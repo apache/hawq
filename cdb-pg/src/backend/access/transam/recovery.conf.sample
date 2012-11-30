@@ -1,0 +1,74 @@
+# -------------------------------
+# PostgreSQL recovery config file
+# -------------------------------
+#
+# Edit this file to provide the parameters that PostgreSQL
+# needs to perform an archive recovery of a database.
+#
+# If "recovery.conf" is present in the PostgreSQL data directory, it is
+# read on postmaster startup.  After successful recovery, it is renamed
+# to "recovery.done" to ensure that we do not accidentally re-enter
+# archive recovery mode.
+#
+# This file consists of lines of the form:
+#
+#   name = 'value'
+#
+# (The quotes around the value are NOT optional, but the "=" is.)
+#
+# Comments are introduced with '#'.
+#
+# The complete list of option names and allowed values can be found
+# in the PostgreSQL documentation. The commented-out settings shown below
+# are example values.
+#
+#---------------------------------------------------------------------------
+# REQUIRED PARAMETERS
+#---------------------------------------------------------------------------
+#
+# restore_command
+#
+# specifies the shell command that is executed to copy log files
+# back from archival storage.  The command string may contain %f,
+# which is replaced by the name of the desired log file, and %p,
+# which is replaced by the absolute path to copy the log file to.
+#
+# It is important that the command return nonzero exit status on failure.
+# The command *will* be asked for log files that are not present in the
+# archive; it must return nonzero when so asked.
+#
+# NOTE that the basename of %p will be different from %f; do not
+# expect them to be interchangeable.
+#
+#
+#restore_command = 'cp /mnt/server/archivedir/%f %p'
+#
+#
+#---------------------------------------------------------------------------
+# OPTIONAL PARAMETERS
+#---------------------------------------------------------------------------
+#
+# By default, recovery will rollforward to the end of the WAL log.
+# If you want to stop rollforward before that point, you
+# must set a recovery target.
+#
+# You may set a recovery target either by transactionId, or
+# by timestamp. Recovery may either include or exclude the
+# transaction(s) with the recovery target value (ie, stop either
+# just after or just before the given target, respectively).
+#
+#recovery_target_time = '2004-07-14 22:39:00 EST'
+#
+#recovery_target_xid = '1100842'
+#
+#recovery_target_inclusive = 'true'		# 'true' or 'false'
+#
+#
+# If you want to recover into a timeline other than the "main line" shown in
+# pg_control, specify the timeline number here, or write 'latest' to get
+# the latest branch for which there's a history file.
+#
+#recovery_target_timeline = '33'		# number or 'latest'
+#
+#
+#---------------------------------------------------------------------------

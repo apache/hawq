@@ -1,0 +1,1 @@
+For PostgreSQL version 8.0.x, rdbmsSrvInfoStartupTime is not properly reported, because that information is unavailable.

@@ -1,0 +1,29 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 9.00
+# Visual Studio 2005
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libgpcc", "libgpcc\libgpcc.vcproj", "{CB56862F-0B15-43C2-A9C9-B6136522F61C}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gpfdist", "gpfdist\gpfdist.vcproj", "{9E9FE342-644C-477C-8B61-C1FA93767584}"
+	ProjectSection(ProjectDependencies) = postProject
+		{CB56862F-0B15-43C2-A9C9-B6136522F61C} = {CB56862F-0B15-43C2-A9C9-B6136522F61C}
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CB56862F-0B15-43C2-A9C9-B6136522F61C}.Debug|Win32.ActiveCfg = Debug|Win32
+		{CB56862F-0B15-43C2-A9C9-B6136522F61C}.Debug|Win32.Build.0 = Debug|Win32
+		{CB56862F-0B15-43C2-A9C9-B6136522F61C}.Release|Win32.ActiveCfg = Release|Win32
+		{CB56862F-0B15-43C2-A9C9-B6136522F61C}.Release|Win32.Build.0 = Release|Win32
+		{9E9FE342-644C-477C-8B61-C1FA93767584}.Debug|Win32.ActiveCfg = Debug|Win32
+		{9E9FE342-644C-477C-8B61-C1FA93767584}.Debug|Win32.Build.0 = Debug|Win32
+		{9E9FE342-644C-477C-8B61-C1FA93767584}.Release|Win32.ActiveCfg = Release|Win32
+		{9E9FE342-644C-477C-8B61-C1FA93767584}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

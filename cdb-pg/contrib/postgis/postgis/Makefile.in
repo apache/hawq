@@ -1,0 +1,111 @@
+# **********************************************************************
+# * $Id: Makefile.in 
+# *
+# * PostGIS - Spatial Types for PostgreSQL
+# * http://postgis.refractions.net
+# * Copyright 2008 Mark Cave-Ayland
+# *
+# * This is free software; you can redistribute and/or modify it under
+# * the terms of the GNU General Public Licence. See the COPYING file.
+# *
+# **********************************************************************
+
+MODULE_big=postgis-@POSTGIS_MAJOR_VERSION@.@POSTGIS_MINOR_VERSION@
+
+# Files to be copied to the contrib/ directory
+DATA_built=postgis.sql uninstall_postgis.sql postgis_upgrade_14_minor.sql postgis_upgrade_13_to_14.sql postgis_upgrade_12_to_14.sql
+DATA=../spatial_ref_sys.sql
+
+# SQL objects (files requiring C pre-processing)
+SQL_OBJS=postgis.sql.in uninstall_postgis.sql.in
+
+# PostgreSQL objects
+PG_OBJS=lwgeom_pg.o \
+	lwgeom_debug.o \
+	lwgeom_accum.o \
+	lwgeom_spheroid.o \
+	lwgeom_ogc.o \
+	lwgeom_functions_analytic.o \
+	lwgeom_inout.o \
+	lwgeom_estimate.o \
+	lwgeom_functions_basic.o \
+	lwgeom_gist.o \
+	lwgeom_btree.o \
+	lwgeom_transform.o \
+	lwgeom_box.o \
+	lwgeom_box3d.o \
+	lwgeom_box2dfloat4.o \
+	lwgeom_chip.o \
+	lwgeom_geos.o \
+	lwgeom_geos_prepared.o \
+	lwgeom_svg.o \
+	lwgeom_gml.o \
+	lwgeom_kml.o \
+	lwgeom_geojson.o \
+	lwgeom_triggers.o \
+	lwgeom_dump.o \
+	lwgeom_functions_lrs.o \
+	long_xact.o \
+	lwgeom_sqlmm.o \
+	lwgeom_rtree.o
+
+# Objects to build using PGXS
+OBJS=$(PG_OBJS)
+
+# Libraries to link into the module (proj, geos)
+#
+# Note: we specify liblwgeom.a directly in SHLIB_LINK rather than using
+# -L... -l options to prevent issues with some platforms trying to link
+# to an existing liblwgeom.so in the PostgreSQL $libdir supplied by an
+# older version of PostGIS, rather than with the static liblwgeom.a 
+# supplied with newer versions of PostGIS
+BLD_TOP=../../../..
+include $(BLD_TOP)/Makefile.global     # for BLD_ARCH
+include $(BLD_TOP)/releng/tools.mk
+GEOS_DIR=$(RELENG_TOOLS)/geos-3.2.2
+GEOS_CONFIG=$(GEOS_DIR)/bin/geos-config
+PROJ_DIR=$(RELENG_TOOLS)/proj-4.7.0
+
+PG_CPPFLAGS+= -I$(GEOS_DIR)/include -I$(PROJ_DIR)/include -I../liblwgeom
+SHLIB_LINK+= -L$(GEOS_DIR)/lib -L$(PROJ_DIR)/lib -lgeos_c -lproj ../liblwgeom/liblwgeom.a
+
+# Extra files to remove during 'make clean'
+EXTRA_CLEAN=$(SQL_OBJS)
+
+ifdef USE_PGXS
+PG_CONFIG = @PGCONFIG@
+PGXS := $(shell $(PG_CONFIG) --pgxs)
+include $(PGXS)
+libdir = $(shell $(PG_CONFIG) --libdir)
+includedir = $(shell $(PG_CONFIG) --includedir)
+else
+subdir = contrib/postgis/postgis
+top_builddir = ../../..
+include $(top_builddir)/src/Makefile.global
+include $(top_srcdir)/contrib/contrib-global.mk
+endif
+
+# Borrow the $libdir substitution from PGXS but customise by adding the version number
+%.sql: %.sql.in
+	sed 's,MODULE_PATHNAME,$$libdir/$*-@POSTGIS_MAJOR_VERSION@.@POSTGIS_MINOR_VERSION@,g' $< >$@
+
+postgis_upgrade_14_minor.sql: postgis.sql
+	$(PERL) ../utils/postgis_proc_upgrade.pl $< 1.4 > $@
+
+postgis_upgrade_13_to_14.sql: postgis.sql
+	$(PERL) ../utils/postgis_proc_upgrade.pl $< 1.3 > $@
+
+postgis_upgrade_12_to_14.sql: postgis.sql
+	$(PERL) ../utils/postgis_proc_upgrade.pl $< 1.2 > $@
+
+# Generate any .sql.in files from .sql.in.c files by running them through the C pre-processor 
+$(SQL_OBJS): %.in: %.in.c
+	$(CPP) -I$(includedir) -traditional-cpp $< | grep -v '^#' > $@
+
+deps-install:
+	$(INSTALL_SHLIB) $(GEOS_DIR)/lib/libgeos* $(libdir)
+	$(INSTALL_SHLIB) $(PROJ_DIR)/lib/libproj* $(libdir)
+
+deps-uninstall:
+	rm -f $(libdir)/libgeos*
+	rm -f $(libdir)/libproj*

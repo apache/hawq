@@ -1,0 +1,14 @@
+The RSA BSAFE library wraps OpenSSL. Some of the OpenSSL library, particularly
+BIO (an IO library) has leaked out of BSAFE. Since we also link against OpenSSL,
+some of the symbols which we want to bind to the OpenSSL library resolve,
+instead, to RSA BSAFE.
+
+If RSA BSAFE was a shared library, this wouldn't be a problem, because shared
+libraries can cope with such problems. RSA BSAFE has static library components.
+The reason for this is 'security related' (they don't want the shared library to
+be replaced on disk with a compromised one).
+
+The solution is to wrap RSA BSAFE in a shared library itself and allow the
+linker to take care of the rest.
+
+- Gavin

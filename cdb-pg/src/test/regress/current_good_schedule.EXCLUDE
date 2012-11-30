@@ -1,0 +1,27 @@
+# 
+# EXCLUDE file for known_good_schedule.  Do not run the test if the
+# condition evaluates to FALSE, ie run the test when the condition is TRUE.
+#
+
+# .* :::  $gpx->{hostname} !~ m/foo/ 
+# aaa ::: ($gpx->{generic_processor} =~ m/i386/)&&($gpx->{number_of_segs} < 5)
+# .*aaa.* ::: $gpx->{isainfo} =~ m/sparc/
+
+# (boolean|char|name) ::: $gpx->{generic_processor} !~ m/86/
+
+# mpp-2556: disable geometry test on ppc for now
+ geometry  ::: $gpx->{generic_processor} !~ m/powerpc/i
+
+# mpp-2559: disable portal_p2 test on ppc for now
+ portal_p2 ::: $gpx->{generic_processor} !~ m/powerpc/i
+
+# mpp-2549: disable sreh test on ppc for now
+ sreh ::: $gpx->{generic_processor} !~ m/powerpc/i
+
+# MPP-9643: disable upg2 on sparc for now
+ upg2 ::: $gpx->{isainfo} !~ m/sparc/
+
+# disable tidycat on sparc for now
+ tidycat ::: ($gpx->{isainfo} !~ m/sparc/)&&($gpx->{osname} !~ m/solaris/i)
+
+

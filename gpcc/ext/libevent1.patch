@@ -1,0 +1,22 @@
+--- libevent-1.4.6-stable/evutil.h.orig	2008-12-29 09:12:41.000000000 -0800
++++ libevent-1.4.6-stable/evutil.h	2008-12-29 09:13:20.000000000 -0800
+@@ -168,7 +168,7 @@
+ #ifdef _EVENT_HAVE_GETTIMEOFDAY
+ #define evutil_gettimeofday(tv, tz) gettimeofday((tv), (tz))
+ #else
+-int evutil_gettimeofday(struct timeval *tv, struct timezone *tz);
++int evutil_gettimeofday(struct timeval *tv, void *tz);
+ #endif
+ 
+ int evutil_snprintf(char *buf, size_t buflen, const char *format, ...)
+--- libevent-1.4.6-stable/evutil.c.orig	2008-12-29 09:13:39.000000000 -0800
++++ libevent-1.4.6-stable/evutil.c	2008-12-29 09:13:59.000000000 -0800
+@@ -202,7 +202,7 @@
+ 
+ #ifndef _EVENT_HAVE_GETTIMEOFDAY
+ int
+-evutil_gettimeofday(struct timeval *tv, struct timezone *tz)
++evutil_gettimeofday(struct timeval *tv,void *tz)
+ {
+ 	struct _timeb tb;
+ 

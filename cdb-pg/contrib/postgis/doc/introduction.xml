@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<chapter>
+  <title>Introduction</title>
+
+  <para>PostGIS is developed by Refractions Research Inc, as a spatial
+  database technology research project. Refractions is a GIS and database
+  consulting company in Victoria, British Columbia, Canada, specializing in
+  data integration and custom software development. We plan on supporting and
+  developing PostGIS to support a range of important GIS functionality,
+  including full OpenGIS support, advanced topological constructs (coverages,
+  surfaces, networks), desktop user interface tools for viewing and editing
+  GIS data, and web-based access tools.</para>
+
+ <sect1 id="psc">
+	<title>Project Steering Committee</title>
+	<para>
+		The PostGIS Project Steering Committee (PSC) coordinates the general direction,
+			release cycles, documentation, and outreach efforts for the PostGIS project.  In addition
+			the PSC provides general user support, accepts and approves patches from the general PostGIS community
+			and votes on miscellaneous issues involving PostGIS such as developer commit access, new PSC members
+			or significant API changes.
+	</para>
+	<variablelist>
+	  <varlistentry>
+		<term>Mark Cave-Ayland</term>
+		<listitem>
+		  <para>Coordinates bug fixing and maintenance effort, alignment of
+		  PostGIS with PostgreSQL releases, spatial index selectivity and binding, windows production builds, integration of new
+		  GEOS functionality, and new function enhancements.</para>
+		</listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+		<term>Paul Ramsey</term>
+		<listitem>
+		  <para>Co-founder of PostGIS project.  General bug fixing, geography support, GEOS functionality integration and alignment with 
+		  GEOS releases.</para>
+		</listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+		<term>Kevin Neufeld</term>
+		<listitem>
+		  <para>Documentation, Hudson automated build, advanced user support
+		  on PostGIS newsgroup, and postgis maintenance function enhancements.</para>
+		</listitem>
+	  </varlistentry>
+	  
+	  <varlistentry>
+		<term>Regina Obe</term>
+		<listitem>
+		  <para>Documentation, general user support on PostGIS newsgroup, windows production and experimental builds, and 
+		  smoke testing new functionality or major code changes.</para>
+		</listitem>
+	  </varlistentry>
+	</variablelist>
+  </sect1>
+  <sect1 id="credits">
+	<title>Contributors Past and Present</title>
+
+	<variablelist>	  
+	  <varlistentry>
+		<term>Sandro Santilli</term>
+
+		<listitem>
+		  <para>Bug fixes and maintenance and integration of new GEOS
+		  functionality. WKT Raster support.</para>
+		</listitem>
+	  </varlistentry>
+	  
+	  <varlistentry>
+		<term>Dave Blasby</term>
+
+		<listitem>
+		  <para>The original developer/Co-founder of PostGIS. Dave wrote the server side
+		  objects, index bindings, and many of the server side analytical
+		  functions.</para>
+		</listitem>
+	  </varlistentry>
+	  
+	 <varlistentry>
+		<term>Jeff Lounsbury</term>
+		<listitem>
+		  <para>Original development of the Shape file loader/dumper. Current PostGIS Project Owner representative.</para>
+		</listitem>
+	  </varlistentry>
+	  
+	  <varlistentry>
+		<term>Mark Leslie</term>
+		<listitem>
+		  <para>Ongoing maintenance and development of core functions.  Enhanced curve support.</para>
+		</listitem>
+	  </varlistentry>
+	  
+	  <varlistentry>
+		<term>Olivier Courtin</term>
+		<listitem>
+		  <para>Input output XML (KML,GML)/GeoJSON functions and bug fixes.</para>
+		</listitem>
+	  </varlistentry>
+	  
+	 <varlistentry>
+		<term>Pierre Racine</term>
+		<listitem>
+		  <para>WKT Raster overall architecture and programming support</para>
+		</listitem>
+	 </varlistentry>
+	  
+	 <varlistentry>
+		<term>Mateusz Loskot</term>
+		<listitem>
+		  <para>WKT Raster support</para>
+		</listitem>
+	  </varlistentry>
+	  
+	  <varlistentry>
+		<term>Chris Hodgson</term>
+
+		<listitem>
+		  <para>General development</para>
+		</listitem>
+	  </varlistentry>
+	  
+	  <varlistentry>
+		<term>Stephen Frost</term>
+
+		<listitem>
+		  <para>Tiger geocoder development</para>
+		</listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+		<term>Other contributors</term>
+
+		<listitem>
+		  <para>In alphabetical order: Alex Bodnaru, Alex Mayrhofer, Barbara
+		  Phillipot, Ben Jubb, Bernhard Reiter, Bruce Rindahl, Bruno Wolff
+		  III, Carl Anderson, Charlie Savage, Dane Springmeyer, David Skea,
+		  David Techer, Eduin Carrillo, IIDA Tetsushi, Geographic Data BC,
+		  Gerald Fenoy, Gino Lucrezi, Klaus Foerster, Kris Jurka, Mark
+		  Sondheim, Markus Schaber, Michael Fuhr, Nikita Shulga, Nicklas Avén, Norman Vine,
+		  Ralph Mason,  Steffen Macke</para>
+		</listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+		<term>Important Support Libraries</term>
+
+		<listitem>
+		  <para>The <ulink url="http://trac.osgeo.org/geos/">GEOS</ulink>
+		  geometry operations library, and the algorithmic work of Martin
+		  Davis in making it all work, ongoing maintenance and support of
+		  Mateusz Loskot, Paul Ramsey and others.</para>
+
+		  <para>The <ulink url="http://trac.osgeo.org/proj/">Proj4</ulink>
+		  cartographic projection library, and the work of Gerald Evenden and
+		  Frank Warmerdam in creating and maintaining it.</para>
+		</listitem>
+	  </varlistentry>
+	</variablelist>
+  </sect1>
+
+  <sect1>
+	<title>More Information</title>
+
+	<itemizedlist>
+	  <listitem>
+		<para>The latest software, documentation and news items are available
+		at the PostGIS web site, <ulink
+		url="http://postgis.refractions.net">http://postgis.refractions.net</ulink>.</para>
+	  </listitem>
+
+	  <listitem>
+		<para>More information about the GEOS geometry operations library is
+		available at<ulink url="http://trac.osgeo.org/geos/">
+		http://trac.osgeo.org/geos/</ulink>.</para>
+	  </listitem>
+
+	  <listitem>
+		<para>More information about the Proj4 reprojection library is
+		available at <ulink
+		url="http://trac.osgeo.org/proj/">http://trac.osgeo.org/proj/</ulink>.</para>
+	  </listitem>
+
+	  <listitem>
+		<para>More information about the PostgreSQL database server is
+		available at the PostgreSQL main site <ulink
+		url="http://www.postgresql.org">http://www.postgresql.org</ulink>.</para>
+	  </listitem>
+
+	  <listitem>
+		<para>More information about GiST indexing is available at the
+		PostgreSQL GiST development site, <ulink
+		url="http://www.sai.msu.su/~megera/postgres/gist/">http://www.sai.msu.su/~megera/postgres/gist/</ulink>.</para>
+	  </listitem>
+
+	  <listitem>
+		<para>More information about MapServer internet map server is
+		available at <ulink
+		url="http://mapserver.gis.umn.edu/">http://mapserver.gis.umn.edu</ulink>.</para>
+	  </listitem>
+
+	  <listitem>
+		<para>The "<ulink
+		url="http://www.opengeospatial.org/standards/sfs">Simple Features for
+		Specification for SQL</ulink>" is available at the OpenGIS Consortium
+		web site: <ulink
+		url="http://www.opengeospatial.org/">http://www.opengeospatial.org/</ulink>.</para>
+	  </listitem>
+	</itemizedlist>
+  </sect1>
+</chapter>

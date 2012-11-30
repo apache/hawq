@@ -1,0 +1,16 @@
+32749
+ERROR:  Operation on mixed SRID geometries (lwgeom_pg.c:112)
+SRID=3;LINESTRING(0 0,1 1)
+ERROR:  Operation on mixed SRID geometries (lwgeom_pg.c:112)
+BOX(0 0,1 1)
+ERROR:  Operation on mixed SRID geometries (lwgeom_pg.c:112)
+BOX3D(0 0 0,1 1 0)
+ERROR:  Operation on mixed SRID geometries (lwgeom_pg.c:112)
+32749
+ERROR:  Operation on mixed SRID geometries (lwgeom_pg.c:112)
+SRID=3;LINESTRING(0 0,1 1)
+ERROR:  Operation on mixed SRID geometries (lwgeom_pg.c:112)
+BOX(0 0,1 1)
+ERROR:  Operation on mixed SRID geometries (lwgeom_pg.c:112)
+BOX3D(0 0 0,1 1 0)
+ERROR:  Operation on mixed SRID geometries (lwgeom_pg.c:112)

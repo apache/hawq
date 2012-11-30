@@ -1,0 +1,301 @@
+#
+# Greenplum ThirdParty Library Makefile
+#
+# This file controls which thirdparty libraries are made available to the build of our product(s).
+#
+
+# only load this file once
+ifeq "$(BLD_THIRDPARTY_DIR)" ""
+
+# ------------------------------------------------------------------------------------------------
+#
+# All of the third-party library filesets are stored here: $(BLD_THIRDPARTY)/$(BLD_ARCH).
+#
+# ------------------------------------------------------------------------------------------------
+
+# calculate BLD_TOP in absolute path form
+BLD_TOP_ABSOLUTE:=$(shell cd $(BLD_TOP) && pwd)
+
+BLD_THIRDPARTY:=$(BLD_TOP_ABSOLUTE)/ext
+ifeq "$(BLD_ARCH)" ""
+BLD_ARCH:=$(shell $(BLD_TOP)/releng/set_bld_arch.sh)
+endif
+
+# map builds on Snow Leopard to act like builds on Leopard, for now
+ifeq "$(BLD_ARCH)" "osx106_x86"
+export BLD_ARCH=osx105_x86
+endif
+
+aix5_ppc_64_BLD_BITS=64
+aix5_ppc_32_BLD_BITS=32
+rhel4_x86_64_BLD_BITS=64
+rhel4_x86_32_BLD_BITS=32
+rhel6_x86_64_BLD_BITS=64
+rhel5_x86_64_BLD_BITS=64
+rhel5_x86_32_BLD_BITS=32
+sol8_sparc_BLD_BITS=32
+sol8_sparc_32_BLD_BITS=32
+sol8_sparc_64_BLD_BITS=64
+sol9_sparc_BLD_BITS=32
+sol9_sparc_32_BLD_BITS=32
+sol9_sparc_64_BLD_BITS=64
+sol10_sparc_BLD_BITS=64
+sol10_sparc_64_BLD_BITS=64
+sol10_sparc_32_BLD_BITS=32
+sol10_x86_64_BLD_BITS=64
+sol10_x86_32_BLD_BITS=32
+suse10_x86_64_BLD_BITS=64
+suse11_x86_64_BLD_BITS=64
+win64_BLD_BITS=64
+win32_BLD_BITS=32
+BLD_BITS=$($(BLD_ARCH)_BLD_BITS)
+
+
+# ------------------------------------------------------------------------------------------------
+#
+# The third-party libraries are managed in two flavors.  The first is BASE and consists of the
+# "default" set of libraries for the source set they accompany.  BASE libraries are stored in
+# a single directory structure and accessed by single paths by purpose, $(BLD_THIRDPARTY_INCLUDE_DIR)
+# and $(BLD_THIRDPARTY_LIB_DIR), for example.
+#
+# EXCEPTIONS is the second flavor.  These are libraries not needed by the whole build but rather
+# by one or more specific parts of the build and may include one or more other versions of a
+# third-party library already in the BASE set.  Each of the EXCEPTION filesets is stored in its
+# own directory structure at $(BLD_THIRDPARTY)/$(BLD_ARCH)/$(BLD_<name>-<version>_ID).
+#
+# ------------------------------------------------------------------------------------------------
+
+# the list of thirdparty libraries available in this source set
+BLD_THIRDPARTY_LIBS=$(BLD_THIRDPARTY_LIBS_BASE) $(BLD_THIRDPARTY_LIBS_EXCEPTIONS)
+
+# ------------------------------------------------------------------------------------------------
+#
+# The BASE set:
+#
+# ------------------------------------------------------------------------------------------------
+
+# --------------------------------------------------------------------------------
+# Include and lib locations for the C/C++ compilers and linkers to use.  These may
+# be passed as values for compiler -I flags and linker -L flags and may also be
+# provided to configure scripts.
+# --------------------------------------------------------------------------------
+BLD_THIRDPARTY_DIR=$(BLD_THIRDPARTY)/$(BLD_ARCH)
+BLD_THIRDPARTY_BIN_DIR=$(BLD_THIRDPARTY)/$(BLD_ARCH)/bin
+BLD_THIRDPARTY_INCLUDE_DIR=$(BLD_THIRDPARTY)/$(BLD_ARCH)/include
+BLD_THIRDPARTY_LIB_DIR=$(BLD_THIRDPARTY)/$(BLD_ARCH)/lib
+
+
+# --------------------------------------------------------------------------------
+#
+# Set the [DY]LD_LIBRARY_PATH for the linker and for ldd.
+#
+# Please note that this DOES NOT include any of the paths from the EXCEPTIONS
+# libraries.  Also, this setting is exported out to the environment to affect
+# anything being built by this make instance or its children.  However, once this
+# make instance exits, this setting is gone.  Setting [DY]LD_LIBRARY_PATH at 
+# runtime is left to other mechanisms and should not point to $(BLD_THIRDPARTY)
+# but rather to a distribution that includes the libraries from $(BLD_THIRDPARTY).
+# Helper make targets are provided for installing these libraries into a distri-
+# bution fileset.
+#
+# --------------------------------------------------------------------------------
+
+ifeq "$(findstring osx,$(BLD_ARCH))" "osx"
+BLD_MAC_PREFIX=DY
+endif
+
+ifeq "$(findstring $(BLD_THIRDPARTY_LIB_DIR),$($(BLD_WHERE_THE_LIBRARY_THINGS_ARE)))" ""
+tmpLD_LIBRARY_PATH=$(BLD_THIRDPARTY_LIB_DIR):$($(BLD_WHERE_THE_LIBRARY_THINGS_ARE))
+export $(BLD_WHERE_THE_LIBRARY_THINGS_ARE):=$(tmpLD_LIBRARY_PATH)
+$(info $(BLD_WHERE_THE_LIBRARY_THINGS_ARE)="$($(BLD_WHERE_THE_LIBRARY_THINGS_ARE))")
+endif
+
+
+# --------------------------------------------------------------------------------
+# Move names here from the BASE list to enable the thirdparty-delete target to clean
+# them out of the BASE library set for you
+# --------------------------------------------------------------------------------
+define tmpBLD_THIRDPARTY_LIBS_BASE_TO_REMOVE
+endef
+BLD_THIRDPARTY_LIBS_BASE_TO_REMOVE:=$(strip $(tmpBLD_THIRDPARTY_LIBS_BASE_TO_REMOVE))
+
+
+# --------------------------------------------------------------------------------
+# Add names to the BASE list here to enable the thirdparty-integrate target to populate
+# the BASE directory structure for you from the //tools depot in Perforce
+# --------------------------------------------------------------------------------
+define tmpBLD_THIRDPARTY_LIBS_BASE
+	DDBoostSDK/2.4.1.0-289644
+	apr/1.2.12
+	apr-util/1.2.12
+	bzip2/1.0.6
+	clapack/3.1.1-p1
+	curl/7.21.7
+	emcconnect/1.1
+	json-c/0.6
+	gimli/1.1.54
+	krb5/1.6.2
+	libedit/3.0
+	libesmtp/1.0.4-p1
+	libevent/1.4.6
+	lighttpd/1.4.28
+	net-snmp/5.5
+	openldap/2.3.38
+	openssl/0.9.8g
+	pcre/7.8
+	psi/0.3b2
+	python/2.6.2
+	sigar/1.6.3
+	yaml/0.1.1
+	zlib/1.2.3
+endef
+BLD_THIRDPARTY_LIBS_BASE:=$(strip $(tmpBLD_THIRDPARTY_LIBS_BASE))
+
+define unusedAUTHLIBS
+	curl/7.17.1
+	krb5/1.6.2
+	openldap/2.3.38
+	openssl/0.9.8g
+endef
+
+# ------------------------------------------------------------------------------------------------
+#
+# The EXCEPTIONS set:
+#
+# ------------------------------------------------------------------------------------------------
+
+# --------------------------------------------------------------------------------
+# Move names here from the EXCEPTIONS list to enable the thirdparty-delete target to clean
+# them out of the EXCEPTIONS library sets for you
+# --------------------------------------------------------------------------------
+
+define tmpBLD_THIRDPARTY_LIBS_EXCEPTIONS_TO_REMOVE
+endef
+BLD_THIRDPARTY_LIBS_EXCEPTIONS_TO_REMOVE:=$(strip $(tmpBLD_THIRDPARTY_LIBS_EXCEPTIONS_TO_REMOVE))
+
+# --------------------------------------------------------------------------------
+# Add names to the EXCEPTIONS list here to enable the thirdparty-integrate target to populate
+# the EXCEPTIONS directory structures for you from the //tools depot in Perforce
+# --------------------------------------------------------------------------------
+
+define tmpBLD_THIRDPARTY_LIBS_EXCEPTIONS
+endef
+BLD_THIRDPARTY_LIBS_EXCEPTIONS:=$(strip $(tmpBLD_THIRDPARTY_LIBS_EXCEPTIONS))
+
+# --------------------------------------------------------------------------------
+#
+# For each third-party library, define its characteristics. They include:
+# ID -- the name listed in the EXCEPTIONS library list
+# HOME -- the path to the top of this library's fileset
+# LIBS -- the list of the libraries we use from this fileset
+# LIBDIR -- the path to the directory inside this library's fileset where the actual lib files
+#           can be found
+# INCDIR -- the path to the directory inside this library's fileset where the include files
+#           can be found
+#
+# --------------------------------------------------------------------------------
+
+BLD_ZLIB-1.2.3_ID=zlib/1.2.3
+BLD_ZLIB-1.2.3_HOME=$(BLD_THIRDPARTY)/$(BLD_ARCH)/$(BLD_ZLIB-1.2.3_ID)
+BLD_ZLIB-1.2.3_LIBS=z
+BLD_ZLIB-1.2.3_LIBDIR=$(BLD_ZLIB_HOME)/lib
+BLD_ZLIB-1.2.3_INCDIR=$(BLD_ZLIB_HOME)/include
+
+
+# ------------------------------------------------------------------------------------------------
+#
+# Helper target for testing the macros set up by this makefile and to be an example of how to
+# use them.
+#
+# ------------------------------------------------------------------------------------------------
+
+.PHONY: thirdparty-test
+thirdparty-test:
+	@echo LD_LIBRARY_PATH=$$LD_LIBRARY_PATH
+	@echo gcc -o boo -I$(BLD_ZLIB_INCDIR) -L$(BLD_ZLIB_LIBDIR) $(foreach lib,$(BLD_ZLIB_LIBS),-l$(lib)) boo.c
+
+
+# ------------------------------------------------------------------------------------------------
+#
+# Helper targets for installing libraries
+#
+# ------------------------------------------------------------------------------------------------
+
+.PHONY: thirdparty-dist thirdparty-dist-base thirdparty-dist-exceptions
+
+BLD_DYLIB_NAME=so
+ifeq "$(findstring osx,$(BLD_ARCH))" "osx"
+BLD_DYLIB_NAME=dylib
+endif
+ifeq "$(findstring aix,$(BLD_ARCH))" "aix"
+BLD_DYLIB_NAME=a
+endif
+
+BLD_THIRDPARTY_BASE_SHARED_OBJECTS_DIRS=$(shell find $(BLD_THIRDPARTY_LIB_DIR) -type d)
+BLD_THIRDPARTY_BASE_SHARED_OBJECTS=$(foreach dir,$(BLD_THIRDPARTY_BASE_SHARED_OBJECTS_DIRS),$(wildcard $(dir)/*.$(BLD_DYLIB_NAME)*))
+BLD_THIRDPARTY_BASE_SHARED_OBJECTS_INSTALLED=$(patsubst $(BLD_THIRDPARTY_LIB_DIR)/%,$(INSTLOC)/lib/%,$(BLD_THIRDPARTY_BASE_SHARED_OBJECTS))
+
+BLD_THIRDPARTY_EXCEPTIONS_DIRS=$(foreach tplib,$(BLD_THIRDPARTY_LIBS_EXCEPTIONS),$(BLD_THIRDPARTY)/$(BLD_ARCH)/$(BLD_$(tplib)_ID))
+BLD_THIRDPARTY_EXCEPTIONS_DELIVERABLES=$(foreach tplib,$(BLD_THIRDPARTY_EXCEPTIONS_DIRS),$(wildcard $(tplib)/lib/*.$(BLD_DYLIB_NAME)*))
+BLD_THIRDPARTY_EXCEPTIONS_INSTALLED=$(foreach deliverable,$(BLD_THIRDPARTY_EXCEPTIONS_DELIVERABLES),$(INSTLOC)/lib/$(basename $(deliverable)))
+
+thirdparty-dist: thirdparty-dist-base thirdparty-dist-exceptions ;
+
+thirdparty-dist-base: $(BLD_THIRDPARTY_BASE_SHARED_OBJECTS_INSTALLED) ;
+
+thirdparty-dist-exceptions: $(BLD_THIRDPARTY_EXCEPTIONS_INSTALLED) ;
+
+$(INSTLOC)/lib/%: $(BLD_THIRDPARTY_LIB_DIR)/%
+	@(cd $(?D) && $(TAR) cf - $(@F)) | (cd $(INSTLOC)/lib && $(TAR) xf -)$(check_pipe_for_errors)
+
+$(INSTLOC)/lib/%: $(BLD_THIRDPARTY_EXCEPTIONS_DIRS)/lib/%
+	@for i in $?; do \
+	    echo "Copying $(?D)/$(@F) to $(@D)..."; \
+	    (cd `dirname $$i` && $(TAR) cf - $(@F)) | (cd $(@D) && $(TAR) xvf -)$(check_pipe_for_errors); \
+	done
+
+
+# ------------------------------------------------------------------------------------------------
+#
+# Helper targets to ease working with //tools for thirdparty libraries.
+#
+# ------------------------------------------------------------------------------------------------
+
+.PHONY: thirdparty-integrate thirdparty-delete thirdparty-revert
+
+thirdparty-integrate: $(foreach tplib,$(BLD_THIRDPARTY_LIBS_BASE),$(BLD_THIRDPARTY)/$(BLD_ARCH)/$(tplib).base) \
+			  $(foreach tplib,$(BLD_THIRDPARTY_LIBS_EXCEPTIONS),$(BLD_THIRDPARTY)/$(BLD_ARCH)/$(BLD_$(tplib)_ID))
+	p4 resolve -at $(BLD_THIRDPARTY)/...
+	@echo "Remember to submit these!"
+
+$(foreach tplib,$(BLD_THIRDPARTY_LIBS_BASE),$(BLD_THIRDPARTY)/$(BLD_ARCH)/$(tplib).base):
+	p4 integrate -d //tools/$(notdir $(@D))/$(basename $(@F))/dist/$(BLD_ARCH)/... $(BLD_THIRDPARTY)/$(BLD_ARCH)/...
+
+$(foreach tplib,$(BLD_THIRDPARTY_LIBS_EXCEPTIONS),$(BLD_THIRDPARTY)/$(BLD_ARCH)/$(BLD_$(tplib)_ID)):
+	p4 integrate -d //tools/$(notdir $(@D))/$(@F)/dist/%%1/... $(BLD_THIRDPARTY)/%%1/$(notdir $(@D))/$(@F)/...
+
+thirdparty-delete:
+	@# --- remove base library files one by one based on lists in checksum files ---
+	@if [ x"$(BLD_THIRDPARTY_LIBS_BASE_TO_REMOVE)" != x"" ]; then \
+	    for i in $(foreach tplib,$(BLD_THIRDPARTY_LIBS_BASE_TO_REMOVE),$(subst /,-,$(tplib))); do \
+	        for j in `cat $(BLD_THIRDPARTY)/$(BLD_ARCH)/checksums.$$i | awk '{print $$2}'`; do \
+	            echo "p4 delete $(BLD_THIRDPARTY)/$(BLD_ARCH)/$$j"; \
+	            p4 delete $(BLD_THIRDPARTY)/$(BLD_ARCH)/$$j; \
+	        done; \
+	        p4 delete $(BLD_THIRDPARTY)/$(BLD_ARCH)/checksums.$$i; \
+	    done; \
+	fi
+	@# --- remove exceptions library files as sets as they each have their own directory structure ---
+	@if [ x"$(BLD_THIRDPARTY_LIBS_EXCEPTIONS_TO_REMOVE)" != x"" ]; then \
+	    for i in $(BLD_THIRDPARTY_LIBS_EXCEPTIONS_TO_REMOVE); do \
+	        echo "p4 delete $(BLD_THIRDPARTY)/$(BLD_ARCH)/$$i/..."; \
+	        p4 delete $(BLD_THIRDPARTY)/$(BLD_ARCH)/$$i/...; \
+	    done; \
+	fi
+	@echo "Remember to submit these!"
+
+thirdparty-revert:
+	p4 revert $(BLD_THIRDPARTY)/...
+	@echo "`date` -- INFO:  Files have been reverted."
+
+endif

@@ -1,0 +1,12 @@
+# @(#)queries.readme	2.1.8.1
+File:          queries/README
+Spec Revision: 1.0.1
+Last Modified: 22 Apr 1999
+
+This directory contains the current set of funtional query
+definition templates. They are derived from the functional query
+definitions presented in Clause 2 of the TPC-H and TPC-R Benchmark 
+Specifications and should allow the use of QGEN (see ../dbgen).  
+The template for query nn is stored in nn.sql.
+
+Refer to Clause 2.2 for the permissible use of these templates.

@@ -1,0 +1,135 @@
+#!/usr/bin/env perl
+
+use Cwd;
+use strict;
+use POSIX;
+
+my %schedule;
+my @scheduleOrder;
+
+# get arch
+sub getArch
+{
+    my @conf = @_;
+
+    open(FILE, "file $ENV{'GPHOME'}/bin/postgres |") || die;
+    my ($file) = <FILE>;
+    close FILE;
+
+    $file =~ s|[^ ]+:\s*(.*)\s*$|\1|;
+
+    foreach my $conf (@conf)
+    {
+	my ($arch, $regex) = $conf =~ /([^ ]+)\s*:\s*'(.*)'\s*/;
+	return $arch if ($file =~ /$regex/);
+    }
+    return "unknown";
+}
+
+
+sub readArchConf
+{
+    my $file = shift;
+    open(ARCH, $file) || die;
+    my @conf = grep !/^\s*$/, <ARCH>;
+    close (ARCH);
+
+    return grep !/^#.*/, @conf;
+}
+
+
+sub readSchedule
+{
+    my $schedfile = shift;
+
+    open(SCHED, "grep -v ^# $schedfile |");
+    my @tests = <SCHED>;
+    close SCHED;
+
+    foreach my $spec (@tests)
+    {
+	my ($act, $name) = $spec=~/(.*):\s+(.*)/;
+	die "duplicate schedule information for test $name"
+	    if $schedule{$name};
+
+	next if $name =~ /^\s*$/;
+
+	$schedule{$name} = $act;
+	push @scheduleOrder, $name;
+    }
+}
+
+
+sub writeSchedule
+{
+    my $filename = shift;
+
+    open(SCHED, ">$filename") || die;
+    print STDERR "Writing new schedule '$filename'.\n";
+    foreach my $test (@scheduleOrder)
+    {
+	print SCHED "$schedule{$test}: $test\n";
+    }
+    close SCHED;
+}
+
+
+sub linkFile
+{
+    my ($dir, $test, $arch, $suffix) = @_;
+    my $cwd = getcwd();
+
+    my $tplfile = "$test.$arch.tpl";
+    my $target = "$test.$suffix";
+
+    if (-f "$dir/$tplfile" && $arch ne "unknown")
+    {
+	chdir($dir) || die;
+
+	unlink($target);
+	symlink($tplfile, $target);
+
+	chdir($cwd) || die;
+
+	print STDERR "Configuring file $dir/$test.$arch.$suffix.\n";
+	return 1;
+    }
+
+
+    print STDERR "*** WARNING: Can't find test template to generate $dir/$test.$suffix for architecture '$arch'. ***\n";
+    return 0;
+}
+
+
+sub processTests
+{
+    my ($sqldir, $sourcedir, $expdir, $arch) = @_;
+    
+    foreach my $test (@scheduleOrder)
+    {
+	if ($schedule{$test} ne "ignore")
+	{
+	    my $sqlfile = $sqldir."/".$test.".sql";
+	    my $source = $sourcedir."/".$test.".source";
+
+	    # ignore all test for which we have .sql or .source files
+	    next if 
+		(-f $sqlfile || -f $source) && 
+		(! ( -l $sqlfile || -l $source ));
+
+	    $schedule{$test} = "ignore";
+
+	    $schedule{$test} = "test" 
+		if (&linkFile($sqldir, $test, $arch, "sql") &&
+		    &linkFile($expdir, $test, $arch, "out"));
+	}
+    }
+}
+
+
+&readSchedule(@ARGV[0]);
+my $arch = &getArch(&readArchConf("arch_config"));
+&processTests("sql", "input", "expected", $arch);
+&writeSchedule(@ARGV[1]);
+
+#EOF

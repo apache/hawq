@@ -1,0 +1,11 @@
+--- open.c.orig	2008-12-29 09:07:19.000000000 -0800
++++ open.c	2008-12-29 09:07:37.000000000 -0800
+@@ -32,7 +32,7 @@
+ #include "apr_arch_misc.h"
+ #include "apr_arch_inherit.h"
+ #include <io.h>
+-#include <WinIoCtl.h>
++#include <winioctl.h>
+ 
+ #if APR_HAS_UNICODE_FS
+ apr_status_t utf8_to_unicode_path(apr_wchar_t* retstr, apr_size_t retlen, 

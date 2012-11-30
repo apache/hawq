@@ -1,0 +1,110 @@
+--
+-- LIMIT
+-- Check the LIMIT/OFFSET feature of SELECT
+--
+SELECT ''::text AS two, unique1, unique2, stringu1 
+		FROM onek WHERE unique1 > 50 
+		ORDER BY unique1,unique2 LIMIT 2;
+ two | unique1 | unique2 | stringu1 
+-----+---------+---------+----------
+     |      51 |      76 | ZBAAAA
+     |      52 |     985 | ACAAAA
+(2 rows)
+
+SELECT ''::text AS five, unique1, unique2, stringu1 
+		FROM onek WHERE unique1 > 60 
+		ORDER BY unique1,unique2 LIMIT 5;
+ five | unique1 | unique2 | stringu1 
+------+---------+---------+----------
+      |      61 |     560 | JCAAAA
+      |      62 |     633 | KCAAAA
+      |      63 |     296 | LCAAAA
+      |      64 |     479 | MCAAAA
+      |      65 |      64 | NCAAAA
+(5 rows)
+
+SELECT ''::text AS two, unique1, unique2, stringu1 
+		FROM onek WHERE unique1 > 60 AND unique1 < 63
+		ORDER BY unique1 ,unique2 LIMIT 5;
+ two | unique1 | unique2 | stringu1 
+-----+---------+---------+----------
+     |      61 |     560 | JCAAAA
+     |      62 |     633 | KCAAAA
+(2 rows)
+
+SELECT ''::text AS three, unique1, unique2, stringu1 
+		FROM onek WHERE unique1 > 100 
+		ORDER BY unique1,unique2 LIMIT 3 OFFSET 20;
+ three | unique1 | unique2 | stringu1 
+-------+---------+---------+----------
+       |     121 |     700 | REAAAA
+       |     122 |     519 | SEAAAA
+       |     123 |     777 | TEAAAA
+(3 rows)
+
+SELECT ''::text AS zero, unique1, unique2, stringu1 
+		FROM onek WHERE unique1 < 50 
+		ORDER BY unique1,unique2 DESC LIMIT 8 OFFSET 99;
+ zero | unique1 | unique2 | stringu1 
+------+---------+---------+----------
+(0 rows)
+
+SELECT ''::text AS eleven, unique1, unique2, stringu1 
+		FROM onek WHERE unique1 < 50 
+		ORDER BY unique1,unique2 DESC LIMIT 20 OFFSET 39;
+ eleven | unique1 | unique2 | stringu1 
+--------+---------+---------+----------
+        |      39 |     482 | NBAAAA
+        |      40 |     192 | OBAAAA
+        |      41 |     521 | PBAAAA
+        |      42 |     394 | QBAAAA
+        |      43 |     953 | RBAAAA
+        |      44 |     488 | SBAAAA
+        |      45 |     586 | TBAAAA
+        |      46 |     930 | UBAAAA
+        |      47 |     190 | VBAAAA
+        |      48 |     958 | WBAAAA
+        |      49 |     885 | XBAAAA
+(11 rows)
+
+SELECT ''::text AS ten, unique1, unique2, stringu1 
+		FROM onek
+		ORDER BY unique1,unique2 OFFSET 990;
+ ten | unique1 | unique2 | stringu1 
+-----+---------+---------+----------
+     |     990 |     369 | CMAAAA
+     |     991 |     426 | DMAAAA
+     |     992 |     363 | EMAAAA
+     |     993 |     661 | FMAAAA
+     |     994 |     695 | GMAAAA
+     |     995 |     144 | HMAAAA
+     |     996 |     258 | IMAAAA
+     |     997 |      21 | JMAAAA
+     |     998 |     549 | KMAAAA
+     |     999 |     152 | LMAAAA
+(10 rows)
+
+SELECT ''::text AS five, unique1, unique2, stringu1 
+		FROM onek
+		ORDER BY unique1,unique2 OFFSET 990 LIMIT 5;
+ five | unique1 | unique2 | stringu1 
+------+---------+---------+----------
+      |     990 |     369 | CMAAAA
+      |     991 |     426 | DMAAAA
+      |     992 |     363 | EMAAAA
+      |     993 |     661 | FMAAAA
+      |     994 |     695 | GMAAAA
+(5 rows)
+
+SELECT ''::text AS five, unique1, unique2, stringu1 
+		FROM onek
+		ORDER BY unique1,unique2 LIMIT 5 OFFSET 900;
+ five | unique1 | unique2 | stringu1 
+------+---------+---------+----------
+      |     900 |     913 | QIAAAA
+      |     901 |     931 | RIAAAA
+      |     902 |     702 | SIAAAA
+      |     903 |     641 | TIAAAA
+      |     904 |     793 | UIAAAA
+(5 rows)
+

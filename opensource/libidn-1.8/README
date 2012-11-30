@@ -1,0 +1,32 @@
+Libidn README -- Important introductory notes.
+Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008 Simon Josefsson
+See the end for copying conditions.
+
+Libidn is a package for internationalized string handling based on the
+Stringprep, Punycode, IDNA and TLD specifications.  Libidn is a GNU
+project.
+
+Read INSTALL for installation instructions, and doc/libidn.* for the
+manual in various formats (including Info, HTML, PostScript, and PDF).
+
+The C library (libidn.a), C# library (Libidn.dll) and Java library
+(libidn-*.jar) are licensed under the GNU Lesser General Public
+License version 2.1.  See the file COPYING.LIB.
+
+The command line tool, self tests, examples, and other auxilliary
+files, are licensed under the GNU General Public License version 3.0.
+See the file COPYING.
+
+Libidn will not be stable without your help.  Report bugs, proof read
+the manual, or make a monetary donation.
+
+If you need help to use Libidn, or wish to help others, you are
+invited to join our mailing list help-libidn@gnu.org, see
+<http://lists.gnu.org/mailman/listinfo/help-libidn>.
+
+For more information, see <http://josefsson.org/libidn/>.
+
+----------------------------------------------------------------------
+Copying and distribution of this file, with or without modification,
+are permitted in any medium without royalty provided the copyright
+notice and this notice are preserved.

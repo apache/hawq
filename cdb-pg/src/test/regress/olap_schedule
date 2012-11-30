@@ -1,0 +1,6 @@
+# $PostgreSQL: pgsql/src/test/regress/serial_schedule,v 1.33 2006/08/30 23:34:22 tgl Exp $
+# This is a brief schedule to test OLAP stuff.
+test: olap_setup
+test: olap_group
+test: olap_window
+test: olap_window_seq

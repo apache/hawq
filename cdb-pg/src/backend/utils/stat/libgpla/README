@@ -1,0 +1,4 @@
+Wrapper for linear algebra routines we need from BLAS and CLAPACK. We do not
+want to link these into the backend binary directly because shared libraries,
+like PL/R and MADlib, also link against these libraries and that usually leads
+to issues like MPP-16512.

@@ -1,0 +1,42 @@
+# $PostgreSQL: pgsql/src/makefiles/Makefile.cygwin,v 1.9 2006/06/22 23:50:35 tgl Exp $
+DLLTOOL= dlltool
+DLLWRAP= dllwrap
+ifdef PGXS
+BE_DLLLIBS= -L$(libdir) -lpostgres
+else
+BE_DLLLIBS= -L$(top_builddir)/src/backend -lpostgres
+endif
+
+# linking with -lm or -lc causes program to crash
+# (see http://sources.redhat.com/cygwin/faq/faq.html#SEC110)
+LIBS:=$(filter-out -lm -lc, $(LIBS))
+
+AROPT = crs
+DLSUFFIX = .dll
+CFLAGS_SL =
+
+%.dll: %.o
+	$(DLLTOOL) --export-all --output-def $*.def $<
+	$(DLLWRAP) -o $@ --def $*.def $< $(SHLIB_LINK)
+	rm -f $*.def
+
+ifneq (,$(findstring backend,$(subdir)))
+ifeq (,$(findstring conversion_procs,$(subdir)))
+override CPPFLAGS+= -DBUILDING_DLL
+endif
+endif
+
+ifneq (,$(findstring timezone,$(subdir)))
+override CPPFLAGS+= -DBUILDING_DLL
+endif
+
+ifneq (,$(findstring ecpg/ecpglib,$(subdir)))
+override CPPFLAGS+= -DBUILDING_DLL
+endif
+
+# required by Python headers
+ifneq (,$(findstring src/pl/plpython,$(subdir)))
+override CPPFLAGS+= -DUSE_DL_IMPORT
+endif
+
+sqlmansect = 7

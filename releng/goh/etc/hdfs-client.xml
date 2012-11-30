@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<configuration>
+
+	<property>
+		<name>ipc.client.connection.maxidletime</name>
+		<value>10000</value>
+		<description>
+			the idle timeout interval of a rpc channel, rpc channel
+			will exit if timeout
+		</description>
+	</property>
+
+	<property>
+		<name>ipc.client.connect.max.retries</name>
+		<value>1</value>
+		<description>
+			the max retry times when a rpc channel failed to connect
+			to the server for any reason except timeout.
+		</description>
+	</property>
+
+
+	<property>
+		<name>ipc.client.connect.max.retries.on.timeouts</name>
+		<value>1</value>
+		<description>
+			the max retry times when a rpc channel failed to connect
+			to the server since timeout.
+		</description>
+	</property>
+
+	<property>
+		<name>ipc.client.connect.timeout</name>
+		<value>10000</value>
+		<description>
+			the timeout interval for a rpc channel to connect to the
+			server.
+		</description>
+	</property>
+
+	<property>
+		<name>ipc.client.write.timeout</name>
+		<value>60000</value>
+		<description>
+			the timeout interval for a rpc channel to write data into
+			socket.
+		</description>
+	</property>
+
+	<property>
+		<name>ipc.client.tcpnodelay</name>
+		<value>true</value>
+		<description>
+			to set rpc channel to tcpnodelay mode.
+		</description>
+	</property>
+
+	<property>
+		<name>dfs.ConfigKey.type</name>
+		<value>CRC32C</value>
+		<description>
+			default checksum type, valid value is: CRC32, CRC32C,
+			NULL
+		</description>
+	</property>
+
+	<property>
+		<name>dfs.bytes-per-ConfigKey</name>
+		<value>512</value>
+		<description>
+			the size of chunk to calculate checksum.
+		</description>
+	</property>
+
+	<property>
+		<name>dfs.namenode.rpc.timeout</name>
+		<value>60000</value>
+		<description>
+			the timeout interval to the client to wait for the
+			namenode to finish a rpc call.
+		</description>
+	</property>
+
+	<property>
+		<name>dfs.datanode.rpc.timeout</name>
+		<value>60000</value>
+		<description>
+			the timeout interval to the client to wait for the
+			datanode to finish a rpc call.
+		</description>
+	</property>
+
+	<property>
+		<name>dfs.client-write-packet-size</name>
+		<value>65536</value>
+		<description>
+			the packet size for the output stream.
+		</description>
+	</property>
+
+	<property>
+		<name>dfs.client.block.write.retries</name>
+		<value>3</value>
+		<description>
+			the max retry time when output stream failed to write
+			data to pipeline
+		</description>
+	</property>
+
+	<property>
+		<name>dfs.client.close.file.timeout</name>
+		<value>60000</value>
+		<description>
+			the timeout interval to the output stream to wait for
+			close file operation complete.
+		</description>
+	</property>
+
+	<property>
+		<name>dfs.client.block.write.timeout</name>
+		<value>60000</value>
+		<description>
+			time timeout interval to the output stream to write data
+			into socket.
+		</description>
+	</property>
+
+	<property>
+		<name>dfs.prefetchsize</name>
+		<value>10</value>
+		<description>
+			the number of block which metadatas will be prefetched.
+		</description>
+	</property>
+
+	<property>
+		<name>dfs.client_local_block_read_buffer</name>
+		<value>1048576</value>
+		<description>
+			the buffer size if read block from local file system
+			instead of network.
+		</description>
+	</property>
+
+	<property>
+		<name>dfs.client.socket.write.timeout</name>
+		<value>60000</value>
+		<description>
+			the timeout interval for socket write operation.
+		</description>
+	</property>
+
+	<property>
+		<name>dfs.client.socket.read.timeout</name>
+		<value>60000</value>
+		<description>
+			the timeout interval for socket read operation.
+		</description>
+	</property>
+
+	<property>
+		<name>dfs.client.socket.connect.timeout</name>
+		<value>10000</value>
+		<description>
+			the timeout interval to setup a tcp socket connection,
+			include resolve host name.
+		</description>
+	</property>
+
+	<property>
+		<name>dfs.client.read.verifychecksum</name>
+		<value>true</value>
+		<description>
+			input stream will verify checksum, this can be
+			overwritten when open input stream.
+		</description>
+	</property>
+
+	<property>
+		<name>dfs.client.enable.read.from.local</name>
+		<value>true</value>
+		<description>
+			enable input stream to read block directly from local
+			file system. need to configure on server.
+		</description>
+	</property>
+
+	<property>
+		<name>dfs.log.file.prefix</name>
+		<value>libhdfs3</value>
+		<description>
+			the libhdfs3 log file prefix, see glog document.
+		</description>
+	</property>
+
+	<property>
+		<name>dfs.log.stderr</name>
+		<value>true</value>
+		<description>
+			output libhdfs3 log to stderr.
+		</description>
+	</property>
+
+	<property>
+		<name>dfs.replication</name>
+		<value>3</value>
+		<description>
+			the default number of replica, can be overwritten when
+			create output stream.
+		</description>
+	</property>
+
+	<property>
+		<name>dfs.blocksize</name>
+		<value>67108864</value>
+		<description>
+			the default block size, can be overwritten when create
+			output stream.
+		</description>
+	</property>
+
+	<property>
+		<name>dfs.buffersize</name>
+		<value>1048576</value>
+		<description>
+			not used yet, can be overwritten when create output
+			stream.
+		</description>
+	</property>
+
+</configuration>

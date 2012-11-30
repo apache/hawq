@@ -1,0 +1,131 @@
+--
+-- See MPP-6861
+--
+CREATE TABLE ds_4
+(
+  month_id character varying(6),
+  cust_group_acc numeric(10),
+  mobile_no character varying(10),
+  source character varying(12),
+  vas_group numeric(10),
+  vas_type numeric(10),
+  count_vas integer,
+  amt_vas numeric(10,2),
+  network_type character varying(3),
+  execution_id integer
+)
+WITH (
+  OIDS=FALSE
+)
+DISTRIBUTED BY (cust_group_acc, mobile_no)
+PARTITION BY LIST(month_id)
+          (
+          PARTITION p200800 VALUES('200800'),
+          PARTITION p200801 VALUES('200801'),
+          PARTITION p200802 VALUES('200802'),
+          PARTITION p200803 VALUES('200803')
+);
+NOTICE:  CREATE TABLE will create partition "ds_4_1_prt_p200800" for table "ds_4"
+NOTICE:  CREATE TABLE will create partition "ds_4_1_prt_p200801" for table "ds_4"
+NOTICE:  CREATE TABLE will create partition "ds_4_1_prt_p200802" for table "ds_4"
+NOTICE:  CREATE TABLE will create partition "ds_4_1_prt_p200803" for table "ds_4"
+-- this is the case that worked before MPP-6861
+explain select * from ds_4 where month_id = '200800';
+                                     QUERY PLAN                                      
+-------------------------------------------------------------------------------------
+ Gather Motion 2:1  (slice1; segments: 2)  (cost=0.00..0.00 rows=1 width=184)
+   ->  Append  (cost=0.00..0.00 rows=1 width=184)
+         ->  Seq Scan on ds_4_1_prt_p200800 ds_4  (cost=0.00..0.00 rows=1 width=184)
+               Filter: month_id::text = '200800'::text
+(4 rows)
+
+-- now we can evaluate this function at planning/prune time
+explain select * from ds_4 where month_id::int = 200800;
+                                     QUERY PLAN                                      
+-------------------------------------------------------------------------------------
+ Gather Motion 2:1  (slice1; segments: 2)  (cost=0.00..0.00 rows=1 width=184)
+   ->  Append  (cost=0.00..0.00 rows=1 width=184)
+         ->  Seq Scan on ds_4_1_prt_p200800 ds_4  (cost=0.00..0.00 rows=1 width=184)
+               Filter: month_id::integer = 200800
+(4 rows)
+
+-- this will be satisfied by 200800
+explain select * from ds_4 where month_id::int - 801 < 200000;
+                                     QUERY PLAN                                      
+-------------------------------------------------------------------------------------
+ Gather Motion 2:1  (slice1; segments: 2)  (cost=0.00..0.00 rows=1 width=184)
+   ->  Append  (cost=0.00..0.00 rows=1 width=184)
+         ->  Seq Scan on ds_4_1_prt_p200800 ds_4  (cost=0.00..0.00 rows=1 width=184)
+               Filter: (month_id::integer - 801) < 200000
+(4 rows)
+
+-- test OR case -- should NOT get pruning
+explain select * from ds_4 where month_id::int - 801 < 200000 OR count_vas > 10;
+                                     QUERY PLAN                                      
+-------------------------------------------------------------------------------------
+ Gather Motion 2:1  (slice1)  (cost=0.00..0.00 rows=5 width=107)
+   ->  Append  (cost=0.00..0.00 rows=2 width=107)
+         ->  Seq Scan on ds_4_1_prt_p200800 ds_4  (cost=0.00..0.00 rows=0 width=107)
+               Filter: (month_id::integer - 801) < 200000 OR count_vas > 10
+         ->  Seq Scan on ds_4_1_prt_p200801 ds_4  (cost=0.00..0.00 rows=0 width=107)
+               Filter: (month_id::integer - 801) < 200000 OR count_vas > 10
+         ->  Seq Scan on ds_4_1_prt_p200802 ds_4  (cost=0.00..0.00 rows=0 width=107)
+               Filter: (month_id::integer - 801) < 200000 OR count_vas > 10
+         ->  Seq Scan on ds_4_1_prt_p200803 ds_4  (cost=0.00..0.00 rows=0 width=107)
+               Filter: (month_id::integer - 801) < 200000 OR count_vas > 10
+(10 rows)
+
+-- test AND case -- should still get pruning
+explain select * from ds_4 where month_id::int - 801 < 200000 AND count_vas > 10;
+                                     QUERY PLAN                                      
+-------------------------------------------------------------------------------------
+ Gather Motion 2:1  (slice1; segments: 2)  (cost=0.00..0.00 rows=1 width=184)
+   ->  Append  (cost=0.00..0.00 rows=1 width=184)
+         ->  Seq Scan on ds_4_1_prt_p200800 ds_4  (cost=0.00..0.00 rows=1 width=184)
+               Filter: (month_id::integer - 801) < 200000 AND count_vas > 10
+(4 rows)
+
+-- test expression case : should get pruning
+explain select * from ds_4 where case when month_id = '200800' then 100 else 2 end = 100;
+                                        QUERY PLAN                                         
+-------------------------------------------------------------------------------------------
+ Gather Motion 2:1  (slice1; segments: 2)  (cost=0.00..0.00 rows=1 width=184)
+   ->  Append  (cost=0.00..0.00 rows=1 width=184)
+         ->  Seq Scan on ds_4_1_prt_p200800 ds_4  (cost=0.00..0.00 rows=1 width=184)
+               Filter: CASE WHEN month_id::text = '200800'::text THEN 100 ELSE 2 END = 100
+(4 rows)
+
+-- test expression case : should get pruning
+explain select * from ds_4 where case when month_id = '200800' then NULL else 2 end IS NULL;
+                                              QUERY PLAN                                               
+-------------------------------------------------------------------------------------------------------
+ Gather Motion 2:1  (slice1; segments: 2)  (cost=0.00..0.00 rows=1 width=184)
+   ->  Append  (cost=0.00..0.00 rows=1 width=184)
+         ->  Seq Scan on ds_4_1_prt_p200800 ds_4  (cost=0.00..0.00 rows=1 width=184)
+               Filter: CASE WHEN month_id::text = '200800'::text THEN NULL::integer ELSE 2 END IS NULL
+(4 rows)
+
+-- should still get pruning here -- count_vas is only used in the path for month id = 200800
+explain select * from ds_4 where case when month_id::int = 200800 then count_vas else 2 end IS NULL;
+                                          QUERY PLAN                                          
+----------------------------------------------------------------------------------------------
+ Gather Motion 2:1  (slice1; segments: 2)  (cost=0.00..0.00 rows=1 width=184)
+   ->  Append  (cost=0.00..0.00 rows=1 width=184)
+         ->  Seq Scan on ds_4_1_prt_p200800 ds_4  (cost=0.00..0.00 rows=1 width=184)
+               Filter: CASE WHEN month_id::integer = 200800 THEN count_vas ELSE 2 END IS NULL
+(4 rows)
+
+-- do one that matches a couple partitions
+explain select * from ds_4 where month_id::int in (200801, 1,55,6,6,6,6,66,565,65,65,200803);
+                                               QUERY PLAN                                               
+--------------------------------------------------------------------------------------------------------
+ Gather Motion 2:1  (slice1)  (cost=0.00..0.00 rows=3 width=107)
+   ->  Append  (cost=0.00..0.00 rows=2 width=107)
+         ->  Seq Scan on ds_4_1_prt_p200801 ds_4  (cost=0.00..0.00 rows=0 width=107)
+               Filter: month_id::integer = ANY ('{200801,1,55,6,6,6,6,66,565,65,65,200803}'::integer[])
+         ->  Seq Scan on ds_4_1_prt_p200803 ds_4  (cost=0.00..0.00 rows=0 width=107)
+               Filter: month_id::integer = ANY ('{200801,1,55,6,6,6,6,66,565,65,65,200803}'::integer[])
+(6 rows)
+
+-- cleanup
+drop table ds_4;

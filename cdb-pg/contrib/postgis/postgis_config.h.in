@@ -1,0 +1,99 @@
+/* postgis_config.h.in.  Generated from configure.ac by autoheader.  */
+
+/* Define to 1 if you have the <dlfcn.h> header file. */
+#undef HAVE_DLFCN_H
+
+/* Defined if libiconv headers and library are present */
+#undef HAVE_ICONV
+
+/* ieeefp.h header */
+#undef HAVE_IEEEFP_H
+
+/* Define to 1 if you have the <inttypes.h> header file. */
+#undef HAVE_INTTYPES_H
+
+/* Define to 1 if you have the `geos_c' library (-lgeos_c). */
+#undef HAVE_LIBGEOS_C
+
+/* Define to 1 if you have the `pq' library (-lpq). */
+#undef HAVE_LIBPQ
+
+/* Define to 1 if you have the `proj' library (-lproj). */
+#undef HAVE_LIBPROJ
+
+/* Define to 1 if you have the <memory.h> header file. */
+#undef HAVE_MEMORY_H
+
+/* Define to 1 if you have the <stdint.h> header file. */
+#undef HAVE_STDINT_H
+
+/* Define to 1 if you have the <stdlib.h> header file. */
+#undef HAVE_STDLIB_H
+
+/* Define to 1 if you have the <strings.h> header file. */
+#undef HAVE_STRINGS_H
+
+/* Define to 1 if you have the <string.h> header file. */
+#undef HAVE_STRING_H
+
+/* Define to 1 if you have the <sys/stat.h> header file. */
+#undef HAVE_SYS_STAT_H
+
+/* Define to 1 if you have the <sys/types.h> header file. */
+#undef HAVE_SYS_TYPES_H
+
+/* Define to 1 if you have the <unistd.h> header file. */
+#undef HAVE_UNISTD_H
+
+/* Define to the sub-directory in which libtool stores uninstalled libraries.
+   */
+#undef LT_OBJDIR
+
+/* Enable caching of bounding box within geometries */
+#undef POSTGIS_AUTOCACHE_BBOX
+
+/* PostGIS build date */
+#undef POSTGIS_BUILD_DATE
+
+/* PostGIS library debug level (0=disabled) */
+#undef POSTGIS_DEBUG_LEVEL
+
+/* GEOS library version */
+#undef POSTGIS_GEOS_VERSION
+
+/* PostGIS library version */
+#undef POSTGIS_LIB_VERSION
+
+/* PostGIS major version */
+#undef POSTGIS_MAJOR_VERSION
+
+/* PostGIS micro version */
+#undef POSTGIS_MICRO_VERSION
+
+/* PostGIS minor version */
+#undef POSTGIS_MINOR_VERSION
+
+/* PostgreSQL server version */
+#undef POSTGIS_PGSQL_VERSION
+
+/* Enable GEOS profiling (0=disabled) */
+#undef POSTGIS_PROFILE
+
+/* PROJ library version */
+#undef POSTGIS_PROJ_VERSION
+
+/* PostGIS scripts version */
+#undef POSTGIS_SCRIPTS_VERSION
+
+/* Enable use of ANALYZE statistics */
+#undef POSTGIS_USE_STATS
+
+/* PostGIS version */
+#undef POSTGIS_VERSION
+
+/* Define to 1 if you have the ANSI C header files. */
+#undef STDC_HEADERS
+
+/* Define to 1 if `lex' declares `yytext' as a `char *' by default, not a
+   `char[]'. */
+#undef YYTEXT_POINTER

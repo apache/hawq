@@ -1,0 +1,81 @@
+# $PostgreSQL: pgsql/src/test/regress/serial_schedule,v 1.33 2006/08/30 23:34:22 tgl Exp $
+# This should probably be in an order similar to parallel_schedule.
+test: boolean char name varchar text int2 int4 int8 oid float4 float8 bit numeric
+
+test: strings
+test: numerology
+
+test: point lseg box path polygon circle date time timetz timestamp timestamptz interval abstime reltime tinterval inet comments oidjoins type_sanity opr_sanity
+
+test: geometry
+test: horology
+
+test: insert
+test: create_function_1
+test: create_type
+test: create_table
+test: create_function_2
+
+test: copy copyselect
+
+test: constraints create_misc create_aggregate create_operator drop_if_exists vacuum
+
+ignore: triggers
+ignore: inherit
+test: create_index create_view
+
+ignore: sanity_check
+
+test: errors
+test: select
+
+test: select_into select_distinct select_distinct_on select_having subselect union case join indexjoin aggregates random update delete namespace
+
+ignore: select_implicit
+ignore: transactions
+test: direct_dispatch
+test: partition_pruning_with_fn
+test: distributed_transactions
+ignore: portals
+ignore: arrays
+test: btree_index
+test: hash_index
+ignore: prepared_xacts
+ignore: privileges
+ignore: misc
+test: select_views portals_p2
+ignore: rules
+ignore: foreign_key
+test: cluster
+test: dependency
+test: guc
+ignore: combocid
+test: limit temp prepare without_oid conversion truncate sequence rowtypes
+ignore: plpgsql
+ignore: copy2
+ignore: domain
+ignore: rangefuncs
+ignore: alter_table
+ignore: polymorphism
+ignore: returning
+ignore: stats
+ignore: tablespace
+test: gpdiffcheck
+test: exttab1
+test: resource_queue
+test: gptokencheck
+test: gpcopy
+test: sreh
+test: olap_setup
+test: olap_group
+test: olap_window
+test: olap_window_seq
+ignore: tpch500GB
+test: partition
+test: gpupgrade
+test: appendonly
+test: gp_hashagg
+test: gpic
+test: gpic_bigtup
+test: filter
+test: gpctas

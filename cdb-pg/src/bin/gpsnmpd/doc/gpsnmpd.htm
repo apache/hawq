@@ -1,0 +1,314 @@
+<html>
+  <title>gpsnmpd</title>
+  <style type="text/css">
+  <!--
+  	body {
+		font-family: sans-serif;
+		font-size: 14;
+		width: 800px;
+	}
+	h2 {
+		color: #AA0000;
+		font-weight: bold;
+		border-bottom: 1px solid #AA0000;
+	}
+	div.desc {
+		padding-left: 20px;
+	}
+	div.codeblock {
+		font-family: monospace;
+		font-size: 12;
+		border: 2px solid #999999;
+		padding: 5px;
+		margin-top: 8px;
+		margin-bottom: 8px;
+		margin-left: 15px;
+		margin-right: 15px;
+		font-weight: bold;
+	}
+	.codeblock p {
+		padding: 1px;
+		margin: 1px;
+	}
+	li {
+		font-style: italic;
+	}
+  -->
+  </style>
+<body>
+  <h2>About gpsnmpd</h2>
+    <div class="desc">
+  <p>gpsnmpd is an SNMP agent for Greenplum Database which implements RDBMS-MIB, as
+  defined in <a href="http://www.faqs.org/rfcs/rfc1697.html">RFC 1697</a>.
+  This MIB was developed by a group of representatives from different database
+  manufacturers, and describes various attributes common to most relational
+  database management systems. Because it was designed as the least common
+  denominator, it doesn't show very much detail and there are definitely a
+  number of things RDBMS-MIB doesn't cover that GPDB administrators would
+  be very interested in. Future versions of gpsnmpd will support a second MIB,
+  tentatively called GPDB-MIB, in addition to RDBMS-MIB. This GPDB-MIB will
+  be GPDB-specific, and will include many more data points of interest to
+  Greenplum users and administrators.</p> <p>gpsnmpd has been used on Linux,
+  OpenBSD, and FreeBSD, and perhaps other systems. Future versions will likely
+  also work on Windows-based platforms.</p>
+    </div>
+
+  <h2>Running gpsnmpd</h2>
+    <div class="desc">
+  <p>gpsnmpd can run in one of three different modes:</p>
+  <ul>
+    <li>Standalone SNMP agent</li>
+    <li>Pass-through sub-agent</li>
+    <li>AgentX sub-agent</li>
+  </ul>
+  <p>As a standalone SNMP agent, gpsnmpd itself listens on a network socket for
+  SNMP queries, and requires the same configuration as the Net-SNMP SNMP
+  daemon. SNMP is sometimes difficult to configure, and Net-SNMP provides a
+  program called snmpconf to help the user create a suitable configuration
+  file.</p> <p>gpsnmpd can also run as a sub-agent in two different ways. A
+  sub-agent is like a slave to a master agent; when it starts, the sub-agent
+  registers itself with the master to tell the master which parts of the MIB it
+  knows about.  The master communicates with the SNMP client, and forwards
+  requests for appropriate sections of the MIB to the sub-agent. Pass-through
+  agents are actually identical to standalone agents &mdash; the only
+  difference is that the master is configured to pass queries through to the
+  sub-agent. AgentX sub-agents, on the other hand, don't listen to the network
+  at all, and instead communicate with the master agent through UNIX
+  sockets.</p>
+  <p>gpsnmpd is implemented using net-snmp and libpq, and most of the
+  command-line options available are intended to control those libraries. gpsnmpd
+  supports the following options:</p>
+      <div class="codeblocK">
+<p>jtolley@uber:~/devel/gpsnmpd$ ./gpsnmpd  -?</p>
+<p>./gpsnmpd: invalid option -- ?</p>
+<p>Version PGSQL-SNMP-1.0beta</p>
+<p>usage: gpsnmpd [-s] [-b] [-c FILE ] [-x address ] [-g] [-C "Connect String"]</p>
+<p style="text-indent: 3em">   -s : run as AgentX sub-agent of an existing snmpd process</p>
+<p style="text-indent: 3em">   -b : run in the background</p>
+<p style="text-indent: 3em">   -c : configuration file name</p>
+<p style="text-indent: 3em">   -g : use syslog</p>
+<p style="text-indent: 3em">   -C : libpq connect strings</p>
+<p style="text-indent: 3em">   -x : address:port of a network interface</p>
+<p style="text-indent: 3em">   -V : display version strings</p>
+      </div>
+    <p>Perhaps the simplest way to run gpsnmpd is as a standalone SNMP agent,
+    as described below. The most difficult part is to write a proper
+    configuration file. The gpsnmpd regression tester, gpsnmpd_regress.pl,
+    contains a workable sample configuration file, shown here:</p>
+      <div class="codeblock">
+<p>com2sec readwrite default public</p>
+<p>group MyRWGroup v2c readwrite</p>
+<p>view all included .1 80</p>
+<p>access MyRWGroup "" any noauth exact all all none</p>
+<p>agentaddress localhost:10161</p>
+      </div>
+    <p>Users interested in making more complex configuration files are
+    encouraged to read the snmpd.conf(5) manpage. This configuration file will
+    create one SNMP community called "public" and grant it read-only access on
+    the entire MIB. It will also tell the SNMP agent to listen on port 10161
+    instead of the default 161. This is useful for gpsnmpd_regress.pl because
+    listening on port 161 would require root privileges.</p>
+    <p>gpsnmpd also requires a libpq connection string, so it can connect to
+    PostgreSQL. Note that nothing requires gpsnmpd to run on the same machine
+    as PostgreSQL &mdash; the agent can easily monitor a remote PostgreSQL
+    instance, if the network configuration allows it to connect. The
+    configuration string can contain the database name, the host name, the
+    port number, the username, the password, and other information where
+    needed. One sample configuration string could say "dbname=gpsnmpd
+    host=localhost user=gpsnmpd password=pgsnnmpd".</p>
+    <p>Still using gpsnmpd_regress.pl as an example, one way to start gpsnmpd as a standalone agent is as follows:</p>
+      <div class="codeblock">
+<p>jtolley@uber:~/devel/gpsnmpd$ ./gpsnmpd -c gpsnmpd.conf -C "dbname=jtolley host=localhost user=jtolley password=jtolley"</p>
+<p>PGSQL-SNMP-1.0beta is up and running.</p>
+      </div>
+    <p>A user could then query gpsnmpd with a Net-SNMP client program such as snmpwalk:</p>
+      <div class="codeblock">
+<p>jtolley@uber:~$ snmpwalk -v 2c -c public localhost:10161 .1</p>
+<p>SNMPv2-SMI::mib-2.39.1.1.1.2.1 = OID: SNMPv2-SMI::enterprises.27645.1</p>
+<p>SNMPv2-SMI::mib-2.39.1.1.1.2.10818 = OID: SNMPv2-SMI::enterprises.27645.10818</p>
+<p>SNMPv2-SMI::mib-2.39.1.1.1.2.10819 = OID: SNMPv2-SMI::enterprises.27645.10819</p>
+<p>SNMPv2-SMI::mib-2.39.1.1.1.2.16384 = OID: SNMPv2-SMI::enterprises.27645.16384</p>
+<p>SNMPv2-SMI::mib-2.39.1.1.1.3.1 = STRING: "PostgreSQL"</p>
+<p>...</p>
+      </div>
+    </div>
+  <h2>gpsnmpd_regress.pl - a gpsnmpd regression test</h2>
+    <div class="desc">
+  gpsnmpd includes a Perl-based regression test script, gpsnmpd_regress.pl. A sample run is below
+      <div class="codeblock">
+<p>jtolley@uber:~/devel/postgresql-8.2.3/contrib/gpsnmpd$ perl gpsnmpd_regress.pl </p>
+<p>1..7</p>
+<p>NOTICE:  CREATE TABLE / PRIMARY KEY will create implicit index "gpsnmpd_rdbmsdbtable_pkey" for table "gpsnmpd_rdbmsdbtable"</p>
+<p>&nbsp;&nbsp;&nbsp;** Redirecting gpsnmpd child process STDOUT and STDERR to /dev/null</p>
+<p>ok 1 - Found OID for this database</p>
+<p>&nbsp;&nbsp;&nbsp;** Getting DbInfoTable</p>
+<p>&nbsp;&nbsp;&nbsp;** Getting rdbmsDbParamTable</p>
+<p>Can't parse: .1.3.6.1.2.1.39.1.3.1.5.16384.4.103.101.113.111.0</p>
+<p>***** ERROR parsing .1.3.6.1.2.1.39.1.3.1.5.16384.4.103.101.113.111.0 MIB OID</p>
+<p>Can't parse: .1.3.6.1.2.1.39.1.3.1.5.18033.4.103.101.113.111.0</p>
+<p>***** ERROR parsing .1.3.6.1.2.1.39.1.3.1.5.18033.4.103.101.113.111.0 MIB OID</p>
+<p>&nbsp;&nbsp;&nbsp;** Getting rdbmsDbLimitedResourceTable</p>
+<p>&nbsp;&nbsp;&nbsp;** Getting rdbmsSrvTable</p>
+<p>&nbsp;&nbsp;&nbsp;** Getting rdbmsSrvInfoTable</p>
+<p>&nbsp;&nbsp;&nbsp;** Getting rdbmsSrvParamTable</p>
+<p>ok 2 - rdbmsDbInfoTable has a row for this database</p>
+<p>ok 3 - geqo should be off</p>
+<p>ok 4 - XID should be reported in rdbmsDbLimitedResourceTable</p>
+<p>ok 5 - Contact name should be set to gpsnmpd_regress</p>
+<p>ok 6 - Finished transactions should be reported</p>
+<p>ok 7 - Lots of server parameters should be defined</p>
+<p>&nbsp;&nbsp;&nbsp;** Killing gpsnmpd</p>
+<p>&nbsp;&nbsp;&nbsp;** Dropping test database gpsnmpd_regress</p>
+      </div>
+  The test simply checks a test database and checks each of the seven major
+  tables defined in RDBMS-MIB and supported by gpsnmpd for values related to
+  that database. The first table checked, rdbmsDbTable, is indexed by the OID
+  of the test database in the pg_database catalog table, and that same index
+  value gets repeated throughout RDBMS-MIB. gpsnmpd_regress.pl searches
+  rdbmsDbTable for the OID of the test database, and then uses it to test the
+  other tables.
+      <ul>
+        <li>rdbmsDbInfoTable</li>
+  rdbmsDbTable contains relatively few details about each database, and
+  rdbmsDbInfoTable fills out the rest of the details. There will be one line in
+  this table for each database, indexed by OID. gpsnmpd_regress.pl makes sure
+  this line exists for the test database.
+        <li>rdbmsDbParamTable</li>
+  rdbmsDbParamTable contains database-specific parameters taken from
+  pg_database.datconfig and indexed by database OID. The regression test turns
+  off the Genetic Query Optimizer in the test database, which creates an entry
+  in the datconfig column. gpsnmpd_regress.pl tests to see if that entry
+  exists. 
+        <li>rdbmsDbLimitedResourceTable</li>
+  rdbmsDbLimitedResourceTable contains the current XID for each database, also
+  indexed by OID. gpsnmpd_regress.pl checks this table for an entry for the
+  test database
+	<li>rdbmsSrvTable</li>
+  rdbmsSrvTable contains one entry per database server on the system. RDBMS-MIB
+  supports multiple database server instances being monitored via SNMP from the
+  same agent at the same time. Unfortunately, gpsnmpd doesn't yet support
+  monitoring multiple PostgreSQL clusters simultaneously, so this table always
+  only contains one entry, which describes the one PostgreSQL instance being
+  monitored. gpsnmpd_regress.pl looks for this one entry, specifically checking
+  the contact name field, which it set when creating the database.
+        <li>rdbmsSrvInfoTable</li>
+  Much like rdbmsDbInfoTable contains information to supplement rdbmsDbTable,
+  rdbmsSrvInfoTable supplements rdbmsSrvTable with things like disk usage and
+  uptime information. gpsnmpd_regress.pl makes sure a line exists in this table
+  for the test database, checking for the number of finished transactions to be
+  reported.
+        <li>rdbmsSrvParamTable</li>
+  rdbmsSrvParamTable contains an entry for all server-specific configuration
+  parameters &mdash; in other words, approximately the contents of the
+  pg_settings table. This should always contain many entries per database,
+  because PostgreSQL has many configuration parameters, and gpsnmpd_regress.pl
+  just checks to see that there are several lines in this table.
+      </ul>
+    </div>
+  <h2>Implementation details and other information</h2>
+    <div class="desc">
+  <p>gpsnmpd is implemented using libpq and Net-SNMP, which includes a templating
+  system to generate a C implementation of an SNMP table given the MIB
+  definition of that table. Net-SNMP includes all the SNMP protocol code,
+  network code, authentication and access control code, etc., and leaves the
+  implementer with only the job of gathering the data published in the MIB. One
+  important feature of the system used to obtain the SNMP data is that Net-SNMP
+  provides a cache for each table implemented in an agent, and each cache has
+  an expiration timeout. For most tables in gpsnmpd, this timeout is 60
+  seconds, meaning that the data published by the agent are updated at most
+  every 60 seconds. Note also that gpsnmpd will only refresh cached values if
+  both the timeout is past <b>and</b> someone queries the table in question, so
+  a table might go much longer than the timeout value without refreshing, if it
+  isn't queried for a long period of time.</p>
+  <p>The current version of gpsnmpd implements only RDBMS-MIB, but future
+  versions will implement a PGSQL-MIB (which needs to be defined still) which
+  will describe a PostgreSQL instance in much greater detail than is possible
+  with RDBMS-MIB. RDBMS-MIB describes nine tables, as follows:</p>
+  <ul>
+    <li>rdbmsDbTable</li>
+    Describes each database monitored by the SNMP agent, including vendor name
+    and contact information
+    <li>rdbmsDbInfoTable</li>
+    Describes version, size, and backup information for each database the SNMP
+    agent monitors
+    <li>rdbmsDbParamTable</li>
+    Describes configuration parameters specific to each database
+    <li>rdbmsDbLimitedResourceTable</li>
+    Describes resources that are known to be limited, specific to a particular
+    database
+    <li>rdbmsSrvTable</li>
+    Describes each server monitored by the SNMP agent (a "server" is, for
+    instance, a PostgreSQL cluster) including its vendor name, contact person,
+    and version information
+    <li>rdbmsSrvInfoTable</li>
+    Describes disk, connection, startup, and transaction information for each
+    server monitored by the SNMP agent
+    <li>rdbmsSrvParamTable</li>
+    Describes server-specific configuration parameters indexed by server
+    <li>rdbmsSrvLimitedResourceTable</li>
+    Describes limited resources specific to each server
+    <li>rdbmsRelTable</li>
+    Relates each database to its respective server
+  </ul>
+  <p>Some comments on the above are in order. First, since some of the tables
+  contain contact information, vendor names, or other data not normally tracked
+  by GPDB, gpsnmpd supports a set of supplementary tables, by default
+  kept in a schema called "gpsnmpd", which will track this information. One
+  table contains database information, and is indexed by OID from pg_database,
+  and the other tracks server specific information.</p>
+  <p>Second, since gpsnmpd supports only one libpq connection, it only supports
+  one GPDB server in its current version. It is not possible to monitor
+  multiple Greenplum Database clusters with one gpsnmpd instance. It is, however,
+  possible to run multiple instances of gpsnmpd on one machine to monitor
+  multiple Greenplum Database clusters, however the gpsnmpd instances will need to be
+  configured so as not to conflict (for instance, configuring each to listen on
+  a different UDP port). This limitation means that rdbmsSrvTable and
+  rdbmsSrvInfoTable are fairly boring, containing only one entry each, and
+  rdbmsRelTable is similarly boring, since each database must necessarily be
+  connected to the one server gpsnmpd knows about.</p>
+  <p>RDBMS-MIB refers to another MIB defined in an RFC, specifically
+  APPLICATION-MIB from <a href="http://www.faqs.org/rfcs/rfc1565.html">RFC
+  1565</a>. gpsnmpd doesn't implement this yet. Specifically, entries in
+  rdbmsSrvTable are supposed to be indexed to match indices in
+  APPLICATION-MIB::applTable, and the corresponding entry in applTable would
+  contain further information about the server, specifically related to
+  connections from clients. Because of particular complexities associated with
+  implementing this part of the MIB, the connection between rdbmsSrvTable and
+  applTable is unimplemented in the current version of gpsnmpd.</p>
+  <p>RDBMS-MIB contains two tables to describe limited resources, one for
+  database-specific resources and one for server-specific ones.
+  rdbmsSrvLimitedResourceTable is empty in the current implementation of
+  gpsnmpd, and rdbmsDbLimitedResourceTable contains only one row per database.
+  This is because the only limited resource the authors could think of was
+  transaction ID (xid). Since xid is database-specific, it went in the database
+  limited resource table. Other limited resources, such as disk space, memory,
+  etc. are instrumented elsewhere in the MIB, and weren't copied into
+  gpsnmpd.</p>
+  <p>rdbmsSrvInfoTable contains a row to instrument the maximum number of
+  incoming connections seen. Each time the cached rdbmsSrvInfoTable values are
+  updated, the number of connections to the database at the time is recorded,
+  compared against the recorded maximum, and kept as the new maximum when
+  appropriate. But this only occurs when the cached data are updated, meaning
+  that the value in this column is not necessarily particularly accurate.
+  Future versions will hopefully correct this problem.</p>
+  <p>Finally, RDBMS-MIB describes two SNMP traps which RDBMS-MIB agents can
+  optionally implement. gpsnmpd does not implement these.</p>
+    </div>
+  <h2>Future plans</h2>
+    <div class="desc">
+  gpsnmpd would benefit greatly from more GPDB-specific data, so the next
+  major task is to write and implement a GPDB-MIB which instruments more of
+  the PostgreSQL database. This will likely include all the system catalog
+  tables, as well as many other data points. Also, none of the data in gpsnmpd
+  is writeable yet, though SNMP could be an extremely powerful method of
+  configuring the database if some of the values were read-write. If some of
+  the configuration parameters that do not require a database restart were
+  modifiable via SNMP, third-party administration tools could be used for
+  configuration of PostgreSQL as well as other network devices and
+  applications. Perhaps most interesting are the things gpsnmpd could do with
+  SNMP traps, properly implemented. For instance, users could configure gpsnmpd
+  to use LISTEN/NOTIFY to signal an SNMP trap. Finally, gpsnmpd should support
+  APPLICATION-MIB, as well as connections to multiple GPDB databases.</p>
+    </div>
+</body>
+</html>

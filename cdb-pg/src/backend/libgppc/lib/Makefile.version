@@ -1,0 +1,4 @@
+# Common values to be included from multiple Makefiles.
+SO_MAJOR_VERSION = 1
+SO_MINOR_VERSION = 1
+GPPC_VERSION_NUM = $(shell expr $(SO_MAJOR_VERSION) '*' 100 '+' $(SO_MINOR_VERSION))

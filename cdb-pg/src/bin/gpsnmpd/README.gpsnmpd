@@ -1,0 +1,87 @@
+gpsnmpD Version 2.0 Release.
+
+===== Abstract =====
+
+SNMP (Simple Network Management Protocol) is a protocol for supervising 
+the apparatus connected to the network via a network.
+The version 1 of SNMP is defined by RFC1157 and the version 2 is carried
+out by RFC1441. 
+
+Network management by SNMP is realized by the UDP communication between 
+a manager and the agent who resides in the apparatus for management 
+permanently. An agent returns a response to the request from a manager.
+when special phenomena apparatus rebooted occur, a trap is sent to a 
+manager from an agent.
+
+MIB (Management Information Base) is the database of the management 
+information about the network apparatus which exists in the network 
+apparatus corresponding to SNMP. The thing of each management information 
+stored in MIB is called object (Object).OID (Object IDentifier),it is the
+discernment child rejected in order to distinguish each object,and is also
+called an object discernment child. the object is managed by the tree 
+structure.
+
+Community name is the exchange between a manager and an agent, and has a 
+role like a password. That is, if the right community name is not specified 
+when publishing a request from a manager to an agent, in an agent side,
+it will be interpreted as unlawful access.
+
+
+1.) How to Compile.
+
+Please develop this to the contrib directory of PostgreSQL Version 8.x
+And it only gmake.
+However, it is necessary to have net-snmp before it.
+http://net-snmp.sourceforge.net/
+This is checking operation by Version 5.2.1.
+
+
+2.) Usage.
+
+usage: gpsnmpd [-s] [-b] [-c FILE ] [-x address ] [-g] [-C "Connect String"]
+   -s : SNMP subagent running
+   -b : run in the background
+   -c : configuration file name
+   -g : use syslog
+   -C : libpq connect strings
+   -x : address:port of a network interface.
+   -V : display version strings
+
+You need to become the superuser of PostgreSQL as connection of libpq.
+
+(MIB TUTORIAL SMAPLE)
+RDBMS-MIB
+
+agent running samp.
+#gpsnmpd -c `pwd`/gpsnmpd.conf -x 192.168.1.0 -C "host=127.0.0.1"
+
+sub agent running sample.
+#gpsnmpd -s -c `pwd`/gpsnmpd.conf -C "host=127.0.0.1"
+
+
+3.) Client Manager.
+
+Surveillance managers, such as RMON, can be used.
+
+for sample.
+#snmpwalk -v1 -c public localhost RDBMS-MIB::rdbmsDbTable
+
+4.) enterprise-numbers of PostgreSQL
+--
+http://www.iana.org/assignments/enterprise-numbers
+
+27645
+  PostgreSQL Global Development Group
+    Dave Page
+      dpage&postgresql.org
+--
+
+-------------------------------------------
+-- pgsnmpd team(pgsnmpd-devel@pgfoundry.org)
+-------------------------------------------
+Josh Tolley
+Hiroshi Saito
+Magnus Hagander
+Dave Page
+Francisco Figueiredo Jr
+-------------------------------------------

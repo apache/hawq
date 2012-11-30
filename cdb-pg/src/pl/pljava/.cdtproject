@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse-cdt version="2.0"?>
+
+<cdtproject id="org.eclipse.cdt.make.core.make">
+<extension id="org.eclipse.cdt.core.GNU_ELF" point="org.eclipse.cdt.core.BinaryParser">
+<attribute key="addr2line" value="addr2line"/>
+<attribute key="c++filt" value="c++filt"/>
+</extension>
+<extension id="org.eclipse.cdt.core.nullindexer" point="org.eclipse.cdt.core.CIndexer"/>
+<data>
+        
+    
+<item id="org.eclipse.cdt.core.pathentry">
+<pathentry excluding="type/" kind="src" path="src/C/pljava"/>
+<pathentry kind="src" path="src/C/pljava/type"/>
+<pathentry kind="out" path=""/>
+<pathentry kind="mac" name="PGSQL_MAJOR_VERSION" path="" value="8"/>
+<pathentry kind="mac" name="PGSQL_MINOR_VERSION" path="" value="1"/>
+<pathentry base-path="org.postgresql.pljava" include="src/C/include" kind="inc" path="" system="true"/>
+<pathentry base-path="org.postgresql.pljava" include="build/jni" kind="inc" path="" system="true"/>
+<pathentry base-path="pgsql" include="src/include" kind="inc" path="" system="true"/>
+<pathentry include="C:/Program Files/Java/jdk1.5.0_06/include/win32" kind="inc" path="" system="true"/>
+<pathentry include="C:/Program Files/Java/jdk1.5.0_06/include" kind="inc" path="" system="true"/>
+<pathentry include="C:/msys/mingw/include" kind="inc" path="" system="true"/>
+<pathentry include="C:/msys/mingw/include/sys" kind="inc" path="" system="true"/>
+</item>
+<item id="cdt_indexer">
+<indexEnabled indexValue="false"/>
+<indexerProblemsEnabled indexProblemsValue="0"/>
+</item>
+
+<item id="org.eclipse.cdt.make.core.buildtargets">
+<buildTargets>
+<target name="test_all" path="" targetID="org.eclipse.cdt.make.MakeTargetBuilder">
+<buildCommand>make</buildCommand>
+<buildArguments>-e /bin/make</buildArguments>
+<buildTarget>test_all</buildTarget>
+<stopOnError>false</stopOnError>
+<useDefaultCommand>true</useDefaultCommand>
+</target>
+<target name="clean" path="" targetID="org.eclipse.cdt.make.MakeTargetBuilder">
+<buildCommand>c:/msys/bin/rxvt</buildCommand>
+<buildArguments>-e /bin/make</buildArguments>
+<buildTarget>clean</buildTarget>
+<stopOnError>false</stopOnError>
+<useDefaultCommand>true</useDefaultCommand>
+</target>
+<target name="all" path="" targetID="org.eclipse.cdt.make.MakeTargetBuilder">
+<buildCommand>c:/msys/bin/rxvt</buildCommand>
+<buildArguments>-e /bin/make</buildArguments>
+<buildTarget>all</buildTarget>
+<stopOnError>false</stopOnError>
+<useDefaultCommand>true</useDefaultCommand>
+</target>
+<target name="release" path="" targetID="org.eclipse.cdt.make.MakeTargetBuilder">
+<buildCommand>c:/msys/bin/rxvt</buildCommand>
+<buildArguments>-e /bin/make</buildArguments>
+<buildTarget>release</buildTarget>
+<stopOnError>false</stopOnError>
+<useDefaultCommand>true</useDefaultCommand>
+</target>
+</buildTargets>
+</item>
+<item id="scannerConfiguration">
+<autodiscovery enabled="false" problemReportingEnabled="true" selectedProfileId="org.eclipse.cdt.make.core.GCCStandardMakePerProjectProfile"/>
+<profile id="org.eclipse.cdt.make.core.GCCStandardMakePerProjectProfile">
+<buildOutputProvider>
+<openAction enabled="false" filePath=""/>
+<parser enabled="true"/>
+</buildOutputProvider>
+<scannerInfoProvider id="specsFile">
+<runAction arguments="-E -P -v -dD ${plugin_state_location}/${specs_file}" command="gcc" useDefault="true"/>
+<parser enabled="true"/>
+</scannerInfoProvider>
+</profile>
+</item>
+</data>
+</cdtproject>

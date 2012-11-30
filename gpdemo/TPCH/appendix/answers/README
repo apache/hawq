@@ -1,0 +1,12 @@
+# @(#)answers.readme	2.1.8.1
+File:          answers/README
+Spec Revision: 1.0.1
+Last Modified: 22 April 99
+
+This directory contains the qualification answer sets for the
+TPC-H and TPC-R benchmarks. They are derived from the functional query
+definitions presented in Clause 2 of the TPC-H and TPC-R benchmark 
+specification, and DBGEN (v. 1.0.1).  The answer set for query NN is 
+stored in NN.ans.
+
+Refer to Clause 2.1.3 for answer set compliance requirements.

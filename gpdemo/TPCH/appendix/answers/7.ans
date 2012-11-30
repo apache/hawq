@@ -1,0 +1,12 @@
+# @(#)7.ans	2.1.8.1
+Q7 
+ *** Query completed. 4 rows found. 4 columns returned.
+
+supp_nation	cust_nation	year	revenue
+-----------	-----------	----	-----------------
+ 
+FRANCE		GERMANY		1995	54639732.73
+FRANCE		GERMANY		1996	54633083.31
+GERMANY		FRANCE		1995	52531746.67
+GERMANY		FRANCE		1996	52520549.02
+

@@ -1,0 +1,34 @@
+AROPT = crs
+ifeq ($(with_gnu_ld), yes)
+    export_dynamic = -Wl,-E
+else
+    export_dynamic = -Wl,-Bexport
+endif
+
+ifeq ($(ld_R_works), yes)
+ifeq ($(with_gnu_ld), yes)
+    rpath = -Wl,-rpath,'$(rpathdir)'
+else
+    rpath = -Wl,-R'$(rpathdir)'
+endif
+endif
+
+DLSUFFIX = .so
+ifeq ($(GCC), yes)
+CFLAGS_SL = -fpic
+else
+CFLAGS_SL = -K PIC
+endif
+ifeq ($(GCC), yes)
+SO_FLAGS = -shared
+else
+SO_FLAGS = -G
+endif
+
+%.so: %.o
+	$(CC) $(SO_FLAGS) -o $@ $<
+
+sqlmansect = 5sql
+
+# Unixware needs threads for everything that uses libpq
+CFLAGS += $(PTHREAD_CFLAGS)

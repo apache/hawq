@@ -1,0 +1,1288 @@
+#!/usr/bin/env python
+'''
+Usage: gpdetective <option> [dbname]
+
+    -?         : Print usage and exit
+    -v         : Print version and exit
+    -h host    : DB host name
+    -p port    : DB port number
+    -P passwd  : DB password
+    -U uname   : DB User Name
+
+    --start_date=number       : Log start date (number of days ago)
+    --start_date="YYYY-MM-DD" : Log start date (explicit date)
+    --end_date="YYYY-MM-DD"   : Log end date (ends at 00:00:00 on end_date)
+
+    --diagnostics=a[ll],n[one],s[tate],o[s],c[atalog] 
+         : Defines which diagnostics to run (default is "all")
+
+    --logs=a[ll],n[none,<list> 
+         : Defines the list of segment log file dbid's to retrieve 
+             a[ll]  = all segments and mirrors  (the default) 
+             n[one] = no segments and mirrors
+             <list> = [n | n-m[,n | n-m]...] where n and m are integers. (e.g. 0,1-4,8,11)
+
+    --pg_changetracking_logs=a[ll],n[none,<list> 
+         : Defines the list of segment pg_changetracking log file dbid's to retrieve 
+             a[ll]  = all segments and mirrors
+             n[one] = no segments and mirrors (the default)
+             <list> = [n | n-m[,n | n-m]...] where n and m are integers. (e.g. 0,1-4,8,11)
+
+    --core=t[rue]|f[alse]
+         : Determines whether or not core files are retrieved (default is true).
+ 
+    --pg_dumpall=t[rue]|f[alse]  
+         : Option to run pg_dumpall (default is true)
+ 
+    --pg_dump_options="<options>"
+         : A list of valid pg_dump options (e.g. "-t public.table1 database1")
+
+    --tempdir="temp dir"      
+         : Temporary directory used by gpdetective 
+           The default is determined by the $TEMP, $TMP and $TMPDIR environment variables.
+
+    --connect=t[rue]|f[alse]  
+         : If connect is false, then retrieve only information that can be 
+           obtained without making a connection to the database (default is true).
+
+'''
+#============================================================
+import sys, os, tempfile, subprocess, re, getopt, types, traceback, datetime
+from gppylib.gpcoverage import GpCoverage
+from gppylib.operations.filespace import GP_TRANSACTION_FILES_FILESPACE, GP_TEMPORARY_FILES_FILESPACE
+
+libdir = sys.path[0] + '/lib'
+try: 
+    from pygresql import pg
+except Exception, e:
+    sys.exit('Error: unable to import the PyGreSQL Python module module: ' + str(e))
+
+
+GPHOME=os.environ.get('GPHOME')
+SRC_GPPATH=". %s/greenplum_path.sh;" % GPHOME
+
+#============================================================
+def pretty_version(v):
+    '''
+    Turns the RCS revision number into a prettier format
+    '''
+    m = re.compile('Revision: #(\d+)').search(v)
+    if m: return str((float(m.group(1))+100)/100)
+    else: return str(v)
+__version__ = pretty_version('$Revision$')
+
+#============================================================
+def usage(exitarg = None):
+    '''
+    Print usage information and exit
+    '''
+    print cli_help() or __doc__
+    sys.exit(exitarg)
+
+#============================================================
+def cli_help():
+    progname=os.path.split(__file__)[-1]
+    help_path = os.path.join(sys.path[0], '..', 'docs', 'cli_help', progname + '_help');
+    f = None
+    try:
+        try:
+            f = open(help_path);
+            return f.read(-1)
+        except:
+            return ''
+    finally:
+        if f: f.close()
+        
+#============================================================
+def which (filename):
+    if not os.environ.has_key('PATH') or os.environ['PATH'] == '':
+        p = os.defpath
+    else:
+        p = os.environ['PATH']
+
+    pathlist = p.split (os.pathsep)
+
+    for path in pathlist:
+        f = os.path.join(path, filename)
+        if os.access(f, os.X_OK):
+            return f
+    return None
+
+#============================================================
+def truth (option, val):
+    if val.lower() == 't' or val.lower() == 'true':
+        return True
+    elif val.lower() == 'f' or val.lower() == 'false':
+        return False
+    else:
+        usage('Error: Invalid option for %s: %s' % (option, val))
+
+
+#============================================================
+class GPDetective:
+    '''
+    GPDetecive main class
+    '''
+    opt    = {}         # Command line options
+    db     = 'postgres' # Default database
+    master = None       # Database connection to master
+    olddir = None       # Directory script was executed from
+    logdir = None       # Temporary directory
+    errlog = None       # Error log
+    tardir = None       # name of the produced tarball
+    error  = None
+    start_date      = None
+    end_date        = None
+    log_list                   = []    # [] implies all segments (the default)
+    pg_changetracking_log_list = None  # None implies no segments (the default)
+    pg_dump_options = None
+    rungpstate    = True
+    runpg_dumpall = True
+    rungpcheckos  = True
+    rungpcheckcat = True
+    runcore       = True
+    runconnected  = True
+
+    # Configuration information
+    tempdir   = None    # Temporary directory for gathering information
+    masterdir = None    # Master Directory, assumed on this host
+    backupmasterhostdir   = None    # backup (mirror) Master Directory
+    backupmasterhostname  = None    # backup (mirror) Master host name
+    hosts     = []      # list of all segment hosts
+    segments  = []      # list of all segments (tuple with "dbid" and "hostname:datadir")  
+    mirrors   = []      # list of all mirror segments (tuple with "dbid" and "hostname:datadir")
+    databases = []      # list of all databases (except template)
+
+    #------------------------------------------------------------
+    def __init__(self): 
+        '''
+        Initialize the Greenplum Detective
+          1) Extract command line arguments
+          2) Establish connection to master database
+          3) Create Logging Directory
+          4) Create error file
+        '''
+        self.olddir = os.getcwd()
+        if not os.access('.', os.W_OK):
+            sys.exit("No write permission to current directory")
+        
+        # Get default option values from enviornment
+        self.opt = {
+            '-h': os.environ.get('PGHOST') or 'localhost',
+            '-P': os.environ.get('PGPASSWORD'),
+            '-U': os.environ.get('USER'),
+            '-p': os.environ.get('PGPORT'),
+            }
+
+        # Override defaults based on command line options
+        try:
+            (options, args) = getopt.getopt(sys.argv[1:], 
+                                            '?h:p:P:U:vV',
+                                            [ 'version'
+                                            , 'start_date='
+                                            , 'end_date='
+                                            , 'connect='
+                                            , 'pg_dump_options='
+                                            , 'tempdir='
+                                            , 'diagnostics='
+                                            , 'logs='
+                                            , 'pg_changetracking_logs='
+                                            , 'pg_dumpall='
+                                            , 'cores='
+                                            ])
+            for (switch, val) in options:
+                if   switch == '-?':       usage(0)
+                if   switch[1] in 'vV' or switch == '--version':
+                    print 'gpdetective ' + __version__
+                    sys.exit(0)
+                elif switch == '--connect':
+                    self.runconnected = truth(switch, val)
+                elif switch == '--start_date':
+                    self.start_date = val
+                elif switch == '--end_date':
+                    self.end_date = val
+                elif switch == '--pg_dump_options':
+                    self.pg_dump_options = val
+                elif switch == '--tempdir':
+                    self.tempdir = val
+                elif switch == '--diagnostics':
+                    self.handleDiagnosticParameterList(val)
+                elif switch == '--logs':
+                    self.log_list = self.handleSegmentParameterList(val)
+                elif switch == '--pg_changetracking_logs':
+                    self.pg_changetracking_log_list = self.handleSegmentParameterList(val)
+                elif switch == '--pg_dumpall':
+                    self.runpg_dumpall = truth(switch, val)
+                elif switch == '--cores':
+                    self.runcore = truth(switch, val)
+                elif switch[1] in 'hpPU':
+                    self.opt[switch] = val
+        except Exception, e:
+            usage('Error: ' + str(e))
+
+        # Before we go calling psql, we should check the path to ensure
+        # that we have everything we need.
+        self.checkPath();
+
+        # If still no default port, resort to other methods
+        if not self.opt['-p']:
+            psql = subprocess.Popen(['psql', '-?'], stdout=subprocess.PIPE)
+            port = subprocess.Popen(['grep', 'PORT'], stdin=psql.stdout,
+                                    stdout=subprocess.PIPE)
+            line = port.communicate()[0]
+            port_re = re.compile('default: "(\d+)"')
+            m = port_re.search(line)
+            if not m: exit('Error: Could not determine PORT')
+            self.opt['-p'] = m.group(1)
+            
+        # Make sure port is actually an integer
+        try: self.opt['-p'] = int(self.opt['-p'])
+        except ValueError: exit('Error: Could not determine PORT')
+
+        # Connect to master
+        if self.runconnected == True:
+          try:
+              self.master = self.connect(db=self.db, utility=True)
+          except:
+              print "Error: Could not connect to the master database:",
+              print " %s@%s:%s" % (self.opt['-U'], self.opt['-h'], self.opt['-p'])
+              print "Please specify the correct host or start the master in admin mode."
+              print "You may also run gpdetective in un-connected mode (i.e. --connect=false)."
+              exit(1)
+
+        # Setup the log directory
+        self.mklogdir()
+        self.errlog = open('error.log', 'w')
+        self.errlog.write('gpdetective version ' + __version__ + '\n')
+        self.errlog.flush()
+        print 'Collecting information'
+        self.getConfiguration()
+
+
+    #------------------------------------------------------------
+
+    def finishup(self):
+        '''
+        Cleanup open connections and remove temporary files
+        '''
+        if self.logdir:
+            try: self.makeTar()
+            except Exception, e: print str(e)
+        if self.olddir: os.chdir(self.olddir)
+        if self.master: self.master.close()
+        if self.errlog: self.errlog.close()
+        if self.logdir: subprocess.call(['rm', '-rf', self.logdir])
+        if self.error:
+            try:
+                raise self.error
+            except Exception, e:
+                print "Internal error: " + str(e)
+                print "  details: %s" % traceback.format_exc()
+                print "Aborting"
+        else:
+            print "Done"
+
+
+    #------------------------------------------------------------
+    def handleDiagnosticParameterList(self, diagnostics):
+        '''
+        All diagnostics are done by default. 
+        If the user specifies option(s), then all diagnostic options are set 
+        to false (i.e. not done), and individual diagnostics are are set to
+        true (i.e. turned on) if the user specified their corresponding option. 
+        '''
+        if diagnostics == None:
+           usage('Error: Missing diagnostic options.')           
+
+        diagnosticsNoSpaces = diagnostics.replace(' ', '')
+        diagList = diagnosticsNoSpaces.split(',')
+        if len(diagList) == 1: 
+           if diagList[0] == 'a' or diagList[0] == 'all':
+              # One diagnostic 'all' implies all diagnostics (the defalut)
+              return
+           elif diagList[0] == 'n' or diagList[0] == 'none':
+              # One diagnostic 'none' implies turn off everyting.
+              self.rungpstate    = False
+              self.rungpcheckos  = False
+              self.rungpcheckcat = False
+              return
+        
+        # If we got this far, turn everything off.
+        self.rungpstate    = False
+        self.rungpcheckos  = False
+        self.rungpcheckcat = False
+
+        # Go through the list, and selectively turn on the corresponding diagnostic
+        for diag in diagList:
+            if diag == 'a' or diag == 'all' or diag == 'n' or diag == 'none':
+               usage('Error: "%s" must be only diagnostics option.' % diag) 
+            elif diag == 's' or diag == 'state':
+               self.rungpstate = True
+            elif diag == 'o' or diag == 'os':
+               self.rungpcheckos = True
+            elif diag == 'c' or diag == 'catalog':
+               self.rungpcheckcat = True
+            else:
+               usage('Error: Unrecognized diagnostic option: %s' % diag)
+
+
+    #------------------------------------------------------------
+    def handleSegmentParameterList(self, segs):
+        '''
+        The segs parameter is of the form 
+           a[ll]
+           n[one]
+           [n | n-m[,n | n-m]...] where n and m are integers.
+
+          return 
+            []     implies all segments
+            None   implies no segments
+            A list of integers that correspond to the list of entries in segs.
+            (e.g. segs = "1, 2, 5-10, 14". Return [1,2,5,6,7,8,9,10,14])
+            If segs contains no segment numbers, then None
+        '''
+        
+        returnValueList  = None
+        segsNoSpaces = ""
+        inRange = False
+        done = False
+
+        if segs == None:
+           usage('Error: Missing segs options.')
+
+        segsNoSpaces = segs.replace(" ", "")
+        segList = segsNoSpaces.split(',')
+        if len(segList) == 1:
+           if segList[0] == 'a' or segList[0] == 'all':
+              returnValueList = []
+              done = True
+           elif segList[0] == 'n' or segList[0] == 'none':
+              returnValueList = None
+              done = True
+
+        if done == False:
+           returnValueList = []
+           try:
+              for element in segList:
+                 if element.isdigit() == True:
+                    returnValueList.append(int(element))
+                 else:
+                     subRange = element.split('-')
+                     for i in range(int(subRange[0]) , int(subRange[1]) + 1): 
+                        returnValueList.append(i)
+           except Exception, e:
+              print 'Error in segment dbid list: ' + str(e)
+              raise e
+
+        return returnValueList
+
+    #------------------------------------------------------------
+    def checkPath(self):
+        '''
+        Ensures that we can find all the needed utilities used by
+        the script.
+        '''
+        def cmdExists(cmd):
+            if (not self.runCmd(['which', cmd])):
+                sys.exit("Error: Could not find %s in path" % cmd)
+        cmds = ['psql', 'ssh', 'scp', 'uname', 'ls', 'date', 'tar']
+        map(cmdExists, cmds)
+        
+        
+
+    #------------------------------------------------------------
+    def connect(self, user=None, password=None, host=None, port=None, db=None, utility=False):
+        '''
+        Establish a connection to the Greenplum database
+        '''
+        user     = user     or self.opt['-U']
+        password = password or self.opt['-P']
+        host     = host     or self.opt['-h']
+        port     = port     or self.opt['-p']
+        db       = db       or self.opt['-U']
+        if utility:
+            options = '-c gp_session_role=utility'
+        else:
+            options = ''
+        return pg.DB( dbname=db
+                    , host=host
+                    , port=port
+                    , user=user
+                    , passwd=password
+                    , opt=options
+                    )
+
+
+    #------------------------------------------------------------
+    def writeCmd(self, filename, cmd, childenv=None):
+        '''
+        Execute a shell command and dumps the results to the
+        specified file.
+
+        "cmd" can be a list or string.
+
+        '''
+        self.errlog.write('localhost$ ')
+        for i in cmd: self.errlog.write(str(i) + ' ')
+        self.errlog.write("\n")
+        self.errlog.flush()
+
+        if filename:
+            file = open(filename, 'w')
+            file.write('localhost$ ')
+            if isinstance(cmd, str):
+               file.write(cmd)
+            else:
+               for i in cmd: file.write(str(i) + ' ')
+            file.write("\n")
+            file.flush()
+        else:
+            file = self.errlog
+        try:
+            if isinstance(cmd, str):
+               p = subprocess.Popen(cmd, stdout=file, shell=True, stderr=self.errlog, env=childenv)
+               p.wait()
+            else:
+               subprocess.call(cmd, stdout=file, stderr=self.errlog, env=childenv)
+        except Exception, e:
+            self.errlog.write("Error: " + str(e) + "\n");
+            self.errlog.flush()
+
+        if filename: 
+            file.close()
+
+    #------------------------------------------------------------
+    def writeSelect(self, filename, queryStr):
+        '''
+        Execute a sql query and dump the results to the specified file.
+
+        For formatting purposes it materializes the entire query in
+        memory, so don't get out of hand!
+        '''
+        self.errlog.write('SQL: ' + queryStr + "\n")
+        self.errlog.flush()
+        results = None
+
+        try:
+            resultObject = self.master.query(queryStr)
+        except Exception, e:
+            self.errlog.write("Error: " + str(e) + "\n");
+            self.errlog.flush()
+            return
+
+        d = resultObject.listfields()
+        file = open(filename, 'w')
+        file.write('SQL: ' + queryStr + "\n")
+        file.flush()
+
+        # In order to produce formatted output we need to scan through
+        # all the data first before we output anything.
+        width = map(lambda(x): len(x), d)
+        data  = []
+        results = resultObject.getresult()
+        for tuple in results:
+            data.append(tuple)
+            for column in d:
+                index = resultObject.fieldnum(column)
+                item = str(tuple[index])
+                width[index] = max(width[index], len(item))
+
+        # Now that we have calculated the width, output the result
+        for column in d:
+            index = resultObject.fieldnum(column)
+            file.write(column.ljust(width[index]) + ' | ')
+        file.write("\n")
+        for column in d:
+            index = resultObject.fieldnum(column)
+            if (index > 0): 
+                file.write('-')
+            file.write('-' * width[index] + '-+')
+        file.write("\n")
+        for tuple in data:
+            for column in d:
+                index = resultObject.fieldnum(column)
+                file.write(str(tuple[index]).ljust(width[index]) + ' | ')
+            file.write("\n")
+        file.close()
+
+
+   #------------------------------------------------------------  
+    def writeArray(self, filename, itemlist):
+        '''
+        Writes an array to a specified file
+        '''
+        file = open(filename, 'w')
+        for item in itemlist:
+            file.write(str(item) + "\n")
+        file.close()
+
+    #------------------------------------------------------------  
+    def select(self, queryStr):
+        '''
+        Execute a SQL query and return an array of result rows
+           + Single columns will be returned as an array of values
+           + Multiple columns will be returned as an array of tuples
+        '''
+        self.errlog.write('SQL: ' + queryStr + "\n")
+        self.errlog.flush()
+
+        rows = []
+        resultObject = self.master.query(queryStr)
+        results = resultObject.getresult()
+        for tuple in results:
+            if len(tuple) == 1: 
+                rows.append(tuple[0])
+            else: 
+                rows.append(tuple)
+        return rows
+
+    #------------------------------------------------------------  
+    def runCmd(self, cmd, host=None):
+        '''
+        Execute a shell command and returns the results
+        '''
+        if not host:
+            host = 'localhost'
+        
+        # For logging purposes get the string version of the command
+        if isinstance(cmd, list):
+            cmdstr = ''
+            for c in cmd: cmdstr += c + ' '
+        else:
+            cmdstr = str(cmd)
+
+        if (self.errlog):
+            self.errlog.write('%s$ %s\n' % (host, cmdstr))
+            self.errlog.flush()
+        try:
+            cmd = cmd.split(' ')
+        except: pass
+        if host != 'localhost':
+            cmd.insert(0, 'ssh')
+            cmd.insert(1, host)
+        
+        # A stupid hack to ignore unmatched globs in 'ls'
+        if (cmd[0] == 'ls'):
+            x = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        else:            
+            x = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=self.errlog)
+        return str(x.communicate()[0].strip())
+
+    #------------------------------------------------------------
+    def log(self, test):
+        '''
+        Logs the start of a test
+        '''
+        print '  + ' + test
+        if (self.errlog):
+            self.errlog.write('\nTEST: ' + test + '\n')
+            self.errlog.flush()
+
+    
+    #------------------------------------------------------------  
+    def getConfiguration(self):
+        '''
+        Collect configuration information
+        '''
+        self.log('getConfiguration')
+
+        os.mkdir('master')
+
+        if self.runconnected == False:
+           # Assume we are running on the master,
+           # and try to get the location of the master directory
+           self.opt['-h'] = self.runCmd('uname -n') 
+           self.masterdir = os.environ.get('MASTER_DATA_DIRECTORY')
+           return
+
+        os.mkdir('backupmaster')
+
+        # Master directory
+        rows = self.select(
+        '''
+           SELECT hostname, fselocation 
+           FROM   gp_segment_configuration
+           INNER JOIN pg_filespace_entry on (fsedbid=dbid)
+           INNER JOIN pg_filespace fs on (fs.oid = fsefsoid and fsname = 'pg_system')
+           WHERE  content = -1  AND preferred_role = 'p'
+        ''')
+        self.opt['h']  = rows[0][0]
+        self.masterdir = rows[0][1]
+
+        # Backup (mirror) Master directory
+        rows = self.select(
+        '''
+           SELECT hostname, fselocation
+           FROM   gp_segment_configuration
+           INNER JOIN pg_filespace_entry on (fsedbid=dbid)
+           INNER JOIN pg_filespace fs on (fs.oid = fsefsoid and fsname = 'pg_system')
+           WHERE  content < 0 AND preferred_role != 'p'
+        ''')
+        if len(rows) > 0:
+           self.backupmasterhostname  = rows[0][0]
+           self.backupmasterhostdir   = rows[0][1]
+
+        # List of hosts
+        self.hosts = self.select(
+        '''
+           SELECT distinct hostname
+           FROM   gp_segment_configuration
+           WHERE  content >= 0
+        ''')
+
+        # list of segments
+        self.segments = self.select(
+        '''
+           SELECT dbid, hostname || ':' || fselocation
+           FROM   gp_segment_configuration
+           INNER JOIN pg_filespace_entry on (fsedbid=dbid)
+           INNER JOIN pg_filespace fs on (fs.oid = fsefsoid and fsname = 'pg_system')
+           WHERE  content >= 0  AND  preferred_role = 'p'
+        ''')
+
+        # list of mirrors
+        self.mirrors = self.select(
+        '''
+           SELECT dbid, hostname || ':' || fselocation
+           FROM   gp_segment_configuration
+           INNER JOIN pg_filespace_entry on (fsedbid=dbid)
+           INNER JOIN pg_filespace fs on (fs.oid = fsefsoid and fsname = 'pg_system')
+           WHERE  content >= 0  AND  preferred_role != 'p'
+        ''')
+
+        # list of databases
+        self.databases = self.select(
+        '''
+           SELECT datname FROM pg_database
+           WHERE  datname not in ('template0', 'template1')
+        ''')
+
+        self.writeArray('hosts', self.hosts)
+        for host in self.hosts:
+           os.mkdir(host)
+        self.writeSelect('config.log', 
+        '''
+           SELECT * from gp_segment_configuration
+        ''')
+        
+        self.writeSelect('config_history.log',
+        '''
+           SELECT * from gp_configuration_history
+        ''')
+
+        self.writeSelect('config_history.log', 
+        '''
+            SELECT * FROM gp_configuration_history
+        ''')
+        
+        self.writeSelect('resqueue.log',
+        '''
+            SELECT * FROM pg_catalog.pg_resqueue
+        ''')
+        
+        self.writeSelect('mastermirror.log',
+        '''
+            SELECT * FROM pg_catalog.gp_master_mirroring
+        ''')
+        
+        self.writeSelect('version_at_initdb.log',
+        '''
+            SELECT * FROM pg_catalog.gp_version_at_initdb
+        ''')
+    
+        self.writeSelect('interfaces.log',
+        '''
+            SELECT * FROM pg_catalog.gp_interfaces
+        ''')
+    
+        self.writeSelect('db_interfaces.log',
+        '''
+            SELECT * FROM pg_catalog.gp_db_interfaces
+        ''')
+        
+        self.writeSelect('autovacuum.log',
+        '''
+            SELECT * FROM pg_catalog.pg_autovacuum
+        ''')
+        
+        self.writeSelect('pgdatabase.log',
+        '''
+            SELECT * FROM pg_catalog.gp_pgdatabase
+        ''')
+        
+        self.writeSelect('dbsizes.log',
+        '''
+            SELECT datname,pg_size_pretty(pg_database_size( datname )) 
+            FROM ( SELECT datname 
+                   FROM pg_database 
+                   WHERE datname NOT IN ('template0', 'postgres')) d
+        ''')
+
+        self.writeSelect('pg_stat_resqueue.log',
+        '''
+            SELECT * FROM pg_catalog.pg_stat_resqueues            
+        ''')
+        
+        self.writeSelect('pg_stat_database.log',
+        '''
+            SELECT * FROM pg_catalog.pg_stat_database            
+        ''')
+
+        self.writeSelect('pg_roles.log',
+        '''
+            SELECT * FROM pg_catalog.pg_roles
+        ''')
+
+        self.writeSelect('pg_filespace.log',
+        '''
+            SELECT * FROM pg_catalog.pg_filespace
+        ''')
+
+        self.writeSelect('pg_filespace_entry.log',
+        '''
+            SELECT * FROM pg_catalog.pg_filespace_entry
+        ''')
+        
+
+
+    
+    #------------------------------------------------------------
+    def get_timeopt(self):
+        opt = ''
+        if self.start_date:
+            if self.start_date.find('-') == -1:
+                start = datetime.date.today() - datetime.timedelta(days=int(self.start_date))
+                opt = '--begin %s' % str(start)
+            else:
+                opt = '--begin %s' % self.start_date
+        if self.end_date:
+            opt = opt + ' --end %s' % self.end_date
+        return opt
+
+        
+        
+    #------------------------------------------------------------
+    def grabMasterLog(self,masterlog,dst_file,time_opt):
+        myfile = open(dst_file, 'w')        
+        cmd = '%s/gplogfilter --quiet %s %s' % (sys.path[0],time_opt,masterlog)
+        p=subprocess.Popen(cmd, stdout=myfile,shell=True)
+        p.wait()
+        myfile.close() 
+        if p.returncode == 0:
+            return True
+        else:
+            return False
+
+    
+   #------------------------------------------------------------                                                                                                    
+    def grabLog(self, hostname, loglocation, dst_file, time_opt):
+        myfile = open(dst_file, 'w')
+        try:
+            cmdstr = "gplogfilter --quiet %s %s 2>&1" % (time_opt,loglocation)
+            cmd="ssh %s \"%s %s\" " % (hostname,SRC_GPPATH,cmdstr)
+            p = subprocess.Popen(cmd, stdout=myfile,shell=True)
+            p.wait()
+            if p.returncode == 0:
+                found = True
+            else:
+                self.log('could not find the log on host: %s in dir: %s' % (hostname,loglocation))
+                myfile.close()
+                f = open(dst_file,'r')
+                str=f.readlines()
+                self.log('command returned: %s' % str)
+                f.close()
+                found = False
+        except OSError, e:
+            self.log('' + str(e))
+            found = False
+
+        myfile.close()
+        return found
+
+
+    #------------------------------------------------------------
+    def copyLogs(self):
+        '''
+        1. Copy logfiles from master and all segments
+        2. Copy postgresql.conf from master and all segments
+        3. Copy ~/gpAdminLogs from master.
+        '''
+        self.log('copyLogs')
+
+        # Grab master log and postgresql.conf
+        #
+        path_re = re.compile('/([^/]*)$')
+        m = path_re.search(self.masterdir)
+        
+        time_opt=self.get_timeopt()
+        hostname=m.group(1)
+
+        logfile= self.masterdir + '/pg_log/*'
+        dst_file = 'master/%s_rotated.log' % hostname
+        if not self.grabMasterLog(logfile,dst_file,time_opt):
+           os.remove(dst_file)
+
+        self.log('    get master logs')        
+        self.runCmd(['scp', '%s/postgresql.conf' % self.masterdir,
+                     'master/postgresql.conf'])
+        self.runCmd(['scp', '%s/global/pg_database' % self.masterdir,
+                     'master/pg_database'])
+        self.runCmd(['scp', '%s/global/pg_auth' % self.masterdir,
+                     'master/pg_pgauth'])
+
+        
+        # Grab backup master log and postgresql.conf
+        #                    host  : fullpath / filename
+        host_rx = re.compile('(.*)/([^/]*)')
+        if self.runconnected == True and self.backupmasterhostdir != None and self.backupmasterhostname != None:
+           m = host_rx.search(self.backupmasterhostdir)
+           backupmaster_out_name='backupmaster/%s_rotated.log' % m.group(2)
+           backupmasterlog = "%s/%s/pg_log/*" % m.group(1,2)
+           if not self.grabLog( self.backupmasterhostname
+                              , backupmasterlog
+                              , backupmaster_out_name
+                              , time_opt
+                              ):
+               os.remove(backupmaster_out_name)
+
+           self.log('    get backup master logs')
+           self.runCmd(['scp', '-q',
+                        '%s/postgresql.conf' % str(self.backupmasterhostname + ':' + self.backupmasterhostdir),
+                        'backupmaster/postgresql_%s.conf' % m.group(2)])
+        
+
+        # Grab segment logs and postgresql.conf
+        #                    host  : fullpath / filename
+        host_rx = re.compile('(.*)\:(.*)/([^/]*)')
+        if self.log_list != None and self.runconnected == True:
+           self.log('    get primary segment logs')
+           for seg in self.segments:
+               if self.log_list != [] and int(seg[0]) not in self.log_list:
+                  continue
+               m = host_rx.search(seg[1])
+               hostname = m.group(1)            
+               out_name='%s/%s_rotated.log' % (m.group(1,3))            
+               seglog = "%s/%s/pg_log/*" % m.group(2,3)
+               if not self.grabLog(hostname,seglog,out_name,time_opt):
+                   os.remove(out_name)
+               self.runCmd(['scp', '-q',
+                            '%s/postgresql.conf' % seg[1],
+                            '%s/postgresql_%s.conf' % m.group(1,3)])
+        
+        # Grab backup (mirror) segment logs and postgresql.conf
+        #                    host  : fullpath / filename
+        host_rx = re.compile('(.*)\:(.*)/([^/]*)')
+        if self.log_list != None and self.runconnected == True and len(self.mirrors) > 0:
+           self.log('    get mirror segment logs')
+           for mir in self.mirrors:
+               if self.log_list != [] and int(mir[0]) not in self.log_list:
+                     continue
+               m = host_rx.search(mir[1])
+               hostname = m.group(1)
+               out_name = '%s/%s_rotated_mirror.log' % (m.group(1,3))
+               mirlog   = "%s/%s/pg_log/*" % m.group(2,3)
+               if not self.grabLog(hostname,mirlog,out_name,time_opt):
+                   os.remove(out_name)
+               self.runCmd(['scp', '-q',
+                            '%s/postgresql.conf' % mir[1],
+                            '%s/postgresql_%s_mirror.conf' % m.group(1,3)])
+
+        #3 grab gpAdminLogs
+        adminLogsDir=os.path.expanduser("~") + "/gpAdminLogs/"
+        self.log('    get gpAdminLogs')
+        self.runCmd(['cp', '-R', adminLogsDir , 'master/gpAdminLogs'])
+        
+        
+        # Grab segment pg_changetracking logs
+        #                    host  : fullpath / filename
+        host_rx = re.compile('(.*)\:(.*)/([^/]*)')
+        if self.pg_changetracking_log_list != None and self.runconnected == True:
+           self.log('    get primary segment pg_changetracking logs')
+           for seg in self.segments:
+               if self.pg_changetracking_log_list != [] and int(seg[0]) not in self.pg_changetracking_log_list:
+                  continue
+               m = host_rx.search(seg[1])
+               hostname = m.group(1)
+               tempStr = self.runCmd(['scp', '-qr',
+                            '%s/pg_changetracking' % seg[1],
+                            '%s/pg_changetracking_%s' % m.group(1,3)])
+        elif self.runconnected == True:
+           # We still want to get some of the log files.
+           self.log('    get primary segment pg_changetracking FILEREP_CONFIG_LOG and FILEREP_LOG  logs')
+           for seg in self.segments:
+               m = host_rx.search(seg[1])
+               hostname = m.group(1)
+               tempStr = self.runCmd(['mkdir', '%s/pg_changetracking_%s' % m.group(1,3)])
+               tempStr = self.runCmd(['scp', '-qr',
+                            '%s/pg_changetracking/FILEREP_CONFIG_LOG' % seg[1],
+                            '%s/pg_changetracking_%s/FILEREP_CONFIG_LOG' % m.group(1,3)])
+               tempStr = self.runCmd(['scp', '-qr',
+                            '%s/pg_changetracking/FILEREP_LOG' % seg[1],
+                            '%s/pg_changetracking_%s/FILEREP_LOG' % m.group(1,3)])
+
+        # Grab backup (mirror) pg_changetracking logs
+        #                    host  : fullpath / filename
+        host_rx = re.compile('(.*)\:(.*)/([^/]*)')
+        if self.pg_changetracking_log_list != None and self.runconnected == True and len(self.mirrors) > 0:
+           self.log('    get mirror segment pg_changetracking logs')
+           for mir in self.mirrors:
+               if self.pg_changetracking_log_list != [] and int(mir[0]) not in self.pg_changetracking_log_list:
+                  continue
+               m = host_rx.search(mir[1])
+               hostname = m.group(1)
+               tempStr = self.runCmd(['scp', '-qr',
+                            '%s/pg_changetracking' % mir[1],
+                            '%s/pg_changetracking_%s_mirror' % m.group(1,3)])
+        elif self.runconnected == True:
+           # We still want to get some of the log files.
+           self.log('    get mirror segment pg_changetracking FILEREP_CONFIG_LOG and FILEREP_LOG  logs')
+           for mir in self.mirrors:
+               m = host_rx.search(mir[1])
+               hostname = m.group(1)
+               tempStr = self.runCmd(['mkdir', '%s/pg_changetracking_%s_mirror' % m.group(1,3)])
+               tempStr = self.runCmd(['scp', '-qr',
+                            '%s/pg_changetracking/FILEREP_CONFIG_LOG' % mir[1],
+                            '%s/pg_changetracking_%s_mirror/FILEREP_CONFIG_LOG' % m.group(1,3)])
+               tempStr = self.runCmd(['scp', '-qr',
+                            '%s/pg_changetracking/FILEREP_LOG' % mir[1],
+                            '%s/pg_changetracking_%s_mirror/FILEREP_LOG' % m.group(1,3)])
+
+    #------------------------------------------------------------
+    def filespaceFlatFiles(self):
+        """
+        Copy the flat files for temporary/transaction filespaces
+        from all the segments, master and standby.
+        """
+
+        #Copy files from primaries
+        host_rx = re.compile('(.*)\:(.*)/([^/]*)')
+        for seg in self.segments:
+            m = host_rx.search(seg[1])
+            tempStr = self.runCmd(['scp', '-qr',
+                                   '%s/%s' % (seg[1], GP_TRANSACTION_FILES_FILESPACE), 
+                                   '%s/pg_changetracking_%s/%s' % (m.group(1), m.group(3), GP_TRANSACTION_FILES_FILESPACE)])
+
+            tempStr = self.runCmd(['scp', '-qr',
+                                   '%s/%s' % (seg[1], GP_TEMPORARY_FILES_FILESPACE), 
+                                   '%s/pg_changetracking_%s/%s' % (m.group(1), m.group(3), GP_TEMPORARY_FILES_FILESPACE)])
+
+        #Copy files from mirrors
+        for seg in self.mirrors: 
+            m = host_rx.search(seg[1])
+            tempStr = self.runCmd(['scp', '-qr',
+                                   '%s/%s' % (seg[1], GP_TRANSACTION_FILES_FILESPACE), 
+                                   '%s/pg_changetracking_%s_mirror/%s' % (m.group(1), m.group(3), GP_TRANSACTION_FILES_FILESPACE)])
+
+            tempStr = self.runCmd(['scp', '-qr',
+                                   '%s/%s' % (seg[1], GP_TEMPORARY_FILES_FILESPACE), 
+                                   '%s/pg_changetracking_%s_mirror/%s' % (m.group(1), m.group(3), GP_TEMPORARY_FILES_FILESPACE)])
+        
+        #Copy files from backupmaster
+        host_rx = re.compile('(.*)/([^/]*)')
+        if self.backupmasterhostdir is not None and self.backupmasterhostname is not None:
+            m = host_rx.search(self.backupmasterhostdir)
+            tempStr = self.runCmd(['scp', '-q',
+                                   '%s/%s' % (self.backupmasterhostname + ':' + self.backupmasterhostdir, 
+                                              GP_TRANSACTION_FILES_FILESPACE),
+                                   '%s/%s' % (m.group(1), GP_TRANSACTION_FILES_FILESPACE)])
+            tempStr = self.runCmd(['scp', '-q',
+                                   '%s/%s' % (self.backupmasterhostname + ':' + self.backupmasterhostdir, 
+                                              GP_TEMPORARY_FILES_FILESPACE),
+                                   '%s/%s' % (m.group(1), GP_TEMPORARY_FILES_FILESPACE)])
+        
+        #Copy files from the master
+        tempStr = self.runCmd(['cp', '%s/%s' % (self.masterdir, GP_TRANSACTION_FILES_FILESPACE), 
+                                     'master/%s' % (GP_TRANSACTION_FILES_FILESPACE)])
+        tempStr = self.runCmd(['cp', '%s/%s' % (self.masterdir, GP_TEMPORARY_FILES_FILESPACE), 
+                                     'master/%s' % (GP_TEMPORARY_FILES_FILESPACE)])
+ 
+    #------------------------------------------------------------
+    def systemInfo(self):
+        '''
+        1. Run gpstate
+        2. Run gpcheckos
+        '''
+        self.log('systemInfo')
+
+        if self.rungpstate == True and self.runconnected == True:
+           self.writeCmd('gpstate_mirrors.log',        ['gpstate', '-m'])
+           self.writeCmd('gpstate_standby_master.log', ['gpstate', '-f'])
+#        self.writeCmd('gpstate_master.log',         
+#                      ['gpstate', '-d', self.masterdir])
+
+        if self.rungpcheckos == True:
+           self.writeCmd('gpcheckos_master.log',   
+                         ['gpcheckos', '-vm', '-h', self.opt['-h']])
+           if self.runconnected == True:
+              self.writeCmd('gpcheckos_segments.log', 
+                            ['gpcheckos', '-vf', 'hosts'])
+        
+
+    #------------------------------------------------------------
+    def checkCatalog(self):
+        '''
+        1. Run gpcheckcat
+        2. pg_dump all databases or pg_dump using command specified in pg_dump_options
+        3. Run other catalog queries
+        '''
+        self.log('checkCatalog')
+
+        checkcat = [libdir + '/gpcheckcat'] 
+        if self.opt['-h']: checkcat.extend(['-h', str(self.opt['-h'])])
+        if self.opt['-p']: checkcat.extend(['-p', str(self.opt['-p'])])
+        if self.opt['-U']: checkcat.extend(['-U', str(self.opt['-U'])])
+        if self.opt['-P']: checkcat.extend(['-P', str(self.opt['-P'])])
+
+        if self.rungpcheckcat == True:
+           for db in self.databases:
+              checkcat.append(db)
+              self.writeCmd('gpcheckcat_' + db + '.log', checkcat)
+              checkcat.pop()
+
+        conOpts = ""
+        if self.opt['-h']:
+           conOpts = conOpts + ' -h ' + str(self.opt['-h'])
+        if self.opt['-p']:
+           conOpts = conOpts + ' -p ' + str(self.opt['-p'])
+        if self.opt['-U']:
+           conOpts = conOpts + ' -U ' + str(self.opt['-U'])
+
+        # if -P specified, put password into PGPASSWORD environment
+        # for child pg_dumpall/pg_dump processes.
+        childenv = None
+        if self.opt['-P']:
+            childenv = dict(os.environ)
+            childenv['PGPASSWORD'] = self.opt['-P']
+
+        if self.runpg_dumpall == True and self.pg_dump_options == None:
+            self.log('pg_dumpall')
+            self.writeCmd( 'pg_dumpall.log', 
+                           'pg_dumpall' + ' --schema-only' + ' --gp-syntax' + conOpts,
+                           childenv
+                         );
+        if self.pg_dump_options != None:
+            self.log('pd_dump')
+            self.writeCmd( 'pg_dump.log'
+                         , 'pg_dump' + ' --schema-only' + ' --gp-syntax ' + self.pg_dump_options + conOpts
+                         , childenv
+                         );
+
+        self.writeSelect('catalog_q1.log', 
+        '''
+           SELECT 
+             nspname || '.' || relname, 
+             attname, 
+             starelid,
+             staattnum,
+             stanullfrac,
+             stawidth,
+             stadistinct,
+             stakind1,
+             stakind2,
+             stakind3,
+             stakind4,
+             staop1,
+             staop2,
+             staop3,
+             staop4,
+             array_to_string(stanumbers1, ','),
+             array_to_string(stanumbers2, ','),
+             array_to_string(stanumbers3, ','),
+             array_to_string(stanumbers4, ','),
+             array_to_string(stavalues1, ','),
+             array_to_string(stavalues2, ','),
+             array_to_string(stavalues3, ','),
+             array_to_string(stavalues4, ',')
+           FROM   pg_class c, 
+                  pg_namespace n, 
+                  pg_attribute a, 
+                  pg_statistic s 
+           WHERE  n.oid = c.relnamespace 
+             AND  c.oid = a.attrelid 
+             AND  c.oid = s.starelid 
+             AND  a.attnum = s.staattnum 
+          ORDER BY 1, 2
+        ''')
+
+
+    #------------------------------------------------------------
+    def crashReport(self):
+        '''
+        Find core files and extract useful information
+           + Stack Traces
+           + Local variables of current stack frame
+           + Offending statement
+        '''
+        self.log('crashReport')
+
+        path_re = re.compile('(.*/)?([^/]*)')
+        core_re = re.compile('^Core was generated by .*postgres')
+
+        # If master isn't in the list of hosts, add it in
+        hosts = set(self.hosts).union([self.opt['-h']])        
+
+        for host in hosts:
+            print "    + " + host
+            system = self.runCmd('uname', host)
+            cores  = [];
+
+            if system == 'Darwin':
+                # For OSX copy the CrashReporter files, these should exist even
+                # if no core files were generated; this assumes we are running 
+                # as the user that started postgres.
+                cr = host + ':~/Library/Logs/CrashReporter/postgres*'
+                crlogs = self.runCmd(['scp', cr, host])
+                core_pattern = self.runCmd(['/usr/sbin/sysctl', '-n', 
+                                            'kern.corefile'], host)
+
+            elif system == 'Linux':
+                core_pattern  = self.runCmd(['/sbin/sysctl', '-n', 
+                                            'kernel.core_pattern'], host)
+                if self.runCmd(['/sbin/sysctl', '-n', 
+                                'kernel.core_uses_pid'], host):
+                    core_pattern = core_pattern + '*'
+
+            elif system == 'SunOS':
+                init_pattern = self.runCmd(['grep', 'COREADM_INIT_PATTERN',
+                                            '/etc/coreadm.conf'], host)
+                core_pattern = init_pattern.split('=')[1]
+
+            else:
+                self.log('Crash Report - Unknown System: ' + system)
+                self.writeArray('crash_report.log', 
+                                ['Unknown system: ' + system])
+                continue
+
+
+            # Make replacements in core_pattern            
+            m = path_re.search(core_pattern)
+            core_path    = m.group(1) or ''
+            core_pattern = m.group(2)
+            core_pattern = re.sub(re.compile('\%[hH]'), host, 
+                                  core_pattern)
+            core_pattern = re.sub(re.compile('\%[eE]'), 'postgres', 
+                                  core_pattern)
+            core_pattern = re.sub(re.compile('\%.'), '*', core_pattern)
+
+            # If the pattern is a full path then all the core files are
+            # conviently in one place for this host.  Otherwise we need
+            # to go searching
+            if len(core_path) > 0:
+                cores = self.runCmd('ls -1 ' + core_path + core_pattern, host)
+                cores = cores.split('\n')
+
+                # If there are no cores, we end up with a list with one empty item. Remove it.
+                if '' in cores:
+                    cores.remove('')
+            else:
+                # cores inconvienently dumped into process directory,
+                # so go look in the relevant locations
+                dir = ''
+                if host == self.opt['-h']:
+                    dir = '%s %s/%s' % (dir, self.masterdir, core_pattern)
+
+                for seg in self.segments:
+                    (shost, sdir) = seg[1].split(':')
+                    if shost == host:
+                        dir = '%s %s/%s' % (dir, sdir, core_pattern)
+                for seg in self.mirrors:
+                    (shost, sdir) = seg[1].split(':')
+                    if shost == host:
+                        dir = '%s %s/%s' % (dir, sdir, core_pattern)
+                cores = self.runCmd('ls -1 ' + dir, host)
+                cores = cores.split('\n')
+                # If there are no cores, we end up with a list with one empty item. Remove it.
+                if '' in cores:
+                    cores.remove('')
+
+            gdb = which('gdb');
+            if (gdb == None):
+                self.log('  No debugger found');
+                self.writeArray('  Core files: ', cores)
+                return
+
+            def is_pgcore(c):
+                corecheck = self.runCmd('%s -batch -n -c %s' 
+                                        % (gdb, str(c)), 
+                                        host)
+                return core_re.search(corecheck)
+            cores = filter(is_pgcore, cores)
+
+            for corefile in cores:
+                name = re.sub('/', '_', corefile)
+                dbgout = self.runCmd([gdb, '--batch', '-n', '-c', corefile,
+                                      '-x', libdir + '/crashreport.gdb',
+                                      sys.path[0] + '/postgres'], host)
+                if host in self.hosts:
+                    self.writeArray('%s/core%s' % (host, name), [dbgout])
+                else:
+                    self.writeArray('master/core%s' % name, [dbgout])
+    
+    #------------------------------------------------------------
+    def mklogdir(self):
+        '''
+        Creates the temporary directory and cds to that location
+        '''
+        self.logdir = tempfile.mkdtemp(dir=self.tempdir)
+        os.chdir(self.logdir)
+        timestamp = self.runCmd('date +%Y%m%d%H%M%S')
+        self.tardir = 'gpdetective' + timestamp.strip()
+        os.mkdir(self.tardir)
+        os.chdir(self.tardir)
+
+
+    #------------------------------------------------------------
+    def makeTar(self):
+        '''
+        Creates a tar archive from the files in the temporary logdir
+        '''
+        self.log('makeTar')
+        self.errlog.close();
+        self.errlog = None
+        os.chdir(self.logdir)
+
+        # because solaris tar can't gzip we do the tar and gzip as 
+        # separate steps.
+        tarfile = self.tardir + '.tar'
+        tarcmd = ['tar', '-cf', tarfile];
+        tarcmd.extend(os.listdir('.'))
+        self.runCmd(tarcmd)
+        try:
+            self.runCmd(['bzip2', tarfile])
+            tarfile = tarfile + '.bz2';
+        except:
+            pass
+        self.runCmd(['cp', tarfile, self.olddir])
+        os.chdir(self.tardir)
+
+#================================================================
+coverage = GpCoverage()
+coverage.start()
+
+try:
+    d = GPDetective()
+    try:    
+        d.copyLogs()
+        d.filespaceFlatFiles()
+        d.systemInfo()
+        if d.runconnected == True:
+           d.checkCatalog()
+        if d.runcore == True:
+           d.crashReport()
+        d.finishup()
+    except Exception, e:
+        print 'ERROR: %s' % e
+        print "  details: %s" % traceback.format_exc()        
+        d.error = e
+        d.finishup()
+        exit(1)
+except Exception, e:
+    print "ERROR:"
+    print "   Unhandled internal error:" + str(e)
+    print traceback.format_exc()
+    exit(1)
+finally:
+    coverage.stop()
+    coverage.generate_report()
+
+exit(0);

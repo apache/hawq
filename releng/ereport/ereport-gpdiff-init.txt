@@ -1,0 +1,13 @@
+-- start_matchsubs
+--
+-- # create a match/subs expression remove line numbers, which can change
+--
+-- m/\:\d+\:/
+-- s/\:\d+\:/\:00\:/
+-- m/yy/i
+-- s/.*/DUMMY_YY/
+--
+-- m/\#line/
+-- s/\#line\s+\d+/\#line DUMMY_NUM/
+--
+-- end_matchsubs

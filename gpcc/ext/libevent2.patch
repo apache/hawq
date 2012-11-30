@@ -1,0 +1,20 @@
+--- Makefile.orig	2008-12-29 09:44:50.000000000 -0800
++++ Makefile	2008-12-29 09:49:10.000000000 -0800
+@@ -124,7 +124,7 @@
+   distclean-recursive maintainer-clean-recursive
+ ETAGS = etags
+ CTAGS = ctags
+-DIST_SUBDIRS = . sample test
++DIST_SUBDIRS = .
+ DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
+ distdir = $(PACKAGE)-$(VERSION)
+ top_distdir = $(distdir)
+@@ -298,7 +298,7 @@
+ 
+ lib_LTLIBRARIES = libevent.la libevent_core.la libevent_extra.la
+ #SUBDIRS = . sample test
+-SUBDIRS = . sample
++SUBDIRS = .
+ #SYS_LIBS = 
+ SYS_LIBS = -lws2_32
+ #SYS_SRC = 

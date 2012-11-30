@@ -1,0 +1,510 @@
+# -----------------------------
+# PostgreSQL configuration file
+# -----------------------------
+#
+# This file consists of lines of the form:
+#
+#   name = value
+#
+# (The "=" is optional.)  Whitespace may be used.  Comments are introduced with
+# "#" anywhere on a line.  The complete list of parameter names and allowed
+# values can be found in the PostgreSQL documentation.
+#
+# The commented-out settings shown in this file represent the default values.
+# Re-commenting a setting is NOT sufficient to revert it to the default value;
+# you need to reload the server.
+#
+# This file is read on server startup and when the server receives a SIGHUP
+# signal.  If you edit the file on a running system, you have to SIGHUP the
+# server for the changes to take effect, or use "pg_ctl reload".  Some
+# parameters, which are marked below, require a server shutdown and restart to
+# take effect.
+#
+# Any parameter can also be given as a command-line option to the server, e.g.,
+# "postgres -c log_connections=on".  Some parameters can be changed at run time
+# with the "SET" SQL command.
+#
+# Memory units:  kB = kilobytes        Time units:  ms  = milliseconds
+#                MB = megabytes                     s   = seconds
+#                GB = gigabytes                     min = minutes
+#                                                   h   = hours
+#                                                   d   = days
+
+
+#------------------------------------------------------------------------------
+# CONNECTIONS AND AUTHENTICATION
+#------------------------------------------------------------------------------
+
+# - Connection Settings -
+
+#listen_addresses = '*'		# what IP address(es) to listen on;
+					# comma-separated list of addresses;
+					# defaults to '*', '*' = all
+					# (change requires restart)
+
+#port = 5432				# sets the database listener port for 
+      					# a Greenplum instance. The master and 
+					# each segment has its own port number. 
+# note: Port numbers for the Greenplum system must also be changed in the
+# gp_configuration catalog. See the Greenplum Database Administrator Guide 
+# for instructions!
+#
+# WARNING: YOU MUST SHUT DOWN YOUR GREENPLUM SYSTEM BEFORE CHANGING 
+# THE PORT NUMBER IN THIS FILE.
+
+#max_connections = 200
+# note: increasing max_connections costs ~400 bytes of shared memory per
+# connection slot, plus lock space (see max_locks_per_transaction).  You
+# might also need to raise shared_buffers to support more connections.
+#superuser_reserved_connections = 3	# (change requires restart)
+#unix_socket_directory = ''		# (change requires restart)
+#unix_socket_group = ''			# (change requires restart)
+#unix_socket_permissions = 0777		# begin with 0 to use octal notation
+					# (change requires restart)
+#bonjour_name = ''			# defaults to the computer name
+					# (change requires restart)
+
+# - Security and Authentication -
+
+#authentication_timeout = 1min		# 1s-600s
+#ssl = off				# (change requires restart)
+#ssl_ciphers = 'ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH'	# allowed SSL ciphers
+					# (change requires restart)
+#password_encryption = on
+#db_user_namespace = off
+
+# Kerberos and GSSAPI
+#krb_server_keyfile = ''
+#krb_srvname = 'postgres'		# (Kerberos only)
+#krb_caseins_users = off
+
+# - TCP Keepalives -
+# see "man 7 tcp" for details
+
+#tcp_keepalives_idle = 0		# TCP_KEEPIDLE, in seconds;
+					# 0 selects the system default
+#tcp_keepalives_interval = 0		# TCP_KEEPINTVL, in seconds;
+					# 0 selects the system default
+#tcp_keepalives_count = 0		# TCP_KEEPCNT;
+					# 0 selects the system default
+
+
+#------------------------------------------------------------------------------
+# RESOURCE USAGE (except WAL)
+#------------------------------------------------------------------------------
+
+# - Memory -
+
+#shared_buffers = 128MB			# min 128kB or max_connections*16kB
+					# (change requires restart)
+#temp_buffers = 8MB			# min 800kB
+max_prepared_transactions = 250		# can be 0 or more
+					# (change requires restart)
+# Note: increasing max_prepared_transactions costs ~600 bytes of shared memory
+# per transaction slot, plus lock space (see max_locks_per_transaction).
+#work_mem = 32MB			# min 64kB
+#maintenance_work_mem = 64MB		# min 1MB
+#max_stack_depth = 2MB			# min 100kB
+
+# - Free Space Map -
+
+#max_fsm_pages = 1638400		# min max_fsm_relations*16, 6 bytes each
+					# (change requires restart)
+#max_fsm_relations = 1000		# min 100, ~70 bytes each
+					# (change requires restart)
+
+# - Kernel Resource Usage -
+
+#max_files_per_process = 1000		# min 25
+					# (change requires restart)
+#shared_preload_libraries = ''		# (change requires restart)
+
+# - Cost-Based Vacuum Delay -
+
+#vacuum_cost_delay = 0ms		# 0-100 milliseconds
+#vacuum_cost_page_hit = 1		# 0-10000 credits
+#vacuum_cost_page_miss = 10		# 0-10000 credits
+#vacuum_cost_page_dirty = 20		# 0-10000 credits
+#vacuum_cost_limit = 200		# 1-10000 credits
+
+#------------------------------------------------------------------------------
+# QUERY TUNING
+#------------------------------------------------------------------------------
+
+# - Planner Method Configuration -
+
+#enable_bitmapscan = on
+#enable_indexscan = on
+#enable_seqscan = on
+#enable_tidscan = on
+
+#enable_hashjoin = on
+#enable_mergejoin = off
+#enable_nestloop = off
+#gp_enable_adaptive_nestloop = on
+
+#gp_enable_multiphase_agg = on
+#gp_enable_preunique = on
+#gp_enable_agg_distinct = on
+#gp_enable_agg_distinct_pruning = on
+#enable_groupagg = on
+#enable_hashagg = on
+#gp_selectivity_damping_for_scans = on
+#gp_selectivity_damping_for_joins = off
+
+
+#gp_enable_sequential_window_plans = off
+
+#enable_sort = on
+#gp_enable_sort_limit = on
+#gp_enable_sort_distinct = on
+
+# - Planner Cost Constants -
+
+#seq_page_cost = 1.0			# measured on an arbitrary scale
+#random_page_cost = 100			# same scale as above
+
+#cpu_tuple_cost = 0.01			# same scale as above
+#cpu_index_tuple_cost = 0.005		# same scale as above
+#cpu_operator_cost = 0.0025		# same scale as above
+#gp_motion_cost_per_row = 0.0  # (same) (if 0, 2*cpu_tuple_cost is used)
+
+#effective_cache_size = 4MB
+
+# - Other Planner Options -
+
+#from_collapse_limit = 8
+#join_collapse_limit = 8		# 1 disables collapsing of explicit
+					# JOINs
+#gp_segments_for_planner = 0     # if 0, actual number of segments is used
+
+#gp_enable_direct_dispatch = on
+
+#------------------------------------------------------------------------------
+# ERROR REPORTING AND LOGGING
+#------------------------------------------------------------------------------
+
+# - Set gp_reraise_signal to on to generate core files on SIGSEGV
+
+#gp_reraise_signal = off
+
+# - Where to Log -
+
+#log_truncate_on_rotation = off		# If on, an existing log file of the
+					# same name as the new log file will be
+					# truncated rather than appended to.
+					# But such truncation only occurs on
+					# time-driven rotation, not on restarts
+					# or size-driven rotation.  Default is
+					# off, meaning append to existing files
+					# in all cases.
+#log_rotation_age = 1d			# Automatic rotation of logfiles will
+					# happen after that time.  0 disables.
+#log_rotation_size = 10MB		# Automatic rotation of logfiles will 
+					# happen after that much log output.
+					# 0 disables.
+
+# - When to Log -
+
+#client_min_messages = notice		# values in order of decreasing detail:
+					#   debug5
+					#   debug4
+					#   debug3
+					#   debug2
+					#   debug1
+					#   log
+					#   notice
+					#   warning
+					#   error
+
+#log_min_messages = warning		# Values in order of decreasing detail:
+					#   debug5
+					#   debug4
+					#   debug3
+					#   debug2
+					#   debug1
+					#   info
+					#   notice
+					#   warning
+					#   error
+					#   log
+					#   fatal
+					#   panic
+
+#log_error_verbosity = default		# terse, default, or verbose messages
+
+#log_min_error_statement = error	# values in order of decreasing detail:
+				 	#   debug5
+					#   debug4
+					#   debug3
+					#   debug2
+					#   debug1
+				 	#   info
+					#   notice
+					#   warning
+					#   error
+					#   log
+					#   fatal
+					#   panic (effectively off)
+
+#log_min_duration_statement = -1	# -1 is disabled, 0 logs all statements
+					# and their durations, > 0 logs only
+					# statements running at least this number
+					# of milliseconds
+
+
+# - What to Log -
+
+#debug_print_parse = off
+#debug_print_rewritten = off
+#debug_print_prelim_plan = off
+#debug_print_slice_table = off
+#debug_print_plan = off
+#debug_pretty_print = off
+#log_connections = off
+#log_disconnections = off
+#log_duration = off
+#log_hostname = off
+
+#log_statement = 'none'			# none, mod, ddl, all
+#log_timezone = unknown			# actually, defaults to TZ environment
+					# setting
+
+#------------------------------------------------------------------------------
+# PL/JAVA
+#------------------------------------------------------------------------------
+#pljava_classpath = ''                      # ':' separated list of installed jar files
+#pljava_vmoptions = ''                      # Options sent to the JVM on startup
+#pljava_statement_cache_size = 0            # Size of the prepared statement MRU cache
+#pljava_release_lingering_savepoints = off  # on/off to release/abort lingering savepoints
+
+
+#------------------------------------------------------------------------------
+# PERFORMANCE MONITOR
+#------------------------------------------------------------------------------
+
+#gp_enable_gpperfmon=on		# Enable the performance monitor
+#gpperfmon_port=8888		# Port used the the performance monitor daemons
+
+										
+#------------------------------------------------------------------------------
+# EMAIL ALERTS
+#------------------------------------------------------------------------------
+
+# Configure the DNS name of the SMTP server you want to use,
+# the port it runs on (which will be either 25 or 587), and
+# the SASL authentication information used to connect to it.
+
+#gp_email_smtp_server = 'localhost:25'      # SMTP server hostname and port (don't forget the port!)
+#gp_email_smtp_userid = ''					# Userid used to authenticate with SMTP server, if needed
+#gp_email_smtp_password = ''				# Password/Passphrase used to authenticate with SMTP server, if needed
+
+# Here you need to specify e-mail addresses.  The email_from address doesn't actually need 
+# to be a valid e-mail address, but it is much better if it is, because delivery failure notifications
+# go to that address.  The email_to is a list of recipients who will get the alerts.
+#
+# The e-mail addresses need to be in the form of userid@domain.com, not just userid.
+# If email_to list is empty, it disables e-mail alerts.
+#
+# e-mail addresses can be just the actual e-mail address, userid@domain.com, or can be a
+# human readable name with attached e-mail address in the form 'Joe Smith <userid@domain.com>".
+# If using the latter format, the e-mail address must be between '<' and '>'.  The first part of
+# the string can be any text, and if used for the gp_email_from address, can help differentiate the e-mails
+# from different servers (for example:  'my test GPDB system <userid@domain.com>").
+
+#gp_email_from = ''						# Who do we say the e-mails are from?  and who is the return-path?
+#gp_email_to = ''						# Semicolon separated list of recipients that will get e-mail alerts.
+										# empty means disable e-mail alerts.
+
+#------------------------------------------------------------------------------
+# SNMP INFORM/TRAP ALERTS
+#------------------------------------------------------------------------------
+
+# Configure the gp_snmp_monitor_address to be the system your SNMP monitor runs on, or a proxy
+# that will relay the message to the SNMP monitor.  You can specify transport, DNS name, and port:
+# [<transport-specifier>:]<transport-address>[:port]
+#
+# where <transport-specifier> can be 'udp', 'tcp', 'udpv6', 'tcpv6', or 'unix' for unix domain sockets (optional).
+# For udp or tcp, the port is typically 162. 
+# For a SNMP monitor running locally, you might use 'localhost:162', but more typically
+# the SNMP monitor is running on some other machine.
+# You can send to multiple network monitors by using a comma separated list of addresses.
+#
+# if gp_snmp_peername is empty, snmp alerts are disabled.
+
+#gp_snmp_monitor_address = ''     		# name or IP address(es) (and optionally the port) of the SNMP monitor(s) that will receive the alerts.
+#gp_snmp_community = 'public'			# Change to whatever community string you use in your monitor
+#gp_snmp_use_inform_or_trap = 'trap'    # Set to 'inform' or 'trap', we will send SNMP v2c inform, or SNMP v2c trap.
+
+#------------------------------------------------------------------------------
+# EMC Connect
+#------------------------------------------------------------------------------
+
+#gp_connectemc_mode = 'on'				# 'on' will send EMC Connect events and store locally, 
+										# 'local' will store events locally, 
+										# 'off' will not store or send events
+
+#------------------------------------------------------------------------------
+# RUNTIME STATISTICS
+#------------------------------------------------------------------------------
+
+# - ANALYZE Statistics on Database Contents -
+
+#default_statistics_target = 25		# range 1 - 1000 (target # of
+					# histogram bins)
+#gp_analyze_relative_error = 0.25	# range 0.0 - 1.0 (target relative
+					# error fraction)
+					
+# - Query/Index Statistics Collector -
+
+#track_activities = on
+#track_counts = off
+#update_process_title = on
+
+#stats_queue_level = off
+
+
+# - Statistics Monitoring -
+
+#log_parser_stats = off
+#log_planner_stats = off
+#log_executor_stats = off
+#log_statement_stats = off
+
+
+gp_autostats_mode=on_no_stats		# none, on_no_stats, on_change. see documentation for semantics.
+gp_autostats_on_change_threshold=2147483647 # [0..INT_MAX]. see documentation for semantics.
+log_autostats=off	# print additional autostats information
+
+#------------------------------------------------------------------------------
+# CLIENT CONNECTION DEFAULTS
+#------------------------------------------------------------------------------
+
+# - Statement Behavior -
+
+#search_path = '"$user",public'		# schema names
+#default_tablespace = ''		# a tablespace name, '' uses the default
+#check_function_bodies = on
+#default_transaction_isolation = 'read committed'
+#default_transaction_read_only = off
+#statement_timeout = 0			# in milliseconds, 0 is disabled
+#idle_session_gang_timeout = 18s 	# in milliseconds, 0 is disabled
+#vacuum_freeze_min_age = 100000000
+
+# - Locale and Formatting -
+
+#datestyle = 'iso, mdy'
+#intervalstyle = 'postgres'
+#timezone = unknown			# actually, defaults to TZ environment
+					# setting
+#timezone_abbreviations = 'Default'     # Select the set of available time zone
+					# abbreviations. Currently, there are
+					#   Default
+					#   Australia
+					#   India
+					# You can create your own file in
+					# share/timezonesets/.
+#extra_float_digits = 0			# min -15, max 2
+#client_encoding = sql_ascii		# actually, defaults to database
+					# encoding
+
+# These settings are initialized by initdb, but they can be changed.
+#lc_messages = 'C'			# locale for system error message
+					# strings
+#lc_monetary = 'C'			# locale for monetary formatting
+#lc_numeric = 'C'			# locale for number formatting
+#lc_time = 'C'				# locale for time formatting
+
+# - Other Defaults -
+
+#dynamic_library_path = '$libdir'
+#explain_pretty_print = on
+#local_preload_libraries = ''
+
+
+#------------------------------------------------------------------------------
+# LOCK MANAGEMENT
+#------------------------------------------------------------------------------
+
+#deadlock_timeout = 1s
+#max_locks_per_transaction = 128		# min 10
+					# (change requires restart)
+# Note:  Each lock table slot uses ~270 bytes of shared memory, and there are
+# max_locks_per_transaction * (max_connections + max_prepared_transactions)
+# lock table slots.
+
+
+#---------------------------------------------------------------------------
+# RESOURCE SCHEDULING
+#---------------------------------------------------------------------------
+
+#max_resource_queues = 9		# no. of resource queues to create.
+#max_resource_portals_per_transaction = 64	# no. of portals per backend.
+#resource_select_only = on		# resource lock SELECT queries only.
+#resource_cleanup_gangs_on_wait = on	# Cleanup idle reader gangs before
+										# resource lockwait.
+gp_resqueue_memory_policy = 'eager_free'	# memory request based queueing. 
+									# eager_free, auto or none
+#---------------------------------------------------------------------------
+# EXTERNAL TABLES
+#---------------------------------------------------------------------------
+#gp_external_enable_exec = on   # enable external tables with EXECUTE.
+#gp_external_grant_privileges = off #enable create http/gpfdist for non su's
+
+#---------------------------------------------------------------------------
+# APPEND ONLY TABLES
+#---------------------------------------------------------------------------
+#gp_safefswritesize = 0   # minimum size for safe AO writes in a non-mature fs
+max_appendonly_tables = 10000 # Maximum number of append only tables that can 
+							  # participate in writing data concurrently.
+#------------------------------------------------------------------------------
+# VERSION/PLATFORM COMPATIBILITY
+#------------------------------------------------------------------------------
+
+# - Previous PostgreSQL Versions -
+
+#add_missing_from = off
+#array_nulls = on
+#backslash_quote = safe_encoding	# on, off, or safe_encoding
+#escape_string_warning = on
+#regex_flavor = advanced		# advanced, extended, or basic
+#standard_conforming_strings = off
+
+
+# - Other Platforms and Clients -
+
+#transform_null_equals = off
+
+
+#---------------------------------------------------------------------------
+# GREENPLUM ARRAY CONFIGURATION
+#---------------------------------------------------------------------------
+
+#---------------------------------------------------------------------------
+# GREENPLUM ARRAY TUNING
+#---------------------------------------------------------------------------
+
+# - Interconnect -
+
+#gp_max_packet_size = 8192
+gp_interconnect_type=udp
+
+# - Worker Process Creation -
+
+gp_connections_per_thread = 64
+gp_segment_connect_timeout = 600s
+#gp_enable_delete_as_truncate = off
+
+# - Resource limits -
+gp_vmem_protect_limit = 8192  #Virtual memory limit (in MB).
+#gp_vmem_idle_resource_timeout = 18000 # idle-time before gang-release, in milliseconds (zero disables release).
+
+#------------------------------------------------------------------------------
+# CUSTOMIZED OPTIONS
+#------------------------------------------------------------------------------
+
+#custom_variable_classes = ''			# list of custom variable class names
+gp_backup_directIO = off				# enable\disable dump with direct IO
+gp_backup_directIO_read_chunk_mb = 20	# Size of read Chunk buffer in directIO dump (in MB)
+
+gp_crash_handler_async = on

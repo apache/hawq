@@ -1,0 +1,181 @@
+# @(#)9.ans	2.1.8.1
+Q9
+ *** Query completed. 175 rows found. 3 columns returned. 
+
+NATION                            YEAR            SUM_PROFIT
+-------------------------  -----------  --------------------
+ALGERIA                           1998          31342867.24
+ALGERIA                           1997          57138193.03
+ALGERIA                           1996          56140140.13
+ALGERIA                           1995          53051469.66
+ALGERIA                           1994          53867582.12
+ALGERIA                           1993          54942718.12
+ALGERIA                           1992          54628034.70
+ARGENTINA                         1998          30211185.70
+ARGENTINA                         1997          50805741.77
+ARGENTINA                         1996          51923746.59
+ARGENTINA                         1995          49298625.76
+ARGENTINA                         1994          50835610.10
+ARGENTINA                         1993          51646079.17
+ARGENTINA                         1992          50410315.00 
+BRAZIL                            1998          27217924.37
+BRAZIL                            1997          48378669.20 
+BRAZIL                            1996          50482870.36
+BRAZIL                            1995          47623383.63
+BRAZIL                            1994          47840165.71
+BRAZIL                            1993          49054694.04
+BRAZIL                            1992          48667639.09
+CANADA                            1998          30379833.75
+CANADA                            1997          50465052.32
+CANADA                            1996          52560501.37
+CANADA                            1995          52375332.79
+CANADA                            1994          52600364.66
+CANADA                            1993          52644504.07
+CANADA                            1992          53932871.69
+CHINA                             1998          31075466.17
+CHINA                             1997          50551874.47
+CHINA                             1996          51039293.86
+CHINA                             1995          49287534.62
+CHINA                             1994          50851090.06
+CHINA                             1993          54229629.82
+CHINA                             1992          52400529.39
+EGYPT                             1998          29054433.39
+EGYPT                             1997          50627611.48
+EGYPT                             1996          49542212.86
+EGYPT                             1995          48311550.32
+EGYPT                             1994          49790644.75
+EGYPT                             1993          48904292.97
+EGYPT                             1992          49434932.61
+ETHIOPIA                          1998          28040717.27
+ETHIOPIA                          1997          47455009.85
+ETHIOPIA                          1996          46491097.57
+ETHIOPIA                          1995          46804449.32
+ETHIOPIA                          1994          48516143.92
+ETHIOPIA                          1993          46551891.56
+ETHIOPIA                          1992          44934648.65
+FRANCE                            1998          32226407.84
+FRANCE                            1997          47121485.87
+FRANCE                            1996          47263135.50
+FRANCE                            1995          47275997.57
+FRANCE                            1994          47067209.33
+FRANCE                            1993          51163370.12
+FRANCE                            1992          47846235.32
+GERMANY                           1998          28624942.67
+GERMANY                           1997          49309074.89
+GERMANY                           1996          49918683.17
+GERMANY                           1995          52650718.71
+GERMANY                           1994          50346900.42
+GERMANY                           1993          50991895.79
+GERMANY                           1992          48274126.11
+INDIA                             1998          29943144.35
+INDIA                             1997          50665453.24
+INDIA                             1996          50283092.29
+INDIA                             1995          50006774.65
+INDIA                             1994          48995190.75
+INDIA                             1993          50286902.82
+INDIA                             1992          50850329.39
+INDONESIA                         1998          27672339.99
+INDONESIA                         1997          50512145.74
+INDONESIA                         1996          51653060.14
+INDONESIA                         1995          51508779.57
+INDONESIA                         1994          52817950.31
+INDONESIA                         1993          47959994.97
+INDONESIA                         1992          51776605.03
+IRAN                              1998          29065736.24
+IRAN                              1997          50042063.05
+IRAN                              1996          50926653.20
+IRAN                              1995          51249667.65
+IRAN                              1994          50337085.87
+IRAN                              1993          51730763.49
+IRAN                              1992          49955856.56
+IRAQ                              1998          31624550.99
+IRAQ                              1997          55121749.00
+IRAQ                              1996          55897663.76
+IRAQ                              1995          54815472.51
+IRAQ                              1994          54408516.13
+IRAQ                              1993          53633167.99
+IRAQ                              1992          55891939.33
+JAPAN                             1998          27934179.68
+JAPAN                             1997          44517162.54
+JAPAN                             1996          42545606.13
+JAPAN                             1995          43749356.41
+JAPAN                             1994          44840243.06
+JAPAN                             1993          44660015.55
+JAPAN                             1992          45410249.13
+JORDAN                            1998          26901488.56
+JORDAN                            1997          45471878.43
+JORDAN                            1996          46794325.79
+JORDAN                            1995          45178828.56
+JORDAN                            1994          45333636.53
+JORDAN                            1993          47971496.09
+JORDAN                            1992          44717239.18
+KENYA                             1998          28597614.34
+KENYA                             1997          47949733.72
+KENYA                             1996          46886924.64
+KENYA                             1995          46072338.76
+KENYA                             1994          45772061.18
+KENYA                             1993          46308728.23
+KENYA                             1992          47257780.84
+MOROCCO                           1998          26732115.58
+MOROCCO                           1997          45637304.26
+MOROCCO                           1996          45558221.76
+MOROCCO                           1995          47851318.90 
+MOROCCO                           1994          46272172.93
+MOROCCO                           1993          46764326.17
+MOROCCO                           1992          48122783.59
+MOZAMBIQUE                        1998          30712392.01
+MOZAMBIQUE                        1997          50316528.75
+MOZAMBIQUE                        1996          51640320.23
+MOZAMBIQUE                        1995          50693774.52
+MOZAMBIQUE                        1994          49253277.62
+MOZAMBIQUE                        1993          49153016.52
+MOZAMBIQUE                        1992          48247551.85
+PERU                              1998          29326102.31
+PERU                              1997          49753780.37
+PERU                              1996          50935170.28
+PERU                              1995          53309883.40
+PERU                              1994          50643531.81
+PERU                              1993          51584622.00 
+PERU                              1992          47523899.04
+ROMANIA                           1998          30368667.40
+ROMANIA                           1997          50365683.86
+ROMANIA                           1996          49598999.03
+ROMANIA                           1995          47537642.87
+ROMANIA                           1994          51455283.00
+ROMANIA                           1993          50407136.90
+ROMANIA                           1992          48185385.12
+RUSSIA                            1998          28322384.05
+RUSSIA                            1997          50106685.18
+RUSSIA                            1996          51753342.42
+RUSSIA                            1995          49215820.36
+RUSSIA                            1994          52205666.42
+RUSSIA                            1993          51860230.03
+RUSSIA                            1992          53251677.15
+SAUDI ARABIA                      1998          31541259.82
+SAUDI ARABIA                      1997          52438750.81
+SAUDI ARABIA                      1996          52543737.83
+SAUDI ARABIA                      1995          52938696.52
+SAUDI ARABIA                      1994          51389601.97
+SAUDI ARABIA                      1993          52937508.89
+SAUDI ARABIA                      1992          54843459.65
+UNITED KINGDOM                    1998          28494874.00
+UNITED KINGDOM                    1997          49381810.89
+UNITED KINGDOM                    1996          51386853.94
+UNITED KINGDOM                    1995          51509586.78
+UNITED KINGDOM                    1994          48086499.70
+UNITED KINGDOM                    1993          49166827.23
+UNITED KINGDOM                    1992          49349122.08
+UNITED STATES                     1998          25126238.94
+UNITED STATES                     1997          50077306.41
+UNITED STATES                     1996          48048649.48
+UNITED STATES                     1995          48809032.40
+UNITED STATES                     1994          49296747.18
+UNITED STATES                     1993          48029946.79
+UNITED STATES                     1992          48671944.51
+VIETNAM                           1998          30442736.06
+VIETNAM                           1997          50309179.80 
+VIETNAM                           1996          50488161.42
+VIETNAM                           1995          49658284.61
+VIETNAM                           1994          50596057.26
+VIETNAM                           1993          50953919.14
+VIETNAM                           1992          49613838.33

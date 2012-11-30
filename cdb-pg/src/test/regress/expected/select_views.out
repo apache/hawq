@@ -1,0 +1,18 @@
+--
+-- SELECT_VIEWS
+-- test the views defined in CREATE_VIEWS
+--
+SELECT * FROM street ORDER BY 1, 2, 3;
+ERROR:  could not identify an ordering operator for type path
+LINE 1: SELECT * FROM street ORDER BY 1, 2, 3;
+                                         ^
+HINT:  Use an explicit ordering operator or modify the query.
+SELECT name, #thepath FROM iexit ORDER BY 1, 2, 3;
+ERROR:  ORDER BY position 3 is not in select list
+LINE 1: SELECT name, #thepath FROM iexit ORDER BY 1, 2, 3;
+                                                        ^
+SELECT * FROM toyemp WHERE name = 'sharon' ORDER BY 1, 2, 3;
+ERROR:  could not identify an ordering operator for type point
+LINE 1: SELECT * FROM toyemp WHERE name = 'sharon' ORDER BY 1, 2, 3;
+                                                                  ^
+HINT:  Use an explicit ordering operator or modify the query.

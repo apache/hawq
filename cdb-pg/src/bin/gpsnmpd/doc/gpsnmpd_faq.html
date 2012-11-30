@@ -1,0 +1,29 @@
+<h2>FAQ, or rather, QTWBAFIAAUQ,WTD (Questions that would be asked frequently if anyone asked any questions, which they don't)</h2>
+
+<p><b>What is gpsnmpd?</b></p>
+
+<p>gpsnmpd is an SNMP agent for PostgreSQL. See "What is SNMP", "What is a MIB", "What is an SNMP agent", and "What MIB(s) does gpsnmpd implement" for further information.</p>
+
+<p><b>What is SNMP?</b></p>
+
+<p>SNMP (Simple Network Management Protocol) is a protocol designed to allow monitoring and configuration of devices or applications using a network. It's a standard, defined by an RFC (for instance, RFC 1157), and fairly widely spoken by all sorts of monitoring applications (for instance, see http://www.cacti.net and http://oss.oetiker.ch/mrtg/). SNMP allows an SNMP client to query information from a virtual tree, called a MIB (Management information base -- see "What is a MIB"), which organizes the data published by an SNMP agent into something comprehensible. </p>
+
+<p><b>What is a MIB?</b></p>
+
+<p>A MIB is a document that defines a tree structure where each node is numbered. These numbers are called OIDs, or Object Identifiers. SNMP agents fetch data from a data source and plug data values into spaces in this tree so clients querying the SNMP for the corresponding OID can get back the information they're looking for.</p>
+
+<p><b>What is an SNMP agent?</b></p>
+
+<p>An SNMP agent responds to SNMP requests from a client. This includes the network communications involved in talking to an SNMP client as well as whatever is needed to fetch the data the agent says it will make available. This also includes handling things like access control and threading and all the other stuff daemons have to deal with. gpsnmpd can function as a standalone SNMP agent, or it can be a sort of plugin to a pre-existing net-snmp server.</p>
+
+<p><b>What MIB(s) does gpsnmpd implement?</b></p>
+
+<p>The initial goal for gpsnmpd is to implement RFC 1697, which is a MIB designed to publish data about a generic database instance. The MIB is supposed to work with basically any relational database system, so the information contained therein is necessarily pretty generic. Once this RFC is implemented, the plan is to come up with a PostgreSQL-specific MIB that will contain more useful information, and to implement it.</p>
+
+<p><b>What can I do with gpsnmpd?</b></p>
+
+<p>Right now, not a whole lot. Eventually, as the implemented MIB(s) grow, you'll be able to do things like make pretty graphs of various performance characteristics you're interested in on a PostgreSQL server, receive notifications when values exceed certain thresholds, using generic monitoring software packages that support SNMP.</p>
+
+<p><b>How is gpsnmpd implemented?</b></p>
+
+<p>gpsnmpd is based on net-snmp (http://net-snmp.sourceforge.net). Eventually we may manage to get it turned into something forked from the postmaster process, but right now it's a standalone daemon that has to use libpq to talk to PostgreSQL.</p>

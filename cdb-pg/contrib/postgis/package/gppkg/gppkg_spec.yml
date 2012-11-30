@@ -1,0 +1,8 @@
+Pkgname: postgis
+Architecture: #arch 
+OS: #os
+Version: 1.0
+GPDBVersion: 4.2
+Description: PostGIS provides spatial database functions for the Greenplum Database. 
+PostInstall:
+- Master: "echo 'Please run psql -d mydatabase -f $GPHOME/share/postgresql/contrib/postgis.sql to enable the package.'"

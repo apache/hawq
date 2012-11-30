@@ -1,0 +1,12 @@
+# @(#)4.ans	2.1.8.1
+Q4
+ *** Query completed. 5 rows found. 2 columns returned.
+ 
+O_ORDERPRIORITY  ORDER_COUNT
+---------------  -----------
+1-URGENT               10594
+2-HIGH                 10476
+3-MEDIUM               10410
+4-NOT SPECIFIED        10556
+5-LOW                  10487
+

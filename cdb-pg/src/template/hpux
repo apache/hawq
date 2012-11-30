@@ -1,0 +1,19 @@
+# $PostgreSQL: pgsql/src/template/hpux,v 1.16 2006/12/12 19:43:19 petere Exp $
+
+CPPFLAGS="$CPPFLAGS -D_XOPEN_SOURCE_EXTENDED"
+
+if test "$GCC" != yes ; then
+  CC="$CC -Ae"
+  CFLAGS="+O2"
+fi
+
+# Pick right test-and-set (TAS) code.  We need out-of-line assembler
+# when not using gcc.
+case $host in
+  hppa*-*-hpux*)
+	if test "$GCC" != yes ; then
+		need_tas=yes
+		tas_file=hpux_hppa.s
+	fi
+    ;;
+esac

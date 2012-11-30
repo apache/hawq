@@ -1,0 +1,55 @@
+# @(#)appendix.readme	2.1.8.1
+                                     last modified: 11 March 1998
+0. Introduction
+1. Directory Structure
+2. Downloading
+3. Reporting Problems
+
+0. Introduction
+
+This is the soft appendix for TPC-H and TPC-R. It includes: 
+  -- source code for data generation utility (DBGEN) 
+  -- source code for query generation utility (QGEN)
+  -- source code for a query permutation utility (PERMUTE)
+  -- functional query definition templates
+  -- approved query variants templates
+  -- query validation answers
+
+This document will be updated as needed to remain in sync with the current
+revision of the benchmark specifications. Please be sure that the soft 
+appendix you are using is current. See "Downloading" for instructions on 
+retrieving a new copy of the soft appendix.
+
+1. Directory Structure
+
+The soft appendix is composed of:
+  ./README     -- this file
+  ./VERSION    -- the specificaiton revision associated with this soft 
+                  appendix
+  ./dbgen      -- sources for DBGEN and QGEN and PERMUTE
+  ./queries    -- functional query definition templates
+  ./variants   -- approved query variants templates
+  ./answers    -- answers sets for query validation
+
+Please refer to the README files in each subdirectory for more information.
+
+2. Downloading
+
+The easiest way to get a new copy of this soft appendix is to 
+download it from the TPC's WWW server. If you do not have access to the web,
+the soft appendix is also available on floppy disk. For more complete
+instructions, contact the TPC at:
+
+Shanley Public Relations
+777 N. First Street
+Suite 600
+San Jose, CA  95112-6311, USA
+Phone: (408) 295-8894
+FAX:   (408) 295-9768
+email: tpc@tpc.org
+ 
+3. Reporting Problems
+
+Every attempt has been made to assure that the soft appendix is accurate
+and complete, and that the source code provided is highly portable. If
+you have any problems, please contact the TPC.

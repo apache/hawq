@@ -1,0 +1,10 @@
+tpchdriver
+core
+dbgen
+qgen
+delete.1
+Debug
+Release
+out
+enc_temp_folder
+

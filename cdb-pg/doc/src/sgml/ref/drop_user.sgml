@@ -1,0 +1,54 @@
+<!--
+$PostgreSQL: pgsql/doc/src/sgml/ref/drop_user.sgml,v 1.23.2.1 2007/05/15 19:43:59 neilc Exp $
+PostgreSQL documentation
+-->
+
+<refentry id="SQL-DROPUSER">
+ <refmeta>
+  <refentrytitle id="SQL-DROPUSER-TITLE">DROP USER</refentrytitle>
+  <refmiscinfo>SQL - Language Statements</refmiscinfo>
+ </refmeta>
+
+ <refnamediv>
+  <refname>DROP USER</refname>
+  <refpurpose>remove a database role</refpurpose>
+ </refnamediv>
+
+ <indexterm zone="sql-dropuser">
+  <primary>DROP USER</primary>
+ </indexterm>
+
+ <refsynopsisdiv>
+<synopsis>
+DROP USER [ IF EXISTS ] <replaceable class="PARAMETER">name</replaceable> [, ...]
+</synopsis>
+ </refsynopsisdiv>
+
+ <refsect1>
+  <title>Description</title>
+
+  <para>
+   <command>DROP USER</command> is now an alias for
+   <xref linkend="sql-droprole" endterm="sql-droprole-title">.
+  </para>
+ </refsect1>
+
+ <refsect1>
+  <title>Compatibility</title>
+
+  <para>
+   The <command>DROP USER</command> statement is a
+   <productname>PostgreSQL</productname> extension.  The SQL standard
+   leaves the definition of users to the implementation.
+  </para>
+ </refsect1>
+
+ <refsect1>
+  <title>See Also</title>
+
+  <simplelist type="inline">
+   <member><xref linkend="sql-droprole" endterm="sql-droprole-title"></member>
+  </simplelist>
+ </refsect1>
+
+</refentry>

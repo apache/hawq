@@ -1,0 +1,58 @@
+-- create a tablespace we can use
+CREATE TABLESPACE testspace LOCATION '@testtablespace@';
+-- create a schema we can use
+CREATE SCHEMA testschema;
+-- try a table
+CREATE TABLE testschema.foo (i int) TABLESPACE testspace;
+SELECT relname, spcname FROM pg_catalog.pg_tablespace t, pg_catalog.pg_class c
+    where c.reltablespace = t.oid AND c.relname = 'foo';
+ relname |  spcname  
+---------+-----------
+ foo     | testspace
+(1 row)
+
+INSERT INTO testschema.foo VALUES(1);
+INSERT INTO testschema.foo VALUES(2);
+-- tables from dynamic sources
+CREATE TABLE testschema.asselect TABLESPACE testspace AS SELECT 1;
+SELECT relname, spcname FROM pg_catalog.pg_tablespace t, pg_catalog.pg_class c
+    where c.reltablespace = t.oid AND c.relname = 'asselect';
+ relname  |  spcname  
+----------+-----------
+ asselect | testspace
+(1 row)
+
+PREPARE selectsource(int) AS SELECT $1;
+CREATE TABLE testschema.asexecute TABLESPACE testspace
+    AS EXECUTE selectsource(2);
+SELECT relname, spcname FROM pg_catalog.pg_tablespace t, pg_catalog.pg_class c
+    where c.reltablespace = t.oid AND c.relname = 'asexecute';
+  relname  |  spcname  
+-----------+-----------
+ asexecute | testspace
+(1 row)
+
+-- index
+CREATE INDEX foo_idx on testschema.foo(i) TABLESPACE testspace;
+SELECT relname, spcname FROM pg_catalog.pg_tablespace t, pg_catalog.pg_class c
+    where c.reltablespace = t.oid AND c.relname = 'foo_idx';
+ relname |  spcname  
+---------+-----------
+ foo_idx | testspace
+(1 row)
+
+-- Will fail with bad path
+CREATE TABLESPACE badspace LOCATION '/no/such/location';
+ERROR:  could not set permissions on directory "/no/such/location": No such file or directory
+-- No such tablespace
+CREATE TABLE bar (i int) TABLESPACE nosuchspace;
+ERROR:  tablespace "nosuchspace" does not exist
+-- Fail, not empty
+DROP TABLESPACE testspace;
+ERROR:  tablespace "testspace" is not empty
+DROP SCHEMA testschema CASCADE;
+NOTICE:  drop cascades to table testschema.asexecute
+NOTICE:  drop cascades to table testschema.asselect
+NOTICE:  drop cascades to table testschema.foo
+-- Should succeed
+DROP TABLESPACE testspace;

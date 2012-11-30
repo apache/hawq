@@ -1,0 +1,11 @@
+# @(#)variants.readme	2.1.8.1
+File:          variants/README
+Spec Revision: 1.0.1
+Last Modified: 22 Apr 1999
+
+This directory contains the current set of approved query 
+variants. Variants for query NN are stored in files 
+NNa.sql - NNz.sql.
+
+Refer to Clause 2.2 for the permissible use of these variants.
+

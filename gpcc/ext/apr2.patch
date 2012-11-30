@@ -1,0 +1,11 @@
+--- apr_arch_misc.h.orig	2008-12-29 08:56:16.000000000 -0800
++++ apr_arch_misc.h	2008-12-29 09:03:41.000000000 -0800
+@@ -28,6 +28,8 @@
+ #include "apr_errno.h"
+ #include "apr_getopt.h"
+ 
++#include <tlhelp32.h>
++
+ #if APR_HAVE_STDIO_H
+ #include <stdio.h>
+ #endif

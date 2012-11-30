@@ -1,0 +1,34 @@
+.cproject
+.project
+VERSION
+.cdtproject
+.deps
+.settings
+.pydevproject
+openssl
+openssl-0.9.8g
+openldap
+openldap-2.3.38
+krb5
+krb5-1.6.2
+curl
+curl-7.17.1
+ext
+greenplum-clients-main-build-dev-SOL-x86_64.tar.gz
+greenplum-loaders-main-build-dev-SOL-x86_64.bin
+greenplum-loaders-main-build-dev-SOL-x86_64.tar.gz
+env.sh
+greenplum-clients-main-build-dev-SOL-x86_64.bin
+greenplum-plr-main-build-dev-suse10_x86_64.zip
+Debug
+Release
+Build
+.timestamp
+.autotools
+*.log
+greenplum-plr-*.zip
+greenplum-clients-*.zip
+greenplum-loaders-*.zip
+greenplum-loaders-*.bin
+Linux GCC
+Linux\ GCC

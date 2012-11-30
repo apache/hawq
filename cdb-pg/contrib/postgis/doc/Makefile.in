@@ -1,0 +1,188 @@
+#
+# PostGIS documentation build Makefile
+#
+# Written by Mark Cave-Ayland
+#
+# NOTE: We don't use a standard PGXS Makefile here since the DOCS target
+# only allows files to be stored within contrib/ and we currently
+# store documentation under contrib/postgis due to the possibility
+# that we could produce a large number of files (think chunked HTML)
+#
+
+POSTGIS_MAJOR_VERSION=@POSTGIS_MAJOR_VERSION@
+POSTGIS_MINOR_VERSION=@POSTGIS_MINOR_VERSION@
+POSTGIS_MICRO_VERSION=@POSTGIS_MICRO_VERSION@
+
+XSLTPROC = @XSLTPROC@
+XSLBASE = @XSLBASE@
+
+XSLTPROC_COMMONOPTS = \
+	--param section.autolabel 1 \
+	--param section.label.includes.component.label 1 \
+	--param chunk.section.depth 0 \
+	--param generate.section.toc.level 1 \
+	--param funcsynopsis.style ansi \
+	--param admon.graphics 1 \
+	--param admon.textlabel 0 \
+	--param simplesect.in.toc 0 \
+	--param use.id.as.filename 1 \
+	--param chunk.quietly 1
+
+XSLTPROC_HTMLOPTS = \
+	--stringparam html.stylesheet style.css \
+
+HTML_DOCBOOK_XSL=$(XSLBASE)/html/docbook.xsl
+CHUNK_HTML_DOCBOOK_XSL=$(XSLBASE)/html/chunk.xsl
+
+# DBLatex's dblatex script for PDF generation from DocBook
+DBLATEX = @DBLATEX@
+
+# Imagemagick's convert utility program for generated images used in the documentation
+IMAGEMAGICK = @IMAGEMAGICK@
+
+# Directories for postgresql subdirectories
+ifdef USE_PGXS
+PG_CONFIG = @PGCONFIG@
+PGSQL_DOCDIR = $(shell $(PG_CONFIG) --docdir)
+PGSQL_MANDIR = $(shell $(PG_CONFIG) --mandir)
+PGSQL_SHAREDIR = $(shell $(PG_CONFIG) --sharedir)
+else
+top_builddir = ../../..
+include $(top_builddir)/src/Makefile.global
+PGSQL_DOCDIR = $(docdir)
+PGSQL_MANDIR = $(mandir)
+PGSQL_SHAREDIR = $(datadir)
+endif
+
+# If XSLTPROC or XSLBASE were not found during configure, we cannot
+# build the documentation
+ifeq ($(XSLTPROC),)
+all: requirements_not_met_xsltproc
+else
+ifeq ($(XSLBASE),)
+all: requirements_not_met_xslbase
+else
+ifeq ($(IMAGEMAGICK),)
+all: requirements_not_met_imagemagick
+else
+all: html/postgis.html postgis_comments.sql
+endif
+endif
+endif
+
+postgis_aggs_mm.xml: ./xsl/postgis_aggs_mm.xml.xsl reference.xml
+	$(XSLTPROC) ./xsl/postgis_aggs_mm.xml.xsl reference.xml > $@
+
+postgis_comments.sql: ./xsl/postgis_comments.sql.xsl reference.xml
+	$(XSLTPROC) ./xsl/postgis_comments.sql.xsl reference.xml > $@
+
+postgis-out.xml: postgis.xml introduction.xml installation.xml faq.xml using_postgis_dataman.xml  using_postgis_app.xml performance_tips.xml reference.xml postgis_aggs_mm.xml reporting.xml release_notes.xml ../Version.config
+	cat $< | sed "s/@@LAST_RELEASE_VERSION@@/${POSTGIS_MAJOR_VERSION}.${POSTGIS_MINOR_VERSION}.${POSTGIS_MICRO_VERSION}/g" > $@
+
+chunked-html: postgis-out.xml
+	$(XSLTPROC) $(XSLTPROC_COMMONOPTS) $(XSLTPROC_HTMLOPTS) \
+		--output html/ \
+		--stringparam saxon.character.representation decimal \
+		$(CHUNK_HTML_DOCBOOK_XSL) \
+		$<
+
+html/postgis.html: postgis-out.xml
+	$(XSLTPROC) $(XSLTPROC_COMMONOPTS) $(XSLTPROC_HTMLOPTS) \
+		--output html/postgis.html \
+		$(HTML_DOCBOOK_XSL) \
+		$<
+
+
+postgis-${POSTGIS_MAJOR_VERSION}.${POSTGIS_MINOR_VERSION}.${POSTGIS_MICRO_VERSION}.pdf: postgis-out.xml
+	@if test x"$(DBLATEX)" = x; then \
+	   echo "Error: dblatex not found, can't build pdf"; \
+	   echo "       try installing dblatex and then re-run configure"; \
+	   false; \
+	else \
+		cp reference.xml reference.xml.orig; \
+		cat reference.xml.orig | sed -e "s:term:listitem:g" > reference.xml; \
+		dblatex -T native -t pdf \
+		   -I "${PWD}/html" \
+		   -P doc.collab.show=0 \
+		   -P figure.note="${PWD}/html/images/note" \
+		   -P figure.tip="${PWD}/html/images/tip" \
+		   -P figure.important="${PWD}/html/images/important" \
+		   -P figure.warning="${PWD}/html/images/warning" \
+		   -P figure.caution="${PWD}/html/images/caution" \
+		   -P latex.output.revhistory=0 \
+		   -o postgis-${POSTGIS_MAJOR_VERSION}.${POSTGIS_MINOR_VERSION}.${POSTGIS_MICRO_VERSION}.pdf $<; \
+		cp reference.xml.orig reference.xml; \
+		rm -rf reference.xml.orig; \
+	fi
+
+pdf: postgis-${POSTGIS_MAJOR_VERSION}.${POSTGIS_MINOR_VERSION}.${POSTGIS_MICRO_VERSION}.pdf
+
+doxygen.cfg: doxygen.cfg.in
+	cat $< | sed "s/@@LAST_RELEASE_VERSION@@/${POSTGIS_MAJOR_VERSION}.${POSTGIS_MINOR_VERSION}.${POSTGIS_MICRO_VERSION}/g" > $@
+
+doxygen: doxygen.cfg
+	doxygen $<
+
+images: 
+	make -C html/image_src images
+	
+clean:
+	make -C html/image_src clean
+	@rm -f postgis-out.xml postgis_comments.sql postgis_aggs_mm.xml
+
+maintainer-clean: clean
+	make -C html/image_src clean
+	@rm -f html/*.html \
+		postgis-${POSTGIS_MAJOR_VERSION}.${POSTGIS_MINOR_VERSION}.${POSTGIS_MICRO_VERSION}.pdf
+
+comments: postgis_comments.sql
+
+comments-install: comments
+	cp postgis_comments.sql $(PGSQL_SHAREDIR)/contrib/postgis_comments.sql
+
+comments-uninstall:
+	rm -f $(PGSQL_SHAREDIR)/contrib/postgis_comments.sql
+
+install: html/postgis.html man/shp2pgsql.1 man/pgsql2shp.1
+	@mkdir -p $(PGSQL_DOCDIR)/postgis
+	@mkdir -p $(PGSQL_MANDIR)/man1
+	cp html/postgis.html $(PGSQL_DOCDIR)/postgis/postgis.html
+	cp ../README.postgis $(PGSQL_DOCDIR)/postgis/README.postgis
+	cp man/pgsql2shp.1 $(PGSQL_MANDIR)/man1/pgsql2shp.1
+	cp man/shp2pgsql.1 $(PGSQL_MANDIR)/man1/shp2pgsql.1
+
+uninstall:
+	rm -f $(PGSQL_DOCDIR)/postgis/postgis.html
+	rm -f $(PGSQL_DOCDIR)/postgis/README.postgis
+	rm -f $(PGSQL_MANDIR)/man1/shp2pgsql.1
+	rm -f $(PGSQL_MANDIR)/man1/pgsql2shp.1
+
+requirements_not_met_xsltproc:
+	@echo
+	@echo "configure was unable to find 'xsltproc' which is required to build the documentation."
+	@echo "To build the documentation, install xsltproc and then re-run configure. Alternatively "
+	@echo "refer to online manual:"
+	@echo
+	@echo "  http://postgis.refractions.net/docs"
+	@echo
+
+requirements_not_met_xslbase:
+	@echo
+	@echo "configure was unable to find the Docbook XSL stylesheet directory which is required to build the documentation."
+	@echo "To build the documentation, install the Docbook XSL stylesheets and/or re-run configure with the --with-xsldir option. Alternatively "
+	@echo "refer to online manual:"
+	@echo
+	@echo "  http://postgis.refractions.net/docs"
+	@echo
+
+requirements_not_met_imagemagick:
+	@echo 
+	@echo "configure was unable to find the ImageMagick's 'convert' utility program."
+	@echo "To build the documentation, install ImageMagick and then re-run configure. Alternatively "
+	@echo "refer to online manual:"
+	@echo
+	@echo "  http://postgis.refractions.net/docs"
+	@echo 
+	
+.PHONY: html
+

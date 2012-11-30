@@ -1,0 +1,79 @@
+Instruction for Building the Greenplum Database, PerfMon, Clients, Loaders, and Connectivity Packages
+
+July, 2009
+
+Along with this file you will find the complete source to the above Greenplum products and pre-built
+versions of all of the third-party libraries that they use.  In addition, you will need the following
+tools:
+
+autoconf	2.59 or later.  autoconf 2.63 preferred.
+binutils	2.15
+bison		1.875 or later.  bison 2.4.1 preferred.
+diffutils	2.8.1
+flex		2.5.4a or later.  flex 2.5.35 preferred.
+gcc		4.4.2
+gfortran	4.4.2
+greptools	2.5.1 on Linux, 2.5 on Solaris
+libtool		1.4.6 on CentOS, 1.5.22 on SuSE
+make		3.80 or later
+perl		5.8.8
+tar (GNU)	1.14 (named or symlinked to gtar on Solaris)
+
+Most of these tools can be installed anywhere on the PATH.  A few, however, need to be installed into
+specific locations:
+
+/opt/gcc-4.1.1 on CentOS and Solaris
+/opt/perl-5.8.8
+
+In addition, there is one GNU library that is not included in the source set.  That is readline-5.2.
+It is only required if you want readline support on Solaris for Python-2.6.2.  It just needs to be in
+LD_LIBRARY_PATH if you build Python and when you run it.  Again, this is only for Solaris as CentOS
+and SuSE already include readline.
+
+To build the Greenplum Database and PerfMon products, run GNU make with the following options:
+
+For a debug build:
+
+# make HOME=`pwd` devel
+
+For a dist build:
+
+# make GPROOT=`pwd` dist
+
+To build the Clients, Loaders, and Connectivity packages, add the BLD_TARGETS= argument to the make
+command line:
+
+# make GPROOT=`pwd` BLD_TARGETS="clients loaders connectivity" dist
+
+These packages are supported on a longer list of platforms than the Database and PerfMon packages.
+Supported Clients, Loaders, and Connectivity platforms include the following and require, where listed
+an additional argument to make.
+
+OSX 10.5
+CentOS 4.5 32-bit
+CentOS 4.5 64-bit
+CentOS 5.2 32-bit
+Solaris 10u3 x86 32-bit		BLD_ARCH=sol10_x86_32
+Solaris 10u4 SPARC 32-bit	BLD_ARCH=sol10_sparc_32
+Solaris 10u4 SPARC 64-bit	BLD_ARCH=sol10_sparc_64
+Solaris 9u9 SPARC 32-bit	BLD_ARCH=sol9_sparc_32
+Solaris 8 2/04 SPARC 32-bit	BLD_ARCH=sol8_sparc_32
+Windows 32-bit			BLD_ARCH=win32
+
+Later updates of the Solaris releases should suffice for building but will respectively raise the OS
+level requirement at runtime.  The Windows build requires an install of mingw32 on a Linux machine
+and a Windows machine with Cygwin sshd the WIX packaging tools installed.
+
+Locations of the Component Products
+
+The Greenplum Database source set is contained in the cdb-pg, gpcc, and gpMgmt directories with support
+from the releng and ext/<arch> directories as well as the top-level files.
+
+Greenplum Performance Monitor is located in the gpperfmon directory with dependencies on the cdb-pg and
+ext/<arch> directories.
+
+Clients, Loaders, and Connectivity products are built from a subset of the Greenplum Database binaries
+and the client directory.
+
+The ext/<arch> directories provide the third-party libraries used by the above products for each platform.
+

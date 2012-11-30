@@ -1,0 +1,117 @@
+#-----------------------------------------------------
+#
+# Configuration directives are in postgis_config.h 
+#
+#-----------------------------------------------------
+
+all: config.status postgis loaderdumper utils
+	@echo "PostGIS was built successfully. Ready to install." 
+
+install: all postgis-install loaderdumper-install
+
+uninstall: postgis-uninstall loaderdumper-uninstall docs-uninstall comments-uninstall
+
+clean: liblwgeom-clean postgis-clean loaderdumper-clean docs-clean test-clean 
+	rm -f postgis.sql postgis_upgrade.sql
+
+distclean: clean
+	rm -Rf autom4te.cache
+	rm -f config.log config.cache config.status 
+	rm -f postgis_config.h
+
+maintainer-clean: 
+	@echo '------------------------------------------------------'
+	@echo 'This command is intended for maintainers to use; it'
+	@echo 'deletes files that may need special tools to rebuild.'
+	@echo '------------------------------------------------------'
+	$(MAKE) -C doc maintainer-clean
+	$(MAKE) -C postgis maintainer-clean
+	$(MAKE) -C jdbc2 maintainer-clean
+	$(MAKE) distclean
+	rm -f configure
+
+test check installcheck: postgis
+	$(MAKE) -C liblwgeom/cunit check
+	$(MAKE) -C regress check
+
+test-clean:
+	$(MAKE) -C regress clean
+
+liblwgeom:
+	$(MAKE) -C liblwgeom 
+
+liblwgeom-clean:
+	$(MAKE) -C liblwgeom clean
+
+postgis: liblwgeom
+	$(MAKE) -C postgis all
+
+postgis-clean:
+	$(MAKE) -C postgis clean
+
+postgis-install:
+	$(MAKE) -C postgis install
+
+postgis-uninstall:
+	$(MAKE) -C postgis uninstall
+
+loaderdumper:
+	$(MAKE) -C loader
+
+loaderdumper-clean:
+	$(MAKE) -C loader clean
+
+loaderdumper-install:
+	$(MAKE) -C loader install
+
+loaderdumper-uninstall:
+	$(MAKE) -C loader uninstall
+
+templategis:
+	$(MAKE) -C extras/template_gis
+
+templategis-clean:
+	$(MAKE) -C extras/template_gis clean
+
+templategis-install:
+	$(MAKE) -C extras/template_gis install
+
+templategis-uninstall:
+	$(MAKE) -C extras/template_gis uninstall
+
+docs: 
+	$(MAKE) -C doc 
+
+docs-clean:
+	$(MAKE) -C doc clean
+
+comments:
+	$(MAKE) -C doc comments
+
+comments-install:
+	$(MAKE) -C doc comments-install
+
+comments-uninstall:
+	$(MAKE) -C doc comments-uninstall
+
+docs-install:
+	$(MAKE) -C doc install
+
+docs-uninstall:
+	$(MAKE) -C doc uninstall
+
+utils:
+	$(MAKE) -C utils
+
+BLD_TOP=../../..
+include $(BLD_TOP)/Makefile.global     # for BLD_ARCH
+include $(BLD_TOP)/releng/tools.mk
+GEOS_DIR=$(RELENG_TOOLS)/geos-3.2.2
+GEOS_CONFIG=$(GEOS_DIR)/bin/geos-config
+PROJ_DIR=$(RELENG_TOOLS)/proj-4.7.0
+PG_CONFIG=$(BLD_TOP)/cdb-pg/src/bin/pg_config/pg_config
+
+config.status: $(GEOS_DIR) $(PROJ_DIR)
+	GEOS_PREFIX=$(GEOS_DIR) ./configure --with-geosconfig=$(GEOS_CONFIG) --with-projdir=$(PROJ_DIR) --with-pgconfig=$(PG_CONFIG)
+
+.PHONY: utils liblwgeom

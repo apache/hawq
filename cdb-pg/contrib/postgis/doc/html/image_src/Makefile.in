@@ -1,0 +1,98 @@
+# **********************************************************************
+# * $Id: Makefile.in
+# *
+# * PostGIS - Spatial Types for PostgreSQL
+# * http://postgis.refractions.net
+# * Copyright 2008 Kevin Neufeld
+# *
+# * This is free software; you can redistribute and/or modify it under
+# * the terms of the GNU General Public Licence. See the COPYING file.
+# *
+# **********************************************************************
+
+CC=@CC@
+CFLAGS=@CFLAGS@ @WARNFLAGS@
+
+CUNIT_LDFLAGS=@CUNIT_LDFLAGS@
+CUNIT_CPPFLAGS=@CUNIT_CPPFLAGS@ -I../../../liblwgeom
+
+IMAGES= \
+	../images/st_buffer01.png \
+	../images/st_buffer02.png \
+	../images/st_buildarea01.png \
+	../images/st_buildarea02.png \
+	../images/st_centroid01.png \
+	../images/st_centroid02.png \
+	../images/st_centroid03.png \
+	../images/st_centroid04.png \
+	../images/st_contains01.png \
+	../images/st_contains02.png \
+	../images/st_contains03.png \
+	../images/st_contains04.png \
+	../images/st_contains05.png \
+	../images/st_contains06.png \
+	../images/st_convexhull01.png \
+	../images/st_crosses01.png \
+	../images/st_crosses02.png \
+	../images/st_crosses03.png \
+	../images/st_crosses04.png \
+	../images/st_difference01.png \
+	../images/st_issimple01.png \
+	../images/st_issimple02.png \
+	../images/st_issimple03.png \
+	../images/st_issimple04.png \
+	../images/st_issimple05.png \
+	../images/st_issimple06.png \
+	../images/st_issimple07.png \
+	../images/st_isvalid01.png \
+	../images/st_isvalid02.png \
+	../images/st_isvalid03.png \
+	../images/st_isvalid04.png \
+	../images/st_isvalid05.png \
+	../images/st_isvalid06.png \
+	../images/st_isvalid07.png \
+	../images/st_isvalid08.png \
+	../images/st_linecrossingdirection01.png \
+	../images/st_linecrossingdirection02.png \
+	../images/st_linecrossingdirection03.png \
+	../images/st_linecrossingdirection04.png \
+	../images/st_line_interpolate_point01.png \
+	../images/st_line_substring01.png \
+	../images/st_minimumboundingcircle01.png \
+	../images/st_symdifference01.png \
+	../images/st_symdifference02.png \
+	../images/st_touches01.png \
+	../images/st_touches02.png \
+	../images/st_touches03.png \
+	../images/st_touches04.png \
+	../images/st_touches05.png \
+	../images/st_touches06.png \
+	../images/st_within01.png
+
+OBJS=styles.o generator.o
+
+# Build the generator
+all: generator
+
+# generate the images
+images: $(IMAGES)
+
+# Command to build each of the .o files
+$(OBJS): %.o: %.c
+	$(CC) $(CFLAGS) $(CUNIT_CPPFLAGS) -c -o $@ $<
+
+# Command to build each of the .wkt files
+$(IMAGES): ../images/%.png: %.wkt generator styles.conf
+	@./generator $<
+
+# Build the main executable
+generator: ../../../liblwgeom/liblwgeom.a $(OBJS)
+	$(CC) -o $@ $(OBJS) ../../../liblwgeom/liblwgeom.a -lm $(CUNIT_LDFLAGS)
+
+# Clean target
+clean:
+	@rm -f $(OBJS)
+	@rm -f generator
+	@rm -f tmp[0-9].png
+
+

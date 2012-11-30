@@ -1,0 +1,10 @@
+# @(#)12.ans	2.1.8.1
+Q12
+ *** Query completed. 2 rows found. 3 columns returned.
+ 
+L_SHIPMODE  HIGH_LINE_COUNT  LOW_LINE_COUNT
+----------  ---------------  --------------
+MAIL                   6202            9324
+SHIP                   6200            9262
+ 
+

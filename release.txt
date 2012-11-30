@@ -1,0 +1,459 @@
+<<<NEW vi: set expandtab ts=4: >>>
+
+Release-3_1_0-branch:
+    Created branch.
+    Wed Nov 14 08:05:51 PST 2007
+
+Release-2_2_0:  17/May/2006  sdanforth
+     blocker bugs  : 608
+     critical bugs : 601, 600, 500, 402, 68
+     major bugs    : 611, 605, 603, 599, 584, 580, 578, 553, 549,
+                     538, 527, 520, 519, 518, 502, 472, 462, 460,
+                     445, 351, 309, 306, 283, 279, 276, 275, 250,
+                     242, 241, 236, 228, 195, 187, 179,  87,   2
+    minor bugs     : 610, 609, 606, 595, 589, 572, 567, 558, 552,
+                     543, 525, 515, 506, 504, 487, 438, 432, 400,
+                     352, 342, 297, 288, 256, 243, 204, 203, 188,
+                     117, 115, 101, 51, 25
+
+Release-2_1_12:  10/Mar/2006  ksrikanth
+     blocker bugs  : 523
+     critical bugs : 521, 500, 475, 471, 460, 434, 402, 400,
+                     288, 275, 245
+     major  bugs   : 531, 529, 528, 527, 526, 520, 519, 518,
+                     514, 512, 509, 502, 499, 494, 493, 487,
+                     479, 478, 472, 462, 445, 442, 419, 378,
+                     351, 350, 349, 324, 310, 309, 306, 283,
+                     279, 276, 250, 249, 242, 241, 238, 236,
+                     228, 195, 187, 179,  87,  68,  38,   2
+     minor bugs    : 530, 525, 516, 515, 506, 504, 503, 486,
+                     485, 438, 432, 359, 352, 342, 341, 297,
+                     256, 243, 239, 235, 211, 204, 203, 188,
+                     117, 115, 101,  84,  51,  42,  25,  23
+
+Release-2_1_11:  24/Feb/2006  ksrikanth
+     blocker bugs  : 496
+     critical bugs : 475, 471, 469, 460, 447, 434, 402, 400, 
+                     292, 288, 275, 245
+     major  bugs   : 494, 489, 487, 483, 482, 479, 478, 472, 
+                     462, 461, 445, 442, 419, 380, 378, 368, 
+                     363, 351, 350, 349, 324, 310, 309, 306, 
+                     300, 285, 283, 280, 279, 276, 268, 250, 
+                     249, 242, 241, 238, 236, 228, 198, 195, 
+                     187, 180, 179,  87,  68,  36,   6,   2
+     minor bugs    : 493, 486, 485, 474, 470, 458, 438, 432, 
+                     359, 358, 352, 342, 341, 299, 297, 256, 
+                     243, 239, 235, 211, 204, 203, 188, 117, 
+                     115, 101,  84,  51,  42,  25,  23
+
+Release-2_1_10:  23/Feb/2006  ksrikanth
+     blocker bugs  : NONE
+     critical bugs : 475, 471, 469, 460, 447, 434, 428, 426,
+                     402, 400, 345, 292, 288, 275, 245
+     major  bugs   : 494, 489, 487, 483, 482, 479, 478, 472,
+                     462, 461, 445, 442, 419, 380, 378, 368,
+                     363, 351, 350, 349, 324, 310, 309, 306,
+                     300, 285, 283, 280, 279, 276, 268, 250,
+                     249, 242, 241, 238, 236, 228, 198, 195,
+                     187, 180, 179,  87,  68,  36,   6,   2
+     minor bugs    : 493, 486, 485, 474, 470, 458, 438, 432,
+                     359, 358, 352, 342, 341, 299, 297, 256,
+                     243, 239, 235, 211, 204, 203, 188, 117,
+                     115, 101,  84,  51,  42,  25,  23
+
+Release-2_1_9:  23/Feb/2006  ksrikanth
+     blocker bugs  : 475
+     critical bugs : 471, 469, 460, 447, 434, 428, 426, 402,
+                     400, 345, 292, 288, 275, 245
+     major  bugs   : 494, 489, 487, 483, 482, 479, 478, 472,
+                     462, 461, 445, 442, 419, 380, 378, 368,
+                     363, 351, 350, 349, 324, 310, 309, 306,
+                     300, 285, 283, 280, 279, 276, 268, 250,
+                     249, 242, 241, 238, 236, 228, 198, 195,
+                     187, 180, 179,  87,  68,  36,   6,   2
+     minor bugs    : 493, 486, 485, 474, 470, 458, 438, 432,
+                     359, 358, 352, 342, 341, 299, 297, 256,
+                     243, 239, 235, 211, 204, 203, 188, 117,
+                     115, 101,  84,  51,  42,  25,  23
+
+Release-2_1_8:  23/Feb/2006  ksrikanth
+     blocker bugs  : 475
+     critical bugs : 471, 469, 460, 447, 434, 428, 426, 402,
+                     400, 345, 292, 288, 275, 245
+     major  bugs   : 494, 489, 487, 483, 482, 479, 478, 472,
+                     462, 461, 445, 442, 419, 380, 378, 368,
+                     363, 351, 350, 349, 324, 310, 309, 306,
+                     300, 285, 283, 280, 279, 276, 268, 250,
+                     249, 242, 241, 238, 236, 228, 198, 195,
+                     187, 180, 179,  87,  68,  36,   6,   2
+     minor bugs    : 493, 486, 485, 474, 470, 458, 438, 432,
+                     359, 358, 352, 342, 341, 299, 297, 256,
+                     243, 239, 235, 211, 204, 203, 188, 117,
+                     115, 101,  84,  51,  42,  25,  23
+
+Release-2_1_7:  22/Feb/2006  ksrikanth
+     blocker bugs  : 490, 480, 475
+     critical bugs : 476, 471, 469, 460, 447, 434, 428, 427,
+                     426, 402, 400, 345, 292, 288, 275, 245
+     major  bugs   : 489, 487, 483, 482, 481, 479, 478, 472,
+                     467, 462, 461, 445, 442, 419, 380, 378,
+                     368, 363, 351, 350, 349, 324, 310, 309,
+                     306, 300, 285, 283, 280, 279, 276, 268,
+                     250, 249, 242, 241, 238, 236, 228, 198,
+                     195, 187, 180, 179,  87,  68,  36,   6,
+                       2
+     minor bugs    : 486, 485, 474, 470, 458, 438, 432, 359,
+                     358, 352, 342, 341, 299, 297, 256, 243,
+                     239, 235, 211, 204, 203, 188, 117, 115,
+                     101,  84,  51,  42,  25,  23
+
+Release-2_1_6:  17/Feb/2006  ksrikanth
+     blocker bugs  : 475, 450, 439
+     critical bugs : 476, 471, 469, 463, 460, 451, 447, 434,
+                     428, 427, 426, 402, 400, 345, 292, 288,
+                     275, 245,
+     major  bugs   : 473, 472, 467, 462, 461, 445, 442, 419,
+                     413, 401, 380, 378, 368, 363, 351, 350,
+                     349, 324, 310, 309, 306, 300, 285, 283,
+                     280, 279, 276, 268, 250, 249, 242, 241,
+                     238, 236, 228, 198, 195, 187, 180, 179,
+                     87,  68,  36,   6,   2
+     minor bugs    : 474, 470, 464, 458, 438, 432, 359, 358,
+                     352, 342, 341, 299, 297, 256, 243, 239,
+                     235, 211, 204, 203, 188, 117, 115, 101,
+                      84,  51,  42,  25,  23
+
+Release-2_1_5:  17/Feb/2006  ksrikanth
+     blocker bugs  : 450, 439
+     critical bugs : 471, 469, 463, 460, 451, 447, 434, 428,
+                     427, 426, 402, 400, 345, 292, 288, 275,
+                     245,
+     major  bugs   : 473, 472, 467, 462, 461, 445, 442, 419,
+                     413, 401, 380, 378, 368, 363, 351, 350,
+                     349, 324, 310, 309, 306, 300, 285, 283,
+                     280, 279, 276, 268, 250, 249, 242, 241,
+                     238, 236, 228, 198, 195, 187, 180, 179,
+                     87,  68,  36,   6,   2
+     minor bugs    : 474, 470, 464, 458, 438, 432, 359, 358,
+                     352, 342, 341, 299, 297, 256, 243, 239,
+                     235, 211, 204, 203, 188, 117, 115, 101,
+                      84,  51,  42,  25,  23
+
+
+Release-2_1_4:  16/Feb/2006  ksrikanth
+     blocker bugs  : 466, 450, 439, 300
+     critical bugs : 469, 463, 460, 451, 447, 434, 428, 427,
+                     426, 402, 400, 345, 292, 288, 275, 245,
+     major  bugs   : 467, 462, 461, 445, 442, 419, 413, 401,
+                     380, 378, 368, 363, 351, 350, 349, 324,
+                     310, 309, 306, 285, 283, 280, 279, 276,
+                     268, 250, 249, 242, 241, 238, 236, 228,
+                     198, 195, 187, 180, 179,  87,  68,  36,
+                       6,   2,
+     minor bugs    : 464, 458, 438, 432, 359, 358, 352, 342,
+                     341, 299, 297, 256, 243, 239, 235, 211,
+                     204, 203, 188, 117, 115, 101,  84,  51,
+                      42,  25,  23
+
+Release-2_1_3:  14/Feb/2006  ksrikanth
+     blocker bugs  : 460, 450, 444, 439, 345, 300
+     critical bugs : 451, 447, 434, 428, 427, 426, 402, 400
+                     288, 275, 245
+     major  bugs   : 452, 445, 442, 419, 413, 401, 380, 378,
+                     368, 363, 351, 350, 349, 324, 310, 309,
+                     306, 292, 285, 283, 280, 279, 276, 268,
+                     250, 249, 243, 241, 238, 236, 228, 198,
+                     195, 187, 180, 179,  87,  68,  36, 6,
+                       2,
+     minor bugs    : 458, 438, 432, 359, 358, 352, 342, 341,
+                     299, 297, 256, 243, 239, 235, 211, 204,
+                     203, 188, 117, 115, 101,  84,  51,  42,
+                      25,  23
+
+Release-2_1_2:  13/Feb/2006  ksrikanth
+     blocker bugs  : 456, 454, 453, 450, 449, 446, 444, 439,
+                     345, 300
+     critical bugs : 451, 447, 434, 428, 427, 426, 402, 400
+                     288, 275, 245
+     major  bugs   : 452, 445, 442, 419, 413, 401, 380, 378,
+                     368, 363, 351, 350, 349, 338, 324, 310,
+                     309, 306, 292, 285, 283, 280, 279, 276,
+                     268, 250, 249, 243, 241, 238, 236, 228,
+                     198, 195, 187, 180, 179,  87,  68,  36,
+                       6,   2,
+     minor bugs    : 438, 432, 396, 359, 358, 352, 342, 341,
+                    299, 297, 256, 243, 239, 235, 211, 204,
+                    203, 188, 117, 115, 101,  84,  51,  42,
+                     25,  23
+
+Release-2_1_1:  08/Feb/2006  ksrikanth
+   blocker bugs : 446, 444, 439, 345, 300
+   critical bugs: 447, 434, 428, 427, 426, 402, 400, 288,
+                  275, 251 245
+   major bugs   : 445, 443, 442, 419, 413, 401, 380, 378,
+                  368, 363, 351, 350, 349, 338, 324, 310,
+                  309, 306, 292, 285, 283, 280, 279, 276,
+                  268, 250, 249, 242, 241, 238, 236, 234,
+                  228, 198, 195, 187, 180, 179,  87,  68,
+                  36,   6,   2
+   minor bugs   : 438, 432, 396, 359, 358, 352, 342, 341,
+                  299, 297, 256, 243, 239, 235, 211, 204,
+                  203, 188, 117, 115, 101,  84,  51,  42,
+                  25,  23
+
+Release-2_0_22:  18/Nov/2005  llonergan
+    blocker bugs: mpp-266,286
+    critical bugs: mpp-208,213,254,258,275,284
+    major bugs: mpp-2,21,53,68,87,99,128,177,179,180,187,
+                195,198,205,221,222,228,229,230,233,234,236,237,238,
+                241,242,244,245,246,247,248,249,250,251,268,269,
+                271,272,273,276,277,279,280,283,285,287
+    minor bugs: mpp-25,36,42,51,84,98,101,115,117,188,196,203,204,211
+                214,227,231,235,239,243,252,256,260,265,282
+
+Release-2_0_21:  18/Nov/2005  llonergan
+    blocker bugs: mpp-266
+    critical bugs: mpp-208,254,258,275,284
+    major bugs: mpp-2,21,53,66,68,87,99,128,177,179,180,187,
+                195,198,205,221,222,228,229,230,233,234,236,237,238,
+                241,242,244,245,246,247,248,249,250,251,253,268,269,
+                271,272,273,276,277,279,280,285
+    minor bugs: mpp-25,36,42,51,84,98,101,115,117,188,196,203,204,211
+                214,227,231,235,239,243,252,256,260,265,282
+
+Release-2_0_20:  17/Nov/2005  llonergan
+    Blocker bugs: mpp-193,266
+    Critical bugs: mpp-208,254,258,275,284
+    Major bugs: mpp-2,21,53,66,68,87,99,128,177,179,180,187,
+                195,198,205,221,222,228,229,230,233,234,236,237,238,
+                241,242,244,245,246,247,248,249,250,251,253,268,269,
+                271,272,273,274,276,277,279,280,283
+    Minor bugs: mpp-25,36,42,51,84,98,101,115,117,188,196,203,204,211
+                214,227,231,235,239,243,252,256,260,265,282
+
+Release-2_0_19:  16/Nov/2005  llonergan
+    Blocker bugs: mpp-266
+    Critical bugs: mpp-208,213,254,258,263,275
+    Major bugs: mpp-2,21,53,66,68,87,99,128,177,179,180,187,
+                195,198,205,221,222,228,229,230,233,234,236,237,238,
+                241,242,244,245,246,247,248,249,250,251,253,268,269,
+                271,272,273,276,277,278
+    Minor bugs: mpp-25,36,42,51,84,98,101,115,117,188,196,203,204,211
+                214,227,231,235,239,243,252,256,260,262,265
+
+Release-2_0_18-1:  19/Oct/2005  llonergan
+    Release Maintenance
+    Blocker bugs: None
+    Critical bugs: mpp-100,155,196,208,213
+    Major bugs: mpp-2,21,53,66,68,72,87,99,128,131,
+                    149,177,179,180,183,187,195,198,203,205
+    Minor bugs: mpp-25,36,42,51,56,84,98,101,115,117,188,204,211,214
+
+Release-2_0_18:  17/Oct/2005  llonergan
+    Release
+    Known bugs:
+        Blocker bugs: None
+        Critical bugs: mpp-155,196,213
+        Major bugs: mpp-2,21,53,66,68,72,87,99,100,128,131,
+                        149,177,179,180,183,187,195,198,203
+        Minor bugs: mpp-25,36,42,51,56,84,98,101,115,117,188,204,211,214
+
+Release-2_0_17:  16/Oct/2005  llonergan
+    Release Candidate
+    Known bugs:
+        Blocker bugs: None
+        Critical bugs: mpp-149,155,174,196,198,213
+        Major bugs: mpp-2,21,53,66,68,72,87,99,100,128,131,
+                        177,179,180,183,187,195,203,205,208
+        Minor bugs: mpp-25,36,42,51,56,84,98,101,115,117,188,204,211,214,215
+
+Release-2_0_16:  16/Oct/2005  llonergan
+    Release Candidate
+    Known bugs:
+        Blocker bugs: None
+        Critical bugs: mpp-149,155,174,182,196,198
+        Major bugs: mpp-2,21,53,66,68,72,87,99,100,128,131,
+                        177,179,180,183,187,195,203,205,208
+        Minor bugs: mpp-25,36,42,51,56,84,98,101,115,117,188,204,211
+
+Release-2_0_15:  16/Oct/2005  llonergan
+    Known bugs:
+        Blocker bugs: mpp-155,202,210
+        Critical bugs: mpp-149,174,182,196,198
+        Major bugs: mpp-2,21,53,66,68,72,87,99,100,128,131,
+                        177,179,180,183,187,195,203,205,207
+        Minor bugs: mpp-25,36,42,51,56,84,98,101,115,117,188,204,211
+
+Release-2_0_14:  15/Oct/2005  llonergan
+    Backout of a bad commit
+    Known bugs:
+        Blocker bugs: mpp-150,155,193,197
+        Critical bugs: mpp-70,86,95,128,149,174,180,189,196,198
+        Major bugs: mpp-2,21,53,59,66,68,72,87,99,100,131
+                        177,179,183,187,195,199
+        Minor bugs: mpp-25,36,42,51,56,84,98,101,115,117,158,188
+
+
+Release-2_0_13:  15/Oct/2005  llonergan
+    Known bugs:
+        Blocker bugs: mpp-150,155,193,197
+        Critical bugs: mpp-70,86,95,128,149,174,180,189,196,198
+        Major bugs: mpp-2,21,53,59,66,68,72,87,99,100,131
+                        177,179,183,187,195,199
+        Minor bugs: mpp-25,36,42,51,56,84,98,101,115,117,158,188
+
+Release-2_0_12:  14/Oct/2005  llonergan
+    Known bugs:
+        Blocker bugs: mpp-111,150,170
+        Critical bugs: mpp-70,86,95,128,149,174,180
+        Major bugs: mpp-2,21,53,59,66,68,72,87,99,100,131
+                        177,179,183,185,187,189,191
+        Minor bugs: mpp-25,36,42,51,56,84,98,101,115,117,188
+
+Release-2_0_11:  14/Oct/2005  llonergan
+    Major update of dispatcher
+    Change of planner to avoid Motion rescans
+    Solaris support for management scripts
+    Known bugs:
+        Blocker bugs: mpp-111,150,170
+        Critical bugs: mpp-70,86,95,128,149,174,180,181
+        Major bugs: mpp-2,21,53,59,66,68,72,87,99,100,114,131
+                        173,177,179,183,185,187,189,191
+        Minor bugs: mpp-25,36,42,51,56,84,98,101,115,117,175,188
+
+Release-2_0_10:  13/Oct/2005  llonergan
+    Known bugs:
+        Blocker bugs: mpp-93,111,129,134,145,150,168,169,170,172,178
+        Critical bugs: mpp-70,86,95,128,148,149,174,176,180,181
+        Major bugs: mpp-2,21,53,59,66,68,69,72,83,87,99,100,
+                        114,131,162,173,177,179,182
+        Minor bugs: mpp-25,36,42,51,56,84,98,101,115,117,175,183
+
+Release-2_0_9:  12/Oct/2005  llonergan
+    Known bugs:
+        Blocker bugs: mpp-93,111,122,129,130,134,137,142,145,150,155,168
+        Critical bugs: mpp-70,86,95,128,148,149
+        Major bugs: mpp-2,21,27,53,59,66,68,69,72,83,87,99,100,114,131,162,163,164
+        Minor bugs: mpp-25,36,42,51,56,84,98,101,115,117
+
+Release-2_0_8:  11/Oct/2005  llonergan
+    Known bugs:
+        Blocker bugs: mpp-93,111,122,129,130,134,137,142,145,150,153,166
+        Critical bugs: mpp-70,86,95,128,148,149
+        Major bugs: mpp-2,21,27,53,59,66,68,69,72,83,87,99,100,114,131,155,163,164
+        Minor bugs: mpp-25,36,42,51,56,84,98,101,115,117
+
+Release-2_0_7:  09/Oct/2005  llonergan
+    Known bugs:
+        Blocker bugs: mpp-68,78,93,120,122,130,134,137,150,151
+        Critical bugs: mpp-70,128,129,145
+        Major bugs: mpp-2,21,27,45,53,59,66,69,72,82,83,85-88,94,95,99,100,107
+        Minor bugs: mpp-25,36,42,51,56,84,98,101,104,110,115,117
+
+Release-2_0_6:  08/Oct/2005  llonergan
+Release-2_0_5:  08/Oct/2005  llonergan
+    Test for tagging system.
+Release-2_0_4:  08/Oct/2005  llonergan
+    Saturday build. Includes Kurt's revised dispatcher
+    Known bugs:
+        Blocker bugs: mpp-68,78,93,120,122,130,134,137,150
+        Critical bugs: mpp-70,128,129,145
+        Major bugs: mpp-2,21,27,45,53,59,66,69,72,82,83,85-88,94,95,99,100,107
+        Minor bugs: mpp-25,36,42,51,56,84,98,101,104,110,115,117,147
+
+Release-2_0_3:  05/Oct/2005  builder
+    Initial Release contains fixes from Oct 5 bang
+
+
+Release-2_0_2:  05/Oct/2005  builder
+    Initial Release. 
+
+
+Release-2_0_1:  03/Oct/2005  builder
+    Initial Release. 
+
+
+Release-0_0_1:  08/Oct/2005  llonergan
+    Another dry run.
+
+Release-0_0_0:  26/Sep/2005  builder
+    Dry Run for Oct 15 2005 Release
+
+Fixes: mpp-55, mpp-63. Also added ctrl-c support and disabled COPY in 
+    read only transactions.
+Added new GUC variable Gp_max_packet_size.  This specifies the largest packet
+	size that the interconnect will send messages with.  Like Mpp_session_role, 
+	this can only be set before startup.  The value that is set on the QD is
+	always set on all of the QEs as part of the QE connection process. The 
+	default value is 8 kBytes and valid are from 512-64k bytes.  The GUC 
+	Gp_max_tuple_chunk_size has been removed.  The tuple chunk size is now
+	derived from Gp_max_packet_size.
+COPY command integration with DTM completed. COPY now relies on the 
+    transaction manager to issue a ROLLBACK if the dispatcher throws
+    an error.
+NAME datatype is now valid for hashing.
+Major simplifications to the cdbloader front end: removed the hashing
+    logic, removed all communications to the admin schema. The loader
+    now connects only to the entry node, and the entry node information
+    is still passed into the loader from the command line like before.
+Added support for hashing on FLOAT4 and FLOAT8. Also added the option
+    to select either the FNV1 or FNV1A hash algorithm, so that they
+    should both be tested. Reduction methods are "lazy-mod" and "bit
+    mask". Bit mask reduction is selected when the number of segments
+    is a power of 2, and Lazymod otherwize. This is done for performance
+    sake.
+CDB Hash API added. So far support for hashing on INT2,INT4,INT8,
+    TEXT,VARCHAR(n),CHAR(n) is added. Corresponding manual tests
+    are located in libcdbtest. 
+MPPEXEC command added.
+    The command MPPEXEC is for internal use  only.
+Log4j is the new CDB-Loader logger. Logging is now configurable from
+    a properties config file and also some config options exist in the
+    command line argument options (command line on higher priority).
+Data load rate (MB/sec) added to the end of load statistics in the CDB-Loader.
+CDB-Loader code changes that accomodate the change from a "cdb-head and
+    tails" in CDB1.x to an all equal segment database cluster.
+CDB2 admin schema version 1 support added to the CDB-Loader. Besides
+    the support for this schema version, other schema versions support
+    could be added in the future and loaded automatically. The loader
+    now asks the admin schema which version it is and loads the appropriate
+    set of queries for that particular version. 
+Added traffic control and preliminary parallelization to SQL DML.
+    CDB now analyzes and, in some cases, parallelizes the SQL DML commands,
+    SELECT, INSERT, UPDATE, and DELETE. In addition, it recognizes and 
+    rejects commands that should be parallelized but that the current code 
+    can't handle.  Parallelized plans still execute in a single segment
+    database, but the effects of parallelization may be observed via the
+    EXPLAIN command.
+Fixed some traffic control and message issues (CDB-5)
+    ALTER messages now distinguish failures due to unsupported objects
+    (like ALTER TABLE) versus unsupported operations  (like ALTER OWNER).
+    Clarified some other messages and aligned the program behavior with
+    the documented behavior vis a vis rejection versus interim rejection
+Special handling of SQL commands for CDB users.
+    Added "traffic control" for SQL commands to issue errors or warnings 
+    as appropriate when Mpp_role=dispatch.  Modified PostgreSQL utilities 
+    (e.g, initdb, createdb) to override external specification of 
+    Mpp_session_role, thus preserving their old behavior.
+New run-time variables Mpp_session_role and Mpp_role.
+    The run-time parameters Mpp_session_role and Mpp_role report and provide 
+    control over the role assumed by a postgres process.  The roles are 
+    dispatch (process acts as a parallel SQL dispatcher), execute (process 
+    acts as a parallel SQL executor), and utility (process acts as a simple 
+    SQL engine. They are initialized to the same value at connection time and 
+    are local to the resulting session. A super user can modify Mpp_role via 
+    the SET command, but Mpp_session_role may not be modified.  
+
+Release-2_0_0:  18/Nov/2004  jeshleman
+
+    First post!  Initial Cut at Admin schema.
+
+Entry_template:  18/Nov/2004  jeshleman
+    One line description of the update including Scarab defect id.
+        Paragraph containing detailed update description from a product
+        consumer's point of view.  Internals discussions should be left
+        to Scarab entries and code comments.  New entries should be
+        added immediately following the <<<NEW>>> tag-line with no
+        blank lines between entries (the undented one line description
+        acts as an entry separator).  This file is processed using
+        automation so formatting is important.

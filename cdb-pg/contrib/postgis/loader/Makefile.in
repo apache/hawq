@@ -1,0 +1,98 @@
+# **********************************************************************
+# * $Id: Makefile.in
+# *
+# * PostGIS - Spatial Types for PostgreSQL
+# * http://postgis.refractions.net
+# * Copyright 2008 Mark Cave-Ayland
+# *
+# * This is free software; you can redistribute and/or modify it under
+# * the terms of the GNU General Public Licence. See the COPYING file.
+# *
+# **********************************************************************
+
+# PGXS information
+#
+# Note that PGXS currently doesn't handle building FE executables, but we need
+# the INSTALL and DESTDIR variables so we can get the correct install paths. 
+# Hence we include the PGXS Makefile here, but ensure that we override the
+# 'all' and 'install' targets with the ones we really want to use below.
+ifdef USE_PGXS
+PG_CONFIG = @PGCONFIG@
+PGXS := $(shell $(PG_CONFIG) --pgxs)
+include $(PGXS)
+else
+subdir = contrib/postgis/loader
+top_builddir = ../../..
+include $(top_builddir)/src/Makefile.global
+include $(top_srcdir)/contrib/contrib-global.mk
+endif
+
+# Set CFLAGS afer PGXS, otherwise it will get overwritten with the PGXS
+# version which is not what we want. 
+CC=@CC@
+CFLAGS=@ICONV_CFLAGS@ @CFLAGS@ @PICFLAGS@ @WARNFLAGS@
+
+# Filenames with extension as determined by the OS
+PGSQL2SHP=pgsql2shp@EXESUFFIX@
+SHP2PGSQL=shp2pgsql@EXESUFFIX@
+SHP2PGSQL-GUI=shp2pgsql-gui@EXESUFFIX@
+SHP2PGSQL-CLI=shp2pgsql-cli@EXESUFFIX@
+
+# PostgreSQL frontend CPPFLAGS and LDFLAGS (for compiling and linking with libpq)
+PGSQL_FE_CPPFLAGS=@PGSQL_FE_CPPFLAGS@
+PGSQL_FE_LDFLAGS=@PGSQL_FE_LDFLAGS@
+
+# iconv flags
+ICONV_LDFLAGS=@ICONV_LDFLAGS@
+
+# liblwgeom
+LIBLWGEOM=../liblwgeom/liblwgeom.a
+
+# GTK includes and libraries
+GTK_CFLAGS = @GTK_CFLAGS@
+GTK_LIBS = @GTK_LIBS@
+
+
+# The real parts of the Makefile
+all: $(SHP2PGSQL) $(PGSQL2SHP) @GTK_BUILD@
+
+gui: $(SHP2PGSQL-GUI) $(SHP2PGSQL-CLI)
+
+# liblwgeom.a dependency to allow "make install" in 
+# the loader/ subdirectory to work  
+$(LIBLWGEOM):
+	make -C ../liblwgeom
+
+pgsql2shp.o: pgsql2shp.c
+	$(CC) $(CFLAGS) $(PGSQL_FE_CPPFLAGS) -c $<
+
+$(PGSQL2SHP): shpopen.o dbfopen.o getopt.o pgsql2shp.o $(LIBLWGEOM) 
+	$(CC) $(CFLAGS) $^ $(ICONV_LDFLAGS) $(PGSQL_FE_LDFLAGS) -lm -o $@ 
+
+$(SHP2PGSQL): shpopen.o dbfopen.o getopt.o  shp2pgsql.o $(LIBLWGEOM) 
+	$(CC) $(CFLAGS) $^ $(ICONV_LDFLAGS) -lm -o $@ 
+
+shp2pgsql-core-gui.o: shp2pgsql-core.c
+	$(CC) $(CFLAGS) $(ICONV_CFLAGS) -DPGUI -c -o $@ $^
+
+shp2pgsql-gui.o: shp2pgsql-gui.c
+	$(CC) $(PGSQL_FE_CPPFLAGS) $(CFLAGS) $(GTK_CFLAGS) -o $@ -c shp2pgsql-gui.c
+
+$(SHP2PGSQL-GUI): stringbuffer.o shpopen.o dbfopen.o shp2pgsql-core-gui.o shp2pgsql-gui.o $(LIBLWGEOM) 
+	$(CC) $(CFLAGS) $^ -o $@ $(GTK_LIBS) $(ICONV_LDFLAGS) $(PGSQL_FE_LDFLAGS) -lm 
+
+$(SHP2PGSQL-CLI): stringbuffer.o shpopen.o dbfopen.o getopt.o shp2pgsql-core.o shp2pgsql-cli.o $(LIBLWGEOM) 
+	$(CC) $(CFLAGS) $^ -o $@ $(ICONV_LDFLAGS) -lm 
+
+install: all
+	@mkdir -p $(DESTDIR)$(bindir)
+	$(INSTALL) $(PGSQL2SHP) $(DESTDIR)$(bindir)
+	$(INSTALL) $(SHP2PGSQL) $(DESTDIR)$(bindir)
+
+uninstall:
+	@rm -f $(DESTDIR)$(bindir)/$(PGSQL2SHP)
+	@rm -f $(DESTDIR)$(bindir)/$(SHP2PGSQL)
+
+clean:
+	@rm -f *.o $(SHP2PGSQL) $(PGSQL2SHP) 
+

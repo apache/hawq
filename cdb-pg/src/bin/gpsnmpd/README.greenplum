@@ -1,0 +1,60 @@
+SNMP MIB for monitoring the health of the Greenplum Database (4.x)
+------------------------------------------------------------------
+6/30/2008   Ben Werther    bwerther@greenplum.com
+3/10/2010   Chuck McDevitt cmcdevitt@greenplum.com
+-------------------------------------------------
+
+I've adapted and extended the basic Postgres SNMP MIB to support health monitoring of a Greenplum array.
+
+The Postgres MIB implements the standard RDBMS MIB, which provides general vendor neutral information about the configuration of a database.
+
+For details of the underlying MIB, see http://publib.boulder.ibm.com/infocenter/idshelp/v10/index.jsp?topic=/com.ibm.snmp.doc/snmp80.htm or the actual MIB file enclosed.
+
+
+How it operates:
+- The mode in which I've been using this package is either as an agentx subagent, or as a standalone SNMP agent. 
+
+
+Installing the MIB:
+- Copy the NETWORK-SERVICES-MIB.txt and RDBMS-MIB.txt and GPDB-MIB.txt files to the /usr/share/snmp/mibs folder on the target machine
+- Put gpsnmpd and gpsnmpd.conf in a convenient directory 
+- Edit the agentaddress setting in gpsnmpd.conf to set the UDP port that it will listen on.
+
+- Run gpsnmpd with syntax like: 
+        gpsnmpd -c gpsnmpd.conf -C "host=127.0.0.1 user=gpadmin"   --where -C is the connect string to the Greenplum database
+     -or-
+        gpsnmpd -s -C "host=127.0.0.1 user=gpadmin" 			   --to run as an agentx subagent 
+        
+- From an snmp client you should be able to browse this MIB
+
+    snmpwalk -c public localhost:161 -v2c RDBMS-MIB::rdbmsRelState       will give you the state of the system and the segments --
+
+         [root@localhost gpsnmpd-1.0]# snmpwalk -c public localhost:160 -v2c RDBMS-MIB::rdbmsRelState
+          RDBMS-MIB::rdbmsRelState.1.1 = INTEGER: active(2)
+          RDBMS-MIB::rdbmsRelState.2.0 = INTEGER: active(2)
+          RDBMS-MIB::rdbmsRelState.2.1 = INTEGER: active(2)
+          RDBMS-MIB::rdbmsRelState.2.2 = INTEGER: active(2)
+          RDBMS-MIB::rdbmsRelState.2.3 = INTEGER: active(2)
+
+  rdbmsRelState.1.1 is the entire array, and can have the value:
+     active(2) -- if it is queryable
+     unavailable(5) -- if the array or a required segement is down
+
+     [it determines this by connecting to the array and doing a tiny distributed query every 60 seconds]
+
+  rdbmsRelState.2.x are the segments, and can have the values:
+    active(2) -- currently valid and acting as a primary
+    available(3) -- valid but not acting as a primary (i.e. a standby)
+    unavailable(4) -- not valid
+    other(1) -- anything else (this is not expected to occur)
+     
+    [it determines these from the gp_pgdatabase table]
+
+
+
+ Good luck, and let me know if you have any questions...
+
+   -Ben
+
+
+

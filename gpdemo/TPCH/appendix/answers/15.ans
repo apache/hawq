@@ -1,0 +1,11 @@
+# @(#)15.ans	2.1.8.1
+Q15
+ *** Query completed. One row found. 5 columns returned.
+ 
+  S_SUPPKEY  S_NAME                     S_ADDRESS
+-----------  -------------------------  ----------------------------------------
+   S_PHONE                 TOTAL_REVENUE
+   ---------------  --------------------
+       8449  Supplier#000008449         Wp34zim9qYFbVctdW
+   20-469-856-8873           1772627.21
+

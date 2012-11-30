@@ -1,0 +1,27 @@
+TODO
+Names in parentheses indicate the developer working on the TODO item
+
+- General
+	- Get db password off of the command line
+	- Update FAQ to specify agent type
+	- Command line option for location of snmpd config file
+	- Config options for tcp wrappers to find hosts.{allow|deny} files
+	- Config option to pass a config string to snmpd or tcp wrappers
+	- Possibly use pg_config VERSION string to determine for which version the agent has been compiled, to compare against server version
+
+- RDBMS-MIB
+	- Make regression test support SNMP v3
+	- Fix getopts code in gpsnmpd.c to support all snmpd command-line options
+	- Implement NETWORK-SERVICES-MIB enough to index the rbdmsSrv* tables and rdbmsRelTable (Waiting until after May)
+	- Implement rdbmsWellKnownLimitedResources (maybe this isn't worth it... the only data point in there is "rdbmsLogSpace", which talks about remaining space allocated for "redo and undo logs", which doesn't mean a whole lot to pgsql)
+	- Figure out what the rdbmsConformance section of the MIB tree is supposed to do
+	- Send traps. This will take finding a nice way to poll for trap values, or have some other notification in place
+	- Review cache timeout settings for each table and adjust appropriately (it's in <table_name>_data_access.h, namely #define <TABLE_NAME>_CACHE_TIMEOUT, and defaults to 60 sec)
+		- Note that even if the timeout expires, the cache only updates when the table is polled for data. Some values (perhaps rdbmsSrvInfoHighwaterInboundAssociations, for instance) maybe ought to be updated periodically whether the OID is queried or not.
+
+- GPDB-MIB
+	- Come up with a useful MIB, and implement it
+	- Extension of surveillance information.
+	- Server GUC management.
+	- Traps on NOTIFY
+	- Investigate possibility of reporting on standby systems of various flavors (minimally PITR, possibly others)

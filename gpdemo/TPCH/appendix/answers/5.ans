@@ -1,0 +1,12 @@
+# @(#)5.ans	2.1.8.1
+Q5 
+ *** Query completed. 5 rows found. 2 columns returned.
+ 
+N_NAME                                  REVENUE
+-------------------------  --------------------
+INDONESIA                          55502041.17
+VIETNAM                            55295086.00
+CHINA                              53724494.26
+INDIA                              52035511.00
+JAPAN                              45410175.70
+

@@ -1,0 +1,179 @@
+GPDB-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+     MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE,
+      --Counter32, Gauge32, Integer32, 
+      enterprises
+          FROM SNMPv2-SMI
+      DisplayString     --, TEXTUAL-CONVENTION, DateAndTime, TruthValue, AutonomousType
+          FROM SNMPv2-TC
+      MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP
+          FROM SNMPv2-CONF
+      SnmpAdminString 
+      	  FROM SNMP-FRAMEWORK-MIB
+      --rdbmsDbIndex
+      --    FROM RDBMS-MIB
+          ;
+
+
+
+gpdbMIB MODULE-IDENTITY
+    LAST-UPDATED "201006071500Z"
+    ORGANIZATION "Greenplum Corporation"
+    CONTACT-INFO
+            "E-mail: cmcdevitt@greenplum.com
+             WWW: http://www.greenplum.com"
+    DESCRIPTION
+        "MIB to describe a Greenplum Database System"
+        
+    REVISION "201006071500Z"
+    DESCRIPTION "Add system name to alert message"
+        
+    REVISION "201003041500Z"
+    DESCRIPTION "Initial version"
+    
+    ::= { enterprises 31327 }
+
+ gpdbObjects        OBJECT IDENTIFIER ::= { gpdbMIB 1 }
+ 
+ -- SnmpAdminString is UTF-8, while DisplayString is ASCII 7
+ -- SnmpAdminString defaults to SIZE (0..255).
+ 
+ gpdbAlertMsg    OBJECT-TYPE
+      SYNTAX          SnmpAdminString (SIZE (0..128))
+      MAX-ACCESS      read-only
+      STATUS          current
+      DESCRIPTION
+          "An error or information message from GPDB."
+
+      ::= { gpdbObjects 1 }
+      
+  gpdbAlertSeverity    OBJECT-TYPE
+      SYNTAX          INTEGER
+      					{
+      						gpdbSevUnknown(0),
+      						gpdbSevOk(1),
+      						gpdbSevWarning(2),
+      						gpdbSevError(3),
+      						gpdbSevFatal(4),
+      						gpdbSevPanic(5),
+      						gpdbSevSystemDegraded(6),
+      						gpdbSevSystemDown(7)
+      					}
+      MAX-ACCESS      read-only
+      STATUS          current
+      DESCRIPTION
+          "Severity of Alert, if known."
+
+      ::= { gpdbObjects 2 }
+      
+  gpdbAlertSqlstate    OBJECT-TYPE
+      SYNTAX          DisplayString (SIZE (0..5))
+      MAX-ACCESS      read-only
+      STATUS          current
+      DESCRIPTION
+          "SQLSTATE associated with the Alert."
+
+      ::= { gpdbObjects 3 }
+      
+  gpdbAlertDetail    OBJECT-TYPE
+      SYNTAX          SnmpAdminString (SIZE (0..128))
+      MAX-ACCESS      read-only
+      STATUS          current
+      DESCRIPTION
+          "Detail associated with the Alert message."
+
+      ::= { gpdbObjects 4 }
+      
+  gpdbAlertSqlStmt    OBJECT-TYPE
+      SYNTAX          SnmpAdminString (SIZE (0..128))
+      MAX-ACCESS      read-only
+      STATUS          current
+      DESCRIPTION
+          "SQL statement associated with the Alert message."
+
+      ::= { gpdbObjects 5 }
+      
+  gpdbAlertSystemName OBJECT-TYPE
+      SYNTAX          SnmpAdminString (SIZE (0..72))
+      MAX-ACCESS      read-only
+      STATUS          current
+      DESCRIPTION
+          "Name if the system that generated this alert."
+
+      ::= { gpdbObjects 6 }
+      
+  ----------------------------------------------------------------
+
+  gpdbTraps       OBJECT IDENTIFIER ::= { gpdbMIB 5 }
+  
+  -- This extra level, with a 0 in the identifier, is necessary to 
+  -- allows proxies to convert this v2c trap to a v1 trap for managers that need it.
+  
+  gpdbTrapsList	  OBJECT IDENTIFIER ::= { gpdbTraps 0 }
+  				 
+  				
+
+  gpdbAlert    NOTIFICATION-TYPE
+      OBJECTS         { gpdbAlertMsg,
+      					gpdbAlertSeverity,
+      					gpdbAlertSqlstate,
+      					gpdbAlertDetail,
+      					gpdbAlertSqlStmt }
+      STATUS          current
+      DESCRIPTION
+          "gpdbAlert traps happen whenever the GPDB system
+           decides to send us an error or information message."
+           
+      ::= { gpdbTrapsList 1 }
+
+  ----------------------------------------------------------------
+  
+  -- conformance information
+
+  gpdbMIBConformance
+               OBJECT IDENTIFIER ::= { gpdbMIB 2 }
+
+  gpdbMIBCompliances
+               OBJECT IDENTIFIER ::= { gpdbMIBConformance 1 }
+  gpdbMIBGroups  OBJECT IDENTIFIER ::= { gpdbMIBConformance 2 }
+
+  -- compliance statements
+  
+  
+  gpdbCompliance MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+            "The compliance statement for SNMP entities which
+            implement this MIB module."
+    MODULE  -- this module
+        MANDATORY-GROUPS { gpdbGroup,
+                           gpdbNotificationsGroup }
+
+    ::= { gpdbMIBCompliances 1 }
+
+
+
+  gpdbGroup OBJECT-GROUP
+    OBJECTS { gpdbAlertMsg,
+    		  gpdbAlertSeverity,
+    		  gpdbAlertSqlstate,
+    		  gpdbAlertDetail,
+    		  gpdbAlertSqlStmt,
+    		  gpdbAlertSystemName }
+    STATUS  current
+    DESCRIPTION
+            "A collection of objects providing basic instrumentation
+            and control of an SNMP entity."
+    ::= { gpdbMIBGroups 1 }
+
+  gpdbNotificationsGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { gpdbAlert }
+    STATUS        current
+    DESCRIPTION
+       "The basic notifications implemented by an SNMP entity
+        supporting command responder applications."
+    ::= { gpdbMIBGroups 2 }
+  
+
+  END

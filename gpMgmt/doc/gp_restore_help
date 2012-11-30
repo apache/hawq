@@ -1,0 +1,218 @@
+COMMAND NAME: gp_restore
+
+Restores Greenplum Database databases that were backed up using gp_dump.
+
+*****************************************************
+SYNOPSIS
+*****************************************************
+
+gp_restore --gp-k=<timestamp_key> -d <database_name> [-a | -s] [-i] 
+[-v] [-c] [-h <hostname>] [-p <port>] [-U <username>] [-W] 
+[--gp-c] [--gp-i] [--gp-d=<directoryname>] [--gp-r=<reportfile>] 
+[--gp-l=a|p]
+
+gp_restore -? | -h | --help 
+
+gp_restore --version
+
+
+*****************************************************
+DESCRIPTION
+*****************************************************
+
+
+The gp_restore utility recreates the data definitions (schema) and 
+user data in a Greenplum Database database using the script files created 
+by an gp_dump operation. The use of this script assumes:
+
+1. You have backup files created by an gp_dump operation.
+
+2. Your Greenplum Database system up and running.
+
+3. Your Greenplum Database system has the exact same number of segment 
+   instances as the system that was backed up using gp_dump. 
+
+4. (optional) The gp_restore script uses the information in 
+   the Greenplum system catalog tables to determine the hosts, ports, 
+   and data directories for the segment instances it is restoring. If 
+   you want to change any of this information (for example, move the 
+   system to a different array of hosts) you must use the gprebuildsystem 
+   and gprebuildseg scripts to reconfigure your array before restoring.
+
+5. The databases you are restoring have been created in the system.
+
+The functionality of gp_restore is analogous to PostgreSQL pg_restore 
+utility, which restores a database from files created by the database 
+backup process. It issues the commands necessary to reconstruct the database 
+to the state it was in at the time it was saved.
+
+The functionality of gp_restore is modified to accommodate the
+distributed nature of a Greenplum Database database, and to use files 
+created by an gp_dump operation. Keep in mind that a database in 
+Greenplum is actually comprised of several PostgreSQL instances (the master 
+and all segments), each of which must be restored individually. 
+The gp_restore utility takes care of populating each segment in the 
+system with its own distinct portion of data.
+
+The gp_restore utility performs the following actions:
+
+ON THE MASTER HOST
+
+* Creates the user database schema(s) using the 
+  gp_dump_1_<dbid>_<timestamp> SQL file created by gp_dump.
+
+* Creates a log file in the master data directory named 
+  gp_restore_status_1_<dbid>_<timestamp>.
+
+* gp_restore launches a gp_restore_agent for each segment instance 
+  to be restored. gp_restore_agent processes run on the segment hosts 
+  and report status back to the gp_restore process running on the 
+  master host. 
+
+ON THE SEGMENT HOSTS
+
+* Restores the user data for each segment instance using the 
+  gp_dump_0_<dbid>_<timestamp> files created by gp_dump. Each 
+  segment instance on a host (primary and mirror instances) are restored.
+
+* Creates a log file for each segment instance named 
+  gp_restore_status_0_<dbid>_<timestamp>.
+
+Note that the 14 digit timestamp is the number that uniquely identifies 
+the backup job to be restored, and is part of the filename for each 
+dump file created by a gp_dump operation. This timestamp must be passed 
+to the gp_restore utility when restoring a Greenplum Database database.
+
+
+
+*****************************************************
+OPTIONS
+*****************************************************
+
+
+--gp-k=<timestamp_key>
+
+Required. The 14 digit timestamp key that uniquely identifies the 
+backup set of data to restore. This timestamp can be found in the gp_dump 
+log file output, as well as at the end of the dump files created by a 
+gp_dump operation. It is of the form YYYYMMDDHHMMSS.
+
+
+-d <database_name>
+--dbname=<dbname>
+
+Required. The name of the database to connect to in order to restore 
+the user data. The database(s) you are restoring must exist, gp_restore 
+does not create the database.
+ 
+
+-i
+--ignore-version
+
+Ignores a version mismatch between gp_restore and the database server.
+
+
+-v
+--verbose
+
+Specifies verbose mode.
+
+
+-a
+--data-only
+
+Restore only the data, not the schema (data definitions).
+
+
+-c
+--clean
+
+Clean (drop) database objects before recreating them.
+
+
+-s
+--schema-only
+
+Restores only the schema (data definitions), no user data is restored.
+
+
+-h <hostname>
+--host=<hostname>
+
+The host name of the master host. If not provided, the value of PGHOST 
+or the local host is used.
+
+
+-p <port>
+--port=<port>
+
+The master port. If not provided, the value of PGPORT or 
+the port number provided at compile time is used.
+
+
+-U <username>
+--username=<username>
+
+The database super user account name, for example bgadmin. If not 
+provided, the value of PGUSER or the current OS user name is used.
+
+
+-W
+
+Forces a password prompt. This will happen automatically if the 
+server requires password authentication.
+
+
+--gp-c
+
+Use gunzip for inline decompression.
+
+
+--gp-i
+
+Specifies that processing should ignore any errors that occur. Use 
+this option to continue restore processing on errors.
+
+
+--gp-d=<directoryname>
+
+Specifies the relative or absolute path to backup files on the hosts. 
+If this is a relative path, it is considered to be relative to the data 
+directory. If not specified, defaults to the data directory of each instance 
+being restored. Use this option if you created your backup files in an 
+alternate location when running gp_dump.
+
+
+--gp-r=<reportfile>
+
+Specifies the full path name where the restore job report file will 
+be placed on the master host. If not specified, defaults to the 
+master data directory.
+
+
+--gp-l={a|p}
+
+Specifies whether to check for backup files on (a)ll segment instances 
+or only on (p)rimary segment instances. The default is to check for 
+primary segment backup files only, and then recreate the corresponding 
+mirrors.
+
+
+*****************************************************
+EXAMPLES
+*****************************************************
+
+
+Restore a Greenplum database using backup files created by gp_dump:
+
+gp_restore --gp-k=2005103112453 -d gpdb
+
+
+*****************************************************
+SEE ALSO
+*****************************************************
+
+
+gp_dump, gprebuildsystem, gprebuildseg
+
+
