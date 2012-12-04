@@ -1,5 +1,5 @@
 #
-# RPM spec file for Greenplum Database
+# RPM spec file for GPSQL
 # Uses the greenplum-db-*.bin file that contains both the shell script to install GPDB as well as the tarball contents
 # Currently, expects the greenplum-db-*.bin file to be present in the same directory as the spec file.
 #
@@ -9,15 +9,16 @@
 # 3. Are there any disadvantages of turning AutoReq off, as has been done below?
 #
 
-%define name            greenplum-db
+%define name            gpsql
+%define gpdbname        greenplum-db
 %define version         %{greenplum_db_ver}
 %define release         %{bld_number}
 %define arch            x86_64
-%define gpdbtarball     %{name}-%{version}-build-%{release}-RHEL5-%{arch}.tar.gz
+%define gpdbtarball     %{gpdbname}-%{version}-build-%{release}-RHEL5-%{arch}.tar.gz
 %define installdir      /usr/local/%{name}-%{version}
 %define symlink         /usr/local/%{name}
 
-Summary:        Greenplum Database
+Summary:        GPSQL
 Name:           %{name}
 Version:        %{version}
 Release:        %{release}
@@ -35,7 +36,7 @@ AutoReq:        no
 BuildRoot:      %{_topdir}/temp
 
 %description
-Greenplum Database
+GPSQL
 
 %prep
 # As the source tarball for this RPM is created during the %%prep phase, we cannot assign the source as SOURCE0: <tar.gz file path>
@@ -63,8 +64,3 @@ rm -rf $RPM_BUILD_ROOT
 # Made sure that even after this step, rpm -e removes greenplum_path.sh as well
 sed "s#GPHOME=.*#GPHOME=%{installdir}#g" %{installdir}/greenplum_path.sh > %{installdir}/greenplum_path.sh.updated
 mv %{installdir}/greenplum_path.sh.updated %{installdir}/greenplum_path.sh
-
-%changelog
-* Tue Oct 30 2012 Bhooshan Mogal <Bhooshan.Mogal@emc.com> - 4.2.2.5-1
-- Initial package
-
