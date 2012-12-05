@@ -63,9 +63,10 @@ rm -rf $RPM_BUILD_ROOT
 %{symlink}
 
 %post
+INSTDIR=$RPM_INSTALL_PREFIX0/%{name}-%{version}
 # Update GPHOME in greenplum_path.sh
 # Have to use sed to replace it into another file, and then move it back to greenplum_path.sh
 # Made sure that even after this step, rpm -e removes greenplum_path.sh as well
-sed "s#GPHOME=.*#GPHOME=%{installdir}#g" %{installdir}/greenplum_path.sh > %{installdir}/greenplum_path.sh.updated
-mv %{installdir}/greenplum_path.sh.updated %{installdir}/greenplum_path.sh
+sed "s#GPHOME=.*#GPHOME=${INSTDIR}#g" ${INSTDIR}/greenplum_path.sh > ${INSTDIR}/greenplum_path.sh.updated
+mv ${INSTDIR}/greenplum_path.sh.updated ${INSTDIR}/greenplum_path.sh
 
