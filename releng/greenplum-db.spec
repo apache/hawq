@@ -12,9 +12,14 @@
 %define name            gpsql
 %define gpdbname        greenplum-db
 %define version         %{greenplum_db_ver}
-%define release         %{bld_number}
 %define arch            x86_64
-%define gpdbtarball     %{gpdbname}-%{version}-build-%{release}-RHEL5-%{arch}.tar.gz
+%if "%{version}" == "dev"
+%define gpdbtarball  %{gpdbname}-%{version}-RHEL5-%{arch}.tar.gz
+%define release         dev
+%else
+%define gpdbtarball  %{gpdbname}-%{version}-build-%{release}-RHEL5-%{arch}.tar.gz
+%define release         %{bld_number}
+%endif
 %define installdir      /usr/local/%{name}-%{version}
 %define symlink         /usr/local/%{name}
 
@@ -31,8 +36,6 @@ BuildArch:      %{arch}
 # generated RPMS. However, we tested the rpm generated after turning AutoReq off
 # and it seemed to work fine.
 AutoReq:        no
-# This does not work because the %{gpdbtarball} is created during the %%prep phase
-#Source0:       %{gpdbtarball}
 BuildRoot:      %{_topdir}/temp
 
 %description
@@ -64,3 +67,4 @@ rm -rf $RPM_BUILD_ROOT
 # Made sure that even after this step, rpm -e removes greenplum_path.sh as well
 sed "s#GPHOME=.*#GPHOME=%{installdir}#g" %{installdir}/greenplum_path.sh > %{installdir}/greenplum_path.sh.updated
 mv %{installdir}/greenplum_path.sh.updated %{installdir}/greenplum_path.sh
+
