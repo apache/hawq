@@ -37,6 +37,7 @@ BuildArch:      %{arch}
 # and it seemed to work fine.
 AutoReq:        no
 BuildRoot:      %{_topdir}/temp
+Prefix:         /usr/local
 
 %description
 GPSQL
