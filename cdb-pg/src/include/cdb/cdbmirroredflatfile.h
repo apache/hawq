@@ -102,6 +102,7 @@ extern int MirroredFlatFile_OpenInDbDir(
 	MirroredFlatFileOpen *open,
 				/* The resulting open struct. */
 
+	int4				contentid,
 	DbDirNode 			*dbDirNode,
 	
 	char			*simpleFileName,

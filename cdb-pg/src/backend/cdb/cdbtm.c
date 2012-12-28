@@ -39,6 +39,9 @@
 #include "utils/fmgroids.h"
 #include "utils/memutils.h"
 
+
+TransactionId DispatchedMasterTransactionId = 0;
+
 extern bool Test_print_direct_dispatch_info;
 extern struct Port *MyProcPort;
 
@@ -428,6 +431,13 @@ dtmPreCommand(const char *debugCaller, const char *debugDetail, PlannedStmt *stm
 
 	Assert(debugCaller != NULL);
 	Assert(debugDetail != NULL);
+
+	/*
+	 * in gpsql, distributed transacetion is disabled.
+	 */
+	Assert(currentGxact == NULL);
+	needsTwoPhaseCommit = FALSE;
+	wantSnapshot = FALSE;
 
 	/**
 	 * update the information about what segments are participating in the transaction
@@ -4246,4 +4256,29 @@ performDtxProtocolCommand(DtxProtocolCommand dtxProtocolCommand,
 			break;
 	}
 	elog(DTM_DEBUG5, "performDtxProtocolCommand successful return for distributed transaction %s", gid);
+}
+
+/*
+ * get master's local transaction id.
+ * in gpsql, there is no distributed transaction.
+ * master's transaction is dispatched from master to segments.
+ */
+TransactionId
+GetMasterTransactionId(void)
+{
+	if (Gp_role == GP_ROLE_DISPATCH)
+		return GetCurrentTransactionId();
+
+	return DispatchedMasterTransactionId;
+}
+
+/*
+ * set dispatched master's transaction id on QE
+ */
+void
+SetMasterTransactionId(TransactionId xid)
+{
+	Assert(Gp_role == GP_ROLE_EXECUTE);
+
+	DispatchedMasterTransactionId = xid;
 }

@@ -884,10 +884,10 @@ void UpdateMasterAosegTotals(Relation parentrel, int segno, uint64 tupcount)
 		/*
 		 * Since we have an exclusive lock on the segment-file entry, we can use SnapshotNow.
 		 */
-        fsinfo = GetFileSegInfo(parentrel, aoEntry, SnapshotNow, segno);
+        fsinfo = GetFileSegInfo(parentrel, aoEntry, SnapshotNow, segno, GpIdentity.segindex);
 		if (fsinfo == NULL)
 		{
-			InsertInitialSegnoEntry(aoEntry, segno);
+			InsertInitialSegnoEntry(aoEntry, segno, GpIdentity.segindex);
 		}
 		else
 		{

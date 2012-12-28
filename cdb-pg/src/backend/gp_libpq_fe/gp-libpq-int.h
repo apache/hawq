@@ -302,7 +302,9 @@ struct pg_conn
 	char	   *keepalives_count;		/* maximum number of TCP keepalive
 										 * retransmits */
 
-
+	char	   *dboid; 		 	/* gpsql */
+	char	   *bootstrap_user; /* gpsql */
+	char	   *encoding;		/* gpsql */
 
     char       *gpqeid;        /* MPP: session id & startup info for qExec */
     char       *gpqdid;        /* MPP: session id & startup info for QD callback */
@@ -405,6 +407,10 @@ struct pg_conn
 
 	/* Buffer for receiving various parts of messages */
 	PQExpBufferData workBuffer; /* expansible string */
+
+	/* Buffer for QE catalog write back message */
+	char *		serializedCatalog;
+	int			serializedCatalogLen;
 };
 
 /* PGcancel stores all data necessary to cancel a connection. A copy of this

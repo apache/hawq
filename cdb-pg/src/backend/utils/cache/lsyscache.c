@@ -18,7 +18,8 @@
 
 #include "access/hash.h"
 #include "bootstrap/bootstrap.h"
-#include "catalog/heap.h"                   /* SystemAttributeDefinition() */    
+#include "catalog/heap.h"                   /* SystemAttributeDefinition() */  
+#include "catalog/pg_authid.h"
 #include "catalog/pg_amop.h"
 #include "catalog/pg_amproc.h"
 #include "catalog/pg_namespace.h"
@@ -2430,6 +2431,27 @@ get_roleid(const char *rolname)
 	return GetSysCacheOid(AUTHNAME,
 						  PointerGetDatum((char *) rolname),
 						  0, 0, 0);
+}
+
+char *
+get_rolname(Oid roleid)
+{
+	HeapTuple	ht;
+	Form_pg_authid auth_rec;
+	char		*result = NULL;
+
+	ht = SearchSysCache(AUTHOID,
+							ObjectIdGetDatum(roleid),
+							0, 0, 0);
+	if (!HeapTupleIsValid(ht))
+		return result;
+
+	auth_rec = (Form_pg_authid) GETSTRUCT(ht);
+
+	result = pstrdup(NameStr(auth_rec->rolname));
+
+	ReleaseSysCache(ht);
+	return result;
 }
 
 /*

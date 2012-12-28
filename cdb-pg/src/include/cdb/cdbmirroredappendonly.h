@@ -35,20 +35,22 @@ typedef struct MirroredAppendOnlyOpen
 	
 	uint32		segmentFileNum;
 	
-	char		mirrorFilespaceLocation[MAXPGPATH+1];
+	int32		contentid;
+
+	/*char		mirrorFilespaceLocation[MAXPGPATH+1];*/
 					// UNDONE: Consider palloc'ing this instead of statically allocating
 					// UNDONE: to use less stack space...
 	
 	
 	File		primaryFile;
 
-	MirrorDataLossTrackingState mirrorDataLossTrackingState;
+	/*MirrorDataLossTrackingState mirrorDataLossTrackingState;
 
-	int64						mirrorDataLossTrackingSessionNum;
+	int64						mirrorDataLossTrackingSessionNum;*/
 
 	bool						create;
 
-	bool						primaryOnlyToLetResynchronizeWork;
+	/*bool						primaryOnlyToLetResynchronizeWork;
 	
 	bool						mirrorOnly;
 	
@@ -58,7 +60,7 @@ typedef struct MirroredAppendOnlyOpen
 	
 	StorageManagerMirrorMode	mirrorMode;
 
-	bool						mirrorDataLossOccurred;
+	bool						mirrorDataLossOccurred;*/
 } MirroredAppendOnlyOpen;
 
 // -----------------------------------------------------------------------------
@@ -75,30 +77,13 @@ extern void MirroredAppendOnly_Create(
 	int32						segmentFileNum,
 				/* Which segment file. */
 	
+	int32						contentid,
+
 	char						*relationName,
 					/* For tracing only.  Can be NULL in some execution paths. */
 	
-	MirrorDataLossTrackingState mirrorDataLossTrackingState,
+	int 						*primaryError);
 
-	int64						mirrorDataLossTrackingSessionNum,
-	
-	int 						*primaryError,
-	
-	bool						*mirrorDataLossOccurred);
-
-
-extern void MirroredAppendOnly_MirrorReCreate(
-	RelFileNode 				*relFileNode,
-				/* The tablespace, database, and relation OIDs for the open. */
-
-	int32						segmentFileNum,
-				/* Which segment file. */
-	
-	MirrorDataLossTrackingState mirrorDataLossTrackingState,
-
-	int64						mirrorDataLossTrackingSessionNum,
-	
-	bool						*mirrorDataLossOccurred);
 
 /*
  * MirroredAppendOnly_OpenReadWrite will acquire and release the MirroredLock.
@@ -113,84 +98,17 @@ extern void MirroredAppendOnly_OpenReadWrite(
 	int32						segmentFileNum,
 				/* Which segment file. */
 	
+	int32						contentid,
+
 	char						*relationName,
 					/* For tracing only.  Can be NULL in some execution paths. */
 	
 	int64						logicalEof,
 				/* The logical EOF to begin appending the new data. */
 
-	bool						traceOpenFlags,
-
-	ItemPointer					persistentTid,
-
-	int64						persistentSerialNum,
-	
 	bool						readOnly,
 
 	int 						*primaryError);
-
-extern void MirroredAppendOnly_AddMirrorResyncEofs(
-	RelFileNode						*relFileNode,
-
-	int32							segmentFileNum,
-
-	char							*relationName,
-
-	ItemPointer						persistentTid,
-
-	int64							persistentSerialNum,
-
-	MirroredLockLocalVars 			*mirroredLockByRefVars,
-
-	bool							originalMirrorCatchupRequired,
-
-	MirrorDataLossTrackingState 	originalMirrorDataLossTrackingState,
-
-	int64 							originalMirrorDataLossTrackingSessionNum,
-
-	int64							mirrorNewEof);
-
-extern void MirroredAppendOnly_EndXactCatchup(
-		int 							entryIndex,
-	
-		RelFileNode 					*relFileNode,
-	
-		int32							segmentFileNum,
-	
-		int 							nestLevel,
-	
-		char							*relationName,
-	
-		ItemPointer 					persistentTid,
-	
-		int64							persistentSerialNum,
-	
-		MirroredLockLocalVars			*mirroredLockVarsByRef,
-	
-		bool							lastMirrorCatchupRequired,
-	
-		MirrorDataLossTrackingState 	lastMirrorDataLossTrackingState,
-	
-		int64							lastMirrorDataLossTrackingSessionNum,
-	
-		int64							mirrorNewEof);
-
-extern void MirroredAppendOnly_OpenResynchonize(
-	MirroredAppendOnlyOpen		*open,
-				/* The resulting open struct. */
-
-	RelFileNode 				*relFileNode,
-				/* The tablespace, database, and relation OIDs for the open. */
-
-	int32						segmentFileNum,
-				/* Which segment file. */
-		
-	int64						logicalEof,
-				/* The logical EOF to begin appending the new data. */
-									
-	int 						*primaryError,
-	
-	bool						*mirrorDataLossOccurred);
 
 extern bool MirroredAppendOnly_IsActive(
 					MirroredAppendOnlyOpen *open);
@@ -208,15 +126,7 @@ extern void MirroredAppendOnly_FlushAndClose(
 	MirroredAppendOnlyOpen 		*open,
 				/* The open struct. */				
 
-	int 						*primaryError,
-	
-	bool					*mirrorDataLossOccurred,
-
-	bool					*mirrorCatchupRequired,
-
-	MirrorDataLossTrackingState 	*originalMirrorDataLossTrackingState,
-	
-	int64 							*originalMirrorDataLossTrackingSessionNum);
+	int 						*primaryError);
 
 /*
  * Flush an Append-Only relation file.
@@ -225,18 +135,13 @@ extern void MirroredAppendOnly_Flush(
 	MirroredAppendOnlyOpen 		*open,
 				/* The open struct. */				
 
-	int 						*primaryError,
-	
-	bool						*mirrorDataLossOccurred);
+	int 						*primaryError);
 
 /*
  * Close an Append-Only relation file.
  */
 extern void MirroredAppendOnly_Close(
-	MirroredAppendOnlyOpen 	*open,
-				/* The open struct. */				
-
-	bool					*mirrorDataLossOccurred);
+	MirroredAppendOnlyOpen 	*open);
 
 
 extern void MirroredAppendOnly_Drop(
@@ -244,26 +149,13 @@ extern void MirroredAppendOnly_Drop(
 	 
 	int32						segmentFileNum,
 
+	int32						contentid,
+
 	char						*relationName,
 					/* For tracing only.  Can be NULL in some execution paths. */
 	
-	bool  						primaryOnly,
+	int							*primaryError);
 
-	int							*primaryError,
-
-	bool						*mirrorDataLossOccurred);
-
-
-extern void MirroredAppendOnly_MirrorReDrop(
-	RelFileNode					*relFileNode,
-	 
-	int32						segmentFileNum,
-	
-	MirrorDataLossTrackingState mirrorDataLossTrackingState,
-
-	int64						mirrorDataLossTrackingSessionNum,
-	
-	bool						*mirrorDataLossOccurred);
 
 // -----------------------------------------------------------------------------
 // Append 
@@ -282,9 +174,7 @@ extern void MirroredAppendOnly_Append(
 	int32		appendDataLen,
 	
 				/* The byte length of the Append-Only data. */
-	int 		*primaryError,
-	
-	bool		*mirrorDataLossOccurred);
+	int 		*primaryError);
 
 // -----------------------------------------------------------------------------
 // Truncate
@@ -296,9 +186,7 @@ extern void MirroredAppendOnly_Truncate(
 	int64		position,
 				/* The position to cutoff the data. */
 
-	int 		*primaryError,
-	
-	bool		*mirrorDataLossOccurred);
+	int 		*primaryError);
 
 
 // -----------------------------------------------------------------------------

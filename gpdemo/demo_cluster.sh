@@ -302,7 +302,8 @@ if [ "${ENABLE_HDFS}" = "true" ]; then
 	cat >> $CLUSTER_CONFIG <<-EOF
 
 		# HDFS Support
-		HDFS_URL=${HDFS_HOST}/gpsql/gpdb${DATE}
+		DFS_NAME=hdfs
+		DFS_URL=${HDFS_HOST}/gpsql/gpdb${DATE}
 		DATABASE_NAME=hdfs
 	EOF
 

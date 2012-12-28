@@ -80,6 +80,13 @@ extern void initStringInfo(StringInfo str);
 
 extern void initStringInfoOfSize(StringInfo str, int bufsize);
 
+/*
+ * initStringInfoOfString
+ *
+ * Initialize a StringInfoData struct with c string
+ */
+extern void initStringInfoOfString(StringInfo str, char * buf, int size);
+
 /*------------------------
  * resetStringInfo
  * Clears the current content of the StringInfo, if any. The

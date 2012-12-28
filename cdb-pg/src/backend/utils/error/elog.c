@@ -3991,6 +3991,33 @@ is_log_level_output(int elevel, int log_min_level)
     return false;
 }
 
+void
+pending_for_debug(int timeout)
+{
+	int     seconds_to_linger = timeout;
+	int     seconds_lingered = 0;
+
+	while (seconds_lingered < seconds_to_linger)
+	{
+		int seconds_left = seconds_to_linger - seconds_lingered;
+		int minutes_left = seconds_left / 60;
+		int setproctitle_seconds = (minutes_left <= 1) ? 5 :
+									(minutes_left <= 5) ? 30 : 60;
+		int sleep_seconds;
+		char buf[50];
+
+		/* Update 'ps' display. */
+		snprintf(buf, sizeof(buf)-1,
+				"wait for debug, continue in %dm %ds", minutes_left, seconds_left - minutes_left * 60);
+		set_ps_display(buf, true);
+
+		/* Sleep. */
+		sleep_seconds = Min(seconds_left, setproctitle_seconds);
+		pg_usleep(sleep_seconds * 1000000L);
+		seconds_lingered += sleep_seconds;
+	}
+}
+
 /*
  * elog_debug_linger
  */

@@ -334,7 +334,7 @@ extern void PersistentFileSysObj_UpdateRelationBufpoolKind(
 
 	PersistentFileSysRelBufpoolKind 	relBufpoolKind);
 
-extern bool PersistentFileSysObj_CanAppendOnlyCatchupDuringResync(
+/*extern bool PersistentFileSysObj_CanAppendOnlyCatchupDuringResync(
 		RelFileNode 				*relFileNode,
 	
 		int32						segmentFileNum,
@@ -343,9 +343,9 @@ extern bool PersistentFileSysObj_CanAppendOnlyCatchupDuringResync(
 	
 		int64						persistentSerialNum,
 	
-		int64						*eof);
+		int64						*eof);*/
 
-extern void PersistentFileSysObj_GetAppendOnlyCatchupMirrorStartEof(
+/*extern void PersistentFileSysObj_GetAppendOnlyCatchupMirrorStartEof(
 	RelFileNode					*relFileNode,
 
 	int32						segmentFileNum,
@@ -354,13 +354,13 @@ extern void PersistentFileSysObj_GetAppendOnlyCatchupMirrorStartEof(
 
 	int64						persistentSerialNum,
 
-	int64						*startEof);
+	int64						*startEof);*/
 
 extern void PersistentFileSysObj_RequestResynchronizeTransition(void);
 
 extern void PersistentFileSysObj_MarkWholeMirrorFullCopy(void);
 
-extern void PersistentFileSysObj_MarkWholeMirrorScanIncremental(void);
+/*extern void PersistentFileSysObj_MarkWholeMirrorScanIncremental(void);*/
 
 extern void PersistentFileSysObj_MarkAppendOnlyCatchup(void);
 
@@ -526,6 +526,8 @@ extern bool PersistentFileSysObj_FilespaceScan(
 	FilespaceScanToken				*filespaceScanToken,
 
 	Oid 							*filespaceOid,
+
+	int4							*contentid,
 	
 	int16							*dbId1,
 	

@@ -393,32 +393,10 @@ static char *alterTableCmdString(AlterTableType subtype);
 Oid
 DefineRelation(CreateStmt *stmt, char relkind, char relstorage)
 {
-	volatile struct CdbDispatcherState ds = {NULL, NULL};
-
     Oid reloid = 0;
     Assert(stmt->relation->schemaname == NULL || strlen(stmt->relation->schemaname)>0);
 
-    PG_TRY();
-    {
-        reloid = DefineRelation_int(stmt, relkind, relstorage, (struct CdbDispatcherState *)&ds);
-    }
-	PG_CATCH();
-	{
-        /* If dispatched, stop QEs and clean up after them. */
-        if (ds.primaryResults)
-            cdbdisp_handleError((struct CdbDispatcherState *)&ds);
-
-        /* Carry on with error handling. */
-		PG_RE_THROW();
-	}
-	PG_END_TRY();
-
-	/*
-	 * We successfully completed our work.	Now check the results from the
-	 * qExecs, if dispatched.  This waits for them to all finish, and exits
-	 * via ereport(ERROR,...) if unsuccessful.
-	 */
-	cdbdisp_finishCommand((struct CdbDispatcherState *)&ds, NULL, NULL);
+    reloid = DefineRelation_int(stmt, relkind, relstorage, NULL);
 
     return reloid;
 }
@@ -451,11 +429,6 @@ DefineRelation_int(CreateStmt *stmt,
 	int64			persistentSerialNum;
 
 	TidycatOptions *tidycatOptions = NULL;
-
-	bool		shouldDispatch = Gp_role == GP_ROLE_DISPATCH &&
-                                 IsNormalProcessingMode() &&
-                                 relkind != RELKIND_SEQUENCE &&
-                                 relkind != RELKIND_VIEW;
 
 	/*
 	 * Truncate relname to appropriate length (probably a waste of time, as
@@ -539,16 +512,14 @@ DefineRelation_int(CreateStmt *stmt,
 		/* Need the real tablespace id for dispatch */
 		if (!OidIsValid(tablespaceId))
 			tablespaceId = get_database_dts(MyDatabaseId);
-
-		/* 
-		 * MPP-8238 : inconsistent tablespaces between segments and master 
-		 */
-		if (shouldDispatch)
-			stmt->tablespacename = get_tablespace_name(tablespaceId);
 	}
 
 	/* Goh tablespace check. */
+	/*
+	 * temporaty disable this check for dispatching matedata test.
+	 * TODO
 	CheckCrossAccessTablespace(tablespaceId);
+	*/
 
 	/*
 	 * Parse and validate reloptions, if any.
@@ -628,109 +599,14 @@ DefineRelation_int(CreateStmt *stmt,
 	}
 
 
-	if (shouldDispatch)
-	{
-		Oid			toastRelationId = InvalidOid;
-		Oid         toastComptypeOid = InvalidOid;
-		Oid			aosegRelationId = InvalidOid;
-		Oid			aoblkdirRelationId = InvalidOid;
-		Relation	pg_class_desc;
-		Relation	pg_type_desc;
-		Oid 		comptypeOid = InvalidOid;
-		Oid			toastIndexId = InvalidOid;
-		Oid			aosegIndexId = InvalidOid;
-		Oid			aoblkdirIndexId = InvalidOid;
-		Oid         aosegComptypeOid = InvalidOid;
-		Oid         aoblkdirComptypeOid = InvalidOid;
 
-		MemoryContext oldContext;
-
-		/*
-		 * We use a RowExclusiveLock but hold it till end of transaction so that two
-		 * DDL operations will not deadlock between QEs
-		 */
-		pg_class_desc = heap_open(RelationRelationId, RowExclusiveLock);
-		pg_type_desc = heap_open(TypeRelationId, RowExclusiveLock);
-
-		LockRelationOid(DependRelationId, RowExclusiveLock);
-
-		cdb_sync_oid_to_segments();
-
-		/*
-		 * Pre-Allocate an OID for the relfilenode, plus one for the toast table
-		 * and another for an aoseg table (just in case).
-		 *
-		 * The OID will be the relfilenode as well, so make sure it doesn't collide
-		 * with either pg_class OIDs or existing physical files.
-		 *
-		 * For upgrade, use the tidycat OIDs if specified. Also, remove the distribution
-		 * policy because catalog table does not have distribution.
-		 */
-		if (gp_upgrade_mode && (tidycatOptions->relid != InvalidOid))
-		{
-			relationId       = tidycatOptions->relid;
-			comptypeOid      = tidycatOptions->reltype_oid;
-			toastRelationId  = tidycatOptions->toast_oid;
-			toastIndexId     = tidycatOptions->toast_index;
-			toastComptypeOid = tidycatOptions->toast_reltype;
-			stmt->policy = NULL;
-		}
-		else
-		{
-			relationId          = GetNewRelFileNode(tablespaceId, false,  pg_class_desc);
-			comptypeOid         = GetNewRelFileNode(tablespaceId, false,  pg_type_desc);
-			toastRelationId     = GetNewRelFileNode(tablespaceId, false,  pg_class_desc);
-			toastIndexId        = GetNewRelFileNode(tablespaceId, false,  pg_class_desc);
-			toastComptypeOid    = GetNewRelFileNode(tablespaceId, false,  pg_type_desc);
-			aosegRelationId     = GetNewRelFileNode(tablespaceId, false,  pg_class_desc);
-			aosegIndexId        = GetNewRelFileNode(tablespaceId, false,  pg_class_desc);
-			aoblkdirRelationId  = GetNewRelFileNode(tablespaceId, false,  pg_class_desc);
-			aoblkdirIndexId     = GetNewRelFileNode(tablespaceId, false,  pg_class_desc);
-			aosegComptypeOid    = GetNewRelFileNode(tablespaceId, false,  pg_type_desc);
-			aoblkdirComptypeOid = GetNewRelFileNode(tablespaceId, false,  pg_type_desc);
-		}
-
-		heap_close(pg_class_desc, NoLock);  /* gonna update, so don't unlock */
-
-		stmt->oidInfo.relOid = relationId;
-		stmt->oidInfo.comptypeOid = comptypeOid;
-		stmt->oidInfo.toastOid = toastRelationId;
-		stmt->oidInfo.toastIndexOid = toastIndexId;
-		stmt->oidInfo.toastComptypeOid = toastComptypeOid;
-		stmt->oidInfo.aosegOid = aosegRelationId;
-		stmt->oidInfo.aosegIndexOid = aosegIndexId;
-		stmt->oidInfo.aosegComptypeOid = aosegComptypeOid;
-		stmt->oidInfo.aoblkdirOid = aoblkdirRelationId;
-		stmt->oidInfo.aoblkdirIndexOid = aoblkdirIndexId;
-		stmt->oidInfo.aoblkdirComptypeOid = aoblkdirComptypeOid;
-
-		stmt->relKind = relkind;
-		stmt->relStorage = relstorage;
-
-		if (!OidIsValid(stmt->ownerid))
-			stmt->ownerid = GetUserId();
-
-		oldContext = MemoryContextSwitchTo(CacheMemoryContext);
-		stmt->relation->schemaname = get_namespace_name(namespaceId);
-		MemoryContextSwitchTo(oldContext);
-
-		heap_close(pg_type_desc, NoLock);
-	}
-	else if (Gp_role == GP_ROLE_EXECUTE)
-	{
-		Assert(stmt->oidInfo.relOid != 0);
-		relationId = stmt->oidInfo.relOid;
-	}
-	else
-	{
-		stmt->oidInfo.toastOid = InvalidOid;
-		stmt->oidInfo.toastIndexOid = InvalidOid;
-		stmt->oidInfo.aosegOid = InvalidOid;
-		stmt->oidInfo.aosegIndexOid = InvalidOid;
-		stmt->oidInfo.aoblkdirOid = InvalidOid;
-		stmt->oidInfo.aoblkdirIndexOid = InvalidOid;
-		stmt->ownerid = GetUserId();
-	}
+	stmt->oidInfo.toastOid = InvalidOid;
+	stmt->oidInfo.toastIndexOid = InvalidOid;
+	stmt->oidInfo.aosegOid = InvalidOid;
+	stmt->oidInfo.aosegIndexOid = InvalidOid;
+	stmt->oidInfo.aoblkdirOid = InvalidOid;
+	stmt->oidInfo.aoblkdirIndexOid = InvalidOid;
+	stmt->ownerid = GetUserId();
 
 	/* MPP-8405: disallow OIDS on partitioned tables */
 	if ((stmt->partitionBy ||
@@ -747,10 +623,9 @@ DefineRelation_int(CreateStmt *stmt,
 					 errOmitLocation(true)));
 
     if (stmt->oidInfo.relOid)
-        elog(DEBUG4, "DefineRelation relOid=%d schemaname=%s shouldDispatch=%d",
+        elog(DEBUG4, "DefineRelation relOid=%d schemaname=%s ",
              stmt->oidInfo.relOid,
-             stmt->relation->schemaname ? stmt->relation->schemaname : "",
-             shouldDispatch);
+             stmt->relation->schemaname ? stmt->relation->schemaname : "");
 
 	relationId = heap_create_with_catalog(relname,
 										  namespaceId,
@@ -846,22 +721,6 @@ DefineRelation_int(CreateStmt *stmt,
 	if (stmt->attr_encodings)
 		AddRelationAttributeEncodings(rel, stmt->attr_encodings);
 
-	/* It is now safe to dispatch */
-	if (shouldDispatch)
-	{
-
-		/* Dispatch the statement tree to all primary and mirror segdbs.
-		 * Doesn't wait for the QEs to finish execution.
-		 */
-		cdbdisp_dispatchUtilityStatement((Node *)stmt,
-										 true,      /* cancelOnError */
-										 true,      /* startTransaction */
-										 true,      /* withSnapshot */
-										 ds,
-										 "DefineRelation_int");
-
-	}
-
 	/*
 	 * Clean up.  We keep lock on new relation (although it shouldn't be
 	 * visible to anyone else anyway, until commit).
@@ -890,7 +749,7 @@ DefineRelation_int(CreateStmt *stmt,
 extern void
 DefineExternalRelation(CreateExternalStmt *createExtStmt)
 {
-	volatile struct CdbDispatcherState ds = {NULL, NULL};
+	/*volatile struct CdbDispatcherState ds = {NULL, NULL};*/
 	CreateStmt				  *createStmt = makeNode(CreateStmt);
 	ExtTableTypeDesc 		  *exttypeDesc = (ExtTableTypeDesc *)createExtStmt->exttypedesc;
 	SingleRowErrorDesc 		  *singlerowerrorDesc = NULL;
@@ -902,7 +761,6 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 	Datum					  locationUris = 0;
 	Datum					  locationExec = 0;
 	char*					  commandString = NULL;
-	char*					  customProtName = NULL;
 	char					  rejectlimittype = '\0';
 	char					  formattype;
 	int						  rejectlimit = -1;
@@ -910,9 +768,7 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 	bool					  issreh = false; /* is single row error handling requested? */
 	bool					  iswritable = createExtStmt->iswritable;
 	bool					  isweb = createExtStmt->isweb;
-	bool					  shouldDispatch = (Gp_role == GP_ROLE_DISPATCH &&
-												IsNormalProcessingMode());
-	
+
 	/*
 	 * now set the parameters for keys/inheritance etc. Most of these are
 	 * uninteresting for external relations...
@@ -1108,6 +964,13 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 	 */
 	formattype = transformFormatType(createExtStmt->format);
 	
+	if (fmttype_is_custom(formattype))
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+						errmsg("Cannot support custom formatter yet in GPSQL") ));
+	}
+
 	formatOptStr = transformFormatOpts(formattype,
 									   createExtStmt->formatOpts,
 									   list_length(createExtStmt->tableElts),
@@ -1203,100 +1066,62 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 	 * Under the covers this will dispatch a CREATE TABLE statement to all the
 	 * QEs.
 	 */
-	if (Gp_role == GP_ROLE_DISPATCH || Gp_role == GP_ROLE_UTILITY)
-		reloid = DefineRelation(createStmt, RELKIND_RELATION, RELSTORAGE_EXTERNAL);
+	Assert(Gp_role == GP_ROLE_DISPATCH || Gp_role == GP_ROLE_UTILITY);
+
+	reloid = DefineRelation(createStmt, RELKIND_RELATION, RELSTORAGE_EXTERNAL);
 
 	/*
 	 * Now we take care of pg_exttable and dependency with error table (if any).
 	 */
-    PG_TRY();
-    {
-
-		/*
-		 * get our pg_class external rel OID. If we're the QD we just created
-		 * it above. If we're a QE DefineRelation() was already dispatched to
-		 * us and therefore we have a local entry in pg_class. get the OID
-		 * from cache.
-		 */
-		if (Gp_role == GP_ROLE_DISPATCH || Gp_role == GP_ROLE_UTILITY)
-			Assert(reloid != InvalidOid);
-		else
-			reloid = RangeVarGetRelid(createExtStmt->relation, true);
-
-		/*
-		 * create a pg_exttable entry for this external table.
-		 */
-		InsertExtTableEntry(reloid, 
-							iswritable, 
-							isweb,
-							issreh,
-							formattype,
-							rejectlimittype,
-							commandString,
-							rejectlimit,
-							fmtErrTblOid,
-							encoding,
-							formatOptStr,
-							locationExec,
-							locationUris);
-		
-		/*
-		 * record a dependency between the external table and its error table (if one exists)
-		 */
-		if(singlerowerrorDesc && singlerowerrorDesc->errtable)
-		{
-			ObjectAddress	myself,
-			referenced;
-			Oid		fmtErrTblOid = RangeVarGetRelid(((SingleRowErrorDesc *)createExtStmt->sreh)->errtable, true);
-
-			Assert(!createExtStmt->iswritable);
-			Assert(fmtErrTblOid != InvalidOid);
-
-			myself.classId = RelationRelationId;
-			myself.objectId = reloid;
-			myself.objectSubId = 0;
-			referenced.classId = RelationRelationId;
-			referenced.objectId = fmtErrTblOid;
-			referenced.objectSubId = 0;
-			recordDependencyOn(&myself, &referenced, DEPENDENCY_NORMAL);
-		}
-
-		if (shouldDispatch)
-		{
-
-			/*
-			 * Dispatch the statement tree to all primary segdbs.
-			 * Doesn't wait for the QEs to finish execution.
-			 */
-			cdbdisp_dispatchUtilityStatement((Node *)createExtStmt,
-											 true,      /* cancelOnError */
-											 true,      /* startTransaction */
-											 true,      /* withSnapshot */
-											 (struct CdbDispatcherState *)&ds,
-											 "DefineExternalRelation");
-		}
-    }
-	PG_CATCH();
-	{
-        /* If dispatched, stop QEs and clean up after them. */
-        if (ds.primaryResults)
-            cdbdisp_handleError((struct CdbDispatcherState *)&ds);
-
-        /* Carry on with error handling. */
-		PG_RE_THROW();
-	}
-	PG_END_TRY();
 
 	/*
-	 * We successfully completed our work.	Now check the results from the
-	 * qExecs, if dispatched.  This waits for them to all finish, and exits
-	 * via ereport(ERROR,...) if unsuccessful.
+	 * get our pg_class external rel OID. If we're the QD we just created
+	 * it above. If we're a QE DefineRelation() was already dispatched to
+	 * us and therefore we have a local entry in pg_class. get the OID
+	 * from cache.
 	 */
-	cdbdisp_finishCommand((struct CdbDispatcherState *)&ds, NULL, NULL);
-	
-	if(customProtName)
-		pfree(customProtName);
-	
+	if (Gp_role == GP_ROLE_DISPATCH || Gp_role == GP_ROLE_UTILITY)
+		Assert(reloid != InvalidOid);
+	else
+		reloid = RangeVarGetRelid(createExtStmt->relation, true);
+
+	/*
+	 * create a pg_exttable entry for this external table.
+	 */
+	InsertExtTableEntry(reloid,
+						iswritable,
+						isweb,
+						issreh,
+						formattype,
+						rejectlimittype,
+						commandString,
+						rejectlimit,
+						fmtErrTblOid,
+						encoding,
+						formatOptStr,
+						locationExec,
+						locationUris);
+
+	/*
+	 * record a dependency between the external table and its error table (if one exists)
+	 */
+	if(singlerowerrorDesc && singlerowerrorDesc->errtable)
+	{
+		ObjectAddress	myself,
+		referenced;
+		Oid		fmtErrTblOid = RangeVarGetRelid(((SingleRowErrorDesc *)createExtStmt->sreh)->errtable, true);
+
+		Assert(!createExtStmt->iswritable);
+		Assert(fmtErrTblOid != InvalidOid);
+
+		myself.classId = RelationRelationId;
+		myself.objectId = reloid;
+		myself.objectSubId = 0;
+		referenced.classId = RelationRelationId;
+		referenced.objectId = fmtErrTblOid;
+		referenced.objectSubId = 0;
+		recordDependencyOn(&myself, &referenced, DEPENDENCY_NORMAL);
+	}
 }
 
 extern void
@@ -1687,11 +1512,6 @@ ExecuteTruncate(TruncateStmt *stmt)
 	List	   *rels = NIL;
 	List	   *relids = NIL;
 	List	   *meta_relids = NIL;
-	List	   *new_heap_oids = NIL;
-	List	   *new_toast_oids = NIL;
-	List	   *new_aoseg_oids = NIL;
-	List       *new_aoblkdir_oids = NIL;
-	List	   *new_ind_oids = NIL;
 	ListCell   *cell;
     int partcheck = 2;
 	List *partList = NIL;
@@ -1846,214 +1666,72 @@ ExecuteTruncate(TruncateStmt *stmt)
 	/*
 	 * OK, truncate each table.
 	 */
-	if (Gp_role != GP_ROLE_EXECUTE)
+	foreach(cell, rels)
 	{
-		cdb_sync_oid_to_segments();
+		Relation	rel = (Relation) lfirst(cell);
+		Oid			heap_relid;
+		Oid			toast_relid;
+		Oid			aoseg_relid = InvalidOid;
+		Oid			aoblkdir_relid = InvalidOid;
+		Oid			new_heap_oid = InvalidOid;
+		Oid			new_toast_oid = InvalidOid;
+		Oid			new_aoseg_oid = InvalidOid;
+		Oid			new_aoblkdir_oid = InvalidOid;
+		List	   *indoids = NIL;
 
-		foreach(cell, rels)
+		/*
+		 * Create a new empty storage file for the relation, and assign it
+		 * as the relfilenode value. The old storage file is scheduled for
+		 * deletion at commit.
+		 */
+		new_heap_oid = setNewRelfilenode(rel);
+
+		heap_relid = RelationGetRelid(rel);
+		toast_relid = rel->rd_rel->reltoastrelid;
+		heap_close(rel, NoLock);
+
+		if (!RelationIsAoRows(rel) && !RelationIsAoCols(rel))
 		{
-			Relation	rel = (Relation) lfirst(cell);
-			Oid			heap_relid;
-			Oid			toast_relid;
-			Oid			aoseg_relid = InvalidOid;
-			Oid			aoblkdir_relid = InvalidOid;
-			Oid			new_heap_oid = InvalidOid;
-			Oid			new_toast_oid = InvalidOid;
-			Oid			new_aoseg_oid = InvalidOid;
-			Oid			new_aoblkdir_oid = InvalidOid;
-			List	   *indoids = NIL;
+			ereport(ERROR,
+					( errcode(ERRCODE_GP_COMMAND_ERROR),
+							errmsg("TRUNCATE on heap table is not supported in gpsql.")));
+		}
 
-			/*
-			 * Create a new empty storage file for the relation, and assign it
-			 * as the relfilenode value. The old storage file is scheduled for
-			 * deletion at commit.
-			 */
-			new_heap_oid = setNewRelfilenode(rel);
+		GetAppendOnlyEntryAuxOids(heap_relid, SnapshotNow,
+								  &aoseg_relid, NULL,
+								  &aoblkdir_relid, NULL);
 
-			new_heap_oids = lappend_oid(new_heap_oids, new_heap_oid);
-
-			heap_relid = RelationGetRelid(rel);
-			toast_relid = rel->rd_rel->reltoastrelid;
+		/*
+		 * The same for the toast table, if any.
+		 */
+		if (OidIsValid(toast_relid))
+		{
+			rel = relation_open(toast_relid, AccessExclusiveLock);
+			new_toast_oid = setNewRelfilenode(rel);
 			heap_close(rel, NoLock);
-
-			if (RelationIsAoRows(rel) ||
-				RelationIsAoCols(rel))
-				GetAppendOnlyEntryAuxOids(heap_relid, SnapshotNow,
-										  &aoseg_relid, NULL,
-										  &aoblkdir_relid, NULL);
-
-			/*
-			 * The same for the toast table, if any.
-			 */
-			if (OidIsValid(toast_relid))
-			{
-				rel = relation_open(toast_relid, AccessExclusiveLock);
-				new_toast_oid = setNewRelfilenode(rel);
-				heap_close(rel, NoLock);
-			}
-
-			/*
-			 * The same for the aoseg table, if any.
-			 */
-			if (OidIsValid(aoseg_relid))
-			{
-				rel = relation_open(aoseg_relid, AccessExclusiveLock);
-				new_aoseg_oid = setNewRelfilenode(rel);
-				heap_close(rel, NoLock);
-			}
-
-			if (OidIsValid(aoblkdir_relid))
-			{
-				rel = relation_open(aoblkdir_relid, AccessExclusiveLock);
-				new_aoblkdir_oid = setNewRelfilenode(rel);
-				heap_close(rel, NoLock);
-			}
-
-			new_toast_oids = lappend_oid(new_toast_oids, new_toast_oid);
-			new_aoseg_oids = lappend_oid(new_aoseg_oids, new_aoseg_oid);
-			new_aoblkdir_oids = lappend_oid(new_aoblkdir_oids, new_aoblkdir_oid);
-
-			elog(DEBUG5, "Truncate in DISPATCH mode: old heap oid %u "
-				 "toast %u aoseg %u aoblkdir %u new heap oid %u, new toast oid %u "
-				 "aoseg oid %u aoblkdir oid %u",
-				 heap_relid, toast_relid, aoseg_relid, aoblkdir_relid,
-				 new_heap_oid, new_toast_oid, new_aoseg_oid, new_aoblkdir_oid);
-
-			/*
-			 * Reconstruct the indexes to match, and we're done.
-			 */
-			reindex_relation(heap_relid, true, true, true, &indoids, true);
-			new_ind_oids = lappend(new_ind_oids, indoids);
 		}
 
-		if (Gp_role == GP_ROLE_DISPATCH)
+		/*
+		 * The same for the aoseg table, if any.
+		 */
+		if (OidIsValid(aoseg_relid))
 		{
-			ListCell	*lc;
-
-			stmt->relids = relids;
-			stmt->new_heap_oids = new_heap_oids;
-			stmt->new_toast_oids = new_toast_oids;
-			stmt->new_aoseg_oids = new_aoseg_oids;
-			stmt->new_aoblkdir_oids = new_aoblkdir_oids;
-			stmt->new_ind_oids = new_ind_oids;
-
-			CdbDispatchUtilityStatement((Node *) stmt, "ExecuteTruncate");
-
-			/* MPP-6929: metadata tracking */
-			foreach(lc, meta_relids)
-			{
-				Oid			a_relid = lfirst_oid(lc);
-
-				MetaTrackUpdObject(RelationRelationId,
-								   a_relid,
-								   GetUserId(),
-								   "VACUUM", "TRUNCATE");
-			}
-
-		}
-	}
-	else /* role=execute */
-	{
-		ListCell   *cell2;
-		ListCell   *cell3;
-		ListCell   *cell4;
-		ListCell   *cell5;
-		ListCell   *cell6;
-		ListCell   *ind_cell;
-
-#ifdef USE_ASSERT_CHECKING
-		int			len = list_length(relids);
-		Assert(len == list_length(stmt->relids));
-		Assert(len == list_length(stmt->new_heap_oids));
-		Assert(len == list_length(stmt->new_toast_oids));
-		Assert(len == list_length(stmt->new_aoseg_oids));
-		Assert(len == list_length(stmt->new_aoblkdir_oids));
-		Assert(len == list_length(stmt->new_ind_oids));
-#endif /* USE_ASSERT_CHECKING */
-
-		cell2 = list_head(stmt->relids);
-		cell3 = list_head(stmt->new_heap_oids);
-		cell4 = list_head(stmt->new_toast_oids);
-		cell5 = list_head(stmt->new_aoseg_oids);
-		cell6 = list_head(stmt->new_aoblkdir_oids);
-
-		ind_cell = list_head(stmt->new_ind_oids);
-
-		foreach(cell, rels)
-		{
-			Relation	rel = (Relation) lfirst(cell);
-			Oid			heap_relid = lfirst_oid(cell2);
-			Oid			toast_relid;
-			Oid			aoseg_relid = InvalidOid;
-			Oid			aoblkdir_relid = InvalidOid;
-			Oid			new_heap_oid = lfirst_oid(cell3);
-			Oid			new_toast_oid = lfirst_oid(cell4);
-			Oid			new_aoseg_oid = lfirst_oid(cell5);
-			Oid			new_aoblkdir_oid = lfirst_oid(cell6);
-			List	   *ind_oids = ind_cell ? lfirst(ind_cell) : NIL;
-
-			/*
-			 * Create a new empty storage file for the relation, and assign it
-			 * as the relfilenode value. The old storage file is scheduled for
-			 * deletion at commit.
-			 */
-			setNewRelfilenodeToOid(rel, new_heap_oid);
-
-			heap_relid = RelationGetRelid(rel);
-			toast_relid = rel->rd_rel->reltoastrelid;
+			rel = relation_open(aoseg_relid, AccessExclusiveLock);
+			new_aoseg_oid = setNewRelfilenode(rel);
 			heap_close(rel, NoLock);
-
-			if (RelationIsAoRows(rel) || RelationIsAoCols(rel))
-				GetAppendOnlyEntryAuxOids(heap_relid, SnapshotNow,
-										  &aoseg_relid, NULL,
-										  &aoblkdir_relid, NULL);
-
-			/*
-			 * The same for the toast table, if any.
-			 */
-			if (OidIsValid(toast_relid))
-			{
-				rel = relation_open(toast_relid, AccessExclusiveLock);
-				setNewRelfilenodeToOid(rel, new_toast_oid);
-				heap_close(rel, NoLock);
-			}
-
-			/*
-			 * The same for the aoseg table, if any.
-			 */
-
-			if (OidIsValid(aoseg_relid))
-			{
-				rel = relation_open(aoseg_relid, AccessExclusiveLock);
-				setNewRelfilenodeToOid(rel, new_aoseg_oid);
-				heap_close(rel, NoLock);
-			}
-
-			if (OidIsValid(aoblkdir_relid))
-			{
-				rel = relation_open(aoblkdir_relid, AccessExclusiveLock);
-				setNewRelfilenodeToOid(rel, new_aoblkdir_oid);
-				heap_close(rel, NoLock);
-			}
-
-			elog(DEBUG5, "Truncate in EXECUTE mode: old heap oid %u "
-				 "toast %u aoseg %u aoblkdir %u new heap oid %u, new toast oid %u "
-				 "aoseg oid %u aoblkdir oid %u",
-				 heap_relid, toast_relid, aoseg_relid, aoblkdir_relid,
-				 new_heap_oid, new_toast_oid, new_aoseg_oid, new_aoblkdir_oid);
-
-			/*
-			 * Reconstruct the indexes to match, and we're done.
-			 */
-			reindex_relation(heap_relid, true, true, true, &ind_oids, false);
-
-			cell2 = lnext(cell2);
-			cell3 = lnext(cell3);
-			cell4 = lnext(cell4);
-			cell5 = lnext(cell5);
-			cell6 = lnext(cell6);
-			ind_cell = ind_cell ? lnext(ind_cell) : NULL;
 		}
+
+		if (OidIsValid(aoblkdir_relid))
+		{
+			rel = relation_open(aoblkdir_relid, AccessExclusiveLock);
+			new_aoblkdir_oid = setNewRelfilenode(rel);
+			heap_close(rel, NoLock);
+		}
+
+		/*
+		 * Reconstruct the indexes to match, and we're done.
+		 */
+		reindex_relation(heap_relid, true, true, true, &indoids, true);
 	}
 }
 
@@ -3802,9 +3480,6 @@ AlterTable(AlterTableStmt *stmt)
 				 &stmt->oidInfoCount,
 				 &stmt->oidInfo,
 				 &stmt->oidmap);
-
-	if (Gp_role == GP_ROLE_DISPATCH)
-		CdbDispatchUtilityStatement((Node *) stmt, "AlterTable");
 }
 
 /*
@@ -10286,12 +9961,12 @@ copy_append_only_data(
 
 	int 		primaryError;
 
-	bool mirrorDataLossOccurred;
+	/*bool mirrorDataLossOccurred;*/
 
-	bool mirrorCatchupRequired;
+	/*bool mirrorCatchupRequired;
 
 	MirrorDataLossTrackingState 	originalMirrorDataLossTrackingState;
-	int64 							originalMirrorDataLossTrackingSessionNum;
+	int64 							originalMirrorDataLossTrackingSessionNum;*/
 
 	if (segmentFileNum > 0)
 	{
@@ -10326,11 +10001,12 @@ copy_append_only_data(
 								&mirroredDstOpen,
 								newRelFileNode,
 								segmentFileNum,
+								/*
+								 * TODO, in gpsql, fix later
+								 */
+								GpIdentity.segindex,
 								relationName,
 								/* logicalEof */ 0, // NOTE: This is the START EOF.  Since we are copying, we start at 0.
-								/* traceOpenFlags */ false,
-								persistentTid,
-								persistentSerialNum,
 								true,
 								&primaryError);
 	if (primaryError != 0)
@@ -10367,8 +10043,8 @@ copy_append_only_data(
 							  &mirroredDstOpen,
 							  buffer,
 							  bufferLen,
-							  &primaryError,
-							  &mirrorDataLossOccurred);
+							  &primaryError/*,
+							  &mirrorDataLossOccurred*/);
 		if (primaryError != 0)
 			ereport(ERROR,
 					(errcode_for_file_access(),
@@ -10389,11 +10065,11 @@ copy_append_only_data(
 
 	MirroredAppendOnly_FlushAndClose(
 							&mirroredDstOpen,
-							&primaryError,
-							&mirrorDataLossOccurred,
+							&primaryError
+							/*&mirrorDataLossOccurred,
 							&mirrorCatchupRequired,
 							&originalMirrorDataLossTrackingState,
-							&originalMirrorDataLossTrackingSessionNum);
+							&originalMirrorDataLossTrackingSessionNum*/);
 	if (primaryError != 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
@@ -10404,12 +10080,12 @@ copy_append_only_data(
 
 	FileClose(srcFile);
 
-	if (eof > 0)
+	/*if (eof > 0)
 	{
-		/* 
+
 		 * This routine will handle both updating the persistent information about the
 		 * new EOFs and copy data to the mirror if we are now in synchronized state.
-		 */
+
 		if (Debug_persistent_print)
 			elog(Persistent_DebugPrintLevel(),
 				 "copy_append_only_data: %u/%u/%u, segment file #%d, serial number " INT64_FORMAT ", TID %s, mirror catchup required %s, "
@@ -10436,7 +10112,7 @@ copy_append_only_data(
 										originalMirrorDataLossTrackingSessionNum,
 										eof);
 
-	}
+	}*/
 	
 	MIRRORED_UNLOCK;
 
@@ -10480,6 +10156,7 @@ ATExecSetTableSpace_AppendOnly(
 				 */
 					
 	int segmentCount;
+	int32 contentid;
 
 	oldTablespace = rel->rd_rel->reltablespace ? rel->rd_rel->reltablespace : MyDatabaseTableSpace;
 
@@ -10530,17 +10207,19 @@ ATExecSetTableSpace_AppendOnly(
 	while ((tuple = GpRelationNodeGetNext(
 							&gpRelationNodeScan,
 							&segmentFileNum,
+							&contentid,
 							&oldPersistentTid,
 							&oldPersistentSerialNum)))
 	{
 		int64 eof = 0;
-
 		/*
 		 * Create segment file in new tablespace under transaction.
 		 */
+
 		MirroredFileSysObj_TransactionCreateAppendOnlyFile(
 											newRelFileNode,
 											segmentFileNum,
+											contentid,
 											rel->rd_rel->relname.data,
 											/* doJustInTimeDirCreate */ true,
 											&newPersistentTid,
@@ -10548,12 +10227,13 @@ ATExecSetTableSpace_AppendOnly(
 
 		if (Debug_persistent_print)
 			elog(Persistent_DebugPrintLevel(), 
-				 "ALTER TABLE SET TABLESPACE: Create for Append-Only %u/%u/%u, segment file #%d "
+				 "ALTER TABLE SET TABLESPACE: Create for Append-Only %u/%u/%u, segment file #%d contentid %d "
 				 "persistent TID %s and serial number " INT64_FORMAT,
 				 newRelFileNode->spcNode,
 				 newRelFileNode->dbNode,
 				 newRelFileNode->relNode,
 				 segmentFileNum,
+				 contentid,
 				 ItemPointerToString(&newPersistentTid),
 				 newPersistentSerialNum);
 
@@ -10577,18 +10257,20 @@ ATExecSetTableSpace_AppendOnly(
 		MirroredFileSysObj_ScheduleDropAppendOnlyFile(
 											&rel->rd_node,
 											segmentFileNum,
+											contentid,
 											rel->rd_rel->relname.data,
 											&oldPersistentTid,
 											oldPersistentSerialNum);
 
 		if (Debug_persistent_print)
 			elog(Persistent_DebugPrintLevel(), 
-				 "ALTER TABLE SET TABLESPACE: Drop for Append-Only %u/%u/%u, segment file #%d "
+				 "ALTER TABLE SET TABLESPACE: Drop for Append-Only %u/%u/%u, segment file #%d contentid %d"
 				 "persistent TID %s and serial number " INT64_FORMAT,
 				 rel->rd_node.spcNode,
 				 rel->rd_node.dbNode,
 				 rel->rd_node.relNode,
 				 segmentFileNum,
+				 contentid,
 				 ItemPointerToString(&oldPersistentTid),
 				 oldPersistentSerialNum);
 
@@ -10599,7 +10281,7 @@ ATExecSetTableSpace_AppendOnly(
 		{
 			FileSegInfo *fileSegInfo;
 
-			fileSegInfo = GetFileSegInfo(rel, aoEntry, appendOnlyMetaDataSnapshot, segmentFileNum);
+			fileSegInfo = GetFileSegInfo(rel, aoEntry, appendOnlyMetaDataSnapshot, segmentFileNum, GpIdentity.segindex);
 			if (fileSegInfo == NULL)
 			{
 				/*
@@ -10755,10 +10437,13 @@ ATExecSetTableSpace_BufferPool(
 			 (!useWal ? "true" : "false"));
 	
 	/* Fetch relation's gp_relation_node row */
+	/* TODO in gpsql */
+	Assert(!"need contentid");
 	nodeTuple = ScanGpRelationNodeTuple(
 							gp_relation_node,
 							rel->rd_rel->relfilenode,
-							/* segmentFileNum */ 0);
+							/* segmentFileNum */ 0,
+							-1 /* TODO */);
 	if (!HeapTupleIsValid(nodeTuple))
 		elog(ERROR, "cache lookup failed for relation %u, tablespace %u, relation file node %u", 
 		     tableOid,
@@ -10805,8 +10490,8 @@ ATExecSetTableSpace_BufferPool(
 			 "ALTER TABLE SET TABLESPACE: Scheduling drop for '%s' "
 			 "persistent TID %s and serial number " INT64_FORMAT,
 			 relpath(*newRelFileNode),
-			 ItemPointerToString(&rel->rd_segfile0_relationnodeinfo.persistentTid),
-			 rel->rd_segfile0_relationnodeinfo.persistentSerialNum);
+			 ItemPointerToString(&rel->rd_segfile0_relationnodeinfos[0].persistentTid),
+			 rel->rd_segfile0_relationnodeinfos[0].persistentSerialNum);
 
 
 	/* schedule unlinking old physical file */

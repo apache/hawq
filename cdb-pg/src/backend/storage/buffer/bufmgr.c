@@ -52,6 +52,7 @@
 #include "access/aosegfiles.h"
 #include "access/aocssegfiles.h"
 #include "cdb/cdbappendonlyam.h"
+#include "cdb/cdbvars.h"
 			
 /* Note: these two macros only work on shared buffers, not local ones! */
 #define BufHdrGetBlock(bufHdr)	((Block) (BufferBlocks + ((Size) (bufHdr)->buf_id) * BLCKSZ))
@@ -2432,7 +2433,7 @@ RelationGetNumberOfBlocks(Relation relation)
 	 */
 	if (RelationIsAoRows(relation))
 	{
-		FileSegTotals *fstotal = GetSegFilesTotals(relation, SnapshotNow);
+		FileSegTotals *fstotal = GetSegFilesTotals(relation, SnapshotNow, GpIdentity.segindex);
 		return ((BlockNumber)RelationGuessNumberOfBlocks(fstotal->totalbytes));
 	}
 	
@@ -2473,7 +2474,11 @@ RelationTruncate(Relation rel, BlockNumber nblocks, bool markPersistentAsPhysica
 		 */
 		RelationFetchGpRelationNodeForXLog(rel);
 
-		if (rel->rd_segfile0_relationnodeinfo.isPresent)
+		/*
+		 * in gpsql, no mirror is configured.
+		 * TODO
+		 */
+		if (rel->rd_segfile0_relationnodeinfos[0].isPresent)
 		{
 			/*
 			 * Since we are deleting 0, 1, or more segments files and possibly lopping off the
@@ -2482,8 +2487,8 @@ RelationTruncate(Relation rel, BlockNumber nblocks, bool markPersistentAsPhysica
 			 */
 			PersistentRelation_MarkBufPoolRelationForScanIncrementalResync(
 															&rel->rd_node,
-															&rel->rd_segfile0_relationnodeinfo.persistentTid,
-															rel->rd_segfile0_relationnodeinfo.persistentSerialNum);
+															&rel->rd_segfile0_relationnodeinfos[0].persistentTid,
+															rel->rd_segfile0_relationnodeinfos[0].persistentSerialNum);
 		}
 	}
 
@@ -2504,8 +2509,8 @@ RelationTruncate(Relation rel, BlockNumber nblocks, bool markPersistentAsPhysica
 			nblocks, 
 			rel->rd_istemp, 
 			rel->rd_isLocalBuf,
-			&rel->rd_segfile0_relationnodeinfo.persistentTid,
-			rel->rd_segfile0_relationnodeinfo.persistentSerialNum);
+			&rel->rd_segfile0_relationnodeinfos[0].persistentTid,
+			rel->rd_segfile0_relationnodeinfos[0].persistentSerialNum);
 
 	MIRROREDLOCK_BUFMGR_UNLOCK;
 	// -------- MirroredLock ----------

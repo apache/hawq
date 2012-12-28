@@ -2689,6 +2689,12 @@ retry1:
 				port->user_name = pstrdup(valptr);
 			else if (strcmp(nameptr, "options") == 0)
 				port->cmdline_options = pstrdup(valptr);
+			else if (strcmp(nameptr, "dboid") == 0)
+				port->dboid = atoi(valptr);
+			else if (strcmp(nameptr, "bootstrap_user") == 0)
+				port->bootstrap_user = pstrdup(valptr);
+			else if (strcmp(nameptr, "encoding") == 0)
+				port->encoding = atoi(valptr);
 			else if (strcmp(nameptr, "gpqeid") == 0)
 				gpqeid = valptr;
 			else if (strcmp(nameptr, "gpqdid") == 0)
@@ -6495,9 +6501,13 @@ BackendInitialize(Port *port)
 	char		remote_host[NI_MAXHOST];
 	char		remote_port[NI_MAXSERV];
 	char		remote_ps_data[NI_MAXHOST];
+	MemoryContext	old;
 
 	/* Save port etc. for ps status */
 	MyProcPort = port;
+	old = MemoryContextSwitchTo(TopMemoryContext);
+	initStringInfo(&MyProcPort->override_options);
+	MemoryContextSwitchTo(old);
 
 	/*
 	 * PreAuthDelay is a debugging aid for investigating problems in the
@@ -7130,6 +7140,7 @@ int
 SubPostmasterMain(int argc, char *argv[])
 {
 	Port		port;
+	MemoryContext	old;
 
 	/* Do this sooner rather than later... */
 	IsUnderPostmaster = true;	/* we are a postmaster subprocess now */
@@ -7161,6 +7172,9 @@ SubPostmasterMain(int argc, char *argv[])
 
 	/* Read in the variables file */
 	memset(&port, 0, sizeof(Port));
+	old = MemoryContextSwitchTo(TopMemoryContext);
+	initStringInfo(&port->override_options);
+	MemoryContextSwitchTo(old);
 	read_backend_variables(argv[2], &port);
 
 	/*

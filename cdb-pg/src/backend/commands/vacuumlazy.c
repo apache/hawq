@@ -973,7 +973,7 @@ vacuum_appendonly_rel(Relation aorel, void *vacrelstats, bool isVacFull)
 					relname)));
 
 	/* get statistics from the pg_aoseg table */
-	fstotal = GetSegFilesTotals(aorel, SnapshotNow);
+	fstotal = GetSegFilesTotals(aorel, SnapshotNow, GpIdentity.segindex);
 
 	/* calculate the values we care about */
 	eof = (double)fstotal->totalbytes;
@@ -1083,7 +1083,7 @@ vacuum_appendonly_rel(Relation aorel, void *vacrelstats, bool isVacFull)
 				int32				   fileSegNo;
 
 				/* Re-fetch under the write lock to get latest committed eof. */
-				fsinfo = GetFileSegInfo(aorel, aoEntry, SnapshotNow, segno);
+				fsinfo = GetFileSegInfo(aorel, aoEntry, SnapshotNow, segno, GpIdentity.segindex);
 				if (fsinfo == NULL)
 					continue;
 

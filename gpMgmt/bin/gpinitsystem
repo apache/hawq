@@ -54,8 +54,8 @@ GP_TBL=gp_id
 GP_CONFIG_TBL=gp_segment_configuration
 PG_SYSTEM_FILESPACE=3052
 GP_FAILOVER_CONFIG_TBL=gp_fault_strategy
-# Default plugable hdfs filesystem name
-GP_HDFS_NAME=hdfs
+GP_FILESPACE_NAME=dfs_system
+GP_TABLESPACE_NAME=dfs_default
 unset PG_CONF_ADD_FILE
 #unset QD_PRIMARY_ARRAY QE_PRIMARY_ARRAY QE_MIRROR_ARRAY
 EXIT_STATUS=0
@@ -145,7 +145,6 @@ USAGE () {
 		$ECHO "      -e, <password>, password to set for Greenplum superuser in database [default $GP_PASSWD]"
 		$ECHO "      -n, <locale>, setting for locale to be set when database initialized [default $DEFAULT_LOCALE_SETTING]"
 		$ECHO "      -B, <number> run this batch of create segment processes in parallel [default $BATCH_DEFAULT]"
-		$ECHO "      -S, configure spread mirroring [default group]"
 		$ECHO
 		$ECHO "      Return codes:"
 		$ECHO "      0 - No problems encountered with requested operation"
@@ -234,7 +233,7 @@ CHK_PARAMS () {
 		    fi
 
 		    if [ $MIRROR_PORT_BASE ]; then
-			    MIRRORING=1
+			    LOG_MSG "[WARNING]:-Should not specify MIRRORING configuration for GPSQL."
 		    fi
 
 		else
@@ -708,6 +707,31 @@ CHK_OPEN_FILES () {
 	LOG_MSG "[INFO]:-End Function $FUNCNAME"
 }
 
+# GPSQL needs DFS_NAME set.
+CHK_DFS_NAME () { 
+    LOG_MSG "[INFO]:-Start Function $FUNCNAME"
+    if [ x"" == x"$DFS_NAME" ]; then 
+        ERROR_EXIT "[FATAL]:-Issue with DFS_NAME: not set" 2
+    fi   
+    
+    name=$(echo $DFS_NAME | awk '{print toupper($0)}')
+    if [ x"$name" != x"HDFS" ]; then 
+        ERROR_EXIT "[FATAL]:-Issue with DFS_NAME: only \"HDFS\" is supported" 2
+    fi   
+    LOG_MSG "[INFO]:-End Function $FUNCNAME"    
+}
+
+# GPSQL needs dfs url.
+CHK_DFS_URL () {
+	LOG_MSG "[INFO]:-Start Function $FUNCNAME"
+	
+	if [ x"" == x"$DFS_URL" ]; then
+		ERROR_EXIT "[FATAL]:-Issue with DFS_URL: not set" 2
+	fi
+
+	LOG_MSG "[INFO]:-End Function $FUNCNAME"	
+}
+
 CHK_QES () {
 	LOG_MSG "[INFO]:-Start Function $FUNCNAME"
 	LOG_MSG "[INFO]:-Checking Master host" 1
@@ -1068,7 +1092,8 @@ DISPLAY_CONFIG () {
 		LOG_MSG "[INFO]:-Postgres param file        = $PG_ADD" 1
 		LOG_MSG "[INFO]:-Initdb to be used          = $INITDB" 1
 		LOG_MSG "[INFO]:-GP_LIBRARY_PATH is         = $GP_LIBRARY_PATH" 1
-		LOG_MSG "[INFO]:-HDFS url is                = $HDFS_URL" 1
+		LOG_MSG "[INFO]:-DFS name is                = $DFS_NAME" 1
+		LOG_MSG "[INFO]:-DFS url is                 = $DFS_URL" 1
 		if [ $ULIMIT_WARN -eq 1 ];then
 			LOG_MSG "[WARN]:-Ulimit check               = Warnings generated, see log file $WARN_MARK" 1
 		else
@@ -1102,25 +1127,6 @@ DISPLAY_CONFIG () {
         LOG_MSG "[INFO]:-Trusted shell              = $TRUSTED_SHELL" 1
         ((NUM_QES=${#MACHINE_LIST[*]}))
         LOG_MSG "[INFO]:-Number segment hosts       = $NUM_QES" 1
-        if [ $MIRROR_PORT_BASE ]; then
-            LOG_MSG "[INFO]:-Mirror port base           = $MIRROR_PORT_BASE" 1
-            LOG_MSG "[INFO]:-Replicaton port base       = $REPLICATION_PORT_BASE" 1
-            LOG_MSG "[INFO]:-Mirror replicaton port base= $MIRROR_REPLICATION_PORT_BASE" 1
-            ((NUM_MIRROR_DIRECTORY=${#MIRROR_DATA_DIRECTORY[@]}))
-            LOG_MSG "[INFO]:-Mirror segment #           = $NUM_MIRROR_DIRECTORY" 1
-            LOG_MSG "[INFO]:-Mirroring config           = ON" 1
-            if [ x"$INPUT_CONFIG" != x"" ];then
-                LOG_MSG "[INFO]:-Mirroring type             = Custom" 1
-            else
-                if [ $MIRROR_TYPE -eq 0 ];then
-                    LOG_MSG "[INFO]:-Mirroring type             = Group" 1
-                else
-                    LOG_MSG "[INFO]:-Mirroring type             = Spread" 1
-                fi
-            fi
-        else
-            LOG_MSG "[INFO]:-Mirroring config           = OFF" 1
-        fi
         LOG_MSG "[INFO]:----------------------------------------" 1
         LOG_MSG "[INFO]:-Greenplum Primary Segment Configuration" 1
         LOG_MSG "[INFO]:----------------------------------------" 1
@@ -1220,6 +1226,7 @@ CREATE_QD_DB () {
 		cmd="$cmd --shared_buffers=$MASTER_SHARED_BUFFERS"
 		cmd="$cmd --is_filerep_mirrored=no"
 		cmd="$cmd --backend_output=$GP_DIR.initdb"
+		cmd="$cmd --content_id=-1"
 
 		LOG_MSG "[INFO]:-Commencing local $cmd"
 		$cmd >> $LOG_FILE 2>&1
@@ -1606,37 +1613,62 @@ SET_GP_USER_PW () {
 CREATE_DATABASE () {
 		LOG_MSG "[INFO]:-Start Function $FUNCNAME"
 		SET_VAR $QD_PRIMARY_ARRAY
-		if [  x"" != x"$HDFS_URL" ]; then
-			$PSQL -p $GP_PORT -d "$DEFAULTDB" -c"create database \"${DATABASE_NAME}\" tablespace \"${GP_HDFS_NAME}_tablespace\";" >> $LOG_FILE 2>&1
-		else
-			$PSQL -p $GP_PORT -d "$DEFAULTDB" -c"create database \"${DATABASE_NAME}\";" >> $LOG_FILE 2>&1
-		fi
+		$PSQL -p $GP_PORT -d "$DEFAULTDB" -c"create database \"${DATABASE_NAME}\" tablespace \"$GP_TABLESPACE_NAME\";" >> $LOG_FILE 2>&1
 		ERROR_CHK $? "create database $DATABASE_NAME" 2
 		LOG_MSG "[INFO]:-End Function $FUNCNAME"
 }
 
-CREATE_HDFS_TABLESPACE () {
+CREATE_DFS_TABLESPACE () {
 	LOG_MSG "[INFO]:-Start Function $FUNCNAME"
 	SET_VAR $QD_PRIMARY_ARRAY
 	# master & standby
-	$MKDIR "${MASTER_DIRECTORY}/init_hdfs" >> $LOG_FILE 2>&1
+	$MKDIR "${MASTER_DIRECTORY}/dfs" >> $LOG_FILE 2>&1
 	if [ x"" != x"$STANDBY_HOSTNAME" ];then
-		$TRUSTED_SHELL $STANDBY_HOSTNAME "$MKDIR \"${MASTER_DIRECTORY}/init_hdfs\""
+		$TRUSTED_SHELL $STANDBY_HOSTNAME "$MKDIR \"${MASTER_DIRECTORY}/dfs\""
 	fi
-	HDFS_QD_PATH_LIST=`$PSQL -p $GP_PORT -d "$DEFAULTDB" -A -t -c "SELECT dbid || ':' || '''${MASTER_DIRECTORY}/init_hdfs/${SEG_PREFIX}' || content || '''' FROM $GP_CONFIG_TBL WHERE content = -1;" 2>/dev/null` >> $LOG_FILE 2>&1
+	DFS_QD_PATH_LIST=`$PSQL -p $GP_PORT -d "$DEFAULTDB" -A -t -c "SELECT dbid || ':' || '''${MASTER_DIRECTORY}/dfs/${SEG_PREFIX}' || content || '''' FROM $GP_CONFIG_TBL WHERE content = -1;" 2>/dev/null` >> $LOG_FILE 2>&1
 	# segments
-	HDFS_QE_PATH_LIST=`$PSQL -p $GP_PORT -d "$DEFAULTDB" -A -t -c "SELECT dbid || ':' || '''${HDFS_URL}/${SEG_PREFIX}' || content || '''' FROM $GP_CONFIG_TBL WHERE content <> -1;" 2>/dev/null` >> $LOG_FILE 2>&1
-    ERROR_CHK $? "create filespace $GP_HDFS_NAME" 2
-	HDFS_QD_PATH_LIST=`$ECHO "$HDFS_QD_PATH_LIST" | $TR '\n' ',' | $SED -e 's:,$::'`
-	HDFS_QE_PATH_LIST=`$ECHO "$HDFS_QE_PATH_LIST" | $TR '\n' ',' | $SED -e 's:,$::'`
-	HDFS_PATH_LIST="${HDFS_QD_PATH_LIST},${HDFS_QE_PATH_LIST}"
-	LOG_MSG "[INFO]:-HDFS_PATH_LIST: ${HDFS_PATH_LIST}"
-	$PSQL -p $GP_PORT -d "$DEFAULTDB" -c"create filespace \"${GP_HDFS_NAME}_filespace\" on \"${GP_HDFS_NAME}\" (${HDFS_PATH_LIST});" >> $LOG_FILE 2>&1
-	ERROR_CHK $? "create filespace $GP_HDFS_NAME" 2
-	$PSQL -p $GP_PORT -d "$DEFAULTDB" -c"create tablespace \"${GP_HDFS_NAME}_tablespace\" filespace \"${GP_HDFS_NAME}_filespace\";" >> $LOG_FILE 2>&1
-	ERROR_CHK $? "create tablespace $GP_HDFS_NAME" 2
+	DFS_QE_PATH_LIST=`$PSQL -p $GP_PORT -d "$DEFAULTDB" -A -t -c "SELECT dbid || ':' || '''${DFS_URL}/${SEG_PREFIX}' || content || '''' FROM $GP_CONFIG_TBL WHERE content <> -1;" 2>/dev/null` >> $LOG_FILE 2>&1
+    ERROR_CHK $? "create filespace on $DFS_NAME" 2
+	DFS_QD_PATH_LIST=`$ECHO "$DFS_QD_PATH_LIST" | $TR '\n' ',' | $SED -e 's:,$::'`
+	DFS_QE_PATH_LIST=`$ECHO "$DFS_QE_PATH_LIST" | $TR '\n' ',' | $SED -e 's:,$::'`
+	DFS_PATH_LIST="${DFS_QD_PATH_LIST},${DFS_QE_PATH_LIST}"
+	LOG_MSG "[INFO]:-DFS_PATH_LIST: ${DFS_PATH_LIST}"
+	$PSQL -p $GP_PORT -d "$DEFAULTDB" -c"create filespace \"$GP_FILESPACE_NAME\" on \"${DFS_NAME}\" (${DFS_PATH_LIST});" >> $LOG_FILE 2>&1
+	ERROR_CHK $? "create filespace $GP_FILESPACE_NAME" 2
+	$PSQL -p $GP_PORT -d "$DEFAULTDB" -c"create tablespace \"$GP_TABLESPACE_NAME\" filespace \"$GP_FILESPACE_NAME\";" >> $LOG_FILE 2>&1
+	ERROR_CHK $? "create tablespace $GP_TABLESPACE_NAME" 2
 	LOG_MSG "[INFO]:-End Function $FUNCNAME"
 }
+
+CREATE_TEMPLATE1 () {
+		LOG_MSG "[INFO]:-Start Function $FUNCNAME"
+		SET_VAR $QD_PRIMARY_ARRAY
+		$PSQL -p $GP_PORT -d "$DEFAULTDB" -c"create database \"template1\" tablespace \"$GP_TABLESPACE_NAME\" template template0;" >> $LOG_FILE 2>&1
+		ERROR_CHK $? "create database $DATABASE_NAME" 2
+		$PSQL -p $GP_PORT -d "$DEFAULTDB" -c"SET allow_system_table_mods='dml';UPDATE pg_database SET datistemplate = 't' WHERE datname = 'template1';" >> $LOG_FILE 2>&1
+		ERROR_CHK $? "update database $DATABASE_NAME" 2
+		#$PSQL -p $GP_PORT -d "$DEFAULTDB" -c"REVOKE CREATE,TEMPORARY ON DATABASE template0 FROM public;" >> $LOG_FILE 2>&1
+		#ERROR_CHK $? "revoke privileges database $DATABASE_NAME" 2
+		#$PSQL -p $GP_PORT -d "$DEFAULTDB" -c"REVOKE CREATE,TEMPORARY ON DATABASE template1 FROM public;" >> $LOG_FILE 2>&1
+		#ERROR_CHK $? "revoke privileges database $DATABASE_NAME" 2
+		#$PSQL -p $GP_PORT -d "$DEFAULTDB" -c"VACUUM FULL pg_database;" >> $LOG_FILE 2>&1		
+		#ERROR_CHK $? "vacuum database $DATABASE_NAME" 2
+		LOG_MSG "[INFO]:-End Function $FUNCNAME"	
+}
+
+CREATE_POSTGRES () {
+		LOG_MSG "[INFO]:-Start Function $FUNCNAME"
+		SET_VAR $QD_PRIMARY_ARRAY
+		$PSQL -p $GP_PORT -d "$DEFAULTDB" -c"create database \"postgres\" tablespace \"$GP_TABLESPACE_NAME\";" >> $LOG_FILE 2>&1
+		ERROR_CHK $? "create database $DATABASE_NAME" 2
+		$PSQL -p $GP_PORT -d "$DEFAULTDB" -c"SET allow_system_table_mods='dml';UPDATE pg_database SET datistemplate = 't' WHERE datname = 'postgres';" >> $LOG_FILE 2>&1
+		ERROR_CHK $? "update database $DATABASE_NAME" 2
+		#$PSQL -p $GP_PORT -d "$DEFAULTDB" -c"VACUUM FULL pg_database;" >> $LOG_FILE 2>&1		
+		#ERROR_CHK $? "vacuum database $DATABASE_NAME" 2
+		LOG_MSG "[INFO]:-End Function $FUNCNAME"	
+}
+
 
 SCAN_LOG () {
 	LOG_MSG "[INFO]:-Start Function $FUNCNAME"
@@ -1972,7 +2004,7 @@ SET_DCA_CONFIG_SETTINGS () {
 # Main Section
 #******************************************************************************
 trap 'ERROR_EXIT "[FATAL]:-Received INT or TERM signal" 2' INT TERM
-while getopts ":v'?'aiqe:c:l:-:p:m:h:on:s:b:!DB:SI:O:" opt
+while getopts ":v'?'aiqe:c:l:-:p:m:h:on:s:b:!DBI:O:" opt
 		do
 		case $opt in
 				v ) VERSION_INFO ;;
@@ -1992,7 +2024,6 @@ while getopts ":v'?'aiqe:c:l:-:p:m:h:on:s:b:!DB:SI:O:" opt
 				n ) REQ_LOCALE_SETTING=$OPTARG ;;
 				D ) DEBUG_LEVEL=1 ;;
 				B ) BATCH_DEFAULT=$OPTARG ;;
-				S ) MIRROR_TYPE=1 ;;
 				I ) INPUT_CONFIG=$OPTARG ;;
 				O ) OUTPUT_CONFIG=$OPTARG ;;
 				- ) # Long options ...
@@ -2053,6 +2084,8 @@ if [ x"$INPUT_CONFIG" != x"" ] ; then
     CHK_PARAMS
     CHK_QE_ARRAY_PORT_RANGES
     CHK_QES_FROM_INPUTFILE
+    CHK_DFS_NAME
+    CHK_DFS_URL
 
     if [ x"" != x"$OUTPUT_CONFIG" ] ; then
 	DUMP_OUTPUT_CONFIG
@@ -2066,6 +2099,8 @@ else
     CHK_PARAMS
     CHK_MULTI_HOME
     CREATE_QE_ARRAY
+    CHK_DFS_NAME
+    CHK_DFS_URL
     CHK_QE_ARRAY_PORT_RANGES
     CHK_QES
 
@@ -2124,11 +2159,12 @@ env PGOPTIONS="-c gp_session_role=utility" $PSQL -p $MASTER_PORT -d "$U_DB" -c "
 STOP_QD_PRODUCTION
 START_QD_PRODUCTION
 
-LOAD_GP_TOOLKIT
+CREATE_DFS_TABLESPACE
 
-if [  x"" != x"$HDFS_URL" ]; then
-    CREATE_HDFS_TABLESPACE
-fi
+CREATE_TEMPLATE1
+CREATE_POSTGRES
+
+# LOAD_GP_TOOLKIT
 
 if [ x"" != x"$DATABASE_NAME" ]; then
     CREATE_DATABASE

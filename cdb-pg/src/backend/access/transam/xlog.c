@@ -7281,7 +7281,7 @@ StartupXLOG_Pass2(void)
 
 	PersistentRecovery_Drop();
 
-	PersistentRecovery_UpdateAppendOnlyMirrorResyncEofs();
+	/*PersistentRecovery_UpdateAppendOnlyMirrorResyncEofs();*/
 	InRecoveryPass = 0;
 
 #ifdef USE_ASSERT_CHECKING
@@ -10346,7 +10346,7 @@ HandleCrash(SIGNAL_ARGS)
 
 extern bool FindMyDatabase(const char *name, Oid *db_id, Oid *db_tablespace);
 
-static char *knownDatabase = "postgres";
+static char *knownDatabase = "template0";
 
 /* Main entry point for startup process */
 void

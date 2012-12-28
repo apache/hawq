@@ -35,10 +35,10 @@
 #include "cdb/cdbpersistentrecovery.h"
 #include "cdb/cdbpersistentfilesysobj.h"
 
-static void tblspc_get_filespace_paths(Oid tblspc, int16 master_dbid,
+static void tblspc_get_filespace_paths(Oid tblspc, int4 contentid, int16 master_dbid,
 									   int16 mirror_dbid,
 									   char **master_path, char **mirror_path);
-static void get_filespace_paths(Oid filespace, char **master_path, char **mirror_path);
+static void get_filespace_paths(int4 contentid, Oid filespace, char **master_path, char **mirror_path);
 static void add_filespace_map_entry(fspc_map *m, XLogRecPtr *beginLoc, char *caller);
 static void add_tablespace_map_entry(tspc_map *m, XLogRecPtr *beginLoc, char *caller);
 
@@ -69,7 +69,8 @@ obj_get_path(xl_mm_fs_obj *xlrec)
 		 *
 		 * Return a NULL path pointer and allow the caller to log the event.
 		 */
-	path = NULL;
+		/* XXX:mat3: FILESPACE and TABLESPACE will have all of db_ids. */
+		path = xlrec->master_path;
 	}
 
 	return path;
@@ -89,14 +90,14 @@ unlink_obj(char *path, uint8 info)
 	{
 		/* same behaviour as dropdb(), RemoveFileSpace(), RemoveTableSpace() */
 		elog(DEBUG1, "removing directory, as requested %s", path);
-		rmtree(path, true);
+		RemovePath(path, true);
 	}
 	else if (info == MMXLOG_REMOVE_FILE)
 	{
 		if (Debug_print_qd_mirroring)
 			elog(DEBUG1, "unlinking file, as requested %s", path);
 
-		if (unlink(path) < 0)
+		if (RemovePath(path, false) < 0)
 		{
 			if (errno != ENOENT) /* allow it to already be removed */
 				elog(WARNING, "could not unlink %s: %m", path);
@@ -198,7 +199,7 @@ mmxlog_redo(XLogRecPtr beginLoc, XLogRecPtr lsn, XLogRecord *record)
 			add_tablespace_map_entry(&m, &beginLoc, "mmxlog_redo");
 		}
 
-		if (mkdir(path, 0700) == 0)
+		if (MakeDirectory(path, 0700) == 0)
 		{
 			if (Debug_persistent_recovery_print)
 			{
@@ -241,7 +242,7 @@ mmxlog_redo(XLogRecPtr beginLoc, XLogRecPtr lsn, XLogRecord *record)
 
 		/* need to add PG_VERSION for newly created databases */
 		if (xlrec->objtype == MM_OBJ_DATABASE && dir_created == true)
-			set_short_version(path, NULL, false);
+			set_short_version(xlrec->contentid, path, NULL, false);
 	}
 	else if (info == MMXLOG_REMOVE_DIR)
 	{
@@ -318,7 +319,8 @@ mmxlog_redo(XLogRecPtr beginLoc, XLogRecPtr lsn, XLogRecord *record)
 				 xlrec->u.dbid.mirror,
 				 xlrec->mirror_path);
 		}
-		int fd = open(path, O_CREAT | O_RDWR | PG_BINARY, 0600);
+
+		int fd = PathNameOpenFile(path, O_CREAT | O_EXCL | PG_BINARY, 0600);
 
 		if (fd < 0)
 		{
@@ -327,14 +329,8 @@ mmxlog_redo(XLogRecPtr beginLoc, XLogRecPtr lsn, XLogRecord *record)
 				elog(WARNING, "could open open file %s: %m", path);
 		}
 
-		/*
-		 * Yes, close(2) can fail! The only interesting error here is
-		 * that we were interrupted. Don't leak the file descriptor
-		 */
-		while (close(fd) < 0 && errno == EINTR)
-			/* loop */
-			;
-
+		if (fd >= 0)
+			FileClose(fd);
 	}
 	else if (info == MMXLOG_REMOVE_FILE)
 	{
@@ -346,9 +342,10 @@ mmxlog_redo(XLogRecPtr beginLoc, XLogRecPtr lsn, XLogRecord *record)
 		if (Debug_persistent_recovery_print)
 		{
 			elog(PersistentRecovery_DebugPrintLevel(),
-				 "mmxlog_redo: remove file request %d: path \"%s\", filespace %u, %u/%u/%u, primary dbid %u, path \"%s\"; mirror dbid %u, path \"%s\"",
+				 "mmxlog_redo: remove file request %d: path \"%s\", content %u, filespace %u, %u/%u/%u, primary dbid %u, path \"%s\"; mirror dbid %u, path \"%s\"",
 				 info,
 				 path,
+				 xlrec->contentid,
 				 xlrec->filespace,
 				 xlrec->tablespace,
 				 xlrec->database,
@@ -380,6 +377,7 @@ mmxlog_redo(XLogRecPtr beginLoc, XLogRecPtr lsn, XLogRecord *record)
 			 */
 			tablespaceGetFilespaces =
 				PersistentTablespace_TryGetPrimaryAndMirrorFilespaces(
+															xlrec->contentid,
 															rnode.spcNode,
 															&primaryFilespaceLocation,
 															&mirrorFilespaceLocation,
@@ -405,14 +403,41 @@ mmxlog_redo(XLogRecPtr beginLoc, XLogRecPtr lsn, XLogRecord *record)
 			}
 		}
 
-		smgrdounlink(
-				&rnode,
-				/* isLocalBuf */ false,
-				/* relationName */ NULL,
-				/* primaryOnly */ true,
-				/* isRedo */ true,		// Don't generate Master Mirroring records...
-				/* ignoreNonExistence */ true,
-				&mirrorDataLossOccurred);
+		/*
+		 * QD needs remove the other segments files.
+		 */
+		if (GpIdentity.segindex == MASTER_CONTENT_ID && xlrec->contentid != MASTER_CONTENT_ID)
+		{
+			char	*primary_path = NULL;
+			int		pathlen;
+
+			/* 
+			 * We should develop an interface for the above that doesn't
+			 * require reallocating to a slightly larger size...
+			 * Assume %u use 10 chars.
+			 */
+			pathlen = strlen(path)+1+10+1+10+1+10+1+1+10+1;
+			primary_path = (char *) palloc(pathlen);
+			if (xlrec->segnum == 0)
+				snprintf(primary_path, pathlen, "%s/%u/%u/%u",
+						 path, rnode.spcNode, rnode.dbNode, rnode.relNode);
+			else
+				snprintf(primary_path, pathlen, "%s/%u/%u/%u.%u",
+						 path, rnode.spcNode, rnode.dbNode, rnode.relNode, xlrec->segnum);
+
+			RemovePath(primary_path, false);
+			/* Throw away the allocation we got from persistent layer */
+			pfree(primary_path);
+		}
+		else
+			smgrdounlink(
+					&rnode,
+					/* isLocalBuf */ false,
+					/* relationName */ NULL,
+					/* primaryOnly */ true,
+					/* isRedo */ true,		// Don't generate Master Mirroring records...
+					/* ignoreNonExistence */ true,
+					&mirrorDataLossOccurred);
 	}
 	else
 		elog(PANIC, "unknown mmxlog op code %u", info);
@@ -530,7 +555,7 @@ append_file_parts(mm_fs_obj_type type,
  * the master.
  */
 static bool
-emit_mmxlog_fs_record(mm_fs_obj_type type, Oid filespace,
+emit_mmxlog_fs_record(mm_fs_obj_type type, int4 contentid, Oid filespace,
 					  Oid tablespace, Oid database, Oid relfilenode,
 					  uint32 segnum, uint8 flags, XLogRecPtr *beginLoc)
 {
@@ -541,6 +566,7 @@ emit_mmxlog_fs_record(mm_fs_obj_type type, Oid filespace,
 		return false;
 
 	/* only interesting on the master */
+	/* XXX:mat3: standby might be a huge problem here! */
 	if (GpIdentity.dbid == MASTER_DBID)
 	{
 		XLogRecData rdata;
@@ -559,16 +585,16 @@ emit_mmxlog_fs_record(mm_fs_obj_type type, Oid filespace,
 		if (type == MM_OBJ_FILESPACE)
 		{
 			Insist(OidIsValid(filespace));
-			get_filespace_paths(filespace, &master_path, &mirror_path);
+			get_filespace_paths(contentid, filespace, &master_path, &mirror_path);
 		}
 		else
 		{
 			Insist(OidIsValid(tablespace));
 
-			tblspc_get_filespace_paths(tablespace, master_dbid, mirror_dbid,
+			tblspc_get_filespace_paths(tablespace, contentid, master_dbid, mirror_dbid,
 									   &master_path, &mirror_path);
 
-			filespace = PersistentTablespace_GetFileSpaceOid(tablespace);
+			filespace = PersistentTablespace_GetFileSpaceOid(contentid, tablespace);
 		}
 
 		/*
@@ -577,6 +603,7 @@ emit_mmxlog_fs_record(mm_fs_obj_type type, Oid filespace,
 		 * commits or not; if not, the file will be dropped at abort time.
 		 */
 		xlrec.objtype = type;
+		xlrec.contentid = contentid;
 		xlrec.filespace = filespace;
 		xlrec.tablespace = tablespace;
 		xlrec.database = database;
@@ -640,7 +667,7 @@ emit_mmxlog_fs_record(mm_fs_obj_type type, Oid filespace,
 
 /* External interface to filespace removal logging */
 void
-mmxlog_log_remove_filespace(Oid filespace)
+mmxlog_log_remove_filespace(int4 contentid, Oid filespace)
 {
 	bool emitted;
 	XLogRecPtr beginLoc;
@@ -651,6 +678,7 @@ mmxlog_log_remove_filespace(Oid filespace)
 	emitted =
 		emit_mmxlog_fs_record(
 						  MM_OBJ_FILESPACE,
+						  contentid,
 						  filespace,
 						  InvalidOid /* tablespace */,
 						  InvalidOid /* database */,
@@ -676,7 +704,7 @@ mmxlog_log_remove_filespace(Oid filespace)
 
 /* External interface to tablespace removal logging */
 void
-mmxlog_log_remove_tablespace(Oid tablespace)
+mmxlog_log_remove_tablespace(int4 contentid, Oid tablespace)
 {
 	bool emitted;
 	XLogRecPtr beginLoc;
@@ -687,6 +715,7 @@ mmxlog_log_remove_tablespace(Oid tablespace)
 	emitted =
 		emit_mmxlog_fs_record(
 						  MM_OBJ_TABLESPACE,
+						  contentid,
 						  InvalidOid /* filespace */,
 						  tablespace,
 						  InvalidOid /* database */,
@@ -701,7 +730,8 @@ mmxlog_log_remove_tablespace(Oid tablespace)
 		SUPPRESS_ERRCONTEXT_PUSH();
 
 		elog(PersistentRecovery_DebugPrintLevel(),
-			 "mmxlog_log_remove_tablespace: delete tablespace %u (emitted %s, beginLoc %s)",
+			 "mmxlog_log_remove_tablespace: delete contentid %d tablespace %u (emitted %s, beginLoc %s)",
+			 contentid,
 			 tablespace,
 			 (emitted ? "true" : "false"),
 			 XLogLocationToString(&beginLoc));
@@ -712,7 +742,7 @@ mmxlog_log_remove_tablespace(Oid tablespace)
 
 /* External interface to database removal logging */
 void
-mmxlog_log_remove_database(Oid tablespace, Oid database)
+mmxlog_log_remove_database(int4 contentid, Oid tablespace, Oid database)
 {
 	bool emitted;
 	XLogRecPtr beginLoc;
@@ -723,6 +753,7 @@ mmxlog_log_remove_database(Oid tablespace, Oid database)
 	emitted =
 		emit_mmxlog_fs_record(
 						  MM_OBJ_DATABASE,
+						  contentid /* Database is belongs to master? */,
 						  InvalidOid /* filespace */,
 						  tablespace,
 						  database,
@@ -749,7 +780,7 @@ mmxlog_log_remove_database(Oid tablespace, Oid database)
 
 /* External interface to relfilenode removal logging */
 void
-mmxlog_log_remove_relfilenode(Oid tablespace, Oid database, Oid relfilenode,
+mmxlog_log_remove_relfilenode(int4 contentid, Oid tablespace, Oid database, Oid relfilenode,
 							  uint32 segnum)
 {
 	bool emitted;
@@ -761,6 +792,7 @@ mmxlog_log_remove_relfilenode(Oid tablespace, Oid database, Oid relfilenode,
 	emitted =
 		emit_mmxlog_fs_record(
 						  MM_OBJ_RELFILENODE,
+						  contentid,
 						  InvalidOid /* filespace */,
 						  tablespace,
 						  database,
@@ -775,7 +807,8 @@ mmxlog_log_remove_relfilenode(Oid tablespace, Oid database, Oid relfilenode,
 		SUPPRESS_ERRCONTEXT_PUSH();
 
 		elog(PersistentRecovery_DebugPrintLevel(),
-			 "mmxlog_log_remove_relfilenode: delete relation %u/%u/%u, segment file #%d (emitted %s, beginLoc %s)",
+			 "mmxlog_log_remove_relfilenode: delete content %u relation %u/%u/%u, segment file #%d (emitted %s, beginLoc %s)",
+			 contentid,
 			 tablespace,
 			 database,
 			 relfilenode,
@@ -789,7 +822,7 @@ mmxlog_log_remove_relfilenode(Oid tablespace, Oid database, Oid relfilenode,
 
 /* External interface to filespace creation logging */
 void
-mmxlog_log_create_filespace(Oid filespace)
+mmxlog_log_create_filespace(int4 contentid, Oid filespace)
 {
 	bool emitted;
 	XLogRecPtr beginLoc;
@@ -797,6 +830,7 @@ mmxlog_log_create_filespace(Oid filespace)
 	emitted =
 		emit_mmxlog_fs_record(
 						  MM_OBJ_FILESPACE,
+						  contentid,
 						  filespace,
 						  InvalidOid /* tablespace */,
 						  InvalidOid /* database */,
@@ -822,7 +856,7 @@ mmxlog_log_create_filespace(Oid filespace)
 
 /* External interface to tablespace creation logging */
 void
-mmxlog_log_create_tablespace(Oid filespace, Oid tablespace)
+mmxlog_log_create_tablespace(int4 contentid, Oid filespace, Oid tablespace)
 {
 	bool emitted;
 	XLogRecPtr beginLoc;
@@ -830,6 +864,7 @@ mmxlog_log_create_tablespace(Oid filespace, Oid tablespace)
 	emitted =
 		emit_mmxlog_fs_record(
 						  MM_OBJ_TABLESPACE,
+						  contentid,
 						  filespace,
 						  tablespace,
 						  InvalidOid /* database */,
@@ -844,7 +879,8 @@ mmxlog_log_create_tablespace(Oid filespace, Oid tablespace)
 		SUPPRESS_ERRCONTEXT_PUSH();
 
 		elog(PersistentRecovery_DebugPrintLevel(),
-			 "mmxlog_log_create_tablespace: create tablespace %u (filespace %u, emitted %s, beginLoc %s)",
+			 "mmxlog_log_create_tablespace: create contentid %d tablespace %u (filespace %u, emitted %s, beginLoc %s)",
+			 contentid,
 			 tablespace,
 			 filespace,
 			 (emitted ? "true" : "false"),
@@ -856,7 +892,7 @@ mmxlog_log_create_tablespace(Oid filespace, Oid tablespace)
 
 /* External interface to database creation logging */
 void
-mmxlog_log_create_database(Oid tablespace, Oid database)
+mmxlog_log_create_database(int4 contentid, Oid tablespace, Oid database)
 {
 	bool emitted;
 	XLogRecPtr beginLoc;
@@ -864,6 +900,7 @@ mmxlog_log_create_database(Oid tablespace, Oid database)
 	emitted =
 		emit_mmxlog_fs_record(
 						  MM_OBJ_DATABASE,
+						  contentid,
 						  InvalidOid /* filespace */,
 						  tablespace,
 						  database,
@@ -890,7 +927,7 @@ mmxlog_log_create_database(Oid tablespace, Oid database)
 
 /* External interface to relfilenode creation logging */
 void
-mmxlog_log_create_relfilenode(Oid tablespace, Oid database,
+mmxlog_log_create_relfilenode(int4 contentid, Oid tablespace, Oid database,
 							  Oid relfilenode, uint32 segnum)
 {
 	bool emitted;
@@ -899,6 +936,7 @@ mmxlog_log_create_relfilenode(Oid tablespace, Oid database,
 	emitted =
 		emit_mmxlog_fs_record(
 						  MM_OBJ_RELFILENODE,
+						  contentid,
 						  InvalidOid /* filespace */,
 						  tablespace,
 						  database,
@@ -913,7 +951,8 @@ mmxlog_log_create_relfilenode(Oid tablespace, Oid database,
 		SUPPRESS_ERRCONTEXT_PUSH();
 
 		elog(PersistentRecovery_DebugPrintLevel(),
-			 "mmxlog_log_create_relfilenode: create relation %u/%u/%u, segment file #%d (emitted %s, beginLoc %s)",
+			 "mmxlog_log_create_relfilenode: create content %u relation %u/%u/%u, segment file #%d (emitted %s, beginLoc %s)",
+			 contentid,
 			 tablespace,
 			 database,
 			 relfilenode,
@@ -2073,16 +2112,16 @@ mmxlog_read_checkpoint_data(char *cpdata, int masterMirroringLen, int checkpoint
  * because the entry in the latter table is likely already gone.
  */
 static void
-get_filespace_paths(Oid filespace, char **master_path, char **mirror_path)
+get_filespace_paths(int4 contentid, Oid filespace, char **master_path, char **mirror_path)
 {
-	PersistentFilespace_GetPrimaryAndMirror(filespace, master_path, mirror_path);
+	PersistentFilespace_GetPrimaryAndMirror(contentid, filespace, master_path, mirror_path);
 }
 
 /*
  * Given a tablespace OID, get the master and mirror filespace paths.
  */
 static void
-tblspc_get_filespace_paths(Oid tblspc, int16 master_dbid, int16 mirror_dbid,
+tblspc_get_filespace_paths(Oid tblspc, int4 contentid, int16 master_dbid, int16 mirror_dbid,
 						   char **master_path, char **mirror_path)
 {
 	/*
@@ -2102,7 +2141,9 @@ tblspc_get_filespace_paths(Oid tblspc, int16 master_dbid, int16 mirror_dbid,
 	}
 
 	PersistentTablespace_GetPrimaryAndMirrorFilespaces(
+								contentid,
 								tblspc,
+								FALSE,
 							 	master_path,
 								mirror_path);
 }

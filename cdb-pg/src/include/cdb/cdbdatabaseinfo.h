@@ -47,6 +47,7 @@ typedef struct DbInfoGpRelationNode
 	ItemPointerData		gpRelationNodeTid;
 	Oid					relfilenodeOid;
 	int32				segmentFileNum;
+	int32				contentid;
 	ItemPointerData		persistentTid;
 	int64				persistentSerialNum;
 	int64				logicalEof;

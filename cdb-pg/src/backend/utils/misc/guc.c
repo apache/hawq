@@ -271,7 +271,7 @@ bool 		Debug_appendonly_print_scan = false;
 bool 		Debug_appendonly_print_scan_tuple = false;
 bool 		Debug_appendonly_print_storage_headers = false;
 bool 		Debug_appendonly_print_verify_write_block = false;
-bool		Debug_appendonly_use_no_toast = false;
+bool		Debug_appendonly_use_no_toast = true;
 bool 		Debug_appendonly_print_blockdirectory = false;
 bool 		Debug_appendonly_print_read_block = false;
 bool 		Debug_appendonly_print_append_block = false;
@@ -2480,7 +2480,7 @@ static struct config_bool ConfigureNamesBool[] =
 			GUC_SUPERUSER_ONLY |  GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
 		&Debug_appendonly_use_no_toast,
-		false, NULL, NULL
+		true, NULL, NULL
 	},
 
 	{
@@ -10382,6 +10382,13 @@ ProcessGUCArray(ArrayType *array, GucSource source)
 		 * when it was inserted.
 		 */
 		SetConfigOption(name, value, PGC_SUSET, source);
+
+		/*
+		 * GPSQL needs to dispatch the database/user config to segments.
+		 */
+		if (GpIdentity.segindex == MASTER_CONTENT_ID)
+			appendStringInfo(&MyProcPort->override_options, "-c %s=%s ", name, value);
+		elog(DEBUG1, "gpsql guc: %s = %s", name , value);
 
 		free(name);
 		if (value)

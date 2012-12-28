@@ -2713,6 +2713,7 @@ FileRepPrimary_VerifyUserFilespaces(
 	ItemPointerData	 persistentTid;
 	int64	persistentSerialNum = 0;
 	Oid		filespaceOid;
+	int4	contentid;
 	int		numFilespaces = 0;
 	FileRepVerifyLogControl_s logControl = request->logControl;
 	bool	keepFilespace = false;
@@ -2737,6 +2738,7 @@ FileRepPrimary_VerifyUserFilespaces(
 		found = PersistentFileSysObj_FilespaceScan(
 												   &token,
 												   &filespaceOid,
+												   &contentid,
 												   &primary_dbId,
 												   primaryFilespaceLocationBlankPadded,
 												   &mirror_dbId,
@@ -3592,6 +3594,7 @@ FileRepPrimary_EstimateUserFilespaces(
 	ItemPointerData	 persistentTid;
 	int64		 persistentSerialNum = 0;
 	Oid	   filespaceOid;
+	int4	contentid;
 
 	verifyLog(request->logControl, DEBUG1,
 			  "FileRepPrimary_EstimateUserFilespaces");
@@ -3607,6 +3610,7 @@ FileRepPrimary_EstimateUserFilespaces(
 		found = PersistentFileSysObj_FilespaceScan(
 			&token,
 			&filespaceOid,
+			&contentid,
 			&primary_dbId,
 			primaryFilespaceLocationBlankPadded,
 			&mirror_dbId,
@@ -4135,7 +4139,9 @@ FileRepPrimary_VerifyAllRelFileNodes(
 
 				/* relfilenodeTable[numThisSend].mirrorIdSame = false; */
 				PersistentTablespace_GetPrimaryAndMirrorFilespaces(
+					GpIdentity.segindex,
 					relfilenodeTable[numThisSend].relFileNode.spcNode,
+					FALSE,
 					&primaryFilespaceLocation,
 					&mirrorFilespaceLocation);
 
@@ -10757,6 +10763,7 @@ checkDirectoryInDB(char * dir)
 	ItemPointerData	 persistentTid;
 	int64		 persistentSerialNum = 0;
 	Oid	   filespaceOid;
+	int4	contentid;
 
 	bool found = false;
 	char primaryBaseDirectory[MAXPGPATH+1];
@@ -10802,6 +10809,7 @@ checkDirectoryInDB(char * dir)
 		found = PersistentFileSysObj_FilespaceScan(
 			&token,
 			&filespaceOid,
+			&contentid,
 			&primary_dbId,
 			primaryFilespaceLocationBlankPadded,
 			&mirror_dbId,

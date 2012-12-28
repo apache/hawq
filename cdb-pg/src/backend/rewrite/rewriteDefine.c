@@ -461,9 +461,14 @@ DefineQueryRewrite(RuleStmt *stmt)
 		{
 			MirroredFileSysObj_ScheduleDropBufferPoolRel(event_relation);
 			
+			/*
+			 * in gpsql, need a correct contenid
+			 * TODO
+			 */
 			DeleteGpRelationNodeTuple(
 							event_relation,
-							/* segmentFileNum */ 0);
+							/* segmentFileNum */ 0,
+							GpIdentity.segindex);
 		}
 		else
 		{
@@ -474,6 +479,7 @@ DefineQueryRewrite(RuleStmt *stmt)
 			HeapTuple tuple;
 			
 			int32 segmentFileNum;
+			int32 contentid;
 			
 			ItemPointerData persistentTid;
 			int64 persistentSerialNum;
@@ -489,6 +495,7 @@ DefineQueryRewrite(RuleStmt *stmt)
 			while ((tuple = GpRelationNodeGetNext(
 									&gpRelationNodeScan,
 									&segmentFileNum,
+									&contentid,
 									&persistentTid,
 									&persistentSerialNum)))
 			{
@@ -506,6 +513,7 @@ DefineQueryRewrite(RuleStmt *stmt)
 				MirroredFileSysObj_ScheduleDropAppendOnlyFile(
 												&event_relation->rd_node,
 												segmentFileNum,
+												contentid,
 												event_relation->rd_rel->relname.data,
 												&persistentTid,
 												persistentSerialNum);

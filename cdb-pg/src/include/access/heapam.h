@@ -129,7 +129,8 @@ extern void RelationFetchGpRelationNodeForXLog_Index(Relation relation);
 inline static void RelationFetchGpRelationNodeForXLog(
 	Relation		relation)
 {
-	if (!InRecovery && !relation->rd_segfile0_relationnodeinfo.isPresent &&
+	Assert(NULL != relation->rd_segfile0_relationnodeinfos);
+	if (!InRecovery && !relation->rd_segfile0_relationnodeinfos[0].isPresent &&
 		!GpPersistent_SkipXLogInfo(relation->rd_id))
 	{
 	
@@ -140,7 +141,17 @@ inline static void RelationFetchGpRelationNodeForXLog(
 			return;
 				 
 		}
-		RelationFetchSegFile0GpRelationNode(relation);
+
+		if (relation->rd_rel->relstorage != RELSTORAGE_AOROWS
+			&& relation->rd_rel->relstorage != RELSTORAGE_AOCOLS)
+			RelationFetchSegFile0GpRelationNode(relation, MASTER_CONTENT_ID);
+		else
+		{
+			int i;
+			for (i = 0; i < relation->rd_segfile0_count; ++i)
+				RelationFetchSegFile0GpRelationNode(relation, i - 1);
+
+		}
 	}
 }
 
@@ -174,8 +185,8 @@ inline static void xl_heaptid_set(
 	ItemPointer tid)
 {
 	heaptid->node = rel->rd_node;
-	heaptid->persistentTid = rel->rd_segfile0_relationnodeinfo.persistentTid;
-	heaptid->persistentSerialNum = rel->rd_segfile0_relationnodeinfo.persistentSerialNum;
+	heaptid->persistentTid = rel->rd_segfile0_relationnodeinfos[0].persistentTid;
+	heaptid->persistentSerialNum = rel->rd_segfile0_relationnodeinfos[0].persistentSerialNum;
 	heaptid->tid = *tid;
 }
 
@@ -185,8 +196,8 @@ inline static void xl_heapnode_set(
 	Relation rel)
 {
 	heapnode->node = rel->rd_node;
-	heapnode->persistentTid = rel->rd_segfile0_relationnodeinfo.persistentTid;
-	heapnode->persistentSerialNum = rel->rd_segfile0_relationnodeinfo.persistentSerialNum;
+	heapnode->persistentTid = rel->rd_segfile0_relationnodeinfos[0].persistentTid;
+	heapnode->persistentSerialNum = rel->rd_segfile0_relationnodeinfos[0].persistentSerialNum;
 }
 
 extern Relation relation_open(Oid relationId, LOCKMODE lockmode);

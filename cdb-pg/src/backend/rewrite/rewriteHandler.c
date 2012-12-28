@@ -1656,7 +1656,24 @@ RewriteQuery(Query *parsetree, List *rewrite_events)
 		 * ensures that any references to NEW.field will behave sanely.
 		 */
 		if (event == CMD_UPDATE)
+		{
+			if(RelationIsAoRows(rt_entry_relation)||(RelationIsAoCols(rt_entry_relation)))
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
+							errmsg("Update append-only table statement not supported yet in GPSQL")));
+			}
 			rewriteTargetList(parsetree, rt_entry_relation, NULL);
+		}
+		else if (event == CMD_DELETE)
+		{
+			if(RelationIsAoRows(rt_entry_relation)||(RelationIsAoCols(rt_entry_relation)))
+						{
+							ereport(ERROR,
+									(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
+										errmsg("Delete append-only table statement not supported yet in GPSQL")));
+						}
+		}
 		else if (event == CMD_INSERT)
 		{
 			RangeTblEntry *values_rte = NULL;

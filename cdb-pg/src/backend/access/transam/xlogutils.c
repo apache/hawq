@@ -32,6 +32,7 @@
 #include "cdb/cdbpersistentrecovery.h"
 #include "cdb/cdbpersistenttablespace.h"
 #include "utils/guc.h"
+#include "cdb/cdbvars.h"
 #include "postmaster/postmaster.h"
 
 
@@ -490,8 +491,11 @@ XLogOpenRelation(RelFileNode rnode)
 				/*
 				 * Investigate whether the containing directories exist to give more detail.
 				 */
+				/* In recovery, we only need to access OUR relation! */
 				PersistentTablespace_GetPrimaryAndMirrorFilespaces(
+													0, // GpIdentity.segindex,
 													rnode.spcNode,
+													FALSE,
 													&primaryFilespaceLocation,
 													&mirrorFilespaceLocation);
 				if (primaryFilespaceLocation == NULL ||

@@ -373,10 +373,6 @@ int32 PersistentEndXactRec_FetchObjectsFromSmgr(
 			break;
 			
 		case PersistentEndXactObjKind_AppendOnlyMirrorResyncEofs:
-			count = smgrGetAppendOnlyMirrorResyncEofs(
-									endXactRecKind,
-									(PersistentEndXactAppendOnlyMirrorResyncEofs**)&data);
-			len = count * sizeof(PersistentEndXactAppendOnlyMirrorResyncEofs);
 			break;
 
 		default:
@@ -415,10 +411,10 @@ bool PersistentEndXactRec_WillHaveObjectsFromSmgr(
 			break;
 			
 		case PersistentEndXactObjKind_AppendOnlyMirrorResyncEofs:
-			if (smgrIsAppendOnlyMirrorResyncEofs(endXactRecKind))
+			/*if (smgrIsAppendOnlyMirrorResyncEofs(endXactRecKind))
 			{
 				return true;
-			}
+			}*/
 			break;
 
 		default:

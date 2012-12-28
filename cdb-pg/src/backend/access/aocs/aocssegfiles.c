@@ -73,6 +73,8 @@ void InsertInitialAOCSFileSegInfo(Oid segrelid, int4 segno, int4 nvp)
 	InsertFastSequenceEntry(segrelid,
 							(int64)segno,
 							0,
+							/*TODO: need change in gpsql*/
+							-1,
 							&tid);
 
     values[Anum_pg_aocs_segno-1] = Int32GetDatum(segno);

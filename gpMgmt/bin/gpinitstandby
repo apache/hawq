@@ -983,6 +983,8 @@ try:
     # setup logging
     logger = get_default_logger()
     setup_tool_logging(EXECNAME,unix.getLocalHostname(),unix.getUserName())
+    logger.fatal("gpinitstandby NOT SUPPORTED YET IN GPSQL")
+    sys.exit(2)
 
     (options, args) = parseargs()
 

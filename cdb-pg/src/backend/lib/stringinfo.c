@@ -71,6 +71,20 @@ initStringInfoOfSize(StringInfo str, int size)
 }
 
 /*
+ * initStringInfoOfString
+ *
+ * Initialize a StringInfoData struct with c string
+ */
+void
+initStringInfoOfString(StringInfo str, char * buf, int size)
+{
+	str->data = buf;
+	str->maxlen = size;
+	str->len = size;
+	str->cursor = 0;
+}
+
+/*
  * resetStringInfo
  *
  * Reset the StringInfo: the data buffer remains valid, but its

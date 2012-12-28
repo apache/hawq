@@ -184,7 +184,6 @@ typedef struct
 
 static void spiCallback_getEachResultColumnAsArray(void *clientData);
 static void spiCallback_getProcessedAsFloat4(void *clientData);
-static void spiCallback_getSingleResultRowArrayAsTwoFloat4(void *clientData);
 static void spiCallback_getSingleResultRowColumnAsFloat4(void *clientData);
 
 /**
@@ -410,7 +409,6 @@ void analyzeStmt(VacuumStmt *stmt, List *relids)
 			 * We use a different transaction per relation so that we
 			 * may release locks on relations as soon as possible.
 			 */
-			setupRegularDtxContext();
 			StartTransactionCommand();
 			ActiveSnapshot = CopySnapshot(GetTransactionSnapshot());
 			MemoryContextSwitchTo(analyzeStatementContext);
@@ -563,7 +561,10 @@ void analyzeStmt(VacuumStmt *stmt, List *relids)
 		/**
 		 * We start a new transaction command to match the one in PostgresMain().
 		 */
-		setupRegularDtxContext();
+		/*
+		 * in gpsql, there is no distributed transaction
+		 */
+		/*setupRegularDtxContext();*/
 		StartTransactionCommand();
 		ActiveSnapshot = CopySnapshot(GetTransactionSnapshot());
 		MemoryContextSwitchTo(analyzeStatementContext);
@@ -1073,41 +1074,6 @@ static void spiCallback_getSingleResultRowColumnAsFloat4(void *clientData)
 }
 
 /**
- * A callback function for use with spiExecuteWithCallback.  Asserts that exactly one row was returned.
- *  Gets the row's first column as an array of float4 values and returns the two values from the array,
- *   after asserting that the array has exactly two elements
- *
- */
-static void spiCallback_getSingleResultRowArrayAsTwoFloat4(void *clientData)
-{
-    float4 *out;
-    Datum arrayDatum;
-    bool isNull;
-    Datum *values = NULL;
-    int valuesLength, i;
-    const int requiredArraySize = 2;
-
-    Assert(SPI_tuptable != NULL);
-    Assert(SPI_processed == 1);
-
-    arrayDatum = heap_getattr(SPI_tuptable->vals[0], 1, SPI_tuptable->tupdesc, &isNull);
-    Assert(!isNull);
-
-    deconstruct_array(DatumGetArrayTypeP(arrayDatum),
-            FLOAT4OID,
-            sizeof(float4),
-            true,
-            'i',
-            &values, NULL, &valuesLength);
-    Assert(valuesLength == requiredArraySize);
-
-    out = (float4*) clientData;
-    for ( i = 0; i < requiredArraySize; i++)
-        *out++ 	= DatumGetFloat4(values[i]);
-    pfree(values);
-}
-
-/**
  * A callback function for use with spiExecuteWithCallback.  Copies the SPI_processed value into
  *    *clientDataOut, treating it as a float4 pointer.
  */
@@ -1284,29 +1250,18 @@ static void dropSampleTable(Oid sampleTableOid)
  */
 static void analyzeEstimateIndexpages(Oid relationOid, Oid indexOid, float4 *indexPages)
 {
-	StringInfoData 	sqlstmt;
-	float4          spiResult[2];
-	
 	*indexPages = 0;			
 		
-	initStringInfo(&sqlstmt);
-	
-	if (isMasterOnly(relationOid))
-	{
-		appendStringInfo(&sqlstmt, "select sum(gp_statistics_estimate_reltuples_relpages_oid(c.oid))::float4[] "
-				"from pg_class c where c.oid=%d", indexOid);		
-	}
-	else
-	{
-		appendStringInfo(&sqlstmt, "select sum(gp_statistics_estimate_reltuples_relpages_oid(c.oid))::float4[] "
-				"from gp_dist_random('pg_class') c where c.oid=%d", indexOid);
-	}
+	Relation rel = try_relation_open(indexOid, AccessShareLock, false);
 
-    spiExecuteWithCallback(sqlstmt.data, false /*readonly*/, 0 /*tcount */,
-        	                        spiCallback_getSingleResultRowArrayAsTwoFloat4, spiResult);
-    *indexPages = spiResult[1];
+	if (rel != NULL)
+	{
+		Assert(rel->rd_rel->relkind == RELKIND_INDEX);
 
-	pfree(sqlstmt.data);
+		*indexPages = RelationGetNumberOfBlocks(rel);
+
+		relation_close(rel, AccessShareLock);
+	}
 	return;
 }
 
@@ -1322,32 +1277,34 @@ static void analyzeEstimateIndexpages(Oid relationOid, Oid indexOid, float4 *ind
  */
 static void analyzeEstimateReltuplesRelpages(Oid relationOid, float4 *relTuples, float4 *relPages)
 {	
-	StringInfoData 	sqlstmt;
-	float4          spiResult[2];
-	
 	*relPages = 0.0;		
 	*relTuples = 0.0;			
 		
-	initStringInfo(&sqlstmt);
-	
-	if (isMasterOnly(relationOid))
-	{
-		appendStringInfo(&sqlstmt, "select sum(gp_statistics_estimate_reltuples_relpages_oid(c.oid))::float4[] "
-				"from pg_class c where c.oid=%d", relationOid);		
-	}
-	else
-	{
-		appendStringInfo(&sqlstmt, "select sum(gp_statistics_estimate_reltuples_relpages_oid(c.oid))::float4[] "
-				"from gp_dist_random('pg_class') c where c.oid=%d", relationOid);
+	Relation rel = try_relation_open(relationOid, AccessShareLock, false);
+
+	if (rel != NULL ) {
+		Assert(rel->rd_rel->relkind == RELKIND_RELATION);
+		if (RelationIsHeap(rel))
+		{
+			/*
+			 * in gpsql, all heap table should not be distributed.
+			 */
+			gp_statistics_estimate_reltuples_relpages_heap(rel, relTuples,
+					relPages);
+		} 
+		else if (RelationIsAoRows(rel))
+		{
+			gp_statistics_estimate_reltuples_relpages_ao_rows(rel, relTuples,
+					relPages);
+		} 
+		else if (RelationIsAoCols(rel))
+		{
+			gp_statistics_estimate_reltuples_relpages_ao_cs(rel, relTuples,
+					relPages);
+		}
 	}
 
-    spiExecuteWithCallback(sqlstmt.data, false /*readonly*/, 0 /*tcount */,
-        	                        spiCallback_getSingleResultRowArrayAsTwoFloat4, spiResult);
-    *relTuples = spiResult[0];
-    *relPages = spiResult[1];
-
-	pfree(sqlstmt.data);
-	return;
+	relation_close(rel, AccessShareLock);
 }
 
 /**
@@ -2500,6 +2457,11 @@ static void gp_statistics_estimate_reltuples_relpages_ao_cs(Relation rel, float4
     double			totalBytes = 0;
 	AppendOnlyEntry *aoEntry;
 	
+	/*
+	 * TODO, in gpsql
+	 */
+	Insist(!"not implemented");
+
 	/**
 	 * Ensure that the right kind of relation with the right type of storage is passed to us.
 	 */
@@ -2553,6 +2515,7 @@ static void gp_statistics_estimate_reltuples_relpages_ao_cs(Relation rel, float4
 
 static void gp_statistics_estimate_reltuples_relpages_ao_rows(Relation rel, float4 *reltuples, float4 *relpages)
 {
+	int i;
 	FileSegTotals		*fstotal;
 	
 	/**
@@ -2561,88 +2524,29 @@ static void gp_statistics_estimate_reltuples_relpages_ao_rows(Relation rel, floa
 	Assert(rel->rd_rel->relkind == RELKIND_RELATION);
 	Assert(RelationIsAoRows(rel));
 	
-	fstotal = GetSegFilesTotals(rel, SnapshotNow);
-	Assert(fstotal);
-	/**
-	 * The planner doesn't understand AO's blocks, so need this method to try to fudge up a number for
-	 * the planner. 
-	 */
-	*relpages = RelationGuessNumberOfBlocks((double)fstotal->totalbytes);
-	/**
-	 * The number of tuples in AO table is known accurately. Therefore, we just utilize this value.
-	 */
-	*reltuples = (double)fstotal->totaltuples;
-	pfree(fstotal);
+	Assert(Gp_role == GP_ROLE_DISPATCH);
+
+	*relpages = 0.0;
+	*reltuples = 0.0;
+
+	for (i = 0 ; i < GpIdentity.numsegments ; ++i)
+	{
+		fstotal = GetSegFilesTotals(rel, SnapshotNow, i);
+		Assert(fstotal);
+		/**
+		 * The planner doesn't understand AO's blocks, so need this method to try to fudge up a number for
+		 * the planner.
+		 */
+		*relpages += RelationGuessNumberOfBlocks((double) fstotal->totalbytes);
+		/**
+		 * The number of tuples in AO table is known accurately. Therefore, we just utilize this value.
+		 */
+		*reltuples += (double) fstotal->totaltuples;
+
+		pfree(fstotal);
+	}
 	
 	return;
-}
-
-/**
- * Given the oid of a relation, this method calculates reltuples, relpages. This only looks up
- * local information (on master or segments). It produces meaningful values for AO and
- * heap tables and returns [0.0,0.0] for all other relations.
- * Input: 
- * 	relationoid
- * Output:
- * 	array of two values [reltuples,relpages]
- */
-Datum
-gp_statistics_estimate_reltuples_relpages_oid(PG_FUNCTION_ARGS)
-{
-	
-	float4		relpages = 0.0;		
-	float4		reltuples = 0.0;			
-	Oid			relOid = PG_GETARG_OID(0);
-	Datum		values[2];
-	ArrayType   *result;
-	
-	Relation rel = try_relation_open(relOid, AccessShareLock, false);
-	
-	if (rel != NULL)
-	{
-		if (rel->rd_rel->relkind == RELKIND_RELATION)
-		{
-			if (RelationIsHeap(rel))
-			{
-				gp_statistics_estimate_reltuples_relpages_heap(rel, &reltuples, &relpages);
-			}
-			else if (RelationIsAoRows(rel))
-			{
-				gp_statistics_estimate_reltuples_relpages_ao_rows(rel, &reltuples, &relpages);
-			}
-			else if	(RelationIsAoCols(rel))
-			{
-				gp_statistics_estimate_reltuples_relpages_ao_cs(rel, &reltuples, &relpages);
-			}	
-		}
-		else if (rel->rd_rel->relkind == RELKIND_INDEX)
-		{
-			reltuples = 1.0;
-			relpages = RelationGetNumberOfBlocks(rel);
-		}
-		else
-		{
-			/**
-			 * Should we silently return [0.0,0.0] or error out? Currently, we choose option 1.
-			 */
-		}
-		relation_close(rel, AccessShareLock);
-	}
-	else
-	{
-		/**
-		 * Should we silently return [0.0,0.0] or error out? Currently, we choose option 1.
-		 */
-	}
-	
-	values[0] = Float4GetDatum(reltuples);
-	values[1] = Float4GetDatum(relpages);
-
-	result = construct_array(values, 2,
-					FLOAT4OID,
-					sizeof(float4), true, 'i');
-
-	PG_RETURN_ARRAYTYPE_P(result);
 }
 
 

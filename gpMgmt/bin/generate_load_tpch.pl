@@ -210,6 +210,7 @@ print OUT "CREATE EXTERNAL WEB TABLE E_LINEITEM ( L_ORDERKEY    INT8 ,
 
 # Now statements to load the data
 
+print OUT "\\timing\n";
 print OUT "insert into nation select * from e_nation;\n";
 print OUT "insert into region select * from e_region;\n";
 print OUT "insert into part select * from e_part;\n";

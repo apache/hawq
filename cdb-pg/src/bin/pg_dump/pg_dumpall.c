@@ -1383,11 +1383,11 @@ dumpCreateDB(PGconn *conn)
 		resetPQExpBuffer(buf);
 
 		/*
-		 * Skip the CREATE DATABASE commands for "template1" and "postgres",
+		 * Skip the CREATE DATABASE commands for "template0" and "postgres",
 		 * since they are presumably already there in the destination cluster.
 		 * We do want to emit their ACLs and config options if any, however.
 		 */
-		if (strcmp(dbname, "template1") != 0 &&
+		if (strcmp(dbname, "template0") != 0 &&
 			strcmp(dbname, "postgres") != 0)
 		{
 			if (output_clean)

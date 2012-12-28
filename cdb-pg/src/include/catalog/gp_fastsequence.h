@@ -30,9 +30,10 @@
    objid   oid,
    objmod  bigint,
    last_sequence bigint
+   contentid	int2
    );
 
-   create unique index on gp_fastsequence(objid, objmod) with (indexid=6067);
+   create unique index on gp_fastsequence(objid, objmod, contentid) with (indexid=6067);
 
    alter table gp_fastsequence add fk objid on pg_class(oid);
 
@@ -45,6 +46,7 @@ CATALOG(gp_fastsequence,5043) BKI_WITHOUT_OIDS
 	Oid				objid;				/* object oid */
 	int8			objmod;				/* object modifier */
 	int8			last_sequence;      /* the last sequence number used by the object */
+	int4			contentid;			/* content id */
 } FormData_gp_fastsequence;
 
 
@@ -55,10 +57,11 @@ CATALOG(gp_fastsequence,5043) BKI_WITHOUT_OIDS
 */
 typedef FormData_gp_fastsequence *Form_gp_fastsequence;
 
-#define Natts_gp_fastsequence				3
+#define Natts_gp_fastsequence				4
 #define Anum_gp_fastsequence_objid			1
 #define Anum_gp_fastsequence_objmod         2
 #define Anum_gp_fastsequence_last_sequence	3
+#define Anum_gp_fastsequence_contentid		4
 
 #define NUM_FAST_SEQUENCES					 100
 
@@ -70,7 +73,7 @@ typedef FormData_gp_fastsequence *Form_gp_fastsequence;
  * The tid for the new entry is returned.
  */
 extern void InsertFastSequenceEntry(Oid objid, int64 objmod, int64 lastSequence,
-									ItemPointer tid);
+		int32 contentid, ItemPointer tid);
 
 /*
  * GetFastSequences

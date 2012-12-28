@@ -2592,11 +2592,11 @@ external_set_env_vars(extvar_t *extvar, char* uri, bool csv, char* escape, char*
 			1900 + tm->tm_year, 1 + tm->tm_mon, tm->tm_mday);
 	sprintf(extvar->GP_TIME, "%02d%02d%02d",
 			tm->tm_hour, tm->tm_min, tm->tm_sec);
-	if (! getDistributedTransactionIdentifier(extvar->GP_XID))
-		ereport(ERROR,
-				(errcode_for_file_access(),
-				 errmsg("cannot get distributed transaction identifier while %s", uri)));
 
+	/*
+	 * in gpsql, there is no distributed transaction
+	 */
+	sprintf(extvar->GP_XID, "%u", GetMasterTransactionId());
 	sprintf(extvar->GP_CID, "%x", QEDtxContextInfo.curcid);
 	sprintf(extvar->GP_SN, "%x", scancounter);
 	sprintf(extvar->GP_SEGMENT_ID, "%d", Gp_segment);

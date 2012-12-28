@@ -292,7 +292,7 @@ static void Sequence_AddPersistentInfoCache(
 static void
 Sequence_FetchGpRelationNodeForXLog(Relation rel)
 {
-	if (rel->rd_segfile0_relationnodeinfo.isPresent)
+	if (rel->rd_segfile0_relationnodeinfos[0].isPresent)
 		return;
 
 	/*
@@ -301,8 +301,8 @@ Sequence_FetchGpRelationNodeForXLog(Relation rel)
 	 */
 	if (Sequence_CheckPersistentInfoCache(
 								&rel->rd_node,
-								&rel->rd_segfile0_relationnodeinfo.persistentTid,
-								&rel->rd_segfile0_relationnodeinfo.persistentSerialNum))
+								&rel->rd_segfile0_relationnodeinfos[0].persistentTid,
+								&rel->rd_segfile0_relationnodeinfos[0].persistentSerialNum))
 	{
 		if (Debug_persistent_print)
 			elog(Persistent_DebugPrintLevel(), 
@@ -310,16 +310,16 @@ Sequence_FetchGpRelationNodeForXLog(Relation rel)
 				 rel->rd_node.spcNode,
 				 rel->rd_node.dbNode,
 				 rel->rd_node.relNode,
-				 rel->rd_segfile0_relationnodeinfo.persistentSerialNum,
-				 ItemPointerToString(&rel->rd_segfile0_relationnodeinfo.persistentTid));
+				 rel->rd_segfile0_relationnodeinfos[0].persistentSerialNum,
+				 ItemPointerToString(&rel->rd_segfile0_relationnodeinfos[0].persistentTid));
 	} 
 	else 
 	{
 		if (!PersistentFileSysObj_ScanForRelation(
 												&rel->rd_node,
 												/* segmentFileNum */ 0,
-												&rel->rd_segfile0_relationnodeinfo.persistentTid,
-												&rel->rd_segfile0_relationnodeinfo.persistentSerialNum))
+												&rel->rd_segfile0_relationnodeinfos[0].persistentTid,
+												&rel->rd_segfile0_relationnodeinfos[0].persistentSerialNum))
 		{
 			elog(ERROR, "Cound not find persistent information for sequence %u/%u/%u",
 			     rel->rd_node.spcNode,
@@ -329,8 +329,8 @@ Sequence_FetchGpRelationNodeForXLog(Relation rel)
 
 		Sequence_AddPersistentInfoCache(
 								&rel->rd_node,
-								&rel->rd_segfile0_relationnodeinfo.persistentTid,
-								rel->rd_segfile0_relationnodeinfo.persistentSerialNum);
+								&rel->rd_segfile0_relationnodeinfos[0].persistentTid,
+								rel->rd_segfile0_relationnodeinfos[0].persistentSerialNum);
 
 		if (Debug_persistent_print)
 			elog(Persistent_DebugPrintLevel(), 
@@ -338,13 +338,13 @@ Sequence_FetchGpRelationNodeForXLog(Relation rel)
 				 rel->rd_node.spcNode,
 				 rel->rd_node.dbNode,
 				 rel->rd_node.relNode,
-				 rel->rd_segfile0_relationnodeinfo.persistentSerialNum,
-				 ItemPointerToString(&rel->rd_segfile0_relationnodeinfo.persistentTid));
+				 rel->rd_segfile0_relationnodeinfos[0].persistentSerialNum,
+				 ItemPointerToString(&rel->rd_segfile0_relationnodeinfos[0].persistentTid));
 	}
 
 	if (Debug_check_for_invalid_persistent_tid &&
 		!Persistent_BeforePersistenceWork() &&
-		PersistentStore_IsZeroTid(&rel->rd_segfile0_relationnodeinfo.persistentTid))
+		PersistentStore_IsZeroTid(&rel->rd_segfile0_relationnodeinfos[0].persistentTid))
 	{	
 		elog(ERROR, 
 			 "Sequence_FetchGpRelationNodeForXLog has invalid TID (0,0) for relation %u/%u/%u '%s', serial number " INT64_FORMAT,
@@ -352,10 +352,10 @@ Sequence_FetchGpRelationNodeForXLog(Relation rel)
 			 rel->rd_node.dbNode,
 			 rel->rd_node.relNode,
 			 NameStr(rel->rd_rel->relname),
-			 rel->rd_segfile0_relationnodeinfo.persistentSerialNum);
+			 rel->rd_segfile0_relationnodeinfos[0].persistentSerialNum);
 	}
 
-	rel->rd_segfile0_relationnodeinfo.isPresent = true;
+	rel->rd_segfile0_relationnodeinfos[0].isPresent = true;
 }
 
 /*
@@ -595,8 +595,8 @@ DefineSequence(CreateSeqStmt *seq)
 		newseq->log_cnt = 0;
 
 		xlrec.node = rel->rd_node;
-		xlrec.persistentTid = rel->rd_segfile0_relationnodeinfo.persistentTid;
-		xlrec.persistentSerialNum = rel->rd_segfile0_relationnodeinfo.persistentSerialNum;
+		xlrec.persistentTid = rel->rd_segfile0_relationnodeinfos[0].persistentTid;
+		xlrec.persistentSerialNum = rel->rd_segfile0_relationnodeinfos[0].persistentSerialNum;
 
 		rdata[0].data = (char *) &xlrec;
 		rdata[0].len = sizeof(xl_seq_rec);
@@ -722,8 +722,8 @@ AlterSequence(AlterSeqStmt *stmt)
 		XLogRecData rdata[2];
 
 		xlrec.node = seqrel->rd_node;
-		xlrec.persistentTid = seqrel->rd_segfile0_relationnodeinfo.persistentTid;
-		xlrec.persistentSerialNum = seqrel->rd_segfile0_relationnodeinfo.persistentSerialNum;
+		xlrec.persistentTid = seqrel->rd_segfile0_relationnodeinfos[0].persistentTid;
+		xlrec.persistentSerialNum = seqrel->rd_segfile0_relationnodeinfos[0].persistentSerialNum;
 
 		rdata[0].data = (char *) &xlrec;
 		rdata[0].len = sizeof(xl_seq_rec);
@@ -1030,8 +1030,8 @@ cdb_sequence_nextval(Relation   seqrel,
 		XLogRecData rdata[2];
 
 		xlrec.node = seqrel->rd_node;
-		xlrec.persistentTid = seqrel->rd_segfile0_relationnodeinfo.persistentTid;
-		xlrec.persistentSerialNum = seqrel->rd_segfile0_relationnodeinfo.persistentSerialNum;
+		xlrec.persistentTid = seqrel->rd_segfile0_relationnodeinfos[0].persistentTid;
+		xlrec.persistentSerialNum = seqrel->rd_segfile0_relationnodeinfos[0].persistentSerialNum;
 
 		rdata[0].data = (char *) &xlrec;
 		rdata[0].len = sizeof(xl_seq_rec);
@@ -1251,8 +1251,8 @@ do_setval(Oid relid, int64 next, bool iscalled)
 		Page		page = BufferGetPage(buf);
 
 		xlrec.node = seqrel->rd_node;
-		xlrec.persistentTid = seqrel->rd_segfile0_relationnodeinfo.persistentTid;
-		xlrec.persistentSerialNum = seqrel->rd_segfile0_relationnodeinfo.persistentSerialNum;
+		xlrec.persistentTid = seqrel->rd_segfile0_relationnodeinfos[0].persistentTid;
+		xlrec.persistentSerialNum = seqrel->rd_segfile0_relationnodeinfos[0].persistentSerialNum;
 
 		rdata[0].data = (char *) &xlrec;
 		rdata[0].len = sizeof(xl_seq_rec);

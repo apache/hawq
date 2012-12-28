@@ -513,4 +513,6 @@ extern bool gp_log_stack_trace_lines;   /* session GUC, controls line info in st
 extern const char *SegvBusIllName(int signal);
 extern void StandardHandlerForSigillSigsegvSigbus_OnMainThread(char * processName, SIGNAL_ARGS);
 
+extern void pending_for_debug(int timeout);
+
 #endif   /* ELOG_H */

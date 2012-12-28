@@ -128,6 +128,7 @@ PROCESS_QE () {
     cmd="$cmd --shared_buffers=$QE_SHARED_BUFFERS"
     cmd="$cmd --is_filerep_mirrored=$IS_FILEREP_MIRRORED_OPTION"
     cmd="$cmd --backend_output=$GP_DIR.initdb"
+    cmd="$cmd --content_id=$GP_CONTENT"
 
     $TRUSTED_SHELL ${GP_HOSTADDRESS} $cmd >> $LOG_FILE 2>&1
     RETVAL=$?

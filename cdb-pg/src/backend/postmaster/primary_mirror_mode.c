@@ -2343,6 +2343,7 @@ isFilespaceInfoConsistent(void)
 
         /* Use the oid to retrieve the paths on primary and mirror */
         PersistentFilespace_GetPrimaryAndMirror(
+        		-1 /* XXX: mat3 */,
                 filespaceOid,
                 &primaryFilespaceLocation,
                 &mirrorFilespaceLocation);
@@ -2393,6 +2394,7 @@ isFilespaceInfoConsistent(void)
 
         /* Use the oid to retrieve the paths on primary and mirror */
         PersistentFilespace_GetPrimaryAndMirror(
+      		    -1 /* XXX: mat3 */,
                 filespaceOid,
                 &primaryFilespaceLocation,
                 &mirrorFilespaceLocation);

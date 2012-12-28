@@ -34,6 +34,7 @@
 #include "cdb/cdbmirroredbufferpool.h"
 #include "cdb/cdbpersistenttablespace.h"
 #include "cdb/cdbfilerepprimary.h"
+#include "cdb/cdbvars.h"
 #include "utils/guc.h"
 #include "catalog/pg_tablespace.h"
 
@@ -236,7 +237,9 @@ static int errdetail_nonexistent_relation(
 		 * Investigate whether the containing directories exist to give more detail.
 		 */
 		PersistentTablespace_GetPrimaryAndMirrorFilespaces(
+											/* Master access only its own relation. */ GpIdentity.segindex,
 											relFileNode->spcNode,
+											FALSE,
 											&primaryFilespaceLocation,
 											&mirrorFilespaceLocation);
 		if (primaryFilespaceLocation == NULL ||
@@ -552,6 +555,7 @@ mdcreatefilespacedir(
  */
 void
 mdcreatetablespacedir(
+	int4						contentid,
 	Oid							tablespaceOid,
 
 	StorageManagerMirrorMode 	mirrorMode,
@@ -570,7 +574,9 @@ mdcreatetablespacedir(
 	*mirrorDataLossOccurred = false;
 	
 	PersistentTablespace_GetPrimaryAndMirrorFilespaces(
+										contentid,
 										tablespaceOid,
+										FALSE,
 										&primaryFilespaceLocation,
 										&mirrorFilespaceLocation);
 
@@ -623,6 +629,7 @@ mdcreatetablespacedir(
  */
 void
 mdcreatedbdir(
+	int4						contentid,
 	DbDirNode					*dbDirNode,
 
 	StorageManagerMirrorMode 	mirrorMode,
@@ -639,9 +646,11 @@ mdcreatedbdir(
 
 	*primaryError = 0;
 	*mirrorDataLossOccurred = false;
-	
+
 	PersistentTablespace_GetPrimaryAndMirrorFilespaces(
+										contentid,
 										dbDirNode->tablespace,
+										FALSE,
 										&primaryFilespaceLocation,
 										&mirrorFilespaceLocation);
 	
@@ -668,7 +677,9 @@ mdcreatedbdir(
 					dbDirNode->database);
 
 		if (MakeDirectory(dbPath, 0700) < 0)
-			*primaryError = errno;
+			if (ignoreAlreadyExists &&
+				errno != EEXIST)
+				*primaryError = errno;
 	}
 	
 	if (StorageManagerMirrorMode_SendToMirror(mirrorMode) &&
@@ -1028,6 +1039,7 @@ mdrmfilespacedir(
  */
 bool
 mdrmtablespacedir(
+	int4						contentid,
 	Oid							tablespaceOid,
 	
 	bool						primaryOnly,
@@ -1054,7 +1066,9 @@ mdrmtablespacedir(
 							mirrorDataLossOccurred);
 
 	PersistentTablespace_GetPrimaryAndMirrorFilespaces(
+										contentid,
 										tablespaceOid,
+										FALSE,
 										&primaryFilespaceLocation,
 										&mirrorFilespaceLocation);
 
@@ -1113,6 +1127,8 @@ mdrmtablespacedir(
  */
 bool
 mdrmdbdir(
+	int4						contentid,
+
 	DbDirNode					*dbDirNode,
 	
 	bool						primaryOnly,
@@ -1139,7 +1155,9 @@ mdrmdbdir(
 							mirrorDataLossOccurred);
 
 	PersistentTablespace_GetPrimaryAndMirrorFilespaces(
+										contentid,
 										dbDirNode->tablespace,
+										FALSE,
 										&primaryFilespaceLocation,
 										&mirrorFilespaceLocation);
 	

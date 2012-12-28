@@ -517,6 +517,56 @@ CreateFileSpace(CreateFileSpaceStmt *stmt)
 	list_free(nodeSegs);
 	nodeSegs = NULL;
 
+	/* Make sure all of urls has the same prefix. */
+	char	*url_buf = NULL;
+	char	*url_common_end = NULL;
+	int		url_buf_len = 0;
+	foreach(cell, stmt->locations)
+	{
+		FileSpaceEntry	*fse = (FileSpaceEntry*) lfirst(cell);
+
+		/* Skip the QD and standby. */
+		if (fse->contentid == MASTER_CONTENT_ID)
+			continue;
+
+		/* Try to get the common prefix. */
+		if (url_buf == NULL)
+		{
+			char	cid_string[12];
+			char	*localtion_end;
+
+			/* We needs an extra space for '\n' and 12 extra spaces for segid. */
+			url_buf_len = strlen(fse->location) + 1 + 12;
+			url_buf = palloc(url_buf_len);
+
+			/*
+			 * Guess the prefix ending.
+			 * The last n digits in the fse->location should match the fse->contentid.
+			 */
+			memset(cid_string, 0, sizeof(cid_string));
+			snprintf(cid_string, sizeof(cid_string), "%d", fse->contentid);
+
+			/* locate the common prefix ending place */
+			localtion_end = fse->location + strlen(fse->location) - strlen(cid_string);
+
+			/* copy the common prefix to buf */
+			snprintf(url_buf, url_buf_len, "%s", fse->location);
+			url_common_end = url_buf + strlen(fse->location) - strlen(cid_string);
+			url_common_end[0] = '\0';
+
+			/* Make sure this guy is equal to 'common_prefix' + dbid */
+		}
+
+		elog(DEBUG1, "url_buf: %s", url_buf);
+		snprintf(url_common_end, 12, "%d", fse->contentid);
+		if (strcmp(url_buf, fse->location))	
+			ereport(ERROR,
+					(errcode(ERRCODE_GP_COMMAND_ERROR),
+					 errmsg("filespace locations does not have the same prefix for dbid: %d", fse->dbid)));
+		
+		url_common_end[0] = '\0';
+	}
+
 	/* 
 	 * Everything possible has been checked: 
 	 *  - Begin actual creation of the filespace
@@ -594,7 +644,7 @@ CreateFileSpace(CreateFileSpaceStmt *stmt)
 
 		/* Dispatch to segments */
 		stmt->fsoid = fsoid;  /* Already Asserted OidIsValid */
-		CdbDispatchUtilityStatement((Node *) stmt, "CreateFilespaceCommand");
+		// CdbDispatchUtilityStatement((Node *) stmt, "CreateFilespaceCommand");
 
 		/* MPP-6929: metadata tracking */
 		MetaTrackAddObject(FileSpaceRelationId,
@@ -617,18 +667,13 @@ CreateFileSpace(CreateFileSpaceStmt *stmt)
 	 * mechanisms know how to use this to cleanup after a hard failure or 
 	 * replay the creation for mirror resynchronisation.
 	 */
-	if (mirror == NULL)
+	foreach(cell, stmt->locations)
 	{
+		FileSpaceEntry *fse  = (FileSpaceEntry*) lfirst(cell);
+
 		MirroredFileSysObj_TransactionCreateFilespaceDir(
 			fsoid, 
-			primary->dbid, primary->location, 0, NULL,
-			&persistentTid, &persistentSerialNum);
-	}
-	else
-	{
-		MirroredFileSysObj_TransactionCreateFilespaceDir(
-			fsoid, 
-			primary->dbid, primary->location, mirror->dbid, mirror->location,
+			fse->dbid, fse->location, 0, NULL,
 			&persistentTid, &persistentSerialNum);
 	}
 }
@@ -646,6 +691,8 @@ RemoveFileSpace(List *names, DropBehavior behavior, bool missing_ok)
 	Oid			  fsoid;
 	ObjectAddress object;
 	bool		  sharedStorage;
+	List		 *db_ids;
+	ListCell	  *db_id;
 
 	/* 
 	 * General DROP (object) syntax allows fully qualified names, but
@@ -753,6 +800,7 @@ RemoveFileSpace(List *names, DropBehavior behavior, bool missing_ok)
 	 *
 	 * Note: no need for dispatch, that is handled in utility.c
 	 */
+	db_ids = get_filespace_contentids(fsoid);
 	if (Gp_role == GP_ROLE_DISPATCH)
 	{
 		DeleteFilespaceEntryTuples(fsoid);
@@ -768,7 +816,11 @@ RemoveFileSpace(List *names, DropBehavior behavior, bool missing_ok)
 	 * this transaciton.  This marks the filespace as pending delete and it
 	 * will be deleted iff the transaction commits.
 	 */
-	MirroredFileSysObj_ScheduleDropFilespaceDir(fsoid, sharedStorage);
+	foreach(db_id, db_ids)
+	{
+		MirroredFileSysObj_ScheduleDropFilespaceDir(lfirst_int(db_id), fsoid, sharedStorage);
+	}
+	list_free(db_ids);
 }
 
 /* 
@@ -802,7 +854,8 @@ RemoveFileSpaceById(Oid fsoid)
 	heap_close(rel, RowExclusiveLock);
 }
 
-static void 
+/* Return list of db_ids for each path. */
+static void
 DeleteFilespaceEntryTuples(Oid fsoid)
 {
 	Relation	rel;
@@ -829,6 +882,8 @@ DeleteFilespaceEntryTuples(Oid fsoid)
 	/* Clean up after the scan */
 	systable_endscan(scan);
 	heap_close(rel, RowExclusiveLock);
+
+	return;
 }
 
 
@@ -1622,3 +1677,46 @@ num_filespaces(void)
 
 	return n;
 }
+
+List *
+get_filespace_contentids(Oid filespace)
+{
+	Relation rel = heap_open(FileSpaceEntryRelationId, AccessShareLock);
+	ScanKeyData key[1];
+	SysScanDesc scan;
+	HeapTuple tup;
+	List		*db_ids = NIL;
+	ListCell	*cell;
+
+	ScanKeyInit(&key[0],
+				Anum_pg_filespace_entry_fsefsoid,
+				BTEqualStrategyNumber,
+				F_OIDEQ,
+				ObjectIdGetDatum(filespace));
+
+	scan = systable_beginscan(rel, FileSpaceEntryFsefsoidFsedbidIndexId,
+							  true, /* index ok? */
+							  SnapshotSelf,
+							  1,
+							  key);
+
+	while ((tup = systable_getnext(scan)) != NULL)
+	{
+		Datum	d;
+		bool	isNull;
+
+		d = heap_getattr(tup, Anum_pg_filespace_entry_fsedbid, RelationGetDescr(rel), &isNull);
+		Assert(isNull == false);
+		db_ids = lappend_int(db_ids, DatumGetInt32(d));
+	}
+
+	systable_endscan(scan);
+	heap_close(rel, AccessShareLock);
+
+	foreach(cell, db_ids)
+	{
+		lfirst_int(cell) = get_contentid_from_dbid(lfirst_int(cell));
+	}
+	return db_ids;
+}
+

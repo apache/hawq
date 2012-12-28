@@ -97,6 +97,8 @@ extern void smgrclosenode(RelFileNode rnode);
 extern void smgrcreatefilespacedirpending(
 	Oid 							filespaceOid,
 
+	int4							contentid,
+
 	int16							primaryDbId,
 
 	char							*primaryFilespaceLocation,
@@ -131,6 +133,7 @@ extern void smgrcreatefilespacedir(
 
 	bool						*mirrorDataLossOccurred);
 extern void smgrcreatetablespacedirpending(
+	int4							contentid,
 	TablespaceDirNode				*tablespaceDirNode,
 
 	MirroredObjectExistenceState	mirrorExistenceState,
@@ -142,6 +145,7 @@ extern void smgrcreatetablespacedirpending(
 
 	bool							flushToXLog);
 extern void smgrcreatetablespacedir(
+	int4						contentid,
 	Oid 						tablespaceOid,
 
 	StorageManagerMirrorMode	mirrorMode,
@@ -152,6 +156,7 @@ extern void smgrcreatetablespacedir(
 
 	bool						*mirrorDataLossOccurred);
 extern void smgrcreatedbdirjustintime(
+	int4						contentid,
 	DbDirNode					*justInTimeDbDirNode,
 
 	MirroredObjectExistenceState 	mirrorExistenceState,
@@ -166,6 +171,7 @@ extern void smgrcreatedbdirjustintime(
 
 	bool						*mirrorDataLossOccurred);
 extern void smgrcreatedbdirpending(
+	int4							contentid,
 	DbDirNode						*dbDirNode,
 
 	MirroredObjectExistenceState	mirrorExistenceState,
@@ -176,7 +182,7 @@ extern void smgrcreatedbdirpending(
 
 	bool							flushToXLog);
 extern void smgrcreatedbdir(
-	
+	int4						contentid,
 	DbDirNode					*dbDirNode,
 
 	StorageManagerMirrorMode	mirrorMode,
@@ -190,6 +196,8 @@ extern void smgrcreatepending(
 	RelFileNode 					*relFileNode,
 
 	int32							segmentFileNum,
+
+	int32							contentid,
 
 	PersistentFileSysRelStorageMgr relStorageMgr,
 
@@ -247,6 +255,8 @@ extern void smgrscheduleunlink(
 
 	int32			segmentFileNum,
 
+	int32			contentid,
+
 	PersistentFileSysRelStorageMgr relStorageMgr,
 
 	bool			isLocalBuf,
@@ -272,6 +282,7 @@ extern void smgrdounlink(
 
 	bool						*mirrorDataLossOccurred);
 extern void smgrschedulermfilespacedir(
+	int4				contentid,
 	Oid 				filespaceOid,
 
 	ItemPointer 		persistentTid,
@@ -279,6 +290,7 @@ extern void smgrschedulermfilespacedir(
 	int64				persistentSerialNum,
 	bool				sharedStorage);
 extern void smgrschedulermtablespacedir(
+	int4				contentid,
 	Oid 				tablespaceOid,
 
 	ItemPointer 		persistentTid,
@@ -286,6 +298,7 @@ extern void smgrschedulermtablespacedir(
 	int64				persistentSerialNum,
 	bool				sharedStorage);
 extern void smgrschedulermdbdir(
+	int4				contentid,
 	DbDirNode			*dbDirNode,
 
 	ItemPointer		 	persistentTid,
@@ -311,6 +324,7 @@ extern void smgrdormfilespacedir(
 
 	bool						*mirrorDataLossOccurred);
 extern void smgrdormtablespacedir(
+	int4						contentid,
 	Oid 						tablespaceOid,
 	
 	bool  						primaryOnly,
@@ -321,6 +335,8 @@ extern void smgrdormtablespacedir(
 
 	bool						*mirrorDataLossOccurred);
 extern void smgrdormdbdir(
+	int4						contentid,
+
 	DbDirNode 					*dropDbDirNode,
 	
 	bool  						primaryOnly,
@@ -347,7 +363,7 @@ extern bool smgrgetpersistentinfo(
 
 	int64		*persistentSerialNum);
 extern void smgrimmedsync(SMgrRelation reln);
-extern void smgrappendonlymirrorresynceofs(
+/*extern void smgrappendonlymirrorresynceofs(
 	RelFileNode						*relFileNode,
 
 	int32							segmentFileNum,
@@ -364,8 +380,8 @@ extern void smgrappendonlymirrorresynceofs(
 
 	int64							mirrorDataLossTrackingSessionNum,
 
-	int64							mirrorNewEof);
-extern bool smgrgetappendonlyinfo(
+	int64							mirrorNewEof);*/
+/*extern bool smgrgetappendonlyinfo(
 	RelFileNode 					*relFileNode,
 
 	int32							segmentFileNum,
@@ -376,19 +392,19 @@ extern bool smgrgetappendonlyinfo(
 
 	MirrorDataLossTrackingState 	*mirrorDataLossTrackingState,
 
-	int64							*mirrorDataLossTrackingSessionNum);
+	int64							*mirrorDataLossTrackingSessionNum);*/
 extern int	smgrGetPendingFileSysWork(
 	EndXactRecKind						endXactRecKind,
 
 	PersistentEndXactFileSysActionInfo	**ptr);
-extern int	smgrGetAppendOnlyMirrorResyncEofs(
+/*extern int	smgrGetAppendOnlyMirrorResyncEofs(
 	EndXactRecKind									endXactRecKind,
 
-	PersistentEndXactAppendOnlyMirrorResyncEofs 	**ptr);
+	PersistentEndXactAppendOnlyMirrorResyncEofs 	**ptr);*/
 extern bool	smgrIsPendingFileSysWork(
 	EndXactRecKind						endXactRecKind);
-extern bool smgrIsAppendOnlyMirrorResyncEofs(
-	EndXactRecKind						endXactRecKind);
+/*extern bool smgrIsAppendOnlyMirrorResyncEofs(
+	EndXactRecKind						endXactRecKind);*/
 extern void AtSubCommit_smgr(void);
 extern void AtSubAbort_smgr(void);
 extern void AtEOXact_smgr(bool forCommit);
@@ -425,6 +441,7 @@ extern void mdcreatefilespacedir(
 
 	bool						*mirrorDataLossOccurred);
 extern void mdcreatetablespacedir(
+	int4						contentid,
 	Oid 						tablespaceOid,
 
 	StorageManagerMirrorMode	mirrorMode,
@@ -435,6 +452,7 @@ extern void mdcreatetablespacedir(
 
 	bool						*mirrorDataLossOccurred);
 extern void mdcreatedbdir(
+	int4						contentid,
 	DbDirNode					*dbDirNode,
 
 	StorageManagerMirrorMode	mirrorMode,
@@ -493,6 +511,7 @@ extern bool mdrmfilespacedir(
 
 	bool						*mirrorDataLossOccurred);
 extern bool mdrmtablespacedir(
+	int4						contentid,
 	Oid 						tablespaceOid,
 	
 	bool						primaryOnly,
@@ -503,6 +522,8 @@ extern bool mdrmtablespacedir(
 
 	bool						*mirrorDataLossOccurred);
 extern bool mdrmdbdir(
+	int4						contentid,
+
 	DbDirNode					*dbDirNode,
 	
 	bool						primaryOnly,

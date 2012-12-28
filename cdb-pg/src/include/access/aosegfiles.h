@@ -20,6 +20,7 @@
 #define Anum_pg_aoseg_tupcount			3
 #define Anum_pg_aoseg_varblockcount		4
 #define Anum_pg_aoseg_eofuncompressed	5
+#define Anum_pg_aoseg_content			6
 
 #define InvalidFileSegNumber			-1
 #define InvalidUncompressedEof			-1
@@ -62,6 +63,7 @@ typedef struct FileSegInfo
 	TupleVisibilitySummary	tupleVisibilitySummary;
 
 	int			segno;			/* the file segment number */
+	int			content;		/* content id of this tuple */
 	int64		tupcount;		/* total number of tuples in this fileseg */
 	int64		varblockcount;	/* total number of varblocks in this fileseg */	
 	ItemPointerData  sequence_tid;     /* tid for the unique sequence number for this fileseg */
@@ -97,7 +99,7 @@ typedef enum
 extern FileSegInfo *NewFileSegInfo(int segno);
 
 extern void 
-InsertInitialSegnoEntry(AppendOnlyEntry *aoEntry, int segno);
+InsertInitialSegnoEntry(AppendOnlyEntry *aoEntry, int segno, int contentid);
  
  /*
   * GetFileSegInfo
@@ -113,7 +115,7 @@ InsertInitialSegnoEntry(AppendOnlyEntry *aoEntry, int segno);
   * to append data to the segment file.
   */
 extern FileSegInfo *
-GetFileSegInfo(Relation parentrel, AppendOnlyEntry *aoEntry, Snapshot appendOnlyMetaDataSnapshot, int segno);
+GetFileSegInfo(Relation parentrel, AppendOnlyEntry *aoEntry, Snapshot appendOnlyMetaDataSnapshot, int segno, int contentid);
 
 extern FileSegInfo **
 GetAllFileSegInfo(Relation parentrel, AppendOnlyEntry *aoEntry, Snapshot appendOnlyMetaDataSnapshot, int *totalsegs);
@@ -131,7 +133,7 @@ UpdateFileSegInfo(Relation parentrel,
 				  int64 varblocks_added);
 
 extern FileSegTotals *
-GetSegFilesTotals(Relation parentrel, Snapshot appendOnlyMetaDataSnapshot);
+GetSegFilesTotals(Relation parentrel, Snapshot appendOnlyMetaDataSnapshot, int32 contentid);
 
 extern int64 GetAOTotalBytes(Relation parentrel, Snapshot appendOnlyMetaDataSnapshot);
 

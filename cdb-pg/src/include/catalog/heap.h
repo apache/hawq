@@ -85,6 +85,7 @@ extern void InsertGpRelationNodeTuple(
 	char			*relname,
 	Oid				relation,
 	int32			segmentFileNum,
+	int32			contentid,
 	bool			updateIndex,
 	ItemPointer		persistentTid,
 	int64			persistentSerialNum);
@@ -97,7 +98,8 @@ extern void UpdateGpRelationNodeTuple(
 		int64		persistentSerialNum);
 extern void DeleteGpRelationNodeTuple(
 		Relation 	relation,
-		int32		segmentFileNum);
+		int32		segmentFileNum,
+		int32		contentid);
 
 extern List *AddRelationRawConstraints(Relation rel,
 						  List *rawColDefaults,

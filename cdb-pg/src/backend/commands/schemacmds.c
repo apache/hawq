@@ -58,8 +58,8 @@ CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString)
 	Oid			saved_uid;
 	AclResult	aclresult;
 	bool        saved_secdefcxt;
-	bool		shouldDispatch = (Gp_role == GP_ROLE_DISPATCH && 
-								  !IsBootstrapProcessingMode());
+/*	bool		shouldDispatch = (Gp_role == GP_ROLE_DISPATCH &&
+								  !IsBootstrapProcessingMode());*/
 
 	GetUserIdAndContext(&saved_uid, &saved_secdefcxt);
 
@@ -130,8 +130,12 @@ CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString)
 	if (saved_uid != owner_uid)
 		SetUserIdAndContext(owner_uid, true);
 
+	/*
+	 * in gpsql, should be only called on master
+	 */
+	Assert(Gp_role != GP_ROLE_EXECUTE);
 	/* Create the schema's namespace */
-	if (shouldDispatch || Gp_role != GP_ROLE_EXECUTE)
+	/*if (shouldDispatch || Gp_role != GP_ROLE_EXECUTE)
 	{
 		namespaceId = NamespaceCreate(schemaName, owner_uid, 0);
 
@@ -142,13 +146,25 @@ CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString)
             Assert(stmt->schemaOid == 0);
             stmt->schemaOid = namespaceId;
 
-            /*
+
              * Dispatch the command to all primary and mirror segment dbs.
              * Starts a global transaction and reconfigures cluster if needed.
              * Waits for QEs to finish.  Exits via ereport(ERROR,...) if error.
-             */
+
             CdbDispatchUtilityStatement((Node *)stmt, "CreateSchemaCommand");
 		}
+
+		 MPP-6929: metadata tracking
+		if (Gp_role == GP_ROLE_DISPATCH && !istemp)
+			MetaTrackAddObject(NamespaceRelationId,
+							   namespaceId,
+							   saved_uid,
+							   "CREATE", "SCHEMA"
+					);
+	}
+	else if (Gp_role == GP_ROLE_EXECUTE)*/
+	{
+		namespaceId = NamespaceCreate(schemaName, owner_uid, stmt->schemaOid);
 
 		/* MPP-6929: metadata tracking */
 		if (Gp_role == GP_ROLE_DISPATCH && !istemp)
@@ -157,10 +173,6 @@ CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString)
 							   saved_uid,
 							   "CREATE", "SCHEMA"
 					);
-	}
-	else if (Gp_role == GP_ROLE_EXECUTE)
-	{
-		namespaceId = NamespaceCreate(schemaName, owner_uid, stmt->schemaOid);
 	}
 
 	/* Advance cmd counter to make the namespace visible */
@@ -231,6 +243,8 @@ void
 RemoveSchema(List *names, DropBehavior behavior, bool missing_ok)
 {
 	char	   *schemaName;
+
+	Assert(Gp_role != GP_ROLE_EXECUTE);
 
 	if (list_length(names) != 1)
 		ereport(ERROR,
@@ -335,6 +349,8 @@ RenameSchema(const char *oldname, const char *newname)
 	Relation	rel;
 	AclResult	aclresult;
 
+	Assert(Gp_role != GP_ROLE_EXECUTE);
+
 	rel = heap_open(NamespaceRelationId, RowExclusiveLock);
 
 	tup = SearchSysCacheCopy(NAMESPACENAME,
@@ -434,6 +450,8 @@ AlterSchemaOwner(const char *name, Oid newOwnerId)
 	HeapTuple	tup;
 	Relation	rel;
 
+	Assert(Gp_role != GP_ROLE_EXECUTE);
+
 	rel = heap_open(NamespaceRelationId, RowExclusiveLock);
 
 	tup = SearchSysCache(NAMESPACENAME,
@@ -463,6 +481,8 @@ static void
 AlterSchemaOwner_internal(HeapTuple tup, Relation rel, Oid newOwnerId)
 {
 	Form_pg_namespace nspForm;
+
+	Assert(Gp_role != GP_ROLE_EXECUTE);
 
 	Assert(RelationGetRelid(rel) == NamespaceRelationId);
 

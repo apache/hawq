@@ -43,6 +43,7 @@ logger = gplog.get_default_logger()
 
 class GpdbRestore(Operation):
     def __init__(self, options, args):
+     	raise ExceptionNoStackTraceNeeded("GPDB RESTORE NOT SUPPORTED YET IN GPSQL")
         # only one of -t, -b, -R, and -s can be provided
         count = sum([1 for opt in ['db_timestamp', 'db_date_dir', 'db_host_path', 'search_for_dbname']
                        if options.__dict__[opt] is not None])

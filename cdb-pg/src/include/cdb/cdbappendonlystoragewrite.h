@@ -92,8 +92,8 @@ typedef struct AppendOnlyStorageWrite
 	RelFileNode	relFileNode;
 	int32		segmentFileNum;
 
-	ItemPointerData 	persistentTid;
-	int64				persistentSerialNum;
+/*	ItemPointerData 	persistentTid;
+	int64				persistentSerialNum;*/
 			/*
 			 * Persistence information for current write open.
 			 */
@@ -234,10 +234,7 @@ extern void AppendOnlyStorageWrite_FinishSession(
  * Creates an on-demand Append-Only segment file under transaction.
  */
 void AppendOnlyStorageWrite_TransactionCreateFile(
-	AppendOnlyStorageWrite		*storageWrite,
-
-	char						*filePathName,
-				/* The name of the segment file to open. */
+	char						*relname,
 
 	int64						logicalEof,
 				/*
@@ -250,6 +247,7 @@ void AppendOnlyStorageWrite_TransactionCreateFile(
 				 * exist.
 				 */
 	RelFileNode 				*relFileNode,
+	int32						contentid,
 	int32						segmentFileNum,
 	ItemPointer 				persistentTid,
 	int64						*persistentSerialNum);
@@ -279,8 +277,9 @@ extern void AppendOnlyStorageWrite_OpenFile(
 	int64						fileLen_uncompressed,
 	RelFileNode					*relFileNode,
 	int32						segmentFileNum,
-	ItemPointer 				persistentTid,
-	int64						persistentSerialNum);
+	int32						contentid
+	/*ItemPointer 				persistentTid,
+	int64						persistentSerialNum*/);
 
 /*
  * Flush and close the current segment file.

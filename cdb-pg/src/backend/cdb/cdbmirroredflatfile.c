@@ -187,6 +187,7 @@ int MirroredFlatFile_OpenInDbDir(
 	MirroredFlatFileOpen *open,
 				/* The resulting open struct. */
 
+	int4			contentid,
 	DbDirNode 		*dbDirNode,
 	
 	char			*simpleFileName,
@@ -218,7 +219,9 @@ int MirroredFlatFile_OpenInDbDir(
 	subDirectoryMirror = (char*)palloc(MAXPGPATH + 1);
 	
 	PersistentTablespace_GetPrimaryAndMirrorFilespaces(
+													   contentid,
 													   dbDirNode->tablespace,
+													   FALSE,
 													   &primaryFilespaceLocation,
 													   &mirrorFilespaceLocation);	
 	FormDatabasePath(
@@ -1278,6 +1281,7 @@ MirroredFlatFile_MirrorDropTemporaryFiles(void)
 int
 PgVersionRecoverMirror(void)
 {
+	int4		contentid;
 	DbDirNode dbDirNode;
 	PersistentFileSysState state;
 	
@@ -1321,6 +1325,7 @@ PgVersionRecoverMirror(void)
 	MemSet(&mirroredOpen, 0, sizeof(mirroredOpen));
 	MemSet(&primaryOpen, 0, sizeof(primaryOpen));
 	while (PersistentDatabase_DirIterateNext(
+											 &contentid,
 											 &dbDirNode,
 											 &state,
 											 &persistentTid,
@@ -1330,7 +1335,9 @@ PgVersionRecoverMirror(void)
 			continue;
 		
 		PersistentTablespace_GetPrimaryAndMirrorFilespaces(
+														   contentid,
 														   dbDirNode.tablespace,
+														   FALSE,
 														   &primaryFilespaceLocation,
 														   &mirrorFilespaceLocation);
 				

@@ -87,6 +87,9 @@
 
 #include "utils/guc.h"
 
+typedef struct pg_result PGresult;
+extern void PQclear(PGresult *res);
+
 static void MetaTrackAddUpdInternal(Oid			classid, 
 									Oid			objoid, 
 									Oid			relowner,
@@ -364,8 +367,8 @@ heap_create(const char *relname,
 			skipCreatingSharedTable = PersistentFileSysObj_ScanForRelation(
 							&rel->rd_node,
 							/* segmentFileNum */ 0,
-							&rel->rd_segfile0_relationnodeinfo.persistentTid,
-							&rel->rd_segfile0_relationnodeinfo.persistentSerialNum);
+							&rel->rd_segfile0_relationnodeinfos[0].persistentTid,
+							&rel->rd_segfile0_relationnodeinfos[0].persistentSerialNum);
 
 			if (Debug_persistent_print && skipCreatingSharedTable)
 				elog(Persistent_DebugPrintLevel(),
@@ -395,27 +398,36 @@ heap_create(const char *relname,
 													relBufpoolKind,
 													rel->rd_isLocalBuf,
 													rel->rd_rel->relname.data,
-													/* doJustInTimeDirCreate */ true,
-													bufferPoolBulkLoad,
-													&rel->rd_segfile0_relationnodeinfo.persistentTid,
-													&rel->rd_segfile0_relationnodeinfo.persistentSerialNum);
+													/* doJustInTimeDirCreate */true, bufferPoolBulkLoad,
+													&rel->rd_segfile0_relationnodeinfos[0].persistentTid,
+													&rel->rd_segfile0_relationnodeinfos[0].persistentSerialNum);
 			}
 			else
 			{
-				MirroredFileSysObj_TransactionCreateAppendOnlyFile(
+				/*
+				 * in gpsql, master create segfiles for all segments
+				 */
+				Assert(Gp_role == GP_ROLE_DISPATCH);
+
+				int i;
+				for (i = 0; i <= GpIdentity.numsegments; ++i)
+				{
+					MirroredFileSysObj_TransactionCreateAppendOnlyFile(
 													&rel->rd_node,
 													/* segmentFileNum */ 0,
+													i - 1,
 													rel->rd_rel->relname.data,
 													/* doJustInTimeDirCreate */ true,
-													&rel->rd_segfile0_relationnodeinfo.persistentTid,
-													&rel->rd_segfile0_relationnodeinfo.persistentSerialNum);
+													&rel->rd_segfile0_relationnodeinfos[i].persistentTid,
+													&rel->rd_segfile0_relationnodeinfos[i].persistentSerialNum);
+				}
 			}
 		}
 		
 
 		if (Debug_check_for_invalid_persistent_tid &&
 			!Persistent_BeforePersistenceWork() &&
-			PersistentStore_IsZeroTid(&rel->rd_segfile0_relationnodeinfo.persistentTid))
+			PersistentStore_IsZeroTid(&rel->rd_segfile0_relationnodeinfos[0].persistentTid))
 		{	
 			elog(ERROR, 
 				 "setNewRelfilenodeCommon has invalid TID (0,0) into relation %u/%u/%u '%s', serial number " INT64_FORMAT,
@@ -423,18 +435,23 @@ heap_create(const char *relname,
 				 rel->rd_node.dbNode,
 				 rel->rd_node.relNode,
 				 NameStr(rel->rd_rel->relname),
-				 rel->rd_segfile0_relationnodeinfo.persistentSerialNum);
+				 rel->rd_segfile0_relationnodeinfos[0].persistentSerialNum);
 		}
 
-		rel->rd_segfile0_relationnodeinfo.isPresent = true;
+		{
+			int i;
+			for (i = 0; i < rel->rd_segfile0_count; ++i) {
+				rel->rd_segfile0_relationnodeinfos[i].isPresent = true;
+			}
+		}
 
 		if (Debug_persistent_print)
 			elog(Persistent_DebugPrintLevel(), 
 			     "heap_create: '%s', Append-Only '%s', persistent TID %s and serial number " INT64_FORMAT " for CREATE",
 				 relpath(rel->rd_node),
 				 (isAppendOnly ? "true" : "false"),
-				 ItemPointerToString(&rel->rd_segfile0_relationnodeinfo.persistentTid),
-				 rel->rd_segfile0_relationnodeinfo.persistentSerialNum);
+				 ItemPointerToString(&rel->rd_segfile0_relationnodeinfos[0].persistentTid),
+				 rel->rd_segfile0_relationnodeinfos[0].persistentSerialNum);
 	}
 
 	return rel;
@@ -1171,6 +1188,7 @@ InsertGpRelationNodeTuple(
 	char			*relname,
 	Oid				relfilenode,
 	int32			segmentFileNum,
+	int32			contentid,
 	bool			updateIndex,
 	ItemPointer		persistentTid,
 	int64			persistentSerialNum)
@@ -1184,11 +1202,12 @@ InsertGpRelationNodeTuple(
 		PersistentStore_IsZeroTid(persistentTid))
 	{	
 		elog(ERROR, 
-			 "Inserting with invalid TID (0,0) into relation id %u '%s', relfilenode %u, segment file #%d, serial number " INT64_FORMAT,
+			 "Inserting with invalid TID (0,0) into relation id %u '%s', relfilenode %u, segment file #%d, contentid %d, serial number " INT64_FORMAT,
 			 relationId,
 			 relname,
 			 relfilenode,
 			 segmentFileNum,
+			 contentid,
 			 persistentSerialNum);
 	}
 
@@ -1197,11 +1216,12 @@ InsertGpRelationNodeTuple(
 
 	if (Debug_persistent_print)
 		elog(Persistent_DebugPrintLevel(), 
-			 "InsertGpRelationNodeTuple: Inserting into relation id %u '%s', relfilenode %u, segment file #%d, serial number " INT64_FORMAT ", TID %s",
+			 "InsertGpRelationNodeTuple: Inserting into relation id %u '%s', relfilenode %u, segment file #%d, contentid %d, serial number " INT64_FORMAT ", TID %s",
 			 relationId,
 			 relname,
 			 relfilenode,
 			 segmentFileNum,
+			 contentid,
 			 persistentSerialNum,
 			 ItemPointerToString(persistentTid));
 
@@ -1210,6 +1230,7 @@ InsertGpRelationNodeTuple(
 								values,
 								relfilenode,
 								segmentFileNum,
+								contentid,
 								/* createMirrorDataLossTrackingSessionNum */ 0,
 								persistentTid,
 								persistentSerialNum);
@@ -1291,9 +1312,13 @@ UpdateGpRelationNodeTuple(
 static void
 AddNewRelationNodeTuple(
 						Relation gp_relation_node,
-						Relation new_rel)
+						Relation new_rel,
+						int32 contentid)
 {
-	if (new_rel->rd_segfile0_relationnodeinfo.isPresent)
+	int	i = contentid + 1;
+
+	Assert(i >= 0);
+	if (new_rel->rd_segfile0_relationnodeinfos[i].isPresent)
 	{
 		InsertGpRelationNodeTuple(
 							gp_relation_node,
@@ -1301,9 +1326,10 @@ AddNewRelationNodeTuple(
 							new_rel->rd_rel->relname.data,
 							new_rel->rd_rel->relfilenode,
 							/* segmentFileNum */ 0,
+							contentid,
 							/* updateIndex */ true,
-							&new_rel->rd_segfile0_relationnodeinfo.persistentTid,
-							new_rel->rd_segfile0_relationnodeinfo.persistentSerialNum);
+							&new_rel->rd_segfile0_relationnodeinfos[i].persistentTid,
+							new_rel->rd_segfile0_relationnodeinfos[i].persistentSerialNum);
 							
 	}
 }
@@ -1368,7 +1394,16 @@ heap_create_with_catalog(const char *relname,
 	if(appendOnlyRel)
 	{
 		if(stdRdOptions->columnstore)
+		{
+			/*
+			 * TODO, in gpsql, currently not supported
+			 */
+			ereport(ERROR,
+					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+							errmsg("Cannot support column store table yet in GPSQL") ));
+
             relstorage = RELSTORAGE_AOCOLS;
+		}
 		else
 			relstorage = RELSTORAGE_AOROWS;
 	}
@@ -1381,6 +1416,10 @@ heap_create_with_catalog(const char *relname,
 	 */
 	if (stdRdOptions->errorTable)
 	{
+		ereport(ERROR,
+				(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+						errmsg("Cannot support error table yet in GPSQL")));
+
 		/* If this is a error log table, we have to save it in local tablespace. */
 		override = false;
 		reltablespace = MyDatabaseTableSpace;
@@ -1485,8 +1524,10 @@ heap_create_with_catalog(const char *relname,
 
 	if (persistentTid != NULL)
 	{
-		*persistentTid = new_rel_desc->rd_segfile0_relationnodeinfo.persistentTid;
-		*persistentSerialNum = new_rel_desc->rd_segfile0_relationnodeinfo.persistentSerialNum;
+		*persistentTid =
+				new_rel_desc->rd_segfile0_relationnodeinfos[0].persistentTid;
+		*persistentSerialNum =
+				new_rel_desc->rd_segfile0_relationnodeinfos[0].persistentSerialNum;
 	}
 
 	/*
@@ -1562,12 +1603,27 @@ heap_create_with_catalog(const char *relname,
 
 	if (gp_relation_node_desc != NULL)
 	{
-		AddNewRelationNodeTuple(gp_relation_node_desc,
-			                    new_rel_desc);
-
+		if (appendOnlyRel)
+		{
+			int i;
+			for (i = 0; i <= GpIdentity.numsegments; ++i)
+				AddNewRelationNodeTuple(
+						gp_relation_node_desc,
+						new_rel_desc,
+						i - 1);
+		}
+		else
+		{
+			/*
+			 * for heap table and index, use master's contentid always
+			 */
+			AddNewRelationNodeTuple(
+						gp_relation_node_desc,
+						new_rel_desc,
+						MASTER_CONTENT_ID);
+		}
 		heap_close(gp_relation_node_desc, RowExclusiveLock);
 	}
-
 
 	/*
 	 * if this is an append-only relation, add an entry in pg_appendonly.
@@ -1896,12 +1952,15 @@ DeleteAttributeTuples(Oid relid)
 void
 DeleteGpRelationNodeTuple(
 	Relation 	relation,
-	int32		segmentFileNum)
+	int32		segmentFileNum,
+	int32		contentid)
 {
 	Relation	gp_relation_node;
 	HeapTuple	tuple;
 
-	Assert(relation->rd_segfile0_relationnodeinfo.isPresent);
+	Assert(NULL != relation->rd_segfile0_relationnodeinfos
+			&& contentid + 1 < relation->rd_segfile0_count);
+	Assert(relation->rd_segfile0_relationnodeinfos[contentid + 1].isPresent);
 
 	/* Grab an appropriate lock on the pg_class relation */
 	gp_relation_node = heap_open(GpRelationNodeRelationId, RowExclusiveLock);
@@ -1909,12 +1968,14 @@ DeleteGpRelationNodeTuple(
 	tuple = ScanGpRelationNodeTuple(
 						gp_relation_node,
 						relation->rd_rel->relfilenode,
-						segmentFileNum);
+						segmentFileNum,
+						contentid);
 	if (!HeapTupleIsValid(tuple))
-		elog(ERROR, "could not find node tuple for relation %u, relation file node %u, segment file #%d",
+		elog(ERROR, "could not find node tuple for relation %u, relation file node %u, segment file #%d, contentid %d",
 			 RelationGetRelid(relation),
 			 relation->rd_rel->relfilenode,
-			 segmentFileNum);
+			 segmentFileNum,
+			 contentid);
 
 	/* delete the relation tuple from pg_class, and finish up */
 	simple_heap_delete(gp_relation_node, &tuple->t_self);
@@ -2168,14 +2229,15 @@ remove_gp_relation_node_and_schedule_drop(
 
 		DeleteGpRelationNodeTuple(
 								rel,
-								/* segmentFileNum */ 0);
+								/* segmentFileNum */ 0,
+								MASTER_CONTENT_ID);
 		
 		if (Debug_persistent_print)
 			elog(Persistent_DebugPrintLevel(), 
 				 "remove_gp_relation_node_and_schedule_drop: For Buffer Pool managed relation '%s' persistent TID %s and serial number " INT64_FORMAT " for DROP",
 				 relpath(rel->rd_node),
-				 ItemPointerToString(&rel->rd_segfile0_relationnodeinfo.persistentTid),
-				 rel->rd_segfile0_relationnodeinfo.persistentSerialNum);
+				 ItemPointerToString(&rel->rd_segfile0_relationnodeinfos[0].persistentTid),
+				 rel->rd_segfile0_relationnodeinfos[0].persistentSerialNum);
 	}
 	else
 	{
@@ -2187,6 +2249,8 @@ remove_gp_relation_node_and_schedule_drop(
 		
 		int32 segmentFileNum;
 		
+		int32 contentid;
+
 		ItemPointerData persistentTid;
 		int64 persistentSerialNum;
 		
@@ -2201,15 +2265,17 @@ remove_gp_relation_node_and_schedule_drop(
 		while ((tuple = GpRelationNodeGetNext(
 								&gpRelationNodeScan,
 								&segmentFileNum,
+								&contentid,
 								&persistentTid,
 								&persistentSerialNum)))
 		{
 			if (Debug_persistent_print)
 				elog(Persistent_DebugPrintLevel(), 
-					 "remove_gp_relation_node_and_schedule_drop: For Append-Only relation %u relfilenode %u scanned segment file #%d, serial number " INT64_FORMAT " at TID %s for DROP",
+					 "remove_gp_relation_node_and_schedule_drop: For Append-Only relation %u relfilenode %u scanned segment file #%d, contentid %d, serial number " INT64_FORMAT " at TID %s for DROP",
 					 rel->rd_id,
 					 rel->rd_rel->relfilenode,
 					 segmentFileNum,
+					 contentid,
 					 persistentSerialNum,
 					 ItemPointerToString(&persistentTid));
 			
@@ -2218,6 +2284,7 @@ remove_gp_relation_node_and_schedule_drop(
 			MirroredFileSysObj_ScheduleDropAppendOnlyFile(
 											&rel->rd_node,
 											segmentFileNum,
+											contentid,
 											rel->rd_rel->relname.data,
 											&persistentTid,
 											persistentSerialNum);
@@ -2416,9 +2483,9 @@ StoreAttrDefault(Relation rel, AttrNumber attnum, char *adbin)
 			 adrel->rd_node.dbNode,
 			 adrel->rd_node.relNode,
 			 NameStr(adrel->rd_rel->relname),
-			 (adrel->rd_segfile0_relationnodeinfo.isPresent ? "true" : "false"),
-			 adrel->rd_segfile0_relationnodeinfo.persistentSerialNum,
-			 ItemPointerToString(&adrel->rd_segfile0_relationnodeinfo.persistentTid));
+			 (adrel->rd_segfile0_relationnodeinfos[0].isPresent ? "true" : "false"),
+			 adrel->rd_segfile0_relationnodeinfos[0].persistentSerialNum,
+			 ItemPointerToString(&adrel->rd_segfile0_relationnodeinfos[0].persistentTid));
 	}
 
 	// Fetch gp_persistent_relation_node information that will be added to XLOG record.
@@ -2432,9 +2499,9 @@ StoreAttrDefault(Relation rel, AttrNumber attnum, char *adbin)
 			 adrel->rd_node.dbNode,
 			 adrel->rd_node.relNode,
 			 NameStr(adrel->rd_rel->relname),
-			 (adrel->rd_segfile0_relationnodeinfo.isPresent ? "true" : "false"),
-			 adrel->rd_segfile0_relationnodeinfo.persistentSerialNum,
-			 ItemPointerToString(&adrel->rd_segfile0_relationnodeinfo.persistentTid));
+			 (adrel->rd_segfile0_relationnodeinfos[0].isPresent ? "true" : "false"),
+			 adrel->rd_segfile0_relationnodeinfos[0].persistentSerialNum,
+			 ItemPointerToString(&adrel->rd_segfile0_relationnodeinfos[0].persistentTid));
 	}
 
 	tuple = heap_form_tuple(adrel->rd_att, values, nulls);
@@ -3442,6 +3509,7 @@ insert_ordered_unique_oid(List *list, Oid datum)
 static void
 setNewRelfilenodeCommon(Relation relation, Oid newrelfilenode)
 {
+	int i;
 	RelFileNode newrnode;
 	Relation	pg_class;
 	HeapTuple	tuple;
@@ -3500,24 +3568,30 @@ setNewRelfilenodeCommon(Relation relation, Oid newrelfilenode)
 											NameStr(relation->rd_rel->relname),
 											/* doJustInTimeDirCreate */ true,
 											/* bufferPoolBulkLoad */ false,
-											&relation->rd_segfile0_relationnodeinfo.persistentTid,
-											&relation->rd_segfile0_relationnodeinfo.persistentSerialNum);
+											&relation->rd_segfile0_relationnodeinfos[0].persistentTid,
+											&relation->rd_segfile0_relationnodeinfos[0].persistentSerialNum);
 		smgrclose(srel);
 	}
 	else
 	{
-		MirroredFileSysObj_TransactionCreateAppendOnlyFile(
+		Assert(Gp_role != GP_ROLE_EXECUTE);
+
+		for (i = 0 ; i < relation->rd_segfile0_count; ++i) {
+			MirroredFileSysObj_TransactionCreateAppendOnlyFile(
 											&newrnode,
 											/* segmentFileNum */ 0,
+											i - 1,
 											NameStr(relation->rd_rel->relname),
 											/* doJustInTimeDirCreate */ true,
-											&relation->rd_segfile0_relationnodeinfo.persistentTid,
-											&relation->rd_segfile0_relationnodeinfo.persistentSerialNum);
+											&relation->rd_segfile0_relationnodeinfos[i].persistentTid,
+											&relation->rd_segfile0_relationnodeinfos[i].persistentSerialNum);
+
+		}
 	}
 
 	if (Debug_check_for_invalid_persistent_tid &&
 		!Persistent_BeforePersistenceWork() &&
-		PersistentStore_IsZeroTid(&relation->rd_segfile0_relationnodeinfo.persistentTid))
+		PersistentStore_IsZeroTid(&relation->rd_segfile0_relationnodeinfos[0].persistentTid))
 	{	
 		elog(ERROR, 
 			 "setNewRelfilenodeCommon has invalid TID (0,0) for relation %u/%u/%u '%s', serial number " INT64_FORMAT,
@@ -3525,18 +3599,19 @@ setNewRelfilenodeCommon(Relation relation, Oid newrelfilenode)
 			 newrnode.dbNode,
 			 newrnode.relNode,
 			 NameStr(relation->rd_rel->relname),
-			 relation->rd_segfile0_relationnodeinfo.persistentSerialNum);
+			 relation->rd_segfile0_relationnodeinfos[0].persistentSerialNum);
 	}
 
-	relation->rd_segfile0_relationnodeinfo.isPresent = true;
+	for (i = 0; i < relation->rd_segfile0_count; ++i)
+		relation->rd_segfile0_relationnodeinfos[i].isPresent = true;
 	
 	if (Debug_persistent_print)
 		elog(Persistent_DebugPrintLevel(), 
 			 "setNewRelfilenodeCommon: NEW '%s', Append-Only '%s', persistent TID %s and serial number " INT64_FORMAT,
 			 relpath(newrnode),
 			 (isAppendOnly ? "true" : "false"),
-			 ItemPointerToString(&relation->rd_segfile0_relationnodeinfo.persistentTid),
-			 relation->rd_segfile0_relationnodeinfo.persistentSerialNum);
+			 ItemPointerToString(&relation->rd_segfile0_relationnodeinfos[0].persistentTid),
+			 relation->rd_segfile0_relationnodeinfos[0].persistentSerialNum);
 
 	/* Update GETSTRUCT fields of the pg_class row */
 	rd_rel->relfilenode = newrelfilenode;
@@ -3552,15 +3627,39 @@ setNewRelfilenodeCommon(Relation relation, Oid newrelfilenode)
 	 */
 	is_gp_relation_node_index = relation->rd_index &&
 								relation->rd_index->indrelid == GpRelationNodeRelationId;
-	InsertGpRelationNodeTuple(
+
+	if (isAppendOnly)
+	{
+		for (i = 0; i < relation->rd_segfile0_count; ++i)
+		{
+			InsertGpRelationNodeTuple(
 						gp_relation_node,
 						relation->rd_id,
 						NameStr(relation->rd_rel->relname),
 						newrelfilenode,
 						/* segmentFileNum */ 0,
+						i - 1,
 						/* updateIndex */ !is_gp_relation_node_index,
-						&relation->rd_segfile0_relationnodeinfo.persistentTid,
-						relation->rd_segfile0_relationnodeinfo.persistentSerialNum);
+						&relation->rd_segfile0_relationnodeinfos[i].persistentTid,
+						relation->rd_segfile0_relationnodeinfos[i].persistentSerialNum);
+		}
+	}
+	else
+	{
+		int contentid =	GpIdentity.segindex == UNINITIALIZED_GP_IDENTITY_VALUE ?
+						MASTER_CONTENT_ID : GpIdentity.segindex;
+
+		InsertGpRelationNodeTuple(
+								gp_relation_node,
+								relation->rd_id,
+								NameStr(relation->rd_rel->relname),
+								newrelfilenode,
+								/* segmentFileNum */ 0,
+								contentid,
+								/* updateIndex */ !is_gp_relation_node_index,
+								&relation->rd_segfile0_relationnodeinfos[0].persistentTid,
+								relation->rd_segfile0_relationnodeinfos[0].persistentSerialNum);
+	}
 
 	simple_heap_update(pg_class, &tuple->t_self, tuple);
 
@@ -3597,11 +3696,8 @@ setNewRelfilenode(Relation relation)
 									   relation->rd_rel->relisshared,
 									   NULL);
 
-	if (Gp_role == GP_ROLE_EXECUTE)
-	{
 		elog(DEBUG1, "setNewRelfilenode called in EXECUTE mode, "
 			 "newrelfilenode=%d", newrelfilenode);
-	}
 
 	setNewRelfilenodeCommon(relation, newrelfilenode);
 

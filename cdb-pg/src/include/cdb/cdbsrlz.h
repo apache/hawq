@@ -16,9 +16,16 @@
 #include "lib/stringinfo.h"
 #include "nodes/pg_list.h"
 
+extern char *WriteBackCatalogs;
+extern int32 WriteBackCatalogLen;
+
 extern char *serializeNode(Node *node, int *size);
 extern Node *deserializeNode(const char *strNode, int size);
 
+extern char *serializeInMemCatalog(int * len);
 
+extern void deserializeAndRebuildInmemCatalog(const char * catalog, int len);
+
+extern void deserializeAndUpdateCatalog(const char * catalog, int size);
 
 #endif   /* CDBSRLZ_H */

@@ -42,6 +42,8 @@
 #include "utils/lsyscache.h"
 #include "commands/tablespace.h"
 
+#include "cdb/cdbvars.h"
+
 
 /*
  * This module is for generic relation file create and drop.
@@ -138,6 +140,7 @@ static bool PersistentRelation_CheckTablespaceScanTupleCallback(
 {
 	RelFileNode		relFileNode;
 	int32			segmentFileNum;
+	int32			contentid;
 
 	PersistentFileSysRelStorageMgr relationStorageManager;
 
@@ -169,6 +172,7 @@ static bool PersistentRelation_CheckTablespaceScanTupleCallback(
 									&relFileNode.dbNode,
 									&relFileNode.relNode,
 									&segmentFileNum,
+									&contentid,
 									&relationStorageManager,
 									&state,
 									&createMirrorDataLossTrackingSessionNum,
@@ -239,6 +243,8 @@ void PersistentRelation_AddCreatePending(
 
 	int32				segmentFileNum,
 
+	int32				contentid,
+
 	PersistentFileSysRelStorageMgr relStorageMgr,
 
 	PersistentFileSysRelBufpoolKind relBufpoolKind,
@@ -295,6 +301,7 @@ void PersistentRelation_AddCreatePending(
 										&fsObjName, 
 										relFileNode,
 										segmentFileNum,
+										contentid,
 										is_tablespace_shared);
 
 	WRITE_PERSISTENT_STATE_ORDERED_LOCK;
@@ -305,6 +312,7 @@ void PersistentRelation_AddCreatePending(
 										relFileNode->dbNode,
 										relFileNode->relNode,
 										segmentFileNum,
+										contentid,
 										relStorageMgr,
 										(bufferPoolBulkLoad ?
 												PersistentFileSysState_BulkLoadCreatePending :
@@ -335,7 +343,12 @@ void PersistentRelation_AddCreatePending(
 	 * This XLOG must be generated under the persistent write-lock.
 	 */
 #ifdef MASTER_MIRROR_SYNC
+
+	/*
+	 * TODO, add contentid
+	 */
 	mmxlog_log_create_relfilenode(
+						contentid,
 						relFileNode->spcNode,
 						relFileNode->dbNode,
 						relFileNode->relNode,
@@ -367,7 +380,7 @@ void PersistentRelation_AddCreatePending(
 
 	WRITE_PERSISTENT_STATE_ORDERED_UNLOCK;
 
-	if (Debug_persistent_print)
+	/*if (Debug_persistent_print)
 		elog(Persistent_DebugPrintLevel(), 
 		     "Persistent relation: Add '%s', relation name '%s' in state 'Create Pending', relation storage manager '%s', mirror existence state '%s', relation data resynchronization state '%s', serial number " INT64_FORMAT " at TID %s",
 			 PersistentFileSysObjName_ObjectName(&fsObjName),
@@ -376,7 +389,7 @@ void PersistentRelation_AddCreatePending(
 			 MirroredObjectExistenceState_Name(mirrorExistenceState),
 			 MirroredRelDataSynchronizationState_Name(relDataSynchronizationState),
 			 *serialNum,
-			 ItemPointerToString(persistentTid));
+			 ItemPointerToString(persistentTid));*/
 }
 
 void PersistentRelation_AddCreated(
@@ -384,6 +397,8 @@ void PersistentRelation_AddCreated(
 				/* The tablespace, database, and relation OIDs for the create. */
 
 	int32				segmentFileNum,
+
+	int32				contentid,
 
 	PersistentFileSysRelStorageMgr relStorageMgr,
 
@@ -434,6 +449,7 @@ void PersistentRelation_AddCreated(
 										&fsObjName, 
 										relFileNode,
 										segmentFileNum,
+										contentid,
 										is_tablespace_shared);
 
 	WRITE_PERSISTENT_STATE_ORDERED_LOCK;
@@ -444,6 +460,7 @@ void PersistentRelation_AddCreated(
 										relFileNode->dbNode,
 										relFileNode->relNode,
 										segmentFileNum,
+										contentid,
 										relStorageMgr,
 										PersistentFileSysState_Created,
 										/* createMirrorDataLossTrackingSessionNum */ 0,
@@ -525,6 +542,7 @@ void PersistentRelation_FinishBufferPoolBulkLoad(
 										&fsObjName, 
 										relFileNode,
 										/* segmentFileNum */ 0,
+										GpIdentity.segindex,
 										is_tablespace_shared);
 
 	// Do this check after skipping out if in bootstrap mode.
@@ -670,6 +688,7 @@ PersistentRelation_AddMirrorAll(int16 pridbid, int16 mirdbid)
 		PersistentFileSysObjName_SetRelationFile(&fsObjName,
 												 &node,
 												 segment_file_num,
+												 GpIdentity.segindex,
 												 is_tablespace_shared);
 
 	    PersistentFileSysObj_AddMirror(&fsObjName,
@@ -724,6 +743,7 @@ PersistentRelation_RemoveSegment(int16 dbid, bool ismirror)
 		PersistentFileSysObjName_SetRelationFile(&fsObjName,
 												 &node,
 												 segment_file_num,
+												 GpIdentity.segindex,
 												 is_tablespace_shared);
 
 	    PersistentFileSysObj_RemoveSegment(&fsObjName,
@@ -777,6 +797,7 @@ PersistentRelation_ActivateStandby(int16 oldmaster, int16 newmaster)
 		PersistentFileSysObjName_SetRelationFile(&fsObjName,
 												 &node,
 												 segment_file_num,
+												 GpIdentity.segindex,
 												 is_tablespace_shared);
 
 	    PersistentFileSysObj_ActivateStandby(&fsObjName,
@@ -1021,6 +1042,7 @@ PersistentRelation_DroppedVerifiedActionCallback(
 		 */
 #ifdef MASTER_MIRROR_SYNC
 		mmxlog_log_remove_relfilenode(
+							fsObjName->contentid,
 							relFileNode->spcNode, 
 							relFileNode->dbNode, 
 							relFileNode->relNode,
@@ -1158,6 +1180,7 @@ void PersistentRelation_MarkBufPoolRelationForScanIncrementalResync(
 										&fsObjName, 
 										relFileNode,
 										/* segmentFileNum */ 0,
+										GpIdentity.segindex,
 										is_tablespace_shared);
 
 	// Do this check after skipping out if in bootstrap mode.

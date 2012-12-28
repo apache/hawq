@@ -275,7 +275,11 @@ void vacuum(VacuumStmt *vacstmt, List *relids)
 	
 	Assert(!(vacstmt != NULL && relids != NULL));
 	
-	if (doVacuum)
+	/*
+	 * TODO, in gpsql, temporary disable vacuum
+	 */
+	/*if (doVacuum)*/
+	if (FALSE)
 	{
 		/**
 		 * Perform vacuum.
@@ -432,11 +436,6 @@ vacuumStatement(VacuumStmt *vacstmt, List *relids)
 
 			bTemp = false;
 			
-			if (Gp_role == GP_ROLE_DISPATCH)
-			{
-				/* Set up the distributed transaction context. */
-				setupRegularDtxContext();
-			}
 			/*
 			 * Decide whether we need to start/commit our own transactions.
 			 *
@@ -652,20 +651,6 @@ vacuumStatement(VacuumStmt *vacstmt, List *relids)
 	/* Turn off vacuum cost accounting */
 	VacuumCostActive = false;
 
-	/*
-	 * Finish up processing.
-	 * This matches the CommitTransaction waiting for us in
-	 * PostgresMain().
-	 *
-	 * MPP-7632 and MPP-7984: if we're in a vacuum analyze we need to
-	 * make sure that this transaction we're in has the right
-	 * properties
-	 */
-	if (Gp_role == GP_ROLE_DISPATCH)
-	{
-		/* Set up the distributed transaction context. */
-		setupRegularDtxContext();
-	}
 	StartTransactionCommand();
 
 	/*

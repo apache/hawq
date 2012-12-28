@@ -396,7 +396,7 @@ class GpStart:
         logger.info("Obtaining Greenplum Master catalog information")
 
         logger.info("Obtaining Segment details from master...")
-        self.dburl = dbconn.DbURL(port=self.port,dbname='template1')
+        self.dburl = dbconn.DbURL(port=self.port,dbname='template0')
         self.gparray = GpArray.initFromCatalog(self.dburl, utility=True)
 
         logger.debug("Gathering collation settings...")

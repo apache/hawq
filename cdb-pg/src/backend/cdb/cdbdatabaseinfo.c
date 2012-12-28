@@ -572,6 +572,7 @@ static bool DatabaseInfo_AddGpRelationNode(
 	HTAB 				*dbInfoRelHashTable,
 	Oid					relfilenode,
 	int32				segmentFileNum,
+	int32				contentid,
 	ItemPointer			persistentTid,
 	int64				persistentSerialNum,
 	ItemPointer			gpRelationNodeTid)
@@ -626,6 +627,7 @@ static bool DatabaseInfo_AddGpRelationNode(
 	dbInfoGpRelationNode->gpRelationNodeTid = *gpRelationNodeTid;
 	dbInfoGpRelationNode->relfilenodeOid = relfilenode;
 	dbInfoGpRelationNode->segmentFileNum = segmentFileNum;
+	dbInfoGpRelationNode->contentid = contentid;
 	dbInfoGpRelationNode->persistentTid = *persistentTid;
 	dbInfoGpRelationNode->persistentSerialNum = persistentSerialNum;
 	dbInfoGpRelationNode->logicalEof = 0;	// This will obtained from the other sources later (e.g. aoseg / aocsseg).
@@ -947,6 +949,7 @@ DatabaseInfo_CollectGpRelationNode(
 
 		Oid				relfilenode;
 		int32			segmentFileNum;
+		int32			contentid;
 		int64			createMirrorDataLossTrackingSessionNum;
 		ItemPointerData	persistentTid;
 		int64			persistentSerialNum;
@@ -957,6 +960,7 @@ DatabaseInfo_CollectGpRelationNode(
 							values,
 							&relfilenode,
 							&segmentFileNum,
+							&contentid,
 							&createMirrorDataLossTrackingSessionNum,
 							&persistentTid,
 							&persistentSerialNum);
@@ -966,6 +970,7 @@ DatabaseInfo_CollectGpRelationNode(
 									dbInfoRelHashTable,
 									relfilenode,
 									segmentFileNum,
+									contentid,
 									&persistentTid,
 									persistentSerialNum,
 									&tuple->t_self))
@@ -1046,10 +1051,13 @@ DatabaseInfo_HandleAppendOnly(
 
 				Relation pg_aoseg_rel;
 
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support CREATE DATABASE statement if template1 changed in GPSQL") ));
+
 				pg_aoseg_rel = 
 						DirectOpen_PgAoSegOpenDynamic(
 											aoEntry->segrelid,
-											dbInfoRel->reltablespace,
+											MyDatabaseTableSpace,
 											info->database,
 											aosegDbInfoRel->relfilenodeOid);
 				
@@ -1080,7 +1088,7 @@ DatabaseInfo_HandleAppendOnly(
 				pg_aocsseg_rel =
 						DirectOpen_PgAoCsSegOpenDynamic(
 											aoEntry->segrelid,
-											dbInfoRel->reltablespace,
+											MyDatabaseTableSpace,
 											info->database,
 											aosegDbInfoRel->relfilenodeOid);
 				
@@ -1404,6 +1412,14 @@ DatabaseInfo_Collect(
 	info->parentlessGpRelationNodesMaxCount = 10;
 	info->parentlessGpRelationNodes =  \
 		palloc0(info->parentlessGpRelationNodesMaxCount*sizeof(DbInfoGpRelationNode));
+
+	/* 
+	 * During the init process, the tempalte0 and postgres are a little special,
+	 * they exist only on the local. But the others will be on hdfs and local!.
+	 * XXX:mat3: I'll change this later.
+	 */
+	if (defaultTablespace != DEFAULTTABLESPACE_OID)
+		DatabaseInfo_AddTablespace(info, DEFAULTTABLESPACE_OID);
 
 	/* 
 	 * Start Collecting information: 

@@ -45,7 +45,9 @@ extern char *default_tablespace;
 #include "libpq/ip.h"
 
 #include "utils/guc_tables.h"
-
+#include "commands/dbcommands.h"
+#include "catalog/pg_authid.h"
+#include "utils/lsyscache.h"
 
 #define MAX_CACHED_1_GANGS 1
 /*
@@ -229,6 +231,14 @@ create_gang_retry:
 		/* Using a named portal */
 		portal = GetPortalByName(portal_name);
 		Assert(portal);
+	}
+
+	/* GPSQL: it is safe to access the catalog. */
+	if (GpIdentity.segindex == MASTER_CONTENT_ID)
+	{
+		MyProcPort->dboid = MyDatabaseId;
+		MyProcPort->bootstrap_user = get_rolname(BOOTSTRAP_SUPERUSERID);
+		MyProcPort->encoding = GetDatabaseEncoding();
 	}
 
 	connectAsSuperUser = superuser_arg(MyProc->roleId);
@@ -1050,6 +1060,12 @@ addOptions(PQExpBufferData *buffer, bool iswriter, int segindex, bool i_am_super
 			if (!fOK)
 				return -i;
 		}
+	}
+
+	/* GPSQL needs to dispatch the database/user gucs. */
+	if (GpIdentity.segindex == MASTER_CONTENT_ID && MyProcPort->override_options.len)
+	{
+		appendPQExpBuffer(buffer, " %s", MyProcPort->override_options.data);
 	}
 
 	appendPQExpBuffer(buffer, "' ");

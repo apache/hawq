@@ -114,6 +114,7 @@ void GpPersistentRelationNode_GetValues(
 	Oid 									*databaseOid,
 	Oid 									*relfilenodeOid,
 	int32									*segmentFileNum,
+	int32									*contentid,
 	PersistentFileSysRelStorageMgr			*relationStorageManager,
 	PersistentFileSysState					*persistentState,
 	int64									*createMirrorDataLossTrackingSessionNum,
@@ -171,6 +172,10 @@ void GpPersistentRelationNode_GetValues(
 
 	*sharedStorage = DatumGetBool(values[Anum_gp_persistent_relation_node_shared_storage - 1]);
 
+	*contentid = DatumGetInt32(values[Anum_gp_persistent_relation_node_contentid - 1]);
+
+	Assert(*contentid >= MASTER_CONTENT_ID);
+
 }
 
 void GpPersistentRelationNode_SetDatumValues(
@@ -180,6 +185,7 @@ void GpPersistentRelationNode_SetDatumValues(
 	Oid 							databaseOid,
 	Oid 							relfilenodeOid,
 	int32							segmentFileNum,
+	int32							contentid,
 	PersistentFileSysRelStorageMgr	relationStorageManager,
 	PersistentFileSysState			persistentState,
 	int64							createMirrorDataLossTrackingSessionNum,
@@ -200,6 +206,8 @@ void GpPersistentRelationNode_SetDatumValues(
 	if (persistentState != PersistentFileSysState_Free && !PersistentFileSysRelStorageMgr_IsValid(relationStorageManager))
 		elog(ERROR, "Invalid value for relation storage manager (%d)",
 		     relationStorageManager);
+
+	Assert(contentid >= MASTER_CONTENT_ID);
 
 	values[Anum_gp_persistent_relation_node_tablespace_oid - 1] = 
 									ObjectIdGetDatum(tablespaceOid);
@@ -258,11 +266,15 @@ void GpPersistentRelationNode_SetDatumValues(
 
 	values[Anum_gp_persistent_relation_node_shared_storage - 1] = 
 									BoolGetDatum(sharedStorage);
+
+	values[Anum_gp_persistent_relation_node_contentid - 1] =
+										Int32GetDatum(contentid);
 }
 
 void GpPersistentDatabaseNode_GetValues(
 	Datum							*values,
 
+	int4							*contentid,
 	Oid 							*tablespaceOid,
 	Oid 							*databaseOid,
 	PersistentFileSysState			*persistentState,
@@ -274,6 +286,8 @@ void GpPersistentDatabaseNode_GetValues(
 	ItemPointerData 				*previousFreeTid,
 	bool							*sharedStorage)
 {
+	*contentid = DatumGetInt32(values[Anum_gp_persistent_database_node_content_id - 1]);
+
     *tablespaceOid = DatumGetObjectId(values[Anum_gp_persistent_database_node_tablespace_oid - 1]);
 
     *databaseOid = DatumGetObjectId(values[Anum_gp_persistent_database_node_database_oid - 1]);
@@ -299,6 +313,7 @@ void GpPersistentDatabaseNode_GetValues(
 void GpPersistentDatabaseNode_SetDatumValues(
 	Datum							*values,
 
+	int4							contentid,
 	Oid 							tablespaceOid,
 	Oid 							databaseOid,
 	PersistentFileSysState			persistentState,
@@ -310,6 +325,8 @@ void GpPersistentDatabaseNode_SetDatumValues(
 	ItemPointerData 				*previousFreeTid,
 	bool							sharedStorage)
 {
+	values[Anum_gp_persistent_database_node_content_id - 1] =
+									Int32GetDatum(contentid);
 	values[Anum_gp_persistent_database_node_tablespace_oid - 1] = 
 									ObjectIdGetDatum(tablespaceOid);
 	values[Anum_gp_persistent_database_node_database_oid - 1] = 
@@ -343,6 +360,7 @@ void GpPersistentDatabaseNode_SetDatumValues(
 void GpPersistentTablespaceNode_GetValues(
 	Datum							*values,
 
+	int4							*contentid,
 	Oid 							*filespaceOid,
 	Oid 							*tablespaceOid,
 	PersistentFileSysState			*persistentState,
@@ -354,6 +372,8 @@ void GpPersistentTablespaceNode_GetValues(
 	ItemPointerData 				*previousFreeTid,
 	bool							*sharedStorage)
 {
+	*contentid = DatumGetInt32(values[Anum_gp_persistent_tablespace_node_content_id - 1]);
+
     *filespaceOid = DatumGetObjectId(values[Anum_gp_persistent_tablespace_node_filespace_oid - 1]);
 
     *tablespaceOid = DatumGetObjectId(values[Anum_gp_persistent_tablespace_node_tablespace_oid - 1]);
@@ -379,6 +399,7 @@ void GpPersistentTablespaceNode_GetValues(
 void GpPersistentTablespaceNode_SetDatumValues(
 	Datum							*values,
 
+	int4							contentid,
 	Oid 							filespaceOid,
 	Oid 							tablespaceOid,
 	PersistentFileSysState			persistentState,
@@ -390,6 +411,9 @@ void GpPersistentTablespaceNode_SetDatumValues(
 	ItemPointerData 				*previousFreeTid,
 	bool							sharedStorage)
 {
+	values[Anum_gp_persistent_tablespace_node_content_id - 1] = 
+										Int32GetDatum(contentid);
+
 	values[Anum_gp_persistent_tablespace_node_filespace_oid - 1] = 
 									ObjectIdGetDatum(filespaceOid);
 
@@ -425,6 +449,7 @@ void GpPersistentFilespaceNode_GetValues(
 	Datum							*values,
 
 	Oid 							*filespaceOid,
+	int4							*contentid,
 	int16							*dbId1,
 	char							locationBlankPadded1[FilespaceLocationBlankPaddedWithNullTermLen],
 	int16							*dbId2,
@@ -442,6 +467,8 @@ void GpPersistentFilespaceNode_GetValues(
 	int locationLen;
 
     *filespaceOid = DatumGetObjectId(values[Anum_gp_persistent_filespace_node_filespace_oid - 1]);
+
+	*contentid = DatumGetInt32(values[Anum_gp_persistent_filespace_node_content_id - 1]);
 
     *dbId1 = DatumGetInt16(values[Anum_gp_persistent_filespace_node_db_id_1 - 1]);
 
@@ -487,6 +514,7 @@ void GpPersistentFilespaceNode_SetDatumValues(
 	Datum							*values,
 
 	Oid 							filespaceOid,
+	int4							contentid,
 	int16							dbId1,
 	char							locationBlankPadded1[FilespaceLocationBlankPaddedWithNullTermLen],
 	int16							dbId2,
@@ -516,6 +544,9 @@ void GpPersistentFilespaceNode_SetDatumValues(
 
 	values[Anum_gp_persistent_filespace_node_filespace_oid - 1] = 
 									ObjectIdGetDatum(filespaceOid);
+
+	values[Anum_gp_persistent_filespace_node_content_id - 1] = 
+									ObjectIdGetDatum(contentid);
 
 	values[Anum_gp_persistent_filespace_node_db_id_1 - 1] = 
 									Int16GetDatum(dbId1);
@@ -575,6 +606,7 @@ void GpPersistent_GetCommonValues(
 		{
 			RelFileNode 					relFileNode;
 			int32 							segmentFileNum;
+			int32							contentid;
 
 			PersistentFileSysRelStorageMgr	relationStorageManager;
 			MirroredRelDataSynchronizationState mirrorDataSynchronizationState;
@@ -592,6 +624,7 @@ void GpPersistent_GetCommonValues(
 											&relFileNode.dbNode,
 											&relFileNode.relNode,
 											&segmentFileNum,
+											&contentid,
 											&relationStorageManager,
 											persistentState,
 											&createMirrorDataLossTrackingSessionNum,
@@ -613,6 +646,7 @@ void GpPersistent_GetCommonValues(
 												fsObjName,
 												&relFileNode,
 												segmentFileNum,
+												contentid,
 												NULL);
 			fsObjName->hasInited = true;
 			fsObjName->sharedStorage = sharedStorage;
@@ -622,10 +656,12 @@ void GpPersistent_GetCommonValues(
 
 	case PersistentFsObjType_DatabaseDir:
 		{
+			int4	contentid;
 			DbDirNode dbDirNode;
 
 			GpPersistentDatabaseNode_GetValues(
 									values,
+									&contentid,
 									&dbDirNode.tablespace,
 									&dbDirNode.database,
 									persistentState,
@@ -644,16 +680,19 @@ void GpPersistent_GetCommonValues(
 											NULL);
 			fsObjName->hasInited = true;
 			fsObjName->sharedStorage = sharedStorage;
+			fsObjName->contentid = contentid;
 		}
 		break;
 
 	case PersistentFsObjType_TablespaceDir:
 		{
+			int4 contentid;
 			Oid tablespaceOid;
 			Oid filespaceOid;
 
 			GpPersistentTablespaceNode_GetValues(
 											values,
+											&contentid,
 											&filespaceOid,
 											&tablespaceOid,
 											persistentState,
@@ -669,6 +708,7 @@ void GpPersistent_GetCommonValues(
 												fsObjName, 
 												tablespaceOid,
 												NULL);
+			fsObjName->contentid = contentid;
 			fsObjName->hasInited = true;
 			fsObjName->sharedStorage = sharedStorage;
 		}
@@ -677,6 +717,7 @@ void GpPersistent_GetCommonValues(
 	case PersistentFsObjType_FilespaceDir:
 		{
 			Oid filespaceOid;
+			int4	contentid;
 			int16 dbId1;
 			char locationBlankPadded1[FilespaceLocationBlankPaddedWithNullTermLen];
 			int16 dbId2;
@@ -685,6 +726,7 @@ void GpPersistent_GetCommonValues(
 			GpPersistentFilespaceNode_GetValues(
 											values,
 											&filespaceOid,
+											&contentid,
 											&dbId1,
 											locationBlankPadded1,
 											&dbId2,
@@ -702,8 +744,10 @@ void GpPersistent_GetCommonValues(
 												fsObjName, 
 												filespaceOid,
 												NULL);
+			/* XXX:mat3: */
 			fsObjName->hasInited = true;
 			fsObjName->sharedStorage = sharedStorage;
+			fsObjName->contentid = contentid;
 		}
 	break;
 
@@ -719,6 +763,7 @@ void GpRelationNode_GetValues(
 
 	Oid 							*relfilenodeOid,
 	int32							*segmentFileNum,
+	int32							*contentid,
 	int64							*createMirrorDataLossTrackingSessionNum,
 	ItemPointer		 				persistentTid,
 	int64							*persistentSerialNum)
@@ -733,6 +778,10 @@ void GpRelationNode_GetValues(
 
 	*persistentSerialNum = DatumGetInt64(values[Anum_gp_relation_node_persistent_serial_num - 1]);
 
+	*contentid = DatumGetInt32(values[Anum_gp_relation_node_contentid - 1]);
+
+	Assert(*contentid >= MASTER_CONTENT_ID);
+
 }
 
 void GpRelationNode_SetDatumValues(
@@ -740,10 +789,13 @@ void GpRelationNode_SetDatumValues(
 
 	Oid 							relfilenodeOid,
 	int32							segmentFileNum,
+	int32							contentid,
 	int64							createMirrorDataLossTrackingSessionNum,
 	ItemPointer		 				persistentTid,
 	int64							persistentSerialNum)
 {
+	Assert(contentid >= MASTER_CONTENT_ID);
+
 	values[Anum_gp_relation_node_relfilenode_oid - 1] = 
 									ObjectIdGetDatum(relfilenodeOid);
 
@@ -758,5 +810,8 @@ void GpRelationNode_SetDatumValues(
 	
 	values[Anum_gp_relation_node_persistent_serial_num - 1] = 
 									Int64GetDatum(persistentSerialNum);
+
+	values[Anum_gp_relation_node_contentid - 1] =
+										Int32GetDatum(contentid);
 }
 

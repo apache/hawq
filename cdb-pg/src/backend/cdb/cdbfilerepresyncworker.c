@@ -393,7 +393,7 @@ FileRepPrimary_ResyncWrite(FileRepResyncHashEntry_s	*entry)
 		{
 			MirroredAppendOnlyOpen	mirroredOpen;
 			int						primaryError;
-			bool					mirrorDataLossOccurred;
+			/*bool					mirrorDataLossOccurred;*/
 			char					*buffer = NULL;
 			int64					endOffset = entry->mirrorAppendOnlyNewEof;
 			int64					startOffset = entry->mirrorAppendOnlyLossEof;
@@ -418,13 +418,18 @@ FileRepPrimary_ResyncWrite(FileRepResyncHashEntry_s	*entry)
 					 * The MirroredAppendOnly_OpenResynchonize routine knows we are a resynch worker and
 					 * will open BOTH, but write only the MIRROR!!!
 					 */
-					MirroredAppendOnly_OpenResynchonize(
+					/*MirroredAppendOnly_OpenResynchonize(
 											&mirroredOpen, 
 											&entry->relFileNode,
 											entry->segmentFileNum,
 											startOffset,
 											&primaryError,
-											&mirrorDataLossOccurred);
+											&mirrorDataLossOccurred);*/
+					/*
+					 * in gpsql, no mirror is configured,
+					 * TODO, should be cleaned in the future.
+					 */
+					primaryError = EIO;
 					if (primaryError != 0)
 					{
 						ereport(ERROR,
@@ -439,8 +444,8 @@ FileRepPrimary_ResyncWrite(FileRepResyncHashEntry_s	*entry)
 						break;
 					}
 
-					if (mirrorDataLossOccurred)
-						break;
+					/*if (mirrorDataLossOccurred)
+						break;*/
 					
 					/* AO and CO Data Store writes 64k size by default */
 					bufferLen = (Size) Min(2*BLCKSZ, endOffset - startOffset);
@@ -477,11 +482,11 @@ FileRepPrimary_ResyncWrite(FileRepResyncHashEntry_s	*entry)
 											  &mirroredOpen,
 											  buffer,
 											  bufferLen,
-											  &primaryError,
-											  &mirrorDataLossOccurred);
+											  &primaryError/*,
+											  &mirrorDataLossOccurred*/);
 						
-						if (mirrorDataLossOccurred)
-							break;
+						/*if (mirrorDataLossOccurred)
+							break;*/
 
 						Assert(primaryError == 0);	// No primary writes as resync worker.
 						
@@ -496,23 +501,23 @@ FileRepPrimary_ResyncWrite(FileRepResyncHashEntry_s	*entry)
 						buffer = NULL;
 					}
 					
-					if (mirrorDataLossOccurred)
-						break;
+					/*if (mirrorDataLossOccurred)
+						break;*/
 					
 					/* Flush written data on Mirror */
 					MirroredAppendOnly_Flush(
 										&mirroredOpen,
-										&primaryError,
-										&mirrorDataLossOccurred);
-					if (mirrorDataLossOccurred)
-						break;
+										&primaryError/*,
+										&mirrorDataLossOccurred*/);
+					/*if (mirrorDataLossOccurred)
+						break;*/
 					
 					Assert(primaryError == 0);	// Not flushed on primary as resync worker.
 					
 					/* Close Primary and Mirror */
 					MirroredAppendOnly_Close(
-										&mirroredOpen,
-										&mirrorDataLossOccurred);
+										&mirroredOpen/*,
+										&mirrorDataLossOccurred*/);
 								
 					break;
 					

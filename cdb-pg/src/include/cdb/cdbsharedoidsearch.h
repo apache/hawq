@@ -40,6 +40,7 @@ typedef struct SharedOidSearchObjHeader
 
 	Oid	oid1;
 	Oid oid2;
+	Oid oid3;
 
 	uint8	clientData[];
 } SharedOidSearchObjHeader;
@@ -104,16 +105,19 @@ extern SharedOidSearchAddResult SharedOidSearch_Add(
 	SharedOidSearchTable 		*table,
 	Oid 						oid1,
 	Oid 						oid2,
+	Oid							oid3,
 	SharedOidSearchObjHeader	**header);
 
 extern SharedOidSearchObjHeader *SharedOidSearch_Find(
 	SharedOidSearchTable 	*table,
 	Oid 					oid1,
-	Oid 					oid2);
+	Oid 					oid2,
+	Oid						oid3);
 
 extern SharedOidSearchObjHeader *SharedOidSearch_Probe(
 	SharedOidSearchTable 	*table,
-	Oid 					oid1);
+	Oid 					oid1,
+	Oid						oid2);
 
 extern void SharedOidSearch_Iterate(
 	SharedOidSearchTable 		*table,

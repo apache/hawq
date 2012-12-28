@@ -257,7 +257,6 @@ def delete_cluster(options):
 #-------------------------------------------------------------------------
 # main 
 #-------------------------------------------------------------------------
-
 g_warnings_generated = False
 g_errors_generated = False
 
@@ -267,6 +266,9 @@ coverage.start()
 # setup logging
 logger = get_default_logger()
 setup_tool_logging(EXECNAME,unix.getLocalHostname(),unix.getUserName())
+
+logger.fatal('DELETE SYSTEM NOT SUPPORTED YET IN GPSQL')
+sys.exit(2)
 
 # parse args and options
 (options, args) = parseargs()

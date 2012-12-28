@@ -292,7 +292,6 @@ static void ShowTransactionState(const char *str);
 static void ShowTransactionStateRec(TransactionState state);
 static const char *BlockStateAsString(TBlockState blockState);
 static const char *TransStateAsString(TransState state);
-static void DispatchRollbackToSavepoint(char *name);
 
 static bool search_binary_xids(TransactionId *ids, uint32 size,
 			       TransactionId xid, int32 *index);
@@ -4195,7 +4194,10 @@ AbortTransaction(void)
 	 * Do abort to all QE. NOTE: we don't process
 	 * signals to prevent recursion until we've notified the QEs.
 	 */
-	rollbackDtxTransaction();
+	/*
+	 * no distributed transaction in gpsql
+	 */
+	/*rollbackDtxTransaction();*/
 
 	if (!LocalDistribXactRef_IsNil(&localDistribXactRef))
 	{
@@ -4277,7 +4279,10 @@ CleanupTransaction(void)
 	 */
 	s->state = TRANS_DEFAULT;
 
-	finishDistributedTransactionContext("CleanupTransaction", true);
+	/*
+	 * no distributed transaction in gpsql
+	 */
+	/*finishDistributedTransactionContext("CleanupTransaction", true);*/
 
 }
 
@@ -4573,11 +4578,6 @@ CommitTransactionCommand(void)
 			AbortSubTransaction();
 			CleanupSubTransaction();
 
-			if (Gp_role == GP_ROLE_DISPATCH)
-			{
-				DispatchRollbackToSavepoint(name);
-			}
-
 			DefineSavepoint(name);
 			s = CurrentTransactionState;	/* changed by push */
 			if (name)
@@ -4608,11 +4608,6 @@ CommitTransactionCommand(void)
 			savepointLevel = s->savepointLevel;
 
 			CleanupSubTransaction();
-
-			if (Gp_role == GP_ROLE_DISPATCH)
-			{
-				DispatchRollbackToSavepoint(name);
-			}
 
 			DefineSavepoint(name);
 			s = CurrentTransactionState;	/* changed by push */
@@ -5434,40 +5429,6 @@ DefineDispatchSavepoint(char *name)
 			    BlockStateAsString(s->blockState));
 	}	
 
-	/* First we attempt to create on the QEs */
-	if (Gp_role == GP_ROLE_DISPATCH)
-	{
-		char	   *cmd = NULL;
-		bool		freecmd;
-
-		if (name != NULL)
-		{
-			cmd = palloc(sizeof("SAVEPOINT ") + strlen(name));
-			Assert(cmd != NULL);
-			if (cmd == NULL)
-				elog(ERROR, "Can't define savepoint name too long (%s)", name);
-			sprintf(cmd, "SAVEPOINT %s", name);
-			freecmd = true;
-		}
-		else
-		{
-			cmd = "SAVEPOINT";
-			freecmd = false;
-		}
-
-		/*
-		 * dispatch a DTX command, in the event of an error, this call
-		 * will either exit via elog()/ereport() or return false
-		 */
-		if (!dispatchDtxCommand(cmd, /* withSnapshot */ false, /* raiseError */ false))
-		{
-			elog(ERROR, "Could not create a new savepoint (%s)", cmd);
-		}
-
-		if (freecmd)
-			pfree(cmd);
-	}
-
 	DefineSavepoint(name);
 }
 
@@ -5584,39 +5545,6 @@ ReleaseSavepoint(List *options)
 	}
 
 	Assert(PointerIsValid(name));
-
-	if (Gp_role == GP_ROLE_DISPATCH)
-	{
-		char	   *cmd = NULL;
-		bool		freecmd;
-
-		if (name != NULL)
-		{
-			cmd = palloc(sizeof("RELEASE SAVEPOINT ") + strlen(name));
-			Assert(cmd != NULL);
-			if (cmd == NULL)
-				elog(ERROR, "Can't release savepoint name too long (%s)", name);
-			sprintf(cmd, "RELEASE SAVEPOINT %s", name);
-			freecmd = true;
-		}
-		else
-		{
-			cmd = "RELEASE SAVEPOINT";
-			freecmd = false;
-		}
-
-		/*
-		 * dispatch a DTX command, in the event of an error, this call will
-		 * either exit via elog()/ereport() or return false
-		 */
-		if (!dispatchDtxCommand(cmd, /* withSnapshot*/ false, /* raiseError */ false))
-		{
-			elog(ERROR, "Could not release savepoint (%s)", cmd);
-		}
-
-		if (freecmd)
-			pfree(cmd);
-	}
 
 	for (target = s; PointerIsValid(target); target = target->parent)
 	{
@@ -5763,41 +5691,6 @@ RollbackToSavepoint(List *options)
 		elog(FATAL, "RollbackToSavepoint: unexpected state %s",
 			 BlockStateAsString(xact->blockState));
 }
-
-static void
-DispatchRollbackToSavepoint(char *name)
-{
-	char	   *cmd;
-	bool		freecmd;
-
-	if (name != NULL)
-	{
-		cmd = palloc(sizeof("ROLLBACK TO SAVEPOINT ") + strlen(name));
-		Assert(cmd != NULL);
-		if (cmd == NULL)
-			elog(ERROR, "Can't rollback to savepoint, name too long (%s)", name);
-		sprintf(cmd, "ROLLBACK TO SAVEPOINT %s", name);
-		freecmd = true;
-	}
-	else
-	{
-		cmd = "ROLLBACK TO SAVEPOINT";
-		freecmd = false;
-	}
-
-	/*
-	 * dispatch a DTX command, in the event of an error, this call will
-	 * either exit via elog()/ereport() or return false
-	 */
-	if (!dispatchDtxCommand(cmd, /* withSnapshot */ false, /* raiseError */ false))
-	{
-		elog(ERROR, "Could not rollback to savepoint (%s)", cmd);
-	}
-
-	if (freecmd)
-		pfree(cmd);
-}
-
 
 /*
  * BeginInternalSubTransaction

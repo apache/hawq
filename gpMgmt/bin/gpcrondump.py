@@ -44,6 +44,8 @@ logger = gplog.get_default_logger()
 
 class GpCronDump(Operation):
     def __init__(self, options, args):
+    	raise ExceptionNoStackTraceNeeded("gpcrondump NOT SUPPORTED YET IN GPSQL")
+    
         if args:
             logger.warn("please note that some of the arguments (%s) aren't valid and will be ignored.", args)
         if options.masterDataDirectory is None:

@@ -39,6 +39,9 @@
 
 #include "cdb/cdbtm.h"
 #include "cdb/cdbvars.h"
+#include "cdb/cdbsrlz.h"
+
+#include "cdb/cdbinmemheapam.h"
 
 void AddQEWriterTransactionInfo(StringInfo buf);
 
@@ -174,6 +177,19 @@ EndCommand(const char *commandTag, CommandDest dest)
 
 				pq_beginmessage(&buf, 'g');
 				pq_sendstring(&buf, commandTag);
+
+				/*
+				 * if the catalogs have been inserted/updated/deleted on QE,
+				 * send them back to QD.
+				 */
+				pq_sendint(&buf, WriteBackCatalogLen, sizeof(int32));
+				if (WriteBackCatalogLen > 0)
+				{
+					pq_sendbytes(&buf, WriteBackCatalogs, WriteBackCatalogLen);
+					pfree(WriteBackCatalogs);
+					WriteBackCatalogs = NULL;
+					WriteBackCatalogLen = 0;
+				}
 
 				AddQEWriterTransactionInfo(&buf);
 
@@ -369,3 +385,4 @@ sendQEDetails(void)
 	pq_sendbytes(&buf, PG_VERSION_STR, sizeof(PG_VERSION_STR));
 	pq_endmessage(&buf);
 }
+

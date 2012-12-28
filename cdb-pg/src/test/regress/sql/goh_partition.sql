@@ -1,5 +1,3 @@
-\c hdfs
-
 set enable_partition_rules = false;
 set gp_enable_hash_partitioned_tables = true;
 
@@ -684,49 +682,6 @@ select min(d), max(d) from foz_1_prt_3;
 select min(d), max(d) from foz_1_prt_4;
 
 
-drop table foz cascade;
-
--- copy test
-create table foz (i int, d date) distributed by (i)
-partition by range (d) (start (date '2001-01-01') end (date '2005-01-01')
-every(interval '1 year'));
-COPY foz FROM stdin DELIMITER '|';
-1|2001-01-2
-2|2001-10-10
-3|2002-10-30
-4|2003-01-01
-5|2004-05-05
-\.
-select * from foz_1_prt_1;
-select * from foz_1_prt_2;
-select * from foz_1_prt_3;
-select * from foz_1_prt_4;
-
--- Check behaviour of key for which there is no partition
-COPY foz FROM stdin DELIMITER '|';
-6|2010-01-01
-\.
-drop table foz cascade;
--- Same test with append only
-create table foz (i int, d date) with (appendonly = true) distributed by (i)
-partition by range (d) (start (date '2001-01-01') end (date '2005-01-01')
-every(interval '1 year'));
-COPY foz FROM stdin DELIMITER '|';
-1|2001-01-2
-2|2001-10-10
-3|2002-10-30
-4|2003-01-01
-5|2004-05-05
-\.
-select * from foz_1_prt_1;
-select * from foz_1_prt_2;
-select * from foz_1_prt_3;
-select * from foz_1_prt_4;
-
--- Check behaviour of key for which there is no partition
-COPY foz FROM stdin DELIMITER '|';
-6|2010-01-01
-\.
 drop table foz cascade;
 
 

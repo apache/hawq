@@ -90,7 +90,6 @@ static int	port = -1;
 static char *user = NULL;
 static char *srcdir = NULL;
 static _stringlist *extraroles = NULL;
-static char *tablespace = "";
 
 /* internal variables */
 static const char *progname;
@@ -1852,9 +1851,13 @@ drop_database_if_exists(const char *dbname)
 	psql_command("postgres", "DROP DATABASE IF EXISTS \"%s\"", dbname);
 }
 
+/*
+ * TODO: change this function back after "alter database" and "create language" are supported
+ */
 static void
 create_database(const char *dbname)
 {
+
 	_stringlist *sl;
 
 	/*
@@ -1863,9 +1866,9 @@ create_database(const char *dbname)
 	 */
 	header(_("creating database \"%s\""), dbname);
 	if (encoding && strlen(encoding) > 0)
-		psql_command("postgres", "CREATE DATABASE \"%s\" TEMPLATE=template0 ENCODING='%s' %s", dbname, encoding, tablespace);
+		psql_command("postgres", "CREATE DATABASE \"%s\" TEMPLATE=template0 TABLESPACE=dfs_default ENCODING='%s'", dbname, encoding);
 	else
-		psql_command("postgres", "CREATE DATABASE \"%s\" TEMPLATE=template0 %s", dbname, tablespace);
+		psql_command("postgres", "CREATE DATABASE \"%s\" TEMPLATE=template0 TABLESPACE=dfs_default", dbname);
 	psql_command(dbname,
 				 "ALTER DATABASE \"%s\" SET lc_messages TO 'C';"
 				 "ALTER DATABASE \"%s\" SET lc_monetary TO 'C';"
@@ -1873,7 +1876,6 @@ create_database(const char *dbname)
 				 "ALTER DATABASE \"%s\" SET lc_time TO 'C';"
 			"ALTER DATABASE \"%s\" SET timezone_abbreviations TO 'Default';",
 				 dbname, dbname, dbname, dbname, dbname);
-
 	/*
 	 * Install any requested procedural languages
 	 */
@@ -2001,7 +2003,6 @@ regression_main(int argc, char *argv[], init_function ifunc, test_function tfunc
 		{"psqldir", required_argument, NULL, 16},
 		{"srcdir", required_argument, NULL, 17},
 		{"create-role", required_argument, NULL, 18},
-		{"tablespace", required_argument, NULL, 19},
 		{NULL, 0, NULL, 0}
 	};
 
@@ -2096,16 +2097,6 @@ regression_main(int argc, char *argv[], init_function ifunc, test_function tfunc
 				break;
 			case 18:
 				split_to_stringlist(strdup(optarg), ", ", &extraroles);
-				break;
-			case 19:
-				tablespace = malloc(11 + strlen(optarg) + 1);
-				if (!tablespace)
-				{
-					fprintf(stderr, _("out of memory.\n"));
-					exit_nicely(2);
-				}
-				snprintf(tablespace, 11 + strlen(optarg) + 1,
-						"TABLESPACE %s", optarg);
 				break;
 			default:
 				/* getopt_long already emitted a complaint */

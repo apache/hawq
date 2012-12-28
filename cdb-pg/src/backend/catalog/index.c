@@ -697,9 +697,10 @@ index_create(Oid heapRelationId,
 							indexRelation->rd_rel->relname.data,
 							indexRelation->rd_rel->relfilenode,
 							/* segmentFileNum */ 0,
+							MASTER_CONTENT_ID, /* use master's contentid for all heap table and index */
 							/* updateIndex */ true,
-							&indexRelation->rd_segfile0_relationnodeinfo.persistentTid,
-							indexRelation->rd_segfile0_relationnodeinfo.persistentSerialNum);
+							&indexRelation->rd_segfile0_relationnodeinfos[0].persistentTid,
+							indexRelation->rd_segfile0_relationnodeinfos[0].persistentSerialNum);
 	
 		heap_close(gp_relation_node, RowExclusiveLock);
 	}
@@ -982,8 +983,12 @@ index_drop(Oid indexId)
 	userIndexRelation = index_open(indexId, AccessExclusiveLock);
 
 
-	if (!userIndexRelation->rd_segfile0_relationnodeinfo.isPresent)
-		RelationFetchSegFile0GpRelationNode(userIndexRelation);
+	/*
+	 * TODO, in gpsql, only MASTER_CONTENT_ID is used here,
+	 * will changed later depends on the design of index.
+	 */
+	if (!userIndexRelation->rd_segfile0_relationnodeinfos[0].isPresent)
+		RelationFetchSegFile0GpRelationNode(userIndexRelation, MASTER_CONTENT_ID);
 
 	/*
 	 * Schedule physical removal of the files
@@ -992,7 +997,9 @@ index_drop(Oid indexId)
 
 	DeleteGpRelationNodeTuple(
 					userIndexRelation,
-					/* segmentFileNum */ 0);
+					/* segmentFileNum */ 0,
+					MASTER_CONTENT_ID /* use master contentid for all heap table and index*/
+					);
 	
 
 	/*

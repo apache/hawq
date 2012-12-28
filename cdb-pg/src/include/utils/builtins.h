@@ -418,7 +418,7 @@ extern Datum pg_relation_size_name(PG_FUNCTION_ARGS);
 extern Datum pg_total_relation_size_oid(PG_FUNCTION_ARGS);
 extern Datum pg_total_relation_size_name(PG_FUNCTION_ARGS);
 extern Datum pg_size_pretty(PG_FUNCTION_ARGS);
-extern Datum gp_statistics_estimate_reltuples_relpages_oid(PG_FUNCTION_ARGS);
+/*extern Datum gp_statistics_estimate_reltuples_relpages_oid(PG_FUNCTION_ARGS);*/
 
 /* genfile.c */
 extern Datum pg_stat_file(PG_FUNCTION_ARGS);

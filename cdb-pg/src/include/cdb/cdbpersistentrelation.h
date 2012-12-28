@@ -53,6 +53,8 @@ extern void PersistentRelation_AddCreatePending(
 
 	int32				segmentFileNum,
 
+	int32				contentid,
+
 	PersistentFileSysRelStorageMgr relStorageMgr,
 
 	PersistentFileSysRelBufpoolKind relBufpoolKind,
@@ -80,6 +82,8 @@ extern void PersistentRelation_AddCreated(
 				/* The tablespace, database, and relation OIDs for the create. */
 				
 	int32				segmentFileNum,
+
+	int32				contentid,
 				
 	PersistentFileSysRelStorageMgr relStorageMgr,
 	

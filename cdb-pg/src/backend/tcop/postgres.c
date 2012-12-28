@@ -93,6 +93,9 @@
 #include "cdb/cdbfilerep.h"
 #include "postmaster/primary_mirror_mode.h"
 
+#include "cdb/cdbinmemheapam.h"
+
+
 extern int	optind;
 extern char *optarg;
 
@@ -901,6 +904,7 @@ exec_mpp_query(const char *query_string,
 			   const char * serializedPlantree, int serializedPlantreelen,
 			   const char * serializedParams, int serializedParamslen,
 			   const char * serializedSliceInfo, int serializedSliceInfolen,
+			   const char * serializedCatalog, int serializedCataloglen,
 			   const char * seqServerHost, int seqServerPort,
 			   int localSlice)
 {
@@ -968,6 +972,15 @@ exec_mpp_query(const char *query_string,
 	
 	QueryContext = CurrentMemoryContext;
 	
+	InitOidInMemHeapMapping(10, MessageContext);
+
+	/*
+	 * some catalogs are dispatched from QD,
+	 * construct in-memory heap catalog tables from them;
+	 */
+	if (serializedCatalog != 0 && serializedCataloglen > 0)
+		deserializeAndRebuildInmemCatalog(serializedCatalog, serializedCataloglen);
+
 	/* 
 	 * Deserialize the Query node, if there is one.  If this is a planned stmt, then
 	 * there isn't one, but there must be a PlannedStmt later on.
@@ -1295,7 +1308,23 @@ exec_mpp_query(const char *query_string,
 						 completionTag);
 		
 		(*receiver->rDestroy) (receiver);
-		
+
+
+		/*
+		 * Send inserted/updated/deleted catalogs to QD
+		 */
+		MemoryContext old = MemoryContextSwitchTo(TopMemoryContext);
+		WriteBackCatalogs = serializeInMemCatalog(&WriteBackCatalogLen);
+		MemoryContextSwitchTo(old);
+
+		/*
+		 * cleanup all temporary in-memory heap table after each query
+		 * PortalDrop will release the resource owner,
+		 * should drop all in-memory heap table first.
+		 */
+		InMemHeap_DropAll();
+		CleanupOidInMemHeapMapping();
+
 		PortalDrop(portal, false);
 		
 		/*
@@ -1389,6 +1418,8 @@ exec_mpp_dtx_protocol_command(
 {
 	CommandDest dest = whereToSendOutput;
 	const char *commandTag = loggingStr;
+
+	Insist(!"in gpsql we should never get here");
 
 	if (log_statement == LOGSTMT_ALL)
 	{
@@ -1643,6 +1674,8 @@ exec_simple_query(const char *query_string, const char *seqServerHost, int seqSe
 		 */
 		oldcontext = MemoryContextSwitchTo(MessageContext);
 
+		InitOidInMemHeapMapping(10, MessageContext);
+
 		querytree_list = pg_analyze_and_rewrite(parsetree, query_string,
 												NULL, 0);
 
@@ -1726,6 +1759,14 @@ exec_simple_query(const char *query_string, const char *seqServerHost, int seqSe
 						 completionTag);
 
 		(*receiver->rDestroy) (receiver);
+
+		/*
+		 * cleanup all temporary in-memory heap table after each query
+		 * PortalDrop will release the resource owner,
+		 * should drop all in-memory heap table first.
+		 */
+		InMemHeap_DropAll();
+		CleanupOidInMemHeapMapping();
 
 		PortalDrop(portal, false);
 
@@ -4244,7 +4285,14 @@ PostgresMain(int argc, char *argv[], const char *username)
 	 */
 	ereport(DEBUG3,
 			(errmsg_internal("InitPostgres")));
-	am_superuser = InitPostgres(dbname, InvalidOid, username, NULL);
+
+	/* This is the initdb process */
+	if (GpIdentity.segindex == UNINITIALIZED_GP_IDENTITY_VALUE ||
+		GpIdentity.segindex == MASTER_CONTENT_ID ||
+		MyProcPort->bootstrap_user == NULL)
+		am_superuser = InitPostgres(dbname, InvalidOid, username, NULL);
+	else
+		am_superuser = InitPostgres("template0", InvalidOid, MyProcPort->bootstrap_user, NULL);
 
 	SetProcessingMode(NormalProcessing);
 	
@@ -4297,7 +4345,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 	 * likewise can't be done until GUC settings are complete)
 	 */
 	process_local_preload_libraries();
-	
+
 	/*
 	 * DA requires these be cleared at start
 	 */
@@ -4402,7 +4450,15 @@ PostgresMain(int argc, char *argv[], const char *username)
 			elog((Debug_print_full_dtm ? LOG : DEBUG5), "PostgresMain seeing cancel 0x%x",
 			     topErrCode);
 		}
-				
+
+		/*
+		 * cleanup all temporary in-memory heap table after each query
+		 * AbortCurrentTransaction will release the resource owner,
+		 * should drop all in-memory heap table first.
+		 */
+		InMemHeap_DropAll();
+		CleanupOidInMemHeapMapping();
+
 		/*
 		 * Abort the current transaction in order to recover.
 		 */
@@ -4411,9 +4467,9 @@ PostgresMain(int argc, char *argv[], const char *username)
 		topErrLevel = elog_getelevel();
 		if (topErrLevel <= ERROR)
 		{
-			/*
+		/*
 			 * Let's see if the DTM has phase 2 retry work.
-			 */
+		 */
 			if (Gp_role == GP_ROLE_DISPATCH)
 				doDtxPhase2Retry();
 		}
@@ -4607,7 +4663,10 @@ PostgresMain(int argc, char *argv[], const char *username)
 
 					elog((Debug_print_full_dtm ? LOG : DEBUG5), "Simple query stmt: %s.",query_string);
 
-					setupRegularDtxContext();
+					/*
+					 * in gpsql, there is no distributed transaction
+					 */
+					/*setupRegularDtxContext();*/
 
 					exec_simple_query(query_string, NULL, -1);
 
@@ -4630,6 +4689,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 					const char *serializedPlantree = NULL;
 					const char *serializedParams = NULL;
 					const char *serializedSliceInfo = NULL;
+					const char *serializedCatalog = NULL;
 					const char *seqServerHost = NULL;
 					
 					int query_string_len = 0;
@@ -4638,6 +4698,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 					int serializedPlantreelen = 0;
 					int serializedParamslen = 0;
 					int serializedSliceInfolen = 0;
+					int serializedCataloglen = 0;
 					int seqServerHostlen = 0;
 					int seqServerPort = -1;
 					
@@ -4707,8 +4768,11 @@ PostgresMain(int argc, char *argv[], const char *username)
 						serializedSnapshot, serializedSnapshotlen,
 						&TempDtxContextInfo);
 
+					serializedCataloglen = pq_getmsgint(&input_message, 4);
+
 					/* get the transaction options */
 					unusedFlags = pq_getmsgint(&input_message, 4);
+					Assert(0 == unusedFlags);
 
 					seqServerHostlen = pq_getmsgint(&input_message, 4);
 					seqServerPort = pq_getmsgint(&input_message, 4);
@@ -4728,6 +4792,9 @@ PostgresMain(int argc, char *argv[], const char *username)
 						
 					if (serializedSliceInfolen > 0)
 						serializedSliceInfo = pq_getmsgbytes(&input_message,serializedSliceInfolen);
+
+					if (serializedCataloglen > 0)
+						serializedCatalog = pq_getmsgbytes(&input_message,serializedCataloglen);
 
 					if (seqServerHostlen > 0)
 						seqServerHost = pq_getmsgbytes(&input_message, seqServerHostlen);
@@ -4785,6 +4852,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 									   serializedPlantree, serializedPlantreelen,
 									   serializedParams, serializedParamslen,
 									   serializedSliceInfo, serializedSliceInfolen,
+									   serializedCatalog, serializedCataloglen,
 									   seqServerHost, seqServerPort, localSlice);
 					
 					SetUserIdAndContext(GetOuterUserId(), false);
@@ -4886,7 +4954,10 @@ PostgresMain(int argc, char *argv[], const char *username)
 
 					elog((Debug_print_full_dtm ? LOG : DEBUG5), "Parse: %s.",query_string);
 
-					setupRegularDtxContext();
+					/*
+					 *  in gpsql, there is no distributed transaction
+					 */
+					/*setupRegularDtxContext();*/
 					
 					exec_parse_message(query_string, stmt_name,
 									   paramTypes, numParams);
@@ -4903,7 +4974,10 @@ PostgresMain(int argc, char *argv[], const char *username)
 				/* Set statement_timestamp() */
 				SetCurrentStatementStartTimestamp();
 
-                setupRegularDtxContext();
+				/*
+				 *  in gpsql, there is no distributed transaction
+				 */
+                /*setupRegularDtxContext();*/
                 
 				/*
 				 * this message is complex enough that it seems best to put
@@ -4928,7 +5002,10 @@ PostgresMain(int argc, char *argv[], const char *username)
 
 					elog((Debug_print_full_dtm ? LOG : DEBUG5), "Execute: %s.",portal_name);
 
-					setupRegularDtxContext();
+					/*
+					 *  in gpsql, there is no distributed transaction
+					 */
+					/*setupRegularDtxContext();*/
 					
 					exec_execute_message(portal_name, max_rows);
 				}
@@ -4944,7 +5021,10 @@ PostgresMain(int argc, char *argv[], const char *username)
 
 				elog((Debug_print_full_dtm ? LOG : DEBUG5), "Fast path function call.");
 
-				setupRegularDtxContext();
+				/*
+				 *  in gpsql, there is no distributed transaction
+				 */
+				/*setupRegularDtxContext();*/
 					
 				/* start an xact for this function invocation */
 				start_xact_command();
@@ -5043,7 +5123,10 @@ PostgresMain(int argc, char *argv[], const char *username)
 
 					elog((Debug_print_full_dtm ? LOG : DEBUG5), "Describe: %s.", describe_target);
 					
-					setupRegularDtxContext();
+					/*
+					 *  in gpsql, there is no distributed transaction
+					 */
+					/*setupRegularDtxContext();*/
 					
 					switch (describe_type)
 					{

@@ -930,8 +930,8 @@ formSplitRdata(Relation r, BlockNumber blkno, bool page_is_leaf,
 	RelationFetchGpRelationNodeForXLog(r);
 	
 	xlrec->node = r->rd_node;
-	xlrec->persistentTid = r->rd_segfile0_relationnodeinfo.persistentTid;
-	xlrec->persistentSerialNum = r->rd_segfile0_relationnodeinfo.persistentSerialNum;
+	xlrec->persistentTid = r->rd_segfile0_relationnodeinfos[0].persistentTid;
+	xlrec->persistentSerialNum = r->rd_segfile0_relationnodeinfos[0].persistentSerialNum;
 	xlrec->origblkno = blkno;
 	xlrec->origleaf = page_is_leaf;
 	xlrec->npage = (uint16) npage;
@@ -993,8 +993,8 @@ formUpdateRdata(Relation r, Buffer buffer,
 	RelationFetchGpRelationNodeForXLog(r);
 
 	xlrec->node = r->rd_node;
-	xlrec->persistentTid = r->rd_segfile0_relationnodeinfo.persistentTid;
-	xlrec->persistentSerialNum = r->rd_segfile0_relationnodeinfo.persistentSerialNum;
+	xlrec->persistentTid = r->rd_segfile0_relationnodeinfos[0].persistentTid;
+	xlrec->persistentSerialNum = r->rd_segfile0_relationnodeinfos[0].persistentSerialNum;
 	xlrec->blkno = BufferGetBlockNumber(buffer);
 	xlrec->ntodelete = ntodelete;
 
@@ -1048,8 +1048,8 @@ formCreateRData(Relation r)
 	RelationFetchGpRelationNodeForXLog(r);
 
 	xlrec->node = r->rd_node;
-	xlrec->persistentTid = r->rd_segfile0_relationnodeinfo.persistentTid;
-	xlrec->persistentSerialNum = r->rd_segfile0_relationnodeinfo.persistentSerialNum;
+	xlrec->persistentTid = r->rd_segfile0_relationnodeinfos[0].persistentTid;
+	xlrec->persistentSerialNum = r->rd_segfile0_relationnodeinfos[0].persistentSerialNum;
 
 	rdata[0].data = (char *) xlrec;
 	rdata[0].len = sizeof(gistxlogCreateIndex);

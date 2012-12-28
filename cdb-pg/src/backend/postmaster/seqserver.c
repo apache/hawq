@@ -376,7 +376,7 @@ RequestShutdown(SIGNAL_ARGS)
 	shutdown_requested = true;
 }
 
-static char *knownDatabase = "postgres";
+static char *knownDatabase = "template0";
 
 /*
  * AutoVacMain
@@ -492,7 +492,7 @@ SeqServerMain(int argc, char *argv[])
 
 	if (!FindMyDatabase(knownDatabase, &MyDatabaseId, &MyDatabaseTableSpace))
 		ereport(FATAL, (errcode(ERRCODE_UNDEFINED_DATABASE),
-			errmsg("database 'postgres' does not exist")));
+			errmsg("database 'template0' does not exist")));
 
 	fullpath = GetDatabasePath(MyDatabaseId, MyDatabaseTableSpace);
 

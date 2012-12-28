@@ -186,7 +186,7 @@ main(int argc, char *argv[])
 		keywords[4] = "dbname";
 		values[4] = (options.action == ACT_LIST_DB &&
 					 options.dbname == NULL) ?
-			"postgres" : options.dbname;
+			"template0" : options.dbname;
 		keywords[5] = "fallback_application_name";
 		values[5] = pset.progname;
 		keywords[6] = NULL;

@@ -144,28 +144,9 @@ FileRepPrimary_BypassMirrorCheck(Oid ts_oid, Oid fs_oid, bool *primaryOnly)
 	if (GpIdentity.segindex == MASTER_CONTENT_ID)
 		return false;
 
-	/*
-	 * In the recovery, the primaryOnly will be set correctly, use it directly!
-	 */
-	if (InRecoveryPass == 2 && primaryOnly)
-		return *primaryOnly;
+	/* in gpsql, return true always since there is no mirror */
+	return true;
 
-	if (ts_oid == InvalidOid && fs_oid == InvalidOid)
-		return false;
-
-	if (fs_oid == InvalidOid)
-		fs_oid = get_tablespace_fsoid(ts_oid);
-
-	if (is_filespace_shared(fs_oid))
-	{
-		/* Ignore the data loss event if we are using hdfs. */
-		//elog(NOTICE, "bypass mirror for %s wiht oid %u which stores on hdfs.",
- 		//			get_tablespace_name(ts_oid), ts_oid);
-
-		return true;
-	}
-
-	return false;
 }
 
 MirrorDataLossTrackingState

@@ -196,6 +196,17 @@ static const PQconninfoOption PQconninfoOptions[] = {
 	"TCP-Keepalives-Count", "", 10},	/* strlen(INT32_MAX) == 10 */
 
 	/*
+	 * GPSQL
+	 */
+	{"dboid", NULL, "", NULL,
+	"dboid", "D", 10},
+	{"bootstrap_user", NULL, "", NULL,
+	"bootstrap_user", "D", 64},
+	{"encoding", NULL, "", NULL,
+	"encoding", "D", 10},
+	
+
+	/*
      * Internal QD to QE communications don't use SSL
      */
 
@@ -537,6 +548,16 @@ fillPGconn(PGconn *conn, PQconninfoOption *connOptions)
 	conn->keepalives_interval = tmp ? strdup(tmp) : NULL;
 	tmp = conninfo_getval(connOptions, "keepalives_count");
 	conn->keepalives_count = tmp ? strdup(tmp) : NULL;
+
+	/*
+	 * gpsql
+	 */
+	tmp = conninfo_getval(connOptions, "dboid");
+	conn->dboid = tmp ? strdup(tmp) : NULL;
+	tmp = conninfo_getval(connOptions, "bootstrap_user");
+	conn->bootstrap_user = tmp ? strdup(tmp) : NULL;
+	tmp = conninfo_getval(connOptions, "encoding");
+	conn->encoding = tmp ? strdup(tmp) : NULL;
 
 	/*
 	 * Internal communications from QD to QE don't use SSL
@@ -2221,6 +2242,13 @@ freePGconn(PGconn *conn)
 	if (conn->keepalives_count)
 		free(conn->keepalives_count);
 
+	if (conn->dboid)
+		free(conn->dboid);
+	if (conn->bootstrap_user)
+		free(conn->bootstrap_user);
+	if (conn->encoding)
+		free(conn->encoding);
+
     if (conn->gpqeid)			/* CDB */
         free(conn->gpqeid);
     if (conn->gpqdid)			/* CDB */
@@ -2262,7 +2290,9 @@ freePGconn(PGconn *conn)
 		free(conn->outBuffer);
 	termPQExpBuffer(&conn->errorMessage);
 	termPQExpBuffer(&conn->workBuffer);
-
+	if (conn->serializedCatalog)
+		free(conn->serializedCatalog);
+	conn->serializedCatalogLen = 0;
 	free(conn);
 
 #ifdef WIN32

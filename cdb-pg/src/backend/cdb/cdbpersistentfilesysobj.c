@@ -47,6 +47,8 @@
 #include "utils/builtins.h"
 #include "utils/faultinjector.h"
 
+#include "cdb/cdbvars.h"
+
 typedef struct PersistentFileSysObjPrivateSharedMemory
 {
 	bool	needInitScan;
@@ -122,6 +124,7 @@ static void PersistentFileSysObj_PrintRelationFile(
 {
 	RelFileNode		relFileNode;
 	int32			segmentFileNum;
+	int32			contentid;
 
 	PersistentFileSysRelStorageMgr relationStorageManager;
 
@@ -153,6 +156,7 @@ static void PersistentFileSysObj_PrintRelationFile(
 									&relFileNode.dbNode,
 									&relFileNode.relNode,
 									&segmentFileNum,
+									&contentid,
 									&relationStorageManager,
 									&state,
 									&createMirrorDataLossTrackingSessionNum,
@@ -182,7 +186,7 @@ static void PersistentFileSysObj_PrintRelationFile(
 	else if (relationStorageManager == PersistentFileSysRelStorageMgr_BufferPool)
 	{
 		elog(elevel,
-			 "%s gp_persistent_relation_node %s: %u/%u/%u, segment file #%d, relation storage manager '%s', persistent state '%s', create mirror data loss tracking session num " INT64_FORMAT ", "
+			 "%s gp_persistent_relation_node %s: %u/%u/%u, segment file #%d, contentid %d, relation storage manager '%s', persistent state '%s', create mirror data loss tracking session num " INT64_FORMAT ", "
 			 "mirror existence state '%s', data synchronization state '%s', "
 			 "Buffer Pool (marked for scan incremental resync = %s, "
 			 "resync changed page count " INT64_FORMAT ", "
@@ -195,6 +199,7 @@ static void PersistentFileSysObj_PrintRelationFile(
 			 relFileNode.dbNode,
 			 relFileNode.relNode,
 			 segmentFileNum,
+			 contentid,
 			 PersistentFileSysRelStorageMgr_Name(relationStorageManager),
 			 PersistentFileSysObjState_Name(state),
 			 createMirrorDataLossTrackingSessionNum,
@@ -213,7 +218,7 @@ static void PersistentFileSysObj_PrintRelationFile(
 	{
 		Assert(relationStorageManager == PersistentFileSysRelStorageMgr_AppendOnly);
 		elog(elevel,
-			 "%s gp_persistent_relation_node %s: %u/%u/%u, segment file #%d, relation storage manager '%s', persistent state '%s', create mirror data loss tracking session num " INT64_FORMAT ", "
+			 "%s gp_persistent_relation_node %s: %u/%u/%u, segment file #%d, contentid %d, relation storage manager '%s', persistent state '%s', create mirror data loss tracking session num " INT64_FORMAT ", "
 			 "mirror existence state '%s', data synchronization state '%s', "
 			 "Append-Only (loss EOF " INT64_FORMAT ", new EOF " INT64_FORMAT ", equal = %s), "
 			 "relation buffer pool kind %u, parent xid %u, "
@@ -224,6 +229,7 @@ static void PersistentFileSysObj_PrintRelationFile(
 			 relFileNode.dbNode,
 			 relFileNode.relNode,
 			 segmentFileNum,
+			 contentid,
 			 PersistentFileSysRelStorageMgr_Name(relationStorageManager),
 			 PersistentFileSysObjState_Name(state),
 			 createMirrorDataLossTrackingSessionNum,
@@ -245,6 +251,7 @@ static void PersistentFileSysObj_PrintDatabaseDir(
 	ItemPointer 			persistentTid,
 	Datum					*values)
 {
+	int4			contentid;
 	DbDirNode		dbDirNode;
 
 	PersistentFileSysState	state;
@@ -261,6 +268,7 @@ static void PersistentFileSysObj_PrintDatabaseDir(
 
 	GpPersistentDatabaseNode_GetValues(
 									values,
+									&contentid,
 									&dbDirNode.tablespace,
 									&dbDirNode.database,
 									&state,
@@ -307,6 +315,7 @@ static void PersistentFileSysObj_PrintTablespaceDir(
 	ItemPointer 			persistentTid,
 	Datum					*values)
 {
+	int4	contentid;
 	Oid		filespaceOid;
 	Oid		tablespaceOid;
 
@@ -324,6 +333,7 @@ static void PersistentFileSysObj_PrintTablespaceDir(
 
 	GpPersistentTablespaceNode_GetValues(
 									values,
+									&contentid,
 									&filespaceOid,
 									&tablespaceOid,
 									&state,
@@ -347,11 +357,12 @@ static void PersistentFileSysObj_PrintTablespaceDir(
 	else
 	{
 		elog(elevel,
-			 "%s gp_persistent_tablespace_node %s: tablespace %u (filespace %u), persistent state '%s', create mirror data loss tracking session num " INT64_FORMAT ", "
+			 "%s gp_persistent_tablespace_node %s: contentid %d tablespace %u (filespace %u), persistent state '%s', create mirror data loss tracking session num " INT64_FORMAT ", "
 			 "mirror existence state '%s', reserved %u, parent xid %u, "
 			 "persistent serial num " INT64_FORMAT ", previous free TID %s",
 			 prefix,
 			 ItemPointerToString(persistentTid),
+			 contentid,
 			 tablespaceOid,
 			 filespaceOid,
 			 PersistentFileSysObjState_Name(state),
@@ -371,6 +382,7 @@ static void PersistentFileSysObj_PrintFilespaceDir(
 	Datum					*values)
 {
 	Oid		filespaceOid;
+	int4	contentid;
 
 	int16	dbId1;
 	char	locationBlankPadded1[FilespaceLocationBlankPaddedWithNullTermLen];
@@ -393,6 +405,7 @@ static void PersistentFileSysObj_PrintFilespaceDir(
 	GpPersistentFilespaceNode_GetValues(
 									values,
 									&filespaceOid,
+									&contentid,
 									&dbId1,
 									locationBlankPadded1,
 									&dbId2,
@@ -949,6 +962,7 @@ void PersistentFileSysObj_FreeTuple(
 												/* databaseOid */ 0,
 												/* relFileNodeOid */ 0,
 												/* segmentFileNum */ 0,
+												/* contentid */ -1,
 												PersistentFileSysRelStorageMgr_None,
 												PersistentFileSysState_Free,
 												/* createMirrorDataLossTrackingSessionNum */ 0,
@@ -971,6 +985,7 @@ void PersistentFileSysObj_FreeTuple(
 	case PersistentFsObjType_DatabaseDir:
 		GpPersistentDatabaseNode_SetDatumValues(
 											freeValues,
+											/* db_id */ 0,
 											/* tablespaceOid */ 0,
 											/* databaseOid */ 0,
 											PersistentFileSysState_Free,
@@ -986,6 +1001,7 @@ void PersistentFileSysObj_FreeTuple(
 	case PersistentFsObjType_TablespaceDir:
 		GpPersistentTablespaceNode_SetDatumValues(
 											freeValues,
+											/* db_id */ 0,
 											/* filespaceOid */ 0,
 											/* tablespaceOid */ 0,
 											PersistentFileSysState_Free,
@@ -1008,6 +1024,7 @@ void PersistentFileSysObj_FreeTuple(
 			GpPersistentFilespaceNode_SetDatumValues(
 												freeValues,
 												/* filespaceOid */ 0,
+												/* contentid */ 0,
 												/* dbId1 */ 0,
 												locationBlankFilled,
 												/* dbId2 */ 0,
@@ -2231,7 +2248,9 @@ PersistentFileSysObj_DoMirrorValidation(
 			}
 
 			PersistentTablespace_GetPrimaryAndMirrorFilespaces(
+															   GpIdentity.segindex,
 															   relFileNode->spcNode,
+															   FALSE,
 															   &primaryFilespaceLocation,
 															   &mirrorFilespaceLocation);
 
@@ -2257,7 +2276,9 @@ PersistentFileSysObj_DoMirrorValidation(
 			DbDirNode *dbDirNode = &fsObjName->variant.dbDirNode;
 
 			PersistentTablespace_GetPrimaryAndMirrorFilespaces(
+															   GpIdentity.segindex,
 															   dbDirNode->tablespace,
+															   FALSE,
 															   &primaryFilespaceLocation,
 															   &mirrorFilespaceLocation);
 
@@ -2281,7 +2302,9 @@ PersistentFileSysObj_DoMirrorValidation(
 			char *mirrorFilespaceLocation = NULL;
 
 			PersistentTablespace_GetPrimaryAndMirrorFilespaces(
+															   GpIdentity.segindex,
 															   fsObjName->variant.tablespaceOid,
+															   FALSE,
 															   &primaryFilespaceLocation,
 															   &mirrorFilespaceLocation);
 
@@ -2305,6 +2328,7 @@ PersistentFileSysObj_DoMirrorValidation(
 			char *mirrorFilespaceLocation = NULL;
 
 			PersistentFilespace_GetPrimaryAndMirrorUnderLock(
+													GpIdentity.segindex,
 													fsObjName->variant.filespaceOid,
 													&primaryFilespaceLocation,
 													&mirrorFilespaceLocation);
@@ -2360,13 +2384,12 @@ static void PersistentFileSysObj_DoMirrorReCreate(
 	case PersistentFsObjType_RelationFile:
 		{
 			RelFileNode *relFileNode = PersistentFileSysObjName_GetRelFileNodePtr(fsObjName);
-			int32 segmentFileNum = PersistentFileSysObjName_GetSegmentFileNum(fsObjName);
 
 			Assert(relStorageMgr != PersistentFileSysRelStorageMgr_None);
 
 			if (relStorageMgr == PersistentFileSysRelStorageMgr_BufferPool)
 			{
-				Assert(segmentFileNum == 0);
+				Assert(PersistentFileSysObjName_GetSegmentFileNum(fsObjName) == 0);
 
 				MirroredBufferPool_MirrorReCreate(
 											relFileNode,
@@ -2379,12 +2402,12 @@ static void PersistentFileSysObj_DoMirrorReCreate(
 			{
 				Assert(relStorageMgr == PersistentFileSysRelStorageMgr_AppendOnly);
 
-				MirroredAppendOnly_MirrorReCreate(
+				/*MirroredAppendOnly_MirrorReCreate(
 											relFileNode,
 											segmentFileNum,
 											mirrorDataLossTrackingState,
 											mirrorDataLossTrackingSessionNum,
-											mirrorDataLossOccurred);
+											mirrorDataLossOccurred);*/
 			}
 		}
 		break;
@@ -2394,6 +2417,7 @@ static void PersistentFileSysObj_DoMirrorReCreate(
 			DbDirNode *dbDirNode = &fsObjName->variant.dbDirNode;
 
 			MirroredFileSysObj_CreateDbDir(
+								fsObjName->contentid,
 								dbDirNode,
 								mirrorMode,
 								ignoreAlreadyExists,
@@ -2404,6 +2428,7 @@ static void PersistentFileSysObj_DoMirrorReCreate(
 
 	case PersistentFsObjType_TablespaceDir:
 		MirroredFileSysObj_CreateTablespaceDir(
+							GpIdentity.segindex,
 							fsObjName->variant.tablespaceOid,
 							mirrorMode,
 							ignoreAlreadyExists,
@@ -2417,6 +2442,7 @@ static void PersistentFileSysObj_DoMirrorReCreate(
 			char *mirrorFilespaceLocation;
 
 			PersistentFilespace_GetPrimaryAndMirror(
+								GpIdentity.segindex,
 								fsObjName->variant.filespaceOid,
 								&primaryFilespaceLocation,
 								&mirrorFilespaceLocation);
@@ -2805,6 +2831,7 @@ void PersistentFileSysObj_DropObject(
 		{
 			RelFileNode *relFileNode = PersistentFileSysObjName_GetRelFileNodePtr(fsObjName);
 			int32 segmentFileNum = PersistentFileSysObjName_GetSegmentFileNum(fsObjName);
+			int32 contentid = PersistentFileSysObjName_GetRelFileContentid(fsObjName);
 
 			if (!PersistentFileSysRelStorageMgr_IsValid(relStorageMgr))
 				elog(ERROR, "Relation storage manager for persistent '%s' tuple for DROP is invalid (%d)",
@@ -2814,6 +2841,7 @@ void PersistentFileSysObj_DropObject(
 			MirroredFileSysObj_DropRelFile(
 								relFileNode,
 								segmentFileNum,
+								contentid,
 								relStorageMgr,
 								relationName,
 								/* isLocalBuf */ false,
@@ -2844,6 +2872,7 @@ void PersistentFileSysObj_DropObject(
 			DbDirNode *dbDirNode = &fsObjName->variant.dbDirNode;
 
 			MirroredFileSysObj_DropDbDir(
+								fsObjName->contentid,
 								dbDirNode,
 								/* primaryOnly */ suppressMirror || fsObjName->sharedStorage,
 								/* mirrorOnly */ false,
@@ -2869,6 +2898,7 @@ void PersistentFileSysObj_DropObject(
 
 	case PersistentFsObjType_TablespaceDir:
 		MirroredFileSysObj_DropTablespaceDir(
+							fsObjName->contentid,
 							fsObjName->variant.tablespaceOid,
 							/* primaryOnly */ suppressMirror || fsObjName->sharedStorage,
 							/* mirrorOnly */ false,
@@ -2897,6 +2927,7 @@ void PersistentFileSysObj_DropObject(
 			char *mirrorFilespaceLocation;
 
 			PersistentFilespace_GetPrimaryAndMirror(
+								fsObjName->contentid,
 								fsObjName->variant.filespaceOid,
 								&primaryFilespaceLocation,
 								&mirrorFilespaceLocation);
@@ -3015,12 +3046,13 @@ static void PersistentFileSysObj_DoMirrorReDrop(
 			{
 				Assert(relStorageMgr == PersistentFileSysRelStorageMgr_AppendOnly);
 
-				MirroredAppendOnly_MirrorReDrop(
+				/*MirroredAppendOnly_MirrorReDrop(
 											relFileNode,
 											segmentFileNum,
 											mirrorDataLossTrackingState,
 											mirrorDataLossTrackingSessionNum,
-											mirrorDataLossOccurred);
+											mirrorDataLossOccurred);*/
+				*mirrorDataLossOccurred = FALSE;
 			}
 
 			if (*mirrorDataLossOccurred)
@@ -3038,6 +3070,7 @@ static void PersistentFileSysObj_DoMirrorReDrop(
 			DbDirNode *dbDirNode = &fsObjName->variant.dbDirNode;
 
 			MirroredFileSysObj_DropDbDir(
+								fsObjName->contentid,
 								dbDirNode,
 								/* primaryOnly */ false,
 								/* mirrorOnly */ true,
@@ -3056,6 +3089,7 @@ static void PersistentFileSysObj_DoMirrorReDrop(
 
 	case PersistentFsObjType_TablespaceDir:
 		MirroredFileSysObj_DropTablespaceDir(
+							fsObjName->contentid,
 							fsObjName->variant.tablespaceOid,
 							/* primaryOnly */ false,
 							/* mirrorOnly */ true,
@@ -3078,6 +3112,7 @@ static void PersistentFileSysObj_DoMirrorReDrop(
 			char *mirrorFilespaceLocation;
 
 			PersistentFilespace_GetPrimaryAndMirror(
+								-1 /* XXX: mat3 */,
 								fsObjName->variant.filespaceOid,
 								&primaryFilespaceLocation,
 								&mirrorFilespaceLocation);
@@ -3226,6 +3261,7 @@ void PersistentFileSysObj_UpdateAppendOnlyMirrorResyncEofs(
 
 	RelFileNode 					actualRelFileNode;
 	int32							actualSegmentFileNum;
+	int32							contentid;
 
 	PersistentFileSysRelStorageMgr	relationStorageManager;
 	PersistentFileSysState			persistentState;
@@ -3283,6 +3319,7 @@ void PersistentFileSysObj_UpdateAppendOnlyMirrorResyncEofs(
 									&actualRelFileNode.dbNode,
 									&actualRelFileNode.relNode,
 									&actualSegmentFileNum,
+									&contentid,
 									&relationStorageManager,
 									&persistentState,
 									&createMirrorDataLossTrackingSessionNum,
@@ -3301,29 +3338,32 @@ void PersistentFileSysObj_UpdateAppendOnlyMirrorResyncEofs(
 									&sharedStorage);
 
 	if (persistentState == PersistentFileSysState_Free)
-		elog(ERROR, "Persistent %u/%u/%u, segment file #%d, entry is 'Free' for update Append-Only mirror resync EOFs at TID %s",
+		elog(ERROR, "Persistent %u/%u/%u, segment file #%d. contentid %d, entry is 'Free' for update Append-Only mirror resync EOFs at TID %s",
 			 relFileNode->spcNode,
 			 relFileNode->dbNode,
 			 relFileNode->relNode,
 			 segmentFileNum,
+			 contentid,
 			 ItemPointerToString(persistentTid));
 
 	if (persistentSerialNum != actualPersistentSerialNum)
-		elog(ERROR, "Persistent %u/%u/%u, segment file #%d, serial number mismatch for update Append-Only mirror resync EOFs (expected " INT64_FORMAT ", found " INT64_FORMAT "), at TID %s",
+		elog(ERROR, "Persistent %u/%u/%u, segment file #%d, contentid %d, serial number mismatch for update Append-Only mirror resync EOFs (expected " INT64_FORMAT ", found " INT64_FORMAT "), at TID %s",
 			 relFileNode->spcNode,
 			 relFileNode->dbNode,
 			 relFileNode->relNode,
 			 segmentFileNum,
+			 contentid,
 			 persistentSerialNum,
 			 actualPersistentSerialNum,
 			 ItemPointerToString(persistentTid));
 
 	if (relationStorageManager != PersistentFileSysRelStorageMgr_AppendOnly)
-		elog(ERROR, "Persistent %u/%u/%u, segment file #%d, relation storage manager mismatch for update Append-Only mirror resync EOFs (expected '%s', found '%s'), at TID %s",
+		elog(ERROR, "Persistent %u/%u/%u, segment file #%d, contentid %d, relation storage manager mismatch for update Append-Only mirror resync EOFs (expected '%s', found '%s'), at TID %s",
 			 relFileNode->spcNode,
 			 relFileNode->dbNode,
 			 relFileNode->relNode,
 			 segmentFileNum,
+			 contentid,
 			 PersistentFileSysRelStorageMgr_Name(PersistentFileSysRelStorageMgr_AppendOnly),
 			 PersistentFileSysRelStorageMgr_Name(relationStorageManager),
 			 ItemPointerToString(persistentTid));
@@ -3331,11 +3371,12 @@ void PersistentFileSysObj_UpdateAppendOnlyMirrorResyncEofs(
 	if (!recovery)
 	{
 		if (mirrorAppendOnlyNewEof >= mirrorNewEof)
-			elog(ERROR, "Persistent %u/%u/%u, segment file #%d, current new EOF is greater than or equal to update new EOF for Append-Only mirror resync EOFs (current new EOF " INT64_FORMAT ", update new EOF " INT64_FORMAT "), persistent serial num " INT64_FORMAT " at TID %s",
+			elog(ERROR, "Persistent %u/%u/%u, segment file #%d, contentid %d, current new EOF is greater than or equal to update new EOF for Append-Only mirror resync EOFs (current new EOF " INT64_FORMAT ", update new EOF " INT64_FORMAT "), persistent serial num " INT64_FORMAT " at TID %s",
 				 relFileNode->spcNode,
 				 relFileNode->dbNode,
 				 relFileNode->relNode,
 				 segmentFileNum,
+				 contentid,
 				 mirrorAppendOnlyNewEof,
 				 mirrorNewEof,
 				 persistentSerialNum,
@@ -4402,6 +4443,7 @@ void PersistentFileSysObj_MarkBufPoolRelationForScanIncrementalResync(
 
 	RelFileNode 					actualRelFileNode;
 	int32							actualSegmentFileNum;
+	int32							contentid;
 
 	PersistentFileSysRelStorageMgr	relationStorageManager;
 	PersistentFileSysState			persistentState;
@@ -4453,6 +4495,7 @@ void PersistentFileSysObj_MarkBufPoolRelationForScanIncrementalResync(
 									&actualRelFileNode.dbNode,
 									&actualRelFileNode.relNode,
 									&actualSegmentFileNum,
+									&contentid,
 									&relationStorageManager,
 									&persistentState,
 									&createMirrorDataLossTrackingSessionNum,
@@ -4496,7 +4539,7 @@ void PersistentFileSysObj_MarkBufPoolRelationForScanIncrementalResync(
 
 	pfree(values);
 }
-
+/*
 bool PersistentFileSysObj_CanAppendOnlyCatchupDuringResync(
 	RelFileNode					*relFileNode,
 
@@ -4617,9 +4660,9 @@ bool PersistentFileSysObj_CanAppendOnlyCatchupDuringResync(
 
 	if (mirrorAppendOnlyLossEof < mirrorAppendOnlyNewEof)
 	{
-		/*
+
 		 * Resynchronize needs to catch-up the mirror.
-		 */
+
 		return false;
 	}
 	Assert(mirrorAppendOnlyLossEof == mirrorAppendOnlyNewEof);
@@ -4629,16 +4672,16 @@ bool PersistentFileSysObj_CanAppendOnlyCatchupDuringResync(
 		&&
 		mirrorDataSynchronizationState == MirroredRelDataSynchronizationState_FullCopy)
 	{
-		/*
+
 		 * When Resynchronize need to do a full copy, we need to not access the mirror.
-		 */
+
 		return false;
 	}
 
 	*eof = mirrorAppendOnlyNewEof;
 	return true;
-}
-
+}*/
+/*
 void PersistentFileSysObj_GetAppendOnlyCatchupMirrorStartEof(
 	RelFileNode					*relFileNode,
 
@@ -4764,7 +4807,7 @@ void PersistentFileSysObj_GetAppendOnlyCatchupMirrorStartEof(
 			 mirrorAppendOnlyNewEof);
 
 	*startEof = mirrorAppendOnlyNewEof;
-}
+}*/
 
 static int32 PersistentFileSysObj_GetBufferPoolRelationTotalBlocks(
 	RelFileNode			*relFileNode)
@@ -5367,7 +5410,7 @@ void PersistentFileSysObj_MirrorAdd(void)
 	}
 }
 
-
+/*
 void PersistentFileSysObj_MarkWholeMirrorScanIncremental(void)
 {
 	WRITE_PERSISTENT_STATE_ORDERED_LOCK_DECLARE;
@@ -5488,7 +5531,7 @@ void PersistentFileSysObj_MarkWholeMirrorScanIncremental(void)
 													&persistentTid,
 													persistentSerialNum,
 													MirroredRelDataSynchronizationState_BufferPoolScanIncremental,
-													/* flushToXLog */ false);
+													 flushToXLog  false);
 
 			heap_freetuple(tupleCopy);
 		}
@@ -5514,7 +5557,7 @@ void PersistentFileSysObj_MarkWholeMirrorScanIncremental(void)
 	WRITE_PERSISTENT_STATE_ORDERED_UNLOCK;
 
 	PersistentStore_EndScan(&storeScan);
-}
+}*/
 
 /*
  * Mark the special persistent tables as needing 'Scan Incremental' recovery.
@@ -5559,6 +5602,7 @@ void PersistentFileSysObj_MarkSpecialScanIncremental(void)
 	{
 		RelFileNode 					relFileNode;
 		int32 							segmentFileNum;
+		int32							contentid;
 
 		PersistentFileSysRelStorageMgr	relationStorageManager;
 		PersistentFileSysState			persistentState;
@@ -5587,6 +5631,7 @@ void PersistentFileSysObj_MarkSpecialScanIncremental(void)
 										&relFileNode.dbNode,
 										&relFileNode.relNode,
 										&segmentFileNum,
+										&contentid,
 										&relationStorageManager,
 										&persistentState,
 										&createMirrorDataLossTrackingSessionNum,
@@ -5608,6 +5653,7 @@ void PersistentFileSysObj_MarkSpecialScanIncremental(void)
 											&fsObjName,
 											&relFileNode,
 											segmentFileNum,
+											contentid,
 											 NULL);
 
 		fsObjName.sharedStorage = sharedStorage;
@@ -5744,6 +5790,7 @@ void PersistentFileSysObj_MarkAppendOnlyCatchup(void)
 	{
 		RelFileNode 					relFileNode;
 		int32 							segmentFileNum;
+		int32							contentid;
 
 		PersistentFileSysRelStorageMgr	relationStorageManager;
 		PersistentFileSysState			persistentState;
@@ -5770,6 +5817,7 @@ void PersistentFileSysObj_MarkAppendOnlyCatchup(void)
 										&relFileNode.dbNode,
 										&relFileNode.relNode,
 										&segmentFileNum,
+										&contentid,
 										&relationStorageManager,
 										&persistentState,
 										&createMirrorDataLossTrackingSessionNum,
@@ -5794,6 +5842,7 @@ void PersistentFileSysObj_MarkAppendOnlyCatchup(void)
 											&fsObjName,
 											&relFileNode,
 											segmentFileNum,
+											contentid,
 											NULL);
 
 		fsObjName.sharedStorage = sharedStorage;
@@ -5904,6 +5953,7 @@ static void PersistentFileSysObj_MarkPageIncremental(
 
 	RelFileNode 					relFileNode;
 	int32							segmentFileNum;
+	int32							contentid;
 
 	PersistentFileSysRelStorageMgr	relationStorageManager;
 	PersistentFileSysState			persistentState;
@@ -5955,6 +6005,7 @@ static void PersistentFileSysObj_MarkPageIncremental(
 									&relFileNode.dbNode,
 									&relFileNode.relNode,
 									&segmentFileNum,
+									&contentid,
 									&relationStorageManager,
 									&persistentState,
 									&createMirrorDataLossTrackingSessionNum,
@@ -6006,6 +6057,7 @@ static void PersistentFileSysObj_MarkPageIncremental(
 										&fsObjName,
 										&relFileNode,
 										segmentFileNum,
+										GpIdentity.segindex,
 										NULL);
 	fsObjName.sharedStorage = sharedStorage;
 	fsObjName.hasInited = true;
@@ -6173,6 +6225,8 @@ bool PersistentFileSysObj_ResynchronizeScan(
 
 	PersistentFileSysObjName		fsObjName;
 
+	int32							contentid;
+
 	if (resynchronizeScanToken->done)
 		return false;
 
@@ -6218,6 +6272,7 @@ bool PersistentFileSysObj_ResynchronizeScan(
 										&relFileNode->dbNode,
 										&relFileNode->relNode,
 										segmentFileNum,
+										&contentid,
 										relStorageMgr,
 										&state,
 										&createMirrorDataLossTrackingSessionNum,
@@ -6242,6 +6297,7 @@ bool PersistentFileSysObj_ResynchronizeScan(
 											&fsObjName,
 											relFileNode,
 											*segmentFileNum,
+											contentid,
 											NULL);
 		fsObjName.hasInited = true;
 		fsObjName.sharedStorage = sharedStorage;
@@ -6342,6 +6398,7 @@ bool PersistentFileSysObj_ResynchronizeRefetch(
 
 	RelFileNode 					actualRelFileNode;
 	int32							actualSegmentFileNum;
+	int32							contentid;
 
 	PersistentFileSysState			persistentState;
 	int64							createMirrorDataLossTrackingSessionNum;
@@ -6387,6 +6444,7 @@ bool PersistentFileSysObj_ResynchronizeRefetch(
 									&actualRelFileNode.dbNode,
 									&actualRelFileNode.relNode,
 									&actualSegmentFileNum,
+									&contentid,
 									relStorageMgr,
 									&persistentState,
 									&createMirrorDataLossTrackingSessionNum,
@@ -6619,6 +6677,8 @@ bool PersistentFileSysObj_OnlineVerifyScan(
 {
 	WRITE_PERSISTENT_STATE_ORDERED_LOCK_DECLARE;
 
+	int32 contentid;
+
 	PersistentFileSysObjData *fileSysObjData;
 	PersistentFileSysObjSharedData	*fileSysObjSharedData;
 
@@ -6681,6 +6741,7 @@ bool PersistentFileSysObj_OnlineVerifyScan(
 										&relFileNode->dbNode,
 										&relFileNode->relNode,
 										segmentFileNum,
+										&contentid,
 										relStorageMgr,
 										&state,
 										&createMirrorDataLossTrackingSessionNum,
@@ -6705,6 +6766,7 @@ bool PersistentFileSysObj_OnlineVerifyScan(
 											&fsObjName,
 											relFileNode,
 											*segmentFileNum,
+											GpIdentity.segindex,
 											NULL);
 		fsObjName.sharedStorage = sharedStorage;
 		fsObjName.hasInited = true;
@@ -6768,6 +6830,8 @@ bool PersistentFileSysObj_FilespaceScan(
 	FilespaceScanToken				*filespaceScanToken,
 
 	Oid 							*filespaceOid,
+
+	int4							*contentid,
 
 	int16							*dbId1,
 
@@ -6842,6 +6906,7 @@ bool PersistentFileSysObj_FilespaceScan(
 		GpPersistentFilespaceNode_GetValues(
 										values,
 										filespaceOid,
+										contentid,
 										dbId1,
 										locationBlankPadded1,
 										dbId2,
@@ -6864,6 +6929,7 @@ bool PersistentFileSysObj_FilespaceScan(
 											NULL);
 		fsObjName.hasInited = true;
 		fsObjName.sharedStorage = sharedStorage;
+		fsObjName.contentid = *contentid;
 		if (Debug_persistent_print)
 			elog(Persistent_DebugPrintLevel(),
 				 "PersistentFileSysObj_FilespaceScan: Return '%s' (persistent state '%s', mirror existence state '%s', serial number " INT64_FORMAT " at TID %s",
@@ -6919,6 +6985,8 @@ bool PersistentFileSysObj_ScanForRelation(
 	Datum values[Natts_gp_persistent_relation_node];
 
 	bool found;
+
+	int32 contentid;
 
 	if(RelFileNode_IsEmpty(relFileNode))
 		elog(ERROR, "Invalid RelFileNode (0,0,0)");
@@ -6983,6 +7051,7 @@ bool PersistentFileSysObj_ScanForRelation(
 										&candidateRelFileNode.dbNode,
 										&candidateRelFileNode.relNode,
 										&candidateSegmentFileNum,
+										&contentid,
 										&relationStorageManager,
 										&persistentState,
 										&createMirrorDataLossTrackingSessionNum,
@@ -7024,11 +7093,12 @@ bool PersistentFileSysObj_ScanForRelation(
 
 	if (found && Debug_persistent_print)
 		elog(Persistent_DebugPrintLevel(),
-		     "Scan found persistent relation %u/%u/%u, segment file #%d with serial number " INT64_FORMAT " at TID %s",
+		     "Scan found persistent relation %u/%u/%u, segment file #%d contentid %d with serial number " INT64_FORMAT " at TID %s",
 			 relFileNode->spcNode,
 			 relFileNode->dbNode,
 			 relFileNode->relNode,
 			 segmentFileNum,
+			 contentid,
 			 *persistentSerialNum,
 			 ItemPointerToString(persistentTid));
 
@@ -7066,6 +7136,7 @@ static void PersistentFileSysObj_StartupIntegrityCheckRelation(void)
 	{
 		RelFileNode 					relFileNode;
 		int32 							segmentFileNum;
+		int32							contentid;
 
 		PersistentFileSysRelStorageMgr	relationStorageManager;
 		PersistentFileSysState			persistentState;
@@ -7092,6 +7163,7 @@ static void PersistentFileSysObj_StartupIntegrityCheckRelation(void)
 										&relFileNode.dbNode,
 										&relFileNode.relNode,
 										&segmentFileNum,
+										&contentid,
 										&relationStorageManager,
 										&persistentState,
 										&createMirrorDataLossTrackingSessionNum,
@@ -7128,10 +7200,11 @@ static void PersistentFileSysObj_StartupIntegrityCheckRelation(void)
 			continue;
 		}
 
-		if (!PersistentDatabase_DbDirExistsUnderLock(&dbDirNode))
+		if (!PersistentDatabase_DbDirExistsUnderLock(contentid, &dbDirNode))
 		{
 			elog(LOG,
-				 "Database directory not found for relation %u/%u/%u",
+				 "Database directory not found for content %d relation %u/%u/%u",
+				 contentid,
 				 relFileNode.spcNode,
 				 relFileNode.dbNode,
 				 relFileNode.relNode);
@@ -7143,6 +7216,7 @@ static void PersistentFileSysObj_StartupIntegrityCheckRelation(void)
 
 static void PersistentFileSysObj_StartupIntegrityCheckPrintDbDirs(void)
 {
+	int4		contentid;
 	DbDirNode dbDirNode;
 	PersistentFileSysState state;
 
@@ -7151,6 +7225,7 @@ static void PersistentFileSysObj_StartupIntegrityCheckPrintDbDirs(void)
 
 	PersistentDatabase_DirIterateInit();
 	while (PersistentDatabase_DirIterateNext(
+									&contentid,
 									&dbDirNode,
 									&state,
 									&persistentTid,

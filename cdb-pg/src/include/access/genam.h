@@ -20,6 +20,8 @@
 #include "storage/lock.h"
 #include "utils/relcache.h"
 
+#include "cdb/cdbinmemheapam.h"
+
 /*
  * Struct for statistics returned by ambuild
  */
@@ -81,6 +83,7 @@ typedef struct SysScanDescData
 	Relation	irel;			/* NULL if doing heap scan */
 	HeapScanDesc scan;			/* only valid in heap-scan case */
 	IndexScanDesc iscan;		/* only valid in index-scan case */
+	InMemHeapScanDesc inmemscan; /* only valid in in-memory heap scan*/
 } SysScanDescData;
 
 typedef SysScanDescData *SysScanDesc;

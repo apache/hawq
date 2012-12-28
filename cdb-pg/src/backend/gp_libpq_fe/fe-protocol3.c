@@ -58,6 +58,7 @@ static int	getParameterStatus(PGconn *conn);
 static int	getNotify(PGconn *conn);
 static int	getCopyStart(PGconn *conn, ExecStatusType copytype);
 static int	getQEWriterTransactionInfo(PGconn *conn);
+static int  getQECatalogInfo(PGconn *conn);
 static int	getStandbyMasterEndLocation(PGconn *conn);
 static int	getReadyForQuery(PGconn *conn);
 static int	getReadyForQuery_QEWriter(PGconn *conn);
@@ -250,6 +251,9 @@ pqParseInput3(PGconn *conn)
 					if (pqGets(&conn->workBuffer, conn))
 						return;
 					
+					if (getQECatalogInfo(conn))
+						return;
+
 					if (getQEWriterTransactionInfo(conn))
 						return;
 
@@ -1467,6 +1471,30 @@ getQEWriterTransactionInfo(PGconn *conn)
 }
 
 /*
+ * process QE catalog write back information in remainer of message
+ */
+static int
+getQECatalogInfo(PGconn *conn)
+{
+	Assert(NULL != conn);
+
+	if (pqGetInt((int*) &conn->serializedCatalogLen, 4, conn))
+		return EOF;
+	if (conn->serializedCatalogLen > 0)
+	{
+		conn->serializedCatalog = malloc(conn->serializedCatalogLen);
+		if (NULL == conn->serializedCatalog)
+			return EOF;
+		if (pqGetnchar(conn->serializedCatalog, conn->serializedCatalogLen,
+				conn))
+			return EOF;
+	} else
+		conn->serializedCatalog = NULL;
+
+	return 0;
+}
+
+/*
  * getStandbyEndLocation - process standby master XLOG end location in remainer of message
  */
 static int
@@ -2219,6 +2247,37 @@ build_startup_packet(const PGconn *conn, char *packet,
 		val = conn->appname ? conn->appname : conn->fbappname;
 		if (val && val[0])
 			ADD_STARTUP_OPTION("application_name", val);
+	}
+
+	/* GPSQL: */
+	if (conn->dboid && conn->dboid[0])
+	{
+		if (packet)
+			strcpy(packet + packet_len, "dboid");
+		packet_len += strlen("dboid") + 1;
+		if (packet)
+			strcpy(packet + packet_len, conn->dboid);
+		packet_len += strlen(conn->dboid) + 1;
+	}
+
+	if (conn->bootstrap_user && conn->bootstrap_user[0])
+	{
+		if (packet)
+			strcpy(packet + packet_len, "bootstrap_user");
+		packet_len += strlen("bootstrap_user") + 1;
+		if (packet)
+			strcpy(packet + packet_len, conn->bootstrap_user);
+		packet_len += strlen(conn->bootstrap_user) + 1;
+	}
+
+	if (conn->encoding && conn->encoding[0])
+	{
+		if (packet)
+			strcpy(packet + packet_len, "encoding");
+		packet_len += strlen("encoding") + 1;
+		if (packet)
+			strcpy(packet + packet_len, conn->encoding);
+		packet_len += strlen(conn->encoding) + 1;
 	}
 
 	/* CDB: Add qExec startup data */

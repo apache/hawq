@@ -1,6 +1,14 @@
 --
 -- TRANSACTIONS
 --
+CREATE TABLE aggtest (
+	a 			int2,
+	b			float4
+);
+INSERT INTO aggtest (a, b) VALUES (56, 7.8);
+INSERT INTO aggtest (a, b) VALUES (100, 99.097);
+INSERT INTO aggtest (a, b) VALUES (0, 0.09561);
+INSERT INTO aggtest (a, b) VALUES (42, 324.78);
 BEGIN;
 SELECT * 
    INTO TABLE xacttest
@@ -16,7 +24,7 @@ SELECT a FROM xacttest WHERE a > 100;
 
 BEGIN;
 CREATE TABLE disappear (a int4);
-DELETE FROM aggtest;
+TRUNCATE aggtest;
 -- should be empty
 SELECT * FROM aggtest;
  a | b 
@@ -40,6 +48,7 @@ SELECT * FROM aggtest;
   42 |  324.78
 (4 rows)
 
+drop table aggtest;
 -- Read-only tests
 CREATE TABLE writetest (a int);
 CREATE TEMPORARY TABLE temptest (a int);
@@ -53,11 +62,10 @@ SELECT * FROM writetest; -- ok
 ---
 (0 rows)
 
-DELETE FROM temptest; -- ok
-UPDATE temptest SET a = 0 FROM writetest WHERE temptest.a = 1 AND writetest.a = temptest.a; -- ok
-PREPARE test AS UPDATE writetest SET a = 0; -- ok
-EXECUTE test; -- fail
-ERROR:  transaction is read-only
+-- DELETE FROM temptest; -- ok
+-- UPDATE temptest SET a = 0 FROM writetest WHERE temptest.a = 1 AND writetest.a = temptest.a; -- ok
+-- PREPARE test AS INSERT INTO writetest VALUES (1); -- ok
+-- EXECUTE test; -- fail
 SELECT * FROM writetest, temptest; -- ok
  a | a 
 ---+---
@@ -93,6 +101,8 @@ SELECT * FROM foo;		-- should be empty
 
 SELECT * FROM bar;		-- shouldn't exist
 ERROR:  relation "bar" does not exist
+LINE 1: SELECT * FROM bar;
+                      ^
 SELECT * FROM barbaz;	-- should be empty
  a 
 ---
@@ -166,12 +176,12 @@ SELECT * FROM savepoints;
 -- test whole-tree rollback
 BEGIN;
 	SAVEPOINT one;
-		DELETE FROM savepoints WHERE a=1;
+		INSERT INTO savepoints VALUES (23);
 	RELEASE SAVEPOINT one;
 	SAVEPOINT two;
-		DELETE FROM savepoints WHERE a=1;
+		INSERT INTO savepoints VALUES (24);
 		SAVEPOINT three;
-			DELETE FROM savepoints WHERE a=2;
+			INSERT INTO savepoints VALUES (25);
 ROLLBACK;
 COMMIT;		-- should not be in a transaction block
 WARNING:  there is no transaction in progress
@@ -208,19 +218,9 @@ BEGIN;
 	INSERT INTO savepoints VALUES (8);
 COMMIT;
 -- rows 6 and 8 should have been created by the same xact
-SELECT a.xmin = b.xmin FROM savepoints a, savepoints b WHERE a.a=6 AND b.a=8;
- ?column? 
-----------
- t
-(1 row)
-
+-- SELECT a.xmin = b.xmin FROM savepoints a, savepoints b WHERE a.a=6 AND b.a=8;
 -- rows 6 and 7 should have been created by different xacts
-SELECT a.xmin = b.xmin FROM savepoints a, savepoints b WHERE a.a=6 AND b.a=7;
- ?column? 
-----------
- f
-(1 row)
-
+-- SELECT a.xmin = b.xmin FROM savepoints a, savepoints b WHERE a.a=6 AND b.a=7;
 BEGIN;
 	INSERT INTO savepoints VALUES (9);
 	SAVEPOINT one;
@@ -236,12 +236,7 @@ SELECT a FROM savepoints WHERE a in (9, 10, 11) ORDER BY 1;
 (2 rows)
 
 -- rows 9 and 11 should have been created by different xacts
-SELECT a.xmin = b.xmin FROM savepoints a, savepoints b WHERE a.a=9 AND b.a=11;
- ?column? 
-----------
- f
-(1 row)
-
+-- SELECT a.xmin = b.xmin FROM savepoints a, savepoints b WHERE a.a=9 AND b.a=11;
 BEGIN;
 	INSERT INTO savepoints VALUES (12);
 	SAVEPOINT one;
@@ -314,70 +309,25 @@ SELECT 1;			-- this should work
 (1 row)
 
 -- check non-transactional behavior of cursors
-BEGIN;
-	DECLARE c CURSOR FOR SELECT unique2 FROM tenk1 ORDER BY 1;
-	SAVEPOINT one;
-		FETCH 10 FROM c;
- unique2 
----------
-       0
-       1
-       2
-       3
-       4
-       5
-       6
-       7
-       8
-       9
-(10 rows)
-
-	ROLLBACK TO SAVEPOINT one;
-		FETCH 10 FROM c;
- unique2 
----------
-      10
-      11
-      12
-      13
-      14
-      15
-      16
-      17
-      18
-      19
-(10 rows)
-
-	RELEASE SAVEPOINT one;
-	FETCH 10 FROM c;
- unique2 
----------
-      20
-      21
-      22
-      23
-      24
-      25
-      26
-      27
-      28
-      29
-(10 rows)
-
-	CLOSE c;
-	DECLARE c CURSOR FOR SELECT unique2/0 FROM tenk1 ORDER BY 1;
-	SAVEPOINT two;
-		FETCH 10 FROM c;
-ERROR:  division by zero
-	ROLLBACK TO SAVEPOINT two;
-	-- c is now dead to the world ...
-		FETCH 10 FROM c;
-ERROR:  portal "c" cannot be run
-	ROLLBACK TO SAVEPOINT two;
-	RELEASE SAVEPOINT two;
-	FETCH 10 FROM c;
-ERROR:  portal "c" cannot be run
-COMMIT;
+-- BEGIN;
+-- 	DECLARE c CURSOR FOR SELECT unique2 FROM tenk1 ORDER BY 1;
+-- 	SAVEPOINT one;
+-- 		FETCH 10 FROM c;
+-- 	ROLLBACK TO SAVEPOINT one;
+-- 		FETCH 10 FROM c;
+-- 	RELEASE SAVEPOINT one;
+-- 	FETCH 10 FROM c;
+-- 	CLOSE c;
+-- 	DECLARE c CURSOR FOR SELECT unique2/0 FROM tenk1 ORDER BY 1;
+-- 	SAVEPOINT two;
+-- 		FETCH 10 FROM c;
+-- 	ROLLBACK TO SAVEPOINT two;
+-- 	-- c is now dead to the world ...
+-- 		FETCH 10 FROM c;
+-- 	ROLLBACK TO SAVEPOINT two;
+-- 	RELEASE SAVEPOINT two;
+-- 	FETCH 10 FROM c;
+-- COMMIT;
 --
 -- Check that "stable" functions are really stable.  They should not be
 -- able to see the partial results of the calling query.  (Ideally we would
@@ -394,133 +344,72 @@ select * from xacttest;
  777 | 777.777
 (5 rows)
 
-create or replace function max_xacttest() returns smallint language sql as
-'select max(a) from xacttest' stable;
-begin;
-update xacttest set a = max_xacttest() + 10 where a > 0;
-select * from xacttest;
-  a  |    b    
------+---------
-   0 | 0.09561
- 787 |     7.8
- 787 |  99.097
- 787 |  324.78
- 787 | 777.777
-(5 rows)
-
-rollback;
+-- create or replace function max_xacttest() returns smallint language sql as
+-- 'select max(a) from xacttest' stable;
+-- begin;
+-- update xacttest set a = max_xacttest() + 10 where a > 0;
+-- select * from xacttest;
+-- rollback;
 -- But a volatile function can see the partial results of the calling query
-create or replace function max_xacttest() returns smallint language sql as
-'select max(a) from xacttest' volatile;
-begin;
-update xacttest set a = max_xacttest() + 10 where a > 0;
-select * from xacttest;
-  a  |    b    
------+---------
-   0 | 0.09561
- 787 |     7.8
- 797 |  99.097
- 807 |  324.78
- 817 | 777.777
-(5 rows)
-
-rollback;
+-- create or replace function max_xacttest() returns smallint language sql as
+-- 'select max(a) from xacttest' volatile;
+-- begin;
+-- update xacttest set a = max_xacttest() + 10 where a > 0;
+-- select * from xacttest;
+-- rollback;
 -- Now the same test with plpgsql (since it depends on SPI which is different)
-create or replace function max_xacttest() returns smallint language plpgsql as
-'begin return max(a) from xacttest; end' stable;
-begin;
-update xacttest set a = max_xacttest() + 10 where a > 0;
-select * from xacttest;
-  a  |    b    
------+---------
-   0 | 0.09561
- 787 |     7.8
- 787 |  99.097
- 787 |  324.78
- 787 | 777.777
-(5 rows)
-
-rollback;
-create or replace function max_xacttest() returns smallint language plpgsql as
-'begin return max(a) from xacttest; end' volatile;
-begin;
-update xacttest set a = max_xacttest() + 10 where a > 0;
-select * from xacttest;
-  a  |    b    
------+---------
-   0 | 0.09561
- 787 |     7.8
- 797 |  99.097
- 807 |  324.78
- 817 | 777.777
-(5 rows)
-
-rollback;
+-- create or replace function max_xacttest() returns smallint language plpgsql as
+-- 'begin return max(a) from xacttest; end' stable;
+-- begin;
+-- update xacttest set a = max_xacttest() + 10 where a > 0;
+-- select * from xacttest;
+-- rollback;
+-- create or replace function max_xacttest() returns smallint language plpgsql as
+-- 'begin return max(a) from xacttest; end' volatile;
+-- begin;
+-- update xacttest set a = max_xacttest() + 10 where a > 0;
+-- select * from xacttest;
+-- rollback;
 -- test case for problems with dropping an open relation during abort
-BEGIN;
-	savepoint x;
-		CREATE TABLE koju (a INT UNIQUE);
-NOTICE:  CREATE TABLE / UNIQUE will create implicit index "koju_a_key" for table "koju"
-		INSERT INTO koju VALUES (1);
-		INSERT INTO koju VALUES (1);
-ERROR:  duplicate key violates unique constraint "koju_a_key"
-	rollback to x;
-	CREATE TABLE koju (a INT UNIQUE);
-NOTICE:  CREATE TABLE / UNIQUE will create implicit index "koju_a_key" for table "koju"
-	INSERT INTO koju VALUES (1);
-	INSERT INTO koju VALUES (1);
-ERROR:  duplicate key violates unique constraint "koju_a_key"
-ROLLBACK;
+-- BEGIN;
+-- 	savepoint x;
+-- 		CREATE TABLE koju (a INT UNIQUE);
+-- 		INSERT INTO koju VALUES (1);
+-- 		INSERT INTO koju VALUES (1);
+-- 	rollback to x;
+-- 	CREATE TABLE koju (a INT UNIQUE);
+-- 	INSERT INTO koju VALUES (1);
+-- 	INSERT INTO koju VALUES (1);
+-- ROLLBACK;
 DROP TABLE foo;
 DROP TABLE baz;
 DROP TABLE barbaz;
 -- verify that cursors created during an aborted subtransaction are
 -- closed, but that we do not rollback the effect of any FETCHs
 -- performed in the aborted subtransaction
-begin;
-savepoint x;
-create table abc (a int);
-insert into abc values (5);
-insert into abc values (10);
-declare foo cursor for select * from abc;
-fetch from foo;
- a 
----
- 5
-(1 row)
-
-rollback to x;
+-- begin;
+-- savepoint x;
+-- create table abc (a int);
+-- insert into abc values (5);
+-- insert into abc values (10);
+-- declare foo cursor for select * from abc;
+-- fetch from foo;
+-- rollback to x;
 -- should fail
-fetch from foo;
-ERROR:  cursor "foo" does not exist
-commit;
-begin;
-create table abc (a int);
-insert into abc values (5);
-insert into abc values (10);
-insert into abc values (15);
-declare foo cursor for select * from abc;
-fetch from foo;
- a 
----
- 5
-(1 row)
-
-savepoint x;
-fetch from foo;
- a  
-----
- 10
-(1 row)
-
-rollback to x;
-fetch from foo;
- a  
-----
- 15
-(1 row)
-
-abort;
+-- fetch from foo;
+-- commit;
+-- begin;
+-- create table abc (a int);
+-- insert into abc values (5);
+-- insert into abc values (10);
+-- insert into abc values (15);
+-- declare foo cursor for select * from abc;
+-- fetch from foo;
+-- savepoint x;
+-- fetch from foo;
+-- rollback to x;
+-- fetch from foo;
+-- abort;
 -- tests for the "tid" type
 SELECT '(3, 3)'::tid = '(3, 4)'::tid;
  ?column? 

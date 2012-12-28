@@ -23,6 +23,8 @@
 #include "cdb/cdbfilerepprimary.h"
 #include "cdb/cdbpersistenttablespace.h"
 #include "cdb/cdbpersistentstore.h"
+#include "cdb/cdbvars.h"
+#include "cdb/cdbutil.h"
 #include "storage/bufmgr.h"
 #include "storage/fd.h"
 #include "storage/smgr.h"
@@ -175,7 +177,9 @@ static void MirroredBufferPool_RecheckMirrorAccess(
 			char *mirrorFilespaceLocation;
 			
 			PersistentTablespace_GetPrimaryAndMirrorFilespaces(
+															   GpIdentity.segindex,
 															   open->relFileNode.spcNode,
+															   FALSE,
 															   &primaryFilespaceLocation,
 															   &mirrorFilespaceLocation);
 			
@@ -255,7 +259,9 @@ static void MirroredBufferPool_DoOpen(
 		fileFlags = O_CREAT | O_RDWR | PG_BINARY;
 
 	PersistentTablespace_GetPrimaryAndMirrorFilespaces(
+										GpIdentity.segindex,
 										relFileNode->spcNode,
+										FALSE,
 										&primaryFilespaceLocation,
 										&mirrorFilespaceLocation);
 	
@@ -1320,7 +1326,9 @@ static void MirroredBufferPool_DoDrop(
 							mirrorDataLossOccurred);
 
 	PersistentTablespace_GetPrimaryAndMirrorFilespaces(
+												   GpIdentity.segindex,
 												   relFileNode->spcNode,
+												   FALSE,
 												   &primaryFilespaceLocation,
 												   &mirrorFilespaceLocation);	
 	

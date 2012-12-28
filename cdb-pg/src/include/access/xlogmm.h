@@ -33,6 +33,7 @@ typedef struct xl_mm_fs_obj
 {
 	mm_fs_obj_type objtype; /* One of the MM_OBJ_* types */
 
+	int4	contentid;
 	Oid filespace;
 	Oid tablespace;
 	Oid database;
@@ -130,20 +131,20 @@ extern void mmxlog_desc(StringInfo buf, XLogRecPtr beginLoc, XLogRecord *record)
  * Functions to generate WAL records to remove file system objects on the
  * master / standby master.
  */
-extern void mmxlog_log_remove_filespace(Oid filespace);
-extern void mmxlog_log_remove_tablespace(Oid tablespace);
-extern void mmxlog_log_remove_database(Oid tablespace, Oid database);
-extern void mmxlog_log_remove_relfilenode( Oid tablespace, Oid database,
+extern void mmxlog_log_remove_filespace(int4 contentid, Oid filespace);
+extern void mmxlog_log_remove_tablespace(int4 contentid, Oid tablespace);
+extern void mmxlog_log_remove_database(int4 contentid, Oid tablespace, Oid database);
+extern void mmxlog_log_remove_relfilenode(int4 contentid, Oid tablespace, Oid database,
 										  Oid relfilenode, uint32 segnum);
 
 /*
  * Functions to generate WAL records to add file system objects on the
  * master / standby master.
  */
-extern void mmxlog_log_create_filespace(Oid filespace);
-extern void mmxlog_log_create_tablespace(Oid filespace, Oid tablespace);
-extern void mmxlog_log_create_database(Oid tablespace, Oid database);
-extern void mmxlog_log_create_relfilenode(Oid tablespace, Oid database,
+extern void mmxlog_log_create_filespace(int4 contentid, Oid filespace);
+extern void mmxlog_log_create_tablespace(int4 contentid, Oid filespace, Oid tablespace);
+extern void mmxlog_log_create_database(int4 contentid, Oid tablespace, Oid database);
+extern void mmxlog_log_create_relfilenode(int4 contentid, Oid tablespace, Oid database,
 										  Oid relfilenode, uint32 segnum);
 extern void mmxlog_append_checkpoint_data(XLogRecData rdata[5]);
 extern void mmxlog_read_checkpoint_data(char *cpdata, int masterMirroringLen, int checkpointLen, XLogRecPtr *beginLoc);

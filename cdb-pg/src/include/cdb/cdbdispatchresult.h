@@ -69,6 +69,9 @@ typedef struct CdbDispatchResult
 
 	int					numrowsrejected; /* num rows rejected in SREH mode */
 	
+	char *				serializedCatalog;	/* modified Catalog on QE*/
+	int					serializedCatalogLen;
+
 }   CdbDispatchResult;
 
 

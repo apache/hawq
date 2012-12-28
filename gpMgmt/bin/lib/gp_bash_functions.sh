@@ -230,7 +230,7 @@ if [ x"$TRUSTED_COPY" = x"" ]; then TRUSTED_COPY="$SCP"; fi
 PG_CONF_ADD_FILE=$WORKDIR/postgresql_conf_gp_additions
 RECOVER_FLAG=/tmp/active_recovery_in_progress
 SCHEMA_FILE=cdb_schema.sql
-DEFAULTDB=template1
+DEFAULTDB=template0
 
 CONFIG_TABLE="(SELECT dbid, content, role, preferred_role, mode, status,
                hostname, address, port, fselocation as datadir,

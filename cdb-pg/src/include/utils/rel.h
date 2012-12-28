@@ -213,11 +213,22 @@ typedef struct RelationData
 	/*
 	 * Physical file-system information.
 	 */
-	struct RelationNodeInfo rd_segfile0_relationnodeinfo;
+	/*struct RelationNodeInfo rd_segfile0_relationnodeinfo;*/
 								/* Values from gp_relation_node, if present */
 
 	/* use "struct" here to avoid needing to include pgstat.h: */
 	struct PgStat_TableStatus *pgstat_info;		/* statistics collection area */
+
+	/*
+	 * in gpsql, master create all segfiles for segments,
+	 * therefore we need an array.
+	 * use this varaiable instead of rd_segfile0_relationnodeinfo,
+	 * rd_segfile0_relationnodeinfo should be removed finally.
+	 */
+	struct RelationNodeInfo * rd_segfile0_relationnodeinfos;
+	int32 rd_segfile0_count;
+
+
 } RelationData;
 
 /*

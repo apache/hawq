@@ -53,6 +53,7 @@ typedef DatabaseDirEntryData *DatabaseDirEntry;
 extern void PersistentDatabase_DirIterateInit(void);
 
 extern bool PersistentDatabase_DirIterateNext(
+	int4					*contentid,
 	DbDirNode				*dbDirNode,
 
 	PersistentFileSysState	*state,
@@ -64,6 +65,7 @@ extern bool PersistentDatabase_DirIterateNext(
 extern void PersistentDatabase_DirIterateClose(void);
 
 extern bool PersistentDatabase_DbDirExistsUnderLock(
+	int4					contentid,
 	DbDirNode				*dbDirNode);
 
 extern void PersistentDatabase_Reset(void);
@@ -79,6 +81,7 @@ extern void PersistentDatabase_Reset(void);
  * note on XLOG flushing).
  */
 extern void PersistentDatabase_MarkCreatePending(
+	int4			contentid,
 	DbDirNode 		*dbDirNode,
 				/* The tablespace and database OIDs for the create. */
 
@@ -181,9 +184,11 @@ extern void PersistentDatabase_Dropped(
 				/* Serial number for the relation.	Distinquishes the uses of the tuple. */
 
 extern bool PersistentDatabase_DirIsCreated(
+	int4			contentid,
 	DbDirNode		*dbDirNode);
 	
 extern void PersistentDatabase_MarkJustInTimeCreatePending(
+	int4			contentid,
 	DbDirNode 		*dbDirNode,
 
 	MirroredObjectExistenceState 	mirrorExistenceState,
@@ -195,6 +200,7 @@ extern void PersistentDatabase_MarkJustInTimeCreatePending(
 				/* Serial number for the relation.	Distinquishes the uses of the tuple. */
 
 extern void PersistentDatabase_JustInTimeCreated(
+	int4			contentid,
 	DbDirNode 		*dbDirNode,
 
 	ItemPointer 	persistentTid,
@@ -204,6 +210,7 @@ extern void PersistentDatabase_JustInTimeCreated(
 				/* Serial number for the relation.	Distinquishes the uses of the tuple. */
 	
 extern void PersistentDatabase_AbandonJustInTimeCreatePending(
+	int4			contentid,
 	DbDirNode 		*dbDirNode,
 
 	ItemPointer 	persistentTid,

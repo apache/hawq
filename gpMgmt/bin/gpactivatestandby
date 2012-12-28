@@ -539,6 +539,9 @@ def stop_database():
 logger = get_default_logger()
 setup_tool_logging(EXECNAME, unix.getLocalHostname(), unix.getUserName())
 
+logger.fatal('gpactivestandby NOT SUPPORTED YET IN GPSQL')
+sys.exit(1)
+
 # parse args and options
 (options_, args_) = parseargs()
 

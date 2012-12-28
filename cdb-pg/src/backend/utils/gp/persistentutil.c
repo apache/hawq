@@ -22,6 +22,7 @@
 #include "cdb/cdbglobalsequence.h"
 #include "cdb/cdbpersistenttablespace.h"
 #include "cdb/cdbpersistentfilesysobj.h"
+#include "cdb/cdbvars.h"
 #include "executor/executor.h"
 #include "utils/builtins.h"
 
@@ -570,7 +571,7 @@ gp_persistent_relation_node_check(PG_FUNCTION_ARGS)
 		fdata->tablespaceOid = HeapTupleGetOid(tuple);
 				
 		PersistentTablespace_GetPrimaryAndMirrorFilespaces(
-			fdata->tablespaceOid, &primaryPath, &mirrorPath);
+			GpIdentity.segindex, fdata->tablespaceOid, FALSE, &primaryPath, &mirrorPath);
 
 		/* Find the location of this tablespace on disk */
 		FormTablespacePath(fdata->tablespaceDirName, 

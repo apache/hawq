@@ -539,7 +539,7 @@ test_postmaster_connection(bool do_checkpoint __attribute__((unused)))
 	 * probably timeout first
 	 */
 	snprintf(connstr, sizeof(connstr),
-			"dbname=postgres port=%s connect_timeout=5 options=%s", portstr, backend_options);
+			"dbname=template0 port=%s connect_timeout=5 options=%s", portstr, backend_options);
 
 	for (i = 0; i < wait_seconds; i++)
 	{

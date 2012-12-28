@@ -186,8 +186,9 @@ calculate_database_size(Oid dbOid)
 		if (tsOid != GLOBALTABLESPACE_OID)
 		{			
 			/* Find the filespace path for this tablespace */
+			/* Master access its own database only. */
 			PersistentTablespace_GetPrimaryAndMirrorFilespaces(
-				tsOid, &priFilespace, &mirFilespace);
+				GpIdentity.segindex, tsOid, FALSE, &priFilespace, &mirFilespace);
 
 			/* Build the path for this database in this tablespace */
 			FormDatabasePath(pathname, priFilespace, tsOid, dbOid);

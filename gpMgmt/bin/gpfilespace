@@ -662,7 +662,7 @@ class GPFilespace:
         self.hostcache  = None
 
         self.default_fsysname = 'local'
-        self.default_fsreplica = 1
+        self.default_fsreplica = 3
 
     def Setup(self):
         '''
@@ -971,7 +971,8 @@ class GPFilespace:
         if fsysname == None:
             fsysname = ""
             file_system_names = []
-            file_system_names.append(self.default_fsysname)
+            # there is no local file system anymore.
+            # file_system_names.append(self.default_fsysname)
             file_system_names.extend([fsys.getName() for fsys in self.array.getFilesystem()])
             question = "Available filesystem name:\n"
             for name in file_system_names:
@@ -1016,7 +1017,7 @@ class GPFilespace:
             print "Your system has %d hosts with %d primary and %d mirror " \
                 "segments per host." % (nhosts, nprimary, nmirror)
 
-        shared_filespace = fsysname != self.default_fsysname
+        shared_filespace = True
         # For every configuration we need to setup paths for the filespace
         # Loop through each one and prompt for paths.
         for id in configurations:
@@ -1040,17 +1041,14 @@ class GPFilespace:
             # Note: it is theoretically possible for gpexpand to create
             # some hosts with "mirror only" configurations.
             if (nprimary > 0):
-                print "\nPlease specify %s locations for the primary " \
-                    "segments, one per line:" % nprimary
+                print "\nPlease specify the DFS location for the segments (for example: localhost:9000/fs)"
+                prompt = "location> "
+                dir = getdir(prompt, config.hosts, primary=True, shared=shared_filespace)
                 for i in range(nprimary):
                     prompt = "primary location %d> " % (i+1)
-                    dir = getdir(prompt, config.hosts, primary=True, shared=shared_filespace)
                     config.set_primary(dir)
-                    # Shared filespace will be shared by primary and mirror.
-                    if shared_filespace:
-                        config.set_mirror(dir)
                     logger.debug("%s %s" % (prompt, dir))
-                
+
             # Get mirror segment locations, if needed
             if (nmirror > 0 and not shared_filespace):
                 print "\nPlease specify %s locations for the mirror " \
@@ -1216,6 +1214,8 @@ To add this filespace to the database please run the command:
                         logger.warn("detected an old style file or an invalid file")
                         logger.warn("no fsysname at line %d: default fsysname is '%s'" % (lineno, self.default_fsysname))
                     fsysname = self.default_fsysname
+                elif fsysname == 'local':
+                    raise GPError('Invalid filesystem name: %s' % fsysname)
                 elif not isValidIdentifier(fsysname):
                     processed = True
                     raise GPError('Invalid filesystem name, should be a valid filesystem name: %s' % fsysname)

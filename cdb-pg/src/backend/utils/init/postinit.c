@@ -26,6 +26,7 @@
 #include "catalog/pg_database.h"
 #include "catalog/pg_tablespace.h"
 #include "libpq/hba.h"
+#include "libpq/libpq-be.h"
 #include "cdb/cdbvars.h"
 #include "cdb/cdbutil.h"
 #include "mb/pg_wchar.h"
@@ -242,7 +243,12 @@ CheckMyDatabase(const char *name, bool am_superuser)
 	 * OK, we're golden.  Next to-do item is to save the encoding info out of
 	 * the pg_database tuple.
 	 */
-	SetDatabaseEncoding(dbform->encoding);
+	if (GpIdentity.segindex == UNINITIALIZED_GP_IDENTITY_VALUE ||
+		GpIdentity.segindex == MASTER_CONTENT_ID)
+		SetDatabaseEncoding(dbform->encoding);
+	else
+		SetDatabaseEncoding(MyProcPort->encoding);
+
 	/* Record it as a GUC internal option, too */
 	SetConfigOption("server_encoding", GetDatabaseEncodingName(),
 					PGC_INTERNAL, PGC_S_OVERRIDE);
@@ -501,8 +507,14 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 	 * CREATE DATABASE.
 	 */
 	if (!bootstrap)
-		LockSharedObject(DatabaseRelationId, MyDatabaseId, 0,
-						 RowExclusiveLock);
+	{
+		if (MyDatabaseId == TemplateDbOid)
+			LockSharedObject(DatabaseRelationId, MyDatabaseId, 0,
+							 AccessShareLock);
+		else
+			LockSharedObject(DatabaseRelationId, MyDatabaseId, 0,
+							 RowExclusiveLock);
+	}
 
 	/*
 	 * Recheck the flat file copy of pg_database to make sure the target

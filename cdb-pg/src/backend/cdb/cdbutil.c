@@ -1199,6 +1199,51 @@ dbid_get_dbinfo(int16 dbid)
 }
 
 /*
+ * Obtain the contentid of a segment at a given dbid.
+ */
+int16
+get_contentid_from_dbid(int16 db_id)
+{
+	int16 contendid = -2;
+	ScanKeyData key[1];
+	HeapScanDesc scandesc;
+	Relation rel;
+	HeapTuple tup;
+
+	/*
+	 * Can only run on a master node, this restriction is due to the reliance
+	 * on the gp_segment_configuration table.  This may be able to be relaxed
+	 * by switching to a different method of checking.
+	 */
+	if (GpIdentity.segindex != MASTER_CONTENT_ID)
+		elog(ERROR, "get_contentid_from_dbid() executed on execution segment");
+
+	rel = heap_open(GpSegmentConfigRelationId, AccessShareLock);
+
+	ScanKeyInit(&key[0], Anum_gp_segment_configuration_dbid,
+				BTEqualStrategyNumber, F_INT2EQ,
+				Int16GetDatum(db_id));
+
+	scandesc = heap_beginscan(rel, SnapshotNow, 1, key);
+	tup = heap_getnext(scandesc, ForwardScanDirection);
+
+	if (HeapTupleIsValid(tup))
+	{
+		contendid = ((Form_gp_segment_configuration) GETSTRUCT(tup))->content;
+
+		/* We expect a single result, assert this */
+		Assert(!HeapTupleIsValid(heap_getnext(scandesc, ForwardScanDirection)));
+	}
+
+	heap_endscan(scandesc);
+
+	/* no need to hold the lock, it's a catalog */
+	heap_close(rel, AccessShareLock);
+	return contendid;
+}
+
+
+/*
  * Obtain the dbid of a of a segment at a given segment index (i.e., content id)
  * currently fulfilling the role specified. This means that the segment is
  * really performing the role of primary or mirror, irrespective of their

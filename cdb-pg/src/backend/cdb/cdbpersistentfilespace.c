@@ -63,6 +63,7 @@ typedef struct PersistentFilespaceData
 
 typedef struct FilespaceDirEntryKey
 {
+	int4	contentid;
 	Oid	filespaceOid;
 } FilespaceDirEntryKey;
 
@@ -106,6 +107,7 @@ static void PersistentFilespace_VerifyInitScan(void)
  */
 static FilespaceDirEntry
 PersistentFilespace_FindDirUnderLock(
+	int4		contentid,
 	Oid			filespaceOid)
 {
 	bool			found;
@@ -114,9 +116,12 @@ PersistentFilespace_FindDirUnderLock(
 
 	FilespaceDirEntryKey key;
 
+	elog(DEBUG1, "PersistentFilespace_FindDirUnderLock: contentid %d filespace %d", contentid, filespaceOid);
+
 	if (persistentFilespaceSharedHashTable == NULL)
 		elog(PANIC, "Persistent filespace information shared-memory not setup");
 
+	key.contentid = contentid;
 	key.filespaceOid = filespaceOid;
 
 	filespaceDirEntry =
@@ -133,6 +138,7 @@ PersistentFilespace_FindDirUnderLock(
 
 static FilespaceDirEntry
 PersistentFilespace_CreateDirUnderLock(
+	int4		contentid,
 	Oid			filespaceOid)
 {
 	bool			found;
@@ -141,9 +147,12 @@ PersistentFilespace_CreateDirUnderLock(
 
 	FilespaceDirEntryKey key;
 
+	elog(DEBUG1, "PersistentFilespace_CreateDirUnderLock: contentid %d filespace %d", contentid, filespaceOid);
+
 	if (persistentFilespaceSharedHashTable == NULL)
 		elog(PANIC, "Persistent filespace information shared-memory not setup");
 
+	key.contentid = contentid;
 	key.filespaceOid = filespaceOid;
 
 	filespaceDirEntry =
@@ -194,6 +203,7 @@ static bool PersistentFilespace_ScanTupleCallback(
 	Datum					*values)
 {
 	Oid		filespaceOid;
+	int4	contentid;
 
 	int16	dbId1;
 	char	locationBlankPadded1[FilespaceLocationBlankPaddedWithNullTermLen];
@@ -218,6 +228,7 @@ static bool PersistentFilespace_ScanTupleCallback(
 	GpPersistentFilespaceNode_GetValues(
 									values,
 									&filespaceOid,
+									&contentid,
 									&dbId1,
 									locationBlankPadded1,
 									&dbId2,
@@ -243,6 +254,7 @@ static bool PersistentFilespace_ScanTupleCallback(
 
 	filespaceDirEntry =
 			PersistentFilespace_CreateDirUnderLock(
+											contentid,
 											filespaceOid);
 
 	filespaceDirEntry->dbId1 = dbId1;
@@ -280,6 +292,7 @@ static bool PersistentFilespace_CheckScanTupleCallback(
 	Datum					*values)
 {
 	Oid		filespaceOid;
+	int4	contentid;
 
 	int16	dbId1;
 	char	locationBlankPadded1[FilespaceLocationBlankPaddedWithNullTermLen];
@@ -302,6 +315,7 @@ static bool PersistentFilespace_CheckScanTupleCallback(
 	GpPersistentFilespaceNode_GetValues(
 									values,
 									&filespaceOid,
+									&contentid,
 									&dbId1,
 									locationBlankPadded1,
 									&dbId2,
@@ -389,6 +403,7 @@ static bool PersistentFilespace_FileRepVerifyScanTupleCallback(
 															   Datum				*values)
 {
 	Oid		filespaceOid;
+	int4	contentid;
 
 	int16	dbId1;
 	char	locationBlankPadded1[FilespaceLocationBlankPaddedWithNullTermLen];
@@ -411,6 +426,7 @@ static bool PersistentFilespace_FileRepVerifyScanTupleCallback(
 	GpPersistentFilespaceNode_GetValues(
 										values,
 										&filespaceOid,
+										&contentid,
 										&dbId1,
 										locationBlankPadded1,
 										&dbId2,
@@ -451,6 +467,7 @@ void PersistentFilespace_FileRepVerify(void)
 }
 
 extern void PersistentFilespace_LookupTidAndSerialNum(
+	int4		contentid,
 	Oid 		filespaceOid,
 				/* The filespace OID for the lookup. */
 
@@ -469,6 +486,7 @@ extern void PersistentFilespace_LookupTidAndSerialNum(
 
 	filespaceDirEntry =
 				PersistentFilespace_FindDirUnderLock(
+												contentid,
 												filespaceOid);
 	if (filespaceDirEntry == NULL)
 		elog(ERROR, "Did not find persistent filespace entry %u",
@@ -510,6 +528,7 @@ static void PersistentFilespace_AddTuple(
 	GpPersistentFilespaceNode_SetDatumValues(
 										values,
 										filespaceOid,
+										filespaceDirEntry->key.contentid,
 										filespaceDirEntry->dbId1,
 										filespaceDirEntry->locationBlankPadded1,
 										filespaceDirEntry->dbId2,
@@ -601,6 +620,7 @@ void PersistentFilespace_ConvertBlankPaddedLocation(
 }
 
 bool PersistentFilespace_TryGetPrimaryAndMirrorUnderLock(
+	int4		contentid,
 	Oid 		filespaceOid,
 				/* The filespace OID to lookup. */
 
@@ -641,10 +661,12 @@ bool PersistentFilespace_TryGetPrimaryAndMirrorUnderLock(
 
 	filespaceDirEntry =
 				PersistentFilespace_FindDirUnderLock(
+												contentid,
 												filespaceOid);
 	if (filespaceDirEntry == NULL)
 		return false;
 
+	primaryDbId = GpIdentity.dbid;
 	/*
 	 * The persistent_filespace_node_table contains the paths for both the
 	 * primary and mirror nodes, and the table is the same on both sides of the
@@ -653,7 +675,6 @@ bool PersistentFilespace_TryGetPrimaryAndMirrorUnderLock(
 	 * determine which path corresponds to this node we compare our dbid to the
 	 * one stored in the table.
 	 */
-	primaryDbId = GpIdentity.dbid;
 	if (filespaceDirEntry->dbId1 == primaryDbId)
 	{
 		/* dbid == dbid1 */
@@ -665,6 +686,12 @@ bool PersistentFilespace_TryGetPrimaryAndMirrorUnderLock(
 		/* dbid == dbid2 */
 		primaryBlankPadded = filespaceDirEntry->locationBlankPadded2;
 		mirrorBlankPadded = filespaceDirEntry->locationBlankPadded1;
+	}
+	else if (contentid != MASTER_CONTENT_ID)
+	{
+		/* XXX:mat3: The QEs locations on the QD. */
+		primaryBlankPadded = filespaceDirEntry->locationBlankPadded1;
+		mirrorBlankPadded = filespaceDirEntry->locationBlankPadded2;		
 	}
 	else
 	{
@@ -717,6 +744,7 @@ bool PersistentFilespace_TryGetPrimaryAndMirrorUnderLock(
 }
 
 void PersistentFilespace_GetPrimaryAndMirrorUnderLock(
+	int4		contentid,
 	Oid 		filespaceOid,
 				/* The filespace OID to lookup. */
 
@@ -734,6 +762,7 @@ void PersistentFilespace_GetPrimaryAndMirrorUnderLock(
 	 */
 
 	if (!PersistentFilespace_TryGetPrimaryAndMirrorUnderLock(
+													contentid,
 													filespaceOid,
 													primaryFilespaceLocation,
 													mirrorFilespaceLocation))
@@ -766,7 +795,9 @@ bool PersistentFilespace_TryGetPrimaryAndMirror(
 
 	READ_PERSISTENT_STATE_ORDERED_LOCK;
 
+	Insist(false);
 	result = PersistentFilespace_TryGetPrimaryAndMirrorUnderLock(
+													-1 /* XXX:mat3: No references */,
 													filespaceOid,
 													primaryFilespaceLocation,
 													mirrorFilespaceLocation);
@@ -777,6 +808,7 @@ bool PersistentFilespace_TryGetPrimaryAndMirror(
 }
 
 void PersistentFilespace_GetPrimaryAndMirror(
+	int4		contentid,
 	Oid 		filespaceOid,
  	            /* The filespace OID to lookup */
 
@@ -798,6 +830,7 @@ void PersistentFilespace_GetPrimaryAndMirror(
 	READ_PERSISTENT_STATE_ORDERED_LOCK;
 
 	if (!PersistentFilespace_TryGetPrimaryAndMirrorUnderLock(
+											contentid,
 											filespaceOid,
 											primaryFilespaceLocation,
 											mirrorFilespaceLocation))
@@ -826,6 +859,8 @@ void PersistentFilespace_GetPrimaryAndMirror(
 void PersistentFilespace_MarkCreatePending(
 	Oid 		filespaceOid,
 				/* The filespace where the filespace lives. */
+
+	int4		contentid,
 
 	int16		primaryDbId,
 
@@ -870,14 +905,17 @@ void PersistentFilespace_MarkCreatePending(
 	PersistentFilespace_VerifyInitScan();
 
 	PersistentFileSysObjName_SetFilespaceDir(&fsObjName,filespaceOid,is_filespace_shared);
+	fsObjName.contentid = contentid;
 
 	WRITE_PERSISTENT_STATE_ORDERED_LOCK;
 
 	filespaceDirEntry =
 				PersistentFilespace_CreateDirUnderLock(
+												contentid,
 												filespaceOid);
 	Assert(filespaceDirEntry != NULL);
 
+	filespaceDirEntry->key.contentid = contentid;
 	filespaceDirEntry->dbId1 = primaryDbId;
 	PersistentFilespace_BlankPadCopyLocation(
 										filespaceDirEntry->locationBlankPadded1,
@@ -905,7 +943,7 @@ void PersistentFilespace_MarkCreatePending(
 	 * This XLOG must be generated under the persistent write-lock.
 	 */
 #ifdef MASTER_MIRROR_SYNC
-	mmxlog_log_create_filespace(filespaceOid);
+	mmxlog_log_create_filespace(filespaceDirEntry->key.contentid, filespaceOid);
 #endif
 
 
@@ -986,6 +1024,7 @@ void PersistentFilespace_Created(
 
 	filespaceDirEntry =
 				PersistentFilespace_FindDirUnderLock(
+												fsObjName->contentid,
 												filespaceOid);
 	if (filespaceDirEntry == NULL)
 		elog(ERROR, "did not find persistent filespace entry %u",
@@ -1068,6 +1107,7 @@ PersistentFileSysObjStateChangeResult PersistentFilespace_MarkDropPending(
 
 	filespaceDirEntry =
 				PersistentFilespace_FindDirUnderLock(
+												fsObjName->contentid,
 												filespaceOid);
 	if (filespaceDirEntry == NULL)
 		elog(ERROR, "Did not find persistent filespace entry %u",
@@ -1147,10 +1187,11 @@ PersistentFileSysObjStateChangeResult PersistentFilespace_MarkAbortingCreate(
 
 	filespaceDirEntry =
 				PersistentFilespace_FindDirUnderLock(
+												fsObjName->contentid,
 												filespaceOid);
 	if (filespaceDirEntry == NULL)
-		elog(ERROR, "Did not find persistent filespace entry %u",
-			 filespaceOid);
+		elog(ERROR, "Did not find persistent contentid %d filespace entry %u",
+			 fsObjName->contentid, filespaceOid);
 
 	if (filespaceDirEntry->state != PersistentFileSysState_CreatePending)
 		elog(ERROR, "Persistent filespace entry %u expected to be in 'Create Pending' (actual state '%s')",
@@ -1209,7 +1250,7 @@ PersistentFilespace_DroppedVerifiedActionCallback(
 		 * This XLOG must be generated under the persistent write-lock.
 		 */
 #ifdef MASTER_MIRROR_SYNC
-		mmxlog_log_remove_filespace(filespaceOid);
+		mmxlog_log_remove_filespace(fsObjName->contentid, filespaceOid);
 #endif
 
 		break;
@@ -1260,6 +1301,7 @@ void PersistentFilespace_Dropped(
 
 	filespaceDirEntry =
 				PersistentFilespace_FindDirUnderLock(
+												fsObjName->contentid,
 												filespaceOid);
 	if (filespaceDirEntry == NULL)
 		elog(ERROR, "Did not find persistent filespace entry %u",
@@ -1322,7 +1364,9 @@ PersistentFilespace_AddMirror(Oid filespace,
 
 	WRITE_PERSISTENT_STATE_ORDERED_LOCK;
 
-	fde = PersistentFilespace_FindDirUnderLock(filespace);
+	/* Not support for mirror! */
+	Assert(false);
+	fde = PersistentFilespace_FindDirUnderLock(-1, filespace);
 	if (fde == NULL)
 		elog(ERROR, "did not find persistent filespace entry %u",
 			 filespace);
@@ -1538,7 +1582,7 @@ Size PersistentFilespace_ShmemSize(void)
 	Size		size;
 
 	/* The hash table of persistent filespaces */
-	size = hash_estimate_size((Size)gp_max_filespaces,
+	size = hash_estimate_size((Size)gp_max_filespaces * (GpIdentity.segindex != MASTER_CONTENT_ID ? 1 : GpIdentity.numsegments + 1),
 							  sizeof(FilespaceDirEntryData));
 
 	/* The shared-memory structure. */
@@ -1567,8 +1611,8 @@ PersistentFilespace_HashTableInit(void)
 
 	persistentFilespaceSharedHashTable =
 						ShmemInitHash("Persistent Filespace Hash",
-								   gp_max_filespaces,
-								   gp_max_filespaces,
+								   gp_max_filespaces * (GpIdentity.numsegments != MASTER_CONTENT_ID ? 1 : GpIdentity.numsegments + 1),
+								   gp_max_filespaces * (GpIdentity.numsegments != MASTER_CONTENT_ID ? 1 : GpIdentity.numsegments + 1),
 								   &info,
 								   hash_flags);
 

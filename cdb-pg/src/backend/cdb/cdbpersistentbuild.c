@@ -42,6 +42,8 @@
 #include "storage/bufpage.h"
 #include "commands/tablespace.h"
 
+#include "cdb/cdbvars.h"
+
 static void
 PersistentBuild_NonTransactionTruncate(RelFileNode *relFileNode)
 {
@@ -53,6 +55,7 @@ PersistentBuild_NonTransactionTruncate(RelFileNode *relFileNode)
 										&fsObjName, 
 										relFileNode,
 										/* segmentFileNum */ 0,
+										GpIdentity.segindex,
 										is_tablespace_shared);
 	if (Debug_persistent_print)
 		elog(Persistent_DebugPrintLevel(), 
@@ -106,6 +109,7 @@ static void PersistentBuild_ScanGpPersistentRelationNodeForGlobal(
 	{
 		RelFileNode 					relFileNode;
 		int32 							segmentFileNum;
+		int32							contentid;
 		
 		PersistentFileSysRelStorageMgr	relationStorageManager;
 		PersistentFileSysState			persistentState;
@@ -132,6 +136,7 @@ static void PersistentBuild_ScanGpPersistentRelationNodeForGlobal(
 										&relFileNode.dbNode,
 										&relFileNode.relNode,
 										&segmentFileNum,
+										&contentid,
 										&relationStorageManager,
 										&persistentState,
 										&createMirrorDataLossTrackingSessionNum,
@@ -156,6 +161,7 @@ static void PersistentBuild_ScanGpPersistentRelationNodeForGlobal(
 											&fsObjName,
 											&relFileNode,
 											segmentFileNum,
+											GpIdentity.segindex,
 											NULL);
 		fsObjName.hasInited = true;
 		fsObjName.sharedStorage = sharedStorage;
@@ -172,6 +178,7 @@ static void PersistentBuild_ScanGpPersistentRelationNodeForGlobal(
 						/* relationName */ NULL,	// Optional.
 						relFileNode.relNode,	// pg_class relfilenode
 						/* segmentFileNum */ 0,
+						contentid,
 						/* updateIndex */ false,
 						&persistentTid,
 						persistentSerialNum);
@@ -271,6 +278,7 @@ static void PersistentBuild_PopulateGpRelationNode(
 			PersistentRelation_AddCreated(
 										&relFileNode,
 										/* segmentFileNum */ 0,
+										MASTER_CONTENT_ID, /* use master contentid for all heap table and index*/
 										relStorageMgr,
 										relBufpoolKind,
 										mirrorExistenceState,
@@ -288,6 +296,7 @@ static void PersistentBuild_PopulateGpRelationNode(
 							dbInfoRel->relname,
 							relFileNode.relNode,	// pg_class relfilenode
 							/* segmentFileNum */ 0,
+							MASTER_CONTENT_ID, /* use master contentid for all heap table and index*/
 							/* updateIndex */ false,
 							&persistentTid,
 							persistentSerialNum);
@@ -397,6 +406,7 @@ static void PersistentBuild_PopulateGpRelationNode(
 				PersistentRelation_AddCreated(
 											&relFileNode,
 											physicalSegmentFileNum,
+											GpIdentity.segindex,
 											relStorageMgr,
 											PersistentFileSysRelBufpoolKind_None,
 											mirrorExistenceState,
@@ -414,6 +424,7 @@ static void PersistentBuild_PopulateGpRelationNode(
 								dbInfoRel->relname,
 								relFileNode.relNode,	// pg_class relfilenode
 								physicalSegmentFileNum,
+								GpIdentity.numsegments,
 								/* updateIndex */ false,
 								&persistentTid,
 								persistentSerialNum);
@@ -462,6 +473,7 @@ static void PersistentBuild_PopulateGpRelationNode(
 	indexInfo->ii_NumIndexAttrs = Natts_gp_relation_node_index;
 	indexInfo->ii_KeyAttrNumbers[0] = 1;
 	indexInfo->ii_KeyAttrNumbers[1] = 2;
+	indexInfo->ii_KeyAttrNumbers[2] = 6;
 	indexInfo->ii_Unique = true;
 
 	if (Debug_persistent_print)
@@ -704,6 +716,7 @@ gp_persistent_build_all(PG_FUNCTION_ARGS)
 				 tablespaceOid, DatumGetInt32(d[Anum_pg_tablespace_spcfsoid - 1]));
 						
 		PersistentTablespace_AddCreated(
+										/* XXX:mat3: There is no way to build this from pg_tablespace, need more metadata to rebuilt.... */ 0,
 										DatumGetInt32(d[Anum_pg_tablespace_spcfsoid - 1]),
 										tablespaceOid,
 										mirrored ?
@@ -721,7 +734,7 @@ gp_persistent_build_all(PG_FUNCTION_ARGS)
 	
 	/*
 	 * Re-build databases.
-	 * Do template1 first since it will also populate the shared-object persistent objects.
+	 * Do template0 first since it will also populate the shared-object persistent objects.
 	 */	
 	PersistentBuild_BuildDb(
 						TemplateDbOid,
@@ -729,7 +742,7 @@ gp_persistent_build_all(PG_FUNCTION_ARGS)
 
 	if (Debug_persistent_print)
 		elog(Persistent_DebugPrintLevel(), 
-			 "gp_persistent_build_all: template1 complete");
+			 "gp_persistent_build_all: template0 complete");
 
 	/*
 	 * Now, the remaining databases.
@@ -748,7 +761,7 @@ gp_persistent_build_all(PG_FUNCTION_ARGS)
 		{
 			if (Debug_persistent_print)
 				elog(Persistent_DebugPrintLevel(), 
-					 "gp_persistent_build_all: skip template1");
+					 "gp_persistent_build_all: skip template0");
 			continue;
 		}
 

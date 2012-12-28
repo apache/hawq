@@ -25,6 +25,8 @@
 #include "catalog/pg_compression.h"
 #include "utils/faultinjector.h"
 
+#include "cdb/cdbvars.h"
+
 typedef enum AOCSBK
 {
 	AOCSBK_None = 0,
@@ -721,8 +723,8 @@ void destroy_datumstreamread(DatumStreamRead *ds)
 
 void datumstreamwrite_open_file(DatumStreamWrite *ds, char *fn, int64 eof, int64 eofUncompressed, RelFileNode relFileNode, int32 segmentFileNum)
 {
-	ItemPointerData persistentTid;
-	int64 persistentSerialNum;
+/*	ItemPointerData persistentTid;
+	int64 persistentSerialNum;*/
 
     ds->eof = eof;
     ds->eofUncompress = eofUncompressed;
@@ -731,11 +733,15 @@ void datumstreamwrite_open_file(DatumStreamWrite *ds, char *fn, int64 eof, int64
         datumstreamwrite_close_file(ds);
 
 	/*
+     * in gpsql, all segfiles must be created by master before dispatching
+     */
+
+	/*
 	 * Segment file #0 is created when the Append-Only table is created.
 	 *
 	 * Other segment files are created on-demand under transaction.
 	 */
-	if (segmentFileNum > 0 && eof == 0)
+	/*if (segmentFileNum > 0 && eof == 0)
 	{
 		AppendOnlyStorageWrite_TransactionCreateFile(
 			&ds->ao_write,
@@ -759,7 +765,7 @@ void datumstreamwrite_open_file(DatumStreamWrite *ds, char *fn, int64 eof, int64
 				 segmentFileNum,
 				 eof);
 		}
-	}
+	}*/
 
 	/*
 	 * Open the existing file for write.
@@ -771,8 +777,9 @@ void datumstreamwrite_open_file(DatumStreamWrite *ds, char *fn, int64 eof, int64
 		eofUncompressed,
 		&relFileNode,
 		segmentFileNum,
-		&persistentTid,
-		persistentSerialNum);
+		GpIdentity.segindex
+		/*&persistentTid,
+		persistentSerialNum*/);
 
 	ds->need_close_file = true;
 }

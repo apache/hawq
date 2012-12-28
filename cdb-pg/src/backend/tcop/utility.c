@@ -552,9 +552,13 @@ ProcessDropStatement(DropStmt *stmt)
 		 */
 		switch (stmt->removeType)
 		{
+			case OBJECT_FOREIGNTABLE:
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support drop foreign table statement yet in GPSQL") ));
+
 			case OBJECT_TABLE:
 			case OBJECT_EXTTABLE:
-			case OBJECT_FOREIGNTABLE:
+
 				rel = makeRangeVarFromNameList(names);
 				if (CheckDropPermissions(rel, RELKIND_RELATION,
 										 stmt->missing_ok) &&
@@ -565,6 +569,9 @@ ProcessDropStatement(DropStmt *stmt)
 				break;
 
 			case OBJECT_SEQUENCE:
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support drop sequence statement yet in GPSQL") ));
+
 				rel = makeRangeVarFromNameList(names);
 				if (CheckDropPermissions(rel, RELKIND_SEQUENCE,
 										 stmt->missing_ok))
@@ -578,11 +585,13 @@ ProcessDropStatement(DropStmt *stmt)
 				if (CheckDropPermissions(rel, RELKIND_VIEW,
 										 stmt->missing_ok))
 					RemoveView(rel, stmt->behavior);
-				else
-					dispatchDrop = false;
+				dispatchDrop = false;
 				break;
 
 			case OBJECT_INDEX:
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support drop index statement yet in GPSQL") ));
+
 				rel = makeRangeVarFromNameList(names);
 				if (CheckDropPermissions(rel, RELKIND_INDEX,
 										 stmt->missing_ok))
@@ -592,12 +601,17 @@ ProcessDropStatement(DropStmt *stmt)
 				break;
 
 			case OBJECT_TYPE:
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support drop type statement yet in GPSQL") ));
+
 				/* RemoveType does its own permissions checks */
 				RemoveType(names, stmt->behavior,
 						   stmt->missing_ok);
 				break;
 
 			case OBJECT_DOMAIN:
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support drop domain statement yet in GPSQL") ));
 
 				/*
 				 * RemoveDomain does its own permissions checks
@@ -607,6 +621,9 @@ ProcessDropStatement(DropStmt *stmt)
 				break;
 
 			case OBJECT_CONVERSION:
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support drop conversion statement yet in GPSQL") ));
+
 				DropConversionCommand(names, stmt->behavior,
 									  stmt->missing_ok);
 				break;
@@ -625,6 +642,7 @@ ProcessDropStatement(DropStmt *stmt)
 				 * RemoveFileSpace does its own permissions checks
 				 */
 				RemoveFileSpace(names, stmt->behavior, stmt->missing_ok);
+				dispatchDrop = false;
 				break;
 
 			case OBJECT_FILESYSTEM:
@@ -639,10 +657,13 @@ ProcessDropStatement(DropStmt *stmt)
 				 * RemoveTableSpace does its own permissions checks
 				 */
 				RemoveTableSpace(names, stmt->behavior, stmt->missing_ok);
+				dispatchDrop = false;
 				break;
 
 			case OBJECT_EXTPROTOCOL:
-				
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support drop protocol statement yet in GPSQL") ));
+
 				/*
 				 * RemoveExtProtocol does its own permissions checks
 				 */
@@ -735,8 +756,6 @@ ProcessUtility(Node *parsetree,
 												  true,
 												  /* gp_dispatch */ false);
 							}
-
-							sendDtxExplicitBegin();
 						}
 						break;
 
@@ -814,16 +833,6 @@ ProcessUtility(Node *parsetree,
 
 							Assert(PointerIsValid(name));
 
-							if (Gp_role == GP_ROLE_DISPATCH)
-							{
-								/* We already checked that we're in a
-								 * transaction; need to make certain
-								 * that the BEGIN has been dispatched
-								 * before we start dispatching our savepoint.
-								 */
-								sendDtxExplicitBegin();
-							}
-
 							DefineDispatchSavepoint(
 									name);
 						}
@@ -856,6 +865,9 @@ ProcessUtility(Node *parsetree,
 			 */
 		case T_PlannedStmt:
 		{
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support DECLARE CURSOR yet in GPSQL") ));
+
 			PlannedStmt *stmt = (PlannedStmt *) parsetree;
 
 			if (stmt->utilityStmt == NULL ||
@@ -867,6 +879,9 @@ ProcessUtility(Node *parsetree,
 
 		case T_ClosePortalStmt:
 			{
+				ereport(ERROR,
+								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support close cursor statement yet in GPSQL") ));
+
 				ClosePortalStmt *stmt = (ClosePortalStmt *) parsetree;
 
 				PerformPortalClose(stmt->portalname);
@@ -874,6 +889,9 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_FetchStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support fetch statement yet in GPSQL") ));
+
 			PerformPortalFetch((FetchStmt *) parsetree, dest,
 							   completionTag);
 			break;
@@ -945,11 +963,16 @@ ProcessUtility(Node *parsetree,
 						((CreateStmt *) parsetree)->oidInfo.toastIndexOid,
 					    &(((CreateStmt *) parsetree)->oidInfo.toastComptypeOid),
 						((CreateStmt *)parsetree)->is_part_child);
-					AlterTableCreateAoSegTableWithOid(relOid,
-						((CreateStmt *) parsetree)->oidInfo.aosegOid,
-						((CreateStmt *) parsetree)->oidInfo.aosegIndexOid,
-						&(((CreateStmt *) parsetree)->oidInfo.aosegComptypeOid),
-						((CreateStmt *)parsetree)->is_part_child);
+
+					/*
+					 * gpsql, move appendonly table metadata to master
+					 */
+					if (Gp_role == GP_ROLE_DISPATCH)
+						AlterTableCreateAoSegTableWithOid(relOid,
+								((CreateStmt *) parsetree)->oidInfo.aosegOid,
+								((CreateStmt *) parsetree)->oidInfo.aosegIndexOid,
+								&(((CreateStmt *) parsetree)->oidInfo.aosegComptypeOid),
+								((CreateStmt *) parsetree)->is_part_child);
 
 					if (((CreateStmt *)parsetree)->buildAoBlkdir)
 						AlterTableCreateAoBlkdirTableWithOid(relOid,
@@ -975,6 +998,9 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_CreateForeignStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create foreign statement yet in GPSQL") ));
+
 			DefineForeignRelation((CreateForeignStmt *) parsetree);
 			break;
 			
@@ -987,38 +1013,65 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_CreateFdwStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create foreign data wrapper statement yet in GPSQL") ));
+
 			CreateForeignDataWrapper((CreateFdwStmt *) parsetree);
 			break;
 
 		case T_AlterFdwStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter foreign data wrapper statement yet in GPSQL") ));
+
 			AlterForeignDataWrapper((AlterFdwStmt *) parsetree);
 			break;
 
 		case T_DropFdwStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support drop foreign data wrapper statement yet in GPSQL") ));
+
 			RemoveForeignDataWrapper((DropFdwStmt *) parsetree);
 			break;
 
 		case T_CreateForeignServerStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create server statement yet in GPSQL") ));
+
 			CreateForeignServer((CreateForeignServerStmt *) parsetree);
 			break;
 
 		case T_AlterForeignServerStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter server statement yet in GPSQL") ));
+
 			AlterForeignServer((AlterForeignServerStmt *) parsetree);
 			break;
 
 		case T_DropForeignServerStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support drop server statement yet in GPSQL") ));
+
 			RemoveForeignServer((DropForeignServerStmt *) parsetree);
 			break;
 
 		case T_CreateUserMappingStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create user mapping statement yet in GPSQL") ));
+
 			CreateUserMapping((CreateUserMappingStmt *) parsetree);
 			break;
 
 		case T_AlterUserMappingStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter user mapping statement yet in GPSQL") ));
+
 			AlterUserMapping((AlterUserMappingStmt *) parsetree);
 			break;
 
 		case T_DropUserMappingStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support drop user mapping statement yet in GPSQL") ));
+
 			RemoveUserMapping((DropUserMappingStmt *) parsetree);
 			break;
 
@@ -1040,19 +1093,7 @@ ProcessUtility(Node *parsetree,
 					stmt->objects = lappend(stmt->objects, list_copy(names));
 					stmt->missing_ok = if_exists;
 
-					if (ProcessDropStatement(stmt))
-					{
-						/*
-						 * If we are the QD, dispatch this DROP command to all the QEs
-						 * NOTE: on the segments we convert all drop-statements into
-						 * drop-if-exists.
-						 */
-						if (Gp_role == GP_ROLE_DISPATCH)
-						{
-							stmt->missing_ok = true;
-							CdbDispatchUtilityStatement((Node *) stmt, "ProcessUtility");
-						}
-					}
+					ProcessDropStatement(stmt);
 				}
 			}
 			break;
@@ -1068,6 +1109,7 @@ ProcessUtility(Node *parsetree,
 
 		case T_CopyStmt:
 			{
+				/*NOTE: Usage Forbidden should be considered in detail*/
 				uint64		processed = DoCopy((CopyStmt *) parsetree, debug_query_string);
 
 				if (completionTag)
@@ -1077,15 +1119,24 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_PrepareStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support prepare statement yet in GPSQL") ));
+
 			PrepareQuery((PrepareStmt *) parsetree, debug_query_string);
 			break;
 
 		case T_ExecuteStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support execute statement yet in GPSQL") ));
+
 			ExecuteQuery((ExecuteStmt *) parsetree, debug_query_string, params,
 						 dest, completionTag);
 			break;
 
 		case T_DeallocateStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support deallocate statement yet in GPSQL") ));
+
 			DeallocateQuery((DeallocateStmt *) parsetree);
 			break;
 
@@ -1094,14 +1145,42 @@ ProcessUtility(Node *parsetree,
 			 * schema
 			 */
 		case T_RenameStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support rename statement yet in GPSQL") ));
+
 			ExecRenameStmt((RenameStmt *) parsetree);
 			break;
 
 		case T_AlterObjectSchemaStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter object schema statement yet in GPSQL") ));
+
 			ExecAlterObjectSchemaStmt((AlterObjectSchemaStmt *) parsetree);
 			break;
 
 		case T_AlterOwnerStmt:
+			switch (((AlterOwnerStmt *) parsetree)->objectType) {
+					case OBJECT_SCHEMA:
+						break;
+					case OBJECT_AGGREGATE:
+					case OBJECT_CONVERSION:
+					case OBJECT_DATABASE:
+					case OBJECT_DOMAIN:
+					case OBJECT_FUNCTION:
+					case OBJECT_OPERATOR:
+					case OBJECT_OPCLASS:
+					case OBJECT_FILESPACE:
+					case OBJECT_FILESYSTEM:
+					case OBJECT_TABLESPACE:
+					case OBJECT_TYPE:
+					case OBJECT_FDW:
+					case OBJECT_FOREIGN_SERVER:
+					case OBJECT_EXTPROTOCOL:
+					default:
+						ereport(ERROR,
+								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter owner statement yet in GPSQL") ));
+						break;
+					}
 			ExecAlterOwnerStmt((AlterOwnerStmt *) parsetree);
 			break;
 
@@ -1111,6 +1190,9 @@ ProcessUtility(Node *parsetree,
 
 		case T_AlterDomainStmt:
 			{
+				ereport(ERROR,
+								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter domain statement yet in GPSQL") ));
+
 				AlterDomainStmt *stmt = (AlterDomainStmt *) parsetree;
 
 				/*
@@ -1159,10 +1241,17 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_GrantStmt:
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) || (Gp_role == GP_ROLE_DISPATCH))) {
+									ereport(ERROR,
+											(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE statement yet in GPSQL") ));
+								}
 			ExecuteGrantStmt((GrantStmt *) parsetree);
 			break;
 
 		case T_GrantRoleStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE role yet in GPSQL") ));
+
 			GrantRole((GrantRoleStmt *) parsetree);
 			break;
 
@@ -1176,19 +1265,36 @@ ProcessUtility(Node *parsetree,
 				switch (stmt->kind)
 				{
 					case OBJECT_AGGREGATE:
+						if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) || (Gp_role == GP_ROLE_DISPATCH))) {
+							ereport(ERROR,
+								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create aggregate statement yet in GPSQL") ));
+						}
+
 						DefineAggregate(stmt->defnames, stmt->args,
-										stmt->oldstyle, stmt->definition,
-										stmt->newOid, stmt->ordered);
+																stmt->oldstyle, stmt->definition,
+																stmt->newOid, stmt->ordered);
 						break;
 					case OBJECT_OPERATOR:
+						if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) || (Gp_role == GP_ROLE_DISPATCH))) {
+							ereport(ERROR,
+								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create operator statement yet in GPSQL") ));
+						}
 						Assert(stmt->args == NIL);
 						DefineOperator(stmt->defnames, stmt->definition, stmt->newOid);
 						break;
 					case OBJECT_TYPE:
+						if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) || (Gp_role == GP_ROLE_DISPATCH))) {
+							ereport(ERROR,
+								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create type statement yet in GPSQL") ));
+						}
 						Assert(stmt->args == NIL);
 						DefineType(stmt->defnames, stmt->definition, stmt->newOid, stmt->shadowOid);
 						break;
 					case OBJECT_EXTPROTOCOL:
+						if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) || (Gp_role == GP_ROLE_DISPATCH))) {
+							ereport(ERROR,
+								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create protocol statement yet in GPSQL") ));
+						}
 						Assert(stmt->args == NIL);
 						DefineExtProtocol(stmt->defnames, stmt->definition, stmt->newOid, stmt->trusted);
 						break;						
@@ -1206,6 +1312,9 @@ ProcessUtility(Node *parsetree,
 
 		case T_CompositeTypeStmt:		/* CREATE TYPE (composite) */
 			{
+				ereport(ERROR,
+								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create type yet in GPSQL") ));
+
 				CompositeTypeStmt *stmt = (CompositeTypeStmt *) parsetree;
 
 				DefineCompositeType(stmt->typevar, stmt->coldeflist, stmt->relOid, stmt->comptypeOid);
@@ -1221,15 +1330,28 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_CreateFunctionStmt:		/* CREATE FUNCTION */
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
+						ereport(ERROR,
+								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create function statement yet in GPSQL") ));
+					}
+
 			CreateFunction((CreateFunctionStmt *) parsetree);
 			break;
 
 		case T_AlterFunctionStmt:		/* ALTER FUNCTION */
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
+						ereport(ERROR,
+								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter function statement yet in GPSQL") ));
+					}
+
 			AlterFunction((AlterFunctionStmt *) parsetree);
 			break;
 
 		case T_IndexStmt:		/* CREATE INDEX */
 			{
+				ereport(ERROR,
+								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create index statement yet in GPSQL") ));
+
 				IndexStmt  *stmt = (IndexStmt *) parsetree;
 
 				if (stmt->concurrent)
@@ -1260,6 +1382,11 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_RuleStmt:		/* CREATE RULE */
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create rule statement yet in GPSQL") ));
+			}
+
 			DefineQueryRewrite((RuleStmt *) parsetree);
 			if (Gp_role == GP_ROLE_DISPATCH)
 			{
@@ -1268,15 +1395,26 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_CreateSeqStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create sequence statement yet in GPSQL") ));
+
 			DefineSequence((CreateSeqStmt *) parsetree);
 			break;
 
 		case T_AlterSeqStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter sequence statement yet in GPSQL") ));
+
 			AlterSequence((AlterSeqStmt *) parsetree);
 			break;
 
 		case T_RemoveFuncStmt:
 			{
+				if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
+							ereport(ERROR,
+									(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support remove function statement yet in GPSQL") ));
+						}
+
 				RemoveFuncStmt *stmt = (RemoveFuncStmt *) parsetree;
 
 				switch (stmt->kind)
@@ -1320,6 +1458,9 @@ ProcessUtility(Node *parsetree,
 			/* Query-level asynchronous notification */
 		case T_NotifyStmt:
 			{
+				ereport(ERROR,
+								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support notify statement yet in GPSQL") ));
+
 				NotifyStmt *stmt = (NotifyStmt *) parsetree;
 
 				if (Gp_role == GP_ROLE_EXECUTE)
@@ -1334,6 +1475,9 @@ ProcessUtility(Node *parsetree,
 
 		case T_ListenStmt:
 			{
+				ereport(ERROR,
+								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support listen statement yet in GPSQL") ));
+
 				ListenStmt *stmt = (ListenStmt *) parsetree;
 
 				if (Gp_role == GP_ROLE_EXECUTE)
@@ -1348,6 +1492,9 @@ ProcessUtility(Node *parsetree,
 
 		case T_UnlistenStmt:
 			{
+				ereport(ERROR,
+								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support unlisten statement yet in GPSQL") ));
+
 				UnlistenStmt *stmt = (UnlistenStmt *) parsetree;
 
 				if (Gp_role == GP_ROLE_EXECUTE)
@@ -1362,6 +1509,9 @@ ProcessUtility(Node *parsetree,
 
 		case T_LoadStmt:
 			{
+				ereport(ERROR,
+								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support load statement yet in GPSQL") ));
+
 				LoadStmt   *stmt = (LoadStmt *) parsetree;
 
 				closeAllVfds(); /* probably not necessary... */
@@ -1382,6 +1532,9 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_ClusterStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support cluster statement yet in GPSQL") ));
+
 			cluster((ClusterStmt *) parsetree);
 			break;
 
@@ -1412,11 +1565,11 @@ ProcessUtility(Node *parsetree,
 						if (strcmp(item->defname, "transaction_isolation") == 0)
 							SetPGVariable("transaction_isolation",
 										  list_make1(item->arg), n->is_local,
-										  /* gp_dispatch */ true);
+										  /* gp_dispatch */ false);
 						else if (strcmp(item->defname, "transaction_read_only") == 0)
 							SetPGVariable("transaction_read_only",
 										  list_make1(item->arg), n->is_local,
-									      /* gp_dispatch */ true);
+									      /* gp_dispatch */ false);
 					}
 				}
 				else if (strcmp(n->name, "SESSION CHARACTERISTICS") == 0)
@@ -1430,11 +1583,11 @@ ProcessUtility(Node *parsetree,
 						if (strcmp(item->defname, "transaction_isolation") == 0)
 							SetPGVariable("default_transaction_isolation",
 										  list_make1(item->arg), n->is_local,
-									      /* gp_dispatch */ true);
+									      /* gp_dispatch */ false);
 						else if (strcmp(item->defname, "transaction_read_only") == 0)
 							SetPGVariable("default_transaction_read_only",
 										  list_make1(item->arg), n->is_local,
-										  /* gp_dispatch */ true);
+										  /* gp_dispatch */ false);
 					}
 				}
 				else
@@ -1475,6 +1628,11 @@ ProcessUtility(Node *parsetree,
 
 		case T_CreateTrigStmt:
 			{
+				if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
+							ereport(ERROR,
+									(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create trigger statement yet in GPSQL") ));
+						}
+
 				Oid trigOid = CreateTrigger((CreateTrigStmt *) parsetree, false);
 				if (Gp_role == GP_ROLE_DISPATCH)
 				{
@@ -1486,6 +1644,9 @@ ProcessUtility(Node *parsetree,
 
 		case T_DropPropertyStmt:
 			{
+				ereport(ERROR,
+								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support drop property statement yet in GPSQL") ));
+
 				DropPropertyStmt *stmt = (DropPropertyStmt *) parsetree;
 				Oid			relId;
 
@@ -1516,10 +1677,21 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_CreatePLangStmt:
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
+						ereport(ERROR,
+								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create plang statement yet in GPSQL") ));
+					}
+
 			CreateProceduralLanguage((CreatePLangStmt *) parsetree);
 			break;
 
 		case T_DropPLangStmt:
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
+						ereport(ERROR,
+								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support drop plang statement yet in GPSQL") ));
+						DropProceduralLanguage((DropPLangStmt *) parsetree);
+					}
+
 			DropProceduralLanguage((DropPLangStmt *) parsetree);
 			break;
 
@@ -1527,6 +1699,11 @@ ProcessUtility(Node *parsetree,
 			 * ******************************** DOMAIN statements ****
 			 */
 		case T_CreateDomainStmt:
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
+						ereport(ERROR,
+								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create domain statement yet in GPSQL") ));
+					}
+
 			DefineDomain((CreateDomainStmt *) parsetree);
 			break;
 
@@ -1534,14 +1711,29 @@ ProcessUtility(Node *parsetree,
 			 * ********************* RESOOURCE QUEUE statements ****
 			 */
 		case T_CreateQueueStmt:
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
+						ereport(ERROR,
+								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create queue statement yet in GPSQL") ));
+					}
+
 			CreateQueue((CreateQueueStmt *) parsetree);
 			break;
 
 		case T_AlterQueueStmt:
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
+									ereport(ERROR,
+											(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter queue statement yet in GPSQL") ));
+								}
+
 			AlterQueue((AlterQueueStmt *) parsetree);
 			break;
 
 		case T_DropQueueStmt:
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
+						ereport(ERROR,
+								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support drop queue statement yet in GPSQL") ));
+					}
+
 			DropQueue((DropQueueStmt *) parsetree);
 			break;
 
@@ -1549,34 +1741,58 @@ ProcessUtility(Node *parsetree,
 			 * ******************************** ROLE statements ****
 			 */
 		case T_CreateRoleStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create role statement yet in GPSQL") ));
+
 			CreateRole((CreateRoleStmt *) parsetree);
 			break;
 
 		case T_AlterRoleStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter role statement yet in GPSQL") ));
+
 			AlterRole((AlterRoleStmt *) parsetree);
 			break;
 
 		case T_AlterRoleSetStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter role set statement yet in GPSQL") ));
+
 			AlterRoleSet((AlterRoleSetStmt *) parsetree);
 			break;
 
 		case T_DropRoleStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support drop role set statement yet in GPSQL") ));
+
 			DropRole((DropRoleStmt *) parsetree);
 			break;
 
 		case T_DropOwnedStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support drop owned statement yet in GPSQL") ));
+
 			DropOwnedObjects((DropOwnedStmt *) parsetree);
 			break;
 
 		case T_ReassignOwnedStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support reassign owned statement yet in GPSQL") ));
+
 			ReassignOwnedObjects((ReassignOwnedStmt *) parsetree);
 			break;
 
 		case T_LockStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support lock statement yet in GPSQL") ));
+
 			LockTableCommand((LockStmt *) parsetree);
 			break;
 
 		case T_ConstraintsSetStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support constraints set statement yet in GPSQL") ));
+
 			AfterTriggerSetState((ConstraintsSetStmt *) parsetree);
 			break;
 
@@ -1594,6 +1810,9 @@ ProcessUtility(Node *parsetree,
 
 		case T_ReindexStmt:
 			{
+				ereport(ERROR,
+								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support reindex statement yet in GPSQL") ));
+
 				ReindexStmt *stmt = (ReindexStmt *) parsetree;
 
 				switch (stmt->kind)
@@ -1642,26 +1861,46 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_CreateConversionStmt:
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
+						ereport(ERROR,
+								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create conversion statement yet in GPSQL") ));
+					}
+
 			CreateConversionCommand((CreateConversionStmt *) parsetree);
 			break;
 
 		case T_CreateCastStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create cast statement yet in GPSQL") ));
+
 			CreateCast((CreateCastStmt *) parsetree);
 			break;
 
 		case T_DropCastStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support drop cast statement yet in GPSQL") ));
+
 			DropCast((DropCastStmt *) parsetree);
 			break;
 
 		case T_CreateOpClassStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create opclass statement yet in GPSQL") ));
+
 			DefineOpClass((CreateOpClassStmt *) parsetree);
 			break;
 
 		case T_RemoveOpClassStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support remove opclass statement yet in GPSQL") ));
+
 			RemoveOpClass((RemoveOpClassStmt *) parsetree);
 			break;
 
 		case T_AlterTypeStmt:
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter type statement yet in GPSQL") ));
+
 			AlterType((AlterTypeStmt *) parsetree);
 			break;
 

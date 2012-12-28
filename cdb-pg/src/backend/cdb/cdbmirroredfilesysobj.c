@@ -27,6 +27,7 @@
 #include "cdb/cdbpersistentdatabase.h"
 #include "cdb/cdbpersistenttablespace.h"
 #include "cdb/cdbpersistentfilespace.h"
+#include "cdb/cdbutil.h"
 #include "storage/lwlock.h"
 #include "miscadmin.h"
 #include "postmaster/primary_mirror_mode.h"
@@ -37,6 +38,8 @@
 #include "cdb/cdbmirroredappendonly.h"
 #include "commands/filespace.h"
 #include "commands/tablespace.h"
+
+#include "cdb/cdbvars.h"
 
 static void MirroredFileSysObj_BeginMirroredCreate(
 	PersistentFileSysObjName		*fsObjName,
@@ -262,6 +265,7 @@ void MirroredFileSysObj_TransactionCreateFilespaceDir(
 										&fsObjName,
 										filespaceOid,
 										is_filespace_shared);
+	fsObjName.contentid = get_contentid_from_dbid(primaryDbId);
 
 	LWLockAcquire(MirroredLock, LW_SHARED);
 
@@ -326,6 +330,7 @@ void MirroredFileSysObj_TransactionCreateFilespaceDir(
 	 */
 	smgrcreatefilespacedirpending(
 							filespaceOid, 
+							fsObjName.contentid,
 							primaryDbId, 
 							primaryFilespaceLocation, 
 							mirrorDbId, 
@@ -397,6 +402,7 @@ void MirroredFileSysObj_CreateFilespaceDir(
 }
 
 void MirroredFileSysObj_ScheduleDropFilespaceDir(
+	int4		contentid,
 	Oid			filespaceOid,
 	bool		sharedStorage)
 {
@@ -444,11 +450,13 @@ void MirroredFileSysObj_ScheduleDropFilespaceDir(
 	}
 
 	PersistentFilespace_LookupTidAndSerialNum(
+										contentid,
 										filespaceOid,
 										&persistentTid,
 										&persistentSerialNum);
 
 	smgrschedulermfilespacedir(
+						contentid,
 						filespaceOid,
 						&persistentTid,
 						persistentSerialNum,
@@ -488,6 +496,8 @@ void MirroredFileSysObj_DropFilespaceDir(
 }
 
 void MirroredFileSysObj_TransactionCreateTablespaceDir(
+	int4				contentid,
+	
 	TablespaceDirNode	*tablespaceDirNode,
 
 	ItemPointer 		persistentTid,
@@ -512,6 +522,7 @@ void MirroredFileSysObj_TransactionCreateTablespaceDir(
 										tablespaceDirNode->tablespace,
 										NULL);
 	fsObjName.sharedStorage = is_filespace_shared(tablespaceDirNode->filespace);
+	fsObjName.contentid = contentid;
 
 	LWLockAcquire(MirroredLock, LW_SHARED);
 
@@ -530,6 +541,7 @@ void MirroredFileSysObj_TransactionCreateTablespaceDir(
 	 * any create tablespace directory work on either the primary or mirror.
 	 */
 	smgrcreatetablespacedirpending(
+							fsObjName.contentid,
 							tablespaceDirNode, 
 							mirrorExistenceState,
 							persistentTid, 
@@ -541,6 +553,7 @@ void MirroredFileSysObj_TransactionCreateTablespaceDir(
 	 * Synchronous primary and mirror create tablespace directory.
 	 */
 	MirroredFileSysObj_CreateTablespaceDir(
+								fsObjName.contentid,
 								tablespaceDirNode->tablespace,
 								mirrorMode,
 								/* ignoreAlreadyExists */ false,
@@ -568,6 +581,7 @@ void MirroredFileSysObj_TransactionCreateTablespaceDir(
 }
 
 void MirroredFileSysObj_CreateTablespaceDir(
+	int4						contentid,
 	Oid							tablespaceOid,
 
 	StorageManagerMirrorMode 	mirrorMode,
@@ -579,6 +593,7 @@ void MirroredFileSysObj_CreateTablespaceDir(
 	bool						*mirrorDataLossOccurred)
 {
 	smgrcreatetablespacedir(
+					contentid,
 					tablespaceOid, 
 					mirrorMode,
 					ignoreAlreadyExists,
@@ -587,6 +602,7 @@ void MirroredFileSysObj_CreateTablespaceDir(
 }
 
 void MirroredFileSysObj_ScheduleDropTablespaceDir(
+	int4		contentid,
 	Oid			tablespaceOid,
 	bool		sharedStorage)
 {
@@ -594,11 +610,13 @@ void MirroredFileSysObj_ScheduleDropTablespaceDir(
 	int64 persistentSerialNum;
 
 	PersistentTablespace_LookupTidAndSerialNum(
+										contentid,
 										tablespaceOid,
 										&persistentTid,
 										&persistentSerialNum);
 
 	smgrschedulermtablespacedir(
+						contentid,
 						tablespaceOid,
 						&persistentTid,
 						persistentSerialNum,
@@ -606,6 +624,7 @@ void MirroredFileSysObj_ScheduleDropTablespaceDir(
 }
 
 void MirroredFileSysObj_DropTablespaceDir(
+	int4						contentid,
 	Oid							tablespaceOid,
 	
 	bool						primaryOnly,
@@ -617,6 +636,7 @@ void MirroredFileSysObj_DropTablespaceDir(
 	bool						*mirrorDataLossOccurred)
 {
 	smgrdormtablespacedir(
+				contentid,
 				tablespaceOid,
 				primaryOnly,
 				mirrorOnly,
@@ -625,6 +645,7 @@ void MirroredFileSysObj_DropTablespaceDir(
 }
 
 void MirroredFileSysObj_TransactionCreateDbDir(
+	int4				contentid,
 	DbDirNode			*dbDirNode,
 
 	ItemPointer 		persistentTid,
@@ -650,6 +671,7 @@ void MirroredFileSysObj_TransactionCreateDbDir(
 										dbDirNode->tablespace,
 										dbDirNode->database,
 										is_tablespace_shared);
+	fsObjName.contentid = contentid;
 
 	LWLockAcquire(MirroredLock, LW_SHARED);
 
@@ -669,6 +691,7 @@ void MirroredFileSysObj_TransactionCreateDbDir(
 	 * any create database directory work on either the primary or mirror.
 	 */
 	smgrcreatedbdirpending(
+				fsObjName.contentid,
 				dbDirNode,
 				mirrorExistenceState,
 				persistentTid, 
@@ -679,6 +702,7 @@ void MirroredFileSysObj_TransactionCreateDbDir(
 	 * Synchronous primary and mirror create database directory.
 	 */
 	MirroredFileSysObj_CreateDbDir(
+								fsObjName.contentid,
 								dbDirNode,
 								mirrorMode,
 								/* ignoreAlreadyExists */ false,
@@ -705,6 +729,7 @@ void MirroredFileSysObj_TransactionCreateDbDir(
 }
 
 void MirroredFileSysObj_CreateDbDir(
+	int4						contentid,
 	DbDirNode					*dbDirNode,
 
 	StorageManagerMirrorMode 	mirrorMode,
@@ -718,6 +743,7 @@ void MirroredFileSysObj_CreateDbDir(
 	Assert(dbDirNode != NULL);
 
 	smgrcreatedbdir(
+				contentid,
 				dbDirNode, 
 				mirrorMode,
 				ignoreAlreadyExists,
@@ -726,6 +752,7 @@ void MirroredFileSysObj_CreateDbDir(
 }
 
 void MirroredFileSysObj_ScheduleDropDbDir(
+	int4				contentid,
 	DbDirNode			*dbDirNode,
 	
 	ItemPointer		 	persistentTid,
@@ -736,6 +763,7 @@ void MirroredFileSysObj_ScheduleDropDbDir(
 	Assert(dbDirNode != NULL);
 
 	smgrschedulermdbdir(
+					contentid,
 					dbDirNode,
 					persistentTid,
 					persistentSerialNum,
@@ -744,6 +772,8 @@ void MirroredFileSysObj_ScheduleDropDbDir(
 }
 
 void MirroredFileSysObj_DropDbDir(
+	int4						contentid,
+
 	DbDirNode					*dbDirNode,
 	
 	bool						primaryOnly,
@@ -757,6 +787,7 @@ void MirroredFileSysObj_DropDbDir(
 	Assert(dbDirNode != NULL);
 
 	smgrdormdbdir(
+			contentid,
 			dbDirNode,
 			primaryOnly,
 			mirrorOnly, 
@@ -765,6 +796,7 @@ void MirroredFileSysObj_DropDbDir(
 }
 
 static void MirroredFileSysObj_JustInTimeDbDirCreate(
+	int4				contentid,
 	DbDirNode			*justInTimeDbDirNode)
 {
 	PersistentFileSysObjName	fsObjName;
@@ -799,6 +831,7 @@ static void MirroredFileSysObj_JustInTimeDbDirCreate(
 										justInTimeDbDirNode->tablespace,
 										justInTimeDbDirNode->database,
 										is_tablespace_shared);
+	fsObjName.contentid = contentid;
 
 	/*
 	 * Acquire TablespaceCreateLock to ensure that no DROP TABLESPACE
@@ -809,7 +842,7 @@ static void MirroredFileSysObj_JustInTimeDbDirCreate(
 	/* Prevent cancel/die interrupt while doing this multi-step */
 	HOLD_INTERRUPTS();
 
-	if (PersistentDatabase_DirIsCreated(justInTimeDbDirNode))
+	if (PersistentDatabase_DirIsCreated(contentid, justInTimeDbDirNode))
 	{
 		RESUME_INTERRUPTS();
 		LWLockRelease(TablespaceCreateLock);
@@ -830,7 +863,7 @@ static void MirroredFileSysObj_JustInTimeDbDirCreate(
 									&mirrorMode);
 
 
-	if (PersistentTablespace_GetState(justInTimeDbDirNode->tablespace) == PersistentFileSysState_CreatePending)
+	if (PersistentTablespace_GetState(fsObjName.contentid, justInTimeDbDirNode->tablespace) == PersistentFileSysState_CreatePending)
 	{
 		/*
 		 * This tablespace was created in our explicit (i.e. BEGIN ... END) transaction.
@@ -845,6 +878,7 @@ static void MirroredFileSysObj_JustInTimeDbDirCreate(
 		 * any create database directory work on either the primary or mirror.
 		 */
 		smgrcreatedbdirpending(
+						fsObjName.contentid,
 						justInTimeDbDirNode,
 						mirrorExistenceState,
 						&persistentTid, 
@@ -855,6 +889,7 @@ static void MirroredFileSysObj_JustInTimeDbDirCreate(
 		 * Synchronous primary and mirror create database directory.
 		 */
 		MirroredFileSysObj_CreateDbDir(
+									fsObjName.contentid,
 									justInTimeDbDirNode,
 									mirrorMode,
 									/* ignoreAlreadyExists */ false,
@@ -879,6 +914,7 @@ static void MirroredFileSysObj_JustInTimeDbDirCreate(
 		 * Do Just-In-Time non-transaction database directory create.
 		 */
 		smgrcreatedbdirjustintime(
+							contentid,
 							justInTimeDbDirNode,
 							mirrorExistenceState,
 							mirrorMode,
@@ -956,14 +992,17 @@ void MirroredFileSysObj_TransactionCreateBufferPoolFile(
 		 */
 		justInTimeDbDirNode.tablespace = smgrOpen->smgr_rnode.spcNode;
 		justInTimeDbDirNode.database = smgrOpen->smgr_rnode.dbNode;
-		MirroredFileSysObj_JustInTimeDbDirCreate(&justInTimeDbDirNode);
+		MirroredFileSysObj_JustInTimeDbDirCreate(GpIdentity.segindex, &justInTimeDbDirNode);
 	}
 
 	PersistentFileSysObjName_SetRelationFile(
 										&fsObjName,
 										&smgrOpen->smgr_rnode,
 										/* segmentFileNum */ 0,
+										MASTER_CONTENT_ID, /* use master's content id for all heap table and index*/
 										is_tablespace_shared);
+	fsObjName.contentid = MASTER_CONTENT_ID;
+
 
 	LWLockAcquire(MirroredLock, LW_SHARED);
 
@@ -985,6 +1024,7 @@ void MirroredFileSysObj_TransactionCreateBufferPoolFile(
 	smgrcreatepending(
 				&smgrOpen->smgr_rnode,
 				/* segmentFileNum */ 0,
+				MASTER_CONTENT_ID, /* use master's content id for all heap table and index */
 				PersistentFileSysRelStorageMgr_BufferPool,
 				relBufpoolKind,
 				mirrorExistenceState,
@@ -1051,10 +1091,15 @@ void MirroredFileSysObj_TransactionCreateBufferPoolFile(
 	}
 }
 
+/*
+ * in gpsql, we acturely do not do any mirror related work.
+ */
 void MirroredFileSysObj_TransactionCreateAppendOnlyFile(
 	RelFileNode 			*relFileNode,
 
 	int32					segmentFileNum,
+
+	int32					contentid,
 
 	char					*relationName,
 
@@ -1066,17 +1111,17 @@ void MirroredFileSysObj_TransactionCreateAppendOnlyFile(
 	int64					*persistentSerialNum)
 				/* Output: The serial number of the gp_persistent_relation_node tuple. */
 {
-	PersistentFileSysObjName	fsObjName;
+	/*PersistentFileSysObjName	fsObjName;
 	
 	MirrorDataLossTrackingState mirrorDataLossTrackingState;
-	int64 mirrorDataLossTrackingSessionNum;
+	int64 mirrorDataLossTrackingSessionNum;*/
 	
-	MirroredObjectExistenceState mirrorExistenceState = MirroredObjectExistenceState_None;
+/*	MirroredObjectExistenceState mirrorExistenceState = MirroredObjectExistenceState_None;
 	MirroredRelDataSynchronizationState relDataSynchronizationState = MirroredRelDataSynchronizationState_None;
-	StorageManagerMirrorMode mirrorMode = StorageManagerMirrorMode_None;
+	StorageManagerMirrorMode mirrorMode = StorageManagerMirrorMode_None;*/
 
 	int primaryError;
-	bool mirrorDataLossOccurred;
+/*	bool mirrorDataLossOccurred;*/
 
 	Assert(relationName != NULL);
 	Assert(persistentTid != NULL);
@@ -1086,21 +1131,21 @@ void MirroredFileSysObj_TransactionCreateAppendOnlyFile(
 	{
 		DbDirNode justInTimeDbDirNode;
 		
-		/*
-		 * "Fault-in" the database directory in a tablespace if it doesn't exist yet.
-		 */
+
+		 /* "Fault-in" the database directory in a tablespace if it doesn't exist yet.*/
+
 		justInTimeDbDirNode.tablespace = relFileNode->spcNode;
 		justInTimeDbDirNode.database = relFileNode->dbNode;
-		MirroredFileSysObj_JustInTimeDbDirCreate(&justInTimeDbDirNode);
+		MirroredFileSysObj_JustInTimeDbDirCreate(contentid, &justInTimeDbDirNode);
 	}
 
-	PersistentFileSysObjName_SetRelationFile(
+/*	PersistentFileSysObjName_SetRelationFile(
 										&fsObjName,
 										relFileNode,
 										segmentFileNum,
-										is_tablespace_shared);
+										is_tablespace_shared);*/
 
-	LWLockAcquire(MirroredLock, LW_SHARED);
+	/*LWLockAcquire(MirroredLock, LW_SHARED);
 
 	mirrorDataLossTrackingState = 
 				FileRepPrimary_GetMirrorDataLossTrackingSessionNum(
@@ -1111,25 +1156,25 @@ void MirroredFileSysObj_TransactionCreateAppendOnlyFile(
 									mirrorDataLossTrackingState,
 									&mirrorExistenceState,
 									&relDataSynchronizationState,
-									&mirrorMode);
+									&mirrorMode);*/
 
 	/*
 	 * We write our intention or 'Create Pending' persistent information before we do
 	 * any create relation work on either the primary or mirror.
 	 */
-	smgrcreatepending(
-				relFileNode,
-				segmentFileNum,
-				PersistentFileSysRelStorageMgr_AppendOnly,
-				PersistentFileSysRelBufpoolKind_None,
-				mirrorExistenceState,
-				relDataSynchronizationState,
-				relationName,
-				persistentTid, 
-				persistentSerialNum, 
-				/* isLocalBuf */ false,
-				/* bufferPoolBulkLoad */ false,
-				/* flushToXLog */ true);
+	smgrcreatepending(relFileNode,
+					segmentFileNum,
+					contentid,
+					PersistentFileSysRelStorageMgr_AppendOnly,
+					PersistentFileSysRelBufpoolKind_None,
+					MirroredObjectExistenceState_NotMirrored,
+					MirroredRelDataSynchronizationState_None,
+					relationName,
+					persistentTid,
+					persistentSerialNum,
+					/*isLocalBuf*/ false,
+					/*bufferPoolBulkLoad*/ false,
+					/*flushToXLog*/ true);
 
 	/*
 	 * Synchronous primary and mirror create relation.
@@ -1137,32 +1182,31 @@ void MirroredFileSysObj_TransactionCreateAppendOnlyFile(
 	MirroredAppendOnly_Create(
 							relFileNode,
 							segmentFileNum,
+							contentid,
 							relationName,
-							mirrorDataLossTrackingState,
-							mirrorDataLossTrackingSessionNum,
-							&primaryError,
-							&mirrorDataLossOccurred);
+							&primaryError);
 	if (primaryError != 0)
 	{
-		LWLockRelease(MirroredLock);
+		/*LWLockRelease(MirroredLock);*/
 		ereport(ERROR,
 			(errcode_for_file_access(),
-			 errmsg("could not create relation file '%s', relation name '%s': %s",
+			 errmsg("could not create relation file '%s', relation name '%s', contentid: %d: %s",
 					relpath(*relFileNode),
 					relationName,
+					contentid,
 					strerror(primaryError))));
 	}
 
-	MirroredFileSysObj_FinishMirroredCreate(
+	/*MirroredFileSysObj_FinishMirroredCreate(
 									&fsObjName,
 									persistentTid, 
 									*persistentSerialNum, 
 									mirrorExistenceState,
 									mirrorDataLossOccurred);	
 
-	LWLockRelease(MirroredLock);
+	LWLockRelease(MirroredLock);*/
 	
-	if (Debug_persistent_print)
+	/*if (Debug_persistent_print)
 	{
 		SUPPRESS_ERRCONTEXT_DECLARE;
 
@@ -1181,15 +1225,18 @@ void MirroredFileSysObj_TransactionCreateAppendOnlyFile(
 			 ItemPointerToString(persistentTid));
 
 		SUPPRESS_ERRCONTEXT_POP();
-	}
+	}*/
 }
 
 void MirroredFileSysObj_ScheduleDropBufferPoolRel(
 	Relation 				relation)
 {
-	if (!relation->rd_segfile0_relationnodeinfo.isPresent)
-		RelationFetchSegFile0GpRelationNode(relation);
-	Assert(relation->rd_segfile0_relationnodeinfo.isPresent);
+	/*
+	 * use MASTER_CONTENT_ID for heap table and index even on segments.
+	 */
+	if (!relation->rd_segfile0_relationnodeinfos[0].isPresent)
+		RelationFetchSegFile0GpRelationNode(relation, MASTER_CONTENT_ID);
+	Assert(relation->rd_segfile0_relationnodeinfos[0].isPresent);
 	
 	/* IMPORANT:
 	 * ----> Relcache invalidation can close an open smgr <------
@@ -1206,11 +1253,12 @@ void MirroredFileSysObj_ScheduleDropBufferPoolRel(
 	smgrscheduleunlink(
 					&relation->rd_node,
 					/* segmentFileNum */ 0,
+					MASTER_CONTENT_ID, /* use master's content id for all heap table and index*/
 					PersistentFileSysRelStorageMgr_BufferPool,
 					relation->rd_isLocalBuf,
 					relation->rd_rel->relname.data,
-					&relation->rd_segfile0_relationnodeinfo.persistentTid,
-					relation->rd_segfile0_relationnodeinfo.persistentSerialNum);
+					&relation->rd_segfile0_relationnodeinfos[0].persistentTid,
+					relation->rd_segfile0_relationnodeinfos[0].persistentSerialNum);
 
 	/* Now close the file and throw away the hashtable entry */
 	smgrclose(relation->rd_smgr);
@@ -1260,6 +1308,7 @@ void MirroredFileSysObj_ScheduleDropBufferPoolFile(
 	smgrscheduleunlink(
 					relFileNode,
 					/* segmentFileNum */ 0,
+					MASTER_CONTENT_ID, /* use master's content id for all heap table and index*/
 					PersistentFileSysRelStorageMgr_BufferPool,
 					isLocalBuf,
 					relationName,
@@ -1289,6 +1338,8 @@ void MirroredFileSysObj_ScheduleDropAppendOnlyFile(
 
 	int32						segmentFileNum,
 
+	int32						contentid,
+
 	char						*relationName,
 
 	ItemPointer 				persistentTid,
@@ -1316,6 +1367,7 @@ void MirroredFileSysObj_ScheduleDropAppendOnlyFile(
 	smgrscheduleunlink(
 					relFileNode,
 					segmentFileNum,
+					contentid,
 					PersistentFileSysRelStorageMgr_AppendOnly,
 					/* isLocalBuf */ false,
 					relationName,
@@ -1327,6 +1379,8 @@ void MirroredFileSysObj_DropRelFile(
 	RelFileNode 				*relFileNode,
 
 	int32						segmentFileNum,
+
+	int32						contentid,
 
 	PersistentFileSysRelStorageMgr relStorageMgr,
 
@@ -1360,10 +1414,11 @@ void MirroredFileSysObj_DropRelFile(
 		MirroredAppendOnly_Drop(
 					relFileNode,
 					segmentFileNum,
+					contentid,
 					relationName,
-					primaryOnly,
-					&primaryError,
-					mirrorDataLossOccurred);
+					/*primaryOnly,*/
+					&primaryError/*,
+					mirrorDataLossOccurred*/);
 		if (ignoreNonExistence && primaryError == ENOENT)
 			primaryError = 0;
 

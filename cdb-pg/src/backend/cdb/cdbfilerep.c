@@ -3097,7 +3097,9 @@ FileRep_GetRelationPath(
 	char *mirrorFilespaceLocation;
 
 	PersistentTablespace_GetPrimaryAndMirrorFilespaces(
+													   GpIdentity.segindex,
 													   relFileNode.spcNode,
+													   FALSE,
 													   &primaryFilespaceLocation,
 													   &mirrorFilespaceLocation);
 

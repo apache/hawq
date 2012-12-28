@@ -343,6 +343,10 @@ cdbconn_doConnect(SegmentDatabaseDescriptor    *segdbDesc,
 
     appendPQExpBuffer(&buffer, "connect_timeout=%d ", gp_segment_connect_timeout);
 
+	appendPQExpBuffer(&buffer, "dboid=%u ", MyProcPort->dboid);
+	appendPQExpBuffer(&buffer, "bootstrap_user=%s ", MyProcPort->bootstrap_user);
+	appendPQExpBuffer(&buffer, "encoding=%d ", MyProcPort->encoding);
+
     /*
      * Call libpq to connect
      */

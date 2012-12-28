@@ -83,7 +83,7 @@ static volatile bool shutdown_requested = false;
 static volatile bool rescan_requested = false;
 
 static char *probeUser = NULL;
-static char *probeDatabase = "postgres";
+static char *probeDatabase = "template0";
 
 static char failover_strategy='n';
 

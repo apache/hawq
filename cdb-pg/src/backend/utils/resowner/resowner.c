@@ -746,6 +746,9 @@ ResourceOwnerRememberRelationRef(ResourceOwner owner, Relation rel)
 void
 ResourceOwnerForgetRelationRef(ResourceOwner owner, Relation rel)
 {
+	Assert(NULL != owner);
+	Assert(NULL != rel);
+
 	Relation   *relrefs = owner->relrefs;
 	int			nr1 = owner->nrelrefs - 1;
 	int			i;

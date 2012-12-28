@@ -1078,7 +1078,7 @@ SearchCatCache(CatCache *cache,
 					cache->cc_tupdesc,
 					cache->cc_nkeys,
 					cur_skey,
-					res);
+					&res);
 		if (!res)
 			continue;
 
@@ -1328,7 +1328,7 @@ SearchCatCacheList(CatCache *cache,
 					cache->cc_tupdesc,
 					nkeys,
 					cur_skey,
-					res);
+					&res);
 		if (!res)
 			continue;
 

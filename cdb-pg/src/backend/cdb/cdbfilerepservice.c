@@ -558,7 +558,7 @@ static void
 FileRepSubProcess_InitializeResyncManagerProcess(void)
 {
 	char	*fullpath;
-	char	*knownDatabase = "postgres";
+	char	*knownDatabase = "template0";
 	
 	SetProcessingMode(InitProcessing);
 	
@@ -583,7 +583,7 @@ FileRepSubProcess_InitializeResyncManagerProcess(void)
 	
 	if (!FindMyDatabase(knownDatabase, &MyDatabaseId, &MyDatabaseTableSpace))
 		ereport(FATAL, (errcode(ERRCODE_UNDEFINED_DATABASE),
-						errmsg("database 'postgres' does not exist")));
+						errmsg("database 'template0' does not exist")));
 	
 	fullpath = GetDatabasePath(MyDatabaseId, MyDatabaseTableSpace);
 	

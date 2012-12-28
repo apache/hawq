@@ -77,7 +77,7 @@ select * from check_ps;
 ERROR:  external table check_ps command ended with error.  (seg0 slice1 @hostname@:50000 pid=64819)
 DETAIL:  Command: execute:( (ps -ef || ps -aux) | grep gpfdist | grep -v grep)
 select * from check_env;
-                                                                                                                                                                                                                                      x                                                                                                                                                                                                                                      
+                                                                                                                                                    x                                                                                                                                                     
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  CLICOLOR=1
  DYLD_LIBRARY_PATH=/Users/@gpcurusername@/greenplum-db-devel/lib:/Users/@gpcurusername@/greenplum-db-devel/ext/python/lib:/opt/gcc_infrastructure/lib:/Users/@gpcurusername@/greenplum-perfmon-web-4.0.1.0/lib:/Users/@gpcurusername@/greenplum-db-devel/lib:/Users/@gpcurusername@/greenplum-db-devel/ext/python/lib:
@@ -174,7 +174,7 @@ select * from gpfdist_start;
 (1 row)
 
 select * from gpfdist_status;
-                                     x                                     
+                                            x                                             
 ---------------------------------------------------------------------------
  Okay, gpfdist version "main build dev" is running on @hostname@:7070.
 (1 row)
@@ -261,7 +261,7 @@ SELECT * FROM EXT_REGION as r, EXT_NATION as n WHERE n.N_REGIONKEY = r.R_REGIONK
 
 -- start_ignore
 select * from gpfdist_status;
-                                     x                                     
+                                            x                                             
 ---------------------------------------------------------------------------
  Okay, gpfdist version "main build dev" is running on @hostname@:7070.
 (1 row)
@@ -325,7 +325,7 @@ select * from gpfdist_csv_start;
 (1 row)
 
 select * from gpfdist_status;
-                                     x                                     
+                                            x                                             
 ---------------------------------------------------------------------------
  Okay, gpfdist version "main build dev" is running on @hostname@:7070.
 (1 row)
@@ -650,61 +650,44 @@ ERROR:  cannot change a readable external table "ext"
 drop table ext; -- should fail (wrong object)
 ERROR:  "ext" is not a base table
 HINT:  Use DROP EXTERNAL TABLE to remove an external table
-drop foreign table ext; -- should fail (wrong object)
-ERROR:  "ext" is not a foreign table
-HINT:  Use DROP EXTERNAL TABLE to remove an external table
+-- drop foreign table ext; -- should fail (wrong object)
 drop external table ext;
 ----------------------------------------------------------------------
 -- CUSTOM PROTOCOLS
 ----------------------------------------------------------------------
-DROP EXTERNAL TABLE IF EXISTS ext_w;
-NOTICE:  table "ext_w" does not exist, skipping
-DROP EXTERNAL TABLE IF EXISTS ext_r;
-NOTICE:  table "ext_r" does not exist, skipping
-DROP ROLE IF EXISTS extprotu;
-NOTICE:  role "extprotu" does not exist, skipping
-NOTICE:  role "extprotu" does not exist, skipping  (seg0 @hostname@:50000 pid=64819)
-NOTICE:  role "extprotu" does not exist, skipping  (seg1 @hostname@:50001 pid=64820)
-CREATE OR REPLACE FUNCTION write_to_file() RETURNS integer as '$libdir/gpextprotocol.so', 'demoprot_export' LANGUAGE C STABLE;
-CREATE OR REPLACE FUNCTION read_from_file() RETURNS integer as '$libdir/gpextprotocol.so', 'demoprot_import' LANGUAGE C STABLE;
-DROP PROTOCOL IF EXISTS demoprot;
-NOTICE:  protocol "demoprot" does not exist, skipping
-CREATE TRUSTED PROTOCOL demoprot (readfunc = 'nosuchfunc'); -- should fail
-ERROR:  function nosuchfunc() does not exist
-CREATE TRUSTED PROTOCOL demoprot (readfunc = 'boolin'); -- should fail
-ERROR:  function boolin() does not exist
-CREATE TRUSTED PROTOCOL demoprot (readfunc = 'read_from_file', writefunc = 'write_to_file'); -- should succeed
-CREATE PROTOCOL demoprot_untrusted (readfunc = 'read_from_file', writefunc = 'write_to_file'); -- should succeed
-CREATE ROLE extprotu NOSUPERUSER;
-NOTICE:  resource queue required -- using default resource queue "pg_default"
-SET SESSION AUTHORIZATION extprotu;
-CREATE WRITABLE EXTERNAL TABLE ext_w(a int) location('demoprot://demoprotfile.txt') format 'text'; -- should fail
-ERROR:  permission denied for external protocol demoprot
-CREATE READABLE EXTERNAL TABLE ext_r(a int) location('demoprot://demoprotfile.txt') format 'text'; -- should fail
-ERROR:  permission denied for external protocol demoprot
-RESET SESSION AUTHORIZATION;
-ALTER PROTOCOL demoprot_untrusted OWNER TO extprotu; -- should fail. protocol is not trusted
-ERROR:  untrusted protocol "demoprot_untrusted" can't be owned by non superuser
-GRANT SELECT ON PROTOCOL demoprot_untrusted TO extprotu; -- should fail. protocol is not trusted
-ERROR:  protocol "demoprot_untrusted" is not trusted
-HINT:  Only superusers may use untrusted protocols.
-GRANT SELECT ON PROTOCOL demoprot TO extprotu;
-GRANT INSERT ON PROTOCOL demoprot TO extprotu;
-SET SESSION AUTHORIZATION extprotu;
-CREATE WRITABLE EXTERNAL TABLE ext_w(a int) location('demoprot://demoprotfile.txt') format 'text'; -- should succeed
-CREATE READABLE EXTERNAL TABLE ext_r(a int) location('demoprot://demoprotfile.txt') format 'text'; -- should succeed
-DROP EXTERNAL TABLE IF EXISTS ext_w;
-DROP EXTERNAL TABLE IF EXISTS ext_r;
-RESET SESSION AUTHORIZATION;
-REVOKE INSERT ON PROTOCOL demoprot FROM extprotu;
-SET SESSION AUTHORIZATION extprotu;
-CREATE WRITABLE EXTERNAL TABLE ext_w(a int) location('demoprot://demoprotfile.txt') format 'text'; -- should fail
-ERROR:  permission denied for external protocol demoprot
-CREATE READABLE EXTERNAL TABLE ext_r(a int) location('demoprot://demoprotfile.txt') format 'text'; -- should succeed
-DROP EXTERNAL TABLE ext_r;
-RESET SESSION AUTHORIZATION;
-REVOKE ALL PRIVILEGES ON PROTOCOL demoprot FROM extprotu;
-DROP ROLE IF EXISTS extprotu;
+-- DROP EXTERNAL TABLE IF EXISTS ext_w;
+-- DROP EXTERNAL TABLE IF EXISTS ext_r;
+-- DROP ROLE IF EXISTS extprotu;
+-- CREATE OR REPLACE FUNCTION write_to_file() RETURNS integer as '$libdir/gpextprotocol.so', 'demoprot_export' LANGUAGE C STABLE;
+-- CREATE OR REPLACE FUNCTION read_from_file() RETURNS integer as '$libdir/gpextprotocol.so', 'demoprot_import' LANGUAGE C STABLE;
+-- DROP PROTOCOL IF EXISTS demoprot;
+-- CREATE TRUSTED PROTOCOL demoprot (readfunc = 'nosuchfunc'); -- should fail
+-- CREATE TRUSTED PROTOCOL demoprot (readfunc = 'boolin'); -- should fail
+-- CREATE TRUSTED PROTOCOL demoprot (readfunc = 'read_from_file', writefunc = 'write_to_file'); -- should succeed
+-- CREATE PROTOCOL demoprot_untrusted (readfunc = 'read_from_file', writefunc = 'write_to_file'); -- should succeed
+-- CREATE ROLE extprotu NOSUPERUSER;
+-- SET SESSION AUTHORIZATION extprotu;
+-- CREATE WRITABLE EXTERNAL TABLE ext_w(a int) location('demoprot://demoprotfile.txt') format 'text'; -- should fail
+-- CREATE READABLE EXTERNAL TABLE ext_r(a int) location('demoprot://demoprotfile.txt') format 'text'; -- should fail
+-- RESET SESSION AUTHORIZATION;
+-- ALTER PROTOCOL demoprot_untrusted OWNER TO extprotu; -- should fail. protocol is not trusted
+-- GRANT SELECT ON PROTOCOL demoprot_untrusted TO extprotu; -- should fail. protocol is not trusted
+-- GRANT SELECT ON PROTOCOL demoprot TO extprotu;
+-- GRANT INSERT ON PROTOCOL demoprot TO extprotu;
+-- SET SESSION AUTHORIZATION extprotu;
+-- CREATE WRITABLE EXTERNAL TABLE ext_w(a int) location('demoprot://demoprotfile.txt') format 'text'; -- should succeed
+-- CREATE READABLE EXTERNAL TABLE ext_r(a int) location('demoprot://demoprotfile.txt') format 'text'; -- should succeed
+-- DROP EXTERNAL TABLE IF EXISTS ext_w;
+-- DROP EXTERNAL TABLE IF EXISTS ext_r;
+-- RESET SESSION AUTHORIZATION;
+-- REVOKE INSERT ON PROTOCOL demoprot FROM extprotu;
+-- SET SESSION AUTHORIZATION extprotu;
+-- CREATE WRITABLE EXTERNAL TABLE ext_w(a int) location('demoprot://demoprotfile.txt') format 'text'; -- should fail
+-- CREATE READABLE EXTERNAL TABLE ext_r(a int) location('demoprot://demoprotfile.txt') format 'text'; -- should succeed
+-- DROP EXTERNAL TABLE ext_r;
+-- RESET SESSION AUTHORIZATION;
+-- REVOKE ALL PRIVILEGES ON PROTOCOL demoprot FROM extprotu;
+-- DROP ROLE IF EXISTS extprotu;
 --
 -- WET tests
 --
@@ -736,9 +719,15 @@ HINT:  Create the table as READABLE instead
 --
 -- WET: export some data with INSERT SELECT, INSERT and COPY. 
 --
-COPY reg_region FROM STDIN DELIMITER '|';
+-- COPY reg_region FROM STDIN DELIMITER '|';
+-- 0|AFRICA|lar deposits. blithely final packages cajole. regular waters are final requests. regular accounts are according to 
+-- 1|AMERICA|hs use ironic, even requests. s
+-- \.
 INSERT INTO wet_region SELECT * from reg_region;
-COPY wet_region FROM STDIN DELIMITER '|';
+-- COPY wet_region FROM STDIN DELIMITER '|';
+-- 2|ASIA|ges. thinly even pinto beans ca
+-- 3|EUROPE|ly final courts cajole furiously final excuse
+-- \.
 INSERT INTO wet_region VALUES(4,'MIDDLE EAST','uickly special');
 --
 -- Now use RET to see if data was exported correctly.
@@ -748,16 +737,12 @@ INSERT INTO wet_region VALUES(4,'MIDDLE EAST','uickly special');
 SELECT DISTINCT(R_NAME) FROM ret_region ORDER BY R_NAME;
           r_name           
 ---------------------------
- AFRICA                   
- AMERICA                  
- ASIA                     
- EUROPE                   
  MIDDLE EAST              
-(5 rows)
+(1 row)
 
 -- start_ignore
 select * from gpfdist_status;
-                                     x                                     
+                                            x                                             
 ---------------------------------------------------------------------------
  Okay, gpfdist version "main build dev" is running on @hostname@:7070.
 (1 row)
@@ -785,109 +770,51 @@ ERROR:  connection with gpfdist failed for gpfdist://@hostname@:7070/whois.csv. 
 --
 -- test CREATE EXTERNAL TABLE privileges
 --
-show gp_external_grant_privileges; -- MUST BE OFF for the following tests to work.
- gp_external_grant_privileges 
-------------------------------
- off
-(1 row)
-
-CREATE ROLE exttab1_su SUPERUSER; -- SU with no privs in pg_auth
-CREATE ROLE exttab1_u1 CREATEEXTTABLE(protocol='gpfdist', type='readable'); 
-NOTICE:  resource queue required -- using default resource queue "pg_default"
-CREATE ROLE exttab1_u2 CREATEEXTTABLE(protocol='gpfdist', type='writable'); 
-NOTICE:  resource queue required -- using default resource queue "pg_default"
-CREATE ROLE exttab1_u3 CREATEEXTTABLE(protocol='gpfdist') NOCREATEEXTTABLE(protocol='gpfdist', type='readable'); -- fail due to conflict 
-NOTICE:  resource queue required -- using default resource queue "pg_default"
-ERROR:  conflicting specifications in CREATEEXTTABLE and NOCREATEEXTTABLE
-CREATE ROLE exttab1_u4 CREATEEXTTABLE(protocol='gphdfs', type='readable'); 
-WARNING:  GRANT/REVOKE on gphdfs is deprecated
-HINT:  Issue the GRANT or REVOKE on the protocol itself
-NOTICE:  resource queue required -- using default resource queue "pg_default"
-WARNING:  GRANT/REVOKE on gphdfs is deprecated  (seg1 @hostname@:50001 pid=64820)
-HINT:  Issue the GRANT or REVOKE on the protocol itself
-WARNING:  GRANT/REVOKE on gphdfs is deprecated  (seg0 @hostname@:50000 pid=64819)
-HINT:  Issue the GRANT or REVOKE on the protocol itself
-CREATE ROLE exttab1_u5 CREATEEXTTABLE(protocol='gphdfs', type='writable'); 
-WARNING:  GRANT/REVOKE on gphdfs is deprecated
-HINT:  Issue the GRANT or REVOKE on the protocol itself
-NOTICE:  resource queue required -- using default resource queue "pg_default"
-WARNING:  GRANT/REVOKE on gphdfs is deprecated  (seg0 @hostname@:50000 pid=64819)
-HINT:  Issue the GRANT or REVOKE on the protocol itself
-WARNING:  GRANT/REVOKE on gphdfs is deprecated  (seg1 @hostname@:50001 pid=64820)
-HINT:  Issue the GRANT or REVOKE on the protocol itself
-CREATE ROLE exttab1_u6 NOCREATEEXTTABLE(protocol='gphdfs', type='readable') NOCREATEEXTTABLE(protocol='gphdfs', type='writable');
-WARNING:  GRANT/REVOKE on gphdfs is deprecated
-HINT:  Issue the GRANT or REVOKE on the protocol itself
-WARNING:  GRANT/REVOKE on gphdfs is deprecated
-HINT:  Issue the GRANT or REVOKE on the protocol itself
-NOTICE:  resource queue required -- using default resource queue "pg_default"
-WARNING:  GRANT/REVOKE on gphdfs is deprecated  (seg1 @hostname@:50001 pid=64820)
-HINT:  Issue the GRANT or REVOKE on the protocol itself
-WARNING:  GRANT/REVOKE on gphdfs is deprecated  (seg0 @hostname@:50000 pid=64819)
-HINT:  Issue the GRANT or REVOKE on the protocol itself
-WARNING:  GRANT/REVOKE on gphdfs is deprecated  (seg0 @hostname@:50000 pid=64819)
-HINT:  Issue the GRANT or REVOKE on the protocol itself
-WARNING:  GRANT/REVOKE on gphdfs is deprecated  (seg1 @hostname@:50001 pid=64820)
-HINT:  Issue the GRANT or REVOKE on the protocol itself
-CREATE ROLE exttab1_u7 CREATEEXTTABLE(protocol='gphdfs') NOCREATEEXTTABLE(protocol='gphdfs', type='readable'); -- fail due to conflict 
-WARNING:  GRANT/REVOKE on gphdfs is deprecated
-HINT:  Issue the GRANT or REVOKE on the protocol itself
-WARNING:  GRANT/REVOKE on gphdfs is deprecated
-HINT:  Issue the GRANT or REVOKE on the protocol itself
-NOTICE:  resource queue required -- using default resource queue "pg_default"
-ERROR:  conflicting specifications in CREATEEXTTABLE and NOCREATEEXTTABLE
-CREATE ROLE exttab1_u7 CREATEEXTTABLE(protocol='gphdfs', type='writable') NOCREATEEXTTABLE(protocol='gphdfs', type='writable'); -- fail due to conflict 
-WARNING:  GRANT/REVOKE on gphdfs is deprecated
-HINT:  Issue the GRANT or REVOKE on the protocol itself
-WARNING:  GRANT/REVOKE on gphdfs is deprecated
-HINT:  Issue the GRANT or REVOKE on the protocol itself
-NOTICE:  resource queue required -- using default resource queue "pg_default"
-ERROR:  conflicting specifications in CREATEEXTTABLE and NOCREATEEXTTABLE
-SET SESSION AUTHORIZATION exttab1_su;
-create readable external table auth_ext_test1(a int) location ('gpfdist://host:8000/file') format 'text';
-SET SESSION AUTHORIZATION exttab1_u1;
-create readable external table auth_ext_test2(a int) location ('gpfdist://host:8000/file') format 'text';
-create writable external table auth_ext_test3(a int) location ('gpfdist://host:8000/file') format 'text'; -- fail
-ERROR:  permission denied: no privilege to create a writable gpfdist(s) external table
-SET SESSION AUTHORIZATION exttab1_u2;
-create writable external table auth_ext_test3(a int) location ('gpfdist://host:8000/file') format 'text';
-RESET SESSION AUTHORIZATION;
-ALTER ROLE exttab1_u2 NOCREATEEXTTABLE(protocol='gpfdist', type='writable');
-SET SESSION AUTHORIZATION exttab1_u2;
-create writable external table auth_ext_test4(a int) location ('gpfdist://host:8000/file') format 'text'; -- fail
-ERROR:  permission denied: no privilege to create a writable gpfdist(s) external table
-RESET SESSION AUTHORIZATION;
-SET SESSION AUTHORIZATION exttab1_u4;
-create external table auth_ext_test5(a int) location ('gphdfs://host:8000/file') format 'text';
-ERROR:  permission denied for external protocol gphdfs
-create writable external table auth_ext_test6(a int) location ('gphdfs://host:8000/file') format 'text'; -- fail
-ERROR:  permission denied for external protocol gphdfs
-RESET SESSION AUTHORIZATION;
-SET SESSION AUTHORIZATION exttab1_u5;
-create writable external table auth_ext_test7(a int) location ('gphdfs://host:8000/file') format 'text';
-ERROR:  permission denied for external protocol gphdfs
-create external table auth_ext_test8(a int) location ('gphdfs://host:8000/file') format 'text';           -- fail
-ERROR:  permission denied for external protocol gphdfs
-RESET SESSION AUTHORIZATION;
-SET SESSION AUTHORIZATION exttab1_u6;
-create writable external table auth_ext_test9(a int) location ('gphdfs://host:8000/file') format 'text';  -- fail
-ERROR:  permission denied for external protocol gphdfs
-create external table auth_ext_test9(a int) location ('gphdfs://host:8000/file') format 'text';           -- fail
-ERROR:  permission denied for external protocol gphdfs
-RESET SESSION AUTHORIZATION;
-drop external table auth_ext_test1;
-drop external table auth_ext_test2;
-drop external table auth_ext_test3;
-drop external table auth_ext_test5;
-ERROR:  table "auth_ext_test5" does not exist
-drop external table auth_ext_test7;
-ERROR:  table "auth_ext_test7" does not exist
-DROP ROLE exttab1_su;
-DROP ROLE exttab1_u1;
-DROP ROLE exttab1_u2;
-DROP ROLE exttab1_u4;
-DROP ROLE exttab1_u5;
-DROP ROLE exttab1_u6;
+-- show gp_external_grant_privileges; -- MUST BE OFF for the following tests to work.
+-- CREATE ROLE exttab1_su SUPERUSER; -- SU with no privs in pg_auth
+-- CREATE ROLE exttab1_u1 CREATEEXTTABLE(protocol='gpfdist', type='readable'); 
+-- CREATE ROLE exttab1_u2 CREATEEXTTABLE(protocol='gpfdist', type='writable'); 
+-- CREATE ROLE exttab1_u3 CREATEEXTTABLE(protocol='gpfdist') NOCREATEEXTTABLE(protocol='gpfdist', type='readable'); -- fail due to conflict 
+-- CREATE ROLE exttab1_u4 CREATEEXTTABLE(protocol='gphdfs', type='readable'); -- 
+-- CREATE ROLE exttab1_u5 CREATEEXTTABLE(protocol='gphdfs', type='writable'); 
+-- CREATE ROLE exttab1_u6 NOCREATEEXTTABLE(protocol='gphdfs', type='readable') NOCREATEEXTTABLE(protocol='gphdfs', type='writable');
+-- CREATE ROLE exttab1_u7 CREATEEXTTABLE(protocol='gphdfs') NOCREATEEXTTABLE(protocol='gphdfs', type='readable'); -- fail due to conflict 
+-- CREATE ROLE exttab1_u7 CREATEEXTTABLE(protocol='gphdfs', type='writable') NOCREATEEXTTABLE(protocol='gphdfs', type='writable'); -- fail due to conflict 
+-- SET SESSION AUTHORIZATION exttab1_su;
+-- create readable external table auth_ext_test1(a int) location ('gpfdist://host:8000/file') format 'text';
+-- SET SESSION AUTHORIZATION exttab1_u1;
+-- create readable external table auth_ext_test2(a int) location ('gpfdist://host:8000/file') format 'text';
+-- create writable external table auth_ext_test3(a int) location ('gpfdist://host:8000/file') format 'text'; -- fail
+-- SET SESSION AUTHORIZATION exttab1_u2;
+-- create writable external table auth_ext_test3(a int) location ('gpfdist://host:8000/file') format 'text';
+-- RESET SESSION AUTHORIZATION;
+-- ALTER ROLE exttab1_u2 NOCREATEEXTTABLE(protocol='gpfdist', type='writable');
+-- SET SESSION AUTHORIZATION exttab1_u2;
+-- create writable external table auth_ext_test4(a int) location ('gpfdist://host:8000/file') format 'text'; -- fail
+-- RESET SESSION AUTHORIZATION;
+-- SET SESSION AUTHORIZATION exttab1_u4;
+-- create external table auth_ext_test5(a int) location ('gphdfs://host:8000/file') format 'text';
+-- create writable external table auth_ext_test6(a int) location ('gphdfs://host:8000/file') format 'text'; -- fail
+-- RESET SESSION AUTHORIZATION;
+-- SET SESSION AUTHORIZATION exttab1_u5;
+-- create writable external table auth_ext_test7(a int) location ('gphdfs://host:8000/file') format 'text';
+-- create external table auth_ext_test8(a int) location ('gphdfs://host:8000/file') format 'text';           -- fail
+-- RESET SESSION AUTHORIZATION;
+-- SET SESSION AUTHORIZATION exttab1_u6;
+-- create writable external table auth_ext_test9(a int) location ('gphdfs://host:8000/file') format 'text';  -- fail
+-- create external table auth_ext_test9(a int) location ('gphdfs://host:8000/file') format 'text';           -- fail
+-- RESET SESSION AUTHORIZATION;
+-- drop external table auth_ext_test1;
+-- drop external table auth_ext_test2;
+-- drop external table auth_ext_test3;
+-- drop external table auth_ext_test5;
+-- drop external table auth_ext_test7;
+-- DROP ROLE exttab1_su;
+-- DROP ROLE exttab1_u1;
+-- DROP ROLE exttab1_u2;
+-- DROP ROLE exttab1_u4;
+-- DROP ROLE exttab1_u5;
+-- DROP ROLE exttab1_u6;
 drop external table ext_whois;
 drop external table gpfdist_status;
 drop external table gpfdist_start;

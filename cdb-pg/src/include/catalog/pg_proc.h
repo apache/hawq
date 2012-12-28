@@ -10138,8 +10138,9 @@ DESCR("Greenplum fault testing only");
 
 /* Analyze related */
 /* gp_statistics_estimate_reltuples_relpages_oid(oid) => _float4 */ 
-DATA(insert OID = 5032 ( gp_statistics_estimate_reltuples_relpages_oid  PGNSP PGUID 12 f f t f v 1 1021 f "26" _null_ _null_ _null_ gp_statistics_estimate_reltuples_relpages_oid - _null_ ));
-DESCR("Return reltuples/relpages information for relation.");
+/*
+ * deleted in gpsql
+ */
 
 
 /* Backoff related */

@@ -56,6 +56,7 @@ typedef struct PersistentFileSysObjName
 
 	PersistentFileSysObjNameVariant variant;
 	/* If tablespace is a shared storage, we skip mirroring checking. */
+	int4	contentid;
 	bool	hasInited;
 	bool	sharedStorage;
 } PersistentFileSysObjName;
@@ -64,12 +65,15 @@ inline static void PersistentFileSysObjName_SetRelationFile(
 	PersistentFileSysObjName	*fsObjName,
 	RelFileNode					*relFileNode,
 	int32						segmentFileNum,
+	int32						contentid,
 	bool 						(*getSharedStorage) (Oid))
 {
 	MemSet(fsObjName, 0, sizeof(PersistentFileSysObjName));
 	fsObjName->type = PersistentFsObjType_RelationFile;
 	memcpy(&(fsObjName->variant.rel.relFileNode), relFileNode, sizeof(RelFileNode));
 	fsObjName->variant.rel.segmentFileNum = segmentFileNum;
+	fsObjName->contentid = contentid;
+
 	if (fsObjName->hasInited || !getSharedStorage)
 		return;
 	fsObjName->hasInited = true;
@@ -90,6 +94,14 @@ inline static RelFileNode *PersistentFileSysObjName_GetRelFileNodePtr(
 	Assert(fsObjName->type == PersistentFsObjType_RelationFile);
 
 	return &fsObjName->variant.rel.relFileNode;
+}
+
+inline static int32 PersistentFileSysObjName_GetRelFileContentid(
+	PersistentFileSysObjName	*fsObjName)
+{
+	Assert(fsObjName->type == PersistentFsObjType_RelationFile);
+
+	return fsObjName->contentid;
 }
 
 inline static int32 PersistentFileSysObjName_GetSegmentFileNum(

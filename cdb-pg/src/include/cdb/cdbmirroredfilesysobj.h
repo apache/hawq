@@ -59,6 +59,7 @@ extern void MirroredFileSysObj_CreateFilespaceDir(
 	bool 						*mirrorDataLossOccurred);
 
 extern void MirroredFileSysObj_ScheduleDropFilespaceDir(
+	int4		contentid,
 	Oid			filespaceOid,
 	bool		sharedStorage);
 
@@ -82,6 +83,7 @@ extern void MirroredFileSysObj_DropFilespaceDir(
 	bool						*mirrorDataLossOccurred);
 
 extern void MirroredFileSysObj_TransactionCreateTablespaceDir(
+	int4				contentid,
 	TablespaceDirNode	*tablespaceDirNode,
 
 	ItemPointer 		persistentTid,
@@ -91,6 +93,7 @@ extern void MirroredFileSysObj_TransactionCreateTablespaceDir(
 				/* Output: The serial number of the gp_persistent_tablespace_node tuple. */
 
 extern void MirroredFileSysObj_CreateTablespaceDir(
+	int4						contentid,
 	Oid 						tablespaceOid,
 	
 	StorageManagerMirrorMode	mirrorMode,
@@ -102,10 +105,12 @@ extern void MirroredFileSysObj_CreateTablespaceDir(
 	bool 						*mirrorDataLossOccurred);
 
 extern void MirroredFileSysObj_ScheduleDropTablespaceDir(
+	int4						contentid,
 	Oid							tablespaceOid,
 	bool						sharedStorage);
 
 extern void MirroredFileSysObj_DropTablespaceDir(
+	int4						contentid,
 	Oid							tablespaceOid,
 	
 	bool						primaryOnly,
@@ -117,6 +122,7 @@ extern void MirroredFileSysObj_DropTablespaceDir(
 	bool						*mirrorDataLossOccurred);
 	
 extern void MirroredFileSysObj_TransactionCreateDbDir(
+	int4				contentid,
 	DbDirNode			*dbDirNode,
 
 	ItemPointer 		persistentTid,
@@ -126,6 +132,7 @@ extern void MirroredFileSysObj_TransactionCreateDbDir(
 				/* Output: The serial number of the gp_persistent_database_node tuple. */
 
 extern void MirroredFileSysObj_CreateDbDir(
+	int4						contentid,
 	DbDirNode					*dbDirNode,
 	
 	StorageManagerMirrorMode	mirrorMode,
@@ -137,6 +144,7 @@ extern void MirroredFileSysObj_CreateDbDir(
 	bool 						*mirrorDataLossOccurred);
 
 extern void MirroredFileSysObj_ScheduleDropDbDir(
+	int4			contentid,
 	DbDirNode		*dbDirNode,
 	
 	ItemPointer		 persistentTid,
@@ -145,6 +153,8 @@ extern void MirroredFileSysObj_ScheduleDropDbDir(
 	bool			sharedStorage);
 
 extern void MirroredFileSysObj_DropDbDir(
+	int4						contentid,
+
 	DbDirNode					*dbDirNode,
 	
 	bool						primaryOnly,
@@ -177,6 +187,8 @@ extern void MirroredFileSysObj_TransactionCreateAppendOnlyFile(
 
 	int32					segmentFileNum,
 
+	int32					contentid,
+
 	char					*relationName,
 
 	bool					doJustInTimeDirCreate,
@@ -202,6 +214,8 @@ extern void MirroredFileSysObj_ScheduleDropAppendOnlyFile(
 
 	int32						segmentFileNum,
 
+	int32						contentid,
+
 	char						*relationName,
 
 	ItemPointer 				persistentTid,
@@ -212,6 +226,8 @@ extern void MirroredFileSysObj_DropRelFile(
 	RelFileNode 				*relFileNode,
 
 	int32						segmentFileNum,
+
+	int32						contentid,
 
 	PersistentFileSysRelStorageMgr relStorageMgr,
 

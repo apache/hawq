@@ -20,6 +20,7 @@
 #include "access/genam.h"
 #include "access/htup.h"
 #include "access/heapam.h"
+#include "cdb/cdbvars.h"
 
 static void update_fastsequence(
 	Relation gp_fastsequence_rel,
@@ -27,6 +28,7 @@ static void update_fastsequence(
 	TupleDesc tupleDesc,
 	Oid objid,
 	int64 objmod,
+	int32 contentid,
 	int64 newLastSequence,
 	ItemPointer tid);
 
@@ -41,7 +43,7 @@ static void update_fastsequence(
  */
 void
 InsertFastSequenceEntry(Oid objid, int64 objmod, int64 lastSequence,
-						ItemPointer tid)
+		int32 contentid, ItemPointer tid)
 {
 	Relation gp_fastsequence_rel;
 	TupleDesc tupleDesc;
@@ -58,7 +60,7 @@ InsertFastSequenceEntry(Oid objid, int64 objmod, int64 lastSequence,
 	gp_fastsequence_rel = heap_open(FastSequenceRelationId, RowExclusiveLock);
 	tupleDesc = RelationGetDescr(gp_fastsequence_rel);
 	
-	scanKeys = palloc0(2 * sizeof(ScanKeyData));
+	scanKeys = palloc0(3 * sizeof(ScanKeyData));
 
 	ScanKeyInit(&scanKeys[0],
 				Anum_gp_fastsequence_objid,
@@ -70,11 +72,18 @@ InsertFastSequenceEntry(Oid objid, int64 objmod, int64 lastSequence,
 				BTEqualStrategyNumber,
 				F_INT8EQ,
 				Int64GetDatum(objmod));
+
+	ScanKeyInit(&scanKeys[2],
+			Anum_gp_fastsequence_contentid,
+				BTEqualStrategyNumber,
+				F_INT4EQ,
+				Int32GetDatum(contentid));
+
 	scanDesc = systable_beginscan(gp_fastsequence_rel,
 								  FastSequenceObjidObjmodIndexId,
 								  true,
 								  SnapshotNow,
-								  2,
+								  3,
 								  scanKeys);
 	tuple = systable_getnext(scanDesc);
 
@@ -87,10 +96,15 @@ InsertFastSequenceEntry(Oid objid, int64 objmod, int64 lastSequence,
 		values[Anum_gp_fastsequence_objid - 1] = ObjectIdGetDatum(objid);
 		values[Anum_gp_fastsequence_objmod - 1] = Int64GetDatum(objmod);
 		values[Anum_gp_fastsequence_last_sequence - 1] = Int64GetDatum(lastSequence);
-	
+		values[Anum_gp_fastsequence_contentid - 1] = Int32GetDatum(contentid);
+
 		tuple = heaptuple_form_to(tupleDesc, values, nulls, NULL, NULL);
 		frozen_heap_insert(gp_fastsequence_rel, tuple);
-		CatalogUpdateIndexes(gp_fastsequence_rel, tuple);
+		/*
+		 * in gpsql, index only exists on master
+		 */
+		if (Gp_role != GP_ROLE_EXECUTE)
+			CatalogUpdateIndexes(gp_fastsequence_rel, tuple);
 	
 		ItemPointerCopy(&tuple->t_self, tid);
 
@@ -105,6 +119,7 @@ InsertFastSequenceEntry(Oid objid, int64 objmod, int64 lastSequence,
 							tupleDesc,
 							objid,
 							objmod,
+							contentid,
 							lastSequence,
 							tid);
 	}
@@ -126,6 +141,9 @@ InsertFastSequenceEntry(Oid objid, int64 objmod, int64 lastSequence,
  * table.
  *
  * The tuple id value for the entry is copied out to 'tid'.
+ *
+ * NOTE: in gpsql, we do not add new tuple in QE, it should be dispatched
+ * from master, and only update is allowed on QE.
  */
 static void
 update_fastsequence(Relation gp_fastsequence_rel,
@@ -133,6 +151,7 @@ update_fastsequence(Relation gp_fastsequence_rel,
 					TupleDesc tupleDesc,
 					Oid objid,
 					int64 objmod,
+					int32 contentid,
 					int64 newLastSequence,
 					ItemPointer tid)
 {
@@ -148,12 +167,16 @@ update_fastsequence(Relation gp_fastsequence_rel,
 	 */
 	if (oldTuple == NULL)
 	{
+		Assert(Gp_role != GP_ROLE_EXECUTE);
+
 		values[Anum_gp_fastsequence_objid - 1] = ObjectIdGetDatum(objid);
 		values[Anum_gp_fastsequence_objmod - 1] = Int64GetDatum(objmod);
 		values[Anum_gp_fastsequence_last_sequence - 1] = Int64GetDatum(newLastSequence);
+		values[Anum_gp_fastsequence_contentid - 1] = Int32GetDatum(GpIdentity.segindex);
 
 		newTuple = heaptuple_form_to(tupleDesc, values, nulls, NULL, NULL);
 		frozen_heap_insert(gp_fastsequence_rel, newTuple);
+
 		CatalogUpdateIndexes(gp_fastsequence_rel, newTuple);
 
 		ItemPointerCopy(&newTuple->t_self, tid);
@@ -178,6 +201,7 @@ update_fastsequence(Relation gp_fastsequence_rel,
 		values[Anum_gp_fastsequence_objid - 1] = ObjectIdGetDatum(objid);
 		values[Anum_gp_fastsequence_objmod - 1] = Int64GetDatum(objmod);
 		values[Anum_gp_fastsequence_last_sequence - 1] = Int64GetDatum(newLastSequence);
+		values[Anum_gp_fastsequence_contentid - 1] = Int32GetDatum(contentid);
 
 		newTuple = heap_form_tuple(tupleDesc, values, nulls);
 		newTuple->t_data->t_ctid = oldTuple->t_data->t_ctid;
@@ -224,11 +248,12 @@ int64 GetFastSequences(Oid objid, int64 objmod,
 	int64 newLastSequence;
 
 	Assert(tid != NULL);
+	Assert(Gp_role != GP_ROLE_DISPATCH);
 	
 	gp_fastsequence_rel = heap_open(FastSequenceRelationId, RowExclusiveLock);
 	tupleDesc = RelationGetDescr(gp_fastsequence_rel);
 	
-	scanKeys = palloc0(2 * sizeof(ScanKeyData));
+	scanKeys = palloc0(3 * sizeof(ScanKeyData));
 
 	ScanKeyInit(&scanKeys[0],
 				Anum_gp_fastsequence_objid,
@@ -240,16 +265,27 @@ int64 GetFastSequences(Oid objid, int64 objmod,
 				BTEqualStrategyNumber,
 				F_INT8EQ,
 				Int64GetDatum(objmod));
+
+	ScanKeyInit(&scanKeys[2],
+				Anum_gp_fastsequence_contentid,
+				BTEqualStrategyNumber,
+				F_INT4EQ,
+				Int32GetDatum(GpIdentity.segindex));
+
 	scanDesc = systable_beginscan(gp_fastsequence_rel,
 								  FastSequenceObjidObjmodIndexId,
 								  true,
 								  SnapshotNow,
-								  2,
+								  3,
 								  scanKeys);
 	tuple = systable_getnext(scanDesc);
 
 	if (tuple == NULL)
 	{
+		elog(ERROR, "gp_fastsequence should be dispatched to QE, "
+				"objid = %u, objmod = "INT64_FORMAT", minseq = "INT64_FORMAT", numseq = "INT64_FORMAT", contentid = %d",
+				objid, objmod, minSequence, numSequences, GpIdentity.segindex);
+
 		newLastSequence = firstSequence + numSequences - 1;
 	}
 	else
@@ -270,7 +306,7 @@ int64 GetFastSequences(Oid objid, int64 objmod,
 	}
 	
 	update_fastsequence(gp_fastsequence_rel, tuple, tupleDesc,
-						objid, objmod, newLastSequence, tid);
+						objid, objmod, GpIdentity.segindex, newLastSequence, tid);
 		
 	systable_endscan(scanDesc);
 
@@ -349,6 +385,7 @@ GetFastSequencesByTid(ItemPointer tid,
 						tupleDesc,
 						DatumGetObjectId(objidDatum),
 						DatumGetInt64(objmodDatum),
+						GpIdentity.segindex,
 						newLastSequence,
 						tid);
 	
@@ -410,3 +447,4 @@ RemoveFastSequenceEntry(Oid objid)
 	systable_endscan(scanDesc);
 	heap_close(rel, RowExclusiveLock);
 }
+

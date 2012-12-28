@@ -110,6 +110,8 @@ CreateTableSpace(CreateTableSpaceStmt *stmt)
 	TablespaceDirNode tablespaceDirNode;
 	ItemPointerData persistentTid;
 	int64		persistentSerialNum;
+	List		*contentids;
+	ListCell	*cell;
 
 	/* validate */
 
@@ -225,10 +227,16 @@ CreateTableSpace(CreateTableSpaceStmt *stmt)
 	/* Create the persistent directory for the tablespace */
 	tablespaceDirNode.tablespace = tablespaceoid;
 	tablespaceDirNode.filespace = filespaceoid;
-	MirroredFileSysObj_TransactionCreateTablespaceDir(
+	contentids = get_filespace_contentids(filespaceoid);
+	foreach(cell, contentids)
+	{
+		MirroredFileSysObj_TransactionCreateTablespaceDir(
+											lfirst_int(cell),
 											&tablespaceDirNode,
 											&persistentTid,
 											&persistentSerialNum);
+	}
+	list_free(contentids);
 
 	/*
 	 * Record dependency on owner 
@@ -252,7 +260,7 @@ CreateTableSpace(CreateTableSpaceStmt *stmt)
 	if (Gp_role == GP_ROLE_DISPATCH)
 	{
 		stmt->tsoid = tablespaceoid;
-		CdbDispatchUtilityStatement((Node *) stmt, "CreateTablespaceCommand");
+		// CdbDispatchUtilityStatement((Node *) stmt, "CreateTablespaceCommand");
 
 		/* MPP-6929: metadata tracking */
 		MetaTrackAddObject(TableSpaceRelationId,
@@ -286,6 +294,9 @@ RemoveTableSpace(List *names, DropBehavior behavior, bool missing_ok)
 	ItemPointerData persistentTid;
 	int64 		 persistentSerialNum;
 	bool		 sharedStorage;
+	List		*contentids;
+	ListCell	*cell;
+	int4		contentid;
 	
 
 	/* don't call this in a transaction block */
@@ -420,6 +431,7 @@ RemoveTableSpace(List *names, DropBehavior behavior, bool missing_ok)
 	 */
     PersistentDatabase_DirIterateInit();
     while (PersistentDatabase_DirIterateNext(
+										&contentid,
                                         &dbDirNode,
                                         &persistentState,
                                         &persistentTid,
@@ -437,6 +449,7 @@ RemoveTableSpace(List *names, DropBehavior behavior, bool missing_ok)
             continue;
     
         MirroredFileSysObj_ScheduleDropDbDir(
+										contentid,
                                         &dbDirNode,
                                         &persistentTid,
                                         persistentSerialNum,
@@ -446,7 +459,12 @@ RemoveTableSpace(List *names, DropBehavior behavior, bool missing_ok)
 	/*
 	 * Now schedule the tablespace directory removal.
 	 */
-	MirroredFileSysObj_ScheduleDropTablespaceDir(tablespaceoid, sharedStorage);
+	contentids = get_filespace_contentids(get_tablespace_fsoid(tablespaceoid));
+	foreach(cell, contentids)
+	{
+		MirroredFileSysObj_ScheduleDropTablespaceDir(lfirst_int(cell), tablespaceoid, sharedStorage);
+	}
+	list_free(contentids);
 
 	/*
 	 * Note: because we checked that the tablespace was empty, there should be
@@ -627,13 +645,12 @@ remove_tablespace_directories(Oid tablespaceoid, bool redo, char *phys)
  * XXX: API is terrible, make it cleaner
  */
 void
-set_short_version(const char *path, DbDirNode *dbDirNode, bool mirror)
+set_short_version(int4 contentid, const char *path, DbDirNode *dbDirNode, bool mirror)
 {
 	char	   *short_version;
 	bool		gotdot = false;
 	int			end;
 	char	   *fullname;
-	FILE	   *version_file;
 
 	/* Construct short version string (should match initdb.c) */
 	short_version = pstrdup(PG_VERSION);
@@ -665,7 +682,7 @@ set_short_version(const char *path, DbDirNode *dbDirNode, bool mirror)
 		Insist(!PointerIsValid(path));
 		Insist(PointerIsValid(dbDirNode));
 
-		MirroredFlatFile_OpenInDbDir(&mirroredOpen, dbDirNode, "PG_VERSION",
+		MirroredFlatFile_OpenInDbDir(&mirroredOpen, contentid, dbDirNode, "PG_VERSION",
 							O_CREAT | O_WRONLY | PG_BINARY, S_IRUSR | S_IWUSR,
 							/* suppressError */ false);
 
@@ -678,24 +695,30 @@ set_short_version(const char *path, DbDirNode *dbDirNode, bool mirror)
 	}
 	else
 	{
+		File	version_file;
+		int		len;
+
 		Insist(!PointerIsValid(dbDirNode));
 		Insist(PointerIsValid(path));
 
 		/* Now write the file */
 		fullname = palloc(strlen(path) + 11 + 1);
 		sprintf(fullname, "%s/PG_VERSION", path);
-		version_file = AllocateFile(fullname, PG_BINARY_W);
-		if (version_file == NULL)
+		sleep(10);
+		version_file = PathNameOpenFile(fullname, O_CREAT | O_WRONLY, 0600);
+		if (version_file < 0)
 			ereport(ERROR,
 					(errcode_for_file_access(),
 					 errmsg("could not write to file \"%s\": %m",
 							fullname)));
-		fprintf(version_file, "%s", short_version);
-		if (FreeFile(version_file))
+		len = strlen(short_version) + 1;
+		if (FileWrite(version_file, short_version, len) != len)
 			ereport(ERROR,
 					(errcode_for_file_access(),
 					 errmsg("could not write to file \"%s\": %m",
 							fullname)));
+			
+		FileClose(version_file);
 
 		pfree(fullname);
 	}
@@ -1256,8 +1279,10 @@ tblspc_redo(XLogRecPtr beginLoc, XLogRecPtr lsn, XLogRecord *record)
 					 errmsg("could not create subdirectory \"%s\": %m",
 							sublocation)));
 	
+		/* XXX:mat3: How to recovery? Should I add db_id to the xlog??? */
+		Insist(false);
 		/* Create or re-create the PG_VERSION file in the target directory */
-		set_short_version(sublocation, NULL, false);
+		set_short_version(-1, sublocation, NULL, false);
 
 		/* Create the symlink if not already present */
 		linkloc = (char *) palloc(10 + 10 + 1);

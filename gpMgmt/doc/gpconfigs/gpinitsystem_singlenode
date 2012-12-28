@@ -107,6 +107,12 @@ CHECK_POINT_SEGMENTS=8
 
 ENCODING=UNICODE
 
+################################################
+#### Distributed File System Informaiton
+################################################
+
+DFS_NAME=hdfs
+DFS_URL=localhost:9000/gpsql
 
 ################################################
 # OPTIONAL PARAMETERS

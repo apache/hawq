@@ -510,7 +510,10 @@ estimate_rel_size(Relation rel, int32 *attr_widths,
 			if(RelationIsAoRows(rel))
 			{
 				/* MPP-7629 */
-				FileSegTotals	*fstotal = GetSegFilesTotals(rel, SnapshotNow);
+				/*
+				 * relation should not be distributed table
+				 */
+				FileSegTotals	*fstotal = GetSegFilesTotals(rel, SnapshotNow, GpIdentity.segindex);
 				
 				Assert(fstotal);
 				curpages = RelationGuessNumberOfBlocks((double)fstotal->totalbytes);

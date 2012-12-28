@@ -347,9 +347,12 @@ static int open_next_scan_seg(AOCSScanDesc scan)
 															nvp,
 															true);
 
+					Assert(!"in gpsql, need contentid here");
                     InsertFastSequenceEntry(scan->aoEntry->segrelid,
 											curSegInfo->segno,
 											firstSequence,
+											/*TODO, need change in gpsql*/
+											-1,
 											&tid);
 				}
 

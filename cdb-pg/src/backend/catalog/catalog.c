@@ -60,12 +60,17 @@
 #include "utils/lsyscache.h"
 
 #include "cdb/cdbpersistenttablespace.h"
+#include "cdb/cdbdispatchedtablespaceinfo.h"
 #include "cdb/cdbvars.h"
+
+#include "commands/dbcommands.h"
 
 #define OIDCHARS	10			/* max chars printed by %u */
 
-static void GetFilespacePathForTablespace(
+void GetFilespacePathForTablespace(
 	Oid tablespaceOid,
+
+	int32 contentid,
 
 	char **filespacePath)
 {
@@ -74,18 +79,32 @@ static void GetFilespacePathForTablespace(
 
 	/* All other tablespaces are accessed via filespace locations */
 	char *primary_path;
-	char *mirror_path;	/* unused */
+	char *mirror_path = NULL;	/* unused */
 
 	Assert(tablespaceOid != GLOBALTABLESPACE_OID);
 	Assert(tablespaceOid != DEFAULTTABLESPACE_OID);
 	
-	/* Lookup filespace location from the persistent object layer. */
-	tablespaceGetFilespaces = 
+	if (Gp_role != GP_ROLE_EXECUTE || IsBootstrapProcessingMode())
+	{
+		/* Lookup filespace location from the persistent object layer. */
+		tablespaceGetFilespaces = 
 			PersistentTablespace_TryGetPrimaryAndMirrorFilespaces(
+														contentid,
 														tablespaceOid, 
 														&primary_path, 
 														&mirror_path,
 														&filespaceOid);
+	}
+	else
+	{
+		bool found;
+		DispatchedFilespace_GetPathForTablespace(tablespaceOid, &primary_path, &found);
+		if (!found)
+			tablespaceGetFilespaces = PersistentTablespaceGetFilespaces_TablespaceNotFound;
+		else
+			tablespaceGetFilespaces = PersistentTablespaceGetFilespaces_Ok;
+	}
+
 	switch (tablespaceGetFilespaces)
 	{
 	case PersistentTablespaceGetFilespaces_TablespaceNotFound:
@@ -158,10 +177,17 @@ relpath(RelFileNode rnode)
 	else
 	{
 		char *primary_path;
+		int32 contentid;
+
+		if (IsBootstrapProcessingMode() || Gp_role == GP_ROLE_UTILITY)
+			contentid = -1;
+		else
+			contentid = GpIdentity.segindex;
 
 		/* All other tablespaces are accessed via filespace locations */
 		GetFilespacePathForTablespace(
 								rnode.spcNode,
+								contentid,
 								&primary_path);
 
 		/* 
@@ -207,10 +233,17 @@ CopyRelPath(char *target, int targetMaxLen, RelFileNode rnode)
 	else
 	{
 		char *primary_path;
+		int32 contentid;
+
+		if (IsBootstrapProcessingMode() || Gp_role == GP_ROLE_UTILITY)
+			contentid = -1;
+		else
+			contentid = GpIdentity.segindex;
 
 		/* All other tablespaces are accessed via filespace locations */
 		GetFilespacePathForTablespace(
 								rnode.spcNode,
+								contentid,
 								&primary_path);
 
 		/* Copy path into the passed in target location */
@@ -272,10 +305,17 @@ GetDatabasePath(Oid dbNode, Oid spcNode)
 	else
 	{
 		char *primary_path;
+		int32 contentid;
+
+		if (IsBootstrapProcessingMode() || Gp_role == GP_ROLE_UTILITY)
+			contentid = -1;
+		else
+			contentid = GpIdentity.segindex;
 
 		/* All other tablespaces are accessed via filespace locations */
 		GetFilespacePathForTablespace(
 								spcNode,
+								contentid,
 								&primary_path);
 
 		/* 
@@ -322,10 +362,17 @@ CopyDatabasePath(char *target, int targetMaxLen, Oid dbNode, Oid spcNode)
 	else
 	{
 		char *primary_path;
+		int32 contentid;
+
+		if (IsBootstrapProcessingMode() || Gp_role == GP_ROLE_UTILITY)
+			contentid = -1;
+		else
+			contentid = GpIdentity.segindex;
 
 		/* All other tablespaces are accessed via filespace locations */
 		GetFilespacePathForTablespace(
 								spcNode,
+								contentid,
 								&primary_path);
 
 		/* Copy path into the passed in target location */
@@ -1049,7 +1096,7 @@ GetNewRelFileNode(Oid reltablespace, bool relisshared, Relation pg_class)
 	bool		collides;
 
 	/* This should match RelationInitPhysicalAddr */
-	rnode.spcNode = reltablespace ? reltablespace : MyDatabaseTableSpace;
+	rnode.spcNode = reltablespace ? reltablespace : get_database_dts(MyDatabaseId);
 	rnode.dbNode = relisshared ? InvalidOid : MyDatabaseId;
 
 	do
@@ -1064,7 +1111,7 @@ GetNewRelFileNode(Oid reltablespace, bool relisshared, Relation pg_class)
 
 		/* Check for existing file of same name */
 		rpath = relpath(rnode);
-		fd = BasicOpenFile(rpath, O_RDONLY | PG_BINARY, 0);
+		fd = PathNameOpenFile(rpath, O_RDONLY | PG_BINARY, 0);
 
 		if (fd >= 0)
 		{

@@ -2973,6 +2973,9 @@ try:
 
     logger = get_default_logger()
     setup_tool_logging(EXECNAME,getLocalHostname(),getUserName())
+    
+    logger.fatal('GPEXPAND NOT SUPPORTED YET IN GPSQL')
+    sys.exit(2)
 
     options, args = parseargs()
 

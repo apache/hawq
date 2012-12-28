@@ -73,6 +73,7 @@
 #include "cdb/cdbvars.h"        /* Gp_role */
 #include "cdb/cdbmirroredflatfile.h"
 #include "cdb/cdbpersistentfilesysobj.h"
+#include "libpq/libpq-be.h"		/* MyProcPort: dereferencing pointer to incomplete type */
 
 
 /*
@@ -313,9 +314,13 @@ GpRelationNodeBeginScan(
 	 * without a pg_internal.init file).  The caller can also force a heap
 	 * scan by setting indexOK == false.
 	 */
+	/*
+	 * in gpsql, we change the schema of gp_relation_node,
+	 * disable index scan.
+	 */
 	gpRelationNodeScan->scan = \
-		systable_beginscan(gp_relation_node, GpRelationNodeOidIndexId,
-						   /* indexOK */ true,
+		systable_beginscan(gp_relation_node, InvalidOid,
+						   /* indexOK */ FALSE,
 						   SnapshotNow,
 						   /* nKeys */ 1, 
 						   gpRelationNodeScan->scankey);
@@ -330,6 +335,8 @@ GpRelationNodeGetNext(
 	GpRelationNodeScan 	*gpRelationNodeScan,
 
 	int32				*segmentFileNum,
+
+	int32				*contentid,
 
 	ItemPointer			persistentTid,
 
@@ -357,11 +364,12 @@ GpRelationNodeGetNext(
 	}
 	
 	heap_deform_tuple(tuple, RelationGetDescr(gpRelationNodeScan->gp_relation_node), values, nulls);
-		
+
 	GpRelationNode_GetValues(
 						values,
 						&actualRelationNode,
 						segmentFileNum,
+						contentid,
 						&createMirrorDataLossTrackingSessionNum,
 						persistentTid,
 						persistentSerialNum);
@@ -388,11 +396,12 @@ HeapTuple
 ScanGpRelationNodeTuple(
 	Relation 	gp_relation_node,
 	Oid 		relfilenode,
-	int32		segmentFileNum)
+	int32		segmentFileNum,
+	int32		contentid)
 {
 	HeapTuple	tuple;
 	SysScanDesc scan;
-	ScanKeyData key[2];
+	ScanKeyData key[3];
 
 	Assert (relfilenode != 0);
 
@@ -407,6 +416,10 @@ ScanGpRelationNodeTuple(
 				Anum_gp_relation_node_segment_file_num,
 				BTEqualStrategyNumber, F_INT4EQ,
 				Int32GetDatum(segmentFileNum));
+	ScanKeyInit(&key[2],
+				Anum_gp_relation_node_contentid,
+				BTEqualStrategyNumber, F_INT4EQ,
+				Int32GetDatum(contentid));
 
 	/*
 	 * Open pg_class and fetch a tuple.  Force heap scan if we haven't yet
@@ -417,7 +430,7 @@ ScanGpRelationNodeTuple(
 	scan = systable_beginscan(gp_relation_node, GpRelationNodeOidIndexId,
 									   /* indexOK */ true,
 									   SnapshotNow,
-									   2, key);
+									   3, key);
 
 	tuple = systable_getnext(scan);
 
@@ -438,6 +451,7 @@ FetchGpRelationNodeTuple(
 	Relation 		gp_relation_node,
 	Oid 			relfilenode,
 	int32			segmentFileNum,
+	int32			contentid,
 	ItemPointer		persistentTid,
 	int64			*persistentSerialNum)
 {
@@ -448,6 +462,7 @@ FetchGpRelationNodeTuple(
 	
 	Oid actualRelationNode;
 	int32 actualSegmentFileNum;
+	int32 content;
 
 	int64 createMirrorDataLossTrackingSessionNum;
 
@@ -456,7 +471,8 @@ FetchGpRelationNodeTuple(
 	tuple = ScanGpRelationNodeTuple(
 					gp_relation_node,
 					relfilenode,
-					segmentFileNum);
+					segmentFileNum,
+					contentid);
 	
 	/*
 	 * if no such tuple exists, return NULL
@@ -474,10 +490,12 @@ FetchGpRelationNodeTuple(
 						values,
 						&actualRelationNode,
 						&actualSegmentFileNum,
+						&content,
 						&createMirrorDataLossTrackingSessionNum,
 						persistentTid,
 						persistentSerialNum);
 	Assert (actualRelationNode == relfilenode);
+	Assert (content == contentid);
 	
 	return tuple;
 }
@@ -487,6 +505,8 @@ ReadGpRelationNode(
 	Oid 			relfilenode,
 	
 	int32			segmentFileNum,
+
+	int32			contentid,
 
 	ItemPointer		persistentTid,
 
@@ -505,6 +525,7 @@ ReadGpRelationNode(
 						gp_relation_node,
 						relfilenode,
 						segmentFileNum,
+						contentid,
 						persistentTid,
 						persistentSerialNum);
 
@@ -528,9 +549,10 @@ ReadGpRelationNode(
 			tupleVisibilitySummaryString = GetTupleVisibilitySummaryString(&tupleVisibilitySummary);
 			
 			elog(Persistent_DebugPrintLevel(), 
-				 "ReadGpRelationNode: For relfilenode %u, segment file #%d found persistent serial number " INT64_FORMAT ", TID %s (gp_relation_node tuple visibility: %s)",
+				 "ReadGpRelationNode: For relfilenode %u, segment file #%d, contentid #%d, found persistent serial number " INT64_FORMAT ", TID %s (gp_relation_node tuple visibility: %s)",
 				 relfilenode,
 				 segmentFileNum,
+				 contentid,
 				 *persistentSerialNum,
 				 ItemPointerToString(persistentTid),
 				 tupleVisibilitySummaryString);
@@ -548,17 +570,20 @@ ReadGpRelationNode(
 
 void
 RelationFetchSegFile0GpRelationNode(
-	Relation relation)
+	Relation relation, int32 contentid)
 {
-	if (!relation->rd_segfile0_relationnodeinfo.isPresent)
+	Assert(contentid >= -1);
+	Assert(NULL != relation->rd_segfile0_relationnodeinfos);
+
+	if (!relation->rd_segfile0_relationnodeinfos[contentid + 1].isPresent)
 	{
 		if (Persistent_BeforePersistenceWork() || InRecovery)
 		{
-			MemSet(&relation->rd_segfile0_relationnodeinfo.persistentTid, 0, sizeof(ItemPointerData));
-			relation->rd_segfile0_relationnodeinfo.persistentSerialNum = 0;
+			MemSet(&relation->rd_segfile0_relationnodeinfos[contentid + 1].persistentTid, 0, sizeof(ItemPointerData));
+			relation->rd_segfile0_relationnodeinfos[contentid + 1].persistentSerialNum = 0;
 		
-			relation->rd_segfile0_relationnodeinfo.isPresent = true;
-			relation->rd_segfile0_relationnodeinfo.tidAllowedToBeZero = true;
+			relation->rd_segfile0_relationnodeinfos[contentid + 1].isPresent = true;
+			relation->rd_segfile0_relationnodeinfos[contentid + 1].tidAllowedToBeZero = true;
 			
 			return; // The initdb process will load the persistent table once we out of bootstrap mode.
 		}
@@ -566,29 +591,32 @@ RelationFetchSegFile0GpRelationNode(
 		if (!ReadGpRelationNode(
 					relation->rd_node.relNode,
 					/* segmentFileNum */ 0,
-					&relation->rd_segfile0_relationnodeinfo.persistentTid,
-					&relation->rd_segfile0_relationnodeinfo.persistentSerialNum))
+					contentid,
+					&relation->rd_segfile0_relationnodeinfos[contentid + 1].persistentTid,
+					&relation->rd_segfile0_relationnodeinfos[contentid + 1].persistentSerialNum))
 		{
-			elog(ERROR, "Did not find gp_relation_node entry for relation name %s, relation id %u, relfilenode %u",
+			elog(ERROR, "Did not find gp_relation_node entry for relation name %s, relation id %u, relfilenode %u contentid %d",
 				 relation->rd_rel->relname.data,
 				 relation->rd_id,
-				 relation->rd_node.relNode);
+				 relation->rd_node.relNode,
+				 contentid);
 		}
 
 		Assert(!Persistent_BeforePersistenceWork());
 		if (Debug_check_for_invalid_persistent_tid &&
-			PersistentStore_IsZeroTid(&relation->rd_segfile0_relationnodeinfo.persistentTid))
+			PersistentStore_IsZeroTid(&relation->rd_segfile0_relationnodeinfos[contentid + 1].persistentTid))
 		{	
 			elog(ERROR, 
-				 "RelationFetchSegFile0GpRelationNode has invalid TID (0,0) into relation %u/%u/%u '%s', serial number " INT64_FORMAT,
+				 "RelationFetchSegFile0GpRelationNode has invalid TID (0,0) into relation %u/%u/%u '%s' conentid %d, serial number " INT64_FORMAT,
 				 relation->rd_node.spcNode,
 				 relation->rd_node.dbNode,
 				 relation->rd_node.relNode,
 				 NameStr(relation->rd_rel->relname),
-				 relation->rd_segfile0_relationnodeinfo.persistentSerialNum);
+				 contentid,
+				 relation->rd_segfile0_relationnodeinfos[contentid + 1].persistentSerialNum);
 		}
 
-		relation->rd_segfile0_relationnodeinfo.isPresent = true;
+		relation->rd_segfile0_relationnodeinfos[contentid + 1].isPresent = true;
 		
 	}
 
@@ -640,7 +668,7 @@ RelationFetchGpRelationNodeForXLog_Index(
 			 saveDeep);
 	}
 
-	RelationFetchSegFile0GpRelationNode(relation);
+	RelationFetchSegFile0GpRelationNode(relation, MASTER_CONTENT_ID);
 
 	deep--;
 }
@@ -697,8 +725,24 @@ AllocateRelationDesc(Form_pg_class relp)
 	 * This part MUST be remain as a fetch on demand, otherwise you end up
 	 * needing it to open pg_class and then relation_open does infinite recursion...
 	 */
-	relation->rd_segfile0_relationnodeinfo.isPresent = false;
-	relation->rd_segfile0_relationnodeinfo.tidAllowedToBeZero = false;
+	if (!IsBootstrapProcessingMode() && Gp_role == GP_ROLE_DISPATCH)
+	{
+		relation->rd_segfile0_count = GpIdentity.numsegments + 1;
+	} else
+	{
+		relation->rd_segfile0_count = 1;
+	}
+	relation->rd_segfile0_relationnodeinfos =
+			palloc0(relation->rd_segfile0_count * sizeof(struct RelationNodeInfo));
+	{
+		int i;
+		for (i = 0; i < relation->rd_segfile0_count; ++i)
+		{
+			relation->rd_segfile0_relationnodeinfos[i].isPresent = false;
+			relation->rd_segfile0_relationnodeinfos[i].tidAllowedToBeZero =
+					false;
+		}
+	}
 
 	/* and allocate attribute tuple form storage */
 	relation->rd_att = CreateTemplateTupleDesc(relationForm->relnatts,
@@ -1312,8 +1356,11 @@ RelationInitPhysicalAddr(Relation relation)
 		relation->rd_node.spcNode = MyDatabaseTableSpace;
 	if (relation->rd_rel->relisshared)
 		relation->rd_node.dbNode = InvalidOid;
-	else
+	else if (relation->rd_id < FirstNormalObjectId ||
+			GpIdentity.segindex == MASTER_CONTENT_ID)
 		relation->rd_node.dbNode = MyDatabaseId;
+	else
+		relation->rd_node.dbNode = MyProcPort->dboid;
 	relation->rd_node.relNode = relation->rd_rel->relfilenode;
 }
 
@@ -1740,9 +1787,25 @@ formrdesc(const char *relationName, Oid relationReltype,
 	/*
 	 * Physical file-system information.
 	 */
-	relation->rd_segfile0_relationnodeinfo.isPresent = false;
-	relation->rd_segfile0_relationnodeinfo.tidAllowedToBeZero = false;
-	
+	if (!IsBootstrapProcessingMode() && Gp_role == GP_ROLE_DISPATCH)
+	{
+		relation->rd_segfile0_count = GpIdentity.numsegments + 1;
+	} else
+	{
+		relation->rd_segfile0_count = 1;
+	}
+	relation->rd_segfile0_relationnodeinfos =
+			palloc0(relation->rd_segfile0_count * sizeof(struct RelationNodeInfo));
+	{
+		int i;
+		for (i = 0; i < relation->rd_segfile0_count; ++i)
+		{
+			relation->rd_segfile0_relationnodeinfos[i].isPresent = false;
+			relation->rd_segfile0_relationnodeinfos[i].tidAllowedToBeZero =
+					false;
+		}
+	}
+
 	/*
 	 * initialize attribute tuple form
 	 *
@@ -2015,7 +2078,7 @@ RelationReloadClassinfo(Relation relation)
 	relation->rd_amcache = NULL;
 
 	/* Forget gp_relation_node information -- it may have changed. */
-	MemSet(&relation->rd_segfile0_relationnodeinfo, 0, sizeof(RelationNodeInfo));
+	MemSet(&relation->rd_segfile0_relationnodeinfos[0], 0, sizeof(RelationNodeInfo));
 
 
 	/* Okay, now it's valid again */
@@ -2064,6 +2127,8 @@ RelationDestroyRelation(Relation relation)
 		MemoryContextDelete(relation->rd_rulescxt);
 	if (relation->rd_cdbpolicy)
 		pfree(relation->rd_cdbpolicy);
+	if (relation->rd_segfile0_relationnodeinfos)
+		pfree(relation->rd_segfile0_relationnodeinfos);
 
 	pfree(relation);
 }
@@ -2780,8 +2845,24 @@ RelationBuildLocalRelation(const char *relname,
 	 * Create zeroed-out gp_relation_node data.  It will be filled in when the
 	 * disk file is created.
 	 */
-	rel->rd_segfile0_relationnodeinfo.isPresent = false;
-	rel->rd_segfile0_relationnodeinfo.tidAllowedToBeZero = false;
+	if (!IsBootstrapProcessingMode() && Gp_role == GP_ROLE_DISPATCH)
+	{
+		rel->rd_segfile0_count = GpIdentity.numsegments + 1;
+	} else
+	{
+		rel->rd_segfile0_count = 1;
+	}
+	rel->rd_segfile0_relationnodeinfos =
+			palloc0(rel->rd_segfile0_count * sizeof(struct RelationNodeInfo));
+	{
+		int i;
+		for (i = 0; i < rel->rd_segfile0_count; ++i)
+		{
+			rel->rd_segfile0_relationnodeinfos[i].isPresent = false;
+			rel->rd_segfile0_relationnodeinfos[i].tidAllowedToBeZero =
+					false;
+		}
+	}
 
 	/*
 	 * Insert relation physical and logical identifiers (OIDs) into the right
@@ -2820,6 +2901,8 @@ RelationBuildLocalRelation(const char *relname,
 	 */
 	RelationIncrementReferenceCount(rel);
 
+	Assert(NULL != rel->rd_segfile0_relationnodeinfos
+			&& 0 != rel->rd_segfile0_count);
 	return rel;
 }
 
@@ -3830,6 +3913,28 @@ load_relcache_init_file(void)
 
 			constr->has_not_null = true;
 			rel->rd_att->constr = constr;
+		}
+
+		if (rel->rd_rel->relkind == RELKIND_INDEX
+				|| (rel->rd_rel->relstorage != RELSTORAGE_AOROWS
+						&& rel->rd_rel->relstorage != RELSTORAGE_AOCOLS)
+				|| IsBootstrapProcessingMode() || Gp_role != GP_ROLE_DISPATCH) {
+			rel->rd_segfile0_count = 1;
+		}
+		else
+			rel->rd_segfile0_count = 1 + GpIdentity.numsegments;
+
+		rel->rd_segfile0_relationnodeinfos =
+				palloc0(rel->rd_segfile0_count * sizeof(struct RelationNodeInfo));
+
+		{
+			int i;
+			for (i = 0; i < rel->rd_segfile0_count; ++i)
+			{
+				rel->rd_segfile0_relationnodeinfos[i].isPresent = false;
+				rel->rd_segfile0_relationnodeinfos[i].tidAllowedToBeZero =
+						false;
+			}
 		}
 
 		/* If it's an index, there's more to do */

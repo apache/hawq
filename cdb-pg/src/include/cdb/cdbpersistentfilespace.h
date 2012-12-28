@@ -33,6 +33,7 @@ extern void PersistentFilespace_ConvertBlankPaddedLocation(
 	bool		isPrimary);
 
 extern void PersistentFilespace_LookupTidAndSerialNum(
+	int4		contentid,
 	Oid 		filespaceOid,
 				/* The filespace OID for the lookup. */
 
@@ -42,6 +43,7 @@ extern void PersistentFilespace_LookupTidAndSerialNum(
 	int64			*persistentSerialNum);
 
 extern bool PersistentFilespace_TryGetPrimaryAndMirrorUnderLock(
+	int4		contentid,
 	Oid 		filespaceOid,
 				/* The filespace OID to lookup. */
 
@@ -52,6 +54,7 @@ extern bool PersistentFilespace_TryGetPrimaryAndMirrorUnderLock(
 				/* The primary filespace directory path.  Return NULL for global and base. 
 				 * Or, returns NULL when mirror not configured. */
 extern void PersistentFilespace_GetPrimaryAndMirrorUnderLock(
+	int4		contentid,
 	Oid 		filespaceOid,
 				/* The filespace OID to lookup. */
 
@@ -73,6 +76,7 @@ extern bool PersistentFilespace_TryGetPrimaryAndMirror(
 				/* The primary filespace directory path.  Return NULL for global and base. 
 				 * Or, returns NULL when mirror not configured. */
 extern void PersistentFilespace_GetPrimaryAndMirror(
+	int4		contentid,
 	Oid 		filespaceOid,
 				/* The filespace OID to lookup. */
 
@@ -96,6 +100,8 @@ extern void PersistentFilespace_GetPrimaryAndMirror(
 extern void PersistentFilespace_MarkCreatePending(
 	Oid 		filespaceOid,
 				/* The filespace where the filespace lives. */
+
+	int4		contentid,
 
 	int16		primaryDbId,
 	

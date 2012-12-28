@@ -27,6 +27,86 @@
 #include "utils/guc.h"
 #include "cdb/cdbpersistentfilesysobj.h"
 
+HeapTuple
+CreateAppendOnlyEntry(TupleDesc desp,
+					  Oid relid,
+		  	  	  	  int blocksize,
+		  	  	  	  int safefswritesize,
+		  	  	  	  int compresslevel,
+		  	  	  	  bool checksum,
+		  	  	  	  bool columnstore,
+		  	  	  	  char* compresstype,
+		  	  	  	  Oid segrelid,
+		  	  	  	  Oid segidxid,
+		  	  	  	  Oid blkdirrelid,
+		  	  	  	  Oid blkdiridxid)
+{
+	Datum	   *values;
+	bool	   *nulls;
+
+	HeapTuple	pg_appendonly_tuple = NULL;
+
+	int			natts = Natts_pg_appendonly;
+
+	/* these are hardcoded for now. in the future should get passed in */
+	const int majorversion = 1;
+	const int minorversion = 0;
+
+	values = palloc0(sizeof(Datum) * natts);
+	nulls = palloc0(sizeof(bool) * natts);
+
+
+	values[Anum_pg_appendonly_relid - 1] = ObjectIdGetDatum(relid);
+	values[Anum_pg_appendonly_blocksize - 1] = Int32GetDatum(blocksize);
+	values[Anum_pg_appendonly_safefswritesize - 1] = Int32GetDatum(
+			safefswritesize);
+	values[Anum_pg_appendonly_compresslevel - 1] = Int32GetDatum(compresslevel);
+	values[Anum_pg_appendonly_majorversion - 1] = Int32GetDatum(majorversion);
+	values[Anum_pg_appendonly_minorversion - 1] = Int32GetDatum(minorversion);
+	values[Anum_pg_appendonly_checksum - 1] = BoolGetDatum(checksum);
+	values[Anum_pg_appendonly_columnstore - 1] = BoolGetDatum(columnstore);
+	values[Anum_pg_appendonly_segrelid - 1] = ObjectIdGetDatum(segrelid);
+	values[Anum_pg_appendonly_segidxid - 1] = ObjectIdGetDatum(segidxid);
+	values[Anum_pg_appendonly_blkdirrelid - 1] = ObjectIdGetDatum(blkdirrelid);
+	values[Anum_pg_appendonly_blkdiridxid - 1] = ObjectIdGetDatum(blkdiridxid);
+	values[Anum_pg_appendonly_version - 1] = test_appendonly_version_default;
+
+	if (compresstype)
+	{
+		/*
+		 * check compresstype string length.
+		 *
+		 * when compresstype column was added to pg_appendonly (release 3.3) we
+		 * skipped the creation of a toast table even though it's normally
+		 * required for tables with text columns. In this case it's not
+		 * necessary because compresstype is always very short (or NULL) and we
+		 * never expect it to be toasted. so, for sanity, make sure that it's
+		 * indeed very short. otherwise, it's an internal error.
+		 */
+		Insist(strlen(compresstype) < 100);
+
+		values[Anum_pg_appendonly_compresstype - 1] = DirectFunctionCall1(
+				textin, CStringGetDatum(compresstype));
+
+	}
+	else
+	{
+		Assert(compresslevel == 0);
+		nulls[Anum_pg_appendonly_compresstype - 1] = true;
+	}
+
+	/*
+	 * form the tuple and insert it
+	 */
+	pg_appendonly_tuple = heaptuple_form_to(desp, values, nulls, NULL, NULL );
+
+	pfree(values);
+	pfree(nulls);
+
+	return pg_appendonly_tuple;
+}
+
+
 /*
  * Adds an entry into the pg_appendonly catalog table. The entry
  * includes the new relfilenode of the appendonly relation that 
@@ -47,65 +127,25 @@ InsertAppendOnlyEntry(Oid relid,
 {
 	Relation	pg_appendonly_rel;
 	HeapTuple	pg_appendonly_tuple = NULL;
-	bool	   *nulls;
-	Datum	   *values;
-	int			natts = 0;
-	
-	/* these are hardcoded for now. in the future should get passed in */
-	const int	majorversion = 1;
-	const int	minorversion = 0;
 
     /*
      * Open and lock the pg_appendonly catalog.
      */
 	pg_appendonly_rel = heap_open(AppendOnlyRelationId, RowExclusiveLock);
-	natts = Natts_pg_appendonly;
-	values = palloc0(sizeof(Datum) * natts);
-	nulls = palloc0(sizeof(bool) * natts);
 	
-	values[Anum_pg_appendonly_relid - 1] = ObjectIdGetDatum(relid);
-	values[Anum_pg_appendonly_blocksize - 1] = Int32GetDatum(blocksize);
-	values[Anum_pg_appendonly_safefswritesize - 1] = Int32GetDatum(safefswritesize);
-	values[Anum_pg_appendonly_compresslevel - 1] = Int32GetDatum(compresslevel);
-	values[Anum_pg_appendonly_majorversion - 1] = Int32GetDatum(majorversion);
-	values[Anum_pg_appendonly_minorversion - 1] = Int32GetDatum(minorversion);
-	values[Anum_pg_appendonly_checksum - 1] = BoolGetDatum(checksum);
-	values[Anum_pg_appendonly_columnstore - 1] = BoolGetDatum(columnstore);
-	values[Anum_pg_appendonly_segrelid - 1] = ObjectIdGetDatum(segrelid);
-	values[Anum_pg_appendonly_segidxid - 1] = ObjectIdGetDatum(segidxid);
-	values[Anum_pg_appendonly_blkdirrelid - 1] = ObjectIdGetDatum(blkdirrelid);
-	values[Anum_pg_appendonly_blkdiridxid - 1] = ObjectIdGetDatum(blkdiridxid);
-	values[Anum_pg_appendonly_version - 1] = test_appendonly_version_default;
-	
-	if(compresstype)
-	{
-		/*
-		 * check compresstype string length.
-		 * 
-		 * when compresstype column was added to pg_appendonly (release 3.3) we
-		 * skipped the creation of a toast table even though it's normally
-		 * required for tables with text columns. In this case it's not
-		 * necessary because compresstype is always very short (or NULL) and we
-		 * never expect it to be toasted. so, for sanity, make sure that it's 
-		 * indeed very short. otherwise, it's an internal error.
-		 */
-		Insist(strlen(compresstype) < 100);
-		
-		values[Anum_pg_appendonly_compresstype - 1] = DirectFunctionCall1(textin,
-																		  CStringGetDatum(compresstype));
-					
-	}
-	else
-	{
-		Assert(compresslevel == 0);
-		nulls[Anum_pg_appendonly_compresstype - 1] = true;
-	}
-	
-	/*
-	 * form the tuple and insert it
-	 */
-	pg_appendonly_tuple = heaptuple_form_to(RelationGetDescr(pg_appendonly_rel), 
-										 values, nulls, NULL, NULL);
+	pg_appendonly_tuple = CreateAppendOnlyEntry(RelationGetDescr(pg_appendonly_rel),
+												relid,
+												blocksize,
+												safefswritesize,
+												compresslevel,
+												checksum,
+												columnstore,
+												compresstype,
+												segrelid,
+												segidxid,
+												blkdirrelid,
+												blkdiridxid);
+
 	simple_heap_insert(pg_appendonly_rel, pg_appendonly_tuple);
 	CatalogUpdateIndexes(pg_appendonly_rel, pg_appendonly_tuple);
 	
@@ -116,8 +156,7 @@ InsertAppendOnlyEntry(Oid relid,
      */
     heap_close(pg_appendonly_rel, NoLock);
 
-	pfree(values);
-	pfree(nulls);
+    heap_freetuple(pg_appendonly_tuple);
 
 }
 

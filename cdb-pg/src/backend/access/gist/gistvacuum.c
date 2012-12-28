@@ -121,8 +121,8 @@ gistDeleteSubtree(GistVacuum *gv, BlockNumber blkno)
 		RelationFetchGpRelationNodeForXLog(gv->index);
 
 		xlrec.node = gv->index->rd_node;
-		xlrec.persistentTid = gv->index->rd_segfile0_relationnodeinfo.persistentTid;
-		xlrec.persistentSerialNum = gv->index->rd_segfile0_relationnodeinfo.persistentSerialNum;
+		xlrec.persistentTid = gv->index->rd_segfile0_relationnodeinfos[0].persistentTid;
+		xlrec.persistentSerialNum = gv->index->rd_segfile0_relationnodeinfos[0].persistentSerialNum;
 		xlrec.blkno = blkno;
 
 		rdata[0].buffer = buffer;

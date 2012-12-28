@@ -275,9 +275,12 @@ SetNextFileSegForRead(AppendOnlyScanDesc scan)
 														1, /* columnGroupNo */
 														false);
 
+				Assert(!"in gpsql, need contentid here");
 				InsertFastSequenceEntry(scan->aoEntry->segrelid,
 										segno,
 										firstSequence,
+										/*TODO, need change in gpsql*/
+										-1,
 										&tid);
 			}
 
@@ -408,8 +411,6 @@ SetCurrentFileSegForWrite(AppendOnlyInsertDesc aoInsertDesc)
 	int64			eof_uncompressed;
 	int64			varblockcount;
 	int32			fileSegNo;
-	ItemPointerData persistentTid;
-	int64			persistentSerialNum;
 
 	/* Make the 'segment' file name */
 	MakeAOSegmentFileName(aoInsertDesc->aoi_rel,
@@ -438,13 +439,21 @@ SetCurrentFileSegForWrite(AppendOnlyInsertDesc aoInsertDesc)
 									aoInsertDesc->aoi_rel,
 									aoInsertDesc->aoEntry,
 									aoInsertDesc->appendOnlyMetaDataSnapshot,
-									aoInsertDesc->cur_segno);
-	if (aoInsertDesc->fsInfo == NULL)
+									aoInsertDesc->cur_segno,
+									GpIdentity.segindex);
+
+	/*
+	 * in gpsql, we cannot insert a new catalog entry and then update,
+	 * since we cannot get the tid of added tuple.
+	 * we should add the new catalog entry on master and then dispatch it to segments for update.
+	 */
+	Assert(aoInsertDesc->fsInfo != NULL);
+	/*if (aoInsertDesc->fsInfo == NULL)
 	{
 		InsertInitialSegnoEntry(aoInsertDesc->aoEntry, aoInsertDesc->cur_segno);
 
 		aoInsertDesc->fsInfo = NewFileSegInfo(aoInsertDesc->cur_segno);
-	}
+	}*/
 
 	fsinfo = aoInsertDesc->fsInfo;
 	Assert(fsinfo);
@@ -452,39 +461,6 @@ SetCurrentFileSegForWrite(AppendOnlyInsertDesc aoInsertDesc)
 	eof_uncompressed = (int64)fsinfo->eof_uncompressed;
 	varblockcount = (int64)fsinfo->varblockcount;
 	aoInsertDesc->rowCount = fsinfo->tupcount;
-
-	/*
-	 * Segment file #0 is created when the Append-Only table is created.
-	 *
-	 * Other segment files are created on-demand under transaction.
-	 */
-	if (aoInsertDesc->cur_segno > 0 && eof == 0)
-	{
-		AppendOnlyStorageWrite_TransactionCreateFile(
-								&aoInsertDesc->storageWrite,
-								aoInsertDesc->appendFilePathName,
-								eof,
-								&aoInsertDesc->aoi_rel->rd_node,
-								aoInsertDesc->cur_segno,
-								&persistentTid,
-								&persistentSerialNum);
-	}
-	else
-	{
-		if (!ReadGpRelationNode(
-					aoInsertDesc->aoi_rel->rd_node.relNode,
-					aoInsertDesc->cur_segno,
-					&persistentTid,
-					&persistentSerialNum))
-		{
-			elog(ERROR, "Did not find gp_relation_node entry for relation name %s, relation id %u, relfilenode %u, segment file #%d, logical eof " INT64_FORMAT,
-				 aoInsertDesc->aoi_rel->rd_rel->relname.data,
-				 aoInsertDesc->aoi_rel->rd_id,
-				 aoInsertDesc->aoi_rel->rd_node.relNode,
-				 aoInsertDesc->cur_segno,
-				 eof);
-		}
-	}
 
 	/*
 	 * Open the existing file for write.
@@ -496,8 +472,7 @@ SetCurrentFileSegForWrite(AppendOnlyInsertDesc aoInsertDesc)
 							eof_uncompressed,
 							&aoInsertDesc->aoi_rel->rd_node,
 							aoInsertDesc->cur_segno,
-							&persistentTid,
-							persistentSerialNum);
+							GpIdentity.segindex);
 
 	/* reset counts */
 	aoInsertDesc->insertCount = 0;
@@ -841,6 +816,8 @@ AppendOnlyExecutorReadBlock_Init(
 	ItemPointerSet(&executorReadBlock->cdb_fake_ctid, 0, 0);
 
 	executorReadBlock->storageRead = storageRead;
+
+	executorReadBlock->memoryContext = memoryContext;
 
 	MemoryContextSwitchTo(oldcontext);
 
@@ -2703,12 +2680,23 @@ appendonly_insert_init(Relation rel, int segno)
 	if (aoInsertDesc->numSequences == 0)
 	{
 		int64 firstSequence;
+
+		/*
+		 * in gpsql, catalog are in memory heap table,
+		 * ItemPointer of tuple is invalid.
+		 */
+		if (Gp_role == GP_ROLE_EXECUTE)
+		{
+			firstSequence = GetFastSequences(aoInsertDesc->aoEntry->segrelid,
+					aoInsertDesc->cur_segno, aoInsertDesc->lastSequence + 1,
+					NUM_FAST_SEQUENCES, &aoInsertDesc->fsInfo->sequence_tid);
+		} else {
 		Assert(ItemPointerIsValid(&aoInsertDesc->fsInfo->sequence_tid));
 
-		firstSequence =
-			GetFastSequencesByTid(&aoInsertDesc->fsInfo->sequence_tid,
-								  aoInsertDesc->lastSequence + 1,
-								  NUM_FAST_SEQUENCES);
+			firstSequence = GetFastSequencesByTid(
+					&aoInsertDesc->fsInfo->sequence_tid,
+					aoInsertDesc->lastSequence + 1, NUM_FAST_SEQUENCES);
+		}
 		Assert(firstSequence == aoInsertDesc->lastSequence + 1);
 		aoInsertDesc->numSequences = NUM_FAST_SEQUENCES;
 	}

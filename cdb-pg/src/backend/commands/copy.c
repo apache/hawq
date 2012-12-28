@@ -953,6 +953,10 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
     /* save relationOid for auto-stats */
 	Oid         relationOid = InvalidOid;
 
+	if (GpIdentity.segindex != UNINITIALIZED_GP_IDENTITY_VALUE)
+		ereport(ERROR,
+				(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support copy statement yet in GPSQL") ));
+
 	/* Allocate workspace and zero all fields */
 	cstate = (CopyStateData *) palloc0(sizeof(CopyStateData));
 

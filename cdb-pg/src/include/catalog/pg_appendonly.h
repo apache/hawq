@@ -184,6 +184,20 @@ static inline void AORelationVersion_CheckValid(int version)
 
 extern int test_appendonly_version_default;
 
+extern HeapTuple
+CreateAppendOnlyEntry(TupleDesc desp,
+					  Oid relid,
+		  	  	  	  int blocksize,
+		  	  	  	  int safefswritesize,
+		  	  	  	  int compresslevel,
+		  	  	  	  bool checksum,
+		  	  	  	  bool columnstore,
+		  	  	  	  char* compresstype,
+		  	  	  	  Oid segrelid,
+		  	  	  	  Oid segidxid,
+		  	  	  	  Oid blkdirrelid,
+		  	  	  	  Oid blkdiridxid);
+
 extern void
 InsertAppendOnlyEntry(Oid relid, 
 					  int blocksize, 

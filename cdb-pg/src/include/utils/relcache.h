@@ -84,6 +84,8 @@ GpRelationNodeGetNext(
 
 	int32				*segmentFileNum,
 
+	int32				*contentid,
+
 	ItemPointer			persistentTid,
 
 	int64				*persistentSerialNum);
@@ -95,19 +97,22 @@ GpRelationNodeEndScan(
 extern HeapTuple ScanGpRelationNodeTuple(
 	Relation 	gp_relation_node,
 	Oid 		relationNode,
-	int32		segmentFileNum);
+	int32		segmentFileNum,
+	int32		contentid);
 extern HeapTuple FetchGpRelationNodeTuple(
 	Relation 		gp_relation_node,
 	Oid 			relationNode,
 	int32			segmentFileNum,
+	int32			contentid,
 	ItemPointer		persistentTid,
 	int64			*persistentSerialNum);
 extern bool ReadGpRelationNode(
 	Oid 			relfilenode,
 	int32			segmentFileNum,
+	int32			contentid,
 	ItemPointer		persistentTid,
 	int64			*persistentSerialNum);
-extern void RelationFetchSegFile0GpRelationNode(Relation relation);
+extern void RelationFetchSegFile0GpRelationNode(Relation relation, int32 contentid);
 extern void RelationFetchGpRelationNodeForXLog_Index(Relation relation);
 
 /*

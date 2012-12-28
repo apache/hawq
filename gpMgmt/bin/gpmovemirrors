@@ -333,6 +333,8 @@ try:
     signal.signal(signal.SIGHUP, sig_handler)
 
     logger = get_default_logger()
+    logger.error('gpmovemirrors NOT SUPPORTED YET IN GPSQL')
+    sys.exit(2)
 
     options, args = parseargs()
 

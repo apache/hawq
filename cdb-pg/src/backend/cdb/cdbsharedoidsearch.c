@@ -135,15 +135,42 @@ void SharedOidSearch_InitTable(
 
 static SharedOidSearchHashBucket *SharedOidSearch_GetBucket(
 	SharedOidSearchTable		*table,
-	Oid 						oid1)
+	Oid 						oid1,
+	Oid							oid2)
 {
 	int32 bucketNum;
 	
-	bucketNum = oid1 % table->private.hashSize;
+	bucketNum = (oid1 ^ oid2) % table->private.hashSize;
 	return &table->private.buckets[bucketNum];
 }
 
 static SharedOidSearchObjHeader *SharedOidSearch_FindInBucket(
+	SharedOidSearchTable		*table,
+	SharedOidSearchHashBucket	*bucket,
+	Oid 						oid1,
+	Oid							oid2,
+	Oid							oid3)
+{
+	SharedListBase				*listBase = &table->private.freePool.listBase;
+	SharedDoublyLinkedHead		*listHead;
+	SharedOidSearchObjHeader 	*ele;
+
+	listHead = &bucket->bucketListHead;
+	ele = (SharedOidSearchObjHeader*)
+					SharedDoublyLinkedHead_First(listBase, listHead);
+	while (ele != NULL)
+	{
+		if (ele->oid1 == oid1 && ele->oid2 == oid2 && ele->oid3 == oid3)
+			return ele;
+
+		ele = (SharedOidSearchObjHeader*)
+					SharedDoubleLinks_Next(listBase, listHead, ele);
+	}
+
+	return NULL;
+}
+
+static SharedOidSearchObjHeader *SharedOidSearch_ProbeInBucket(
 	SharedOidSearchTable		*table,
 	SharedOidSearchHashBucket	*bucket,
 	Oid 						oid1,
@@ -159,30 +186,6 @@ static SharedOidSearchObjHeader *SharedOidSearch_FindInBucket(
 	while (ele != NULL)
 	{
 		if (ele->oid1 == oid1 && ele->oid2 == oid2)
-			return ele;
-
-		ele = (SharedOidSearchObjHeader*)
-					SharedDoubleLinks_Next(listBase, listHead, ele);
-	}
-
-	return NULL;
-}
-
-static SharedOidSearchObjHeader *SharedOidSearch_ProbeInBucket(
-	SharedOidSearchTable		*table,
-	SharedOidSearchHashBucket	*bucket,
-	Oid 						oid1)
-{
-	SharedListBase				*listBase = &table->private.freePool.listBase;
-	SharedDoublyLinkedHead		*listHead;
-	SharedOidSearchObjHeader 	*ele;
-
-	listHead = &bucket->bucketListHead;
-	ele = (SharedOidSearchObjHeader*)
-					SharedDoublyLinkedHead_First(listBase, listHead);
-	while (ele != NULL)
-	{
-		if (ele->oid1 == oid1)
 			return ele;
 
 		ele = (SharedOidSearchObjHeader*)
@@ -222,14 +225,15 @@ SharedOidSearchAddResult SharedOidSearch_Add(
 	SharedOidSearchTable 		*table,
 	Oid 						oid1,
 	Oid 						oid2,
+	Oid							oid3,
 	SharedOidSearchObjHeader	**header)
 {
 	SharedOidSearchHashBucket	*bucket;
 	SharedOidSearchObjHeader 	*ele;
 
-	bucket = SharedOidSearch_GetBucket(table, oid1);
+	bucket = SharedOidSearch_GetBucket(table, oid1, oid2);
 
-	ele = SharedOidSearch_FindInBucket(table, bucket, oid1, oid2);
+	ele = SharedOidSearch_FindInBucket(table, bucket, oid1, oid2, oid3);
 	if (ele != NULL)
 		return SharedOidSearchAddResult_Exists;
 
@@ -245,6 +249,7 @@ SharedOidSearchAddResult SharedOidSearch_Add(
 	ele->private.isDeleted = false;
 	ele->oid1 = oid1;
 	ele->oid2 = oid2;
+	ele->oid3 = oid3;
 
 	SharedDoublyLinkedHead_AddLast(
 							&table->private.freePool.listBase,
@@ -258,14 +263,15 @@ SharedOidSearchAddResult SharedOidSearch_Add(
 SharedOidSearchObjHeader *SharedOidSearch_Find(
 	SharedOidSearchTable 	*table,
 	Oid 					oid1,
-	Oid 					oid2)
+	Oid 					oid2,
+	Oid						oid3)
 {
 	SharedOidSearchHashBucket	*bucket;
 	SharedOidSearchObjHeader 	*ele;
 
-	bucket = SharedOidSearch_GetBucket(table, oid1);
+	bucket = SharedOidSearch_GetBucket(table, oid1, oid2);
 
-	ele = SharedOidSearch_FindInBucket(table, bucket, oid1, oid2);
+	ele = SharedOidSearch_FindInBucket(table, bucket, oid1, oid2, oid3);
 	if (ele == NULL)
 		return NULL;
 
@@ -274,14 +280,15 @@ SharedOidSearchObjHeader *SharedOidSearch_Find(
 
 SharedOidSearchObjHeader *SharedOidSearch_Probe(
 	SharedOidSearchTable 	*table,
-	Oid 					oid1)
+	Oid 					oid1,
+	Oid						oid2)
 {
 	SharedOidSearchHashBucket	*bucket;
 	SharedOidSearchObjHeader 	*ele;
 
-	bucket = SharedOidSearch_GetBucket(table, oid1);
+	bucket = SharedOidSearch_GetBucket(table, oid1, oid2);
 
-	ele = SharedOidSearch_ProbeInBucket(table, bucket, oid1);
+	ele = SharedOidSearch_ProbeInBucket(table, bucket, oid1, oid2);
 	if (ele == NULL)
 		return NULL;
 
@@ -336,7 +343,7 @@ void SharedOidSearch_Iterate(
 		/*
 		 * Try to get next element in current bucket.
 		 */
-		bucket = SharedOidSearch_GetBucket(table, current->oid1);
+		bucket = SharedOidSearch_GetBucket(table, current->oid1, current->oid2);
 
 		Assert(current->private.pinCount > 0);
 		current->private.pinCount--;
@@ -414,7 +421,7 @@ void SharedOidSearch_ReleaseIterator(
 	if (current->private.isDeleted &&
 		current->private.pinCount == 0)
 	{
-		bucket = SharedOidSearch_GetBucket(table, current->oid1);
+		bucket = SharedOidSearch_GetBucket(table, current->oid1, current->oid2);
 		SharedOidSearch_RemoveFromBucket(table, bucket, current);
 	}
 	
@@ -433,7 +440,7 @@ void SharedOidSearch_Delete(
 	if (header->private.pinCount > 0)
 		return;		// Let the last iterator turn out the light.
 
-	bucket = SharedOidSearch_GetBucket(table, header->oid1);
+	bucket = SharedOidSearch_GetBucket(table, header->oid1, header->oid2);
 
 	SharedOidSearch_RemoveFromBucket(table, bucket, header);
 }

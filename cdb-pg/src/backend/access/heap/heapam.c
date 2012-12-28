@@ -63,6 +63,9 @@
 #include "utils/guc.h"
 #include "cdb/cdbfilerepprimary.h"
 #include "cdb/cdbpersistentrecovery.h"
+#include "cdb/cdbinmemheapam.h"
+#include "cdb/cdbvars.h"
+#include "miscadmin.h"
 
 static XLogRecPtr log_heap_update(Relation reln, Buffer oldbuf,
 		   ItemPointerData from, Buffer newbuf, HeapTuple newtup, bool move);
@@ -516,7 +519,7 @@ heapgettup(HeapScanDesc scan,
 #else
 				if (valid && key != NULL)
 					HeapKeyTest(tuple, RelationGetDescr(scan->rs_rd),
-								nkeys, key, valid);
+								nkeys, key, &valid);
 #endif
 
 				if (valid)
@@ -775,7 +778,7 @@ heapgettup_pagemode(HeapScanDesc scan,
 				bool		valid;
 
 				HeapKeyTest(tuple, RelationGetDescr(scan->rs_rd),
-							nkeys, key, valid);
+							nkeys, key, &valid);
 				if (valid)
 				{
 					
@@ -2119,6 +2122,35 @@ Oid
 heap_insert(Relation relation, HeapTuple tup, CommandId cid,
 			bool use_wal, bool use_fsm, TransactionId xid)
 {
+
+	/*
+	 * in gpsql, heap table only used for catalog on master.
+	 */
+	if (Gp_role == GP_ROLE_EXECUTE )
+	{
+		Assert(NULL != OidInMemHeapMapping);
+
+		InMemHeapRelation inmemrel = OidGetInMemHeapRelation(relation->rd_id);
+		if (NULL == inmemrel)
+		{
+			inmemrel = InMemHeap_Create(relation->rd_id, relation, FALSE, 10,
+					NoLock, RelationGetRelationName(relation));
+			Assert(NULL != inmemrel);
+		}
+
+		InMemHeap_Insert(inmemrel, tup, TRUE, GpIdentity.segindex);
+
+		/*
+		 * in gpsql, catalogs are dispatched to segments,
+		 * and return all modified catalogs back to master.
+		 * here, we just insert the tuple into in-memory table,
+		 * therefore we cannot get the oid of tuple on segments.
+		 */
+		return InvalidOid;
+	}
+
+
+
 	MIRROREDLOCK_BUFMGR_DECLARE;
 
 	bool		isFrozen = (xid == FrozenTransactionId);
@@ -2271,6 +2303,11 @@ simple_heap_insert(Relation relation, HeapTuple tup)
 Oid
 frozen_heap_insert(Relation relation, HeapTuple tup)
 {
+	if (Gp_role == GP_ROLE_EXECUTE)
+	{
+		elog(ERROR, "in gpsql, frozen_heap_insert() is not allowed on segments");
+	}
+
 	MIRROREDLOCK_BUFMGR_VERIFY_NO_LOCK_LEAK_DECLARE;
 
 	Oid result;
@@ -2291,6 +2328,11 @@ frozen_heap_insert_directed(
 	HeapTuple 		tup, 
 	BlockNumber 	blockNum)
 {
+	if (Gp_role == GP_ROLE_EXECUTE)
+	{
+		elog(ERROR, "in gpsql, frozen_heap_insert_directed() is not allowed on segments");
+	}
+
 	MIRROREDLOCK_BUFMGR_VERIFY_NO_LOCK_LEAK_DECLARE;
 
 	Oid result;
@@ -2363,6 +2405,28 @@ heap_delete(Relation relation, ItemPointer tid,
 			ItemPointer ctid, TransactionId *update_xmax,
 			CommandId cid, Snapshot crosscheck, bool wait)
 {
+
+	/*
+	 * in gpsql, heap table only used for catalog on master.
+	 */
+	if (Gp_role == GP_ROLE_EXECUTE )
+	{
+		Assert(NULL != OidInMemHeapMapping);
+
+		InMemHeapRelation inmemrel = OidGetInMemHeapRelation(relation->rd_id);
+		if (NULL == inmemrel)
+		{
+			elog(ERROR, "cannot find in-memory table: %s",
+					RelationGetRelationName(relation));
+		}
+
+		InMemHeap_Delete(inmemrel, tid);
+
+		return HeapTupleMayBeUpdated ;
+	}
+
+
+
 	MIRROREDLOCK_BUFMGR_DECLARE;
 
 	HTSU_Result result;
@@ -3181,6 +3245,25 @@ heap_update(Relation relation, ItemPointer otid, HeapTuple newtup,
 void
 simple_heap_update(Relation relation, ItemPointer otid, HeapTuple tup)
 {
+
+	/*
+	 * in gpsql, heap table only used for catalog on master.
+	 */
+	if (Gp_role == GP_ROLE_EXECUTE ) {
+		Assert(NULL != OidInMemHeapMapping);
+
+		InMemHeapRelation inmemrel = OidGetInMemHeapRelation(relation->rd_id);
+		if (NULL == inmemrel)
+		{
+			elog(ERROR, "cannot find in-memory table: %s",
+					RelationGetRelationName(relation));
+		}
+
+		InMemHeap_Update(inmemrel, otid, tup);
+
+		return;
+	}
+
 	MIRROREDLOCK_BUFMGR_VERIFY_NO_LOCK_LEAK_DECLARE;
 
 	HTSU_Result result;
@@ -3963,6 +4046,11 @@ heap_inplace_frozen_delete_internal(Relation relation, HeapTuple tuple, Transact
 void
 frozen_heap_inplace_update(Relation relation, HeapTuple tuple)
 {
+	if (Gp_role == GP_ROLE_EXECUTE)
+	{
+		elog(ERROR, "in gpsql, frozen_heap_inplace_update() is not allowed on segments");
+	}
+
 	MIRROREDLOCK_BUFMGR_VERIFY_NO_LOCK_LEAK_DECLARE;
 
 	MIRROREDLOCK_BUFMGR_VERIFY_NO_LOCK_LEAK_ENTER;
@@ -3975,6 +4063,11 @@ frozen_heap_inplace_update(Relation relation, HeapTuple tuple)
 void
 frozen_heap_inplace_delete(Relation relation, HeapTuple tuple)
 {
+	if (Gp_role == GP_ROLE_EXECUTE)
+	{
+		elog(ERROR, "in gpsql, frozen_heap_inplace_delete() is not allowed on segments");
+	}
+
 	MIRROREDLOCK_BUFMGR_VERIFY_NO_LOCK_LEAK_DECLARE;
 
 	MIRROREDLOCK_BUFMGR_VERIFY_NO_LOCK_LEAK_ENTER;
@@ -3987,6 +4080,24 @@ frozen_heap_inplace_delete(Relation relation, HeapTuple tuple)
 void
 heap_inplace_update(Relation relation, HeapTuple tuple)
 {
+	/*
+	 * in gpsql, heap table only used for catalog on master.
+	 */
+	if (Gp_role == GP_ROLE_EXECUTE ) {
+		Assert(NULL != OidInMemHeapMapping);
+
+		InMemHeapRelation inmemrel = OidGetInMemHeapRelation(relation->rd_id);
+		if (NULL == inmemrel)
+		{
+			elog(ERROR, "cannot find in-memory table: %s",
+					RelationGetRelationName(relation));
+		}
+
+		InMemHeap_Update(inmemrel, &tuple->t_self, tuple);
+
+		return;
+	}
+
 	MIRROREDLOCK_BUFMGR_VERIFY_NO_LOCK_LEAK_DECLARE;
 
 	MIRROREDLOCK_BUFMGR_VERIFY_NO_LOCK_LEAK_ENTER;

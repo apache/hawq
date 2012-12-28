@@ -71,6 +71,7 @@ typedef struct
 #include "libpq/hba.h"
 #include "libpq/pqcomm.h"
 #include "utils/timestamp.h"
+#include "lib/stringinfo.h"
 
 
 typedef enum CAC_state
@@ -124,6 +125,12 @@ typedef struct Port
 	char	   *user_name;
 	char	   *cmdline_options;
 	List	   *guc_options;
+
+	/* GPSQL segments information */
+	Oid			dboid;
+	char		*bootstrap_user;
+	int			encoding;
+	StringInfoData	override_options;		/* database/user config */
 
 	/*
 	 * Information that needs to be held during the authentication cycle.

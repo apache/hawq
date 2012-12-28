@@ -23,6 +23,7 @@
 #include "catalog/indexing.h"
 #include "catalog/namespace.h"
 #include "catalog/gp_fastsequence.h"
+#include "catalog/aoseg.h"
 #include "cdb/cdbvars.h"
 #include "executor/spi.h"
 #include "nodes/makefuncs.h"
@@ -63,8 +64,7 @@ NewFileSegInfo(int segno)
  * Also insert a new entry to gp_fastsequence for this segment file.
  */
 void
-InsertInitialSegnoEntry(AppendOnlyEntry *aoEntry,
-						int segno)
+InsertInitialSegnoEntry(AppendOnlyEntry *aoEntry, int segno, int contentid)
 {
 	Relation	pg_aoseg_rel;
 	Relation	pg_aoseg_idx;
@@ -80,6 +80,7 @@ InsertInitialSegnoEntry(AppendOnlyEntry *aoEntry,
 	InsertFastSequenceEntry(aoEntry->segrelid,
 							(int64)segno,
 							0,
+							contentid,
 							&tid);
 
 	pg_aoseg_rel = heap_open(aoEntry->segrelid, RowExclusiveLock);
@@ -90,13 +91,18 @@ InsertInitialSegnoEntry(AppendOnlyEntry *aoEntry,
 	values = palloc0(sizeof(Datum) * natts);
 	MemSet(nulls, false, sizeof(char) * natts);
 
-	pg_aoseg_idx = index_open(aoEntry->segidxid, RowExclusiveLock);
+
+	if (Gp_role != GP_ROLE_EXECUTE)
+		pg_aoseg_idx = index_open(aoEntry->segidxid, RowExclusiveLock);
+	else
+		pg_aoseg_idx = NULL;
 
 	values[Anum_pg_aoseg_segno - 1] = ObjectIdGetDatum(segno);
 	values[Anum_pg_aoseg_tupcount - 1] = Float8GetDatum(0);
 	values[Anum_pg_aoseg_varblockcount - 1] = Float8GetDatum(0);
 	values[Anum_pg_aoseg_eof - 1] = Float8GetDatum(0);
 	values[Anum_pg_aoseg_eofuncompressed - 1] = Float8GetDatum(0);
+	values[Anum_pg_aoseg_content - 1] = Int32GetDatum(contentid);
 
 	/*
 	 * form the tuple and insert it
@@ -106,11 +112,14 @@ InsertInitialSegnoEntry(AppendOnlyEntry *aoEntry,
 		elog(ERROR, "failed to build AO file segment tuple");
 
 	frozen_heap_insert(pg_aoseg_rel, pg_aoseg_tuple);
-	CatalogUpdateIndexes(pg_aoseg_rel, pg_aoseg_tuple);
+
+	if (Gp_role != GP_ROLE_EXECUTE)
+		CatalogUpdateIndexes(pg_aoseg_rel, pg_aoseg_tuple);
 
 	heap_freetuple(pg_aoseg_tuple);
 
-	index_close(pg_aoseg_idx, RowExclusiveLock);
+	if (Gp_role != GP_ROLE_EXECUTE)
+		index_close(pg_aoseg_idx, RowExclusiveLock);
 	heap_close(pg_aoseg_rel, RowExclusiveLock);
 }
 
@@ -128,17 +137,18 @@ InsertInitialSegnoEntry(AppendOnlyEntry *aoEntry,
  * to append data to the segment file.
  */
 FileSegInfo *
-GetFileSegInfo(Relation parentrel, AppendOnlyEntry *aoEntry, Snapshot appendOnlyMetaDataSnapshot, int segno)
+GetFileSegInfo(Relation parentrel, AppendOnlyEntry *aoEntry, Snapshot appendOnlyMetaDataSnapshot, int segno, int contentid)
 {
 
 	Relation		pg_aoseg_rel;
-	Relation		pg_aoseg_idx;
 	TupleDesc		pg_aoseg_dsc;
 	HeapTuple		tuple;
-	ScanKeyData		key;
-	IndexScanDesc	aoscan;
+	ScanKeyData		key[2];
+	SysScanDesc		aoscan;
 	Datum			eof, eof_uncompressed, tupcount, varbcount;
 	bool			isNull;
+	bool			indexOK;
+	Oid				indexid;
 	FileSegInfo 	*fsinfo;
 
 	/*
@@ -147,35 +157,42 @@ GetFileSegInfo(Relation parentrel, AppendOnlyEntry *aoEntry, Snapshot appendOnly
 	 */
 	pg_aoseg_rel = heap_open(aoEntry->segrelid, AccessShareLock);
 	pg_aoseg_dsc = pg_aoseg_rel->rd_att;
-	pg_aoseg_idx = index_open(aoEntry->segidxid, AccessShareLock);
+
+	if (Gp_role == GP_ROLE_EXECUTE)
+	{
+		indexOK =  FALSE;
+		indexid = InvalidOid;
+	} else
+	{
+		indexOK = TRUE;
+		indexid = aoEntry->segidxid;
+	}
 
 	/*
 	 * Setup a scan key to fetch from the index by segno.
 	 */
-	ScanKeyInit(&key,
-				(AttrNumber) 1,
-				BTEqualStrategyNumber,
-				F_OIDEQ,
-				ObjectIdGetDatum(segno));
+	ScanKeyInit(&key[0], (AttrNumber) Anum_pg_aoseg_XXX_segno,
+			BTEqualStrategyNumber, F_OIDEQ, ObjectIdGetDatum(segno));
 
-	aoscan = index_beginscan(pg_aoseg_rel, pg_aoseg_idx, appendOnlyMetaDataSnapshot, 1, &key);
+	ScanKeyInit(&key[1], (AttrNumber) Anum_pg_aoseg_XXX_content,
+			BTEqualStrategyNumber, F_INT4EQ, ObjectIdGetDatum(contentid));
 
-	tuple = index_getnext(aoscan, ForwardScanDirection);
+	aoscan = systable_beginscan(pg_aoseg_rel, indexid, indexOK, SnapshotNow, 2,
+			&key[0]);
+
+	tuple = systable_getnext(aoscan);
 
 	if (!HeapTupleIsValid(tuple))
 	{
         /* This segment file does not have an entry. */
-		index_endscan(aoscan);
-		index_close(pg_aoseg_idx, AccessShareLock);
+		systable_endscan(aoscan);
 		heap_close(pg_aoseg_rel, AccessShareLock);
 		return NULL;
 	}
 
-	/* Close the index */
 	tuple = heap_copytuple(tuple);
 
-	index_endscan(aoscan);
-	index_close(pg_aoseg_idx, AccessShareLock);
+	systable_endscan(aoscan);
 
 	Assert(HeapTupleIsValid(tuple));
 
@@ -230,6 +247,8 @@ GetFileSegInfo(Relation parentrel, AppendOnlyEntry *aoEntry, Snapshot appendOnly
 	fsinfo->eof = (int64)DatumGetFloat8(eof);
 	fsinfo->tupcount = (int64)DatumGetFloat8(tupcount);
 	fsinfo->varblockcount = (int64)DatumGetFloat8(varbcount);
+	fsinfo->content = GpIdentity.segindex;
+
 	ItemPointerSetInvalid(&fsinfo->sequence_tid);
 
 	if (fsinfo->eof < 0)
@@ -286,6 +305,8 @@ aoFileSegInfoCmp(const void *left, const void *right)
 	FileSegInfo *leftSegInfo = *((FileSegInfo **)left);
 	FileSegInfo *rightSegInfo = *((FileSegInfo **)right);
 	
+	Insist(leftSegInfo->content == rightSegInfo->content);
+
 	if (leftSegInfo->segno < rightSegInfo->segno)
 		return -1;
 	
@@ -304,7 +325,8 @@ FileSegInfo **GetAllFileSegInfo_pg_aoseg_rel(
 {
 	TupleDesc		pg_aoseg_dsc;
 	HeapTuple		tuple;
-	HeapScanDesc	aoscan;
+	SysScanDesc		aoscan;
+	ScanKeyData		key[1];
 	FileSegInfo		**allseginfo;
 	int				seginfo_no;
 	int				seginfo_slot_no = AO_FILESEGINFO_ARRAY_SIZE;
@@ -312,7 +334,8 @@ FileSegInfo **GetAllFileSegInfo_pg_aoseg_rel(
 					eof,
 					eof_uncompressed,
 					tupcount,
-					varblockcount;
+					varblockcount,
+					content;
 	bool			isNull;
 
 	pg_aoseg_dsc = pg_aoseg_rel->rd_att;
@@ -324,12 +347,16 @@ FileSegInfo **GetAllFileSegInfo_pg_aoseg_rel(
 	allseginfo = (FileSegInfo **) palloc0(sizeof(FileSegInfo*) * seginfo_slot_no);
 	seginfo_no = 0;
 
+	ScanKeyInit(&key[0], (AttrNumber) Anum_pg_aoseg_XXX_content,
+			BTEqualStrategyNumber, F_INT4EQ, ObjectIdGetDatum(GpIdentity.segindex));
+
 	/*
 	 * Now get the actual segfile information
 	 */
-	aoscan = heap_beginscan(pg_aoseg_rel, appendOnlyMetaDataSnapshot, 0, NULL);
+	aoscan = systable_beginscan(pg_aoseg_rel, InvalidOid, FALSE,
+			appendOnlyMetaDataSnapshot, 1, &key[0]);
 
-	while ((tuple = heap_getnext(aoscan, ForwardScanDirection)) != NULL)
+	while ((tuple = systable_getnext(aoscan)) != NULL)
 	{
 		/* dynamically expand space for FileSegInfo* array */
 		if (seginfo_no >= seginfo_slot_no)
@@ -351,13 +378,13 @@ FileSegInfo **GetAllFileSegInfo_pg_aoseg_rel(
 		oneseginfo->segno = DatumGetInt32(segno);
 
 		eof = fastgetattr(tuple, Anum_pg_aoseg_eof, pg_aoseg_dsc, &isNull);
-		oneseginfo->eof += (int64)DatumGetFloat8(eof);
+		oneseginfo->eof = (int64)DatumGetFloat8(eof);
 
 		tupcount = fastgetattr(tuple, Anum_pg_aoseg_tupcount, pg_aoseg_dsc, &isNull);
-		oneseginfo->tupcount += (int64)DatumGetFloat8(tupcount);
+		oneseginfo->tupcount = (int64)DatumGetFloat8(tupcount);
 
 		varblockcount = fastgetattr(tuple, Anum_pg_aoseg_varblockcount, pg_aoseg_dsc, &isNull);
-		oneseginfo->varblockcount += (int64)DatumGetFloat8(varblockcount);
+		oneseginfo->varblockcount = (int64)DatumGetFloat8(varblockcount);
 
 		ItemPointerSetInvalid(&oneseginfo->sequence_tid);
 
@@ -366,7 +393,10 @@ FileSegInfo **GetAllFileSegInfo_pg_aoseg_rel(
 		if(isNull)
 			oneseginfo->eof_uncompressed = InvalidUncompressedEof;
 		else
-			oneseginfo->eof_uncompressed += (int64)DatumGetFloat8(eof);
+			oneseginfo->eof_uncompressed = (int64)DatumGetFloat8(eof);
+
+		content = fastgetattr(tuple, Anum_pg_aoseg_content, pg_aoseg_dsc, &isNull);
+		oneseginfo->content = DatumGetInt32(content);
 
 		if (Debug_appendonly_print_scan)
 			elog(LOG,"Append-only found existing segno %d with eof " INT64_FORMAT " for table '%s' out of total %d segs",
@@ -380,7 +410,7 @@ FileSegInfo **GetAllFileSegInfo_pg_aoseg_rel(
 		CHECK_FOR_INTERRUPTS();
 	}
 
-	heap_endscan(aoscan);
+	systable_endscan(aoscan);
 
 	*totalsegs = seginfo_no;
 
@@ -417,10 +447,9 @@ UpdateFileSegInfo(Relation parentrel,
 	LockAcquireResult acquireResult;
 	
 	Relation			pg_aoseg_rel;
-	Relation			pg_aoseg_idx;
 	TupleDesc			pg_aoseg_dsc;
-	ScanKeyData			key;
-	IndexScanDesc		aoscan;
+	ScanKeyData			key[2];
+	SysScanDesc			aoscan;
 	HeapTuple			tuple, new_tuple;
 	Datum				filetupcount;
 	Datum				filevarblockcount;
@@ -430,6 +459,8 @@ UpdateFileSegInfo(Relation parentrel,
 	bool			   *new_record_nulls;
 	bool			   *new_record_repl;
 	bool				isNull;
+	bool			indexOK;
+	Oid				indexid;
 
 	/* overflow sanity checks. don't check the same for tuples_added,
 	 * it may be coming as a negative diff from gp_update_ao_master_stats */
@@ -457,20 +488,33 @@ UpdateFileSegInfo(Relation parentrel,
 	 */
 	pg_aoseg_rel = heap_open(aoEntry->segrelid, RowExclusiveLock);
 	pg_aoseg_dsc = pg_aoseg_rel->rd_att;
-	pg_aoseg_idx = index_open(aoEntry->segidxid, RowExclusiveLock);
+
+	/*
+	 * in gpsql, index only exists on master.
+	 */
+	if (Gp_role == GP_ROLE_EXECUTE)
+	{
+		indexOK = FALSE;
+		indexid = InvalidOid;
+	} else
+	{
+		indexOK = TRUE;
+		indexid = aoEntry->segidxid;
+	}
 
 	/*
 	 * Setup a scan key to fetch from the index by segno.
 	 */
-	ScanKeyInit(&key,
-				(AttrNumber) 1,
-				BTEqualStrategyNumber,
-				F_OIDEQ,
-				ObjectIdGetDatum(segno));
+	ScanKeyInit(&key[0], (AttrNumber) Anum_pg_aoseg_XXX_segno,
+			BTEqualStrategyNumber, F_OIDEQ, ObjectIdGetDatum(segno));
 
-	aoscan = index_beginscan(pg_aoseg_rel, pg_aoseg_idx, SnapshotNow, 1, &key);
+	ScanKeyInit(&key[1], (AttrNumber) Anum_pg_aoseg_XXX_content,
+			BTEqualStrategyNumber, F_INT4EQ, ObjectIdGetDatum(GpIdentity.segindex));
 
-	tuple = index_getnext(aoscan, ForwardScanDirection);
+	aoscan = systable_beginscan(pg_aoseg_rel, indexid, indexOK,
+			SnapshotNow, 2, &key[0]);
+
+	tuple = systable_getnext(aoscan);
 
 	if (!HeapTupleIsValid(tuple))
 		ereport(ERROR,
@@ -538,13 +582,14 @@ UpdateFileSegInfo(Relation parentrel,
 								new_record_nulls, new_record_repl);
 
 	simple_heap_update(pg_aoseg_rel, &tuple->t_self, new_tuple);
-	CatalogUpdateIndexes(pg_aoseg_rel, new_tuple);
+
+	if (Gp_role != GP_ROLE_EXECUTE)
+		CatalogUpdateIndexes(pg_aoseg_rel, new_tuple);
 
 	heap_freetuple(new_tuple);
 
 	/* Finish up scan */
-	index_endscan(aoscan);
-	index_close(pg_aoseg_idx, RowExclusiveLock);
+	systable_endscan(aoscan);
 	heap_close(pg_aoseg_rel, RowExclusiveLock);
 
 	pfree(new_record);
@@ -558,13 +603,14 @@ UpdateFileSegInfo(Relation parentrel,
  * Get the total bytes, tuples, and varblocks for a specific AO table
  * from the pg_aoseg table on this local segdb.
  */
-FileSegTotals *GetSegFilesTotals(Relation parentrel, Snapshot appendOnlyMetaDataSnapshot)
+FileSegTotals *GetSegFilesTotals(Relation parentrel, Snapshot appendOnlyMetaDataSnapshot, int32 contentid)
 {
 
 	Relation		pg_aoseg_rel;
 	TupleDesc		pg_aoseg_dsc;
 	HeapTuple		tuple;
-	HeapScanDesc	aoscan;
+	ScanKeyData		key[2];
+	SysScanDesc		aoscan;
 	FileSegTotals  *result;
 	Datum			eof,
 					eof_uncompressed,
@@ -582,9 +628,13 @@ FileSegTotals *GetSegFilesTotals(Relation parentrel, Snapshot appendOnlyMetaData
 	pg_aoseg_rel = heap_open(aoEntry->segrelid, AccessShareLock);
 	pg_aoseg_dsc = pg_aoseg_rel->rd_att;
 
-	aoscan = heap_beginscan(pg_aoseg_rel, appendOnlyMetaDataSnapshot, 0, NULL);
+	ScanKeyInit(&key[0], (AttrNumber) Anum_pg_aoseg_XXX_content,
+			BTEqualStrategyNumber, F_INT4EQ, ObjectIdGetDatum(contentid));
 
-	while ((tuple = heap_getnext(aoscan, ForwardScanDirection)) != NULL)
+	aoscan = systable_beginscan(pg_aoseg_rel, InvalidOid, FALSE,
+			appendOnlyMetaDataSnapshot, 1, &key[0]);
+
+	while ((tuple = systable_getnext(aoscan)) != NULL)
 	{
 		eof = fastgetattr(tuple, Anum_pg_aoseg_eof, pg_aoseg_dsc, &isNull);
 		tupcount = fastgetattr(tuple, Anum_pg_aoseg_tupcount, pg_aoseg_dsc, &isNull);
@@ -604,7 +654,7 @@ FileSegTotals *GetSegFilesTotals(Relation parentrel, Snapshot appendOnlyMetaData
 		CHECK_FOR_INTERRUPTS();
 	}
 
-	heap_endscan(aoscan);
+	systable_endscan(aoscan);
 	heap_close(pg_aoseg_rel, AccessShareLock);
 
 	pfree(aoEntry);
@@ -624,12 +674,16 @@ int64 GetAOTotalBytes(Relation parentrel, Snapshot appendOnlyMetaDataSnapshot)
 	Relation		pg_aoseg_rel;
 	TupleDesc		pg_aoseg_dsc;
 	HeapTuple		tuple;
-	HeapScanDesc	aoscan;
+	ScanKeyData		key[1];
+	SysScanDesc		aoscan;
 	int64		  	result;
 	Datum			eof;
 	bool			isNull;
 	AppendOnlyEntry *aoEntry = NULL;
 	
+	bool			indexOK;
+	Oid				indexid;
+
 	aoEntry = GetAppendOnlyEntry(RelationGetRelid(parentrel), appendOnlyMetaDataSnapshot);
 
 	result = 0;
@@ -637,9 +691,23 @@ int64 GetAOTotalBytes(Relation parentrel, Snapshot appendOnlyMetaDataSnapshot)
 	pg_aoseg_rel = heap_open(aoEntry->segrelid, AccessShareLock);
 	pg_aoseg_dsc = pg_aoseg_rel->rd_att;
 
-	aoscan = heap_beginscan(pg_aoseg_rel, appendOnlyMetaDataSnapshot, 0, NULL);
+	if (Gp_role == GP_ROLE_EXECUTE)
+	{
+		indexOK = FALSE;
+		indexid = InvalidOid;
+	} else
+	{
+		indexOK = TRUE;
+		indexid = aoEntry->segidxid;
+	}
 
-	while ((tuple = heap_getnext(aoscan, ForwardScanDirection)) != NULL)
+	ScanKeyInit(&key[0], (AttrNumber) Anum_pg_aoseg_XXX_content,
+			BTEqualStrategyNumber, F_INT4EQ, ObjectIdGetDatum(GpIdentity.segindex));
+
+	aoscan = systable_beginscan(pg_aoseg_rel, indexid, indexOK,
+			appendOnlyMetaDataSnapshot, 1, &key[1]);
+
+	while ((tuple = systable_getnext(aoscan)) != NULL)
 	{
 		eof = fastgetattr(tuple, Anum_pg_aoseg_eof, pg_aoseg_dsc, &isNull);
 		Assert(!isNull);
@@ -649,7 +717,7 @@ int64 GetAOTotalBytes(Relation parentrel, Snapshot appendOnlyMetaDataSnapshot)
 		CHECK_FOR_INTERRUPTS();
 	}
 
-	heap_endscan(aoscan);
+	systable_endscan(aoscan);
 	heap_close(pg_aoseg_rel, AccessShareLock);
 
 	pfree(aoEntry);
@@ -929,10 +997,11 @@ gp_update_aorow_master_stats_internal(Relation parentrel, Snapshot appendOnlyMet
 												AccessExclusiveLock,
 												/* dontWait */ false);
 
-				fsinfo = GetFileSegInfo(parentrel, aoEntry, appendOnlyMetaDataSnapshot, qe_segno);
+				fsinfo = GetFileSegInfo(parentrel, aoEntry, appendOnlyMetaDataSnapshot, qe_segno, GpIdentity.segindex);
 				if (fsinfo == NULL)
 				{
-					InsertInitialSegnoEntry(aoEntry, qe_segno);
+					Assert(!"in gpsql, master should dispatch seginfo to all QE");
+					InsertInitialSegnoEntry(aoEntry, qe_segno, GpIdentity.segindex);
 
 					fsinfo = NewFileSegInfo(qe_segno);
 				}
@@ -1043,7 +1112,7 @@ gp_update_ao_master_stats_name(PG_FUNCTION_ARGS)
 	text	   		*relname = PG_GETARG_TEXT_P(0);
 	Oid				relid;
 
-	Assert(Gp_role == GP_ROLE_DISPATCH);
+	Assert(Gp_role != GP_ROLE_EXECUTE);
 
 	parentrv = makeRangeVarFromNameList(textToQualifiedNameList(relname));
 	relid = RangeVarGetRelid(parentrv, false);
@@ -1062,7 +1131,7 @@ gp_update_ao_master_stats_oid(PG_FUNCTION_ARGS)
 {
 	Oid			relid = PG_GETARG_OID(0);
 
-	Assert(Gp_role == GP_ROLE_DISPATCH);
+	Assert(Gp_role != GP_ROLE_EXECUTE);
 
 	return gp_update_ao_master_stats_internal(relid, SnapshotNow);
 }
@@ -1100,7 +1169,7 @@ get_ao_distribution_oid(PG_FUNCTION_ARGS)
 	int 			ret;
 	Oid				relid = PG_GETARG_OID(0);
 
-	Assert(Gp_role == GP_ROLE_DISPATCH);
+	Assert(Gp_role != GP_ROLE_EXECUTE);
 
 	/*
 	 * stuff done only on the first call of the function. In here we
@@ -1287,7 +1356,7 @@ get_ao_distribution_name(PG_FUNCTION_ARGS)
 	text	   		*relname = PG_GETARG_TEXT_P(0);
 	Oid				relid;
 
-	Assert(Gp_role == GP_ROLE_DISPATCH);
+	Assert(Gp_role != GP_ROLE_EXECUTE);
 
 	/*
 	 * stuff done only on the first call of the function. In here we
@@ -1467,7 +1536,7 @@ get_ao_compression_ratio_name(PG_FUNCTION_ARGS)
 	text	   		*relname = PG_GETARG_TEXT_P(0);
 	Oid				relid;
 
-	Assert(Gp_role == GP_ROLE_DISPATCH);
+	Assert(Gp_role != GP_ROLE_EXECUTE);
 
 	parentrv = makeRangeVarFromNameList(textToQualifiedNameList(relname));
 	relid = RangeVarGetRelid(parentrv, false);
@@ -1486,7 +1555,7 @@ get_ao_compression_ratio_oid(PG_FUNCTION_ARGS)
 {
 	Oid			relid = PG_GETARG_OID(0);
 
-	Assert(Gp_role == GP_ROLE_DISPATCH);
+	Assert(Gp_role != GP_ROLE_EXECUTE);
 
 	return ao_compression_ratio_internal(relid);
 }
@@ -1521,7 +1590,7 @@ aorow_compression_ratio_internal(Relation parentrel)
 	 * assemble our query string
 	 */
 	initStringInfo(&sqlstmt);
-	if (Gp_role == GP_ROLE_DISPATCH)
+	if (Gp_role != GP_ROLE_EXECUTE)
 		appendStringInfo(&sqlstmt, "select sum(eof), sum(eofuncompressed) "
 								"from gp_dist_random('pg_aoseg.%s')",
 									aoseg_relname);

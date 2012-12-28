@@ -41,6 +41,7 @@
 #include "catalog/pg_tablespace.h"
 #include "commands/comment.h"
 #include "commands/dbcommands.h"
+#include "commands/filespace.h"
 #include "commands/tablespace.h"
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"
@@ -114,24 +115,50 @@ static void create_target_directories(
 
 		Oid tablespace = info->tablespaces[t];
 		DbDirNode dbDirNode;
+		List		*contentids = NIL;
+		ListCell	*cell = NULL;
 		
 		CHECK_FOR_INTERRUPTS();
 		
 		if (tablespace == GLOBALTABLESPACE_OID)
 			continue;
 
+		/* The meta data tablespace. */
+		if (tablespace == DEFAULTTABLESPACE_OID)
+		{
+			dbDirNode.tablespace = DEFAULTTABLESPACE_OID;
+			dbDirNode.database = destDatabase;
+
+			MirroredFileSysObj_TransactionCreateDbDir(
+												GpIdentity.segindex,
+												&dbDirNode,
+												&persistentTid,
+												&persistentSerialNum);
+
+			set_short_version(GpIdentity.segindex, NULL, &dbDirNode, true);
+			continue;
+		}
+
+		Assert(Gp_role == GP_ROLE_DISPATCH);
+		/* This is the original data tablespace which we want to change. */
 		if (tablespace == sourceDefaultTablespace)
 			tablespace = destDefaultTablespace;
 
 		dbDirNode.tablespace = tablespace;
 		dbDirNode.database = destDatabase;
-		
-		MirroredFileSysObj_TransactionCreateDbDir(
+
+		contentids = get_filespace_contentids(get_tablespace_fsoid(tablespace));
+		foreach(cell, contentids)
+		{
+			MirroredFileSysObj_TransactionCreateDbDir(
+											lfirst_int(cell),
 											&dbDirNode,
 											&persistentTid,
 											&persistentSerialNum);
 
-		set_short_version(NULL, &dbDirNode, true);
+			set_short_version(lfirst_int(cell), NULL, &dbDirNode, true);
+		}
+		list_free(contentids);
 	}
 }
 
@@ -428,12 +455,12 @@ static void copy_append_only_segment_file(
 
 	int primaryError;
 
-	bool mirrorDataLossOccurred;
+	/*bool mirrorDataLossOccurred;*/
 
-	bool mirrorCatchupRequired;
+	/*bool mirrorCatchupRequired;*/
 
-	MirrorDataLossTrackingState 	originalMirrorDataLossTrackingState;
-	int64 							originalMirrorDataLossTrackingSessionNum;
+/*	MirrorDataLossTrackingState 	originalMirrorDataLossTrackingState;
+	int64 							originalMirrorDataLossTrackingSessionNum;*/
 
 	Assert(eof > 0);
 
@@ -480,11 +507,12 @@ static void copy_append_only_segment_file(
 							&mirroredDstOpen,
 							dstRelFileNode,
 							segmentFileNum,
+							/*
+							 * TODO, in gpsql, fix later
+							 */
+							GpIdentity.segindex,
 							relationName,
 							/* logicalEof */ 0,	// NOTE: This is the START EOF.  Since we are copying, we start at 0.
-							/* traceOpenFlags */ false,
-							persistentTid,
-							persistentSerialNum,
 							true,
 							&primaryError);
 	if (primaryError != 0)
@@ -520,8 +548,8 @@ static void copy_append_only_segment_file(
 							  &mirroredDstOpen,
 							  buffer,
 							  bufferLen,
-							  &primaryError,
-							  &mirrorDataLossOccurred);
+							  &primaryError/*,
+							  &mirrorDataLossOccurred*/);
 		if (primaryError != 0)
 			ereport(ERROR,
 					(errcode_for_file_access(),
@@ -542,11 +570,11 @@ static void copy_append_only_segment_file(
 
 	MirroredAppendOnly_FlushAndClose(
 							&mirroredDstOpen,
-							&primaryError,
+							&primaryError/*,
 							&mirrorDataLossOccurred,
 							&mirrorCatchupRequired,
 							&originalMirrorDataLossTrackingState,
-							&originalMirrorDataLossTrackingSessionNum);
+							&originalMirrorDataLossTrackingSessionNum*/);
 	if (primaryError != 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
@@ -556,12 +584,12 @@ static void copy_append_only_segment_file(
 
 	FileClose(srcFile);
 	
-	if (eof > 0)
+	/*if (eof > 0)
 	{
-		/* 
+
 		 * This routine will handle both updating the persistent information about the
 		 * new EOFs and copy data to the mirror if we are now in synchronized state.
-		 */
+
 		if (Debug_persistent_print)
 			elog(Persistent_DebugPrintLevel(), 
 				 "copy_append_only_segment_file: Exit %u/%u/%u, segment file #%d, serial number " INT64_FORMAT ", TID %s, mirror catchup required %s, "
@@ -588,7 +616,7 @@ static void copy_append_only_segment_file(
 										originalMirrorDataLossTrackingSessionNum,
 										eof);
 
-	}
+	}*/
 	
 	MIRRORED_UNLOCK;
 
@@ -830,7 +858,7 @@ createdb_int(CreatedbStmt *stmt, CdbDispatcherState *ds)
 	 * (exception is to allow CREATE DB while connected to template1).
 	 * Otherwise we might copy inconsistent data.
 	 */
-	if (DatabaseHasActiveBackends(src_dboid, true))
+	if (src_dboid != TemplateDbOid && DatabaseHasActiveBackends(src_dboid, true))
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_IN_USE),
 			errmsg("source database \"%s\" is being accessed by other users",
@@ -955,7 +983,10 @@ createdb_int(CreatedbStmt *stmt, CdbDispatcherState *ds)
 	 * a filename conflict with anything already existing in the tablespace
 	 * directories.
 	 */
-	pg_database_rel = heap_open(DatabaseRelationId, RowExclusiveLock);
+	if (src_dboid == TemplateDbOid)
+		pg_database_rel = heap_open(DatabaseRelationId, AccessShareLock);
+	else
+		pg_database_rel = heap_open(DatabaseRelationId, RowExclusiveLock);
 
 	if (Gp_role == GP_ROLE_EXECUTE && stmt->dbOid != 0)
 		dboid = stmt->dbOid;
@@ -970,23 +1001,6 @@ createdb_int(CreatedbStmt *stmt, CdbDispatcherState *ds)
 
 	/* Remember this for dispatching to segDBs */
 	stmt->dbOid = dboid;
-
-	if (shouldDispatch)
-	{
-		elog(DEBUG5, "shouldDispatch = true, dbOid = %d", dboid);
-
-        /* 
-              * Dispatch the command to all primary segments.
-              *
-              * Doesn't wait for the QEs to finish execution.
-              */
-        cdbdisp_dispatchUtilityStatement((Node *)stmt,
-                                         true,      /* cancelOnError */
-                                     	 true,      /* startTransaction */
-                                     	 true,      /* withSnapshot */
-                                     	 ds,
-									 	 "createdb_int");
-	}
 
 	/*
 	 * Insert a new tuple into pg_database.  This establishes our ownership of
@@ -1079,7 +1093,7 @@ createdb_int(CreatedbStmt *stmt, CdbDispatcherState *ds)
 
 		info = DatabaseInfo_Collect(
 							src_dboid, 
-							src_deftablespace,
+							DEFAULTTABLESPACE_OID,
 							/* collectGpRelationNodeInfo */ true,
 							/* collectAppendOnlyCatalogSegmentInfo */ true,
 							/* scanFileSystem */ true);
@@ -1111,28 +1125,18 @@ createdb_int(CreatedbStmt *stmt, CdbDispatcherState *ds)
 
 		/*
 		 * Create target database directories (under transaction).
+		 * The meta data tablespace is local tablespace, and will be added to
+		 * the info structure.
 		 */
 		create_target_directories(
 								info,
 								src_deftablespace,
 								dst_deftablespace,
 								dboid);
-		/*
-		 * Due to lower level storage lack of updatable capability, we need to
-		 * create the same dir structure in the updatable storage in where the
-		 * meta live.
-		 */
-		if (store_meta_on_default_tablespace)
-			create_target_directories(
-								info,
-								src_deftablespace,
-								DEFAULTTABLESPACE_OID,
-								dboid);
 
 		if (Debug_database_command_print)
 			elog(NOTICE, "created db dirs phase: %s",
 				 pg_rusage_show(&ru_start));
-
 
 		/*
 		 * Create each physical destination relation segment file and copy the data.
@@ -1246,6 +1250,7 @@ createdb_int(CreatedbStmt *stmt, CdbDispatcherState *ds)
 					MirroredFileSysObj_TransactionCreateAppendOnlyFile(
 														&dstRelFileNode,
 														dbInfoGpRelationNode->segmentFileNum,
+														dbInfoGpRelationNode->contentid,
 														dbInfoRel->relname,
 														/* doJustInTimeDirCreate */ false,
 														&dbInfoGpRelationNode->persistentTid,			// OUTPUT
@@ -1290,10 +1295,22 @@ createdb_int(CreatedbStmt *stmt, CdbDispatcherState *ds)
 		 * Manually set the persistence information so it will get recorded in
 		 * the insert XLOG records.
 		 */
-		gp_relation_node->rd_segfile0_relationnodeinfo.isPresent = true;
-		gp_relation_node->rd_segfile0_relationnodeinfo.persistentTid = gpRelationNodePersistentTid;
-		gp_relation_node->rd_segfile0_relationnodeinfo.persistentSerialNum = gpRelationNodePersistentSerialNum;
-		
+		{
+			/*
+			 * TODO, in gpsql, in createdb more work need todo.
+			 */
+			int i;
+			Assert(NULL != gp_relation_node->rd_segfile0_relationnodeinfos);
+			for (i = 0; i < gp_relation_node->rd_segfile0_count; ++i) {
+				gp_relation_node->rd_segfile0_relationnodeinfos[i].isPresent =
+						true;
+				gp_relation_node->rd_segfile0_relationnodeinfos[i].persistentTid =
+						gpRelationNodePersistentTid;
+				gp_relation_node->rd_segfile0_relationnodeinfos[i].persistentSerialNum =
+						gpRelationNodePersistentSerialNum;
+			}
+		}
+
 		for (r = 0; r < info->dbInfoRelArrayCount; r++)
 		{
 			DbInfoRel *dbInfoRel = &info->dbInfoRelArray[r];
@@ -1437,25 +1454,6 @@ dropdb(const char *dbname, bool missing_ok)
 	sharedStorage = is_tablespace_shared(get_database_dts(db_id));
 
 	/*
-	 * Free the database on the segDBs
-	 *
-	 */
-	if (Gp_role == GP_ROLE_DISPATCH)
-	{
-		StringInfoData buffer;
-
-		initStringInfo(&buffer);
-
-		appendStringInfo(&buffer, "DROP DATABASE IF EXISTS \"%s\"", dbname);
-
-
-		/*
-		 * Do the DROP DATABASE as part of a distributed transaction.
-		 */
-		CdbDoCommand(buffer.data, true, true);
-	}
-
-	/*
 	 * Remove the database's tuple from pg_database.
 	 */
 	tup = SearchSysCache(DATABASEOID,
@@ -1509,6 +1507,8 @@ dropdb(const char *dbname, bool missing_ok)
 		DatabaseInfo *info;
 		int r;
 
+		/* dbid is the segment unique id. */
+		int4	  dbid;
 		DbDirNode dbDirNode;
 		PersistentFileSysState state;
 		
@@ -1596,11 +1596,12 @@ dropdb(const char *dbname, bool missing_ok)
 					dbInfoGpRelationNode = &dbInfoRel->gpRelationNodes[g];
 
 					MirroredFileSysObj_ScheduleDropAppendOnlyFile(
-													&relFileNode,
-													dbInfoGpRelationNode->segmentFileNum,
-													dbInfoRel->relname,
-													&dbInfoGpRelationNode->persistentTid,
-													dbInfoGpRelationNode->persistentSerialNum);
+											&relFileNode,
+											dbInfoGpRelationNode->segmentFileNum,
+											dbInfoGpRelationNode->contentid,
+											dbInfoRel->relname,
+											&dbInfoGpRelationNode->persistentTid,
+											dbInfoGpRelationNode->persistentSerialNum);
 				}
 			}
 		}
@@ -1610,6 +1611,7 @@ dropdb(const char *dbname, bool missing_ok)
 		 */
 		PersistentDatabase_DirIterateInit();
 		while (PersistentDatabase_DirIterateNext(
+										&dbid,
 										&dbDirNode,
 										&state,
 										&persistentTid,
@@ -1630,6 +1632,7 @@ dropdb(const char *dbname, bool missing_ok)
 				 dbDirNode.tablespace, dbDirNode.database);
 
 			MirroredFileSysObj_ScheduleDropDbDir(
+											dbid,
 											&dbDirNode,
 											&persistentTid,
 											persistentSerialNum,
@@ -1839,18 +1842,6 @@ AlterDatabase(AlterDatabaseStmt *stmt)
 	/* Close pg_database, but keep lock till commit */
 	heap_close(rel, NoLock);
 
-	if (Gp_role == GP_ROLE_DISPATCH)
-	{
-
-		StringInfoData buffer;
-
-		initStringInfo(&buffer);
-
-		appendStringInfo(&buffer, "ALTER DATABASE \"%s\" CONNECTION LIMIT %d", stmt->dbname, connlimit);
-
-		CdbDoCommand(buffer.data, false, /*start txn*/ true);
-	}
-
 	/*
 	 * We don't bother updating the flat file since the existing options for
 	 * ALTER DATABASE don't affect it.
@@ -1980,62 +1971,6 @@ AlterDatabaseSet(AlterDatabaseSetStmt *stmt)
 
 	/* Close pg_database, but keep lock till commit */
 	heap_close(rel, NoLock);
-	
-	if (Gp_role == GP_ROLE_DISPATCH)
-	{
-
-		StringInfoData buffer;
-
-		initStringInfo(&buffer);
-
-		appendStringInfo(&buffer, "ALTER DATABASE \"%s\" ", stmt->dbname);
-		
-		if (strcmp(stmt->variable, "all") == 0 && valuestr == NULL)
-		{
-			appendStringInfo(&buffer, "RESET ALL");
-		}
-		else if (valuestr == NULL)
-		{
-			appendStringInfo(&buffer, "RESET \"%s\"", stmt->variable);
-		}
-		else
-		{
-			ListCell   *l;
-	
-			
-			appendStringInfo(&buffer, "SET \"%s\" TO ",stmt->variable);
-		
-
-		
-			/* Parse string into list of identifiers */
-
-			foreach(l, stmt->value)
-			{
-				A_Const    *arg = (A_Const *) lfirst(l);
-				if (l != list_head(stmt->value))
-					appendStringInfo(&buffer, ",");
-				
-				switch (nodeTag(&arg->val))
-				{
-					case T_Integer:
-						appendStringInfo(&buffer, "%ld", intVal(&arg->val));
-						break;
-					case T_Float:
-						/* represented as a string, so just copy it */
-						appendStringInfoString(&buffer, strVal(&arg->val));
-						break;
-					case T_String:
-						appendStringInfo(&buffer,"'%s'", strVal(&arg->val));
-						break;
-					default:
-						appendStringInfo(&buffer, "%s", quote_identifier(strVal(&arg->val)));
-				}
-			}
-
-		}
-
-		CdbDoCommand(buffer.data, false, /*start txn*/ true);
-	}
 
 	/*
 	 * We don't bother updating the flat file since ALTER DATABASE SET doesn't

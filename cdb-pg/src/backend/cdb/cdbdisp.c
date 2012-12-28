@@ -63,6 +63,8 @@
 #include "utils/builtins.h"
 #include "utils/portal.h"
 
+#include "cdb/cdbinmemheapam.h"
+
 extern bool Test_print_direct_dispatch_info;
 
 extern pthread_t main_tid;
@@ -187,7 +189,7 @@ typedef struct {
 static int fillSliceVector(SliceTable * sliceTable, int sliceIndex, sliceVec *sliceVector, int len);
 
 /* determines which dispatchOptions need to be set. */
-static int generateTxnOptions(bool needTwoPhase);
+/*static int generateTxnOptions(bool needTwoPhase);*/
 
 typedef struct
 {
@@ -860,6 +862,17 @@ addSegDBToDispatchThreadPool(DispatchCommandParms  *ParmsAr,
 					pParms->queryParms.seqServerPort = pQueryParms->seqServerPort;
 				}
 				
+				if (pQueryParms->serializedCatalog == NULL || pQueryParms->serializedCataloglen == 0)
+				{
+					pParms->queryParms.serializedCatalog = NULL;
+					pParms->queryParms.serializedCataloglen = 0;
+				}
+				else
+				{
+					pParms->queryParms.serializedCatalog = pQueryParms->serializedCatalog;
+					pParms->queryParms.serializedCataloglen = pQueryParms->serializedCataloglen;
+				}
+
 				pParms->queryParms.primary_gang_id = pQueryParms->primary_gang_id;
 			}
 			break;
@@ -1389,8 +1402,15 @@ cdbdisp_dispatchCommand(const char                 *strCommand,
 	queryParms.primary_gang_id = primaryGang->gang_id;
 	
 	/* Serialize a version of our DTX Context Info */
-	queryParms.serializedDtxContextInfo = 
+	/*queryParms.serializedDtxContextInfo =
 		qdSerializeDtxContextInfo(&queryParms.serializedDtxContextInfolen, withSnapshot, false, generateTxnOptions(needTwoPhase), "cdbdisp_dispatchCommand");
+	 */
+
+	/*
+	 * in gpsql, there is no distributed transaction
+	 */
+	queryParms.serializedDtxContextInfo = NULL;
+	queryParms.serializedDtxContextInfolen = 0;
 
 	/* sequence server info */
 	qdinfo = &(getComponentDatabases()->entry_db_info[0]);
@@ -1398,6 +1418,10 @@ cdbdisp_dispatchCommand(const char                 *strCommand,
 	queryParms.seqServerHost = pstrdup(qdinfo->hostip);
 	queryParms.seqServerHostlen = strlen(qdinfo->hostip) + 1;
 	queryParms.seqServerPort = seqServerCtl->seqServerPort;
+
+	/* TODO add serialized catalog for dispatch */
+	queryParms.serializedCatalog = NULL;
+	queryParms.serializedCataloglen = 0;
 
 	/*
 	 * Dispatch the command.
@@ -1637,10 +1661,15 @@ cdbdisp_dispatchCommandToAllGangs(const char	*strCommand,
 	queryParms.primary_gang_id = primaryGang->gang_id;
 
 	/* serialized a version of our snapshot */
-	queryParms.serializedDtxContextInfo = 
-		qdSerializeDtxContextInfo(&queryParms.serializedDtxContextInfolen, true /* withSnapshot */, false /* cursor*/,
-								  generateTxnOptions(needTwoPhase), "cdbdisp_dispatchCommandToAllGangs");
-	
+	/*queryParms.serializedDtxContextInfo =
+		qdSerializeDtxContextInfo(&queryParms.serializedDtxContextInfolen, true  withSnapshot , false  cursor,
+								  generateTxnOptions(needTwoPhase), "cdbdisp_dispatchCommandToAllGangs");*/
+	/*
+	 * in gpsql, there is no distributed transaction
+	 */
+	queryParms.serializedDtxContextInfo = NULL;
+	queryParms.serializedDtxContextInfolen = 0;
+
 	readerGangs = getAllReaderGangs();
 	
 	/*
@@ -1687,6 +1716,7 @@ thread_DispatchOut(DispatchCommandParms *pParms)
 				pQueryParms->serializedParams, pQueryParms->serializedParamslen, 
 				pQueryParms->serializedSliceInfo, pQueryParms->serializedSliceInfolen, 
 				pQueryParms->serializedDtxContextInfo, pQueryParms->serializedDtxContextInfolen, 
+				pQueryParms->serializedCatalog, pQueryParms->serializedCataloglen,
 				0 /* unused flags*/, pParms->cmdID, pParms->localSlice, pQueryParms->rootIdx,
 				pQueryParms->seqServerHost, pQueryParms->seqServerHostlen, pQueryParms->seqServerPort,
 				pQueryParms->primary_gang_id,
@@ -2773,6 +2803,12 @@ processResults(CdbDispatchResult *dispatchResult)
 		/* Get one message. */
 		pRes = PQgetResult(segdbDesc->conn);
 		
+		/*
+		 * modified catalog on QE.
+		 */
+		dispatchResult->serializedCatalog = segdbDesc->conn->serializedCatalog;
+		dispatchResult->serializedCatalogLen = segdbDesc->conn->serializedCatalogLen;
+
 		CollectQEWriterTransactionInformation(segdbDesc, dispatchResult);
 
 		/*
@@ -3581,7 +3617,7 @@ cdbdisp_dispatchX(DispatchCommandQueryParms *pQueryParms,
 		sliceTbl->localSlice = oldLocalSlice;
 
 	/*
-	 * If bailed before completely dispatched, stop QEs and throw error.
+	 * If failed before completely dispatched, stop QEs and throw error.
 	 */
 	if (iSlice < nSlices)
 	{
@@ -3691,11 +3727,13 @@ cdbdisp_dispatchPlan(struct QueryDesc *queryDesc,
 {
 	char 	*splan,
 		*ssliceinfo,
-		*sparams;
+		*sparams,
+		*scatalog;
 
 	int 	splan_len,
 		ssliceinfo_len,
-		sparams_len;
+		sparams_len,
+		scatalog_len;
 
 	SliceTable *sliceTbl;
 	int			rootIdx;
@@ -3813,6 +3851,7 @@ cdbdisp_dispatchPlan(struct QueryDesc *queryDesc,
 
 	Assert(splan != NULL && splan_len > 0);
 
+	scatalog = serializeInMemCatalog(&scatalog_len);
 
 	/*
 	*/
@@ -3894,6 +3933,8 @@ cdbdisp_dispatchPlan(struct QueryDesc *queryDesc,
 	queryParms.serializedParamslen = sparams_len;
 	queryParms.serializedSliceInfo = ssliceinfo;
 	queryParms.serializedSliceInfolen= ssliceinfo_len;
+	queryParms.serializedCatalog = scatalog;
+	queryParms.serializedCataloglen = scatalog_len;
 	queryParms.rootIdx = rootIdx;
 
 	/* sequence server info */
@@ -3912,9 +3953,15 @@ cdbdisp_dispatchPlan(struct QueryDesc *queryDesc,
 	 * to decide if the special circumstances exist which allow us to
 	 * dispatch without starting a global xact.
 	 */
-	queryParms.serializedDtxContextInfo = 
-		qdSerializeDtxContextInfo(&queryParms.serializedDtxContextInfolen, true /* wantSnapshot */, queryDesc->extended_query,
-								  generateTxnOptions(planRequiresTxn), "cdbdisp_dispatchPlan");
+	/*queryParms.serializedDtxContextInfo =
+		qdSerializeDtxContextInfo(&queryParms.serializedDtxContextInfolen, true  wantSnapshot , queryDesc->extended_query,
+								  generateTxnOptions(planRequiresTxn), "cdbdisp_dispatchPlan");*/
+
+	/*
+	 * in gpsql, there is no distributed transaction
+	 */
+	queryParms.serializedDtxContextInfo = NULL;
+	queryParms.serializedDtxContextInfolen = 0;
 
 	Assert(sliceTbl);
 	Assert(sliceTbl->slices != NIL);
@@ -4330,7 +4377,7 @@ qdSerializeDtxContextInfo(int *size, bool wantSnapshot, bool inCursor, int txnOp
  *				 be started.  Certain utility statements dont want to be in a
  *				 distributed transaction.
  */
-static int
+/*static int
 generateTxnOptions(bool needTwoPhase)
 {
 	int options;
@@ -4339,7 +4386,7 @@ generateTxnOptions(bool needTwoPhase)
 		
 	return options;
 	
-}
+}*/
 
 /*
  * cdbdisp_makeDispatchThreads:
@@ -4442,6 +4489,13 @@ cdbdisp_destroyDispatchThreads(CdbDispatchCmdThreads *dThreads)
 						pfree(pQueryParms->serializedParams);
 					pQueryParms->serializedParams = NULL;
 				}
+
+				if (pQueryParms->serializedCatalog)
+				{
+					if (i == 0)
+						pfree(pQueryParms->serializedCatalog);
+					pQueryParms->serializedCatalog = NULL;
+				}
 			}
 			break;
 		
@@ -4467,5 +4521,4 @@ cdbdisp_destroyDispatchThreads(CdbDispatchCmdThreads *dThreads)
 		
 	pfree(dThreads);
 }                               /* cdbdisp_destroyDispatchThreads */
-
 

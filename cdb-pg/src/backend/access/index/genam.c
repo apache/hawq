@@ -29,6 +29,11 @@
 #include "utils/rel.h"
 #include "utils/tqual.h"
 
+#include "cdb/cdbvars.h"
+
+#include "cdb/cdbinmemheapam.h"
+#include "catalog/pg_namespace.h"
+
 
 /* ----------------------------------------------------------------
  *		general access method routines
@@ -179,7 +184,33 @@ systable_beginscan(Relation heapRelation,
 				   int nkeys, ScanKey key)
 {
 	SysScanDesc sysscan;
-	Relation	irel;
+	Relation	irel = NULL;
+	InMemHeapRelation memheap = NULL;
+
+	bool inmemonly = FALSE;
+
+	if (heapRelation->rd_rel->relnamespace == PG_AOSEGMENT_NAMESPACE
+			&& Gp_role == GP_ROLE_EXECUTE)
+		inmemonly = TRUE;
+
+	sysscan = (SysScanDesc) palloc0(sizeof(SysScanDescData));
+
+	sysscan->heap_rel = heapRelation;
+	sysscan->irel = NULL;
+
+	memheap = OidGetInMemHeapRelation(heapRelation->rd_id);
+	if (memheap && Gp_role == GP_ROLE_EXECUTE)
+		sysscan->inmemscan = InMemHeap_BeginScan(memheap, nkeys, key, inmemonly);
+	else
+		sysscan->inmemscan = NULL;
+
+	if (inmemonly && NULL == sysscan->inmemscan)
+			elog(ERROR, "initialize an in-memory only system catalog scan of %s "
+					"but in-memory table cannot be found.",
+					heapRelation->rd_rel->relname.data);
+
+	if (inmemonly || sysscan->inmemscan)
+		return sysscan;
 
 	if (indexOK &&
 		!IgnoreSystemIndexes &&
@@ -187,11 +218,6 @@ systable_beginscan(Relation heapRelation,
 		irel = index_open(indexId, AccessShareLock);
 	else
 		irel = NULL;
-
-	sysscan = (SysScanDesc) palloc(sizeof(SysScanDescData));
-
-	sysscan->heap_rel = heapRelation;
-	sysscan->irel = irel;
 
 	if (irel)
 	{
@@ -219,6 +245,8 @@ systable_beginscan(Relation heapRelation,
 		sysscan->iscan = NULL;
 	}
 
+	sysscan->irel = irel;
+
 	return sysscan;
 }
 
@@ -236,7 +264,9 @@ systable_getnext(SysScanDesc sysscan)
 {
 	HeapTuple	htup;
 
-	if (sysscan->irel)
+	if (sysscan->inmemscan && Gp_role == GP_ROLE_EXECUTE)
+		htup = InMemHeap_GetNext(sysscan->inmemscan, ForwardScanDirection);
+	else if (sysscan->irel)
 		htup = index_getnext(sysscan->iscan, ForwardScanDirection);
 	else
 		htup = heap_getnext(sysscan->scan, ForwardScanDirection);
@@ -248,8 +278,9 @@ HeapTuple
 systable_getprev(SysScanDesc sysscan)
 {
 	HeapTuple	htup;
-
-	if (sysscan->irel)
+	if (sysscan->inmemscan && Gp_role == GP_ROLE_EXECUTE)
+		htup = InMemHeap_GetNext(sysscan->inmemscan, BackwardScanDirection);
+	else if (sysscan->irel)
 		htup = index_getnext(sysscan->iscan, BackwardScanDirection);
 	else
 		htup = heap_getnext(sysscan->scan, BackwardScanDirection);
@@ -265,12 +296,14 @@ systable_getprev(SysScanDesc sysscan)
 void
 systable_endscan(SysScanDesc sysscan)
 {
+	if (sysscan->inmemscan && Gp_role == GP_ROLE_EXECUTE)
+		InMemHeap_EndScan(sysscan->inmemscan);
 	if (sysscan->irel)
 	{
 		index_endscan(sysscan->iscan);
 		index_close(sysscan->irel, AccessShareLock);
 	}
-	else
+	if (sysscan->scan)
 		heap_endscan(sysscan->scan);
 
 	pfree(sysscan);

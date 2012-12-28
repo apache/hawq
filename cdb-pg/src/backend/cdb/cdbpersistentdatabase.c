@@ -27,6 +27,7 @@
 #include "cdb/cdbpersistenttablespace.h"
 #include "cdb/cdbpersistentdatabase.h"
 #include "cdb/cdbpersistentrelation.h"
+#include "cdb/cdbvars.h"
 #include "storage/itemptr.h"
 #include "utils/hsearch.h"
 #include "storage/shmem.h"
@@ -100,6 +101,7 @@ static bool PersistentDatabase_ScanTupleCallback(
 	int64					persistentSerialNum,
 	Datum					*values)
 {
+	int4			contentid;
 	DbDirNode		dbDirNode;
 	
 	PersistentFileSysState	state;
@@ -119,6 +121,7 @@ static bool PersistentDatabase_ScanTupleCallback(
 
 	GpPersistentDatabaseNode_GetValues(
 									values,
+									&contentid,
 									&dbDirNode.tablespace,
 									&dbDirNode.database,
 									&state,
@@ -139,10 +142,11 @@ static bool PersistentDatabase_ScanTupleCallback(
 				 persistentSerialNum);
 		return true;	// Continue.
 	}
-	
+
 	addResult =
 			SharedOidSearch_Add(
 					&persistentDatabaseSharedData->databaseDirSearchTable,
+					contentid,
 					dbDirNode.database,
 					dbDirNode.tablespace,
 					(SharedOidSearchObjHeader**)&databaseDirEntry);
@@ -178,6 +182,7 @@ static bool PersistentDatabase_CheckTablespaceScanTupleCallback(
 	int64					persistentSerialNum,
 	Datum					*values)
 {
+	int4			contentid;
 	DbDirNode		dbDirNode;
 	
 	PersistentFileSysState	state;
@@ -195,6 +200,7 @@ static bool PersistentDatabase_CheckTablespaceScanTupleCallback(
 
 	GpPersistentDatabaseNode_GetValues(
 									values,
+									&contentid,
 									&dbDirNode.tablespace,
 									&dbDirNode.database,
 									&state,
@@ -295,6 +301,7 @@ void PersistentDatabase_DirIterateInit(void)
 
 
 bool PersistentDatabase_DirIterateNext(
+	int4					*contentid,
 	DbDirNode				*dbDirNode,
 
 	PersistentFileSysState	*state,
@@ -337,9 +344,10 @@ bool PersistentDatabase_DirIterateNext(
 			Assert(dirIterateDatabaseDirEntry->iteratorRefCount > 0);
 			continue;
 		}
-		
-		dbDirNode->tablespace = dirIterateDatabaseDirEntry->header.oid2;
-		dbDirNode->database = dirIterateDatabaseDirEntry->header.oid1;
+
+		*contentid = dirIterateDatabaseDirEntry->header.oid1;
+		dbDirNode->tablespace = dirIterateDatabaseDirEntry->header.oid3;
+		dbDirNode->database = dirIterateDatabaseDirEntry->header.oid2;
 
 		*persistentTid = dirIterateDatabaseDirEntry->persistentTid;
 		*persistentSerialNum = dirIterateDatabaseDirEntry->persistentSerialNum;
@@ -370,16 +378,19 @@ void PersistentDatabase_DirIterateClose(void)
 
 
 bool PersistentDatabase_DbDirExistsUnderLock(
+	int4					contentid,
 	DbDirNode				*dbDirNode)
 {
 	DatabaseDirEntry databaseDirEntry;
 	
 	PersistentDatabase_VerifyInitScan();
 
+	/* XXX:mat3: I don't this call path... */
 	databaseDirEntry =
 			(DatabaseDirEntry)
 				    SharedOidSearch_Find(
 				    		&persistentDatabaseSharedData->databaseDirSearchTable,
+							contentid,
 				    		dbDirNode->database,
 				    		dbDirNode->tablespace);
 	
@@ -439,6 +450,7 @@ extern void PersistentDatabase_Reset(void)
 // -----------------------------------------------------------------------------
 
 static void PersistentDatabase_LookupExistingDbDir(
+	int4					contentid,
 	DbDirNode				*dbDirNode,
 
 	DatabaseDirEntry 	    *databaseDirEntry)
@@ -450,6 +462,7 @@ static void PersistentDatabase_LookupExistingDbDir(
 			(DatabaseDirEntry)
 				    SharedOidSearch_Find(
 				    		&persistentDatabaseSharedData->databaseDirSearchTable,
+							contentid,
 				    		dbDirNode->database,
 				    		dbDirNode->tablespace);
 	if (*databaseDirEntry == NULL)
@@ -475,8 +488,9 @@ static void PersistentDatabase_AddTuple(
 	bool			flushToXLog)
 				/* When true, the XLOG record for this change will be flushed to disk. */
 {
-	Oid tablespaceOid = databaseDirEntry->header.oid2;
-	Oid databaseOid = databaseDirEntry->header.oid1;
+	Oid tablespaceOid = databaseDirEntry->header.oid3;
+	Oid databaseOid = databaseDirEntry->header.oid2;
+	int4 contentid = databaseDirEntry->header.oid1;
 
 	ItemPointerData previousFreeTid;
 
@@ -486,6 +500,7 @@ static void PersistentDatabase_AddTuple(
 
 	GpPersistentDatabaseNode_SetDatumValues(
 								values,
+								contentid,
 								tablespaceOid,
 								databaseOid,
 								databaseDirEntry->state,
@@ -520,6 +535,7 @@ static void PersistentDatabase_AddTuple(
  * note on XLOG flushing).
  */
 void PersistentDatabase_MarkCreatePending(
+	int4			contentid,
 	DbDirNode 		*dbDirNode,
 				/* The tablespace and database OIDs for the create. */
 
@@ -563,6 +579,7 @@ void PersistentDatabase_MarkCreatePending(
 									dbDirNode->tablespace,
 									dbDirNode->database,
 									is_tablespace_shared);
+	fsObjName.contentid = contentid;
 
 	WRITE_PERSISTENT_STATE_ORDERED_LOCK;
 
@@ -570,6 +587,7 @@ void PersistentDatabase_MarkCreatePending(
 			(DatabaseDirEntry)
 				    SharedOidSearch_Find(
 				    		&persistentDatabaseSharedData->databaseDirSearchTable,
+				    		contentid,
 				    		dbDirNode->database,
 				    		dbDirNode->tablespace);
 	if (databaseDirEntry != NULL)
@@ -582,6 +600,7 @@ void PersistentDatabase_MarkCreatePending(
 	addResult =
 		    SharedOidSearch_Add(
 		    		&persistentDatabaseSharedData->databaseDirSearchTable,
+					contentid,
 		    		dbDirNode->database,
 		    		dbDirNode->tablespace,
 		    		(SharedOidSearchObjHeader**)&databaseDirEntry);
@@ -615,7 +634,7 @@ void PersistentDatabase_MarkCreatePending(
 	 * This XLOG must be generated under the persistent write-lock.
 	 */
 #ifdef MASTER_MIRROR_SYNC
-	mmxlog_log_create_database(dbDirNode->tablespace, dbDirNode->database); 
+	mmxlog_log_create_database(contentid, dbDirNode->tablespace, dbDirNode->database); 
 #endif
 
 
@@ -672,10 +691,16 @@ void PersistentDatabase_AddCreated(
 
 	WRITE_PERSISTENT_STATE_ORDERED_LOCK;
 
+	/*
+	 * GpIdentity.segindex
+	 *	In the initdb, GpIdentity.segindex is set to -10000. It will update this
+	 *	value to the correct GpIdentity.segindex.
+	 */
 	databaseDirEntry =
 			(DatabaseDirEntry)
 				    SharedOidSearch_Find(
 				    		&persistentDatabaseSharedData->databaseDirSearchTable,
+							GpIdentity.segindex,
 				    		dbDirNode->database,
 				    		dbDirNode->tablespace);
 	if (databaseDirEntry != NULL)
@@ -688,6 +713,7 @@ void PersistentDatabase_AddCreated(
 	addResult =
 		    SharedOidSearch_Add(
 		    		&persistentDatabaseSharedData->databaseDirSearchTable,
+					GpIdentity.segindex,
 		    		dbDirNode->database,
 		    		dbDirNode->tablespace,
 		    		(SharedOidSearchObjHeader**)&databaseDirEntry);
@@ -739,8 +765,10 @@ xlog_create_database(DbDirNode *db)
 
 	WRITE_PERSISTENT_STATE_ORDERED_LOCK;
 
+	/* XXX:mat3: I'll fix it later when I'm dealing with recovery. */
 	dbe = (DatabaseDirEntry) SharedOidSearch_Find(
 				    	&persistentDatabaseSharedData->databaseDirSearchTable,
+				    							  -1,
 				    							  db->database,
 				    							  db->tablespace);
 	if (dbe != NULL)
@@ -751,8 +779,10 @@ xlog_create_database(DbDirNode *db)
 				   db->tablespace),
 		     PersistentFileSysObjState_Name(dbe->state));
 
+	/* XXX:mat3: I'll fix it later when I'm dealing with recovery. */
 	addResult = SharedOidSearch_Add(
 		    		&persistentDatabaseSharedData->databaseDirSearchTable,
+					-1,
 		    		db->database,
 		    		db->tablespace,
 		    		(SharedOidSearchObjHeader**)&dbe);
@@ -822,6 +852,7 @@ void PersistentDatabase_Created(
 	WRITE_PERSISTENT_STATE_ORDERED_LOCK;
 
 	PersistentDatabase_LookupExistingDbDir(
+									fsObjName->contentid,
 									dbDirNode,
 									&databaseDirEntry);
 
@@ -1068,6 +1099,7 @@ PersistentFileSysObjStateChangeResult PersistentDatabase_MarkDropPending(
 	WRITE_PERSISTENT_STATE_ORDERED_LOCK;
 
 	PersistentDatabase_LookupExistingDbDir(
+									fsObjName->contentid,
 									dbDirNode,
 									&databaseDirEntry);
 
@@ -1147,6 +1179,7 @@ PersistentFileSysObjStateChangeResult PersistentDatabase_MarkAbortingCreate(
 	WRITE_PERSISTENT_STATE_ORDERED_LOCK;
 
 	PersistentDatabase_LookupExistingDbDir(
+								fsObjName->contentid,
 								dbDirNode,
 								&databaseDirEntry);
 
@@ -1210,7 +1243,7 @@ PersistentDatabase_DroppedVerifiedActionCallback(
 		 * This XLOG must be generated under the persistent write-lock.
 		 */
 #ifdef MASTER_MIRROR_SYNC
-		mmxlog_log_remove_database(dbDirNode->tablespace, dbDirNode->database);
+		mmxlog_log_remove_database(fsObjName->contentid, dbDirNode->tablespace, dbDirNode->database);
 #endif
 				
 		break;
@@ -1262,6 +1295,7 @@ void PersistentDatabase_Dropped(
 	WRITE_PERSISTENT_STATE_ORDERED_LOCK;
 
 	PersistentDatabase_LookupExistingDbDir(
+								fsObjName->contentid,
 								dbDirNode,
 								&databaseDirEntry);
 
@@ -1304,7 +1338,7 @@ void PersistentDatabase_Dropped(
 }
 
 bool 
-PersistentDatabase_DirIsCreated(DbDirNode *dbDirNode)
+PersistentDatabase_DirIsCreated(int4 contentid, DbDirNode *dbDirNode)
 {
 	READ_PERSISTENT_STATE_ORDERED_LOCK_DECLARE;
 
@@ -1331,10 +1365,13 @@ PersistentDatabase_DirIsCreated(DbDirNode *dbDirNode)
 
 	READ_PERSISTENT_STATE_ORDERED_LOCK;
 
+
+	/* XXX:mat3: I'll fix it later when I'm dealing with recovery. */
 	databaseDirEntry =
 			(DatabaseDirEntry)
 				    SharedOidSearch_Find(
 				    		&persistentDatabaseSharedData->databaseDirSearchTable,
+				    		contentid,
 				    		dbDirNode->database,
 				    		dbDirNode->tablespace);
 	result = (databaseDirEntry != NULL);
@@ -1353,6 +1390,7 @@ PersistentDatabase_DirIsCreated(DbDirNode *dbDirNode)
 }
 		
 void PersistentDatabase_MarkJustInTimeCreatePending(
+	int4			contentid,
 	DbDirNode		*dbDirNode,
 
 	MirroredObjectExistenceState 	mirrorExistenceState,
@@ -1389,10 +1427,12 @@ void PersistentDatabase_MarkJustInTimeCreatePending(
 
 	WRITE_PERSISTENT_STATE_ORDERED_LOCK;
 
+	fsObjName.contentid = contentid;
 	databaseDirEntry =
 			(DatabaseDirEntry)
 				    SharedOidSearch_Find(
 				    		&persistentDatabaseSharedData->databaseDirSearchTable,
+				    		fsObjName.contentid,
 				    		dbDirNode->database,
 				    		dbDirNode->tablespace);
 	if (databaseDirEntry != NULL)
@@ -1410,6 +1450,7 @@ void PersistentDatabase_MarkJustInTimeCreatePending(
 	addResult =
 			SharedOidSearch_Add(
 					&persistentDatabaseSharedData->databaseDirSearchTable,
+					fsObjName.contentid,
 					dbDirNode->database,
 					dbDirNode->tablespace,
 					(SharedOidSearchObjHeader**)&databaseDirEntry);
@@ -1440,12 +1481,10 @@ void PersistentDatabase_MarkJustInTimeCreatePending(
 
 	/*
 	 * This XLOG must be generated under the persistent write-lock.
-	 *
-	 * UNDONE: Just-in-time creation is a strange case.  What if we can't create
-	 * the directory??
 	 */
 #ifdef MASTER_MIRROR_SYNC
-	mmxlog_log_create_database(dbDirNode->tablespace,
+	mmxlog_log_create_database(fsObjName.contentid,
+							   dbDirNode->tablespace,
 							   dbDirNode->database);	
 #endif
 	
@@ -1464,6 +1503,7 @@ void PersistentDatabase_MarkJustInTimeCreatePending(
  * Indicate the non-transaction just-in-time database create was successful.
  */
 void PersistentDatabase_JustInTimeCreated(
+	int4			contentid,
 	DbDirNode 		*dbDirNode,
 
 	ItemPointer		persistentTid,
@@ -1496,10 +1536,12 @@ void PersistentDatabase_JustInTimeCreated(
 	PersistentDatabase_VerifyInitScan();
 
 	PersistentFileSysObjName_SetDatabaseDir(&fsObjName,dbDirNode->tablespace,dbDirNode->database,is_tablespace_shared);
+	fsObjName.contentid = contentid;
 
 	WRITE_PERSISTENT_STATE_ORDERED_LOCK;
 
 	PersistentDatabase_LookupExistingDbDir(
+								fsObjName.contentid,
 								dbDirNode,
 								&databaseDirEntry);
 
@@ -1538,6 +1580,7 @@ void PersistentDatabase_JustInTimeCreated(
  * Indicate the non-transaction just-in-time database create was NOT successful.
  */
 void PersistentDatabase_AbandonJustInTimeCreatePending(
+	int4			contentid,
 	DbDirNode 		*dbDirNode,
 
 	ItemPointer 	persistentTid,
@@ -1570,10 +1613,12 @@ void PersistentDatabase_AbandonJustInTimeCreatePending(
 	PersistentDatabase_VerifyInitScan();
 
 	PersistentFileSysObjName_SetDatabaseDir(&fsObjName,dbDirNode->tablespace,dbDirNode->database,is_tablespace_shared);
+	fsObjName.contentid = contentid;
 
 	WRITE_PERSISTENT_STATE_ORDERED_LOCK;
 
 	PersistentDatabase_LookupExistingDbDir(
+								fsObjName.contentid,
 								dbDirNode,
 								&databaseDirEntry);
 
@@ -1634,7 +1679,7 @@ static Size PersistentDatabase_SharedDataSize(void)
 Size PersistentDatabase_ShmemSize(void)
 {
 	if (MaxPersistentDatabaseDirectories == 0)
-		MaxPersistentDatabaseDirectories = gp_max_databases * gp_max_tablespaces;
+		MaxPersistentDatabaseDirectories = gp_max_databases * gp_max_tablespaces * (GpIdentity.numsegments != MASTER_CONTENT_ID ? 1 : GpIdentity.numsegments + 1);
 
 	/* The shared-memory structure. */
 	return PersistentDatabase_SharedDataSize();

@@ -723,6 +723,7 @@ class GpAddMirrorsProgram:
 
     @staticmethod
     def createProgram(options, args):
+        raise ExceptionNoStackTraceNeeded("add mirrors NOT SUPPORTED YET IN GPSQL")
         if len(args) > 0 :
             raise ProgramArgumentValidationException("too many arguments: only options may be specified", True)
         return GpAddMirrorsProgram(options)

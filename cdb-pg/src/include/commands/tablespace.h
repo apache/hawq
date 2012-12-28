@@ -59,7 +59,7 @@ extern bool directory_is_empty(const char *path);
 
 extern void tblspc_redo(XLogRecPtr beginLoc, XLogRecPtr lsn, XLogRecord *rptr);
 extern void tblspc_desc(StringInfo buf, XLogRecPtr beginLoc, XLogRecord *record);
-extern void set_short_version(const char *path, DbDirNode *dbDirNode,
+extern void set_short_version(int4 contentid, const char *path, DbDirNode *dbDirNode,
 							  bool mirror);
 
 #endif   /* TABLESPACE_H */

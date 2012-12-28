@@ -1236,6 +1236,9 @@ if __name__ == '__main__':
     coverage = GpCoverage()
     coverage.start()
     
+    logger.fatal('gpmigrator_mirror NOT SUPPORTED YET IN GPSQL')
+    sys.exit(1)
+    
     # Create a new GPUpgrade - should never throw exception
     u = GPUpgrade()
     

@@ -24,9 +24,11 @@ extern bool PersistentTablespace_Check(
 	Oid 			tablespace);
 
 extern PersistentFileSysState PersistentTablespace_GetState(
+	int4	contentid,
 	Oid 	tablespaceOid);
 
 extern void PersistentTablespace_LookupTidAndSerialNum(
+	int4		contentid,
 	Oid 		tablespaceOid,
 				/* The tablespace OID for the lookup. */
 
@@ -49,6 +51,7 @@ typedef enum PersistentTablespaceGetFilespaces
 } PersistentTablespaceGetFilespaces;
 				
 extern PersistentTablespaceGetFilespaces PersistentTablespace_TryGetPrimaryAndMirrorFilespaces(
+	int4		contentid,
 	Oid 		tablespaceOid,
 				/* The tablespace OID for the create. */
 
@@ -62,8 +65,12 @@ extern PersistentTablespaceGetFilespaces PersistentTablespace_TryGetPrimaryAndMi
 	Oid *filespaceOid);
 
 extern void PersistentTablespace_GetPrimaryAndMirrorFilespaces(
+	int4		contentid,
+
 	Oid 		tablespaceOid,
 				/* The tablespace OID for the create. */
+
+	bool 		needDispatchedTablespaceInfo,
 
 	char **primaryFilespaceLocation,
 				/* The primary filespace directory path.  Return NULL for global and base. */
@@ -83,6 +90,7 @@ extern void PersistentTablespace_GetPrimaryAndMirrorFilespaces(
  * note on XLOG flushing).
  */
 extern void PersistentTablespace_MarkCreatePending(
+	int4		contentid,
 	Oid 		filespaceOid,
 				/* The filespace where the tablespace lives. */
 
@@ -174,6 +182,7 @@ extern void PersistentTablespace_Dropped(
 // Re-build tablespace persistent table 'gp_persistent_tablespace_node'
 // -----------------------------------------------------------------------------
 extern void PersistentTablespace_AddCreated(
+											 int4		contentid,
 											 Oid 		filespaceOid,
 											 /* The filespace where the tablespace lives. */
 											 
@@ -206,7 +215,7 @@ extern void PersistentTablespace_ActivateStandby(int16 oldmaster,
 												 int16 newmaster);
 extern void xlog_persistent_tablespace_create(Oid filespaceoid,
 											  Oid tablespaceoid);
-extern Oid PersistentTablespace_GetFileSpaceOid(Oid tablespaceOid);
+extern Oid PersistentTablespace_GetFileSpaceOid(int4 contentid, Oid tablespaceOid);
 
 extern void xlog_persistent_tablespace_create(Oid filespaceoid,
 											  Oid tablespaceoid);

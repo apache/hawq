@@ -33,6 +33,8 @@
 #include "utils/syscache.h"
 #include "utils/guc.h"
 
+#include "cdb/cdbvars.h"
+
 static bool create_toast_table(Relation rel, Oid toastOid, Oid toastIndexOid,
 							   Oid *comptypeOid, bool is_part_child);
 
@@ -413,6 +415,19 @@ RelationNeedsToastTable(Relation rel)
 	if(RelationIsExternal(rel))
 		return false;
 	
+	/*
+	 * in gpsql, we cannot use toast table for dispatched table.
+	 */
+	if (RelationIsAoRows(rel) || RelationIsAoCols(rel))
+		return false ;
+
+	if (!IsBootstrapProcessingMode() && Gp_role == GP_ROLE_DISPATCH)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+						errmsg("toast table is not supported in gpsql")));
+	}
+
 	tupdesc = rel->rd_att;
 	att = tupdesc->attrs;
 

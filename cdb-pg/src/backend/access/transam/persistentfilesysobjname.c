@@ -155,6 +155,11 @@ int PersistentFileSysObjName_Compare(
 	int compareLen = 0;
 	int cmp;
 
+	if (name1->contentid > name2->contentid)
+		return 1;
+	else if (name1->contentid < name2->contentid)
+		return -1;
+
 	if (name1->type == name2->type)
 	{		
 		switch (name1->type)

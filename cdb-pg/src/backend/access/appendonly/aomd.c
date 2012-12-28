@@ -28,6 +28,7 @@
 #include "access/appendonlytid.h"
 #include "cdb/cdbappendonlystorage.h"
 #include "cdb/cdbmirroredappendonly.h"
+#include "cdb/cdbvars.h"
 
 int
 AOSegmentFilePathNameLen(Relation rel)
@@ -140,6 +141,7 @@ OpenAOSegmentFile(
 	if (!ReadGpRelationNode(
 				rel->rd_node.relNode,
 				segmentFileNum,
+				GpIdentity.segindex,
 				&persistentTid,
 				&persistentSerialNum))
 	{
@@ -158,11 +160,12 @@ OpenAOSegmentFile(
 							mirroredOpen, 
 							&rel->rd_node,
 							segmentFileNum,
+							/*
+							 * TODO, in gpsql, fix later
+							 */
+							GpIdentity.segindex,
 							/* relationName */ NULL,		// Ok to be NULL -- we don't know the name here.
 							logicalEof,
-							/* traceOpenFlags */ false,
-							&persistentTid,
-							persistentSerialNum,
 							true,
 							&primaryError);
 	if (primaryError != 0)
@@ -182,13 +185,13 @@ OpenAOSegmentFile(
 void
 CloseAOSegmentFile(MirroredAppendOnlyOpen *mirroredOpen)
 {
-	bool mirrorDataLossOccurred;	// UNDONE: We need to do something now...
+	/*bool mirrorDataLossOccurred;*/	// UNDONE: We need to do something now...
 
 	Assert(mirroredOpen->primaryFile > 0);
 	
 	MirroredAppendOnly_Close(
-						mirroredOpen,
-						&mirrorDataLossOccurred);
+						mirroredOpen/*,
+						&mirrorDataLossOccurred*/);
 }
 
 /*
@@ -198,7 +201,7 @@ void
 TruncateAOSegmentFile(MirroredAppendOnlyOpen *mirroredOpen, Relation rel, int64 offset, int elevel)
 {
 	int primaryError;
-	bool mirrorDataLossOccurred;	// We'll look at this at close time.
+	/*bool mirrorDataLossOccurred;*/	// We'll look at this at close time.
 
 	char *relname = RelationGetRelationName(rel);
 	
@@ -212,8 +215,8 @@ TruncateAOSegmentFile(MirroredAppendOnlyOpen *mirroredOpen, Relation rel, int64 
 	MirroredAppendOnly_Truncate(
 							mirroredOpen,
 							offset,
-							&primaryError,
-							&mirrorDataLossOccurred);
+							&primaryError/*,
+							&mirrorDataLossOccurred*/);
 	if (primaryError != 0)
 		ereport(elevel,
 				(errmsg("\"%s\": failed to truncate data after eof: %s", 

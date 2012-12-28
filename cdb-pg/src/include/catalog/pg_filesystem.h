@@ -133,6 +133,14 @@ typedef FormData_pg_filesystem *Form_pg_filesystem;
 #define Anum_pg_filesystem_fsystrusted			19
 #define Anum_pg_filesystem_fsysacl				20
 
+/* ----------------
+ *		initial contents of pg_filesystem
+ *
+ * NOTE: only "bootstrapped" relations need to be declared here.  Be sure that
+ * the OIDs listed here match those given in their CATALOG macros, and that
+ * the relnatts values are correct.
+ * ----------------
+ */
 
 /* TIDYCAT_END_CODEGEN */
 

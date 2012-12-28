@@ -16,6 +16,7 @@
 #include "catalog/pg_index.h"
 #include "catalog/pg_opclass.h"
 #include "utils/builtins.h"
+#include "cdb/cdbvars.h"
 
 /*
  * pg_class.
@@ -111,9 +112,9 @@ static FormData_pg_attribute
 							{Schema_gp_global_sequence};
 
 DirectOpenDefineStatic(DirectOpen_GpGlobalSequence,\
-GlobalSequence_PgClass,\
-GlobalSequence_AttrArray,\
-false);
+		GlobalSequence_PgClass,\
+		GlobalSequence_AttrArray,\
+		false);
 
 /*
  * gp_persistent_relation_node.
@@ -417,6 +418,27 @@ Relation DirectOpen_Open(
 		direct->pgStat.t_shared = 1;
 
 		direct->relationData.pgstat_info = &direct->pgStat;
+
+		if (!IsBootstrapProcessingMode() && Gp_role == GP_ROLE_DISPATCH)
+		{
+			direct->relationData.rd_segfile0_count = 1 + GpIdentity.numsegments;
+		} else
+		{
+			direct->relationData.rd_segfile0_count = 1;
+		}
+		direct->relationData.rd_segfile0_relationnodeinfos =
+				MemoryContextAllocZero(TopMemoryContext, direct->relationData.rd_segfile0_count
+						* sizeof(struct RelationNodeInfo ));
+		{
+			int i;
+			for (i = 0; i < direct->relationData.rd_segfile0_count; ++i)
+			{
+				direct->relationData.rd_segfile0_relationnodeinfos[i].isPresent =
+						FALSE;
+				direct->relationData.rd_segfile0_relationnodeinfos[i].tidAllowedToBeZero =
+						FALSE;
+			}
+		}
 
 		direct->isInit = true;
 	}

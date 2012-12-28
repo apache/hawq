@@ -102,6 +102,7 @@ static char *authmethod = "";
 static bool debug = false;
 static bool noclean = false;
 static char *backend_output = DEVNULL;
+static int	contentid = -10000;
 
 /**
  * Build the minimal set of files needed for a mirror db.  Note that this could be removed
@@ -198,7 +199,7 @@ static void set_short_version(char *short_version, char *extrapath);
 static void set_null_conf(void);
 static void test_config_settings(void);
 static void setup_config(void);
-static void bootstrap_template1(char *short_version);
+static void bootstrap_template0(char *short_version);
 static void setup_auth(void);
 static void get_set_pwd(void);
 static void setup_depend(void);
@@ -1541,10 +1542,10 @@ setup_config(void)
 
 
 /*
- * run the BKI script in bootstrap mode to create template1
+ * run the BKI script in bootstrap mode to create template0
  */
 static void
-bootstrap_template1(char *short_version)
+bootstrap_template0(char *short_version)
 {
 	PG_CMD_DECL;
 	char	  **line;
@@ -1552,7 +1553,7 @@ bootstrap_template1(char *short_version)
 	char	  **bki_lines;
 	char		headerline[MAXPGPATH];
 
-	printf(_("creating template1 database in %s/base/1 ... "), pg_data);
+	printf(_("creating template0 database in %s/base/1 ... "), pg_data);
 	fflush(stdout);
 
 	if (debug)
@@ -1653,7 +1654,7 @@ setup_auth(void)
 	fflush(stdout);
 
 	snprintf(cmd, sizeof(cmd),
-			 "\"%s\" %s template1 >%s",
+			 "\"%s\" %s template0 >%s",
 			 backend_exec, backend_options,
 			 backend_output);
 
@@ -1733,7 +1734,7 @@ get_set_pwd(void)
 	fflush(stdout);
 
 	snprintf(cmd, sizeof(cmd),
-			 "\"%s\" %s template1 >%s",
+			 "\"%s\" %s template0 >%s",
 			 backend_exec, backend_options,
 			 backend_output);
 
@@ -1827,7 +1828,7 @@ setup_depend(void)
 	fflush(stdout);
 
 	snprintf(cmd, sizeof(cmd),
-			 "\"%s\" %s template1 >%s",
+			 "\"%s\" %s template0 >%s",
 			 backend_exec, backend_options,
 			 backend_output);
 
@@ -1860,7 +1861,7 @@ setup_sysviews(void)
 	 * We use -j here to avoid backslashing stuff in system_views.sql
 	 */
 	snprintf(cmd, sizeof(cmd),
-			 "\"%s\" %s -j template1 >%s",
+			 "\"%s\" %s -j template0 >%s",
 			 backend_exec, backend_options,
 			 backend_output);
 
@@ -1891,7 +1892,7 @@ setup_description(void)
 	fflush(stdout);
 
 	snprintf(cmd, sizeof(cmd),
-			 "\"%s\" %s template1 >%s",
+			 "\"%s\" %s template0 >%s",
 			 backend_exec, backend_options,
 			 backend_output);
 
@@ -1943,7 +1944,7 @@ setup_conversion(void)
 	fflush(stdout);
 
 	snprintf(cmd, sizeof(cmd),
-			 "\"%s\" %s template1 >%s",
+			 "\"%s\" %s template0 >%s",
 			 backend_exec, backend_options,
 			 backend_output);
 
@@ -1994,7 +1995,7 @@ setup_privileges(void)
 	fflush(stdout);
 
 	snprintf(cmd, sizeof(cmd),
-			 "\"%s\" %s template1 >%s",
+			 "\"%s\" %s template0 >%s",
 			 backend_exec, backend_options,
 			 backend_output);
 
@@ -2057,7 +2058,7 @@ setup_schema(void)
 	 * We use -j here to avoid backslashing stuff in information_schema.sql
 	 */
 	snprintf(cmd, sizeof(cmd),
-			 "\"%s\" %s -j template1 >%s",
+			 "\"%s\" %s -j template0 >%s",
 			 backend_exec, backend_options,
 			 backend_output);
 
@@ -2074,7 +2075,7 @@ setup_schema(void)
 	PG_CMD_CLOSE;
 
 	snprintf(cmd, sizeof(cmd),
-			 "\"%s\" %s template1 >%s",
+			 "\"%s\" %s template0 >%s",
 			 backend_exec, backend_options,
 			 backend_output);
 
@@ -2116,7 +2117,7 @@ setup_cdb_schema(void)
 	 * information_schema.sql
 	 */
 	snprintf(cmd, sizeof(cmd),
-			 "\"%s\" %s -j template1 >%s",
+			 "\"%s\" %s -j template0 >%s",
 			 backend_exec, backend_options,
 			 backend_output);
 
@@ -2133,7 +2134,7 @@ setup_cdb_schema(void)
 	PG_CMD_CLOSE;
 
 	snprintf(cmd, sizeof(cmd),
-			 "\"%s\" %s template1 >%s",
+			 "\"%s\" %s template0 >%s",
 			 backend_exec, backend_options,
 			 backend_output);
 
@@ -2148,12 +2149,12 @@ setup_gp_persistent_tables(void)
 {
 	PG_CMD_DECL;
 
-	fprintf(stdout, _("loading file-system persistent tables for template1 (mirrored = %s) ... \n"), 
+	fprintf(stdout, _("loading file-system persistent tables for template0 (mirrored = %s) ... \n"), 
 		    (gIsFileRepMirrored  ? "true" : "false"));
 	fflush(stdout);
 
 	snprintf(cmd, sizeof(cmd),
-			 "\"%s\" %s -c gp_before_persistence_work=on template1 >%s",
+			 "\"%s\" %s -c gp_before_persistence_work=on template0 >%s",
 			 backend_exec, backend_options,
 			 backend_output);
 
@@ -2169,18 +2170,18 @@ setup_gp_persistent_tables(void)
 
 
 /*
- * clean everything up in template1
+ * clean everything up in template0
  */
 static void
 vacuum_db(void)
 {
 	PG_CMD_DECL;
 
-	fputs(_("vacuuming database template1 ... "), stdout);
+	fputs(_("vacuuming database template0 ... "), stdout);
 	fflush(stdout);
 
 	snprintf(cmd, sizeof(cmd),
-			 "\"%s\" %s template1 >%s",
+			 "\"%s\" %s template0 >%s",
 			 backend_exec, backend_options,
 			 backend_output);
 
@@ -2283,6 +2284,34 @@ make_postgres(void)
 
 	for (line = postgres_setup; *line; line++)
 		PG_CMD_PUTS(*line);
+
+	PG_CMD_CLOSE;
+
+	check_ok();
+}
+
+static void
+update_contentid(void)
+{
+	PG_CMD_DECL;
+	char content[16];
+
+	fputs(_("updating content id ... "), stdout);
+	fflush(stdout);
+
+	snprintf(cmd, sizeof(cmd),
+			 "\"%s\" %s template0 >%s",
+			 backend_exec, backend_options,
+			 backend_output);
+
+	snprintf(content, sizeof(content), "%d", contentid);
+
+	PG_CMD_OPEN;
+
+	PG_CMD_PUTS("SET gp_permit_persistent_metadata_update TO true;\n");
+	PG_CMD_PUTS("UPDATE gp_persistent_database_node SET contentid = ");
+	PG_CMD_PUTS(content);
+	PG_CMD_PUTS(" WHERE contentid = -10000\n");
 
 	PG_CMD_CLOSE;
 
@@ -2798,6 +2827,7 @@ main(int argc, char *argv[])
 		{"show", no_argument, NULL, 's'},
 		{"noclean", no_argument, NULL, 'n'},
 		{"xlogdir", required_argument, NULL, 'X'},
+		{"content_id", required_argument, NULL, 1006},
 		{NULL, 0, NULL, 0}
 	};
 
@@ -2972,6 +3002,9 @@ main(int argc, char *argv[])
                 break;
 			case 1005:
 				backend_output = xstrdup(optarg);
+				break;
+			case 1006:
+				contentid = atoi(optarg);
 				break;
 			default:
 				/* getopt_long already emitted a complaint */
@@ -3488,8 +3521,8 @@ main(int argc, char *argv[])
 		sprintf(backend_options, backend_options_format,
 			    ((gIsFileRepMirrored  ? "true" : "false")));
 
-		/* Bootstrap template1 */
-		bootstrap_template1(short_version);
+		/* Bootstrap template0 */
+		bootstrap_template0(short_version);
 
 		/*
 		 * Make the per-database PG_VERSION for template1 only after init'ing it
@@ -3525,9 +3558,15 @@ main(int argc, char *argv[])
 
 		vacuum_db();
 
-		make_template0();
+		/* XXX:mat3: The following databases will skip in local creation. */
+		if (false)
+		{
+			make_template0();
 
-		make_postgres();
+			make_postgres();
+		}
+
+		update_contentid();
 	}
 
 	if (authwarning != NULL)

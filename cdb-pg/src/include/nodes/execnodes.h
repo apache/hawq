@@ -333,7 +333,7 @@ typedef struct EState
 
 	/* Stuff used for SELECT INTO: */
 	Relation	es_into_relation_descriptor;
-	bool		es_into_relation_is_bulkload;
+	bool		es_into_relation_is_bulkload; /* always false in gpsql */
 
 	ItemPointerData es_into_relation_last_heap_tid;
 

@@ -66,6 +66,7 @@
 #include "cdb/cdbmotion.h"
 #include "cdb/cdbsreh.h"
 #include "cdb/memquota.h"
+#include "cdb/cdbsrlz.h"
 #include "catalog/catalog.h" // isMasterOnly()
 #include "executor/spi.h"
 #include "utils/elog.h"
@@ -88,6 +89,9 @@ int			NIndexTupleProcessed;
 static EState *InternalCreateExecutorState(MemoryContext qcontext,
 										   bool is_subquery);
 static void ShutdownExprContext(ExprContext *econtext);
+
+static void
+collectAndUpdateCatalog(CdbDispatchResults *primaryResults, void *ctx);
 
 
 /* ----------------------------------------------------------------
@@ -2053,7 +2057,7 @@ void mppExecutorFinishup(QueryDesc *queryDesc)
 		 * error, report it and exit to our error handler via PG_THROW.
 		 * NB: This call doesn't wait, because we already waited above.
 		 */
-		cdbdisp_finishCommand(estate->dispatcherState, NULL, NULL);
+		cdbdisp_finishCommand(estate->dispatcherState, collectAndUpdateCatalog, NULL);
 	}
 
 	/* Teardown the Interconnect */
@@ -2460,4 +2464,23 @@ int RootSliceIndex(EState *estate)
 	}
 
 	return result;
+}
+
+/* update returned catalog */
+void
+collectAndUpdateCatalog(CdbDispatchResults * primaryResults, void *ctx)
+{
+	int i;
+	CdbDispatchResult * dispatchResult;
+
+	for (i = 0 ; i < primaryResults->resultCount; ++i)
+	{
+		dispatchResult = & primaryResults->resultArray[i];
+
+		if (dispatchResult->serializedCatalog != NULL
+				&& dispatchResult->serializedCatalogLen > 0)
+			deserializeAndUpdateCatalog(dispatchResult->serializedCatalog,
+
+					dispatchResult->serializedCatalogLen);
+	}
 }

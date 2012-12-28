@@ -230,8 +230,8 @@ inline static void xl_btreetid_set(
 	OffsetNumber itup_off)
 {
 	btreeid->node = rel->rd_node;
-	btreeid->persistentTid = rel->rd_segfile0_relationnodeinfo.persistentTid;
-	btreeid->persistentSerialNum = rel->rd_segfile0_relationnodeinfo.persistentSerialNum;
+	btreeid->persistentTid = rel->rd_segfile0_relationnodeinfos[0].persistentTid;
+	btreeid->persistentSerialNum = rel->rd_segfile0_relationnodeinfos[0].persistentSerialNum;
 	ItemPointerSet(&(btreeid->tid), itup_blkno, itup_off);
 }
 
@@ -248,8 +248,8 @@ inline static void xl_btreenode_set(
 	Relation rel)
 {
 	btreenode->node = rel->rd_node;
-	btreenode->persistentTid = rel->rd_segfile0_relationnodeinfo.persistentTid;
-	btreenode->persistentSerialNum = rel->rd_segfile0_relationnodeinfo.persistentSerialNum;
+	btreenode->persistentTid = rel->rd_segfile0_relationnodeinfos[0].persistentTid;
+	btreenode->persistentSerialNum = rel->rd_segfile0_relationnodeinfos[0].persistentSerialNum;
 }
 
 

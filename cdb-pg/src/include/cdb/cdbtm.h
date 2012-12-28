@@ -17,6 +17,12 @@
 #include "cdb/cdbpublic.h"
 #include "nodes/plannodes.h"
 
+/*
+ * in gpsql, there is no distributed transaction,
+ * this is master's local transaction id.
+ */
+extern TransactionId DispatchedMasterTransactionId;
+
 /**
  * DTX states, used to track the state of the distributed transaction
  *   from the QD's point of view.
@@ -362,5 +368,8 @@ extern void UtilityModeCloseDtmRedoFile(void);
 extern void PleaseDebugMe(char *caller);
 
 extern void cdbtm_performDeferredRecovery(void);
+
+extern TransactionId GetMasterTransactionId(void);
+extern void SetMasterTransactionId(TransactionId xid);
 
 #endif   /* CDBTM_H */

@@ -859,6 +859,8 @@ def matchConfig(session, conf):
                 error(p.x_peer, key, correct_val)
             ok = False
     return ok
+    
+usage('ERROR: checkos NOT SUPPORTED YET IN GPSQL')
 
 coverage = GpCoverage()
 coverage.start()

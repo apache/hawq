@@ -492,12 +492,6 @@ DefineView(ViewStmt *stmt)
 	 * Now create the rules associated with the view.
 	 */
 	DefineViewRules(view, viewParse, replace, &stmt->rewriteOid);
-
-	if (Gp_role == GP_ROLE_DISPATCH)
-	{
-		CdbDispatchUtilityStatement((Node *) stmt, "DefineView");
-
-	}
 }
 
 /*
