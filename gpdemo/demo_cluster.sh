@@ -320,16 +320,6 @@ cat >> $CLUSTER_CONFIG <<-EOF
 	export TRUSTED_SHELL
 EOF
 
-cat >> $CLUSTER_CONFIG <<-EOF
-
-	# Keep max_connection settings to reasonable values for
-	# installcheck good execution.
-
-	DEFAULT_QD_MAX_CONNECT=25
-	QE_CONNECT_FACTOR=5
-
-EOF
-
 #*****************************************************************************************
 # Create environment file
 #*****************************************************************************************
