@@ -32,6 +32,7 @@
 #include "postgres.h"
 
 #include "access/genam.h"
+#include "access/catquery.h"
 #include "access/heapam.h"
 #include "access/reloptions.h"
 #include "access/xact.h"
@@ -112,7 +113,7 @@ DefineType(List *names, List *parameters, Oid newOid, Oid shadowOid)
 	char		delimiter = DEFAULT_TYPDELIM;
 	char		alignment = 'i';	/* default alignment */
 	char		storage = 'p';	/* default TOAST storage method */
-	char        typtype = 'b';
+	char        typtype = TYPTYPE_BASE;
 	Oid			inputOid;
 	Oid			outputOid;
 	Oid			receiveOid = InvalidOid;
@@ -149,10 +150,14 @@ DefineType(List *names, List *parameters, Oid newOid, Oid shadowOid)
 	 * TypeCreate will complain).  If it doesn't, create it as a shell, so
 	 * that the OID is known for use in the I/O function definitions.
 	 */
-	typoid = GetSysCacheOid(TYPENAMENSP,
-							CStringGetDatum(typeName),
-							ObjectIdGetDatum(typeNamespace),
-							0, 0);
+	typoid = caql_getoid(
+			NULL,
+			cql("SELECT oid FROM pg_type "
+				" WHERE typname = :1 "
+				" AND typnamespace = :2 ",
+				CStringGetDatum(typeName),
+				ObjectIdGetDatum(typeNamespace)));
+
 	if (!OidIsValid(typoid))
 	{
 		/*
@@ -238,7 +243,7 @@ DefineType(List *names, List *parameters, Oid newOid, Oid shadowOid)
 		{
 			elemType = typenameTypeId(NULL, defGetTypeName(defel));
 			/* disallow arrays of pseudotypes */
-			if (get_typtype(elemType) == 'p')
+			if (get_typtype(elemType) == TYPTYPE_PSEUDO)
 				ereport(ERROR,
 						(errcode(ERRCODE_DATATYPE_MISMATCH),
 						 errmsg("array element type cannot be %s",
@@ -485,7 +490,7 @@ DefineType(List *names, List *parameters, Oid newOid, Oid shadowOid)
 	 *
 	 * Create a array type only if we're not creating an internal type during upgrade.
 	 */
-	if (typtype == 'b')
+	if (typtype == TYPTYPE_BASE)
 	{
 		shadow_type = makeArrayTypeName(typeName);
 
@@ -498,7 +503,7 @@ DefineType(List *names, List *parameters, Oid newOid, Oid shadowOid)
 			   0,				/* relation kind (ditto) */
 			   GetUserId(), /* owner's ID */
 			   -1,				/* internal size */
-			   'b',				/* type-type (base type) */
+			   TYPTYPE_BASE,	/* type-type (base type) */
 			   delimiter,		/* array element delimiter */
 			   F_ARRAY_IN,		/* input procedure */
 			   F_ARRAY_OUT,		/* output procedure */
@@ -545,8 +550,9 @@ RemoveType(List *names, DropBehavior behavior, bool missing_ok)
 {
 	TypeName   *typname;
 	Oid			typeoid;
-	HeapTuple	tup;
+	Oid			typeNsp;
 	ObjectAddress object;
+	int			 fetchCount;
 
 	/* Make a TypeName so we can use standard type lookup machinery */
 	typname = makeTypeNameFromNameList(names);
@@ -576,20 +582,23 @@ RemoveType(List *names, DropBehavior behavior, bool missing_ok)
 		return;
 	}
 
-	tup = SearchSysCache(TYPEOID,
-						 ObjectIdGetDatum(typeoid),
-						 0, 0, 0);
-	if (!HeapTupleIsValid(tup))
+	typeNsp = caql_getoid_plus(
+			NULL,
+			&fetchCount,
+			NULL,
+			cql("SELECT typnamespace FROM pg_type "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(typeoid)));
+
+	if (!fetchCount)
 		elog(ERROR, "cache lookup failed for type %u", typeoid);
 
 	/* Permission check: must own type or its namespace */
 	if (!pg_type_ownercheck(typeoid, GetUserId()) &&
-	  !pg_namespace_ownercheck(((Form_pg_type) GETSTRUCT(tup))->typnamespace,
-							   GetUserId()))
+		!pg_namespace_ownercheck(typeNsp, GetUserId()))
 		aclcheck_error(ACLCHECK_NOT_OWNER, ACL_KIND_TYPE,
 					   TypeNameToString(typname));
 
-	ReleaseSysCache(tup);
 
 	/*
 	 * Remove any storage encoding
@@ -615,7 +624,7 @@ void
 RemoveTypeById(Oid typeOid)
 {
 	Relation	relation;
-	HeapTuple	tup;
+	cqContext	cqc;
 
 	/* 
 	 * It might look like the call in RemoveType() is enough for
@@ -626,15 +635,15 @@ RemoveTypeById(Oid typeOid)
 
 	relation = heap_open(TypeRelationId, RowExclusiveLock);
 
-	tup = SearchSysCache(TYPEOID,
-						 ObjectIdGetDatum(typeOid),
-						 0, 0, 0);
-	if (!HeapTupleIsValid(tup))
+	if (0 ==
+		caql_getcount(
+			caql_addrel(cqclr(&cqc), relation),
+			cql("DELETE FROM pg_type "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(typeOid))))
+	{
 		elog(ERROR, "cache lookup failed for type %u", typeOid);
-
-	simple_heap_delete(relation, &tup->t_self);
-
-	ReleaseSysCache(tup);
+	}
 
 	heap_close(relation,  Gp_role == GP_ROLE_DISPATCH ? NoLock : RowExclusiveLock);
 }
@@ -715,7 +724,7 @@ DefineDomain(CreateDomainStmt *stmt)
 	 * might be made to work in the future, but not today.
 	 */
 	typtype = baseType->typtype;
-	if (typtype != 'b' && typtype != 'd')
+	if (typtype != TYPTYPE_BASE && typtype != TYPTYPE_DOMAIN)
 		ereport(ERROR,
 				(errcode(ERRCODE_DATATYPE_MISMATCH),
 				 errmsg("\"%s\" is not a valid base type for a domain",
@@ -910,7 +919,7 @@ DefineDomain(CreateDomainStmt *stmt)
 				   0,			/* relation kind (ditto) */
 				   GetUserId(), /* owner's ID */
 				   internalLength,		/* internal size */
-				   'd',			/* type-type (domain type) */
+				   TYPTYPE_DOMAIN,		/* type-type (domain type) */
 				   delimiter,	/* array element delimiter */
 				   inputProcedure,		/* input procedure */
 				   outputProcedure,		/* output procedure */
@@ -961,7 +970,7 @@ DefineDomain(CreateDomainStmt *stmt)
 	/*
 	 * Now we can clean up.
 	 */
-	ReleaseSysCache(typeTup);
+	ReleaseType(typeTup);
 
 	if (Gp_role == GP_ROLE_DISPATCH)
 	{
@@ -984,6 +993,7 @@ RemoveDomain(List *names, DropBehavior behavior, bool missing_ok)
 	HeapTuple	tup;
 	char		typtype;
 	ObjectAddress object;
+	cqContext  *pcqCtx;
 
 	/* Make a TypeName so we can use standard type lookup machinery */
 	typname = makeTypeNameFromNameList(names);
@@ -1013,9 +1023,14 @@ RemoveDomain(List *names, DropBehavior behavior, bool missing_ok)
 		return;
 	}
 
-	tup = SearchSysCache(TYPEOID,
-						 ObjectIdGetDatum(typeoid),
-						 0, 0, 0);
+	pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_type "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(typeoid)));
+
+	tup = caql_getnext(pcqCtx);
+
 	if (!HeapTupleIsValid(tup))
 		elog(ERROR, "cache lookup failed for type %u", typeoid);
 
@@ -1029,14 +1044,14 @@ RemoveDomain(List *names, DropBehavior behavior, bool missing_ok)
 	/* Check that this is actually a domain */
 	typtype = ((Form_pg_type) GETSTRUCT(tup))->typtype;
 
-	if (typtype != 'd')
+	if (typtype != TYPTYPE_DOMAIN)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("\"%s\" is not a domain",
 						TypeNameToString(typname)),
 								   errOmitLocation(true)));
 
-	ReleaseSysCache(tup);
+	caql_endscan(pcqCtx);
 
 	/*
 	 * Do the deletion
@@ -1352,6 +1367,8 @@ AlterDomainDefault(List *names, Node *defaultRaw)
 	bool		new_record_repl[Natts_pg_type];
 	HeapTuple	newtuple;
 	Form_pg_type typTup;
+	cqContext	*pcqCtx;
+	cqContext	 cqc;
 
 	/* Make a TypeName so we can use standard type lookup machinery */
 	typname = makeTypeNameFromNameList(names);
@@ -1359,10 +1376,16 @@ AlterDomainDefault(List *names, Node *defaultRaw)
 
 	/* Look up the domain in the type table */
 	rel = heap_open(TypeRelationId, RowExclusiveLock);
+	
+	pcqCtx = caql_addrel(cqclr(&cqc), rel);
 
-	tup = SearchSysCacheCopy(TYPEOID,
-							 ObjectIdGetDatum(domainoid),
-							 0, 0, 0);
+	tup = caql_getfirst(
+			pcqCtx,
+			cql("SELECT * FROM pg_type "
+				" WHERE oid = :1 "
+				" FOR UPDATE ",
+				ObjectIdGetDatum(domainoid)));
+
 	if (!HeapTupleIsValid(tup))
 		elog(ERROR, "cache lookup failed for type %u", domainoid);
 	typTup = (Form_pg_type) GETSTRUCT(tup);
@@ -1427,9 +1450,7 @@ AlterDomainDefault(List *names, Node *defaultRaw)
 								new_record, new_record_nulls,
 								new_record_repl);
 
-	simple_heap_update(rel, &tup->t_self, newtuple);
-
-	CatalogUpdateIndexes(rel, newtuple);
+	caql_update_current(pcqCtx, newtuple);
 
 	/* Rebuild dependencies */
 	GenerateTypeDependencies(typTup->typnamespace,
@@ -1465,6 +1486,8 @@ AlterDomainNotNull(List *names, bool notNull)
 	Relation	typrel;
 	HeapTuple	tup;
 	Form_pg_type typTup;
+	cqContext	*pcqCtx;
+	cqContext	 cqc;
 
 	/* Make a TypeName so we can use standard type lookup machinery */
 	typname = makeTypeNameFromNameList(names);
@@ -1473,9 +1496,15 @@ AlterDomainNotNull(List *names, bool notNull)
 	/* Look up the domain in the type table */
 	typrel = heap_open(TypeRelationId, RowExclusiveLock);
 
-	tup = SearchSysCacheCopy(TYPEOID,
-							 ObjectIdGetDatum(domainoid),
-							 0, 0, 0);
+	pcqCtx = caql_addrel(cqclr(&cqc), typrel);
+
+	tup = caql_getfirst(
+			pcqCtx,
+			cql("SELECT * FROM pg_type "
+				" WHERE oid = :1 "
+				" FOR UPDATE ",
+				ObjectIdGetDatum(domainoid)));
+
 	if (!HeapTupleIsValid(tup))
 		elog(ERROR, "cache lookup failed for type %u", domainoid);
 	typTup = (Form_pg_type) GETSTRUCT(tup);
@@ -1541,9 +1570,7 @@ AlterDomainNotNull(List *names, bool notNull)
 	 */
 	typTup->typnotnull = notNull;
 
-	simple_heap_update(typrel, &tup->t_self, tup);
-
-	CatalogUpdateIndexes(typrel, tup);
+	caql_update_current(pcqCtx, tup);
 
 	/* Clean up */
 	heap_freetuple(tup);
@@ -1563,9 +1590,8 @@ AlterDomainDropConstraint(List *names, const char *constrName,
 	Oid			domainoid;
 	HeapTuple	tup;
 	Relation	rel;
-	Relation	conrel;
-	SysScanDesc conscan;
-	ScanKeyData key[1];
+	cqContext  *pcqCtx;
+	cqContext	cqc;
 	HeapTuple	contup;
 
 	/* Make a TypeName so we can use standard type lookup machinery */
@@ -1575,9 +1601,16 @@ AlterDomainDropConstraint(List *names, const char *constrName,
 	/* Look up the domain in the type table */
 	rel = heap_open(TypeRelationId, RowExclusiveLock);
 
-	tup = SearchSysCacheCopy(TYPEOID,
-							 ObjectIdGetDatum(domainoid),
-							 0, 0, 0);
+	/* NOTE: separate cqc and pcqCtx here -- 
+	 * cqc for pg_type, pcqCtx for pg_constraint 
+	 */
+	tup = caql_getfirst(
+			caql_addrel(cqclr(&cqc), rel),
+			cql("SELECT * FROM pg_type "
+				" WHERE oid = :1 "
+				" FOR UPDATE ",
+				ObjectIdGetDatum(domainoid)));
+
 	if (!HeapTupleIsValid(tup))
 		elog(ERROR, "cache lookup failed for type %u", domainoid);
 
@@ -1585,21 +1618,18 @@ AlterDomainDropConstraint(List *names, const char *constrName,
 	checkDomainOwner(tup, typname);
 
 	/* Grab an appropriate lock on the pg_constraint relation */
-	conrel = heap_open(ConstraintRelationId, RowExclusiveLock);
-
 	/* Use the index to scan only constraints of the target relation */
-	ScanKeyInit(&key[0],
-				Anum_pg_constraint_contypid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(HeapTupleGetOid(tup)));
 
-	conscan = systable_beginscan(conrel, ConstraintTypidIndexId, true,
-								 SnapshotNow, 1, key);
-
+	pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_constraint "
+				" WHERE contypid = :1 "
+				" FOR UPDATE ",
+				ObjectIdGetDatum(HeapTupleGetOid(tup))));
 	/*
 	 * Scan over the result set, removing any matching entries.
 	 */
-	while ((contup = systable_getnext(conscan)) != NULL)
+	while (HeapTupleIsValid(contup = caql_getnext(pcqCtx)))
 	{
 		Form_pg_constraint con = (Form_pg_constraint) GETSTRUCT(contup);
 
@@ -1615,8 +1645,7 @@ AlterDomainDropConstraint(List *names, const char *constrName,
 		}
 	}
 	/* Clean up after the scan */
-	systable_endscan(conscan);
-	heap_close(conrel, RowExclusiveLock);
+	caql_endscan(pcqCtx);
 
 	heap_close(rel, NoLock);
 }
@@ -1642,6 +1671,7 @@ AlterDomainAddConstraint(List *names, Node *newConstraint)
 	Expr	   *expr;
 	ExprState  *exprstate;
 	Constraint *constr;
+	cqContext	cqc;
 
 	/* Make a TypeName so we can use standard type lookup machinery */
 	typname = makeTypeNameFromNameList(names);
@@ -1650,9 +1680,13 @@ AlterDomainAddConstraint(List *names, Node *newConstraint)
 	/* Look up the domain in the type table */
 	typrel = heap_open(TypeRelationId, RowExclusiveLock);
 
-	tup = SearchSysCacheCopy(TYPEOID,
-							 ObjectIdGetDatum(domainoid),
-							 0, 0, 0);
+	tup = caql_getfirst(
+			caql_addrel(cqclr(&cqc), typrel),
+			cql("SELECT * FROM pg_type "
+				" WHERE oid = :1 "
+				" FOR UPDATE ",
+				ObjectIdGetDatum(domainoid)));
+
 	if (!HeapTupleIsValid(tup))
 		elog(ERROR, "cache lookup failed for type %u", domainoid);
 	typTup = (Form_pg_type) GETSTRUCT(tup);
@@ -1828,9 +1862,7 @@ static List *
 get_rels_with_domain(Oid domainOid, LOCKMODE lockmode)
 {
 	List	   *result = NIL;
-	Relation	depRel;
-	ScanKeyData key[2];
-	SysScanDesc depScan;
+	cqContext  *pcqCtx;
 	HeapTuple	depTup;
 
 	Assert(lockmode != NoLock);
@@ -1839,21 +1871,15 @@ get_rels_with_domain(Oid domainOid, LOCKMODE lockmode)
 	 * We scan pg_depend to find those things that depend on the domain. (We
 	 * assume we can ignore refobjsubid for a domain.)
 	 */
-	depRel = heap_open(DependRelationId, AccessShareLock);
+	pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_depend "
+				" WHERE refclassid = :1 "
+				" AND refobjid = :2 ",
+				ObjectIdGetDatum(TypeRelationId),
+				ObjectIdGetDatum(domainOid)));
 
-	ScanKeyInit(&key[0],
-				Anum_pg_depend_refclassid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(TypeRelationId));
-	ScanKeyInit(&key[1],
-				Anum_pg_depend_refobjid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(domainOid));
-
-	depScan = systable_beginscan(depRel, DependReferenceIndexId, true,
-								 SnapshotNow, 2, key);
-
-	while (HeapTupleIsValid(depTup = systable_getnext(depScan)))
+	while (HeapTupleIsValid(depTup = caql_getnext(pcqCtx)))
 	{
 		Form_pg_depend pg_depend = (Form_pg_depend) GETSTRUCT(depTup);
 		RelToCheck *rtc = NULL;
@@ -1864,7 +1890,7 @@ get_rels_with_domain(Oid domainOid, LOCKMODE lockmode)
 		/* Check for directly dependent types --- must be domains */
 		if (pg_depend->classid == TypeRelationId)
 		{
-			Assert(get_typtype(pg_depend->objid) == 'd');
+			Assert(get_typtype(pg_depend->objid) == TYPTYPE_DOMAIN);
 			/*
 			 * Recursively add dependent columns to the output list.  This
 			 * is a bit inefficient since we may fail to combine RelToCheck
@@ -1955,9 +1981,7 @@ get_rels_with_domain(Oid domainOid, LOCKMODE lockmode)
 		rtc->atts[ptr] = pg_depend->objsubid;
 	}
 
-	systable_endscan(depScan);
-
-	relation_close(depRel, AccessShareLock);
+	caql_endscan(pcqCtx);
 
 	return result;
 }
@@ -1974,7 +1998,7 @@ checkDomainOwner(HeapTuple tup, TypeName *typname)
 	Form_pg_type typTup = (Form_pg_type) GETSTRUCT(tup);
 
 	/* Check that this is actually a domain */
-	if (typTup->typtype != 'd')
+	if (typTup->typtype != TYPTYPE_DOMAIN)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("\"%s\" is not a domain",
@@ -2161,20 +2185,26 @@ GetDomainConstraints(Oid typeOid)
 		HeapTuple	tup;
 		HeapTuple	conTup;
 		Form_pg_type typTup;
-		ScanKeyData key[1];
-		SysScanDesc scan;
+		cqContext	*typcqCtx;
+		cqContext	*pcqCtx;
+		cqContext	 cqc;
 
-		tup = SearchSysCache(TYPEOID,
-							 ObjectIdGetDatum(typeOid),
-							 0, 0, 0);
+		typcqCtx = caql_beginscan(
+				NULL,
+				cql("SELECT * FROM pg_type "
+					" WHERE oid = :1 ",
+					ObjectIdGetDatum(typeOid)));
+
+		tup = caql_getnext(typcqCtx);
+
 		if (!HeapTupleIsValid(tup))
 			elog(ERROR, "cache lookup failed for type %u", typeOid);
 		typTup = (Form_pg_type) GETSTRUCT(tup);
 
-		if (typTup->typtype != 'd')
+		if (typTup->typtype != TYPTYPE_DOMAIN)
 		{
 			/* Not a domain, so done */
-			ReleaseSysCache(tup);
+			caql_endscan(typcqCtx);
 			break;
 		}
 
@@ -2183,15 +2213,14 @@ GetDomainConstraints(Oid typeOid)
 			notNull = true;
 
 		/* Look for CHECK Constraints on this domain */
-		ScanKeyInit(&key[0],
-					Anum_pg_constraint_contypid,
-					BTEqualStrategyNumber, F_OIDEQ,
-					ObjectIdGetDatum(typeOid));
 
-		scan = systable_beginscan(conRel, ConstraintTypidIndexId, true,
-								  SnapshotNow, 1, key);
+		pcqCtx = caql_beginscan(
+				caql_addrel(cqclr(&cqc), conRel),
+				cql("SELECT * FROM pg_constraint "
+					" WHERE contypid = :1 ",
+					ObjectIdGetDatum(typeOid)));
 
-		while (HeapTupleIsValid(conTup = systable_getnext(scan)))
+		while (HeapTupleIsValid(conTup = caql_getnext(pcqCtx)))
 		{
 			Form_pg_constraint c = (Form_pg_constraint) GETSTRUCT(conTup);
 			Datum		val;
@@ -2206,8 +2235,8 @@ GetDomainConstraints(Oid typeOid)
 			/*
 			 * Not expecting conbin to be NULL, but we'll test for it anyway
 			 */
-			val = fastgetattr(conTup, Anum_pg_constraint_conbin,
-							  conRel->rd_att, &isNull);
+			val = caql_getattr(pcqCtx, Anum_pg_constraint_conbin,
+							   &isNull);
 			if (isNull)
 				elog(ERROR, "domain \"%s\" constraint \"%s\" has NULL conbin",
 					 NameStr(typTup->typname), NameStr(c->conname));
@@ -2231,11 +2260,11 @@ GetDomainConstraints(Oid typeOid)
 			result = lcons(r, result);
 		}
 
-		systable_endscan(scan);
+		caql_endscan(pcqCtx);
 
 		/* loop to next domain in stack */
 		typeOid = typTup->typbasetype;
-		ReleaseSysCache(tup);
+		caql_endscan(typcqCtx);
 	}
 
 	heap_close(conRel, AccessShareLock);
@@ -2271,6 +2300,8 @@ AlterTypeOwner(List *names, Oid newOwnerId)
 	HeapTuple	tup;
 	Form_pg_type typTup;
 	AclResult	aclresult;
+	cqContext  *pcqCtx;
+	cqContext	cqc;
 
 	/* Make a TypeName so we can use standard type lookup machinery */
 	typname = makeTypeNameFromNameList(names);
@@ -2287,9 +2318,15 @@ AlterTypeOwner(List *names, Oid newOwnerId)
 	/* Look up the type in the type table */
 	rel = heap_open(TypeRelationId, RowExclusiveLock);
 
-	tup = SearchSysCacheCopy(TYPEOID,
-							 ObjectIdGetDatum(typeOid),
-							 0, 0, 0);
+	pcqCtx = caql_addrel(cqclr(&cqc), rel);
+
+	tup = caql_getfirst(
+			pcqCtx,
+			cql("SELECT * FROM pg_type "
+				" WHERE oid = :1 "
+				" FOR UPDATE ",
+				ObjectIdGetDatum(typeOid)));
+
 	if (!HeapTupleIsValid(tup))
 		elog(ERROR, "cache lookup failed for type %u", typeOid);
 	typTup = (Form_pg_type) GETSTRUCT(tup);
@@ -2299,7 +2336,7 @@ AlterTypeOwner(List *names, Oid newOwnerId)
 	 * free-standing composite type, and not a table's underlying type. We
 	 * want people to use ALTER TABLE not ALTER TYPE for that case.
 	 */
-	if (typTup->typtype == 'c' &&
+	if (typTup->typtype == TYPTYPE_COMPOSITE &&
 		get_rel_relkind(typTup->typrelid) != RELKIND_COMPOSITE_TYPE)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -2338,7 +2375,7 @@ AlterTypeOwner(List *names, Oid newOwnerId)
 		 * fix up the pg_class entry properly.  That will call back to
 		 * AlterTypeOwnerInternal to take care of the pg_type entry(s).
 		 */
-		if (typTup->typtype == 'c')
+		if (typTup->typtype == TYPTYPE_COMPOSITE)
 			ATExecChangeOwner(typTup->typrelid, newOwnerId, true);
 		else
 		{
@@ -2349,9 +2386,7 @@ AlterTypeOwner(List *names, Oid newOwnerId)
 			 */
 			typTup->typowner = newOwnerId;
 
-			simple_heap_update(rel, &tup->t_self, tup);
-
-			CatalogUpdateIndexes(rel, tup);
+			caql_update_current(pcqCtx, tup);
 
 			/* Update owner dependency reference */
 			changeDependencyOnOwner(TypeRelationId, typeOid, newOwnerId);
@@ -2380,12 +2415,20 @@ AlterTypeOwnerInternal(Oid typeOid, Oid newOwnerId,
 	Relation	rel;
 	HeapTuple	tup;
 	Form_pg_type typTup;
+	cqContext  *pcqCtx;
+	cqContext	cqc;
 
 	rel = heap_open(TypeRelationId, RowExclusiveLock);
 
-	tup = SearchSysCacheCopy(TYPEOID,
-							 ObjectIdGetDatum(typeOid),
-							 0, 0, 0);
+	pcqCtx = caql_addrel(cqclr(&cqc), rel);
+
+	tup = caql_getfirst(
+			pcqCtx,
+			cql("SELECT * FROM pg_type "
+				" WHERE oid = :1 "
+				" FOR UPDATE ",
+				ObjectIdGetDatum(typeOid)));
+
 	if (!HeapTupleIsValid(tup))
 		elog(ERROR, "cache lookup failed for type %u", typeOid);
 	typTup = (Form_pg_type) GETSTRUCT(tup);
@@ -2395,9 +2438,7 @@ AlterTypeOwnerInternal(Oid typeOid, Oid newOwnerId,
 	 */
 	typTup->typowner = newOwnerId;
 
-	simple_heap_update(rel, &tup->t_self, tup);
-
-	CatalogUpdateIndexes(rel, tup);
+	caql_update_current(pcqCtx, tup);
 
 	/* Update owner dependency reference, if it has one */
 	if (hasDependEntry)
@@ -2451,12 +2492,20 @@ AlterTypeNamespaceInternal(Oid typeOid, Oid nspOid,
 	Form_pg_type typform;
 	Oid			oldNspOid;
 	bool		isCompositeType;
+	cqContext  *pcqCtx;
+	cqContext	cqc, cqc2;
 
 	rel = heap_open(TypeRelationId, RowExclusiveLock);
 
-	tup = SearchSysCacheCopy(TYPEOID,
-							 ObjectIdGetDatum(typeOid),
-							 0, 0, 0);
+	pcqCtx = caql_addrel(cqclr(&cqc), rel);
+
+	tup = caql_getfirst(
+			pcqCtx,
+			cql("SELECT * FROM pg_type "
+				" WHERE oid = :1 "
+				" FOR UPDATE ",
+				ObjectIdGetDatum(typeOid)));
+
 	if (!HeapTupleIsValid(tup))
 		elog(ERROR, "cache lookup failed for type %u", typeOid);
 	typform = (Form_pg_type) GETSTRUCT(tup);
@@ -2493,24 +2542,30 @@ AlterTypeNamespaceInternal(Oid typeOid, Oid nspOid,
 						   errOmitLocation(true)));
 
 	/* check for duplicate name (more friendly than unique-index failure) */
-	if (SearchSysCacheExists(TYPENAMENSP,
-							 CStringGetDatum(NameStr(typform->typname)),
-							 ObjectIdGetDatum(nspOid),
-							 0, 0))
+	if (caql_getcount(
+				caql_addrel(cqclr(&cqc2), rel),
+					cql("SELECT COUNT(*) FROM pg_type "
+						" WHERE typname = :1 "
+						" AND typnamespace = :2 ",
+						CStringGetDatum(NameStr(typform->typname)),
+						ObjectIdGetDatum(nspOid))))
+	{
 		ereport(ERROR,
 				(errcode(ERRCODE_DUPLICATE_OBJECT),
 				 errmsg("type \"%s\" already exists in schema \"%s\"",
 						NameStr(typform->typname),
 						get_namespace_name(nspOid)),
 								   errOmitLocation(true)));
+	}
 
 	/* Detect whether type is a composite type (but not a table rowtype) */
 	isCompositeType =
-		(typform->typtype == 'c' &&
+		(typform->typtype == TYPTYPE_COMPOSITE &&
 		 get_rel_relkind(typform->typrelid) == RELKIND_COMPOSITE_TYPE);
 
 	/* Enforce not-table-type if requested */
-	if (typform->typtype == 'c' && !isCompositeType && errorOnTableType)
+	if (typform->typtype == TYPTYPE_COMPOSITE && 
+		!isCompositeType && errorOnTableType)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("%s is a table's row type",
@@ -2522,8 +2577,7 @@ AlterTypeNamespaceInternal(Oid typeOid, Oid nspOid,
 	/* tup is a copy, so we can scribble directly on it */
 	typform->typnamespace = nspOid;
 
-	simple_heap_update(rel, &tup->t_self, tup);
-	CatalogUpdateIndexes(rel, tup);
+	caql_update_current(pcqCtx, tup);
 
 	/*
 	 * Composite types have pg_class entries.
@@ -2553,7 +2607,7 @@ AlterTypeNamespaceInternal(Oid typeOid, Oid nspOid,
 	else
 	{
 		/* If it's a domain, it might have constraints */
-		if (typform->typtype == 'd')
+		if (typform->typtype == TYPTYPE_DOMAIN)
 			AlterConstraintNamespaces(typeOid, oldNspOid, nspOid, true);
 	}
 
@@ -2561,7 +2615,7 @@ AlterTypeNamespaceInternal(Oid typeOid, Oid nspOid,
 	 * Update dependency on schema, if any --- a table rowtype has not got
 	 * one.
 	 */
-	if (isCompositeType || typform->typtype != 'c')
+	if (isCompositeType || typform->typtype != TYPTYPE_COMPOSITE)
 		if (changeDependencyFor(TypeRelationId, typeOid,
 							NamespaceRelationId, oldNspOid, nspOid) != 1)
 			elog(ERROR, "failed to change schema dependency for type %s",
@@ -2582,8 +2636,8 @@ AlterType(AlterTypeStmt *stmt)
 {
 	TypeName	   *typname = stmt->typname;
 	Oid				typid;
-	ScanKeyData		key[1];
-	SysScanDesc		scan;
+	cqContext	   *pcqCtx;
+	cqContext		cqc;
 	HeapTuple		tup;
 	Datum			typoptions;
 	bool			typmod_set = false;
@@ -2654,15 +2708,14 @@ AlterType(AlterTypeStmt *stmt)
 									 false,
 									 false);
 
+	pcqCtx = caql_addrel(cqclr(&cqc), pgtypeenc);
 
-	ScanKeyInit(&key[0],
-				Anum_pg_type_encoding_typid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(typid));
-
-	scan = systable_beginscan(pgtypeenc, TypeEncodingTypidIndexId, true,
-							  SnapshotNow, 1, key);
-	tup = systable_getnext(scan);
+	tup = caql_getfirst(
+			pcqCtx,
+			cql("SELECT * FROM pg_type_encoding "
+				" WHERE typid = :1 "
+				" FOR UPDATE ",
+				ObjectIdGetDatum(typid)));
 
 	if (HeapTupleIsValid(tup))
 	{
@@ -2682,16 +2735,12 @@ AlterType(AlterTypeStmt *stmt)
 		newtuple = heap_modify_tuple(tup, RelationGetDescr(pgtypeenc),
 									 values, nulls, replaces);
 
-		simple_heap_update(pgtypeenc, &tup->t_self, newtuple);
-
-		CatalogUpdateIndexes(pgtypeenc, newtuple);
+		caql_update_current(pcqCtx, newtuple);
 	}
 	else
 	{
 		add_type_encoding(typid, typoptions);
 	}	
-
-	systable_endscan(scan);
 
 	if (Gp_role == GP_ROLE_DISPATCH)
 		CdbDispatchUtilityStatement((Node *)stmt, NULL);
@@ -2705,28 +2754,16 @@ AlterType(AlterTypeStmt *stmt)
 static void
 remove_type_encoding(Oid typid)
 {
-	Relation 		pgtypeenc = heap_open(TypeEncodingRelationId, RowExclusiveLock);
-	ScanKeyData		key[1];
-	SysScanDesc		scan;
-	HeapTuple		tup;
+	int numDel;
 
 	/* check permissions on type */
 	if (!pg_type_ownercheck(typid, GetUserId()))
 		aclcheck_error(ACLCHECK_NOT_OWNER, ACL_KIND_TYPE,
 					   format_type_be(typid));
 
-	ScanKeyInit(&key[0],
-				Anum_pg_type_encoding_typid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(typid));
-
-	scan = systable_beginscan(pgtypeenc, TypeEncodingTypidIndexId, true,
-							  SnapshotNow, 1, key);
-	tup = systable_getnext(scan);
-
-	if (HeapTupleIsValid(tup))
-		simple_heap_delete(pgtypeenc, &tup->t_self);
-
-	systable_endscan(scan);
-	heap_close(pgtypeenc, RowExclusiveLock);
+	numDel = caql_getcount(
+			NULL,
+			cql("DELETE FROM pg_type_encoding "
+				" WHERE typid = :1 ",
+				ObjectIdGetDatum(typid)));
 }

@@ -99,6 +99,7 @@
 
 #include "postgres.h"
 
+#include "access/catquery.h"
 #include "access/heapam.h"
 #include "access/nbtree.h"
 #include "catalog/pg_amop.h"
@@ -2709,9 +2710,13 @@ SelectSortFunction(Oid sortOperator,
 	 * registered the same way in multiple opclasses, assume we can use the
 	 * associated comparator function from any one.
 	 */
-	catlist = SearchSysCacheList(AMOPOPID, 1,
-								 ObjectIdGetDatum(sortOperator),
-								 0, 0, 0);
+	catlist = caql_begin_CacheList(
+			NULL,
+			cql("SELECT * FROM pg_amop "
+				" WHERE amopopr = :1 "
+				" ORDER BY amopopr, "
+				" amopclaid ",
+				ObjectIdGetDatum(sortOperator)));
 
 	for (i = 0; i < catlist->n_members; i++)
 	{
@@ -2723,7 +2728,7 @@ SelectSortFunction(Oid sortOperator,
 		if (!opclass_is_btree(aform->amopclaid))
 			continue;
 		/* must be of default subtype, too */
-		if (aform->amopsubtype != InvalidOid)
+		if (OidIsValid(aform->amopsubtype))
 			continue;
 
 		if (aform->amopstrategy == BTLessStrategyNumber)
@@ -2740,7 +2745,7 @@ SelectSortFunction(Oid sortOperator,
 		}
 	}
 
-	ReleaseSysCacheList(catlist);
+	caql_end_CacheList(catlist);
 
 	if (OidIsValid(opclass))
 	{

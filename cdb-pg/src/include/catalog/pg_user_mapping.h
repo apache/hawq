@@ -29,8 +29,12 @@
    umoptions  text[]
    );
 
-   create unique index on pg_user_mapping(oid) with (indexid=3316, CamelCase=UserMappingOid);
-   create unique index on pg_user_mapping(umuser, umserver) with (indexid=3317, CamelCase=UserMappingUserServer);
+   create unique index on pg_user_mapping(oid) with (indexid=3316, CamelCase=UserMappingOid, syscacheid=USERMAPPINGOID, syscache_nbuckets=128);
+
+   create unique index on pg_user_mapping(umuser, umserver) with (indexid=3317, CamelCase=UserMappingUserServer, syscacheid=USERMAPPINGUSERSERVER, syscache_nbuckets=128);
+
+   alter table pg_user_mapping add fk umuser on pg_authid(oid);
+   alter table pg_user_mapping add fk umserver on pg_foreign_server(oid);
 
    TIDYCAT_ENDFAKEDEF
 */

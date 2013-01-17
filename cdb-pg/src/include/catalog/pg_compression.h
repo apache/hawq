@@ -37,7 +37,7 @@
    alter table pg_compression add fk compconstructor on pg_proc(oid);
    alter table pg_compression add fk compdestructor on pg_proc(oid);
    alter table pg_compression add fk compcompressor on pg_proc(oid);
-   alter table pg_compression add fk compdestructor on pg_proc(oid);
+   alter table pg_compression add fk compdecompressor on pg_proc(oid);
    alter table pg_compression add fk compvalidator on pg_proc(oid);
    alter table pg_compression add fk compowner on pg_authid(oid);
 

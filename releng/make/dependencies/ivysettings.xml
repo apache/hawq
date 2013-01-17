@@ -1,29 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <ivysettings>
-
-  <!-- ====================================================================== -->
-       
-  <settings defaultResolver="shared" />
 
   <!-- ====================================================================== -->
 
   <caches defaultCacheDir="/opt/releng/tools"
           lockStrategy="artifact-lock"
-          ivyPattern="[organisation]/[module]/ivy-[revision].xml"
-          artifactPattern="[organisation]/[module]/[type]s/[artifact]-[revision].[ext]"
+               ivyPattern="[organisation]/[module]/[revision]/[type]s/ivy-[revision].xml"
+          artifactPattern="[organisation]/[module]/[revision]/[type]s/[artifact]-[revision].[ext]"
           datafilePattern="[organisation]/[module]/ivydata-[revision].properties"
           />
 
   <!-- ====================================================================== -->
 
+  <property name="repo.dir" value="/opt/repo"/>
+  <settings defaultResolver="public"/>
+
+  <!-- ====================================================================== -->
+
   <resolvers>
     <filesystem name="local">
-      <ivy      pattern="/opt/ivy/modules/[organisation]/[module]/ivy-[revision].xml" />
-      <artifact pattern="/opt/ivy/modules/[organisation]/[module]/[type]s/[artifact]-[revision].[ext]" />
+      <ivy      pattern="${repo.dir}/[organization]/[module]/[revision]/[type]s/ivy-[revision].xml" />
+      <artifact pattern="${repo.dir}/[organization]/[module]/[revision]/[type]s/[artifact]-[revision].[ext]" />
     </filesystem>
-    <url name="shared">
-      <ivy      pattern="http://releng.sanmateo.greenplum.com/ivy/modules/[organisation]/[module]/ivy-[revision].xml" />
-      <artifact pattern="http://releng.sanmateo.greenplum.com/ivy/modules/[organisation]/[module]/[type]s/[artifact]-[revision].[ext]" />
-    </url>                      
+    <url name="public">
+      <ivy      pattern="http://artifactory.greenplum.com/gpdb-ext-release-local/[organization]/[module]/[revision]/[type]s/ivy-[revision].xml" />
+      <artifact pattern="http://artifactory.greenplum.com/gpdb-ext-release-local/[organization]/[module]/[revision]/[type]s/[artifact]-[revision].[ext]" />
+    </url>
   </resolvers>
 
   <!-- ====================================================================== -->

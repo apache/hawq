@@ -33,6 +33,7 @@
 #include "postgres.h"
 
 #include "access/genam.h"
+#include "access/catquery.h"
 #include "access/heapam.h"
 #include "catalog/dependency.h"
 #include "catalog/indexing.h"
@@ -56,7 +57,9 @@
 #include "cdb/cdbvars.h"
 #include "cdb/cdbdisp.h"
 
-static void AlterFunctionOwner_internal(Relation rel, HeapTuple tup, Oid newOwnerId);
+static void AlterFunctionOwner_internal(cqContext *pcqCtx,
+										Relation rel, HeapTuple tup, 
+										Oid newOwnerId);
 
 /*
  *	 Examine the RETURNS clause of the CREATE FUNCTION statement
@@ -734,6 +737,7 @@ CreateFunction(CreateFunctionStmt *stmt)
 	List	   *as_clause;
 	List       *describeQualName = NIL;
 	Oid         describeFuncOid  = InvalidOid;
+	cqContext  *pcqCtx;
 
 	/* Convert list of names to a name and namespace */
 	namespaceId = QualifiedNameGetCreationNamespace(stmt->funcname,
@@ -758,9 +762,14 @@ CreateFunction(CreateFunctionStmt *stmt)
 	languageName = case_translate_language_name(language);
 
 	/* Look up the language and validate permissions */
-	languageTuple = SearchSysCache(LANGNAME,
-								   PointerGetDatum(languageName),
-								   0, 0, 0);
+	pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_language "
+				" WHERE lanname = :1 ",
+				PointerGetDatum(languageName)));
+
+	languageTuple = caql_getnext(pcqCtx);
+
 	if (!HeapTupleIsValid(languageTuple))
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_OBJECT),
@@ -791,7 +800,7 @@ CreateFunction(CreateFunctionStmt *stmt)
 
 	languageValidator = languageStruct->lanvalidator;
 
-	ReleaseSysCache(languageTuple);
+	caql_endscan(pcqCtx);
 
 	/*
 	 * Convert remaining parameters of CREATE to form wanted by
@@ -914,6 +923,7 @@ RemoveFunction(RemoveFuncStmt *stmt)
 	Oid			funcOid;
 	HeapTuple	tup;
 	ObjectAddress object;
+	cqContext  *pcqCtx;
 
 	/*
 	 * Find the function, do permissions and validity checks
@@ -929,9 +939,14 @@ RemoveFunction(RemoveFuncStmt *stmt)
 		return;
 	}
 
-	tup = SearchSysCache(PROCOID,
-						 ObjectIdGetDatum(funcOid),
-						 0, 0, 0);
+	pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_proc "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(funcOid)));
+
+	tup = caql_getnext(pcqCtx);
+
 	if (!HeapTupleIsValid(tup)) /* should not happen */
 		elog(ERROR, "cache lookup failed for function %u", funcOid);
 
@@ -959,7 +974,7 @@ RemoveFunction(RemoveFuncStmt *stmt)
 						NameListToString(functionName))));
 	}
 
-	ReleaseSysCache(tup);
+	caql_endscan(pcqCtx);
 
 	/*
 	 * Do the deletion
@@ -985,28 +1000,30 @@ RemoveFunction(RemoveFuncStmt *stmt)
 void
 RemoveFunctionById(Oid funcOid)
 {
-	Relation	relation;
 	HeapTuple	tup;
 	bool		isagg;
+	cqContext  *pcqCtx;
 
 	/*
 	 * Delete the pg_proc tuple.
 	 */
-	relation = heap_open(ProcedureRelationId, RowExclusiveLock);
 
-	tup = SearchSysCache(PROCOID,
-						 ObjectIdGetDatum(funcOid),
-						 0, 0, 0);
+	pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_proc "
+				" WHERE oid = :1 "
+				" FOR UPDATE ",
+				ObjectIdGetDatum(funcOid)));
+
+	tup = caql_getnext(pcqCtx);
+
 	if (!HeapTupleIsValid(tup)) /* should not happen */
 		elog(ERROR, "cache lookup failed for function %u", funcOid);
 
 	isagg = ((Form_pg_proc) GETSTRUCT(tup))->proisagg;
 
-	simple_heap_delete(relation, &tup->t_self);
-
-	ReleaseSysCache(tup);
-
-	heap_close(relation, RowExclusiveLock);
+	caql_delete_current(pcqCtx);
+	caql_endscan(pcqCtx);
 
 	/* Remove anything in pg_proc_callback for this function */
 	deleteProcCallbacks(funcOid);
@@ -1016,19 +1033,17 @@ RemoveFunctionById(Oid funcOid)
 	 */
 	if (isagg)
 	{
-		relation = heap_open(AggregateRelationId, RowExclusiveLock);
-
-		tup = SearchSysCache(AGGFNOID,
-							 ObjectIdGetDatum(funcOid),
-							 0, 0, 0);
-		if (!HeapTupleIsValid(tup))		/* should not happen */
-			elog(ERROR, "cache lookup failed for pg_aggregate tuple for function %u", funcOid);
-
-		simple_heap_delete(relation, &tup->t_self);
-
-		ReleaseSysCache(tup);
-
-		heap_close(relation, RowExclusiveLock);
+		if (0 == caql_getcount(
+					NULL,
+					cql("DELETE FROM pg_aggregate "
+						" WHERE aggfnoid = :1 ",
+						ObjectIdGetDatum(funcOid)))) 
+		{
+			/* should not happen */
+			elog(ERROR, 
+				 "cache lookup failed for pg_aggregate tuple for function %u",
+				 funcOid);
+		}
 	}
 }
 
@@ -1045,14 +1060,23 @@ RenameFunction(List *name, List *argtypes, const char *newname)
 	Form_pg_proc procForm;
 	Relation	rel;
 	AclResult	aclresult;
+	cqContext	cqc2;
+	cqContext	cqc;
+	cqContext  *pcqCtx;
 
 	rel = heap_open(ProcedureRelationId, RowExclusiveLock);
 
 	procOid = LookupFuncNameTypeNames(name, argtypes, false);
 
-	tup = SearchSysCacheCopy(PROCOID,
-							 ObjectIdGetDatum(procOid),
-							 0, 0, 0);
+	pcqCtx = caql_addrel(cqclr(&cqc), rel);
+
+	tup = caql_getfirst(
+			pcqCtx,
+			cql("SELECT * FROM pg_proc "
+				" WHERE oid = :1 "
+				" FOR UPDATE ",
+				ObjectIdGetDatum(procOid)));
+
 	if (!HeapTupleIsValid(tup)) /* should not happen */
 		elog(ERROR, "cache lookup failed for function %u", procOid);
 	procForm = (Form_pg_proc) GETSTRUCT(tup);
@@ -1067,11 +1091,15 @@ RenameFunction(List *name, List *argtypes, const char *newname)
 	namespaceOid = procForm->pronamespace;
 
 	/* make sure the new name doesn't exist */
-	if (SearchSysCacheExists(PROCNAMEARGSNSP,
-							 CStringGetDatum((char *) newname),
-							 PointerGetDatum(&procForm->proargtypes),
-							 ObjectIdGetDatum(namespaceOid),
-							 0))
+	if (caql_getcount(
+				caql_addrel(cqclr(&cqc2), rel),
+				cql("SELECT COUNT(*) FROM pg_proc "
+					" WHERE proname = :1 "
+					" AND proargtypes = :2 "
+					" AND pronamespace = :3 ",
+					CStringGetDatum((char *) newname),
+					PointerGetDatum(&procForm->proargtypes),
+					ObjectIdGetDatum(namespaceOid))))
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_DUPLICATE_FUNCTION),
@@ -1095,8 +1123,7 @@ RenameFunction(List *name, List *argtypes, const char *newname)
 
 	/* rename */
 	namestrcpy(&(procForm->proname), newname);
-	simple_heap_update(rel, &tup->t_self, tup);
-	CatalogUpdateIndexes(rel, tup);
+	caql_update_current(pcqCtx, tup); /* implicit update of index as well */
 
 	heap_close(rel, NoLock);
 	heap_freetuple(tup);
@@ -1111,14 +1138,22 @@ AlterFunctionOwner(List *name, List *argtypes, Oid newOwnerId)
 	Relation	rel;
 	Oid			procOid;
 	HeapTuple	tup;
+	cqContext  *pcqCtx;
+	cqContext	cqc;
 
 	rel = heap_open(ProcedureRelationId, RowExclusiveLock);
 
 	procOid = LookupFuncNameTypeNames(name, argtypes, false);
 
-	tup = SearchSysCache(PROCOID,
-						 ObjectIdGetDatum(procOid),
-						 0, 0, 0);
+	pcqCtx = caql_addrel(cqclr(&cqc), rel);
+
+	tup = caql_getfirst(
+			pcqCtx,
+			cql("SELECT * FROM pg_proc "
+				" WHERE oid = :1 "
+				" FOR UPDATE ",
+				ObjectIdGetDatum(procOid)));
+
 	if (!HeapTupleIsValid(tup)) /* should not happen */
 		elog(ERROR, "cache lookup failed for function %u", procOid);
 
@@ -1129,7 +1164,7 @@ AlterFunctionOwner(List *name, List *argtypes, Oid newOwnerId)
 						NameListToString(name)),
 				 errhint("Use ALTER AGGREGATE to change owner of aggregate functions.")));
 
-	AlterFunctionOwner_internal(rel, tup, newOwnerId);
+	AlterFunctionOwner_internal(pcqCtx, rel, tup, newOwnerId);
 
 	heap_close(rel, NoLock);
 }
@@ -1142,21 +1177,31 @@ AlterFunctionOwner_oid(Oid procOid, Oid newOwnerId)
 {
 	Relation	rel;
 	HeapTuple	tup;
+	cqContext  *pcqCtx;
+	cqContext	cqc;
 
 	rel = heap_open(ProcedureRelationId, RowExclusiveLock);
 
-	tup = SearchSysCache(PROCOID,
-						 ObjectIdGetDatum(procOid),
-						 0, 0, 0);
+	pcqCtx = caql_addrel(cqclr(&cqc), rel);
+
+	tup = caql_getfirst(
+			pcqCtx,
+			cql("SELECT * FROM pg_proc "
+				" WHERE oid = :1 "
+				" FOR UPDATE ",
+				ObjectIdGetDatum(procOid)));
+
 	if (!HeapTupleIsValid(tup)) /* should not happen */
 		elog(ERROR, "cache lookup failed for function %u", procOid);
-	AlterFunctionOwner_internal(rel, tup, newOwnerId);
+
+	AlterFunctionOwner_internal(pcqCtx, rel, tup, newOwnerId);
 
 	heap_close(rel, NoLock);
 }
 
 static void
-AlterFunctionOwner_internal(Relation rel, HeapTuple tup, Oid newOwnerId)
+AlterFunctionOwner_internal(cqContext *pcqCtx,
+							Relation rel, HeapTuple tup, Oid newOwnerId)
 {
 	Form_pg_proc procForm;
 	AclResult	aclresult;
@@ -1211,9 +1256,9 @@ AlterFunctionOwner_internal(Relation rel, HeapTuple tup, Oid newOwnerId)
 		 * Determine the modified ACL for the new owner.  This is only
 		 * necessary when the ACL is non-null.
 		 */
-		aclDatum = SysCacheGetAttr(PROCOID, tup,
-								   Anum_pg_proc_proacl,
-								   &isNull);
+		aclDatum = caql_getattr(pcqCtx,
+								Anum_pg_proc_proacl,
+								&isNull);
 		if (!isNull)
 		{
 			newAcl = aclnewowner(DatumGetAclP(aclDatum),
@@ -1222,19 +1267,17 @@ AlterFunctionOwner_internal(Relation rel, HeapTuple tup, Oid newOwnerId)
 			repl_val[Anum_pg_proc_proacl - 1] = PointerGetDatum(newAcl);
 		}
 
-		newtuple = heap_modify_tuple(tup, RelationGetDescr(rel), repl_val,
-									 repl_null, repl_repl);
-
-		simple_heap_update(rel, &newtuple->t_self, newtuple);
-		CatalogUpdateIndexes(rel, newtuple);
+		newtuple = caql_modify_current(pcqCtx, repl_val, repl_null, repl_repl);
+		
+		caql_update_current(pcqCtx, newtuple);
+		/* and Update indexes (implicit) */
 
 		heap_freetuple(newtuple);
 
 		/* Update owner dependency reference */
 		changeDependencyOnOwner(ProcedureRelationId, procOid, newOwnerId);
 	}
-
-	ReleaseSysCache(tup);
+	/* caller frees pcqCtx */
 }
 
 /*
@@ -1253,6 +1296,8 @@ AlterFunction(AlterFunctionStmt *stmt)
 	DefElem    *volatility_item = NULL;
 	DefElem    *strict_item = NULL;
 	DefElem    *security_def_item = NULL;
+	cqContext	cqc;
+	cqContext  *pcqCtx;
 
 	rel = heap_open(ProcedureRelationId, RowExclusiveLock);
 
@@ -1260,9 +1305,15 @@ AlterFunction(AlterFunctionStmt *stmt)
 									  stmt->func->funcargs,
 									  false);
 
-	tup = SearchSysCacheCopy(PROCOID,
-							 ObjectIdGetDatum(funcOid),
-							 0, 0, 0);
+	pcqCtx = caql_addrel(cqclr(&cqc), rel);
+
+	tup = caql_getfirst(
+			pcqCtx,
+			cql("SELECT * FROM pg_proc "
+				" WHERE oid = :1 "
+				" FOR UPDATE ",
+				ObjectIdGetDatum(funcOid)));
+
 	if (!HeapTupleIsValid(tup)) /* should not happen */
 		elog(ERROR, "cache lookup failed for function %u", funcOid);
 
@@ -1299,8 +1350,8 @@ AlterFunction(AlterFunctionStmt *stmt)
 		procForm->prosecdef = intVal(security_def_item->arg);
 
 	/* Do the update */
-	simple_heap_update(rel, &tup->t_self, tup);
-	CatalogUpdateIndexes(rel, tup);
+
+	caql_update_current(pcqCtx, tup); /* implicit update of index as well */
 
 	heap_close(rel, NoLock);
 	heap_freetuple(tup);
@@ -1324,12 +1375,20 @@ SetFunctionReturnType(Oid funcOid, Oid newRetType)
 	Relation	pg_proc_rel;
 	HeapTuple	tup;
 	Form_pg_proc procForm;
+	cqContext	cqc;
+	cqContext  *pcqCtx;
 
 	pg_proc_rel = heap_open(ProcedureRelationId, RowExclusiveLock);
 
-	tup = SearchSysCacheCopy(PROCOID,
-							 ObjectIdGetDatum(funcOid),
-							 0, 0, 0);
+	pcqCtx = caql_addrel(cqclr(&cqc), pg_proc_rel);
+
+	tup = caql_getfirst(
+			pcqCtx,
+			cql("SELECT * FROM pg_proc "
+				" WHERE oid = :1 "
+				" FOR UPDATE ",
+				ObjectIdGetDatum(funcOid)));
+
 	if (!HeapTupleIsValid(tup)) /* should not happen */
 		elog(ERROR, "cache lookup failed for function %u", funcOid);
 	procForm = (Form_pg_proc) GETSTRUCT(tup);
@@ -1341,9 +1400,7 @@ SetFunctionReturnType(Oid funcOid, Oid newRetType)
 	procForm->prorettype = newRetType;
 
 	/* update the catalog and its indexes */
-	simple_heap_update(pg_proc_rel, &tup->t_self, tup);
-
-	CatalogUpdateIndexes(pg_proc_rel, tup);
+	caql_update_current(pcqCtx, tup); /* implicit update of index as well */
 
 	heap_close(pg_proc_rel, RowExclusiveLock);
 }
@@ -1360,12 +1417,20 @@ SetFunctionArgType(Oid funcOid, int argIndex, Oid newArgType)
 	Relation	pg_proc_rel;
 	HeapTuple	tup;
 	Form_pg_proc procForm;
+	cqContext	cqc;
+	cqContext  *pcqCtx;
 
 	pg_proc_rel = heap_open(ProcedureRelationId, RowExclusiveLock);
 
-	tup = SearchSysCacheCopy(PROCOID,
-							 ObjectIdGetDatum(funcOid),
-							 0, 0, 0);
+	pcqCtx = caql_addrel(cqclr(&cqc), pg_proc_rel);
+
+	tup = caql_getfirst(
+			pcqCtx,
+			cql("SELECT * FROM pg_proc "
+				" WHERE oid = :1 "
+				" FOR UPDATE ",
+				ObjectIdGetDatum(funcOid)));
+
 	if (!HeapTupleIsValid(tup)) /* should not happen */
 		elog(ERROR, "cache lookup failed for function %u", funcOid);
 	procForm = (Form_pg_proc) GETSTRUCT(tup);
@@ -1378,9 +1443,7 @@ SetFunctionArgType(Oid funcOid, int argIndex, Oid newArgType)
 	procForm->proargtypes.values[argIndex] = newArgType;
 
 	/* update the catalog and its indexes */
-	simple_heap_update(pg_proc_rel, &tup->t_self, tup);
-
-	CatalogUpdateIndexes(pg_proc_rel, tup);
+	caql_update_current(pcqCtx, tup); /* implicit update of index as well */
 
 	heap_close(pg_proc_rel, RowExclusiveLock);
 }
@@ -1404,6 +1467,9 @@ CreateCast(CreateCastStmt *stmt)
 	bool		nulls[Natts_pg_cast];
 	ObjectAddress myself,
 				referenced;
+	cqContext	cqc;
+	cqContext	cqc2;
+	cqContext  *pcqCtx;
 
 	sourcetypeid = typenameTypeId(NULL, stmt->sourcetype);
 	targettypeid = typenameTypeId(NULL, stmt->targettype);
@@ -1433,14 +1499,20 @@ CreateCast(CreateCastStmt *stmt)
 	if (stmt->func != NULL)
 	{
 		Form_pg_proc procstruct;
+		cqContext  *proccqCtx;
 
 		funcid = LookupFuncNameTypeNames(stmt->func->funcname,
 										 stmt->func->funcargs,
 										 false);
 
-		tuple = SearchSysCache(PROCOID,
-							   ObjectIdGetDatum(funcid),
-							   0, 0, 0);
+		proccqCtx = caql_beginscan(
+				NULL,
+				cql("SELECT * FROM pg_proc "
+					" WHERE oid = :1 ",
+					ObjectIdGetDatum(funcid)));
+
+		tuple = caql_getnext(proccqCtx);
+
 		if (!HeapTupleIsValid(tuple))
 			elog(ERROR, "cache lookup failed for function %u", funcid);
 
@@ -1487,7 +1559,7 @@ CreateCast(CreateCastStmt *stmt)
 					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
 					 errmsg("cast function must not return a set")));
 
-		ReleaseSysCache(tuple);
+		caql_endscan(proccqCtx);
 	}
 	else
 	{
@@ -1555,23 +1627,31 @@ CreateCast(CreateCastStmt *stmt)
 	}
 
 	relation = heap_open(CastRelationId, RowExclusiveLock);
+	pcqCtx = caql_beginscan(
+							caql_addrel(cqclr(&cqc), relation), 
+							cql("INSERT INTO pg_cast",
+								NULL));
 
 	/*
 	 * Check for duplicate.  This is just to give a friendly error message,
 	 * the unique index would catch it anyway (so no need to sweat about race
 	 * conditions).
 	 */
-	tuple = SearchSysCache(CASTSOURCETARGET,
-						   ObjectIdGetDatum(sourcetypeid),
-						   ObjectIdGetDatum(targettypeid),
-						   0, 0);
-	if (HeapTupleIsValid(tuple))
+
+	if (caql_getcount(
+				caql_addrel(cqclr(&cqc2), relation), 
+				cql("SELECT COUNT(*) FROM pg_cast "
+					" WHERE castsource = :1 "
+					" AND casttarget = :2 ",
+					ObjectIdGetDatum(sourcetypeid),
+					ObjectIdGetDatum(targettypeid))))
+	{
 		ereport(ERROR,
 				(errcode(ERRCODE_DUPLICATE_OBJECT),
 				 errmsg("cast from type %s to type %s already exists",
 						TypeNameToString(stmt->sourcetype),
 						TypeNameToString(stmt->targettype))));
-
+	}
 	/* ready to go */
 	values[Anum_pg_cast_castsource - 1] = ObjectIdGetDatum(sourcetypeid);
 	values[Anum_pg_cast_casttarget - 1] = ObjectIdGetDatum(targettypeid);
@@ -1580,14 +1660,13 @@ CreateCast(CreateCastStmt *stmt)
 
 	MemSet(nulls, false, sizeof(nulls));
 
-	tuple = heap_form_tuple(RelationGetDescr(relation), values, nulls);
+	tuple = caql_form_tuple(pcqCtx, values, nulls);
 
 	if (stmt->castOid != 0)
 		HeapTupleSetOid(tuple, stmt->castOid);
 		
-	stmt->castOid = simple_heap_insert(relation, tuple);
-
-	CatalogUpdateIndexes(relation, tuple);
+	stmt->castOid = caql_insert(pcqCtx, tuple);
+	/* and Update indexes (implicit) */
 
 	/* make dependency entries */
 	myself.classId = CastRelationId;
@@ -1617,6 +1696,7 @@ CreateCast(CreateCastStmt *stmt)
 
 	heap_freetuple(tuple);
 
+	caql_endscan(pcqCtx);
 	heap_close(relation, RowExclusiveLock);
 	
 	if (Gp_role == GP_ROLE_DISPATCH)
@@ -1636,18 +1716,25 @@ DropCast(DropCastStmt *stmt)
 {
 	Oid			sourcetypeid;
 	Oid			targettypeid;
-	HeapTuple	tuple;
 	ObjectAddress object;
+	int			fetchCount;
+	Oid			castOid;
 
 	/* when dropping a cast, the types must exist even if you use IF EXISTS */
 	sourcetypeid = typenameTypeId(NULL, stmt->sourcetype);
 	targettypeid = typenameTypeId(NULL, stmt->targettype);
 
-	tuple = SearchSysCache(CASTSOURCETARGET,
-						   ObjectIdGetDatum(sourcetypeid),
-						   ObjectIdGetDatum(targettypeid),
-						   0, 0);
-	if (!HeapTupleIsValid(tuple))
+	castOid = caql_getoid_plus(
+			NULL,
+			&fetchCount,
+			NULL,
+			cql("SELECT oid FROM pg_cast "
+				" WHERE castsource = :1 "
+				" AND casttarget = :2 ",
+				ObjectIdGetDatum(sourcetypeid),
+				ObjectIdGetDatum(targettypeid)));
+
+	if (!fetchCount)
 	{
 		if (!stmt->missing_ok)
 			ereport(ERROR,
@@ -1677,10 +1764,8 @@ DropCast(DropCastStmt *stmt)
 	 * Do the deletion
 	 */
 	object.classId = CastRelationId;
-	object.objectId = HeapTupleGetOid(tuple);
+	object.objectId = castOid;
 	object.objectSubId = 0;
-
-	ReleaseSysCache(tuple);
 
 	performDeletion(&object, stmt->behavior);
 	
@@ -1694,27 +1779,16 @@ DropCast(DropCastStmt *stmt)
 void
 DropCastById(Oid castOid)
 {
-	Relation	relation;
-	ScanKeyData scankey;
-	SysScanDesc scan;
-	HeapTuple	tuple;
+	int			numDel;
 
-	relation = heap_open(CastRelationId, RowExclusiveLock);
+	numDel = caql_getcount(
+			NULL,
+			cql("DELETE FROM pg_cast "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(castOid)));
 
-	ScanKeyInit(&scankey,
-				ObjectIdAttributeNumber,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(castOid));
-	scan = systable_beginscan(relation, CastOidIndexId, true,
-							  SnapshotNow, 1, &scankey);
-
-	tuple = systable_getnext(scan);
-	if (!HeapTupleIsValid(tuple))
+	if (!numDel)
 		elog(ERROR, "could not find tuple for cast %u", castOid);
-	simple_heap_delete(relation, &tuple->t_self);
-
-	systable_endscan(scan);
-	heap_close(relation, RowExclusiveLock);
 }
 
 /*
@@ -1732,6 +1806,9 @@ AlterFunctionNamespace(List *name, List *argtypes, bool isagg,
 	HeapTuple	tup;
 	Relation	procRel;
 	Form_pg_proc proc;
+	cqContext	cqc2;
+	cqContext	cqc;
+	cqContext  *pcqCtx;
 
 	procRel = heap_open(ProcedureRelationId, RowExclusiveLock);
 
@@ -1746,9 +1823,15 @@ AlterFunctionNamespace(List *name, List *argtypes, bool isagg,
 		aclcheck_error(ACLCHECK_NOT_OWNER, ACL_KIND_PROC,
 					   NameListToString(name));
 
-	tup = SearchSysCacheCopy(PROCOID,
-							 ObjectIdGetDatum(procOid),
-							 0, 0, 0);
+	pcqCtx = caql_addrel(cqclr(&cqc), procRel);
+
+	tup = caql_getfirst(
+			pcqCtx,
+			cql("SELECT * FROM pg_proc "
+				" WHERE oid = :1 "
+				" FOR UPDATE ",
+				ObjectIdGetDatum(procOid)));
+
 	if (!HeapTupleIsValid(tup))
 		elog(ERROR, "cache lookup failed for function %u", procOid);
 	proc = (Form_pg_proc) GETSTRUCT(tup);
@@ -1784,24 +1867,29 @@ AlterFunctionNamespace(List *name, List *argtypes, bool isagg,
 				 errmsg("cannot move objects into or out of AO SEGMENT schema")));
 	
 	/* check for duplicate name (more friendly than unique-index failure) */
-	if (SearchSysCacheExists(PROCNAMEARGSNSP,
-							 CStringGetDatum(NameStr(proc->proname)),
-							 PointerGetDatum(&proc->proargtypes),
-							 ObjectIdGetDatum(nspOid),
-							 0))
+	if (caql_getcount(
+				caql_addrel(cqclr(&cqc2), procRel),
+				cql("SELECT COUNT(*) FROM pg_proc "
+					" WHERE proname = :1 "
+					" AND proargtypes = :2 "
+					" AND pronamespace = :3 ",
+					CStringGetDatum(NameStr(proc->proname)),
+					PointerGetDatum(&proc->proargtypes),
+					ObjectIdGetDatum(nspOid))))
+	{
 		ereport(ERROR,
 				(errcode(ERRCODE_DUPLICATE_FUNCTION),
 				 errmsg("function \"%s\" already exists in schema \"%s\"",
 						NameStr(proc->proname),
 						newschema)));
+	}
 
 	/* OK, modify the pg_proc row */
 
 	/* tup is a copy, so we can scribble directly on it */
 	proc->pronamespace = nspOid;
 
-	simple_heap_update(procRel, &tup->t_self, tup);
-	CatalogUpdateIndexes(procRel, tup);
+	caql_update_current(pcqCtx, tup); /* implicit update of index as well */
 
 	/* Update dependency on schema */
 	if (changeDependencyFor(ProcedureRelationId, procOid,

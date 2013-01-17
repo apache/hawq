@@ -13,6 +13,7 @@
  */
 #include "postgres.h"
 
+#include "access/catquery.h"
 #include "access/heapam.h"
 #include "access/reloptions.h"
 #include "catalog/catalog.h"
@@ -38,6 +39,7 @@
 #include "utils/rel.h"
 #include "utils/syscache.h"
 #include "access/genam.h"
+#include "access/catquery.h"
 
 /*
  * Convert a DefElem list to the text array format that is used in
@@ -208,6 +210,8 @@ AlterForeignDataWrapperOwner(const char *name, Oid newOwnerId)
 	Relation	rel;
 	Oid			fdwId;
 	Form_pg_foreign_data_wrapper form;
+	cqContext	cqc;
+	cqContext  *pcqCtx;
 
 	/* Must be a superuser to change a FDW owner */
 	if (!superuser())
@@ -229,9 +233,14 @@ AlterForeignDataWrapperOwner(const char *name, Oid newOwnerId)
 
 	rel = heap_open(ForeignDataWrapperRelationId, RowExclusiveLock);
 
-	tup = SearchSysCacheCopy(FOREIGNDATAWRAPPERNAME,
-							 CStringGetDatum(name),
-							 0, 0, 0);
+	pcqCtx = caql_addrel(cqclr(&cqc), rel);
+
+	tup = caql_getfirst(
+			pcqCtx,
+			cql("SELECT * FROM pg_foreign_data_wrapper "
+				" WHERE fdwname = :1 "
+				" FOR UPDATE ",
+				CStringGetDatum(name)));
 
 	if (!HeapTupleIsValid(tup))
 		ereport(ERROR,
@@ -246,8 +255,7 @@ AlterForeignDataWrapperOwner(const char *name, Oid newOwnerId)
 	{
 		form->fdwowner = newOwnerId;
 
-		simple_heap_update(rel, &tup->t_self, tup);
-		CatalogUpdateIndexes(rel, tup);
+		caql_update_current(pcqCtx, tup); /* implicit update of index as well*/
 
 		/* Update owner dependency reference */
 		changeDependencyOnOwner(ForeignDataWrapperRelationId,
@@ -271,12 +279,19 @@ AlterForeignServerOwner(const char *name, Oid newOwnerId)
 	Oid			srvId;
 	AclResult	aclresult;
 	Form_pg_foreign_server form;
+	cqContext	cqc;
+	cqContext  *pcqCtx;
 
 	rel = heap_open(ForeignServerRelationId, RowExclusiveLock);
 
-	tup = SearchSysCacheCopy(FOREIGNSERVERNAME,
-							 CStringGetDatum(name),
-							 0, 0, 0);
+	pcqCtx = caql_addrel(cqclr(&cqc), rel);
+
+	tup = caql_getfirst(
+			pcqCtx,
+			cql("SELECT * FROM pg_foreign_server "
+				" WHERE srvname = :1 "
+				" FOR UPDATE ",
+				CStringGetDatum(name)));
 
 	if (!HeapTupleIsValid(tup))
 		ereport(ERROR,
@@ -312,8 +327,7 @@ AlterForeignServerOwner(const char *name, Oid newOwnerId)
 
 		form->srvowner = newOwnerId;
 
-		simple_heap_update(rel, &tup->t_self, tup);
-		CatalogUpdateIndexes(rel, tup);
+		caql_update_current(pcqCtx, tup); /* implicit update of index as well*/
 
 		/* Update owner dependency reference */
 		changeDependencyOnOwner(ForeignServerRelationId, HeapTupleGetOid(tup),
@@ -354,6 +368,8 @@ CreateForeignDataWrapper(CreateFdwStmt *stmt)
 	Oid			fdwvalidator;
 	Datum		fdwoptions;
 	Oid			ownerId;
+	cqContext	cqc;
+	cqContext  *pcqCtx;
 
 	/* Must be super user */
 	if (!superuser())
@@ -382,6 +398,11 @@ CreateForeignDataWrapper(CreateFdwStmt *stmt)
 	 */
 	rel = heap_open(ForeignDataWrapperRelationId, RowExclusiveLock);
 
+	pcqCtx = caql_beginscan(
+			caql_addrel(cqclr(&cqc), rel),
+			cql("INSERT INTO pg_foreign_data_wrapper", 
+				NULL));
+
 	memset(values, 0, sizeof(values));
 	memset(nulls, false, sizeof(nulls));
 
@@ -406,10 +427,9 @@ CreateForeignDataWrapper(CreateFdwStmt *stmt)
 	else
 		nulls[Anum_pg_foreign_data_wrapper_fdwoptions - 1] = true;
 
-	tuple = heap_form_tuple(rel->rd_att, values, nulls);
+	tuple = caql_form_tuple(pcqCtx, values, nulls);
 
-	fdwId = simple_heap_insert(rel, tuple);
-	CatalogUpdateIndexes(rel, tuple);
+	fdwId = caql_insert(pcqCtx, tuple); /* implicit update of index as well */
 
 	heap_freetuple(tuple);
 
@@ -430,6 +450,7 @@ CreateForeignDataWrapper(CreateFdwStmt *stmt)
 
 	recordDependencyOnOwner(ForeignDataWrapperRelationId, fdwId, ownerId);
 
+	caql_endscan(pcqCtx);
 	heap_close(rel, NoLock);
 
 	/* dispatch to QEs */
@@ -453,6 +474,8 @@ AlterForeignDataWrapper(AlterFdwStmt *stmt)
 	bool		isnull;
 	Datum		datum;
 	Oid			fdwvalidator;
+	cqContext	cqc;
+	cqContext  *pcqCtx;
 
 	/* Must be super user */
 	if (!superuser())
@@ -463,9 +486,16 @@ AlterForeignDataWrapper(AlterFdwStmt *stmt)
 			 errhint("Must be superuser to alter a foreign-data wrapper."),
 						errOmitLocation(true)));
 
-	tp = SearchSysCacheCopy(FOREIGNDATAWRAPPERNAME,
-							CStringGetDatum(stmt->fdwname),
-							0, 0, 0);
+	rel = heap_open(ForeignDataWrapperRelationId, RowExclusiveLock);
+
+	pcqCtx = caql_addrel(cqclr(&cqc), rel);
+
+	tp = caql_getfirst(
+			pcqCtx,
+			cql("SELECT * FROM pg_foreign_data_wrapper "
+				" WHERE fdwname = :1 "
+				" FOR UPDATE ",
+				CStringGetDatum(stmt->fdwname)));
 
 	if (!HeapTupleIsValid(tp))
 		ereport(ERROR,
@@ -500,10 +530,9 @@ AlterForeignDataWrapper(AlterFdwStmt *stmt)
 		/*
 		 * Validator is not changed, but we need it for validating options.
 		 */
-		datum = SysCacheGetAttr(FOREIGNDATAWRAPPEROID,
-								tp,
-								Anum_pg_foreign_data_wrapper_fdwvalidator,
-								&isnull);
+		datum = caql_getattr(pcqCtx,
+							 Anum_pg_foreign_data_wrapper_fdwvalidator,
+							 &isnull);
 		Assert(!isnull);
 		fdwvalidator = DatumGetObjectId(datum);
 	}
@@ -514,10 +543,9 @@ AlterForeignDataWrapper(AlterFdwStmt *stmt)
 	if (stmt->options)
 	{
 		/* Extract the current options */
-		datum = SysCacheGetAttr(FOREIGNDATAWRAPPEROID,
-								tp,
-								Anum_pg_foreign_data_wrapper_fdwoptions,
-								&isnull);
+		datum = caql_getattr(pcqCtx,
+							 Anum_pg_foreign_data_wrapper_fdwoptions,
+							 &isnull);
 		if (isnull)
 			datum = PointerGetDatum(NULL);
 
@@ -534,13 +562,11 @@ AlterForeignDataWrapper(AlterFdwStmt *stmt)
 
 	/* Everything looks good - update the tuple */
 
-	rel = heap_open(ForeignDataWrapperRelationId, RowExclusiveLock);
+	tp = caql_modify_current(pcqCtx,
+							 repl_val, repl_null, repl_repl);
 
-	tp = heap_modify_tuple(tp, RelationGetDescr(rel),
-						   repl_val, repl_null, repl_repl);
-
-	simple_heap_update(rel, &tp->t_self, tp);
-	CatalogUpdateIndexes(rel, tp);
+	caql_update_current(pcqCtx, tp);
+	/* and Update indexes (implicit) */
 
 	heap_close(rel, RowExclusiveLock);
 	heap_freetuple(tp);
@@ -610,23 +636,14 @@ RemoveForeignDataWrapper(DropFdwStmt *stmt)
 void
 RemoveForeignDataWrapperById(Oid fdwId)
 {
-	HeapTuple	tp;
-	Relation	rel;
-
-	rel = heap_open(ForeignDataWrapperRelationId, RowExclusiveLock);
-
-	tp = SearchSysCache(FOREIGNDATAWRAPPEROID,
-						ObjectIdGetDatum(fdwId),
-						0, 0, 0);
-
-	if (!HeapTupleIsValid(tp))
+	if (0 == caql_getcount(
+				NULL,
+				cql("DELETE FROM pg_foreign_data_wrapper "
+					" WHERE oid = :1 ",
+					ObjectIdGetDatum(fdwId))))
+	{
 		elog(ERROR, "cache lookup failed for foreign-data wrapper %u", fdwId);
-
-	simple_heap_delete(rel, &tp->t_self);
-
-	ReleaseSysCache(tp);
-
-	heap_close(rel, RowExclusiveLock);
+	}
 }
 
 
@@ -647,6 +664,8 @@ CreateForeignServer(CreateForeignServerStmt *stmt)
 	ObjectAddress myself;
 	ObjectAddress referenced;
 	ForeignDataWrapper *fdw;
+	cqContext	cqc;
+	cqContext  *pcqCtx;
 
 	/* For now the owner cannot be specified on create. Use effective user ID. */
 	ownerId = GetUserId();
@@ -675,6 +694,10 @@ CreateForeignServer(CreateForeignServerStmt *stmt)
 	 * Insert tuple into pg_foreign_server.
 	 */
 	rel = heap_open(ForeignServerRelationId, RowExclusiveLock);
+	pcqCtx = caql_beginscan(
+			caql_addrel(cqclr(&cqc), rel),
+			cql("INSERT INTO pg_foreign_server", 
+				NULL));
 
 	memset(values, 0, sizeof(values));
 	memset(nulls, false, sizeof(nulls));
@@ -710,11 +733,9 @@ CreateForeignServer(CreateForeignServerStmt *stmt)
 	else
 		nulls[Anum_pg_foreign_server_srvoptions - 1] = true;
 
-	tuple = heap_form_tuple(rel->rd_att, values, nulls);
+	tuple = caql_form_tuple(pcqCtx, values, nulls);
 
-	srvId = simple_heap_insert(rel, tuple);
-
-	CatalogUpdateIndexes(rel, tuple);
+	srvId = caql_insert(pcqCtx, tuple); /* implicit update of index as well */
 
 	heap_freetuple(tuple);
 
@@ -730,6 +751,7 @@ CreateForeignServer(CreateForeignServerStmt *stmt)
 
 	recordDependencyOnOwner(ForeignServerRelationId, srvId, ownerId);
 
+	caql_endscan(pcqCtx);
 	heap_close(rel, NoLock);
 	
 	/* dispatch to QEs */
@@ -752,10 +774,19 @@ AlterForeignServer(AlterForeignServerStmt *stmt)
 	bool		repl_repl[Natts_pg_foreign_server];
 	Oid			srvId;
 	Form_pg_foreign_server srvForm;
+	cqContext	cqc;
+	cqContext  *pcqCtx;
 
-	tp = SearchSysCacheCopy(FOREIGNSERVERNAME,
-							CStringGetDatum(stmt->servername),
-							0, 0, 0);
+	rel = heap_open(ForeignServerRelationId, RowExclusiveLock);
+
+	pcqCtx = caql_addrel(cqclr(&cqc), rel);
+
+	tp = caql_getfirst(
+			pcqCtx,
+			cql("SELECT * FROM pg_foreign_server "
+				" WHERE srvname = :1 "
+				" FOR UPDATE ",
+				CStringGetDatum(stmt->servername)));
 
 	if (!HeapTupleIsValid(tp))
 		ereport(ERROR,
@@ -798,10 +829,9 @@ AlterForeignServer(AlterForeignServerStmt *stmt)
 		bool		isnull;
 
 		/* Extract the current srvoptions */
-		datum = SysCacheGetAttr(FOREIGNSERVEROID,
-								tp,
-								Anum_pg_foreign_server_srvoptions,
-								&isnull);
+		datum = caql_getattr(pcqCtx,
+							 Anum_pg_foreign_server_srvoptions,
+							 &isnull);
 		if (isnull)
 			datum = PointerGetDatum(NULL);
 
@@ -819,13 +849,11 @@ AlterForeignServer(AlterForeignServerStmt *stmt)
 
 	/* Everything looks good - update the tuple */
 
-	rel = heap_open(ForeignServerRelationId, RowExclusiveLock);
+	tp = caql_modify_current(pcqCtx,
+							 repl_val, repl_null, repl_repl);
 
-	tp = heap_modify_tuple(tp, RelationGetDescr(rel),
-						   repl_val, repl_null, repl_repl);
-
-	simple_heap_update(rel, &tp->t_self, tp);
-	CatalogUpdateIndexes(rel, tp);
+	caql_update_current(pcqCtx, tp);
+	/* and Update indexes (implicit) */
 
 	heap_close(rel, RowExclusiveLock);
 	heap_freetuple(tp);
@@ -889,25 +917,15 @@ RemoveForeignServer(DropForeignServerStmt *stmt)
 void
 RemoveForeignServerById(Oid srvId)
 {
-	HeapTuple	tp;
-	Relation	rel;
-
-	rel = heap_open(ForeignServerRelationId, RowExclusiveLock);
-
-	tp = SearchSysCache(FOREIGNSERVEROID,
-						ObjectIdGetDatum(srvId),
-						0, 0, 0);
-
-	if (!HeapTupleIsValid(tp))
+	if (0 == caql_getcount(
+				NULL,
+				cql("DELETE FROM pg_foreign_server "
+					" WHERE oid = :1 ",
+					ObjectIdGetDatum(srvId))))
+	{
 		elog(ERROR, "cache lookup failed for foreign server %u", srvId);
-
-	simple_heap_delete(rel, &tp->t_self);
-
-	ReleaseSysCache(tp);
-
-	heap_close(rel, RowExclusiveLock);
+	}
 }
-
 
 /*
  * Common routine to check permission for user-mapping-related DDL
@@ -953,6 +971,10 @@ CreateUserMapping(CreateUserMappingStmt *stmt)
 	ObjectAddress referenced;
 	ForeignServer *srv;
 	ForeignDataWrapper *fdw;
+	cqContext	cqc;
+	cqContext	cqc2;
+	cqContext  *pcqCtx;
+
 
 	useId = GetUserOidFromMapping(stmt->username, false);
 
@@ -961,13 +983,24 @@ CreateUserMapping(CreateUserMappingStmt *stmt)
 
 	user_mapping_ddl_aclcheck(useId, srv->serverid, stmt->servername);
 
+	rel = heap_open(UserMappingRelationId, RowExclusiveLock);
+
+	pcqCtx = caql_beginscan(
+			caql_addrel(cqclr(&cqc), rel),
+			cql("INSERT INTO pg_user_mapping",
+				NULL));
+
 	/*
 	 * Check that the user mapping is unique within server.
 	 */
-	umId = GetSysCacheOid(USERMAPPINGUSERSERVER,
-						  ObjectIdGetDatum(useId),
-						  ObjectIdGetDatum(srv->serverid),
-						  0, 0);
+	umId = caql_getoid(
+			caql_addrel(cqclr(&cqc2), rel),
+			cql("SELECT oid FROM pg_user_mapping "
+				" WHERE umuser = :1 "
+				" AND umserver = :2 ",
+				ObjectIdGetDatum(useId),
+				ObjectIdGetDatum(srv->serverid)));
+
 	if (OidIsValid(umId))
 		ereport(ERROR,
 				(errcode(ERRCODE_DUPLICATE_OBJECT),
@@ -981,7 +1014,6 @@ CreateUserMapping(CreateUserMappingStmt *stmt)
 	/*
 	 * Insert tuple into pg_user_mapping.
 	 */
-	rel = heap_open(UserMappingRelationId, RowExclusiveLock);
 
 	memset(values, 0, sizeof(values));
 	memset(nulls, false, sizeof(nulls));
@@ -997,12 +1029,10 @@ CreateUserMapping(CreateUserMappingStmt *stmt)
 		values[Anum_pg_user_mapping_umoptions - 1] = useoptions;
 	else
 		nulls[Anum_pg_user_mapping_umoptions - 1] = true;
+	
+	tuple = caql_form_tuple(pcqCtx, values, nulls);
 
-	tuple = heap_form_tuple(rel->rd_att, values, nulls);
-
-	umId = simple_heap_insert(rel, tuple);
-
-	CatalogUpdateIndexes(rel, tuple);
+	umId = caql_insert(pcqCtx, tuple); /* implicit update of index as well */
 
 	heap_freetuple(tuple);
 
@@ -1020,12 +1050,12 @@ CreateUserMapping(CreateUserMappingStmt *stmt)
 		/* Record the mapped user dependency */
 		recordDependencyOnOwner(UserMappingRelationId, umId, useId);
 
+	caql_endscan(pcqCtx);
 	heap_close(rel, NoLock);
 	
 	/* dispatch to QEs */
 	if (Gp_role == GP_ROLE_DISPATCH)
 		CdbDispatchUtilityStatement((Node *) stmt, "CreateUserMappingStmt");
-
 }
 
 
@@ -1043,14 +1073,20 @@ AlterUserMapping(AlterUserMappingStmt *stmt)
 	Oid			useId;
 	Oid			umId;
 	ForeignServer *srv;
+	cqContext	cqc;
+	cqContext  *pcqCtx;
 
 	useId = GetUserOidFromMapping(stmt->username, false);
 	srv = GetForeignServerByName(stmt->servername, false);
 
-	umId = GetSysCacheOid(USERMAPPINGUSERSERVER,
-						  ObjectIdGetDatum(useId),
-						  ObjectIdGetDatum(srv->serverid),
-						  0, 0);
+	umId = caql_getoid(
+			NULL,
+			cql("SELECT oid FROM pg_user_mapping "
+				" WHERE umuser = :1 "
+				" AND umserver = :2 ",
+				ObjectIdGetDatum(useId),
+				ObjectIdGetDatum(srv->serverid)));
+
 	if (!OidIsValid(umId))
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_OBJECT),
@@ -1060,9 +1096,16 @@ AlterUserMapping(AlterUserMappingStmt *stmt)
 
 	user_mapping_ddl_aclcheck(useId, srv->serverid, stmt->servername);
 
-	tp = SearchSysCacheCopy(USERMAPPINGOID,
-							ObjectIdGetDatum(umId),
-							0, 0, 0);
+	rel = heap_open(UserMappingRelationId, RowExclusiveLock);
+
+	pcqCtx = caql_addrel(cqclr(&cqc), rel);
+
+	tp = caql_getfirst(
+			pcqCtx,
+			cql("SELECT * FROM pg_user_mapping "
+				" WHERE oid = :1 "
+				" FOR UPDATE ",
+				ObjectIdGetDatum(umId)));
 
 	if (!HeapTupleIsValid(tp))
 		elog(ERROR, "cache lookup failed for user mapping %u", umId);
@@ -1083,10 +1126,9 @@ AlterUserMapping(AlterUserMappingStmt *stmt)
 
 		fdw = GetForeignDataWrapper(srv->fdwid);
 
-		datum = SysCacheGetAttr(USERMAPPINGUSERSERVER,
-								tp,
-								Anum_pg_user_mapping_umoptions,
-								&isnull);
+		datum = caql_getattr(pcqCtx,
+							 Anum_pg_user_mapping_umoptions,
+							 &isnull);
 		if (isnull)
 			datum = PointerGetDatum(NULL);
 
@@ -1104,13 +1146,11 @@ AlterUserMapping(AlterUserMappingStmt *stmt)
 
 	/* Everything looks good - update the tuple */
 
-	rel = heap_open(UserMappingRelationId, RowExclusiveLock);
+	tp = caql_modify_current(pcqCtx,
+							 repl_val, repl_null, repl_repl);
 
-	tp = heap_modify_tuple(tp, RelationGetDescr(rel),
-						   repl_val, repl_null, repl_repl);
-
-	simple_heap_update(rel, &tp->t_self, tp);
-	CatalogUpdateIndexes(rel, tp);
+	caql_update_current(pcqCtx, tp);
+	/* and Update indexes (implicit) */
 
 	heap_close(rel, RowExclusiveLock);
 	heap_freetuple(tp);
@@ -1160,10 +1200,13 @@ RemoveUserMapping(DropUserMappingStmt *stmt)
 		return;
 	}
 
-	umId = GetSysCacheOid(USERMAPPINGUSERSERVER,
-						  ObjectIdGetDatum(useId),
-						  ObjectIdGetDatum(srv->serverid),
-						  0, 0);
+	umId = caql_getoid(
+			NULL,
+			cql("SELECT oid FROM pg_user_mapping "
+				" WHERE umuser = :1 "
+				" AND umserver = :2 ",
+				ObjectIdGetDatum(useId),
+				ObjectIdGetDatum(srv->serverid)));
 
 	if (!OidIsValid(umId))
 	{
@@ -1204,23 +1247,14 @@ RemoveUserMapping(DropUserMappingStmt *stmt)
 void
 RemoveUserMappingById(Oid umId)
 {
-	HeapTuple	tp;
-	Relation	rel;
-
-	rel = heap_open(UserMappingRelationId, RowExclusiveLock);
-
-	tp = SearchSysCache(USERMAPPINGOID,
-						ObjectIdGetDatum(umId),
-						0, 0, 0);
-
-	if (!HeapTupleIsValid(tp))
+	if (0 == caql_getcount(
+				NULL,
+				cql("DELETE FROM pg_user_mapping "
+					" WHERE oid = :1 ",
+					ObjectIdGetDatum(umId))))
+	{
 		elog(ERROR, "cache lookup failed for user mapping %u", umId);
-
-	simple_heap_delete(rel, &tp->t_self);
-
-	ReleaseSysCache(tp);
-
-	heap_close(rel, RowExclusiveLock);
+	}
 }
 
 /*******************************************************************
@@ -1251,6 +1285,8 @@ InsertForeignTableEntry(Oid relid, char	*servername, List *options)
 	AclResult	aclresult;
 	ForeignServer *srv;
 	ForeignDataWrapper *fdw;
+	cqContext	cqc;
+	cqContext  *pcqCtx;
 
 	/* For now the owner cannot be specified on create. Use effective user ID. */
 	ownerId = GetUserId();
@@ -1272,6 +1308,10 @@ InsertForeignTableEntry(Oid relid, char	*servername, List *options)
 	 * Insert tuple into pg_foreign_table.
 	 */
 	rel = heap_open(ForeignTableRelationId, RowExclusiveLock);
+	pcqCtx = caql_beginscan(
+			caql_addrel(cqclr(&cqc), rel),
+			cql("INSERT INTO pg_foreign_table", 
+				NULL));
 
 	memset(values, 0, sizeof(values));
 	memset(nulls, false, sizeof(nulls));
@@ -1289,12 +1329,14 @@ InsertForeignTableEntry(Oid relid, char	*servername, List *options)
 	else
 		nulls[Anum_pg_foreign_table_tbloptions - 1] = true;
 
-	tuple = heap_form_tuple(rel->rd_att, values, nulls);
+	tuple = caql_form_tuple(pcqCtx, values, nulls);
 
-	srvId = simple_heap_insert(rel, tuple);
+	srvId = caql_insert(pcqCtx, tuple); /* implicit update of index as well */
+	(void) srvId;  /* never used */
 
-	CatalogUpdateIndexes(rel, tuple);
 	heap_freetuple(tuple);
+
+	caql_endscan(pcqCtx);
 	heap_close(rel, NoLock);
 }
 
@@ -1305,41 +1347,25 @@ void
 RemoveForeignTableEntry(Oid relid)
 {
 	Relation	pg_foreigntable_rel;
-	HeapTuple	tuple;
-	ScanKeyData	key;
-	SysScanDesc	foreignscan;
+	int			numDel;
+	cqContext	cqc;
 
 	/*
 	 * now remove the pg_foreign_table entry
 	 */
 	pg_foreigntable_rel = heap_open(ForeignTableRelationId, RowExclusiveLock);
 
-	ScanKeyInit(&key,
-				Anum_pg_foreign_table_reloid,
-				BTEqualStrategyNumber,
-				F_OIDEQ,
-				ObjectIdGetDatum(relid));
+	numDel = caql_getcount(
+			caql_addrel(cqclr(&cqc), pg_foreigntable_rel),
+			cql("DELETE FROM pg_foreign_table "
+				" WHERE reloid = :1 ",
+				ObjectIdGetDatum(relid)));
 
-	foreignscan = systable_beginscan(pg_foreigntable_rel, 
-									 ForeignTableRelOidIndexId, true,
-									 SnapshotNow, 1, &key);
-
-	tuple = systable_getnext(foreignscan);
-	if (!HeapTupleIsValid(tuple))
+	if (!numDel)
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_OBJECT),
 				 errmsg("foreign table object id \"%d\" does not exist",
 						relid)));
 
-	/*
-	 * Delete the external table entry from the catalog (pg_foreign_table).
-	 */
-	simple_heap_delete(pg_foreigntable_rel, &tuple->t_self);
-
-	/* Finish up scan and close pg_foreign_table catalog. */
-	systable_endscan(foreignscan);
-
 	heap_close(pg_foreigntable_rel, NoLock);
 }
-
-

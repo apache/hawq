@@ -16,6 +16,7 @@
  */
 #include "postgres.h"
 
+#include "access/catquery.h"
 #include "access/twophase.h"
 #include "access/xact.h"
 #include "catalog/catalog.h"
@@ -190,6 +191,7 @@ CheckDropPermissions(RangeVar *rel, char rightkind, bool missing_ok)
 	Oid			relOid;
 	HeapTuple	tuple;
 	Form_pg_class classform;
+	cqContext	*pcqCtx;
 
 	relOid = RangeVarGetRelid(rel, true);
 	if (!OidIsValid(relOid))
@@ -198,9 +200,14 @@ CheckDropPermissions(RangeVar *rel, char rightkind, bool missing_ok)
 		return false;
 	}
 
-	tuple = SearchSysCache(RELOID,
-						   ObjectIdGetDatum(relOid),
-						   0, 0, 0);
+	pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_class "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(relOid)));
+
+	tuple = caql_getnext(pcqCtx);
+
 	if (!HeapTupleIsValid(tuple))
 		elog(ERROR, "cache lookup failed for relation %u", relOid);
 
@@ -222,7 +229,7 @@ CheckDropPermissions(RangeVar *rel, char rightkind, bool missing_ok)
 				 errmsg("permission denied: \"%s\" is a system catalog",
 						rel->relname)));
 
-	ReleaseSysCache(tuple);
+	caql_endscan(pcqCtx);
 
 	return true;
 }
@@ -240,15 +247,21 @@ CheckDropRelStorage(RangeVar *rel, ObjectType removeType)
 	Oid			relOid;
 	HeapTuple	tuple;
 	Form_pg_class classform;
+	cqContext	*pcqCtx;
 
 	relOid = RangeVarGetRelid(rel, true);
 	
 	if (!OidIsValid(relOid))
 		return false;
 
-	tuple = SearchSysCache(RELOID,
-						   ObjectIdGetDatum(relOid),
-						   0, 0, 0);
+	pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_class "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(relOid)));
+
+	tuple = caql_getnext(pcqCtx);
+
 	if (!HeapTupleIsValid(tuple))
 		elog(ERROR, "cache lookup failed for relation %u", relOid);
 
@@ -285,7 +298,7 @@ CheckDropRelStorage(RangeVar *rel, ObjectType removeType)
 				 errOmitLocation(true)));
 	}
 	
-	ReleaseSysCache(tuple);
+	caql_endscan(pcqCtx);
 
 	return true;
 }
@@ -301,11 +314,18 @@ CheckRelationOwnership(RangeVar *rel, bool noCatalogs)
 {
 	Oid			relOid;
 	HeapTuple	tuple;
+	cqContext  *pcqCtx;
 
 	relOid = RangeVarGetRelid(rel, false);
-	tuple = SearchSysCache(RELOID,
-						   ObjectIdGetDatum(relOid),
-						   0, 0, 0);
+
+	pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_class "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(relOid)));
+
+	tuple = caql_getnext(pcqCtx);
+
 	if (!HeapTupleIsValid(tuple))		/* should not happen */
 		elog(ERROR, "cache lookup failed for relation %u", relOid);
 
@@ -323,7 +343,7 @@ CheckRelationOwnership(RangeVar *rel, bool noCatalogs)
 							rel->relname)));
 	}
 
-	ReleaseSysCache(tuple);
+	caql_endscan(pcqCtx);
 }
 
 /*

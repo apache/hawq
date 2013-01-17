@@ -414,6 +414,8 @@ drop external table ext;
 -- CREATE TRUSTED PROTOCOL demoprot (readfunc = 'boolin'); -- should fail
 -- CREATE TRUSTED PROTOCOL demoprot (readfunc = 'read_from_file', writefunc = 'write_to_file'); -- should succeed
 -- CREATE PROTOCOL demoprot_untrusted (readfunc = 'read_from_file', writefunc = 'write_to_file'); -- should succeed
+-- ALTER PROTOCOL demoprot_untrusted RENAME TO demoprot_untrusted2;
+-- ALTER PROTOCOL demoprot_untrusted2 RENAME TO demoprot_untrusted;
 
 -- CREATE ROLE extprotu NOSUPERUSER;
 -- SET SESSION AUTHORIZATION extprotu;

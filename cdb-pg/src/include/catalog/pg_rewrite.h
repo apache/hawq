@@ -39,7 +39,7 @@
    );
 
    create unique index on pg_rewrite(oid) with (indexid=2692, CamelCase=RewriteOid);
-   create unique index on pg_rewrite(ev_class, rulename) with (indexid=2693, CamelCase=RewriteRelRulename);
+   create unique index on pg_rewrite(ev_class, rulename) with (indexid=2693, CamelCase=RewriteRelRulename, syscacheid=RULERELNAME, syscache_nbuckets=1024);
 
    alter table pg_rewrite add fk ev_class on pg_attribute(attrelid);
 

@@ -13,6 +13,7 @@
  */
 #include "postgres.h"
 
+#include "access/catquery.h"
 #include "access/printtup.h"
 #include "access/sysattr.h"
 #include "access/xact.h"
@@ -844,7 +845,7 @@ char *
 SPI_gettype(TupleDesc tupdesc, int fnumber)
 {
 	Oid			typoid;
-	HeapTuple	typeTuple;
+	int			fetchCount;
 	char	   *result;
 
 	SPI_result = 0;
@@ -861,18 +862,20 @@ SPI_gettype(TupleDesc tupdesc, int fnumber)
 	else
 		typoid = (SystemAttributeDefinition(fnumber, true))->atttypid;
 
-	typeTuple = SearchSysCache(TYPEOID,
-							   ObjectIdGetDatum(typoid),
-							   0, 0, 0);
+	result = caql_getcstring_plus(
+			NULL,
+			&fetchCount,
+			NULL,
+			cql("SELECT typname FROM pg_type "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(typoid)));
 
-	if (!HeapTupleIsValid(typeTuple))
+	if (!fetchCount)
 	{
 		SPI_result = SPI_ERROR_TYPUNKNOWN;
 		return NULL;
 	}
 
-	result = pstrdup(NameStr(((Form_pg_type) GETSTRUCT(typeTuple))->typname));
-	ReleaseSysCache(typeTuple);
 	return result;
 }
 

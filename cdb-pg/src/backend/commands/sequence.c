@@ -15,6 +15,7 @@
  */
 #include "postgres.h"
 
+#include "access/catquery.h"
 #include "access/heapam.h"
 #include "access/transam.h"
 #include "access/xact.h"
@@ -1142,12 +1143,16 @@ lastval(PG_FUNCTION_ARGS)
 				 errmsg("lastval is not yet defined in this session")));
 
 	/* Someone may have dropped the sequence since the last nextval() */
-	if (!SearchSysCacheExists(RELOID,
-							  ObjectIdGetDatum(last_used_seq->relid),
-							  0, 0, 0))
+	if (0 == caql_getcount(
+				NULL,
+				cql("SELECT COUNT(*) FROM pg_class "
+					" WHERE oid = :1 ",
+					ObjectIdGetDatum(last_used_seq->relid))))
+	{
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 				 errmsg("lastval is not yet defined in this session")));
+	}
 
 	seqrel = open_share_lock(last_used_seq);
 

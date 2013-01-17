@@ -53,13 +53,16 @@
    );
 
 
-   create unique index on pg_proc(oid) with (indexid=2690, CamelCase=ProcedureOid);
-   create unique index on pg_proc(proname, proargtypes, pronamespace) with (indexid=2691, CamelCase=ProcedureNameArgsNsp);
+   create unique index on pg_proc(oid) with (indexid=2690, CamelCase=ProcedureOid, syscacheid=PROCOID, syscache_nbuckets=2048);
+
+   create unique index on pg_proc(proname, proargtypes, pronamespace) with (indexid=2691, CamelCase=ProcedureNameArgsNsp, syscacheid=PROCNAMEARGSNSP, syscache_nbuckets=2048);
 
    alter table pg_proc add fk pronamespace on pg_namespace(oid);
    alter table pg_proc add fk proowner on pg_authid(oid);
    alter table pg_proc add fk prolang on pg_language(oid);
    alter table pg_proc add fk prorettype on pg_type(oid);
+   alter table pg_proc add vector_fk proargtypes on pg_type(oid);
+   alter table pg_proc add vector_fk proallargtypes on pg_type(oid);
 
    TIDYCAT_ENDFAKEDEF
 */

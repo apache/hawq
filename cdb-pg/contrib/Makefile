@@ -13,7 +13,7 @@ WANTED_DIRS = \
 		formatter \
 		formatter_fixedwidth \
 		extprotocol \
-		gp_internal_tools
+		gp_internal_tools \
 		gp_cancel_query
 
 ifeq ($(with_openssl),yes)

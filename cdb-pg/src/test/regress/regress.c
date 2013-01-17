@@ -12,6 +12,7 @@
 #include "access/transam.h"
 #include "access/xact.h"
 #include "catalog/pg_type.h"
+#include "cdb/memquota.h"
 #include "commands/sequence.h"
 #include "commands/trigger.h"
 #include "executor/executor.h"
@@ -21,8 +22,8 @@
 #include "libpq/hba.h"
 #include "utils/builtins.h"
 #include "utils/geo_decls.h"
+#include "utils/lsyscache.h"
 #include "utils/resscheduler.h"
-#include "cdb/memquota.h"
 
 #define P_MAXDIG 12
 #define LDELIM			'('

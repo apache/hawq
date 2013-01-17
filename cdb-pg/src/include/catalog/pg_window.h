@@ -42,7 +42,7 @@
    winkind          "char" 
    );
 
-   create unique index on pg_window(winfnoid) with (indexid=5005, indexname=pg_window_fnoid_index);
+   create unique index on pg_window(winfnoid) with (indexid=5005, indexname=pg_window_fnoid_index, syscacheid=WINFNOID, syscache_nbuckets=32);
 
    alter table pg_window add fk winfnoid on pg_proc(oid);
    alter table pg_window add fk winfunc on pg_proc(oid);

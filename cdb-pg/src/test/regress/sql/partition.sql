@@ -2956,6 +2956,7 @@ partition b start('e') end('g')
 -- Test locking behaviour. When creating, dropping, querying or adding indexes
 -- partitioned tables, we want to lock only the master, not the children.
 
+-- start_ignore
 create view locktest as
 select coalesce(
   case when relname like 'pg_toast%index' then 'toast index'
@@ -2966,7 +2967,10 @@ locktype from
 pg_locks l left outer join pg_class c on (l.relation = c.oid),
 pg_database d where relation is not null and l.database = d.oid and 
 l.gp_segment_id = -1 and
+l.relation != 5039 and     -- XXX XXX: ignore gp_fault_strategy
 d.datname = current_database() order by 1, 3, 2;
+-- end_ignore
+
 -- Partitioned table with toast table
 begin;
 

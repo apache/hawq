@@ -29,6 +29,7 @@
 #include <utime.h>
 #endif
 
+#include "access/catquery.h"
 #include "catalog/pg_authid.h"
 #include "cdb/cdbvars.h"
 #include "mb/pg_wchar.h"
@@ -423,7 +424,7 @@ InitializeSessionUserId(const char *rolename)
 	Datum		datum;
 	bool		isnull;
 	Oid			roleid;
-
+	cqContext  *pcqCtx;
 	/*
 	 * Don't do scans if we're bootstrapping, none of the system catalogs
 	 * exist yet, and they should be owned by postgres anyway.
@@ -433,9 +434,14 @@ InitializeSessionUserId(const char *rolename)
 	/* call only once */
 	AssertState(!OidIsValid(AuthenticatedUserId));
 
-	roleTup = SearchSysCache(AUTHNAME,
-							 PointerGetDatum((char *) rolename),
-							 0, 0, 0);
+	pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_authid "
+				" WHERE rolname = :1 ",
+				PointerGetDatum((char *) rolename)));
+
+	roleTup = caql_getnext(pcqCtx);
+
 	if (!HeapTupleIsValid(roleTup))
 		ereport(FATAL,
 				(errcode(ERRCODE_INVALID_AUTHORIZATION_SPECIFICATION),
@@ -546,8 +552,8 @@ InitializeSessionUserId(const char *rolename)
 	 * Set up user-specific configuration variables.  This is a good place to
 	 * do it so we don't have to read pg_authid twice during session startup.
 	 */
-	datum = SysCacheGetAttr(AUTHNAME, roleTup,
-							Anum_pg_authid_rolconfig, &isnull);
+	datum = caql_getattr(pcqCtx,
+						 Anum_pg_authid_rolconfig, &isnull);
 	if (!isnull)
 	{
 		ArrayType  *a = DatumGetArrayTypeP(datum);
@@ -555,7 +561,7 @@ InitializeSessionUserId(const char *rolename)
 		ProcessGUCArray(a, PGC_S_USER);
 	}
 
-	ReleaseSysCache(roleTup);
+	caql_endscan(pcqCtx);
 }
 
 
@@ -683,20 +689,22 @@ SetCurrentRoleId(Oid roleid, bool is_superuser)
 char *
 GetUserNameFromId(Oid roleid)
 {
-	HeapTuple	tuple;
 	char	   *result;
+	int			fetchCount;
+	
+	result = caql_getcstring_plus(
+			NULL,
+			&fetchCount,
+			NULL,
+			cql("SELECT rolname FROM pg_authid "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(roleid)));
 
-	tuple = SearchSysCache(AUTHOID,
-						   ObjectIdGetDatum(roleid),
-						   0, 0, 0);
-	if (!HeapTupleIsValid(tuple))
+	if (!fetchCount)
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_OBJECT),
 				 errmsg("invalid role OID: %u", roleid)));
 
-	result = pstrdup(NameStr(((Form_pg_authid) GETSTRUCT(tuple))->rolname));
-
-	ReleaseSysCache(tuple);
 	return result;
 }
 

@@ -31,6 +31,9 @@
 
    create unique index on pg_foreign_table(reloid) with (indexid=3049, CamelCase=ForeignTableRelOid);
 
+   alter table pg_foreign_table add fk reloid on pg_class(oid);
+   alter table pg_foreign_table add fk server on pg_foreign_server(oid);
+
    TIDYCAT_ENDFAKEDEF
 */
 

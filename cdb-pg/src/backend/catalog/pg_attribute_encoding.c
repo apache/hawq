@@ -10,6 +10,7 @@
 #include "fmgr.h"
 
 #include "access/reloptions.h"
+#include "access/catquery.h"
 #include "catalog/pg_attribute_encoding.h"
 #include "catalog/pg_compression.h"
 #include "catalog/dependency.h"
@@ -31,30 +32,32 @@
 static void
 add_attribute_encoding_entry(Oid relid, AttrNumber attnum, Datum attoptions)
 {
-	Relation pgaerel;
 	Datum values[Natts_pg_attribute_encoding];
 	bool nulls[Natts_pg_attribute_encoding];
 	HeapTuple tuple;
+	cqContext	   *pcqCtx;
 	
 	Insist(!gp_upgrade_mode);
 	Insist(attnum != InvalidAttrNumber);
 	
-	pgaerel = heap_open(AttributeEncodingRelationId, RowExclusiveLock);
+	pcqCtx = caql_beginscan(
+			NULL,
+			cql("INSERT INTO pg_attribute_encoding",
+				NULL));
 
 	MemSet(nulls, 0, sizeof(nulls));
 	values[Anum_pg_attribute_encoding_attrelid - 1] = ObjectIdGetDatum(relid);
 	values[Anum_pg_attribute_encoding_attnum - 1] = Int16GetDatum(attnum);
 	values[Anum_pg_attribute_encoding_attoptions - 1] = attoptions;
 
-	tuple = heap_form_tuple(RelationGetDescr(pgaerel), values, nulls);
+	tuple = caql_form_tuple(pcqCtx, values, nulls);
 
-	simple_heap_insert(pgaerel, tuple);
-
-	CatalogUpdateIndexes(pgaerel, tuple);
+	/* insert a new tuple */
+	caql_insert(pcqCtx, tuple); /* implicit update of index as well */
 
 	heap_freetuple(tuple);
 
-	heap_close(pgaerel, RowExclusiveLock);
+	caql_endscan(pcqCtx);
 }
 
 /*
@@ -89,8 +92,8 @@ get_rel_attoptions(Oid relid, AttrNumber max_attno)
 {
 	Form_pg_attribute attform;
 	HeapTuple		tuple;
-	ScanKeyData		key;
-	SysScanDesc		scan;
+	cqContext		cqc;
+	cqContext	   *pcqCtx;
 	Datum		   *dats;
 	Relation 		pgae = heap_open(AttributeEncodingRelationId,
 									 AccessShareLock);
@@ -100,20 +103,13 @@ get_rel_attoptions(Oid relid, AttrNumber max_attno)
 
 	dats = palloc0(max_attno * sizeof(Datum));
 
-	ScanKeyInit(&key,
-				Anum_pg_attribute_encoding_attrelid,
-				BTEqualStrategyNumber,
-				F_OIDEQ,
-				ObjectIdGetDatum(relid));
+	pcqCtx = caql_beginscan(
+			caql_addrel(cqclr(&cqc), pgae),
+			cql("SELECT * FROM pg_attribute_encoding "
+				" WHERE attrelid = :1 ",
+				ObjectIdGetDatum(relid)));
 
-	scan = systable_beginscan(pgae,
-							  AttributeEncodingAttrelidIndexId,
-							  true,
-							  SnapshotNow,
-							  1,
-							  &key);
-
-	while ((tuple = systable_getnext(scan)))
+	while (HeapTupleIsValid(tuple = caql_getnext(pcqCtx)))
 	{
 		Form_pg_attribute_encoding a = 
 			(Form_pg_attribute_encoding)GETSTRUCT(tuple);
@@ -132,7 +128,7 @@ get_rel_attoptions(Oid relid, AttrNumber max_attno)
 									 attform->attlen);
 	}
 
-	systable_endscan(scan);
+	caql_endscan(pcqCtx);
 
 	heap_close(pgae, AccessShareLock);
 
@@ -360,64 +356,18 @@ AddRelationAttributeEncodings(Relation rel, List *attr_encodings)
 	}
 }
 
-static void
-remove_attr_encoding(Oid relid, AttrNumber attnum, bool error_not_found)
+void
+RemoveAttributeEncodingsByRelid(Oid relid)
 {
-	ScanKeyData skey[2];
-	int			nkeys = 1;
-	SysScanDesc attrencscan;
-	HeapTuple	tuple;
-	Relation	pgattrenc;
 	bool 		found = false;
-	char	   *relname;
 
 	/* shouldn't be anything to do in upgrade mode */
 	if (gp_upgrade_mode)
 		return;
 
-	relname = get_rel_name(relid);
-	pgattrenc = heap_open(AttributeEncodingRelationId, RowExclusiveLock);
-
-	ScanKeyInit(&skey[0],
-				Anum_pg_attribute_encoding_attrelid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(relid));
-	if (attnum != InvalidAttrNumber)
-	{
-		ScanKeyInit(&skey[1],
-					Anum_pg_attribute_encoding_attnum,
-					BTEqualStrategyNumber, F_OIDEQ,
-					Int16GetDatum(attnum));
-		nkeys = 2;
-	}
-
-	attrencscan = systable_beginscan(pgattrenc,
-									 AttributeEncodingAttrelidAttnumIndexId,
-									 true, SnapshotNow, nkeys, skey);
-
-	while ((tuple = systable_getnext(attrencscan)) != NULL)
-	{
-		found = true;
-		simple_heap_delete(pgattrenc, &tuple->t_self);
-	}
-
-	if (!found && error_not_found)
-		elog(ERROR, "cannot find pg_attribute_encoding entry for relation \"%s\"",
-			 relname ? relname : "unknown");
-
-	systable_endscan(attrencscan);
-	heap_close(pgattrenc, RowExclusiveLock);
+	found = (0 != caql_getcount(
+					 NULL,
+					 cql("DELETE FROM pg_attribute_encoding "
+						 " WHERE attrelid = :1 ",
+						 ObjectIdGetDatum(relid))));
 }
-
-void
-RemoveRelationAttributeEncoding(Oid relid, AttrNumber attnum)
-{
-	remove_attr_encoding(relid, attnum, false);
-}
-
-void
-RemoveAttributeEncodingsByRelid(Oid relid)
-{
-	remove_attr_encoding(relid, InvalidAttrNumber, false);
-}
-

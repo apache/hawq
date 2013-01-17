@@ -41,11 +41,10 @@
    nspacl    aclitem[]  -- VARIABLE LENGTH FIELD
    );
 
-   create unique index on pg_namespace(nspname) with (indexid=2684);
-   create unique index on pg_namespace(oid) with (indexid=2685);
+   create unique index on pg_namespace(nspname) with (indexid=2684, syscacheid=NAMESPACENAME, syscache_nbuckets=256);
+   create unique index on pg_namespace(oid) with (indexid=2685, syscacheid=NAMESPACEOID, syscache_nbuckets=256);
 
    alter table pg_namespace add fk nspowner on pg_authid(oid);
-
 
    TIDYCAT_ENDDEF
 */

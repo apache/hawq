@@ -32,8 +32,9 @@
    admin_option  boolean
    );
 
-   create unique index on pg_auth_members(roleid, member) with (indexid=2694, CamelCase=AuthMemRoleMem);
-   create unique index on pg_auth_members(member, roleid) with (indexid=2695, CamelCase=AuthMemMemRole);
+   create unique index on pg_auth_members(roleid, member) with (indexid=2694, CamelCase=AuthMemRoleMem, syscacheid=AUTHMEMROLEMEM, syscache_nbuckets=128);
+
+   create unique index on pg_auth_members(member, roleid) with (indexid=2695, CamelCase=AuthMemMemRole, syscacheid=AUTHMEMMEMROLE, syscache_nbuckets=128);
 
    alter table pg_auth_members add fk roleid  on pg_authid(oid);
    alter table pg_auth_members add fk member  on pg_authid(oid);

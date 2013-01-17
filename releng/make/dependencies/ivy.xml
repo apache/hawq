@@ -13,6 +13,7 @@
 
     <dependencies>
       <dependency org="R-Project" name="R" rev="2.13.0" conf="osx105_x86->osx105_x86;rhel5_x86_64->rhel5_x86_64;rhel6_x86_64->rhel6_x86_64;sol10_x86_32->sol10_x86_32;sol10_x86_64->sol10_x86_64;suse10_x86_64->suse10_x86_64" />
+      <dependency org="gnu"       name="gperf"     rev="3.0.4"    conf="osx105_x86->osx105_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
     </dependencies>
 
 </ivy-module>

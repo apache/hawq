@@ -38,6 +38,7 @@
  */
 #include "postgres.h"
 
+#include "access/catquery.h"
 #include "access/heapam.h"
 #include "access/hio.h"
 #include "access/multixact.h"
@@ -943,9 +944,11 @@ try_relation_open(Oid relationId, LOCKMODE lockmode, bool noWait)
 	 * Now that we have the lock, probe to see if the relation really exists
 	 * or not.
 	 */
-	if (!SearchSysCacheExists(RELOID,
-							  ObjectIdGetDatum(relationId),
-							  0, 0, 0))
+	if (0 == caql_getcount(
+				NULL,
+				cql("SELECT COUNT(*) FROM pg_class "
+					" WHERE oid = :1 ",
+					ObjectIdGetDatum(relationId))))
 	{
 		/* Release useless lock */
 		if (lockmode != NoLock)

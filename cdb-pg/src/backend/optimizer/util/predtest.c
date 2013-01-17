@@ -15,6 +15,7 @@
  */
 #include "postgres.h"
 
+#include "access/catquery.h"
 #include "catalog/pg_amop.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_operator.h"
@@ -1573,9 +1574,13 @@ btree_predicate_proof(Expr *predicate, Node *clause, bool refute_it)
 	 * corresponding test operator.  This should work for any logically
 	 * consistent opclasses.
 	 */
-	catlist = SearchSysCacheList(AMOPOPID, 1,
-								 ObjectIdGetDatum(pred_op),
-								 0, 0, 0);
+	catlist = caql_begin_CacheList(
+			NULL,
+			cql("SELECT * FROM pg_amop "
+				" WHERE amopopr = :1 "
+				" ORDER BY amopopr, "
+				" amopclaid ",
+				ObjectIdGetDatum(pred_op)));
 
 	/*
 	 * If we couldn't find any opclass containing the pred_op, perhaps it is a
@@ -1588,10 +1593,17 @@ btree_predicate_proof(Expr *predicate, Node *clause, bool refute_it)
 		if (OidIsValid(pred_op_negator))
 		{
 			pred_op_negated = true;
-			ReleaseSysCacheList(catlist);
-			catlist = SearchSysCacheList(AMOPOPID, 1,
-										 ObjectIdGetDatum(pred_op_negator),
-										 0, 0, 0);
+
+			caql_end_CacheList(catlist);
+
+			catlist = caql_begin_CacheList(
+					NULL,
+					cql("SELECT * FROM pg_amop "
+						" WHERE amopopr = :1 "
+						" ORDER BY amopopr, "
+						" amopclaid ",
+						ObjectIdGetDatum(pred_op_negator)));
+
 		}
 	}
 
@@ -1604,6 +1616,7 @@ btree_predicate_proof(Expr *predicate, Node *clause, bool refute_it)
 		HeapTuple	pred_tuple = &catlist->members[i]->tuple;
 		Form_pg_amop pred_form = (Form_pg_amop) GETSTRUCT(pred_tuple);
 		HeapTuple	clause_tuple;
+		cqContext  *amcqCtx;
 
 		opclass_id = pred_form->amopclaid;
 
@@ -1630,10 +1643,16 @@ btree_predicate_proof(Expr *predicate, Node *clause, bool refute_it)
 		 * From the same opclass, find a strategy number for the clause_op, if
 		 * possible
 		 */
-		clause_tuple = SearchSysCache(AMOPOPID,
-									  ObjectIdGetDatum(clause_op),
-									  ObjectIdGetDatum(opclass_id),
-									  0, 0);
+		amcqCtx = caql_beginscan(
+				NULL,
+				cql("SELECT * FROM pg_amop "
+					" WHERE amopopr = :1 "
+					" AND amopclaid = :2 ",
+					ObjectIdGetDatum(clause_op),
+					ObjectIdGetDatum(opclass_id)));
+
+		clause_tuple = caql_getnext(amcqCtx);
+
 		if (HeapTupleIsValid(clause_tuple))
 		{
 			Form_pg_amop clause_form = (Form_pg_amop) GETSTRUCT(clause_tuple);
@@ -1642,14 +1661,22 @@ btree_predicate_proof(Expr *predicate, Node *clause, bool refute_it)
 			clause_strategy = (StrategyNumber) clause_form->amopstrategy;
 			Assert(clause_strategy >= 1 && clause_strategy <= 5);
 			clause_subtype = clause_form->amopsubtype;
-			ReleaseSysCache(clause_tuple);
+			caql_endscan(amcqCtx);
 		}
 		else if (OidIsValid(clause_op_negator))
 		{
-			clause_tuple = SearchSysCache(AMOPOPID,
-										  ObjectIdGetDatum(clause_op_negator),
-										  ObjectIdGetDatum(opclass_id),
-										  0, 0);
+			caql_endscan(amcqCtx);
+
+			amcqCtx = caql_beginscan(
+					NULL,
+					cql("SELECT * FROM pg_amop "
+						" WHERE amopopr = :1 "
+						" AND amopclaid = :2 ",
+						ObjectIdGetDatum(clause_op_negator),
+						ObjectIdGetDatum(opclass_id)));
+
+			clause_tuple = caql_getnext(amcqCtx);
+
 			if (HeapTupleIsValid(clause_tuple))
 			{
 				Form_pg_amop clause_form = (Form_pg_amop) GETSTRUCT(clause_tuple);
@@ -1658,7 +1685,8 @@ btree_predicate_proof(Expr *predicate, Node *clause, bool refute_it)
 				clause_strategy = (StrategyNumber) clause_form->amopstrategy;
 				Assert(clause_strategy >= 1 && clause_strategy <= 5);
 				clause_subtype = clause_form->amopsubtype;
-				ReleaseSysCache(clause_tuple);
+
+				caql_endscan(amcqCtx);
 
 				/* Only consider negators that are = */
 				if (clause_strategy != BTEqualStrategyNumber)
@@ -1666,10 +1694,16 @@ btree_predicate_proof(Expr *predicate, Node *clause, bool refute_it)
 				clause_strategy = BTNE;
 			}
 			else
+			{
+				caql_endscan(amcqCtx);
 				continue;
+			}
 		}
 		else
+		{
+			caql_endscan(amcqCtx);
 			continue;
+		}
 
 		/*
 		 * Look up the "test" strategy number in the implication table
@@ -1720,7 +1754,7 @@ btree_predicate_proof(Expr *predicate, Node *clause, bool refute_it)
 		}
 	}
 
-	ReleaseSysCacheList(catlist);
+	caql_end_CacheList(catlist);
 
 	if (!found)
 	{

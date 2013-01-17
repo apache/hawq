@@ -17,6 +17,7 @@
  */
 #include "postgres.h"
 
+#include "access/catquery.h"
 #include "access/heapam.h"
 #include "access/xact.h"
 #include "catalog/dependency.h"
@@ -136,25 +137,36 @@ OperatorGet(const char *operatorName,
 {
 	HeapTuple	tup;
 	Oid			operatorObjectId;
+	cqContext  *pcqCtx;
 
-	tup = SearchSysCache(OPERNAMENSP,
-						 PointerGetDatum((char *) operatorName),
-						 ObjectIdGetDatum(leftObjectId),
-						 ObjectIdGetDatum(rightObjectId),
-						 ObjectIdGetDatum(operatorNamespace));
+	pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_operator "
+				" WHERE oprname = :1 "
+				" AND oprleft = :2 "
+				" AND oprright = :3 "
+				" AND oprnamespace = :4 ",
+				PointerGetDatum((char *) operatorName),
+				ObjectIdGetDatum(leftObjectId),
+				ObjectIdGetDatum(rightObjectId),
+				ObjectIdGetDatum(operatorNamespace)));
+
+	tup = caql_getnext(pcqCtx);
+
 	if (HeapTupleIsValid(tup))
 	{
 		RegProcedure oprcode = ((Form_pg_operator) GETSTRUCT(tup))->oprcode;
 
 		operatorObjectId = HeapTupleGetOid(tup);
 		*defined = RegProcedureIsValid(oprcode);
-		ReleaseSysCache(tup);
 	}
 	else
 	{
 		operatorObjectId = InvalidOid;
 		*defined = false;
 	}
+
+	caql_endscan(pcqCtx);
 
 	return operatorObjectId;
 }
@@ -202,14 +214,13 @@ OperatorShellMake(const char *operatorName,
 				  Oid leftTypeId,
 				  Oid rightTypeId)
 {
-	Relation	pg_operator_desc;
 	Oid			operatorObjectId;
 	int			i;
 	HeapTuple	tup;
 	Datum		values[Natts_pg_operator];
 	bool		nulls[Natts_pg_operator];
 	NameData	oname;
-	TupleDesc	tupDesc;
+	cqContext  *pcqCtx;
 
 	/*
 	 * validate operator name
@@ -256,20 +267,21 @@ OperatorShellMake(const char *operatorName,
 	/*
 	 * open pg_operator
 	 */
-	pg_operator_desc = heap_open(OperatorRelationId, RowExclusiveLock);
-	tupDesc = pg_operator_desc->rd_att;
-
+	pcqCtx = caql_beginscan(
+			NULL,
+			cql("INSERT INTO pg_operator",
+				NULL));
+	
 	/*
 	 * create a new operator tuple
 	 */
-	tup = heap_form_tuple(tupDesc, values, nulls);
+	tup = caql_form_tuple(pcqCtx, values, nulls);
 
 	/*
 	 * insert our "shell" operator tuple
 	 */
-	operatorObjectId = simple_heap_insert(pg_operator_desc, tup);
-
-	CatalogUpdateIndexes(pg_operator_desc, tup);
+	operatorObjectId = caql_insert(pcqCtx, tup); 
+	/* and Update indexes (implicit) */
 
 	/* Add dependencies for the entry */
 	makeOperatorDependencies(tup);
@@ -279,7 +291,7 @@ OperatorShellMake(const char *operatorName,
 	/*
 	 * close the operator relation and return the oid.
 	 */
-	heap_close(pg_operator_desc, RowExclusiveLock);
+	caql_endscan(pcqCtx);
 
 	return operatorObjectId;
 }
@@ -358,7 +370,7 @@ OperatorShellMake(const char *operatorName,
  *	 get the t_self from the modified tuple and call RelationReplaceHeapTuple
  * else if a new operator is being created
  *	 create a tuple using heap_formtuple
- *	 call simple_heap_insert
+ *	 call caql_insert
  */
 Oid
 OperatorCreate(const char *operatorName,
@@ -434,8 +446,9 @@ OperatorCreateWithOid(const char *operatorName,
 	Oid			typeId[4];		/* only need up to 4 args here */
 	int			nargs;
 	NameData	oname;
-	TupleDesc	tupDesc;
 	int			i;
+	cqContext	cqc;
+	cqContext  *pcqCtx;
 
 	/*
 	 * Sanity checks
@@ -662,39 +675,42 @@ OperatorCreateWithOid(const char *operatorName,
 
 	pg_operator_desc = heap_open(OperatorRelationId, RowExclusiveLock);
 
+	pcqCtx = caql_addrel(cqclr(&cqc), pg_operator_desc);
+
 	/*
 	 * If we are replacing an operator shell, update; else insert
 	 */
 	if (operatorObjectId)
 	{
-		tup = SearchSysCacheCopy(OPEROID,
-								 ObjectIdGetDatum(operatorObjectId),
-								 0, 0, 0);
+		tup = caql_getfirst(
+					pcqCtx,
+					cql("SELECT * FROM pg_operator "
+						" WHERE oid = :1 "
+						" FOR UPDATE ",
+						ObjectIdGetDatum(operatorObjectId)));
+
 		if (!HeapTupleIsValid(tup))
 			elog(ERROR, "cache lookup failed for operator %u",
 				 operatorObjectId);
 
-		tup = heap_modify_tuple(tup,
-								RelationGetDescr(pg_operator_desc),
-								values,
-								nulls,
-								replaces);
-
-		simple_heap_update(pg_operator_desc, &tup->t_self, tup);
+		tup = caql_modify_current(pcqCtx,
+								  values,
+								  nulls,
+								  replaces);
+		
+		caql_update_current(pcqCtx, tup);
+		/* and Update indexes (implicit) */
 	}
 	else
 	{
-		tupDesc = pg_operator_desc->rd_att;
-		tup = heap_form_tuple(tupDesc, values, nulls);
+		tup = caql_form_tuple(pcqCtx, values, nulls);
 		
 		if (newOid != (Oid) 0)
 			HeapTupleSetOid(tup, newOid);
 
-		operatorObjectId = simple_heap_insert(pg_operator_desc, tup);
+		operatorObjectId = caql_insert(pcqCtx, tup);
+		/* and Update indexes (implicit) */
 	}
-
-	/* Must update the indexes in either case */
-	CatalogUpdateIndexes(pg_operator_desc, tup);
 
 	/* Add dependencies for the entry */
 	makeOperatorDependencies(tup);
@@ -803,6 +819,8 @@ OperatorUpd(Oid baseId, Oid commId, Oid negId)
 	bool		nulls[Natts_pg_operator];
 	bool		replaces[Natts_pg_operator];
 	Datum		values[Natts_pg_operator];
+	cqContext	cqc;
+	cqContext  *pcqCtx;
 
 	for (i = 0; i < Natts_pg_operator; ++i)
 	{
@@ -821,9 +839,14 @@ OperatorUpd(Oid baseId, Oid commId, Oid negId)
 
 	pg_operator_desc = heap_open(OperatorRelationId, RowExclusiveLock);
 
-	tup = SearchSysCacheCopy(OPEROID,
-							 ObjectIdGetDatum(commId),
-							 0, 0, 0);
+	pcqCtx = caql_addrel(cqclr(&cqc), pg_operator_desc);
+
+	tup = caql_getfirst(
+			pcqCtx,
+			cql("SELECT * FROM pg_operator "
+				" WHERE oid = :1 "
+				" FOR UPDATE ",
+				ObjectIdGetDatum(commId)));
 
 	/*
 	 * if the commutator and negator are the same operator, do one update. XXX
@@ -850,15 +873,13 @@ OperatorUpd(Oid baseId, Oid commId, Oid negId)
 					replaces[Anum_pg_operator_oprcom - 1] = true;
 				}
 
-				tup = heap_modify_tuple(tup,
-										RelationGetDescr(pg_operator_desc),
-										values,
-										nulls,
-										replaces);
+				tup = caql_modify_current(pcqCtx,
+										  values,
+										  nulls,
+										  replaces);
 
-				simple_heap_update(pg_operator_desc, &tup->t_self, tup);
-
-				CatalogUpdateIndexes(pg_operator_desc, tup);
+				caql_update_current(pcqCtx, tup);
+				/* and Update indexes (implicit) */
 			}
 		}
 
@@ -875,25 +896,34 @@ OperatorUpd(Oid baseId, Oid commId, Oid negId)
 		values[Anum_pg_operator_oprcom - 1] = ObjectIdGetDatum(baseId);
 		replaces[Anum_pg_operator_oprcom - 1] = true;
 
-		tup = heap_modify_tuple(tup,
-								RelationGetDescr(pg_operator_desc),
-								values,
-								nulls,
-								replaces);
+		tup = caql_modify_current(pcqCtx,
+								  values,
+								  nulls,
+								  replaces);
 
-		simple_heap_update(pg_operator_desc, &tup->t_self, tup);
+		caql_update_current(pcqCtx, tup);
+		/* and Update indexes (implicit) */
 
-		CatalogUpdateIndexes(pg_operator_desc, tup);
-
+		/* XXX XXX XXX XXX XXX XXX
+		 * NOTE: reset the values/replaces arrays *after*
+		 * this update because we might re-use them in the next update
+		 * XXX XXX XXX XXX XXX XXX
+		 */
 		values[Anum_pg_operator_oprcom - 1] = (Datum) 0;
 		replaces[Anum_pg_operator_oprcom - 1] = false;
 	}
 
 	/* check and update the negator, if necessary */
 
-	tup = SearchSysCacheCopy(OPEROID,
-							 ObjectIdGetDatum(negId),
-							 0, 0, 0);
+	/* reset the context and re-use it */
+	pcqCtx = caql_addrel(cqclr(&cqc), pg_operator_desc); 
+
+	tup = caql_getfirst(
+			pcqCtx,
+			cql("SELECT * FROM pg_operator "
+				" WHERE oid = :1 "
+				" FOR UPDATE ",
+				ObjectIdGetDatum(negId)));
 
 	if (HeapTupleIsValid(tup) &&
 		!(OidIsValid(((Form_pg_operator) GETSTRUCT(tup))->oprnegate)))
@@ -901,15 +931,13 @@ OperatorUpd(Oid baseId, Oid commId, Oid negId)
 		values[Anum_pg_operator_oprnegate - 1] = ObjectIdGetDatum(baseId);
 		replaces[Anum_pg_operator_oprnegate - 1] = true;
 
-		tup = heap_modify_tuple(tup,
-								RelationGetDescr(pg_operator_desc),
+		tup = caql_modify_current(pcqCtx,
 								values,
 								nulls,
 								replaces);
 
-		simple_heap_update(pg_operator_desc, &tup->t_self, tup);
-
-		CatalogUpdateIndexes(pg_operator_desc, tup);
+		caql_update_current(pcqCtx, tup);
+		/* and Update indexes (implicit) */
 	}
 
 	heap_close(pg_operator_desc, RowExclusiveLock);

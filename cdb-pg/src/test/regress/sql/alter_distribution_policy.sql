@@ -2113,3 +2113,23 @@ where
     and e.relname ~ '^mpp8474.*';
 
 drop table mpp8474;
+
+-- MPP-18660: duplicate entry in gp_distribution_policy
+set enable_indexscan=on;
+set enable_seqscan=off;
+
+drop table if exists distrib_index_test;
+create table distrib_index_test (a int, b text) distributed by (a);
+select count(*) from gp_distribution_policy 
+	where localoid in (select oid from pg_class where relname='distrib_index_test');
+
+begin;
+drop table distrib_index_test;
+rollback;
+
+select count(*) from gp_distribution_policy 
+	where localoid in (select oid from pg_class where relname='distrib_index_test');
+
+reset enable_indexscan;
+reset enable_seqscan;
+drop table distrib_index_test;

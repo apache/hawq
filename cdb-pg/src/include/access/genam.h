@@ -155,7 +155,4 @@ extern HeapTuple systable_getnext_ordered(SysScanDesc sysscan,
 						 ScanDirection direction);
 extern void systable_endscan_ordered(SysScanDesc sysscan);
 
-/* CAQL prototype: expand to nothing */
-#define cql0(x, ...) if (0) {} else 
-
 #endif   /* GENAM_H */

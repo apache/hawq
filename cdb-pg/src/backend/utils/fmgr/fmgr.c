@@ -15,6 +15,7 @@
 
 #include "postgres.h"
 
+#include "access/catquery.h"
 #include "access/tuptoaster.h"
 #include "catalog/pg_language.h"
 #include "catalog/pg_proc.h"
@@ -81,7 +82,7 @@ static HTAB *CFuncHash = NULL;
 
 static void fmgr_info_cxt_security(Oid functionId, FmgrInfo *finfo, MemoryContext mcxt,
 					   bool ignore_security);
-static void fmgr_info_C_lang(Oid functionId, FmgrInfo *finfo, HeapTuple procedureTuple);
+static void fmgr_info_C_lang(Oid functionId, FmgrInfo *finfo, HeapTuple procedureTuple, cqContext *pcqCtx);
 static void fmgr_info_other_lang(Oid functionId, FmgrInfo *finfo, HeapTuple procedureTuple);
 static CFuncHashTabEntry *lookup_C_func(HeapTuple procedureTuple);
 static void record_C_func(HeapTuple procedureTuple,
@@ -181,6 +182,7 @@ fmgr_info_cxt_security(Oid functionId, FmgrInfo *finfo, MemoryContext mcxt,
 	Datum		prosrcdatum;
 	bool		isnull;
 	char	   *prosrc;
+	cqContext  *procqCtx;
 
 	/*
 	 * fn_oid *must* be filled in last.  Some code assumes that if fn_oid is
@@ -208,9 +210,14 @@ fmgr_info_cxt_security(Oid functionId, FmgrInfo *finfo, MemoryContext mcxt,
 	}
 
 	/* Otherwise we need the pg_proc entry */
-	procedureTuple = SearchSysCache(PROCOID,
-									ObjectIdGetDatum(functionId),
-									0, 0, 0);
+	procqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_proc "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(functionId)));
+
+	procedureTuple = caql_getnext(procqCtx);
+
 	if (!HeapTupleIsValid(procedureTuple))
 		elog(ERROR, "cache lookup failed for function %u", functionId);
 	procedureStruct = (Form_pg_proc) GETSTRUCT(procedureTuple);
@@ -224,7 +231,9 @@ fmgr_info_cxt_security(Oid functionId, FmgrInfo *finfo, MemoryContext mcxt,
 		finfo->fn_addr = fmgr_security_definer;
 		finfo->fn_stats = TRACK_FUNC_ALL;		/* ie, never track */
 		finfo->fn_oid = functionId;
-		ReleaseSysCache(procedureTuple);
+		
+		caql_endscan(procqCtx);
+
 		return;
 	}
 
@@ -241,8 +250,8 @@ fmgr_info_cxt_security(Oid functionId, FmgrInfo *finfo, MemoryContext mcxt,
 			 * internal function is stored in prosrc (it doesn't have to be
 			 * the same as the name of the alias!)
 			 */
-			prosrcdatum = SysCacheGetAttr(PROCOID, procedureTuple,
-										  Anum_pg_proc_prosrc, &isnull);
+			prosrcdatum = caql_getattr(procqCtx,
+									   Anum_pg_proc_prosrc, &isnull);
 			if (isnull)
 				elog(ERROR, "null prosrc");
 			prosrc = TextDatumGetCString(prosrcdatum);
@@ -260,7 +269,7 @@ fmgr_info_cxt_security(Oid functionId, FmgrInfo *finfo, MemoryContext mcxt,
 			break;
 
 		case ClanguageId:
-			fmgr_info_C_lang(functionId, finfo, procedureTuple);
+			fmgr_info_C_lang(functionId, finfo, procedureTuple, procqCtx);
 			finfo->fn_stats = TRACK_FUNC_PL;	/* ie, track if ALL */
 			break;
 
@@ -276,7 +285,8 @@ fmgr_info_cxt_security(Oid functionId, FmgrInfo *finfo, MemoryContext mcxt,
 	}
 
 	finfo->fn_oid = functionId;
-	ReleaseSysCache(procedureTuple);
+
+	caql_endscan(procqCtx);
 }
 
 /*
@@ -284,7 +294,8 @@ fmgr_info_cxt_security(Oid functionId, FmgrInfo *finfo, MemoryContext mcxt,
  * finfo->fn_oid is not valid yet.
  */
 static void
-fmgr_info_C_lang(Oid functionId, FmgrInfo *finfo, HeapTuple procedureTuple)
+fmgr_info_C_lang(Oid functionId, FmgrInfo *finfo, HeapTuple procedureTuple,
+				 cqContext *pcqCtx)
 {
 	Form_pg_proc procedureStruct = (Form_pg_proc) GETSTRUCT(procedureTuple);
 	CFuncHashTabEntry *hashentry;
@@ -316,14 +327,14 @@ fmgr_info_C_lang(Oid functionId, FmgrInfo *finfo, HeapTuple procedureTuple)
 		 * While in general these columns might be null, that's not allowed
 		 * for C-language functions.
 		 */
-		prosrcattr = SysCacheGetAttr(PROCOID, procedureTuple,
-									 Anum_pg_proc_prosrc, &isnull);
+		prosrcattr = caql_getattr(pcqCtx,
+								  Anum_pg_proc_prosrc, &isnull);
 		if (isnull)
 			elog(ERROR, "null prosrc for C function %u", functionId);
 		prosrcstring = TextDatumGetCString(prosrcattr);
 
-		probinattr = SysCacheGetAttr(PROCOID, procedureTuple,
-									 Anum_pg_proc_probin, &isnull);
+		probinattr = caql_getattr(pcqCtx,
+								  Anum_pg_proc_probin, &isnull);
 		if (isnull)
 			elog(ERROR, "null probin for C function %u", functionId);
 		probinstring = TextDatumGetCString(probinattr);
@@ -379,23 +390,27 @@ fmgr_info_other_lang(Oid functionId, FmgrInfo *finfo, HeapTuple procedureTuple)
 {
 	Form_pg_proc procedureStruct = (Form_pg_proc) GETSTRUCT(procedureTuple);
 	Oid			language = procedureStruct->prolang;
-	HeapTuple	languageTuple;
-	Form_pg_language languageStruct;
 	FmgrInfo	plfinfo;
+	Oid			lanplcallfoid;
+	int			fetchCount;
 
-	languageTuple = SearchSysCache(LANGOID,
-								   ObjectIdGetDatum(language),
-								   0, 0, 0);
-	if (!HeapTupleIsValid(languageTuple))
+	lanplcallfoid = caql_getoid_plus(
+			NULL,
+			&fetchCount,
+			NULL,
+			cql("SELECT lanplcallfoid FROM pg_language "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(language)));
+
+	if (!fetchCount)
 		elog(ERROR, "cache lookup failed for language %u", language);
-	languageStruct = (Form_pg_language) GETSTRUCT(languageTuple);
 
 	/*
 	 * Look up the language's call handler function, ignoring any attributes
 	 * that would normally cause insertion of fmgr_security_definer.  We
 	 * need to get back a bare pointer to the actual C-language function.
 	 */
-	fmgr_info_cxt_security(languageStruct->lanplcallfoid, &plfinfo,
+	fmgr_info_cxt_security(lanplcallfoid, &plfinfo,
 						   CurrentMemoryContext, true);
 	finfo->fn_addr = plfinfo.fn_addr;
 
@@ -407,7 +422,6 @@ fmgr_info_other_lang(Oid functionId, FmgrInfo *finfo, HeapTuple procedureTuple)
 	if (plfinfo.fn_extra != NULL)
 		elog(ERROR, "language %u has old-style handler", language);
 
-	ReleaseSysCache(languageTuple);
 }
 
 /*
@@ -875,11 +889,13 @@ fmgr_security_definer(PG_FUNCTION_ARGS)
 	struct fmgr_security_definer_cache *volatile fcache;
 	Oid			save_userid;
 	bool		save_secdefcxt;
-	HeapTuple	tuple;
 	PgStat_FunctionCallUsage fcusage;
 
 	if (!fcinfo->flinfo->fn_extra)
 	{
+		Oid			proowner;
+		int			fetchCount;
+
 		fcache = MemoryContextAllocZero(fcinfo->flinfo->fn_mcxt,
 										sizeof(*fcache));
 
@@ -887,14 +903,18 @@ fmgr_security_definer(PG_FUNCTION_ARGS)
 							   fcinfo->flinfo->fn_mcxt, true);
 		fcache->flinfo.fn_expr = fcinfo->flinfo->fn_expr;
 
-		tuple = SearchSysCache(PROCOID,
-							   ObjectIdGetDatum(fcinfo->flinfo->fn_oid),
-							   0, 0, 0);
-		if (!HeapTupleIsValid(tuple))
+		proowner = caql_getoid_plus(
+				NULL,
+				&fetchCount,
+				NULL,
+				cql("SELECT proowner FROM pg_proc "
+					" WHERE oid = :1 ",
+					ObjectIdGetDatum(fcinfo->flinfo->fn_oid)));
+
+		if (!fetchCount)
 			elog(ERROR, "cache lookup failed for function %u",
 				 fcinfo->flinfo->fn_oid);
-		fcache->userid = ((Form_pg_proc) GETSTRUCT(tuple))->proowner;
-		ReleaseSysCache(tuple);
+		fcache->userid = proowner;
 
 		fcinfo->flinfo->fn_extra = fcache;
 	}

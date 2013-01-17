@@ -21,6 +21,7 @@
 #include "fmgr.h"
 #include "funcapi.h"
 
+#include "access/catquery.h"
 #include "access/formatter.h"
 #include "catalog/pg_proc.h"
 #include "utils/builtins.h"
@@ -255,16 +256,23 @@ static void byteArrayToBoolArray(bits8* data, int len, bool** booldata, int bool
  */
 static void getTypeName(Oid typeid, char* data)
 {
-	HeapTuple type_tuple;
 	char*     name;
 
-	type_tuple = SearchSysCache(TYPEOID, ObjectIdGetDatum(typeid), 0, 0, 0);
-	Insist(HeapTupleIsValid(type_tuple));
-	name = ((Form_pg_type) GETSTRUCT(type_tuple))->typname.data;
+	/* XXX: would have been get_type_name() */
+	name = caql_getcstring_plus(
+					NULL,
+					NULL,
+					NULL,
+					cql("SELECT typname FROM pg_type "
+						" WHERE oid = :1 ",
+						ObjectIdGetDatum(typeid)));
+
+	Insist(name);
 
 	strcpy(data, name);
-	ReleaseSysCache(type_tuple);
+	pfree(name);
 }
+
 Datum
 gphdfsformatter_export(PG_FUNCTION_ARGS)
 {

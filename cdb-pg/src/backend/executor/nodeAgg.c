@@ -81,6 +81,7 @@
 
 #include "postgres.h"
 
+#include "access/catquery.h"
 #include "access/heapam.h"
 #include "catalog/pg_aggregate.h"
 #include "catalog/pg_proc.h"
@@ -1856,6 +1857,7 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 		Datum		textInitVal;
 		int			i;
 		ListCell   *lc;
+		cqContext  *pcqCtx;
 		
 		/* Planner should have assigned aggregate to correct level */
 		Assert(aggref->agglevelsup == 0);
@@ -1915,9 +1917,14 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 			inputTypes[i++] = exprType((Node*)tle->expr);
 		}
 
-		aggTuple = SearchSysCache(AGGFNOID,
-								  ObjectIdGetDatum(aggref->aggfnoid),
-								  0, 0, 0);
+		pcqCtx = caql_beginscan(
+				NULL,
+				cql("SELECT * FROM pg_aggregate "
+					" WHERE aggfnoid = :1 ",
+					ObjectIdGetDatum(aggref->aggfnoid)));
+
+		aggTuple = caql_getnext(pcqCtx);
+
 		if (!HeapTupleIsValid(aggTuple))
 			elog(ERROR, "cache lookup failed for aggregate %u",
 				 aggref->aggfnoid);
@@ -1958,17 +1965,20 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 
 		/* Check that aggregate owner has permission to call component fns */
 		{
-			HeapTuple	procTuple;
 			Oid			aggOwner;
+			int			fetchCount;
 
-			procTuple = SearchSysCache(PROCOID,
-									   ObjectIdGetDatum(aggref->aggfnoid),
-									   0, 0, 0);
-			if (!HeapTupleIsValid(procTuple))
+			aggOwner = caql_getoid_plus(
+					NULL,
+					&fetchCount,
+					NULL,
+					cql("SELECT proowner FROM pg_proc "
+						" WHERE oid = :1 ",
+						ObjectIdGetDatum(aggref->aggfnoid)));
+
+			if (!fetchCount)
 				elog(ERROR, "cache lookup failed for function %u",
 					 aggref->aggfnoid);
-			aggOwner = ((Form_pg_proc) GETSTRUCT(procTuple))->proowner;
-			ReleaseSysCache(procTuple);
 
 			aclresult = pg_proc_aclcheck(transfn_oid, aggOwner,
 										 ACL_EXECUTE);
@@ -2038,11 +2048,11 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 
 		/*
 		 * initval is potentially null, so don't try to access it as a struct
-		 * field. Must do it the hard way with SysCacheGetAttr.
+		 * field. Must do it the hard way with caql_getattr
 		 */
-		textInitVal = SysCacheGetAttr(AGGFNOID, aggTuple,
-									  Anum_pg_aggregate_agginitval,
-									  &peraggstate->initValueIsNull);
+		textInitVal = caql_getattr(pcqCtx,
+								   Anum_pg_aggregate_agginitval,
+								   &peraggstate->initValueIsNull);
 
 		if (peraggstate->initValueIsNull)
 			peraggstate->initValue = (Datum) 0;
@@ -2193,8 +2203,7 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 			fmgr_info(eqfunc, &peraggstate->equalfn);
 		}
 		
-		
-		ReleaseSysCache(aggTuple);
+		caql_endscan(pcqCtx);
 	}
 
 	/*

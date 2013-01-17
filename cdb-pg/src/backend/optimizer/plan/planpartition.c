@@ -9,6 +9,7 @@
  */
 
 #include "postgres.h"
+#include "access/catquery.h"
 #include "optimizer/planpartition.h"
 #include "optimizer/walkers.h"
 #include "optimizer/clauses.h"
@@ -623,14 +624,21 @@ static bool IsJoin(Node *node)
  */
 static Oid RelationGetTypeOid(Oid relationOid)
 {
+	int fetchCount;
+	Oid typeOid;
+
 	Assert(relationOid != InvalidOid);
-	HeapTuple tup = SearchSysCache(RELOID,
-									ObjectIdGetDatum(relationOid),
-									0, 0, 0);
-	Form_pg_class pgClass = (Form_pg_class) GETSTRUCT(tup);
-	Oid typeOid = pgClass->reltype;
+	typeOid = caql_getoid_plus(
+			NULL,
+			&fetchCount,
+			NULL,
+			cql("SELECT reltype FROM pg_class "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(relationOid)));
+
+	Assert(fetchCount);
+
 	Assert(typeOid != InvalidOid);
-	ReleaseSysCache(tup);
 
 	return typeOid;
 }

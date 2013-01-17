@@ -41,7 +41,7 @@
    );
 
    create unique index on pg_database(datname) with (indexid=2671, CamelCase=DatabaseName);
-   create unique index on pg_database(oid) with (indexid=2672, CamelCase=DatabaseOid);
+   create unique index on pg_database(oid) with (indexid=2672, CamelCase=DatabaseOid, syscacheid=DATABASEOID, syscache_nbuckets=4);
 
    alter table pg_database add fk datdba on pg_authid(oid);
    alter table pg_database add fk dattablespace on pg_tablespace(oid);

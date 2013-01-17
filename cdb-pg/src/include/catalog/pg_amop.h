@@ -48,8 +48,8 @@
    amopopr       oid
    );
 
-   create unique index on pg_amop(amopclaid, amopsubtype, amopstrategy) with (indexid=2653, CamelCase=AccessMethodStrategy);
-   create unique index on pg_amop(amopopr, amopclaid) with (indexid=2654, CamelCase=AccessMethodOperator);
+   create unique index on pg_amop(amopclaid, amopsubtype, amopstrategy) with (indexid=2653, CamelCase=AccessMethodStrategy, syscacheid=AMOPSTRATEGY, syscache_nbuckets=64);
+   create unique index on pg_amop(amopopr, amopclaid) with (indexid=2654, CamelCase=AccessMethodOperator, syscacheid=AMOPOPID, syscache_nbuckets=64);
 
    alter table pg_amop add fk amopclaid on pg_opclass(oid);
    alter table pg_amop add fk amopsubtype on pg_type(oid);

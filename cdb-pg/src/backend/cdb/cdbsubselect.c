@@ -9,6 +9,7 @@
  */
 #include "postgres.h"
 
+#include "access/catquery.h"
 #include "catalog/pg_type.h"            /* INT8OID */
 #include "nodes/makefuncs.h"
 #include "optimizer/clauses.h"
@@ -1497,15 +1498,24 @@ static bool is_attribute_nonnullable(Oid relationOid, AttrNumber attrNumber)
 {
 	HeapTuple			attributeTuple = NULL;
 	Form_pg_attribute 	attribute = NULL;
-	bool result = true;
+	bool				result = true;
+	cqContext		   *pcqCtx;
 	
-	attributeTuple = SearchSysCache(ATTNUM,
-						   ObjectIdGetDatum(relationOid),
-						   Int16GetDatum(attrNumber), 0, 0);
-						  									 
-						  			
+	pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_attribute "
+				" WHERE attrelid = :1 "
+				" AND attnum = :2 ",
+				ObjectIdGetDatum(relationOid),
+				Int16GetDatum(attrNumber)));
+
+	attributeTuple = caql_getnext(pcqCtx);
+
 	if (!HeapTupleIsValid(attributeTuple))
+	{
+		caql_endscan(pcqCtx);
 		return false;
+	}
 
 	attribute = (Form_pg_attribute) GETSTRUCT(attributeTuple);
 	
@@ -1515,7 +1525,7 @@ static bool is_attribute_nonnullable(Oid relationOid, AttrNumber attrNumber)
 	if (!attribute->attnotnull)
 		result = false;
 	
-	ReleaseSysCache(attributeTuple);
+	caql_endscan(pcqCtx);
 
 	return result;
 }

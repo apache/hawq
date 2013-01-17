@@ -2,7 +2,7 @@
 #
 # $Header$
 #
-# Copyright (c) 2007-2011 GreenPlum.  All rights reserved.  
+# Copyright (c) 2007-2012 GreenPlum.  All rights reserved.  
 # Author: Jeffrey I Cohen
 #
 #
@@ -78,7 +78,7 @@ source directory references are less common, and usually followed by
 
 Jeffrey I Cohen
 
-Copyright (c) 2007-2011 GreenPlum.  All rights reserved.  
+Copyright (c) 2007-2012 GreenPlum.  All rights reserved.  
 
 Address bug reports and comments to: jcohen@greenplum.com
 
@@ -112,6 +112,15 @@ BEGIN {
 
     unless (-f $glob_token_file)
     {
+		if (length($tokenf))
+		{
+			warn("ERROR: Cannot find specified token file: $glob_token_file");
+		}
+		else
+		{
+			warn("ERROR: Need to run test gptokencheck to generate token file:\n\n\tmake installcheck-good TT=gptokencheck\n\n");
+		}
+
         $glob_id = "ERROR - invalid file: $glob_token_file\n";
         pod2usage(-msg => $glob_id, -exitstatus => 1, -verbose => 0);
     }

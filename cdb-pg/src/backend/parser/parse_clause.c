@@ -16,6 +16,7 @@
 
 #include "postgres.h"
 
+#include "access/catquery.h"
 #include "access/heapam.h"
 #include "catalog/heap.h"
 #include "catalog/pg_am.h"
@@ -273,7 +274,7 @@ transformWindowFrameEdge(ParseState *pstate, WindowFrameEdge *e,
 
 			oprresult = ((Form_pg_operator)GETSTRUCT(tup))->oprresult;
 			newrtype = ((Form_pg_operator)GETSTRUCT(tup))->oprright;
-			ReleaseSysCache(tup);
+			ReleaseOperator(tup);
 			list_free_deep(oprname);
 
 			if (rtype != newrtype)
@@ -353,8 +354,8 @@ transformWindowFrameEdge(ParseState *pstate, WindowFrameEdge *e,
 								 errmsg("RANGE parameter cannot be negative"),
 										   errOmitLocation(true)));
 
-					ReleaseSysCache(tup);
-					ReleaseSysCache(typ);
+					ReleaseOperator(tup);
+					ReleaseType(typ);
 				}
 			}
 		}
@@ -408,9 +409,16 @@ winref_checkspec_walker(Node *node, void *ctx)
 		{
 			HeapTuple		tuple;
 			Form_pg_window	wf;
+			cqContext	   *pcqCtx;
 
-			tuple = SearchSysCache(WINFNOID,
-								   ObjectIdGetDatum(winref->winfnoid), 0, 0, 0);
+			pcqCtx = caql_beginscan(
+					NULL,
+					cql("SELECT * FROM pg_window "
+						" WHERE winfnoid = :1 ",
+						ObjectIdGetDatum(winref->winfnoid)));
+
+			tuple = caql_getnext(pcqCtx);
+
 			/*
 			 * Check only "true" window function.
 			 * Otherwise, it must be an aggregate.
@@ -433,9 +441,8 @@ winref_checkspec_walker(Node *node, void *ctx)
 									"a framed window specification",
 									get_func_name(wf->winfnoid)),
 								parser_errposition(ref->pstate, winref->location)));
-
-				ReleaseSysCache(tuple);
 			}
+			caql_endscan(pcqCtx);
 		}
 	}
 
@@ -2979,13 +2986,18 @@ sort_op_can_sort(Oid opid, bool mergejoin)
 	int i;
 	bool result = false;
 
-	catlist = SearchSysCacheList(AMOPOPID, 1,
-								 ObjectIdGetDatum(opid),
-								 0, 0, 0);
+	catlist = caql_begin_CacheList(
+								   NULL,
+								   cql("SELECT * FROM pg_amop "
+									   " WHERE amopopr = :1 "
+									   " ORDER BY amopopr, "
+									   " amopclaid ",
+									   ObjectIdGetDatum(opid)));
+
 	/* not associated with an AM, so can't be a match */
 	if (catlist->n_members == 0)
 	{
-		ReleaseSysCacheList(catlist);
+		caql_end_CacheList(catlist);
 		return false;
 	}
 
@@ -3018,7 +3030,7 @@ sort_op_can_sort(Oid opid, bool mergejoin)
 			}
 		}
 	}
-	ReleaseSysCacheList(catlist);
+	caql_end_CacheList(catlist);
 	return result;
 }
 

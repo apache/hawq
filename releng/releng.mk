@@ -16,7 +16,8 @@
 ## NOTE: Dependent project module version is kept in $(BLD_TOP)/releng/make/dependencies/ivy.xml
 ##-------------------------------------------------------------------------------------
 
-GREP_SED_VAR = $(BLD_TOP)/releng/make/dependencies/ivy.xml | sed -e 's|\(.*\)rev="\(.*\)" conf\(.*\)|\2|'
+GREP_SED_VAR = $(BLD_TOP)/releng/make/dependencies/ivy.xml | sed -e 's|\(.*\)rev="\(.*\)"[ ]*conf\(.*\)|\2|'
+
 
 ## ---------------------------------------
 ## R-Project support
@@ -30,6 +31,13 @@ else
 ifneq "$(wildcard /opt/releng/tools/R-Project/R/$(R_VER)/$(BLD_ARCH)/lib)" ""
 R_HOME = /opt/releng/tools/R-Project/R/$(R_VER)/$(BLD_ARCH)/lib/R
 endif
+endif
+
+GPERF_VERSION = $(shell grep 'name="gperf"' $(GREP_SED_VAR))
+ifneq "$(wildcard /opt/releng/tools/gnu/gperf/$(GPERF_VERSION)/$(BLD_ARCH)/bin/gperf)" ""
+GPERF_DIR = /opt/releng/tools/gnu/gperf/$(GPERF_VERSION)/$(BLD_ARCH)
+gperftmpPATH:=$(GPERF_DIR)/bin:$(PATH)
+export PATH=$(gperftmpPATH)
 endif
 
 display_dependent_vers:

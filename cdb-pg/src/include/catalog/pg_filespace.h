@@ -40,7 +40,7 @@
    fsrep  smallint, -- num of replica
    );
 
-   create unique index on pg_filespace(oid) with (indexid=2858);
+   create unique index on pg_filespace(oid) with (indexid=2858, CamelCase=FilespaceOid);
    create unique index on pg_filespace(fsname) with (indexid=2859, CamelCase=FilespaceName);
 
 

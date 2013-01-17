@@ -15,6 +15,8 @@
  */
 #include "postgres.h"
 
+#include "access/catquery.h"
+
 #include "catalog/pg_aggregate.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_type.h"
@@ -1364,8 +1366,8 @@ static bool validateBound(Node *node, bool is_rows)
 				 errmsg("%s parameter cannot be negative", is_rows ? "ROWS" : "RANGE"),
 						   errOmitLocation(true)));
 	
-	ReleaseSysCache(tup);
-	ReleaseSysCache(typ);
+	ReleaseOperator(tup);
+	ReleaseType(typ);
 	
 	return TRUE;
 }
@@ -1685,14 +1687,20 @@ lookup_window_function(RefInfo *rinfo)
 	HeapTuple	tuple;
 	Form_pg_proc proform;
 	bool isagg, iswin;
+	cqContext	*procqCtx;
 	Oid transtype = InvalidOid;
 	
 	Oid fnoid = rinfo->ref->winfnoid;
 	
 	/* pg_proc */
-	tuple = SearchSysCache(PROCOID,
-							  ObjectIdGetDatum(fnoid),
-							  0, 0, 0);
+	procqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_proc "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(fnoid)));
+
+	tuple = caql_getnext(procqCtx);
+
 	if (!HeapTupleIsValid(tuple))
 		elog(ERROR, "cache lookup failed for function %u", fnoid);
 	proform = (Form_pg_proc) GETSTRUCT(tuple);
@@ -1706,17 +1714,23 @@ lookup_window_function(RefInfo *rinfo)
 			 errmsg("can not call ordinary function, %s, as window function", NameStr(proform->proname)),
 					   errOmitLocation(true)));
 	}
-	ReleaseSysCache(tuple);
+	caql_endscan(procqCtx);
 	
 	Assert( isagg != iswin );
 	
 	if ( isagg )
 	{
-		Form_pg_aggregate aggform;
-	
-		tuple = SearchSysCache(AGGFNOID,
-								  ObjectIdGetDatum(fnoid),
-								  0, 0, 0);
+		Form_pg_aggregate		 aggform;
+		cqContext				*aggcqCtx;
+
+		aggcqCtx = caql_beginscan(
+				NULL,
+				cql("SELECT * FROM pg_aggregate "
+					" WHERE aggfnoid = :1 ",
+					ObjectIdGetDatum(fnoid)));
+		
+		tuple = caql_getnext(aggcqCtx);
+
 		if (!HeapTupleIsValid(tuple))
 			elog(ERROR, "cache lookup failed for aggregate function %u", fnoid);
 		aggform = (Form_pg_aggregate) GETSTRUCT(tuple);
@@ -1728,10 +1742,10 @@ lookup_window_function(RefInfo *rinfo)
 		rinfo->hasinvprelim = (aggform->agginvprelimfn != InvalidOid);
 		transtype = aggform->aggtranstype;
 
-		ReleaseSysCache(tuple);
+		caql_endscan(aggcqCtx);
 		
 		/*
-		 * If the transition type is pass-by-refernce, note the estimated 
+		 * If the transition type is pass-by-reference, note the estimated 
 		 * size of the value itself, plus palloc overhead.
 		 */
 		if (!get_typbyval(transtype))
@@ -1747,11 +1761,17 @@ lookup_window_function(RefInfo *rinfo)
 	}
 	else /* iswin */
 	{
-		Form_pg_window winform;
-	
-		tuple = SearchSysCache(WINFNOID,
-								  ObjectIdGetDatum(fnoid),
-								  0, 0, 0);
+		Form_pg_window	 winform;
+		cqContext		*wincqCtx;
+
+		wincqCtx = caql_beginscan(
+				NULL,
+				cql("SELECT * FROM pg_window "
+					" WHERE winfnoid = :1 ",
+					ObjectIdGetDatum(fnoid)));
+
+		tuple = caql_getnext(wincqCtx);
+
 		if (!HeapTupleIsValid(tuple))
 			elog(ERROR, "cache lookup failed for window function %u", fnoid);
 		winform = (Form_pg_window) GETSTRUCT(tuple);
@@ -1761,7 +1781,7 @@ lookup_window_function(RefInfo *rinfo)
 		rinfo->winpretype = winform->winpretype;
 		rinfo->winfinfunc = winform->winfinfunc;		
 
-		ReleaseSysCache(tuple);
+		caql_endscan(wincqCtx);
 	}
 }
 
@@ -3914,26 +3934,24 @@ char *get_function_name(Oid proid, const char *dflt)
 {
 	char	   *result;
 
-	if (proid == InvalidOid)
+	if (!OidIsValid(proid))
 	{
 		result = pstrdup(dflt);
 	}
 	else
 	{
-		HeapTuple proctup = SearchSysCache(PROCOID,
-										   ObjectIdGetDatum(proid),
-										   0, 0, 0);
+		int			fetchCount;
+
+		result = caql_getcstring_plus(
+				NULL,
+				&fetchCount,
+				NULL,
+				cql("SELECT proname FROM pg_proc "
+					" WHERE oid = :1 ",
+					ObjectIdGetDatum(proid)));
 	
-		if (HeapTupleIsValid(proctup))
-		{
-			Form_pg_proc procform = (Form_pg_proc) GETSTRUCT(proctup);
-			result = pstrdup(NameStr(procform->proname));	
-			ReleaseSysCache(proctup);
-		}
-		else
-		{
+		if (!fetchCount)
 			result = pstrdup(dflt);
-		}
 	}
 
 	return result;
@@ -4258,4 +4276,3 @@ window_edge_is_delayed(WindowFrameEdge *edge)
 
 	return false;
 }
-

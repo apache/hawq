@@ -14,6 +14,7 @@
  */
 #include "postgres.h"
 
+#include "access/catquery.h"
 #include "access/heapam.h"
 #include "access/xact.h"
 #include "catalog/catalog.h"
@@ -37,7 +38,8 @@
 #include "cdb/cdbvars.h"
 #include "cdb/cdbcat.h"
 
-static void AlterSchemaOwner_internal(HeapTuple tup, Relation rel, Oid newOwnerId);
+static void AlterSchemaOwner_internal(cqContext  *pcqCtx, 
+									  HeapTuple tup, Relation rel, Oid newOwnerId);
 static void RemoveSchema_internal(const char *schemaName, DropBehavior behavior, 
 								  bool missing_ok, bool is_internal);
 
@@ -262,8 +264,12 @@ RemoveSchema_internal(const char *schemaName, DropBehavior behavior,
 	Oid				namespaceId;
 	ObjectAddress	object;
 
-	namespaceId = GetSysCacheOid(NAMESPACENAME,
-								 CStringGetDatum(schemaName), 0, 0, 0);
+	namespaceId = caql_getoid(
+			NULL,
+			cql("SELECT oid FROM pg_namespace "
+				" WHERE nspname = :1 ",
+				CStringGetDatum(schemaName)));
+
 	if (!OidIsValid(namespaceId))
 	{
 		if (!missing_ok)
@@ -319,22 +325,15 @@ RemoveSchema_internal(const char *schemaName, DropBehavior behavior,
 void
 RemoveSchemaById(Oid schemaOid)
 {
-	Relation	relation;
-	HeapTuple	tup;
-
-	relation = heap_open(NamespaceRelationId, RowExclusiveLock);
-
-	tup = SearchSysCache(NAMESPACEOID,
-						 ObjectIdGetDatum(schemaOid),
-						 0, 0, 0);
-	if (!HeapTupleIsValid(tup)) /* should not happen */
+	if (0 ==
+		caql_getcount(
+				NULL,
+				cql("DELETE FROM pg_namespace "
+					" WHERE oid = :1 ",
+					ObjectIdGetDatum(schemaOid)))) /* should not happen */
+	{
 		elog(ERROR, "cache lookup failed for namespace %u", schemaOid);
-
-	simple_heap_delete(relation, &tup->t_self);
-
-	ReleaseSysCache(tup);
-
-	heap_close(relation, RowExclusiveLock);
+	}
 }
 
 
@@ -348,27 +347,39 @@ RenameSchema(const char *oldname, const char *newname)
 	Oid			nsoid;
 	Relation	rel;
 	AclResult	aclresult;
+	cqContext	cqc2;
+	cqContext	cqc;
+	cqContext  *pcqCtx;
 
 	Assert(Gp_role != GP_ROLE_EXECUTE);
 
 	rel = heap_open(NamespaceRelationId, RowExclusiveLock);
 
-	tup = SearchSysCacheCopy(NAMESPACENAME,
-							 CStringGetDatum((char *) oldname),
-							 0, 0, 0);
+	pcqCtx = caql_addrel(cqclr(&cqc), rel);
+
+	tup = caql_getfirst(
+			pcqCtx,
+			cql("SELECT * FROM pg_namespace "
+				" WHERE nspname = :1 "
+				" FOR UPDATE ",
+				CStringGetDatum((char *) oldname)));
+
 	if (!HeapTupleIsValid(tup))
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_SCHEMA),
 				 errmsg("schema \"%s\" does not exist", oldname)));
 
 	/* make sure the new name doesn't exist */
-	if (HeapTupleIsValid(
-						 SearchSysCache(NAMESPACENAME,
-										CStringGetDatum((char *) newname),
-										0, 0, 0)))
+	if (caql_getcount(
+				caql_addrel(cqclr(&cqc2), rel),
+				cql("SELECT * FROM pg_namespace "
+					" WHERE nspname = :1 ",
+					CStringGetDatum((char *) newname))))
+	{
 		ereport(ERROR,
 				(errcode(ERRCODE_DUPLICATE_SCHEMA),
 				 errmsg("schema \"%s\" already exists", newname)));
+	}
 
 	/* must be owner */
 	nsoid = HeapTupleGetOid(tup);
@@ -402,7 +413,7 @@ RenameSchema(const char *oldname, const char *newname)
 
 	/* rename */
 	namestrcpy(&(((Form_pg_namespace) GETSTRUCT(tup))->nspname), newname);
-	simple_heap_update(rel, &tup->t_self, tup);
+	caql_update_current(pcqCtx, tup); /* implicit update of index as well */
 	
 	/* MPP-6929: metadata tracking */
 	if (Gp_role == GP_ROLE_DISPATCH)
@@ -411,8 +422,6 @@ RenameSchema(const char *oldname, const char *newname)
 						   GetUserId(),
 						   "ALTER", "RENAME"
 				);
-
-	CatalogUpdateIndexes(rel, tup);
 
 	heap_close(rel, NoLock);
 	heap_freetuple(tup);
@@ -424,18 +433,26 @@ AlterSchemaOwner_oid(Oid oid, Oid newOwnerId)
 {
 	HeapTuple	tup;
 	Relation	rel;
+	cqContext	cqc;
+	cqContext  *pcqCtx;
 
 	rel = heap_open(NamespaceRelationId, RowExclusiveLock);
 
-	tup = SearchSysCache(NAMESPACEOID,
-						 ObjectIdGetDatum(oid),
-						 0, 0, 0);
+	pcqCtx = caql_beginscan(
+				caql_addrel(cqclr(&cqc), rel),
+				cql("SELECT * FROM pg_namespace "
+					" WHERE oid = :1 "
+					" FOR UPDATE ",
+					ObjectIdGetDatum(oid)));
+
+	tup = caql_getnext(pcqCtx);
+
 	if (!HeapTupleIsValid(tup))
 		elog(ERROR, "cache lookup failed for schema %u", oid);
 
-	AlterSchemaOwner_internal(tup, rel, newOwnerId);
+	AlterSchemaOwner_internal(pcqCtx, tup, rel, newOwnerId);
 
-	ReleaseSysCache(tup);
+	caql_endscan(pcqCtx);
 
 	heap_close(rel, RowExclusiveLock);
 }
@@ -449,14 +466,22 @@ AlterSchemaOwner(const char *name, Oid newOwnerId)
 {
 	HeapTuple	tup;
 	Relation	rel;
+	cqContext	cqc;
+	cqContext  *pcqCtx;
 
 	Assert(Gp_role != GP_ROLE_EXECUTE);
 
 	rel = heap_open(NamespaceRelationId, RowExclusiveLock);
 
-	tup = SearchSysCache(NAMESPACENAME,
-						 CStringGetDatum((char *) name),
-						 0, 0, 0);
+	pcqCtx = caql_beginscan(
+				caql_addrel(cqclr(&cqc), rel),
+				cql("SELECT * FROM pg_namespace "
+					" WHERE nspname = :1 "
+					" FOR UPDATE ",
+					CStringGetDatum((char *) name)));
+
+	tup = caql_getnext(pcqCtx);
+
 	if (!HeapTupleIsValid(tup))
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_SCHEMA),
@@ -470,15 +495,16 @@ AlterSchemaOwner(const char *name, Oid newOwnerId)
 				 errdetail("Schema %s is reserved for system use.", name)));
 	}
 
-	AlterSchemaOwner_internal(tup, rel, newOwnerId);
+	AlterSchemaOwner_internal(pcqCtx, tup, rel, newOwnerId);
 
-	ReleaseSysCache(tup);
+	caql_endscan(pcqCtx);
 
 	heap_close(rel, RowExclusiveLock);
 }
 
 static void
-AlterSchemaOwner_internal(HeapTuple tup, Relation rel, Oid newOwnerId)
+AlterSchemaOwner_internal(cqContext  *pcqCtx, 
+						  HeapTuple tup, Relation rel, Oid newOwnerId)
 {
 	Form_pg_namespace nspForm;
 
@@ -538,9 +564,9 @@ AlterSchemaOwner_internal(HeapTuple tup, Relation rel, Oid newOwnerId)
 		 * Determine the modified ACL for the new owner.  This is only
 		 * necessary when the ACL is non-null.
 		 */
-		aclDatum = SysCacheGetAttr(NAMESPACENAME, tup,
-								   Anum_pg_namespace_nspacl,
-								   &isNull);
+		aclDatum = caql_getattr(pcqCtx,
+								Anum_pg_namespace_nspacl,
+								&isNull);
 		if (!isNull)
 		{
 			newAcl = aclnewowner(DatumGetAclP(aclDatum),
@@ -549,9 +575,10 @@ AlterSchemaOwner_internal(HeapTuple tup, Relation rel, Oid newOwnerId)
 			repl_val[Anum_pg_namespace_nspacl - 1] = PointerGetDatum(newAcl);
 		}
 
-		newtuple = heap_modify_tuple(tup, RelationGetDescr(rel), repl_val, repl_null, repl_repl);
+		newtuple = caql_modify_current(pcqCtx, repl_val, repl_null, repl_repl);
 
-		simple_heap_update(rel, &newtuple->t_self, newtuple);
+		caql_update_current(pcqCtx, newtuple);
+		/* and Update indexes (implicit) */
 
 		/* MPP-6929: metadata tracking */
 		if (Gp_role == GP_ROLE_DISPATCH)
@@ -560,8 +587,6 @@ AlterSchemaOwner_internal(HeapTuple tup, Relation rel, Oid newOwnerId)
 							   GetUserId(),
 							   "ALTER", "OWNER"
 					);
-
-		CatalogUpdateIndexes(rel, newtuple);
 
 		heap_freetuple(newtuple);
 

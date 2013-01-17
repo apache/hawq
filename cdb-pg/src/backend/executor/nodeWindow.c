@@ -4,7 +4,7 @@
  *	  Routines to handle window nodes.
  *
  *
- * Copyright (c) 2007-2008, Greenplum inc *
+ * Copyright (c) 2007-2012, Greenplum inc *
  *
  *-------------------------------------------------------------------------
  */
@@ -13,6 +13,7 @@
 #include "miscadmin.h"
 
 /* XXX include list is speculative -- bhagenbuch */
+#include "access/catquery.h"
 #include "access/heapam.h"
 #include "catalog/pg_aggregate.h"
 #include "catalog/pg_namespace.h"
@@ -2380,6 +2381,7 @@ initWindowFuncState(WindowState *wstate, Window *node)
 					isWin,
 					isSet;
 		AclResult	aclresult;
+		cqContext  *pcqCtx;
 
 		refno++; /* First one is 0 */
 
@@ -2459,9 +2461,14 @@ initWindowFuncState(WindowState *wstate, Window *node)
 						   get_func_name(winref->winfnoid));
 
 		/* Collect information about the window function's pg_proc entry. */
-		heap_tuple = SearchSysCache(PROCOID,
-								  ObjectIdGetDatum(winref->winfnoid),
-								  0, 0, 0);
+		pcqCtx = caql_beginscan(
+				NULL,
+				cql("SELECT * FROM pg_proc "
+					" WHERE oid = :1 ",
+					ObjectIdGetDatum(winref->winfnoid)));
+
+		heap_tuple = caql_getnext(pcqCtx);
+
 		insist_log(HeapTupleIsValid(heap_tuple),
 			"cache lookup failed for window function proc %u",
 			winref->winfnoid);
@@ -2473,7 +2480,7 @@ initWindowFuncState(WindowState *wstate, Window *node)
 		winResType = proform->prorettype;
 		winOwner = proform->proowner;
 		
-		ReleaseSysCache(heap_tuple);
+		caql_endscan(pcqCtx);
 		
 		Assert( isAgg != isWin );
 		Assert( !isSet );
@@ -2509,12 +2516,18 @@ initWindowFuncState(WindowState *wstate, Window *node)
 				 *invprelimfnexpr,
 				 *prelimfnexpr;
 			Datum textInitVal;
+			cqContext	*aggcqCtx;
 			
 			Insist(winref->winlevel < wstate->numlevels);
 
-			agg_tuple = SearchSysCache(AGGFNOID,
-									   ObjectIdGetDatum(winref->winfnoid),
-									   0, 0, 0);
+			aggcqCtx = caql_beginscan(
+					NULL,
+					cql("SELECT * FROM pg_aggregate "
+						" WHERE aggfnoid = :1 ",
+						ObjectIdGetDatum(winref->winfnoid)));
+
+			agg_tuple = caql_getnext(aggcqCtx);
+
 			insist_log(HeapTupleIsValid(agg_tuple), "cache lookup failed for aggregate %u",
 					 winref->winfnoid);
 			aggform = (Form_pg_aggregate) GETSTRUCT(agg_tuple);
@@ -2593,11 +2606,11 @@ initWindowFuncState(WindowState *wstate, Window *node)
 
 			/*
 			 * initval is potentially null, so don't try to access it as a 
-			 * struct field. Must do it the hard way with SysCacheGetAttr.
+			 * struct field. Must do it the hard way with caql_getattr
 		 	*/
-			textInitVal = SysCacheGetAttr(AGGFNOID, agg_tuple,
-										  Anum_pg_aggregate_agginitval,
-										  &funcstate->aggInitValueIsNull);
+			textInitVal = caql_getattr(aggcqCtx,
+									   Anum_pg_aggregate_agginitval,
+									   &funcstate->aggInitValueIsNull);
 
 			if (funcstate->aggInitValueIsNull)
 				funcstate->aggInitValue = (Datum) 0;
@@ -2622,7 +2635,7 @@ initWindowFuncState(WindowState *wstate, Window *node)
 									"input type and transition type",
 									winref->winfnoid)));
 			}
-			ReleaseSysCache(agg_tuple);
+			caql_endscan(aggcqCtx);
 			
 			wrxstate->winkind = WINKIND_AGGREGATE;
 		}
@@ -2633,10 +2646,16 @@ initWindowFuncState(WindowState *wstate, Window *node)
 			Oid windowfn_oid = InvalidOid;
 			Const *refptr;
 			ExprState *xtrastate;
-			
-			win_tuple = SearchSysCache(WINFNOID,
-									   ObjectIdGetDatum(winref->winfnoid),
-									   0, 0, 0);
+			cqContext *wincqCtx;
+
+			wincqCtx = caql_beginscan(
+					NULL,
+					cql("SELECT * FROM pg_window "
+						" WHERE winfnoid = :1 ",
+						ObjectIdGetDatum(winref->winfnoid)));
+
+			win_tuple = caql_getnext(wincqCtx);
+
 			if (!HeapTupleIsValid(win_tuple))
 				elog(ERROR, "cache lookup failed for window function %u",
 					 winref->winfnoid);
@@ -2743,7 +2762,8 @@ initWindowFuncState(WindowState *wstate, Window *node)
 			funcstate->win_value = 0;
 			funcstate->win_value_is_null = true;
 
-			ReleaseSysCache(win_tuple);
+			caql_endscan(wincqCtx);
+
 		}
 		else
 		{
@@ -5167,6 +5187,7 @@ init_bound_frame_edge_expr(WindowFrameEdge *edge, TupleDesc desc,
 	char *oprname;
 	Form_pg_operator opr;
 	int32 vartypmod = desc->attrs[attnum - 1]->atttypmod;
+	cqContext *pcqCtx;
 	
 	Insist(EDGE_IS_BOUND(edge));
 
@@ -5233,12 +5254,19 @@ init_bound_frame_edge_expr(WindowFrameEdge *edge, TupleDesc desc,
 		oprname = "+";
 	}
 
-		
-	tup = SearchSysCache(OPERNAMENSP,
-						 CStringGetDatum(oprname),
-						 ObjectIdGetDatum(ltype),
-						 ObjectIdGetDatum(rtype),
-						 ObjectIdGetDatum(PG_CATALOG_NAMESPACE));
+	pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_operator "
+				" WHERE oprname = :1 "
+				" AND oprleft = :2 "
+				" AND oprright = :3 "
+				" AND oprnamespace = :4 ",
+				CStringGetDatum(oprname),
+				ObjectIdGetDatum(ltype),
+				ObjectIdGetDatum(rtype),
+				ObjectIdGetDatum(PG_CATALOG_NAMESPACE)));
+	
+	tup = caql_getnext(pcqCtx);
 
 	/*
 	 * If we didn't find an operator, it's probably because the user has
@@ -5249,16 +5277,15 @@ init_bound_frame_edge_expr(WindowFrameEdge *edge, TupleDesc desc,
 	 */
 	if (!HeapTupleIsValid(tup))
 	{
+		HeapTuple tup2;
+
 		List *oprlist = lappend(NIL, makeString(oprname));
 
-		tup = oper(NULL, oprlist, ltype, rtype, true, -1);
+		tup2 = oper(NULL, oprlist, ltype, rtype, true, -1);
 
 		list_free_deep(oprlist);
 
-		/* We have to find it now */
-		Insist(HeapTupleIsValid(tup));
-		
-		opr = (Form_pg_operator) GETSTRUCT(tup);
+		opr = (Form_pg_operator) GETSTRUCT(tup2);
 
 		/* this is why we're here */
 		Insist(ltype != opr->oprleft);
@@ -5268,16 +5295,25 @@ init_bound_frame_edge_expr(WindowFrameEdge *edge, TupleDesc desc,
 												COERCION_EXPLICIT,
 												COERCE_IMPLICIT_CAST,
 												-1);
+
+		exprrestype = opr->oprresult;
+		expr = make_opclause(HeapTupleGetOid(tup2), exprrestype,
+							 false, varexpr, 
+							 (Expr *)edge->val);
+		((OpExpr *)expr)->opfuncid = opr->oprcode;
+		ReleaseOperator(tup2);
 	}
 	else
+	{
 		opr = ((Form_pg_operator) GETSTRUCT(tup));
 
-	exprrestype = opr->oprresult;
-	expr = make_opclause(HeapTupleGetOid(tup), exprrestype,
-						 false, varexpr, 
-						 (Expr *)edge->val);
-	((OpExpr *)expr)->opfuncid = opr->oprcode;
-	ReleaseSysCache(tup);
+		exprrestype = opr->oprresult;
+		expr = make_opclause(HeapTupleGetOid(tup), exprrestype,
+							 false, varexpr, 
+							 (Expr *)edge->val);
+		((OpExpr *)expr)->opfuncid = opr->oprcode;
+		caql_endscan(pcqCtx);
+	}
 
 	/*
 	 * If the frame edge operation returns a different type
@@ -5515,20 +5551,26 @@ init_frames(WindowState *wstate)
 		/* what sort order did the user specify for each key? */
 		for (col_no = 0; col_no < ncols; col_no++)
 		{
-			Oid sortop = level_state->sortOperators[col_no];
-			Form_pg_operator op;
-			HeapTuple optup = SearchSysCache(OPEROID,
-							   				 ObjectIdGetDatum(sortop),
-							   				 0, 0, 0);
-			Insist(HeapTupleIsValid(optup));
-			op = (Form_pg_operator)GETSTRUCT(optup);
+			Oid			 sortop = level_state->sortOperators[col_no];
+			char		*oprname;
+			int			 fetchCount;
 
-			if (strcmp(NameStr(op->oprname), "<") == 0)
+			oprname = caql_getcstring_plus(
+					NULL,
+					&fetchCount,
+					NULL,
+					cql("SELECT oprname FROM pg_operator "
+						" WHERE oid = :1 ",
+						ObjectIdGetDatum(sortop)));
+
+			Insist(fetchCount);
+
+			if (strcmp(oprname, "<") == 0)
 				level_state->col_sort_asc[col_no] = true;
 			else
 				level_state->col_sort_asc[col_no] = false;
 
-			ReleaseSysCache(optup);
+			pfree(oprname);
 		}
 
 		/* now, initialize the actual frame */

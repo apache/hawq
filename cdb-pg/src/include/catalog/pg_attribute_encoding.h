@@ -89,7 +89,6 @@ extern StdRdOptions **RelationGetAttributeOptions(Relation rel);
 extern List **RelationGetUntransformedAttributeOptions(Relation rel);
 
 extern void AddRelationAttributeEncodings(Relation rel, List *attr_encodings);
-extern void RemoveRelationAttributeEncoding(Oid relid, AttrNumber attnum);
 extern void RemoveAttributeEncodingsByRelid(Oid relid);
 extern void cloneAttributeEncoding(Oid oldrelid, Oid newrelid, AttrNumber max_attno);
 extern Datum *get_rel_attoptions(Oid relid, AttrNumber max_attno);

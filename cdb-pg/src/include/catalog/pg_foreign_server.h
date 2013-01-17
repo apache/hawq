@@ -37,8 +37,11 @@
    srvoptions    text[] -- FDW-specific options
    );
 
-   create unique index on pg_foreign_server(oid) with (indexid=3308, CamelCase=ForeignServerOid);
-   create unique index on pg_foreign_server(srvname) with (indexid=3309, CamelCase=ForeignServerName);
+   create unique index on pg_foreign_server(oid) with (indexid=3308, CamelCase=ForeignServerOid, syscacheid=FOREIGNSERVEROID, syscache_nbuckets=32);
+   create unique index on pg_foreign_server(srvname) with (indexid=3309, CamelCase=ForeignServerName, syscacheid=FOREIGNSERVERNAME, syscache_nbuckets=32);
+
+   alter table pg_foreign_server add fk srvowner on pg_authid(oid);
+   alter table pg_foreign_server add fk srvfdw on pg_foreign_data_wrapper(oid);
 
    TIDYCAT_ENDFAKEDEF
 */

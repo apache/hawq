@@ -34,8 +34,8 @@
    lanacl         aclitem[] -- Access privileges
    );
 
-   create unique index on pg_language(lanname) with (indexid=2681, CamelCase=LanguageName);
-   create unique index on pg_language(oid) with (indexid=2682, CamelCase=LanguageOid);
+   create unique index on pg_language(lanname) with (indexid=2681, CamelCase=LanguageName, syscacheid=LANGNAME, syscache_nbuckets=4);
+   create unique index on pg_language(oid) with (indexid=2682, CamelCase=LanguageOid, syscacheid=LANGOID, syscache_nbuckets=4);
 
    alter table pg_language add fk lanplcallfoid on pg_proc(oid);
    alter table pg_language add fk lanvalidator on pg_proc(oid);

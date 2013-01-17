@@ -56,7 +56,7 @@ typedef struct varlena anyarray;
    stavalues4   text
    );
 
-   create unique index on pg_statistic(starelid, staattnum) with (indexid=2696, CamelCase=StatisticRelidAttnum);
+   create unique index on pg_statistic(starelid, staattnum) with (indexid=2696, CamelCase=StatisticRelidAttnum, syscacheid=STATRELATT, syscache_nbuckets=1024);
 
    alter table pg_statistic add fk starelid on pg_attribute(attrelid);
    alter table pg_statistic add fk staop1 on pg_operator(oid);

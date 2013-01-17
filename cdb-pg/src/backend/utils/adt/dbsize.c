@@ -19,6 +19,7 @@
 #include "lib/stringinfo.h"
 
 #include "access/heapam.h"
+#include "access/catquery.h"
 #include "access/appendonlywriter.h"
 #include "access/aocssegfiles.h"
 #include "catalog/catalog.h"
@@ -520,18 +521,22 @@ pg_relation_size_name(PG_FUNCTION_ARGS)
 		Oid namespaceId;
 		Oid relOid;
 		/*
-		 * Do this the hard way, because the optimizer wants to be able to use this
-		 * function on relations the user might not have direct access to.
+		 * Do this the hard way, because the optimizer wants to be
+		 * able to use this function on relations the user might not
+		 * have direct access to.
 		 */
 
 		AcceptInvalidationMessages();
-		
-		namespaceId =  GetSysCacheOid(NAMESPACENAME,
-									  CStringGetDatum(relrv->schemaname),
-									  0, 0, 0);
+
+		namespaceId = caql_getoid(
+				NULL,
+				cql("SELECT oid FROM pg_namespace "
+					" WHERE nspname = :1 ",
+					CStringGetDatum(relrv->schemaname)));
+
 		relOid = get_relname_relid(relrv->relname, namespaceId);
 		
-		if (relOid == InvalidOid)
+		if (!OidIsValid(relOid))
 		{
 			size = 0;
 			PG_RETURN_INT64(size);
@@ -695,9 +700,12 @@ pg_total_relation_size_name(PG_FUNCTION_ARGS)
 		 */
 		AcceptInvalidationMessages();
 
-		namespaceId =  GetSysCacheOid(NAMESPACENAME,
-								 CStringGetDatum(relrv->schemaname),
-								 0, 0, 0);
+		namespaceId = caql_getoid(
+				NULL,
+				cql("SELECT oid FROM pg_namespace "
+					" WHERE nspname = :1 ",
+					CStringGetDatum(relrv->schemaname)));
+
 		relid = get_relname_relid(relrv->relname, namespaceId);
 	}
 	else

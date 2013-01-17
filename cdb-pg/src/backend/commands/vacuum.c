@@ -25,6 +25,7 @@
 
 #include "access/clog.h"
 #include "access/genam.h"
+#include "access/catquery.h"
 #include "access/heapam.h"
 #include "catalog/heap.h"
 #include "access/transam.h"
@@ -740,21 +741,20 @@ get_rel_oids(List *relids, const RangeVar *vacrel, const char *stmttype,
 	else
 	{
 		/* Process all plain relations listed in pg_class */
-		Relation	pgclass;
-		HeapScanDesc scan;
 		HeapTuple	tuple;
-		ScanKeyData key;
+		cqContext	cqc;
+		cqContext  *pcqCtx;
 
-		ScanKeyInit(&key,
-					Anum_pg_class_relkind,
-					BTEqualStrategyNumber, F_CHAREQ,
-					CharGetDatum(RELKIND_RELATION));
+		/* NOTE: force heapscan in caql */
+		pcqCtx = caql_beginscan(
+				caql_syscache(
+						caql_indexOK(cqclr(&cqc), false),
+						false),
+				cql("SELECT * FROM pg_class "
+					" WHERE relkind = :1 ",
+					CharGetDatum(RELKIND_RELATION)));
 
-		pgclass = heap_open(RelationRelationId, AccessShareLock);
-
-		scan = heap_beginscan(pgclass, SnapshotNow, 1, &key);
-
-		while ((tuple = heap_getnext(scan, ForwardScanDirection)) != NULL)
+		while (HeapTupleIsValid(tuple = caql_getnext(pcqCtx)))
 		{
 			Form_pg_class classForm = (Form_pg_class) GETSTRUCT(tuple);
 
@@ -776,8 +776,7 @@ get_rel_oids(List *relids, const RangeVar *vacrel, const char *stmttype,
 			MemoryContextSwitchTo(oldcontext);
 		}
 
-		heap_endscan(scan);
-		heap_close(pgclass, AccessShareLock);
+		caql_endscan(pcqCtx);
 	}
 
 	return oid_list;
@@ -884,6 +883,8 @@ vac_update_relstats(Relation rel, BlockNumber num_pages, double num_tuples,
 	Form_pg_class pgcform;
 	Oid			relid = RelationGetRelid(rel);
 	bool		dirty;
+	cqContext	cqc;
+	cqContext  *pcqCtx;
 
 	Assert(relid != InvalidOid);
 
@@ -949,10 +950,16 @@ vac_update_relstats(Relation rel, BlockNumber num_pages, double num_tuples,
 	 */
 	rd = heap_open(RelationRelationId, RowExclusiveLock);
 
+	pcqCtx = caql_addrel(cqclr(&cqc), rd);
+
 	/* Fetch a copy of the tuple to scribble on */
-	ctup = SearchSysCacheCopy(RELOID,
-							  ObjectIdGetDatum(relid),
-							  0, 0, 0);
+	ctup = caql_getfirst(
+			pcqCtx,
+			cql("SELECT * FROM pg_class "
+				" WHERE oid = :1 "
+				" FOR UPDATE ",
+				ObjectIdGetDatum(relid)));
+
 	if (!HeapTupleIsValid(ctup))
 		elog(ERROR, "pg_class entry for relid %u vanished during vacuuming",
 			 relid);
@@ -1044,8 +1051,10 @@ vac_update_datfrozenxid(void)
 	HeapTuple	tuple;
 	Form_pg_database dbform;
 	Relation	relation;
-	SysScanDesc scan;
 	HeapTuple	classTup;
+	cqContext  *pcqCtx;
+	cqContext	cqc;
+
 	TransactionId newFrozenXid;
 	bool		dirty = false;
 
@@ -1061,12 +1070,11 @@ vac_update_datfrozenxid(void)
 	 * We must seqscan pg_class to find the minimum Xid, because there is no
 	 * index that can help us here.
 	 */
-	relation = heap_open(RelationRelationId, AccessShareLock);
+	pcqCtx = caql_beginscan(
+			caql_indexOK(cqclr(&cqc), false),
+			cql("SELECT * FROM pg_class ", NULL));
 
-	scan = systable_beginscan(relation, InvalidOid, false,
-							  SnapshotNow, 0, NULL);
-
-	while ((classTup = systable_getnext(scan)) != NULL)
+	while (HeapTupleIsValid(classTup = caql_getnext(pcqCtx)))
 	{
 		Form_pg_class classForm = (Form_pg_class) GETSTRUCT(classTup);
 
@@ -1094,18 +1102,27 @@ vac_update_datfrozenxid(void)
 	}
 
 	/* we're done with pg_class */
-	systable_endscan(scan);
-	heap_close(relation, AccessShareLock);
+	caql_endscan(pcqCtx);
 
 	Assert(TransactionIdIsNormal(newFrozenXid));
 
 	/* Now fetch the pg_database tuple we need to update. */
 	relation = heap_open(DatabaseRelationId, RowExclusiveLock);
 
+	cqContext  *dbcqCtx;
+	cqContext	dbcqc;
+
+	dbcqCtx = caql_addrel(cqclr(&dbcqc), relation);
+
 	/* Fetch a copy of the tuple to scribble on */
-	tuple = SearchSysCacheCopy(DATABASEOID,
-							   ObjectIdGetDatum(MyDatabaseId),
-							   0, 0, 0);
+
+	tuple = caql_getfirst(
+			dbcqCtx,
+			cql("SELECT * FROM pg_database "
+				" WHERE oid = :1 "
+				" FOR UPDATE ",
+				ObjectIdGetDatum(MyDatabaseId)));
+
 	if (!HeapTupleIsValid(tuple))
 		elog(ERROR, "could not find tuple for database %u", MyDatabaseId);
 	dbform = (Form_pg_database) GETSTRUCT(tuple);
@@ -1157,9 +1174,9 @@ static void
 vac_truncate_clog(TransactionId frozenXID)
 {
 	TransactionId myXID = GetCurrentTransactionId();
-	Relation	relation;
-	HeapScanDesc scan;
 	HeapTuple	tuple;
+	cqContext	cqc;
+	cqContext  *pcqCtx;
 	NameData	oldest_datname;
 	bool		frozenAlreadyWrapped = false;
 
@@ -1178,11 +1195,11 @@ vac_truncate_clog(TransactionId frozenXID)
 	 * the worst possible outcome is that pg_clog is not truncated as
 	 * aggressively as it could be.
 	 */
-	relation = heap_open(DatabaseRelationId, AccessShareLock);
+	pcqCtx = caql_beginscan(
+			caql_indexOK(cqclr(&cqc), false),
+			cql("SELECT * FROM pg_database ", NULL));
 
-	scan = heap_beginscan(relation, SnapshotNow, 0, NULL);
-
-	while ((tuple = heap_getnext(scan, ForwardScanDirection)) != NULL)
+	while (HeapTupleIsValid(tuple = caql_getnext(pcqCtx)))
 	{
 		Form_pg_database dbform = (Form_pg_database) GETSTRUCT(tuple);
 
@@ -1197,9 +1214,7 @@ vac_truncate_clog(TransactionId frozenXID)
 		}
 	}
 
-	heap_endscan(scan);
-
-	heap_close(relation, AccessShareLock);
+	caql_endscan(pcqCtx);
 
 	/*
 	 * Do not truncate CLOG if we seem to have suffered wraparound already;
@@ -4289,4 +4304,3 @@ vacuum_combine_stats(CdbDispatchResults *primaryResults,
 	}
 
 }
-

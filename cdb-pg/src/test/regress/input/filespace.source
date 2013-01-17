@@ -65,6 +65,13 @@ create tablespace rtsfake filespace pg_system;
 -- duplicate
 create tablespace regressionts1 filespace regressionfs1;
 
+-- caql coverage for tablecmds.c
+drop table if exists ttable;
+create tablespace ttbspace filespace regressionfs1;
+create table ttable (a int, b int) tablespace regressionts1;
+alter table ttable set tablespace ttbspace;
+drop table ttable;
+
 -- do some alters
 create user fsuser1;
 
@@ -80,10 +87,9 @@ alter filespace regressionfs1 owner to fsuser1;
 
 SET SESSION AUTHORIZATION fsuser1;
 create tablespace rtsfake filespace regressionfs1;
-create filespace regressionfs2 @gpfilespace_regressionfs2@ 
+create filespace regressionfs2 @gpfilespace_regressionfs2@
 
 ;
-
 
 
 -- switch to superuser
@@ -97,9 +103,23 @@ drop filespace pg_system;
 drop tablespace pg_default;
 drop tablespace pg_global;
 
+-- test tablespace and filespace aclcheck
+drop user if exists tbs_user1;
+drop user if exists tbs_user2;
+create user tbs_user1;
+create user tbs_user2;
+alter tablespace ttbspace owner to tbs_user1;
+set session authorization tbs_user1;
+alter tablespace ttbspace owner to tbs_user2;
+alter filespace regressionfs1 owner to tbs_user1;
+reset session authorization;
+
 -- cleanup
 drop tablespace regressionts1;
+drop tablespace ttbspace;
 
 drop filespace regressionfs1;
 
 drop user fsuser1;
+drop user tbs_user1;
+drop user tbs_user2;

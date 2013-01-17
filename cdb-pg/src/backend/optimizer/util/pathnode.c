@@ -2225,7 +2225,7 @@ hash_safe_tlist(List *tlist)
 		if (!optup)
 			return false;
 		oprcanhash = ((Form_pg_operator) GETSTRUCT(optup))->oprcanhash;
-		ReleaseSysCache(optup);
+		ReleaseOperator(optup);
 		if (!oprcanhash)
 			return false;
 	}

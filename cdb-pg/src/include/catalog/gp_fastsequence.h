@@ -30,7 +30,7 @@
    objid   oid,
    objmod  bigint,
    last_sequence bigint
-   contentid	int2
+   contentid	integer
    );
 
    create unique index on gp_fastsequence(objid, objmod, contentid) with (indexid=6067);

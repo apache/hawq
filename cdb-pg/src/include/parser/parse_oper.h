@@ -17,8 +17,9 @@
 #include "access/htup.h"
 #include "parser/parse_node.h"
 
-
 typedef HeapTuple Operator;
+
+#define ReleaseOperator(fmw) ReleaseSysCache((fmw))
 
 /* Routines to look up an operator given name and exact input type(s) */
 extern Oid LookupOperName(ParseState *pstate, List *opername,

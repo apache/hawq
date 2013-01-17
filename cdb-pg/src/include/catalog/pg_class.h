@@ -32,7 +32,7 @@
 /* TIDYCAT_BEGINFAKEDEF
 
    CREATE TABLE pg_class
-   with (bootstrap=true, relid=1259)
+   with (camelcase=Relation, bootstrap=true, relid=1259)
    (
    relname         name      ,
    relnamespace    oid       ,
@@ -66,8 +66,9 @@
    reloptions      text[]    
    );
 
-   create unique index on pg_class(oid) with (indexid=2662, CamelCase=ClassOid);
-   create unique index on pg_class(relname, relnamespace) with (indexid=2663, CamelCase=ClassNameNsp);
+   create unique index on pg_class(oid) with (indexid=2662, CamelCase=ClassOid, syscacheid=RELOID, syscache_nbuckets=1024);
+
+   create unique index on pg_class(relname, relnamespace) with (indexid=2663, CamelCase=ClassNameNsp, syscacheid=RELNAMENSP, syscache_nbuckets=1024);
 
    alter table pg_class add fk relnamespace on pg_namespace(oid);
    alter table pg_class add fk reltype on pg_type(oid);

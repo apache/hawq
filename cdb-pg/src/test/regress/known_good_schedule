@@ -177,7 +177,6 @@ ignore: filespace
 ignore: orafunk
 ignore: icudp_no_fault_injection
 ignore: icudp_full
-ignore: gpcheckmirrorseg
 ignore: trig
 ignore: xml
 ignore: auth_constraint
@@ -189,6 +188,11 @@ ignore: plpgsql_cache
 ignore: percentile
 ignore: resource_queue_function
 ignore: co_nestloop_idxscan
+#
+# gpcheckmirrorseg should be last to check mirror integrity
+#
+ignore: gpcheckmirrorseg
+# end of tests
 # the following test needs some special filespace/tablespace.
 ignore: goh_tablespace
 ignore: hdfs_filesystem

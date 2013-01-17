@@ -16,6 +16,7 @@
 #include "fmgr.h"
 
 #include "access/genam.h"
+#include "access/catquery.h"
 #include "access/reloptions.h"
 #include "access/tupdesc.h"
 #include "access/tupmacs.h"
@@ -113,9 +114,6 @@ PGFunction *
 GetCompressionImplementation(char *comptype)
 {
 	HeapTuple		tuple;
-	ScanKeyData		key;
-	SysScanDesc		scan;
-	Relation		pgcomp;
 	NameData		compname;
 	PGFunction	   *funcs;
 	Form_pg_compression ctup;
@@ -123,22 +121,11 @@ GetCompressionImplementation(char *comptype)
 
 	compname = comptype_to_name(comptype);
 
-	pgcomp = heap_open(CompressionRelationId, AccessShareLock);
-
-	ScanKeyInit(&key,
-				Anum_pg_compression_compname,
-				BTEqualStrategyNumber,
-				F_NAMEEQ,
-				NameGetDatum(&compname));
-
-	scan = systable_beginscan(pgcomp,
-							  CompressionCompnameIndexId,
-							  true,
-							  SnapshotNow,
-							  1,
-							  &key);
-
-	tuple = systable_getnext(scan);
+	tuple = caql_getfirst(
+			NULL,
+			cql("SELECT * FROM pg_compression "
+				" WHERE compname = :1 ",
+				NameGetDatum(&compname)));
 
 	if (!HeapTupleIsValid(tuple))
 		ereport(ERROR,
@@ -169,9 +156,6 @@ GetCompressionImplementation(char *comptype)
 	Insist(OidIsValid(ctup->compvalidator));
 	fmgr_info(ctup->compvalidator, &finfo);
 	funcs[COMPRESSION_VALIDATOR] = finfo.fn_addr;
-
-	systable_endscan(scan);
-	heap_close(pgcomp, AccessShareLock);
 
 	return funcs;
 }
@@ -637,29 +621,17 @@ dummy_compression_validator(PG_FUNCTION_ARGS)
 bool
 compresstype_is_valid(char *comptype)
 {
-	ScanKeyData skey[1];
-	SysScanDesc scan;
-	HeapTuple	tuple;
-	Relation	pgcomp;
 	NameData	compname;
 	bool		found = false;
 
 	compname = comptype_to_name(comptype);
 
-	pgcomp = heap_open(CompressionRelationId, AccessShareLock);
-
-	ScanKeyInit(&skey[0],
-				Anum_pg_compression_compname,
-				BTEqualStrategyNumber, F_NAMEEQ,
-				NameGetDatum(&compname));
-	scan = systable_beginscan(pgcomp, CompressionCompnameIndexId,
-							  true, SnapshotNow, 1, skey);
-
-	tuple = systable_getnext(scan);
-	found = HeapTupleIsValid(tuple);
-
-	systable_endscan(scan);
-	heap_close(pgcomp, AccessShareLock);
+	found = (0 !=
+			 caql_getcount(
+					 NULL,
+					 cql("SELECT COUNT(*) FROM pg_compression "
+						 " WHERE compname = :1 ",
+						 NameGetDatum(&compname))));
 		
 	return found;
 }

@@ -16,6 +16,7 @@
 #include <unistd.h>
 
 #include "access/genam.h"
+#include "access/catquery.h"
 #include "access/heapam.h"
 #include "libpq/pqsignal.h"
 #include "miscadmin.h"
@@ -567,56 +568,60 @@ FtsFindSuperuser(bool try_bootstrap)
 	char *suser = NULL;
 	Relation auth_rel;
 	HeapTuple	auth_tup;
-	HeapScanDesc auth_scan;
-	ScanKeyData key[3];
+	cqContext  *pcqCtx;
+	cqContext	cqc;
 	bool	isNull;
 
-	ScanKeyInit(&key[0],
-				Anum_pg_authid_rolsuper,
-				BTEqualStrategyNumber, F_BOOLEQ,
-				BoolGetDatum(true));
-
-	ScanKeyInit(&key[1],
-				Anum_pg_authid_rolcanlogin,
-				BTEqualStrategyNumber, F_BOOLEQ,
-				BoolGetDatum(true));
+	auth_rel = heap_open(AuthIdRelationId, AccessShareLock);
 
 	if (try_bootstrap)
 	{
-		ScanKeyInit(&key[2],
-					ObjectIdAttributeNumber,
-					BTEqualStrategyNumber, F_OIDEQ,
-					ObjectIdGetDatum(BOOTSTRAP_SUPERUSERID));
+		pcqCtx = caql_beginscan(
+				caql_addrel(cqclr(&cqc), auth_rel),
+				cql("SELECT * FROM pg_authid "
+					" WHERE rolsuper = :1 "
+					" AND rolcanlogin = :2 "
+					" AND oid = :3 ",
+					BoolGetDatum(true),
+					BoolGetDatum(true),
+					ObjectIdGetDatum(BOOTSTRAP_SUPERUSERID)));
+	}
+	else
+	{
+		pcqCtx = caql_beginscan(
+				caql_addrel(cqclr(&cqc), auth_rel),
+				cql("SELECT * FROM pg_authid "
+					" WHERE rolsuper = :1 "
+					" AND rolcanlogin = :2 ",
+					BoolGetDatum(true),
+					BoolGetDatum(true)));
 	}
 
-	auth_rel = heap_open(AuthIdRelationId, AccessShareLock);
-	auth_scan = heap_beginscan(auth_rel, SnapshotNow, try_bootstrap ? 3 : 2, key);
-	while (HeapTupleIsValid(auth_tup = heap_getnext(auth_scan, ForwardScanDirection)))
+	while (HeapTupleIsValid(auth_tup = caql_getnext(pcqCtx)))
 	{
 		Datum	attrName;
-		Datum	attrNameOid;
 		Oid		userOid;
 		Datum	validuntil;
 
-		validuntil = heap_getattr(auth_tup, Anum_pg_authid_rolvaliduntil, auth_rel->rd_att, &isNull);
+		validuntil = heap_getattr(auth_tup, Anum_pg_authid_rolvaliduntil, 
+								  RelationGetDescr(auth_rel), &isNull);
 		/* we actually want it to be NULL, that means always valid */
 		if (!isNull)
 			continue;
 
-		attrName = heap_getattr(auth_tup, Anum_pg_authid_rolname, auth_rel->rd_att, &isNull);
+		attrName = heap_getattr(auth_tup, Anum_pg_authid_rolname, 
+								RelationGetDescr(auth_rel), &isNull);
 		Assert(!isNull);
 		suser = pstrdup(DatumGetCString(attrName));
 
-		attrNameOid = heap_getattr(auth_tup, ObjectIdAttributeNumber, auth_rel->rd_att, &isNull);
-		Assert(!isNull);
-		userOid = DatumGetObjectId(attrNameOid);
+		userOid = HeapTupleGetOid(auth_tup);
 
 		SetSessionUserId(userOid, true);
 
 		break;
 	}
 
-	heap_endscan(auth_scan);
+	caql_endscan(pcqCtx);
 	heap_close(auth_rel, AccessShareLock);
 	return suser;
 }
@@ -1009,19 +1014,24 @@ getFailoverStrategy(char *strategy)
 {
 	Relation	strategy_rel;
 	HeapTuple	strategy_tup;
-	HeapScanDesc strategy_scan;
+	cqContext  *pcqCtx;
+	cqContext	cqc;
 	bool	isNull=true;
 
 	Assert(strategy != NULL);
 
 	strategy_rel = heap_open(GpFaultStrategyRelationId, AccessShareLock);
-	strategy_scan = heap_beginscan(strategy_rel, SnapshotNow, 0, NULL);
 
-	while (HeapTupleIsValid(strategy_tup = heap_getnext(strategy_scan, ForwardScanDirection)))
+	/* XXX XXX: only one of these? then would be getfirst... */
+	pcqCtx = caql_beginscan(
+			caql_addrel(cqclr(&cqc), strategy_rel),
+			cql("SELECT * FROM gp_fault_strategy ", NULL));
+
+	while (HeapTupleIsValid(strategy_tup = caql_getnext(pcqCtx)))
 	{
 		Datum	strategy_datum;
 
-		strategy_datum = heap_getattr(strategy_tup, Anum_gp_fault_strategy_fault_strategy, strategy_rel->rd_att, &isNull);
+		strategy_datum = heap_getattr(strategy_tup, Anum_gp_fault_strategy_fault_strategy, RelationGetDescr(strategy_rel), &isNull);
 
 		if (isNull)
 			break;
@@ -1029,7 +1039,7 @@ getFailoverStrategy(char *strategy)
 		*strategy = DatumGetChar(strategy_datum);
 	}
 
-	heap_endscan(strategy_scan);
+	caql_endscan(pcqCtx);
 	heap_close(strategy_rel, AccessShareLock);
 
 	return;

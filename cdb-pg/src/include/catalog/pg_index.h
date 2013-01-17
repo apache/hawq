@@ -40,10 +40,11 @@
    );
 
    create index on pg_index(indrelid) with (indexid=2678, CamelCase=IndexIndrelid);
-   create unique index on pg_index(indexrelid) with (indexid=2679, CamelCase=IndexRelid);
+   create unique index on pg_index(indexrelid) with (indexid=2679, CamelCase=IndexRelid, syscacheid=INDEXRELID, syscache_nbuckets=1024);
 
    alter table pg_index add fk indexrelid on pg_class(oid);
    alter table pg_index add fk indrelid on pg_class(oid);
+   alter table pg_index add vector_fk indclass on pg_opclass(oid);
 
    TIDYCAT_ENDFAKEDEF
 */

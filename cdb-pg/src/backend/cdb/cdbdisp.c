@@ -13,6 +13,7 @@
 #include <pthread.h>
 #include <limits.h>
 
+#include "access/catquery.h"
 #include "executor/execdesc.h"	/* QueryDesc */
 #include "storage/ipc.h"		/* For proc_exit_inprogress  */
 #include "miscadmin.h"
@@ -3083,10 +3084,16 @@ pre_dispatch_function_evaluation_mutator(Node *node,
 		{
 			bool is_seq_func = false;
 			bool tup_or_set;
+			cqContext	*pcqCtx;
 
-			func_tuple = SearchSysCache(PROCOID,
-										ObjectIdGetDatum(funcid),
-										0, 0, 0);
+			pcqCtx = caql_beginscan(
+					NULL,
+					cql("SELECT * FROM pg_proc "
+						" WHERE oid = :1 ",
+						ObjectIdGetDatum(funcid)));
+
+			func_tuple = caql_getnext(pcqCtx);
+
 			if (!HeapTupleIsValid(func_tuple))
 				elog(ERROR, "cache lookup failed for function %u", funcid);
 
@@ -3095,7 +3102,8 @@ pre_dispatch_function_evaluation_mutator(Node *node,
 			/* can't handle set returning or row returning functions */
 			tup_or_set = (funcform->proretset || 
 						  type_is_rowtype(funcform->prorettype));
-			ReleaseSysCache(func_tuple);
+
+			caql_endscan(pcqCtx);
 			
 			/* can't handle it */
 			if (tup_or_set)

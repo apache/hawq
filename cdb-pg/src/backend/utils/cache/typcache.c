@@ -42,6 +42,7 @@
  */
 #include "postgres.h"
 
+#include "access/catquery.h"
 #include "access/hash.h"
 #include "access/heapam.h"
 #include "access/nbtree.h"
@@ -132,10 +133,16 @@ lookup_type_cache(Oid type_id, int flags)
 		 */
 		HeapTuple	tp;
 		Form_pg_type typtup;
+		cqContext	*pcqCtx;
 
-		tp = SearchSysCache(TYPEOID,
-							ObjectIdGetDatum(type_id),
-							0, 0, 0);
+		pcqCtx = caql_beginscan(
+				NULL,
+				cql("SELECT * FROM pg_type "
+					" WHERE oid = :1 ",
+					ObjectIdGetDatum(type_id)));
+
+		tp = caql_getnext(pcqCtx);
+
 		if (!HeapTupleIsValid(tp))
 			elog(ERROR, "cache lookup failed for type %u", type_id);
 		typtup = (Form_pg_type) GETSTRUCT(tp);
@@ -159,7 +166,7 @@ lookup_type_cache(Oid type_id, int flags)
 		typentry->typtype = typtup->typtype;
 		typentry->typrelid = typtup->typrelid;
 
-		ReleaseSysCache(tp);
+		caql_endscan(pcqCtx);
 	}
 
 	/* If we haven't already found the opclass, try to do so */

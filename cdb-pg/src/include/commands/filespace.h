@@ -33,7 +33,6 @@ extern void RenameFileSpace(const char *oldname, const char *newname);
 extern Oid get_filespace_oid(Relation rel, const char *filespacename);
 extern char *get_filespace_name(Oid fsoid);
 extern bool	is_filespace_shared(Oid fsoid);
-extern char *get_filespace_path(Oid fseoid, int16 dbid);
 extern void add_catalog_filespace_entry(Relation rel, Oid fsoid, int16 dbid,
 										char *location);
 extern void dbid_remove_filespace_entries(Relation rel, int16 dbid);

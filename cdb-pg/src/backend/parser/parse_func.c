@@ -15,6 +15,7 @@
 #include "postgres.h"
 
 #include "access/heapam.h"
+#include "access/catquery.h"
 #include "access/transam.h"
 #include "catalog/pg_aggregate.h"
 #include "catalog/pg_inherits.h"
@@ -377,6 +378,7 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 		/* must be a window function call */
 		WindowRef  *winref = makeNode(WindowRef);
 		HeapTuple	tuple;	
+		cqContext  *wincqCtx;
 		
 		if (retset)
 			ereport(ERROR,
@@ -395,7 +397,15 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
          * If this is a "true" window function, rather than an aggregate
          * derived window function then it will have a tuple in pg_window
          */
-		tuple = SearchSysCache(WINFNOID, ObjectIdGetDatum(funcid), 0, 0, 0);
+
+		wincqCtx = caql_beginscan(
+				NULL,
+				cql("SELECT * FROM pg_window "
+					" WHERE winfnoid = :1 ",
+					ObjectIdGetDatum(funcid)));
+
+		tuple = caql_getnext(wincqCtx);
+
 		if (HeapTupleIsValid(tuple))
 		{
 			if (agg_filter)
@@ -412,8 +422,9 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 			 * later in transformWindowClause(). It's too early at this stage.
 			 */
 
-			ReleaseSysCache(tuple);
 		}
+		caql_endscan(wincqCtx);
+
 
 		winref->winfnoid = funcid;
 		winref->restype = rettype;
@@ -1094,13 +1105,19 @@ func_get_detail(List *funcname,
 		HeapTuple	ftup;
 		Form_pg_proc pform;
 		bool isagg = false;
+		cqContext	*procqCtx;
 
 		*funcid = best_candidate->oid;
 		*true_typeids = best_candidate->args;
 
-		ftup = SearchSysCache(PROCOID,
-							  ObjectIdGetDatum(best_candidate->oid),
-							  0, 0, 0);
+		procqCtx = caql_beginscan(
+				NULL,
+				cql("SELECT * FROM pg_proc "
+					" WHERE oid = :1 ",
+				ObjectIdGetDatum(best_candidate->oid)));
+
+		ftup = caql_getnext(procqCtx);
+
 		if (!HeapTupleIsValid(ftup))	/* should not happen */
 			elog(ERROR, "cache lookup failed for function %u",
 				 best_candidate->oid);
@@ -1110,7 +1127,8 @@ func_get_detail(List *funcname,
 		*retstrict = pform->proisstrict;
 		*retordered = false;
 		isagg = pform->proisagg;
-		ReleaseSysCache(ftup);
+
+		caql_endscan(procqCtx);
 
 		/* 
 		 * For aggregate functions STRICTness is defined by the 
@@ -1120,16 +1138,18 @@ func_get_detail(List *funcname,
 		{
 		    Form_pg_aggregate	aggform;
 			FmgrInfo			transfn;
-			Relation            aggrel;
-			TupleDesc			aggdesc;
 			Datum				value;
 			bool				isnull;
+			cqContext		   *aggcqCtx;
 
-			aggrel = heap_open(AggregateRelationId, AccessShareLock);
-			aggdesc = RelationGetDescr(aggrel);
-			ftup = SearchSysCache(AGGFNOID,
-								  ObjectIdGetDatum(best_candidate->oid),
-								  0, 0, 0);
+			aggcqCtx = caql_beginscan(
+					NULL,
+					cql("SELECT * FROM pg_aggregate "
+						" WHERE aggfnoid = :1 ",
+						ObjectIdGetDatum(best_candidate->oid)));
+
+			ftup = caql_getnext(aggcqCtx);
+
 			if (!HeapTupleIsValid(ftup))	/* should not happen */
 			    elog(ERROR, "cache lookup failed for aggregate %u",
 					 best_candidate->oid);
@@ -1140,14 +1160,15 @@ func_get_detail(List *funcname,
 			/* 
 			 * Check if this is an ordered aggregate - while aggordered
 			 * should never be null it comes after a variable length field
-			 * so we must access it via heap_getattr.
+			 * so we must access it via caql_getattr.
 			 */
-			value = heap_getattr(ftup, Anum_pg_aggregate_aggordered, aggdesc, 
+			value = caql_getattr(aggcqCtx, 
+								 Anum_pg_aggregate_aggordered, 
 								 &isnull);
 			*retordered = (!isnull) && DatumGetBool(value);
 
-			ReleaseSysCache(ftup);
-			heap_close(aggrel, AccessShareLock);
+			caql_endscan(aggcqCtx);
+
 			return FUNCDETAIL_AGGREGATE;
 		}
 		return FUNCDETAIL_NORMAL;
@@ -1194,8 +1215,8 @@ typeInheritsFrom(Oid subclassTypeId, Oid superclassTypeId)
 	foreach(queue_item, queue)
 	{
 		Oid			this_relid = lfirst_oid(queue_item);
-		ScanKeyData skey;
-		HeapScanDesc inhscan;
+		cqContext  *pcqCtx;
+		cqContext	cqc;		
 		HeapTuple	inhtup;
 
 		/* If we've seen this relid already, skip it */
@@ -1211,14 +1232,13 @@ typeInheritsFrom(Oid subclassTypeId, Oid superclassTypeId)
 		if (queue_item != list_head(queue))
 			visited = lappend_oid(visited, this_relid);
 
-		ScanKeyInit(&skey,
-					Anum_pg_inherits_inhrelid,
-					BTEqualStrategyNumber, F_OIDEQ,
-					ObjectIdGetDatum(this_relid));
+		pcqCtx = caql_beginscan(
+				caql_addrel(cqclr(&cqc), inhrel),
+				cql("SELECT * FROM pg_inherits "
+					" WHERE inhrelid = :1 ",
+					ObjectIdGetDatum(this_relid)));
 
-		inhscan = heap_beginscan(inhrel, SnapshotNow, 1, &skey);
-
-		while ((inhtup = heap_getnext(inhscan, ForwardScanDirection)) != NULL)
+		while (HeapTupleIsValid(inhtup = caql_getnext(pcqCtx)))
 		{
 			Form_pg_inherits inh = (Form_pg_inherits) GETSTRUCT(inhtup);
 			Oid			inhparent = inh->inhparent;
@@ -1234,7 +1254,7 @@ typeInheritsFrom(Oid subclassTypeId, Oid superclassTypeId)
 			queue = lappend_oid(queue, inhparent);
 		}
 
-		heap_endscan(inhscan);
+		caql_endscan(pcqCtx);
 
 		if (result)
 			break;
@@ -1546,6 +1566,8 @@ LookupAggNameTypeNames(List *aggname, List *argtypes, bool noError)
 	Oid			oid;
 	HeapTuple	ftup;
 	Form_pg_proc pform;
+	cqContext	*pcqCtx;
+	bool		 proisagg;
 
 	argcount = list_length(argtypes);
 	if (argcount > FUNC_MAX_ARGS)
@@ -1591,16 +1613,26 @@ LookupAggNameTypeNames(List *aggname, List *argtypes, bool noError)
 	}
 
 	/* Make sure it's an aggregate */
-	ftup = SearchSysCache(PROCOID,
-						  ObjectIdGetDatum(oid),
-						  0, 0, 0);
+	/* SELECT proisagg FROM pg_proc */
+
+	pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_proc "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(oid)));
+
+	ftup = caql_getnext(pcqCtx);
+
 	if (!HeapTupleIsValid(ftup))	/* should not happen */
 		elog(ERROR, "cache lookup failed for function %u", oid);
 	pform = (Form_pg_proc) GETSTRUCT(ftup);
 
-	if (!pform->proisagg)
+	proisagg = pform->proisagg;
+
+	caql_endscan(pcqCtx);
+
+	if (!proisagg)
 	{
-		ReleaseSysCache(ftup);
 		if (noError)
 			return InvalidOid;
 		/* we do not use the (*) notation for functions... */
@@ -1610,8 +1642,6 @@ LookupAggNameTypeNames(List *aggname, List *argtypes, bool noError)
 						func_signature_string(aggname,
 											  argcount, argoids))));
 	}
-
-	ReleaseSysCache(ftup);
 
 	return oid;
 }

@@ -52,9 +52,9 @@
    rolcreatewexthdfs boolean -- allowed to create writable gphdfs tbl?
    );
 
-   CREATE UNIQUE INDEX on pg_authid(rolname) with (indexid=2676);
+   CREATE UNIQUE INDEX on pg_authid(rolname) with (indexid=2676, syscacheid=AUTHNAME, syscache_nbuckets=128);
 
-   CREATE UNIQUE INDEX on pg_authid(oid) with (indexid=2677);
+   CREATE UNIQUE INDEX on pg_authid(oid) with (indexid=2677, syscacheid=AUTHOID, syscache_nbuckets=128);
 
    CREATE INDEX on pg_authid(rolresqueue) with (CamelCase=AuthIdRolResQueue,indexid=6029);
 

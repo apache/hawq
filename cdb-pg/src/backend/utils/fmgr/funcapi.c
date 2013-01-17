@@ -13,6 +13,7 @@
  */
 #include "postgres.h"
 
+#include "access/catquery.h"
 #include "access/heapam.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_proc.h"
@@ -299,11 +300,17 @@ internal_get_result_type(Oid funcid,
 	Form_pg_proc procform;
 	Oid			rettype;
 	TupleDesc	tupdesc;
+	cqContext  *pcqCtx;
 
 	/* First fetch the function's pg_proc row to inspect its rettype */
-	tp = SearchSysCache(PROCOID,
-						ObjectIdGetDatum(funcid),
-						0, 0, 0);
+	pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_proc "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(funcid)));
+
+	tp = caql_getnext(pcqCtx);
+
 	if (!HeapTupleIsValid(tp))
 		elog(ERROR, "cache lookup failed for function %u", funcid);
 	procform = (Form_pg_proc) GETSTRUCT(tp);
@@ -340,7 +347,7 @@ internal_get_result_type(Oid funcid,
 			result = TYPEFUNC_RECORD;
 		}
 
-		ReleaseSysCache(tp);
+		caql_endscan(pcqCtx);
 
 		return result;
 	}
@@ -352,7 +359,7 @@ internal_get_result_type(Oid funcid,
 	{
 		Oid			newrettype = exprType(call_expr);
 
-		if (newrettype == InvalidOid)	/* this probably should not happen */
+		if (!OidIsValid(newrettype))	/* this probably should not happen */
 			ereport(ERROR,
 					(errcode(ERRCODE_DATATYPE_MISMATCH),
 					 errmsg("could not determine actual result type for function \"%s\" declared to return type %s",
@@ -392,7 +399,7 @@ internal_get_result_type(Oid funcid,
 			break;
 	}
 
-	ReleaseSysCache(tp);
+	caql_endscan(pcqCtx);
 
 	return result;
 }
@@ -764,11 +771,17 @@ get_func_result_name(Oid functionId)
 	int			numoutargs;
 	int			nargnames;
 	int			i;
+	cqContext  *pcqCtx;
 
 	/* First fetch the function's pg_proc row */
-	procTuple = SearchSysCache(PROCOID,
-							   ObjectIdGetDatum(functionId),
-							   0, 0, 0);
+	pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_proc "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(functionId)));
+
+	procTuple = caql_getnext(pcqCtx);
+
 	if (!HeapTupleIsValid(procTuple))
 		elog(ERROR, "cache lookup failed for function %u", functionId);
 
@@ -779,13 +792,13 @@ get_func_result_name(Oid functionId)
 	else
 	{
 		/* Get the data out of the tuple */
-		proargmodes = SysCacheGetAttr(PROCOID, procTuple,
-									  Anum_pg_proc_proargmodes,
-									  &isnull);
+		proargmodes = caql_getattr(pcqCtx,
+								   Anum_pg_proc_proargmodes,
+								   &isnull);
 		Assert(!isnull);
-		proargnames = SysCacheGetAttr(PROCOID, procTuple,
-									  Anum_pg_proc_proargnames,
-									  &isnull);
+		proargnames = caql_getattr(pcqCtx,
+								   Anum_pg_proc_proargnames,
+								   &isnull);
 		Assert(!isnull);
 
 		/*
@@ -840,7 +853,7 @@ get_func_result_name(Oid functionId)
 		}
 	}
 
-	ReleaseSysCache(procTuple);
+	caql_endscan(pcqCtx);
 
 	return result;
 }
