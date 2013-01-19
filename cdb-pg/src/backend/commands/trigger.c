@@ -681,8 +681,7 @@ renametrig(Oid relid,
 				caql_addrel(cqclr(&cqc), tgrel),
 				cql("SELECT count(*) FROM pg_trigger "
 					" WHERE tgrelid = :1 "
-					" AND tgname = :2 "
-					" FOR UPDATE ",
+					" AND tgname = :2 ",
 					ObjectIdGetDatum(relid),
 					PointerGetDatum((char *) newname))))
 	{

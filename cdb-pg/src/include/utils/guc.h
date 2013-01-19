@@ -251,6 +251,7 @@ extern bool gp_crash_handler_async;
 extern bool gp_temporary_files_filespace_repair;
 extern bool gp_perfmon_print_packet_info;
 extern bool gp_plpgsql_clear_cache_always;
+extern bool gp_disable_catalog_access_on_segment;
 
 /* Debug DTM Action */
 typedef enum

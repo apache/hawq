@@ -1,18 +1,21 @@
-subdir=src/backend/cdb
-top_builddir=../../../..
+subdir=src/backend/catalog/caql
+top_builddir=../../../../..
 
-TARGETS=cdbbufferedread
+TARGETS=caqlanalyze gram
 
-# Objects from backend, which don't need to be mocked but need to be linked.
-cdbbufferedread_REAL_OBJS=\
+COMMON_REAL_OBJS = \
 	$(top_srcdir)/src/backend/access/hash/hashfunc.o \
-	$(top_srcdir)/src/backend/access/transam/filerepdefs.o \
 	$(top_srcdir)/src/backend/bootstrap/bootparse.o \
+	$(top_srcdir)/src/backend/catalog/caql/gram.o \
 	$(top_srcdir)/src/backend/lib/stringinfo.o \
 	$(top_srcdir)/src/backend/nodes/bitmapset.o \
 	$(top_srcdir)/src/backend/nodes/equalfuncs.o \
+	$(top_srcdir)/src/backend/nodes/copyfuncs.o \
 	$(top_srcdir)/src/backend/nodes/list.o \
+	$(top_srcdir)/src/backend/nodes/value.o \
 	$(top_srcdir)/src/backend/parser/gram.o \
+	$(top_srcdir)/src/backend/parser/kwlookup.o \
+	$(top_srcdir)/src/backend/parser/scansup.o \
 	$(top_srcdir)/src/backend/regex/regcomp.o \
 	$(top_srcdir)/src/backend/regex/regerror.o \
 	$(top_srcdir)/src/backend/regex/regexec.o \
@@ -27,14 +30,29 @@ cdbbufferedread_REAL_OBJS=\
 	$(top_srcdir)/src/backend/utils/mb/wchar.o \
 	$(top_srcdir)/src/backend/utils/misc/guc.o \
 	$(top_srcdir)/src/backend/utils/init/globals.o \
-	$(top_srcdir)/src/port/path.o \
+	$(top_srcdir)/src/port/strlcpy.o \
 	$(top_srcdir)/src/port/pgsleep.o \
+	$(top_srcdir)/src/port/path.o \
 	$(top_srcdir)/src/port/pgstrcasecmp.o \
 	$(top_srcdir)/src/port/qsort.o \
-	$(top_srcdir)/src/port/strlcpy.o \
 	$(top_srcdir)/src/port/thread.o \
 	$(top_srcdir)/src/timezone/localtime.o \
-	$(top_srcdir)/src/timezone/pgtz.o \
-	$(top_srcdir)/src/timezone/strftime.o
+	$(top_srcdir)/src/timezone/strftime.o \
+	$(top_srcdir)/src/timezone/pgtz.o
 
-include ../../../Makefile.mock
+# Objects from backend, which don't need to be mocked but need to be linked.
+caqlanalyze_REAL_OBJS=$(COMMON_REAL_OBJS) \
+	$(top_srcdir)/src/backend/access/common/heaptuple.o \
+	$(top_srcdir)/src/backend/access/common/tupdesc.o \
+	$(top_srcdir)/src/backend/access/index/catquery.o \
+	$(top_srcdir)/src/backend/catalog/core/catcoretable.o \
+	$(top_srcdir)/src/backend/catalog/core/catcore.o
+gram_REAL_OBJS=$(COMMON_REAL_OBJS)
+
+include ../../../../Makefile.mock
+
+gram.t: gram_upper
+
+gram_upper:
+	$(MAKE) -C ..
+

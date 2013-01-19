@@ -32,5 +32,7 @@ extern const ScanKeyword ScanKeywords[];
 extern const ScanKeyword *LastScanKeyword;
 
 extern const ScanKeyword *ScanKeywordLookup(const char *text);
+extern const ScanKeyword *ScanKeywordLookupExt(const char *keyword,
+			const ScanKeyword scanKeywords[], const ScanKeyword *lastScanKeyword);
 
 #endif   /* KEYWORDS_H */

@@ -640,6 +640,8 @@ bool		gp_reject_internal_tcp_conn = true;
 /* plpgsql plancache GUC */
 bool gp_plpgsql_clear_cache_always = false;
 
+/* gp_disable_catalog_access_on_segment */
+bool gp_disable_catalog_access_on_segment = false;
 
 /*
  * Displayable names for context types (enum GucContext)
@@ -3377,7 +3379,6 @@ static struct config_bool ConfigureNamesBool[] =
 		true, NULL, NULL
 	},
 
-	
 	{
 		{"gp_hadoop_enable_filter_pushdown", PGC_USERSET, CUSTOM_OPTIONS,
 			gettext_noop("Enables hadoop's use of GP query scan quals."),
@@ -3387,6 +3388,16 @@ static struct config_bool ConfigureNamesBool[] =
 		&gp_hadoop_enable_filter_pushdown,
 		true, NULL, NULL
 	},	
+
+	{
+		{"gp_disable_catalog_access_on_segment", PGC_USERSET, DEVELOPER_OPTIONS,
+		 gettext_noop("Disables non-builtin object access on segments"),
+		 NULL, 
+		 GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE | GUC_GPDB_ADDOPT
+		},
+		&gp_disable_catalog_access_on_segment,
+		false, NULL, NULL
+	},
 
 	/* End-of-list marker */
 	{

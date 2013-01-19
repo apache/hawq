@@ -123,3 +123,29 @@ SELECT '2006-08-13 12:34:56'::timestamptz;
 RESET datestyle;
 SHOW datestyle;
 SELECT '2006-08-13 12:34:56'::timestamptz;
+
+--
+-- Test GUC - gp_disable_catalog_access_on_segment
+--
+SHOW gp_disable_catalog_access_on_segment;
+CREATE TABLE test1(c1 int, c2 int);
+INSERT INTO test1 values(1, 10);
+SELECT 1 FROM test1;
+SELECT * FROM test1;
+SELECT c1 + 1 FROM test1;
+
+SET gp_disable_catalog_access_on_segment = true;
+SHOW gp_disable_catalog_access_on_segment;
+CREATE TABLE test2(c1 int, c2 int);
+INSERT INTO test1 values(1, 10);
+SELECT 1 FROM test1;
+SELECT * FROM test1;
+SELECT c1 + 1 FROM test1;
+
+SET gp_disable_catalog_access_on_segment = false;
+SHOW gp_disable_catalog_access_on_segment;
+
+-- start_ignore
+DROP TABLE test1;
+DROP TABLE test2;
+-- end_ignore

@@ -123,7 +123,6 @@ CAQL_CQL_SRCS := $(addprefix $(top_srcdir)/src/backend/,\
 
 # Generate catquery.c by discovering cql statements in src files
 
-jversion := 4.2
 caql_locktest_FLAGS := -lockcheck -readlock \
 -holdlock \
 -logquery \
@@ -133,18 +132,19 @@ caql_locktest_FLAGS := -lockcheck -readlock \
 
 caql.files: $(CAQL_CQL_SRCS) $(top_srcdir)/src/include/catalog/calico.pl 
 	find $(top_srcdir)/ -name '*.c' | \
-	xargs grep -l cql | grep -v catquery > caql.files 
+	xargs grep -l cql | grep -v catquery | grep -v mock/backend > caql.files 
 
 catquery.o: catquery.c
 
 catquery.c: caql.files $(top_srcdir)/src/include/catalog/calico.pl
 	perl $(top_srcdir)/src/include/catalog/calico.pl \
-		-meta $(top_srcdir)/../gpMgmt/bin/gppylib/data/$(jversion).json \
+		-meta $(catdump_json) \
 		$(caql_logquery_FLAGS) \
 		-filemap caqlfilemap.json \
 		-uniqdef uniqdef.json \
 		-basedef basedef.json \
-		-gperf gperf.init -infiles caql.files > catquery.c 
+		-gperf gperf.init -infiles caql.files | \
+		sed -e 's/^#line [0-9]* "gperf.init"//' > catquery.c 
 	# track the cql source files
 	cat caql.files | xargs openssl dgst -md5 -hex | cat > caql.md5 
 

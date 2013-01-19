@@ -43,13 +43,7 @@ class SpecialFuncs(object):
     def make_body_MemoryContextAllocZeroAlignedImpl(func):
         return """
         void *p = malloc(size);
-        return p;
-        """
-
-    @staticmethod
-    def make_body_MemoryContextAllocZeroAlignedImpl(func):
-        return """
-        void *p = malloc(size);
+        memset(p, 0, size);
         return p;
         """
 

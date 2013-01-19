@@ -24,6 +24,7 @@
 #include "postgres.h"
 
 #include "access/attnum.h"
+#include "catalog/caqlparse.h"
 #include "catalog/gp_policy.h"
 #include "nodes/plannodes.h"
 #include "nodes/execnodes.h" /* CdbProcess, Slice, and SliceTable. */
@@ -3910,6 +3911,58 @@ _copyAlterTypeStmt(AlterTypeStmt *from)
 	return newnode;
 }
 
+static CaQLSelect *
+_copyCaQLSelect(const CaQLSelect *from)
+{
+	CaQLSelect *newnode = makeNode(CaQLSelect);
+
+	COPY_NODE_FIELD(targetlist);
+	COPY_STRING_FIELD(from);
+	COPY_NODE_FIELD(where);
+	COPY_NODE_FIELD(orderby);
+	COPY_SCALAR_FIELD(forupdate);
+	COPY_SCALAR_FIELD(count);
+
+	return newnode;
+}
+
+static CaQLInsert *
+_copyCaQLInsert(const CaQLInsert *from)
+{
+	CaQLInsert *newnode = makeNode(CaQLInsert);
+
+	COPY_STRING_FIELD(into);
+
+	return newnode;
+}
+
+static CaQLDelete *
+_copyCaQLDelete(const CaQLDelete *from)
+{
+	CaQLDelete *newnode = makeNode(CaQLDelete);
+
+	COPY_STRING_FIELD(from);
+	COPY_NODE_FIELD(where);
+
+	return newnode;
+}
+
+static CaQLExpr *
+_copyCaQLExpr(const CaQLExpr *from)
+{
+	CaQLExpr *newnode = makeNode(CaQLExpr);
+
+	COPY_STRING_FIELD(left);
+	COPY_STRING_FIELD(op);
+	COPY_SCALAR_FIELD(right);
+	COPY_SCALAR_FIELD(attnum);
+	COPY_SCALAR_FIELD(strategy);
+	COPY_SCALAR_FIELD(fnoid);
+	COPY_SCALAR_FIELD(typid);
+
+	return newnode;
+}
+
 /* ****************************************************************
  *					pg_list.h copy functions
  * ****************************************************************
@@ -4743,6 +4796,19 @@ copyObject(void *from)
 			break;
 		case T_DenyLoginPoint:
 			retval = _copyDenyLoginPoint(from);
+			break;
+
+		case T_CaQLSelect:
+			retval = _copyCaQLSelect(from);
+			break;
+		case T_CaQLInsert:
+			retval = _copyCaQLInsert(from);
+			break;
+		case T_CaQLDelete:
+			retval = _copyCaQLDelete(from);
+			break;
+		case T_CaQLExpr:
+			retval = _copyCaQLExpr(from);
 			break;
 
 		default:

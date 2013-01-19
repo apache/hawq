@@ -884,8 +884,8 @@ SUPPRESS_ERRCONTEXT_DECLARE;
 SUPPRESS_ERRCONTEXT_PUSH();
 if (gp_enable_caql_logging) 
 {
-	CaqlLogTag caqllogtag;
-	CaqlLogEntry *entry;
+	CaQLLogTag caqllogtag;
+	CaQLLogEntry *entry;
 	int hashcode;
 	int len;
 	bool found = false;
@@ -900,7 +900,7 @@ if (gp_enable_caql_logging)
 	hashcode = caqlLogHashCode(&caqllogtag);
 
 	/* look up the hash table to see if this line has been logged before */
-	entry = (CaqlLogEntry *) hash_search_with_hash_value(CaqlLogHash,
+	entry = (CaQLLogEntry *) hash_search_with_hash_value(CaQLLogHash,
 								(void *)&caqllogtag,
 								hashcode,
 								HASH_ENTER, &found);
@@ -923,14 +923,8 @@ EOF_bigstr
 sub selectfrom_elog
 {
     my $bigstr = <<'EOF_bigstr';
-SUPPRESS_ERRCONTEXT_DECLARE;
-SUPPRESS_ERRCONTEXT_PUSH();
-if (gp_enable_caql_logging) 
-	elog(LOG, "catquery: %s caller: %s %d %d %d ",
-		"{FUNCNAME}", pcql->filename, pcql->lineno, pCtx->cq_uniqquery_code,
-		DatumGetObjectId(pcql->cqlKeys[0])
-	);
-SUPPRESS_ERRCONTEXT_POP();
+caql_logquery("{FUNCNAME}", pcql->filename, pcql->lineno, pCtx->cq_uniqquery_code,
+			  DatumGetObjectId(pcql->cqlKeys[0]));
 EOF_bigstr
 	return $bigstr;
 }
@@ -2170,17 +2164,10 @@ sub dothing
 	}
 
 	# logging code
-	if ($glob_glob->{logquery})
+	if ($glob_glob->{logquery} || $glob_glob->{logquery_hash})
 	{
 		$basicargs->{SELECTFROM_ELOG} = 
 			doformat(selectfrom_elog(),
-					 $basicargs,
-			);
-	}
-	elsif ($glob_glob->{logquery_hash})
-	{
-		$basicargs->{SELECTFROM_ELOG} = 
-			doformat(selectfrom_elog_hash(),
 					 $basicargs,
 			);
 	}
@@ -3450,6 +3437,7 @@ sub more_header
 #include "access/relscan.h"
 #include "access/transam.h"
 
+#include "catalog/caqlparse.h"
 #include "catalog/catalog.h"
 #include "catalog/indexing.h"
 #include "catalog/pg_aggregate.h"
@@ -3609,8 +3597,6 @@ cqContext *caql_switch(struct caql_hash_cookie *pchn,
 	pCtx->cq_uniqquery_code = pchn->uniqquery_code;
 	pCtx->cq_basequery_code = pchn->basequery_code;
 
-	{CAQL_LOG_HASH_CREATE}
-
 	/* NOTE: pass the cql to basic functions -- optionally 
 	 * used for debugging 
 	 */
@@ -3726,14 +3712,14 @@ EOF_bigstr
 sub static_caql_log_hash_create
 {
     my $bigstr = <<'EOF_bigstr';
-if (gp_enable_caql_logging && CaqlLogHash == NULL)
+if (gp_enable_caql_logging && CaQLLogHash == NULL)
 {
 	HASHCTL hash_ctl;
-	hash_ctl.keysize = sizeof(CaqlLogTag);
-	hash_ctl.entrysize = sizeof(CaqlLogTag);
+	hash_ctl.keysize = sizeof(CaQLLogTag);
+	hash_ctl.entrysize = sizeof(CaQLLogTag);
 	hash_ctl.hash = tag_hash;
 
-	CaqlLogHash = hash_create("caql log hash",
+	CaQLLogHash = hash_create("caql log hash",
 					1000,
 					&hash_ctl,
 					HASH_ELEM | HASH_FUNCTION);
@@ -3745,22 +3731,22 @@ EOF_bigstr
 sub static_caql_log_hash
 {
     my $bigstr = <<'EOF_bigstr';
-static HTAB *CaqlLogHash = NULL;
+static HTAB *CaQLLogHash = NULL;
 
-typedef struct CaqlLogTag
+typedef struct CaQLLogTag
 {
 	char filename[MAXPGPATH];
 	int lineno;
-} CaqlLogTag;
+} CaQLLogTag;
 
-typedef struct CaqlLogEntry
+typedef struct CaQLLogEntry
 {
-	CaqlLogTag key;
-} CaqlLogEntry;
+	CaQLLogTag key;
+} CaQLLogEntry;
 
-static uint32 caqlLogHashCode(CaqlLogTag *tagPtr)
+static uint32 caqlLogHashCode(CaQLLogTag *tagPtr)
 {
-	return get_hash_value(CaqlLogHash, (void *)tagPtr);
+	return get_hash_value(CaQLLogHash, (void *)tagPtr);
 }
 
 EOF_bigstr
@@ -4186,6 +4172,9 @@ sub caql_fetch_funcs
     my $bigstr = <<'EOF_bigstr';
 
 {CAQL_LOCKWELL}
+{BUILTIN_OBJECT_CHECK}
+{DISABLE_CATALOG_CHECK}
+{DISABLE_ATTRIBUTE_CHECK}
 
 /* ----------------------------------------------------------------
  * cqclr
@@ -4443,7 +4432,7 @@ int caql_getcount(cqContext *pCtx0, cq_list *pcql)
 	const char*				 caql_str = pcql->caqlStr;
 	const char*				 filenam  = pcql->filename;
 	int						 lineno	  = pcql->lineno;
-	struct caql_hash_cookie	*pchn	  = {LOOKUP}(caql_str, strlen(caql_str));
+	struct caql_hash_cookie	*pchn	  = {LOOKUP}(caql_str, strlen(caql_str), pcql);
 	cqContext				*pCtx;
 	cqContext				 cqc;
 	HeapTuple				 tuple;
@@ -4472,6 +4461,8 @@ int caql_getcount(cqContext *pCtx0, cq_list *pcql)
 		tuple = SearchSysCacheKeyArray(pCtx->cq_cacheId, 
 									   pCtx->cq_NumKeys, 
 									   pCtx->cq_cacheKeys);
+
+		disable_catalog_check(pCtx, tuple);
 		if (HeapTupleIsValid(tuple))
 		{
 			ii++;
@@ -4496,6 +4487,7 @@ int caql_getcount(cqContext *pCtx0, cq_list *pcql)
 
 	while (HeapTupleIsValid(tuple = systable_getnext(pCtx->cq_sysScan)))
 	{
+		disable_catalog_check(pCtx, tuple);
 		if (HeapTupleIsValid(tuple) && (pchn->bDelete || pCtx->cq_setpklock))
 		{
 			pCtx->cq_lasttup = tuple;
@@ -4527,7 +4519,7 @@ HeapTuple caql_getfirst_only(cqContext *pCtx0, bool *pbOnly, cq_list *pcql)
 	const char*				 caql_str = pcql->caqlStr;
 	const char*				 filenam  = pcql->filename;
 	int						 lineno	  = pcql->lineno;
-	struct caql_hash_cookie	*pchn	  = {LOOKUP}(caql_str, strlen(caql_str));
+	struct caql_hash_cookie	*pchn	  = {LOOKUP}(caql_str, strlen(caql_str), pcql);
 	cqContext				*pCtx;
 	cqContext				 cqc;
 	HeapTuple				 tuple, newTup = NULL;
@@ -4557,6 +4549,8 @@ HeapTuple caql_getfirst_only(cqContext *pCtx0, bool *pbOnly, cq_list *pcql)
 		tuple = SearchSysCacheKeyArray(pCtx->cq_cacheId, 
 									   pCtx->cq_NumKeys, 
 									   pCtx->cq_cacheKeys);
+
+		disable_catalog_check(pCtx, tuple);
 		if (HeapTupleIsValid(tuple))
 		{
 			newTup = heap_copytuple(tuple);
@@ -4575,6 +4569,8 @@ HeapTuple caql_getfirst_only(cqContext *pCtx0, bool *pbOnly, cq_list *pcql)
 
 	if (HeapTupleIsValid(tuple = systable_getnext(pCtx->cq_sysScan)))
 	{
+		disable_catalog_check(pCtx, tuple);
+
 		/* always copy the tuple, because the endscan releases tup memory */
 		newTup = heap_copytuple(tuple);
  
@@ -4631,7 +4627,7 @@ struct catclist *caql_begin_CacheList(cqContext *pCtx0,
 	const char*				 caql_str = pcql->caqlStr;
 	const char*				 filenam  = pcql->filename;
 	int						 lineno	  = pcql->lineno;
-	struct caql_hash_cookie	*pchn	  = {LOOKUP}(caql_str, strlen(caql_str));
+	struct caql_hash_cookie	*pchn	  = {LOOKUP}(caql_str, strlen(caql_str), pcql);
 	cqContext				*pCtx;
 	cqContext				 cqc;
 
@@ -4676,7 +4672,7 @@ cqContext *caql_beginscan(cqContext *pCtx0, cq_list *pcql)
 	const char*				 caql_str = pcql->caqlStr;
 	const char*				 filenam  = pcql->filename;
 	int						 lineno	  = pcql->lineno;
-	struct caql_hash_cookie	*pchn	  = {LOOKUP}(caql_str, strlen(caql_str));
+	struct caql_hash_cookie	*pchn	  = {LOOKUP}(caql_str, strlen(caql_str), pcql);
 	cqContext				*pCtx;
 
 	/* use the provided context, or *allocate* a clean one */
@@ -4744,6 +4740,8 @@ HeapTuple caql_getnext(cqContext *pCtx)
 		pCtx->cq_EOF	 = true;  /* at EOF always, because only 0 or 1 */
 	}
 
+	disable_catalog_check(pCtx, tuple);
+
 	if (pCtx->cq_setpklock)
 		caql_iud_switch(pCtx, 0, tuple, NULL, false /* Wait */);
 
@@ -4781,6 +4779,8 @@ HeapTuple caql_getprev(cqContext *pCtx)
 		
 		pCtx->cq_EOF	 = true;  /* at EOF always, because only 0 or 1 */
 	}
+
+	disable_catalog_check(pCtx, tuple);
 
 	if (pCtx->cq_setpklock)
 		caql_iud_switch(pCtx, 0, tuple, NULL, false /* Wait */);
@@ -4872,6 +4872,7 @@ void caql_delete_current(cqContext *pCtx)
 	rel  = pCtx->cq_heap_rel;
 	Assert(RelationIsValid(rel));
 
+	disable_catalog_check(pCtx, pCtx->cq_lasttup);
 	if (HeapTupleIsValid(pCtx->cq_lasttup))
 	{
 		caql_iud_switch(pCtx, 0, pCtx->cq_lasttup, NULL, true /* dontWait */);
@@ -4893,6 +4894,8 @@ Oid caql_insert(cqContext *pCtx, HeapTuple tup)
 
 	rel  = pCtx->cq_heap_rel;
 	Assert(RelationIsValid(rel));
+
+	disable_catalog_check(pCtx, tup);
 
 	{
 		caql_iud_switch(pCtx, 1, NULL, tup, true /* dontWait */);
@@ -4920,6 +4923,8 @@ void caql_update_current(cqContext *pCtx, HeapTuple tup)
 	Assert(RelationIsValid(rel));
 
 	Insist(HeapTupleIsValid(pCtx->cq_lasttup));
+
+	disable_catalog_check(pCtx, pCtx->cq_lasttup);
 
 	{
 		caql_iud_switch(pCtx, 2, pCtx->cq_lasttup, tup, true /* dontWait */);
@@ -5025,6 +5030,7 @@ HeapTuple caql_getattname(cqContext *pCtx, Oid relid, const char *attname)
 {
 	HeapTuple tup;
 
+	disable_attribute_check(relid);
 	tup = SearchSysCacheCopyAttName(relid, attname);
 
 	if (pCtx)
@@ -5078,6 +5084,8 @@ cqContext *
 caql_getattname_scan(cqContext *pCtx0, Oid relid, const char *attname)
 {
 	cqContext				*pCtx;
+
+	disable_attribute_check(relid);
 
 	/* use the provided context, or *allocate* a clean one */
 	if (pCtx0)
@@ -5136,6 +5144,7 @@ AttrNumber caql_getattnumber(Oid relid, const char *attname)
 {
 	HeapTuple	tp;
 
+	disable_attribute_check(relid);
 	tp = SearchSysCacheAttName(relid, attname);
 	if (HeapTupleIsValid(tp))
 	{
@@ -5315,7 +5324,7 @@ Oid caql_getoid_plus(cqContext *pCtx0, int *pFetchcount,
 	const char*				 caql_str = pcql->caqlStr;
 	const char*				 filenam  = pcql->filename;
 	int						 lineno	  = pcql->lineno;
-	struct caql_hash_cookie	*pchn	  = {LOOKUP}(caql_str, strlen(caql_str));
+	struct caql_hash_cookie	*pchn	  = {LOOKUP}(caql_str, strlen(caql_str), pcql);
 	cqContext				*pCtx;
 	cqContext				 cqc;
 	HeapTuple				 tuple;
@@ -5353,6 +5362,7 @@ Oid caql_getoid_plus(cqContext *pCtx0, int *pFetchcount,
 		tuple = systable_getnext(pCtx->cq_sysScan);
 	}
 
+	disable_catalog_check(pCtx, tuple);
 	if (HeapTupleIsValid(tuple))
 	{
 		if (pFetchcount) *pFetchcount = 1;
@@ -5405,7 +5415,7 @@ Oid caql_getoid_only(cqContext *pCtx0, bool *pbOnly, cq_list *pcql)
 	const char*				 caql_str = pcql->caqlStr;
 	const char*				 filenam  = pcql->filename;
 	int						 lineno	  = pcql->lineno;
-	struct caql_hash_cookie	*pchn	  = {LOOKUP}(caql_str, strlen(caql_str));
+	struct caql_hash_cookie	*pchn	  = {LOOKUP}(caql_str, strlen(caql_str), pcql);
 	cqContext				*pCtx;
 	cqContext				 cqc;
 	HeapTuple				 tuple;
@@ -5436,6 +5446,9 @@ Oid caql_getoid_only(cqContext *pCtx0, bool *pbOnly, cq_list *pcql)
 		tuple = SearchSysCacheKeyArray(pCtx->cq_cacheId, 
 									   pCtx->cq_NumKeys, 
 									   pCtx->cq_cacheKeys);
+
+		disable_catalog_check(pCtx, tuple);
+
 		if (HeapTupleIsValid(tuple))
 		{
 			result = HeapTupleGetOid(tuple);
@@ -5443,11 +5456,14 @@ Oid caql_getoid_only(cqContext *pCtx0, bool *pbOnly, cq_list *pcql)
 			/* only one */
 		}
 		caql_heapclose(pCtx);
+
 		return (result);
 	}
 
 	if (HeapTupleIsValid(tuple = systable_getnext(pCtx->cq_sysScan)))
 	{
+		disable_catalog_check(pCtx, tuple);
+
 		result = HeapTupleGetOid(tuple);
 
 		if (pbOnly)
@@ -5473,7 +5489,7 @@ char *caql_getcstring_plus(cqContext *pCtx0, int *pFetchcount,
 	const char*				 caql_str = pcql->caqlStr;
 	const char*				 filenam  = pcql->filename;
 	int						 lineno	  = pcql->lineno;
-	struct caql_hash_cookie	*pchn	  = {LOOKUP}(caql_str, strlen(caql_str));
+	struct caql_hash_cookie	*pchn	  = {LOOKUP}(caql_str, strlen(caql_str), pcql);
 	cqContext				*pCtx;
 	cqContext				 cqc;
 	HeapTuple				 tuple;
@@ -5511,6 +5527,8 @@ char *caql_getcstring_plus(cqContext *pCtx0, int *pFetchcount,
 		tuple = systable_getnext(pCtx->cq_sysScan);
 	}
 
+	disable_catalog_check(pCtx, tuple);
+
 	if (HeapTupleIsValid(tuple))
 	{
 		if (pFetchcount) *pFetchcount = 1;
@@ -5541,6 +5559,7 @@ char *caql_getcstring_plus(cqContext *pCtx0, int *pFetchcount,
 EOF_bigstr
 	return $bigstr;
 } # end caql_fetch_cols
+
 
 # build the gperf input file
 sub do_gperf
@@ -5588,11 +5607,13 @@ sub do_gperf
 	$gen_hdr_str .= 
 		doformat(more_header(),
 				 {
-					 STATIC_CAQL_LOCKWELL => $static_caql_lockwell_str,
-					 CAQL_HEAPCLOSE		  => $caql_heapclose_str,
-					 CAQL_LOG_HASH	=> $static_caql_log_hash_str
+					STATIC_CAQL_LOCKWELL => $static_caql_lockwell_str,
+					CAQL_HEAPCLOSE		  => $caql_heapclose_str,
+					CAQL_LOG_HASH	=> $static_caql_log_hash_str
 				 }
 		);
+
+	$gen_hdr_str .= "#ifdef NOT_USED\n";
 
 	print $gpo doformat(gperf_header(),
 						{
@@ -5760,10 +5781,6 @@ sub do_gperf
 	
 	my $allcase = "";
 	my $all_iudcase = "";
-	my $static_caql_log_hash_create_str = (exists($glob_glob->{logquery_hash}) &&
-								  $glob_glob->{logquery_hash}) ?
-								  static_caql_log_hash_create() : "";
-
 
 	for my $bq (sort(keys(%{$caqlh->{basic}})))
 	{
@@ -5803,8 +5820,7 @@ sub do_gperf
 	}
 	my $caqlsw = doformat(caql_switch(),
 						  {
-							ALLCASES => $allcase,
-					 		CAQL_LOG_HASH_CREATE	=> $static_caql_log_hash_create_str
+							ALLCASES => $allcase
 						  }
 		);
 	
@@ -5816,6 +5832,7 @@ sub do_gperf
 	
 	print $gpo $caqlsw;
 
+	print $gpo "#endif /* NOT_USED */\n";
 	if (exists($glob_glob->{lockcheck}) &&
 		$glob_glob->{lockcheck})
     {
@@ -5835,10 +5852,24 @@ sub do_gperf
 					  $glob_glob->{lockcheck}) ? 
 					  caql_lockwell_func_body() : "";
 
+	my $builtin_object_check_case_str = get_builtin_object_check_case_str();
+
+	my $builtin_object_check_str = doformat(get_builtin_object_check_str(),
+						{
+							BUILTIN_OBJECT_CHECK_CASE => $builtin_object_check_case_str
+						}
+		);
+
+	my $disable_catalog_check_str = get_disable_catalog_check_str();
+	my $disable_attribute_check_str = get_disable_attribute_check_str();
+
 	print $gpo doformat(caql_fetch_funcs(),
 						{
 							CAQL_LOCKWELL => $lockwell_str,
-							LOOKUP => "cq_lookup"
+							LOOKUP => "cq_lookup",
+							BUILTIN_OBJECT_CHECK => $builtin_object_check_str,
+							DISABLE_CATALOG_CHECK => $disable_catalog_check_str,
+							DISABLE_ATTRIBUTE_CHECK => $disable_attribute_check_str
 						}
 		);
 
@@ -5982,9 +6013,160 @@ sub do_gperf
 						}
 		);
 
+	print $gpo doformat(caql_logquery(),
+						{}
+		);
+
 	close $gpo;
 
 } # end do_gperf
+
+
+sub get_builtin_object_check_case_str()
+{
+	my $str = "";
+	my @clist = ("GpPolicyRelationId, FormData_gp_policy *, localoid",
+				 "FastSequenceRelationId, Form_gp_fastsequence, objid",
+				 "AggregateRelationId, Form_pg_aggregate, aggfnoid",
+				 "AccessMethodOperatorRelationId, Form_pg_amop, amopclaid",
+				 "AccessMethodProcedureRelationId, Form_pg_amproc, amopclaid",
+				 "AppendOnlyRelationId, Form_pg_appendonly, relid",
+				 "AttrDefaultRelationId, Form_pg_attrdef, adrelid",
+				 "AttributeRelationId, Form_pg_attribute, attrelid",
+				 "AttributeEncodingRelationId, Form_pg_attribute_encoding, attrelid",
+				 "AuthMemRelationId, Form_pg_auth_members, roleid",
+				 "AuthTimeConstraintRelationId, Form_pg_auth_time_constraint, authid",
+				 "DependRelationId, Form_pg_depend, objid",
+				 "DescriptionRelationId, Form_pg_description, objoid",
+				 "ExtTableRelationId, Form_pg_exttable, reloid",
+				 "FileSpaceEntryRelationId, Form_pg_filespace_entry, fsefsoid",
+				 "IndexRelationId, Form_pg_index, indexrelid",
+				 "InheritsRelationId, Form_pg_inherits, inhrelid",
+				 "PartitionEncodingRelationId, Form_pg_partition_encoding, parencoid",
+				 "PLTemplateRelationId, Form_pg_pltemplate, tmplname",
+				 "TriggerRelationId, Form_pg_trigger, tgrelid",
+				 "RewriteRelationId, Form_pg_rewrite, ev_class",
+				 "ProcCallbackRelationId, Form_pg_proc_callback, profnoid",
+				 "SharedDependRelationId, Form_pg_shdepend, objid",
+				 "SharedDescriptionRelationId, Form_pg_shdescription, objoid",
+				 "StatLastOpRelationId, Form_pg_statlastop, objid",
+				 "StatLastShOpRelationId, Form_pg_statlastshop, objid",
+				 "StatisticRelationId, Form_pg_statistic, starelid",
+				 "TypeEncodingRelationId, Form_pg_type_encoding, typid",
+				 "WindowRelationId, Form_pg_window, winfnoid"
+				);
+
+	for my $lin (@clist)
+	{
+		my @foo = split(/, /, $lin);
+		if ($foo[0] =~ /PLTemplateRelationId/)
+		{
+			$str .= <<'EOF_str';
+case PLTemplateRelationId:
+	{
+		char *name_str = pstrdup(NameStr(((Form_pg_pltemplate) GETSTRUCT(tuple))->tmplname));
+		if ((strcmp(name_str, "plpgsql") != 0) ||
+			(strcmp(name_str, "c") != 0) ||
+			(strcmp(name_str, "sql") != 0) ||
+			(strcmp(name_str, "internal") != 0))
+			result = InvalidOid;
+		break;
+	}
+EOF_str
+		}
+		else
+		{
+			$str .= <<EOF_str;
+case $foo[0]:
+	result = (Oid) (($foo[1]) GETSTRUCT(tuple))->$foo[2];
+	break;
+EOF_str
+		}
+	}
+
+	return $str;
+}
+
+sub get_disable_catalog_check_str()
+{
+	my $bigstr = <<'EOF_bigstr';
+/*
+ * Error out when 
+ *	- the guc is enable 
+ *	- and users try to access catalog on segments
+ */
+static void
+disable_catalog_check(cqContext *pCtx, HeapTuple tuple)
+{
+	if (Gp_role != GP_ROLE_DISPATCH && Gp_segment != -1
+		&& gp_disable_catalog_access_on_segment)
+	{
+		if (!is_builtin_object(pCtx, tuple))
+			elog(ERROR, "invalid catalog access on segments (catalog relid: %d)",
+					pCtx->cq_relationId);
+	}
+}
+EOF_bigstr
+
+	return $bigstr;
+}
+
+
+sub get_disable_attribute_check_str()
+{
+	my $bigstr = <<'EOF_bigstr';
+/*
+ * Error out when 
+ *	- the guc is enable 
+ *	- and users try to access catalog - pg_attribute on segments
+ */
+static void
+disable_attribute_check(Oid attrelid)
+{
+	if (Gp_role != GP_ROLE_DISPATCH && Gp_segment != -1
+		&& gp_disable_catalog_access_on_segment)
+	{
+		if (attrelid > FirstNormalObjectId)
+			elog(ERROR, "invalid pg_attribute access on segments");
+	}
+}
+EOF_bigstr
+
+	return $bigstr;
+}
+
+
+sub get_builtin_object_check_str()
+{
+	my $bigstr = <<'EOF_bigstr';
+static bool
+is_builtin_object(cqContext *pCtx, HeapTuple tuple)
+{
+	Oid result = InvalidOid;
+
+	if (!HeapTupleIsValid(tuple))
+		return true;
+
+	if (tuple->t_data->t_infomask & HEAP_HASOID)
+		result = HeapTupleGetOid(tuple);
+	else
+	{
+		switch(pCtx->cq_relationId)
+		{
+			{BUILTIN_OBJECT_CHECK_CASE}
+			default:
+				return false;
+		}
+	}
+	if (result > FirstNormalObjectId)
+		return false;
+
+	return true;
+}
+EOF_bigstr
+
+	return $bigstr;
+}
 
 sub get_syscacheid_map
 {
@@ -6606,4 +6788,83 @@ if (1)
 	}
 
 
+}
+
+sub caql_logquery
+{
+	my $bigstr = <<'EOF_bigstr';
+
+void
+caql_logquery(const char *funcname, const char *filename, int lineno,
+			  int uniqquery_code, Oid arg1)
+{
+EOF_bigstr
+
+	if ($glob_glob->{logquery})
+	{
+
+		$bigstr .= <<'EOF_bigstr';
+	SUPPRESS_ERRCONTEXT_DECLARE;
+	SUPPRESS_ERRCONTEXT_PUSH();
+	elog(LOG, "catquery: %s caller: %s %d %d %d ",
+		funcname, filename, lineno, uniqquery_code, arg1);
+	SUPPRESS_ERRCONTEXT_POP();
+
+EOF_bigstr
+	}
+	elsif ($glob_glob->{logquery_hash})
+	{
+		$bigstr .= <<'EOF_bigstr';
+	CaQLLogTag tag;
+	CaQLLogEntry *entry;
+	int			hashcode;
+	int			len;
+	bool		found = false;
+	SUPPRESS_ERRCONTEXT_DECLARE;
+
+	if (!gp_enable_caql_logging)
+		return;
+
+	if (CaQLLogHash == NULL)
+	{
+		HASHCTL hash_ctl;
+		hash_ctl.keysize = sizeof(CaQLLogTag);
+		hash_ctl.entrysize = sizeof(CaQLLogTag);
+		hash_ctl.hash = tag_hash;
+
+		CaQLLogHash = hash_create("caql log hash",
+						1000,
+						&hash_ctl,
+						HASH_ELEM | HASH_FUNCTION);
+	}
+
+	/* memset is required, as we use memcmp on this */
+	MemSet(&tag, 0, sizeof(CaQLLogTag));
+	len = strlen(filename);
+	if (len > MAXPGPATH - 1)
+		len = MAXPGPATH - 1;
+	memcpy(tag.filename, filename, len);
+	tag.lineno = lineno;
+
+	/* compute the hash */
+	hashcode = caqlLogHashCode(&tag);
+
+	/* look up the hash table to see if this line has been logged before */
+	entry = (CaQLLogEntry *) hash_search_with_hash_value(CaQLLogHash,
+														 (void *) &tag,
+														 hashcode,
+														 HASH_ENTER, &found);
+	SUPPRESS_ERRCONTEXT_PUSH();
+	if (!found)
+		elog(LOG, "catquery: %s caller: %s %d %d %d ",
+			funcname, filename, lineno, uniqquery_code, arg1);
+	SUPPRESS_ERRCONTEXT_POP();
+EOF_bigstr
+	}
+
+	$bigstr .= <<'EOF_bigstr';
+}
+
+EOF_bigstr
+	return $bigstr;
 }

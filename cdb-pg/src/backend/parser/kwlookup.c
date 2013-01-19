@@ -41,6 +41,13 @@
 const ScanKeyword *
 ScanKeywordLookup(const char *text)
 {
+	return ScanKeywordLookupExt(text, ScanKeywords, LastScanKeyword);
+}
+
+const ScanKeyword *
+ScanKeywordLookupExt(const char *text, const ScanKeyword scanKeywords[],
+					 const ScanKeyword *lastScanKeyword)
+{
 	int			len,
 				i;
 	char		word[NAMEDATALEN];
@@ -69,8 +76,8 @@ ScanKeywordLookup(const char *text)
 	/*
 	 * Now do a binary search using plain strcmp() comparison.
 	 */
-	low = &ScanKeywords[0];
-	high = LastScanKeyword - 1;
+	low = &scanKeywords[0];
+	high = lastScanKeyword - 1;
 	while (low <= high)
 	{
 		const ScanKeyword *middle;

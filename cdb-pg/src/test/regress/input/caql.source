@@ -32,7 +32,7 @@ execute E'(cat @abs_srcdir@/../../backend/access/index/caql.md5 | perl -nle \'my
 -- build hash codes for current set of caql modules
 --
 CREATE EXTERNAL WEB TABLE current_caql_x (mod text, hsh text)
-execute E'(find @abs_srcdir@/../../.. -name \'*.c\' | xargs grep -l cql | grep -v catquery | xargs openssl dgst -md5 -hex | perl -nle \'my @foo =split("/", $_); print $foo[-2]."/".$foo[-1]\' | sed "s/)=/|/" | sort ) ' on MASTER format 'text' (delimiter '|');
+execute E'(find @abs_srcdir@/../../.. -name \'*.c\' | xargs grep -l cql | grep -v catquery | grep -v mock/backend | xargs openssl dgst -md5 -hex | perl -nle \'my @foo =split("/", $_); print $foo[-2]."/".$foo[-1]\' | sed "s/)=/|/" | sort ) ' on MASTER format 'text' (delimiter '|');
 
 create table caql1 as select * from compiled_caql_x;
 create table caql2 as select * from current_caql_x;

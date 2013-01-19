@@ -14,10 +14,33 @@
 #include "access/genam.h"
 #include "access/relscan.h"
 #include "access/sdir.h"
+#include "catalog/catcore.h"
 #include "nodes/primnodes.h"
 #include "storage/lock.h"
 #include "utils/catcache.h"
 #include "utils/relcache.h"
+
+/*
+ * TODO: probably "hash cookie" is meaningless now.  More like parser state.
+ */
+typedef struct caql_hash_cookie
+{
+	const char *name;		/* caql string */
+	int			basequery_code; /* corresponding base query */
+	int			bDelete;	/* query performs DELETE */
+	int			bCount;		/* SELECT COUNT(*) (or DELETE) */
+	int			bUpdate;	/* SELECT ... FOR UPDATE */
+	int			bInsert;	/* INSERT INTO  */
+	bool		bAllEqual;	/* true if all equality operators */
+	AttrNumber	attnum;		/* column number (or 0 if no column specified) */
+	const CatCoreRelation *relation; /* target relation */
+	const CatCoreIndex    *index; /* available index */
+	Node	   *query;		/* parsed syntax tree */
+
+	/* debug info */
+	char	   *file;		/* file location */
+	int			lineno;		/* line number */
+} caql_hash_cookie;
 
 typedef struct cqListData
 {
@@ -56,6 +79,9 @@ typedef struct cqContextData
 	Datum		cq_datumKeys[5];/* key array of datums */
 	int			cq_NumKeys;		/* number of keys */
 	ScanKeyData	cq_scanKeys[5]; /* initialized sysscan key (from datums) */
+
+	const CatCoreRelation *relation; /* relation being read */
+	const CatCoreIndex *index;	/* usable index on the relation */
 
 	/* 	index update information */
 	CatalogIndexState	cq_indstate;	/* non-NULL after CatalogOpenIndexes */
@@ -194,10 +220,18 @@ cqContext	*caql_syscache(cqContext *pCtx, bool bUseCache);	/*  */
 cqContext	*cqclr(cqContext	 *pCtx);						/*  */
 #define	cqClearContext(pcqContext) MemSet(pcqContext, 0, sizeof(cqContext))
 
+void caql_logquery(const char *funcname, const char *filename, int lineno,
+			  int uniqquery_code, Oid arg1);
+
 /* CAQL prototype: expand to nothing */
 #define cql0(x, ...) if (0) {} else 
 
 /* ifdef gnuc ! */
 #define cql(x, ...) cql1(x, __FILE__, __LINE__, __VA_ARGS__)
+
+/* caqlanalyze.c */
+struct caql_hash_cookie * cq_lookup(const char *str, unsigned int len, cq_list *pcql);
+cqContext *caql_switch(struct caql_hash_cookie *pchn, cqContext *pCtx, cq_list *pcql);
+
 
 #endif   /* CATQUERY_H */

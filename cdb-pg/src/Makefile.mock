@@ -15,6 +15,7 @@ MOCK_LIBS := $(filter-out -lpgport -lesmtp -ledit, $(LIBS))
 
 # We are unable to mock them up at the moment.  Real objects should contain them.
 EXCL_OBJS=src/backend/bootstrap/bootparse.o \
+			src/backend/catalog/caql/gram.o \
 			src/backend/parser/gram.o \
 			src/backend/regex/regcomp.o \
 			src/backend/regex/regexec.o \
@@ -86,7 +87,7 @@ clean: $(patsubst %,%-clean,$(TARGETS))
 
 .PHONY:
 %-clean:
-	rm -f $*.t
+	rm -f $*.t $*_test.o
 
 .PHONY:
 clean-mock: $(patsubst %,%-clean-mock,$(TARGETS))
