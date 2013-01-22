@@ -587,7 +587,8 @@ CreateRole(CreateRoleStmt *stmt)
 	{
 		Assert(stmt->type == T_CreateRoleStmt);
 		Assert(stmt->type < 1000);
-		CdbDispatchUtilityStatement((Node *) stmt, "CreateRole");
+		/* GPSQL: no dispatch to segments */
+		/* CdbDispatchUtilityStatement((Node *) stmt, "CreateRole"); */
 
 		/* MPP-6929: metadata tracking */
 		MetaTrackAddObject(AuthIdRelationId,
@@ -1510,7 +1511,8 @@ DropRole(DropRoleStmt *stmt)
 
 	if (Gp_role == GP_ROLE_DISPATCH)
 	{
-		CdbDispatchUtilityStatement((Node *) stmt, "DropRole");
+		/* GPSQL: no dispatch to segments */
+		/* CdbDispatchUtilityStatement((Node *) stmt, "DropRole"); */
 
 	}
 }

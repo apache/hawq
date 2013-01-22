@@ -1761,9 +1761,6 @@ ProcessUtility(Node *parsetree,
 			 * ******************************** ROLE statements ****
 			 */
 		case T_CreateRoleStmt:
-			ereport(ERROR,
-							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create role statement yet in GPSQL") ));
-
 			CreateRole((CreateRoleStmt *) parsetree);
 			break;
 
@@ -1782,9 +1779,6 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_DropRoleStmt:
-			ereport(ERROR,
-							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support drop role set statement yet in GPSQL") ));
-
 			DropRole((DropRoleStmt *) parsetree);
 			break;
 
