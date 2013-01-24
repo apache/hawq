@@ -545,7 +545,8 @@ DefineRelation_int(CreateStmt *stmt,
 	}
 
 	/* Check permissions except when using database's default */
-	if (OidIsValid(tablespaceId) && tablespaceId != MyDatabaseTableSpace)
+	if (OidIsValid(tablespaceId) && tablespaceId != MyDatabaseTableSpace &&
+			tablespaceId != get_database_dts(MyDatabaseId))
 	{
 		AclResult	aclresult;
 
