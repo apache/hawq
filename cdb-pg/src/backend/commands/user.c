@@ -1193,7 +1193,8 @@ AlterRole(AlterRoleStmt *stmt)
 
 	if (Gp_role == GP_ROLE_DISPATCH)
 	{
-		CdbDispatchUtilityStatement((Node *) stmt, "AlterRole");
+		/* GPSQL: no dispatch to segments */
+		/*CdbDispatchUtilityStatement((Node *) stmt, "AlterRole");*/
 	}
 }
 

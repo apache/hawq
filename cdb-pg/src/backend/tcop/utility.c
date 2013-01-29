@@ -1765,9 +1765,6 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_AlterRoleStmt:
-			ereport(ERROR,
-							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter role statement yet in GPSQL") ));
-
 			AlterRole((AlterRoleStmt *) parsetree);
 			break;
 
