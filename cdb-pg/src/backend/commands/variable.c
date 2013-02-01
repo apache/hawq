@@ -770,6 +770,13 @@ assign_session_authorization(const char *value, bool doit, GucSource source)
 		roleTup = caql_getnext(pcqCtx);
 		if (!HeapTupleIsValid(roleTup))
 		{
+			if (Gp_role == GP_ROLE_EXECUTE)
+			{
+				/* GPSQL: don't error out even if the role doesn't exit. */
+				caql_endscan(pcqCtx);
+				return session_authorization_string;
+			}
+
 			if (source >= PGC_S_INTERACTIVE)
 				ereport(ERROR,
 						(errcode(ERRCODE_UNDEFINED_OBJECT),
