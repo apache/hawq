@@ -111,7 +111,7 @@ cq_lookup(const char *str, unsigned int len, cq_list *pcql)
 			{
 				hash_cookie->attnum =
 					catcore_lookup_attnum(hash_cookie->relation, attname);
-				if (hash_cookie->attnum == InvalidOid)
+				if (hash_cookie->attnum == InvalidAttrNumber)
 					elog(ERROR, "could not find attribute \"%s\" in %s at %s:%d",
 								attname, str, pcql->filename, pcql->lineno);
 			}
