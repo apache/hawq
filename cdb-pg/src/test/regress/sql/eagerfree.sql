@@ -155,3 +155,16 @@ select smallt2.* from smallt2
 where i < all (select total from (select d, sum(i) as total from smallt group by d) as my_group_sum, smallt, smallt2 as tmp
     where my_group_sum.d = smallt.d and smallt.d = tmp.d and my_group_sum.d = smallt2.d)
 and i = 0 order by 1,2,3; --order 1,2,3
+
+-- Nested Subplan
+drop table if exists r;
+drop table if exists s;
+drop table if exists t;
+create table r (r1 int, r2 int, r3 int);
+create table s (s1 int, s2 int, s3 int);
+create table t (t1 int, t2 int, t3 int);
+insert into r select generate_series(1, 20), generate_series(1, 5), generate_series(1, 8);
+insert into s select generate_series(1, 20), generate_series(6, 10), generate_series(1, 4);
+insert into t select generate_series(1, 30), generate_series(1, 6), generate_series(1, 5);
+
+select * from t where t1 > (select min(r1) from r where r2<t2 and r3 > (Select min(s3) from s where s1<r1));
