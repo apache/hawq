@@ -1068,6 +1068,13 @@ prepareDispatchedCatalogRelation(RangeTblEntry *rte, HTAB *rels)
 	Assert(NULL != rte && rte->rtekind == RTE_RELATION);
 	switch (rel->rd_rel->relstorage)
 	{
+	case RELSTORAGE_HEAP:
+		/*
+		 * We need to support this because gp_dist_random with catalog
+		 * table comes here.
+		 */
+		prepareDispatchedCatalogObject(rte->relid);
+		break;
 	case RELSTORAGE_AOROWS:
 	case RELSTORAGE_AOCOLS:
 		{
@@ -1102,7 +1109,6 @@ prepareDispatchedCatalogRelation(RangeTblEntry *rte, HTAB *rels)
 		prepareDispatchedCatalogObject(rte->relid);
 		break;
 
-	case RELSTORAGE_HEAP:
 	case RELSTORAGE_FOREIGN:
 		/* TODO */
 		elog(ERROR, "not implemented relstorage: %c", rel->rd_rel->relstorage);
