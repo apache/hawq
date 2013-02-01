@@ -488,6 +488,18 @@ typedef struct EState
 	int currentExecutingSliceId;
 
 	/*
+	 * Each subplan has its own EState. This value indicates
+	 * the level of the corresponding subplan for this EState
+	 * with respect to the main plan tree.
+	 *
+	 * This is used to determine whether we could eager free
+	 * the Material node on top of Broadcast inside a subplan
+	 * (for supporting correlated subqueries). The Material
+	 * node can be eager-free'ed only when this value is 0.
+	 */
+	int subplanLevel;
+
+	/*
 	 * The root slice id for this EState.
 	 */
 	int rootSliceId;

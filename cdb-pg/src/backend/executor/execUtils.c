@@ -227,6 +227,7 @@ CreateSubExecutorState(EState *parent_estate)
 
 	/* Subqueries share the same dynamicTableScanInfo with their parents. */
 	es->dynamicTableScanInfo = parent_estate->dynamicTableScanInfo;
+	es->subplanLevel = parent_estate->subplanLevel + 1;
     return es;
 }
 
@@ -309,6 +310,7 @@ InternalCreateExecutorState(MemoryContext qcontext, bool is_subquery)
 
 	estate->currentSliceIdInPlan = 0;
 	estate->currentExecutingSliceId = 0;
+	estate->subplanLevel = 0;
 	estate->rootSliceId = 0;
 
 	/*

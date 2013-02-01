@@ -903,7 +903,7 @@ Exec_Jmp_Done:
 			SubPlanState *subplanState = (SubPlanState *)lfirst(subp);
 			Assert(subplanState != NULL &&
 				   subplanState->planstate != NULL);
-			ExecEagerFreeChildNodes(subplanState->planstate, true);
+			ExecEagerFreeChildNodes(subplanState->planstate, (node->state->subplanLevel == 0));
 			ExecEagerFree(subplanState->planstate);
 		}
 	}
