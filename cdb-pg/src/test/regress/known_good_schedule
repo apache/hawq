@@ -18,6 +18,7 @@ test: goh_toast
 ignore: goh_alter_distribution_policy
 ignore: goh_column_compression
 test: goh_database
+test: goh_gp_dist_random
 ignore: gpsql_fault_tolerance
 test: boolean
 test: char
@@ -191,9 +192,6 @@ ignore: plpgsql_cache
 ignore: percentile
 ignore: resource_queue_function
 ignore: co_nestloop_idxscan
-# the following test needs some special filespace/tablespace.
-ignore: goh_tablespace
-ignore: hdfs_filesystem
 test: madlib_array_ops
 test: madlib_svec_test
 test: madlib_chi2_test
@@ -205,3 +203,9 @@ test: madlib_newplda
 test: madlib_logistic
 test: madlib_multilogistic
 test: madlib_kmeans
+#
+# the following test needs some special filespace/tablespace.
+#
+ignore: goh_tablespace
+ignore: hdfs_filesystem
+
