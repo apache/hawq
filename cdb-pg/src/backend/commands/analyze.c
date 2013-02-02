@@ -819,6 +819,12 @@ static void analyzeRelation(Relation relation, List *lAttributeNames)
 	}
 
 	/**
+	 * in gpsql, if it is a heap table, finish it here
+	 */
+	if (RelationIsHeap(relation))
+		return;
+
+	/**
 	 * Determine how many rows need to be sampled.
 	 */
 	foreach (le, lAttributeNames)
@@ -2576,7 +2582,7 @@ static void gp_statistics_estimate_reltuples_relpages_ao_rows(Relation rel, floa
 	*relpages = 0.0;
 	*reltuples = 0.0;
 
-	for (i = 0 ; i < GpIdentity.numsegments ; ++i)
+	for (i = 0 ; i < GetTotalSegmentsNumber() ; ++i)
 	{
 		fstotal = GetSegFilesTotals(rel, SnapshotNow, i);
 		Assert(fstotal);

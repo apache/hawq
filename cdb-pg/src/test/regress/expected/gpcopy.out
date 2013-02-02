@@ -12,8 +12,8 @@ CREATE TABLE copy_regression_hash5(a text[][]) distributed by (a);
 CREATE TABLE copy_regression_hash6(a int[], b text[]) distributed by (a,b);
 CREATE TABLE copy_regression_hash7(a text,b text) distributed randomly;
 -- single key, not first
-COPY copy_regression_hash1 from stdin;
-COPY copy_regression_hash1(b,c,a) from stdin;
+COPY copy_regression_hash1 from stdin segment reject limit 10 rows;
+COPY copy_regression_hash1(b,c,a) from stdin segment reject limit 10 rows;
 SELECT * FROM copy_regression_hash1;
    a    |   b    |   c    
 --------+--------+--------

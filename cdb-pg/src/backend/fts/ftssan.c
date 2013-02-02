@@ -462,12 +462,12 @@ startSegmentForDbid(int dbid)
 			elog(LOG, "Failed to find GPHOME, sending our pg_ctl without path.");
 			/* we don't have "gphome" ? let's try this anyhow and hope for the best. */
 			snprintf(cmd, sizeof(cmd), "ssh %s \"pg_ctl -w -D %s -l %s/pg_log/startup.log -o '-i -p %d --silent-mode=true -M mirrorless -b %d -C %d -z %d' start 2>&1 \" ",
-					 host, dir, dir, port, dbid, content_id, GpIdentity.numsegments);
+					 host, dir, dir, port, dbid, content_id, GetTotalSegmentsNumber());
 		}
 		else
 		{
 			snprintf(cmd, sizeof(cmd), "ssh %s \"source %s/greenplum_path.sh; %s/bin/pg_ctl -w -D %s -l %s/pg_log/startup.log -o '-i -p %d --silent-mode=true -M mirrorless -b %d -C %d -z %d' start 2>&1 \" ",
-					 host, gphome_env, gphome_env, dir, dir, port, dbid, content_id, GpIdentity.numsegments);
+					 host, gphome_env, gphome_env, dir, dir, port, dbid, content_id, GetTotalSegmentsNumber());
 		}
 
 		if (gp_log_fts >= GPVARS_VERBOSITY_DEBUG)

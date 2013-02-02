@@ -137,45 +137,15 @@ CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString)
 	 */
 	Assert(Gp_role != GP_ROLE_EXECUTE);
 	/* Create the schema's namespace */
-	/*if (shouldDispatch || Gp_role != GP_ROLE_EXECUTE)
-	{
-		namespaceId = NamespaceCreate(schemaName, owner_uid, 0);
+    namespaceId = NamespaceCreate(schemaName, owner_uid, 0);
 
-		if (shouldDispatch)
-		{
-            elog(DEBUG5, "shouldDispatch = true, namespaceOid = %d", namespaceId);
-
-            Assert(stmt->schemaOid == 0);
-            stmt->schemaOid = namespaceId;
-
-
-             * Dispatch the command to all primary and mirror segment dbs.
-             * Starts a global transaction and reconfigures cluster if needed.
-             * Waits for QEs to finish.  Exits via ereport(ERROR,...) if error.
-
-            CdbDispatchUtilityStatement((Node *)stmt, "CreateSchemaCommand");
-		}
-
-		 MPP-6929: metadata tracking
-		if (Gp_role == GP_ROLE_DISPATCH && !istemp)
-			MetaTrackAddObject(NamespaceRelationId,
-							   namespaceId,
-							   saved_uid,
-							   "CREATE", "SCHEMA"
-					);
-	}
-	else if (Gp_role == GP_ROLE_EXECUTE)*/
-	{
-		namespaceId = NamespaceCreate(schemaName, owner_uid, stmt->schemaOid);
-
-		/* MPP-6929: metadata tracking */
-		if (Gp_role == GP_ROLE_DISPATCH && !istemp)
-			MetaTrackAddObject(NamespaceRelationId,
-							   namespaceId,
-							   saved_uid,
-							   "CREATE", "SCHEMA"
-					);
-	}
+    /* MPP-6929: metadata tracking */
+    if (Gp_role == GP_ROLE_DISPATCH && !istemp)
+        MetaTrackAddObject(NamespaceRelationId,
+                           namespaceId,
+                           saved_uid,
+                           "CREATE", "SCHEMA"
+                );
 
 	/* Advance cmd counter to make the namespace visible */
 	CommandCounterIncrement();

@@ -21,6 +21,8 @@
 #include "nodes/primnodes.h"
 #include "storage/itemptr.h"
 
+#include "cdb/cdbquerycontextdispatching.h"
+
 typedef struct DirectDispatchInfo
 {
      /**
@@ -140,6 +142,8 @@ typedef struct PlannedStmt
 
 		/* What is the memory reserved for this query's execution? */
 		uint64		query_mem;
+
+		QueryContextInfo * contextdisp; /* query context for dispatching */
 
 } PlannedStmt;
 

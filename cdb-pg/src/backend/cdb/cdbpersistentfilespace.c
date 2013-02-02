@@ -1364,9 +1364,9 @@ PersistentFilespace_AddMirror(Oid filespace,
 
 	WRITE_PERSISTENT_STATE_ORDERED_LOCK;
 
-	/* Not support for mirror! */
-	Assert(false);
-	fde = PersistentFilespace_FindDirUnderLock(-1, filespace);
+	/* Not support for segments mirror! */
+	Assert(GpIdentity.segindex == MASTER_CONTENT_ID);
+	fde = PersistentFilespace_FindDirUnderLock(GpIdentity.segindex, filespace);
 	if (fde == NULL)
 		elog(ERROR, "did not find persistent filespace entry %u",
 			 filespace);
@@ -1582,7 +1582,7 @@ Size PersistentFilespace_ShmemSize(void)
 	Size		size;
 
 	/* The hash table of persistent filespaces */
-	size = hash_estimate_size((Size)gp_max_filespaces * (GpIdentity.segindex != MASTER_CONTENT_ID ? 1 : GpIdentity.numsegments + 1),
+	size = hash_estimate_size((Size)gp_max_filespaces * (GpIdentity.segindex != MASTER_CONTENT_ID ? 1 : GetTotalSegmentsNumber() + 1),
 							  sizeof(FilespaceDirEntryData));
 
 	/* The shared-memory structure. */
@@ -1611,8 +1611,8 @@ PersistentFilespace_HashTableInit(void)
 
 	persistentFilespaceSharedHashTable =
 						ShmemInitHash("Persistent Filespace Hash",
-								   gp_max_filespaces * (GpIdentity.numsegments != MASTER_CONTENT_ID ? 1 : GpIdentity.numsegments + 1),
-								   gp_max_filespaces * (GpIdentity.numsegments != MASTER_CONTENT_ID ? 1 : GpIdentity.numsegments + 1),
+								   gp_max_filespaces * (GpIdentity.segindex != MASTER_CONTENT_ID ? 1 : GetTotalSegmentsNumber() + 1),
+								   gp_max_filespaces * (GpIdentity.segindex != MASTER_CONTENT_ID ? 1 : GetTotalSegmentsNumber() + 1),
 								   &info,
 								   hash_flags);
 
@@ -1680,12 +1680,17 @@ get_filespace_data(fspc_agg_state **fas, char *caller)
 	hash_seq_init(&stat, persistentFilespaceSharedHashTable);
 
 	while ((fde = hash_seq_search(&stat)) != NULL)
+	{
+		if (fde->key.contentid != MASTER_CONTENT_ID)
+			continue;
+
 		mmxlog_add_filespace(
 				 fas, &maxCount,
 				 fde->key.filespaceOid,
 				 fde->dbId1, fde->locationBlankPadded1,
                  fde->dbId2, fde->locationBlankPadded2,
                  caller);
+	}
 
 }
 #endif

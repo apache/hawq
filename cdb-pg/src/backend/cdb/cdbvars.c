@@ -426,6 +426,17 @@ void verifyGpIdentityIsSet(void)
 }
 
 /*
+ * This is the snapshot of alive segments for the session.;
+ */
+AliveSegmentsInfo GpAliveSegmentsInfo = {0, 0, false, false, 0, 0, UNINITIALIZED_GP_IDENTITY_VALUE, 0, NULL, NULL};
+
+/*
+ * this is fault injection test gucs for alive segments.;
+ */
+int	Gp_test_failed_segmentid_start = 0;
+int	Gp_test_failed_segmentid_number = 0;
+
+/*
  * Keep track of a few dispatch-related  statistics:
  */
 int cdb_total_slices = 0;

@@ -105,7 +105,7 @@ int HdfsDelete(FsysName protocol, hdfsFS fileSystem, char * path, int recursive)
 int HdfsChmod(FsysName protocol, hdfsFS fileSystem, char * path, short mode);
 
 int HdfsRead(FsysName protocol, hdfsFS fileSystem, hdfsFile file, void * buffer, int length);
-int HdfsWrite(FsysName protocol, hdfsFS fileSystem, hdfsFile file, void * buffer, int length);
+int HdfsWrite(FsysName protocol, hdfsFS fileSystem, hdfsFile file, const void * buffer, int length);
 int HdfsSeek(FsysName protocol, hdfsFS fileSystem, hdfsFile file, int64_t desiredPos);
 int64_t HdfsTell(FsysName protocol, hdfsFS fileSystem, hdfsFile file);
 

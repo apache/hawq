@@ -18,6 +18,7 @@
 #include "storage/proc.h"		/* MyProc */
 #include "storage/ipc.h"
 #include "utils/memutils.h"
+#include "utils/faultinjector.h"
 
 #include "catalog/namespace.h"
 #include "commands/variable.h"
@@ -348,6 +349,23 @@ create_gang_retry:
 
 		pthread_err = gp_pthread_create(&pParms->thread, thread_DoConnect, pParms, "createGang");
 
+		/*
+		 * If defined FAULT_INJECTOR, and injected fault is create thread failure, set pthread_err to -1,
+		 * to trigger thread join process
+		 */
+#ifdef FAULT_INJECTOR
+		int faultType = FaultInjector_InjectFaultIfSet(
+				GangThreadCreation,
+				DDLNotSpecified,
+				"",	//databaseName
+				""); // tableName
+
+		if(faultType == FaultInjectorTypeCreateThreadFail)
+		{
+			pthread_err = -1;
+		}
+#endif
+
 		if (pthread_err != 0)
 		{
 			int			j;
@@ -425,6 +443,27 @@ create_gang_retry:
 		segdbDesc = &newGangDefinition->db_descriptors[i];
 		q = segdbDesc->segment_database_info;
 
+#ifdef FAULT_INJECTOR
+		int faultType = FaultInjector_InjectFaultIfSet(
+				ConnectionFailAfterGangCreation,
+				DDLNotSpecified,
+				"",	//databaseName
+				""); // tableName
+
+		if(faultType == FaultInjectorTypeConnectionNull){
+			PQfinish(segdbDesc->conn);
+			segdbDesc->conn = NULL;
+			segdbDesc->errcode = 1;
+			appendPQExpBufferStr(&(segdbDesc->error_message), "fault injector error message");
+		}
+		else if(faultType == FaultInjectorTypeConnectionNullInRestoreMode){
+			PQfinish(segdbDesc->conn);
+			segdbDesc->conn = NULL;
+			segdbDesc->errcode = 1;
+			appendPQExpBufferStr(&(segdbDesc->error_message), "FATAL:");
+			appendPQExpBufferStr(&(segdbDesc->error_message), _(POSTMASTER_IN_RECOVERY_MSG));
+		}
+#endif
 		/*
 		 * check connection established or not, if not, we may have to
 		 * re-build this gang.
@@ -582,7 +621,7 @@ create_gang_retry:
 			disconnectAndDestroyGang(newGangDefinition);
 
 			ereport(ERROR, (errcode(ERRCODE_GP_INTERCONNECTION_ERROR),
-					errmsg("failed to acquire resources on one or more segments")));
+					errmsg("failed to acquire resources on segment %d", i)));
 		}
 	}
 
@@ -698,7 +737,7 @@ buildGangDefinition(GangType type, int gang_id, int size, int content, char *por
 	 * anyone who has pointers into the free()ed space is going to
 	 * freak out)
 	 */
-	cdb_component_dbs = getCdbComponentDatabases();
+	cdb_component_dbs = getCdbComponentDatabasesForGangs();
 
 	if (cdb_component_dbs == NULL ||
 		cdb_component_dbs->total_segments <= 0 ||
@@ -1822,7 +1861,7 @@ getCdbProcessList(Gang *gang, int sliceIndex, DirectDispatchInfo *directDispatch
 			if (gang->size > 1 ||
 				gang->type == GANGTYPE_PRIMARY_WRITER)
 			{
-				while (segdbDesc->segindex > listsize)
+				while (segdbDesc->segindex > listsize && listsize < i)
 				{
 					list = lappend(list, NULL);
 					listsize++;
@@ -2661,7 +2700,10 @@ CheckForResetSession(void)
 
 		/* Update the slotid for our singleton reader. */
 		if (SharedLocalSnapshotSlot != NULL)
+		{
 			SharedLocalSnapshotSlot->slotid = gp_session_id;
+			SharedLocalSnapshotSlot->contentid = GpIdentity.segindex;
+		}
 
 		elog(LOG, "The previous session was reset because its gang was disconnected (session id = %d). "
 			 "The new session id = %d",

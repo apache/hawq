@@ -42,6 +42,8 @@
 #include "cdb/cdbdisp.h"
 #include "cdb/cdbpersistenttablespace.h"
 
+extern int64
+calculate_relation_size(Relation rel);
 
 static int64
 get_size_from_segDBs(const char * cmd)
@@ -374,7 +376,7 @@ pg_tablespace_size_name(PG_FUNCTION_ARGS)
 	if (Gp_role == GP_ROLE_DISPATCH)
 	{
 		StringInfoData buffer;
-		
+
 		initStringInfo(&buffer);
 
 		appendStringInfo(&buffer, "select sum(pg_tablespace_size('%s'))::int8 from gp_dist_random('gp_id');", NameStr(*tblspcName));
@@ -393,7 +395,7 @@ pg_tablespace_size_name(PG_FUNCTION_ARGS)
  * glob is extremely slow if there are lots of relations in the
  * database.  So we handle all cases, instead. 
  */
-static int64
+int64
 calculate_relation_size(Relation rel)
 {
 	int64		totalsize = 0;
@@ -449,15 +451,7 @@ pg_relation_size_oid(PG_FUNCTION_ARGS)
 	Relation	rel;
 	int64		size = 0;
 	
-	/**
-	 * This function is peculiar in that it does its own dispatching.
-	 * It does not work on entry db since we do not support dispatching
-	 * from entry-db currently.
-	 */
-	if (Gp_role == GP_ROLE_EXECUTE && Gp_segment == -1)
-	{
-		elog(ERROR, "This query is not currently supported by GPDB.");
-	}
+	Assert(Gp_role != GP_ROLE_EXECUTE);
 
 	rel = relation_open(relOid, AccessShareLock);
 	
@@ -466,31 +460,6 @@ pg_relation_size_oid(PG_FUNCTION_ARGS)
 	else
 		size = calculate_relation_size(rel); 
 	
-	if (Gp_role == GP_ROLE_DISPATCH)
-	{
-		StringInfoData buffer;
-		char *schemaName;
-		char *relName;
-
-		schemaName = get_namespace_name(get_rel_namespace(relOid));
-		if (schemaName == NULL)
-		{
-			elog(ERROR, "Cannot find schema for oid %d", relOid);
-		}
-
-		relName = get_rel_name(relOid);
-		if (relName == NULL)
-		{
-			elog(ERROR, "Cannot find relation for oid %d", relOid);
-		}
-
-		initStringInfo(&buffer);
-
-		appendStringInfo(&buffer, "select sum(pg_relation_size('%s.%s'))::int8 from gp_dist_random('gp_id');", quote_identifier(schemaName), quote_identifier(relName));
-
-		size += get_size_from_segDBs(buffer.data);
-	}
-
 	relation_close(rel, AccessShareLock);
 
 	PG_RETURN_INT64(size);
@@ -504,72 +473,17 @@ pg_relation_size_name(PG_FUNCTION_ARGS)
 	Relation	rel;
 	int64		size;
 	
-	/**
-	 * This function is peculiar in that it does its own dispatching.
-	 * It does not work on entry db since we do not support dispatching
-	 * from entry-db currently.
-	 */
-	if (Gp_role == GP_ROLE_EXECUTE && Gp_segment == -1)
-	{
-		elog(ERROR, "This query is not currently supported by GPDB.");
-	}
-	
+	Assert(Gp_role != GP_ROLE_EXECUTE);
+
 	relrv = makeRangeVarFromNameList(textToQualifiedNameList(relname));
 	
-	if (Gp_role == GP_ROLE_EXECUTE && relrv->schemaname != NULL)
-	{
-		Oid namespaceId;
-		Oid relOid;
-		/*
-		 * Do this the hard way, because the optimizer wants to be
-		 * able to use this function on relations the user might not
-		 * have direct access to.
-		 */
-
-		AcceptInvalidationMessages();
-
-		namespaceId = caql_getoid(
-				NULL,
-				cql("SELECT oid FROM pg_namespace "
-					" WHERE nspname = :1 ",
-					CStringGetDatum(relrv->schemaname)));
-
-		relOid = get_relname_relid(relrv->relname, namespaceId);
-		
-		if (!OidIsValid(relOid))
-		{
-			size = 0;
-			PG_RETURN_INT64(size);
-		}
-		
-		/* Let relation_open do the rest */
-		rel = relation_open(relOid, AccessShareLock);
-	}
-	else
-		rel = relation_openrv(relrv, AccessShareLock);
+	rel = relation_openrv(relrv, AccessShareLock);
 	
 	if (rel->rd_node.relNode == 0)
 		size = 0;
 	else
 		size = calculate_relation_size(rel); 
 	
-	if (Gp_role == GP_ROLE_DISPATCH)
-	{
-		char * rawname;
-		StringInfoData buffer;
-		
-		initStringInfo(&buffer);
-		
-		rawname = DatumGetCString(DirectFunctionCall1(textout,
-													  PointerGetDatum(relname)));
-		
-		initStringInfo(&buffer);
-
-		appendStringInfo(&buffer, "select sum(pg_relation_size('%s'))::int8 from gp_dist_random('gp_id');", rawname);
-
-		size += get_size_from_segDBs(buffer.data);
-	}
-
 	relation_close(rel, AccessShareLock);
 
 	PG_RETURN_INT64(size);

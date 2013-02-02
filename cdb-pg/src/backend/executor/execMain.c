@@ -97,6 +97,7 @@
 #include "cdb/cdbllize.h"
 #include "cdb/memquota.h"
 #include "cdb/cdbtargeteddispatch.h"
+#include "cdb/cdbquerycontextdispatching.h"
 #include "optimizer/prep.h"
 
 typedef struct evalPlanQual
@@ -153,6 +154,7 @@ static void intorel_receive(TupleTableSlot *slot, DestReceiver *self);
 static void intorel_shutdown(DestReceiver *self);
 static void intorel_destroy(DestReceiver *self);
 static void ClearPartitionState(EState *estate);
+static void CreateAppendOnlySegFileForRelationOnMaster(Relation rel, int segno);
 
 /*
  * For a partitioned insert target only:  
@@ -539,7 +541,7 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
 				 * On return, gangs have been allocated and CDBProcess lists have
 				 * been filled in in the slice table.)
 				 */
-				AssignGangs(queryDesc, gp_singleton_segindex);
+				AssignGangs(queryDesc, GpAliveSegmentsInfo.singleton_segindex);
 			}
 
 		}
@@ -615,13 +617,47 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
 			 */
 			if (Gp_role == GP_ROLE_DISPATCH)
 			{
-				if (queryDesc->plannedstmt->rtable)
-					prepareDispatchedCatalog(queryDesc->plannedstmt->rtable);
-				if (queryDesc->plannedstmt->intoClause != NULL)
+				int i;
+
+				HTAB * htab = createPrepareDispatchedCatalogRelationDisctinctHashTable();
+
+				PlannedStmt *plannedstmt = queryDesc->plannedstmt;
+				Assert(NULL == plannedstmt->contextdisp);
+				plannedstmt->contextdisp = CreateQueryContextInfo();
+
+				for (i = 0; i < estate->es_num_result_relations; ++i)
 				{
-					prepareDispatchedCatalogObject(queryDesc->plannedstmt->intoClause->oidInfo.relOid);
-					prepareDispatchedCatalogForAoCo(queryDesc->estate->es_into_relation_descriptor);
+					ResultRelInfo * relinfo;
+					relinfo = &estate->es_result_relation_info[i];
+					prepareDispatchedCatalogRelation(plannedstmt->contextdisp,
+							RelationGetRelid(relinfo->ri_RelationDesc), TRUE, estate->es_result_aosegnos, htab);
 				}
+
+				if (plannedstmt->intoClause != NULL)
+				{
+					prepareDispatchedCatalogSingleRelation(plannedstmt->contextdisp,
+							plannedstmt->intoClause->oidInfo.relOid, TRUE, 1, htab);
+				}
+
+				if (plannedstmt->rtable)
+					prepareDispatchedCatalog(plannedstmt->contextdisp, plannedstmt->rtable, htab);
+
+				if (plannedstmt->returningLists)
+				{
+					ListCell *lc;
+					foreach(lc, plannedstmt->returningLists)
+					{
+						List *targets = lfirst(lc);
+
+						if (targets)
+							prepareDispatchedCatalogTargets(plannedstmt->contextdisp, targets, htab);
+					}
+				}
+
+				prepareDispatchedCatalogPlan(plannedstmt->contextdisp, plannedstmt->planTree, htab);
+
+				hash_destroy(htab);
+				CloseQueryContextInfo(plannedstmt->contextdisp);
 			}
 
 			/*
@@ -659,6 +695,9 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
              * dispatched.
 			 */
 			cdbdisp_dispatchPlan(queryDesc, needDtxTwoPhase, true, estate->dispatcherState);
+
+            DropQueryContextInfo(queryDesc->plannedstmt->contextdisp);
+            queryDesc->plannedstmt->contextdisp = NULL;
 		}
 
 
@@ -718,6 +757,11 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
     }
 	PG_CATCH();
 	{
+	    if (queryDesc->plannedstmt->contextdisp)
+	    {
+	        DropQueryContextInfo(queryDesc->plannedstmt->contextdisp);
+	        queryDesc->plannedstmt->contextdisp = NULL;
+	    }
 		mppExecutorCleanup(queryDesc);
 		PG_RE_THROW();
 	}
@@ -992,14 +1036,6 @@ ExecutorEnd(QueryDesc *queryDesc)
 	 */
 	PG_TRY();
 	{
-		/*
-		 * On QD, we should cleanup in-memory heap for each statement.
-		 * On QE, modified in-memory heap tuples should be send back to QE.
-		 */
-		if (Gp_role != GP_ROLE_EXECUTE)
-		{
-			InMemHeap_DropAll();
-		}
 		mppExecutorFinishup(queryDesc);
 	}
 	PG_CATCH();
@@ -1478,6 +1514,7 @@ InitPlan(QueryDesc *queryDesc, int eflags)
 				{
 					relinfo = &(resultRelInfos[relno]);
 					ResultRelInfoSetSegno(relinfo, estate->es_result_aosegnos);
+					CreateAppendOnlySegFileOnMaster(relinfo, estate->es_result_aosegnos);
 				}
 			}
 		}
@@ -1964,8 +2001,47 @@ initResultRelInfo(ResultRelInfo *resultRelInfo,
 			ExecOpenIndices(resultRelInfo);
 }
 
+void
+CreateAppendOnlySegFileOnMaster(ResultRelInfo *resultRelInfo, List *mapping)
+{
+   	ListCell *relid_to_segno;
+   	bool	  found = false;
+
+	/* only relevant for AO relations */
+	if(!relstorage_is_ao(RelinfoGetStorage(resultRelInfo)))
+		return;
+
+	Assert(mapping);
+	Assert(resultRelInfo->ri_RelationDesc);
+
+   	/* lookup the segfile # to write into, according to my relid */
+
+   	foreach(relid_to_segno, mapping)
+   	{
+		SegfileMapNode *n = (SegfileMapNode *)lfirst(relid_to_segno);
+		Oid myrelid = RelationGetRelid(resultRelInfo->ri_RelationDesc);
+		if(n->relid == myrelid)
+		{
+			Assert(n->segno != InvalidFileSegNumber);
+			resultRelInfo->ri_aosegno = n->segno;
+
+			/*
+			 * in gpsql, master create all segfile for segments
+			 */
+			if (Gp_role == GP_ROLE_DISPATCH)
+				CreateAppendOnlySegFileForRelationOnMaster(resultRelInfo->ri_RelationDesc,
+						n->segno);
+
+			found = true;
+		}
+	}
+
+	Assert(found);
+}
+
 static void
-CreateAppendOnlySegFileOnMaster(Relation rel, int segno) {
+CreateAppendOnlySegFileForRelationOnMaster(Relation rel, int segno)
+{
 	int i;
 
 	FileSegInfo * fsinfo;
@@ -1989,7 +2065,7 @@ CreateAppendOnlySegFileOnMaster(Relation rel, int segno) {
 		AppendOnlyEntry * aoEntry = GetAppendOnlyEntry(child_rel->rd_id, SnapshotNow );
 
 
-		for (i = 0; i <= GpIdentity.numsegments; ++i)
+		for (i = 0; i <= GetTotalSegmentsNumber(); ++i)
 		{
 			Assert(i < child_rel->rd_segfile0_count);
 
@@ -2065,13 +2141,6 @@ ResultRelInfoSetSegno(ResultRelInfo *resultRelInfo, List *mapping)
 		{
 			Assert(n->segno != InvalidFileSegNumber);
 			resultRelInfo->ri_aosegno = n->segno;
-
-			/*
-			 * in gpsql, master create all segfile for segments
-			 */
-			if (Gp_role == GP_ROLE_DISPATCH)
-				CreateAppendOnlySegFileOnMaster(resultRelInfo->ri_RelationDesc,
-						n->segno);
 
 			if (Debug_appendonly_print_insert)
 				elog(LOG, "Appendonly: setting pre-assigned segno %d in result "
@@ -2840,6 +2909,7 @@ ExecInsert(TupleTableSlot *slot,
 		{
 			/* Set the pre-assigned fileseg number to insert into */
 			ResultRelInfoSetSegno(resultRelInfo, estate->es_result_aosegnos);
+			CreateAppendOnlySegFileOnMaster(resultRelInfo, estate->es_result_aosegnos);
 
 			resultRelInfo->ri_aoInsertDesc =
 				appendonly_insert_init(resultRelationDesc,
@@ -2854,6 +2924,7 @@ ExecInsert(TupleTableSlot *slot,
 		if (resultRelInfo->ri_aocsInsertDesc == NULL)
 		{
 			ResultRelInfoSetSegno(resultRelInfo, estate->es_result_aosegnos);
+			CreateAppendOnlySegFileOnMaster(resultRelInfo, estate->es_result_aosegnos);
 			resultRelInfo->ri_aocsInsertDesc = aocs_insert_init(resultRelationDesc, resultRelInfo->ri_aosegno);
 		}
 
@@ -4301,7 +4372,7 @@ CreateIntoRel(QueryDesc *queryDesc)
 	/*
 	 * create segment 1 for insert.
 	 */
-	CreateAppendOnlySegFileOnMaster(intoRelationDesc, 1);
+	CreateAppendOnlySegFileForRelationOnMaster(intoRelationDesc, 1);
 
 	intoClause->oidInfo.relOid = intoRelationId;
 	estate->es_into_relation_descriptor = intoRelationDesc;

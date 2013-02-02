@@ -126,12 +126,14 @@ extern void cdb_cleanup(int code, Datum arg  __attribute__((unused)) );
  *
  */
 extern CdbComponentDatabases *getCdbComponentDatabases(void);
+extern CdbComponentDatabases *getCdbComponentDatabasesForGangs(void);
 
 /*
  * freeCdbComponentDatabases() releases the palloc'd storage returned by
  * getCdbComponentDatabases().
  */
 extern void freeCdbComponentDatabases(CdbComponentDatabases *pDBs);
+extern void freeCdbComponentDatabaseInfo(CdbComponentDatabaseInfo *cdi);
 
 // UNDONE: This was a private procedure... are there any issues in making it public???
 /*

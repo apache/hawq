@@ -343,7 +343,10 @@ AOCSFileSegInfo **GetAllAOCSFileSegInfo_pg_aocsseg_rel(
 /*
  * GetAOCSTotalBytes
  *
- * Get the total bytes for a specific AOCS table from the pg_aocsseg table on this local segdb.
+ * Get the total bytes for a specific AOCS table from the pg_aocsseg table on master.
+ *
+ * In gpsql, master keep all segfile info in pg_aocsseg table,
+ * therefore it get the whole table size.
  */
 int64 GetAOCSTotalBytes(Relation parentrel, Snapshot appendOnlyMetaDataSnapshot)
 {
@@ -356,6 +359,8 @@ int64 GetAOCSTotalBytes(Relation parentrel, Snapshot appendOnlyMetaDataSnapshot)
 
 	aoEntry = GetAppendOnlyEntry(RelationGetRelid(parentrel), appendOnlyMetaDataSnapshot);
 	Assert(aoEntry != NULL);
+
+	/* TODO: in gpsql, get all segfile info on master */
 
 	result = 0;
 	allseg = GetAllAOCSFileSegInfo(parentrel, aoEntry, appendOnlyMetaDataSnapshot, &totalseg);

@@ -211,7 +211,7 @@ relpath(RelFileNode rnode)
 }
 
 void
-CopyRelPath(char *target, int targetMaxLen, RelFileNode rnode)
+CopyRelPath(char *target, int targetMaxLen, int4 contentid, RelFileNode rnode)
 {
 	int 		snprintfResult;
 
@@ -233,12 +233,9 @@ CopyRelPath(char *target, int targetMaxLen, RelFileNode rnode)
 	else
 	{
 		char *primary_path;
-		int32 contentid;
 
 		if (IsBootstrapProcessingMode() || Gp_role == GP_ROLE_UTILITY)
-			contentid = -1;
-		else
-			contentid = GpIdentity.segindex;
+			Assert(contentid == MASTER_CONTENT_ID);
 
 		/* All other tablespaces are accessed via filespace locations */
 		GetFilespacePathForTablespace(

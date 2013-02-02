@@ -204,6 +204,10 @@ static const PQconninfoOption PQconninfoOptions[] = {
 	"bootstrap_user", "D", 64},
 	{"encoding", NULL, "", NULL,
 	"encoding", "D", 10},
+	{"segindex", NULL, "", NULL,
+	"segindex", "D", 10},
+	{"dbid", NULL, "", NULL,
+	"dbid", "D", 10},
 	
 
 	/*
@@ -558,6 +562,10 @@ fillPGconn(PGconn *conn, PQconninfoOption *connOptions)
 	conn->bootstrap_user = tmp ? strdup(tmp) : NULL;
 	tmp = conninfo_getval(connOptions, "encoding");
 	conn->encoding = tmp ? strdup(tmp) : NULL;
+	tmp = conninfo_getval(connOptions, "segindex");
+	conn->segindex = tmp ? strdup(tmp) : NULL;
+	tmp = conninfo_getval(connOptions, "dbid");
+	conn->dbid = tmp ? strdup(tmp) : NULL;
 
 	/*
 	 * Internal communications from QD to QE don't use SSL
@@ -2248,6 +2256,10 @@ freePGconn(PGconn *conn)
 		free(conn->bootstrap_user);
 	if (conn->encoding)
 		free(conn->encoding);
+	if (conn->segindex)
+		free(conn->segindex);
+	if (conn->dbid)
+		free(conn->dbid);
 
     if (conn->gpqeid)			/* CDB */
         free(conn->gpqeid);

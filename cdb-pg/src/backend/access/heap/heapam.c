@@ -2126,33 +2126,10 @@ heap_insert(Relation relation, HeapTuple tup, CommandId cid,
 			bool use_wal, bool use_fsm, TransactionId xid)
 {
 
-	/*
-	 * in gpsql, heap table only used for catalog on master.
-	 */
 	if (Gp_role == GP_ROLE_EXECUTE )
 	{
-		Assert(NULL != OidInMemHeapMapping);
-
-		InMemHeapRelation inmemrel = OidGetInMemHeapRelation(relation->rd_id);
-		if (NULL == inmemrel)
-		{
-			inmemrel = InMemHeap_Create(relation->rd_id, relation, FALSE, 10,
-					NoLock, RelationGetRelationName(relation));
-			Assert(NULL != inmemrel);
-		}
-
-		InMemHeap_Insert(inmemrel, tup, TRUE, GpIdentity.segindex);
-
-		/*
-		 * in gpsql, catalogs are dispatched to segments,
-		 * and return all modified catalogs back to master.
-		 * here, we just insert the tuple into in-memory table,
-		 * therefore we cannot get the oid of tuple on segments.
-		 */
-		return InvalidOid;
+		Insist(!"should not insert any tuple into heap table on QE.");
 	}
-
-
 
 	MIRROREDLOCK_BUFMGR_DECLARE;
 
@@ -2414,21 +2391,8 @@ heap_delete(Relation relation, ItemPointer tid,
 	 */
 	if (Gp_role == GP_ROLE_EXECUTE )
 	{
-		Assert(NULL != OidInMemHeapMapping);
-
-		InMemHeapRelation inmemrel = OidGetInMemHeapRelation(relation->rd_id);
-		if (NULL == inmemrel)
-		{
-			elog(ERROR, "cannot find in-memory table: %s",
-					RelationGetRelationName(relation));
-		}
-
-		InMemHeap_Delete(inmemrel, tid);
-
-		return HeapTupleMayBeUpdated ;
+		elog(ERROR, "in gpsql, heap_delete() is not allowed on segments");
 	}
-
-
 
 	MIRROREDLOCK_BUFMGR_DECLARE;
 

@@ -152,6 +152,13 @@ mmxlog_redo(XLogRecPtr beginLoc, XLogRecPtr lsn, XLogRecord *record)
 	bool found;
 	void *entry;
 
+	/* Only master can touch the shared storage. */
+	if (GPStandby() && xlrec->contentid != MASTER_CONTENT_ID)
+	{
+		elog(LOG, "skip contentid: %d for path: %s", xlrec->contentid, path);
+		return;
+	}
+
 	if (info == MMXLOG_CREATE_DIR)
 	{
 		bool dir_created = true;

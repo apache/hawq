@@ -49,7 +49,6 @@
  * Helper Functions
  */
 static int	CdbComponentDatabaseInfoCompare(const void *p1, const void *p2);
-static void freeCdbComponentDatabaseInfo(CdbComponentDatabaseInfo *cdi);
 
 static void getAddressesForDBid(CdbComponentDatabaseInfo *c, int elevel);
 
@@ -304,7 +303,7 @@ getCdbComponentInfo(bool DNSLookupAsError)
 	/*
 	 *	Validate that gp_numsegments == segment_databases->total_segment_dbs
 	 */
-	if (getgpsegmentCount() != component_databases->total_segments)
+	if (GetTotalSegmentsNumber() != component_databases->total_segments)
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_EXCEPTION),
@@ -382,6 +381,80 @@ getCdbComponentDatabases(void)
 	return getCdbComponentInfo(true);
 }
 
+static void
+copyCdbComponentDatabaseInfo(CdbComponentDatabaseInfo *src, CdbComponentDatabaseInfo *dest)
+{
+	int	i;
+
+	dest->dbid = src->dbid;
+	dest->segindex = src->segindex;
+	dest->role = src->role;
+	dest->preferred_role = src->preferred_role;
+	dest->mode = src->mode;
+	dest->status = src->status;
+	dest->port = src->port;
+	dest->filerep_port = src->filerep_port;
+	if (src->hostname)
+		dest->hostname = pstrdup(src->hostname);
+	if (src->address)
+		dest->address = pstrdup(src->address);
+	if (src->hostip)
+		dest->hostip = pstrdup(src->hostip);
+	for (i = 0; i < COMPONENT_DBS_MAX_ADDRS; i++)
+		if (src->hostaddrs[i])
+			dest->hostaddrs[i] = pstrdup(src->hostaddrs[i]);
+}
+
+CdbComponentDatabases *
+getCdbComponentDatabasesForGangs(void)
+{
+	CdbComponentDatabases	*newInfo;
+	int	i;
+
+	/* XXX:mat3: recovery special code.. */
+	if (GpAliveSegmentsInfo.cdbComponentDatabases == NULL)
+		return getCdbComponentDatabases();
+
+	if (GpAliveSegmentsInfo.aliveSegmentsCount == 0)
+		elog(ERROR, "No alive segment in the cluser.");
+
+	newInfo = palloc0(sizeof(*newInfo));
+	newInfo->total_segment_dbs = GpAliveSegmentsInfo.cdbComponentDatabases->total_segment_dbs;
+	newInfo->segment_db_info = palloc0(sizeof(CdbComponentDatabaseInfo) * newInfo->total_segment_dbs);
+	for (i = 0; i < newInfo->total_segment_dbs; i++)
+		copyCdbComponentDatabaseInfo(&GpAliveSegmentsInfo.cdbComponentDatabases->segment_db_info[i], &newInfo->segment_db_info[i]);
+
+	newInfo->total_entry_dbs = GpAliveSegmentsInfo.cdbComponentDatabases->total_entry_dbs;
+	newInfo->entry_db_info = palloc0(sizeof(CdbComponentDatabaseInfo) * newInfo->total_entry_dbs);
+	for (i = 0; i < newInfo->total_entry_dbs; i++)
+		copyCdbComponentDatabaseInfo(&GpAliveSegmentsInfo.cdbComponentDatabases->entry_db_info[i], &newInfo->entry_db_info[i]);	
+
+	/* It means no mirror config. */
+	newInfo->total_segments = newInfo->total_segment_dbs;
+	newInfo->my_dbid = GpAliveSegmentsInfo.cdbComponentDatabases->my_dbid;
+	newInfo->my_segindex = GpAliveSegmentsInfo.cdbComponentDatabases->my_segindex;
+	newInfo->my_isprimary = GpAliveSegmentsInfo.cdbComponentDatabases->my_isprimary;
+
+	elog(DEBUG4, "getCdbComponentDatabasesForGangs returns:");
+	elog(DEBUG4, "  my_dbid = %d", newInfo->my_dbid);
+	elog(DEBUG4, "  my_segindex = %d", newInfo->my_segindex);
+	elog(DEBUG4, "  total_segments = %d", newInfo->total_segments);
+	elog(DEBUG4, "  entry_db_info = %d", newInfo->total_entry_dbs);
+	elog(DEBUG4, "  total_segment_dbs = %d", newInfo->total_segment_dbs);
+	for (i = 0; i < newInfo->total_segment_dbs; i++)
+	{
+		CdbComponentDatabaseInfo *info = &newInfo->segment_db_info[i];
+		elog(DEBUG4, "    gang member %d: ", i);
+		elog(DEBUG4, "      db_id: %d", info->dbid);
+		elog(DEBUG4, "      segindex: %d", info->segindex);
+		elog(DEBUG4, "      status: %s", info->status == 'u' ? "up" : "down");
+		elog(DEBUG4, "      hostname: %s", info->hostname);
+		elog(DEBUG4, "      address: %s", info->address);
+		elog(DEBUG4, "      port: %d", info->port);
+	}
+
+	return newInfo;
+}
 
 /*
  * freeCdbComponentDatabases

@@ -1022,6 +1022,16 @@ vacuum_appendonly_rel(Relation aorel, void *vacrelstats, bool isVacFull)
 	 * If we don't guarantee the locking conditions we can truncate concurrent
 	 * user's data while he's in the process of writing it!
 	 */
+
+	/*
+	 * for lock reason, in gpsql, we currently do not truncate the relation
+	 */
+	pfree(fstotal);
+
+	return;
+
+
+
 	if (Gp_role == GP_ROLE_EXECUTE)
 	{
 		FileSegInfo **segfile_array = NULL;	/* array of all segfiles information */
@@ -1245,6 +1255,21 @@ vacuum_aocs_rel(Relation aorel, void *vacrelstats, bool isVacFull)
 	 * If we don't guarantee the locking conditions we can truncate concurrent
 	 * user's data while he's in the process of writing it!
 	 */
+
+	/*
+	 * for lock reason, in gpsql, we currently do not truncate relation
+	 */
+	pfree(aoEntry);
+
+	if (allseg)
+	{
+		FreeAllAOCSSegFileInfo(allseg, totalseg);
+		pfree(allseg);
+	}
+
+	return;
+
+
 	if (Gp_role == GP_ROLE_EXECUTE)
 	{
 		/*

@@ -65,7 +65,7 @@ extern int	max_files_per_process;
 extern File LocalPathNameOpenFile(FileName fileName, int fileFlags, int fileMode);
 extern void LocalFileClose(File file);
 extern int LocalFileRead(File file, char *buffer, int amount);
-extern int LocalFileWrite(File file, char *buffer, int amount);
+extern int LocalFileWrite(File file, const char *buffer, int amount);
 extern int64 LocalFileSeek(File file, int64 offset, int whence);
 extern int LocalFileSync(File file);
 extern int LocalRemovePath(FileName fileName, int recursive);
@@ -75,7 +75,7 @@ extern int LocalFileTruncate(File file, int64 offset);
 extern File HdfsPathNameOpenFile(FileName fileName, int fileFlags, int fileMode);
 extern void HdfsFileClose(File file, bool canReportError);
 extern int HdfsFileRead(File file, char *buffer, int amount);
-extern int HdfsFileWrite(File file, char *buffer, int amount);
+extern int HdfsFileWrite(File file, const char *buffer, int amount);
 extern int64 HdfsFileSeek(File file, int64 offset, int whence);
 extern int64 HdfsFileTell(File file);
 extern int HdfsFileSync(File file);
@@ -99,7 +99,7 @@ extern void FileClose(File file);
 extern void FileUnlink(File file);
 extern int	FileRead(File file, char *buffer, int amount);
 extern int	FileReadIntr(File file, char *buffer, int amount, bool fRetryInt);
-extern int	FileWrite(File file, char *buffer, int amount);
+extern int	FileWrite(File file, const char *buffer, int amount);
 extern int	FileSync(File file);
 extern int64 FileSeek(File file, int64 offset, int whence);
 extern int64 FileNonVirtualTell(File file);
@@ -139,5 +139,7 @@ extern int  MakeDirectory(const char * path, mode_t mode);
 #define PG_TEMP_FILE_PREFIX "pgsql_tmp"
 
 extern size_t GetTempFilePrefix(char * buf, size_t buflen, const char * fileName);
+
+extern bool TestFileValid(File file);
 
 #endif   /* FD_H */

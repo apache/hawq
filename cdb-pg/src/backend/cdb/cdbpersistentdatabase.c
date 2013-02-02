@@ -979,7 +979,7 @@ PersistentDatabase_ActivateStandby(int16 oldmaster, int16 newmaster)
 		PersistentFileSysObjName_SetDatabaseDir(&fsObjName,
 												tblspcoid,
 												dboid,
-												/* FIXME: mat3: ??? */ false);
+												false);
 
 	    PersistentFileSysObj_ActivateStandby(&fsObjName,
 											 &tuple->t_self,
@@ -1679,7 +1679,7 @@ static Size PersistentDatabase_SharedDataSize(void)
 Size PersistentDatabase_ShmemSize(void)
 {
 	if (MaxPersistentDatabaseDirectories == 0)
-		MaxPersistentDatabaseDirectories = gp_max_databases * gp_max_tablespaces * (GpIdentity.numsegments != MASTER_CONTENT_ID ? 1 : GpIdentity.numsegments + 1);
+		MaxPersistentDatabaseDirectories = gp_max_databases * gp_max_tablespaces * (GpIdentity.segindex != MASTER_CONTENT_ID ? 1 : GetTotalSegmentsNumber() + 1);
 
 	/* The shared-memory structure. */
 	return PersistentDatabase_SharedDataSize();
@@ -1762,11 +1762,14 @@ get_database_data(dbdir_agg_state **das, char *caller)
 		{
 			break;
 		}
-		
+
+		if (databaseDirEntry->header.oid1 != MASTER_CONTENT_ID)
+			continue;
+
 		mmxlog_add_database(
 				 das, &maxCount, 
-				 /* databaseoid */ databaseDirEntry->header.oid1, 
-				 /* tablespaceoid */ databaseDirEntry->header.oid2,
+				 /* databaseoid */ databaseDirEntry->header.oid2, 
+				 /* tablespaceoid */ databaseDirEntry->header.oid3,
 				 caller);
 	}
 }

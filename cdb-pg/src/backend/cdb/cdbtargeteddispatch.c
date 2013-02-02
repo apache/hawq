@@ -246,9 +246,9 @@ GetContentIdsFromPlanForSingleRelation(List *rtable, Plan *plan, int rangeTableI
 		}
 		else if ( totalCombinations > 0 &&
 				/* don't bother for ones which will likely hash to many segments */
-				totalCombinations < GpIdentity.numsegments * 3 )
+				totalCombinations < getgpsegmentCount() * 3 )
 		{
-			CdbHash *h = makeCdbHash(GpIdentity.numsegments, HASH_FNV_1);
+			CdbHash *h = makeCdbHash(getgpsegmentCount(), HASH_FNV_1);
 			long index = 0;
 
 			result.dd.isDirectDispatch = true;
@@ -393,7 +393,7 @@ FinalizeDirectDispatchDataForSlice(Node *node, ContentIdAssignmentData *data, bo
 				MemoryContext oldContext;
 				if ( ddcr->dd.contentIds == NULL )
 				{
-					ddcr->dd.contentIds = list_make1_int( cdb_randint(GpIdentity.numsegments - 1, 0));
+					ddcr->dd.contentIds = list_make1_int(cdb_randint(getgpsegmentCount() - 1, 0));
 					if (  ShouldPrintTestMessages())
 						elog(INFO, "DDCR learned no content dispatch is required");
 				}

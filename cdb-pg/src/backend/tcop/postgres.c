@@ -904,7 +904,6 @@ exec_mpp_query(const char *query_string,
 			   const char * serializedPlantree, int serializedPlantreelen,
 			   const char * serializedParams, int serializedParamslen,
 			   const char * serializedSliceInfo, int serializedSliceInfolen,
-			   const char * serializedCatalog, int serializedCataloglen,
 			   const char * seqServerHost, int seqServerPort,
 			   int localSlice)
 {
@@ -974,13 +973,6 @@ exec_mpp_query(const char *query_string,
 	
 	InitOidInMemHeapMapping(10, MessageContext);
 
-	/*
-	 * some catalogs are dispatched from QD,
-	 * construct in-memory heap catalog tables from them;
-	 */
-	if (serializedCatalog != 0 && serializedCataloglen > 0)
-		deserializeAndRebuildInmemCatalog(serializedCatalog, serializedCataloglen);
-
 	/* 
 	 * Deserialize the Query node, if there is one.  If this is a planned stmt, then
 	 * there isn't one, but there must be a PlannedStmt later on.
@@ -993,6 +985,17 @@ exec_mpp_query(const char *query_string,
 			elog(ERROR, "MPPEXEC: received non-utility Query node.");
 		
 		utilityStmt = query->utilityStmt;
+
+		/*
+		 * only few Query should be dispatched to QE,
+		 * I assume they should be dispatched with query context.
+		 */
+        Assert(NULL != query->contextdisp);
+		if (query->contextdisp)
+		{
+			RebuildQueryContext(query->contextdisp);
+			CloseQueryContextInfo(query->contextdisp);
+		}
 	}
 	
 	/*
@@ -1036,6 +1039,10 @@ exec_mpp_query(const char *query_string,
 		 * and let the code that sets up the QueryDesc sort it out.
 		 */
 		plan->sliceTable = (Node *) sliceTable; /* Cache for CreateQueryDesc */
+
+		Assert(NULL != plan->contextdisp);
+		RebuildQueryContext(plan->contextdisp);
+		CloseQueryContextInfo(plan->contextdisp);
     }
     if (gp_enable_resqueue_priority)
     {
@@ -1676,6 +1683,13 @@ exec_simple_query(const char *query_string, const char *seqServerHost, int seqSe
 
 		InitOidInMemHeapMapping(10, MessageContext);
 
+		/*
+		 * In the transaction start, we get the segment alive information.
+		 * If the segment alive information changes, all of gangs must be released.
+		 */
+		if (Gp_role == GP_ROLE_DISPATCH)
+			UpdateAliveSegmentsInfo();
+
 		querytree_list = pg_analyze_and_rewrite(parsetree, query_string,
 												NULL, 0);
 
@@ -1769,6 +1783,23 @@ exec_simple_query(const char *query_string, const char *seqServerHost, int seqSe
 		CleanupOidInMemHeapMapping();
 
 		PortalDrop(portal, false);
+
+		/*
+		 * We can release the gangs only not in the transaction. This is beacuse
+		 * that some gangs might be allocated to the portals. And cannot be released.
+		 *
+		 * TODO: The holdable cursor needs more changes!
+		 */
+		if (GpAliveSegmentsInfo.cleanGangs)
+		{
+			GpAliveSegmentsInfo.cleanGangs = false;
+			/* If segment */
+			if (gangsExist())
+			{
+				disconnectAndDestroyAllGangs();
+				elog(ERROR, "segment alive information changed, cleanup the gangs.");
+			}
+		}
 
 		if (IsA(parsetree, TransactionStmt))
 		{
@@ -4689,7 +4720,6 @@ PostgresMain(int argc, char *argv[], const char *username)
 					const char *serializedPlantree = NULL;
 					const char *serializedParams = NULL;
 					const char *serializedSliceInfo = NULL;
-					const char *serializedCatalog = NULL;
 					const char *seqServerHost = NULL;
 					
 					int query_string_len = 0;
@@ -4698,7 +4728,6 @@ PostgresMain(int argc, char *argv[], const char *username)
 					int serializedPlantreelen = 0;
 					int serializedParamslen = 0;
 					int serializedSliceInfolen = 0;
-					int serializedCataloglen = 0;
 					int seqServerHostlen = 0;
 					int seqServerPort = -1;
 					
@@ -4768,8 +4797,6 @@ PostgresMain(int argc, char *argv[], const char *username)
 						serializedSnapshot, serializedSnapshotlen,
 						&TempDtxContextInfo);
 
-					serializedCataloglen = pq_getmsgint(&input_message, 4);
-
 					/* get the transaction options */
 					unusedFlags = pq_getmsgint(&input_message, 4);
 					Assert(0 == unusedFlags);
@@ -4792,9 +4819,6 @@ PostgresMain(int argc, char *argv[], const char *username)
 						
 					if (serializedSliceInfolen > 0)
 						serializedSliceInfo = pq_getmsgbytes(&input_message,serializedSliceInfolen);
-
-					if (serializedCataloglen > 0)
-						serializedCatalog = pq_getmsgbytes(&input_message,serializedCataloglen);
 
 					if (seqServerHostlen > 0)
 						seqServerHost = pq_getmsgbytes(&input_message, seqServerHostlen);
@@ -4852,7 +4876,6 @@ PostgresMain(int argc, char *argv[], const char *username)
 									   serializedPlantree, serializedPlantreelen,
 									   serializedParams, serializedParamslen,
 									   serializedSliceInfo, serializedSliceInfolen,
-									   serializedCatalog, serializedCataloglen,
 									   seqServerHost, seqServerPort, localSlice);
 					
 					SetUserIdAndContext(GetOuterUserId(), false);

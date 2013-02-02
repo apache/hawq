@@ -51,8 +51,6 @@ typedef struct DispatchCommandQueryParms
 	int			serializedParamslen;
 	char		*serializedSliceInfo;
 	int			serializedSliceInfolen;
-	char		*serializedCatalog;
-	int			serializedCataloglen;
 	
 	/*
 	 * serialized DTX context string

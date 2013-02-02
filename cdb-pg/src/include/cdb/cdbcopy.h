@@ -15,6 +15,7 @@
 #include "access/aosegfiles.h" /* for InvalidFileSegNumber const */ 
 #include "lib/stringinfo.h"
 #include "cdb/cdbgang.h"
+#include "cdb/cdbquerycontextdispatching.h"
 
 #define COPYOUT_CHUNK_SIZE 16 * 1024
 
@@ -58,11 +59,12 @@ typedef struct CdbCopy
 /* global function declarations */
 CdbCopy    *makeCdbCopy(bool copy_in);
 int			cdbCopyGetDbCount(int total_segs, int seg);
-void		cdbCopyStart(CdbCopy *cdbCopy, char *copyCmd);
+void		cdbCopyStart(CdbCopy *cdbCopy, char *copyCmd, Oid relid, Oid relerror);
 void		cdbCopySendData(CdbCopy *c, int target_seg, const char *buffer, int nbytes);
 void		cdbCopySendDataSingle(CdbCopy *c, int target_seg, const char *buffer, int nbytes);
 bool		cdbCopyGetData(CdbCopy *c, bool cancel, uint64 *rows_processed);
 int			cdbCopyEnd(CdbCopy *c);
 void		cdbCopyStartTransaction(void);
+void		cdbCopyGetCatalogs(CdbCopy *c);
 
 #endif   /* CDBCOPY_H */

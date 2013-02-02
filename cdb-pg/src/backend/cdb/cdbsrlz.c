@@ -195,33 +195,6 @@ uncompress_string(const char *src, int size, int *uncompressed_len)
 }
 
 /*
- * we dispatch tablespace location instead of tablespace catalog entry.
- */
-static void
-serializeTablespaceInfo(InMemHeapRelation rel, StringInfo buffer)
-{
-	int i;
-
-	/* add oid of table first */
-	pq_sendint(buffer, rel->relid, sizeof(Oid));
-	/* add tuple size */
-	pq_sendint(buffer, rel->tupsize, sizeof(int32));
-
-	for (i = 0; i < rel->tupsize; ++i)
-	{
-		/*
-		 * send oid of tablespace
-		 */
-		pq_sendint(buffer, rel->tuples[i].entry->tablespace, sizeof(Oid));
-		/*
-		 * send tablespace location
-		 */
-		pq_sendbytes(buffer, (const char *) rel->tuples[i].entry->location,
-				strlen((const char *) rel->tuples[i].entry->location) + 1);
-	}
-}
-
-/*
  * serialize all modified tuple in in-memory heap table.
  */
 static void
@@ -245,9 +218,7 @@ serializeInMemHeapTable(InMemHeapRelation rel, StringInfo buffer)
 			CacheInvalidateHeapTuple(rel->rel, rel->tuples[i].tuple);
 		}
 
-		if (rel->tuples[i].flags == INMEM_HEAP_TUPLE_DELETED
-				|| rel->tuples[i].flags == INMEM_HEAP_TUPLE_UPDATED
-				|| rel->tuples[i].flags == INMEM_HEAP_TUPLE_ADDED)
+		if (rel->tuples[i].flags == INMEM_HEAP_TUPLE_UPDATED)
 		{
 			++tupsize;
 		}
@@ -259,9 +230,7 @@ serializeInMemHeapTable(InMemHeapRelation rel, StringInfo buffer)
 	/* for each tuple */
 	for (i = 0; i < rel->tupsize; ++i)
 	{
-		if (rel->tuples[i].flags == INMEM_HEAP_TUPLE_DELETED
-				|| rel->tuples[i].flags == INMEM_HEAP_TUPLE_UPDATED
-				|| rel->tuples[i].flags == INMEM_HEAP_TUPLE_ADDED)
+		if ( rel->tuples[i].flags == INMEM_HEAP_TUPLE_UPDATED)
 		{
 
 			if (Gp_role != GP_ROLE_EXECUTE)
@@ -335,13 +304,7 @@ serializeInMemCatalog(int * len)
 				 * base catalog base[i] is in OidInMemHeapMapping,
 				 * serialize it first and add to base catalog hash.
 				 */
-				if (entry->rel->relid == TableSpaceRelationId)
-				{
-					if (Gp_role == GP_ROLE_DISPATCH)
-						serializeTablespaceInfo(entry->rel, &str);
-				}
-				else
-					serializeInMemHeapTable(entry->rel, &str);
+				serializeInMemHeapTable(entry->rel, &str);
 
 				hash_search(baseHash, &base[i], HASH_ENTER, &found);
 				Assert(FALSE == found);
@@ -461,21 +424,11 @@ deserializeAndUpdateCatalog(const char * catalog, int size)
 			tuple = (HeapTuple) pq_getmsgbytes(&str, HEAPTUPLESIZE + tuplelen);
 			tuple->t_data = (HeapTupleHeader) ((char *) tuple + HEAPTUPLESIZE);
 
-			if (flags == INMEM_HEAP_TUPLE_DELETED)
-			{
-				simple_heap_delete(rel, &tuple->t_self);
-			}
-			else if (flags == INMEM_HEAP_TUPLE_UPDATED)
-			{
-				simple_heap_update(rel, &tuple->t_self, tuple);
-				CatalogUpdateIndexes(rel, tuple);
-			}
-			else
-			{
-				Assert(flags == INMEM_HEAP_TUPLE_ADDED);
-				simple_heap_insert(rel, tuple);
-				CatalogUpdateIndexes(rel, tuple);
-			}
+            if (flags == INMEM_HEAP_TUPLE_UPDATED)
+            {
+                simple_heap_update(rel, &tuple->t_self, tuple);
+                CatalogUpdateIndexes(rel, tuple);
+            }
 		}
 		heap_close(rel, RowExclusiveLock);
 	}
@@ -554,7 +507,7 @@ deserializeAndRebuildInmemCatalog(const char * catalog, int size)
 			Assert(tuple->t_len == tuplelen);
 			Assert(ItemPointerIsValid(&tuple->t_self));
 
-			InMemHeap_Insert(inmemrel, tuple, FALSE, contentid);
+			InMemHeap_Insert(inmemrel, tuple, contentid);
 		}
 	}
 }

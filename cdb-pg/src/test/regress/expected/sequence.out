@@ -120,11 +120,11 @@ CREATE TEMP TABLE t1 (
 NOTICE:  CREATE TABLE will create implicit sequence "t1_f1_seq" for serial column "t1.f1"
 -- Both drops should fail, but with different error messages:
 DROP SEQUENCE t1_f1_seq;
-NOTICE:  default for table t1 column f1 depends on sequence t1_f1_seq
+NOTICE:  default for append only table t1 column f1 depends on sequence t1_f1_seq
 ERROR:  cannot drop sequence t1_f1_seq because other objects depend on it
 HINT:  Use DROP ... CASCADE to drop the dependent objects too.
 DROP SEQUENCE myseq2;
-NOTICE:  default for table t1 column f2 depends on sequence myseq2
+NOTICE:  default for append only table t1 column f2 depends on sequence myseq2
 ERROR:  cannot drop sequence myseq2 because other objects depend on it
 HINT:  Use DROP ... CASCADE to drop the dependent objects too.
 -- This however will work:
@@ -166,10 +166,9 @@ SELECT nextval('sequence_test2');
 (1 row)
 
 -- Test comments
-COMMENT ON SEQUENCE asdf IS 'won''t work';
-ERROR:  relation "asdf" does not exist
-COMMENT ON SEQUENCE sequence_test2 IS 'will work';
-COMMENT ON SEQUENCE sequence_test2 IS NULL;
+-- COMMENT ON SEQUENCE asdf IS 'won''t work';
+-- COMMENT ON SEQUENCE sequence_test2 IS 'will work';
+-- COMMENT ON SEQUENCE sequence_test2 IS NULL;
 -- Test lastval()
 CREATE SEQUENCE seq;
 SELECT nextval('seq');
@@ -197,18 +196,13 @@ SELECT nextval('seq2');
 DROP SEQUENCE seq2;
 -- should fail
 --SELECT lastval();
-CREATE USER seq_user;
-BEGIN;
-SET LOCAL SESSION AUTHORIZATION seq_user;
-CREATE SEQUENCE seq3;
-SELECT nextval('seq3');
- nextval 
----------
-       1
-(1 row)
-
-REVOKE ALL ON seq3 FROM seq_user;
+-- CREATE USER seq_user;
+-- BEGIN;
+-- SET LOCAL SESSION AUTHORIZATION seq_user;
+-- CREATE SEQUENCE seq3;
+-- SELECT nextval('seq3');
+-- REVOKE ALL ON seq3 FROM seq_user;
 --SELECT lastval();
-ROLLBACK;
-DROP USER seq_user;
+-- ROLLBACK;
+-- DROP USER seq_user;
 DROP SEQUENCE seq;

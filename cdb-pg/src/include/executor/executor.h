@@ -380,7 +380,9 @@ extern void UnregisterExprContextCallback(ExprContext *econtext,
 extern ShareNodeEntry * ExecGetShareNodeEntry(EState *estate, int shareid, bool fCreate);
 
 /* ResultRelInfo and Append Only segment assignment */
-void ResultRelInfoSetSegno(ResultRelInfo *resultRelInfo, List *mapping);
+extern void ResultRelInfoSetSegno(ResultRelInfo *resultRelInfo, List *mapping);
+
+extern void CreateAppendOnlySegFileOnMaster(ResultRelInfo *resultRelInfo, List *mapping);
 
 /* Additions for MPP Slice table utilities defined in execUtils.c */
 extern GpExecIdentity getGpExecIdentity(QueryDesc *queryDesc,

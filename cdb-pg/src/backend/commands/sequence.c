@@ -383,8 +383,6 @@ DefineSequence(CreateSeqStmt *seq)
 	int			i;
 	NameData	name;
 
-	bool shouldDispatch =  Gp_role == GP_ROLE_DISPATCH && !IsBootstrapProcessingMode();
-
 	/* Check and set all option values */
 	init_params(seq->options, true, &new, &owned_by);
 
@@ -399,18 +397,6 @@ DefineSequence(CreateSeqStmt *seq)
 	stmt->oidInfo.aosegIndexOid = 0;
 	stmt->oidInfo.aoblkdirOid = 0;
 	stmt->oidInfo.aoblkdirIndexOid = 0;
-
-	if (shouldDispatch)
-	{
-
-			/* stmt->relOid = newOid(); */
-	}
-	else if (Gp_role == GP_ROLE_EXECUTE)
-	{
-
-			stmt->oidInfo.relOid = seq->relOid;
-
-	}
 	stmt->tableElts = NIL;
 	for (i = SEQ_COL_FIRSTCOL; i <= SEQ_COL_LASTCOL; i++)
 	{
@@ -627,14 +613,7 @@ DefineSequence(CreateSeqStmt *seq)
 		process_owned_by(rel, owned_by);
 
 	heap_close(rel, NoLock);
-
 	
-	/* Dispatch to segments */
-	if (shouldDispatch)
-	{
-		seq->comptypeOid = stmt->oidInfo.comptypeOid;
-		CdbDispatchUtilityStatement((Node *)seq, "DefineSequence");
-	}
 }
 
 /*
@@ -786,21 +765,18 @@ AlterSequence(AlterSeqStmt *stmt)
 
 	}
 
-	if (Gp_role == GP_ROLE_DISPATCH)
+	Assert (Gp_role == GP_ROLE_DISPATCH);
+
+	if (!bSeqIsTemp)
 	{
-		CdbDispatchUtilityStatement((Node *)stmt, "AlterSequence");
-
-		if (!bSeqIsTemp)
-		{
-			/* MPP-6929: metadata tracking */
-			MetaTrackUpdObject(RelationRelationId,
-							   relid,
-							   GetUserId(),
-							   "ALTER", alter_subtype
-					);
-		}
-
+		/* MPP-6929: metadata tracking */
+		MetaTrackUpdObject(RelationRelationId,
+						   relid,
+						   GetUserId(),
+						   "ALTER", alter_subtype
+				);
 	}
+
 }
 
 
@@ -1852,6 +1828,10 @@ cdb_sequence_relation_init(Relation seqrel,
     seqrel->rd_id = relid;
     seqrel->rd_istemp = istemp;
 
+    seqrel->rd_segfile0_relationnodeinfos =
+			palloc0(sizeof(struct RelationNodeInfo));
+    seqrel->rd_segfile0_count = 1;
+
     /* Must use shared buffer pool so seqserver & QDs can see the data. */
     seqrel->rd_isLocalBuf = false;
 
@@ -1872,6 +1852,9 @@ cdb_sequence_relation_term(Relation seqrel)
 {
     /* Close the file. */
     RelationCloseSmgr(seqrel);
+
+    if (seqrel->rd_segfile0_relationnodeinfos)
+    	pfree(seqrel->rd_segfile0_relationnodeinfos);
 
     if (seqrel->rd_rel)
         pfree(seqrel->rd_rel);

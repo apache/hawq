@@ -4,7 +4,7 @@
 '''
 gpssh-exkeys -- exchange ssh public keys among friends
 
-Usage: gpssh-exkeys [--version] [-?v] 
+Usage: gpssh-exkeys [--version] [-?v][-p] 
                     { -f hostfile |
                       -h host ... |
                       -e hostfile -x hostfile }
@@ -12,6 +12,7 @@ Usage: gpssh-exkeys [--version] [-?v]
              --version     : print version information
              -?            : print this help screen
              -v            : verbose mode
+             -p password   : the password used to connect to hosts
              -h host       : the new host to connect to (multiple -h is okay)
              -f hostfile   : a file listing all new hosts to connect to
              -e hostfile   : a file listing all existing hosts for expansion
@@ -322,7 +323,7 @@ class Host:
 def parseCommandLine():
     global opt
     try:
-        (options, args) = getopt.getopt(sys.argv[1:], '?vh:f:x:e:', ['version'])
+        (options, args) = getopt.getopt(sys.argv[1:], '?vh:p:f:x:e:', ['version'])
     except Exception, e:
         usage('[ERROR] ' + str(e))
 
@@ -331,6 +332,7 @@ def parseCommandLine():
         elif (switch == '-v'):        GV.opt[switch] = True
         elif (switch[1] in ['f', 'x', 'e']):      GV.opt[switch] = val
         elif (switch == '-h'):        GV.opt[switch].append(val)
+        elif (switch == '-p'):        GV.passwd.append(val)
         elif (switch == '--version'): print_version()
 
     if not (len(GV.opt['-h']) or GV.opt['-f'] or GV.opt['-x'] or GV.opt['-e']):

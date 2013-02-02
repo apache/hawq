@@ -1688,7 +1688,7 @@ AssignGangs(QueryDesc *queryDesc, int utility_segment_index)
 			}
 			else
 			{
-				inv.vecNgangs[i] = allocateGang(GANGTYPE_PRIMARY_READER, getgpsegmentCount(), 0, queryDesc->portal_name);
+				inv.vecNgangs[i] = allocateGang(GANGTYPE_PRIMARY_READER, getgpsegmentCount(), GpAliveSegmentsInfo.singleton_segindex, queryDesc->portal_name);
 			}
 		}
 	}
@@ -2479,8 +2479,10 @@ collectAndUpdateCatalog(CdbDispatchResults * primaryResults, void *ctx)
 
 		if (dispatchResult->serializedCatalog != NULL
 				&& dispatchResult->serializedCatalogLen > 0)
+		{
 			deserializeAndUpdateCatalog(dispatchResult->serializedCatalog,
-
-					dispatchResult->serializedCatalogLen);
+										dispatchResult->serializedCatalogLen);
+		}
+		dispatchResult->serializedCatalogLen = 0;
 	}
 }

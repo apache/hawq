@@ -680,6 +680,10 @@ CreateFileSpace(CreateFileSpaceStmt *stmt)
 	{
 		FileSpaceEntry *fse  = (FileSpaceEntry*) lfirst(cell);
 
+		/* Standby will create filespace dir in xlog_mm.c */
+		if (fse->dbid == GpStandbyDbid)
+			continue;
+
 		MirroredFileSysObj_TransactionCreateFilespaceDir(
 			fsoid, 
 			fse->dbid, fse->location, 0, NULL,
@@ -1426,7 +1430,8 @@ SharedStoragePathCheck(CreateFileSpaceStmt *stmt)
 				/*
 				 * It is better to call function in fts.c, but it is easy to use this information.
 				 */
-				hasMirror = true;
+                if (elem->primary->contentid != MASTER_CONTENT_ID)
+					hasMirror = true;
 			}
 			else
 			{
@@ -1596,6 +1601,7 @@ get_filespace_contentids(Oid filespace)
 							  1,
 							  key);
 
+	/* Skip the standby master, standby will create local file by itself. */
 	while ((tup = systable_getnext(scan)) != NULL)
 	{
 		Datum	d;
@@ -1603,6 +1609,9 @@ get_filespace_contentids(Oid filespace)
 
 		d = heap_getattr(tup, Anum_pg_filespace_entry_fsedbid, RelationGetDescr(rel), &isNull);
 		Assert(isNull == false);
+
+		if (DatumGetInt32(d) == master_standby_dbid())
+			continue;
 		db_ids = lappend_int(db_ids, DatumGetInt32(d));
 	}
 

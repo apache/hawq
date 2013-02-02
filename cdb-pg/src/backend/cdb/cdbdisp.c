@@ -32,6 +32,7 @@
 #include "nodes/makefuncs.h"
 #include "utils/datum.h"
 #include "utils/guc.h"
+#include "utils/faultinjector.h"
 #include "executor/executor.h"
 #include "optimizer/clauses.h"
 #include "optimizer/planmain.h"
@@ -611,6 +612,25 @@ cdbdisp_dispatchToGang(struct CdbDispatcherState *ds,
 
 		Assert(segdbDesc != NULL);
 
+#ifdef FAULT_INJECTOR
+		int faultType = FaultInjector_InjectFaultIfSet(
+							DispatchToGangThreadStructureInitialization,
+							DDLNotSpecified,
+							"",	//databaseName
+							""); // tableName
+
+		if(faultType == FaultInjectorTypeUserCancel)
+		{
+			QueryCancelPending = true;
+			InterruptPending = true;
+		}
+		if(faultType == FaultInjectorTypeProcDie)
+		{
+			ProcDiePending = true;
+			InterruptPending = true;
+		}
+#endif
+
 		if (disp_direct->directed_dispatch)
 		{
 			Assert (disp_direct->count == 1); /* currently we allow direct-to-one dispatch, only */
@@ -681,7 +701,7 @@ cdbdisp_dispatchToGang(struct CdbDispatcherState *ds,
 		DispatchCommandParms *pParms = &(ds->dispatchThreads->dispatchCommandParmsAr + ds->dispatchThreads->threadCount)[i];
 		
 		Assert(pParms != NULL);
-		
+
 	    if (gp_connections_per_thread==0)
 	    {
 	    	Assert(newThreads <= 1);
@@ -693,6 +713,34 @@ cdbdisp_dispatchToGang(struct CdbDispatcherState *ds,
 
 			pParms->thread_valid = true;
 			pthread_err = gp_pthread_create(&pParms->thread, thread_DispatchCommand, pParms, "dispatchToGang");
+
+
+			/*
+			 * If defined FAULT_INJECTOR, and injected fault is create thread failure, set pthread_err to -1,
+			 * to trigger thread join process
+			 */
+#ifdef FAULT_INJECTOR
+			int faultType = FaultInjector_InjectFaultIfSet(
+					DispatchThreadCreation,
+					DDLNotSpecified,
+					"",	//databaseName
+					""); // tableName
+
+			if(faultType == FaultInjectorTypeCreateThreadFail)
+			{
+				pthread_err = -1;
+			}
+			if(faultType == FaultInjectorTypeUserCancel)
+			{
+				QueryCancelPending = true;
+				InterruptPending = true;
+			}
+			if(faultType == FaultInjectorTypeProcDie)
+			{
+				ProcDiePending = true;
+				InterruptPending = true;
+			}
+#endif
 
 			if (pthread_err != 0)
 			{
@@ -863,17 +911,6 @@ addSegDBToDispatchThreadPool(DispatchCommandParms  *ParmsAr,
 					pParms->queryParms.seqServerPort = pQueryParms->seqServerPort;
 				}
 				
-				if (pQueryParms->serializedCatalog == NULL || pQueryParms->serializedCataloglen == 0)
-				{
-					pParms->queryParms.serializedCatalog = NULL;
-					pParms->queryParms.serializedCataloglen = 0;
-				}
-				else
-				{
-					pParms->queryParms.serializedCatalog = pQueryParms->serializedCatalog;
-					pParms->queryParms.serializedCataloglen = pQueryParms->serializedCataloglen;
-				}
-
 				pParms->queryParms.primary_gang_id = pQueryParms->primary_gang_id;
 			}
 			break;
@@ -1420,10 +1457,6 @@ cdbdisp_dispatchCommand(const char                 *strCommand,
 	queryParms.seqServerHostlen = strlen(qdinfo->hostip) + 1;
 	queryParms.seqServerPort = seqServerCtl->seqServerPort;
 
-	/* TODO add serialized catalog for dispatch */
-	queryParms.serializedCatalog = NULL;
-	queryParms.serializedCataloglen = 0;
-
 	/*
 	 * Dispatch the command.
 	 */
@@ -1717,7 +1750,6 @@ thread_DispatchOut(DispatchCommandParms *pParms)
 				pQueryParms->serializedParams, pQueryParms->serializedParamslen, 
 				pQueryParms->serializedSliceInfo, pQueryParms->serializedSliceInfolen, 
 				pQueryParms->serializedDtxContextInfo, pQueryParms->serializedDtxContextInfolen, 
-				pQueryParms->serializedCatalog, pQueryParms->serializedCataloglen,
 				0 /* unused flags*/, pParms->cmdID, pParms->localSlice, pQueryParms->rootIdx,
 				pQueryParms->seqServerHost, pQueryParms->seqServerHostlen, pQueryParms->seqServerPort,
 				pQueryParms->primary_gang_id,
@@ -2046,6 +2078,31 @@ thread_DispatchWait(DispatchCommandParms		*pParms)
 
 		/* Block here until input is available. */
 		n = select(max_sock + 1, (fd_set *)&pParms->mask, NULL, NULL, &tv);
+
+		/* Inject fault for select result */
+#ifdef FAULT_INJECTOR
+		int faultType = FaultInjector_InjectFaultIfSet(
+							DispatchWait,
+							DDLNotSpecified,
+							"",	//databaseName
+							""); // tableName
+
+		if(faultType == FaultInjectorTypeDispatchError)
+		{
+			write_log("fault injected on dispatch wait, fault identifier is DispatchWait, and fault "
+					"type is FaultInjectorDispatchError");
+			n = -1;
+		}
+		else if(faultType == FaultInjectorTypeTimeOut)
+		{
+			write_log("fault injected on dispatch wait, fault identifier is DispatchWait, and fault "
+								"type is FaultInjectorTypeTimeOut");
+			n = 0;
+		}
+/* #else */
+		/* Block here until input is available. */
+/*		n = select(max_sock + 1, (fd_set *)&pParms->mask, NULL, NULL, &tv); */
+#endif
 
 		if (n < 0)
 		{
@@ -3542,8 +3599,6 @@ cdbdisp_dispatchX(DispatchCommandQueryParms *pQueryParms,
 				if (primaryGang != NULL)
 					Assert(primaryGang->type == slice->gangType || primaryGang->type == GANGTYPE_PRIMARY_WRITER);
 
-				if (primaryGang == NULL)
-					continue;
 			}
 
 			if (slice->directDispatch.isDirectDispatch)
@@ -3592,6 +3647,25 @@ cdbdisp_dispatchX(DispatchCommandQueryParms *pQueryParms,
 		{
 			Assert(ds->primaryResults && ds->primaryResults->resultArray);
 		}
+
+#ifdef FAULT_INJECTOR
+		int faultType = FaultInjector_InjectFaultIfSet(
+							BeforeDispatch,
+							DDLNotSpecified,
+							"",	//databaseName
+							""); // tableName
+
+		if(faultType == FaultInjectorTypeUserCancel)
+		{
+			QueryCancelPending = true;
+			InterruptPending = true;
+		}
+		if(faultType == FaultInjectorTypeProcDie)
+		{
+			ProcDiePending = true;
+			InterruptPending = true;
+		}
+#endif
 
 		/* Bail out if already got an error or cancellation request. */
 		if (cancelOnError)
@@ -3735,13 +3809,11 @@ cdbdisp_dispatchPlan(struct QueryDesc *queryDesc,
 {
 	char 	*splan,
 		*ssliceinfo,
-		*sparams,
-		*scatalog;
+		*sparams;
 
 	int 	splan_len,
 		ssliceinfo_len,
-		sparams_len,
-		scatalog_len;
+		sparams_len;
 
 	SliceTable *sliceTbl;
 	int			rootIdx;
@@ -3859,8 +3931,6 @@ cdbdisp_dispatchPlan(struct QueryDesc *queryDesc,
 
 	Assert(splan != NULL && splan_len > 0);
 
-	scatalog = serializeInMemCatalog(&scatalog_len);
-
 	/*
 	*/
 	if (queryDesc->params != NULL && queryDesc->params->numParams > 0)
@@ -3941,8 +4011,6 @@ cdbdisp_dispatchPlan(struct QueryDesc *queryDesc,
 	queryParms.serializedParamslen = sparams_len;
 	queryParms.serializedSliceInfo = ssliceinfo;
 	queryParms.serializedSliceInfolen= ssliceinfo_len;
-	queryParms.serializedCatalog = scatalog;
-	queryParms.serializedCataloglen = scatalog_len;
 	queryParms.rootIdx = rootIdx;
 
 	/* sequence server info */
@@ -4409,7 +4477,7 @@ cdbdisp_makeDispatchThreads(int paramCount)
 
 	dThreads->dispatchCommandParmsAr =
 		(DispatchCommandParms *)palloc0(paramCount * sizeof(DispatchCommandParms));
-	
+
 	dThreads->dispatchCommandParmsArSize = paramCount;
 
     dThreads->threadCount = 0;
@@ -4496,13 +4564,6 @@ cdbdisp_destroyDispatchThreads(CdbDispatchCmdThreads *dThreads)
 					if (i==0)
 						pfree(pQueryParms->serializedParams);
 					pQueryParms->serializedParams = NULL;
-				}
-
-				if (pQueryParms->serializedCatalog)
-				{
-					if (i == 0)
-						pfree(pQueryParms->serializedCatalog);
-					pQueryParms->serializedCatalog = NULL;
 				}
 			}
 			break;

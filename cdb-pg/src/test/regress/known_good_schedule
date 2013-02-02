@@ -1,9 +1,10 @@
 # $PostgreSQL: pgsql/src/test/regress/serial_schedule,v 1.33 2006/08/30 23:34:22 tgl Exp $
 # This should probably be in an order similar to parallel_schedule.
+test: querycontext
 ignore: goh_create_function_1
 ignore: goh_create_type
 ignore: goh_create_table
-ignore: goh_copy
+test: goh_copy
 ignore: goh_create_aggregate
 ignore: goh_vacuum
 ignore: goh_subselect
@@ -17,7 +18,7 @@ test: goh_toast
 ignore: goh_alter_distribution_policy
 ignore: goh_column_compression
 test: goh_database
-test: goh_gp_dist_random
+ignore: gpsql_fault_tolerance
 test: boolean
 test: char
 test: name
@@ -125,7 +126,7 @@ ignore: without_oid
 ignore: conversion
 ignore: truncate
 ignore: alter_table
-ignore: sequence
+test: sequence
 ignore: polymorphism
 ignore: rowtypes
 ignore: returning
@@ -137,7 +138,7 @@ ignore: gphdfs
 ignore: custom_format
 ignore: resource_queue
 ignore: gptokencheck
-ignore: gpcopy
+test: gpcopy
 ignore: sreh
 ignore: olap_setup
 ignore: olap_group
@@ -178,6 +179,7 @@ ignore: filespace
 ignore: orafunk
 ignore: icudp_no_fault_injection
 ignore: icudp_full
+ignore: gpcheckmirrorseg
 ignore: trig
 ignore: xml
 ignore: auth_constraint
@@ -189,12 +191,17 @@ ignore: plpgsql_cache
 ignore: percentile
 ignore: resource_queue_function
 ignore: co_nestloop_idxscan
-#
-# gpcheckmirrorseg should be last to check mirror integrity
-#
-ignore: gpcheckmirrorseg
-# end of tests
 # the following test needs some special filespace/tablespace.
 ignore: goh_tablespace
 ignore: hdfs_filesystem
-
+test: madlib_array_ops
+test: madlib_svec_test
+test: madlib_chi2_test
+test: madlib_sample
+test: madlib_linalg
+test: madlib_assoc_rules
+test: madlib_linear
+test: madlib_newplda
+test: madlib_logistic
+test: madlib_multilogistic
+test: madlib_kmeans

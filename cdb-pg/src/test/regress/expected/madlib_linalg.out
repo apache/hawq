@@ -1,0 +1,243 @@
+SET client_min_messages TO ERROR;
+DROP SCHEMA IF EXISTS madlib_install_check_gpsql_linalg CASCADE;
+CREATE SCHEMA madlib_install_check_gpsql_linalg;
+SET search_path = madlib_install_check_gpsql_linalg, madlib;
+SELECT assert(
+    relative_error(
+        norm2(ARRAY[-1.2, 0,  10,    5,    3,    9]),
+        sqrt(        1.2^2  + 10^2 + 5^2 + 3^2 + 9^2)
+    ) < 1e-5,
+    'Incorrect 2-norm'
+);
+ assert 
+--------
+ 
+(1 row)
+
+SELECT assert(
+    relative_error(
+        norm1(ARRAY[-1.2, 0,  10,  5,  3,  9]),
+        (            1.2    + 10 + 5 + 3 + 9)
+    ) < 1e-5,
+    'Incorrect 1-norm'
+);
+ assert 
+--------
+ 
+(1 row)
+
+SELECT assert(
+    relative_error(
+        dist_norm1(
+            ARRAY[-1.2,  0,  10,  5, 3,   9],
+            ARRAY[10.1, 43, 5.2, 13, 3, -10]),
+        (10.1 + 1.2) + 43 + (10 - 5.2) + (13 - 5) + (9 + 10)
+    ) < 1e-5,
+    'Incorrect distance w.r.t. 1-norm'
+);
+ assert 
+--------
+ 
+(1 row)
+
+SELECT assert(
+    relative_error(
+        dist_norm2(
+            ARRAY[-1.2,  0,  10,  5, 3,   9],
+            ARRAY[10.1, 43, 5.2, 13, 3, -10]),
+        sqrt((10.1 + 1.2)^2 + 43^2 + (10 - 5.2)^2 + (13 - 5)^2 + (9 + 10)^2)
+    ) < 1e-5,
+    'Incorrect distance w.r.t. 2-norm'
+);
+ assert 
+--------
+ 
+(1 row)
+
+SELECT assert(
+    relative_error(
+        squared_dist_norm2(
+            ARRAY[-1.2,  0,  10,  5, 3,   9],
+            ARRAY[10.1, 43, 5.2, 13, 3, -10]),
+        (10.1 + 1.2)^2 + 43^2 + (10 - 5.2)^2 + (13 - 5)^2 + (9 + 10)^2
+    ) < 1e-5,
+    'Incorrect squared distance w.r.t. 2-norm'
+);
+ assert 
+--------
+ 
+(1 row)
+
+SELECT assert(
+    relative_error(
+        dist_angle(x, y),
+        acos(
+            ((10.1 * -1.2) + (10 * 5.2) + (13 * 5) + (3 * 3) + (9 * -10)) /
+            (norm2(x) * norm2(y))
+        )
+    ) < 1e-5,
+    'Incorrect angle'
+) FROM (
+    SELECT ARRAY[-1.2,  0,  10,  5, 3,   9] AS x,
+           ARRAY[10.1, 43, 5.2, 13, 3, -10] AS y
+) AS ignored;
+ assert 
+--------
+ 
+(1 row)
+
+SELECT assert(
+    relative_error(
+        dist_tanimoto(x, y),
+        (
+            1. - dot / (norm2(x)^2 + norm2(y)^2 - dot)
+        )
+    ) < 1e-5,
+    'Incorrect Tanimoto distance'
+) FROM (
+    SELECT ARRAY[-1.2,  0,  10,  5, 3,   9] AS x,
+           ARRAY[10.1, 43, 5.2, 13, 3, -10] AS y,
+           ((10.1 * -1.2) + (10 * 5.2) + (13 * 5) + (3 * 3) + (9 * -10)) AS dot
+) AS ignored;
+ assert 
+--------
+ 
+(1 row)
+
+SELECT assert(
+    dist1 = dist2 AND dist2 = dist3,
+        'Incorrect closest column.'
+) FROM (
+    SELECT
+        squared_dist_norm2(matrix[column_id + lb:column_id + lb], x) AS dist1,
+        distance AS dist2,
+        least AS dist3,
+        *
+    FROM (
+        SELECT
+            (closest_column(matrix, x, 'squared_dist_norm2')).*,
+            least(
+                squared_dist_norm2(a, x),
+                squared_dist_norm2(b, x),
+                squared_dist_norm2(c, x),
+                squared_dist_norm2(d, x)
+            ),
+            array_lower(matrix, 2) AS lb,
+            *
+        FROM (
+            SELECT
+                ARRAY[a, b, c, d] AS matrix,
+                *
+            FROM (
+                SELECT
+                    ARRAY[ 1.2,  4.5, -1.6,  9.2, 100.3, 34.3] AS a,
+                    ARRAY[-3.1, -5.4,  6.2, 10.2,  59.2, -8.2] AS b,
+                    ARRAY[42  , 32  ,  3.1,  8.1,  24.3, 10.3] AS c,
+                    ARRAY[-5.1, 12.2,  3.9, -6.4,  39.9, -4.9] AS d,
+                    ARRAY[1.2, 5, 6.4, -5, 56, 0] AS x
+            ) AS ignored
+        ) AS ignored
+    ) AS ignored
+) AS ignored;
+ assert 
+--------
+ 
+(1 row)
+
+SELECT
+    closest_columns(
+        ARRAY[
+            ARRAY[0,0],
+            ARRAY[0,1],
+            ARRAY[1,0],
+            ARRAY[0,1]
+        ]::DOUBLE PRECISION[][],
+        ARRAY[.5,.5]::DOUBLE PRECISION[],
+        2::INTEGER,
+        'squared_dist_norm2'
+    );
+    closest_columns    
+-----------------------
+ ("{0,1}","{0.5,0.5}")
+(1 row)
+
+/* All values in the following test are exact sums of powers of 2, so
+ * floating-point arithmetic needs to be exact. */
+SELECT assert(
+    (c1).column_ids = ARRAY[0,1]::INTEGER[] AND
+    (c1).distances = ARRAY[0.5,0.5]::DOUBLE PRECISION[] AND
+    (c2).column_ids = ARRAY[0,1]::INTEGER[] AND
+    (c2).distances = ARRAY[0.125,0.625]::DOUBLE PRECISION[] AND
+    (c3).column_ids = ARRAY[1,0]::INTEGER[] AND
+    (c3).distances = ARRAY[0.125,0.625]::DOUBLE PRECISION[] AND
+    (c4).column_ids = ARRAY[3,0]::INTEGER[] AND
+    (c4).distances = ARRAY[0.125,0.625]::DOUBLE PRECISION[] AND
+    (c5).column_ids = ARRAY[0,3]::INTEGER[] AND
+    (c5).distances = ARRAY[0.3125,0.3125]::DOUBLE PRECISION[],
+    'Incorrect closest columns.')
+FROM (
+    SELECT
+        closest_columns(matrix, ARRAY[.5,.5]::DOUBLE PRECISION[], num, metric) AS c1,
+        closest_columns(matrix, ARRAY[.25,.25]::DOUBLE PRECISION[], num, metric) AS c2,
+        closest_columns(matrix, ARRAY[.75,.25]::DOUBLE PRECISION[], num, metric) AS c3,
+        closest_columns(matrix, ARRAY[.25,.75]::DOUBLE PRECISION[], num, metric) AS c4,
+        closest_columns(matrix, ARRAY[.25,.5]::DOUBLE PRECISION[], num, metric) AS c5
+    FROM (
+        SELECT
+            ARRAY[
+                ARRAY[0,0],
+                ARRAY[1,0],
+                ARRAY[1,1],
+                ARRAY[0,1]
+            ]::DOUBLE PRECISION[][] AS matrix,
+            2 AS num,
+            'squared_dist_norm2'::REGPROC AS metric
+    ) AS ignored
+) AS ignored;
+ assert 
+--------
+ 
+(1 row)
+
+CREATE TABLE some_vectors (
+    id SERIAL,
+    x FLOAT8[]
+);
+INSERT INTO some_vectors(x) VALUES
+(ARRAY[1,0,0,0]),
+(ARRAY[0,1,0,0]),
+(ARRAY[0,0,1,0]),
+(ARRAY[0,0,0,2]);
+SELECT assert(
+    relative_error(avg(x), ARRAY[1./4., 1./4., 1./4., 2./4.]) < 1e-5,
+    'Incorrect average of vectors'
+)
+FROM some_vectors;
+ assert 
+--------
+ 
+(1 row)
+
+SELECT assert(
+    relative_error(normalized_avg(x), ARRAY[1./2., 1./2., 1./2., 1./2.]) < 1e-5,
+    'Incorrect normalized average of vectors'
+)
+FROM some_vectors;
+ assert 
+--------
+ 
+(1 row)
+
+SELECT assert(
+    madlib.matrix_column(matrix, 0) = ARRAY[1,2]::DOUBLE PRECISION[] AND
+    madlib.matrix_column(matrix, 1) = ARRAY[3,4]::DOUBLE PRECISION[],
+    'Vector returned does not match column in matrix.')
+FROM (
+    SELECT ARRAY[ARRAY[1,2],ARRAY[3,4]]::DOUBLE PRECISION[][] AS matrix
+) ignored;
+ assert 
+--------
+ 
+(1 row)
+
+DROP SCHEMA madlib_install_check_gpsql_linalg CASCADE;

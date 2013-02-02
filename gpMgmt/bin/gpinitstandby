@@ -271,9 +271,9 @@ def getDbUrlForInitStandby():
     """
 
     #
-    # use template1 to avoid using PGDATABASE value (which definitely won't work during initsystem)
+    # use template0 to avoid using PGDATABASE value (which definitely won't work during initsystem)
     #
-    return dbconn.DbURL(dbname="template1")
+    return dbconn.DbURL(dbname="template0")
 
 #-------------------------------------------------------------------------
 def start_database():
@@ -594,13 +594,17 @@ def validate_standby_init(options, array, standby_filespace_map):
     # make sure we have top level dirs
     for fs_name, fs_dir in standby_filespace_map:
         base_dir = os.path.dirname(os.path.normpath(fs_dir))
+        # create the default dfs dir for standby
+        if fs_name == 'dfs_system':
+            unix.MakeDirectory.remote('make dir for "dfs_system"', options.standby_host, base_dir)
+
         if not unix.FileDirExists.remote('check for filespace dir',
                                          options.standby_host,
                                          base_dir):
             logger.error('Parent directory %s does not exist on host %s' %(base_dir, options.standby_host))
             logger.error('This directory must be created before running gpactivatestandby')
             raise GpInitStandbyException('Parent directory %s does not exist' % base_dir)
-        
+
         # check that master data dir does not exist on new host unless we are just re-syncing
         logger.info('Checking for filespace directory %s on %s' % (fs_dir, options.standby_host))
         if not options.no_update and unix.FileDirExists.remote('check for filespace dir', options.standby_host,
@@ -983,8 +987,6 @@ try:
     # setup logging
     logger = get_default_logger()
     setup_tool_logging(EXECNAME,unix.getLocalHostname(),unix.getUserName())
-    logger.fatal("gpinitstandby NOT SUPPORTED YET IN GPSQL")
-    sys.exit(2)
 
     (options, args) = parseargs()
 

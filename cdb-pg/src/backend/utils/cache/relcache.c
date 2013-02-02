@@ -746,7 +746,7 @@ AllocateRelationDesc(Form_pg_class relp)
 	 */
 	if (!IsBootstrapProcessingMode() && Gp_role == GP_ROLE_DISPATCH)
 	{
-		relation->rd_segfile0_count = GpIdentity.numsegments + 1;
+		relation->rd_segfile0_count = GetTotalSegmentsNumber() + 1;
 	} else
 	{
 		relation->rd_segfile0_count = 1;
@@ -1805,7 +1805,7 @@ formrdesc(const char *relationName, Oid relationReltype,
 	 */
 	if (!IsBootstrapProcessingMode() && Gp_role == GP_ROLE_DISPATCH)
 	{
-		relation->rd_segfile0_count = GpIdentity.numsegments + 1;
+		relation->rd_segfile0_count = GetTotalSegmentsNumber() + 1;
 	} else
 	{
 		relation->rd_segfile0_count = 1;
@@ -2567,7 +2567,11 @@ AtEOXact_RelationCache(bool isCommit)
 	 * MPP-3333: READERS need to *always* scan, otherwise they will not be able
 	 * to maintain a coherent view of the storage layer.
 	 */
-	if (!need_eoxact_work &&
+
+	/*
+	 * in gpsql, QE should always cleanup the relcache.
+	 */
+	if (Gp_role != GP_ROLE_EXECUTE && !need_eoxact_work &&
 		DistributedTransactionContext != DTX_CONTEXT_QE_READER
 #ifdef USE_ASSERT_CHECKING
 		&& !assert_enabled
@@ -2863,7 +2867,7 @@ RelationBuildLocalRelation(const char *relname,
 	 */
 	if (!IsBootstrapProcessingMode() && Gp_role == GP_ROLE_DISPATCH)
 	{
-		rel->rd_segfile0_count = GpIdentity.numsegments + 1;
+		rel->rd_segfile0_count = GetTotalSegmentsNumber() + 1;
 	} else
 	{
 		rel->rd_segfile0_count = 1;
@@ -3945,7 +3949,7 @@ load_relcache_init_file(void)
 			rel->rd_segfile0_count = 1;
 		}
 		else
-			rel->rd_segfile0_count = 1 + GpIdentity.numsegments;
+			rel->rd_segfile0_count = 1 + GetTotalSegmentsNumber();
 
 		rel->rd_segfile0_relationnodeinfos =
 				palloc0(rel->rd_segfile0_count * sizeof(struct RelationNodeInfo));

@@ -148,56 +148,6 @@ typedef struct VRelStats
 	VTupleLink	vtlinks;
 } VRelStats;
 
-typedef struct VacuumStatsContext
-{
-	MemoryContext ctx;
-	Relation onerel;
-	List *updated_stats;
-	VacAttrStats **vac_stats;
-} VacuumStatsContext;
-
-typedef enum VacuumStatsType
-{
-	PG_CLASS_STATS,
-	PG_STATISTIC_STATS
-} VacuumStatsType;
-
-/*
- * VUpdatedStats represents the base structure for the stats info for
- * both pg_class and pg_statistic. This is used to store the stats collected from
- * QE.
- *
- * Depending on the value for 'type', the object represents either VPgClassStats
- * or VPgStatisticStats.
- */
-typedef struct VUpdatedStats
-{
-	VacuumStatsType type;
-	Oid relid;
-} VUpdatedStats;
-
-typedef struct VPgClassStats
-{
-	VUpdatedStats metadata;
-	BlockNumber rel_pages;
-	double rel_tuples;
-} VPgClassStats;
-
-typedef struct VPgStatisticStats
-{
-	VUpdatedStats metadata;
-	
-	/* Represent tuples in pg_statistic table from QEs */
-	List *tuples;
-
-	/* The number of tuples corresponding each tuple in 'tuples'.  */
-	List *reltuples;
-
-	/* The corresponing attribute index */
-	int16 attno;
-	PgStatistic pgstat;
-} VPgStatisticStats;
-
 /* GUC parameters */
 extern PGDLLIMPORT int default_statistics_target; /* PGDLLIMPORT for PostGIS */
 extern PGDLLIMPORT double analyze_relative_error;

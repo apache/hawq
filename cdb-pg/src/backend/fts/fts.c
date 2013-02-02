@@ -679,21 +679,37 @@ probePublishUpdate(uint8 *probe_results)
 
 		if (failover_strategy == 'n')
 		{
+			uint8 statusOld = ftsProbeInfo->fts_status[segInfo->dbid];
+
 			Assert(SEGMENT_IS_ACTIVE_PRIMARY(segInfo));
-			Assert(FTS_STATUS_ISALIVE(segInfo->dbid, ftsProbeInfo->fts_status));
 			Assert(mirror == NULL);
 
 			/* no mirror available to failover */
-			if (!PROBE_IS_ALIVE(segInfo))
+			if (!PROBE_IS_ALIVE(segInfo) && (statusOld & FTS_STATUS_ALIVE))
 			{
 				FtsSegmentStatusChange changes;
-				uint8 statusOld = ftsProbeInfo->fts_status[segInfo->dbid];
 				uint8 statusNew = statusOld & ~FTS_STATUS_ALIVE;
 
 				buildSegmentStateChange(segInfo, &changes, statusNew);
 
+				/* GPSQL can mark the segment down. */
+				updateConfiguration(&changes, 1);
 				FtsFailoverNull(&changes);
+				update_found = true;
 			}
+			else if (PROBE_IS_ALIVE(segInfo) && ~(statusOld | ~FTS_STATUS_ALIVE))
+			{
+				FtsSegmentStatusChange changes;
+				uint8 statusNew = statusOld | FTS_STATUS_ALIVE;
+
+				buildSegmentStateChange(segInfo, &changes, statusNew);
+
+				/* The segment is back online. */
+				updateConfiguration(&changes, 1);
+				FtsFailoverNull(&changes);
+				update_found = true;
+			}
+
 			continue;
 		}
 
@@ -968,8 +984,6 @@ probeUpdateConfig(PGconn *entryConn, FtsSegmentStatusChange *changes, int change
 			Assert(failover_strategy == 'f');
 			Assert(primary && valid);
 		}
-
-		Assert((valid || !primary) && "Primary cannot be down");
 
 		/*
 		 * Log change to segment configuration

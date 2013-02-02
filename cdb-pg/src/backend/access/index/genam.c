@@ -205,9 +205,9 @@ systable_beginscan(Relation heapRelation,
 		sysscan->inmemscan = NULL;
 
 	if (inmemonly && NULL == sysscan->inmemscan)
-			elog(ERROR, "initialize an in-memory only system catalog scan of %s "
-					"but in-memory table cannot be found.",
-					heapRelation->rd_rel->relname.data);
+		elog(ERROR, "initialize an in-memory only system catalog scan of %s relid %u "
+			"but in-memory table cannot be found.",
+			heapRelation->rd_rel->relname.data, heapRelation->rd_id);
 
 	if (inmemonly || sysscan->inmemscan)
 		return sysscan;
@@ -265,7 +265,7 @@ systable_getnext(SysScanDesc sysscan)
 	HeapTuple	htup;
 
 	if (sysscan->inmemscan && Gp_role == GP_ROLE_EXECUTE)
-		htup = InMemHeap_GetNext(sysscan->inmemscan, ForwardScanDirection);
+		htup = InMemHeap_GetNext(sysscan->inmemscan);
 	else if (sysscan->irel)
 		htup = index_getnext(sysscan->iscan, ForwardScanDirection);
 	else
@@ -277,9 +277,11 @@ systable_getnext(SysScanDesc sysscan)
 HeapTuple
 systable_getprev(SysScanDesc sysscan)
 {
-	HeapTuple	htup;
+	HeapTuple	htup = NULL;
 	if (sysscan->inmemscan && Gp_role == GP_ROLE_EXECUTE)
-		htup = InMemHeap_GetNext(sysscan->inmemscan, BackwardScanDirection);
+	{
+		elog(ERROR, "in gpsql, systable_getprev() is not allowed on segments");
+	}
 	else if (sysscan->irel)
 		htup = index_getnext(sysscan->iscan, BackwardScanDirection);
 	else

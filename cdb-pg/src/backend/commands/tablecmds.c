@@ -8991,7 +8991,7 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 								{
 									int			ia = 0;
 
-									if (cdbRelSize(RelationGetRelid(rel)) != 0)
+									if (cdbRelSize(rel) != 0)
 
 									for (ia = 0; ia < policy->nattrs; ia++)
 									{
@@ -9040,7 +9040,7 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 						{
 							int			ia = 0;
 
-							if (cdbRelSize(RelationGetRelid(rel)) != 0)
+							if (cdbRelSize(rel) != 0)
 
 							for (ia = 0; ia < policy->nattrs; ia++)
 							{
@@ -9186,7 +9186,7 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 							 errOmitLocation(true)));
 			}
 
-			if (cdbRelSize(RelationGetRelid(rel)) != 0)
+			if (cdbRelSize(rel) != 0)
 			{
 				for (ia = 0; ia < policy->nattrs; ia++)
 				{
@@ -10035,6 +10035,8 @@ ATExecSetRelOptions(Relation rel, List *defList, bool isReset)
 
 static void 
 copy_append_only_data(
+	int4			contentid,
+
 	RelFileNode		*oldRelFileNode,
 	
 	RelFileNode		*newRelFileNode,
@@ -10082,7 +10084,7 @@ copy_append_only_data(
 	else
 		extension[0] = '\0';
 
-	CopyRelPath(srcFileName, MAXPGPATH, *oldRelFileNode);
+	CopyRelPath(srcFileName, MAXPGPATH, contentid, *oldRelFileNode);
 	if (segmentFileNum > 0)
 	{
 		strcat(srcFileName, extension);
@@ -10098,7 +10100,7 @@ copy_append_only_data(
 				 errmsg("could not open file \"%s\": %m", srcFileName)));
 
 
-	CopyRelPath(dstFileName, MAXPGPATH, *newRelFileNode);
+	CopyRelPath(dstFileName, MAXPGPATH, contentid, *newRelFileNode);
 	if (segmentFileNum > 0)
 	{
 		strcat(dstFileName, extension);
@@ -10108,10 +10110,7 @@ copy_append_only_data(
 								&mirroredDstOpen,
 								newRelFileNode,
 								segmentFileNum,
-								/*
-								 * TODO, in gpsql, fix later
-								 */
-								GpIdentity.segindex,
+								contentid,
 								relationName,
 								/* logicalEof */ 0, // NOTE: This is the START EOF.  Since we are copying, we start at 0.
 								true,
@@ -10470,6 +10469,7 @@ ATExecSetTableSpace_AppendOnly(
 				 newPersistentSerialNum);
 		
 		copy_append_only_data(
+						contentid,
 						&rel->rd_node,
 						newRelFileNode,
 						segmentFileNum,

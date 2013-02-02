@@ -138,6 +138,8 @@ extern bool Debug_appendonly_print_append_block;
 extern bool Debug_appendonly_print_segfile_choice;
 extern int  Debug_appendonly_bad_header_print_level;
 extern bool Debug_appendonly_print_datumstream;
+extern bool Debug_querycontext_print_tuple;
+extern bool Debug_querycontext_print;
 extern bool Debug_gp_relation_node_fetch_wait_for_debugging;
 extern bool gp_crash_recovery_abort_suppress_fatal;
 extern bool gp_persistent_statechange_suppress_error;

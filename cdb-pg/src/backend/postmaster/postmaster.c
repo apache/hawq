@@ -2695,6 +2695,10 @@ retry1:
 				port->bootstrap_user = pstrdup(valptr);
 			else if (strcmp(nameptr, "encoding") == 0)
 				port->encoding = atoi(valptr);
+			else if (strcmp(nameptr, "segindex") == 0)
+				GpIdentity.segindex = atoi(valptr);
+			else if (strcmp(nameptr, "dbid") == 0)
+				GpIdentity.dbid = atoi(valptr);
 			else if (strcmp(nameptr, "gpqeid") == 0)
 				gpqeid = valptr;
 			else if (strcmp(nameptr, "gpqdid") == 0)

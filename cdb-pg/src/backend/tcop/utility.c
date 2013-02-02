@@ -554,7 +554,6 @@ static bool
 ProcessDropStatement(DropStmt *stmt)
 {
 	ListCell   *arg;
-	bool		dispatchDrop = true;
 
 	Assert(list_length(stmt->objects) == 1);
 
@@ -584,20 +583,15 @@ ProcessDropStatement(DropStmt *stmt)
 										 stmt->missing_ok) &&
 					CheckDropRelStorage(rel, stmt->removeType))
 					RemoveRelation(rel, stmt->behavior, stmt);
-				else
-					dispatchDrop = false;
+
 				break;
 
 			case OBJECT_SEQUENCE:
-				ereport(ERROR,
-						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support drop sequence statement yet in GPSQL") ));
-
 				rel = makeRangeVarFromNameList(names);
 				if (CheckDropPermissions(rel, RELKIND_SEQUENCE,
 										 stmt->missing_ok))
 					RemoveRelation(rel, stmt->behavior, stmt);
-				else
-					dispatchDrop = false;
+
 				break;
 
 			case OBJECT_VIEW:
@@ -605,7 +599,7 @@ ProcessDropStatement(DropStmt *stmt)
 				if (CheckDropPermissions(rel, RELKIND_VIEW,
 										 stmt->missing_ok))
 					RemoveView(rel, stmt->behavior);
-				dispatchDrop = false;
+
 				break;
 
 			case OBJECT_INDEX:
@@ -616,8 +610,7 @@ ProcessDropStatement(DropStmt *stmt)
 				if (CheckDropPermissions(rel, RELKIND_INDEX,
 										 stmt->missing_ok))
 					RemoveIndex(rel, stmt->behavior);
-				else
-					dispatchDrop = false;
+
 				break;
 
 			case OBJECT_TYPE:
@@ -662,7 +655,7 @@ ProcessDropStatement(DropStmt *stmt)
 				 * RemoveFileSpace does its own permissions checks
 				 */
 				RemoveFileSpace(names, stmt->behavior, stmt->missing_ok);
-				dispatchDrop = false;
+
 				break;
 
 			case OBJECT_FILESYSTEM:
@@ -677,7 +670,7 @@ ProcessDropStatement(DropStmt *stmt)
 				 * RemoveTableSpace does its own permissions checks
 				 */
 				RemoveTableSpace(names, stmt->behavior, stmt->missing_ok);
-				dispatchDrop = false;
+
 				break;
 
 			case OBJECT_EXTPROTOCOL:
@@ -701,7 +694,7 @@ ProcessDropStatement(DropStmt *stmt)
 		 * but now it's done inside performDeletion().
 		 */
 	}
-	return dispatchDrop;
+	return false;
 }
 
 /*
@@ -929,34 +922,9 @@ ProcessUtility(Node *parsetree,
 				char		relKind = RELKIND_RELATION;
 				char		relStorage = RELSTORAGE_HEAP;
 
-				/*
-				 * If this T_CreateStmt was dispatched and we're a QE
-				 * receiving it, extract the relkind and relstorage from
-				 * it
-				 */
-				if (Gp_role == GP_ROLE_EXECUTE)
-				{
-					if (((CreateStmt *) parsetree)->relKind != 0)
-						relKind = ((CreateStmt *) parsetree)->relKind;
 
-					if (((CreateStmt *) parsetree)->relStorage != 0)
-						relStorage = ((CreateStmt *) parsetree)->relStorage;
+				Assert (Gp_role != GP_ROLE_EXECUTE);
 
-					/* sanity check */
-					switch(relKind)
-					{
-						case RELKIND_VIEW:
-						case RELKIND_COMPOSITE_TYPE:
-							Assert(relStorage = RELSTORAGE_VIRTUAL);
-							break;
-						default:
-							Assert(relStorage == RELSTORAGE_HEAP ||
-								   relStorage == RELSTORAGE_AOROWS ||
-								   relStorage == RELSTORAGE_AOCOLS ||
-								   relStorage == RELSTORAGE_EXTERNAL ||
-								   relStorage == RELSTORAGE_FOREIGN);
-					}
-				}
 
 				relOid = DefineRelation((CreateStmt *) parsetree,
 										relKind, relStorage);
@@ -984,15 +952,11 @@ ProcessUtility(Node *parsetree,
 					    &(((CreateStmt *) parsetree)->oidInfo.toastComptypeOid),
 						((CreateStmt *)parsetree)->is_part_child);
 
-					/*
-					 * gpsql, move appendonly table metadata to master
-					 */
-					if (Gp_role == GP_ROLE_DISPATCH)
-						AlterTableCreateAoSegTableWithOid(relOid,
-								((CreateStmt *) parsetree)->oidInfo.aosegOid,
-								((CreateStmt *) parsetree)->oidInfo.aosegIndexOid,
-								&(((CreateStmt *) parsetree)->oidInfo.aosegComptypeOid),
-								((CreateStmt *) parsetree)->is_part_child);
+					AlterTableCreateAoSegTableWithOid(relOid,
+							((CreateStmt *) parsetree)->oidInfo.aosegOid,
+							((CreateStmt *) parsetree)->oidInfo.aosegIndexOid,
+							&(((CreateStmt *) parsetree)->oidInfo.aosegComptypeOid),
+							((CreateStmt *) parsetree)->is_part_child);
 
 					if (((CreateStmt *)parsetree)->buildAoBlkdir)
 						AlterTableCreateAoBlkdirTableWithOid(relOid,
@@ -1165,9 +1129,6 @@ ProcessUtility(Node *parsetree,
 			 * schema
 			 */
 		case T_RenameStmt:
-			ereport(ERROR,
-							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support rename statement yet in GPSQL") ));
-
 			ExecRenameStmt((RenameStmt *) parsetree);
 			break;
 
@@ -1332,8 +1293,10 @@ ProcessUtility(Node *parsetree,
 
 		case T_CompositeTypeStmt:		/* CREATE TYPE (composite) */
 			{
-				ereport(ERROR,
-								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create type yet in GPSQL") ));
+				if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) || (Gp_role == GP_ROLE_DISPATCH))) {
+				    ereport(ERROR,
+                        (errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create type yet in GPSQL") ));
+                }
 
 				CompositeTypeStmt *stmt = (CompositeTypeStmt *) parsetree;
 
@@ -1415,16 +1378,10 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_CreateSeqStmt:
-			ereport(ERROR,
-							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create sequence statement yet in GPSQL") ));
-
 			DefineSequence((CreateSeqStmt *) parsetree);
 			break;
 
 		case T_AlterSeqStmt:
-			ereport(ERROR,
-							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter sequence statement yet in GPSQL") ));
-
 			AlterSequence((AlterSeqStmt *) parsetree);
 			break;
 
@@ -1881,9 +1838,10 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_CreateCastStmt:
-			ereport(ERROR,
+            if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
+		    	ereport(ERROR,
 							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create cast statement yet in GPSQL") ));
-
+            }
 			CreateCast((CreateCastStmt *) parsetree);
 			break;
 
@@ -1895,9 +1853,10 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_CreateOpClassStmt:
-			ereport(ERROR,
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) )) {
+			    ereport(ERROR,
 							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create opclass statement yet in GPSQL") ));
-
+            }
 			DefineOpClass((CreateOpClassStmt *) parsetree);
 			break;
 

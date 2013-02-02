@@ -351,6 +351,8 @@ _outPlannedStmt(StringInfo str, PlannedStmt *node)
 	
 	WRITE_INT_FIELD(backoff_weight);
 	WRITE_UINT64_FIELD(query_mem);
+
+	WRITE_NODE_FIELD(contextdisp);
 }
 
 static void
@@ -2797,6 +2799,7 @@ _outQuery(StringInfo str, Query *node)
 	WRITE_NODE_FIELD(result_partitions);
 	WRITE_NODE_FIELD(result_aosegnos);
 	WRITE_NODE_FIELD(returningLists);
+	WRITE_NODE_FIELD(contextdisp);
 	/* Don't serialize policy */
 }
 
@@ -3428,6 +3431,23 @@ _outAlterTypeStmt(StringInfo str, AlterTypeStmt *node)
 
 	WRITE_NODE_FIELD(typname);
 	WRITE_NODE_FIELD(encoding);
+}
+
+static void
+_outQueryContextInfo(StringInfo str, QueryContextInfo *node)
+{
+    WRITE_NODE_TYPE("QUERYCONTEXTINFO");
+    WRITE_BOOL_FIELD(useFile);
+
+    if (node->useFile)
+    {
+        WRITE_STRING_FIELD(sharedPath);
+    }
+    else
+    {
+        WRITE_INT_FIELD(cursor);
+        appendBinaryStringInfo(str, (const char *) node->buffer, node->cursor);
+    }
 }
 
 /*
@@ -4189,6 +4209,10 @@ _outNode(StringInfo str, void *obj)
 			case T_AlterTypeStmt:
 				_outAlterTypeStmt(str, obj);
 				break;
+
+			case T_QueryContextInfo:
+			    _outQueryContextInfo(str, obj);
+			    break;
 
 			default:
 				elog(ERROR, "could not serialize unrecognized node type: %d",

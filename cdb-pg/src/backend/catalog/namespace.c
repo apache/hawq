@@ -2149,6 +2149,10 @@ void
 AtEOSubXact_Namespace(bool isCommit, SubTransactionId mySubid,
 					  SubTransactionId parentSubid)
 {
+
+    if (Gp_role == GP_ROLE_EXECUTE)
+        return;
+
 	if (myTempNamespaceSubID == mySubid)
 	{
 		if (isCommit)
@@ -2205,6 +2209,13 @@ RemoveTempRelationsCallback(int code, Datum arg)
 		 */
 		return;
 	}
+
+	/*
+	 * in gpsql, we do not create any object on QE,
+	 * therefore we do not drop anything.
+	 */
+	if (Gp_role == GP_ROLE_EXECUTE)
+        return;
 
 	if (OidIsValid(myTempNamespace))
 	{

@@ -81,6 +81,7 @@
 #include "cdb/cdbvars.h"
 #include "cdb/cdbdisp.h"
 #include "cdb/cdbappendonlyblockdirectory.h"
+#include "cdb/cdbquerycontextdispatching.h"
 #include "cdb/memquota.h"
 
 #ifdef USE_CONNECTEMC
@@ -225,6 +226,10 @@ static const char *assign_debug_dtm_action_protocol(const char *newval,
 						bool doit, GucSource source);
 static const char *assign_gp_log_format(const char *value, bool doit,
 										GucSource source);
+static bool assign_gp_test_failed_segmentid_start(int newval, bool doit,
+												GucSource source);
+static bool assign_gp_test_failed_segmentid_number(int newval, bool doit,
+												GucSource source);
 
 #ifdef USE_CONNECTEMC
 static const char *assign_connectemc_mode(const char *newval, bool doit, GucSource source);
@@ -278,6 +283,8 @@ bool 		Debug_appendonly_print_append_block = false;
 bool 		Debug_appendonly_print_segfile_choice = false;
 int			Debug_appendonly_bad_header_print_level = ERROR;
 bool		Debug_appendonly_print_datumstream = false;
+bool        Debug_querycontext_print_tuple = false;
+bool        Debug_querycontext_print = false;
 bool 		Debug_gp_relation_node_fetch_wait_for_debugging = false;
 bool        gp_crash_recovery_abort_suppress_fatal = false;
 bool		gp_persistent_statechange_suppress_error = false;
@@ -2507,6 +2514,26 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
+	    {"Debug_querycontext_print_tuple", PGC_SUSET, DEVELOPER_OPTIONS,
+	         gettext_noop("Print log messages for query context dispatching of a catalog tuple."),
+	         NULL,
+	         GUC_SUPERUSER_ONLY |  GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+	    },
+	     &Debug_querycontext_print_tuple,
+	     false, NULL, NULL
+	},
+
+    {
+        {"Debug_querycontext_print", PGC_SUSET, DEVELOPER_OPTIONS,
+             gettext_noop("Print query context content message for debug."),
+             NULL,
+             GUC_SUPERUSER_ONLY |  GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+        },
+         &Debug_querycontext_print,
+         false, NULL, NULL
+    },
+
+	{
 		{"debug_gp_relation_node_fetch_wait_for_debugging", PGC_SUSET, DEVELOPER_OPTIONS,
 			gettext_noop("Wait for debugger attach for MPP-16395 RelationFetchGpRelationNodeForXLog issue."),
 			NULL,
@@ -3662,6 +3689,26 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
+		{"Gp_test_failed_segmentid_start", PGC_SUSET, DEVELOPER_OPTIONS,
+			gettext_noop("For testing purposes, fake the segment status to the session. This is the start segmentid(content) in the cluster."),
+			NULL,
+			GUC_SUPERUSER_ONLY |  GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE | GUC_GPDB_ADDOPT
+		},
+		&Gp_test_failed_segmentid_start,
+		0, 0, INT_MAX, assign_gp_test_failed_segmentid_start, NULL
+	},
+
+	{
+		{"Gp_test_failed_segmentid_number", PGC_SUSET, DEVELOPER_OPTIONS,
+			gettext_noop("For testing purposes, fake the segment status to the session. This is the number of fake failed segmentid(content) in the cluster."),
+			NULL,
+			GUC_SUPERUSER_ONLY |  GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE | GUC_GPDB_ADDOPT
+		},
+		&Gp_test_failed_segmentid_number,
+		0, 0, INT_MAX, assign_gp_test_failed_segmentid_number, NULL
+	},
+
+	{
 		{"gp_safefswritesize", PGC_BACKEND, RESOURCES,
 			gettext_noop("Minimum FS safe write size."),
 			NULL
@@ -3739,6 +3786,16 @@ static struct config_int ConfigureNamesInt[] =
 		},
 		&maintenance_work_mem,
 		65536, 1024, MAX_KILOBYTES, NULL, NULL
+	},
+
+	{
+	    {"gp_query_context_mem_limit", PGC_USERSET, RESOURCES_MEM,
+	        gettext_noop("Sets the maximum memory to be used for query context dispatching."),
+	        gettext_noop("If memory usage larger than this limit, use file instead."),
+	        GUC_UNIT_KB | GUC_GPDB_ADDOPT
+	    },
+        &QueryContextDispatchingSizeMemoryLimit,
+	    102400, 0, MAX_KILOBYTES, NULL, NULL
 	},
 
 	{
@@ -11763,5 +11820,58 @@ show_allow_system_table_mods(void)
 		return "NONE";
 }
 
+static bool
+assign_gp_test_failed_segmentid_start(const int newval, bool doit, GucSource source)
+{
+	/*
+	 * If the transaction rollback, gp_test_failed_segmentid_start and
+	 * gp_test_failed_segmentid_number will be reset. But change the segment
+	 * alive information needs to release all of gangs and report an error.
+	 * So skip the reset for those two GUCs.
+	 */
+	if (source == PGC_S_OVERRIDE)
+		return true;
+
+	/*
+	 * The Postmaster will pass the value and set it in the start of QD process.
+	 * Clean the gangs iff gp_test_failed_segmentid_start and
+	 * gp_test_failed_segmentid_number changes!
+	 */
+	if (newval == GpAliveSegmentsInfo.failed_segmentid_start)
+		return true;
+
+	GpAliveSegmentsInfo.failed_segmentid_start = newval;
+	GpAliveSegmentsInfo.forceUpdate = true;
+	GpAliveSegmentsInfo.cleanGangs = true;
+
+	return true;
+}
+
+static bool
+assign_gp_test_failed_segmentid_number(int newval, bool doit, GucSource source)
+{
+	/*
+	 * If the transaction rollback, gp_test_failed_segmentid_start and
+	 * gp_test_failed_segmentid_number will be reset. But change the segment
+	 * alive information needs to release all of gangs and report an error.
+	 * So skip the reset for those two GUCs.
+	 */
+	if (source == PGC_S_OVERRIDE)
+		return true;
+
+	/*
+	 * The Postmaster will pass the value and set it in the start of QD process.
+	 * Clean the gangs iff gp_test_failed_segmentid_start and
+	 * gp_test_failed_segmentid_number changes!
+	 */
+	if (newval == GpAliveSegmentsInfo.failed_segmentid_number)
+		return true;
+
+	GpAliveSegmentsInfo.failed_segmentid_number = newval;
+	GpAliveSegmentsInfo.forceUpdate = true;
+	GpAliveSegmentsInfo.cleanGangs = true;
+
+	return true;
+}
 
 #include "guc-file.c"

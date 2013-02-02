@@ -99,11 +99,8 @@ ExecRenameStmt(RenameStmt *stmt)
 		case OBJECT_TABLE:
 		case OBJECT_INDEX:
 		{
-			if (Gp_role == GP_ROLE_DISPATCH)
-			{
-				CheckRelationOwnership(stmt->relation, true);
-				stmt->objid = RangeVarGetRelid(stmt->relation, false);
-			}
+			CheckRelationOwnership(stmt->relation, true);
+			stmt->objid = RangeVarGetRelid(stmt->relation, false);
 
 			/*
 			 * RENAME TABLE requires that we (still) hold
@@ -157,11 +154,6 @@ ExecRenameStmt(RenameStmt *stmt)
 			elog(ERROR, "unrecognized rename stmt type: %d",
 				 (int) stmt->renameType);
 	}
-	/*if (Gp_role == GP_ROLE_DISPATCH)
-	{
-		CdbDispatchUtilityStatement((Node *) stmt, "ExecRenameStmt");
-	}*/
-
 }
 
 /*
@@ -198,10 +190,6 @@ ExecAlterObjectSchemaStmt(AlterObjectSchemaStmt *stmt)
 			elog(ERROR, "unrecognized AlterObjectSchemaStmt type: %d",
 				 (int) stmt->objectType);
 	}
-	/*if (Gp_role == GP_ROLE_DISPATCH)
-	{
-		CdbDispatchUtilityStatement((Node *) stmt, "ExecAlterObjectSchemaStmt");
-	}*/
 }
 
 /*
@@ -277,8 +265,4 @@ ExecAlterOwnerStmt(AlterOwnerStmt *stmt)
 			elog(ERROR, "unrecognized AlterOwnerStmt type: %d",
 				 (int) stmt->objectType);
 	}
-	/*if (Gp_role == GP_ROLE_DISPATCH)
-	{
-		CdbDispatchUtilityStatement((Node *) stmt, "ExecAlterOwnerStmt");
-	}*/
 }

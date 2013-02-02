@@ -470,7 +470,7 @@ checkPolicyForUniqueIndex(Relation rel, AttrNumber *indattr, int nidxatts,
 	 */
 	if (!bms_is_subset(polbm, indbm))
 	{
-       	if (cdbRelSize(rel->rd_id) != 0 || has_pkey || has_ukey || has_exprs)
+       	if (cdbRelSize(rel) != 0 || has_pkey || has_ukey || has_exprs)
 		{
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_TABLE_DEFINITION),

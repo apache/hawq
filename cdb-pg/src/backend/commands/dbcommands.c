@@ -430,6 +430,7 @@ static void copy_buffer_pool_files(
 }
 
 static void copy_append_only_segment_file(
+	int4			contentid,
 	RelFileNode 	*srcRelFileNode,
 	RelFileNode		*dstRelFileNode,
 	int32			segmentFileNum,
@@ -483,7 +484,7 @@ static void copy_append_only_segment_file(
 	else
 		extension[0] = '\0';
 	
-	CopyRelPath(srcFileName, MAXPGPATH, *srcRelFileNode);
+	CopyRelPath(srcFileName, MAXPGPATH, contentid, *srcRelFileNode);
 	if (segmentFileNum > 0)
 	{
 		strcat(srcFileName, extension);
@@ -498,7 +499,7 @@ static void copy_append_only_segment_file(
 				(errcode_for_file_access(),
 				 errmsg("could not open file \"%s\": %m", srcFileName)));
 
-	CopyRelPath(dstFileName, MAXPGPATH, *dstRelFileNode);
+	CopyRelPath(dstFileName, MAXPGPATH, contentid, *dstRelFileNode);
 	if (segmentFileNum > 0)
 	{
 		strcat(dstFileName, extension);
@@ -508,13 +509,10 @@ static void copy_append_only_segment_file(
 							&mirroredDstOpen,
 							dstRelFileNode,
 							segmentFileNum,
-							/*
-							 * TODO, in gpsql, fix later
-							 */
-							GpIdentity.segindex,
+							contentid,
 							relationName,
 							/* logicalEof */ 0,	// NOTE: This is the START EOF.  Since we are copying, we start at 0.
-							true,
+							false,
 							&primaryError);
 	if (primaryError != 0)
 		ereport(ERROR,
@@ -1263,6 +1261,7 @@ createdb_int(CreatedbStmt *stmt, CdbDispatcherState *ds)
 					if (dbInfoGpRelationNode->logicalEof > 0)
 					{
 						copy_append_only_segment_file(
+										dbInfoGpRelationNode->contentid,
 										&srcRelFileNode,
 										&dstRelFileNode,
 										dbInfoGpRelationNode->segmentFileNum,

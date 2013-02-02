@@ -1203,7 +1203,7 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 	scan_clauses = order_qual_clauses(ctx->root, scan_clauses);
 
 	/* get the total valid primary segdb count */
-	db_info = getCdbComponentDatabases();
+	db_info = getCdbComponentDatabasesForGangs();
 	for (i = 0; i < db_info->total_segment_dbs; i++)
 	{
 		CdbComponentDatabaseInfo *p = &db_info->segment_db_info[i];
@@ -1223,6 +1223,9 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 	MemSet(segdb_file_map, 0, total_primaries * sizeof(char *));
 
 	Assert(rel->locationlist != NIL);
+
+	if (GpAliveSegmentsInfo.aliveSegmentsCount != GetTotalSegmentsNumber())
+		elog(ERROR, "external table scan does not support failover.");
 
 	/* is this an EXECUTE table or a LOCATION (URI) table */
 	if(rel->execcommand)

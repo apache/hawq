@@ -102,6 +102,7 @@ typedef struct SharedSnapshotSlot
 {
 	int4			slotindex;  /* where in the array this one is. */
 	int4	 		slotid;
+	int4			contentid;
 	pid_t	 		pid; /* pid of writer seg */
 	TransactionId	xid;
 	CommandId       cid;

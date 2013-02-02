@@ -1000,6 +1000,7 @@ static QueryDesc *SubplanQueryDesc(QueryDesc * qd)
 	substmt->nCrossLevelParams = stmt->nCrossLevelParams;
 	substmt->nMotionNodes = stmt->nMotionNodes;
 	substmt->nInitPlans = stmt->nInitPlans;
+	substmt->contextdisp = stmt->contextdisp;
 	
 	
 	/*

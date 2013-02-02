@@ -676,9 +676,9 @@ else
 BLD_OS:=$(shell uname -s)
 endif
 AIX_LOADERS_LIBS=libbz2.a libz.a libpq.a liblber*.a libldap*.a libyaml*.a
-Darwin_LOADERS_LIBS=libcrypto.*.dylib libssl.*.dylib libpq.*.dylib* libkrb5.*.dylib libcom_err.*.dylib libldap_r-*.dylib libk5crypto.*.dylib libkrb5support.*.dylib liblber-*.dylib
-Linux_LOADERS_LIBS=libcrypto.so* libssl.so.* libz.so* libpq.so* libkrb5.so* libcom_err.so* libk5crypto.so* libkrb5support.so* liblber*.so* libldap_r-*so*
-SunOS_LOADERS_LIBS=libcrypto.so* libssl.so.* libgcc_s.so.1 libz.so* libpq.so* libk5crypto.so* libkrb5support.so* liblber*.so* libldap_r-*so* libcom_err.so* libkrb5.so*
+Darwin_LOADERS_LIBS=libmadlib.so libcrypto.*.dylib libssl.*.dylib libpq.*.dylib* libkrb5.*.dylib libcom_err.*.dylib libldap_r-*.dylib libk5crypto.*.dylib libkrb5support.*.dylib liblber-*.dylib
+Linux_LOADERS_LIBS=libmadlib.so libcrypto.so* libssl.so.* libz.so* libpq.so* libkrb5.so* libcom_err.so* libk5crypto.so* libkrb5support.so* liblber*.so* libldap_r-*so*
+SunOS_LOADERS_LIBS=libmadlib.so libcrypto.so* libssl.so.* libgcc_s.so.1 libz.so* libpq.so* libk5crypto.so* libkrb5support.so* liblber*.so* libldap_r-*so* libcom_err.so* libkrb5.so*
 Windows_LOADERS_LIBS=libpq.dll
 define tmpLOADERS_FILESET_LIB
 	$($(BLD_OS)_LOADERS_LIBS)
@@ -1217,6 +1217,8 @@ endif
 copylibs : thirdparty-dist copy-rsa-libs
 	if [ `uname -s` = 'SunOS' ]; then cp `ldd $(INSTLOC)/bin/psql | grep gcc | head -1 | awk '{print $$3}'` $(INSTLOC)/lib; fi
 	if [ `uname -s` = 'Darwin' ] ; then \
+	    echo "cp $(BLD_THIRDPARTY_LIB_DIR)/libmadlib.so $(INSTLOC)/lib/postgresql/" ; \
+	    cp $(BLD_THIRDPARTY_LIB_DIR)/libmadlib.so $(INSTLOC)/lib/postgresql/ ; \
 	    for lib in `otool -L $(INSTLOC)/bin/psql | egrep 'libssl|libcrypto|libcom_err|libkrb5|curl|readline|numa' | awk '{print $$1}'`; do \
 	        if [ x"`dirname $$lib`" = x"$(INSTLOC)/lib" ]; then continue; fi; \
 	        if [ -f $(INSTLOC)/lib/`basename $$lib` -a ! -w $(INSTLOC)/lib/`basename $$lib` ]; then chmod u+w $(INSTLOC)/lib/`basename $$lib`; fi; \
@@ -1230,6 +1232,8 @@ copylibs : thirdparty-dist copy-rsa-libs
 	    done ; \
 	fi
 	if [ `uname -s` != 'Darwin' -a `uname -s` != 'AIX' ] ; then \
+	    echo "cp $(BLD_THIRDPARTY_LIB_DIR)/libmadlib.so $(INSTLOC)/lib/postgresql/" ; \
+	    cp $(BLD_THIRDPARTY_LIB_DIR)/libmadlib.so $(INSTLOC)/lib/postgresql/ ; \
 	    for lib in `ldd $(INSTLOC)/bin/psql | egrep 'libssl|libcrypto|libcom_err|curl|readline|numa' | awk '{print $$3}' | sort -u`; do \
 	        if [ x"`dirname $$lib`" = x"$(INSTLOC)/lib" ]; then continue; fi; \
 	        if [ -f $(INSTLOC)/lib/`basename $$lib` -a ! -w $(INSTLOC)/lib/`basename $$lib` ]; then chmod u+w $(INSTLOC)/lib/`basename $$lib`; fi; \
@@ -1238,6 +1242,8 @@ copylibs : thirdparty-dist copy-rsa-libs
 	    done ; \
 	fi
 	if [ `uname -s` = 'AIX' ] ; then \
+	    echo "cp $(BLD_THIRDPARTY_LIB_DIR)/libmadlib.so $(INSTLOC)/lib/postgresql/" ; \
+	    cp $(BLD_THIRDPARTY_LIB_DIR)/libmadlib.so $(INSTLOC)/lib/postgresql/ ; \
 	    for lib in `ldd $(INSTLOC)/bin/psql | egrep 'libssl|libcrypto|libcom_err|curl|readline|numa' | awk -F\( '{print $$1}' | sort -u`; do \
 	        if [ x"`dirname $$lib`" = x"$(INSTLOC)/lib" ]; then continue; fi; \
 	        if [ -f $(INSTLOC)/lib/`basename $$lib` -a ! -w $(INSTLOC)/lib/`basename $$lib` ]; then chmod u+w $(INSTLOC)/lib/`basename $$lib`; fi; \
@@ -1252,6 +1258,8 @@ copylibs : thirdparty-dist copy-rsa-libs
 	    done ; \
 	fi
 	if [ `uname -s` != 'AIX' -a `uname -s` != 'Darwin' ] ; then \
+	    echo "cp $(BLD_THIRDPARTY_LIB_DIR)/libmadlib.so $(INSTLOC)/lib/postgresql/" ; \
+	    cp $(BLD_THIRDPARTY_LIB_DIR)/libmadlib.so $(INSTLOC)/lib/postgresql/ ; \
 	    lib_wildcards=`$(BLD_LDD) $(INSTLOC)/bin/lib/gpcheckdb | egrep 'libstdc\+\+' $(BLD_LDD_FILTER)` export lib_wildcards; \
 	    if [ -z "$${lib_wildcards}" ]; then exit 0; fi; \
 	    lib_list=`ls $${lib_wildcards}` export lib_list; \

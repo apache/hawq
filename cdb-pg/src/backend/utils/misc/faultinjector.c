@@ -92,6 +92,13 @@ FaultInjectorTypeEnumToString[] = {
 	_("status"),
 	_("panic_suppress"),
 	_("segv"),
+	_("create_thread_fail"),
+	_("timeout"),
+	_("dispatch_error"),
+	_("connection_null"),
+	_("connection_restore"),
+	_("user_cancel"),
+	_("proc_die"),
 	_("not recognized"),
 };
 
@@ -248,6 +255,20 @@ FaultInjectorIdentifierEnumToString[] = {
 		/* inject fault to simulate transaction abort failure  */
 	_("update_committed_eof_in_persistent_table"),
 		/* inject fault before committed EOF is updated in gp_persistent_relation_node for Append Only segment files */
+	_("gang_thread_creation_failure"),
+		/* inject fault after gang thread creation*/
+	_("dispatch_thread_creation_failure"),
+		/* inject fault after dispatcher thread creation*/
+	_("dispatch_wait"),
+		/* inject fault after dispatcher wait for results from segments*/
+	_("connection_fail_after_gang"),
+		/* inject fault after gang thread creation, set connection null*/
+	_("make_dispatch_thread"),
+		/* inject fault when initialing memory structure for dispatcher thread*/
+	_("before_dispatch"),
+		/* inject fault before dispatching out threads */
+	_("dispatch_thread_initialization"),
+		/* inject fault when dispatching thread needed structured creating*/
 	_("not recognized"),
 };
 
@@ -683,6 +704,23 @@ FaultInjector_InjectFaultIfSet(
 			break;
 		}
 		
+		case FaultInjectorTypeCreateThreadFail:
+		case FaultInjectorTypeConnectionNull:
+		case FaultInjectorTypeConnectionNullInRestoreMode:
+		case FaultInjectorTypeUserCancel:
+		case FaultInjectorTypeProcDie:
+		{
+			ereport(LOG,
+					(errmsg("fault triggered, fault name:'%s' fault type:'%s' ",
+							FaultInjectorIdentifierEnumToString[entryLocal->faultInjectorIdentifier],
+							FaultInjectorTypeEnumToString[entryLocal->faultInjectorType])));
+			break;
+		}
+		case FaultInjectorTypeTimeOut:
+		case FaultInjectorTypeDispatchError:
+		{
+			break;
+		}
 		default:
 			
 			ereport(LOG, 

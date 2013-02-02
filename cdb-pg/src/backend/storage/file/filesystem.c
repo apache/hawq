@@ -570,7 +570,7 @@ HdfsRead(FsysName protocol, hdfsFS fileSystem, hdfsFile file, void * buffer, int
 }
 
 int
-HdfsWrite(FsysName protocol, hdfsFS fileSystem, hdfsFile file, void * buffer, int length)
+HdfsWrite(FsysName protocol, hdfsFS fileSystem, hdfsFile file, const void * buffer, int length)
 {
 	FunctionCallInfoData fcinfo;
 	FileSystemUdfData fsysUdf;
@@ -584,7 +584,7 @@ HdfsWrite(FsysName protocol, hdfsFS fileSystem, hdfsFile file, void * buffer, in
 	fsysUdf.type = T_FileSystemFunctionData;
 	fsysUdf.fsys_hdfs = fileSystem;
 	fsysUdf.fsys_hfile = file;
-	fsysUdf.fsys_databuf = buffer;
+    fsysUdf.fsys_databuf = (char *) buffer;
 	fsysUdf.fsys_maxbytes = length;
 
 	InitFunctionCallInfoData(/* FunctionCallInfoData */ fcinfo,

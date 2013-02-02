@@ -24,6 +24,7 @@
 #include "nodes/bitmapset.h"
 #include "nodes/primnodes.h"
 #include "nodes/value.h"
+#include "cdb/cdbquerycontextdispatching.h"
 
 typedef struct PartitionNode PartitionNode; /* see relation.h */
 
@@ -185,6 +186,9 @@ typedef struct Query
 		 *      set operations.
 		 */
 		struct GpPolicy  *intoPolicy;
+
+		QueryContextInfo * contextdisp; /* query context for dispatching */
+
 } Query;
 
 /****************************************************************************

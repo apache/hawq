@@ -19,7 +19,7 @@
 
 extern void GetFilespacePathForTablespace(Oid tablespaceOid, int32 contentid, char **filespacePath);
 extern char *relpath(RelFileNode rnode);
-extern void CopyRelPath(char *target, int targetMaxLen, RelFileNode rnode);
+extern void CopyRelPath(char *target, int targetMaxLen, int4 contentid, RelFileNode rnode);
 extern char *GetDatabasePath(Oid dbNode, Oid spcNode);
 extern void CopyDatabasePath(char *target, int targetMaxLen, Oid dbNode, Oid spcNode);
 extern void FormDatabasePath(char *databasePath, char *filespaceLocation, Oid tablespaceOid, Oid databaseOid);

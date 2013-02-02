@@ -1,0 +1,248 @@
+/* 
+ * PREPARE THE TEST DATA
+ * id < 100: The data inserts before test
+ * id < 200: The data inserts when segment id 1 failed
+ * id < 300: The data inserts when segment id 0 failed
+ * id < 400: the data inserts after recovery
+ */
+DROP TABLE IF EXISTS x;
+NOTICE:  table "x" does not exist, skipping
+CREATE TABLE x(c INT, d TEXT) DISTRIBUTED RANDOMLY; --  DISTRIBUTED BY (c);
+INSERT INTO x VALUES(1, 'insert before test');
+INSERT INTO x VALUES(2, 'insert before test');
+INSERT INTO x VALUES(3, 'insert before test');
+INSERT INTO x VALUES(4, 'insert before test');
+INSERT INTO x VALUES(5, 'insert before test');
+COPY x FROM stdin DELIMITER ',';
+-- every segments returns
+SELECT c, d FROM x;
+ c  |         d          
+----+--------------------
+  6 | copy before test
+  8 | copy before test
+ 10 | copy before test
+  1 | insert before test
+  2 | insert before test
+  3 | insert before test
+  4 | insert before test
+  5 | insert before test
+  7 | copy before test
+  9 | copy before test
+(10 rows)
+
+SELECT count(*) AS data_before_failover FROM x;
+ data_before_failover 
+----------------------
+                   10
+(1 row)
+
+-- COPY x TO stdout;
+COPY (SELECT c, d FROM x ORDER BY c) TO stdout;
+1	insert before test
+2	insert before test
+3	insert before test
+4	insert before test
+5	insert before test
+6	copy before test
+7	copy before test
+8	copy before test
+9	copy before test
+10	copy before test
+/*
+ * FAULT TOLENRANCE TEST
+ */
+SET gp_test_failed_segmentid_number = 1;
+ERROR:  segment alive information changed, cleanup the gangs. (postgres.c:1800)
+-- SEGMENT ID 1 FAILED
+SET gp_test_failed_segmentid_start = 1;
+ERROR:  segment alive information changed, cleanup the gangs. (postgres.c:1800)
+SELECT COUNT(DISTINCT gp_segment_id) > 0 AS has_segment_id_1 FROM x WHERE gp_segment_id = 1; -- must be true
+ has_segment_id_1 
+------------------
+ f
+(1 row)
+
+INSERT INTO x VALUES(100, 'insert when segment id 1 failed');
+COPY x FROM stdin DELIMITER ',';
+SELECT COUNT(DISTINCT gp_segment_id) > 0 AS has_segment_id_1 FROM x WHERE gp_segment_id = 1; -- must be true
+ has_segment_id_1 
+------------------
+ f
+(1 row)
+
+SELECT c, d FROM x WHERE c BETWEEN 100 AND 200; -- expected insert successful
+  c  |                d                
+-----+---------------------------------
+ 100 | insert when segment id 1 failed
+ 101 | copy when segment id 1 failed
+(2 rows)
+
+-- COPY x TO stdout;
+COPY (SELECT c, d FROM x WHERE c BETWEEN 100 AND 200 ORDER BY c) TO stdout; -- expected insert successful
+100	insert when segment id 1 failed
+101	copy when segment id 1 failed
+-- SEGMENT ID 0 FAILED
+SET gp_test_failed_segmentid_start = 0;
+ERROR:  segment alive information changed, cleanup the gangs. (postgres.c:1800)
+SELECT COUNT(DISTINCT gp_segment_id) > 0 AS has_segment_id_0 FROM x WHERE gp_segment_id = 0; -- must be true
+ has_segment_id_0 
+------------------
+ f
+(1 row)
+
+INSERT INTO x VALUES(200, 'insert when segment id 0 failed');
+COPY x FROM stdin DELIMITER ',';
+SELECT COUNT(DISTINCT gp_segment_id) > 0 AS has_segment_id_0 FROM x WHERE gp_segment_id = 0; -- must be true
+ has_segment_id_0 
+------------------
+ f
+(1 row)
+
+SELECT c, d FROM x WHERE c BETWEEN 200 AND 300; -- expected insert successful
+  c  |                d                
+-----+---------------------------------
+ 200 | insert when segment id 0 failed
+ 201 | copy when segment id 0 failed
+(2 rows)
+
+-- COPY x TO stdout;
+COPY (SELECT c, d FROM x WHERE c BETWEEN 200 AND 300 ORDER BY c) TO stdout; -- expected insert successful
+200	insert when segment id 0 failed
+201	copy when segment id 0 failed
+/*
+ * ALL SEGMENTS RECOVERYED
+ */
+SET gp_test_failed_segmentid_number = 0;
+ERROR:  segment alive information changed, cleanup the gangs. (postgres.c:1800)
+-- All data should be returned
+SELECT c, d FROM x;
+  c  |                d                
+-----+---------------------------------
+   1 | insert before test
+   2 | insert before test
+   3 | insert before test
+   4 | insert before test
+   5 | insert before test
+   7 | copy before test
+   9 | copy before test
+ 200 | insert when segment id 0 failed
+ 201 | copy when segment id 0 failed
+   6 | copy before test
+   8 | copy before test
+  10 | copy before test
+ 100 | insert when segment id 1 failed
+ 101 | copy when segment id 1 failed
+(14 rows)
+
+SELECT count(*) AS data_before_failover FROM x;
+ data_before_failover 
+----------------------
+                   14
+(1 row)
+
+-- COPY x TO stdout;
+COPY (SELECT c, d FROM x ORDER BY c) TO stdout;
+1	insert before test
+2	insert before test
+3	insert before test
+4	insert before test
+5	insert before test
+6	copy before test
+7	copy before test
+8	copy before test
+9	copy before test
+10	copy before test
+100	insert when segment id 1 failed
+101	copy when segment id 1 failed
+200	insert when segment id 0 failed
+201	copy when segment id 0 failed
+INSERT INTO x VALUES(301, 'insert after recovery');
+INSERT INTO x VALUES(302, 'insert after recovery');
+INSERT INTO x VALUES(303, 'insert after recovery');
+INSERT INTO x VALUES(304, 'insert after recovery');
+INSERT INTO x VALUES(305, 'insert after recovery');
+COPY x FROM stdin DELIMITER ',';
+SELECT c, d FROM x;
+  c  |                d                
+-----+---------------------------------
+   6 | copy before test
+   8 | copy before test
+  10 | copy before test
+ 100 | insert when segment id 1 failed
+ 101 | copy when segment id 1 failed
+ 303 | insert after recovery
+ 304 | insert after recovery
+ 305 | insert after recovery
+ 306 | copy after recovery
+ 308 | copy after recovery
+ 310 | copy after recovery
+   1 | insert before test
+   2 | insert before test
+   3 | insert before test
+   4 | insert before test
+   5 | insert before test
+   7 | copy before test
+   9 | copy before test
+ 200 | insert when segment id 0 failed
+ 201 | copy when segment id 0 failed
+ 301 | insert after recovery
+ 302 | insert after recovery
+ 307 | copy after recovery
+ 309 | copy after recovery
+(24 rows)
+
+SELECT count(*) AS data_before_failover FROM x;
+ data_before_failover 
+----------------------
+                   24
+(1 row)
+
+-- COPY x TO stdout;
+COPY (SELECT c, d FROM x ORDER BY c) TO stdout;
+1	insert before test
+2	insert before test
+3	insert before test
+4	insert before test
+5	insert before test
+6	copy before test
+7	copy before test
+8	copy before test
+9	copy before test
+10	copy before test
+100	insert when segment id 1 failed
+101	copy when segment id 1 failed
+200	insert when segment id 0 failed
+201	copy when segment id 0 failed
+301	insert after recovery
+302	insert after recovery
+303	insert after recovery
+304	insert after recovery
+305	insert after recovery
+306	copy after recovery
+307	copy after recovery
+308	copy after recovery
+309	copy after recovery
+310	copy after recovery
+DROP TABLE x;
+-- Temp table tests
+CREATE TEMP TABLE y(c int) DISTRIBUTED BY (c);
+SELECT * FROM y;
+ c 
+---
+(0 rows)
+
+-- start_matchsubs
+--
+-- m/WARNING:  Any temporary tables for this session/
+-- s/\(session id = .*\)//
+--
+-- end_matchsubs
+SET gp_test_failed_segmentid_number = 1;
+WARNING:  Any temporary tables for this session have been dropped because the gang was disconnected (session id = 188)
+ERROR:  segment alive information changed, cleanup the gangs. (postgres.c:1800)
+SET gp_test_failed_segmentid_start = 1;
+ERROR:  segment alive information changed, cleanup the gangs. (postgres.c:1800)
+SELECT * FROM y;
+ERROR:  relation "y" does not exist
+LINE 1: SELECT * FROM y;
+                      ^

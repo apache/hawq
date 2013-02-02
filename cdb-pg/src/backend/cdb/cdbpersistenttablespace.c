@@ -29,6 +29,7 @@
 #include "cdb/cdbpersistentfilesysobj.h"
 #include "cdb/cdbpersistentfilespace.h"
 #include "cdb/cdbpersistenttablespace.h"
+#include "cdb/cdbdispatchedtablespaceinfo.h"
 #include "cdb/cdbutil.h"
 #include "cdb/cdbvars.h"
 #include "postmaster/postmaster.h"
@@ -533,9 +534,11 @@ PersistentTablespaceGetFilespaces PersistentTablespace_TryGetPrimaryAndMirrorFil
 	 */
 	if (GPStandby())
 	{
-		/* XXX:mat3: db_id for standby again... */
-		Insist(false);
-
+		/*
+		 * Standby can not access the shared storage, so the contendid must be
+		 * MASTER_CONTENT_ID.
+		 */
+		Assert(contentid == MASTER_CONTENT_ID);
 		if (!mmxlog_tablespace_get_filespace(
 									tablespaceOid,
 									filespaceOid))
@@ -1077,9 +1080,8 @@ PersistentTablespace_ActivateStandby(int16 oldmaster, int16 newmaster)
 		PersistentFileSysObjName fsObjName;
 		Oid tblspc = tablespaceDirEntry->key.tablespaceOid;
 
-		/* XXX:mat3: what db_id should I set for standby??? */
-		Insist(false);
-		tablespaceDirEntry = PersistentTablespace_FindEntryUnderLock(0, tblspc);
+		Assert(GpIdentity.segindex == MASTER_CONTENT_ID);
+		tablespaceDirEntry = PersistentTablespace_FindEntryUnderLock(GpIdentity.segindex, tblspc);
 
 		if (tablespaceDirEntry == NULL)
 			elog(ERROR, "cannot find persistent tablespace entry %u", 
@@ -1439,7 +1441,7 @@ Size PersistentTablespace_ShmemSize(void)
 	Size		size;
 
 	/* The hash table of persistent tablespaces */
-	size = hash_estimate_size((Size)gp_max_tablespaces * (GpIdentity.numsegments != MASTER_CONTENT_ID ? 1 : GpIdentity.numsegments + 1),
+	size = hash_estimate_size((Size)gp_max_tablespaces * (GpIdentity.segindex != MASTER_CONTENT_ID ? 1 : GetTotalSegmentsNumber() + 1),
 							  sizeof(TablespaceDirEntryData));
 
 	/* The shared-memory structure. */
@@ -1468,8 +1470,8 @@ PersistentTablespace_HashTableInit(void)
 
 	persistentTablespaceSharedHashTable = 
 						ShmemInitHash("Persistent Tablespace Hash",
-								   gp_max_tablespaces * (GpIdentity.numsegments != MASTER_CONTENT_ID ? 1 : GpIdentity.numsegments + 1),
-								   gp_max_tablespaces * (GpIdentity.numsegments != MASTER_CONTENT_ID ? 1 : GpIdentity.numsegments + 1),
+								   gp_max_tablespaces * (GpIdentity.segindex != MASTER_CONTENT_ID ? 1 : GetTotalSegmentsNumber() + 1),
+								   gp_max_tablespaces * (GpIdentity.segindex != MASTER_CONTENT_ID ? 1 : GetTotalSegmentsNumber() + 1),
 								   &info,
 								   hash_flags);
 
@@ -1538,10 +1540,15 @@ get_tablespace_data(tspc_agg_state **tas, char *caller)
 	hash_seq_init(&stat, persistentTablespaceSharedHashTable);
 
 	while ((tde = hash_seq_search(&stat)) != NULL)
+	{
+		if (tde->key.contentid != MASTER_CONTENT_ID)
+			continue;
+
 		mmxlog_add_tablespace(
 				 tas, &maxCount, 
 				 tde->filespaceOid, tde->key.tablespaceOid,
 				 caller);
+	}
 
 }
 #endif

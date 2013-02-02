@@ -129,7 +129,6 @@ static void generateGID(char *gid, DistributedTransactionId *gxid);
 
 static void recoverTM(void);
 static bool recoverInDoubtTransactions(void);
-static HTAB *gatherRMInDoubtTransactions(void);
 static void abortRMInDoubtTransactions(HTAB *htab);
 static void cleanRMResultSets(PGresult **pgresultSets);
 
@@ -145,7 +144,6 @@ static void doPrepareTransaction(void);
 static void doInsertForgetCommitted(void);
 static void doNotifyingCommitPrepared(void);
 static void doNotifyingAbort(void);
-static bool doNotifyCommittedInDoubt(char *gid);
 static void doAbortInDoubt(char *gid);
 static void doQEDistributedExplicitBegin(int txnOptions);
 
@@ -155,7 +153,6 @@ static void ReplayRedoFromUtilityMode(void);
 static void RemoveRedoUtilityModeFile(void);
 static void performDtxProtocolCommitPrepared(const char *gid, bool raiseErrorIfNotFound);
 static void performDtxProtocolAbortPrepared(const char *gid, bool raiseErrorIfNotFound);
-static DistributedTransactionId determineSegmentMaxDistributedXid(void);
 
 extern void resetSessionForPrimaryGangLoss(void);
 extern void CheckForResetSession(void);
@@ -1055,31 +1052,6 @@ doDtxPhase2Retry(void)
 				 (int) currentGxact->state);
 			break;
 	}
-}
-
-static bool
-doNotifyCommittedInDoubt(char *gid)
-{
-	bool succeeded;
-	bool badGangs;
-
-	CdbDispatchDirectDesc direct=default_dispatch_direct_desc;
-
-	/* UNDONE: Pass real gxid instead of InvalidDistributedTransactionId. */
-	succeeded = doDispatchDtxProtocolCommand(DTX_PROTOCOL_COMMAND_RECOVERY_COMMIT_PREPARED, /* flags */ 0,
-											 gid, InvalidDistributedTransactionId,
-											 &badGangs, /* raiseError */ false,
-											 &direct, NULL, 0);
-	if (!succeeded)
-	{
-		elog(FATAL, "Crash recovery broadcast of the distributed transaction 'Commit Prepared' broadcast failed to one or more segments for gid = %s.", gid);
-	}
-	else
-	{
-		elog(LOG, "Crash recovery broadcast of the distributed transaction 'Commit Prepared' broadcast succeeded for gid = %s.", gid);
-	}
-
-	return succeeded;
 }
 
 static void
@@ -2950,9 +2922,13 @@ recoverTM(void)
 	else
 		elog(LOG, "DTM starting in readonly-mode: deferring recovery");
 
-	/* finished recovery successfully. */
 
-	segmentMaxDistributedTransactionId = determineSegmentMaxDistributedXid();
+	/*
+	 * If the GPDB, QD needs to collect the max distributed xid from every
+	 * segments by calling determineSegmentMaxDistributedXid();.
+	 * But in GPSQL, there si no distributed transaction.
+	 */
+	segmentMaxDistributedTransactionId = *shmGIDSeq;
 	if (segmentMaxDistributedTransactionId >= *shmGIDSeq)
 	{
 		*shmGIDSeq = segmentMaxDistributedTransactionId + 1;
@@ -3062,10 +3038,10 @@ recoverInDoubtTransactions(void)
 		     gxact->gid);
 
 		/*
-		 * Can't start system if we cannot deliiver commits.
+		 * In the GPDB, it can't start system if we cannot deliiver commits by
+		 * calling doNotifyCommittedInDoubt(gxact->gid);. In GPSQL, donot need
+		 * to recovery distributed transaction.
 		 */
-		doNotifyCommittedInDoubt(gxact->gid);
-
 		currentGxact = gxact;
 
 		/*
@@ -3090,8 +3066,12 @@ recoverInDoubtTransactions(void)
 	/*
 	 * UNDONE: Thus, any in-doubt transctions found will be for aborted transactions.
 	 * UNDONE: Gather in-boubt transactions and issue aborts.
+	 *
+	 * In the GPDB, it needs to gather all of aborted transaction from segments
+	 * bu calling gatherRMInDoubtTransactions();. In GPSQL, donot need to
+	 * recovery distributed transaction.
 	 */
-	htab = gatherRMInDoubtTransactions();
+	htab = NULL;
 
 	/*
 	 * go through and resolve any remaining in-doubt transactions that the
@@ -3105,8 +3085,8 @@ recoverInDoubtTransactions(void)
 	/* get rid of the hashtable */
 	hash_destroy(htab);
 
-	/* yes... we are paranoid and will double check */
-	htab = gatherRMInDoubtTransactions();
+	/* In GPDB, it needs to double check the aborted transaction. */
+	htab = NULL;
 
 	/*
 	 * Hmm.  we still have some remaining indoubt transactions.  For now we
@@ -3141,194 +3121,6 @@ recoverInDoubtTransactions(void)
 	RemoveRedoUtilityModeFile();
 
 	return true;
-}
-
-/*
- * determineSegmentMaxDistributedXid:
- *
- * Since we don't know whether the Segment Databases were left over from
- * an earlier start or left over from a postmaster system reset due to
- * a server process failure, we must go out and determine the maximum
- * distributed transaction id currently in-use.
- */
-static DistributedTransactionId
-determineSegmentMaxDistributedXid(void)
-{
-	DistributedTransactionId max = 0;
-	int		i;
-	int 	resultCount = 0;
-	struct pg_result **results = NULL;
-	StringInfoData buffer;
-	StringInfoData errbuf;
-
-#define FUNCTION_DOES_NOT_EXIST "function gp_max_distributed_xid() does not exist"
-
-	initStringInfo(&buffer);
-
-	appendStringInfo(&buffer, "select gp_max_distributed_xid()");
-
-	initStringInfo(&errbuf);
-
-	results = cdbdisp_dispatchRMCommand(buffer.data, /* Snapshot */ false,
-		                                &errbuf, &resultCount);
-
-	if (errbuf.len > 0)
-	{
-		int cmplen = strlen(FUNCTION_DOES_NOT_EXIST);
-
-		if (strlen(errbuf.data) >= cmplen &&
-			strncmp(errbuf.data, FUNCTION_DOES_NOT_EXIST, cmplen ) == 0)
-		{
-			elog(LOG, "The function gp_max_distributed_xid is missing on one or more segments.  The beta 3.0 upgrade steps are necessary");
-
-		}
-		else
-		{
-			ereport(ERROR,
-					(errmsg("gp_max_distributed_xid error (gathered %d results from cmd '%s')", resultCount, buffer.data),
-					 errdetail("%s", errbuf.data)));
-		}
-	}
-	else
-	{
-		elog(DTM_DEBUG5, "determineSegmentMaxDistributedXid resultCount = %d",resultCount);
-
-		for (i = 0; i < resultCount; i++)
-		{
-			if (PQresultStatus(results[i]) != PGRES_TUPLES_OK)
-			{
-				elog(ERROR, "gp_max_distributed_xid: resultStatus not tuples_Ok");
-			}
-			else
-			{
-				/*
-				 * Due to funkyness in the current dispatch agent code, instead of 1 result
-				 * per QE with 1 row each, we can get back 1 result per dispatch agent, with
-				 * one row per QE controlled by that agent.
-				 */
-				int j;
-				for (j = 0; j < PQntuples(results[i]); j++)
-				{
-					DistributedTransactionId temp = 0;
-					temp  =  atol(PQgetvalue(results[i], j, 0));
-					elog(DTM_DEBUG5, "determineSegmentMaxDistributedXid value = %d",temp);
-					if (temp  > max)
-						max = temp;
-				}
-			}
-		}
-	}
-
-	pfree(errbuf.data);
-
-	for (i = 0; i < resultCount; i++)
-		PQclear(results[i]);
-
-	free(results);
-
-	return max;
-}
-
-
-
-/*
- * gatherRMInDoubtTransactions:
- * Builds a hashtable of all of the in-doubt transactions that exist on the
- * segment databases.  The hashtable basically just serves as a single list
- * without duplicates of all the in-doubt transactions.  It does not keep track
- * of which seg db's have which transactions in-doubt.  It currently doesn't
- * need to due to the way we handle this information later.
- */
-static HTAB *
-gatherRMInDoubtTransactions(void)
-{
-	PGresult  **pgresultSets = NULL;
-	StringInfoData errmsgbuf;
-	const char *cmdbuf = "select gid from pg_prepared_xacts";
-	PGresult  **rs;
-
-	InDoubtDtx *lastDtx = NULL;
-
-	HASHCTL		hctl;
-	HTAB	   *htab = NULL;
-
-	int			j,
-				rows;
-	bool		found;
-
-	initStringInfo(&errmsgbuf);
-
-	/* call to all QE to get in-doubt transactions */
-	pgresultSets = cdbdisp_dispatchRMCommand(cmdbuf, /* withSnapshot */false,
-											 &errmsgbuf, NULL);
-
-	/* display error messages */
-	if (errmsgbuf.len > 0)
-	{
-		ereport(ERROR, (errcode(ERRCODE_GP_INTERCONNECTION_ERROR),
-					errmsg("Unable to collect list of prepared transactions "
-						   "from all segment databases."),
-						errdetail("%s", errmsgbuf.data)));
-
-		pfree(errmsgbuf.data);
-
-		/* need recovery */
-		return NULL;
-	}
-
-	pfree(errmsgbuf.data);
-
-	/* If any result set is nonempty, there are in-doubt transactions. */
-	for (rs = pgresultSets; *rs; ++rs)
-	{
-		rows = PQntuples(*rs);
-
-		for (j = 0; j < rows; j++)
-		{
-			char	   *gid;
-
-			/*
-			 * we dont setup our hashtable until we know we have at least one
-			 * in doubt transaction
-			 */
-			if (htab == NULL)
-			{
-
-				/* setup a hash table */
-				hctl.keysize = TMGIDSIZE;		/* GID */
-				hctl.entrysize = sizeof(InDoubtDtx);
-
-				htab = hash_create("InDoubtDtxHash", 10, &hctl, HASH_ELEM);
-
-				if (htab == NULL)
-				{
-					ereport(FATAL, (errcode(ERRCODE_OUT_OF_MEMORY),
-									errmsg("DTM could not allocate hash table for InDoubtDtxList.")));
-				}
-			}
-
-			gid = PQgetvalue(*rs, j, 0);
-
-			/* Now we can add entry to hash table */
-			lastDtx = (InDoubtDtx *) hash_search(htab, gid, HASH_ENTER, &found);
-
-			/*
-			 * only need to bother doing work if there isn't already an entry
-			 * for our GID
-			 */
-			if (!found)
-			{
-				elog(DEBUG3, "Found in-doubt transaction with GID: %s on remote RM", gid);
-
-				strcpy(lastDtx->gid, gid);
-			}
-
-		}
-	}
-
-	cleanRMResultSets(pgresultSets);
-
-	return htab;
 }
 
 static bool

@@ -997,8 +997,6 @@ PQbuildGpQueryString(const char  *command,
 					 int          sliceinfo_len,
 					 const char  *snapshotInfo,
 					 int          snapshotInfo_len,
-					 const char  *catalog,
-					 int          catalog_len,
 					 int          flags,
 					 int          gp_command_count,
 					 int          localSlice,
@@ -1042,8 +1040,6 @@ PQbuildGpQueryString(const char  *command,
 		sizeof(sliceinfo_len) +
 		sizeof(snapshotInfo_len) +
 		snapshotInfo_len +
-		sizeof(catalog_len) +
-		catalog_len +
 		sizeof(flags) +
 		sizeof(seqServerHostlen) +
 		sizeof(seqServerPort) +
@@ -1150,10 +1146,6 @@ PQbuildGpQueryString(const char  *command,
 		pos += snapshotInfo_len;
 	}
 
-	tmp = htonl(catalog_len);
-	memcpy(pos, &tmp, sizeof(tmp));
-	pos += sizeof(tmp);
-
 	tmp = htonl(flags);
 	memcpy(pos, &tmp, sizeof(tmp));
 	pos += sizeof(tmp);
@@ -1194,12 +1186,6 @@ PQbuildGpQueryString(const char  *command,
 	{
 		memcpy(pos, sliceinfo, sliceinfo_len);
 		pos += sliceinfo_len;
-	}
-
-	if (catalog_len > 0)
-	{
-		memcpy(pos, catalog, catalog_len);
-		pos += catalog_len;
 	}
 
 	if (seqServerHostlen > 0)

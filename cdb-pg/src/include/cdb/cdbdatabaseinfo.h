@@ -78,6 +78,7 @@ typedef struct DbInfoSegmentFile
  */
 typedef struct DbInfoAppendOnlyCatalogSegmentInfo
 {
+	int4		contentid;
 	int32		segmentFileNum;
 	int64		logicalEof;
 } DbInfoAppendOnlyCatalogSegmentInfo;

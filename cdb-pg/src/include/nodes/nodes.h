@@ -458,6 +458,9 @@ typedef enum NodeTag
     /* CDB: tags for random other stuff */
     T_CdbExplain_StatHdr = 950,             /* in cdb/cdbexplain.c */
 
+    /* gpsql: tags for query context dispatching */
+    T_QueryContextInfo = 1000,
+
     /*
      * TAGS FOR CAQL PARSER
      */

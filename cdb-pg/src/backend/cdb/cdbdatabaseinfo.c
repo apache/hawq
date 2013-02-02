@@ -474,6 +474,7 @@ static void DatabaseInfo_AddExtraSegmentFile(
 
 static void DatabaseInfo_AddAppendOnlyCatalogSegmentInfo(
 	DbInfoRel 				*dbInfoRel,
+	int4					contentid,
 	int32 					segmentFileNum,
 	int64					logicalEof)
 {
@@ -490,7 +491,8 @@ static void DatabaseInfo_AddAppendOnlyCatalogSegmentInfo(
 
 	appendOnlyCatalogSegmentInfo = &dbInfoRel->appendOnlyCatalogSegmentInfo[dbInfoRel->appendOnlyCatalogSegmentInfoCount];
 	dbInfoRel->appendOnlyCatalogSegmentInfoCount++;
-	
+
+	appendOnlyCatalogSegmentInfo->contentid = contentid;
 	appendOnlyCatalogSegmentInfo->segmentFileNum = segmentFileNum;
 	appendOnlyCatalogSegmentInfo->logicalEof = logicalEof;
 
@@ -920,6 +922,11 @@ DbInfoAppendOnlyCatalogSegmentInfo_Compare(const void *entry1, const void *entry
 	const DbInfoAppendOnlyCatalogSegmentInfo *info2 = 
 		(DbInfoAppendOnlyCatalogSegmentInfo *) entry2;
 
+	if (info1->contentid < info2->contentid)
+		return -1;
+	if (info1->contentid > info2->contentid)
+		return 1;
+
 	if (info1->segmentFileNum == info2->segmentFileNum)
 		return 0;
 	else if (info1->segmentFileNum > info2->segmentFileNum)
@@ -1051,9 +1058,6 @@ DatabaseInfo_HandleAppendOnly(
 
 				Relation pg_aoseg_rel;
 
-				ereport(ERROR,
-						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support CREATE DATABASE statement if template1 changed in GPSQL") ));
-
 				pg_aoseg_rel = 
 						DirectOpen_PgAoSegOpenDynamic(
 											aoEntry->segrelid,
@@ -1067,11 +1071,13 @@ DatabaseInfo_HandleAppendOnly(
 												aoEntry,
 												pg_aoseg_rel,
 												SnapshotNow, 
+												true,
 												&totalAoSegFiles);
 				for (i = 0; i < totalAoSegFiles; i++)
 				{
 					DatabaseInfo_AddAppendOnlyCatalogSegmentInfo(
 															dbInfoRel,
+															aoSegfileArray[i]->content,
 															aoSegfileArray[i]->segno,
 															aoSegfileArray[i]->eof);
 				}
@@ -1111,9 +1117,11 @@ DatabaseInfo_HandleAppendOnly(
 	                    AOCSVPInfoEntry *entry;
 
 						entry = getAOCSVPEntry(aocsSegfileArray[i], columnNum);
-						
+
+						Insist(!"should not be here!");
 						DatabaseInfo_AddAppendOnlyCatalogSegmentInfo(
 																dbInfoRel,
+																/* This is not supported. */ -1,
 																columnNum * AOTupleId_MultiplierSegmentFileNum + segmentFileNum,
 																entry->eof);
 					}
@@ -1530,7 +1538,8 @@ DatabaseInfo_AlignAppendOnly(
 					 dbInfoRel->relname,
 					 dbInfoRel->gpRelationNodes[g].segmentFileNum);
 			}
-			else if (dbInfoRel->gpRelationNodes[g].segmentFileNum == appendOnlyCatalogSegmentInfo->segmentFileNum)
+			else if (dbInfoRel->gpRelationNodes[g].segmentFileNum == appendOnlyCatalogSegmentInfo->segmentFileNum &&
+					dbInfoRel->gpRelationNodes[g].contentid == appendOnlyCatalogSegmentInfo->contentid)
 			{
 				dbInfoRel->gpRelationNodes[g].logicalEof = appendOnlyCatalogSegmentInfo->logicalEof;
 				g++;

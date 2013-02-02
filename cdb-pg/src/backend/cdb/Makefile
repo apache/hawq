@@ -62,7 +62,8 @@ OBJS = cdbanalyze.o \
 	   cdbvars.o cdbvarblock.o \
 	   cdbworkfile.o \
 	   cdbinmemheapam.o \
-	   cdbdispatchedtablespaceinfo.o
+	   cdbdispatchedtablespaceinfo.o \
+	   cdbquerycontextdispatching.o
 
 ifeq ($(PORTNAME),cygwin)
 .LIBPATTERNS := $(filter-out %.so,$(.LIBPATTERNS))

@@ -34,6 +34,7 @@ typedef struct SegmentDatabaseDescriptor
 	 * segindex assigned to the segment in gp_segment_config
 	 */
 	int4         			segindex; /* this is actually the *content-id* */
+	int4					dbid;
 	
     /* conn
 	 *

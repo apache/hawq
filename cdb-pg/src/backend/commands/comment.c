@@ -53,7 +53,6 @@
 #include "utils/rel.h"
 #include "utils/syscache.h"
 #include "cdb/cdbvars.h"
-#include "cdb/cdbdisp.h"
 
 
 /*
@@ -163,10 +162,6 @@ CommentObject(CommentStmt *stmt)
 		default:
 			elog(ERROR, "unrecognized object type: %d",
 				 (int) stmt->objtype);
-	}
-	if (Gp_role == GP_ROLE_DISPATCH)
-	{
-		CdbDispatchUtilityStatement((Node *) stmt, "CommentObject");
 	}
 }
 

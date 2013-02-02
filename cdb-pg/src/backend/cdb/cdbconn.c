@@ -231,6 +231,7 @@ cdbconn_initSegmentDescriptor(SegmentDatabaseDescriptor *segdbDesc,
     /* Segment db info */
     segdbDesc->segment_database_info = cdbinfo;
     segdbDesc->segindex = cdbinfo->segindex;
+	segdbDesc->dbid = cdbinfo->dbid;
     //segdbDesc->dbname = MyProcPort->database_name ? strdup(MyProcPort->database_name) : NULL;
 	//segdbDesc->username = MyProcPort->user_name ? strdup(MyProcPort->user_name) : NULL;
 
@@ -346,6 +347,8 @@ cdbconn_doConnect(SegmentDatabaseDescriptor    *segdbDesc,
 	appendPQExpBuffer(&buffer, "dboid=%u ", MyProcPort->dboid);
 	appendPQExpBuffer(&buffer, "bootstrap_user=%s ", MyProcPort->bootstrap_user);
 	appendPQExpBuffer(&buffer, "encoding=%d ", MyProcPort->encoding);
+	appendPQExpBuffer(&buffer, "segindex=%d", segdbDesc->segindex);
+	appendPQExpBuffer(&buffer, "dbid=%d", segdbDesc->dbid);
 
     /*
      * Call libpq to connect

@@ -543,7 +543,7 @@ external_insert_init(Relation rel)
 		Value*		v;
 		char*		uri_str;
 		int			segindex = GpIdentity.segindex;
-		int			num_segs = GpIdentity.numsegments;
+		int			num_segs = getgpsegmentCount();
 		int			num_urls = list_length(extentry->locations);
 		int			my_url = segindex % num_urls;
 
@@ -2568,7 +2568,7 @@ external_set_env_vars(extvar_t *extvar, char* uri, bool csv, char* escape, char*
 	}
 	else
 	{
-		CdbComponentDatabases *cdb_component_dbs = getCdbComponentDatabases();
+		CdbComponentDatabases *cdb_component_dbs = getCdbComponentDatabasesForGangs();
 		CdbComponentDatabaseInfo *qdinfo = &cdb_component_dbs->entry_db_info[0];
 
 		pg_ltoa(qdinfo->port, result);
@@ -2602,7 +2602,7 @@ external_set_env_vars(extvar_t *extvar, char* uri, bool csv, char* escape, char*
 	sprintf(extvar->GP_SEGMENT_ID, "%d", Gp_segment);
     sprintf(extvar->GP_SEG_PORT, "%d", PostPortNumber);
     sprintf(extvar->GP_SESSION_ID, "%d", gp_session_id);
- 	sprintf(extvar->GP_SEGMENT_COUNT, "%d", GpIdentity.numsegments);
+ 	sprintf(extvar->GP_SEGMENT_COUNT, "%d", getgpsegmentCount());
 
  	/* Hadoop Connector env var
  	 *

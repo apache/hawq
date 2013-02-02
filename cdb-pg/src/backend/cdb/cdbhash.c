@@ -32,6 +32,7 @@
 #include "utils/syscache.h"
 #include "cdb/cdbhash.h"
 #include "cdb/cdbutil.h"
+#include "cdb/cdbvars.h"
 
 /*
  * 32 bit FNV-1 and FNV-1a non-zero initial basis
@@ -670,6 +671,10 @@ cdbhashreduce(CdbHash *h)
 			result = (h->hash) % (h->numsegs);	/* simple mod */
 			break;
 	}
+
+	if (GpAliveSegmentsInfo.cdbComponentDatabases &&
+		GpAliveSegmentsInfo.cdbComponentDatabases->total_segments > result)
+		return GpAliveSegmentsInfo.cdbComponentDatabases->segment_db_info[result].segindex;
 
 	return result;
 }

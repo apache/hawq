@@ -23,6 +23,7 @@
 #include "cdb/cdbfts.h"
 #include "cdb/cdblink.h"
 #include "cdb/cdbtm.h"
+#include "cdb/cdbutil.h"
 #include "libpq/libpq-be.h"
 #include "commands/dbcommands.h"
 #include "storage/proc.h"
@@ -57,6 +58,7 @@ static LWLockId ftsQDMirrorUpdateConfigLock;
 static struct FtsQDMirrorInfo *ftsQDMirrorInfo=NULL;
 
 static char *QDMirroringDisabledReasonToString(QDMIRRORDisabledReason disabledReason);
+static AliveSegmentsInfo *GetSegmentsInfo(Bitmapset *last_alive_segment_bms);
 
 /*
  * get fts share memory size
@@ -1559,3 +1561,224 @@ FtsGetQDMirrorInfo(char **hostname, uint16 *port)
 	*port = ftsQDMirrorInfo->port;
 	return;
 }
+
+/*
+ * This function returns the segments information. If there are some failed
+ * segment, this function will auto failover failed segments to alive segment.
+ */
+static AliveSegmentsInfo *
+GetSegmentsInfo(Bitmapset *last_alive_segment_bms)
+{
+	AliveSegmentsInfo *info = NULL;
+	int			i;
+	int			current_id;
+	int			alive_id;
+	Bitmapset	*alive_bms = NULL;
+	CdbComponentDatabases *databases = NULL;
+	int			debug_log_level = DEBUG2;
+
+	info = (AliveSegmentsInfo *) palloc0(sizeof(AliveSegmentsInfo));
+	databases = getCdbComponentInfo(true);
+
+	/* We will not leave the dead segment in its place. */
+	for (current_id = 0, alive_id = 0;
+		current_id < databases->total_segment_dbs;
+		current_id++)
+	{
+		CdbComponentDatabaseInfo *p = &databases->segment_db_info[current_id];
+
+		/* Fault injection for fake failed segment. */
+		if (GpAliveSegmentsInfo.failed_segmentid_number > 0 &&
+			GpAliveSegmentsInfo.failed_segmentid_start <= p->segindex &&
+			p->segindex < GpAliveSegmentsInfo.failed_segmentid_start + GpAliveSegmentsInfo.failed_segmentid_number)
+		{
+			elog(debug_log_level, "fake segindex: %d status down actual status %s", p->segindex, p->status == 'u' ? "up" : "down");
+			p->status = 'd';
+		}
+
+		if (p->status == 'u')
+		{
+			alive_bms = bms_add_member(alive_bms, p->segindex);
+			/* Move the alive to the correct position. */
+			if (current_id != alive_id)
+				databases->segment_db_info[alive_id] = *p;
+			alive_id++;
+			continue;
+		}
+
+		/* free the failed segment. */
+		freeCdbComponentDatabaseInfo(p);
+	}
+
+	/* Number of segments will change in the failover code. */
+	databases->total_segment_dbs = alive_id;
+	databases->total_segments = alive_id;
+	info->aliveSegmentsCount = alive_id;
+	info->aliveSegmentsBitmap = alive_bms;
+	info->cdbComponentDatabases = databases;
+
+	if (GetTotalSegmentsNumber() != info->aliveSegmentsCount)
+		elog(debug_log_level, "total segment: %d alive segment: %d", GetTotalSegmentsNumber(), info->aliveSegmentsCount);
+
+	if (info->aliveSegmentsCount == 0)
+	{
+		/* No alive segment, let the caller decide whether error out or not. */
+		return info;
+	}
+
+	if (bms_equal(last_alive_segment_bms, alive_bms))
+	{
+		/* It looks like nothing happened. */
+		bms_free(alive_bms);
+		while (alive_id--)
+			freeCdbComponentDatabaseInfo(&databases->segment_db_info[current_id]);
+		pfree(databases);
+		return NULL;
+	}
+
+	/*
+	 * TODO: failover has some bugs.
+	 */
+	if (info->aliveSegmentsCount != GetTotalSegmentsNumber())
+	{
+		elog(LOG, "failover not fully supports");
+		return info;
+	}
+
+	/*
+	 * There are some failover segments, random failover the failed segments
+	 * to alive segments.
+	 */
+	for (i = 0; i < GetTotalSegmentsNumber(); i++)
+	{
+		int		failover_seg_pos;
+		int		failover_segindex;
+
+		if (bms_is_member(i, alive_bms))
+			continue;
+
+		failover_seg_pos = random() % info->aliveSegmentsCount;
+		failover_segindex = databases->segment_db_info[failover_seg_pos].segindex;
+		elog(debug_log_level, "random failover segindex %d to segindex %d", i, failover_segindex);
+		databases->segment_db_info[alive_id] = databases->segment_db_info[failover_seg_pos];
+		databases->segment_db_info[alive_id].segindex = i;
+		/* databases->segment_db_info[alive_id].dbid */
+		alive_id++;
+	}
+
+	Insist(alive_id == GetTotalSegmentsNumber());
+
+	info->cdbComponentDatabases->total_segment_dbs = alive_id;
+	info->cdbComponentDatabases->total_segments = alive_id;
+	info->aliveSegmentsCount = alive_id;
+
+	return info;
+}
+
+/*
+ * UpdateGpAliveSegmentsInfo
+ *	Update the UpdateGpAliveSegmentsInfo if the fts changes. if 'force' is true,
+ *	Update it forcely.
+ */
+static void
+UpdateGpAliveSegmentsInfo(bool force)
+{
+	MemoryContext		old;
+	AliveSegmentsInfo	*info = NULL;
+	int			i;
+
+	old = MemoryContextSwitchTo(TopMemoryContext);
+	info = GetSegmentsInfo(force ? NULL : GpAliveSegmentsInfo.aliveSegmentsBitmap);
+	MemoryContextSwitchTo(old);
+
+	/* Nothing happened. */
+	if (info == NULL)
+		return;
+
+	GpAliveSegmentsInfo.fts_statusVersion = 0;
+	GpAliveSegmentsInfo.tid = GetCurrentTransactionId();
+	/* GpAliveSegmentsInfo.cleanGangs */
+	GpAliveSegmentsInfo.forceUpdate = false;
+	/* GpAliveSegmentsInfo.failed_segmentid_start */
+	/* GpAliveSegmentsInfo.failed_segmentid_number */
+	GpAliveSegmentsInfo.aliveSegmentsCount = info->aliveSegmentsCount;
+	GpAliveSegmentsInfo.aliveSegmentsBitmap = info->aliveSegmentsBitmap;
+	GpAliveSegmentsInfo.cdbComponentDatabases = info->cdbComponentDatabases;
+	GpAliveSegmentsInfo.singleton_segindex = UNINITIALIZED_GP_IDENTITY_VALUE;
+	/* Find the singleton. */
+	for (i = 0; i < GpAliveSegmentsInfo.aliveSegmentsCount; i++)
+		if (GpAliveSegmentsInfo.singleton_segindex == UNINITIALIZED_GP_IDENTITY_VALUE ||
+			GpAliveSegmentsInfo.singleton_segindex > GpAliveSegmentsInfo.cdbComponentDatabases->segment_db_info[i].segindex)
+			GpAliveSegmentsInfo.singleton_segindex = GpAliveSegmentsInfo.cdbComponentDatabases->segment_db_info[i].segindex;
+
+	pfree(info);
+
+	if (GpAliveSegmentsInfo.aliveSegmentsCount == 0)
+		elog(ERROR, "No alive segment in the GPSQL.");
+
+	/*
+	 * The alive segments information has been changed. Try to failover to a new
+	 * session. Segment failed or recoveryed.
+	 */
+	if (!force)
+	{
+		elog(ERROR, "segment configuration changed, reset session");
+	}
+}
+
+
+/*
+ * UpdateAliveSegmentsInfo
+ *	Update the alive segment information from ftsprobe.
+ *
+ *	The debug & test GUCs are tricky.
+ *	  Start Transaction
+ *	  UpdateAliveSegmentsInfo()	<- init
+ *	  AllocateGangs()			<- writer
+ *	  Change GUCs
+ *	  End Transaction
+ *	  ReleaseGangs				<- cleanGangs
+ *	  Start Transaction
+ *	  UpdateAliveSegmentsInfo() <- forceUpdate
+ */
+void
+UpdateAliveSegmentsInfo(void)
+{
+	bool	init = GpAliveSegmentsInfo.cdbComponentDatabases == NULL;
+
+	if (!init && GpAliveSegmentsInfo.forceUpdate)
+	{
+		UpdateGpAliveSegmentsInfo(true);
+		return;
+	}
+
+	ftsLock();
+	if (!FtsIsActive())
+	{
+		/* Make sure we have a initial state of GpAliveSegmentsInfo. */
+		if (init)
+		{
+			UpdateGpAliveSegmentsInfo(true);
+		}
+		ftsUnlock();
+		return;
+	}
+	ftsUnlock();
+
+	GpAliveSegmentsInfo.forceUpdate = false;
+	/*
+	 * CANNOT change the segment information in the same transaction. There might
+	 * be some gangs allocated to a specific session. They can be released iff
+	 * not in the transaction.
+	 */
+	if (GpAliveSegmentsInfo.tid == GetCurrentTransactionId())
+		return;
+
+	/* TODO: fts version... not support */
+
+	elog(LOG, "segment reconfiguraion happened.");
+
+	/* If it is the first time update alive information. Don't trigger error! */
+	UpdateGpAliveSegmentsInfo(init);
+}
+

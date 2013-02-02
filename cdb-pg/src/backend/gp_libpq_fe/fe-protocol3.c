@@ -2280,6 +2280,26 @@ build_startup_packet(const PGconn *conn, char *packet,
 		packet_len += strlen(conn->encoding) + 1;
 	}
 
+	if (conn->segindex && conn->segindex[0])
+	{
+		if (packet)
+			strcpy(packet + packet_len, "segindex");
+		packet_len += strlen("segindex") + 1;
+		if (packet)
+			strcpy(packet + packet_len, conn->segindex);
+		packet_len += strlen(conn->segindex) + 1;
+	}
+
+	if (conn->dbid && conn->dbid[0])
+	{
+		if (packet)
+			strcpy(packet + packet_len, "dbid");
+		packet_len += strlen("dbid") + 1;
+		if (packet)
+			strcpy(packet + packet_len, conn->dbid);
+		packet_len += strlen(conn->dbid) + 1;
+	}
+
 	/* CDB: Add qExec startup data */
 	if (conn->gpqeid && conn->gpqeid[0])
 	{

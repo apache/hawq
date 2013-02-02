@@ -14,7 +14,7 @@
 
 void clear_relsize_cache(void);
 
-int64 cdbRelSize(Oid relOid);
+int64 cdbRelSize(Relation rel);
 
 
 #endif /*CDBRELSIZE_H_*/

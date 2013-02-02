@@ -953,10 +953,6 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
     /* save relationOid for auto-stats */
 	Oid         relationOid = InvalidOid;
 
-	if (GpIdentity.segindex != UNINITIALIZED_GP_IDENTITY_VALUE)
-		ereport(ERROR,
-				(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support copy statement yet in GPSQL") ));
-
 	/* Allocate workspace and zero all fields */
 	cstate = (CopyStateData *) palloc0(sizeof(CopyStateData));
 
@@ -1535,8 +1531,8 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 		 */
 		if(shouldDispatch)
 		{
-			Oid relid = RelationGetRelid(cstate->rel);
-			List *all_relids = NIL;
+			Oid		relid = RelationGetRelid(cstate->rel);
+			List	*all_relids = NIL;
 
 			all_relids = lappend_oid(all_relids, relid);
 
@@ -1839,7 +1835,7 @@ CopyToDispatch(CopyState cstate)
 	 */
 
 	cdbCopy = makeCdbCopy(false);
-
+	
 	cdbCopy->partitions = RelationBuildPartitionDesc(cstate->rel, false);
 
 	/* XXX: lock all partitions */
@@ -1867,7 +1863,7 @@ CopyToDispatch(CopyState cstate)
 
 	PG_TRY();
 	{
-		cdbCopyStart(cdbCopy, cdbcopy_cmd.data);
+		cdbCopyStart(cdbCopy, cdbcopy_cmd.data, RelationGetRelid(cstate->rel), InvalidOid);
 	}
 	PG_CATCH();
 	{
@@ -1974,6 +1970,8 @@ CopyToDispatch(CopyState cstate)
 		ereport(ERROR,
 				(errcode(ERRCODE_IO_ERROR),
 				 errmsg("%s", cdbcopy_err.data)));
+
+	cdbCopyGetCatalogs(cdbCopy);
 
 	pfree(cdbcopy_cmd.data);
 	pfree(cdbcopy_err.data);
@@ -2544,6 +2542,7 @@ CopyFromDispatch(CopyState cstate)
 	int			p_index;
 	Oid			in_func_oid;
 	Oid			out_func_oid;
+	Oid         relerror = InvalidOid;
 	Datum	   *values;
 	bool	   *nulls;
 	int		   *attr_offsets;
@@ -2657,6 +2656,7 @@ CopyFromDispatch(CopyState cstate)
             palloc0(resultRelInfo->ri_TrigDesc->numtriggers * sizeof(FmgrInfo));
     resultRelInfo->ri_TrigInstrument = NULL;
     ResultRelInfoSetSegno(resultRelInfo, cstate->ao_segnos);
+	CreateAppendOnlySegFileOnMaster(resultRelInfo, cstate->ao_segnos);
 
 	ExecOpenIndices(resultRelInfo);
 
@@ -2897,7 +2897,10 @@ CopyFromDispatch(CopyState cstate)
 	elog(DEBUG5, "COPY command sent to segdbs: %s", cdbcopy_cmd.data);
 	PG_TRY();
 	{
-		cdbCopyStart(cdbCopy, cdbcopy_cmd.data);
+	    if (cstate->cdbsreh && cstate->cdbsreh->errtbl)
+	        relerror = RelationGetRelid(cstate->cdbsreh->errtbl);
+
+		cdbCopyStart(cdbCopy, cdbcopy_cmd.data, RelationGetRelid(cstate->rel), relerror);
 	}
 	PG_CATCH();
 	{
@@ -3479,6 +3482,8 @@ CopyFromDispatch(CopyState cstate)
 
 	if (cdbCopy->remote_data_err || cdbCopy->io_errors)
 		appendBinaryStringInfo(&cdbcopy_err, cdbCopy->err_msg.data, cdbCopy->err_msg.len);
+	else
+		cdbCopyGetCatalogs(cdbCopy);
 
 	if (cdbCopy->remote_data_err)
 	{

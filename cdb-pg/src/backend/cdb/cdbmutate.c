@@ -149,7 +149,7 @@ directDispatchCalculateHash(Plan *plan, GpPolicy *targetPolicy)
 	ListCell *cell=NULL;
 	bool directDispatch;
 
-	h = makeCdbHash(GpIdentity.numsegments, HASH_FNV_1);
+	h = makeCdbHash(getgpsegmentCount(), HASH_FNV_1);
 	cdbhashinit(h);
 
 	/*

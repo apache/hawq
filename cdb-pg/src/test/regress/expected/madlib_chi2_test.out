@@ -1,0 +1,67 @@
+SET client_min_messages TO ERROR;
+DROP SCHEMA IF EXISTS madlib_install_check_gpsql_chi2_test CASCADE;
+CREATE SCHEMA madlib_install_check_gpsql_chi2_test;
+SET search_path = madlib_install_check_gpsql_chi2_test, madlib;
+CREATE TABLE chi2_test_blood_group (
+    id SERIAL,
+    blood_group VARCHAR,
+    observed BIGINT,
+    expected DOUBLE PRECISION
+);
+INSERT INTO chi2_test_blood_group(blood_group, observed, expected) VALUES
+    ('O', 67, 82.28),
+    ('A', 83, 84.15),
+    ('B', 29, 14.96),
+    ('AB', 8, 5.61);
+CREATE TABLE chi2_gof_test_1 AS
+SELECT (chi2_gof_test(observed, expected)).* FROM chi2_test_blood_group;
+--SELECT * FROM chi2_gof_test_1;
+SELECT assert(
+    relative_error(statistic, 17.0481) < 0.001 AND
+    df = 3,
+    'Chi-squared g.o.f. test: Wrong results'
+) FROM chi2_gof_test_1;
+ assert 
+--------
+ 
+(1 row)
+
+CREATE TABLE chi2_test_friendly (
+    id_x SERIAL,
+    values INTEGER[]
+);
+INSERT INTO chi2_test_friendly(values) VALUES
+    (array[5, 29, 14, 16]),
+    (array[15, 54, 14, 10]),
+    (array[20, 84, 17, 94]),
+    (array[68, 119, 26, 7]);
+CREATE TABLE chi2_test_friendly_unpivoted AS
+SELECT id_x, id_y, values[id_y] AS observed
+FROM
+    chi2_test_friendly,
+    generate_series(1,4) AS id_y;
+CREATE TABLE chi2_independence_est_1 AS
+SELECT (chi2_gof_test(observed, expected, deg_freedom)).*
+FROM (
+    SELECT
+        observed,
+        sum(observed) OVER (PARTITION BY id_x)::DOUBLE PRECISION
+            * sum(observed) OVER (PARTITION BY id_y) AS expected
+    FROM chi2_test_friendly_unpivoted
+) p, (
+    SELECT
+        (count(DISTINCT id_x) - 1) * (count(DISTINCT id_y) - 1) AS deg_freedom
+    FROM chi2_test_friendly_unpivoted
+) q;
+--SELECT * FROM chi2_independence_est_1;
+SELECT assert(
+    relative_error(statistic, 138.2898) < 0.001 AND
+    df = 9,
+    'Chi-squared independence test: Wrong results'
+) FROM chi2_independence_est_1;
+ assert 
+--------
+ 
+(1 row)
+
+DROP SCHEMA madlib_install_check_gpsql_chi2_test CASCADE;

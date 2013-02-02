@@ -165,6 +165,18 @@ typedef enum FaultInjectorIdentifier_e {
 
 	UpdateCommittedEofInPersistentTable,
 
+	GangThreadCreation,
+	DispatchThreadCreation,
+
+	DispatchWait,
+	ConnectionFailAfterGangCreation,
+
+	MakeDispatchThread,
+
+	BeforeDispatch,
+
+	DispatchToGangThreadStructureInitialization,
+
 	/* INSERT has to be done before that line */
 	FaultInjectorIdMax,
 	
@@ -206,6 +218,20 @@ typedef enum FaultInjectorType_e {
 
 	FaultInjectorTypeSegv,
 	
+	FaultInjectorTypeCreateThreadFail,
+
+	FaultInjectorTypeTimeOut,
+
+	FaultInjectorTypeDispatchError,
+
+	FaultInjectorTypeConnectionNull,
+
+	FaultInjectorTypeConnectionNullInRestoreMode,
+
+	FaultInjectorTypeUserCancel,
+
+	FaultInjectorTypeProcDie,
+
 	/* INSERT has to be done before that line */
 	FaultInjectorTypeMax,
 	

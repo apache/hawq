@@ -26,7 +26,7 @@ include $(top_srcdir)/src/backend/common.mk
 all: cdb_init.sql cdb_util.sql cdb_schema.sql gp_toolkit.sql gp_toolkit_test.sql $(BKIFILES)
 
 cdb_init.sql: cdb_schema.sql filesystem.sql
-	cat $(call vpathsearch,cdb_schema.sql) $(call vpathsearch,cdb_external_extensions.sql) $(call vpathsearch,filesystem.sql) > cdb_init.sql
+	cat $(call vpathsearch,cdb_schema.sql) $(call vpathsearch,cdb_external_extensions.sql) $(call vpathsearch,filesystem.sql) $(call vpathsearch,madlib.sql) > cdb_init.sql
 
 cdb_schema.sql: cdb_schema.in
 			sed -e 's,@pkglibdir@,$(pkglibdir),g' \

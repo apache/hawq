@@ -1,15 +1,123 @@
 --
 -- COPY
 --
-\c hdfs
+-- copy from create_table
+CREATE TABLE aggtest (
+    a           int2,
+    b           float4
+);
+CREATE TABLE tenk1 (
+    unique1     int4,
+    unique2     int4,
+    two         int4,
+    four        int4,
+    ten         int4,
+    twenty      int4,
+    hundred     int4,
+    thousand    int4,
+    twothousand int4,
+    fivethous   int4,
+    tenthous    int4,
+    odd         int4,
+    even        int4,
+    stringu1    name,
+    stringu2    name,
+    string4     name
+) WITH OIDS;
+CREATE TABLE slow_emp4000 (
+    home_base    box
+);
+CREATE TABLE person (
+    name        text,
+    age         int4,
+    location    point
+);
+CREATE TABLE onek (
+    unique1     int4,
+    unique2     int4,
+    two         int4,
+    four        int4,
+    ten         int4,
+    twenty      int4,
+    hundred     int4,
+    thousand    int4,
+    twothousand int4,
+    fivethous   int4,
+    tenthous    int4,
+    odd         int4,
+    even        int4,
+    stringu1    name,
+    stringu2    name,
+    string4     name
+);
+CREATE TABLE emp (
+    salary      int4,
+    manager     name
+) INHERITS (person) WITH OIDS;
+CREATE TABLE student (
+    gpa         float8
+) INHERITS (person);
+CREATE TABLE stud_emp (
+    percent     int4
+) INHERITS (emp, student);
+CREATE TABLE real_city (
+    pop         int4,
+    cname       text,
+    outline     path
+);
+CREATE TABLE road (
+    name        text,
+    thepath     path
+);
+CREATE TABLE hash_i4_heap (
+    seqno       int4,
+    random      int4
+);
+CREATE TABLE hash_name_heap (
+    seqno       int4,
+    random      name
+);
+CREATE TABLE hash_txt_heap (
+    seqno       int4,
+    random      text
+);
+CREATE TABLE hash_f8_heap (
+    seqno       int4,
+    random      float8
+);
+CREATE TABLE bt_i4_heap (
+    seqno       int4,
+    random      int4
+);
+CREATE TABLE bt_name_heap (
+    seqno       name,
+    random      int4
+);
+CREATE TABLE bt_txt_heap (
+    seqno       text,
+    random      int4
+);
+CREATE TABLE bt_f8_heap (
+    seqno       float8,
+    random      int4
+);
+CREATE TABLE array_op_test (
+    seqno       int4,
+    i           int4[],
+    t           text[]
+);
+CREATE TABLE array_index_op_test (
+    seqno       int4,
+    i           int4[],
+    t           text[]
+);
 -- CLASS POPULATION
 --	(any resemblance to real life is purely coincidental)
 --
 COPY aggtest FROM '@abs_srcdir@/data/agg.data';
 COPY onek FROM '@abs_srcdir@/data/onek.data';
 COPY onek TO '@abs_builddir@/results/onek.data';
-DELETE FROM onek;
-ERROR:  Append-only tables are not updatable. Operation not permitted. 
+TRUNCATE onek;
 COPY onek FROM '@abs_builddir@/results/onek.data';
 COPY tenk1 FROM '@abs_srcdir@/data/tenk.data';
 COPY slow_emp4000 FROM '@abs_srcdir@/data/rect.data';
@@ -72,4 +180,17 @@ copy copytest3 to stdout csv header;
 c1,"col with , comma","col with "" quote"
 1,a,1
 2,b,2
-\c regression
+DROP TABLE aggtest;
+DROP TABLE tenk1;
+DROP TABLE slow_emp4000;
+DROP TABLE onek;
+DROP TABLE road;
+DROP TABLE hash_i4_heap;
+DROP TABLE real_city;
+DROP TABLE hash_name_heap;
+DROP TABLE hash_txt_heap;
+DROP TABLE hash_f8_heap;
+DROP TABLE stud_emp;
+DROP TABLE student;
+DROP TABLE emp;
+DROP TABLE person;

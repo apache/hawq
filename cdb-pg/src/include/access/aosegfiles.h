@@ -38,7 +38,8 @@
 { -1, {"eof"},					701, -1, 8, 2, 0, -1, -1, true, 'p', 'd', false, false, false, true, 0 }, \
 { -1, {"tupcount"},				701, -1, 8, 3, 0, -1, -1, true, 'p', 'd', false, false, false, true, 0 }, \
 { -1, {"varblockcount"},		701, -1, 8, 4, 0, -1, -1, true, 'p', 'd', false, false, false, true, 0 }, \
-{ -1, {"eofuncompressed"},		701, -1, 8, 5, 0, -1, -1, true, 'p', 'd', false, false, false, true, 0 }
+{ -1, {"eofuncompressed"},		701, -1, 8, 5, 0, -1, -1, true, 'p', 'd', false, false, false, true, 0 }, \
+{ -1, {"contentid"},			23, -1, 4, 21, 0, -1, -1, true, 'p', 'i', true, false, false, true, 0 }
 
 /*
  * pg_aoseg_nnnnnn table values for FormData_pg_class.
@@ -121,7 +122,7 @@ extern FileSegInfo **
 GetAllFileSegInfo(Relation parentrel, AppendOnlyEntry *aoEntry, Snapshot appendOnlyMetaDataSnapshot, int *totalsegs);
 
 extern FileSegInfo **
-GetAllFileSegInfo_pg_aoseg_rel(char *relationName, AppendOnlyEntry *aoEntry, Relation pg_aoseg_rel, Snapshot appendOnlyMetaDataSnapshot, int *totalsegs);
+GetAllFileSegInfo_pg_aoseg_rel(char *relationName, AppendOnlyEntry *aoEntry, Relation pg_aoseg_rel, Snapshot appendOnlyMetaDataSnapshot, bool regurnAllSegmentsFiles, int *totalsegs);
 
 extern void
 UpdateFileSegInfo(Relation parentrel,

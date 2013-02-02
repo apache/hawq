@@ -182,6 +182,7 @@ typedef enum LockTagType
  */
 typedef struct LOCKTAG
 {
+	uint32		segindex;		/* backend contentid */
 	uint32		locktag_field1; /* a 32-bit ID field */
 	uint32		locktag_field2; /* a 32-bit ID field */
 	uint32		locktag_field3; /* a 32-bit ID field */
@@ -196,7 +197,8 @@ typedef struct LOCKTAG
  * rather than accessing the fields directly.  Note multiple eval of target!
  */
 #define SET_LOCKTAG_RELATION(locktag,dboid,reloid) \
-	((locktag).locktag_field1 = (dboid), \
+	((locktag).segindex = GpIdentity.segindex, \
+	 (locktag).locktag_field1 = (dboid), \
 	 (locktag).locktag_field2 = (reloid), \
 	 (locktag).locktag_field3 = 0, \
 	 (locktag).locktag_field4 = 0, \
@@ -204,7 +206,8 @@ typedef struct LOCKTAG
 	 (locktag).locktag_lockmethodid = DEFAULT_LOCKMETHOD)
 
 #define SET_LOCKTAG_RELATION_EXTEND(locktag,dboid,reloid) \
-	((locktag).locktag_field1 = (dboid), \
+	((locktag).segindex = GpIdentity.segindex, \
+	 (locktag).locktag_field1 = (dboid), \
 	 (locktag).locktag_field2 = (reloid), \
 	 (locktag).locktag_field3 = 0, \
 	 (locktag).locktag_field4 = 0, \
@@ -212,7 +215,8 @@ typedef struct LOCKTAG
 	 (locktag).locktag_lockmethodid = DEFAULT_LOCKMETHOD)
 
 #define SET_LOCKTAG_PAGE(locktag,dboid,reloid,blocknum) \
-	((locktag).locktag_field1 = (dboid), \
+	((locktag).segindex = GpIdentity.segindex, \
+	 (locktag).locktag_field1 = (dboid), \
 	 (locktag).locktag_field2 = (reloid), \
 	 (locktag).locktag_field3 = (blocknum), \
 	 (locktag).locktag_field4 = 0, \
@@ -220,7 +224,8 @@ typedef struct LOCKTAG
 	 (locktag).locktag_lockmethodid = DEFAULT_LOCKMETHOD)
 
 #define SET_LOCKTAG_TUPLE(locktag,dboid,reloid,blocknum,offnum) \
-	((locktag).locktag_field1 = (dboid), \
+	((locktag).segindex = GpIdentity.segindex, \
+	 (locktag).locktag_field1 = (dboid), \
 	 (locktag).locktag_field2 = (reloid), \
 	 (locktag).locktag_field3 = (blocknum), \
 	 (locktag).locktag_field4 = (offnum), \
@@ -228,7 +233,8 @@ typedef struct LOCKTAG
 	 (locktag).locktag_lockmethodid = DEFAULT_LOCKMETHOD)
 
 #define SET_LOCKTAG_TRANSACTION(locktag,xid) \
-	((locktag).locktag_field1 = (xid), \
+	((locktag).segindex = GpIdentity.segindex, \
+	 (locktag).locktag_field1 = (xid), \
 	 (locktag).locktag_field2 = 0, \
 	 (locktag).locktag_field3 = 0, \
 	 (locktag).locktag_field4 = 0, \
@@ -236,7 +242,8 @@ typedef struct LOCKTAG
 	 (locktag).locktag_lockmethodid = DEFAULT_LOCKMETHOD)
 
 #define SET_LOCKTAG_RELATION_RESYNCHRONIZE(locktag,dboid,reloid) \
-	((locktag).locktag_field1 = (dboid), \
+	((locktag).segindex = GpIdentity.segindex, \
+	 (locktag).locktag_field1 = (dboid), \
 	 (locktag).locktag_field2 = (reloid), \
 	 (locktag).locktag_field3 = 0, \
 	 (locktag).locktag_field4 = 0, \
@@ -244,7 +251,8 @@ typedef struct LOCKTAG
 	 (locktag).locktag_lockmethodid = DEFAULT_LOCKMETHOD)
 
 #define SET_LOCKTAG_RELATION_APPENDONLY_SEGMENT_FILE(locktag,dboid,reloid,segno) \
-	((locktag).locktag_field1 = (dboid), \
+	((locktag).segindex = GpIdentity.segindex, \
+	 (locktag).locktag_field1 = (dboid), \
 	 (locktag).locktag_field2 = (reloid), \
 	 (locktag).locktag_field3 = (segno), \
 	 (locktag).locktag_field4 = 0, \
@@ -252,7 +260,8 @@ typedef struct LOCKTAG
 	 (locktag).locktag_lockmethodid = DEFAULT_LOCKMETHOD)
 
 #define SET_LOCKTAG_OBJECT(locktag,dboid,classoid,objoid,objsubid) \
-	((locktag).locktag_field1 = (dboid), \
+	((locktag).segindex = GpIdentity.segindex, \
+	 (locktag).locktag_field1 = (dboid), \
 	 (locktag).locktag_field2 = (classoid), \
 	 (locktag).locktag_field3 = (objoid), \
 	 (locktag).locktag_field4 = (objsubid), \
@@ -260,7 +269,8 @@ typedef struct LOCKTAG
 	 (locktag).locktag_lockmethodid = DEFAULT_LOCKMETHOD)
 
 #define SET_LOCKTAG_ADVISORY(locktag,id1,id2,id3,id4) \
-	((locktag).locktag_field1 = (id1), \
+	((locktag).segindex = GpIdentity.segindex, \
+	 (locktag).locktag_field1 = (id1), \
 	 (locktag).locktag_field2 = (id2), \
 	 (locktag).locktag_field3 = (id3), \
 	 (locktag).locktag_field4 = (id4), \

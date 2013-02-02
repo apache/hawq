@@ -424,7 +424,7 @@ static void PersistentBuild_PopulateGpRelationNode(
 								dbInfoRel->relname,
 								relFileNode.relNode,	// pg_class relfilenode
 								physicalSegmentFileNum,
-								GpIdentity.numsegments,
+								GetTotalSegmentsNumber(),
 								/* updateIndex */ false,
 								&persistentTid,
 								persistentSerialNum);

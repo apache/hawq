@@ -64,10 +64,8 @@ class PortAssigner:
         #
         segments = gpArray.getDbList()
         ports = [seg.getSegmentPort() for seg in segments if seg.isSegmentQE()]
-        replicationPorts = [seg.getSegmentReplicationPort() for seg in segments if seg.getSegmentReplicationPort() is not None]
-        if len(replicationPorts) > 0 and len(ports) > 0:
+        if len(ports) > 0:
             self.__minPort = min(ports)
-            self.__minReplicationPort = min(replicationPorts)
         else:
             raise Exception("No segment ports found in array.")
         self.__usedPortsByHostName = {}
@@ -77,9 +75,8 @@ class PortAssigner:
             usedPorts = self.__usedPortsByHostName[hostName] = {}
             for seg in segments:
                 usedPorts[seg.getSegmentPort()] = True
-                usedPorts[seg.getSegmentReplicationPort()] = True
 
-    def findAndReservePort(self, getReplicationPortNotPostmasterPort, hostName, address):
+    def findAndReservePort(self, hostName, address):
         """
         Find an unused port of the given type (normal postmaster or replication port)
         When found, add an entry:  usedPorts[port] = True   and return the port found
@@ -89,7 +86,7 @@ class PortAssigner:
             self.__usedPortsByHostName[hostName] = {}
         usedPorts = self.__usedPortsByHostName[hostName]
 
-        minPort = self.__minReplicationPort if getReplicationPortNotPostmasterPort else self.__minPort
+        minPort = self.__minPort
         for port in range(minPort, PortAssigner.MAX_PORT_EXCLUSIVE):
             if port not in usedPorts:
                 usedPorts[port] = True
@@ -262,8 +259,13 @@ class GpRecoverSegmentProgram:
         return GpMirrorListToBuild(segs, self.__pool, self.__options.quiet, self.__options.parallelDegree)
 
     def findAndValidatePeersForFailedSegments(self, gpArray, failedSegments):
-        dbIdToPeerMap = gpArray.getDbIdToPeerMap()
-        peersForFailedSegments = [ dbIdToPeerMap.get(seg.getSegmentDbId()) for seg in failedSegments]
+        """
+        findAndValidatePeersForFailedSegments will returns random segments for failed segments.
+        """
+        segs = [ seg for seg in gpArray.get_valid_segdbs() if not seg.isSegmentDown()]
+        if len(segs) <= 0:
+            raise Exception("No available segment in the cluster.")
+        peersForFailedSegments = [ segs[0] for seg in failedSegments]
         for i in range(len(failedSegments)):
             peer = peersForFailedSegments[i]
             if peer is None:
@@ -450,10 +452,8 @@ class GpRecoverSegmentProgram:
                 failedSegment = failoverSegment.copy()
                 failoverSegment.setSegmentHostName( newRecoverHost )
                 failoverSegment.setSegmentAddress( newRecoverAddress )
-                port = portAssigner.findAndReservePort(False, newRecoverHost, newRecoverAddress )
-                replicationPort = portAssigner.findAndReservePort(True, newRecoverHost, newRecoverAddress )
+                port = portAssigner.findAndReservePort(newRecoverHost, newRecoverAddress )
                 failoverSegment.setSegmentPort( port )
-                failoverSegment.setSegmentReplicationPort( replicationPort)
 
             if spareDirectoryMap is not None:
                 #
@@ -466,6 +466,69 @@ class GpRecoverSegmentProgram:
             segs.append( GpMirrorToBuild(failedSegment, liveSegment, failoverSegment, forceFull ))
         
         return GpMirrorListToBuild(segs, self.__pool, self.__options.quiet, self.__options.parallelDegree, interfaceHostnameWarnings)
+
+    def GPSQLFailback(self, gpArray, gpEnv):
+        if self.__options.outputSpareDataDirectoryFile is not None:
+            self.__outputSpareDataDirectoryFile(gpEnv, gpArray, self.__options.outputSpareDataDirectoryFile)
+            return 0
+
+        if self.__options.newRecoverHosts is not None:
+            try:
+                uniqueHosts = []
+                [uniqueHosts.append(h.strip()) for h in self.__options.newRecoverHosts.split(',') \
+                    if h.strip() not in uniqueHosts ]
+                self.__options.newRecoverHosts = uniqueHosts
+            except Exception, ex:
+                raise ProgramArgumentValidationException(\
+                    "Invalid value for recover hosts: %s" % ex)
+
+        # If it's a rebalance operation
+        if self.__options.rebalanceSegments:
+            raise Exception("GPSQL does not support rebalance.")
+
+        # retain list of hosts that were existing in the system prior to getRecoverActions...
+        # this will be needed for later calculations that determine whether
+        # new hosts were added into the system
+        existing_hosts = set(gpArray.getHostList())
+
+        # figure out what needs to be done
+        mirrorBuilder = self.getRecoveryActionsBasedOnOptions(gpEnv, gpArray)
+
+        if self.__options.outputSampleConfigFile is not None:
+            # just output config file and done
+            self.outputToFile(mirrorBuilder, gpArray, self.__options.outputSampleConfigFile)
+            self.logger.info('Configuration file output to %s successfully.' % self.__options.outputSampleConfigFile)            
+        elif len(mirrorBuilder.getMirrorsToBuild()) == 0:
+            self.logger.info('No segments to recover')
+        else:
+            mirrorBuilder.checkForPortAndDirectoryConflicts(gpArray)
+
+            self.displayRecovery(mirrorBuilder, gpArray)
+            self.__displayRecoveryWarnings(mirrorBuilder)
+
+            if self.__options.interactive:
+                if not userinput.ask_yesno(None, "\nContinue with segment recovery procedure", 'N'):
+                    raise UserAbortedException()
+
+            # sync packages
+            current_hosts = set(gpArray.getHostList())
+            new_hosts = current_hosts - existing_hosts
+            if new_hosts:
+                self.syncPackages(new_hosts)
+
+            mirrorBuilder.buildMirrors("recover", gpEnv, gpArray )
+            return 1
+            confProvider.sendPgElogFromMaster("Recovery of %d segment(s) has been started." % \
+                    len(mirrorBuilder.getMirrorsToBuild()), True)
+
+            self.logger.info("******************************************************************")
+            self.logger.info("Updating segments for resynchronization is completed.")
+            self.logger.info("For segments updated successfully, resynchronization will continue in the background.")
+            self.logger.info("")
+            self.logger.info("Use  gpstate -s  to check the resynchronization progress.")
+            self.logger.info("******************************************************************")
+
+        return 0 # success -- exit code 0!
 
     # San-failback is handled separately from the Filerep-recovery operations.
     # 
@@ -760,10 +823,10 @@ class GpRecoverSegmentProgram:
     
                 tabLog = TableLogger()
     
-                syncMode = "Full" if toRecover.isFullSynchronization() else "Incremental"
-                tabLog.info(["Synchronization mode", "= " + syncMode])
+                # syncMode = "Full" if toRecover.isFullSynchronization() else "Incremental"
+                # tabLog.info(["Synchronization mode", "= " + syncMode])
                 programIoUtils.appendSegmentInfoForOutput("Failed", gpArray, toRecover.getFailedSegment(), tabLog)
-                programIoUtils.appendSegmentInfoForOutput("Recovery Source", gpArray, toRecover.getLiveSegment(), tabLog)
+                # programIoUtils.appendSegmentInfoForOutput("Recovery Source", gpArray, toRecover.getLiveSegment(), tabLog)
     
                 if toRecover.getFailoverSegment() is not None:
                     programIoUtils.appendSegmentInfoForOutput("Recovery Target", gpArray, toRecover.getFailoverSegment(), tabLog)
@@ -886,6 +949,9 @@ class GpRecoverSegmentProgram:
         # check that we actually have mirrors
         if gpArray.getFaultStrategy() == gparray.FAULT_STRATEGY_SAN:
             self.SanFailback(gpArray, gpEnv)
+            return 0
+        elif gpArray.getFaultStrategy() == gparray.FAULT_STRATEGY_NONE:
+            self.GPSQLFailback(gpArray, gpEnv)
             return 0
         elif gpArray.getFaultStrategy() != gparray.FAULT_STRATEGY_FILE_REPLICATION:
             raise ExceptionNoStackTraceNeeded( \

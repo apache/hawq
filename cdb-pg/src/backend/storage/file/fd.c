@@ -1221,7 +1221,7 @@ retry:
 	return returnCode;
 }
 
-int LocalFileWrite(File file, char *buffer, int amount) {
+int LocalFileWrite(File file, const char *buffer, int amount) {
 	int			returnCode;
 	FileRepGpmonRecord_s gpmonRecord;
 	FileRepGpmonStatType_e whichStat =0;
@@ -2621,7 +2621,7 @@ int HdfsFileRead(File file, char *buffer, int amount) {
 /*
  * write into hdfs file
  */
-int HdfsFileWrite(File file, char *buffer, int amount) {
+int HdfsFileWrite(File file, const char *buffer, int amount) {
 	int returnCode;
 	Vfd *vfdP;
 	vfdP = &VfdCache[file];
@@ -2930,7 +2930,7 @@ int FileRead(File file, char *buffer, int amount) {
 		return HdfsFileRead(file, buffer, amount);
 }
 
-int FileWrite(File file, char *buffer, int amount) {
+int FileWrite(File file, const char *buffer, int amount) {
 	if (IsLocalFile(file))
 		return LocalFileWrite(file, buffer, amount);
 	else
@@ -2990,4 +2990,10 @@ int MakeDirectory(const char * path, mode_t mode) {
 		return mkdir(path, mode);
 	else
 		return HdfsMakeDirectory(path, mode);
+}
+
+bool
+TestFileValid(File file)
+{
+    return FileIsValid(file);
 }

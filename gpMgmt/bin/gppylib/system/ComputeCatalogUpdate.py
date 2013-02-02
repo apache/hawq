@@ -13,6 +13,7 @@
 import copy
 from gppylib.gplog import *
 from gppylib.gparray import ROLE_PRIMARY, ROLE_MIRROR, MASTER_CONTENT_ID
+from gppylib import gparray
 
 logger = get_default_logger()
 
@@ -102,6 +103,9 @@ class ComputeCatalogUpdate:
             dbid = seg.getSegmentDbId()
             if dbid in forceMap:
                 removeandaddmap[dbid] = seg
+                continue
+            # In GPSQL, no needs to remove the original segment, updating the hostname and address is enough.
+            if gpArray.getFaultStrategy() == gparray.FAULT_STRATEGY_NONE:
                 continue
             if not seg.equalIgnoringModeAndStatusAndReplicationPort(self.dbsegmap[dbid]):
                 removeandaddmap[dbid] = seg
@@ -204,6 +208,7 @@ class ComputeCatalogUpdate:
                 #
                 # Assertion here -- user should not be allowed to change primary info.
                 #
+                return
                 raise Exception("Internal error: Can only change core details of mirrors, not primaries" \
                                 " (on segment %s) (seg %s vs original %s)" %
                                 (seg.getSegmentDbId(), repr(seg), repr(originalSeg)))

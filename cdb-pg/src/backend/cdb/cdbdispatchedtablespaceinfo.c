@@ -9,11 +9,11 @@
 
 #include "postgres.h"
 
-#include "utils/hsearch.h"
 #include "catalog/pg_tablespace.h"
 #include "cdb/cdbdispatchedtablespaceinfo.h"
-#include "utils/memutils.h"
 #include "utils/guc.h"
+#include "utils/hsearch.h"
+#include "utils/memutils.h"
 
 /*
  * never destroy it until process exit

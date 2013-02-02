@@ -68,6 +68,15 @@ cdblink_setup(void)
 }
 
 /*
+ * Returns the total number of segments
+ */
+int
+GetTotalSegmentsNumber(void)
+{
+	return GpIdentity.numsegments;
+}
+
+/*
  * Returns the number of segments
  *
  * N.B.  Gp_role must be either dispatch or execute, since
@@ -90,6 +99,15 @@ getgpsegmentCount(void)
 	}
 
 	verifyGpIdentityIsSet();
+
+	/* Return the alive segment information if initialized. */
+	if (GpAliveSegmentsInfo.aliveSegmentsCount != UNINITIALIZED_GP_IDENTITY_VALUE)
+	{
+		if (GpAliveSegmentsInfo.aliveSegmentsCount == 0)
+			elog(ERROR, "No alive segment in the cluser.");
+		return GpAliveSegmentsInfo.aliveSegmentsCount;
+	}
+
 	Assert(GpIdentity.numsegments > 0);
 	return GpIdentity.numsegments;
 }

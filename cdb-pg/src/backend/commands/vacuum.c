@@ -243,15 +243,11 @@ static int	vac_cmp_offno(const void *left, const void *right);
 static int	vac_cmp_vtlinks(const void *left, const void *right);
 static bool enough_space(VacPage vacpage, Size len);
 static Size PageGetFreeSpaceWithFillFactor(Relation relation, Page page);
-static void dispatchVacuum(VacuumStmt *vacstmt, VacuumStatsContext *ctx);
 static Relation open_relation_and_check_permission(VacuumStmt *vacstmt,
 												   Oid relid,
 												   char expected_relkind);
 static void vacuumStatement(VacuumStmt *vacstmt, List *relids);
 
-static void
-vacuum_combine_stats(CdbDispatchResults *primaryResults,
-						 void *ctx);
 
 /****************************************************************************
  *																			*
@@ -276,11 +272,7 @@ void vacuum(VacuumStmt *vacstmt, List *relids)
 	
 	Assert(!(vacstmt != NULL && relids != NULL));
 	
-	/*
-	 * TODO, in gpsql, temporary disable vacuum
-	 */
-	/*if (doVacuum)*/
-	if (FALSE)
+	if (doVacuum)
 	{
 		/**
 		 * Perform vacuum.
@@ -326,13 +318,13 @@ vacuumStatement(VacuumStmt *vacstmt, List *relids)
 	volatile bool all_rels = false;
 	List	   *relations = NIL;
 	bool		expanded = false;
-	VacuumStatsContext stats_context;
 
 	/**
 	 * Handles only vacuum (incl FULL). Does not handle ANALYZE.
 	 */
 	Assert(vacstmt->vacuum);
 	Assert(!vacstmt->analyze);
+	Assert(Gp_role != GP_ROLE_EXECUTE);
 
 	if (vacstmt->verbose)
 		elevel = INFO;
@@ -533,32 +525,19 @@ vacuumStatement(VacuumStmt *vacstmt, List *relids)
 			AppendRelToVacuumRels(onerel);
 			MemoryContextSwitchTo(oldctx);
 
+
+			/* Generate extra oids for relfilenodes to be used in
+			 * bitmap indexes if any. */
+			gen_oids_for_bitmaps(vacstmt, onerel);
+
 			/*
-			 * If we are in the dispatch mode, dispatch this modified
-			 * vacuum statement to QEs, and wait for them to finish.
+			 * We have to acquire a ShareLock for the relation
+			 * which has bitmap indexes, since reindex is used
+			 * later. Otherwise, concurrent vacuum and insert may
+			 * cause deadlock, see MPP-5960.
 			 */
-			if (Gp_role == GP_ROLE_DISPATCH)
-			{
-				stats_context.ctx = vac_context;
-				stats_context.onerel = onerel;
-				stats_context.updated_stats = NIL;
-				stats_context.vac_stats = NULL;
-
-				/* Generate extra oids for relfilenodes to be used in
-				 * bitmap indexes if any. */
-				gen_oids_for_bitmaps(vacstmt, onerel);
-
-				/*
-				 * We have to acquire a ShareLock for the relation
-				 * which has bitmap indexes, since reindex is used
-				 * later. Otherwise, concurrent vacuum and insert may
-				 * cause deadlock, see MPP-5960.
-				 */
-				if (vacstmt->extra_oids != NULL)
-					LockRelation(onerel, ShareLock);
-
-				dispatchVacuum(vacstmt, &stats_context);
-			}
+			if (vacstmt->extra_oids != NULL)
+				LockRelation(onerel, ShareLock);
 
 			onerelid = onerel->rd_lockInfo.lockRelId;
 
@@ -577,15 +556,10 @@ vacuumStatement(VacuumStmt *vacstmt, List *relids)
 			 */
 			LockRelationIdForSession(&onerelid, lmode);
 
-			vacuum_rel(onerel, vacstmt, lmode, stats_context.updated_stats);
+			vacuum_rel(onerel, vacstmt, lmode, NULL);
 
-			if (Gp_role == GP_ROLE_DISPATCH)
-			{
-				list_free_deep(stats_context.updated_stats);
-				stats_context.updated_stats = NIL;
-				list_free(vacstmt->extra_oids);
-				vacstmt->extra_oids = NIL;
-			}
+			list_free(vacstmt->extra_oids);
+			vacstmt->extra_oids = NIL;
 
 			/*
 			 * Close source relation now, but keep lock so that no one
@@ -887,51 +861,8 @@ vac_update_relstats(Relation rel, BlockNumber num_pages, double num_tuples,
 	cqContext  *pcqCtx;
 
 	Assert(relid != InvalidOid);
+	Assert (Gp_role != GP_ROLE_EXECUTE);
 
-	/*
-	 * If this is QD, use the stats collected in updated_stats instead of
-	 * the one provided through 'num_pages' and 'num_tuples'.
-	 */
-	if (Gp_role == GP_ROLE_DISPATCH)
-	{
-		ListCell *lc;
-		num_pages = 0;
-		num_tuples = 0;
-		foreach (lc, updated_stats)
-		{
-			VUpdatedStats *stats = (VUpdatedStats*) lfirst(lc);
-			if (stats->relid == relid && stats->type == PG_CLASS_STATS)
-			{
-				VPgClassStats *pgclass_stats = (VPgClassStats *)stats;
-
-				num_pages += pgclass_stats->rel_pages;
-				num_tuples += pgclass_stats->rel_tuples;
-
-				break;
-			}
-		}
-	}
-
-	/*
-	 * CDB: send the number of tuples and the number of pages in pg_class located
-	 * at QEs through the dispatcher.
-	 */
-	if (Gp_role == GP_ROLE_EXECUTE)
-	{
-		/* cdbanalyze_get_relstats(rel, &num_pages, &num_tuples);*/
-		StringInfoData buf;
-		VPgClassStats stats;
-
-		pq_beginmessage(&buf, 'y');
-		pq_sendstring(&buf, "VACUUM");
-		stats.metadata.type = PG_CLASS_STATS;
-		stats.metadata.relid = relid;
-		stats.rel_pages = num_pages;
-		stats.rel_tuples = num_tuples;
-		pq_sendint(&buf, sizeof(VPgClassStats), sizeof(int));
-		pq_sendbytes(&buf, (char*)(&stats), sizeof(VPgClassStats));
-		pq_endmessage(&buf);
-	}
 
 	/* 
 	 * We need a way to distinguish these 2 cases:
@@ -3883,120 +3814,6 @@ vacuum_delay_point()
 }
 
 /*
- * Dispatch a Vacuum command.
- */
-static void
-dispatchVacuum(VacuumStmt *vacstmt, VacuumStatsContext *ctx)
-{
-	char	   *pszVacuum=NULL;
-	int			pszVacuum_len;
-	Query	   *q = NULL;
-
-	/* should these be marked volatile ? */
-	volatile struct CdbDispatcherState ds = {NULL, NULL};
-
-	volatile int disp_phase=0;
-
-	Assert(Gp_role == GP_ROLE_DISPATCH); //Maybe dispatch agent? 	
-	Assert(vacstmt);
-	Assert(vacstmt->vacuum);
-	Assert(!vacstmt->analyze);
-
-	/*
-	 * Serialize the stmt tree, and create the sql statement....
-	 */
-	q = makeNode(Query);
-
-	Assert(q);
-	
-	q->commandType = CMD_UTILITY;
-	q->utilityStmt = (Node *) vacstmt;
-	q->querySource = QSRC_ORIGINAL;
-	q->canSetTag = true;	/* ? */
-
-	pszVacuum = serializeNode((Node *) q, &pszVacuum_len);
-	Assert(pszVacuum);
-
-	/*
-	 * VACUUM gets dispatched to primaries and mirrors.  Mpp-895
-	 * stagger vacuum dispatch to primaries first, then mirrors, to
-	 * avoid i/o contention.
-	 */
-
-	/*
-	 * MPP-6796/MPP-6801:
-	 *
-	 * I'm not exactly sure about the way this code uses
-	 * dtmPreCommand(). We call it twice, which may make sense
-	 * if we're going to be using separate transactions. Calling it
-	 * multiple times does no harm, but I find it confusing (are these
-	 * vacuum calls auto-committed ?).
-	 *
-	 * We need to handle the dispatcher-cleanup *here* otherwise the
-	 * rest of the cleanup will be trying to do further dispatcher
-	 * work on our gangs -- and those operations *expect* the gangs to
-	 * be clean.
-	 */
-	PG_TRY();
-	{
-		/* mark the dtx as dirty */
-		dtmPreCommand("cdbdisp_dispatchCommand", "(none)", NULL,
-				true /* needs two-phase */, true /* withSnapshot */, false /* inCursor */);
-
-		cdbdisp_dispatchCommand( "vacuum" , pszVacuum, pszVacuum_len,
-								 true /* cancelOnError */, true /* needTwoPhase */,
-								 true /* withSnapshot */,
-								 (struct CdbDispatcherState *)&ds);
-
-		disp_phase = 1;
-
-		elog(DEBUG2, "Sent %s command to primary QEs",  "vacuum" );
-
-		/*
-		 * Wait for all QEs to finish. If not all of our QEs were successful,
-		 * report the error and throw up.
-		 *
-		 * NOTE: this has the side-effect of calling pfree() on
-		 * pszVacuum! (we re-serialize for our mirrors below).
-		 */
-		cdbdisp_finishCommand((struct CdbDispatcherState *)&ds, vacuum_combine_stats, ctx);
-	}
-	PG_CATCH();
-	{
-		char *disp_msg;
-		bool dispatch_inflight=false;
-
-		switch(disp_phase)
-		{
-			case 0:
-				disp_msg = "primary dispatch";
-				dispatch_inflight = true;
-				break;
-			case 1:
-				disp_msg = "primary completion";
-				break;
-			default:
-				disp_msg = "unknown";
-				break;
-		}
-
-		elog(LOG, "Caught error during dispatchVacuum(): %s", disp_msg);
-
-		/*
-		 * Handle errors/cancels here: we may catch *either* of the
-		 * two dispatch operations above.
-		 */
-		if (dispatch_inflight && ds.primaryResults)
-			cdbdisp_handleError((struct CdbDispatcherState *)&ds);
-
-		PG_RE_THROW();
-	}
-	PG_END_TRY();
-
-	pfree(q);
-}
-
-/*
  * open_relation_and_check_permission -- open the relation with an appropriate
  * lock based on the vacuum statement, and check for the permissions on this
  * relation.
@@ -4215,92 +4032,3 @@ get_oids_for_bitmap(List *all_extra_oids, Relation Irel,
 	return extra_oids;
 }
 
-/*
- * cdbanalyze_combine_stats
- * This function combine the stats information sent by QEs to generate
- * the final stats for QD relations.
- *
- * Note that the mirrorResults is ignored by this function.
- */
-void
-vacuum_combine_stats(CdbDispatchResults *primaryResults,
-						 void *ctx)
-{
-	int result_no;
-	VacuumStatsContext *stats_context = (VacuumStatsContext *)ctx;
-		
-	Assert(Gp_role == GP_ROLE_DISPATCH);
-
-	if (primaryResults == NULL)
-		return;
-
-	/*
-	 * Process the dispatch results from the primary. Note that the QE
-	 * processes also send back the new stats info, such as stats on
-	 * pg_class, for the relevant table and its
-	 * indexes. We parse this information, and compute the final stats
-	 * for the QD.
-	 *
-	 * For pg_class stats, we compute the maximum number of tuples and
-	 * maximum number of pages after processing the stats from each QE.
-	 *
-	 */
-	for(result_no = 0; result_no < primaryResults->resultCount; result_no++)
-	{
-		CdbDispatchResult *result = &(primaryResults->resultArray[result_no]);
-		int num_pgresults = cdbdisp_numPGresult(result);
-		int pgresult_no;
-		VPgClassStats *pgclass_stats = NULL;
-
-		for (pgresult_no = 0; pgresult_no < num_pgresults; pgresult_no++)
-		{
-			ListCell *lc = NULL;
-
-			struct pg_result *pgresult = cdbdisp_getPGresult(result, pgresult_no);
-			int type;
-
-			if (pgresult->extras == NULL)
-				continue;
-
-			Assert(pgresult->extraslen > sizeof(int));
-
-			/* Check for the type of stats that are received */
-			memcpy(&type, pgresult->extras, sizeof(int));
-			Assert(type == PG_CLASS_STATS);
-
-			/*
-			 * Process the stats for pg_class. We simple compute the maximum
-			 * number of rel_tuples and rel_pages.
-			 */
-			pgclass_stats = (VPgClassStats *)pgresult->extras;
-			foreach (lc, stats_context->updated_stats)
-			{
-				VUpdatedStats *tmp_stats = (VUpdatedStats *)lfirst(lc);
-				if (tmp_stats->relid == pgclass_stats->metadata.relid &&
-						tmp_stats->type == PG_CLASS_STATS)
-				{
-					VPgClassStats *tmp_pgclass_stats = (VPgClassStats *)tmp_stats;
-
-					tmp_pgclass_stats->rel_pages +=
-							pgclass_stats->rel_pages;
-					tmp_pgclass_stats->rel_tuples +=
-							pgclass_stats->rel_tuples;
-
-					break;
-				}
-			}
-
-			if (lc == NULL)
-			{
-				Assert(pgresult->extraslen == sizeof(VPgClassStats));
-
-				pgclass_stats = palloc(sizeof(VPgClassStats));
-				memcpy(pgclass_stats, pgresult->extras, pgresult->extraslen);
-
-				stats_context->updated_stats =
-						lappend(stats_context->updated_stats, pgclass_stats);
-			}
-		}
-	}
-
-}

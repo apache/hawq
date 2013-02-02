@@ -264,8 +264,12 @@ class GpConfigurationProviderUsingGpdbCatalog(GpConfigurationProvider) :
         # update mode and status
         # when adding a mirror, the replication port may change as well
         #
-        what = "%s: segment mode and status"
-        self.__updateSegmentModeStatus(conn, seg)
+        if gpArray.getFaultStrategy() == gparray.FAULT_STRATEGY_NONE:
+            what = "%s: segment hostname and address"
+            self.__updateSegmentAddress(conn, seg)
+        else:
+            what = "%s: segment mode and status"
+            self.__updateSegmentModeStatus(conn, seg)
 
         if seg.getSegmentReplicationPort() != originalSeg.getSegmentReplicationPort():
             what = "%s: segment mode, status, and replication port"
@@ -367,6 +371,17 @@ class GpConfigurationProviderUsingGpdbCatalog(GpConfigurationProvider) :
             "  SET\n" + \
             "  mode = " + self.__toSqlCharValue(seg.getSegmentMode()) + ",\n" \
             "  status = " + self.__toSqlCharValue(seg.getSegmentStatus()) + "\n" \
+            "WHERE dbid = " + self.__toSqlIntValue(seg.getSegmentDbId())
+        logger.debug(sql)
+        dbconn.executeUpdateOrInsert(conn, sql, 1)
+
+
+    def __updateSegmentAddress(self, conn, seg):
+        # run an update
+        sql = "UPDATE pg_catalog.gp_segment_configuration\n" + \
+            "  SET\n" + \
+            "  hostname = " + self.__toSqlCharValue(seg.getSegmentHostName()) + ",\n" \
+            "  address = " + self.__toSqlCharValue(seg.getSegmentAddress()) + "\n" \
             "WHERE dbid = " + self.__toSqlIntValue(seg.getSegmentDbId())
         logger.debug(sql)
         dbconn.executeUpdateOrInsert(conn, sql, 1)

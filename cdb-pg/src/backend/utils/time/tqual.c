@@ -239,6 +239,7 @@ CreateSharedSnapshotArray(void)
 			SharedSnapshotSlot *tmpSlot = &sharedSnapshotArray->slots[i];
 
 			tmpSlot->slotid = -1;
+			tmpSlot->contentid = UNINITIALIZED_GP_IDENTITY_VALUE;
 			tmpSlot->slotindex = i;
 
 			/*
@@ -277,8 +278,8 @@ SharedSnapshotDump(void)
 
 		if (testSlot->slotid != -1)
 		{
-			appendStringInfo(&str, "(SLOT index: %d slotid: %d QDxid: %u QDcid: %u pid: %u)",
-							 testSlot->slotindex, testSlot->slotid, testSlot->QDxid, testSlot->QDcid, (int)testSlot->pid);
+			appendStringInfo(&str, "(SLOT index: %d slotid: %d contentid: %d QDxid: %u QDcid: %u pid: %u)",
+							 testSlot->slotindex, testSlot->slotid, testSlot->contentid, testSlot->QDxid, testSlot->QDcid, (int)testSlot->pid);
 		}
 
 	}
@@ -318,7 +319,7 @@ retry:
 		if (testSlot->slotindex > arrayP->maxSlots)
 			elog(ERROR, "Shared Local Snapshots Array appears corrupted: %s", SharedSnapshotDump());
 
-		if (testSlot->slotid == slotId)
+		if (testSlot->slotid == slotId && testSlot->contentid == GpIdentity.segindex)
 		{
 			slot = testSlot;
 			break;
@@ -384,9 +385,10 @@ retry:
 		arrayP->nextSlot = nextSlot;
 
 	arrayP->numSlots += 1;
-
 	/* initialize some things */
 	slot->slotid = slotId;
+	slot->contentid = GpIdentity.segindex;
+	elog(LOG, "slotid: %d contentid: %d", slotId, GpIdentity.segindex);
 	slot->xid = 0;
 	slot->pid = 0;
 	slot->cid = 0;
@@ -441,7 +443,7 @@ SharedSnapshotLookup(int4 slotId)
 				elog(ERROR, "Shared Local Snapshots Array appears corrupted: %s", SharedSnapshotDump());
 			}
 
-			if (testSlot->slotid == slotId)
+			if (testSlot->slotid == slotId && testSlot->contentid == GpIdentity.segindex)
 			{
 				slot = testSlot;
 				break;
@@ -498,6 +500,7 @@ SharedSnapshotRemove(volatile SharedSnapshotSlot *slot, char *creatorDescription
 
 	/* reset the slotid which marks it as being unused. */
 	slot->slotid = -1;
+	slot->contentid = UNINITIALIZED_GP_IDENTITY_VALUE;
 	slot->xid = 0;
 	slot->pid = 0;
 	slot->cid = 0;

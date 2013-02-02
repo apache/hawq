@@ -421,7 +421,7 @@ Relation DirectOpen_Open(
 
 		if (!IsBootstrapProcessingMode() && Gp_role == GP_ROLE_DISPATCH)
 		{
-			direct->relationData.rd_segfile0_count = 1 + GpIdentity.numsegments;
+			direct->relationData.rd_segfile0_count = 1 + GetTotalSegmentsNumber();
 		} else
 		{
 			direct->relationData.rd_segfile0_count = 1;

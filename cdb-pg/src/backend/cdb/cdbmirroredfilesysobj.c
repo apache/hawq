@@ -1411,6 +1411,8 @@ void MirroredFileSysObj_DropRelFile(
 		break;
 
 	case PersistentFileSysRelStorageMgr_AppendOnly:
+		/* Shared storage never loss data! */
+		*mirrorDataLossOccurred = false;
 		MirroredAppendOnly_Drop(
 					relFileNode,
 					segmentFileNum,

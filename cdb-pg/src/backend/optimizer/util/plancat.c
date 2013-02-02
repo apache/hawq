@@ -413,7 +413,7 @@ cdb_estimate_rel_size(RelOptInfo   *relOptInfo,
 		 */
 		if(!RelationIsExternal(rel))
 		{
-		    size = cdbRelSize(rel->rd_id);
+		    size = cdbRelSize(rel);
 		}
 		else
 		{

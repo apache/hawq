@@ -288,6 +288,7 @@ FileSegInfo **GetAllFileSegInfo(Relation parentrel,
 									aoEntry,
 									pg_aoseg_rel,
 									appendOnlyMetaDataSnapshot,
+									/* Accessing the files belong to this segment */ false,
 									totalsegs);
 	
 	heap_close(pg_aoseg_rel, AccessShareLock);
@@ -305,7 +306,11 @@ aoFileSegInfoCmp(const void *left, const void *right)
 	FileSegInfo *leftSegInfo = *((FileSegInfo **)left);
 	FileSegInfo *rightSegInfo = *((FileSegInfo **)right);
 	
-	Insist(leftSegInfo->content == rightSegInfo->content);
+	if (leftSegInfo->content < rightSegInfo->content)
+		return -1;
+
+	if (leftSegInfo->content > rightSegInfo->content)
+		return 1;
 
 	if (leftSegInfo->segno < rightSegInfo->segno)
 		return -1;
@@ -321,6 +326,7 @@ FileSegInfo **GetAllFileSegInfo_pg_aoseg_rel(
 								AppendOnlyEntry *aoEntry,
 								Relation pg_aoseg_rel,
 								Snapshot appendOnlyMetaDataSnapshot,
+								bool returnAllSegmentsFiles,
 								int *totalsegs)
 {
 	TupleDesc		pg_aoseg_dsc;
@@ -353,8 +359,12 @@ FileSegInfo **GetAllFileSegInfo_pg_aoseg_rel(
 	/*
 	 * Now get the actual segfile information
 	 */
-	aoscan = systable_beginscan(pg_aoseg_rel, InvalidOid, FALSE,
-			appendOnlyMetaDataSnapshot, 1, &key[0]);
+	if (returnAllSegmentsFiles)
+		aoscan = systable_beginscan(pg_aoseg_rel, InvalidOid, FALSE,
+									appendOnlyMetaDataSnapshot, 0, NULL);
+	else
+		aoscan = systable_beginscan(pg_aoseg_rel, InvalidOid, FALSE,
+									appendOnlyMetaDataSnapshot, 1, &key[0]);
 
 	while ((tuple = systable_getnext(aoscan)) != NULL)
 	{
@@ -399,7 +409,8 @@ FileSegInfo **GetAllFileSegInfo_pg_aoseg_rel(
 		oneseginfo->content = DatumGetInt32(content);
 
 		if (Debug_appendonly_print_scan)
-			elog(LOG,"Append-only found existing segno %d with eof " INT64_FORMAT " for table '%s' out of total %d segs",
+			elog(LOG,"Append-only found existing contentid %d segno %d with eof " INT64_FORMAT " for table '%s' out of total %d segs",
+				oneseginfo->content,
 				oneseginfo->segno,
 				oneseginfo->eof,
 				relationName,
@@ -665,8 +676,10 @@ FileSegTotals *GetSegFilesTotals(Relation parentrel, Snapshot appendOnlyMetaData
 /*
  * GetAOTotalBytes
  *
- * Get the total bytes for a specific AO table from the pg_aoseg table on this local segdb.
- * (A version of GetSegFilesTotals that just gets the total bytes.)
+ * Get the total bytes for a specific AO table from the pg_aoseg table on master.
+ *
+ * In gpsql, master keep all segfile info in pg_aoseg table,
+ * therefore it get the whole table size.
  */
 int64 GetAOTotalBytes(Relation parentrel, Snapshot appendOnlyMetaDataSnapshot)
 {
@@ -674,16 +687,12 @@ int64 GetAOTotalBytes(Relation parentrel, Snapshot appendOnlyMetaDataSnapshot)
 	Relation		pg_aoseg_rel;
 	TupleDesc		pg_aoseg_dsc;
 	HeapTuple		tuple;
-	ScanKeyData		key[1];
 	SysScanDesc		aoscan;
 	int64		  	result;
 	Datum			eof;
 	bool			isNull;
 	AppendOnlyEntry *aoEntry = NULL;
 	
-	bool			indexOK;
-	Oid				indexid;
-
 	aoEntry = GetAppendOnlyEntry(RelationGetRelid(parentrel), appendOnlyMetaDataSnapshot);
 
 	result = 0;
@@ -691,21 +700,10 @@ int64 GetAOTotalBytes(Relation parentrel, Snapshot appendOnlyMetaDataSnapshot)
 	pg_aoseg_rel = heap_open(aoEntry->segrelid, AccessShareLock);
 	pg_aoseg_dsc = pg_aoseg_rel->rd_att;
 
-	if (Gp_role == GP_ROLE_EXECUTE)
-	{
-		indexOK = FALSE;
-		indexid = InvalidOid;
-	} else
-	{
-		indexOK = TRUE;
-		indexid = aoEntry->segidxid;
-	}
+	Assert (Gp_role != GP_ROLE_EXECUTE);
 
-	ScanKeyInit(&key[0], (AttrNumber) Anum_pg_aoseg_XXX_content,
-			BTEqualStrategyNumber, F_INT4EQ, ObjectIdGetDatum(GpIdentity.segindex));
-
-	aoscan = systable_beginscan(pg_aoseg_rel, indexid, indexOK,
-			appendOnlyMetaDataSnapshot, 1, &key[1]);
+	aoscan = systable_beginscan(pg_aoseg_rel, InvalidOid, FALSE,
+			appendOnlyMetaDataSnapshot, 0, NULL);
 
 	while ((tuple = systable_getnext(aoscan)) != NULL)
 	{
@@ -827,6 +825,7 @@ gp_aoseg_history(PG_FUNCTION_ARGS)
 											aoEntry, 
 											pg_aoseg_rel,
 											SnapshotAny,	// Get ALL tuples from pg_aoseg_% including aborted and in-progress ones. 
+											true,
 											&context->totalAoSegFiles);
 
 		heap_close(pg_aoseg_rel, NoLock);

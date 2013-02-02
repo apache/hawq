@@ -177,7 +177,8 @@ class GpDB:
         self.catdirs = None
         
         # Todo: Remove old dead code
-        self.valid = (status == 'u')
+        # GPSQL: The preferred primary can be down status, but try to start!
+        self.valid = (preferred_role == 'p' and role == 'p') or (status == 'u')
         
     # --------------------------------------------------------------------
     def __str__(self):
@@ -426,7 +427,7 @@ class GpDB:
         
         # Make sure we have enough room in the dstDir to fit the segment and its filespaces.
         requiredSize = DiskUsage.get_size( name = "srcDir"
-                                         , remote_host = "localhost"
+                                         , remote_host = self.address
                                          , directory = dstDir
                                          )
         name = "segcopy filespace get_size"
@@ -434,7 +435,7 @@ class GpDB:
             if oid == SYSTEM_FILESPACE:
                 continue
             dir = self.__filespaces[oid]
-            size = DiskUsage.get_size(name, "localhost", dir)
+            size = DiskUsage.get_size(name, self.address, dir)
             requiredSize = requiredSize + size 
 
         dstBytesAvail = DiskFree.get_size_local(name = "Check for available free space for segment template", directory = dstDir)
@@ -443,7 +444,7 @@ class GpDB:
 
         logger.info("Starting copy of segment dbid %d to location %s" % (int(self.getSegmentDbId()), dstDir))
 
-        cpCmd = LocalDirCopy("Copy system data directory", self.getSegmentDataDirectory(), dstDir)
+        cpCmd = Scp("Copy system data directory", self.getSegmentDataDirectory() + '/*', dstDir, self.address, None, True)
         cpCmd.run(validateAfter = True)
         res = cpCmd.get_results()
             
@@ -1474,6 +1475,10 @@ class GpArray:
             if preferred_role != role and content >= 0:
                 if mode == MODE_SYNCHRONIZED and status == STATUS_UP:
                     recoveredSegmentDbids.append(dbid)
+
+            # In GPSQL, only master maintain the filespace information.
+            if content != MASTER_CONTENT_ID and fsoid != SYSTEM_FILESPACE:
+                continue
             
             # The query returns all the filespaces for a segment on separate
             # rows.  If this row is the same dbid as the previous row simply
@@ -1679,10 +1684,11 @@ class GpArray:
         """
         @return a newly allocated list of GpFilespaceObj objects, will have been sorted by filespace name
         """
-        if includeSystemFilespace:
-            return [fs for fs in self.__filespaceArr]
-        else:
-            return [fs for fs in self.__filespaceArr if not fs.isSystemFilespace()]
+        # if includeSystemFilespace:
+        #    return [fs for fs in self.__filespaceArr]
+        # else:
+        #    return [fs for fs in self.__filespaceArr if not fs.isSystemFilespace()]
+        return [fs for fs in self.__filespaceArr if fs.isSystemFilespace()]
 
     # --------------------------------------------------------------
     def getFileSpaceName(self, filespaceOid):

@@ -305,6 +305,8 @@ struct pg_conn
 	char	   *dboid; 		 	/* gpsql */
 	char	   *bootstrap_user; /* gpsql */
 	char	   *encoding;		/* gpsql */
+	char	   *segindex;		/* gpsql */
+	char	   *dbid;			/* gpsql */
 
     char       *gpqeid;        /* MPP: session id & startup info for qExec */
     char       *gpqdid;        /* MPP: session id & startup info for QD callback */

@@ -1972,7 +1972,8 @@ PersistentFileSysObj_ActivateStandby(PersistentFileSysObjName *fsObjName,
 			}
 			else
 			{
-				Insist(false);
+				/* We store all of segments path on master. Skip them during activate standby. */
+				return;
 			}
 
 			/*

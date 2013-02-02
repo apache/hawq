@@ -190,6 +190,7 @@ _readQuery(const char ** str)
 	READ_NODE_FIELD(result_partitions);
 	READ_NODE_FIELD(result_aosegnos);
 	READ_NODE_FIELD(returningLists);
+	READ_NODE_FIELD(contextdisp);
 	/* policy not serialized */
 
 	READ_DONE();
@@ -2666,6 +2667,8 @@ _readPlannedStmt(const char ** str)
 	READ_INT_FIELD(backoff_weight);
 	READ_UINT64_FIELD(query_mem);
 
+	READ_NODE_FIELD(contextdisp);
+
 	READ_DONE();
 }
 
@@ -3638,6 +3641,29 @@ _readValue(const char ** str, NodeTag nt)
 
 }
 
+static QueryContextInfo *
+_readQueryContextInfo(const char **str)
+{
+    READ_LOCALS(QueryContextInfo);
+
+    READ_BOOL_FIELD(useFile);
+
+    if (local_node->useFile)
+    {
+        READ_STRING_FIELD(sharedPath);
+        InitQueryContextInfoFromFile(local_node);
+    }
+    else
+    {
+        READ_INT_FIELD(size);
+        local_node->buffer = palloc(local_node->size);
+        memcpy(local_node->buffer, *str, local_node->size);
+        *str += local_node->size;
+    }
+
+    READ_DONE();
+}
+
 void *
 readNodeBinary(const char ** str)
 {
@@ -4335,6 +4361,10 @@ readNodeBinary(const char ** str)
 		case T_AlterTypeStmt:
 			return_value = _readAlterTypeStmt(str);
 			break;
+
+		case T_QueryContextInfo:
+		    return_value = _readQueryContextInfo(str);
+		    break;
 
 			default:
 				return_value = NULL; /* keep the compiler silent */

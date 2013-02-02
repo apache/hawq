@@ -27,6 +27,7 @@
 #include "utils/memutils.h"
 #include "cdb/cdbsrlz.h"
 #include "commands/copy.h"
+#include "optimizer/prep.h"
 
 extern int	pq_putmessage(char msgtype, const char *s, size_t len);
 /*
@@ -76,8 +77,8 @@ makeCdbCopy(bool is_copy_in)
 	if (!c->copy_in)
 	{
 		int i;
-		for (i = 0; i < c->total_segs; i++)
-			c->outseglist = lappend_int(c->outseglist, i);
+		for (i = 0; i < GpAliveSegmentsInfo.cdbComponentDatabases->total_segment_dbs; i++)
+			c->outseglist = lappend_int(c->outseglist, GpAliveSegmentsInfo.cdbComponentDatabases->segment_db_info[i].segindex);
 	}
 
 	return c;
@@ -90,7 +91,7 @@ makeCdbCopy(bool is_copy_in)
  * may pg_throw via elog/ereport.
  */
 void
-cdbCopyStart(CdbCopy *c, char *copyCmd)
+cdbCopyStart(CdbCopy *c, char *copyCmd, Oid relid, Oid relerror)
 {
 	int			seg;
 	MemoryContext oldcontext;
@@ -101,6 +102,7 @@ cdbCopyStart(CdbCopy *c, char *copyCmd)
 	char	   *serializedQuerytree;
 	int			serializedQuerytree_len;
 	Query	   *q = makeNode(Query);
+    HTAB        *htab = NULL;
 	
 	/* clean err message */
 	c->err_msg.len = 0;
@@ -177,6 +179,29 @@ cdbCopyStart(CdbCopy *c, char *copyCmd)
 	
 	MemoryContextSwitchTo(oldcontext);
 
+    q->contextdisp = CreateQueryContextInfo();
+
+	htab = createPrepareDispatchedCatalogRelationDisctinctHashTable();
+
+	if (c->copy_in)
+	{
+		prepareDispatchedCatalogRelation(q->contextdisp, relid, TRUE,
+				c->ao_segnos, htab);
+	}
+	else
+	{
+		prepareDispatchedCatalogRelation(q->contextdisp, relid, FALSE, NULL,
+				htab);
+	}
+
+	if (OidIsValid(relerror))
+		prepareDispatchedCatalogRelation(q->contextdisp, relerror, FALSE, NULL,
+				htab);
+
+    hash_destroy(htab);
+
+    CloseQueryContextInfo(q->contextdisp);
+
 	/*
 	 * serialized the stmt tree, and dispatch it ....
 	 */
@@ -184,28 +209,34 @@ cdbCopyStart(CdbCopy *c, char *copyCmd)
 
 	Assert(serializedQuerytree != NULL);
 	
-	dtmPreCommand("CdbCopy", copyCmd, NULL,
-			c->copy_in, /* needs 2-phase */
-			true, /* want snapshot */
-			false /* in cursor */);
-	
-	cdbdisp_dispatchCommand(copyCmd, serializedQuerytree, serializedQuerytree_len, 
+	PG_TRY();
+	{
+	    cdbdisp_dispatchCommand(copyCmd, serializedQuerytree, serializedQuerytree_len,
 								false 		/* cancelonError */, 
-								c->copy_in 	/* need2phase */, 
+								false	 	/* need2phase */, 
 								true 		/* withSnapshot */,
 								&ds);
 
-	/*  MPP-3017: insert a call like this to expand the timing, and
-	 *  then play with cancellation during a COPY command:
-	 *
-	 *  pg_usleep(10000000);
-	 */
+        /*  MPP-3017: insert a call like this to expand the timing, and
+         *  then play with cancellation during a COPY command:
+         *
+         *  pg_usleep(10000000);
+         */
 
-	/*
-	 * Wait for all QEs to finish. If not all of our QEs were successful,
-	 * report the error and throw up.
-	 */
-	cdbdisp_finishCommand(&ds, NULL, NULL);
+        /*
+         * Wait for all QEs to finish. If not all of our QEs were successful,
+         * report the error and throw up.
+         */
+        cdbdisp_finishCommand(&ds, NULL, NULL);
+
+        DropQueryContextInfo(q->contextdisp);
+	}
+    PG_CATCH();
+    {
+        DropQueryContextInfo(q->contextdisp);
+        PG_RE_THROW();
+    }
+    PG_END_TRY();
 
 	/* fill in CdbCopy structure */
 	for (seg = 0; seg < c->total_segs; seg++)
@@ -614,7 +645,24 @@ processCopyEndResults(CdbCopy *c,
 	}
 }
 
-					  
+void
+cdbCopyGetCatalogs(CdbCopy *c)
+{
+	int		i;
+	Gang	*gp;
+	SegmentDatabaseDescriptor *q;
+
+	gp = c->primary_writer;
+	for (i = 0; i < gp->size; i++)
+	{
+		q = &gp->db_descriptors[i];
+		if (q->conn->serializedCatalogLen > 0)
+		{
+			deserializeAndUpdateCatalog(q->conn->serializedCatalog, q->conn->serializedCatalogLen);
+			q->conn->serializedCatalogLen = 0;
+		}
+	}
+}
 
 /*
  * ends the copy command on all segment databases.

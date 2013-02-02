@@ -412,7 +412,7 @@ heap_create(const char *relname,
 				Assert(Gp_role == GP_ROLE_DISPATCH);
 
 				int i;
-				for (i = 0; i <= GpIdentity.numsegments; ++i)
+				for (i = 0; i <= GetTotalSegmentsNumber(); ++i)
 				{
 					MirroredFileSysObj_TransactionCreateAppendOnlyFile(
 													&rel->rd_node,
@@ -1625,7 +1625,7 @@ heap_create_with_catalog(const char *relname,
 		if (appendOnlyRel)
 		{
 			int i;
-			for (i = 0; i <= GpIdentity.numsegments; ++i)
+			for (i = 0; i <= GetTotalSegmentsNumber(); ++i)
 				AddNewRelationNodeTuple(
 						gp_relation_node_desc,
 						new_rel_desc,

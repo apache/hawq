@@ -712,7 +712,6 @@ set_short_version(int4 contentid, const char *path, DbDirNode *dbDirNode, bool m
 		/* Now write the file */
 		fullname = palloc(strlen(path) + 11 + 1);
 		sprintf(fullname, "%s/PG_VERSION", path);
-		sleep(10);
 		version_file = PathNameOpenFile(fullname, O_CREAT | O_WRONLY, 0600);
 		if (version_file < 0)
 			ereport(ERROR,

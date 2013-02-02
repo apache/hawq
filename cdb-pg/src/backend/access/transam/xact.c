@@ -58,6 +58,7 @@
 #include "cdb/cdbvars.h" /* Gp_role, Gp_is_writer, interconnect_setup_timeout */
 
 #include "cdb/cdbpersistentstore.h"
+#include "cdb/cdbquerycontextdispatching.h"
 
 /*
  *	User-tweakable parameters
@@ -3607,6 +3608,8 @@ CommitTransaction(void)
 	 */
 	AtEOXact_Inval(true);
 
+	AtEOXact_QueryContext();
+
 	/*
 	 * Likewise, dropping of files deleted during the transaction is best done
 	 * after releasing relcache and buffer pins.  (This is not strictly
@@ -4159,6 +4162,8 @@ AbortTransaction(void)
 	AtEOXact_RelationCache(false);
 	AtEOXact_Inval(false);
 	AtXactCancle_Files(); /* close all HDFS files before remove them. */
+
+	AtEOXact_QueryContext();
 	AtEOXact_smgr(false);
 
 	if (willHaveObjectsFromSmgr)

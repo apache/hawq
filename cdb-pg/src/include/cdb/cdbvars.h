@@ -572,6 +572,8 @@ extern bool gp_interconnect_cache_future_packets;
 extern int	Gp_segment;		/* GUC var */
 
 extern int	getgpsegmentCount(void);
+extern int	GetTotalSegmentsNumber(void);
+extern void	UpdateAliveSegmentsInfo(void);
 
 /*
  * Parameter interconnect_setup_timeout
@@ -1119,6 +1121,32 @@ typedef struct GpId
 								 * 0, ..., n-1 for segment database *
 								 * a primary and its mirror have the same segIndex */
 } GpId;
+
+typedef struct AliveSegmentsInfo AliveSegmentsInfo;
+struct AliveSegmentsInfo
+{
+	uint64			fts_statusVersion;
+	TransactionId	tid;
+
+	/* Release gangs */
+	bool			cleanGangs;
+
+	/* Used for debug & test */
+	bool			forceUpdate;
+	int				failed_segmentid_start;
+	int				failed_segmentid_number;
+
+	/* Used for disptacher. */
+	int4			aliveSegmentsCount;
+	int4			singleton_segindex;
+	Bitmapset		*aliveSegmentsBitmap;
+	struct CdbComponentDatabases *cdbComponentDatabases;
+};
+
+extern AliveSegmentsInfo GpAliveSegmentsInfo;
+
+extern int	Gp_test_failed_segmentid_start;
+extern int	Gp_test_failed_segmentid_number;
 
 /* --------------------------------------------------------------------------------------------------
  * Global variable declaration for the data for the single row of gp_id table
