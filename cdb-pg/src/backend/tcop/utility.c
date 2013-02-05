@@ -1230,9 +1230,6 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_GrantRoleStmt:
-			ereport(ERROR,
-							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE role yet in GPSQL") ));
-
 			GrantRole((GrantRoleStmt *) parsetree);
 			break;
 
