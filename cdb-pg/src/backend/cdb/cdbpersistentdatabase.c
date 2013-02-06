@@ -385,7 +385,6 @@ bool PersistentDatabase_DbDirExistsUnderLock(
 	
 	PersistentDatabase_VerifyInitScan();
 
-	/* XXX:mat3: I don't this call path... */
 	databaseDirEntry =
 			(DatabaseDirEntry)
 				    SharedOidSearch_Find(
@@ -421,7 +420,7 @@ extern void PersistentDatabase_Reset(void)
 										&fsObjName,
 										/* tablespaceOid */ databaseDirEntry->header.oid2,
 										/* databaseOid */ databaseDirEntry->header.oid1,
-										/* FIXME: mat3: ??? */ false);
+										NULL);
 
 		if (Debug_persistent_print)
 			elog(Persistent_DebugPrintLevel(), 
@@ -979,7 +978,7 @@ PersistentDatabase_ActivateStandby(int16 oldmaster, int16 newmaster)
 		PersistentFileSysObjName_SetDatabaseDir(&fsObjName,
 												tblspcoid,
 												dboid,
-												false);
+												NULL);
 
 	    PersistentFileSysObj_ActivateStandby(&fsObjName,
 											 &tuple->t_self,
@@ -1365,8 +1364,6 @@ PersistentDatabase_DirIsCreated(int4 contentid, DbDirNode *dbDirNode)
 
 	READ_PERSISTENT_STATE_ORDERED_LOCK;
 
-
-	/* XXX:mat3: I'll fix it later when I'm dealing with recovery. */
 	databaseDirEntry =
 			(DatabaseDirEntry)
 				    SharedOidSearch_Find(
@@ -1678,8 +1675,21 @@ static Size PersistentDatabase_SharedDataSize(void)
  */
 Size PersistentDatabase_ShmemSize(void)
 {
+	int			content_num = (GpIdentity.segindex != MASTER_CONTENT_ID ? 1 : GetTotalSegmentsNumber() + 1);
+
 	if (MaxPersistentDatabaseDirectories == 0)
-		MaxPersistentDatabaseDirectories = gp_max_databases * gp_max_tablespaces * (GpIdentity.segindex != MASTER_CONTENT_ID ? 1 : GetTotalSegmentsNumber() + 1);
+		MaxPersistentDatabaseDirectories = gp_max_databases * gp_max_tablespaces * content_num;
+
+	elog(DEBUG1, "PersistentDatabase_ShmemSize: %zu = "
+			  "PersistentDatabase_SharedDataSize(): %zu ="
+			  "PersistentDatabaseSharedData: %zu +"
+			  "MaxPersistentDatabaseDirectories: %d (db: %d * ts: %d * content: %d) *"
+			  "sizeof(DatabaseDirEntryData): %zu",
+			  PersistentDatabase_SharedDataSize(),
+			  PersistentDatabase_SharedDataSize(),
+			  offsetof(PersistentDatabaseSharedData,databaseDirSearchTable),
+			  MaxPersistentDatabaseDirectories, gp_max_databases, gp_max_tablespaces, content_num,
+			  sizeof(DatabaseDirEntryData));
 
 	/* The shared-memory structure. */
 	return PersistentDatabase_SharedDataSize();

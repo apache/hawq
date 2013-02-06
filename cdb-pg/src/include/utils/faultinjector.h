@@ -168,10 +168,10 @@ typedef enum FaultInjectorIdentifier_e {
 	GangThreadCreation,
 	DispatchThreadCreation,
 
-	DispatchWait,
+/*	DispatchWait,*/
 	ConnectionFailAfterGangCreation,
 
-	MakeDispatchThread,
+/*	MakeDispatchThread,*/
 
 	BeforeDispatch,
 

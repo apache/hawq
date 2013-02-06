@@ -689,7 +689,7 @@ bool PersistentFilespace_TryGetPrimaryAndMirrorUnderLock(
 	}
 	else if (contentid != MASTER_CONTENT_ID)
 	{
-		/* XXX:mat3: The QEs locations on the QD. */
+		/* In GPSQL, the QE's locations are on the QD. */
 		primaryBlankPadded = filespaceDirEntry->locationBlankPadded1;
 		mirrorBlankPadded = filespaceDirEntry->locationBlankPadded2;		
 	}
@@ -1580,13 +1580,24 @@ static Size PersistentFilespace_SharedDataSize(void)
 Size PersistentFilespace_ShmemSize(void)
 {
 	Size		size;
+	int			content_num = (GpIdentity.segindex != MASTER_CONTENT_ID ? 1 : GetTotalSegmentsNumber() + 1);
 
 	/* The hash table of persistent filespaces */
-	size = hash_estimate_size((Size)gp_max_filespaces * (GpIdentity.segindex != MASTER_CONTENT_ID ? 1 : GetTotalSegmentsNumber() + 1),
+	size = hash_estimate_size((Size)gp_max_filespaces * content_num,
 							  sizeof(FilespaceDirEntryData));
 
 	/* The shared-memory structure. */
 	size = add_size(size, PersistentFilespace_SharedDataSize());
+
+	elog(DEBUG1, "PersistentFilespace_ShmemSize: %zu = "
+			  "gp_max_filespaces: %d * content: %d "
+			  "* sizeof(FilespaceDirEntryData): %zu "
+			  "+ PersistentFilespace_SharedDataSize(): %zu",
+			  size,
+			  gp_max_filespaces,
+			  content_num,
+			  sizeof(FilespaceDirEntryData),
+			  PersistentFilespace_SharedDataSize());
 
 	return size;
 }

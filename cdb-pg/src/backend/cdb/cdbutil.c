@@ -411,7 +411,7 @@ getCdbComponentDatabasesForGangs(void)
 	CdbComponentDatabases	*newInfo;
 	int	i;
 
-	/* XXX:mat3: recovery special code.. */
+	/* If there is no alive segments info, assume all segments are alive. */
 	if (GpAliveSegmentsInfo.cdbComponentDatabases == NULL)
 		return getCdbComponentDatabases();
 
@@ -1270,7 +1270,7 @@ dbid_get_dbinfo(int16 dbid)
 int16
 get_contentid_from_dbid(int16 db_id)
 {
-	int16 contendid = -2;
+	int16 contentid = -2;
 	ScanKeyData key[1];
 	HeapScanDesc scandesc;
 	Relation rel;
@@ -1295,7 +1295,7 @@ get_contentid_from_dbid(int16 db_id)
 
 	if (HeapTupleIsValid(tup))
 	{
-		contendid = ((Form_gp_segment_configuration) GETSTRUCT(tup))->content;
+		contentid = ((Form_gp_segment_configuration) GETSTRUCT(tup))->content;
 
 		/* We expect a single result, assert this */
 		Assert(!HeapTupleIsValid(heap_getnext(scandesc, ForwardScanDirection)));
@@ -1305,7 +1305,7 @@ get_contentid_from_dbid(int16 db_id)
 
 	/* no need to hold the lock, it's a catalog */
 	heap_close(rel, AccessShareLock);
-	return contendid;
+	return contentid;
 }
 
 

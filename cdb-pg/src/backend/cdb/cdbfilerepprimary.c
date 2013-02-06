@@ -210,7 +210,7 @@ FileRepPrimary_IsMirroringRequired(FileRepIdentifier_u		*fileRepIdentifier,
 	bool	isInTransition = FALSE;
 	DataState_e dataStateTransition;
 
-	/* FIXME: mat3: Should I do something for FlatFile and AppendOnly? */
+	/* In GOH, should the appendonly be processed here? */
 	if (fileRepIdentifier)
 	{
 		switch (fileRepRelationType)

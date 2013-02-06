@@ -1414,17 +1414,12 @@ heap_create_with_catalog(const char *relname,
 	{
 		if(stdRdOptions->columnstore)
 		{
-			/*
-			 * TODO, in gpsql, currently not supported
-			 */
-			ereport(ERROR,
-					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
-							errmsg("Cannot support column store table yet in GPSQL") ));
-
             relstorage = RELSTORAGE_AOCOLS;
 		}
 		else
+        {
 			relstorage = RELSTORAGE_AOROWS;
+        }
 	}
 
 	

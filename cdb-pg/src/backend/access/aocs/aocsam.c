@@ -631,10 +631,11 @@ static void OpenAOCSDatumStreams(AOCSInsertDesc desc)
     					desc->aoi_rel, 
     					desc->aoEntry, 
     					desc->appendOnlyMetaDataSnapshot, 
-    					desc->cur_segno);
+    					desc->cur_segno,
+    					GpIdentity.segindex);
 	if (seginfo == NULL)
 	{
-		InsertInitialAOCSFileSegInfo(desc->aoEntry->segrelid, desc->cur_segno, nvp);
+		InsertInitialAOCSFileSegInfo(desc->aoEntry->segrelid, desc->cur_segno, GpIdentity.segindex, nvp);
 
 		seginfo = NewAOCSFileSegInfo(desc->cur_segno, nvp);
 	}
@@ -851,12 +852,25 @@ Oid aocs_insert_values(AOCSInsertDesc idesc, Datum *d, bool * null, AOTupleId *a
 	if (idesc->numSequences == 0)
 	{
 		int64 firstSequence;
-		Assert(ItemPointerIsValid(&idesc->fsInfo->sequence_tid));
 
-		firstSequence =
-			GetFastSequencesByTid(&idesc->fsInfo->sequence_tid,
-								  idesc->lastSequence + 1,
-								  NUM_FAST_SEQUENCES);
+		/*
+		 * in GP-SQL, catalog is in memory heap table,
+		 * ItemPointer of tuple is invalid.
+		 */
+		if (GP_ROLE_EXECUTE == Gp_role)
+		{
+			firstSequence = GetFastSequences(idesc->aoEntry->segrelid,
+					idesc->cur_segno, idesc->lastSequence + 1,
+					NUM_FAST_SEQUENCES, &idesc->fsInfo->sequence_tid);
+		}
+		else
+		{
+			Assert(ItemPointerIsValid(&idesc->fsInfo->sequence_tid));
+
+			firstSequence = GetFastSequencesByTid(&idesc->fsInfo->sequence_tid,
+							idesc->lastSequence + 1,
+							NUM_FAST_SEQUENCES);
+		}
 		Assert(firstSequence == idesc->lastSequence + 1);
 		idesc->numSequences = NUM_FAST_SEQUENCES;
 	}

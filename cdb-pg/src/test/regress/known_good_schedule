@@ -19,7 +19,7 @@ ignore: goh_alter_distribution_policy
 ignore: goh_column_compression
 test: goh_database
 test: goh_gp_dist_random
-ignore: gpsql_fault_tolerance
+test: gpsql_fault_tolerance
 test: boolean
 test: char
 test: name
@@ -150,7 +150,7 @@ ignore: partition
 ignore: dpe
 ignore: sirv_functions
 ignore: appendonly
-ignore: aocs
+test: aocs
 ignore: gp_hashagg
 ignore: gp_dqa
 ignore: gpic

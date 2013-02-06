@@ -361,7 +361,7 @@ void PersistentTablespace_Reset(void)
 
 	hash_seq_init(&stat, persistentTablespaceSharedHashTable);
 
-	/* XXX:mat3: nowhere to set db_id */
+	/* XXX:mat3: Currently, persistent tablespace cannot be reset! */
 	Insist(false);
 	while (true)
 	{
@@ -535,7 +535,7 @@ PersistentTablespaceGetFilespaces PersistentTablespace_TryGetPrimaryAndMirrorFil
 	if (GPStandby())
 	{
 		/*
-		 * Standby can not access the shared storage, so the contendid must be
+		 * Standby can not access the shared storage, so the contentid must be
 		 * MASTER_CONTENT_ID.
 		 */
 		Assert(contentid == MASTER_CONTENT_ID);
@@ -1439,13 +1439,24 @@ static Size PersistentTablespace_SharedDataSize(void)
 Size PersistentTablespace_ShmemSize(void)
 {
 	Size		size;
+	int			content_num = (GpIdentity.segindex != MASTER_CONTENT_ID ? 1 : GetTotalSegmentsNumber() + 1);
 
 	/* The hash table of persistent tablespaces */
-	size = hash_estimate_size((Size)gp_max_tablespaces * (GpIdentity.segindex != MASTER_CONTENT_ID ? 1 : GetTotalSegmentsNumber() + 1),
+	size = hash_estimate_size((Size)gp_max_tablespaces * content_num,
 							  sizeof(TablespaceDirEntryData));
 
 	/* The shared-memory structure. */
 	size = add_size(size, PersistentTablespace_SharedDataSize());
+
+	elog(DEBUG1, "PersistentTablespace_ShmemSize: %zu = "
+			  "gp_max_tablespaces: %d * content: %d "
+			  "* sizeof(TablespaceDirEntryData): %zu "
+			  "+ PersistentTablespace_SharedDataSize(): %zu",
+			  size,
+			  gp_max_tablespaces,
+			  content_num,
+			  sizeof(TablespaceDirEntryData),
+			  PersistentTablespace_SharedDataSize());
 
 	return size;
 }

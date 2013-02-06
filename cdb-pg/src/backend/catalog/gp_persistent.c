@@ -744,7 +744,6 @@ void GpPersistent_GetCommonValues(
 												fsObjName, 
 												filespaceOid,
 												NULL);
-			/* XXX:mat3: */
 			fsObjName->hasInited = true;
 			fsObjName->sharedStorage = sharedStorage;
 			fsObjName->contentid = contentid;

@@ -650,6 +650,9 @@ bool gp_plpgsql_clear_cache_always = false;
 /* gp_disable_catalog_access_on_segment */
 bool gp_disable_catalog_access_on_segment = false;
 
+/* indicate whether called by gpdump, if yes, processutility will open some limitations */
+bool gp_called_by_pgdump = false;
+
 /*
  * Displayable names for context types (enum GucContext)
  *
@@ -3423,6 +3426,16 @@ static struct config_bool ConfigureNamesBool[] =
 		 GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE | GUC_GPDB_ADDOPT
 		},
 		&gp_disable_catalog_access_on_segment,
+		false, NULL, NULL
+	},
+
+	{
+		{"gp_called_by_pgdump", PGC_USERSET, DEVELOPER_OPTIONS,
+		 gettext_noop("Indicate whether called by pg_dump"),
+		 NULL,
+		 GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_called_by_pgdump,
 		false, NULL, NULL
 	},
 

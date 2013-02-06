@@ -639,12 +639,12 @@ cdbdisp_dispatchToGang(struct CdbDispatcherState *ds,
 				continue;
 		}
 
-//		if (mppDispatchCommandType == GP_DISPATCH_COMMAND_TYPE_QUERY)
-//		{
-//			MarkSendingToSegment(
-//				 segdbDesc->segment_database_info->segindex,
-//				 segdbDesc->segment_database_info->isprimary);
-//		}
+/*		if (mppDispatchCommandType == GP_DISPATCH_COMMAND_TYPE_QUERY)
+		{
+			MarkSendingToSegment(
+				 segdbDesc->segment_database_info->segindex,
+				 segdbDesc->segment_database_info->isprimary);
+		}*/
 
 		/* Initialize the QE's CdbDispatchResult object. */
 		qeResult = cdbdisp_makeResult(dispatchResults, segdbDesc, sliceIndex);
@@ -2079,7 +2079,8 @@ thread_DispatchWait(DispatchCommandParms		*pParms)
 		/* Block here until input is available. */
 		n = select(max_sock + 1, (fd_set *)&pParms->mask, NULL, NULL, &tv);
 
-		/* Inject fault for select result */
+/*
+		 Inject fault for select result
 #ifdef FAULT_INJECTOR
 		int faultType = FaultInjector_InjectFaultIfSet(
 							DispatchWait,
@@ -2099,10 +2100,11 @@ thread_DispatchWait(DispatchCommandParms		*pParms)
 								"type is FaultInjectorTypeTimeOut");
 			n = 0;
 		}
-/* #else */
-		/* Block here until input is available. */
-/*		n = select(max_sock + 1, (fd_set *)&pParms->mask, NULL, NULL, &tv); */
+ #else
+		 Block here until input is available.
+		n = select(max_sock + 1, (fd_set *)&pParms->mask, NULL, NULL, &tv);
 #endif
+*/
 
 		if (n < 0)
 		{

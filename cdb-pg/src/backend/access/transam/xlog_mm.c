@@ -64,12 +64,12 @@ obj_get_path(xl_mm_fs_obj *xlrec)
 	else
 	{
 		/*
-		 * We should never get here. We can not call elog here, because it will trigger a recursive
-		 * call back via the resource manager redo logic.
+		 * In GPSQL, this is a valid case, all of segment files are managed by master.
 		 *
+		 * BTW: We can not call elog here, because it will trigger a recursive
+		 * call back via the resource manager redo logic.
 		 * Return a NULL path pointer and allow the caller to log the event.
 		 */
-		/* XXX:mat3: FILESPACE and TABLESPACE will have all of db_ids. */
 		path = xlrec->master_path;
 	}
 
@@ -155,7 +155,7 @@ mmxlog_redo(XLogRecPtr beginLoc, XLogRecPtr lsn, XLogRecord *record)
 	/* Only master can touch the shared storage. */
 	if (GPStandby() && xlrec->contentid != MASTER_CONTENT_ID)
 	{
-		elog(LOG, "skip contentid: %d for path: %s", xlrec->contentid, path);
+		elog(DEBUG1, "skip contentid: %d for path: %s", xlrec->contentid, path);
 		return;
 	}
 
@@ -573,7 +573,6 @@ emit_mmxlog_fs_record(mm_fs_obj_type type, int4 contentid, Oid filespace,
 		return false;
 
 	/* only interesting on the master */
-	/* XXX:mat3: standby might be a huge problem here! */
 	if (GpIdentity.dbid == MASTER_DBID)
 	{
 		XLogRecData rdata;

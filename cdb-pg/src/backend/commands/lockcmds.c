@@ -76,8 +76,8 @@ LockTableCommand(LockStmt *lockstmt)
 		relation_close(rel, NoLock);	/* close rel, keep lock */
 	}
 
-	if (Gp_role == GP_ROLE_DISPATCH)
+/*	if (Gp_role == GP_ROLE_DISPATCH)
 	{
 		CdbDispatchUtilityStatement((Node *) lockstmt, "LockTableCommand");
-	}
+	}*/
 }

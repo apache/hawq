@@ -10426,7 +10426,8 @@ ATExecSetTableSpace_AppendOnly(
 
 			actualSegmentNum = segmentFileNum % AOTupleId_MultiplierSegmentFileNum;
 			
-			aocsFileSegInfo = GetAOCSFileSegInfo(rel, aoEntry, appendOnlyMetaDataSnapshot, actualSegmentNum);
+			aocsFileSegInfo = GetAOCSFileSegInfo(rel, aoEntry, appendOnlyMetaDataSnapshot, actualSegmentNum, 
+                                                 GpIdentity.segindex);
 			if (aocsFileSegInfo == NULL)
 			{
 				/*

@@ -1104,6 +1104,7 @@ DatabaseInfo_HandleAppendOnly(
 																aoEntry, 
 																pg_aocsseg_rel,
 																SnapshotNow, 
+																true,
 																&totalAocsSegFiles);
 				for (i = 0; i < totalAocsSegFiles; i++)
 				{
@@ -1118,7 +1119,6 @@ DatabaseInfo_HandleAppendOnly(
 
 						entry = getAOCSVPEntry(aocsSegfileArray[i], columnNum);
 
-						Insist(!"should not be here!");
 						DatabaseInfo_AddAppendOnlyCatalogSegmentInfo(
 																dbInfoRel,
 																/* This is not supported. */ -1,

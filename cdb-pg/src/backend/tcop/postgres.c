@@ -990,7 +990,7 @@ exec_mpp_query(const char *query_string,
 		 * only few Query should be dispatched to QE,
 		 * I assume they should be dispatched with query context.
 		 */
-        Assert(NULL != query->contextdisp);
+		/*Assert(NULL != query->contextdisp);*/
 		if (query->contextdisp)
 		{
 			RebuildQueryContext(query->contextdisp);

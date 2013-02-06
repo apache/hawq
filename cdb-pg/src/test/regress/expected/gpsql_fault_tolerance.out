@@ -18,12 +18,12 @@ COPY x FROM stdin DELIMITER ',';
 SELECT c, d FROM x;
  c  |         d          
 ----+--------------------
+  3 | insert before test
   6 | copy before test
   8 | copy before test
  10 | copy before test
   1 | insert before test
   2 | insert before test
-  3 | insert before test
   4 | insert before test
   5 | insert before test
   7 | copy before test
@@ -59,7 +59,7 @@ ERROR:  segment alive information changed, cleanup the gangs. (postgres.c:1800)
 SELECT COUNT(DISTINCT gp_segment_id) > 0 AS has_segment_id_1 FROM x WHERE gp_segment_id = 1; -- must be true
  has_segment_id_1 
 ------------------
- f
+ t
 (1 row)
 
 INSERT INTO x VALUES(100, 'insert when segment id 1 failed');
@@ -67,7 +67,7 @@ COPY x FROM stdin DELIMITER ',';
 SELECT COUNT(DISTINCT gp_segment_id) > 0 AS has_segment_id_1 FROM x WHERE gp_segment_id = 1; -- must be true
  has_segment_id_1 
 ------------------
- f
+ t
 (1 row)
 
 SELECT c, d FROM x WHERE c BETWEEN 100 AND 200; -- expected insert successful
@@ -87,7 +87,7 @@ ERROR:  segment alive information changed, cleanup the gangs. (postgres.c:1800)
 SELECT COUNT(DISTINCT gp_segment_id) > 0 AS has_segment_id_0 FROM x WHERE gp_segment_id = 0; -- must be true
  has_segment_id_0 
 ------------------
- f
+ t
 (1 row)
 
 INSERT INTO x VALUES(200, 'insert when segment id 0 failed');
@@ -95,7 +95,7 @@ COPY x FROM stdin DELIMITER ',';
 SELECT COUNT(DISTINCT gp_segment_id) > 0 AS has_segment_id_0 FROM x WHERE gp_segment_id = 0; -- must be true
  has_segment_id_0 
 ------------------
- f
+ t
 (1 row)
 
 SELECT c, d FROM x WHERE c BETWEEN 200 AND 300; -- expected insert successful
@@ -120,18 +120,18 @@ SELECT c, d FROM x;
 -----+---------------------------------
    1 | insert before test
    2 | insert before test
-   3 | insert before test
    4 | insert before test
    5 | insert before test
    7 | copy before test
    9 | copy before test
- 200 | insert when segment id 0 failed
- 201 | copy when segment id 0 failed
+   3 | insert before test
    6 | copy before test
    8 | copy before test
   10 | copy before test
  100 | insert when segment id 1 failed
  101 | copy when segment id 1 failed
+ 200 | insert when segment id 0 failed
+ 201 | copy when segment id 0 failed
 (14 rows)
 
 SELECT count(*) AS data_before_failover FROM x;
@@ -165,28 +165,28 @@ COPY x FROM stdin DELIMITER ',';
 SELECT c, d FROM x;
   c  |                d                
 -----+---------------------------------
+   1 | insert before test
+   2 | insert before test
+   4 | insert before test
+   5 | insert before test
+   7 | copy before test
+   9 | copy before test
+ 301 | insert after recovery
+ 303 | insert after recovery
+ 305 | insert after recovery
+ 306 | copy after recovery
+ 308 | copy after recovery
+ 310 | copy after recovery
+   3 | insert before test
    6 | copy before test
    8 | copy before test
   10 | copy before test
  100 | insert when segment id 1 failed
  101 | copy when segment id 1 failed
- 303 | insert after recovery
- 304 | insert after recovery
- 305 | insert after recovery
- 306 | copy after recovery
- 308 | copy after recovery
- 310 | copy after recovery
-   1 | insert before test
-   2 | insert before test
-   3 | insert before test
-   4 | insert before test
-   5 | insert before test
-   7 | copy before test
-   9 | copy before test
  200 | insert when segment id 0 failed
  201 | copy when segment id 0 failed
- 301 | insert after recovery
  302 | insert after recovery
+ 304 | insert after recovery
  307 | copy after recovery
  309 | copy after recovery
 (24 rows)
@@ -238,7 +238,7 @@ SELECT * FROM y;
 --
 -- end_matchsubs
 SET gp_test_failed_segmentid_number = 1;
-WARNING:  Any temporary tables for this session have been dropped because the gang was disconnected (session id = 188)
+WARNING:  Any temporary tables for this session have been dropped because the gang was disconnected (session id = 741)
 ERROR:  segment alive information changed, cleanup the gangs. (postgres.c:1800)
 SET gp_test_failed_segmentid_start = 1;
 ERROR:  segment alive information changed, cleanup the gangs. (postgres.c:1800)

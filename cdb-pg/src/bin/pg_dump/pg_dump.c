@@ -229,6 +229,7 @@ static int	dumpBlobComments(Archive *AH, void *arg __attribute__((unused)));
 static void dumpDatabase(Archive *AH);
 static void dumpEncoding(Archive *AH);
 static void dumpStdStrings(Archive *AH);
+static void dumpGPDumpCalling(Archive *AH);
 static const char *getAttrName(int attrnum, TableInfo *tblInfo);
 static const char *fmtCopyColumnList(const TableInfo *ti);
 static void do_sql_command(PGconn *conn, const char *query);
@@ -643,6 +644,10 @@ main(int argc, char **argv)
 		}
 	}
 
+	/* Set guc variable to true so that processutility doesn't forbid certain operations */
+	do_sql_command(g_conn, "SET gp_called_by_pgdump = true");
+
+
 	/*
 	 * Get the active encoding and the standard_conforming_strings setting, so
 	 * we know how to escape strings.
@@ -800,6 +805,7 @@ main(int argc, char **argv)
 	/* First the special ENCODING and STDSTRINGS entries. */
 	dumpEncoding(g_fout);
 	dumpStdStrings(g_fout);
+	dumpGPDumpCalling(g_fout);
 
 	/* The database item is always next, unless we don't want it at all */
 	if (include_everything && !dataOnly)
@@ -1022,7 +1028,9 @@ selectDumpableNamespace(NamespaceInfo *nsinfo)
 												   nsinfo->dobj.catId.oid);
 	else if (strncmp(nsinfo->dobj.name, "pg_", 3) == 0 ||
 			 strcmp(nsinfo->dobj.name, "information_schema") == 0 ||
-			 strcmp(nsinfo->dobj.name, "gp_toolkit") == 0)
+			 strcmp(nsinfo->dobj.name, "gp_toolkit") == 0 ||
+			 strcmp(nsinfo->dobj.name, "madlib") == 0 ||
+			 strcmp(nsinfo->dobj.name, "retail_demo") == 0)
 		nsinfo->dobj.dump = false;
 	else
 		nsinfo->dobj.dump = true;
@@ -1659,6 +1667,28 @@ dumpStdStrings(Archive *AH)
 	destroyPQExpBuffer(qry);
 }
 
+/*
+ * dumpGPDumpCalling: put the correct escape string behavior into the archive
+ */
+static void
+dumpGPDumpCalling(Archive *AH)
+{
+//	const char *stdstrings = AH->std_strings ? "on" : "off";
+	PQExpBuffer qry = createPQExpBuffer();
+
+	if (g_verbose)
+		write_msg(NULL, "saving gp_called_by_pgdump = true\n");
+
+	appendPQExpBuffer(qry, "SET gp_called_by_pgdump = true;\n");
+
+	ArchiveEntry(AH, nilCatalogId, createDumpId(),
+				 "GPDUMPGUC", NULL, NULL, "",
+				 false, "INTERNAL GUC", qry->data, "", NULL,
+				 NULL, 0,
+				 NULL, NULL);
+
+	destroyPQExpBuffer(qry);
+}
 
 /*
  * hasBlobs:
@@ -3680,6 +3710,10 @@ getProcLangs(int *numProcLangs)
 			planginfo[i].lanowner = strdup(PQgetvalue(res, i, i_lanowner));
 		else
 			planginfo[i].lanowner = strdup("");
+
+		/* Decide whether to dump this procedure language */
+		if(strcmp(planginfo[i].dobj.name, "plpythonu") == 0)
+			planginfo[i].dobj.dump = false;
 	}
 
 	PQclear(res);
@@ -5253,7 +5287,7 @@ dumpProcLang(Archive *fout, ProcLangInfo *plang)
 	FuncInfo   *funcInfo;
 	FuncInfo   *validatorInfo = NULL;
 
-	if (dataOnly)
+	if (!plang->dobj.dump || dataOnly)
 		return;
 
 	/*

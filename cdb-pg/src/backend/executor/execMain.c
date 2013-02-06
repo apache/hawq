@@ -2067,33 +2067,73 @@ CreateAppendOnlySegFileForRelationOnMaster(Relation rel, int segno)
 
 		for (i = 0; i <= GetTotalSegmentsNumber(); ++i)
 		{
-			Assert(i < child_rel->rd_segfile0_count);
-
-			fsinfo = GetFileSegInfo(child_rel, aoEntry, SnapshotNow, segno, i - 1);
-
-			if (NULL == fsinfo)
+			if(RelationIsAoRows(child_rel))
 			{
-				InsertInitialSegnoEntry(aoEntry, segno, i - 1);
+				Assert(i < child_rel->rd_segfile0_count);
+
+				fsinfo = GetFileSegInfo(child_rel, aoEntry, SnapshotNow, segno, i - 1);
+
+				if (NULL == fsinfo)
+				{
+					InsertInitialSegnoEntry(aoEntry, segno, i - 1);
+				}
+				else if (fsinfo->eof != 0)
+				{
+					pfree(fsinfo);
+					continue;
+				}
+
+				if (fsinfo)
+					pfree(fsinfo);
+
+				AppendOnlyStorageWrite_TransactionCreateFile(
+						RelationGetRelationName(child_rel),
+						0,
+						&child_rel->rd_node,
+						segno,
+						i - 1,
+						&child_rel->rd_segfile0_relationnodeinfos[i].persistentTid,
+						&child_rel->rd_segfile0_relationnodeinfos[i].persistentSerialNum
+						);
+				child_rel->rd_segfile0_relationnodeinfos[i].isPresent = TRUE;
 			}
-			else if (fsinfo->eof != 0)
+			else
 			{
-				pfree(fsinfo);
-				continue;
+				int j;
+				AOCSFileSegInfo *aocsFileSegInfo;
+
+				Assert(RelationIsAoCols(child_rel));
+
+				aocsFileSegInfo = GetAOCSFileSegInfo(child_rel, aoEntry, SnapshotNow, segno, i - 1);
+
+				if (NULL == aocsFileSegInfo)
+				{
+					InsertInitialAOCSFileSegInfo(aoEntry->segrelid, segno, i - 1, child_rel->rd_att->natts);
+				}
+
+				for (j = 0; j < child_rel->rd_att->natts; j++)
+				{
+					if ((aocsFileSegInfo) && (0 != aocsFileSegInfo->vpinfo.entry[j].eof))
+					{
+						continue;
+					}
+
+					AppendOnlyStorageWrite_TransactionCreateFile(
+							RelationGetRelationName(child_rel),
+							0,
+							&child_rel->rd_node,
+							j * AOTupleId_MultiplierSegmentFileNum + segno, /* for aocs */
+							i - 1,
+							&child_rel->rd_segfile0_relationnodeinfos[i].persistentTid,
+							&child_rel->rd_segfile0_relationnodeinfos[i].persistentSerialNum);
+				}
+				child_rel->rd_segfile0_relationnodeinfos[i].isPresent = TRUE;
+
+				if (aocsFileSegInfo)
+				{
+					pfree(aocsFileSegInfo);
+				}
 			}
-
-			if (fsinfo)
-				pfree(fsinfo);
-
-			AppendOnlyStorageWrite_TransactionCreateFile(
-					RelationGetRelationName(child_rel),
-					0,
-					&child_rel->rd_node,
-					segno,
-					i - 1,
-					&child_rel->rd_segfile0_relationnodeinfos[i].persistentTid,
-					&child_rel->rd_segfile0_relationnodeinfos[i].persistentSerialNum
-					);
-			child_rel->rd_segfile0_relationnodeinfos[i].isPresent = TRUE;
 		}
 
 		if (oid != rel->rd_id)

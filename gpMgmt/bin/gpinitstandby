@@ -594,9 +594,8 @@ def validate_standby_init(options, array, standby_filespace_map):
     # make sure we have top level dirs
     for fs_name, fs_dir in standby_filespace_map:
         base_dir = os.path.dirname(os.path.normpath(fs_dir))
-        # create the default dfs dir for standby
-        if fs_name == 'dfs_system':
-            unix.MakeDirectory.remote('make dir for "dfs_system"', options.standby_host, base_dir)
+        # In GPSQL, user should not maintain the master local path anymore.
+        unix.MakeDirectory.remote('make dir for ' + str(fs_name), options.standby_host, base_dir)
 
         if not unix.FileDirExists.remote('check for filespace dir',
                                          options.standby_host,

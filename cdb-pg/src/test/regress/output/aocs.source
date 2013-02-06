@@ -1,18 +1,4 @@
 set client_min_messages='ERROR';
--- test ao seg totals
-create  or replace function aototal(relname text) returns float8 as $$
-declare
-  aosegname text;
-  tupcount float8 := 0;
-  rc int := 0;
-begin
-
-  execute 'select relname from pg_class where oid=(select segrelid from pg_class, pg_appendonly where relname=''' || relname || ''' and relid = pg_class.oid)' into aosegname;
-  if aosegname > 0 then
-	  execute 'select tupcount from pg_aoseg.' || aosegname into tupcount;
-  end if;
-  return tupcount;
-end; $$ language plpgsql volatile;
 CREATE TABLE tenk_heap_for_aocs (
 	unique1 	int4,
 	unique2 	int4,
@@ -30,7 +16,7 @@ CREATE TABLE tenk_heap_for_aocs (
 	stringu1	name,
 	stringu2	name,
 	string4		name
-) with (appendonly=false) distributed by(unique1);
+) with (appendonly=true) distributed by(unique1);
 --
 -- create few AO tables. test various reloptions combinations. use a sample
 -- of them (the first 4) for later testing.
@@ -107,12 +93,6 @@ SELECT count(*) FROM tenk_aocs4;
  10000
 (1 row)
 
-SELECT aototal('tenk_aocs1'), aototal('tenk_aocs2'), aototal('tenk_aocs3'), aototal('tenk_aocs4');
- aototal | aototal | aototal | aototal 
----------+---------+---------+---------
-   10000 |   10000 |   10000 |   10000
-(1 row)
-
 -- INSERT SELECT
 INSERT INTO tenk_aocs1 SELECT * FROM tenk_heap_for_aocs;
 INSERT INTO tenk_aocs2 SELECT * FROM tenk_heap_for_aocs;
@@ -123,12 +103,6 @@ INSERT INTO tenk_aocs1 SELECT * FROM tenk_aocs1;
 INSERT INTO tenk_aocs2 SELECT * FROM tenk_aocs3;
 INSERT INTO tenk_aocs3 SELECT * FROM tenk_aocs2;
 INSERT INTO tenk_aocs4 SELECT * FROM tenk_aocs3;
-SELECT aototal('tenk_aocs1'), aototal('tenk_aocs2'), aototal('tenk_aocs3'), aototal('tenk_aocs4');
- aototal | aototal | aototal | aototal 
----------+---------+---------+---------
-   40000 |   40000 |   60000 |   80000
-(1 row)
-
 -- SELECT
 SELECT count(*) FROM tenk_heap_for_aocs;
  count 
@@ -202,12 +176,6 @@ SELECT count(*) FROM tenk_aocs4;
  80000
 (1 row)
 
-SELECT aototal('tenk_aocs1'), aototal('tenk_aocs2'), aototal('tenk_aocs3'), aototal('tenk_aocs4');
- aototal | aototal | aototal | aototal 
----------+---------+---------+---------
-   40000 |   40000 |   60000 |   80000
-(1 row)
-
 -------------------- 
 -- transactionality
 --------------------
@@ -227,12 +195,6 @@ SELECT count(*) FROM tenk_aocs1; -- should show previous count
  40000
 (1 row)
 
-SELECT aototal('tenk_aocs1');
- aototal 
----------
-   40000
-(1 row)
-
 -- commit
 BEGIN;
 INSERT INTO tenk_aocs1 SELECT * FROM tenk_heap_for_aocs;
@@ -247,12 +209,6 @@ SELECT count(*) FROM tenk_aocs1; -- should show new count
  count 
 -------
  50000
-(1 row)
-
-SELECT aototal('tenk_aocs1');
- aototal 
----------
-   50000
 (1 row)
 
 -- same txn inserts
@@ -282,81 +238,6 @@ SELECT count(*) FROM tenk_aocs1 WHERE unique1 = 87654321; -- should be 5
      5
 (1 row)
 
---------------------
--- cursors (basic)
---------------------
-BEGIN;
-DECLARE foo1 CURSOR FOR SELECT * FROM tenk_aocs1 ORDER BY 1,2,3,4;
-DECLARE foo2 CURSOR FOR SELECT * FROM tenk_aocs2 ORDER BY 1,2,3,4;
-FETCH 1 in foo1;
- unique1 | unique2 | two | four | ten | twenty | hundred | thousand | twothousand | fivethous | tenthous | odd | even | stringu1 | stringu2 | string4 
----------+---------+-----+------+-----+--------+---------+----------+-------------+-----------+----------+-----+------+----------+----------+---------
-       0 |    9998 |   0 |    0 |   0 |      0 |       0 |        0 |           0 |         0 |        0 |   0 |    1 | AAAAAA   | OUOAAA   | OOOOxx
-(1 row)
-
-FETCH 2 in foo2;
- unique1 | unique2 | two | four | ten | twenty | hundred | thousand | twothousand | fivethous | tenthous | odd | even | stringu1 | stringu2 | string4 
----------+---------+-----+------+-----+--------+---------+----------+-------------+-----------+----------+-----+------+----------+----------+---------
-       0 |    9998 |   0 |    0 |   0 |      0 |       0 |        0 |           0 |         0 |        0 |   0 |    1 | AAAAAA   | OUOAAA   | OOOOxx
-       0 |    9998 |   0 |    0 |   0 |      0 |       0 |        0 |           0 |         0 |        0 |   0 |    1 | AAAAAA   | OUOAAA   | OOOOxx
-(2 rows)
-
-FETCH 1 in foo1;
- unique1 | unique2 | two | four | ten | twenty | hundred | thousand | twothousand | fivethous | tenthous | odd | even | stringu1 | stringu2 | string4 
----------+---------+-----+------+-----+--------+---------+----------+-------------+-----------+----------+-----+------+----------+----------+---------
-       0 |    9998 |   0 |    0 |   0 |      0 |       0 |        0 |           0 |         0 |        0 |   0 |    1 | AAAAAA   | OUOAAA   | OOOOxx
-(1 row)
-
-FETCH 2 in foo2;
- unique1 | unique2 | two | four | ten | twenty | hundred | thousand | twothousand | fivethous | tenthous | odd | even | stringu1 | stringu2 | string4 
----------+---------+-----+------+-----+--------+---------+----------+-------------+-----------+----------+-----+------+----------+----------+---------
-       0 |    9998 |   0 |    0 |   0 |      0 |       0 |        0 |           0 |         0 |        0 |   0 |    1 | AAAAAA   | OUOAAA   | OOOOxx
-       0 |    9998 |   0 |    0 |   0 |      0 |       0 |        0 |           0 |         0 |        0 |   0 |    1 | AAAAAA   | OUOAAA   | OOOOxx
-(2 rows)
-
-CLOSE foo1;
-CLOSE foo2;
-END;
-BEGIN;
-DECLARE foo3 NO SCROLL CURSOR FOR SELECT * FROM tenk_aocs1 ORDER BY 1,2,3,4;
-FETCH 1 FROM foo3;
- unique1 | unique2 | two | four | ten | twenty | hundred | thousand | twothousand | fivethous | tenthous | odd | even | stringu1 | stringu2 | string4 
----------+---------+-----+------+-----+--------+---------+----------+-------------+-----------+----------+-----+------+----------+----------+---------
-       0 |    9998 |   0 |    0 |   0 |      0 |       0 |        0 |           0 |         0 |        0 |   0 |    1 | AAAAAA   | OUOAAA   | OOOOxx
-(1 row)
-
-FETCH BACKWARD 1 FROM foo3; -- should fail
-ERROR:  backward scan is not supported in this version of Greenplum Database
-END;
--- Cursors outside transaction blocks
-BEGIN;
-DECLARE foo4 CURSOR WITH HOLD FOR SELECT * FROM tenk_aocs1 ORDER BY 1,2,3,4;
-FETCH FROM foo4;
- unique1 | unique2 | two | four | ten | twenty | hundred | thousand | twothousand | fivethous | tenthous | odd | even | stringu1 | stringu2 | string4 
----------+---------+-----+------+-----+--------+---------+----------+-------------+-----------+----------+-----+------+----------+----------+---------
-       0 |    9998 |   0 |    0 |   0 |      0 |       0 |        0 |           0 |         0 |        0 |   0 |    1 | AAAAAA   | OUOAAA   | OOOOxx
-(1 row)
-
-FETCH FROM foo4;
- unique1 | unique2 | two | four | ten | twenty | hundred | thousand | twothousand | fivethous | tenthous | odd | even | stringu1 | stringu2 | string4 
----------+---------+-----+------+-----+--------+---------+----------+-------------+-----------+----------+-----+------+----------+----------+---------
-       0 |    9998 |   0 |    0 |   0 |      0 |       0 |        0 |           0 |         0 |        0 |   0 |    1 | AAAAAA   | OUOAAA   | OOOOxx
-(1 row)
-
-COMMIT;
-FETCH FROM foo4;
- unique1 | unique2 | two | four | ten | twenty | hundred | thousand | twothousand | fivethous | tenthous | odd | even | stringu1 | stringu2 | string4 
----------+---------+-----+------+-----+--------+---------+----------+-------------+-----------+----------+-----+------+----------+----------+---------
-       0 |    9998 |   0 |    0 |   0 |      0 |       0 |        0 |           0 |         0 |        0 |   0 |    1 | AAAAAA   | OUOAAA   | OOOOxx
-(1 row)
-
-SELECT name, statement, is_holdable, is_binary, is_scrollable FROM pg_cursors ORDER BY name;
- name |                                  statement                                   | is_holdable | is_binary | is_scrollable 
-------+------------------------------------------------------------------------------+-------------+-----------+---------------
- foo4 | DECLARE foo4 CURSOR WITH HOLD FOR SELECT * FROM tenk_aocs1 ORDER BY 1,2,3,4; | t           | f         | f
-(1 row)
-
-CLOSE foo4;
 -- DROP
 DROP TABLE tenk_aocs1;
 DROP TABLE tenk_aocs2;
@@ -470,15 +351,10 @@ TRUNCATE tenk_aocs2;
 -- MPP-8058: should fail
 CREATE TABLE aocswithoids(a int, b int) WITH (appendonly=true, orientation=column, oids=true);
 ERROR:  OIDS=TRUE is not allowed on tables that use column-oriented storage. Use OIDS=FALSE
--- INDEX
-CREATE INDEX tenk_aocs1_unique1 ON tenk_aocs1 USING btree(unique1 int4_ops);
 drop table if exists co;
 create table co (i int, j int, k varchar) with(appendonly=true, orientation=column);
 insert into co values (1,1,'a'), (2,2,'aa'), (3,3,'aaa'), (4,4,'aaaa'),
 	(5,5,'aaaaa'), (6,6,'aaaaaa'), (7,7,'aaaaaaa'), (8,8,'aaaaaaaa');
-create index co_j on co using btree(j);
-create index co_k on co using btree(k);
-create index co_jk on co using btree((j + length(k)));
 set enable_seqscan=off;
 select * from co where j = 2;
  i | j | k  
@@ -512,9 +388,6 @@ drop table if exists co;
 create table co (i int, j int, k varchar) with(appendonly=true, orientation=column);
 insert into co values (1,1,'a'), (2,2,'aa'), (3,3,'aaa'), (4,4,'aaaa'),
 	(5,5,'aaaaa'), (6,6,'aaaaaa'), (7,7,'aaaaaaa'), (8,8,'aaaaaaaa');
-create index co_j on co using bitmap(j);
-create index co_k on co using bitmap(k);
-create index co_jk on co using bitmap((j + length(k)));
 set enable_seqscan=off;
 select * from co where j = 2;
  i | j | k  
@@ -549,23 +422,10 @@ select * from co where j = 2;
 --------------------
 -- DELETE (not supported)
 DELETE FROM tenk_aocs1 WHERE unique1 = 1;
-ERROR:  Append-only tables are not updatable. Operation not permitted.  (seg0 @hostname@:11002 pid=30886)
+ERROR:  Delete append-only table statement not supported yet in GPSQL
 -- UPDATE (not supported)
 UPDATE tenk_aocs1 SET unique2 = 1 WHERE unique2 = 2;
-ERROR:  Append-only tables are not updatable. Operation not permitted.  (seg0 @hostname@:11002 pid=30886)
--- ALTER
-ALTER TABLE tenk_aocs1 RENAME TO tenk_renamed;
-ALTER TABLE tenk_renamed ADD COLUMN newcol int default 10;
-ALTER TABLE tenk_renamed ALTER COLUMN twothousand SET NOT NULL;
-ALTER TABLE tenk_renamed ADD COLUMN newcol2 int NOT NULL; -- should fail
-ERROR:  ADD COLUMN with no default value in append-only tables is not yet supported.
-SELECT count(*) FROM tenk_renamed;
- count 
--------
- 10000
-(1 row)
-
-ALTER TABLE tenk_renamed RENAME TO tenk_aocs1;
+ERROR:  Update append-only table statement not supported yet in GPSQL
 --------------------
 -- system columns
 --------------------

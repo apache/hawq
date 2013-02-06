@@ -259,12 +259,12 @@ FaultInjectorIdentifierEnumToString[] = {
 		/* inject fault after gang thread creation*/
 	_("dispatch_thread_creation_failure"),
 		/* inject fault after dispatcher thread creation*/
-	_("dispatch_wait"),
-		/* inject fault after dispatcher wait for results from segments*/
+/*	_("dispatch_wait"),
+		 inject fault after dispatcher wait for results from segments*/
 	_("connection_fail_after_gang"),
 		/* inject fault after gang thread creation, set connection null*/
-	_("make_dispatch_thread"),
-		/* inject fault when initialing memory structure for dispatcher thread*/
+/*	_("make_dispatch_thread"),
+		 inject fault when initialing memory structure for dispatcher thread*/
 	_("before_dispatch"),
 		/* inject fault before dispatching out threads */
 	_("dispatch_thread_initialization"),

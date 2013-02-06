@@ -12,7 +12,7 @@
 #define Anum_pg_aocs_tupcount 2
 #define Anum_pg_aocs_varblockcount 3
 #define Anum_pg_aocs_vpinfo 4
-
+#define Anum_pg_aocs_content 5
 
 /*
  * pg_aocsseg_nnnnnn table values for FormData_pg_attribute.
@@ -79,6 +79,7 @@ typedef struct AOCSFileSegInfo
 	TupleVisibilitySummary	tupleVisibilitySummary;
 
 	int32 segno;
+	int32 content;	/* GP-SQL: content id of this tuple */
 	int64 tupcount;
 	int64 varblockcount;
 	ItemPointerData sequence_tid;
@@ -122,7 +123,8 @@ GetAOCSFileSegInfo(
 	Relation 			prel,
 	AppendOnlyEntry 	*aoEntry,
 	Snapshot 			appendOnlyMetaDataSnapshot,
-	int32 				segno);
+	int32 				segno,
+	int32 contentid);
 
 
 extern AOCSFileSegInfo **
@@ -138,7 +140,8 @@ GetAllAOCSFileSegInfo_pg_aocsseg_rel(
 	char 				*relationName, 
 	AppendOnlyEntry 	*aoEntry, 
 	Relation 			pg_aocsseg_rel, 
-	Snapshot 			appendOnlyMetaDataSnapshot, 
+	Snapshot 			appendOnlyMetaDataSnapshot,
+	bool returnAllSegmentsFiles,
 	int32 				*totalseg);
 
 extern void FreeAllAOCSSegFileInfo(AOCSFileSegInfo **allAOCSSegInfo, int totalSegFiles);
@@ -148,9 +151,9 @@ extern int64 GetAOCSTotalBytes(
 	Snapshot appendOnlyMetaDataSnapshot);
 
 extern AOCSFileSegInfo *NewAOCSFileSegInfo(int4 segno, int4 nvp);
-extern void InsertInitialAOCSFileSegInfo(Oid segrelid, int32 segno, int32 nvp); 
+extern void InsertInitialAOCSFileSegInfo(Oid segrelid, int32 segno, int32 contentid, int32 nvp);
 extern void UpdateAOCSFileSegInfo(struct AOCSInsertDescData *desc);
-extern void AOCSFileSegInfoAddCount(Relation prel, AppendOnlyEntry *aoEntry, int32 segno, int64 tupadded, int64 varblockadded); 
+extern void AOCSFileSegInfoAddCount(Relation prel, AppendOnlyEntry *aoEntry, int32 segno, int64 tupadded, int64 varblockadded);
 
 extern Datum gp_update_aocol_master_stats_internal(Relation parentrel, Snapshot appendOnlyMetaDataSnapshot);
 extern Datum aocol_compression_ratio_internal(Relation parentrel);

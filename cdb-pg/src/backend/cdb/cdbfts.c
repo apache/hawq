@@ -1562,6 +1562,19 @@ FtsGetQDMirrorInfo(char **hostname, uint16 *port)
 	return;
 }
 
+static int
+cdbComponentDatabasesSorter(const void *a, const void *b)
+{
+	CdbComponentDatabaseInfo	*cdi1 = (CdbComponentDatabaseInfo *) a;
+	CdbComponentDatabaseInfo	*cdi2 = (CdbComponentDatabaseInfo *) b;
+
+	if (cdi1->segindex == cdi2->segindex)
+		return 0;
+	if (cdi1->segindex > cdi2->segindex)
+		return 1;
+	return -1;
+}
+
 /*
  * This function returns the segments information. If there are some failed
  * segment, this function will auto failover failed segments to alive segment.
@@ -1637,15 +1650,6 @@ GetSegmentsInfo(Bitmapset *last_alive_segment_bms)
 	}
 
 	/*
-	 * TODO: failover has some bugs.
-	 */
-	if (info->aliveSegmentsCount != GetTotalSegmentsNumber())
-	{
-		elog(LOG, "failover not fully supports");
-		return info;
-	}
-
-	/*
 	 * There are some failover segments, random failover the failed segments
 	 * to alive segments.
 	 */
@@ -1662,7 +1666,7 @@ GetSegmentsInfo(Bitmapset *last_alive_segment_bms)
 		elog(debug_log_level, "random failover segindex %d to segindex %d", i, failover_segindex);
 		databases->segment_db_info[alive_id] = databases->segment_db_info[failover_seg_pos];
 		databases->segment_db_info[alive_id].segindex = i;
-		/* databases->segment_db_info[alive_id].dbid */
+		databases->segment_db_info[alive_id].dbid = contentid_get_dbid(i, 'p', true);
 		alive_id++;
 	}
 
@@ -1671,6 +1675,12 @@ GetSegmentsInfo(Bitmapset *last_alive_segment_bms)
 	info->cdbComponentDatabases->total_segment_dbs = alive_id;
 	info->cdbComponentDatabases->total_segments = alive_id;
 	info->aliveSegmentsCount = alive_id;
+
+	/* There are lots of codes assume that this array is ordered by segindex. */
+	qsort(databases->segment_db_info,
+		  info->aliveSegmentsCount,
+		  sizeof(CdbComponentDatabaseInfo),
+		  cdbComponentDatabasesSorter);
 
 	return info;
 }
@@ -1722,6 +1732,7 @@ UpdateGpAliveSegmentsInfo(bool force)
 	 */
 	if (!force)
 	{
+		GpAliveSegmentsInfo.cleanGangs = true;
 		elog(ERROR, "segment configuration changed, reset session");
 	}
 }

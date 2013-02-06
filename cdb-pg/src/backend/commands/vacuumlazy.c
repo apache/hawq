@@ -1320,7 +1320,7 @@ vacuum_aocs_rel(Relation aorel, void *vacrelstats, bool isVacFull)
 			{
 
 				/* Re-fetch under the write lock to get latest committed eof. */
-				fsinfo = GetAOCSFileSegInfo(aorel, aoEntry, SnapshotNow, segno);
+				fsinfo = GetAOCSFileSegInfo(aorel, aoEntry, SnapshotNow, segno, GpIdentity.segindex);
 				if (fsinfo == NULL)
 					continue;
 

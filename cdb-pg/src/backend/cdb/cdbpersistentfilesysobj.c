@@ -3113,7 +3113,7 @@ static void PersistentFileSysObj_DoMirrorReDrop(
 			char *mirrorFilespaceLocation;
 
 			PersistentFilespace_GetPrimaryAndMirror(
-								-1 /* XXX: mat3 */,
+								fsObjName->contentid,
 								fsObjName->variant.filespaceOid,
 								&primaryFilespaceLocation,
 								&mirrorFilespaceLocation);

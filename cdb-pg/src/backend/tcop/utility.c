@@ -878,9 +878,12 @@ ProcessUtility(Node *parsetree,
 			 */
 		case T_PlannedStmt:
 		{
-			ereport(ERROR,
+			/* if guc variable not set, which means not called by pg_dump, throw exception*/
+			if(!gp_called_by_pgdump)
+			{
+				ereport(ERROR,
 							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support DECLARE CURSOR yet in GPSQL") ));
-
+			}
 			PlannedStmt *stmt = (PlannedStmt *) parsetree;
 
 			if (stmt->utilityStmt == NULL ||
@@ -892,9 +895,12 @@ ProcessUtility(Node *parsetree,
 
 		case T_ClosePortalStmt:
 			{
-				ereport(ERROR,
-								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support close cursor statement yet in GPSQL") ));
-
+				/* if guc variable not set, which means not called by pg_dump, throw exception*/
+				if(!gp_called_by_pgdump)
+				{
+					ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support close cursor statement yet in GPSQL") ));
+				}
 				ClosePortalStmt *stmt = (ClosePortalStmt *) parsetree;
 
 				PerformPortalClose(stmt->portalname);
@@ -902,9 +908,12 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_FetchStmt:
-			ereport(ERROR,
+			/* if guc variable not set, which means not called by pg_dump, throw exception*/
+			if(!gp_called_by_pgdump)
+			{
+				ereport(ERROR,
 							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support fetch statement yet in GPSQL") ));
-
+			}
 			PerformPortalFetch((FetchStmt *) parsetree, dest,
 							   completionTag);
 			break;
@@ -1158,8 +1167,12 @@ ProcessUtility(Node *parsetree,
 					case OBJECT_FOREIGN_SERVER:
 					case OBJECT_EXTPROTOCOL:
 					default:
-						ereport(ERROR,
-								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter owner statement yet in GPSQL") ));
+						/* if guc variable not set, which means not called by pg_dump, throw exception*/
+						if(!gp_called_by_pgdump)
+						{
+							ereport(ERROR,
+									(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter owner statement yet in GPSQL") ));
+						}
 						break;
 					}
 			ExecAlterOwnerStmt((AlterOwnerStmt *) parsetree);
@@ -1222,7 +1235,8 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_GrantStmt:
-			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) || (Gp_role == GP_ROLE_DISPATCH))) {
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY)
+					|| gp_called_by_pgdump)) {
 									ereport(ERROR,
 											(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE statement yet in GPSQL") ));
 								}
@@ -1564,6 +1578,10 @@ ProcessUtility(Node *parsetree,
 										  /* gp_dispatch */ false);
 					}
 				}
+				else if (strcmp(n->name, "default_tablespace") == 0)
+				{
+					SetPGVariable(n->name, n->args, n->is_local, /* gp_dispatch */ false);
+				}
 				else
 					SetPGVariable(n->name, n->args, n->is_local, /* gp_dispatch */ true);
 			}
@@ -1651,10 +1669,13 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_CreatePLangStmt:
-			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
-						ereport(ERROR,
-								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create plang statement yet in GPSQL") ));
-					}
+			/* if guc variable not set, or bootstrap mode, or utility mode connection, throw exception*/
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY)
+					|| gp_called_by_pgdump))
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create plang statement yet in GPSQL") ));
+			}
 
 			CreateProceduralLanguage((CreatePLangStmt *) parsetree);
 			break;
@@ -1748,9 +1769,13 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_LockStmt:
-			ereport(ERROR,
-							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support lock statement yet in GPSQL") ));
-
+			/* if guc variable not set, or bootstrap mode, or utility mode connection, throw exception*/
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY)
+					|| gp_called_by_pgdump))
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support lock statement yet in GPSQL") ));
+			}
 			LockTableCommand((LockStmt *) parsetree);
 			break;
 

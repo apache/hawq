@@ -672,10 +672,6 @@ cdbhashreduce(CdbHash *h)
 			break;
 	}
 
-	if (GpAliveSegmentsInfo.cdbComponentDatabases &&
-		GpAliveSegmentsInfo.cdbComponentDatabases->total_segments > result)
-		return GpAliveSegmentsInfo.cdbComponentDatabases->segment_db_info[result].segindex;
-
 	return result;
 }
 

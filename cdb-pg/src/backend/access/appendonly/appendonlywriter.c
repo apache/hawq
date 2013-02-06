@@ -910,16 +910,17 @@ void UpdateMasterAosegTotals(Relation parentrel, int segno, uint64 tupcount)
 							parentrel, 
 							aoEntry, 
 							SnapshotNow, 
-							segno);
+							segno,
+							GpIdentity.segindex);
 		if (seginfo == NULL)
 		{
-			InsertInitialAOCSFileSegInfo(aoEntry->segrelid, segno, parentrel->rd_att->natts);
+			InsertInitialAOCSFileSegInfo(aoEntry->segrelid, segno, GpIdentity.segindex, parentrel->rd_att->natts);
 		}
 		else
 		{
 			pfree(seginfo);
 		}
-    	AOCSFileSegInfoAddCount(parentrel, aoEntry, segno, tupcount, 0);
+		AOCSFileSegInfoAddCount(parentrel, aoEntry, segno, tupcount, 0);
     }
 
 	/*

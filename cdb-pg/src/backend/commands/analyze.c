@@ -2510,17 +2510,14 @@ static void gp_statistics_estimate_reltuples_relpages_ao_cs(Relation rel, float4
     double			totalBytes = 0;
 	AppendOnlyEntry *aoEntry;
 	
-	/*
-	 * TODO, in gpsql
-	 */
-	Insist(!"not implemented");
-
 	/**
 	 * Ensure that the right kind of relation with the right type of storage is passed to us.
 	 */
 	Assert(rel->rd_rel->relkind == RELKIND_RELATION);
 	Assert(RelationIsAoCols(rel));
 	
+	Assert(GP_ROLE_DISPATCH == Gp_role);
+
 	*reltuples = 0.0;
 	*relpages = 0.0;
 	
@@ -2529,24 +2526,24 @@ static void gp_statistics_estimate_reltuples_relpages_ao_cs(Relation rel, float4
     aocsInfo = GetAllAOCSFileSegInfo(rel, aoEntry, SnapshotNow, &nsegs);
     if (aocsInfo)
     {
-    	int i = 0;
-    	int j = 0;
-    	for(i = 0; i < nsegs; i++)
-    	{
-    		for(j = 0; j < RelationGetNumberOfAttributes(rel); j++)
-    		{
-    			AOCSVPInfoEntry *e = getAOCSVPEntry(aocsInfo[i], j);
-    			Assert(e);
-    			totalBytes += e->eof_uncompressed;
-    		}
+        int i = 0;
+        int j = 0;
+        for(i = 0; i < nsegs; i++)
+        {
+            for(j = 0; j < RelationGetNumberOfAttributes(rel); j++)
+            {
+                AOCSVPInfoEntry *e = getAOCSVPEntry(aocsInfo[i], j);
+                Assert(e);
+                totalBytes += e->eof_uncompressed;
+            }
 
-    		*reltuples += aocsInfo[i]->tupcount;
-    	}
-    	/**
-    	 * The planner doesn't understand AO's blocks, so need this method to try to fudge up a number for
-    	 * the planner. 
-    	 */
-    	*relpages = RelationGuessNumberOfBlocks(totalBytes);
+            *reltuples += aocsInfo[i]->tupcount;
+        }
+        /**
+         * The planner doesn't understand AO's blocks, so need this method to try to fudge up a number for
+         * the planner.
+         */
+        *relpages = RelationGuessNumberOfBlocks(totalBytes);
     }
 
 	pfree(aoEntry);

@@ -486,11 +486,11 @@ ExecuteGrantStmt(GrantStmt *stmt)
 
 	ExecGrantStmt_oids(&istmt);
 	
-		
+/*	* Should not dispatch grant statement to segment
 	if (Gp_role == GP_ROLE_DISPATCH)
 	{
 		CdbDispatchUtilityStatement((Node *)stmt, "ExecuteGrantStmt");
-	}
+	}*/
 	
 }
 

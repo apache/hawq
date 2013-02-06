@@ -21,6 +21,7 @@
 #include "catalog/namespace.h"
 #include "catalog/indexing.h"
 #include "catalog/gp_fastsequence.h"
+#include "catalog/aoseg.h"
 #include "cdb/cdbvars.h"
 #include "executor/spi.h"
 #include "nodes/makefuncs.h"
@@ -59,7 +60,7 @@ NewAOCSFileSegInfo(int4 segno, int4 nvp)
 	return seginfo;
 }
 
-void InsertInitialAOCSFileSegInfo(Oid segrelid, int4 segno, int4 nvp)
+void InsertInitialAOCSFileSegInfo(Oid segrelid, int4 segno, int4 contentid, int4 nvp)
 {
     bool *nulls = palloc0(sizeof(bool) * Natts_pg_aocsseg);
     Datum *values = palloc0(sizeof(Datum) * Natts_pg_aocsseg);
@@ -73,17 +74,21 @@ void InsertInitialAOCSFileSegInfo(Oid segrelid, int4 segno, int4 nvp)
 	InsertFastSequenceEntry(segrelid,
 							(int64)segno,
 							0,
-							/*TODO: need change in gpsql*/
-							-1,
+							contentid,
 							&tid);
 
     values[Anum_pg_aocs_segno-1] = Int32GetDatum(segno);
     values[Anum_pg_aocs_vpinfo-1] = PointerGetDatum(vpinfo);
+    values[Anum_pg_aocs_content-1] = Int32GetDatum(contentid);
 
     segtup = heaptuple_form_to(segrel->rd_att, values, nulls, NULL, NULL);
 
     frozen_heap_insert(segrel, segtup);
-    CatalogUpdateIndexes(segrel, segtup);
+
+    if (GP_ROLE_EXECUTE != Gp_role)
+    {
+        CatalogUpdateIndexes(segrel, segtup);
+    }
 
     heap_freetuple(segtup);
     heap_close(segrel, RowExclusiveLock);
@@ -111,34 +116,50 @@ GetAOCSFileSegInfo(
 	Relation 			prel,
 	AppendOnlyEntry 	*aoEntry,
 	Snapshot 			appendOnlyMetaDataSnapshot,
-	int32 				segno)
+	int32 				segno,
+	int32 contentid)
 {
     int32 nvp = prel->rd_att->natts;
 
     Relation segrel;
-    Relation segidx;
-    ScanKeyData scankey;
-    IndexScanDesc scan;
+    TupleDesc segdsc;
+    ScanKeyData scankey[2];
+    SysScanDesc aocsscan;
     HeapTuple segtup;
 
     AOCSFileSegInfo *seginfo;
     Datum *d;
     bool *null;
+    bool indexOK;
+    Oid indexid;
 
     segrel = heap_open(aoEntry->segrelid, AccessShareLock);
-    segidx = index_open(aoEntry->segidxid, AccessShareLock);
+    segdsc = segrel->rd_att;
 
-    ScanKeyInit(&scankey, 1, BTEqualStrategyNumber, F_OIDEQ, Int32GetDatum(segno));
+    if (GP_ROLE_EXECUTE == Gp_role)
+    {
+        indexOK = FALSE;
+        indexid = InvalidOid;
+    }
+    else
+    {
+        indexOK = TRUE;
+        indexid = aoEntry->segidxid;
+    }
 
-    scan = index_beginscan(segrel, segidx, appendOnlyMetaDataSnapshot, 1, &scankey);
+    ScanKeyInit(&scankey[0], (AttrNumber)Anum_pg_aocsseg_XXX_segno, BTEqualStrategyNumber,
+    		F_OIDEQ, ObjectIdGetDatum(segno));
+    ScanKeyInit(&scankey[1], (AttrNumber)Anum_pg_aocsseg_XXX_content, BTEqualStrategyNumber,
+    		F_INT4EQ, ObjectIdGetDatum(contentid));
 
-    segtup = index_getnext(scan, ForwardScanDirection);
+    aocsscan = systable_beginscan(segrel, indexid, indexOK, SnapshotNow, 2, &scankey[0]);
+
+    segtup = systable_getnext(aocsscan);
 
     if(!HeapTupleIsValid(segtup))
     {
         /* This segment file does not have an entry. */
-        index_endscan(scan);
-        index_close(segidx, AccessShareLock);
+        systable_endscan(aocsscan);
         heap_close(segrel, AccessShareLock);
         return NULL;
     }
@@ -146,8 +167,7 @@ GetAOCSFileSegInfo(
 	/* Close the index */
     segtup = heap_copytuple(segtup);
 	
-	index_endscan(scan);
-	index_close(segidx, AccessShareLock);
+	systable_endscan(aocsscan);
 
 	Assert(HeapTupleIsValid(segtup));
 
@@ -181,6 +201,8 @@ GetAOCSFileSegInfo(
             pfree(dv);
     }
 
+    seginfo->content = GpIdentity.segindex;
+
     pfree(d);
     pfree(null);
 
@@ -195,17 +217,27 @@ AOCSFileSegInfo **GetAllAOCSFileSegInfo(Relation prel,
 										int32 *totalseg)
 {
     Relation 			pg_aocsseg_rel;
+    bool returnAllSegmentsFiles;
 
 	AOCSFileSegInfo 	**results;
 	
 	pg_aocsseg_rel = relation_open(aoEntry->segrelid, AccessShareLock);
 
+	if (GP_ROLE_EXECUTE != Gp_role)
+	{
+		returnAllSegmentsFiles = TRUE;
+	}
+	else
+	{
+		returnAllSegmentsFiles = FALSE;
+	}
 	results = GetAllAOCSFileSegInfo_pg_aocsseg_rel(
 											prel->rd_att->natts,
 											NameStr(prel->rd_rel->relname),
 											aoEntry,
 											pg_aocsseg_rel,
 											appendOnlyMetaDataSnapshot,
+											returnAllSegmentsFiles,
 											totalseg);
 
     heap_close(pg_aocsseg_rel, AccessShareLock);
@@ -223,11 +255,25 @@ aocsFileSegInfoCmp(const void *left, const void *right)
 	AOCSFileSegInfo *leftSegInfo = *((AOCSFileSegInfo **)left);
 	AOCSFileSegInfo *rightSegInfo = *((AOCSFileSegInfo **)right);
 	
-	if (leftSegInfo->segno < rightSegInfo->segno)
+	if (leftSegInfo->content < rightSegInfo->content)
+	{
 		return -1;
+	}
+
+	if (leftSegInfo->content > rightSegInfo->content)
+	{
+		return 1;
+	}
+
+	if (leftSegInfo->segno < rightSegInfo->segno)
+	{
+		return -1;
+	}
 	
 	if (leftSegInfo->segno > rightSegInfo->segno)
+	{
 		return 1;
+	}
 	
 	return 0;
 }
@@ -238,14 +284,15 @@ AOCSFileSegInfo **GetAllAOCSFileSegInfo_pg_aocsseg_rel(
 										AppendOnlyEntry *aoEntry,
 									    Relation pg_aocsseg_rel,
 										Snapshot snapshot,
+										bool returnAllSegmentsFiles,
 										int32 *totalseg)
 {
 
     int32 nvp = numOfColumns;
 
-    HeapScanDesc scan;
+    SysScanDesc scan;
     HeapTuple tup;
-
+    ScanKeyData key[1];
     AOCSFileSegInfo **allseg;
     AOCSFileSegInfo *seginfo;
     int cur_seg;
@@ -265,8 +312,18 @@ AOCSFileSegInfo **GetAllAOCSFileSegInfo_pg_aocsseg_rel(
 
     cur_seg = 0;
 
-    scan = heap_beginscan(pg_aocsseg_rel, snapshot, 0, NULL);
-    while ((tup = heap_getnext(scan, ForwardScanDirection)) != NULL)
+    ScanKeyInit(&key[0], (AttrNumber)Anum_pg_aocsseg_XXX_content,
+    		BTEqualStrategyNumber, F_INT4EQ, ObjectIdGetDatum(GpIdentity.segindex));
+
+    if (returnAllSegmentsFiles)
+    {
+        scan = systable_beginscan(pg_aocsseg_rel, InvalidOid, FALSE, snapshot, 0, NULL);
+    }
+    else
+    {
+        scan = systable_beginscan(pg_aocsseg_rel, InvalidOid, FALSE, snapshot, 1, &key[0]);
+    }
+    while ((tup = systable_getnext(scan)) != NULL)
     {
 		/* dynamically expand space for AOCSFileSegInfo* array */
 		if (cur_seg >= seginfo_slot_no)
@@ -311,13 +368,15 @@ AOCSFileSegInfo **GetAllAOCSFileSegInfo_pg_aocsseg_rel(
             if(dv!=v)
                 pfree(dv);
         }
+
+        seginfo->content = DatumGetInt32(d[Anum_pg_aocs_content - 1]);
         ++cur_seg;
     }
 
     pfree(d);
     pfree(null);
 
-    heap_endscan(scan);
+    systable_endscan(scan);
 
 	*totalseg = cur_seg;
 
@@ -360,7 +419,7 @@ int64 GetAOCSTotalBytes(Relation parentrel, Snapshot appendOnlyMetaDataSnapshot)
 	aoEntry = GetAppendOnlyEntry(RelationGetRelid(parentrel), appendOnlyMetaDataSnapshot);
 	Assert(aoEntry != NULL);
 
-	/* TODO: in gpsql, get all segfile info on master */
+	Assert(GP_ROLE_EXECUTE != Gp_role);
 
 	result = 0;
 	allseg = GetAllAOCSFileSegInfo(parentrel, aoEntry, appendOnlyMetaDataSnapshot, &totalseg);
@@ -374,11 +433,15 @@ int64 GetAOCSTotalBytes(Relation parentrel, Snapshot appendOnlyMetaDataSnapshot)
 
 		for (e = 0; e < nEntry; e++)
 			result += vpinfo->entry[e].eof;
+
+		pfree(allseg[s]);
 	}
 
 	pfree(aoEntry);
-	
-	// UNDONE: How do you free allseg?
+	if (allseg)
+	{
+		pfree(allseg);
+	}
 
 	return result;
 }
@@ -389,10 +452,9 @@ void UpdateAOCSFileSegInfo(AOCSInsertDesc idesc)
 	
     Relation prel = idesc->aoi_rel;
     Relation segrel;
-    Relation segidx;
 
-    ScanKeyData key;
-    IndexScanDesc scan;
+    ScanKeyData key[2];
+    SysScanDesc scan;
 
     HeapTuple oldtup;
     HeapTuple newtup;
@@ -405,7 +467,8 @@ void UpdateAOCSFileSegInfo(AOCSInsertDesc idesc)
     int i;
     AOCSVPInfo *vpinfo = create_aocs_vpinfo(nvp);
 	AppendOnlyEntry *aoEntry = idesc->aoEntry;
-
+	bool indexOK;
+	Oid indexid;
 
 
 	/*
@@ -431,13 +494,27 @@ void UpdateAOCSFileSegInfo(AOCSInsertDesc idesc)
 	}
 
     segrel = heap_open(aoEntry->segrelid, RowExclusiveLock);
-    segidx = index_open(aoEntry->segidxid, RowExclusiveLock);
     tupdesc = segrel->rd_att;
 
-    ScanKeyInit(&key, 1, BTEqualStrategyNumber, F_OIDEQ, ObjectIdGetDatum(idesc->cur_segno)); 
-    scan = index_beginscan(segrel, segidx, usesnapshot, 1, &key);
+    /* In GP-SQL, index only exists on master. */
+    if (GP_ROLE_EXECUTE == Gp_role)
+    {
+        indexOK = FALSE;
+        indexid = InvalidOid;
+    }
+    else
+    {
+        indexOK = TRUE;
+        indexid = aoEntry->segidxid;
+    }
 
-    oldtup = index_getnext(scan, ForwardScanDirection);
+    /* Setup a scan key to fetch from the indexed by segno and content id */
+    ScanKeyInit(&key[0], (AttrNumber)Anum_pg_aocsseg_XXX_segno, BTEqualStrategyNumber, F_OIDEQ, ObjectIdGetDatum(idesc->cur_segno));
+    ScanKeyInit(&key[1], (AttrNumber)Anum_pg_aocsseg_XXX_content, BTEqualStrategyNumber, F_INT4EQ, ObjectIdGetDatum(GpIdentity.segindex));
+
+    scan = systable_beginscan(segrel, indexid, indexOK, usesnapshot, 2, &key[0]);
+
+    oldtup = systable_getnext(scan);
 
     if(!HeapTupleIsValid(oldtup))
         ereport(ERROR, (errcode(ERRCODE_UNDEFINED_OBJECT),
@@ -475,13 +552,16 @@ void UpdateAOCSFileSegInfo(AOCSInsertDesc idesc)
     newtup = heap_modify_tuple(oldtup, tupdesc, d, null, repl);
 
     simple_heap_update(segrel, &oldtup->t_self, newtup);
-    CatalogUpdateIndexes(segrel, newtup);
+
+    if (GP_ROLE_EXECUTE != Gp_role)
+    {
+        CatalogUpdateIndexes(segrel, newtup);
+    }
 
     pfree(newtup);
     pfree(vpinfo);
 
-    index_endscan(scan);
-    index_close(segidx, RowExclusiveLock);
+    systable_endscan(scan);
     heap_close(segrel, RowExclusiveLock);
 }
 
@@ -490,16 +570,17 @@ void AOCSFileSegInfoAddCount(Relation prel, AppendOnlyEntry *aoEntry, int32 segn
 	LockAcquireResult acquireResult;
 	
     Relation segrel;
-    Relation segidx;
 
-    ScanKeyData key;
-    IndexScanDesc scan;
+    ScanKeyData key[2];
+    SysScanDesc scan;
 
     HeapTuple oldtup;
     HeapTuple newtup;
     Datum d[Natts_pg_aocsseg];
     bool null[Natts_pg_aocsseg] = {0, };
     bool repl[Natts_pg_aocsseg] = {0, };
+    bool indexOK;
+    Oid indexid;
 
     TupleDesc tupdesc; 
 
@@ -508,7 +589,6 @@ void AOCSFileSegInfoAddCount(Relation prel, AppendOnlyEntry *aoEntry, int32 segn
 	 * we can use SnapshotNow.
 	 */
     Snapshot usesnapshot = SnapshotNow;
-
 
 	Assert(aoEntry != NULL);
 
@@ -527,14 +607,29 @@ void AOCSFileSegInfoAddCount(Relation prel, AppendOnlyEntry *aoEntry, int32 segn
 	}
 
     segrel = heap_open(aoEntry->segrelid, RowExclusiveLock);
-    segidx = index_open(aoEntry->segidxid, RowExclusiveLock);
-
     tupdesc = segrel->rd_att;
 
-    ScanKeyInit(&key, 1, BTEqualStrategyNumber, F_OIDEQ, ObjectIdGetDatum(segno));
-    scan = index_beginscan(segrel, segidx, usesnapshot, 1, &key);
+    /* In GP-SQL, index only exists on master*/
+    if (GP_ROLE_EXECUTE == Gp_role)
+    {
+        indexOK = FALSE;
+        indexid = InvalidOid;
+    }
+    else
+    {
+        indexOK = TRUE;
+        indexid = aoEntry->segidxid;
+    }
 
-    oldtup = index_getnext(scan, ForwardScanDirection);
+    /* setup the scan key */
+    ScanKeyInit(&key[0], (AttrNumber) Anum_pg_aocsseg_XXX_segno,
+    		BTEqualStrategyNumber, F_OIDEQ, ObjectIdGetDatum(segno));
+    ScanKeyInit(&key[1], (AttrNumber) Anum_pg_aocsseg_XXX_content,
+    		BTEqualStrategyNumber, F_INT4EQ, ObjectIdGetDatum(GpIdentity.segindex));
+
+    scan = systable_beginscan(segrel, indexid, indexOK, usesnapshot, 2, &key[0]);
+
+    oldtup = systable_getnext(scan);
 
     if(!HeapTupleIsValid(oldtup))
         ereport(ERROR, (errcode(ERRCODE_UNDEFINED_OBJECT),
@@ -562,12 +657,14 @@ void AOCSFileSegInfoAddCount(Relation prel, AppendOnlyEntry *aoEntry, int32 segn
     newtup = heap_modify_tuple(oldtup, tupdesc, d, null, repl);
 
     simple_heap_update(segrel, &oldtup->t_self, newtup);
-    CatalogUpdateIndexes(segrel, newtup);
+    if (GP_ROLE_EXECUTE != Gp_role)
+    {
+        CatalogUpdateIndexes(segrel, newtup);
+    }
 
     heap_freetuple(newtup);
 
-    index_endscan(scan);
-    index_close(segidx, RowExclusiveLock);
+    systable_endscan(scan);
     heap_close(segrel, RowExclusiveLock);
 }
 
@@ -693,7 +790,8 @@ gp_aocsseg(PG_FUNCTION_ARGS)
 														aocsRel->rd_rel->relname.data, 
 														aoEntry, 
 														pg_aocsseg_rel,
-														SnapshotNow, 
+														SnapshotNow,
+														true,
 														&context->totalAocsSegFiles);
 
 		heap_close(pg_aocsseg_rel, NoLock);
@@ -888,6 +986,7 @@ gp_aocsseg_history(PG_FUNCTION_ARGS)
 														aoEntry, 
 														pg_aocsseg_rel,
 														SnapshotAny,	// Get ALL tuples from pg_aocsseg_% including aborted and in-progress ones. 
+														true,
 														&context->totalAocsSegFiles);
 
 		heap_close(pg_aocsseg_rel, NoLock);
@@ -1077,10 +1176,12 @@ gp_update_aocol_master_stats_internal(Relation parentrel, Snapshot appendOnlyMet
 												AccessExclusiveLock,
 												/* dontWait */ false);
 					
-				aocsfsinfo = GetAOCSFileSegInfo(parentrel, aoEntry, appendOnlyMetaDataSnapshot, qe_segno);
+				aocsfsinfo = GetAOCSFileSegInfo(parentrel, aoEntry, appendOnlyMetaDataSnapshot, qe_segno, GpIdentity.segindex);
 				if (aocsfsinfo == NULL)
 				{
-					InsertInitialAOCSFileSegInfo(aoEntry->segrelid, qe_segno, nvp);
+					Assert(!"in GP-SQL, master should dispatch seginfo to all QEs");
+
+					InsertInitialAOCSFileSegInfo(aoEntry->segrelid, qe_segno, GpIdentity.segindex, nvp);
 
 					aocsfsinfo = NewAOCSFileSegInfo(qe_segno, nvp);
 				}
