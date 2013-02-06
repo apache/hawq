@@ -34,6 +34,7 @@
 #include "utils/resowner.h"
 #include "utils/resscheduler.h"
 #include "cdb/memquota.h"
+#include "cdb/cdbvars.h"
 
 static void ResCleanUpLock(LOCK *lock, PROCLOCK *proclock, uint32 hashcode, bool wakeupNeeded);
 

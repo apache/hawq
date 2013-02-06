@@ -105,7 +105,8 @@ typedef struct ResPortalTag
  * Lock/Queue macros (maybe first one should be in lock.h)?
  */
 #define SET_LOCKTAG_RESOURCE_QUEUE(locktag, queueid) \
-	((locktag).locktag_field1 = (queueid), \
+	((locktag).segindex = (GpIdentity.segindex), \
+	 (locktag).locktag_field1 = (queueid), \
 	 (locktag).locktag_field2 = 0, \
 	 (locktag).locktag_field3 = 0, \
 	 (locktag).locktag_field4 = 0, \
