@@ -25,6 +25,7 @@
 #include "miscadmin.h"
 #include "utils/acl.h"
 #include "utils/builtins.h"
+#include "utils/lsyscache.h"
 #include "utils/syscache.h"
 #include "utils/tqual.h"
 #include "mb/pg_wchar.h"
@@ -761,6 +762,12 @@ assign_session_authorization(const char *value, bool doit, GucSource source)
 			return NULL;
 		}
 
+		/*
+		 * GPSQL: QEs are run as the bootstrap user.
+		 */
+		if (Gp_role == GP_ROLE_EXECUTE)
+			value = get_rolname(BOOTSTRAP_SUPERUSERID);
+
 		pcqCtx = caql_beginscan(
 				NULL,
 				cql("SELECT * FROM pg_authid "
@@ -770,13 +777,6 @@ assign_session_authorization(const char *value, bool doit, GucSource source)
 		roleTup = caql_getnext(pcqCtx);
 		if (!HeapTupleIsValid(roleTup))
 		{
-			if (Gp_role == GP_ROLE_EXECUTE)
-			{
-				/* GPSQL: don't error out even if the role doesn't exit. */
-				caql_endscan(pcqCtx);
-				return session_authorization_string;
-			}
-
 			if (source >= PGC_S_INTERACTIVE)
 				ereport(ERROR,
 						(errcode(ERRCODE_UNDEFINED_OBJECT),
@@ -908,6 +908,12 @@ assign_role(const char *value, bool doit, GucSource source)
 			return NULL;
 		}
 
+		/*
+		 * GPSQL: QEs are run as the bootstrap user.
+		 */
+		if (Gp_role == GP_ROLE_EXECUTE)
+			value = get_rolname(BOOTSTRAP_SUPERUSERID);
+
 		pcqCtx = caql_beginscan(
 				NULL,
 				cql("SELECT * FROM pg_authid "
@@ -917,13 +923,6 @@ assign_role(const char *value, bool doit, GucSource source)
 		roleTup = caql_getnext(pcqCtx);
 		if (!HeapTupleIsValid(roleTup))
 		{
-			if (Gp_role == GP_ROLE_EXECUTE)
-			{
-				/* GPSQL: don't error out even if the role doesn't exit. */
-				caql_endscan(pcqCtx);
-				return role_string;
-			}
-
 			if (source >= PGC_S_INTERACTIVE)
 				ereport(ERROR,
 						(errcode(ERRCODE_UNDEFINED_OBJECT),

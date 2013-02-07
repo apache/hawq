@@ -27,6 +27,7 @@
 
 #include "utils/syscache.h"
 #include "utils/lsyscache.h"
+#include "catalog/pg_authid.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_type.h"
 #include "nodes/makefuncs.h"
@@ -938,11 +939,19 @@ addSegDBToDispatchThreadPool(DispatchCommandParms  *ParmsAr,
 					 (int) mppDispatchCommandType);
 		}
 		
-		pParms->sessUserId = GetSessionUserId();
-		pParms->outerUserId = GetOuterUserId();
-		pParms->currUserId = GetUserId();
-		pParms->sessUserId_is_super = superuser_arg(GetSessionUserId());
-		pParms->outerUserId_is_super = superuser_arg(GetOuterUserId());
+		/*
+		 * GPSQL: in segments, we run everything as the bootstrap user
+		 * which is set in InitPostgres.  There are couple of security
+		 * concerns if we support full SQL, but this is ok for the
+		 * current status, and for those rich features (such like
+		 * nested function calls) we'll need bigger mechanism like
+		 * catalog server anyway.
+		 */
+		pParms->sessUserId = BOOTSTRAP_SUPERUSERID;
+		pParms->outerUserId = BOOTSTRAP_SUPERUSERID;
+		pParms->currUserId = BOOTSTRAP_SUPERUSERID;
+		pParms->sessUserId_is_super = true;
+		pParms->outerUserId_is_super = true;
 
 		pParms->cmdID = gp_command_count;
 		pParms->localSlice = sliceId;
