@@ -1,0 +1,62 @@
+<ivy-module version="1.0">
+    <info organisation="emc" module="gpfusion">
+      <license name="EMC"/>
+      <ivyauthor name="GPDB Hadoop Team" url="http://emc.com"/>
+      <description>
+          GPDB Hadoop Integration
+      </description>
+    </info>
+
+    <configurations defaultconfmapping="default">
+      <!--these match the Maven configurations-->
+      <conf name="default" extends="master,runtime"/>
+      <conf name="master" description="contains the artifact but no dependencies"/>
+      <conf name="compile" description="contains the artifact but no dependencies"/>
+      <conf name="runtime" description="runtime but not the artifact"/>
+      <!-- Private configurations -->
+      <conf name="checkstyle" visibility="private"/>
+    </configurations>
+
+    <dependencies>
+      <dependency org="org.apache.hadoop" name="hadoop-common" rev="2.0.1-alpha"
+                  conf="compile->master"/>
+      <dependency org="org.apache.hadoop" name="hadoop-mapreduce-client-core" rev="2.0.1-alpha"
+                  conf="compile->master"/>
+      <dependency org="org.apache.hadoop" name="hadoop-hdfs" rev="2.0.1-alpha"
+                  conf="compile->master"/>
+      <dependency org="org.apache.hadoop" name="hadoop-annotations" rev="2.0.1-alpha"
+                  conf="compile->master"/>
+	  <dependency org="org.apache.hive" name="hive-service" rev="0.9.0"
+                  conf="compile->master"/>	
+	  <dependency org="org.apache.hive" name="hive-metastore" rev="0.9.0"
+                  conf="compile->master"/>
+	  <dependency org="org.apache.hive" name="hive-common" rev="0.8.0"
+                  conf="compile->master"/>
+	  <dependency org="org.apache.hive" name="hive-serde" rev="0.8.0"
+                  conf="compile->master"/>					  				  
+	  <dependency org="org.apache.cassandra.deps" name="libthrift" rev="0.5.0"
+                  conf="compile->master"/>
+	  <dependency org="org.apache.thrift" name="libfb303" rev="0.7.0"
+                  conf="compile->master"/>					  
+      <dependency org="checkstyle" name="checkstyle" rev="${checkstyle.version}"
+                  conf="checkstyle->default"/>
+      <dependency org="com.google.protobuf" name="protobuf-java" rev="2.4.1" 
+                  conf="compile->master"/>
+      <dependency org="org.apache.hbase" name="hbase" rev="0.94.1" 
+                  conf="compile->master"/>
+	  <dependency org="org.apache.avro" name="avro" rev="1.5.4" 
+	  			  conf="compile->master"/>
+	  <dependency org="org.apache.avro" name="avro-mapred" rev="1.5.4" 
+	  			  conf="compile->master"/>
+	  <dependency org="org.codehaus.jackson" name="jackson-core-asl" rev="1.9.3" 
+	  			  conf="compile->master"/>
+	  <dependency org="org.codehaus.jackson" name="jackson-mapper-asl" rev="1.9.3" 
+	  			  conf="compile->master"/>
+	  <dependency org="com.sun.jersey" name="jersey-core" rev="1.8" 
+	  			  conf="compile->master"/>
+	  <dependency org="org.mortbay.jetty" name="jetty" rev="6.1.26" 
+	  			  conf="compile->master"/>
+	  <dependency org="commons-logging" name="commons-logging" rev="1.1.1" 
+	  			  conf="compile->master"/>
+    </dependencies>
+</ivy-module>
