@@ -486,7 +486,7 @@ ExecuteGrantStmt(GrantStmt *stmt)
 
 	ExecGrantStmt_oids(&istmt);
 	
-/*	* Should not dispatch grant statement to segment
+	/* Should not dispatch grant statement to segment
 	if (Gp_role == GP_ROLE_DISPATCH)
 	{
 		CdbDispatchUtilityStatement((Node *)stmt, "ExecuteGrantStmt");
@@ -505,31 +505,92 @@ ExecGrantStmt_oids(InternalGrant *istmt)
 	switch (istmt->objtype)
 	{
 		case ACL_OBJECT_RELATION:
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) 
+				|| gp_called_by_pgdump))
+			{
+                        	ereport(ERROR,
+                                	(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE on TABLE statement in GPSQL") )); 
+			}
+			break;
 		case ACL_OBJECT_SEQUENCE:
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) 
+				|| gp_called_by_pgdump))
+			{
+                        	ereport(ERROR,
+                                	(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE on SEQUENCE statement in GPSQL") )); 
+			}
 			ExecGrant_Relation(istmt);
 			break;
 		case ACL_OBJECT_DATABASE:
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) 
+				|| gp_called_by_pgdump))
+			{
+                        	ereport(ERROR,
+                                	(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE on DATABASE statement in GPSQL") )); 
+			}
 			ExecGrant_Database(istmt);
 			break;
 		case ACL_OBJECT_FDW:
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) 
+				|| gp_called_by_pgdump))
+			{
+                        	ereport(ERROR,
+                                	(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE on FOREIGN DATA WRAPPER statement in GPSQL") )); 
+			}
 			ExecGrant_Fdw(istmt);
 			break;
 		case ACL_OBJECT_FOREIGN_SERVER:
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) 
+				|| gp_called_by_pgdump))
+			{
+                        	ereport(ERROR,
+                                	(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE on FOREIGN SERVER statement in GPSQL") )); 
+			}
 			ExecGrant_ForeignServer(istmt);
 			break;
 		case ACL_OBJECT_FUNCTION:
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) 
+				|| gp_called_by_pgdump))
+			{
+                        	ereport(ERROR,
+                                	(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE on FUNCTION statement in GPSQL") )); 
+			}
 			ExecGrant_Function(istmt);
 			break;
 		case ACL_OBJECT_LANGUAGE:
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) 
+				|| gp_called_by_pgdump))
+			{
+                        	ereport(ERROR,
+                                	(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE on LANGUAGE statement in GPSQL") )); 
+			}
 			ExecGrant_Language(istmt);
 			break;
 		case ACL_OBJECT_NAMESPACE:
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) 
+				|| gp_called_by_pgdump))
+			{
+                        	ereport(ERROR,
+                                	(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE on SCHEMA statement in GPSQL") )); 
+			}
 			ExecGrant_Namespace(istmt);
 			break;
 		case ACL_OBJECT_TABLESPACE:
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) 
+				|| gp_called_by_pgdump))
+			{
+                        	ereport(ERROR,
+                                	(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE on TABLESPACE statement in GPSQL") )); 
+			}
 			ExecGrant_Tablespace(istmt);
 			break;
 		case ACL_OBJECT_EXTPROTOCOL:
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) 
+				|| gp_called_by_pgdump))
+			{
+                        	ereport(ERROR,
+                                	(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE on PROTOCOL statement in GPSQL") )); 
+			}
 			ExecGrant_ExtProtocol(istmt);
 			break;
 		default:

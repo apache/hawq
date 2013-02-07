@@ -1235,11 +1235,6 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_GrantStmt:
-			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY)
-					|| gp_called_by_pgdump)) {
-									ereport(ERROR,
-											(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE statement yet in GPSQL") ));
-								}
 			ExecuteGrantStmt((GrantStmt *) parsetree);
 			break;
 
