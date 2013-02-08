@@ -282,7 +282,8 @@ calculate_tablespace_size(Oid tblspcOid)
 	 * explicitly granted or implicitly because it is default for current
 	 * database.
 	 */
-	if (tblspcOid != MyDatabaseTableSpace)
+	if (tblspcOid != MyDatabaseTableSpace &&
+		tblspcOid != get_database_dts(MyDatabaseId))
 	{
 		aclresult = pg_tablespace_aclcheck(tblspcOid, GetUserId(), ACL_CREATE);
 		if (aclresult != ACLCHECK_OK)

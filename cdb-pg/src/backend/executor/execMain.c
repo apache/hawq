@@ -4269,7 +4269,8 @@ CreateIntoRel(QueryDesc *queryDesc)
 	}
 
 	/* Check permissions except when using the database's default space */
-	if (tablespaceId != MyDatabaseTableSpace)
+	if (tablespaceId != MyDatabaseTableSpace &&
+		tablespaceId != get_database_dts(MyDatabaseId))
 	{
 		AclResult	aclresult;
 
