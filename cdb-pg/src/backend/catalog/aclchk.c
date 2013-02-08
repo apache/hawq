@@ -561,12 +561,6 @@ ExecGrantStmt_oids(InternalGrant *istmt)
 			ExecGrant_Language(istmt);
 			break;
 		case ACL_OBJECT_NAMESPACE:
-			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) 
-				|| gp_called_by_pgdump))
-			{
-                        	ereport(ERROR,
-                                	(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE on SCHEMA statement in GPSQL") )); 
-			}
 			ExecGrant_Namespace(istmt);
 			break;
 		case ACL_OBJECT_TABLESPACE:
