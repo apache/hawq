@@ -1757,9 +1757,6 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_ReassignOwnedStmt:
-			ereport(ERROR,
-							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support reassign owned statement yet in GPSQL") ));
-
 			ReassignOwnedObjects((ReassignOwnedStmt *) parsetree);
 			break;
 

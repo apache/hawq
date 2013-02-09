@@ -1802,10 +1802,12 @@ ReassignOwnedObjects(ReassignOwnedStmt *stmt)
 				 errmsg("permission denied to reassign objects"),
 				 errOmitLocation(true)));
 				 
+	/*
 	if (Gp_role == GP_ROLE_DISPATCH)
     {
         CdbDispatchUtilityStatement((Node *) stmt, "ReassignOwnedObjects");
     }
+	*/
 
 	/* Ok, do it */
 	shdepReassignOwned(role_ids, newrole);
