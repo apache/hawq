@@ -505,15 +505,7 @@ ExecGrantStmt_oids(InternalGrant *istmt)
 	switch (istmt->objtype)
 	{
 		case ACL_OBJECT_RELATION:
-			ExecGrant_Relation(istmt);
-			break;
 		case ACL_OBJECT_SEQUENCE:
-			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) 
-				|| gp_called_by_pgdump))
-			{
-                        	ereport(ERROR,
-                                	(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE on SEQUENCE statement in GPSQL") )); 
-			}
 			ExecGrant_Relation(istmt);
 			break;
 		case ACL_OBJECT_DATABASE:
