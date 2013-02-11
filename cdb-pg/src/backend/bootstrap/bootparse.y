@@ -366,7 +366,7 @@ Boot_CreateStmt:
 								break;
 
 
-/* relation id: 5080 - pg_filesystem 20120524 */
+/* relation id: 6112 - pg_filesystem 20130123 */
 							case FileSystemRelationId:
 								typid = PG_FILESYSTEM_RELTYPE_OID;
 								break;

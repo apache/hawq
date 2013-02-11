@@ -788,13 +788,13 @@ DATA(insert OID = 2915 ( pg_auth_time_constraint        PGNSP PGUID -1 f c t \05
 DATA(insert OID = 3057 ( pg_compression	    PGNSP PGUID -1 f c t \054 3056 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_ ));	
 #define PG_COMPRESSION_RELTYPE_OID 3057
 
-/* relation id: 5080 - pg_filesystem 20120524 */
-DATA(insert OID = 6450 ( pg_filesystem	    PGNSP PGUID -1 f c t \054 5080 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_ ));	
-#define PG_FILESYSTEM_RELTYPE_OID 6450
+/* relation id: 6112 - pg_filesystem 20130123 */
+DATA(insert OID = 6113 ( pg_filesystem	    PGNSP PGUID -1 f c t \054 6112 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_ ));	
+#define PG_FILESYSTEM_RELTYPE_OID 6113
 
-/* relation id: 5080 - pg_filesystem 20120903 */
-DATA(insert OID = 2916 (pg_toast_5080 TOASTNSP PGUID -1 f c t \054 5081 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_));
-#define PG_FILESYSTEM_TOAST_RELTYPE_OID 2916
+/* relation id: 6112 - pg_filesystem 20130123 */
+DATA(insert OID = 6116 (pg_toast_6112 TOASTNSP PGUID -1 f c t \054 6114 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_));
+#define PG_FILESYSTEM_TOAST_RELTYPE_OID 6116
 
 /* TIDYCAT_END_CODEGEN */
 

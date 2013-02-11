@@ -816,7 +816,7 @@ relationId == GpVerificationHistoryRelationId ||
 /* relation id: 2914 - pg_auth_time_constraint 20110908 */
 relationId == AuthTimeConstraintRelationId ||
 
-/* relation id: 5080 - pg_filesystem 20120524 */
+/* relation id: 6112 - pg_filesystem 20130123 */
 relationId == FileSystemRelationId || 
 /* TIDYCAT_END_CODEGEN */
 		0 /* OR ZERO */
@@ -889,14 +889,13 @@ relationId == GpSegmentConfigDbidIndexId ||
 relationId == FileSpaceEntryFsefsoidIndexId || 
 /* relation id: 5033 - pg_filespace_entry 20101122 */
 relationId == FileSpaceEntryFsefsoidFsedbidIndexId || 
-
 /* relation id: 6429 - gp_verification_history 20110609 */
 relationId == GpVerificationHistoryVertokenIndexId || 
 
 
-/* relation id: 5080 - pg_filesystem 20120524 */
+/* relation id: 6112 - pg_filesystem 20130123 */
 relationId == FileSystemOidIndexId || 
-/* relation id: 5080 - pg_filesystem 20120524 */
+/* relation id: 6112 - pg_filesystem 20130123 */
 relationId == FileSystemFsysnameIndexId || 
 
 /* TIDYCAT_END_CODEGEN */
@@ -914,16 +913,14 @@ relationId == FileSystemFsysnameIndexId ||
 
 /* TIDYCAT_BEGIN_CODEGEN 
 */
-
 /* relation id: 5036 - gp_segment_configuration 20101122 */
 relationId == GpSegmentConfigToastTable || 
 relationId == GpSegmentConfigToastIndex || 
-
 /* relation id: 5033 - pg_filespace_entry 20101122 */
 relationId == PgFileSpaceEntryToastTable || 
 relationId == PgFileSpaceEntryToastIndex || 
 
-/* relation id: 5080 - pg_filesystem 20120903 */
+/* relation id: 6112 - pg_filesystem 20130123 */
 relationId == PgFileSystemToastTable || 
 relationId == PgFileSystemToastIndex || 
 /* TIDYCAT_END_CODEGEN */

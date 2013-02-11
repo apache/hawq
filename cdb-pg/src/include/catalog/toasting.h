@@ -93,10 +93,10 @@ DECLARE_TOAST(pg_partition_encoding, 9905, 9906);
 #define PgPartitionEncodingToastTable	9905
 #define PgPartitionEncodingToastIndex	9906
 
-/* relation id: 5080 - pg_filesystem 20120903 */
-DECLARE_TOAST(pg_filesystem, 5081, 5082);
-#define PgFileSystemToastTable	5081
-#define PgFileSystemToastIndex	5082
+/* relation id: 6112 - pg_filesystem 20130123 */
+DECLARE_TOAST(pg_filesystem, 6114, 6115);
+#define PgFileSystemToastTable	6114
+#define PgFileSystemToastIndex	6115
 
 /* TIDYCAT_END_CODEGEN */
 

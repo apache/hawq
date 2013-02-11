@@ -31,4 +31,11 @@
 #define FirstBootstrapObjectId	10000
 #define FirstNormalObjectId	16384
 
+/*
+ * For the time being, we split the OID range so that newly added objects
+ * won't conflict between GPDB and GPSQL.  If two merge into one in some day,
+ * this boundary will disappear.
+ */
+#define LowestGPSQLBootstrapObjectId 6112
+
 #endif

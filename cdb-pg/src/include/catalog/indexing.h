@@ -399,11 +399,11 @@ DECLARE_UNIQUE_INDEX(pg_compression_oid_index, 3058, on pg_compression using btr
 DECLARE_UNIQUE_INDEX(pg_compression_compname_index, 3059, on pg_compression using btree(compname name_ops));
 #define CompressionCompnameIndexId	3059
 
-/* relation id: 5080 - pg_filesystem 20120524 */
+/* relation id: 6112 - pg_filesystem 20130123 */
 DECLARE_UNIQUE_INDEX(pg_filesystem_oid_index, 7183, on pg_filesystem using btree(oid oid_ops));
 #define FileSystemOidIndexId	7183
 
-/* relation id: 5080 - pg_filesystem 20120524 */
+/* relation id: 6112 - pg_filesystem 20130123 */
 DECLARE_UNIQUE_INDEX(pg_filesystem_fsysname_index, 7184, on pg_filesystem using btree(fsysname name_ops));
 #define FileSystemFsysnameIndexId	7184
 

@@ -20,8 +20,13 @@
 AWK="awk"
 
 # Get FirstBootstrapObjectId from access/transam.h
-FIRSTOBJECTID=`grep '#define[ 	]*FirstBootstrapObjectId' ../access/transam.h | $AWK '{ print $3 }'`
+FIRSTOBJECTID=`grep '#define[ 	]*FirstBootstrapObjectId' ./pg_magic_oid.h | $AWK '{ print $3 }'`
 export FIRSTOBJECTID
+
+# This value splits the OID range into two so that GPDB and GPSQL can add
+# new built-in objects in parallel.
+LOWESTGPSQLOID=`grep '#define[ 	]*LowestGPSQLBootstrapObjectId' ./pg_magic_oid.h | $AWK '{ print $3 }'`
+export LOWESTGPSQLOID
 
 # this part (down to the uniq step) should match the duplicate_oids script
 # note: we exclude BKI_BOOTSTRAP relations since they are expected to have
@@ -39,7 +44,7 @@ sort -n | \
 uniq | \
 $AWK '
 BEGIN {
-	last = 0;
+	last = ENVIRON["LOWESTGPSQLOID"] - 1
 }
 /^[0-9]/ {
 	if ($1 > last + 1) {
@@ -49,8 +54,12 @@ BEGIN {
 			print last + 1;
 		}
 	}
-	last = $1;
+	if ($1 >= last){
+		last = $1;
+	}
 }
 END {
-	print last + 1, "-", ENVIRON["FIRSTOBJECTID"]-1;
+	if (last + 1 != ENVIRON["FIRSTOBJECTID"]) {
+		print last + 1, "-", ENVIRON["FIRSTOBJECTID"]-1;
+	}
 }'
