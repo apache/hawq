@@ -894,7 +894,10 @@ Exec_Jmp_Done:
 	ExecCdbTraceNode(node, false, result);
 #endif   /* CDB_TRACE_EXECUTOR */
 
-	/* Eager free the subplans */
+	/*
+	 * Eager free and squelch the subplans, unless it's a nested subplan.
+	 * In that case we cannot free or squelch, because it will be re-executed.
+	 */
 	if (TupIsNull(result))
 	{
 		ListCell *subp;
@@ -903,7 +906,14 @@ Exec_Jmp_Done:
 			SubPlanState *subplanState = (SubPlanState *)lfirst(subp);
 			Assert(subplanState != NULL &&
 				   subplanState->planstate != NULL);
-			ExecEagerFreeChildNodes(subplanState->planstate, (node->state->subplanLevel == 0));
+
+			bool subplanAtTopNestLevel = (node->state->subplanLevel == 0);
+
+			if (subplanAtTopNestLevel)
+			{
+				ExecSquelchNode(subplanState->planstate);
+			}
+			ExecEagerFreeChildNodes(subplanState->planstate, subplanAtTopNestLevel);
 			ExecEagerFree(subplanState->planstate);
 		}
 	}
