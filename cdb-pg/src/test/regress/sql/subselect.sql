@@ -623,3 +623,37 @@ select count(*) from finra_t1 where x in (select y from finra_t2 union all selec
 select count(*) from 
        ( select 1 as FIELD_1 union all select 2 as FIELD_1 ) TABLE_1 
        where FIELD_1 in ( select 1 as FIELD_1 union all select 1 as FIELD_1 union all select 1 as FIELD_1 );
+       
+---
+--- Query was deadlocking because of not squelching subplans (MPP-18936)
+---
+drop table if exists t1; 
+drop table if exists t2; 
+drop table if exists t3; 
+drop table if exists t4; 
+
+CREATE TABLE t1 AS (SELECT generate_series(1, 5000) AS i, generate_series(5001, 10000) AS j);
+CREATE TABLE t2 AS (SELECT * FROM t1 WHERE gp_segment_id = 0);
+CREATE TABLE t3 AS (SELECT * FROM t1 WHERE gp_segment_id = 1);
+CREATE TABLE t4 (i1 int, i2 int); 
+
+set gp_interconnect_queue_depth=1;
+
+-- This query was deadlocking on a 2P system
+INSERT INTO t4 
+(
+SELECT t1.i, (SELECT t3.i FROM t3 WHERE t3.i + 1 = t1.i + 1)
+FROM t1, t3
+WHERE t1.i = t3.i
+)
+UNION
+(
+SELECT t1.i, (SELECT t2.i FROM t2 WHERE t2.i + 1 = t1.i + 1)
+FROM t1, t2
+WHERE t1.i = t2.i
+);
+
+drop table if exists t1; 
+drop table if exists t2; 
+drop table if exists t3; 
+drop table if exists t4; 
