@@ -11,13 +11,16 @@ PORT_BASE=18506
 
 all: clean check cluster probe
 
-cluster:	
+cluster:
 	@ echo ""
 	@echo "Building cluster, this may take a few minutes."
-	@- MASTER_DEMO_PORT=$(MASTER_PORT) DEMO_PORT_BASE=$(PORT_BASE) \
-		./demo_cluster.sh 
+	@MASTER_DEMO_PORT=$(MASTER_PORT) DEMO_PORT_BASE=$(PORT_BASE) \
+		./demo_cluster.sh; if [ $$? -gt 1 ] ; then $(MAKE) clusterfail ; fi
 	@echo ""
 
+clusterfail:
+	@echo "Failed to initialize GPDB, please check log files"
+	@exit 1
 
 probe:
 	@ echo "Probing the databases "
