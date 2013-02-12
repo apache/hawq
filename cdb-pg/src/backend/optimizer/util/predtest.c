@@ -119,7 +119,7 @@ static PossibleValueSet ProcessAndClauseForPossibleValues( PredIterInfoData *cla
 static PossibleValueSet ProcessOrClauseForPossibleValues( PredIterInfoData *clauseInfo, Node *clause, Node *variable);
 static bool TryProcessEqualityNodeForPossibleValues(OpExpr *expr, Node *variable, PossibleValueSet *resultOut );
 
-static bool simple_equality_predicate_implied_or_refuted(Node *clause, Node *predicate, bool checkImpliedInsteadOfRefuted);
+static bool simple_equality_predicate_refuted(Node *clause, Node *predicate);
 
 /*
  * predicate_implied_by
@@ -149,16 +149,7 @@ predicate_implied_by(List *predicate_list, List *restrictinfo_list)
 		return false;			/* no restriction: implication must fail */
 
 	/* Otherwise, away we go ... */
-	if ( predicate_implied_by_recurse((Node *) restrictinfo_list,
-										(Node *) predicate_list))
-    {
-        return true;
-    }
-
-    if ( ! kUseFnEvaluationForPredicates )
-        return false;
-    return simple_equality_predicate_implied_or_refuted((Node *) restrictinfo_list,
-										(Node *) predicate_list, true);
+	return predicate_implied_by_recurse((Node *) restrictinfo_list, (Node *) predicate_list);
 }
 
 /*
@@ -206,8 +197,8 @@ predicate_refuted_by(List *predicate_list, List *restrictinfo_list)
 
     if ( ! kUseFnEvaluationForPredicates )
         return false;
-    return simple_equality_predicate_implied_or_refuted((Node *) restrictinfo_list,
-										(Node *) predicate_list, false);
+    return simple_equality_predicate_refuted((Node *) restrictinfo_list,
+										(Node *) predicate_list);
 }
 
 /*----------
@@ -1164,16 +1155,21 @@ convertToExplicitAndsShallowly( Node *n)
 }
 
 /**
- * Check to see if the predicate is expr=constant or constant=expr.  In that case, try to evaluate the clause
- *   by replacing every occurence of expr with the constant.  If the clause can then be reduced to a
- *   single boolean value, the boolean value tells whether the clause is always true or always false, given the
- *   predicate.
+ * Check to see if the predicate is expr=constant or constant=expr. In that case, try to evaluate the clause
+ *   by replacing every occurrence of expr with the constant.  If the clause can then be reduced to FALSE, we
+ *   conclude that the expression is refuted
  *
- * Returns true only if evaluation was possible.  In that case, and only that case, *resultOut will be filled with
- *   whether the clause evaluates to true or false
+ * Returns true only if evaluation is possible AND expression is refuted based on evaluation results
+ *
+ * MPP-18979:
+ * This mechanism cannot be used to prove implication. One example expression is
+ * "F(x)=1 and x=2", where F(x) is an immutable function that returns 1 for any input x.
+ * In this case, replacing x with 2 produces F(2)=1 and 2=2. Although evaluating the resulting
+ * expression gives TRUE, we cannot conclude that (x=2) is implied by the whole expression.
+ *
  */
 static bool
-simple_equality_predicate_implied_or_refuted(Node *clause, Node *predicate, bool checkImpliedInsteadOfRefuted)
+simple_equality_predicate_refuted(Node *clause, Node *predicate)
 {
 	OpExpr *predicateExpr;
 	Node *leftPredicateOp, *rightPredicateOp;
@@ -1273,7 +1269,7 @@ simple_equality_predicate_implied_or_refuted(Node *clause, Node *predicate, bool
                 if ( c->consttype == BOOLOID &&
                      ! c->constisnull )
                 {
-                    result = DatumGetBool(c->constvalue) == checkImpliedInsteadOfRefuted;
+                	result = (DatumGetBool(c->constvalue) == false);
                 }
             }
         }
