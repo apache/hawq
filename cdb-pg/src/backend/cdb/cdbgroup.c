@@ -1703,7 +1703,10 @@ make_three_stage_agg_plan(PlannerInfo *root, MppGroupContext *ctx)
 		root->parse->rtable = rtable;
 		root->parse->targetList = copyObject(result_plan->targetlist);
 	}
-	
+	// Rebuild arrays for RelOptInfo and RangeTblEntry for the PlannerInfo
+	// since the underlying range tables have been transformed
+	rebuild_simple_rel_and_rte(root);
+
 	return result_plan;
 }
 
@@ -5499,6 +5502,10 @@ make_deduplicate_plan(PlannerInfo *root,
 	root->parse->scatterClause = (List *)
 		cdbpullup_expr((Expr *) root->parse->scatterClause, tlist, NIL, Outer);
 	root->parse->rtable = parse->rtable;
+
+	// Rebuild arrays for RelOptInfo and RangeTblEntry for the PlannerInfo
+	// since the underlying range tables have been transformed
+	rebuild_simple_rel_and_rte(root);
 
 	return result_plan;
 }
