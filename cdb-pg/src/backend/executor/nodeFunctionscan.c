@@ -155,7 +155,6 @@ ExecInitFunctionScan(FunctionScan *node, EState *estate, int eflags)
 	Oid			funcrettype;
 	TypeFuncClass functypclass;
 	TupleDesc	tupdesc = NULL;
-    List       *tlist;
 
 	/*
 	 * FunctionScan should not have any children.
@@ -195,12 +194,9 @@ ExecInitFunctionScan(FunctionScan *node, EState *estate, int eflags)
 		ExecInitExpr((Expr *) node->scan.plan.qual,
 					 (PlanState *) scanstate);
 
-    /* CDB: Does targetlist contain a Var node referencing the ctid column? */
-    tlist = node->scan.plan.targetlist;
-    scanstate->cdb_want_ctid = contain_var_reference((Node *)tlist,
-                                                     node->scan.scanrelid,
-                                                     SelfItemPointerAttributeNumber,
-                                                     0);
+	/* Check if targetlist or qual contains a var node referencing the ctid column */
+	scanstate->cdb_want_ctid = contain_ctid_var_reference(&node->scan);
+
     ItemPointerSet(&scanstate->cdb_fake_ctid, 0, 0);
     ItemPointerSet(&scanstate->cdb_mark_ctid, 0, 0);
 

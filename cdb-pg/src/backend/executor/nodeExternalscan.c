@@ -27,7 +27,7 @@
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
 #include "parser/parsetree.h"
-
+#include "optimizer/var.h"
 
 static TupleTableSlot *ExternalNext(ExternalScanState *node);
 
@@ -78,6 +78,15 @@ ExternalNext(ExternalScanState *node)
 		Gpmon_M_Incr_Rows_Out(GpmonPktFromExtScanState(node));
 		CheckSendPlanStateGpmonPkt(&node->ss.ps);
 		ExecStoreGenericTuple(tuple, slot, true);
+
+	    /*
+	     * CDB: Label each row with a synthetic ctid if needed for subquery dedup.
+	     */
+	    if (node->cdb_want_ctid &&
+	        !TupIsNull(slot))
+	    {
+	    	slot_set_ctid_from_fake(slot, &node->cdb_fake_ctid);
+	    }
 	}
 	else
 	{
@@ -150,6 +159,10 @@ ExecInitExternalScan(ExternalScan *node, EState *estate, int eflags)
 	externalstate->ss.ps.qual = (List *)
 		ExecInitExpr((Expr *) node->scan.plan.qual,
 					 (PlanState *) externalstate);
+
+	/* Check if targetlist or qual contains a var node referencing the ctid column */
+	externalstate->cdb_want_ctid = contain_ctid_var_reference(&node->scan);
+	ItemPointerSetInvalid(&externalstate->cdb_fake_ctid);
 
 #define EXTSCAN_NSLOTS 2
 
@@ -307,6 +320,8 @@ ExecExternalReScan(ExternalScanState *node, ExprContext *exprCtxt)
 	Gpmon_M_Incr(GpmonPktFromExtScanState(node), GPMON_EXTSCAN_RESCAN);
      	CheckSendPlanStateGpmonPkt(&node->ss.ps);
 	fileScan = node->ess_ScanDesc;
+
+	ItemPointerSet(&node->cdb_fake_ctid, 0, 0);
 
 	external_rescan(fileScan);
 }

@@ -20,6 +20,7 @@
 #include "optimizer/var.h"
 #include "parser/parsetree.h"
 #include "rewrite/rewriteManip.h"
+#include "access/sysattr.h"
 
 
 typedef struct
@@ -203,7 +204,7 @@ contain_var_reference_cbVar(Var    *var,
 	return false;
 }
 
-bool
+static bool
 contain_var_reference(Node *node, int varno, int varattno, int levelsup)
 {
 	contain_var_reference_context context;
@@ -214,6 +215,24 @@ contain_var_reference(Node *node, int varno, int varattno, int levelsup)
 	return cdb_walk_vars(node, contain_var_reference_cbVar, NULL, NULL, &context, levelsup);
 }
 
+bool
+contain_ctid_var_reference(Scan *scan)
+{
+	/* Check if targetlist contains a var node referencing the ctid column */
+	bool want_ctid_in_targetlist =
+			contain_var_reference((Node *) scan->plan.targetlist,
+			scan->scanrelid,
+			SelfItemPointerAttributeNumber,
+			0);
+	/* Check if qual contains a var node referencing the ctid column */
+	bool want_ctid_in_qual =
+			contain_var_reference((Node *) scan->plan.qual,
+			scan->scanrelid,
+			SelfItemPointerAttributeNumber,
+			0);
+
+	return want_ctid_in_targetlist || want_ctid_in_qual;
+}
 
 /*
  * contain_var_clause

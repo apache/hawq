@@ -246,11 +246,8 @@ ExecInitValuesScan(ValuesScan *node, EState *estate, int eflags)
 		ExecInitExpr((Expr *) node->scan.plan.qual,
 					 (PlanState *) scanstate);
 
-    /* CDB: Does targetlist contain a Var node referencing the ctid column? */
-    scanstate->cdb_want_ctid = contain_var_reference((Node *)node->scan.plan.targetlist,
-                                                     node->scan.scanrelid,
-                                                     SelfItemPointerAttributeNumber,
-                                                     0);
+	/* Check if targetlist or qual contains a var node referencing the ctid column */
+	scanstate->cdb_want_ctid = contain_ctid_var_reference(&node->scan);
 
 	/*
 	 * get info about values list

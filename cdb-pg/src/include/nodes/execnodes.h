@@ -1636,8 +1636,10 @@ typedef struct ValuesScanState
  */
 typedef struct ExternalScanState
 {
-        ScanState        ss;
-        struct FileScanDescData        *ess_ScanDesc;
+	ScanState ss;
+	struct FileScanDescData *ess_ScanDesc;
+	bool cdb_want_ctid;
+	ItemPointerData cdb_fake_ctid;
 } ExternalScanState;
 
 /* ----------------

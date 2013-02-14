@@ -1505,3 +1505,39 @@ slot_getsysattr(TupleTableSlot *slot, int attnum, bool *isnull)
         return result;
 }                               /* slot_getsysattr */
 
+/*
+ * Set a synthetic ctid based on a fake ctid. Fake ctid is incremented before
+ * the assignment.
+ */
+void
+slot_set_ctid_from_fake(TupleTableSlot *slot, ItemPointerData *fake_ctid)
+{
+	/* Uninitialized */
+	if (!ItemPointerIsValid(fake_ctid))
+	{
+		ItemPointerSetBlockNumber(fake_ctid, 0);
+		ItemPointerSetOffsetNumber(fake_ctid, FirstOffsetNumber);
+	}
+	else
+	{
+		/* would we overflow? */
+		if (ItemPointerGetOffsetNumber(fake_ctid) ==
+			MaxOffsetNumber - 1)
+		{
+			/* How can we overflow 2^46? */
+			Assert(ItemPointerGetBlockNumber(fake_ctid) !=
+				   MaxBlockNumber - 1);
+			ItemPointerSetBlockNumber(fake_ctid,
+					ItemPointerGetBlockNumber(fake_ctid) + 1);
+			ItemPointerSetOffsetNumber(fake_ctid,
+					FirstOffsetNumber);
+		}
+		else
+		{
+			ItemPointerSetOffsetNumber(fake_ctid,
+				ItemPointerGetOffsetNumber(fake_ctid) + 1);
+		}
+	}
+
+	slot_set_ctid(slot, fake_ctid);
+}
