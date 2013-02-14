@@ -20,6 +20,7 @@ ignore: goh_column_compression
 test: goh_database
 test: goh_gp_dist_random
 test: gpsql_fault_tolerance
+test: goh_portals
 test: boolean
 test: char
 test: name

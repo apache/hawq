@@ -878,12 +878,6 @@ ProcessUtility(Node *parsetree,
 			 */
 		case T_PlannedStmt:
 		{
-			/* if guc variable not set, which means not called by pg_dump, throw exception*/
-			if(!gp_called_by_pgdump)
-			{
-				ereport(ERROR,
-							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support DECLARE CURSOR yet in GPSQL") ));
-			}
 			PlannedStmt *stmt = (PlannedStmt *) parsetree;
 
 			if (stmt->utilityStmt == NULL ||
@@ -895,12 +889,6 @@ ProcessUtility(Node *parsetree,
 
 		case T_ClosePortalStmt:
 			{
-				/* if guc variable not set, which means not called by pg_dump, throw exception*/
-				if(!gp_called_by_pgdump)
-				{
-					ereport(ERROR,
-							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support close cursor statement yet in GPSQL") ));
-				}
 				ClosePortalStmt *stmt = (ClosePortalStmt *) parsetree;
 
 				PerformPortalClose(stmt->portalname);
@@ -908,12 +896,6 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_FetchStmt:
-			/* if guc variable not set, which means not called by pg_dump, throw exception*/
-			if(!gp_called_by_pgdump)
-			{
-				ereport(ERROR,
-							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support fetch statement yet in GPSQL") ));
-			}
 			PerformPortalFetch((FetchStmt *) parsetree, dest,
 							   completionTag);
 			break;
