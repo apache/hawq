@@ -1750,9 +1750,6 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_DropOwnedStmt:
-			ereport(ERROR,
-							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support drop owned statement yet in GPSQL") ));
-
 			DropOwnedObjects((DropOwnedStmt *) parsetree);
 			break;
 

@@ -1760,10 +1760,12 @@ DropOwnedObjects(DropOwnedStmt *stmt)
 					 errOmitLocation(true)));
 	}
 	
+	/*
 	if (Gp_role == GP_ROLE_DISPATCH)
     {
         CdbDispatchUtilityStatement((Node *) stmt, "DropOwnedObjects");
     }
+	*/
     
 	/* Ok, do it */
 	shdepDropOwned(role_ids, stmt->behavior);
