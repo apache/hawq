@@ -21,6 +21,7 @@ test: goh_database
 test: goh_gp_dist_random
 test: gpsql_fault_tolerance
 test: goh_portals
+test: goh_prepare
 test: boolean
 test: char
 test: name

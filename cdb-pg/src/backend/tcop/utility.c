@@ -1094,24 +1094,15 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_PrepareStmt:
-			ereport(ERROR,
-							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support prepare statement yet in GPSQL") ));
-
 			PrepareQuery((PrepareStmt *) parsetree, debug_query_string);
 			break;
 
 		case T_ExecuteStmt:
-			ereport(ERROR,
-							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support execute statement yet in GPSQL") ));
-
 			ExecuteQuery((ExecuteStmt *) parsetree, debug_query_string, params,
 						 dest, completionTag);
 			break;
 
 		case T_DeallocateStmt:
-			ereport(ERROR,
-							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support deallocate statement yet in GPSQL") ));
-
 			DeallocateQuery((DeallocateStmt *) parsetree);
 			break;
 
