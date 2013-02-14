@@ -548,3 +548,27 @@ GRANT INSERT ON PROTOCOL pxf TO nonsuperproto;
 REVOKE SELECT ON PROTOCOL pxf FROM nonsuperproto;
 REVOKE INSERT ON PROTOCOL pxf FROM nonsuperproto;
 DROP USER nonsuperproto;
+
+-- Tests for MPP17980: generating artificial CTIDs for external table scans
+-- This is necessary because the planner currently generates plans that include
+-- the CTID attribute for external tables. 
+
+CREATE EXTERNAL TABLE ext_mpp17980 ( id int , id1 int , id2 int)
+LOCATION ('file://@hostname@@abs_srcdir@/data/mpp17980.data')
+FORMAT 'CSV' ( DELIMITER ',' NULL ' ');
+
+CREATE TABLE mpp17980 (id int, date date, amt decimal(10,2))
+DISTRIBUTED randomly PARTITION BY RANGE (date)
+( START (date '2008-01-01') INCLUSIVE  END (date '2009-01-01') EXCLUSIVE 
+EVERY (INTERVAL '1 month') );
+
+INSERT INTO mpp17980 VALUES ( 1,'2008-02-20',122.11);
+
+SELECT COUNT(*) FROM ext_mpp17980 WHERE id IN ( 1 ) ;  -- This returns 18 tuples
+
+SELECT COUNT(*) FROM ext_mpp17980 WHERE id IN ( SELECT id FROM mpp17980 ) ; -- This should return 18 tuples but returns only 1
+
+SELECT ctid, * FROM ext_mpp17980;
+
+DROP EXTERNAL TABLE ext_mpp17980;
+DROP TABLE mpp17980;
