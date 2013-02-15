@@ -32,6 +32,7 @@
 #include "miscadmin.h"
 #include "optimizer/prep.h"
 #include "storage/fd.h"
+#include "utils/acl.h"
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
 #include "utils/lsyscache.h"
@@ -1361,6 +1362,18 @@ prepareDispatchedCatalogFunctionExpr(QueryContextInfo *cxt, Expr *expr, HTAB *ht
         Assert(arg->xpr.type == T_Const);
         Assert(arg->consttype == REGCLASSOID);
         seqoid = DatumGetObjectId(arg->constvalue);
+
+	/* 
+  	 * aclchecks for nextval are done on the segments. But in GPSQL 
+ 	 * we are executing as bootstrap user on the segments. So any aclchecks
+	 * on segments defeats the purpose. 
+	 * Do the aclchecks on the master, prior to dispatch
+	 */
+	if (pg_class_aclcheck(seqoid, GetUserId(), ACL_UPDATE) != ACLCHECK_OK)
+                ereport(ERROR,
+                                (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+                                 errmsg("permission denied for sequence %s",
+                                                get_rel_name(seqoid))));
 
         prepareDispatchedCatalogSingleRelation(cxt, seqoid, FALSE, 0, htab);
     }
