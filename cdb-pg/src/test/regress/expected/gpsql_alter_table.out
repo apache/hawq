@@ -1,0 +1,118 @@
+CREATE TABLE altable(a int, b text, c int);
+INSERT INTO altable SELECT i, i::text, i FROM generate_series(1, 10)i;
+ALTER TABLE altable ADD COLUMN x int;
+ERROR:  ALTER TABLE ... ADD COLUMN is not supported
+ALTER TABLE altable ALTER COLUMN c SET DEFAULT 10 - 1;
+INSERT INTO altable(a, b) VALUES(11, '11');
+SELECT a, b, c FROM altable WHERE a = 11;
+ a  | b  | c 
+----+----+---
+ 11 | 11 | 9
+(1 row)
+
+ALTER TABLE altable ALTER COLUMN c DROP DEFAULT;
+INSERT INTO altable(a, b) VALUES(12, '12');
+SELECT a, b, c FROM altable WHERE a = 12;
+ a  | b  | c 
+----+----+---
+ 12 | 12 |  
+(1 row)
+
+ALTER TABLE altable ALTER COLUMN c SET NOT NULL;
+INSERT INTO altable(a, b) VALUES(13, '13');
+ERROR:  null value in column "c" violates not-null constraint
+ALTER TABLE altable ALTER COLUMN c DROP NOT NULL;
+INSERT INTO altable(a, b) VALUES(13, '13');
+ERROR:  null value in column "c" violates not-null constraint
+SELECT a, b, c FROM altable WHERE a = 13;
+ a | b | c 
+---+---+---
+(0 rows)
+
+ALTER TABLE altable ALTER COLUMN c SET STATISTICS 100;
+ALTER TABLE altable ALTER COLUMN b SET STORAGE PLAIN;
+ALTER TABLE altable DROP COLUMN b;
+SELECT a, c FROM altable;
+ a  | c  
+----+----
+  1 |  1
+  2 |  2
+  3 |  3
+  4 |  4
+  5 |  5
+  6 |  6
+  7 |  7
+  8 |  8
+  9 |  9
+ 10 | 10
+ 11 |  9
+ 12 |   
+(12 rows)
+
+ALTER TABLE altable ADD CONSTRAINT c_check CHECK (c > 0);
+ERROR:  ALTER TABLE ... ADD CONSTRAINT is not supported
+INSERT INTO altable(a, c) VALUES(0, -10);
+ALTER TABLE altable DROP CONSTRAINT c_check;
+ERROR:  constraint "c_check" does not exist
+INSERT INTO altable(a, c) VALUES(0, -10);
+ALTER TABLE altable ALTER COLUMN c TYPE bigint;
+ERROR:  ALTER TABLE ... ALTER COLUMN TYPE is not supported
+ALTER TABLE altable OWNER to some_user;
+ERROR:  ALTER TABLE ... ALTER OWNER is not supported
+ALTER TABLE altable CLUSTER ON some_index;
+ERROR:  ALTER TABLE ... CLUSTER is not supported
+ALTER TABLE altable SET WITHOUT OIDS;
+ERROR:  ALTER TABLE ... SET WITHOUT OIDS is not supported
+ALTER TABLE altable SET TABLESPACE pg_default;
+ERROR:  ALTER TABLE ... SET TABLESPACE is not supported
+ALTER TABLE altable SET (fillfactor = 90);
+ERROR:  altering reloptions for append only tables is not permitted
+ALTER TABLE altable SET DISTRIBUTED BY c;
+ERROR:  syntax error at or near "c"
+LINE 1: ALTER TABLE altable SET DISTRIBUTED BY c;
+                                               ^
+ALTER TABLE altable ENABLE TRIGGER ALL;
+ERROR:  ALTER TABLE ... ENABLE TRIGGER is not supported
+ALTER TABLE altable DISABLE TRIGGER ALL;
+ERROR:  ALTER TABLE ... DISABLE TRIGGER is not supported
+CREATE TABLE palt(a int, b text, c int)
+PARTITION BY RANGE(c)
+(START (1) END (100) EVERY (10));
+NOTICE:  CREATE TABLE will create partition "palt_1_prt_1" for table "palt"
+NOTICE:  CREATE TABLE will create partition "palt_1_prt_2" for table "palt"
+NOTICE:  CREATE TABLE will create partition "palt_1_prt_3" for table "palt"
+NOTICE:  CREATE TABLE will create partition "palt_1_prt_4" for table "palt"
+NOTICE:  CREATE TABLE will create partition "palt_1_prt_5" for table "palt"
+NOTICE:  CREATE TABLE will create partition "palt_1_prt_6" for table "palt"
+NOTICE:  CREATE TABLE will create partition "palt_1_prt_7" for table "palt"
+NOTICE:  CREATE TABLE will create partition "palt_1_prt_8" for table "palt"
+NOTICE:  CREATE TABLE will create partition "palt_1_prt_9" for table "palt"
+NOTICE:  CREATE TABLE will create partition "palt_1_prt_10" for table "palt"
+INSERT INTO palt SELECT i, i::text, i FROM generate_series(1, 99)i;
+CREATE TABLE palt_child(a int, b text, c int);
+ALTER TABLE palt EXCHANGE PARTITION FOR (51) WITH TABLE palt_child;
+ERROR:  ALTER TABLE ... EXCHANGE PARTITION is not supported
+ALTER TABLE palt SPLIT PARTITION FOR (51) AT (55) INTO (PARTITION a, PARTITION b);
+ERROR:  ALTER TABLE ... SPLIT PARTITION is not supported
+ALTER TABLE palt ADD PARTITION START (100) END (110);
+NOTICE:  CREATE TABLE will create partition "palt_1_prt_r454812723" for table "palt"
+INSERT INTO palt VALUES(100, '100', 100);
+SELECT count(*) FROM palt;
+ count 
+-------
+   100
+(1 row)
+
+ALTER TABLE palt RENAME PARTITION FOR (100) TO part100;
+ALTER TABLE palt DROP PARTITION FOR (100);
+NOTICE:  dropped partition "part100" for relation "palt"
+INSERT INTO palt VALUES(100, '100', 100);
+ERROR:  no partition for partitioning key
+SELECT count(*) FROM palt;
+ count 
+-------
+    99
+(1 row)
+
+ALTER TABLE palt TRUNCATE PARTITION FOR (51);
+ERROR:  ALTER TABLE ... TRUNCATE PARTITION is not supported

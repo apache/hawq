@@ -3726,7 +3726,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 		  bool recurse, bool recursing)
 {
 	AlteredTableInfo *tab;
-	int			pass;
+	int			pass = 0;
 
 	/* Find or create work queue entry for this table */
 	tab = ATGetQueueEntry(wqueue, rel);
@@ -3747,6 +3747,9 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 	switch (cmd->subtype)
 	{
 		case AT_AddColumn:		/* ADD COLUMN */
+			ereport(ERROR,
+					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+					 errmsg("ALTER TABLE ... ADD COLUMN is not supported")));
 			ATSimplePermissions(rel, false);
 			/*
 			 * test that this is allowed for partitioning, but only if we aren't
@@ -3758,6 +3761,9 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			pass = AT_PASS_ADD_COL;
 			break;
 		case AT_AddColumnRecurse:		/* ADD COLUMN internal */
+			ereport(ERROR,
+					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+					 errmsg("ALTER TABLE ... ADD COLUMN is not supported")));
 			ATSimplePermissions(rel, false);
 			/* No need to do ATPartitionCheck */
 			/* Performs own recursion */
@@ -3815,6 +3821,9 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			pass = AT_PASS_DROP;
 			break;
 		case AT_AddIndex:		/* ADD INDEX */
+			ereport(ERROR,
+					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+					 errmsg("ALTER TABLE ... ADD INDEX is not supported")));
 			ATSimplePermissions(rel, false);
 			/* Any recursion for partitioning is done in ATExecAddIndex() itself */
 			/* However, if the index supports a PK or UNIQUE constraint and the
@@ -3869,6 +3878,9 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			pass = AT_PASS_ADD_INDEX;
 			break;
 		case AT_AddConstraint:	/* ADD CONSTRAINT */
+			ereport(ERROR,
+					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+					 errmsg("ALTER TABLE ... ADD CONSTRAINT is not supported")));
 			ATSimplePermissions(rel, false);
 			/* (!recurse &&  !recursing) is supposed to detect the ONLY clause.
 			 * We allow operations on the root of a partitioning hierarchy, but
@@ -3910,6 +3922,9 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			pass = AT_PASS_DROP;
 			break;
 		case AT_AlterColumnType:		/* ALTER COLUMN TYPE */
+			ereport(ERROR,
+					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+					 errmsg("ALTER TABLE ... ALTER COLUMN TYPE is not supported")));
 			ATSimplePermissions(rel, false);
 			ATPartitionCheck(cmd->subtype, rel, false, recursing);
 			/* Performs own recursion */
@@ -3917,6 +3932,9 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			pass = AT_PASS_ALTER_TYPE;
 			break;
 		case AT_ChangeOwner:	/* ALTER OWNER */
+			ereport(ERROR,
+					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+					 errmsg("ALTER TABLE ... ALTER OWNER is not supported")));
 			{
 				bool do_recurse = false;
 
@@ -3943,13 +3961,22 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			}
 			break;
 		case AT_ClusterOn:		/* CLUSTER ON */
+			ereport(ERROR,
+					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+					 errmsg("ALTER TABLE ... CLUSTER is not supported")));
 		case AT_DropCluster:	/* SET WITHOUT CLUSTER */
+			ereport(ERROR,
+					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+					 errmsg("ALTER TABLE ... SET WITHOUT CLUSTER is not supported")));
 			ATSimplePermissions(rel, false);
 			/* These commands never recurse */
 			/* No command-specific prep needed */
 			pass = AT_PASS_MISC;
 			break;
 		case AT_DropOids:		/* SET WITHOUT OIDS */
+			ereport(ERROR,
+					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+					 errmsg("ALTER TABLE ... SET WITHOUT OIDS is not supported")));
 			ATSimplePermissions(rel, false);
 			ATPartitionCheck(cmd->subtype, rel, false, recursing);
 			/* Performs own recursion */
@@ -3965,6 +3992,9 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			pass = AT_PASS_DROP;
 			break;
 		case AT_SetTableSpace:	/* SET TABLESPACE */
+			ereport(ERROR,
+					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+					 errmsg("ALTER TABLE ... SET TABLESPACE is not supported")));
 			ATSimplePermissionsRelationOrIndex(rel);
 			/* This command never recurses, but the offered relation may be partitioned, 
 			 * in which case, we need to act as if the command specified the top-level
@@ -4010,6 +4040,9 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			pass = AT_PASS_MISC;
 			break;
 		case AT_SetDistributedBy:	/* SET DISTRIBUTED BY */
+			ereport(ERROR,
+					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+					 errmsg("ALTER TABLE ... SET DISTRIBUTED BY is not supported")));
 			if ( !recursing ) /* MPP-5772, MPP-5784 */
 			{
 				Oid relid = RelationGetRelid(rel);
@@ -4100,9 +4133,15 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 		case AT_EnableTrig:		/* ENABLE TRIGGER variants */
 		case AT_EnableTrigAll:
 		case AT_EnableTrigUser:
+			ereport(ERROR,
+					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+					 errmsg("ALTER TABLE ... ENABLE TRIGGER is not supported")));
 		case AT_DisableTrig:	/* DISABLE TRIGGER variants */
 		case AT_DisableTrigAll:
 		case AT_DisableTrigUser:
+			ereport(ERROR,
+					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+					 errmsg("ALTER TABLE ... DISABLE TRIGGER is not supported")));
 			ATSimplePermissions(rel, false);
 			ATPartitionCheck(cmd->subtype, rel, false, recursing);
 			/* These commands never recurse */
@@ -4119,7 +4158,9 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			break;
 			/* CDB: Partitioned Table commands */
 		case AT_PartExchange:			/* Exchange */
-			
+			ereport(ERROR,
+					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+					 errmsg("ALTER TABLE ... EXCHANGE PARTITION is not supported")));
 			ATPartitionCheck(cmd->subtype, rel, false, recursing);
 			
 			if (Gp_role == GP_ROLE_UTILITY)
@@ -4133,6 +4174,9 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			
 			break;
 		case AT_PartMerge:
+			ereport(ERROR,
+					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+					 errmsg("ALTER TABLE ... MERGE PARTITION is not supported")));
 		{
 			AlterPartitionCmd  *pc    	= (AlterPartitionCmd *) cmd->def;
 			PgPartRule   	   *prule1	= NULL;
@@ -4234,6 +4278,9 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 		}
 
 		case AT_PartSplit:				/* Split */
+			ereport(ERROR,
+					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+					 errmsg("ALTER TABLE ... SPLIT PARTITION is not supported")));
 		{
 			AlterPartitionCmd	*pc    	= (AlterPartitionCmd *) cmd->def;
 
@@ -4772,9 +4819,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 		case AT_PartDrop:				/* Drop */
 		case AT_PartRename:				/* Rename */
 		case AT_PartSetTemplate:		/* Set Subpartition Template */
-		case AT_PartTruncate:			/* Truncate */
 		case AT_PartAddInternal:		/* internal partition creation */
-		case AT_PartModify:             /* Modify */
 			ATSimplePermissions(rel, false);
 			ATPartitionCheck(cmd->subtype, rel, false, recursing);
 				/* XXX XXX XXX */
@@ -4782,6 +4827,16 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			/* No command-specific prep needed */
 			/* XXX: check permissions */
 			pass = AT_PASS_MISC;
+			break;
+
+		case AT_PartTruncate:			/* Truncate */
+			ereport(ERROR,
+					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+					 errmsg("ALTER TABLE ... TRUNCATE PARTITION is not supported")));
+		case AT_PartModify:             /* Modify */
+			ereport(ERROR,
+					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+					 errmsg("ALTER TABLE ... MODIFY PARTITION is not supported")));
 			break;
 
 		default:				/* oops */

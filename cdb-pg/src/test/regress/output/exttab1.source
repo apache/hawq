@@ -629,11 +629,14 @@ HINT:  Use ALTER EXTERNAL TABLE instead
 alter table ext drop column a; -- should pass with warning
 WARNING:  "ext" is an external table. ALTER TABLE for external tables is deprecated.
 HINT:  Use ALTER EXTERNAL TABLE instead
-alter external table ext add column a int; -- pass
-alter external table ext drop column a; -- pass
+alter external table ext add column a int;
+ERROR:  ALTER TABLE ... ADD COLUMN is not supported
+alter external table ext drop column a;
+ERROR:  column "a" of relation "ext" does not exist
 alter external table ext add column extnewcol int not null; -- should fail (constraints not allowed)
 ERROR:  Unsupported ALTER command for table type external
-alter external table ext add column extnewcol int; -- pass
+alter external table ext add column extnewcol int;
+ERROR:  ALTER TABLE ... ADD COLUMN is not supported
 alter external table ext alter column extnewcol set default 1; -- should fail (unsupported alter type)
 ERROR:  Unsupported ALTER command for table type external
 --
