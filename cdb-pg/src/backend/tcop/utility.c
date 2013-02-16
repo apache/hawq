@@ -1674,29 +1674,14 @@ ProcessUtility(Node *parsetree,
 			 * ********************* RESOOURCE QUEUE statements ****
 			 */
 		case T_CreateQueueStmt:
-			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
-						ereport(ERROR,
-								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create queue statement yet in GPSQL") ));
-					}
-
 			CreateQueue((CreateQueueStmt *) parsetree);
 			break;
 
 		case T_AlterQueueStmt:
-			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
-									ereport(ERROR,
-											(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter queue statement yet in GPSQL") ));
-								}
-
 			AlterQueue((AlterQueueStmt *) parsetree);
 			break;
 
 		case T_DropQueueStmt:
-			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
-						ereport(ERROR,
-								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support drop queue statement yet in GPSQL") ));
-					}
-
 			DropQueue((DropQueueStmt *) parsetree);
 			break;
 

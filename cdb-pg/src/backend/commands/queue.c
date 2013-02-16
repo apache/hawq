@@ -1035,7 +1035,7 @@ CreateQueue(CreateQueueStmt *stmt)
 	if (Gp_role == GP_ROLE_DISPATCH)
 	{
 		stmt->queueOid = queueid;
-		CdbDispatchUtilityStatement((Node *) stmt, "CreateResourceQueue");
+/*		CdbDispatchUtilityStatement((Node *) stmt, "CreateResourceQueue"); */
 		MetaTrackAddObject(ResQueueRelationId,
 						   queueid,
 						   GetUserId(), /* not ownerid */
@@ -1479,7 +1479,7 @@ AlterQueue(AlterQueueStmt *stmt)
 	/* MPP-6929, MPP-7583: metadata tracking */
 	if (Gp_role == GP_ROLE_DISPATCH)
 	{
-		CdbDispatchUtilityStatement((Node *) stmt, "AlterResourceQueue");
+/*		CdbDispatchUtilityStatement((Node *) stmt, "AlterResourceQueue"); */
 		MetaTrackUpdObject(ResQueueRelationId,
 						   queueid,
 						   GetUserId(), /* not ownerid */
@@ -1614,10 +1614,12 @@ DropQueue(DropQueueStmt *stmt)
 	 */
 	DeleteSharedComments(queueid, ResQueueRelationId);
 
+/*
 	if (Gp_role == GP_ROLE_DISPATCH)
 	{
 		CdbDispatchUtilityStatement((Node *) stmt, "DropResourceQueue");
 	}
+*/
 	/* MPP-6929, MPP-7583: metadata tracking */
 	MetaTrackDropObject(ResQueueRelationId,
 						queueid);
