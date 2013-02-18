@@ -405,6 +405,8 @@ extern void PersistentDatabase_Reset(void)
 	SharedOidSearch_Iterate(
 					&persistentDatabaseSharedData->databaseDirSearchTable,
 					(SharedOidSearchObjHeader**)&databaseDirEntry);
+	/* XXX:mat3: This path should not be called. The contentid is not set. */
+	Insist(false);
 	while (true)
 	{
 		PersistentFileSysObjName fsObjName;
@@ -604,7 +606,16 @@ void PersistentDatabase_MarkCreatePending(
 		    		dbDirNode->tablespace,
 		    		(SharedOidSearchObjHeader**)&databaseDirEntry);
 	if (addResult == SharedOidSearchAddResult_NoMemory)
-		elog(ERROR, "Out of shared-memory for persistent databaseS");
+	{
+		/* If out of shared memory, no need to promote to PANIC. */
+		WRITE_PERSISTENT_STATE_ORDERED_UNLOCK;
+		ereport(ERROR,
+				(errcode(ERRCODE_OUT_OF_MEMORY),
+				 errmsg("Out of shared-memory for persistent databases"),
+				 errhint("You may need to increase the gp_max_databases and "
+				 		 "gp_max_tablespaces value"),
+				 errOmitLocation(true)));
+	}
 	else if (addResult == SharedOidSearchAddResult_Exists)
 		elog(PANIC, "Persistent database entry '%s' already exists in state '%s'", 
 		     GetDatabasePath(
@@ -717,7 +728,16 @@ void PersistentDatabase_AddCreated(
 		    		dbDirNode->tablespace,
 		    		(SharedOidSearchObjHeader**)&databaseDirEntry);
 	if (addResult == SharedOidSearchAddResult_NoMemory)
-		elog(ERROR, "Out of shared-memory for persistent databaseS");
+	{
+		/* If out of shared memory, no need to promote to PANIC. */
+		WRITE_PERSISTENT_STATE_ORDERED_UNLOCK;
+		ereport(ERROR,
+				(errcode(ERRCODE_OUT_OF_MEMORY),
+				 errmsg("Out of shared-memory for persistent databases"),
+				 errhint("You may need to increase the gp_max_databases and "
+				 		 "gp_max_tablespaces value"),
+				 errOmitLocation(true)));
+	}
 	else if (addResult == SharedOidSearchAddResult_Exists)
 		elog(PANIC, "Persistent database entry '%s' already exists in state '%s'", 
 		     GetDatabasePath(
@@ -764,7 +784,10 @@ xlog_create_database(DbDirNode *db)
 
 	WRITE_PERSISTENT_STATE_ORDERED_LOCK;
 
-	/* XXX:mat3: I'll fix it later when I'm dealing with recovery. */
+	/*
+	 * XXX:mat3: This is the dead code in GPSQL. There is no local recovery on 
+	 * segment. And master has its own rerecover code path.
+	 */
 	dbe = (DatabaseDirEntry) SharedOidSearch_Find(
 				    	&persistentDatabaseSharedData->databaseDirSearchTable,
 				    							  -1,
@@ -778,7 +801,6 @@ xlog_create_database(DbDirNode *db)
 				   db->tablespace),
 		     PersistentFileSysObjState_Name(dbe->state));
 
-	/* XXX:mat3: I'll fix it later when I'm dealing with recovery. */
 	addResult = SharedOidSearch_Add(
 		    		&persistentDatabaseSharedData->databaseDirSearchTable,
 					-1,
@@ -1452,7 +1474,16 @@ void PersistentDatabase_MarkJustInTimeCreatePending(
 					dbDirNode->tablespace,
 					(SharedOidSearchObjHeader**)&databaseDirEntry);
 	if (addResult == SharedOidSearchAddResult_NoMemory)
-		elog(ERROR, "Out of shared-memory for persistent databases");
+	{
+		/* If out of shared memory, no need to promote to PANIC. */
+		WRITE_PERSISTENT_STATE_ORDERED_UNLOCK;
+		ereport(ERROR,
+				(errcode(ERRCODE_OUT_OF_MEMORY),
+				 errmsg("Out of shared-memory for persistent databases"),
+				 errhint("You may need to increase the gp_max_databases and "
+				 		 "gp_max_tablespaces value"),
+				 errOmitLocation(true)));
+	}
 	else if (addResult == SharedOidSearchAddResult_Exists)
 		elog(PANIC, "Persistent database entry '%s' already exists in state '%s'", 
 			 GetDatabasePath(
@@ -1680,10 +1711,10 @@ Size PersistentDatabase_ShmemSize(void)
 	if (MaxPersistentDatabaseDirectories == 0)
 		MaxPersistentDatabaseDirectories = gp_max_databases * gp_max_tablespaces * content_num;
 
-	elog(DEBUG1, "PersistentDatabase_ShmemSize: %zu = "
-			  "PersistentDatabase_SharedDataSize(): %zu ="
-			  "PersistentDatabaseSharedData: %zu +"
-			  "MaxPersistentDatabaseDirectories: %d (db: %d * ts: %d * content: %d) *"
+	elog(LOG, "PersistentDatabase_ShmemSize: %zu = "
+			  "PersistentDatabase_SharedDataSize(): %zu = "
+			  "PersistentDatabaseSharedData: %zu + "
+			  "MaxPersistentDatabaseDirectories: %d (db: %d * ts: %d * content: %d) * "
 			  "sizeof(DatabaseDirEntryData): %zu",
 			  PersistentDatabase_SharedDataSize(),
 			  PersistentDatabase_SharedDataSize(),

@@ -75,7 +75,7 @@ typedef struct AOSegfileStatus
 	int64			tupsadded;		/* Num tuples added in this segno across  * 
 									 * all segdbs in the current transaction  */
 	TransactionId	xid;	   		/* the inserting transaction id 		  */
-	DistributedTransactionId latestWriteXid; /* the latest committed inserting
+	TransactionId 	latestWriteXid; /* the latest committed inserting
 												transaction id */
 	bool			inuse;	   		/* if true - segno is assigned right now. *
 									 * use another 							  */

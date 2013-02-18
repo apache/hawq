@@ -1931,6 +1931,20 @@ MAKE_DBID_FILE() {
 dbid = $DBID\" > $FILEPATH &&  chmod 400 $FILEPATH"
 }
 
+MAKE_CONTENTNUM_FILE() {
+	CONTENT_NUM=$1; shift
+	DATADIR=$1; shift
+
+	FILEPATH=$DATADIR/gp_contentnum
+	if [ "$FILEPATH" = "/gp_contentnum" ]; then # DATADIR is empty
+		ERROR_EXIT "[FATAL]:-Internal error -- expected non-empty data directory" 2
+	fi
+
+	$ECHO "# Greenplum Database content num for master/standby.
+# Do not change the contents of this file.
+content_num = $CONTENT_NUM" > "$FILEPATH" && chmod 600 "$FILEPATH"
+}
+
 UPDATE_MPP () {
 	LOG_MSG "[INFO][$INST_COUNT]:-Start Function $FUNCNAME"
 	U_DB=$DEFAULTDB

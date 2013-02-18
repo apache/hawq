@@ -819,12 +819,6 @@ static void analyzeRelation(Relation relation, List *lAttributeNames)
 	}
 
 	/**
-	 * in gpsql, if it is a heap table, finish it here
-	 */
-	if (RelationIsHeap(relation))
-		return;
-
-	/**
 	 * Determine how many rows need to be sampled.
 	 */
 	foreach (le, lAttributeNames)

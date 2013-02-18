@@ -729,6 +729,18 @@ CHK_DFS_URL () {
 		ERROR_EXIT "[FATAL]:-Issue with DFS_URL: not set" 2
 	fi
 
+	# Don't need the protocol part in the URL.
+	if `$ECHO "$DFS_URL" | $GREP -q '^[a-zA-Z]*://'`; then
+		ERROR_EXIT "[FATAL]:-Issue with DFS_URL: protocol in the dfs url should not be specified" 2
+	fi
+
+	dfs_host=`$ECHO "$DFS_URL" | $SED 's,[:/].*,,'`
+	PING_HOST "$dfs_host"
+
+	# We must create the filespace in a relative path
+	DFS_URL="$DFS_URL"/gpsql_data
+	export DFS_URL
+
 	LOG_MSG "[INFO]:-End Function $FUNCNAME"	
 }
 
@@ -1350,6 +1362,7 @@ UPDATE_GPCONFIG () {
 		fi
 		if [ $U_CONTENT -eq -1 ]
 		then
+			MAKE_CONTENTNUM_FILE $CONTENT_COUNT $U_DIR
 			MAKE_DBID_FILE $U_DBID $U_HOSTNAME $U_DIR
 		fi
 		LOG_MSG "[INFO]:-End Function $FUNCNAME"
@@ -1626,19 +1639,67 @@ CREATE_DFS_TABLESPACE () {
 	if [ x"" != x"$STANDBY_HOSTNAME" ];then
 		$TRUSTED_SHELL $STANDBY_HOSTNAME "$MKDIR \"${MASTER_DIRECTORY}/dfs\""
 	fi
+
+    LOG_MSG "[INFO]:-Prepare to create filespace on $DFS_NAME" 1
 	DFS_QD_PATH_LIST=`$PSQL -p $GP_PORT -d "$DEFAULTDB" -A -t -c "SELECT dbid || ':' || '''${MASTER_DIRECTORY}/dfs/${SEG_PREFIX}' || content || '''' FROM $GP_CONFIG_TBL WHERE content = -1;" 2>/dev/null` >> $LOG_FILE 2>&1
 	# segments
 	DFS_QE_PATH_LIST=`$PSQL -p $GP_PORT -d "$DEFAULTDB" -A -t -c "SELECT dbid || ':' || '''${DFS_URL}/${SEG_PREFIX}' || content || '''' FROM $GP_CONFIG_TBL WHERE content <> -1;" 2>/dev/null` >> $LOG_FILE 2>&1
-    ERROR_CHK $? "create filespace on $DFS_NAME" 2
+    CHECK_CREATE_DFS_ERROR
+
 	DFS_QD_PATH_LIST=`$ECHO "$DFS_QD_PATH_LIST" | $TR '\n' ',' | $SED -e 's:,$::'`
 	DFS_QE_PATH_LIST=`$ECHO "$DFS_QE_PATH_LIST" | $TR '\n' ',' | $SED -e 's:,$::'`
 	DFS_PATH_LIST="${DFS_QD_PATH_LIST},${DFS_QE_PATH_LIST}"
 	LOG_MSG "[INFO]:-DFS_PATH_LIST: ${DFS_PATH_LIST}"
+
+	# create filespace statement
+	LOG_MSG "[INFO]:-Create filespace $GP_FILESPACE_NAME" 1
 	$PSQL -p $GP_PORT -d "$DEFAULTDB" -c"create filespace \"$GP_FILESPACE_NAME\" on \"${DFS_NAME}\" (${DFS_PATH_LIST});" >> $LOG_FILE 2>&1
-	ERROR_CHK $? "create filespace $GP_FILESPACE_NAME" 2
+    CHECK_CREATE_DFS_ERROR
+
+	# create tablespace statement
+	LOG_MSG "[INFO]:-Create tablespace $GP_TABLESPACE_NAME" 1
 	$PSQL -p $GP_PORT -d "$DEFAULTDB" -c"create tablespace \"$GP_TABLESPACE_NAME\" filespace \"$GP_FILESPACE_NAME\";" >> $LOG_FILE 2>&1
-	ERROR_CHK $? "create tablespace $GP_TABLESPACE_NAME" 2
+    CHECK_CREATE_DFS_ERROR
+
 	LOG_MSG "[INFO]:-End Function $FUNCNAME"
+}
+
+CHECK_CREATE_DFS_ERROR () {
+    if [ $? -ne 0 ];then
+        # this text is duplicated below
+        LOG_MSG "[WARN]:" 1
+        LOG_MSG "[WARN]:-Failed to create dfs filespace; review gpinitsystem output to" 1
+        LOG_MSG "[WARN]:- determine why this step failed and reinitialize cluster after resolving" 1
+        LOG_MSG "[WARN]:- issues.  Not all initialization tasks have completed so the cluster" 1
+        LOG_MSG "[WARN]:- should not be used." 1
+
+        LOG_MSG "[WARN]:-gpinitsystem will now try to stop the cluster" 1
+        LOG_MSG "[WARN]:" 1
+ 
+        if [ -f $GPSTOP ]; then
+		GPSTOP_OPTS=$(OUTPUT_LEVEL_OPTS)
+            export MASTER_DATA_DIRECTORY=${MASTER_DIRECTORY}/${SEG_PREFIX}-1
+            $GPSTOP -a -i -d $MASTER_DATA_DIRECTORY $GPSTOP_OPTS
+
+            RETVAL=$?
+            case $RETVAL in
+                0 ) LOG_MSG "[INFO]:-Successfully shutdown the Greenplum instance" 1;;
+                1 ) LOG_MSG "[WARN]:-Non fatal error from Greenplum instance shutdown" 1;;
+                * ) ERROR_EXIT "[WARN]:-Failed to stop new Greenplum instance" 2
+            esac
+        else
+            LOG_MSG "[WARN]:-$GPSTOP not located" 1
+        fi
+
+        # this text is duplicated above
+        LOG_MSG "[WARN]:" 1
+        LOG_MSG "[WARN]:-Failed to create dfs filespace; review gpinitsystem output to" 1
+        LOG_MSG "[WARN]:- determine why this step failed and reinitialize cluster after resolving" 1
+        LOG_MSG "[WARN]:- issues.  Not all initialization tasks have completed so the cluster" 1
+        LOG_MSG "[WARN]:- should not be used." 1
+        LOG_MSG "[WARN]:" 1
+        ERROR_EXIT "[FATAL]: create dfs filespace failed;" 2
+    fi
 }
 
 CREATE_TEMPLATE1 () {

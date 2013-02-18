@@ -34,6 +34,7 @@ try:
     from gppylib.gpcoverage import GpCoverage
     from gppylib.utils import TableLogger
     from gppylib.gp_dbid import GpDbidFile
+    from gppylib.gp_contentnum import GpContentnumFile
     from gppylib.gp_era import GpEraFile
     from gppylib.operations.filespace import CheckFilespaceConsistency, FileType
 except ImportError, e:
@@ -379,8 +380,10 @@ class GpStart:
 
         d = GpDbidFile(self.master_datadir)
         d.read_gp_dbid()
+        cn = GpContentnumFile(self.master_datadir)
+        cn.read_gp_contentnum()
 
-        numContentsInCluster = 0
+        numContentsInCluster = cn.contentnum
         cmd=gp.MasterStart('master in utility mode', self.master_datadir,
                            self.port, d.dbid, d.standby_dbid or 0,
                            numContentsInCluster, self.era,

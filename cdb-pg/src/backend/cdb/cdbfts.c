@@ -1577,7 +1577,7 @@ cdbComponentDatabasesSorter(const void *a, const void *b)
 
 /*
  * This function returns the segments information. If there are some failed
- * segment, this function will auto failover failed segments to alive segment.
+ * segments, this function will auto failover failed segments to alive segments.
  */
 static AliveSegmentsInfo *
 GetSegmentsInfo(Bitmapset *last_alive_segment_bms)
@@ -1663,7 +1663,7 @@ GetSegmentsInfo(Bitmapset *last_alive_segment_bms)
 
 		failover_seg_pos = random() % info->aliveSegmentsCount;
 		failover_segindex = databases->segment_db_info[failover_seg_pos].segindex;
-		elog(debug_log_level, "random failover segindex %d to segindex %d", i, failover_segindex);
+		elog(LOG, "random failover for failed segindex %d to alive segindex %d", i, failover_segindex);
 		databases->segment_db_info[alive_id] = databases->segment_db_info[failover_seg_pos];
 		databases->segment_db_info[alive_id].segindex = i;
 		databases->segment_db_info[alive_id].dbid = contentid_get_dbid(i, 'p', true);
@@ -1745,10 +1745,13 @@ UpdateGpAliveSegmentsInfo(bool force)
  *	The debug & test GUCs are tricky.
  *	  Start Transaction
  *	  UpdateAliveSegmentsInfo()	<- init
- *	  AllocateGangs()			<- writer
+ *	  CreatePortal
+ *	  AllocateGangs()			<- allocate writer gangs to portal
  *	  Change GUCs
+ *	  Trigger ERROR
+ *	  DropPortal				<- return gangs to free list
+ *	  ReleaseGangs				<- cleanGangs, and free the temp namespace
  *	  End Transaction
- *	  ReleaseGangs				<- cleanGangs
  *	  Start Transaction
  *	  UpdateAliveSegmentsInfo() <- forceUpdate
  */
@@ -1786,8 +1789,8 @@ UpdateAliveSegmentsInfo(void)
 		return;
 
 	/* TODO: fts version... not support */
-
-	elog(LOG, "segment reconfiguraion happened.");
+	if (!init)
+		elog(LOG, "segment reconfiguraion happened.");
 
 	/* If it is the first time update alive information. Don't trigger error! */
 	UpdateGpAliveSegmentsInfo(init);

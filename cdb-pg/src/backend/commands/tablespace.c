@@ -370,7 +370,8 @@ RemoveTableSpace(List *names, DropBehavior behavior, bool missing_ok)
 
 	/* Disallow drop of the standard tablespaces, even by superuser */
 	if (tablespaceoid == GLOBALTABLESPACE_OID ||
-		tablespaceoid == DEFAULTTABLESPACE_OID)
+		tablespaceoid == DEFAULTTABLESPACE_OID ||
+		strcmp(tablespacename, "dfs_default") == 0)
 		aclcheck_error(ACLCHECK_NO_PRIV, ACL_KIND_TABLESPACE,
 					   tablespacename);
 

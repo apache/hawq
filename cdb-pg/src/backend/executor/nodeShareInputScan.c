@@ -466,9 +466,9 @@ void ExecShareInputScanReScan(ShareInputScanState *node, ExprContext *exprCtxt)
 
 void shareinput_create_bufname_prefix(char* p, int size, int share_id)
 {
-	snprintf(p, size, "%s_SIRW_%d_%d_%d", 
+	snprintf(p, size, "%s_SIRW_%d_%d_%d_%d", 
             PG_TEMP_FILE_PREFIX, 
-            gp_session_id, gp_command_count, share_id);
+            Gp_segment, gp_session_id, gp_command_count, share_id);
 }
 
 /* Here we use the absolute path name as the lock name.  See fd.c 

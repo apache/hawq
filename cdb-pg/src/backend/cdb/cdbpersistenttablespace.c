@@ -162,7 +162,7 @@ PersistentTablespace_CreateEntryUnderLock(
 								&found);
 
 	if (tablespaceDirEntry == NULL)
-		elog(ERROR, "Out of shared-memory for persistent tablespaces");
+		return NULL;
 
 	tablespaceDirEntry->filespaceOid = filespaceOid;
 	
@@ -289,7 +289,10 @@ static bool PersistentTablespace_ScanTupleCallback(
 	
 	tablespaceDirEntry = 
 		PersistentTablespace_CreateEntryUnderLock(contentid, filespaceOid, tablespaceOid);
-	
+
+	if (tablespaceDirEntry == NULL)
+		elog(ERROR, "Out of shared-memory for persistent tablespaces");
+
 	tablespaceDirEntry->state = state;
 	tablespaceDirEntry->persistentSerialNum = serialNum;
 	tablespaceDirEntry->persistentTid = *persistentTid;
@@ -791,7 +794,16 @@ void PersistentTablespace_MarkCreatePending(
 												fsObjName.contentid,
 												filespaceOid,
 												tablespaceOid);
-	Assert(tablespaceDirEntry != NULL);
+	if (tablespaceDirEntry == NULL)
+	{
+		/* If out of shared memory, no need to promote to PANIC. */
+		WRITE_PERSISTENT_STATE_ORDERED_UNLOCK;
+		ereport(ERROR,
+				(errcode(ERRCODE_OUT_OF_MEMORY),
+				 errmsg("Out of shared-memory for persistent tablespaces"),
+				 errhint("You may need to increase the gp_max_tablespaces value"),
+				 errOmitLocation(true)));
+	}
 
 	tablespaceDirEntry->state = PersistentFileSysState_CreatePending;
 
@@ -859,7 +871,8 @@ xlog_persistent_tablespace_create(Oid filespaceoid, Oid tablespaceoid)
 	tde = PersistentTablespace_CreateEntryUnderLock(GpIdentity.segindex,
 													filespaceoid,
 												    tablespaceoid);
-	Insist(tde != NULL);
+	if (tde == NULL)
+		elog(ERROR, "Out of shared-memory for persistent tablespaces");
 
 	tde->state = PersistentFileSysState_Created;
 
@@ -914,7 +927,16 @@ void PersistentTablespace_AddCreated(
 											  fsObjName.contentid,
 											  filespaceOid,
 											  tablespaceOid);
-	Assert(tablespaceDirEntry != NULL);
+	if (tablespaceDirEntry == NULL)
+	{
+		/* If out of shared memory, no need to promote to PANIC. */
+		WRITE_PERSISTENT_STATE_ORDERED_UNLOCK;
+		ereport(ERROR,
+				(errcode(ERRCODE_OUT_OF_MEMORY),
+				 errmsg("Out of shared-memory for persistent tablespaces"),
+				 errhint("You may need to increase the gp_max_tablespaces value"),
+				 errOmitLocation(true)));
+	}
 	
 	tablespaceDirEntry->state = PersistentFileSysState_Created;
 	
@@ -1448,7 +1470,7 @@ Size PersistentTablespace_ShmemSize(void)
 	/* The shared-memory structure. */
 	size = add_size(size, PersistentTablespace_SharedDataSize());
 
-	elog(DEBUG1, "PersistentTablespace_ShmemSize: %zu = "
+	elog(LOG, "PersistentTablespace_ShmemSize: %zu = "
 			  "gp_max_tablespaces: %d * content: %d "
 			  "* sizeof(TablespaceDirEntryData): %zu "
 			  "+ PersistentTablespace_SharedDataSize(): %zu",

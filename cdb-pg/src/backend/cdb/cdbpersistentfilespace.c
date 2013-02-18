@@ -163,7 +163,7 @@ PersistentFilespace_CreateDirUnderLock(
 								&found);
 
 	if (filespaceDirEntry == NULL)
-		elog(ERROR, "Out of shared-memory for persistent filespaces");
+		return NULL;
 
 	filespaceDirEntry->state = 0;
 	filespaceDirEntry->persistentSerialNum = 0;
@@ -256,6 +256,9 @@ static bool PersistentFilespace_ScanTupleCallback(
 			PersistentFilespace_CreateDirUnderLock(
 											contentid,
 											filespaceOid);
+
+	if (filespaceDirEntry == NULL)
+		elog(ERROR, "Out of shared-memory for persistent filespaces");
 
 	filespaceDirEntry->dbId1 = dbId1;
 	memcpy(filespaceDirEntry->locationBlankPadded1, locationBlankPadded1, FilespaceLocationBlankPaddedWithNullTermLen);
@@ -913,7 +916,16 @@ void PersistentFilespace_MarkCreatePending(
 				PersistentFilespace_CreateDirUnderLock(
 												contentid,
 												filespaceOid);
-	Assert(filespaceDirEntry != NULL);
+	if (filespaceDirEntry == NULL)
+	{
+		/* If out of shared memory, no need to promote to PANIC. */
+		WRITE_PERSISTENT_STATE_ORDERED_UNLOCK;
+		ereport(ERROR,
+				(errcode(ERRCODE_OUT_OF_MEMORY),
+				 errmsg("Out of shared-memory for persistent filespaces"),
+				 errhint("You may need to increase the gp_max_filespaces value"),
+				 errOmitLocation(true)));
+	}
 
 	filespaceDirEntry->key.contentid = contentid;
 	filespaceDirEntry->dbId1 = primaryDbId;
@@ -1589,7 +1601,7 @@ Size PersistentFilespace_ShmemSize(void)
 	/* The shared-memory structure. */
 	size = add_size(size, PersistentFilespace_SharedDataSize());
 
-	elog(DEBUG1, "PersistentFilespace_ShmemSize: %zu = "
+	elog(LOG, "PersistentFilespace_ShmemSize: %zu = "
 			  "gp_max_filespaces: %d * content: %d "
 			  "* sizeof(FilespaceDirEntryData): %zu "
 			  "+ PersistentFilespace_SharedDataSize(): %zu",

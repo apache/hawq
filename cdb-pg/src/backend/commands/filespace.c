@@ -758,7 +758,7 @@ RemoveFileSpace(List *names, DropBehavior behavior, bool missing_ok)
 		aclcheck_error(ACLCHECK_NOT_OWNER, ACL_KIND_FILESPACE, fsname);
 
 	/* Disallow drop of the standard filespaces, even by superuser */
-	if (fsoid == SYSTEMFILESPACE_OID)
+	if (fsoid == SYSTEMFILESPACE_OID || strcmp(fsname, "dfs_system") == 0)
 		ereport(ERROR,
 				(errmsg("cannot drop filespace %s because it is required "
 						"by the database system", fsname)));

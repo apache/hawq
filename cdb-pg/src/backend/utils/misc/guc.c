@@ -3630,7 +3630,7 @@ static struct config_int ConfigureNamesInt[] =
 			NULL
 		},
 		&gp_max_databases,
-		GP_MAX_DATABASES_DEFAULT, 8, 256, NULL, NULL
+		GP_MAX_DATABASES_DEFAULT, 8, 64, NULL, NULL
 	},
 
 	{
@@ -3639,7 +3639,7 @@ static struct config_int ConfigureNamesInt[] =
 			NULL
 		},
 		&gp_max_tablespaces,
-		GP_MAX_TABLESPACES_DEFAULT, 8, 2048, NULL, NULL
+		GP_MAX_TABLESPACES_DEFAULT, 8, 64, NULL, NULL
 	},
 
 	{
@@ -3648,7 +3648,7 @@ static struct config_int ConfigureNamesInt[] =
 			NULL
 		},
 		&gp_max_filespaces,
-		GP_MAX_FILESPACES_DEFAULT, 8, 256, NULL, NULL
+		GP_MAX_FILESPACES_DEFAULT, 8, 32, NULL, NULL
 	},
 
 	{

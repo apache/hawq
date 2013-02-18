@@ -74,6 +74,8 @@ SELECT nextval('sequence_test2');
 SELECT nextval('sequence_test2');
 SELECT nextval('sequence_test2');
 
+SELECT nextval(oid) FROM gp_dist_random('pg_class') WHERE relname = 'sequence_test2';
+
 -- Test comments
 -- COMMENT ON SEQUENCE asdf IS 'won''t work';
 -- COMMENT ON SEQUENCE sequence_test2 IS 'will work';

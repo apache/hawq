@@ -19,6 +19,7 @@
 #include "catalog/pg_attrdef.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_exttable.h"
+#include "catalog/pg_magic_oid.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_tablespace.h"
@@ -72,6 +73,18 @@ enum QueryContextDispatchingItemType
 };
 typedef enum QueryContextDispatchingItemType QueryContextDispatchingItemType;
 
+enum QueryContextDispatchingObjType
+{
+    RelationType, TablespaceType, NamespaceType
+};
+typedef enum QueryContextDispatchingObjType QueryContextDispatchingObjType;
+
+struct QueryContextDispatchingHashItem
+{
+    Oid objid;
+    QueryContextDispatchingObjType type;
+};
+typedef struct QueryContextDispatchingHashItem QueryContextDispatchingHashItem;
 
 static void
 prepareDispatchedCatalogFunctionExpr(QueryContextInfo *cxt, Expr *expr, HTAB *htab);
@@ -704,11 +717,17 @@ AddTablespaceLocationToContextInfo(QueryContextInfo *cxt, Oid tspoid,
 }
 
 static bool
-alreadyAddedForDispatching(HTAB *rels, Oid objid) {
+alreadyAddedForDispatching(HTAB *rels, Oid objid, QueryContextDispatchingObjType type) {
     bool found = false;
 
     Assert(NULL != rels);
-    hash_search(rels, &objid, HASH_ENTER, &found);
+
+    QueryContextDispatchingHashItem item;
+
+    item.objid = objid;
+    item.type = type;
+
+    hash_search(rels, &item, HASH_ENTER, &found);
 
     return found;
 }
@@ -729,7 +748,7 @@ prepareDispatchedCatalogNamespace(QueryContextInfo *cxt, Oid namespace, HTAB *ht
             || namespace == PG_AOSEGMENT_NAMESPACE)
         return;
 
-    if (alreadyAddedForDispatching(htab, namespace))
+    if (alreadyAddedForDispatching(htab, namespace, NamespaceType))
         return;
 
     tuple = SearchSysCache(NAMESPACEOID, ObjectIdGetDatum(namespace), 0, 0, 0);
@@ -757,7 +776,7 @@ prepareDispatchedCatalogTablespace(QueryContextInfo *cxt, Oid tablespace, HTAB *
     if (IsBuiltinTablespace(tablespace) || tablespace == InvalidOid )
         return;
 
-    if (alreadyAddedForDispatching(htab, tablespace))
+    if (alreadyAddedForDispatching(htab, tablespace, TablespaceType))
         return;
 
     /*
@@ -795,9 +814,6 @@ prepareDispatchedCatalogCompositeType(QueryContextInfo *cxt,
     Form_pg_type attr;
 
     Assert(OidIsValid(typeid));
-
-    if (alreadyAddedForDispatching(htab, typeid))
-        return;
 
     tuple = SearchSysCache(TYPEOID, ObjectIdGetDatum(typeid), 0, 0, 0);
 
@@ -922,9 +938,6 @@ prepareDispatchedCatalogTypeByRelation(QueryContextInfo *cxt,
     if (InvalidOid == DatumGetObjectId(typeid))
         elog(ERROR, "reltype in pg_class for %u is invalid", relid);
 
-    if (alreadyAddedForDispatching(htab, DatumGetObjectId(typeid)))
-               return;
-
     typetuple = SearchSysCache(TYPEOID, typeid, 0, 0, 0);
 
     AddTupleToContextInfo(cxt, TypeRelationId, "pg_type", typetuple,
@@ -985,7 +998,13 @@ prepareDispatchedCatalogSingleRelation(QueryContextInfo *cxt, Oid relid,
 
     Assert(relid != InvalidOid);
 
-    if (alreadyAddedForDispatching(htab, relid))
+    /*
+     * buildin object, dispatch nothing
+     */
+    if (relid < FirstNormalObjectId)
+        return;
+
+    if (alreadyAddedForDispatching(htab, relid, RelationType))
         return;
 
     /* find relid in pg_class */
@@ -1064,7 +1083,7 @@ prepareDispatchedCatalogSingleRelation(QueryContextInfo *cxt, Oid relid,
     case RELSTORAGE_VIRTUAL:
         break;
     case RELSTORAGE_HEAP:
-    	/* support catalog tables (gp_dist_random et al.) */
+        /* support catalog tables (gp_dist_random et al.) */
         break;
 
     case RELSTORAGE_FOREIGN:
@@ -1359,23 +1378,31 @@ prepareDispatchedCatalogFunctionExpr(QueryContextInfo *cxt, Expr *expr, HTAB *ht
         Oid seqoid;
 
         arg = (Const *) linitial(func->args);
-        Assert(arg->xpr.type == T_Const);
-        Assert(arg->consttype == REGCLASSOID);
-        seqoid = DatumGetObjectId(arg->constvalue);
-
-	/* 
-  	 * aclchecks for nextval are done on the segments. But in GPSQL 
- 	 * we are executing as bootstrap user on the segments. So any aclchecks
-	 * on segments defeats the purpose. 
-	 * Do the aclchecks on the master, prior to dispatch
-	 */
-	if (pg_class_aclcheck(seqoid, GetUserId(), ACL_UPDATE) != ACLCHECK_OK)
+        if (arg->xpr.type == T_Const && arg->consttype == REGCLASSOID)
+        {
+            seqoid = DatumGetObjectId(arg->constvalue);
+            
+            /* 
+             * aclchecks for nextval are done on the segments. But in GPSQL 
+             * we are executing as bootstrap user on the segments. So any aclchecks
+             * on segments defeats the purpose. 
+             * Do the aclchecks on the master, prior to dispatch
+             */
+            if (pg_class_aclcheck(seqoid, GetUserId(), ACL_UPDATE) != ACLCHECK_OK)
                 ereport(ERROR,
                                 (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
                                  errmsg("permission denied for sequence %s",
                                                 get_rel_name(seqoid))));
+            prepareDispatchedCatalogSingleRelation(cxt, seqoid, FALSE, 0, htab);
+        }
+        else
+        {
+            ereport(ERROR,
+                    (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+                            errmsg("Non const argument in function \"NEXTVAL\" is not support yet in GPSQL.")));
+        }
 
-        prepareDispatchedCatalogSingleRelation(cxt, seqoid, FALSE, 0, htab);
+
     }
         break;
     default:
@@ -1597,9 +1624,9 @@ createPrepareDispatchedCatalogRelationDisctinctHashTable(void)
 
     MemSet(&info, 0, sizeof(info));
 
-    info.hash = oid_hash;
-    info.keysize = sizeof(Oid);
-    info.entrysize = sizeof(Oid);
+    info.hash = tag_hash;
+    info.keysize = sizeof(QueryContextDispatchingHashItem);
+    info.entrysize = sizeof(QueryContextDispatchingHashItem);
 
     rels = hash_create("all relations", 10, &info, HASH_FUNCTION | HASH_ELEM);
 
