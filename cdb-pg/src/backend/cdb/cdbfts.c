@@ -217,6 +217,15 @@ FtsTestConnection(CdbComponentDatabaseInfo *failedDBInfo, bool fullScan)
 		return true;
 	}
 
+	/*
+	 * If this is not a failover segment, use the old method.
+	 * If this is a failover segment, skip the test is ok. The host segment will
+	 * be checked to make sure the fault can be detected correctly.
+	 */
+	if (GpAliveSegmentsInfo.aliveSegmentsBitmap &&
+		!bms_is_member(failedDBInfo->segindex, GpAliveSegmentsInfo.aliveSegmentsBitmap))
+		return true;
+
 	if (!fullScan)
 	{
 		return FTS_STATUS_ISALIVE(failedDBInfo->dbid, ftsProbeInfo->fts_status);
