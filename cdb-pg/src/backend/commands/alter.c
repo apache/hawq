@@ -166,11 +166,15 @@ ExecAlterObjectSchemaStmt(AlterObjectSchemaStmt *stmt)
 	switch (stmt->objectType)
 	{
 		case OBJECT_AGGREGATE:
+			ereport(ERROR,
+                            (errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter aggregate schema statement yet in GPSQL") ));
 			AlterFunctionNamespace(stmt->object, stmt->objarg, true,
 								   stmt->newschema);
 			break;
 
 		case OBJECT_FUNCTION:
+			ereport(ERROR,
+                            (errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter function schema statement yet in GPSQL") ));
 			AlterFunctionNamespace(stmt->object, stmt->objarg, false,
 								   stmt->newschema);
 			break;
@@ -183,6 +187,8 @@ ExecAlterObjectSchemaStmt(AlterObjectSchemaStmt *stmt)
 
 		case OBJECT_TYPE:
 		case OBJECT_DOMAIN:
+			ereport(ERROR,
+                            (errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter type schema statement yet in GPSQL") ));
 			AlterTypeNamespace(stmt->object, stmt->newschema);
 			break;
 

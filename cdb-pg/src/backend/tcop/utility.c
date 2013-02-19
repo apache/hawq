@@ -1115,9 +1115,6 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_AlterObjectSchemaStmt:
-			ereport(ERROR,
-							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter object schema statement yet in GPSQL") ));
-
 			ExecAlterObjectSchemaStmt((AlterObjectSchemaStmt *) parsetree);
 			break;
 
