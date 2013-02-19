@@ -24,6 +24,7 @@ test: gpsql_alter_table
 test: goh_portals
 test: goh_prepare
 test: goh_set_schema
+test: goh_alter_owner
 test: boolean
 test: char
 test: name

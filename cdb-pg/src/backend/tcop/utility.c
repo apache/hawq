@@ -1119,32 +1119,6 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_AlterOwnerStmt:
-			switch (((AlterOwnerStmt *) parsetree)->objectType) {
-					case OBJECT_SCHEMA:
-						break;
-					case OBJECT_AGGREGATE:
-					case OBJECT_CONVERSION:
-					case OBJECT_DATABASE:
-					case OBJECT_DOMAIN:
-					case OBJECT_FUNCTION:
-					case OBJECT_OPERATOR:
-					case OBJECT_OPCLASS:
-					case OBJECT_FILESPACE:
-					case OBJECT_FILESYSTEM:
-					case OBJECT_TABLESPACE:
-					case OBJECT_TYPE:
-					case OBJECT_FDW:
-					case OBJECT_FOREIGN_SERVER:
-					case OBJECT_EXTPROTOCOL:
-					default:
-						/* if guc variable not set, which means not called by pg_dump, throw exception*/
-						if(!gp_called_by_pgdump)
-						{
-							ereport(ERROR,
-									(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter owner statement yet in GPSQL") ));
-						}
-						break;
-					}
 			ExecAlterOwnerStmt((AlterOwnerStmt *) parsetree);
 			break;
 
