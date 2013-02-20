@@ -1653,7 +1653,7 @@ GetSegmentsInfo(Bitmapset *last_alive_segment_bms)
 		/* It looks like nothing happened. */
 		bms_free(alive_bms);
 		while (alive_id--)
-			freeCdbComponentDatabaseInfo(&databases->segment_db_info[current_id]);
+			freeCdbComponentDatabaseInfo(&databases->segment_db_info[alive_id]);
 		pfree(databases);
 		return NULL;
 	}

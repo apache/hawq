@@ -1364,18 +1364,26 @@ Once a filespace is created, it can be used by one or more tablespaces.
 
 """)
         if opt.movetransfilespace:
+            logger.fatal('movetransfilespace option NOT SUPPORTED YET IN GPSQL')
+            sys.exit(1)
             if opt.movetransfilespace == 'default':
                 opt.movetransfilespace = PG_SYSTEM_FILESPACE
             MoveFilespace(opt.movetransfilespace, FileType.TRANSACTION_FILES, opt.username, opt.password).run() 
         elif opt.movetempfilespace:
+            logger.fatal('movetempfilespace option NOT SUPPORTED YET IN GPSQL')
+            sys.exit(1)
             if opt.movetempfilespace == 'default':
                 opt.movetempfilespace = PG_SYSTEM_FILESPACE
             MoveFilespace(opt.movetempfilespace, FileType.TEMPORARY_FILES, opt.username, opt.password).run()
         else:
             gpf = GPFilespace(opt)
             if opt.showtransfilespace:
+                logger.fatal('showtransfilespace option NOT SUPPORTED YET IN GPSQL')
+                sys.exit(1)
                 gpf.do_showfilespace(FileType.TRANSACTION_FILES, opt.username, opt.password)
             elif opt.showtempfilespace:
+                logger.fatal('showtempfilespace option NOT SUPPORTED YET IN GPSQL')
+                sys.exit(1)
                 gpf.do_showfilespace(FileType.TEMPORARY_FILES, opt.username, opt.password)
             else:
                 try:

@@ -985,9 +985,10 @@ def undo_update_pg_hba_conf(array):
 try:
     # setup logging
     logger = get_default_logger()
-    setup_tool_logging(EXECNAME,unix.getLocalHostname(),unix.getUserName())
-
+    
     (options, args) = parseargs()
+    
+    setup_tool_logging(EXECNAME,unix.getLocalHostname(),unix.getUserName(),options.logfile)
 
     # Turn on debug logging if needed
     if options.debug:
