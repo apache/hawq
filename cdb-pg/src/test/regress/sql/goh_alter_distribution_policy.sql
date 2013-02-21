@@ -1,5 +1,3 @@
-\c hdfs
-
 -- ALTER TABLE ... SET DISTRIBUTED BY
 -- This is the main interface for system expansion
 \set DATA values(1, 2), (2, 3), (3, 4)
@@ -46,15 +44,6 @@ insert into ats_test :DATA;
 select gp_segment_id, * from ats_test except
 select gp_segment_id, * from atsdb;
 drop table ats_test;
-
--- Now make sure indexes work.
-create index atsdb_i_idx on atsdb(i);
-set enable_seqscan to off;
-explain select * from atsdb where i = 1;
-select * from atsdb where i = 1;
-alter table atsdb set distributed by (i);
-explain select * from atsdb where i = 1;
-select * from atsdb where i = 1;
 
 drop table atsdb;
 
@@ -257,8 +246,6 @@ alter table mpp5746 set with (reorganize=true, appendonly = true);
 select * from mpp5746 order by 1;
 alter table mpp5746 drop column t;
 select * from mpp5746 order by 1;
-alter table mpp5746 set with (reorganize=true, appendonly = false);
-select * from mpp5746 order by 1;
 drop table mpp5746;
 
 -- MPP-5738
@@ -288,71 +275,6 @@ alter table mpp5754 set distributed by (n_nationkey);
 select * from mpp5754 order by n_nationkey;
 drop table mpp5754;
 
-
--- MPP-5918
-create role atsdb;
-create table owner_test(i int, toast text) distributed randomly;
-alter table owner_test owner to atsdb;
-alter table owner_test set with (reorganize = true) distributed by (i);
--- verify, atsdb should own all three
-select a.relname, 
-       x.rolname as relowner, 
-       y.rolname as toastowner,
-	   z.rolname as toastidxowner
-from pg_class a, pg_class b, pg_class c, 
-     pg_authid x, pg_authid y, pg_authid z
-where a.reltoastrelid = b.oid 
-  and b.reltoastidxid=c.oid
-  and a.relname='owner_test'
-  and x.oid = a.relowner
-  and y.oid = b.relowner
-  and z.oid = c.relowner;
-
--- MPP-9663 - Check that the ownership is consistent on the segments as well
-select a.relname, 
-       x.rolname as relowner, 
-       y.rolname as toastowner,
-	   z.rolname as toastidxowner
-from gp_dist_random('pg_class') a, 
-	 gp_dist_random('pg_class') b, 
-	 gp_dist_random('pg_class') c, 
-     pg_authid x, pg_authid y, pg_authid z
-where a.reltoastrelid=b.oid
-  and b.reltoastidxid=c.oid
-  and a.relname='owner_test'
-  and x.oid = a.relowner
-  and y.oid = b.relowner
-  and z.oid = c.relowner
-  and a.gp_segment_id = 0
-  and b.gp_segment_id = 0
-  and c.gp_segment_id = 0;
-
--- MPP-9663 - The code path is different when the table has dropped columns
-alter table owner_test add column d text default '';
-alter table owner_test drop column d;
-alter table owner_test set with (reorganize = true) distributed by (i);
-
-select a.relname, 
-       x.rolname as relowner, 
-       y.rolname as toastowner,
-	   z.rolname as toastidxowner
-from gp_dist_random('pg_class') a, 
-	 gp_dist_random('pg_class') b, 
-	 gp_dist_random('pg_class') c, 
-     pg_authid x, pg_authid y, pg_authid z
-where a.reltoastrelid=b.oid
-  and b.reltoastidxid=c.oid
-  and a.relname='owner_test'
-  and x.oid = a.relowner
-  and y.oid = b.relowner
-  and z.oid = c.relowner
-  and a.gp_segment_id = 0
-  and b.gp_segment_id = 0
-  and c.gp_segment_id = 0;
-
-drop table owner_test;
-drop role atsdb;
-
 -- MPP-6332
 create table abc (a int, b int, c int);
 Alter table abc set distributed randomly;
@@ -367,36 +289,3 @@ set gp_setwith_alter_storage = false;
 create table atsdb (i int, j text) distributed by (j);
 alter table atsdb set with(appendonly = true);
 drop table atsdb;
-
--- MPP-8474: Index relfilenode mismatch: entry db to segment db.
---
--- XXX This really belongs in alter_table.sql but this is not 
---     in use in current_good_schedule.
-drop table if exists mpp8474 cascade; --ignore
-
-create table mpp8474(a int, b int, c text) 
-    with (appendonly=true) 
-    distributed by (b);
-create index mpp8474_a 
-    on mpp8474(a);
-alter table mpp8474 
-    add column d int default 10;
-
-select 
-    'Mismatched relfilenodes:' as oops,
-    e.oid::regclass as entry_oid,
-    e.relkind,
-    e.relfilenode as entry_relfilenode,
-    s.segid,
-    s.segfilenode as segment_relfilenode
-from 
-    pg_class e,
-    (   select gp_execution_segment(), oid, relfilenode
-        from gp_dist_random('pg_class')
-    ) s (segid, segoid, segfilenode)
-where 
-    e.oid = s.segoid 
-    and e.relfilenode != s.segfilenode
-    and e.relname ~ '^mpp8474.*';
-
-drop table mpp8474;

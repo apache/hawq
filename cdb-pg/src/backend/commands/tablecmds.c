@@ -4137,9 +4137,6 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			pass = AT_PASS_MISC;
 			break;
 		case AT_SetDistributedBy:	/* SET DISTRIBUTED BY */
-			ereport(ERROR,
-					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
-					 errmsg("ALTER TABLE ... SET DISTRIBUTED BY is not supported")));
 			if ( !recursing ) /* MPP-5772, MPP-5784 */
 			{
 				Oid relid = RelationGetRelid(rel);
@@ -12685,10 +12682,15 @@ make_distro_str(List *lwith, List *ldistro)
  * ALTER TABLE SET DISTRIBUTED BY
  *
  * set distribution policy for rel
+ *
+ * GPSQL: Despite the GP_ROLE_DISPATCH references, note that this entire
+ * function executes only on the master.
  */
 static void
 ATExecSetDistributedBy(Relation rel, Node *node, AlterTableCmd *cmd)
 {
+	Assert(Gp_role != GP_ROLE_EXECUTE);		/* GPSQL */
+
 	List 	   *lprime;
 	List 	   *lwith, *ldistro;
 	List	   *cols = NIL;
@@ -13097,6 +13099,10 @@ ATExecSetDistributedBy(Relation rel, Node *node, AlterTableCmd *cmd)
 		 */
 		qe_data = lappend(qe_data, makeInteger(MyBackendId));
 	}
+	/*
+	GPSQL: ALTER SET DISTRIBUTED BY doesn't need to propagate the tmprv and relopts to
+	the QEs, because the QEs won't be needing to revise their own catalogs.
+
 	else
 	{
 		int backend_id;
@@ -13120,10 +13126,8 @@ ATExecSetDistributedBy(Relation rel, Node *node, AlterTableCmd *cmd)
 		else if (!lwith)
 			reorg = false;
 
-		/* Set to random distribution on master with no reorganisation */
 		if (!reorg && list_length(qe_data) == 1 && linitial(qe_data) == NULL)
 		{
-			/* caller expects rel to be closed for this AT type */
 			heap_close(rel, NoLock);
 			goto l_distro_fini;			
 		}
@@ -13157,6 +13161,7 @@ ATExecSetDistributedBy(Relation rel, Node *node, AlterTableCmd *cmd)
 
 		newOptions = new_rel_opts(rel, lwith);
 	}
+	*/
 
 	/*
 	 * Step (e) - Correct ownership on temporary table:
@@ -13235,6 +13240,9 @@ ATExecSetDistributedBy(Relation rel, Node *node, AlterTableCmd *cmd)
 	}
 
 	/* now, reindex */
+	/* GPSQL: This will run only on the master, and that's ok. At this
+	 * stage of GPSQL, the only indexes we're concerned with are those
+	 * that reside on the master, which index master metadata. */
 	reindex_relation(tarrelid, false, false /* ao_segs ? */, false,
 					 &oid_map, Gp_role == GP_ROLE_DISPATCH);
 

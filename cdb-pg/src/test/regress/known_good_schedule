@@ -15,7 +15,7 @@ ignore: goh_dpe
 ignore: goh_gpic
 ignore: goh_eagerfree
 test: goh_toast
-ignore: goh_alter_distribution_policy
+test: goh_alter_distribution_policy
 ignore: goh_column_compression
 test: goh_database
 test: goh_gp_dist_random
