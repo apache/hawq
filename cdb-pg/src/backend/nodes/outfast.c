@@ -159,7 +159,47 @@
 
 static void _outNode(StringInfo str, void *obj);
 
+static void
+_outTupleDesc(StringInfo str, TupleDesc node)
+{
+	int i;
 
+	WRITE_INT_FIELD(natts);
+	for (i = 0; i < node->natts; i++)
+	{
+		appendBinaryStringInfo(str, (const char *) node->attrs[i],
+							   ATTRIBUTE_FIXED_PART_SIZE);
+	}
+
+	/*
+	 * We need to tell deserializer to allocate memory for the constr.
+	 * constr is not a boolean value, but it works in practice.
+	 */
+	WRITE_BOOL_FIELD(constr);
+
+	if (node->constr)
+	{
+		WRITE_INT_FIELD(constr->num_defval);
+		for (i = 0; i < node->constr->num_defval; i++)
+		{
+			WRITE_INT_FIELD(constr->defval[i].adnum);
+			WRITE_STRING_FIELD(constr->defval[i].adbin);
+		}
+
+		WRITE_INT_FIELD(constr->num_check);
+
+		for (i = 0; i < node->constr->num_check; i++)
+		{
+			WRITE_STRING_FIELD(constr->check[i].ccname);
+			WRITE_STRING_FIELD(constr->check[i].ccbin);
+		}
+	}
+
+	WRITE_OID_FIELD(tdtypeid);
+	WRITE_INT_FIELD(tdtypmod);
+	WRITE_BOOL_FIELD(tdhasoid);
+	/* tdrefcount is not effective */
+}
 
 static void
 _outList(StringInfo str, List *node)
@@ -2152,6 +2192,43 @@ _outAlterPartitionId(StringInfo str, AlterPartitionId *node)
 }
 
 static void
+_outAlterRewriteTableInfo(StringInfo str, AlterRewriteTableInfo *node)
+{
+	WRITE_NODE_TYPE("ALTERREWRITETABLEINFO");
+
+	WRITE_OID_FIELD(relid);
+	WRITE_CHAR_FIELD(relkind);
+	_outTupleDesc(str, node->oldDesc);
+	WRITE_NODE_FIELD(constraints);
+	WRITE_NODE_FIELD(newvals);
+	WRITE_BOOL_FIELD(new_notnull);
+	WRITE_BOOL_FIELD(new_dropoids);
+	WRITE_OID_FIELD(newTableSpace);
+	WRITE_OID_FIELD(exchange_relid);
+	WRITE_OID_FIELD(newheap_oid);
+}
+
+static void
+_outAlterRewriteNewConstraint(StringInfo str, AlterRewriteNewConstraint *node)
+{
+	WRITE_NODE_TYPE("ALTERREWRITENEWCONSTRAINT");
+
+	WRITE_STRING_FIELD(name);
+	WRITE_ENUM_FIELD(contype, ConstrType);
+	WRITE_OID_FIELD(refrelid);
+	WRITE_NODE_FIELD(qual);
+}
+
+static void
+_outAlterRewriteNewColumnValue(StringInfo str, AlterRewriteNewColumnValue *node)
+{
+	WRITE_NODE_TYPE("ALTERREWRITENEWCOLUMNVALUE");
+
+	WRITE_INT_FIELD(attnum);
+	WRITE_NODE_FIELD(expr);
+}
+
+static void
 _outCreateRoleStmt(StringInfo str, CreateRoleStmt *node)
 {
 	WRITE_NODE_TYPE("CREATEROLESTMT");
@@ -3949,6 +4026,15 @@ _outNode(StringInfo str, void *obj)
 				break;
 			case T_AlterPartitionId:
 				_outAlterPartitionId(str, obj);
+				break;
+			case T_AlterRewriteTableInfo:
+				_outAlterRewriteTableInfo(str, obj);
+				break;
+			case T_AlterRewriteNewConstraint:
+				_outAlterRewriteNewConstraint(str, obj);
+				break;
+			case T_AlterRewriteNewColumnValue:
+				_outAlterRewriteNewColumnValue(str, obj);
 				break;
 
 			case T_CreateRoleStmt:

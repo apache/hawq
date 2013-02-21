@@ -59,6 +59,8 @@ extern bool RelationToRemoveIsTemp(const RangeVar *relation, DropBehavior behavi
 
 extern void AlterTable(AlterTableStmt *stmt);
 
+extern void AlterRewriteTable(AlterRewriteTableInfo *ar_tab);
+
 extern void ATExecChangeOwner(Oid relationOid, Oid newOwnerId, bool recursing);
 
 extern void AlterTableInternal(Oid relid, List *cmds, bool recurse);

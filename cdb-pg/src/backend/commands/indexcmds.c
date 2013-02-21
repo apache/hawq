@@ -728,6 +728,7 @@ DefineIndex(RangeVar *heapRelation,
 				 * the QEs to finish execution.
 				 */
 				cdbdisp_dispatchUtilityStatement((Node *)stmt,
+												 NULL,
 												 true,      /* cancelOnError */
 												 false,      /* startTransaction */
 												 true,      /* withSnapshot */

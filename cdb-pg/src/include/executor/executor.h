@@ -208,6 +208,7 @@ extern Node *attrMapExpr(AttrMap *map, Node *expr);
 extern bool map_part_attrs(Relation base, Relation part, AttrMap **map_ptr, bool throwerror);
 extern TupleTableSlot *reconstructMatchingTupleSlot(TupleTableSlot *slot,
 													ResultRelInfo *resultRelInfo);
+extern void CreateAppendOnlySegFileForRelationOnMaster(Relation rel, int segno);
 
 /*
  * prototypes from functions in execProcnode.c
@@ -391,6 +392,8 @@ extern GpExecIdentity getGpExecIdentity(QueryDesc *queryDesc,
 extern void mppExecutorFinishup(QueryDesc *queryDesc);
 extern void mppExecutorCleanup(QueryDesc *queryDesc);
 
+
+extern void collectAndUpdateCatalog(struct CdbDispatchResults *primaryResults, void *ctx);
 
 /* prototypes defined in nodeAgg.c for rollup-aware Agg/Group nodes. */
 extern int64 tuple_grouping(TupleTableSlot *outerslot, int numGroupCols,

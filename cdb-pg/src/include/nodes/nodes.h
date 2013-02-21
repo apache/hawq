@@ -399,6 +399,9 @@ typedef enum NodeTag
 	T_DenyLoginInterval,
 	T_DenyLoginPoint,
 	T_AlterTypeStmt,
+	T_AlterRewriteTableInfo,
+	T_AlterRewriteNewConstraint,
+	T_AlterRewriteNewColumnValue,
 
 	/**/
 	

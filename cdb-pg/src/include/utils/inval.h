@@ -55,6 +55,8 @@ extern void CacheRegisterRelcacheCallback(CacheCallbackFunction func,
 extern void inval_twophase_postcommit(TransactionId xid, uint16 info,
 						  void *recdata, uint32 len);
 
+extern void ResetSystemCaches(void);
+
 /* Enum for system cache invalidation mode */
 typedef enum SysCacheFlushForce
 {

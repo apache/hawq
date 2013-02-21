@@ -90,9 +90,6 @@ static EState *InternalCreateExecutorState(MemoryContext qcontext,
 										   bool is_subquery);
 static void ShutdownExprContext(ExprContext *econtext);
 
-static void
-collectAndUpdateCatalog(CdbDispatchResults *primaryResults, void *ctx);
-
 
 /* ----------------------------------------------------------------
  *						statistic functions

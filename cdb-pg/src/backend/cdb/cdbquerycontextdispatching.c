@@ -36,6 +36,7 @@
 #include "utils/acl.h"
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
+#include "utils/inval.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
 #include "utils/syscache.h"
@@ -606,6 +607,16 @@ RebuildQueryContext(QueryContextInfo *cxt)
                     "QueryContextDispatchingItemType %d", (int) type)));
         }
     }
+
+	/*
+	 * This is a bit overkill, but since we don't yet have a decent way to
+	 * determine individual cache entries affected by the dispatched
+	 * metadata, we should release all the system cache here.  Our good-old
+	 * shared invalidation message is not necessarily applicable here;
+	 * backends in segments never change the metadata and we care the
+	 * metadata changes only within the session.
+	 */
+	ResetSystemCaches();
 }
 
 /*

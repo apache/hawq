@@ -1126,6 +1126,10 @@ ProcessUtility(Node *parsetree,
 			AlterTable((AlterTableStmt *) parsetree);
 			break;
 
+		case T_AlterRewriteTableInfo:
+			AlterRewriteTable((AlterRewriteTableInfo *) parsetree);
+			break;
+
 		case T_AlterDomainStmt:
 			{
 				ereport(ERROR,

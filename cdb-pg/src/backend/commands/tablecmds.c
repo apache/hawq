@@ -119,6 +119,7 @@
 #include "cdb/cdbmirroredbufferpool.h"
 #include "cdb/cdbmirroredappendonly.h"
 #include "cdb/cdbpersistentfilesysobj.h"
+#include "cdb/cdbquerycontextdispatching.h"
 
 /*
  * ON COMMIT action list
@@ -1214,6 +1215,7 @@ DefineForeignRelation(CreateForeignStmt *createForeignStmt)
 			 * Doesn't wait for the QEs to finish execution.
 			 */
 			cdbdisp_dispatchUtilityStatement((Node *)createForeignStmt,
+											 NULL,
 											 true,      /* cancelOnError */
 											 true,      /* startTransaction */
 											 true,      /* withSnapshot */
@@ -3468,6 +3470,104 @@ void ATVerifyObject(AlterTableStmt *stmt, Relation rel)
 }
 
 /*
+ * Copy the AlteredTableInfo to a serializeable AlterRewriteTableInfo, to dispatch
+ * ATRewriteTable work to segments.
+ */
+static AlterRewriteTableInfo *
+prepareAlteredTableInfo(AlteredTableInfo *tab)
+{
+	AlterRewriteTableInfo  *ar_tab = makeNode(AlterRewriteTableInfo);
+	ListCell			   *l;
+
+	ar_tab->relid = tab->relid;
+	ar_tab->relkind = tab->relkind;
+	ar_tab->oldDesc = tab->oldDesc;
+	ar_tab->new_notnull = tab->new_notnull;
+	ar_tab->new_dropoids = tab->new_dropoids;
+	ar_tab->newTableSpace = tab->newTableSpace;
+	ar_tab->exchange_relid = tab->exchange_relid;
+
+	/* Copy constraints */
+	foreach (l, tab->constraints)
+	{
+		NewConstraint	   *con = lfirst(l);
+		AlterRewriteNewConstraint	   *ar_con =
+					makeNode(AlterRewriteNewConstraint);
+
+		ar_con->name = pstrdup(con->name);
+		ar_con->contype = con->contype;
+		ar_con->refrelid = con->refrelid;
+		ar_con->qual = copyObject(con->qual);
+
+		ar_tab->constraints = lappend(ar_tab->constraints, ar_con);
+	}
+
+	/* Copy newvals */
+	foreach (l, tab->newvals)
+	{
+		NewColumnValue	   *ex = lfirst(l);
+		AlterRewriteNewColumnValue *ar_ex =
+					makeNode(AlterRewriteNewColumnValue);
+
+		ar_ex->attnum = ex->attnum;
+		ar_ex->expr = copyObject(ex->expr);
+
+		ar_tab->newvals = lappend(ar_tab->newvals, ar_ex);
+	}
+
+	return ar_tab;
+}
+
+/*
+ * Copy back the AlteredTableInfo from a serializeable AlterRewriteTableInfo.
+ */
+static AlteredTableInfo *
+rebuildAlteredTableInfo(AlterRewriteTableInfo *ar_tab)
+{
+	AlteredTableInfo	   *tab =
+			(AlteredTableInfo *) palloc0(sizeof(AlteredTableInfo));
+	ListCell			   *l;
+
+	tab->relid = ar_tab->relid;
+	tab->relkind = ar_tab->relkind;
+	tab->oldDesc = ar_tab->oldDesc;
+	tab->new_notnull = ar_tab->new_notnull;
+	tab->new_dropoids = ar_tab->new_dropoids;
+	tab->newTableSpace = ar_tab->newTableSpace;
+	tab->exchange_relid = ar_tab->exchange_relid;
+
+	/* Copy constraints */
+	foreach (l, ar_tab->constraints)
+	{
+		AlterRewriteNewConstraint	   *ar_con = lfirst(l);
+		NewConstraint	   *con =
+				(NewConstraint *) palloc0(sizeof(NewConstraint));
+
+		con->name = pstrdup(ar_con->name);
+		con->contype = ar_con->contype;
+		con->refrelid = ar_con->refrelid;
+		con->qual = copyObject(ar_con->qual);
+
+		tab->constraints = lappend(tab->constraints, con);
+	}
+
+	/* Copy newvals */
+	foreach (l, ar_tab->newvals)
+	{
+		AlterRewriteNewColumnValue *ar_ex = lfirst(l);
+		NewColumnValue	   *ex =
+				(NewColumnValue *) palloc0(sizeof(NewColumnValue));
+
+		ex->attnum = ar_ex->attnum;
+		ex->expr = copyObject(ar_ex->expr);
+
+		tab->newvals = lappend(tab->newvals, ex);
+	}
+
+	return tab;
+}
+
+/*
  * AlterTable
  *		Execute ALTER TABLE, which can be a list of subcommands
  *
@@ -3713,6 +3813,21 @@ ATController(Relation rel, List *cmds, bool recurse,
 }
 
 /*
+ * This is the execution work of the phase 3 of ALTER TABLE.  The piece of
+ * information should be dispatched from master.
+ */
+void
+AlterRewriteTable(AlterRewriteTableInfo *ar_tab)
+{
+	AlteredTableInfo	   *tab;
+
+	Assert(Gp_role == GP_ROLE_EXECUTE);
+
+	tab = rebuildAlteredTableInfo(ar_tab);
+	ATRewriteTable(tab, ar_tab->newheap_oid);
+}
+
+/*
  * ATPrepCmd
  *
  * Traffic cop for ALTER TABLE Phase 1 operations, including simple
@@ -3747,9 +3862,6 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 	switch (cmd->subtype)
 	{
 		case AT_AddColumn:		/* ADD COLUMN */
-			ereport(ERROR,
-					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
-					 errmsg("ALTER TABLE ... ADD COLUMN is not supported")));
 			ATSimplePermissions(rel, false);
 			/*
 			 * test that this is allowed for partitioning, but only if we aren't
@@ -3761,9 +3873,6 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			pass = AT_PASS_ADD_COL;
 			break;
 		case AT_AddColumnRecurse:		/* ADD COLUMN internal */
-			ereport(ERROR,
-					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
-					 errmsg("ALTER TABLE ... ADD COLUMN is not supported")));
 			ATSimplePermissions(rel, false);
 			/* No need to do ATPartitionCheck */
 			/* Performs own recursion */
@@ -3878,9 +3987,6 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			pass = AT_PASS_ADD_INDEX;
 			break;
 		case AT_AddConstraint:	/* ADD CONSTRAINT */
-			ereport(ERROR,
-					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
-					 errmsg("ALTER TABLE ... ADD CONSTRAINT is not supported")));
 			ATSimplePermissions(rel, false);
 			/* (!recurse &&  !recursing) is supposed to detect the ONLY clause.
 			 * We allow operations on the root of a partitioning hierarchy, but
@@ -3922,9 +4028,6 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			pass = AT_PASS_DROP;
 			break;
 		case AT_AlterColumnType:		/* ALTER COLUMN TYPE */
-			ereport(ERROR,
-					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
-					 errmsg("ALTER TABLE ... ALTER COLUMN TYPE is not supported")));
 			ATSimplePermissions(rel, false);
 			ATPartitionCheck(cmd->subtype, rel, false, recursing);
 			/* Performs own recursion */
@@ -3932,9 +4035,6 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			pass = AT_PASS_ALTER_TYPE;
 			break;
 		case AT_ChangeOwner:	/* ALTER OWNER */
-			ereport(ERROR,
-					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
-					 errmsg("ALTER TABLE ... ALTER OWNER is not supported")));
 			{
 				bool do_recurse = false;
 
@@ -3974,9 +4074,6 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			pass = AT_PASS_MISC;
 			break;
 		case AT_DropOids:		/* SET WITHOUT OIDS */
-			ereport(ERROR,
-					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
-					 errmsg("ALTER TABLE ... SET WITHOUT OIDS is not supported")));
 			ATSimplePermissions(rel, false);
 			ATPartitionCheck(cmd->subtype, rel, false, recursing);
 			/* Performs own recursion */
@@ -4158,9 +4255,6 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			break;
 			/* CDB: Partitioned Table commands */
 		case AT_PartExchange:			/* Exchange */
-			ereport(ERROR,
-					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
-					 errmsg("ALTER TABLE ... EXCHANGE PARTITION is not supported")));
 			ATPartitionCheck(cmd->subtype, rel, false, recursing);
 			
 			if (Gp_role == GP_ROLE_UTILITY)
@@ -4819,6 +4913,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 		case AT_PartDrop:				/* Drop */
 		case AT_PartRename:				/* Rename */
 		case AT_PartSetTemplate:		/* Set Subpartition Template */
+		case AT_PartTruncate:			/* Truncate */
 		case AT_PartAddInternal:		/* internal partition creation */
 			ATSimplePermissions(rel, false);
 			ATPartitionCheck(cmd->subtype, rel, false, recursing);
@@ -4829,10 +4924,6 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			pass = AT_PASS_MISC;
 			break;
 
-		case AT_PartTruncate:			/* Truncate */
-			ereport(ERROR,
-					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
-					 errmsg("ALTER TABLE ... TRUNCATE PARTITION is not supported")));
 		case AT_PartModify:             /* Modify */
 			ereport(ERROR,
 					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
@@ -5962,9 +6053,63 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 
 	FreeExecutorState(estate);
 
+	/*
+	 * In GPSQL, here we dispatch the process to segments as opposed to what
+	 * we did in GPDB which is to dispatch the whole statement from the top-level.
+	 * The reason is we need a new relation created, but not yet swapped, so
+	 * the catalog status is somewhat transient.  This is the only timing we
+	 * can construct metadata dispatch and delegate to segments.  We don't
+	 * need to dispatch the process if ATRewriteTable has no work to do.
+	 */
+	if (Gp_role == GP_ROLE_DISPATCH && (newrel || needscan))
+	{
+		AlterRewriteTableInfo *ar_tab;
+		QueryContextInfo *contextdisp;
+		HTAB *htab;
+
+		/*
+		 * We create seg files for the new relation here.
+		 */
+		if (newrel)
+			CreateAppendOnlySegFileForRelationOnMaster(newrel, RESERVED_SEGNO);
+
+		/* prepare for the metadata dispatch */
+		contextdisp = CreateQueryContextInfo();
+		htab = createPrepareDispatchedCatalogRelationDisctinctHashTable();
+		ar_tab = prepareAlteredTableInfo(tab);
+
+		/*
+		 * For the original table, there could be a case to scan
+		 * partition table, while the new rel is always a new single
+		 * relation.
+		 */
+		prepareDispatchedCatalogRelation(contextdisp,
+										 tab->relid,
+										 false,
+										 NULL,
+										 htab);
+
+		/*
+		 * Specify the segno directly as we don't have segno mapping here.
+		 */
+		if (OidIsValid(OIDNewHeap))
+			prepareDispatchedCatalogSingleRelation(contextdisp,
+												   OIDNewHeap,
+												   true,
+												   RESERVED_SEGNO,
+												   htab);
+		hash_destroy(htab);
+		CloseQueryContextInfo(contextdisp);
+
+		ar_tab->newheap_oid = OIDNewHeap;
+
+		CdbDispatchUtilityStatementContext((Node *) ar_tab, contextdisp);
+	}
+
 	heap_close(oldrel, NoLock);
 	if (newrel)
 		heap_close(newrel, NoLock);
+
 }
 
 /*

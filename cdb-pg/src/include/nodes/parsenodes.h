@@ -1122,7 +1122,6 @@ typedef struct AlterTableStmt
 	List		 *oidmap;		/* For reindex_relation */
 	int			oidInfoCount;	/* Vector of TableOidInfo pointers: */
 	TableOidInfo *oidInfo;		/* MPP Allow for hierarchy of tables to alter */
-	
 } AlterTableStmt;
 
 typedef enum AlterTableType
@@ -1513,6 +1512,49 @@ typedef struct Constraint
 	char	   *indexspace;		/* index tablespace for PKEY/UNIQUE
 								 * constraints; NULL for default */
 } Constraint;
+
+/*
+ * AlterRewriteTableInfo
+ * This is a seriazable representation of AlteredTableInfo.  We use this
+ * to dispatch the execution work in phase 3 of ALTER TABLE, so any information
+ * that is used only in phase 1 or 2 is not here.
+ */
+typedef struct AlterRewriteTableInfo
+{
+	NodeTag		type;
+	Oid			relid;			/* Relation to work on */
+	char		relkind;		/* Its relkind */
+	TupleDesc	oldDesc;		/* Pre-modification tuple descriptor */
+	List	   *constraints;	/* List of NewConstraint */
+	List	   *newvals;		/* List of NewColumnValue */
+	bool		new_notnull;	/* T if we added new NOT NULL constraints */
+	bool		new_dropoids;	/* T if we dropped the OID column */
+	Oid			newTableSpace;	/* new tablespace; 0 means no change */
+	Oid			exchange_relid;	/* for EXCHANGE, the exchanged in rel */
+	Oid			newheap_oid;
+} AlterRewriteTableInfo;
+
+/*
+ * Serializable version of NewConstraint.
+ */
+typedef struct AlterRewriteNewConstraint
+{
+	NodeTag		type;
+	char	   *name;			/* Constraint name, or NULL if none */
+	ConstrType	contype;		/* CHECK or FOREIGN */
+	Oid			refrelid;		/* PK rel, if FOREIGN */
+	Node	   *qual;			/* Check expr or FkConstraint struct */
+} AlterRewriteNewConstraint;
+
+/*
+ * Serializable version of NewColumnValue.
+ */
+typedef struct AlterRewriteNewColumnValue
+{
+	NodeTag		type;
+	AttrNumber	attnum;			/* which column */
+	Expr	   *expr;			/* expression to compute */
+} AlterRewriteNewColumnValue;
 
 /* ----------
  * Definitions for FOREIGN KEY constraints in CreateStmt

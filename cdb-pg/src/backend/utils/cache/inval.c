@@ -559,6 +559,17 @@ InvalidateSystemCaches(void)
 }
 
 /*
+ * This is identical to InvalidateSystemCache, for now, with exception that this is
+ * a public interface, mainly because we want to keep the old interface private.
+ * At some point in the future we may want to consolidate them, though.
+ */
+void
+ResetSystemCaches(void)
+{
+	InvalidateSystemCaches();
+}
+
+/*
  * PrepareForTupleInvalidation
  *		Detect whether invalidation of this tuple implies invalidation
  *		of catalog/relation cache entries; if so, register inval events.

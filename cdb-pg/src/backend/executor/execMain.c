@@ -154,7 +154,6 @@ static void intorel_receive(TupleTableSlot *slot, DestReceiver *self);
 static void intorel_shutdown(DestReceiver *self);
 static void intorel_destroy(DestReceiver *self);
 static void ClearPartitionState(EState *estate);
-static void CreateAppendOnlySegFileForRelationOnMaster(Relation rel, int segno);
 
 /*
  * For a partitioned insert target only:  
@@ -2039,7 +2038,7 @@ CreateAppendOnlySegFileOnMaster(ResultRelInfo *resultRelInfo, List *mapping)
 	Assert(found);
 }
 
-static void
+void
 CreateAppendOnlySegFileForRelationOnMaster(Relation rel, int segno)
 {
 	int i;
@@ -2086,6 +2085,12 @@ CreateAppendOnlySegFileForRelationOnMaster(Relation rel, int segno)
 				if (fsinfo)
 					pfree(fsinfo);
 
+				/*
+				 * seg0 file should have been created by the table creation.
+				 */
+				if (segno == RESERVED_SEGNO)
+					continue;
+
 				AppendOnlyStorageWrite_TransactionCreateFile(
 						RelationGetRelationName(child_rel),
 						0,
@@ -2113,16 +2118,25 @@ CreateAppendOnlySegFileForRelationOnMaster(Relation rel, int segno)
 
 				for (j = 0; j < child_rel->rd_att->natts; j++)
 				{
+					int32		segmentFileNum;
+
 					if ((aocsFileSegInfo) && (0 != aocsFileSegInfo->vpinfo.entry[j].eof))
 					{
 						continue;
 					}
 
+					segmentFileNum = j * AOTupleId_MultiplierSegmentFileNum + segno;
+					/*
+					 * seg0 file should have been created by the table creation.
+					 */
+					if (segmentFileNum == RESERVED_SEGNO)
+						continue;
+
 					AppendOnlyStorageWrite_TransactionCreateFile(
 							RelationGetRelationName(child_rel),
 							0,
 							&child_rel->rd_node,
-							j * AOTupleId_MultiplierSegmentFileNum + segno, /* for aocs */
+							segmentFileNum,
 							i - 1,
 							&child_rel->rd_segfile0_relationnodeinfos[i].persistentTid,
 							&child_rel->rd_segfile0_relationnodeinfos[i].persistentSerialNum);

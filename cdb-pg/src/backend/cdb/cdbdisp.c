@@ -204,7 +204,9 @@ static Node *pre_dispatch_function_evaluation_mutator(Node *node,
 						 pre_dispatch_function_evaluation_context * context);
 
 static void
-CdbDispatchUtilityStatement_Internal(struct Node *stmt, bool needTwoPhase, char* debugCaller);
+CdbDispatchUtilityStatement_Internal(struct Node *stmt,
+									 QueryContextInfo *contextdisp,
+									 bool needTwoPhase, char* debugCaller);
 
 /* 
  * ====================================================
@@ -4204,6 +4206,7 @@ fillSliceVector(SliceTable *sliceTbl, int rootIdx, sliceVec *sliceVector, int sl
  */
 void
 cdbdisp_dispatchUtilityStatement(struct Node *stmt,
+								 QueryContextInfo *contextdisp,
 								 bool cancelOnError,
 								 bool needTwoPhase,
 								 bool withSnapshot,
@@ -4230,6 +4233,7 @@ cdbdisp_dispatchUtilityStatement(struct Node *stmt,
 	Assert(stmt->type > 0);
 
 	q->utilityStmt = stmt;
+	q->contextdisp = contextdisp;
 
 	q->querySource = QSRC_ORIGINAL;
 
@@ -4266,17 +4270,37 @@ cdbdisp_dispatchUtilityStatement(struct Node *stmt,
 void
 CdbDispatchUtilityStatement(struct Node *stmt, char *debugCaller __attribute__((unused)) )
 {
-	CdbDispatchUtilityStatement_Internal(stmt, /* needTwoPhase */ true, "CdbDispatchUtilityStatement");
+	CdbDispatchUtilityStatement_Internal(stmt,
+										 NULL,
+										 true,
+										 "CdbDispatchUtilityStatement");
 }
 
 void
 CdbDispatchUtilityStatement_NoTwoPhase(struct Node *stmt, char *debugCaller __attribute__((unused)) )
 {
-	CdbDispatchUtilityStatement_Internal(stmt, /* needTwoPhase */ false, "CdbDispatchUtilityStatement_NoTwoPhase");
+	CdbDispatchUtilityStatement_Internal(stmt,
+										 NULL,
+										 false,
+										 "CdbDispatchUtilityStatement_NoTwoPhase");
+}
+
+/*
+ * This interface is used to send QueryContextInfo along with the utility
+ * statement.  It is dispatched and reconstructed in segments, and the
+ * update results will also be reflected into the master catalogs.
+ */
+void
+CdbDispatchUtilityStatementContext(struct Node *stmt, QueryContextInfo *contextdisp)
+{
+	CdbDispatchUtilityStatement_Internal(stmt,
+										 contextdisp,
+										 true,
+										 "CdbDispatchUtilityStatementContext");
 }
 
 static void
-CdbDispatchUtilityStatement_Internal(struct Node *stmt, bool needTwoPhase, char *debugCaller)
+CdbDispatchUtilityStatement_Internal(struct Node *stmt, QueryContextInfo *contextdisp, bool needTwoPhase, char *debugCaller)
 {
 	volatile struct CdbDispatcherState ds = {NULL, NULL};
 	
@@ -4286,15 +4310,26 @@ CdbDispatchUtilityStatement_Internal(struct Node *stmt, bool needTwoPhase, char 
 
 	PG_TRY();
 	{
-		cdbdisp_dispatchUtilityStatement(stmt, 
-										 true /* cancelOnError */, 
+		void (*handle_results_callback)(CdbDispatchResults *primaryResults, void *ctx)
+			= NULL;
+
+		cdbdisp_dispatchUtilityStatement(stmt,
+										 contextdisp,
+										 true /* cancelOnError */,
 										 needTwoPhase, 
 										 true /* withSnapshot */,
 										 (struct CdbDispatcherState *)&ds,
 										 debugCaller);
 
+		/*
+		 * If we dispatched metadata, we should read back any updates done
+		 * in segments.
+		 */
+		if (contextdisp != NULL)
+			handle_results_callback = collectAndUpdateCatalog;
 		/* Wait for all QEs to finish.	Throw up if error. */
-		cdbdisp_finishCommand((struct CdbDispatcherState *)&ds, NULL, NULL);
+		cdbdisp_finishCommand((struct CdbDispatcherState *) &ds,
+							   handle_results_callback, NULL);
 	}
 	PG_CATCH();
 	{

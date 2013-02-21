@@ -151,6 +151,66 @@ static void * readNodeBinary(const char ** str);
 
 static Datum readDatum(const char ** str, bool typbyval);
 
+static TupleDesc
+_readTupleDesc(const char **str)
+{
+	int i;
+	TupleDesc local_node = (TupleDesc) palloc0(sizeof(struct tupleDesc));
+	bool constr_is_notnull = false;
+
+	READ_INT_FIELD(natts);
+	local_node->attrs = (Form_pg_attribute *) palloc0(
+			local_node->natts * sizeof(Form_pg_attribute));
+	for (i = 0; i < local_node->natts; i++)
+	{
+		local_node->attrs[i] = (Form_pg_attribute) palloc(ATTRIBUTE_FIXED_PART_SIZE);
+		memcpy(local_node->attrs[i], *str, ATTRIBUTE_FIXED_PART_SIZE);
+		(*str) += ATTRIBUTE_FIXED_PART_SIZE;
+	}
+
+	/*
+	 * The serializer writes 1 if the pointer was valid, and 0 otherwise.
+	 * We need to allocate true memory for constr if we read back the content.
+	 */
+	constr_is_notnull = (*str)[0] != 0;
+	(*str)++;
+
+	if (constr_is_notnull)
+	{
+		local_node->constr = (TupleConstr *) palloc0(sizeof(TupleConstr));
+		READ_INT_FIELD(constr->num_defval);
+		if (local_node->constr->num_defval > 0)
+		{
+			local_node->constr->defval = (AttrDefault *) palloc(
+					local_node->constr->num_defval * sizeof(AttrDefault));
+		}
+		for (i = 0; i < local_node->constr->num_defval; i++)
+		{
+			READ_INT_FIELD(constr->defval[i].adnum);
+			READ_STRING_FIELD(constr->defval[i].adbin);
+		}
+
+		READ_INT_FIELD(constr->num_check);
+		if (local_node->constr->num_check > 0)
+		{
+			local_node->constr->check = (ConstrCheck *) palloc(
+					local_node->constr->num_check * sizeof(ConstrCheck));
+		}
+
+		for (i = 0; i < local_node->constr->num_check; i++)
+		{
+			READ_STRING_FIELD(constr->check[i].ccname);
+			READ_STRING_FIELD(constr->check[i].ccbin);
+		}
+	}
+
+	READ_OID_FIELD(tdtypeid);
+	READ_INT_FIELD(tdtypmod);
+	READ_BOOL_FIELD(tdhasoid);
+	/* tdrefcount is not effective */
+
+	READ_DONE();
+}
 
 /*
  * _readQuery
@@ -823,6 +883,49 @@ _readAlterPartitionId(const char ** str)
 
 	READ_ENUM_FIELD(idtype, AlterPartitionIdType);
 	READ_NODE_FIELD(partiddef);
+
+	READ_DONE();
+}
+
+static AlterRewriteTableInfo *
+_readAlterRewriteTableInfo(const char **str)
+{
+	READ_LOCALS(AlterRewriteTableInfo);
+
+	READ_OID_FIELD(relid);
+	READ_CHAR_FIELD(relkind);
+	local_node->oldDesc = _readTupleDesc(str);
+	READ_NODE_FIELD(constraints);
+	READ_NODE_FIELD(newvals);
+	READ_BOOL_FIELD(new_notnull);
+	READ_BOOL_FIELD(new_dropoids);
+	READ_OID_FIELD(newTableSpace);
+	READ_OID_FIELD(exchange_relid);
+	READ_OID_FIELD(newheap_oid);
+
+	READ_DONE();
+}
+
+static AlterRewriteNewConstraint *
+_readAlterRewriteNewConstraint(const char **str)
+{
+	READ_LOCALS(AlterRewriteNewConstraint);
+
+	READ_STRING_FIELD(name);
+	READ_ENUM_FIELD(contype, ConstrType);
+	READ_OID_FIELD(refrelid);
+	READ_NODE_FIELD(qual);
+
+	READ_DONE();
+}
+
+static AlterRewriteNewColumnValue *
+_readAlterRewriteNewColumnValue(const char **str)
+{
+	READ_LOCALS(AlterRewriteNewColumnValue);
+
+	READ_INT_FIELD(attnum);
+	READ_NODE_FIELD(expr);
 
 	READ_DONE();
 }
@@ -4115,6 +4218,15 @@ readNodeBinary(const char ** str)
 				break;
 			case T_AlterPartitionId:
 				return_value = _readAlterPartitionId(str);
+				break;
+			case T_AlterRewriteTableInfo:
+				return_value = _readAlterRewriteTableInfo(str);
+				break;
+			case T_AlterRewriteNewConstraint:
+				return_value = _readAlterRewriteNewConstraint(str);
+				break;
+			case T_AlterRewriteNewColumnValue:
+				return_value = _readAlterRewriteNewColumnValue(str);
 				break;
 
 			case T_CreateRoleStmt:

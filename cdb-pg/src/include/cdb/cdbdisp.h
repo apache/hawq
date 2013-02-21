@@ -423,11 +423,12 @@ cdbdisp_dispatchPlan(struct QueryDesc              *queryDesc,
  */
 void
 cdbdisp_dispatchUtilityStatement(struct Node   *stmt,
-                                 bool           cancelOnError,
-                                 bool			needTwoPhase,
-                                 bool			withSnapshot,
+								 QueryContextInfo *contextdisp,
+								 bool cancelOnError,
+								 bool needTwoPhase,
+								 bool withSnapshot,
 								 struct CdbDispatcherState *ds,
-								 char* debugCaller __attribute__((unused)) );
+								 char* debugCaller __attribute__((unused)));
 
 /* Dispatch a command - already parsed and in the form of a Node
  * tree - to all primary segdbs, and wait for completion.
@@ -440,6 +441,9 @@ CdbDispatchUtilityStatement(struct Node *stmt, char* debugCaller __attribute__((
 
 void
 CdbDispatchUtilityStatement_NoTwoPhase(struct Node *stmt, char* debugCaller __attribute__((unused)) );
+
+void
+CdbDispatchUtilityStatementContext(struct Node *stmt, QueryContextInfo *contextdisp);
 
 /*
  * create a CdbDispatchCmdThreads object that holds the dispatch
