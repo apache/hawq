@@ -53,7 +53,7 @@ cp ../../%{gpdbtarball} %_sourcedir/.
 rm -rf $RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT%{installdir}
 tar zxf %{_sourcedir}/%{gpdbtarball} -C $RPM_BUILD_ROOT%{installdir}
-ln -s $RPM_BUILD_ROOT%{installdir} $RPM_BUILD_ROOT%{symlink}
+(cd $RPM_BUILD_ROOT%{installdir}; ln -s %{name}-%{version} %{name})
 
 %clean
 rm -rf $RPM_BUILD_ROOT
