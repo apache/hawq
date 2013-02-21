@@ -11837,6 +11837,13 @@ transformLockingClause(Query *qry, LockingClause *lc)
 	Index		i;
 	LockingClause *allrels;
 
+	/* disable select for update for gpsql */
+	if(lc->forUpdate){
+		ereport(ERROR,
+				(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+				errmsg("Cannot support select for update statement yet in GPSQL") ));
+	}
+
 	CheckSelectLocking(qry);
 
 	/* make a clause we can pass down to subqueries to select all rels */
