@@ -928,6 +928,12 @@ createdb_int(CreatedbStmt *stmt, CdbDispatcherState *ds)
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				  errmsg("pg_global cannot be used as default tablespace")));
 
+		/* don't allow user create database on pg_default*/
+		if (dst_deftablespace == DEFAULTTABLESPACE_OID)
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					errmsg("Creating database on tablespace 'pg_default' is not allowed")));
+
 		/*
 		 * If we are trying to change the default tablespace of the template,
 		 * we require that the template not have any files in the new default

@@ -385,6 +385,19 @@ static void InvokeProtocolValidation(Oid procOid, char *procName, bool iswritabl
 
 static char *alterTableCmdString(AlterTableType subtype);
 
+static bool isPgDefaultTablespace(const char *tablespacename);
+
+bool
+isPgDefaultTablespace(const char *tablespacename){
+	if(tablespacename == NULL)
+		return false;
+	else if(strcmp(tablespacename, "pg_default") == 0)
+		return true;
+	else
+		return false;
+}
+
+
 /* ----------------------------------------------------------------
  *		DefineRelation
  *				Creates a new relation.
@@ -397,6 +410,14 @@ DefineRelation(CreateStmt *stmt, char relkind, char relstorage)
 {
     Oid reloid = 0;
     Assert(stmt->relation->schemaname == NULL || strlen(stmt->relation->schemaname)>0);
+
+    /* forbid create non-system table on tablespace pg_default */
+    if((!IsBootstrapProcessingMode()) && (isPgDefaultTablespace(stmt->tablespacename)))
+    {
+    	ereport(ERROR,
+    					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+    					errmsg("Creating table on tablespace 'pg_default' is not allowed")));
+    }
 
     reloid = DefineRelation_int(stmt, relkind, relstorage, NULL);
 
