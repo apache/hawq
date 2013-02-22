@@ -513,6 +513,10 @@ class GpStop:
                         continue
                     raise ExecutionError("Error Executing Command: ",item)           
 
+        if not self.gparray.allSegmentsAlive():
+            logger.error("Can not reload postgres.conf because some of segments are down")
+            return 1
+
         self.pool = SighupWorkerPool(numWorkers = workers)
         dbList = self.gparray.getDbList()
         dispatch_count = 0

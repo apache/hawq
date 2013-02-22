@@ -176,11 +176,16 @@ CREATE VIEW pg_prepared_statements AS
     (name text, statement text, prepare_time timestamptz,
      parameter_types regtype[], from_sql boolean);
 
-CREATE VIEW pg_settings AS 
+CREATE VIEW pg_settings_gpsql AS 
     SELECT * 
     FROM pg_show_all_settings() AS A 
     (name text, setting text, unit text, category text, short_desc text, extra_desc text,
-     context text, vartype text, source text, min_val text, max_val text);
+     context text, vartype text, source text, min_val text, max_val text, gp_segment_id text);
+
+CREATE VIEW pg_settings AS
+    SELECT name, setting, unit, category, short_desc, extra_desc, context, vartype,
+    source, min_val, max_val
+    FROM pg_settings_gpsql;
 
 CREATE RULE pg_settings_u AS 
     ON UPDATE TO pg_settings 

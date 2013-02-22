@@ -2997,3 +2997,35 @@ TestFileValid(File file)
 {
     return FileIsValid(file);
 }
+
+bool
+HdfsPathExist(char *path)
+{
+	char	relative_path[MAXPGPATH + 1];
+	char	protocol[MAXPGPATH];
+	short	rep = FS_DEFAULT_REPLICA_NUM;
+	hdfsFS	fs = NULL;
+	HdfsFileInfo	*info;
+
+	DO_DB(elog(LOG, "HdfsPathExist, path: %s", path));
+
+	if (!HdfsGetProtocol(path, protocol, sizeof(protocol)))
+		elog(ERROR, "cannot get protocol for path: %s", path);
+
+	HdfsParseOptions(path, &rep);
+
+	fs = HdfsGetConnection(protocol, path);
+	if (fs == NULL)
+		elog(ERROR, "cannot get connection for path: %s", path);
+
+	if (NULL == ConvertToUnixPath(path, relative_path, sizeof(relative_path)))
+		elog(ERROR, "cannot convert to unix path for path: %s", path);
+
+	info = HdfsGetPathInfo(protocol, fs, relative_path);
+	if (info == NULL)
+		return false;
+
+	HdfsFreeFileInfo(protocol, info, 1);
+	return true;
+}
+

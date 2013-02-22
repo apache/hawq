@@ -99,7 +99,8 @@ def parseargs():
 
 class JetPackQuery:
     def __init__(self, name):
-        self.query = "select * from gp_toolkit.gp_param_setting('%s')" % name
+        self.query_master = "select gp_segment_id::int, name, setting from pg_settings_gpsql where name = '%s'" % name
+        self.query_segment = "select gp_segment_id::int, name, setting from gp_dist_random('pg_settings_gpsql') where name = '%s'" %name
 
 class JetPackGuc:
     def __init__(self,row): 
@@ -179,8 +180,10 @@ def doShow(gucname, longform):
     try:
         dburl = dbconn.DbURL()
         conn = dbconn.connect(dburl, False)
-        query = JetPackQuery(gucname).query
-        rows = dbconn.execSQL(conn, query)
+        query_master = JetPackQuery(gucname).query_master
+        query_segment = JetPackQuery(gucname).query_segment
+        rows_master = dbconn.execSQL(conn, query_master)
+        rows_segment = dbconn.execSQL(conn, query_segment)
 
         mastervalue = None
         value = None
@@ -189,16 +192,29 @@ def doShow(gucname, longform):
         if longform:
 
             print "GUC                 : %s" % gucname
-            for row in rows:
+            for row in rows_master:
+                guc = JetPackGuc(row)
+                print "Context: %5s Value: %s" % (guc.context, guc.value)
+            for row in rows_segment:
                 guc = JetPackGuc(row)
                 print "Context: %5s Value: %s" % (guc.context, guc.value)
 
         else:
-            for row in rows:
+            for row in rows_master:
+                guc = JetPackGuc(row)
+                if guc.context == -1:
+                    mastervalue = guc.value
+                else:
+                    #valid = False
+                    #break
+                    pass
+
+            for row in rows_segment:
                 guc = JetPackGuc(row)
     
                 if guc.context == -1:
-                    mastervalue = guc.value
+                    valid = False
+                    break
     
                 elif not value:
                     value = guc.value
@@ -219,7 +235,11 @@ def doShow(gucname, longform):
             else:
                 print "WARNING: GUCS ARE OUT OF SYNC: "
     
-                rows = dbconn.execSQL(conn, query)
+                rows = dbconn.execSQL(conn, query_master)
+                for row in rows:
+                    guc = JetPackGuc(row)
+                    guc.Print()
+                rows = dbconn.execSQL(conn, query_segment)
                 for row in rows:
                     guc = JetPackGuc(row)
                     guc.Print()
@@ -317,6 +337,10 @@ if len(failedPings):
 try:
     # do the segments
     if not options.masteronly:
+        if not gparray.allSegmentsAlive():
+            logger.error("Can not change guc because some of segments are down")
+            sys.exit(2)
+
         for h in hostCache.get_hosts():
             directory_string = None
             

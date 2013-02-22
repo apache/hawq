@@ -142,4 +142,6 @@ extern size_t GetTempFilePrefix(char * buf, size_t buflen, const char * fileName
 
 extern bool TestFileValid(File file);
 
+extern bool HdfsPathExist(char *path);
+
 #endif   /* FD_H */

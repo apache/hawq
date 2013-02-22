@@ -9706,6 +9706,10 @@ GetConfigOptionByNum(int varnum, const char **values, bool *noshow)
 			}
 			break;
 	}
+
+	/* gp_segment_id */
+	snprintf(buffer, sizeof(buffer), "%d", GpIdentity.segindex);
+	values[11] = pstrdup(buffer);
 }
 
 /*
@@ -9745,7 +9749,7 @@ show_config_by_name(PG_FUNCTION_ARGS)
  * show_all_settings - equiv to SHOW ALL command but implemented as
  * a Table Function.
  */
-#define NUM_PG_SETTINGS_ATTS	11
+#define NUM_PG_SETTINGS_ATTS	12
 
 Datum
 show_all_settings(PG_FUNCTION_ARGS)
@@ -9794,6 +9798,8 @@ show_all_settings(PG_FUNCTION_ARGS)
 		TupleDescInitEntry(tupdesc, (AttrNumber) 10, "min_val",
 						   TEXTOID, -1, 0);
 		TupleDescInitEntry(tupdesc, (AttrNumber) 11, "max_val",
+						   TEXTOID, -1, 0);
+		TupleDescInitEntry(tupdesc, (AttrNumber) 12, "gp_segment_id",
 						   TEXTOID, -1, 0);
 
 		/*

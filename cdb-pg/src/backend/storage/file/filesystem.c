@@ -712,10 +712,10 @@ HdfsFileInfo * HdfsGetPathInfo(FsysName protocol, hdfsFS fileSystem, char * path
 							 /* Call Context */ (Node *) (&fsysUdf),
 							 /* ResultSetInfo */ NULL);
 
-	Datum d = FunctionCallInvoke(&fcinfo);
+	(void) FunctionCallInvoke(&fcinfo);
 
 	/* We do not expect a null result */
-	if (fcinfo.isnull || DatumGetInt32(d))
+	if (fcinfo.isnull)
 		elog(WARNING, "function %u returned error", fcinfo.flinfo->fn_oid);
 
 	return FSYS_UDF_GET_FILEINFO(&fcinfo);

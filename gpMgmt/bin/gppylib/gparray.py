@@ -1741,6 +1741,17 @@ class GpArray:
         return dbs
 
     # --------------------------------------------------------------------
+    def allSegmentsAlive(self):
+        """
+        Return True if all segments alive
+        """
+
+        for seg in self.getSegDbList():
+            if seg.status == STATUS_DOWN:
+                return False
+        return True
+
+    # --------------------------------------------------------------------
     def getHostList(self, includeExpansionSegs = False):
         """
         Return a list of all Hosts that make up the array

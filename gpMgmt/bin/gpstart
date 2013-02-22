@@ -517,6 +517,7 @@ class GpStart:
         # look at each content, see if there is a segment available (or one which can be made
         #   available by the fault prober by switching to changetracking)
         #
+        has_least_one_segment = False
         for primary in gparray.getSegDbList():
 
             if not primary.isSegmentPrimary(current_role=True):
@@ -530,6 +531,7 @@ class GpStart:
 
             if primary.getSegmentDbId() in successfulSegmentsByDbId:
                 # good, we can continue!
+                has_least_one_segment = True
                 continue
 
             if primary.getSegmentDbId() in mirroringFailuresByDbId \
@@ -550,9 +552,13 @@ class GpStart:
                 #
                 continue
 
-            logger.error("No segment started for content: %d." % primary.getSegmentContentId())
+            logger.warning("No segment started for content: %d." % primary.getSegmentContentId())
             logger.info("dumping success segments: %s" % [s.__str__() for s in startResult.getSuccessfulSegments()])
+
+        if not has_least_one_segment:
+            logger.error("No alive segment started.")
             return False
+
         return True
 
     ######  

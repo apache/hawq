@@ -645,6 +645,12 @@ CreateFileSpace(CreateFileSpaceStmt *stmt)
 				encoded = EncodeFileLocations("local", fsrep, fse->location);
 			else
 				encoded = EncodeFileLocations(stmt->fsysname, fsrep, fse->location);
+
+			if (fse->contentid != MASTER_CONTENT_ID && HdfsPathExist(encoded))
+				ereport(ERROR, 
+						(errcode_for_file_access(),
+						 errmsg("%s: File exists", encoded)));
+
 			fse->location = encoded;
 			add_catalog_filespace_entry(rel, fsoid, fse->dbid, fse->location);
 		}
