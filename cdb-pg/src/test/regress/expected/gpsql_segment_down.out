@@ -1,0 +1,5 @@
+SET gp_test_failed_segmentid_number = 1;
+ERROR:  segment alive information changed, cleanup the gangs. (postgres.c:1800)
+-- SEGMENT ID 1 FAILED
+SET gp_test_failed_segmentid_start = 1;
+ERROR:  segment alive information changed, cleanup the gangs. (postgres.c:1800)
