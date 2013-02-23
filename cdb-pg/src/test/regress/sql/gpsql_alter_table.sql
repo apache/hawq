@@ -113,8 +113,6 @@ INSERT INTO palt SELECT i, i::text, i FROM generate_series(1, 99)i;
 CREATE TABLE palt_child(a int, b text, c int);
 ALTER TABLE palt EXCHANGE PARTITION FOR (51) WITH TABLE palt_child;
 
-ALTER TABLE palt SPLIT PARTITION FOR (51) AT (55) INTO (PARTITION a, PARTITION b);
-
 ALTER TABLE palt ADD PARTITION START (100) END (110);
 INSERT INTO palt VALUES(100, '100', 100);
 SELECT count(*) FROM palt;

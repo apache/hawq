@@ -63,6 +63,8 @@ extern void AlterRewriteTable(AlterRewriteTableInfo *ar_tab);
 
 extern void ATExecChangeOwner(Oid relationOid, Oid newOwnerId, bool recursing);
 
+extern void ATPExecPartSplit(Relation rel, AlterPartitionCmd *pc);         
+
 extern void AlterTableInternal(Oid relid, List *cmds, bool recurse);
 
 extern void AlterTableNamespace(RangeVar *relation, const char *newschema);

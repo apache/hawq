@@ -909,6 +909,91 @@ end ('2007-10-01') inclusive;
 alter table hhh_r1 add partition yaa start ('2007-05-01') 
 end ('2007-10-01') exclusive;
 
-
 drop table hhh_r1 cascade;
 drop table hhh_l1 cascade;
+
+-- SPLIT tests
+-- basic sanity tests. All should pass.
+create table k (i int) partition by range(i) (start(1) end(10) every(2), 
+default partition mydef);
+insert into k select i from generate_series(1, 100) i;
+alter table k split partition mydef at (20) into (partition mydef, 
+partition foo);
+drop table k;
+
+create table j (i int) partition by list(i) (partition a values(1, 2, 3, 4),
+partition b values(5, 6, 7, 8));
+insert into j select i from generate_series(1, 8) i;
+alter table j split partition for(1) at (2, 3) into (partition fa, partition
+fb);
+select * from j_1_prt_fa;
+select * from j_1_prt_fb;
+alter table j split partition for(5) at (6);
+select * from j;
+-- should fail
+alter table j split partition for (1) at (100);
+drop table j;
+create table k (i int) partition by range(i) (start(1) end(10) every(2), 
+default partition mydef);
+-- should fail
+alter table k split default partition start(30) end (300) into (partition mydef, partition mydef);
+alter table k split partition for(3) at (20);
+drop table k;
+-- should work
+create table k (i int) partition by range(i) (start(1) end(10) every(2), 
+default partition mydef);
+insert into k select i from generate_series(1, 30) i;
+alter table k split default partition start(15) end(20) into
+(partition mydef, partition foo);
+select * from k_1_prt_foo;
+alter table k split default partition start(22) exclusive end(25) inclusive
+into (partition bar, partition mydef);
+select * from k_1_prt_bar;
+alter table k split partition bar at (23) into (partition baz, partition foz);
+select partitiontablename,partitionposition,partitionrangestart,
+       partitionrangeend from pg_partitions where tablename = 'k'
+	   order by partitionposition;
+drop table k;
+-- Test errors for default handling
+create table k (i int) partition by range(i) (start(1) end(2), 
+default partition mydef);
+alter table k split partition mydef at (25) into (partition foo, partition
+mydef);
+drop table k;
+-- check that when we split a default, the INTO clause must named the default
+create table k (i date) partition by range(i) (start('2008-01-01')
+end('2009-01-01') every(interval '1 month'), default partition default_part);
+alter table k split default partition start ('2009-01-01') end ('2009-02-01')
+into (partition aa, partition nodate);
+alter table k split default partition start ('2009-01-01') end ('2009-02-01')
+into (partition aa, partition default_part);
+-- check that it works without INTO
+alter table k split default partition start ('2009-02-01') end ('2009-03-01');
+drop table k;
+-- List too
+create table k (i int) partition by list(i) (partition a values(1, 2),
+partition b values(3, 4), default partition mydef);
+alter table k split partition mydef at (5) into (partition foo, partition bar);
+alter table k split partition mydef at (5) into (partition foo, partition mydef);
+alter table k split partition mydef at (10);
+drop table k;
+
+-- For LIST, make sure that we reject AT() clauses which match all parameters
+create table j (i int) partition by list(i) (partition a values(1, 2, 3, 4),
+ partition b values(5, 6, 7, 8));
+alter table j split partition for(1) at (1,2) into (partition fa, partition fb);
+alter table j split partition for(1) at (1,2) 
+into (partition f1a, partition f1b); -- This has partition rules that overlaps
+drop table j;
+
+-- Check that we can split LIST partitions that have a default partition
+create table j (i int) partition by list(i) (partition a values(1, 2, 3, 4),
+partition b values(5, 6, 7, 8), default partition default_part);
+alter table j split partition for(1) at (1,2) into (partition f1a, partition
+f1b);
+drop table j;
+-- Make sure range can too
+create table j (i int) partition by range(i) (partition a start(1) end(10),
+default partition default_part);
+alter table j split partition for(1) at (5) into (partition f1a, partition f1b);
+drop table j;

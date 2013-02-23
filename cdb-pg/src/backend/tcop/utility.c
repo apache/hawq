@@ -1130,6 +1130,16 @@ ProcessUtility(Node *parsetree,
 			AlterRewriteTable((AlterRewriteTableInfo *) parsetree);
 			break;
 
+		case T_AlterPartitionCmd:
+			/*
+			 * GPSQL: For ALTER TABLE .. SPLIT, phase 2 of alter is 
+			 * dispatched to segments to perform the splitting of rows.
+			 */
+			Assert(Gp_role == GP_ROLE_EXECUTE);
+
+			ATPExecPartSplit(NULL, (AlterPartitionCmd *) parsetree);
+			break;
+
 		case T_AlterDomainStmt:
 			{
 				ereport(ERROR,

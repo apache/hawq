@@ -337,8 +337,6 @@ static void ATPExecPartRename(Relation rel,
 static void ATPExecPartSetTemplate(AlteredTableInfo *tab,   /* Set */
 								   Relation rel,            /* Subpartition */
                                    AlterPartitionCmd *pc);	/* Template */
-static void ATPExecPartSplit(Relation rel,
-                             AlterPartitionCmd *pc);		/* Split */
 static List *
 atpxTruncateList(Relation rel, PartitionNode *pNode);
 static void ATPExecPartTruncate(Relation rel,
@@ -4390,9 +4388,6 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 		}
 
 		case AT_PartSplit:				/* Split */
-			ereport(ERROR,
-					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
-					 errmsg("ALTER TABLE ... SPLIT PARTITION is not supported")));
 		{
 			AlterPartitionCmd	*pc    	= (AlterPartitionCmd *) cmd->def;
 
@@ -15483,7 +15478,7 @@ make_orientation_options(Relation rel)
 	return l;
 }
 
-static void
+void
 ATPExecPartSplit(Relation rel,
                  AlterPartitionCmd *pc)
 {
@@ -16353,11 +16348,60 @@ ATPExecPartSplit(Relation rel,
 	 */
 	split_rows(intoa, intob, temprel);
 
+	/* 
+	 * In GPSQL, we need to dispatch the splitting of rows to segments. Most other 
+	 * ALTER operations, dispatch the ALTER phase 3 work to segments. ALTER .. SPLIT PARTITION
+	 * is different as the actual working of splitting happens in phase 2. Hence we dispatch
+	 * at this point 
+	 */
+	if (Gp_role == GP_ROLE_DISPATCH)
+	{
+		
+		QueryContextInfo *contextdisp;
+		HTAB *htab;
+
+		/* create the segfiles for the new relations here */
+		CreateAppendOnlySegFileForRelationOnMaster(intoa, RESERVED_SEGNO);
+	
+		CreateAppendOnlySegFileForRelationOnMaster(intob, RESERVED_SEGNO);
+
+		/* prepare for the metadata dispatch */	
+		contextdisp = CreateQueryContextInfo();
+		htab = createPrepareDispatchedCatalogRelationDisctinctHashTable();
+		
+		prepareDispatchedCatalogSingleRelation(contextdisp, 
+							intoa->rd_id,
+							true, 
+							RESERVED_SEGNO, 
+							htab);
+
+		prepareDispatchedCatalogSingleRelation(contextdisp, 
+							intob->rd_id,
+							true, 
+							RESERVED_SEGNO, 
+							htab);
+
+		prepareDispatchedCatalogRelation(contextdisp,
+							(Oid)intVal((Value *)pc->partid), 
+							false,
+							NULL,
+							htab);
+
+		hash_destroy(htab);
+                CloseQueryContextInfo(contextdisp);
+
+		CdbDispatchUtilityStatementContext((Node *) pc, contextdisp);
+	}
+
 	elog(DEBUG5, "dropping temp rel %s", RelationGetRelationName(temprel));
 	temprelid = RelationGetRelid(temprel);
 	heap_close(temprel, NoLock);
 
-	/* drop temp table */
+	/* 
+	 * In GPSQL, we only need to drop the temp relation on the master which will ensure
+	 * the relation is dropped on segments as well. 
+ 	 */
+	if (Gp_role != GP_ROLE_EXECUTE)
 	{
 		ObjectAddress addr;
 		addr.classId = RelationRelationId;
