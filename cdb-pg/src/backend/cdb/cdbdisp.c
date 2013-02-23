@@ -3968,6 +3968,20 @@ cdbdisp_dispatchPlan(struct QueryDesc *queryDesc,
 		                 errhint("Size controlled by gp_max_plan_size"))));
 	}
 
+	/* compute the total uncompressed size of the query plan for all slices */
+	int num_slices = queryDesc->plannedstmt->planTree->nMotionNodes + 1;
+	int plan_size_in_kb = (splan_len_uncompressed * num_slices) / 1024;
+	
+	elog(LOG, "Query plan size to dispatch: %dKB", plan_size_in_kb);
+	
+	if (0 < gp_max_plan_size && plan_size_in_kb > gp_max_plan_size)
+	{
+		ereport(ERROR,
+		        (errcode(ERRCODE_STATEMENT_TOO_COMPLEX),
+		                (errmsg("Query plan size limit exceeded, current size: %dKB, max allowed size: %dKB", plan_size_in_kb, gp_max_plan_size),
+		                 errhint("Size controlled by gp_max_plan_size"))));
+	}
+
 	Assert(splan != NULL && splan_len > 0);
 
 	/*
