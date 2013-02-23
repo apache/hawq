@@ -59,7 +59,7 @@ gp_compressBound(unsigned long sourceLen)
  * The returned string is palloc'ed in the current memory context.
  */
 char *
-serializeNode(Node *node, int *size)
+serializeNode(Node *node, int *size, int *uncompressed_size_out)
 {
 	char *pszNode;
 	char *sNode;
@@ -71,6 +71,10 @@ serializeNode(Node *node, int *size)
 	pszNode = nodeToBinaryStringFast(node, &uncompressed_size);
 	Assert(pszNode != NULL);
 
+	if (NULL != uncompressed_size_out)
+	{
+		*uncompressed_size_out = uncompressed_size;
+	}
 	sNode = compress_string(pszNode, uncompressed_size, size);
 	pfree(pszNode);
 

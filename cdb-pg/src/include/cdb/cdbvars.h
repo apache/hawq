@@ -978,6 +978,9 @@ extern bool	gp_create_index_concurrently;
 /* Priority for the segworkers relative to the postmaster's priority */
 extern int gp_segworker_relative_priority;
 
+/*  Max size of dispatched plans; 0 if no limit */
+extern int gp_max_plan_size;
+
 /* The maximum number of times on average that the hybrid hashed aggregation
  * algorithm will plan to spill an input row to disk before including it in
  * an aggregation.  Increasing this parameter will cause the planner to choose

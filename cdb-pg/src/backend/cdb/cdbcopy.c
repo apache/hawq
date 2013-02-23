@@ -205,7 +205,7 @@ cdbCopyStart(CdbCopy *c, char *copyCmd, Oid relid, Oid relerror)
 	/*
 	 * serialized the stmt tree, and dispatch it ....
 	 */
-	serializedQuerytree = serializeNode((Node *) q, &serializedQuerytree_len);
+	serializedQuerytree = serializeNode((Node *) q, &serializedQuerytree_len, NULL /*uncompressed_size*/);
 
 	Assert(serializedQuerytree != NULL);
 	

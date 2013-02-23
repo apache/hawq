@@ -19,7 +19,7 @@
 extern char *WriteBackCatalogs;
 extern int32 WriteBackCatalogLen;
 
-extern char *serializeNode(Node *node, int *size);
+extern char *serializeNode(Node *node, int *size, int *uncompressed_size);
 extern Node *deserializeNode(const char *strNode, int size);
 
 #endif   /* CDBSRLZ_H */

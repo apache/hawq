@@ -4182,6 +4182,16 @@ static struct config_int ConfigureNamesInt[] =
 		&max_statement_mem,
 		2048000, 32768, INT_MAX, NULL, NULL
 	},
+	
+	{
+		{"gp_max_plan_size", PGC_SUSET, RESOURCES_MEM,
+		 	gettext_noop("Sets the maximum size of a plan to be dispatched."),
+		 	NULL,
+			GUC_UNIT_KB
+		},
+		&gp_max_plan_size,
+		0, 0, MAX_KILOBYTES, NULL, NULL
+	},
 
 	{
 		{"max_stack_depth", PGC_SUSET, RESOURCES_MEM,

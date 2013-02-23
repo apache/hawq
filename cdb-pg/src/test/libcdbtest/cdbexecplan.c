@@ -102,7 +102,7 @@ cdb_serialize_plan(PG_FUNCTION_ARGS)
 	ListCell   *plan_list_item = list_head(thePlan->ptlist);
 
 	oldContext = MemoryContextSwitchTo(myContext);
-	pszOutput = serializeNode(lfirst(plan_list_item), NULL);
+	pszOutput = serializeNode(lfirst(plan_list_item), NULL, NULL /*uncompressed_size*/);
 	MemoryContextSwitchTo(oldContext);
 
 	if ( pszOutput == NULL )
@@ -208,7 +208,7 @@ cdb_serialize_query(PG_FUNCTION_ARGS)
 		foreach(query_list_item, query_list)
 		{
 			oldContext = MemoryContextSwitchTo(myContext);
-			pszOutput = serializeNode(lfirst(query_list_item), NULL);
+			pszOutput = serializeNode(lfirst(query_list_item), NULL, NULL /*uncompressed_size*/);
 			MemoryContextSwitchTo(oldContext);
 
 			if ( pszOutput == NULL )
@@ -519,7 +519,7 @@ cdb_test_mppexec(PG_FUNCTION_ARGS)
 	/*
 	* Serialize the plan tree to a string
 	*/
-	pszPlan = serializeNode(lfirst(plan_list_item), NULL);
+	pszPlan = serializeNode(lfirst(plan_list_item), NULL, NULL /*uncompressed_size*/);
 
 	if ( pszPlan == NULL )
 	{
@@ -558,7 +558,7 @@ cdb_test_mppexec(PG_FUNCTION_ARGS)
 			/*
 			* Serialize the query tree to a string
 			*/
-			pszQuery = serializeNode(lfirst(query_list_item), NULL);
+			pszQuery = serializeNode(lfirst(query_list_item), NULL, NULL /*uncompressed_size*/);
 
 			if ( pszQuery == NULL )
 			{

@@ -331,6 +331,9 @@ bool gp_encoding_check_locale_compatibility = true;
 /* Priority for the segworkers relative to the postmaster's priority */
 int gp_segworker_relative_priority = PRIO_MAX;
 
+/* Max size of dispatched plans; 0 if no limit */
+int			gp_max_plan_size = 0;
+
 /* Disable setting of tuple hints while reading */
 bool		gp_disable_tuple_hints = false;
 int		gp_hashagg_compress_spill_files = 0;
