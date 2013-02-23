@@ -9,6 +9,12 @@
 # 3. Are there any disadvantages of turning AutoReq off, as has been done below?
 #
 
+# disable stripping of debug symbols
+%global _enable_debug_package 0
+%global debug_package %{nil}
+%global __os_install_post /usr/lib/rpm/brp-compress %{nil}
+
+
 %define name            gpsql
 %define gpdbname        greenplum-db
 %define version         %{greenplum_db_ver}
@@ -54,6 +60,9 @@ rm -rf $RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT%{installdir}
 tar zxf %{_sourcedir}/%{gpdbtarball} -C $RPM_BUILD_ROOT%{installdir}
 (cd $RPM_BUILD_ROOT%{installdir}/..; ln -s %{name}-%{version} %{name})
+
+#disable stripping of debug symbols
+export DONT_STRIP=1
 
 %clean
 rm -rf $RPM_BUILD_ROOT
