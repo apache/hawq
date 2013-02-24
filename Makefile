@@ -1290,6 +1290,8 @@ copylibs : thirdparty-dist copy-rsa-libs
 	fi
 	mkdir -p $(INSTLOC)/etc
 	mkdir -p $(INSTLOC)/include
+	# Copy libhdfs3
+	cp -rp $(BLD_THIRDPARTY_INCLUDE_DIR)/hdfs $(INSTLOC)/include/
 ifeq "$(findstring $(BLD_ARCH),aix5_ppc_32 aix5_ppc_64 win32 win64)" ""
 	# Copy curl header file
 	cp -rp $(BLD_THIRDPARTY_INCLUDE_DIR)/curl $(INSTLOC)/include/
