@@ -2094,8 +2094,7 @@ RelationReloadClassinfo(Relation relation)
 	relation->rd_amcache = NULL;
 
 	/* Forget gp_relation_node information -- it may have changed. */
-	MemSet(&relation->rd_segfile0_relationnodeinfos[0], 0, sizeof(RelationNodeInfo));
-
+	MemSet(relation->rd_segfile0_relationnodeinfos, 0, sizeof(RelationNodeInfo) * relation->rd_segfile0_count);
 
 	/* Okay, now it's valid again */
 	relation->rd_isvalid = true;
@@ -2339,6 +2338,8 @@ RelationClearRelation(Relation relation, bool rebuild)
 
 		/* preserve rd_cdbpolicy, as there are probably pointers to it */
 		SWAPFIELD(struct GpPolicy *, rd_cdbpolicy);
+
+		SWAPFIELD(struct RelationNodeInfo *, rd_segfile0_relationnodeinfos);
 
 #undef SWAPFIELD
 
