@@ -232,7 +232,7 @@ CREATE TYPE mw_test_result AS (
 
 
 
-CREATE TYPE newplda_result AS (
+CREATE TYPE lda_result AS (
 	output_table text,
 	description text
 );
@@ -321,40 +321,40 @@ $$
 
 
 
-CREATE FUNCTION __newplda_count_topic_prefunc(state1 integer[], state2 integer[]) RETURNS integer[]
-    AS '$libdir/libmadlib.so', 'newplda_count_topic_prefunc'
+CREATE FUNCTION __lda_count_topic_prefunc(state1 integer[], state2 integer[]) RETURNS integer[]
+    AS '$libdir/libmadlib.so', 'lda_count_topic_prefunc'
     LANGUAGE c IMMUTABLE STRICT;
 
 
 
-CREATE FUNCTION __newplda_count_topic_sfunc(state integer[], words integer[], counts integer[], topic_assignment integer[], voc_size integer, topic_num integer) RETURNS integer[]
-    AS '$libdir/libmadlib.so', 'newplda_count_topic_sfunc'
+CREATE FUNCTION __lda_count_topic_sfunc(state integer[], words integer[], counts integer[], topic_assignment integer[], voc_size integer, topic_num integer) RETURNS integer[]
+    AS '$libdir/libmadlib.so', 'lda_count_topic_sfunc'
     LANGUAGE c;
 
 
 
-CREATE FUNCTION __newplda_gibbs_sample(words integer[], counts integer[], doc_topic integer[], model integer[], alpha double precision, beta double precision, voc_size integer, topic_num integer, iter_num integer) RETURNS integer[]
-    AS '$libdir/libmadlib.so', 'newplda_gibbs_sample'
+CREATE FUNCTION __lda_gibbs_sample(words integer[], counts integer[], doc_topic integer[], model integer[], alpha double precision, beta double precision, voc_size integer, topic_num integer, iter_num integer) RETURNS integer[]
+    AS '$libdir/libmadlib.so', 'lda_gibbs_sample'
     LANGUAGE c;
 
 
 
-CREATE FUNCTION __newplda_random_assign(word_count integer, topic_num integer) RETURNS integer[]
-    AS '$libdir/libmadlib.so', 'newplda_random_assign'
+CREATE FUNCTION __lda_random_assign(word_count integer, topic_num integer) RETURNS integer[]
+    AS '$libdir/libmadlib.so', 'lda_random_assign'
     LANGUAGE c STRICT;
 
 
 
-CREATE FUNCTION __newplda_util_conorm_data(data_table text, vocab_table text, output_data_table text, output_vocab_table text) RETURNS SETOF newplda_result
+CREATE FUNCTION __lda_util_conorm_data(data_table text, vocab_table text, output_data_table text, output_vocab_table text) RETURNS SETOF lda_result
     AS $$
     
     import sys
     from inspect import getframeinfo, currentframe
     try:
-        from newplda import newplda
+        from lda import lda
     except:
         sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
-        from newplda import newplda
+        from lda import lda
     
     # Retrieve the schema name of the current function
     # Make it available as variable: schema_madlib
@@ -370,7 +370,7 @@ CREATE FUNCTION __newplda_util_conorm_data(data_table text, vocab_table text, ou
     global schema_madlib
     schema_madlib = rv[0]['nspname']    
 
-    newplda.conorm_data(
+    lda.conorm_data(
         data_table, vocab_table, output_data_table, output_vocab_table)
     return [[output_data_table,'normalized data table'],
         [output_vocab_table,'normalized vocab table']]
@@ -379,16 +379,16 @@ $$
 
 
 
-CREATE FUNCTION __newplda_util_index_sort(arr double precision[]) RETURNS integer[]
+CREATE FUNCTION __lda_util_index_sort(arr double precision[]) RETURNS integer[]
     AS $$
     
     import sys
     from inspect import getframeinfo, currentframe
     try:
-        from newplda import newplda
+        from lda import lda
     except:
         sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
-        from newplda import newplda
+        from lda import lda
     
     # Retrieve the schema name of the current function
     # Make it available as variable: schema_madlib
@@ -404,22 +404,22 @@ CREATE FUNCTION __newplda_util_index_sort(arr double precision[]) RETURNS intege
     global schema_madlib
     schema_madlib = rv[0]['nspname']    
 
-    return newplda.index_sort(arr)
+    return lda.index_sort(arr)
 $$
     LANGUAGE plpythonu STRICT;
 
 
 
-CREATE FUNCTION __newplda_util_norm_dataset(data_table text, norm_vocab_table text, output_data_table text) RETURNS SETOF newplda_result
+CREATE FUNCTION __lda_util_norm_dataset(data_table text, norm_vocab_table text, output_data_table text) RETURNS SETOF lda_result
     AS $$
     
     import sys
     from inspect import getframeinfo, currentframe
     try:
-        from newplda import newplda
+        from lda import lda
     except:
         sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
-        from newplda import newplda
+        from lda import lda
     
     # Retrieve the schema name of the current function
     # Make it available as variable: schema_madlib
@@ -435,23 +435,23 @@ CREATE FUNCTION __newplda_util_norm_dataset(data_table text, norm_vocab_table te
     global schema_madlib
     schema_madlib = rv[0]['nspname']    
 
-    newplda.norm_dataset(data_table, norm_vocab_table, output_data_table)
+    lda.norm_dataset(data_table, norm_vocab_table, output_data_table)
     return [[output_data_table,'normalized data table']]
 $$
     LANGUAGE plpythonu STRICT;
 
 
 
-CREATE FUNCTION __newplda_util_norm_vocab(vocab_table text, output_vocab_table text) RETURNS SETOF newplda_result
+CREATE FUNCTION __lda_util_norm_vocab(vocab_table text, output_vocab_table text) RETURNS SETOF lda_result
     AS $$
     
     import sys
     from inspect import getframeinfo, currentframe
     try:
-        from newplda import newplda
+        from lda import lda
     except:
         sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
-        from newplda import newplda
+        from lda import lda
     
     # Retrieve the schema name of the current function
     # Make it available as variable: schema_madlib
@@ -467,23 +467,23 @@ CREATE FUNCTION __newplda_util_norm_vocab(vocab_table text, output_vocab_table t
     global schema_madlib
     schema_madlib = rv[0]['nspname']    
 
-    newplda.norm_vocab(vocab_table, output_vocab_table)
+    lda.norm_vocab(vocab_table, output_vocab_table)
     return [[output_vocab_table,'normalized vocbulary table']]
 $$
     LANGUAGE plpythonu STRICT;
 
 
 
-CREATE FUNCTION __newplda_util_norm_with_smoothing(arr double precision[], smooth double precision) RETURNS double precision[]
+CREATE FUNCTION __lda_util_norm_with_smoothing(arr double precision[], smooth double precision) RETURNS double precision[]
     AS $$
     
     import sys
     from inspect import getframeinfo, currentframe
     try:
-        from newplda import newplda
+        from lda import lda
     except:
         sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
-        from newplda import newplda
+        from lda import lda
     
     # Retrieve the schema name of the current function
     # Make it available as variable: schema_madlib
@@ -499,20 +499,20 @@ CREATE FUNCTION __newplda_util_norm_with_smoothing(arr double precision[], smoot
     global schema_madlib
     schema_madlib = rv[0]['nspname']    
 
-    return newplda.l1_norm_with_smoothing(arr, smooth)
+    return lda.l1_norm_with_smoothing(arr, smooth)
 $$
     LANGUAGE plpythonu STRICT;
 
 
 
-CREATE FUNCTION __newplda_util_transpose(matrix integer[]) RETURNS integer[]
-    AS '$libdir/libmadlib.so', 'newplda_transpose'
+CREATE FUNCTION __lda_util_transpose(matrix integer[]) RETURNS integer[]
+    AS '$libdir/libmadlib.so', 'lda_transpose'
     LANGUAGE c IMMUTABLE STRICT;
 
 
 
-CREATE FUNCTION __newplda_util_unnest(arr integer[]) RETURNS SETOF integer[]
-    AS '$libdir/libmadlib.so', 'newplda_unnest'
+CREATE FUNCTION __lda_util_unnest(arr integer[]) RETURNS SETOF integer[]
+    AS '$libdir/libmadlib.so', 'lda_unnest'
     LANGUAGE c IMMUTABLE STRICT;
 
 
@@ -2109,16 +2109,16 @@ CREATE FUNCTION mw_test_transition(state double precision[], first boolean, valu
 
 
 
-CREATE FUNCTION newplda_get_topic_desc(model_table text, vocab_table text, desc_table text, top_k integer) RETURNS SETOF newplda_result
+CREATE FUNCTION lda_get_topic_desc(model_table text, vocab_table text, desc_table text, top_k integer) RETURNS SETOF lda_result
     AS $$
     
     import sys
     from inspect import getframeinfo, currentframe
     try:
-        from newplda import newplda
+        from lda import lda
     except:
         sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
-        from newplda import newplda
+        from lda import lda
     
     # Retrieve the schema name of the current function
     # Make it available as variable: schema_madlib
@@ -2134,7 +2134,7 @@ CREATE FUNCTION newplda_get_topic_desc(model_table text, vocab_table text, desc_
     global schema_madlib
     schema_madlib = rv[0]['nspname']    
 
-    newplda.get_topic_desc(
+    lda.get_topic_desc(
         schema_madlib, model_table, vocab_table, desc_table, top_k)
     return [[
         desc_table, 
@@ -2145,16 +2145,16 @@ $$
 
 
 
-CREATE FUNCTION newplda_get_topic_word_count(model_table text, output_table text) RETURNS SETOF newplda_result
+CREATE FUNCTION lda_get_topic_word_count(model_table text, output_table text) RETURNS SETOF lda_result
     AS $$
     
     import sys
     from inspect import getframeinfo, currentframe
     try:
-        from newplda import newplda
+        from lda import lda
     except:
         sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
-        from newplda import newplda
+        from lda import lda
     
     # Retrieve the schema name of the current function
     # Make it available as variable: schema_madlib
@@ -2170,23 +2170,23 @@ CREATE FUNCTION newplda_get_topic_word_count(model_table text, output_table text
     global schema_madlib
     schema_madlib = rv[0]['nspname']    
 
-    newplda.get_topic_word_count(schema_madlib, model_table, output_table)
+    lda.get_topic_word_count(schema_madlib, model_table, output_table)
     return [[output_table, 'per-topic word counts']]
 $$
     LANGUAGE plpythonu STRICT;
 
 
 
-CREATE FUNCTION newplda_get_word_topic_count(model_table text, output_table text) RETURNS SETOF newplda_result
+CREATE FUNCTION lda_get_word_topic_count(model_table text, output_table text) RETURNS SETOF lda_result
     AS $$
     
     import sys
     from inspect import getframeinfo, currentframe
     try:
-        from newplda import newplda
+        from lda import lda
     except:
         sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
-        from newplda import newplda
+        from lda import lda
     
     # Retrieve the schema name of the current function
     # Make it available as variable: schema_madlib
@@ -2202,23 +2202,23 @@ CREATE FUNCTION newplda_get_word_topic_count(model_table text, output_table text
     global schema_madlib
     schema_madlib = rv[0]['nspname']    
 
-    newplda.get_word_topic_count(schema_madlib, model_table, output_table)
+    lda.get_word_topic_count(schema_madlib, model_table, output_table)
     return [[output_table, 'per-word topic counts']]
 $$
     LANGUAGE plpythonu STRICT;
 
 
 
-CREATE FUNCTION newplda_predict(data_table text, model_table text, output_table text) RETURNS SETOF newplda_result
+CREATE FUNCTION lda_predict(data_table text, model_table text, output_table text) RETURNS SETOF lda_result
     AS $$
     
     import sys
     from inspect import getframeinfo, currentframe
     try:
-        from newplda import newplda
+        from lda import lda
     except:
         sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
-        from newplda import newplda
+        from lda import lda
     
     # Retrieve the schema name of the current function
     # Make it available as variable: schema_madlib
@@ -2234,7 +2234,7 @@ CREATE FUNCTION newplda_predict(data_table text, model_table text, output_table 
     global schema_madlib
     schema_madlib = rv[0]['nspname']    
 
-    newplda.plda_predict(schema_madlib, data_table, model_table, output_table)
+    lda.lda_predict(schema_madlib, data_table, model_table, output_table)
     return [[
         output_table, 
         'per-doc topic distribution and per-word topic assignments']]
@@ -2243,16 +2243,16 @@ $$
 
 
 
-CREATE FUNCTION newplda_train(data_table text, model_table text, output_data_table text, voc_size integer, topic_num integer, iter_num integer, alpha double precision, beta double precision) RETURNS SETOF newplda_result
+CREATE FUNCTION lda_train(data_table text, model_table text, output_data_table text, voc_size integer, topic_num integer, iter_num integer, alpha double precision, beta double precision) RETURNS SETOF lda_result
     AS $$
     
     import sys
     from inspect import getframeinfo, currentframe
     try:
-        from newplda import newplda
+        from lda import lda
     except:
         sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
-        from newplda import newplda
+        from lda import lda
     
     # Retrieve the schema name of the current function
     # Make it available as variable: schema_madlib
@@ -2268,7 +2268,7 @@ CREATE FUNCTION newplda_train(data_table text, model_table text, output_data_tab
     global schema_madlib
     schema_madlib = rv[0]['nspname']    
 
-    newplda.plda_train(
+    lda.lda_train(
         schema_madlib, data_table, model_table, output_data_table, voc_size,
         topic_num, iter_num, alpha, beta
     )
@@ -2918,10 +2918,10 @@ CREATE FUNCTION wsr_test_transition(state double precision[], value double preci
 
 
 
-CREATE AGGREGATE __newplda_count_topic_agg(integer[], integer[], integer[], integer, integer) (
-    SFUNC = __newplda_count_topic_sfunc,
+CREATE AGGREGATE __lda_count_topic_agg(integer[], integer[], integer[], integer, integer) (
+    SFUNC = __lda_count_topic_sfunc,
     STYPE = integer[],
-    PREFUNC = __newplda_count_topic_prefunc
+    PREFUNC = __lda_count_topic_prefunc
 );
 
 

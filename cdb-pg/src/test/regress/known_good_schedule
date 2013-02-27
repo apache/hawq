@@ -15,7 +15,7 @@ ignore: goh_dpe
 ignore: goh_gpic
 ignore: goh_eagerfree
 test: goh_toast
-test: goh_alter_distribution_policy
+ignore: goh_alter_distribution_policy
 ignore: goh_column_compression
 test: goh_database
 test: goh_gp_dist_random
@@ -23,8 +23,6 @@ test: gpsql_fault_tolerance
 test: gpsql_alter_table
 test: goh_portals
 test: goh_prepare
-test: goh_set_schema
-test: goh_alter_owner
 test: boolean
 test: char
 test: name
@@ -204,7 +202,7 @@ test: madlib_sample
 test: madlib_linalg
 test: madlib_assoc_rules
 test: madlib_linear
-test: madlib_newplda
+test: madlib_lda
 test: madlib_logistic
 test: madlib_multilogistic
 test: madlib_kmeans
