@@ -498,7 +498,7 @@ class GpSystemStateProgram:
         tabLog.addSeparator()
 
         # primary and mirror segment info
-        for whichType in ["Primary", "Mirror"]:
+        for whichType in ["Primary"]:
             tabLog.info(["%s Segment Status" % whichType])
             tabLog.addSeparator()
 
@@ -1439,8 +1439,12 @@ class GpSystemStateProgram:
 
         # do it!
         if self.__options.showMirrorList:
+            logger.fatal('"-m (list mirrors)" option NOT SUPPORTED YET IN GPSQL')
+            sys.exit(1)
             exitCode = self._showMirrorList(gpEnv, gpArray)
         elif self.__options.showClusterConfig:
+            logger.fatal('"-c (show primary to mirror mappings)" option NOT SUPPORTED YET IN GPSQL')
+            sys.exit(1)
             exitCode = self.__showClusterConfig(gpEnv, gpArray)
         elif self.__options.showQuickStatus:
             exitCode = self.__showQuickStatus(gpEnv, gpArray)
@@ -1449,6 +1453,8 @@ class GpSystemStateProgram:
         elif self.__options.showVersionInfo:
             exitCode = self.__showVersionInfo(gpEnv, gpArray)
         elif self.__options.showSummaryOfSegmentsWhichRequireAttention:
+            logger.fatal('"-e (show segments with mirror status issues)" option NOT SUPPORTED YET IN GPSQL')
+            sys.exit(1)
             exitCode = self.__showSummaryOfSegmentsWhichRequireAttention(gpEnv, gpArray)
         elif self.__options.printSampleExternalTableSqlForSegmentStatus:
             exitCode = self.__printSampleExternalTableSqlForSegmentStatus(gpEnv)

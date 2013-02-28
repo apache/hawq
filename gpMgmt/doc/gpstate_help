@@ -29,8 +29,6 @@ such as:
 * Master and segment configuration information (hosts, 
   data directories, etc.).
 * The ports used by the system.
-* A mapping of primary segments to their corresponding 
-  mirror segments.
 
 *****************************************************
 OPTIONS
@@ -49,28 +47,10 @@ OPTIONS
   how many segment instances it needs to check.
 
 
--c (show primary to mirror mappings)
-
-  Optional. Display mapping of primary segments to their 
-  corresponding mirror segments.
-
-
 -d <master_data_directory>
 
   Optional. The master data directory. If not specified, the 
   value set for $MASTER_DATA_DIRECTORY will be used.
-
-
--e (show segments with mirror status issues)
-
-  Show details on primary/mirror segment pairs that have 
-  potential issues such as 1) the active segment is running in 
-  change tracking mode, meaning a segment is down 2) the active 
-  segment is in resynchronization mode, meaning it is catching 
-  up changes to the mirror 3) a segment is not in its preferred role, 
-  for example a segment that was a primary at system initialization 
-  time is now acting as a mirror, meaning you may have one or more 
-  segment hosts with unbalanced processing load.
 
 
 -f (show standby master details)
@@ -87,12 +67,6 @@ OPTIONS
 -l <logfile_directory>
 
   The directory to write the log file. Defaults to ~/gpAdminLogs.
-
-
--m (list mirrors)
- 
-  Optional. List the mirror segment instances in the system, 
-  their current role, and synchronization status.
 
 
 -p (show ports)
@@ -161,8 +135,6 @@ MASTER OUTPUT DATA
 * Postgres version - version of PostgreSQL that Greenplum Database 
                      is based on
 
-* Greenplum mirroring status - physical mirroring, SAN or none
-
 * Master standby - host name of the standby master
 
 * Standby master state - status of the standby master: active or passive
@@ -179,29 +151,9 @@ SEGMENT OUTPUT DATA
 
 * Port - port number of segment postgres database listener process
 
-* Current Role - current role of a segment: Mirror or Primary 
+* Current Role - current role of a segment: Primary 
 
-* Preferred Role - role at system initialization time: Mirror or Primary
-
-* Mirror Status - status of a primary/mirror segment pair:
-                Synchronized = data is up to date on both 
-                Resynchronizing = data is currently being copied from one to the other
-                Change Tracking = segment down and active segment is logging changes
-
-* Change tracking data size - when in Change Tracking mode, the size of the change 
-                            log file (may grow and shrink as compression is applied)
-
-* Estimated total data to synchronize - when in Resynchronization mode, the estimated 
-                                      size of data left to syncronize
-
-* Data synchronized - when in Resynchronization mode, the estimated size of data 
-                    that has already been syncronized
-
-* Estimated resync progress with mirror - when in Resynchronization mode, the 
-                                        estimated percentage of completion
-
-* Estimated resync end time - when in Resynchronization mode, the estimated 
-                            time to complete
+* Preferred Role - role at system initialization time: Primary
 
 * File postmaster.pid - status of postmaster.pid lock file: Found or Missing
 
@@ -232,11 +184,6 @@ Show detailed status information of a Greenplum Database system:
 Do a quick check for down segments in the master host system catalog:
 
    gpstate -Q
-
-
-Show information about mirror segment instances:
-
-   gpstate -m
 
 
 Show information about the standby master configuration:
