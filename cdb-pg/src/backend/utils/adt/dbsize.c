@@ -452,7 +452,12 @@ pg_relation_size_oid(PG_FUNCTION_ARGS)
 	Relation	rel;
 	int64		size = 0;
 	
-	Assert(Gp_role != GP_ROLE_EXECUTE);
+	if (GP_ROLE_EXECUTE == Gp_role)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_GP_COMMAND_ERROR),
+						errmsg("pg_relation_size: cannot be executed in segment")));
+	}
 
 	rel = relation_open(relOid, AccessShareLock);
 	
@@ -474,7 +479,12 @@ pg_relation_size_name(PG_FUNCTION_ARGS)
 	Relation	rel;
 	int64		size;
 	
-	Assert(Gp_role != GP_ROLE_EXECUTE);
+	if (GP_ROLE_EXECUTE == Gp_role)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_GP_COMMAND_ERROR),
+						errmsg("pg_relation_size: cannot be executed in segment")));
+	}
 
 	relrv = makeRangeVarFromNameList(textToQualifiedNameList(relname));
 	
