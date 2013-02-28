@@ -110,6 +110,23 @@ WSAPoll(
 #endif
 
 #define MAX_TRY (11)
+int
+timeoutArray[] =
+{
+	1,
+	1,
+	2,
+	4,
+	8,
+	16,
+	32,
+	64,
+	128,
+	256,
+	512,
+	512 /* MAX_TRY*/
+};
+#define TIMEOUT(try) ((try) < MAX_TRY ? (timeoutArray[(try)]) : (timeoutArray[MAX_TRY]))
 
 /* 1/4 sec in msec */
 #define RX_THREAD_POLL_TIMEOUT (250)
@@ -5410,7 +5427,7 @@ computeTimeout(MotionConn *conn, int retry)
         return TIMER_CHECKING_PERIOD;
 
     /* for capacity based flow control */
-    return Min((1 << (Max(buf->nRetry, 1) - 1)), 512);
+    return TIMEOUT(buf->nRetry);
 }
 
 /*
