@@ -1284,7 +1284,7 @@ dumpTablespaces(PGconn *conn)
 						   "FROM pg_catalog.pg_tablespace t, "
 						   "pg_catalog.pg_filespace fs "
 						   "WHERE t.spcfsoid = fs.oid AND spcname !~ '^pg_' "
-						   "ORDER BY 1");
+						   "and spcname != 'dfs_default' ORDER BY 1");
 	}
 
 	if (PQntuples(res) > 0)
@@ -1388,14 +1388,15 @@ dumpCreateDB(PGconn *conn)
 		 * We do want to emit their ACLs and config options if any, however.
 		 */
 		if (strcmp(dbname, "template0") != 0 &&
-			strcmp(dbname, "postgres") != 0)
+			strcmp(dbname, "postgres") != 0 &&
+			strcmp(dbname, "template1") != 0)
 		{
 			if (output_clean)
 				appendPQExpBuffer(buf, "DROP DATABASE %s;\n", fdbname);
 
 			appendPQExpBuffer(buf, "CREATE DATABASE %s", fdbname);
 
-			appendPQExpBuffer(buf, " WITH TEMPLATE = template0");
+			appendPQExpBuffer(buf, " WITH TEMPLATE = template1");
 
 			if (strlen(dbowner) != 0)
 				appendPQExpBuffer(buf, " OWNER = %s", fmtId(dbowner));
