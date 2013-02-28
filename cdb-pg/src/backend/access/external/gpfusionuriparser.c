@@ -1,18 +1,20 @@
-#include "uriparser.h"
+#include "access/gpfusionuriparser.h"
 #include "utils/formatting.h"
 
 static const char* segwork_substring = "segwork=";
+static const char segwork_separator = '@';
 
 static void  GPHDUri_parse_protocol(GPHDUri *uri, char **cursor);
 static void  GPHDUri_parse_authority(GPHDUri *uri, char **cursor);
-static void  GPHDUri_parse_type(GPHDUri *uri, char **cursor);
 static void  GPHDUri_parse_data(GPHDUri *uri, char **cursor);
 static void  GPHDUri_parse_options(GPHDUri *uri, char **cursor);
-static void  GPHDUri_verify_type(GPHDUri *uri);
+static List* GPHDUri_parse_option(char* pair, List* options, const char* uri);
+static void  GPHDUri_free_options(GPHDUri *uri);
 static void  GPHDUri_parse_segwork(GPHDUri *uri, const char *uri_str);
 static List* GPHDUri_parse_fragment(char* fragment, List* fragments);
 static void  GPHDUri_free_fragments(GPHDUri *uri);
 static char* GPHDUri_dup_without_segwork(const char* uri);
+static void  GPHDUri_debug_print_options(GPHDUri *uri);
 static void  GPHDUri_debug_print_segwork(GPHDUri *uri);
 
 /* parseGPHDUri
@@ -21,14 +23,12 @@ static void  GPHDUri_debug_print_segwork(GPHDUri *uri);
  * verifying valid structure given a specific target protocol.
  *
  * URI format:
- * 		<protocol name>://<authority>/<type>/<data>?<option>&<option>&<...>&segwork=<segwork>
+ * 		<protocol name>://<authority>/<data>?<option>&<option>&<...>&segwork=<segwork>
  *
- * currently supported protocols for HD are 'gphdfs' and 'gphbase'.
  *
  * protocol name	- must be 'gpfusion'
  * authority		- host:port
- * type				- either 'hdfs' or 'hbase'
- * data				- directory name (gphdfs) or table name (gphbase)
+ * data				- data path (directory name/table name/etc., depending on target)
  * options			- valid options are dependent on the protocol. Each
  * 					  option is a key value pair.
  * 					  segwork option is not a user option but a gp master
@@ -53,7 +53,6 @@ parseGPHDUri(const char *uri_str)
 	GPHDUri_parse_segwork(uri, uri_str);
 	GPHDUri_parse_protocol(uri, &cursor);
 	GPHDUri_parse_authority(uri, &cursor);
-	GPHDUri_parse_type(uri, &cursor);
 	GPHDUri_parse_data(uri, &cursor);
 	GPHDUri_parse_options(uri, &cursor);
 
@@ -63,30 +62,44 @@ parseGPHDUri(const char *uri_str)
 void
 freeGPHDUri(GPHDUri *uri)
 {
-	GPHDUri_verify_type(uri);
 
 	pfree(uri->protocol);
 	GPHDUri_free_fragments(uri);
 
-	if (uri->type == URI_GPHDFS)
-	{
-		pfree(uri->host);
-		pfree(uri->port);
-		pfree(uri->u.hdfs.directory);
-		pfree(uri->u.hdfs.accessor);
+	pfree(uri->host);
+	pfree(uri->port);
+	pfree(uri->data);
 
-		if(uri->u.hdfs.data_schema)
-			pfree(uri->u.hdfs.data_schema);
-
-		pfree(uri->u.hdfs.resolver);
-	}
-	else
-	{
-		pfree(uri->u.hbase.table_name);
-	}
+	GPHDUri_free_options(uri);
 
 	pfree(uri);
 }
+
+/*
+ * GPHDUri_get_value_for_opt
+ *
+ * Given a key, find the matching val and assign it to 'val'.
+ * Returns 0 if the key was found, -1 otherwise.
+ */
+int
+GPHDUri_get_value_for_opt(GPHDUri *uri, char *key, char **val)
+{
+	ListCell	*item;
+
+	foreach(item, uri->options)
+	{
+		OptionData *data = (OptionData*)lfirst(item);
+
+		if (pg_strcasecmp(data->key, key) == 0)
+		{
+			*val = data->value;
+			return 0;
+		}
+	}
+
+	return -1;
+}
+
 
 /*
  * GPHDUri_parse_protocol
@@ -210,44 +223,6 @@ GPHDUri_parse_authority(GPHDUri *uri, char **cursor)
 }
 
 /*
- * GPHDUri_parse_type
- *
- * parses the type section of the uri
- */
-static void  
-GPHDUri_parse_type(GPHDUri *uri, char **cursor)
-{
-	char	*start = *cursor;
-	char	*end = strchr(start, '/');
-	char	*type;
-	int		 type_len;
-
-	if (!end)
-		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("invalid URI %s: missing type ('hbase/hdfs')",
-						uri->uri)));
-
-	type_len = end - start;
-	type = pnstrdup(start, type_len);
-
-	if (pg_strcasecmp(type, "hdfs") == 0)
-		uri->type = URI_GPHDFS;
-	else if (pg_strcasecmp(type, "hbase") == 0)
-		uri->type = URI_GPHBASE;
-	else
-		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("invalid URI %s : unsupported type '%s'",
-						uri->uri, type)));
-
-	pfree(type);
-
-	/* set cursor to skip type trailing '/' */
-	*cursor = start + type_len + 1;
-}
-
-/*
  * GPHDUri_parse_data
  *
  * Parse the data section of the URI which is passed down
@@ -260,10 +235,8 @@ static void
 GPHDUri_parse_data(GPHDUri *uri, char **cursor)
 {
 	char	*start = *cursor;
-	char	*options_section = strchr(start, '?');
+	char	*options_section = strrchr(start, '?');
 	size_t	 data_len;
-
-	GPHDUri_verify_type(uri);
 
 	/*
 	 * If there exists an 'options' section, the data section length
@@ -275,42 +248,8 @@ GPHDUri_parse_data(GPHDUri *uri, char **cursor)
 	else
 		data_len = strlen(start);
 
-
-	if (uri->type == URI_GPHDFS)
-	{
-		/* gphdfs: directory name */
-		uri->u.hdfs.directory = pnstrdup(start, data_len);
-	}
-	else /* URI_GPHBASE */
-	{
-		/* gphbase: table name */
-		uri->u.hbase.table_name = pnstrdup(start, data_len);
-	}
-
+	uri->data = pnstrdup(start, data_len);
 	*cursor += data_len;
-}
-
-/*
- * GPHDUri_default_options
- *
- * Set the default options for each URI type.
- */
-static void
-GPHDUri_default_options(GPHDUri *uri)
-{
-	if (uri->type == URI_GPHBASE)
-	{
-		/* gphbase doesn't support options yet */
-	}
-	else /* URI_GPHDFS */
-	{
-		if(!uri->u.hdfs.accessor)
-			uri->u.hdfs.accessor = pstrdup("SequenceFileAccessor");
-		if(!uri->u.hdfs.data_schema)
-			uri->u.hdfs.data_schema = pstrdup("schema.idl");
-		if(!uri->u.hdfs.resolver)
-			uri->u.hdfs.resolver = pstrdup("WritableResolver");
-	}
 }
 
 /*
@@ -325,14 +264,15 @@ GPHDUri_default_options(GPHDUri *uri)
 static void
 GPHDUri_parse_options(GPHDUri *uri, char **cursor)
 {
-	char	*start = *cursor;
-
-	GPHDUri_verify_type(uri);
-	GPHDUri_default_options(uri);
+	char    *dup = pstrdup(*cursor);
+	char	*start = dup;
 
 	/* option section must start with '?'. if absent, there are no options */
-	if (start[0] != '?')
-		return;
+	if (!start || start[0] != '?')
+		ereport(ERROR,
+				(errcode(ERRCODE_SYNTAX_ERROR),
+				 errmsg("invalid URI %s: missing options section",
+						uri->uri)));
 
 	/* skip '?' */
 	start++;
@@ -341,73 +281,79 @@ GPHDUri_parse_options(GPHDUri *uri, char **cursor)
 	if (strlen(start) < 2)
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("invalid %s URI %s: invalid option after '?'",
-						(uri->type == URI_GPHDFS ? "hdfs" : "hbase"),
+				 errmsg("invalid URI %s: invalid option after '?'",
 						uri->uri)));
 
 	/* ok, parse the options now */
-	if (uri->type == URI_GPHDFS)
+
+	const char	*sep = "&";
+	char		*strtok_context;
+	char		*pair;
+
+	for (pair = strtok_r(start, sep, &strtok_context);
+			pair;
+			pair = strtok_r(NULL, sep, &strtok_context))
 	{
-		const char	*sep = "&";
-		char		*strtok_context;
-		char		*pair;
-
-		for (pair = strtok_r(start, sep, &strtok_context);
-			 pair;
-			 pair = strtok_r(NULL, sep, &strtok_context))
-		{
-			const char	*opt_accessor	= "accessor=";
-			const char	*opt_schema		= "schema=";
-			const char	*opt_resolver	= "resolver=";
-			
-			if (pg_strncasecmp(pair, opt_accessor, strlen(opt_accessor)) == 0)
-			{
-				const char	*value 		= pair + strlen(opt_accessor);
-
-				pfree(uri->u.hdfs.accessor);
-				uri->u.hdfs.accessor = pstrdup(value);
-			}
-			else if (pg_strncasecmp(pair, opt_schema, strlen(opt_schema)) == 0)
-			{
-				const char	*value 		= pair + strlen(opt_schema);
-
-				pfree(uri->u.hdfs.data_schema);
-				uri->u.hdfs.data_schema = pstrdup(value); /* keep case */
-			}
-			else if (pg_strncasecmp(pair, opt_resolver, strlen(opt_resolver)) == 0)
-			{
-				const char	*value 		= pair + strlen(opt_resolver);
-
-				pfree(uri->u.hdfs.resolver);
-				uri->u.hdfs.resolver = pstrdup(value);
-			}
-			else
-			{
-				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
-						errmsg("invalid gpfusion/hdfs URI %s: invalid option %s",
-								uri->uri, pair)));
-			}
-		}
+		uri->options = GPHDUri_parse_option(pair, uri->options, uri->uri);
 	}
-	else /* URI_GPHBASE */
-	{
-		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("invalid gpfusion/hbase URI %s: extra options after table "
-						"name", uri->uri)));
-	}
+
+	pfree(dup);
+
 }
 
-static void
-GPHDUri_verify_type(GPHDUri *uri)
+/*
+ * Parse an option in the form:
+ * <key>=<value>
+ * to OptionData object (key and value).
+ */
+static List*
+GPHDUri_parse_option(char* pair, List* options, const char* uri)
 {
-	if (uri->type != URI_GPHDFS && uri->type != URI_GPHBASE)
-	{
+
+	char	*sep;
+	int		pair_len, key_len, value_len;
+	OptionData* option_data;
+
+	option_data = palloc0(sizeof(OptionData));
+	pair_len = strlen(pair);
+
+	sep = strchr(pair, '=');
+	if (sep == NULL) {
 		ereport(ERROR,
-				(errcode(ERRCODE_INTERNAL_ERROR),
-				 errmsg("Internal error in GPHDUri parser. Unsupported type")));
+				(errcode(ERRCODE_SYNTAX_ERROR),
+				 errmsg("Invalid URI %s: option '%s' missing '='", uri, pair)));
 	}
+
+	key_len = sep - pair;
+	if (key_len == 0) {
+		ereport(ERROR,
+				(errcode(ERRCODE_SYNTAX_ERROR),
+				 errmsg("Invalid URI %s: option '%s' missing key before '='", uri, pair)));
+	}
+	option_data->key = pnstrdup(pair,key_len);
+	value_len = pair_len - key_len + 1;
+	option_data->value = pnstrdup(sep + 1, value_len);
+
+	return lappend(options, option_data);
+}
+
+/*
+ * Free options list
+ */
+static void
+GPHDUri_free_options(GPHDUri *uri)
+{
+	ListCell *option = NULL;
+
+	foreach(option, uri->options)
+	{
+		OptionData *data = (OptionData*)lfirst(option);
+		pfree(data->key);
+		pfree(data->value);
+		pfree(data);
+	}
+	list_free(uri->options);
+	uri->options = NIL;
 }
 
 /*
@@ -418,31 +364,38 @@ GPHDUri_verify_type(GPHDUri *uri)
 void
 GPHDUri_debug_print(GPHDUri *uri)
 {
-	bool	is_hdfs = (uri->type == URI_GPHDFS);
 
-	GPHDUri_verify_type(uri);
+	elog(NOTICE,
+		 "URI: %s, Host: %s, Port: %s, Data Path: %s",
+		 uri->uri,
+		 uri->host,
+		 uri->port,
+		 uri->data);
 
-	if (is_hdfs)
-	{
-		elog(NOTICE,
-			 "Type: GPHDFS, Host: %s, Port: %s, Dir: %s, Type: %s, Idl: %s, Ser: %s",
-			 uri->host,
-			 uri->port,
-			 uri->u.hdfs.directory,
-			 uri->u.hdfs.accessor,
-			 uri->u.hdfs.data_schema,
-			 uri->u.hdfs.resolver);
-	}
-	else
-	{
-		elog(NOTICE,
-			 "Type: GPHBASE, Host: %s, Port: %s, Table: %s",
-			 uri->host,
-			 uri->port,
-			 uri->u.hbase.table_name);
-	}
-
+	GPHDUri_debug_print_options(uri);
 	GPHDUri_debug_print_segwork(uri);
+}
+
+/*
+ * GPHDUri_debug_print_options
+ *
+ * For debugging while development only.
+ */
+void
+GPHDUri_debug_print_options(GPHDUri *uri)
+{
+	ListCell	*item;
+	int			count = 0;
+
+	elog(NOTICE, "options section data: ");
+	foreach(item, uri->options)
+	{
+		OptionData *data = (OptionData*)lfirst(item);
+		elog(NOTICE,
+			 "%u: key: %s, value: %s",
+			 count, data->key, data->value);
+		++count;
+	}
 }
 
 /*
@@ -460,24 +413,33 @@ GPHDUri_debug_print_segwork(GPHDUri *uri)
 	foreach(item, uri->fragments)
 	{
 		FragmentData *data = (FragmentData*)lfirst(item);
-		elog(NOTICE,
-			 "%u: authority: %s, index %s",
-			 count, data->authority, data->index);
+		if (data->user_data)
+		{
+			elog(NOTICE,
+				 "%u: authority: %s, index %s, user data: %s",
+				 count, data->authority, data->index, data->user_data);
+		}
+		else
+		{
+			elog(NOTICE,
+				 "%u: authority: %s, index %s",
+				 count, data->authority, data->index);
+		}
 		++count;
 	}
 }
 
 /*
  * GPHDUri_parse_segwork parses the segwork section of the uri.
- * ...&segwork=<ip>@<port>@<index>+<ip>@<port>@<index>+...
+ * ...&segwork=<size>@<ip>@<port>@<index><size>@<ip>@<port>@<index><size>...
  */
 static void
 GPHDUri_parse_segwork(GPHDUri *uri, const char *uri_str)
 {
-	const char	*sep = "+";
 	char		*segwork;
-	char		*strtok_context;
 	char		*fragment;
+	char		*size_end;
+	int 		 fragment_size, count = 0;
 
 	/* skip segwork= */
 	segwork = strstr(uri_str, segwork_substring);
@@ -486,50 +448,89 @@ GPHDUri_parse_segwork(GPHDUri *uri, const char *uri_str)
 
 	segwork += strlen(segwork_substring);
 
-	/* separate by - */
-	for (fragment = strtok_r(segwork, sep, &strtok_context);
-		 fragment;
-		 fragment = strtok_r(NULL, sep, &strtok_context))
+	/*
+	 * read next segment.
+	 * each segment is prefixed its size.
+	 */
+	while (segwork && strlen(segwork))
+	{
+		/* expect size */
+		size_end = strchr(segwork, segwork_separator);
+		Assert(size_end != NULL);
+		*size_end = '\0';
+		fragment_size = atoi(segwork);
+		segwork = size_end + 1; /* skip the size field */
+		Assert(fragment_size <= strlen(segwork));
+
+		fragment = pnstrdup(segwork, fragment_size);
+		elog(DEBUG2, "GPHDUri_parse_segwork: fragment #%d, size %d, str %s", count, fragment_size, fragment);
 		uri->fragments = GPHDUri_parse_fragment(fragment, uri->fragments);
+		segwork += fragment_size;
+		++count;
+		pfree(fragment);
+	}
+
 }
 
 /*
  * Parsed a fragment string in the form:
- * <ip>@<port>@<index> - 192.168.1.1@1422@1
+ * <ip>@<port>@<index>[@user_data] - 192.168.1.1@1422@1[@user_data]
  * to authority ip:port - 192.168.1.1:1422
  * to index - 1
+ * user data is optional
  */
-static List* 
+static List*
 GPHDUri_parse_fragment(char* fragment, List* fragments)
 {
-	static const char	*sep = "@";
-	char	*strtok_context;
-	char	*value;
+
+	char	*dup_frag = pstrdup(fragment);
+	char	*value_start;
+	char	*value_end;
+	bool	has_user_data = false;
+
 	StringInfoData formatter;
 	FragmentData* fragment_data;
 
 	fragment_data = palloc0(sizeof(FragmentData));
 	initStringInfo(&formatter);
 
+	value_start = dup_frag;
 	/* expect ip */
-	value = strtok_r(fragment, sep, &strtok_context);
-	Assert(value != NULL);
-	appendStringInfo(&formatter, "%s:", value);
-
+	value_end = strchr(value_start, segwork_separator);
+	Assert(value_end != NULL);
+	*value_end = '\0';
+	appendStringInfo(&formatter, "%s:", value_start);
+	value_start = value_end + 1;
 	/* expect port */
-	value = strtok_r(NULL, sep, &strtok_context);
-	Assert(value != NULL);
-	appendStringInfo(&formatter, "%s", value);
+	value_end = strchr(value_start, segwork_separator);
+	Assert(value_end != NULL);
+	*value_end = '\0';
+	appendStringInfo(&formatter, "%s", value_start);
 	fragment_data->authority = formatter.data;
-
+	value_start = value_end + 1;
+	/* expect source name */
+	value_end = strchr(value_start, segwork_separator);
+	Assert(value_end != NULL);
+	*value_end = '\0';
+	fragment_data->source_name = pstrdup(value_start);
+	value_start = value_end + 1;
 	/* expect index */
-	value = strtok_r(NULL, sep, &strtok_context);
-	Assert(value != NULL);
-	fragment_data->index = pstrdup(value);
+	Assert(value_start);
 
-	/* expect the end */
-	value = strtok_r(NULL, sep, &strtok_context);
-	Assert(value == NULL);
+	/* check for user data */
+	value_end = strchr(value_start, segwork_separator);
+	if (value_end != NULL)
+	{
+		has_user_data = true;
+		*value_end = '\0';
+	}
+	fragment_data->index = pstrdup(value_start);
+
+	/* read user data */
+	if (has_user_data)
+	{
+		fragment_data->user_data = pstrdup(value_end + 1);
+	}
 
 	return lappend(fragments, fragment_data);
 }
@@ -547,6 +548,7 @@ GPHDUri_free_fragments(GPHDUri *uri)
 		FragmentData *data = (FragmentData*)lfirst(fragment);
 		pfree(data->authority);
 		pfree(data->index);
+		pfree(data->source_name);
 		pfree(data);
 	}
 	list_free(uri->fragments);

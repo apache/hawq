@@ -16,7 +16,6 @@ typedef enum UriProtocol
 	URI_FTP,
 	URI_HTTP,
 	URI_GPFDIST,
-	URI_GPHDFS,
 	URI_CUSTOM,
 	URI_GPFDISTS
 }	UriProtocol;

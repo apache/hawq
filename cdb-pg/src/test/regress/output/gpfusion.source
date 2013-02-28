@@ -1,0 +1,1934 @@
+--
+-- GPFusion regression suite 
+--
+-- Section 1: Test HDFS type syntax and data read.
+-- Section 2: Test HBASE type syntax and data read.
+--
+-- Prerequisites:
+--
+--   Must have a running hdfs with REST service on port 50070
+--   Must have a running hbase with REST service on port 60009
+--   Must have HADOOP_ROOT, HBASE_ROOT and ZOOKEEPER_ROOT set.
+--
+-- TODO: test gpdbwritable write/read when it is enabled.
+-- TODO: test PB, AVRO, THRIFT when it is enabled (read only, with pre formatted files).
+-- TODO: test protocol validator for gpfusion once written.
+-- TODO: test parameter passing, filter passing
+-- TODO: test file masks (/yyy/*) paths when it is available.
+--------------------------------------------------------------------------------
+-- GPHDFS
+--------------------------------------------------------------------------------
+--
+-- syntax validations
+--
+CREATE READABLE EXTERNAL TABLE gphdfs_in(a int, b text, c bytea)
+LOCATION ('gpfusion://@hostname@:50070/somepath/gpdb_regression_data?someuseropt=someuserval')
+FORMAT 'CUSTOM' (formatter='gpfusionwritable_import'); -- positive
+CREATE READABLE EXTERNAL TABLE gphdfs_in1(a int, b text, c bytea)
+LOCATION ('gpfusion://@hostname@:50070/gpdb_regression_data?ACCESSOR=SequenceFileAccessor&RESOLVER=AvroResolver&DATA-SCHEMA=MySchema')
+FORMAT 'CUSTOM' (formatter='gpfusionwritable_import'); -- positive
+CREATE READABLE EXTERNAL TABLE gphdfs_in2(a int, b text, c bytea)
+LOCATION ('gpfusion://@hostname@:50070/gpdb_regression_data/*')
+FORMAT 'CUSTOM' (formatter='gpfusionwritable_import'); -- negative
+ERROR:  invalid URI gpfusion://@hostname@:50070/gpdb_regression_data/*: missing options section
+DROP EXTERNAL TABLE gphdfs_in;
+DROP EXTERNAL TABLE gphdfs_in1;
+--
+-- Load HDFS with test data
+--
+\! ${HADOOP_ROOT}/bin/hadoop fs -mkdir /gpdb_regression_data
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gphdfs/writable_inside_sequence1.tbl /gpdb_regression_data/writable_inside_sequence1.tbl
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gphdfs/avro_inside_sequence.tbl /gpdb_regression_data/avro_inside_sequence.tbl; 
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gphdfs/avroformat_inside_avrofile.avro /gpdb_regression_data/avroformat_inside_avrofile.avro
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gphdfs/text_data.csv /gpdb_regression_data/text_data.csv
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gphdfs/protobuf_data.tbl /gpdb_regression_data/protobuf_data.tbl
+\! ${HADOOP_ROOT}/bin/hadoop fs -mkdir /gpdb_regression_data/wild
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gphdfs/writable_inside_sequence1.tbl /gpdb_regression_data/wild/writable_inside_sequence1.tbl
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gphdfs/writable_inside_sequence2.tbl /gpdb_regression_data/wild/writable_inside_sequence2.tbl
+\! sh @abs_srcdir@/helpers/create_table_file.sh @abs_srcdir@/data/gphdfs/multiblock.tbl
+creating file @abs_srcdir@/data/gphdfs/multiblock.tbl
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gphdfs/multiblock.tbl /gpdb_regression_data/multiblock.tbl
+--
+-- Test TEXT format on a file with many fields
+--
+CREATE EXTERNAL TABLE bigtext (s1 text, 
+                               s2 text, 
+							   s3 text, 
+							   d1 timestamp, 
+							   n1 int, 
+							   n2 int, 
+							   n3 int, 
+							   n4 int, 
+							   n5 int, 
+							   n6 int, 
+							   n7 int,
+                               s11 text, 
+							   s12 text, 
+							   s13 text, 
+							   d11 timestamp, 
+							   n11 int, 
+							   n12 int, 
+							   n13 int, 
+							   n14 int, 
+							   n15 int, 
+							   n16 int, 
+							   n17 int)
+LOCATION ('gpfusion://@hostname@:50070/gpdb_regression_data/text_data.csv?FRAGMENTER=HdfsDataFragmenter')
+FORMAT 'TEXT' (DELIMITER ',');
+SELECT n1, n2, n3, n4, n5, s1, s2, s3, d1 FROM bigtext ORDER BY n1;
+ n1 | n2  |  n3  |  n4  |  n5  |  s1  |  s2   |   s3   |            d1            
+----+-----+------+------+------+------+-------+--------+--------------------------
+  1 |  10 |  100 |  100 |  100 | s_1  | s_10  | s_100  | Wed Jun 01 12:30:30 2011
+  2 |  20 |  200 |  200 |  200 | s_2  | s_20  | s_200  | Wed Jun 01 12:30:30 2011
+  3 |  30 |  300 |  300 |  300 | s_3  | s_30  | s_300  | Wed Jun 01 12:30:30 2011
+  4 |  40 |  400 |  400 |  400 | s_4  | s_40  | s_400  | Wed Jun 01 12:30:30 2011
+  5 |  50 |  500 |  500 |  500 | s_5  | s_50  | s_500  | Wed Jun 01 12:30:30 2011
+  6 |  60 |  600 |  600 |  600 | s_6  | s_60  | s_600  | Wed Jun 01 12:30:30 2011
+  7 |  70 |  700 |  700 |  700 | s_7  | s_70  | s_700  | Wed Jun 01 12:30:30 2011
+  8 |  80 |  800 |  800 |  800 | s_8  | s_80  | s_800  | Wed Jun 01 12:30:30 2011
+  9 |  90 |  900 |  900 |  900 | s_9  | s_90  | s_900  | Wed Jun 01 12:30:30 2011
+ 10 | 100 | 1000 | 1000 | 1000 | s_10 | s_100 | s_1000 | Wed Jun 01 12:30:30 2011
+ 11 | 110 | 1100 | 1100 | 1100 | s_11 | s_110 | s_1100 | Wed Jun 01 12:30:30 2011
+ 12 | 120 | 1200 | 1200 | 1200 | s_12 | s_120 | s_1200 | Wed Jun 01 12:30:30 2011
+ 13 | 130 | 1300 | 1300 | 1300 | s_13 | s_130 | s_1300 | Wed Jun 01 12:30:30 2011
+ 14 | 140 | 1400 | 1400 | 1400 | s_14 | s_140 | s_1400 | Wed Jun 01 12:30:30 2011
+ 15 | 150 | 1500 | 1500 | 1500 | s_15 | s_150 | s_1500 | Wed Jun 01 12:30:30 2011
+ 16 | 160 | 1600 | 1600 | 1600 | s_16 | s_160 | s_1600 | Wed Jun 01 12:30:30 2011
+ 17 | 170 | 1700 | 1700 | 1700 | s_17 | s_170 | s_1700 | Wed Jun 01 12:30:30 2011
+ 18 | 180 | 1800 | 1800 | 1800 | s_18 | s_180 | s_1800 | Wed Jun 01 12:30:30 2011
+ 19 | 190 | 1900 | 1900 | 1900 | s_19 | s_190 | s_1900 | Wed Jun 01 12:30:30 2011
+ 20 | 200 | 2000 | 2000 | 2000 | s_20 | s_200 | s_2000 | Wed Jun 01 12:30:30 2011
+ 21 | 210 | 2100 | 2100 | 2100 | s_21 | s_210 | s_2100 | Wed Jun 01 12:30:30 2011
+ 22 | 220 | 2200 | 2200 | 2200 | s_22 | s_220 | s_2200 | Wed Jun 01 12:30:30 2011
+ 23 | 230 | 2300 | 2300 | 2300 | s_23 | s_230 | s_2300 | Wed Jun 01 12:30:30 2011
+ 24 | 240 | 2400 | 2400 | 2400 | s_24 | s_240 | s_2400 | Wed Jun 01 12:30:30 2011
+ 25 | 250 | 2500 | 2500 | 2500 | s_25 | s_250 | s_2500 | Wed Jun 01 12:30:30 2011
+ 26 | 260 | 2600 | 2600 | 2600 | s_26 | s_260 | s_2600 | Wed Jun 01 12:30:30 2011
+ 27 | 270 | 2700 | 2700 | 2700 | s_27 | s_270 | s_2700 | Wed Jun 01 12:30:30 2011
+ 28 | 280 | 2800 | 2800 | 2800 | s_28 | s_280 | s_2800 | Wed Jun 01 12:30:30 2011
+ 29 | 290 | 2900 | 2900 | 2900 | s_29 | s_290 | s_2900 | Wed Jun 01 12:30:30 2011
+ 30 | 300 | 3000 | 3000 | 3000 | s_30 | s_300 | s_3000 | Wed Jun 01 12:30:30 2011
+(30 rows)
+
+SELECT n11, n12, n13, n14, n15, s11, s12, s13, d11 FROM bigtext ORDER BY n11;
+ n11 | n12 | n13  | n14  | n15  | s11  |  s12  |  s13   |           d11            
+-----+-----+------+------+------+------+-------+--------+--------------------------
+   1 |  10 |  100 |  100 |  100 | s_1  | s_10  | s_100  | Wed Jun 01 12:30:30 2011
+   2 |  20 |  200 |  200 |  200 | s_2  | s_20  | s_200  | Wed Jun 01 12:30:30 2011
+   3 |  30 |  300 |  300 |  300 | s_3  | s_30  | s_300  | Wed Jun 01 12:30:30 2011
+   4 |  40 |  400 |  400 |  400 | s_4  | s_40  | s_400  | Wed Jun 01 12:30:30 2011
+   5 |  50 |  500 |  500 |  500 | s_5  | s_50  | s_500  | Wed Jun 01 12:30:30 2011
+   6 |  60 |  600 |  600 |  600 | s_6  | s_60  | s_600  | Wed Jun 01 12:30:30 2011
+   7 |  70 |  700 |  700 |  700 | s_7  | s_70  | s_700  | Wed Jun 01 12:30:30 2011
+   8 |  80 |  800 |  800 |  800 | s_8  | s_80  | s_800  | Wed Jun 01 12:30:30 2011
+   9 |  90 |  900 |  900 |  900 | s_9  | s_90  | s_900  | Wed Jun 01 12:30:30 2011
+  10 | 100 | 1000 | 1000 | 1000 | s_10 | s_100 | s_1000 | Wed Jun 01 12:30:30 2011
+  11 | 110 | 1100 | 1100 | 1100 | s_11 | s_110 | s_1100 | Wed Jun 01 12:30:30 2011
+  12 | 120 | 1200 | 1200 | 1200 | s_12 | s_120 | s_1200 | Wed Jun 01 12:30:30 2011
+  13 | 130 | 1300 | 1300 | 1300 | s_13 | s_130 | s_1300 | Wed Jun 01 12:30:30 2011
+  14 | 140 | 1400 | 1400 | 1400 | s_14 | s_140 | s_1400 | Wed Jun 01 12:30:30 2011
+  15 | 150 | 1500 | 1500 | 1500 | s_15 | s_150 | s_1500 | Wed Jun 01 12:30:30 2011
+  16 | 160 | 1600 | 1600 | 1600 | s_16 | s_160 | s_1600 | Wed Jun 01 12:30:30 2011
+  17 | 170 | 1700 | 1700 | 1700 | s_17 | s_170 | s_1700 | Wed Jun 01 12:30:30 2011
+  18 | 180 | 1800 | 1800 | 1800 | s_18 | s_180 | s_1800 | Wed Jun 01 12:30:30 2011
+  19 | 190 | 1900 | 1900 | 1900 | s_19 | s_190 | s_1900 | Wed Jun 01 12:30:30 2011
+  20 | 200 | 2000 | 2000 | 2000 | s_20 | s_200 | s_2000 | Wed Jun 01 12:30:30 2011
+  21 | 210 | 2100 | 2100 | 2100 | s_21 | s_210 | s_2100 | Wed Jun 01 12:30:30 2011
+  22 | 220 | 2200 | 2200 | 2200 | s_22 | s_220 | s_2200 | Wed Jun 01 12:30:30 2011
+  23 | 230 | 2300 | 2300 | 2300 | s_23 | s_230 | s_2300 | Wed Jun 01 12:30:30 2011
+  24 | 240 | 2400 | 2400 | 2400 | s_24 | s_240 | s_2400 | Wed Jun 01 12:30:30 2011
+  25 | 250 | 2500 | 2500 | 2500 | s_25 | s_250 | s_2500 | Wed Jun 01 12:30:30 2011
+  26 | 260 | 2600 | 2600 | 2600 | s_26 | s_260 | s_2600 | Wed Jun 01 12:30:30 2011
+  27 | 270 | 2700 | 2700 | 2700 | s_27 | s_270 | s_2700 | Wed Jun 01 12:30:30 2011
+  28 | 280 | 2800 | 2800 | 2800 | s_28 | s_280 | s_2800 | Wed Jun 01 12:30:30 2011
+  29 | 290 | 2900 | 2900 | 2900 | s_29 | s_290 | s_2900 | Wed Jun 01 12:30:30 2011
+  30 | 300 | 3000 | 3000 | 3000 | s_30 | s_300 | s_3000 | Wed Jun 01 12:30:30 2011
+(30 rows)
+
+DROP EXTERNAL TABLE bigtext;
+--
+-- Test Writable data inside a SequenceFile (read only).
+--
+CREATE EXTERNAL TABLE seqwr(tmp1  timestamp, 
+                            num1  integer, 
+                            num2  integer, 
+                            num3  integer, 
+                            num4  integer,
+                            t1    text, 
+                            t2    text, 
+                            t3    text, 
+                            t4    text, 
+                            t5    text, 
+                            t6    text, 
+                            dub1  double precision, 
+                            dub2  double precision, 
+                            dub3  double precision, 
+                            ft1   real, 
+                            ft2   real, 
+                            ft3   real, 
+                            ln1   bigint, 
+                            ln2   bigint, 
+                            ln3   bigint, 
+                            bt    bytea)
+LOCATION ('gpfusion://@hostname@:50070/gpdb_regression_data/writable_inside_sequence1.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='gpfusionwritable_import');
+SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt FROM seqwr ORDER BY num1;
+             tmp1             | num1 | num2 | num3 | num4 | ln1 | ln2 | ln3 |         bt          
+------------------------------+------+------+------+------+-----+-----+-----+---------------------
+ Wed Jan 11 14:48:24.577 2012 |   10 |   20 |   10 |   20 |  30 |  40 |  15 | Sarkozy\000\000\000
+ Wed Jan 11 14:48:24.58 2012  |   20 |   40 |   20 |   40 |  60 |  80 |  25 | Sarkozy\000\000\000
+ Wed Jan 11 14:48:24.58 2012  |   30 |   60 |   30 |   60 |  90 | 120 |  35 | Sarkozy\000\000\000
+ Wed Jan 11 14:48:24.581 2012 |   40 |   80 |   40 |   80 | 120 | 160 |  45 | Sarkozy\000\000\000
+ Wed Jan 11 14:48:24.581 2012 |   50 |  100 |   50 |  100 | 150 | 200 |  55 | Sarkozy\000\000\000
+ Wed Jan 11 14:48:24.582 2012 |   60 |  120 |   60 |  120 | 180 | 240 |  65 | Sarkozy\000\000\000
+ Wed Jan 11 14:48:24.582 2012 |   70 |  140 |   70 |  140 | 210 | 280 |  75 | Sarkozy\000\000\000
+ Wed Jan 11 14:48:24.582 2012 |   80 |  160 |   80 |  160 | 240 | 320 |  85 | Sarkozy\000\000\000
+ Wed Jan 11 14:48:24.582 2012 |   90 |  180 |   90 |  180 | 270 | 360 |  95 | Sarkozy\000\000\000
+ Wed Jan 11 14:48:24.582 2012 |  100 |  200 |  100 |  200 | 300 | 400 | 105 | Sarkozy\000\000\000
+ Wed Jan 11 14:48:24.582 2012 |  110 |  220 |  110 |  220 | 330 | 440 | 115 | Sarkozy\000\000\000
+ Wed Jan 11 14:48:24.583 2012 |  120 |  240 |  120 |  240 | 360 | 480 | 125 | Sarkozy\000\000\000
+ Wed Jan 11 14:48:24.583 2012 |  130 |  260 |  130 |  260 | 390 | 520 | 135 | Sarkozy\000\000\000
+ Wed Jan 11 14:48:24.583 2012 |  140 |  280 |  140 |  280 | 420 | 560 | 145 | Sarkozy\000\000\000
+ Wed Jan 11 14:48:24.583 2012 |  150 |  300 |  150 |  300 | 450 | 600 | 155 | Sarkozy\000\000\000
+ Wed Jan 11 14:48:24.583 2012 |  160 |  320 |  160 |  320 | 480 | 640 | 165 | Sarkozy\000\000\000
+ Wed Jan 11 14:48:24.583 2012 |  170 |  340 |  170 |  340 | 510 | 680 | 175 | Sarkozy\000\000\000
+ Wed Jan 11 14:48:24.584 2012 |  180 |  360 |  180 |  360 | 540 | 720 | 185 | Sarkozy\000\000\000
+ Wed Jan 11 14:48:24.584 2012 |  190 |  380 |  190 |  380 | 570 | 760 | 195 | Sarkozy\000\000\000
+(19 rows)
+
+SELECT num1, t1, t2, t3 FROM seqwr ORDER BY num1;
+ num1 |               t1                |               t2                |               t3                
+------+---------------------------------+---------------------------------+---------------------------------
+   10 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   20 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   30 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   40 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   50 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   60 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   70 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   80 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   90 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  100 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  110 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  120 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  130 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  140 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  150 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  160 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  170 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  180 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  190 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+(19 rows)
+
+DROP EXTERNAL TABLE seqwr;
+--
+-- Test Avro data inside a SequenceFile (read only).
+--
+CREATE EXTERNAL TABLE seqav(tmp1 timestamp, 
+                            num1  integer, 
+                            num2  integer, 
+                            num3  integer, 
+                            num4  integer,
+                            t1    text,
+                            t2    text,
+                            t3    text,
+                            t4    text,
+                            t5    text,
+                            t6    text,
+                            dub1  double precision,
+                            dub2  double precision, 
+                            dub3  double precision, 
+                            ft1   real, 
+                            ft2   real, 
+                            ft3   real, 
+                            ln1   bigint, 
+                            ln2   bigint, 
+                            ln3   bigint, 
+                            bt    bytea)
+LOCATION ('gpfusion://@hostname@:50070/gpdb_regression_data/avro_inside_sequence.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=AvroResolver&DATA-SCHEMA=regressGPFusionCustomAvro.avsc')
+FORMAT 'custom' (formatter='gpfusionwritable_import');
+SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt FROM seqav ORDER BY num1;
+             tmp1             | num1 | num2 | num3 | num4 | ln1  | ln2  | ln3 |    bt    
+------------------------------+------+------+------+------+------+------+-----+----------
+ Mon Jan 23 13:44:32.504 2012 |  200 |  400 |  200 |  400 |  600 |  800 | 205 | AvroDude
+ Mon Jan 23 13:44:32.697 2012 |  210 |  420 |  210 |  420 |  630 |  840 | 215 | AvroDude
+ Mon Jan 23 13:44:32.698 2012 |  220 |  440 |  220 |  440 |  660 |  880 | 225 | AvroDude
+ Mon Jan 23 13:44:32.7 2012   |  230 |  460 |  230 |  460 |  690 |  920 | 235 | AvroDude
+ Mon Jan 23 13:44:32.701 2012 |  240 |  480 |  240 |  480 |  720 |  960 | 245 | AvroDude
+ Mon Jan 23 13:44:32.702 2012 |  250 |  500 |  250 |  500 |  750 | 1000 | 255 | AvroDude
+ Mon Jan 23 13:44:32.703 2012 |  260 |  520 |  260 |  520 |  780 | 1040 | 265 | AvroDude
+ Mon Jan 23 13:44:32.704 2012 |  270 |  540 |  270 |  540 |  810 | 1080 | 275 | AvroDude
+ Mon Jan 23 13:44:32.706 2012 |  280 |  560 |  280 |  560 |  840 | 1120 | 285 | AvroDude
+ Mon Jan 23 13:44:32.707 2012 |  290 |  580 |  290 |  580 |  870 | 1160 | 295 | AvroDude
+ Mon Jan 23 13:44:32.708 2012 |  300 |  600 |  300 |  600 |  900 | 1200 | 305 | AvroDude
+ Mon Jan 23 13:44:32.709 2012 |  310 |  620 |  310 |  620 |  930 | 1240 | 315 | AvroDude
+ Mon Jan 23 13:44:32.71 2012  |  320 |  640 |  320 |  640 |  960 | 1280 | 325 | AvroDude
+ Mon Jan 23 13:44:32.711 2012 |  330 |  660 |  330 |  660 |  990 | 1320 | 335 | AvroDude
+ Mon Jan 23 13:44:32.712 2012 |  340 |  680 |  340 |  680 | 1020 | 1360 | 345 | AvroDude
+ Mon Jan 23 13:44:32.713 2012 |  350 |  700 |  350 |  700 | 1050 | 1400 | 355 | AvroDude
+ Mon Jan 23 13:44:32.714 2012 |  360 |  720 |  360 |  720 | 1080 | 1440 | 365 | AvroDude
+ Mon Jan 23 13:44:32.715 2012 |  370 |  740 |  370 |  740 | 1110 | 1480 | 375 | AvroDude
+ Mon Jan 23 13:44:32.716 2012 |  380 |  760 |  380 |  760 | 1140 | 1520 | 385 | AvroDude
+ Mon Jan 23 13:44:32.717 2012 |  390 |  780 |  390 |  780 | 1170 | 1560 | 395 | AvroDude
+ Mon Jan 23 13:44:32.718 2012 |  400 |  800 |  400 |  800 | 1200 | 1600 | 405 | AvroDude
+ Mon Jan 23 13:44:32.719 2012 |  410 |  820 |  410 |  820 | 1230 | 1640 | 415 | AvroDude
+ Mon Jan 23 13:44:32.721 2012 |  420 |  840 |  420 |  840 | 1260 | 1680 | 425 | AvroDude
+ Mon Jan 23 13:44:32.722 2012 |  430 |  860 |  430 |  860 | 1290 | 1720 | 435 | AvroDude
+ Mon Jan 23 13:44:32.723 2012 |  440 |  880 |  440 |  880 | 1320 | 1760 | 445 | AvroDude
+ Mon Jan 23 13:44:32.724 2012 |  450 |  900 |  450 |  900 | 1350 | 1800 | 455 | AvroDude
+ Mon Jan 23 13:44:32.73 2012  |  460 |  920 |  460 |  920 | 1380 | 1840 | 465 | AvroDude
+ Mon Jan 23 13:44:32.731 2012 |  470 |  940 |  470 |  940 | 1410 | 1880 | 475 | AvroDude
+ Mon Jan 23 13:44:32.733 2012 |  480 |  960 |  480 |  960 | 1440 | 1920 | 485 | AvroDude
+ Mon Jan 23 13:44:32.734 2012 |  490 |  980 |  490 |  980 | 1470 | 1960 | 495 | AvroDude
+(30 rows)
+
+SELECT num1, t1, t2, t3 FROM seqav ORDER BY num1;
+ num1 |               t1                |               t2                |               t3                
+------+---------------------------------+---------------------------------+---------------------------------
+  200 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  210 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  220 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  230 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  240 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  250 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  260 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  270 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  280 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  290 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  300 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  310 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  320 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  330 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  340 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  350 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  360 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  370 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  380 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  390 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  400 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  410 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  420 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  430 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  440 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  450 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  460 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  470 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  480 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  490 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+(30 rows)
+
+DROP EXTERNAL TABLE seqav;
+--
+-- Test file name with spaces.
+--
+CREATE EXTERNAL TABLE seqav_space(tmp1 timestamp, 
+                            num1  integer, 
+                            num2  integer, 
+                            num3  integer, 
+                            num4  integer,
+                            t1    text,
+                            t2    text,
+                            t3    text,
+                            t4    text,
+                            t5    text,
+                            t6    text,
+                            dub1  double precision,
+                            dub2  double precision, 
+                            dub3  double precision, 
+                            ft1   real, 
+                            ft2   real, 
+                            ft3   real, 
+                            ln1   bigint, 
+                            ln2   bigint, 
+                            ln3   bigint, 
+                            bt    bytea)
+LOCATION ('gpfusion://@hostname@:50070/gpdb_regression_data/avro_inside_sequence.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=AvroResolver&DATA-SCHEMA=regress GPFusion Custom Avro1.avsc')
+FORMAT 'custom' (formatter='gpfusionwritable_import');
+SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt FROM seqav_space ORDER BY num1;
+             tmp1             | num1 | num2 | num3 | num4 | ln1  | ln2  | ln3 |    bt    
+------------------------------+------+------+------+------+------+------+-----+----------
+ Mon Jan 23 13:44:32.504 2012 |  200 |  400 |  200 |  400 |  600 |  800 | 205 | AvroDude
+ Mon Jan 23 13:44:32.697 2012 |  210 |  420 |  210 |  420 |  630 |  840 | 215 | AvroDude
+ Mon Jan 23 13:44:32.698 2012 |  220 |  440 |  220 |  440 |  660 |  880 | 225 | AvroDude
+ Mon Jan 23 13:44:32.7 2012   |  230 |  460 |  230 |  460 |  690 |  920 | 235 | AvroDude
+ Mon Jan 23 13:44:32.701 2012 |  240 |  480 |  240 |  480 |  720 |  960 | 245 | AvroDude
+ Mon Jan 23 13:44:32.702 2012 |  250 |  500 |  250 |  500 |  750 | 1000 | 255 | AvroDude
+ Mon Jan 23 13:44:32.703 2012 |  260 |  520 |  260 |  520 |  780 | 1040 | 265 | AvroDude
+ Mon Jan 23 13:44:32.704 2012 |  270 |  540 |  270 |  540 |  810 | 1080 | 275 | AvroDude
+ Mon Jan 23 13:44:32.706 2012 |  280 |  560 |  280 |  560 |  840 | 1120 | 285 | AvroDude
+ Mon Jan 23 13:44:32.707 2012 |  290 |  580 |  290 |  580 |  870 | 1160 | 295 | AvroDude
+ Mon Jan 23 13:44:32.708 2012 |  300 |  600 |  300 |  600 |  900 | 1200 | 305 | AvroDude
+ Mon Jan 23 13:44:32.709 2012 |  310 |  620 |  310 |  620 |  930 | 1240 | 315 | AvroDude
+ Mon Jan 23 13:44:32.71 2012  |  320 |  640 |  320 |  640 |  960 | 1280 | 325 | AvroDude
+ Mon Jan 23 13:44:32.711 2012 |  330 |  660 |  330 |  660 |  990 | 1320 | 335 | AvroDude
+ Mon Jan 23 13:44:32.712 2012 |  340 |  680 |  340 |  680 | 1020 | 1360 | 345 | AvroDude
+ Mon Jan 23 13:44:32.713 2012 |  350 |  700 |  350 |  700 | 1050 | 1400 | 355 | AvroDude
+ Mon Jan 23 13:44:32.714 2012 |  360 |  720 |  360 |  720 | 1080 | 1440 | 365 | AvroDude
+ Mon Jan 23 13:44:32.715 2012 |  370 |  740 |  370 |  740 | 1110 | 1480 | 375 | AvroDude
+ Mon Jan 23 13:44:32.716 2012 |  380 |  760 |  380 |  760 | 1140 | 1520 | 385 | AvroDude
+ Mon Jan 23 13:44:32.717 2012 |  390 |  780 |  390 |  780 | 1170 | 1560 | 395 | AvroDude
+ Mon Jan 23 13:44:32.718 2012 |  400 |  800 |  400 |  800 | 1200 | 1600 | 405 | AvroDude
+ Mon Jan 23 13:44:32.719 2012 |  410 |  820 |  410 |  820 | 1230 | 1640 | 415 | AvroDude
+ Mon Jan 23 13:44:32.721 2012 |  420 |  840 |  420 |  840 | 1260 | 1680 | 425 | AvroDude
+ Mon Jan 23 13:44:32.722 2012 |  430 |  860 |  430 |  860 | 1290 | 1720 | 435 | AvroDude
+ Mon Jan 23 13:44:32.723 2012 |  440 |  880 |  440 |  880 | 1320 | 1760 | 445 | AvroDude
+ Mon Jan 23 13:44:32.724 2012 |  450 |  900 |  450 |  900 | 1350 | 1800 | 455 | AvroDude
+ Mon Jan 23 13:44:32.73 2012  |  460 |  920 |  460 |  920 | 1380 | 1840 | 465 | AvroDude
+ Mon Jan 23 13:44:32.731 2012 |  470 |  940 |  470 |  940 | 1410 | 1880 | 475 | AvroDude
+ Mon Jan 23 13:44:32.733 2012 |  480 |  960 |  480 |  960 | 1440 | 1920 | 485 | AvroDude
+ Mon Jan 23 13:44:32.734 2012 |  490 |  980 |  490 |  980 | 1470 | 1960 | 495 | AvroDude
+(30 rows)
+
+DROP EXTERNAL TABLE seqav_space;
+--
+-- Test Avro data inside an AvroFile (read only).
+--
+CREATE EXTERNAL TABLE avfav(tmp1 timestamp, 
+                            num1  integer, 
+                            num2  integer, 
+                            num3  integer, 
+                            num4  integer,
+                            t1    text,
+                            t2    text,
+                            t3    text,
+                            t4    text,
+                            t5    text,
+                            t6    text,
+                            dub1  double precision,
+                            dub2  double precision, 
+                            dub3  double precision, 
+                            ft1   real, 
+                            ft2   real, 
+                            ft3   real, 
+                            ln1   bigint, 
+                            ln2   bigint, 
+                            ln3   bigint, 
+                            bt    bytea)
+LOCATION ('gpfusion://@hostname@:50070/gpdb_regression_data/avroformat_inside_avrofile.avro?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=AvroFileAccessor&RESOLVER=AvroResolver')
+FORMAT 'custom' (formatter='gpfusionwritable_import');
+SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt FROM avfav ORDER BY num1;
+             tmp1             | num1 | num2 | num3 | num4 | ln1  | ln2  | ln3 |    bt    
+------------------------------+------+------+------+------+------+------+-----+----------
+ Wed Feb 15 23:45:41.516 2012 |  200 |  400 |  200 |  400 |  600 |  800 | 205 | AvroDude
+ Wed Feb 15 23:45:41.521 2012 |  210 |  420 |  210 |  420 |  630 |  840 | 215 | AvroDude
+ Wed Feb 15 23:45:41.522 2012 |  220 |  440 |  220 |  440 |  660 |  880 | 225 | AvroDude
+ Wed Feb 15 23:45:41.523 2012 |  230 |  460 |  230 |  460 |  690 |  920 | 235 | AvroDude
+ Wed Feb 15 23:45:41.523 2012 |  240 |  480 |  240 |  480 |  720 |  960 | 245 | AvroDude
+ Wed Feb 15 23:45:41.524 2012 |  250 |  500 |  250 |  500 |  750 | 1000 | 255 | AvroDude
+ Wed Feb 15 23:45:41.525 2012 |  260 |  520 |  260 |  520 |  780 | 1040 | 265 | AvroDude
+ Wed Feb 15 23:45:41.526 2012 |  270 |  540 |  270 |  540 |  810 | 1080 | 275 | AvroDude
+ Wed Feb 15 23:45:41.527 2012 |  280 |  560 |  280 |  560 |  840 | 1120 | 285 | AvroDude
+ Wed Feb 15 23:45:41.528 2012 |  290 |  580 |  290 |  580 |  870 | 1160 | 295 | AvroDude
+ Wed Feb 15 23:45:41.529 2012 |  300 |  600 |  300 |  600 |  900 | 1200 | 305 | AvroDude
+ Wed Feb 15 23:45:41.53 2012  |  310 |  620 |  310 |  620 |  930 | 1240 | 315 | AvroDude
+ Wed Feb 15 23:45:41.53 2012  |  320 |  640 |  320 |  640 |  960 | 1280 | 325 | AvroDude
+ Wed Feb 15 23:45:41.531 2012 |  330 |  660 |  330 |  660 |  990 | 1320 | 335 | AvroDude
+ Wed Feb 15 23:45:41.532 2012 |  340 |  680 |  340 |  680 | 1020 | 1360 | 345 | AvroDude
+ Wed Feb 15 23:45:41.533 2012 |  350 |  700 |  350 |  700 | 1050 | 1400 | 355 | AvroDude
+ Wed Feb 15 23:45:41.534 2012 |  360 |  720 |  360 |  720 | 1080 | 1440 | 365 | AvroDude
+ Wed Feb 15 23:45:41.535 2012 |  370 |  740 |  370 |  740 | 1110 | 1480 | 375 | AvroDude
+ Wed Feb 15 23:45:41.536 2012 |  380 |  760 |  380 |  760 | 1140 | 1520 | 385 | AvroDude
+ Wed Feb 15 23:45:41.536 2012 |  390 |  780 |  390 |  780 | 1170 | 1560 | 395 | AvroDude
+ Wed Feb 15 23:45:41.537 2012 |  400 |  800 |  400 |  800 | 1200 | 1600 | 405 | AvroDude
+ Wed Feb 15 23:45:41.538 2012 |  410 |  820 |  410 |  820 | 1230 | 1640 | 415 | AvroDude
+ Wed Feb 15 23:45:41.539 2012 |  420 |  840 |  420 |  840 | 1260 | 1680 | 425 | AvroDude
+ Wed Feb 15 23:45:41.54 2012  |  430 |  860 |  430 |  860 | 1290 | 1720 | 435 | AvroDude
+ Wed Feb 15 23:45:41.541 2012 |  440 |  880 |  440 |  880 | 1320 | 1760 | 445 | AvroDude
+ Wed Feb 15 23:45:41.542 2012 |  450 |  900 |  450 |  900 | 1350 | 1800 | 455 | AvroDude
+ Wed Feb 15 23:45:41.542 2012 |  460 |  920 |  460 |  920 | 1380 | 1840 | 465 | AvroDude
+ Wed Feb 15 23:45:41.543 2012 |  470 |  940 |  470 |  940 | 1410 | 1880 | 475 | AvroDude
+ Wed Feb 15 23:45:41.544 2012 |  480 |  960 |  480 |  960 | 1440 | 1920 | 485 | AvroDude
+ Wed Feb 15 23:45:41.545 2012 |  490 |  980 |  490 |  980 | 1470 | 1960 | 495 | AvroDude
+(30 rows)
+
+SELECT num1, t1, t2, t3 FROM avfav ORDER BY num1;
+ num1 |               t1                |               t2                |               t3                
+------+---------------------------------+---------------------------------+---------------------------------
+  200 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  210 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  220 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  230 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  240 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  250 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  260 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  270 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  280 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  290 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  300 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  310 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  320 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  330 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  340 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  350 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  360 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  370 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  380 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  390 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  400 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  410 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  420 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  430 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  440 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  450 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  460 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  470 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  480 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  490 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+(30 rows)
+
+DROP EXTERNAL TABLE avfav;
+--
+-- Test Protocol-Buffers (read only).
+--
+-- create the external table for the protocol-buffers and query the data
+CREATE EXTERNAL TABLE pb(s1 text, 
+                         num1 int, 
+						 s2 text, 
+						 s3 text, 
+						 num2 int)
+LOCATION ('gpfusion://@hostname@:50070/gpdb_regression_data/protobuf_data.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=ProtobufFileAccessor&RESOLVER=ProtobufResolver&DATA-SCHEMA=pbgp.desc') 
+FORMAT 'custom' (formatter='gpfusionwritable_import');
+SELECT s1, num1, s2, s3, num2 from pb ORDER BY num1;
+    s1    | num1 |        s2        |        s3         | num2 
+----------+------+------------------+-------------------+------
+ Name__1  |    1 | name__1@url.com  | phone_number___1  |    2
+ Name__2  |    2 | name__2@url.com  | phone_number___2  |    2
+ Name__3  |    3 | name__3@url.com  | phone_number___3  |    2
+ Name__4  |    4 | name__4@url.com  | phone_number___4  |    2
+ Name__5  |    5 | name__5@url.com  | phone_number___5  |    2
+ Name__6  |    6 | name__6@url.com  | phone_number___6  |    2
+ Name__7  |    7 | name__7@url.com  | phone_number___7  |    2
+ Name__8  |    8 | name__8@url.com  | phone_number___8  |    2
+ Name__9  |    9 | name__9@url.com  | phone_number___9  |    2
+ Name__10 |   10 | name__10@url.com | phone_number___10 |    2
+(10 rows)
+
+DROP EXTERNAL TABLE pb;
+--
+-- Test wildcards in file name
+--
+CREATE EXTERNAL TABLE seqwild(tmp1  timestamp, 
+                              num1  integer, 
+                              num2  integer, 
+                              num3  integer, 
+                              num4  integer,
+                              t1    text, 
+                              t2    text, 
+                              t3    text, 
+                              t4    text, 
+                              t5    text, 
+                              t6    text, 
+                              dub1  double precision, 
+                              dub2  double precision, 
+                              dub3  double precision, 
+                              ft1   real, 
+                              ft2   real, 
+                              ft3   real, 
+                              ln1   bigint, 
+                              ln2   bigint, 
+                              ln3   bigint, 
+                              bt    bytea)
+LOCATION ('gpfusion://@hostname@:50070/gpdb_regression_data/wild/*.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='gpfusionwritable_import');
+SELECT num1, t1, t2, t3 FROM seqwild ORDER BY num1;
+ num1 |               t1                |               t2                |               t3                
+------+---------------------------------+---------------------------------+---------------------------------
+   10 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   10 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   20 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   20 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   30 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   30 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   40 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   40 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   50 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   50 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   60 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   60 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   70 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   70 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   80 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   80 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   90 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   90 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  100 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  110 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  120 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  130 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  140 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  150 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  160 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  170 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  180 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  190 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+(28 rows)
+
+DROP EXTERNAL TABLE seqwild;
+CREATE EXTERNAL TABLE seqquestion(tmp1  timestamp, 
+                              num1  integer, 
+                              num2  integer, 
+                              num3  integer, 
+                              num4  integer,
+                              t1    text, 
+                              t2    text, 
+                              t3    text, 
+                              t4    text, 
+                              t5    text, 
+                              t6    text, 
+                              dub1  double precision, 
+                              dub2  double precision, 
+                              dub3  double precision, 
+                              ft1   real, 
+                              ft2   real, 
+                              ft3   real, 
+                              ln1   bigint, 
+                              ln2   bigint, 
+                              ln3   bigint, 
+                              bt    bytea)
+LOCATION ('gpfusion://@hostname@:50070/gpdb_regression_data/wild/writable_inside_sequence?.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='gpfusionwritable_import');
+SELECT num1, t1, t2, t3 FROM seqquestion ORDER BY num1;
+ num1 |               t1                |               t2                |               t3                
+------+---------------------------------+---------------------------------+---------------------------------
+   10 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   10 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   20 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   20 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   30 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   30 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   40 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   40 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   50 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   50 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   60 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   60 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   70 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   70 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   80 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   80 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   90 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   90 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  100 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  110 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  120 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  130 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  140 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  150 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  160 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  170 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  180 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  190 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+(28 rows)
+
+DROP EXTERNAL TABLE seqquestion;
+--
+-- Test multiblock file
+--
+CREATE EXTERNAL TABLE mbt(t1 text,
+                          a1 integer)
+LOCATION ('gpfusion://@hostname@:50070/gpdb_regression_data/multiblock.tbl?FRAGMENTER=HdfsDataFragmenter')
+FORMAT 'TEXT' (DELIMITER ',');
+SELECT t1, a1 FROM mbt ORDER BY t1 LIMIT 10;
+ t1 | a1 
+----+----
+ t1 |  1
+ t1 |  1
+ t1 |  1
+ t1 |  1
+ t1 |  1
+ t1 |  1
+ t1 |  1
+ t1 |  1
+ t1 |  1
+ t1 |  1
+(10 rows)
+
+SELECT COUNT(*) FROM mbt;
+  count   
+----------
+ 32768000
+(1 row)
+
+SELECT cnt < 32768000 AS check FROM (SELECT COUNT(*) AS cnt FROM mbt WHERE gp_segment_id = 0) AS a;
+ check 
+-------
+ t
+(1 row)
+
+DROP EXTERNAL TABLE mbt;
+--
+-- Test error in host name -- negative
+--
+CREATE EXTERNAL TABLE host_err(t1 text,
+                               a1 integer)
+LOCATION ('gpfusion://badhostname:50070/gpdb_regression_data/multiblock.tbl?FRAGMENTER=HdfsDataFragmenter')
+FORMAT 'TEXT' (DELIMITER ',');
+SELECT t1, a1 FROM host_err ORDER BY t1 LIMIT 10; -- negative
+ERROR:  remote component error: 0 (libchurl.c:607)
+DETAIL:  There is no gpfusion servlet listening on the host and port specified in the external table url
+DROP EXTERNAL TABLE host_err;
+--
+-- Test error in port -- negative
+--
+CREATE EXTERNAL TABLE port_err(t1 text,
+                               a1 integer)
+LOCATION ('gpfusion://@hostname@:9000/gpdb_regression_data/multiblock.tbl?FRAGMENTER=HdfsDataFragmenter')
+FORMAT 'TEXT' (DELIMITER ',');
+SELECT t1, a1 FROM port_err ORDER BY t1 LIMIT 10; -- negative
+ERROR:  remote component error: 0 (libchurl.c:607)
+DETAIL:  There is no gpfusion servlet listening on the host and port specified in the external table url
+DROP EXTERNAL TABLE port_err;
+--
+-- Cleanup: delete all data that was copied into hdfs
+--
+-- start_ignore
+\! ${HADOOP_ROOT}/bin/hadoop fs -rm -r /gpdb_regression_data
+Deleted hdfs://0.0.0.0:8020/gpdb_regression_data
+\! rm @abs_srcdir@/data/gphdfs/multiblock.tbl
+-- end_ignore
+--------------------------------------------------------------------------------
+-- HBASE
+--------------------------------------------------------------------------------
+--
+-- syntax validations
+--
+CREATE READABLE EXTERNAL TABLE gphbase_in(a int, b text, c bytea)
+LOCATION ('gpfusion://@hostname@:60009/hbasetable')
+FORMAT 'CUSTOM' (formatter='gpfusionwritable_import'); -- negative
+ERROR:  invalid URI gpfusion://@hostname@:60009/hbasetable: missing options section
+CREATE WRITABLE EXTERNAL TABLE gphbase_out(a int, b text, c bytea)
+LOCATION ('gpfusion://@hostname@:60009/hbasetable?FRAGMENTER=HBaseDataFragmenter')
+FORMAT 'CUSTOM' (formatter='gpdbwritable_export');
+ERROR:  gpfusion does not yet support writable external tables
+-- Setup
+\! javac -cp `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar` @abs_srcdir@/helpers/HBaseCreateTables.java @abs_srcdir@/helpers/HBaseDropTables.java @abs_srcdir@/helpers/HBaseChangeLookupTable.java
+\! java -cp  `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar`:`echo ${HADOOP_ROOT}/lib/commons-logging-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-configuration-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-lang-[1-9]*.jar`:@abs_srcdir@/helpers HBaseCreateTables
+Create table 'gphbase_test', with 100 rows per split
+create table
+populate table
+update lookup table
+leave
+Create table 'gphbase_test_null', with 5 rows per split and null values
+create table
+populate table
+update lookup table
+leave
+Create table 'gphbase_test_upper', with 2 rows per split and key in upper case in lookup table
+create table
+populate table
+update lookup table
+leave
+set gp_hadoop_enable_filter_pushdown = on;
+-- Test
+CREATE EXTERNAL TABLE gphbase_select(recordkey TEXT, 
+                                     "cf1:q1" VARCHAR, 
+                                     "cf1:q2" TEXT, 
+                                     "cf1:q3" INT, 
+                                     q4 BYTEA, 
+                                     "cf1:q5" REAL, 
+                                     "cf1:q6" FLOAT, 
+                                     "cf1:q7" CHAR, 
+                                     "cf1:q8" SMALLINT, 
+                                     "cf1:q9" BIGINT) 
+LOCATION ('gpfusion://@hostname@:60009/gphbase_test?FRAGMENTER=HBaseDataFragmenter')
+FORMAT 'CUSTOM' (formatter='gpfusionwritable_import');
+SELECT * FROM gphbase_select ORDER BY recordkey ASC;
+  recordkey  |    cf1:q1     |          cf1:q2          | cf1:q3 |       q4       | cf1:q5 |   cf1:q6    | cf1:q7 | cf1:q8 |      cf1:q9       
+-------------+---------------+--------------------------+--------+----------------+--------+-------------+--------+--------+-------------------
+ row00000000 | ASCII00000000 | UTF8_計算機用語_00000000 |      0 | lookup00000000 |      0 |           0 |        |      0 |                 0
+ row00000001 | ASCII00000001 | UTF8_計算機用語_00000001 |  10000 | lookup00000002 |    1.1 |      1111.1 | !      |      1 |      -10000000001
+ row00000002 | ASCII00000002 | UTF8_計算機用語_00000002 |  20000 | lookup00000004 |    2.2 |      2222.2 | "      |      2 |       80000000002
+ row00000003 | ASCII00000003 | UTF8_計算機用語_00000003 |  30000 | lookup00000006 |    3.3 |      3333.3 | #      |      3 |     -270000000003
+ row00000004 | ASCII00000004 | UTF8_計算機用語_00000004 |  40000 | lookup00000008 |    4.4 |      4444.4 | $      |      4 |      640000000004
+ row00000005 | ASCII00000005 | UTF8_計算機用語_00000005 |  50000 | lookup00000010 |    5.5 |      5555.5 | %      |      5 |    -1250000000005
+ row00000006 | ASCII00000006 | UTF8_計算機用語_00000006 |  60000 | lookup00000012 |    6.6 |      6666.6 | &      |      6 |     2160000000006
+ row00000007 | ASCII00000007 | UTF8_計算機用語_00000007 |  70000 | lookup00000014 |    7.7 |      7777.7 | '      |      7 |    -3430000000007
+ row00000008 | ASCII00000008 | UTF8_計算機用語_00000008 |  80000 | lookup00000016 |    8.8 |      8888.8 | (      |      8 |     5120000000008
+ row00000009 | ASCII00000009 | UTF8_計算機用語_00000009 |  90000 | lookup00000018 |    9.9 |      9999.9 | )      |      9 |    -7290000000009
+ row00000010 | ASCII00000010 | UTF8_計算機用語_00000010 | 100000 | lookup00000020 |   10.1 |  10101010.1 | *      |     10 |    10000000000010
+ row00000011 | ASCII00000011 | UTF8_計算機用語_00000011 | 110000 | lookup00000022 |  11.11 | 11111111.11 | +      |     11 |   -13310000000011
+ row00000012 | ASCII00000012 | UTF8_計算機用語_00000012 | 120000 | lookup00000024 |  12.12 | 12121212.12 | ,      |     12 |    17280000000012
+ row00000013 | ASCII00000013 | UTF8_計算機用語_00000013 | 130000 | lookup00000026 |  13.13 | 13131313.13 | -      |     13 |   -21970000000013
+ row00000014 | ASCII00000014 | UTF8_計算機用語_00000014 | 140000 | lookup00000028 |  14.14 | 14141414.14 | .      |     14 |    27440000000014
+ row00000015 | ASCII00000015 | UTF8_計算機用語_00000015 | 150000 | lookup00000030 |  15.15 | 15151515.15 | /      |     15 |   -33750000000015
+ row00000016 | ASCII00000016 | UTF8_計算機用語_00000016 | 160000 | lookup00000032 |  16.16 | 16161616.16 | 0      |     16 |    40960000000016
+ row00000017 | ASCII00000017 | UTF8_計算機用語_00000017 | 170000 | lookup00000034 |  17.17 | 17171717.17 | 1      |     17 |   -49130000000017
+ row00000018 | ASCII00000018 | UTF8_計算機用語_00000018 | 180000 | lookup00000036 |  18.18 | 18181818.18 | 2      |     18 |    58320000000018
+ row00000019 | ASCII00000019 | UTF8_計算機用語_00000019 | 190000 | lookup00000038 |  19.19 | 19191919.19 | 3      |     19 |   -68590000000019
+ row00000020 | ASCII00000020 | UTF8_計算機用語_00000020 | 200000 | lookup00000040 |   20.2 |  20202020.2 | 4      |     20 |    80000000000020
+ row00000021 | ASCII00000021 | UTF8_計算機用語_00000021 | 210000 | lookup00000042 |  21.21 | 21212121.21 | 5      |     21 |   -92610000000021
+ row00000022 | ASCII00000022 | UTF8_計算機用語_00000022 | 220000 | lookup00000044 |  22.22 | 22222222.22 | 6      |     22 |   106480000000022
+ row00000023 | ASCII00000023 | UTF8_計算機用語_00000023 | 230000 | lookup00000046 |  23.23 | 23232323.23 | 7      |     23 |  -121670000000023
+ row00000024 | ASCII00000024 | UTF8_計算機用語_00000024 | 240000 | lookup00000048 |  24.24 | 24242424.24 | 8      |     24 |   138240000000024
+ row00000025 | ASCII00000025 | UTF8_計算機用語_00000025 | 250000 | lookup00000050 |  25.25 | 25252525.25 | 9      |     25 |  -156250000000025
+ row00000026 | ASCII00000026 | UTF8_計算機用語_00000026 | 260000 | lookup00000052 |  26.26 | 26262626.26 | :      |     26 |   175760000000026
+ row00000027 | ASCII00000027 | UTF8_計算機用語_00000027 | 270000 | lookup00000054 |  27.27 | 27272727.27 | ;      |     27 |  -196830000000027
+ row00000028 | ASCII00000028 | UTF8_計算機用語_00000028 | 280000 | lookup00000056 |  28.28 | 28282828.28 | <      |     28 |   219520000000028
+ row00000029 | ASCII00000029 | UTF8_計算機用語_00000029 | 290000 | lookup00000058 |  29.29 | 29292929.29 | =      |     29 |  -243890000000029
+ row00000030 | ASCII00000030 | UTF8_計算機用語_00000030 | 300000 | lookup00000060 |   30.3 |  30303030.3 | >      |     30 |   270000000000030
+ row00000031 | ASCII00000031 | UTF8_計算機用語_00000031 | 310000 | lookup00000062 |  31.31 | 31313131.31 | ?      |     31 |  -297910000000031
+ row00000032 | ASCII00000032 | UTF8_計算機用語_00000032 | 320000 | lookup00000064 |  32.32 | 32323232.32 | @      |     32 |   327680000000032
+ row00000033 | ASCII00000033 | UTF8_計算機用語_00000033 | 330000 | lookup00000066 |  33.33 | 33333333.33 | A      |     33 |  -359370000000033
+ row00000034 | ASCII00000034 | UTF8_計算機用語_00000034 | 340000 | lookup00000068 |  34.34 | 34343434.34 | B      |     34 |   393040000000034
+ row00000035 | ASCII00000035 | UTF8_計算機用語_00000035 | 350000 | lookup00000070 |  35.35 | 35353535.35 | C      |     35 |  -428750000000035
+ row00000036 | ASCII00000036 | UTF8_計算機用語_00000036 | 360000 | lookup00000072 |  36.36 | 36363636.36 | D      |     36 |   466560000000036
+ row00000037 | ASCII00000037 | UTF8_計算機用語_00000037 | 370000 | lookup00000074 |  37.37 | 37373737.37 | E      |     37 |  -506530000000037
+ row00000038 | ASCII00000038 | UTF8_計算機用語_00000038 | 380000 | lookup00000076 |  38.38 | 38383838.38 | F      |     38 |   548720000000038
+ row00000039 | ASCII00000039 | UTF8_計算機用語_00000039 | 390000 | lookup00000078 |  39.39 | 39393939.39 | G      |     39 |  -593190000000039
+ row00000040 | ASCII00000040 | UTF8_計算機用語_00000040 | 400000 | lookup00000080 |   40.4 |  40404040.4 | H      |     40 |   640000000000040
+ row00000041 | ASCII00000041 | UTF8_計算機用語_00000041 | 410000 | lookup00000082 |  41.41 | 41414141.41 | I      |     41 |  -689210000000041
+ row00000042 | ASCII00000042 | UTF8_計算機用語_00000042 | 420000 | lookup00000084 |  42.42 | 42424242.42 | J      |     42 |   740880000000042
+ row00000043 | ASCII00000043 | UTF8_計算機用語_00000043 | 430000 | lookup00000086 |  43.43 | 43434343.43 | K      |     43 |  -795070000000043
+ row00000044 | ASCII00000044 | UTF8_計算機用語_00000044 | 440000 | lookup00000088 |  44.44 | 44444444.44 | L      |     44 |   851840000000044
+ row00000045 | ASCII00000045 | UTF8_計算機用語_00000045 | 450000 | lookup00000090 |  45.45 | 45454545.45 | M      |     45 |  -911250000000045
+ row00000046 | ASCII00000046 | UTF8_計算機用語_00000046 | 460000 | lookup00000092 |  46.46 | 46464646.46 | N      |     46 |   973360000000046
+ row00000047 | ASCII00000047 | UTF8_計算機用語_00000047 | 470000 | lookup00000094 |  47.47 | 47474747.47 | O      |     47 | -1038230000000047
+ row00000048 | ASCII00000048 | UTF8_計算機用語_00000048 | 480000 | lookup00000096 |  48.48 | 48484848.48 | P      |     48 |  1105920000000048
+ row00000049 | ASCII00000049 | UTF8_計算機用語_00000049 | 490000 | lookup00000098 |  49.49 | 49494949.49 | Q      |     49 | -1176490000000049
+ row00000050 | ASCII00000050 | UTF8_計算機用語_00000050 | 500000 | lookup00000100 |   50.5 |  50505050.5 | R      |     50 |  1250000000000050
+ row00000051 | ASCII00000051 | UTF8_計算機用語_00000051 | 510000 | lookup00000102 |  51.51 | 51515151.51 | S      |     51 | -1326510000000051
+ row00000052 | ASCII00000052 | UTF8_計算機用語_00000052 | 520000 | lookup00000104 |  52.52 | 52525252.52 | T      |     52 |  1406080000000052
+ row00000053 | ASCII00000053 | UTF8_計算機用語_00000053 | 530000 | lookup00000106 |  53.53 | 53535353.53 | U      |     53 | -1488770000000053
+ row00000054 | ASCII00000054 | UTF8_計算機用語_00000054 | 540000 | lookup00000108 |  54.54 | 54545454.54 | V      |     54 |  1574640000000054
+ row00000055 | ASCII00000055 | UTF8_計算機用語_00000055 | 550000 | lookup00000110 |  55.55 | 55555555.55 | W      |     55 | -1663750000000055
+ row00000056 | ASCII00000056 | UTF8_計算機用語_00000056 | 560000 | lookup00000112 |  56.56 | 56565656.56 | X      |     56 |  1756160000000056
+ row00000057 | ASCII00000057 | UTF8_計算機用語_00000057 | 570000 | lookup00000114 |  57.57 | 57575757.57 | Y      |     57 | -1851930000000057
+ row00000058 | ASCII00000058 | UTF8_計算機用語_00000058 | 580000 | lookup00000116 |  58.58 | 58585858.58 | Z      |     58 |  1951120000000058
+ row00000059 | ASCII00000059 | UTF8_計算機用語_00000059 | 590000 | lookup00000118 |  59.59 | 59595959.59 | [      |     59 | -2053790000000059
+ row00000060 | ASCII00000060 | UTF8_計算機用語_00000060 | 600000 | lookup00000120 |   60.6 |  60606060.6 | \      |     60 |  2160000000000060
+ row00000061 | ASCII00000061 | UTF8_計算機用語_00000061 | 610000 | lookup00000122 |  61.61 | 61616161.61 | ]      |     61 | -2269810000000061
+ row00000062 | ASCII00000062 | UTF8_計算機用語_00000062 | 620000 | lookup00000124 |  62.62 | 62626262.62 | ^      |     62 |  2383280000000062
+ row00000063 | ASCII00000063 | UTF8_計算機用語_00000063 | 630000 | lookup00000126 |  63.63 | 63636363.63 | _      |     63 | -2500470000000063
+ row00000064 | ASCII00000064 | UTF8_計算機用語_00000064 | 640000 | lookup00000128 |  64.64 | 64646464.64 | `      |     64 |  2621440000000064
+ row00000065 | ASCII00000065 | UTF8_計算機用語_00000065 | 650000 | lookup00000130 |  65.65 | 65656565.65 | a      |     65 | -2746250000000065
+ row00000066 | ASCII00000066 | UTF8_計算機用語_00000066 | 660000 | lookup00000132 |  66.66 | 66666666.66 | b      |     66 |  2874960000000066
+ row00000067 | ASCII00000067 | UTF8_計算機用語_00000067 | 670000 | lookup00000134 |  67.67 | 67676767.67 | c      |     67 | -3007630000000067
+ row00000068 | ASCII00000068 | UTF8_計算機用語_00000068 | 680000 | lookup00000136 |  68.68 | 68686868.68 | d      |     68 |  3144320000000068
+ row00000069 | ASCII00000069 | UTF8_計算機用語_00000069 | 690000 | lookup00000138 |  69.69 | 69696969.69 | e      |     69 | -3285090000000069
+ row00000070 | ASCII00000070 | UTF8_計算機用語_00000070 | 700000 | lookup00000140 |   70.7 |  70707070.7 | f      |     70 |  3430000000000070
+ row00000071 | ASCII00000071 | UTF8_計算機用語_00000071 | 710000 | lookup00000142 |  71.71 | 71717171.71 | g      |     71 | -3579110000000071
+ row00000072 | ASCII00000072 | UTF8_計算機用語_00000072 | 720000 | lookup00000144 |  72.72 | 72727272.72 | h      |     72 |  3732480000000072
+ row00000073 | ASCII00000073 | UTF8_計算機用語_00000073 | 730000 | lookup00000146 |  73.73 | 73737373.73 | i      |     73 | -3890170000000073
+ row00000074 | ASCII00000074 | UTF8_計算機用語_00000074 | 740000 | lookup00000148 |  74.74 | 74747474.74 | j      |     74 |  4052240000000074
+ row00000075 | ASCII00000075 | UTF8_計算機用語_00000075 | 750000 | lookup00000150 |  75.75 | 75757575.75 | k      |     75 | -4218750000000075
+ row00000076 | ASCII00000076 | UTF8_計算機用語_00000076 | 760000 | lookup00000152 |  76.76 | 76767676.76 | l      |     76 |  4389760000000076
+ row00000077 | ASCII00000077 | UTF8_計算機用語_00000077 | 770000 | lookup00000154 |  77.77 | 77777777.77 | m      |     77 | -4565330000000077
+ row00000078 | ASCII00000078 | UTF8_計算機用語_00000078 | 780000 | lookup00000156 |  78.78 | 78787878.78 | n      |     78 |  4745520000000078
+ row00000079 | ASCII00000079 | UTF8_計算機用語_00000079 | 790000 | lookup00000158 |  79.79 | 79797979.79 | o      |     79 | -4930390000000079
+ row00000080 | ASCII00000080 | UTF8_計算機用語_00000080 | 800000 | lookup00000160 |   80.8 |  80808080.8 | p      |     80 |  5120000000000080
+ row00000081 | ASCII00000081 | UTF8_計算機用語_00000081 | 810000 | lookup00000162 |  81.81 | 81818181.81 | q      |     81 | -5314410000000081
+ row00000082 | ASCII00000082 | UTF8_計算機用語_00000082 | 820000 | lookup00000164 |  82.82 | 82828282.82 | r      |     82 |  5513680000000082
+ row00000083 | ASCII00000083 | UTF8_計算機用語_00000083 | 830000 | lookup00000166 |  83.83 | 83838383.83 | s      |     83 | -5717870000000083
+ row00000084 | ASCII00000084 | UTF8_計算機用語_00000084 | 840000 | lookup00000168 |  84.84 | 84848484.84 | t      |     84 |  5927040000000084
+ row00000085 | ASCII00000085 | UTF8_計算機用語_00000085 | 850000 | lookup00000170 |  85.85 | 85858585.85 | u      |     85 | -6141250000000085
+ row00000086 | ASCII00000086 | UTF8_計算機用語_00000086 | 860000 | lookup00000172 |  86.86 | 86868686.86 | v      |     86 |  6360560000000086
+ row00000087 | ASCII00000087 | UTF8_計算機用語_00000087 | 870000 | lookup00000174 |  87.87 | 87878787.87 | w      |     87 | -6585030000000087
+ row00000088 | ASCII00000088 | UTF8_計算機用語_00000088 | 880000 | lookup00000176 |  88.88 | 88888888.88 | x      |     88 |  6814720000000088
+ row00000089 | ASCII00000089 | UTF8_計算機用語_00000089 | 890000 | lookup00000178 |  89.89 | 89898989.89 | y      |     89 | -7049690000000089
+ row00000090 | ASCII00000090 | UTF8_計算機用語_00000090 | 900000 | lookup00000180 |   90.9 |  90909090.9 | z      |     90 |  7290000000000090
+ row00000091 | ASCII00000091 | UTF8_計算機用語_00000091 | 910000 | lookup00000182 |  91.91 | 91919191.91 | {      |     91 | -7535710000000091
+ row00000092 | ASCII00000092 | UTF8_計算機用語_00000092 | 920000 | lookup00000184 |  92.92 | 92929292.92 | |      |     92 |  7786880000000092
+ row00000093 | ASCII00000093 | UTF8_計算機用語_00000093 | 930000 | lookup00000186 |  93.93 | 93939393.93 | }      |     93 | -8043570000000093
+ row00000094 | ASCII00000094 | UTF8_計算機用語_00000094 | 940000 | lookup00000188 |  94.94 | 94949494.94 | ~      |     94 |  8305840000000094
+ row00000095 | ASCII00000095 | UTF8_計算機用語_00000095 | 950000 | lookup00000190 |  95.95 | 95959595.95 | \x7F   |     95 | -8573750000000095
+ row00000096 | ASCII00000096 | UTF8_計算機用語_00000096 | 960000 | lookup00000192 |  96.96 | 96969696.96 | \u0080 |     96 |  8847360000000096
+ row00000097 | ASCII00000097 | UTF8_計算機用語_00000097 | 970000 | lookup00000194 |  97.97 | 97979797.97 | \u0081 |     97 | -9126730000000097
+ row00000098 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000099 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+ row00000100 | ASCII00000000 | UTF8_計算機用語_00000000 |      0 | lookup00000000 |      0 |           0 |        |      0 |                 0
+ row00000101 | ASCII00000001 | UTF8_計算機用語_00000001 |  10000 | lookup00000002 |    1.1 |      1111.1 | !      |      1 |      -10000000001
+ row00000102 | ASCII00000002 | UTF8_計算機用語_00000002 |  20000 | lookup00000004 |    2.2 |      2222.2 | "      |      2 |       80000000002
+ row00000103 | ASCII00000003 | UTF8_計算機用語_00000003 |  30000 | lookup00000006 |    3.3 |      3333.3 | #      |      3 |     -270000000003
+ row00000104 | ASCII00000004 | UTF8_計算機用語_00000004 |  40000 | lookup00000008 |    4.4 |      4444.4 | $      |      4 |      640000000004
+ row00000105 | ASCII00000005 | UTF8_計算機用語_00000005 |  50000 | lookup00000010 |    5.5 |      5555.5 | %      |      5 |    -1250000000005
+ row00000106 | ASCII00000006 | UTF8_計算機用語_00000006 |  60000 | lookup00000012 |    6.6 |      6666.6 | &      |      6 |     2160000000006
+ row00000107 | ASCII00000007 | UTF8_計算機用語_00000007 |  70000 | lookup00000014 |    7.7 |      7777.7 | '      |      7 |    -3430000000007
+ row00000108 | ASCII00000008 | UTF8_計算機用語_00000008 |  80000 | lookup00000016 |    8.8 |      8888.8 | (      |      8 |     5120000000008
+ row00000109 | ASCII00000009 | UTF8_計算機用語_00000009 |  90000 | lookup00000018 |    9.9 |      9999.9 | )      |      9 |    -7290000000009
+ row00000110 | ASCII00000010 | UTF8_計算機用語_00000010 | 100000 | lookup00000020 |   10.1 |  10101010.1 | *      |     10 |    10000000000010
+ row00000111 | ASCII00000011 | UTF8_計算機用語_00000011 | 110000 | lookup00000022 |  11.11 | 11111111.11 | +      |     11 |   -13310000000011
+ row00000112 | ASCII00000012 | UTF8_計算機用語_00000012 | 120000 | lookup00000024 |  12.12 | 12121212.12 | ,      |     12 |    17280000000012
+ row00000113 | ASCII00000013 | UTF8_計算機用語_00000013 | 130000 | lookup00000026 |  13.13 | 13131313.13 | -      |     13 |   -21970000000013
+ row00000114 | ASCII00000014 | UTF8_計算機用語_00000014 | 140000 | lookup00000028 |  14.14 | 14141414.14 | .      |     14 |    27440000000014
+ row00000115 | ASCII00000015 | UTF8_計算機用語_00000015 | 150000 | lookup00000030 |  15.15 | 15151515.15 | /      |     15 |   -33750000000015
+ row00000116 | ASCII00000016 | UTF8_計算機用語_00000016 | 160000 | lookup00000032 |  16.16 | 16161616.16 | 0      |     16 |    40960000000016
+ row00000117 | ASCII00000017 | UTF8_計算機用語_00000017 | 170000 | lookup00000034 |  17.17 | 17171717.17 | 1      |     17 |   -49130000000017
+ row00000118 | ASCII00000018 | UTF8_計算機用語_00000018 | 180000 | lookup00000036 |  18.18 | 18181818.18 | 2      |     18 |    58320000000018
+ row00000119 | ASCII00000019 | UTF8_計算機用語_00000019 | 190000 | lookup00000038 |  19.19 | 19191919.19 | 3      |     19 |   -68590000000019
+ row00000120 | ASCII00000020 | UTF8_計算機用語_00000020 | 200000 | lookup00000040 |   20.2 |  20202020.2 | 4      |     20 |    80000000000020
+ row00000121 | ASCII00000021 | UTF8_計算機用語_00000021 | 210000 | lookup00000042 |  21.21 | 21212121.21 | 5      |     21 |   -92610000000021
+ row00000122 | ASCII00000022 | UTF8_計算機用語_00000022 | 220000 | lookup00000044 |  22.22 | 22222222.22 | 6      |     22 |   106480000000022
+ row00000123 | ASCII00000023 | UTF8_計算機用語_00000023 | 230000 | lookup00000046 |  23.23 | 23232323.23 | 7      |     23 |  -121670000000023
+ row00000124 | ASCII00000024 | UTF8_計算機用語_00000024 | 240000 | lookup00000048 |  24.24 | 24242424.24 | 8      |     24 |   138240000000024
+ row00000125 | ASCII00000025 | UTF8_計算機用語_00000025 | 250000 | lookup00000050 |  25.25 | 25252525.25 | 9      |     25 |  -156250000000025
+ row00000126 | ASCII00000026 | UTF8_計算機用語_00000026 | 260000 | lookup00000052 |  26.26 | 26262626.26 | :      |     26 |   175760000000026
+ row00000127 | ASCII00000027 | UTF8_計算機用語_00000027 | 270000 | lookup00000054 |  27.27 | 27272727.27 | ;      |     27 |  -196830000000027
+ row00000128 | ASCII00000028 | UTF8_計算機用語_00000028 | 280000 | lookup00000056 |  28.28 | 28282828.28 | <      |     28 |   219520000000028
+ row00000129 | ASCII00000029 | UTF8_計算機用語_00000029 | 290000 | lookup00000058 |  29.29 | 29292929.29 | =      |     29 |  -243890000000029
+ row00000130 | ASCII00000030 | UTF8_計算機用語_00000030 | 300000 | lookup00000060 |   30.3 |  30303030.3 | >      |     30 |   270000000000030
+ row00000131 | ASCII00000031 | UTF8_計算機用語_00000031 | 310000 | lookup00000062 |  31.31 | 31313131.31 | ?      |     31 |  -297910000000031
+ row00000132 | ASCII00000032 | UTF8_計算機用語_00000032 | 320000 | lookup00000064 |  32.32 | 32323232.32 | @      |     32 |   327680000000032
+ row00000133 | ASCII00000033 | UTF8_計算機用語_00000033 | 330000 | lookup00000066 |  33.33 | 33333333.33 | A      |     33 |  -359370000000033
+ row00000134 | ASCII00000034 | UTF8_計算機用語_00000034 | 340000 | lookup00000068 |  34.34 | 34343434.34 | B      |     34 |   393040000000034
+ row00000135 | ASCII00000035 | UTF8_計算機用語_00000035 | 350000 | lookup00000070 |  35.35 | 35353535.35 | C      |     35 |  -428750000000035
+ row00000136 | ASCII00000036 | UTF8_計算機用語_00000036 | 360000 | lookup00000072 |  36.36 | 36363636.36 | D      |     36 |   466560000000036
+ row00000137 | ASCII00000037 | UTF8_計算機用語_00000037 | 370000 | lookup00000074 |  37.37 | 37373737.37 | E      |     37 |  -506530000000037
+ row00000138 | ASCII00000038 | UTF8_計算機用語_00000038 | 380000 | lookup00000076 |  38.38 | 38383838.38 | F      |     38 |   548720000000038
+ row00000139 | ASCII00000039 | UTF8_計算機用語_00000039 | 390000 | lookup00000078 |  39.39 | 39393939.39 | G      |     39 |  -593190000000039
+ row00000140 | ASCII00000040 | UTF8_計算機用語_00000040 | 400000 | lookup00000080 |   40.4 |  40404040.4 | H      |     40 |   640000000000040
+ row00000141 | ASCII00000041 | UTF8_計算機用語_00000041 | 410000 | lookup00000082 |  41.41 | 41414141.41 | I      |     41 |  -689210000000041
+ row00000142 | ASCII00000042 | UTF8_計算機用語_00000042 | 420000 | lookup00000084 |  42.42 | 42424242.42 | J      |     42 |   740880000000042
+ row00000143 | ASCII00000043 | UTF8_計算機用語_00000043 | 430000 | lookup00000086 |  43.43 | 43434343.43 | K      |     43 |  -795070000000043
+ row00000144 | ASCII00000044 | UTF8_計算機用語_00000044 | 440000 | lookup00000088 |  44.44 | 44444444.44 | L      |     44 |   851840000000044
+ row00000145 | ASCII00000045 | UTF8_計算機用語_00000045 | 450000 | lookup00000090 |  45.45 | 45454545.45 | M      |     45 |  -911250000000045
+ row00000146 | ASCII00000046 | UTF8_計算機用語_00000046 | 460000 | lookup00000092 |  46.46 | 46464646.46 | N      |     46 |   973360000000046
+ row00000147 | ASCII00000047 | UTF8_計算機用語_00000047 | 470000 | lookup00000094 |  47.47 | 47474747.47 | O      |     47 | -1038230000000047
+ row00000148 | ASCII00000048 | UTF8_計算機用語_00000048 | 480000 | lookup00000096 |  48.48 | 48484848.48 | P      |     48 |  1105920000000048
+ row00000149 | ASCII00000049 | UTF8_計算機用語_00000049 | 490000 | lookup00000098 |  49.49 | 49494949.49 | Q      |     49 | -1176490000000049
+ row00000150 | ASCII00000050 | UTF8_計算機用語_00000050 | 500000 | lookup00000100 |   50.5 |  50505050.5 | R      |     50 |  1250000000000050
+ row00000151 | ASCII00000051 | UTF8_計算機用語_00000051 | 510000 | lookup00000102 |  51.51 | 51515151.51 | S      |     51 | -1326510000000051
+ row00000152 | ASCII00000052 | UTF8_計算機用語_00000052 | 520000 | lookup00000104 |  52.52 | 52525252.52 | T      |     52 |  1406080000000052
+ row00000153 | ASCII00000053 | UTF8_計算機用語_00000053 | 530000 | lookup00000106 |  53.53 | 53535353.53 | U      |     53 | -1488770000000053
+ row00000154 | ASCII00000054 | UTF8_計算機用語_00000054 | 540000 | lookup00000108 |  54.54 | 54545454.54 | V      |     54 |  1574640000000054
+ row00000155 | ASCII00000055 | UTF8_計算機用語_00000055 | 550000 | lookup00000110 |  55.55 | 55555555.55 | W      |     55 | -1663750000000055
+ row00000156 | ASCII00000056 | UTF8_計算機用語_00000056 | 560000 | lookup00000112 |  56.56 | 56565656.56 | X      |     56 |  1756160000000056
+ row00000157 | ASCII00000057 | UTF8_計算機用語_00000057 | 570000 | lookup00000114 |  57.57 | 57575757.57 | Y      |     57 | -1851930000000057
+ row00000158 | ASCII00000058 | UTF8_計算機用語_00000058 | 580000 | lookup00000116 |  58.58 | 58585858.58 | Z      |     58 |  1951120000000058
+ row00000159 | ASCII00000059 | UTF8_計算機用語_00000059 | 590000 | lookup00000118 |  59.59 | 59595959.59 | [      |     59 | -2053790000000059
+ row00000160 | ASCII00000060 | UTF8_計算機用語_00000060 | 600000 | lookup00000120 |   60.6 |  60606060.6 | \      |     60 |  2160000000000060
+ row00000161 | ASCII00000061 | UTF8_計算機用語_00000061 | 610000 | lookup00000122 |  61.61 | 61616161.61 | ]      |     61 | -2269810000000061
+ row00000162 | ASCII00000062 | UTF8_計算機用語_00000062 | 620000 | lookup00000124 |  62.62 | 62626262.62 | ^      |     62 |  2383280000000062
+ row00000163 | ASCII00000063 | UTF8_計算機用語_00000063 | 630000 | lookup00000126 |  63.63 | 63636363.63 | _      |     63 | -2500470000000063
+ row00000164 | ASCII00000064 | UTF8_計算機用語_00000064 | 640000 | lookup00000128 |  64.64 | 64646464.64 | `      |     64 |  2621440000000064
+ row00000165 | ASCII00000065 | UTF8_計算機用語_00000065 | 650000 | lookup00000130 |  65.65 | 65656565.65 | a      |     65 | -2746250000000065
+ row00000166 | ASCII00000066 | UTF8_計算機用語_00000066 | 660000 | lookup00000132 |  66.66 | 66666666.66 | b      |     66 |  2874960000000066
+ row00000167 | ASCII00000067 | UTF8_計算機用語_00000067 | 670000 | lookup00000134 |  67.67 | 67676767.67 | c      |     67 | -3007630000000067
+ row00000168 | ASCII00000068 | UTF8_計算機用語_00000068 | 680000 | lookup00000136 |  68.68 | 68686868.68 | d      |     68 |  3144320000000068
+ row00000169 | ASCII00000069 | UTF8_計算機用語_00000069 | 690000 | lookup00000138 |  69.69 | 69696969.69 | e      |     69 | -3285090000000069
+ row00000170 | ASCII00000070 | UTF8_計算機用語_00000070 | 700000 | lookup00000140 |   70.7 |  70707070.7 | f      |     70 |  3430000000000070
+ row00000171 | ASCII00000071 | UTF8_計算機用語_00000071 | 710000 | lookup00000142 |  71.71 | 71717171.71 | g      |     71 | -3579110000000071
+ row00000172 | ASCII00000072 | UTF8_計算機用語_00000072 | 720000 | lookup00000144 |  72.72 | 72727272.72 | h      |     72 |  3732480000000072
+ row00000173 | ASCII00000073 | UTF8_計算機用語_00000073 | 730000 | lookup00000146 |  73.73 | 73737373.73 | i      |     73 | -3890170000000073
+ row00000174 | ASCII00000074 | UTF8_計算機用語_00000074 | 740000 | lookup00000148 |  74.74 | 74747474.74 | j      |     74 |  4052240000000074
+ row00000175 | ASCII00000075 | UTF8_計算機用語_00000075 | 750000 | lookup00000150 |  75.75 | 75757575.75 | k      |     75 | -4218750000000075
+ row00000176 | ASCII00000076 | UTF8_計算機用語_00000076 | 760000 | lookup00000152 |  76.76 | 76767676.76 | l      |     76 |  4389760000000076
+ row00000177 | ASCII00000077 | UTF8_計算機用語_00000077 | 770000 | lookup00000154 |  77.77 | 77777777.77 | m      |     77 | -4565330000000077
+ row00000178 | ASCII00000078 | UTF8_計算機用語_00000078 | 780000 | lookup00000156 |  78.78 | 78787878.78 | n      |     78 |  4745520000000078
+ row00000179 | ASCII00000079 | UTF8_計算機用語_00000079 | 790000 | lookup00000158 |  79.79 | 79797979.79 | o      |     79 | -4930390000000079
+ row00000180 | ASCII00000080 | UTF8_計算機用語_00000080 | 800000 | lookup00000160 |   80.8 |  80808080.8 | p      |     80 |  5120000000000080
+ row00000181 | ASCII00000081 | UTF8_計算機用語_00000081 | 810000 | lookup00000162 |  81.81 | 81818181.81 | q      |     81 | -5314410000000081
+ row00000182 | ASCII00000082 | UTF8_計算機用語_00000082 | 820000 | lookup00000164 |  82.82 | 82828282.82 | r      |     82 |  5513680000000082
+ row00000183 | ASCII00000083 | UTF8_計算機用語_00000083 | 830000 | lookup00000166 |  83.83 | 83838383.83 | s      |     83 | -5717870000000083
+ row00000184 | ASCII00000084 | UTF8_計算機用語_00000084 | 840000 | lookup00000168 |  84.84 | 84848484.84 | t      |     84 |  5927040000000084
+ row00000185 | ASCII00000085 | UTF8_計算機用語_00000085 | 850000 | lookup00000170 |  85.85 | 85858585.85 | u      |     85 | -6141250000000085
+ row00000186 | ASCII00000086 | UTF8_計算機用語_00000086 | 860000 | lookup00000172 |  86.86 | 86868686.86 | v      |     86 |  6360560000000086
+ row00000187 | ASCII00000087 | UTF8_計算機用語_00000087 | 870000 | lookup00000174 |  87.87 | 87878787.87 | w      |     87 | -6585030000000087
+ row00000188 | ASCII00000088 | UTF8_計算機用語_00000088 | 880000 | lookup00000176 |  88.88 | 88888888.88 | x      |     88 |  6814720000000088
+ row00000189 | ASCII00000089 | UTF8_計算機用語_00000089 | 890000 | lookup00000178 |  89.89 | 89898989.89 | y      |     89 | -7049690000000089
+ row00000190 | ASCII00000090 | UTF8_計算機用語_00000090 | 900000 | lookup00000180 |   90.9 |  90909090.9 | z      |     90 |  7290000000000090
+ row00000191 | ASCII00000091 | UTF8_計算機用語_00000091 | 910000 | lookup00000182 |  91.91 | 91919191.91 | {      |     91 | -7535710000000091
+ row00000192 | ASCII00000092 | UTF8_計算機用語_00000092 | 920000 | lookup00000184 |  92.92 | 92929292.92 | |      |     92 |  7786880000000092
+ row00000193 | ASCII00000093 | UTF8_計算機用語_00000093 | 930000 | lookup00000186 |  93.93 | 93939393.93 | }      |     93 | -8043570000000093
+ row00000194 | ASCII00000094 | UTF8_計算機用語_00000094 | 940000 | lookup00000188 |  94.94 | 94949494.94 | ~      |     94 |  8305840000000094
+ row00000195 | ASCII00000095 | UTF8_計算機用語_00000095 | 950000 | lookup00000190 |  95.95 | 95959595.95 | \x7F   |     95 | -8573750000000095
+ row00000196 | ASCII00000096 | UTF8_計算機用語_00000096 | 960000 | lookup00000192 |  96.96 | 96969696.96 | \u0080 |     96 |  8847360000000096
+ row00000197 | ASCII00000097 | UTF8_計算機用語_00000097 | 970000 | lookup00000194 |  97.97 | 97979797.97 | \u0081 |     97 | -9126730000000097
+ row00000198 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000199 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+ row00000200 | ASCII00000000 | UTF8_計算機用語_00000000 |      0 | lookup00000000 |      0 |           0 |        |      0 |                 0
+ row00000201 | ASCII00000001 | UTF8_計算機用語_00000001 |  10000 | lookup00000002 |    1.1 |      1111.1 | !      |      1 |      -10000000001
+ row00000202 | ASCII00000002 | UTF8_計算機用語_00000002 |  20000 | lookup00000004 |    2.2 |      2222.2 | "      |      2 |       80000000002
+ row00000203 | ASCII00000003 | UTF8_計算機用語_00000003 |  30000 | lookup00000006 |    3.3 |      3333.3 | #      |      3 |     -270000000003
+ row00000204 | ASCII00000004 | UTF8_計算機用語_00000004 |  40000 | lookup00000008 |    4.4 |      4444.4 | $      |      4 |      640000000004
+ row00000205 | ASCII00000005 | UTF8_計算機用語_00000005 |  50000 | lookup00000010 |    5.5 |      5555.5 | %      |      5 |    -1250000000005
+ row00000206 | ASCII00000006 | UTF8_計算機用語_00000006 |  60000 | lookup00000012 |    6.6 |      6666.6 | &      |      6 |     2160000000006
+ row00000207 | ASCII00000007 | UTF8_計算機用語_00000007 |  70000 | lookup00000014 |    7.7 |      7777.7 | '      |      7 |    -3430000000007
+ row00000208 | ASCII00000008 | UTF8_計算機用語_00000008 |  80000 | lookup00000016 |    8.8 |      8888.8 | (      |      8 |     5120000000008
+ row00000209 | ASCII00000009 | UTF8_計算機用語_00000009 |  90000 | lookup00000018 |    9.9 |      9999.9 | )      |      9 |    -7290000000009
+ row00000210 | ASCII00000010 | UTF8_計算機用語_00000010 | 100000 | lookup00000020 |   10.1 |  10101010.1 | *      |     10 |    10000000000010
+ row00000211 | ASCII00000011 | UTF8_計算機用語_00000011 | 110000 | lookup00000022 |  11.11 | 11111111.11 | +      |     11 |   -13310000000011
+ row00000212 | ASCII00000012 | UTF8_計算機用語_00000012 | 120000 | lookup00000024 |  12.12 | 12121212.12 | ,      |     12 |    17280000000012
+ row00000213 | ASCII00000013 | UTF8_計算機用語_00000013 | 130000 | lookup00000026 |  13.13 | 13131313.13 | -      |     13 |   -21970000000013
+ row00000214 | ASCII00000014 | UTF8_計算機用語_00000014 | 140000 | lookup00000028 |  14.14 | 14141414.14 | .      |     14 |    27440000000014
+ row00000215 | ASCII00000015 | UTF8_計算機用語_00000015 | 150000 | lookup00000030 |  15.15 | 15151515.15 | /      |     15 |   -33750000000015
+ row00000216 | ASCII00000016 | UTF8_計算機用語_00000016 | 160000 | lookup00000032 |  16.16 | 16161616.16 | 0      |     16 |    40960000000016
+ row00000217 | ASCII00000017 | UTF8_計算機用語_00000017 | 170000 | lookup00000034 |  17.17 | 17171717.17 | 1      |     17 |   -49130000000017
+ row00000218 | ASCII00000018 | UTF8_計算機用語_00000018 | 180000 | lookup00000036 |  18.18 | 18181818.18 | 2      |     18 |    58320000000018
+ row00000219 | ASCII00000019 | UTF8_計算機用語_00000019 | 190000 | lookup00000038 |  19.19 | 19191919.19 | 3      |     19 |   -68590000000019
+ row00000220 | ASCII00000020 | UTF8_計算機用語_00000020 | 200000 | lookup00000040 |   20.2 |  20202020.2 | 4      |     20 |    80000000000020
+ row00000221 | ASCII00000021 | UTF8_計算機用語_00000021 | 210000 | lookup00000042 |  21.21 | 21212121.21 | 5      |     21 |   -92610000000021
+ row00000222 | ASCII00000022 | UTF8_計算機用語_00000022 | 220000 | lookup00000044 |  22.22 | 22222222.22 | 6      |     22 |   106480000000022
+ row00000223 | ASCII00000023 | UTF8_計算機用語_00000023 | 230000 | lookup00000046 |  23.23 | 23232323.23 | 7      |     23 |  -121670000000023
+ row00000224 | ASCII00000024 | UTF8_計算機用語_00000024 | 240000 | lookup00000048 |  24.24 | 24242424.24 | 8      |     24 |   138240000000024
+ row00000225 | ASCII00000025 | UTF8_計算機用語_00000025 | 250000 | lookup00000050 |  25.25 | 25252525.25 | 9      |     25 |  -156250000000025
+ row00000226 | ASCII00000026 | UTF8_計算機用語_00000026 | 260000 | lookup00000052 |  26.26 | 26262626.26 | :      |     26 |   175760000000026
+ row00000227 | ASCII00000027 | UTF8_計算機用語_00000027 | 270000 | lookup00000054 |  27.27 | 27272727.27 | ;      |     27 |  -196830000000027
+ row00000228 | ASCII00000028 | UTF8_計算機用語_00000028 | 280000 | lookup00000056 |  28.28 | 28282828.28 | <      |     28 |   219520000000028
+ row00000229 | ASCII00000029 | UTF8_計算機用語_00000029 | 290000 | lookup00000058 |  29.29 | 29292929.29 | =      |     29 |  -243890000000029
+ row00000230 | ASCII00000030 | UTF8_計算機用語_00000030 | 300000 | lookup00000060 |   30.3 |  30303030.3 | >      |     30 |   270000000000030
+ row00000231 | ASCII00000031 | UTF8_計算機用語_00000031 | 310000 | lookup00000062 |  31.31 | 31313131.31 | ?      |     31 |  -297910000000031
+ row00000232 | ASCII00000032 | UTF8_計算機用語_00000032 | 320000 | lookup00000064 |  32.32 | 32323232.32 | @      |     32 |   327680000000032
+ row00000233 | ASCII00000033 | UTF8_計算機用語_00000033 | 330000 | lookup00000066 |  33.33 | 33333333.33 | A      |     33 |  -359370000000033
+ row00000234 | ASCII00000034 | UTF8_計算機用語_00000034 | 340000 | lookup00000068 |  34.34 | 34343434.34 | B      |     34 |   393040000000034
+ row00000235 | ASCII00000035 | UTF8_計算機用語_00000035 | 350000 | lookup00000070 |  35.35 | 35353535.35 | C      |     35 |  -428750000000035
+ row00000236 | ASCII00000036 | UTF8_計算機用語_00000036 | 360000 | lookup00000072 |  36.36 | 36363636.36 | D      |     36 |   466560000000036
+ row00000237 | ASCII00000037 | UTF8_計算機用語_00000037 | 370000 | lookup00000074 |  37.37 | 37373737.37 | E      |     37 |  -506530000000037
+ row00000238 | ASCII00000038 | UTF8_計算機用語_00000038 | 380000 | lookup00000076 |  38.38 | 38383838.38 | F      |     38 |   548720000000038
+ row00000239 | ASCII00000039 | UTF8_計算機用語_00000039 | 390000 | lookup00000078 |  39.39 | 39393939.39 | G      |     39 |  -593190000000039
+ row00000240 | ASCII00000040 | UTF8_計算機用語_00000040 | 400000 | lookup00000080 |   40.4 |  40404040.4 | H      |     40 |   640000000000040
+ row00000241 | ASCII00000041 | UTF8_計算機用語_00000041 | 410000 | lookup00000082 |  41.41 | 41414141.41 | I      |     41 |  -689210000000041
+ row00000242 | ASCII00000042 | UTF8_計算機用語_00000042 | 420000 | lookup00000084 |  42.42 | 42424242.42 | J      |     42 |   740880000000042
+ row00000243 | ASCII00000043 | UTF8_計算機用語_00000043 | 430000 | lookup00000086 |  43.43 | 43434343.43 | K      |     43 |  -795070000000043
+ row00000244 | ASCII00000044 | UTF8_計算機用語_00000044 | 440000 | lookup00000088 |  44.44 | 44444444.44 | L      |     44 |   851840000000044
+ row00000245 | ASCII00000045 | UTF8_計算機用語_00000045 | 450000 | lookup00000090 |  45.45 | 45454545.45 | M      |     45 |  -911250000000045
+ row00000246 | ASCII00000046 | UTF8_計算機用語_00000046 | 460000 | lookup00000092 |  46.46 | 46464646.46 | N      |     46 |   973360000000046
+ row00000247 | ASCII00000047 | UTF8_計算機用語_00000047 | 470000 | lookup00000094 |  47.47 | 47474747.47 | O      |     47 | -1038230000000047
+ row00000248 | ASCII00000048 | UTF8_計算機用語_00000048 | 480000 | lookup00000096 |  48.48 | 48484848.48 | P      |     48 |  1105920000000048
+ row00000249 | ASCII00000049 | UTF8_計算機用語_00000049 | 490000 | lookup00000098 |  49.49 | 49494949.49 | Q      |     49 | -1176490000000049
+ row00000250 | ASCII00000050 | UTF8_計算機用語_00000050 | 500000 | lookup00000100 |   50.5 |  50505050.5 | R      |     50 |  1250000000000050
+ row00000251 | ASCII00000051 | UTF8_計算機用語_00000051 | 510000 | lookup00000102 |  51.51 | 51515151.51 | S      |     51 | -1326510000000051
+ row00000252 | ASCII00000052 | UTF8_計算機用語_00000052 | 520000 | lookup00000104 |  52.52 | 52525252.52 | T      |     52 |  1406080000000052
+ row00000253 | ASCII00000053 | UTF8_計算機用語_00000053 | 530000 | lookup00000106 |  53.53 | 53535353.53 | U      |     53 | -1488770000000053
+ row00000254 | ASCII00000054 | UTF8_計算機用語_00000054 | 540000 | lookup00000108 |  54.54 | 54545454.54 | V      |     54 |  1574640000000054
+ row00000255 | ASCII00000055 | UTF8_計算機用語_00000055 | 550000 | lookup00000110 |  55.55 | 55555555.55 | W      |     55 | -1663750000000055
+ row00000256 | ASCII00000056 | UTF8_計算機用語_00000056 | 560000 | lookup00000112 |  56.56 | 56565656.56 | X      |     56 |  1756160000000056
+ row00000257 | ASCII00000057 | UTF8_計算機用語_00000057 | 570000 | lookup00000114 |  57.57 | 57575757.57 | Y      |     57 | -1851930000000057
+ row00000258 | ASCII00000058 | UTF8_計算機用語_00000058 | 580000 | lookup00000116 |  58.58 | 58585858.58 | Z      |     58 |  1951120000000058
+ row00000259 | ASCII00000059 | UTF8_計算機用語_00000059 | 590000 | lookup00000118 |  59.59 | 59595959.59 | [      |     59 | -2053790000000059
+ row00000260 | ASCII00000060 | UTF8_計算機用語_00000060 | 600000 | lookup00000120 |   60.6 |  60606060.6 | \      |     60 |  2160000000000060
+ row00000261 | ASCII00000061 | UTF8_計算機用語_00000061 | 610000 | lookup00000122 |  61.61 | 61616161.61 | ]      |     61 | -2269810000000061
+ row00000262 | ASCII00000062 | UTF8_計算機用語_00000062 | 620000 | lookup00000124 |  62.62 | 62626262.62 | ^      |     62 |  2383280000000062
+ row00000263 | ASCII00000063 | UTF8_計算機用語_00000063 | 630000 | lookup00000126 |  63.63 | 63636363.63 | _      |     63 | -2500470000000063
+ row00000264 | ASCII00000064 | UTF8_計算機用語_00000064 | 640000 | lookup00000128 |  64.64 | 64646464.64 | `      |     64 |  2621440000000064
+ row00000265 | ASCII00000065 | UTF8_計算機用語_00000065 | 650000 | lookup00000130 |  65.65 | 65656565.65 | a      |     65 | -2746250000000065
+ row00000266 | ASCII00000066 | UTF8_計算機用語_00000066 | 660000 | lookup00000132 |  66.66 | 66666666.66 | b      |     66 |  2874960000000066
+ row00000267 | ASCII00000067 | UTF8_計算機用語_00000067 | 670000 | lookup00000134 |  67.67 | 67676767.67 | c      |     67 | -3007630000000067
+ row00000268 | ASCII00000068 | UTF8_計算機用語_00000068 | 680000 | lookup00000136 |  68.68 | 68686868.68 | d      |     68 |  3144320000000068
+ row00000269 | ASCII00000069 | UTF8_計算機用語_00000069 | 690000 | lookup00000138 |  69.69 | 69696969.69 | e      |     69 | -3285090000000069
+ row00000270 | ASCII00000070 | UTF8_計算機用語_00000070 | 700000 | lookup00000140 |   70.7 |  70707070.7 | f      |     70 |  3430000000000070
+ row00000271 | ASCII00000071 | UTF8_計算機用語_00000071 | 710000 | lookup00000142 |  71.71 | 71717171.71 | g      |     71 | -3579110000000071
+ row00000272 | ASCII00000072 | UTF8_計算機用語_00000072 | 720000 | lookup00000144 |  72.72 | 72727272.72 | h      |     72 |  3732480000000072
+ row00000273 | ASCII00000073 | UTF8_計算機用語_00000073 | 730000 | lookup00000146 |  73.73 | 73737373.73 | i      |     73 | -3890170000000073
+ row00000274 | ASCII00000074 | UTF8_計算機用語_00000074 | 740000 | lookup00000148 |  74.74 | 74747474.74 | j      |     74 |  4052240000000074
+ row00000275 | ASCII00000075 | UTF8_計算機用語_00000075 | 750000 | lookup00000150 |  75.75 | 75757575.75 | k      |     75 | -4218750000000075
+ row00000276 | ASCII00000076 | UTF8_計算機用語_00000076 | 760000 | lookup00000152 |  76.76 | 76767676.76 | l      |     76 |  4389760000000076
+ row00000277 | ASCII00000077 | UTF8_計算機用語_00000077 | 770000 | lookup00000154 |  77.77 | 77777777.77 | m      |     77 | -4565330000000077
+ row00000278 | ASCII00000078 | UTF8_計算機用語_00000078 | 780000 | lookup00000156 |  78.78 | 78787878.78 | n      |     78 |  4745520000000078
+ row00000279 | ASCII00000079 | UTF8_計算機用語_00000079 | 790000 | lookup00000158 |  79.79 | 79797979.79 | o      |     79 | -4930390000000079
+ row00000280 | ASCII00000080 | UTF8_計算機用語_00000080 | 800000 | lookup00000160 |   80.8 |  80808080.8 | p      |     80 |  5120000000000080
+ row00000281 | ASCII00000081 | UTF8_計算機用語_00000081 | 810000 | lookup00000162 |  81.81 | 81818181.81 | q      |     81 | -5314410000000081
+ row00000282 | ASCII00000082 | UTF8_計算機用語_00000082 | 820000 | lookup00000164 |  82.82 | 82828282.82 | r      |     82 |  5513680000000082
+ row00000283 | ASCII00000083 | UTF8_計算機用語_00000083 | 830000 | lookup00000166 |  83.83 | 83838383.83 | s      |     83 | -5717870000000083
+ row00000284 | ASCII00000084 | UTF8_計算機用語_00000084 | 840000 | lookup00000168 |  84.84 | 84848484.84 | t      |     84 |  5927040000000084
+ row00000285 | ASCII00000085 | UTF8_計算機用語_00000085 | 850000 | lookup00000170 |  85.85 | 85858585.85 | u      |     85 | -6141250000000085
+ row00000286 | ASCII00000086 | UTF8_計算機用語_00000086 | 860000 | lookup00000172 |  86.86 | 86868686.86 | v      |     86 |  6360560000000086
+ row00000287 | ASCII00000087 | UTF8_計算機用語_00000087 | 870000 | lookup00000174 |  87.87 | 87878787.87 | w      |     87 | -6585030000000087
+ row00000288 | ASCII00000088 | UTF8_計算機用語_00000088 | 880000 | lookup00000176 |  88.88 | 88888888.88 | x      |     88 |  6814720000000088
+ row00000289 | ASCII00000089 | UTF8_計算機用語_00000089 | 890000 | lookup00000178 |  89.89 | 89898989.89 | y      |     89 | -7049690000000089
+ row00000290 | ASCII00000090 | UTF8_計算機用語_00000090 | 900000 | lookup00000180 |   90.9 |  90909090.9 | z      |     90 |  7290000000000090
+ row00000291 | ASCII00000091 | UTF8_計算機用語_00000091 | 910000 | lookup00000182 |  91.91 | 91919191.91 | {      |     91 | -7535710000000091
+ row00000292 | ASCII00000092 | UTF8_計算機用語_00000092 | 920000 | lookup00000184 |  92.92 | 92929292.92 | |      |     92 |  7786880000000092
+ row00000293 | ASCII00000093 | UTF8_計算機用語_00000093 | 930000 | lookup00000186 |  93.93 | 93939393.93 | }      |     93 | -8043570000000093
+ row00000294 | ASCII00000094 | UTF8_計算機用語_00000094 | 940000 | lookup00000188 |  94.94 | 94949494.94 | ~      |     94 |  8305840000000094
+ row00000295 | ASCII00000095 | UTF8_計算機用語_00000095 | 950000 | lookup00000190 |  95.95 | 95959595.95 | \x7F   |     95 | -8573750000000095
+ row00000296 | ASCII00000096 | UTF8_計算機用語_00000096 | 960000 | lookup00000192 |  96.96 | 96969696.96 | \u0080 |     96 |  8847360000000096
+ row00000297 | ASCII00000097 | UTF8_計算機用語_00000097 | 970000 | lookup00000194 |  97.97 | 97979797.97 | \u0081 |     97 | -9126730000000097
+ row00000298 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000299 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+(300 rows)
+
+SELECT * FROM gphbase_select WHERE gp_segment_id = 0 ORDER BY recordkey ASC;
+  recordkey  |    cf1:q1     |          cf1:q2          | cf1:q3 |       q4       | cf1:q5 |   cf1:q6    | cf1:q7 | cf1:q8 |      cf1:q9       
+-------------+---------------+--------------------------+--------+----------------+--------+-------------+--------+--------+-------------------
+ row00000000 | ASCII00000000 | UTF8_計算機用語_00000000 |      0 | lookup00000000 |      0 |           0 |        |      0 |                 0
+ row00000001 | ASCII00000001 | UTF8_計算機用語_00000001 |  10000 | lookup00000002 |    1.1 |      1111.1 | !      |      1 |      -10000000001
+ row00000002 | ASCII00000002 | UTF8_計算機用語_00000002 |  20000 | lookup00000004 |    2.2 |      2222.2 | "      |      2 |       80000000002
+ row00000003 | ASCII00000003 | UTF8_計算機用語_00000003 |  30000 | lookup00000006 |    3.3 |      3333.3 | #      |      3 |     -270000000003
+ row00000004 | ASCII00000004 | UTF8_計算機用語_00000004 |  40000 | lookup00000008 |    4.4 |      4444.4 | $      |      4 |      640000000004
+ row00000005 | ASCII00000005 | UTF8_計算機用語_00000005 |  50000 | lookup00000010 |    5.5 |      5555.5 | %      |      5 |    -1250000000005
+ row00000006 | ASCII00000006 | UTF8_計算機用語_00000006 |  60000 | lookup00000012 |    6.6 |      6666.6 | &      |      6 |     2160000000006
+ row00000007 | ASCII00000007 | UTF8_計算機用語_00000007 |  70000 | lookup00000014 |    7.7 |      7777.7 | '      |      7 |    -3430000000007
+ row00000008 | ASCII00000008 | UTF8_計算機用語_00000008 |  80000 | lookup00000016 |    8.8 |      8888.8 | (      |      8 |     5120000000008
+ row00000009 | ASCII00000009 | UTF8_計算機用語_00000009 |  90000 | lookup00000018 |    9.9 |      9999.9 | )      |      9 |    -7290000000009
+ row00000010 | ASCII00000010 | UTF8_計算機用語_00000010 | 100000 | lookup00000020 |   10.1 |  10101010.1 | *      |     10 |    10000000000010
+ row00000011 | ASCII00000011 | UTF8_計算機用語_00000011 | 110000 | lookup00000022 |  11.11 | 11111111.11 | +      |     11 |   -13310000000011
+ row00000012 | ASCII00000012 | UTF8_計算機用語_00000012 | 120000 | lookup00000024 |  12.12 | 12121212.12 | ,      |     12 |    17280000000012
+ row00000013 | ASCII00000013 | UTF8_計算機用語_00000013 | 130000 | lookup00000026 |  13.13 | 13131313.13 | -      |     13 |   -21970000000013
+ row00000014 | ASCII00000014 | UTF8_計算機用語_00000014 | 140000 | lookup00000028 |  14.14 | 14141414.14 | .      |     14 |    27440000000014
+ row00000015 | ASCII00000015 | UTF8_計算機用語_00000015 | 150000 | lookup00000030 |  15.15 | 15151515.15 | /      |     15 |   -33750000000015
+ row00000016 | ASCII00000016 | UTF8_計算機用語_00000016 | 160000 | lookup00000032 |  16.16 | 16161616.16 | 0      |     16 |    40960000000016
+ row00000017 | ASCII00000017 | UTF8_計算機用語_00000017 | 170000 | lookup00000034 |  17.17 | 17171717.17 | 1      |     17 |   -49130000000017
+ row00000018 | ASCII00000018 | UTF8_計算機用語_00000018 | 180000 | lookup00000036 |  18.18 | 18181818.18 | 2      |     18 |    58320000000018
+ row00000019 | ASCII00000019 | UTF8_計算機用語_00000019 | 190000 | lookup00000038 |  19.19 | 19191919.19 | 3      |     19 |   -68590000000019
+ row00000020 | ASCII00000020 | UTF8_計算機用語_00000020 | 200000 | lookup00000040 |   20.2 |  20202020.2 | 4      |     20 |    80000000000020
+ row00000021 | ASCII00000021 | UTF8_計算機用語_00000021 | 210000 | lookup00000042 |  21.21 | 21212121.21 | 5      |     21 |   -92610000000021
+ row00000022 | ASCII00000022 | UTF8_計算機用語_00000022 | 220000 | lookup00000044 |  22.22 | 22222222.22 | 6      |     22 |   106480000000022
+ row00000023 | ASCII00000023 | UTF8_計算機用語_00000023 | 230000 | lookup00000046 |  23.23 | 23232323.23 | 7      |     23 |  -121670000000023
+ row00000024 | ASCII00000024 | UTF8_計算機用語_00000024 | 240000 | lookup00000048 |  24.24 | 24242424.24 | 8      |     24 |   138240000000024
+ row00000025 | ASCII00000025 | UTF8_計算機用語_00000025 | 250000 | lookup00000050 |  25.25 | 25252525.25 | 9      |     25 |  -156250000000025
+ row00000026 | ASCII00000026 | UTF8_計算機用語_00000026 | 260000 | lookup00000052 |  26.26 | 26262626.26 | :      |     26 |   175760000000026
+ row00000027 | ASCII00000027 | UTF8_計算機用語_00000027 | 270000 | lookup00000054 |  27.27 | 27272727.27 | ;      |     27 |  -196830000000027
+ row00000028 | ASCII00000028 | UTF8_計算機用語_00000028 | 280000 | lookup00000056 |  28.28 | 28282828.28 | <      |     28 |   219520000000028
+ row00000029 | ASCII00000029 | UTF8_計算機用語_00000029 | 290000 | lookup00000058 |  29.29 | 29292929.29 | =      |     29 |  -243890000000029
+ row00000030 | ASCII00000030 | UTF8_計算機用語_00000030 | 300000 | lookup00000060 |   30.3 |  30303030.3 | >      |     30 |   270000000000030
+ row00000031 | ASCII00000031 | UTF8_計算機用語_00000031 | 310000 | lookup00000062 |  31.31 | 31313131.31 | ?      |     31 |  -297910000000031
+ row00000032 | ASCII00000032 | UTF8_計算機用語_00000032 | 320000 | lookup00000064 |  32.32 | 32323232.32 | @      |     32 |   327680000000032
+ row00000033 | ASCII00000033 | UTF8_計算機用語_00000033 | 330000 | lookup00000066 |  33.33 | 33333333.33 | A      |     33 |  -359370000000033
+ row00000034 | ASCII00000034 | UTF8_計算機用語_00000034 | 340000 | lookup00000068 |  34.34 | 34343434.34 | B      |     34 |   393040000000034
+ row00000035 | ASCII00000035 | UTF8_計算機用語_00000035 | 350000 | lookup00000070 |  35.35 | 35353535.35 | C      |     35 |  -428750000000035
+ row00000036 | ASCII00000036 | UTF8_計算機用語_00000036 | 360000 | lookup00000072 |  36.36 | 36363636.36 | D      |     36 |   466560000000036
+ row00000037 | ASCII00000037 | UTF8_計算機用語_00000037 | 370000 | lookup00000074 |  37.37 | 37373737.37 | E      |     37 |  -506530000000037
+ row00000038 | ASCII00000038 | UTF8_計算機用語_00000038 | 380000 | lookup00000076 |  38.38 | 38383838.38 | F      |     38 |   548720000000038
+ row00000039 | ASCII00000039 | UTF8_計算機用語_00000039 | 390000 | lookup00000078 |  39.39 | 39393939.39 | G      |     39 |  -593190000000039
+ row00000040 | ASCII00000040 | UTF8_計算機用語_00000040 | 400000 | lookup00000080 |   40.4 |  40404040.4 | H      |     40 |   640000000000040
+ row00000041 | ASCII00000041 | UTF8_計算機用語_00000041 | 410000 | lookup00000082 |  41.41 | 41414141.41 | I      |     41 |  -689210000000041
+ row00000042 | ASCII00000042 | UTF8_計算機用語_00000042 | 420000 | lookup00000084 |  42.42 | 42424242.42 | J      |     42 |   740880000000042
+ row00000043 | ASCII00000043 | UTF8_計算機用語_00000043 | 430000 | lookup00000086 |  43.43 | 43434343.43 | K      |     43 |  -795070000000043
+ row00000044 | ASCII00000044 | UTF8_計算機用語_00000044 | 440000 | lookup00000088 |  44.44 | 44444444.44 | L      |     44 |   851840000000044
+ row00000045 | ASCII00000045 | UTF8_計算機用語_00000045 | 450000 | lookup00000090 |  45.45 | 45454545.45 | M      |     45 |  -911250000000045
+ row00000046 | ASCII00000046 | UTF8_計算機用語_00000046 | 460000 | lookup00000092 |  46.46 | 46464646.46 | N      |     46 |   973360000000046
+ row00000047 | ASCII00000047 | UTF8_計算機用語_00000047 | 470000 | lookup00000094 |  47.47 | 47474747.47 | O      |     47 | -1038230000000047
+ row00000048 | ASCII00000048 | UTF8_計算機用語_00000048 | 480000 | lookup00000096 |  48.48 | 48484848.48 | P      |     48 |  1105920000000048
+ row00000049 | ASCII00000049 | UTF8_計算機用語_00000049 | 490000 | lookup00000098 |  49.49 | 49494949.49 | Q      |     49 | -1176490000000049
+ row00000050 | ASCII00000050 | UTF8_計算機用語_00000050 | 500000 | lookup00000100 |   50.5 |  50505050.5 | R      |     50 |  1250000000000050
+ row00000051 | ASCII00000051 | UTF8_計算機用語_00000051 | 510000 | lookup00000102 |  51.51 | 51515151.51 | S      |     51 | -1326510000000051
+ row00000052 | ASCII00000052 | UTF8_計算機用語_00000052 | 520000 | lookup00000104 |  52.52 | 52525252.52 | T      |     52 |  1406080000000052
+ row00000053 | ASCII00000053 | UTF8_計算機用語_00000053 | 530000 | lookup00000106 |  53.53 | 53535353.53 | U      |     53 | -1488770000000053
+ row00000054 | ASCII00000054 | UTF8_計算機用語_00000054 | 540000 | lookup00000108 |  54.54 | 54545454.54 | V      |     54 |  1574640000000054
+ row00000055 | ASCII00000055 | UTF8_計算機用語_00000055 | 550000 | lookup00000110 |  55.55 | 55555555.55 | W      |     55 | -1663750000000055
+ row00000056 | ASCII00000056 | UTF8_計算機用語_00000056 | 560000 | lookup00000112 |  56.56 | 56565656.56 | X      |     56 |  1756160000000056
+ row00000057 | ASCII00000057 | UTF8_計算機用語_00000057 | 570000 | lookup00000114 |  57.57 | 57575757.57 | Y      |     57 | -1851930000000057
+ row00000058 | ASCII00000058 | UTF8_計算機用語_00000058 | 580000 | lookup00000116 |  58.58 | 58585858.58 | Z      |     58 |  1951120000000058
+ row00000059 | ASCII00000059 | UTF8_計算機用語_00000059 | 590000 | lookup00000118 |  59.59 | 59595959.59 | [      |     59 | -2053790000000059
+ row00000060 | ASCII00000060 | UTF8_計算機用語_00000060 | 600000 | lookup00000120 |   60.6 |  60606060.6 | \      |     60 |  2160000000000060
+ row00000061 | ASCII00000061 | UTF8_計算機用語_00000061 | 610000 | lookup00000122 |  61.61 | 61616161.61 | ]      |     61 | -2269810000000061
+ row00000062 | ASCII00000062 | UTF8_計算機用語_00000062 | 620000 | lookup00000124 |  62.62 | 62626262.62 | ^      |     62 |  2383280000000062
+ row00000063 | ASCII00000063 | UTF8_計算機用語_00000063 | 630000 | lookup00000126 |  63.63 | 63636363.63 | _      |     63 | -2500470000000063
+ row00000064 | ASCII00000064 | UTF8_計算機用語_00000064 | 640000 | lookup00000128 |  64.64 | 64646464.64 | `      |     64 |  2621440000000064
+ row00000065 | ASCII00000065 | UTF8_計算機用語_00000065 | 650000 | lookup00000130 |  65.65 | 65656565.65 | a      |     65 | -2746250000000065
+ row00000066 | ASCII00000066 | UTF8_計算機用語_00000066 | 660000 | lookup00000132 |  66.66 | 66666666.66 | b      |     66 |  2874960000000066
+ row00000067 | ASCII00000067 | UTF8_計算機用語_00000067 | 670000 | lookup00000134 |  67.67 | 67676767.67 | c      |     67 | -3007630000000067
+ row00000068 | ASCII00000068 | UTF8_計算機用語_00000068 | 680000 | lookup00000136 |  68.68 | 68686868.68 | d      |     68 |  3144320000000068
+ row00000069 | ASCII00000069 | UTF8_計算機用語_00000069 | 690000 | lookup00000138 |  69.69 | 69696969.69 | e      |     69 | -3285090000000069
+ row00000070 | ASCII00000070 | UTF8_計算機用語_00000070 | 700000 | lookup00000140 |   70.7 |  70707070.7 | f      |     70 |  3430000000000070
+ row00000071 | ASCII00000071 | UTF8_計算機用語_00000071 | 710000 | lookup00000142 |  71.71 | 71717171.71 | g      |     71 | -3579110000000071
+ row00000072 | ASCII00000072 | UTF8_計算機用語_00000072 | 720000 | lookup00000144 |  72.72 | 72727272.72 | h      |     72 |  3732480000000072
+ row00000073 | ASCII00000073 | UTF8_計算機用語_00000073 | 730000 | lookup00000146 |  73.73 | 73737373.73 | i      |     73 | -3890170000000073
+ row00000074 | ASCII00000074 | UTF8_計算機用語_00000074 | 740000 | lookup00000148 |  74.74 | 74747474.74 | j      |     74 |  4052240000000074
+ row00000075 | ASCII00000075 | UTF8_計算機用語_00000075 | 750000 | lookup00000150 |  75.75 | 75757575.75 | k      |     75 | -4218750000000075
+ row00000076 | ASCII00000076 | UTF8_計算機用語_00000076 | 760000 | lookup00000152 |  76.76 | 76767676.76 | l      |     76 |  4389760000000076
+ row00000077 | ASCII00000077 | UTF8_計算機用語_00000077 | 770000 | lookup00000154 |  77.77 | 77777777.77 | m      |     77 | -4565330000000077
+ row00000078 | ASCII00000078 | UTF8_計算機用語_00000078 | 780000 | lookup00000156 |  78.78 | 78787878.78 | n      |     78 |  4745520000000078
+ row00000079 | ASCII00000079 | UTF8_計算機用語_00000079 | 790000 | lookup00000158 |  79.79 | 79797979.79 | o      |     79 | -4930390000000079
+ row00000080 | ASCII00000080 | UTF8_計算機用語_00000080 | 800000 | lookup00000160 |   80.8 |  80808080.8 | p      |     80 |  5120000000000080
+ row00000081 | ASCII00000081 | UTF8_計算機用語_00000081 | 810000 | lookup00000162 |  81.81 | 81818181.81 | q      |     81 | -5314410000000081
+ row00000082 | ASCII00000082 | UTF8_計算機用語_00000082 | 820000 | lookup00000164 |  82.82 | 82828282.82 | r      |     82 |  5513680000000082
+ row00000083 | ASCII00000083 | UTF8_計算機用語_00000083 | 830000 | lookup00000166 |  83.83 | 83838383.83 | s      |     83 | -5717870000000083
+ row00000084 | ASCII00000084 | UTF8_計算機用語_00000084 | 840000 | lookup00000168 |  84.84 | 84848484.84 | t      |     84 |  5927040000000084
+ row00000085 | ASCII00000085 | UTF8_計算機用語_00000085 | 850000 | lookup00000170 |  85.85 | 85858585.85 | u      |     85 | -6141250000000085
+ row00000086 | ASCII00000086 | UTF8_計算機用語_00000086 | 860000 | lookup00000172 |  86.86 | 86868686.86 | v      |     86 |  6360560000000086
+ row00000087 | ASCII00000087 | UTF8_計算機用語_00000087 | 870000 | lookup00000174 |  87.87 | 87878787.87 | w      |     87 | -6585030000000087
+ row00000088 | ASCII00000088 | UTF8_計算機用語_00000088 | 880000 | lookup00000176 |  88.88 | 88888888.88 | x      |     88 |  6814720000000088
+ row00000089 | ASCII00000089 | UTF8_計算機用語_00000089 | 890000 | lookup00000178 |  89.89 | 89898989.89 | y      |     89 | -7049690000000089
+ row00000090 | ASCII00000090 | UTF8_計算機用語_00000090 | 900000 | lookup00000180 |   90.9 |  90909090.9 | z      |     90 |  7290000000000090
+ row00000091 | ASCII00000091 | UTF8_計算機用語_00000091 | 910000 | lookup00000182 |  91.91 | 91919191.91 | {      |     91 | -7535710000000091
+ row00000092 | ASCII00000092 | UTF8_計算機用語_00000092 | 920000 | lookup00000184 |  92.92 | 92929292.92 | |      |     92 |  7786880000000092
+ row00000093 | ASCII00000093 | UTF8_計算機用語_00000093 | 930000 | lookup00000186 |  93.93 | 93939393.93 | }      |     93 | -8043570000000093
+ row00000094 | ASCII00000094 | UTF8_計算機用語_00000094 | 940000 | lookup00000188 |  94.94 | 94949494.94 | ~      |     94 |  8305840000000094
+ row00000095 | ASCII00000095 | UTF8_計算機用語_00000095 | 950000 | lookup00000190 |  95.95 | 95959595.95 | \x7F   |     95 | -8573750000000095
+ row00000096 | ASCII00000096 | UTF8_計算機用語_00000096 | 960000 | lookup00000192 |  96.96 | 96969696.96 | \u0080 |     96 |  8847360000000096
+ row00000097 | ASCII00000097 | UTF8_計算機用語_00000097 | 970000 | lookup00000194 |  97.97 | 97979797.97 | \u0081 |     97 | -9126730000000097
+ row00000098 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000099 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+ row00000200 | ASCII00000000 | UTF8_計算機用語_00000000 |      0 | lookup00000000 |      0 |           0 |        |      0 |                 0
+ row00000201 | ASCII00000001 | UTF8_計算機用語_00000001 |  10000 | lookup00000002 |    1.1 |      1111.1 | !      |      1 |      -10000000001
+ row00000202 | ASCII00000002 | UTF8_計算機用語_00000002 |  20000 | lookup00000004 |    2.2 |      2222.2 | "      |      2 |       80000000002
+ row00000203 | ASCII00000003 | UTF8_計算機用語_00000003 |  30000 | lookup00000006 |    3.3 |      3333.3 | #      |      3 |     -270000000003
+ row00000204 | ASCII00000004 | UTF8_計算機用語_00000004 |  40000 | lookup00000008 |    4.4 |      4444.4 | $      |      4 |      640000000004
+ row00000205 | ASCII00000005 | UTF8_計算機用語_00000005 |  50000 | lookup00000010 |    5.5 |      5555.5 | %      |      5 |    -1250000000005
+ row00000206 | ASCII00000006 | UTF8_計算機用語_00000006 |  60000 | lookup00000012 |    6.6 |      6666.6 | &      |      6 |     2160000000006
+ row00000207 | ASCII00000007 | UTF8_計算機用語_00000007 |  70000 | lookup00000014 |    7.7 |      7777.7 | '      |      7 |    -3430000000007
+ row00000208 | ASCII00000008 | UTF8_計算機用語_00000008 |  80000 | lookup00000016 |    8.8 |      8888.8 | (      |      8 |     5120000000008
+ row00000209 | ASCII00000009 | UTF8_計算機用語_00000009 |  90000 | lookup00000018 |    9.9 |      9999.9 | )      |      9 |    -7290000000009
+ row00000210 | ASCII00000010 | UTF8_計算機用語_00000010 | 100000 | lookup00000020 |   10.1 |  10101010.1 | *      |     10 |    10000000000010
+ row00000211 | ASCII00000011 | UTF8_計算機用語_00000011 | 110000 | lookup00000022 |  11.11 | 11111111.11 | +      |     11 |   -13310000000011
+ row00000212 | ASCII00000012 | UTF8_計算機用語_00000012 | 120000 | lookup00000024 |  12.12 | 12121212.12 | ,      |     12 |    17280000000012
+ row00000213 | ASCII00000013 | UTF8_計算機用語_00000013 | 130000 | lookup00000026 |  13.13 | 13131313.13 | -      |     13 |   -21970000000013
+ row00000214 | ASCII00000014 | UTF8_計算機用語_00000014 | 140000 | lookup00000028 |  14.14 | 14141414.14 | .      |     14 |    27440000000014
+ row00000215 | ASCII00000015 | UTF8_計算機用語_00000015 | 150000 | lookup00000030 |  15.15 | 15151515.15 | /      |     15 |   -33750000000015
+ row00000216 | ASCII00000016 | UTF8_計算機用語_00000016 | 160000 | lookup00000032 |  16.16 | 16161616.16 | 0      |     16 |    40960000000016
+ row00000217 | ASCII00000017 | UTF8_計算機用語_00000017 | 170000 | lookup00000034 |  17.17 | 17171717.17 | 1      |     17 |   -49130000000017
+ row00000218 | ASCII00000018 | UTF8_計算機用語_00000018 | 180000 | lookup00000036 |  18.18 | 18181818.18 | 2      |     18 |    58320000000018
+ row00000219 | ASCII00000019 | UTF8_計算機用語_00000019 | 190000 | lookup00000038 |  19.19 | 19191919.19 | 3      |     19 |   -68590000000019
+ row00000220 | ASCII00000020 | UTF8_計算機用語_00000020 | 200000 | lookup00000040 |   20.2 |  20202020.2 | 4      |     20 |    80000000000020
+ row00000221 | ASCII00000021 | UTF8_計算機用語_00000021 | 210000 | lookup00000042 |  21.21 | 21212121.21 | 5      |     21 |   -92610000000021
+ row00000222 | ASCII00000022 | UTF8_計算機用語_00000022 | 220000 | lookup00000044 |  22.22 | 22222222.22 | 6      |     22 |   106480000000022
+ row00000223 | ASCII00000023 | UTF8_計算機用語_00000023 | 230000 | lookup00000046 |  23.23 | 23232323.23 | 7      |     23 |  -121670000000023
+ row00000224 | ASCII00000024 | UTF8_計算機用語_00000024 | 240000 | lookup00000048 |  24.24 | 24242424.24 | 8      |     24 |   138240000000024
+ row00000225 | ASCII00000025 | UTF8_計算機用語_00000025 | 250000 | lookup00000050 |  25.25 | 25252525.25 | 9      |     25 |  -156250000000025
+ row00000226 | ASCII00000026 | UTF8_計算機用語_00000026 | 260000 | lookup00000052 |  26.26 | 26262626.26 | :      |     26 |   175760000000026
+ row00000227 | ASCII00000027 | UTF8_計算機用語_00000027 | 270000 | lookup00000054 |  27.27 | 27272727.27 | ;      |     27 |  -196830000000027
+ row00000228 | ASCII00000028 | UTF8_計算機用語_00000028 | 280000 | lookup00000056 |  28.28 | 28282828.28 | <      |     28 |   219520000000028
+ row00000229 | ASCII00000029 | UTF8_計算機用語_00000029 | 290000 | lookup00000058 |  29.29 | 29292929.29 | =      |     29 |  -243890000000029
+ row00000230 | ASCII00000030 | UTF8_計算機用語_00000030 | 300000 | lookup00000060 |   30.3 |  30303030.3 | >      |     30 |   270000000000030
+ row00000231 | ASCII00000031 | UTF8_計算機用語_00000031 | 310000 | lookup00000062 |  31.31 | 31313131.31 | ?      |     31 |  -297910000000031
+ row00000232 | ASCII00000032 | UTF8_計算機用語_00000032 | 320000 | lookup00000064 |  32.32 | 32323232.32 | @      |     32 |   327680000000032
+ row00000233 | ASCII00000033 | UTF8_計算機用語_00000033 | 330000 | lookup00000066 |  33.33 | 33333333.33 | A      |     33 |  -359370000000033
+ row00000234 | ASCII00000034 | UTF8_計算機用語_00000034 | 340000 | lookup00000068 |  34.34 | 34343434.34 | B      |     34 |   393040000000034
+ row00000235 | ASCII00000035 | UTF8_計算機用語_00000035 | 350000 | lookup00000070 |  35.35 | 35353535.35 | C      |     35 |  -428750000000035
+ row00000236 | ASCII00000036 | UTF8_計算機用語_00000036 | 360000 | lookup00000072 |  36.36 | 36363636.36 | D      |     36 |   466560000000036
+ row00000237 | ASCII00000037 | UTF8_計算機用語_00000037 | 370000 | lookup00000074 |  37.37 | 37373737.37 | E      |     37 |  -506530000000037
+ row00000238 | ASCII00000038 | UTF8_計算機用語_00000038 | 380000 | lookup00000076 |  38.38 | 38383838.38 | F      |     38 |   548720000000038
+ row00000239 | ASCII00000039 | UTF8_計算機用語_00000039 | 390000 | lookup00000078 |  39.39 | 39393939.39 | G      |     39 |  -593190000000039
+ row00000240 | ASCII00000040 | UTF8_計算機用語_00000040 | 400000 | lookup00000080 |   40.4 |  40404040.4 | H      |     40 |   640000000000040
+ row00000241 | ASCII00000041 | UTF8_計算機用語_00000041 | 410000 | lookup00000082 |  41.41 | 41414141.41 | I      |     41 |  -689210000000041
+ row00000242 | ASCII00000042 | UTF8_計算機用語_00000042 | 420000 | lookup00000084 |  42.42 | 42424242.42 | J      |     42 |   740880000000042
+ row00000243 | ASCII00000043 | UTF8_計算機用語_00000043 | 430000 | lookup00000086 |  43.43 | 43434343.43 | K      |     43 |  -795070000000043
+ row00000244 | ASCII00000044 | UTF8_計算機用語_00000044 | 440000 | lookup00000088 |  44.44 | 44444444.44 | L      |     44 |   851840000000044
+ row00000245 | ASCII00000045 | UTF8_計算機用語_00000045 | 450000 | lookup00000090 |  45.45 | 45454545.45 | M      |     45 |  -911250000000045
+ row00000246 | ASCII00000046 | UTF8_計算機用語_00000046 | 460000 | lookup00000092 |  46.46 | 46464646.46 | N      |     46 |   973360000000046
+ row00000247 | ASCII00000047 | UTF8_計算機用語_00000047 | 470000 | lookup00000094 |  47.47 | 47474747.47 | O      |     47 | -1038230000000047
+ row00000248 | ASCII00000048 | UTF8_計算機用語_00000048 | 480000 | lookup00000096 |  48.48 | 48484848.48 | P      |     48 |  1105920000000048
+ row00000249 | ASCII00000049 | UTF8_計算機用語_00000049 | 490000 | lookup00000098 |  49.49 | 49494949.49 | Q      |     49 | -1176490000000049
+ row00000250 | ASCII00000050 | UTF8_計算機用語_00000050 | 500000 | lookup00000100 |   50.5 |  50505050.5 | R      |     50 |  1250000000000050
+ row00000251 | ASCII00000051 | UTF8_計算機用語_00000051 | 510000 | lookup00000102 |  51.51 | 51515151.51 | S      |     51 | -1326510000000051
+ row00000252 | ASCII00000052 | UTF8_計算機用語_00000052 | 520000 | lookup00000104 |  52.52 | 52525252.52 | T      |     52 |  1406080000000052
+ row00000253 | ASCII00000053 | UTF8_計算機用語_00000053 | 530000 | lookup00000106 |  53.53 | 53535353.53 | U      |     53 | -1488770000000053
+ row00000254 | ASCII00000054 | UTF8_計算機用語_00000054 | 540000 | lookup00000108 |  54.54 | 54545454.54 | V      |     54 |  1574640000000054
+ row00000255 | ASCII00000055 | UTF8_計算機用語_00000055 | 550000 | lookup00000110 |  55.55 | 55555555.55 | W      |     55 | -1663750000000055
+ row00000256 | ASCII00000056 | UTF8_計算機用語_00000056 | 560000 | lookup00000112 |  56.56 | 56565656.56 | X      |     56 |  1756160000000056
+ row00000257 | ASCII00000057 | UTF8_計算機用語_00000057 | 570000 | lookup00000114 |  57.57 | 57575757.57 | Y      |     57 | -1851930000000057
+ row00000258 | ASCII00000058 | UTF8_計算機用語_00000058 | 580000 | lookup00000116 |  58.58 | 58585858.58 | Z      |     58 |  1951120000000058
+ row00000259 | ASCII00000059 | UTF8_計算機用語_00000059 | 590000 | lookup00000118 |  59.59 | 59595959.59 | [      |     59 | -2053790000000059
+ row00000260 | ASCII00000060 | UTF8_計算機用語_00000060 | 600000 | lookup00000120 |   60.6 |  60606060.6 | \      |     60 |  2160000000000060
+ row00000261 | ASCII00000061 | UTF8_計算機用語_00000061 | 610000 | lookup00000122 |  61.61 | 61616161.61 | ]      |     61 | -2269810000000061
+ row00000262 | ASCII00000062 | UTF8_計算機用語_00000062 | 620000 | lookup00000124 |  62.62 | 62626262.62 | ^      |     62 |  2383280000000062
+ row00000263 | ASCII00000063 | UTF8_計算機用語_00000063 | 630000 | lookup00000126 |  63.63 | 63636363.63 | _      |     63 | -2500470000000063
+ row00000264 | ASCII00000064 | UTF8_計算機用語_00000064 | 640000 | lookup00000128 |  64.64 | 64646464.64 | `      |     64 |  2621440000000064
+ row00000265 | ASCII00000065 | UTF8_計算機用語_00000065 | 650000 | lookup00000130 |  65.65 | 65656565.65 | a      |     65 | -2746250000000065
+ row00000266 | ASCII00000066 | UTF8_計算機用語_00000066 | 660000 | lookup00000132 |  66.66 | 66666666.66 | b      |     66 |  2874960000000066
+ row00000267 | ASCII00000067 | UTF8_計算機用語_00000067 | 670000 | lookup00000134 |  67.67 | 67676767.67 | c      |     67 | -3007630000000067
+ row00000268 | ASCII00000068 | UTF8_計算機用語_00000068 | 680000 | lookup00000136 |  68.68 | 68686868.68 | d      |     68 |  3144320000000068
+ row00000269 | ASCII00000069 | UTF8_計算機用語_00000069 | 690000 | lookup00000138 |  69.69 | 69696969.69 | e      |     69 | -3285090000000069
+ row00000270 | ASCII00000070 | UTF8_計算機用語_00000070 | 700000 | lookup00000140 |   70.7 |  70707070.7 | f      |     70 |  3430000000000070
+ row00000271 | ASCII00000071 | UTF8_計算機用語_00000071 | 710000 | lookup00000142 |  71.71 | 71717171.71 | g      |     71 | -3579110000000071
+ row00000272 | ASCII00000072 | UTF8_計算機用語_00000072 | 720000 | lookup00000144 |  72.72 | 72727272.72 | h      |     72 |  3732480000000072
+ row00000273 | ASCII00000073 | UTF8_計算機用語_00000073 | 730000 | lookup00000146 |  73.73 | 73737373.73 | i      |     73 | -3890170000000073
+ row00000274 | ASCII00000074 | UTF8_計算機用語_00000074 | 740000 | lookup00000148 |  74.74 | 74747474.74 | j      |     74 |  4052240000000074
+ row00000275 | ASCII00000075 | UTF8_計算機用語_00000075 | 750000 | lookup00000150 |  75.75 | 75757575.75 | k      |     75 | -4218750000000075
+ row00000276 | ASCII00000076 | UTF8_計算機用語_00000076 | 760000 | lookup00000152 |  76.76 | 76767676.76 | l      |     76 |  4389760000000076
+ row00000277 | ASCII00000077 | UTF8_計算機用語_00000077 | 770000 | lookup00000154 |  77.77 | 77777777.77 | m      |     77 | -4565330000000077
+ row00000278 | ASCII00000078 | UTF8_計算機用語_00000078 | 780000 | lookup00000156 |  78.78 | 78787878.78 | n      |     78 |  4745520000000078
+ row00000279 | ASCII00000079 | UTF8_計算機用語_00000079 | 790000 | lookup00000158 |  79.79 | 79797979.79 | o      |     79 | -4930390000000079
+ row00000280 | ASCII00000080 | UTF8_計算機用語_00000080 | 800000 | lookup00000160 |   80.8 |  80808080.8 | p      |     80 |  5120000000000080
+ row00000281 | ASCII00000081 | UTF8_計算機用語_00000081 | 810000 | lookup00000162 |  81.81 | 81818181.81 | q      |     81 | -5314410000000081
+ row00000282 | ASCII00000082 | UTF8_計算機用語_00000082 | 820000 | lookup00000164 |  82.82 | 82828282.82 | r      |     82 |  5513680000000082
+ row00000283 | ASCII00000083 | UTF8_計算機用語_00000083 | 830000 | lookup00000166 |  83.83 | 83838383.83 | s      |     83 | -5717870000000083
+ row00000284 | ASCII00000084 | UTF8_計算機用語_00000084 | 840000 | lookup00000168 |  84.84 | 84848484.84 | t      |     84 |  5927040000000084
+ row00000285 | ASCII00000085 | UTF8_計算機用語_00000085 | 850000 | lookup00000170 |  85.85 | 85858585.85 | u      |     85 | -6141250000000085
+ row00000286 | ASCII00000086 | UTF8_計算機用語_00000086 | 860000 | lookup00000172 |  86.86 | 86868686.86 | v      |     86 |  6360560000000086
+ row00000287 | ASCII00000087 | UTF8_計算機用語_00000087 | 870000 | lookup00000174 |  87.87 | 87878787.87 | w      |     87 | -6585030000000087
+ row00000288 | ASCII00000088 | UTF8_計算機用語_00000088 | 880000 | lookup00000176 |  88.88 | 88888888.88 | x      |     88 |  6814720000000088
+ row00000289 | ASCII00000089 | UTF8_計算機用語_00000089 | 890000 | lookup00000178 |  89.89 | 89898989.89 | y      |     89 | -7049690000000089
+ row00000290 | ASCII00000090 | UTF8_計算機用語_00000090 | 900000 | lookup00000180 |   90.9 |  90909090.9 | z      |     90 |  7290000000000090
+ row00000291 | ASCII00000091 | UTF8_計算機用語_00000091 | 910000 | lookup00000182 |  91.91 | 91919191.91 | {      |     91 | -7535710000000091
+ row00000292 | ASCII00000092 | UTF8_計算機用語_00000092 | 920000 | lookup00000184 |  92.92 | 92929292.92 | |      |     92 |  7786880000000092
+ row00000293 | ASCII00000093 | UTF8_計算機用語_00000093 | 930000 | lookup00000186 |  93.93 | 93939393.93 | }      |     93 | -8043570000000093
+ row00000294 | ASCII00000094 | UTF8_計算機用語_00000094 | 940000 | lookup00000188 |  94.94 | 94949494.94 | ~      |     94 |  8305840000000094
+ row00000295 | ASCII00000095 | UTF8_計算機用語_00000095 | 950000 | lookup00000190 |  95.95 | 95959595.95 | \x7F   |     95 | -8573750000000095
+ row00000296 | ASCII00000096 | UTF8_計算機用語_00000096 | 960000 | lookup00000192 |  96.96 | 96969696.96 | \u0080 |     96 |  8847360000000096
+ row00000297 | ASCII00000097 | UTF8_計算機用語_00000097 | 970000 | lookup00000194 |  97.97 | 97979797.97 | \u0081 |     97 | -9126730000000097
+ row00000298 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000299 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+(200 rows)
+
+SELECT * FROM gphbase_select WHERE recordkey > 'row00000090' AND recordkey <= 'row00000103' ORDER BY recordkey ASC;
+  recordkey  |    cf1:q1     |          cf1:q2          | cf1:q3 |       q4       | cf1:q5 |   cf1:q6    | cf1:q7 | cf1:q8 |      cf1:q9       
+-------------+---------------+--------------------------+--------+----------------+--------+-------------+--------+--------+-------------------
+ row00000091 | ASCII00000091 | UTF8_計算機用語_00000091 | 910000 | lookup00000182 |  91.91 | 91919191.91 | {      |     91 | -7535710000000091
+ row00000092 | ASCII00000092 | UTF8_計算機用語_00000092 | 920000 | lookup00000184 |  92.92 | 92929292.92 | |      |     92 |  7786880000000092
+ row00000093 | ASCII00000093 | UTF8_計算機用語_00000093 | 930000 | lookup00000186 |  93.93 | 93939393.93 | }      |     93 | -8043570000000093
+ row00000094 | ASCII00000094 | UTF8_計算機用語_00000094 | 940000 | lookup00000188 |  94.94 | 94949494.94 | ~      |     94 |  8305840000000094
+ row00000095 | ASCII00000095 | UTF8_計算機用語_00000095 | 950000 | lookup00000190 |  95.95 | 95959595.95 | \x7F   |     95 | -8573750000000095
+ row00000096 | ASCII00000096 | UTF8_計算機用語_00000096 | 960000 | lookup00000192 |  96.96 | 96969696.96 | \u0080 |     96 |  8847360000000096
+ row00000097 | ASCII00000097 | UTF8_計算機用語_00000097 | 970000 | lookup00000194 |  97.97 | 97979797.97 | \u0081 |     97 | -9126730000000097
+ row00000098 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000099 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+ row00000100 | ASCII00000000 | UTF8_計算機用語_00000000 |      0 | lookup00000000 |      0 |           0 |        |      0 |                 0
+ row00000101 | ASCII00000001 | UTF8_計算機用語_00000001 |  10000 | lookup00000002 |    1.1 |      1111.1 | !      |      1 |      -10000000001
+ row00000102 | ASCII00000002 | UTF8_計算機用語_00000002 |  20000 | lookup00000004 |    2.2 |      2222.2 | "      |      2 |       80000000002
+ row00000103 | ASCII00000003 | UTF8_計算機用語_00000003 |  30000 | lookup00000006 |    3.3 |      3333.3 | #      |      3 |     -270000000003
+(13 rows)
+
+SELECT * FROM gphbase_select WHERE recordkey = 'row00000100';
+  recordkey  |    cf1:q1     |          cf1:q2          | cf1:q3 |       q4       | cf1:q5 | cf1:q6 | cf1:q7 | cf1:q8 | cf1:q9 
+-------------+---------------+--------------------------+--------+----------------+--------+--------+--------+--------+--------
+ row00000100 | ASCII00000000 | UTF8_計算機用語_00000000 |      0 | lookup00000000 |      0 |      0 |        |      0 |      0
+(1 row)
+
+SELECT * FROM gphbase_select WHERE recordkey != 'row00000090' AND recordkey <= 'row00000103' ORDER BY recordkey ASC;
+  recordkey  |    cf1:q1     |          cf1:q2          | cf1:q3 |       q4       | cf1:q5 |   cf1:q6    | cf1:q7 | cf1:q8 |      cf1:q9       
+-------------+---------------+--------------------------+--------+----------------+--------+-------------+--------+--------+-------------------
+ row00000000 | ASCII00000000 | UTF8_計算機用語_00000000 |      0 | lookup00000000 |      0 |           0 |        |      0 |                 0
+ row00000001 | ASCII00000001 | UTF8_計算機用語_00000001 |  10000 | lookup00000002 |    1.1 |      1111.1 | !      |      1 |      -10000000001
+ row00000002 | ASCII00000002 | UTF8_計算機用語_00000002 |  20000 | lookup00000004 |    2.2 |      2222.2 | "      |      2 |       80000000002
+ row00000003 | ASCII00000003 | UTF8_計算機用語_00000003 |  30000 | lookup00000006 |    3.3 |      3333.3 | #      |      3 |     -270000000003
+ row00000004 | ASCII00000004 | UTF8_計算機用語_00000004 |  40000 | lookup00000008 |    4.4 |      4444.4 | $      |      4 |      640000000004
+ row00000005 | ASCII00000005 | UTF8_計算機用語_00000005 |  50000 | lookup00000010 |    5.5 |      5555.5 | %      |      5 |    -1250000000005
+ row00000006 | ASCII00000006 | UTF8_計算機用語_00000006 |  60000 | lookup00000012 |    6.6 |      6666.6 | &      |      6 |     2160000000006
+ row00000007 | ASCII00000007 | UTF8_計算機用語_00000007 |  70000 | lookup00000014 |    7.7 |      7777.7 | '      |      7 |    -3430000000007
+ row00000008 | ASCII00000008 | UTF8_計算機用語_00000008 |  80000 | lookup00000016 |    8.8 |      8888.8 | (      |      8 |     5120000000008
+ row00000009 | ASCII00000009 | UTF8_計算機用語_00000009 |  90000 | lookup00000018 |    9.9 |      9999.9 | )      |      9 |    -7290000000009
+ row00000010 | ASCII00000010 | UTF8_計算機用語_00000010 | 100000 | lookup00000020 |   10.1 |  10101010.1 | *      |     10 |    10000000000010
+ row00000011 | ASCII00000011 | UTF8_計算機用語_00000011 | 110000 | lookup00000022 |  11.11 | 11111111.11 | +      |     11 |   -13310000000011
+ row00000012 | ASCII00000012 | UTF8_計算機用語_00000012 | 120000 | lookup00000024 |  12.12 | 12121212.12 | ,      |     12 |    17280000000012
+ row00000013 | ASCII00000013 | UTF8_計算機用語_00000013 | 130000 | lookup00000026 |  13.13 | 13131313.13 | -      |     13 |   -21970000000013
+ row00000014 | ASCII00000014 | UTF8_計算機用語_00000014 | 140000 | lookup00000028 |  14.14 | 14141414.14 | .      |     14 |    27440000000014
+ row00000015 | ASCII00000015 | UTF8_計算機用語_00000015 | 150000 | lookup00000030 |  15.15 | 15151515.15 | /      |     15 |   -33750000000015
+ row00000016 | ASCII00000016 | UTF8_計算機用語_00000016 | 160000 | lookup00000032 |  16.16 | 16161616.16 | 0      |     16 |    40960000000016
+ row00000017 | ASCII00000017 | UTF8_計算機用語_00000017 | 170000 | lookup00000034 |  17.17 | 17171717.17 | 1      |     17 |   -49130000000017
+ row00000018 | ASCII00000018 | UTF8_計算機用語_00000018 | 180000 | lookup00000036 |  18.18 | 18181818.18 | 2      |     18 |    58320000000018
+ row00000019 | ASCII00000019 | UTF8_計算機用語_00000019 | 190000 | lookup00000038 |  19.19 | 19191919.19 | 3      |     19 |   -68590000000019
+ row00000020 | ASCII00000020 | UTF8_計算機用語_00000020 | 200000 | lookup00000040 |   20.2 |  20202020.2 | 4      |     20 |    80000000000020
+ row00000021 | ASCII00000021 | UTF8_計算機用語_00000021 | 210000 | lookup00000042 |  21.21 | 21212121.21 | 5      |     21 |   -92610000000021
+ row00000022 | ASCII00000022 | UTF8_計算機用語_00000022 | 220000 | lookup00000044 |  22.22 | 22222222.22 | 6      |     22 |   106480000000022
+ row00000023 | ASCII00000023 | UTF8_計算機用語_00000023 | 230000 | lookup00000046 |  23.23 | 23232323.23 | 7      |     23 |  -121670000000023
+ row00000024 | ASCII00000024 | UTF8_計算機用語_00000024 | 240000 | lookup00000048 |  24.24 | 24242424.24 | 8      |     24 |   138240000000024
+ row00000025 | ASCII00000025 | UTF8_計算機用語_00000025 | 250000 | lookup00000050 |  25.25 | 25252525.25 | 9      |     25 |  -156250000000025
+ row00000026 | ASCII00000026 | UTF8_計算機用語_00000026 | 260000 | lookup00000052 |  26.26 | 26262626.26 | :      |     26 |   175760000000026
+ row00000027 | ASCII00000027 | UTF8_計算機用語_00000027 | 270000 | lookup00000054 |  27.27 | 27272727.27 | ;      |     27 |  -196830000000027
+ row00000028 | ASCII00000028 | UTF8_計算機用語_00000028 | 280000 | lookup00000056 |  28.28 | 28282828.28 | <      |     28 |   219520000000028
+ row00000029 | ASCII00000029 | UTF8_計算機用語_00000029 | 290000 | lookup00000058 |  29.29 | 29292929.29 | =      |     29 |  -243890000000029
+ row00000030 | ASCII00000030 | UTF8_計算機用語_00000030 | 300000 | lookup00000060 |   30.3 |  30303030.3 | >      |     30 |   270000000000030
+ row00000031 | ASCII00000031 | UTF8_計算機用語_00000031 | 310000 | lookup00000062 |  31.31 | 31313131.31 | ?      |     31 |  -297910000000031
+ row00000032 | ASCII00000032 | UTF8_計算機用語_00000032 | 320000 | lookup00000064 |  32.32 | 32323232.32 | @      |     32 |   327680000000032
+ row00000033 | ASCII00000033 | UTF8_計算機用語_00000033 | 330000 | lookup00000066 |  33.33 | 33333333.33 | A      |     33 |  -359370000000033
+ row00000034 | ASCII00000034 | UTF8_計算機用語_00000034 | 340000 | lookup00000068 |  34.34 | 34343434.34 | B      |     34 |   393040000000034
+ row00000035 | ASCII00000035 | UTF8_計算機用語_00000035 | 350000 | lookup00000070 |  35.35 | 35353535.35 | C      |     35 |  -428750000000035
+ row00000036 | ASCII00000036 | UTF8_計算機用語_00000036 | 360000 | lookup00000072 |  36.36 | 36363636.36 | D      |     36 |   466560000000036
+ row00000037 | ASCII00000037 | UTF8_計算機用語_00000037 | 370000 | lookup00000074 |  37.37 | 37373737.37 | E      |     37 |  -506530000000037
+ row00000038 | ASCII00000038 | UTF8_計算機用語_00000038 | 380000 | lookup00000076 |  38.38 | 38383838.38 | F      |     38 |   548720000000038
+ row00000039 | ASCII00000039 | UTF8_計算機用語_00000039 | 390000 | lookup00000078 |  39.39 | 39393939.39 | G      |     39 |  -593190000000039
+ row00000040 | ASCII00000040 | UTF8_計算機用語_00000040 | 400000 | lookup00000080 |   40.4 |  40404040.4 | H      |     40 |   640000000000040
+ row00000041 | ASCII00000041 | UTF8_計算機用語_00000041 | 410000 | lookup00000082 |  41.41 | 41414141.41 | I      |     41 |  -689210000000041
+ row00000042 | ASCII00000042 | UTF8_計算機用語_00000042 | 420000 | lookup00000084 |  42.42 | 42424242.42 | J      |     42 |   740880000000042
+ row00000043 | ASCII00000043 | UTF8_計算機用語_00000043 | 430000 | lookup00000086 |  43.43 | 43434343.43 | K      |     43 |  -795070000000043
+ row00000044 | ASCII00000044 | UTF8_計算機用語_00000044 | 440000 | lookup00000088 |  44.44 | 44444444.44 | L      |     44 |   851840000000044
+ row00000045 | ASCII00000045 | UTF8_計算機用語_00000045 | 450000 | lookup00000090 |  45.45 | 45454545.45 | M      |     45 |  -911250000000045
+ row00000046 | ASCII00000046 | UTF8_計算機用語_00000046 | 460000 | lookup00000092 |  46.46 | 46464646.46 | N      |     46 |   973360000000046
+ row00000047 | ASCII00000047 | UTF8_計算機用語_00000047 | 470000 | lookup00000094 |  47.47 | 47474747.47 | O      |     47 | -1038230000000047
+ row00000048 | ASCII00000048 | UTF8_計算機用語_00000048 | 480000 | lookup00000096 |  48.48 | 48484848.48 | P      |     48 |  1105920000000048
+ row00000049 | ASCII00000049 | UTF8_計算機用語_00000049 | 490000 | lookup00000098 |  49.49 | 49494949.49 | Q      |     49 | -1176490000000049
+ row00000050 | ASCII00000050 | UTF8_計算機用語_00000050 | 500000 | lookup00000100 |   50.5 |  50505050.5 | R      |     50 |  1250000000000050
+ row00000051 | ASCII00000051 | UTF8_計算機用語_00000051 | 510000 | lookup00000102 |  51.51 | 51515151.51 | S      |     51 | -1326510000000051
+ row00000052 | ASCII00000052 | UTF8_計算機用語_00000052 | 520000 | lookup00000104 |  52.52 | 52525252.52 | T      |     52 |  1406080000000052
+ row00000053 | ASCII00000053 | UTF8_計算機用語_00000053 | 530000 | lookup00000106 |  53.53 | 53535353.53 | U      |     53 | -1488770000000053
+ row00000054 | ASCII00000054 | UTF8_計算機用語_00000054 | 540000 | lookup00000108 |  54.54 | 54545454.54 | V      |     54 |  1574640000000054
+ row00000055 | ASCII00000055 | UTF8_計算機用語_00000055 | 550000 | lookup00000110 |  55.55 | 55555555.55 | W      |     55 | -1663750000000055
+ row00000056 | ASCII00000056 | UTF8_計算機用語_00000056 | 560000 | lookup00000112 |  56.56 | 56565656.56 | X      |     56 |  1756160000000056
+ row00000057 | ASCII00000057 | UTF8_計算機用語_00000057 | 570000 | lookup00000114 |  57.57 | 57575757.57 | Y      |     57 | -1851930000000057
+ row00000058 | ASCII00000058 | UTF8_計算機用語_00000058 | 580000 | lookup00000116 |  58.58 | 58585858.58 | Z      |     58 |  1951120000000058
+ row00000059 | ASCII00000059 | UTF8_計算機用語_00000059 | 590000 | lookup00000118 |  59.59 | 59595959.59 | [      |     59 | -2053790000000059
+ row00000060 | ASCII00000060 | UTF8_計算機用語_00000060 | 600000 | lookup00000120 |   60.6 |  60606060.6 | \      |     60 |  2160000000000060
+ row00000061 | ASCII00000061 | UTF8_計算機用語_00000061 | 610000 | lookup00000122 |  61.61 | 61616161.61 | ]      |     61 | -2269810000000061
+ row00000062 | ASCII00000062 | UTF8_計算機用語_00000062 | 620000 | lookup00000124 |  62.62 | 62626262.62 | ^      |     62 |  2383280000000062
+ row00000063 | ASCII00000063 | UTF8_計算機用語_00000063 | 630000 | lookup00000126 |  63.63 | 63636363.63 | _      |     63 | -2500470000000063
+ row00000064 | ASCII00000064 | UTF8_計算機用語_00000064 | 640000 | lookup00000128 |  64.64 | 64646464.64 | `      |     64 |  2621440000000064
+ row00000065 | ASCII00000065 | UTF8_計算機用語_00000065 | 650000 | lookup00000130 |  65.65 | 65656565.65 | a      |     65 | -2746250000000065
+ row00000066 | ASCII00000066 | UTF8_計算機用語_00000066 | 660000 | lookup00000132 |  66.66 | 66666666.66 | b      |     66 |  2874960000000066
+ row00000067 | ASCII00000067 | UTF8_計算機用語_00000067 | 670000 | lookup00000134 |  67.67 | 67676767.67 | c      |     67 | -3007630000000067
+ row00000068 | ASCII00000068 | UTF8_計算機用語_00000068 | 680000 | lookup00000136 |  68.68 | 68686868.68 | d      |     68 |  3144320000000068
+ row00000069 | ASCII00000069 | UTF8_計算機用語_00000069 | 690000 | lookup00000138 |  69.69 | 69696969.69 | e      |     69 | -3285090000000069
+ row00000070 | ASCII00000070 | UTF8_計算機用語_00000070 | 700000 | lookup00000140 |   70.7 |  70707070.7 | f      |     70 |  3430000000000070
+ row00000071 | ASCII00000071 | UTF8_計算機用語_00000071 | 710000 | lookup00000142 |  71.71 | 71717171.71 | g      |     71 | -3579110000000071
+ row00000072 | ASCII00000072 | UTF8_計算機用語_00000072 | 720000 | lookup00000144 |  72.72 | 72727272.72 | h      |     72 |  3732480000000072
+ row00000073 | ASCII00000073 | UTF8_計算機用語_00000073 | 730000 | lookup00000146 |  73.73 | 73737373.73 | i      |     73 | -3890170000000073
+ row00000074 | ASCII00000074 | UTF8_計算機用語_00000074 | 740000 | lookup00000148 |  74.74 | 74747474.74 | j      |     74 |  4052240000000074
+ row00000075 | ASCII00000075 | UTF8_計算機用語_00000075 | 750000 | lookup00000150 |  75.75 | 75757575.75 | k      |     75 | -4218750000000075
+ row00000076 | ASCII00000076 | UTF8_計算機用語_00000076 | 760000 | lookup00000152 |  76.76 | 76767676.76 | l      |     76 |  4389760000000076
+ row00000077 | ASCII00000077 | UTF8_計算機用語_00000077 | 770000 | lookup00000154 |  77.77 | 77777777.77 | m      |     77 | -4565330000000077
+ row00000078 | ASCII00000078 | UTF8_計算機用語_00000078 | 780000 | lookup00000156 |  78.78 | 78787878.78 | n      |     78 |  4745520000000078
+ row00000079 | ASCII00000079 | UTF8_計算機用語_00000079 | 790000 | lookup00000158 |  79.79 | 79797979.79 | o      |     79 | -4930390000000079
+ row00000080 | ASCII00000080 | UTF8_計算機用語_00000080 | 800000 | lookup00000160 |   80.8 |  80808080.8 | p      |     80 |  5120000000000080
+ row00000081 | ASCII00000081 | UTF8_計算機用語_00000081 | 810000 | lookup00000162 |  81.81 | 81818181.81 | q      |     81 | -5314410000000081
+ row00000082 | ASCII00000082 | UTF8_計算機用語_00000082 | 820000 | lookup00000164 |  82.82 | 82828282.82 | r      |     82 |  5513680000000082
+ row00000083 | ASCII00000083 | UTF8_計算機用語_00000083 | 830000 | lookup00000166 |  83.83 | 83838383.83 | s      |     83 | -5717870000000083
+ row00000084 | ASCII00000084 | UTF8_計算機用語_00000084 | 840000 | lookup00000168 |  84.84 | 84848484.84 | t      |     84 |  5927040000000084
+ row00000085 | ASCII00000085 | UTF8_計算機用語_00000085 | 850000 | lookup00000170 |  85.85 | 85858585.85 | u      |     85 | -6141250000000085
+ row00000086 | ASCII00000086 | UTF8_計算機用語_00000086 | 860000 | lookup00000172 |  86.86 | 86868686.86 | v      |     86 |  6360560000000086
+ row00000087 | ASCII00000087 | UTF8_計算機用語_00000087 | 870000 | lookup00000174 |  87.87 | 87878787.87 | w      |     87 | -6585030000000087
+ row00000088 | ASCII00000088 | UTF8_計算機用語_00000088 | 880000 | lookup00000176 |  88.88 | 88888888.88 | x      |     88 |  6814720000000088
+ row00000089 | ASCII00000089 | UTF8_計算機用語_00000089 | 890000 | lookup00000178 |  89.89 | 89898989.89 | y      |     89 | -7049690000000089
+ row00000091 | ASCII00000091 | UTF8_計算機用語_00000091 | 910000 | lookup00000182 |  91.91 | 91919191.91 | {      |     91 | -7535710000000091
+ row00000092 | ASCII00000092 | UTF8_計算機用語_00000092 | 920000 | lookup00000184 |  92.92 | 92929292.92 | |      |     92 |  7786880000000092
+ row00000093 | ASCII00000093 | UTF8_計算機用語_00000093 | 930000 | lookup00000186 |  93.93 | 93939393.93 | }      |     93 | -8043570000000093
+ row00000094 | ASCII00000094 | UTF8_計算機用語_00000094 | 940000 | lookup00000188 |  94.94 | 94949494.94 | ~      |     94 |  8305840000000094
+ row00000095 | ASCII00000095 | UTF8_計算機用語_00000095 | 950000 | lookup00000190 |  95.95 | 95959595.95 | \x7F   |     95 | -8573750000000095
+ row00000096 | ASCII00000096 | UTF8_計算機用語_00000096 | 960000 | lookup00000192 |  96.96 | 96969696.96 | \u0080 |     96 |  8847360000000096
+ row00000097 | ASCII00000097 | UTF8_計算機用語_00000097 | 970000 | lookup00000194 |  97.97 | 97979797.97 | \u0081 |     97 | -9126730000000097
+ row00000098 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000099 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+ row00000100 | ASCII00000000 | UTF8_計算機用語_00000000 |      0 | lookup00000000 |      0 |           0 |        |      0 |                 0
+ row00000101 | ASCII00000001 | UTF8_計算機用語_00000001 |  10000 | lookup00000002 |    1.1 |      1111.1 | !      |      1 |      -10000000001
+ row00000102 | ASCII00000002 | UTF8_計算機用語_00000002 |  20000 | lookup00000004 |    2.2 |      2222.2 | "      |      2 |       80000000002
+ row00000103 | ASCII00000003 | UTF8_計算機用語_00000003 |  30000 | lookup00000006 |    3.3 |      3333.3 | #      |      3 |     -270000000003
+(103 rows)
+
+SELECT * FROM gphbase_select WHERE recordkey != 'row00000090' AND recordkey <= 'row00000095' AND "cf1:q7" > 'o' ORDER BY recordkey ASC;
+  recordkey  |    cf1:q1     |          cf1:q2          | cf1:q3 |       q4       | cf1:q5 |   cf1:q6    | cf1:q7 | cf1:q8 |      cf1:q9       
+-------------+---------------+--------------------------+--------+----------------+--------+-------------+--------+--------+-------------------
+ row00000080 | ASCII00000080 | UTF8_計算機用語_00000080 | 800000 | lookup00000160 |   80.8 |  80808080.8 | p      |     80 |  5120000000000080
+ row00000081 | ASCII00000081 | UTF8_計算機用語_00000081 | 810000 | lookup00000162 |  81.81 | 81818181.81 | q      |     81 | -5314410000000081
+ row00000082 | ASCII00000082 | UTF8_計算機用語_00000082 | 820000 | lookup00000164 |  82.82 | 82828282.82 | r      |     82 |  5513680000000082
+ row00000083 | ASCII00000083 | UTF8_計算機用語_00000083 | 830000 | lookup00000166 |  83.83 | 83838383.83 | s      |     83 | -5717870000000083
+ row00000084 | ASCII00000084 | UTF8_計算機用語_00000084 | 840000 | lookup00000168 |  84.84 | 84848484.84 | t      |     84 |  5927040000000084
+ row00000085 | ASCII00000085 | UTF8_計算機用語_00000085 | 850000 | lookup00000170 |  85.85 | 85858585.85 | u      |     85 | -6141250000000085
+ row00000086 | ASCII00000086 | UTF8_計算機用語_00000086 | 860000 | lookup00000172 |  86.86 | 86868686.86 | v      |     86 |  6360560000000086
+ row00000087 | ASCII00000087 | UTF8_計算機用語_00000087 | 870000 | lookup00000174 |  87.87 | 87878787.87 | w      |     87 | -6585030000000087
+ row00000088 | ASCII00000088 | UTF8_計算機用語_00000088 | 880000 | lookup00000176 |  88.88 | 88888888.88 | x      |     88 |  6814720000000088
+ row00000089 | ASCII00000089 | UTF8_計算機用語_00000089 | 890000 | lookup00000178 |  89.89 | 89898989.89 | y      |     89 | -7049690000000089
+ row00000091 | ASCII00000091 | UTF8_計算機用語_00000091 | 910000 | lookup00000182 |  91.91 | 91919191.91 | {      |     91 | -7535710000000091
+ row00000092 | ASCII00000092 | UTF8_計算機用語_00000092 | 920000 | lookup00000184 |  92.92 | 92929292.92 | |      |     92 |  7786880000000092
+ row00000093 | ASCII00000093 | UTF8_計算機用語_00000093 | 930000 | lookup00000186 |  93.93 | 93939393.93 | }      |     93 | -8043570000000093
+ row00000094 | ASCII00000094 | UTF8_計算機用語_00000094 | 940000 | lookup00000188 |  94.94 | 94949494.94 | ~      |     94 |  8305840000000094
+ row00000095 | ASCII00000095 | UTF8_計算機用語_00000095 | 950000 | lookup00000190 |  95.95 | 95959595.95 | \x7F   |     95 | -8573750000000095
+(15 rows)
+
+SELECT * FROM gphbase_select WHERE "cf1:q1" > 'ASCII00000090' AND q4 <= 'lookup00000198' ORDER BY recordkey ASC;
+  recordkey  |    cf1:q1     |          cf1:q2          | cf1:q3 |       q4       | cf1:q5 |   cf1:q6    | cf1:q7 | cf1:q8 |      cf1:q9       
+-------------+---------------+--------------------------+--------+----------------+--------+-------------+--------+--------+-------------------
+ row00000091 | ASCII00000091 | UTF8_計算機用語_00000091 | 910000 | lookup00000182 |  91.91 | 91919191.91 | {      |     91 | -7535710000000091
+ row00000092 | ASCII00000092 | UTF8_計算機用語_00000092 | 920000 | lookup00000184 |  92.92 | 92929292.92 | |      |     92 |  7786880000000092
+ row00000093 | ASCII00000093 | UTF8_計算機用語_00000093 | 930000 | lookup00000186 |  93.93 | 93939393.93 | }      |     93 | -8043570000000093
+ row00000094 | ASCII00000094 | UTF8_計算機用語_00000094 | 940000 | lookup00000188 |  94.94 | 94949494.94 | ~      |     94 |  8305840000000094
+ row00000095 | ASCII00000095 | UTF8_計算機用語_00000095 | 950000 | lookup00000190 |  95.95 | 95959595.95 | \x7F   |     95 | -8573750000000095
+ row00000096 | ASCII00000096 | UTF8_計算機用語_00000096 | 960000 | lookup00000192 |  96.96 | 96969696.96 | \u0080 |     96 |  8847360000000096
+ row00000097 | ASCII00000097 | UTF8_計算機用語_00000097 | 970000 | lookup00000194 |  97.97 | 97979797.97 | \u0081 |     97 | -9126730000000097
+ row00000098 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000099 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+ row00000191 | ASCII00000091 | UTF8_計算機用語_00000091 | 910000 | lookup00000182 |  91.91 | 91919191.91 | {      |     91 | -7535710000000091
+ row00000192 | ASCII00000092 | UTF8_計算機用語_00000092 | 920000 | lookup00000184 |  92.92 | 92929292.92 | |      |     92 |  7786880000000092
+ row00000193 | ASCII00000093 | UTF8_計算機用語_00000093 | 930000 | lookup00000186 |  93.93 | 93939393.93 | }      |     93 | -8043570000000093
+ row00000194 | ASCII00000094 | UTF8_計算機用語_00000094 | 940000 | lookup00000188 |  94.94 | 94949494.94 | ~      |     94 |  8305840000000094
+ row00000195 | ASCII00000095 | UTF8_計算機用語_00000095 | 950000 | lookup00000190 |  95.95 | 95959595.95 | \x7F   |     95 | -8573750000000095
+ row00000196 | ASCII00000096 | UTF8_計算機用語_00000096 | 960000 | lookup00000192 |  96.96 | 96969696.96 | \u0080 |     96 |  8847360000000096
+ row00000197 | ASCII00000097 | UTF8_計算機用語_00000097 | 970000 | lookup00000194 |  97.97 | 97979797.97 | \u0081 |     97 | -9126730000000097
+ row00000198 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000199 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+ row00000291 | ASCII00000091 | UTF8_計算機用語_00000091 | 910000 | lookup00000182 |  91.91 | 91919191.91 | {      |     91 | -7535710000000091
+ row00000292 | ASCII00000092 | UTF8_計算機用語_00000092 | 920000 | lookup00000184 |  92.92 | 92929292.92 | |      |     92 |  7786880000000092
+ row00000293 | ASCII00000093 | UTF8_計算機用語_00000093 | 930000 | lookup00000186 |  93.93 | 93939393.93 | }      |     93 | -8043570000000093
+ row00000294 | ASCII00000094 | UTF8_計算機用語_00000094 | 940000 | lookup00000188 |  94.94 | 94949494.94 | ~      |     94 |  8305840000000094
+ row00000295 | ASCII00000095 | UTF8_計算機用語_00000095 | 950000 | lookup00000190 |  95.95 | 95959595.95 | \x7F   |     95 | -8573750000000095
+ row00000296 | ASCII00000096 | UTF8_計算機用語_00000096 | 960000 | lookup00000192 |  96.96 | 96969696.96 | \u0080 |     96 |  8847360000000096
+ row00000297 | ASCII00000097 | UTF8_計算機用語_00000097 | 970000 | lookup00000194 |  97.97 | 97979797.97 | \u0081 |     97 | -9126730000000097
+ row00000298 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000299 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+(27 rows)
+
+SELECT * FROM gphbase_select WHERE "cf1:q2" > 'UTF8_計算機用語_00000090' AND "cf1:q3" <= 990000 ORDER BY recordkey ASC;
+  recordkey  |    cf1:q1     |          cf1:q2          | cf1:q3 |       q4       | cf1:q5 |   cf1:q6    | cf1:q7 | cf1:q8 |      cf1:q9       
+-------------+---------------+--------------------------+--------+----------------+--------+-------------+--------+--------+-------------------
+ row00000091 | ASCII00000091 | UTF8_計算機用語_00000091 | 910000 | lookup00000182 |  91.91 | 91919191.91 | {      |     91 | -7535710000000091
+ row00000092 | ASCII00000092 | UTF8_計算機用語_00000092 | 920000 | lookup00000184 |  92.92 | 92929292.92 | |      |     92 |  7786880000000092
+ row00000093 | ASCII00000093 | UTF8_計算機用語_00000093 | 930000 | lookup00000186 |  93.93 | 93939393.93 | }      |     93 | -8043570000000093
+ row00000094 | ASCII00000094 | UTF8_計算機用語_00000094 | 940000 | lookup00000188 |  94.94 | 94949494.94 | ~      |     94 |  8305840000000094
+ row00000095 | ASCII00000095 | UTF8_計算機用語_00000095 | 950000 | lookup00000190 |  95.95 | 95959595.95 | \x7F   |     95 | -8573750000000095
+ row00000096 | ASCII00000096 | UTF8_計算機用語_00000096 | 960000 | lookup00000192 |  96.96 | 96969696.96 | \u0080 |     96 |  8847360000000096
+ row00000097 | ASCII00000097 | UTF8_計算機用語_00000097 | 970000 | lookup00000194 |  97.97 | 97979797.97 | \u0081 |     97 | -9126730000000097
+ row00000098 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000099 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+ row00000191 | ASCII00000091 | UTF8_計算機用語_00000091 | 910000 | lookup00000182 |  91.91 | 91919191.91 | {      |     91 | -7535710000000091
+ row00000192 | ASCII00000092 | UTF8_計算機用語_00000092 | 920000 | lookup00000184 |  92.92 | 92929292.92 | |      |     92 |  7786880000000092
+ row00000193 | ASCII00000093 | UTF8_計算機用語_00000093 | 930000 | lookup00000186 |  93.93 | 93939393.93 | }      |     93 | -8043570000000093
+ row00000194 | ASCII00000094 | UTF8_計算機用語_00000094 | 940000 | lookup00000188 |  94.94 | 94949494.94 | ~      |     94 |  8305840000000094
+ row00000195 | ASCII00000095 | UTF8_計算機用語_00000095 | 950000 | lookup00000190 |  95.95 | 95959595.95 | \x7F   |     95 | -8573750000000095
+ row00000196 | ASCII00000096 | UTF8_計算機用語_00000096 | 960000 | lookup00000192 |  96.96 | 96969696.96 | \u0080 |     96 |  8847360000000096
+ row00000197 | ASCII00000097 | UTF8_計算機用語_00000097 | 970000 | lookup00000194 |  97.97 | 97979797.97 | \u0081 |     97 | -9126730000000097
+ row00000198 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000199 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+ row00000291 | ASCII00000091 | UTF8_計算機用語_00000091 | 910000 | lookup00000182 |  91.91 | 91919191.91 | {      |     91 | -7535710000000091
+ row00000292 | ASCII00000092 | UTF8_計算機用語_00000092 | 920000 | lookup00000184 |  92.92 | 92929292.92 | |      |     92 |  7786880000000092
+ row00000293 | ASCII00000093 | UTF8_計算機用語_00000093 | 930000 | lookup00000186 |  93.93 | 93939393.93 | }      |     93 | -8043570000000093
+ row00000294 | ASCII00000094 | UTF8_計算機用語_00000094 | 940000 | lookup00000188 |  94.94 | 94949494.94 | ~      |     94 |  8305840000000094
+ row00000295 | ASCII00000095 | UTF8_計算機用語_00000095 | 950000 | lookup00000190 |  95.95 | 95959595.95 | \x7F   |     95 | -8573750000000095
+ row00000296 | ASCII00000096 | UTF8_計算機用語_00000096 | 960000 | lookup00000192 |  96.96 | 96969696.96 | \u0080 |     96 |  8847360000000096
+ row00000297 | ASCII00000097 | UTF8_計算機用語_00000097 | 970000 | lookup00000194 |  97.97 | 97979797.97 | \u0081 |     97 | -9126730000000097
+ row00000298 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000299 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+(27 rows)
+
+SELECT * FROM gphbase_select WHERE "cf1:q5" > 91.92 AND "cf1:q6" <= 99999999.99 ORDER BY recordkey ASC;
+  recordkey  |    cf1:q1     |          cf1:q2          | cf1:q3 |       q4       | cf1:q5 |   cf1:q6    | cf1:q7 | cf1:q8 |      cf1:q9       
+-------------+---------------+--------------------------+--------+----------------+--------+-------------+--------+--------+-------------------
+ row00000092 | ASCII00000092 | UTF8_計算機用語_00000092 | 920000 | lookup00000184 |  92.92 | 92929292.92 | |      |     92 |  7786880000000092
+ row00000093 | ASCII00000093 | UTF8_計算機用語_00000093 | 930000 | lookup00000186 |  93.93 | 93939393.93 | }      |     93 | -8043570000000093
+ row00000094 | ASCII00000094 | UTF8_計算機用語_00000094 | 940000 | lookup00000188 |  94.94 | 94949494.94 | ~      |     94 |  8305840000000094
+ row00000095 | ASCII00000095 | UTF8_計算機用語_00000095 | 950000 | lookup00000190 |  95.95 | 95959595.95 | \x7F   |     95 | -8573750000000095
+ row00000096 | ASCII00000096 | UTF8_計算機用語_00000096 | 960000 | lookup00000192 |  96.96 | 96969696.96 | \u0080 |     96 |  8847360000000096
+ row00000097 | ASCII00000097 | UTF8_計算機用語_00000097 | 970000 | lookup00000194 |  97.97 | 97979797.97 | \u0081 |     97 | -9126730000000097
+ row00000098 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000099 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+ row00000192 | ASCII00000092 | UTF8_計算機用語_00000092 | 920000 | lookup00000184 |  92.92 | 92929292.92 | |      |     92 |  7786880000000092
+ row00000193 | ASCII00000093 | UTF8_計算機用語_00000093 | 930000 | lookup00000186 |  93.93 | 93939393.93 | }      |     93 | -8043570000000093
+ row00000194 | ASCII00000094 | UTF8_計算機用語_00000094 | 940000 | lookup00000188 |  94.94 | 94949494.94 | ~      |     94 |  8305840000000094
+ row00000195 | ASCII00000095 | UTF8_計算機用語_00000095 | 950000 | lookup00000190 |  95.95 | 95959595.95 | \x7F   |     95 | -8573750000000095
+ row00000196 | ASCII00000096 | UTF8_計算機用語_00000096 | 960000 | lookup00000192 |  96.96 | 96969696.96 | \u0080 |     96 |  8847360000000096
+ row00000197 | ASCII00000097 | UTF8_計算機用語_00000097 | 970000 | lookup00000194 |  97.97 | 97979797.97 | \u0081 |     97 | -9126730000000097
+ row00000198 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000199 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+ row00000292 | ASCII00000092 | UTF8_計算機用語_00000092 | 920000 | lookup00000184 |  92.92 | 92929292.92 | |      |     92 |  7786880000000092
+ row00000293 | ASCII00000093 | UTF8_計算機用語_00000093 | 930000 | lookup00000186 |  93.93 | 93939393.93 | }      |     93 | -8043570000000093
+ row00000294 | ASCII00000094 | UTF8_計算機用語_00000094 | 940000 | lookup00000188 |  94.94 | 94949494.94 | ~      |     94 |  8305840000000094
+ row00000295 | ASCII00000095 | UTF8_計算機用語_00000095 | 950000 | lookup00000190 |  95.95 | 95959595.95 | \x7F   |     95 | -8573750000000095
+ row00000296 | ASCII00000096 | UTF8_計算機用語_00000096 | 960000 | lookup00000192 |  96.96 | 96969696.96 | \u0080 |     96 |  8847360000000096
+ row00000297 | ASCII00000097 | UTF8_計算機用語_00000097 | 970000 | lookup00000194 |  97.97 | 97979797.97 | \u0081 |     97 | -9126730000000097
+ row00000298 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000299 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+(24 rows)
+
+SELECT * FROM gphbase_select WHERE "cf1:q8" > 97 AND "cf1:q9" <= 9702990000000099 ORDER BY recordkey ASC;
+  recordkey  |    cf1:q1     |          cf1:q2          | cf1:q3 |       q4       | cf1:q5 |   cf1:q6    | cf1:q7 | cf1:q8 |      cf1:q9       
+-------------+---------------+--------------------------+--------+----------------+--------+-------------+--------+--------+-------------------
+ row00000098 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000099 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+ row00000198 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000199 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+ row00000298 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000299 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+(6 rows)
+
+SELECT * FROM gphbase_select WHeRE "cf1:q9" < -7000000000000000 ORDER BY recordkey ASC;
+  recordkey  |    cf1:q1     |          cf1:q2          | cf1:q3 |       q4       | cf1:q5 |   cf1:q6    | cf1:q7 | cf1:q8 |      cf1:q9       
+-------------+---------------+--------------------------+--------+----------------+--------+-------------+--------+--------+-------------------
+ row00000089 | ASCII00000089 | UTF8_計算機用語_00000089 | 890000 | lookup00000178 |  89.89 | 89898989.89 | y      |     89 | -7049690000000089
+ row00000091 | ASCII00000091 | UTF8_計算機用語_00000091 | 910000 | lookup00000182 |  91.91 | 91919191.91 | {      |     91 | -7535710000000091
+ row00000093 | ASCII00000093 | UTF8_計算機用語_00000093 | 930000 | lookup00000186 |  93.93 | 93939393.93 | }      |     93 | -8043570000000093
+ row00000095 | ASCII00000095 | UTF8_計算機用語_00000095 | 950000 | lookup00000190 |  95.95 | 95959595.95 | \x7F   |     95 | -8573750000000095
+ row00000097 | ASCII00000097 | UTF8_計算機用語_00000097 | 970000 | lookup00000194 |  97.97 | 97979797.97 | \u0081 |     97 | -9126730000000097
+ row00000099 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+ row00000189 | ASCII00000089 | UTF8_計算機用語_00000089 | 890000 | lookup00000178 |  89.89 | 89898989.89 | y      |     89 | -7049690000000089
+ row00000191 | ASCII00000091 | UTF8_計算機用語_00000091 | 910000 | lookup00000182 |  91.91 | 91919191.91 | {      |     91 | -7535710000000091
+ row00000193 | ASCII00000093 | UTF8_計算機用語_00000093 | 930000 | lookup00000186 |  93.93 | 93939393.93 | }      |     93 | -8043570000000093
+ row00000195 | ASCII00000095 | UTF8_計算機用語_00000095 | 950000 | lookup00000190 |  95.95 | 95959595.95 | \x7F   |     95 | -8573750000000095
+ row00000197 | ASCII00000097 | UTF8_計算機用語_00000097 | 970000 | lookup00000194 |  97.97 | 97979797.97 | \u0081 |     97 | -9126730000000097
+ row00000199 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+ row00000289 | ASCII00000089 | UTF8_計算機用語_00000089 | 890000 | lookup00000178 |  89.89 | 89898989.89 | y      |     89 | -7049690000000089
+ row00000291 | ASCII00000091 | UTF8_計算機用語_00000091 | 910000 | lookup00000182 |  91.91 | 91919191.91 | {      |     91 | -7535710000000091
+ row00000293 | ASCII00000093 | UTF8_計算機用語_00000093 | 930000 | lookup00000186 |  93.93 | 93939393.93 | }      |     93 | -8043570000000093
+ row00000295 | ASCII00000095 | UTF8_計算機用語_00000095 | 950000 | lookup00000190 |  95.95 | 95959595.95 | \x7F   |     95 | -8573750000000095
+ row00000297 | ASCII00000097 | UTF8_計算機用語_00000097 | 970000 | lookup00000194 |  97.97 | 97979797.97 | \u0081 |     97 | -9126730000000097
+ row00000299 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+(18 rows)
+
+SELECT * FROM gphbase_select WHERE recordkey > 'row00000090' AND recordkey <= 'row00000103' OR recordkey = 'row00000105' ORDER BY recordkey ASC;
+  recordkey  |    cf1:q1     |          cf1:q2          | cf1:q3 |       q4       | cf1:q5 |   cf1:q6    | cf1:q7 | cf1:q8 |      cf1:q9       
+-------------+---------------+--------------------------+--------+----------------+--------+-------------+--------+--------+-------------------
+ row00000091 | ASCII00000091 | UTF8_計算機用語_00000091 | 910000 | lookup00000182 |  91.91 | 91919191.91 | {      |     91 | -7535710000000091
+ row00000092 | ASCII00000092 | UTF8_計算機用語_00000092 | 920000 | lookup00000184 |  92.92 | 92929292.92 | |      |     92 |  7786880000000092
+ row00000093 | ASCII00000093 | UTF8_計算機用語_00000093 | 930000 | lookup00000186 |  93.93 | 93939393.93 | }      |     93 | -8043570000000093
+ row00000094 | ASCII00000094 | UTF8_計算機用語_00000094 | 940000 | lookup00000188 |  94.94 | 94949494.94 | ~      |     94 |  8305840000000094
+ row00000095 | ASCII00000095 | UTF8_計算機用語_00000095 | 950000 | lookup00000190 |  95.95 | 95959595.95 | \x7F   |     95 | -8573750000000095
+ row00000096 | ASCII00000096 | UTF8_計算機用語_00000096 | 960000 | lookup00000192 |  96.96 | 96969696.96 | \u0080 |     96 |  8847360000000096
+ row00000097 | ASCII00000097 | UTF8_計算機用語_00000097 | 970000 | lookup00000194 |  97.97 | 97979797.97 | \u0081 |     97 | -9126730000000097
+ row00000098 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000099 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+ row00000100 | ASCII00000000 | UTF8_計算機用語_00000000 |      0 | lookup00000000 |      0 |           0 |        |      0 |                 0
+ row00000101 | ASCII00000001 | UTF8_計算機用語_00000001 |  10000 | lookup00000002 |    1.1 |      1111.1 | !      |      1 |      -10000000001
+ row00000102 | ASCII00000002 | UTF8_計算機用語_00000002 |  20000 | lookup00000004 |    2.2 |      2222.2 | "      |      2 |       80000000002
+ row00000103 | ASCII00000003 | UTF8_計算機用語_00000003 |  30000 | lookup00000006 |    3.3 |      3333.3 | #      |      3 |     -270000000003
+ row00000105 | ASCII00000005 | UTF8_計算機用語_00000005 |  50000 | lookup00000010 |    5.5 |      5555.5 | %      |      5 |    -1250000000005
+(14 rows)
+
+SELECT * FROM gphbase_select WHERE recordkey != 'row00000099' AND "cf1:q8" > 97 AND "cf1:q9" <= 9702990000000099 ORDER BY recordkey ASC;
+  recordkey  |    cf1:q1     |          cf1:q2          | cf1:q3 |       q4       | cf1:q5 |   cf1:q6    | cf1:q7 | cf1:q8 |      cf1:q9       
+-------------+---------------+--------------------------+--------+----------------+--------+-------------+--------+--------+-------------------
+ row00000098 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000198 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000199 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+ row00000298 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000299 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+(5 rows)
+
+SELECT * FROM gphbase_select WHERE "cf1:q9" <= 9702990000000099 AND recordkey != 'row00000099' AND "cf1:q8" > 97 ORDER BY recordkey ASC;
+  recordkey  |    cf1:q1     |          cf1:q2          | cf1:q3 |       q4       | cf1:q5 |   cf1:q6    | cf1:q7 | cf1:q8 |      cf1:q9       
+-------------+---------------+--------------------------+--------+----------------+--------+-------------+--------+--------+-------------------
+ row00000098 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000198 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000199 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+ row00000298 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000299 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+(5 rows)
+
+set gp_hadoop_enable_filter_pushdown = off;
+SELECT * FROM gphbase_select WHERE "cf1:q9" <= 9702990000000099 AND recordkey != 'row00000099' AND "cf1:q8" > 97 ORDER BY recordkey ASC;
+  recordkey  |    cf1:q1     |          cf1:q2          | cf1:q3 |       q4       | cf1:q5 |   cf1:q6    | cf1:q7 | cf1:q8 |      cf1:q9       
+-------------+---------------+--------------------------+--------+----------------+--------+-------------+--------+--------+-------------------
+ row00000098 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000198 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000199 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+ row00000298 | ASCII00000098 | UTF8_計算機用語_00000098 | 980000 | lookup00000196 |  98.98 | 98989898.98 | \u0082 |     98 |  9411920000000098
+ row00000299 | ASCII00000099 | UTF8_計算機用語_00000099 | 990000 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
+(5 rows)
+
+set gp_hadoop_enable_filter_pushdown = on;
+DROP EXTERNAL TABLE gphbase_select;
+-- Test null values
+CREATE EXTERNAL TABLE gphbase_null(recordkey TEXT, 
+                                     "cf1:q1" VARCHAR, 
+                                     "cf1:q2" TEXT, 
+                                     "cf1:q3" INT, 
+                                     q4 BYTEA, 
+                                     "cf1:q5" REAL, 
+                                     "cf1:q6" FLOAT, 
+                                     "cf1:q7" CHAR, 
+                                     "cf1:q8" SMALLINT, 
+                                     "cf1:q9" BIGINT) 
+LOCATION ('gpfusion://@hostname@:60009/gphbase_test_null?FRAGMENTER=HBaseDataFragmenter')
+FORMAT 'CUSTOM' (formatter='gpfusionwritable_import');
+SELECT * FROM gphbase_null WHERE "cf1:q1" is null ORDER BY recordkey ASC;
+  recordkey  | cf1:q1 |          cf1:q2          | cf1:q3 |       q4       | cf1:q5 | cf1:q6 | cf1:q7 | cf1:q8 |    cf1:q9     
+-------------+--------+--------------------------+--------+----------------+--------+--------+--------+--------+---------------
+ row00000001 |        | UTF8_計算機用語_00000001 |        | lookup00000002 |    1.1 | 1111.1 | !      |      1 |  -10000000001
+ row00000003 |        | UTF8_計算機用語_00000003 |  30000 | lookup00000006 |    3.3 | 3333.3 | #      |      3 | -270000000003
+ row00000006 |        | UTF8_計算機用語_00000001 |        | lookup00000002 |    1.1 | 1111.1 | !      |      1 |  -10000000001
+ row00000008 |        | UTF8_計算機用語_00000003 |  30000 | lookup00000006 |    3.3 | 3333.3 | #      |      3 | -270000000003
+ row00000011 |        | UTF8_計算機用語_00000001 |        | lookup00000002 |    1.1 | 1111.1 | !      |      1 |  -10000000001
+ row00000013 |        | UTF8_計算機用語_00000003 |  30000 | lookup00000006 |    3.3 | 3333.3 | #      |      3 | -270000000003
+(6 rows)
+
+SELECT * FROM gphbase_null WHERE "cf1:q3" is null ORDER BY recordkey ASC;
+  recordkey  |    cf1:q1     |          cf1:q2          | cf1:q3 |       q4       | cf1:q5 | cf1:q6 | cf1:q7 | cf1:q8 |    cf1:q9    
+-------------+---------------+--------------------------+--------+----------------+--------+--------+--------+--------+--------------
+ row00000001 |               | UTF8_計算機用語_00000001 |        | lookup00000002 |    1.1 | 1111.1 | !      |      1 | -10000000001
+ row00000002 | ASCII00000002 | UTF8_計算機用語_00000002 |        | lookup00000004 |    2.2 | 2222.2 | "      |      2 |  80000000002
+ row00000004 | ASCII00000004 | UTF8_計算機用語_00000004 |        | lookup00000008 |    4.4 | 4444.4 | $      |      4 | 640000000004
+ row00000006 |               | UTF8_計算機用語_00000001 |        | lookup00000002 |    1.1 | 1111.1 | !      |      1 | -10000000001
+ row00000007 | ASCII00000002 | UTF8_計算機用語_00000002 |        | lookup00000004 |    2.2 | 2222.2 | "      |      2 |  80000000002
+ row00000009 | ASCII00000004 | UTF8_計算機用語_00000004 |        | lookup00000008 |    4.4 | 4444.4 | $      |      4 | 640000000004
+ row00000011 |               | UTF8_計算機用語_00000001 |        | lookup00000002 |    1.1 | 1111.1 | !      |      1 | -10000000001
+ row00000012 | ASCII00000002 | UTF8_計算機用語_00000002 |        | lookup00000004 |    2.2 | 2222.2 | "      |      2 |  80000000002
+ row00000014 | ASCII00000004 | UTF8_計算機用語_00000004 |        | lookup00000008 |    4.4 | 4444.4 | $      |      4 | 640000000004
+(9 rows)
+
+DROP EXTERNAL TABLE gphbase_null;
+-- Test upper case key in lookup table
+CREATE EXTERNAL TABLE gphbase_upper(recordkey TEXT, 
+                                     "cf1:q1" VARCHAR, 
+                                     "cf1:q2" TEXT, 
+                                     "cf1:q3" INT, 
+                                     q4 BYTEA, 
+                                     "cf1:q5" REAL, 
+                                     "cf1:q6" FLOAT, 
+                                     "cf1:q7" CHAR, 
+                                     "cf1:q8" SMALLINT, 
+                                     "cf1:q9" BIGINT) 
+LOCATION ('gpfusion://@hostname@:60009/gphbase_test_upper?FRAGMENTER=HBaseDataFragmenter')
+FORMAT 'CUSTOM' (formatter='gpfusionwritable_import');
+SELECT * FROM gphbase_upper ORDER BY recordkey ASC;
+  recordkey  |    cf1:q1     |          cf1:q2          | cf1:q3 |       q4       | cf1:q5 | cf1:q6 | cf1:q7 | cf1:q8 |    cf1:q9    
+-------------+---------------+--------------------------+--------+----------------+--------+--------+--------+--------+--------------
+ row00000000 | ASCII00000000 | UTF8_計算機用語_00000000 |      0 | lookup00000000 |      0 |      0 |        |      0 |            0
+ row00000001 |               | UTF8_計算機用語_00000001 |        | lookup00000002 |    1.1 | 1111.1 | !      |      1 | -10000000001
+ row00000002 | ASCII00000000 | UTF8_計算機用語_00000000 |      0 | lookup00000000 |      0 |      0 |        |      0 |            0
+ row00000003 |               | UTF8_計算機用語_00000001 |        | lookup00000002 |    1.1 | 1111.1 | !      |      1 | -10000000001
+ row00000004 | ASCII00000000 | UTF8_計算機用語_00000000 |      0 | lookup00000000 |      0 |      0 |        |      0 |            0
+ row00000005 |               | UTF8_計算機用語_00000001 |        | lookup00000002 |    1.1 | 1111.1 | !      |      1 | -10000000001
+(6 rows)
+
+DROP EXTERNAL TABLE gphbase_upper;
+-- Negative test
+CREATE EXTERNAL TABLE gphbase_error(recordkey int)
+LOCATION ('gpfusion://@hostname@:60009/gphbase_test?FRAGMENTER=HBaseDataFragmenter')
+FORMAT 'CUSTOM' (formatter='gpfusionwritable_import');
+SELECT * FROM gphbase_error;
+ERROR:  Reporting a badly formatted data record which was detected by the java reader. See GPBridge log for more details
+DETAIL:  External table gphbase_error
+DROP EXTERNAL TABLE gphbase_error;
+-- query without lookup table
+CREATE EXTERNAL TABLE gphbase_lookup(recordkey TEXT, 
+                                     "cf1:q1" VARCHAR, 
+                                     "cf1:q2" TEXT, 
+                                     "cf1:q3" INT, 
+                                     "cf1:q4" BYTEA, 
+                                     "cf1:q5" REAL, 
+                                     "cf1:q6" FLOAT, 
+                                     "cf1:q7" CHAR, 
+                                     "cf1:q8" SMALLINT, 
+                                     "cf1:q9" BIGINT) 
+LOCATION ('gpfusion://@hostname@:60009/gphbase_test?FRAGMENTER=HBaseDataFragmenter')
+FORMAT 'CUSTOM' (formatter='gpfusionwritable_import');
+-- truncate lookup table
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar`:`echo ${HADOOP_ROOT}/lib/commons-logging-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-configuration-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-lang-[1-9]*.jar`:@abs_srcdir@/helpers HBaseChangeLookupTable truncate-table
+Command: [truncate-table]
+truncate table
+disable table
+drop table
+create table
+SELECT recordkey, "cf1:q1" FROM gphbase_lookup ORDER BY recordkey LIMIT 5;
+  recordkey  |    cf1:q1     
+-------------+---------------
+ row00000000 | ASCII00000000
+ row00000001 | ASCII00000001
+ row00000002 | ASCII00000002
+ row00000003 | ASCII00000003
+ row00000004 | ASCII00000004
+(5 rows)
+
+-- disable lookup table
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar`:`echo ${HADOOP_ROOT}/lib/commons-logging-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-configuration-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-lang-[1-9]*.jar`:@abs_srcdir@/helpers HBaseChangeLookupTable disable-table
+Command: [disable-table]
+disable table
+SELECT recordkey, "cf1:q1" FROM gphbase_lookup ORDER BY recordkey LIMIT 5;
+  recordkey  |    cf1:q1     
+-------------+---------------
+ row00000000 | ASCII00000000
+ row00000001 | ASCII00000001
+ row00000002 | ASCII00000002
+ row00000003 | ASCII00000003
+ row00000004 | ASCII00000004
+(5 rows)
+
+-- remove mapping cf from lookup table
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar`:`echo ${HADOOP_ROOT}/lib/commons-logging-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-configuration-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-lang-[1-9]*.jar`:@abs_srcdir@/helpers HBaseChangeLookupTable remove-cf
+Command: [remove-cf]
+disable table
+remove column name mapping
+enable table
+SELECT recordkey, "cf1:q1" FROM gphbase_lookup ORDER BY recordkey LIMIT 5;
+  recordkey  |    cf1:q1     
+-------------+---------------
+ row00000000 | ASCII00000000
+ row00000001 | ASCII00000001
+ row00000002 | ASCII00000002
+ row00000003 | ASCII00000003
+ row00000004 | ASCII00000004
+(5 rows)
+
+-- drop lookup table
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar`:`echo ${HADOOP_ROOT}/lib/commons-logging-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-configuration-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-lang-[1-9]*.jar`:@abs_srcdir@/helpers HBaseChangeLookupTable drop-table
+Command: [drop-table]
+disable table
+drop table
+SELECT recordkey, "cf1:q1" FROM gphbase_lookup ORDER BY recordkey LIMIT 5;
+  recordkey  |    cf1:q1     
+-------------+---------------
+ row00000000 | ASCII00000000
+ row00000001 | ASCII00000001
+ row00000002 | ASCII00000002
+ row00000003 | ASCII00000003
+ row00000004 | ASCII00000004
+(5 rows)
+
+-- create lookup table
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar`:`echo ${HADOOP_ROOT}/lib/commons-logging-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-configuration-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-lang-[1-9]*.jar`:@abs_srcdir@/helpers HBaseChangeLookupTable create-table
+Command: [create-table]
+create table
+DROP EXTERNAL TABLE gphbase_lookup;
+-- Cleanup
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar`:`echo ${HADOOP_ROOT}/lib/commons-logging-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-configuration-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-lang-[1-9]*.jar`:@abs_srcdir@/helpers HBaseDropTables
+table name to drop is 'gphbase_test'
+drop
+lookup cleanup
+leave
+table name to drop is 'gphbase_test_null'
+drop
+lookup cleanup
+leave
+table name to drop is 'gphbase_test_upper'
+drop
+lookup cleanup
+leave
+--------------------------------------------------------------------------------
+-- HIVE
+--------------------------------------------------------------------------------
+--
+-- 0. Compiling the HiveThinClient
+\! javac -cp `${HADOOP_ROOT}/bin/hadoop classpath` @abs_srcdir@/helpers/HiveThinClient.java
+-- 1. Hive table stored as text
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "create table reg_txt (s1 string,s2 string,n1 int, d1 double)row format delimited fields terminated by ','"
+number of lines: 0
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "load data local inpath '@abs_srcdir@/data/gphdfs/hive_small_data.txt' into table reg_txt"
+number of lines: 0
+CREATE EXTERNAL TABLE hv_txt(
+t1    text,
+t2    text,  
+num1  integer, 
+dub1  double precision)
+LOCATION ('gpfusion://@hostname@:50070/reg_txt?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
+format 'custom' (formatter='gpfusionwritable_import');
+select * from hv_txt order by t1;
+  t1   |  t2  | num1 | dub1 
+-------+------+------+------
+ row1  | s_6  |    1 |    6
+ row10 | s_15 |   10 |   15
+ row2  | s_7  |    2 |    7
+ row3  | s_8  |    3 |    8
+ row4  | s_9  |    4 |    9
+ row5  | s_10 |    5 |   10
+ row6  | s_11 |    6 |   11
+ row7  | s_12 |    7 |   12
+ row8  | s_13 |    8 |   13
+ row9  | s_14 |    9 |   14
+(10 rows)
+
+-- 2. Hive table stored as sequence
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "create table reg_seq (t0 string, t1 string, num1 int, d1 double) row format delimited fields terminated by ',' STORED AS SEQUENCEFILE"
+number of lines: 0
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "insert into table reg_seq select * from reg_txt"
+number of lines: 0
+CREATE EXTERNAL TABLE hv_seq(
+t1    text,
+t2    text,  
+num1  integer, 
+dub1  double precision)
+LOCATION ('gpfusion://@hostname@:50070/reg_seq?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
+format 'custom' (formatter='gpfusionwritable_import');
+select * from hv_seq order by t1;
+  t1   |  t2  | num1 | dub1 
+-------+------+------+------
+ row1  | s_6  |    1 |    6
+ row10 | s_15 |   10 |   15
+ row2  | s_7  |    2 |    7
+ row3  | s_8  |    3 |    8
+ row4  | s_9  |    4 |    9
+ row5  | s_10 |    5 |   10
+ row6  | s_11 |    6 |   11
+ row7  | s_12 |    7 |   12
+ row8  | s_13 |    8 |   13
+ row9  | s_14 |    9 |   14
+(10 rows)
+
+-- 3. Hive table stored as rcfile
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "create table reg_rc (t0 string, t1 string, num1 int, d1 double) STORED AS RCFILE"
+number of lines: 0
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "insert into table reg_rc select * from reg_txt"
+number of lines: 0
+CREATE EXTERNAL TABLE hv_rc(
+t1    text,
+t2    text,  
+num1  integer, 
+dub1  double precision)
+LOCATION ('gpfusion://@hostname@:50070/reg_rc?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
+format 'custom' (formatter='gpfusionwritable_import');
+select * from hv_rc order by t1;
+  t1   |  t2  | num1 | dub1 
+-------+------+------+------
+ row1  | s_6  |    1 |    6
+ row10 | s_15 |   10 |   15
+ row2  | s_7  |    2 |    7
+ row3  | s_8  |    3 |    8
+ row4  | s_9  |    4 |    9
+ row5  | s_10 |    5 |   10
+ row6  | s_11 |    6 |   11
+ row7  | s_12 |    7 |   12
+ row8  | s_13 |    8 |   13
+ row9  | s_14 |    9 |   14
+(10 rows)
+
+-- 4. Hive table stored in several partitions where each partition is stored in a diferrent format
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "create external table reg_heterogen (s1 string,s2 string,n1 int, d1 double) partitioned by (fmt string)  row format delimited fields terminated by ','"
+number of lines: 0
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "alter table reg_heterogen add partition (fmt = 'txt') location 'hdfs:/hive/warehouse/reg_txt'"
+number of lines: 0
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "alter table reg_heterogen add partition (fmt = 'rc') location 'hdfs:/hive/warehouse/reg_rc'"
+number of lines: 0
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "alter table reg_heterogen add partition (fmt = 'seq') location 'hdfs:/hive/warehouse/reg_seq'"
+number of lines: 0
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "alter table reg_heterogen partition (fmt='rc') set fileformat RCFILE"
+number of lines: 0
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "alter table reg_heterogen partition (fmt='seq') set fileformat SEQUENCEFILE"
+number of lines: 0
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "show partitions reg_heterogen"
+number of lines: 3
+fmt=rc
+fmt=seq
+fmt=txt
+CREATE EXTERNAL TABLE hv_heterogen(
+t1    text,
+t2    text,  
+num1  integer, 
+dub1  double precision)
+LOCATION ('gpfusion://@hostname@:50070/reg_heterogen?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
+format 'custom' (formatter='gpfusionwritable_import');
+select * from hv_heterogen order by t1;
+  t1   |  t2  | num1 | dub1 
+-------+------+------+------
+ row1  | s_6  |    1 |    6
+ row1  | s_6  |    1 |    6
+ row1  | s_6  |    1 |    6
+ row10 | s_15 |   10 |   15
+ row10 | s_15 |   10 |   15
+ row10 | s_15 |   10 |   15
+ row2  | s_7  |    2 |    7
+ row2  | s_7  |    2 |    7
+ row2  | s_7  |    2 |    7
+ row3  | s_8  |    3 |    8
+ row3  | s_8  |    3 |    8
+ row3  | s_8  |    3 |    8
+ row4  | s_9  |    4 |    9
+ row4  | s_9  |    4 |    9
+ row4  | s_9  |    4 |    9
+ row5  | s_10 |    5 |   10
+ row5  | s_10 |    5 |   10
+ row5  | s_10 |    5 |   10
+ row6  | s_11 |    6 |   11
+ row6  | s_11 |    6 |   11
+ row6  | s_11 |    6 |   11
+ row7  | s_12 |    7 |   12
+ row7  | s_12 |    7 |   12
+ row7  | s_12 |    7 |   12
+ row8  | s_13 |    8 |   13
+ row8  | s_13 |    8 |   13
+ row8  | s_13 |    8 |   13
+ row9  | s_14 |    9 |   14
+ row9  | s_14 |    9 |   14
+ row9  | s_14 |    9 |   14
+(30 rows)
+
+-- 5. Hive table with collection types (non primitive types)
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "CREATE TABLE reg_collections ( s1 STRING, f1 FLOAT, a1 ARRAY<STRING> , m1 MAP<STRING,  FLOAT > , sr1 STRUCT<street:STRING,  city:STRING,  state:STRING,  zip:INT > )  ROW FORMAT DELIMITED  FIELDS TERMINATED BY '\001' COLLECTION ITEMS TERMINATED BY '\002' MAP KEYS TERMINATED BY '\003'  LINES TERMINATED BY '\n'  STORED AS TEXTFILE"
+number of lines: 0
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "load data local inpath '@abs_srcdir@/data/gphdfs/hive_collections.txt' into table reg_collections"
+number of lines: 0
+CREATE EXTERNAL TABLE hv_collections(
+t1    text,   
+f1    real,
+t2    text, 
+t3    text, 
+t4    text,
+t5    text, 
+f2    real,
+t6    text,
+f3    real,
+t7    text,
+t8    text,
+t9    text,
+num1  integer)
+LOCATION ('gpfusion://@hostname@:50070/reg_collections?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
+format 'custom' (formatter='gpfusionwritable_import');
+select * from hv_collections order by t1;
+   t1    | f1 |    t2    |  t3   |  t4   |   t5   | f2 |   t6    | f3  |    t7    |  t8  |   t9   | num1  
+---------+----+----------+-------+-------+--------+----+---------+-----+----------+------+--------+-------
+ giraffe |  2 | Nige     | Kenya | Congo | height |  4 | wheight | 100 | agripas  | aviv | israel | 56303
+ lion    |  2 | Zanzibar | Kenya | Congo | height |  2 | wheight |  90 | horcanus | aviv | israel | 56303
+ panther |  2 | Somalia  | Kenya | Congo | height |  1 | wheight |  40 | herzog   | aviv | israel | 56303
+ zebra   |  2 | Tanzania | Kenya | Congo | height |  2 | wheight |  50 | zohar    | aviv | israel | 56303
+(4 rows)
+
+-- 6. Clean after Hive
+drop external table hv_collections;
+drop external table hv_heterogen;
+drop external table hv_rc;
+drop external table hv_seq;
+drop external table hv_txt;
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "drop table reg_collections"
+number of lines: 0
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "drop table reg_heterogen"
+number of lines: 0
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "drop table reg_rc"
+number of lines: 0
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "drop table reg_seq"
+number of lines: 0
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "drop table reg_txt"
+number of lines: 0

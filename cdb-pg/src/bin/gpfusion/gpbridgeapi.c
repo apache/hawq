@@ -1,13 +1,10 @@
 #include "common.h"
 #include "gphdfilters.h"
-#include "libchurl.h"
-#include "uriparser.h"
+#include "access/libchurl.h"
+#include "access/gpfusionuriparser.h"
 
-///////////////////////////////////////////////////////////////
+static const char* remote_uri_template = "http://%s/%s/%s/Bridge/?fragments=%s";
 
-static const char* remote_uri_template = "http://%s/gpdb/v1/?fragments=%s";
-
-///////////////////////////////////////////////////////////////
 typedef struct
 {
 	CHURL_HEADERS churl_headers;
@@ -17,7 +14,6 @@ typedef struct
 	ListCell* current_fragment;
 } gphadoop_context;
 
-///////////////////////////////////////////////////////////////
 void	gpbridge_check_inside_extproto(PG_FUNCTION_ARGS);
 bool	gpbridge_last_call(PG_FUNCTION_ARGS);
 bool	gpbridge_first_call(PG_FUNCTION_ARGS);
@@ -30,6 +26,7 @@ void	add_alignment_size_httpheader(gphadoop_context* context);
 void	add_tuple_desc_httpheader(gphadoop_context* context, Relation rel);
 void	append_churl_header_if_exists(gphadoop_context* context,
 									  const char* key, const char* value);
+void    set_current_fragment_headers(gphadoop_context* context);
 void	gpbridge_import_start(PG_FUNCTION_ARGS);
 size_t	gpbridge_read(PG_FUNCTION_ARGS);
 void	cleanup_churl_headers(gphadoop_context* context);
@@ -37,7 +34,8 @@ void	parse_gphd_uri(gphadoop_context* context, PG_FUNCTION_ARGS);
 gphadoop_context*	create_context(PG_FUNCTION_ARGS);
 void	build_uri_from_current_fragment(gphadoop_context* context);
 size_t	fill_buffer(gphadoop_context* context, char* start, size_t size);
-///////////////////////////////////////////////////////////////
+char* 	prepend_x_gp(const char* key);
+
 
 /* Custom protocol entry point for read
  */
@@ -116,7 +114,7 @@ gphadoop_context* create_context(PG_FUNCTION_ARGS)
 	gphadoop_context* context = NULL;
 
 	context = palloc0(sizeof(gphadoop_context));
-	// first thing we do, store the context
+	/* first thing we do, store the context */
 	EXTPROTOCOL_SET_USER_CTX(fcinfo, context);
 
 	initStringInfo(&context->uri);
@@ -135,6 +133,7 @@ void build_http_header(gphadoop_context* context, PG_FUNCTION_ARGS)
 	char *format;
 	char *filterstr = NULL;
 	extvar_t ev;
+	ListCell *option = NULL;
 
 	/* NOTE: I've to assume that if it's not TEXT, it's going to be the RIGHT
 	 * custom format. There's no easy way to find out the name of the formatter here.
@@ -157,42 +156,33 @@ void build_http_header(gphadoop_context* context, PG_FUNCTION_ARGS)
 	add_alignment_size_httpheader(context);
 	add_tuple_desc_httpheader(context, rel);
 
-    switch(context->gphd_uri->type)
-    {
-    	case URI_GPHDFS:
-			churl_headers_append(context->churl_headers, "X-GP-HDTYPE", "hdfs");
-			churl_headers_append(context->churl_headers, "X-GP-URL-HOST", context->gphd_uri->host);
-			churl_headers_append(context->churl_headers, "X-GP-URL-PORT", context->gphd_uri->port);
-			churl_headers_append(context->churl_headers, "X-GP-DATA-DIR", context->gphd_uri->u.hdfs.directory);
-			churl_headers_append(context->churl_headers, "X-GP-ACCESSOR", context->gphd_uri->u.hdfs.accessor);
-    		append_churl_header_if_exists(context, "X-GP-DATA-SCHEMA", context->gphd_uri->u.hdfs.data_schema);
-			churl_headers_append(context->churl_headers, "X-GP-RESOLVER", context->gphd_uri->u.hdfs.resolver);
-			// should be for write only
-			churl_headers_append(context->churl_headers, "X-GP-URI", context->gphd_uri->uri);
 
-    		break;
+	churl_headers_append(context->churl_headers, "X-GP-URL-HOST", context->gphd_uri->host);
+	churl_headers_append(context->churl_headers, "X-GP-URL-PORT", context->gphd_uri->port);
+	churl_headers_append(context->churl_headers, "X-GP-DATA-DIR", context->gphd_uri->data);
 
-    	case URI_GPHBASE:
-			churl_headers_append(context->churl_headers, "X-GP-HDTYPE", "hbase");
-			churl_headers_append(context->churl_headers, "X-GP-HBASE-TABLE", context->gphd_uri->u.hbase.table_name);
+	/* append options: */
+	foreach(option, context->gphd_uri->options)
+	{
+		OptionData *data = (OptionData*)lfirst(option);
+		char *x_gp_key = prepend_x_gp(data->key);
+		churl_headers_append(context->churl_headers, x_gp_key, data->value);
+		pfree(x_gp_key);
+	}
 
-    		if (filterstr)
-    		{
-				churl_headers_append(context->churl_headers, "X-GP-HAS-FILTER", "1");
-				churl_headers_append(context->churl_headers, "X-GP-FILTER", filterstr);
-    		}
-    		else
-				churl_headers_append(context->churl_headers, "X-GP-HAS-FILTER", "0");
+	/* should be for write only */
+	churl_headers_append(context->churl_headers, "X-GP-URI", context->gphd_uri->uri);
 
-    		break;
+	if (filterstr)
+	{
+		churl_headers_append(context->churl_headers, "X-GP-HAS-FILTER", "1");
+		churl_headers_append(context->churl_headers, "X-GP-FILTER", filterstr);
+	}
+	else
+		churl_headers_append(context->churl_headers, "X-GP-HAS-FILTER", "0");
 
-    	default:
-			ereport(ERROR,
-					(errcode(ERRCODE_PROTOCOL_VIOLATION),
-					 errmsg("unsupported type %d in uri %s", 
-							context->gphd_uri->type, context->gphd_uri->uri)));
-    }
 }
+
 
 /* Report alignment size to remote component
  * GPDBWritable uses alignment that has to be the same as
@@ -223,7 +213,7 @@ void add_tuple_desc_httpheader(gphadoop_context* context, Relation rel)
 
     initStringInfo(&formatter);
 
-    /* Get tuple descrition it self */
+    /* Get tuple description itself */
     tuple = RelationGetDescr(rel);
 
     /* Convert the number of attributes to a string */
@@ -253,6 +243,34 @@ void append_churl_header_if_exists(gphadoop_context* context, const char* key, c
 		churl_headers_append(context->churl_headers, key, value);
 }
 
+/*
+ * Change the headers with current fragment information:
+ * 1. X-GP-DATA-DIR header is changed to the source name of the current fragment.
+ * We reuse the same http header to send all requests for specific fragments.
+ * The original header's value contains the name of the general path of the query
+ * (can be with wildcard or just a directory name), and this value is changed here
+ * to the specific source name of each fragment name.
+ * 2. X-GP-FRAGMENT-USER-DATA header is changed to the current fragment's user data.
+ * If the fragment doesn't user data, the header will be removed.
+ */
+void set_current_fragment_headers(gphadoop_context* context)
+{
+	FragmentData* frag_data = (FragmentData*)lfirst(context->current_fragment);
+	elog(DEBUG2, "gpfusion: set_current_fragment_source_name: source_name %s, index %s, has user data: %s ",
+		 frag_data->source_name, frag_data->index, frag_data->user_data ? "TRUE" : "FALSE");
+	churl_headers_override(context->churl_headers, "X-GP-DATA-DIR", frag_data->source_name);
+
+	if (frag_data->user_data)
+	{
+		churl_headers_override(context->churl_headers, "X-GP-FRAGMENT-USER-DATA", frag_data->user_data);
+	}
+	else
+	{
+		churl_headers_remove(context->churl_headers, "X-GP-FRAGMENT-USER-DATA", true);
+	}
+
+}
+
 void gpbridge_import_start(PG_FUNCTION_ARGS)
 {
 	gphadoop_context* context = create_context(fcinfo);
@@ -262,6 +280,9 @@ void gpbridge_import_start(PG_FUNCTION_ARGS)
 	build_uri_from_current_fragment(context);
 	context->churl_headers = churl_headers_init();
 	build_http_header(context, fcinfo);
+
+	set_current_fragment_headers(context);
+
 	context->churl_handle = churl_init_download(context->uri.data,
 												context->churl_headers);
 }
@@ -288,7 +309,8 @@ size_t gpbridge_read(PG_FUNCTION_ARGS)
 			return 0;
 
 		build_uri_from_current_fragment(context);
-		churl_download_restart(context->churl_handle, context->uri.data);
+		set_current_fragment_headers(context);
+		churl_download_restart(context->churl_handle, context->uri.data, context->churl_headers);
 	}
 
 	return n;
@@ -305,7 +327,9 @@ void build_uri_from_current_fragment(gphadoop_context* context)
 	FragmentData* data = (FragmentData*)lfirst(context->current_fragment);
 	resetStringInfo(&context->uri);
 	appendStringInfo(&context->uri, remote_uri_template,
-					 data->authority, data->index);
+					 data->authority, GPDB_REST_PREFIX, GPFX_VERSION, data->index);
+	elog(DEBUG2, "gpfusion: uri with current fragment: %s", context->uri.data);
+
 }
 
 size_t fill_buffer(gphadoop_context* context, char* start, size_t size)
@@ -325,3 +349,14 @@ size_t fill_buffer(gphadoop_context* context, char* start, size_t size)
 
 	return ptr - start;
 }
+
+char* prepend_x_gp(const char* key)
+{
+
+	StringInfoData formatter;
+	initStringInfo(&formatter);
+	appendStringInfo(&formatter, "X-GP-%s", key);
+	
+	return formatter.data;
+}
+

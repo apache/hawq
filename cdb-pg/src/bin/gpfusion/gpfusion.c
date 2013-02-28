@@ -1,5 +1,5 @@
 #include "common.h"
-#include "uriparser.h"
+#include "access/gpfusionuriparser.h"
 
 PG_FUNCTION_INFO_V1(gpfusionprotocol_export);
 PG_FUNCTION_INFO_V1(gpfusionprotocol_import);

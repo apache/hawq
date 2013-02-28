@@ -920,31 +920,6 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 										errOmitLocation(true)));
 
 				}
-				else if (uri->protocol == URI_GPHDFS && iswritable)
-				{
-					Datum 	d_wexthdfs = caql_getattr(pcqCtx, Anum_pg_authid_rolcreatewexthdfs,
-													  &isnull);
-					bool	createwexthdfs = (isnull ? false : DatumGetBool(d_wexthdfs));
-
-					if (!createwexthdfs)
-						ereport(ERROR,
-								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-								errmsg("permission denied: no privilege to create a writable gphdfs external table"),
-										errOmitLocation(true)));
-				}
-				else if (uri->protocol == URI_GPHDFS && !iswritable)
-				{
-					Datum 	d_rexthdfs = caql_getattr(pcqCtx, Anum_pg_authid_rolcreaterexthdfs,
-													  &isnull);
-					bool	createrexthdfs = (isnull ? false : DatumGetBool(d_rexthdfs));
-
-					if (!createrexthdfs)
-						ereport(ERROR,
-								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-								errmsg("permission denied: no privilege to create a readable gphdfs external table"),
-										errOmitLocation(true)));
-
-				}
 				else if (uri->protocol == URI_HTTP && !iswritable)
 				{
 					Datum 	d_exthttp = caql_getattr(pcqCtx, Anum_pg_authid_rolcreaterexthttp, 
@@ -996,13 +971,6 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 	 */
 	formattype = transformFormatType(createExtStmt->format);
 	
-	if (fmttype_is_custom(formattype))
-	{
-		ereport(ERROR,
-				(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
-						errmsg("Cannot support custom formatter yet in GPSQL") ));
-	}
-
 	formatOptStr = transformFormatOpts(formattype,
 									   createExtStmt->formatOpts,
 									   list_length(createExtStmt->tableElts),
@@ -17168,17 +17136,6 @@ static Datum transformLocationUris(List *locs, bool isweb, bool iswritable)
 			/* no changes to original uri string */
 			uri_str_final = (char *) uri_str_orig;
 		}
-
-		/*
-		 * check for various errors
-		 */
-		if (!first_uri && uri->protocol == URI_GPHDFS)
-			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
-					errmsg("GPHDFS can only have one location list"),
-					errhint("Combine multiple HDFS files into a single file"),
-					errOmitLocation(true)));
-
 
 		/* 
 		 * If a custom protocol is used, validate its existence.

@@ -3,7 +3,7 @@ include $(top_builddir)/src/Makefile.global
 
 MODULE_big = gpfusion
 OBJS       = gpdbwritableformatter.o gphdfsformatter.o gpbridgeapi.o \
-             gphdfilters.o libchurl.o gpfusion.o uriparser.o 
+             gphdfilters.o gpfusion.o 
 
 CFLAGS += -lcurl
 
