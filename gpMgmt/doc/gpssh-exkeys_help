@@ -7,7 +7,7 @@ Exchanges SSH public keys between hosts.
 SYNOPSIS
 *****************************************************
 
-gpssh-exkeys -f <hostfile_exkeys> | -h <hostname> [-h <hostname> ...]
+gpssh-exkeys -f <hostfile_exkeys> [-p <password>] | -h <hostname> [-h <hostname> ...] [-p <password>]
 
 gpssh-exkeys -e <hostfile_exkeys> -x <hostfile_gpexpand>
 
@@ -94,6 +94,9 @@ OPTIONS
  the SSH key exchange. You can use the -h option multiple times to 
  specify multiple host names and host addresses.
 
+-p <password>
+
+ Specifies the password used to login to the hosts. The hosts should share the same password.
 
 --version
 
