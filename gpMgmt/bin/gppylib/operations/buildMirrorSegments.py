@@ -597,7 +597,7 @@ class GpMirrorListToBuild:
         # In GPSQL, we need to create a template and copy it to all of failed segments.
         if gpArray.getFaultStrategy() == gparray.FAULT_STRATEGY_NONE:
             tempDir = '/tmp/GPSQL'
-            templateDir = tempDir + '/gpsql_template'
+            templateDir = tempDir + '/gpsql_template' + time.strftime("%Y%m%d_%H%M%S")
             unix.MakeDirectory("create blank directory for segment", templateDir).run(validateAfter=True)
             unix.Chmod.local('set permissions on template dir', templateDir, '0700') # set perms so postgres can start
 
