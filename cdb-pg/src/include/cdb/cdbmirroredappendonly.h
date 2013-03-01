@@ -36,31 +36,10 @@ typedef struct MirroredAppendOnlyOpen
 	uint32		segmentFileNum;
 	
 	int32		contentid;
-
-	/*char		mirrorFilespaceLocation[MAXPGPATH+1];*/
-					// UNDONE: Consider palloc'ing this instead of statically allocating
-					// UNDONE: to use less stack space...
-	
 	
 	File		primaryFile;
 
-	/*MirrorDataLossTrackingState mirrorDataLossTrackingState;
-
-	int64						mirrorDataLossTrackingSessionNum;*/
-
 	bool						create;
-
-	/*bool						primaryOnlyToLetResynchronizeWork;
-	
-	bool						mirrorOnly;
-	
-	bool						copyToMirror;
-
-	bool						guardOtherCallsWithMirroredLock;
-	
-	StorageManagerMirrorMode	mirrorMode;
-
-	bool						mirrorDataLossOccurred;*/
 } MirroredAppendOnlyOpen;
 
 // -----------------------------------------------------------------------------

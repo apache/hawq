@@ -1111,17 +1111,7 @@ void MirroredFileSysObj_TransactionCreateAppendOnlyFile(
 	int64					*persistentSerialNum)
 				/* Output: The serial number of the gp_persistent_relation_node tuple. */
 {
-	/*PersistentFileSysObjName	fsObjName;
-	
-	MirrorDataLossTrackingState mirrorDataLossTrackingState;
-	int64 mirrorDataLossTrackingSessionNum;*/
-	
-/*	MirroredObjectExistenceState mirrorExistenceState = MirroredObjectExistenceState_None;
-	MirroredRelDataSynchronizationState relDataSynchronizationState = MirroredRelDataSynchronizationState_None;
-	StorageManagerMirrorMode mirrorMode = StorageManagerMirrorMode_None;*/
-
 	int primaryError;
-/*	bool mirrorDataLossOccurred;*/
 
 	Assert(relationName != NULL);
 	Assert(persistentTid != NULL);
@@ -1138,25 +1128,6 @@ void MirroredFileSysObj_TransactionCreateAppendOnlyFile(
 		justInTimeDbDirNode.database = relFileNode->dbNode;
 		MirroredFileSysObj_JustInTimeDbDirCreate(contentid, &justInTimeDbDirNode);
 	}
-
-/*	PersistentFileSysObjName_SetRelationFile(
-										&fsObjName,
-										relFileNode,
-										segmentFileNum,
-										is_tablespace_shared);*/
-
-	/*LWLockAcquire(MirroredLock, LW_SHARED);
-
-	mirrorDataLossTrackingState = 
-				FileRepPrimary_GetMirrorDataLossTrackingSessionNum(
-												&mirrorDataLossTrackingSessionNum);
-
-	MirroredFileSysObj_BeginMirroredCreate(
-									&fsObjName,
-									mirrorDataLossTrackingState,
-									&mirrorExistenceState,
-									&relDataSynchronizationState,
-									&mirrorMode);*/
 
 	/*
 	 * We write our intention or 'Create Pending' persistent information before we do
@@ -1196,36 +1167,6 @@ void MirroredFileSysObj_TransactionCreateAppendOnlyFile(
 					contentid,
 					strerror(primaryError))));
 	}
-
-	/*MirroredFileSysObj_FinishMirroredCreate(
-									&fsObjName,
-									persistentTid, 
-									*persistentSerialNum, 
-									mirrorExistenceState,
-									mirrorDataLossOccurred);	
-
-	LWLockRelease(MirroredLock);*/
-	
-	/*if (Debug_persistent_print)
-	{
-		SUPPRESS_ERRCONTEXT_DECLARE;
-
-		SUPPRESS_ERRCONTEXT_PUSH();
-
-		elog(Persistent_DebugPrintLevel(), 
-			 "MirroredFileSysObj_TransactionCreateAppendOnlyFile: %u/%u/%u, relation name '%s', mirror existence state '%s', mirror data loss occurred %s"
-			 ", persistent serial number " INT64_FORMAT " at TID %s",
-			 relFileNode->spcNode,
-			 relFileNode->dbNode,
-			 relFileNode->relNode,
-			 (relationName == NULL ? "<null>" : relationName),
-			 MirroredObjectExistenceState_Name(mirrorExistenceState),
-			 (mirrorDataLossOccurred ? "true" : "false"),
-			 *persistentSerialNum,
-			 ItemPointerToString(persistentTid));
-
-		SUPPRESS_ERRCONTEXT_POP();
-	}*/
 }
 
 void MirroredFileSysObj_ScheduleDropBufferPoolRel(
@@ -1418,9 +1359,7 @@ void MirroredFileSysObj_DropRelFile(
 					segmentFileNum,
 					contentid,
 					relationName,
-					/*primaryOnly,*/
-					&primaryError/*,
-					mirrorDataLossOccurred*/);
+					&primaryError);
 		if (ignoreNonExistence && primaryError == ENOENT)
 			primaryError = 0;
 

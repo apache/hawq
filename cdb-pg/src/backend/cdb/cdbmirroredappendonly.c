@@ -112,8 +112,6 @@ static void MirroredAppendOnly_DoOpen(
 
 	errno = 0;
 
-	/*if (FileRepPrimary_BypassMirrorCheck(open->relFileNode.spcNode,
-			InvalidOid, &primaryOnlyToLetResynchronizeWork))*/
 	{
 		fileFlags = 0;
 		if (readOnly)
@@ -167,9 +165,7 @@ void MirroredAppendOnly_Create(
 	char						*relationName,
 					/* For tracing only.  Can be NULL in some execution paths. */
 	
-	int 						*primaryError/*,
-	
-	bool						*mirrorDataLossOccurred*/)
+	int 						*primaryError)
 {
 	MirroredAppendOnlyOpen mirroredOpen;
 
@@ -190,11 +186,7 @@ void MirroredAppendOnly_Create(
 
 	MirroredAppendOnly_FlushAndClose(
 							&mirroredOpen,
-							primaryError/*,
-							mirrorDataLossOccurred,
-							&mirrorCatchupRequired,
-							&originalMirrorDataLossTrackingState,
-							&originalMirrorDataLossTrackingSessionNum*/);
+							primaryError);
 }
 
 /*
@@ -292,9 +284,7 @@ void MirroredAppendOnly_Flush(
 	MirroredAppendOnlyOpen 	*open,
 				/* The open struct. */				
 
-	int						*primaryError/*,
-
-	bool					*mirrorDataLossOccurred*/)
+	int						*primaryError)
 {
 	Assert(open != NULL);
 	Assert(open->isActive);
@@ -458,9 +448,7 @@ void MirroredAppendOnly_Truncate(
 	int64		position,
 				/* The position to cutoff the data. */
 
-	int 		*primaryError/*,
-	
-	bool		*mirrorDataLossOccurred*/)
+	int 		*primaryError)
 {
 	*primaryError = 0;
 		errno = 0;

@@ -1797,10 +1797,6 @@ UpdateAliveSegmentsInfo(void)
 	if (GpAliveSegmentsInfo.tid == GetCurrentTransactionId())
 		return;
 
-	/* TODO: fts version... not support */
-	if (!init)
-		elog(LOG, "segment reconfiguraion happened.");
-
 	/* If it is the first time update alive information. Don't trigger error! */
 	UpdateGpAliveSegmentsInfo(init);
 }
