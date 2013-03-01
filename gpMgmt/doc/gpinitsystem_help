@@ -18,7 +18,7 @@ gpinitsystem -c <gpinitsystem_config>
             [--lc-ctype=<locale>] [--lc-messages=<locale>] 
             [--lc-monetary=<locale>] [--lc-numeric=<locale>] 
             [--lc-time=<locale>] [--su_password=<password>] 
-            [-S] [-a] [-q] [-l <logfile_directory>] [-D]
+            [-a] [-q] [-l <logfile_directory>] [-D]
 
 gpinitsystem -? 
 
@@ -60,7 +60,6 @@ This utility performs the following tasks:
 * Initializes the master instance.
 * Initializes the standby master instance (if specified).
 * Initializes the primary segment instances.
-* Initializes the mirror segment instances (if mirroring is configured).
 * Configures the Greenplum Database system and checks for errors.
 * Starts the Greenplum Database system.
 
@@ -209,17 +208,6 @@ OPTIONS
  change default passwords immediately after installation.
 
 
--S (spread mirror configuration)
-
- If mirroring parameters are specified, spreads the mirror segments 
- across the available hosts. The default is to group the set of mirror 
- segments together on an alternate host from their primary segment set. 
- Mirror spreading will place each mirror on a different host within the 
- Greenplum Database array. Spreading is only allowed if there is a 
- sufficient number of hosts in the array (number of hosts is greater 
- than the number of segment instances).
-
-
 -v (show utility version)
 
  Displays the version of this utility.
@@ -343,58 +331,14 @@ DATABASE_NAME
  using the CREATE DATABASE command or the createdb utility.
 
 
-MIRROR_PORT_BASE
-
- Optional. This specifies the base number by which mirror segment 
- port numbers are calculated. The first mirror segment port on a 
- host is set as MIRROR_PORT_BASE, and then incremented by one 
- for each additional mirror segment on that host. Valid values 
- range from 1 through 65535 and cannot conflict with the ports 
- calculated by PORT_BASE.
-
-
-REPLICATION_PORT_BASE
-
- Optional. This specifies the base number by which the port numbers 
- for the primary file replication process are calculated. The 
- first replication port on a host is set as REPLICATION_PORT_BASE, 
- and then incremented by one for each additional primary segment 
- on that host. Valid values range from 1 through 65535 and cannot 
- conflict with the ports calculated by PORT_BASE or MIRROR_PORT_BASE.
-
-
-MIRROR_REPLICATION_PORT_BASE
-
- Optional. This specifies the base number by which the port numbers 
- for the mirror file replication process are calculated. The first 
- mirror replication port on a host is set as MIRROR_REPLICATION_PORT_BASE, 
- and then incremented by one for each additional mirror segment on 
- that host. Valid values range from 1 through 65535 and cannot conflict 
- with the ports calculated by PORT_BASE, MIRROR_PORT_BASE, 
- or REPLICATION_PORT_BASE.
-
-
-MIRROR_DATA_DIRECTORY
-
- Optional. This specifies the data storage location(s) where the utility 
- will create the mirror segment data directories. There must be the same 
- number of data directories declared for mirror segment instances as for 
- primary segment instances (see the DATA_DIRECTORY parameter). The user 
- who runs gpinitsystem (for example, the gpadmin user) must have permission 
- to write to these directories. For example:
-
-  declare -a MIRROR_DATA_DIRECTORY=(/data1/mirror /data1/mirror /data1/mirror /data2/mirror /data2/mirror /data2/mirror)
-
-
 *****************************************************
 EXAMPLES
 *****************************************************
 
 Initialize a Greenplum Database array by supplying a configuration file 
-and a segment host address file, and set up a spread mirroring (-S) 
-configuration:
+and a segment host address file:
 
- $ gpinitsystem -c gpinitsystem_config -h hostfile_gpinitsystem -S
+ $ gpinitsystem -c gpinitsystem_config -h hostfile_gpinitsystem
 
 
 Initialize a Greenplum Database array and set the superuser remote password:

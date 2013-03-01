@@ -1843,9 +1843,15 @@ READ_INPUT_CONFIG () {
     done
 
     DATA_DIRECTORY=(`$ECHO ${DATA_DIRECTORY[@]} | $TR ' ' '\n' | $SORT | $TR '\n' ' '`)
-    
+
+    # GPSQL does not support mirroring.
     if [ x"" != x"${MIRROR_ARRAY}" ] ; then
-        MIRRORING=1
+        LOG_MSG "[WARN]:-GPSQL finds MIRROR_ARRAY variable in config file: $INPUT_CONFIG, mirroring config will be omitted"
+    fi
+    MIRROR_ARRAY=
+
+    if [ x"" != x"${MIRROR_ARRAY}" ] ; then
+        MIRRORING=0
         MIRROR_DATA_DIRECTORY=()
         for QE in ${MIRROR_ARRAY[@]}
         do
