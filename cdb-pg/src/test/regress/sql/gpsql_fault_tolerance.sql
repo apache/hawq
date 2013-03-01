@@ -7,7 +7,7 @@
  * id < 400: the data inserts after recovery
  */
 DROP TABLE IF EXISTS x;
-CREATE TABLE x(c INT, d TEXT) DISTRIBUTED RANDOMLY; --  DISTRIBUTED BY (c);
+CREATE TABLE x(c INT, d TEXT) DISTRIBUTED BY (c);
 INSERT INTO x VALUES(1, 'insert before test');
 INSERT INTO x VALUES(2, 'insert before test');
 INSERT INTO x VALUES(3, 'insert before test');
