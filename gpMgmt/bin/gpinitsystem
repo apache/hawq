@@ -108,7 +108,7 @@ USAGE () {
 		$ECHO
 		$ECHO "      `basename $0` -c gp_config_file [OPTIONS]"
 		$ECHO
-		$ECHO "      Creates a new GPSQL instance on a Master host and a number of"
+		$ECHO "      Creates a new HAWQ instance on a Master host and a number of"
 		$ECHO "      segment instance hosts."
 		$ECHO
 		$ECHO "      General options:"
@@ -233,7 +233,7 @@ CHK_PARAMS () {
 		    fi
 
 		    if [ $MIRROR_PORT_BASE ]; then
-			    LOG_MSG "[WARNING]:-Should not specify MIRRORING configuration for GPSQL."
+			    LOG_MSG "[WARNING]:-Should not specify MIRRORING configuration for HAWQ."
 		    fi
 
 		else
@@ -707,7 +707,7 @@ CHK_OPEN_FILES () {
 	LOG_MSG "[INFO]:-End Function $FUNCNAME"
 }
 
-# GPSQL needs DFS_NAME set.
+# HAWQ needs DFS_NAME set.
 CHK_DFS_NAME () { 
     LOG_MSG "[INFO]:-Start Function $FUNCNAME"
     if [ x"" == x"$DFS_NAME" ]; then 
@@ -721,7 +721,7 @@ CHK_DFS_NAME () {
     LOG_MSG "[INFO]:-End Function $FUNCNAME"    
 }
 
-# GPSQL needs dfs url.
+# HAWQ needs dfs url.
 CHK_DFS_URL () {
 	LOG_MSG "[INFO]:-Start Function $FUNCNAME"
 	
@@ -738,7 +738,7 @@ CHK_DFS_URL () {
 	PING_HOST "$dfs_host"
 
 	# We must create the filespace in a relative path
-	DFS_URL="$DFS_URL"/gpsql_data
+	DFS_URL="$DFS_URL"/hawq_data
 	export DFS_URL
 
 	LOG_MSG "[INFO]:-End Function $FUNCNAME"	
@@ -1084,7 +1084,7 @@ DISPLAY_CONFIG () {
 		export QD_DIR=$GP_DIR
 	if [ x"" != x"$INTERACTIVE" ];then
 		SET_VAR $QD_PRIMARY_ARRAY
-		LOG_MSG "[INFO]:-GPSQL Creation Parameters" 1
+		LOG_MSG "[INFO]:-HAWQ Creation Parameters" 1
 		LOG_MSG "[INFO]:---------------------------------------" 1
 		LOG_MSG "[INFO]:-Master Configuration" 1
 		LOG_MSG "[INFO]:---------------------------------------" 1
@@ -1844,9 +1844,9 @@ READ_INPUT_CONFIG () {
 
     DATA_DIRECTORY=(`$ECHO ${DATA_DIRECTORY[@]} | $TR ' ' '\n' | $SORT | $TR '\n' ' '`)
 
-    # GPSQL does not support mirroring.
+    # HAWQ does not support mirroring.
     if [ x"" != x"${MIRROR_ARRAY}" ] ; then
-        LOG_MSG "[WARN]:-GPSQL finds MIRROR_ARRAY variable in config file: $INPUT_CONFIG, mirroring config will be omitted"
+        LOG_MSG "[WARN]:-HAWQ finds MIRROR_ARRAY variable in config file: $INPUT_CONFIG, mirroring config is not needed and is omitted"
     fi
     MIRROR_ARRAY=
 
@@ -2240,7 +2240,7 @@ fi
 SET_GP_USER_PW
 
 SCAN_LOG
-LOG_MSG "[INFO]:-GPSQL instance successfully created" 1
+LOG_MSG "[INFO]:-HAWQ instance successfully created" 1
 LOG_MSG "[INFO]:-------------------------------------------------------" 1
 LOG_MSG "[INFO]:-To complete the environment configuration, please " 1
 LOG_MSG "[INFO]:-update $USER_NAME .bashrc file with the following" 1
