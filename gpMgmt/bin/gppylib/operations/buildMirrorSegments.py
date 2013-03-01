@@ -844,6 +844,8 @@ class GpMirrorListToBuild:
             failureReason = failure.getReason()
             logger.warn("Failed to start segment.  The fault prober will shortly mark it as down. Segment: %s: REASON: %s" % (failedSeg, failureReason))
         pass
+        if len(segmentStartResult.getFailedSegmentObjs()) > 0:
+            raise Exception("One or more segments cannot be recovered. Please try to recovery the data directory with -F or move to a spare host with -p.");
 
     def __convertAllPrimaries(self, gpEnv, gpArray, segments, convertUsingFullResync):
         segmentStartResult = self.__createStartSegmentsOp(gpEnv).transitionSegments(gpArray, segments, convertUsingFullResync, startSegments.MIRROR_MODE_PRIMARY)
