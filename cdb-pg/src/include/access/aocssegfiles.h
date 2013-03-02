@@ -24,7 +24,8 @@
 { -1, {"segno"}, 				23, -1, 4, 1, 0, -1, -1, true, 'p', 'i', false, false, false, true, 0 }, \
 { -1, {"tupcount"},				20, -1, 8, 2, 0, -1, -1, true, 'p', 'd', false, false, false, true, 0 }, \
 { -1, {"varblockcount"},		20, -1, 8, 3, 0, -1, -1, true, 'p', 'd', false, false, false, true, 0 }, \
-{ -1, {"vpinfo"},				17, -1, -1, 4, 0, -1, -1, false, 'x', 'i', false, false, false, true, 0 }
+{ -1, {"vpinfo"},				17, -1, -1, 4, 0, -1, -1, false, 'x', 'i', false, false, false, true, 0 }, \
+{ -1, {"contentid"},			23, -1, 4, 21, 0, -1, -1, true, 'p', 'i', true, false, false, true, 0 }
 
 /*
  * pg_aoseg_nnnnnn table values for FormData_pg_class.

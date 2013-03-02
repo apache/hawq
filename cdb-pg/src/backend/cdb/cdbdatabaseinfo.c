@@ -1121,7 +1121,7 @@ DatabaseInfo_HandleAppendOnly(
 
 						DatabaseInfo_AddAppendOnlyCatalogSegmentInfo(
 																dbInfoRel,
-																/* This is not supported. */ -1,
+																aocsSegfileArray[i]->content,
 																columnNum * AOTupleId_MultiplierSegmentFileNum + segmentFileNum,
 																entry->eof);
 					}
