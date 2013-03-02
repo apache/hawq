@@ -218,8 +218,14 @@ pg_database_size_oid(PG_FUNCTION_ARGS)
 {
 	int64		size = 0;
 	Oid			dbOid = PG_GETARG_OID(0);
+
+	ereport(ERROR,
+			(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+		errmsg("pg_database_size function not supported"),
+				   errOmitLocation(true)));
+
 	size = calculate_database_size(dbOid);
-	
+
 	if (Gp_role == GP_ROLE_DISPATCH)
 	{
 		StringInfoData buffer;
@@ -241,6 +247,11 @@ pg_database_size_name(PG_FUNCTION_ARGS)
 	Name		dbName = PG_GETARG_NAME(0);
 	Oid			dbOid = get_database_oid(NameStr(*dbName));
 
+	ereport(ERROR,
+			(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+		errmsg("pg_database_size function not supported"),
+				   errOmitLocation(true)));
+
 	if (!OidIsValid(dbOid))
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_DATABASE),
@@ -248,7 +259,7 @@ pg_database_size_name(PG_FUNCTION_ARGS)
 						NameStr(*dbName))));
 						
 	size = calculate_database_size(dbOid);
-	
+
 	if (Gp_role == GP_ROLE_DISPATCH)
 	{
 		StringInfoData buffer;

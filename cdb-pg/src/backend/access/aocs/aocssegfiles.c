@@ -1284,7 +1284,7 @@ aocol_compression_ratio_internal(Relation parentrel)
 	initStringInfo(&sqlstmt);
 	if (Gp_role == GP_ROLE_DISPATCH)
 		appendStringInfo(&sqlstmt, "select vpinfo "
-								"from gp_dist_random('pg_aoseg.%s')",
+								"from pg_aoseg.%s",
 									aocsseg_relname);
 	else
 		appendStringInfo(&sqlstmt, "select vpinfo "

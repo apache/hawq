@@ -1111,6 +1111,15 @@ gp_update_ao_master_stats_name(PG_FUNCTION_ARGS)
 	text	   		*relname = PG_GETARG_TEXT_P(0);
 	Oid				relid;
 
+	/*
+	 * gp_update_ao_master_stats is used only in gp_restore which is not supported yet.
+	 */
+
+	ereport(ERROR,
+			(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+		errmsg("function gp_update_ao_master_stats not supported"),
+				   errOmitLocation(true)));
+
 	Assert(Gp_role != GP_ROLE_EXECUTE);
 
 	parentrv = makeRangeVarFromNameList(textToQualifiedNameList(relname));
@@ -1129,6 +1138,15 @@ Datum
 gp_update_ao_master_stats_oid(PG_FUNCTION_ARGS)
 {
 	Oid			relid = PG_GETARG_OID(0);
+
+	/*
+	 * gp_update_ao_master_stats is used only in gp_restore which is not supported yet.
+	 */
+
+	ereport(ERROR,
+			(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+		errmsg("function gp_update_ao_master_stats not supported"),
+				   errOmitLocation(true)));
 
 	Assert(Gp_role != GP_ROLE_EXECUTE);
 
@@ -1591,7 +1609,7 @@ aorow_compression_ratio_internal(Relation parentrel)
 	initStringInfo(&sqlstmt);
 	if (Gp_role != GP_ROLE_EXECUTE)
 		appendStringInfo(&sqlstmt, "select sum(eof), sum(eofuncompressed) "
-								"from gp_dist_random('pg_aoseg.%s')",
+								"from pg_aoseg.%s",
 									aoseg_relname);
 	else
 		appendStringInfo(&sqlstmt, "select eof, eofuncompressed "
