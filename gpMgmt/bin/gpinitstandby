@@ -450,16 +450,19 @@ def create_standby(options):
         # display summary
         print_summary(options, array, standby_filespace_map)
         
+        # GPSQL does not support gppkg and package, and there is known issue for GPSQL rpm build:
+        # MPP-15568 and GPSQL-99.
+        #
         # sync packages
         # The design decision here is to squash any exceptions resulting from the 
         # synchronization of packages. We should *not* disturb the user's attempts 
         # initialize a standby.
-        try:
-            logger.info('Syncing Greenplum Database extensions to standby')
-            SyncPackages(options.standby_host).run()
-        except Exception, e:
-            logger.exception('Syncing of Greenplum Database extensions has failed.')
-            logger.warning('Please run gppkg --clean after successful standby initialization.')
+        # try:
+        #    logger.info('Syncing Greenplum Database extensions to standby')
+        #    SyncPackages(options.standby_host).run()
+        # except Exception, e:
+        #    logger.exception('Syncing of Greenplum Database extensions has failed.')
+        #    logger.warning('Please run gppkg --clean after successful standby initialization.')
 
         # Disable Ctrl-C
         signal.signal(signal.SIGINT,signal.SIG_IGN)
