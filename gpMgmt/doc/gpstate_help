@@ -8,7 +8,7 @@ SYNOPSIS
 *****************************************************
 
 gpstate [-d <master_data_directory>] [-B <parallel_processes>] 
-        [-s | -b | -Q | -e] [-m | -c] [-p] [-i] [-f] 
+        [-s | -b | -Q] [-p] [-i] [-f] 
         [-v | -q] [-l <log_directory>]
 
 
