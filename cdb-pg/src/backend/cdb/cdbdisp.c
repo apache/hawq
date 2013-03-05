@@ -4005,22 +4005,20 @@ cdbdisp_dispatchPlan(struct QueryDesc *queryDesc,
 
 	/* compute the total uncompressed size of the query plan for all slices */
 	int num_slices = queryDesc->plannedstmt->planTree->nMotionNodes + 1;
-	int plan_size_in_kb = (splan_len_uncompressed * num_slices) / 1024;
+	uint64 plan_size_in_kb = ((uint64)splan_len_uncompressed * (uint64)num_slices) / (uint64)1024;
 	
-	elog(LOG, "Query plan size to dispatch: %dKB", plan_size_in_kb);
-	
+	elog(LOG, "Query plan size to dispatch: " UINT64_FORMAT "KB", plan_size_in_kb);
+
 	if (0 < gp_max_plan_size && plan_size_in_kb > gp_max_plan_size)
 	{
 		ereport(ERROR,
-		        (errcode(ERRCODE_STATEMENT_TOO_COMPLEX),
-		                (errmsg("Query plan size limit exceeded, current size: %dKB, max allowed size: %dKB", plan_size_in_kb, gp_max_plan_size),
-		                 errhint("Size controlled by gp_max_plan_size"))));
+			(errcode(ERRCODE_STATEMENT_TOO_COMPLEX),
+				(errmsg("Query plan size limit exceeded, current size: " UINT64_FORMAT "KB, max allowed size: %dKB", plan_size_in_kb, gp_max_plan_size),
+				 errhint("Size controlled by gp_max_plan_size"))));
 	}
 
-	Assert(splan != NULL && splan_len > 0);
-
-	/*
-	*/
+	Assert(splan != NULL && splan_len > 0 && splan_len_uncompressed > 0);
+	
 	if (queryDesc->params != NULL && queryDesc->params->numParams > 0)
 	{		
         ParamListInfoData  *pli;
