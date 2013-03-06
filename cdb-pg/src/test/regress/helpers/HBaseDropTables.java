@@ -22,7 +22,7 @@ class HBaseDropTable
 	HBaseAdmin admin;
 	String tableName;
 	
-	final String lookupTableName = "gpfusionlookup";
+	final String lookupTableName = "gpxflookup";
 
 	void go() throws Exception
 	{

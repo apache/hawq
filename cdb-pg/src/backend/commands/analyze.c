@@ -26,6 +26,7 @@
 #include <math.h>
 
 #include "access/heapam.h"
+#include "access/hd_work_mgr.h"
 #include "access/catquery.h"
 #include "catalog/heap.h"
 #include "access/transam.h"
@@ -36,6 +37,7 @@
 #include "catalog/indexing.h"
 #include "catalog/namespace.h"
 #include "catalog/catalog.h"
+#include "catalog/pg_exttable.h"
 #include "cdb/cdbappendonlyam.h"
 #include "cdb/cdbaocsam.h"
 #include "cdb/cdbpartition.h"
@@ -81,6 +83,8 @@ bool			gp_statistics_use_fkeys = FALSE;
 int				gp_statistics_blocks_target = 25;
 double			gp_statistics_ndistinct_scaling_ratio_threshold = 0.10;
 double			gp_statistics_sampling_threshold = 10000;
+const int gp_external_table_default_number_of_pages = 1000;
+const int gp_external_table_default_number_of_tuples = 1000000;
 
 /**
  * This struct contains statistics produced during ANALYZE
@@ -744,6 +748,7 @@ static void analyzeRelation(Relation relation, List *lAttributeNames)
 	Oid			sampleTableOid = InvalidOid;
 	float4		minSampleTableSize = 0;
 	bool		sampleTableRequired = true;
+	bool        isExternalGpxf = false;
 	ListCell	*le = NULL;
 	Oid			relationOid = InvalidOid;
 	float4 estimatedRelTuples = 0.0;
@@ -751,19 +756,25 @@ static void analyzeRelation(Relation relation, List *lAttributeNames)
 	float4 sampleTableRelTuples = 0.0;
 	List	*indexOidList = NIL;
 	ListCell	*lc = NULL;
+	StringInfoData location;
 	
+	initStringInfo(&location);
 	relationOid = RelationGetRelid(relation);
+	/* test that table is external before testing that is external GPXF (which ia a more expensive test) */
+	isExternalGpxf =  relstorage_is_external(relation->rd_rel->relstorage) && RelationIsExternalGpxf(relationOid, &location);	
 	
-	/**
-	 * Step 1: estimate reltuples, relpages for the relation. 
-	 */
-	analyzeEstimateReltuplesRelpages(relationOid, &estimatedRelTuples, &estimatedRelPages);
+	/* Step 1: estimate reltuples, relpages for the relation */
+	if (!isExternalGpxf)
+		analyzeEstimateReltuplesRelpages(relationOid, &estimatedRelTuples, &estimatedRelPages);
+	else
+	{
+		gp_statistics_estimate_reltuples_relpages_external_gpxf(relation, &location, &estimatedRelTuples, &estimatedRelPages);
+		pfree(location.data);
+	}
 	
 	elog(elevel, "ANALYZE estimated reltuples=%f, relpages=%f for table %s", estimatedRelTuples, estimatedRelPages, RelationGetRelationName(relation));
 	
-	/**
-	 * Step 2: update the pg_class entry.
-	 */
+	/* Step 2: update the pg_class entry. */
 	updateReltuplesRelpagesInCatalog(relationOid, estimatedRelTuples, estimatedRelPages);
 	
 	/* Find relpages of each index and update these as well */
@@ -802,6 +813,14 @@ static void analyzeRelation(Relation relation, List *lAttributeNames)
 	/* report results to the stats collector, too */
 	pgstat_report_analyze(relation, estimatedRelTuples, 0 /*totaldeadrows*/);
 	
+	/**
+	 * For an external GPXF table, the next steps are irrelevant - it's time to leave
+	 */
+	if (isExternalGpxf)
+	{
+		elog(elevel, "ANALYZE on GPXF table %s computes only reltuples and relpages.", RelationGetRelationName(relation));
+		return;
+	}	
 	/**
 	 * Does the relation have any rows. If not, no point analyzing columns.
 	 */
@@ -2591,4 +2610,76 @@ static void gp_statistics_estimate_reltuples_relpages_ao_rows(Relation rel, floa
 	}
 	
 	return;
+}
+/* --------------------------------
+ *		RelationIsExternalGpxf -
+ *
+ *		Check if the external table is GPPXF
+ * --------------------------------
+ */
+bool RelationIsExternalGpxf(Oid	rel_oid, StringInfo location)
+{
+	ExtTableEntry* tbl = GetExtTableEntry(rel_oid);
+	if (tbl == NULL)
+		return false;
+	
+	List* locsList = tbl->locations;
+	struct ListCell* cell;
+	
+	foreach(cell, locsList)
+	{
+		char* locsItem = strVal(lfirst(cell));
+		if (locsItem == NULL)
+			continue;
+		if (strstr(locsItem, gpxf_protocol_name) != NULL)
+		{
+			appendStringInfoString(location, locsItem);
+			pfree(tbl);
+			return true;
+		}
+	}
+	pfree(tbl);
+	
+	return false;
+}
+
+/* --------------------------------
+ *		gp_statistics_estimate_reltuples_relpages_external_gpxf -
+ *
+ *		Fetch reltuples and relpages for an external table which is GPXF
+ * --------------------------------
+ */
+void gp_statistics_estimate_reltuples_relpages_external_gpxf(Relation rel, StringInfo location, float4 *reltuples, float4 *relpages)
+{
+	ListCell *cell = NULL;
+	List *stats_list = get_gpxf_statistics(location->data);
+	/*
+	 * if get_gpxf_statistics returned NIL - probably a communication error, we fallback to default values
+	 * we don't want to stop the analyze, since this can be part of a long procedure performed on many tables
+	 * not just this one
+	 */
+	if (!stats_list)
+	{
+		*relpages =  gp_external_table_default_number_of_pages;
+		*reltuples =  gp_external_table_default_number_of_tuples;
+		return;
+	}
+	
+	foreach(cell, stats_list)
+	{
+		GpxfStatsElem *elem = (GpxfStatsElem*)lfirst(cell);
+		*relpages += floor(( ((float4)elem->blockSize) * elem->numBlocks) / BLCKSZ);
+		*reltuples += elem->numTuples;
+		
+		pfree(elem);
+	}
+	
+	/* in case there were problems with the GPXF service, keep the defaults */
+	if (*relpages < 0)
+		*relpages =  gp_external_table_default_number_of_pages;
+	if (*reltuples < 0)
+		*reltuples =  gp_external_table_default_number_of_tuples;
+	
+	/* free list*/
+	list_free(stats_list);
 }

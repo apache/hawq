@@ -61,6 +61,7 @@
 #include "catalog/pg_type.h"
 #include "catalog/gp_fastsequence.h"
 #include "cdb/cdbpartition.h"
+#include "cdb/cdbanalyze.h"
 #include "commands/dbcommands.h"
 #include "commands/tablecmds.h"
 #include "commands/tablespace.h"
@@ -1100,8 +1101,8 @@ AddNewRelationTuple(Relation pg_class_desc,
 			/* NOTE: look at cdb_estimate_rel_size() if changing these values */
 			if(relstorage_is_external(relstorage))
 			{
-				new_rel_reltup->relpages = 1000;
-				new_rel_reltup->reltuples = 1000000;
+				new_rel_reltup->relpages = gp_external_table_default_number_of_pages; 
+				new_rel_reltup->reltuples = gp_external_table_default_number_of_tuples;
 			}
 			break;
 		case RELKIND_SEQUENCE:

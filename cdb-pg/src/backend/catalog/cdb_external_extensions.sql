@@ -37,33 +37,33 @@ CREATE TRUSTED PROTOCOL gphdfs (
   validatorfunc = gphdfs_validate);
   
 ------------------------------------------------------------------
--- gpfusion
+-- gpxf
 ------------------------------------------------------------------
 
-CREATE OR REPLACE FUNCTION pg_catalog.gpfusion_write() RETURNS integer
-AS '$libdir/gpfusion.so', 'gpfusionprotocol_export'
+CREATE OR REPLACE FUNCTION pg_catalog.gpxf_write() RETURNS integer
+AS '$libdir/gpxf.so', 'gpxfprotocol_export'
 LANGUAGE C STABLE;
 
-CREATE OR REPLACE FUNCTION pg_catalog.gpfusion_read() RETURNS integer
-AS '$libdir/gpfusion.so', 'gpfusionprotocol_import'
+CREATE OR REPLACE FUNCTION pg_catalog.gpxf_read() RETURNS integer
+AS '$libdir/gpxf.so', 'gpxfprotocol_import'
 LANGUAGE C STABLE;
 
-CREATE OR REPLACE FUNCTION pg_catalog.gpfusion_validate() RETURNS void
-AS '$libdir/gpfusion.so', 'gpfusionprotocol_validate_urls'
+CREATE OR REPLACE FUNCTION pg_catalog.gpxf_validate() RETURNS void
+AS '$libdir/gpxf.so', 'gpxfprotocol_validate_urls'
 LANGUAGE C STABLE;
 
-CREATE OR REPLACE FUNCTION pg_catalog.gpfusionwritable_export(record) RETURNS bytea
-AS '$libdir/gpfusion.so', 'gpdbwritableformatter_export'
+CREATE OR REPLACE FUNCTION pg_catalog.gpxfwritable_export(record) RETURNS bytea
+AS '$libdir/gpxf.so', 'gpdbwritableformatter_export'
 LANGUAGE C STABLE;
 
-CREATE OR REPLACE FUNCTION pg_catalog.gpfusionwritable_import() RETURNS record
-AS '$libdir/gpfusion.so', 'gpdbwritableformatter_import'
+CREATE OR REPLACE FUNCTION pg_catalog.gpxfwritable_import() RETURNS record
+AS '$libdir/gpxf.so', 'gpdbwritableformatter_import'
 LANGUAGE C STABLE;
 
-CREATE TRUSTED PROTOCOL gpfusion (
-  writefunc		= gpfusion_write,
-  readfunc      = gpfusion_read,
-  validatorfunc = gpfusion_validate);  
+CREATE TRUSTED PROTOCOL gpxf (
+  writefunc		= gpxf_write,
+  readfunc      = gpxf_read,
+  validatorfunc = gpxf_validate);  
   
 ------------------------------------------------------------------
 -- fixedwidth Formatters

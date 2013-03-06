@@ -1,40 +1,40 @@
 #include "common.h"
-#include "access/gpfusionuriparser.h"
+#include "access/gpxfuriparser.h"
 
-PG_FUNCTION_INFO_V1(gpfusionprotocol_export);
-PG_FUNCTION_INFO_V1(gpfusionprotocol_import);
-PG_FUNCTION_INFO_V1(gpfusionprotocol_validate_urls);
+PG_FUNCTION_INFO_V1(gpxfprotocol_export);
+PG_FUNCTION_INFO_V1(gpxfprotocol_import);
+PG_FUNCTION_INFO_V1(gpxfprotocol_validate_urls);
 
-Datum gpfusionprotocol_export(PG_FUNCTION_ARGS);
-Datum gpfusionprotocol_import(PG_FUNCTION_ARGS);
-Datum gpfusionprotocol_validate_urls(PG_FUNCTION_ARGS);
+Datum gpxfprotocol_export(PG_FUNCTION_ARGS);
+Datum gpxfprotocol_import(PG_FUNCTION_ARGS);
+Datum gpxfprotocol_validate_urls(PG_FUNCTION_ARGS);
 
 Datum
-gpfusionprotocol_export(PG_FUNCTION_ARGS)
+gpxfprotocol_export(PG_FUNCTION_ARGS)
 {
 	ereport(ERROR,
 			(errcode(ERRCODE_GP_FEATURE_NOT_YET),
-			 errmsg("gpfusion does not yet support writable external tables")));
+			 errmsg("gpxf does not yet support writable external tables")));
 	PG_RETURN_VOID();
 }
 
 Datum
-gpfusionprotocol_import(PG_FUNCTION_ARGS)
+gpxfprotocol_import(PG_FUNCTION_ARGS)
 {
 	return gpbridge_import(fcinfo);
 }
 
 /*
- * Validate the user-specified gpfusion URI supported functionality
+ * Validate the user-specified gpxf URI supported functionality
  */
 Datum
-gpfusionprotocol_validate_urls(PG_FUNCTION_ARGS)
+gpxfprotocol_validate_urls(PG_FUNCTION_ARGS)
 {
 	GPHDUri	*uri;
 
 	/* Must be called via the external table format manager */
 	if (!CALLED_AS_EXTPROTOCOL_VALIDATOR(fcinfo))
-		elog(ERROR, "cannot execute gpfusionprotocol_validate_urls outside protocol manager");
+		elog(ERROR, "cannot execute gpxfprotocol_validate_urls outside protocol manager");
 
 	/*
 	 * Condition 1: there must be only ONE url.
@@ -50,7 +50,7 @@ gpfusionprotocol_validate_urls(PG_FUNCTION_ARGS)
 	if (EXTPROTOCOL_VALIDATOR_GET_DIRECTION(fcinfo) == EXT_VALIDATE_WRITE)
             ereport(ERROR,
                     (errcode(ERRCODE_GP_FEATURE_NOT_YET),
-                     errmsg("gpfusion does not yet support writable external tables")));
+                     errmsg("gpxf does not yet support writable external tables")));
 
 	/*
 	 * Condition 3: url formatting of extra options.

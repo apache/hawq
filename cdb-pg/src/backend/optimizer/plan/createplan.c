@@ -172,7 +172,7 @@ static Sort *make_sort(PlannerInfo *root, Plan *lefttree, int numCols,
 		  AttrNumber *sortColIdx, Oid *sortOperators);
 
 static List *flatten_grouping_list(List *groupcls);
-static bool is_gpfusion_protocol(Uri *uri);
+static bool is_gpxf_protocol(Uri *uri);
 
 
 /*
@@ -1109,15 +1109,15 @@ create_aocsscan_plan(CreatePlanContext *ctx, Path *best_path,
 }
 
 /*
- * is_gpfusion_protocol
- * tests if the external table custom protocol is an HADOOP protocol - gpfusion
+ * is_gpxf_protocol
+ * tests if the external table custom protocol is an HADOOP protocol - gpxf
  */
-static bool is_gpfusion_protocol(Uri *uri)
+static bool is_gpxf_protocol(Uri *uri)
 {	
 	if (uri->protocol != URI_CUSTOM || uri->customprotocol == NULL)
 		return false;
 	
-	if (strcmp(uri->customprotocol, "gpfusion") == 0)
+	if (strcmp(uri->customprotocol, "gpxf") == 0)
 		return true;
 
 	return false;
@@ -1515,7 +1515,7 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 		if(should_skip_randomly)
 			skip_map = makeRandomSegMap(total_primaries, total_to_skip);
 
-		is_custom_hd = is_gpfusion_protocol(uri);
+		is_custom_hd = is_gpxf_protocol(uri);
 		if (is_custom_hd)
 		{
 			segdb_work_map = map_hddata_2gp_segments((char *) strVal(linitial(rel->locationlist)), 

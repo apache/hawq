@@ -27,6 +27,7 @@
 #include "catalog/pg_exttable.h"
 #include "catalog/indexing.h"
 #include "catalog/pg_type.h"
+#include "cdb/cdbanalyze.h"
 #include "commands/tablecmds.h"
 #include "nodes/makefuncs.h"
 #include "optimizer/clauses.h"
@@ -80,6 +81,9 @@ cdb_estimate_rel_size(RelOptInfo   *relOptInfo,
 
 static void
 cdb_default_stats_warning_for_index(Oid reloid, Oid indexoid);
+
+static bool 
+need_to_analyze_gpxf(Relation rel, StringInfo location, BlockNumber relpages,  double reltuples);
 
 extern BlockNumber RelationGuessNumberOfBlocks(double totalbytes);
 
@@ -363,10 +367,13 @@ cdb_estimate_rel_size(RelOptInfo   *relOptInfo,
 	double		reltuples;
 	double		density;
     int32       tuple_width;
+	
     BlockNumber curpages = 0;
 	int64	size = 0;
 
     *default_stats_used = false;
+	StringInfoData location;
+	initStringInfo(&location);
 
     /* Rel not distributed?  RelationGetNumberOfBlocks can get actual #pages. */
     if (!relOptInfo->cdbpolicy ||
@@ -385,8 +392,16 @@ cdb_estimate_rel_size(RelOptInfo   *relOptInfo,
 	 * Asking the QE for the size of the relation is a bit expensive.
 	 * Do we want to do it all the time?  Or only for tables that have never had analyze run?
 	 */
-
-	if (relpages > 0)
+	if (need_to_analyze_gpxf(rel, &location, relpages, reltuples))
+	{
+		float4 tuples, pages;
+		gp_statistics_estimate_reltuples_relpages_external_gpxf(rel, &location, &tuples, &pages);
+		
+		relpages = curpages = pages;
+		reltuples = tuples;
+		pfree(location.data);
+	}	
+	else if (relpages > 0) 
 	{
 
 		/*
@@ -398,7 +413,7 @@ cdb_estimate_rel_size(RelOptInfo   *relOptInfo,
 
 		curpages = relpages;
 	}
-	else
+	else /* relpages is 0 and this is a regular table or an external non-GPXF table */
 	{
 
 		/*
@@ -478,6 +493,19 @@ cdb_estimate_rel_size(RelOptInfo   *relOptInfo,
 
 }                               /* cdb_estimate_rel_size */
 
+/* 
+ * table is GPXF external table and analyze was not run on the table
+ */
+static bool need_to_analyze_gpxf(Relation rel, 
+								 StringInfo loc, 	
+								 BlockNumber relpages,
+								 double		reltuples)
+{
+	return RelationIsExternal(rel) && 
+	       RelationIsExternalGpxf(rel->rd_id, loc) &&
+		   relpages == gp_external_table_default_number_of_pages &&
+		   reltuples == gp_external_table_default_number_of_tuples;
+}
 
 /*
  * estimate_rel_size - estimate # pages and # tuples in a table or index

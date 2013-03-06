@@ -36,7 +36,7 @@ class HBaseCreateTable
 	boolean upperCaseLookup;
 	final String rowKeyPrefix = "row";
 	final String valuePrefix = "value";
-	final String lookupTableName = "gpfusionlookup";
+	final String lookupTableName = "gpxflookup";
 	final String lookupTableMappingColumnFamilyName = "mapping";
 
 	void go() throws Exception
@@ -116,7 +116,7 @@ class HBaseCreateTable
 
 				//Qualifier 3. integer value.
                 if ((!useNull) || (i%3==0))
-                	addValue(newRow, columnFamily, "q3", String.format("%08d", i * 10000));
+                	addValue(newRow, columnFamily, "q3", String.format("%08d", 1 + i + splitIndex * rowsPerSplit));
 
 				//Qualifier 4. regular ascii (for a lookup table redirection)
                 addValue(newRow, columnFamily, "q4", String.format("lookup%08d", i * 2));

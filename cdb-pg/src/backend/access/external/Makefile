@@ -9,7 +9,7 @@ subdir = src/backend/access/external
 top_builddir = ../../../..
 include $(top_builddir)/src/Makefile.global
 
-OBJS = fileam.o url.o libchurl.o hd_work_mgr.o gpfusionuriparser.o
+OBJS = fileam.o url.o libchurl.o hd_work_mgr.o gpxfuriparser.o
 
 include $(top_srcdir)/src/backend/common.mk
 

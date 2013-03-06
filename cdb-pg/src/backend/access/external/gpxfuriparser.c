@@ -1,4 +1,4 @@
-#include "access/gpfusionuriparser.h"
+#include "access/gpxfuriparser.h"
 #include "utils/formatting.h"
 
 static const char* segwork_substring = "segwork=";
@@ -26,7 +26,7 @@ static void  GPHDUri_debug_print_segwork(GPHDUri *uri);
  * 		<protocol name>://<authority>/<data>?<option>&<option>&<...>&segwork=<segwork>
  *
  *
- * protocol name	- must be 'gpfusion'
+ * protocol name	- must be 'gpxf'
  * authority		- host:port
  * data				- data path (directory name/table name/etc., depending on target)
  * options			- valid options are dependent on the protocol. Each
@@ -129,7 +129,7 @@ GPHDUri_parse_protocol(GPHDUri *uri, char **cursor)
 	ptc_len = post_ptc - start;
 	uri->protocol = pnstrdup(start, ptc_len);
 
-	if (pg_strcasecmp(uri->protocol, "gpfusion") != 0)
+	if (pg_strcasecmp(uri->protocol, "gpxf") != 0)
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
 				 errmsg("invalid URI %s : unsupported protocol '%s'",

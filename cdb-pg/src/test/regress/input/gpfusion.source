@@ -1,5 +1,5 @@
 --
--- GPFusion regression suite 
+-- GPXF regression suite 
 --
 -- Section 1: Test HDFS type syntax and data read.
 -- Section 2: Test HBASE type syntax and data read.
@@ -7,12 +7,13 @@
 -- Prerequisites:
 --
 --   Must have a running hdfs with REST service on port 50070
---   Must have a running hbase with REST service on port 60009
---   Must have HADOOP_ROOT, HBASE_ROOT and ZOOKEEPER_ROOT set.
+--   Must have a running YARN services (to load data into Hive).
+--   Must have HADOOP_ROOT, HBASE_ROOT, HIVE_ROOT and ZOOKEEPER_ROOT set.
+--   Must have Hive Thrift server running locally on port 10000
 --
 -- TODO: test gpdbwritable write/read when it is enabled.
 -- TODO: test PB, AVRO, THRIFT when it is enabled (read only, with pre formatted files).
--- TODO: test protocol validator for gpfusion once written.
+-- TODO: test protocol validator for gpxf once written.
 -- TODO: test parameter passing, filter passing
 -- TODO: test file masks (/yyy/*) paths when it is available.
 
@@ -23,16 +24,16 @@
 -- syntax validations
 --
 CREATE READABLE EXTERNAL TABLE gphdfs_in(a int, b text, c bytea)
-LOCATION ('gpfusion://@hostname@:50070/somepath/gpdb_regression_data?someuseropt=someuserval')
-FORMAT 'CUSTOM' (formatter='gpfusionwritable_import'); -- positive
+LOCATION ('gpxf://@hostname@:50070/somepath/gpdb_regression_data?someuseropt=someuserval')
+FORMAT 'CUSTOM' (formatter='gpxfwritable_import'); -- positive
 
 CREATE READABLE EXTERNAL TABLE gphdfs_in1(a int, b text, c bytea)
-LOCATION ('gpfusion://@hostname@:50070/gpdb_regression_data?ACCESSOR=SequenceFileAccessor&RESOLVER=AvroResolver&DATA-SCHEMA=MySchema')
-FORMAT 'CUSTOM' (formatter='gpfusionwritable_import'); -- positive
+LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data?ACCESSOR=SequenceFileAccessor&RESOLVER=AvroResolver&DATA-SCHEMA=MySchema')
+FORMAT 'CUSTOM' (formatter='gpxfwritable_import'); -- positive
 
 CREATE READABLE EXTERNAL TABLE gphdfs_in2(a int, b text, c bytea)
-LOCATION ('gpfusion://@hostname@:50070/gpdb_regression_data/*')
-FORMAT 'CUSTOM' (formatter='gpfusionwritable_import'); -- negative
+LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/*')
+FORMAT 'CUSTOM' (formatter='gpxfwritable_import'); -- negative
 
 DROP EXTERNAL TABLE gphdfs_in;
 DROP EXTERNAL TABLE gphdfs_in1;
@@ -76,7 +77,7 @@ CREATE EXTERNAL TABLE bigtext (s1 text,
 							   n15 int, 
 							   n16 int, 
 							   n17 int)
-LOCATION ('gpfusion://@hostname@:50070/gpdb_regression_data/text_data.csv?FRAGMENTER=HdfsDataFragmenter')
+LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/text_data.csv?FRAGMENTER=HdfsDataFragmenter')
 FORMAT 'TEXT' (DELIMITER ',');
 SELECT n1, n2, n3, n4, n5, s1, s2, s3, d1 FROM bigtext ORDER BY n1;
 SELECT n11, n12, n13, n14, n15, s11, s12, s13, d11 FROM bigtext ORDER BY n11;
@@ -107,8 +108,8 @@ CREATE EXTERNAL TABLE seqwr(tmp1  timestamp,
                             ln2   bigint, 
                             ln3   bigint, 
                             bt    bytea)
-LOCATION ('gpfusion://@hostname@:50070/gpdb_regression_data/writable_inside_sequence1.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
-FORMAT 'custom' (formatter='gpfusionwritable_import');
+LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/writable_inside_sequence1.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='gpxfwritable_import');
 SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt FROM seqwr ORDER BY num1;
 SELECT num1, t1, t2, t3 FROM seqwr ORDER BY num1;
 DROP EXTERNAL TABLE seqwr;
@@ -136,8 +137,8 @@ CREATE EXTERNAL TABLE seqav(tmp1 timestamp,
                             ln2   bigint, 
                             ln3   bigint, 
                             bt    bytea)
-LOCATION ('gpfusion://@hostname@:50070/gpdb_regression_data/avro_inside_sequence.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=AvroResolver&DATA-SCHEMA=regressGPFusionCustomAvro.avsc')
-FORMAT 'custom' (formatter='gpfusionwritable_import');
+LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/avro_inside_sequence.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=AvroResolver&DATA-SCHEMA=regressGPFusionCustomAvro.avsc')
+FORMAT 'custom' (formatter='gpxfwritable_import');
 SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt FROM seqav ORDER BY num1;
 SELECT num1, t1, t2, t3 FROM seqav ORDER BY num1;
 DROP EXTERNAL TABLE seqav;
@@ -165,10 +166,38 @@ CREATE EXTERNAL TABLE seqav_space(tmp1 timestamp,
                             ln2   bigint, 
                             ln3   bigint, 
                             bt    bytea)
-LOCATION ('gpfusion://@hostname@:50070/gpdb_regression_data/avro_inside_sequence.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=AvroResolver&DATA-SCHEMA=regress GPFusion Custom Avro1.avsc')
-FORMAT 'custom' (formatter='gpfusionwritable_import');
+LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/avro_inside_sequence.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=AvroResolver&DATA-SCHEMA=regress GPFusion Custom Avro1.avsc')
+FORMAT 'custom' (formatter='gpxfwritable_import');
 SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt FROM seqav_space ORDER BY num1;
 DROP EXTERNAL TABLE seqav_space;
+--
+-- Test options are case insensitive
+--
+CREATE EXTERNAL TABLE seqav_case(tmp1 timestamp, 
+                            num1  integer, 
+                            num2  integer, 
+                            num3  integer, 
+                            num4  integer,
+                            t1    text,
+                            t2    text,
+                            t3    text,
+                            t4    text,
+                            t5    text,
+                            t6    text,
+                            dub1  double precision,
+                            dub2  double precision, 
+                            dub3  double precision, 
+                            ft1   real, 
+                            ft2   real, 
+                            ft3   real, 
+                            ln1   bigint, 
+                            ln2   bigint, 
+                            ln3   bigint, 
+                            bt    bytea)
+LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/avro_inside_sequence.tbl?fragmenter=HdfsDataFragmenter&Accessor=SequenceFileAccessor&ReSoLvEr=AvroResolver&Data-Schema=regressGPFusionCustomAvro.avsc')
+FORMAT 'custom' (formatter='gpxfwritable_import');
+SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt FROM seqav_case ORDER BY num1;
+DROP EXTERNAL TABLE seqav_case;
 --
 -- Test Avro data inside an AvroFile (read only).
 --
@@ -193,8 +222,8 @@ CREATE EXTERNAL TABLE avfav(tmp1 timestamp,
                             ln2   bigint, 
                             ln3   bigint, 
                             bt    bytea)
-LOCATION ('gpfusion://@hostname@:50070/gpdb_regression_data/avroformat_inside_avrofile.avro?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=AvroFileAccessor&RESOLVER=AvroResolver')
-FORMAT 'custom' (formatter='gpfusionwritable_import');
+LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/avroformat_inside_avrofile.avro?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=AvroFileAccessor&RESOLVER=AvroResolver')
+FORMAT 'custom' (formatter='gpxfwritable_import');
 SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt FROM avfav ORDER BY num1;
 SELECT num1, t1, t2, t3 FROM avfav ORDER BY num1;
 DROP EXTERNAL TABLE avfav;
@@ -207,8 +236,8 @@ CREATE EXTERNAL TABLE pb(s1 text,
 						 s2 text, 
 						 s3 text, 
 						 num2 int)
-LOCATION ('gpfusion://@hostname@:50070/gpdb_regression_data/protobuf_data.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=ProtobufFileAccessor&RESOLVER=ProtobufResolver&DATA-SCHEMA=pbgp.desc') 
-FORMAT 'custom' (formatter='gpfusionwritable_import');
+LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/protobuf_data.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=ProtobufFileAccessor&RESOLVER=ProtobufResolver&DATA-SCHEMA=pbgp.desc') 
+FORMAT 'custom' (formatter='gpxfwritable_import');
 SELECT s1, num1, s2, s3, num2 from pb ORDER BY num1;
 DROP EXTERNAL TABLE pb;
 --
@@ -235,8 +264,8 @@ CREATE EXTERNAL TABLE seqwild(tmp1  timestamp,
                               ln2   bigint, 
                               ln3   bigint, 
                               bt    bytea)
-LOCATION ('gpfusion://@hostname@:50070/gpdb_regression_data/wild/*.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
-FORMAT 'custom' (formatter='gpfusionwritable_import');
+LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/wild/*.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='gpxfwritable_import');
 SELECT num1, t1, t2, t3 FROM seqwild ORDER BY num1;
 DROP EXTERNAL TABLE seqwild;
 CREATE EXTERNAL TABLE seqquestion(tmp1  timestamp, 
@@ -260,8 +289,8 @@ CREATE EXTERNAL TABLE seqquestion(tmp1  timestamp,
                               ln2   bigint, 
                               ln3   bigint, 
                               bt    bytea)
-LOCATION ('gpfusion://@hostname@:50070/gpdb_regression_data/wild/writable_inside_sequence?.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
-FORMAT 'custom' (formatter='gpfusionwritable_import');
+LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/wild/writable_inside_sequence?.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='gpxfwritable_import');
 SELECT num1, t1, t2, t3 FROM seqquestion ORDER BY num1;
 DROP EXTERNAL TABLE seqquestion;
 --
@@ -269,9 +298,10 @@ DROP EXTERNAL TABLE seqquestion;
 --
 CREATE EXTERNAL TABLE mbt(t1 text,
                           a1 integer)
-LOCATION ('gpfusion://@hostname@:50070/gpdb_regression_data/multiblock.tbl?FRAGMENTER=HdfsDataFragmenter')
+LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/multiblock.tbl?FRAGMENTER=HdfsDataFragmenter')
 FORMAT 'TEXT' (DELIMITER ',');
 SELECT t1, a1 FROM mbt ORDER BY t1 LIMIT 10;
+SELECT SUM(a1) from mbt;
 SELECT COUNT(*) FROM mbt;
 SELECT cnt < 32768000 AS check FROM (SELECT COUNT(*) AS cnt FROM mbt WHERE gp_segment_id = 0) AS a;
 DROP EXTERNAL TABLE mbt;
@@ -280,7 +310,7 @@ DROP EXTERNAL TABLE mbt;
 --
 CREATE EXTERNAL TABLE host_err(t1 text,
                                a1 integer)
-LOCATION ('gpfusion://badhostname:50070/gpdb_regression_data/multiblock.tbl?FRAGMENTER=HdfsDataFragmenter')
+LOCATION ('gpxf://badhostname:50070/gpdb_regression_data/multiblock.tbl?FRAGMENTER=HdfsDataFragmenter')
 FORMAT 'TEXT' (DELIMITER ',');
 SELECT t1, a1 FROM host_err ORDER BY t1 LIMIT 10; -- negative
 DROP EXTERNAL TABLE host_err;
@@ -289,10 +319,67 @@ DROP EXTERNAL TABLE host_err;
 --
 CREATE EXTERNAL TABLE port_err(t1 text,
                                a1 integer)
-LOCATION ('gpfusion://@hostname@:9000/gpdb_regression_data/multiblock.tbl?FRAGMENTER=HdfsDataFragmenter')
+LOCATION ('gpxf://@hostname@:9000/gpdb_regression_data/multiblock.tbl?FRAGMENTER=HdfsDataFragmenter')
 FORMAT 'TEXT' (DELIMITER ',');
 SELECT t1, a1 FROM port_err ORDER BY t1 LIMIT 10; -- negative
 DROP EXTERNAL TABLE port_err;
+--
+-- Test extensibility
+--
+CREATE EXTERNAL TABLE extens(tmp1  timestamp, 
+                            num1  integer, 
+                            num2  integer, 
+                            num3  integer, 
+                            num4  integer,
+                            t1    text, 
+                            t2    text, 
+                            t3    text, 
+                            t4    text, 
+                            t5    text, 
+                            t6    text, 
+                            dub1  double precision, 
+                            dub2  double precision, 
+                            dub3  double precision, 
+                            ft1   real, 
+                            ft2   real, 
+                            ft3   real, 
+                            ln1   bigint, 
+                            ln2   bigint, 
+                            ln3   bigint, 
+                            bt    bytea)
+LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/writable_inside_sequence1.tbl?FRAGMENTER=TestHdfsFragmenter&ACCESSOR=TestSequenceFileAccessor&RESOLVER=TestWritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='gpxfwritable_import');
+SELECT num1, t1, t2, t3 FROM extens ORDER BY num1;
+DROP EXTERNAL TABLE extens;
+--
+-- Test analyze for HDFS file(read only).
+--
+CREATE EXTERNAL TABLE avfav(tmp1 timestamp, 
+                            num1  integer, 
+                            num2  integer, 
+                            num3  integer, 
+                            num4  integer,
+                            t1    text,
+                            t2    text,
+                            t3    text,
+                            t4    text,
+                            t5    text,
+                            t6    text,
+                            dub1  double precision,
+                            dub2  double precision, 
+                            dub3  double precision, 
+                            ft1   real, 
+                            ft2   real, 
+                            ft3   real, 
+                            ln1   bigint, 
+                            ln2   bigint, 
+                            ln3   bigint, 
+                            bt    bytea)
+LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/avroformat_inside_avrofile.avro?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=AvroFileAccessor&RESOLVER=AvroResolver')
+FORMAT 'custom' (formatter='gpxfwritable_import');
+ANALYZE avfav;
+select relpages, reltuples from pg_class where relname = 'avfav';
+DROP EXTERNAL TABLE avfav;
 --
 -- Cleanup: delete all data that was copied into hdfs
 --
@@ -307,11 +394,11 @@ DROP EXTERNAL TABLE port_err;
 -- syntax validations
 --
 CREATE READABLE EXTERNAL TABLE gphbase_in(a int, b text, c bytea)
-LOCATION ('gpfusion://@hostname@:60009/hbasetable')
-FORMAT 'CUSTOM' (formatter='gpfusionwritable_import'); -- negative
+LOCATION ('gpxf://@hostname@:50070/hbasetable')
+FORMAT 'CUSTOM' (formatter='gpxfwritable_import'); -- negative
 
 CREATE WRITABLE EXTERNAL TABLE gphbase_out(a int, b text, c bytea)
-LOCATION ('gpfusion://@hostname@:60009/hbasetable?FRAGMENTER=HBaseDataFragmenter')
+LOCATION ('gpxf://@hostname@:50070/hbasetable?FRAGMENTER=HBaseDataFragmenter')
 FORMAT 'CUSTOM' (formatter='gpdbwritable_export');
 
 -- Setup
@@ -330,11 +417,15 @@ CREATE EXTERNAL TABLE gphbase_select(recordkey TEXT,
                                      "cf1:q7" CHAR, 
                                      "cf1:q8" SMALLINT, 
                                      "cf1:q9" BIGINT) 
-LOCATION ('gpfusion://@hostname@:60009/gphbase_test?FRAGMENTER=HBaseDataFragmenter')
-FORMAT 'CUSTOM' (formatter='gpfusionwritable_import');
+LOCATION ('gpxf://@hostname@:50070/gphbase_test?FRAGMENTER=HBaseDataFragmenter')
+FORMAT 'CUSTOM' (formatter='gpxfwritable_import');
+
+-- Test analyze for HBase table.
+ANALYZE gphbase_select;
+select relpages, reltuples from pg_class where relname = 'gphbase_select';
 
 SELECT * FROM gphbase_select ORDER BY recordkey ASC;
-SELECT * FROM gphbase_select WHERE gp_segment_id = 0 ORDER BY recordkey ASC;
+SELECT cnt < 300 AS check FROM (SELECT COUNT(*) AS cnt FROM gphbase_select WHERE gp_segment_id = 0) AS a;
 SELECT * FROM gphbase_select WHERE recordkey > 'row00000090' AND recordkey <= 'row00000103' ORDER BY recordkey ASC;
 SELECT * FROM gphbase_select WHERE recordkey = 'row00000100';
 SELECT * FROM gphbase_select WHERE recordkey != 'row00000090' AND recordkey <= 'row00000103' ORDER BY recordkey ASC;
@@ -362,8 +453,8 @@ CREATE EXTERNAL TABLE gphbase_null(recordkey TEXT,
                                      "cf1:q7" CHAR, 
                                      "cf1:q8" SMALLINT, 
                                      "cf1:q9" BIGINT) 
-LOCATION ('gpfusion://@hostname@:60009/gphbase_test_null?FRAGMENTER=HBaseDataFragmenter')
-FORMAT 'CUSTOM' (formatter='gpfusionwritable_import');
+LOCATION ('gpxf://@hostname@:50070/gphbase_test_null?FRAGMENTER=HBaseDataFragmenter')
+FORMAT 'CUSTOM' (formatter='gpxfwritable_import');
 SELECT * FROM gphbase_null WHERE "cf1:q1" is null ORDER BY recordkey ASC;
 SELECT * FROM gphbase_null WHERE "cf1:q3" is null ORDER BY recordkey ASC;
 DROP EXTERNAL TABLE gphbase_null;
@@ -378,14 +469,14 @@ CREATE EXTERNAL TABLE gphbase_upper(recordkey TEXT,
                                      "cf1:q7" CHAR, 
                                      "cf1:q8" SMALLINT, 
                                      "cf1:q9" BIGINT) 
-LOCATION ('gpfusion://@hostname@:60009/gphbase_test_upper?FRAGMENTER=HBaseDataFragmenter')
-FORMAT 'CUSTOM' (formatter='gpfusionwritable_import');
+LOCATION ('gpxf://@hostname@:50070/gphbase_test_upper?FRAGMENTER=HBaseDataFragmenter')
+FORMAT 'CUSTOM' (formatter='gpxfwritable_import');
 SELECT * FROM gphbase_upper ORDER BY recordkey ASC;
 DROP EXTERNAL TABLE gphbase_upper;
 -- Negative test
 CREATE EXTERNAL TABLE gphbase_error(recordkey int)
-LOCATION ('gpfusion://@hostname@:60009/gphbase_test?FRAGMENTER=HBaseDataFragmenter')
-FORMAT 'CUSTOM' (formatter='gpfusionwritable_import');
+LOCATION ('gpxf://@hostname@:50070/gphbase_test?FRAGMENTER=HBaseDataFragmenter')
+FORMAT 'CUSTOM' (formatter='gpxfwritable_import');
 SELECT * FROM gphbase_error;
 DROP EXTERNAL TABLE gphbase_error;
 -- query without lookup table
@@ -399,8 +490,8 @@ CREATE EXTERNAL TABLE gphbase_lookup(recordkey TEXT,
                                      "cf1:q7" CHAR, 
                                      "cf1:q8" SMALLINT, 
                                      "cf1:q9" BIGINT) 
-LOCATION ('gpfusion://@hostname@:60009/gphbase_test?FRAGMENTER=HBaseDataFragmenter')
-FORMAT 'CUSTOM' (formatter='gpfusionwritable_import');
+LOCATION ('gpxf://@hostname@:50070/gphbase_test?FRAGMENTER=HBaseDataFragmenter')
+FORMAT 'CUSTOM' (formatter='gpxfwritable_import');
 -- truncate lookup table
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar`:`echo ${HADOOP_ROOT}/lib/commons-logging-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-configuration-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-lang-[1-9]*.jar`:@abs_srcdir@/helpers HBaseChangeLookupTable truncate-table
 SELECT recordkey, "cf1:q1" FROM gphbase_lookup ORDER BY recordkey LIMIT 5;
@@ -435,8 +526,8 @@ t1    text,
 t2    text,  
 num1  integer, 
 dub1  double precision)
-LOCATION ('gpfusion://@hostname@:50070/reg_txt?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
-format 'custom' (formatter='gpfusionwritable_import');
+LOCATION ('gpxf://@hostname@:50070/reg_txt?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
+format 'custom' (formatter='gpxfwritable_import');
 select * from hv_txt order by t1;
 
 -- 2. Hive table stored as sequence
@@ -448,8 +539,8 @@ t1    text,
 t2    text,  
 num1  integer, 
 dub1  double precision)
-LOCATION ('gpfusion://@hostname@:50070/reg_seq?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
-format 'custom' (formatter='gpfusionwritable_import');
+LOCATION ('gpxf://@hostname@:50070/reg_seq?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
+format 'custom' (formatter='gpxfwritable_import');
 select * from hv_seq order by t1;
 
 -- 3. Hive table stored as rcfile
@@ -461,8 +552,8 @@ t1    text,
 t2    text,  
 num1  integer, 
 dub1  double precision)
-LOCATION ('gpfusion://@hostname@:50070/reg_rc?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
-format 'custom' (formatter='gpfusionwritable_import');
+LOCATION ('gpxf://@hostname@:50070/reg_rc?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
+format 'custom' (formatter='gpxfwritable_import');
 select * from hv_rc order by t1;
 
 -- 4. Hive table stored in several partitions where each partition is stored in a diferrent format
@@ -478,10 +569,15 @@ CREATE EXTERNAL TABLE hv_heterogen(
 t1    text,
 t2    text,  
 num1  integer, 
-dub1  double precision)
-LOCATION ('gpfusion://@hostname@:50070/reg_heterogen?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
-format 'custom' (formatter='gpfusionwritable_import');
-select * from hv_heterogen order by t1;
+dub1  double precision,
+t3 text)
+LOCATION ('gpxf://@hostname@:50070/reg_heterogen?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
+format 'custom' (formatter='gpxfwritable_import');
+select * from hv_heterogen order by t3, t1;
+
+-- Test analyze for Hive table.
+ANALYZE hv_heterogen;
+select relpages, reltuples from pg_class where relname = 'hv_heterogen';
 
 -- 5. Hive table with collection types (non primitive types)
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "CREATE TABLE reg_collections ( s1 STRING, f1 FLOAT, a1 ARRAY<STRING> , m1 MAP<STRING,  FLOAT > , sr1 STRUCT<street:STRING,  city:STRING,  state:STRING,  zip:INT > )  ROW FORMAT DELIMITED  FIELDS TERMINATED BY '\001' COLLECTION ITEMS TERMINATED BY '\002' MAP KEYS TERMINATED BY '\003'  LINES TERMINATED BY '\n'  STORED AS TEXTFILE"
@@ -501,8 +597,8 @@ t7    text,
 t8    text,
 t9    text,
 num1  integer)
-LOCATION ('gpfusion://@hostname@:50070/reg_collections?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
-format 'custom' (formatter='gpfusionwritable_import');
+LOCATION ('gpxf://@hostname@:50070/reg_collections?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
+format 'custom' (formatter='gpxfwritable_import');
 select * from hv_collections order by t1;
 
 -- 6. Clean after Hive

@@ -1,5 +1,5 @@
-#ifndef _GPFUSION_URIPARSER_H_
-#define _GPFUSION_URIPARSER_H_
+#ifndef _GPXF_URIPARSER_H_
+#define _GPXF_URIPARSER_H_
 
 #include "postgres.h"
 #include "fmgr.h"

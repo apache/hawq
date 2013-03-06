@@ -1,6 +1,7 @@
 #include "access/libchurl.h"
 #include "lib/stringinfo.h"
 #include "utils/guc.h"
+#include "miscadmin.h"
 
 /* include libcurl without typecheck.
  * This allows wrapping curl_easy_setopt to be wrapped
@@ -487,10 +488,11 @@ void flush_internal_buffer(churl_context* context)
 
 	while((context->curl_still_running != 0) && ((context->top - context->bot) > 0))
 	{
-		/* TODO: Do I really need this? copied from url.c
-		 * Can I call this from custom protocol?
-		 * CHECK_FOR_INTERRUPTS();
+		/*
+		 * Allow canceling a query while waiting for input from remote service
 		 */
+		CHECK_FOR_INTERRUPTS();
+
 		multi_perform(context);
 	}
 
@@ -599,9 +601,10 @@ int fill_internal_buffer(churl_context* context, int want)
         FD_ZERO(&fdwrite);
         FD_ZERO(&fdexcep);
 
-		/* TODO: do we need this?
-		 * CHECK_FOR_INTERRUPTS();
-		 */
+        /*
+         * Allow canceling a query while waiting for input from remote service
+         */
+        CHECK_FOR_INTERRUPTS();
 
         /* set a suitable timeout to fail on */
         timeout.tv_sec = 5;
@@ -706,7 +709,7 @@ get_http_error_msg(long http_ret_code, char* msg)
 	 *    In this case there is no Response from the server, so we issue our own message
 	 */
 	if (http_ret_code == 0) 
-		return "There is no gpfusion servlet listening on the host and port specified in the external table url";
+		return "There is no gpxf servlet listening on the host and port specified in the external table url";
 	
 	/*
 	 * 2. There is a response from the server since the http_ret_code is not 0, but there is no response message.
