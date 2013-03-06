@@ -96,6 +96,7 @@
 #include "cdb/cdbpersistentfilesysobj.h"
 #include "cdb/cdbllize.h"
 #include "cdb/memquota.h"
+#include "cdb/cdbsharedstorageop.h"
 #include "cdb/cdbtargeteddispatch.h"
 #include "cdb/cdbquerycontextdispatching.h"
 #include "optimizer/prep.h"
@@ -2038,12 +2039,149 @@ CreateAppendOnlySegFileOnMaster(ResultRelInfo *resultRelInfo, List *mapping)
 	Assert(found);
 }
 
+static void
+CreaateAoRowSegFileForRelationOnMaster(Relation rel,
+		AppendOnlyEntry * aoEntry, int segno, SharedStorageOpTasks *tasks)
+{
+	int i;
+	FileSegInfo * fsinfo;
+
+	Relation gp_relation_node;
+	HeapTuple tuple;
+
+	ItemPointerData persistentTid;
+	int64 persistentSerialNum;
+
+	Assert(RelationIsAoRows(rel));
+
+	char * relname = RelationGetRelationName(rel);
+
+	gp_relation_node = heap_open(GpRelationNodeRelationId, AccessShareLock);
+
+	for (i = 0; i < rel->rd_segfile0_count; ++i)
+	{
+		fsinfo = GetFileSegInfo(rel, aoEntry, SnapshotNow, segno,
+				i - 1);
+
+		if (NULL == fsinfo)
+		{
+			InsertInitialSegnoEntry(aoEntry, segno, i - 1);
+		}
+		else if (fsinfo->eof != 0)
+		{
+			pfree(fsinfo);
+			continue;
+		}
+
+		if (fsinfo)
+			pfree(fsinfo);
+
+		tuple = FetchGpRelationNodeTuple(
+					gp_relation_node,
+					rel->rd_node.relNode,
+					segno,
+					i - 1,
+					&persistentTid,
+					&persistentSerialNum);
+
+		if (HeapTupleIsValid(tuple))
+		{
+			heap_freetuple(tuple);
+			continue;
+		}
+
+		SharedStorageOpPreAddTask(&rel->rd_node, segno, i - 1, relname,
+				&rel->rd_segfile0_relationnodeinfos[i].persistentTid,
+				&rel->rd_segfile0_relationnodeinfos[i].persistentSerialNum);
+
+		rel->rd_segfile0_relationnodeinfos[i].isPresent = TRUE;
+
+		SharedStorageOpAddTask(relname, &rel->rd_node, segno, i - 1,
+				&rel->rd_segfile0_relationnodeinfos[i].persistentTid,
+				rel->rd_segfile0_relationnodeinfos[i].persistentSerialNum,
+				tasks);
+	}
+
+	heap_close(gp_relation_node, AccessShareLock);
+}
+
+static void
+CreateAoCsSegFileForRelationOnMaster(Relation rel,
+		AppendOnlyEntry * aoEntry, int segno, SharedStorageOpTasks *tasks)
+{
+	int i, j;
+	AOCSFileSegInfo *aocsFileSegInfo;
+
+	Relation gp_relation_node;
+	HeapTuple tuple;
+
+	ItemPointerData persistentTid;
+	int64 persistentSerialNum;
+
+	Assert(RelationIsAoCols(rel));
+
+	char * relname = RelationGetRelationName(rel);
+
+	gp_relation_node = heap_open(GpRelationNodeRelationId, AccessShareLock);
+
+	for (i = 0; i < rel->rd_segfile0_count; ++i)
+	{
+		aocsFileSegInfo = GetAOCSFileSegInfo(rel, aoEntry, SnapshotNow,
+				segno, i - 1);
+		if (NULL == aocsFileSegInfo)
+		{
+			InsertInitialAOCSFileSegInfo(aoEntry->segrelid, segno, i - 1,
+					rel->rd_att->natts);
+		}
+
+		for (j = 0; j < rel->rd_att->natts; j++)
+		{
+			int32		segmentFileNum;
+
+			if (aocsFileSegInfo && 0 != aocsFileSegInfo->vpinfo.entry[j].eof)
+				continue;
+
+			segmentFileNum = j * AOTupleId_MultiplierSegmentFileNum + segno;
+
+			tuple = FetchGpRelationNodeTuple(
+						gp_relation_node,
+						rel->rd_node.relNode,
+						segmentFileNum,
+						i - 1,
+						&persistentTid,
+						&persistentSerialNum);
+
+			if (HeapTupleIsValid(tuple))
+			{
+				heap_freetuple(tuple);
+				continue;
+			}
+
+			SharedStorageOpPreAddTask(&rel->rd_node,
+					segmentFileNum,
+					i - 1, relname,
+					&rel->rd_segfile0_relationnodeinfos[i].persistentTid,
+					&rel->rd_segfile0_relationnodeinfos[i].persistentSerialNum);
+
+			rel->rd_segfile0_relationnodeinfos[i].isPresent = TRUE;
+
+			SharedStorageOpAddTask(relname, &rel->rd_node,
+					segmentFileNum,
+					i - 1, &rel->rd_segfile0_relationnodeinfos[i].persistentTid,
+					rel->rd_segfile0_relationnodeinfos[i].persistentSerialNum,
+					tasks);
+		}
+		rel->rd_segfile0_relationnodeinfos[i].isPresent = TRUE;
+
+		if (aocsFileSegInfo)
+			pfree(aocsFileSegInfo);
+	}
+	heap_close(gp_relation_node, AccessShareLock);
+}
+
 void
 CreateAppendOnlySegFileForRelationOnMaster(Relation rel, int segno)
 {
-	int i;
-
-	FileSegInfo * fsinfo;
 	List		*children = NIL;
 	ListCell	*lc;
 
@@ -2051,6 +2189,8 @@ CreateAppendOnlySegFileForRelationOnMaster(Relation rel, int segno)
 
 	/* Let's deal with partition relation. */
 	children = find_all_inheritors(rel->rd_id);
+
+	SharedStorageOpTasks *tasks = CreateSharedStorageOpTasks();
 
 	foreach(lc, children)
 	{
@@ -2061,100 +2201,22 @@ CreateAppendOnlySegFileForRelationOnMaster(Relation rel, int segno)
 		if (oid != rel->rd_id)
 			child_rel = heap_open(oid, AccessShareLock);
 
-		AppendOnlyEntry * aoEntry = GetAppendOnlyEntry(child_rel->rd_id, SnapshotNow );
+		AppendOnlyEntry *aoEntry = GetAppendOnlyEntry(child_rel->rd_id, SnapshotNow);
 
-
-		for (i = 0; i <= GetTotalSegmentsNumber(); ++i)
-		{
-			if(RelationIsAoRows(child_rel))
-			{
-				Assert(i < child_rel->rd_segfile0_count);
-
-				fsinfo = GetFileSegInfo(child_rel, aoEntry, SnapshotNow, segno, i - 1);
-
-				if (NULL == fsinfo)
-				{
-					InsertInitialSegnoEntry(aoEntry, segno, i - 1);
-				}
-				else if (fsinfo->eof != 0)
-				{
-					pfree(fsinfo);
-					continue;
-				}
-
-				if (fsinfo)
-					pfree(fsinfo);
-
-				/*
-				 * seg0 file should have been created by the table creation.
-				 */
-				if (segno == RESERVED_SEGNO)
-					continue;
-
-				AppendOnlyStorageWrite_TransactionCreateFile(
-						RelationGetRelationName(child_rel),
-						0,
-						&child_rel->rd_node,
-						segno,
-						i - 1,
-						&child_rel->rd_segfile0_relationnodeinfos[i].persistentTid,
-						&child_rel->rd_segfile0_relationnodeinfos[i].persistentSerialNum
-						);
-				child_rel->rd_segfile0_relationnodeinfos[i].isPresent = TRUE;
-			}
-			else
-			{
-				int j;
-				AOCSFileSegInfo *aocsFileSegInfo;
-
-				Assert(RelationIsAoCols(child_rel));
-
-				aocsFileSegInfo = GetAOCSFileSegInfo(child_rel, aoEntry, SnapshotNow, segno, i - 1);
-
-				if (NULL == aocsFileSegInfo)
-				{
-					InsertInitialAOCSFileSegInfo(aoEntry->segrelid, segno, i - 1, child_rel->rd_att->natts);
-				}
-
-				for (j = 0; j < child_rel->rd_att->natts; j++)
-				{
-					int32		segmentFileNum;
-
-					if ((aocsFileSegInfo) && (0 != aocsFileSegInfo->vpinfo.entry[j].eof))
-					{
-						continue;
-					}
-
-					segmentFileNum = j * AOTupleId_MultiplierSegmentFileNum + segno;
-					/*
-					 * seg0 file should have been created by the table creation.
-					 */
-					if (segmentFileNum == RESERVED_SEGNO)
-						continue;
-
-					AppendOnlyStorageWrite_TransactionCreateFile(
-							RelationGetRelationName(child_rel),
-							0,
-							&child_rel->rd_node,
-							segmentFileNum,
-							i - 1,
-							&child_rel->rd_segfile0_relationnodeinfos[i].persistentTid,
-							&child_rel->rd_segfile0_relationnodeinfos[i].persistentSerialNum);
-				}
-				child_rel->rd_segfile0_relationnodeinfos[i].isPresent = TRUE;
-
-				if (aocsFileSegInfo)
-				{
-					pfree(aocsFileSegInfo);
-				}
-			}
-		}
+		if(RelationIsAoRows(child_rel))
+			CreaateAoRowSegFileForRelationOnMaster(child_rel, aoEntry, segno, tasks);
+		else
+			CreateAoCsSegFileForRelationOnMaster(child_rel, aoEntry, segno, tasks);
 
 		if (oid != rel->rd_id)
 			heap_close(child_rel, AccessShareLock);
 
 		pfree(aoEntry);
 	}
+
+	PerformSharedStorageOpTasks(tasks);
+	PostPerformSharedStorageOpTasks(tasks);
+	DropSharedStorageOpTasks(tasks);
 }
 
 /*

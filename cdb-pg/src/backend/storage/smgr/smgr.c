@@ -2064,14 +2064,23 @@ smgrGetPendingFileSysWork(
 
 	if (!pendingDeletesSorted)
 	{
+		/**
+		 * in case smgrSortDeleteList throw an exception after modified global veriable.
+		 */
+		PendingDelete * temp = pendingDeletes;
+		int tempCount = pendingDeletesCount;
+
 		/*
 		 * Sort the list in relation, database directory, tablespace, etc order.
 		 * And, collapse same transaction create-deletes.
 		 */
 		smgrSortDeletesList(
-						&pendingDeletes, 
-						&pendingDeletesCount,
+						&temp,
+						&tempCount,
 						nestLevel);
+
+		pendingDeletes = temp;
+		pendingDeletesCount = tempCount;
 
 		pendingDeletesSorted = (nestLevel <= 1);
 	}

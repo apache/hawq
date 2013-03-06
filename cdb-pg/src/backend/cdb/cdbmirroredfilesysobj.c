@@ -795,7 +795,7 @@ void MirroredFileSysObj_DropDbDir(
 			mirrorDataLossOccurred);
 }
 
-static void MirroredFileSysObj_JustInTimeDbDirCreate(
+void MirroredFileSysObj_JustInTimeDbDirCreate(
 	int4				contentid,
 	DbDirNode			*justInTimeDbDirNode)
 {
@@ -1158,7 +1158,6 @@ void MirroredFileSysObj_TransactionCreateAppendOnlyFile(
 							&primaryError);
 	if (primaryError != 0)
 	{
-		/*LWLockRelease(MirroredLock);*/
 		ereport(ERROR,
 			(errcode_for_file_access(),
 			 errmsg("could not create relation file '%s', relation name '%s', contentid: %d: %s",

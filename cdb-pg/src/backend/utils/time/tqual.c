@@ -388,7 +388,6 @@ retry:
 	/* initialize some things */
 	slot->slotid = slotId;
 	slot->contentid = GpIdentity.segindex;
-	elog(LOG, "slotid: %d contentid: %d", slotId, GpIdentity.segindex);
 	slot->xid = 0;
 	slot->pid = 0;
 	slot->cid = 0;

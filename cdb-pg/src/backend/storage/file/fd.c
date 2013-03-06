@@ -2460,7 +2460,6 @@ static bool HdfsBasicOpenFile(FileName fileName, int fileFlags, int fileMode,
 		return TRUE; /* success! */
 	}
 
-	elog(WARNING, "hdfs error, cannot open %s, errno = %d", fileName, errno);
 	return FALSE; /* failure */
 }
 
@@ -2494,8 +2493,6 @@ File HdfsPathNameOpenFile(FileName fileName, int fileFlags, int fileMode) {
 
 	if (result == FALSE) {
 		free(pathname);
-		elog(WARNING, "HdfsPathNameOpenFile: fail %s, errno %d", fileName,
-				errno);
 		return -1;
 	}
 
@@ -2568,14 +2565,12 @@ void HdfsFileClose(File file, bool canReportError) {
 	//return the Vfd slot to the free list
 	FreeVfd(file);
 
-	if (retval == -1) {
+	if (retval == -1)
+	{
 		/* do not disconnect. */
 		if (canReportError)
 			elog(ERROR, "could not close file %d : (%s) errno %d", file,
-			fileName, errno);
-		else
-			elog(WARNING, "could not close file %d : (%s) errno %d", file,
-			fileName, errno);
+					fileName, errno);
 	}
 }
 
@@ -2785,8 +2780,6 @@ int HdfsRemovePath(FileName fileName, int recursive) {
 	}
 
 	if(HdfsDelete(protocol, fs, path, recursive)) {
-	    elog(WARNING, "cannot delete path: %s, recursive: %d, errno %d",
-	            fileName, recursive, errno);
 	    return -1;
 	}
 	return 0;

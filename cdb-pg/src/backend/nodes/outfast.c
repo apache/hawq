@@ -157,6 +157,10 @@
 		} \
 	}
 
+/* Write RelFileNode */
+#define WRITE_RELFILENODE_FIELD(fldname) \
+	appendBinaryStringInfo(str, (const char *)&node->fldname, sizeof(RelFileNode))
+
 static void _outNode(StringInfo str, void *obj);
 
 static void
@@ -3527,6 +3531,36 @@ _outQueryContextInfo(StringInfo str, QueryContextInfo *node)
     }
 }
 
+static void
+_outSharedStorageOpStmt(StringInfo str, SharedStorageOpStmt *node)
+{
+	WRITE_NODE_TYPE("SHAREDSTORAGEOPSTMT");
+	WRITE_ENUM_FIELD(op, SharedStorageOp);
+
+	WRITE_INT_FIELD(numTasks);
+
+	int i;
+	for (i = 0; i < node->numTasks; ++i)
+	{
+		WRITE_INT_FIELD(segmentFileNum[i]);
+	}
+
+	for (i = 0; i < node->numTasks; ++i)
+	{
+		WRITE_INT_FIELD(contentid[i]);
+	}
+
+	for (i = 0; i < node->numTasks; ++i)
+	{
+		WRITE_RELFILENODE_FIELD(relFileNode[i]);
+	}
+
+	for (i = 0; i < node->numTasks; ++i)
+	{
+		WRITE_STRING_FIELD(relationName[i]);
+	}
+}
+
 /*
  * _outNode -
  *	  converts a Node into binary string and append it to 'str'
@@ -4299,6 +4333,10 @@ _outNode(StringInfo str, void *obj)
 			case T_QueryContextInfo:
 			    _outQueryContextInfo(str, obj);
 			    break;
+
+			case T_SharedStorageOpStmt:
+				_outSharedStorageOpStmt(str, obj);
+				break;
 
 			default:
 				elog(ERROR, "could not serialize unrecognized node type: %d",

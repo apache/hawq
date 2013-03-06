@@ -155,11 +155,6 @@ int PersistentFileSysObjName_Compare(
 	int compareLen = 0;
 	int cmp;
 
-	if (name1->contentid > name2->contentid)
-		return 1;
-	else if (name1->contentid < name2->contentid)
-		return -1;
-
 	if (name1->type == name2->type)
 	{		
 		switch (name1->type)
@@ -194,10 +189,24 @@ int PersistentFileSysObjName_Compare(
 			 * Handle segmentFileNum for 'Relation File's.
 			 */
 			if (name1->type != PersistentFsObjType_RelationFile)
-				return 0;
+			{
+				if (name1->contentid > name2->contentid)
+					return 1;
+				else if (name1->contentid < name2->contentid)
+					return -1;
+				else
+					return 0;
+			}
 
 			if (name1->variant.rel.segmentFileNum == name2->variant.rel.segmentFileNum)
-				return 0;
+			{
+				if (name1->contentid > name2->contentid)
+					return 1;
+				else if (name1->contentid < name2->contentid)
+					return -1;
+				else
+					return 0;
+			}
 			else if (name1->variant.rel.segmentFileNum > name2->variant.rel.segmentFileNum)
 				return 1;
 			else

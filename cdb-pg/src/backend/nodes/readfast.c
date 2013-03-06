@@ -146,6 +146,12 @@
 		} \
 	}
 
+/* Read RelFileNode */
+#define READ_RELFILENODE_FIELD(fldname) \
+	{ \
+		memcpy(&local_node->fldname, *str, sizeof(RelFileNode)); \
+		(*str) += sizeof(RelFileNode); \
+	}
 
 static void * readNodeBinary(const char ** str);
 
@@ -3767,6 +3773,43 @@ _readQueryContextInfo(const char **str)
     READ_DONE();
 }
 
+static SharedStorageOpStmt *
+_readSharedStorageOpStmt(const char **str)
+{
+	READ_LOCALS(SharedStorageOpStmt);
+
+	READ_ENUM_FIELD(op, SharedStorageOp);
+	READ_INT_FIELD(numTasks);
+
+	local_node->segmentFileNum = palloc(sizeof(int) * local_node->numTasks);
+	local_node->relationName = palloc(sizeof(char *) * local_node->numTasks);
+	local_node->contentid = palloc(sizeof(int) * local_node->numTasks);
+	local_node->relFileNode =
+			palloc(sizeof(RelFileNode) * local_node->numTasks);
+
+	int i;
+	for (i = 0; i < local_node->numTasks; ++i)
+	{
+		READ_INT_FIELD(segmentFileNum[i]);
+	}
+
+	for (i = 0; i < local_node->numTasks; ++i)
+	{
+		READ_INT_FIELD(contentid[i]);
+	}
+
+	for (i = 0; i < local_node->numTasks; ++i)
+	{
+		READ_RELFILENODE_FIELD(relFileNode[i]);
+	}
+
+	for (i = 0; i < local_node->numTasks; ++i)
+	{
+		READ_STRING_FIELD(relationName[i]);
+	}
+	READ_DONE();
+}
+
 void *
 readNodeBinary(const char ** str)
 {
@@ -4478,12 +4521,16 @@ readNodeBinary(const char ** str)
 		    return_value = _readQueryContextInfo(str);
 		    break;
 
-			default:
-				return_value = NULL; /* keep the compiler silent */
-				elog(ERROR, "could not deserialize unrecognized node type: %d",
-						 (int) nt);
+		case T_SharedStorageOpStmt:
+			return_value = _readSharedStorageOpStmt(str);
+			break;
 
-				break;
+		default:
+			return_value = NULL; /* keep the compiler silent */
+			elog(ERROR, "could not deserialize unrecognized node type: %d",
+					 (int) nt);
+
+			break;
 	}
 
 	return (Node *)return_value;

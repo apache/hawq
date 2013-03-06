@@ -180,6 +180,10 @@ extern int MirroredAppendOnly_Read(
 	
 	int32					bufferLen);
 
+extern void MirroredFileSysObj_JustInTimeDbDirCreate(
+		int4				contentid,
+		DbDirNode			*justInTimeDbDirNode);
+
 #endif   /* CDBMIRROREDAPPENDONLY_H */
 
 

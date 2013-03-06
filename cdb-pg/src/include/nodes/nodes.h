@@ -402,7 +402,7 @@ typedef enum NodeTag
 	T_AlterRewriteTableInfo,
 	T_AlterRewriteNewConstraint,
 	T_AlterRewriteNewColumnValue,
-
+	T_SharedStorageOpStmt,
 	/**/
 	
 	T_A_Expr = 850,

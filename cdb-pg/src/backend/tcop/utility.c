@@ -67,6 +67,7 @@
 #include "cdb/cdbsrlz.h"
 #include "cdb/cdbtm.h"
 #include "cdb/cdbvars.h"
+#include "cdb/cdbsharedstorageop.h"
 
 /*
  * Error-checking support for DROP commands
@@ -1826,6 +1827,10 @@ ProcessUtility(Node *parsetree,
 							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter type statement yet in GPSQL") ));
 
 			AlterType((AlterTypeStmt *) parsetree);
+			break;
+
+		case T_SharedStorageOpStmt:
+			PerformSharedStorageOp((SharedStorageOpStmt *) parsetree);
 			break;
 
 		default:

@@ -1412,6 +1412,23 @@ typedef struct CreateStmt
 	List	   *attr_encodings; /* attribute storage directives */
 } CreateStmt;
 
+typedef enum SharedStorageOp
+{
+	Op_CreateSegFile, Op_DropSegFile, Op_CreateDir
+} SharedStorageOp;
+
+typedef struct SharedStorageOpStmt
+{
+	NodeTag 			type;
+	SharedStorageOp 	op;
+
+	RelFileNode 		*relFileNode;
+	int 				*segmentFileNum;
+	char 				**relationName;
+	int					*contentid;
+	int					numTasks;
+} SharedStorageOpStmt;
+
 /* ----------------------
  *	Definitions for external tables
  * ----------------------

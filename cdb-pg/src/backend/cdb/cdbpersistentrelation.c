@@ -344,9 +344,6 @@ void PersistentRelation_AddCreatePending(
 	 */
 #ifdef MASTER_MIRROR_SYNC
 
-	/*
-	 * TODO, add contentid
-	 */
 	mmxlog_log_create_relfilenode(
 						contentid,
 						relFileNode->spcNode,
@@ -380,7 +377,7 @@ void PersistentRelation_AddCreatePending(
 
 	WRITE_PERSISTENT_STATE_ORDERED_UNLOCK;
 
-	/*if (Debug_persistent_print)
+	if (Debug_persistent_print)
 		elog(Persistent_DebugPrintLevel(), 
 		     "Persistent relation: Add '%s', relation name '%s' in state 'Create Pending', relation storage manager '%s', mirror existence state '%s', relation data resynchronization state '%s', serial number " INT64_FORMAT " at TID %s",
 			 PersistentFileSysObjName_ObjectName(&fsObjName),
@@ -389,7 +386,7 @@ void PersistentRelation_AddCreatePending(
 			 MirroredObjectExistenceState_Name(mirrorExistenceState),
 			 MirroredRelDataSynchronizationState_Name(relDataSynchronizationState),
 			 *serialNum,
-			 ItemPointerToString(persistentTid));*/
+			 ItemPointerToString(persistentTid));
 }
 
 void PersistentRelation_AddCreated(

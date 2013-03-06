@@ -82,6 +82,7 @@
 
 #include "cdb/cdbvars.h"
 
+#include "cdb/cdbsharedstorageop.h"
 #include "cdb/cdbmirroredfilesysobj.h"
 #include "cdb/cdbpersistentfilesysobj.h"
 #include "catalog/gp_persistent.h"
@@ -403,26 +404,36 @@ heap_create(const char *relname,
 													/* doJustInTimeDirCreate */true, bufferPoolBulkLoad,
 													&rel->rd_segfile0_relationnodeinfos[0].persistentTid,
 													&rel->rd_segfile0_relationnodeinfos[0].persistentSerialNum);
+
+				rel->rd_segfile0_relationnodeinfos[0].isPresent = true;
 			}
 			else
 			{
-				/*
-				 * in gpsql, master create segfiles for all segments
-				 */
 				Assert(Gp_role == GP_ROLE_DISPATCH);
 
+				TransactionCreateDatabaseDir(rel->rd_node.dbNode,
+						rel->rd_node.spcNode);
+
+				SharedStorageOpTasks *tasks = CreateSharedStorageOpTasks();
+
 				int i;
-				for (i = 0; i <= GetTotalSegmentsNumber(); ++i)
+				for (i = 0 ; i < rel->rd_segfile0_count; ++i)
 				{
-					MirroredFileSysObj_TransactionCreateAppendOnlyFile(
-													&rel->rd_node,
-													/* segmentFileNum */ 0,
-													i - 1,
-													rel->rd_rel->relname.data,
-													/* doJustInTimeDirCreate */ true,
-													&rel->rd_segfile0_relationnodeinfos[i].persistentTid,
-													&rel->rd_segfile0_relationnodeinfos[i].persistentSerialNum);
+					SharedStorageOpPreAddTask(&rel->rd_node, 0, i - 1, relname,
+									&rel->rd_segfile0_relationnodeinfos[i].persistentTid,
+									&rel->rd_segfile0_relationnodeinfos[i].persistentSerialNum);
+
+					rel->rd_segfile0_relationnodeinfos[i].isPresent = TRUE;
+
+					SharedStorageOpAddTask(relname, &rel->rd_node, 0, i - 1,
+							&rel->rd_segfile0_relationnodeinfos[i].persistentTid,
+							rel->rd_segfile0_relationnodeinfos[i].persistentSerialNum,
+							tasks);
 				}
+
+				PerformSharedStorageOpTasks(tasks);
+				PostPerformSharedStorageOpTasks(tasks);
+				DropSharedStorageOpTasks(tasks);
 			}
 		}
 		
@@ -438,13 +449,6 @@ heap_create(const char *relname,
 				 rel->rd_node.relNode,
 				 NameStr(rel->rd_rel->relname),
 				 rel->rd_segfile0_relationnodeinfos[0].persistentSerialNum);
-		}
-
-		{
-			int i;
-			for (i = 0; i < rel->rd_segfile0_count; ++i) {
-				rel->rd_segfile0_relationnodeinfos[i].isPresent = true;
-			}
 		}
 
 		if (Debug_persistent_print)
@@ -1617,16 +1621,7 @@ heap_create_with_catalog(const char *relname,
 
 	if (gp_relation_node_desc != NULL)
 	{
-		if (appendOnlyRel)
-		{
-			int i;
-			for (i = 0; i <= GetTotalSegmentsNumber(); ++i)
-				AddNewRelationNodeTuple(
-						gp_relation_node_desc,
-						new_rel_desc,
-						i - 1);
-		}
-		else
+		if (!appendOnlyRel)
 		{
 			/*
 			 * for heap table and index, use master's contentid always
@@ -3505,6 +3500,7 @@ setNewRelfilenodeCommon(Relation relation, Oid newrelfilenode)
 	bool		is_gp_relation_node_index;
 	cqContext	cqc;
 	cqContext  *pcqCtx;
+	char * relname;
 
 	/*
 	 * Find the pg_class tuple for the given relation.	This is not used
@@ -3538,6 +3534,8 @@ setNewRelfilenodeCommon(Relation relation, Oid newrelfilenode)
 	isAppendOnly = (relation->rd_rel->relstorage == RELSTORAGE_AOROWS || 
 					relation->rd_rel->relstorage == RELSTORAGE_AOCOLS);
 	
+	relname = RelationGetRelationName(relation);
+
 	if (!isAppendOnly)
 	{
 		SMgrRelation srel;
@@ -3559,7 +3557,7 @@ setNewRelfilenodeCommon(Relation relation, Oid newrelfilenode)
 											srel,
 											relBufpoolKind,
 											relation->rd_isLocalBuf,
-											NameStr(relation->rd_rel->relname),
+											relname,
 											/* doJustInTimeDirCreate */ true,
 											/* bufferPoolBulkLoad */ false,
 											&relation->rd_segfile0_relationnodeinfos[0].persistentTid,
@@ -3570,17 +3568,28 @@ setNewRelfilenodeCommon(Relation relation, Oid newrelfilenode)
 	{
 		Assert(Gp_role != GP_ROLE_EXECUTE);
 
-		for (i = 0 ; i < relation->rd_segfile0_count; ++i) {
-			MirroredFileSysObj_TransactionCreateAppendOnlyFile(
-											&newrnode,
-											/* segmentFileNum */ 0,
-											i - 1,
-											NameStr(relation->rd_rel->relname),
-											/* doJustInTimeDirCreate */ true,
-											&relation->rd_segfile0_relationnodeinfos[i].persistentTid,
-											&relation->rd_segfile0_relationnodeinfos[i].persistentSerialNum);
+		TransactionCreateDatabaseDir(newrnode.dbNode, relation->rd_node.spcNode);
 
+		SharedStorageOpTasks *tasks = CreateSharedStorageOpTasks();
+
+		int i;
+		for (i = 0 ; i < relation->rd_segfile0_count; ++i)
+		{
+			SharedStorageOpPreAddTask(&newrnode, 0, i - 1, relname,
+							&relation->rd_segfile0_relationnodeinfos[i].persistentTid,
+							&relation->rd_segfile0_relationnodeinfos[i].persistentSerialNum);
+
+			relation->rd_segfile0_relationnodeinfos[i].isPresent = TRUE;
+
+			SharedStorageOpAddTask(relname, &newrnode, 0, i - 1,
+					&relation->rd_segfile0_relationnodeinfos[i].persistentTid,
+					relation->rd_segfile0_relationnodeinfos[i].persistentSerialNum,
+					tasks);
 		}
+
+		PerformSharedStorageOpTasks(tasks);
+		PostPerformSharedStorageOpTasks(tasks);
+		DropSharedStorageOpTasks(tasks);
 	}
 
 	if (Debug_check_for_invalid_persistent_tid &&
@@ -3622,23 +3631,7 @@ setNewRelfilenodeCommon(Relation relation, Oid newrelfilenode)
 	is_gp_relation_node_index = relation->rd_index &&
 								relation->rd_index->indrelid == GpRelationNodeRelationId;
 
-	if (isAppendOnly)
-	{
-		for (i = 0; i < relation->rd_segfile0_count; ++i)
-		{
-			InsertGpRelationNodeTuple(
-						gp_relation_node,
-						relation->rd_id,
-						NameStr(relation->rd_rel->relname),
-						newrelfilenode,
-						/* segmentFileNum */ 0,
-						i - 1,
-						/* updateIndex */ !is_gp_relation_node_index,
-						&relation->rd_segfile0_relationnodeinfos[i].persistentTid,
-						relation->rd_segfile0_relationnodeinfos[i].persistentSerialNum);
-		}
-	}
-	else
+	if (!isAppendOnly)
 	{
 		int contentid =	GpIdentity.segindex == UNINITIALIZED_GP_IDENTITY_VALUE ?
 						MASTER_CONTENT_ID : GpIdentity.segindex;
