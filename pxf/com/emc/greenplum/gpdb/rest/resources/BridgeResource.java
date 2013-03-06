@@ -47,9 +47,9 @@ public class BridgeResource
 	 * its records, printing it out to outgoing stream.
 	 * Outputs GPDBWritable.
 	 *
-	 * Parameters come through HTTP header unless its fragments
+	 * Parameters come through HTTP header other than the fragments.
 	 * fragments is part of the url:
-	 * /v1/?fragments?=
+	 * /v2/Bridge?fragments=
 	 */
     @GET
     @Produces(MediaType.APPLICATION_OCTET_STREAM)
@@ -113,9 +113,12 @@ public class BridgeResource
 		{
 			String val = multimap.getFirst(key);
 			String newVal = val.replace("\\\"", "\"");
-			if (key.compareTo("X-GP-FRAGMENT-USER-DATA") == 0)
+			String newKey = key;
+			if (key.startsWith("X-GP-"))
+				newKey = key.toUpperCase();
+			if (newKey.compareTo("X-GP-FRAGMENT-USER-DATA") == 0)
 				newVal = newVal.replaceAll(HiveDataFragmenter.HIVE_LINEFEED_REPLACE, "\n"); /* Replacing the '\n' that were removed in HiveDataFragmenter.makeUserData */
-			result.put(key, newVal);
+			result.put(newKey, newVal);
 		}
 
 		return result;

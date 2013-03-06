@@ -6,7 +6,7 @@ import org.apache.hadoop.hbase.util.Bytes;
  * ColumnDescriptor describes one column in greenplum database.
  * Currently it means a name and a type (GPDB OID)
  */
-class ColumnDescriptor
+public class ColumnDescriptor
 {
     int gpdbColumnType;
     String gpdbColumnName;

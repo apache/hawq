@@ -10,29 +10,14 @@ import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
 
 /*
- * View classes are a JSON tool, used to filter which FragmentInfo fields will be serialized
- */
-class Views 
-{
-	/* 
-	 * FragmentInfo fields that belong to this view are the basic properties that are always needed
-	 */
-	static class FusionView { } 
-	/* 
-	 * Controls serialization of ThirdParty fields - additional data that a user wants to attach to a fragment
-	 */	
-	static class ThirdPartyView extends FusionView { }
-}
-
-/*
  * Fragmenter Info is a public class that represents the information of
  * a data fragment. It is to be used with any GP Fusion Fragmenter impl.
  */
 public class FragmentInfo
 {	
-	@JsonView(Views.FusionView.class) private String     sourceName;	// File path+name, table name, etc.	
-	@JsonView(Views.FusionView.class) private String[]   hosts;	    // Fragment hostnames (1 or more)
-	@JsonView(Views.ThirdPartyView.class) private String userData;  // ThirdParty data added to a fragment
+	private String sourceName;	// File path+name, table name, etc.	
+	private String[] hosts;	    // Fragment hostnames (1 or more)
+	private String userData;	// ThirdParty data added to a fragment. Ignored if null
 	
 	public FragmentInfo(String   sourceName,
 						String[] hosts)
@@ -70,10 +55,6 @@ public class FragmentInfo
 	public static String listToJSON(List<FragmentInfo> fragmentInfos) throws IOException
 	{
 		ObjectMapper	mapper	= new ObjectMapper();
-		if (fragmentInfos.get(0).getUserData() == null) // semi-ugly assumption. If the first fragment has ThirdParty data, then all fragments will have it
-			mapper.getSerializationConfig().withView(Views.FusionView.class);
-		else
-			mapper.getSerializationConfig().withView(Views.ThirdPartyView.class);
 		
 		String			result	= new String("{\"GPXFFragments\":[");
 		boolean			isFirst	= true;
@@ -106,11 +87,12 @@ public class FragmentInfo
 		for (FragmentInfo fi : fragmentInfos)
 		{
 			result.append("Fragment: [");
-			result.append("Source: " + fi.sourceName + ", Hosts: ");
+			result.append("Source: " + fi.sourceName + ", Hosts:");
 			
 			for (String host : fi.hosts)
-				result.append(host + " ");
+				result.append(" " + host);
 			
+			result.append(", User Data: " + fi.userData);
 			result.append("]");
 		}
 				

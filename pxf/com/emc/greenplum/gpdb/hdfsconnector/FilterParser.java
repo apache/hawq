@@ -27,7 +27,7 @@ import java.util.HashMap;
  * FilterParser makes sure a column objects are always on the left of the 
  * expression (when relevant)
  */
-class FilterParser
+public class FilterParser
 {
 	private int index;
 	private String filterString;
@@ -93,6 +93,52 @@ class FilterParser
 		}
 
 		public Object constant()
+		{
+			return constant;
+		}
+	}
+	
+	/*
+	 * Basic filter provided for cases where the target storage system does not provide it's own filter
+	 * For example: Hbase storage provides it's own filter but for a Writable based record in a sequence
+	 * file there is no filter provided and so we need to have a default
+	 */
+	static public class BasicFilter
+	{
+		private Operation oper;
+		private ColumnIndex column;
+		private Constant constant;
+		
+		/*
+		 * C'tor
+		 */
+		public BasicFilter(Operation inOper, ColumnIndex inColumn, Constant inConstant)
+		{
+			oper = inOper;
+			column = inColumn;
+			constant = inConstant;
+		}
+		
+		/*
+		 * returns oper field
+		 */
+		public Operation getOperation()
+		{
+			return oper;
+		}
+		
+		/*
+		 * returns column field
+		 */
+		public ColumnIndex getColumn()
+		{
+			return column;
+		}
+		
+		/*
+		 * returns constant field
+		 */
+		public Constant getConstant()
 		{
 			return constant;
 		}

@@ -1,21 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project name="gpfusion" default="all" xmlns:ivy="antlib:org.apache.ivy.ant">
+<project name="gpxf" default="all" xmlns:ivy="antlib:org.apache.ivy.ant">
 
 	<property file="build.properties" />
 
 	<!-- Compiler options -->
-	<property name="name" value="gpfusion" />
-	<property name="gpfusion.version" value="2.0.0" />
-	<property name="gphd.version" value="2.0.0.0" />
-	<property name="version" value="${gpfusion.version}-gphd-${gphd.version}" />
+	<property environment="env"/>
+	<property name="name" value="gpxf" />
+	<property name="gpxf.version" value="2.0.0" />
+	<condition property="gpxf.build" value="${env.BUILD_NUMBER}" else="${user.name}" >
+	    <isset property="env.BUILD_NUMBER" />
+	</condition>
+	<condition property="package.postfix" value="_dev" else="" >
+	    <isset property="build.trunkbuild"/>
+	</condition>
+	<property name="version" value="${gpxf.version}" />
 	<property name="final.name" value="${name}-${version}" />
 
 	<property name="src.dir" value="${basedir}" />
 	<property name="lib.dir" value="${basedir}/build/lib" />
 	<property name="build.dir" value="${basedir}/build" />
 	<property name="dist.dir" value="${build.dir}/${final.name}" />
-	<property name="package.buildroot" value="/tmp/gpfusion_package_build_${user.name}"/>
-	<property name="package.release" value="gphd_${gphd.version}"/>
+	<property name="package.buildroot" value="/tmp/gpxf_package_build_${user.name}"/>
+	<property name="package.release" value="${gpxf.build}${package.postfix}"/>
 	<property name="package.prefix" value="/usr/lib/gphd"/>
 
 	<!--Apache Ivy(http://ant.apache.org/ivy/history/latest-milestone/install.html) -->
@@ -66,6 +72,7 @@
 
 	<target name="clean">
 		<delete dir="${build.dir}"/>
+		<delete dir="${package.buildroot}"/>
 	</target>
 
 	<target name="compile" depends="ivy-retrieve-hadoop">
@@ -181,17 +188,17 @@
 				<include name="protobuf*.jar"/>      
 			</fileset>
 			<fileset dir="${build.dir}">
-				<include name="gpfusion*.jar"/>
+				<include name="gpxf*.jar"/>
 				<include name="protobuf-appendix.jar"/>
 			</fileset>
 		</copy>
 	</target>
 
 	<target name="tar" depends="package" description="create a tarball">
-	    <tar destfile="${build.dir}/${final.name}.tar.gz"
-		compression="gzip" 
-		longfile="gnu">
-		<tarfileset dir="${dist.dir}" prefix="${final.name}"/>
+		<tar destfile="${build.dir}/${final.name}-${package.release}.tar.gz"
+			compression="gzip" 
+			longfile="gnu">
+			<tarfileset dir="${dist.dir}" prefix="${final.name}"/>
 	    </tar>
 	</target>
 
@@ -203,20 +210,20 @@
 		<mkdir dir="${package.buildroot}/SPECS" />
 		<copy todir="${package.buildroot}/SOURCES">
 			<fileset dir="${build.dir}">
-				<include name="${final.name}.tar.gz" />
+				<include name="${final.name}-${package.release}.tar.gz" />
 			</fileset>
 		</copy>
-		<copy file="${src.dir}/packages/gpfusion.spec" todir="${package.buildroot}/SPECS">
+		<copy file="${src.dir}/packages/gpxf.spec" todir="${package.buildroot}/SPECS">
 			<filterchain>
 				<replacetokens>
 					<token key="final.name" value="${final.name}" />
-					<token key="version" value="${gpfusion.version}" />
+					<token key="version" value="${gpxf.version}" />
 					<token key="package.release" value="${package.release}" />
 					<token key="package.prefix" value="${package.prefix}" />
 				</replacetokens>
 			</filterchain>
 		</copy>
-		<rpm specFile="gpfusion.spec" command="-bb" topDir="${package.buildroot}" cleanBuildDir="true" failOnError="true"/>
+		<rpm specFile="gpxf.spec" command="-bb" topDir="${package.buildroot}" cleanBuildDir="true" failOnError="true"/>
 		<copy todir="${build.dir}/" flatten="true">
 			<fileset dir="${package.buildroot}/RPMS">
 				<include name="**/${name}*.rpm" />

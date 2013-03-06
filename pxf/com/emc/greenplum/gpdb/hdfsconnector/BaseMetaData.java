@@ -20,7 +20,7 @@ public class BaseMetaData
 	
 	/*
 	 * When a property is not found we throw an exception from getProperty method(). The exception message
-	 * has a generic form containg the HTTP option name. For example:
+	 * has a generic form containing the HTTP option name. For example:
 	 * --  Property "X-GP-ACCESSOR" has no value in current request  --
 	 * X-GP-ACCESSOR is a GPFUSION internal term, and it would be better not to display it to the user.
 	 * With propertyErrorMap we make possible to attach a specific explanatory message to a property

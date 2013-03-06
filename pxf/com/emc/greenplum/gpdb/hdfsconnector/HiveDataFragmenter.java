@@ -7,6 +7,7 @@ import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map.Entry;
 import java.util.Map;
 import java.util.Properties;
@@ -55,7 +56,10 @@ public class HiveDataFragmenter extends BaseDataFragmenter
 	private List<FragmentInfo> fragmentInfos;
 	
 	public static final String HIVE_USER_DATA_DELIM = "hive_usr_delim";
+	public static final String HIVE_ONE_PARTITION_DELIM = "hive_one_partition_delim";
+	public static final String HIVE_PARTITIONS_DELIM = "hive_partitions_delim";
 	public static final String HIVE_LINEFEED_REPLACE = "hive_linefeed_replace";
+	public static final String HIVE_TABLE_WITHOUT_PARTITIONS = "hive_table_without_partitions";
 	public static final int TODO_REMOVE_THIS_CONST = 1000; 
 	
 	/* internal class used for parsing the qualified table name received as input to GetFragments() */
@@ -75,12 +79,28 @@ public class HiveDataFragmenter extends BaseDataFragmenter
 	{
 		public StorageDescriptor storageDesc;
 		public Properties properties;
+		public Partition partition;
+		public List<FieldSchema> partitionKeys;
 		
 		public HiveTablePartition(StorageDescriptor inStorageDesc, Properties inProperties)
 		{
 			storageDesc = inStorageDesc;
 			properties = inProperties;
+			partition = null;
+			partitionKeys = null;
 		}
+		
+		public HiveTablePartition(StorageDescriptor inStorageDesc, 
+								  Properties inProperties,
+								  Partition inPartition,
+								  List<FieldSchema> inPartitionKeys)
+		{
+			storageDesc = inStorageDesc;
+			properties = inProperties;
+			partition = inPartition;
+			partitionKeys = inPartitionKeys;
+		}
+		
 	}
 	
 	/*
@@ -165,7 +185,7 @@ public class HiveDataFragmenter extends BaseDataFragmenter
 		if (partitions.size() == 0)
 		{
 			props = MetaStoreUtils.getSchema(tbl);
-			fetchPartitionMetaData(descTable, props);
+			fetchMetaDataForSimpleTable(descTable, props);
 		}
 		else 
 		{
@@ -179,20 +199,34 @@ public class HiveDataFragmenter extends BaseDataFragmenter
 												 (Map<String,String>)null, // Map<string, string> parameters - can be empty
 												 tblDesc.dbName, tblDesc.tableName, // table name
 												 partitionKeys);
-				fetchPartitionMetaData(descPartition, props);
+				fetchMetaDataForPrtitionedTable(descPartition, props, partition, partitionKeys);
 			}			
 		}
 		
 	}
 	
+	private void fetchMetaDataForSimpleTable(StorageDescriptor stdsc, Properties props) throws Exception
+	{
+		HiveTablePartition tablePartition = new HiveTablePartition(stdsc, props);
+		fetchMetaData(tablePartition);
+	}
+	
+	private void fetchMetaDataForPrtitionedTable(StorageDescriptor stdsc, 
+												 Properties props,
+												 Partition partition,
+												 List<FieldSchema> partitionKeys) throws Exception
+	{
+		HiveTablePartition tablePartition = new HiveTablePartition(stdsc, props, partition, partitionKeys);
+		fetchMetaData(tablePartition);
+	}
+	
 	/*
 	 * Fill a table partition
 	 */
-	private void fetchPartitionMetaData(StorageDescriptor stdsc, Properties props) throws Exception
+	private void fetchMetaData(HiveTablePartition tablePartition) throws Exception
 	{
-		HiveTablePartition tablePartition = new HiveTablePartition(stdsc, props);
-		FileInputFormat<?, ?> fformat = makeInputFormat(stdsc.getInputFormat(), jobConf);
-		fformat.setInputPaths(jobConf, new Path(stdsc.getLocation()));
+		FileInputFormat<?, ?> fformat = makeInputFormat(tablePartition.storageDesc.getInputFormat(), jobConf);
+		fformat.setInputPaths(jobConf, new Path(tablePartition.storageDesc.getLocation()));
 		InputSplit[] splits = fformat.getSplits(jobConf, 1);
 		
 		for (InputSplit split : splits)
@@ -230,12 +264,45 @@ public class HiveDataFragmenter extends BaseDataFragmenter
 		return outStream.toString();		
 	}
 	
+	/*
+	 * Turn the partition keys into a string
+	 */
+	private String serializePartitionKeys(HiveTablePartition partData) throws Exception
+	{
+		if (partData.partition == null) /* this is a simple hive table - there are no partitions */
+			return HIVE_TABLE_WITHOUT_PARTITIONS;
+		
+		String partitionKeys = new String("");
+		
+		ListIterator<String> valsIter = partData.partition.getValues().listIterator();
+		ListIterator<FieldSchema> keysIter = partData.partitionKeys.listIterator();
+		while (valsIter.hasNext() && keysIter.hasNext())
+		{
+			if (!partitionKeys.isEmpty())
+				partitionKeys = partitionKeys + HIVE_PARTITIONS_DELIM;
+				
+			FieldSchema key = keysIter.next();
+			String name = key.getName();
+			String type = key.getType(); 
+			String val = valsIter.next();
+			
+			String oneLevel = name + HIVE_ONE_PARTITION_DELIM + type + HIVE_ONE_PARTITION_DELIM + val;
+			partitionKeys = partitionKeys + oneLevel;			
+		}
+		
+		return partitionKeys;
+	}
+	
 	private String makeUserData(HiveTablePartition partData) throws Exception
 	{
 		String inputFormatName = partData.storageDesc.getInputFormat();
 		String serdeName = partData.storageDesc.getSerdeInfo().getSerializationLib();
 		String propertiesString = serializeProperties(partData.properties);
-		String userData = inputFormatName + HIVE_USER_DATA_DELIM + serdeName + HIVE_USER_DATA_DELIM + propertiesString;
+		String partionKeys = serializePartitionKeys(partData);
+		String userData = inputFormatName + HIVE_USER_DATA_DELIM + 
+						  serdeName + HIVE_USER_DATA_DELIM + 
+		                  propertiesString + HIVE_USER_DATA_DELIM +
+						  partionKeys;
 		
 		/*
 		 * we replace the LINEFEED, since Jetty will treat wrong this message once it will receive it from the GP Segment.

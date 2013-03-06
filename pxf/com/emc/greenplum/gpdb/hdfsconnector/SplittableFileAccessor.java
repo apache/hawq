@@ -14,12 +14,12 @@ import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hadoop.mapreduce.Job;
 
 /*
- * Implementation of IHdfsFileAccessor for acccessing a sequence file. A sequence file is splittable
- * - it means that HDFS will devide the file into splits based on an internal algorithm (by default, the 
+ * Implementation of IHdfsFileAccessor for accessing a sequence file. A sequence file is splittable
+ * - it means that HDFS will divide the file into splits based on an internal algorithm (by default, the 
  * the block size 64 MB is also the split size). This code runs in the context of the java process 
- * spawned by a GPDB segment and so it will only process the splits that corespond to it's segment id - 
+ * spawned by a GPDB segment and so it will only process the splits that correspond to its segment id - 
  * exact algorithm in the Open() function. While fetching each record, this class needs to go over the records
- * located in all it's splits.
+ * located in all its splits.
  */
 public abstract class SplittableFileAccessor implements IHdfsFileAccessor
 {
@@ -92,7 +92,7 @@ public abstract class SplittableFileAccessor implements IHdfsFileAccessor
 	/*
 	 * Specialized accessors will override this method and implement their own recordReader
 	 */
-	abstract Object getReader(JobConf jobConf, InputSplit split) throws IOException;
+	abstract protected Object getReader(JobConf jobConf, InputSplit split) throws IOException;
 
 	/*
 	 * getNextSplit

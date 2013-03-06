@@ -16,7 +16,7 @@ import org.apache.hadoop.io.Writable;
 /*
  * Adapter used for adding a recordkey field to the records output List<OneField>
  */
-class RecordkeyAdapter 
+public class RecordkeyAdapter 
 {
 	/*
 	 * We need to transform Record keys to java primitive types.

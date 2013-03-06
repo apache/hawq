@@ -10,7 +10,7 @@ import org.apache.hadoop.mapred.Reporter;
 
 /*
  * Class is not intended to read a specific format, hence it implements a dummy getRecordReader
- * Instead, its puprpose is to apply FileInputFormat.getSplits from one point in GPFusion and get the splits
+ * Instead, its purpose is to apply FileInputFormat.getSplits from one point in GPFusion and get the splits
  * which are valid for the actual InputFormats, since all of them we use inherit FileInputFormat but do not 
  * override getSplits.
  */

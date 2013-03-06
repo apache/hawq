@@ -28,14 +28,14 @@ public class GPDBWritable implements Writable {
      * For fixed length type, we know the length.
      * In the col val, we align pad according to the alignment requirement of the type.
      * For var length type, the alignment is always 4 byte.
-     * For var legnth type, col val is <4 byte length><payload val>
+     * For var length type, col val is <4 byte length><payload val>
 	 */
 
 
 	/*
 	 * "DEFINE" of the Database Datatype OID
 	 * All datatypes are supported. The types listed here
-	 * are commonly used type to facilitaes ease-of-use.
+	 * are commonly used type to facilitates ease-of-use.
 	 * Note that String should always be UTF-8 formatted.
 	 */
 	public static final int BOOLEAN   =   16;

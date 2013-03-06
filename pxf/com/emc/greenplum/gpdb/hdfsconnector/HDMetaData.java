@@ -30,6 +30,8 @@ public class HDMetaData extends BaseMetaData
 	protected String host;
     protected int port;
 	protected ArrayList<ColumnDescriptor> tupleDescription;
+	protected boolean filterStringValid;
+	protected String filterString;
 	protected BridgeProtocols protocol;
 	protected ArrayList<Integer> dataFragments;
 	private   Log Log;
@@ -38,7 +40,7 @@ public class HDMetaData extends BaseMetaData
 	 * The name of the recordkey column. It can appear in any location in the columns list.
 	 * By specifying the recordkey column, the user declares that he is interested to receive for every record 
 	 * retrieved also the the recordkey in the database. The recordkey is present in HBase table (it is called rowkey),
-	 * and in sequence files. When the HDFS storage element querried will not have a recordkey and
+	 * and in sequence files. When the HDFS storage element queried will not have a recordkey and
 	 * the user will still specify it in the "create external table" statement, then the values for this field will be null.
 	 * This field will always be the first field in the tuple returned
 	 */
@@ -58,6 +60,11 @@ public class HDMetaData extends BaseMetaData
         segmentId = getIntProperty("X-GP-SEGMENT-ID");
         totalSegments = getIntProperty("X-GP-SEGMENT-COUNT");
 		
+		filterStringValid = getBoolProperty("X-GP-HAS-FILTER");
+		
+		if (filterStringValid)
+			filterString = getProperty("X-GP-FILTER");
+		
 		//TEMPORARY HACK! parseProtocol should be removed altogether.
 		//here we use FRAGMENTER instead of HDTYPE for the time being
 		//as an ugly workaround until the notions of 'base' and 'hdfs'
@@ -66,11 +73,8 @@ public class HDMetaData extends BaseMetaData
 		
 		parseFormat(getProperty("X-GP-FORMAT"));
 
-		if(protocol == BridgeProtocols.GPHDFS)
-		{
-			host = getProperty("X-GP-URL-HOST");
-			port = getIntProperty("X-GP-URL-PORT");
-		}
+		host = getProperty("X-GP-URL-HOST");
+		port = getIntProperty("X-GP-URL-PORT");
 
 		tupleDescription = new ArrayList<ColumnDescriptor>();
 		recordkeyColumn = null;
@@ -80,7 +84,7 @@ public class HDMetaData extends BaseMetaData
 		parseDataFragments(getProperty("X-GP-DATA-FRAGMENTS"));
 	}
 
-    /* Copy contructor of HDMetaData
+    /* Copy constructor of HDMetaData
      * Used to create from an extending class
      */
     public HDMetaData(HDMetaData copy)
@@ -97,6 +101,8 @@ public class HDMetaData extends BaseMetaData
 		this.protocol = copy.protocol;
 		this.dataFragments = copy.dataFragments;
 		this.recordkeyColumn = copy.recordkeyColumn;
+		this.filterStringValid = copy.filterStringValid;
+		this.filterString = copy.filterString;
     }
 
     /* returns the number of segments in GP
@@ -134,6 +140,22 @@ public class HDMetaData extends BaseMetaData
     {
         return port;
     }
+	
+	/*
+	 * Returns true if there is a filter string to parse
+	 */
+	public boolean hasFilter()
+	{
+		return filterStringValid;
+	}
+	
+	/*
+	 * The filter string
+	 */
+	public String filterString()
+	{
+		return filterString;
+	}	
 
 	/* returns the number of columns in Tuple Description
 	 */
@@ -192,12 +214,10 @@ public class HDMetaData extends BaseMetaData
      */		
 	protected void parseProtocol(String /*scheme*/ fragmenter)
 	{
-		if ( (fragmenter.compareToIgnoreCase("HdfsDataFragmenter") == 0) || (fragmenter.compareToIgnoreCase("HiveDataFragmenter") == 0) )
-			protocol = BridgeProtocols.GPHDFS;
-		else if (fragmenter.compareToIgnoreCase("HBaseDataFragmenter") == 0)
+		if (fragmenter.compareToIgnoreCase("HBaseDataFragmenter") == 0)
 			protocol = BridgeProtocols.GPHBASE;
 		else
-			throw new IllegalArgumentException(fragmenter + " doesn't map to any built in protocol");
+			protocol = BridgeProtocols.GPHDFS; /* default */
 	}
 
 	/* 

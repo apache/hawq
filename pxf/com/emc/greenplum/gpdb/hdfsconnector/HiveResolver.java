@@ -5,17 +5,21 @@ import java.io.ByteArrayInputStream;
 import java.lang.IllegalAccessException;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Properties;
 import java.io.IOException;
 import java.sql.Timestamp;
 import java.util.Map.Entry;
 import java.util.Map;
+import java.text.SimpleDateFormat;
+import java.text.ParsePosition;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.hive.common.JavaUtils;
+import org.apache.hadoop.hive.serde.Constants;
 import org.apache.hadoop.hive.serde2.Deserializer;
 import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
@@ -36,6 +40,12 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.StringObjectInspe
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.BinaryObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.TimestampObjectInspector;
 
+///// dbg
+import java.io.IOException;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+/////////
+
 /*
  * Class HiveResolver handles deserialization of records that were serialized 
  * using Hadoop's Hive serialization framework. HiveResolver implements
@@ -52,8 +62,8 @@ class HiveResolver implements  IFieldsResolver
 	////////////////////////////
 	private Deserializer deserializer;
 	private Properties serdeProperties;
-	
-
+	private List<OneField> partitionFields;
+		
 	public HiveResolver(HDFSMetaData conf) throws Exception
 	{
         connectorConfiguration = conf;
@@ -66,7 +76,8 @@ class HiveResolver implements  IFieldsResolver
 		String propsString = toks[2];
 		ByteArrayInputStream inStream = new ByteArrayInputStream(propsString.getBytes());
 		serdeProperties = new Properties();
-		serdeProperties.load(inStream);
+		serdeProperties.load(inStream);		
+		initPartitionFields(toks[3]);
 		
 		deserializer.initialize(new JobConf(new Configuration(), HiveResolver.class), serdeProperties);
 	}
@@ -85,7 +96,56 @@ class HiveResolver implements  IFieldsResolver
 		ObjectInspector oi = deserializer.getObjectInspector();
 		
 		traverseTuple(tuple, oi, record);
+		/* We follow Hive convention. Partition fields are always added at the end of the record*/
+		addPartitionKeyValues(record);
 		return record;
+	}
+	
+	/*
+	 * The partition fields are initialized  one time  base on userData provided by the fragmenter
+	 */
+	private void initPartitionFields(String partitionKeys)
+	{
+		partitionFields	= new LinkedList<OneField>();
+		if (partitionKeys.compareTo(HiveDataFragmenter.HIVE_TABLE_WITHOUT_PARTITIONS) == 0)
+			return;
+		
+		String[] partitionLevels = partitionKeys.split(HiveDataFragmenter.HIVE_PARTITIONS_DELIM);
+		for (String partLevel : partitionLevels)
+		{
+			SimpleDateFormat dateFormat = new SimpleDateFormat();
+			String[] levelKey = partLevel.split(HiveDataFragmenter.HIVE_ONE_PARTITION_DELIM);
+			String name = levelKey[0];
+			String type = levelKey[1];
+			String val = levelKey[2];
+			
+			if (type.compareTo(Constants.STRING_TYPE_NAME) == 0)
+				addOneFieldToRecord(partitionFields, GPDBWritable.TEXT, val);
+			else if (type.compareTo(Constants.TINYINT_TYPE_NAME) == 0)
+				addOneFieldToRecord(partitionFields, GPDBWritable.CHAR, Byte.parseByte(val));
+			else if (type.compareTo(Constants.SMALLINT_TYPE_NAME) == 0)
+				addOneFieldToRecord(partitionFields, GPDBWritable.SMALLINT, Short.parseShort(val));
+			else if (type.compareTo(Constants.INT_TYPE_NAME) == 0)
+				addOneFieldToRecord(partitionFields, GPDBWritable.INTEGER, Integer.parseInt(val));
+			else if (type.compareTo(Constants.BIGINT_TYPE_NAME) == 0)
+				addOneFieldToRecord(partitionFields, GPDBWritable.BIGINT, Long.parseLong(val));
+			else if (type.compareTo(Constants.FLOAT_TYPE_NAME) == 0)
+				addOneFieldToRecord(partitionFields, GPDBWritable.REAL, Float.parseFloat(val));
+			else if (type.compareTo(Constants.DOUBLE_TYPE_NAME) == 0)
+				addOneFieldToRecord(partitionFields, GPDBWritable.FLOAT8, Double.parseDouble(val));
+			else if (type.compareTo(Constants.DATE_TYPE_NAME) == 0)
+				addOneFieldToRecord(partitionFields, GPDBWritable.DATE, dateFormat.parse(val, new ParsePosition(0)));
+			else if (type.compareTo(Constants.TIMESTAMP_TYPE_NAME) == 0)
+				addOneFieldToRecord(partitionFields, GPDBWritable.TIMESTAMP, Timestamp.valueOf(val));
+			else 
+				throw new RuntimeException("Unknown type: " + type);
+		}		
+	}
+	
+	private void addPartitionKeyValues(List<OneField> record)
+	{
+		for (OneField field : partitionFields)
+			record.add(field);
 	}
 	
 	public void traverseTuple(Object obj, ObjectInspector objInspector, List<OneField> record) throws IOException

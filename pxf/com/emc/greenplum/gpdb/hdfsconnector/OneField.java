@@ -15,6 +15,6 @@ public class OneField
  */
 enum BridgeProtocols
 {
-    GPHDFS,
+    GPHDFS /* default value */,
     GPHBASE;
 }

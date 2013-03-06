@@ -35,23 +35,60 @@ import com.emc.greenplum.gpdb.hdfsconnector.FragmenterFactory;
  * /gpdb/ is made part of the path when this package is registered in the jetty servlet
  * in NameNode.java in the hadoop package - /hadoop-core-X.X.X.jar
  */
-@Path( "/v2/Fragmenter/" )
+@Path("/v2/Fragmenter/")
 public class FragmenterResource
 {
 	org.apache.hadoop.fs.Path path = null;
 	private Log Log;
 
+	enum FunctionType{
+		GetFragments,
+		GetStats
+	};
+
+	
 	public FragmenterResource() throws IOException
 	{ 
 		Log = LogFactory.getLog(FragmenterResource.class);
 	}
 	
 	@GET
+	@Path("getFragments")
 	@Produces("application/json")
-	public Response read (@Context HttpHeaders headers,
-						  @QueryParam("path") String p) throws Exception
+	public Response getFragments(@Context HttpHeaders headers,
+						  		  @QueryParam("path") String p) throws Exception
 	{
-		String startmsg = new String("FRAGMENTER started for path \"" + p + "\"");
+		return getDataFromFragmenter(headers, p, FunctionType.GetFragments);
+	}
+	
+
+	/*
+	 * Returns statistics for the given path (data source).
+	 * Example for querying API FRAGMENTER from a web client
+	 * curl -i "http://localhost:50070/gpdb/v2/Fragmenter/getStats?path=/dir1/dir2/*txt"
+	 * An default answer, unless a fragmenter implements GetStats, would be:
+	 * {"GPXFFilesSize":[{"blockSize":67108864,"numberOfBlocks":1000,"numberOfTuples":1000000}]}
+	 * Currently only HDFS is implemented to calculate the block size and block number, 
+	 * and returns -1 for number of tuples.
+	 * Example:
+	 * {"GPXFFilesSize":[{"blockSize":67108864,"numberOfBlocks":3,"numberOfTuples":-1}]}
+	 */
+	@GET
+	@Path("getStats")
+	@Produces("application/json")
+	public Response getStats(@Context HttpHeaders headers,
+			                 @QueryParam("path") String p) throws Exception
+	{
+		return getDataFromFragmenter(headers, p, FunctionType.GetStats);
+	}
+	
+	
+	Response getDataFromFragmenter(HttpHeaders headers,
+			                       String path,
+			                       FunctionType func) throws Exception
+	{		                  
+		String startmsg = new String("FRAGMENTER started for path \"" + path + "\"");
+		startmsg += ", Function " + func + ".";
 				
 		if (headers != null) 
 		{
@@ -64,12 +101,13 @@ public class FragmenterResource
 		/* Convert headers into a regular map */
 		Map<String, String> params = convertToRegularMap(headers.getRequestHeaders());
 		final IDataFragmenter fragmenter = FragmenterFactory.create(new BaseMetaData(params));
-		final String datapath = new String(p);
+		final String datapath = new String(path);
+		final FunctionType function = func;
 		
 		StreamingOutput streaming = new StreamingOutput()
 		{
 			/*
-			 * Function queries the gpfusion Fragmenter for the data fragments of the resourc
+			 * Function queries the gpfusion Fragmenter for the data fragments of the resource
 			 * The fragments are returned in a string formatted in JSON	 
 			 */			
 			@Override
@@ -79,7 +117,15 @@ public class FragmenterResource
 				
 				try
 				{
-					dos.writeBytes(fragmenter.GetFragments(datapath));
+					switch (function)
+					{
+						case GetFragments:
+							dos.writeBytes(fragmenter.GetFragments(datapath));
+							break;
+						case GetStats:
+							dos.writeBytes(fragmenter.GetStats(datapath));
+							break;
+					}
 				} 
 				catch (org.mortbay.jetty.EofException e)
 				{
@@ -102,8 +148,12 @@ public class FragmenterResource
 	{
 		Map<String, String> result = new HashMap<String, String>();
 		for (String key : multimap.keySet())
-			result.put(key, multimap.getFirst(key).replace("\\\"", "\""));
-		
+		{
+			String newKey = key;
+			if (key.startsWith("X-GP-"))
+				newKey = key.toUpperCase();
+			result.put(newKey, multimap.getFirst(key).replace("\\\"", "\""));
+		}
 		return result;
 	}
 }

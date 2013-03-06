@@ -33,7 +33,7 @@ class HBaseLookupTable
 	private Log Log;
 	
 	// TODO: put this someplace else
-	private static final byte[] LOOKUPTABLENAME = Bytes.toBytes("gpfusionlookup");
+	private static final byte[] LOOKUPTABLENAME = Bytes.toBytes("gpxflookup");
 	private static final byte[] LOOKUPCOLUMNFAMILY = Bytes.toBytes("mapping");
 	/*
 	 * The parameter sets the size of the lookup table pool size.

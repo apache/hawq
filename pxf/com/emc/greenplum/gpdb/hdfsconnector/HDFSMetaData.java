@@ -51,7 +51,7 @@ public class HDFSMetaData extends HDMetaData
 		}
 		
 		/*
-		 * TODO: leading '/' is expected. gpdb ingores it. deal more gracefully...
+		 * TODO: leading '/' is expected. gpdb ignores it. deal more gracefully...
 		 */
 		path = "/" + getProperty("X-GP-DATA-DIR"); 		
     }
@@ -92,7 +92,7 @@ public class HDFSMetaData extends HDMetaData
     public String srlzSchemaName() throws  FileNotFoundException, IllegalArgumentException
     {
 		/*
-		 * Testing that the schema name was supplied by the user - schema is an optional propery.
+		 * Testing that the schema name was supplied by the user - schema is an optional properly.
 		 */
 		if (srlzSchemaName == null)
             throw new IllegalArgumentException("Schema was not supplied in the CREATE EXTERNAL TABLE statement." +

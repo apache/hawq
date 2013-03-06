@@ -58,7 +58,7 @@ public class Utilities
 			 * We are creating resolvers, accessors and fragmenters using the reflection framework. If for example, a resolver, during its
 			 * instantiation - in the c'tor, will throw an exception, the Resolver's exception will reach the Reflection
 			 * layer and there it will be wrapped inside an InvocationTargetException. Here we are above the 
-			 * Reflection layer and we need to unwrap the Resolver's inital exception and throw it instead of the
+			 * Reflection layer and we need to unwrap the Resolver's initial exception and throw it instead of the
 			 * wrapper InvocationTargetException so that our initial Exception text will be displayed
 			 * in psql instead of the message: "Internal Server Error"
 			 */

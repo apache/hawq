@@ -21,17 +21,18 @@ import org.apache.hadoop.io.Writable;
 
 /*
  * class BasicBridge is an abstract class implementing the "Template Method" design pattern
- * BasicBridge impelements the IBridge interface. In order to implement the IBridge methods,
+ * BasicBridge implements the IBridge interface. In order to implement the IBridge methods,
  * BasicBridge uses the methods of two other "internal" interfaces IHdfsFileAccessor and IFieldsResolver.
  * The use of these two internal interfaces (IHdfsFileAccessor and IFieldsResolver) inside BasicBridge 
  * represents in fact the skeleton of the data access algorithm of the Bridge framework.
- * The actual details od file accesss and records deserialization for given file types or serialization methods
+ * The actual details of file access and records deserialization for given file types or serialization methods
  * are located inside the implementations of the interfaces IHdfsFileAccessor and IFieldsResolver.
- * The user cannot instantiate BasicBridge since  it is abstract. Instead the user will instantiate a specialization
- * of BasicBridge (like for instance GpHdfsBridge). The sole purpose of the BasicBridge specialization class
- * is to instantiate the actual implementations of IHdfsFileAccessor and IFieldsResolver, and pass them to the
- * BasicBridge class who uses the interfaces without being aware of the actual implementations which hold
- * the details of file access and deserialization.
+ * The user cannot instantiate BasicBridge since it is abstract. 
+ * Instead the user will instantiate a specialization of BasicBridge (like for instance GpHdfsBridge). 
+ * The sole purpose of the BasicBridge specialization class is to instantiate the actual implementations 
+ * of IHdfsFileAccessor and IFieldsResolver, and pass them to the BasicBridge class who uses the 
+ * interfaces without being aware of the actual implementations which hold the details of file access 
+ * and deserialization.
  */
 abstract class BasicBridge implements IBridge
 {
@@ -97,7 +98,7 @@ abstract class BasicBridge implements IBridge
 	 * might lead us to believe. For example, an EOFEception will be thrown while fetching a record
 	 * from a sequence file, if there is a formatting problem in the record. Fetching record from
 	 * the sequence-file is the responsibility of the accessor so the exception will be thrown from the
-	 * accessor. We identify this cases by analizing the exception type, and when we discover that the
+	 * accessor. We identify this cases by analyzing the exception type, and when we discover that the
 	 * actual problem was a data problem, we return the errorOutput GPDBWritable.
 	 */
 	private boolean isDataException(IOException ex)
