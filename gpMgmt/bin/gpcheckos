@@ -860,7 +860,7 @@ def matchConfig(session, conf):
             ok = False
     return ok
     
-usage('ERROR: checkos NOT SUPPORTED YET IN GPSQL')
+usage('ERROR: checkos NOT SUPPORTED YET')
 
 coverage = GpCoverage()
 coverage.start()

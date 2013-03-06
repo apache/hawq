@@ -422,10 +422,10 @@ select * from co where j = 2;
 --------------------
 -- DELETE (not supported)
 DELETE FROM tenk_aocs1 WHERE unique1 = 1;
-ERROR:  Delete append-only table statement not supported yet in GPSQL
+ERROR:  Delete append-only table statement not supported yet
 -- UPDATE (not supported)
 UPDATE tenk_aocs1 SET unique2 = 1 WHERE unique2 = 2;
-ERROR:  Update append-only table statement not supported yet in GPSQL
+ERROR:  Update append-only table statement not supported yet
 --------------------
 -- system columns
 --------------------

@@ -1661,7 +1661,7 @@ RewriteQuery(Query *parsetree, List *rewrite_events)
 			{
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-							errmsg("Update append-only table statement not supported yet in GPSQL")));
+							errmsg("Update append-only table statement not supported yet")));
 			}
 			rewriteTargetList(parsetree, rt_entry_relation, NULL);
 		}
@@ -1671,7 +1671,7 @@ RewriteQuery(Query *parsetree, List *rewrite_events)
 						{
 							ereport(ERROR,
 									(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-										errmsg("Delete append-only table statement not supported yet in GPSQL")));
+										errmsg("Delete append-only table statement not supported yet")));
 						}
 		}
 		else if (event == CMD_INSERT)

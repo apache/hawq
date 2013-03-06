@@ -11841,7 +11841,7 @@ transformLockingClause(Query *qry, LockingClause *lc)
 	if(lc->forUpdate){
 		ereport(ERROR,
 				(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
-				errmsg("Cannot support select for update statement yet in GPSQL") ));
+				errmsg("Cannot support select for update statement yet") ));
 	}
 
 	CheckSelectLocking(qry);
