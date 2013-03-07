@@ -30,32 +30,19 @@ _AssertionSetting()
 }
 #endif
 
-/* Tests assigning the maximum number of Procs per segment. */
+/* Tests that calling numProcsPerSegment doesn't change the value of gp_resqueue_priority_cpucores_per_segment. */
 void
-test__numProcsPerSegment__AssignMax(void **state)
+test__numProcsPerSegment__VerifyImmutableAssignment(void **state)
 {
-
-	gp_resqueue_priority_cpucores_per_segment = 33;
-	gp_enable_resqueue_priority = 1;
-	backoffSingleton = 1;
-
-	build_guc_variables();
-	
-	assert_true( numProcsPerSegment() == 33);	     
-}
-
-/* Tests assigning the minimum number of Procs per segment. */
-void
-test__numProcsPerSegment__AssignMin(void **state)
-{
-
 	gp_resqueue_priority_cpucores_per_segment = 1;
 	gp_enable_resqueue_priority = 1;
+
+	/* backoffSingleton is required to be non-null for successful execution of numProcsPerSegment. */
 	backoffSingleton = 1;
 	
 	build_guc_variables();
 
-	assert_true( numProcsPerSegment() == 1);	     
+	assert_true(numProcsPerSegment() == 1);
 }
 
 #ifdef USE_ASSERT_CHECKING
@@ -120,8 +107,7 @@ main(int argc, char* argv[]) {
         cmockery_parse_arguments(argc, argv);
 
         const UnitTest tests[] = {
-        		unit_test(test__numProcsPerSegment__AssignMax)
-        		, unit_test(test__numProcsPerSegment__AssignMin)
+        		unit_test(test__numProcsPerSegment__VerifyImmutableAssignment)
 #ifdef USE_ASSERT_CHECKING			
 			, unit_test(test__numProcsPerSegment__NotNegative)
                         , unit_test(test__numProcsPerSegment__NotZero)

@@ -124,6 +124,7 @@ RESET datestyle;
 SHOW datestyle;
 SELECT '2006-08-13 12:34:56'::timestamptz;
 
+<<<<<<< HEAD
 --
 -- Test GUC - gp_disable_catalog_access_on_segment
 --
@@ -149,3 +150,6 @@ SHOW gp_disable_catalog_access_on_segment;
 DROP TABLE test1;
 DROP TABLE test2;
 -- end_ignore
+=======
+SELECT min_val, max_val FROM pg_settings WHERE name = 'gp_resqueue_priority_cpucores_per_segment';
+>>>>>>> 7817d7f... Fixed MPP-16606 to allow gp_resqueue_priority_cpucores_per_segment to have values up to 512. Added ICG and unit tests.

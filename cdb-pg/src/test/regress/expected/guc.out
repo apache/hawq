@@ -485,3 +485,10 @@ DROP TABLE test1;
 DROP TABLE test2;
 ERROR:  table "test2" does not exist
 -- end_ignore
+
+SELECT min_val, max_val FROM pg_settings WHERE name = 'gp_resqueue_priority_cpucores_per_segment';
+ min_val | max_val 
+---------+---------
+ 0.1     | 512
+(1 row)
+
