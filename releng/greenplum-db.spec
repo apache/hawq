@@ -49,11 +49,7 @@ Prefix:         /usr/local
 Pivotal Advanced Database Services (ADS) powered by HAWQ, extends
 Pivotal HD Enterprise, adding rich, proven parallel SQL processing
 facilities. These render Hadoop queries faster than any Hadoop-based
-query interface on the market today, enhancing productivity. Pivotal
-ADS enables SQL analysis of data in a variety of Hadoop-based data
-formats using the Pivotal Xtension Framework, without duplicating or
-converting HBase files. Alternatively, an optimized format is
-available for ADS table storage for best performance.
+query interface on the market today, enhancing productivity.
 
 %prep
 # As the source tarball for this RPM is created during the %%prep phase, we cannot assign the source as SOURCE0: <tar.gz file path>
