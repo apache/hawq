@@ -13,6 +13,7 @@
 #include "cdb/cdbmirroredappendonly.h"
 #include "cdb/cdbmirroredfilesysobj.h"
 #include "cdb/cdbsharedstorageop.h"
+#include "cdb/cdbdispatchresult.h"
 #include "cdb/cdbsrlz.h"
 #include "cdb/cdbvars.h"
 #include "nodes/parsenodes.h"
@@ -177,31 +178,47 @@ void PerformSharedStorageOpTasks(SharedStorageOpTasks *tasks)
 
 	DropQueryContextInfo(q->contextdisp);
 
-	cdbdisp_dispatchCommand("PERFORM SHARED STORAGE OPERATION ON SEGMENTS",
-			serializedQuerytree, serializedQuerytree_len,
-			false /* cancelonError */, false /* need2phase */,
-			false /* withSnapshot */, &ds);
-
-	for (i = 0; i < masterWorkCount; ++i)
+	PG_TRY();
 	{
-		int error = 0;
-		MirroredAppendOnly_Create(&masterWork[i]->node, masterWork[i]->segno,
-				MASTER_CONTENT_ID, masterWork[i]->relname, &error);
 
-		if (error != 0)
+		cdbdisp_dispatchCommand("PERFORM SHARED STORAGE OPERATION ON SEGMENTS",
+				serializedQuerytree, serializedQuerytree_len,
+				true /* cancelonError */, false /* need2phase */,
+				false /* withSnapshot */, &ds);
+
+		for (i = 0; i < masterWorkCount; ++i)
 		{
-			ereport(ERROR,
-				(errcode_for_file_access(),
-					errmsg("could not create relation file '%s', relation name '%s', contentid: %d: %s",
-						relpath(stat->relFileNode[i]),
-						stat->relationName[i], GpIdentity.segindex,
-						strerror(error))));
+			int error = 0;
+			MirroredAppendOnly_Create(&masterWork[i]->node, masterWork[i]->segno,
+					MASTER_CONTENT_ID, masterWork[i]->relname, &error);
+
+			if (error != 0)
+			{
+				ereport(ERROR,
+					(errcode_for_file_access(),
+						errmsg("could not create relation file '%s', relation name '%s', contentid: %d: %s",
+							relpath(stat->relFileNode[i]),
+							stat->relationName[i], GpIdentity.segindex,
+							strerror(error))));
+			}
 		}
+
+		pfree(masterWork);
+
+		cdbdisp_finishCommand(&ds, NULL, NULL);
 	}
+	PG_CATCH();
+	{
+		/* Something happend, clean up after ourselves */
+		CdbCheckDispatchResult((struct CdbDispatcherState *)&ds, true);
 
-	pfree(masterWork);
+		cdbdisp_destroyDispatchResults(ds.primaryResults);
+		cdbdisp_destroyDispatchThreads(ds.dispatchThreads);
 
-	cdbdisp_finishCommand(&ds, NULL, NULL);
+		PG_RE_THROW();
+		/* not reached */
+	}
+	PG_END_TRY();
 
 	pfree(stat->contentid);
 	pfree(stat->relFileNode);
