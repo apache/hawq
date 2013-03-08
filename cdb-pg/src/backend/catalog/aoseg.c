@@ -142,21 +142,21 @@ create_aoseg_table(Relation rel, Oid aosegOid, Oid aosegIndexOid, Oid * comptype
 				"pg_aoseg_%u_index", relOid);
 
 		/* this is pretty painful...  need a tuple descriptor */
-		tupdesc = CreateTemplateTupleDesc(Natts_pg_aoseg_XXX, false );
+		tupdesc = CreateTemplateTupleDesc(Natts_pg_aoseg, false );
 
-		TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aoseg_XXX_segno,
+		TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aoseg_segno,
 				"segno", INT4OID, -1, 0);
-		TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aoseg_XXX_eof, "eof",
+		TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aoseg_eof, "eof",
 				FLOAT8OID, -1, 0);
-		TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aoseg_XXX_tupcount,
+		TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aoseg_tupcount,
 				"tupcount", FLOAT8OID, -1, 0);
 		TupleDescInitEntry(tupdesc,
-				(AttrNumber) Anum_pg_aoseg_XXX_varblockcount, "varblockcount",
+				(AttrNumber) Anum_pg_aoseg_varblockcount, "varblockcount",
 				FLOAT8OID, -1, 0);
 		TupleDescInitEntry(tupdesc,
-				(AttrNumber) Anum_pg_aoseg_XXX_eofuncompressedo,
+				(AttrNumber) Anum_pg_aoseg_eofuncompressed,
 				"eofuncompressed", FLOAT8OID, -1, 0);
-		TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aoseg_XXX_content,
+		TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aoseg_content,
 				"content", INT4OID, -1, 0);
 	}
 	else
@@ -197,18 +197,18 @@ create_aoseg_table(Relation rel, Oid aosegOid, Oid aosegIndexOid, Oid * comptype
 		 *                             INTO MULTIPLE COLUMNS!!
 		 */
 
-        tupdesc = CreateTemplateTupleDesc(Natts_pg_aocsseg_XXX, false);
+        tupdesc = CreateTemplateTupleDesc(Natts_pg_aocsseg, false);
 
-		TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aocsseg_XXX_segno,
+		TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aocs_segno,
 				"segno", INT4OID, -1, 0);
-		TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aocsseg_XXX_tupcount,
+		TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aocs_tupcount,
 				"tupcount", INT8OID, -1, 0);
 		TupleDescInitEntry(tupdesc,
-				(AttrNumber) Anum_pg_aocsseg_XXX_varblockcount, "varblockcount",
+				(AttrNumber) Anum_pg_aocs_varblockcount, "varblockcount",
 				INT8OID, -1, 0);
-		TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aocsseg_XXX_vpinfo,
+		TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aocs_vpinfo,
 				"vpinfo", BYTEAOID, -1, 0);
-		TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aocsseg_XXX_content,
+		TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aocs_content,
 				"content", INT4OID, -1, 0);
     }
 
@@ -252,9 +252,9 @@ create_aoseg_table(Relation rel, Oid aosegOid, Oid aosegIndexOid, Oid * comptype
 	indexInfo->ii_NumIndexAttrs = 2;
 	indexInfo->ii_KeyAttrNumbers[0] = 1;
 	if (RelationIsAoRows(rel))
-		indexInfo->ii_KeyAttrNumbers[1] = Anum_pg_aoseg_XXX_content;
+		indexInfo->ii_KeyAttrNumbers[1] = Anum_pg_aoseg_content;
 	else
-		indexInfo->ii_KeyAttrNumbers[1] = Anum_pg_aocsseg_XXX_content;
+		indexInfo->ii_KeyAttrNumbers[1] = Anum_pg_aocs_content;
 	indexInfo->ii_Expressions = NIL;
 	indexInfo->ii_ExpressionsState = NIL;
 	indexInfo->ii_Predicate = NIL;

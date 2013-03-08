@@ -29,6 +29,7 @@
 #include "nodes/makefuncs.h"
 #include "utils/acl.h"
 #include "utils/builtins.h"
+#include "utils/lsyscache.h"
 #include "utils/syscache.h"
 #include "utils/fmgroids.h"
 #include "utils/numeric.h"
@@ -85,11 +86,11 @@ InsertInitialSegnoEntry(AppendOnlyEntry *aoEntry, int segno, int contentid)
 
 	pg_aoseg_rel = heap_open(aoEntry->segrelid, RowExclusiveLock);
 
-	pg_aoseg_dsc = pg_aoseg_rel->rd_att;
+	pg_aoseg_dsc = RelationGetDescr(pg_aoseg_rel);
 	natts = pg_aoseg_dsc->natts;
 	nulls = palloc(sizeof(bool) * natts);
 	values = palloc0(sizeof(Datum) * natts);
-	MemSet(nulls, false, sizeof(char) * natts);
+	MemSet(nulls, 0, sizeof(char) * natts);
 
 
 	if (Gp_role != GP_ROLE_EXECUTE)
@@ -97,7 +98,7 @@ InsertInitialSegnoEntry(AppendOnlyEntry *aoEntry, int segno, int contentid)
 	else
 		pg_aoseg_idx = NULL;
 
-	values[Anum_pg_aoseg_segno - 1] = ObjectIdGetDatum(segno);
+	values[Anum_pg_aoseg_segno - 1] = Int32GetDatum(segno);
 	values[Anum_pg_aoseg_tupcount - 1] = Float8GetDatum(0);
 	values[Anum_pg_aoseg_varblockcount - 1] = Float8GetDatum(0);
 	values[Anum_pg_aoseg_eof - 1] = Float8GetDatum(0);
@@ -156,7 +157,7 @@ GetFileSegInfo(Relation parentrel, AppendOnlyEntry *aoEntry, Snapshot appendOnly
 	 * is there.
 	 */
 	pg_aoseg_rel = heap_open(aoEntry->segrelid, AccessShareLock);
-	pg_aoseg_dsc = pg_aoseg_rel->rd_att;
+	pg_aoseg_dsc = RelationGetDescr(pg_aoseg_rel);
 
 	if (Gp_role == GP_ROLE_EXECUTE)
 	{
@@ -171,11 +172,11 @@ GetFileSegInfo(Relation parentrel, AppendOnlyEntry *aoEntry, Snapshot appendOnly
 	/*
 	 * Setup a scan key to fetch from the index by segno.
 	 */
-	ScanKeyInit(&key[0], (AttrNumber) Anum_pg_aoseg_XXX_segno,
-			BTEqualStrategyNumber, F_OIDEQ, ObjectIdGetDatum(segno));
+	ScanKeyInit(&key[0], (AttrNumber) Anum_pg_aoseg_segno,
+			BTEqualStrategyNumber, F_INT4EQ, Int32GetDatum(segno));
 
-	ScanKeyInit(&key[1], (AttrNumber) Anum_pg_aoseg_XXX_content,
-			BTEqualStrategyNumber, F_INT4EQ, ObjectIdGetDatum(contentid));
+	ScanKeyInit(&key[1], (AttrNumber) Anum_pg_aoseg_content,
+			BTEqualStrategyNumber, F_INT4EQ, Int32GetDatum(contentid));
 
 	aoscan = systable_beginscan(pg_aoseg_rel, indexid, indexOK, SnapshotNow, 2,
 			&key[0]);
@@ -255,7 +256,7 @@ GetFileSegInfo(Relation parentrel, AppendOnlyEntry *aoEntry, Snapshot appendOnly
 		ereport(ERROR,
 				(errcode(ERRCODE_GP_INTERNAL_ERROR),
 				errmsg("Invalid eof " INT64_FORMAT " for relation %s",
-					   fsinfo->eof, NameStr(parentrel->rd_rel->relname))));
+					   fsinfo->eof, RelationGetRelationName(parentrel))));
 
 	/* Finish up scan and close appendonly catalog. */
 	heap_close(pg_aoseg_rel, AccessShareLock);
@@ -284,7 +285,7 @@ FileSegInfo **GetAllFileSegInfo(Relation parentrel,
 	pg_aoseg_rel = heap_open(aoEntry->segrelid, AccessShareLock);
 
 	result = GetAllFileSegInfo_pg_aoseg_rel(
-									NameStr(parentrel->rd_rel->relname),
+									RelationGetRelationName(parentrel),
 									aoEntry,
 									pg_aoseg_rel,
 									appendOnlyMetaDataSnapshot,
@@ -344,7 +345,7 @@ FileSegInfo **GetAllFileSegInfo_pg_aoseg_rel(
 					content;
 	bool			isNull;
 
-	pg_aoseg_dsc = pg_aoseg_rel->rd_att;
+	pg_aoseg_dsc = RelationGetDescr(pg_aoseg_rel);
 
 	/* MPP-16407:
 	 * Initialize the segment file information array, we first allocate 8 slot for the array,
@@ -353,8 +354,8 @@ FileSegInfo **GetAllFileSegInfo_pg_aoseg_rel(
 	allseginfo = (FileSegInfo **) palloc0(sizeof(FileSegInfo*) * seginfo_slot_no);
 	seginfo_no = 0;
 
-	ScanKeyInit(&key[0], (AttrNumber) Anum_pg_aoseg_XXX_content,
-			BTEqualStrategyNumber, F_INT4EQ, ObjectIdGetDatum(GpIdentity.segindex));
+	ScanKeyInit(&key[0], (AttrNumber) Anum_pg_aoseg_content,
+			BTEqualStrategyNumber, F_INT4EQ, Int32GetDatum(GpIdentity.segindex));
 
 	/*
 	 * Now get the actual segfile information
@@ -366,7 +367,7 @@ FileSegInfo **GetAllFileSegInfo_pg_aoseg_rel(
 		aoscan = systable_beginscan(pg_aoseg_rel, InvalidOid, FALSE,
 									appendOnlyMetaDataSnapshot, 1, &key[0]);
 
-	while ((tuple = systable_getnext(aoscan)) != NULL)
+	while (HeapTupleIsValid(tuple = systable_getnext(aoscan)))
 	{
 		/* dynamically expand space for FileSegInfo* array */
 		if (seginfo_no >= seginfo_slot_no)
@@ -398,7 +399,7 @@ FileSegInfo **GetAllFileSegInfo_pg_aoseg_rel(
 
 		ItemPointerSetInvalid(&oneseginfo->sequence_tid);
 
-		eof_uncompressed = fastgetattr(tuple, Anum_pg_aoseg_varblockcount, pg_aoseg_dsc, &isNull);
+		eof_uncompressed = fastgetattr(tuple, Anum_pg_aoseg_eofuncompressed, pg_aoseg_dsc, &isNull);
 
 		if(isNull)
 			oneseginfo->eof_uncompressed = InvalidUncompressedEof;
@@ -491,7 +492,7 @@ UpdateFileSegInfo(Relation parentrel,
 	if (acquireResult != LOCKACQUIRE_ALREADY_HELD)
 	{
 		elog(ERROR, "Should already have the (transaction-scope) write-lock on Append-Only segment file #%d, "
-					 "relation %s", segno, parentrel->rd_rel->relname.data);
+			 "relation %s", segno, RelationGetRelationName(parentrel));
 	}
 
 	/*
@@ -516,11 +517,11 @@ UpdateFileSegInfo(Relation parentrel,
 	/*
 	 * Setup a scan key to fetch from the index by segno.
 	 */
-	ScanKeyInit(&key[0], (AttrNumber) Anum_pg_aoseg_XXX_segno,
-			BTEqualStrategyNumber, F_OIDEQ, ObjectIdGetDatum(segno));
+	ScanKeyInit(&key[0], (AttrNumber) Anum_pg_aoseg_segno,
+			BTEqualStrategyNumber, F_INT4EQ, Int32GetDatum(segno));
 
-	ScanKeyInit(&key[1], (AttrNumber) Anum_pg_aoseg_XXX_content,
-			BTEqualStrategyNumber, F_INT4EQ, ObjectIdGetDatum(GpIdentity.segindex));
+	ScanKeyInit(&key[1], (AttrNumber) Anum_pg_aoseg_content,
+			BTEqualStrategyNumber, F_INT4EQ, Int32GetDatum(GpIdentity.segindex));
 
 	aoscan = systable_beginscan(pg_aoseg_rel, indexid, indexOK,
 			SnapshotNow, 2, &key[0]);
@@ -637,15 +638,15 @@ FileSegTotals *GetSegFilesTotals(Relation parentrel, Snapshot appendOnlyMetaData
 	result = (FileSegTotals *) palloc0(sizeof(FileSegTotals));
 
 	pg_aoseg_rel = heap_open(aoEntry->segrelid, AccessShareLock);
-	pg_aoseg_dsc = pg_aoseg_rel->rd_att;
+	pg_aoseg_dsc = RelationGetDescr(pg_aoseg_rel);
 
-	ScanKeyInit(&key[0], (AttrNumber) Anum_pg_aoseg_XXX_content,
-			BTEqualStrategyNumber, F_INT4EQ, ObjectIdGetDatum(contentid));
+	ScanKeyInit(&key[0], (AttrNumber) Anum_pg_aoseg_content,
+			BTEqualStrategyNumber, F_INT4EQ, Int32GetDatum(contentid));
 
 	aoscan = systable_beginscan(pg_aoseg_rel, InvalidOid, FALSE,
 			appendOnlyMetaDataSnapshot, 1, &key[0]);
 
-	while ((tuple = systable_getnext(aoscan)) != NULL)
+	while (HeapTupleIsValid(tuple = systable_getnext(aoscan)))
 	{
 		eof = fastgetattr(tuple, Anum_pg_aoseg_eof, pg_aoseg_dsc, &isNull);
 		tupcount = fastgetattr(tuple, Anum_pg_aoseg_tupcount, pg_aoseg_dsc, &isNull);
@@ -698,14 +699,14 @@ int64 GetAOTotalBytes(Relation parentrel, Snapshot appendOnlyMetaDataSnapshot)
 	result = 0;
 
 	pg_aoseg_rel = heap_open(aoEntry->segrelid, AccessShareLock);
-	pg_aoseg_dsc = pg_aoseg_rel->rd_att;
+	pg_aoseg_dsc = RelationGetDescr(pg_aoseg_rel);
 
 	Assert (Gp_role != GP_ROLE_EXECUTE);
 
 	aoscan = systable_beginscan(pg_aoseg_rel, InvalidOid, FALSE,
 			appendOnlyMetaDataSnapshot, 0, NULL);
 
-	while ((tuple = systable_getnext(aoscan)) != NULL)
+	while (HeapTupleIsValid(tuple = systable_getnext(aoscan)))
 	{
 		eof = fastgetattr(tuple, Anum_pg_aoseg_eof, pg_aoseg_dsc, &isNull);
 		Assert(!isNull);
@@ -821,7 +822,7 @@ gp_aoseg_history(PG_FUNCTION_ARGS)
 		
 		context->aoSegfileArray = 
 				GetAllFileSegInfo_pg_aoseg_rel(
-											aocsRel->rd_rel->relname.data, 
+											RelationGetRelationName(aocsRel),
 											aoEntry, 
 											pg_aoseg_rel,
 											SnapshotAny,	// Get ALL tuples from pg_aoseg_% including aborted and in-progress ones. 
@@ -863,7 +864,7 @@ gp_aoseg_history(PG_FUNCTION_ARGS)
 		 * Form tuple with appropriate data.
 		 */
 		MemSet(values, 0, sizeof(values));
-		MemSet(nulls, false, sizeof(nulls));
+		MemSet(nulls, 0, sizeof(nulls));
 
 		aoSegfile = context->aoSegfileArray[context->segfileArrayIndex];
 
@@ -895,9 +896,8 @@ static Datum
 gp_update_aorow_master_stats_internal(Relation parentrel, Snapshot appendOnlyMetaDataSnapshot)
 {
 	StringInfoData 	sqlstmt;
-	Relation		aosegrel;
 	bool 			connected = false;
-	char			aoseg_relname[32];
+	char		   *aoseg_relname;
 	int 			proc;
 	int 			ret;
 	int64			total_count = 0;
@@ -910,9 +910,9 @@ gp_update_aorow_master_stats_internal(Relation parentrel, Snapshot appendOnlyMet
 	/*
 	 * get the name of the aoseg relation
 	 */
-	aosegrel = heap_open(aoEntry->segrelid, AccessShareLock);
-	snprintf(aoseg_relname, 32, "%s", RelationGetRelationName(aosegrel));
-	heap_close(aosegrel, AccessShareLock);
+	aoseg_relname = get_rel_name(aoEntry->segrelid);
+	if (NULL == aoseg_relname)
+		elog(ERROR, "failed to get relname for AO file segment");
 
 	/*
 	 * assemble our query string
@@ -1181,8 +1181,7 @@ get_ao_distribution_oid(PG_FUNCTION_ARGS)
 	QueryInfo 		*query_block = NULL;
 	StringInfoData 	sqlstmt;
 	Relation		parentrel;
-	Relation		aosegrel;
-	char			aoseg_relname[32];
+	char		   *aoseg_relname;
 	int 			ret;
 	Oid				relid = PG_GETARG_OID(0);
 
@@ -1231,9 +1230,9 @@ get_ao_distribution_oid(PG_FUNCTION_ARGS)
 		/*
 		 * get the name of the aoseg relation
 		 */
-		aosegrel = heap_open(segrelid, AccessShareLock);
-		snprintf(aoseg_relname, 32, "%s", RelationGetRelationName(aosegrel));
-		heap_close(aosegrel, AccessShareLock);
+		aoseg_relname = get_rel_name(segrelid);
+		if (NULL == aoseg_relname)
+			elog(ERROR, "failed to get relname for AO file segment");
 
 		/*
 		 * assemble our query string
@@ -1367,8 +1366,7 @@ get_ao_distribution_name(PG_FUNCTION_ARGS)
 	StringInfoData 	sqlstmt;
 	RangeVar		*parentrv;
 	Relation		parentrel;
-	Relation		aosegrel;
-	char			aoseg_relname[32];
+	char		   *aoseg_relname;
 	int 			ret;
 	text	   		*relname = PG_GETARG_TEXT_P(0);
 	Oid				relid;
@@ -1422,9 +1420,9 @@ get_ao_distribution_name(PG_FUNCTION_ARGS)
 		/*
 		 * get the name of the aoseg relation
 		 */
-		aosegrel = heap_open(segrelid, AccessShareLock);
-		snprintf(aoseg_relname, 32, "%s", RelationGetRelationName(aosegrel));
-		heap_close(aosegrel, AccessShareLock);
+		aoseg_relname = get_rel_name(segrelid);
+		if (NULL == aoseg_relname)
+			elog(ERROR, "failed to get relname for AO file segment");
 
 		/*
 		 * assemble our query string
@@ -1581,9 +1579,8 @@ static Datum
 aorow_compression_ratio_internal(Relation parentrel)
 {
 	StringInfoData 	sqlstmt;
-	Relation		aosegrel;
 	bool 			connected = false;
-	char			aoseg_relname[32];
+	char		   *aoseg_relname;
 	int 			proc;
 	int 			ret;
 	float8			compress_ratio = -1; /* the default, meaning "not available" */
@@ -1599,9 +1596,9 @@ aorow_compression_ratio_internal(Relation parentrel)
 	/*
 	 * get the name of the aoseg relation
 	 */
-	aosegrel = heap_open(segrelid, AccessShareLock);
-	snprintf(aoseg_relname, 32, "%s", RelationGetRelationName(aosegrel));
-	heap_close(aosegrel, AccessShareLock);
+	aoseg_relname = get_rel_name(segrelid);
+	if (NULL == aoseg_relname)
+		elog(ERROR, "failed to get relname for AO file segment");
 
 	/*
 	 * assemble our query string

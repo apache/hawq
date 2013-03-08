@@ -41,6 +41,10 @@
 #include "utils/memutils.h"
 #include "utils/syscache.h"
 
+/* include last until fix dependencies in this file */
+#include "access/aocssegfiles.h"
+
+
 /**
  * all opened file on shared storage will be removed after transaction terminated.
  */
@@ -1137,7 +1141,7 @@ prepareDispatchedCatalogFastSequence(QueryContextInfo *cxt,
     scanDesc = systable_beginscan(fast_seq_rel, InvalidOid, FALSE,
             SnapshotNow, 2, scanKeys);
 
-    while (NULL != (tuple = systable_getnext(scanDesc)))
+    while (HeapTupleIsValid(tuple = systable_getnext(scanDesc)))
     {
         contentid = heap_getattr(tuple, Anum_gp_fastsequence_contentid,
                 RelationGetDescr(fast_seq_rel), NULL );
@@ -1232,7 +1236,7 @@ prepareDispatchedCatalogAoSegfile(QueryContextInfo *cxt,
 
     if (forInsert)
     {
-        ScanKeyInit(&key, Anum_pg_aoseg_XXX_segno, BTEqualStrategyNumber,
+        ScanKeyInit(&key, Anum_pg_aoseg_segno, BTEqualStrategyNumber,
                 F_INT4EQ, segno);
 
         aosegScanDesc = systable_beginscan(ao_seg_rel, InvalidOid, FALSE,
@@ -1244,7 +1248,7 @@ prepareDispatchedCatalogAoSegfile(QueryContextInfo *cxt,
                 SnapshotNow, 0, NULL );
     }
 
-    while (NULL != (pg_aoseg_tuple = systable_getnext(aosegScanDesc)))
+    while (HeapTupleIsValid(pg_aoseg_tuple = systable_getnext(aosegScanDesc)))
     {
         Datum segno, contentid;
 
@@ -1255,7 +1259,7 @@ prepareDispatchedCatalogAoSegfile(QueryContextInfo *cxt,
 
         if (RelationIsAoRows(rel))
         {
-            contentid = heap_getattr(pg_aoseg_tuple, Anum_pg_aoseg_XXX_content,
+            contentid = heap_getattr(pg_aoseg_tuple, Anum_pg_aoseg_content,
                     RelationGetDescr(ao_seg_rel), NULL );
         }
         else
@@ -1263,7 +1267,7 @@ prepareDispatchedCatalogAoSegfile(QueryContextInfo *cxt,
             Assert(RelationIsAoCols(rel));
 
             contentid = heap_getattr(pg_aoseg_tuple,
-                    Anum_pg_aocsseg_XXX_content, RelationGetDescr(ao_seg_rel),
+                    Anum_pg_aocs_content, RelationGetDescr(ao_seg_rel),
                     NULL );
         }
 

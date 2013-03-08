@@ -1,7 +1,7 @@
 /*
  * Append only columnar access methods
  *
- *	Copyright (c), 2009-2010, Greenplum Inc.
+ *	Copyright (c), 2009-2013, Greenplum Inc.
  */
 
 #include "postgres.h"
@@ -411,10 +411,7 @@ aocs_beginscan(Relation relation, Snapshot appendOnlyMetaDataSnapshot, TupleDesc
 	ValidateAppendOnlyMetaDataSnapshot(&appendOnlyMetaDataSnapshot);
 	
     if (!relationTupleDesc)
-    {
-        relationTupleDesc = relation->rd_att;
-    }
-
+		relationTupleDesc = RelationGetDescr(relation);
 
     int nvp = relationTupleDesc->natts;
 
@@ -744,6 +741,7 @@ AOCSInsertDesc aocs_insert_init(Relation rel, int segno)
 Oid aocs_insert_values(AOCSInsertDesc idesc, Datum *d, bool * null, AOTupleId *aoTupleId)
 {
     Relation rel = idesc->aoi_rel;
+    TupleDesc tupdesc = RelationGetDescr(rel);
     int i;
 
     if (rel->rd_rel->relhasoids)
@@ -752,7 +750,7 @@ Oid aocs_insert_values(AOCSInsertDesc idesc, Datum *d, bool * null, AOTupleId *a
 				 errmsg("append-only column-oriented tables do not support rows with OIDs")));
 
     /* As usual, at this moment, we assume one col per vp */
-    for(i=0; i<rel->rd_att->natts; ++i)
+    for(i=0; i<tupdesc->natts; ++i)
     {
     	void *toFree1;
 		Datum datum;
@@ -881,9 +879,10 @@ Oid aocs_insert_values(AOCSInsertDesc idesc, Datum *d, bool * null, AOTupleId *a
 void aocs_insert_finish(AOCSInsertDesc idesc)
 {
     Relation rel = idesc->aoi_rel;
+    TupleDesc tupdesc = RelationGetDescr(rel);
     int i;
 
-    for(i=0; i<rel->rd_att->natts; ++i)
+    for(i=0; i<tupdesc->natts; ++i)
     {
 		int itemCount = datumstreamwrite_nth(idesc->ds[i]);
 
@@ -906,7 +905,7 @@ void aocs_insert_finish(AOCSInsertDesc idesc)
 	pfree(idesc->fsInfo);
     pfree(idesc->aoEntry);
 
-	close_ds_write(idesc->ds, rel->rd_att->natts);
+	close_ds_write(idesc->ds, tupdesc->natts);
 }
 
 static void
@@ -1128,6 +1127,8 @@ aocs_fetch_init(Relation relation,
 	aocsFetchDesc->segmentFileInfo =
 		GetAllAOCSFileSegInfo(relation, aoentry, appendOnlyMetaDataSnapshot, &aocsFetchDesc->totalSegfiles);
 
+	Assert(tupleDesc != NULL);
+
 	AppendOnlyBlockDirectory_Init_forSearch(
 		&aocsFetchDesc->blockDirectory,
 		aoentry,
@@ -1135,17 +1136,14 @@ aocs_fetch_init(Relation relation,
 		(FileSegInfo **)aocsFetchDesc->segmentFileInfo,
 		aocsFetchDesc->totalSegfiles,
 		aocsFetchDesc->relation,
-		relation->rd_att->natts,
+		tupleDesc->natts,
 		true);
 
-	Assert(relation->rd_att != NULL);
-
 	aocsFetchDesc->datumStreamFetchDesc = (DatumStreamFetchDesc*)
-		palloc0(relation->rd_att->natts * sizeof(DatumStreamFetchDesc));
+			palloc0(tupleDesc->natts * sizeof(DatumStreamFetchDesc));
 
-	for (colno = 0; colno < relation->rd_att->natts; colno++)
-	{
-
+	for (colno = 0; colno < tupleDesc->natts; colno++)
+	{	
 		aocsFetchDesc->datumStreamFetchDesc[colno] = NULL;
 		if (proj[colno])
 		{
@@ -1195,7 +1193,7 @@ aocs_fetch_init(Relation relation,
 								   blksz,
 								   aoentry->version,
 								   tupleDesc->attrs[colno],
-								   relation->rd_rel->relname.data,
+								   RelationGetRelationName(relation),
 								   /* title */ titleBuf.data);
 
 		}
@@ -1218,7 +1216,8 @@ aocs_fetch(AOCSFetchDesc aocsFetchDesc,
 {
 	int segmentFileNum = AOTupleIdGet_segmentFileNum(aoTupleId);
 	int64 rowNum = AOTupleIdGet_rowNum(aoTupleId);
-	int numCols = aocsFetchDesc->relation->rd_att->natts;
+    TupleDesc tupdesc = RelationGetDescr(aocsFetchDesc->relation);
+	int numCols = tupdesc->natts;
 	int colno;
 	bool found = true;
 
@@ -1381,9 +1380,13 @@ aocs_fetch_finish(AOCSFetchDesc aocsFetchDesc)
 	int colno;
 	Relation relation = aocsFetchDesc->relation;
 
-	Assert(relation != NULL && relation->rd_att != NULL);
+	Assert(relation != NULL);
 
-	for (colno = 0; colno < relation->rd_att->natts; colno++)
+    TupleDesc tupdesc = RelationGetDescr(relation);
+
+	Assert(tupdesc != NULL);
+
+	for (colno = 0; colno < tupdesc->natts; colno++)
 	{
 		DatumStreamFetchDesc datumStreamFetchDesc =
 			aocsFetchDesc->datumStreamFetchDesc[colno];
