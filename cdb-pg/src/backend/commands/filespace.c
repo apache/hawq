@@ -685,14 +685,23 @@ CreateFileSpace(CreateFileSpaceStmt *stmt)
 	foreach(cell, stmt->locations)
 	{
 		FileSpaceEntry *fse  = (FileSpaceEntry*) lfirst(cell);
+		int				dbid = 0;
+		char			*location = NULL;
 
 		/* Standby will create filespace dir in xlog_mm.c */
 		if (fse->dbid == GpStandbyDbid)
 			continue;
 
+		/* Master must set the standby information. */
+		if (fse->dbid == GpIdentity.dbid && mirror)
+		{
+			dbid = mirror->dbid;
+			location = mirror->location;
+		}
+
 		MirroredFileSysObj_TransactionCreateFilespaceDir(
 			fsoid, 
-			fse->dbid, fse->location, 0, NULL,
+			fse->dbid, fse->location, dbid, location,
 			&persistentTid, &persistentSerialNum);
 	}
 }
