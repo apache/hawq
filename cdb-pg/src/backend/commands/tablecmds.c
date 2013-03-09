@@ -3590,6 +3590,25 @@ rebuildAlteredTableInfo(AlterRewriteTableInfo *ar_tab)
 void
 AlterTable(AlterTableStmt *stmt)
 {
+	if (stmt->relkind == OBJECT_INDEX)
+	{
+		if (!gp_called_by_pgdump)
+			ereport(ERROR,
+				(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter index statement yet") ));
+	}
+	else if (stmt->relkind == OBJECT_FOREIGNTABLE)
+	{
+		if (!gp_called_by_pgdump)
+			ereport(ERROR,
+				(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter foreign table statement yet") ));
+	}
+	else if (stmt->relkind == OBJECT_EXTTABLE)
+	{
+		if (!gp_called_by_pgdump)
+			ereport(ERROR,
+				(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter external table statement yet") ));
+	}
+
 	Relation rel = relation_openrv(stmt->relation, AccessExclusiveLock);
 	int			expected_refcnt;
 

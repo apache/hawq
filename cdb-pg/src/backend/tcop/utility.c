@@ -1383,6 +1383,13 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_AlterDatabaseStmt:
+			/* if guc variable not set, or bootstrap mode, or utility mode connection, throw exception*/
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY)
+					|| gp_called_by_pgdump))
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter database statement yet") ));
+			}
 			AlterDatabase((AlterDatabaseStmt *) parsetree);
 			break;
 
@@ -1664,6 +1671,13 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_AlterQueueStmt:
+			/* if guc variable not set, or bootstrap mode, or utility mode connection, throw exception*/
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY)
+					|| gp_called_by_pgdump))
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter resource queue statement yet") ));
+			}
 			AlterQueue((AlterQueueStmt *) parsetree);
 			break;
 

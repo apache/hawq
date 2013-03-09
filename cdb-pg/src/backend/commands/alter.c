@@ -49,30 +49,65 @@ ExecRenameStmt(RenameStmt *stmt)
 	switch (stmt->renameType)
 	{
 		case OBJECT_AGGREGATE:
+			if (!gp_called_by_pgdump)
+			{
+				ereport(ERROR,
+					(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support rename aggregate statement yet") ));
+			}
 			RenameAggregate(stmt->object, stmt->objarg, stmt->newname);
 			break;
 
 		case OBJECT_CONVERSION:
+			if (!gp_called_by_pgdump)
+			{
+				ereport(ERROR,
+					(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support rename conversion statement yet") ));
+			}
 			RenameConversion(stmt->object, stmt->newname);
 			break;
 
 		case OBJECT_DATABASE:
+			if (!gp_called_by_pgdump)
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support rename database statement yet") ));
+			}
 			RenameDatabase(stmt->subname, stmt->newname);
 			break;
 
 		case OBJECT_EXTPROTOCOL:
+			if (!gp_called_by_pgdump)
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support rename protocol statement yet") ));
+			}
 			RenameExtProtocol(stmt->subname, stmt->newname);
 			break;
 
 		case OBJECT_FUNCTION:
+			if (!gp_called_by_pgdump)
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support rename function statement yet") ));
+			}
 			RenameFunction(stmt->object, stmt->objarg, stmt->newname);
 			break;
 
 		case OBJECT_LANGUAGE:
+			if (!gp_called_by_pgdump)
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support rename language statement yet") ));
+			}
 			RenameLanguage(stmt->subname, stmt->newname);
 			break;
 
 		case OBJECT_OPCLASS:
+			if (!gp_called_by_pgdump)
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support rename operator class statement yet") ));
+			}
 			RenameOpClass(stmt->object, stmt->subname, stmt->newname);
 			break;
 
@@ -81,23 +116,48 @@ ExecRenameStmt(RenameStmt *stmt)
 			break;
 
 		case OBJECT_SCHEMA:
+			if (!gp_called_by_pgdump)
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support rename schema statement yet") ));
+			}
 			RenameSchema(stmt->subname, stmt->newname);
 			break;
 
 		case OBJECT_TABLESPACE:
+			if (!gp_called_by_pgdump)
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support rename tablespace statement yet") ));
+			}
 			RenameTableSpace(stmt->subname, stmt->newname);
 			break;
 
 		case OBJECT_FILESPACE:
+			if (!gp_called_by_pgdump)
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support rename filespace statement yet") ));
+			}
 			RenameFileSpace(stmt->subname, stmt->newname);
 			break;
 
 		case OBJECT_FILESYSTEM:
+			if (!gp_called_by_pgdump)
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support rename filesystem statement yet") ));
+			}
 			RenameFileSystem(stmt->subname, stmt->newname);
 			break;
 
-		case OBJECT_TABLE:
 		case OBJECT_INDEX:
+			if (!gp_called_by_pgdump)
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support rename index statement yet") ));
+			}
+		case OBJECT_TABLE:
 		{
 			CheckRelationOwnership(stmt->relation, true);
 			stmt->objid = RangeVarGetRelid(stmt->relation, false);
@@ -121,8 +181,13 @@ ExecRenameStmt(RenameStmt *stmt)
 			break;
 		}
 
-		case OBJECT_COLUMN:
 		case OBJECT_TRIGGER:
+			if (!gp_called_by_pgdump)
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support rename trigger statement yet") ));
+			}
+		case OBJECT_COLUMN:
 			{
 				Oid			relid;
 
@@ -167,28 +232,32 @@ ExecAlterObjectSchemaStmt(AlterObjectSchemaStmt *stmt)
 	{
 		case OBJECT_AGGREGATE:
 			ereport(ERROR,
-                            (errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter aggregate schema statement yet in GPSQL") ));
+                            (errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter aggregate schema statement yet") ));
 			AlterFunctionNamespace(stmt->object, stmt->objarg, true,
 								   stmt->newschema);
 			break;
 
 		case OBJECT_FUNCTION:
 			ereport(ERROR,
-                            (errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter function schema statement yet in GPSQL") ));
+                            (errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter function schema statement yet") ));
 			AlterFunctionNamespace(stmt->object, stmt->objarg, false,
 								   stmt->newschema);
 			break;
 
 		case OBJECT_SEQUENCE:
+			ereport(ERROR,
+			                            (errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter sequence schema statement yet") ));
 		case OBJECT_TABLE:
 			CheckRelationOwnership(stmt->relation, true);
 			AlterTableNamespace(stmt->relation, stmt->newschema);
 			break;
 
 		case OBJECT_TYPE:
+			ereport(ERROR,
+			                            (errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter type schema statement yet") ));
 		case OBJECT_DOMAIN:
 			ereport(ERROR,
-                            (errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter type schema statement yet in GPSQL") ));
+                            (errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter domain schema statement yet") ));
 			AlterTypeNamespace(stmt->object, stmt->newschema);
 			break;
 
@@ -212,32 +281,35 @@ ExecAlterOwnerStmt(AlterOwnerStmt *stmt)
 		case OBJECT_AGGREGATE:
 			if (!gp_called_by_pgdump)
 				ereport(ERROR,
-						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter aggregate owner statement yet in GPSQL") ));
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter aggregate owner statement yet") ));
 			AlterAggregateOwner(stmt->object, stmt->objarg, newowner);
 			break;
 
 		case OBJECT_CONVERSION:
 			if (!gp_called_by_pgdump)
 				ereport(ERROR,
-						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter conversion owner statement yet in GPSQL") ));
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter conversion owner statement yet") ));
 			AlterConversionOwner(stmt->object, newowner);
 			break;
 
 		case OBJECT_DATABASE:
+			if (!gp_called_by_pgdump)
+							ereport(ERROR,
+									(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter database owner statement yet") ));
 			AlterDatabaseOwner(strVal(linitial(stmt->object)), newowner);
 			break;
 
 		case OBJECT_FUNCTION:
 			if (!gp_called_by_pgdump)
 				ereport(ERROR,
-						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter function owner statement yet in GPSQL") ));
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter function owner statement yet") ));
 			AlterFunctionOwner(stmt->object, stmt->objarg, newowner);
 			break;
 
 		case OBJECT_OPERATOR:
 			if (!gp_called_by_pgdump)
 				ereport(ERROR,
-						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter operator owner statement yet in GPSQL") ));
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter operator owner statement yet") ));
 			Assert(list_length(stmt->objarg) == 2);
 			AlterOperatorOwner(stmt->object,
 							   (TypeName *) linitial(stmt->objarg),
@@ -248,25 +320,28 @@ ExecAlterOwnerStmt(AlterOwnerStmt *stmt)
 		case OBJECT_OPCLASS:
 			if (!gp_called_by_pgdump)
 				ereport(ERROR,
-						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter operator class owner statement yet in GPSQL") ));
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter operator class owner statement yet") ));
 			AlterOpClassOwner(stmt->object, stmt->addname, newowner);
 			break;
 
 		case OBJECT_SCHEMA:
+			if (!gp_called_by_pgdump)
+							ereport(ERROR,
+									(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter schema owner statement yet") ));
 			AlterSchemaOwner(strVal(linitial(stmt->object)), newowner);
 			break;
 
 		case OBJECT_TABLESPACE:
 			if (!gp_called_by_pgdump)
 				ereport(ERROR,
-						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter tablespace owner statement yet in GPSQL") ));
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter tablespace owner statement yet") ));
 			AlterTableSpaceOwner(strVal(linitial(stmt->object)), newowner);
 			break;
 
 		case OBJECT_FILESPACE:
 			if (!gp_called_by_pgdump)
 				ereport(ERROR,
-						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter filespace owner statement yet in GPSQL") ));
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter filespace owner statement yet") ));
 			AlterFileSpaceOwner(stmt->object, newowner);
 			break;
 
@@ -274,14 +349,14 @@ ExecAlterOwnerStmt(AlterOwnerStmt *stmt)
 		case OBJECT_DOMAIN:		/* same as TYPE */
 			if (!gp_called_by_pgdump)
 				ereport(ERROR,
-						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter type owner statement yet in GPSQL") ));
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter type owner statement yet") ));
 			AlterTypeOwner(stmt->object, newowner);
 			break;
 
 		case OBJECT_FDW:
 			if (!gp_called_by_pgdump)
 				ereport(ERROR,
-						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter foreign data wrapper owner statement yet in GPSQL") ));
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter foreign data wrapper owner statement yet") ));
 			AlterForeignDataWrapperOwner(strVal(linitial(stmt->object)),
 										 newowner);
 			break;
@@ -289,14 +364,14 @@ ExecAlterOwnerStmt(AlterOwnerStmt *stmt)
 		case OBJECT_FOREIGN_SERVER:
 			if (!gp_called_by_pgdump)
 				ereport(ERROR,
-						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter foreign server owner statement yet in GPSQL") ));
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter foreign server owner statement yet") ));
 			AlterForeignServerOwner(strVal(linitial(stmt->object)), newowner);
 			break;
 		
 		case OBJECT_EXTPROTOCOL:
 			if (!gp_called_by_pgdump)
 				ereport(ERROR,
-						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter external protocol owner statement yet in GPSQL") ));
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter external protocol owner statement yet") ));
 			AlterExtProtocolOwner(strVal(linitial(stmt->object)), newowner);
 			break;
 			
