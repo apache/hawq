@@ -130,6 +130,7 @@ extern Relation RelationBuildLocalRelation(const char *relname,
 						   Oid relid,
 						   Oid reltablespace,
 			               char relkind,            /*CDB*/
+			               char relstorage,
 						   bool shared_relation);
 
 /*

@@ -128,6 +128,7 @@ typedef struct Port
 
 	/* GPSQL segments information */
 	Oid			dboid;
+	Oid			dbdtsoid;
 	char		*bootstrap_user;
 	int			encoding;
 	StringInfoData	override_options;		/* database/user config */

@@ -53,6 +53,7 @@
 #include "catalog/pg_trigger.h"
 #include "catalog/pg_type.h"
 #include "commands/trigger.h"
+#include "commands/dbcommands.h"
 #include "miscadmin.h"
 #include "optimizer/clauses.h"
 #include "optimizer/planmain.h"
@@ -1366,8 +1367,13 @@ RelationInitPhysicalAddr(Relation relation)
 {
 	if (relation->rd_rel->reltablespace)
 		relation->rd_node.spcNode = relation->rd_rel->reltablespace;
+	else if (relstorage_is_ao(relation->rd_rel->relstorage))
+	{
+		relation->rd_node.spcNode = Gp_role != GP_ROLE_EXECUTE ? get_database_dts(MyDatabaseId) : MyProcPort->dbdtsoid;
+	}
 	else
 		relation->rd_node.spcNode = MyDatabaseTableSpace;
+
 	if (relation->rd_rel->relisshared)
 		relation->rd_node.dbNode = InvalidOid;
 	else if (relation->rd_id < FirstNormalObjectId ||
@@ -2736,6 +2742,7 @@ RelationBuildLocalRelation(const char *relname,
 						   Oid relid,
 						   Oid reltablespace,
 			               char relkind,            /*CDB*/
+			               char relstorage,
 						   bool shared_relation)
 {
 	Relation	rel;
@@ -2855,7 +2862,7 @@ RelationBuildLocalRelation(const char *relname,
 	rel->rd_rel->relnamespace = relnamespace;
 
 	rel->rd_rel->relkind = RELKIND_UNCATALOGED;
-	rel->rd_rel->relstorage = RELSTORAGE_HEAP;
+	rel->rd_rel->relstorage = relstorage;
 	rel->rd_rel->relhasoids = rel->rd_att->tdhasoid;
 	rel->rd_rel->relnatts = natts;
 	rel->rd_rel->reltype = InvalidOid;

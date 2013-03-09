@@ -308,6 +308,7 @@ struct pg_conn
 										 * retransmits */
 
 	char	   *dboid; 		 	/* gpsql */
+	char	   *dbdtsoid;		/* gpsql */
 	char	   *bootstrap_user; /* gpsql */
 	char	   *encoding;		/* gpsql */
 	char	   *segindex;		/* gpsql */

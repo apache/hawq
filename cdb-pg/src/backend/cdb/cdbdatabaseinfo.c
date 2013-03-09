@@ -31,6 +31,7 @@
 #include "access/appendonlytid.h"
 #include "utils/guc.h"
 #include "cdb/cdbpersistentfilesysobj.h"
+#include "commands/dbcommands.h"
 
 
 /*-------------------------------------------------------------------------
@@ -887,6 +888,11 @@ DbInfoGpRelationNode_Compare(const void *entry1, const void *entry2)
 
 	if (info1->relfilenodeOid == info2->relfilenodeOid)
 	{
+		if (info1->contentid < info2->contentid)
+			return -1;
+		if (info1->contentid > info2->contentid)
+			return 1;
+		
 		if (info1->segmentFileNum == info2->segmentFileNum)
 			return 0;
 		else if (info1->segmentFileNum > info2->segmentFileNum)
@@ -1239,7 +1245,12 @@ DatabaseInfo_CollectPgClass(
 		reltablespace = form_pg_class->reltablespace;
 
 		if (reltablespace == 0)
-			reltablespace = info->defaultTablespace;
+		{
+			if (relstorage_is_ao(form_pg_class->relstorage))
+				reltablespace = get_database_dts(info->database);
+			else
+				reltablespace = info->defaultTablespace;
+		}
 
 		/*
 		 *	Skip non-storage relations.
@@ -1523,7 +1534,8 @@ DatabaseInfo_AlignAppendOnly(
 				break;
 			}
 
-			if (dbInfoRel->gpRelationNodes[g].segmentFileNum < appendOnlyCatalogSegmentInfo->segmentFileNum)
+			if (dbInfoRel->gpRelationNodes[g].contentid == appendOnlyCatalogSegmentInfo->contentid &&
+				dbInfoRel->gpRelationNodes[g].segmentFileNum < appendOnlyCatalogSegmentInfo->segmentFileNum)
 			{
 				if (dbInfoRel->gpRelationNodes[g].segmentFileNum == 0)
 				{
@@ -1538,8 +1550,8 @@ DatabaseInfo_AlignAppendOnly(
 					 dbInfoRel->relname,
 					 dbInfoRel->gpRelationNodes[g].segmentFileNum);
 			}
-			else if (dbInfoRel->gpRelationNodes[g].segmentFileNum == appendOnlyCatalogSegmentInfo->segmentFileNum &&
-					dbInfoRel->gpRelationNodes[g].contentid == appendOnlyCatalogSegmentInfo->contentid)
+			else if (dbInfoRel->gpRelationNodes[g].contentid == appendOnlyCatalogSegmentInfo->contentid &&
+					 dbInfoRel->gpRelationNodes[g].segmentFileNum == appendOnlyCatalogSegmentInfo->segmentFileNum)
 			{
 				dbInfoRel->gpRelationNodes[g].logicalEof = appendOnlyCatalogSegmentInfo->logicalEof;
 				g++;

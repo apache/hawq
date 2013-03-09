@@ -2320,6 +2320,16 @@ build_startup_packet(const PGconn *conn, char *packet,
 		packet_len += strlen(conn->dboid) + 1;
 	}
 
+	if (conn->dbdtsoid && conn->dbdtsoid[0])
+	{
+		if (packet)
+			strcpy(packet + packet_len, "dbdtsoid");
+		packet_len += strlen("dbdtsoid") + 1;
+		if (packet)
+			strcpy(packet + packet_len, conn->dbdtsoid);
+		packet_len += strlen(conn->dbdtsoid) + 1;
+	}
+
 	if (conn->bootstrap_user && conn->bootstrap_user[0])
 	{
 		if (packet)

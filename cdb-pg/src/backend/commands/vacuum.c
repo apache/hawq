@@ -3952,15 +3952,18 @@ gen_oids_for_bitmaps(VacuumStmt *vacstmt, Relation onerel)
 				vacstmt->extra_oids = lappend_oid(vacstmt->extra_oids,
 											  GetNewRelFileNode(tblspc,
 																shared,
-																NULL));
+																NULL,
+																false));
 				vacstmt->extra_oids = lappend_oid(vacstmt->extra_oids,
 												  GetNewRelFileNode(tblspc,
 																	shared,
-																	NULL));
+																	NULL,
+																	false));
 				vacstmt->extra_oids = lappend_oid(vacstmt->extra_oids,
 												  GetNewRelFileNode(tblspc,
 																	shared,
-																	NULL));
+																	NULL,
+																	false));
 			}
 		}
 	}

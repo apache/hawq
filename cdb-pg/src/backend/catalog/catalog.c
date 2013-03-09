@@ -1082,7 +1082,7 @@ GetNewOidWithIndex(Relation relation, Relation indexrel)
  * created by bootstrap have preassigned OIDs, so there's no need.
  */
 Oid
-GetNewRelFileNode(Oid reltablespace, bool relisshared, Relation pg_class)
+GetNewRelFileNode(Oid reltablespace, bool relisshared, Relation pg_class, bool isAo)
 {
 	RelFileNode rnode;
 	char	   *rpath;
@@ -1090,7 +1090,13 @@ GetNewRelFileNode(Oid reltablespace, bool relisshared, Relation pg_class)
 	bool		collides;
 
 	/* This should match RelationInitPhysicalAddr */
-	rnode.spcNode = reltablespace ? reltablespace : get_database_dts(MyDatabaseId);
+	if (isAo && reltablespace == InvalidOid)
+		rnode.spcNode = get_database_dts(MyDatabaseId);
+	else if (isAo)
+		rnode.spcNode = reltablespace;
+	else
+		rnode.spcNode = MyDatabaseTableSpace;
+
 	rnode.dbNode = relisshared ? InvalidOid : MyDatabaseId;
 
 	do
@@ -1148,7 +1154,7 @@ GetNewRelFileNode(Oid reltablespace, bool relisshared, Relation pg_class)
 
 bool
 CheckNewRelFileNodeIsOk(Oid newOid, Oid reltablespace, bool relisshared, 
-						Relation pg_class)
+						Relation pg_class, bool isAo)
 {
 	RelFileNode rnode;
 	char	   *rpath;
@@ -1193,7 +1199,13 @@ CheckNewRelFileNodeIsOk(Oid newOid, Oid reltablespace, bool relisshared,
 	}
 
 	/* This should match RelationInitPhysicalAddr */
-	rnode.spcNode = reltablespace ? reltablespace : MyDatabaseTableSpace;
+	if (isAo && reltablespace == InvalidOid)
+		rnode.spcNode = get_database_dts(MyDatabaseId);
+	else if (isAo)
+		rnode.spcNode = reltablespace;
+	else
+		rnode.spcNode = MyDatabaseTableSpace;
+
 	rnode.dbNode = relisshared ? InvalidOid : MyDatabaseId;
 	
 	rnode.relNode = newOid;

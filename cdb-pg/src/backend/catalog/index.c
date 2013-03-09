@@ -613,11 +613,11 @@ index_create(Oid heapRelationId,
 	 */
 	if (!OidIsValid(indexRelationId))
 		indexRelationId = GetNewRelFileNode(tableSpaceId, shared_relation,
-											pg_class);
+											pg_class, false);
 	else
 		if (IsUnderPostmaster)
 		{
-			CheckNewRelFileNodeIsOk(indexRelationId, tableSpaceId, shared_relation, pg_class);
+			CheckNewRelFileNodeIsOk(indexRelationId, tableSpaceId, shared_relation, pg_class, false);
 		}
 
 	/*
@@ -2522,7 +2522,8 @@ generateExtraOids(int num_extra_oids,
 		if (genNewOid)
 			newOid = GetNewRelFileNode(reltablespace,
 									   relisshared,
-									   NULL);
+									   NULL,
+									   false);
 		
 		extra_oids = lappend_oid(extra_oids, newOid);
 	}

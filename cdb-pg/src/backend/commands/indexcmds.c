@@ -654,11 +654,11 @@ DefineIndex(RangeVar *heapRelation,
 
 			pg_class = heap_open(RelationRelationId, RowExclusiveLock);
 
-			indexRelationId = GetNewRelFileNode(tablespaceId, false, pg_class);
-		    iiopaque->heapOid = GetNewRelFileNode(tablespaceId, false, pg_class);
-			iiopaque->indexOid = GetNewRelFileNode(tablespaceId, false, pg_class);
-		    iiopaque->blkdirRelOid = GetNewRelFileNode(tablespaceId, false, pg_class);
-			iiopaque->blkdirIdxOid = GetNewRelFileNode(tablespaceId, false, pg_class);
+			indexRelationId = GetNewRelFileNode(tablespaceId, false, pg_class, false);
+		    iiopaque->heapOid = GetNewRelFileNode(tablespaceId, false, pg_class, false);
+			iiopaque->indexOid = GetNewRelFileNode(tablespaceId, false, pg_class, false);
+		    iiopaque->blkdirRelOid = GetNewRelFileNode(tablespaceId, false, pg_class, false);
+			iiopaque->blkdirIdxOid = GetNewRelFileNode(tablespaceId, false, pg_class, false);
 
 			/* done with pg_class */
 			heap_close(pg_class, NoLock);

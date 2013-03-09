@@ -200,6 +200,8 @@ static const PQconninfoOption PQconninfoOptions[] = {
 	 */
 	{"dboid", NULL, "", NULL,
 	"dboid", "D", 10},
+	{"dbdtsoid", NULL, "", NULL,
+	"dbdtsoid", "D", 10},
 	{"bootstrap_user", NULL, "", NULL,
 	"bootstrap_user", "D", 64},
 	{"encoding", NULL, "", NULL,
@@ -558,6 +560,8 @@ fillPGconn(PGconn *conn, PQconninfoOption *connOptions)
 	 */
 	tmp = conninfo_getval(connOptions, "dboid");
 	conn->dboid = tmp ? strdup(tmp) : NULL;
+	tmp = conninfo_getval(connOptions, "dbdtsoid");
+	conn->dbdtsoid = tmp ? strdup(tmp) : NULL;
 	tmp = conninfo_getval(connOptions, "bootstrap_user");
 	conn->bootstrap_user = tmp ? strdup(tmp) : NULL;
 	tmp = conninfo_getval(connOptions, "encoding");
@@ -2252,6 +2256,8 @@ freePGconn(PGconn *conn)
 
 	if (conn->dboid)
 		free(conn->dboid);
+	if (conn->dbdtsoid)
+		free(conn->dbdtsoid);
 	if (conn->bootstrap_user)
 		free(conn->bootstrap_user);
 	if (conn->encoding)

@@ -2691,6 +2691,8 @@ retry1:
 				port->cmdline_options = pstrdup(valptr);
 			else if (strcmp(nameptr, "dboid") == 0)
 				port->dboid = atoi(valptr);
+			else if (strcmp(nameptr, "dbdtsoid") == 0)
+				port->dbdtsoid = atoi(valptr);
 			else if (strcmp(nameptr, "bootstrap_user") == 0)
 				port->bootstrap_user = pstrdup(valptr);
 			else if (strcmp(nameptr, "encoding") == 0)

@@ -98,6 +98,7 @@
 #include "utils/relcache.h"
 #include "utils/simex.h"
 #include "utils/syscache.h"
+#include "commands/dbcommands.h"
 
 
 
@@ -638,8 +639,11 @@ PrepareForTupleInvalidation(Relation relation, HeapTuple tuple)
 		 */
 		if (classtup->reltablespace)
 			rnode.spcNode = classtup->reltablespace;
+		else if (relstorage_is_ao(classtup->relstorage))
+			rnode.spcNode = get_database_dts(databaseId);
 		else
 			rnode.spcNode = MyDatabaseTableSpace;
+		
 		rnode.dbNode = databaseId;
 		rnode.relNode = classtup->relfilenode;
 		RegisterSmgrInvalidation(rnode);
@@ -1105,10 +1109,14 @@ CacheInvalidateRelcacheByTuple(HeapTuple classTuple)
 		databaseId = InvalidOid;
 	else
 		databaseId = MyDatabaseId;
+
 	if (classtup->reltablespace)
 		rnode.spcNode = classtup->reltablespace;
+	else if (relstorage_is_ao(classtup->relstorage))
+		rnode.spcNode = get_database_dts(databaseId);
 	else
 		rnode.spcNode = MyDatabaseTableSpace;
+
 	rnode.dbNode = databaseId;
 	rnode.relNode = classtup->relfilenode;
 

@@ -79,7 +79,6 @@ Compression Level: 0
 Block Size: 32768
 Checksum: f
 Distributed by: (c)
-Tablespace: "goh_regression_tablespace1"
 
 \c regression
 BEGIN;

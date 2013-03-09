@@ -1318,19 +1318,19 @@ void populate_oidInfo(TableOidInfo *oidInfo, Oid TableSpace, bool relisshared,
 
 			/* Get new oids for pg_class entities */
 			oidInfo->relOid = 
-				GetNewRelFileNode(TableSpace, relisshared,  pg_class_desc);
+				GetNewRelFileNode(TableSpace, relisshared,  pg_class_desc, relstorage_is_ao(pg_class_desc->rd_rel->relstorage));
 			oidInfo->toastOid = 
-				GetNewRelFileNode(TableSpace, relisshared,  pg_class_desc);
+				GetNewRelFileNode(TableSpace, relisshared,  pg_class_desc, false);
 			oidInfo->toastIndexOid = 
-				GetNewRelFileNode(TableSpace, relisshared,  pg_class_desc);
+				GetNewRelFileNode(TableSpace, relisshared,  pg_class_desc, false);
 			oidInfo->aosegOid = 
-				GetNewRelFileNode(TableSpace, relisshared,  pg_class_desc);
+				GetNewRelFileNode(TableSpace, relisshared,  pg_class_desc, false);
 			oidInfo->aosegIndexOid = 
-				GetNewRelFileNode(TableSpace, relisshared,  pg_class_desc);
+				GetNewRelFileNode(TableSpace, relisshared,  pg_class_desc, false);
 			oidInfo->aoblkdirOid = 
-				GetNewRelFileNode(TableSpace, relisshared,  pg_class_desc);
+				GetNewRelFileNode(TableSpace, relisshared,  pg_class_desc, false);
 			oidInfo->aoblkdirIndexOid = 
-				GetNewRelFileNode(TableSpace, relisshared,  pg_class_desc);
+				GetNewRelFileNode(TableSpace, relisshared,  pg_class_desc, false);
 
 			/* gonna update, so don't unlock */
 			heap_close(pg_class_desc, NoLock);  
@@ -1341,13 +1341,13 @@ void populate_oidInfo(TableOidInfo *oidInfo, Oid TableSpace, bool relisshared,
 				pg_type_desc = heap_open(TypeRelationId, RowExclusiveLock);
 
 				oidInfo->comptypeOid = 
-					GetNewRelFileNode(TableSpace, relisshared,  pg_type_desc);
+					GetNewRelFileNode(TableSpace, relisshared,  pg_type_desc, false);
 				oidInfo->toastComptypeOid = 
-					GetNewRelFileNode(TableSpace, relisshared,  pg_type_desc);
+					GetNewRelFileNode(TableSpace, relisshared,  pg_type_desc, false);
 				oidInfo->aosegComptypeOid = 
-					GetNewRelFileNode(TableSpace, relisshared,  pg_type_desc);
+					GetNewRelFileNode(TableSpace, relisshared,  pg_type_desc, false);
 				oidInfo->aoblkdirComptypeOid = 
-					GetNewRelFileNode(TableSpace, relisshared,  pg_type_desc);
+					GetNewRelFileNode(TableSpace, relisshared,  pg_type_desc, false);
 
 				/* We don't need to keep the pg_type lock */
 				heap_close(pg_type_desc, RowExclusiveLock);

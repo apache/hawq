@@ -5074,18 +5074,18 @@ ATAddToastIfNeeded(List **wqueue,
 				if (oidInfo[m].toastOid == InvalidOid)
 				{
 					pg_class_desc = heap_open(RelationRelationId, RowExclusiveLock);
-					oidInfo[m].toastOid = GetNewRelFileNode(reltablespace, false, pg_class_desc);
+					oidInfo[m].toastOid = GetNewRelFileNode(reltablespace, false, pg_class_desc, false);
 				}
 				if (oidInfo[m].toastIndexOid == InvalidOid)
 				{
 					if (!pg_class_desc)
 						pg_class_desc = heap_open(RelationRelationId, RowExclusiveLock);
-					oidInfo[m].toastIndexOid = GetNewRelFileNode(reltablespace, false, pg_class_desc);
+					oidInfo[m].toastIndexOid = GetNewRelFileNode(reltablespace, false, pg_class_desc, false);
 				}
 				if (oidInfo[m].toastComptypeOid == InvalidOid)
 				{
 					pg_type_desc = heap_open(RelationRelationId, RowExclusiveLock);
-					oidInfo[m].toastIndexOid = GetNewRelFileNode(reltablespace, false, pg_type_desc);
+					oidInfo[m].toastIndexOid = GetNewRelFileNode(reltablespace, false, pg_type_desc, false);
 				}
 				if (pg_class_desc)
 					heap_close(pg_class_desc, NoLock);

@@ -325,7 +325,7 @@ heap_create(const char *relname,
 	 *
 	 * Yes, this is a bit of a hack.
 	 */
-	if (reltablespace == MyDatabaseTableSpace)
+	if (reltablespace == MyDatabaseTableSpace || reltablespace == get_database_dts(MyDatabaseId))
 		reltablespace = InvalidOid;
 
 	/*
@@ -337,6 +337,7 @@ heap_create(const char *relname,
 									 relid,
 									 reltablespace,
                                      relkind,           /*CDB*/
+                                     relstorage,
 									 shared_relation);
 
 	/*
@@ -1514,12 +1515,12 @@ heap_create_with_catalog(const char *relname,
 	 */
 	if (!OidIsValid(relid))
 		relid = GetNewRelFileNode(reltablespace, shared_relation,
-								  pg_class_desc);
+								  pg_class_desc, relstorage_is_ao(pg_class_desc->rd_rel->relstorage));
 	else
 		if (IsUnderPostmaster)
 		{
 			CheckNewRelFileNodeIsOk(relid, reltablespace, shared_relation,
-									pg_class_desc);
+									pg_class_desc, relstorage_is_ao(pg_class_desc->rd_rel->relstorage));
 		}
 
 	/*
@@ -3682,7 +3683,8 @@ setNewRelfilenode(Relation relation)
 	/* Allocate a new relfilenode */
 	newrelfilenode = GetNewRelFileNode(relation->rd_rel->reltablespace,
 									   relation->rd_rel->relisshared,
-									   NULL);
+									   NULL,
+									   relstorage_is_ao(relation->rd_rel->relstorage));
 
 		elog(DEBUG1, "setNewRelfilenode called in EXECUTE mode, "
 			 "newrelfilenode=%d", newrelfilenode);
@@ -3712,7 +3714,7 @@ setNewRelfilenodeToOid(Relation relation, Oid newrelfilenode)
 		 newrelfilenode);
 
 	CheckNewRelFileNodeIsOk(newrelfilenode, relation->rd_rel->reltablespace,
-							relation->rd_rel->relisshared, NULL);
+							relation->rd_rel->relisshared, NULL, relstorage_is_ao(relation->rd_rel->relstorage));
 
 	setNewRelfilenodeCommon(relation, newrelfilenode);
 

@@ -1055,8 +1055,6 @@ prepareDispatchedCatalogSingleRelation(QueryContextInfo *cxt, Oid relid,
     tablespace = SysCacheGetAttr(RELOID, classtuple,
             Anum_pg_class_reltablespace, NULL );
 
-    prepareDispatchedCatalogTablespace(cxt, DatumGetObjectId(tablespace), htab);
-
     /* collect toast info */
     toastrelid = SysCacheGetAttr(RELOID, classtuple,
             Anum_pg_class_reltoastrelid, NULL );
@@ -1087,30 +1085,36 @@ prepareDispatchedCatalogSingleRelation(QueryContextInfo *cxt, Oid relid,
     relname = SysCacheGetAttr(RELOID, classtuple, Anum_pg_class_relname,
             NULL);
 
-    switch (DatumGetChar(relstorage))
-    {
-    case RELSTORAGE_AOROWS:
-    case RELSTORAGE_AOCOLS:
-        prepareDispatchedCatalogForAoCo(cxt, relid, forInsert, segno, htab);
-        break;
-    case RELSTORAGE_EXTERNAL:
-        prepareDispatchedCatalogExternalTable(cxt, relid);
-        break;
-    case RELSTORAGE_VIRTUAL:
-        break;
-    case RELSTORAGE_HEAP:
-        /* support catalog tables (gp_dist_random et al.) */
-        break;
+	/* The dfs tablespace oid must be dispatched. */
+	if (DatumGetObjectId(tablespace) == InvalidOid && relstorage_is_ao(relstorage))
+		prepareDispatchedCatalogTablespace(cxt, get_database_dts(MyDatabaseId), htab);
+	else
+		prepareDispatchedCatalogTablespace(cxt, DatumGetObjectId(tablespace), htab);
 
-    case RELSTORAGE_FOREIGN:
-        /* TODO */
-        elog(ERROR, "not implemented relstorage: %c, relname: %s",
-                DatumGetChar(relstorage), DatumGetCString(relname));
-        break;
-    default:
-        Insist(!"never get here");
-        break;
-    }
+	switch (DatumGetChar(relstorage))
+	{
+	case RELSTORAGE_AOROWS:
+	case RELSTORAGE_AOCOLS:
+		prepareDispatchedCatalogForAoCo(cxt, relid, forInsert, segno, htab);
+		break;
+	case RELSTORAGE_EXTERNAL:
+	    prepareDispatchedCatalogExternalTable(cxt, relid);
+	    break;
+	case RELSTORAGE_VIRTUAL:
+	    break;
+	case RELSTORAGE_HEAP:
+	    /* support catalog tables (gp_dist_random et al.) */
+	    break;
+
+	case RELSTORAGE_FOREIGN:
+	    /* TODO */
+	    elog(ERROR, "not implemented relstorage: %c, relname: %s",
+	            DatumGetChar(relstorage), DatumGetCString(relname));
+	    break;
+	default:
+	    Insist(!"never get here");
+	    break;
+	}
 
     ReleaseSysCache(classtuple);
 }

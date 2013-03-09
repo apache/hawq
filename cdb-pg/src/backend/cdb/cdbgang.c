@@ -238,6 +238,7 @@ create_gang_retry:
 	if (GpIdentity.segindex == MASTER_CONTENT_ID)
 	{
 		MyProcPort->dboid = MyDatabaseId;
+		MyProcPort->dbdtsoid = get_database_dts(MyDatabaseId);
 		MyProcPort->bootstrap_user = get_rolname(BOOTSTRAP_SUPERUSERID);
 		MyProcPort->encoding = GetDatabaseEncoding();
 	}

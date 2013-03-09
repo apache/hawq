@@ -435,20 +435,20 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
 			pg_class_desc = heap_open(RelationRelationId, RowExclusiveLock);
 			pg_type_desc = heap_open(TypeRelationId, RowExclusiveLock);
 
-			intoClause->oidInfo.relOid = GetNewRelFileNode(reltablespace, false, pg_class_desc);
+			intoClause->oidInfo.relOid = GetNewRelFileNode(reltablespace, false, pg_class_desc, false);
 			elog(DEBUG3, "ExecutorStart assigned new intoOidInfo.relOid = %d",
 				 intoClause->oidInfo.relOid);
 
-			intoClause->oidInfo.comptypeOid = GetNewRelFileNode(reltablespace, false, pg_type_desc);
-			intoClause->oidInfo.toastOid = GetNewRelFileNode(reltablespace, false, pg_class_desc);
-			intoClause->oidInfo.toastIndexOid = GetNewRelFileNode(reltablespace, false, pg_class_desc);
-			intoClause->oidInfo.toastComptypeOid = GetNewRelFileNode(reltablespace, false, pg_type_desc);
-			intoClause->oidInfo.aosegOid = GetNewRelFileNode(reltablespace, false, pg_class_desc);
-			intoClause->oidInfo.aosegIndexOid = GetNewRelFileNode(reltablespace, false, pg_class_desc);
-			intoClause->oidInfo.aosegComptypeOid = GetNewRelFileNode(reltablespace, false, pg_type_desc);
-			intoClause->oidInfo.aoblkdirOid = GetNewRelFileNode(reltablespace, false, pg_class_desc);
-			intoClause->oidInfo.aoblkdirIndexOid = GetNewRelFileNode(reltablespace, false, pg_class_desc);
-			intoClause->oidInfo.aoblkdirComptypeOid = GetNewRelFileNode(reltablespace, false, pg_type_desc);
+			intoClause->oidInfo.comptypeOid = GetNewRelFileNode(reltablespace, false, pg_type_desc, false);
+			intoClause->oidInfo.toastOid = GetNewRelFileNode(reltablespace, false, pg_class_desc, false);
+			intoClause->oidInfo.toastIndexOid = GetNewRelFileNode(reltablespace, false, pg_class_desc, false);
+			intoClause->oidInfo.toastComptypeOid = GetNewRelFileNode(reltablespace, false, pg_type_desc, false);
+			intoClause->oidInfo.aosegOid = GetNewRelFileNode(reltablespace, false, pg_class_desc, false);
+			intoClause->oidInfo.aosegIndexOid = GetNewRelFileNode(reltablespace, false, pg_class_desc, false);
+			intoClause->oidInfo.aosegComptypeOid = GetNewRelFileNode(reltablespace, false, pg_type_desc, false);
+			intoClause->oidInfo.aoblkdirOid = GetNewRelFileNode(reltablespace, false, pg_class_desc, false);
+			intoClause->oidInfo.aoblkdirIndexOid = GetNewRelFileNode(reltablespace, false, pg_class_desc, false);
+			intoClause->oidInfo.aoblkdirComptypeOid = GetNewRelFileNode(reltablespace, false, pg_type_desc, false);
 
 			heap_close(pg_class_desc, RowExclusiveLock);
 			heap_close(pg_type_desc, RowExclusiveLock);
