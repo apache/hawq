@@ -121,7 +121,7 @@ main(int argc, char *argv[])
 		{"no-privileges", no_argument, NULL, 'x'},
 		{"no-acl", no_argument, NULL, 'x'},
 		{"resource-queues", no_argument, NULL, 'r'},
-		{"filespaces", no_argument, NULL, 'f'},
+		{"filespaces", no_argument, NULL, 'F'},
 
 		/*
 		 * the following options don't have an equivalent short option letter
@@ -446,6 +446,8 @@ main(int argc, char *argv[])
 		fprintf(OPF, "SET standard_conforming_strings = %s;\n", std_strings);
 		if (strcmp(std_strings, "off") == 0)
 			fprintf(OPF, "SET escape_string_warning = 'off';\n");
+
+		fprintf(OPF, "SET gp_called_by_pgdump = true;\n");
 		fprintf(OPF, "\n");
 
 		/* Dump Resource Queues */
@@ -512,7 +514,7 @@ help(void)
 	printf(_("  -c, --clean              clean (drop) databases before recreating\n"));
 	printf(_("  -d, --inserts            dump data as INSERT, rather than COPY, commands\n"));
 	printf(_("  -D, --column-inserts     dump data as INSERT commands with column names\n"));
-	printf(_("  -f, --filespaces         dump filespace data\n"));
+	printf(_("  -F, --filespaces         dump filespace data\n"));
 	printf(_("  -g, --globals-only       dump only global objects, no databases\n"));
 	printf(_("  -o, --oids               include OIDs in dump\n"));
 	printf(_("  -O, --no-owner           skip restoration of object ownership\n"));
@@ -1211,7 +1213,7 @@ dumpFilespaces(PGconn *conn)
 		 */
 		subbuf = createPQExpBuffer();
 		appendPQExpBuffer(subbuf,
-						  "SELECT fsedbid, fselocation "
+						  "SELECT fsedbid, regexp_replace(fselocation, '^[^/]*://({[^}]*}){0,1}', '') "
 						  "FROM pg_catalog.pg_filespace_entry "
 						  "WHERE fsefsoid = %s "
 						  "ORDER BY 1",
@@ -1232,8 +1234,22 @@ dumpFilespaces(PGconn *conn)
 		}
 		PQclear(entries);
 
-		/* Finnish off the statement */
-		appendPQExpBuffer(buf, "\n);\n");
+		appendPQExpBuffer(buf, "\n) WITH (NUMREPLICA = ");
+
+		/* we need to look at the replica number of filespace*/
+		subbuf = createPQExpBuffer();
+		appendPQExpBuffer(subbuf,
+						  "SELECT fsrep "
+						  "FROM pg_filespace "
+						  "WHERE oid = %s ",
+						  fsoid);
+		entries = executeQuery(conn, subbuf->data);
+		destroyPQExpBuffer(subbuf);
+
+		/* add replica number to output*/
+		char	   *fsrep = PQgetvalue(entries, 0, 0);
+		appendPQExpBuffer(buf, "%s);\n", fsrep);
+		PQclear(entries);
 
 		/* Add a comment on the filespace if specified */
 		if (fsdesc && strlen(fsdesc))
