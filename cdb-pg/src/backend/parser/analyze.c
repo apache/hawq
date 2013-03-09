@@ -9925,7 +9925,11 @@ transformSelectStmt(ParseState *pstate, SelectStmt *stmt)
 
 	foreach(l, stmt->lockingClause)
 	{
-		transformLockingClause(qry, (LockingClause *) lfirst(l));
+		/* disable select for update/share for gpsql */
+		ereport(ERROR,
+				(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+				errmsg("Cannot support select for update/share statement yet") ));
+		/*transformLockingClause(qry, (LockingClause *) lfirst(l));*/
 	}
 
 	/*
