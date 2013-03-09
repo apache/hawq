@@ -23,6 +23,7 @@
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_tablespace.h"
+#include "catalog/gp_fastsequence.h"
 #include "cdb/cdbdispatchedtablespaceinfo.h"
 #include "cdb/cdbpartition.h"
 #include "cdb/cdbquerycontextdispatching.h"
@@ -1646,4 +1647,141 @@ createPrepareDispatchedCatalogRelationDisctinctHashTable(void)
     rels = hash_create("all relations", 10, &info, HASH_FUNCTION | HASH_ELEM);
 
     return rels;
+}
+
+QueryContextDispatchingSendBack
+CreateQueryContextDispatchingSendBack(int nfile)
+{
+	QueryContextDispatchingSendBack rc =
+			palloc0(sizeof(struct QueryContextDispatchingSendBackData));
+	rc->numfiles = nfile;
+	rc->eof = palloc0(nfile * sizeof(int64));
+	rc->uncompressed_eof = palloc0(nfile * sizeof(int64));
+
+	return rc;
+}
+
+void
+DropQueryContextDispatchingSendBack(QueryContextDispatchingSendBack sendback)
+{
+	if (sendback)
+	{
+		if (sendback->eof)
+			pfree(sendback->eof);
+		if (sendback->uncompressed_eof)
+			pfree(sendback->uncompressed_eof);
+		pfree(sendback);
+	}
+}
+
+
+void
+UpdateCatalogModifiedOnSegments(QueryContextDispatchingSendBack sendback)
+{
+	Assert(NULL != sendback);
+
+	AppendOnlyEntry *aoEntry = GetAppendOnlyEntry(sendback->relid, SnapshotNow);
+	Assert(aoEntry != NULL);
+
+	Relation rel = heap_open(sendback->relid, AccessShareLock);
+	if (RelationIsAoCols(rel))
+	{
+		Insist(sendback->numfiles == rel->rd_att->natts);
+		UpdateAOCSFileSegInfo(rel, aoEntry, sendback->segno,
+				sendback->insertCount, sendback->varblock, sendback->eof,
+				sendback->uncompressed_eof, sendback->contentid);
+	}
+	else if (RelationIsAoRows(rel))
+	{
+		Insist(sendback->numfiles == 1);
+		UpdateFileSegInfo(rel, aoEntry, sendback->segno,
+				sendback->eof[0], sendback->uncompressed_eof[0], sendback->insertCount,
+				sendback->varblock, sendback->contentid);
+	}
+	else
+	{
+		Insist(!"bug, should no get here.");
+	}
+
+	ItemPointerData tid;
+
+	InsertFastSequenceEntry(aoEntry->segrelid, sendback->segno,
+			sendback->nextFastSequence, sendback->contentid, &tid);
+
+	heap_close(rel, AccessShareLock);
+}
+
+StringInfo
+PreSendbackChangedCatalog(int aocount)
+{
+	StringInfo buf = makeStringInfo();
+
+	pq_beginmessage(buf, 'h');
+
+	/*
+	 * 1, send contentid
+	 */
+	pq_sendint(buf, GpIdentity.segindex, 4);
+
+	/*
+	 * 2, send number of relations
+	 */
+	pq_sendint(buf, aocount, 4);
+
+	return buf;
+}
+
+void
+AddSendbackChangedCatalogContent(StringInfo buf,
+		QueryContextDispatchingSendBack sendback)
+{
+	int i;
+
+	/*
+	 * 3, send relation id
+	 */
+	pq_sendint(buf, sendback->relid, 4);
+	/*
+	 * 4, send insertCount
+	 */
+	pq_sendint64(buf, sendback->insertCount);
+
+	/*
+	 * 5, send segment file no.
+	 */
+	pq_sendint(buf, sendback->segno, 4);
+	/*
+	 * 6, send varblock count
+	 */
+	pq_sendint64(buf, sendback->varblock);
+
+	/*
+	 * 7, send number of files
+	 */
+	pq_sendint(buf, sendback->numfiles, 4);
+
+	for (i = 0; i < sendback->numfiles; ++i)
+	{
+		/*
+		 * 8, send eof
+		 */
+		pq_sendint64(buf, sendback->eof[i]);
+		/*
+		 * 9 send uncompressed eof
+		 */
+		pq_sendint64(buf, sendback->uncompressed_eof[i]);
+	}
+
+	/*
+	 * 10, send next fast sequence.
+	 */
+	pq_sendint64(buf, sendback->nextFastSequence);
+}
+
+
+void
+FinishSendbackChangedCatalog(StringInfo buf)
+{
+	pq_endmessage(buf);
+	pfree(buf);
 }

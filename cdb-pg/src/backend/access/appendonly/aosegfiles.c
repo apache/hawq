@@ -454,7 +454,8 @@ UpdateFileSegInfo(Relation parentrel,
 				  int64 eof,
 				  int64 eof_uncompressed,
 				  int64 tuples_added,
-				  int64 varblocks_added)
+				  int64 varblocks_added,
+				  int32 contentid)
 {
 	LockAcquireResult acquireResult;
 	
@@ -471,13 +472,13 @@ UpdateFileSegInfo(Relation parentrel,
 	bool			   *new_record_nulls;
 	bool			   *new_record_repl;
 	bool				isNull;
-	bool			indexOK;
-	Oid				indexid;
 
 	/* overflow sanity checks. don't check the same for tuples_added,
 	 * it may be coming as a negative diff from gp_update_ao_master_stats */
 	Assert(varblocks_added >= 0);
 	Assert(eof >= 0);
+
+	Insist(Gp_role != GP_ROLE_EXECUTE);
 
 	elog(DEBUG3, "UpdateFileSegInfo called. segno = %d", segno);
 
@@ -488,7 +489,8 @@ UpdateFileSegInfo(Relation parentrel,
 												&parentrel->rd_node,
 												segno,
 												AccessExclusiveLock,
-												/* dontWait */ false);
+												/* dontWait */ false,
+												contentid);
 	if (acquireResult != LOCKACQUIRE_ALREADY_HELD)
 	{
 		elog(ERROR, "Should already have the (transaction-scope) write-lock on Append-Only segment file #%d, "
@@ -502,28 +504,15 @@ UpdateFileSegInfo(Relation parentrel,
 	pg_aoseg_dsc = pg_aoseg_rel->rd_att;
 
 	/*
-	 * in gpsql, index only exists on master.
-	 */
-	if (Gp_role == GP_ROLE_EXECUTE)
-	{
-		indexOK = FALSE;
-		indexid = InvalidOid;
-	} else
-	{
-		indexOK = TRUE;
-		indexid = aoEntry->segidxid;
-	}
-
-	/*
 	 * Setup a scan key to fetch from the index by segno.
 	 */
 	ScanKeyInit(&key[0], (AttrNumber) Anum_pg_aoseg_segno,
 			BTEqualStrategyNumber, F_INT4EQ, Int32GetDatum(segno));
 
 	ScanKeyInit(&key[1], (AttrNumber) Anum_pg_aoseg_content,
-			BTEqualStrategyNumber, F_INT4EQ, Int32GetDatum(GpIdentity.segindex));
+			BTEqualStrategyNumber, F_INT4EQ, Int32GetDatum(contentid));
 
-	aoscan = systable_beginscan(pg_aoseg_rel, indexid, indexOK,
+	aoscan = systable_beginscan(pg_aoseg_rel, aoEntry->segidxid, TRUE,
 			SnapshotNow, 2, &key[0]);
 
 	tuple = systable_getnext(aoscan);
@@ -595,8 +584,7 @@ UpdateFileSegInfo(Relation parentrel,
 
 	simple_heap_update(pg_aoseg_rel, &tuple->t_self, new_tuple);
 
-	if (Gp_role != GP_ROLE_EXECUTE)
-		CatalogUpdateIndexes(pg_aoseg_rel, new_tuple);
+	CatalogUpdateIndexes(pg_aoseg_rel, new_tuple);
 
 	heap_freetuple(new_tuple);
 
@@ -994,7 +982,8 @@ gp_update_aorow_master_stats_internal(Relation parentrel, Snapshot appendOnlyMet
 												&parentrel->rd_node,
 												qe_segno,
 												AccessExclusiveLock,
-												/* dontWait */ false);
+												/* dontWait */ false,
+												GpIdentity.segindex);
 
 				fsinfo = GetFileSegInfo(parentrel, aoEntry, appendOnlyMetaDataSnapshot, qe_segno, GpIdentity.segindex);
 				if (fsinfo == NULL)
@@ -1022,7 +1011,7 @@ gp_update_aorow_master_stats_internal(Relation parentrel, Snapshot appendOnlyMet
 					 * QD tup count !=  QE tup count. update QD count by
 					 * passing in the diff (may be negative sometimes).
 					 */
-					UpdateFileSegInfo(parentrel, aoEntry, qe_segno, 0, 0, diff, 0);
+					UpdateFileSegInfo(parentrel, aoEntry, qe_segno, 0, 0, diff, 0, GpIdentity.segindex);
 				}
 				else
 					elog(DEBUG3, "gp_update_ao_master_stats: no need to "

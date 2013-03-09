@@ -851,7 +851,8 @@ void UpdateMasterAosegTotals(Relation parentrel, int segno, uint64 tupcount)
 									&parentrel->rd_node,
 									segno,
 									AccessExclusiveLock,
-									/* dontWait */ false);
+									/* dontWait */ false,
+									GpIdentity.segindex);
 
 	if(RelationIsAoRows(parentrel))
 	{
@@ -875,7 +876,7 @@ void UpdateMasterAosegTotals(Relation parentrel, int segno, uint64 tupcount)
 		/*
 		 * Update the master AO segment info table with correct tuple count total
 		 */
-        UpdateFileSegInfo(parentrel, aoEntry, segno, 0, 0, tupcount, 0);
+        UpdateFileSegInfo(parentrel, aoEntry, segno, 0, 0, tupcount, 0, GpIdentity.segindex);
 	}
     else
     {

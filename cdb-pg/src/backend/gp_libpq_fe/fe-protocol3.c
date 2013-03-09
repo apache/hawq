@@ -43,11 +43,13 @@
  * MPP-3628: explain-analyze of large subtrees can generate big messages.
  *
  * MPP-7971: allow AO to return information about large numbers of partitions.
+ *
+ * HAWQ: send back modified catalog from QE.
  */
 #define VALID_LONG_MESSAGE_TYPE(id) \
 	((id) == 'T' || (id) == 'D' || (id) == 'd' || (id) == 'V' || \
 	 (id) == 'E' || (id) == 'N' || (id) == 'A' || (id) == 'Y' || \
-	 (id) == 'y' || (id) == 'o')
+	 (id) == 'y' || (id) == 'o' || (id) == 'h')
 
 
 static void handleSyncLoss(PGconn *conn, char id, int msgLength);
@@ -58,7 +60,6 @@ static int	getParameterStatus(PGconn *conn);
 static int	getNotify(PGconn *conn);
 static int	getCopyStart(PGconn *conn, ExecStatusType copytype);
 static int	getQEWriterTransactionInfo(PGconn *conn);
-static int  getQECatalogInfo(PGconn *conn);
 static int	getStandbyMasterEndLocation(PGconn *conn);
 static int	getReadyForQuery(PGconn *conn);
 static int	getReadyForQuery_QEWriter(PGconn *conn);
@@ -251,9 +252,6 @@ pqParseInput3(PGconn *conn)
 					if (pqGets(&conn->workBuffer, conn))
 						return;
 					
-					if (getQECatalogInfo(conn))
-						return;
-
 					if (getQEWriterTransactionInfo(conn))
 						return;
 
@@ -539,7 +537,93 @@ pqParseInput3(PGconn *conn)
 					conn->asyncStatus = PGASYNC_READY;
 
 					break;
+				case 'h':
+					/* in HAWQ, send back modified catalog from QE */
+				{
+					int i;
+					int contentid = 0;
 
+					if (conn->result == NULL)
+					{
+						conn->result = PQmakeEmptyPGresult(conn, PGRES_COMMAND_OK);
+						if (!conn->result)
+							return;
+					}
+
+					/*
+					 * 1, get contentid
+					 */
+					if (pqGetInt(&(contentid), 4, conn))
+							return;
+
+					/*
+					 * 2, get get number of relation
+					 */
+					if (pqGetInt(&(conn->result->numSendback), 4, conn))
+							return;
+
+					conn->result->sendback =
+							malloc(conn->result->numSendback
+									* sizeof(struct QueryContextDispatchingSendBackData));
+
+					QueryContextDispatchingSendBack sendback =
+							conn->result->sendback;
+
+					for (i = 0 ; i < conn->result->numSendback ; ++i) {
+						sendback[i].contentid = contentid;
+
+						/*
+						 * 3, get relation id
+						 */
+						if (pqGetInt((int *)&(sendback[i].relid), 4, conn))
+								return;
+						/*
+						 * 4, get insertCount
+						 */
+						if (pqGetInt64(&(sendback[i].insertCount), conn))
+								return;
+						/*
+						 * 5, get segment file no.
+						 */
+						if (pqGetInt(&(sendback[i].segno), 4, conn))
+								return;
+						/*
+						 * 6, get varblock count
+						 */
+						if (pqGetInt64(&(sendback[i].varblock), conn))
+								return;
+						/*
+						 * 7, get number of files.
+						 */
+						if (pqGetInt(&(sendback[i].numfiles), 4, conn))
+								return;
+
+						sendback[i].eof = malloc(sendback[i].numfiles * sizeof(int64));
+						sendback[i].uncompressed_eof = malloc(sendback[i].numfiles * sizeof(int64));
+
+						int j;
+						for (j = 0 ; j < sendback[i].numfiles; ++j)
+						{
+							/*
+							 * 8, get eof
+							 */
+							if (pqGetInt64(&(sendback[i].eof[j]), conn))
+										return;
+							/*
+							 * 9, get uncompressed eof.
+							 */
+							if (pqGetInt64(&(sendback[i].uncompressed_eof[j]), conn))
+										return;
+						}
+
+						/*
+						 * 10, get fast sequence.
+						 */
+						if (pqGetInt64(&(sendback[i].nextFastSequence), conn))
+								return;
+					}
+				}
+					break;
 				default:
 					printfPQExpBuffer(&conn->errorMessage,
 									  libpq_gettext(
@@ -1466,30 +1550,6 @@ getQEWriterTransactionInfo(PGconn *conn)
 	conn->QEWriter_Dirty = (dirty == 'T');
 
 	conn->QEWriter_HaveInfo = true;
-
-	return 0;
-}
-
-/*
- * process QE catalog write back information in remainer of message
- */
-static int
-getQECatalogInfo(PGconn *conn)
-{
-	Assert(NULL != conn);
-
-	if (pqGetInt((int*) &conn->serializedCatalogLen, 4, conn))
-		return EOF;
-	if (conn->serializedCatalogLen > 0)
-	{
-		conn->serializedCatalog = malloc(conn->serializedCatalogLen);
-		if (NULL == conn->serializedCatalog)
-			return EOF;
-		if (pqGetnchar(conn->serializedCatalog, conn->serializedCatalogLen,
-				conn))
-			return EOF;
-	} else
-		conn->serializedCatalog = NULL;
 
 	return 0;
 }

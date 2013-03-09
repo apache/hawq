@@ -131,7 +131,8 @@ UpdateFileSegInfo(Relation parentrel,
 				  int64 eof,
 				  int64 eof_uncompressed,
 				  int64 tuples_added, 
-				  int64 varblocks_added);
+				  int64 varblocks_added,
+				  int32 contentid);
 
 extern FileSegTotals *
 GetSegFilesTotals(Relation parentrel, Snapshot appendOnlyMetaDataSnapshot, int32 contentid);

@@ -606,6 +606,14 @@ processCopyEndResults(CdbCopy *c,
 			/* Get AO tuple counts */
 			c->aotupcounts = process_aotupcounts(c->partitions, c->aotupcounts, res->aotupcounts, res->naotupcounts);
 			/* free the PGresult object */
+
+			int curSendback;
+			for (curSendback = 0 ; curSendback < res->numSendback; ++curSendback)
+			{
+				UpdateCatalogModifiedOnSegments(&res->sendback[curSendback]);
+			}
+
+
 			PQclear(res);
 		}
 
@@ -641,25 +649,6 @@ processCopyEndResults(CdbCopy *c,
 			/* Let FTS deal with it! */
 			failedSegDBs[*failed_count] = q;
 			(*failed_count)++;
-		}
-	}
-}
-
-void
-cdbCopyGetCatalogs(CdbCopy *c)
-{
-	int		i;
-	Gang	*gp;
-	SegmentDatabaseDescriptor *q;
-
-	gp = c->primary_writer;
-	for (i = 0; i < gp->size; i++)
-	{
-		q = &gp->db_descriptors[i];
-		if (q->conn->serializedCatalogLen > 0)
-		{
-			deserializeAndUpdateCatalog(q->conn->serializedCatalog, q->conn->serializedCatalogLen);
-			q->conn->serializedCatalogLen = 0;
 		}
 	}
 }

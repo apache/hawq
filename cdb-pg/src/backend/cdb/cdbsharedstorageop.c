@@ -8,6 +8,7 @@
  */
 #include "postgres.h"
 
+#include "access/appendonlytid.h"
 #include "catalog/heap.h"
 #include "cdb/cdbdisp.h"
 #include "cdb/cdbmirroredappendonly.h"
@@ -16,7 +17,10 @@
 #include "cdb/cdbdispatchresult.h"
 #include "cdb/cdbsrlz.h"
 #include "cdb/cdbvars.h"
+#include "cdb/cdbpartition.h"
 #include "nodes/parsenodes.h"
+#include "optimizer/prep.h"
+#include "storage/lmgr.h"
 
 /*
  * Create a sharedStorageOpTask instance
@@ -313,5 +317,59 @@ void PerformSharedStorageOp(SharedStorageOpStmt * stat)
 		break;
 	default:
 		Insist(!"unexpected shared storage op type.");
+	}
+}
+
+static void LockSegfilesOnMasterForSingleRel(Relation rel, int32 segno)
+{
+	int i, j;
+
+	Insist(Gp_role == GP_ROLE_DISPATCH);
+
+	/*
+	 * do not lock segfile with content id = -1
+	 */
+	for (i = 1; i < rel->rd_segfile0_count; ++i)
+	{
+		if (RelationIsAoRows(rel))
+		{
+			LockRelationAppendOnlySegmentFile(&rel->rd_node, segno,
+					AccessExclusiveLock, false, i - 1);
+		}
+		else if (RelationIsAoCols(rel))
+		{
+			for (j = 0; j < rel->rd_att->natts; ++j)
+			{
+				LockRelationAppendOnlySegmentFile(&rel->rd_node,
+						j * AOTupleId_MultiplierSegmentFileNum + segno,
+						AccessExclusiveLock, false, i - 1);
+			}
+		}
+	}
+}
+
+void LockSegfilesOnMaster(Relation rel, int32 segno)
+{
+	List *children = NIL;
+	ListCell *lc;
+
+	children = find_all_inheritors(rel->rd_id);
+
+	foreach(lc, children)
+	{
+		Relation	child_rel = rel;
+		Oid			oid = lfirst_oid(lc);
+
+		if (rel_is_partitioned(oid))
+			continue;
+
+		/* open/close the child relation. */
+		if (oid != rel->rd_id)
+			child_rel = heap_open(oid, AccessShareLock);
+
+		LockSegfilesOnMasterForSingleRel(child_rel, segno);
+
+		if (oid != rel->rd_id)
+			heap_close(child_rel, AccessShareLock);
 	}
 }

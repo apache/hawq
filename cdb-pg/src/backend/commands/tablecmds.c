@@ -60,6 +60,7 @@
 #include "cdb/cdbappendonlyam.h"
 #include "cdb/cdbaocsam.h"
 #include "cdb/cdbpartition.h"
+#include "cdb/cdbsharedstorageop.h"
 #include "commands/cluster.h"
 #include "commands/copy.h"
 #include "commands/dbcommands.h"
@@ -5903,7 +5904,27 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 			appendonly_endscan(aoscan);
 
 			if(newrel)
+			{
+				StringInfo buf = NULL;
+				QueryContextDispatchingSendBack sendback = NULL;
+
+				if (Gp_role == GP_ROLE_EXECUTE)
+					buf = PreSendbackChangedCatalog(1);
+
+				sendback = CreateQueryContextDispatchingSendBack(1);
+				aoInsertDesc->sendback = sendback;
+				sendback->relid = RelationGetRelid(aoInsertDesc->aoi_rel);
+
 				appendonly_insert_finish(aoInsertDesc);
+
+				if (Gp_role == GP_ROLE_EXECUTE)
+					AddSendbackChangedCatalogContent(buf, sendback);
+
+				DropQueryContextDispatchingSendBack(sendback);
+
+				if (Gp_role == GP_ROLE_EXECUTE)
+					FinishSendbackChangedCatalog(buf);
+			}
 		}
 		else if(relstorage == RELSTORAGE_AOCOLS && Gp_role != GP_ROLE_DISPATCH)
 		{
@@ -6017,7 +6038,29 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 			aocs_endscan(sdesc);
 
 			if(newrel)
+			{
+				StringInfo buf = NULL;
+				QueryContextDispatchingSendBack sendback = NULL;
+
+				if (Gp_role == GP_ROLE_EXECUTE)
+					buf = PreSendbackChangedCatalog(1);
+
+				sendback = CreateQueryContextDispatchingSendBack(
+						idesc->aoi_rel->rd_att->natts);
+
+				idesc->sendback = sendback;
+				sendback->relid = RelationGetRelid(idesc->aoi_rel);
+
 				aocs_insert_finish(idesc);
+
+				if (Gp_role == GP_ROLE_EXECUTE)
+					AddSendbackChangedCatalogContent(buf, sendback);
+
+				DropQueryContextDispatchingSendBack(sendback);
+
+				if (Gp_role == GP_ROLE_EXECUTE)
+					FinishSendbackChangedCatalog(buf);
+			}
 
 			pfree(proj);
 		}
@@ -6071,7 +6114,13 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 		 * We create seg files for the new relation here.
 		 */
 		if (newrel)
+		{
 			CreateAppendOnlySegFileForRelationOnMaster(newrel, RESERVED_SEGNO);
+			/*
+			 * lock segment files on master
+			 */
+			LockSegfilesOnMaster(newrel, RESERVED_SEGNO);
+		}
 
 		/* prepare for the metadata dispatch */
 		contextdisp = CreateQueryContextInfo();
@@ -6103,7 +6152,7 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 
 		ar_tab->newheap_oid = OIDNewHeap;
 
-		CdbDispatchUtilityStatementContext((Node *) ar_tab, contextdisp);
+		CdbDispatchUtilityStatementContext((Node *) ar_tab, contextdisp, TRUE);
 	}
 
 	heap_close(oldrel, NoLock);
@@ -15291,14 +15340,79 @@ split_rows(Relation intoa, Relation intob, Relation temprel)
 		ResetExprContext(econtext);
 	}
 
+	StringInfo buf = NULL;
+	QueryContextDispatchingSendBack sendback = NULL;
+
+	int aocount = 0;
 	if (aoinsertdesc_a)
-		appendonly_insert_finish(aoinsertdesc_a);
+		++aocount;
 	if (aoinsertdesc_b)
-		appendonly_insert_finish(aoinsertdesc_b);
+		++aocount;
 	if (aocsinsertdesc_a)
-		aocs_insert_finish(aocsinsertdesc_a);
+		++aocount;
 	if (aocsinsertdesc_b)
+		++aocount;
+
+	if (Gp_role == GP_ROLE_EXECUTE && aocount > 0)
+		buf = PreSendbackChangedCatalog(aocount);
+
+	if (aoinsertdesc_a)
+	{
+		sendback = CreateQueryContextDispatchingSendBack(1);
+		aoinsertdesc_a->sendback = sendback;
+		sendback->relid = RelationGetRelid(aoinsertdesc_a->aoi_rel);
+
+		appendonly_insert_finish(aoinsertdesc_a);
+
+		if (Gp_role == GP_ROLE_EXECUTE)
+			AddSendbackChangedCatalogContent(buf, sendback);
+
+		DropQueryContextDispatchingSendBack(sendback);
+	}
+	if (aoinsertdesc_b)
+	{
+		sendback = CreateQueryContextDispatchingSendBack(1);
+		aoinsertdesc_b->sendback = sendback;
+		sendback->relid = RelationGetRelid(aoinsertdesc_b->aoi_rel);
+
+		appendonly_insert_finish(aoinsertdesc_b);
+
+		if (Gp_role == GP_ROLE_EXECUTE)
+			AddSendbackChangedCatalogContent(buf, sendback);
+
+		DropQueryContextDispatchingSendBack(sendback);
+	}
+	if (aocsinsertdesc_a)
+	{
+		sendback = CreateQueryContextDispatchingSendBack(
+				aocsinsertdesc_b->aoi_rel->rd_att->natts);
+		aocsinsertdesc_a->sendback = sendback;
+		sendback->relid = RelationGetRelid(aocsinsertdesc_a->aoi_rel);
+
+		aocs_insert_finish(aocsinsertdesc_a);
+
+		if (Gp_role == GP_ROLE_EXECUTE)
+			AddSendbackChangedCatalogContent(buf, sendback);
+
+		DropQueryContextDispatchingSendBack(sendback);
+	}
+	if (aocsinsertdesc_b)
+	{
+		sendback = CreateQueryContextDispatchingSendBack(
+				aocsinsertdesc_b->aoi_rel->rd_att->natts);
+		aocsinsertdesc_b->sendback = sendback;
+		sendback->relid = RelationGetRelid(aocsinsertdesc_b->aoi_rel);
+
 		aocs_insert_finish(aocsinsertdesc_b);
+
+		if (Gp_role == GP_ROLE_EXECUTE)
+			AddSendbackChangedCatalogContent(buf, sendback);
+
+		DropQueryContextDispatchingSendBack(sendback);
+	}
+
+	if (Gp_role == GP_ROLE_EXECUTE && aocount > 0)
+		FinishSendbackChangedCatalog(buf);
 
 	MemoryContextSwitchTo(oldCxt);
 	ExecDropSingleTupleTableSlot(slotT);
@@ -16352,6 +16466,12 @@ ATPExecPartSplit(Relation rel,
 	
 		CreateAppendOnlySegFileForRelationOnMaster(intob, RESERVED_SEGNO);
 
+		/*
+		 * lock segment files on master
+		 */
+		LockSegfilesOnMaster(intoa, RESERVED_SEGNO);
+		LockSegfilesOnMaster(intob, RESERVED_SEGNO);
+
 		/* prepare for the metadata dispatch */	
 		contextdisp = CreateQueryContextInfo();
 		htab = createPrepareDispatchedCatalogRelationDisctinctHashTable();
@@ -16377,7 +16497,7 @@ ATPExecPartSplit(Relation rel,
 		hash_destroy(htab);
                 CloseQueryContextInfo(contextdisp);
 
-		CdbDispatchUtilityStatementContext((Node *) pc, contextdisp);
+		CdbDispatchUtilityStatementContext((Node *) pc, contextdisp, TRUE);
 	}
 
 	elog(DEBUG5, "dropping temp rel %s", RelationGetRelationName(temprel));

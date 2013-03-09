@@ -178,19 +178,6 @@ EndCommand(const char *commandTag, CommandDest dest)
 				pq_beginmessage(&buf, 'g');
 				pq_sendstring(&buf, commandTag);
 
-				/*
-				 * if the catalogs have been inserted/updated/deleted on QE,
-				 * send them back to QD.
-				 */
-				pq_sendint(&buf, WriteBackCatalogLen, sizeof(int32));
-				if (WriteBackCatalogLen > 0)
-				{
-					pq_sendbytes(&buf, WriteBackCatalogs, WriteBackCatalogLen);
-					pfree(WriteBackCatalogs);
-					WriteBackCatalogs = NULL;
-					WriteBackCatalogLen = 0;
-				}
-
 				AddQEWriterTransactionInfo(&buf);
 
 				pq_endmessage(&buf);

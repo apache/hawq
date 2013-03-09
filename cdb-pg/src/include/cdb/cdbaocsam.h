@@ -25,6 +25,7 @@
 #include "cdb/cdbappendonlystoragelayer.h"
 #include "cdb/cdbappendonlystorageread.h"
 #include "cdb/cdbappendonlystoragewrite.h"
+#include "cdb/cdbquerycontextdispatching.h"
 #include "utils/datumstream.h"
 
 /*
@@ -56,6 +57,8 @@ typedef struct AOCSInsertDescData
 	struct DatumStreamWrite **ds;
 
 	AppendOnlyBlockDirectory blockDirectory;
+
+	QueryContextDispatchingSendBack sendback;
 } AOCSInsertDescData;
 
 typedef AOCSInsertDescData *AOCSInsertDesc;

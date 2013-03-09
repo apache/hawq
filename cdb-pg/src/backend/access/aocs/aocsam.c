@@ -618,7 +618,8 @@ static void OpenAOCSDatumStreams(AOCSInsertDesc desc)
 								&desc->aoi_rel->rd_node,
 								desc->cur_segno,
 								AccessExclusiveLock,
-								/* dontWait */ false);
+								/* dontWait */ false,
+								GpIdentity.segindex);
 
     open_ds_write(desc->aoi_rel,
     		desc->ds, tupdesc, NULL, desc->aoEntry->version);
@@ -882,6 +883,17 @@ void aocs_insert_finish(AOCSInsertDesc idesc)
     TupleDesc tupdesc = RelationGetDescr(rel);
     int i;
 
+    idesc->sendback->segno = idesc->cur_segno;
+    idesc->sendback->varblock = idesc->varblockCount;
+    idesc->sendback->insertCount = idesc->insertCount;
+
+    idesc->sendback->numfiles = rel->rd_att->natts;
+
+    idesc->sendback->eof = palloc(rel->rd_att->natts * sizeof(int64));
+	idesc->sendback->uncompressed_eof = palloc(rel->rd_att->natts * sizeof(int64));
+
+	idesc->sendback->nextFastSequence = idesc->lastSequence + idesc->numSequences - 1;
+
     for(i=0; i<tupdesc->natts; ++i)
     {
 		int itemCount = datumstreamwrite_nth(idesc->ds[i]);
@@ -896,11 +908,15 @@ void aocs_insert_finish(AOCSInsertDesc idesc)
 			itemCount);
 
         datumstreamwrite_close_file(idesc->ds[i]);
+
+		idesc->sendback->eof[i] = idesc->ds[i]->eof;
+		idesc->sendback->uncompressed_eof[i] = idesc->ds[i]->eofUncompress;
     }
 
 	AppendOnlyBlockDirectory_End_forInsert(&(idesc->blockDirectory));
 
-    UpdateAOCSFileSegInfo(idesc);
+	if (Gp_role != GP_ROLE_EXECUTE)
+		UpdateAOCSFileSegInfoOnMaster(idesc);
 
 	pfree(idesc->fsInfo);
     pfree(idesc->aoEntry);

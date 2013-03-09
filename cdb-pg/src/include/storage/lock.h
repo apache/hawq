@@ -250,8 +250,8 @@ typedef struct LOCKTAG
 	 (locktag).locktag_type = LOCKTAG_RELATION_RESYNCHRONIZE, \
 	 (locktag).locktag_lockmethodid = DEFAULT_LOCKMETHOD)
 
-#define SET_LOCKTAG_RELATION_APPENDONLY_SEGMENT_FILE(locktag,dboid,reloid,segno) \
-	((locktag).segindex = GpIdentity.segindex, \
+#define SET_LOCKTAG_RELATION_APPENDONLY_SEGMENT_FILE(locktag,dboid,reloid,segno,contentid) \
+	((locktag).segindex = (contentid), \
 	 (locktag).locktag_field1 = (dboid), \
 	 (locktag).locktag_field2 = (reloid), \
 	 (locktag).locktag_field3 = (segno), \

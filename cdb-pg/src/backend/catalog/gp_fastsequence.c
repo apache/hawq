@@ -190,8 +190,24 @@ update_fastsequence(Relation gp_fastsequence_rel,
 		newTuple->t_self = oldTuple->t_self;
 		if (tupleDesc->tdhasoid)
 			HeapTupleSetOid(newTuple, HeapTupleGetOid(oldTuple));
-		heap_inplace_update(gp_fastsequence_rel, newTuple);
 		
+		if (Gp_role != GP_ROLE_EXECUTE)
+		{
+			heap_inplace_update(gp_fastsequence_rel, newTuple);
+		}
+		else
+		{
+			InMemHeapRelation inmemrel = OidGetInMemHeapRelation(
+					gp_fastsequence_rel->rd_id);
+			if (NULL == inmemrel)
+			{
+				elog(ERROR, "cannot find in-memory table: %s",
+						RelationGetRelationName(gp_fastsequence_rel));
+			}
+
+			InMemHeap_Update(inmemrel, &oldTuple->t_self, newTuple);
+		}
+
 		ItemPointerCopy(&newTuple->t_self, tid);
 
 		heap_freetuple(newTuple);

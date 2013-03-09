@@ -432,7 +432,8 @@ SetCurrentFileSegForWrite(AppendOnlyInsertDesc aoInsertDesc)
 									&aoInsertDesc->aoi_rel->rd_node,
 									aoInsertDesc->cur_segno,
 									AccessExclusiveLock,
-									/* dontWait */ false);
+									/* dontWait */ false,
+									GpIdentity.segindex);
 
 	/* Now, get the information for the file segment we are going to append to. */
 	aoInsertDesc->fsInfo = GetFileSegInfo(
@@ -502,24 +503,39 @@ CloseScannedFileSeg(AppendOnlyScanDesc scan)
 static void
 CloseWritableFileSeg(AppendOnlyInsertDesc aoInsertDesc)
 {
-	int64	fileLen;
 	int64	fileLen_uncompressed;
+	int64	fileLen;
 
 	AppendOnlyStorageWrite_TransactionFlushAndCloseFile(
 											&aoInsertDesc->storageWrite,
 											&fileLen,
 											&fileLen_uncompressed);
 
+	aoInsertDesc->sendback->segno = aoInsertDesc->cur_segno;
+	aoInsertDesc->sendback->varblock = aoInsertDesc->varblockCount;
+	aoInsertDesc->sendback->insertCount = aoInsertDesc->insertCount;
+
+	aoInsertDesc->sendback->eof = palloc(sizeof(int64));
+	aoInsertDesc->sendback->uncompressed_eof = palloc( sizeof(int64));
+
+	aoInsertDesc->sendback->numfiles = 1;
+	aoInsertDesc->sendback->eof[0] = fileLen;
+	aoInsertDesc->sendback->uncompressed_eof[0] = fileLen_uncompressed;
+
+	aoInsertDesc->sendback->nextFastSequence = aoInsertDesc->lastSequence + aoInsertDesc->numSequences - 1;
+
 	/*
 	 * Update the AO segment info table with our new eof
 	 */
-	UpdateFileSegInfo(aoInsertDesc->aoi_rel,
+	if (Gp_role != GP_ROLE_EXECUTE)
+		UpdateFileSegInfo(aoInsertDesc->aoi_rel,
 					  aoInsertDesc->aoEntry,
 					  aoInsertDesc->cur_segno,
 					  fileLen,
 					  fileLen_uncompressed,
 					  aoInsertDesc->insertCount,
-					  aoInsertDesc->varblockCount);
+					  aoInsertDesc->varblockCount,
+					  GpIdentity.segindex);
 
 	pfree(aoInsertDesc->fsInfo);
 	aoInsertDesc->fsInfo = NULL;
@@ -2691,8 +2707,6 @@ appendonly_insert_init(Relation rel, int segno)
 					aoInsertDesc->cur_segno, aoInsertDesc->lastSequence + 1,
 					NUM_FAST_SEQUENCES, &aoInsertDesc->fsInfo->sequence_tid);
 		} else {
-		Assert(ItemPointerIsValid(&aoInsertDesc->fsInfo->sequence_tid));
-
 			firstSequence = GetFastSequencesByTid(
 					&aoInsertDesc->fsInfo->sequence_tid,
 					aoInsertDesc->lastSequence + 1, NUM_FAST_SEQUENCES);

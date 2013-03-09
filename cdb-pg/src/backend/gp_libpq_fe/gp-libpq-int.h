@@ -42,6 +42,8 @@
 /* include stuff found in fe only */
 #include "pqexpbuffer.h"
 
+#include "cdb/cdbquerycontextdispatching.h"
+
 /*
  * POSTGRES backend dependent Constants.
  */
@@ -205,6 +207,9 @@ struct pg_result
 	/* GPDB: number of processed tuples for each AO partition */
 	int			naotupcounts;
 	PQaoRelTupCount *aotupcounts;
+	/* HAWQ: send back modified catalog on segments */
+	int			numSendback;
+	QueryContextDispatchingSendBack sendback;
 };
 
 /* PGAsyncStatusType defines the state of the query-execution state machine */
@@ -409,10 +414,6 @@ struct pg_conn
 
 	/* Buffer for receiving various parts of messages */
 	PQExpBufferData workBuffer; /* expansible string */
-
-	/* Buffer for QE catalog write back message */
-	char *		serializedCatalog;
-	int			serializedCatalogLen;
 };
 
 /* PGcancel stores all data necessary to cancel a connection. A copy of this

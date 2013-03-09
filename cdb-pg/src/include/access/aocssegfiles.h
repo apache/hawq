@@ -153,7 +153,12 @@ extern int64 GetAOCSTotalBytes(
 
 extern AOCSFileSegInfo *NewAOCSFileSegInfo(int4 segno, int4 nvp);
 extern void InsertInitialAOCSFileSegInfo(Oid segrelid, int32 segno, int32 contentid, int32 nvp);
-extern void UpdateAOCSFileSegInfo(struct AOCSInsertDescData *desc);
+extern void UpdateAOCSFileSegInfoOnMaster(struct AOCSInsertDescData *desc);
+
+extern void UpdateAOCSFileSegInfo(Relation prel, AppendOnlyEntry *aoEntry,
+		int32 segno, int64 insertCount, int64 varblockCount,
+		int64 *eof, int64 *uncomp_eof, int32 contentid);
+
 extern void AOCSFileSegInfoAddCount(Relation prel, AppendOnlyEntry *aoEntry, int32 segno, int64 tupadded, int64 varblockadded);
 
 extern Datum gp_update_aocol_master_stats_internal(Relation parentrel, Snapshot appendOnlyMetaDataSnapshot);

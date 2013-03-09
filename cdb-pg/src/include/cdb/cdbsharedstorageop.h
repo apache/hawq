@@ -51,4 +51,5 @@ extern void PostPerformSharedStorageOpTasks(SharedStorageOpTasks *tasks);
 
 extern void PerformSharedStorageOp(SharedStorageOpStmt * stat);
 
+extern void LockSegfilesOnMaster(Relation rel, int32 segno);
 #endif /* CDBSHAREDSTORAGEOP_H */

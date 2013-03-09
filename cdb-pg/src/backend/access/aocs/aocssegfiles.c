@@ -451,11 +451,35 @@ int64 GetAOCSTotalBytes(Relation parentrel, Snapshot appendOnlyMetaDataSnapshot)
 	return result;
 }
 
-void UpdateAOCSFileSegInfo(AOCSInsertDesc idesc)
+void UpdateAOCSFileSegInfoOnMaster(AOCSInsertDesc idesc)
+{
+	int i;
+	int64 *eof, *uncomp_eof;
+	int nattr = idesc->aoi_rel->rd_att->natts;
+
+	eof = palloc(nattr * sizeof(int64));
+	uncomp_eof = palloc(nattr * sizeof(int64));
+
+	for (i = 0; i < nattr; ++i)
+	{
+		eof[i] = idesc->ds[i]->eof;
+		uncomp_eof[i] = idesc->ds[i]->eofUncompress;
+	}
+
+	UpdateAOCSFileSegInfo(idesc->aoi_rel, idesc->aoEntry, idesc->cur_segno,
+			idesc->insertCount, idesc->varblockCount, eof, uncomp_eof,
+			GpIdentity.segindex);
+
+	pfree(eof);
+	pfree(uncomp_eof);
+}
+
+void UpdateAOCSFileSegInfo(Relation prel, AppendOnlyEntry *aoEntry,
+		int32 segno, int64 insertCount, int64 varblockCount,
+		int64 *eof, int64 *uncomp_eof, int32 contentid)
 {
 	LockAcquireResult acquireResult;
 	
-    Relation prel = idesc->aoi_rel;
     Relation segrel;
 
     ScanKeyData key[2];
@@ -471,10 +495,8 @@ void UpdateAOCSFileSegInfo(AOCSInsertDesc idesc)
 	int nvp = tupdesc->natts;
     int i;
     AOCSVPInfo *vpinfo = create_aocs_vpinfo(nvp);
-	AppendOnlyEntry *aoEntry = idesc->aoEntry;
-	bool indexOK;
-	Oid indexid;
 
+	Insist(GP_ROLE_EXECUTE != Gp_role);
 
 	/*
 	 * Since we have the segment-file entry under lock (with LockRelationAppendOnlySegmentFile)
@@ -489,80 +511,77 @@ void UpdateAOCSFileSegInfo(AOCSInsertDesc idesc)
 	 */
 	acquireResult = LockRelationAppendOnlySegmentFile(
 												&prel->rd_node,
-												idesc->cur_segno,
+												segno,
 												AccessExclusiveLock,
-												/* dontWait */ false);
+												/* dontWait */ false,
+												contentid);
 	if (acquireResult != LOCKACQUIRE_ALREADY_HELD)
 	{
 		elog(ERROR, "Should already have the (transaction-scope) write-lock on Append-Only segment file #%d, "
-					 "relation %s", idesc->cur_segno, 
+					 "relation %s", segno,
 			 RelationGetRelationName(prel));
 	}
 
     segrel = heap_open(aoEntry->segrelid, RowExclusiveLock);
     tupdesc = RelationGetDescr(segrel);
 
-    /* In GP-SQL, index only exists on master. */
-    if (GP_ROLE_EXECUTE == Gp_role)
-    {
-        indexOK = FALSE;
-        indexid = InvalidOid;
-    }
-    else
-    {
-        indexOK = TRUE;
-        indexid = aoEntry->segidxid;
-    }
-
     /* Setup a scan key to fetch from the indexed by segno and content id */
-    ScanKeyInit(&key[0], (AttrNumber)Anum_pg_aocs_segno, BTEqualStrategyNumber, F_INT4EQ, Int32GetDatum(idesc->cur_segno));
-    ScanKeyInit(&key[1], (AttrNumber)Anum_pg_aocs_content, BTEqualStrategyNumber, F_INT4EQ, Int32GetDatum(GpIdentity.segindex));
+    ScanKeyInit(&key[0],
+    		(AttrNumber)Anum_pg_aocs_segno,
+    		BTEqualStrategyNumber,
+    		F_INT4EQ,
+    		Int32GetDatum(segno));
 
-    scan = systable_beginscan(segrel, indexid, indexOK, usesnapshot, 2, &key[0]);
+    ScanKeyInit(&key[1],
+    		(AttrNumber)Anum_pg_aocs_content,
+    		BTEqualStrategyNumber,
+    		F_INT4EQ,
+    		Int32GetDatum(contentid));
+
+    scan = systable_beginscan(segrel, aoEntry->segidxid, TRUE, usesnapshot, 2, &key[0]);
 
     oldtup = systable_getnext(scan);
 
     if(!HeapTupleIsValid(oldtup))
         ereport(ERROR, (errcode(ERRCODE_UNDEFINED_OBJECT),
                     errmsg("AOCS table \"%s\" file segment \"%d\" does not exist",
-                        RelationGetRelationName(prel), idesc->cur_segno)
+                        RelationGetRelationName(prel), segno)
                     ));
 
 #ifdef USE_ASSERT_CHECKING
-    d[Anum_pg_aocs_segno-1] = fastgetattr(oldtup, Anum_pg_aocs_segno, tupdesc, &null[Anum_pg_aocs_segno-1]);
-    Assert(!null[Anum_pg_aocs_segno-1]);
-    Assert(DatumGetInt32(d[Anum_pg_aocs_segno-1]) == idesc->cur_segno);
+	d[Anum_pg_aocs_segno - 1] =
+			fastgetattr(oldtup, Anum_pg_aocs_segno, tupdesc, &null[Anum_pg_aocs_segno - 1]);
+	Assert(!null[Anum_pg_aocs_segno - 1]);
+	Assert(DatumGetInt32(d[Anum_pg_aocs_segno - 1]) == segno);
 #endif
 
-    d[Anum_pg_aocs_tupcount-1] = fastgetattr(oldtup, Anum_pg_aocs_tupcount, tupdesc, &null[Anum_pg_aocs_tupcount-1]);
-    Assert(!null[Anum_pg_aocs_tupcount-1]);
+	d[Anum_pg_aocs_tupcount - 1] =
+			fastgetattr(oldtup, Anum_pg_aocs_tupcount, tupdesc, &null[Anum_pg_aocs_tupcount - 1]);
+	Assert(!null[Anum_pg_aocs_tupcount -1]);
 
-    d[Anum_pg_aocs_tupcount-1] += idesc->insertCount;
-    repl[Anum_pg_aocs_tupcount-1] = true;
+	d[Anum_pg_aocs_tupcount - 1] += insertCount;
+	repl[Anum_pg_aocs_tupcount - 1] = true;
 
-
-    d[Anum_pg_aocs_varblockcount-1] = fastgetattr(oldtup, Anum_pg_aocs_varblockcount, tupdesc, &null[Anum_pg_aocs_varblockcount-1]);
-    Assert(!null[Anum_pg_aocs_varblockcount-1]);
-    d[Anum_pg_aocs_varblockcount-1] += idesc->varblockCount;
-    repl[Anum_pg_aocs_varblockcount-1] = true;
+	d[Anum_pg_aocs_varblockcount - 1] =
+			fastgetattr(oldtup, Anum_pg_aocs_varblockcount, tupdesc, &null[Anum_pg_aocs_varblockcount - 1]);
+	Assert(!null[Anum_pg_aocs_varblockcount - 1]);
+	d[Anum_pg_aocs_varblockcount - 1] += varblockCount;
+	repl[Anum_pg_aocs_varblockcount - 1] = true;
 
     for(i=0; i<nvp; ++i)
     {
-        vpinfo->entry[i].eof = idesc->ds[i]->eof;
-        vpinfo->entry[i].eof_uncompressed = idesc->ds[i]->eofUncompress;
+        vpinfo->entry[i].eof = eof[i];
+        vpinfo->entry[i].eof_uncompressed = uncomp_eof[i];
     }
-    d[Anum_pg_aocs_vpinfo-1] = PointerGetDatum(vpinfo);
-    null[Anum_pg_aocs_vpinfo-1] = false;
-    repl[Anum_pg_aocs_vpinfo-1] = true;
+    d[Anum_pg_aocs_vpinfo - 1] = PointerGetDatum(vpinfo);
+    null[Anum_pg_aocs_vpinfo - 1] = false;
+    repl[Anum_pg_aocs_vpinfo - 1] = true;
 
     newtup = heap_modify_tuple(oldtup, tupdesc, d, null, repl);
 
     simple_heap_update(segrel, &oldtup->t_self, newtup);
 
-    if (GP_ROLE_EXECUTE != Gp_role)
-    {
-        CatalogUpdateIndexes(segrel, newtup);
-    }
+    CatalogUpdateIndexes(segrel, newtup);
 
     pfree(newtup);
     pfree(vpinfo);
@@ -605,7 +624,8 @@ void AOCSFileSegInfoAddCount(Relation prel, AppendOnlyEntry *aoEntry, int32 segn
 												&prel->rd_node,
 												segno,
 												AccessExclusiveLock,
-												/* dontWait */ false);
+												/* dontWait */ false,
+												GpIdentity.segindex);
 	if (acquireResult != LOCKACQUIRE_ALREADY_HELD)
 	{
 		elog(ERROR, "Should already have the (transaction-scope) write-lock on Append-Only segment file #%d, "
@@ -1180,7 +1200,8 @@ gp_update_aocol_master_stats_internal(Relation parentrel, Snapshot appendOnlyMet
 												&parentrel->rd_node,
 												qe_segno,
 												AccessExclusiveLock,
-												/* dontWait */ false);
+												/* dontWait */ false,
+												GpIdentity.segindex);
 					
 				aocsfsinfo = GetAOCSFileSegInfo(parentrel, aoEntry, appendOnlyMetaDataSnapshot, qe_segno, GpIdentity.segindex);
 				if (aocsfsinfo == NULL)

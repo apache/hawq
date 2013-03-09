@@ -879,6 +879,33 @@ process_aotupcounts(PartitionNode *parts, HTAB *ht,
 	return ht;
 }
 
+void
+cdbdisp_handleModifiedCatalogOnSegments(CdbDispatchResults *results,
+		void (*handler)(QueryContextDispatchingSendBack sendback))
+{
+	int i;
+	for (i = 0; i < results->resultCount; ++i)
+	{
+		CdbDispatchResult *dispatchResult = &results->resultArray[i];
+		int nres = cdbdisp_numPGresult(dispatchResult);
+		int ires;
+		for (ires = 0; ires < nres; ++ires)
+		{
+			/* for each PGresult */
+			PGresult *pgresult = cdbdisp_getPGresult(dispatchResult, ires);
+			if (handler && pgresult && pgresult->sendback)
+			{
+				int j;
+				for (j = 0 ; j < pgresult->numSendback ; ++j)
+				{
+					handler(&pgresult->sendback[j]);
+				}
+			}
+		}
+	}
+}
+
+
 /*
  * sum tuple counts that were added into a partitioned AO table
  */

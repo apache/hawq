@@ -364,27 +364,29 @@ UnlockRelationForResynchronize(RelFileNode *relFileNode, LOCKMODE lockmode)
 }
 
 LockAcquireResult
-LockRelationAppendOnlySegmentFile(RelFileNode *relFileNode, int32 segno, LOCKMODE lockmode, bool dontWait)
+LockRelationAppendOnlySegmentFile(RelFileNode *relFileNode, int32 segno, LOCKMODE lockmode, bool dontWait, int32 contentid)
 {
 	LOCKTAG		tag;
 
 	SET_LOCKTAG_RELATION_APPENDONLY_SEGMENT_FILE(tag,
 						 relFileNode->dbNode,
 						 relFileNode->relNode,
-						 segno);
+						 segno,
+						 contentid);
 
 	return LockAcquire(&tag, lockmode, false, dontWait);
 }
 
 void
-UnlockRelationAppendOnlySegmentFile(RelFileNode *relFileNode, int32 segno, LOCKMODE lockmode)
+UnlockRelationAppendOnlySegmentFile(RelFileNode *relFileNode, int32 segno, LOCKMODE lockmode, int32 contentid)
 {
 	LOCKTAG		tag;
 
 	SET_LOCKTAG_RELATION_APPENDONLY_SEGMENT_FILE(tag,
 						 relFileNode->dbNode,
 						 relFileNode->relNode,
-						 segno);
+						 segno,
+						 contentid);
 
 	LockRelease(&tag, lockmode, false);
 }

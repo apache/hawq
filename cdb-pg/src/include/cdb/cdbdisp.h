@@ -443,7 +443,7 @@ void
 CdbDispatchUtilityStatement_NoTwoPhase(struct Node *stmt, char* debugCaller __attribute__((unused)) );
 
 void
-CdbDispatchUtilityStatementContext(struct Node *stmt, QueryContextInfo *contextdisp);
+CdbDispatchUtilityStatementContext(struct Node *stmt, QueryContextInfo *contextdisp, bool checkSendback);
 
 /*
  * create a CdbDispatchCmdThreads object that holds the dispatch

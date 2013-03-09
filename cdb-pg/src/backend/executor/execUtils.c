@@ -47,6 +47,7 @@
 #include "access/genam.h"
 #include "access/heapam.h"
 #include "access/appendonlywriter.h"
+#include "access/aocssegfiles.h"
 #include "catalog/index.h"
 #include "executor/execdebug.h"
 #include "parser/parsetree.h"
@@ -2003,7 +2004,9 @@ void mppExecutorFinishup(QueryDesc *queryDesc)
 				cdbdisp_sumCmdTuples(pr, LocallyExecutingSliceIndex(estate));
 			estate->es_lastoid =
 				cdbdisp_maxLastOid(pr, LocallyExecutingSliceIndex(estate));
+			cdbdisp_handleModifiedCatalogOnSegments(pr, UpdateCatalogModifiedOnSegments);
 			aopartcounts = cdbdisp_sumAoPartTupCount(estate->es_result_partitions, pr);
+
 		}
 
 		/* sum up rejected rows if any (single row error handling only) */
@@ -2054,7 +2057,7 @@ void mppExecutorFinishup(QueryDesc *queryDesc)
 		 * error, report it and exit to our error handler via PG_THROW.
 		 * NB: This call doesn't wait, because we already waited above.
 		 */
-		cdbdisp_finishCommand(estate->dispatcherState, collectAndUpdateCatalog, NULL);
+		cdbdisp_finishCommand(estate->dispatcherState, NULL, NULL);
 	}
 
 	/* Teardown the Interconnect */
@@ -2461,25 +2464,4 @@ int RootSliceIndex(EState *estate)
 	}
 
 	return result;
-}
-
-/* update returned catalog */
-void
-collectAndUpdateCatalog(CdbDispatchResults * primaryResults, void *ctx)
-{
-	int i;
-	CdbDispatchResult * dispatchResult;
-
-	for (i = 0 ; i < primaryResults->resultCount; ++i)
-	{
-		dispatchResult = & primaryResults->resultArray[i];
-
-		if (dispatchResult->serializedCatalog != NULL
-				&& dispatchResult->serializedCatalogLen > 0)
-		{
-			deserializeAndUpdateCatalog(dispatchResult->serializedCatalog,
-										dispatchResult->serializedCatalogLen);
-		}
-		dispatchResult->serializedCatalogLen = 0;
-	}
 }

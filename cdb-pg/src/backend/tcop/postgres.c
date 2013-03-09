@@ -1318,13 +1318,6 @@ exec_mpp_query(const char *query_string,
 
 
 		/*
-		 * Send inserted/updated/deleted catalogs to QD
-		 */
-		MemoryContext old = MemoryContextSwitchTo(TopMemoryContext);
-		WriteBackCatalogs = serializeInMemCatalog(&WriteBackCatalogLen);
-		MemoryContextSwitchTo(old);
-
-		/*
 		 * cleanup all temporary in-memory heap table after each query
 		 * PortalDrop will release the resource owner,
 		 * should drop all in-memory heap table first.

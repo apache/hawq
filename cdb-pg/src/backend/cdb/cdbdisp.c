@@ -206,7 +206,7 @@ static Node *pre_dispatch_function_evaluation_mutator(Node *node,
 static void
 CdbDispatchUtilityStatement_Internal(struct Node *stmt,
 									 QueryContextInfo *contextdisp,
-									 bool needTwoPhase, char* debugCaller);
+									 bool needTwoPhase, bool checkSendback, char* debugCaller);
 
 /* 
  * ====================================================
@@ -2874,12 +2874,6 @@ processResults(CdbDispatchResult *dispatchResult)
 		/* Get one message. */
 		pRes = PQgetResult(segdbDesc->conn);
 		
-		/*
-		 * modified catalog on QE.
-		 */
-		dispatchResult->serializedCatalog = segdbDesc->conn->serializedCatalog;
-		dispatchResult->serializedCatalogLen = segdbDesc->conn->serializedCatalogLen;
-
 		CollectQEWriterTransactionInformation(segdbDesc, dispatchResult);
 
 		/*
@@ -4273,6 +4267,7 @@ CdbDispatchUtilityStatement(struct Node *stmt, char *debugCaller __attribute__((
 	CdbDispatchUtilityStatement_Internal(stmt,
 										 NULL,
 										 true,
+										 FALSE,
 										 "CdbDispatchUtilityStatement");
 }
 
@@ -4282,6 +4277,7 @@ CdbDispatchUtilityStatement_NoTwoPhase(struct Node *stmt, char *debugCaller __at
 	CdbDispatchUtilityStatement_Internal(stmt,
 										 NULL,
 										 false,
+										 FALSE,
 										 "CdbDispatchUtilityStatement_NoTwoPhase");
 }
 
@@ -4291,16 +4287,17 @@ CdbDispatchUtilityStatement_NoTwoPhase(struct Node *stmt, char *debugCaller __at
  * update results will also be reflected into the master catalogs.
  */
 void
-CdbDispatchUtilityStatementContext(struct Node *stmt, QueryContextInfo *contextdisp)
+CdbDispatchUtilityStatementContext(struct Node *stmt, QueryContextInfo *contextdisp, bool checkSendback)
 {
 	CdbDispatchUtilityStatement_Internal(stmt,
 										 contextdisp,
 										 true,
+										 checkSendback,
 										 "CdbDispatchUtilityStatementContext");
 }
 
 static void
-CdbDispatchUtilityStatement_Internal(struct Node *stmt, QueryContextInfo *contextdisp, bool needTwoPhase, char *debugCaller)
+CdbDispatchUtilityStatement_Internal(struct Node *stmt, QueryContextInfo *contextdisp, bool needTwoPhase, bool checkSendback, char *debugCaller)
 {
 	volatile struct CdbDispatcherState ds = {NULL, NULL};
 	
@@ -4310,9 +4307,6 @@ CdbDispatchUtilityStatement_Internal(struct Node *stmt, QueryContextInfo *contex
 
 	PG_TRY();
 	{
-		void (*handle_results_callback)(CdbDispatchResults *primaryResults, void *ctx)
-			= NULL;
-
 		cdbdisp_dispatchUtilityStatement(stmt,
 										 contextdisp,
 										 true /* cancelOnError */,
@@ -4321,15 +4315,17 @@ CdbDispatchUtilityStatement_Internal(struct Node *stmt, QueryContextInfo *contex
 										 (struct CdbDispatcherState *)&ds,
 										 debugCaller);
 
-		/*
-		 * If we dispatched metadata, we should read back any updates done
-		 * in segments.
-		 */
-		if (contextdisp != NULL)
-			handle_results_callback = collectAndUpdateCatalog;
+		if (checkSendback && Gp_role == GP_ROLE_DISPATCH)
+		{
+			CdbCheckDispatchResult((struct CdbDispatcherState *)&ds, false);
+			if (ds.primaryResults)
+				cdbdisp_handleModifiedCatalogOnSegments(ds.primaryResults,
+						UpdateCatalogModifiedOnSegments);
+		}
+
 		/* Wait for all QEs to finish.	Throw up if error. */
 		cdbdisp_finishCommand((struct CdbDispatcherState *) &ds,
-							   handle_results_callback, NULL);
+							   NULL, NULL);
 	}
 	PG_CATCH();
 	{

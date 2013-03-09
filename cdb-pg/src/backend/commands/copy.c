@@ -34,6 +34,8 @@
 #include "cdb/cdbappendonlyam.h"
 #include "cdb/cdbaocsam.h"
 #include "cdb/cdbpartition.h"
+#include "cdb/cdbdisp.h"
+#include "cdb/cdbsharedstorageop.h"
 #include "commands/copy.h"
 #include "commands/tablecmds.h"
 #include "commands/trigger.h"
@@ -1971,8 +1973,6 @@ CopyToDispatch(CopyState cstate)
 				(errcode(ERRCODE_IO_ERROR),
 				 errmsg("%s", cdbcopy_err.data)));
 
-	cdbCopyGetCatalogs(cdbCopy);
-
 	pfree(cdbcopy_cmd.data);
 	pfree(cdbcopy_err.data);
 	pfree(cdbCopy);
@@ -2657,6 +2657,13 @@ CopyFromDispatch(CopyState cstate)
     resultRelInfo->ri_TrigInstrument = NULL;
     ResultRelInfoSetSegno(resultRelInfo, cstate->ao_segnos);
 	CreateAppendOnlySegFileOnMaster(resultRelInfo, cstate->ao_segnos);
+
+	/*
+	 * lock segments files on master.
+	 */
+	if (Gp_role == GP_ROLE_DISPATCH)
+		LockSegfilesOnMaster(resultRelInfo->ri_RelationDesc, resultRelInfo->ri_aosegno);
+
 
 	ExecOpenIndices(resultRelInfo);
 
@@ -3482,8 +3489,6 @@ CopyFromDispatch(CopyState cstate)
 
 	if (cdbCopy->remote_data_err || cdbCopy->io_errors)
 		appendBinaryStringInfo(&cdbcopy_err, cdbCopy->err_msg.data, cdbCopy->err_msg.len);
-	else
-		cdbCopyGetCatalogs(cdbCopy);
 
 	if (cdbCopy->remote_data_err)
 	{
@@ -4243,27 +4248,67 @@ CopyFrom(CopyState cstate)
 
 	ExecDropSingleTupleTableSlot(slot);
 
+	StringInfo buf = NULL;
+	int aocount = 0;
+
+	resultRelInfo = estate->es_result_relations;
+	for (i = 0; i < estate->es_num_result_relations; i++)
+	{
+		if (resultRelInfo->ri_aoInsertDesc)
+			++aocount;
+		if (resultRelInfo->ri_aocsInsertDesc)
+			++aocount;
+		resultRelInfo++;
+	}
+
+	if (Gp_role == GP_ROLE_EXECUTE && aocount > 0)
+		buf = PreSendbackChangedCatalog(aocount);
+
 	/*
 	 * Finalize appends and close relations we opened.
 	 */
 	resultRelInfo = estate->es_result_relations;
 	for (i = estate->es_num_result_relations; i > 0; i--)
 	{
-			if (resultRelInfo->ri_aoInsertDesc)
-					appendonly_insert_finish(resultRelInfo->ri_aoInsertDesc);
+		QueryContextDispatchingSendBack sendback = NULL;
 
-			if (resultRelInfo->ri_aocsInsertDesc)
-					aocs_insert_finish(resultRelInfo->ri_aocsInsertDesc);
+		if (resultRelInfo->ri_aoInsertDesc)
+		{
+			sendback = CreateQueryContextDispatchingSendBack(1);
+			resultRelInfo->ri_aoInsertDesc->sendback = sendback;
+			sendback->relid = RelationGetRelid(resultRelInfo->ri_RelationDesc);
 
-			if (resultRelInfo->ri_extInsertDesc)
-					external_insert_finish(resultRelInfo->ri_extInsertDesc);
+			appendonly_insert_finish(resultRelInfo->ri_aoInsertDesc);
+		}
+
+
+		if (resultRelInfo->ri_aocsInsertDesc)
+		{
+			sendback = CreateQueryContextDispatchingSendBack(
+					resultRelInfo->ri_aocsInsertDesc->aoi_rel->rd_att->natts);
+			resultRelInfo->ri_aocsInsertDesc->sendback = sendback;
+			sendback->relid = RelationGetRelid(resultRelInfo->ri_RelationDesc);
+
+			aocs_insert_finish(resultRelInfo->ri_aocsInsertDesc);
+		}
+
+		if (resultRelInfo->ri_extInsertDesc)
+				external_insert_finish(resultRelInfo->ri_extInsertDesc);
 			
-			/* Close indices and then the relation itself */
-			ExecCloseIndices(resultRelInfo);
-			heap_close(resultRelInfo->ri_RelationDesc, NoLock);
-			resultRelInfo++;
+		if (sendback && relstorage_is_ao(RelinfoGetStorage(resultRelInfo)) && Gp_role == GP_ROLE_EXECUTE)
+			AddSendbackChangedCatalogContent(buf, sendback);
+
+		DropQueryContextDispatchingSendBack(sendback);
+
+		/* Close indices and then the relation itself */
+		ExecCloseIndices(resultRelInfo);
+		heap_close(resultRelInfo->ri_RelationDesc, NoLock);
+		resultRelInfo++;
 	}
 	
+	if (Gp_role == GP_ROLE_EXECUTE && aocount > 0)
+		FinishSendbackChangedCatalog(buf);
+
 	cstate->rel = NULL; /* closed above */
 	FreeExecutorState(estate);
 }

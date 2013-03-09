@@ -30,6 +30,7 @@
 #include "utils/hsearch.h"
 #include "utils/rel.h"
 #include "utils/relcache.h"
+#include "libpq/pqformat.h"
 
 struct Plan;
 
@@ -51,6 +52,43 @@ struct QueryContextInfo
 };
 
 typedef struct QueryContextInfo QueryContextInfo;
+
+/**
+ * used to hold information to send back to QD.
+ */
+struct QueryContextDispatchingSendBackData
+{
+	Oid	relid;
+	int32 segno;
+	int32 contentid;
+	int64 varblock;
+	int64 insertCount;
+	int32 numfiles;
+	int64 *eof;
+	int64 *uncompressed_eof;
+
+	int64 nextFastSequence;
+};
+typedef struct QueryContextDispatchingSendBackData * QueryContextDispatchingSendBack;
+
+extern QueryContextDispatchingSendBack
+CreateQueryContextDispatchingSendBack(int nfile);
+
+extern void
+UpdateCatalogModifiedOnSegments(QueryContextDispatchingSendBack sendback);
+
+extern StringInfo
+PreSendbackChangedCatalog(int aocount);
+
+extern void
+AddSendbackChangedCatalogContent(StringInfo buf,
+		QueryContextDispatchingSendBack sendback);
+
+extern void
+FinishSendbackChangedCatalog(StringInfo buf);
+
+extern void
+DropQueryContextDispatchingSendBack(QueryContextDispatchingSendBack sendback);
 
 extern QueryContextInfo *
 CreateQueryContextInfo(void);

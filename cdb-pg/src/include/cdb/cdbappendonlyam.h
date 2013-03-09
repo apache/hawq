@@ -38,6 +38,8 @@
 #include "cdb/cdbappendonlystoragewrite.h"
 #include "cdb/cdbappendonlyblockdirectory.h"
 
+#include "cdb/cdbquerycontextdispatching.h"
+
 #define DEFAULT_COMPRESS_LEVEL				 0
 #define MIN_APPENDONLY_BLOCK_SIZE			 8 * 1024
 #define DEFAULT_APPENDONLY_BLOCK_SIZE		32 * 1024
@@ -101,6 +103,9 @@ typedef struct AppendOnlyInsertDescData
 
 	/* The block directory for the appendonly relation. */
 	AppendOnlyBlockDirectory blockDirectory;
+
+
+	QueryContextDispatchingSendBack sendback;
 
 } AppendOnlyInsertDescData;
 

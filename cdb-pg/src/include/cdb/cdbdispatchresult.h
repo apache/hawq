@@ -13,6 +13,7 @@
 
 #include "commands/tablecmds.h"
 #include "utils/hsearch.h"
+#include "cdb/cdbquerycontextdispatching.h"
 
 struct pg_result;                   /* PGresult ... #include "gp-libpq-fe.h" */
 struct SegmentDatabaseDescriptor;   /* #include "cdb/cdbconn.h" */
@@ -68,10 +69,6 @@ typedef struct CdbDispatchResult
 	bool 						QEWriter_Dirty;
 
 	int					numrowsrejected; /* num rows rejected in SREH mode */
-	
-	char *				serializedCatalog;	/* modified Catalog on QE*/
-	int					serializedCatalogLen;
-
 }   CdbDispatchResult;
 
 
@@ -257,6 +254,11 @@ cdbdisp_dumpDispatchResults(struct CdbDispatchResults  *gangResults,
  */
 int64
 cdbdisp_sumCmdTuples(CdbDispatchResults *results, int sliceIndex);
+
+
+void
+cdbdisp_handleModifiedCatalogOnSegments(CdbDispatchResults *results,
+		void (*handler)(QueryContextDispatchingSendBack sendback));
 
 HTAB *
 cdbdisp_sumAoPartTupCount(PartitionNode *parts, CdbDispatchResults *results);

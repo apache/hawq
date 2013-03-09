@@ -2302,9 +2302,6 @@ freePGconn(PGconn *conn)
 		free(conn->outBuffer);
 	termPQExpBuffer(&conn->errorMessage);
 	termPQExpBuffer(&conn->workBuffer);
-	if (conn->serializedCatalog)
-		free(conn->serializedCatalog);
-	conn->serializedCatalogLen = 0;
 	free(conn);
 
 #ifdef WIN32

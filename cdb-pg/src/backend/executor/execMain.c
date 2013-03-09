@@ -1506,16 +1506,18 @@ InitPlan(QueryDesc *queryDesc, int eflags)
 			plannedstmt->result_aosegnos = estate->es_result_aosegnos;
 			heap_close(tmp, NoLock);
 
-			/* Set any QD resultrels segno, just in case. The QEs set their own in ExecInsert(). */
+			int relno = 0;
+			ResultRelInfo* relinfo;
+			for (relno = 0; relno < numResultRelations; relno ++)
 			{
-				int relno = 0;
-				ResultRelInfo* relinfo;
-				for (relno = 0; relno < numResultRelations; relno ++)
-				{
-					relinfo = &(resultRelInfos[relno]);
-					ResultRelInfoSetSegno(relinfo, estate->es_result_aosegnos);
-					CreateAppendOnlySegFileOnMaster(relinfo, estate->es_result_aosegnos);
-				}
+				relinfo = &(resultRelInfos[relno]);
+				ResultRelInfoSetSegno(relinfo, estate->es_result_aosegnos);
+				CreateAppendOnlySegFileOnMaster(relinfo, estate->es_result_aosegnos);
+				/*
+				 * lock segments files on master.
+				 */
+				if (Gp_role == GP_ROLE_DISPATCH)
+					LockSegfilesOnMaster(relinfo->ri_RelationDesc, relinfo->ri_aosegno);
 			}
 		}
 
@@ -2131,7 +2133,7 @@ CreateAoCsSegFileForRelationOnMaster(Relation rel,
 		if (NULL == aocsFileSegInfo)
 		{
 			InsertInitialAOCSFileSegInfo(aoEntry->segrelid, segno, i - 1,
-					rel->rd_att->natts);
+				rel->rd_att->natts);
 		}
 
 		for (j = 0; j < rel->rd_att->natts; j++)
@@ -2402,6 +2404,8 @@ ExecEndPlan(PlanState *planstate, EState *estate)
 	int			i;
 	ListCell   *l;
 
+	int aocount = 0;
+
 	/*
 	 * shut down any PlanQual processing we were doing
 	 */
@@ -2417,17 +2421,47 @@ ExecEndPlan(PlanState *planstate, EState *estate)
 	/* Report how many tuples we may have inserted into AO tables */
 	SendAOTupCounts(estate);
 
+	StringInfo buf = NULL;
+
+	resultRelInfo = estate->es_result_relations;
+	for (i = 0; i < estate->es_num_result_relations; i++)
+	{
+		if (resultRelInfo->ri_aoInsertDesc)
+			++aocount;
+		if (resultRelInfo->ri_aocsInsertDesc)
+			++aocount;
+        resultRelInfo++;
+	}
+
+	if (Gp_role == GP_ROLE_EXECUTE && aocount > 0)
+		buf = PreSendbackChangedCatalog(aocount);
+
 	/*
 	 * close the result relation(s) if any, but hold locks until xact commit.
 	 */
 	resultRelInfo = estate->es_result_relations;
 	for (i = 0; i < estate->es_num_result_relations; i++)
 	{
+		QueryContextDispatchingSendBack sendback = NULL;
+
 		/* end (flush) the INSERT operation in the access layer */
 		if (resultRelInfo->ri_aoInsertDesc)
+		{
+			sendback = CreateQueryContextDispatchingSendBack(1);
+			resultRelInfo->ri_aoInsertDesc->sendback = sendback;
+			sendback->relid = RelationGetRelid(resultRelInfo->ri_RelationDesc);
+
 			appendonly_insert_finish(resultRelInfo->ri_aoInsertDesc);
+		}
         if (resultRelInfo->ri_aocsInsertDesc)
-            aocs_insert_finish(resultRelInfo->ri_aocsInsertDesc);
+		{
+			sendback = CreateQueryContextDispatchingSendBack(
+					resultRelInfo->ri_aocsInsertDesc->aoi_rel->rd_att->natts);
+			resultRelInfo->ri_aocsInsertDesc->sendback = sendback;
+			sendback->relid = RelationGetRelid(resultRelInfo->ri_RelationDesc);
+
+			aocs_insert_finish(resultRelInfo->ri_aocsInsertDesc);
+        }
         if (resultRelInfo->ri_extInsertDesc)
         	external_insert_finish(resultRelInfo->ri_extInsertDesc);
 
@@ -2438,11 +2472,20 @@ ExecEndPlan(PlanState *planstate, EState *estate)
 			ExecClearTuple(resultRelInfo->ri_resultSlot);
 		}
 
+		if (sendback && relstorage_is_ao(RelinfoGetStorage(resultRelInfo))
+				&& Gp_role == GP_ROLE_EXECUTE)
+			AddSendbackChangedCatalogContent(buf, sendback);
+
+		DropQueryContextDispatchingSendBack(sendback);
+
 		/* Close indices and then the relation itself */
 		ExecCloseIndices(resultRelInfo);
 		heap_close(resultRelInfo->ri_RelationDesc, NoLock);
 		resultRelInfo++;
 	}
+
+	if (Gp_role == GP_ROLE_EXECUTE && aocount > 0)
+		FinishSendbackChangedCatalog(buf);
 
 	/*
 	 * close any relations selected FOR UPDATE/FOR SHARE, again keeping locks
@@ -4491,6 +4534,12 @@ CreateIntoRel(QueryDesc *queryDesc)
 	 */
 	CreateAppendOnlySegFileForRelationOnMaster(intoRelationDesc, 1);
 
+	/**
+	 * lock segment files
+	 */
+	if (Gp_role == GP_ROLE_DISPATCH)
+		LockSegfilesOnMaster(intoRelationDesc, 1);
+
 	intoClause->oidInfo.relOid = intoRelationId;
 	estate->es_into_relation_descriptor = intoRelationDesc;
 
@@ -4738,16 +4787,51 @@ intorel_receive(TupleTableSlot *slot, DestReceiver *self)
 static void
 intorel_shutdown(DestReceiver *self)
 {
+	int aocount = 0;
+
 	/* If target was append only, finalise */
 	DR_intorel *myState = (DR_intorel *) self;
 	EState	   *estate = myState->estate;
 	Relation	into_rel = estate->es_into_relation_descriptor;
 
+	StringInfo buf = NULL;
+	QueryContextDispatchingSendBack sendback = NULL;
 
 	if (RelationIsAoRows(into_rel) && myState->ao_insertDesc)
-		appendonly_insert_finish(myState->ao_insertDesc);
+		++aocount;
 	else if (RelationIsAoCols(into_rel) && myState->aocs_ins)
+		++aocount;
+
+	if (Gp_role == GP_ROLE_EXECUTE && aocount > 0)
+		buf = PreSendbackChangedCatalog(aocount);
+
+	if (RelationIsAoRows(into_rel) && myState->ao_insertDesc)
+	{
+		sendback = CreateQueryContextDispatchingSendBack(1);
+		myState->ao_insertDesc->sendback = sendback;
+
+		sendback->relid = RelationGetRelid(myState->ao_insertDesc->aoi_rel);
+
+		appendonly_insert_finish(myState->ao_insertDesc);
+	}
+	else if (RelationIsAoCols(into_rel) && myState->aocs_ins)
+	{
+		sendback = CreateQueryContextDispatchingSendBack(
+				 myState->aocs_ins->aoi_rel->rd_att->natts);
+		myState->aocs_ins->sendback = sendback;
+
+		sendback->relid = RelationGetRelid(myState->aocs_ins->aoi_rel);
+
         aocs_insert_finish(myState->aocs_ins);
+	}
+
+	if (sendback && Gp_role == GP_ROLE_EXECUTE)
+		AddSendbackChangedCatalogContent(buf, sendback);
+
+	DropQueryContextDispatchingSendBack(sendback);
+
+	if (Gp_role == GP_ROLE_EXECUTE && aocount > 0)
+		FinishSendbackChangedCatalog(buf);
 }
 
 /*

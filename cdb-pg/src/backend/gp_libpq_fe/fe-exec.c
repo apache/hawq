@@ -180,6 +180,9 @@ PQmakeEmptyPGresult(PGconn *conn, ExecStatusType status)
 	result->naotupcounts = 0;
 	result->aotupcounts = NULL;
 
+	result->numSendback = 0;
+	result->sendback = NULL;
+
 	if (conn)
 	{
 		/* copy connection data we might need for operations on PGresult */
@@ -657,6 +660,15 @@ PQclear(PGresult *res)
 	if (res->aotupcounts)
 		free(res->aotupcounts);
 	res->naotupcounts = 0;
+
+	if (res->sendback)
+	{
+		if (res->sendback->eof)
+			free(res->sendback->eof);
+		if (res->sendback->uncompressed_eof)
+			free(res->sendback->uncompressed_eof);
+		free(res->sendback);
+	}
 
 	/* Free the PGresult structure itself */
 	free(res);

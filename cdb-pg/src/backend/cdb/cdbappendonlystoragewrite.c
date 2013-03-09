@@ -399,65 +399,32 @@ void AppendOnlyStorageWrite_OpenFile(
 
 	file = storageWrite->bufferedAppend.mirroredOpen.primaryFile;
 
-	/*
-	 * Seek to the logical EOF write position.
-	 * FIXME: mat3: This should be changed, two different path is ugly.
-	 *
-
-	if (is_tablespace_updatable(storageWrite->bufferedAppend.mirroredOpen.relFileNode.spcNode))
+	seekResult = FileNonVirtualTell(file);
+	if (seekResult != logicalEof)
 	{
-		seekResult = FileSeek(file, logicalEof, SEEK_SET);
-		if (seekResult != logicalEof)
+		/*
+		 * previous transaction is aborted
+		 * truncate file
+		 */
+		if (FileTruncate(file, logicalEof))
 		{
-			bool	mirrorDataLossOccurred;
-		
-			MirroredAppendOnly_Close(
-							&storageWrite->bufferedAppend.mirroredOpen,
-							&mirrorDataLossOccurred);
 
+			MirroredAppendOnly_Close(&storageWrite->bufferedAppend.mirroredOpen);
+		
 			ereport(ERROR,
 					(errcode(ERRCODE_IO_ERROR),
-					 errmsg("Append-only Storage Write error on segment file '%s' for relation '%s'.  FileSeek offset = " INT64_FORMAT ".  Error code = %d (%s)",
-							filePathName,
-							storageWrite->relationName,
-							logicalEof,
-							(int)seekResult,
-							strerror((int)seekResult))));
+							errmsg("Append-only Storage Write error on segment file '%s' for relation '%s'.  FileSeek offset = "
+									INT64_FORMAT ".  Error code = %d (%s)",
+									filePathName, storageWrite->relationName,
+									logicalEof, (int)seekResult,
+									strerror((int)seekResult))));
 		}
 	}
-	else
-	{*/
-		seekResult = FileNonVirtualTell(file);
-		if (seekResult != logicalEof)
-		{
-			/*
-			 * previous transaction is aborted
-			 * truncate file
-			 */
-			if (FileTruncate(file, logicalEof))
-			{
-				/*bool mirrorDataLossOccurred;*/
-			
-				MirroredAppendOnly_Close(&storageWrite->bufferedAppend.mirroredOpen/*,
-						&mirrorDataLossOccurred*/);
-			
-				ereport(ERROR,
-						(errcode(ERRCODE_IO_ERROR),
-								errmsg("Append-only Storage Write error on segment file '%s' for relation '%s'.  FileSeek offset = "
-										INT64_FORMAT ".  Error code = %d (%s)",
-										filePathName, storageWrite->relationName,
-										logicalEof, (int)seekResult,
-										strerror((int)seekResult))));
-			}
-		}
-	/*}*/
 
 	storageWrite->file = file;
 	storageWrite->startEof = logicalEof;
 	storageWrite->relFileNode = *relFileNode;
 	storageWrite->segmentFileNum = segmentFileNum;
-/*	storageWrite->persistentTid = *persistentTid;
-	storageWrite->persistentSerialNum = persistentSerialNum;*/
 
 	/*
 	 * When writing multiple segment files, we throw away the old segment file name strings.
@@ -614,11 +581,7 @@ void AppendOnlyStorageWrite_FlushAndCloseFile(
 
 	MirroredAppendOnly_FlushAndClose(
 							&storageWrite->bufferedAppend.mirroredOpen,
-							&primaryError/*,
-							mirrorDataLossOccurred,
-							mirrorCatchupRequired,
-							originalMirrorDataLossTrackingState,
-							originalMirrorDataLossTrackingSessionNum*/);
+							&primaryError);
 	if (primaryError != 0)
 		ereport(ERROR,
 			   (errcode_for_file_access(),
@@ -631,8 +594,6 @@ void AppendOnlyStorageWrite_FlushAndCloseFile(
 
 	MemSet(&storageWrite->relFileNode, 0, sizeof(RelFileNode));
 	storageWrite->segmentFileNum = 0;
-/*	MemSet(&storageWrite->persistentTid, 0, sizeof(ItemPointerData));
-	storageWrite->persistentSerialNum = 0;*/
 }
 
 /*
@@ -654,8 +615,6 @@ void AppendOnlyStorageWrite_TransactionFlushAndCloseFile(
 
 	RelFileNode relFileNode;
 	int32 segmentFileNum;
-/*	ItemPointerData persistentTid;
-	int64 persistentSerialNum;*/
 
 	int64	startEof;
 	bool	mirrorDataLossOccurred;
@@ -676,8 +635,6 @@ void AppendOnlyStorageWrite_TransactionFlushAndCloseFile(
 
 	relFileNode = storageWrite->relFileNode;
 	segmentFileNum = storageWrite->segmentFileNum;
-/*	persistentTid = storageWrite->persistentTid;
-	persistentSerialNum = storageWrite->persistentSerialNum;*/
 
 	startEof = storageWrite->startEof;
 
@@ -695,42 +652,6 @@ void AppendOnlyStorageWrite_TransactionFlushAndCloseFile(
 										&mirrorCatchupRequired,
 										&originalMirrorDataLossTrackingState,
 										&originalMirrorDataLossTrackingSessionNum);
-
-	/*if (*newLogicalEof - startEof > 0)
-	{
-
-		 * This routine will handle both updating the persistent information about the
-		 * new EOF and copy data to the mirror if we are now in synchronized state.
-
-		if (Debug_persistent_print)
-			elog(Persistent_DebugPrintLevel(),
-				 "AppendOnlyStorageWrite_TransactionFlushAndCloseFile: %u/%u/%u, segment file #%d, serial number " INT64_FORMAT ", TID %s, mirror catchup required %s, "
-				 "mirror data loss tracking (state '%s', session num " INT64_FORMAT "), "
-				 "mirror start EOF " INT64_FORMAT ", mirror new EOF " INT64_FORMAT,
-				 relFileNode.spcNode,
-				 relFileNode.dbNode,
-				 relFileNode.relNode,
-				 segmentFileNum,
-				 persistentSerialNum,
-				 ItemPointerToString(&persistentTid),
-				 (mirrorCatchupRequired ? "true" : "false"),
-				 MirrorDataLossTrackingState_Name(originalMirrorDataLossTrackingState),
-				 originalMirrorDataLossTrackingSessionNum,
-				 startEof,
-				 *newLogicalEof);
-		MirroredAppendOnly_AddMirrorResyncEofs(
-										&relFileNode,
-										segmentFileNum,
-										storageWrite->relationName,
-										&persistentTid,
-										persistentSerialNum,
-										&mirroredLockLocalVars,
-										mirrorCatchupRequired,
-										originalMirrorDataLossTrackingState,
-										originalMirrorDataLossTrackingSessionNum,
-										*newLogicalEof);
-
-	}*/
 
 	MIRRORED_UNLOCK;
 

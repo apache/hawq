@@ -1080,7 +1080,8 @@ vacuum_appendonly_rel(Relation aorel, void *vacrelstats, bool isVacFull)
 														&aorel->rd_node,
 														segno,
 														AccessExclusiveLock,
-														/* dontWait */ true);
+														/* dontWait */ true,
+														GpIdentity.segindex);
 			if (acquireResult == LOCKACQUIRE_NOT_AVAIL)
 			{
 				elog(DEBUG5, "vacuum skipping truncate of AO segfile %d, "
@@ -1310,7 +1311,8 @@ vacuum_aocs_rel(Relation aorel, void *vacrelstats, bool isVacFull)
 														&aorel->rd_node,
 														segno,
 														AccessExclusiveLock,
-														/* dontWait */ true);
+														/* dontWait */ true,
+														GpIdentity.segindex);
 			if (acquireResult == LOCKACQUIRE_NOT_AVAIL)
 			{
 				elog(DEBUG5, "vacuum skipping truncate of AO segfile %d, "
