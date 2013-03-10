@@ -4161,8 +4161,6 @@ AbortTransaction(void)
 	AtEOXact_Buffers(false);
 	AtEOXact_RelationCache(false);
 	AtEOXact_Inval(false);
-	AtXactCancle_Files(); /* close all HDFS files before remove them. */
-
 	AtEOXact_QueryContext();
 	AtEOXact_smgr(false);
 

@@ -96,7 +96,7 @@
  * This GUC parameter lets the DBA limit max_safe_fds to something less than
  * what the postmaster's initial probe suggests will work.
  */
-int			max_files_per_process = 1000;
+int			max_files_per_process = 100;
 
 /*
  * Maximum number of file descriptors to open for either VFD entries or
@@ -110,7 +110,6 @@ int			max_files_per_process = 1000;
  * setting this variable, and so need not be tested separately.
  */
 static int	max_safe_fds = 32;	/* default if not changed */
-
 
 /* Debugging.... */
 #ifdef FDDEBUG
@@ -262,7 +261,6 @@ static bool HdfsGetProtocol(const char *fileName, char *buf, size_t size);
 static const char * ConvertToUnixPath(const char * fileName, char * buffer,
 		int len);
 static int IsLocalPath(const char * fileName);
-static int IsLocalFile(File file);
 
 /*
  * pg_fsync --- do fsync with or without writethrough
@@ -584,20 +582,25 @@ LruDelete(File file)
 	Delete(file);
 
 	/* save the seek position */
-	if (IsLocalFile(file))
+	if (IsLocalPath(VfdCache[file].fileName))
 		vfdP->seekPos = pg_lseek64(VfdCache[file].fd, 0, SEEK_CUR);
 	else
 		vfdP->seekPos = (int64)HdfsTell(VfdCache[file].hProtocol, VfdCache[file].hFS,
 				VfdCache[file].hFile);
-	Insist(vfdP->seekPos != INT64CONST(-1));
+
+	if (vfdP->seekPos == INT64CONST(-1))
+		elog(ERROR, "could not get the current position of file \"%s\": %m", vfdP->fileName);
 
 	/* close the file */
-	if (IsLocalFile(file))
+	if (IsLocalPath(VfdCache[file].fileName))
 	{
-	if (close(vfdP->fd))
+		if (close(vfdP->fd))
 			elog(ERROR, "could not close file \"%s\": %m", vfdP->fileName);
-	} else {
-		if (HdfsCloseFile(VfdCache[file].hProtocol, VfdCache[file].hFS, VfdCache[file].hFile))
+	}
+	else
+	{
+		if (HdfsCloseFile(VfdCache[file].hProtocol, VfdCache[file].hFS,
+				VfdCache[file].hFile))
 			elog(ERROR, "could not close file \"%s\": %m", vfdP->fileName);
 	}
 
@@ -605,11 +608,11 @@ LruDelete(File file)
 	vfdP->fd = VFD_CLOSED;
 	vfdP->hFS = NULL;
 	vfdP->hFile = NULL;
-	if(vfdP->hProtocol)
+	if (vfdP->hProtocol)
 	{
 		free(vfdP->hProtocol);
 		vfdP->hProtocol = NULL;
-}
+	}
 }
 
 static void
@@ -650,26 +653,27 @@ LruInsert(File file)
 	{
 	    elog(LOG, "reopen file %s with flag %o", vfdP->fileName, vfdP->fileFlags);
 
-		/*
-		 * The open could still fail for lack of file descriptors, eg due to
-		 * overall system file table being full.  So, be prepared to release
-		 * another FD if necessary...
-		 */
-		if (IsLocalFile(file))
-		{
-		while (nfile + numAllocatedDescs >= max_safe_fds)
+	    while (nfile + numAllocatedDescs >= max_safe_fds)
 		{
 			if (!ReleaseLruFile())
 				break;
 		}
 
-		vfdP->fd = BasicOpenFile(vfdP->fileName, vfdP->fileFlags,
-								 vfdP->fileMode);
-		if (vfdP->fd < 0)
+		/*
+		 * The open could still fail for lack of file descriptors, eg due to
+		 * overall system file table being full.  So, be prepared to release
+		 * another FD if necessary...
+		 */
+		if (IsLocalPath(vfdP->fileName))
 		{
-			DO_DB(elog(LOG, "RE_OPEN FAILED: %d", errno));
-			return vfdP->fd;
-			} else
+			vfdP->fd = BasicOpenFile(vfdP->fileName, vfdP->fileFlags,
+					vfdP->fileMode);
+			if (vfdP->fd < 0)
+			{
+				DO_DB(elog(LOG, "RE_OPEN FAILED: %d", errno));
+				return vfdP->fd;
+			}
+			else
 			{
 				DO_DB(elog(LOG, "RE_OPEN SUCCESS"));
 				++nfile;
@@ -677,59 +681,68 @@ LruInsert(File file)
 		}
 		else
 		{
-			if(!HdfsBasicOpenFile(vfdP->fileName, vfdP->fileFlags, vfdP->fileMode,
-								 &vfdP->hProtocol, &vfdP->hFS, &vfdP->hFile))
+			if (!HdfsBasicOpenFile(vfdP->fileName, vfdP->fileFlags,
+					vfdP->fileMode, &vfdP->hProtocol, &vfdP->hFS, &vfdP->hFile))
 			{
 				DO_DB(elog(LOG, "RE_OPEN FAILED: %d", errno));
 				return -1;
-			} else {
-			DO_DB(elog(LOG, "RE_OPEN SUCCESS"));
-				//++nfile;
+			}
+			else
+			{
+				DO_DB(elog(LOG, "RE_OPEN SUCCESS"));
+				++nfile;
 			}
 		}
 
 		/* seek to the right position */
-		if (vfdP->seekPos != INT64CONST(0))
+		if (vfdP->seekPos != INT64CONST(0) )
 		{
-			int64		returnValue;
-            if (IsLocalFile(file))
-            {
-			returnValue = pg_lseek64(vfdP->fd, vfdP->seekPos, SEEK_SET);
-                if (returnValue < 0)
-                    return -1;
-            } else
-            {
-                if (vfdP->fileFlags & O_WRONLY) {
-                    /*
-                     * open for write, only support append on hdfs
-                     */
-                    int64 len = (int64) HdfsTell(vfdP->hProtocol, vfdP->hFS, vfdP->hFile);
-                    if (vfdP->fileFlags & O_APPEND) {
-                        if (vfdP->seekPos != len) {
-                            elog(WARNING, "hdfs file %s length "INT64_FORMAT
-                                    " is not equal to logic file length "INT64_FORMAT,
-                                    vfdP->fileName, len, vfdP->seekPos);
-							return -1;
-                        }
-                    } else {
-                        elog(WARNING, "hdfs file %s should be open as APPEND", vfdP->fileName);
+			int64 returnValue;
+			if (IsLocalPath(VfdCache[file].fileName))
+			{
+				returnValue = pg_lseek64(vfdP->fd, vfdP->seekPos, SEEK_SET);
+				if (returnValue < 0)
+					return -1;
+			}
+			else
+			{
+				if (vfdP->fileFlags & O_WRONLY)
+				{
+					/*
+					 * open for write, only support append on hdfs
+					 */
+					int64 len = (int64) HdfsTell(vfdP->hProtocol, vfdP->hFS,
+							vfdP->hFile);
+
+
+					Insist(vfdP->fileFlags & O_APPEND);
+					/**
+					 * here, we reopen a file for for append but file length is not correct.
+					 * something really bad happened.
+					 */
+					if (vfdP->seekPos != len)
+					{
+						elog(FATAL, "reopen hdfs file %s length "INT64_FORMAT" is not equal to logic file length "INT64_FORMAT,
+								vfdP->fileName, len, vfdP->seekPos);
 						return -1;
-                    }
-                } else {
-                    /*
-                     * open for read
-                     */
-                    if (HdfsSeek(vfdP->hProtocol, vfdP->hFS, vfdP->hFile, vfdP->seekPos))
-                        return -1;
-                }
-            }
+					}
+				}
+				else
+				{
+					/*
+					 * open for read
+					 */
+					if (HdfsSeek(vfdP->hProtocol, vfdP->hFS, vfdP->hFile,
+							vfdP->seekPos))
+						return -1;
+				}
+			}
 		}
 	}
 
 	/*
 	 * put it at the head of the Lru ring
 	 */
-	if (IsLocalFile(file))
 	Insert(file);
 
 	return 0;
@@ -860,12 +873,11 @@ FileAccess(File file)
 		if (returnValue != 0)
 			return returnValue;
 	}
-	else if (VfdCache[0].lruLessRecently != file && IsLocalFile(file))
+	else if (VfdCache[0].lruLessRecently != file)
 	{
 		/*
 		 * We now know that the file is open and that it is not the last one
 		 * accessed, so we need to move it to the head of the Lru ring.
-		 * Don't put HDFS File into LRU list
 		 */
 
 		Delete(file);
@@ -896,7 +908,9 @@ FileInvalidate(File file)
  * it will be interpreted relative to the process' working directory
  * (which should always be $PGDATA when this code is running).
  */
-File LocalPathNameOpenFile(FileName fileName, int fileFlags, int fileMode) {
+File
+LocalPathNameOpenFile(FileName fileName, int fileFlags, int fileMode)
+{
 	char	   *fnamecopy;
 	File		file;
 	Vfd		   *vfdP;
@@ -908,10 +922,9 @@ File LocalPathNameOpenFile(FileName fileName, int fileFlags, int fileMode) {
 	 * We need a malloc'd copy of the file name; fail cleanly if no room.
 	 */
 	fnamecopy = strdup(fileName);
-	if (fnamecopy == NULL)
+	if (fnamecopy == NULL )
 		ereport(ERROR,
-				(errcode(ERRCODE_OUT_OF_MEMORY),
-				 errmsg("out of memory")));
+				(errcode(ERRCODE_OUT_OF_MEMORY), errmsg("out of memory")));
 
 	file = AllocateVfd();
 	vfdP = &VfdCache[file];
@@ -951,7 +964,7 @@ File LocalPathNameOpenFile(FileName fileName, int fileFlags, int fileMode) {
  * if we are using the system default filespace. Otherwise open
  * the file in the filespace configured for temporary files.
  * The passed name MUST be a relative path.  Effectively, this
- * prepends DatabasePath or path of the filespace to it and then 
+ * prepends DatabasePath or path of the filespace to it and then
  * acts like PathNameOpenFile.
  */
 File
@@ -1099,13 +1112,15 @@ OpenTemporaryFile(const char   *fileName,
 /*
  * close a file when done with it
  */
-void LocalFileClose(File file) {
+void
+LocalFileClose(File file)
+{
 	Vfd		   *vfdP;
 
 	Assert(FileIsValid(file));
 
 	DO_DB(elog(LOG, "FileClose: %d (%s)",
-			   file, VfdCache[file].fileName));
+					file, VfdCache[file].fileName));
 
 	vfdP = &VfdCache[file];
 
@@ -1158,8 +1173,10 @@ FileUnlink(File file)
 	FileClose(file);
 }
 
-int LocalFileRead(File file, char *buffer, int amount) {
-	return FileReadIntr(file, buffer, amount, true);
+int
+LocalFileRead(File file, char *buffer, int amount)
+{
+	return FileReadIntr(file, buffer, amount, true );
 }
 
 int
@@ -1177,7 +1194,7 @@ FileReadIntr(File file, char *buffer, int amount, bool fRetryIntr)
 		(elog(LOG, "FileRead: %d (%s) " INT64_FORMAT " %d %p",
 			  file, VfdCache[file].fileName,
 			  VfdCache[file].seekPos, amount, buffer));
-	
+
 	returnCode = FileAccess(file);
 	if (returnCode < 0)
 		return returnCode;
@@ -1221,22 +1238,25 @@ retry:
 	return returnCode;
 }
 
-int LocalFileWrite(File file, const char *buffer, int amount) {
-	int			returnCode;
+int
+LocalFileWrite(File file, const char *buffer, int amount)
+{
+	int returnCode;
 	FileRepGpmonRecord_s gpmonRecord;
-	FileRepGpmonStatType_e whichStat =0;
+	FileRepGpmonStatType_e whichStat = 0;
 
 	if (fileRepRole == FileRepPrimaryRole)
 	{
-			whichStat = FileRepGpmonStatType_PrimaryWriteSyscall;
-			FileRepGpmonStat_OpenRecord(whichStat, &gpmonRecord);
-			gpmonRecord.size = amount;
+		whichStat = FileRepGpmonStatType_PrimaryWriteSyscall;
+		FileRepGpmonStat_OpenRecord(whichStat, &gpmonRecord);
+		gpmonRecord.size = amount;
 
-	} else if (fileRepRole == FileRepMirrorRole)
+	}
+	else if (fileRepRole == FileRepMirrorRole)
 	{
-			whichStat = FileRepGpmonStatType_MirrorWriteSyscall;
-			FileRepGpmonStat_OpenRecord(whichStat, &gpmonRecord);
-			gpmonRecord.size = amount;
+		whichStat = FileRepGpmonStatType_MirrorWriteSyscall;
+		FileRepGpmonStat_OpenRecord(whichStat, &gpmonRecord);
+		gpmonRecord.size = amount;
 
 	}
 
@@ -1245,7 +1265,7 @@ int LocalFileWrite(File file, const char *buffer, int amount) {
 	DO_DB(elog(LOG, "FileWrite: %d (%s) " INT64_FORMAT " %d %p",
 			   file, VfdCache[file].fileName,
 			   VfdCache[file].seekPos, amount, buffer));
-	
+
 	/* Added temporary for troubleshooting */
 	if (Debug_filerep_print)
 		elog(LOG, "FileWrite: %d (%s) " INT64_FORMAT " %d %p",
@@ -1261,17 +1281,17 @@ int LocalFileWrite(File file, const char *buffer, int amount) {
 							   FILEREP_UNDEFINED,
 							   FileRepAckStateNotInitialized,
 							   VfdCache[file].seekPos,
-							   amount);		
-	
+							   amount);
+
 	returnCode = FileAccess(file);
 	if (returnCode < 0)
 		return returnCode;
-	
-#ifdef FAULT_INJECTOR	
+
+#ifdef FAULT_INJECTOR
 	if (! strcmp(VfdCache[file].fileName, "global/pg_control"))
 	{
 		if (FaultInjector_InjectFaultIfSet(
-										   PgControl, 
+										   PgControl,
 										   DDLNotSpecified,
 										   "" /* databaseName */,
 										   "" /* tableName */) == FaultInjectorTypeDataCorruption)
@@ -1279,11 +1299,11 @@ int LocalFileWrite(File file, const char *buffer, int amount) {
 			MemSet(buffer, 0, amount);
 		}
 	}
-	
+
 	if (strstr(VfdCache[file].fileName, "pg_xlog/"))
 	{
 		if (FaultInjector_InjectFaultIfSet(
-										   PgXlog, 
+										   PgXlog,
 										   DDLNotSpecified,
 										   "" /* databaseName */,
 										   "" /* tableName */) == FaultInjectorTypeDataCorruption)
@@ -1291,10 +1311,10 @@ int LocalFileWrite(File file, const char *buffer, int amount) {
 			MemSet(buffer, 0, amount);
 		}
 	}
-	
-	
-#endif	
-	
+
+
+#endif
+
 retry:
 	errno = 0;
 	returnCode = write(VfdCache[file].fd, buffer, amount);
@@ -1335,7 +1355,7 @@ retry:
 	if (returnCode >=0 )
 	{
 			//only include stat if successful
-			if ((fileRepRole == FileRepPrimaryRole) || 
+			if ((fileRepRole == FileRepPrimaryRole) ||
 				(fileRepRole == FileRepMirrorRole))
 			{
 					FileRepGpmonStat_CloseRecord(whichStat, &gpmonRecord);
@@ -1344,19 +1364,22 @@ retry:
 	return returnCode;
 }
 
-int LocalFileSync(File file) {
-	int			returnCode;
+int
+LocalFileSync(File file)
+{
+	int returnCode;
 	FileRepGpmonRecord_s gpmonRecord;
 	FileRepGpmonStatType_e whichStat;
 
 	if (fileRepRole == FileRepPrimaryRole)
 	{
-			whichStat = FileRepGpmonStatType_PrimaryFsyncSyscall;
-			FileRepGpmonStat_OpenRecord(whichStat, &gpmonRecord);
-	} else 
+		whichStat = FileRepGpmonStatType_PrimaryFsyncSyscall;
+		FileRepGpmonStat_OpenRecord(whichStat, &gpmonRecord);
+	}
+	else
 	{
-			whichStat = FileRepGpmonStatType_MirrorFsyncSyscall;
-			FileRepGpmonStat_OpenRecord(whichStat, &gpmonRecord);
+		whichStat = FileRepGpmonStatType_MirrorFsyncSyscall;
+		FileRepGpmonStat_OpenRecord(whichStat, &gpmonRecord);
 	}
 	Assert(FileIsValid(file));
 
@@ -1373,24 +1396,26 @@ int LocalFileSync(File file) {
 								   DDLNotSpecified,
 								   "",	//databaseName
 								   ""); // tableName
-#endif								
-	
+#endif
+
 	returnCode =  pg_fsync(VfdCache[file].fd);
-	
+
 	if (returnCode >= 0)
 	{
-			//only include stats if successful
-			if ((fileRepRole == FileRepPrimaryRole) || 
-				(fileRepRole == FileRepMirrorRole))
-			{
-					FileRepGpmonStat_CloseRecord(whichStat, &gpmonRecord);
-			}
+		//only include stats if successful
+		if ((fileRepRole == FileRepPrimaryRole)
+				|| (fileRepRole == FileRepMirrorRole))
+		{
+			FileRepGpmonStat_CloseRecord(whichStat, &gpmonRecord);
+		}
 	}
 	return returnCode;
 }
 
-int64 LocalFileSeek(File file, int64 offset, int whence) {
-	int			returnCode;
+int64
+LocalFileSeek(File file, int64 offset, int whence)
+{
+	int returnCode;
 
 	Assert(FileIsValid(file));
 
@@ -1443,8 +1468,10 @@ int64 LocalFileSeek(File file, int64 offset, int whence) {
 	return VfdCache[file].seekPos;
 }
 
-int64 FileNonVirtualTell(File file) {
-	int			returnCode;
+int64
+FileNonVirtualTell(File file)
+{
+	int returnCode;
 
 	Assert(FileIsValid(file));
 
@@ -1455,7 +1482,7 @@ int64 FileNonVirtualTell(File file) {
 	if (returnCode < 0)
 		return returnCode;
 
-	if (IsLocalFile(file))
+	if (IsLocalPath(VfdCache[file].fileName))
 	return pg_lseek64(VfdCache[file].fd, 0, SEEK_CUR);
 	else
 		return HdfsFileTell(file);
@@ -1480,15 +1507,19 @@ FileTell(File file)
  *
  * return 0 on failure, non-zero on success
  */
-int LocalRemovePath(FileName fileName, int recursive) {
+int
+LocalRemovePath(FileName fileName, int recursive)
+{
 	if (!recursive)
 		return !unlink(fileName);
 	else
 		return rmtree(fileName, true);
 }
 
-int LocalFileTruncate(File file, int64 offset) {
-	int			returnCode;
+int
+LocalFileTruncate(File file, int64 offset)
+{
+	int returnCode;
 
 	Assert(FileIsValid(file));
 
@@ -1507,10 +1538,10 @@ int LocalFileTruncate(File file, int64 offset) {
 	 * table data.
 	 */
 	returnCode = ftruncate(VfdCache[file].fd, offset);
-	
+
 	/* Assume we don't know the file position anymore */
 	VfdCache[file].seekPos = FileUnknownPos;
-		
+
 	return returnCode;
 }
 
@@ -1692,7 +1723,7 @@ AllocateDir(const char *dirname)
 
 		/* FIXME: we just need to return something. */
 		dir = (DIR *) malloc(1);
-		if (dir == NULL)			
+		if (dir == NULL)
 			ereport(ERROR,
 					(errcode(ERRCODE_OUT_OF_MEMORY), errmsg("out of memory")));
 		desc->kind = AllocateDescRemoteDir;
@@ -1999,46 +2030,16 @@ CleanupTempFiles(bool isProcExit)
 			  )
 			{
 				AssertImply( (fdstate & FD_TEMPORARY), VfdCache[i].fileName != NULL);
-				FileClose(i);
+				if (IsLocalPath(VfdCache[i].fileName))
+					LocalFileClose(i);
+				else
+					HdfsFileClose(i, false);
 			}
 		}
 	}
 
 	while (numAllocatedDescs > 0)
 		FreeDesc(&allocatedDescs[0]);
-}
-
-/*
- * Close all HDFS files
- */
-static void
-CloseAllHdfsFiles(void)
-{
-	Index		i;
-
-	if (SizeVfdCache > 0)
-	{
-		Assert(FileIsNotOpen(0));		/* Make sure ring not corrupted */
-		for (i = 1; i < SizeVfdCache; i++)
-		{
-			if(FileIsNotOpen(i) || IsLocalFile(i))
-				continue;
-
-			DO_DB(elog(LOG, "CloseAllHdfsFiles: close %d. filename: %s", i, VfdCache[i].fileName));
-
-			/* we are in transaction abort, cannot report error while close file */
-			HdfsFileClose(i, false);
-		}
-	}
-}
-
-/*
- * Called while transaction was aborted
- */
-void
-AtXactCancle_Files(void)
-{
-	CloseAllHdfsFiles();
 }
 
 /*
@@ -2156,12 +2157,13 @@ GetTempFilePrefix(char * buf, size_t buflen, const char * fileName)
 
 	return needlen;
 }
-	
+
 /*
  * Check if a temporary file matches the expected prefix. This
  * is done before deleting it as a sanity check.
  */
-static bool HasTempFilePrefix(char * fileName)
+static bool
+HasTempFilePrefix(char * fileName)
 {
 	return (strncmp(fileName,
 						PG_TEMP_FILE_PREFIX,
@@ -2175,7 +2177,8 @@ static HTAB * HdfsFsTable = NULL;
 static MemoryContext HdfsGlobalContext = NULL;
 #define EXPECTED_MAX_HDFS_CONNECTIONS 10
 
-struct FsEntry {
+struct FsEntry
+{
 	char host[MAXPGPATH + 1];
 	hdfsFS fs;
 };
@@ -2190,7 +2193,9 @@ static const char * local_prefix = "local://";
  * hdfs path schema :
  * 		hdfs:/<host>:<port>/...
  */
-static hdfsFS HdfsGetConnection(const char * protocol, const char * path) {
+static hdfsFS
+HdfsGetConnection(const char * protocol, const char * path)
+{
 	struct FsEntry * entry;
 	HASHCTL hash_ctl;
 	bool found;
@@ -2201,22 +2206,26 @@ static hdfsFS HdfsGetConnection(const char * protocol, const char * path) {
 
 	do {
 		p = strstr(path, fsys_protocol_sep);
-		if (NULL == p) {
+		if (NULL == p)
+		{
 			elog(WARNING, "no filesystem protocol found: %s", path);
 			errno = EINVAL;
 			break;
 		}
 
 		/* skip option field. liugd TODO : ugly */
+		/*should change to uri later, wangzw*/
 		p += strlen(fsys_protocol_sep);
-		if (*p == '{') {
-			p = strstr(p+1, "}") + 1;
+		if (*p == '{')
+		{
+			p = strstr(p + 1, "}") + 1;
 		}
 
 		host = palloc0(strlen(path));
 		strcpy(host, p);
 		p = strstr(host, ":");
-		if (NULL == p) {
+		if (NULL == p)
+		{
 			elog(WARNING, "cannot find hdfs port in path: %s", path);
 			errno = EINVAL;
 			break;
@@ -2224,7 +2233,8 @@ static hdfsFS HdfsGetConnection(const char * protocol, const char * path) {
 		*p++ = 0;
 		errno = 0;
 		port = (int) strtol(p, NULL, 0);
-		if (EINVAL == errno || ERANGE == errno || !(0 < port && port < 65536)) {
+		if (EINVAL == errno || ERANGE == errno || !(0 < port && port < 65536))
+		{
 			elog(WARNING, "cannot find hdfs port in path: %s", path);
 			errno = EINVAL;
 			break;
@@ -2233,8 +2243,10 @@ static hdfsFS HdfsGetConnection(const char * protocol, const char * path) {
 		location = palloc0(strlen(host) + 10);
 		sprintf(location, "%s:%d", host, port);
 
-		if (NULL == HdfsFsTable) {
-			if (NULL == HdfsGlobalContext) {
+		if (NULL == HdfsFsTable)
+		{
+			if (NULL == HdfsGlobalContext)
+			{
 				Assert(NULL != TopMemoryContext);
 				HdfsGlobalContext = AllocSetContextCreate(TopMemoryContext,
 						"HDFS Global Context", ALLOCSET_DEFAULT_MINSIZE,
@@ -2251,7 +2263,8 @@ static hdfsFS HdfsGetConnection(const char * protocol, const char * path) {
 					EXPECTED_MAX_HDFS_CONNECTIONS, &hash_ctl,
 					HASH_ELEM | HASH_FUNCTION | HASH_CONTEXT);
 
-			if (HdfsFsTable == NULL) {
+			if (HdfsFsTable == NULL )
+			{
 				elog(WARNING, "failed to create hash table.");
 				errno = EIO;
 				break;
@@ -2261,12 +2274,14 @@ static hdfsFS HdfsGetConnection(const char * protocol, const char * path) {
 		entry = (struct FsEntry *) hash_search(HdfsFsTable, location,
 				HASH_ENTER, &found);
 
-		if (!found) {
+		if (!found)
+		{
 			Assert(NULL != entry);
 			DO_DB(elog(LOG, "connect webhdfs host: %s, port: %d", host, port));
 
 			entry->fs = HdfsConnect(protocol, host, port);
-			if (NULL == entry->fs) {
+			if (NULL == entry->fs)
+			{
 				hash_search(HdfsFsTable, location, HASH_REMOVE, &found);
 				elog(WARNING, "fail to connect hdfs at %s, errno = %d", location,
 						errno);
@@ -2291,24 +2306,12 @@ static hdfsFS HdfsGetConnection(const char * protocol, const char * path) {
 /*
  * return non-zero if fileName is a well formated hdfs path
  */
-static int IsLocalPath(const char * fileName) {
-	if (0 == strncmp(fileName, local_prefix, strlen(local_prefix))) {
+static int
+IsLocalPath(const char * fileName)
+{
+	if (0 == strncmp(fileName, local_prefix, strlen(local_prefix)))
 		return 1;
-	}
-	if (NULL == strstr(fileName, fsys_protocol_sep)) {
-		return 1;
-	}
-	return 0;
-}
-
-/*
- * return non-zero if file is a hdfs file
- */
-static int IsLocalFile(File file) {
-	Vfd *vfdP;
-	Assert(FileIsValid(file));
-	vfdP = &VfdCache[file];
-	if (NULL == vfdP->hFile && NULL == vfdP->hFS)
+	if (NULL == strstr(fileName, fsys_protocol_sep))
 		return 1;
 	return 0;
 }
@@ -2322,28 +2325,29 @@ HdfsGetProtocol(const char *fileName, char *buf, size_t size)
 	const char	*p;
 
 	p = strstr(fileName, fsys_protocol_sep);
-	if (NULL == p) {
-		elog(WARNING, "internal error: no filesystem protocol found in path \"%s\"",
-				fileName);
+	if (NULL == p)
+	{
 		errno = EINVAL;
-		return false;
+		return false ;
 	}
 
-	if (size < ((p - fileName + 1) * sizeof(char))) {
-		elog(WARNING, "internal error: protocol buf is too small for protocl \"%s\"",
-				fileName);
+	if (size < ((p - fileName + 1) * sizeof(char)))
+	{
 		errno = ENOMEM;
-		return false;
+		return false ;
 	}
-	
+
 	strncpy(buf, fileName, p - fileName);
 	buf[p - fileName] = '\0';
-	return true;
+	return true ;
 }
 
 /*
  * get options from fileName, get rep number
  * liugd TODO : this function is VERY BAD
+ */
+/*
+ * should change to uri later.
  */
 static int
 HdfsParseOptions(const char *fileName, short *rep)
@@ -2353,10 +2357,11 @@ HdfsParseOptions(const char *fileName, short *rep)
 	const char *pe = NULL;
 
 	p = strstr(fileName, fsys_protocol_sep);
-	if (NULL == p) {
-	    errno = EINVAL;
+	if (NULL == p)
+	{
+		errno = EINVAL;
 		elog(WARNING, "internal error HdfsParseOptions: no filesystem protocol found in path \"%s\"",
-			 fileName);
+				fileName);
 		return -1;
 	}
 	p += strlen(fsys_protocol_sep);
@@ -2365,14 +2370,16 @@ HdfsParseOptions(const char *fileName, short *rep)
 
 	pb = p + 1;
 	pe = strstr(pb, "}");
-	if (NULL == pe) {
-	    errno = EINVAL;
+	if (NULL == pe)
+	{
+		errno = EINVAL;
 		elog(WARNING, "internal error HdfsParseOptions: options format error in path \"%s\"",
-			 fileName);
+				fileName);
 		return -1;
 	}
 
-	if(strncmp(pb, "replica=", strlen("replica=")) == 0) {
+	if (strncmp(pb, "replica=", strlen("replica=")) == 0)
+	{
 		pb = pb + strlen("replica=");
 		*rep = atoi(pb);
 	}
@@ -2386,21 +2393,24 @@ HdfsParseOptions(const char *fileName, short *rep)
  * return buffer on success, return NULL on failure
  */
 static const char *
-ConvertToUnixPath(const char * fileName, char * buffer, int len) {
+ConvertToUnixPath(const char * fileName, char * buffer, int len)
+{
 	char * p;
 	p = strstr(fileName, fsys_protocol_sep);
-	if (NULL == p) {
+	if (NULL == p)
+	{
 		elog(WARNING, "internal error: no filesystem protocol found in path \"%s\"",
 				fileName);
 		errno = EINVAL;
-		return NULL;
+		return NULL ;
 	}
 	p = strstr(p + strlen(fsys_protocol_sep), "/");
-	if (NULL == p) {
+	if (NULL == p)
+	{
 		elog(WARNING, "internal error: cannot convert path \"%s\" into unix format",
 				fileName);
 		errno = EINVAL;
-		return NULL;
+		return NULL ;
 	}
 	strncpy(buffer, p, len);
 	return buffer;
@@ -2412,16 +2422,19 @@ ConvertToUnixPath(const char * fileName, char * buffer, int len) {
  * fileName: well formated hdfs file path,
  * 		hdfs file path schema hdfs://<host>:<port>/abspath
  */
-static bool HdfsBasicOpenFile(FileName fileName, int fileFlags, int fileMode,
-							  char **hProtocol, hdfsFS *fs, hdfsFile *hFile) {
+static bool
+HdfsBasicOpenFile(FileName fileName, int fileFlags, int fileMode,
+		char **hProtocol, hdfsFS *fs, hdfsFile *hFile)
+{
 	char path[MAXPGPATH + 1];
 	char protocol[MAXPGPATH];
 	short rep = FS_DEFAULT_REPLICA_NUM;
 
 	DO_DB(elog(LOG, "HdfsBasicOpenFile, path: %s, fileFlags: %x, fileMode: %o",
-	        fileName, fileFlags, fileMode));
+					fileName, fileFlags, fileMode));
 
-	if (!HdfsGetProtocol(fileName, protocol, sizeof(protocol))) {
+	if (!HdfsGetProtocol(fileName, protocol, sizeof(protocol)))
+	{
 		elog(WARNING, "cannot get protocol for path: %s", fileName);
 		return FALSE;
 	}
@@ -2430,32 +2443,24 @@ static bool HdfsBasicOpenFile(FileName fileName, int fileFlags, int fileMode,
 
 	*hProtocol = strdup(protocol);
 	*fs = HdfsGetConnection(protocol, fileName);
-	if (*fs == NULL) {
+	if (*fs == NULL)
 		return FALSE;
-	}
 
-	if (NULL == ConvertToUnixPath(fileName, path, sizeof(path))) {
+	if (NULL == ConvertToUnixPath(fileName, path, sizeof(path)))
 		return FALSE;
-	}
 
-    if (!(fileFlags & O_APPEND) && (fileFlags & O_WRONLY)) {
-        *hFile = HdfsOpenFile(protocol, *fs, path, fileFlags, 0, rep, 0);
-    } else {
-        *hFile = HdfsOpenFile(protocol, *fs, path, fileFlags, 0, 0, 0);
-    }
+	if (!(fileFlags & O_APPEND) && (fileFlags & O_WRONLY))
+		*hFile = HdfsOpenFile(protocol, *fs, path, fileFlags, 0, rep, 0);
+	else
+		*hFile = HdfsOpenFile(protocol, *fs, path, fileFlags, 0, 0, 0);
 
 	//  do not check errno, checked in caller.
-	if (*hFile != NULL) {
-		if (O_CREAT & fileFlags) {
-		    if (HdfsSync(protocol, *fs, *hFile)) {
-		        elog(WARNING, "cannot reopen hdfs file errno %d", errno);
-		        return FALSE;
-		    }
-			if (HdfsChmod(protocol, *fs, path, fileMode)) {
-                elog(WARNING, "cannot set file : %s mode : %o, errno %d", fileName,
-                        fileMode, errno);
-                return FALSE;
-            }
+	if (*hFile != NULL )
+	{
+		if (O_CREAT & fileFlags)
+		{
+			if (HdfsChmod(protocol, *fs, path, fileMode))
+				return FALSE;
 		}
 		return TRUE; /* success! */
 	}
@@ -2468,7 +2473,9 @@ static bool HdfsBasicOpenFile(FileName fileName, int fileFlags, int fileMode,
  *
  * fileName: a well formated hdfs path
  */
-File HdfsPathNameOpenFile(FileName fileName, int fileFlags, int fileMode) {
+File
+HdfsPathNameOpenFile(FileName fileName, int fileFlags, int fileMode)
+{
 	File file;
 	Vfd *vfdP;
 	char * protocol;
@@ -2477,8 +2484,8 @@ File HdfsPathNameOpenFile(FileName fileName, int fileFlags, int fileMode) {
 	char *pathname;
 
 	DO_DB(elog(LOG, "HdfsPathNameOpenFile, path: %s, flag: %x, mode %o",
-			   fileName, fileFlags, fileMode));
-    /*
+					fileName, fileFlags, fileMode));
+	/*
 	 * We need a malloc'd copy of the file name; fail cleanly if no room.
 	 */
 	pathname = strdup(fileName);
@@ -2486,12 +2493,19 @@ File HdfsPathNameOpenFile(FileName fileName, int fileFlags, int fileMode) {
 		ereport(ERROR,
 				(errcode(ERRCODE_OUT_OF_MEMORY), errmsg("out of memory")));
 
-	DO_DB(elog(LOG, "HdfsPathNameOpenFile: %s", fileNane));
+	DO_DB(elog(LOG, "HdfsPathNameOpenFile: %s", fileName));
+
+	while (nfile + numAllocatedDescs + 1 >= max_safe_fds)
+	{
+		if (!ReleaseLruFile())
+			break;
+	}
 
 	bool result = HdfsBasicOpenFile(pathname, fileFlags, fileMode, &protocol,
 			&fs, &hfile);
 
-	if (result == FALSE) {
+	if (result == FALSE)
+	{
 		free(pathname);
 		return -1;
 	}
@@ -2503,7 +2517,6 @@ File HdfsPathNameOpenFile(FileName fileName, int fileFlags, int fileMode) {
 	 */
 	file = AllocateVfd();
 	vfdP = &VfdCache[file];
-
 	vfdP->fileName = pathname;
 	vfdP->hFS = fs;
 	vfdP->hFile = hfile;
@@ -2515,7 +2528,15 @@ File HdfsPathNameOpenFile(FileName fileName, int fileFlags, int fileMode) {
 	vfdP->fileFlags = (fileFlags & ~O_CREAT) | O_APPEND;
 	vfdP->fileMode = fileMode;
 	vfdP->seekPos = INT64CONST(0);
-	vfdP->fdstate = 0x0;
+
+	/*
+	 * all hdfs files should be closed after transaction committed/aborted
+	 */
+	vfdP->fdstate |= FD_CLOSE_AT_EOXACT;
+	vfdP->create_subid = GetCurrentSubTransactionId();
+
+	++nfile;
+	Insert(file);
 
 	DO_DB(elog(LOG, "HdfsPathNameOpenFile: file: %d, success %s", file, fileName));
 
@@ -2525,7 +2546,9 @@ File HdfsPathNameOpenFile(FileName fileName, int fileFlags, int fileMode) {
 /*
  * close a hdfs file
  */
-void HdfsFileClose(File file, bool canReportError) {
+void
+HdfsFileClose(File file, bool canReportError)
+{
 	int retval = 0;
 	Vfd *vfdP;
 
@@ -2535,27 +2558,23 @@ void HdfsFileClose(File file, bool canReportError) {
 	vfdP = &VfdCache[file];
 
 	DO_DB(elog(LOG, "HdfsFileClose: %d (%s)", file, vfdP->fileName));
-	//elog(LOG, "HdfsFileClose: %d (%s)", file, vfdP->fileName);
 
 	if (!FileIsNotOpen(file)) //file is open
 	{
-		//remove the file from the LRU ring
-		//Delete(file);
-		//close file
+		Delete(file);
 
 		//no matter the return code, remove vfd, file cannot be closed twice
 		retval = HdfsCloseFile(vfdP->hProtocol, vfdP->hFS, vfdP->hFile);
 
 		//used for log
-		if (retval == -1) {
+		if (retval == -1)
 			strncpy(fileName, vfdP->fileName, MAXPGPATH);
-		}
 
-		//--nfile;
+		--nfile;
 		vfdP->fd = VFD_CLOSED;
 		vfdP->hFS = NULL;
 		vfdP->hFile = NULL;
-		if(vfdP->hProtocol)
+		if (vfdP->hProtocol)
 		{
 			free(vfdP->hProtocol);
 			vfdP->hProtocol = NULL;
@@ -2569,15 +2588,16 @@ void HdfsFileClose(File file, bool canReportError) {
 	{
 		/* do not disconnect. */
 		if (canReportError)
-			elog(ERROR, "could not close file %d : (%s) errno %d", file,
-					fileName, errno);
+			elog(ERROR, "could not close file %d : (%s) errno %d", file, fileName, errno);
 	}
 }
 
 /*
  * read from hdfs file
  */
-int HdfsFileRead(File file, char *buffer, int amount) {
+int
+HdfsFileRead(File file, char *buffer, int amount)
+{
 	int returnCode;
 
 	Assert(FileIsValid(file));
@@ -2586,24 +2606,26 @@ int HdfsFileRead(File file, char *buffer, int amount) {
 					VfdCache[file].seekPos, amount, buffer));
 
 	//ensure the file is open before FileAccess
-    Vfd *vfdP;
-    vfdP = &VfdCache[file];
+	Vfd *vfdP;
+	vfdP = &VfdCache[file];
 
 	returnCode = FileAccess(file);
-	if (returnCode < 0){
+	if (returnCode < 0)
+	{
 		elog(WARNING, "cannot reopen file %s for read, errno %d",
 				vfdP->fileName, errno);
 		return returnCode;
 	}
 
 	DO_DB(elog(LOG, "HdfsFileRead  para %p %p %p %d", VfdCache[file].hFS,
-			VfdCache[file].hFile, buffer, amount));
-	returnCode = HdfsRead(VfdCache[file].hProtocol, VfdCache[file].hFS, VfdCache[file].hFile,
-			buffer, amount);
+					VfdCache[file].hFile, buffer, amount));
+	returnCode = HdfsRead(VfdCache[file].hProtocol, VfdCache[file].hFS,
+			VfdCache[file].hFile, buffer, amount);
 	DO_DB(elog(LOG, "HdfsFileRead  return %d, errno %d", returnCode, errno));
 	if (returnCode >= 0)
 		VfdCache[file].seekPos += returnCode;
-	else {
+	else
+	{
 		/* Trouble, so assume we don't know the file position anymore */
 		VfdCache[file].seekPos = FileUnknownPos;
 		elog(WARNING, "cannot read from file %s, errno %d",
@@ -2616,7 +2638,9 @@ int HdfsFileRead(File file, char *buffer, int amount) {
 /*
  * write into hdfs file
  */
-int HdfsFileWrite(File file, const char *buffer, int amount) {
+int
+HdfsFileWrite(File file, const char *buffer, int amount)
+{
 	int returnCode;
 	Vfd *vfdP;
 	vfdP = &VfdCache[file];
@@ -2624,49 +2648,48 @@ int HdfsFileWrite(File file, const char *buffer, int amount) {
 	Assert(FileIsValid(file));
 
 	DO_DB(elog(LOG, "HdfsFileWrite: %d (%s) " INT64_FORMAT " %d %p",
-                            file,vfdP->fileName,
-                            vfdP->seekPos, amount, buffer));
+					file,vfdP->fileName,
+					vfdP->seekPos, amount, buffer));
 
 	returnCode = FileAccess(file);
-	if (returnCode < 0){
-	    elog(WARNING, "cannot reopen file %s for write, errno %d",
-	    		vfdP->fileName, errno);
-	    return returnCode;
-	}
+	if (returnCode < 0)
+		return returnCode;
 
 	DO_DB(elog(LOG, "HdfsFileWrite: file %d filename (%s)  amount%d buffer%p", file,
-                            vfdP->fileName, amount, buffer));
+					vfdP->fileName, amount, buffer));
 
-	returnCode = HdfsWrite(vfdP->hProtocol, vfdP->hFS, vfdP->hFile, buffer, amount);
+	returnCode = HdfsWrite(vfdP->hProtocol, vfdP->hFS, vfdP->hFile, buffer,
+			amount);
 
-	if (returnCode >= 0) {
+	if (returnCode >= 0)
 		vfdP->seekPos += returnCode;
-	} else {
+	else
 		/* Trouble, so assume we don't know the file position anymore */
-	    elog(WARNING, "cannot write into file %s, errno %d",
-	    		vfdP->fileName, errno);
-	    vfdP->seekPos = FileUnknownPos;
-	}
+		vfdP->seekPos = FileUnknownPos;
 	return returnCode;
 }
 
 
 /*
  * tell the position of file point
- *
- * NB: file should be already opened
  */
-int64 HdfsFileTell(File file) {
+int64
+HdfsFileTell(File file)
+{
 	int returnCode;
+
 	Assert(FileIsValid(file));
 	DO_DB(elog(LOG, "HfdsFileTell, file %s", VfdCache[file].fileName));
+
 	returnCode = FileAccess(file);
-	if (returnCode < 0){
-	    elog(WARNING, "cannot reopen file %s for file tell, errno %d",
-	            VfdCache[file].fileName, errno);
+	if (returnCode < 0)
+	{
+		elog(WARNING, "cannot reopen file %s for file tell, errno %d",
+				VfdCache[file].fileName, errno);
 		return returnCode;
 	}
-	return (int64) HdfsTell(VfdCache[file].hProtocol, VfdCache[file].hFS, VfdCache[file].hFile);
+	return (int64) HdfsTell(VfdCache[file].hProtocol, VfdCache[file].hFS,
+			VfdCache[file].hFile);
 }
 
 /*
@@ -2674,7 +2697,9 @@ int64 HdfsFileTell(File file) {
  *
  * NB: only hdfs file that is opend for read can be seek
  */
-int64 HdfsFileSeek(File file, int64 offset, int whence) {
+int64
+HdfsFileSeek(File file, int64 offset, int whence)
+{
 	int returnCode;
 	Assert(FileIsValid(file));
 
@@ -2683,9 +2708,8 @@ int64 HdfsFileSeek(File file, int64 offset, int whence) {
 					VfdCache[file].seekPos, offset, whence));
 
 	int64 desiredPos = 0;
-	if (VfdCache[file].seekPos != FileUnknownPos) {
+	if (VfdCache[file].seekPos != FileUnknownPos )
 		desiredPos = VfdCache[file].seekPos;
-	}
 
 	switch (whence) {
 		case SEEK_SET:
@@ -2703,9 +2727,8 @@ int64 HdfsFileSeek(File file, int64 offset, int whence) {
 			ConvertToUnixPath(VfdCache[file].fileName, path, sizeof(path));
 
 			info = HdfsGetPathInfo(VfdCache[file].hProtocol, VfdCache[file].hFS, path);
-			// liugd: do we need to return false instead of elog ERROR?
 			if (!info)
-				elog(ERROR, "hdfsGetPathInfo: failed");
+				return -1;
 
 			desiredPos = info->mSize;
 			HdfsFreeFileInfo(VfdCache[file].hProtocol, info, 1);
@@ -2717,19 +2740,14 @@ int64 HdfsFileSeek(File file, int64 offset, int whence) {
 	}
 
 	returnCode = FileAccess(file);
-	if (returnCode < 0){
-	    elog(WARNING, "cannot open file: %s for seek, errno %d",
-	            VfdCache[file].fileName, errno);
+	if (returnCode < 0)
 		return returnCode;
-	}
-	if (0 != HdfsSeek(VfdCache[file].hProtocol, VfdCache[file].hFS, VfdCache[file].hFile,
-					desiredPos)) {
-	    elog(WARNING, "cannot to seek file %s to "INT64_FORMAT" errno %d",
-	            VfdCache[file].fileName, desiredPos, errno);
+
+	if (HdfsSeek(VfdCache[file].hProtocol, VfdCache[file].hFS,
+					VfdCache[file].hFile, desiredPos))
 		VfdCache[file].seekPos = -1;
-	} else {
+	else
 		VfdCache[file].seekPos = desiredPos;
-	}
 
 	return VfdCache[file].seekPos;
 }
@@ -2737,18 +2755,20 @@ int64 HdfsFileSeek(File file, int64 offset, int whence) {
 /*
  * flush hdfs file
  *
- * NB: hdfs flush do NOT promise that data has been writen on disk
+ * NB: hdfs flush do NOT promise that data has been written on disk
  * after flush, data can be read by others
  */
-int HdfsFileSync(File file) {
+int
+HdfsFileSync(File file)
+{
 	Assert(FileIsValid(file));
-	Assert(!FileIsNotOpen(file));
-	DO_DB(elog(LOG, "HdfsFileSync: %d (%s)", file, VfdCache[file].fileName));
+	if (!FileIsNotOpen(file))
+	{
+		DO_DB(elog(LOG, "HdfsFileSync: %d (%s)", file, VfdCache[file].fileName));
 
-	if(HdfsSync(VfdCache[file].hProtocol, VfdCache[file].hFS, VfdCache[file].hFile)) {
-	    elog(WARNING, "cannot flush hdfs file %s://%s, errno %d",
-			 VfdCache[file].hProtocol, VfdCache[file].fileName, errno);
-	    return -1;
+		if (HdfsSync(VfdCache[file].hProtocol, VfdCache[file].hFS,
+				VfdCache[file].hFile))
+			return -1;
 	}
 	return 0;
 }
@@ -2760,66 +2780,62 @@ int HdfsFileSync(File file) {
  *
  * return 0 on success, non-zero on failure
  */
-int HdfsRemovePath(FileName fileName, int recursive) {
+int
+HdfsRemovePath(FileName fileName, int recursive)
+{
 	char path[MAXPGPATH + 1];
 	char protocol[MAXPGPATH];
 
 	DO_DB(elog(LOG, "HdfsRemovePath, path: %s, recursive: %d", fileName, recursive));
 
-	if (!HdfsGetProtocol(fileName, protocol, sizeof(protocol))) {
-		elog(WARNING, "cannot get protocol for path: %s", fileName);
+	if (!HdfsGetProtocol(fileName, protocol, sizeof(protocol)))
 		return -1;
-	}
 
 	hdfsFS fs = HdfsGetConnection(protocol, fileName);
-	if (NULL == fs) {
+	if (NULL == fs)
 		return -1;
-	}
-	if (NULL == ConvertToUnixPath(fileName, path, sizeof(path))) {
+	if (NULL == ConvertToUnixPath(fileName, path, sizeof(path)))
 		return -1;
-	}
 
-	if(HdfsDelete(protocol, fs, path, recursive)) {
-	    return -1;
-	}
+	if (HdfsDelete(protocol, fs, path, recursive))
+		return -1;
 	return 0;
 }
 
-int HdfsMakeDirectory(const char * path, mode_t mode) {
+int
+HdfsMakeDirectory(const char * path, mode_t mode)
+{
 	char p[MAXPGPATH + 1];
 	char protocol[MAXPGPATH];
 
 	DO_DB(elog(LOG, "HdfsMakeDirectory: %s, mode: %o", path, mode));
 
-	if (!HdfsGetProtocol(path, protocol, sizeof(protocol))) {
-		elog(WARNING, "cannot get protocol for path: %s", path);
+	if (!HdfsGetProtocol(path, protocol, sizeof(protocol)))
 		return -1;
-	}
 
 	hdfsFS fs = HdfsGetConnection(protocol, path);
-	if (NULL == fs) {
+	if (NULL == fs)
 		return -1;
-	}
-	if (NULL == ConvertToUnixPath(path, p, sizeof(p))) {
+	if (NULL == ConvertToUnixPath(path, p, sizeof(p)))
 		return -1;
-	}
 
-	if (0 == HdfsCreateDirectory(protocol, fs, p)) {
-		if(HdfsChmod(protocol, fs, p, mode)) {
-		    elog(WARNING, "cannot set path %s, mode %o, errno %d", path, mode, errno);
-		    return -1;
-		}
+	if (HdfsCreateDirectory(protocol, fs, p))
+		return -1;
+
+	if (HdfsChmod(protocol, fs, p, mode))
+		return -1;
+	else
 		return 0;
-	}
-	return -1;
 }
 
 /*
  * truncate a hdfs file to a defined length
  */
-int HdfsFileTruncate(File file, int64 offset) {
+int
+HdfsFileTruncate(File file, int64 offset)
+{
 	Vfd *vfdP;
-	char protocol [MAXPGPATH + 1];
+	char protocol[MAXPGPATH + 1];
 	hdfsFS fs;
 	char p[MAXPGPATH + 1];
 
@@ -2836,41 +2852,11 @@ int HdfsFileTruncate(File file, int64 offset) {
 
 	fs = vfdP->hFS;
 
-	/*
-	 * HDFS files not in LRU list, so no need to call LruDelete
-	 * but we need to close HDFS file first
-	 */
 	if (!FileIsNotOpen(file)) //file is open
-	{
-		//LruDelete(file);
-		Vfd		   *vfdP;
+		LruDelete(file);
 
-		DO_DB(elog(LOG, "HdfsFileTruncate: close file %d (%s)",
-				   file, VfdCache[file].fileName));
-
-		vfdP = &VfdCache[file];
-
-		/* close the file */
-		if (HdfsCloseFile(VfdCache[file].hProtocol, VfdCache[file].hFS, VfdCache[file].hFile))
-		{
-			elog(WARNING, "could not close file \"%s\": %m", vfdP->fileName);
-			return -1;
-		}
-
-		//--nfile;
-		vfdP->fd = VFD_CLOSED;
-		vfdP->hFS = NULL;
-		vfdP->hFile = NULL;
-		if(vfdP->hProtocol)
-		{
-			free(vfdP->hProtocol);
-			vfdP->hProtocol = NULL;
-		}
-	}
-
-	if (NULL == ConvertToUnixPath(vfdP->fileName, p, sizeof(p))) {
+	if (NULL == ConvertToUnixPath(vfdP->fileName, p, sizeof(p)))
 		return -1;
-	}
 
 	if (0 != HdfsTruncate(protocol, fs, p, offset))
 	    return -1;
@@ -2883,6 +2869,9 @@ int HdfsFileTruncate(File file, int64 offset) {
 	if (FALSE == HdfsBasicOpenFile(vfdP->fileName, vfdP->fileFlags, vfdP->fileMode,
 	        &vfdP->hProtocol, &vfdP->hFS, &vfdP->hFile))
 	    return -1;
+
+	++nfile;
+	Insert(file);
 
 	/*
 	 * check logic position.
@@ -2902,29 +2891,33 @@ int HdfsFileTruncate(File file, int64 offset) {
 	return 0;
 }
 
-File PathNameOpenFile(FileName fileName, int fileFlags, int fileMode) {
+File
+PathNameOpenFile(FileName fileName, int fileFlags, int fileMode) {
 	if (IsLocalPath(fileName))
 		return LocalPathNameOpenFile(fileName, fileFlags, fileMode);
 	else
 		return HdfsPathNameOpenFile(fileName, fileFlags, fileMode);
 }
 
-void FileClose(File file) {
-	if (IsLocalFile(file))
+void
+FileClose(File file) {
+	if (IsLocalPath(VfdCache[file].fileName))
 		LocalFileClose(file);
 	else
 		HdfsFileClose(file, true);
 }
 
-int FileRead(File file, char *buffer, int amount) {
-	if (IsLocalFile(file))
+int
+FileRead(File file, char *buffer, int amount) {
+	if (IsLocalPath(VfdCache[file].fileName))
 		return LocalFileRead(file, buffer, amount);
 	else
 		return HdfsFileRead(file, buffer, amount);
 }
 
-int FileWrite(File file, const char *buffer, int amount) {
-	if (IsLocalFile(file))
+int
+FileWrite(File file, const char *buffer, int amount) {
+	if (IsLocalPath(VfdCache[file].fileName))
 		return LocalFileWrite(file, buffer, amount);
 	else
 		return HdfsFileWrite(file, buffer, amount);
@@ -2935,8 +2928,9 @@ int FileWrite(File file, const char *buffer, int amount) {
  *
  * return the position of file point after seek
  */
-int64 FileSeek(File file, int64 offset, int whence) {
-	if (IsLocalFile(file))
+int64
+FileSeek(File file, int64 offset, int whence) {
+	if (IsLocalPath(VfdCache[file].fileName))
 		return LocalFileSeek(file, offset, whence);
 	else
 		return HdfsFileSeek(file, offset, whence);
@@ -2947,8 +2941,9 @@ int64 FileSeek(File file, int64 offset, int whence) {
  *
  * return 0 on success, non-zero on failure
  */
-int FileSync(File file) {
-	if (IsLocalFile(file))
+int
+FileSync(File file) {
+	if (IsLocalPath(VfdCache[file].fileName))
 		return LocalFileSync(file);
 	else
 		return HdfsFileSync(file);
@@ -2959,15 +2954,17 @@ int FileSync(File file) {
  *
  * return 0 on failure, non-zero on success
  */
-int RemovePath(FileName fileName, int recursive) {
+int
+RemovePath(FileName fileName, int recursive) {
 	if (IsLocalPath(fileName))
 		return LocalRemovePath(fileName, recursive);
 	else
 		return !HdfsRemovePath(fileName, recursive);
 }
 
-int FileTruncate(File file, int64 offset) {
-	if (IsLocalFile(file))
+int
+FileTruncate(File file, int64 offset) {
+	if (IsLocalPath(VfdCache[file].fileName))
 		return LocalFileTruncate(file, offset);
 	else
 		return HdfsFileTruncate(file, offset);
@@ -2978,7 +2975,8 @@ int FileTruncate(File file, int64 offset) {
  *
  * return o on success, non-zero on failure
  */
-int MakeDirectory(const char * path, mode_t mode) {
+int
+MakeDirectory(const char * path, mode_t mode) {
 	if (IsLocalPath(path))
 		return mkdir(path, mode);
 	else
@@ -3009,7 +3007,7 @@ HdfsPathExist(char *path)
 
 	fs = HdfsGetConnection(protocol, path);
 	if (fs == NULL)
-		elog(ERROR, "cannot get connection for path: %s", path);
+		return false;
 
 	if (NULL == ConvertToUnixPath(path, relative_path, sizeof(relative_path)))
 		elog(ERROR, "cannot convert to unix path for path: %s", path);
@@ -3021,4 +3019,5 @@ HdfsPathExist(char *path)
 	HdfsFreeFileInfo(protocol, info, 1);
 	return true;
 }
+
 

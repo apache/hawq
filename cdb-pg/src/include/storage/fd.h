@@ -122,7 +122,6 @@ extern void InitFileAccess(void);
 extern void set_max_safe_fds(void);
 extern void closeAllVfds(void);
 extern void AtEOXact_Files(void);
-extern void AtXactCancle_Files(void);
 extern void AtEOSubXact_Files(bool isCommit, SubTransactionId mySubid,
 				  SubTransactionId parentSubid);
 extern void RemovePgTempFiles(void);
