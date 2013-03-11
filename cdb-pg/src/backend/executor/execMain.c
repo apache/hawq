@@ -1516,8 +1516,11 @@ InitPlan(QueryDesc *queryDesc, int eflags)
 				/*
 				 * lock segments files on master.
 				 */
-				if (Gp_role == GP_ROLE_DISPATCH)
-					LockSegfilesOnMaster(relinfo->ri_RelationDesc, relinfo->ri_aosegno);
+				/*
+				 * currently, we disable vacuum, do not lock since lock table is too small.
+				 */
+				/*if (Gp_role == GP_ROLE_DISPATCH)
+					LockSegfilesOnMaster(relinfo->ri_RelationDesc, relinfo->ri_aosegno);*/
 			}
 		}
 
@@ -4537,8 +4540,11 @@ CreateIntoRel(QueryDesc *queryDesc)
 	/**
 	 * lock segment files
 	 */
-	if (Gp_role == GP_ROLE_DISPATCH)
-		LockSegfilesOnMaster(intoRelationDesc, 1);
+	/*
+	 * currently, we disable vacuum, do not lock since lock table is too small.
+	 */
+	/*if (Gp_role == GP_ROLE_DISPATCH)
+		LockSegfilesOnMaster(intoRelationDesc, 1);*/
 
 	intoClause->oidInfo.relOid = intoRelationId;
 	estate->es_into_relation_descriptor = intoRelationDesc;

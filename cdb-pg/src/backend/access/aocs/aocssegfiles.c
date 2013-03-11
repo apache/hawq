@@ -506,20 +506,23 @@ void UpdateAOCSFileSegInfo(Relation prel, AppendOnlyEntry *aoEntry,
 
 	Assert(aoEntry != NULL);
 
-	/*
-	 * Verify we already have the write-lock!
-	 */
-	acquireResult = LockRelationAppendOnlySegmentFile(
-												&prel->rd_node,
-												segno,
-												AccessExclusiveLock,
-												/* dontWait */ false,
-												contentid);
-	if (acquireResult != LOCKACQUIRE_ALREADY_HELD)
+	if (Gp_role != GP_ROLE_DISPATCH)
 	{
-		elog(ERROR, "Should already have the (transaction-scope) write-lock on Append-Only segment file #%d, "
-					 "relation %s", segno,
-			 RelationGetRelationName(prel));
+		/*
+		 * Verify we already have the write-lock!
+		 */
+		acquireResult = LockRelationAppendOnlySegmentFile(
+													&prel->rd_node,
+													segno,
+													AccessExclusiveLock,
+													/* dontWait */ false,
+													contentid);
+		if (acquireResult != LOCKACQUIRE_ALREADY_HELD)
+		{
+			elog(ERROR, "Should already have the (transaction-scope) write-lock on Append-Only segment file #%d, "
+						 "relation %s", segno,
+				 RelationGetRelationName(prel));
+		}
 	}
 
     segrel = heap_open(aoEntry->segrelid, RowExclusiveLock);

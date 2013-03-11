@@ -2661,8 +2661,11 @@ CopyFromDispatch(CopyState cstate)
 	/*
 	 * lock segments files on master.
 	 */
-	if (Gp_role == GP_ROLE_DISPATCH)
-		LockSegfilesOnMaster(resultRelInfo->ri_RelationDesc, resultRelInfo->ri_aosegno);
+	/*
+	 * currently, we disable vacuum, do not lock since lock table is too small.
+	 */
+	/*if (Gp_role == GP_ROLE_DISPATCH)
+		LockSegfilesOnMaster(resultRelInfo->ri_RelationDesc, resultRelInfo->ri_aosegno);*/
 
 
 	ExecOpenIndices(resultRelInfo);

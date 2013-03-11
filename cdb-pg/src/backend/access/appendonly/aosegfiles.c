@@ -482,19 +482,22 @@ UpdateFileSegInfo(Relation parentrel,
 
 	elog(DEBUG3, "UpdateFileSegInfo called. segno = %d", segno);
 
-	/*
-	 * Verify we already have the write-lock!
-	 */
-	acquireResult = LockRelationAppendOnlySegmentFile(
-												&parentrel->rd_node,
-												segno,
-												AccessExclusiveLock,
-												/* dontWait */ false,
-												contentid);
-	if (acquireResult != LOCKACQUIRE_ALREADY_HELD)
+	if (Gp_role != GP_ROLE_DISPATCH)
 	{
-		elog(ERROR, "Should already have the (transaction-scope) write-lock on Append-Only segment file #%d, "
-			 "relation %s", segno, RelationGetRelationName(parentrel));
+		/*
+		 * Verify we already have the write-lock!
+		 */
+		acquireResult = LockRelationAppendOnlySegmentFile(
+													&parentrel->rd_node,
+													segno,
+													AccessExclusiveLock,
+													/* dontWait */ false,
+													contentid);
+		if (acquireResult != LOCKACQUIRE_ALREADY_HELD)
+		{
+			elog(ERROR, "Should already have the (transaction-scope) write-lock on Append-Only segment file #%d, "
+				 "relation %s", segno, RelationGetRelationName(parentrel));
+		}
 	}
 
 	/*
