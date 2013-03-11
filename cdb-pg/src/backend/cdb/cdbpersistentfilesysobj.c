@@ -7201,7 +7201,9 @@ static void PersistentFileSysObj_StartupIntegrityCheckRelation(void)
 			continue;
 		}
 
-		if (!PersistentDatabase_DbDirExistsUnderLock(contentid, &dbDirNode))
+		/* We support stateless segments, so we don't need do the sanity check for segments. */
+		if (GpIdentity.segindex == MASTER_CONTENT_ID &&
+			!PersistentDatabase_DbDirExistsUnderLock(contentid, &dbDirNode))
 		{
 			elog(LOG,
 				 "Database directory not found for content %d relation %u/%u/%u",

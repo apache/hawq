@@ -227,7 +227,7 @@ setupTCPListeningSocket(int backlog, int *listenerSocketFd, uint16 *listenerPort
 				NULL, 0, NI_NUMERICHOST);
 		hints.ai_flags |= AI_NUMERICHOST;
 		localname = myname;
-		elog(LOG, "binding to %s only",localname);
+		elog(DEBUG2, "binding to %s only",localname);
 		if (gp_log_interconnect >= GPVARS_VERBOSITY_DEBUG)
 				ereport(DEBUG4, (errmsg("binding listener %s", localname)));
 	}
