@@ -481,6 +481,12 @@ class GpRecoverSegmentProgram:
             except Exception, ex:
                 raise ProgramArgumentValidationException(\
                     "Invalid value for recover hosts: %s" % ex)
+            # GPSQL can not fail to the host already exists in cluster. 
+            segmentsHosts = []
+            [ segmentsHosts.append(seg.getSegmentHostName()) for seg in gpArray.getSegDbList() if seg.isSegmentQE() ]
+            for seg in segmentsHosts:
+                if seg in uniqueHosts:
+                    raise Exception("You can not choose the host \"%s\" which has segments running for recover host." % seg)
 
         # If it's a rebalance operation
         if self.__options.rebalanceSegments:
