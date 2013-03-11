@@ -269,7 +269,11 @@ def _enable_gpadmin_logging(name,logdir=None):
         gpadmin_logs_dir=logdir
     
     if not os.path.exists(gpadmin_logs_dir):
-        os.mkdir(gpadmin_logs_dir)
+        # It looks like in ICM, the dir may exists.
+        try:
+            os.mkdir(gpadmin_logs_dir)
+        except OSError, e:
+            pass
     
     filename = "%s/%s_%s.log" % (gpadmin_logs_dir,name, now.strftime("%Y%m%d"))
     _set_file_logging(filename)
