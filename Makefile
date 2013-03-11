@@ -1400,6 +1400,10 @@ installcheck-olaptest :
 	@if [ ! -f $(ISCONFIG) ]; then echo "not configured, cannot check"; exit 1; fi
 	@cd $(BUILDDIR)/src/test/regress && $(MAKE) installcheck-olaptest
 
+installcheck-gpxf :
+	@if [ ! -f $(ISCONFIG) ]; then echo "not configured, cannot check"; exit 1; fi
+	@cd $(BUILDDIR)/src/test/regress && $(MAKE) installcheck-gpxf
+
 #---------------------------------------------------------------------
 # More internal functions
 #---------------------------------------------------------------------
@@ -1475,7 +1479,6 @@ GPPKG_SOURCES = \
 	cdb-pg/src/pl/plr \
 	cdb-pg/src/pl/plperl \
 	cdb-pg/src/pl/pljava \
-	cdb-pg/src/bin/gphdfs \
 	cdb-pg/src/bin/pg_dump/cdb/ddboost \
 	$(NULL)
 endif

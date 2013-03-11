@@ -1,7 +1,7 @@
 /*
  * common.h
  *
- * Header for common gphdfs and gphbase functions and utilities.
+ * Header for common GPXF functions and utilities.
  *
  * Copyright (c) 2011, Greenplum inc
  */

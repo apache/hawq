@@ -1,5 +1,8 @@
+
 #include "access/gpxfuriparser.h"
+#include "catalog/pg_exttable.h"
 #include "utils/formatting.h"
+#include "utils/uri.h"
 
 static const char* segwork_substring = "segwork=";
 static const char segwork_separator = '@';
@@ -129,7 +132,7 @@ GPHDUri_parse_protocol(GPHDUri *uri, char **cursor)
 	ptc_len = post_ptc - start;
 	uri->protocol = pnstrdup(start, ptc_len);
 
-	if (pg_strcasecmp(uri->protocol, "gpxf") != 0)
+	if (!IS_GPXF_URI(uri->uri))
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
 				 errmsg("invalid URI %s : unsupported protocol '%s'",
@@ -581,3 +584,43 @@ GPHDUri_dup_without_segwork(const char* uri)
 
 	return no_segwork;
 }
+
+/* --------------------------------
+ *		RelationIsExternalGpxf -
+ *
+ *		Check if a table is an external GPXF tbl.
+ * --------------------------------
+ */
+bool RelationIsExternalGpxf(Relation rel, StringInfo location)
+{
+	ExtTableEntry	*tbl;
+	List			*locsList;
+	ListCell		*cell;
+
+	if (!RelationIsExternal(rel))
+		return false;
+
+	tbl = GetExtTableEntry(rel->rd_id);
+	Assert(tbl);
+
+	locsList = tbl->locations;
+
+	foreach(cell, locsList)
+	{
+		char* locsItem = strVal(lfirst(cell));
+
+		if (!locsItem)
+			continue;
+
+		if (IS_GPXF_URI(locsItem))
+		{
+			appendStringInfoString(location, locsItem);
+			pfree(tbl);
+			return true;
+		}
+	}
+	pfree(tbl);
+
+	return false;
+}
+

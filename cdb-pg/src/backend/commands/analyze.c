@@ -25,6 +25,7 @@
 
 #include <math.h>
 
+#include "access/gpxfuriparser.h"
 #include "access/heapam.h"
 #include "access/hd_work_mgr.h"
 #include "access/catquery.h"
@@ -430,6 +431,8 @@ void analyzeStmt(VacuumStmt *stmt, List *relids)
 			 */
 			if (analyzePermitted(RelationGetRelid(candidateRelation)))
 			{
+				StringInfoData ext_uri;
+
 				/*
 				 * We have permission to ANALYZE.
 				 */
@@ -461,6 +464,8 @@ void analyzeStmt(VacuumStmt *stmt, List *relids)
 					bTemp = isAnyTempNamespace(
 							candidateRelation->rd_rel->relnamespace);
 
+				initStringInfo(&ext_uri);
+
 				if (candidateRelation->rd_rel->relkind != RELKIND_RELATION)
 				{
 					/**
@@ -474,6 +479,15 @@ void analyzeStmt(VacuumStmt *stmt, List *relids)
 				else if (isOtherTempNamespace(RelationGetNamespace(candidateRelation)))
 				{
 					/* Silently ignore tables that are temp tables of other backends. */
+					relation_close(candidateRelation, ShareUpdateExclusiveLock);
+				}
+				else if (RelationIsExternalGpxf(candidateRelation, &ext_uri) &&
+						 !gpxf_enable_stat_collection)
+				{
+					/* GPXF supports ANALYZE, but only when the GUC is on */
+					ereport(WARNING,
+							(errmsg("skipping \"%s\" --- analyze for GPXF tables is turned off by 'gpxf_enable_stat_collection'",
+									RelationGetRelationName(candidateRelation))));
 					relation_close(candidateRelation, ShareUpdateExclusiveLock);
 				}
 				else
@@ -759,13 +773,14 @@ static void analyzeRelation(Relation relation, List *lAttributeNames)
 	StringInfoData location;
 	
 	initStringInfo(&location);
-	relationOid = RelationGetRelid(relation);
-	/* test that table is external before testing that is external GPXF (which ia a more expensive test) */
-	isExternalGpxf =  relstorage_is_external(relation->rd_rel->relstorage) && RelationIsExternalGpxf(relationOid, &location);	
-	
+	relationOid		= RelationGetRelid(relation);
+	isExternalGpxf	= RelationIsExternalGpxf(relation, &location);
+
 	/* Step 1: estimate reltuples, relpages for the relation */
 	if (!isExternalGpxf)
+	{
 		analyzeEstimateReltuplesRelpages(relationOid, &estimatedRelTuples, &estimatedRelPages);
+	}
 	else
 	{
 		gp_statistics_estimate_reltuples_relpages_external_gpxf(relation, &location, &estimatedRelTuples, &estimatedRelPages);
@@ -2611,37 +2626,6 @@ static void gp_statistics_estimate_reltuples_relpages_ao_rows(Relation rel, floa
 	
 	return;
 }
-/* --------------------------------
- *		RelationIsExternalGpxf -
- *
- *		Check if the external table is GPPXF
- * --------------------------------
- */
-bool RelationIsExternalGpxf(Oid	rel_oid, StringInfo location)
-{
-	ExtTableEntry* tbl = GetExtTableEntry(rel_oid);
-	if (tbl == NULL)
-		return false;
-	
-	List* locsList = tbl->locations;
-	struct ListCell* cell;
-	
-	foreach(cell, locsList)
-	{
-		char* locsItem = strVal(lfirst(cell));
-		if (locsItem == NULL)
-			continue;
-		if (strstr(locsItem, gpxf_protocol_name) != NULL)
-		{
-			appendStringInfoString(location, locsItem);
-			pfree(tbl);
-			return true;
-		}
-	}
-	pfree(tbl);
-	
-	return false;
-}
 
 /* --------------------------------
  *		gp_statistics_estimate_reltuples_relpages_external_gpxf -
@@ -2653,6 +2637,7 @@ void gp_statistics_estimate_reltuples_relpages_external_gpxf(Relation rel, Strin
 {
 	ListCell *cell = NULL;
 	List *stats_list = get_gpxf_statistics(location->data);
+
 	/*
 	 * if get_gpxf_statistics returned NIL - probably a communication error, we fallback to default values
 	 * we don't want to stop the analyze, since this can be part of a long procedure performed on many tables

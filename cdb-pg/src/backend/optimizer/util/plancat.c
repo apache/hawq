@@ -22,6 +22,7 @@
 #include "access/catquery.h"
 #include "access/heapam.h"
 #include "access/aocssegfiles.h"
+#include "access/gpxfuriparser.h"
 #include "catalog/gp_policy.h"
 #include "catalog/pg_inherits.h"
 #include "catalog/pg_exttable.h"
@@ -83,7 +84,7 @@ static void
 cdb_default_stats_warning_for_index(Oid reloid, Oid indexoid);
 
 static bool 
-need_to_analyze_gpxf(Relation rel, StringInfo location, BlockNumber relpages,  double reltuples);
+need_to_get_stats_gpxf(Relation rel, StringInfo location, BlockNumber relpages, double reltuples);
 
 extern BlockNumber RelationGuessNumberOfBlocks(double totalbytes);
 
@@ -369,11 +370,12 @@ cdb_estimate_rel_size(RelOptInfo   *relOptInfo,
     int32       tuple_width;
 	
     BlockNumber curpages = 0;
-	int64	size = 0;
+	int64		size = 0;
+	StringInfoData location;
+
+	initStringInfo(&location);
 
     *default_stats_used = false;
-	StringInfoData location;
-	initStringInfo(&location);
 
     /* Rel not distributed?  RelationGetNumberOfBlocks can get actual #pages. */
     if (!relOptInfo->cdbpolicy ||
@@ -383,7 +385,6 @@ cdb_estimate_rel_size(RelOptInfo   *relOptInfo,
         return;
     }
 
-
 	/* coerce values in pg_class to more desirable types */
 	relpages = (BlockNumber) rel->rd_rel->relpages;
 	reltuples = (double) rel->rd_rel->reltuples;
@@ -392,8 +393,12 @@ cdb_estimate_rel_size(RelOptInfo   *relOptInfo,
 	 * Asking the QE for the size of the relation is a bit expensive.
 	 * Do we want to do it all the time?  Or only for tables that have never had analyze run?
 	 */
-	if (need_to_analyze_gpxf(rel, &location, relpages, reltuples))
+	if (need_to_get_stats_gpxf(rel, &location, relpages, reltuples))
 	{
+		/*
+		 * rel is a gpxf external table, and it wasn't yet ANALYZE'ed.
+		 */
+
 		float4 tuples, pages;
 		gp_statistics_estimate_reltuples_relpages_external_gpxf(rel, &location, &tuples, &pages);
 		
@@ -494,15 +499,19 @@ cdb_estimate_rel_size(RelOptInfo   *relOptInfo,
 }                               /* cdb_estimate_rel_size */
 
 /* 
- * table is GPXF external table and analyze was not run on the table
+ * need_to_get_stats_gpxf
+ *
+ * 1. Table is GPXF external table, and
+ * 2. ANALYZE was not run on the table, and
+ * 3. GUC gpxf_enable_stat_collection is on
  */
-static bool need_to_analyze_gpxf(Relation rel, 
+static bool need_to_get_stats_gpxf(Relation rel, 
 								 StringInfo loc, 	
 								 BlockNumber relpages,
 								 double		reltuples)
 {
-	return RelationIsExternal(rel) && 
-	       RelationIsExternalGpxf(rel->rd_id, loc) &&
+	return gpxf_enable_stat_collection &&
+		   RelationIsExternalGpxf(rel, loc) &&
 		   relpages == gp_external_table_default_number_of_pages &&
 		   reltuples == gp_external_table_default_number_of_tuples;
 }

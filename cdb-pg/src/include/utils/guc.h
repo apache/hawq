@@ -330,12 +330,9 @@ extern char   *gp_snmp_use_inform_or_trap;
 extern char   *gp_snmp_debug_log;
 #endif
 
-/* Hadoop Integration GUCs */
-extern char  *gp_hadoop_connector_jardir;  /* relative dir on $GPHOME of the Hadoop connector jar is located */
-extern char  *gp_hadoop_connector_version; /* connector version (internal use only) */
-extern char  *gp_hadoop_target_version; /* the target hadoop distro/version */
-extern char  *gp_hadoop_home;    /* $HADOOP_HOME on all segments */
-extern bool   gp_hadoop_enable_filter_pushdown; /* turn pushdown logic on/off */
+/* Extension Framework GUCs */
+extern bool   gpxf_enable_filter_pushdown; /* turn pushdown logic on/off     */
+extern bool   gpxf_enable_stat_collection; /* turn off stats collection if needed */
 
 /* Time based authentication GUC */
 extern char  *gp_auth_time_override_str;

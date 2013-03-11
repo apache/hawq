@@ -138,7 +138,6 @@ ignore: stats
 ignore: tablespace
 ignore: gpdiffcheck
 test: exttab1
-ignore: gphdfs
 ignore: custom_format
 ignore: resource_queue
 ignore: gptokencheck

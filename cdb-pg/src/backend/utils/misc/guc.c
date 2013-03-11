@@ -587,12 +587,9 @@ assign_allow_system_table_mods(const char *newval,
 const char *
 show_allow_system_table_mods(void);
 
-/* Hadoop Integration GUCs */
-char  *gp_hadoop_connector_jardir;
-char  *gp_hadoop_connector_version = ""; /* old GUC; now it's a global var. */
-char  *gp_hadoop_target_version;
-char  *gp_hadoop_home;
-bool   gp_hadoop_enable_filter_pushdown = true;
+/* Extension Framework GUCs */
+bool   gpxf_enable_filter_pushdown = true;
+bool   gpxf_enable_stat_collection = true;
 
 /* Time based authentication GUC */
 char  *gp_auth_time_override_str = NULL;
@@ -3410,14 +3407,24 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
-		{"gp_hadoop_enable_filter_pushdown", PGC_USERSET, CUSTOM_OPTIONS,
-			gettext_noop("Enables hadoop's use of GP query scan quals."),
+		{"gpxf_enable_filter_pushdown", PGC_USERSET, CUSTOM_OPTIONS,
+			gettext_noop("Enables GPXF's use of GP query scan quals."),
 			NULL,
 			GUC_GPDB_ADDOPT
 		},
-		&gp_hadoop_enable_filter_pushdown,
+		&gpxf_enable_filter_pushdown,
 		true, NULL, NULL
 	},	
+
+	{
+		{"gpxf_enable_stat_collection", PGC_USERSET, CUSTOM_OPTIONS,
+			gettext_noop("Enables GPXF to gather statistics about the data during ANALYZE and query execution."),
+			NULL,
+			GUC_GPDB_ADDOPT
+		},
+		&gpxf_enable_stat_collection,
+		true, NULL, NULL
+	},
 
 	{
 		{"gp_disable_catalog_access_on_segment", PGC_USERSET, DEVELOPER_OPTIONS,
@@ -6462,36 +6469,6 @@ static struct config_string ConfigureNamesString[] =
 		},
 		&gp_test_system_cache_flush_force_str,
 		"off", assign_system_cache_flush_force, NULL
-	},
-
-	{
-		{"gp_hadoop_connector_jardir", PGC_USERSET, CUSTOM_OPTIONS,
-			gettext_noop("The directory of the Hadoop connector JAR, relative to $GPHOME."),
-			NULL,
-			GUC_GPDB_ADDOPT | GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
-		},
-		&gp_hadoop_connector_jardir,
-		"lib//hadoop", NULL, NULL
-	},
-
-	{
-		{"gp_hadoop_target_version", PGC_USERSET, CUSTOM_OPTIONS,
-			gettext_noop("The distro/version of Hadoop that external table is connecting to."),
-			gettext_noop("See release notes or gppkg readme for details."),
-			GUC_GPDB_ADDOPT
-		},
-		&gp_hadoop_target_version,
-		"gphd-1.1", NULL, NULL
-	},
-
-	{
-		{"gp_hadoop_home", PGC_USERSET, CUSTOM_OPTIONS,
-			gettext_noop("The location where Hadoop is installed in each segment."),
-			NULL,
-			GUC_GPDB_ADDOPT
-		},
-		&gp_hadoop_home,
-		"", NULL, NULL
 	},
 
 	{

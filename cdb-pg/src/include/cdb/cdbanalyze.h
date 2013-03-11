@@ -17,7 +17,6 @@
 extern const int gp_external_table_default_number_of_pages;
 extern const int gp_external_table_default_number_of_tuples;
 
-bool RelationIsExternalGpxf(Oid	rel_oid, StringInfo location);
 void gp_statistics_estimate_reltuples_relpages_external_gpxf(Relation rel, 
 															 StringInfo location,
 															 float4 *reltuples, 

@@ -20,11 +20,6 @@
 #include "utils/elog.h"
 
 /*
- * The name of the GPXF protocol, exposed to the GPDB engine
- */
-const char  *gpxf_protocol_name = "gpxf";
-
-/*
  * Represents a fragment location replica
  */
 typedef struct sFragmentLocation

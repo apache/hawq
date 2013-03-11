@@ -1148,8 +1148,6 @@ static bool is_gpxf_protocol(Uri *uri)
  *                      less than (total segdbs/total URIs) then we make sure
  *                      that no URI gets mapped to more than this GUC number by
  *                      skipping some segdbs randomly.
- *   - 'gphdfs' protocol: file is divided in to chucks and each chuck is assigned
- *                      to a segdb.
  *   - 'exec' protocol: all segdbs get mapped to execute the command (this is
  *                      soon to be changed though).
  */                     

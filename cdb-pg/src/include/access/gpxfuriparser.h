@@ -56,5 +56,7 @@ GPHDUri	*parseGPHDUri(const char *uri_str);
 void 	 freeGPHDUri(GPHDUri *uri);
 void	 GPHDUri_debug_print(GPHDUri *uri);
 int		 GPHDUri_get_value_for_opt(GPHDUri *uri, char *key, char **val);
+bool 	 RelationIsExternalGpxf(Relation rel, StringInfo location);
+
 
 #endif	// 

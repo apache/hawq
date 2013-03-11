@@ -17314,7 +17314,7 @@ static Datum transformLocationUris(List *locs, bool isweb, bool iswritable)
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("URI protocols must be the same for all data sources"),
-					 errhint("Available protocols are 'http', 'file', 'gphdfs', 'gpfdist' and 'gpfdists'"),
+					 errhint("Available protocols are 'http', 'file', 'gpxf', 'gpfdist' and 'gpfdists'"),
 							   errOmitLocation(true)));
 
 		}
@@ -17338,7 +17338,7 @@ static Datum transformLocationUris(List *locs, bool isweb, bool iswritable)
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("unsupported URI protocol \'%s\' for writable external table", 
 							(uri->protocol == URI_HTTP ? "http" : "file")),
-					 errhint("Writable external tables may use \'gpfdist\', \'gpfdists\' or \'gphdfs\' URIs only."),
+					 errhint("Writable external tables may use \'gpfdist(s)\' URIs only."),
 							   errOmitLocation(true)));
 
 		if(uri->protocol != URI_CUSTOM && iswritable && strchr(uri->path, '*'))

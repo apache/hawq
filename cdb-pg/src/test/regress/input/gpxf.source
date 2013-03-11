@@ -42,16 +42,16 @@ DROP EXTERNAL TABLE gphdfs_in1;
 -- Load HDFS with test data
 --
 \! ${HADOOP_ROOT}/bin/hadoop fs -mkdir /gpdb_regression_data
-\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gphdfs/writable_inside_sequence1.tbl /gpdb_regression_data/writable_inside_sequence1.tbl
-\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gphdfs/avro_inside_sequence.tbl /gpdb_regression_data/avro_inside_sequence.tbl; 
-\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gphdfs/avroformat_inside_avrofile.avro /gpdb_regression_data/avroformat_inside_avrofile.avro
-\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gphdfs/text_data.csv /gpdb_regression_data/text_data.csv
-\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gphdfs/protobuf_data.tbl /gpdb_regression_data/protobuf_data.tbl
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gpxf/writable_inside_sequence1.tbl /gpdb_regression_data/writable_inside_sequence1.tbl
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gpxf/avro_inside_sequence.tbl /gpdb_regression_data/avro_inside_sequence.tbl; 
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gpxf/avroformat_inside_avrofile.avro /gpdb_regression_data/avroformat_inside_avrofile.avro
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gpxf/text_data.csv /gpdb_regression_data/text_data.csv
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gpxf/protobuf_data.tbl /gpdb_regression_data/protobuf_data.tbl
 \! ${HADOOP_ROOT}/bin/hadoop fs -mkdir /gpdb_regression_data/wild
-\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gphdfs/writable_inside_sequence1.tbl /gpdb_regression_data/wild/writable_inside_sequence1.tbl
-\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gphdfs/writable_inside_sequence2.tbl /gpdb_regression_data/wild/writable_inside_sequence2.tbl
-\! sh @abs_srcdir@/helpers/create_table_file.sh @abs_srcdir@/data/gphdfs/multiblock.tbl
-\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gphdfs/multiblock.tbl /gpdb_regression_data/multiblock.tbl
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gpxf/writable_inside_sequence1.tbl /gpdb_regression_data/wild/writable_inside_sequence1.tbl
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gpxf/writable_inside_sequence2.tbl /gpdb_regression_data/wild/writable_inside_sequence2.tbl
+\! sh @abs_srcdir@/helpers/create_table_file.sh @abs_srcdir@/data/gpxf/multiblock.tbl
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gpxf/multiblock.tbl /gpdb_regression_data/multiblock.tbl
 --
 -- Test TEXT format on a file with many fields
 --
@@ -137,7 +137,7 @@ CREATE EXTERNAL TABLE seqav(tmp1 timestamp,
                             ln2   bigint, 
                             ln3   bigint, 
                             bt    bytea)
-LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/avro_inside_sequence.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=AvroResolver&DATA-SCHEMA=regressGPFusionCustomAvro.avsc')
+LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/avro_inside_sequence.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=AvroResolver&DATA-SCHEMA=regressGPXFCustomAvro.avsc')
 FORMAT 'custom' (formatter='gpxfwritable_import');
 SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt FROM seqav ORDER BY num1;
 SELECT num1, t1, t2, t3 FROM seqav ORDER BY num1;
@@ -166,7 +166,7 @@ CREATE EXTERNAL TABLE seqav_space(tmp1 timestamp,
                             ln2   bigint, 
                             ln3   bigint, 
                             bt    bytea)
-LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/avro_inside_sequence.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=AvroResolver&DATA-SCHEMA=regress GPFusion Custom Avro1.avsc')
+LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/avro_inside_sequence.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=AvroResolver&DATA-SCHEMA=regress GPXF Custom Avro1.avsc')
 FORMAT 'custom' (formatter='gpxfwritable_import');
 SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt FROM seqav_space ORDER BY num1;
 DROP EXTERNAL TABLE seqav_space;
@@ -194,7 +194,7 @@ CREATE EXTERNAL TABLE seqav_case(tmp1 timestamp,
                             ln2   bigint, 
                             ln3   bigint, 
                             bt    bytea)
-LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/avro_inside_sequence.tbl?fragmenter=HdfsDataFragmenter&Accessor=SequenceFileAccessor&ReSoLvEr=AvroResolver&Data-Schema=regressGPFusionCustomAvro.avsc')
+LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/avro_inside_sequence.tbl?fragmenter=HdfsDataFragmenter&Accessor=SequenceFileAccessor&ReSoLvEr=AvroResolver&Data-Schema=regressGPXFCustomAvro.avsc')
 FORMAT 'custom' (formatter='gpxfwritable_import');
 SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt FROM seqav_case ORDER BY num1;
 DROP EXTERNAL TABLE seqav_case;
@@ -354,7 +354,7 @@ DROP EXTERNAL TABLE extens;
 --
 -- Test analyze for HDFS file(read only).
 --
-CREATE EXTERNAL TABLE avfav(tmp1 timestamp, 
+CREATE EXTERNAL TABLE avfav_analyze_good(tmp1 timestamp, 
                             num1  integer, 
                             num2  integer, 
                             num3  integer, 
@@ -377,15 +377,64 @@ CREATE EXTERNAL TABLE avfav(tmp1 timestamp,
                             bt    bytea)
 LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/avroformat_inside_avrofile.avro?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=AvroFileAccessor&RESOLVER=AvroResolver')
 FORMAT 'custom' (formatter='gpxfwritable_import');
-ANALYZE avfav;
-select relpages, reltuples from pg_class where relname = 'avfav';
-DROP EXTERNAL TABLE avfav;
+
+-- Table that points to a wrong port.
+CREATE EXTERNAL TABLE avfav_analyze_bad(tmp1 timestamp, 
+                            num1  integer, 
+                            num2  integer, 
+                            num3  integer, 
+                            num4  integer,
+                            t1    text,
+                            t2    text,
+                            t3    text,
+                            t4    text,
+                            t5    text,
+                            t6    text,
+                            dub1  double precision,
+                            dub2  double precision, 
+                            dub3  double precision, 
+                            ft1   real, 
+                            ft2   real, 
+                            ft3   real, 
+                            ln1   bigint, 
+                            ln2   bigint, 
+                            ln3   bigint, 
+                            bt    bytea)
+LOCATION ('gpxf://@hostname@:12345/gpdb_regression_data/avroformat_inside_avrofile.avro?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=AvroFileAccessor&RESOLVER=AvroResolver')
+FORMAT 'custom' (formatter='gpxfwritable_import');
+
+-- verify that default stats remain after ANALYZE with GUC off
+SET gpxf_enable_stat_collection = false;
+ANALYZE avfav_analyze_good;
+SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_good' AND relpages = 1000 AND reltuples = 1000000;
+
+-- verify that stats get updated after ANALYZE with GUC on
+-- NOTE: we can't guarantee the same results on each machine. We just check that defaults were changed
+SET gpxf_enable_stat_collection = true;
+ANALYZE avfav_analyze_good;
+SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_good' AND relpages != 1000 AND relpages > 0; -- TODO: add reltuples when implemented
+
+-- verify that stats stay updated to most recent value after ANALYZE with GUC off
+SET gpxf_enable_stat_collection = false;
+ANALYZE avfav_analyze_good;
+SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_good' AND relpages != 1000 AND relpages > 0; -- TODO: add reltuples when implemented
+
+-- verify that ANALYZE doesn't break while checking out a table that can't connect to the analyzer module
+-- TODO: find a way to verify that previous stat values remain.
+SET gpxf_enable_stat_collection = true;
+ANALYZE avfav_analyze_bad;
+SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_bad' AND relpages = 1000 AND reltuples = 1000000;
+
+SET gpxf_enable_stat_collection = true; --reset to default
+
+DROP EXTERNAL TABLE avfav_analyze_good;
+DROP EXTERNAL TABLE avfav_analyze_bad;
 --
 -- Cleanup: delete all data that was copied into hdfs
 --
 -- start_ignore
 \! ${HADOOP_ROOT}/bin/hadoop fs -rm -r /gpdb_regression_data
-\! rm @abs_srcdir@/data/gphdfs/multiblock.tbl
+\! rm @abs_srcdir@/data/gpxf/multiblock.tbl
 -- end_ignore
 --------------------------------------------------------------------------------
 -- HBASE
@@ -405,7 +454,7 @@ FORMAT 'CUSTOM' (formatter='gpdbwritable_export');
 \! javac -cp `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar` @abs_srcdir@/helpers/HBaseCreateTables.java @abs_srcdir@/helpers/HBaseDropTables.java @abs_srcdir@/helpers/HBaseChangeLookupTable.java
 \! java -cp  `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar`:`echo ${HADOOP_ROOT}/lib/commons-logging-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-configuration-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-lang-[1-9]*.jar`:@abs_srcdir@/helpers HBaseCreateTables
 
-set gp_hadoop_enable_filter_pushdown = on;
+set gpxf_enable_filter_pushdown = on;
 -- Test
 CREATE EXTERNAL TABLE gphbase_select(recordkey TEXT, 
                                      "cf1:q1" VARCHAR, 
@@ -438,9 +487,9 @@ SELECT * FROM gphbase_select WHeRE "cf1:q9" < -7000000000000000 ORDER BY recordk
 SELECT * FROM gphbase_select WHERE recordkey > 'row00000090' AND recordkey <= 'row00000103' OR recordkey = 'row00000105' ORDER BY recordkey ASC;
 SELECT * FROM gphbase_select WHERE recordkey != 'row00000099' AND "cf1:q8" > 97 AND "cf1:q9" <= 9702990000000099 ORDER BY recordkey ASC;
 SELECT * FROM gphbase_select WHERE "cf1:q9" <= 9702990000000099 AND recordkey != 'row00000099' AND "cf1:q8" > 97 ORDER BY recordkey ASC;
-set gp_hadoop_enable_filter_pushdown = off;
+set gpxf_enable_filter_pushdown = off;
 SELECT * FROM gphbase_select WHERE "cf1:q9" <= 9702990000000099 AND recordkey != 'row00000099' AND "cf1:q8" > 97 ORDER BY recordkey ASC;
-set gp_hadoop_enable_filter_pushdown = on;
+set gpxf_enable_filter_pushdown = on;
 DROP EXTERNAL TABLE gphbase_select;
 -- Test null values
 CREATE EXTERNAL TABLE gphbase_null(recordkey TEXT, 
@@ -519,7 +568,7 @@ DROP EXTERNAL TABLE gphbase_lookup;
 
 -- 1. Hive table stored as text
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "create table reg_txt (s1 string,s2 string,n1 int, d1 double)row format delimited fields terminated by ','"
-\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "load data local inpath '@abs_srcdir@/data/gphdfs/hive_small_data.txt' into table reg_txt"
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "load data local inpath '@abs_srcdir@/data/gpxf/hive_small_data.txt' into table reg_txt"
 
 CREATE EXTERNAL TABLE hv_txt(
 t1    text,
@@ -581,7 +630,7 @@ select relpages, reltuples from pg_class where relname = 'hv_heterogen';
 
 -- 5. Hive table with collection types (non primitive types)
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "CREATE TABLE reg_collections ( s1 STRING, f1 FLOAT, a1 ARRAY<STRING> , m1 MAP<STRING,  FLOAT > , sr1 STRUCT<street:STRING,  city:STRING,  state:STRING,  zip:INT > )  ROW FORMAT DELIMITED  FIELDS TERMINATED BY '\001' COLLECTION ITEMS TERMINATED BY '\002' MAP KEYS TERMINATED BY '\003'  LINES TERMINATED BY '\n'  STORED AS TEXTFILE"
-\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "load data local inpath '@abs_srcdir@/data/gphdfs/hive_collections.txt' into table reg_collections"
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "load data local inpath '@abs_srcdir@/data/gpxf/hive_collections.txt' into table reg_collections"
 
 CREATE EXTERNAL TABLE hv_collections(
 t1    text,   

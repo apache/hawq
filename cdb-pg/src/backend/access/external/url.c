@@ -463,13 +463,6 @@ make_command(const char *cmd, extvar_t * ev, char *buf)
 	sz += make_export("GP_SESSION_ID", ev->GP_SESSION_ID, buf ? buf + sz : 0);
 	sz += make_export("GP_SEGMENT_COUNT", ev->GP_SEGMENT_COUNT, buf ? buf + sz : 0);
 
-	/* hadoop env var */
-	sz += make_export("GP_HADOOP_CONN_JARDIR", ev->GP_HADOOP_CONN_JARDIR, buf ? buf + sz : 0);
-	sz += make_export("GP_HADOOP_CONN_VERSION", ev->GP_HADOOP_CONN_VERSION, buf ? buf + sz : 0);
-	if (strlen(ev->GP_HADOOP_HOME) > 0)
-		sz += make_export("HADOOP_HOME",    ev->GP_HADOOP_HOME,    buf ? buf + sz : 0);
-
-
 	if (buf)
 		strcpy(buf + sz, cmd);
 	sz += strlen(cmd);

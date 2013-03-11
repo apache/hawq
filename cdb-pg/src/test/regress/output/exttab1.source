@@ -39,24 +39,6 @@ FORMAT 'text' (delimiter '|');
 -- drop tables
 DROP EXTERNAL TABLE EXT_NATION;
 DROP EXTERNAL TABLE EXT_REGION;
--- --------------------------------------
--- 'gphdfs' protocol - (only CREATE, don't SELECT - won't work without Hadoop)
--- --------------------------------------
-CREATE EXTERNAL TABLE EXT_HDFS_READ  ( N_NATIONKEY  INTEGER ,
-                            N_NAME       CHAR(25) ,
-                            N_REGIONKEY  INTEGER ,
-                            N_COMMENT    VARCHAR(152))
-location ('gphdfs://@hostname@@:123/Data/nation.tbl' )
-FORMAT 'text' (delimiter '|');
-CREATE WRITABLE EXTERNAL TABLE EXT_HDFS_WRITE  ( N_NATIONKEY  INTEGER ,
-                            N_NAME       CHAR(25) ,
-                            N_REGIONKEY  INTEGER ,
-                            N_COMMENT    VARCHAR(152))
-location ('gphdfs://@hostname@@/data/nation.tbl' )
-FORMAT 'text';
--- drop tables
-DROP EXTERNAL TABLE EXT_HDFS_READ;
-DROP EXTERNAL TABLE EXT_HDFS_WRITE;
 -- start_ignore
 -- --------------------------------------
 -- check platform
@@ -693,7 +675,7 @@ create readable external table ret_region(like wet_region) location('gpfdist://@
 -- negative
 create writable external table wet_neg1(a text, b text) location('file://@hostname@@abs_srcdir@/badt1.tbl') format 'text';
 ERROR:  unsupported URI protocol 'file' for writable external table
-HINT:  Writable external tables may use 'gpfdist', 'gpfdists' or 'gphdfs' URIs only.
+HINT:  Writable external tables may use 'gpfdist(s)' URIs only.
 create writable external table wet_neg1(a text, b text) location('gpfdist://@hostname@:7070/wet.out', 'gpfdist://@hostname@:7070/wet.out') format 'text';
 ERROR:  location uri "gpfdist://@hostname@:7070/wet.out" appears more than once
 create writable external web table wet_pos5(a text, b text) execute 'some command' on segment 0 format 'text';
@@ -763,11 +745,6 @@ ERROR:  connection with gpfdist failed for gpfdist://@hostname@:7070/whois.csv. 
 -- CREATE ROLE exttab1_u1 CREATEEXTTABLE(protocol='gpfdist', type='readable'); 
 -- CREATE ROLE exttab1_u2 CREATEEXTTABLE(protocol='gpfdist', type='writable'); 
 -- CREATE ROLE exttab1_u3 CREATEEXTTABLE(protocol='gpfdist') NOCREATEEXTTABLE(protocol='gpfdist', type='readable'); -- fail due to conflict 
--- CREATE ROLE exttab1_u4 CREATEEXTTABLE(protocol='gphdfs', type='readable'); -- 
--- CREATE ROLE exttab1_u5 CREATEEXTTABLE(protocol='gphdfs', type='writable'); 
--- CREATE ROLE exttab1_u6 NOCREATEEXTTABLE(protocol='gphdfs', type='readable') NOCREATEEXTTABLE(protocol='gphdfs', type='writable');
--- CREATE ROLE exttab1_u7 CREATEEXTTABLE(protocol='gphdfs') NOCREATEEXTTABLE(protocol='gphdfs', type='readable'); -- fail due to conflict 
--- CREATE ROLE exttab1_u7 CREATEEXTTABLE(protocol='gphdfs', type='writable') NOCREATEEXTTABLE(protocol='gphdfs', type='writable'); -- fail due to conflict 
 -- SET SESSION AUTHORIZATION exttab1_su;
 -- create readable external table auth_ext_test1(a int) location ('gpfdist://host:8000/file') format 'text';
 -- SET SESSION AUTHORIZATION exttab1_u1;
@@ -780,29 +757,12 @@ ERROR:  connection with gpfdist failed for gpfdist://@hostname@:7070/whois.csv. 
 -- SET SESSION AUTHORIZATION exttab1_u2;
 -- create writable external table auth_ext_test4(a int) location ('gpfdist://host:8000/file') format 'text'; -- fail
 -- RESET SESSION AUTHORIZATION;
--- SET SESSION AUTHORIZATION exttab1_u4;
--- create external table auth_ext_test5(a int) location ('gphdfs://host:8000/file') format 'text';
--- create writable external table auth_ext_test6(a int) location ('gphdfs://host:8000/file') format 'text'; -- fail
--- RESET SESSION AUTHORIZATION;
--- SET SESSION AUTHORIZATION exttab1_u5;
--- create writable external table auth_ext_test7(a int) location ('gphdfs://host:8000/file') format 'text';
--- create external table auth_ext_test8(a int) location ('gphdfs://host:8000/file') format 'text';           -- fail
--- RESET SESSION AUTHORIZATION;
--- SET SESSION AUTHORIZATION exttab1_u6;
--- create writable external table auth_ext_test9(a int) location ('gphdfs://host:8000/file') format 'text';  -- fail
--- create external table auth_ext_test9(a int) location ('gphdfs://host:8000/file') format 'text';           -- fail
--- RESET SESSION AUTHORIZATION;
 -- drop external table auth_ext_test1;
 -- drop external table auth_ext_test2;
 -- drop external table auth_ext_test3;
--- drop external table auth_ext_test5;
--- drop external table auth_ext_test7;
 -- DROP ROLE exttab1_su;
 -- DROP ROLE exttab1_u1;
 -- DROP ROLE exttab1_u2;
--- DROP ROLE exttab1_u4;
--- DROP ROLE exttab1_u5;
--- DROP ROLE exttab1_u6;
 drop external table ext_whois;
 drop external table gpfdist_status;
 drop external table gpfdist_start;

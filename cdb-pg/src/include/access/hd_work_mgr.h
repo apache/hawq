@@ -14,8 +14,6 @@
 #include "c.h"
 #include "nodes/pg_list.h"
 
-extern const char  *gpxf_protocol_name;
-
 char** map_hddata_2gp_segments(char *uri, int num_segs);
 void free_hddata_2gp_segments(char **segs_work_map, int num_segs);
 
@@ -28,6 +26,7 @@ typedef struct sGpxfStatsElem
 	int   numBlocks;
 	int   numTuples;
 } GpxfStatsElem;
+
 List *get_gpxf_statistics(char *uri);
 
 #endif   /* HDWORKMGR_H */

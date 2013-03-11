@@ -61,8 +61,8 @@ gpop_hdop_map gphd_supported_opr[] =
  * gphd_make_filter_list
  *
  * Given a scan node qual list, find the filters that are eligible to be used in
- * the GPBridge (for gphdfs and gphbase), construct a GPHDFilter that describes
- * the filter information, and return it to the caller.
+ * the GPBridge, construct a GPHDFilter that describes the filter information,
+ * and return it to the caller.
  *
  * Caller is responsible for pfreeing the returned GPHDFilter List.
  */
@@ -231,7 +231,7 @@ gphd_serialize_filter_list(List *filters)
 /*
  * opexpr_to_gphdfilter
  *
- * check if an OpExpr qualifies to be pushed-down for gphdfs.
+ * check if an OpExpr qualifies to be pushed-down to GPXF.
  * if it is - create it and return a success code.
  */
 static bool
@@ -381,7 +381,7 @@ char *serializeGPHDFilterQuals(List *quals)
 {
 	char	*result = NULL;
 
-	if (gp_hadoop_enable_filter_pushdown)
+	if (gpxf_enable_filter_pushdown)
 	{
 		List *filters = gphd_make_filter_list(quals);
 
