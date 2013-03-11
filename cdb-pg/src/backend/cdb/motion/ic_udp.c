@@ -421,6 +421,9 @@ struct ICGlobalControlInfo
 	/* The background thread handle. */
 	pthread_t threadHandle;
 
+	/* flag showing whether the thread is created. */
+	bool threadCreated;
+
 	/* The lock protecting eno field. */
 	pthread_mutex_t	errorLock;
 	int  eno;
@@ -1442,13 +1445,13 @@ InitMotionUDP(int *listenerSocketFd, uint16 *listenerPort)
 	pthread_attr_destroy(&t_atts);
 	if (pthread_err != 0)
 	{
-		pthread_join(ic_control_info.threadHandle, NULL);
-
+		ic_control_info.threadCreated = false;
 		ereport(FATAL, (errcode(ERRCODE_INTERNAL_ERROR),
 						errmsg("InitMotionLayerIPC: failed to create thread"),
 						errdetail("pthread_create() failed with err %d", pthread_err)));
 	}
 
+	ic_control_info.threadCreated = true;
 	return;
 }
 
@@ -1472,7 +1475,10 @@ CleanupMotionUDP(void)
 	/* Shutdown rx thread. */
 	compare_and_swap_32(&ic_control_info.shutdown, 0, 1);
 
-	pthread_join(ic_control_info.threadHandle, NULL);
+	if(ic_control_info.threadCreated)
+	{
+		pthread_join(ic_control_info.threadHandle, NULL);
+	}
 
 	elog(DEBUG2, "udp-ic: receiver thread shutdown.");
 
