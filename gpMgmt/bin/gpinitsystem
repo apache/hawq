@@ -2221,10 +2221,6 @@ if [ x"" != x"$STANDBY_HOSTNAME" ];then
 	CREATE_STANDBY_QD
 fi
 
-if [ -f $DCA_VERSION_FILE ]; then
-	SET_DCA_CONFIG_SETTINGS	
-fi
-
 env PGOPTIONS="-c gp_session_role=utility" $PSQL -p $MASTER_PORT -d "$U_DB" -c "CHECKPOINT;" >> $LOG_FILE 2>&1
 STOP_QD_PRODUCTION
 START_QD_PRODUCTION
@@ -2233,6 +2229,11 @@ CREATE_DFS_TABLESPACE
 
 CREATE_TEMPLATE1
 CREATE_POSTGRES
+
+# Set DCA config after we have all of databases.
+if [ -f $DCA_VERSION_FILE ]; then
+	SET_DCA_CONFIG_SETTINGS	
+fi
 
 # LOAD_GP_TOOLKIT
 
