@@ -25,8 +25,13 @@ _ExceptionalCondition()
 void
 _init_cdbdisp_dispatchPlan(QueryDesc *queryDesc)
 {
+
+#ifdef USE_ASSERT_CHECKING
+
 	_ExceptionalCondition( );
 	_ExceptionalCondition( );
+
+#endif
 
 	queryDesc->estate = (struct EState *)palloc0(sizeof(struct EState));
 	queryDesc->estate->es_sliceTable = (struct SliceTable *)
