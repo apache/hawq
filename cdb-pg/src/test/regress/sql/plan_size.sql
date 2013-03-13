@@ -6,8 +6,8 @@ drop table if exists times;
 -- Ignoring error messages that might cause diff when plan size changes for test queries
 
 -- start_matchsubs
--- m/psql:.*ERROR:  Query plan size limit exceeded.*/
--- s/psql:.*ERROR:  Query plan size limit exceeded.*/ERROR_MESSAGE/
+-- m/ERROR:  Query plan size limit exceeded.*/
+-- s/ERROR:  Query plan size limit exceeded.*/ERROR_MESSAGE/
 -- end_matchsubs
 
 -- create partitioned lineitem, partitioned by an integer column
