@@ -71,6 +71,15 @@
 /* Greenplum version as a number */
 #undef GP_VERSION_NUM
 
+/* HAWQ major version as a string */
+#undef HQ_MAJORVERSION
+
+/* A string containing the HAWQ version number */
+#undef HQ_VERSION
+
+/* HAWQ version as a number */
+#undef HQ_VERSION_NUM
+
 /* Define to 1 if you have the `atexit' function. */
 #undef HAVE_ATEXIT
 

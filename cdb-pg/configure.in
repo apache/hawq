@@ -17,7 +17,7 @@ dnl Read the Autoconf manual for details.
 dnl
 m4_pattern_forbid(^PGAC_)dnl to catch undefined macros
 
-AC_INIT([Greenplum Database], [8.2.15], [support@greenplum.com])
+AC_INIT([HAWQ], [8.2.15], [support@greenplum.com])
 
 AC_PREREQ(2.63)
 dnl m4_if(m4_defn([m4_PACKAGE_VERSION]), [2.63], [], [m4_fatal([Autoconf version 2.63 is required.
@@ -30,7 +30,7 @@ AC_CONFIG_AUX_DIR(config)
 AC_PREFIX_DEFAULT(/usr/local/pgsql)
 AC_SUBST(configure_args, [$ac_configure_args])
 
-AC_DEFINE_UNQUOTED(PG_VERSION, "$PACKAGE_VERSION", [Postgres version Greenplum Database is based on])
+AC_DEFINE_UNQUOTED(PG_VERSION, "$PACKAGE_VERSION", [Postgres version HAWQ is based on])
 [PG_MAJORVERSION=`expr "$PACKAGE_VERSION" : '\([0-9][0-9]*\.[0-9][0-9]*\)'`]
 AC_SUBST(PG_MAJORVERSION)
 AC_DEFINE_UNQUOTED(PG_MAJORVERSION, "$PG_MAJORVERSION", [PostgreSQL major version as a string])
@@ -406,15 +406,16 @@ AC_SUBST(GCC)
 # Get the Greenplum version string from ../VERSION
 # If there is no VERSION file, set the version to devel
 if [[ -f ../VERSION ]] ; then
-    GP_VERSION=`cat ../VERSION`
+    HQ_VERSION=`cat ../VERSION`
 else
-    GP_VERSION="devel"
+    HQ_VERSION="devel"
 fi
 
+GP_VERSION='4.2.0 build 1'
 GP_VERSION_IN="../cdb-pg/src/include/catalog/gp_version.in"
 GP_VERSION_HEADER="../cdb-pg/src/include/catalog/gp_version.h"
 if grep '\$\$' $GP_VERSION_IN > /dev/null 2>&1 ; then
-    sed "s,\\$.*\\$\\$,$GP_VERSION," $GP_VERSION_IN > $GP_VERSION_HEADER
+    sed "s,\\$.*\\$\\$,$HQ_VERSION," $GP_VERSION_IN > $GP_VERSION_HEADER
 fi
 
 # Create compiler version string
@@ -424,24 +425,31 @@ else
   cc_string=$CC
 fi
 AC_DEFINE_UNQUOTED(PG_VERSION_STR,
-                   ["PostgreSQL $PACKAGE_VERSION (Greenplum Database $GP_VERSION) on $host, compiled by $cc_string"],
+                   ["PostgreSQL $PACKAGE_VERSION (Greenplum Database $GP_VERSION) (HAWQ $HQ_VERSION) on $host, compiled by $cc_string"],
                    [A string containing the version number, platform, and C compiler])
+
+if `echo "$HQ_VERSION" | grep "main build" > /dev/null 2>&1` ; then
+   HQ_VERSION="1.0.0"
+fi
 
 AC_DEFINE_UNQUOTED(GP_VERSION,
                    ["$GP_VERSION"],
                    [A string containing the Greenplum version number])
                  
+AC_DEFINE_UNQUOTED(HQ_VERSION,
+                   ["$HQ_VERSION"],
+                   [A string containing the HAWQ version number])
+                 
 dnl If we are a development build, fake a numeric version number  
 dnl this needs to be manually updated each time we branch a new version
 
-if `echo "$GP_VERSION" | grep "main build" > /dev/null 2>&1` ; then
-   GP_VERSION="4.2.0"
-fi
-                   
 [GP_MAJORVERSION=`expr "$GP_VERSION" : '\([0-9][0-9]*\.[0-9][0-9]*\)'`]
 AC_SUBST(GP_MAJORVERSION)
 AC_DEFINE_UNQUOTED(GP_MAJORVERSION, "$GP_MAJORVERSION", [Greenplum major version as a string])
 
+[HQ_MAJORVERSION=`expr "$HQ_VERSION" : '\([0-9][0-9]*\.[0-9][0-9]*\)'`]
+AC_SUBST(HQ_MAJORVERSION)
+AC_DEFINE_UNQUOTED(HQ_MAJORVERSION, "$HQ_MAJORVERSION", [HAWQ major version as a string])
 
 #
 # Set up TAS assembly code if needed; the template file has now had its
@@ -882,6 +890,11 @@ AC_DEFINE_UNQUOTED(PG_VERSION_NUM, $PG_VERSION_NUM, [PostgreSQL version as a num
 tr '.' '	' |
 $AWK '{printf "%d%02d%02d", $1, $2, (NF >= 3) ? $3 : 0}'`"]
 AC_DEFINE_UNQUOTED(GP_VERSION_NUM, $GP_VERSION_NUM, [Greenplum version as a number])
+
+[HQ_VERSION_NUM="`echo "$HQ_VERSION" | sed 's/[A-Za-z].*$//' |
+tr '.' '	' |
+$AWK '{printf "%d%02d%02d", $1, $2, (NF >= 3) ? $3 : 0}'`"]
+AC_DEFINE_UNQUOTED(HQ_VERSION_NUM, $HQ_VERSION_NUM, [HAWQ version as a number])
 
 ##
 ## Libraries
