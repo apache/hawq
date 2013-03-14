@@ -375,7 +375,7 @@ CREATE EXTERNAL TABLE avfav_analyze_good(tmp1 timestamp,
                             ln2   bigint, 
                             ln3   bigint, 
                             bt    bytea)
-LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/avroformat_inside_avrofile.avro?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=AvroFileAccessor&RESOLVER=AvroResolver')
+LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/avroformat_inside_avrofile.avro?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=AvroFileAccessor&RESOLVER=AvroResolver&ANALYZER=HdfsAnalyzer')
 FORMAT 'custom' (formatter='gpxfwritable_import');
 
 -- Table that points to a wrong port.
@@ -400,7 +400,7 @@ CREATE EXTERNAL TABLE avfav_analyze_bad(tmp1 timestamp,
                             ln2   bigint, 
                             ln3   bigint, 
                             bt    bytea)
-LOCATION ('gpxf://@hostname@:12345/gpdb_regression_data/avroformat_inside_avrofile.avro?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=AvroFileAccessor&RESOLVER=AvroResolver')
+LOCATION ('gpxf://@hostname@:12345/gpdb_regression_data/avroformat_inside_avrofile.avro?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=AvroFileAccessor&RESOLVER=AvroResolver&ANALYZER=HdfsAnalyzer')
 FORMAT 'custom' (formatter='gpxfwritable_import');
 
 -- verify that default stats remain after ANALYZE with GUC off

@@ -15,6 +15,7 @@
 #include "access/gpxfuriparser.h"
 #include "access/hd_work_mgr.h"
 #include "access/libchurl.h"
+#include "access/gpxfheaders.h"
 #include "commands/copy.h"
 #include "utils/guc.h"
 #include "utils/elog.h"
@@ -96,8 +97,8 @@ static void free_datanode_rest_servers(List *srvrs);
 static void process_request(ClientContext* client_context, char *uri);
 static void init_client_context(ClientContext *client_context);
 static GPHDUri* init(char* uri, ClientContext* cl_context);
-static List *get_data_statistics_list(GPHDUri* hadoop_uri, ClientContext *cl_context);
-static List* parse_get_stats_response(List* stats, StringInfo rest_buf);
+static GpxfStatsElem *get_data_statistics(GPHDUri* hadoop_uri, ClientContext *cl_context);
+static GpxfStatsElem* parse_get_stats_response(StringInfo rest_buf);
 
 /*
  * the interface function of the hd_work_mgr module
@@ -113,6 +114,7 @@ char** map_hddata_2gp_segments(char* uri, int num_segs)
 	char **segs_work_map = NULL;
 	List *data_fragments = NIL;
 	ClientContext client_context; /* holds the communication info */
+	GpxfInputData inputData;
 	
 	/*
 	 * 1. Cherrypick the data relevant for HADOOP from the input uri and init curl headers
@@ -120,6 +122,14 @@ char** map_hddata_2gp_segments(char* uri, int num_segs)
 	GPHDUri* hadoop_uri = init(uri, &client_context);
 	if (!hadoop_uri)
 		return (char**)NULL;
+	/*
+	 * Enrich the curl HTTP header
+	 */
+	inputData.headers = client_context.http_headers;
+	inputData.gphduri = hadoop_uri;
+	inputData.rel = NULL; /* We do not supply Relation data to the HTTP header */
+	inputData.filterstr = NULL; /* We do not supply filter data to the HTTP header */	
+	build_http_header(&inputData);
 	
 	/*
 	 * 2. Get the fragments data from the GPXF service
@@ -154,29 +164,44 @@ char** map_hddata_2gp_segments(char* uri, int num_segs)
 /*
  * Fetches statistics of the GPXF datasource from the GPXF service
  */
-List *get_gpxf_statistics(char *uri)
+GpxfStatsElem *get_gpxf_statistics(char *uri, Relation rel)
 {
 	ClientContext client_context; /* holds the communication info */
+	char *analyzer = NULL;
+	GpxfInputData inputData;
 	
 	GPHDUri* hadoop_uri = init(uri, &client_context);
 	if (!hadoop_uri)
 		return NULL;
+
+	/*
+	 * Get the statistics info from REST only if analyzer is defined
+     */
+	if(GPHDUri_get_value_for_opt(hadoop_uri, "analyzer", &analyzer) != 0)
+		return NULL;
 	
-	return get_data_statistics_list(hadoop_uri, &client_context);
+	/*
+	 * Enrich the curl HTTP header
+	 */
+	inputData.headers = client_context.http_headers;
+	inputData.gphduri = hadoop_uri;
+	inputData.rel = rel; 
+	inputData.filterstr = NULL; /* We do not supply filter data to the HTTP header */	
+	build_http_header(&inputData);
+	
+	return get_data_statistics(hadoop_uri, &client_context);
 }
 
 /*
  * Fetch the statistics from the GPXF service
  */
-static List *get_data_statistics_list(GPHDUri* hadoop_uri, ClientContext *cl_context)
+static GpxfStatsElem *get_data_statistics(GPHDUri* hadoop_uri, ClientContext *cl_context)
 {
-	List *data_stats = NIL;
-	StringInfoData request;
-	
+	StringInfoData request;	
 	initStringInfo(&request);
 	
 	/* construct the request */
-	appendStringInfo(&request, "http://%s:%s/%s/%s/Fragmenter/getStats?path=%s",
+	appendStringInfo(&request, "http://%s:%s/%s/%s/Analyzer/getEstimatedStats?path=%s",
 					 hadoop_uri->host,
 					 hadoop_uri->port,
 					 GPDB_REST_PREFIX,
@@ -196,56 +221,45 @@ static List *get_data_statistics_list(GPHDUri* hadoop_uri, ClientContext *cl_con
 		 * and we don't want to stop because of a communication error. So we catch the exception
 		 * and return a NULL, which will force the the analyze code to use defaults
 		 */
-		return data_stats;	
+		return NULL;	
 	}
 	PG_END_TRY();
 	
 	/* parse the JSON response and form a fragments list to return */
-	data_stats = parse_get_stats_response(data_stats, &(cl_context->the_rest_buf));
-	
-	return data_stats;
+	return parse_get_stats_response(&(cl_context->the_rest_buf));
 }
 
 /*
  * Parse the json response from the GPXF Fragmenter.getSize
  */
-static List *parse_get_stats_response(List* stats, StringInfo rest_buf)
+static GpxfStatsElem *parse_get_stats_response(StringInfo rest_buf)
 {
+	GpxfStatsElem* statsElem = (GpxfStatsElem*)palloc0(sizeof(GpxfStatsElem));
 	struct json_object	*whole	= json_tokener_parse(rest_buf->data);
 	struct json_object	*head	= json_object_object_get(whole, "GPXFDataSourceStats");
-	List* 				ret_stats = stats;
-	int 				length	= json_object_array_length(head);
-    	
-	/* obtain stats information from the element */
-	for (int i = 0; i < length; i++)
-	{
-		struct json_object *js_stats = json_object_array_get_idx(head, i);
-		GpxfStatsElem* statsElem = (GpxfStatsElem*)palloc0(sizeof(GpxfStatsElem));
+				
+	/* 0. block size */
+	struct json_object *js_block_size = json_object_object_get(head, "blockSize");
+	statsElem->blockSize = json_object_get_int(js_block_size);
+	
+	/* 1. number of blocks */
+	struct json_object *js_num_blocks = json_object_object_get(head, "numberOfBlocks");
+	statsElem->numBlocks = json_object_get_int(js_num_blocks);
+	
+	/* 2. number of tuples */
+	struct json_object *js_num_tuples = json_object_object_get(head, "numberOfTuples");
+	statsElem->numTuples = json_object_get_int(js_num_tuples);
 		
-		/* 0. block size */
-		struct json_object *js_block_size = json_object_object_get(js_stats, "blockSize");
-		statsElem->blockSize = json_object_get_int(js_block_size);
-		
-		/* 1. number of blocks */
-		struct json_object *js_num_blocks = json_object_object_get(js_stats, "numberOfBlocks");
-		statsElem->numBlocks = json_object_get_int(js_num_blocks);
-		
-		/* 2. number of tuples */
-		struct json_object *js_num_tuples = json_object_object_get(js_stats, "numberOfTuples");
-		statsElem->numTuples = json_object_get_int(js_num_tuples);
-		
-		ret_stats = lappend(ret_stats, statsElem);
-	}
-
-	return ret_stats;	
+	return statsElem;	
 }
 
 /*
  * Preliminary uri parsing and curl initializations for the REST communication
  */
 static GPHDUri* init(char* uri, ClientContext* cl_context)
-{
+{	
 	char *fragmenter = NULL;
+
 	/*
 	 * 1. Cherrypick the data relevant for HADOOP from the input uri
 	 */
@@ -264,8 +278,7 @@ static GPHDUri* init(char* uri, ClientContext* cl_context)
 		return NULL;
 	
 	/*
-	 * 3. Get the fragmenter name from the hadoop uri and invoke it
-	 *    to obtain a data fragment list
+	 * 3. Test that the Fragmenter was specified in the URI
 	 */
 	if(!GPHDUri_get_value_for_opt(hadoop_uri, "fragmenter", &fragmenter))
 	{
@@ -274,9 +287,6 @@ static GPHDUri* init(char* uri, ClientContext* cl_context)
 					(errcode(ERRCODE_SYNTAX_ERROR),
 					 errmsg("No value assigned to the FRAGMENTER option in "
 							"the gpxf uri: %s", hadoop_uri->uri)));
-		
-		churl_headers_append(cl_context->http_headers, "X-GP-FRAGMENTER",
-							 fragmenter);
 	}
 	else
 	{
@@ -285,7 +295,7 @@ static GPHDUri* init(char* uri, ClientContext* cl_context)
 				 errmsg("Missing FRAGMENTER option in the gpxf uri: %s",
 						hadoop_uri->uri)));
 	}
-	
+
 	return hadoop_uri;	
 }
 

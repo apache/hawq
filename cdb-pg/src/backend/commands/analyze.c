@@ -2635,36 +2635,26 @@ static void gp_statistics_estimate_reltuples_relpages_ao_rows(Relation rel, floa
  */
 void gp_statistics_estimate_reltuples_relpages_external_gpxf(Relation rel, StringInfo location, float4 *reltuples, float4 *relpages)
 {
-	ListCell *cell = NULL;
-	List *stats_list = get_gpxf_statistics(location->data);
-
+	GpxfStatsElem *elem = get_gpxf_statistics(location->data, rel);
 	/*
-	 * if get_gpxf_statistics returned NIL - probably a communication error, we fallback to default values
+	 * if get_gpxf_statistics returned NULL - probably a communication error, we fallback to default values
 	 * we don't want to stop the analyze, since this can be part of a long procedure performed on many tables
 	 * not just this one
 	 */
-	if (!stats_list)
+	if (!elem)
 	{
 		*relpages =  gp_external_table_default_number_of_pages;
 		*reltuples =  gp_external_table_default_number_of_tuples;
 		return;
 	}
 	
-	foreach(cell, stats_list)
-	{
-		GpxfStatsElem *elem = (GpxfStatsElem*)lfirst(cell);
-		*relpages += floor(( ((float4)elem->blockSize) * elem->numBlocks) / BLCKSZ);
-		*reltuples += elem->numTuples;
-		
-		pfree(elem);
-	}
+	*relpages = floor(( ((float4)elem->blockSize) * elem->numBlocks) / BLCKSZ);
+	*reltuples = elem->numTuples;
+	pfree(elem);
 	
 	/* in case there were problems with the GPXF service, keep the defaults */
 	if (*relpages < 0)
 		*relpages =  gp_external_table_default_number_of_pages;
 	if (*reltuples < 0)
 		*reltuples =  gp_external_table_default_number_of_tuples;
-	
-	/* free list*/
-	list_free(stats_list);
 }

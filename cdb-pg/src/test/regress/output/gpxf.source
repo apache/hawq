@@ -822,7 +822,7 @@ CREATE EXTERNAL TABLE avfav_analyze_good(tmp1 timestamp,
                             ln2   bigint, 
                             ln3   bigint, 
                             bt    bytea)
-LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/avroformat_inside_avrofile.avro?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=AvroFileAccessor&RESOLVER=AvroResolver')
+LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/avroformat_inside_avrofile.avro?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=AvroFileAccessor&RESOLVER=AvroResolver&ANALYZER=HdfsAnalyzer')
 FORMAT 'custom' (formatter='gpxfwritable_import');
 -- Table that points to a wrong port.
 CREATE EXTERNAL TABLE avfav_analyze_bad(tmp1 timestamp, 
@@ -846,7 +846,7 @@ CREATE EXTERNAL TABLE avfav_analyze_bad(tmp1 timestamp,
                             ln2   bigint, 
                             ln3   bigint, 
                             bt    bytea)
-LOCATION ('gpxf://@hostname@:12345/gpdb_regression_data/avroformat_inside_avrofile.avro?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=AvroFileAccessor&RESOLVER=AvroResolver')
+LOCATION ('gpxf://@hostname@:12345/gpdb_regression_data/avroformat_inside_avrofile.avro?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=AvroFileAccessor&RESOLVER=AvroResolver&ANALYZER=HdfsAnalyzer')
 FORMAT 'custom' (formatter='gpxfwritable_import');
 -- verify that default stats remain after ANALYZE with GUC off
 SET gpxf_enable_stat_collection = false;
@@ -950,7 +950,7 @@ ANALYZE gphbase_select;
 select relpages, reltuples from pg_class where relname = 'gphbase_select';
  relpages | reltuples 
 ----------+-----------
-     2048 |     1e+06
+     1000 |     1e+06
 (1 row)
 
 SELECT * FROM gphbase_select ORDER BY recordkey ASC;
@@ -1914,7 +1914,7 @@ ANALYZE hv_heterogen;
 select relpages, reltuples from pg_class where relname = 'hv_heterogen';
  relpages | reltuples 
 ----------+-----------
-     2048 |     1e+06
+     1000 |     1e+06
 (1 row)
 
 -- 5. Hive table with collection types (non primitive types)
