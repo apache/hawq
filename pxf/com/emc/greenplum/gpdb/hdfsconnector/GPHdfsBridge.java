@@ -30,7 +30,7 @@ public class GPHdfsBridge extends BasicBridge
 	/*
 	 * Creates the file accessor based on the input file type
 	 */
-	static IHdfsFileAccessor getFileAccessor(HDFSMetaData metaData) throws Exception
+	static public IHdfsFileAccessor getFileAccessor(HDFSMetaData metaData) throws Exception
 	{
 		IHdfsFileAccessor accessor = null;
 		String className = (metaData.outputFormat() == OutputFormat.FORMAT_TEXT) ?

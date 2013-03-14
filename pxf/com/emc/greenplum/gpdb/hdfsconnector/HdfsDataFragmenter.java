@@ -25,9 +25,7 @@ import org.apache.hadoop.mapred.JobConf;
 public class HdfsDataFragmenter extends BaseDataFragmenter
 {	
 	private	JobConf jobConf;
-	private FileSystem fs;
 	private List<FragmentInfo> fragmentInfos;
-	private DataSourceStatsInfo filesSizeInfo;
 	private Log Log;
 	
 	/*
@@ -39,7 +37,6 @@ public class HdfsDataFragmenter extends BaseDataFragmenter
 		Log = LogFactory.getLog(HdfsDataFragmenter.class);
 
 		jobConf = new JobConf(new Configuration(), HdfsDataFragmenter.class);
-		fs = FileSystem.get(jobConf);
 		fragmentInfos = new ArrayList<FragmentInfo>();
 	}
 	
@@ -69,49 +66,6 @@ public class HdfsDataFragmenter extends BaseDataFragmenter
 		Log.debug(FragmentInfo.listToString(fragmentInfos, path.toString()));
 
 		return FragmentInfo.listToJSON(fragmentInfos);
-	}
-	
-	/*
-	 * path is a data source URI that can appear as a file 
-	 * name, a directory name  or a wildcard returns the data 
-	 * fragments in json format
-	 */	
-	public String GetStats(String datapath) throws Exception
-	{
-		long blockSize = 0;
-		long numberOfBlocks = 0;
-		long numberOfTuples = -1L; // not implemented yet
-		
-		Path	path = new Path("/" + datapath); //yikes! any better way?
-		
-		InputSplit[] splits = getSplits(path);
-		
-		for (InputSplit split : splits)
-		{	
-			FileSplit fsp = (FileSplit)split;
-			
-			if (blockSize == 0) // blockSize wasn't updated yet
-			{
-				Path filePath = fsp.getPath();
-				FileStatus fileStatus = fs.getFileStatus(filePath);
-				if (fileStatus.isFile()) {
-					blockSize = fileStatus.getBlockSize();
-					break;
-				}
-			}
-		}
-	
-		// if no file is in path (only dirs), get default block size
-		if (blockSize == 0)
-			blockSize = fs.getDefaultBlockSize();
-		numberOfBlocks = splits.length;
-		
-		filesSizeInfo = new DataSourceStatsInfo(blockSize, numberOfBlocks, numberOfTuples);
-		
-		//print files size to log when in debug level
-		Log.debug(DataSourceStatsInfo.dataToString(filesSizeInfo, path.toString()));
-
-		return DataSourceStatsInfo.dataToJSON(filesSizeInfo);
 	}
 	
 	private InputSplit[] getSplits(Path path) throws IOException 

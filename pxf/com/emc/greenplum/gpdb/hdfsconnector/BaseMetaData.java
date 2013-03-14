@@ -37,6 +37,14 @@ public class BaseMetaData
 		requestParametersMap = paramsMap;
 
 	}
+	
+	/*
+	 * Expose the parameters map
+	 */
+	public Map<String, String> getParametersMap()
+	{
+		return requestParametersMap;
+	}
 
     /* Copy contructor of BaseMetaData
      * Used to create from an extending class

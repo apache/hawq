@@ -41,16 +41,16 @@ public class DataSourceStatsInfo
 	 * Given a FragmentsSizeInfo, serialize it in JSON to be used as
 	 * the result string for GPDB. An example result is as follows:
 	 *
-	 * {"GPXFFilesSize":[{"blockSize":67108864,"numberOfBlocks":1,"numberOfTuples":5}]}
+	 * {"GPXFFilesSize":{"blockSize":67108864,"numberOfBlocks":1,"numberOfTuples":5}}
 	 */
 	public static String dataToJSON(DataSourceStatsInfo info) throws IOException
 	{
 		ObjectMapper	mapper	= new ObjectMapper();
 	
-		String result = new String("{\"GPXFDataSourceStats\":[");
+		String result = new String("{\"GPXFDataSourceStats\":");
 		// mapper serializes all members of the class by default
 		result += mapper.writeValueAsString(info);
-		result += "]}";
+		result += "}";
 		
 		return result;
 	}

@@ -2,7 +2,7 @@ package com.emc.greenplum.gpdb.hdfsconnector;
 
 /*
  * Factory class for creation of Fragmenter objects. The actual Fragmenter object is "hidden" behind
- * an IFragmenter interface which is returned by the FragmenterFactory. 
+ * an IDataFragmenter interface which is returned by the FragmenterFactory. 
  */
 public class FragmenterFactory
 {
