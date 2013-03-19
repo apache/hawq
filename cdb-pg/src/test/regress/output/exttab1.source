@@ -804,3 +804,10 @@ select count(*) from pg_catalog.pg_exttable where reloid in (select r.oid from p
 (1 row)
 
 SET gp_foreign_data_access = false;
+CREATE USER nonsuperproto;
+NOTICE:  resource queue required -- using default resource queue "pg_default"
+GRANT SELECT ON PROTOCOL gpxf TO nonsuperproto;
+GRANT INSERT ON PROTOCOL gpxf TO nonsuperproto;
+REVOKE SELECT ON PROTOCOL gpxf FROM nonsuperproto;
+REVOKE INSERT ON PROTOCOL gpxf FROM nonsuperproto;
+DROP USER nonsuperproto;

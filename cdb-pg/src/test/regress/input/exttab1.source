@@ -541,3 +541,10 @@ select count(*) from pg_catalog.pg_exttable where reloid in (select r.oid from p
 drop schema exttabletest cascade;
 select count(*) from pg_catalog.pg_exttable where reloid in (select r.oid from pg_class r where r.relname in ('ext_nation', 'ext_whois', 'gpfdist_status'));
 SET gp_foreign_data_access = false;
+
+CREATE USER nonsuperproto;
+GRANT SELECT ON PROTOCOL gpxf TO nonsuperproto;
+GRANT INSERT ON PROTOCOL gpxf TO nonsuperproto;
+REVOKE SELECT ON PROTOCOL gpxf FROM nonsuperproto;
+REVOKE INSERT ON PROTOCOL gpxf FROM nonsuperproto;
+DROP USER nonsuperproto;

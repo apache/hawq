@@ -560,12 +560,6 @@ ExecGrantStmt_oids(InternalGrant *istmt)
 			ExecGrant_Tablespace(istmt);
 			break;
 		case ACL_OBJECT_EXTPROTOCOL:
-			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) 
-				|| gp_called_by_pgdump))
-			{
-                        	ereport(ERROR,
-                                	(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE on PROTOCOL statement in GPSQL") )); 
-			}
 			ExecGrant_ExtProtocol(istmt);
 			break;
 		default:
