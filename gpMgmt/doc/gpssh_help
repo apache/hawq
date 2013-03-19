@@ -41,7 +41,8 @@ If you do not specify a command on the command-line, gpssh will
 go into interactive mode. At the gpssh command prompt (=>), you 
 can enter a command as you would in a regular bash terminal command-line, 
 and the command will be executed on all hosts involved in the session. 
-To end an interactive session, press CTRL+D on the keyboard or type exit.
+To end an interactive session, press CTRL+D on the keyboard or type 
+exit or quit.
 
 If a user name is not specified in the host list file, gpssh will 
 execute commands as the currently logged in user. To determine the 
@@ -71,11 +72,12 @@ OPTIONS
 -f <hostfile_gpssh>
 
  Specifies the name of a file that contains a list of hosts that 
- will participate in this SSH session. The host name is required.
- The syntax of the host file is one host per line as follows:
+ will participate in this SSH session. The host name is required, 
+ and you can optionally specify an alternate user name and/or SSH 
+ port number per host. The syntax of the host file is one host  
+ per line as follows::
   
-  <hostname>
-
+  [username@]hostname[:ssh_port]
 
 -h <hostname>
 
@@ -125,27 +127,15 @@ Exit an interactive session:
 
   => exit
 
-
-Start a non-interactive group SSH session with the hosts named 
-sdw1 and sdw2 and pass a file containing several commands 
+Start a non-interactive group SSH session with the hosts 
+named dw1 and dw2 and pass a file containing several commands
 named command_file to gpssh:
-
+ 
   $ gpssh -h sdw1 -h sdw2 -v -e < command_file
 
-
-Execute single commands in non-interactive mode on hosts 
-sdw2 and localhost:
+Execute single commands in non-interactive mode on hosts sdw2
+and localhost:
 
   $ gpssh -h sdw2 -h localhost -v -e 'ls -a /data/primary/*'
-
   $ gpssh -h sdw2 -h localhost -v -e 'echo $GPHOME'
-
   $ gpssh -h sdw2 -h localhost -v -e 'ls -1 | wc -l'
-
-
-*****************************************************
-SEE ALSO
-*****************************************************
-
-gpssh-exkeys, gpscp
-

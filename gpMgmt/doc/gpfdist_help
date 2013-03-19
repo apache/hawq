@@ -1,7 +1,6 @@
 COMMAND NAME: gpfdist
 
-Serves data files to or writes data files out from Greenplum
-Database segments.
+Serves data files to or writes data files out from HAWQ segments.
 
 *****************************************************
 SYNOPSIS
@@ -18,17 +17,16 @@ DESCRIPTION
 *****************************************************
 
 
-gpfdist is Greenplum's parallel file distribution program. 
+gpfdist is HAWQ’s parallel file distribution program. 
 It is used by readable external tables and gpload to serve 
-external table files to all Greenplum Database segments in 
-parallel. It is used by writable external tables to accept 
-output streams from Greenplum Database segments in parallel 
-and write them out to a file.
+external table files to all HAWQ segments in parallel. 
+It is used by writable external tables to accept output 
+streams from HAWQ segments in parallel and write them out to a file.
 
 In order for gpfdist to be used by an external table, the 
-LOCATION clause of the external table definition (as defined by
-CREATE EXTERNAL TABLE) must specify the external table data 
-using the gpfdist:// protocol 
+LOCATION clause of the external table definition must specify 
+the correct file location using the gpfdist:// protocol 
+(see CREATE EXTERNAL TABLE). 
 
 NOTE: If the --ssl option is specified to enable SSL security, 
 create the external table with the gpfdists:// protocol.
@@ -39,12 +37,11 @@ thereby offering the best performance as well as easier
 administration of external tables.
 
 For readable external tables, gpfdist parses and serves data 
-files evenly to all the segment instances in the Greenplum Database 
+files evenly to all the segment instances in the HAWQ
 system when users SELECT from the external table. For writable 
 external tables, gpfdist accepts parallel output streams from 
 the segments when users INSERT into the external table, and 
 writes to an output file.
-
 
 For readable external tables, if load files are compressed using 
 gzip or bzip2 (have a .gz or .bz2 file extension), gpfdist 
@@ -56,7 +53,7 @@ compression on Windows platforms, and writable external
 tables do not support compression on any platforms.
 
 Most likely, you will want to run gpfdist on your ETL machines 
-rather than the hosts where Greenplum Database is installed. 
+rather than the hosts where HAWQ is installed. 
 To install gpfdist on another host, simply copy the utility 
 over to that host and add gpfdist to your $PATH.
 
@@ -91,12 +88,12 @@ The HTTP port on which gpfdist will serve files. Defaults to 8080.
 
 -t <timeout>
 
-Sets the time (in seconds) allowed for Greenplum Database to 
+Sets the time (in seconds) allowed for HAWQ to 
 establish a connection to a gpfdist process. Default is 5 seconds.
 Valid values are 2 to 30 seconds.  May need to be increased on 
 systems with a lot of network traffic.
 
--m <maxlen>
+-m <max_length>
 
 Sets the maximum allowed data row length in bytes. Default is 32768.
 Should be used when user data includes very wide rows, i.e when
@@ -150,13 +147,12 @@ Displays online help.
 RUNNING GPFDIST AS A WINDOWS SERVICE
 *****************************************************
 
-Greenplum Loaders allow gpfdist to run as a Windows 
-Service.
+HAWQ Loaders allow gpfdist to run as a Windows Service.
 
 Follow the instructions below to download, register and
 activate gpfdist as a service: 
 
-1. Update your Greenplum Loader package to the latest 
+1. Update your HAWQ Loader package to the latest 
    version. This package is available from the 
    EMC Download Center (https://emc.subscribenet.com) 
 

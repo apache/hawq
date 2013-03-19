@@ -22,155 +22,131 @@ PREREQUISITES
 
 The client machine where gpload is executed must have the following:
 
-* Python 2.6.2 or later, pygresql (the Python interface to PostgreSQL), 
-  and pyyaml. Note that Python and the required Python libraries 
-  are included with the Greenplum Database server installation, so if 
-  you have Greenplum Database installed on the machine where gpload 
-  is running, you do not need a separate Python installation.
-
-  Note: Greenplum Loaders for Windows supports only Python 2.5
+* Python 2.6.2 or later, pygresql (the Python interface to PostgreSQL),
+  and pyyaml. Note that Python and the required Python libraries are 
+  included with the HAWQ server installation, so if you have HAWQ 
+  installed on the machine where gpload is running, you do not need 
+  a separate Python installation.
+  Note: HAWQ Loaders for Windows supports only Python 2.5 
   (available from www.python.org).
 
-* The gpfdist parallel file distribution program installed and in 
-  your $PATH. This program is located in $GPHOME/bin of your 
-  Greenplum Database server installation.
+* The gpfdist parallel file distribution program installed and 
+  in your $PATH. This program is located in $GPHOME/bin of your 
+  HAWQ server installation.
 
-* Network access to and from all hosts in your Greenplum Database 
-  array (master and segments).
+* Network access to and from all hosts in your HAWQ array 
+  (master and segments).
 
-* Network access to and from the hosts where the data to be loaded 
+* Network access to and from the hosts where the data to be loaded
   resides (ETL servers).
-
 
 *****************************************************
 DESCRIPTION
 *****************************************************
 
-gpload is a data loading utility that acts as an interface to 
-Greenplum Database's parallel loading feature. 
-Using a load specification defined in a YAML formatted control file, 
-gpload executes a load by invoking the Greenplum parallel file 
-server (gpfdist), creating an external table definition based on 
-the source data defined, and executing an INSERT, UPDATE or MERGE 
-operation to load the source data into the target table in the 
-database.
-
+gpload is a data loading utility that acts as an interface
+to HAWQ’s external table parallel loading feature. Using a load
+specification defined in a YAML formatted control file, gpload 
+executes a load by invoking the HAWQ parallel file server (gpfdist), 
+creating an external table definition based on the source data 
+defined, and executing an INSERT, UPDATE or MERGE operation to 
+load the source data into the target table in the database.
 
 *****************************************************
 OPTIONS
 *****************************************************
 
--f <control_file>
+-f control_file
 
-Required. A YAML file that contains the load specification 
-details. See 'CONTROL FILE FORMAT' below.
+ Required. A YAML file that contains the load specification details.
+ See “Control File Format” below.
 
+--gpfdist_timeout seconds
+  
+  Sets the timeout for the gpfdist parallel file distribution program
+  to send a response. Enter a value from 0 to 30 seconds (entering “0” to disables timeouts). Note that you might need to increase this value when operating on high-traffic networks.
+ 
+-l log_file
+ 
+  Specifies where to write the log file. Defaults to 
+  ~/gpAdminLogs/gpload_YYYYMMDD. 
 
---gpfdist_timeout <seconds>
+-v (verbose mode) 
 
-Sets the timeout for the gpfdist parallel file distribution program 
-to send a response. Enter a value from 0 to 30 seconds (entering “0” 
-to disables timeouts). Note that you might need to increase this 
-value when operating on high-traffic networks.
-
-
--l <log_file>
-
-Specifies where to write the log file. Defaults to 
-~/gpAdminLogs/gpload_YYYYMMDD. See Also: LOG FILE FORMAT section.
-
-
--v (verbose mode)
-
-Show verbose output of the load steps as they are executed.
-
+  Show verbose output of the load steps as they are executed.
 
 -V (very verbose mode)
 
-Shows very verbose output.
-
+  Shows very verbose output.
 
 -q (no screen output)
-
-Run in quiet mode. Command output is not displayed on the 
-screen, but is still written to the log file.
-
+ 
+  Run in quiet mode. Command output is not displayed on the screen, 
+  but is still written to the log file.
 
 -D (debug mode)
-
-Check for error conditions, but do not execute the load. 
-
+ 
+  Check for error conditions, but do not execute the load. 
 
 -? (show help)
-
-Show help, then exit.
-
+  Show help, then exit.
 
 --version
+ 
+  Show the version of this utility, then exit.
 
-Show the version of this utility, then exit.
 
 *********************
 CONNECTION OPTIONS
 *********************
 
--d <database>
+-d database
 
-The database to load into. If not specified, reads from the load 
-control file, the environment variable $PGDATABASE or defaults
-to the current system user name.
+  The database to load into. If not specified, reads from the 
+  load control file, the environment variable $PGDATABASE or 
+  defaults to the current system user name. 
 
+-h hostname
+  
+  Specifies the host name of the machine on which the HAWQ master
+  database server is running. If not specified, reads from the load 
+  control file, the environment variable $PGHOST or defaults to localhost.
 
--h <hostname>
+-p port
+  
+  Specifies the TCP port on which the HAWQ master database server 
+  is listening for connections. If not specified, reads from the load 
+  control file, the environment variable $PGPORT or defaults to 5432.
 
-Specifies the host name of the machine on which the Greenplum 
-master database server is running. If not specified, reads from 
-the load control file, the environment variable $PGHOST or 
-defaults to localhost.
+-U username
 
-
--p <port>
-
-Specifies the TCP port on which the Greenplum master database 
-server is listening for connections. If not specified, reads 
-from the load control file, the environment variable $PGPORT 
-or defaults to 5432.
-
-
--U <username>
-
-The database role name to connect as. If not specified, reads 
-from the load control file, the environment variable $PGUSER 
-or defaults to the current system user name.
-
+  The database role name to connect as. If not specified, reads
+  from the load control file, the environment variable $PGUSER or 
+  defaults to the current system user name.
 
 -W (force password prompt)
 
-Force a password prompt. If not specified, reads the password 
-from the environment variable $PGPASSWORD or from a password file 
-specified by $PGPASSFILE or in ~/.pgpass. If these are not set, 
-then gpload will prompt for a password even if -W is not supplied.
-
+  Force a password prompt. If not specified, reads the password 
+  from the environment variable $PGPASSWORD or from a password file  
+  specified by $PGPASSFILE or in ~/.pgpass. If these are not set, then 
+  gpload will prompt for a password even if -W is not supplied.
 
 *****************************************************
 CONTROL FILE FORMAT
 *****************************************************
 
 The gpload control file uses the YAML 1.1 document format and 
-then implements its own schema for defining the various steps
-of a Greenplum Database load operation. The control file must 
-be a valid YAML document.
-
-The gpload program processes the control file document in 
-order and uses indentation (spaces) to determine the document 
-hierarchy and the relationships of the sections to one another. 
-The use of white space is significant. White space should not 
-be used simply for formatting purposes, and tabs should not be 
-used at all.
+then implements its own schema for defining the various steps 
+of a HAWQ load operation. The control file must be a valid YAML document.
+The gpload program processes the control file document in order 
+and uses indentation (spaces) to determine the document hierarchy 
+and the relationships of the sections to one another. The use of white
+space is significant. White space should not be used simply for formatting
+purposes, and tabs should not be used at all.
 
 The basic structure of a load control file is:
-
 ---
+
 VERSION: 1.0.0.1
 DATABASE: <db_name>
 USER: <db_username>
@@ -189,6 +165,9 @@ GPLOAD:
          CERTIFICATES_PATH: /path/to/certificates
     - COLUMNS:
            - <field_name>: <data_type>
+    - TRANSFORM: 'transformation'
+    - TRANSFORM_CONFIG: 'configuration_file_path' | 'OFF'
+    - MAX_LINE_LENGTH: integer
     - FORMAT: text | csv
     - DELIMITER: '<delimiter_character>'
     - ESCAPE: '<escape_character>' | 'OFF'
@@ -224,25 +203,25 @@ CONTROL FILE SCHEMA ELEMENT DESCRIPTIONS
 VERSION - Optional. The version of the gpload control file schema. 
           The current version is 1.0.0.1. 
 
-DATABASE - Optional. Specifies which database in Greenplum to 
-           connect to. If not specified, defaults to $PGDATABASE if 
-           set or the current system user name. You can also specify 
-           the database on the command line using the -d option. 
+DATABASE - Optional. Specifies which database in HAWQ to connect to. 
+           If not specified, defaults to $PGDATABASE if set or the current 
+           system user name. You can also specify the database on the command
+           line using the -d option. 
 
 USER - Optional. Specifies which database role to use to connect. 
        If not specified, defaults to the current user or $PGUSER 
        if set. You can also specify the database role on the command 
        line using the -U option. If the user running gpload is not a 
-       Greenplum superuser, then the server configuration parameter 
+       HAWQ superuser, then the server configuration parameter 
        'gp_external_grant_privileges' must be set to on in order 
        for the load to be processed.
 
-HOST - Optional. Specifies Greenplum master host name. If not 
+HOST - Optional. Specifies HAWQ master host name. If not 
        specified, defaults to localhost or $PGHOST if set. You can 
        also specify the master host name on the command line using 
        the -h option.
 
-PORT - Optional. Specifies Greenplum master port. If not specified, 
+PORT - Optional. Specifies HAWQ master port. If not specified, 
        defaults to 5432 or $PGPORT if set. You can also specify the 
        master port on the command line using the -p option.
 
@@ -253,10 +232,10 @@ GPLOAD - Required. Begins the load specification section. A GPLOAD
 INPUT - Required. Defines the location and the format of the input 
         data to be loaded. gpload will start one or more instances of 
         the gpfdist file distribution program on the current host and 
-        create the required external table definition(s) in Greenplum 
-        Database that point to the source data. Note that the host 
+        create the required external table definition(s) in HAWQ 
+        that point to the source data. Note that the host 
         from which you run gpload must be accessible over the network 
-        by all Greenplum hosts (master and segments).
+        by all HAWQ hosts (master and segments).
 
 SOURCE - Required. The SOURCE block of an INPUT specification defines 
          the location of a source file. An INPUT section can have more 
@@ -302,9 +281,7 @@ FILE - Required. Specifies the location of a file, named pipe, or
        to the current directory from which gpload is executed (or you 
        can declare an absolute path).
 
-SSL - Optional. Specifies usage of SSL encryption. If SSL is set to 
-      true, gpload starts the gpfdist server with the --ssl option and 
-      uses the gpfdists protocol.
+SSL - Optional. Specifies usage of SSL encryption.
 
 CERTIFICATES_PATH - Required when SSL is true; cannot be specified when 
                     SSL is false or unspecified. The location specified 
@@ -316,10 +293,10 @@ CERTIFICATES_PATH - Required when SSL is true; cannot be specified when
                     - The trusted certificate authorities, root.crt
 
                     The root directory (/) cannot be specified 
-                    as certificate_path.
+                    as CERTIFICATES_PATH.
 
 COLUMNS - Optional. Specifies the schema of the source data file(s) 
-          in the format of field_name: data_type. The DELIMITER 
+          in the format of <field_name>: <data_type>. The DELIMITER 
           character in the source file is what separates two data value 
           fields (columns). A row is determined by a line feed character 
           (0x0a). If the input COLUMNS are not specified, then the 
@@ -330,13 +307,26 @@ COLUMNS - Optional. Specifies the schema of the source data file(s)
           section and the column names in the target TABLE. This default 
           mapping can be overridden using the MAPPING section.
 
+TRANSFORM - Optional. Specifies the name of the input XML transformation 
+            passed to gpload.
+
+TRANSFORM_CONFIG - Optional. Specifies the location of the XML transformation
+                   configuration file that is specified in the TRANSFORM 
+                   parameter, above.
+
+MAX_LINE_LENGTH - Optional. An integer that specifies the maximum length
+                  of a line in the XML transformation data passed to gpload.
+
 FORMAT - Optional. Specifies the format of the source data file(s); 
          either plain text (TEXT) or comma separated values (CSV) format. 
          Defaults to TEXT if not specified.
 
-DELIMITER - Optional. Specifies a single ASCII character that separates 
-            columns within each row (line) of data. The default is a 
-            tab character in TEXT mode, a comma in CSV mode.
+DELIMITER - Optional. Specifies a single ASCII character that separates
+            columns within each row (line) of data. The default is a tab 
+            character in TEXT mode, a comma in CSV mode. You can also 
+            specify a non-printable ASCII character via an escape sequence\
+            using the decimal representation of the ASCII character. 
+            For example, \014 represents the shift out character..
 
 ESCAPE - Optional. Specifies the single character that is used for C 
          escape sequences (such as \n,\t,\100, and so on) and for 
@@ -376,13 +366,12 @@ HEADER - Optional. Specifies that the first line in the data file(s) is
 ENCODING - Optional. Character set encoding of the source data. 
            Specify a string constant (such as 'SQL_ASCII'), an 
            integer encoding number, or 'DEFAULT' to use the default 
-           client encoding. If not specified, the default client 
-           encoding is used.
+           client encoding. 
 
 ERROR_LIMIT - Optional. Enables single row error isolation mode for 
               this load operation. When enabled, input rows that have 
               format errors will be discarded provided that the error 
-              limit count is not reached on any Greenplum segment instance 
+              limit count is not reached on any HAWQ segment instance 
               during input processing. If the error limit is not reached, 
               all good rows will be loaded and any error rows will either 
               be discarded or logged to the table specified in ERROR_TABLE. 
@@ -411,7 +400,7 @@ MODE - Optional. Defaults to INSERT if not specified. There are three
        available load modes:
 
        * INSERT - Loads data into the target table using the following 
-            method: INSERT INTO target_table SELECT * FROM input_data;
+            method: INSERT INTO <target_table> SELECT * FROM <input_data>;
 
        * UPDATE - Updates the UPDATE_COLUMNS of the target table where 
            the rows have MATCH_COLUMNS attribute values equal to those 
@@ -436,11 +425,9 @@ MATCH_COLUMNS - Required if MODE is UPDATE or MERGE. Specifies the
                 column(s) in order for the row to be updated in the
                 target table.
 
-UPDATE_COLUMNS - Required if MODE is UPDATE or MERGE. Specifies the 
-                 column(s) to update for the rows that meet the 
+UPDATE_COLUMNS - Required if MODE is UPDATE or MERGE. Specifies 
+                 the column(s) to update for the rows that meet the 
                  MATCH_COLUMNS criteria and the optional UPDATE_CONDITION.
-                 Update columns cannot be columns that are used for the 
-                 Greenplum distribution key for the table.
 
 UPDATE_CONDITION - Optional. Specifies a Boolean condition (similar to 
                    what you would declare in a WHERE clause) that must 
@@ -460,9 +447,8 @@ MAPPING - Optional. If a mapping is specified, it overrides the default
           the SELECT list of a query, such as a constant value, a column 
           reference, an operator invocation, a function call, and so on.
 
-PRELOAD - Optional. Specifies operations to run prior to the load 
-          operation. Right now there are 2 preload operations: TRUNCATE 
-          and REUSE_TABLES.
+PRELOAD - Optional. Specifies operations to run prior to the load operation.
+          Right now the only preload operation is TRUNCATE.
 
 TRUNCATE - Optional. If set to true, gpload will remove all rows in the 
            target table prior to loading it.
@@ -479,8 +465,10 @@ SQL - Optional. Defines SQL commands to run before and/or after the load
       AFTER commands. List commands in the order of desired execution.
 
 BEFORE - Optional. An SQL command to run before the load operation starts.
+         Enclose commands in quotes.
 
 AFTER - Optional. An SQL command to run after the load operation completes.
+        Enclose commands in quotes.
 
 
 *****************************************************
@@ -510,6 +498,7 @@ LOG FILE FORMAT
 Log files output by gpload have the following format:
 
 <timestamp>|<level>|<message>
+
 Where <timestamp> takes the form: YYYY-MM-DD HH:MM:SS, 
 <level> is one of DEBUG, LOG, INFO, ERROR, and <message> is 
 a normal text message. Some INFO messages that may be of 

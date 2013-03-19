@@ -1,6 +1,6 @@
 COMMAND NAME: gpinitsystem
 
-Initializes a Greenplum Database system by using configuration 
+Initializes a HAWQ system by using configuration 
 parameters specified in a configuration file (gp_init_config).
 
 
@@ -29,19 +29,18 @@ gpinitsystem -v
 DESCRIPTION
 *****************************************************
 
-The gpinitsystem utility will create a Greenplum Database instance 
+The gpinitsystem utility will create a HAWQ instance 
 using the values defined in a configuration file. See the 
-INITIALIZATION CONFIGURATION FILE FORMAT section below. An example 
-initialization configuration file can be found in 
-$GPHOME/docs/cli_help/gpconfigs/gpinitsystem_config.
+INITIALIZATION CONFIGURATION FILE FORMAT section below. 
  
 Before running this utility, make sure that you have installed 
-the Greenplum Database software on all the hosts in the array.
-In a Greenplum Database DBMS, each database instance (the master 
+the HAWQ software on all the hosts in the array.
+
+In a HAWQ DBMS, each database instance (the master 
 and all segments) must be initialized across all of the hosts in 
 the system in such a way that they can all work together as a 
 unified DBMS. The gpinitsystem utility takes care of initializing 
-the Greenplum master and each segment instance, and configuring 
+the HAWQ master and each segment instance, and configuring 
 the system as a whole.
 
 Before running gpinitsystem, you must set the $GPHOME environment 
@@ -60,8 +59,8 @@ This utility performs the following tasks:
 * Initializes the master instance.
 * Initializes the standby master instance (if specified).
 * Initializes the primary segment instances.
-* Configures the Greenplum Database system and checks for errors.
-* Starts the Greenplum Database system.
+* Configures the HAWQ system and checks for errors.
+* Starts the HAWQ system.
 
 
 *****************************************************
@@ -83,7 +82,7 @@ OPTIONS
 
  Required. The full path and filename of the configuration file, which 
  contains all of the defined parameters to configure and initialize a 
- new Greenplum system. See INITIALIZATION CONFIGURATION FILE FORMAT below.
+ new HAWQ system. See INITIALIZATION CONFIGURATION FILE FORMAT below.
 
 -D (debug)
 
@@ -100,7 +99,7 @@ OPTIONS
 
 --locale=<locale> | -n <locale>  
 
- Sets the default locale used by Greenplum Database. If not specified, 
+ Sets the default locale used by HAWQ. If not specified, 
  the LC_ALL, LC_COLLATE, or LANG environment variable of the master 
  host determines the locale. If these are not set, the default locale 
  is C (POSIX). A locale identifier consists of a language identifier 
@@ -130,13 +129,13 @@ OPTIONS
  (what character sequences are valid and how they are interpreted). This 
  cannot be changed after Greenplum Database is initialized, so it is 
  important to choose a character classification locale that is compatible 
- with the data you plan to store in Greenplum Database.
+ with the data you plan to store in HAWQ.
 
 
 --lc-messages=<locale>
 
  Similar to --locale, but sets the locale used for messages output by 
- Greenplum Database. The current version of Greenplum Database does not 
+ HAWQ. The current version of HAWQ does not 
  support multiple locales for output messages (all messages are in English), 
  so changing this setting will not have any effect.
 
@@ -170,7 +169,7 @@ OPTIONS
 -p <postgresql_conf_param_file>
 
  Optional. The name of a file that contains postgresql.conf parameter 
- settings that you want to set for Greenplum Database. These settings 
+ settings that you want to set for HAWQ. These settings 
  will be used when the individual master and segment instances are 
  initialized. You can also set parameters after initialization using 
  the gpconfig utility.
@@ -184,7 +183,7 @@ OPTIONS
 
 --shared_buffers=<size> | -b <size>
 
- Sets the amount of memory a Greenplum server instance uses for shared 
+ Sets the amount of memory a HAWQ server instance uses for shared 
  memory buffers. You can specify sizing in kilobytes (kB), megabytes (MB) 
  or gigabytes (GB). The default is 125MB.
 
@@ -192,13 +191,14 @@ OPTIONS
 -s <standby_master_host>
 
  Optional. If you wish to configure a backup master host, specify the 
- host name using this option. The Greenplum Database software must 
+ host name using this option. The HAWQ software must 
  already be installed and configured on this host.
 
 
 --su_password=<superuser_password> | -e <superuser_password>
 
- The password to set for the Greenplum Database superuser. Defaults 
+ The password to set for the HAWQ
+ superuser. Defaults 
  to 'gparray'. You can always change the superuser password at a 
  later time using the ALTER ROLE command. Client connections over 
  the network require a password login for the database superuser 
@@ -222,6 +222,11 @@ OPTIONS
 INITIALIZATION CONFIGURATION FILE FORMAT
 *****************************************************
 
+gpinitsystem requires a configuration file with the following
+parameters defined. An example initialization configuration 
+file can be found in 
+$GPHOME/docs/cli_help/gpconfigs/gpinitsystem_config.
+
 ARRAY_NAME
 
  Required. A name for the array you are configuring. You can use 
@@ -244,8 +249,8 @@ SEG_PREFIX
 
  Required. This specifies a prefix that will be used to name the 
  data directories on the master and segment instances. The naming 
- convention for data directories in a Greenplum Database system 
- is SEG_PREFIX<number> where <number> starts with 0 for segment 
+ convention for data directories in a HAWQ system is 
+ SEG_PREFIX<number> where <number> starts with 0 for segment 
  instances (the master is always -1). So for example, if you choose 
  the prefix gpseg, your master instance data directory would be 
  named gpseg-1, and the segment instances would be named 
@@ -275,7 +280,8 @@ DATA_DIRECTORY
  have permission to write to these directories. For example, this 
  will create six primary segments per host:
 
-  declare -a DATA_DIRECTORY=(/data1/primary /data1/primary /data1/primary /data2/primary /data2/primary /data2/primary)
+  declare -a DATA_DIRECTORY=(/data1/primary /data1/primary 
+  /data1/primary /data2/primary /data2/primary /data2/primary)
 
 
 MASTER_HOSTNAME
@@ -297,7 +303,17 @@ MASTER_PORT
 
  Required. The port number for the master instance. This is the port 
  number that users and client connections will use when accessing the 
- Greenplum Database system.
+ HAWQ system.
+
+DFS_NAME
+
+ Required. The distributed file system name for the HAWQ storing files.  
+ Currently, HAWQ only supported hdfs
+ 
+DFS_URL
+
+ Required. The hostname, port, and relative path of distributed 
+ file system. Currently, HAWQ only supported HDFS.
 
 
 TRUSTED_SHELL
@@ -313,20 +329,20 @@ CHECK_POINT_SEGMENTS
  Required. Maximum distance between automatic write ahead log (WAL) 
  checkpoints, in log file segments (each segment is normally 16 megabytes). 
  This will set the checkpoint_segments parameter in the postgresql.conf 
- file for each segment instance in the Greenplum Database system.
+ file for each segment instance in the HAWQ system.
 
 
 ENCODING
 
  Required. The character set encoding to use. This character set must 
  be compatible with the --locale settings used, especially --lc-collate 
- and --lc-ctype. Greenplum Database supports the same character sets 
+ and --lc-ctype. HAWQ supports the same character sets 
  as PostgreSQL.
 
 
 DATABASE_NAME
 
- Optional. The name of a Greenplum Database database to create after 
+ Optional. The name of a HAWQ database to create after 
  the system is initialized. You can always create a database later 
  using the CREATE DATABASE command or the createdb utility.
 
@@ -335,23 +351,12 @@ DATABASE_NAME
 EXAMPLES
 *****************************************************
 
-Initialize a Greenplum Database array by supplying a configuration file 
-and a segment host address file:
+Initialize a HAWQ array and set the superuser remote password:
 
- $ gpinitsystem -c gpinitsystem_config -h hostfile_gpinitsystem
-
-
-Initialize a Greenplum Database array and set the superuser remote password:
-
- $ gpinitsystem -c gpinitsystem_config -h hostfile_gpinitsystem --su-password=mypassword
+ $ gpinitsystem -c gpinitsystem_config -h hostfile_gpinitsystem 
+   --su-password=mypassword
 
 
-Initialize a Greenplum Database array with an optional standby master host:
+Initialize a HAWQ array with an optional standby master host:
 
- $ gpinitsystem -c gpinitsystem_config -h hostfile_gpinitsystem -s host09
-
-*****************************************************
-SEE ALSO
-*****************************************************
-
-gpseginstall, gpssh-exkeys
+ $ gpinitsystem -c gpinitsystem_config -h hostfile_gpinitsystem -s host09S

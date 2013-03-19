@@ -1,6 +1,6 @@
 COMMAND NAME: gpstart
 
-Starts a Greenplum Database system.
+Starts a HAWQ system.
 
 
 *****************************************************
@@ -20,8 +20,8 @@ gpstart --version
 DESCRIPTION
 *****************************************************
 
-The gpstart utility is used to start the Greenplum Database server 
-processes. When you start a Greenplum Database system, you are 
+The gpstart utility is used to start the HAWQ server 
+processes. When you start a HAWQ system, you are 
 actually starting several postgres database server listener processes 
 at once (the master and all of the segment instances). The gpstart utility 
 handles the startup of the individual instances. Each instance is started 
@@ -34,7 +34,7 @@ If new hosts are added to the system, you must manually remove this file
 from the gpadmin user’s home directory. The utility will create a new hosts 
 cache file at the next startup.
 
-Before you can start a Greenplum Database system, you must have initialized 
+Before you can start a HAWQ system, you must have initialized 
 the system using gpinitsystem first.
 
 
@@ -125,18 +125,18 @@ Displays the version of this utility.
 EXAMPLES
 *****************************************************
 
-Start a Greenplum Database system:
+Start a HAWQ system:
 
 gpstart
 
 
-Start a Greenplum Database system in restricted mode 
+Start a HAWQ system in restricted mode 
 (only allow superuser connections):
 
 gpstart -R
 
 
-Start the Greenplum master instance only and connect in utility mode:
+Start the HAWQ master instance only and connect in utility mode:
 
 gpstart -m
 

@@ -1,6 +1,6 @@
 COMMAND NAME: gpcheck
 
-Verifies and validates Greenplum Database platform settings.
+Verifies and validates HAWQ platform settings.
 
 *****************************************************
 SYNOPSIS
@@ -20,20 +20,21 @@ gpcheck --version
 DESCRIPTION
 *****************************************************
 
-The gpcheck utility determines the platform on which you are running 
-Greenplum Database and validates various platform-specific 
+The gpcheck utility determines the platform on which 
+you are running HAWQ and validates various platform-specific 
 configuration settings. gpcheck can use a host file or a file 
 previously created with the --zipout option to validate platform 
-settings. At the end of a successful validation process, GPCHECK_NORMAL 
-message displays. If GPCHECK_ERROR displays, one or more validation 
-checks failed. You can use also gpcheck to gather and view platform 
-settings on hosts without running validation checks.
+settings. At the end of a successful validation process, 
+GPCHECK_NORMAL message displays. If GPCHECK_ERROR displays, 
+one or more validation checks failed. You can use also gpcheck
+to gather and view platform settings on hosts without running 
+validation checks.
 
-Greenplum recommends that you run gpcheck as root. If you do not run 
-gpcheck as root, the utility displays a warning message and will not 
-be able to validate all configuration settings; Only some of these 
-settings will be validated.
-
+Pivotal recommends that you run gpcheck as root. 
+If you do not run gpcheck as root, the utility displays 
+a warning message and will not be able to validate all 
+configuration settings; Only some of these settings will 
+be validated.
 
 *****************************************************
 OPTIONS
@@ -49,11 +50,10 @@ OPTIONS
 
 -f hostfile_gpcheck
 
- The name of a file that contains a list of hosts that gpcheck uses 
- to validate platform-specific settings. This file should contain a 
- single host name for all hosts in your Greenplum Database system 
+ The name of a file that contains a list of hosts that gpcheck 
+ uses to validate platform-specific settings. This file should 
+ contain a single host name for all hosts in your HAWQ system 
  (master, standby master, and segments).
-
 
 -m master_host
 
@@ -100,24 +100,33 @@ OPTIONS
 EXAMPLES
 *****************************************************
 
-Verify and validate the Greenplum Database platform settings by 
+Verify and validate the HAWQ platform settings by 
 entering a host file and specifying the master host and the 
 standby master host:
 
  # gpcheck -f hostfile_gpcheck -m mdw -s smdw
 
 
-Save Greenplum Database platform settings to a zip file:
+Save HAWQ platform settings to a zip file:
 
  # gpcheck -f hostfile_gpcheck -m mdw -s smdw --zipout
 
 
-Verify and validate the Greenplum Database platform settings 
+Verify and validate the HAWQ platform settings 
 using a zip file created with the --zipout option:
 
  # gpcheck --zipin gpcheck_timestamp.tar.gz
 
 
-View collected Greenplum Database platform settings:
+View collected HAWQ platform settings:
 
  # gpcheck -f hostfile_gpcheck -m mdw -s smdw --stdout
+
+
+*****************************************************
+SEE ALSO
+*****************************************************
+
+gpcheckperf
+
+

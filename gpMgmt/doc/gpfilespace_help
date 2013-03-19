@@ -23,14 +23,14 @@ DESCRIPTION
 *****************************************************
 
 A tablespace requires a file system location to store its database 
-files. In GPSQL, the master and each segment needs its own distinct
+files. In HAWQ, the master and each segment needs its own distinct
 storage location. This collection of file system locations for all
-components in a Greenplum system is referred to as a filespace.
+components in a HAWQ system is referred to as a filespace.
 Once a filespace is defined, it can be used by one or more
 tablespaces.
 
 When used with the -o option, the gpfilespace utility looks up your 
-system configuration information in the GPSQL catalog tables and
+system configuration information in the HAWQ catalog tables and
 prompts you for the appropriate file system locations needed to
 create the filespace. It then outputs a configuration file that
 can be used to create a filespace. If a file name is not
@@ -38,12 +38,7 @@ specified, a gpfilespace_config_<#> file will be created in the
 current directory by default.  
 
 Once you have a configuration file, you can run gpfilespace with 
-the -c option to create the filespace in GPSQL.
-
-Note: If segments are down due to a power or nic failure, you may 
-see inconsistencies during filespace creation. You may not be able 
-to bring up the Greenplum Database.
-
+the -c option to create the filespace in HAWQ.
 
 *****************************************************
 OPTIONS
@@ -54,22 +49,13 @@ OPTIONS
  A configuration file containing:
  * An initial line denoting the new filespace name. For example:
    filespace:myfs
- * An second line denoting the filesystem api for filespace. For
-   example:
-   fsysname:hdfs
- * An third line denoting the file replica number. For example:
-   fsreplica:3
  * One line each for the master, the primary segments. A line
    describes a file system location that a particular segment
    database instance should use as its data directory location
-   to store database files associated with a tablespace. The
-   master needs a local path for store database files. The
-   segments need an URL for store database files.  Each line
+   to store database files associated with a tablespace. Each line
    is in the format of:
    <hostname>:<dbid>:/<filesystem_dir>/<seg_datadir_name>
-   <hostname>:<dbid>:<hdfs_hostname>:<hdfs_port>/<filesystem_dir>/<seg_datadir_name>
-
-
+   
 -l | --logdir <logfile_directory>
 
  The directory to write the log file. Defaults to ~/gpAdminLogs.
@@ -91,7 +77,7 @@ OPTIONS
  segments. However, primaries and mirrors cannot use the same 
  location. After the utility creates the configuration file, you 
  can manually edit the file to make any required changes to the 
- filespace layout before creating the filespace in Greenplum Database.
+ filespace layout before creating the filespace in HAWQ.
 
 -v | --version (show utility version)
 
@@ -109,14 +95,14 @@ CONNECTION OPTIONS
 
 -h host | --host host
 
- The host name of the machine on which the Greenplum master 
+ The host name of the machine on which the HAWQ master 
  database server is running. If not specified, reads from 
  the environment variable PGHOST or defaults to localhost.
 
 
 -p port | --port port
 
- The TCP port on which the Greenplum master database server 
+ The TCP port on which the HAWQ master database server 
  is listening for connections. If not specified, reads from 
  the environment variable PGPORT or defaults to 5432.
 
@@ -133,6 +119,9 @@ CONNECTION OPTIONS
 
  Force a password prompt.
 
+Note: gpfilespace, showfilespace, showtempfilespace, 
+movetransfilespace, showtransfilespace, movetempfilespace 
+are not supported.
 
 *****************************************************
 EXAMPLES

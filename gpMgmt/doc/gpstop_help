@@ -1,6 +1,6 @@
 COMMAND NAME: gpstop
 
-Stops or restarts a Greenplum Database system.
+Stops or restarts a GPSQL system.
 
 
 *****************************************************
@@ -27,19 +27,18 @@ DESCRIPTION
 *****************************************************
 
 The gpstop utility is used to stop the database servers that 
-comprise a Greenplum Database system. When you stop a Greenplum 
-Database system, you are actually stopping several postgres 
-database server processes at once (the master and all of the 
-segment instances). The gpstop utility handles the shutdown 
-of the individual instances. Each instance is shutdown in parallel. 
+comprise a GPSQL system. When you stop a GPSQL system, you 
+are actually stopping several postgres database server 
+processes at once (the master and all of the segment instances).
+The gpstop utility handles the shutdown of the individual 
+instances. Each instance is shutdown in parallel. 
 
-By default, you are not allowed to shut down Greenplum Database 
-if there are any client connections to the database. Use 
-the -M fast option to roll back and terminate any connections 
-before shutting down. If there are any transactions in progress, 
-the default behavior is to wait for them to commit before 
-shutting down. Use the -M fast option to roll back open 
-transactions.
+By default, you are not allowed to shut down GPSQL if there 
+are any client connections to the database. Use the -M fast 
+option to roll back all in progress transactions and terminate 
+any connections before shutting down. If there are any 
+transactions in progress, the default behavior is to wait 
+for them to commit before shutting down.
 
 With the -u option, the utility uploads changes made to the 
 master pg_hba.conf file or to runtime configuration parameters 
@@ -76,7 +75,7 @@ OPTIONS
 
 -m (master only)
 
- Optional. Shuts down a Greenplum master instance that was 
+ Optional. Shuts down a GPSQL master instance that was 
  started in maintenance mode.
 
 
@@ -117,7 +116,7 @@ OPTIONS
  shutdown in the specified number of seconds, gpstop displays 
  a message indicating that one or more segments are still in 
  the process of shutting down and that you cannot restart 
- Greenplum Database until the segment instance(s) are stopped. 
+ GPSQL until the segment instance(s) are stopped. 
  This option is useful in situations where gpstop is executed 
  and there are very large transactions that need to rollback. 
  These large transactions can take over a minute to rollback 
@@ -128,10 +127,12 @@ OPTIONS
 
  This option reloads the pg_hba.conf files of the master and 
  segments and the runtime parameters of the postgresql.conf files 
- but does not shutdown the Greenplum Database array. Use this 
+ but does not shutdown the GPSQL array. Use this 
  option to make new configuration settings active after editing 
  postgresql.conf or pg_hba.conf. Note that this only applies to 
- configuration parameters that are designated as runtime parameters.
+ configuration parameters that are designated as runtime 
+ parameters. In HAWQ if there are some failed segments, 
+ this option can not be executed.
 
 
 -v (verbose output)
@@ -160,11 +161,11 @@ OPTIONS
 EXAMPLES
 *****************************************************
 
-Stop a Greenplum Database system in smart mode:
+Stop a GPSQL system in smart mode:
 
   gpstop
 
-Stop a Greenplum Database system in fast mode:
+Stop a GPSQL system in fast mode:
 
   gpstop -M fast
 
@@ -185,10 +186,4 @@ shutdown the Greenplum Database array:
 
   gpstop -u
 
-
-*****************************************************
-SEE ALSO
-*****************************************************
-
-gpstart
 

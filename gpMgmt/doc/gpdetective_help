@@ -1,6 +1,6 @@
 COMMAND NAME: gpdetective
 
-Collects diagnostic information from a running Greenplum Database system.
+Collects diagnostic information from a running HAWQ system.
 
 
 *****************************************************
@@ -26,10 +26,10 @@ gpdetective -v
 DESCRIPTION
 *****************************************************
 
-The gpdetective utility collects information from a running Greenplum 
-Database system and creates a bzip2-compressed tar output file. This 
+The gpdetective utility collects information from a running HAWQ 
+system and creates a bzip2-compressed tar output file. This 
 output file can then be sent to Greenplum Customer Support to help with 
-the diagnosis of Greenplum Database errors or system failures. The 
+the diagnosis of HAWQ errors or system failures. The 
 gpdetective utility runs the following diagnostic tests:
 
   * gpstate to check the system status
@@ -37,11 +37,11 @@ gpdetective utility runs the following diagnostic tests:
   * gpcheckcat and gpcheckdb to check the system catalog tables 
     for inconsistencies
 
-gpdetective captures the following files and Greenplum system information:
+gpdetective captures the following files and HAWQ system information:
 
   * postgresql.conf configuration files
   * log files (master and segments)
-  * Greenplum Database system configuration information
+  * HAWQ system configuration information
   * (optional) Core files
   * (optional) Schema DDL dumps for all databases and global objects 
     
@@ -89,7 +89,7 @@ OPTIONS
 
 -h hostname
 
-  The host name of the machine on which the Greenplum master 
+  The host name of the machine on which the HAWQ master 
   database server is running. If not specified, reads from the 
   environment variable PGHOST or defaults to localhost.
 
@@ -104,7 +104,7 @@ OPTIONS
 
 -P password
 
-  If Greenplum Database is configured to use password authentication, 
+  If HAWQ is configured to use password authentication, 
   you must also supply the database superuser password. If not specified, 
   reads from ~/.pgpass if it exists.
 
@@ -124,7 +124,7 @@ OPTIONS
 
 -p port
 
-  The TCP port on which the Greenplum master database server is listening 
+  The TCP port on which the HAWQ master server is listening 
   for connections. If not specified, reads from the environment variable 
   PGPORT or defaults to 5432.
 
@@ -143,7 +143,9 @@ OPTIONS
 
 -U gp_superuser
 
-  The Greenplum database superuser role name to connect as (typically gpadmin). If not specified, reads from the environment variable PGUSER or defaults to the current system user name.
+  The HAWQ superuser role name to connect as (typically gpadmin). 
+  If not specified, reads from the environment variable PGUSER or 
+  defaults to the current system user name.
 
 
 -v (show utility version)
@@ -160,7 +162,7 @@ OPTIONS
 EXAMPLES
 *****************************************************
 
-Collect all diagnostic information for a Greenplum Database system 
+Collect all diagnostic information for a HAWQ system 
 and supply the required connection information for the master host:
 
   gpdetective -h mdw -p 54320 -U gpadmin -P mypassword
@@ -172,8 +174,8 @@ past two days:
   gpdetective --start_date 2
 
 
-Do not run diagnostic tests or schema dumps, just collect the log 
-files of the master and segment 3:
+To collect the log files of the master and segment without 
+diagnostic tests or schema dumps:
 
   gpdetective --diagnostics n --logs -1,3 --pg_dumpall f
 

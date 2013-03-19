@@ -44,14 +44,14 @@ and runs the following performance tests:
   memory bandwidth (in MB/s). This tests that your system is not 
   limited in performance by the memory bandwidth of the system in 
   relation to the computational performance of the CPU. In applications 
-  where the data set is large (as in Greenplum Database), low memory 
+  where the data set is large (as in HAWQ), low memory 
   bandwidth is a major performance issue. If memory bandwidth is 
   significantly lower than the theoretical bandwidth of the CPU, 
   then it can cause the CPU to spend significant amounts of time 
   waiting for data to arrive from system memory.
 
 * Network Performance Test (gpnetbench) - To test network performance 
- (and thereby the performance of the Greenplum Database interconnect), 
+ (and thereby the performance of the HAWQ interconnect), 
   the utility runs a network benchmark program that transfers a 5 
   second stream of data from the current host to each remote host 
   included in the test. The data is transferred in parallel to each 
@@ -65,27 +65,27 @@ and runs the following performance tests:
   best used to validate if the switch fabric can tolerate a 
   full-matrix workload.
 
-To specify the hosts to test, use the -f option to specify a file 
-containing a list of host names, or use the -h option to name single 
-host names on the command-line. At least one host name (-h) or a 
-host file (-f) is required.
+To specify the hosts to test, use the -f option to specify a file
+ containing a list of host names, or use the -h option to name 
+single host names on the command-line. If running the network 
+performance test, all entries in the host file must be for network 
+interfaces within the same subnet. If your segment hosts have multiple
+network interfaces configured on different subnets, run the network 
+test once for each subnet.
 
-You must also specify at least one test directory (with -d). The 
-user who runs gpcheckperf must have write access to the specified 
-test directories on all remote hosts. For the disk I/O test, the 
-test directories should correspond to your segment data directories 
-(primary and/or mirrors). For the memory bandwidth and network 
-performance tests, a test directory is still required to copy over 
-the test program files.
+You must also specify at least one test directory (with -d). 
+The user who runs gpcheckperf must have write access to the 
+specified test directories on all remote hosts. For the disk 
+I/O test, the test directories should correspond to your segment 
+data directories (primary and/or mirrors). For the memory bandwidth
+and network tests, a temporary directory is required for the test 
+program files.
 
-Before using gpcheckperf, you must have a trusted host setup 
-between the hosts involved in the performance test. You can 
-use the utility gpssh-exkeys to update the known host files 
-and exchange public keys between hosts if you have not done so 
-already.
-
-Note that gpcheckperf calls to gpssh and gpscp, so these 
-Greenplum utilities must also be in your $PATH.
+Before using gpcheckperf, you must have a trusted host setup between
+ the hosts involved in the performance test. Use the utility 
+gpssh-exkeys to update the known host files and exchange public 
+keys between hosts. Note that gpcheckperf calls to gpssh and gpscp,
+so these HAWQ utilities must also be in your $PATH.
 
 *****************************************************
 OPTIONS
@@ -93,10 +93,9 @@ OPTIONS
 
 -B <block_size>
 
-Specifies the block size (in KB or MB) to use for disk I/O test. 
-The default is 32KB, which is the same as the Greenplum Database 
-page size. The maximum block size is 1 MB.
-
+ Specifies the block size (in KB or MB) to use for 
+ I/O test. The default is 32KB, the same as the HAWQ 
+ page size. The maximum block size is 1 MB.
 
 -d <test_directory>
 
@@ -159,9 +158,9 @@ page size. The maximum block size is 1 MB.
 --netperf
 
  Specifies that the netperf binary should be used to perform the 
- network test instead of the Greenplum network test. To use this 
- option, you must download netperf from www.netperf.org and install 
- it into $GPHOME/bin/lib on all Greenplum hosts (master and segments).
+ network test instead of the HAWQ network test. To use this option, 
+ you must download netperf from www.netperf.org and install it 
+ into $GPHOME/bin/lib on all HAWQ hosts (master and segments).
 
 
 -r ds{n|N|M}
@@ -172,10 +171,11 @@ page size. The maximum block size is 1 MB.
   * Network performance test in sequential (n), parallel (N), 
     or full-matrix (M) mode. The optional --duration option specifies 
     how long (in seconds) to run the network test. To use the parallel 
-   (N) mode, you must run the test on an even number of hosts. If you 
-   would rather use netperf (www.netperf.org) instead of the 
-   Greenplum network test, you can download it and install it into 
-   $GPHOME/bin/lib on all Greenplum hosts (master and segments). 
+   (N) mode, you must run the test on an even number of hosts. 
+  
+   If you would rather use netperf (www.netperf.org) instead of the 
+   HAWQ network test, you can download it and install it into 
+   $GPHOME/bin/lib on all HAWQ hosts (master and segments). 
    You would then specify the optional --netperf option to use the 
    netperf binary instead of the default gpnetbench* utilities.
 
@@ -234,8 +234,8 @@ $ gpcheckperf -f hostfile_gpchecknet_ic2 -r N -d /tmp
 
 
 Run the same test as above, but use netperf instead of the 
-Greenplum network test (note that netperf must be installed 
-in $GPHOME/bin/lib on all Greenplum hosts):
+HAWQ network test (note that netperf must be installed 
+in $GPHOME/bin/lib on all HAWQ hosts):
 
 
 $ gpcheckperf -f hostfile_gpchecknet_ic1 -r N --netperf -d /tmp
