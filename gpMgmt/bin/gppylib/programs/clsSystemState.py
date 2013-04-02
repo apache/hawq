@@ -484,7 +484,7 @@ class GpSystemStateProgram:
         """
         hostNameToResults = self.__fetchAllSegmentData(gpArray)
 
-        logger.info("Greenplum instance status summary")
+        logger.info("HAWQ instance status summary")
 
         # master summary info
         tabLog = TableLogger().setWarnWithArrows(True)
@@ -881,15 +881,15 @@ class GpSystemStateProgram:
         tabLog.info(["Master port", "= %d" % master.getSegmentPort()])
 
         tabLog.info(["Master current role", "= %s" % qdRole])
-        tabLog.info(["Greenplum initsystem version", "= %s" % initDbVersion])
+        tabLog.info(["HAWQ initsystem version", "= %s" % initDbVersion])
 
         if statusFetchWarning is None:
             if masterData[gp.SEGMENT_STATUS__GET_VERSION] is None:
-                tabLog.warn(["Greenplum current version", "= Unknown"])
+                tabLog.warn(["HAWQ current version", "= Unknown"])
             else:
-                tabLog.info(["Greenplum current version", "= %s" % masterData[gp.SEGMENT_STATUS__GET_VERSION]])
+                tabLog.info(["HAWQ current version", "= %s" % masterData[gp.SEGMENT_STATUS__GET_VERSION]])
         else:
-            tabLog.warn(["Greenplum current version", "= Error fetching data: %s" % statusFetchWarning])
+            tabLog.warn(["HAWQ current version", "= Error fetching data: %s" % statusFetchWarning])
         tabLog.info(["Postgres version", "= %s" % pgVersion])
 
         self.__appendStandbySummary(hostNameToResults, gpArray.standbyMaster, tabLog)
@@ -1439,11 +1439,11 @@ class GpSystemStateProgram:
 
         # do it!
         if self.__options.showMirrorList:
-            logger.fatal('"-m (list mirrors)" option NOT SUPPORTED YET IN GPSQL')
+            logger.fatal('"-m (list mirrors)" option NOT SUPPORTED YET')
             sys.exit(1)
             exitCode = self._showMirrorList(gpEnv, gpArray)
         elif self.__options.showClusterConfig:
-            logger.fatal('"-c (show primary to mirror mappings)" option NOT SUPPORTED YET IN GPSQL')
+            logger.fatal('"-c (show primary to mirror mappings)" option NOT SUPPORTED YET')
             sys.exit(1)
             exitCode = self.__showClusterConfig(gpEnv, gpArray)
         elif self.__options.showQuickStatus:
@@ -1453,7 +1453,7 @@ class GpSystemStateProgram:
         elif self.__options.showVersionInfo:
             exitCode = self.__showVersionInfo(gpEnv, gpArray)
         elif self.__options.showSummaryOfSegmentsWhichRequireAttention:
-            logger.fatal('"-e (show segments with mirror status issues)" option NOT SUPPORTED YET IN GPSQL')
+            logger.fatal('"-e (show segments with mirror status issues)" option NOT SUPPORTED YET')
             sys.exit(1)
             exitCode = self.__showSummaryOfSegmentsWhichRequireAttention(gpEnv, gpArray)
         elif self.__options.printSampleExternalTableSqlForSegmentStatus:

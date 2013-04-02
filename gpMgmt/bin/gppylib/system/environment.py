@@ -40,7 +40,7 @@ class GpMasterEnvironment:
 
         self.__gpHome = gp.get_gphome()
         self.__gpVersion = gp.GpVersion.local('local GP software version check',self.__gpHome)
-        logger.info("local Greenplum Version: '%s'" % self.__gpVersion)
+        logger.info("local HAWQ Version: '%s'" % self.__gpVersion)
 
         # read collation settings from master
         if readFromMasterCatalog:
@@ -50,7 +50,7 @@ class GpMasterEnvironment:
 
             # MPP-13807, read/show the master's database version too
             self.__pgVersion = dbconn.execSQLForSingletonRow(conn, "select version();")[0]
-            logger.info("master Greenplum Version: '%s'" % self.__pgVersion)
+            logger.info("master HAWQ Version: '%s'" % self.__pgVersion)
             conn.close()
 
             checkNotNone("lc_collate", self.__lcCollate)
