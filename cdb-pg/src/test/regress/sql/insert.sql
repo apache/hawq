@@ -64,3 +64,11 @@ insert into foo(x) select  t1.x from    bar t1 group by t1.x;
 
 drop table if exists foo;
 drop table if exists bar;
+
+-- GPSQL-221
+
+BEGIN;
+CREATE TABLE mpp14758(a int) with (appendonly=true);
+INSERT INTO mpp14758 select * from generate_series(1,10);
+ABORT;
+SELECT * from gp_fastsequence where objid not in (select oid from pg_class);

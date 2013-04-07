@@ -942,25 +942,19 @@ PersistentFileSysObjStateChangeResult PersistentRelation_MarkAbortingCreate(
 	Relation gp_fastsequence_rel = heap_open(FastSequenceRelationId, RowExclusiveLock);
 	HeapTuple   tup;
 	SysScanDesc scan;
-	ScanKeyData skey[2];
-	ScanKeyInit(&skey[0],
+	ScanKeyData skey; 
+	ScanKeyInit(&skey,
 				Anum_gp_fastsequence_objid,
 				BTEqualStrategyNumber,
 				F_OIDEQ,
 				relFileNode->relNode);
 
-	ScanKeyInit(&skey[1],
-				Anum_gp_fastsequence_contentid,
-				BTEqualStrategyNumber,
-				F_INT4EQ,
-				fsObjName->contentid);
-
 	scan = systable_beginscan(gp_fastsequence_rel,
 							  InvalidOid,
 							  false,
 							  SnapshotNow,
-							  2,
-							  &skey[0]);
+							  1,
+							  &skey);
 	while (HeapTupleIsValid(tup = systable_getnext(scan)))
 	{
 		Form_gp_fastsequence found = (Form_gp_fastsequence) GETSTRUCT(tup);

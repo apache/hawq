@@ -60,7 +60,7 @@ ignore: type_sanity
 ignore: opr_sanity
 ignore: geometry
 ignore: horology
-ignore: insert
+test: insert
 ignore: create_function_1
 ignore: create_type
 ignore: create_table
