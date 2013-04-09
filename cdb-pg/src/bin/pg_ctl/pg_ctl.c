@@ -576,10 +576,13 @@ test_postmaster_connection(bool do_checkpoint __attribute__((unused)))
 
 
 			/*
-			 * our connection attempt failed.  
-			 * after two attempts check if the postmaster is still alive before sleeping.
+			 * The postmaster should create postmaster.pid very soon after being
+			 * started.  If it's not there after we've waited 5 or more seconds,
+			 * assume startup failed and give up waiting.  (Note this covers both
+			 * cases where the pidfile was never created, and where it was created
+			 * and then removed during postmaster exit.)
 			 */
-			if (i > 1) 
+			if (i >= 5) 
 			{
 				pgpid_t pid = get_pgpid();
 				if (pid == 0)				/* no pid file */
