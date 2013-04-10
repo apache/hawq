@@ -25,7 +25,6 @@ from datetime import datetime, timedelta
 # import GPDB modules
 try:
     from gppylib.commands import unix, gp, pg
-    from gppylib.commands.gp import GpAddConfigScript
     from gppylib.db import dbconn
     from gppylib.gpparseopts import OptParser, OptChecker, OptionGroup, SUPPRESS_HELP
     from gppylib.gplog import get_default_logger, setup_tool_logging, enable_verbose_logging, get_logger_if_verbose
@@ -33,7 +32,6 @@ try:
     from gppylib.userinput import ask_yesno
     from gppylib.gp_dbid import writeGpDbidFile
     from gppylib.operations.filespace import PG_SYSTEM_FILESPACE, GP_TRANSACTION_FILES_FILESPACE, GP_TEMPORARY_FILES_FILESPACE, GetFilespaceEntries, GetFilespaceEntriesDict
-    from gppylib.commands.base import WorkerPool
 except ImportError, e_:
     sys.exit('ERROR: Cannot import modules.  Please check that you '
              'have sourced greenplum_path.sh.  Detail: ' + str(e_))
@@ -414,54 +412,6 @@ def update_flat_file(array, flat_file):
     except Exception, e:
         raise Exception('Failed to update flat file')
 
-def set_repair_global_sequence(datadir):
-    """set gp_persistent_repair_global_sequenece for new standby master"""
-
-    pool = WorkerPool()
-    cmd = GpAddConfigScript(unix.getLocalHostname(), datadir, 'gp_persistent_repair_global_sequence', 'true', False)
-    pool.addCommand(cmd)
-    try:
-        pool.join()
-        items = pool.getCompletedItems()
-        failure = False
-        for i in items:
-            if not i.was_successful():
-                logger.error('failed updating the postgresql.conf files on host: ' + i.remoteHost)
-                failure = True
-
-        pool.check_results()
-    except Exception, e:
-        logger.error('errors in job:')
-        logger.error(e.__str__())
-        logger.error('exiting early')
-
-    pool.haltWork()
-    pool.joinWorkers()
-
-
-def reset_repair_global_sequence(datadir):
-    """reset gp_persistent_repair_global_sequenece after the activate standby"""
-    pool = WorkerPool()
-    cmd = GpAddConfigScript(unix.getLocalHostname(), datadir, 'gp_persistent_repair_global_sequence', None, True)
-    pool.addCommand(cmd)
-    try:
-        pool.join()
-        items = pool.getCompletedItems()
-        failure = False
-        for i in items:
-            if not i.was_successful():
-                logger.error('failed updating the postgresql.conf files on host: ' + i.remoteHost)
-                failure = True
-
-        pool.check_results()
-    except Exception, e:
-        logger.error('errors in job:')
-        logger.error(e.__str__())
-        logger.error('exiting early')
-
-    pool.haltWork()
-    pool.joinWorkers()
-
 
 #-------------------------------------------------------------------------
 def update_config():
@@ -608,11 +558,8 @@ try:
     # backwards.
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     stop_gpsync_process(options_)
-    # Prevent the global_sequence regression happened.
-    set_repair_global_sequence(options_.master_data_dir)
     start_master()
     array_ = get_config()
-    reset_repair_global_sequence(options_.master_data_dir)
     update_config()
     update_gpdbid_file(array_)
     update_flat_file(array_, GP_TRANSACTION_FILES_FILESPACE)
@@ -626,7 +573,7 @@ try:
     except Exception, e_:
         logger.info('Exception observed while stopping database')
         logger.info(str(e_))
- 
+    
     start_database()
     
     # At this point, cancel isn't all that bad so re-enable 
