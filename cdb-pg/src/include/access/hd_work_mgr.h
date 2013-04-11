@@ -14,6 +14,7 @@
 #include "c.h"
 #include "utils/rel.h"
 #include "nodes/pg_list.h"
+#include "lib/stringinfo.h"
 
 char** map_hddata_2gp_segments(char *uri, int num_segs);
 void free_hddata_2gp_segments(char **segs_work_map, int num_segs);
@@ -27,6 +28,6 @@ typedef struct sGpxfStatsElem
 	int   numBlocks;
 	int   numTuples;
 } GpxfStatsElem;
-GpxfStatsElem *get_gpxf_statistics(char *uri, Relation rel);
+GpxfStatsElem *get_gpxf_statistics(char *uri, Relation rel, StringInfo err_msg);
 
 #endif   /* HDWORKMGR_H */

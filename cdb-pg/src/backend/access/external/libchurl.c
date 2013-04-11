@@ -649,20 +649,51 @@ void churl_headers_set(churl_context* context,
  */
 void check_response_code(churl_context* context)
 {
-	long response;
-	int curl_error;
+	long 	 response_code;
+	char	*response_text = NULL;
+	int 	 curl_error;
 
-	if (CURLE_OK != (curl_error = curl_easy_getinfo(context->curl_handle, CURLINFO_RESPONSE_CODE, &response)))
+	if (CURLE_OK != (curl_error = curl_easy_getinfo(context->curl_handle, CURLINFO_RESPONSE_CODE, &response_code)))
 		elog(ERROR, "internal error: curl_easy_getinfo failed(%d - %s)",
 			 curl_error, curl_easy_strerror(curl_error));
 
-	if (response != 200 && response != 100)
-		if (!handle_special_error(response))
+	if (response_code != 200 && response_code != 100)
+	{
+		if (!handle_special_error(response_code))
 		{
+			char	*dest_ip;
+			long	 dest_port = 0;
+			StringInfoData err;
+
+			initStringInfo(&err);
+
+			/* prepare response text if any */
 			if (context->ptr)
+			{
 				context->ptr[context->top] = '\0';
-			elog(ERROR, "remote component error: %ld\n %s", response, get_http_error_msg(response, (context->ptr + context->bot)));
+				response_text = context->ptr + context->bot;
+			}
+
+			/* add remote http error code */
+			appendStringInfo(&err, "remote component error (%ld)", response_code);
+
+			/* add dest ip and port, if any, and curl was nice to tell us */
+			if (response_code != 0 &&
+				CURLE_OK == curl_easy_getinfo(context->curl_handle, CURLINFO_PRIMARY_IP, &dest_ip) &&
+				CURLE_OK == curl_easy_getinfo(context->curl_handle, CURLINFO_PRIMARY_PORT, &dest_port))
+			{
+				appendStringInfo(&err, " from '%s:%ld'", dest_ip, dest_port);
+			}
+
+			/*
+			 * add detailed error message from the http response. response_text
+			 * could be NULL in some cases. get_http_error_msg checks for that.
+			 */
+			appendStringInfo(&err, ": %s", get_http_error_msg(response_code, response_text));
+
+			elog(ERROR, "%s", err.data);
 		}
+	}
 
 	free_http_response(context);
 }

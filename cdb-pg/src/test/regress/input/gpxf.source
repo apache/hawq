@@ -52,6 +52,7 @@ DROP EXTERNAL TABLE gphdfs_in1;
 \! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gpxf/writable_inside_sequence2.tbl /gpdb_regression_data/wild/writable_inside_sequence2.tbl
 \! sh @abs_srcdir@/helpers/create_table_file.sh @abs_srcdir@/data/gpxf/multiblock.tbl
 \! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gpxf/multiblock.tbl /gpdb_regression_data/multiblock.tbl
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gpxf/empty.tbl /gpdb_regression_data/empty.tbl
 --
 -- Test TEXT format on a file with many fields
 --
@@ -324,6 +325,15 @@ FORMAT 'TEXT' (DELIMITER ',');
 SELECT t1, a1 FROM port_err ORDER BY t1 LIMIT 10; -- negative
 DROP EXTERNAL TABLE port_err;
 --
+-- Test empty file
+--
+CREATE EXTERNAL TABLE empty(t1 text,
+                            a1 integer)
+LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/empty.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='gpxfwritable_import');
+SELECT * FROM empty ORDER BY t1;
+DROP EXTERNAL TABLE empty;
+--
 -- Test extensibility
 --
 CREATE EXTERNAL TABLE extens(tmp1  timestamp, 
@@ -347,9 +357,10 @@ CREATE EXTERNAL TABLE extens(tmp1  timestamp,
                             ln2   bigint, 
                             ln3   bigint, 
                             bt    bytea)
-LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/writable_inside_sequence1.tbl?FRAGMENTER=TestHdfsFragmenter&ACCESSOR=TestSequenceFileAccessor&RESOLVER=TestWritableResolver&DATA-SCHEMA=CustomWritable')
+LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/writable_inside_sequence1.tbl?FRAGMENTER=TestHdfsDataFragmenter&ACCESSOR=TestSequenceFileAccessor&RESOLVER=TestWritableResolver&DATA-SCHEMA=CustomWritable&ANALYZER=TestHdfsAnalyzer')
 FORMAT 'custom' (formatter='gpxfwritable_import');
 SELECT num1, t1, t2, t3 FROM extens ORDER BY num1;
+ANALYZE extens;
 DROP EXTERNAL TABLE extens;
 --
 -- Test analyze for HDFS file(read only).
@@ -379,7 +390,7 @@ LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/avroformat_inside_avrofi
 FORMAT 'custom' (formatter='gpxfwritable_import');
 
 -- Table that points to a wrong port.
-CREATE EXTERNAL TABLE avfav_analyze_bad(tmp1 timestamp, 
+CREATE EXTERNAL TABLE avfav_analyze_bad_port(tmp1 timestamp, 
                             num1  integer, 
                             num2  integer, 
                             num3  integer, 
@@ -403,6 +414,31 @@ CREATE EXTERNAL TABLE avfav_analyze_bad(tmp1 timestamp,
 LOCATION ('gpxf://@hostname@:12345/gpdb_regression_data/avroformat_inside_avrofile.avro?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=AvroFileAccessor&RESOLVER=AvroResolver&ANALYZER=HdfsAnalyzer')
 FORMAT 'custom' (formatter='gpxfwritable_import');
 
+-- Table that points to a wrong analyzer class.
+CREATE EXTERNAL TABLE avfav_analyze_bad_class(tmp1 timestamp, 
+                            num1  integer, 
+                            num2  integer, 
+                            num3  integer, 
+                            num4  integer,
+                            t1    text,
+                            t2    text,
+                            t3    text,
+                            t4    text,
+                            t5    text,
+                            t6    text,
+                            dub1  double precision,
+                            dub2  double precision, 
+                            dub3  double precision, 
+                            ft1   real, 
+                            ft2   real, 
+                            ft3   real, 
+                            ln1   bigint, 
+                            ln2   bigint, 
+                            ln3   bigint, 
+                            bt    bytea)
+LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/avroformat_inside_avrofile.avro?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=AvroFileAccessor&RESOLVER=AvroResolver&ANALYZER=NoSuchAnalyzer')
+FORMAT 'custom' (formatter='gpxfwritable_import');
+
 -- verify that default stats remain after ANALYZE with GUC off
 SET gpxf_enable_stat_collection = false;
 ANALYZE avfav_analyze_good;
@@ -422,13 +458,16 @@ SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_good' AND relpages 
 -- verify that ANALYZE doesn't break while checking out a table that can't connect to the analyzer module
 -- TODO: find a way to verify that previous stat values remain.
 SET gpxf_enable_stat_collection = true;
-ANALYZE avfav_analyze_bad;
-SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_bad' AND relpages = 1000 AND reltuples = 1000000;
+ANALYZE avfav_analyze_bad_port;
+SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_bad_port' AND relpages = 1000 AND reltuples = 1000000;
+ANALYZE avfav_analyze_bad_class;
+SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_bad_class' AND relpages = 1000 AND reltuples = 1000000;
 
 SET gpxf_enable_stat_collection = true; --reset to default
 
 DROP EXTERNAL TABLE avfav_analyze_good;
-DROP EXTERNAL TABLE avfav_analyze_bad;
+DROP EXTERNAL TABLE avfav_analyze_bad_port;
+DROP EXTERNAL TABLE avfav_analyze_bad_class;
 --
 -- Cleanup: delete all data that was copied into hdfs
 --

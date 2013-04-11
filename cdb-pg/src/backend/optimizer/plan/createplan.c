@@ -1150,6 +1150,8 @@ static bool is_gpxf_protocol(Uri *uri)
  *                      skipping some segdbs randomly.
  *   - 'exec' protocol: all segdbs get mapped to execute the command (this is
  *                      soon to be changed though).
+ *   - 'gpxf' protocol: has its own mapping logic. See is_gpxf_protocol() and
+ *   					map_hddata_2gp_segments() below.
  */                     
 static ExternalScan *
 create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,

@@ -9,7 +9,6 @@
  */
 
 #include "postgres.h"
-#include "lib/stringinfo.h"
 #include <curl/curl.h>
 #include <json/json.h>
 #include "access/gpxfuriparser.h"
@@ -82,6 +81,7 @@ static const char *SEGWORK_PREFIX = "segwork=";
 static const char SEGWORK_IN_PAIR_DELIM = '@';
 
 static List* parse_get_fragments_response(List* fragments, StringInfo rest_buf);
+static void free_fragment(DataFragment *fragment);
 static List* free_fragment_list(List *fragments);
 static List* get_data_fragment_list(GPHDUri *hadoop_uri,  ClientContext* client_context);
 static char** distribute_work_2_gp_segments(List *data_fragments_list, int num_segs);
@@ -97,7 +97,7 @@ static void free_datanode_rest_servers(List *srvrs);
 static void process_request(ClientContext* client_context, char *uri);
 static void init_client_context(ClientContext *client_context);
 static GPHDUri* init(char* uri, ClientContext* cl_context);
-static GpxfStatsElem *get_data_statistics(GPHDUri* hadoop_uri, ClientContext *cl_context);
+static GpxfStatsElem *get_data_statistics(GPHDUri* hadoop_uri, ClientContext *cl_context, StringInfo err_msg);
 static GpxfStatsElem* parse_get_stats_response(StringInfo rest_buf);
 
 /*
@@ -164,7 +164,7 @@ char** map_hddata_2gp_segments(char* uri, int num_segs)
 /*
  * Fetches statistics of the GPXF datasource from the GPXF service
  */
-GpxfStatsElem *get_gpxf_statistics(char *uri, Relation rel)
+GpxfStatsElem *get_gpxf_statistics(char *uri, Relation rel, StringInfo err_msg)
 {
 	ClientContext client_context; /* holds the communication info */
 	char *analyzer = NULL;
@@ -178,7 +178,11 @@ GpxfStatsElem *get_gpxf_statistics(char *uri, Relation rel)
 	 * Get the statistics info from REST only if analyzer is defined
      */
 	if(GPHDUri_get_value_for_opt(hadoop_uri, "analyzer", &analyzer) != 0)
+	{
+		if (err_msg)
+			appendStringInfo(err_msg, "no ANALYZER option in table definition");
 		return NULL;
+	}
 	
 	/*
 	 * Enrich the curl HTTP header
@@ -189,13 +193,15 @@ GpxfStatsElem *get_gpxf_statistics(char *uri, Relation rel)
 	inputData.filterstr = NULL; /* We do not supply filter data to the HTTP header */	
 	build_http_header(&inputData);
 	
-	return get_data_statistics(hadoop_uri, &client_context);
+	return get_data_statistics(hadoop_uri, &client_context, err_msg);
 }
 
 /*
  * Fetch the statistics from the GPXF service
  */
-static GpxfStatsElem *get_data_statistics(GPHDUri* hadoop_uri, ClientContext *cl_context)
+static GpxfStatsElem *get_data_statistics(GPHDUri* hadoop_uri,
+										  ClientContext *cl_context,
+										  StringInfo err_msg)
 {
 	StringInfoData request;	
 	initStringInfo(&request);
@@ -207,7 +213,7 @@ static GpxfStatsElem *get_data_statistics(GPHDUri* hadoop_uri, ClientContext *cl
 					 GPDB_REST_PREFIX,
 					 GPFX_VERSION,
 					 hadoop_uri->data);
-	
+
 	/* send the request. The response will exist in rest_buf.data */
 	PG_TRY();
 	{
@@ -218,9 +224,23 @@ static GpxfStatsElem *get_data_statistics(GPHDUri* hadoop_uri, ClientContext *cl
 		/* 
 		 * communication problems with GPXF service 
 		 * Statistics for a table can be done as part of an ANALYZE procedure on many tables,
-		 * and we don't want to stop because of a communication error. So we catch the exception
-		 * and return a NULL, which will force the the analyze code to use defaults
+		 * and we don't want to stop because of a communication error. So we catch the exception,
+		 * append its error to err_msg, and return a NULL,
+		 * which will force the the analyze code to use former calculated values or defaults.
 		 */
+		if (err_msg)
+		{
+			char* message = elog_message();
+			if (message)
+				appendStringInfo(err_msg, "%s", message);
+			else
+				appendStringInfo(err_msg, "Unknown error");
+
+		}
+		/* release error state */
+		if (!elog_dismiss(DEBUG5))
+			PG_RE_THROW(); /* hope to never get here! */
+
 		return NULL;	
 	}
 	PG_END_TRY();
@@ -577,7 +597,16 @@ parse_get_fragments_response(List *fragments, StringInfo rest_buf)
 		if (js_user_data)
 			fragment->user_data = pstrdup(json_object_get_string(js_user_data));
 
-		ret_frags = lappend(ret_frags, fragment);
+		/*
+		 * HD-2547:
+		 * Ignore fragment if it doesn't contain any host locations,
+		 * for example if the file is empty.
+		 */
+		if (fragment->locations)
+			ret_frags = lappend(ret_frags, fragment);
+		else
+			free_fragment(fragment);
+
 	}
 	if (cur_source_name)
 		pfree(cur_source_name);
@@ -706,28 +735,62 @@ static void
 print_fragment_list(List *splits)
 {
 	ListCell *split_cell = NULL;
+	StringInfoData log_str;
+	initStringInfo(&log_str);
+
+	appendStringInfo(&log_str, "Fragment list: (%d elements)\n", splits ? splits->length : 0);
 
 	foreach(split_cell, splits)
 	{
 		DataFragment 	*frag 	= (DataFragment*)lfirst(split_cell);
 		ListCell 		*lc 	= NULL;
 
-		elog(DEBUG2, "Fragment index: %d\n", frag->index);
+		appendStringInfo(&log_str, "Fragment index: %d\n", frag->index);
 
 		foreach(lc, frag->locations)
 		{
 			FragmentLocation* location = (FragmentLocation*)lfirst(lc);
-			elog(DEBUG2, "location: host: %s\n", location->ip);
+			appendStringInfo(&log_str, "location: host: %s\n", location->ip);
 		}
 		if (frag->user_data)
 		{
-			elog(DEBUG2, "user data: %s\n", frag->user_data);
+			appendStringInfo(&log_str, "user data: %s\n", frag->user_data);
 		}
 	}
+
+	elog(DEBUG2, "%s", log_str.data);
+	pfree(log_str.data);
 }
 
 /*
- * release the fragment data structure
+ * release memory of a single fragment
+ */
+static void free_fragment(DataFragment *fragment)
+{
+	ListCell *loc_cell = NULL;
+
+	Assert(fragment != NULL);
+
+	if (fragment->source_name)
+		pfree(fragment->source_name);
+
+	foreach(loc_cell, fragment->locations)
+	{
+		FragmentLocation* location = (FragmentLocation*)lfirst(loc_cell);
+
+		if (location->ip)
+			pfree(location->ip);
+		pfree(location);
+	}
+	list_free(fragment->locations);
+
+	if (fragment->user_data)
+		pfree(fragment->user_data);
+	pfree(fragment);
+}
+
+/*
+ * release the fragment list
  */
 static List* 
 free_fragment_list(List *fragments)
@@ -737,24 +800,7 @@ free_fragment_list(List *fragments)
 	foreach(frag_cell, fragments)
 	{
 		DataFragment *fragment = (DataFragment*)lfirst(frag_cell);
-		ListCell *loc_cell = NULL;
-
-		if (fragment->source_name)
-			pfree(fragment->source_name);
-
-		foreach(loc_cell, fragment->locations)
-		{
-			FragmentLocation* location = (FragmentLocation*)lfirst(loc_cell);
-
-			if (location->ip)
-				pfree(location->ip); 
-			pfree(location);
-		}
-		list_free(fragment->locations);
-
-		if (fragment->user_data)
-			pfree(fragment->user_data);
-		pfree(fragment);
+		free_fragment(fragment);
 	}
 	list_free(fragments);
 	return NIL;

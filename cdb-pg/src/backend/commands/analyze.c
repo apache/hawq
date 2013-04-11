@@ -771,6 +771,7 @@ static void analyzeRelation(Relation relation, List *lAttributeNames)
 	List	*indexOidList = NIL;
 	ListCell	*lc = NULL;
 	StringInfoData location;
+	StringInfoData err_msg;
 	
 	initStringInfo(&location);
 	relationOid		= RelationGetRelid(relation);
@@ -783,9 +784,18 @@ static void analyzeRelation(Relation relation, List *lAttributeNames)
 	}
 	else
 	{
-		gp_statistics_estimate_reltuples_relpages_external_gpxf(relation, &location, &estimatedRelTuples, &estimatedRelPages);
-		pfree(location.data);
+		initStringInfo(&err_msg);
+		gp_statistics_estimate_reltuples_relpages_external_gpxf(relation, &location, &estimatedRelTuples, &estimatedRelPages, &err_msg);
+		if (err_msg.len > 0)
+		{
+			ereport(WARNING,
+					(errmsg("skipping \"%s\" --- error returned: %s",
+							RelationGetRelationName(relation),
+							err_msg.data)));
+		}
+		pfree(err_msg.data);
 	}
+	pfree(location.data);
 	
 	elog(elevel, "ANALYZE estimated reltuples=%f, relpages=%f for table %s", estimatedRelTuples, estimatedRelPages, RelationGetRelationName(relation));
 	
@@ -2633,18 +2643,24 @@ static void gp_statistics_estimate_reltuples_relpages_ao_rows(Relation rel, floa
  *		Fetch reltuples and relpages for an external table which is GPXF
  * --------------------------------
  */
-void gp_statistics_estimate_reltuples_relpages_external_gpxf(Relation rel, StringInfo location, float4 *reltuples, float4 *relpages)
+void gp_statistics_estimate_reltuples_relpages_external_gpxf(Relation rel, StringInfo location,
+															 float4 *reltuples, float4 *relpages,
+															 StringInfo err_msg)
 {
-	GpxfStatsElem *elem = get_gpxf_statistics(location->data, rel);
+
+	GpxfStatsElem *elem = NULL;
+	elem = get_gpxf_statistics(location->data, rel, err_msg);
+
 	/*
-	 * if get_gpxf_statistics returned NULL - probably a communication error, we fallback to default values
+	 * if get_gpxf_statistics returned NULL - probably a communication error, we fall back to former values
+	 * for the relation (can be default if no analyze was run successfully before)
 	 * we don't want to stop the analyze, since this can be part of a long procedure performed on many tables
 	 * not just this one
 	 */
 	if (!elem)
 	{
-		*relpages =  gp_external_table_default_number_of_pages;
-		*reltuples =  gp_external_table_default_number_of_tuples;
+		*relpages = rel->rd_rel->relpages;
+		*reltuples = rel->rd_rel->reltuples;
 		return;
 	}
 	

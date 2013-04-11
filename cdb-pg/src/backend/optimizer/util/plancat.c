@@ -400,7 +400,7 @@ cdb_estimate_rel_size(RelOptInfo   *relOptInfo,
 		 */
 
 		float4 tuples, pages;
-		gp_statistics_estimate_reltuples_relpages_external_gpxf(rel, &location, &tuples, &pages);
+		gp_statistics_estimate_reltuples_relpages_external_gpxf(rel, &location, &tuples, &pages, NULL);
 		
 		relpages = curpages = pages;
 		reltuples = tuples;
