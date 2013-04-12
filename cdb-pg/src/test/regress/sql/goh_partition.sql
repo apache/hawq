@@ -997,3 +997,10 @@ create table j (i int) partition by range(i) (partition a start(1) end(10),
 default partition default_part);
 alter table j split partition for(1) at (5) into (partition f1a, partition f1b);
 drop table j;
+
+-- GPSQL-285
+create table pt_table (a int, b int, c int, d int) distributed by (a) partition by range(b) (default partition others, start(1) end(5) every(1));
+insert into pt_table_1_prt_2 values(1,1,2,2);
+select * from pt_table;
+
+drop table pt_table;

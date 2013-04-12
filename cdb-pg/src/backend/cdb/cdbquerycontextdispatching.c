@@ -1439,6 +1439,25 @@ prepareDispatchedCatalogFunctionExpr(QueryContextInfo *cxt, Expr *expr, HTAB *ht
     }
 }
 
+static int32
+findSegnofromMap(Oid relid, List *segnoMaps)
+{
+	ListCell *relid_to_segno;
+	int32 mysegno = InvalidFileSegNumber;
+
+	foreach(relid_to_segno, segnoMaps)
+	{
+		SegfileMapNode *n = (SegfileMapNode *) lfirst(relid_to_segno);
+
+		if (n->relid == relid)
+		{
+			Assert(n->segno != InvalidFileSegNumber);
+			mysegno = n->segno;
+			break;
+		}
+	}
+	return mysegno;
+}
 
 /*
  * parse Relation and collect metadata used for QE add them to in-memory heap
@@ -1460,21 +1479,7 @@ prepareDispatchedCatalogRelation(QueryContextInfo *cxt, Oid relid,
             Oid myrelid = lfirst_oid(child);
             if (forInsert)
             {
-                ListCell *relid_to_segno;
-                int32 mysegno = InvalidFileSegNumber;
-
-                foreach(relid_to_segno, segnoMaps)
-                {
-                    SegfileMapNode *n =
-                            (SegfileMapNode *) lfirst(relid_to_segno);
-
-                    if (n->relid == myrelid)
-                    {
-                        Assert(n->segno != InvalidFileSegNumber);
-                        mysegno = n->segno;
-                        break;
-                    }
-                }
+				int32 mysegno = findSegnofromMap(relid, segnoMaps);
                 Assert(mysegno != InvalidFileSegNumber);
                 prepareDispatchedCatalogSingleRelation(cxt, myrelid, TRUE,
                         mysegno, htab);
@@ -1492,12 +1497,7 @@ prepareDispatchedCatalogRelation(QueryContextInfo *cxt, Oid relid,
     {
         if (forInsert && NULL != segnoMaps)
         {
-            int32 mysegno = InvalidFileSegNumber;
-            SegfileMapNode *n = (SegfileMapNode *) linitial(segnoMaps);
-
-            Assert(relid == n->relid);
-
-            mysegno = n->segno;
+            int32 mysegno = findSegnofromMap(relid, segnoMaps);
 
             Assert(mysegno != InvalidFileSegNumber);
             prepareDispatchedCatalogSingleRelation(cxt, relid, TRUE, mysegno,

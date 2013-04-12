@@ -1770,3 +1770,18 @@ NOTICE:  dropped partition "a" for relation "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_f1a" for table "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_f1b" for table "j"
 drop table j;
+-- GPSQL-285
+create table pt_table (a int, b int, c int, d int) distributed by (a) partition by range(b) (default partition others, start(1) end(5) every(1));
+NOTICE:  CREATE TABLE will create partition "pt_table_1_prt_others" for table "pt_table"
+NOTICE:  CREATE TABLE will create partition "pt_table_1_prt_2" for table "pt_table"
+NOTICE:  CREATE TABLE will create partition "pt_table_1_prt_3" for table "pt_table"
+NOTICE:  CREATE TABLE will create partition "pt_table_1_prt_4" for table "pt_table"
+NOTICE:  CREATE TABLE will create partition "pt_table_1_prt_5" for table "pt_table"
+insert into pt_table_1_prt_2 values(1,1,2,2);
+select * from pt_table;
+ a | b | c | d 
+---+---+---+---
+ 1 | 1 | 2 | 2
+(1 row)
+
+drop table pt_table;
