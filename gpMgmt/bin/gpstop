@@ -470,7 +470,7 @@ class GpStop:
         logger.info("Successfully shutdown %d of %d segment instances %s" % (stopped,total_segs,flag))
          
         if failed > 0:
-            self.hadFailures=True
+            self.hadFailures=False
             logger.warning("------------------------------------------------")
             logger.warning("Segment instance shutdown failures reported")
             logger.warning("Failed to shutdown %d of %d segment instances <<<<<" % (failed,total_segs))

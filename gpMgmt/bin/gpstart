@@ -755,9 +755,9 @@ class GpStart:
         if len(failedToStart) > 0:
             logger.warning("Number of segments which failed to start:  %d", len(failedToStart))
 
-        if standby_failure or len(failedToStart) > 0:
+        if standby_failure:
             return False
-        
+
         if len(invalidSegments) > 0:
             logger.warning("Number of segments not attempted to start: %d", len(invalidSegments))
             
@@ -766,6 +766,9 @@ class GpStart:
         else:
             logger.info("Database successfully started")
 
+        if len(failedToStart) > 0:
+            logger.warning("Some segments failed please try to recovery failed segment with gprecoverseg utility")
+        
         # set the era we used when starting the segments
         e = GpEraFile(self.master_datadir, logger=get_logger_if_verbose())
         e.set_era(self.era)
