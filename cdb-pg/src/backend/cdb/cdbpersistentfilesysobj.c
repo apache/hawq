@@ -7235,7 +7235,8 @@ static void PersistentFileSysObj_StartupIntegrityCheckPrintDbDirs(void)
 									&persistentSerialNum))
 	{
 		elog(PersistentRecovery_DebugPrintLevel(),
-			 "STARTUP INTEGRITY: Database database %u/%u in state '%s'",
+			 "STARTUP INTEGRITY: Database content %d database %u/%u in state '%s'",
+			 contentid,
 			 dbDirNode.tablespace,
 			 dbDirNode.database,
 			 PersistentFileSysObjState_Name(state));

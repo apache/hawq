@@ -276,7 +276,7 @@ void TransactionCreateDatabaseDir(Oid dbid, Oid tsp)
 	Assert(Gp_role != GP_ROLE_EXECUTE);
 
 	int i;
-	for (i = 0; i < GetTotalSegmentsNumber(); ++i)
+	for (i = 0; i <= GetTotalSegmentsNumber(); ++i)
 	{
 		MirroredFileSysObj_JustInTimeDbDirCreate(i - 1, &justInTimeDbDirNode);
 	}

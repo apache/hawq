@@ -57,9 +57,15 @@ obj_get_path(xl_mm_fs_obj *xlrec)
 {
 	char *path = NULL;
 
-	if (xlrec->u.dbid.master == GpIdentity.dbid)
+	/*
+ 	 * In HAWQ, dbid.master and dbid.mirror is always the master and standby.
+ 	 * Use the contentid to get the correct path for segment.
+ 	 */
+	if (xlrec->contentid == MASTER_CONTENT_ID &&
+		xlrec->u.dbid.master == GpIdentity.dbid)
 		path = xlrec->master_path;
-	else if (xlrec->u.dbid.mirror == GpIdentity.dbid)
+	else if (xlrec->contentid == MASTER_CONTENT_ID &&
+		xlrec->u.dbid.mirror == GpIdentity.dbid)
 		path = xlrec->mirror_path;
 	else
 	{
@@ -327,7 +333,18 @@ mmxlog_redo(XLogRecPtr beginLoc, XLogRecPtr lsn, XLogRecord *record)
 				 xlrec->mirror_path);
 		}
 
-		int fd = PathNameOpenFile(path, O_CREAT | O_EXCL | PG_BINARY, 0600);
+		/* Local file and hdfs file need different flags for open(). */
+		int fd = -1;
+
+		if (xlrec->contentid == MASTER_CONTENT_ID)
+			fd = PathNameOpenFile(path, O_CREAT | O_EXCL | PG_BINARY, 0600);
+		else
+		{
+			if (HdfsPathExist(path))
+				errno = EEXIST;
+			else
+				fd = PathNameOpenFile(path, O_CREAT | O_WRONLY, 0600);
+		}
 
 		if (fd < 0)
 		{
