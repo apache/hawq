@@ -4895,7 +4895,7 @@ get_part(EState *estate, Datum *values, bool *isnull, TupleDesc tupdesc)
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_NO_PARTITION_FOR_PARTITIONING_KEY),
-				 errmsg("the data does not belong to partition's table: %s",
+				 errmsg("the data does not belong to partition: %s",
 						 RelationGetRelationName(estate->es_result_relations->ri_RelationDesc)),
 				 errOmitLocation(true)));
 	}

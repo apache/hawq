@@ -1810,7 +1810,7 @@ select * from pt_table_1_prt_2 order by d;
 (2 rows)
 
 insert into pt_table_1_prt_others values(1,1,1,1);
-ERROR:  the data does not belong to partition's table: pt_table_1_prt_others  (seg2 Zhanweis-MacBook-Pro.local:40002 pid=57274)
+ERROR:  the data does not belong to partition: pt_table_1_prt_others  (seg2 Zhanweis-MacBook-Pro.local:40002 pid=57274)
 select * from pt_table order by b,d;
  a | b | c | d 
 ---+---+---+---
