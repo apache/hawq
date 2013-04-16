@@ -4884,22 +4884,6 @@ get_part(EState *estate, Datum *values, bool *isnull, TupleDesc tupdesc)
 				 errmsg("no partition for partitioning key"),
 				 errOmitLocation(true)));
 
-	Assert(estate->es_result_partitions && estate->es_result_partitions->part);
-	Assert(estate->es_result_relations && estate->es_result_relations->ri_RelationDesc);
-	Oid parent = estate->es_result_partitions->part->parrelid;
-	Oid result = RelationGetRelid(estate->es_result_relations->ri_RelationDesc);
-	/*
-	 * We insert into a partition's child table.
-	 */
-	if (parent != result && targetid != result)
-	{
-		ereport(ERROR,
-				(errcode(ERRCODE_NO_PARTITION_FOR_PARTITIONING_KEY),
-				 errmsg("the data does not belong to partition's table: %s",
-						 RelationGetRelationName(estate->es_result_relations->ri_RelationDesc)),
-				 errOmitLocation(true)));
-	}
-
 	if (estate->es_partition_state->result_partition_hash == NULL)
 	{
 		HASHCTL ctl;
