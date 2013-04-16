@@ -998,9 +998,18 @@ default partition default_part);
 alter table j split partition for(1) at (5) into (partition f1a, partition f1b);
 drop table j;
 
--- GPSQL-285
+-- GPSQL-285 -- GPSQL-277
 create table pt_table (a int, b int, c int, d int) distributed by (a) partition by range(b) (default partition others, start(1) end(5) every(1));
+select partitionname, partitiontablename from pg_partitions where tablename='pt_table' order by partitionname;
+insert into pt_table values(1,1,1,1);
+insert into pt_table values(1,2,1,1);
+select * from pt_table_1_prt_2;
+select * from pt_table_1_prt_3;
 insert into pt_table_1_prt_2 values(1,1,2,2);
-select * from pt_table;
+select * from pt_table_1_prt_2 order by d;
+insert into pt_table_1_prt_others values(1,1,1,1);
+select * from pt_table order by b,d;
+select * from pt_table_1_prt_2 order by b,d;
+select * from pt_table_1_prt_others order by b,d;
 
 drop table pt_table;

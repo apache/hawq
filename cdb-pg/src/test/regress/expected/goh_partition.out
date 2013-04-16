@@ -1770,18 +1770,65 @@ NOTICE:  dropped partition "a" for relation "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_f1a" for table "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_f1b" for table "j"
 drop table j;
--- GPSQL-285
+-- GPSQL-285 -- GPSQL-277
 create table pt_table (a int, b int, c int, d int) distributed by (a) partition by range(b) (default partition others, start(1) end(5) every(1));
 NOTICE:  CREATE TABLE will create partition "pt_table_1_prt_others" for table "pt_table"
 NOTICE:  CREATE TABLE will create partition "pt_table_1_prt_2" for table "pt_table"
 NOTICE:  CREATE TABLE will create partition "pt_table_1_prt_3" for table "pt_table"
 NOTICE:  CREATE TABLE will create partition "pt_table_1_prt_4" for table "pt_table"
 NOTICE:  CREATE TABLE will create partition "pt_table_1_prt_5" for table "pt_table"
-insert into pt_table_1_prt_2 values(1,1,2,2);
-select * from pt_table;
+select partitionname, partitiontablename from pg_partitions where tablename='pt_table' order by partitionname;
+ partitionname |  partitiontablename   
+---------------+-----------------------
+               | pt_table_1_prt_5
+               | pt_table_1_prt_2
+               | pt_table_1_prt_3
+               | pt_table_1_prt_4
+ others        | pt_table_1_prt_others
+(5 rows)
+
+insert into pt_table values(1,1,1,1);
+insert into pt_table values(1,2,1,1);
+select * from pt_table_1_prt_2;
  a | b | c | d 
 ---+---+---+---
- 1 | 1 | 2 | 2
+ 1 | 1 | 1 | 1
 (1 row)
+
+select * from pt_table_1_prt_3;
+ a | b | c | d 
+---+---+---+---
+ 1 | 2 | 1 | 1
+(1 row)
+
+insert into pt_table_1_prt_2 values(1,1,2,2);
+select * from pt_table_1_prt_2 order by d;
+ a | b | c | d 
+---+---+---+---
+ 1 | 1 | 1 | 1
+ 1 | 1 | 2 | 2
+(2 rows)
+
+insert into pt_table_1_prt_others values(1,1,1,1);
+ERROR:  the data does not belong to partition's table: pt_table_1_prt_others  (seg2 Zhanweis-MacBook-Pro.local:40002 pid=57274)
+select * from pt_table order by b,d;
+ a | b | c | d 
+---+---+---+---
+ 1 | 1 | 1 | 1
+ 1 | 1 | 2 | 2
+ 1 | 2 | 1 | 1
+(3 rows)
+
+select * from pt_table_1_prt_2 order by b,d;
+ a | b | c | d 
+---+---+---+---
+ 1 | 1 | 1 | 1
+ 1 | 1 | 2 | 2
+(2 rows)
+
+select * from pt_table_1_prt_others order by b,d;
+ a | b | c | d 
+---+---+---+---
+(0 rows)
 
 drop table pt_table;
