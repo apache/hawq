@@ -1,8 +1,6 @@
 package com.emc.greenplum.gpdb.hdfsconnector;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -96,6 +94,7 @@ public class HdfsAnalyzer extends BaseAnalyzer
 		IHdfsFileAccessor accessor = GPHdfsBridge.getFileAccessor(hdfsConf);		
 		if (accessor.Open());
 		{
+			tuples = 0;
 			while (accessor.LoadNextObject() != null)
 				tuples++;
 
@@ -108,7 +107,7 @@ public class HdfsAnalyzer extends BaseAnalyzer
 	private InputSplit[] getSplits(Path path) throws IOException 
 	{
 		GPFusionInputFormat fformat = new GPFusionInputFormat();
-		fformat.setInputPaths(jobConf, path);
+		GPFusionInputFormat.setInputPaths(jobConf, path);
 		return fformat.getSplits(jobConf, 1);
 	}
 	

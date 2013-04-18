@@ -9,7 +9,7 @@ import java.net.URI;
 import org.apache.hadoop.io.Writable;
 
 /*
- * Utilites class exposes helper method for GPFUSION classes
+ * Utilites class exposes helper method for GPXF classes
  */
 public class Utilities
 {
@@ -53,7 +53,7 @@ public class Utilities
 			throw new ClassNotFoundException("Class " + className + " could not be found on the CLASSPATH. " + e.getMessage());
 		}
 		catch (InvocationTargetException e)
-		{
+		{ 
 			/*
 			 * We are creating resolvers, accessors and fragmenters using the reflection framework. If for example, a resolver, during its
 			 * instantiation - in the c'tor, will throw an exception, the Resolver's exception will reach the Reflection
@@ -62,8 +62,8 @@ public class Utilities
 			 * wrapper InvocationTargetException so that our initial Exception text will be displayed
 			 * in psql instead of the message: "Internal Server Error"
 			 */
-			if (e.getTargetException() != null)
-				throw (Exception)(e.getTargetException()); /* getTargetException() returns a Throwable */
+			if (e.getCause() != null)
+				throw new Exception(e.getCause()); /* getCause() returns a Throwable */
 			throw e;
 		}
 	}

@@ -159,6 +159,8 @@ public class BridgeOutputBuilder
 	void fillGPDBWritable(List<OneField> recFields) throws BadRecordException
 	{
 		int size = recFields.size();
+		if (size == 0) /* size 0 means the resolver couldn't deserialize any of the record fields*/
+			throw new BadRecordException();
 
 		for (int i = 0; i < size; i++)
 			fillOneGPDBWritableField(recFields.get(i), i);

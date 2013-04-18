@@ -1,7 +1,5 @@
 package com.emc.greenplum.gpdb.hdfsconnector;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map.Entry;
 import java.util.NavigableMap;
 
@@ -30,9 +28,8 @@ public class HBaseDataFragmenter extends BaseDataFragmenter
 		Log = LogFactory.getLog(HBaseDataFragmenter.class);
 	}
 
-	public String GetFragments(String datapath) throws Exception
+	public void GetFragmentInfos(String datapath) throws Exception
 	{
-		List<FragmentInfo> fragmentInfos = new ArrayList<FragmentInfo>();
 
 		//get a handle on the table by passing a table name
 		HTable t = new HTable(HBaseConfiguration.create(), datapath);
@@ -54,9 +51,8 @@ public class HBaseDataFragmenter extends BaseDataFragmenter
 		//free table resources
 		t.close();
 		
-		//print the fragment list to log when in debug level
+		//print the raw fragment list to log when in debug level
 		Log.debug(FragmentInfo.listToString(fragmentInfos, datapath));
 
-		return FragmentInfo.listToJSON(fragmentInfos);
 	}
 }

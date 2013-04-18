@@ -1,14 +1,10 @@
 package com.emc.greenplum.gpdb.hdfsconnector;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
@@ -25,7 +21,6 @@ import org.apache.hadoop.mapred.JobConf;
 public class HdfsDataFragmenter extends BaseDataFragmenter
 {	
 	private	JobConf jobConf;
-	private List<FragmentInfo> fragmentInfos;
 	private Log Log;
 	
 	/*
@@ -37,7 +32,6 @@ public class HdfsDataFragmenter extends BaseDataFragmenter
 		Log = LogFactory.getLog(HdfsDataFragmenter.class);
 
 		jobConf = new JobConf(new Configuration(), HdfsDataFragmenter.class);
-		fragmentInfos = new ArrayList<FragmentInfo>();
 	}
 	
 	/*
@@ -45,7 +39,7 @@ public class HdfsDataFragmenter extends BaseDataFragmenter
 	 * name, a directory name  or a wildcard returns the data 
 	 * fragments in json format
 	 */	
-	public String GetFragments(String datapath) throws Exception
+	public void GetFragmentInfos(String datapath) throws Exception
 	{
 		Path	path = new Path("/" + datapath); //yikes! any better way?		
 
@@ -54,24 +48,30 @@ public class HdfsDataFragmenter extends BaseDataFragmenter
 		for (InputSplit split : splits)
 		{	
 			FileSplit fsp = (FileSplit)split;
+			/*
+			 * HD-2547: If the file is empty, an empty split is returned:
+			 * no locations and no length.
+			 */
+			if (fsp.getLength() <= 0)
+				continue;
+			
 			String filepath = fsp.getPath().toUri().getPath();
 			filepath = filepath.substring(1); // hack - remove the '/' from the beginning - we'll deal with this next 
 			FragmentInfo fi = new FragmentInfo(filepath,
-											   fsp.getLocations());
-			
+					fsp.getLocations());
+
 			fragmentInfos.add(fi);
 		}
 		
-		//print the fragment list to log when in debug level
+		//print the raw fragment list to log when in debug level
 		Log.debug(FragmentInfo.listToString(fragmentInfos, path.toString()));
-
-		return FragmentInfo.listToJSON(fragmentInfos);
+		
 	}
 	
 	private InputSplit[] getSplits(Path path) throws IOException 
 	{
 		GPFusionInputFormat fformat = new GPFusionInputFormat();
-		fformat.setInputPaths(jobConf, path);
+		GPFusionInputFormat.setInputPaths(jobConf, path);
 		return fformat.getSplits(jobConf, 1);
 	}
 	

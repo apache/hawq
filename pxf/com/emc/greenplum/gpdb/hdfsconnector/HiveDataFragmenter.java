@@ -2,31 +2,23 @@ package com.emc.greenplum.gpdb.hdfsconnector;
 
 import java.lang.IllegalArgumentException;
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.FileNotFoundException;
-import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
-import java.util.Map.Entry;
 import java.util.Map;
 import java.util.Properties;
 
 import org.apache.hadoop.hive.service.HiveClient;
-import org.apache.hadoop.hive.metastore.api.Schema;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.transport.TSocket;
 import org.apache.thrift.transport.TTransportException;
-import org.apache.thrift.TException;
 
 import org.apache.hadoop.hive.common.JavaUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
-import org.apache.hadoop.hive.metastore.api.MetaException; 
-import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
+import org.apache.hadoop.hive.metastore.TableType;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -53,7 +45,6 @@ public class HiveDataFragmenter extends BaseDataFragmenter
 	private	JobConf jobConf;
 	HiveClient client;
 	private Log Log;
-	private List<FragmentInfo> fragmentInfos;
 	
 	public static final String HIVE_USER_DATA_DELIM = "hive_usr_delim";
 	public static final String HIVE_ONE_PARTITION_DELIM = "hive_one_partition_delim";
@@ -112,7 +103,6 @@ public class HiveDataFragmenter extends BaseDataFragmenter
 		Log = LogFactory.getLog(HiveDataFragmenter.class);
 
 		jobConf = new JobConf(new Configuration(), HiveDataFragmenter.class);
-		fragmentInfos = new ArrayList<FragmentInfo>();
 		client = InitHiveClient();
 	}
 	
@@ -121,16 +111,16 @@ public class HiveDataFragmenter extends BaseDataFragmenter
 	 * name, a directory name  or a wildcard returns the data 
 	 * fragments in json format
 	 */	
-	public String GetFragments(String qualifiedTableName) throws Exception
+	public void GetFragmentInfos(String qualifiedTableName) throws Exception
 	{
 		TblDesc tblDesc = parseTableQualifiedName(qualifiedTableName);
 		if (tblDesc == null) 
 			throw new IllegalArgumentException(qualifiedTableName + " is not a valid Hive table name. Should be either <table_name> or <db_name.table_name>");
 		
 		fetchTableMetaData(tblDesc);		
-		
+
+		//print the raw fragment list to log when in debug level
 		Log.debug(FragmentInfo.listToString(fragmentInfos, qualifiedTableName));		
-		return FragmentInfo.listToJSON(fragmentInfos);
 	}
 	
 	/* Initialize the Hive client */
@@ -178,6 +168,13 @@ public class HiveDataFragmenter extends BaseDataFragmenter
 	private void fetchTableMetaData(TblDesc tblDesc) throws Exception
 	{
 		Table tbl = client.get_table(tblDesc.dbName, tblDesc.tableName);
+		String tblType = tbl.getTableType();
+		
+		Log.debug("Table: " + tblDesc.dbName + "." + tblDesc.tableName + ", type: " + tblType);
+		
+		if (TableType.valueOf(tblType) == TableType.VIRTUAL_VIEW)
+			throw new UnsupportedOperationException("GPXF doesn't support HIVE views"); 
+		
 		List<Partition> partitions = client.get_partitions(tblDesc.dbName, tblDesc.tableName, (short)TODO_REMOVE_THIS_CONST); // guessing the max partitions - will have to further research this
 		StorageDescriptor descTable = tbl.getSd();
 		Properties props;

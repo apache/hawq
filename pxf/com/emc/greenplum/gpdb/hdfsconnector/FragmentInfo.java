@@ -2,11 +2,11 @@ package com.emc.greenplum.gpdb.hdfsconnector;
 
 import java.io.IOException;
 import java.lang.StringBuilder;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.HashMap;
 import java.util.List;
 
-import org.codehaus.jackson.JsonGenerationException;
-import org.codehaus.jackson.map.annotate.JsonView;
-import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
 
 /*
@@ -47,6 +47,41 @@ public class FragmentInfo
 	}
 
 	/*
+	 * convert hosts to their matching IP addresses
+	 */
+	public static void convertHostsToIPs(List<FragmentInfo> fragments) throws UnknownHostException
+	{
+		/* host converted to IP map. Used to limit network calls. */
+		HashMap<String, String> hostToIpMap = new HashMap<String,String>();
+		
+		for (FragmentInfo fragment : fragments)
+		{
+			String[] hosts = fragment.getHosts();
+			if (hosts == null)
+				continue;
+			String[] ips = new String[hosts.length];
+			int index = 0;
+			
+			for (String host : hosts)
+			{
+				String convertedIp = hostToIpMap.get(host);
+				if (convertedIp == null)
+				{
+					/* find host's IP, and add to map */
+					InetAddress addr = InetAddress.getByName(host);
+					convertedIp = addr.getHostAddress();
+					hostToIpMap.put(host, convertedIp);
+				}
+				
+				/* update IPs array */
+				ips[index] = convertedIp;
+				++index;
+			}
+			fragment.hosts = ips;
+		}	
+	}
+	
+	/*
 	 * Given a list of FragmentInfos, serialize it in JSON to be used as
 	 * the result string for GPDB. An example result is as follows:
 	 *
@@ -82,20 +117,24 @@ public class FragmentInfo
 	{
 		StringBuilder result = new StringBuilder();
 		
-		result.append("List of fragments for \"" + datapath + "\" ");
+		result.append("List of fragments for \"" + datapath + "\": ");
+		int i = 0;
 		
 		for (FragmentInfo fi : fragmentInfos)
 		{
-			result.append("Fragment: [");
+			++i;
+			result.append("Fragment #" + i + ": [");
 			result.append("Source: " + fi.sourceName + ", Hosts:");
 			
 			for (String host : fi.hosts)
 				result.append(" " + host);
 			
 			result.append(", User Data: " + fi.userData);
-			result.append("]");
+			result.append("] ");
 		}
-				
+		if (fragmentInfos.isEmpty())
+				result.append("no fragments");
+		
 		return result.toString();
 	}
 	

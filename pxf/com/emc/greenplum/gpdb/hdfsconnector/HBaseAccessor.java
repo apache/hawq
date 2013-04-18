@@ -1,19 +1,21 @@
 package com.emc.greenplum.gpdb.hdfsconnector;
 
 import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.HRegionInfo;
+import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.filter.Filter;
-import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.HConstants;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.NavigableMap;
 
 /*
  * The Bridge API accessor for gphbase protocol.
@@ -120,18 +122,22 @@ class HBaseAccessor implements IHdfsFileAccessor
 	 */
 	private void selectTableSplits() throws IOException
 	{
-		Pair<byte[][], byte[][]> startEndKeys = ((HTable)table).getStartEndKeys();
-		byte[][] startKeys = startEndKeys.getFirst();
-		byte[][] endKeys = startEndKeys.getSecond();
-
-		for (int i = 0; i < conf.dataFragmentsSize(); ++i)
+		NavigableMap<HRegionInfo, ServerName> regions = ((HTable)table).getRegionLocations();
+		int i = 0;
+		
+		ArrayList<Integer> fragments = conf.getDataFragments();
+		
+		for (HRegionInfo region : regions.keySet()) 
 		{
-			int index = conf.getDataFragment(i);
-			byte[] startKey = startKeys[index];
-			byte[] endKey = endKeys[index];
+			if (fragments.contains(new Integer(i))) 
+			{
+				byte[] startKey = region.getStartKey();
+				byte[] endKey = region.getEndKey();
 
-			if (withinScanRange(startKey, endKey))
-				splits.add(new SplitBoundary(startKey, endKey));
+				if (withinScanRange(startKey, endKey))
+					splits.add(new SplitBoundary(startKey, endKey));	
+			}
+			++i;
 		}
 	}
 

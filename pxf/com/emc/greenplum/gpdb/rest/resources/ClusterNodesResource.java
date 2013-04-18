@@ -20,7 +20,7 @@ import org.apache.commons.logging.LogFactory;
 /*
  * Class enhances the API of the HBASE rest server.
  * Example for querying API getClusterNodesInfo from a web client
- * curl http://localhost:8080/gpdb/v2/HadoopCluster/getNodesInfo
+ * curl "http://localhost:50070/gpdb/v2/HadoopCluster/getNodesInfo"
  * /gpdb/ is made part of the path when this package is registered in the jetty servlet
  * in Main.java in the hbase package - hbase-x.xx.x-sc.jar
  */
@@ -43,14 +43,14 @@ public class ClusterNodesResource
 		{
 			/*
 			 * Function queries the Hadoop namenode with the getDataNodeStats API
-			 * It gets the hostname and REST port of every HDFS data node in the 
+			 * It gets the host's IP and REST port of every HDFS data node in the 
 			 * cluster. Then, it packs the results in JSON format and writes to the
 			 * HTTP response stream.
 			 * Response Examples:
-			 * a. When there are no datanodes - getDataNodeStats returns an emty array
+			 * a. When there are no datanodes - getDataNodeStats returns an empty array
 			 *    {"regions":[]}
 			 * b. When there are datanodes 
-			 *    {"regions":[{"host":"host_name1","port":50075},{"host":"host_name2","port":50075}]}
+			 *    {"regions":[{"host":"1.2.3.1","port":50075},{"host":"1.2.3.2","port":50075}]}
 			 */
 			@Override
 			public void write(final OutputStream out ) throws IOException
@@ -67,18 +67,27 @@ public class ClusterNodesResource
 					/* 2. Query the namenode for the datanodes info */
 					nodes = dfs.getDataNodeStats();
 					
-					/* 3. Pack the datanodes info in a JASON text format and write it 
+					/* 3. Pack the datanodes info in a JSON text format and write it 
 					 *    to the HTTP output stream.
 					 */
-					dos = new DataOutputStream(out);
-					dos.writeBytes("{\"regions\":[");
+					String jsonOutput = "{\"regions\":[";
+					
 					for (int i = 0; i < nodes.length; i++)
 					{
-						writeNode(dos, nodes[i]); // write one node to the HTTP stream 
+						verifyNode(nodes[i]);
+						jsonOutput += writeNode(nodes[i]); // write one node to the HTTP stream 
 						if (i < (nodes.length - 1))
-							dos.writeBytes(","); // Separate the nodes in the JASON array with ','
+							jsonOutput += ","; // Separate the nodes in the JSON array with ','
 					}
-					dos.writeBytes("]}");
+					jsonOutput += "]}";
+					Log.debug("getNodesCluster output: " + jsonOutput);
+					dos = new DataOutputStream(out);
+					dos.writeBytes(jsonOutput);
+				}
+				catch (NodeDataException e)
+				{
+					Log.error("Nodes verification failed", e);
+					throw e;
 				}
 				catch (org.mortbay.jetty.EofException e)
 				{
@@ -96,13 +105,34 @@ public class ClusterNodesResource
 		return Response.ok( streaming, MediaType.APPLICATION_OCTET_STREAM ).build();
 	}
 
-	void writeNode(DataOutputStream d, DatanodeInfo node) throws java.io.IOException
+	private class NodeDataException extends java.io.IOException {
+
+		public NodeDataException(String paramString)
+		{
+			super(paramString);
+		} 
+	}
+	
+	private void verifyNode(DatanodeInfo node) throws NodeDataException
 	{
-		d.writeBytes("{\"host\":\"");
-		d.writeBytes(node.getHostName());
-		d.writeBytes("\",\"port\":");
-		String port = Integer.toString(node.getInfoPort());
-		d.writeBytes(port);
-		d.writeBytes("}");		
+		int port = node.getInfoPort();
+		String ip = node.getIpAddr();
+		
+		if ((ip == null) || (ip.length() == 0))
+		{
+			throw new NodeDataException("Invalid IP: " + ip + " (Node " + node.toString() + ")");
+		}
+		
+		if (port <= 0)
+		{
+			throw new NodeDataException("Invalid port: " + port + " (Node " + node.toString() + ")");
+		}
+	}
+	
+	String writeNode(DatanodeInfo node) throws java.io.IOException
+	{
+		String output = "{\"host\":\"" + node.getIpAddr() +
+				"\",\"port\":" + Integer.toString(node.getInfoPort()) + "}";
+		return output;
 	}
 }
