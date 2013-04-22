@@ -1,0 +1,137 @@
+--
+-- GPXF HBASE regression suite 
+--
+-- Prerequisites:
+--
+--   Must have a running hdfs with REST service on port 50070
+--   Must have a running ZooKeeper service
+--   Must have a running HBase service
+--   Must have HADOOP_ROOT, HBASE_ROOT, HIVE_ROOT and ZOOKEEPER_ROOT set.
+--
+-- TODO: test gpdbwritable write/read when it is enabled.
+-- TODO: test PB, AVRO, THRIFT when it is enabled (read only, with pre formatted files).
+-- TODO: test protocol validator for gpxf once written.
+-- TODO: test parameter passing, filter passing
+
+--------------------------------------------------------------------------------
+-- HBASE
+--------------------------------------------------------------------------------
+--
+-- syntax validations
+--
+CREATE READABLE EXTERNAL TABLE gphbase_in(a int, b text, c bytea)
+LOCATION ('gpxf://@hostname@:50070/hbasetable')
+FORMAT 'CUSTOM' (formatter='gpxfwritable_import'); -- negative
+
+CREATE WRITABLE EXTERNAL TABLE gphbase_out(a int, b text, c bytea)
+LOCATION ('gpxf://@hostname@:50070/hbasetable?FRAGMENTER=HBaseDataFragmenter')
+FORMAT 'CUSTOM' (formatter='gpdbwritable_export');
+
+-- Setup
+\! javac -cp `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar` @abs_srcdir@/helpers/HBaseCreateTables.java @abs_srcdir@/helpers/HBaseDropTables.java @abs_srcdir@/helpers/HBaseChangeLookupTable.java
+\! java -cp  `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar`:`echo ${HADOOP_ROOT}/lib/commons-logging-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-configuration-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-lang-[1-9]*.jar`:@abs_srcdir@/helpers HBaseCreateTables
+
+set gpxf_enable_filter_pushdown = on;
+-- Test
+CREATE EXTERNAL TABLE gphbase_select(recordkey TEXT, 
+                                     "cf1:q1" VARCHAR, 
+                                     "cf1:q2" TEXT, 
+                                     "cf1:q3" INT, 
+                                     q4 BYTEA, 
+                                     "cf1:q5" REAL, 
+                                     "cf1:q6" FLOAT, 
+                                     "cf1:q7" CHAR, 
+                                     "cf1:q8" SMALLINT, 
+                                     "cf1:q9" BIGINT) 
+LOCATION ('gpxf://@hostname@:50070/gphbase_test?FRAGMENTER=HBaseDataFragmenter')
+FORMAT 'CUSTOM' (formatter='gpxfwritable_import');
+
+-- Test analyze for HBase table.
+ANALYZE gphbase_select;
+select relpages, reltuples from pg_class where relname = 'gphbase_select';
+
+SELECT * FROM gphbase_select ORDER BY recordkey ASC;
+SELECT cnt < 300 AS check FROM (SELECT COUNT(*) AS cnt FROM gphbase_select WHERE gp_segment_id = 0) AS a;
+SELECT * FROM gphbase_select WHERE recordkey > 'row00000090' AND recordkey <= 'row00000103' ORDER BY recordkey ASC;
+SELECT * FROM gphbase_select WHERE recordkey = 'row00000100';
+SELECT * FROM gphbase_select WHERE recordkey != 'row00000090' AND recordkey <= 'row00000103' ORDER BY recordkey ASC;
+SELECT * FROM gphbase_select WHERE recordkey != 'row00000090' AND recordkey <= 'row00000095' AND "cf1:q7" > 'o' ORDER BY recordkey ASC;
+SELECT * FROM gphbase_select WHERE "cf1:q1" > 'ASCII00000090' AND q4 <= 'lookup00000198' ORDER BY recordkey ASC;
+SELECT * FROM gphbase_select WHERE "cf1:q2" > 'UTF8_計算機用語_00000090' AND "cf1:q3" <= 990000 ORDER BY recordkey ASC;
+SELECT * FROM gphbase_select WHERE "cf1:q5" > 91.92 AND "cf1:q6" <= 99999999.99 ORDER BY recordkey ASC;
+SELECT * FROM gphbase_select WHERE "cf1:q8" > 97 AND "cf1:q9" <= 9702990000000099 ORDER BY recordkey ASC;
+SELECT * FROM gphbase_select WHeRE "cf1:q9" < -7000000000000000 ORDER BY recordkey ASC;
+SELECT * FROM gphbase_select WHERE recordkey > 'row00000090' AND recordkey <= 'row00000103' OR recordkey = 'row00000105' ORDER BY recordkey ASC;
+SELECT * FROM gphbase_select WHERE recordkey != 'row00000099' AND "cf1:q8" > 97 AND "cf1:q9" <= 9702990000000099 ORDER BY recordkey ASC;
+SELECT * FROM gphbase_select WHERE "cf1:q9" <= 9702990000000099 AND recordkey != 'row00000099' AND "cf1:q8" > 97 ORDER BY recordkey ASC;
+set gpxf_enable_filter_pushdown = off;
+SELECT * FROM gphbase_select WHERE "cf1:q9" <= 9702990000000099 AND recordkey != 'row00000099' AND "cf1:q8" > 97 ORDER BY recordkey ASC;
+set gpxf_enable_filter_pushdown = on;
+DROP EXTERNAL TABLE gphbase_select;
+-- Test null values
+CREATE EXTERNAL TABLE gphbase_null(recordkey TEXT, 
+                                     "cf1:q1" VARCHAR, 
+                                     "cf1:q2" TEXT, 
+                                     "cf1:q3" INT, 
+                                     q4 BYTEA, 
+                                     "cf1:q5" REAL, 
+                                     "cf1:q6" FLOAT, 
+                                     "cf1:q7" CHAR, 
+                                     "cf1:q8" SMALLINT, 
+                                     "cf1:q9" BIGINT) 
+LOCATION ('gpxf://@hostname@:50070/gphbase_test_null?FRAGMENTER=HBaseDataFragmenter')
+FORMAT 'CUSTOM' (formatter='gpxfwritable_import');
+SELECT * FROM gphbase_null WHERE "cf1:q1" is null ORDER BY recordkey ASC;
+SELECT * FROM gphbase_null WHERE "cf1:q3" is null ORDER BY recordkey ASC;
+DROP EXTERNAL TABLE gphbase_null;
+-- Test upper case key in lookup table
+CREATE EXTERNAL TABLE gphbase_upper(recordkey TEXT, 
+                                     "cf1:q1" VARCHAR, 
+                                     "cf1:q2" TEXT, 
+                                     "cf1:q3" INT, 
+                                     q4 BYTEA, 
+                                     "cf1:q5" REAL, 
+                                     "cf1:q6" FLOAT, 
+                                     "cf1:q7" CHAR, 
+                                     "cf1:q8" SMALLINT, 
+                                     "cf1:q9" BIGINT) 
+LOCATION ('gpxf://@hostname@:50070/gphbase_test_upper?FRAGMENTER=HBaseDataFragmenter')
+FORMAT 'CUSTOM' (formatter='gpxfwritable_import');
+SELECT * FROM gphbase_upper ORDER BY recordkey ASC;
+DROP EXTERNAL TABLE gphbase_upper;
+-- Negative test
+CREATE EXTERNAL TABLE gphbase_error(recordkey int)
+LOCATION ('gpxf://@hostname@:50070/gphbase_test?FRAGMENTER=HBaseDataFragmenter')
+FORMAT 'CUSTOM' (formatter='gpxfwritable_import');
+SELECT * FROM gphbase_error;
+DROP EXTERNAL TABLE gphbase_error;
+-- query without lookup table
+CREATE EXTERNAL TABLE gphbase_lookup(recordkey TEXT, 
+                                     "cf1:q1" VARCHAR, 
+                                     "cf1:q2" TEXT, 
+                                     "cf1:q3" INT, 
+                                     "cf1:q4" BYTEA, 
+                                     "cf1:q5" REAL, 
+                                     "cf1:q6" FLOAT, 
+                                     "cf1:q7" CHAR, 
+                                     "cf1:q8" SMALLINT, 
+                                     "cf1:q9" BIGINT) 
+LOCATION ('gpxf://@hostname@:50070/gphbase_test?FRAGMENTER=HBaseDataFragmenter')
+FORMAT 'CUSTOM' (formatter='gpxfwritable_import');
+-- truncate lookup table
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar`:`echo ${HADOOP_ROOT}/lib/commons-logging-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-configuration-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-lang-[1-9]*.jar`:@abs_srcdir@/helpers HBaseChangeLookupTable truncate-table
+SELECT recordkey, "cf1:q1" FROM gphbase_lookup ORDER BY recordkey LIMIT 5;
+-- disable lookup table
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar`:`echo ${HADOOP_ROOT}/lib/commons-logging-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-configuration-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-lang-[1-9]*.jar`:@abs_srcdir@/helpers HBaseChangeLookupTable disable-table
+SELECT recordkey, "cf1:q1" FROM gphbase_lookup ORDER BY recordkey LIMIT 5;
+-- remove mapping cf from lookup table
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar`:`echo ${HADOOP_ROOT}/lib/commons-logging-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-configuration-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-lang-[1-9]*.jar`:@abs_srcdir@/helpers HBaseChangeLookupTable remove-cf
+SELECT recordkey, "cf1:q1" FROM gphbase_lookup ORDER BY recordkey LIMIT 5;
+-- drop lookup table
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar`:`echo ${HADOOP_ROOT}/lib/commons-logging-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-configuration-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-lang-[1-9]*.jar`:@abs_srcdir@/helpers HBaseChangeLookupTable drop-table
+SELECT recordkey, "cf1:q1" FROM gphbase_lookup ORDER BY recordkey LIMIT 5;
+-- create lookup table
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar`:`echo ${HADOOP_ROOT}/lib/commons-logging-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-configuration-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-lang-[1-9]*.jar`:@abs_srcdir@/helpers HBaseChangeLookupTable create-table
+DROP EXTERNAL TABLE gphbase_lookup;
+-- Cleanup
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar`:`echo ${HADOOP_ROOT}/lib/commons-logging-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-configuration-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-lang-[1-9]*.jar`:@abs_srcdir@/helpers HBaseDropTables

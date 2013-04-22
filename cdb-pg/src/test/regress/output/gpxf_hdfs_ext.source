@@ -1,0 +1,124 @@
+--
+-- GPXF HDFS extended regression suite 
+--
+-- Prerequisites:
+--
+--   Must have a running hdfs with REST service on port 50070
+--   Must have HADOOP_ROOT, HBASE_ROOT, HIVE_ROOT and ZOOKEEPER_ROOT set.
+--
+-- TODO: test gpdbwritable write/read when it is enabled.
+-- TODO: test PB, AVRO, THRIFT when it is enabled (read only, with pre formatted files).
+-- TODO: test protocol validator for gpxf once written.
+-- TODO: test parameter passing, filter passing
+--------------------------------------------------------------------------------
+-- GPHDFS
+--------------------------------------------------------------------------------
+--
+-- Load HDFS with test data
+--
+\! ${HADOOP_ROOT}/bin/hadoop fs -mkdir /gpdb_regression_data
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gpxf/writable_inside_sequence1.tbl /gpdb_regression_data/writable_inside_sequence1.tbl
+\! sh @abs_srcdir@/helpers/create_table_file.sh @abs_srcdir@/data/gpxf/multiblock.tbl
+creating file @abs_srcdir@/data/gpxf/multiblock.tbl
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gpxf/multiblock.tbl /gpdb_regression_data/multiblock.tbl
+--
+-- Test multiblock file
+--
+CREATE EXTERNAL TABLE mbt(t1 text,
+                          a1 integer)
+LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/multiblock.tbl?FRAGMENTER=HdfsDataFragmenter')
+FORMAT 'TEXT' (DELIMITER ',');
+SELECT t1, a1 FROM mbt ORDER BY t1 LIMIT 10;
+ t1 | a1 
+----+----
+ t1 |  1
+ t1 |  1
+ t1 |  1
+ t1 |  1
+ t1 |  1
+ t1 |  1
+ t1 |  1
+ t1 |  1
+ t1 |  1
+ t1 |  1
+(10 rows)
+
+SELECT SUM(a1) from mbt;
+     sum     
+-------------
+ 16400384000
+(1 row)
+
+SELECT COUNT(*) FROM mbt;
+  count   
+----------
+ 32768000
+(1 row)
+
+SELECT cnt < 32768000 AS check FROM (SELECT COUNT(*) AS cnt FROM mbt WHERE gp_segment_id = 0) AS a;
+ check 
+-------
+ t
+(1 row)
+
+DROP EXTERNAL TABLE mbt;
+--
+-- Test extensibility
+--
+CREATE EXTERNAL TABLE extens(tmp1  timestamp, 
+                            num1  integer, 
+                            num2  integer, 
+                            num3  integer, 
+                            num4  integer,
+                            t1    text, 
+                            t2    text, 
+                            t3    text, 
+                            t4    text, 
+                            t5    text, 
+                            t6    text, 
+                            dub1  double precision, 
+                            dub2  double precision, 
+                            dub3  double precision, 
+                            ft1   real, 
+                            ft2   real, 
+                            ft3   real, 
+                            ln1   bigint, 
+                            ln2   bigint, 
+                            ln3   bigint, 
+                            bt    bytea)
+LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/writable_inside_sequence1.tbl?FRAGMENTER=TestHdfsDataFragmenter&ACCESSOR=TestSequenceFileAccessor&RESOLVER=TestWritableResolver&DATA-SCHEMA=CustomWritable&ANALYZER=TestHdfsAnalyzer')
+FORMAT 'custom' (formatter='gpxfwritable_import');
+SELECT num1, t1, t2, t3 FROM extens ORDER BY num1;
+ num1 |               t1                |               t2                |               t3                
+------+---------------------------------+---------------------------------+---------------------------------
+   10 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   20 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   30 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   40 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   50 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   60 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   70 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   80 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   90 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  100 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  110 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  120 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  130 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  140 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  150 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  160 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  170 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  180 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  190 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+(19 rows)
+
+ANALYZE extens;
+DROP EXTERNAL TABLE extens;
+--
+-- Cleanup: delete all data that was copied into hdfs
+--
+-- start_ignore
+\! ${HADOOP_ROOT}/bin/hadoop fs -rm -r /gpdb_regression_data
+Deleted hdfs://0.0.0.0:8020/gpdb_regression_data
+\! rm @abs_srcdir@/data/gpxf/multiblock.tbl
+-- end_ignore
