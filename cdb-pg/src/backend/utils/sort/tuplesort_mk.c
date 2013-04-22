@@ -1669,9 +1669,15 @@ inittapes_mk(Tuplesortstate_mk *state, const char* rwfile_prefix)
 
     if(state->status == TSS_INITIAL)
     {
-    	/* We are now building heap from array for run-building using
-    	 * replacement-selection algorithm. So, restore original order
-    	 * (MPP-19310) */
+    	/*
+    	 * We are now building heap from array for run-building using
+    	 * replacement-selection algorithm. Such run-building heap need
+    	 * to be a MIN-HEAP, but for limit sorting, we use a MAX-HEAP. The way we
+    	 * convert MIN-HEAP to MAX-HEAP is by setting the limitmask to -1, and then
+    	 * using the limitmask in mkheap_compare() in tuplesort_mkheap.c. So, to restore
+    	 * the MAX-HEAP to a MIN-HEAP, we can just revert the limitmask to 0.
+    	 * This is needed for MPP-19310 and MPP-19857
+    	 */
     	state->mkctxt.limitmask = 0;
 
         state->mkheap = mkheap_from_array(state->entries, state->entry_allocsize, state->entry_count, &state->mkctxt);
