@@ -1669,6 +1669,11 @@ inittapes_mk(Tuplesortstate_mk *state, const char* rwfile_prefix)
 
     if(state->status == TSS_INITIAL)
     {
+    	/* We are now building heap from array for run-building using
+    	 * replacement-selection algorithm. So, restore original order
+    	 * (MPP-19310) */
+    	state->mkctxt.limitmask = 0;
+
         state->mkheap = mkheap_from_array(state->entries, state->entry_allocsize, state->entry_count, &state->mkctxt);
         state->entries = NULL;
         state->entry_allocsize = 0;
