@@ -46,6 +46,15 @@ class SpecialFuncs(object):
         memset(p, 0, size);
         return p;
         """
+    
+    @staticmethod
+    def make_body_pnstrdup(func):
+        return """
+        char *out = malloc(len + 1);
+        memcpy(out, in, len);
+        out[len] = '\\0';
+        return out;
+        """
 
 class ByValStructs(object):
 
