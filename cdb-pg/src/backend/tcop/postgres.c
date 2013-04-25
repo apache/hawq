@@ -3521,6 +3521,19 @@ ProcessInterrupts(void)
 			 errSendAlert(false)));
 	}
 
+	if (ClientConnectionLost)
+	{
+		QueryCancelPending = false;		/* lost connection trumps QueryCancel */
+		ImmediateInterruptOK = false;	/* not idle anymore */
+		DisableNotifyInterrupt();
+		DisableCatchupInterrupt();
+		/* don't send to client, we already know the connection to be dead. */
+		whereToSendOutput = DestNone;
+		ereport(FATAL,
+				(errcode(ERRCODE_CONNECTION_FAILURE),
+				 errmsg("connection to client lost")));
+	}
+
 	if (QueryCancelPending)
 	{
 		elog(LOG,"Process interrupt for 'query cancel pending'.");
