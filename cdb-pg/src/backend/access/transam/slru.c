@@ -617,16 +617,29 @@ SlruPhysicalReadPage(SlruCtl ctl, int pageno, int slotno)
 		return true;
 	}
 
-	if ((nbytes = MirroredFlatFile_Read(
-						&mirroredOpen,
-						offset,
-						shared->page_buffer[slotno],
-						BLCKSZ)) != BLCKSZ)
+	nbytes = MirroredFlatFile_Read(
+							&mirroredOpen,
+							offset,
+							shared->page_buffer[slotno],
+							BLCKSZ);
+
+	if (nbytes < 0)
 	{
 		slru_errcause = SLRU_READ_FAILED;
 		slru_errno = errno;
 		MirroredFlatFile_Close(&mirroredOpen);
 		return false;
+	}
+
+	if (nbytes != BLCKSZ)
+	{
+		ereport(LOG,
+				(errmsg("read file \"%s\" failed, expected to read %d bytes, but actually read %d bytes.",
+						path, BLCKSZ, nbytes)));
+		slru_errcause = SLRU_READ_FAILED;
+		slru_errno = 0;
+		MirroredFlatFile_Close(&mirroredOpen);
+		return false ;
 	}
 
 	// UNDONE: We don't have a suppressError for close...
@@ -823,11 +836,23 @@ SlruReportIOError(SlruCtl ctl, int pageno, TransactionId xid)
 						   path, offset)));
 			break;
 		case SLRU_READ_FAILED:
-			ereport(ERROR,
-					(errcode_for_file_access(),
-					 errmsg("could not access status of transaction %u", xid),
-			   errdetail("Could not read from file \"%s\" at offset %u: %m.",
-						 path, offset)));
+			if (0 != errno)
+			{
+				ereport(ERROR,
+						(errcode_for_file_access(),
+						 errmsg("could not access status of transaction %u", xid),
+				   errdetail("Could not read from file \"%s\" at offset %u: %m.",
+							 path, offset)));
+			}
+			else
+			{
+				ereport(ERROR,
+						(errcode_for_file_access(),
+						 errmsg("could not access status of transaction %u", xid),
+				   errdetail("Could not read from file \"%s\" at offset %u: End of file.",
+							 path, offset)));
+			}
+
 			break;
 		case SLRU_WRITE_FAILED:
 			ereport(ERROR,
