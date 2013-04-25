@@ -87,10 +87,10 @@
 
 #define will_return_with_sideeffect(function, value, sideeffect, sideeffect_data) \
     _will_return(#function, __FILE__, __LINE__, \
-                 cast_to_largest_integral_type(value), sideeffect, sideeffect, 1)
+                 cast_to_largest_integral_type(value), sideeffect, sideeffect_data, 1)
 #define will_be_called_with_sideeffect(function, sideeffect, sideeffect_data) \
 	(void) _will_be_called(#function, __FILE__, __LINE__, \
-                 sideeffect, sideeffect, 1)
+                 sideeffect, sideeffect_data, 1)
 /* Add a custom parameter checking function.  If the event parameter is NULL
  * the event structure is allocated internally by this function.  If event
  * parameter is provided it must be allocated on the heap and doesn't need to
