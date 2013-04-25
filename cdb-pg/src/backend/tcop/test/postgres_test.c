@@ -54,6 +54,42 @@ test__IsTransactionExitStmt__IsQuery(void **state)
 	pfree(stmt);
 }
 
+/*
+ * Test ProcessInterrupts when ClientConnectionLost flag is set
+ */
+void
+test__ProcessInterrupts__ClientConnectionLost(void **state)
+{
+
+	/* Mocking errstart -- expect an ereport(FATAL) to be called */
+	expect_value(errstart, elevel, FATAL);
+	expect_any(errstart, filename);
+	expect_any(errstart, lineno);
+	expect_any(errstart, funcname);
+	expect_any(errstart, domain);
+	will_return(errstart, false);
+
+	will_be_called(DisableNotifyInterrupt);
+	will_be_called(DisableCatchupInterrupt);
+
+	/*
+	 * Setting all the flags so that ProcessInterrupts only goes in the if-block
+	 * we're interested to test
+	 */
+	InterruptHoldoffCount = 0;
+	CritSectionCount = 0;
+	ProcDiePending = 0;
+	ClientConnectionLost = 1;
+	whereToSendOutput = DestDebug;
+
+	/* Run function under test */
+	ProcessInterrupts();
+
+	assert_true(whereToSendOutput == DestNone);
+	assert_false(QueryCancelPending);
+	assert_false(ImmediateInterruptOK);
+
+}
 
 int 
 main(int argc, char* argv[]) 
@@ -63,7 +99,8 @@ main(int argc, char* argv[])
 	const UnitTest tests[] = {
 			unit_test(test__IsTransactionExitStmtList__MultipleElementList),
 			unit_test(test__IsTransactionExitStmt__IsTransactionStmt),
-			unit_test(test__IsTransactionExitStmt__IsQuery)
+			unit_test(test__IsTransactionExitStmt__IsQuery),
+			unit_test(test__ProcessInterrupts__ClientConnectionLost)
 	};
 	return run_tests(tests);
 }
