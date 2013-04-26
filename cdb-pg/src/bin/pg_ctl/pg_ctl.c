@@ -577,12 +577,12 @@ test_postmaster_connection(bool do_checkpoint __attribute__((unused)))
 
 			/*
 			 * The postmaster should create postmaster.pid very soon after being
-			 * started.  If it's not there after we've waited 5 or more seconds,
+			 * started.  If it's not there after we've waited 30 or more seconds,
 			 * assume startup failed and give up waiting.  (Note this covers both
 			 * cases where the pidfile was never created, and where it was created
 			 * and then removed during postmaster exit.)
 			 */
-			if (i >= 5) 
+			if (i >= (wait_seconds / 2))
 			{
 				pgpid_t pid = get_pgpid();
 				if (pid == 0)				/* no pid file */
