@@ -765,7 +765,7 @@ assign_session_authorization(const char *value, bool doit, GucSource source)
 		/*
 		 * GPSQL: QEs are run as the bootstrap user.
 		 */
-		if (Gp_role == GP_ROLE_EXECUTE)
+		if (GpIdentity.segindex != MASTER_CONTENT_ID)
 			value = get_rolname(BOOTSTRAP_SUPERUSERID);
 
 		pcqCtx = caql_beginscan(
