@@ -52,6 +52,7 @@ extern void cdblink_setup(void);
  * thrown if Gp_role = utility.
  */
 extern int	getgpsegmentCount(void);
+extern int  getgphostCount(void);
 
 extern void buildMirrorQDDefinition(void);
 

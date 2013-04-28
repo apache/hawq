@@ -35,6 +35,7 @@
 #include "cdb/cdbvars.h"
 #include "cdb/cdbdisp.h"
 #include "cdb/cdbfts.h"
+#include "cdb/cdbutil.h"
 
 
 /*
@@ -110,6 +111,65 @@ getgpsegmentCount(void)
 
 	Assert(GpIdentity.numsegments > 0);
 	return GpIdentity.numsegments;
+}
+
+/*
+ * We discover how many hosts are in a GP cluster by going over the segments sequence
+ * and fetching the host name from the segment struct. There will be several segements
+ * with the same hosts and the function will only take a given host name once.
+ */
+int
+getgphostCount(void)
+{
+	CdbComponentDatabases *db_info = GpAliveSegmentsInfo.cdbComponentDatabases;
+	
+	if (Gp_role == GP_ROLE_UTILITY)
+	{
+		if (GpIdentity.numsegments <= 0)
+		{
+            elog(DEBUG5, "getgphostCount called when Gp_role == utility. returning zero hosts.");
+            return 0;
+	    }
+		
+		elog(DEBUG1, "getgphostCount called when Gp_role == utility, but is relying on gp_id info");
+	}
+	
+	/* Each host name appears once in this list */
+	List *hostsList = NIL;
+	int i, num_hosts;
+	
+	/* Going over each segment in the sequence */
+	for (i = 0; i < db_info->total_segment_dbs; i++)
+	{
+		CdbComponentDatabaseInfo *p = &db_info->segment_db_info[i];
+		char *candidate_host = p->hostip;
+		ListCell *host_cell = NULL;
+		bool already_in = false;
+		
+		if (!SEGMENT_IS_ACTIVE_PRIMARY(p))
+			continue;
+		
+		/* Test candidate host. We insert the candidate into the hostsLists only if it is not already there */
+		foreach(host_cell, hostsList)
+		{
+			char *saved_host = (char*)lfirst(host_cell);
+			if (strcmp(candidate_host, saved_host) == 0)
+			{
+				already_in = true;
+				break;
+			}
+		}
+		
+		if (!already_in)
+			hostsList = lappend(hostsList, candidate_host);
+	}
+	
+	/* the number of hosts is just the length of hostsLists */
+	num_hosts =  list_length(hostsList);
+	list_free(hostsList);
+	
+	Assert(num_hosts > 0);
+	return num_hosts;
 }
 
 /*

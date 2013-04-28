@@ -44,6 +44,7 @@
 #include "utils/uri.h"
 
 #include "cdb/cdbgroup.h"       /* adapt_flow_to_targetlist() */
+#include "cdb/cdblink.h"        /* getgphostCount() */
 #include "cdb/cdbllize.h"       /* pull_up_Flow() */
 #include "cdb/cdbpath.h"        /* cdbpath_rows() */
 #include "cdb/cdbpathtoplan.h"  /* cdbpathtoplan_create_flow() etc. */
@@ -173,7 +174,7 @@ static Sort *make_sort(PlannerInfo *root, Plan *lefttree, int numCols,
 
 static List *flatten_grouping_list(List *groupcls);
 static bool is_gpxf_protocol(Uri *uri);
-
+static int gpxf_calc_max_participants_allowed(int total_segments);
 
 /*
  * create_plan
@@ -1187,7 +1188,7 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 	/* gpfdist(s) or EXECUTE specific variables */
 	int				total_to_skip = 0;
 	int				max_participants_allowed = 0;
-	int			num_segs_participating = 0;
+	int			    num_segs_participating = 0;
 	bool			*skip_map = NULL;
 	bool			should_skip_randomly = false;
 	bool            is_custom_hd = false;
@@ -1441,6 +1442,7 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 		 * randomly select 1 segdb to skip (7 - 6 = 1). so it may look like this:
 		 * [F F T F F F F] - in which case we know to skip the 3rd segment only.
 		 */
+		is_custom_hd = is_gpxf_protocol(uri);
 
 		/* total num of segs that will participate in the external operation */
 		num_segs_participating = total_primaries;
@@ -1449,6 +1451,11 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 		if ((uri->protocol == URI_GPFDIST) || (uri->protocol == URI_GPFDISTS)){
 		max_participants_allowed = list_length(rel->locationlist) * 
 			gp_external_max_segs;
+		}
+		else if (is_custom_hd)
+		{
+			max_participants_allowed = gpxf_calc_max_participants_allowed(total_primaries);
+			num_segs_participating = max_participants_allowed;  /* same logic as for num_segs_participating > max_participants_allowed  - see below*/
 		}
 		else
 		{
@@ -1515,11 +1522,10 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 		if(should_skip_randomly)
 			skip_map = makeRandomSegMap(total_primaries, total_to_skip);
 
-		is_custom_hd = is_gpxf_protocol(uri);
 		if (is_custom_hd)
 		{
 			segdb_work_map = map_hddata_2gp_segments((char *) strVal(linitial(rel->locationlist)), 
-													num_segs_participating);	
+													total_primaries, max_participants_allowed);	
 			Assert(segdb_work_map != NULL);
 		}
 		
@@ -1563,10 +1569,10 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 					if (segdb_file_map[segind] == NULL) /* segment was not already activated */
 					{
 						if (!is_custom_hd) /* non-hadoop protocols */
-					{
-						segdb_file_map[segind] = pstrdup(uri_str);
-						found_match = true;					
-					}
+					    {
+							segdb_file_map[segind] = pstrdup(uri_str);
+							found_match = true;					
+						}
 						else if(segdb_work_map[segind] != NULL)
 						{
 							/* 
@@ -1612,7 +1618,7 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 		}
 
 		if (is_custom_hd)
-			free_hddata_2gp_segments(segdb_work_map, num_segs_participating);
+			free_hddata_2gp_segments(segdb_work_map, total_primaries);
 	}
 	/* (3) */
 	else if(using_execute)
@@ -1865,6 +1871,39 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 	freeCdbComponentDatabases(db_info);
 
 	return scan_plan;
+}
+
+/*
+ * Calculate max_participants_allowed for gpxf. Calculation is based on gp_external_max_segs
+ * set by the user, the number of gp hosts - num_hosts and the number of segments - total_segments 
+ * There are three cases:
+ * a. The guc gp_external_max_segs is greater or equal to the total number of segments:
+ *    max_participants_allowed will be equal to the total number of segments
+ * b. The guc gp_external_max_segs is between the number of GP hosts and the total number of segments
+ *    In this case we distinguish between two subcases: 
+ *    b.1 The guc gp_external_max_segs is a multiplication of the number of hosts: 
+ *        max_participants_allowed equals the guc gp_external_max_segs
+ *    b.2 The guc gp_external_max_segs is not a multiply of the number of hosts:
+ *        max_participants_allowed will equal the smallest multiplication of the number of hosts
+ *        that is greater than the guc gp_external_max_segs
+ * c. The guc gp_external_max_segs is smaller all equal to the number of hosts.
+ *    max_participants_allowed equals the guc gp_external_max_segs
+ */
+static int
+gpxf_calc_max_participants_allowed(int total_segments)
+{
+	int max_participants_allowed = 0;
+	int num_hosts =  getgphostCount();
+	
+	if (gp_external_max_segs >= total_segments)
+		max_participants_allowed = total_segments;
+	else if ( gp_external_max_segs < total_segments && gp_external_max_segs > num_hosts)
+		max_participants_allowed = (gp_external_max_segs % num_hosts == 0) ? gp_external_max_segs : 
+		    num_hosts * (gp_external_max_segs / num_hosts + 1);
+	else /* gp_external_max_segs <= num_hosts */
+		max_participants_allowed = gp_external_max_segs;
+				
+	return max_participants_allowed;
 }
 
 /*
