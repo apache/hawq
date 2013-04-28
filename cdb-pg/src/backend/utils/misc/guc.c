@@ -590,6 +590,7 @@ show_allow_system_table_mods(void);
 /* Extension Framework GUCs */
 bool   gpxf_enable_filter_pushdown = true;
 bool   gpxf_enable_stat_collection = true;
+bool   gpxf_enable_locality_optimizations = true;
 
 /* Time based authentication GUC */
 char  *gp_auth_time_override_str = NULL;
@@ -3414,7 +3415,17 @@ static struct config_bool ConfigureNamesBool[] =
 		},
 		&gpxf_enable_filter_pushdown,
 		true, NULL, NULL
-	},	
+	},
+	
+	{
+		{"gpxf_enable_locality_optimizations", PGC_USERSET, CUSTOM_OPTIONS,
+			gettext_noop("Enables locality optimizations between database segments and remote data fragments whenever possible."),
+			NULL,
+			GUC_GPDB_ADDOPT
+		},
+		&gpxf_enable_locality_optimizations,
+		true, NULL, NULL
+	},		
 
 	{
 		{"gpxf_enable_stat_collection", PGC_USERSET, CUSTOM_OPTIONS,

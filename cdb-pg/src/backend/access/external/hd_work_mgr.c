@@ -515,17 +515,20 @@ distribute_work_2_gp_segments(List *whole_data_fragments_list, int total_segs, i
 			DatanodeProcessingLoad *found_dn = NULL;
 			char *host_ip = seg->hostip;
 			
-			foreach(datanode_cell, allDNProcessingLoads) /* an attempt at locality - try and find a datanode sitting on the same host with the segment */
+			/* locality logic depends on gpxf_enable_locality_optimizations guc */
+			if (gpxf_enable_locality_optimizations)
 			{
-				DatanodeProcessingLoad *dn = (DatanodeProcessingLoad*)lfirst(datanode_cell);
-				if (are_ips_equal(host_ip, dn->dataNodeIp))
+				foreach(datanode_cell, allDNProcessingLoads) /* an attempt at locality - try and find a datanode sitting on the same host with the segment */
 				{
-					found_dn = dn;
-					appendStringInfo(&msg, "GPXF - Allocating the datanode blocks to a local segment. IP: %s\n", found_dn->dataNodeIp);
-					break;
+					DatanodeProcessingLoad *dn = (DatanodeProcessingLoad*)lfirst(datanode_cell);
+					if (are_ips_equal(host_ip, dn->dataNodeIp))
+					{
+						found_dn = dn;
+						appendStringInfo(&msg, "GPXF - Allocating the datanode blocks to a local segment. IP: %s\n", found_dn->dataNodeIp);
+						break;
+					}
 				}
 			}
-			
 			if (allDNProcessingLoads && !found_dn) /* there is no datanode on the segment's host. Let's just pick the first data node */
 			{
 				found_dn = linitial(allDNProcessingLoads);
