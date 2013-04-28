@@ -27,16 +27,16 @@ select * from alter2.v1;
 (2 rows)
 
 create function alter1.plus1(int) returns int as 'select $1+1' language sql;
-ERROR:  Cannot support create function statement yet in GPSQL
+ERROR:  Cannot support create function statement yet
 alter function alter1.plus1(int) set schema alter2;
-ERROR:  Cannot support alter function schema statement yet in GPSQL
+ERROR:  Cannot support alter function schema statement yet
 create domain alter1.posint integer check (value > 0);
-ERROR:  Cannot support create domain statement yet in GPSQL
+ERROR:  Cannot support create domain statement yet
 alter domain alter1.posint set schema alter2;
-ERROR:  Cannot support alter type schema statement yet in GPSQL
+ERROR:  Cannot support alter domain schema statement yet
 create type alter1.ctype as (f1 int, f2 text);
 alter type alter1.ctype set schema alter2;
-ERROR:  Cannot support alter type schema statement yet in GPSQL
+ERROR:  Cannot support alter type schema statement yet
 drop schema alter1 cascade;
 NOTICE:  drop cascades to type alter1.ctype
 drop schema alter2 cascade;
