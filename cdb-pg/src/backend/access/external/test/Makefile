@@ -1,10 +1,10 @@
 subdir=src/backend/access/external
 top_builddir=../../../../..
 
-TARGETS=gpxfuriparser
+TARGETS=gpxfuriparser hd_work_mgr
 
 # Objects from backend, which don't need to be mocked but need to be linked.
-$(TARGETS)_REAL_OBJS=\
+COMMON_REAL_OBJS=\
     $(top_srcdir)/src/backend/access/hash/hashfunc.o \
     $(top_srcdir)/src/backend/access/transam/filerepdefs.o \
     $(top_srcdir)/src/backend/bootstrap/bootparse.o \
@@ -38,4 +38,13 @@ $(TARGETS)_REAL_OBJS=\
     $(top_srcdir)/src/timezone/pgtz.o \
     $(top_srcdir)/src/timezone/strftime.o  
 
+# Objects from backend, which don't need to be mocked but need to be linked.
+gpxfuriparser_REAL_OBJS=$(COMMON_REAL_OBJS) 
+
+hd_work_mgr_REAL_OBJS=$(COMMON_REAL_OBJS) \
+	$(top_srcdir)/src/backend/access/external/gpxfuriparser.o
+
+
 include ../../../../Makefile.mock
+
+MOCK_LIBS += -ljson	
