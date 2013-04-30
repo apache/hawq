@@ -1016,7 +1016,7 @@ insert into ggg values (7, 7);
 insert into ggg values (8, 8);
 insert into ggg values (9, 9);
 insert into ggg values (10, 10);
-ERROR:  no partition for partitioning key  (seg1 mat3-mbp.local:40001 pid=54484)
+ERROR:  no partition for partitioning key  (seg1 sdw1:35001 pid=10949)
 select * from ggg order by 1, 2;
  id | a 
 ----+---
@@ -1296,7 +1296,7 @@ alter table hhh add partition cc end ('2010-01-01');
 NOTICE:  CREATE TABLE will create partition "hhh_1_prt_cc" for table "hhh"
 -- works - anonymous partition MPP-3350
 alter table hhh add partition end ('2010-02-01');
-NOTICE:  CREATE TABLE will create partition "hhh_1_prt_r1484921857" for table "hhh"
+NOTICE:  CREATE TABLE will create partition "hhh_1_prt_r586877208" for table "hhh"
 -- MPP-3607 - ADD PARTITION with open intervals
 create table no_end1 (aa int, bb int) partition by range (bb)
 (partition foo start(3));
@@ -1540,7 +1540,7 @@ NOTICE:  CREATE TABLE will create partition "j_1_prt_b" for table "j"
 insert into j select i from generate_series(1, 8) i;
 alter table j split partition for(1) at (2, 3) into (partition fa, partition
 fb);
-NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_45635"
+NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_146392"
 NOTICE:  dropped partition "a" for relation "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_fa" for table "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_fb" for table "j"
@@ -1559,10 +1559,10 @@ select * from j_1_prt_fb;
 (2 rows)
 
 alter table j split partition for(5) at (6);
-NOTICE:  exchanged partition "b" of relation "j" with relation "pg_temp_45635"
+NOTICE:  exchanged partition "b" of relation "j" with relation "pg_temp_146392"
 NOTICE:  dropped partition "b" for relation "j"
-NOTICE:  CREATE TABLE will create partition "j_1_prt_r286008752" for table "j"
-NOTICE:  CREATE TABLE will create partition "j_1_prt_r2080918751" for table "j"
+NOTICE:  CREATE TABLE will create partition "j_1_prt_r4356059" for table "j"
+NOTICE:  CREATE TABLE will create partition "j_1_prt_r478536281" for table "j"
 select * from j;
  i 
 ---
@@ -1610,23 +1610,23 @@ NOTICE:  CREATE TABLE will create partition "k_1_prt_6" for table "k"
 insert into k select i from generate_series(1, 30) i;
 alter table k split default partition start(15) end(20) into
 (partition mydef, partition foo);
-NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_46017"
+NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_146774"
 NOTICE:  dropped partition "mydef" for relation "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_foo" for table "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
 select * from k_1_prt_foo;
  i  
 ----
- 16
- 18
  15
  17
  19
+ 16
+ 18
 (5 rows)
 
 alter table k split default partition start(22) exclusive end(25) inclusive
 into (partition bar, partition mydef);
-NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_46017"
+NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_146774"
 NOTICE:  dropped partition "mydef" for relation "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_bar" for table "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
@@ -1639,7 +1639,7 @@ select * from k_1_prt_bar;
 (3 rows)
 
 alter table k split partition bar at (23) into (partition baz, partition foz);
-NOTICE:  exchanged partition "bar" of relation "k" with relation "pg_temp_46017"
+NOTICE:  exchanged partition "bar" of relation "k" with relation "pg_temp_146774"
 NOTICE:  dropped partition "bar" for relation "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_baz" for table "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_foz" for table "k"
@@ -1694,15 +1694,15 @@ into (partition aa, partition nodate);
 ERROR:  default partition name missing from INTO clause
 alter table k split default partition start ('2009-01-01') end ('2009-02-01')
 into (partition aa, partition default_part);
-NOTICE:  exchanged partition "default_part" of relation "k" with relation "pg_temp_46469"
+NOTICE:  exchanged partition "default_part" of relation "k" with relation "pg_temp_147226"
 NOTICE:  dropped partition "default_part" for relation "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_aa" for table "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_default_part" for table "k"
 -- check that it works without INTO
 alter table k split default partition start ('2009-02-01') end ('2009-03-01');
-NOTICE:  exchanged partition "default_part" of relation "k" with relation "pg_temp_46469"
+NOTICE:  exchanged partition "default_part" of relation "k" with relation "pg_temp_147226"
 NOTICE:  dropped partition "default_part" for relation "k"
-NOTICE:  CREATE TABLE will create partition "k_1_prt_r339281316" for table "k"
+NOTICE:  CREATE TABLE will create partition "k_1_prt_r1412309764" for table "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_default_part" for table "k"
 drop table k;
 -- List too
@@ -1716,14 +1716,14 @@ NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
 alter table k split partition mydef at (5) into (partition foo, partition bar);
 ERROR:  default partition name missing from INTO clause
 alter table k split partition mydef at (5) into (partition foo, partition mydef);
-NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_46909"
+NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_147666"
 NOTICE:  dropped partition "mydef" for relation "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_foo" for table "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
 alter table k split partition mydef at (10);
-NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_46909"
+NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_147666"
 NOTICE:  dropped partition "mydef" for relation "k"
-NOTICE:  CREATE TABLE will create partition "k_1_prt_r1182960852" for table "k"
+NOTICE:  CREATE TABLE will create partition "k_1_prt_r225510198" for table "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
 drop table k;
 -- For LIST, make sure that we reject AT() clauses which match all parameters
@@ -1734,7 +1734,7 @@ HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sur
 NOTICE:  CREATE TABLE will create partition "j_1_prt_a" for table "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_b" for table "j"
 alter table j split partition for(1) at (1,2) into (partition fa, partition fb);
-NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_47169"
+NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_147926"
 NOTICE:  dropped partition "a" for relation "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_fa" for table "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_fb" for table "j"
@@ -1752,7 +1752,7 @@ NOTICE:  CREATE TABLE will create partition "j_1_prt_b" for table "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_default_part" for table "j"
 alter table j split partition for(1) at (1,2) into (partition f1a, partition
 f1b);
-NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_47319"
+NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_148076"
 NOTICE:  dropped partition "a" for relation "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_f1a" for table "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_f1b" for table "j"
@@ -1765,7 +1765,7 @@ HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sur
 NOTICE:  CREATE TABLE will create partition "j_1_prt_default_part" for table "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_a" for table "j"
 alter table j split partition for(1) at (5) into (partition f1a, partition f1b);
-NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_47475"
+NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_148232"
 NOTICE:  dropped partition "a" for relation "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_f1a" for table "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_f1b" for table "j"
@@ -1810,7 +1810,7 @@ select * from pt_table_1_prt_2 order by d;
 (2 rows)
 
 insert into pt_table_1_prt_others values(1,1,1,1);
-ERROR:  the data does not belong to partition: pt_table_1_prt_others  (seg2 Zhanweis-MacBook-Pro.local:40002 pid=57274)
+ERROR:  the data does not belong to partition: pt_table_1_prt_others  (seg0 sdw1:35000 pid=10947)
 select * from pt_table order by b,d;
  a | b | c | d 
 ---+---+---+---
@@ -1832,3 +1832,186 @@ select * from pt_table_1_prt_others order by b,d;
 (0 rows)
 
 drop table pt_table;
+-- GPSQL-278
+-- GPSQL-278 - sanity
+drop table if exists pt_check;
+NOTICE:  table "pt_check" does not exist, skipping
+create table pt_check
+(
+distcol int,
+ptcol date,
+col1 text,
+CONSTRAINT distcol_chk CHECK (distcol > 0)
+)
+distributed by (distcol)
+partition by range (ptcol)
+(
+default partition defpt,
+start (date '2010-01-01') inclusive
+end (date '2010-12-31') inclusive
+every (interval '1 month')
+);
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_defpt" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_2" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_3" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_4" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_5" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_6" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_7" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_8" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_9" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_10" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_11" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_12" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_13" for table "pt_check"
+--Insert 2 records to partitioned table.
+INSERT INTO pt_check values (1, '2010-01-10'::date, 'part 1');
+INSERT INTO pt_check values (2, '2010-01-21'::date, 'part 2');
+select * from pt_check order by col1;
+ distcol |   ptcol    |  col1  
+---------+------------+--------
+       1 | 01-10-2010 | part 1
+       2 | 01-21-2010 | part 2
+(2 rows)
+
+--Split partition '2010-01-10' into 2 parts (Jan 1-15 and Jan 16-31).
+ALTER TABLE pt_check SPLIT PARTITION FOR ('2010-01-01')
+AT ('2010-01-16')
+INTO (PARTITION jan1thru15, PARTITION jan16thru31);
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_jan1thru15" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_jan16thru31" for table "pt_check"
+-- Verify split result.
+Select * from pt_check_1_prt_jan1thru15 order by col1;
+ distcol |   ptcol    |  col1  
+---------+------------+--------
+       1 | 01-10-2010 | part 1
+(1 row)
+
+Select * from pt_check_1_prt_jan16thru31 order by col1;
+ distcol |   ptcol    |  col1  
+---------+------------+--------
+       2 | 01-21-2010 | part 2
+(1 row)
+
+-- GPSQL-278 - default partitions
+drop table if exists pt_check;
+create table pt_check
+(
+distcol int,
+ptcol date,
+col1 text,
+CONSTRAINT distcol_chk CHECK (distcol > 0)
+)
+distributed by (distcol)
+partition by range (ptcol)
+(
+default partition defpt,
+start (date '2010-01-01') inclusive
+end (date '2010-12-31') inclusive
+every (interval '1 month')
+);
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_defpt" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_2" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_3" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_4" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_5" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_6" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_7" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_8" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_9" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_10" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_11" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_12" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_13" for table "pt_check"
+--Insert 2 records to partitioned table.
+INSERT INTO pt_check values (1, '2011-01-10'::date, 'part 1');
+INSERT INTO pt_check values (2, '2011-02-21'::date, 'part 2');
+select * from pt_check order by col1;
+ distcol |   ptcol    |  col1  
+---------+------------+--------
+       1 | 01-10-2011 | part 1
+       2 | 02-21-2011 | part 2
+(2 rows)
+
+--Split default partition into 2 parts (Jan 2011 and default).
+ALTER TABLE pt_check SPLIT DEFAULT PARTITION
+	START ('2011-01-01') INCLUSIVE END ('2011-02-01') EXCLUSIVE
+	INTO (PARTITION jan2011, DEFAULT PARTITION);
+NOTICE:  exchanged partition "defpt" of relation "pt_check" with relation "pg_temp_148818"
+NOTICE:  dropped partition "defpt" for relation "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_jan2011" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_defpt" for table "pt_check"
+-- Verify split result.
+select * from pt_check_1_prt_jan2011 order by col1;
+ distcol |   ptcol    |  col1  
+---------+------------+--------
+       1 | 01-10-2011 | part 1
+(1 row)
+
+select * from pt_check_1_prt_defpt order by col1;
+ distcol |   ptcol    |  col1  
+---------+------------+--------
+       2 | 02-21-2011 | part 2
+(1 row)
+
+-- GPSQL-278 - default partitions
+drop table if exists pt_check;
+create table pt_check
+(
+distcol int,
+ptcol date,
+col1 text,
+CONSTRAINT distcol_chk CHECK (distcol > 0)
+)
+distributed by (distcol)
+partition by range (ptcol)
+(
+default partition defpt,
+start (date '2010-01-01') inclusive
+end (date '2010-12-31') inclusive
+every (interval '1 month')
+);
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_defpt" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_2" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_3" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_4" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_5" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_6" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_7" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_8" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_9" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_10" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_11" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_12" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_13" for table "pt_check"
+--Insert 2 records to partitioned table.
+INSERT INTO pt_check values (1, '2011-01-10'::date, 'part 1');
+INSERT INTO pt_check values (2, '2011-02-21'::date, 'part 2');
+select * from pt_check order by col1;
+ distcol |   ptcol    |  col1  
+---------+------------+--------
+       1 | 01-10-2011 | part 1
+       2 | 02-21-2011 | part 2
+(2 rows)
+
+--Split default partition into 2 parts (Jan 2011 and default).
+ALTER TABLE pt_check SPLIT DEFAULT PARTITION
+	START ('2011-01-01') INCLUSIVE END ('2011-02-01') EXCLUSIVE
+	INTO (DEFAULT PARTITION, PARTITION jan2011);
+NOTICE:  exchanged partition "defpt" of relation "pt_check" with relation "pg_temp_149169"
+NOTICE:  dropped partition "defpt" for relation "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_jan2011" for table "pt_check"
+NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_defpt" for table "pt_check"
+-- Verify split result.
+select * from pt_check_1_prt_jan2011 order by col1;
+ distcol |   ptcol    |  col1  
+---------+------------+--------
+       1 | 01-10-2011 | part 1
+(1 row)
+
+select * from pt_check_1_prt_defpt order by col1;
+ distcol |   ptcol    |  col1  
+---------+------------+--------
+       2 | 02-21-2011 | part 2
+(1 row)
+

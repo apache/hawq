@@ -1013,3 +1013,91 @@ select * from pt_table_1_prt_2 order by b,d;
 select * from pt_table_1_prt_others order by b,d;
 
 drop table pt_table;
+
+-- GPSQL-278
+-- GPSQL-278 - sanity
+drop table if exists pt_check;
+create table pt_check
+(
+distcol int,
+ptcol date,
+col1 text,
+CONSTRAINT distcol_chk CHECK (distcol > 0)
+)
+distributed by (distcol)
+partition by range (ptcol)
+(
+default partition defpt,
+start (date '2010-01-01') inclusive
+end (date '2010-12-31') inclusive
+every (interval '1 month')
+);
+--Insert 2 records to partitioned table.
+INSERT INTO pt_check values (1, '2010-01-10'::date, 'part 1');
+INSERT INTO pt_check values (2, '2010-01-21'::date, 'part 2');
+select * from pt_check order by col1;
+--Split partition '2010-01-10' into 2 parts (Jan 1-15 and Jan 16-31).
+ALTER TABLE pt_check SPLIT PARTITION FOR ('2010-01-01')
+AT ('2010-01-16')
+INTO (PARTITION jan1thru15, PARTITION jan16thru31);
+-- Verify split result.
+Select * from pt_check_1_prt_jan1thru15 order by col1;
+Select * from pt_check_1_prt_jan16thru31 order by col1;
+
+-- GPSQL-278 - default partitions
+drop table if exists pt_check;
+create table pt_check
+(
+distcol int,
+ptcol date,
+col1 text,
+CONSTRAINT distcol_chk CHECK (distcol > 0)
+)
+distributed by (distcol)
+partition by range (ptcol)
+(
+default partition defpt,
+start (date '2010-01-01') inclusive
+end (date '2010-12-31') inclusive
+every (interval '1 month')
+);
+--Insert 2 records to partitioned table.
+INSERT INTO pt_check values (1, '2011-01-10'::date, 'part 1');
+INSERT INTO pt_check values (2, '2011-02-21'::date, 'part 2');
+select * from pt_check order by col1;
+--Split default partition into 2 parts (Jan 2011 and default).
+ALTER TABLE pt_check SPLIT DEFAULT PARTITION
+	START ('2011-01-01') INCLUSIVE END ('2011-02-01') EXCLUSIVE
+	INTO (PARTITION jan2011, DEFAULT PARTITION);
+-- Verify split result.
+select * from pt_check_1_prt_jan2011 order by col1;
+select * from pt_check_1_prt_defpt order by col1;
+
+-- GPSQL-278 - default partitions
+drop table if exists pt_check;
+create table pt_check
+(
+distcol int,
+ptcol date,
+col1 text,
+CONSTRAINT distcol_chk CHECK (distcol > 0)
+)
+distributed by (distcol)
+partition by range (ptcol)
+(
+default partition defpt,
+start (date '2010-01-01') inclusive
+end (date '2010-12-31') inclusive
+every (interval '1 month')
+);
+--Insert 2 records to partitioned table.
+INSERT INTO pt_check values (1, '2011-01-10'::date, 'part 1');
+INSERT INTO pt_check values (2, '2011-02-21'::date, 'part 2');
+select * from pt_check order by col1;
+--Split default partition into 2 parts (Jan 2011 and default).
+ALTER TABLE pt_check SPLIT DEFAULT PARTITION
+	START ('2011-01-01') INCLUSIVE END ('2011-02-01') EXCLUSIVE
+	INTO (DEFAULT PARTITION, PARTITION jan2011);
+-- Verify split result.
+select * from pt_check_1_prt_jan2011 order by col1;
+select * from pt_check_1_prt_defpt order by col1;
