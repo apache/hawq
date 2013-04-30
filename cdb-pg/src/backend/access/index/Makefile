@@ -49,6 +49,7 @@ CAQL_CQL_SRCS := $(addprefix $(top_srcdir)/src/backend/,\
 	catalog/toasting.c \
 	cdb/cdbcat.c \
 	cdb/cdbdisp.c \
+	cdb/cdbpartindex.c \
 	cdb/cdbpartition.c \
 	cdb/cdbpersistentbuild.c \
 	cdb/cdbsubselect.c \
