@@ -11,7 +11,9 @@ override CPPFLAGS+= -I$(top_srcdir)/src/backend/libpq \
 					-DDLSUFFIX=$(DLSUFFIX) \
 					-I$(top_srcdir)/src/backend/utils/stat
 
-MOCK_LIBS := $(filter-out -lpgport -lesmtp -ledit, $(LIBS)) 
+# TODO: add ldl for quick hack; we need to figure out why
+# postgres in src/backend/Makefile doesn't need this and -pthread.
+MOCK_LIBS := -ldl $(filter-out -lpgport -lesmtp -ledit, $(LIBS)) 
 
 # We are unable to mock them up at the moment.  Real objects should contain them.
 EXCL_OBJS=src/backend/bootstrap/bootparse.o \
@@ -57,7 +59,7 @@ all: $(patsubst %,%.t,$(TARGETS))
 
 # The test target depends on $(OBJFILES) which would update files including mocks.
 %.t: $(OBJFILES) $(CMOCKERY_OBJS) %_test.o mockup-phony
-	$(CC) $(CFLAGS) -o $@ $(call TARGET_OBJS,$*) $(MOCK_LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(call TARGET_OBJS,$*) $(MOCK_LIBS) -o $@
 
 # We'd like to call only src/backend, but it seems we should build src/port and
 # src/timezone before src/backend.  This is not the case when main build has finished,
