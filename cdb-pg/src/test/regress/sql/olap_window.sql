@@ -1551,3 +1551,28 @@ select stddev(n) over(order by d range between current row and interval '1 day' 
        sum(n) over(order by d range between current row and interval '1 day' following),
        avg(n) over(order by d range between current row and interval '1 day' following), n from test;
 
+-- MPP-19964
+drop table if exists customers_test;
+create table customers_test(name text, device_model text, device_id integer, ppp numeric) distributed by (device_id);
+INSERT INTO customers_test values ('n1', 'd1', 1, 1);
+INSERT INTO customers_test values ('n1', 'd1', 1, 3); 
+INSERT INTO customers_test values ('n2', 'd1', 1, 2); 
+INSERT INTO customers_test values ('n2', 'd1', 2, 1); 
+INSERT INTO customers_test values ('n2', 'd1', 2, 2); 
+INSERT INTO customers_test values ('n3', 'd3', 1, 0); 
+SELECT COUNT(*)
+FROM
+(
+  SELECT name,device_model,median(ppp) md
+  FROM
+  (
+    SELECT name,
+      device_model,
+      device_id,
+      ppp,
+      ntile(4) over (partition by name,device_model order by ppp)
+    FROM customers_test
+  ) a
+  GROUP BY name,device_model
+  HAVING COUNT(DISTINCT CASE WHEN ppp > 0 THEN device_id ELSE NULL END)>0
+) b;
