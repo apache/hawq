@@ -6435,6 +6435,14 @@ within_agg_planner(PlannerInfo *root,
 				Assert(list_length(aggref->args) == 1);
 				arg = linitial(aggref->args);
 				sub_tle = tlist_member(arg, sub_tlist);
+				if (!sub_tle)
+				{
+					sub_tle = makeTargetEntry((Expr *) arg,
+												next_resno++,
+												 "<expr>",
+												 true);
+					sub_tlist = lappend(sub_tlist, sub_tle);
+				}
 				distinctColIdx[numDistinctCols++] = sub_tle->resno;
 			}
 			aggreflist[numsortlist] = lappend(aggreflist[numsortlist], aggref);
