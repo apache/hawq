@@ -581,7 +581,7 @@ void analyzeStmt(VacuumStmt *stmt, List *relids)
 		 * We start a new transaction command to match the one in PostgresMain().
 		 */
 		/*
-		 * in gpsql, there is no distributed transaction
+		 * in hawq, there is no distributed transaction
 		 */
 		/*setupRegularDtxContext();*/
 		StartTransactionCommand();
@@ -1337,7 +1337,7 @@ static void analyzeEstimateReltuplesRelpages(Oid relationOid, float4 *relTuples,
 		if (RelationIsHeap(rel))
 		{
 			/*
-			 * in gpsql, all heap table should not be distributed.
+			 * in hawq, all heap table should not be distributed.
 			 */
 			gp_statistics_estimate_reltuples_relpages_heap(rel, relTuples,
 					relPages);

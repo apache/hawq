@@ -1713,7 +1713,7 @@ ExecuteTruncate(TruncateStmt *stmt)
 		{
 			ereport(ERROR,
 					( errcode(ERRCODE_GP_COMMAND_ERROR),
-							errmsg("TRUNCATE on heap table is not supported in gpsql.")));
+							errmsg("TRUNCATE on heap table is not supported.")));
 		}
 
 		GetAppendOnlyEntryAuxOids(heap_relid, SnapshotNow,
@@ -6097,7 +6097,7 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 	FreeExecutorState(estate);
 
 	/*
-	 * In GPSQL, here we dispatch the process to segments as opposed to what
+	 * In hawq, here we dispatch the process to segments as opposed to what
 	 * we did in GPDB which is to dispatch the whole statement from the top-level.
 	 * The reason is we need a new relation created, but not yet swapped, so
 	 * the catalog status is somewhat transient.  This is the only timing we
@@ -10797,7 +10797,7 @@ ATExecSetTableSpace_BufferPool(
 			 (!useWal ? "true" : "false"));
 	
 	/* Fetch relation's gp_relation_node row */
-	/* TODO in gpsql */
+	/* TODO in hawq */
 	Assert(!"need contentid");
 	nodeTuple = ScanGpRelationNodeTuple(
 							gp_relation_node,
@@ -16457,7 +16457,7 @@ ATPExecPartSplit(Relation rel,
 	split_rows(intoa, intob, temprel);
 
 	/* 
-	 * In GPSQL, we need to dispatch the splitting of rows to segments. Most other 
+	 * In HAWQ, we need to dispatch the splitting of rows to segments. Most other
 	 * ALTER operations, dispatch the ALTER phase 3 work to segments. ALTER .. SPLIT PARTITION
 	 * is different as the actual working of splitting happens in phase 2. Hence we dispatch
 	 * at this point 
@@ -16515,7 +16515,7 @@ ATPExecPartSplit(Relation rel,
 	heap_close(temprel, NoLock);
 
 	/* 
-	 * In GPSQL, we only need to drop the temp relation on the master which will ensure
+	 * In HAWQ, we only need to drop the temp relation on the master which will ensure
 	 * the relation is dropped on segments as well. 
  	 */
 	if (Gp_role != GP_ROLE_EXECUTE)

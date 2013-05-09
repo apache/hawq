@@ -516,7 +516,7 @@ ExecGrantStmt_oids(InternalGrant *istmt)
 				|| gp_called_by_pgdump))
 			{
                         	ereport(ERROR,
-                                	(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE on FOREIGN DATA WRAPPER statement in GPSQL") )); 
+                                	(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE on FOREIGN DATA WRAPPER statement") ));
 			}
 			ExecGrant_Fdw(istmt);
 			break;
@@ -525,7 +525,7 @@ ExecGrantStmt_oids(InternalGrant *istmt)
 				|| gp_called_by_pgdump))
 			{
                         	ereport(ERROR,
-                                	(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE on FOREIGN SERVER statement in GPSQL") )); 
+                                	(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE on FOREIGN SERVER statement") ));
 			}
 			ExecGrant_ForeignServer(istmt);
 			break;
@@ -534,7 +534,7 @@ ExecGrantStmt_oids(InternalGrant *istmt)
 				|| gp_called_by_pgdump))
 			{
                         	ereport(ERROR,
-                                	(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE on FUNCTION statement in GPSQL") )); 
+                                	(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE on FUNCTION statement") ));
 			}
 			ExecGrant_Function(istmt);
 			break;
@@ -543,7 +543,7 @@ ExecGrantStmt_oids(InternalGrant *istmt)
 				|| gp_called_by_pgdump))
 			{
                         	ereport(ERROR,
-                                	(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE on LANGUAGE statement in GPSQL") )); 
+                                	(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE on LANGUAGE statement") ));
 			}
 			ExecGrant_Language(istmt);
 			break;
@@ -555,7 +555,7 @@ ExecGrantStmt_oids(InternalGrant *istmt)
 				|| gp_called_by_pgdump))
 			{
                         	ereport(ERROR,
-                                	(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE on TABLESPACE statement in GPSQL") )); 
+                                	(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE on TABLESPACE statement") ));
 			}
 			ExecGrant_Tablespace(istmt);
 			break;
