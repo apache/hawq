@@ -17,12 +17,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "pg_config_manual.h"
 
 #ifdef GPFXDIST
 #include <gpfxdist.h>
 #endif
 
-#define FILE_ERROR_SZ 200
+#define FILE_ERROR_SZ MAXPGPATH
 char* format_error(char* c1, char* c2);
 
 typedef struct
@@ -847,8 +848,29 @@ int fstream_read(fstream_t *fs,
 			 */
 			if (!p || (char*)dest + size >= p + buffer_capacity)
 			{
-				snprintf(err_buf, sizeof(err_buf)-1, "line too long in file %s near (%lld bytes)",
-						 fs->glob.gl_pathv[fs->fidx], (long long) fs->foff);
+
+				/*
+				 * if the err message length exceeds err_buf size, do it by omitting some content
+				 * of file path. The file path likes ".../a/b/c.txt"
+				 */
+				int err_msg_length = strlen(fs->glob.gl_pathv[fs->fidx]) + sizeof(long long)
+										+ sizeof("line too long in file  near ( bytes)");
+
+				if(err_msg_length <= FILE_ERROR_SZ)
+				{
+					snprintf(err_buf, sizeof(err_buf),
+							"line too long in file %s near (%lld bytes)",
+							fs->glob.gl_pathv[fs->fidx], (long long) fs->foff);
+				}
+				else
+				{
+					int omit_filepath_Len = err_msg_length - FILE_ERROR_SZ;
+					snprintf(err_buf, sizeof(err_buf),
+							"line too long in file ...%s near (%lld bytes)",
+							fs->glob.gl_pathv[fs->fidx] + omit_filepath_Len + 3, (long long) fs->foff);
+
+				}
+
 				fs->ferror = err_buf;
 				gfile_printf_then_putc_newline("%s", err_buf);
 				return -1;
