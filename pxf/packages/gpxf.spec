@@ -21,7 +21,7 @@ License: Apache License v2.0
 Source: %{_package_name}.tar.gz
 Vendor: %{_package_vendor}
 Buildarch: noarch
-Requires: hadoop >= 2.0.0
+Requires: hadoop >= 2.0.0, hadoop-mapreduce >= 2.0.0
 AutoReqProv: no
 Provides: %{_name}
 Prefix: %{_prefix}
