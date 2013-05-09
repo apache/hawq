@@ -282,6 +282,19 @@ cdbconn_doConnect(SegmentDatabaseDescriptor    *segdbDesc,
     initPQExpBuffer(&buffer);
 
     /*
+     * If init buffer failed, set segdbDesc.errcode, err_message, conn set null and return,
+     * the caller cdbgang.c will later check the status of segdbDesc and output to user.
+     */
+    if(buffer.maxlen == 0)
+    {
+    	segdbDesc->errcode = ERRCODE_OUT_OF_MEMORY;
+    	appendPQExpBuffer(&segdbDesc->error_message,
+			  "Master unable to connect, malloc memory structure failure");
+    	segdbDesc->conn = NULL;
+    	return false;
+    }
+
+    /*
      * Build the connection string
      */
     if (options)

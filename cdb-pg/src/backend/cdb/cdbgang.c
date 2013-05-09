@@ -499,6 +499,19 @@ create_gang_retry:
 				in_recovery_mode_count++;
 			}
 
+			/*
+			 * If out of memory error when QD establish connection to QEs, immediately close
+			 * all the successful connections and error out
+			 */
+			if (segdbDesc->errcode == ERRCODE_OUT_OF_MEMORY)
+			{
+				/* clean the gang before error out */
+				disconnectAndDestroyGang(newGangDefinition);
+				ereport(ERROR, (errcode(ERRCODE_GP_INTERCONNECTION_ERROR),
+					errmsg("failed to create connection to segment %d: master out of memory",
+											i)));
+			}
+
 			segdbDesc->errcode = 0;
 			resetPQExpBuffer(&segdbDesc->error_message);
 
@@ -1161,6 +1174,19 @@ thread_DoConnect(void *arg)
 		 */
 
 		initPQExpBuffer(&buffer);
+
+	    /*
+	     * If init buffer failed, set segdbDesc.errcode, err_message, conn set null and return,
+	     * the caller cdbgang.c will later check the status of segdbDesc and output to user.
+	     */
+	    if(buffer.maxlen == 0)
+	    {
+	    	segdbDesc->errcode = ERRCODE_OUT_OF_MEMORY;
+	    	appendPQExpBuffer(&segdbDesc->error_message,
+				  "Master unable to connect, malloc memory structure failure");
+	    	segdbDesc->conn = NULL;
+	    	return (NULL);
+	    }
 
 		/*
 		 * Build the connection string
