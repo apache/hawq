@@ -1456,7 +1456,7 @@ cdbdisp_dispatchCommand(const char                 *strCommand,
 	 */
 
 	/*
-	 * in gpsql, there is no distributed transaction
+	 * in hawq, there is no distributed transaction
 	 */
 	queryParms.serializedDtxContextInfo = NULL;
 	queryParms.serializedDtxContextInfolen = 0;
@@ -1710,7 +1710,7 @@ cdbdisp_dispatchCommandToAllGangs(const char	*strCommand,
 		qdSerializeDtxContextInfo(&queryParms.serializedDtxContextInfolen, true  withSnapshot , false  cursor,
 								  generateTxnOptions(needTwoPhase), "cdbdisp_dispatchCommandToAllGangs");*/
 	/*
-	 * in gpsql, there is no distributed transaction
+	 * in hawq, there is no distributed transaction
 	 */
 	queryParms.serializedDtxContextInfo = NULL;
 	queryParms.serializedDtxContextInfolen = 0;
@@ -4041,7 +4041,7 @@ cdbdisp_dispatchPlan(struct QueryDesc *queryDesc,
 								  generateTxnOptions(planRequiresTxn), "cdbdisp_dispatchPlan");*/
 
 	/*
-	 * in gpsql, there is no distributed transaction
+	 * in hawq, there is no distributed transaction
 	 */
 	queryParms.serializedDtxContextInfo = NULL;
 	queryParms.serializedDtxContextInfolen = 0;

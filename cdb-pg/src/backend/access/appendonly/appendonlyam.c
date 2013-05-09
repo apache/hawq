@@ -275,11 +275,11 @@ SetNextFileSegForRead(AppendOnlyScanDesc scan)
 														1, /* columnGroupNo */
 														false);
 
-				Assert(!"in gpsql, need contentid here");
+				Assert(!"need contentid here");
 				InsertFastSequenceEntry(scan->aoEntry->segrelid,
 										segno,
 										firstSequence,
-										/*TODO, need change in gpsql*/
+										/*TODO, need change in hawq*/
 										-1,
 										&tid);
 			}
@@ -444,7 +444,7 @@ SetCurrentFileSegForWrite(AppendOnlyInsertDesc aoInsertDesc)
 									GpIdentity.segindex);
 
 	/*
-	 * in gpsql, we cannot insert a new catalog entry and then update,
+	 * in hawq, we cannot insert a new catalog entry and then update,
 	 * since we cannot get the tid of added tuple.
 	 * we should add the new catalog entry on master and then dispatch it to segments for update.
 	 */
@@ -2698,7 +2698,7 @@ appendonly_insert_init(Relation rel, int segno)
 		int64 firstSequence;
 
 		/*
-		 * in gpsql, catalog are in memory heap table,
+		 * in hawq, catalog are in memory heap table,
 		 * ItemPointer of tuple is invalid.
 		 */
 		if (Gp_role == GP_ROLE_EXECUTE)

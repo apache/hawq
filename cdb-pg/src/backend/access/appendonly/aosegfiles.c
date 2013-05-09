@@ -670,7 +670,7 @@ FileSegTotals *GetSegFilesTotals(Relation parentrel, Snapshot appendOnlyMetaData
  *
  * Get the total bytes for a specific AO table from the pg_aoseg table on master.
  *
- * In gpsql, master keep all segfile info in pg_aoseg table,
+ * In hawq, master keep all segfile info in pg_aoseg table,
  * therefore it get the whole table size.
  */
 int64 GetAOTotalBytes(Relation parentrel, Snapshot appendOnlyMetaDataSnapshot)
@@ -991,7 +991,7 @@ gp_update_aorow_master_stats_internal(Relation parentrel, Snapshot appendOnlyMet
 				fsinfo = GetFileSegInfo(parentrel, aoEntry, appendOnlyMetaDataSnapshot, qe_segno, GpIdentity.segindex);
 				if (fsinfo == NULL)
 				{
-					Assert(!"in gpsql, master should dispatch seginfo to all QE");
+					Assert(!"master should dispatch seginfo to all QE");
 					InsertInitialSegnoEntry(aoEntry, qe_segno, GpIdentity.segindex);
 
 					fsinfo = NewFileSegInfo(qe_segno);

@@ -2031,7 +2031,7 @@ CreateAppendOnlySegFileOnMaster(ResultRelInfo *resultRelInfo, List *mapping)
 			resultRelInfo->ri_aosegno = n->segno;
 
 			/*
-			 * in gpsql, master create all segfile for segments
+			 * in hawq, master create all segfile for segments
 			 */
 			if (Gp_role == GP_ROLE_DISPATCH)
 				CreateAppendOnlySegFileForRelationOnMaster(resultRelInfo->ri_RelationDesc,

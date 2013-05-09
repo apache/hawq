@@ -998,7 +998,7 @@ index_drop(Oid indexId)
 
 
 	/*
-	 * TODO, in gpsql, only MASTER_CONTENT_ID is used here,
+	 * TODO, in hawq, only MASTER_CONTENT_ID is used here,
 	 * will changed later depends on the design of index.
 	 */
 	if (!userIndexRelation->rd_segfile0_relationnodeinfos[0].isPresent)

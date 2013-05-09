@@ -454,7 +454,7 @@ ProcessQuery(Portal portal,
 		
 		/* MPP-4082. Issue automatic ANALYZE if conditions are satisfied. */
 		/*
-		 * in gpsql, temporary disable auto stats
+		 * in hawq, temporary disable auto stats
 		 *
 		 * TODO: enable it
 		 */

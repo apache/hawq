@@ -4198,7 +4198,7 @@ AbortTransaction(void)
 	 * signals to prevent recursion until we've notified the QEs.
 	 */
 	/*
-	 * no distributed transaction in gpsql
+	 * no distributed transaction in hawq
 	 */
 	/*rollbackDtxTransaction();*/
 
@@ -4283,7 +4283,7 @@ CleanupTransaction(void)
 	s->state = TRANS_DEFAULT;
 
 	/*
-	 * no distributed transaction in gpsql
+	 * no distributed transaction in hawq
 	 */
 	/*finishDistributedTransactionContext("CleanupTransaction", true);*/
 

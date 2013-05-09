@@ -409,7 +409,7 @@ AOCSFileSegInfo **GetAllAOCSFileSegInfo_pg_aocsseg_rel(
  *
  * Get the total bytes for a specific AOCS table from the pg_aocsseg table on master.
  *
- * In gpsql, master keep all segfile info in pg_aocsseg table,
+ * In hawq, master keep all segfile info in pg_aocsseg table,
  * therefore it get the whole table size.
  */
 int64 GetAOCSTotalBytes(Relation parentrel, Snapshot appendOnlyMetaDataSnapshot)

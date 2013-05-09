@@ -85,7 +85,7 @@ InsertFastSequenceEntry(Oid objid, int64 objmod, int64 lastSequence,
 		tuple = heaptuple_form_to(tupleDesc, values, nulls, NULL, NULL);
 		frozen_heap_insert(gp_fastsequence_rel, tuple);
 		/*
-		 * in gpsql, index only exists on master
+		 * in hawq, index only exists on master
 		 */
 		if (Gp_role != GP_ROLE_EXECUTE)
 			CatalogUpdateIndexes(gp_fastsequence_rel, tuple);
@@ -124,7 +124,7 @@ InsertFastSequenceEntry(Oid objid, int64 objmod, int64 lastSequence,
  *
  * The tuple id value for the entry is copied out to 'tid'.
  *
- * NOTE: in gpsql, we do not add new tuple in QE, it should be dispatched
+ * NOTE: in hawq, we do not add new tuple in QE, it should be dispatched
  * from master, and only update is allowed on QE.
  */
 static void

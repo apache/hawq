@@ -2594,7 +2594,7 @@ external_set_env_vars(extvar_t *extvar, char* uri, bool csv, char* escape, char*
 			tm->tm_hour, tm->tm_min, tm->tm_sec);
 
 	/*
-	 * in gpsql, there is no distributed transaction
+	 * in hawq, there is no distributed transaction
 	 */
 	sprintf(extvar->GP_XID, "%u", GetMasterTransactionId());
 	sprintf(extvar->GP_CID, "%x", QEDtxContextInfo.curcid);

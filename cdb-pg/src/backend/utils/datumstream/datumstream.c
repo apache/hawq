@@ -733,7 +733,7 @@ void datumstreamwrite_open_file(DatumStreamWrite *ds, char *fn, int64 eof, int64
         datumstreamwrite_close_file(ds);
 
 	/*
-     * in gpsql, all segfiles must be created by master before dispatching
+     * in hawq, all segfiles must be created by master before dispatching
      */
 
 	/*

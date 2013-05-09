@@ -324,7 +324,7 @@ GpRelationNodeBeginScan(
 	 * scan by setting indexOK == false.
 	 */
 	/*
-	 * in gpsql, we change the schema of gp_relation_node,
+	 * in hawq, we change the schema of gp_relation_node,
 	 * disable index scan.
 	 */
 	gpRelationNodeScan->scan = \
@@ -2576,7 +2576,7 @@ AtEOXact_RelationCache(bool isCommit)
 	 */
 
 	/*
-	 * in gpsql, QE should always cleanup the relcache.
+	 * in hawq, QE should always cleanup the relcache.
 	 */
 	if (Gp_role != GP_ROLE_EXECUTE && !need_eoxact_work &&
 		DistributedTransactionContext != DTX_CONTEXT_QE_READER

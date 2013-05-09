@@ -692,7 +692,7 @@ bool PersistentFilespace_TryGetPrimaryAndMirrorUnderLock(
 	}
 	else if (contentid != MASTER_CONTENT_ID)
 	{
-		/* In GPSQL, the QE's locations are on the QD. */
+		/* In HAWQ, the QE's locations are on the QD. */
 		primaryBlankPadded = filespaceDirEntry->locationBlankPadded1;
 		mirrorBlankPadded = filespaceDirEntry->locationBlankPadded2;		
 	}

@@ -70,7 +70,7 @@ obj_get_path(xl_mm_fs_obj *xlrec)
 	else
 	{
 		/*
-		 * In GPSQL, this is a valid case, all of segment files are managed by master.
+		 * In HAWQ, this is a valid case, all of segment files are managed by master.
 		 *
 		 * BTW: We can not call elog here, because it will trigger a recursive
 		 * call back via the resource manager redo logic.
@@ -658,8 +658,10 @@ emit_mmxlog_fs_record(mm_fs_obj_type type, int4 contentid, Oid filespace,
 
 		xlrec.mirror_path[0] = '\0';
 		if (mirror_path)
+		{
 			strncpy(xlrec.mirror_path, mirror_path,
 					sizeof(xlrec.mirror_path));
+		}
 		else
 		{
 			xlrec.mirror_path[0] = '.';

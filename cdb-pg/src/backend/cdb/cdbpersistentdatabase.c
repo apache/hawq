@@ -785,7 +785,7 @@ xlog_create_database(DbDirNode *db)
 	WRITE_PERSISTENT_STATE_ORDERED_LOCK;
 
 	/*
-	 * XXX:mat3: This is the dead code in GPSQL. There is no local recovery on 
+	 * XXX:mat3: This is the dead code in HAWQ. There is no local recovery on
 	 * segment. And master has its own rerecover code path.
 	 */
 	dbe = (DatabaseDirEntry) SharedOidSearch_Find(

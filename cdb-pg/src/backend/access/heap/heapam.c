@@ -2381,7 +2381,7 @@ heap_delete(Relation relation, ItemPointer tid,
 {
 
 	/*
-	 * in gpsql, heap table only used for catalog on master.
+	 * in hawq, heap table only used for catalog on master.
 	 */
 	if (Gp_role == GP_ROLE_EXECUTE )
 		elog(ERROR, "heap_delete() is not allowed on segments");

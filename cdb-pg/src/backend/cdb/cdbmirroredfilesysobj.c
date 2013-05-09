@@ -1092,7 +1092,7 @@ void MirroredFileSysObj_TransactionCreateBufferPoolFile(
 }
 
 /*
- * in gpsql, we acturely do not do any mirror related work.
+ * in hawq, we acturely do not do any mirror related work.
  */
 void MirroredFileSysObj_TransactionCreateAppendOnlyFile(
 	RelFileNode 			*relFileNode,

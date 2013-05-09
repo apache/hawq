@@ -423,7 +423,7 @@ RelationNeedsToastTable(Relation rel)
 		return false;
 	
 	/*
-	 * in gpsql, we cannot use toast table for dispatched table.
+	 * in hawq, we cannot use toast table for dispatched table.
 	 */
 	if (RelationIsAoRows(rel) || RelationIsAoCols(rel))
 		return false ;
@@ -432,7 +432,7 @@ RelationNeedsToastTable(Relation rel)
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
-						errmsg("toast table is not supported in gpsql")));
+						errmsg("toast table is not supported")));
 	}
 
 	tupdesc = rel->rd_att;

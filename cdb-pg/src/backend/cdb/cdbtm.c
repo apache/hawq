@@ -430,7 +430,7 @@ dtmPreCommand(const char *debugCaller, const char *debugDetail, PlannedStmt *stm
 	Assert(debugDetail != NULL);
 
 	/*
-	 * in gpsql, distributed transacetion is disabled.
+	 * in hawq, distributed transacetion is disabled.
 	 */
 	Assert(currentGxact == NULL);
 	needsTwoPhaseCommit = FALSE;
@@ -2926,7 +2926,7 @@ recoverTM(void)
 	/*
 	 * If the GPDB, QD needs to collect the max distributed xid from every
 	 * segments by calling determineSegmentMaxDistributedXid();.
-	 * But in GPSQL, there si no distributed transaction.
+	 * But in HAWQ, there si no distributed transaction.
 	 */
 	segmentMaxDistributedTransactionId = *shmGIDSeq;
 	if (segmentMaxDistributedTransactionId >= *shmGIDSeq)
@@ -3039,7 +3039,7 @@ recoverInDoubtTransactions(void)
 
 		/*
 		 * In the GPDB, it can't start system if we cannot deliiver commits by
-		 * calling doNotifyCommittedInDoubt(gxact->gid);. In GPSQL, donot need
+		 * calling doNotifyCommittedInDoubt(gxact->gid);. In HAWQ, donot need
 		 * to recovery distributed transaction.
 		 */
 		currentGxact = gxact;
@@ -3068,7 +3068,7 @@ recoverInDoubtTransactions(void)
 	 * UNDONE: Gather in-boubt transactions and issue aborts.
 	 *
 	 * In the GPDB, it needs to gather all of aborted transaction from segments
-	 * bu calling gatherRMInDoubtTransactions();. In GPSQL, donot need to
+	 * bu calling gatherRMInDoubtTransactions();. In HAWQ, donot need to
 	 * recovery distributed transaction.
 	 */
 	htab = NULL;
@@ -4052,7 +4052,7 @@ performDtxProtocolCommand(DtxProtocolCommand dtxProtocolCommand,
 
 /*
  * get master's local transaction id.
- * in gpsql, there is no distributed transaction.
+ * in hawq, there is no distributed transaction.
  * master's transaction is dispatched from master to segments.
  */
 TransactionId

@@ -1419,7 +1419,7 @@ exec_mpp_dtx_protocol_command(
 	CommandDest dest = whereToSendOutput;
 	const char *commandTag = loggingStr;
 
-	Insist(!"in gpsql we should never get here");
+	Insist(!"we should never get here");
 
 	if (log_statement == LOGSTMT_ALL)
 	{
@@ -4688,7 +4688,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 					elog((Debug_print_full_dtm ? LOG : DEBUG5), "Simple query stmt: %s.",query_string);
 
 					/*
-					 * in gpsql, there is no distributed transaction
+					 * in hawq, there is no distributed transaction
 					 */
 					/*setupRegularDtxContext();*/
 
@@ -4971,7 +4971,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 					elog((Debug_print_full_dtm ? LOG : DEBUG5), "Parse: %s.",query_string);
 
 					/*
-					 *  in gpsql, there is no distributed transaction
+					 *  in hawq, there is no distributed transaction
 					 */
 					/*setupRegularDtxContext();*/
 					
@@ -4991,7 +4991,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 				SetCurrentStatementStartTimestamp();
 
 				/*
-				 *  in gpsql, there is no distributed transaction
+				 *  in hawq, there is no distributed transaction
 				 */
                 /*setupRegularDtxContext();*/
                 
@@ -5019,7 +5019,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 					elog((Debug_print_full_dtm ? LOG : DEBUG5), "Execute: %s.",portal_name);
 
 					/*
-					 *  in gpsql, there is no distributed transaction
+					 *  in hawq, there is no distributed transaction
 					 */
 					/*setupRegularDtxContext();*/
 					
@@ -5038,7 +5038,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 				elog((Debug_print_full_dtm ? LOG : DEBUG5), "Fast path function call.");
 
 				/*
-				 *  in gpsql, there is no distributed transaction
+				 *  in hawq, there is no distributed transaction
 				 */
 				/*setupRegularDtxContext();*/
 					
@@ -5140,7 +5140,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 					elog((Debug_print_full_dtm ? LOG : DEBUG5), "Describe: %s.", describe_target);
 					
 					/*
-					 *  in gpsql, there is no distributed transaction
+					 *  in hawq, there is no distributed transaction
 					 */
 					/*setupRegularDtxContext();*/
 					

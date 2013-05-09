@@ -797,7 +797,7 @@ prepareDispatchedCatalogTablespace(QueryContextInfo *cxt, Oid tablespace, HTAB *
 
     /*
      * here we get the seg0' s tablespace location since
-     * master's tablespace location is special in gpsql.
+     * master's tablespace location is special in hawq.
      */
     Assert(GpIdentity.numsegments >=1);
     GetFilespacePathForTablespace(tablespace, 0, &path);
@@ -1403,7 +1403,7 @@ prepareDispatchedCatalogFunctionExpr(QueryContextInfo *cxt, Expr *expr, HTAB *ht
             seqoid = DatumGetObjectId(arg->constvalue);
             
             /* 
-             * aclchecks for nextval are done on the segments. But in GPSQL 
+             * aclchecks for nextval are done on the segments. But in HAWQ
              * we are executing as bootstrap user on the segments. So any aclchecks
              * on segments defeats the purpose. 
              * Do the aclchecks on the master, prior to dispatch
@@ -1419,7 +1419,7 @@ prepareDispatchedCatalogFunctionExpr(QueryContextInfo *cxt, Expr *expr, HTAB *ht
         {
             ereport(ERROR,
                     (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
-                            errmsg("Non const argument in function \"NEXTVAL\" is not support yet in GPSQL.")));
+                            errmsg("Non const argument in function \"NEXTVAL\" is not support yet.")));
         }
 
 

@@ -161,7 +161,7 @@ OpenAOSegmentFile(
 							&rel->rd_node,
 							segmentFileNum,
 							/*
-							 * TODO, in gpsql, fix later
+							 * TODO, in hawq, fix later
 							 */
 							GpIdentity.segindex,
 							/* relationName */ NULL,		// Ok to be NULL -- we don't know the name here.

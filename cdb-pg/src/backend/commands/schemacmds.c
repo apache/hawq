@@ -133,7 +133,7 @@ CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString)
 		SetUserIdAndContext(owner_uid, true);
 
 	/*
-	 * in gpsql, should be only called on master
+	 * in hawq, should be only called on master
 	 */
 	Assert(Gp_role != GP_ROLE_EXECUTE);
 	/* Create the schema's namespace */

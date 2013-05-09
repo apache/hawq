@@ -144,7 +144,7 @@ FileRepPrimary_BypassMirrorCheck(Oid ts_oid, Oid fs_oid, bool *primaryOnly)
 	if (GpIdentity.segindex == MASTER_CONTENT_ID)
 		return false;
 
-	/* in gpsql, return true always since there is no mirror */
+	/* in hawq, return true always since there is no mirror */
 	return true;
 
 }

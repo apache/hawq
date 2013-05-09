@@ -2211,7 +2211,7 @@ RemoveTempRelationsCallback(int code, Datum arg)
 	}
 
 	/*
-	 * in gpsql, we do not create any object on QE,
+	 * in hawq, we do not create any object on QE,
 	 * therefore we do not drop anything.
 	 */
 	if (Gp_role == GP_ROLE_EXECUTE)

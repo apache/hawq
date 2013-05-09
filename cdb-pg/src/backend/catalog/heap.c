@@ -1438,7 +1438,7 @@ heap_create_with_catalog(const char *relname,
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
-						errmsg("Cannot support error table yet in GPSQL")));
+						errmsg("Cannot support error table yet")));
 
 		/* If this is a error log table, we have to save it in local tablespace. */
 		override = false;

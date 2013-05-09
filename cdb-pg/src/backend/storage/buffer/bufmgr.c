@@ -2475,7 +2475,7 @@ RelationTruncate(Relation rel, BlockNumber nblocks, bool markPersistentAsPhysica
 		RelationFetchGpRelationNodeForXLog(rel);
 
 		/*
-		 * in gpsql, no mirror is configured.
+		 * in hawq, no mirror is configured.
 		 * TODO
 		 */
 		if (rel->rd_segfile0_relationnodeinfos[0].isPresent)

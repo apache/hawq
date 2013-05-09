@@ -280,7 +280,7 @@ systable_getprev(SysScanDesc sysscan)
 	HeapTuple	htup = NULL;
 	if (sysscan->inmemscan && Gp_role == GP_ROLE_EXECUTE)
 	{
-		elog(ERROR, "in gpsql, systable_getprev() is not allowed on segments");
+		elog(ERROR, "systable_getprev() is not allowed on segments");
 	}
 	else if (sysscan->irel)
 		htup = index_getnext(sysscan->iscan, BackwardScanDirection);

@@ -1024,7 +1024,7 @@ vacuum_appendonly_rel(Relation aorel, void *vacrelstats, bool isVacFull)
 	 */
 
 	/*
-	 * for lock reason, in gpsql, we currently do not truncate the relation
+	 * for lock reason, in hawq, we currently do not truncate the relation
 	 */
 	pfree(fstotal);
 
@@ -1258,7 +1258,7 @@ vacuum_aocs_rel(Relation aorel, void *vacrelstats, bool isVacFull)
 	 */
 
 	/*
-	 * for lock reason, in gpsql, we currently do not truncate relation
+	 * for lock reason, in hawq, we currently do not truncate relation
 	 */
 	pfree(aoEntry);
 

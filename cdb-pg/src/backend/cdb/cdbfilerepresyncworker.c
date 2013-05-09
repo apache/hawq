@@ -426,7 +426,7 @@ FileRepPrimary_ResyncWrite(FileRepResyncHashEntry_s	*entry)
 											&primaryError,
 											&mirrorDataLossOccurred);*/
 					/*
-					 * in gpsql, no mirror is configured,
+					 * in hawq, no mirror is configured,
 					 * TODO, should be cleaned in the future.
 					 */
 					primaryError = EIO;

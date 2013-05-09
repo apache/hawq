@@ -465,7 +465,7 @@ DefineQueryRewrite(RuleStmt *stmt)
 			MirroredFileSysObj_ScheduleDropBufferPoolRel(event_relation);
 			
 			/*
-			 * in gpsql, need a correct contenid
+			 * in hawq, need a correct contenid
 			 * TODO
 			 */
 			DeleteGpRelationNodeTuple(

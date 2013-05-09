@@ -1260,7 +1260,7 @@ createdb_int(CreatedbStmt *stmt, CdbDispatcherState *ds)
 		 */
 		{
 			/*
-			 * TODO, in gpsql, in createdb more work need todo.
+			 * TODO, in hawq, in createdb more work need todo.
 			 */
 			int i;
 			Assert(NULL != gp_relation_node->rd_segfile0_relationnodeinfos);

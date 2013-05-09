@@ -166,7 +166,7 @@ SELECT nextval('sequence_test2');
 (1 row)
 
 SELECT nextval(oid) FROM gp_dist_random('pg_class') WHERE relname = 'sequence_test2';
-ERROR:  Non const argument in function "NEXTVAL" is not support yet in GPSQL.
+ERROR:  Non const argument in function "NEXTVAL" is not support yet.
 -- Test comments
 -- COMMENT ON SEQUENCE asdf IS 'won''t work';
 -- COMMENT ON SEQUENCE sequence_test2 IS 'will work';
