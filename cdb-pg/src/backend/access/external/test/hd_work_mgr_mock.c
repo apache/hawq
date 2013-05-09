@@ -4,12 +4,8 @@
 #include "cmockery.h"
 
 #include "c.h"
-#include "../hd_work_mgr.c"
+#include "hd_work_mgr_mock.h"
 
-
-
-CdbComponentDatabases *orig_cdb = NULL;
-int orig_seg_count = -1;
 
 /*
  * Helper functions copied from backend/cdb/cdbutils.c

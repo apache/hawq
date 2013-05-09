@@ -136,7 +136,7 @@ static void init_client_context(ClientContext *client_context);
 static GPHDUri* init(char* uri, ClientContext* cl_context);
 static GpxfStatsElem *get_data_statistics(GPHDUri* hadoop_uri, ClientContext *cl_context, StringInfo err_msg);
 static GpxfStatsElem* parse_get_stats_response(StringInfo rest_buf);
-static List* allocate_fragments_2_datanodes(List *whole_data_fragments_list, List *allDNProcessingLoads);
+static List* allocate_fragments_to_datanodes(List *whole_data_fragments_list);
 static DatanodeProcessingLoad* get_dn_processing_load(List **allDNProcessingLoads, FragmentLocation *fragment_loc);
 static void print_data_nodes_allocation(List *allDNProcessingLoads, int total_data_frags);
 static List* do_segment_clustering_by_host(void);
@@ -440,8 +440,7 @@ distribute_work_2_gp_segments(List *whole_data_fragments_list, int total_segs, i
 	 * We copy each fragment from whole_data_fragments_list into allDNProcessingLoads, but now
 	 * each fragment will point to just one datanode - the processing data node, instead of several replicas.
 	 */
-	allDNProcessingLoads = allocate_fragments_2_datanodes(whole_data_fragments_list, 
-														  allDNProcessingLoads);
+	allDNProcessingLoads = allocate_fragments_to_datanodes(whole_data_fragments_list);
 	/* arrange all segments in groups where each group has all the segments which sit on the same host */
 	gpHosts =  do_segment_clustering_by_host();
 	
@@ -691,9 +690,9 @@ print_data_nodes_allocation(List *allDNProcessingLoads, int total_data_frags)
  * each fragment will point to just one datanode - the processing data node, instead of several replicas.
  */
 static List*
-allocate_fragments_2_datanodes(List *whole_data_fragments_list, 
-							   List *allDNProcessingLoads)
+allocate_fragments_to_datanodes(List *whole_data_fragments_list)
 {
+	List* allDNProcessingLoads = NIL;
 	AllocatedDataFragment* allocated = NULL;
 	ListCell *cur_frag_cell = NULL;
 	ListCell *fragment_location_cell = NULL;
