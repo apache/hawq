@@ -1477,7 +1477,8 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 
 			elog(NOTICE, "External scan %s will utilize %d out "
 				 "of %d segment databases", 
-				 (uri->protocol == URI_GPFDIST ? "from gpfdist(s) server" : "using custom protocol"),
+				 (((uri->protocol == URI_GPFDIST) || (uri->protocol == URI_GPFDISTS)) ?
+				 "from gpfdist(s) server" : "using custom protocol"),
 				 num_segs_participating,
 				 total_primaries);
 		}
@@ -1599,7 +1600,7 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 			/* 
 			 * We failed to find a segdb for this gpfdist(s) URI 
 			 * when is_custom_hd is true it means that the HD segment allocation algorithm
-			 * is activated and in this case in not necessay true that all segments are allocated 
+			 * is activated and in this case it is not necessarily true that all segments are allocated
 			 */
 			if(!found_match && !is_custom_hd)
 			{
@@ -3563,7 +3564,7 @@ make_externalscan(List *qptlist,
 	plan->righttree = NULL;
 	node->scan.scanrelid = scanrelid;
 
-	/* external specifictions */
+	/* external specifications */
 	node->uriList = urilist;
 	node->fmtOpts = fmtopts;
 	node->fmtType = fmttype;
