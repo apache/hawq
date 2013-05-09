@@ -1,28 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project name="gpxf" default="all" xmlns:ivy="antlib:org.apache.ivy.ant">
 
+	<!-- Load product and build parameters from build.properties
+		 NOTE: Product name and version defined in build.properties -->
 	<property file="build.properties" />
 
-	<!-- Compiler options -->
+	<!-- Some basic properties -->
 	<property environment="env"/>
-	<property name="name" value="gpxf" />
-	<property name="gpxf.version" value="2.0.0" />
-	<condition property="gpxf.build" value="${env.BUILD_NUMBER}" else="${user.name}" >
+	<property name="component.name" value="${component.basename}-${component.version}" />
+
+	<!-- If BUILD_NUMBER is in environment, use it, o/w use current username -->
+	<condition property="build.number" value="${env.BUILD_NUMBER}" else="${user.name}" >
 	    <isset property="env.BUILD_NUMBER" />
 	</condition>
-	<condition property="package.postfix" value="_dev" else="" >
+
+	<!-- If build.trunkbuild is defined (-D) then add _dev
+		 Used for trunk builds -->
+	<condition property="build.branch" value="_dev" else="" >
 	    <isset property="build.trunkbuild"/>
 	</condition>
-	<property name="version" value="${gpxf.version}" />
-	<property name="final.name" value="${name}-${version}" />
 
 	<property name="src.dir" value="${basedir}" />
-	<property name="lib.dir" value="${basedir}/build/lib" />
 	<property name="build.dir" value="${basedir}/build" />
-	<property name="dist.dir" value="${build.dir}/${final.name}" />
-	<property name="package.buildroot" value="/tmp/gpxf_package_build_${user.name}"/>
-	<property name="package.release" value="${gpxf.build}${package.postfix}"/>
-	<property name="package.prefix" value="/usr/lib/gphd"/>
+	<property name="lib.dir" value="${build.dir}/lib" />
+	<property name="dist.dir" value="${build.dir}/${component.name}" />
+
+	<property name="package.buildroot" value="/tmp/${component.basename}_package_build_${user.name}"/>
+	<property name="package.release" value="${build.number}${build.branch}"/>
+	<property name="package.name" value="${component.name}-${package.release}"/>
 
 	<!--Apache Ivy(http://ant.apache.org/ivy/history/latest-milestone/install.html) -->
 	<loadproperties srcfile="${basedir}/ivy/libraries.properties" />
@@ -43,10 +48,6 @@
 
 
 	<!-- Project Libraries -->
-
-	<path id="pig.classpath">
-		<fileset file="${lib.dir}/hadoop-${hadoop.version}/pig-*-core.jar" />
-	</path>
 
 	<path id="library.commons.classpath">
 
@@ -70,11 +71,13 @@
 	<target name="init" description="Build initialization">
 	</target>
 
+	<!-- Cleanup -->
 	<target name="clean">
 		<delete dir="${build.dir}"/>
 		<delete dir="${package.buildroot}"/>
 	</target>
 
+	<!-- Compilation -->
 	<target name="compile" depends="ivy-retrieve-hadoop">
 		<mkdir dir="${build.dir}/classes" />
 
@@ -88,7 +91,6 @@
 			destdir="${build.dir}/classes"
 			includeantruntime="${compiler.includeantruntime}"
 			debug="${compiler.debug}"
-			deprecation="${compiler.deprecation}"
 			fork="yes"
 			verbose="${compiler.verbose}"
 			memoryMaximumSize="${compiler.max.memory}"
@@ -98,8 +100,9 @@
 
 	</target>
 
+	<!-- Create JAR -->
 	<target name="jar" depends="compile" description="create the main jar files">
-		<jar destfile="${build.dir}/${final.name}.jar">
+		<jar destfile="${build.dir}/${component.name}.jar">
 			<manifest>
 				<attribute name="Built-By" value="${user.name}"/>
 				<attribute name="Built-Date" value="${TODAY}"/> 
@@ -116,7 +119,71 @@
 		</jar>
 	</target>
 
+	<!-- Default -->
 	<target name="all" depends="jar" description="build all jar files" />
+
+	<!-- Create package -->
+	<target name="package" depends="jar" description="create a package directory">
+		<delete dir="${dist.dir}"/>
+		<mkdir dir="${dist.dir}"/>
+		<copy todir="${dist.dir}">
+			<fileset dir="${lib.dir}">
+				<include name="avro*.jar"/>
+				<include name="jackson*.jar"/>  
+				<include name="protobuf*.jar"/>      
+			</fileset>
+			<fileset dir="${build.dir}">
+				<include name="${component.basename}*.jar"/>
+				<include name="protobuf-appendix.jar"/>
+			</fileset>
+		</copy>
+	</target>
+
+	<!-- Create TAR -->
+	<target name="tar" depends="package" description="create a tarball">
+		<tar destfile="${build.dir}/${component.name}-${package.release}.tar.gz"
+			compression="gzip" 
+			longfile="gnu">
+			<tarfileset dir="${dist.dir}" prefix="${component.name}"/>
+	    </tar>
+	</target>
+
+	<!-- Create RPM -->
+	<target name="rpm" depends="tar" description="create an RPM package">
+		<mkdir dir="${package.buildroot}/BUILD" />
+		<mkdir dir="${package.buildroot}/RPMS" />
+		<mkdir dir="${package.buildroot}/SRPMS" />
+		<mkdir dir="${package.buildroot}/SOURCES" />
+		<mkdir dir="${package.buildroot}/SPECS" />
+		<copy todir="${package.buildroot}/SOURCES">
+			<fileset dir="${build.dir}">
+				<include name="${package.name}.tar.gz" />
+			</fileset>
+		</copy>
+		<copy file="${src.dir}/packages/gpxf.spec" todir="${package.buildroot}/SPECS">
+			<filterchain>
+				<replacetokens>
+					<token key="component.basename" value="${component.basename}" />
+					<token key="component.version" value="${component.version}" />
+					<token key="package.release" value="${package.release}" />
+					<token key="package.prefix" value="${package.prefix}" />
+					<token key="component.name" value="${component.name}" />
+					<token key="package.name" value="${package.name}" />
+					<token key="package.publicstage" value="${package.publicstage}" />
+					<token key="package.summary" value="${package.summary}" />
+					<token key="package.vendor" value="${package.vendor}" />
+					<token key="package.description" value="${package.description}" />
+				</replacetokens>
+			</filterchain>
+		</copy>
+		<rpm specFile="gpxf.spec" command="-bb" topDir="${package.buildroot}" cleanBuildDir="true" failOnError="true"/>
+		<copy todir="${build.dir}/" flatten="true">
+			<fileset dir="${package.buildroot}/RPMS">
+				<include name="**/${component.basename}*.rpm" />
+			</fileset>
+		</copy>
+		<delete dir="${package.buildroot}" quiet="true" verbose="false"/>
+	</target>
 
 	<!-- Ivy -->
 	<target name="ivy-probe-antlib">
@@ -143,93 +210,4 @@
 		<ivy:retrieve settingsRef="basic.settings" pattern="${build.ivy.lib.dir}/${ivy.artifact.retrieve.pattern}" sync="true" conf="compile"/>
 		<ivy:cachepath pathid="ivy-classpath" conf="compile"/>
 	</target>
-
-	<target name="ivy-retrieve-checkstyle"
-		description="Retrieve Ivy-managed artifacts for the checkstyle configurations">
-		<ivy:retrieve pattern="${build.ivy.lib.dir}/${ivy.artifact.retrieve.pattern}"/>
-		<ivy:cachepath pathid="checkstyle-classpath" conf="checkstyle"/>
-	</target>
-
-	<!-- ================================================================== -->
-	<!-- Run optional third-party tool targets                              --> 
-	<!-- ================================================================== -->
-
-	<target name="checkstyle" depends="ivy-retrieve-checkstyle,check-for-checkstyle" if="checkstyle.present" description="Run optional third-party tool targets">
-		<taskdef resource="checkstyletask.properties">
-			<classpath refid="checkstyle-classpath"/>
-		</taskdef>
-
-		<mkdir dir="${test.build.dir}"/>
-
-		<checkstyle config="${test.src.dir}/sun_checks.xml"
-			failOnViolation="false">
-			<fileset dir="${src.dir}" includes="*.java"/>
-			<formatter type="xml" toFile="${test.build.dir}/checkstyle-errors.xml"/>
-		</checkstyle>
-
-		<xslt style="${test.src.dir}/checkstyle-noframes-sorted.xsl"
-			in="${test.build.dir}/checkstyle-errors.xml"
-			out="${test.build.dir}/checkstyle-errors.html"/>
-	</target>
-
-	<target name="check-for-checkstyle">
-		<available property="checkstyle.present" resource="checkstyletask.properties">
-			<classpath refid="checkstyle-classpath"/>
-		</available>  	
-	</target>
-
-	<target name="package" depends="jar" description="create a package directory">
-		<delete dir="${dist.dir}"/>
-		<mkdir dir="${dist.dir}"/>
-		<copy todir="${dist.dir}">
-			<fileset dir="${lib.dir}">
-				<include name="avro*.jar"/>
-				<include name="jackson*.jar"/>  
-				<include name="protobuf*.jar"/>      
-			</fileset>
-			<fileset dir="${build.dir}">
-				<include name="gpxf*.jar"/>
-				<include name="protobuf-appendix.jar"/>
-			</fileset>
-		</copy>
-	</target>
-
-	<target name="tar" depends="package" description="create a tarball">
-		<tar destfile="${build.dir}/${final.name}-${package.release}.tar.gz"
-			compression="gzip" 
-			longfile="gnu">
-			<tarfileset dir="${dist.dir}" prefix="${final.name}"/>
-	    </tar>
-	</target>
-
-	<target name="rpm" depends="tar" description="create an RPM package">
-		<mkdir dir="${package.buildroot}/BUILD" />
-		<mkdir dir="${package.buildroot}/RPMS" />
-		<mkdir dir="${package.buildroot}/SRPMS" />
-		<mkdir dir="${package.buildroot}/SOURCES" />
-		<mkdir dir="${package.buildroot}/SPECS" />
-		<copy todir="${package.buildroot}/SOURCES">
-			<fileset dir="${build.dir}">
-				<include name="${final.name}-${package.release}.tar.gz" />
-			</fileset>
-		</copy>
-		<copy file="${src.dir}/packages/gpxf.spec" todir="${package.buildroot}/SPECS">
-			<filterchain>
-				<replacetokens>
-					<token key="final.name" value="${final.name}" />
-					<token key="version" value="${gpxf.version}" />
-					<token key="package.release" value="${package.release}" />
-					<token key="package.prefix" value="${package.prefix}" />
-				</replacetokens>
-			</filterchain>
-		</copy>
-		<rpm specFile="gpxf.spec" command="-bb" topDir="${package.buildroot}" cleanBuildDir="true" failOnError="true"/>
-		<copy todir="${build.dir}/" flatten="true">
-			<fileset dir="${package.buildroot}/RPMS">
-				<include name="**/${name}*.rpm" />
-			</fileset>
-		</copy>
-		<delete dir="${package.buildroot}" quiet="true" verbose="false"/>
-	</target>
-
 </project>
