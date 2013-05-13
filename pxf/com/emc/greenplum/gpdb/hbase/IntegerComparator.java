@@ -15,13 +15,13 @@ import java.io.IOException;
  * every region server
  *
  * It converts a value into Long before comparing
- * The filter is good for any integer numberic comparison
+ * The filter is good for any integer numeric comparison
  * i.e. integer, bigint, smallint
  */
 public class IntegerComparator extends WritableByteArrayComparable 
 {
     private Long val;
-
+    
 	/*
 	 * Used for serialization
 	 */
@@ -47,6 +47,9 @@ public class IntegerComparator extends WritableByteArrayComparable
 	 */
     public int compareTo(byte[] value, int offset, int length) 
     {
+    	if (length == 0) 
+    		return 1; // empty line, can't compare.
+    	
 		// TODO optimize by parsing the bytes directly. 
 		// Maybe we can even determine if it is an int or a string encoded
 		String valueAsString = new String(value, offset, length);
