@@ -772,7 +772,12 @@ get_http_error_msg(long http_ret_code, char* msg)
 			end = strstr(start, "</p>");	/* assuming where is a <p>, there is a </p> */
 			if (end != NULL)
 			{
-				tmp =  start;
+				/* Take one more line after the </p> */
+				tmp = strchr(end, '\n');
+				if (tmp != NULL)
+					end = tmp;
+
+				tmp = start;
 				
 				/*
 				 * Right now we have the full paragraph inside the <body>. We need to extract from it
@@ -783,7 +788,10 @@ get_http_error_msg(long http_ret_code, char* msg)
 					if (*tmp == '>') /* skipping the <pre> tags */
 						skip = false;
 					else if (*tmp == '<') /* skipping the <pre> tags */
+					{
 						skip = true;
+						appendStringInfoChar(&errMsg, ' ');
+					}
 					else if (*tmp != '\n' && *tmp != '\r' && skip == false)
 						appendStringInfoChar(&errMsg, *tmp);
 					tmp++;
@@ -813,7 +821,7 @@ get_http_error_msg(long http_ret_code, char* msg)
 	}
 	
 	/*
-	 * 5. This is an unexpected situation. We recevied an error message from the server but it does not have neither a <body>
+	 * 5. This is an unexpected situation. We received an error message from the server but it does not have neither a <body>
 	 *    nor a <title>. In this case we return the error message we received as-is.
 	 */
 	return msg;
