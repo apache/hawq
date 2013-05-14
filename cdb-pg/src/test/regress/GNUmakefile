@@ -160,9 +160,6 @@ installcheck-gpxf: all upg2-setup ugpart-setup
 installcheck-goh: all ./goh_schedule upg2-setup ugpart-setup
 	$(pg_regress_call)  --psqldir=$(PSQLDIR) --schedule=./goh_schedule --srcdir=$(abs_srcdir) --tablespace=hdfs_ts
 
-installcheck-ha: all upg2-setup ugpart-setup
-	$(pg_regress_call)  --psqldir=$(PSQLDIR) --schedule=./highavailability_schedule --srcdir=$(abs_srcdir)
-
 .PHONY: ./current_good_schedule
 ./current_good_schedule: $(srcdir)/known_good_schedule
 ifneq ($(origin TT), undefined)

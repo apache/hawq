@@ -23,6 +23,8 @@ test: gpsql_fault_tolerance
 test: gpsql_alter_table
 test: goh_portals
 test: goh_prepare
+test: goh_set_schema
+test: goh_alter_owner
 test: boolean
 test: char
 test: name
@@ -205,6 +207,7 @@ test: madlib_lda
 test: madlib_logistic
 test: madlib_multilogistic
 test: madlib_kmeans
+test: madlib_newplda
 #
 # the following test needs some special filespace/tablespace.
 #
