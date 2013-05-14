@@ -54,7 +54,7 @@
 	  			  conf="compile->master"/>
 	  <dependency org="com.sun.jersey" name="jersey-core" rev="1.8" 
 	  			  conf="compile->master"/>
-	  <dependency org="org.mortbay.jetty" name="jetty" rev="6.1.26" 
+	  <dependency org="org.eclipse.jetty" name="jetty-io" rev="7.6.10.v20130312" 
 	  			  conf="compile->master"/>
 	  <dependency org="commons-logging" name="commons-logging" rev="1.1.1" 
 	  			  conf="compile->master"/>

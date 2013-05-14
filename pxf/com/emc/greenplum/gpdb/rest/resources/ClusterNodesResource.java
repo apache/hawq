@@ -89,7 +89,7 @@ public class ClusterNodesResource
 					Log.error("Nodes verification failed", e);
 					throw e;
 				}
-				catch (org.mortbay.jetty.EofException e)
+				catch (org.eclipse.jetty.io.EofException e)
 				{
 					Log.error("Remote connection closed by GPDB", e);
 					throw e;

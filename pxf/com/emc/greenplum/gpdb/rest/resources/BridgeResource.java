@@ -88,7 +88,7 @@ public class BridgeResource
 					while ((record = bridge.GetNext()) != null)
 						record.write(dos);
 				}
-				catch (org.mortbay.jetty.EofException e)
+				catch (org.eclipse.jetty.io.EofException e)
 				{
 					// Occurs whenever GPDB decides the end the connection
 					Log.error("Remote connection closed by GPDB", e);

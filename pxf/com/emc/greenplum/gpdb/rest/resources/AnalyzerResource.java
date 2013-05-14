@@ -101,7 +101,7 @@ public class AnalyzerResource
 				{
 					dos.writeBytes(analyzer.GetEstimatedStats(datapath));
 				} 
-				catch (org.mortbay.jetty.EofException e)
+				catch (org.eclipse.jetty.io.EofException e)
 				{
 					Log.error("Remote connection closed by GPDB", e);
 				}
