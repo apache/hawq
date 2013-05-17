@@ -1943,44 +1943,40 @@ explain WITH cte AS (SELECT * FROM example) SELECT x.* FROM multiset_5( TABLE ( 
 (16 rows)
 
 explain select * from multiset_2( TABLE( SELECT distinct a.a, b.b from example a, example b where a.a = b.a) ) order by 1,2;
-                                             QUERY PLAN                                             
-----------------------------------------------------------------------------------------------------
- Gather Motion 2:1  (slice1; segments: 2)  (cost=6.80..6.87 rows=16 width=36)
+                                          QUERY PLAN                                          
+----------------------------------------------------------------------------------------------
+ Gather Motion 2:1  (slice1; segments: 2)  (cost=6.29..6.36 rows=15 width=36)
    Merge Key: a, b
-   ->  Sort  (cost=6.80..6.87 rows=16 width=36)
+   ->  Sort  (cost=6.29..6.36 rows=15 width=36)
          Sort Key: multiset_2.a, multiset_2.b
-         ->  Table Function Scan on multiset_2  (cost=5.46..6.06 rows=16 width=36)
-               ->  Unique  (cost=5.46..5.69 rows=16 width=16)
+         ->  Table Function Scan on multiset_2  (cost=4.88..5.55 rows=15 width=36)
+               ->  HashAggregate  (cost=4.88..5.18 rows=15 width=36)
                      Group By: a.a, b.b
-                     ->  Sort  (cost=5.46..5.54 rows=16 width=16)
-                           Sort Key (Distinct): a.a, b.b
-                           ->  Hash Join  (cost=2.23..4.73 rows=16 width=16)
-                                 Hash Cond: a.a = b.a
-                                 ->  Seq Scan on example a  (cost=0.00..2.10 rows=5 width=4)
-                                 ->  Hash  (cost=2.10..2.10 rows=5 width=16)
-                                       ->  Seq Scan on example b  (cost=0.00..2.10 rows=5 width=16)
+                     ->  Hash Join  (cost=2.23..4.73 rows=16 width=16)
+                           Hash Cond: a.a = b.a
+                           ->  Seq Scan on example a  (cost=0.00..2.10 rows=5 width=4)
+                           ->  Hash  (cost=2.10..2.10 rows=5 width=16)
+                                 ->  Seq Scan on example b  (cost=0.00..2.10 rows=5 width=16)
  Settings:  gp_segments_for_planner=8
-(15 rows)
+(13 rows)
 
 explain select * from multiset_2( TABLE( SELECT distinct a.a, b.b from example a join example b using (a) ) ) order by 1,2;
-                                             QUERY PLAN                                             
-----------------------------------------------------------------------------------------------------
- Gather Motion 2:1  (slice1; segments: 2)  (cost=6.80..6.87 rows=16 width=36)
+                                          QUERY PLAN                                          
+----------------------------------------------------------------------------------------------
+ Gather Motion 2:1  (slice1; segments: 2)  (cost=6.29..6.36 rows=15 width=36)
    Merge Key: a, b
-   ->  Sort  (cost=6.80..6.87 rows=16 width=36)
+   ->  Sort  (cost=6.29..6.36 rows=15 width=36)
          Sort Key: multiset_2.a, multiset_2.b
-         ->  Table Function Scan on multiset_2  (cost=5.46..6.06 rows=16 width=36)
-               ->  Unique  (cost=5.46..5.69 rows=16 width=16)
+         ->  Table Function Scan on multiset_2  (cost=4.88..5.55 rows=15 width=36)
+               ->  HashAggregate  (cost=4.88..5.18 rows=15 width=36)
                      Group By: a.a, b.b
-                     ->  Sort  (cost=5.46..5.54 rows=16 width=16)
-                           Sort Key (Distinct): a.a, b.b
-                           ->  Hash Join  (cost=2.23..4.73 rows=16 width=16)
-                                 Hash Cond: a.a = b.a
-                                 ->  Seq Scan on example a  (cost=0.00..2.10 rows=5 width=4)
-                                 ->  Hash  (cost=2.10..2.10 rows=5 width=16)
-                                       ->  Seq Scan on example b  (cost=0.00..2.10 rows=5 width=16)
+                     ->  Hash Join  (cost=2.23..4.73 rows=16 width=16)
+                           Hash Cond: a.a = b.a
+                           ->  Seq Scan on example a  (cost=0.00..2.10 rows=5 width=4)
+                           ->  Hash  (cost=2.10..2.10 rows=5 width=16)
+                                 ->  Seq Scan on example b  (cost=0.00..2.10 rows=5 width=16)
  Settings:  gp_segments_for_planner=8
-(15 rows)
+(13 rows)
 
 explain select * from multiset_2( TABLE ( SELECT * FROM example WHERE a = 2 ) ) WHERE a = 2;
                                  QUERY PLAN                                  

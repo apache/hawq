@@ -34,13 +34,14 @@ extern List *transformSortClause(ParseState *pstate, List *orderlist,
                                  List **targetlist, bool resolveUnknown,
                                  bool useSQL99);
 extern List *transformDistinctClause(ParseState *pstate, List *distinctlist,
-						List **targetlist, List **sortClause);
+						List **targetlist, List **sortClause, List **groupClause);
 extern List *transformScatterClause(ParseState *pstate, List *scatterlist,
 									List **targetlist);
 
 extern List *addAllTargetsToSortList(ParseState *pstate,
 						List *sortlist, List *targetlist,
 						bool resolveUnknown);
+
 extern List *addTargetToSortList(ParseState *pstate, TargetEntry *tle,
 					List *sortlist, List *targetlist,
 					int sortby_kind, List *sortby_opname,

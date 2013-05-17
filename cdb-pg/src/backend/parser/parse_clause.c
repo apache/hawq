@@ -2773,7 +2773,7 @@ transformSortClause(ParseState *pstate,
  */
 List *
 transformDistinctClause(ParseState *pstate, List *distinctlist,
-						List **targetlist, List **sortClause)
+						List **targetlist, List **sortClause, List **groupClause)
 {
 	List	   *result = NIL;
 	ListCell   *slitem;
@@ -2786,6 +2786,33 @@ transformDistinctClause(ParseState *pstate, List *distinctlist,
 	if (linitial(distinctlist) == NULL)
 	{
 		/* We had SELECT DISTINCT */
+
+		if (!pstate->p_hasAggs && !pstate->p_hasWindFuncs && *groupClause == NIL)
+		{
+			/*
+			 * MPP-15040
+			 * turn distinct clause into grouping clause to make both sort-based
+			 * and hash-based grouping implementations viable plan options
+			 */
+			*groupClause = addAllTargetsToSortList(pstate,
+													*groupClause,
+													*targetlist,
+													true);
+			/*
+			 * fix tags of group list entries
+			 */
+			ListCell *l;
+			foreach(l, *groupClause)
+			{
+				SortClause *s = (SortClause *) lfirst(l);
+				s->type = T_GroupClause;
+			}
+
+			/*
+			 * return empty distinct list, since we have created a grouping clause to do the job
+			 */
+			return NIL;
+		}
 
 		/*
 		 * All non-resjunk elements from target list that are not already in
