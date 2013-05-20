@@ -1571,6 +1571,47 @@ FtsGetQDMirrorInfo(char **hostname, uint16 *port)
 	return;
 }
 
+static void
+FreeCdbComponentInfo(CdbComponentDatabases *databases)
+{
+	int	i;
+
+	if (databases == NULL)
+		return;
+
+	for (i = 0; i < databases->total_entry_dbs; i++)
+		freeCdbComponentDatabaseInfo(&databases->entry_db_info[i]);
+
+	for (i = 0; i < databases->total_segment_dbs; i++)
+		freeCdbComponentDatabaseInfo(&databases->segment_db_info[i]);
+
+	pfree(databases->entry_db_info);
+	pfree(databases->segment_db_info);
+	pfree(databases);
+}
+
+static void
+CopyCdbComponentInfo(CdbComponentDatabaseInfo *dst, CdbComponentDatabaseInfo *src)
+{
+	int	i;
+
+	(void) memcpy(dst, src, sizeof(*dst));
+
+	if (src->hostname)
+		dst->hostname = pstrdup(src->hostname);
+	if (src->address)
+		dst->address = pstrdup(src->address);
+
+	for (i = 0; i < COMPONENT_DBS_MAX_ADDRS; i++)
+	{
+		if (src->hostaddrs[i] != NULL)
+			dst->hostaddrs[i] = pstrdup(src->hostaddrs[i]);
+	}
+
+	if (src->hostip)
+		dst->hostip = dst->hostaddrs[0];
+}
+
 static int
 cdbComponentDatabasesSorter(const void *a, const void *b)
 {
@@ -1591,7 +1632,7 @@ cdbComponentDatabasesSorter(const void *a, const void *b)
 static AliveSegmentsInfo *
 GetSegmentsInfo(Bitmapset *last_alive_segment_bms)
 {
-	AliveSegmentsInfo *info = NULL;
+	AliveSegmentsInfo 	*info = NULL;
 	int			i;
 	int			current_id;
 	int			alive_id;
@@ -1599,8 +1640,8 @@ GetSegmentsInfo(Bitmapset *last_alive_segment_bms)
 	CdbComponentDatabases *databases = NULL;
 	int			debug_log_level = DEBUG2;
 
-	info = (AliveSegmentsInfo *) palloc0(sizeof(AliveSegmentsInfo));
 	databases = getCdbComponentInfo(true);
+	info = (AliveSegmentsInfo *) palloc0(sizeof(AliveSegmentsInfo));
 
 	/* We will not leave the dead segment in its place. */
 	for (current_id = 0, alive_id = 0;
@@ -1652,9 +1693,8 @@ GetSegmentsInfo(Bitmapset *last_alive_segment_bms)
 	{
 		/* It looks like nothing happened. */
 		bms_free(alive_bms);
-		while (alive_id--)
-			freeCdbComponentDatabaseInfo(&databases->segment_db_info[alive_id]);
-		pfree(databases);
+		FreeCdbComponentInfo(databases);
+		pfree(info);
 		return NULL;
 	}
 
@@ -1673,7 +1713,8 @@ GetSegmentsInfo(Bitmapset *last_alive_segment_bms)
 		failover_seg_pos = random() % info->aliveSegmentsCount;
 		failover_segindex = databases->segment_db_info[failover_seg_pos].segindex;
 		elog(LOG, "random failover for failed segindex %d to alive segindex %d", i, failover_segindex);
-		databases->segment_db_info[alive_id] = databases->segment_db_info[failover_seg_pos];
+		CopyCdbComponentInfo(&databases->segment_db_info[alive_id],
+							 &databases->segment_db_info[failover_seg_pos]);
 		databases->segment_db_info[alive_id].segindex = i;
 		databases->segment_db_info[alive_id].dbid = contentid_get_dbid(i, 'p', true);
 		alive_id++;
@@ -1713,6 +1754,10 @@ UpdateGpAliveSegmentsInfo(bool force)
 	/* Nothing happened. */
 	if (info == NULL)
 		return;
+
+	/* Free the memory. */
+	bms_free(GpAliveSegmentsInfo.aliveSegmentsBitmap);
+	FreeCdbComponentInfo(GpAliveSegmentsInfo.cdbComponentDatabases);
 
 	GpAliveSegmentsInfo.fts_statusVersion = 0;
 	GpAliveSegmentsInfo.tid = GetCurrentTransactionId();
