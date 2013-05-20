@@ -1294,10 +1294,6 @@ subquery_is_pushdown_safe(Query *subquery, Query *topquery,
 	if (subquery->limitOffset != NULL || subquery->limitCount != NULL)
 		return false;
 
-	/* Check point 4 */
-	if ( contain_window_functions((Node*)subquery->targetList) )
-		return false;
-
 	/* Targetlist must not contain SRF */
 	if ( expression_returns_set((Node *) subquery->targetList))
 		return false;
@@ -1516,6 +1512,26 @@ qual_is_pushdown_safe(Query *subquery, Index rti, Node *qual,
 		{
 			safe = false;
 			break;
+		}
+
+		/* MPP-19244:
+		 * if subquery has WINDOW clause, it is safe to push-down quals that
+		 * use columns included in in the Partition-By clauses of every OVER
+		 * clause in the subquery
+		 * */
+		if (subquery->windowClause != NIL)
+		{
+			ListCell *lc =  NULL;
+			foreach(lc, subquery->windowClause)
+			{
+				WindowSpec *ws = (WindowSpec *) lfirst(lc);
+				if (!targetIsInSortGroupList(tle, ws->partition))
+				{
+					/* qual's columns are not included in Partition-By clause, so fail */
+					safe = false;
+					break;
+				}
+			}
 		}
 
 	}
