@@ -8198,3 +8198,87 @@ FROM
      2
 (1 row)
 
+-- MPP-19244; push predicates below window functions
+drop table if exists window_preds;
+create table window_preds(i int, j int, k int);
+insert into window_preds values(1,2,3);
+insert into window_preds values(2,3,4);
+insert into window_preds values(3,4,5);
+insert into window_preds values(4,5,6);
+insert into window_preds values(5,6,7);
+insert into window_preds values(6,7,8);
+select * from (select i,j,k, sum(i) over(), row_number() over(), rank() over(order by i) from window_preds) as foo where i>2 order by rank;
+i | j | k | sum | row_number | rank 
+---+---+---+-----+------------+------
+3 | 4 | 5 |  21 |          3 |    3
+4 | 5 | 6 |  21 |          4 |    4
+5 | 6 | 7 |  21 |          5 |    5
+6 | 7 | 8 |  21 |          6 |    6
+(4 rows)
+
+select * from (select i,j,k, sum(i) over(), row_number() over(partition by i), rank() over(order by i) from window_preds) as foo where i>2 order by rank;
+i | j | k | sum | row_number | rank 
+---+---+---+-----+------------+------
+3 | 4 | 5 |  21 |          1 |    3
+4 | 5 | 6 |  21 |          1 |    4
+5 | 6 | 7 |  21 |          1 |    5
+6 | 7 | 8 |  21 |          1 |    6
+(4 rows)
+
+select * from (select i,j,k, sum(i) over(partition by i), row_number() over(partition by i), rank() over(partition by i order by i) from window_preds) as foo where i>2 order by sum;
+i | j | k | sum | row_number | rank 
+---+---+---+-----+------------+------
+3 | 4 | 5 |   3 |          1 |    1
+4 | 5 | 6 |   4 |          1 |    1
+5 | 6 | 7 |   5 |          1 |    1
+6 | 7 | 8 |   6 |          1 |    1
+(4 rows)
+
+select * from (select i,j,k, sum(i) over(partition by i), row_number() over(partition by i), rank() over(partition by i order by i) from window_preds) as foo where i>2 or j>2 order by sum;
+i | j | k | sum | row_number | rank 
+---+---+---+-----+------------+------
+2 | 3 | 4 |   2 |          1 |    1
+3 | 4 | 5 |   3 |          1 |    1
+4 | 5 | 6 |   4 |          1 |    1
+5 | 6 | 7 |   5 |          1 |    1
+6 | 7 | 8 |   6 |          1 |    1
+(5 rows)
+
+select * from (select i,j,k, sum(i) over(partition by i), row_number() over(partition by i), rank() over(partition by i order by i) from window_preds) as foo where i>2 and j>2 order by sum;
+i | j | k | sum | row_number | rank 
+---+---+---+-----+------------+------
+3 | 4 | 5 |   3 |          1 |    1
+4 | 5 | 6 |   4 |          1 |    1
+5 | 6 | 7 |   5 |          1 |    1
+6 | 7 | 8 |   6 |          1 |    1
+(4 rows)
+
+select * from (select i,j,k, sum(i) over(partition by i,j), row_number() over(partition by i,j), rank() over(partition by i,j order by i) from window_preds) as foo where i>2 and j>2 order by sum;
+i | j | k | sum | row_number | rank 
+---+---+---+-----+------------+------
+3 | 4 | 5 |   3 |          1 |    1
+4 | 5 | 6 |   4 |          1 |    1
+5 | 6 | 7 |   5 |          1 |    1
+6 | 7 | 8 |   6 |          1 |    1
+(4 rows)
+
+select * from (select i,j,k, sum(i) over(partition by i,j), row_number() over(partition by i,j), rank() over(partition by i,j order by i) from window_preds) as foo where i+j>2 order by sum;
+i | j | k | sum | row_number | rank 
+---+---+---+-----+------------+------
+1 | 2 | 3 |   1 |          1 |    1
+2 | 3 | 4 |   2 |          1 |    1
+3 | 4 | 5 |   3 |          1 |    1
+4 | 5 | 6 |   4 |          1 |    1
+5 | 6 | 7 |   5 |          1 |    1
+6 | 7 | 8 |   6 |          1 |    1
+(6 rows)
+
+select * from (select i, sum(i) over(partition by j) from (select i,j, row_number() over(partition by i) from window_preds) as bar) as foo where i>2 order by sum;
+i | sum 
+---+-----
+3 |   3
+4 |   4
+5 |   5
+6 |   6
+(4 rows)
+

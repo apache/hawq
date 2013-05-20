@@ -1576,3 +1576,21 @@ FROM
   GROUP BY name,device_model
   HAVING COUNT(DISTINCT CASE WHEN ppp > 0 THEN device_id ELSE NULL END)>0
 ) b;
+
+-- MPP-19244; push predicates below window functions
+drop table if exists window_preds;
+create table window_preds(i int, j int, k int);
+insert into window_preds values(1,2,3);
+insert into window_preds values(2,3,4);
+insert into window_preds values(3,4,5);
+insert into window_preds values(4,5,6);
+insert into window_preds values(5,6,7);
+insert into window_preds values(6,7,8);
+select * from (select i,j,k, sum(i) over(), row_number() over(), rank() over(order by i) from window_preds) as foo where i>2 order by rank;
+select * from (select i,j,k, sum(i) over(), row_number() over(partition by i), rank() over(order by i) from window_preds) as foo where i>2 order by rank;
+select * from (select i,j,k, sum(i) over(partition by i), row_number() over(partition by i), rank() over(partition by i order by i) from window_preds) as foo where i>2 order by sum;
+select * from (select i,j,k, sum(i) over(partition by i), row_number() over(partition by i), rank() over(partition by i order by i) from window_preds) as foo where i>2 or j>2 order by sum;
+select * from (select i,j,k, sum(i) over(partition by i), row_number() over(partition by i), rank() over(partition by i order by i) from window_preds) as foo where i>2 and j>2 order by sum;
+select * from (select i,j,k, sum(i) over(partition by i,j), row_number() over(partition by i,j), rank() over(partition by i,j order by i) from window_preds) as foo where i>2 and j>2 order by sum;
+select * from (select i,j,k, sum(i) over(partition by i,j), row_number() over(partition by i,j), rank() over(partition by i,j order by i) from window_preds) as foo where i+j>2 order by sum;
+select * from (select i, sum(i) over(partition by j) from (select i,j, row_number() over(partition by i) from window_preds) as bar) as foo where i>2 order by sum;
