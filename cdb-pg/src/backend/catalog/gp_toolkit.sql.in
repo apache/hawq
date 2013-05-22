@@ -473,7 +473,7 @@ $$
 	SELECT gp_execution_segment(), $1, current_setting($1)::text;
 $$
 LANGUAGE SQL
-IMMUTABLE;
+IMMUTABLE CONTAINS SQL;
 
 GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX_AUX%%param_local_setting(varchar) TO public;
 
@@ -518,7 +518,7 @@ BEGIN
 	END LOOP;
 END
 $$
-LANGUAGE plpgSQL;
+LANGUAGE plpgSQL READS SQL DATA;
 
 GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX%%param_setting(varchar) TO public;
 
@@ -550,7 +550,7 @@ BEGIN
 	END LOOP;
 END
 $$
-LANGUAGE plpgSQL;
+LANGUAGE plpgSQL READS SQL DATA;
 
 GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX%%param_settings() TO public;
 
@@ -710,7 +710,7 @@ BEGIN
 	RETURN;	
 END
 $$
-LANGUAGE plpgSQL;
+LANGUAGE plpgSQL READS SQL DATA;
 
 GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX%%skew_details(oid) TO public;
 
@@ -763,7 +763,7 @@ $$
 	) AS skew
 
 $$
-LANGUAGE sql;
+LANGUAGE sql READS SQL DATA;
 
 GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX%%skew_coefficient(oid, OUT oid, OUT numeric) TO public;
 
@@ -798,7 +798,7 @@ BEGIN
 	END LOOP;
 END
 $$
-LANGUAGE plpgsql;
+LANGUAGE plpgsql READS SQL DATA;
 
 GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX_AUX%%skew_coefficients() TO public;
 
@@ -862,7 +862,7 @@ $$
 	) AS skewbaseline
 
 $$
-LANGUAGE sql;
+LANGUAGE sql READS SQL DATA;
 
 GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX%%skew_idle_fraction(oid, OUT oid, OUT numeric) TO public;
 
@@ -897,7 +897,7 @@ BEGIN
 	END LOOP;
 END
 $$
-LANGUAGE plpgsql;
+LANGUAGE plpgsql READS SQL DATA;
 
 GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX_AUX%%skew_idle_fractions() TO public;
 
@@ -1100,7 +1100,7 @@ $$
 	) AS bloatmapping
 		
 $$
-LANGUAGE SQL;
+LANGUAGE SQL READS SQL DATA;
 
 GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX%%bloat_diag(int, int, bool, OUT int, OUT text) TO public;	
 

@@ -147,12 +147,17 @@ main(int argc, char *argv[])
 		}
 		if (strcmp(argv[1], "--version") == 0 || strcmp(argv[1], "-V") == 0)
 		{
-			puts("postgres (Greenplum Database) " PG_VERSION);
+			puts("postgres (HAWQ) " PG_VERSION);
 			exit(0);
 		}
 		if (strcmp(argv[1], "--gp-version") == 0)
 		{
-			puts("postgres (Greenplum Database) " GP_VERSION);
+			puts("postgres (HAWQ) " GP_VERSION);
+			exit(0);
+		}
+		if (strcmp(argv[1], "--hawq-version") == 0)
+		{
+			puts("postgres (HAWQ) " HQ_VERSION);
 			exit(0);
 		}
 		if (strcmp(argv[1], "--catalog-version") == 0 )
@@ -317,6 +322,7 @@ help(const char *progname)
 	printf(_("  --help          show this help, then exit\n"));
 	printf(_("  --version       output version information, then exit\n"));
 	printf(_("  --gp-version    output Greenplum version information, then exit\n"));
+	printf(_("  --hawq-version    output Greenplum version information, then exit\n"));
 	printf(_("  --catalog-version output the catalog version, then exit\n"));
 
 	printf(_("\nDeveloper options:\n"));

@@ -2126,7 +2126,7 @@ heap_insert(Relation relation, HeapTuple tup, CommandId cid,
 			bool use_wal, bool use_fsm, TransactionId xid)
 {
 
-	if (Gp_role == GP_ROLE_EXECUTE)
+	if (Gp_role == GP_ROLE_EXECUTE && !gp_upgrade_mode)
 		elog(ERROR, "heap_insert() is not allowed on segments");
 
 	MIRROREDLOCK_BUFMGR_DECLARE;
@@ -2281,7 +2281,7 @@ simple_heap_insert(Relation relation, HeapTuple tup)
 Oid
 frozen_heap_insert(Relation relation, HeapTuple tup)
 {
-	if (Gp_role == GP_ROLE_EXECUTE)
+	if (Gp_role == GP_ROLE_EXECUTE && !gp_upgrade_mode)
 		elog(ERROR, "frozen_heap_insert() is not allowed on segments");
 
 	MIRROREDLOCK_BUFMGR_VERIFY_NO_LOCK_LEAK_DECLARE;
@@ -2304,7 +2304,7 @@ frozen_heap_insert_directed(
 	HeapTuple 		tup, 
 	BlockNumber 	blockNum)
 {
-	if (Gp_role == GP_ROLE_EXECUTE)
+	if (Gp_role == GP_ROLE_EXECUTE && !gp_upgrade_mode)
 		elog(ERROR, "frozen_heap_insert_directed() is not allowed on segments");
 
 	MIRROREDLOCK_BUFMGR_VERIFY_NO_LOCK_LEAK_DECLARE;
@@ -2383,7 +2383,7 @@ heap_delete(Relation relation, ItemPointer tid,
 	/*
 	 * in hawq, heap table only used for catalog on master.
 	 */
-	if (Gp_role == GP_ROLE_EXECUTE )
+	if (Gp_role == GP_ROLE_EXECUTE && !gp_upgrade_mode )
 		elog(ERROR, "heap_delete() is not allowed on segments");
 
 	MIRROREDLOCK_BUFMGR_DECLARE;
@@ -2706,7 +2706,7 @@ heap_update_internal(Relation relation, ItemPointer otid, HeapTuple newtup,
 			CommandId cid, Snapshot crosscheck, bool wait, bool simple)
 {
 
-	if (Gp_role == GP_ROLE_EXECUTE)
+	if (Gp_role == GP_ROLE_EXECUTE && !gp_upgrade_mode)
 		elog(ERROR, "heap_update_internal() is not allowed on segments");
 
 	MIRROREDLOCK_BUFMGR_DECLARE;
@@ -3209,7 +3209,7 @@ void
 simple_heap_update(Relation relation, ItemPointer otid, HeapTuple tup)
 {
 
-	if (Gp_role == GP_ROLE_EXECUTE)
+	if (Gp_role == GP_ROLE_EXECUTE && !gp_upgrade_mode)
 		elog(ERROR, "simple_heap_update() is not allowed on segments");
 
 	MIRROREDLOCK_BUFMGR_VERIFY_NO_LOCK_LEAK_DECLARE;
@@ -3994,7 +3994,7 @@ heap_inplace_frozen_delete_internal(Relation relation, HeapTuple tuple, Transact
 void
 frozen_heap_inplace_update(Relation relation, HeapTuple tuple)
 {
-	if (Gp_role == GP_ROLE_EXECUTE)
+	if (Gp_role == GP_ROLE_EXECUTE && !gp_upgrade_mode)
 		elog(ERROR, "frozen_heap_inplace_update() is not allowed on segments");
 
 	MIRROREDLOCK_BUFMGR_VERIFY_NO_LOCK_LEAK_DECLARE;
@@ -4009,7 +4009,7 @@ frozen_heap_inplace_update(Relation relation, HeapTuple tuple)
 void
 frozen_heap_inplace_delete(Relation relation, HeapTuple tuple)
 {
-	if (Gp_role == GP_ROLE_EXECUTE)
+	if (Gp_role == GP_ROLE_EXECUTE && !gp_upgrade_mode)
 		elog(ERROR, "frozen_heap_inplace_delete() is not allowed on segments");
 
 	MIRROREDLOCK_BUFMGR_VERIFY_NO_LOCK_LEAK_DECLARE;
@@ -4024,7 +4024,7 @@ frozen_heap_inplace_delete(Relation relation, HeapTuple tuple)
 void
 heap_inplace_update(Relation relation, HeapTuple tuple)
 {
-	if (Gp_role == GP_ROLE_EXECUTE)
+	if (Gp_role == GP_ROLE_EXECUTE && !gp_upgrade_mode)
 		elog(ERROR, "heap_inplace_update() is not allowed on segments");
 
 	MIRROREDLOCK_BUFMGR_VERIFY_NO_LOCK_LEAK_DECLARE;

@@ -1,12 +1,6 @@
 drop table if exists r;
 create table r(a int, b int);
  
--- force_explain
-explain
-SELECT attnum::information_schema.cardinal_number 
-from pg_attribute 
-where attnum > 0 and attrelid = 'r'::regclass;
-
 SELECT attnum::information_schema.cardinal_number 
 from pg_attribute 
 where attnum > 0 and attrelid = 'r'::regclass;
@@ -16,12 +10,6 @@ SELECT attnum::information_schema.cardinal_number
 from pg_attribute 
 where attrelid = 'r'::regclass;
 
--- force_explain
-explain SELECT *
-from (SELECT attnum::information_schema.cardinal_number 
-      from pg_attribute 
-      where attnum > 0 and attrelid = 'r'::regclass) q
-where attnum=2;
 
 
 SELECT *

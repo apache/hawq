@@ -244,6 +244,7 @@ static void dumpDatabaseDefinition(void);
 static void installSignalHandlers(void);
 extern void reset(void);
 static bool testAttributeEncodingSupport(void);
+static bool isHAWQ1100OrLater(void);
 
 /* MPP additions end */
 
@@ -280,6 +281,33 @@ static int createDDBoostDir(ddp_conn_desc_t ddp_conn, char *storage_unit_name, c
 static int updateArchiveWithDDFile(ArchiveHandle *AH, char *g_pszDDBoostFile, const char *g_pszDDBoostDir);
 #endif
 
+/*
+ * If HAWQ version is 1.1 or higher, pg_proc has prodataaccess column.
+ */
+static bool
+isHAWQ1100OrLater(void)
+{
+	bool	retValue = false;
+
+	PQExpBuffer query;
+	PGresult   *res;
+
+	query = createPQExpBuffer();
+	appendPQExpBuffer(query,
+			"select attnum from pg_catalog.pg_attribute "
+			"where attrelid = 'pg_catalog.pg_proc'::regclass and "
+			"attname = 'prodataaccess'");
+	res = PQexec(g_conn, query->data);
+	check_sql_result(res, g_conn, query->data, PGRES_TUPLES_OK);
+
+	if (PQntuples(res) == 1)
+		retValue = true;
+
+	PQclear(res);
+	destroyPQExpBuffer(query);
+
+	return retValue;
+}
 /*
  * testAttributeEncodingSupport - tests whether or not the current GP
  * database includes support for column encoding.
@@ -3471,11 +3499,13 @@ dumpFunc(Archive *fout, FuncInfo *finfo)
 	char	   *proisstrict;
 	char	   *prosecdef;
 	char	   *lanname;
+	char	   *prodataaccess;
 	char	   *rettypename;
 	int			nallargs;
 	char	  **allargtypes = NULL;
 	char	  **argmodes = NULL;
 	char	  **argnames = NULL;
+	bool		isHQ11 = isHAWQ1100OrLater();
 
 	/* Skip if not to be dumped */
 	if (!finfo->dobj.dump || dataOnly)
@@ -3493,10 +3523,11 @@ dumpFunc(Archive *fout, FuncInfo *finfo)
 	appendPQExpBuffer(query,
 					  "SELECT proretset, prosrc, probin, "
 					  "proallargtypes, proargmodes, proargnames, "
-					  "provolatile, proisstrict, prosecdef, "
+					  "provolatile, proisstrict, prosecdef, %s"
 					  "(SELECT lanname FROM pg_catalog.pg_language WHERE oid = prolang) as lanname "
 					  "FROM pg_catalog.pg_proc "
 					  "WHERE oid = '%u'::pg_catalog.oid",
+					  (isHQ11 ? "prodataaccess, " : ""),
 					  finfo->dobj.catId.oid);
 
 	res = PQexec(g_conn, query->data);
@@ -3521,6 +3552,7 @@ dumpFunc(Archive *fout, FuncInfo *finfo)
 	proisstrict = PQgetvalue(res, 0, PQfnumber(res, "proisstrict"));
 	prosecdef = PQgetvalue(res, 0, PQfnumber(res, "prosecdef"));
 	lanname = PQgetvalue(res, 0, PQfnumber(res, "lanname"));
+	prodataaccess = PQgetvalue(res, 0, PQfnumber(res, "prodataaccess"));
 
 	/*
 	 * See backend/commands/define.c for details of how the 'AS' clause is
@@ -3660,6 +3692,15 @@ dumpFunc(Archive *fout, FuncInfo *finfo)
 
 	if (prosecdef[0] == 't')
 		appendPQExpBuffer(q, " SECURITY DEFINER");
+
+	if (prodataaccess[0] == PRODATAACCESS_NONE)
+		appendPQExpBuffer(q, " NO SQL");
+	else if (prodataaccess[0] == PRODATAACCESS_CONTAINS)
+		appendPQExpBuffer(q, " CONTAINS SQL");
+	else if (prodataaccess[0] == PRODATAACCESS_READS)
+		appendPQExpBuffer(q, " READS SQL DATA");
+	else if (prodataaccess[0] == PRODATAACCESS_MODIFIES)
+		appendPQExpBuffer(q, " MODIFIES SQL DATA");
 
 	appendPQExpBuffer(q, ";\n");
 

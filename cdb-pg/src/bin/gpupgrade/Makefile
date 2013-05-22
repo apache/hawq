@@ -21,10 +21,9 @@ MODCAT_OBJS= gpmodcatversion.o pg_crc.o crc32c.o
 DATADIR=$(top_srcdir)/src/test/regress/data
 
 UPGRADEFILES = $(DATADIR)/upgrade/upg2_catupgrade.sql \
-			   $(DATADIR)/upgrade/upg2_catupgrade_check.sql \
-			   $(DATADIR)/upgrade42/upg2_catupgrade_42.sql
+			   $(DATADIR)/upgrade11/upg2_catupgrade_11.sql
 
-DATAFILES = $(DATADIR)/upgrade42/pg_compression.data
+DATAFILES = 
 
 # This sets things up to create a "contrib" module for upgrade extensions
 MODULE_big = gpupgrade

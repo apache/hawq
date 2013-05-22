@@ -88,7 +88,7 @@ ignore: select_distinct_on
 ignore: select_implicit
 ignore: select_having
 ignore: subselect
-ignore: information_schema
+test: information_schema
 ignore: union
 ignore: case
 ignore: join

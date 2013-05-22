@@ -1278,7 +1278,7 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_CreateFunctionStmt:		/* CREATE FUNCTION */
-			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) || gp_upgrade_mode)) {
 						ereport(ERROR,
 								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create function statement yet") ));
 					}
@@ -1287,7 +1287,7 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_AlterFunctionStmt:		/* ALTER FUNCTION */
-			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) || gp_upgrade_mode)) {
 						ereport(ERROR,
 								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter function statement yet") ));
 					}
@@ -1352,7 +1352,7 @@ ProcessUtility(Node *parsetree,
 
 		case T_RemoveFuncStmt:
 			{
-				if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
+				if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) || gp_upgrade_mode)) {
 							ereport(ERROR,
 									(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support remove function statement yet") ));
 						}
@@ -1631,7 +1631,7 @@ ProcessUtility(Node *parsetree,
 
 		case T_CreatePLangStmt:
 			/* if guc variable not set, or bootstrap mode, or utility mode connection, throw exception*/
-			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY)
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) || gp_upgrade_mode
 					|| gp_called_by_pgdump))
 			{
 				ereport(ERROR,
@@ -1642,7 +1642,7 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_DropPLangStmt:
-			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
+			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) || gp_upgrade_mode)) {
 						ereport(ERROR,
 								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support drop plang statement yet") ));
 						DropProceduralLanguage((DropPLangStmt *) parsetree);

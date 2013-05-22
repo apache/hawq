@@ -36,17 +36,19 @@ create language plpgsql;
 
 -- Use this pl/pgsql function to execute DML on cat tab on all segs
 create or replace function @gpupgradeschemaname@.catDML(stmt text) returns int as $$
+declare
+  dbid integer;
+  role text;
 begin
-  execute stmt;
-  return 1;
-end;
-$$ language 'plpgsql';
+  SELECT INTO dbid gp_execution_dbid();
+  EXECUTE 'SHOW gp_session_role' INTO role;
+  IF dbid = 1 THEN
+    IF role = 'dispatch' THEN
+      PERFORM @gpupgradeschemaname@.catDML(stmt) FROM gp_dist_random('gp_id');
+    END IF;
+  END IF;
 
--- Use this pl/pgsql function to add PIn dependency of the newly created procedure
-create or replace function @gpupgradeschemaname@.addProcPIN(classoid oid, procid oid) returns int as $$
-begin
-  INSERT INTO @gpupgradeschemaname@.pg_depend values(0,0,0, classoid, procid, 0, 'p');
-  PERFORM @gpupgradeschemaname@.catDML('INSERT INTO @gpupgradeschemaname@.pg_depend values(0,0,0, '||classoid||', '||procid||', 0, ''p'')') from gp_dist_random('gp_id');
+  execute stmt;
   return 1;
 end;
 $$ language 'plpgsql';
@@ -67,15 +69,8 @@ $$ language 'plpgsql';
 -------------------------------------
 -- Execute the main upgrade script
 -------------------------------------
-\set upg2script `echo $GPHOME/share/postgresql/upgrade/upg2_catupgrade_42.sql`
+\set upg2script `echo $GPHOME/share/postgresql/upgrade/upg2_catupgrade_11.sql`
 \i :upg2script
-
--------------------------------------
--- Blow away the gp_toolkit schema
--------------------------------------
-DROP SCHEMA if exists gp_toolkit cascade;
-CREATE SCHEMA gp_toolkit ;
-
 
 ----------------------------------------
 -- Post upgrade step
@@ -84,39 +79,32 @@ CREATE SCHEMA gp_toolkit ;
 --   drop temp helper routine
 --   commit the txn
 ----------------------------------------
-DELETE FROM @gpupgradeschemaname@.pg_depend WHERE classid<10000 and objid <10000 and classid != 0;
-select @gpupgradeschemaname@.catDML(
-'DELETE FROM @gpupgradeschemaname@.pg_depend WHERE classid<10000 and objid <10000 and classid != 0')
-from gp_dist_random('gp_id');
-
-INSERT INTO @gpupgradeschemaname@.pg_depend SELECT 0,0,0, tableoid,oid,0, 'p' FROM @gpupgradeschemaname@.pg_proc
-        where (tableoid,oid) not in (Select refclassid, refobjid from @gpupgradeschemaname@.pg_depend where deptype = 'p')
-          and oid < 10000;
 select @gpupgradeschemaname@.catDML(
 'INSERT INTO @gpupgradeschemaname@.pg_depend SELECT 0,0,0, tableoid,oid,0, ''p'' FROM @gpupgradeschemaname@.pg_proc
         where (tableoid,oid) not in (Select refclassid, refobjid from @gpupgradeschemaname@.pg_depend where deptype = ''p'')
-          and oid < 10000')
-from gp_dist_random('gp_id');
+          and oid < 10000');
 
-INSERT INTO @gpupgradeschemaname@.pg_depend SELECT 0,0,0, tableoid,oid,0, 'p' FROM @gpupgradeschemaname@.pg_class
-        where (tableoid,oid) not in (Select refclassid, refobjid from @gpupgradeschemaname@.pg_depend where deptype = 'p')
-          and oid < 10000;
 select @gpupgradeschemaname@.catDML(
 'INSERT INTO @gpupgradeschemaname@.pg_depend SELECT 0,0,0, tableoid,oid,0, ''p'' FROM @gpupgradeschemaname@.pg_class
         where (tableoid,oid) not in (Select refclassid, refobjid from @gpupgradeschemaname@.pg_depend where deptype = ''p'')
-          and oid < 10000')
-from gp_dist_random('gp_id');
+          and oid < 10000');
 
-INSERT INTO @gpupgradeschemaname@.pg_depend SELECT 0,0,0, tableoid,oid,0, 'p' FROM @gpupgradeschemaname@.pg_type
-        where (tableoid,oid) not in (Select refclassid, refobjid from @gpupgradeschemaname@.pg_depend where deptype = 'p')
-          and oid < 10000;
 select @gpupgradeschemaname@.catDML(
 'INSERT INTO @gpupgradeschemaname@.pg_depend SELECT 0,0,0, tableoid,oid,0, ''p'' FROM @gpupgradeschemaname@.pg_type
         where (tableoid,oid) not in (Select refclassid, refobjid from @gpupgradeschemaname@.pg_depend where deptype = ''p'')
-          and oid < 10000')
-from gp_dist_random('gp_id');
+          and oid < 10000');
+
+select @gpupgradeschemaname@.catDML(
+'INSERT INTO @gpupgradeschemaname@.pg_depend SELECT 0,0,0, tableoid,oid,0, ''p'' FROM @gpupgradeschemaname@.pg_operator
+        where (tableoid,oid) not in (Select refclassid, refobjid from @gpupgradeschemaname@.pg_depend where deptype = ''p'')
+          and oid < 10000'
+);
+select @gpupgradeschemaname@.catDML(
+'INSERT INTO @gpupgradeschemaname@.pg_depend SELECT 0,0,0, tableoid,oid,0, ''p'' FROM @gpupgradeschemaname@.pg_cast
+        where (tableoid,oid) not in (Select refclassid, refobjid from @gpupgradeschemaname@.pg_depend where deptype = ''p'')
+          and oid < 10000'
+);
 
 drop function @gpupgradeschemaname@.catDML(stmt text);
-drop function @gpupgradeschemaname@.addProcPIN(classoid oid, procid oid);
 drop function @gpupgradeschemaname@.removeDefaultPrivilege(tablenm text);
 \unset ON_ERROR_STOP

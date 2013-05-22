@@ -54,27 +54,27 @@ class GpVersionTestCase(unittest.TestCase):
         self.assertTrue(v34 < "4.0")
 
     def test_case_5(self):
-        vShort = GpVersion("postgres (Greenplum Database) 3.3.5.0 build 3")
+        vShort = GpVersion("postgres (HAWQ) 1.0.0.3 build dev")
 
         self.assertTrue(vShort.isVersionCurrentRelease() == False )
-        self.assertTrue(vShort.getVersionBuild() == '3')
-        self.assertTrue(vShort.getVersionRelease() == "3.3")
-        self.assertTrue(vShort.isVersionRelease("3.3"))
-        self.assertTrue(vShort.isVersionRelease("3.2") == False)
-        self.assertTrue(vShort > "3.2.0.5")
-        self.assertTrue(vShort < "4.0")
+        self.assertTrue(vShort.getVersionBuild() == 'dev')
+        self.assertTrue(vShort.getVersionRelease() == "1.0")
+        self.assertTrue(vShort.isVersionRelease("1.0"))
+        self.assertTrue(vShort.isVersionRelease("1.1") == False)
+        self.assertTrue(vShort > "1.0.0.2")
+        self.assertTrue(vShort < "1.1")
 
 
     def test_case_6(self):
-        vLong = GpVersion("PostgreSQL 8.2.14 (Greenplum Database 3.4.filerep build 0) on i386-apple-darwin9.8.0, compiled by GCC i686-apple-darwin9-gcc-4.0.1 (GCC) 4.0.1 (Apple Inc. build 5465) compiled on Feb 16 2010 11:25:31 (with assert checking)")
+        vLong = GpVersion("PostgreSQL 8.2.15 (Greenplum Database 4.2.0 build 1) (HAWQ 1.1.0.0 build dev) on i386-apple-darwin12.2.1, compiled by GCC gcc (GCC) 4.4.2 compiled on May 10 2013 11:31:49 (with assert checking)")
     
-        self.assertTrue(vLong.isVersionCurrentRelease() == False )
-        self.assertTrue(vLong.getVersionBuild() == 'filerep')
-        self.assertTrue(vLong.getVersionRelease() == "3.4")
-        self.assertTrue(vLong.isVersionRelease("3.4"))
-        self.assertTrue(vLong.isVersionRelease("3.2") == False)
-        self.assertTrue(vLong > "3.2.0.5")
-        self.assertTrue(vLong < "4.0")
+        self.assertTrue(vLong.isVersionCurrentRelease())
+        self.assertTrue(vLong.getVersionBuild() == 'dev')
+        self.assertTrue(vLong.getVersionRelease() == "1.1")
+        self.assertTrue(vLong.isVersionRelease("1.1"))
+        self.assertFalse(vLong.isVersionRelease("1.0"))
+        self.assertTrue(vLong > "1.0.0.3")
+        self.assertTrue(vLong < "1.2")
 
 
 

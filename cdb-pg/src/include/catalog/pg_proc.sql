@@ -1622,7 +1622,7 @@
 
  CREATE FUNCTION char_length(text) RETURNS int4 LANGUAGE internal IMMUTABLE STRICT AS 'textlen' WITH (OID=1381, DESCRIPTION="character length");
 
- CREATE FUNCTION date_part(text, abstime) RETURNS pg_catalog.float8 LANGUAGE sql STABLE STRICT AS $$select pg_catalog.date_part($1, cast($2 as timestamp with time zone))$$  WITH (OID=1382, DESCRIPTION="extract field from abstime");
+ CREATE FUNCTION date_part(text, abstime) RETURNS pg_catalog.float8 LANGUAGE sql STABLE STRICT  AS $$select pg_catalog.date_part($1, cast($2 as timestamp with time zone))$$  WITH (OID=1382, DESCRIPTION="extract field from abstime");
 
  CREATE FUNCTION date_part(text, reltime) RETURNS pg_catalog.float8 LANGUAGE sql STABLE STRICT AS $$select pg_catalog.date_part($1, cast($2 as pg_catalog.interval))$$  WITH (OID=1383, DESCRIPTION="extract field from reltime");
 
@@ -2109,29 +2109,29 @@
  CREATE FUNCTION pg_typeof("any") RETURNS regtype LANGUAGE internal STABLE AS 'pg_typeof' WITH (OID=822, DESCRIPTION="returns the type of the argument");
 
 -- Generic referential integrity constraint triggers 
- CREATE FUNCTION "RI_FKey_check_ins"() RETURNS trigger LANGUAGE internal VOLATILE STRICT AS 'RI_FKey_check_ins' WITH (OID=1644, DESCRIPTION="referential integrity FOREIGN KEY ... REFERENCES");
+ CREATE FUNCTION "RI_FKey_check_ins"() RETURNS trigger LANGUAGE internal VOLATILE STRICT MODIFIES SQL DATA AS 'RI_FKey_check_ins' WITH (OID=1644, DESCRIPTION="referential integrity FOREIGN KEY ... REFERENCES");
 
- CREATE FUNCTION "RI_FKey_check_upd"() RETURNS trigger LANGUAGE internal VOLATILE STRICT AS 'RI_FKey_check_upd' WITH (OID=1645, DESCRIPTION="referential integrity FOREIGN KEY ... REFERENCES");
+ CREATE FUNCTION "RI_FKey_check_upd"() RETURNS trigger LANGUAGE internal VOLATILE STRICT MODIFIES SQL DATA AS 'RI_FKey_check_upd' WITH (OID=1645, DESCRIPTION="referential integrity FOREIGN KEY ... REFERENCES");
 
- CREATE FUNCTION "RI_FKey_cascade_del"() RETURNS trigger LANGUAGE internal VOLATILE STRICT AS 'RI_FKey_cascade_del' WITH (OID=1646, DESCRIPTION="referential integrity ON DELETE CASCADE");
+ CREATE FUNCTION "RI_FKey_cascade_del"() RETURNS trigger LANGUAGE internal VOLATILE STRICT MODIFIES SQL DATA AS 'RI_FKey_cascade_del' WITH (OID=1646, DESCRIPTION="referential integrity ON DELETE CASCADE");
 
- CREATE FUNCTION "RI_FKey_cascade_upd"() RETURNS trigger LANGUAGE internal VOLATILE STRICT AS 'RI_FKey_cascade_upd' WITH (OID=1647, DESCRIPTION="referential integrity ON UPDATE CASCADE");
+ CREATE FUNCTION "RI_FKey_cascade_upd"() RETURNS trigger LANGUAGE internal VOLATILE STRICT MODIFIES SQL DATA AS 'RI_FKey_cascade_upd' WITH (OID=1647, DESCRIPTION="referential integrity ON UPDATE CASCADE");
 
- CREATE FUNCTION "RI_FKey_restrict_del"() RETURNS trigger LANGUAGE internal VOLATILE STRICT AS 'RI_FKey_restrict_del' WITH (OID=1648, DESCRIPTION="referential integrity ON DELETE RESTRICT");
+ CREATE FUNCTION "RI_FKey_restrict_del"() RETURNS trigger LANGUAGE internal VOLATILE STRICT MODIFIES SQL DATA AS 'RI_FKey_restrict_del' WITH (OID=1648, DESCRIPTION="referential integrity ON DELETE RESTRICT");
 
- CREATE FUNCTION "RI_FKey_restrict_upd"() RETURNS trigger LANGUAGE internal VOLATILE STRICT AS 'RI_FKey_restrict_upd' WITH (OID=1649, DESCRIPTION="referential integrity ON UPDATE RESTRICT");
+ CREATE FUNCTION "RI_FKey_restrict_upd"() RETURNS trigger LANGUAGE internal VOLATILE STRICT MODIFIES SQL DATA AS 'RI_FKey_restrict_upd' WITH (OID=1649, DESCRIPTION="referential integrity ON UPDATE RESTRICT");
 
- CREATE FUNCTION "RI_FKey_setnull_del"() RETURNS trigger LANGUAGE internal VOLATILE STRICT AS 'RI_FKey_setnull_del' WITH (OID=1650, DESCRIPTION="referential integrity ON DELETE SET NULL");
+ CREATE FUNCTION "RI_FKey_setnull_del"() RETURNS trigger LANGUAGE internal VOLATILE STRICT MODIFIES SQL DATA AS 'RI_FKey_setnull_del' WITH (OID=1650, DESCRIPTION="referential integrity ON DELETE SET NULL");
 
- CREATE FUNCTION "RI_FKey_setnull_upd"() RETURNS trigger LANGUAGE internal VOLATILE STRICT AS 'RI_FKey_setnull_upd' WITH (OID=1651, DESCRIPTION="referential integrity ON UPDATE SET NULL");
+ CREATE FUNCTION "RI_FKey_setnull_upd"() RETURNS trigger LANGUAGE internal VOLATILE STRICT MODIFIES SQL DATA AS 'RI_FKey_setnull_upd' WITH (OID=1651, DESCRIPTION="referential integrity ON UPDATE SET NULL");
 
- CREATE FUNCTION "RI_FKey_setdefault_del"() RETURNS trigger LANGUAGE internal VOLATILE STRICT AS 'RI_FKey_setdefault_del' WITH (OID=1652, DESCRIPTION="referential integrity ON DELETE SET DEFAULT");
+ CREATE FUNCTION "RI_FKey_setdefault_del"() RETURNS trigger LANGUAGE internal VOLATILE STRICT MODIFIES SQL DATA AS 'RI_FKey_setdefault_del' WITH (OID=1652, DESCRIPTION="referential integrity ON DELETE SET DEFAULT");
 
- CREATE FUNCTION "RI_FKey_setdefault_upd"() RETURNS trigger LANGUAGE internal VOLATILE STRICT AS 'RI_FKey_setdefault_upd' WITH (OID=1653, DESCRIPTION="referential integrity ON UPDATE SET DEFAULT");
+ CREATE FUNCTION "RI_FKey_setdefault_upd"() RETURNS trigger LANGUAGE internal VOLATILE STRICT MODIFIES SQL DATA AS 'RI_FKey_setdefault_upd' WITH (OID=1653, DESCRIPTION="referential integrity ON UPDATE SET DEFAULT");
 
- CREATE FUNCTION "RI_FKey_noaction_del"() RETURNS trigger LANGUAGE internal VOLATILE STRICT AS 'RI_FKey_noaction_del' WITH (OID=1654, DESCRIPTION="referential integrity ON DELETE NO ACTION");
+ CREATE FUNCTION "RI_FKey_noaction_del"() RETURNS trigger LANGUAGE internal VOLATILE STRICT MODIFIES SQL DATA AS 'RI_FKey_noaction_del' WITH (OID=1654, DESCRIPTION="referential integrity ON DELETE NO ACTION");
 
- CREATE FUNCTION "RI_FKey_noaction_upd"() RETURNS trigger LANGUAGE internal VOLATILE STRICT AS 'RI_FKey_noaction_upd' WITH (OID=1655, DESCRIPTION="referential integrity ON UPDATE NO ACTION");
+ CREATE FUNCTION "RI_FKey_noaction_upd"() RETURNS trigger LANGUAGE internal VOLATILE STRICT MODIFIES SQL DATA AS 'RI_FKey_noaction_upd' WITH (OID=1655, DESCRIPTION="referential integrity ON UPDATE NO ACTION");
 
  CREATE FUNCTION varbiteq(varbit, varbit) RETURNS bool LANGUAGE internal IMMUTABLE STRICT AS 'biteq' WITH (OID=1666, DESCRIPTION="equal");
 
@@ -2912,7 +2912,7 @@
 
  CREATE FUNCTION pg_show_all_settings() RETURNS SETOF record LANGUAGE internal STABLE STRICT AS 'show_all_settings' WITH (OID=2084, DESCRIPTION="SHOW ALL as a function");
 
- CREATE FUNCTION pg_lock_status() RETURNS SETOF record LANGUAGE internal VOLATILE STRICT AS 'pg_lock_status' WITH (OID=1371, DESCRIPTION="view system lock information");
+ CREATE FUNCTION pg_lock_status() RETURNS SETOF record LANGUAGE internal VOLATILE STRICT READS SQL DATA AS 'pg_lock_status' WITH (OID=1371, DESCRIPTION="view system lock information");
 
  CREATE FUNCTION pg_prepared_xact() RETURNS SETOF record LANGUAGE internal VOLATILE STRICT AS 'pg_prepared_xact' WITH (OID=1065, DESCRIPTION="view two-phase transactions");
 
@@ -3970,23 +3970,23 @@
 
  CREATE FUNCTION pg_column_size("any") RETURNS int4 LANGUAGE internal STABLE STRICT AS 'pg_column_size' WITH (OID=1269, DESCRIPTION="bytes required to store the value, perhaps with compression");
 
- CREATE FUNCTION pg_tablespace_size(oid) RETURNS int8 LANGUAGE internal VOLATILE STRICT AS 'pg_tablespace_size_oid' WITH (OID=2322, DESCRIPTION="Calculate total disk space usage for the specified tablespace");
+ CREATE FUNCTION pg_tablespace_size(oid) RETURNS int8 LANGUAGE internal VOLATILE STRICT READS SQL DATA AS 'pg_tablespace_size_oid' WITH (OID=2322, DESCRIPTION="Calculate total disk space usage for the specified tablespace");
 
- CREATE FUNCTION pg_tablespace_size(name) RETURNS int8 LANGUAGE internal VOLATILE STRICT AS 'pg_tablespace_size_name' WITH (OID=2323, DESCRIPTION="Calculate total disk space usage for the specified tablespace");
+ CREATE FUNCTION pg_tablespace_size(name) RETURNS int8 LANGUAGE internal VOLATILE STRICT READS SQL DATA AS 'pg_tablespace_size_name' WITH (OID=2323, DESCRIPTION="Calculate total disk space usage for the specified tablespace");
 
- CREATE FUNCTION pg_database_size(oid) RETURNS int8 LANGUAGE internal VOLATILE STRICT AS 'pg_database_size_oid' WITH (OID=2324, DESCRIPTION="Calculate total disk space usage for the specified database");
+ CREATE FUNCTION pg_database_size(oid) RETURNS int8 LANGUAGE internal VOLATILE STRICT READS SQL DATA AS 'pg_database_size_oid' WITH (OID=2324, DESCRIPTION="Calculate total disk space usage for the specified database");
 
- CREATE FUNCTION pg_database_size(name) RETURNS int8 LANGUAGE internal VOLATILE STRICT AS 'pg_database_size_name' WITH (OID=2168, DESCRIPTION="Calculate total disk space usage for the specified database");
+ CREATE FUNCTION pg_database_size(name) RETURNS int8 LANGUAGE internal VOLATILE STRICT READS SQL DATA AS 'pg_database_size_name' WITH (OID=2168, DESCRIPTION="Calculate total disk space usage for the specified database");
 
- CREATE FUNCTION pg_relation_size(oid) RETURNS int8 LANGUAGE internal VOLATILE STRICT AS 'pg_relation_size_oid' WITH (OID=2325, DESCRIPTION="Calculate disk space usage for the specified table or index");
+ CREATE FUNCTION pg_relation_size(oid) RETURNS int8 LANGUAGE internal VOLATILE STRICT READS SQL DATA AS 'pg_relation_size_oid' WITH (OID=2325, DESCRIPTION="Calculate disk space usage for the specified table or index");
 
- CREATE FUNCTION pg_relation_size(text) RETURNS int8 LANGUAGE internal VOLATILE STRICT AS 'pg_relation_size_name' WITH (OID=2289, DESCRIPTION="Calculate disk space usage for the specified table or index");
+ CREATE FUNCTION pg_relation_size(text) RETURNS int8 LANGUAGE internal VOLATILE STRICT READS SQL DATA AS 'pg_relation_size_name' WITH (OID=2289, DESCRIPTION="Calculate disk space usage for the specified table or index");
 
- CREATE FUNCTION pg_total_relation_size(oid) RETURNS int8 LANGUAGE internal VOLATILE STRICT AS 'pg_total_relation_size_oid' WITH (OID=2286, DESCRIPTION="Calculate total disk space usage for the specified table and associated indexes and toast tables");
+ CREATE FUNCTION pg_total_relation_size(oid) RETURNS int8 LANGUAGE internal VOLATILE STRICT READS SQL DATA AS 'pg_total_relation_size_oid' WITH (OID=2286, DESCRIPTION="Calculate total disk space usage for the specified table and associated indexes and toast tables");
 
- CREATE FUNCTION pg_total_relation_size(text) RETURNS int8 LANGUAGE internal VOLATILE STRICT AS 'pg_total_relation_size_name' WITH (OID=2287, DESCRIPTION="Calculate total disk space usage for the specified table and associated indexes and toast tables");
+ CREATE FUNCTION pg_total_relation_size(text) RETURNS int8 LANGUAGE internal VOLATILE STRICT READS SQL DATA AS 'pg_total_relation_size_name' WITH (OID=2287, DESCRIPTION="Calculate total disk space usage for the specified table and associated indexes and toast tables");
 
- CREATE FUNCTION pg_size_pretty(int8) RETURNS text LANGUAGE internal VOLATILE STRICT AS 'pg_size_pretty' WITH (OID=2288, DESCRIPTION="Convert a long int to a human readable text using size units");
+ CREATE FUNCTION pg_size_pretty(int8) RETURNS text LANGUAGE internal VOLATILE STRICT READS SQL DATA AS 'pg_size_pretty' WITH (OID=2288, DESCRIPTION="Convert a long int to a human readable text using size units");
 
  CREATE FUNCTION gpdb_fdw_validator(_text, oid) RETURNS bool LANGUAGE internal IMMUTABLE STRICT AS 'gpdb_fdw_validator' WITH (OID=2897);
 
@@ -4659,7 +4659,7 @@
 -- #define MPP_EXECUTION_SEGMENT_OID 6022
 -- #define MPP_EXECUTION_SEGMENT_TYPE 23
 
- CREATE FUNCTION pg_highest_oid() RETURNS oid LANGUAGE internal VOLATILE STRICT AS 'pg_highest_oid' WITH (OID=6023, DESCRIPTION="Highest oid used so far");
+ CREATE FUNCTION pg_highest_oid() RETURNS oid LANGUAGE internal VOLATILE STRICT READS SQL DATA AS 'pg_highest_oid' WITH (OID=6023, DESCRIPTION="Highest oid used so far");
 
  CREATE FUNCTION gp_distributed_xacts() RETURNS SETOF record LANGUAGE internal VOLATILE AS 'gp_distributed_xacts__' WITH (OID=6035, DESCRIPTION="view mpp distributed transaction state");
 
@@ -5258,17 +5258,17 @@
 
  CREATE FUNCTION ntile_final(_int8, int8) RETURNS int8 LANGUAGE internal IMMUTABLE STRICT AS 'ntile_final' WITH (OID=7305, DESCRIPTION="window final function");
 
- CREATE FUNCTION get_ao_distribution(IN reloid oid, OUT segmentid int4, OUT tupcount float8) RETURNS SETOF pg_catalog.record LANGUAGE internal VOLATILE AS 'get_ao_distribution_oid' WITH (OID=7169, DESCRIPTION="show append only table tuple distribution across segment databases");
+ CREATE FUNCTION get_ao_distribution(IN reloid oid, OUT segmentid int4, OUT tupcount float8) RETURNS SETOF pg_catalog.record LANGUAGE internal VOLATILE READS SQL DATA AS 'get_ao_distribution_oid' WITH (OID=7169, DESCRIPTION="show append only table tuple distribution across segment databases");
 
- CREATE FUNCTION get_ao_distribution(IN relname text, OUT segmentid int4, OUT tupcount float8) RETURNS SETOF pg_catalog.record LANGUAGE internal VOLATILE AS 'get_ao_distribution_name' WITH (OID=7170, DESCRIPTION="show append only table tuple distribution across segment databases");
+ CREATE FUNCTION get_ao_distribution(IN relname text, OUT segmentid int4, OUT tupcount float8) RETURNS SETOF pg_catalog.record LANGUAGE internal VOLATILE READS SQL DATA AS 'get_ao_distribution_name' WITH (OID=7170, DESCRIPTION="show append only table tuple distribution across segment databases");
 
- CREATE FUNCTION get_ao_compression_ratio(oid) RETURNS float8 LANGUAGE internal VOLATILE AS 'get_ao_compression_ratio_oid' WITH (OID=7171, DESCRIPTION="show append only table compression ratio");
+ CREATE FUNCTION get_ao_compression_ratio(oid) RETURNS float8 LANGUAGE internal VOLATILE READS SQL DATA AS 'get_ao_compression_ratio_oid' WITH (OID=7171, DESCRIPTION="show append only table compression ratio");
 
- CREATE FUNCTION get_ao_compression_ratio(text) RETURNS float8 LANGUAGE internal VOLATILE AS 'get_ao_compression_ratio_name' WITH (OID=7172, DESCRIPTION="show append only table compression ratio");
+ CREATE FUNCTION get_ao_compression_ratio(text) RETURNS float8 LANGUAGE internal VOLATILE READS SQL DATA AS 'get_ao_compression_ratio_name' WITH (OID=7172, DESCRIPTION="show append only table compression ratio");
 
- CREATE FUNCTION gp_update_ao_master_stats(oid) RETURNS float8 LANGUAGE internal VOLATILE AS 'gp_update_ao_master_stats_oid' WITH (OID=7173, DESCRIPTION="append only tables utility function");
+ CREATE FUNCTION gp_update_ao_master_stats(oid) RETURNS float8 LANGUAGE internal VOLATILE MODIFIES SQL DATA AS 'gp_update_ao_master_stats_oid' WITH (OID=7173, DESCRIPTION="append only tables utility function");
 
- CREATE FUNCTION gp_update_ao_master_stats(text) RETURNS float8 LANGUAGE internal VOLATILE AS 'gp_update_ao_master_stats_name' WITH (OID=7174, DESCRIPTION="append only tables utility function");
+ CREATE FUNCTION gp_update_ao_master_stats(text) RETURNS float8 LANGUAGE internal VOLATILE MODIFIES SQL DATA AS 'gp_update_ao_master_stats_name' WITH (OID=7174, DESCRIPTION="append only tables utility function");
 
  CREATE FUNCTION gp_persistent_build_db(bool) RETURNS int4 LANGUAGE internal VOLATILE AS 'gp_persistent_build_db' WITH (OID=7178, DESCRIPTION="populate the persistent tables and gp_relation_node for the current database");
 

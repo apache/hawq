@@ -19,7 +19,7 @@ if sys.version_info < (2, 5, 0) or sys.version_info >= (3, 0, 0):
     sys.exit(1)
 
 
-MAIN_VERSION = [4,2,99,99]    # version number for main
+MAIN_VERSION = [1,1,99,99]    # version number for main
 
 
 #============================================================
@@ -86,7 +86,7 @@ class GpVersion:
             if isinstance(v, str):
 
                 # See if it matches one of the two the long formats
-                regex = r"\(Greenplum Database\)? ([^ ]+) build ([^ )]+)"
+                regex = r"\(HAWQ\)? ([^ ]+) build ([^ )]+)"
                 m = re.search(regex, v)
                 if m:
                     (v, self.build) = m.groups()   # (version, build)

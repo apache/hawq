@@ -103,19 +103,19 @@ def is_supported_version(version, upgrade=True):
     build = version.getVersionBuild()
     if not re.match(r"(dev|filerep|\d+)", build):
         raise UpgradeError(
-            "Greenplum Version '%s' is not supported for %s"
+            "HAWQ '%s' is not supported for %s"
             % (str(version), upstr))            
 
-    if version >= "4.1.0.0" and version <= 'main':
+    if version >= "1.0.0.0" and version <= 'main':
         return True
 
-    if version < "4.1.0.0":
+    if version < "1.0.0.0":
         raise UpgradeError(
-            "Greenplum Version '%s' is not supported for %s"
+            "HAWQ '%s' is not supported for %s"
             % (str(version), upstr))
     else:
         raise UpgradeError(
-            "To %s Greenplum Version '%s' use the %s tool "
+            "To %s HAWQ '%s' use the %s tool "
             "shipped with that release" 
             % (upstr, str(version), upstr))
         
@@ -236,7 +236,7 @@ class GPUpgradeBase(object):
 
 
     #------------------------------------------------------------
-    def Select(self, qry, db='template1', port=None, forceutility=False, forceUseEnvUser=False):
+    def Select(self, qry, db='template0', port=None, forceutility=False, forceUseEnvUser=False):
         # forceUseEnvUser: user will be GPMIGRATOR if we're in lockdown mode(gpmigrator); otherwise
         #                  it'll be the env user. Setting forceuseEnvUser will always use env user,
         #                  even though we're in gpmigrator and in lockdown.
@@ -309,7 +309,7 @@ class GPUpgradeBase(object):
         return rows
     
     #------------------------------------------------------------
-    def Update(self, qry, db='template1', port=None, forceutility=False, upgradeMode=False, modSysTbl=False, forceUseEnvUser=False):
+    def Update(self, qry, db='template0', port=None, forceutility=False, upgradeMode=False, modSysTbl=False, forceUseEnvUser=False):
         # forceUseEnvUser: user will be GPMIGRATOR if we're in lockdown mode(gpmigrator); otherwise
         #                  it'll be the env user. Setting forceuseEnvUser will always use env user,
         #                  even though we're in gpmigrator and in lockdown.
@@ -396,9 +396,9 @@ class GPUpgradeBase(object):
         if tryconn:
             try:
                 logger.debug('trying to establish connection to database')
-                logger.debug('user = %s, db = template1, port = %i, dir = %s'
+                logger.debug('user = %s, db = template0, port = %i, dir = %s'
                     % (self.user, self.masterport, self.sock_dir))
-                conn = make_conn(self, self.user, 'template1', '', self.masterport,
+                conn = make_conn(self, self.user, 'template0', '', self.masterport,
                                  self.sock_dir)
             except Exception:
                 raise UpgradeError("Found a postmaster.pid but postmaster " +
@@ -683,8 +683,10 @@ class GPUpgradeBase(object):
         '''
         self.CheckBinaryVersion()
         self.CheckGUCs()
-        self.CheckFreeSpace()
-        self.CheckCatalog()
+        # XXX: cannot rely on gp_toolkit to check free disk space
+        # self.CheckFreeSpace()
+        # XXX: gpcheckcat not yet designed for HAWQ
+        # self.CheckCatalog()
 
     #------------------------------------------------------------
     def CheckBinaryVersion(self):
@@ -695,7 +697,7 @@ class GPUpgradeBase(object):
         hosts = self.Select("select distinct hostname from gp_segment_configuration");
         masterversion = self.getversion(self.newhome, self.newenv)
 
-        cmdStr = '%s/bin/pg_ctl --gp-version' % self.newhome
+        cmdStr = '%s/bin/pg_ctl --hawq-version' % self.newhome
         for uh in hosts:
             cmd = base.Command(uh, cmdStr, base.REMOTE, uh)
             self.pool.addCommand(cmd)
@@ -826,58 +828,13 @@ class GPUpgradeBase(object):
             sys.stderr.write(str(e))
             raise e
         
-        
-    #------------------------------------------------------------
-    def PerformPostUpgrade(self):
-        '''
-        Handles various post upgrade tasks including:
-          - Populates the gp_toolkit schema
-          - Performs updates for the gpperfmon database
-        '''
-        try:
-
-            # Get the admin role and all the databases
-            logger.info("Installing gp_toolkit")
-            rolname = self.Select("select rolname from pg_authid where oid=10")[0]
-
-            # Read the toolkit sql file into memory
-            fname = '%s/share/postgresql/gp_toolkit.sql' % self.newhome
-            sql = open(fname, 'r').read()
-
-            # Set our role to the admin role then execute the sql script
-            sql = "SET SESSION AUTHORIZATION %s;\n%s" % (rolname, sql)
-            oids = sorted(self.dbs.keys())
-            for dboid in oids:
-                db = self.dbs[dboid]
-                
-                if db == 'template0':
-                    continue
-                self.Update(sql, db=db)
-
-            # Handle perfmon upgrade
-            for dboid in oids:
-                db = self.dbs[dboid]
-                if db != 'gpperfmon':
-                    continue
-                logger.info("Updating gpperfmon")
-                fname = os.path.join(self.newhome, "lib/gpperfmon/gpperfmon42.sql")
-                sql = open(fname, 'r').read()
-                sql = "SET SESSION AUTHORIZATION %s;\n%s" % (rolname, sql)
-                self.Update(sql, db=db)
-
-        except BaseException, e:
-            sys.stderr.write(traceback.format_exc())
-            sys.stderr.write(str(e))
-            raise e
-
     #------------------------------------------------------------
     def getversion(self, home,env):
         binary = os.path.join(home, 'bin', 'pg_ctl')
         if not os.path.exists(binary):
             raise UpgradeError(binary + ' not found')
-
         try:
-            return self.RunCmd('pg_ctl --gp-version', env=env)
+            return self.RunCmd('pg_ctl --hawq-version', env=env)
         except CmdError:
             pass
         conf = '%s/include/pg_config.h' % home

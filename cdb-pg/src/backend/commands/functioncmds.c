@@ -342,7 +342,8 @@ static bool
 compute_common_attribute(DefElem *defel,
 						 DefElem **volatility_item,
 						 DefElem **strict_item,
-						 DefElem **security_item)
+						 DefElem **security_item,
+						 DefElem **data_access_item)
 {
 	if (strcmp(defel->defname, "volatility") == 0)
 	{
@@ -364,6 +365,13 @@ compute_common_attribute(DefElem *defel,
 			goto duplicate_error;
 
 		*security_item = defel;
+	}
+	else if (strcmp(defel->defname, "data_access") == 0)
+	{
+		if (*data_access_item)
+			goto duplicate_error;
+
+		*data_access_item = defel;
 	}
 	else
 		return false;
@@ -396,6 +404,62 @@ interpret_func_volatility(DefElem *defel)
 	}
 }
 
+static char
+interpret_data_access(DefElem *defel)
+{
+	char *str = strVal(defel->arg);
+	char proDataAccess = PRODATAACCESS_NONE;
+
+	if (strcmp(str, "none") == 0)
+		proDataAccess = PRODATAACCESS_NONE;
+	else if (strcmp(str, "contains") == 0)
+		proDataAccess = PRODATAACCESS_CONTAINS;
+	else if (strcmp(str, "reads") == 0)
+		proDataAccess = PRODATAACCESS_READS;
+	else if (strcmp(str, "modifies") == 0)
+		proDataAccess = PRODATAACCESS_MODIFIES;
+	else
+		elog(ERROR, "invalid data access \"%s\"", str);
+
+	return proDataAccess;
+}
+
+static char
+getDefaultDataAccess(Oid languageOid)
+{
+	char proDataAccess = PRODATAACCESS_NONE;
+	if (languageOid == SQLlanguageId)
+		proDataAccess = PRODATAACCESS_CONTAINS;
+
+	return proDataAccess;
+}
+
+static void
+validate_sql_data_access(char data_access, char volatility, Oid languageOid)
+{
+	/* IMMUTABLE is not compatible with READS SQL DATA or MODIFIES SQL DATA */
+	if (volatility == PROVOLATILE_IMMUTABLE &&
+			data_access == PRODATAACCESS_READS)
+		ereport(ERROR,
+				(errcode(ERRCODE_SYNTAX_ERROR),
+				errmsg("conflicting options"),
+				errhint("IMMUTABLE conflicts with READS SQL DATA.")));
+
+	if (volatility == PROVOLATILE_IMMUTABLE &&
+			data_access == PRODATAACCESS_MODIFIES)
+		ereport(ERROR,
+				(errcode(ERRCODE_SYNTAX_ERROR),
+				 errmsg("conflicting options"),
+				 errhint("IMMUTABLE conflicts with MODIFIES SQL DATA.")));
+
+	/* SQL language function cannot specify NO SQL */
+	if (languageOid == SQLlanguageId && data_access == PRODATAACCESS_NONE)
+		ereport(ERROR,
+				(errcode(ERRCODE_SYNTAX_ERROR),
+				 errmsg("conflicting options"),
+				 errhint("A SQL function cannot specify NO SQL.")));
+}
+
 /*
  * Dissect the list of options assembled in gram.y into function
  * attributes.
@@ -403,10 +467,12 @@ interpret_func_volatility(DefElem *defel)
 static void
 compute_attributes_sql_style(List *options,
 							 List **as,
-							 char **language,
+							 Oid *languageOid,
+							 char **languageName,
 							 char *volatility_p,
 							 bool *strict_p,
-							 bool *security_definer)
+							 bool *security_definer,
+							 char *data_access)
 {
 	ListCell   *option;
 	DefElem    *as_item = NULL;
@@ -414,6 +480,9 @@ compute_attributes_sql_style(List *options,
 	DefElem    *volatility_item = NULL;
 	DefElem    *strict_item = NULL;
 	DefElem    *security_item = NULL;
+	DefElem    *data_access_item = NULL;
+
+	char	   *language;
 
 	foreach(option, options)
 	{
@@ -438,7 +507,8 @@ compute_attributes_sql_style(List *options,
 		else if (compute_common_attribute(defel,
 										  &volatility_item,
 										  &strict_item,
-										  &security_item))
+										  &security_item,
+										  &data_access_item))
 		{
 			/* recognized common option */
 			continue;
@@ -460,14 +530,30 @@ compute_attributes_sql_style(List *options,
 	}
 
 	if (language_item)
-		*language = strVal(language_item->arg);
+		language = strVal(language_item->arg);
 	else
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
 				 errmsg("no language specified")));
-		*language = NULL;		/* keep compiler quiet */
+		language = NULL;	/* keep compiler quiet */
 	}
+
+	/* Convert language name to canonical case */
+	*languageName = case_translate_language_name(language);
+
+	/* Look up the language and validate permissions */
+	*languageOid = caql_getoid(NULL,
+			cql("SELECT * FROM pg_language "
+				" WHERE lanname = :1 ",
+				PointerGetDatum(*languageName)));
+
+	if (!OidIsValid(*languageOid))
+		ereport(ERROR,
+				(errcode(ERRCODE_UNDEFINED_OBJECT),
+				 errmsg("language \"%s\" does not exist", *languageName),
+				 (PLTemplateExists(*languageName) ?
+				  errhint("Use CREATE LANGUAGE to load the language into the database.") : 0)));
 
 	/* process optional items */
 	if (volatility_item)
@@ -476,6 +562,12 @@ compute_attributes_sql_style(List *options,
 		*strict_p = intVal(strict_item->arg);
 	if (security_item)
 		*security_definer = intVal(security_item->arg);
+
+	/* If prodataaccess indicator not specified, fill in default. */
+	if (data_access_item == NULL)
+		*data_access = getDefaultDataAccess(*languageOid);
+	else
+		*data_access = interpret_data_access(data_access_item);
 }
 
 
@@ -717,7 +809,6 @@ CreateFunction(CreateFunctionStmt *stmt)
 	char	   *prosrc_str;
 	Oid			prorettype;
 	bool		returnsSet;
-	char	   *language;
 	char	   *languageName;
 	Oid			languageOid;
 	Oid			languageValidator;
@@ -737,7 +828,7 @@ CreateFunction(CreateFunctionStmt *stmt)
 	List	   *as_clause;
 	List       *describeQualName = NIL;
 	Oid         describeFuncOid  = InvalidOid;
-	cqContext  *pcqCtx;
+	char		dataAccess;
 
 	/* Convert list of names to a name and namespace */
 	namespaceId = QualifiedNameGetCreationNamespace(stmt->funcname,
@@ -753,31 +844,20 @@ CreateFunction(CreateFunctionStmt *stmt)
 	isStrict = false;
 	security = false;
 	volatility = PROVOLATILE_VOLATILE;
+	dataAccess = PRODATAACCESS_NONE;
 
 	/* override attributes from explicit list */
 	compute_attributes_sql_style(stmt->options,
-				   &as_clause, &language, &volatility, &isStrict, &security);
+				   &as_clause, &languageOid, &languageName, &volatility,
+				   &isStrict, &security, &dataAccess);
 
-	/* Convert language name to canonical case */
-	languageName = case_translate_language_name(language);
-
-	/* Look up the language and validate permissions */
-	pcqCtx = caql_beginscan(
-			NULL,
+	languageTuple = caql_getfirst(NULL,
 			cql("SELECT * FROM pg_language "
-				" WHERE lanname = :1 ",
-				PointerGetDatum(languageName)));
+				"WHERE oid = :1",
+				ObjectIdGetDatum(languageOid)));
+	/* language should have been found in compute_attributes_sql_style() */
+	Assert(HeapTupleIsValid(languageTuple));
 
-	languageTuple = caql_getnext(pcqCtx);
-
-	if (!HeapTupleIsValid(languageTuple))
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("language \"%s\" does not exist", languageName),
-				 (PLTemplateExists(languageName) ?
-				  errhint("Use CREATE LANGUAGE to load the language into the database.") : 0)));
-
-	languageOid = HeapTupleGetOid(languageTuple);
 	languageStruct = (Form_pg_language) GETSTRUCT(languageTuple);
 
 	if (languageStruct->lanpltrusted)
@@ -800,7 +880,11 @@ CreateFunction(CreateFunctionStmt *stmt)
 
 	languageValidator = languageStruct->lanvalidator;
 
-	caql_endscan(pcqCtx);
+	/*
+	 * Check consistency for data access.  Note this comes after the language
+	 * tuple lookup, as we need language oid.
+	 */
+	validate_sql_data_access(dataAccess, volatility, languageOid);
 
 	/*
 	 * Convert remaining parameters of CREATE to form wanted by
@@ -902,6 +986,7 @@ CreateFunction(CreateFunctionStmt *stmt)
 					PointerGetDatum(allParameterTypes),
 					PointerGetDatum(parameterModes),
 					PointerGetDatum(parameterNames),
+					dataAccess,
 					stmt->funcOid);
 					
 	if (Gp_role == GP_ROLE_DISPATCH)
@@ -1296,8 +1381,11 @@ AlterFunction(AlterFunctionStmt *stmt)
 	DefElem    *volatility_item = NULL;
 	DefElem    *strict_item = NULL;
 	DefElem    *security_def_item = NULL;
+	DefElem    *data_access_item = NULL;
 	cqContext	cqc;
 	cqContext  *pcqCtx;
+	bool		isnull;
+	char		data_access;
 
 	rel = heap_open(ProcedureRelationId, RowExclusiveLock);
 
@@ -1338,7 +1426,8 @@ AlterFunction(AlterFunctionStmt *stmt)
 		if (compute_common_attribute(defel,
 									 &volatility_item,
 									 &strict_item,
-									 &security_def_item) == false)
+									 &security_def_item,
+									 &data_access_item) == false)
 			elog(ERROR, "option \"%s\" not recognized", defel->defname);
 	}
 
@@ -1348,6 +1437,31 @@ AlterFunction(AlterFunctionStmt *stmt)
 		procForm->proisstrict = intVal(strict_item->arg);
 	if (security_def_item)
 		procForm->prosecdef = intVal(security_def_item->arg);
+	if (data_access_item)
+	{
+		Datum		repl_val[Natts_pg_proc];
+		bool		repl_null[Natts_pg_proc];
+		bool		repl_repl[Natts_pg_proc];
+
+		MemSet(repl_null, 0, sizeof(repl_null));
+		MemSet(repl_repl, 0, sizeof(repl_repl));
+		repl_repl[Anum_pg_proc_prodataaccess - 1] = true;
+		repl_val[Anum_pg_proc_prodataaccess - 1] =
+			CharGetDatum(interpret_data_access(data_access_item));
+
+		tup = caql_modify_current(pcqCtx, repl_val, repl_null, repl_repl);
+	}
+
+	/* Not caql_getattr, as it might be a copy. */
+	data_access = DatumGetChar(
+			heap_getattr(tup, Anum_pg_proc_prodataaccess,
+				pcqCtx->cq_tupdesc, &isnull));
+	Assert(!isnull);
+	/* Cross check for various properties. */
+	validate_sql_data_access(data_access,
+							 procForm->provolatile,
+							 procForm->prolang);
+
 
 	/* Do the update */
 
@@ -1900,4 +2014,63 @@ AlterFunctionNamespace(List *name, List *argtypes, bool isagg,
 	heap_freetuple(tup);
 
 	heap_close(procRel, RowExclusiveLock);
+}
+
+/*
+ * GetFuncSQLDataAccess
+ *  Returns the data-access indication of a function specified by
+ *  the input funcOid.
+ */
+SQLDataAccess
+GetFuncSQLDataAccess(Oid funcOid)
+{
+	Relation	procRelation;
+	HeapTuple	procTuple;
+	bool		isnull = false;
+	char		proDataAccess;
+	SQLDataAccess	result = SDA_NO_SQL;
+	cqContext	cqc;
+
+	procRelation = heap_open(ProcedureRelationId, AccessShareLock);
+
+	procTuple = caql_getfirst(
+			caql_addrel(cqclr(&cqc), procRelation),
+			cql("SELECT * from pg_proc"
+				" WHERE oid = :1",
+				ObjectIdGetDatum(funcOid)));
+
+	if (!HeapTupleIsValid(procTuple))
+		elog(ERROR, "cache lookup failed for function %u", funcOid);
+
+	/* get the prodataaccess */
+	proDataAccess = DatumGetChar(heap_getattr(procTuple,
+											  Anum_pg_proc_prodataaccess,
+											  RelationGetDescr(procRelation),
+											  &isnull));
+
+	heap_freetuple(procTuple);
+	heap_close(procRelation, AccessShareLock);
+
+	/*
+	 * In upgrade mode, allow prodataaccess to be NULL, to handle the case
+	 * where prodataaccess column has not been added to pg_proc yet. This is
+	 * specifically to handle catDML()
+	 */
+	if (gp_upgrade_mode && isnull)
+		return SDA_NO_SQL;
+
+	Assert(!isnull);
+
+	if (proDataAccess == PRODATAACCESS_NONE)
+		result = SDA_NO_SQL;
+	else if (proDataAccess == PRODATAACCESS_CONTAINS)
+		result = SDA_CONTAINS_SQL;
+	else if (proDataAccess == PRODATAACCESS_READS)
+		result = SDA_READS_SQL;
+	else if (proDataAccess == PRODATAACCESS_MODIFIES)
+		result = SDA_MODIFIES_SQL;
+	else
+		elog(ERROR, "invalid data access option for function %u", funcOid);
+
+	return result;
 }

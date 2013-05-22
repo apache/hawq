@@ -1,0 +1,37 @@
+--
+-- Catalog Upgrade Script (from 1.0 to 1.1)
+--
+ 
+-- make fundamental changes to pg_proc ...
+SELECT catDML('UPDATE pg_class SET relnatts = 20 WHERE relname = ''pg_proc''');
+SELECT catDML('INSERT INTO pg_attribute VALUES
+  (1255, ''prodataaccess'',  18, -1, 1, 20, 0, -1, -1, true, ''p'', ''c'', true, false, false, true, 0)'
+);
+\c
+
+-- Following code populates the prodataaccess field for functions
+-- oid >= 1644 and oid <= 1655 - RI_FKey* functions are set to MODIFIES SQL
+-- oid >= 2322 and oid <= 2325 - pg_tablespace size, pg_database_size, pg_relation_size set to READS SQL
+-- oid = 1371 - pg_lock_status  - set to READS SQL
+-- oid = 2168 - pg_database_size  set to READS SQL
+-- oid = 6023 - pg_highest_oid  set to READS SQL
+-- oid >= 2286 and oid <= 2289 - pg_relation_size, pg_total_relation_size, pg_size_pretty set to READS SQL
+-- oid >= 7169 and oid <= 7172 - get_ao_distribution, get_ao_compression_ratio  set to READS SQL
+-- oid >= 7173 and oid <= 7174 - gp_update_ao_master_stats set to MODIFIES SQL
+-- rest of the functions - if SQL language are set to CONTAINS SQL or are set to NO SQL
+SELECT catDML(
+'UPDATE pg_proc SET prodataaccess =
+           case
+               when oid >= 1644 and oid <= 1655 then ''m''
+               when oid >= 2322 and oid <= 2325 then ''r''
+               when oid = 1371 or oid = 2168 or oid = 6023 then ''r''
+               when oid >= 2286 and oid <= 2289 then ''r''
+               when oid >= 7169 and oid <= 7172 then ''r''
+               when oid >= 7173 and oid <= 7174 then ''m''
+               when prolang = 14 then ''c''
+               else ''n''
+           end'
+);
+
+VACUUM FREEZE pg_proc;
+-- ... and the rest

@@ -81,6 +81,7 @@ ProcedureCreate(const char *procedureName,
 				Datum allParameterTypes,
 				Datum parameterModes,
 				Datum parameterNames,
+				char prodataaccess,
 				Oid funcOid)
 {
 	Oid			retval;
@@ -265,6 +266,7 @@ ProcedureCreate(const char *procedureName,
 		nulls[Anum_pg_proc_probin - 1] = true;
 	/* start out with empty permissions */
 	nulls[Anum_pg_proc_proacl - 1] = true;
+	values[Anum_pg_proc_prodataaccess - 1] = CharGetDatum(prodataaccess);
 
 	rel = heap_open(ProcedureRelationId, RowExclusiveLock);
 

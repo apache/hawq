@@ -3650,7 +3650,6 @@ setNewRelfilenodeCommon(Relation relation, Oid newrelfilenode)
 								relation->rd_segfile0_relationnodeinfos[0].persistentSerialNum);
 	}
 
-
 	caql_update_current(pcqCtx, tuple);
 	/* and Update indexes (implicit) */
 

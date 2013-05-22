@@ -78,7 +78,7 @@ int			optreset;
 
 
 /* version string we expect back from postgres */
-#define PG_VERSIONSTR "postgres (Greenplum Database) " PG_VERSION "\n"
+#define PG_VERSIONSTR "postgres (HAWQ) " PG_VERSION "\n"
 
 /*
  * these values are passed in by makefile defines
@@ -2107,7 +2107,7 @@ setup_cdb_schema(void)
 	char	  **line;
 	char	  **lines;
 
-	fputs(_("creating Greenplum Database schema ... "), stdout);
+	fputs(_("creating HAWQ schema ... "), stdout);
 	fflush(stdout);
 
 	lines = readfile(cdb_init_file);
@@ -2881,12 +2881,12 @@ main(int argc, char *argv[])
 		}
 		if (strcmp(argv[1], "--version") == 0 || strcmp(argv[1], "-V") == 0)
 		{
-			puts("initdb (Greenplum Database) " PG_VERSION);
+			puts("initdb (HAWQ) " PG_VERSION);
 			exit(0);
 		}
 		if (strcmp(argv[1], "--gp-version") == 0)
 		{
-			puts("initdb (Greenplum Database) " GP_VERSION);
+			puts("initdb (HAWQ) " GP_VERSION);
 			exit(0);
 		}
 	}
@@ -3553,7 +3553,7 @@ main(int argc, char *argv[])
 
 		setup_schema();
 
-		/* sets up the Greenplum Database admin schema */
+		/* sets up the HAWQ admin schema */
 		setup_cdb_schema();
 
 		vacuum_db();
