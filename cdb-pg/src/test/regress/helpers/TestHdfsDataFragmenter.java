@@ -8,10 +8,10 @@ import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 
-import com.emc.greenplum.gpdb.hdfsconnector.BaseDataFragmenter;
-import com.emc.greenplum.gpdb.hdfsconnector.BaseMetaData;
-import com.emc.greenplum.gpdb.hdfsconnector.FragmentInfo;
-import com.emc.greenplum.gpdb.hdfsconnector.GPFusionInputFormat;
+import com.pivotal.pxf.fragmenters.BaseDataFragmenter;
+import com.pivotal.pxf.fragmenters.FragmentInfo;
+import com.pivotal.pxf.utilities.BaseMetaData;
+import com.pivotal.pxf.utilities.GPFusionInputFormat;
 
 
 /*

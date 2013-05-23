@@ -1,17 +1,16 @@
-import com.emc.greenplum.gpdb.hadoop.io.GPDBWritable;
-import com.emc.greenplum.gpdb.hdfsconnector.BadRecordException;
-import com.emc.greenplum.gpdb.hdfsconnector.HDFSMetaData;
-import com.emc.greenplum.gpdb.hdfsconnector.IFieldsResolver;
-import com.emc.greenplum.gpdb.hdfsconnector.OneField;
-import com.emc.greenplum.gpdb.hdfsconnector.OneRow;
-import com.emc.greenplum.gpdb.hdfsconnector.RecordkeyAdapter;
-
-import java.lang.IllegalAccessException;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.LinkedList;
 import java.util.List;
+
+import com.pivotal.pxf.exception.BadRecordException;
+import com.pivotal.pxf.format.OneField;
+import com.pivotal.pxf.format.OneRow;
+import com.pivotal.pxf.hadoop.io.GPDBWritable;
+import com.pivotal.pxf.resolvers.IFieldsResolver;
+import com.pivotal.pxf.utilities.HDFSMetaData;
+import com.pivotal.pxf.utilities.RecordkeyAdapter;
 
 
 /*

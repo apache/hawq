@@ -10,14 +10,14 @@ import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 
-import com.emc.greenplum.gpdb.hdfsconnector.BaseAnalyzer;
-import com.emc.greenplum.gpdb.hdfsconnector.BaseMetaData;
-import com.emc.greenplum.gpdb.hdfsconnector.DataSourceStatsInfo;
-import com.emc.greenplum.gpdb.hdfsconnector.GPFusionInputFormat;
-import com.emc.greenplum.gpdb.hdfsconnector.GPHdfsBridge;
-import com.emc.greenplum.gpdb.hdfsconnector.HDFSMetaData;
-import com.emc.greenplum.gpdb.hdfsconnector.HDMetaData;
-import com.emc.greenplum.gpdb.hdfsconnector.IHdfsFileAccessor;
+import com.pivotal.pxf.accessors.IHdfsFileAccessor;
+import com.pivotal.pxf.analyzers.BaseAnalyzer;
+import com.pivotal.pxf.analyzers.DataSourceStatsInfo;
+import com.pivotal.pxf.bridge.GPHdfsBridge;
+import com.pivotal.pxf.utilities.BaseMetaData;
+import com.pivotal.pxf.utilities.GPFusionInputFormat;
+import com.pivotal.pxf.utilities.HDFSMetaData;
+import com.pivotal.pxf.utilities.HDMetaData;
 
 
 /*
