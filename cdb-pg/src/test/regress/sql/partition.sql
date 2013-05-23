@@ -4893,3 +4893,28 @@ from pxn
 where x = 9;
 
 -- MPP-18359 end
+
+-- MPP-19105
+-- Base partitions with trailing dropped columns
+drop table if exists t;
+create table t (
+	a int,
+	b int,
+	c char,
+	d varchar(50)
+) distributed by (c) 
+partition by range (a) 
+( 
+	partition p1 start(1) end(5),
+	partition p2 start(5)
+);
+
+-- Drop column
+alter table t drop column d;
+
+-- Alter table split partition
+alter table t split partition for(1) at (2) into (partition p11, partition p22);
+
+insert into  t values(1,2,'a');
+select * from t;
+-- END MPP-19105

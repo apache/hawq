@@ -9588,3 +9588,36 @@ where x = 9;
 (1 row)
 
 -- MPP-18359 end
+-- MPP-19105
+-- Base partitions with trailing dropped columns
+drop table if exists t;
+NOTICE:  table "t" does not exist, skipping
+create table t (
+        a int, 
+        b int, 
+        c char,
+        d varchar(50)
+) distributed by (c)  
+partition by range (a)  
+( 
+        partition p1 start(1) end(5),
+        partition p2 start(5)
+);
+NOTICE:  CREATE TABLE will create partition "t_1_prt_p1" for table "t"
+NOTICE:  CREATE TABLE will create partition "t_1_prt_p2" for table "t"
+-- Drop column
+alter table t drop column d;
+-- Alter table split partition
+alter table t split partition for(1) at (2) into (partition p11, partition p22);
+NOTICE:  exchanged partition "p1" of relation "t" with relation "pg_temp_362911"
+NOTICE:  dropped partition "p1" for relation "t"
+NOTICE:  CREATE TABLE will create partition "t_1_prt_p11" for table "t"
+NOTICE:  CREATE TABLE will create partition "t_1_prt_p22" for table "t"
+insert into  t values(1,2,'a');
+select * from t;
+ a | b | c  
+---+---+---
+ 1 | 2 | a
+(1 row) 
+
+-- END MPP-19105
