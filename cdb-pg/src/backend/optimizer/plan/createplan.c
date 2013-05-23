@@ -1222,11 +1222,7 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
  	 */
     segdb_file_map = (char **) palloc(total_primaries * sizeof(char *));
 	MemSet(segdb_file_map, 0, total_primaries * sizeof(char *));
-
 	Assert(rel->locationlist != NIL);
-
-	if (GpAliveSegmentsInfo.aliveSegmentsCount != GetTotalSegmentsNumber())
-		elog(ERROR, "external table scan does not support failover.");
 
 	/* is this an EXECUTE table or a LOCATION (URI) table */
 	if(rel->execcommand)

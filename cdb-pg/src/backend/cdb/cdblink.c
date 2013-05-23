@@ -121,7 +121,7 @@ getgpsegmentCount(void)
 int
 getgphostCount(void)
 {
-	CdbComponentDatabases *db_info = GpAliveSegmentsInfo.cdbComponentDatabases;
+	CdbComponentDatabases *db_info = getCdbComponentDatabasesForGangs();
 	
 	if (Gp_role == GP_ROLE_UTILITY)
 	{

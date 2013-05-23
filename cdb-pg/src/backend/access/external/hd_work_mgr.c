@@ -615,13 +615,7 @@ do_segment_clustering_by_host(void)
 {
 	int i;
 	List *gpHosts = NIL;
-	CdbComponentDatabases *cdb = GpAliveSegmentsInfo.cdbComponentDatabases;
-	
-	if (GpAliveSegmentsInfo.aliveSegmentsCount == UNINITIALIZED_GP_IDENTITY_VALUE ||
-		GpAliveSegmentsInfo.aliveSegmentsCount == 0)
-			ereport(ERROR,
-					(errcode(ERRCODE_DATA_CORRUPTED),
-					 errmsg("No alive segment in the cluster.")));
+	CdbComponentDatabases *cdb = getCdbComponentDatabasesForGangs();
 	
 	for (i = 0; i < cdb->total_segment_dbs; i++)
 	{

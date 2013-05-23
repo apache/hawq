@@ -8,6 +8,7 @@ COMMON_REAL_OBJS=\
     $(top_srcdir)/src/backend/access/hash/hashfunc.o \
     $(top_srcdir)/src/backend/access/transam/filerepdefs.o \
     $(top_srcdir)/src/backend/bootstrap/bootparse.o \
+	$(top_srcdir)/src/backend/cdb/cdbutil.o \
     $(top_srcdir)/src/backend/lib/stringinfo.o \
     $(top_srcdir)/src/backend/nodes/bitmapset.o \
     $(top_srcdir)/src/backend/nodes/equalfuncs.o \
