@@ -1,0 +1,98 @@
+--
+-- Catalog Upgrade Script (from 4.2 to 4.3)
+--
+-- All catalog changes should be placed here.
+-- Most operations can be declared as DDL, such as ALTER TABLE, CREATE TABLE
+-- Creating catalog objects must specific its oid. For example,
+--   Create function f1(int) ... with (oid = <newoid>)
+--   Create aggregate agg1(int) (..., oid = <newoid>)
+--
+-- Some operations can't be declared as DDL, such as populating a new catalog column,
+-- or replacing the on-disk representation of views. These must be done as DML.
+-- For example:
+--   update @gpupgradeschemaname@.pg_aggregate set dummy = 123;
+--   select catDML('update pg_catalog.pg_aggregate set dummy = 123') from gp_dist_random('gp_id');
+--
+-- make fundamental changes to pg_proc ...
+SELECT catDML('UPDATE pg_class SET relnatts = 20 WHERE relname = ''pg_proc''');
+SELECT catDML('INSERT INTO pg_attribute VALUES
+  (1255, ''prodataaccess'',  18, -1, 1, 20, 0, -1, -1, true, ''p'', ''c'', true, false, false, true, 0)'
+);
+\c
+
+-- Following code populates the prodataaccess field for functions
+-- oid >= 1644 and oid <= 1655 - RI_FKey* functions are set to MODIFIES SQL
+-- oid >= 2322 and oid <= 2325 - pg_tablespace size, pg_database_size, pg_relation_size set to READS SQL
+-- oid = 1371 - pg_lock_status  - set to READS SQL
+-- oid = 2168 - pg_database_size  set to READS SQL
+-- oid = 6023 - pg_highest_oid  set to READS SQL
+-- oid >= 2286 and oid <= 2289 - pg_relation_size, pg_total_relation_size, pg_size_pretty set to READS SQL
+-- oid >= 7169 and oid <= 7172 - get_ao_distribution, get_ao_compression_ratio  set to READS SQL
+-- oid >= 7173 and oid <= 7174 - gp_update_ao_master_stats set to MODIFIES SQL
+-- rest of the functions - if SQL language are set to CONTAINS SQL or are set to NO SQL
+SELECT catDML(
+'UPDATE pg_proc SET prodataaccess =
+			case
+				when oid >= 1644 and oid <= 1655 then ''m''
+				when oid >= 2322 and oid <= 2325 then ''r''
+				when oid = 1371 or oid = 2168 or oid = 6023 then ''r''
+				when oid >= 2286 and oid <= 2289 then ''r''
+				when oid >= 7169 and oid <= 7172 then ''r''
+				when oid >= 7173 and oid <= 7174 then ''m''
+				when prolang = 14 then ''c''
+				else ''n''
+			end'
+);
+
+VACUUM FREEZE pg_proc;
+-- ... and the rest
+
+-- window frame maker for lead/lag
+CREATE FUNCTION @gpupgradeschemaname@.lead_lag_frame_maker(internal) RETURNS internal LANGUAGE internal VOLATILE STRICT
+	AS 'lead_lag_frame_maker' WITH (OID=5081);
+
+-- MPP-17860 add pg_window.winframemakerfunc
+ALTER TABLE @gpupgradeschemaname@.pg_window
+    ADD COLUMN winframemakerfunc regproc;
+SELECT catDML(
+'UPDATE @gpupgradeschemaname@.pg_window SET winframemakerfunc = 5081
+ FROM pg_proc WHERE pg_proc.oid = pg_window.winfnoid AND
+      (pg_proc.proname = ''lead'' OR pg_proc.proname = ''lag'')
+      AND pg_proc.oid < 10000'
+);
+SELECT catDML(
+'UPDATE @gpupgradeschemaname@.pg_window SET winframemakerfunc = 0
+ WHERE winframemakerfunc IS NULL'
+);
+ALTER TABLE @gpupgradeschemaname@.pg_window
+    ALTER COLUMN winframemakerfunc SET NOT NULL;
+
+--
+-- Partition management functions for the optimizer
+--
+CREATE FUNCTION @gpupgradeschemaname@.gp_partition_propagation(int4, oid) RETURNS void  LANGUAGE internal VOLATILE STRICT AS 'gp_partition_propagation' WITH (OID=6083);
+COMMENT ON FUNCTION @gpupgradeschemaname@.gp_partition_propagation(int4, oid) IS  'inserts a partition oid into specified pid-index';
+
+CREATE FUNCTION @gpupgradeschemaname@.gp_partition_selection(oid, anyelement) RETURNS oid LANGUAGE internal VOLATILE STRICT AS 'gp_partition_selection' WITH (OID=6084);
+COMMENT ON FUNCTION @gpupgradeschemaname@.gp_partition_selection(oid, anyelement)  IS 'selects the child partition oid which satisfies a given partition key value';
+
+CREATE FUNCTION @gpupgradeschemaname@.gp_partition_expansion(oid) RETURNS setof oid LANGUAGE internal VOLATILE STRICT AS 'gp_partition_expansion' WITH (OID=6085);
+COMMENT ON FUNCTION @gpupgradeschemaname@.gp_partition_expansion(oid) IS 'finds all child partition oids for the given parent oid';
+
+CREATE FUNCTION @gpupgradeschemaname@.gp_partition_inverse(oid) RETURNS setof record LANGUAGE internal VOLATILE STRICT AS 'gp_partition_inverse' WITH (OID=6086);
+COMMENT ON FUNCTION @gpupgradeschemaname@.gp_partition_inverse(oid) IS 'returns all child partitition oids with their constraints for a given parent oid');
+
+--
+-- Functions for enabling and disabling transformations
+--
+CREATE FUNCTION @gpupgradeschemaname@.disable_xform(text) RETURNS text LANGUAGE internal IMMUTABLE STRICT AS 'disable_xform' WITH (OID=6087);
+COMMENT ON FUNCTION @gpupgradeschemaname@.disable_xform(text) IS 'disables transformations in the optimizer';
+
+CREATE FUNCTION @gpupgradeschemaname@.enable_xform(text) RETURNS text LANGUAGE internal IMMUTABLE STRICT AS 'enable_xform' WITH (OID=6088);
+COMMENT ON FUNCTION @gpupgradeschemaname@.enable_xform(text) IS 'enables transformations in the optimizer';
+
+--
+-- Show Optimizer's version
+--
+CREATE FUNCTION @gpupgradeschemaname@.gp_opt_version() RETURNS text LANGUAGE internal IMMUTABLE STRICT AS 'gp_opt_version' WITH (OID=6089);
+COMMENT ON FUNCTION @gpupgradeschemaname@.gp_opt_version() IS 'returns the optimizer and gpos library versions';

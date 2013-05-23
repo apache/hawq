@@ -754,7 +754,7 @@ prescan_walker(Node *node, PlanProfile * context)
 			 * may occur in an expression or an initplan list.
 			 */
 
-		{
+ 		{
 			/*
 			 * SubPlans establish a local state for the contained plan,
 			 * notably the range table.

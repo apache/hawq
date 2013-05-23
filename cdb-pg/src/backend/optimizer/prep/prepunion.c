@@ -902,7 +902,7 @@ expand_inherited_rtentry(PlannerInfo *root, RangeTblEntry *rte, Index rti)
 			continue;
 
 		/*
-		 * show only leaf tables when the parent table is partitioned
+		 * show root and leaf partitions
 		 */
 		if (rel_is_partitioned(parentOID) && !rel_is_leaf_partition(childOID))
 		{

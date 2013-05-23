@@ -3391,7 +3391,7 @@ StatementCancelHandler(SIGNAL_ARGS)
 
 
 /* CDB: Signal handler for program errors */
-static void
+void
 CdbProgramErrorHandler(SIGNAL_ARGS)
 {
     int			save_errno = errno;

@@ -6543,16 +6543,9 @@ static void CopyInitPartitioningState(EState *estate)
 {
 	if (estate->es_result_partitions)
 	{
-		Size sz;
-		estate->es_partition_state = makeNode(PartitionState);
-
-		sz = num_partition_levels(estate->es_result_partitions);
-		sz *= sizeof(void *);
-		estate->es_partition_state->amstate = palloc0(sz);
-		estate->es_partition_state->max_partition_attr =
-			max_partition_attr(estate->es_result_partitions);
-		estate->es_partition_state->result_partition_array_size =
-				estate->es_num_result_relations;
+		estate->es_partition_state =
+ 			createPartitionState(estate->es_result_partitions,
+								 estate->es_num_result_relations);
 	}
 }
 

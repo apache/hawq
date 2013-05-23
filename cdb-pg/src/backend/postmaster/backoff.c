@@ -843,7 +843,7 @@ void BackoffSweeper()
 			if (se->isActive)
 				appendStringInfo(&str, "(%d,%f)", i, se->targetUsage);
 		}
-		elog(LOG, "%s", str.data);
+		elog(LOG, "%s", (const char *) str.data);
 		pfree(str.data);
 	}
 

@@ -37,6 +37,7 @@
 #include "cdb/cdbmirroredfilesysobj.h"
 #include "cdb/cdbvars.h"
 #include "cdb/cdbutil.h"
+#include "access/genam.h" 
 #include "access/catquery.h"
 #include "access/genam.h"
 #include "postmaster/primary_mirror_mode.h"

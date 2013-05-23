@@ -248,6 +248,8 @@ extern int ddboost_buf_size;
 extern bool gp_cancel_query_print_log;
 extern int gp_cancel_query_delay_time;
 
+extern bool gp_partitioning_dynamic_selection_log;
+
 extern bool gp_crash_handler_async;
 
 extern bool gp_temporary_files_filespace_repair;
@@ -311,6 +313,47 @@ extern int	gp_filerep_tcp_keepalives_count;
 extern int  WalSendClientTimeout;
 
 extern char  *data_directory;
+
+/* ORCA related definitions */
+#define GPOPT_XFORMS 200 /* number of transformation rules */
+
+/* types of optimizer failures */
+#define GPOPT_ALL_FAIL 0  /* all failures */
+#define GPOPT_UNEXPECTED_FAIL 1  /* unexpected failures */
+#define GPOPT_EXPECTED_FAIL 2 /* expected failures */
+
+// ORCA-related gucs
+extern bool gp_opt_minidump;
+extern bool gp_opt_print_query;
+extern bool gp_opt_print_plan;
+extern bool gp_opt_print_xform;
+extern bool gp_opt_disable_xform_result_printing;
+extern bool	gp_opt_print_memo_after_exploration;
+extern bool	gp_opt_print_memo_after_implementation;
+extern bool	gp_opt_print_memo_after_optimization;
+extern bool	gp_opt_print_job_scheduler;
+extern bool	gp_opt_print_expression_properties;
+extern bool	gp_opt_print_group_properties;
+extern bool	gp_opt_print_optimization_context;
+extern bool gp_opt_print_optimization_stats;
+extern bool	gp_opt_parallel;
+extern bool	gp_opt_local;
+extern int  gp_opt_retries;
+extern bool  gp_opt_xforms[GPOPT_XFORMS];
+extern char *gp_opt_search_strategy_path;
+extern bool gp_opt_extract_dxl_stats;
+extern bool gp_opt_extract_dxl_stats_all_nodes;
+extern bool gp_opt_enumerate_plans;
+extern bool gp_opt_sample_plans;
+extern int	gp_opt_plan_id;
+extern int	gp_opt_samples_number;
+extern int gp_opt_log_failure;
+extern double gp_opt_cost_threshold;
+extern bool gp_opt_cte_inlining;
+extern int gp_opt_cte_inlining_bound;
+extern double gp_opt_damping_factor_filter;
+extern double gp_opt_damping_factor_join;
+extern double gp_opt_damping_factor_groupby;
 
 #if USE_EMAIL
 extern char  *gp_email_smtp_server;

@@ -16,8 +16,8 @@
 #include "executor/instrument.h"
 #include "executor/nodeAgg.h"
 #include "executor/nodeAppend.h"
-#include "executor/nodeAppendOnlyscan.h"
-#include "executor/nodeAOCSScan.h"
+#include "executor/nodeTableScan.h"
+#include "executor/nodeDynamicTableScan.h"
 #include "executor/nodeBitmapAnd.h"
 #include "executor/nodeBitmapHeapscan.h"
 #include "executor/nodeBitmapIndexscan.h"
@@ -33,7 +33,6 @@
 #include "executor/nodeMotion.h"
 #include "executor/nodeNestloop.h"
 #include "executor/nodeResult.h"
-#include "executor/nodeSeqscan.h"
 #include "executor/nodeSetOp.h"
 #include "executor/nodeSort.h"
 #include "executor/nodeSubplan.h"
@@ -123,7 +122,9 @@ ExecReScan(PlanState *node, ExprContext *exprCtxt)
 			break;
 
 		case T_SeqScanState:
-			ExecSeqReScan((SeqScanState *) node, exprCtxt);
+		case T_AppendOnlyScanState:
+		case T_AOCSScanState:
+			insist_log(false, "SeqScan/AppendOnlyScan/AOCSScan are defunct");
 			break;
 
 		case T_IndexScanState:
@@ -134,12 +135,12 @@ ExecReScan(PlanState *node, ExprContext *exprCtxt)
 			ExecExternalReScan((ExternalScanState *) node, exprCtxt);
 			break;			
 
-		case T_AppendOnlyScanState:
-			ExecAppendOnlyReScan((AppendOnlyScanState *) node, exprCtxt);
+		case T_TableScanState:
+			ExecTableReScan((TableScanState *) node, exprCtxt);
 			break;
 
-		case T_AOCSScanState:
-			ExecAOCSReScan((AOCSScanState *) node, exprCtxt);
+		case T_DynamicTableScanState:
+			ExecDynamicTableReScan((DynamicTableScanState *) node, exprCtxt);
 			break;
 
 		case T_BitmapIndexScanState:
@@ -248,13 +249,18 @@ ExecMarkPos(PlanState *node)
 {
 	switch (nodeTag(node))
 	{
-		case T_SeqScanState:
-			ExecSeqMarkPos((SeqScanState *) node);
+		case T_TableScanState:
+			ExecTableMarkPos((TableScanState *) node);
 			break;
 
+		case T_DynamicTableScanState:
+			ExecDynamicTableMarkPos((DynamicTableScanState *) node);
+			break;
+
+		case T_SeqScanState:
 		case T_AppendOnlyScanState:
 		case T_AOCSScanState:
-			elog(ERROR, "Marking scan position for append-only relation is not supported");
+			insist_log(false, "SeqScan/AppendOnlyScan/AOCSScan are defunct");
 			break;			
 			
 		case T_IndexScanState:
@@ -322,13 +328,18 @@ ExecRestrPos(PlanState *node)
 {
 	switch (nodeTag(node))
 	{
-		case T_SeqScanState:
-			ExecSeqRestrPos((SeqScanState *) node);
+		case T_TableScanState:
+			ExecTableRestrPos((TableScanState *) node);
 			break;
 
+		case T_DynamicTableScanState:
+			ExecDynamicTableRestrPos((DynamicTableScanState *) node);
+			break;
+
+		case T_SeqScanState:
 		case T_AppendOnlyScanState:
 		case T_AOCSScanState:
-			elog(ERROR, "Restoring scan position is not yet supported for append-only relation scan");
+			insist_log(false, "SeqScan/AppendOnlyScan/AOCSScan are defunct");
 			break;			
 
 		case T_IndexScanState:
@@ -507,7 +518,8 @@ ExecMayReturnRawTuples(PlanState *node)
 	switch (nodeTag(node))
 	{
 			/* Table scan nodes */
-		case T_SeqScanState:
+		case T_TableScanState:
+		case T_DynamicTableScanState:
 		case T_IndexScanState:
 		case T_BitmapHeapScanState:
 		case T_TidScanState:
@@ -516,6 +528,11 @@ ExecMayReturnRawTuples(PlanState *node)
 		case T_ValuesScanState:
 			if (node->ps_ProjInfo == NULL)
 				return true;
+			break;
+
+
+		case T_SeqScanState:
+			insist_log(false, "SeqScan/AppendOnlyScan/AOCSScan are defunct");
 			break;
 
 			/* Non-projecting nodes */
@@ -571,18 +588,18 @@ ExecEagerFree(PlanState *node)
 		case T_HashState:
 		case T_ValuesScanState:
 		case T_TableFunctionState:
+		case T_DynamicTableScanState:
+		case T_SequenceState:
 			break;
 
+		case T_TableScanState:
+			ExecEagerFreeTableScan((TableScanState *)node);
+			break;
+			
 		case T_SeqScanState:
-			ExecEagerFreeSeqScan((SeqScanState *)node);
-			break;
-			
 		case T_AppendOnlyScanState:
-			ExecEagerFreeAppendOnlyScan((AppendOnlyScanState *)node);
-			break;
-			
 		case T_AOCSScanState:
-			ExecEagerFreeAOCSScan((AOCSScanState *)node);
+			insist_log(false, "SeqScan/AppendOnlyScan/AOCSScan are defunct");
 			break;
 			
 		case T_ExternalScanState:
@@ -729,9 +746,8 @@ ExecEagerFreeChildNodes(PlanState *node, bool subplanDone)
 		case T_UniqueState:
 		case T_HashState:
 		case T_ValuesScanState:
-		case T_SeqScanState:
-		case T_AppendOnlyScanState:
-		case T_AOCSScanState:
+		case T_TableScanState:
+		case T_DynamicTableScanState:
 		case T_ExternalScanState:
 		case T_IndexScanState:
 		case T_BitmapHeapScanState:
@@ -745,6 +761,12 @@ ExecEagerFreeChildNodes(PlanState *node, bool subplanDone)
 			planstate_walk_node(outerPlanState(node), EagerFreeWalker, &ctx);
 			break;
 		}
+
+		case T_SeqScanState:
+		case T_AppendOnlyScanState:
+		case T_AOCSScanState:
+			insist_log(false, "SeqScan/AppendOnlyScan/AOCSScan are defunct");
+			break;
 
 		case T_NestLoopState:
 		case T_MergeJoinState:

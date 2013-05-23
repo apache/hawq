@@ -43,6 +43,8 @@
 #include "miscadmin.h"
 #include "cdb/cdbgang.h"
 
+extern char *SzDXLPlan(Query *parse);
+
 typedef struct ExplainState
 {
 	/* options */
@@ -73,6 +75,11 @@ ExplainOnePlan_internal(PlannedStmt *plannedstmt,
                         const char *queryString, ParamListInfo params,
                         TupOutputState *tstate,
                         ExplainState   *es);
+
+static void ExplainDXL(Query *query, ExplainStmt *stmt,
+							const char *queryString,
+							ParamListInfo params, TupOutputState *tstate);
+
 static double elapsed_time(instr_time *starttime);
 static ErrorData *explain_defer_error(ExplainState *es);
 static void explain_outNode(StringInfo str,
@@ -187,6 +194,91 @@ ExplainResultDesc(ExplainStmt *stmt)
 	return tupdesc;
 }
 
+
+/*
+ * ExplainDXL -
+ *	  print out the execution plan for one Query in DXL format
+ *	  this function implicitly uses gp_optimizer
+ */
+static void
+ExplainDXL(Query *query, ExplainStmt *stmt, const char *queryString,
+				ParamListInfo params, TupOutputState *tstate)
+{
+    MemoryContext   oldcxt = CurrentMemoryContext;
+    MemoryContext   explaincxt;
+	ExplainState    explainState;
+    ExplainState   *es = &explainState;
+
+    /* Create EXPLAIN memory context. */
+    explaincxt = AllocSetContextCreate(CurrentMemoryContext,
+                                       "EXPLAIN working storage",
+                                       ALLOCSET_DEFAULT_MINSIZE,
+                                       ALLOCSET_DEFAULT_INITSIZE,
+                                       ALLOCSET_DEFAULT_MAXSIZE);
+
+    /* Initialize ExplainState structure. */
+    memset(es, 0, sizeof(*es));
+    es->explaincxt = explaincxt;
+    es->showstatctx = NULL;
+    es->deferredError = NULL;
+    es->tupOutputState = tstate;
+    es->pstmt = NULL;
+
+    /* Allocate output buffer and a scratch buffer. */
+    MemoryContextSwitchTo(explaincxt);
+    initStringInfoOfSize(&es->workbuf, 1000);
+	initStringInfoOfSize(&es->outbuf, 16000);
+    MemoryContextSwitchTo(oldcxt);
+
+    bool enumerate = gp_opt_enumerate_plans;
+
+    /* Do the EXPLAIN. */
+    PG_TRY();
+    {
+    	// enable plan enumeration before calling gp_optimizer
+    	gp_opt_enumerate_plans = true;
+
+    	// optimize query using gp_optimizer and get generated plan in DXL format
+    	char *dxl = SzDXLPlan(query);
+
+    	// restore old value of enumerate plans GUC
+    	gp_opt_enumerate_plans = enumerate;
+
+    	if (NULL == dxl)
+    	{
+    		elog(NOTICE, "Optimizer failed to produce plan");
+    	}
+    	else
+    	{
+    		do_text_output_multiline(es->tupOutputState, dxl);
+    		do_text_output_oneline(es->tupOutputState, ""); /* separator line */
+    		pfree(dxl);
+    	}
+
+    	 /* Free the memory we used. */
+    	MemoryContextSwitchTo(oldcxt);
+    	MemoryContextDelete(explaincxt);
+    }
+    PG_CATCH();
+    {
+    	// restore old value of enumerate plans GUC
+    	gp_opt_enumerate_plans = enumerate;
+
+    	/* Free the memory we used. */
+    	if (CurrentMemoryContext == explaincxt)
+    	{
+    		MemoryContextSwitchTo(oldcxt);
+    	}
+
+    	MemoryContextDelete(explaincxt);
+
+    	/* Exit to next error handler. */
+    	PG_RE_THROW();
+    }
+    PG_END_TRY();
+}
+
+
 /*
  * ExplainOneQuery -
  *	  print out the execution plan for one Query
@@ -196,6 +288,12 @@ ExplainOneQuery(Query *query, ExplainStmt *stmt, const char *queryString,
 				ParamListInfo params, TupOutputState *tstate)
 {
 	PlannedStmt	*plan = NULL;
+
+    if (stmt->dxl)
+    {
+    	ExplainDXL(query, stmt, queryString, params, tstate);
+    	return;
+    }
 
 	/* planner will not cope with utility statements */
 	if (query->commandType == CMD_UTILITY)
@@ -499,7 +597,8 @@ ExplainOnePlan_internal(PlannedStmt *plannedstmt,
     	CmdType cmd = queryDesc->plannedstmt->commandType;
     	Plan *childPlan = queryDesc->plannedstmt->planTree;
 
-    	if (cmd == CMD_DELETE || cmd == CMD_INSERT || cmd == CMD_UPDATE)
+    	if ( (cmd == CMD_DELETE || cmd == CMD_INSERT || cmd == CMD_UPDATE) &&
+    		  queryDesc->plannedstmt->planGen == PLANGEN_PLANNER )
     	{
     	   	/* Set sliceNum to the slice number of the outer-most query plan node */
     	   	int sliceNum = 0;
@@ -847,6 +946,9 @@ explain_outNode(StringInfo str,
 		case T_Append:
 			pname = "Append";
 			break;
+		case T_Sequence:
+			pname = "Sequence";
+			break;
 		case T_BitmapAnd:
 			pname = "BitmapAnd";
 			break;
@@ -880,6 +982,9 @@ explain_outNode(StringInfo str,
 				case JOIN_LASJ:
 					pname = "Nested Loop Left Anti Semi Join";
 					break;
+				case JOIN_LASJ_NOTIN:
+					pname = "Nested Loop Left Anti Semi Join (Not-In)";
+					break;
 				default:
 					pname = "Nested Loop ??? Join";
 					break;
@@ -905,6 +1010,9 @@ explain_outNode(StringInfo str,
 					break;
 				case JOIN_LASJ:
 					pname = "Merge Left Anti Semi Join";
+					break;
+				case JOIN_LASJ_NOTIN:
+					pname = "Merge Left Anti Semi Join (Not-In)";
 					break;
 				default:
 					pname = "Merge ??? Join";
@@ -932,6 +1040,9 @@ explain_outNode(StringInfo str,
 				case JOIN_LASJ:
 					pname = "Hash Left Anti Semi Join";
 					break;
+				case JOIN_LASJ_NOTIN:
+					pname = "Hash Left Anti Semi Join (Not-In)";
+					break;
 				default:
 					pname = "Hash ??? Join";
 					break;
@@ -946,11 +1057,20 @@ explain_outNode(StringInfo str,
 		case T_AOCSScan:
 			pname = "Append-only Columnar Scan";
 			break;
+		case T_TableScan:
+			pname = "Table Scan";
+			break;
+		case T_DynamicTableScan:
+			pname = "Dynamic Table Scan";
+			break;
 		case T_ExternalScan:
 			pname = "External Scan";
 			break;
 		case T_IndexScan:
 			pname = "Index Scan";
+			break;
+		case T_DynamicIndexScan:
+			pname = "Dynamic Index Scan";
 			break;
 		case T_BitmapIndexScan:
 			pname = "Bitmap Index Scan";
@@ -1085,6 +1205,34 @@ explain_outNode(StringInfo str,
 
 			}
 			break;
+		case T_DML:
+			{
+				switch (es->pstmt->commandType)
+				{
+					case CMD_INSERT:
+						pname = "Insert";
+						break;
+					case CMD_DELETE:
+						pname = "Delete";
+						break;
+					case CMD_UPDATE:
+						pname = "Update";
+						break;
+					default:
+						pname = "DML ???";
+						break;
+				}
+			}
+			break;
+		case T_SplitUpdate:
+			pname = "Split";
+			break;
+		case T_AssertOp:
+			pname = "Assert";
+			break;
+		case T_RowTrigger:
+ 			pname = "RowTrigger";
+ 			break;
 		default:
 			pname = "???";
 			break;
@@ -1103,6 +1251,9 @@ explain_outNode(StringInfo str,
 		case T_ExternalScan:
 		case T_AppendOnlyScan:
 		case T_AOCSScan:
+		case T_TableScan:
+		case T_DynamicTableScan:
+		case T_DynamicIndexScan:
 		case T_BitmapHeapScan:
 		case T_BitmapAppendOnlyScan:
 		case T_TidScan:
@@ -1123,6 +1274,13 @@ explain_outNode(StringInfo str,
 				if (strcmp(rte->eref->aliasname, relname) != 0)
 					appendStringInfo(str, " %s",
 									 quote_identifier(rte->eref->aliasname));
+
+				/* Print partIndex for DynamicTableScan */
+				if (IsA(plan, DynamicTableScan))
+				{
+					appendStringInfo(str, " (partIndex: %d)",
+									 ((DynamicTableScan *)plan)->partIndex);
+				}
 			}
 			break;
 		case T_BitmapIndexScan:
@@ -1252,6 +1410,7 @@ explain_outNode(StringInfo str,
 	switch (nodeTag(plan))
 	{
 		case T_IndexScan:
+		case T_DynamicIndexScan:
 			show_scan_qual(((IndexScan *) plan)->indexqualorig,
 						   "Index Cond",
 						   ((Scan *) plan)->scanrelid,
@@ -1290,6 +1449,8 @@ explain_outNode(StringInfo str,
 		case T_ExternalScan:
 		case T_AppendOnlyScan:
 		case T_AOCSScan:
+		case T_TableScan:
+		case T_DynamicTableScan:
 		case T_FunctionScan:
 		case T_ValuesScan:
 			show_scan_qual(plan->qual,
@@ -1508,6 +1669,15 @@ explain_outNode(StringInfo str,
                                                          pMotion->motionID);
 			}
 			break;
+		case T_AssertOp:
+			{
+				show_upper_qual(plan->qual,
+								"Assert Cond",
+								NULL, outerPlan(plan),
+								NULL, NULL,
+								str, indent, es);
+			}
+			break;
 		default:
 			break;
 	}
@@ -1620,7 +1790,10 @@ explain_outNode(StringInfo str,
 			Plan	   *subnode = (Plan *) lfirst(lst);
 
 			for (i = 0; i < indent; i++)
+			{
 				appendStringInfo(str, "  ");
+			}
+
 			appendStringInfo(str, "  ->  ");
 
 			/*
@@ -1631,6 +1804,31 @@ explain_outNode(StringInfo str,
 			 */
 			explain_outNode(str, subnode,
 							appendstate->appendplans[j],
+							outer_plan,
+							indent + 3, es);
+			j++;
+		}
+	}
+
+	if (IsA(plan, Sequence))
+	{
+		Sequence *sequence = (Sequence *) plan;
+		SequenceState *sequenceState = (SequenceState *) planstate;
+		ListCell *lc;
+		int j = 0;
+		foreach(lc, sequence->subplans)
+		{
+			Plan *subnode = (Plan *) lfirst(lc);
+
+			for (i = 0; i < indent; i++)
+			{
+				appendStringInfo(str, "  ");
+			}
+			
+			appendStringInfo(str, "  ->  ");
+
+			explain_outNode(str, subnode,
+							sequenceState->subplans[j],
 							outer_plan,
 							indent + 3, es);
 			j++;
@@ -1751,8 +1949,8 @@ static void show_plan_tlist(Plan *plan, StringInfo str, int indent,
 	/* No work if empty tlist (this occurs eg in bitmap indexscans) */
 	if (plan->targetlist == NIL)
 		return;
-	/* The tlist of an Append isn't real helpful, so suppress it */
-	if (IsA(plan, Append))
+	/* Suppress printing the targetlist of Append and Sequence. */
+	if (IsA(plan, Append) || IsA(plan, Sequence))
 		return;
 
 	/* TODO: Likewise for RecursiveUnion */
@@ -2181,4 +2379,5 @@ explain_get_index_name(Oid indexId)
 	}
 	return result;
 }
+
 

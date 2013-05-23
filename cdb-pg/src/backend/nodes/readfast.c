@@ -399,7 +399,6 @@ _readWindowSpec(const char ** str)
 	READ_NODE_FIELD(order);
 	READ_NODE_FIELD(frame);
 	READ_INT_FIELD(location);
-
 	READ_DONE();
 }
 
@@ -441,6 +440,14 @@ _readPercentileExpr(const char ** str)
 	READ_NODE_FIELD(pcExpr);
 	READ_NODE_FIELD(tcExpr);
 	READ_INT_FIELD(location);
+
+	READ_DONE();
+}
+
+static DMLActionExpr *
+_readDMLActionExpr(const char ** str)
+{
+	READ_LOCALS(DMLActionExpr);
 
 	READ_DONE();
 }
@@ -507,7 +514,6 @@ _readSetOperationStmt(const char ** str)
 
 	READ_DONE();
 }
-
 
 /*
  *	Stuff from primnodes.h.
@@ -2752,6 +2758,7 @@ _readPlannedStmt(const char ** str)
 {
 	READ_LOCALS(PlannedStmt);
 	READ_ENUM_FIELD(commandType, CmdType);
+	READ_ENUM_FIELD(planGen, PlanGenerator);
 	READ_BOOL_FIELD(canSetTag);
 	READ_BOOL_FIELD(transientPlan);
 	READ_NODE_FIELD(planTree);
@@ -2764,6 +2771,8 @@ _readPlannedStmt(const char ** str)
 	READ_NODE_FIELD(returningLists);
 	READ_NODE_FIELD(result_partitions);
 	READ_NODE_FIELD(result_aosegnos);
+	READ_NODE_FIELD(queryPartOids);
+	READ_NODE_FIELD(queryPartsMetadata);
 	READ_NODE_FIELD(rowMarks);
 	READ_NODE_FIELD(relationOids);
 	READ_NODE_FIELD(invalItems);
@@ -2847,6 +2856,15 @@ _readAppend(const char ** str)
 	READ_DONE();
 }
 
+static Sequence *
+_readSequence(const char **str)
+{
+	READ_LOCALS(Sequence);
+	readPlanInfo(str, (Plan *)local_node);
+	READ_NODE_FIELD(subplans);
+	READ_DONE();
+}
+
 /*
  * _readBitmapAnd, _readBitmapOr
  */
@@ -2927,6 +2945,22 @@ _readAOCSScan(const char ** str)
 	READ_DONE();
 }
 
+static TableScan *
+_readTableScan(const char **str)
+{
+	READ_LOCALS(TableScan);
+	readScanInfo(str, (Scan *)local_node);
+	READ_DONE();
+}
+
+static DynamicTableScan *
+_readDynamicTableScan(const char **str)
+{
+	READ_LOCALS(DynamicTableScan);
+	readScanInfo(str, (Scan *)local_node);
+	READ_INT_FIELD(partIndex);
+	READ_DONE();
+}
 
 /*
  * _readExternalScan
@@ -2951,6 +2985,19 @@ _readExternalScan(const char ** str)
 	READ_DONE();
 }
 
+static void
+readIndexScanFields(const char ** str, IndexScan *local_node)
+{
+	readScanInfo(str, (Scan *)local_node);
+
+	READ_OID_FIELD(indexid);
+	READ_NODE_FIELD(indexqual);
+	READ_NODE_FIELD(indexqualorig);
+	READ_NODE_FIELD(indexstrategy);
+	READ_NODE_FIELD(indexsubtype);
+	READ_ENUM_FIELD(indexorderdir, ScanDirection);
+}
+
 /*
  * _readIndexScan
  */
@@ -2959,19 +3006,23 @@ _readIndexScan(const char ** str)
 {
 	READ_LOCALS(IndexScan);
 
-	readScanInfo(str, (Scan *)local_node);
-
-	READ_OID_FIELD(indexid);
-	READ_NODE_FIELD(indexqual);
-	READ_NODE_FIELD(indexqualorig);
-	READ_NODE_FIELD(indexstrategy);
-	READ_NODE_FIELD(indexsubtype);
-
-	READ_ENUM_FIELD(indexorderdir, ScanDirection);
+	readIndexScanFields(str, local_node);
 
 	READ_DONE();
 }
 
+
+static DynamicIndexScan *
+_readDynamicIndexScan(const char **str)
+{
+	READ_LOCALS(DynamicIndexScan);
+
+	/* DynamicIndexScan has some content from IndexScan. */
+	readIndexScanFields(str, (IndexScan *)local_node);
+
+	READ_INT_FIELD(partIndex);
+	READ_DONE();
+}
 
 static BitmapIndexScan *
 _readBitmapIndexScan(const char ** str)
@@ -3397,6 +3448,77 @@ _readMotion(const char ** str)
 
 	READ_DONE();
 }
+
+/*
+ * _readDML
+ */
+static DML *
+_readDML(const char ** str)
+{
+	READ_LOCALS(DML);
+
+	READ_UINT_FIELD(scanrelid);
+	READ_INT_FIELD(oidColIdx);
+	READ_INT_FIELD(actionColIdx);
+	READ_INT_FIELD(ctidColIdx);
+
+	readPlanInfo(str, (Plan *)local_node);
+
+	READ_DONE();
+}
+
+/*
+ * _readSplitUpdate
+ */
+static SplitUpdate *
+_readSplitUpdate(const char ** str)
+{
+	READ_LOCALS(SplitUpdate);
+
+	READ_INT_FIELD(actionColIdx);
+	READ_INT_FIELD(ctidColIdx);
+	READ_NODE_FIELD(insertColIdx);
+	READ_NODE_FIELD(deleteColIdx);
+
+	readPlanInfo(str, (Plan *)local_node);
+
+	READ_DONE();
+}
+
+/*
+ * _readRowTrigger
+ */
+static RowTrigger *
+_readRowTrigger(const char ** str)
+{
+	READ_LOCALS(RowTrigger);
+
+	READ_INT_FIELD(relid);
+	READ_INT_FIELD(eventFlags);
+	READ_NODE_FIELD(oldValuesColIdx);
+	READ_NODE_FIELD(newValuesColIdx);
+
+	readPlanInfo(str, (Plan *)local_node);
+
+	READ_DONE();
+}
+
+/*
+ * _readAssertOp
+ */
+static AssertOp *
+_readAssertOp(const char ** str)
+{
+	READ_LOCALS(AssertOp);
+
+	READ_STRING_FIELD(errmessage);  
+	READ_INT_FIELD(errcode);
+
+	readPlanInfo(str, (Plan *)local_node);
+
+	READ_DONE();
+}
+
 
 /*
  * _readVacuumStmt
@@ -3892,6 +4014,9 @@ readNodeBinary(const char ** str)
 			case T_Append:
 				return_value = _readAppend(str);
 				break;
+			case T_Sequence:
+				return_value = _readSequence(str);
+				break;
 			case T_BitmapAnd:
 				return_value = _readBitmapAnd(str);
 				break;
@@ -3910,11 +4035,20 @@ readNodeBinary(const char ** str)
 			case T_AOCSScan:
 				return_value = _readAOCSScan(str);
 				break;
+			case T_TableScan:
+				return_value = _readTableScan(str);
+				break;
+			case T_DynamicTableScan:
+				return_value = _readDynamicTableScan(str);
+				break;
 			case T_ExternalScan:
 				return_value = _readExternalScan(str);
 				break;
 			case T_IndexScan:
 				return_value = _readIndexScan(str);
+				break;
+			case T_DynamicIndexScan:
+				return_value = _readDynamicIndexScan(str);
 				break;
 			case T_BitmapIndexScan:
 				return_value = _readBitmapIndexScan(str);
@@ -3984,6 +4118,18 @@ readNodeBinary(const char ** str)
 				break;
 			case T_Motion:
 				return_value = _readMotion(str);
+				break;
+			case T_DML:
+				return_value = _readDML(str);
+				break;
+			case T_SplitUpdate:
+				return_value = _readSplitUpdate(str);
+				break;
+			case T_RowTrigger:
+				return_value = _readRowTrigger(str);
+				break;
+			case T_AssertOp:
+				return_value = _readAssertOp(str);
 				break;
 			case T_Alias:
 				return_value = _readAlias(str);
@@ -4406,6 +4552,9 @@ readNodeBinary(const char ** str)
 				break;
 			case T_PercentileExpr:
 				return_value = _readPercentileExpr(str);
+				break;
+			case T_DMLActionExpr:
+				return_value = _readDMLActionExpr(str);
 				break;
 			case T_RowMarkClause:
 				return_value = _readRowMarkClause(str);

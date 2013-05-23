@@ -15,7 +15,7 @@ override CPPFLAGS := -I$(top_srcdir)/src/backend/gp_libpq_fe $(CPPFLAGS)
 
 OBJS = bgwriter.o autovacuum.o service.o checkpoint.o seqserver.o ddaserver.o walsendserver.o walredoserver.o pgarch.o pgstat.o \
 	postmaster.o primary_mirror_mode.o primary_mirror_transition_client.o syslogger.o \
-	fork_process.o perfmon.o backoff.o perfmon_segmentinfo.o
+	fork_process.o perfmon.o backoff.o perfmon_segmentinfo.o optserver.o
 	
 ifeq ($(enable_email),yes)
   OBJS += sendalert.o alertseverity.o

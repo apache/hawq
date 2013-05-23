@@ -1408,4 +1408,15 @@ typedef struct PercentileExpr
 	int				location;		/* token location, or -1 if unknown */
 } PercentileExpr;
 
+
+/*
+ * DMLActionExpr
+ *
+ * Represents the expression which introduces the action in a SplitUpdate statement
+ */
+typedef struct DMLActionExpr
+{
+	Expr        xpr;
+} DMLActionExpr;
+
 #endif   /* PRIMNODES_H */

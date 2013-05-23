@@ -61,17 +61,17 @@ initScanDesc(BitmapHeapScanState *scanstate)
 	Relation currentRelation = scanstate->ss.ss_currentRelation;
 	EState *estate = scanstate->ss.ps.state;
 	
-	if (scanstate->ss.ss_currentScanDesc == NULL)
+	if (scanstate->ss_currentScanDesc == NULL)
 	{
 		/*
 		 * Even though we aren't going to do a conventional seqscan, it is useful
 		 * to create a HeapScanDesc --- this checks the relation size and sets up
 		 * statistical infrastructure for us.
 		 */
-		scanstate->ss.ss_currentScanDesc = heap_beginscan(currentRelation,
-														  estate->es_snapshot,
-														  0,
-														  NULL);
+		scanstate->ss_currentScanDesc = heap_beginscan(currentRelation,
+													   estate->es_snapshot,
+													   0,
+													   NULL);
 		
 		/*
 		 * One problem is that heap_beginscan counts a "sequential scan" start,
@@ -88,10 +88,10 @@ initScanDesc(BitmapHeapScanState *scanstate)
 static inline void
 freeScanDesc(BitmapHeapScanState *scanstate)
 {
-	if (scanstate->ss.ss_currentScanDesc != NULL)
+	if (scanstate->ss_currentScanDesc != NULL)
 	{
-		heap_endscan(scanstate->ss.ss_currentScanDesc);
-		scanstate->ss.ss_currentScanDesc = NULL;
+		heap_endscan(scanstate->ss_currentScanDesc);
+		scanstate->ss_currentScanDesc = NULL;
 	}
 }
 
@@ -158,7 +158,7 @@ BitmapHeapNext(BitmapHeapScanState *node)
 	initScanDesc(node);
 	initBitmapState(node);
 
-	scan = node->ss.ss_currentScanDesc;
+	scan = node->ss_currentScanDesc;
 	scanrelid = ((BitmapHeapScan *) node->ss.ps.plan)->scan.scanrelid;
 	tbm = node->tbm;
 	tbmres = (TBMIterateResult *) node->tbmres;
@@ -522,7 +522,7 @@ ExecBitmapHeapReScan(BitmapHeapScanState *node, ExprContext *exprCtxt)
 	}
 
 	/* rescan to release any page pin */
-	heap_rescan(node->ss.ss_currentScanDesc, NULL);
+	heap_rescan(node->ss_currentScanDesc, NULL);
 
 	/* undo bogus "seq scan" count (see notes in ExecInitBitmapHeapScan) */
 	pgstat_discount_heap_scan(node->ss.ss_currentRelation);
@@ -554,7 +554,7 @@ ExecEndBitmapHeapScan(BitmapHeapScanState *node)
 	 * extract information from the node
 	 */
 	relation = node->ss.ss_currentRelation;
-	scanDesc = node->ss.ss_currentScanDesc;
+	scanDesc = node->ss_currentScanDesc;
 
 	/*
 	 * Free the exprcontext

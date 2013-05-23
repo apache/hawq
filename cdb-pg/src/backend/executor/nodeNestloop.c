@@ -574,6 +574,9 @@ initGpmonPktForNestLoop(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estat
 			case JOIN_UNIQUE_INNER:
 				type = PMNT_NestedLoopUniqueInnerJoin;
 			break;
+			case JOIN_LASJ_NOTIN:
+				insist_log(false, "Join type not supported");
+			break;
 		}
 
 		Assert(type != PMNT_Invalid);

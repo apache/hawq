@@ -821,6 +821,53 @@ getPartConstraints(Oid partOid, Oid rootOid)
 }
 
 /*
+ * get_relation_part_constraints
+ *  return the part constraints for a partitioned table given the oid of the root
+ */
+Node *
+get_relation_part_constraints(Oid rootOid, bool *fDefaultPartition)
+{
+	*fDefaultPartition = false;
+	if (!rel_is_partitioned(rootOid))
+	{
+		return NULL;
+	}
+
+	PartitionNode *pn = get_parts(rootOid, 0 /*level*/, 0 /*parent*/, false /* inctemplate */, CurrentMemoryContext);
+	Assert(NULL != pn);
+	List *partOids = all_partition_relids(pn);
+
+	Node *partCons = NULL;
+	Node *allCons = NULL;
+	ListCell *lc = NULL;
+	foreach(lc, partOids)
+	{
+		Oid partOid = lfirst_oid(lc);
+		// fetch part constraint mapped to root
+		partCons = getPartConstraints(partOid, rootOid);
+		
+		if (NULL == partCons)
+		{
+			// default partition has NULL constriant in GPDB's catalog
+			*fDefaultPartition = true;
+			continue;
+		}
+
+		// OR them to current constraints
+		if (NULL == allCons)
+		{
+			allCons = partCons;
+		}
+		else
+		{
+			allCons = (Node *) make_orclause(list_make2(allCons, partCons));
+		}
+	}
+
+	return allCons;
+}
+
+/*
  * populateIndexInfo
  *  Populate the IndexInfo structure with the information from pg_index tuple. 
  */

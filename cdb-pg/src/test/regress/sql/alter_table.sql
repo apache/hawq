@@ -996,6 +996,23 @@ select f3,max(f1) from foo group by f3 order by f3;
 alter table foo alter f1 TYPE integer; -- fails
 alter table foo alter f1 TYPE varchar(10);
 
+--
+-- Test ALTER COLUMN TYPE after dropped column with text datatype (see MPP-19146)
+--
+drop table foo;
+create domain mytype as text;
+create temp table foo (f1 text, f2 mytype, f3 text);
+insert into foo values('aa','bb','cc');
+drop domain mytype cascade;
+alter table foo alter f1 TYPE varchar(10);
+
+drop table foo;
+create domain mytype as int;
+create temp table foo (f1 text, f2 mytype, f3 text);
+insert into foo values('aa',0,'cc');
+drop domain mytype cascade;
+alter table foo alter f1 TYPE varchar(10);
+
 create table anothertab (atcol1 serial8, atcol2 boolean,
 	constraint anothertab_chk check (atcol1 <= 3));
 

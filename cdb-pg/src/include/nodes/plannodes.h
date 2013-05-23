@@ -36,6 +36,19 @@ typedef struct DirectDispatchInfo
     List *contentIds;
 } DirectDispatchInfo;
 
+typedef enum PlanGenerator
+{
+	PLANGEN_PLANNER,			/* plan produced by the planner*/
+	PLANGEN_OPTIMIZER,			/* plan produced by the optimizer*/
+} PlanGenerator;
+
+/* DML Actions */
+typedef enum DMLAction
+{
+	DML_DELETE,
+	DML_INSERT
+} DMLAction;
+
 /* ----------------------------------------------------------------
  *						node definitions
  * ----------------------------------------------------------------
@@ -54,6 +67,8 @@ typedef struct PlannedStmt
 		
 		CmdType		commandType;	/* select|insert|update|delete */
 		
+		PlanGenerator	planGen;		/* optimizer generation */
+	
 		bool		canSetTag;		/* do I set the command result tag? */
 		
 		bool		transientPlan;	/* redo plan when TransactionXmin changes? */
@@ -103,8 +118,15 @@ typedef struct PlannedStmt
 		 * exact set of child tables at parse time. This field used to be in Query.
 		 */
 		struct PartitionNode *result_partitions;
-		
+
 		List	   *result_aosegnos; /* AO file 'seg' numbers for resultRels to use */
+		
+		/*
+		 * Relation oids and partitioning metadata for all partitions
+		 * that are involved in a query.
+		 */
+		List *queryPartOids;
+		List *queryPartsMetadata;
 		
 		List	   *rowMarks;		/* a list of RowMarkClause's */
 		
@@ -366,6 +388,17 @@ typedef struct Append
 	bool 		hasXslice;
 } Append;
 
+/*
+ * Sequence node
+ *   Execute a list of subplans in the order of left-to-right, and return
+ * the results of the last subplan.
+ */
+typedef struct Sequence
+{
+	Plan plan;
+	List *subplans;
+} Sequence;
+
 /* ----------------
  *	 BitmapAnd node -
  *		Generate the intersection of the results of sub-plans.
@@ -411,6 +444,12 @@ typedef struct Scan
  */
 typedef Scan SeqScan;
 
+/*
+ * TableScan
+ *   Scan node that captures different table types.
+ */
+typedef Scan TableScan;
+
 /* ----------------
  *		index scan node
  *
@@ -444,6 +483,48 @@ typedef struct IndexScan
 	List	   *indexsubtype;	/* OID list of strategy subtypes */
 	ScanDirection indexorderdir;	/* forward or backward or don't care */
 } IndexScan;
+
+/*
+ * DynamicIndexScan
+ *   Scan a list of indexes that will be determined at run time.
+ *   The primary application of this operator is to be used
+ *   for partition tables.
+*/
+typedef struct DynamicIndexScan
+{
+	/* Contains the plan and position of range table */
+	Scan scan;
+	/* OID of logical index to use */
+	Oid indexid;
+	/* List of index quals (OpExprs) */
+	List	   *indexqual;
+	/* List of index quals in original form */
+	List	   *indexqualorig;
+
+	/* Indexstrategy and indexsubtype are lists corresponding one-to-one
+	 * with indexqual. They give information about the indexable operators
+	 * that appear at the top of each indexqual. For example,
+	 * searchstrategy= equality and indexsubtype is a particularity
+	 * of the search strategy like the input data type.
+	 * For example, in the btree AM nondefault operators can have right-hand input data
+	 * types different from opcintype and their amopsubtype
+	 * is equal to the right-hand input data type (see pg_amop.h). */
+
+	/* Integer list of strategy numbers */
+	List	   *indexstrategy;
+	/* OID list of strategy subtypes */
+	List	   *indexsubtype;
+	/* Specifies scan direction (forward, backward, or don't care) */
+	ScanDirection indexorderdir;
+	/*
+	 * The index to an internal array structure that
+	 * contains oids of the parts that need to be scanned.
+	 *
+	 * This internal structure is maintained in EState.
+	 */
+	int partIndex;
+
+} DynamicIndexScan;
 
 /* ----------------
  *		bitmap index scan node
@@ -501,6 +582,24 @@ typedef struct BitmapAppendOnlyScan
 	List	   *bitmapqualorig; /* index quals, in standard expr form */
 	bool       isAORow; /* If this is for AO Row tables */
 } BitmapAppendOnlyScan;
+
+/*
+ * DynamicTableScan
+ *   Scan a list of tables that will be determined at run time.
+ */
+typedef struct DynamicTableScan
+{
+	Scan scan;
+
+	/*
+	 * The index to an internal array structure, in which each element
+	 * maintains unique identifiers to the tables that are involved in
+	 * a dynamic table scan.
+	 *
+	 * This internal array structure is maintained in EState.
+	 */
+	int partIndex;
+} DynamicTableScan;
 
 /* ----------------
  *		tid scan node
@@ -1004,6 +1103,62 @@ typedef struct Motion
 	Oid			*sortOperators;		/* OID of operators to sort them by */
 } Motion;
 
+/*
+ * DML Node
+ */
+typedef struct DML
+{
+	
+	Plan		plan;				
+	Index		scanrelid;		/* index into the range table */
+	AttrNumber	oidColIdx;		/* index of table oid into the target list */
+	AttrNumber	actionColIdx;	/* index of action column into the target list */
+	AttrNumber	ctidColIdx;		/* index of ctid column into the target list */
+
+} DML;
+
+/*
+ * SplitUpdate Node
+ *
+ */
+typedef struct SplitUpdate
+{
+	
+	Plan		plan;				
+	AttrNumber	actionColIdx;		/* index of action column into the target list */
+	AttrNumber	ctidColIdx;		/* index of ctid column into the target list */
+	List		*insertColIdx;		/* list of columns to INSERT into the target list */
+	List		*deleteColIdx;		/* list of columns to DELETE into the target list */
+
+} SplitUpdate;
+
+/*
+ * AssertOp Node
+ *
+ */
+typedef struct AssertOp
+{
+	
+	Plan 			plan;
+	int				errcode;		/* SQL error code */
+	char 			*errmessage;	/* error message */
+
+} AssertOp;
+
+/*
+ * RowTrigger Node
+ *
+ */
+typedef struct RowTrigger
+{
+
+	Plan		plan;
+	Oid			relid;				/* OID of target relation */
+	int 		eventFlags;			/* TriggerEvent bit flags (see trigger.h).*/
+	List		*oldValuesColIdx;	/* list of old columns */
+	List		*newValuesColIdx;	/* list of new columns */
+
+} RowTrigger;
 
 /*
  * Plan invalidation info

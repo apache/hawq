@@ -299,7 +299,6 @@ static int32 numericvar_to_int4(NumericVar *var);
 static void apply_typmod(NumericVar *var, int32 typmod);
 
 static void int8_to_numericvar(int64 val, NumericVar *var);
-static double numeric_to_double_no_overflow(Numeric num);
 static double numericvar_to_double_no_overflow(NumericVar *var);
 
 static int	cmp_numerics(Numeric num1, Numeric num2);
@@ -4069,7 +4068,7 @@ int8_to_numericvar(int64 val, NumericVar *var)
 /*
  * Convert numeric to float8; if out of range, return +/- HUGE_VAL
  */
-static double
+double
 numeric_to_double_no_overflow(Numeric num)
 {
 	char	   *tmp;

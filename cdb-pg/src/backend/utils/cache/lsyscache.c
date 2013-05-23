@@ -17,6 +17,7 @@
 #include "postgres.h"
 
 #include "access/hash.h"
+#include "access/genam.h" 
 #include "access/catquery.h"
 #include "bootstrap/bootstrap.h"
 #include "catalog/heap.h"                   /* SystemAttributeDefinition() */  
@@ -27,18 +28,24 @@
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_proc.h"
+#include "catalog/pg_aggregate.h"
+#include "catalog/pg_constraint.h"
 #include "catalog/pg_statistic.h"
+#include "catalog/pg_trigger.h"
 #include "catalog/pg_type.h"
 #include "cdb/cdbpartition.h"
 #include "commands/tablecmds.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
 #include "parser/parse_clause.h"			/* for sort_op_can_sort() */
+#include "parser/parse_coerce.h"
 #include "utils/array.h"
 #include "utils/builtins.h"
 #include "utils/datum.h"
 #include "utils/lsyscache.h"
 #include "utils/syscache.h"
+#include "utils/fmgroids.h"
+#include "funcapi.h"
 
 static Datum
 attstatsslot_getattr(cqContext	*pcqCtx, 
@@ -1000,6 +1007,138 @@ get_oprjoin(Oid opno)
 	return (RegProcedure) result;
 }
 
+/*				---------- TRIGGER CACHE ----------					 */
+
+/*
+ * get_trigger_name
+ *	  returns the name of the trigger with the given triggerid
+ *
+ * Note: returns a palloc'd copy of the string, or NULL if no such trigger
+ */
+char *
+get_trigger_name(Oid triggerid)
+{
+	char	   *result = NULL;
+	int			fetchCount;
+
+	result = caql_getcstring_plus(
+					NULL,
+					&fetchCount,
+					NULL,
+					cql("SELECT tgname FROM pg_trigger "
+						" WHERE oid = :1 ",
+						ObjectIdGetDatum(triggerid)));
+
+	if (!fetchCount)
+		return NULL;
+
+	return result;
+}
+
+/*
+ * get_trigger_relid
+ *		Given trigger id, return the trigger's relation oid
+ */
+Oid
+get_trigger_relid(Oid triggerid)
+{
+	Oid			result;
+	int			fetchCount;
+
+	result  = caql_getoid_plus(
+			NULL,
+			&fetchCount,
+			NULL,
+			cql("SELECT tgrelid FROM pg_trigger "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(triggerid)));
+
+	if (!fetchCount)
+		return InvalidOid;
+
+	return result;
+}
+
+/*
+ * get_trigger_funcid
+ *		Given trigger id, return the trigger's function oid
+ */
+Oid
+get_trigger_funcid(Oid triggerid)
+{
+	Oid			result;
+	int			fetchCount;
+
+	result  = caql_getoid_plus(
+			NULL,
+			&fetchCount,
+			NULL,
+			cql("SELECT tgfoid FROM pg_trigger "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(triggerid)));
+
+	if (!fetchCount)
+		return InvalidOid;
+
+	return result;
+}
+
+/*
+ * get_trigger_type
+ *		Given trigger id, return the trigger's type
+ */
+int32
+get_trigger_type(Oid triggerid)
+{
+	HeapTuple	tp;
+	cqContext  *pcqCtx;
+	int32		result = -1;
+
+	pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_trigger "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(triggerid)));
+
+	tp = caql_getnext(pcqCtx);
+
+	if (!HeapTupleIsValid(tp))
+		elog(ERROR, "cache lookup failed for trigger %u", triggerid);
+
+	result = ((Form_pg_trigger) GETSTRUCT(tp))->tgtype;
+
+	caql_endscan(pcqCtx);
+	return result;
+}
+
+/*
+ * trigger_enabled
+ *		Given trigger id, return the trigger's enabled flag
+ */
+bool
+trigger_enabled(Oid triggerid)
+{
+	HeapTuple	tp;
+	bool		result;
+	cqContext  *pcqCtx;
+
+	pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_trigger "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(triggerid)));
+
+	tp = caql_getnext(pcqCtx);
+
+	if (!HeapTupleIsValid(tp))
+		elog(ERROR, "cache lookup failed for trigger %u", triggerid);
+
+	result = ((Form_pg_trigger) GETSTRUCT(tp))->tgenabled;
+
+	caql_endscan(pcqCtx);
+	return result;
+}
+
 /*				---------- FUNCTION CACHE ----------					 */
 
 /*
@@ -1028,6 +1167,32 @@ get_func_name(Oid funcid)
 	return result;
 }
 
+/*
+ * get_type_name
+ *	  returns the name of the type with the given oid
+ *
+ * Note: returns a palloc'd copy of the string, or NULL if no such type.
+ */
+char *
+get_type_name(Oid oid)
+{
+       char       *result = NULL;
+        int                     fetchCount;
+
+        result = caql_getcstring_plus(
+                                        NULL,
+                                        &fetchCount,
+                                        NULL,
+                                        cql("SELECT typname FROM pg_type "
+                                                " WHERE oid = :1 ",
+                                                ObjectIdGetDatum(oid)));
+
+        if (!fetchCount)
+                return NULL;
+
+        return result;
+}
+ 
 /*
  * get_func_namespace
  *		Returns the pg_namespace OID associated with a given procedure.
@@ -1078,31 +1243,87 @@ get_func_rettype(Oid funcid)
 }
 
 /*
+ * get_agg_transtype
+ *		Given aggregate id, return the aggregate transition function's result type.
+ */
+Oid
+get_agg_transtype(Oid aggid)
+{
+        Oid                     result;
+        int                     fetchCount;
+
+        result = caql_getoid_plus(
+                        NULL,
+                        &fetchCount,
+                        NULL,
+                        cql("SELECT aggtranstype FROM pg_aggregate "
+                                 " WHERE aggfnoid = :1 ",
+                                 ObjectIdGetDatum(aggid)));
+
+        if (!fetchCount)
+                elog(ERROR, "cache lookup failed for aggregate %u", aggid);
+
+        return result;
+}
+
+/*
+ * is_ordered_agg
+ *		Given aggregate id, check if it is an ordered aggregate
+ */
+bool
+is_agg_ordered(Oid aggid)
+{
+	Relation aggRelation = heap_open(AggregateRelationId, AccessShareLock);
+	cqContext	cqc;
+	HeapTuple aggTuple = caql_getfirst(
+			caql_addrel(cqclr(&cqc), aggRelation),
+			cql("SELECT * from pg_aggregate"
+				" WHERE aggfnoid = :1",
+				ObjectIdGetDatum(aggid)));
+
+	if (!HeapTupleIsValid(aggTuple))
+	{
+		elog(ERROR, "cache lookup failed for aggregate %u", aggid);
+	}
+
+	bool isnull = false;
+	bool is_ordered = false;
+	is_ordered = DatumGetBool(heap_getattr(aggTuple, Anum_pg_aggregate_aggordered, RelationGetDescr(aggRelation), &isnull));
+
+	heap_freetuple(aggTuple);
+	heap_close(aggRelation, AccessShareLock);
+
+	Assert(!isnull);
+
+	return is_ordered;
+}
+
+/*
  * get_func_nargs
  *		Given procedure id, return the number of arguments.
  */
 int
 get_func_nargs(Oid funcid)
 {
-	HeapTuple	tp;
-	int			result;
-	cqContext  *pcqCtx;
+       HeapTuple       tp;
+        int                     result;
+        cqContext  *pcqCtx;
 
-	pcqCtx = caql_beginscan(
-			NULL,
-			cql("SELECT * FROM pg_proc "
-				" WHERE oid = :1 ",
-				ObjectIdGetDatum(funcid)));
+        pcqCtx = caql_beginscan(
+                        NULL,
+                        cql("SELECT * FROM pg_proc "
+                                " WHERE oid = :1 ",
+                                ObjectIdGetDatum(funcid)));
 
-	tp = caql_getnext(pcqCtx);
+        tp = caql_getnext(pcqCtx);
 
-	if (!HeapTupleIsValid(tp))
-		elog(ERROR, "cache lookup failed for function %u", funcid);
+        if (!HeapTupleIsValid(tp))
+                elog(ERROR, "cache lookup failed for function %u", funcid);
 
-	result = ((Form_pg_proc) GETSTRUCT(tp))->pronargs;
+        result = ((Form_pg_proc) GETSTRUCT(tp))->pronargs;
 
-	caql_endscan(pcqCtx);
-	return result;
+        caql_endscan(pcqCtx);
+        return result;
 }
 
 /*
@@ -1138,6 +1359,115 @@ get_func_signature(Oid funcid, Oid **argtypes, int *nargs)
 	Assert(*nargs == procstruct->proargtypes.dim1);
 	*argtypes = (Oid *) palloc(*nargs * sizeof(Oid));
 	memcpy(*argtypes, procstruct->proargtypes.values, *nargs * sizeof(Oid));
+
+	caql_endscan(pcqCtx);
+	return result;
+}
+
+/*
+ * pfree_ptr_array
+ * 		Free an array of pointers, after freeing each individual element
+ */
+void
+pfree_ptr_array(char **ptrarray, int nelements)
+{
+	int i;
+	if (NULL == ptrarray)
+		return;
+
+	for (i = 0; i < nelements; i++)
+	{
+		if (NULL != ptrarray[i])
+		{
+			pfree(ptrarray[i]);
+		}
+	}
+	pfree(ptrarray);
+}
+
+/*
+ * get_func_output_arg_types
+ *		Given procedure id, return the function's output argument types
+ */
+List *
+get_func_output_arg_types(Oid funcid)
+{
+        HeapTuple       tp;
+        int             numargs;
+        Oid             *argtypes = NULL;
+        char    **argnames = NULL;
+        char    *argmodes = NULL;
+        List    *l_argtypes = NIL;
+        int             i;
+        cqContext  *pcqCtx;
+
+        pcqCtx = caql_beginscan(
+                        NULL,
+                        cql("SELECT * FROM pg_proc "
+                                " WHERE oid = :1 ",
+                                ObjectIdGetDatum(funcid)));
+
+        tp = caql_getnext(pcqCtx);
+
+        if (!HeapTupleIsValid(tp))
+                elog(ERROR, "cache lookup failed for function %u", funcid);
+
+        numargs = get_func_arg_info(tp, &argtypes, &argnames, &argmodes);
+
+        if (NULL == argmodes)
+        {
+                pfree_ptr_array(argnames, numargs);
+                if (NULL != argtypes)
+                {
+                        pfree(argtypes);
+                }
+                caql_endscan(pcqCtx);
+                return NULL;
+        }
+
+        for (i = 0; i < numargs; i++)
+        {
+                Oid argtype = argtypes[i];
+                char argmode = argmodes[i];
+
+                if (PROARGMODE_INOUT == argmode || PROARGMODE_OUT == argmode || PROARGMODE_TABLE == argmode)
+                {
+                        l_argtypes = lappend_oid(l_argtypes, argtype);
+                }
+        }
+
+        pfree_ptr_array(argnames, numargs);
+        pfree(argtypes);
+        pfree(argmodes);
+
+        caql_endscan(pcqCtx);
+        return l_argtypes;
+}
+
+/*
+ * get_func_arg_types
+ *		Given procedure id, return all the function's argument types
+ */
+List *
+get_func_arg_types(Oid funcid)
+{
+	cqContext *pcqCtx = caql_beginscan(
+							NULL,
+							cql("SELECT * FROM pg_proc "
+								" WHERE oid = :1 ",
+								ObjectIdGetDatum(funcid)));
+
+	HeapTuple tp = caql_getnext(pcqCtx);
+
+	if (!HeapTupleIsValid(tp))
+		elog(ERROR, "cache lookup failed for function %u", funcid);
+
+	oidvector args = ((Form_pg_proc) GETSTRUCT(tp))->proargtypes;
+	List *result = NIL;
+	for (int i = 0; i < args.dim1; i++)
+	{
+		result = lappend_oid(result, args.values[i]);
+	}
 
 	caql_endscan(pcqCtx);
 	return result;
@@ -1225,6 +1555,30 @@ func_volatile(Oid funcid)
 
 	caql_endscan(pcqCtx);
 	return result;
+}
+
+/*
+ * func_data_access
+ *		Given procedure id, return the function's data access flag.
+ */
+char
+func_data_access(Oid funcid)
+{
+	SQLDataAccess sda = GetFuncSQLDataAccess(funcid);
+	switch (sda)
+	{
+		case SDA_NO_SQL:
+			return PRODATAACCESS_NONE;
+		case SDA_CONTAINS_SQL:
+			return PRODATAACCESS_CONTAINS;
+		case SDA_READS_SQL:
+			return PRODATAACCESS_READS;
+		case SDA_MODIFIES_SQL:
+			return PRODATAACCESS_MODIFIES;
+		default:
+			elog(ERROR, "cache lookup failed for function %u", funcid);
+			return '\0';
+	}
 }
 
 /*				---------- RELATION CACHE ----------					 */
@@ -2710,6 +3064,25 @@ free_attstatsslot(Oid atttype,
 		pfree(numbers);
 }
 
+/*
+ * get_att_stats
+ *		Get attribute statistics. Return a copy of the HeapTuple object, or NULL
+ *		if no stats found for attribute
+ * 
+ */
+HeapTuple
+get_att_stats(Oid relid, AttrNumber attrnum)
+{
+		return (
+			caql_getfirst(
+					NULL,
+					cql("SELECT * FROM pg_statistic "
+						" WHERE starelid = :1 "
+						" AND staattnum = :2 ",
+						ObjectIdGetDatum(relid),
+						Int16GetDatum(attrnum))));
+}
+
 /*				---------- PG_NAMESPACE CACHE ----------				 */
 
 /*
@@ -2804,3 +3177,575 @@ get_roleid_checked(const char *rolname)
 						   errOmitLocation(true)));
 	return roleid;
 }
+
+
+/*
+ * relation_oids
+ *	  Extract all relation oids from the catalog.
+ */
+List *
+relation_oids()
+{
+	List			*relationOids = NIL;
+	Relation		pgclass = NULL;
+	HeapScanDesc 	scan = NULL;
+	HeapTuple		tuple = NULL;
+
+	pgclass = heap_open(RelationRelationId, AccessShareLock);
+
+	scan = heap_beginscan(pgclass, SnapshotNow, 0 /* key length */, NULL);
+
+	while ((tuple = heap_getnext(scan, ForwardScanDirection)) != NULL)
+	{
+		Form_pg_class pgclassEntry = (Form_pg_class) GETSTRUCT(tuple);
+
+		switch (pgclassEntry->relstorage)
+		{
+			case RELSTORAGE_HEAP:
+			case RELSTORAGE_AOCOLS:
+			case RELSTORAGE_AOROWS:
+			case RELSTORAGE_EXTERNAL:
+			{
+				Oid relOid = HeapTupleGetOid(tuple);
+				relationOids = lappend_oid(relationOids, relOid);
+				break;
+			}
+			default:
+				break;
+		}
+	}
+
+	heap_endscan(scan);
+	heap_close(pgclass, AccessShareLock);
+	return relationOids;
+}
+
+/*
+ * operator_oids
+ *	  Extract all operator oids from the catalog.
+ */
+List *
+operator_oids()
+{
+	List			*operatorOids = NIL;
+	Relation		operatortable = NULL;
+	HeapScanDesc 	scan = NULL;
+	HeapTuple		tuple = NULL;
+
+	operatortable = heap_open(OperatorRelationId, AccessShareLock);
+
+	scan = heap_beginscan(operatortable, SnapshotNow, 0 /* key length */, NULL);
+
+	while ((tuple = heap_getnext(scan, ForwardScanDirection)) != NULL)
+	{
+		Oid opOid = HeapTupleGetOid(tuple);
+		operatorOids = lappend_oid(operatorOids, opOid);
+	}
+
+	heap_endscan(scan);
+	heap_close(operatortable, AccessShareLock);
+	return operatorOids;
+}
+
+/*
+ * function_oids
+ *	  Extract all function oids from the catalog.
+ */
+List *
+function_oids()
+{
+	List			*functionOids = NIL;
+	Relation		functiontable = NULL;
+	HeapScanDesc 	scan = NULL;
+	HeapTuple		tuple = NULL;
+
+	functiontable = heap_open(ProcedureRelationId, AccessShareLock);
+
+	scan = heap_beginscan(functiontable, SnapshotNow, 0 /* key length */, NULL);
+
+	while ((tuple = heap_getnext(scan, ForwardScanDirection)) != NULL)
+	{
+		Oid funcOid = HeapTupleGetOid(tuple);
+		functionOids = lappend_oid(functionOids, funcOid);
+	}
+
+	heap_endscan(scan);
+	heap_close(functiontable, AccessShareLock);
+	return functionOids;
+}
+
+/*
+ * relation_exists
+ *	  Is there a relation with the given oid
+ */
+bool
+relation_exists(Oid oid)
+{
+	return SearchSysCacheExists(RELOID, oid, 0, 0, 0);
+}
+
+/*
+ * index_exists
+ *	  Is there an index with the given oid
+ */
+bool
+index_exists(Oid oid)
+{
+	return SearchSysCacheExists(INDEXRELID, oid, 0, 0, 0);
+}
+
+/*
+ * type_exists
+ *	  Is there a type with the given oid
+ */
+bool
+type_exists(Oid oid)
+{
+	return SearchSysCacheExists(TYPEOID, oid, 0, 0, 0);
+}
+
+/*
+ * operator_exists
+ *	  Is there an operator with the given oid
+ */
+bool
+operator_exists(Oid oid)
+{
+	return SearchSysCacheExists(OPEROID, oid, 0, 0, 0);
+}
+
+/*
+ * function_exists
+ *	  Is there a function with the given oid
+ */
+bool
+function_exists(Oid oid)
+{
+	return SearchSysCacheExists(PROCOID, oid, 0, 0, 0);
+}
+
+/*
+ * aggregate_exists
+ *	  Is there an aggregate with the given oid
+ */
+bool
+aggregate_exists(Oid oid)
+{
+	return SearchSysCacheExists(AGGFNOID, oid, 0, 0, 0);
+}
+
+// Get oid of aggregate with given name and argument type
+Oid
+get_aggregate(const char *aggname, Oid oidType)
+{
+	HeapTuple htup = NULL;
+	
+	// lookup pg_proc for functions with the given name and arg type
+	cqContext *pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_proc "
+				" WHERE proname = :1",
+				PointerGetDatum((char *) aggname)));
+
+	Oid oidResult = InvalidOid;
+	while (HeapTupleIsValid(htup = caql_getnext(pcqCtx)))
+	{
+		Oid oidProc = HeapTupleGetOid(htup);
+		
+		Form_pg_proc proctuple = (Form_pg_proc) GETSTRUCT(htup);
+
+		// skip functions with the wrong number of type of arguments
+		if (1 != proctuple->pronargs || oidType != proctuple->proargtypes.values[0])
+		{
+			continue;
+		}
+
+		if (caql_getcount(
+					NULL,
+					cql("SELECT COUNT(*) FROM pg_aggregate "
+						" WHERE aggfnoid = :1 ",
+						ObjectIdGetDatum(oidProc))) > 0)
+		{
+			oidResult = oidProc;
+			break;
+		}
+	}
+	
+	caql_endscan(pcqCtx);
+
+	return oidResult;
+}
+
+/*
+ * trigger_exists
+ *	  Is there a trigger with the given oid
+ */
+bool
+trigger_exists(Oid oid)
+{
+	return (caql_getcount(
+					NULL,
+					cql("SELECT COUNT(*) FROM pg_trigger "
+						" WHERE oid = :1 ",
+						ObjectIdGetDatum(oid))) > 0);
+}
+
+/*
+ * get_relation_keys
+ *	  Return a list of relation keys
+ */
+List *
+get_relation_keys(Oid relid)
+{
+	List *keys = NIL;
+
+	// lookup unique constraints for relation from the catalog table
+	ScanKeyData skey[1];
+	ScanKeyInit(&skey[0], Anum_pg_constraint_conrelid, BTEqualStrategyNumber, F_OIDEQ, relid);
+
+	Relation rel = heap_open(ConstraintRelationId, AccessShareLock);
+	SysScanDesc scan = systable_beginscan
+						(
+						rel, 
+						ConstraintRelidIndexId, 
+						true, 
+						SnapshotNow, 
+						1, 
+						skey
+						);
+	
+	HeapTuple	htup = NULL;
+
+	while (HeapTupleIsValid(htup = systable_getnext(scan)))
+	{
+		Form_pg_constraint contuple = (Form_pg_constraint) GETSTRUCT(htup);
+
+		// skip non-unique constraints
+		if (CONSTRAINT_UNIQUE != contuple->contype &&
+			CONSTRAINT_PRIMARY != contuple->contype)
+		{
+			continue;
+		}
+			
+		// store key set in an array
+		List *key = NIL;
+		
+		bool null = false;
+		Datum dat = 
+				heap_getattr(htup, Anum_pg_constraint_conkey, RelationGetDescr(rel), &null);
+		
+		Datum *dats = NULL;
+		int numKeys = 0;
+
+		// extract key elements
+		deconstruct_array(DatumGetArrayTypeP(dat), INT2OID, 2, true, 's', &dats, NULL, &numKeys);
+			
+		for (int i = 0; i < numKeys; i++)
+		{
+			int16 key_elem =  DatumGetInt16(dats[i]);
+			key = lappend_int(key, key_elem);
+		}
+		
+		keys = lappend(keys, key);
+	}
+
+	systable_endscan(scan);
+	heap_close(rel, AccessShareLock);
+
+	return keys;
+}
+
+/*
+ * check_constraint_exists
+ *	  Is there a check constraint with the given oid
+ */
+bool
+check_constraint_exists(Oid oidCheckconstraint)
+{
+	return (caql_getcount(
+					NULL,
+					cql("SELECT COUNT(*) FROM pg_constraint "
+						" WHERE oid = :1 ",
+						ObjectIdGetDatum(oidCheckconstraint))) > 0);
+}
+
+/*
+ * get_check_constraint_relid
+ *		Given check constraint id, return the check constraint's relation oid
+ */
+Oid
+get_check_constraint_relid(Oid oidCheckconstraint)
+{
+	Oid	result = InvalidOid;
+	int	iFetchCount = 0;
+
+	result  = caql_getoid_plus(
+			NULL,
+			&iFetchCount,
+			NULL,
+			cql("SELECT conrelid FROM pg_constraint "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(oidCheckconstraint)));
+
+	if (0 == iFetchCount)
+	{
+		return InvalidOid;
+	}
+
+	return result;
+}
+
+/*
+ * get_check_constraint_oids
+ *	 Extract all check constraint oid for a given relation.
+ */
+List *
+get_check_constraint_oids(Oid oidRel)
+{
+	List *plConstraints = NIL;
+	HeapTuple htup = NULL;
+	cqContext *pcqCtx = NULL;
+
+	// lookup constraints for relation from the catalog table
+	pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_constraint "
+				" WHERE conrelid = :1 ",
+				ObjectIdGetDatum(oidRel)));
+
+	while (HeapTupleIsValid(htup = caql_getnext(pcqCtx)))
+	{
+		Form_pg_constraint contuple = (Form_pg_constraint) GETSTRUCT(htup);
+
+		// only consider check constraints
+		if (CONSTRAINT_CHECK != contuple->contype)
+		{
+			continue;
+		}
+
+		plConstraints = lappend_oid(plConstraints, HeapTupleGetOid(htup));
+	}
+
+	caql_endscan(pcqCtx);
+
+	return plConstraints;
+}
+
+/*
+ * get_check_constraint_name
+ *        returns the name of the check constraint with the given oidConstraint.
+ *
+ * Note: returns a palloc'd copy of the string, or NULL if no such constraint.
+ */
+char *
+get_check_constraint_name(Oid oidCheckconstraint)
+{
+	char *szResult = NULL;
+	int iFetchCount = 0;
+	szResult = caql_getcstring_plus
+				(
+				NULL,
+				&iFetchCount,
+				NULL,
+				cql("SELECT conname FROM pg_constraint "
+					" WHERE oid = :1 ",
+					ObjectIdGetDatum(oidCheckconstraint)
+					)
+				);
+
+	if (0 == iFetchCount)
+	{
+		return NULL;
+	}
+
+	return szResult;
+}
+
+/*
+ * get_check_constraint_expr_tree
+ *        returns the expression node tree representing the check constraint
+ *        with the given oidConstraint.
+ *
+ * Note: returns a palloc'd expression node tree, or NULL if no such constraint.
+ */
+Node *
+get_check_constraint_expr_tree(Oid oidCheckconstraint)
+{
+	char *szResult = NULL;
+	int iFetchCount = 0;
+	szResult = caql_getcstring_plus
+				(
+				NULL,
+				&iFetchCount,
+				NULL,
+				cql("SELECT conbin FROM pg_constraint "
+					" WHERE oid = :1 ",
+					ObjectIdGetDatum(oidCheckconstraint)
+					)
+				);
+
+	if (0 == iFetchCount)
+	{
+		return NULL;
+	}
+
+	return stringToNode(szResult);
+}
+
+/*
+ * get_cast_func
+ *        finds the cast function between the given source and destination type,
+ *        and records its oid and properties in the output parameters.
+ *        Returns true if a cast exists, false otherwise.
+ */
+bool
+get_cast_func(Oid oidSrc, Oid oidDest, bool *is_binary_coercible, Oid *oidCastFunc)
+{
+	if (IsBinaryCoercible(oidSrc, oidDest))
+	{
+		*is_binary_coercible = true;
+		*oidCastFunc = 0;
+		return true;
+	}
+	
+	*is_binary_coercible = false;
+	
+	return find_coercion_pathway(oidDest, oidSrc, COERCION_IMPLICIT, oidCastFunc);
+}
+
+/*
+ * get_comparison_type
+ *      Retrieve comparison type  
+ */
+CmpType
+get_comparison_type
+	(
+	Oid oidOp,
+	Oid oidLeft,
+	Oid oidRight
+	)
+{
+	// find the equality comparison between the operands
+	
+	cqContext *pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_operator "
+				" WHERE oprleft = :1 and oprright = :2",
+				ObjectIdGetDatum(oidLeft),
+				ObjectIdGetDatum(oidRight)));
+
+	Oid	oidEq = InvalidOid;
+	
+	HeapTuple ht = NULL;
+	Form_pg_operator optup = NULL;
+	
+	while (HeapTupleIsValid(ht = caql_getnext(pcqCtx)))
+	{		
+		optup = (Form_pg_operator) GETSTRUCT(ht);
+
+		if (optup->oprrest == F_EQSEL)
+		{
+			oidEq = HeapTupleGetOid(ht);
+			break;
+		}
+	}
+	
+	if (InvalidOid == oidEq)
+	{
+		// no equality found between specified types, hence not a special comparison operator
+		caql_endscan(pcqCtx);
+		return CmptOther;
+	}
+	
+	int cmp_oids[][2] = 
+	{
+	{oidEq, CmptEq},
+	{get_negator(oidEq), CmptNEq},
+	{optup->oprltcmpop, CmptLT},
+	{optup->oprgtcmpop, CmptGT},
+	{get_negator(optup->oprltcmpop), CmptGEq},
+	{get_negator(optup->oprgtcmpop), CmptLEq}
+	};
+	
+	for (int ul = 0; ul < 6; ul++)
+	{
+		int *map_elem = cmp_oids[ul];
+		if (map_elem[0] == oidOp)
+		{
+			caql_endscan(pcqCtx);
+			return map_elem[1];
+		}
+	}
+
+	caql_endscan(pcqCtx);
+	return CmptOther;
+}
+
+/*
+ * get_comparison_operator
+ *      Retrieve comparison operator between given types  
+ */
+Oid
+get_comparison_operator
+	(
+	Oid oidLeft,
+	Oid oidRight,
+	CmpType cmpt
+	)
+{
+	// find the equality comparison between the operands
+	cqContext *pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_operator "
+				" WHERE oprleft = :1 and oprright = :2",
+				ObjectIdGetDatum(oidLeft),
+				ObjectIdGetDatum(oidRight)));
+
+	Oid	oidEq = InvalidOid;
+	
+	HeapTuple ht = NULL;
+	Form_pg_operator optup = NULL;
+	
+	while (HeapTupleIsValid(ht = caql_getnext(pcqCtx)))
+	{		
+		optup = (Form_pg_operator) GETSTRUCT(ht);
+
+		if (optup->oprrest == F_EQSEL)
+		{
+			oidEq = HeapTupleGetOid(ht);
+			break;
+		}
+	}
+	
+	if (InvalidOid == oidEq)
+	{
+		// no equality found between specified types, hence not a special comparison operator
+		caql_endscan(pcqCtx);
+		return CmptOther;
+	}
+	
+	int cmp_oids[][2] = 
+	{
+	{oidEq, CmptEq},
+	{get_negator(oidEq), CmptNEq},
+	{optup->oprltcmpop, CmptLT},
+	{optup->oprgtcmpop, CmptGT},
+	{get_negator(optup->oprltcmpop), CmptGEq},
+	{get_negator(optup->oprgtcmpop), CmptLEq}
+	};
+	
+	for (int ul = 0; ul < 6; ul++)
+	{
+		int *map_elem = cmp_oids[ul];
+		if (map_elem[1] == cmpt)
+		{
+			caql_endscan(pcqCtx);
+			return map_elem[0];
+		}
+	}
+
+	caql_endscan(pcqCtx);
+	
+	return InvalidOid;
+}
+

@@ -59,13 +59,17 @@ typedef enum NodeTag
 	T_Result,
 	T_Plan_Start = T_Result,
 	T_Append,
+	T_Sequence,
 	T_BitmapAnd,
 	T_BitmapOr,
 	T_SeqScan,
 	T_ExternalScan,
 	T_AppendOnlyScan,
 	T_AOCSScan,
+	T_TableScan,
+	T_DynamicTableScan,
 	T_IndexScan,
+	T_DynamicIndexScan,
 	T_BitmapIndexScan,
 	T_BitmapHeapScan,
 	T_BitmapAppendOnlyScan,
@@ -88,6 +92,10 @@ typedef enum NodeTag
 	T_ShareInputScan,
 	T_Window,
 	T_Repeat,
+	T_DML,
+	T_SplitUpdate,
+	T_RowTrigger,
+	T_AssertOp,
 	T_Plan_End,
 	/* this one isn't a subclass of Plan: */
 	T_PlanInvalItem,
@@ -107,13 +115,17 @@ typedef enum NodeTag
 	T_ResultState,
 	T_PlanState_Start = T_ResultState,
 	T_AppendState,
+	T_SequenceState,
 	T_BitmapAndState,
 	T_BitmapOrState,
 	T_SeqScanState,
 	T_AppendOnlyScanState,
 	T_AOCSScanState,
+	T_TableScanState,
+	T_DynamicTableScanState,
 	T_ExternalScanState,
 	T_IndexScanState,
+	T_DynamicIndexScanState,
 	T_BitmapIndexScanState,
 	T_BitmapHeapScanState,
 	T_BitmapAppendOnlyScanState,
@@ -136,6 +148,10 @@ typedef enum NodeTag
 	T_ShareInputScanState,
 	T_WindowState,
 	T_RepeatState,
+	T_DMLState,
+	T_SplitUpdateState,
+	T_RowTriggerState,
+	T_AssertOpState,
 	T_PlanState_End,
 
 	/*
@@ -189,6 +205,7 @@ typedef enum NodeTag
 	T_IntoClause,
     T_AggOrder,
 	T_PercentileExpr,
+	T_DMLActionExpr,
 
 	/*
 	 * TAGS FOR EXPRESSION STATE NODES (execnodes.h)
@@ -633,8 +650,11 @@ typedef enum JoinType
 	JOIN_REVERSE_IN,			/* at most one result per inner row */
 	JOIN_UNIQUE_OUTER,			/* outer path must be made unique */
 	JOIN_UNIQUE_INNER,			/* inner path must be made unique */
-	JOIN_LASJ					/* Left Anti Semi Join: 
+	JOIN_LASJ,					/* Left Anti Semi Join:
 								   one copy of outer row with no match in inner */
+	JOIN_LASJ_NOTIN				/* Left Anti Semi Join with Not-In semantics:
+									If any NULL values are produced by inner side,
+									return no join results. Otherwise, same as LASJ */
 
 	/*
 	 * We might need additional join types someday.

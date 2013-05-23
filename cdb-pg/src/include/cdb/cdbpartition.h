@@ -64,8 +64,8 @@ typedef struct PartitionHashState
 /* part rule update */
 typedef struct part_rule_cxt
 {
-	Oid old;
-	Oid new;
+	Oid old_oid;
+	Oid new_oid;
 } part_rule_cxt;
 
 typedef struct LogicalIndexInfo
@@ -147,6 +147,9 @@ partMakePartition(HeapTuple tuple,
 extern List *
 all_partition_relids(PartitionNode *pn);
 
+extern Node *
+get_relation_part_constraints(Oid rootOid, bool *fDefaultPartition);
+
 extern List *
 all_prule_relids(PartitionRule *prule);
 
@@ -183,12 +186,11 @@ get_parts(Oid relid, int2 level, Oid parent, bool inctemplate,
 extern Oid  rel_partition_get_master(Oid relid);
 
 extern char *
-ChoosePartitionName(const char *tablename, int partDepth,
-					const char *partname, Oid namespace);
+ChoosePartitionName(const char *tablename, int partDepth, const char *partname, Oid nspace);
 
 extern Oid selectPartition(PartitionNode *partnode, Datum *values,
 						   bool *isnull, TupleDesc tupdesc,
-						   PartitionState *pstate);
+						   PartitionAccessMethods *accessMethods);
 
 extern Node *atpxPartAddList(Relation rel, 
 							 AlterPartitionCmd *pc,
@@ -231,7 +233,7 @@ basic_AT_oids(Relation rel, AlterTableCmd *cmd);
 
 extern AlterTableCmd *basic_AT_cmd(AlterTableCmd *cmd);
 extern bool can_implement_dist_on_part(Relation rel, List *dist_cnames);
-extern bool is_exchangeable(Relation rel, Relation oldrel, Relation newrel, bool throw);
+extern bool is_exchangeable(Relation rel, Relation oldrel, Relation newrel, bool fthrow);
 
 extern char *
 ChooseConstraintNameForPartitionEarly(Relation rel, ConstrType contype, Node *expr);
@@ -244,7 +246,7 @@ checkUniqueConstraintVsPartitioning(Relation rel, AttrNumber *indattr, int nidxa
 
 extern List *
 selectPartitionMulti(PartitionNode *partnode, Datum *values, bool *isnull,
-				 TupleDesc tupdesc, PartitionState *pstate);
+				 TupleDesc tupdesc, PartitionAccessMethods *accessMethods);
 
 extern void AddPartitionEncoding(Oid relid, Oid paroid, AttrNumber attnum,
 								 bool deflt, List *encoding);

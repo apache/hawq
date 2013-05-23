@@ -1234,8 +1234,8 @@ COPY foz FROM stdin DELIMITER '|';
 select * from foz_1_prt_1;
  i |     d      
 ---+------------
- 1 | 01-02-2001
  2 | 10-10-2001
+ 1 | 01-02-2001
 (2 rows)
 
 select * from foz_1_prt_2;
@@ -3365,9 +3365,9 @@ select * from foo_p;
 select * from foo_p_1_prt_p1;
  i 
 ---
- 2
  1
  3
+ 2
 (3 rows)
 
 select * from foo_p_1_prt_p2;
@@ -4730,11 +4730,11 @@ NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
 select * from k_1_prt_foo;
  i  
 ----
- 16
- 18
  15
  17
  19
+ 16
+ 18
 (5 rows)
 
 alter table k split default partition start(22) exclusive end(25) inclusive
@@ -5734,12 +5734,13 @@ select * from locktest;
 ----------------------------+-----------------+----------
  g                          | AccessShareLock | relation
  g_1_prt_1                  | AccessShareLock | relation
+ g_idx                      | AccessShareLock | relation
  locktest                   | AccessShareLock | relation
  pg_class                   | AccessShareLock | relation
  pg_class_oid_index         | AccessShareLock | relation
  pg_class_relname_nsp_index | AccessShareLock | relation
  pg_locks                   | AccessShareLock | relation
-(7 rows)
+(8 rows)
 
 commit;
 begin;
@@ -5761,16 +5762,17 @@ commit;
 begin;
 delete from g where i = 4;
 select * from locktest;
-          coalesce          |      mode       | locktype 
-----------------------------+-----------------+----------
- g                          | ExclusiveLock   | relation
- g_1_prt_4                  | ExclusiveLock   | relation
- locktest                   | AccessShareLock | relation
- pg_class                   | AccessShareLock | relation
- pg_class_oid_index         | AccessShareLock | relation
- pg_class_relname_nsp_index | AccessShareLock | relation
- pg_locks                   | AccessShareLock | relation
-(7 rows)
+          coalesce          |       mode       | locktype 
+----------------------------+------------------+----------
+ g                          | ExclusiveLock    | relation
+ g_1_prt_4                  | ExclusiveLock    | relation
+ g_idx                      | RowExclusiveLock | relation
+ locktest                   | AccessShareLock  | relation
+ pg_class                   | AccessShareLock  | relation
+ pg_class_oid_index         | AccessShareLock  | relation
+ pg_class_relname_nsp_index | AccessShareLock  | relation
+ pg_locks                   | AccessShareLock  | relation
+(8 rows)
 
 commit;
 -- drop index
@@ -5989,7 +5991,7 @@ NOTICE:  dropped partition "def" for relation "foo_p"
 NOTICE:  CREATE TABLE will create partition "foo_p_1_prt_p10_20" for table "foo_p"
 NOTICE:  CREATE TABLE will create partition "foo_p_1_prt_def" for table "foo_p"
 select reloptions from pg_class where relname = 'foo_p_1_prt_p10_20';
-                                     reloptions                                      
+            reloptions             
 -----------------------------------
  {appendonly=true,compresslevel=5}
 (1 row)
@@ -9278,6 +9280,8 @@ explain select foo_p.b, foo_p.t from foo_p left outer join bar on foo_p.a = bar.
          ->  Redistribute Motion 2:2  (slice1; segments: 2)  (cost=0.00..53.73 rows=1 width=34)
                Hash Key: ('{1}'::integer[])[1]
                ->  Append  (cost=0.00..22.50 rows=1 width=34)
+                     ->  Seq Scan on foo_p  (cost=0.00..22.50 rows=1 width=34)
+                           Filter: t IS NOT NULL AND a = ('{1}'::integer[])[1]
                      ->  Seq Scan on foo_p_1_prt_other foo_p  (cost=0.00..0.00 rows=1 width=34)
                            Filter: t IS NOT NULL AND a = ('{1}'::integer[])[1]
                      ->  Seq Scan on foo_p_1_prt_2 foo_p  (cost=0.00..6.24 rows=1 width=34)
@@ -9295,7 +9299,7 @@ explain select foo_p.b, foo_p.t from foo_p left outer join bar on foo_p.a = bar.
                      Hash Key: bar.k
                      ->  Seq Scan on bar  (cost=0.00..289.25 rows=1117 width=4)
                            Filter: k = ('{1}'::integer[])[1]
-(23 rows)
+(25 rows)
 
 drop table if exists foo_p;
 drop table if exists bar;

@@ -24,7 +24,12 @@ EXCL_OBJS=src/backend/bootstrap/bootparse.o \
 			src/backend/utils/adt/like.o \
 			src/backend/utils/misc/guc.o \
 			src/timezone/%.o \
-			src/backend/main/%.o
+            src/backend/main/%.o \
+			src/backend/gpopt/%.o \
+			src/backend/gpopt/config/%.o \
+			src/backend/gpopt/relcache/%.o \
+			src/backend/gpopt/translate/%.o \
+			src/backend/gpopt/utils/%.o
 
 OBJFILES=$(top_srcdir)/src/backend/objfiles.txt
 ALL_OBJS=$(addprefix $(top_srcdir)/, \

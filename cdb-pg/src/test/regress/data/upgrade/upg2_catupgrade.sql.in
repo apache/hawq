@@ -74,7 +74,6 @@ $$ language 'plpgsql';
 
 ----------------------------------------
 -- Post upgrade step
---   drop catalog dependency
 --   add PIN dependency to newly created catalog objects
 --   drop temp helper routine
 --   commit the txn

@@ -23,16 +23,6 @@ from generate_series(0, 49) i;
 select d, count(*) from smallt group by d;
      d      | count 
 ------------+-------
- 01-13-2011 |     5
- 01-11-2011 |     5
- 01-03-2011 |     5
- 01-09-2011 |     5
- 01-15-2011 |     5
- 01-07-2011 |     5
- 01-01-2011 |     5
- 01-05-2011 |     5
- 01-19-2011 |     5
- 01-17-2011 |     5
  01-12-2011 |     5
  01-08-2011 |     5
  01-10-2011 |     5
@@ -43,33 +33,43 @@ select d, count(*) from smallt group by d;
  01-02-2011 |     5
  01-16-2011 |     5
  01-06-2011 |     5
+ 01-13-2011 |     5
+ 01-11-2011 |     5
+ 01-03-2011 |     5
+ 01-09-2011 |     5
+ 01-15-2011 |     5
+ 01-07-2011 |     5
+ 01-01-2011 |     5
+ 01-05-2011 |     5
+ 01-19-2011 |     5
+ 01-17-2011 |     5
 (20 rows)
 
 explain analyze select d, count(*) from smallt group by d;
-                                                                       QUERY PLAN                                                                        
----------------------------------------------------------------------------------------------------------------------------------------------------------
+                                                                         QUERY PLAN                                                                         
+------------------------------------------------------------------------------------------------------------------------------------------------------------
  Gather Motion 2:1  (slice2; segments: 2)  (cost=4.20..4.45 rows=10 width=12)
-   Rows out:  20 rows at destination with 37 ms to end, start offset by 0.492 ms.
+   Rows out:  20 rows at destination with 35 ms to first row, 37 ms to end, start offset by 0.498 ms.
    ->  HashAggregate  (cost=4.20..4.45 rows=10 width=12)
          Group By: smallt.d
-         Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 30 ms to first row, 36 ms to end, start offset by 1.408 ms.
+         Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 28 ms to first row, 35 ms to end, start offset by 1.024 ms.
          Executor memory:  6225K bytes avg, 6225K bytes max (seg0).
          ->  Redistribute Motion 2:2  (slice1; segments: 2)  (cost=3.50..3.90 rows=10 width=12)
                Hash Key: smallt.d
-               Rows out:  Avg 10.0 rows x 2 workers at destination.  Max 10 rows (seg0) with 20 ms to end, start offset by 8.350 ms.
+               Rows out:  Avg 10.0 rows x 2 workers at destination.  Max 10 rows (seg0) with 18 ms to end, start offset by 8.318 ms.
                ->  HashAggregate  (cost=3.50..3.50 rows=10 width=12)
                      Group By: smallt.d
-                     Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 10 ms to first row, 16 ms to end, start offset by 8.947 ms.
+                     Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 10 ms to first row, 16 ms to end, start offset by 1.231 ms.
                      Executor memory:  6225K bytes avg, 6225K bytes max (seg0).
                      ->  Seq Scan on smallt  (cost=0.00..3.00 rows=50 width=4)
-                           Rows out:  Avg 50.0 rows x 2 workers.  Max 50 rows (seg0) with 0.045 ms to first row, 0.076 ms to end, start offset by 17 ms.
+                           Rows out:  Avg 50.0 rows x 2 workers.  Max 50 rows (seg0) with 0.084 ms to first row, 0.117 ms to end, start offset by 8.706 ms.
  Slice statistics:
-   (slice0)    Executor memory: 184K bytes.
-   (slice1)    Executor memory: 6457K bytes avg x 2 workers, 6457K bytes max (seg0).
-   (slice2)    Executor memory: 6409K bytes avg x 2 workers, 6409K bytes max (seg0).
+   (slice0)    Executor memory: 318K bytes.
+   (slice1)    Executor memory: 6391K bytes avg x 2 workers, 6391K bytes max (seg0).
+   (slice2)    Executor memory: 6391K bytes avg x 2 workers, 6391K bytes max (seg0).
  Statement statistics:
    Memory used: 128000K bytes
- Total runtime: 38.161 ms
+ Total runtime: 37.841 ms
 (22 rows)
 
 set statement_mem=2560;
@@ -82,31 +82,31 @@ select count(*) from (select i, t, d, count(*) from bigt group by i, t, d) tmp;
 explain analyze select count(*) from (select i, t, d, count(*) from bigt group by i, t, d) tmp;
                                                                                QUERY PLAN                                                                               
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Aggregate  (cost=22337.53..22337.54 rows=1 width=8)
-   Rows out:  1 rows with 1152 ms to end, start offset by 0.514 ms.
-   ->  Gather Motion 2:1  (slice1; segments: 2)  (cost=22337.48..22337.52 rows=1 width=8)
-         Rows out:  2 rows at destination with 1140 ms to first row, 1152 ms to end, start offset by 0.514 ms.
-         ->  Aggregate  (cost=22337.48..22337.49 rows=1 width=8)
-               Rows out:  Avg 1.0 rows x 2 workers.  Max 1 rows (seg0) with 1152 ms to end, start offset by 1.017 ms.
-               ->  Subquery Scan tmp  (cost=21109.84..22337.47 rows=1 width=0)
-                     Rows out:  Avg 66666.5 rows x 2 workers.  Max 66668 rows (seg1) with 983 ms to first row, 1116 ms to end, start offset by 1.011 ms.
-                     ->  HashAggregate  (cost=21109.84..22337.47 rows=49105 width=48)
+ Aggregate  (cost=23994.53..23994.54 rows=1 width=8)
+   Rows out:  1 rows with 1271 ms to end, start offset by 0.502 ms.
+   ->  Gather Motion 2:1  (slice1; segments: 2)  (cost=23994.47..23994.51 rows=1 width=8)
+         Rows out:  2 rows at destination with 1243 ms to first row, 1271 ms to end, start offset by 0.508 ms.
+         ->  Aggregate  (cost=23994.47..23994.48 rows=1 width=8)
+               Rows out:  Avg 1.0 rows x 2 workers.  Max 1 rows (seg0) with 1270 ms to end, start offset by 1.028 ms.
+               ->  Subquery Scan tmp  (cost=21491.52..23744.17 rows=50059 width=0)
+                     Rows out:  Avg 66666.5 rows x 2 workers.  Max 66668 rows (seg1) with 1075 ms to first row, 1214 ms to end, start offset by 1.075 ms.
+                     ->  HashAggregate  (cost=21491.52..22742.99 rows=50059 width=48)
                            Group By: bigt.i, bigt.t, bigt.d
-                           Rows out:  Avg 66666.5 rows x 2 workers.  Max 66668 rows (seg1) with 983 ms to first row, 1089 ms to end, start offset by 1.012 ms.
+                           Rows out:  Avg 66666.5 rows x 2 workers.  Max 66668 rows (seg1) with 1075 ms to first row, 1184 ms to end, start offset by 1.076 ms.
                            Executor memory:  2786K bytes avg, 2786K bytes max (seg0).
                            Work_mem used:  2360K bytes avg, 2360K bytes max (seg0).
                            Work_mem wanted: 5747K bytes avg, 5747K bytes max (seg1) to lessen workfile I/O affecting 2 workers.
                            (seg1)   66668 groups total in 32 batches; 1 overflows; 66668 spill groups.
                            (seg1)   Hash chain length 1.6 avg, 15 max, using 66900 of 270336 buckets.
-                           ->  Seq Scan on bigt  (cost=0.00..11288.92 rows=491046 width=18)
-                                 Rows out:  Avg 500000.0 rows x 2 workers.  Max 500000 rows (seg0) with 0.047 ms to first row, 118 ms to end, start offset by 1.076 ms.
+                           ->  Seq Scan on bigt  (cost=0.00..11479.76 rows=500588 width=18)
+                                 Rows out:  Avg 500000.0 rows x 2 workers.  Max 500000 rows (seg0) with 0.064 ms to first row, 138 ms to end, start offset by 1.074 ms.
  Slice statistics:
-   (slice0)    Executor memory: 202K bytes.
-   (slice1)  * Executor memory: 2971K bytes avg x 2 workers, 2971K bytes max (seg0).  Work_mem: 2360K bytes max, 5747K bytes wanted.
+   (slice0)    Executor memory: 318K bytes.
+   (slice1)  * Executor memory: 2944K bytes avg x 2 workers, 2944K bytes max (seg0).  Work_mem: 2360K bytes max, 5747K bytes wanted.
  Statement statistics:
    Memory used: 2560K bytes
    Memory wanted: 6246K bytes
- Total runtime: 1153.781 ms
+ Total runtime: 1272.424 ms
 (25 rows)
 
 set statement_mem=128000;
@@ -123,20 +123,20 @@ explain analyze select count(distinct d) from smallt;
                                                                    QUERY PLAN                                                                   
 ------------------------------------------------------------------------------------------------------------------------------------------------
  Aggregate  (cost=6.25..6.26 rows=1 width=8)
-   Rows out:  1 rows with 1.150 ms to end, start offset by 0.275 ms.
+   Rows out:  1 rows with 0.780 ms to first row, 0.781 ms to end, start offset by 0.392 ms.
    Executor memory:  29K bytes.
    Work_mem used:  29K bytes.
    ->  Gather Motion 2:1  (slice1; segments: 2)  (cost=0.00..6.00 rows=50 width=4)
-         Rows out:  100 rows at destination with 0.830 ms to first row, 1.008 ms to end, start offset by 0.275 ms.
+         Rows out:  100 rows at destination with 0.519 ms to first row, 0.631 ms to end, start offset by 0.413 ms.
          ->  Seq Scan on smallt  (cost=0.00..3.00 rows=50 width=4)
-               Rows out:  Avg 50.0 rows x 2 workers.  Max 50 rows (seg0) with 0.020 ms to first row, 0.569 ms to end, start offset by 0.580 ms.
+               Rows out:  Avg 50.0 rows x 2 workers.  Max 50 rows (seg0) with 0.021 ms to first row, 0.055 ms to end, start offset by 0.698 ms.
  Slice statistics:
-   (slice0)    Executor memory: 176K bytes.  Work_mem: 29K bytes max.
-   (slice1)    Executor memory: 160K bytes avg x 2 workers, 160K bytes max (seg0).
+   (slice0)    Executor memory: 318K bytes.  Work_mem: 29K bytes max.
+   (slice1)    Executor memory: 127K bytes avg x 2 workers, 127K bytes max (seg0).
  Statement statistics:
    Memory used: 128000K bytes
  Settings:  gp_enable_agg_distinct=off
- Total runtime: 1.637 ms
+ Total runtime: 1.570 ms
 (15 rows)
 
 set statement_mem=2560;
@@ -149,23 +149,23 @@ select count(distinct d) from bigt;
 explain analyze select count(distinct d) from bigt;
                                                                       QUERY PLAN                                                                      
 ------------------------------------------------------------------------------------------------------------------------------------------------------
- Aggregate  (cost=43206.91..43206.92 rows=1 width=8)
-   Rows out:  1 rows with 6619 ms to end, start offset by 0.338 ms.
+ Aggregate  (cost=44017.98..44017.99 rows=1 width=8)
+   Rows out:  1 rows with 6470 ms to end, start offset by 0.331 ms.
    Executor memory:  2585K bytes.
    Work_mem used:  2585K bytes.
    Work_mem wanted: 19596K bytes to lessen workfile I/O.
-   ->  Gather Motion 2:1  (slice1; segments: 2)  (cost=0.00..40751.68 rows=491046 width=4)
-         Rows out:  1000000 rows at destination with 2.077 ms to first row, 1729 ms to end, start offset by 0.338 ms.
-         ->  Seq Scan on bigt  (cost=0.00..11288.92 rows=491046 width=4)
-               Rows out:  Avg 500000.0 rows x 2 workers.  Max 500000 rows (seg0) with 0.051 ms to first row, 373 ms to end, start offset by 0.739 ms.
+   ->  Gather Motion 2:1  (slice1; segments: 2)  (cost=0.00..41515.04 rows=500588 width=4)
+         Rows out:  1000000 rows at destination with 2.120 ms to first row, 1655 ms to end, start offset by 0.350 ms.
+         ->  Seq Scan on bigt  (cost=0.00..11479.76 rows=500588 width=4)
+               Rows out:  Avg 500000.0 rows x 2 workers.  Max 500000 rows (seg0) with 0.059 ms to first row, 316 ms to end, start offset by 0.743 ms.
  Slice statistics:
-   (slice0)  * Executor memory: 2836K bytes.  Work_mem: 2585K bytes max, 19596K bytes wanted.
-   (slice1)    Executor memory: 176K bytes avg x 2 workers, 176K bytes max (seg0).
+   (slice0)  * Executor memory: 2851K bytes.  Work_mem: 2585K bytes max, 19596K bytes wanted.
+   (slice1)    Executor memory: 167K bytes avg x 2 workers, 167K bytes max (seg0).
  Statement statistics:
    Memory used: 2560K bytes
    Memory wanted: 19795K bytes
  Settings:  gp_enable_agg_distinct=off
- Total runtime: 6619.555 ms
+ Total runtime: 6470.847 ms
 (17 rows)
 
 set statement_mem=128000;
@@ -204,50 +204,50 @@ where t1.d = t2.d;
 explain analyze select t1.*, t2.* from
 (select d, count(*) from smallt group by d) as t1, (select d, sum(i) from smallt group by d) as t2
 where t1.d = t2.d;
-                                                                             QUERY PLAN                                                                              
----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                                                                               QUERY PLAN                                                                               
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Gather Motion 2:1  (slice3; segments: 2)  (cost=8.87..18.32 rows=10 width=24)
-   Rows out:  20 rows at destination with 24 ms to first row, 26 ms to end, start offset by 0.786 ms.
+   Rows out:  20 rows at destination with 25 ms to first row, 26 ms to end, start offset by 0.771 ms.
    ->  Nested Loop  (cost=8.87..18.32 rows=10 width=24)
          Join Filter: t1.d = t2.d
-         Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 21 ms to first row, 23 ms to end, start offset by 1.507 ms.
+         Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 20 ms to first row, 23 ms to end, start offset by 4.038 ms.
          ->  HashAggregate  (cost=4.20..4.45 rows=10 width=12)
                Group By: public.smallt.d
-               Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 2.173 ms to first row, 4.315 ms to end, start offset by 20 ms.
+               Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 3.238 ms to first row, 5.580 ms to end, start offset by 21 ms.
                Executor memory:  3153K bytes avg, 3153K bytes max (seg0).
                ->  Redistribute Motion 2:2  (slice1; segments: 2)  (cost=3.50..3.90 rows=10 width=12)
                      Hash Key: public.smallt.d
-                     Rows out:  Avg 10.0 rows x 2 workers at destination.  Max 10 rows (seg0) with 0.022 ms to first row, 0.028 ms to end, start offset by 21 ms.
+                     Rows out:  Avg 10.0 rows x 2 workers at destination.  Max 10 rows (seg0) with 0.885 ms to first row, 0.892 ms to end, start offset by 22 ms.
                      ->  HashAggregate  (cost=3.50..3.50 rows=10 width=12)
                            Group By: public.smallt.d
-                           Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 2.772 ms to first row, 5.651 ms to end, start offset by 3.879 ms.
+                           Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 2.455 ms to first row, 4.518 ms to end, start offset by 6.369 ms.
                            Executor memory:  3153K bytes avg, 3153K bytes max (seg0).
                            ->  Seq Scan on smallt  (cost=0.00..3.00 rows=50 width=4)
-                                 Rows out:  Avg 50.0 rows x 2 workers.  Max 50 rows (seg0) with 0.039 ms to first row, 0.071 ms to end, start offset by 5.261 ms.
+                                 Rows out:  Avg 50.0 rows x 2 workers.  Max 50 rows (seg0) with 0.054 ms to first row, 0.087 ms to end, start offset by 7.425 ms.
          ->  Materialize for deadlock safety  (cost=4.67..4.87 rows=10 width=12)
-               Rows out:  Avg 101.0 rows x 2 workers.  Max 101 rows (seg0) with 18 ms to first row, 19 ms to end of 11 scans, start offset by 23 ms.
+               Rows out:  Avg 101.0 rows x 2 workers.  Max 101 rows (seg0) with 17 ms to end of 11 scans, start offset by 26 ms.
                ->  HashAggregate  (cost=4.20..4.45 rows=10 width=12)
                      Group By: public.smallt.d
-                     Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 16 ms to first row, 18 ms to end, start offset by 1.515 ms.
+                     Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 14 ms to first row, 17 ms to end, start offset by 4.047 ms.
                      Executor memory:  3153K bytes avg, 3153K bytes max (seg0).
                      ->  Redistribute Motion 2:2  (slice2; segments: 2)  (cost=3.50..3.90 rows=10 width=12)
                            Hash Key: public.smallt.d
-                           Rows out:  Avg 10.0 rows x 2 workers at destination.  Max 10 rows (seg0) with 13 ms to end, start offset by 2.847 ms.
+                           Rows out:  Avg 10.0 rows x 2 workers at destination.  Max 10 rows (seg0) with 12 ms to end, start offset by 5.206 ms.
                            ->  HashAggregate  (cost=3.50..3.50 rows=10 width=12)
                                  Group By: public.smallt.d
-                                 Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 2.898 ms to first row, 5.336 ms to end, start offset by 11 ms.
+                                 Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 2.461 ms to first row, 4.560 ms to end, start offset by 6.808 ms.
                                  Executor memory:  3153K bytes avg, 3153K bytes max (seg0).
                                  ->  Seq Scan on smallt  (cost=0.00..3.00 rows=50 width=8)
-                                       Rows out:  Avg 50.0 rows x 2 workers.  Max 50 rows (seg0) with 0.033 ms to first row, 0.067 ms to end, start offset by 12 ms.
+                                       Rows out:  Avg 50.0 rows x 2 workers.  Max 50 rows (seg0) with 0.036 ms to first row, 0.071 ms to end, start offset by 7.894 ms.
  Slice statistics:
-   (slice0)    Executor memory: 287K bytes.
-   (slice1)    Executor memory: 3419K bytes avg x 2 workers, 3419K bytes max (seg0).
-   (slice2)    Executor memory: 3419K bytes avg x 2 workers, 3419K bytes max (seg0).
-   (slice3)    Executor memory: 3455K bytes avg x 2 workers, 3455K bytes max (seg0).
+   (slice0)    Executor memory: 382K bytes.
+   (slice1)    Executor memory: 3383K bytes avg x 2 workers, 3383K bytes max (seg0).
+   (slice2)    Executor memory: 3383K bytes avg x 2 workers, 3383K bytes max (seg0).
+   (slice3)    Executor memory: 3403K bytes avg x 2 workers, 3403K bytes max (seg0).
  Statement statistics:
    Memory used: 128000K bytes
  Settings:  enable_hashjoin=off; enable_nestloop=on; gp_enable_agg_distinct=on
- Total runtime: 27.318 ms
+ Total runtime: 27.715 ms
 (42 rows)
 
 set enable_nestloop=off;
@@ -278,31 +278,31 @@ where t1.i = t2.i;
                                                                          QUERY PLAN                                                                         
 ------------------------------------------------------------------------------------------------------------------------------------------------------------
  Gather Motion 2:1  (slice1; segments: 2)  (cost=7.23..9.71 rows=5 width=24)
-   Rows out:  10 rows at destination with 10 ms to first row, 11 ms to end, start offset by 0.557 ms.
+   Rows out:  10 rows at destination with 11 ms to end, start offset by 0.527 ms.
    ->  Nested Loop  (cost=7.23..9.71 rows=5 width=24)
          Join Filter: t1.i = t2.i
-         Rows out:  Avg 5.0 rows x 2 workers.  Max 5 rows (seg0) with 7.960 ms to first row, 10 ms to end, start offset by 1.097 ms.
+         Rows out:  Avg 5.0 rows x 2 workers.  Max 5 rows (seg0) with 7.759 ms to first row, 9.996 ms to end, start offset by 1.017 ms.
          ->  HashAggregate  (cost=3.50..3.62 rows=5 width=12)
                Group By: public.smallt.i
-               Rows out:  Avg 5.0 rows x 2 workers.  Max 5 rows (seg0) with 2.158 ms to first row, 4.517 ms to end, start offset by 6.896 ms.
+               Rows out:  Avg 5.0 rows x 2 workers.  Max 5 rows (seg0) with 2.853 ms to first row, 5.061 ms to end, start offset by 5.920 ms.
                Executor memory:  3153K bytes avg, 3153K bytes max (seg0).
                ->  Seq Scan on smallt  (cost=0.00..3.00 rows=50 width=4)
-                     Rows out:  Avg 50.0 rows x 2 workers.  Max 50 rows (seg0) with 0.018 ms to first row, 0.041 ms to end, start offset by 7.857 ms.
+                     Rows out:  Avg 50.0 rows x 2 workers.  Max 50 rows (seg0) with 0.035 ms to first row, 0.059 ms to end, start offset by 7.522 ms.
          ->  Materialize for deadlock safety  (cost=3.73..3.83 rows=5 width=12)
-               Rows out:  Avg 26.0 rows x 2 workers.  Max 26 rows (seg0) with 5.797 ms to first row, 5.803 ms to end of 6 scans, start offset by 10 ms.
+               Rows out:  Avg 26.0 rows x 2 workers.  Max 26 rows (seg0) with 4.902 ms to first row, 4.910 ms to end of 6 scans, start offset by 10 ms.
                ->  HashAggregate  (cost=3.50..3.62 rows=5 width=12)
                      Group By: public.smallt.i
-                     Rows out:  Avg 5.0 rows x 2 workers.  Max 5 rows (seg0) with 2.656 ms to first row, 5.781 ms to end, start offset by 1.106 ms.
+                     Rows out:  Avg 5.0 rows x 2 workers.  Max 5 rows (seg0) with 2.580 ms to first row, 4.886 ms to end, start offset by 1.026 ms.
                      Executor memory:  3153K bytes avg, 3153K bytes max (seg0).
                      ->  Seq Scan on smallt  (cost=0.00..3.00 rows=50 width=4)
-                           Rows out:  Avg 50.0 rows x 2 workers.  Max 50 rows (seg0) with 0.018 ms to first row, 0.043 ms to end, start offset by 2.551 ms.
+                           Rows out:  Avg 50.0 rows x 2 workers.  Max 50 rows (seg0) with 0.042 ms to first row, 0.067 ms to end, start offset by 2.338 ms.
  Slice statistics:
-   (slice0)    Executor memory: 201K bytes.
-   (slice1)    Executor memory: 3354K bytes avg x 2 workers, 3354K bytes max (seg0).
+   (slice0)    Executor memory: 318K bytes.
+   (slice1)    Executor memory: 3327K bytes avg x 2 workers, 3327K bytes max (seg0).
  Statement statistics:
    Memory used: 128000K bytes
  Settings:  enable_hashjoin=off; enable_nestloop=on; gp_enable_agg_distinct=on
- Total runtime: 12.074 ms
+ Total runtime: 12.032 ms
 (26 rows)
 
 set enable_nestloop=off;
@@ -311,43 +311,43 @@ set enable_hashjoin=on;
 select d, count(*) from smallt group by d limit 5; --ignore
      d      | count 
 ------------+-------
- 01-13-2011 |     5
- 01-11-2011 |     5
- 01-03-2011 |     5
- 01-09-2011 |     5
- 01-15-2011 |     5
+ 01-12-2011 |     5
+ 01-08-2011 |     5
+ 01-10-2011 |     5
+ 01-14-2011 |     5
+ 01-20-2011 |     5
 (5 rows)
 
 explain analyze select d, count(*) from smallt group by d limit 5;
-                                                                             QUERY PLAN                                                                              
----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                                                                               QUERY PLAN                                                                               
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Limit  (cost=4.20..4.36 rows=5 width=12)
-   Rows out:  5 rows with 30 ms to end, start offset by 0.506 ms.
+   Rows out:  5 rows with 29 ms to end, start offset by 0.505 ms.
    ->  Gather Motion 2:1  (slice2; segments: 2)  (cost=4.20..4.36 rows=3 width=12)
-         Rows out:  5 rows at destination with 30 ms to end, start offset by 0.507 ms.
+         Rows out:  5 rows at destination with 29 ms to end, start offset by 0.507 ms.
          ->  Limit  (cost=4.20..4.26 rows=3 width=12)
-               Rows out:  Avg 5.0 rows x 2 workers.  Max 5 rows (seg0) with 27 ms to first row, 29 ms to end, start offset by 1.014 ms.
+               Rows out:  Avg 5.0 rows x 2 workers.  Max 5 rows (seg0) with 27 ms to first row, 29 ms to end, start offset by 1.050 ms.
                ->  HashAggregate  (cost=4.20..4.45 rows=10 width=12)
                      Group By: smallt.d
-                     Rows out:  Avg 5.0 rows x 2 workers.  Max 5 rows (seg0) with 27 ms to first row, 29 ms to end, start offset by 1.014 ms.
+                     Rows out:  Avg 5.0 rows x 2 workers.  Max 5 rows (seg0) with 27 ms to first row, 29 ms to end, start offset by 1.051 ms.
                      Executor memory:  6225K bytes avg, 6225K bytes max (seg0).
                      ->  Redistribute Motion 2:2  (slice1; segments: 2)  (cost=3.50..3.90 rows=10 width=12)
                            Hash Key: smallt.d
-                           Rows out:  Avg 10.0 rows x 2 workers at destination.  Max 10 rows (seg0) with 17 ms to first row, 18 ms to end, start offset by 8.072 ms.
+                           Rows out:  Avg 10.0 rows x 2 workers at destination.  Max 10 rows (seg0) with 0.052 ms to first row, 0.077 ms to end, start offset by 25 ms.
                            ->  HashAggregate  (cost=3.50..3.50 rows=10 width=12)
                                  Group By: smallt.d
-                                 Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 10 ms to first row, 16 ms to end, start offset by 9.254 ms.
+                                 Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 9.732 ms to first row, 16 ms to end, start offset by 3.065 ms.
                                  Executor memory:  6225K bytes avg, 6225K bytes max (seg0).
                                  ->  Seq Scan on smallt  (cost=0.00..3.00 rows=50 width=4)
-                                       Rows out:  Avg 50.0 rows x 2 workers.  Max 50 rows (seg0) with 0.045 ms to first row, 0.072 ms to end, start offset by 17 ms.
+                                       Rows out:  Avg 50.0 rows x 2 workers.  Max 50 rows (seg0) with 0.137 ms to first row, 0.166 ms to end, start offset by 10 ms.
  Slice statistics:
-   (slice0)    Executor memory: 184K bytes.
-   (slice1)    Executor memory: 6457K bytes avg x 2 workers, 6457K bytes max (seg0).
-   (slice2)    Executor memory: 6409K bytes avg x 2 workers, 6409K bytes max (seg0).
+   (slice0)    Executor memory: 318K bytes.
+   (slice1)    Executor memory: 6391K bytes avg x 2 workers, 6391K bytes max (seg0).
+   (slice2)    Executor memory: 6391K bytes avg x 2 workers, 6391K bytes max (seg0).
  Statement statistics:
    Memory used: 128000K bytes
  Settings:  enable_hashjoin=on; enable_nestloop=off; gp_enable_agg_distinct=on
- Total runtime: 33.871 ms
+ Total runtime: 33.256 ms
 (27 rows)
 
 -- HashJoin
@@ -934,216 +934,6 @@ select t1.* from smallt as t1, smallt as t2 where t1.i = t2.i;
  6 | text 11 | 01-17-2011
  6 | text 11 | 01-17-2011
  6 | text 11 | 01-17-2011
- 8 | text 13 | 01-19-2011
- 8 | text 13 | 01-19-2011
- 8 | text 13 | 01-19-2011
- 8 | text 13 | 01-19-2011
- 8 | text 13 | 01-19-2011
- 8 | text 13 | 01-19-2011
- 8 | text 13 | 01-19-2011
- 8 | text 13 | 01-19-2011
- 8 | text 13 | 01-19-2011
- 8 | text 13 | 01-19-2011
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 2 | text 2  | 01-03-2011
- 2 | text 2  | 01-03-2011
- 2 | text 2  | 01-03-2011
- 2 | text 2  | 01-03-2011
- 2 | text 2  | 01-03-2011
- 2 | text 2  | 01-03-2011
- 2 | text 2  | 01-03-2011
- 2 | text 2  | 01-03-2011
- 2 | text 2  | 01-03-2011
- 2 | text 2  | 01-03-2011
- 4 | text 4  | 01-05-2011
- 4 | text 4  | 01-05-2011
- 4 | text 4  | 01-05-2011
- 4 | text 4  | 01-05-2011
- 4 | text 4  | 01-05-2011
- 4 | text 4  | 01-05-2011
- 4 | text 4  | 01-05-2011
- 4 | text 4  | 01-05-2011
- 4 | text 4  | 01-05-2011
- 4 | text 4  | 01-05-2011
- 6 | text 6  | 01-07-2011
- 6 | text 6  | 01-07-2011
- 6 | text 6  | 01-07-2011
- 6 | text 6  | 01-07-2011
- 6 | text 6  | 01-07-2011
- 6 | text 6  | 01-07-2011
- 6 | text 6  | 01-07-2011
- 6 | text 6  | 01-07-2011
- 6 | text 6  | 01-07-2011
- 6 | text 6  | 01-07-2011
- 8 | text 8  | 01-09-2011
- 8 | text 8  | 01-09-2011
- 8 | text 8  | 01-09-2011
- 8 | text 8  | 01-09-2011
- 8 | text 8  | 01-09-2011
- 8 | text 8  | 01-09-2011
- 8 | text 8  | 01-09-2011
- 8 | text 8  | 01-09-2011
- 8 | text 8  | 01-09-2011
- 8 | text 8  | 01-09-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 2 | text 12 | 01-13-2011
- 2 | text 12 | 01-13-2011
- 2 | text 12 | 01-13-2011
- 2 | text 12 | 01-13-2011
- 2 | text 12 | 01-13-2011
- 2 | text 12 | 01-13-2011
- 2 | text 12 | 01-13-2011
- 2 | text 12 | 01-13-2011
- 2 | text 12 | 01-13-2011
- 2 | text 12 | 01-13-2011
- 4 | text 14 | 01-15-2011
- 4 | text 14 | 01-15-2011
- 4 | text 14 | 01-15-2011
- 4 | text 14 | 01-15-2011
- 4 | text 14 | 01-15-2011
- 4 | text 14 | 01-15-2011
- 4 | text 14 | 01-15-2011
- 4 | text 14 | 01-15-2011
- 4 | text 14 | 01-15-2011
- 4 | text 14 | 01-15-2011
- 6 | text 1  | 01-17-2011
- 6 | text 1  | 01-17-2011
- 6 | text 1  | 01-17-2011
- 6 | text 1  | 01-17-2011
- 6 | text 1  | 01-17-2011
- 6 | text 1  | 01-17-2011
- 6 | text 1  | 01-17-2011
- 6 | text 1  | 01-17-2011
- 6 | text 1  | 01-17-2011
- 6 | text 1  | 01-17-2011
- 8 | text 3  | 01-19-2011
- 8 | text 3  | 01-19-2011
- 8 | text 3  | 01-19-2011
- 8 | text 3  | 01-19-2011
- 8 | text 3  | 01-19-2011
- 8 | text 3  | 01-19-2011
- 8 | text 3  | 01-19-2011
- 8 | text 3  | 01-19-2011
- 8 | text 3  | 01-19-2011
- 8 | text 3  | 01-19-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 2 | text 7  | 01-03-2011
- 2 | text 7  | 01-03-2011
- 2 | text 7  | 01-03-2011
- 2 | text 7  | 01-03-2011
- 2 | text 7  | 01-03-2011
- 2 | text 7  | 01-03-2011
- 2 | text 7  | 01-03-2011
- 2 | text 7  | 01-03-2011
- 2 | text 7  | 01-03-2011
- 2 | text 7  | 01-03-2011
- 4 | text 9  | 01-05-2011
- 4 | text 9  | 01-05-2011
- 4 | text 9  | 01-05-2011
- 4 | text 9  | 01-05-2011
- 4 | text 9  | 01-05-2011
- 4 | text 9  | 01-05-2011
- 4 | text 9  | 01-05-2011
- 4 | text 9  | 01-05-2011
- 4 | text 9  | 01-05-2011
- 4 | text 9  | 01-05-2011
- 6 | text 11 | 01-07-2011
- 6 | text 11 | 01-07-2011
- 6 | text 11 | 01-07-2011
- 6 | text 11 | 01-07-2011
- 6 | text 11 | 01-07-2011
- 6 | text 11 | 01-07-2011
- 6 | text 11 | 01-07-2011
- 6 | text 11 | 01-07-2011
- 6 | text 11 | 01-07-2011
- 6 | text 11 | 01-07-2011
- 8 | text 13 | 01-09-2011
- 8 | text 13 | 01-09-2011
- 8 | text 13 | 01-09-2011
- 8 | text 13 | 01-09-2011
- 8 | text 13 | 01-09-2011
- 8 | text 13 | 01-09-2011
- 8 | text 13 | 01-09-2011
- 8 | text 13 | 01-09-2011
- 8 | text 13 | 01-09-2011
- 8 | text 13 | 01-09-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
- 2 | text 2  | 01-13-2011
- 2 | text 2  | 01-13-2011
- 2 | text 2  | 01-13-2011
- 2 | text 2  | 01-13-2011
- 2 | text 2  | 01-13-2011
- 2 | text 2  | 01-13-2011
- 2 | text 2  | 01-13-2011
- 2 | text 2  | 01-13-2011
- 2 | text 2  | 01-13-2011
- 2 | text 2  | 01-13-2011
- 4 | text 4  | 01-15-2011
- 4 | text 4  | 01-15-2011
- 4 | text 4  | 01-15-2011
- 4 | text 4  | 01-15-2011
- 4 | text 4  | 01-15-2011
- 4 | text 4  | 01-15-2011
- 4 | text 4  | 01-15-2011
- 4 | text 4  | 01-15-2011
- 4 | text 4  | 01-15-2011
- 4 | text 4  | 01-15-2011
- 6 | text 6  | 01-17-2011
- 6 | text 6  | 01-17-2011
- 6 | text 6  | 01-17-2011
- 6 | text 6  | 01-17-2011
- 6 | text 6  | 01-17-2011
- 6 | text 6  | 01-17-2011
- 6 | text 6  | 01-17-2011
- 6 | text 6  | 01-17-2011
- 6 | text 6  | 01-17-2011
- 6 | text 6  | 01-17-2011
- 8 | text 8  | 01-19-2011
- 8 | text 8  | 01-19-2011
- 8 | text 8  | 01-19-2011
- 8 | text 8  | 01-19-2011
- 8 | text 8  | 01-19-2011
- 8 | text 8  | 01-19-2011
- 8 | text 8  | 01-19-2011
- 8 | text 8  | 01-19-2011
- 8 | text 8  | 01-19-2011
- 8 | text 8  | 01-19-2011
  9 | text 14 | 01-20-2011
  9 | text 14 | 01-20-2011
  9 | text 14 | 01-20-2011
@@ -1354,32 +1144,242 @@ select t1.* from smallt as t1, smallt as t2 where t1.i = t2.i;
  9 | text 9  | 01-20-2011
  9 | text 9  | 01-20-2011
  9 | text 9  | 01-20-2011
+ 8 | text 13 | 01-19-2011
+ 8 | text 13 | 01-19-2011
+ 8 | text 13 | 01-19-2011
+ 8 | text 13 | 01-19-2011
+ 8 | text 13 | 01-19-2011
+ 8 | text 13 | 01-19-2011
+ 8 | text 13 | 01-19-2011
+ 8 | text 13 | 01-19-2011
+ 8 | text 13 | 01-19-2011
+ 8 | text 13 | 01-19-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
 (1000 rows)
 
 explain analyze select t1.* from smallt as t1, smallt as t2 where t1.i = t2.i;
                                                                     QUERY PLAN                                                                     
 ---------------------------------------------------------------------------------------------------------------------------------------------------
  Gather Motion 2:1  (slice1; segments: 2)  (cost=4.25..20.00 rows=501 width=15)
-   Rows out:  1000 rows at destination with 20 ms to first row, 33 ms to end, start offset by 0.395 ms.
+   Rows out:  1000 rows at destination with 21 ms to first row, 33 ms to end, start offset by 0.378 ms.
    ->  Hash Join  (cost=4.25..20.00 rows=501 width=15)
          Hash Cond: t1.i = t2.i
-         Rows out:  Avg 500.0 rows x 2 workers.  Max 500 rows (seg0) with 19 ms to first row, 29 ms to end, start offset by 0.798 ms.
+         Rows out:  Avg 500.0 rows x 2 workers.  Max 500 rows (seg0) with 19 ms to first row, 32 ms to end, start offset by 0.900 ms.
          Executor memory:  1K bytes avg, 1K bytes max (seg0).
          Work_mem used:  1K bytes avg, 1K bytes max (seg0).
          (seg0)   Hash chain length 10.0 avg, 10 max, using 5 of 1048589 buckets.
          ->  Seq Scan on smallt t1  (cost=0.00..3.00 rows=50 width=15)
-               Rows out:  Avg 50.0 rows x 2 workers.  Max 50 rows (seg0) with 0.038 ms to first row, 0.051 ms to end, start offset by 0.799 ms.
+               Rows out:  Avg 50.0 rows x 2 workers.  Max 50 rows (seg0) with 0.024 ms to first row, 0.040 ms to end, start offset by 0.900 ms.
          ->  Hash  (cost=3.00..3.00 rows=50 width=4)
-               Rows in:  Avg 50.0 rows x 2 workers.  Max 50 rows (seg0) with 0.140 ms to end, start offset by 20 ms.
+               Rows in:  Avg 50.0 rows x 2 workers.  Max 50 rows (seg0) with 0.152 ms to end, start offset by 20 ms.
                ->  Seq Scan on smallt t2  (cost=0.00..3.00 rows=50 width=4)
-                     Rows out:  Avg 50.0 rows x 2 workers.  Max 50 rows (seg0) with 0.057 ms to first row, 0.084 ms to end, start offset by 20 ms.
+                     Rows out:  Avg 50.0 rows x 2 workers.  Max 50 rows (seg0) with 0.073 ms to first row, 0.101 ms to end, start offset by 20 ms.
  Slice statistics:
-   (slice0)    Executor memory: 220K bytes.
-   (slice1)    Executor memory: 12480K bytes avg x 2 workers, 12480K bytes max (seg0).  Work_mem: 1K bytes max.
+   (slice0)    Executor memory: 318K bytes.
+   (slice1)    Executor memory: 12487K bytes avg x 2 workers, 12487K bytes max (seg0).  Work_mem: 1K bytes max.
  Statement statistics:
    Memory used: 128000K bytes
  Settings:  enable_hashjoin=on; enable_nestloop=off; gp_enable_agg_distinct=on
- Total runtime: 34.050 ms
+ Total runtime: 34.312 ms
 (21 rows)
 
 -- Rescan on HashJoin
@@ -1390,6 +1390,26 @@ select smallt2.* from smallt2
 where i < (select count(*) from smallt where smallt.i = smallt2.i);
  i |   t    |     d      
 ---+--------+------------
+ 1 | text 1 | 01-02-2011
+ 3 | text 3 | 01-04-2011
+ 1 | text 6 | 01-07-2011
+ 3 | text 8 | 01-09-2011
+ 1 | text 1 | 01-12-2011
+ 3 | text 3 | 01-14-2011
+ 1 | text 6 | 01-02-2011
+ 3 | text 8 | 01-04-2011
+ 1 | text 1 | 01-07-2011
+ 3 | text 3 | 01-09-2011
+ 1 | text 6 | 01-12-2011
+ 3 | text 8 | 01-14-2011
+ 1 | text 1 | 01-02-2011
+ 3 | text 3 | 01-04-2011
+ 1 | text 6 | 01-07-2011
+ 3 | text 8 | 01-09-2011
+ 1 | text 1 | 01-12-2011
+ 3 | text 3 | 01-14-2011
+ 1 | text 6 | 01-02-2011
+ 3 | text 8 | 01-04-2011
  0 | text 0 | 01-01-2011
  2 | text 2 | 01-03-2011
  4 | text 4 | 01-05-2011
@@ -1420,26 +1440,6 @@ where i < (select count(*) from smallt where smallt.i = smallt2.i);
  0 | text 5 | 01-01-2011
  2 | text 7 | 01-03-2011
  4 | text 9 | 01-05-2011
- 1 | text 1 | 01-02-2011
- 3 | text 3 | 01-04-2011
- 1 | text 6 | 01-07-2011
- 3 | text 8 | 01-09-2011
- 1 | text 1 | 01-12-2011
- 3 | text 3 | 01-14-2011
- 1 | text 6 | 01-02-2011
- 3 | text 8 | 01-04-2011
- 1 | text 1 | 01-07-2011
- 3 | text 3 | 01-09-2011
- 1 | text 6 | 01-12-2011
- 3 | text 8 | 01-14-2011
- 1 | text 1 | 01-02-2011
- 3 | text 3 | 01-04-2011
- 1 | text 6 | 01-07-2011
- 3 | text 8 | 01-09-2011
- 1 | text 1 | 01-12-2011
- 3 | text 3 | 01-14-2011
- 1 | text 6 | 01-02-2011
- 3 | text 8 | 01-04-2011
 (50 rows)
 
 explain select smallt2.* from smallt2
@@ -1487,26 +1487,6 @@ from generate_series(0, 49) i;
 select * from smallt_part where i < any (select count(*) from smallt2_part where smallt_part.i = smallt2_part.i group by d);
  i |    t    |     d      
 ---+---------+------------
- 1 | text 1  | 01-02-2011
- 3 | text 3  | 01-04-2011
- 1 | text 6  | 01-02-2011
- 3 | text 8  | 01-04-2011
- 1 | text 11 | 01-02-2011
- 3 | text 13 | 01-04-2011
- 1 | text 1  | 01-02-2011
- 3 | text 3  | 01-04-2011
- 1 | text 6  | 01-02-2011
- 3 | text 8  | 01-04-2011
- 1 | text 11 | 01-12-2011
- 3 | text 13 | 01-14-2011
- 1 | text 1  | 01-12-2011
- 3 | text 3  | 01-14-2011
- 1 | text 6  | 01-12-2011
- 3 | text 8  | 01-14-2011
- 1 | text 11 | 01-12-2011
- 3 | text 13 | 01-14-2011
- 1 | text 1  | 01-12-2011
- 3 | text 3  | 01-14-2011
  0 | text 0  | 01-01-2011
  2 | text 2  | 01-03-2011
  0 | text 5  | 01-01-2011
@@ -1527,231 +1507,352 @@ select * from smallt_part where i < any (select count(*) from smallt2_part where
  2 | text 12 | 01-13-2011
  0 | text 0  | 01-11-2011
  2 | text 2  | 01-13-2011
+ 1 | text 1  | 01-02-2011
+ 3 | text 3  | 01-04-2011
+ 1 | text 6  | 01-02-2011
+ 3 | text 8  | 01-04-2011
+ 1 | text 11 | 01-02-2011
+ 3 | text 13 | 01-04-2011
+ 1 | text 1  | 01-02-2011
+ 3 | text 3  | 01-04-2011
+ 1 | text 6  | 01-02-2011
+ 3 | text 8  | 01-04-2011
+ 1 | text 11 | 01-12-2011
+ 3 | text 13 | 01-14-2011
+ 1 | text 1  | 01-12-2011
+ 3 | text 3  | 01-14-2011
+ 1 | text 6  | 01-12-2011
+ 3 | text 8  | 01-14-2011
+ 1 | text 11 | 01-12-2011
+ 3 | text 13 | 01-14-2011
+ 1 | text 1  | 01-12-2011
+ 3 | text 3  | 01-14-2011
 (40 rows)
 
 explain analyze select * from smallt_part where i < any (select count(*) from smallt2_part where smallt_part.i = smallt2_part.i group by d);
                                                                                             QUERY PLAN                                                                                             
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Gather Motion 2:1  (slice17; segments: 2)  (cost=0.00..51345.98 rows=467 width=40)
-   Rows out:  40 rows at destination with 252 ms to first row, 258 ms to end, start offset by 125 ms.
-   ->  Append  (cost=0.00..51345.98 rows=467 width=40)
-         Rows out:  Avg 20.0 rows x 2 workers.  Max 20 rows (seg0) with 45 ms to first row, 66 ms to end, start offset by 310 ms.
-         ->  Seq Scan on smallt_part_1_prt_1 smallt_part  (cost=0.00..12836.50 rows=117 width=40)
+ Gather Motion 2:1  (slice26; segments: 2)  (cost=0.00..0.00 rows=1 width=40)
+   Rows out:  40 rows at destination with 395 ms to first row, 398 ms to end, start offset by 246 ms.
+   ->  Append  (cost=0.00..0.00 rows=1 width=40)
+         Rows out:  Avg 20.0 rows x 2 workers.  Max 20 rows (seg0) with 283 ms to first row, 358 ms to end, start offset by 283 ms.
+         ->  Seq Scan on smallt_part  (cost=0.00..0.00 rows=1 width=40)
                Filter: (subplan)
-               Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 45 ms to first row, 48 ms to end, start offset by 310 ms.
+               Rows out:  0 rows (seg0) with 0 ms to end.
                SubPlan 1
-                 ->  HashAggregate  (cost=27.45..27.49 rows=2 width=12)
+                 ->  HashAggregate  (cost=0.02..0.04 rows=1 width=12)
                        Group By: public.smallt2_part.d
-                       Rows out:  Avg 17.5 rows x 2 workers.  Max 25 rows (seg1) with 88 ms to first row, 94 ms to end of 15 scans, start offset by 364 ms.
-                       Executor memory:  465K bytes avg, 465K bytes max (seg0).
-                       ->  Result  (cost=0.00..27.35 rows=2 width=4)
-                             Rows out:  Avg 125.0 rows x 2 workers.  Max 150 rows (seg1) with 77 ms to first row, 88 ms to end of 15 scans, start offset by 364 ms.
-                             ->  Append  (cost=0.00..27.35 rows=2 width=4)
-                                   Rows out:  Avg 125.0 rows x 2 workers.  Max 150 rows (seg1) with 77 ms to first row, 88 ms to end of 15 scans, start offset by 364 ms.
+                       Rows out:  0 rows (seg0) with 0 ms to end.
+                       ->  Result  (cost=0.00..0.00 rows=1 width=4)
+                             Rows out:  0 rows (seg0) with 0 ms to end.
+                             ->  Append  (cost=0.00..0.00 rows=1 width=4)
+                                   Rows out:  0 rows (seg0) with 0 ms to end.
+                                   ->  Result  (cost=0.00..0.01 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  0 rows (seg0) with 0 ms to end.
+                                         ->  Materialize for deadlock safety  (cost=0.00..0.01 rows=1 width=4)
+                                               Rows out:  0 rows (seg0) with 0 ms to end.
+                                               ->  Broadcast Motion 2:2  (slice1; segments: 2)  (cost=0.00..0.00 rows=1 width=4)
+                                                     Rows out:  0 rows at destination (seg0) with 0 ms to end.
+                                                     ->  Seq Scan on smallt2_part  (cost=0.00..0.00 rows=1 width=4)
+                                                           Rows out:  0 rows (seg0) with 0 ms to end.
                                    ->  Result  (cost=6.84..6.85 rows=1 width=4)
                                          Filter: $0 = public.smallt2_part.i
-                                         Rows out:  Avg 40.0 rows x 2 workers.  Max 40 rows (seg0) with 31 ms to end of 10 scans, start offset by 358 ms.
+                                         Rows out:  0 rows (seg0) with 0 ms to end.
                                          ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
-                                               Rows out:  Avg 200.0 rows x 2 workers.  Max 240 rows (seg1) with 77 ms to end of 15 scans, start offset by 364 ms.
-                                               ->  Broadcast Motion 2:2  (slice1; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
-                                                     Rows out:  Avg 16.0 rows x 2 workers at destination.  Max 16 rows (seg0) with 0.026 ms to first row, 31 ms to end, start offset by 310 ms.
-                                                     ->  Seq Scan on smallt2_part_1_prt_1 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
-                                                           Rows out:  Avg 8.0 rows x 2 workers.  Max 8 rows (seg0) with 0.038 ms to first row, 0.046 ms to end, start offset by 338 ms.
-                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
-                                         Filter: $0 = public.smallt2_part.i
-                                         Rows out:  Avg 32.5 rows x 2 workers.  Max 50 rows (seg1) with 11 ms to end of 15 scans, start offset by 364 ms.
-                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
-                                               Rows out:  Avg 162.5 rows x 2 workers.  Max 195 rows (seg1) with 11 ms to end of 15 scans, start offset by 364 ms.
+                                               Rows out:  0 rows (seg0) with 0 ms to end.
                                                ->  Broadcast Motion 2:2  (slice2; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
-                                                     Rows out:  Avg 13.0 rows x 2 workers at destination.  Max 13 rows (seg0) with 0.016 ms to first row, 13 ms to end, start offset by 341 ms.
-                                                     ->  Seq Scan on smallt2_part_1_prt_2 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
-                                                           Rows out:  Avg 6.5 rows x 2 workers.  Max 10 rows (seg1) with 0.047 ms to first row, 0.055 ms to end, start offset by 264 ms.
+                                                     Rows out:  0 rows at destination (seg0) with 0 ms to end.
+                                                     ->  Seq Scan on smallt2_part_1_prt_1 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  Avg 8.0 rows x 2 workers.  Max 8 rows (seg0) with 0.044 ms to first row, 0.053 ms to end, start offset by 513 ms.
                                    ->  Result  (cost=6.84..6.85 rows=1 width=4)
                                          Filter: $0 = public.smallt2_part.i
-                                         Rows out:  Avg 30.0 rows x 2 workers.  Max 30 rows (seg0) with 0.053 ms to first row, 0.141 ms to end of 10 scans, start offset by 358 ms.
+                                         Rows out:  0 rows (seg0) with 0 ms to end.
                                          ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
-                                               Rows out:  Avg 150.0 rows x 2 workers.  Max 180 rows (seg1) with 0.041 ms to first row, 0.080 ms to end of 15 scans, start offset by 364 ms.
+                                               Rows out:  0 rows (seg0) with 0 ms to end.
                                                ->  Broadcast Motion 2:2  (slice3; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
-                                                     Rows out:  Avg 12.0 rows x 2 workers at destination.  Max 12 rows (seg0) with 0.011 ms to first row, 0.026 ms to end, start offset by 354 ms.
-                                                     ->  Seq Scan on smallt2_part_1_prt_3 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
-                                                           Rows out:  Avg 6.0 rows x 2 workers.  Max 6 rows (seg0) with 0.045 ms to first row, 0.052 ms to end, start offset by 350 ms.
+                                                     Rows out:  0 rows at destination (seg0) with 0 ms to end.
+                                                     ->  Seq Scan on smallt2_part_1_prt_2 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  Avg 6.5 rows x 2 workers.  Max 10 rows (seg1) with 0.062 ms to first row, 0.072 ms to end, start offset by 414 ms.
                                    ->  Result  (cost=6.84..6.85 rows=1 width=4)
                                          Filter: $0 = public.smallt2_part.i
-                                         Rows out:  Avg 22.5 rows x 2 workers.  Max 30 rows (seg1) with 0.036 ms to first row, 0.128 ms to end of 15 scans, start offset by 364 ms.
+                                         Rows out:  0 rows (seg0) with 0 ms to end.
                                          ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
-                                               Rows out:  Avg 112.5 rows x 2 workers.  Max 135 rows (seg1) with 0.030 ms to first row, 0.058 ms to end of 15 scans, start offset by 364 ms.
+                                               Rows out:  0 rows (seg0) with 0 ms to end.
                                                ->  Broadcast Motion 2:2  (slice4; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
-                                                     Rows out:  Avg 9.0 rows x 2 workers at destination.  Max 9 rows (seg0) with 0.007 ms to first row, 0.020 ms to end, start offset by 354 ms.
-                                                     ->  Seq Scan on smallt2_part_1_prt_4 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
-                                                           Rows out:  Avg 4.5 rows x 2 workers.  Max 6 rows (seg1) with 0.058 ms to first row, 0.063 ms to end, start offset by 238 ms.
-         ->  Seq Scan on smallt_part_1_prt_2 smallt_part  (cost=0.00..12836.50 rows=117 width=40)
-               Filter: (subplan)
-               Rows out:  0 rows (seg0) with 0 ms to end.
-               SubPlan 1
-                 ->  HashAggregate  (cost=27.45..27.49 rows=2 width=12)
-                       Group By: public.smallt2_part.d
-                       Rows out:  0 rows (seg0) with 0 ms to end.
-                       Executor memory:  401K bytes avg, 401K bytes max (seg0).
-                       ->  Result  (cost=0.00..27.35 rows=2 width=4)
-                             Rows out:  0 rows (seg0) with 0 ms to end.
-                             ->  Append  (cost=0.00..27.35 rows=2 width=4)
-                                   Rows out:  0 rows (seg0) with 0 ms to end.
+                                                     Rows out:  0 rows at destination (seg0) with 0 ms to end.
+                                                     ->  Seq Scan on smallt2_part_1_prt_3 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  Avg 6.0 rows x 2 workers.  Max 6 rows (seg0) with 0.056 ms to first row, 0.065 ms to end, start offset by 496 ms.
                                    ->  Result  (cost=6.84..6.85 rows=1 width=4)
                                          Filter: $0 = public.smallt2_part.i
                                          Rows out:  0 rows (seg0) with 0 ms to end.
                                          ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
-                                               Rows out:  Avg 200.0 rows x 2 workers.  Max 240 rows (seg0) with 0.063 ms to first row, 0.125 ms to end of 15 scans, start offset by 365 ms.
+                                               Rows out:  0 rows (seg0) with 0 ms to end.
                                                ->  Broadcast Motion 2:2  (slice5; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
-                                                     Rows out:  Avg 16.0 rows x 2 workers at destination.  Max 16 rows (seg0) with 0.022 ms to first row, 0.042 ms to end, start offset by 358 ms.
-                                                     ->  Seq Scan on smallt2_part_1_prt_1 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
-                                                           Rows out:  Avg 8.0 rows x 2 workers.  Max 8 rows (seg0) with 0.055 ms to first row, 0.064 ms to end, start offset by 308 ms.
-                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
-                                         Filter: $0 = public.smallt2_part.i
-                                         Rows out:  0 rows (seg0) with 0 ms to end.
-                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
-                                               Rows out:  Avg 162.5 rows x 2 workers.  Max 195 rows (seg0) with 0.707 ms to first row, 0.750 ms to end of 15 scans, start offset by 365 ms.
-                                               ->  Broadcast Motion 2:2  (slice6; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
-                                                     Rows out:  Avg 13.0 rows x 2 workers at destination.  Max 13 rows (seg0) with 0.016 ms to first row, 0.689 ms to end, start offset by 358 ms.
-                                                     ->  Seq Scan on smallt2_part_1_prt_2 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
-                                                           Rows out:  Avg 6.5 rows x 2 workers.  Max 10 rows (seg1) with 0.115 ms to first row, 0.123 ms to end, start offset by 223 ms.
-                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
-                                         Filter: $0 = public.smallt2_part.i
-                                         Rows out:  0 rows (seg0) with 0 ms to end.
-                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
-                                               Rows out:  Avg 150.0 rows x 2 workers.  Max 180 rows (seg0) with 0.036 ms to first row, 0.073 ms to end of 15 scans, start offset by 365 ms.
-                                               ->  Broadcast Motion 2:2  (slice7; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
-                                                     Rows out:  Avg 12.0 rows x 2 workers at destination.  Max 12 rows (seg0) with 0.011 ms to first row, 0.024 ms to end, start offset by 359 ms.
-                                                     ->  Seq Scan on smallt2_part_1_prt_3 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
-                                                           Rows out:  Avg 6.0 rows x 2 workers.  Max 6 rows (seg0) with 0.145 ms to first row, 0.151 ms to end, start offset by 344 ms.
-                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
-                                         Filter: $0 = public.smallt2_part.i
-                                         Rows out:  0 rows (seg0) with 0 ms to end.
-                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
-                                               Rows out:  Avg 112.5 rows x 2 workers.  Max 135 rows (seg0) with 0.029 ms to first row, 0.054 ms to end of 15 scans, start offset by 365 ms.
-                                               ->  Broadcast Motion 2:2  (slice8; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
-                                                     Rows out:  Avg 9.0 rows x 2 workers at destination.  Max 9 rows (seg0) with 0.007 ms to first row, 0.019 ms to end, start offset by 359 ms.
+                                                     Rows out:  0 rows at destination (seg0) with 0 ms to end.
                                                      ->  Seq Scan on smallt2_part_1_prt_4 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
-                                                           Rows out:  Avg 4.5 rows x 2 workers.  Max 6 rows (seg1) with 0.092 ms to first row, 0.099 ms to end, start offset by 253 ms.
-         ->  Seq Scan on smallt_part_1_prt_3 smallt_part  (cost=0.00..12836.50 rows=117 width=40)
+                                                           Rows out:  Avg 4.5 rows x 2 workers.  Max 6 rows (seg1) with 0.056 ms to first row, 0.064 ms to end, start offset by 549 ms.
+         ->  Seq Scan on smallt_part_1_prt_1 smallt_part  (cost=0.00..22.02 rows=1 width=40)
                Filter: (subplan)
-               Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 0.440 ms to first row, 3.314 ms to end, start offset by 366 ms.
+               Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 283 ms to first row, 288 ms to end, start offset by 283 ms.
                SubPlan 1
-                 ->  HashAggregate  (cost=27.45..27.49 rows=2 width=12)
+                 ->  HashAggregate  (cost=0.02..0.04 rows=1 width=12)
                        Group By: public.smallt2_part.d
-                       Rows out:  Avg 17.5 rows x 2 workers.  Max 25 rows (seg1) with 0.520 ms to first row, 5.822 ms to end of 15 scans, start offset by 378 ms.
+                       Rows out:  Avg 17.5 rows x 2 workers.  Max 25 rows (seg1) with 269 ms to first row, 276 ms to end of 15 scans, start offset by 570 ms.
                        Executor memory:  465K bytes avg, 465K bytes max (seg0).
-                       ->  Result  (cost=0.00..27.35 rows=2 width=4)
-                             Rows out:  Avg 125.0 rows x 2 workers.  Max 150 rows (seg1) with 0.058 ms to first row, 0.870 ms to end of 15 scans, start offset by 378 ms.
-                             ->  Append  (cost=0.00..27.35 rows=2 width=4)
-                                   Rows out:  Avg 125.0 rows x 2 workers.  Max 150 rows (seg1) with 0.055 ms to first row, 0.787 ms to end of 15 scans, start offset by 378 ms.
+                       ->  Result  (cost=0.00..0.00 rows=1 width=4)
+                             Rows out:  Avg 125.0 rows x 2 workers.  Max 150 rows (seg1) with 238 ms to first row, 270 ms to end of 15 scans, start offset by 570 ms.
+                             ->  Append  (cost=0.00..0.00 rows=1 width=4)
+                                   Rows out:  Avg 125.0 rows x 2 workers.  Max 150 rows (seg1) with 238 ms to first row, 269 ms to end of 15 scans, start offset by 570 ms.
+                                   ->  Result  (cost=0.00..0.01 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  0 rows (seg0) with 0 ms to end.
+                                         ->  Materialize for deadlock safety  (cost=0.00..0.01 rows=1 width=4)
+                                               Rows out:  0 rows (seg0) with 0 ms to end.
+                                               ->  Broadcast Motion 2:2  (slice6; segments: 2)  (cost=0.00..0.00 rows=1 width=4)
+                                                     Rows out:  0 rows at destination (seg0) with 0 ms to end.
+                                                     ->  Seq Scan on smallt2_part  (cost=0.00..0.00 rows=1 width=4)
+                                                           Rows out:  0 rows (seg0) with 0 ms to end.
                                    ->  Result  (cost=6.84..6.85 rows=1 width=4)
                                          Filter: $0 = public.smallt2_part.i
-                                         Rows out:  Avg 40.0 rows x 2 workers.  Max 40 rows (seg0) with 0.048 ms to first row, 0.167 ms to end of 10 scans, start offset by 369 ms.
+                                         Rows out:  Avg 40.0 rows x 2 workers.  Max 40 rows (seg0) with 42 ms to end of 10 scans, start offset by 571 ms.
                                          ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
-                                               Rows out:  Avg 200.0 rows x 2 workers.  Max 240 rows (seg1) with 0.046 ms to first row, 0.131 ms to end of 15 scans, start offset by 378 ms.
-                                               ->  Broadcast Motion 2:2  (slice9; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
-                                                     Rows out:  Avg 16.0 rows x 2 workers at destination.  Max 16 rows (seg0) with 0.015 ms to first row, 0.034 ms to end, start offset by 366 ms.
+                                               Rows out:  Avg 200.0 rows x 2 workers.  Max 240 rows (seg1) with 42 ms to end of 15 scans, start offset by 570 ms.
+                                               ->  Broadcast Motion 2:2  (slice7; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  Avg 16.0 rows x 2 workers at destination.  Max 16 rows (seg0) with 7.912 ms to first row, 42 ms to end, start offset by 490 ms.
                                                      ->  Seq Scan on smallt2_part_1_prt_1 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
-                                                           Rows out:  Avg 8.0 rows x 2 workers.  Max 8 rows (seg0) with 0.121 ms to first row, 0.130 ms to end, start offset by 323 ms.
+                                                           Rows out:  Avg 8.0 rows x 2 workers.  Max 8 rows (seg0) with 0.174 ms to first row, 0.188 ms to end, start offset by 532 ms.
                                    ->  Result  (cost=6.84..6.85 rows=1 width=4)
                                          Filter: $0 = public.smallt2_part.i
-                                         Rows out:  Avg 32.5 rows x 2 workers.  Max 50 rows (seg1) with 0.040 ms to first row, 0.174 ms to end of 15 scans, start offset by 378 ms.
+                                         Rows out:  Avg 32.5 rows x 2 workers.  Max 50 rows (seg1) with 30 ms to first row, 31 ms to end of 15 scans, start offset by 570 ms.
                                          ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
-                                               Rows out:  Avg 162.5 rows x 2 workers.  Max 195 rows (seg1) with 0.036 ms to first row, 0.087 ms to end of 15 scans, start offset by 378 ms.
-                                               ->  Broadcast Motion 2:2  (slice10; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
-                                                     Rows out:  Avg 13.0 rows x 2 workers at destination.  Max 13 rows (seg0) with 0.008 ms to first row, 0.026 ms to end, start offset by 366 ms.
+                                               Rows out:  Avg 162.5 rows x 2 workers.  Max 195 rows (seg1) with 30 ms to end of 15 scans, start offset by 570 ms.
+                                               ->  Broadcast Motion 2:2  (slice8; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  Avg 13.0 rows x 2 workers at destination.  Max 13 rows (seg0) with 0.040 ms to first row, 34 ms to end, start offset by 532 ms.
                                                      ->  Seq Scan on smallt2_part_1_prt_2 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
-                                                           Rows out:  Avg 6.5 rows x 2 workers.  Max 10 rows (seg1) with 0.123 ms to first row, 0.132 ms to end, start offset by 232 ms.
+                                                           Rows out:  Avg 6.5 rows x 2 workers.  Max 10 rows (seg1) with 0.145 ms to first row, 0.161 ms to end, start offset by 454 ms.
                                    ->  Result  (cost=6.84..6.85 rows=1 width=4)
                                          Filter: $0 = public.smallt2_part.i
-                                         Rows out:  Avg 30.0 rows x 2 workers.  Max 30 rows (seg0) with 0.039 ms to first row, 0.128 ms to end of 10 scans, start offset by 369 ms.
+                                         Rows out:  Avg 30.0 rows x 2 workers.  Max 30 rows (seg0) with 0.113 ms to first row, 0.222 ms to end of 10 scans, start offset by 571 ms.
                                          ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
-                                               Rows out:  Avg 150.0 rows x 2 workers.  Max 180 rows (seg1) with 0.034 ms to first row, 0.082 ms to end of 15 scans, start offset by 378 ms.
-                                               ->  Broadcast Motion 2:2  (slice11; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
-                                                     Rows out:  Avg 12.0 rows x 2 workers at destination.  Max 12 rows (seg0) with 0.011 ms to first row, 0.025 ms to end, start offset by 366 ms.
+                                               Rows out:  Avg 150.0 rows x 2 workers.  Max 180 rows (seg1) with 0.150 ms to first row, 0.191 ms to end of 15 scans, start offset by 570 ms.
+                                               ->  Broadcast Motion 2:2  (slice9; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  Avg 12.0 rows x 2 workers at destination.  Max 12 rows (seg0) with 0.056 ms to first row, 0.092 ms to end, start offset by 566 ms.
                                                      ->  Seq Scan on smallt2_part_1_prt_3 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
-                                                           Rows out:  Avg 6.0 rows x 2 workers.  Max 6 rows (seg0) with 0.113 ms to first row, 0.119 ms to end, start offset by 355 ms.
+                                                           Rows out:  Avg 6.0 rows x 2 workers.  Max 6 rows (seg0) with 0.173 ms to first row, 0.185 ms to end, start offset by 486 ms.
                                    ->  Result  (cost=6.84..6.85 rows=1 width=4)
                                          Filter: $0 = public.smallt2_part.i
-                                         Rows out:  Avg 22.5 rows x 2 workers.  Max 30 rows (seg1) with 0.035 ms to first row, 0.119 ms to end of 15 scans, start offset by 378 ms.
+                                         Rows out:  Avg 22.5 rows x 2 workers.  Max 30 rows (seg1) with 0.200 ms to first row, 0.287 ms to end of 15 scans, start offset by 570 ms.
                                          ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
-                                               Rows out:  Avg 112.5 rows x 2 workers.  Max 135 rows (seg1) with 0.029 ms to first row, 0.066 ms to end of 15 scans, start offset by 378 ms.
-                                               ->  Broadcast Motion 2:2  (slice12; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
-                                                     Rows out:  Avg 9.0 rows x 2 workers at destination.  Max 9 rows (seg0) with 0.008 ms to first row, 0.020 ms to end, start offset by 366 ms.
+                                               Rows out:  Avg 112.5 rows x 2 workers.  Max 135 rows (seg1) with 0.193 ms to first row, 0.226 ms to end of 15 scans, start offset by 570 ms.
+                                               ->  Broadcast Motion 2:2  (slice10; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  Avg 9.0 rows x 2 workers at destination.  Max 9 rows (seg0) with 0.022 ms to first row, 0.078 ms to end, start offset by 566 ms.
                                                      ->  Seq Scan on smallt2_part_1_prt_4 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
-                                                           Rows out:  Avg 4.5 rows x 2 workers.  Max 6 rows (seg1) with 0.113 ms to first row, 0.122 ms to end, start offset by 261 ms.
-         ->  Seq Scan on smallt_part_1_prt_4 smallt_part  (cost=0.00..12836.50 rows=117 width=40)
+                                                           Rows out:  Avg 4.5 rows x 2 workers.  Max 6 rows (seg1) with 0.149 ms to first row, 0.161 ms to end, start offset by 487 ms.
+         ->  Seq Scan on smallt_part_1_prt_2 smallt_part  (cost=0.00..22.02 rows=1 width=40)
                Filter: (subplan)
                Rows out:  0 rows (seg0) with 0 ms to end.
                SubPlan 1
-                 ->  HashAggregate  (cost=27.45..27.49 rows=2 width=12)
+                 ->  HashAggregate  (cost=0.02..0.04 rows=1 width=12)
                        Group By: public.smallt2_part.d
                        Rows out:  0 rows (seg0) with 0 ms to end.
                        Executor memory:  401K bytes avg, 401K bytes max (seg0).
-                       ->  Result  (cost=0.00..27.35 rows=2 width=4)
+                       ->  Result  (cost=0.00..0.00 rows=1 width=4)
                              Rows out:  0 rows (seg0) with 0 ms to end.
-                             ->  Append  (cost=0.00..27.35 rows=2 width=4)
+                             ->  Append  (cost=0.00..0.00 rows=1 width=4)
                                    Rows out:  0 rows (seg0) with 0 ms to end.
+                                   ->  Result  (cost=0.00..0.01 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  0 rows (seg0) with 0 ms to end.
+                                         ->  Materialize for deadlock safety  (cost=0.00..0.01 rows=1 width=4)
+                                               Rows out:  0 rows (seg0) with 0 ms to end.
+                                               ->  Broadcast Motion 2:2  (slice11; segments: 2)  (cost=0.00..0.00 rows=1 width=4)
+                                                     Rows out:  0 rows at destination (seg0) with 0 ms to end.
+                                                     ->  Seq Scan on smallt2_part  (cost=0.00..0.00 rows=1 width=4)
+                                                           Rows out:  0 rows (seg0) with 0 ms to end.
                                    ->  Result  (cost=6.84..6.85 rows=1 width=4)
                                          Filter: $0 = public.smallt2_part.i
                                          Rows out:  0 rows (seg0) with 0 ms to end.
                                          ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
-                                               Rows out:  Avg 200.0 rows x 2 workers.  Max 240 rows (seg0) with 0.042 ms to first row, 0.105 ms to end of 15 scans, start offset by 376 ms.
-                                               ->  Broadcast Motion 2:2  (slice13; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
-                                                     Rows out:  Avg 16.0 rows x 2 workers at destination.  Max 16 rows (seg0) with 0.014 ms to first row, 0.031 ms to end, start offset by 369 ms.
+                                               Rows out:  Avg 200.0 rows x 2 workers.  Max 240 rows (seg0) with 0.106 ms to first row, 0.162 ms to end of 15 scans, start offset by 627 ms.
+                                               ->  Broadcast Motion 2:2  (slice12; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  Avg 16.0 rows x 2 workers at destination.  Max 16 rows (seg0) with 0.029 ms to first row, 0.062 ms to end, start offset by 583 ms.
                                                      ->  Seq Scan on smallt2_part_1_prt_1 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
-                                                           Rows out:  Avg 8.0 rows x 2 workers.  Max 8 rows (seg0) with 0.093 ms to first row, 0.101 ms to end, start offset by 332 ms.
+                                                           Rows out:  Avg 8.0 rows x 2 workers.  Max 8 rows (seg0) with 0.174 ms to first row, 0.187 ms to end, start offset by 471 ms.
                                    ->  Result  (cost=6.84..6.85 rows=1 width=4)
                                          Filter: $0 = public.smallt2_part.i
                                          Rows out:  0 rows (seg0) with 0 ms to end.
                                          ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
-                                               Rows out:  Avg 162.5 rows x 2 workers.  Max 195 rows (seg0) with 0.036 ms to first row, 0.086 ms to end of 15 scans, start offset by 376 ms.
-                                               ->  Broadcast Motion 2:2  (slice14; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
-                                                     Rows out:  Avg 13.0 rows x 2 workers at destination.  Max 13 rows (seg0) with 0.007 ms to first row, 0.025 ms to end, start offset by 369 ms.
+                                               Rows out:  Avg 162.5 rows x 2 workers.  Max 195 rows (seg0) with 37 ms to end of 15 scans, start offset by 627 ms.
+                                               ->  Broadcast Motion 2:2  (slice13; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  Avg 13.0 rows x 2 workers at destination.  Max 13 rows (seg0) with 0.018 ms to first row, 37 ms to end, start offset by 583 ms.
                                                      ->  Seq Scan on smallt2_part_1_prt_2 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
-                                                           Rows out:  Avg 6.5 rows x 2 workers.  Max 10 rows (seg1) with 0.123 ms to first row, 0.131 ms to end, start offset by 281 ms.
+                                                           Rows out:  Avg 6.5 rows x 2 workers.  Max 10 rows (seg1) with 0.204 ms to first row, 0.219 ms to end, start offset by 619 ms.
                                    ->  Result  (cost=6.84..6.85 rows=1 width=4)
                                          Filter: $0 = public.smallt2_part.i
                                          Rows out:  0 rows (seg0) with 0 ms to end.
                                          ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
-                                               Rows out:  Avg 150.0 rows x 2 workers.  Max 180 rows (seg0) with 0.037 ms to first row, 0.082 ms to end of 15 scans, start offset by 376 ms.
-                                               ->  Broadcast Motion 2:2  (slice15; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
-                                                     Rows out:  Avg 12.0 rows x 2 workers at destination.  Max 12 rows (seg0) with 0.013 ms to first row, 0.027 ms to end, start offset by 369 ms.
+                                               Rows out:  Avg 150.0 rows x 2 workers.  Max 180 rows (seg0) with 0.248 ms to first row, 0.290 ms to end of 15 scans, start offset by 627 ms.
+                                               ->  Broadcast Motion 2:2  (slice14; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  Avg 12.0 rows x 2 workers at destination.  Max 12 rows (seg0) with 0.099 ms to first row, 0.130 ms to end, start offset by 620 ms.
                                                      ->  Seq Scan on smallt2_part_1_prt_3 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
-                                                           Rows out:  Avg 6.0 rows x 2 workers.  Max 6 rows (seg0) with 0.104 ms to first row, 0.112 ms to end, start offset by 325 ms.
+                                                           Rows out:  Avg 6.0 rows x 2 workers.  Max 6 rows (seg0) with 0.148 ms to first row, 0.159 ms to end, start offset by 535 ms.
                                    ->  Result  (cost=6.84..6.85 rows=1 width=4)
                                          Filter: $0 = public.smallt2_part.i
                                          Rows out:  0 rows (seg0) with 0 ms to end.
                                          ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
-                                               Rows out:  Avg 112.5 rows x 2 workers.  Max 135 rows (seg0) with 0.028 ms to first row, 0.057 ms to end of 15 scans, start offset by 376 ms.
-                                               ->  Broadcast Motion 2:2  (slice16; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
-                                                     Rows out:  Avg 9.0 rows x 2 workers at destination.  Max 9 rows (seg0) with 0.007 ms to first row, 0.018 ms to end, start offset by 369 ms.
+                                               Rows out:  Avg 112.5 rows x 2 workers.  Max 135 rows (seg0) with 0.057 ms to first row, 0.087 ms to end of 15 scans, start offset by 627 ms.
+                                               ->  Broadcast Motion 2:2  (slice15; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  Avg 9.0 rows x 2 workers at destination.  Max 9 rows (seg0) with 0.019 ms to first row, 0.045 ms to end, start offset by 620 ms.
                                                      ->  Seq Scan on smallt2_part_1_prt_4 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
-                                                           Rows out:  Avg 4.5 rows x 2 workers.  Max 6 rows (seg1) with 0.095 ms to first row, 0.102 ms to end, start offset by 251 ms.
+                                                           Rows out:  Avg 4.5 rows x 2 workers.  Max 6 rows (seg1) with 0.201 ms to first row, 0.218 ms to end, start offset by 432 ms.
+         ->  Seq Scan on smallt_part_1_prt_3 smallt_part  (cost=0.00..22.02 rows=1 width=40)
+               Filter: (subplan)
+               Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 0.903 ms to first row, 5.231 ms to end, start offset by 627 ms.
+               SubPlan 1
+                 ->  HashAggregate  (cost=0.02..0.04 rows=1 width=12)
+                       Group By: public.smallt2_part.d
+                       Rows out:  Avg 17.5 rows x 2 workers.  Max 25 rows (seg1) with 6.224 ms to first row, 12 ms to end of 15 scans, start offset by 638 ms.
+                       Executor memory:  465K bytes avg, 465K bytes max (seg0).
+                       ->  Result  (cost=0.00..0.00 rows=1 width=4)
+                             Rows out:  Avg 125.0 rows x 2 workers.  Max 150 rows (seg1) with 4.772 ms to first row, 6.687 ms to end of 15 scans, start offset by 638 ms.
+                             ->  Append  (cost=0.00..0.00 rows=1 width=4)
+                                   Rows out:  Avg 125.0 rows x 2 workers.  Max 150 rows (seg1) with 4.767 ms to first row, 6.571 ms to end of 15 scans, start offset by 638 ms.
+                                   ->  Result  (cost=0.00..0.01 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  0 rows (seg0) with 0 ms to end.
+                                         ->  Materialize for deadlock safety  (cost=0.00..0.01 rows=1 width=4)
+                                               Rows out:  0 rows (seg0) with 0 ms to end.
+                                               ->  Broadcast Motion 2:2  (slice16; segments: 2)  (cost=0.00..0.00 rows=1 width=4)
+                                                     Rows out:  0 rows at destination (seg0) with 0 ms to end.
+                                                     ->  Seq Scan on smallt2_part  (cost=0.00..0.00 rows=1 width=4)
+                                                           Rows out:  0 rows (seg0) with 0 ms to end.
+                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  Avg 40.0 rows x 2 workers.  Max 40 rows (seg0) with 0.291 ms to first row, 0.420 ms to end of 10 scans, start offset by 632 ms.
+                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
+                                               Rows out:  Avg 200.0 rows x 2 workers.  Max 240 rows (seg1) with 0.378 ms to first row, 0.441 ms to end of 15 scans, start offset by 638 ms.
+                                               ->  Broadcast Motion 2:2  (slice17; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  Avg 16.0 rows x 2 workers at destination.  Max 16 rows (seg0) with 0.186 ms to first row, 0.244 ms to end, start offset by 627 ms.
+                                                     ->  Seq Scan on smallt2_part_1_prt_1 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  Avg 8.0 rows x 2 workers.  Max 8 rows (seg0) with 0.153 ms to first row, 0.166 ms to end, start offset by 451 ms.
+                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  Avg 32.5 rows x 2 workers.  Max 50 rows (seg1) with 0.127 ms to first row, 0.268 ms to end of 15 scans, start offset by 638 ms.
+                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
+                                               Rows out:  Avg 162.5 rows x 2 workers.  Max 195 rows (seg1) with 0.122 ms to first row, 0.178 ms to end of 15 scans, start offset by 638 ms.
+                                               ->  Broadcast Motion 2:2  (slice18; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  Avg 13.0 rows x 2 workers at destination.  Max 13 rows (seg0) with 0.019 ms to first row, 0.076 ms to end, start offset by 628 ms.
+                                                     ->  Seq Scan on smallt2_part_1_prt_2 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  Avg 6.5 rows x 2 workers.  Max 10 rows (seg1) with 0.178 ms to first row, 0.198 ms to end, start offset by 576 ms.
+                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  Avg 30.0 rows x 2 workers.  Max 30 rows (seg0) with 0.064 ms to first row, 0.160 ms to end of 10 scans, start offset by 632 ms.
+                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
+                                               Rows out:  Avg 150.0 rows x 2 workers.  Max 180 rows (seg1) with 0.118 ms to first row, 0.206 ms to end of 15 scans, start offset by 638 ms.
+                                               ->  Broadcast Motion 2:2  (slice19; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  Avg 12.0 rows x 2 workers at destination.  Max 12 rows (seg0) with 0.022 ms to first row, 0.049 ms to end, start offset by 628 ms.
+                                                     ->  Seq Scan on smallt2_part_1_prt_3 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  Avg 6.0 rows x 2 workers.  Max 6 rows (seg0) with 0.234 ms to first row, 0.249 ms to end, start offset by 523 ms.
+                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  Avg 22.5 rows x 2 workers.  Max 30 rows (seg1) with 0.863 ms to first row, 0.951 ms to end of 15 scans, start offset by 638 ms.
+                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
+                                               Rows out:  Avg 112.5 rows x 2 workers.  Max 135 rows (seg1) with 0.855 ms to first row, 0.890 ms to end of 15 scans, start offset by 638 ms.
+                                               ->  Broadcast Motion 2:2  (slice20; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  Avg 9.0 rows x 2 workers at destination.  Max 9 rows (seg0) with 0.019 ms to first row, 0.042 ms to end, start offset by 628 ms.
+                                                     ->  Seq Scan on smallt2_part_1_prt_4 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  Avg 4.5 rows x 2 workers.  Max 6 rows (seg1) with 0.157 ms to first row, 0.167 ms to end, start offset by 497 ms.
+         ->  Seq Scan on smallt_part_1_prt_4 smallt_part  (cost=0.00..22.02 rows=1 width=40)
+               Filter: (subplan)
+               Rows out:  0 rows (seg0) with 0 ms to end.
+               SubPlan 1
+                 ->  HashAggregate  (cost=0.02..0.04 rows=1 width=12)
+                       Group By: public.smallt2_part.d
+                       Rows out:  0 rows (seg0) with 0 ms to end.
+                       Executor memory:  401K bytes avg, 401K bytes max (seg0).
+                       ->  Result  (cost=0.00..0.00 rows=1 width=4)
+                             Rows out:  0 rows (seg0) with 0 ms to end.
+                             ->  Append  (cost=0.00..0.00 rows=1 width=4)
+                                   Rows out:  0 rows (seg0) with 0 ms to end.
+                                   ->  Result  (cost=0.00..0.01 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  0 rows (seg0) with 0 ms to end.
+                                         ->  Materialize for deadlock safety  (cost=0.00..0.01 rows=1 width=4)
+                                               Rows out:  0 rows (seg0) with 0 ms to end.
+                                               ->  Broadcast Motion 2:2  (slice21; segments: 2)  (cost=0.00..0.00 rows=1 width=4)
+                                                     Rows out:  0 rows at destination (seg0) with 0 ms to end.
+                                                     ->  Seq Scan on smallt2_part  (cost=0.00..0.00 rows=1 width=4)
+                                                           Rows out:  0 rows (seg0) with 0 ms to end.
+                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  0 rows (seg0) with 0 ms to end.
+                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
+                                               Rows out:  Avg 200.0 rows x 2 workers.  Max 240 rows (seg0) with 0.196 ms to first row, 0.267 ms to end of 15 scans, start offset by 641 ms.
+                                               ->  Broadcast Motion 2:2  (slice22; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  Avg 16.0 rows x 2 workers at destination.  Max 16 rows (seg0) with 0.055 ms to first row, 0.162 ms to end, start offset by 633 ms.
+                                                     ->  Seq Scan on smallt2_part_1_prt_1 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  Avg 8.0 rows x 2 workers.  Max 8 rows (seg0) with 0.152 ms to first row, 0.167 ms to end, start offset by 611 ms.
+                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  0 rows (seg0) with 0 ms to end.
+                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
+                                               Rows out:  Avg 162.5 rows x 2 workers.  Max 195 rows (seg0) with 0.161 ms to first row, 0.216 ms to end of 15 scans, start offset by 641 ms.
+                                               ->  Broadcast Motion 2:2  (slice23; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  Avg 13.0 rows x 2 workers at destination.  Max 13 rows (seg0) with 0.087 ms to first row, 0.148 ms to end, start offset by 633 ms.
+                                                     ->  Seq Scan on smallt2_part_1_prt_2 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  Avg 6.5 rows x 2 workers.  Max 10 rows (seg1) with 0.143 ms to first row, 0.167 ms to end, start offset by 473 ms.
+                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  0 rows (seg0) with 0 ms to end.
+                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
+                                               Rows out:  Avg 150.0 rows x 2 workers.  Max 180 rows (seg0) with 0.164 ms to first row, 0.208 ms to end of 15 scans, start offset by 641 ms.
+                                               ->  Broadcast Motion 2:2  (slice24; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  Avg 12.0 rows x 2 workers at destination.  Max 12 rows (seg0) with 0.052 ms to first row, 0.132 ms to end, start offset by 633 ms.
+                                                     ->  Seq Scan on smallt2_part_1_prt_3 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  Avg 6.0 rows x 2 workers.  Max 6 rows (seg0) with 0.200 ms to first row, 0.213 ms to end, start offset by 600 ms.
+                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  0 rows (seg0) with 0 ms to end.
+                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
+                                               Rows out:  Avg 112.5 rows x 2 workers.  Max 135 rows (seg0) with 0.081 ms to first row, 0.110 ms to end of 15 scans, start offset by 641 ms.
+                                               ->  Broadcast Motion 2:2  (slice25; segments: 2)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  Avg 9.0 rows x 2 workers at destination.  Max 9 rows (seg0) with 0.029 ms to first row, 0.070 ms to end, start offset by 633 ms.
+                                                     ->  Seq Scan on smallt2_part_1_prt_4 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  Avg 4.5 rows x 2 workers.  Max 6 rows (seg1) with 0.202 ms to first row, 0.222 ms to end, start offset by 505 ms.
  Slice statistics:
-   (slice0)    Executor memory: 1040K bytes.
-   (slice1)    Executor memory: 965K bytes avg x 2 workers, 965K bytes max (seg0).
-   (slice2)    Executor memory: 965K bytes avg x 2 workers, 965K bytes max (seg0).
-   (slice3)    Executor memory: 965K bytes avg x 2 workers, 965K bytes max (seg0).
-   (slice4)    Executor memory: 965K bytes avg x 2 workers, 965K bytes max (seg0).
-   (slice5)    Executor memory: 965K bytes avg x 2 workers, 965K bytes max (seg0).
-   (slice6)    Executor memory: 965K bytes avg x 2 workers, 965K bytes max (seg0).
-   (slice7)    Executor memory: 965K bytes avg x 2 workers, 965K bytes max (seg0).
-   (slice8)    Executor memory: 965K bytes avg x 2 workers, 965K bytes max (seg0).
-   (slice9)    Executor memory: 965K bytes avg x 2 workers, 965K bytes max (seg0).
-   (slice10)   Executor memory: 965K bytes avg x 2 workers, 965K bytes max (seg0).
-   (slice11)   Executor memory: 973K bytes avg x 2 workers, 973K bytes max (seg0).
-   (slice12)   Executor memory: 981K bytes avg x 2 workers, 981K bytes max (seg0).
-   (slice13)   Executor memory: 989K bytes avg x 2 workers, 989K bytes max (seg0).
-   (slice14)   Executor memory: 997K bytes avg x 2 workers, 997K bytes max (seg0).
-   (slice15)   Executor memory: 1005K bytes avg x 2 workers, 1005K bytes max (seg0).
-   (slice16)   Executor memory: 1013K bytes avg x 2 workers, 1013K bytes max (seg0).
-   (slice17)   Executor memory: 1517K bytes avg x 2 workers, 1517K bytes max (seg0).
+   (slice0)    Executor memory: 891K bytes.
+   (slice1)    Executor memory: 671K bytes avg x 2 workers, 671K bytes max (seg0).
+   (slice2)    Executor memory: 671K bytes avg x 2 workers, 671K bytes max (seg0).
+   (slice3)    Executor memory: 671K bytes avg x 2 workers, 671K bytes max (seg0).
+   (slice4)    Executor memory: 671K bytes avg x 2 workers, 671K bytes max (seg0).
+   (slice5)    Executor memory: 671K bytes avg x 2 workers, 671K bytes max (seg0).
+   (slice6)    Executor memory: 671K bytes avg x 2 workers, 671K bytes max (seg0).
+   (slice7)    Executor memory: 671K bytes avg x 2 workers, 671K bytes max (seg0).
+   (slice8)    Executor memory: 671K bytes avg x 2 workers, 671K bytes max (seg0).
+   (slice9)    Executor memory: 671K bytes avg x 2 workers, 671K bytes max (seg0).
+   (slice10)   Executor memory: 671K bytes avg x 2 workers, 671K bytes max (seg0).
+   (slice11)   Executor memory: 679K bytes avg x 2 workers, 679K bytes max (seg0).
+   (slice12)   Executor memory: 687K bytes avg x 2 workers, 687K bytes max (seg0).
+   (slice13)   Executor memory: 695K bytes avg x 2 workers, 695K bytes max (seg0).
+   (slice14)   Executor memory: 703K bytes avg x 2 workers, 703K bytes max (seg0).
+   (slice15)   Executor memory: 711K bytes avg x 2 workers, 711K bytes max (seg0).
+   (slice16)   Executor memory: 719K bytes avg x 2 workers, 719K bytes max (seg0).
+   (slice17)   Executor memory: 728K bytes avg x 2 workers, 728K bytes max (seg0).
+   (slice18)   Executor memory: 736K bytes avg x 2 workers, 736K bytes max (seg0).
+   (slice19)   Executor memory: 744K bytes avg x 2 workers, 744K bytes max (seg0).
+   (slice20)   Executor memory: 752K bytes avg x 2 workers, 752K bytes max (seg0).
+   (slice21)   Executor memory: 760K bytes avg x 2 workers, 760K bytes max (seg0).
+   (slice22)   Executor memory: 768K bytes avg x 2 workers, 768K bytes max (seg0).
+   (slice23)   Executor memory: 776K bytes avg x 2 workers, 776K bytes max (seg0).
+   (slice24)   Executor memory: 784K bytes avg x 2 workers, 784K bytes max (seg0).
+   (slice25)   Executor memory: 792K bytes avg x 2 workers, 792K bytes max (seg0).
+   (slice26)   Executor memory: 1297K bytes avg x 2 workers, 1297K bytes max (seg0).
  Statement statistics:
    Memory used: 128000K bytes
  Settings:  enable_hashjoin=on; enable_nestloop=off; gp_enable_agg_distinct=on
- Total runtime: 385.153 ms
-(219 rows)
+ Total runtime: 646.018 ms
+(320 rows)
 
 -- Sort in MergeJoin
 set enable_hashjoin=off;
@@ -1759,106 +1860,6 @@ set enable_mergejoin=on;
 select t1.* from smallt as t1, smallt as t2 where t1.i = t2.i and t1.i < 2;
  i |    t    |     d      
 ---+---------+------------
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
- 0 | text 10 | 01-01-2011
- 0 | text 10 | 01-01-2011
- 0 | text 10 | 01-01-2011
- 0 | text 10 | 01-01-2011
- 0 | text 10 | 01-01-2011
- 0 | text 10 | 01-01-2011
- 0 | text 10 | 01-01-2011
- 0 | text 10 | 01-01-2011
- 0 | text 10 | 01-01-2011
- 0 | text 10 | 01-01-2011
- 0 | text 5  | 01-11-2011
- 0 | text 5  | 01-11-2011
- 0 | text 5  | 01-11-2011
- 0 | text 5  | 01-11-2011
- 0 | text 5  | 01-11-2011
- 0 | text 5  | 01-11-2011
- 0 | text 5  | 01-11-2011
- 0 | text 5  | 01-11-2011
- 0 | text 5  | 01-11-2011
- 0 | text 5  | 01-11-2011
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 0 | text 0  | 01-01-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 0 | text 10 | 01-11-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 0 | text 5  | 01-01-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
- 0 | text 0  | 01-11-2011
  1 | text 1  | 01-02-2011
  1 | text 1  | 01-02-2011
  1 | text 1  | 01-02-2011
@@ -1959,94 +1960,144 @@ select t1.* from smallt as t1, smallt as t2 where t1.i = t2.i and t1.i < 2;
  1 | text 1  | 01-12-2011
  1 | text 1  | 01-12-2011
  1 | text 1  | 01-12-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
 (200 rows)
 
 explain analyze select t1.* from smallt as t1, smallt as t2 where t1.i = t2.i and t1.i < 2;
                                                                       QUERY PLAN                                                                      
 ------------------------------------------------------------------------------------------------------------------------------------------------------
  Gather Motion 2:1  (slice1; segments: 2)  (cost=7.36..8.06 rows=21 width=15)
-   Rows out:  200 rows at destination with 1.019 ms to first row, 1.229 ms to end, start offset by 0.469 ms.
+   Rows out:  200 rows at destination with 1.090 ms to first row, 1.319 ms to end, start offset by 0.432 ms.
    ->  Merge Join  (cost=7.36..8.06 rows=21 width=15)
          Merge Cond: t1.i = t2.i
-         Rows out:  Avg 100.0 rows x 2 workers.  Max 100 rows (seg0) with 0.179 ms to first row, 0.297 ms to end, start offset by 0.867 ms.
+         Rows out:  Avg 100.0 rows x 2 workers.  Max 100 rows (seg0) with 0.190 ms to first row, 0.320 ms to end, start offset by 0.879 ms.
          ->  Sort  (cost=3.68..3.73 rows=10 width=15)
                Sort Key: t1.i
-               Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 0.098 ms to first row, 0.107 ms to end, start offset by 0.867 ms.
+               Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 0.105 ms to first row, 0.111 ms to end, start offset by 0.879 ms.
                Executor memory:  29K bytes avg, 29K bytes max (seg0).
                Work_mem used:  29K bytes avg, 29K bytes max (seg0).
                ->  Seq Scan on smallt t1  (cost=0.00..3.25 rows=10 width=15)
                      Filter: i < 2
-                     Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 0.022 ms to first row, 0.045 ms to end, start offset by 0.902 ms.
+                     Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 0.029 ms to first row, 0.052 ms to end, start offset by 0.911 ms.
          ->  Sort  (cost=3.68..3.73 rows=10 width=4)
                Sort Key: t2.i
-               Rows out:  Avg 91.0 rows x 2 workers.  Max 91 rows (seg0) with 0.077 ms to first row, 0.107 ms to end, start offset by 0.966 ms.
+               Rows out:  Avg 91.0 rows x 2 workers.  Max 91 rows (seg0) with 0.081 ms to first row, 0.096 ms to end, start offset by 0.985 ms.
                Executor memory:  29K bytes avg, 29K bytes max (seg0).
                Work_mem used:  29K bytes avg, 29K bytes max (seg0).
                ->  Seq Scan on smallt t2  (cost=0.00..3.25 rows=10 width=4)
                      Filter: i < 2
-                     Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 0.012 ms to first row, 0.034 ms to end, start offset by 0.999 ms.
+                     Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 0.017 ms to first row, 0.039 ms to end, start offset by 1.016 ms.
  Slice statistics:
-   (slice0)    Executor memory: 213K bytes.
-   (slice1)    Executor memory: 233K bytes avg x 2 workers, 233K bytes max (seg0).  Work_mem: 29K bytes max.
+   (slice0)    Executor memory: 318K bytes.
+   (slice1)    Executor memory: 215K bytes avg x 2 workers, 215K bytes max (seg0).  Work_mem: 29K bytes max.
  Statement statistics:
    Memory used: 128000K bytes
  Settings:  enable_hashjoin=off; enable_mergejoin=on; enable_nestloop=off; gp_enable_agg_distinct=on
- Total runtime: 2.108 ms
+ Total runtime: 2.237 ms
 (28 rows)
 
 select t1.* from smallt as t1, smallt as t2 where t1.d = t2.d and t1.i < 2;
  i |    t    |     d      
 ---+---------+------------
- 1 | text 6  | 01-02-2011
- 1 | text 6  | 01-02-2011
- 1 | text 6  | 01-02-2011
- 1 | text 6  | 01-02-2011
- 1 | text 6  | 01-02-2011
- 1 | text 1  | 01-02-2011
- 1 | text 1  | 01-02-2011
- 1 | text 1  | 01-02-2011
- 1 | text 1  | 01-02-2011
- 1 | text 1  | 01-02-2011
- 1 | text 11 | 01-02-2011
- 1 | text 11 | 01-02-2011
- 1 | text 11 | 01-02-2011
- 1 | text 11 | 01-02-2011
- 1 | text 11 | 01-02-2011
- 1 | text 6  | 01-02-2011
- 1 | text 6  | 01-02-2011
- 1 | text 6  | 01-02-2011
- 1 | text 6  | 01-02-2011
- 1 | text 6  | 01-02-2011
- 1 | text 1  | 01-02-2011
- 1 | text 1  | 01-02-2011
- 1 | text 1  | 01-02-2011
- 1 | text 1  | 01-02-2011
- 1 | text 1  | 01-02-2011
- 1 | text 6  | 01-12-2011
- 1 | text 6  | 01-12-2011
- 1 | text 6  | 01-12-2011
- 1 | text 6  | 01-12-2011
- 1 | text 6  | 01-12-2011
- 1 | text 1  | 01-12-2011
- 1 | text 1  | 01-12-2011
- 1 | text 1  | 01-12-2011
- 1 | text 1  | 01-12-2011
- 1 | text 1  | 01-12-2011
- 1 | text 11 | 01-12-2011
- 1 | text 11 | 01-12-2011
- 1 | text 11 | 01-12-2011
- 1 | text 11 | 01-12-2011
- 1 | text 11 | 01-12-2011
- 1 | text 11 | 01-12-2011
- 1 | text 11 | 01-12-2011
- 1 | text 11 | 01-12-2011
- 1 | text 11 | 01-12-2011
- 1 | text 11 | 01-12-2011
- 1 | text 1  | 01-12-2011
- 1 | text 1  | 01-12-2011
- 1 | text 1  | 01-12-2011
- 1 | text 1  | 01-12-2011
- 1 | text 1  | 01-12-2011
  0 | text 0  | 01-01-2011
  0 | text 0  | 01-01-2011
  0 | text 0  | 01-01-2011
@@ -2097,6 +2148,56 @@ select t1.* from smallt as t1, smallt as t2 where t1.d = t2.d and t1.i < 2;
  0 | text 10 | 01-11-2011
  0 | text 10 | 01-11-2011
  0 | text 10 | 01-11-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
 (100 rows)
 
 --start_ignore
@@ -2104,35 +2205,35 @@ explain analyze select t1.* from smallt as t1, smallt as t2 where t1.d = t2.d an
                                                                              QUERY PLAN                                                                              
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Gather Motion 2:1  (slice2; segments: 2)  (cost=11.24..14.44 rows=51 width=15)
-   Rows out:  100 rows at destination with 4.230 ms to first row, 4.341 ms to end, start offset by 0.554 ms.
+   Rows out:  100 rows at destination with 4.169 ms to first row, 4.288 ms to end, start offset by 0.489 ms.
    ->  Merge Join  (cost=11.24..14.44 rows=51 width=15)
          Merge Cond: t1.d = t2.d
-         Rows out:  Avg 50.0 rows x 2 workers.  Max 50 rows (seg0) with 3.421 ms to first row, 3.512 ms to end, start offset by 1.092 ms.
+         Rows out:  Avg 50.0 rows x 2 workers.  Max 50 rows (seg0) with 3.293 ms to first row, 3.380 ms to end, start offset by 1.050 ms.
          ->  Sort  (cost=4.91..5.01 rows=20 width=15)
                Sort Key: t1.d
-               Rows out:  Avg 20.0 rows x 2 workers.  Max 20 rows (seg0) with 3.278 ms to first row, 3.281 ms to end, start offset by 1.092 ms.
+               Rows out:  Avg 20.0 rows x 2 workers.  Max 20 rows (seg0) with 3.102 ms to first row, 3.106 ms to end, start offset by 1.050 ms.
                Executor memory:  29K bytes avg, 29K bytes max (seg0).
                Work_mem used:  29K bytes avg, 29K bytes max (seg0).
                ->  Broadcast Motion 2:2  (slice1; segments: 2)  (cost=0.00..3.85 rows=20 width=15)
-                     Rows out:  Avg 20.0 rows x 2 workers at destination.  Max 20 rows (seg0) with 3.190 ms to first row, 3.213 ms to end, start offset by 1.125 ms.
+                     Rows out:  Avg 20.0 rows x 2 workers at destination.  Max 20 rows (seg0) with 2.515 ms to first row, 3.034 ms to end, start offset by 1.079 ms.
                      ->  Seq Scan on smallt t1  (cost=0.00..3.25 rows=10 width=15)
                            Filter: i < 2
-                           Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 0.054 ms to first row, 0.076 ms to end, start offset by 3.348 ms.
+                           Rows out:  Avg 10.0 rows x 2 workers.  Max 10 rows (seg0) with 0.112 ms to first row, 0.195 ms to end, start offset by 3.409 ms.
          ->  Sort  (cost=6.32..6.57 rows=50 width=4)
                Sort Key: t2.d
-               Rows out:  Avg 71.0 rows x 2 workers.  Max 71 rows (seg0) with 0.134 ms to first row, 0.152 ms to end, start offset by 4.372 ms.
+               Rows out:  Avg 71.0 rows x 2 workers.  Max 71 rows (seg0) with 0.182 ms to first row, 0.193 ms to end, start offset by 4.154 ms.
                Executor memory:  29K bytes avg, 29K bytes max (seg0).
                Work_mem used:  29K bytes avg, 29K bytes max (seg0).
                ->  Seq Scan on smallt t2  (cost=0.00..3.00 rows=50 width=4)
-                     Rows out:  Avg 50.0 rows x 2 workers.  Max 50 rows (seg0) with 0.017 ms to first row, 0.049 ms to end, start offset by 4.402 ms.
+                     Rows out:  Avg 50.0 rows x 2 workers.  Max 50 rows (seg0) with 0.043 ms to first row, 0.090 ms to end, start offset by 4.188 ms.
  Slice statistics:
-   (slice0)    Executor memory: 197K bytes.
-   (slice1)    Executor memory: 273K bytes avg x 2 workers, 273K bytes max (seg0).
-   (slice2)    Executor memory: 249K bytes avg x 2 workers, 249K bytes max (seg0).  Work_mem: 29K bytes max.
+   (slice0)    Executor memory: 318K bytes.
+   (slice1)    Executor memory: 191K bytes avg x 2 workers, 191K bytes max (seg0).
+   (slice2)    Executor memory: 231K bytes avg x 2 workers, 231K bytes max (seg0).  Work_mem: 29K bytes max.
  Statement statistics:
    Memory used: 128000K bytes
  Settings:  enable_hashjoin=off; enable_mergejoin=on; enable_nestloop=off; gp_enable_agg_distinct=on
- Total runtime: 5.472 ms
+ Total runtime: 5.345 ms
 (30 rows)
 
 --end_ignore
@@ -2183,25 +2284,25 @@ and smallt.d = '2011-01-04'::date;
                                                                    QUERY PLAN                                                                   
 ------------------------------------------------------------------------------------------------------------------------------------------------
  Gather Motion 2:1  (slice1; segments: 2)  (cost=300.33..601.12 rows=2 width=15)
-   Rows out:  20 rows at destination with 1.379 ms to first row, 2.375 ms to end, start offset by 0.515 ms.
+   Rows out:  20 rows at destination with 0.665 ms to first row, 0.675 ms to end, start offset by 0.380 ms.
    ->  Nested Loop  (cost=300.33..601.12 rows=2 width=15)
          Join Filter: smallt.i = smallt2.i
-         Rows out:  20 rows (seg0) with 0.061 ms to first row, 0.121 ms to end, start offset by 1.591 ms.
+         Rows out:  20 rows (seg0) with 0.053 ms to first row, 0.116 ms to end, start offset by 0.763 ms.
          ->  Index Scan using smallt_d_idx on smallt  (cost=0.00..300.34 rows=3 width=15)
                Index Cond: d = '01-04-2011'::date
-               Rows out:  5 rows (seg0) with 0.025 ms to first row, 0.039 ms to end, start offset by 1.591 ms.
+               Rows out:  5 rows (seg0) with 0.021 ms to first row, 0.035 ms to end, start offset by 0.763 ms.
          ->  Materialize  (cost=300.33..300.37 rows=2 width=4)
-               Rows out:  20 rows (seg0) with 0.030 ms to first row, 0.054 ms to end of 5 scans, start offset by 1.722 ms.
+               Rows out:  20 rows (seg0) with 0.028 ms to first row, 0.053 ms to end of 5 scans, start offset by 0.888 ms.
                ->  Index Scan using smallt2_d_idx on smallt2  (cost=0.00..300.32 rows=2 width=4)
                      Index Cond: d = '01-04-2011'::date
-                     Rows out:  4 rows (seg0) with 0.016 ms to first row, 0.030 ms to end, start offset by 1.628 ms.
+                     Rows out:  4 rows (seg0) with 0.015 ms to first row, 0.029 ms to end, start offset by 0.795 ms.
  Slice statistics:
-   (slice0)    Executor memory: 184K bytes.
-   (slice1)    Executor memory: 216K bytes avg x 2 workers, 232K bytes max (seg0).
+   (slice0)    Executor memory: 318K bytes.
+   (slice1)    Executor memory: 167K bytes avg x 2 workers, 183K bytes max (seg0).
  Statement statistics:
    Memory used: 128000K bytes
  Settings:  enable_bitmapscan=off; enable_hashjoin=off; enable_mergejoin=off; enable_nestloop=on; enable_seqscan=off; gp_enable_agg_distinct=on
- Total runtime: 3.411 ms
+ Total runtime: 1.486 ms
 (20 rows)
 
 -- BitmapScan
@@ -2238,33 +2339,33 @@ and smallt.d = '2011-01-04'::date;
                                                                              QUERY PLAN                                                                              
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Gather Motion 2:1  (slice1; segments: 2)  (cost=202.63..205.14 rows=2 width=15)
-   Rows out:  20 rows at destination with 2.140 ms to first row, 2.150 ms to end, start offset by 0.453 ms.
+   Rows out:  20 rows at destination with 0.852 ms to first row, 0.865 ms to end, start offset by 0.408 ms.
    ->  Nested Loop  (cost=202.63..205.14 rows=2 width=15)
          Join Filter: smallt.i = smallt2.i
-         Rows out:  20 rows (seg0) with 0.263 ms to first row, 0.327 ms to end, start offset by 2.100 ms.
+         Rows out:  20 rows (seg0) with 0.222 ms to first row, 0.284 ms to end, start offset by 0.831 ms.
          ->  Bitmap Heap Scan on smallt  (cost=100.29..102.35 rows=3 width=15)
                Recheck Cond: d = '01-04-2011'::date
-               Rows out:  5 rows (seg0) with 0.177 ms to first row, 0.187 ms to end, start offset by 2.101 ms.
+               Rows out:  5 rows (seg0) with 0.090 ms to first row, 0.105 ms to end, start offset by 0.831 ms.
                ->  Bitmap Index Scan on smallt_d_idx  (cost=0.00..100.29 rows=3 width=0)
                      Index Cond: d = '01-04-2011'::date
-                     Bitmaps out:  Avg 1.0 x 2 workers.  Max 1 (seg0) with 0.022 ms to end, start offset by 2.225 ms.
+                     Bitmaps out:  Avg 1.0 x 2 workers.  Max 1 (seg0) with 0.019 ms to end, start offset by 0.886 ms.
                      Work_mem used:  9K bytes.
          ->  Materialize  (cost=102.34..102.38 rows=2 width=4)
-               Rows out:  20 rows (seg0) with 0.083 ms to first row, 0.115 ms to end of 5 scans, start offset by 2.430 ms.
+               Rows out:  20 rows (seg0) with 0.130 ms to first row, 0.155 ms to end of 5 scans, start offset by 1.115 ms.
                ->  Bitmap Heap Scan on smallt2  (cost=100.28..102.33 rows=2 width=4)
                      Recheck Cond: d = '01-04-2011'::date
-                     Rows out:  4 rows (seg0) with 0.069 ms to first row, 0.091 ms to end, start offset by 2.289 ms.
+                     Rows out:  4 rows (seg0) with 0.075 ms to first row, 0.088 ms to end, start offset by 0.973 ms.
                      ->  Bitmap Index Scan on smallt2_d_idx  (cost=0.00..100.28 rows=2 width=0)
                            Index Cond: d = '01-04-2011'::date
-                           Bitmaps out:  1 (seg0) with 0.015 ms to end, start offset by 2.331 ms.
+                           Bitmaps out:  1 (seg0) with 0.014 ms to end, start offset by 1.022 ms.
                            Work_mem used:  9K bytes.
  Slice statistics:
-   (slice0)    Executor memory: 266K bytes.
-   (slice1)    Executor memory: 454K bytes avg x 2 workers, 522K bytes max (seg0).  Work_mem: 9K bytes max.
+   (slice0)    Executor memory: 382K bytes.
+   (slice1)    Executor memory: 419K bytes avg x 2 workers, 487K bytes max (seg0).  Work_mem: 9K bytes max.
  Statement statistics:
    Memory used: 128000K bytes
  Settings:  enable_bitmapscan=on; enable_hashjoin=off; enable_indexscan=off; enable_mergejoin=off; enable_nestloop=on; enable_seqscan=off; gp_enable_agg_distinct=on
- Total runtime: 3.042 ms
+ Total runtime: 1.695 ms
 (28 rows)
 
 set enable_hashjoin=on;

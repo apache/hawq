@@ -206,6 +206,8 @@ extern AttrNumber attrMap(AttrMap *map, AttrNumber anum);
 extern List *attrMapIntList(AttrMap *map, List *attrs);
 extern Node *attrMapExpr(AttrMap *map, Node *expr);
 extern bool map_part_attrs(Relation base, Relation part, AttrMap **map_ptr, bool throwerror);
+extern void map_part_attrs_from_targetdesc(TupleDesc target, TupleDesc part, AttrMap **map_ptr);
+extern PartitionState *createPartitionState(PartitionNode *partsAndRules, int resultPartSize);
 extern TupleTableSlot *reconstructMatchingTupleSlot(TupleTableSlot *slot,
 													ResultRelInfo *resultRelInfo);
 extern void CreateAppendOnlySegFileForRelationOnMaster(Relation rel, int segno);
@@ -272,6 +274,44 @@ typedef TupleTableSlot *(*ExecScanAccessMtd) (ScanState *node);
 
 extern TupleTableSlot *ExecScan(ScanState *node, ExecScanAccessMtd accessMtd);
 extern void ExecAssignScanProjectionInfo(ScanState *node);
+extern void InitScanStateInternal(ScanState *scanState, Plan *plan, EState *estate, int eflags);
+extern void FreeScanRelationInternal(ScanState *scanState);
+extern Relation OpenScanRelationByOid(Oid relid);
+extern void CloseScanRelation(Relation rel);
+extern int getTableType(Relation rel);
+extern TupleTableSlot *ExecTableScanRelation(ScanState *scanState);
+extern void BeginTableScanRelation(ScanState *scanState);
+extern void EndTableScanRelation(ScanState *scanState);
+extern void ReScanRelation(ScanState *scanState);
+extern void MarkPosScanRelation(ScanState *scanState);
+extern void RestrPosScanRelation(ScanState *scanState);
+extern void MarkRestrNotAllowed(ScanState *scanState);
+
+/*
+ * prototypes from functions in execHeapScan.c
+ */
+extern TupleTableSlot *HeapScanNext(ScanState *scanState);
+extern void BeginScanHeapRelation(ScanState *scanState);
+extern void EndScanHeapRelation(ScanState *scanState);
+extern void ReScanHeapRelation(ScanState *scanState);
+extern void MarkPosHeapRelation(ScanState *scanState);
+extern void RestrPosHeapRelation(ScanState *scanState);
+
+/*
+ * prototypes from functions in execAppendOnlyScan.c
+ */
+extern TupleTableSlot *AppendOnlyScanNext(ScanState *scanState);
+extern void BeginScanAppendOnlyRelation(ScanState *scanState);
+extern void EndScanAppendOnlyRelation(ScanState *scanState);
+extern void ReScanAppendOnlyRelation(ScanState *scanState);
+
+/*
+ * prototypes from functions in execAOCSScan.c
+ */
+extern TupleTableSlot *AOCSScanNext(ScanState *scanState);
+extern void BeginScanAOCSRelation(ScanState *scanState);
+extern void EndScanAOCSRelation(ScanState *scanState);
+extern void ReScanAOCSRelation(ScanState *scanState);
 
 /*
  * prototypes from functions in execTuples.c

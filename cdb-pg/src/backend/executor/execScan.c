@@ -1,13 +1,9 @@
 /*-------------------------------------------------------------------------
  *
  * execScan.c
- *	  This code provides support for generalized relation scans. ExecScan
- *	  is passed a node and a pointer to a function to "do the right thing"
- *	  and return a tuple from the relation. ExecScan then does the tedious
- *	  stuff - checking the qualification and projecting the tuple
- *	  appropriately.
+ *    Support routines for scans on various table type.
  *
- * Portions Copyright (c) 2006-2008, Greenplum inc
+ * Portions Copyright (c) 2006 - present, EMC/Greenplum
  * Portions Copyright (c) 1996-2008, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
@@ -25,6 +21,71 @@
 #include "utils/debugbreak.h"
 
 #include <unistd.h>
+
+/*
+ * ScanMethod
+ *   Methods that are relevant to support scans on various table types.
+ */
+typedef struct ScanMethod
+{
+	/* Function that scans the table. */
+	TupleTableSlot *(*accessMethod)(ScanState *scanState);
+
+	/* Functions that initiate or terminate a scan. */
+	void (*beginScanMethod)(ScanState *scanState);
+	void (*endScanMethod)(ScanState *scanState);
+
+	/* Function that does rescan. */
+	void (*reScanMethod)(ScanState *scanState);
+
+	/* Function that does MarkPos in a scan. */
+	void (*markPosMethod)(ScanState *scanState);
+
+	/* Function that does RestroPos in a scan. */
+	void (*restrPosMethod)(ScanState *scanState);
+} ScanMethod;
+
+/*
+ * getScanMethod
+ *   Return ScanMethod for a given table type.
+ *
+ * Return NULL if the given type is TableTypeInvalid or not defined in TableType.
+ */
+static const ScanMethod *
+getScanMethod(int tableType)
+{
+	/*
+	 * scanMethods
+	 *    Array that specifies different scan methods for various table types.
+	 *
+	 * The index in this array for a specific table type should match the enum value
+	 * defined in TableType.
+	 */
+	static const ScanMethod scanMethods[] =
+	{
+		{
+			&HeapScanNext, &BeginScanHeapRelation, &EndScanHeapRelation,
+			&ReScanHeapRelation, &MarkPosHeapRelation, &RestrPosHeapRelation
+		},
+		{
+			&AppendOnlyScanNext, &BeginScanAppendOnlyRelation, &EndScanAppendOnlyRelation,
+			&ReScanAppendOnlyRelation, &MarkRestrNotAllowed, &MarkRestrNotAllowed
+		},
+		{
+			&AOCSScanNext, &BeginScanAOCSRelation, &EndScanAOCSRelation,
+			&ReScanAOCSRelation, &MarkRestrNotAllowed, &MarkRestrNotAllowed
+		}
+	};
+	
+	COMPILE_ASSERT(ARRAY_SIZE(scanMethods) == TableTypeInvalid);
+
+	if (tableType < 0 && tableType >= TableTypeInvalid)
+	{
+		return NULL;
+	}
+
+	return &scanMethods[tableType];
+}
 
 
 static bool tlist_matches_tupdesc(PlanState *ps, List *tlist, Index varno, TupleDesc tupdesc);
@@ -237,4 +298,253 @@ tlist_matches_tupdesc(PlanState *ps, List *tlist, Index varno, TupleDesc tupdesc
 	}
 
 	return true;
+}
+
+/*
+ * InitScanStateInternal
+ *   Initialize ScanState common variables for various Scan node.
+ */
+void
+InitScanStateInternal(ScanState *scanState, Plan *plan, EState *estate, int eflags)
+{
+	Assert(IsA(plan, SeqScan) ||
+		   IsA(plan, AppendOnlyScan) ||
+		   IsA(plan, AOCSScan) ||
+		   IsA(plan, TableScan) ||
+		   IsA(plan, DynamicTableScan));
+
+	PlanState *planState = &scanState->ps;
+
+	planState->plan = plan;
+	planState->state = estate;
+
+	/* Create expression evaluation context */
+	ExecAssignExprContext(estate, planState);
+
+	/* Initialize child expressions */
+	planState->targetlist = (List *)ExecInitExpr((Expr *)plan->targetlist, planState);
+	planState->qual = (List *)ExecInitExpr((Expr *)plan->qual, planState);
+	
+	/* Initialize tuple table slot */
+	ExecInitResultTupleSlot(estate, planState);
+	ExecInitScanTupleSlot(estate, scanState);
+	
+	/* For dynamic table scan, do not open the parent partition relation. */
+	if (!IsA(plan, DynamicTableScan))
+	{
+		Relation currentRelation = ExecOpenScanRelation(estate, ((Scan *)plan)->scanrelid);
+		scanState->ss_currentRelation = currentRelation;
+		ExecAssignScanType(scanState, RelationGetDescr(currentRelation));
+		ExecAssignScanProjectionInfo(scanState);
+
+		scanState->tableType = getTableType(scanState->ss_currentRelation);
+	}
+
+	/* Initialize result tuple type. */
+	ExecAssignResultTypeFromTL(planState);
+
+	/*
+	 * If eflag contains EXEC_FLAG_REWIND or EXEC_FLAG_BACKWARD or EXEC_FLAG_MARK,
+	 * then this node is not eager free safe.
+	 */
+	scanState->ps.delayEagerFree =
+		((eflags & (EXEC_FLAG_REWIND | EXEC_FLAG_BACKWARD | EXEC_FLAG_MARK)) != 0);
+
+	/* Currently, only SeqScan supports Mark/Restore. */
+	AssertImply((eflags & EXEC_FLAG_MARK) != 0, IsA(plan, SeqScan));
+}
+
+/*
+ * FreeScanRelationInternal
+ *   Free ScanState common variables initialized in InitScanStateInternal.
+ */
+void
+FreeScanRelationInternal(ScanState *scanState)
+{
+	ExecFreeExprContext(&scanState->ps);
+	ExecClearTuple(scanState->ps.ps_ResultTupleSlot);
+	ExecClearTuple(scanState->ss_ScanTupleSlot);
+
+	if (!IsA(scanState->ps.plan, DynamicTableScan))
+	{
+		ExecCloseScanRelation(scanState->ss_currentRelation);
+	}
+}
+
+/*
+ * OpenScanRelationByOid
+ *   Open the relation by the given Oid with AccessShareLock.
+ */
+Relation
+OpenScanRelationByOid(Oid relid)
+{
+	return heap_open(relid, AccessShareLock);
+}
+
+/*
+ * CloseScanRelation
+ *  Close the relation that is opened through OpenScanRelationByOid.
+ */
+void
+CloseScanRelation(Relation rel)
+{
+	heap_close(rel, AccessShareLock);
+}
+
+/*
+ * getTableType
+ *   Return the table type for a given relation.
+ */
+int
+getTableType(Relation rel)
+{
+	Assert(rel != NULL && rel->rd_rel != NULL);
+	
+	if (RelationIsHeap(rel))
+	{
+		return TableTypeHeap;
+	}
+
+	if (RelationIsAoRows(rel))
+	{
+		return TableTypeAppendOnly;
+	}
+	
+	if (RelationIsAoCols(rel))
+	{
+		return TableTypeAOCS;
+	}
+	
+	elog(ERROR, "undefined table type for storage format: %c", rel->rd_rel->relstorage);
+	return TableTypeInvalid;
+}
+
+/*
+ * ExecTableScanRelation
+ *    Scan the relation and return the next qualifying tuple.
+ *
+ * This is a wrapper function for ExecScan. The access method is determined
+ * based on the type of the table being scanned.
+ */
+TupleTableSlot *
+ExecTableScanRelation(ScanState *scanState)
+{
+	Assert(scanState->tableType >= 0 && scanState->tableType < TableTypeInvalid);
+	
+	return ExecScan(scanState, getScanMethod(scanState->tableType)->accessMethod);
+}
+
+/*
+ * BeginScanRelation
+ *   Begin the relation scan.
+ */
+void
+BeginTableScanRelation(ScanState *scanState)
+{
+	Assert(scanState->tableType >= 0 && scanState->tableType < TableTypeInvalid);
+
+	getScanMethod(scanState->tableType)->beginScanMethod(scanState);
+}
+
+/*
+ * EndTableScanRelation
+ *   Terminate the relation scan.
+ */
+void
+EndTableScanRelation(ScanState *scanState)
+{
+	Assert(scanState->tableType >= 0 && scanState->tableType < TableTypeInvalid);
+
+	getScanMethod(scanState->tableType)->endScanMethod(scanState);
+}
+
+/*
+ * ReScanRelation
+ *   Rescan the relation.
+ */
+void
+ReScanRelation(ScanState *scanState)
+{
+	Assert(scanState->tableType >= 0 && scanState->tableType < TableTypeInvalid);
+
+	EState *estate = scanState->ps.state;
+	Index scanrelid = ((Scan *)scanState->ps.plan)->scanrelid;
+	
+	/* If this is re-scanning of PlanQual ... */
+	if (estate->es_evTuple != NULL &&
+		estate->es_evTuple[scanrelid - 1] != NULL)
+	{
+		estate->es_evTupleNull[scanrelid - 1] = false;
+		return;
+	}
+
+	const ScanMethod *scanMethod = getScanMethod(scanState->tableType);
+	Assert(scanMethod != NULL);
+
+	if ((scanState->scan_state & SCAN_SCAN) == 0)
+	{
+		scanMethod->beginScanMethod(scanState);
+	}
+	
+	scanMethod->reScanMethod(scanState);
+}
+
+/*
+ * MarkPosScanRelation
+ *   Set a Mark position in the scan.
+ */
+void
+MarkPosScanRelation(ScanState *scanState)
+{
+	Assert(scanState->tableType >= 0 && scanState->tableType < TableTypeInvalid);
+
+	getScanMethod(scanState->tableType)->markPosMethod(scanState);	
+}
+
+/*
+ * RestrPosScanRelation
+ *   Restore a marked position in the scan.
+ */
+void
+RestrPosScanRelation(ScanState *scanState)
+{
+	Assert(scanState->tableType >= 0 && scanState->tableType < TableTypeInvalid);
+
+	getScanMethod(scanState->tableType)->restrPosMethod(scanState);	
+}
+
+/*
+ * MarkRestrNotAllowed
+ *   Errors when Mark/Restr is not implemented in the given scan.
+ *
+ * This function only supports AppendOnlyScan, AOCSScan, DynamicTableScan.
+ */
+void
+MarkRestrNotAllowed(ScanState *scanState)
+{
+	Assert(scanState->tableType == TableTypeAppendOnly ||
+		   scanState->tableType == TableTypeAOCS ||
+		   IsA(scanState, DynamicTableScanState));
+	
+	const char *scan = NULL;
+	if (scanState->tableType == TableTypeAppendOnly)
+	{
+		scan = "AppendOnlyRowScan";
+	}
+	
+	else if (scanState->tableType == TableTypeAOCS)
+	{
+		scan = "AppendOnlyColumnarScan";
+	}
+	
+	else
+	{
+		Assert(IsA(scanState, DynamicTableScanState));
+		scan = "DynamicTableScan";
+	}
+
+	ereport(ERROR,
+			(errcode(ERRCODE_GP_INTERNAL_ERROR),
+			 errmsg("Mark/Restore is not allowed in %s", scan)));
+	
 }

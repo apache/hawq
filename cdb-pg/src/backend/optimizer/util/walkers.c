@@ -138,6 +138,7 @@ expression_tree_walker(Node *node,
 		case T_SetToDefault:
 		case T_RangeTblRef:
 		case T_OuterJoinInfo:
+		case T_DMLActionExpr:
 			/* primitive node types with no expression subnodes */
 			break;
 		case T_Aggref:
@@ -860,7 +861,14 @@ plan_tree_walker(Node *node,
 				return true;
 			break;
 
-        case T_BitmapAnd:
+		case T_Sequence:
+			if (walk_plan_node_fields((Plan *) node, walker, context))
+				return true;
+			if (walker((Node *) ((Sequence *) node)->subplans, context))
+				return true;
+			break;
+
+		case T_BitmapAnd:
             if (walk_plan_node_fields((Plan *) node, walker, context))
                 return true;
             if (walker((Node *) ((BitmapAnd *) node)->bitmapplans, context))
@@ -881,6 +889,8 @@ plan_tree_walker(Node *node,
 		case T_ExternalScan:
 		case T_AppendOnlyScan:
 		case T_AOCSScan:
+		case T_TableScan:
+		case T_DynamicTableScan:
 		case T_BitmapHeapScan:
 		case T_BitmapAppendOnlyScan:
 		case T_FunctionScan:
@@ -891,6 +901,7 @@ plan_tree_walker(Node *node,
 			break;
 
 		case T_IndexScan:
+		case T_DynamicIndexScan:
 			if (walk_scan_node_fields((Scan *) node, walker, context))
 				return true;
 			if (walker((Node *) ((IndexScan *) node)->indexqual, context))
@@ -1068,6 +1079,18 @@ plan_tree_walker(Node *node,
 			 */
 			break;
 
+		case T_DML:
+		case T_SplitUpdate:
+		case T_RowTrigger:
+		case T_AssertOp:
+
+			if (walk_plan_node_fields((Plan *) node, walker, context))
+			{
+				return true;
+			}
+			
+			break;
+			
 			/*
 			 * Query nodes are handled by the Postgres query_tree_walker. We
 			 * just use it without setting any ignore flags.  The caller must
@@ -1172,12 +1195,13 @@ void plan_tree_base_subplan_put_plan(plan_tree_base_prefix *base, SubPlan *subpl
 typedef struct extract_context
 {
 	plan_tree_base_prefix base; /* Required prefix for plan_tree_walker/mutator */
-	bool descendIntoSubqueries;
+ 	bool descendIntoSubqueries;
 	NodeTag  nodeTag;
 	List *nodes;
 } extract_context;
 
 static bool extract_nodes_walker(Node *node, extract_context *context);
+static bool extract_nodes_expression_walker(Node *node, extract_context *context);
 
 /**
  * Does node contain a sub-node with the specific nodeTag?
@@ -1271,4 +1295,95 @@ extract_nodes_walker(Node *node, extract_context *context)
 
 	return plan_tree_walker(node, extract_nodes_walker,
 								  (void *) context);
+}
+
+/**
+ * Extract nodes with specific tag.
+ * Same as above, but starts off a scalar expression node rather than a PlannedStmt
+ *
+ */
+List *extract_nodes_expression(Node *node, int nodeTag)
+{
+	extract_context context;
+	Assert(node);
+	context.base.node = NULL;
+	context.nodes = NULL;
+	context.nodeTag = nodeTag;
+	context.descendIntoSubqueries = false;
+	extract_nodes_expression_walker(node, &context);
+	
+	return context.nodes;
+}
+
+static bool
+extract_nodes_expression_walker(Node *node, extract_context *context)
+{
+	if (NULL == node)
+	{
+		return false;
+	}
+	
+	if (nodeTag(node) == context->nodeTag)
+	{
+		context->nodes = lappend(context->nodes, node);
+	}
+	
+	return expression_tree_walker(node, extract_nodes_expression_walker, (void *) context);
+}
+
+/**
+ * These are helpers to find node in queries
+ */
+typedef struct find_nodes_context
+{
+	List *nodeTags;
+	int foundNode;
+} find_nodes_context;
+
+static bool find_nodes_walker(Node *node, find_nodes_context *context);
+
+/**
+ * Looks for nodes that belong to the given list.
+ * Returns the index of the first such node that it encounters, or -1 if none
+ */
+int find_nodes(Node *node, List *nodeTags)
+{
+	find_nodes_context context;
+	Assert(NULL != node);
+	context.nodeTags = nodeTags;
+	context.foundNode = -1;
+	find_nodes_walker(node, &context);
+
+	return context.foundNode;
+}
+
+static bool
+find_nodes_walker(Node *node, find_nodes_context *context)
+{
+	if (NULL == node)
+	{
+		return false;
+	}
+
+	if (IsA(node, Query))
+	{
+		/* Recurse into subselects */
+		return query_tree_walker((Query *) node, find_nodes_walker, (void *) context, 0 /* flags */);
+	}
+
+	ListCell *lc;
+	int i = 0;
+	foreach(lc, context->nodeTags)
+	{
+		NodeTag nodeTag = (NodeTag) lfirst_int(lc);
+		if (nodeTag(node) == nodeTag)
+		{
+			context->foundNode = i;
+			return true;
+		}
+
+		i++;
+	}
+
+	return expression_tree_walker(node, find_nodes_walker, (void *) context);
 }

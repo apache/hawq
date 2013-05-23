@@ -7,7 +7,7 @@
  *
  * NOTES
  *
- *	- According to src/backend/executor/nodeSeqScan.c
+ *	- According to src/backend/executor/execHeapScan.c
  *		"tuples returned by heap_getnext() are pointers onto disk
  *		pages and were not created with palloc() and so should not
  *		be pfree()'d"

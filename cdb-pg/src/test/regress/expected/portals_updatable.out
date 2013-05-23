@@ -253,46 +253,12 @@ SELECT * from uctest ORDER BY 1, 2, 3;
 (3 rows)
 
 --
--- Inheritance
---
-CREATE TEMP TABLE ucchild () inherits (uctest);
-NOTICE:  Table has parent, setting distribution columns to match parent table
-INSERT INTO ucchild values(100, 100, 'hundred');
-SELECT * FROM uctest ORDER BY 1, 2, 3;
- f1  | f2  |   f3    
------+-----+---------
-   1 |   1 | one
-   2 |   8 | two
-   3 |  22 | three
- 100 | 100 | hundred
-(4 rows)
-
-BEGIN;
-DECLARE c1 CURSOR FOR SELECT * FROM uctest WHERE f1 = 100;
-FETCH 1 FROM c1;
- f1  | f2  |   f3    
------+-----+---------
- 100 | 100 | hundred
-(1 row)
-
-UPDATE uctest SET f2 = f2 + 10 WHERE CURRENT OF c1;
-COMMIT;
-SELECT * FROM uctest ORDER BY 1, 2, 3;
- f1  | f2  |   f3    
------+-----+---------
-   1 |   1 | one
-   2 |   8 | two
-   3 |  22 | three
- 100 | 110 | hundred
-(4 rows)
-
---
 -- UPDATE with FROM and subqueries
 --
 BEGIN;
 DECLARE c CURSOR FOR SELECT * FROM uctest WHERE f1 = 3;
 FETCH 1 FROM c;
- f1 | f2 |  f3
+ f1 | f2 |  f3   
 ----+----+-------
   3 | 22 | three
 (1 row)
@@ -302,18 +268,17 @@ UPDATE uctest SET f2 = other.f2 + 10 FROM
     WHERE CURRENT OF c;
 COMMIT;
 SELECT * FROM uctest ORDER BY 1, 2, 3;
- f1  | f2  |   f3
------+-----+---------
-   1 |   1 | one
-   2 |   8 | two
-   3 |  32 | three
- 100 | 110 | hundred
-(4 rows)
+ f1 | f2 |  f3   
+----+----+-------
+  1 |  1 | one
+  2 |  8 | two
+  3 | 32 | three
+(3 rows)
 
 BEGIN;
 DECLARE c CURSOR FOR SELECT * FROM uctest WHERE f1 = 3;
 FETCH 1 FROM c;
- f1 | f2 |  f3
+ f1 | f2 |  f3   
 ----+----+-------
   3 | 32 | three
 (1 row)
@@ -321,13 +286,12 @@ FETCH 1 FROM c;
 UPDATE uctest SET f2 = (SELECT f2 - 10 FROM uctest WHERE f1 = 3) WHERE CURRENT OF c;
 COMMIT;
 SELECT * FROM uctest ORDER BY 1, 2, 3;
- f1  | f2  |   f3
------+-----+---------
-   1 |   1 | one
-   2 |   8 | two
-   3 |  22 | three
- 100 | 110 | hundred
-(4 rows)
+ f1 | f2 |  f3   
+----+----+-------
+  1 |  1 | one
+  2 |  8 | two
+  3 | 22 | three
+(3 rows)
 
 --
 -- Partitioning
@@ -641,13 +605,12 @@ FETCH 1 FROM c;
 UPDATE uctest SET f2 = f2 + 10 WHERE CURRENT OF c; 
 COMMIT;
 SELECT * FROM uctest ORDER BY 1, 2, 3;
- f1  | f2  |   f3    
------+-----+---------
-   1 |   1 | one
-   2 |   8 | two
-   3 |  32 | three
- 100 | 110 | hundred
-(4 rows)
+ f1 | f2 |  f3   
+----+----+-------
+  1 |  1 | one
+  2 |  8 | two
+  3 | 32 | three
+(3 rows)
 
 -- gp_dist_random, edge case treated as special RTE_RELATION
 BEGIN;
@@ -661,13 +624,12 @@ FETCH 1 FROM c;
 UPDATE uctest SET f2 = f2 + 10 WHERE CURRENT OF c;
 COMMIT;
 SELECT * FROM uctest ORDER BY 1, 2, 3;
- f1  | f2  |   f3    
------+-----+---------
-   1 |   1 | one
-   2 |   8 | two
-   3 |  42 | three
- 100 | 110 | hundred
-(4 rows)
+ f1 | f2 |  f3   
+----+----+-------
+  1 |  1 | one
+  2 |  8 | two
+  3 | 42 | three
+(3 rows)
 
 -- naive PREPARE usage
 PREPARE ucplan AS UPDATE uctest SET f2 = f2 * -1 WHERE CURRENT OF a;
@@ -682,13 +644,12 @@ FETCH 1 FROM a;
 EXECUTE ucplan;
 COMMIT;
 SELECT * FROM uctest ORDER BY 1, 2, 3;
- f1  | f2  |   f3    
------+-----+---------
-   1 |   1 | one
-   2 |   8 | two
-   3 | -42 | three
- 100 | 110 | hundred
-(4 rows)
+ f1 | f2  |  f3   
+----+-----+-------
+  1 |   1 | one
+  2 |   8 | two
+  3 | -42 | three
+(3 rows)
 
 --
 -- Negative
@@ -797,13 +758,12 @@ ROLLBACK;
 BEGIN;
 DECLARE c1 CURSOR FOR SELECT * FROM uctest;
 FETCH ALL FROM c1;
- f1  | f2  |   f3    
------+-----+---------
-   1 |   1 | one
-   2 |   8 | two
-   3 | -42 | three
- 100 | 110 | hundred
-(4 rows)
+ f1 | f2  |  f3   
+----+-----+-------
+  1 |   1 | one
+  3 | -42 | three
+  2 |   8 | two
+(3 rows)
 
 FETCH 1 FROM c1;
  f1 | f2 | f3 

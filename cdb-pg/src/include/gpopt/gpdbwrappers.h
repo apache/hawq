@@ -1,0 +1,560 @@
+//---------------------------------------------------------------------------
+//	Greenplum Database
+//	Copyright (C) 2012 EMC Corp.
+//
+//	@filename:
+//		gpdbwrappers.h
+//
+//	@doc:
+//		Definition of GPDB function wrappers
+//
+//	@owner:
+//		elhela
+//
+//	@test:
+//
+//
+//---------------------------------------------------------------------------
+#ifndef GPDB_gpdbwrappers_H
+#define GPDB_gpdbwrappers_H
+
+#include "postgres.h"
+#include "access/attnum.h"
+
+// fwd declarations
+typedef struct SysScanDescData *SysScanDesc;
+typedef struct SnapshotData *Snapshot;
+typedef int LOCKMODE;
+typedef struct _FuncCandidateList *FuncCandidateList;
+struct TypeCacheEntry;
+typedef struct NumericData *Numeric;
+typedef struct HeapTupleData *HeapTuple;
+struct PartitionNode;
+typedef struct RelationData *Relation;
+struct Value;
+typedef struct tupleDesc *TupleDesc;
+struct Query;
+typedef struct ScanKeyData *ScanKey;
+typedef uint16 StrategyNumber;
+struct Bitmapset;
+struct Plan;
+struct ListCell;
+struct TargetEntry;
+struct Expr;
+struct ExtTableEntry;
+struct Uri;
+struct CdbComponentDatabases;
+struct StringInfoData;
+typedef StringInfoData *StringInfo;
+struct LogicalIndexes;
+struct ParseState;
+
+namespace gpdb {
+
+	// convert datum to bool
+	bool FBoolFromDatum(Datum d);
+
+	// convert bool to datum
+	Datum DDatumFromBool(bool b);
+
+	// convert datum to char
+	char CCharFromDatum(Datum d);
+
+	// convert char to datum
+	Datum DDatumFromChar(char c);
+
+	// convert datum to int8
+	int8 CInt8FromDatum(Datum d);
+
+	// convert int8 to datum
+	Datum DDatumFromInt8(int8 i8);
+
+	// convert datum to uint8
+	uint8 UcUint8FromDatum(Datum d);
+
+	// convert uint8 to datum
+	Datum DDatumFromUint8(uint8 ui8);
+
+	// convert datum to int16
+	int16 SInt16FromDatum(Datum d);
+
+	// convert int16 to datum
+	Datum DDatumFromInt16(int16 i16);
+
+	// convert datum to uint16
+	uint16 UsUint16FromDatum(Datum d);
+
+	// convert uint16 to datum
+	Datum DDatumFromUint16(uint16 ui16);
+
+	// convert datum to int32
+	int32 IInt32FromDatum(Datum d);
+
+	// convert int32 to datum
+	Datum DDatumFromInt32(int32 i32);
+
+	// convert datum to uint32
+	uint32 UlUint32FromDatum(Datum d);
+
+	// convert uint32 to datum
+	Datum DDatumFromUint32(uint32 ui32);
+
+	// convert datum to int64
+	int64 LlInt64FromDatum(Datum d);
+
+	// convert int64 to datum
+	Datum DDatumFromInt64(int64 i64);
+
+	// convert datum to uint64
+	uint64 UllUint64FromDatum(Datum d);
+
+	// convert uint64 to datum
+	Datum DDatumFromUint64(uint64 ui64);
+
+	// convert datum to oid
+	Oid OidFromDatum(Datum d);
+
+	// convert datum to generic object with pointer handle
+	void *PvPointerFromDatum(Datum d);
+
+	// convert pointer to datum
+	Datum DDatumFromPointer(const void *p);
+
+	// does an aggregate exist with the given oid
+	bool FAggregateExists(Oid oid);
+
+	// add member to Bitmapset
+	Bitmapset *PbmsAddMember(Bitmapset *a, int x);
+
+	// create a copy of an object
+	void *PvCopyObject(void *from);
+
+	// datum size
+	Size SDatumSize(Datum value, bool typByVal, int typLen);
+
+	// expression type
+	Oid OidExprType(Node *expr);
+
+	// expression type modifier
+	int32 IExprTypeMod(Node *expr);
+
+	// extract nodes with specific tag from a plan tree
+	List *PlExtractNodesPlan(Plan *pl, int nodeTag, bool descendIntoSubqueries);
+
+	// extract nodes with specific tag from an expression tree
+	List *PlExtractNodesExpression(Node *node, int nodeTag);
+	
+	// intermediate result type of given aggregate
+	Oid OidAggIntermediateResultType(Oid aggid);
+
+	// is aggregate ordered
+	bool FOrderedAgg(Oid aggid);
+
+	// intermediate result type of given aggregate
+	Oid OidAggregate(const char*szArg, Oid oidType);
+
+	// array type oid
+	Oid OidArrayType(Oid typid);
+
+	// deconstruct array
+	void DeconstructArray(struct ArrayType *array, Oid elmtype, int elmlen, bool elmbyval,
+			char elmalign, Datum **elemsp, bool **nullsp, int *nelemsp);
+
+	// attribute stats slot
+	bool FGetAttrStatsSlot(HeapTuple statstuple, Oid atttype, int32 atttypmod, int reqkind,
+			Oid reqop, Datum **values, int *nvalues, float4 **numbers, int *nnumbers);
+
+	// free attribute stats slot
+	void FreeAttrStatsSlot(Oid atttype, Datum *values, int nvalues, float4 *numbers, int nnumbers);
+
+	// attribute statistics
+	HeapTuple HtAttrStats(Oid relid, AttrNumber attnum);
+
+	// function oids
+	List *PlFunctionOids(void);
+
+	// does a function exist with the given oid
+	bool FFunctionExists(Oid oid);
+
+	// is the given function strict
+	bool FFuncStrict(Oid funcid);
+
+	// stability property of given function
+	char CFuncStability(Oid funcid);
+
+	// data access property of given function
+	char CFuncDataAccess(Oid funcid);
+
+	// list of candidate functions with the given names
+	FuncCandidateList FclFuncCandidates(List *names, int nargs);
+
+	// trigger name
+	char *SzTriggerName(Oid triggerid);
+
+	// trigger relid
+	Oid OidTriggerRelid(Oid triggerid);
+
+	// trigger funcid
+	Oid OidTriggerFuncid(Oid triggerid);
+
+	// trigger type
+	int32 ITriggerType(Oid triggerid);
+
+	// is trigger enabled
+	bool FTriggerEnabled(Oid triggerid);
+
+	// does trigger exist
+	bool FTriggerExists(Oid oid);
+
+	// does check constraint exist
+	bool FCheckConstraintExists(Oid oidCheckConstraint);
+
+	// check constraint name
+	char *SzCheckConstraintName(Oid oidCheckConstraint);
+
+	// check constraint relid
+	Oid OidCheckConstraintRelid(Oid oidCheckConstraint);
+
+	// check constraint expression tree
+	Node *PnodeCheckConstraint(Oid oidCheckConstraint);
+
+	// get the list of check constraints for a given relation
+	List *PlCheckConstraint(Oid oidRel);
+
+	// part constraint expression tree
+	Node *PnodePartConstraintRel(Oid oidRel, bool *pfDefaultConstraint);
+
+	// get the cast function for the specified source and destination types
+	bool FCastFunc(Oid oidSrc, Oid oidDest, bool *is_binary_coercible, Oid *oidCastFunc);
+	
+	// get type of operator
+	uint UlCmpt(Oid oidOp, Oid oidLeft, Oid oidRight);
+	
+	// get scalar comparison between given types
+	Oid OidScCmp(Oid oidLeft, Oid oidRight, uint ulCmpt);
+	
+	// function name
+	char *SzFuncName(Oid funcid);
+
+	// output argument types of the given function
+	List *PlFuncOutputArgTypes(Oid funcid);
+
+	// argument types of the given function
+	List *PlFuncArgTypes(Oid funcid);
+
+	// does a function return a set of rows
+	bool FFuncRetset(Oid funcid);
+
+	// return type of the given function
+	Oid OidFuncRetType(Oid funcid);
+
+	// commutator operator of the given operator
+	Oid OidCommutatorOp(Oid opno);
+
+	// inverse operator of the given operator
+	Oid OidInverseOp(Oid opno);
+
+	// function oid corresponding to the given operator oid
+	RegProcedure OidOpFunc(Oid opno);
+
+	// operator name
+	char *SzOpName(Oid opno);
+
+	// parts of a partitioned table
+	bool FLeafPartition(Oid oid);
+	
+	// find the oid of the root partition given partition oid belongs to
+	Oid OidRootPartition(Oid oid);
+	
+	// partition attributes
+	List *PlPartitionAttrs(PartitionNode *pn);
+
+	// parts of a partitioned table
+	PartitionNode *PpnParts(Oid relid, int2 level, Oid parent, bool inctemplate, MemoryContext mcxt);
+
+	// keys of the relation with the given oid
+	List *PlRelationKeys(Oid relid);
+
+	// relid of a composite type
+	Oid OidTypeRelid(Oid typid);
+
+	// name of the type with the given oid
+	char *SzTypeName(Oid typid);
+
+	// number of GP segments
+	int UlSegmentCountGP(void);
+
+	// heap attribute is null
+	bool FHeapAttIsNull(HeapTuple tup, int attnum);
+
+	// free heap tuple
+	void FreeHeapTuple(HeapTuple htup);
+
+	// does an index exist with the given oid
+	bool FIndexExists(Oid oid);
+
+	// check if given oid is hashable internally in Greenplum Database
+	bool FGreenplumDbHashable(Oid typid);
+
+	// append an element to a list
+	List *PlAppendElement(List *list, void *datum);
+
+	// append an integer to a list
+	List *PlAppendInt(List *list, int datum);
+
+	// append an oid to a list
+	List *PlAppendOid(List *list, Oid datum);
+
+	// prepend a new element to the list
+	List *PlPrependElement(void *datum, List *list);
+
+	// prepend an integer to the list
+	List *PlPrependInt(int datum, List *list);
+
+	// prepend an oid to a list
+	List *PlPrependOid(Oid datum, List *list);
+
+	// concatenate lists
+	List *PlConcat(List *list1, List *list2);
+
+	// copy list
+	List *PlCopy(List *list);
+
+	// first cell in a list
+	ListCell *PlcListHead(List *l);
+
+	// last cell in a list
+	ListCell *PlcListTail(List *l);
+
+	// number of items in a list
+	int UlListLength(List *l);
+
+	// return the nth element in a list of pointers
+	void *PvListNth(List *list, int n);
+
+	// return the nth element in a list of ints
+	int IListNth(List *list, int n);
+
+	// return the nth element in a list of oids
+	Oid OidListNth(List *list, int n);
+
+	// free list
+	void FreeList(List *plist);
+
+	// if pplist is non-NULL, and *pplist is non-NULL then free the list and set
+	// *pplist to NULL
+	void FreeListAndNull(List **pplist);
+
+	// lookup type cache
+	TypeCacheEntry *PtceLookup(Oid type_id, int flags);
+
+	// create a value node for a string
+	Value *PvalMakeString(char *str);
+
+	// create a bool constant
+	Node *PnodeMakeBoolConst(bool value, bool isnull);
+
+	// make a NULL constant of the given type
+	Node *PnodeMakeNULLConst(Oid oidType);
+	
+	// create a new target entry
+	TargetEntry *PteMakeTargetEntry(Expr *expr, AttrNumber resno, char *resname, bool resjunk);
+
+	// create a new var node
+	Var *PvarMakeVar(Index varno, AttrNumber varattno, Oid vartype, int32 vartypmod, Index varlevelsup);
+
+	// memory allocation functions
+	void *PvMemoryContextAllocImpl(MemoryContext context, Size size, const char* file, const char * func, int line);
+	void *PvMemoryContextAllocZeroAlignedImpl(MemoryContext context, Size size, const char* file, const char * func, int line);
+	void *PvMemoryContextAllocZeroImpl(MemoryContext context, Size size, const char* file, const char * func, int line);
+	void *PvMemoryContextReallocImpl(void *pointer, Size size, const char* file, const char * func, int line);
+	void *GPDBAlloc(Size size);
+	void GPDBFree(void *ptr);
+
+	// create a duplicate of the given string in the given memory context
+	char *SzMemoryContextStrdup(MemoryContext context, const char *string);
+
+	// string representation of a node
+	char *SzNodeToString(void *obj);
+
+	// node representation from a string
+	Node *Pnode(char *string);
+
+	// return the default value of the type
+	Node *PnodeTypeDefault(Oid typid);
+
+	// convert numeric to double; if out of range, return +/- HUGE_VAL
+	double DNumericToDoubleNoOverflow(Numeric num);
+
+	// is the given operator hash-joinable
+	bool FOpHashJoinable(Oid opno);
+
+	// is the given operator merge-joinable
+	bool FOpMergeJoinable(Oid opno, Oid *leftOp, Oid *rightOp);
+
+	// get input types for a given operator
+	void GetOpInputTypes(Oid opno, Oid *lefttype, Oid *righttype);
+
+	// does an operator exist with the given oid
+	bool FOperatorExists(Oid oid);
+
+	// fetch detoasted copies of toastable datatypes
+	struct varlena *PvlenDetoastDatum(struct varlena * datum);
+
+	// expression tree walker
+	bool FWalkExpressionTree(Node *node, bool(*walker)(), void *context);
+
+	// query or expression tree walker
+	bool FWalkQueryOrExpressionTree(Node *node, bool(*walker)(), void *context, int flags);
+
+	// modify a query tree
+	Query *PqueryMutateQueryTree(Query *query, Node *(*mutator)(), void *context, int flags);
+
+	// modify an expression tree
+	Node *PnodeMutateExpressionTree(Node *node, Node *(*mutator)(), void *context);
+
+	// modify a query or an expression tree
+	Node *PnodeMutateQueryOrExpressionTree(Node *node, Node *(*mutator)(), void *context, int flags);
+
+	// the part of PqueryMutateQueryTree that processes a query's rangetable
+	List *PlMutateRangeTable(List *rtable, Node *(*mutator)(), void *context, int flags);
+
+	// check whether the part with the given oid is the root of a partition table
+	bool FRelPartIsRoot(Oid relid);
+	
+	// check whether partitioning type encodes hash partitioning
+	bool FHashPartitioned(char c);
+	
+	// does a relation exist with the given oid
+	bool FRelationExists(Oid oid);
+
+	// extract all relation oids from the catalog
+	List *PlRelationOids(void);
+
+	// close the given relation
+	void CloseRelation(Relation rel);
+
+	// return the logical indexes for a partitioned table
+	LogicalIndexes *Plgidx(Oid oid);
+	
+	// return a list of index oids for a given relation
+	List *PlRelationIndexes(Relation relation);
+
+	// build an array of triggers for this relation
+	void BuildRelationTriggers(Relation rel);
+
+	// get relation with given oid
+	Relation RelGetRelation(Oid relationId);
+
+	// get external table entry with given oid
+	ExtTableEntry *Pexttable(Oid relationId);
+
+	// return the first member of the given targetlist whose expression is
+	// equal to the given expression, or NULL if no such member exists
+	TargetEntry *PteMember(Node *node, List *targetlist);
+
+	// does a type exist with the given oid
+	bool FTypeExists(Oid oid);
+
+	// check whether a type is composite
+	bool FCompositeType(Oid typid);
+
+	// get integer value from an Integer value node
+	int IValue(Node *node);
+
+	// parse external table URI
+	Uri *PuriParseExternalTable(const char *szUri);
+	
+	// returns ComponentDatabases
+	CdbComponentDatabases *PcdbComponentDatabases(void);
+
+	// compare two strings ignoring case
+	int IStrCmpIgnoreCase(const char *sz1, const char *sz2);
+
+	// construct random segment map
+	bool *RgfRandomSegMap(int total_primaries, int total_to_skip);
+
+	// create an empty 'StringInfoData' & return a pointer to it
+	StringInfo SiMakeStringInfo(void);
+
+	// append the two given strings to the StringInfo object
+	void AppendStringInfo(StringInfo str, const char *str1, const char *str2);
+
+	// look for the given node tags in the given tree and return the index of
+	// the first one found, or -1 if there are none
+	int IFindNodes(Node *node, List *nodeTags);
+
+	Node *PnodeCoerceToCommonType(ParseState *pstate, Node *pnode, Oid oidTargetType, const char *context);
+
+	// deduce an individual actual datatype on the assumption that the rules for ANYARRAY/ANYELEMENT are being followed
+	Oid OidResolveGenericType(Oid declared_type, Oid context_actual_type, Oid context_declared_type);
+
+} //namespace gpdb
+
+#define ForEach(cell, l)	\
+	for ((cell) = gpdb::PlcListHead(l); (cell) != NULL; (cell) = lnext(cell))
+
+#define ForBoth(cell1, list1, cell2, list2)							\
+	for ((cell1) = gpdb::PlcListHead(list1), (cell2) = gpdb::PlcListHead(list2);	\
+		 (cell1) != NULL && (cell2) != NULL;						\
+		 (cell1) = lnext(cell1), (cell2) = lnext(cell2))
+
+#define ForEachWithCount(cell, list, counter) \
+	for ((cell) = gpdb::PlcListHead(list), (counter)=0; \
+	     (cell) != NULL; \
+	     (cell) = lnext(cell), ++(counter))
+
+#define ListMake1(x1) gpdb::PlPrependElement(x1, NIL)
+
+#define ListMake2(x1,x2) gpdb::PlPrependElement(x1, ListMake1(x2))
+
+#define ListMake1Int(x1) gpdb::PlPrependInt(x1, NIL)
+
+#define ListMake1Oid(x1) gpdb::PlPrependOid(x1, NIL)
+#define ListMake2Oid(x1,x2) gpdb::PlPrependOid(x1, ListMake1Oid(x2))
+
+#define LInitial(l) lfirst(gpdb::PlcListHead(l))
+
+#define LInitialOID(l) lfirst_oid(gpdb::PlcListHead(l))
+
+#define Palloc0Fast(sz) \
+	( MemSetTest(0, (sz)) ? \
+		gpdb::PvMemoryContextAllocZeroAlignedImpl(CurrentMemoryContext, (sz), __FILE__, PG_FUNCNAME_MACRO, __LINE__) : \
+		gpdb::PvMemoryContextAllocZeroImpl(CurrentMemoryContext, (sz), __FILE__, PG_FUNCNAME_MACRO, __LINE__))
+
+#ifdef __GNUC__
+
+/* With GCC, we can use a compound statement within an expression */
+#define NewNode(size, tag) \
+({	Node   *_result; \
+	AssertMacro((size) >= sizeof(Node));		/* need the tag, at least */ \
+	_result = (Node *) Palloc0Fast(size); \
+	_result->type = (tag); \
+	_result; \
+})
+#else
+
+/*
+ *	There is no way to dereference the palloc'ed pointer to assign the
+ *	tag, and also return the pointer itself, so we need a holder variable.
+ *	Fortunately, this macro isn't recursive so we just define
+ *	a global variable for this purpose.
+ */
+extern PGDLLIMPORT Node *newNodeMacroHolder;
+
+#define NewNode(size, tag) \
+( \
+	AssertMacro((size) >= sizeof(Node)),		/* need the tag, at least */ \
+	newNodeMacroHolder = (Node *) Palloc0Fast(size), \
+	newNodeMacroHolder->type = (tag), \
+	newNodeMacroHolder \
+)
+#endif   // __GNUC__
+
+#define MakeNode(_type_) 		((_type_ *) NewNode(sizeof(_type_),T_##_type_))
+
+#define PStrDup(str) gpdb::SzMemoryContextStrdup(CurrentMemoryContext, (str))
+
+#endif // !GPDB_gpdbwrappers_H
+
+// EOF

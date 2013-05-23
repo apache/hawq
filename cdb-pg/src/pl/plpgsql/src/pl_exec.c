@@ -1053,6 +1053,9 @@ exec_stmt_block(PLpgSQL_execstate *estate, PLpgSQL_stmt_block *block)
 			 */
 			SPI_restore_connection();
 
+			/* Clean up econtext. */
+			exec_eval_cleanup(estate);
+
 			/* Look for a matching exception handler */
 			foreach(e, block->exceptions->exc_list)
 			{
@@ -3622,6 +3625,13 @@ exec_assign_value(PLpgSQL_execstate *estate,
 				arraytyplen = get_typlen(arraytypeid);
 
 				/*
+				 * Allow exec_eval_integer to evaluate non-single
+				 * Result (simple expression) queries.
+				 */
+				SPITupleTable * save_tuptable = estate->eval_tuptable;
+				estate->eval_tuptable = NULL;
+
+				/*
 				 * Evaluate the subscripts, switch into left-to-right order.
 				 * Like ExecEvalArrayRef(), complain if any subscript is null.
 				 */
@@ -3633,11 +3643,22 @@ exec_assign_value(PLpgSQL_execstate *estate,
 						exec_eval_integer(estate,
 										  subscripts[nsubscripts - 1 - i],
 										  &subisnull);
+
+					if (estate->eval_tuptable != NULL)
+					{
+						SPI_freetuptable(estate->eval_tuptable);
+						estate->eval_tuptable = NULL;
+					}
+
 					if (subisnull)
 						ereport(ERROR,
 								(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
 								 errmsg("array subscript in assignment must not be NULL")));
 				}
+
+				/* Swap to the caller's tuple table. */
+				Assert(estate->eval_tuptable == NULL);
+				estate->eval_tuptable = save_tuptable;
 
 				/* Coerce source value to match array element type. */
 				coerced_value = exec_simple_cast_value(value,

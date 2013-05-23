@@ -110,19 +110,6 @@ COMMIT;
 SELECT * from uctest ORDER BY 1, 2, 3;
 
 --
--- Inheritance
---
-CREATE TEMP TABLE ucchild () inherits (uctest);
-INSERT INTO ucchild values(100, 100, 'hundred');
-SELECT * FROM uctest ORDER BY 1, 2, 3;
-BEGIN;
-DECLARE c1 CURSOR FOR SELECT * FROM uctest WHERE f1 = 100;
-FETCH 1 FROM c1;
-UPDATE uctest SET f2 = f2 + 10 WHERE CURRENT OF c1;
-COMMIT;
-SELECT * FROM uctest ORDER BY 1, 2, 3;
-
---
 -- UPDATE with FROM and subqueries
 --
 BEGIN;

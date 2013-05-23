@@ -157,9 +157,9 @@ set enable_indexscan=on;
 set enable_seqscan=off;
 set enable_hashjoin=off;
 
-explain select * from t, pt where tid = ptid and t1 = 'hello0';
+explain select * from t, pt where tid = ptid;
 
-select * from t, pt where tid = ptid and t1 = 'hello0';
+select * from t, pt where tid = ptid;
 
 --
 -- Negative test cases where transform does not apply
@@ -182,9 +182,9 @@ select * from t, pt where tid < ptid;
 -- cascading joins
 --
 
-explain select * from t, t1, pt where t1.t2 = t.t2 and t1.tid = ptid and t.t1 = 'hello0';
+explain select * from t, t1, pt where t1.t2 = t.t2 and t1.tid = ptid;
 
-select * from t, t1, pt where t1.t2 = t.t2 and t1.tid = ptid and t.t1 = 'hello0';
+select * from t, t1, pt where t1.t2 = t.t2 and t1.tid = ptid;
 
 
 --

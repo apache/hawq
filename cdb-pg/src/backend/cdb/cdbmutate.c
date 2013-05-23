@@ -44,6 +44,9 @@
 
 #include "executor/executor.h"
 
+/* Enable the optimizer */
+extern bool		gp_optimizer;
+
 /*
  * An ApplyMotionState holds state for the recursive apply_motion_mutator().
  * It is externalized here to make it shareable by helper code in other
@@ -539,7 +542,6 @@ apply_motion(PlannerInfo *root, Plan *plan, Query *query)
 								bool *nulls;
 								Datum *values;
 								EState *estate = CreateExecutorState();
-								Size sz;
 								ResultRelInfo *rri;
 
 								/* 4: build tuple, look up partitioning key */
@@ -569,14 +571,9 @@ apply_motion(PlannerInfo *root, Plan *plan, Query *query)
 									}
 								}
 								estate->es_result_partitions = pn;
-								estate->es_partition_state = makeNode(PartitionState);
+								estate->es_partition_state =
+									createPartitionState(estate->es_result_partitions, 1 /*resultPartSize */);
 
-								sz = num_partition_levels(estate->es_result_partitions);
-								sz *= sizeof(void *);
-								estate->es_partition_state->amstate = palloc0(sz);
-								estate->es_partition_state->max_partition_attr =
-									max_partition_attr(estate->es_result_partitions);
-								estate->es_partition_state->result_partition_array_size = 1;
 								rri = makeNode(ResultRelInfo);
 								rri->ri_RangeTableIndex = 1;      /* dummy */
 								rri->ri_RelationDesc = rel;
@@ -699,9 +696,11 @@ apply_motion(PlannerInfo *root, Plan *plan, Query *query)
 			if (targetPolicyType == POLICYTYPE_PARTITIONED)
 			{
 				/*
-				 * Make sure we are not updating any of the partitioning columns
+				 * The planner does not support updating any of the partitioning columns.
+				 * The optimizer supports updating partitioning columns.
 				 */
 				if (query->commandType == CMD_UPDATE &&
+					!gp_optimizer &&
 					doesUpdateAffectPartitionCols(root, plan,query))
 				{
 					ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
@@ -1846,6 +1845,15 @@ static void shareinput_walker(SHAREINPUT_MUTATOR f, Node *node, ApplyShareInputC
 				shareinput_walker(f, (Node *)plan->lefttree, ctxt);
 			}
 		}
+		else if (IsA(node, Sequence))
+		{
+			ListCell *cell = NULL;
+			Sequence *sequence = (Sequence *) node;
+			foreach(cell, sequence->subplans)
+			{
+				shareinput_walker(f, (Node *)lfirst(cell), ctxt);
+			}
+		}
 		else
 		{
 			shareinput_walker(f, (Node *)plan->lefttree, ctxt);
@@ -2064,6 +2072,10 @@ static bool shareinput_mutator_xslice_1(Node* node, ApplyShareInputContext *ctxt
 			int  shareSliceId = 0;
 			
 			shareinput_find_sharenode(ctxt, sisc->share_id, &plan_slicemark);
+			if (!plan_slicemark.plan)
+			{
+				return false;
+			}
 			shareSliceId = get_plan_driver_slice(plan_slicemark.plan);
 
 			if(shareSliceId != motId)

@@ -1191,4 +1191,18 @@ extern Datum test_quicklz_compression(PG_FUNCTION_ARGS);
 extern Datum percentile_cont_trans(PG_FUNCTION_ARGS);
 extern Datum percentile_disc_trans(PG_FUNCTION_ARGS);
 
+/* gp_partition_funtions.c */
+extern Datum gp_partition_propagation(PG_FUNCTION_ARGS);
+extern void dumpDynamicTableScanPidIndex(int index);
+extern Datum gp_partition_selection(PG_FUNCTION_ARGS);
+extern Datum gp_partition_expansion(PG_FUNCTION_ARGS);
+extern Datum gp_partition_inverse(PG_FUNCTION_ARGS);
+
+/* XForms */
+extern Datum disable_xform(PG_FUNCTION_ARGS);
+extern Datum enable_xform(PG_FUNCTION_ARGS);
+
+/* Optimizer's version */
+extern Datum gp_opt_version(PG_FUNCTION_ARGS);
+
 #endif   /* BUILTINS_H */

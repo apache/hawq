@@ -84,14 +84,18 @@
 #include "executor/instrument.h"
 #include "executor/nodeAgg.h"
 #include "executor/nodeAppend.h"
+#include "executor/nodeAssertOp.h"
+#include "executor/nodeSequence.h"
 #include "executor/nodeBitmapAnd.h"
 #include "executor/nodeBitmapHeapscan.h"
 #include "executor/nodeBitmapIndexscan.h"
 #include "executor/nodeBitmapOr.h"
 #include "executor/nodeBitmapAppendOnlyscan.h"
 #include "executor/nodeExternalscan.h"
-#include "executor/nodeAppendOnlyscan.h"
-#include "executor/nodeAOCSScan.h"
+#include "executor/nodeTableScan.h"
+#include "executor/nodeDML.h"
+#include "executor/nodeDynamicIndexscan.h"
+#include "executor/nodeDynamicTableScan.h"
 #include "executor/nodeFunctionscan.h"
 #include "executor/nodeHash.h"
 #include "executor/nodeHashjoin.h"
@@ -103,10 +107,11 @@
 #include "executor/nodeNestloop.h"
 #include "executor/nodeRepeat.h"
 #include "executor/nodeResult.h"
-#include "executor/nodeSeqscan.h"
+#include "executor/nodeRowTrigger.h"
 #include "executor/nodeSetOp.h"
 #include "executor/nodeShareInputScan.h"
 #include "executor/nodeSort.h"
+#include "executor/nodeSplitUpdate.h"
 #include "executor/nodeSubplan.h"
 #include "executor/nodeSubqueryscan.h"
 #include "executor/nodeTableFunction.h"
@@ -206,7 +211,9 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 	 * do nothing when we get to the end of a leaf on tree.
 	 */
 	if (node == NULL)
+	{
 		return NULL;
+	}
 
 	Assert(estate != NULL);
 	int origSliceIdInPlan = estate->currentSliceIdInPlan;
@@ -227,6 +234,11 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 												  estate, eflags);
 			break;
 
+		case T_Sequence:
+			result = (PlanState *) ExecInitSequence((Sequence *) node,
+													estate, eflags);
+			break;
+
 		case T_BitmapAnd:
 			result = (PlanState *) ExecInitBitmapAnd((BitmapAnd *) node,
 													 estate, eflags);
@@ -241,19 +253,17 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 			 * scan nodes
 			 */
 		case T_SeqScan:
-			result = (PlanState *) ExecInitSeqScan((SeqScan *) node,
-												   estate, eflags);
-			break;
-
 		case T_AppendOnlyScan:
-			result = (PlanState *) ExecInitAppendOnlyScan((AppendOnlyScan *) node,
-														  estate, eflags);
-			break;
-                case T_AOCSScan:
-			result = (PlanState *) ExecInitAOCSScan((AOCSScan *) node,
-														  estate, eflags);
+		case T_AOCSScan:
+		case T_TableScan:
+			result = (PlanState *) ExecInitTableScan((TableScan *) node,
+													 estate, eflags);
 			break;
 
+		case T_DynamicTableScan:
+			result = (PlanState *) ExecInitDynamicTableScan((DynamicTableScan *) node,
+													 estate, eflags);
+			break;
 
 		case T_ExternalScan:
 			result = (PlanState *) ExecInitExternalScan((ExternalScan *) node,
@@ -263,6 +273,11 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 		case T_IndexScan:
 			result = (PlanState *) ExecInitIndexScan((IndexScan *) node,
 													 estate, eflags);
+			break;
+
+		case T_DynamicIndexScan:
+			result = (PlanState *) ExecInitDynamicIndexScan((DynamicIndexScan *) node,
+													estate, eflags);
 			break;
 
 		case T_BitmapIndexScan:
@@ -379,8 +394,22 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 			result = (PlanState *) ExecInitRepeat((Repeat *) node,
 												  estate, eflags);
 			break;
-
-
+		case T_DML:
+			result = (PlanState *) ExecInitDML((DML *) node,
+												  estate, eflags);
+			break;
+		case T_SplitUpdate:
+			result = (PlanState *) ExecInitSplitUpdate((SplitUpdate *) node,
+												  estate, eflags);
+			break;
+		case T_AssertOp:
+ 			result = (PlanState *) ExecInitAssertOp((AssertOp *) node,
+ 												  estate, eflags);
+ 			break;
+		case T_RowTrigger:
+ 			result = (PlanState *) ExecInitRowTrigger((RowTrigger *) node,
+ 												   estate, eflags);
+ 			break;
 		default:
 			elog(ERROR, "unrecognized node type: %d", (int) nodeTag(node));
 			result = NULL;		/* keep compiler quiet */
@@ -473,6 +502,14 @@ ExecSliceDependencyNode(PlanState *node)
 		for(; i<app->as_nplans; ++i)
 			ExecSliceDependencyNode(app->appendplans[i]);
 	}
+	else if(nodeTag(node) == T_SequenceState)
+	{
+		int i=0;
+		SequenceState *ss = (SequenceState *) node;
+
+		for(; i<ss->numSubplans; ++i)
+			ExecSliceDependencyNode(ss->subplans[i]);
+	}
 
 	ExecSliceDependencyNode(outerPlanState(node));
 	ExecSliceDependencyNode(innerPlanState(node));
@@ -493,13 +530,17 @@ ExecProcNode(PlanState *node)
 	static void *ExecJmpTbl[] = {
 		&&Exec_Jmp_Result,
 		&&Exec_Jmp_Append,
+		&&Exec_Jmp_Sequence,
 		&&Exec_Jmp_BitmapAnd,
 		&&Exec_Jmp_BitmapOr,
-		&&Exec_Jmp_SeqScan,
-		&&Exec_Jmp_AppendOnlyScan,
-		&&Exec_Jmp_AOCSScan,
+		&&Exec_Jmp_TableScan,
+		&&Exec_Jmp_TableScan,
+		&&Exec_Jmp_TableScan,
+		&&Exec_Jmp_TableScan,
+		&&Exec_Jmp_DynamicTableScan,
 		&&Exec_Jmp_ExternalScan,
 		&&Exec_Jmp_IndexScan,
+		&&Exec_Jmp_DynamicIndexScan,
 		&&Exec_Jmp_BitmapIndexScan,
 		&&Exec_Jmp_BitmapHeapScan,
 		&&Exec_Jmp_BitmapAppendOnlyScan,
@@ -522,6 +563,10 @@ ExecProcNode(PlanState *node)
 		&&Exec_Jmp_ShareInputScan,
 		&&Exec_Jmp_Window,
 		&&Exec_Jmp_Repeat,
+		&&Exec_Jmp_DML,
+		&&Exec_Jmp_SplitUpdate,
+		&&Exec_Jmp_RowTrigger,
+		&&Exec_Jmp_AssertOp
 	};
 
 	COMPILE_ASSERT((T_Plan_End - T_Plan_Start) == (T_PlanState_End - T_PlanState_Start));
@@ -556,21 +601,21 @@ Exec_Jmp_Append:
 	result = ExecAppend((AppendState *) node);
 	goto Exec_Jmp_Done;
 
+Exec_Jmp_Sequence:
+	result = ExecSequence((SequenceState *) node);
+	goto Exec_Jmp_Done;
+
 	/* These two does not yield tuple */
 Exec_Jmp_BitmapAnd:
 Exec_Jmp_BitmapOr:
 	goto Exec_Jmp_Done;
 
-Exec_Jmp_SeqScan:
-	result = ExecSeqScan((SeqScanState *) node);
+Exec_Jmp_TableScan:
+	result = ExecTableScan((TableScanState *)node);
 	goto Exec_Jmp_Done;
 
-Exec_Jmp_AppendOnlyScan:
-	result = ExecAppendOnlyScan((AppendOnlyScanState *) node);
-	goto Exec_Jmp_Done;
-
-Exec_Jmp_AOCSScan:
-	result = ExecAOCSScan((AOCSScanState *) node);
+Exec_Jmp_DynamicTableScan:
+	result = ExecDynamicTableScan((DynamicTableScanState *) node);
 	goto Exec_Jmp_Done;
 
 Exec_Jmp_ExternalScan:
@@ -581,6 +626,10 @@ Exec_Jmp_IndexScan:
 	result = ExecIndexScan((IndexScanState *) node);
 	goto Exec_Jmp_Done;
 
+Exec_Jmp_DynamicIndexScan:
+	/* TODO: garcic12 Jan 14 2013; Implementation of DynamicIndexScan */
+	Assert(false);
+	goto Exec_Jmp_Done;
 	/* BitmapIndexScanState does not yield tuples */
 Exec_Jmp_BitmapIndexScan:
 	goto Exec_Jmp_Done;
@@ -668,6 +717,22 @@ Exec_Jmp_Repeat:
 	result = ExecRepeat((RepeatState *) node);
 	goto Exec_Jmp_Done;
 
+Exec_Jmp_DML:
+	result = ExecDML((DMLState *) node);
+	goto Exec_Jmp_Done;
+	
+Exec_Jmp_SplitUpdate:
+	result = ExecSplitUpdate((SplitUpdateState *) node);
+	goto Exec_Jmp_Done;
+
+Exec_Jmp_RowTrigger:
+	result = ExecRowTrigger((RowTriggerState *) node);
+	goto Exec_Jmp_Done;
+
+Exec_Jmp_AssertOp:
+	result = ExecAssertOp((AssertOpState *) node);
+	goto Exec_Jmp_Done;
+
 Exec_Jmp_Done:
 	if (node->instrument)
 		InstrStopNode(node->instrument, TupIsNull(result) ? 0.0 : 1.0);
@@ -709,7 +774,9 @@ Exec_Jmp_Done:
 			 * scan nodes
 			 */
 		case T_SeqScanState:
-			result = ExecSeqScan((SeqScanState *) node);
+		case T_AppendOnlyScanState:
+		case T_AOCSScanState:
+			insist_log(false, "SeqScan/AppendOnlyScan/AOCSScan are defunct");
 			break;
 
 		case T_IndexScanState:
@@ -930,6 +997,9 @@ ExecCountSlotsNode(Plan *node)
 		case T_Append:
 			return ExecCountSlotsAppend((Append *) node);
 
+		case T_Sequence:
+			return ExecCountSlotsSequence((Sequence *) node);
+
 		case T_BitmapAnd:
 			return ExecCountSlotsBitmapAnd((BitmapAnd *) node);
 
@@ -940,19 +1010,22 @@ ExecCountSlotsNode(Plan *node)
 			 * scan nodes
 			 */
 		case T_SeqScan:
-			return ExecCountSlotsSeqScan((SeqScan *) node);
-
 		case T_AppendOnlyScan:
-			return ExecCountSlotsAppendOnlyScan((AppendOnlyScan *) node);
-
 		case T_AOCSScan:
-			return ExecCountSlotsAOCSScan((AOCSScan *) node);
+		case T_TableScan:
+			return ExecCountSlotsTableScan((TableScan *) node);
+
+		case T_DynamicTableScan:
+			return ExecCountSlotsDynamicTableScan((DynamicTableScan *) node);
 
 		case T_ExternalScan:
 			return ExecCountSlotsExternalScan((ExternalScan *) node);
 
 		case T_IndexScan:
 			return ExecCountSlotsIndexScan((IndexScan *) node);
+
+		case T_DynamicIndexScan:
+			return ExecCountSlotsDynamicIndexScan((DynamicIndexScan *) node);
 
 		case T_BitmapIndexScan:
 			return ExecCountSlotsBitmapIndexScan((BitmapIndexScan *) node);
@@ -1028,6 +1101,19 @@ ExecCountSlotsNode(Plan *node)
 
 		case T_Repeat:
 			return ExecCountSlotsRepeat((Repeat *) node);
+
+		case T_DML:
+			return ExecCountSlotsDML((DML *) node);
+
+		case T_SplitUpdate:
+			return ExecCountSlotsSplitUpdate((SplitUpdate *) node);
+
+		case T_AssertOp:
+ 			return ExecCountSlotsAssertOp((AssertOp *) node);
+
+		case T_RowTrigger:
+ 			return ExecCountSlotsRowTrigger((RowTrigger *) node);
+
 		default:
 			elog(ERROR, "unrecognized node type: %d", (int) nodeTag(node));
 			break;
@@ -1171,6 +1257,10 @@ ExecEndNode(PlanState *node)
 			ExecEndAppend((AppendState *) node);
 			break;
 
+		case T_SequenceState:
+			ExecEndSequence((SequenceState *) node);
+			break;
+
 		case T_BitmapAndState:
 			ExecEndBitmapAnd((BitmapAndState *) node);
 			break;
@@ -1183,23 +1273,29 @@ ExecEndNode(PlanState *node)
 			 * scan nodes
 			 */
 		case T_SeqScanState:
-			ExecEndSeqScan((SeqScanState *) node);
+		case T_AppendOnlyScanState:
+		case T_AOCSScanState:
+			insist_log(false, "SeqScan/AppendOnlyScan/AOCSScan are defunct");
+			break;
+			
+		case T_TableScanState:
+			ExecEndTableScan((TableScanState *) node);
+			break;
+			
+		case T_DynamicTableScanState:
+			ExecEndDynamicTableScan((DynamicTableScanState *) node);
 			break;
 
 		case T_IndexScanState:
 			ExecEndIndexScan((IndexScanState *) node);
 			break;
 
+		case T_DynamicIndexScanState:
+			ExecEndDynamicIndexScan((DynamicIndexScanState *) node);
+			break;
+
 		case T_ExternalScanState:
 			ExecEndExternalScan((ExternalScanState *) node);
-			break;
-
-		case T_AppendOnlyScanState:
-			ExecEndAppendOnlyScan((AppendOnlyScanState *) node);
-			break;
-
-		case T_AOCSScanState:
-			ExecEndAOCSScan((AOCSScanState *) node);
 			break;
 
 		case T_BitmapIndexScanState:
@@ -1213,6 +1309,7 @@ ExecEndNode(PlanState *node)
 		case T_BitmapAppendOnlyScanState:
 			ExecEndBitmapAppendOnlyScan((BitmapAppendOnlyScanState *) node);
 			break;
+
 		case T_TidScanState:
 			ExecEndTidScan((TidScanState *) node);
 			break;
@@ -1297,7 +1394,21 @@ ExecEndNode(PlanState *node)
 		case T_RepeatState:
 			ExecEndRepeat((RepeatState *) node);
 			break;
-
+			/*
+			 * DML nodes
+			 */
+		case T_DMLState:
+			ExecEndDML((DMLState *) node);
+			break;
+		case T_SplitUpdateState:
+			ExecEndSplitUpdate((SplitUpdateState *) node);
+			break;
+		case T_AssertOpState:
+ 			ExecEndAssertOp((AssertOpState *) node);
+ 			break;
+		case T_RowTriggerState:
+ 			ExecEndRowTrigger((RowTriggerState *) node);
+ 			break;
 
 		default:
 			elog(ERROR, "unrecognized node type: %d", (int) nodeTag(node));
@@ -1351,11 +1462,23 @@ ExecCdbTraceNode(PlanState *node, bool entry, TupleTableSlot *result)
 			nameTag = "Append";
 			break;
 
+		case T_SequenceState:
+			nameTag = "Sequence";
+			break;
+
 			/*
 			 * scan nodes
 			 */
 		case T_SeqScanState:
 			nameTag = "SeqScan";
+			break;
+
+		case T_TableScanState:
+			nameTag = "TableScan";
+			break;
+
+		case T_DynamicTableScanState:
+			nameTag = "DynamicTableScan";
 			break;
 
 		case T_IndexScanState:
@@ -1466,6 +1589,21 @@ ExecCdbTraceNode(PlanState *node, bool entry, TupleTableSlot *result)
 		case T_RepeatState:
 			nameTag = "Repeat";
 			break;
+			/*
+			 * DML nodes
+			 */
+		case T_DMLState:
+			ExecEndDML((DMLState *) node);
+			break;
+		case T_SplitUpdateState:
+			nameTag = "SplitUpdate";
+			break;
+		case T_AssertOp:
+ 			nameTag = "AssertOp";
+ 			break;
+ 		case T_RowTriggerState:
+ 			nameTag = "RowTrigger";
+ 			break;
 		default:
 			nameTag = "*unknown*";
 			break;
@@ -1657,6 +1795,16 @@ planstate_walk_kids(PlanState      *planstate,
             Assert(!planstate->lefttree && !planstate->righttree);
 			break;
 		}
+
+        case T_SequenceState:
+		{
+			SequenceState *ss = (SequenceState *)planstate;
+
+            v = planstate_walk_array(ss->subplans, ss->numSubplans, walker, context, flags);
+            Assert(!planstate->lefttree && !planstate->righttree);
+			break;
+		}
+  
         case T_BitmapAndState:
         {
             BitmapAndState *bas = (BitmapAndState *)planstate;

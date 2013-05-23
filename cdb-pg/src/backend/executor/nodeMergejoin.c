@@ -1939,6 +1939,9 @@ initGpmonPktForMergeJoin(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *esta
 			case JOIN_UNIQUE_INNER:
 				type = PMNT_MergeUniqueInnerJoin;
 				break;
+			case JOIN_LASJ_NOTIN:
+				insist_log(false, "Join type not supported");
+				break;
 		}
 
 		Assert(type != PMNT_Invalid);

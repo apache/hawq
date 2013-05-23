@@ -15068,8 +15068,8 @@ partrule_walker(Node *node, void *context)
 	{
 		PartitionRule *pr = (PartitionRule *)node;
 
-		if (pr->parchildrelid == p->old)
-			pr->parchildrelid = p->new;
+		if (pr->parchildrelid == p->old_oid)
+			pr->parchildrelid = p->new_oid;
 
 		return partrule_walker((Node *)pr->children, p);
 
@@ -15938,8 +15938,8 @@ ATPExecPartSplit(Relation rel,
 
 			/* need to update the OID reference */
 			pr = linitial((List *)idpid->partiddef);
-			cxt.old = rel_to_drop;
-			cxt.new = temprelid;
+			cxt.old_oid = rel_to_drop;
+			cxt.new_oid = temprelid;
 			partrule_walker((Node *)pr, (void *)&cxt);
 			elog(DEBUG5, "dropping OID %u", temprelid);
 		}

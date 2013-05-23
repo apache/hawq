@@ -82,5 +82,4 @@ gp_get_monotonic_time(GpMonotonicTime *time)
 			(time->endTime.tv_usec / USECS_PER_SECOND);
 		time->endTime.tv_usec = time->endTime.tv_usec % USECS_PER_SECOND;
 	}
-	
 }

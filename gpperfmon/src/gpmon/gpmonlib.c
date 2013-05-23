@@ -400,6 +400,7 @@ const char* gpdb_getnodestatus(PerfmonNodeStatus status)
 #define QENODE_TYPE_BITMAP_APPENDONLY_SCAN "Bitmap Append-Only Scan"
 #define QENODE_TYPE_BITMAP_HEAP_SCAN "Bitmap Heap Scan"
 #define QENODE_TYPE_BITMAP_INDEX_SCAN "Bitmap Index Scan"
+#define QENODE_TYPE_TABLE_SCAN "Table Scan"
 #define QENODE_TYPE_EXTERNAL_SCAN "External Scan"
 #define QENODE_TYPE_FUNCTION_SCAN "Function Scan"
 #define QENODE_TYPE_GROUP "Group"
@@ -441,6 +442,7 @@ const char* gpdb_getnodestatus(PerfmonNodeStatus status)
 #define QENODE_TYPE_RESULT "Result"
 #define QENODE_TYPE_REPEAT "Repeat"
 #define QENODE_TYPE_SEQ_SCAN "Seq Scan"
+#define QENODE_TYPE_SEQUENCE "Sequence"
 #define QENODE_TYPE_SETOP "SetOp"
 #define QENODE_TYPE_SETOP_INTERSECT "SetOp Intersect"
 #define QENODE_TYPE_SETOP_INTERSECT_ALL "SetOp Intersect All"
@@ -450,6 +452,7 @@ const char* gpdb_getnodestatus(PerfmonNodeStatus status)
 #define QENODE_TYPE_SORT "Sort"
 #define QENODE_TYPE_SUBQUERY_SCAN "Subquery Scan"
 #define QENODE_TYPE_TABLE_FUNCTION_SCAN "Table Function Scan"
+#define QENODE_TYPE_DYNAMICTABLE_SCAN "Dynamic Table Scan"
 #define QENODE_TYPE_TID_SCAN "Tid Scan"
 #define QENODE_TYPE_UNIQUE "Unique"
 #define QENODE_TYPE_VALUES_SCAN "Values Scan"
@@ -487,6 +490,7 @@ const char* gpdb_getnodestatus(PerfmonNodeStatus status)
 #define QENODE_MEASURE_BITMAP_HEAP_SCAN_PAGES "Bitmap Heap Scan Pages"
 #define QENODE_MEASURE_BITMAP_HEAP_SCAN_RESCAN "Bitmap Heap Scan Rescan"
 #define QENODE_MEASURE_BITMAP_INDEX_SCAN_RESCAN "Bitmap Index Scan Rescan"
+#define QENODE_MEASURE_DYNAMICTABLE_SCAN_RESCAN "Dynamic Table Scan Rescan"
 #define QENODE_MEASURE_EXTERNAL_SCAN_RESCAN "External Scan Rescan"
 #define QENODE_MEASURE_HASH_SPILL_BATCHES "Hash Spill Batches"
 #define QENODE_MEASURE_HASH_SPILL_TUPLES "Hash Spill Tuples"
@@ -513,6 +517,9 @@ const char* gpdb_getnodestatus(PerfmonNodeStatus status)
 #define QENODE_MEASURE_SORT_CURRENT_SPILL_PASS_TUPLES "Sort Current Spill Pass Tuples"
 #define QENODE_MEASURE_SORT_CURRENT_SPILL_PASS_BYTES "Sort Current Spill Pass Bytes"
 #define QENODE_MEASURE_SUBQUERY_SCAN_RESCAN "Subquery Scan Rescan"
+#define QENODE_MEASURE_TABLE_SCAN_PAGE_STATS "Table Scan Page Stats"
+#define QENODE_MEASURE_TABLE_SCAN_RESTORE_POS "Table Scan Restore Pos"
+#define QENODE_MEASURE_TABLE_SCAN_RESCAN "Table Scan Rescan"
 #define QENODE_MEASURE_MOTION_BYTES_SENT "Motion Bytes Sent"
 #define QENODE_MEASURE_MOTION_TOTAL_ACK_TIME "Motion Total Ack Time"
 #define QENODE_MEASURE_MOTION_AVG_ACK_TIME "Motion Average Ack Time"
@@ -621,6 +628,10 @@ QenodeNamesDescriptor nodetype_string_lookup[PMNT_MAXIMUM_ENUM] =
 		{QENODE_MEASURE_ROWS_IN, QENODE_MEASURE_BITMAP_INDEX_SCAN_RESCAN  }, 
 		{QENODE_UNIT_ROWS, QENODE_UNIT_RESCANS },
 		2
+	},
+	{PMNT_DynamicTableScan, QENODE_TYPE_DYNAMICTABLE_SCAN, 
+		{QENODE_MEASURE_ROWS_IN, QENODE_MEASURE_DYNAMICTABLE_SCAN_RESCAN }, 
+		{QENODE_UNIT_ROWS, QENODE_UNIT_RESCANS}
 	},
 	{PMNT_ExternalScan, QENODE_TYPE_EXTERNAL_SCAN,
 		{QENODE_MEASURE_ROWS_IN, QENODE_MEASURE_EXTERNAL_SCAN_RESCAN }, 
@@ -827,6 +838,10 @@ QenodeNamesDescriptor nodetype_string_lookup[PMNT_MAXIMUM_ENUM] =
 		{QENODE_UNIT_ROWS, QENODE_UNIT_PAGES, QENODE_UNIT_RESTORES, QENODE_UNIT_RESCANS },
 		4
 	},
+	{PMNT_Sequence, QENODE_TYPE_SEQUENCE,
+		{QENODE_MEASURE_ROWS_IN },
+		{QENODE_UNIT_ROWS }
+	},
 	{PMNT_SetOp, QENODE_TYPE_SETOP, 
 		{QENODE_MEASURE_ROWS_IN }, 
 		{QENODE_UNIT_ROWS },
@@ -871,6 +886,10 @@ QenodeNamesDescriptor nodetype_string_lookup[PMNT_MAXIMUM_ENUM] =
 		{QENODE_MEASURE_ROWS_IN }, 
 		{QENODE_UNIT_ROWS },
 		1
+	},
+	{PMNT_TableScan, QENODE_TYPE_TABLE_SCAN, 
+		{QENODE_MEASURE_ROWS_IN, QENODE_MEASURE_TABLE_SCAN_PAGE_STATS, QENODE_MEASURE_TABLE_SCAN_RESTORE_POS, QENODE_MEASURE_TABLE_SCAN_RESCAN }, 
+		{QENODE_UNIT_ROWS, QENODE_UNIT_PAGES, QENODE_UNIT_RESTORES, QENODE_UNIT_RESCANS }
 	},
 	{PMNT_TidScan, QENODE_TYPE_TID_SCAN, 
 		{QENODE_MEASURE_ROWS_IN }, 

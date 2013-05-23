@@ -215,6 +215,7 @@ transformExpr(ParseState *pstate, Node *expr)
 			result = transformFuncCall(pstate, (FuncCall *) expr);
 			break;
 
+
 		case T_SubLink:
 			result = transformSubLink(pstate, (SubLink *) expr);
 			break;
@@ -2477,6 +2478,9 @@ exprType(Node *expr)
 			break;
 		case T_PercentileExpr:
 			type = ((PercentileExpr *) expr)->perctype;
+			break;
+		case T_DMLActionExpr:
+			type = INT4OID;
 			break;
 		default:
 			elog(ERROR, "unrecognized node type: %d", (int) nodeTag(expr));

@@ -583,7 +583,6 @@ ExecInitIndexScan(IndexScan *node, EState *estate, int eflags)
 	currentRelation = ExecOpenScanRelation(estate, node->scan.scanrelid);
 
 	indexstate->ss.ss_currentRelation = currentRelation;
-	indexstate->ss.ss_currentScanDesc = NULL;	/* no heap scan here */
 
 	/*
 	 * get the scan type from the relation descriptor.

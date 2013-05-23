@@ -35,9 +35,11 @@ explain select * from ds_4 where month_id = '200800';
 -------------------------------------------------------------------------------------
  Gather Motion 2:1  (slice1; segments: 2)  (cost=0.00..0.00 rows=1 width=184)
    ->  Append  (cost=0.00..0.00 rows=1 width=184)
+         ->  Seq Scan on ds_4  (cost=0.00..0.00 rows=1 width=184)
+               Filter: month_id::text = '200800'::text
          ->  Seq Scan on ds_4_1_prt_p200800 ds_4  (cost=0.00..0.00 rows=1 width=184)
                Filter: month_id::text = '200800'::text
-(4 rows)
+(6 rows)
 
 -- now we can evaluate this function at planning/prune time
 explain select * from ds_4 where month_id::int = 200800;
@@ -45,9 +47,11 @@ explain select * from ds_4 where month_id::int = 200800;
 -------------------------------------------------------------------------------------
  Gather Motion 2:1  (slice1; segments: 2)  (cost=0.00..0.00 rows=1 width=184)
    ->  Append  (cost=0.00..0.00 rows=1 width=184)
+         ->  Seq Scan on ds_4  (cost=0.00..0.00 rows=1 width=184)
+               Filter: month_id::integer = 200800
          ->  Seq Scan on ds_4_1_prt_p200800 ds_4  (cost=0.00..0.00 rows=1 width=184)
                Filter: month_id::integer = 200800
-(4 rows)
+(6 rows)
 
 -- this will be satisfied by 200800
 explain select * from ds_4 where month_id::int - 801 < 200000;
@@ -55,25 +59,29 @@ explain select * from ds_4 where month_id::int - 801 < 200000;
 -------------------------------------------------------------------------------------
  Gather Motion 2:1  (slice1; segments: 2)  (cost=0.00..0.00 rows=1 width=184)
    ->  Append  (cost=0.00..0.00 rows=1 width=184)
+         ->  Seq Scan on ds_4  (cost=0.00..0.00 rows=1 width=184)
+               Filter: (month_id::integer - 801) < 200000
          ->  Seq Scan on ds_4_1_prt_p200800 ds_4  (cost=0.00..0.00 rows=1 width=184)
                Filter: (month_id::integer - 801) < 200000
-(4 rows)
+(6 rows)
 
 -- test OR case -- should NOT get pruning
 explain select * from ds_4 where month_id::int - 801 < 200000 OR count_vas > 10;
                                      QUERY PLAN                                      
 -------------------------------------------------------------------------------------
- Gather Motion 2:1  (slice1)  (cost=0.00..0.00 rows=5 width=107)
-   ->  Append  (cost=0.00..0.00 rows=2 width=107)
-         ->  Seq Scan on ds_4_1_prt_p200800 ds_4  (cost=0.00..0.00 rows=0 width=107)
+ Gather Motion 2:1  (slice1; segments: 2)  (cost=0.00..0.00 rows=1 width=184)
+   ->  Append  (cost=0.00..0.00 rows=1 width=184)
+         ->  Seq Scan on ds_4  (cost=0.00..0.00 rows=1 width=184)
                Filter: (month_id::integer - 801) < 200000 OR count_vas > 10
-         ->  Seq Scan on ds_4_1_prt_p200801 ds_4  (cost=0.00..0.00 rows=0 width=107)
+         ->  Seq Scan on ds_4_1_prt_p200800 ds_4  (cost=0.00..0.00 rows=1 width=184)
                Filter: (month_id::integer - 801) < 200000 OR count_vas > 10
-         ->  Seq Scan on ds_4_1_prt_p200802 ds_4  (cost=0.00..0.00 rows=0 width=107)
+         ->  Seq Scan on ds_4_1_prt_p200801 ds_4  (cost=0.00..0.00 rows=1 width=184)
                Filter: (month_id::integer - 801) < 200000 OR count_vas > 10
-         ->  Seq Scan on ds_4_1_prt_p200803 ds_4  (cost=0.00..0.00 rows=0 width=107)
+         ->  Seq Scan on ds_4_1_prt_p200802 ds_4  (cost=0.00..0.00 rows=1 width=184)
                Filter: (month_id::integer - 801) < 200000 OR count_vas > 10
-(10 rows)
+         ->  Seq Scan on ds_4_1_prt_p200803 ds_4  (cost=0.00..0.00 rows=1 width=184)
+               Filter: (month_id::integer - 801) < 200000 OR count_vas > 10
+(12 rows)
 
 -- test AND case -- should still get pruning
 explain select * from ds_4 where month_id::int - 801 < 200000 AND count_vas > 10;
@@ -81,9 +89,11 @@ explain select * from ds_4 where month_id::int - 801 < 200000 AND count_vas > 10
 -------------------------------------------------------------------------------------
  Gather Motion 2:1  (slice1; segments: 2)  (cost=0.00..0.00 rows=1 width=184)
    ->  Append  (cost=0.00..0.00 rows=1 width=184)
+         ->  Seq Scan on ds_4  (cost=0.00..0.00 rows=1 width=184)
+               Filter: (month_id::integer - 801) < 200000 AND count_vas > 10
          ->  Seq Scan on ds_4_1_prt_p200800 ds_4  (cost=0.00..0.00 rows=1 width=184)
                Filter: (month_id::integer - 801) < 200000 AND count_vas > 10
-(4 rows)
+(6 rows)
 
 -- test expression case : should get pruning
 explain select * from ds_4 where case when month_id = '200800' then 100 else 2 end = 100;
@@ -91,9 +101,11 @@ explain select * from ds_4 where case when month_id = '200800' then 100 else 2 e
 -------------------------------------------------------------------------------------------
  Gather Motion 2:1  (slice1; segments: 2)  (cost=0.00..0.00 rows=1 width=184)
    ->  Append  (cost=0.00..0.00 rows=1 width=184)
+         ->  Seq Scan on ds_4  (cost=0.00..0.00 rows=1 width=184)
+               Filter: CASE WHEN month_id::text = '200800'::text THEN 100 ELSE 2 END = 100
          ->  Seq Scan on ds_4_1_prt_p200800 ds_4  (cost=0.00..0.00 rows=1 width=184)
                Filter: CASE WHEN month_id::text = '200800'::text THEN 100 ELSE 2 END = 100
-(4 rows)
+(6 rows)
 
 -- test expression case : should get pruning
 explain select * from ds_4 where case when month_id = '200800' then NULL else 2 end IS NULL;
@@ -101,9 +113,11 @@ explain select * from ds_4 where case when month_id = '200800' then NULL else 2 
 -------------------------------------------------------------------------------------------------------
  Gather Motion 2:1  (slice1; segments: 2)  (cost=0.00..0.00 rows=1 width=184)
    ->  Append  (cost=0.00..0.00 rows=1 width=184)
+         ->  Seq Scan on ds_4  (cost=0.00..0.00 rows=1 width=184)
+               Filter: CASE WHEN month_id::text = '200800'::text THEN NULL::integer ELSE 2 END IS NULL
          ->  Seq Scan on ds_4_1_prt_p200800 ds_4  (cost=0.00..0.00 rows=1 width=184)
                Filter: CASE WHEN month_id::text = '200800'::text THEN NULL::integer ELSE 2 END IS NULL
-(4 rows)
+(6 rows)
 
 -- should still get pruning here -- count_vas is only used in the path for month id = 200800
 explain select * from ds_4 where case when month_id::int = 200800 then count_vas else 2 end IS NULL;
@@ -111,21 +125,25 @@ explain select * from ds_4 where case when month_id::int = 200800 then count_vas
 ----------------------------------------------------------------------------------------------
  Gather Motion 2:1  (slice1; segments: 2)  (cost=0.00..0.00 rows=1 width=184)
    ->  Append  (cost=0.00..0.00 rows=1 width=184)
+         ->  Seq Scan on ds_4  (cost=0.00..0.00 rows=1 width=184)
+               Filter: CASE WHEN month_id::integer = 200800 THEN count_vas ELSE 2 END IS NULL
          ->  Seq Scan on ds_4_1_prt_p200800 ds_4  (cost=0.00..0.00 rows=1 width=184)
                Filter: CASE WHEN month_id::integer = 200800 THEN count_vas ELSE 2 END IS NULL
-(4 rows)
+(6 rows)
 
 -- do one that matches a couple partitions
 explain select * from ds_4 where month_id::int in (200801, 1,55,6,6,6,6,66,565,65,65,200803);
                                                QUERY PLAN                                               
 --------------------------------------------------------------------------------------------------------
- Gather Motion 2:1  (slice1)  (cost=0.00..0.00 rows=3 width=107)
-   ->  Append  (cost=0.00..0.00 rows=2 width=107)
-         ->  Seq Scan on ds_4_1_prt_p200801 ds_4  (cost=0.00..0.00 rows=0 width=107)
+ Gather Motion 2:1  (slice1; segments: 2)  (cost=0.00..0.00 rows=1 width=184)
+   ->  Append  (cost=0.00..0.00 rows=1 width=184)
+         ->  Seq Scan on ds_4  (cost=0.00..0.00 rows=1 width=184)
                Filter: month_id::integer = ANY ('{200801,1,55,6,6,6,6,66,565,65,65,200803}'::integer[])
-         ->  Seq Scan on ds_4_1_prt_p200803 ds_4  (cost=0.00..0.00 rows=0 width=107)
+         ->  Seq Scan on ds_4_1_prt_p200801 ds_4  (cost=0.00..0.00 rows=1 width=184)
                Filter: month_id::integer = ANY ('{200801,1,55,6,6,6,6,66,565,65,65,200803}'::integer[])
-(6 rows)
+         ->  Seq Scan on ds_4_1_prt_p200803 ds_4  (cost=0.00..0.00 rows=1 width=184)
+               Filter: month_id::integer = ANY ('{200801,1,55,6,6,6,6,66,565,65,65,200803}'::integer[])
+(8 rows)
 
 -- cleanup
 drop table ds_4;

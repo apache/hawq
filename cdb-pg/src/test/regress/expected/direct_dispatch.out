@@ -391,9 +391,9 @@ select * from direct_test;
 INFO:  Dispatch command to ALL contents
  key | value 
 -----+-------
+   2 | boo
      | cow
    1 | 100
-   2 | boo
 (3 rows)
 
 ------------------------

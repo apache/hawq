@@ -39,7 +39,7 @@ all : devel
 .PHONY : test2 test3
 
 # Internal functions which are invoked by other rules within this makefile
-.PHONY : groupSession mkgpcc mkgpperfmon copydocs mgmtcopy pkgplr copylibs
+.PHONY : groupSession mkgpcc mkgpperfmon copydocs mgmtcopy copylibs
 .PHONY : greenplum_path RECONFIG HOMEDEP GPROOTDEP GPROOTDEP GPROOTFAIL goh
 .PHONY : version gccVersionCheck pygres authlibs clients loaders connectivity gppkg
 
@@ -179,7 +179,6 @@ sol10_x86_64_CONFIGFLAGS=--enable-email --enable-snmp
 sol_x86_64_CONFIGFLAGS=--enable-email
 suse10_x86_64_CONFIGFLAGS=--enable-email --enable-snmp --enable-ddboost
 linux_x86_64_CONFIGFLAGS=--enable-email --enable-snmp
-osx104_x86_CONFIGFLAGS=--enable-email
 osx105_x86_CONFIGFLAGS=--enable-email --enable-snmp	
 osx106_x86_CONFIGFLAGS=--enable-email --enable-snmp
 
@@ -714,6 +713,7 @@ rhel5_x86_64_MPP_ARCH=RHEL5-x86_64
 rhel6_x86_64_MPP_ARCH=RHEL6-x86_64
 osx10_x86_MPP_ARCH=OSX-i386
 osx105_x86_MPP_ARCH=OSX-i386
+osx106_x86_MPP_ARCH=OSX-i386
 ifneq "$($(BLD_ARCH)_MPP_ARCH)" ""
 export MPP_ARCH=$($(BLD_ARCH)_MPP_ARCH)
 else
@@ -723,6 +723,13 @@ endif
 
 ifeq "$(INSTLOC)" ""
 INSTLOC=$(GPDIR)
+endif
+
+# define build flags for GP Optimizer UDFs library
+ifeq (Darwin, $(BLD_OS))
+	GPOPT_UDF_FLAGS := -m32 -dynamiclib -flat_namespace -undefined dynamic_lookup
+else
+	GPOPT_UDF_FLAGS := -m64 -shared
 endif
 
 VERSION:=$(shell [ -f VERSION ] && perl -pe 's, ,-,g' VERSION)
@@ -1164,28 +1171,6 @@ endif
 	rm -rf $(INSTLOC)/bin/gppylib
 	find $(INSTLOC)/lib/python/gppylib -name test -type d | xargs rm -rf
 
-pkgplr:
-	@if [ ! -z "$(PLRDIR)" ]; then \
-	    echo "`date` -- INFO: Found a previous PL/R package, removing it"; \
-	    rm -rf $(PLRDIR); \
-	fi
-	@if [ -f $(INSTLOC)/lib/postgresql/plr.so ] ; then \
-	    echo "" ; \
-	    echo "`date` -- INFO: Found plr.so, creating PL/R package" ; \
-	    mkdir $(PLRDIR) ; \
-	    cp -p $(INSTLOC)/lib/postgresql/plr.so $(PLRDIR)/ ; \
-	    if [ `uname -s` = 'SunOS' ]; then cp /releng/lib/libiconv.so.2 /releng/lib/amd64/libgcc_s.so.1 $(PLRDIR)/ ; fi ; \
-	    cp -p $(BLD_TOP)/languages/PLR/PLR_README $(PLRDIR)/ ; \
-	    echo "" ; \
-	    echo "`date` -- INFO: Cleaning up $(INSTLOC) of plr components" ; \
-	    rm -f $(INSTLOC)/share/postgresql/contrib/plr.sql ; \
-	    rm -f $(INSTLOC)/lib/postgresql/plr.so ; \
-	    echo "" ; \
-	    echo "`date` -- INFO: Creating .zip" ; \
-	    zip -q -r greenplum-plr-$(VERSION)-${MPP_ARCH}.zip $(PLRDIR) ; \
-	    echo "" ; \
-	fi
-
 BLD_LDD=ldd
 osx104_x86_LDD=otool -L
 ifneq "$($(BLD_ARCH)_LDD)" ""
@@ -1309,6 +1294,33 @@ endif
 endif
 	# Copy glider stack trace capture tool
 	-cp -rp $(BLD_THIRDPARTY_BIN_DIR)/glider $(INSTLOC)/sbin/
+	
+ifneq "$(BLD_GPDB_BUILDSET)" "partial"
+	# Copy GP Optimizer libraries 
+	echo "Copying Orca libraries";
+	for b in libnaucrates libgpopt; do \
+		rm -f $(INSTLOC)/lib/$$b.$(LDSFX); \
+		echo "Copying $$b"; \
+		cp  $(OPTIMIZER)/$$b/$(OBJDIR_DEFAULT)/$$b.$(LDSFX) $(INSTLOC)/lib ; \
+	done
+	rm -f $(INSTLOC)/lib/libgpos.$(LDSFX);
+	cp $(LIBGPOS_LIBDIR)/libgpos.$(LDSFX) $(INSTLOC)/lib;
+	rm -f $(INSTLOC)/lib/libxerces-c-3.1.$(LDSFX);
+	cp $(XERCES_LIBDIR)/libxerces-c-3.1.$(LDSFX) $(INSTLOC)/lib;
+	
+	# Copy DXL translators library
+	echo "Copy DXL translators library";	
+	cp $(BLD_TOP)/cdb-pg/src/backend/gpopt/libdxltranslators.$(LDSFX) $(INSTLOC)/lib;
+	rm -f $(BLD_TOP)/cdb-pg/src/backend/gpopt/libdxltranslators.$(LDSFX);
+	
+	cd $(LIBSTDC++_LIBDIR); tar cvf - * | (cd $(INSTLOC)/lib; tar xfp -)
+
+	# Create GP Optimizer UDFs library  
+	echo "Create GP Optimizer UDFs library";
+	rm -f $(INSTLOC)/lib/libgpoptudf.$(LDSFX);
+	g++ $(GPOPT_UDF_FLAGS) -L$(INSTLOC)/lib -lgpos -lnaucrates -lgpopt -o $(INSTLOC)/lib/libgpoptudf.$(LDSFX)  ./cdb-pg/src/backend/gpopt/utils/funcs.o ;
+endif
+
 
 greenplum_path:
 	mkdir -p $(INSTLOC)
@@ -1530,6 +1542,32 @@ else
 	done
 endif
 endif
+
+## ----------------------------------------------------------------------
+## Target to install GPDB udfs. Currently, this only works on Mac OSX 
+## and Linux
+## ----------------------------------------------------------------------
+
+create_orca_installer:
+	rm -rf $(BLD_TOP)/orca_tmp
+	mkdir -p $(BLD_TOP)/orca_tmp
+	for b in libnaucrates libgpopt; do \
+		cp $(OPTIMIZER)/$$b/$(OBJDIR_DEFAULT)/$$b.$(LDSFX) $(BLD_TOP)/orca_tmp; \
+	done
+	cp $(LIBGPOS_LIBDIR)/libgpos.$(LDSFX)  $(BLD_TOP)/orca_tmp
+	cp $(XERCES_LIBDIR)/libxerces-c-3.1.$(LDSFX) $(BLD_TOP)/orca_tmp
+	tar zcvf $(BLD_TOP)/orca.tgz -C $(BLD_TOP)/orca_tmp .
+	sed \
+	  -e "s|%%BUILD_NUMBER%%|$${BUILD_NUMBER:=99999}|g" \
+	  -e "s|%%PULSE_BUILD_TIMESTAMP%%|$${PULSE_BUILD_TIMESTAMP:=n/a}|g" \
+	  -e "s|%%GPDB_VER%%|$(VERSION)|g" \
+	  -e "s|%%OPTIMIZER_VER%%|$(OPTIMIZER_VER)|g" \
+	  -e "s|%%LIBGPOS_VER%%|$(LIBGPOS_VER)|g" \
+	  -e "s|%%XERCES_VER%%|$(XERCES_VER)|g" \
+	  $(BLD_TOP)/releng/bin/orca_installer_hdr.sh > $(BLD_TOP)/releng/bin/orca_installer_hdr.sh.out
+	cat $(BLD_TOP)/releng/bin/orca_installer_hdr.sh.out $(BLD_TOP)/orca.tgz > $(BLD_TOP)/gpdb-orca-$(MPP_ARCH).sh
+	chmod a+x $(BLD_TOP)/gpdb-orca-$(MPP_ARCH).sh
+	rm -rf $(BLD_TOP)/orca_tmp
 
 ## ----------------------------------------------------------------------
 

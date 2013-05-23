@@ -71,7 +71,6 @@ typedef struct VariableStatData
 	RelOptInfo *rel;			/* Relation, or NULL if not identifiable */
 	cqContext  *statscqCtx;		/* pg_statistic cqctx, or NULL if none */
 	/* NB: if statsTuple!=NULL, it must be freed when caller is done */
-	bool        statsTupleFromSysCache; /* if the stats tuple is from a catalog cache entry - free method depends on this */
 	double		numdistinctFromPrimaryKey; /* this is the numdistinct as estimated from the primary key relation. If this is < 0, then it is ignored. */
 	Oid			vartype;		/* exposed type of expression */
 	Oid			atttype;		/* type to pass to get_attstatsslot */

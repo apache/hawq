@@ -135,6 +135,7 @@ _copyPlannedStmt(PlannedStmt *from)
 	PlannedStmt   *newnode = makeNode(PlannedStmt);
 
 	COPY_SCALAR_FIELD(commandType);
+	COPY_SCALAR_FIELD(planGen);
 	COPY_SCALAR_FIELD(canSetTag);
 	COPY_SCALAR_FIELD(transientPlan);
 
@@ -150,6 +151,8 @@ _copyPlannedStmt(PlannedStmt *from)
 	
 	COPY_NODE_FIELD(result_partitions);
 	COPY_NODE_FIELD(result_aosegnos);
+	COPY_NODE_FIELD(queryPartOids);
+	COPY_NODE_FIELD(queryPartsMetadata);
 	COPY_NODE_FIELD(rowMarks);
 	COPY_NODE_FIELD(relationOids);
 	COPY_SCALAR_FIELD(invalItems);
@@ -254,6 +257,16 @@ _copyAppend(Append *from)
 	COPY_SCALAR_FIELD(isTarget);
 	COPY_SCALAR_FIELD(isZapped);
 	COPY_SCALAR_FIELD(hasXslice);
+
+	return newnode;
+}
+
+static Sequence *
+_copySequence(Sequence *from)
+{
+	Sequence *newnode = makeNode(Sequence);
+	CopyPlanFields((Plan *) from, (Plan *) newnode);
+	COPY_NODE_FIELD(subplans);
 
 	return newnode;
 }
@@ -378,6 +391,26 @@ _copyAOCSScan(AOCSScan *from)
 
 	return newnode;
 }
+
+static TableScan *
+_copyTableScan(TableScan *from)
+{
+	TableScan *newnode = makeNode(TableScan);
+	CopyScanFields((Scan *) from, (Scan *) newnode);
+
+	return newnode;
+}
+
+static DynamicTableScan *
+_copyDynamicTableScan(DynamicTableScan *from)
+{
+	DynamicTableScan *newnode = makeNode(DynamicTableScan);
+	CopyScanFields((Scan *) from, (Scan *) newnode);
+	COPY_SCALAR_FIELD(partIndex);
+
+	return newnode;
+}
+
 /*
  * _copyExternalScan
  */
@@ -407,6 +440,18 @@ _copyExternalScan(ExternalScan *from)
 	return newnode;
 }
 
+static void
+copyIndexScanFields(const IndexScan *from, IndexScan *newnode)
+{
+	CopyScanFields((Scan *) from, (Scan *) newnode);
+
+	COPY_SCALAR_FIELD(indexid);
+	COPY_NODE_FIELD(indexqual);
+	COPY_NODE_FIELD(indexqualorig);
+	COPY_NODE_FIELD(indexstrategy);
+	COPY_NODE_FIELD(indexsubtype);
+	COPY_SCALAR_FIELD(indexorderdir);
+}
 
 /*
  * _copyIndexScan
@@ -416,20 +461,23 @@ _copyIndexScan(IndexScan *from)
 {
 	IndexScan  *newnode = makeNode(IndexScan);
 
-	/*
-	 * copy node superclass fields
-	 */
-	CopyScanFields((Scan *) from, (Scan *) newnode);
+	copyIndexScanFields(from, newnode);
 
-	/*
-	 * copy remainder of node
-	 */
-	COPY_SCALAR_FIELD(indexid);
-	COPY_NODE_FIELD(indexqual);
-	COPY_NODE_FIELD(indexqualorig);
-	COPY_NODE_FIELD(indexstrategy);
-	COPY_NODE_FIELD(indexsubtype);
-	COPY_SCALAR_FIELD(indexorderdir);
+	return newnode;
+}
+
+/*
+ * _copyDynamicIndexScan
+ */
+static DynamicIndexScan *
+_copyDynamicIndexScan(const DynamicIndexScan *from)
+{
+	DynamicIndexScan  *newnode = makeNode(DynamicIndexScan);
+
+	/* DynamicIndexScan has some content from IndexScan */
+	copyIndexScanFields((IndexScan *)from, (IndexScan *)newnode);
+
+	COPY_SCALAR_FIELD(partIndex);
 
 	return newnode;
 }
@@ -946,6 +994,89 @@ _copyMotion(Motion *from)
 	
 	return newnode;
 }
+
+/*
+ * _copyDML
+ */
+static DML *
+_copyDML(const DML *from)
+{
+	DML *newnode = makeNode(DML);
+
+	/*
+	 * copy node superclass fields
+	 */
+	CopyPlanFields((Plan *) from, (Plan *) newnode);
+
+	COPY_SCALAR_FIELD(scanrelid);
+	COPY_SCALAR_FIELD(oidColIdx);
+	COPY_SCALAR_FIELD(actionColIdx);
+	COPY_SCALAR_FIELD(ctidColIdx);
+		
+	return newnode;
+}
+
+/*
+ * _copySplitUpdate
+ */
+static SplitUpdate *
+_copySplitUpdate(const SplitUpdate *from)
+{
+	SplitUpdate *newnode = makeNode(SplitUpdate);
+
+	/*
+	 * copy node superclass fields
+	 */
+	CopyPlanFields((Plan *) from, (Plan *) newnode);
+
+	COPY_SCALAR_FIELD(actionColIdx);
+	COPY_SCALAR_FIELD(ctidColIdx);
+	COPY_NODE_FIELD(insertColIdx);
+	COPY_NODE_FIELD(deleteColIdx);
+
+	return newnode;
+}
+
+/*
+ * _copyRowTrigger
+ */
+static RowTrigger *
+_copyRowTrigger(const RowTrigger *from)
+{
+	RowTrigger *newnode = makeNode(RowTrigger);
+
+	/*
+	 * copy node superclass fields
+	 */
+	CopyPlanFields((Plan *) from, (Plan *) newnode);
+
+	COPY_SCALAR_FIELD(relid);
+	COPY_SCALAR_FIELD(eventFlags);
+	COPY_NODE_FIELD(oldValuesColIdx);
+	COPY_NODE_FIELD(newValuesColIdx);
+
+	return newnode;
+}
+
+/*
+ * _copyAssertOp
+ */
+static AssertOp *
+_copyAssertOp(const AssertOp *from)
+{
+	AssertOp *newnode = makeNode(AssertOp);
+
+	/*
+	 * copy node superclass fields
+	 */
+	CopyPlanFields((Plan *) from, (Plan *) newnode);
+
+	COPY_SCALAR_FIELD(errcode);
+	COPY_STRING_FIELD(errmessage);
+	
+	return newnode;
+}
+
 
 /* ****************************************************************
  *					   primnodes.h copy functions
@@ -2304,6 +2435,14 @@ _copyLockingClause(LockingClause *from)
 	return newnode;
 }
 
+static DMLActionExpr *
+_copyDMLActionExpr(const DMLActionExpr *from)
+{
+	DMLActionExpr *newnode = makeNode(DMLActionExpr);
+
+	return newnode;
+}
+
 static Query *
 _copyQuery(Query *from)
 {
@@ -2427,7 +2566,6 @@ _copySetOperationStmt(SetOperationStmt *from)
 	COPY_NODE_FIELD(rarg);
 	COPY_NODE_FIELD(colTypes);
 	COPY_NODE_FIELD(colTypmods);
-
 	return newnode;
 }
 
@@ -4072,6 +4210,9 @@ copyObject(void *from)
 		case T_Append:
 			retval = _copyAppend(from);
 			break;
+		case T_Sequence:
+			retval = _copySequence(from);
+			break;
 		case T_BitmapAnd:
 			retval = _copyBitmapAnd(from);
 			break;
@@ -4089,12 +4230,21 @@ copyObject(void *from)
 			break;
 		case T_AOCSScan:
 			retval = _copyAOCSScan(from);
-                        break;
+			break;
+		case T_TableScan:
+			retval = _copyTableScan(from);
+			break;
+		case T_DynamicTableScan:
+			retval = _copyDynamicTableScan(from);
+			break;
 		case T_ExternalScan:
 			retval = _copyExternalScan(from);
 			break;
 		case T_IndexScan:
 			retval = _copyIndexScan(from);
+			break;
+		case T_DynamicIndexScan:
+			retval = _copyDynamicIndexScan(from);
 			break;
 		case T_BitmapIndexScan:
 			retval = _copyBitmapIndexScan(from);
@@ -4164,6 +4314,18 @@ copyObject(void *from)
 			break;
 		case T_Motion:
 			retval = _copyMotion(from);
+			break;
+		case T_DML:
+			retval = _copyDML(from);
+			break;
+		case T_SplitUpdate:
+			retval = _copySplitUpdate(from);
+			break;
+		case T_RowTrigger:
+			retval = _copyRowTrigger(from);
+			break;
+		case T_AssertOp:
+			retval = _copyAssertOp(from);
 			break;
 
 			/*
@@ -4720,6 +4882,9 @@ copyObject(void *from)
 			break;
 		case T_LockingClause:
 			retval = _copyLockingClause(from);
+			break;
+		case T_DMLActionExpr:
+			retval = _copyDMLActionExpr(from);
 			break;
 		case T_RangeTblEntry:
 			retval = _copyRangeTblEntry(from);

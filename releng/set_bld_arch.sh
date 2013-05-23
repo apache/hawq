@@ -2,10 +2,14 @@
 #
 #
 case "`uname -s`" in
-
     Darwin)
-    BLD_ARCH_HOST=`system_profiler SPSoftwareDataType | grep "System Version:" | awk ' {print tolower($4) tolower($5) $6}' | awk -F. ' {print $1 $2}'`_`uname -p | sed -e s/i386/x86/`
-    ;;
+        sw_vers | grep ProductVersion | grep 10.5
+        if [ $? = 0 ]; then
+            BLD_ARCH_HOST=osx105_x86
+        else
+            BLD_ARCH_HOST=osx106_x86
+        fi
+        ;;
 
     Linux)
     if [ -f /etc/redhat-release ]; then

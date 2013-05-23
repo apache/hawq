@@ -290,6 +290,22 @@ typedef struct ShareNodeEntry
 	Node *shareState;
 } ShareNodeEntry;
 
+/*
+ * PartitionAccessMethods
+ *    Defines the lookup access methods for partitions, one for each level.
+ */
+typedef struct PartitionAccessMethods
+{
+	/* Number of partition levels */
+	int partLevels;
+	
+	/* Access methods, one for each level */
+	void **amstate;
+
+	/* Memory context for access methods */
+	MemoryContext part_cxt;
+} PartitionAccessMethods;
+
 typedef struct PartitionState
 {
 	NodeTag type;
@@ -297,9 +313,66 @@ typedef struct PartitionState
 	AttrNumber max_partition_attr;
 	int result_partition_array_size; /* max elements of result relation array */
 	HTAB *result_partition_hash;
-	MemoryContext part_cxt;
-	void **amstate; /* access method specific lookup, one for each level */
+	PartitionAccessMethods *accessMethods;
 } PartitionState;
+
+/*
+ * PartitionMetadata
+ *   Defines the metadata for partitions.
+ */
+typedef struct PartitionMetadata
+{
+	PartitionNode *partsAndRules;
+	PartitionAccessMethods *accessMethods;
+} PartitionMetadata;
+
+/*
+ * DynamicTableScanInfo
+ *   Encapsulate the information that is needed to maintain the pid indexes
+ * for all dynamic table scans in a plan.
+ */
+typedef struct DynamicTableScanInfo
+{
+	/*
+	 * The total number of unique dynamic table scans in the plan.
+	 */
+	int numScans;
+
+	/*
+	 * An array of pid indexes, one for each unique dynamic table scans.
+	 * Each of these pid indexes maintains unique pids that are involved
+	 * in the scan.
+	 */
+	HTAB **pidIndexes;
+
+	/*
+	 * Partitioning metadata for all relevant partition tables.
+	 */
+	List *partsMetadata;
+
+	/*
+	 * The memory context in which pidIndexes are allocated.
+	 */
+	MemoryContext memoryContext;
+} DynamicTableScanInfo;
+
+/*
+ * Number of pids used when initializing the pid-index hash table for each dynamic
+ * table scan.
+ */
+#define INITIAL_NUM_PIDS 1000
+
+/*
+ * The initial estimate size for dynamic table scan pid-index array, and the
+ * default incremental number when the array is out of space.
+ */
+#define NUM_PID_INDEXES_ADDED 10
+
+/*
+ * The global variable for the information relevant to dynamic table scans.
+ * During execution, this will point to the value initialized in EState.
+ */
+extern DynamicTableScanInfo *dynamicTableScanInfo;
 
 /* ----------------
  *          EState information
@@ -421,6 +494,11 @@ typedef struct EState
 
 	struct PlanState *planstate;        /* plan's state tree */
 
+	/*
+	 * Information relevant to dynamic table scans.
+	 */
+	DynamicTableScanInfo *dynamicTableScanInfo;
+
 } EState;
 
 struct PlanState;
@@ -517,8 +595,6 @@ static inline void cxt_free(void *manager, void *pointer)
 	if (pointer != NULL)
 		pfree(pointer);
 }
-
-
 
 /* ----------------------------------------------------------------
  *                                 Expression State Trees
@@ -1044,6 +1120,8 @@ typedef struct Gpmon_NameVal_Text
         char *value;
 } Gpmon_NameVal_Text;
 
+/* Gpperfmon helper functions defined in execGpmon.h */
+extern char *GetScanRelNameGpmon(Oid relid, char schema_table_name[SCAN_REL_NAME_BUF_SIZE]);
 extern void CheckSendPlanStateGpmonPkt(PlanState *ps);
 extern void EndPlanStateGpmonPkt(PlanState *ps);
 extern void InitPlanNodeGpmonPkt(Plan* plan, gpmon_packet_t *gpmon_pkt, EState *estate,
@@ -1142,6 +1220,21 @@ typedef struct AppendState
         int                        as_lastplan;
 } AppendState;
 
+/*
+ * SequenceState
+ */
+typedef struct SequenceState
+{
+	PlanState ps;
+	PlanState **subplans;
+	int numSubplans;
+
+	/*
+	 * True if no subplan has been executed.
+	 */
+	bool initState;
+} SequenceState;
+
 /* ----------------
  *         BitmapAndState information
  * ----------------
@@ -1192,32 +1285,57 @@ enum {
         SCAN_DONE         = 4,
 };
 
+/*
+ * TableType
+ *   Enum for different types of tables.
+ */
+typedef enum
+{
+	TableTypeHeap,
+	TableTypeAppendOnly,
+	TableTypeAOCS,
+	TableTypeInvalid,
+} TableType;
+
 typedef struct ScanState
 {
-        PlanState        ps;                                /* its first field is NodeTag */
-        Relation        ss_currentRelation;
-        struct HeapScanDescData * ss_currentScanDesc;
-        struct TupleTableSlot *ss_ScanTupleSlot;
+	PlanState        ps;                                /* its first field is NodeTag */
+	Relation        ss_currentRelation;
+	struct TupleTableSlot *ss_ScanTupleSlot;
+	
+	int scan_state;
+	
+	/* The type of the table that is being scanned */
+	TableType tableType;
 
-        int scan_state;
-
-        /* CKTAN */
-        struct {
-                HeapTupleData item[512];
-                int bot, top;
-                HeapTuple last;
-                int seen_EOS;
-        } ss_heapTupleData;
 } ScanState;
 
 /*
- * SeqScan uses a bare ScanState as its state node, since it needs
- * no additional fields.
+ * SeqScanOpaqueData
+ *   Additional state data (in addition to ScanState) for scanning heap table.
  */
-typedef ScanState SeqScanState;
+typedef struct SeqScanOpaqueData
+{
+	struct HeapScanDescData * ss_currentScanDesc;
 
-/* Gpperfmon helper function */
-extern char *GetScanRelNameGpmon(Oid relid, char schema_table_name[SCAN_REL_NAME_BUF_SIZE]);
+	struct {
+		HeapTupleData item[512];
+		int bot, top;
+		HeapTuple last;
+		int seen_EOS;
+	} ss_heapTupleData;
+	
+} SeqScanOpaqueData;
+
+/*
+ * SeqScanState
+ *   State data for scanning heap table.
+ */
+typedef struct SeqScanState
+{
+	ScanState ss;
+	SeqScanOpaqueData *opaque;
+} SeqScanState;
 
 /*
  * These structs store information about index quals that don't have simple
@@ -1268,6 +1386,27 @@ typedef struct IndexScanState
         struct IndexScanDescData *iss_ScanDesc;
 } IndexScanState;
 
+/*
+ * DynamicIndexScanState
+ */
+typedef struct DynamicIndexScanState
+{
+	IndexScanState indexScanState;
+
+	/*
+	* Partition Id Index that mantains all unique ids for the
+	* DynamicIndexScan.
+	*/
+	HTAB *pidxIndex;
+
+	/*
+	* Status of the sequentially index scan of the pid index.
+	*/
+	HASH_SEQ_STATUS pidxStatus;
+
+} DynamicIndexScanState;
+
+
 /* ----------------
  *         BitmapIndexScanState information
  *
@@ -1286,18 +1425,18 @@ typedef struct IndexScanState
  */
 typedef struct BitmapIndexScanState
 {
-        ScanState        ss;                                /* its first field is NodeTag */
-        Node            *bitmap;                        /* output bitmap */
-        ScanKey                biss_ScanKeys;
-        int                        biss_NumScanKeys;
-        IndexRuntimeKeyInfo *biss_RuntimeKeys;
-        int                        biss_NumRuntimeKeys;
-        IndexArrayKeyInfo *biss_ArrayKeys;
-        int                        biss_NumArrayKeys;
-        bool                biss_RuntimeKeysReady;
-        ExprContext *biss_RuntimeContext;
-        Relation        biss_RelationDesc;
-        struct IndexScanDescData *biss_ScanDesc;
+	ScanState        ss;                                /* its first field is NodeTag */
+	Node            *bitmap;                        /* output bitmap */
+	ScanKey                biss_ScanKeys;
+	int                        biss_NumScanKeys;
+	IndexRuntimeKeyInfo *biss_RuntimeKeys;
+	int                        biss_NumRuntimeKeys;
+	IndexArrayKeyInfo *biss_ArrayKeys;
+	int                        biss_NumArrayKeys;
+	bool                biss_RuntimeKeysReady;
+	ExprContext *biss_RuntimeContext;
+	Relation        biss_RelationDesc;
+	struct IndexScanDescData *biss_ScanDesc;
 } BitmapIndexScanState;
 
 /* ----------------
@@ -1310,10 +1449,11 @@ typedef struct BitmapIndexScanState
  */
 typedef struct BitmapHeapScanState
 {
-        ScanState        ss;                                /* its first field is NodeTag */
-        List           *bitmapqualorig;
-        Node  *tbm;
-        struct TBMIterateResult *tbmres;
+	ScanState        ss;                                /* its first field is NodeTag */
+	struct HeapScanDescData * ss_currentScanDesc;
+	List           *bitmapqualorig;
+	Node  *tbm;
+	struct TBMIterateResult *tbmres;
 } BitmapHeapScanState;
 
 /* ----------------
@@ -1470,18 +1610,35 @@ typedef struct ExternalScanState
 } ExternalScanState;
 
 /* ----------------
-*         AppendOnlyScanState information
-*
-*                AppendOnlyScan nodes are used to scan append only tables
-*
-*                aos_ScanDesc                the context of the append only scan
-* ----------------
-*/
+ * AppendOnlyScanState information
+ *
+ *   AppendOnlyScan nodes are used to scan append only tables
+ *
+ *   aos_ScanDesc is the additional data that is needed for scanning
+ * AppendOnly table.
+ * ----------------
+ */
 typedef struct AppendOnlyScanState
 {
         ScanState        ss;
         struct AppendOnlyScanDescData *aos_ScanDesc;
 } AppendOnlyScanState;
+
+/*
+ * AOCSScanOpaqueData
+ *    Additional data (in addition to ScanState) for scanning AppendOnly
+ * columnar table.
+ */
+typedef struct AOCSScanOpaqueData
+{
+	/*
+	 * The array to indicate columns that are involved in the scan.
+	 */
+	bool *proj;
+	int  ncol;
+
+	struct AOCSScanDescData *scandesc;
+} AOCSScanOpaqueData;
 
 /* -----------------------------------------------
  *      AOCSScanState
@@ -1489,11 +1646,47 @@ typedef struct AppendOnlyScanState
  */
 typedef struct AOCSScanState
 {
-        ScanState ss;
-        bool *proj;
-        int  ncol;
-        struct AOCSScanDescData *scandesc;
+	ScanState ss;
+	AOCSScanOpaqueData *opaque;
 } AOCSScanState;
+
+/*
+ * TableScanState
+ *   Encapsulate the scan state for different table type.
+ *
+ * During execution, the 'opaque' is mapped to different XXXOpaqueData
+ * for different table type.
+ */
+typedef struct TableScanState
+{
+	ScanState ss;
+
+	/*
+	 * Opaque data that is associated with different table type.
+	 */
+	void *opaque;
+	
+} TableScanState;
+
+/*
+ * DynamicTableScanState
+ */
+typedef struct DynamicTableScanState
+{
+	TableScanState tableScanState;
+
+	/*
+	 * Pid index that maintains all unique partition pids for this dynamic
+	 * table scan to scan.
+	 */
+	HTAB *pidIndex;
+	
+	/*
+	 * The status of sequentially scan the pid index.
+	 */
+	HASH_SEQ_STATUS pidStatus;
+
+} DynamicTableScanState;
 
 /* ----------------------------------------------------------------
  *                                 Join State Information
@@ -1680,8 +1873,8 @@ typedef struct ShareInputScanState
 } ShareInputScanState;
 
 /* XXX Should move into buf file */
-extern void *shareinput_reader_waitready(int share_id);
-extern void *shareinput_writer_notifyready(int share_id, int nsharer_xslice_notify_ready);
+extern void *shareinput_reader_waitready(int share_id, PlanGenerator planGen);
+extern void *shareinput_writer_notifyready(int share_id, int nsharer_xslice_notify_ready, PlanGenerator planGen);
 extern void shareinput_reader_notifydone(void *, int share_id);
 extern void shareinput_writer_waitdone(void *, int share_id, int nsharer_xslice_wait_done);
 extern void shareinput_create_bufname_prefix(char* p, int size, int share_id);
@@ -1919,6 +2112,70 @@ typedef struct LimitState
         struct TupleTableSlot *subSlot;        /* tuple last obtained from subplan */
 } LimitState;
 
+/* 
+ * DML Operations
+ */
+
+/*
+ * ExecNode for DML.
+ * This operator contains a Plannode in PlanState.
+ * The Plannode contains indexes to the resjunk columns
+ * needed for deciding the action (Insert/Delete), the table oid
+ * and the tuple ctid.
+ */
+typedef struct DMLState
+{
+	
+	PlanState	ps;
+	JunkFilter *junkfilter;			/* filter that removes junk and dropped attributes */
+	struct TupleTableSlot *insertSlot;	/* holds `final' tuple */
+	
+} DMLState;
+
+/*
+ * ExecNode for Split.
+ * This operator contains a Plannode in PlanState.
+ * The Plannode contains indexes to the ctid, insert, delete, resjunk columns
+ * needed for adding the action (Insert/Delete).
+ * A MemoryContext and TupleTableSlot are maintained to keep the INSERT
+ * tuple until requested.
+ */
+typedef struct SplitUpdateState
+{
+	
+	PlanState		ps;
+	bool			processInsert;		/* flag that specifies the operator's next action. */
+	struct TupleTableSlot	*insertTuple;	/* tuple to Insert */
+	struct TupleTableSlot   *deleteTuple;	/* tuple to Delete */
+	
+} SplitUpdateState;
+
+/*
+ * ExecNode for AssertOp.
+ * This operator contains a Plannode that contains the expressions
+ * to execute.
+ */
+typedef struct AssertOpState
+{	
+	PlanState	ps;
+	
+} AssertOpState;
+
+/*
+ * ExecNode for RowTrigger.
+ * This operator contains a Plannode that contains the triggers
+ * to execute.
+ */
+typedef struct RowTriggerState
+{
+ 	PlanState				ps;
+ 	struct TupleTableSlot 	*newTuple;	/* stores new values */
+ 	struct TupleTableSlot 	*oldTuple;	/* stores old values */
+ 	struct TupleTableSlot 	*triggerTuple;  /* stores returned values by the trigger */
+
+} RowTriggerState;
+
+
 typedef enum MotionStateType
 {
         MOTIONSTATE_NONE,           /* The motion state is not decided, or non active in a slice
@@ -1975,13 +2232,14 @@ typedef struct MotionState
 extern void sendInitGpmonPkts(Plan *node, EState *estate);
 extern void initGpmonPktForResult(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estate);
 extern void initGpmonPktForAppend(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estate);
+extern void initGpmonPktForSequence(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estate);
 extern void initGpmonPktForBitmapAnd(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estate);
 extern void initGpmonPktForBitmapOr(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estate);
-extern void initGpmonPktForSeqScan(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estate);
-extern void initGpmonPktForAppendOnlyScan(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estate);
-extern void initGpmonPktForAOCSScan(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estate);
+extern void initGpmonPktForTableScan(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estate);
+extern void initGpmonPktForDynamicTableScan(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estate);
 extern void initGpmonPktForExternalScan(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estate);
 extern void initGpmonPktForIndexScan(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estate);
+extern void initGpmonPktForDynamicIndexScan(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estate);
 extern void initGpmonPktForBitmapIndexScan(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estate);
 extern void initGpmonPktForBitmapHeapScan(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estate);
 extern void initGpmonPktForBitmapAppendOnlyScan(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estate);
@@ -2004,7 +2262,8 @@ extern void initGpmonPktForMotion(Plan *planNode, gpmon_packet_t *gpmon_pkt, ESt
 extern void initGpmonPktForShareInputScan(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estate);
 extern void initGpmonPktForWindow(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estate);
 extern void initGpmonPktForRepeat(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estate);
-
+extern void initGpmonPktForDefunctOperators(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estate);
+extern void initGpmonPktForDML(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estate);
 /*
  * The funcion pointers to init gpmon package for each plan node. 
  * The order of the function pointers are the same as the one defined in

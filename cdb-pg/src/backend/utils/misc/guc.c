@@ -175,6 +175,8 @@ static const char *assign_log_min_messages(const char *newval, bool doit,
 						GucSource source);
 static const char *assign_client_min_messages(const char *newval,
 						   bool doit, GucSource source);
+static const char *assign_gp_opt_log_failure(const char *newval,
+							bool doit, GucSource source);
 static const char *assign_min_error_statement(const char *newval, bool doit,
 						   GucSource source);
 static const char *assign_time_slice_report_level(const char *newval, bool doit,
@@ -480,6 +482,7 @@ static char *gp_hashagg_compress_spill_files_str;
 static char *gp_workfile_compress_algorithm_str;
 static char *gp_workfile_type_hashjoin_str;
 static char *client_min_messages_str;
+static char *gp_opt_log_failure_str;
 static char *Debug_persistent_print_level_str;
 static char *Debug_persistent_recovery_print_level_str;
 static char *Debug_persistent_store_print_level_str;
@@ -566,6 +569,9 @@ static char *gp_test_deadlock_hazard_report_level_str;
 bool gp_cancel_query_print_log;
 int gp_cancel_query_delay_time;
 
+/* partitioning GUC */
+bool gp_partitioning_dynamic_selection_log;
+ 
 /* Enable the SEGV/BUS/ILL signal handler that are async safe. */
 bool gp_crash_handler_async = false;
 
@@ -639,14 +645,51 @@ bool		gp_cte_sharing = false;
 
 char	   *gp_idf_deduplicate_str;
 
+/* gp_disable_catalog_access_on_segment */
+bool gp_disable_catalog_access_on_segment = false;
+
+/* ORCA related gucs */
+bool		gp_optimizer;
+bool		gp_log_optimizer;
+bool		gp_opt_minidump;
+bool		gp_opt_print_query;
+bool		gp_opt_print_plan;
+bool		gp_opt_print_xform;
+bool		gp_opt_disable_xform_result_printing;
+bool		gp_opt_print_memo_after_exploration;
+bool		gp_opt_print_memo_after_implementation;
+bool		gp_opt_print_memo_after_optimization;
+bool		gp_opt_print_job_scheduler;
+bool		gp_opt_print_expression_properties;
+bool		gp_opt_print_group_properties;
+bool		gp_opt_print_optimization_context;
+bool		gp_opt_print_optimization_stats;
+bool		gp_opt_parallel;
+bool		gp_opt_local;
+int 		gp_opt_retries;
+bool  		gp_opt_xforms[GPOPT_XFORMS] = {[0 ... GPOPT_XFORMS - 1] = false}; /* array of xforms disable flags */
+char 		*gp_opt_search_strategy_path = NULL;
+char	   *gp_idf_deduplicate_str;
+bool		gp_opt_extract_dxl_stats;
+bool		gp_opt_extract_dxl_stats_all_nodes;
+bool		gp_opt_enumerate_plans;
+bool		gp_opt_sample_plans;
+int			gp_opt_plan_id;
+int 		gp_opt_samples_number;
+int			gp_opt_log_failure;
+double		gp_opt_cost_threshold;
+bool		gp_opt_cte_inlining;
+int			gp_opt_cte_inlining_bound;
+double 		gp_opt_damping_factor_filter;
+double		gp_opt_damping_factor_join;
+double 		gp_opt_damping_factor_groupby;
+
 /* Security */
 bool		gp_reject_internal_tcp_conn = true;
 
 /* plpgsql plancache GUC */
 bool gp_plpgsql_clear_cache_always = false;
 
-/* gp_disable_catalog_access_on_segment */
-bool gp_disable_catalog_access_on_segment = false;
 
 /* indicate whether called by gpdump, if yes, processutility will open some limitations */
 bool gp_called_by_pgdump = false;
@@ -3286,7 +3329,17 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
-		{"gp_perfmon_print_packet_info", PGC_USERSET, DEVELOPER_OPTIONS,
+	 	{"gp_partitioning_dynamic_selection_log", PGC_USERSET, DEVELOPER_OPTIONS,
+		 gettext_noop("Print out debugging info for GPDB dynamic partition selection"),
+		 NULL,
+		 GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE | GUC_GPDB_ADDOPT
+		},
+		&gp_partitioning_dynamic_selection_log,
+		false, NULL, NULL
+	},
+
+	{
+	 	{"gp_perfmon_print_packet_info", PGC_USERSET, DEVELOPER_OPTIONS,
 		 gettext_noop("Print out debugging info for a Perfmon packet"),
 		 NULL,
 		 GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE | GUC_GPDB_ADDOPT
@@ -3363,6 +3416,234 @@ static struct config_bool ConfigureNamesBool[] =
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
 		&gp_ignore_window_exclude,
+		false, NULL, NULL
+	},
+
+	{
+		{"gp_optimizer", PGC_USERSET, QUERY_TUNING_METHOD,
+			gettext_noop("Enable the new optimizer."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_optimizer,
+		false, NULL, NULL
+	},
+
+	{
+		{"gp_log_optimizer", PGC_USERSET, LOGGING_WHAT,
+			gettext_noop("Log new optimizer messages."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_log_optimizer,
+		false, NULL, NULL
+	},
+
+	{
+		{"gp_opt_minidump", PGC_USERSET, LOGGING_WHAT,
+			gettext_noop("Produce a minidump on every query."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_minidump,
+		false, NULL, NULL
+	},
+
+	{
+		{"gp_opt_print_query", PGC_USERSET, LOGGING_WHAT,
+			gettext_noop("Prints the optimizer's input query expression tree."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_print_query,
+		false, NULL, NULL
+	},
+
+	{
+		{"gp_opt_print_plan", PGC_USERSET, LOGGING_WHAT,
+			gettext_noop("Prints the plan expression tree produced by the optimizer."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_print_plan,
+		false, NULL, NULL
+	},
+	
+	{
+		{"gp_opt_print_xform", PGC_USERSET, LOGGING_WHAT,
+			gettext_noop("Prints optimizer transformation information."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_print_xform,
+		false, NULL, NULL
+	},
+
+	{
+		{"gp_opt_disable_xform_result_printing", PGC_USERSET, LOGGING_WHAT,
+			gettext_noop("Disable printing the input and output of optimizer transformations."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_disable_xform_result_printing,
+		false, NULL, NULL
+	},
+ 
+	{
+		{"gp_opt_print_memo_after_exploration", PGC_USERSET, LOGGING_WHAT,
+			gettext_noop("Print optimizer memo structure after the exploration phase."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_print_memo_after_exploration,
+		false, NULL, NULL
+	},
+
+	{
+		{"gp_opt_print_memo_after_implementation", PGC_USERSET, LOGGING_WHAT,
+			gettext_noop("Print optimizer memo structure after the implementation phase."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_print_memo_after_implementation,
+		false, NULL, NULL
+	},
+
+	{
+		{"gp_opt_print_memo_after_optimization", PGC_USERSET, LOGGING_WHAT,
+			gettext_noop("Print optimizer memo structure after optimization."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_print_memo_after_optimization,
+		false, NULL, NULL
+	},
+
+	{
+		{"gp_opt_print_job_scheduler", PGC_USERSET, LOGGING_WHAT,
+			gettext_noop("Print the jobs in the scheduler on each job completion."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_print_job_scheduler,
+		false, NULL, NULL
+	},
+
+	{
+		{"gp_opt_print_expression_properties", PGC_USERSET, LOGGING_WHAT,
+			gettext_noop("Print expression properties."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_print_expression_properties,
+		false, NULL, NULL
+	},
+
+	{
+		{"gp_opt_print_group_properties", PGC_USERSET, LOGGING_WHAT,
+			gettext_noop("Print group properties."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_print_group_properties,
+		false, NULL, NULL
+	},
+
+	{
+		{"gp_opt_print_optimization_context", PGC_USERSET, LOGGING_WHAT,
+			gettext_noop("Print the optimization context."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_print_optimization_context,
+		false, NULL, NULL
+	}, 
+ 	{
+ 		{"gp_reject_internal_tcp_connection", PGC_POSTMASTER,
+			DEVELOPER_OPTIONS,
+			gettext_noop("Permit internal TCP connections to the master."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_reject_internal_tcp_conn,
+		true, NULL, NULL
+	},
+	
+	{
+		{"gp_opt_print_optimization_stats", PGC_USERSET, LOGGING_WHAT,
+			gettext_noop("Print optimization stats."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+ 		&gp_opt_print_optimization_stats,
+		false, NULL, NULL
+	},
+	
+	{
+		{"gp_opt_parallel", PGC_USERSET, LOGGING_WHAT,
+			gettext_noop("Enable using threads in optimization engine."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_parallel,
+		false, NULL, NULL
+	},
+
+	{
+		{"gp_opt_local", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Invoke optimizer inside QD process."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_local,
+		true, NULL, NULL
+	},
+ 	{
+		{"gp_opt_extract_dxl_stats", PGC_USERSET, LOGGING_WHAT,
+			gettext_noop("Extract plan stats in dxl."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_extract_dxl_stats,
+		false, NULL, NULL
+	},
+	{
+		{"gp_opt_extract_dxl_stats_all_nodes", PGC_USERSET, LOGGING_WHAT,
+			gettext_noop("Extract plan stats for all physical dxl nodes."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_extract_dxl_stats_all_nodes,
+		false, NULL, NULL
+	},
+
+	{
+		{"gp_opt_enumerate_plans", PGC_USERSET, LOGGING_WHAT,
+			gettext_noop("Enable plan enumeration"),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_enumerate_plans,
+		false, NULL, NULL
+	},
+ 
+	{
+		{"gp_opt_sample_plans", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Enable plan sampling"),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_sample_plans,
+		false, NULL, NULL
+	},
+
+	{
+		{"gp_opt_cte_inlining", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Enable CTE inlining"),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_cte_inlining,
 		false, NULL, NULL
 	},
 
@@ -5262,7 +5543,17 @@ static struct config_int ConfigureNamesInt[] =
 		100, 50, INT_MAX, NULL, NULL
 	},
 
-        {
+	{
+		{"gp_opt_retries", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Sets the number of retries on QD to get execution plan from the OPT process"),
+			NULL,
+			GUC_UNIT_KB | GUC_GPDB_ADDOPT | GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_retries,
+		3, 0, INT_MAX, NULL, NULL
+	},
+
+       {
             {"gp_backup_directIO_read_chunk_mb", PGC_USERSET, DEVELOPER_OPTIONS,
                     gettext_noop("Size of read Chunk buffer in directIO dump (in MB)"),
                     NULL,
@@ -5300,6 +5591,38 @@ static struct config_int ConfigureNamesInt[] =
 		7200, 300, 86400, NULL, NULL
 	},
 #endif
+
+	{
+		{"gp_opt_plan_id", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Choose a plan alternative"),
+			NULL,
+			GUC_GPDB_ADDOPT | GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_plan_id,
+		0, 0, INT_MAX, NULL, NULL
+	},
+
+	{
+		{"gp_opt_samples_number", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Set the number of plan samples"),
+			NULL,
+			GUC_GPDB_ADDOPT | GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_samples_number,
+		1000, 1, INT_MAX, NULL, NULL
+	},
+
+	{
+		{"gp_opt_cte_inlining_bound", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Set the CTE inlining cutoff"),
+			NULL,
+			GUC_GPDB_ADDOPT | GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_cte_inlining_bound,
+		0, 0, INT_MAX, NULL, NULL
+	},
+
+
 	/* End-of-list marker */
 	{
 		{NULL, 0, 0, NULL, NULL}, NULL, 0, 0, 0, NULL, NULL
@@ -5510,6 +5833,44 @@ static struct config_real ConfigureNamesReal[] =
 		100.0, 0.001, 100.0, NULL, NULL
 	},
 
+	{
+		{"gp_opt_damping_factor_filter", PGC_USERSET, QUERY_TUNING_METHOD,
+		 gettext_noop("select predicate damping factor in optimizer, 1.0 means no damping"),
+		 NULL,
+		 GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_damping_factor_filter,
+		0.75, 0.0, 1.0, NULL, NULL
+	},
+
+	{
+		{"gp_opt_damping_factor_join", PGC_USERSET, QUERY_TUNING_METHOD,
+		 gettext_noop("join predicate damping factor in optimizer, 1.0 means no damping"),
+		 NULL,
+		 GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_damping_factor_join,
+		0.01, 0.0, 1.0, NULL, NULL
+	},
+	{
+		{"gp_opt_damping_factor_groupby", PGC_USERSET, QUERY_TUNING_METHOD,
+		 gettext_noop("groupby operator damping factor in optimizer, 1.0 means no damping"),
+		 NULL,
+		 GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_damping_factor_groupby,
+		0.75, 0.0, 1.0, NULL, NULL
+	},
+
+	{
+		{"gp_opt_cost_threshold",PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("set the threshold for plan smapling relative to the cost of best plan, 0.0 means unbounded"),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_opt_cost_threshold,
+		0.0, 0.0, INT_MAX, NULL, NULL
+	},
 
 /* End-of-list marker */
 	{
@@ -5600,6 +5961,16 @@ static struct config_string ConfigureNamesString[] =
 		},
 		&client_min_messages_str,
 		"notice", assign_client_min_messages, NULL
+	},
+
+	{
+		{"gp_opt_log_failure", PGC_USERSET, LOGGING_WHEN,
+			gettext_noop("Sets which optimizer failures are logged."),
+			gettext_noop("Valid values are unexpected, expected, all"),
+			GUC_GPDB_ADDOPT
+		},
+		&gp_opt_log_failure_str,
+		"unexpected", assign_gp_opt_log_failure, NULL
 	},
 
 	{
@@ -6509,6 +6880,15 @@ static struct config_string ConfigureNamesString[] =
 		},
 		&gp_idf_deduplicate_str,
 		"auto", assign_gp_idf_deduplicate, NULL
+	},
+
+	{
+		{"gp_opt_search_strategy_path", PGC_USERSET, QUERY_TUNING_METHOD,
+			gettext_noop("Sets the search strategy used by gp optimizer."),
+			NULL
+		},
+		&gp_opt_search_strategy_path,
+		"default", NULL, NULL
 	},
 
 	/* End-of-list marker */
@@ -10914,6 +11294,30 @@ assign_client_min_messages(const char *newval, bool doit, GucSource source)
 {
 	return (assign_msglvl(&client_min_messages, newval, doit, source));
 }
+
+static const char *
+assign_gp_opt_log_failure(const char *val, bool assign, GucSource source)
+{
+	if (pg_strcasecmp(val, "all") == 0 && assign)
+	{
+		gp_opt_log_failure = GPOPT_ALL_FAIL;
+	}
+	else if (pg_strcasecmp(val, "unexpected") == 0 && assign)
+	{
+		gp_opt_log_failure = GPOPT_UNEXPECTED_FAIL;
+	}
+	else if (pg_strcasecmp(val, "expected") == 0 && assign)
+	{
+		gp_opt_log_failure = GPOPT_EXPECTED_FAIL;
+	}
+	else
+	{
+		return NULL; /* fail */
+	}
+
+	return val;
+}
+
 
 static const char *
 assign_min_error_statement(const char *newval, bool doit, GucSource source)

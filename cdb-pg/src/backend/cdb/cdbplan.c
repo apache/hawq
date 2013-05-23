@@ -198,7 +198,30 @@ plan_tree_mutator(Node *node,
 			}
 			break;
 
-        case T_BitmapAnd:
+		case T_Sequence:
+			{
+				Sequence *sequence = (Sequence *) node;
+				Sequence *newSequence = NULL;
+
+				FLATCOPY(newSequence, sequence, Sequence);
+				PLANMUTATE(newSequence, sequence);
+				MUTATE(newSequence->subplans, sequence->subplans, List *);
+
+				return (Node *) newSequence;
+			}
+			
+		case T_AssertOp:
+			{
+				AssertOp *assert = (AssertOp *) node;
+				AssertOp *newAssert = NULL;
+
+				FLATCOPY(newAssert, assert, AssertOp);
+				PLANMUTATE(newAssert, assert);
+
+				return (Node *) newAssert;
+			}
+
+		case T_BitmapAnd:
 			{
 				BitmapAnd  *old = (BitmapAnd *) node;
                 BitmapAnd  *mut;
@@ -258,6 +281,30 @@ plan_tree_mutator(Node *node,
 				SCANMUTATE(newaocs, aocs);
 				/* (for now) A AOCSScan is really just a Scan, so we're done. */
 				return (Node *) newaocs;
+			}
+			break;
+				
+		case T_TableScan:
+			{
+				TableScan *tableScan = (TableScan *) node;
+				TableScan *newTableScan = NULL; 
+				
+				FLATCOPY(newTableScan, tableScan, TableScan);
+				SCANMUTATE(newTableScan, tableScan);
+
+				return (Node *) newTableScan;
+			}
+			break;
+				
+		case T_DynamicTableScan:
+			{
+				DynamicTableScan *tableScan = (DynamicTableScan *) node;
+				DynamicTableScan *newTableScan = NULL;
+				
+				FLATCOPY(newTableScan, tableScan, DynamicTableScan);
+				SCANMUTATE(newTableScan, tableScan);
+				newTableScan->partIndex = tableScan->partIndex;
+				return (Node *) newTableScan;
 			}
 			break;
 				
@@ -833,6 +880,14 @@ set_hasxslice_in_append_walker(Node *node, void *ctx)
 			
 			((Append *)node)->hasXslice =
 				bms_is_member(context->currentSliceNo, context->slices);
+
+			return false;
+		}
+
+		case T_Sequence:
+		{
+			walk_plan_node_fields((Plan *) node, set_hasxslice_in_append_walker, ctx);
+			set_hasxslice_in_append_walker((Node *) ((Sequence *) node)->subplans, context);
 
 			return false;
 		}

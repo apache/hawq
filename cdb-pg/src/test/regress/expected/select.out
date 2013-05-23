@@ -537,7 +537,7 @@ create function select_f(int) returns int as $$
 		end if;
 		return select_f($1-1) + select_i($1);
 	end;
-	$$ language plpgsql;
+	$$ language plpgsql READS SQL DATA;
 	
 select x, select_f(x) from (values (0), (1), (2), (3), (4), (5), (6)) r(x);
  x | select_f 

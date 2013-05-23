@@ -189,12 +189,14 @@ ignore: trig
 ignore: xml
 ignore: auth_constraint
 ignore: column_compression
+ignore: tpch500GB_orca
 ignore: role
 ignore: rle
 ignore: portals_updatable
 ignore: plpgsql_cache
 ignore: percentile
 ignore: resource_queue_function
+ignore: gp_optimizer
 ignore: co_nestloop_idxscan
 test: madlib_array_ops
 test: madlib_svec_test

@@ -15,7 +15,16 @@
 #include "optimizer/var.h"
 #include "utils/lsyscache.h"
 #include "catalog/pg_proc.h"
+#include "catalog/namespace.h"
+#include "parser/parse_oper.h"
+#include "parser/parse_coerce.h"
+#include "lib/stringinfo.h"
+#include "catalog/pg_operator.h"
 
+// max size of a folded constant when optimizing queries in Orca
+// Note: this is to prevent OOM issues when trying to serialize very large constants
+// Current limit: 100KB
+#define GPOPT_MAX_FOLDED_CONSTANT_SIZE (100*1024)
 /**
  * Static declarations
  */
@@ -30,6 +39,26 @@ static Query *make_sirvf_subquery(FuncExpr *fe);
 static bool safe_to_replace_sirvf_tle(Query *query);
 static bool safe_to_replace_sirvf_rte(Query *query);
 static void wrap_vars_with_fieldselect(List *targetlist, int varno, Oid newvartype);
+
+/**
+ * Preprocess query structure for consumption by the optimizer
+ */
+Query *preprocess_query_optimizer(Query *query, ParamListInfo boundParams)
+{
+#ifdef USE_ASSERT_CHECKING
+	Query *qcopy = (Query *) copyObject(query);
+#endif
+
+	/* fold all constant expressions */
+	Query *res = fold_constants(query, boundParams, GPOPT_MAX_FOLDED_CONSTANT_SIZE);
+
+#ifdef USE_ASSERT_CHECKING
+	Assert(equal(qcopy, query) && "Preprocessing should not modify original query object");
+#endif
+
+	return res;
+
+}
 
 /**
  * Normalize query before planning.
@@ -547,3 +576,4 @@ static void wrap_vars_with_fieldselect(List *targetlist, int varno, Oid recordty
 		lfirst(lc) = (TargetEntry *) wrap_vars_with_fieldselect_mutator((Node *) tle, &ctx);
 	}
 }
+
