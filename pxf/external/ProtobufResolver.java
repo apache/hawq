@@ -1,13 +1,11 @@
-import com.emc.greenplum.gpdb.hdfsconnector.*;
-import com.emc.greenplum.gpdb.hdfsconnector.OneField;
-import com.emc.greenplum.gpdb.hadoop.io.GPDBWritable;
-import com.google.protobuf.Descriptors.Descriptor;
+import com.pivotal.pxf.format.OneField;
+import com.pivotal.pxf.format.OneRow;
+import com.pivotal.pxf.hadoop.io.GPDBWritable;
+import com.pivotal.pxf.resolvers.IFieldsResolver;
+import com.pivotal.pxf.utilities.HDFSMetaData;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.DynamicMessage;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 /*
  * Implementation for protocol-buffers of IFieldsResolver

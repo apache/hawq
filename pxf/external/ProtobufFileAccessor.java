@@ -1,19 +1,16 @@
-import com.emc.greenplum.gpdb.hdfsconnector.*;
-import com.google.protobuf.DescriptorProtos.FileDescriptorSet;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
+
 import com.google.protobuf.DescriptorProtos;
-import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Descriptors.DescriptorValidationException;
 import com.google.protobuf.DynamicMessage;
-import java.io.FileInputStream;
-import java.io.InputStream;
-import java.io.IOException;
-import java.lang.reflect.Field;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import org.apache.hadoop.fs.Path;
+import com.pivotal.pxf.accessors.OddFileAccessor;
+import com.pivotal.pxf.format.OneRow;
+import com.pivotal.pxf.utilities.HDFSMetaData;
 
 /*
  * Specialization of OddFileAccessor for protocol-buffer files
