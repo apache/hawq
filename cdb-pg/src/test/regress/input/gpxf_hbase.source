@@ -31,7 +31,7 @@ FORMAT 'CUSTOM' (formatter='gpdbwritable_export');
 \! javac -cp `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar` @abs_srcdir@/helpers/HBaseCreateTables.java @abs_srcdir@/helpers/HBaseDropTables.java @abs_srcdir@/helpers/HBaseChangeLookupTable.java
 \! java -cp  `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar`:`echo ${HADOOP_ROOT}/lib/commons-logging-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-configuration-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-lang-[1-9]*.jar`:@abs_srcdir@/helpers HBaseCreateTables
 
-set gpxf_enable_filter_pushdown = on;
+SET gpxf_enable_filter_pushdown = on;
 -- Test
 CREATE EXTERNAL TABLE gphbase_select(recordkey TEXT, 
                                      "cf1:q1" VARCHAR, 
@@ -64,9 +64,9 @@ SELECT * FROM gphbase_select WHeRE "cf1:q9" < -7000000000000000 ORDER BY recordk
 SELECT * FROM gphbase_select WHERE recordkey > 'row00000090' AND recordkey <= 'row00000103' OR recordkey = 'row00000105' ORDER BY recordkey ASC;
 SELECT * FROM gphbase_select WHERE recordkey != 'row00000099' AND "cf1:q8" > 97 AND "cf1:q9" <= 9702990000000099 ORDER BY recordkey ASC;
 SELECT * FROM gphbase_select WHERE "cf1:q9" <= 9702990000000099 AND recordkey != 'row00000099' AND "cf1:q8" > 97 ORDER BY recordkey ASC;
-set gpxf_enable_filter_pushdown = off;
+SET gpxf_enable_filter_pushdown = off;
 SELECT * FROM gphbase_select WHERE "cf1:q9" <= 9702990000000099 AND recordkey != 'row00000099' AND "cf1:q8" > 97 ORDER BY recordkey ASC;
-set gpxf_enable_filter_pushdown = on;
+SET gpxf_enable_filter_pushdown = on;
 DROP EXTERNAL TABLE gphbase_select;
 -- Test null values
 CREATE EXTERNAL TABLE gphbase_null(recordkey TEXT, 
@@ -133,5 +133,22 @@ SELECT recordkey, "cf1:q1" FROM gphbase_lookup ORDER BY recordkey LIMIT 5;
 -- create lookup table
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar`:`echo ${HADOOP_ROOT}/lib/commons-logging-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-configuration-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-lang-[1-9]*.jar`:@abs_srcdir@/helpers HBaseChangeLookupTable create-table
 DROP EXTERNAL TABLE gphbase_lookup;
+-- query a table with rowkey as integer (HD-2610)
+CREATE EXTERNAL TABLE gphbase_integer_rowkey(recordkey INTEGER, 
+                                     "cf1:q1" VARCHAR, 
+                                     "cf1:q2" TEXT, 
+                                     "cf1:q3" INT, 
+                                     "cf1:q4" BYTEA, 
+                                     "cf1:q5" REAL, 
+                                     "cf1:q6" FLOAT, 
+                                     "cf1:q7" CHAR, 
+                                     "cf1:q8" SMALLINT, 
+                                     "cf1:q9" BIGINT) 
+LOCATION ('gpxf://@hostname@:50070/gphbase_test_integer_rowkey?FRAGMENTER=HBaseDataFragmenter')
+FORMAT 'CUSTOM' (formatter='gpxfwritable_import');
+SET gpxf_enable_filter_pushdown = on;
+SELECT * FROM gphbase_integer_rowkey WHERE recordkey = 50;
+SELECT * FROM gphbase_integer_rowkey WHERE recordkey <= 30 OR recordkey > 145 ORDER BY recordkey;
+DROP EXTERNAL TABLE gphbase_integer_rowkey;
 -- Cleanup
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar`:`echo ${HADOOP_ROOT}/lib/commons-logging-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-configuration-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-lang-[1-9]*.jar`:@abs_srcdir@/helpers HBaseDropTables

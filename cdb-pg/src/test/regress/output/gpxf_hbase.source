@@ -44,7 +44,12 @@ create table
 populate table
 update lookup table
 leave
-set gpxf_enable_filter_pushdown = on;
+Create table 'gphbase_test_integer_rowkey', with integer rowkey and 50 rows per split
+create table
+populate table
+update lookup table
+leave
+SET gpxf_enable_filter_pushdown = on;
 -- Test
 CREATE EXTERNAL TABLE gphbase_select(recordkey TEXT, 
                                      "cf1:q1" VARCHAR, 
@@ -696,7 +701,7 @@ SELECT * FROM gphbase_select WHERE "cf1:q9" <= 9702990000000099 AND recordkey !=
  row00000299 | ASCII00000099 | UTF8_計算機用語_00000099 |    300 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
 (5 rows)
 
-set gpxf_enable_filter_pushdown = off;
+SET gpxf_enable_filter_pushdown = off;
 SELECT * FROM gphbase_select WHERE "cf1:q9" <= 9702990000000099 AND recordkey != 'row00000099' AND "cf1:q8" > 97 ORDER BY recordkey ASC;
   recordkey  |    cf1:q1     |          cf1:q2          | cf1:q3 |       q4       | cf1:q5 |   cf1:q6    | cf1:q7 | cf1:q8 |      cf1:q9       
 -------------+---------------+--------------------------+--------+----------------+--------+-------------+--------+--------+-------------------
@@ -707,7 +712,7 @@ SELECT * FROM gphbase_select WHERE "cf1:q9" <= 9702990000000099 AND recordkey !=
  row00000299 | ASCII00000099 | UTF8_計算機用語_00000099 |    300 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
 (5 rows)
 
-set gpxf_enable_filter_pushdown = on;
+SET gpxf_enable_filter_pushdown = on;
 DROP EXTERNAL TABLE gphbase_select;
 -- Test null values
 CREATE EXTERNAL TABLE gphbase_null(recordkey TEXT, 
@@ -861,6 +866,67 @@ SELECT recordkey, "cf1:q1" FROM gphbase_lookup ORDER BY recordkey LIMIT 5;
 Command: [create-table]
 create table
 DROP EXTERNAL TABLE gphbase_lookup;
+-- query a table with rowkey as integer (HD-2610)
+CREATE EXTERNAL TABLE gphbase_integer_rowkey(recordkey INTEGER, 
+                                     "cf1:q1" VARCHAR, 
+                                     "cf1:q2" TEXT, 
+                                     "cf1:q3" INT, 
+                                     "cf1:q4" BYTEA, 
+                                     "cf1:q5" REAL, 
+                                     "cf1:q6" FLOAT, 
+                                     "cf1:q7" CHAR, 
+                                     "cf1:q8" SMALLINT, 
+                                     "cf1:q9" BIGINT) 
+LOCATION ('gpxf://@hostname@:50070/gphbase_test_integer_rowkey?FRAGMENTER=HBaseDataFragmenter')
+FORMAT 'CUSTOM' (formatter='gpxfwritable_import');
+SET gpxf_enable_filter_pushdown = on;
+SELECT * FROM gphbase_integer_rowkey WHERE recordkey = 50;
+ recordkey |    cf1:q1     |          cf1:q2          | cf1:q3 |     cf1:q4     | cf1:q5 | cf1:q6 | cf1:q7 | cf1:q8 | cf1:q9 
+-----------+---------------+--------------------------+--------+----------------+--------+--------+--------+--------+--------
+        50 | ASCII00000000 | UTF8_計算機用語_00000000 |     51 | lookup00000000 |      0 |      0 |        |      0 |      0
+(1 row)
+
+SELECT * FROM gphbase_integer_rowkey WHERE recordkey <= 30 OR recordkey > 145 ORDER BY recordkey;
+ recordkey |    cf1:q1     |          cf1:q2          | cf1:q3 |     cf1:q4     | cf1:q5 |   cf1:q6    | cf1:q7 | cf1:q8 |      cf1:q9       
+-----------+---------------+--------------------------+--------+----------------+--------+-------------+--------+--------+-------------------
+         0 | ASCII00000000 | UTF8_計算機用語_00000000 |      1 | lookup00000000 |      0 |           0 |        |      0 |                 0
+         1 | ASCII00000001 | UTF8_計算機用語_00000001 |      2 | lookup00000002 |    1.1 |      1111.1 | !      |      1 |      -10000000001
+         2 | ASCII00000002 | UTF8_計算機用語_00000002 |      3 | lookup00000004 |    2.2 |      2222.2 | "      |      2 |       80000000002
+         3 | ASCII00000003 | UTF8_計算機用語_00000003 |      4 | lookup00000006 |    3.3 |      3333.3 | #      |      3 |     -270000000003
+         4 | ASCII00000004 | UTF8_計算機用語_00000004 |      5 | lookup00000008 |    4.4 |      4444.4 | $      |      4 |      640000000004
+         5 | ASCII00000005 | UTF8_計算機用語_00000005 |      6 | lookup00000010 |    5.5 |      5555.5 | %      |      5 |    -1250000000005
+         6 | ASCII00000006 | UTF8_計算機用語_00000006 |      7 | lookup00000012 |    6.6 |      6666.6 | &      |      6 |     2160000000006
+         7 | ASCII00000007 | UTF8_計算機用語_00000007 |      8 | lookup00000014 |    7.7 |      7777.7 | '      |      7 |    -3430000000007
+         8 | ASCII00000008 | UTF8_計算機用語_00000008 |      9 | lookup00000016 |    8.8 |      8888.8 | (      |      8 |     5120000000008
+         9 | ASCII00000009 | UTF8_計算機用語_00000009 |     10 | lookup00000018 |    9.9 |      9999.9 | )      |      9 |    -7290000000009
+        10 | ASCII00000010 | UTF8_計算機用語_00000010 |     11 | lookup00000020 |   10.1 |  10101010.1 | *      |     10 |    10000000000010
+        11 | ASCII00000011 | UTF8_計算機用語_00000011 |     12 | lookup00000022 |  11.11 | 11111111.11 | +      |     11 |   -13310000000011
+        12 | ASCII00000012 | UTF8_計算機用語_00000012 |     13 | lookup00000024 |  12.12 | 12121212.12 | ,      |     12 |    17280000000012
+        13 | ASCII00000013 | UTF8_計算機用語_00000013 |     14 | lookup00000026 |  13.13 | 13131313.13 | -      |     13 |   -21970000000013
+        14 | ASCII00000014 | UTF8_計算機用語_00000014 |     15 | lookup00000028 |  14.14 | 14141414.14 | .      |     14 |    27440000000014
+        15 | ASCII00000015 | UTF8_計算機用語_00000015 |     16 | lookup00000030 |  15.15 | 15151515.15 | /      |     15 |   -33750000000015
+        16 | ASCII00000016 | UTF8_計算機用語_00000016 |     17 | lookup00000032 |  16.16 | 16161616.16 | 0      |     16 |    40960000000016
+        17 | ASCII00000017 | UTF8_計算機用語_00000017 |     18 | lookup00000034 |  17.17 | 17171717.17 | 1      |     17 |   -49130000000017
+        18 | ASCII00000018 | UTF8_計算機用語_00000018 |     19 | lookup00000036 |  18.18 | 18181818.18 | 2      |     18 |    58320000000018
+        19 | ASCII00000019 | UTF8_計算機用語_00000019 |     20 | lookup00000038 |  19.19 | 19191919.19 | 3      |     19 |   -68590000000019
+        20 | ASCII00000020 | UTF8_計算機用語_00000020 |     21 | lookup00000040 |   20.2 |  20202020.2 | 4      |     20 |    80000000000020
+        21 | ASCII00000021 | UTF8_計算機用語_00000021 |     22 | lookup00000042 |  21.21 | 21212121.21 | 5      |     21 |   -92610000000021
+        22 | ASCII00000022 | UTF8_計算機用語_00000022 |     23 | lookup00000044 |  22.22 | 22222222.22 | 6      |     22 |   106480000000022
+        23 | ASCII00000023 | UTF8_計算機用語_00000023 |     24 | lookup00000046 |  23.23 | 23232323.23 | 7      |     23 |  -121670000000023
+        24 | ASCII00000024 | UTF8_計算機用語_00000024 |     25 | lookup00000048 |  24.24 | 24242424.24 | 8      |     24 |   138240000000024
+        25 | ASCII00000025 | UTF8_計算機用語_00000025 |     26 | lookup00000050 |  25.25 | 25252525.25 | 9      |     25 |  -156250000000025
+        26 | ASCII00000026 | UTF8_計算機用語_00000026 |     27 | lookup00000052 |  26.26 | 26262626.26 | :      |     26 |   175760000000026
+        27 | ASCII00000027 | UTF8_計算機用語_00000027 |     28 | lookup00000054 |  27.27 | 27272727.27 | ;      |     27 |  -196830000000027
+        28 | ASCII00000028 | UTF8_計算機用語_00000028 |     29 | lookup00000056 |  28.28 | 28282828.28 | <      |     28 |   219520000000028
+        29 | ASCII00000029 | UTF8_計算機用語_00000029 |     30 | lookup00000058 |  29.29 | 29292929.29 | =      |     29 |  -243890000000029
+        30 | ASCII00000030 | UTF8_計算機用語_00000030 |     31 | lookup00000060 |   30.3 |  30303030.3 | >      |     30 |   270000000000030
+       146 | ASCII00000046 | UTF8_計算機用語_00000046 |    147 | lookup00000092 |  46.46 | 46464646.46 | N      |     46 |   973360000000046
+       147 | ASCII00000047 | UTF8_計算機用語_00000047 |    148 | lookup00000094 |  47.47 | 47474747.47 | O      |     47 | -1038230000000047
+       148 | ASCII00000048 | UTF8_計算機用語_00000048 |    149 | lookup00000096 |  48.48 | 48484848.48 | P      |     48 |  1105920000000048
+       149 | ASCII00000049 | UTF8_計算機用語_00000049 |    150 | lookup00000098 |  49.49 | 49494949.49 | Q      |     49 | -1176490000000049
+(35 rows)
+
+DROP EXTERNAL TABLE gphbase_integer_rowkey;
 -- Cleanup
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar`:`echo ${HADOOP_ROOT}/lib/commons-logging-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-configuration-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-lang-[1-9]*.jar`:@abs_srcdir@/helpers HBaseDropTables
 table name to drop is 'gphbase_test'
@@ -872,6 +938,10 @@ drop
 lookup cleanup
 leave
 table name to drop is 'gphbase_test_upper'
+drop
+lookup cleanup
+leave
+table name to drop is 'gphbase_test_integer_rowkey'
 drop
 lookup cleanup
 leave

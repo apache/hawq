@@ -34,7 +34,7 @@ class HBaseCreateTable
 	int rowsPerSplit;
 	boolean useNull;
 	boolean upperCaseLookup;
-	final String rowKeyPrefix = "row";
+	String rowKeyPrefix = "row";
 	final String valuePrefix = "value";
 	final String lookupTableName = "gpxflookup";
 	final String lookupTableMappingColumnFamilyName = "mapping";
@@ -68,6 +68,11 @@ class HBaseCreateTable
 		admin = new HBaseAdmin(config);
 	}
 
+	void setRowKeyPrefix(String rowKeyPrefix)
+	{
+		this.rowKeyPrefix = rowKeyPrefix;
+	}
+	
 	boolean tableExists(String tableName) throws IOException
 	{
 		return admin.isTableAvailable(tableName);
@@ -222,6 +227,12 @@ class HBaseCreateTables
 		System.out.println("Create table 'gphbase_test_upper', with 2 rows per split and key in upper case in lookup table");
         createTable = 
 				new HBaseCreateTable("gphbase_test_upper", 2, true, true);
+		createTable.go();
+		
+		System.out.println("Create table 'gphbase_test_integer_rowkey', with integer rowkey and 50 rows per split");
+        createTable = 
+				new HBaseCreateTable("gphbase_test_integer_rowkey", 50, false, false);
+        createTable.setRowKeyPrefix("");
 		createTable.go();
        
 	}

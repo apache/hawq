@@ -91,6 +91,10 @@ class HBaseDropTables
 		System.out.println("table name to drop is 'gphbase_test_upper'");
 		dropTable = new HBaseDropTable("gphbase_test_upper");
 		dropTable.go();
+		
+		System.out.println("table name to drop is 'gphbase_test_integer_rowkey'");
+		dropTable = new HBaseDropTable("gphbase_test_integer_rowkey");
+		dropTable.go();
         
 	}
 }
