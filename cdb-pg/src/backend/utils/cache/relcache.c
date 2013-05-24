@@ -558,27 +558,6 @@ ReadGpRelationNode(
 	}
 	else
 	{
-		if (Debug_persistent_print)
-		{
-			TupleVisibilitySummary tupleVisibilitySummary;
-			char *tupleVisibilitySummaryString;
-			
-			GetTupleVisibilitySummary(
-									tuple,
-									&tupleVisibilitySummary);
-			tupleVisibilitySummaryString = GetTupleVisibilitySummaryString(&tupleVisibilitySummary);
-			
-			elog(Persistent_DebugPrintLevel(), 
-				 "ReadGpRelationNode: For relfilenode %u, segment file #%d, contentid #%d, found persistent serial number " INT64_FORMAT ", TID %s (gp_relation_node tuple visibility: %s)",
-				 relfilenode,
-				 segmentFileNum,
-				 contentid,
-				 *persistentSerialNum,
-				 ItemPointerToString(persistentTid),
-				 tupleVisibilitySummaryString);
-			pfree(tupleVisibilitySummaryString);
-		}
-
 		found = true;
 		heap_freetuple(tuple);
 	}

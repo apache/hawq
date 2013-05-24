@@ -341,9 +341,12 @@ AOCSFileSegInfo **GetAllAOCSFileSegInfo_pg_aocsseg_rel(
 
         allseg[cur_seg] = seginfo;
 
-		GetTupleVisibilitySummary(
+        if (Gp_role == GP_ROLE_DISPATCH)
+		{
+        	GetTupleVisibilitySummary(
 								tup,
 								&seginfo->tupleVisibilitySummary);
+		}
 
         heap_deform_tuple(tup, RelationGetDescr(pg_aocsseg_rel), d, null);
 
@@ -755,6 +758,13 @@ gp_aocsseg(PG_FUNCTION_ARGS)
 	FuncCallContext *funcctx;
 	Context *context;
 
+	if (Gp_role != GP_ROLE_DISPATCH)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_GP_COMMAND_ERROR),
+				errmsg("gp_aocsseg cannot be called on segments.")));
+	}
+
 	if (SRF_IS_FIRSTCALL())
 	{
 		TupleDesc	tupdesc;
@@ -929,6 +939,13 @@ gp_aocsseg_history(PG_FUNCTION_ARGS)
 	
 	FuncCallContext *funcctx;
 	Context *context;
+
+	if (Gp_role != GP_ROLE_DISPATCH)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_GP_COMMAND_ERROR),
+				errmsg("gp_aocsseg_history cannot be called on segments.")));
+	}
 
 	if (SRF_IS_FIRSTCALL())
 	{

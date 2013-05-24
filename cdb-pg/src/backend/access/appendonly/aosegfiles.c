@@ -381,9 +381,12 @@ FileSegInfo **GetAllFileSegInfo_pg_aoseg_rel(
 		allseginfo[seginfo_no] = (FileSegInfo *)palloc0(sizeof(FileSegInfo));
 		oneseginfo = allseginfo[seginfo_no];
 
-		GetTupleVisibilitySummary(
+		if (Gp_role == GP_ROLE_DISPATCH)
+		{
+			GetTupleVisibilitySummary(
 								tuple,
 								&oneseginfo->tupleVisibilitySummary);
+		}
 
 		segno = fastgetattr(tuple, Anum_pg_aoseg_segno, pg_aoseg_dsc, &isNull);
 		oneseginfo->segno = DatumGetInt32(segno);
@@ -738,6 +741,13 @@ gp_aoseg_history(PG_FUNCTION_ARGS)
 	
 	FuncCallContext *funcctx;
 	Context *context;
+
+	if (Gp_role != GP_ROLE_DISPATCH)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_GP_COMMAND_ERROR),
+				errmsg("gp_aoseg_history cannot be called on segments.")));
+	}
 
 	if (SRF_IS_FIRSTCALL())
 	{
