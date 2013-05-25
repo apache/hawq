@@ -47,7 +47,82 @@ create database caqltrack_db;
 \c caqltrack_db
 set role caql_super_luser;
 set gp_enable_caql_logging=false;
--- \d gp_toolkit.__gp_log_master_ext;
+-- start_ignore
+-- GPSQL-512 enable caqlcov 
+-- create my_gp_toolkit because the real gp_toolkit is empty in GPSQL
+create schema my_gp_toolkit;
+CREATE EXTERNAL WEB TABLE my_gp_toolkit.__gp_log_master_ext
+(
+    logtime timestamp with time zone,
+    loguser text,
+    logdatabase text,
+    logpid text,
+    logthread text,
+    loghost text,
+    logport text,
+    logsessiontime timestamp with time zone,
+    logtransaction int,
+    logsession text,
+    logcmdcount text,
+    logsegment text,
+    logslice text,
+    logdistxact text,
+    loglocalxact text,
+    logsubxact text,
+    logseverity text,
+    logstate text,
+    logmessage text,
+    logdetail text,
+    loghint text,
+    logquery text,
+    logquerypos int,
+    logcontext text,
+    logdebug text,
+    logcursorpos int,
+    logfunction text,
+    logfile text,
+    logline int,
+    logstack text
+)
+EXECUTE E'cat $GP_SEG_DATADIR/pg_log/*.csv' ON MASTER
+FORMAT 'CSV' (DELIMITER AS ',' NULL AS '' QUOTE AS '"');
+CREATE EXTERNAL WEB TABLE my_gp_toolkit.__gp_log_segment_ext
+(
+    logtime timestamp with time zone,
+    loguser text,
+    logdatabase text,
+    logpid text,
+    logthread text,
+    loghost text,
+    logport text,
+    logsessiontime timestamp with time zone,
+    logtransaction int,
+    logsession text,
+    logcmdcount text,
+    logsegment text,
+    logslice text,
+    logdistxact text,
+    loglocalxact text,
+    logsubxact text,
+    logseverity text,
+    logstate text,
+    logmessage text,
+    logdetail text,
+    loghint text,
+    logquery text,
+    logquerypos int,
+    logcontext text,
+    logdebug text,
+    logcursorpos int,
+    logfunction text,
+    logfile text,
+    logline int,
+    logstack text
+)
+EXECUTE E'cat $GP_SEG_DATADIR/pg_log/*.csv'
+FORMAT 'CSV' (DELIMITER AS ',' NULL AS '' QUOTE AS '"');
+-- end_ignore
+-- \d my_gp_toolkit.__gp_log_master_ext;
 -- start_ignore
 DROP TABLE caql_master_t1;
 DROP TABLE caql_segment_t1;
@@ -103,7 +178,7 @@ as select
     logline,
     logstack
 from
-gp_toolkit.__gp_log_master_ext
+my_gp_toolkit.__gp_log_master_ext
 where logmessage like ('catquery:%');
 CREATE TABLE caql_master_t1
 as select * from caql_master_m1 distributed by (logtime);
@@ -186,7 +261,7 @@ as select
     logline,
     logstack
 from
-gp_toolkit.__gp_log_segment_ext
+my_gp_toolkit.__gp_log_segment_ext
 where logmessage like ('catquery:%');
 CREATE TABLE caql_segment_t1
 as select * from caql_segment_m1 distributed by (logtime);
@@ -356,16 +431,419 @@ select count(*)
  where caller.fn is null;
  count
 -------
-     0
+   403
 (1 row)
 
 select path, file, lineno
   from caloc left join caller using(file, lineno)
  where caller.fn is null
  order by 1, 3;
- path | file | lineno 
-------+------+--------
-(0 rows)
+                    path                    |        file        | lineno 
+--------------------------------------------+--------------------+--------
+ src/backend/catalog/aclchk.c               | aclchk.c           |    636
+ src/backend/catalog/aclchk.c               | aclchk.c           |    660
+ src/backend/catalog/aclchk.c               | aclchk.c           |    684
+ src/backend/catalog/aclchk.c               | aclchk.c           |    772
+ src/backend/catalog/aclchk.c               | aclchk.c           |   1039
+ src/backend/catalog/aclchk.c               | aclchk.c           |   1169
+ src/backend/catalog/aclchk.c               | aclchk.c           |   1292
+ src/backend/catalog/aclchk.c               | aclchk.c           |   1415
+ src/backend/catalog/aclchk.c               | aclchk.c           |   1536
+ src/backend/catalog/aclchk.c               | aclchk.c           |   1667
+ src/backend/catalog/aclchk.c               | aclchk.c           |   1798
+ src/backend/catalog/aclchk.c               | aclchk.c           |   2475
+ src/backend/catalog/aclchk.c               | aclchk.c           |   2537
+ src/backend/catalog/aclchk.c               | aclchk.c           |   2599
+ src/backend/catalog/aclchk.c               | aclchk.c           |   2767
+ src/backend/catalog/aclchk.c               | aclchk.c           |   2834
+ src/backend/catalog/aclchk.c               | aclchk.c           |   2903
+ src/backend/catalog/aclchk.c               | aclchk.c           |   2972
+ src/backend/catalog/aclchk.c               | aclchk.c           |   3251
+ src/backend/catalog/aclchk.c               | aclchk.c           |   3279
+ src/backend/catalog/aclchk.c               | aclchk.c           |   3307
+ src/backend/catalog/aclchk.c               | aclchk.c           |   3336
+ src/backend/catalog/aclchk.c               | aclchk.c           |   3364
+ src/backend/catalog/aclchk.c               | aclchk.c           |   3392
+ src/backend/catalog/aclchk.c               | aclchk.c           |   3420
+ src/backend/catalog/aclchk.c               | aclchk.c           |   3504
+ src/backend/catalog/aclchk.c               | aclchk.c           |   3533
+ src/backend/catalog/aclchk.c               | aclchk.c           |   3562
+ src/backend/catalog/aclchk.c               | aclchk.c           |   3590
+ src/backend/catalog/aclchk.c               | aclchk.c           |   3619
+ src/backend/catalog/dependency.c           | dependency.c       |   1298
+ src/backend/catalog/dependency.c           | dependency.c       |   1309
+ src/backend/catalog/dependency.c           | dependency.c       |   1330
+ src/backend/catalog/dependency.c           | dependency.c       |   1847
+ src/backend/catalog/dependency.c           | dependency.c       |   1908
+ src/backend/catalog/dependency.c           | dependency.c       |   1960
+ src/backend/catalog/dependency.c           | dependency.c       |   1989
+ src/backend/catalog/dependency.c           | dependency.c       |   2004
+ src/backend/catalog/dependency.c           | dependency.c       |   2062
+ src/backend/catalog/dependency.c           | dependency.c       |   2174
+ src/backend/catalog/index.c                | index.c            |    238
+ src/backend/catalog/index.c                | index.c            |    293
+ src/backend/catalog/index.c                | index.c            |   1304
+ src/backend/catalog/namespace.c            | namespace.c        |    736
+ src/backend/catalog/namespace.c            | namespace.c        |   1082
+ src/backend/catalog/namespace.c            | namespace.c        |   1153
+ src/backend/catalog/namespace.c            | namespace.c        |   1182
+ src/backend/catalog/namespace.c            | namespace.c        |   1247
+ src/backend/catalog/namespace.c            | namespace.c        |   1276
+ src/backend/catalog/namespace.c            | namespace.c        |   1491
+ src/backend/catalog/namespace.c            | namespace.c        |   2503
+ src/backend/catalog/namespace.c            | namespace.c        |   2518
+ src/backend/catalog/namespace.c            | namespace.c        |   2533
+ src/backend/catalog/namespace.c            | namespace.c        |   2548
+ src/backend/catalog/namespace.c            | namespace.c        |   2563
+ src/backend/catalog/pg_aggregate.c         | pg_aggregate.c     |    144
+ src/backend/catalog/pg_aggregate.c         | pg_aggregate.c     |    301
+ src/backend/catalog/pg_constraint.c        | pg_constraint.c    |    626
+ src/backend/catalog/pg_constraint.c        | pg_constraint.c    |    652
+ src/backend/catalog/pg_conversion.c        | pg_conversion.c    |     71
+ src/backend/catalog/pg_conversion.c        | pg_conversion.c    |     99
+ src/backend/catalog/pg_conversion.c        | pg_conversion.c    |    170
+ src/backend/catalog/pg_conversion.c        | pg_conversion.c    |    209
+ src/backend/catalog/pg_conversion.c        | pg_conversion.c    |    283
+ src/backend/catalog/pg_conversion.c        | pg_conversion.c    |    346
+ src/backend/catalog/pg_depend.c            | pg_depend.c        |    314
+ src/backend/catalog/pg_depend.c            | pg_depend.c        |    396
+ src/backend/catalog/pg_depend.c            | pg_depend.c        |    444
+ src/backend/catalog/pg_extprotocol.c       | pg_extprotocol.c   |     93
+ src/backend/catalog/pg_extprotocol.c       | pg_extprotocol.c   |    100
+ src/backend/catalog/pg_extprotocol.c       | pg_extprotocol.c   |    200
+ src/backend/catalog/pg_extprotocol.c       | pg_extprotocol.c   |    314
+ src/backend/catalog/pg_extprotocol.c       | pg_extprotocol.c   |    323
+ src/backend/catalog/pg_extprotocol.c       | pg_extprotocol.c   |    412
+ src/backend/catalog/pg_operator.c          | pg_operator.c      |    152
+ src/backend/catalog/pg_operator.c          | pg_operator.c      |    273
+ src/backend/catalog/pg_operator.c          | pg_operator.c      |    690
+ src/backend/catalog/pg_operator.c          | pg_operator.c      |    849
+ src/backend/catalog/pg_operator.c          | pg_operator.c      |    926
+ src/backend/catalog/pg_proc.c              | pg_proc.c          |    284
+ src/backend/catalog/pg_proc.c              | pg_proc.c          |    359
+ src/backend/catalog/pg_proc.c              | pg_proc.c          |    423
+ src/backend/catalog/pg_proc.c              | pg_proc.c          |    537
+ src/backend/catalog/pg_proc.c              | pg_proc.c          |    586
+ src/backend/catalog/pg_proc.c              | pg_proc.c          |    636
+ src/backend/catalog/pg_proc_callback.c     | pg_proc_callback.c |     52
+ src/backend/catalog/pg_proc_callback.c     | pg_proc_callback.c |     84
+ src/backend/catalog/pg_proc_callback.c     | pg_proc_callback.c |    128
+ src/backend/catalog/pg_shdepend.c          | pg_shdepend.c      |    277
+ src/backend/catalog/pg_shdepend.c          | pg_shdepend.c      |   1114
+ src/backend/catalog/pg_shdepend.c          | pg_shdepend.c      |   1243
+ src/backend/catalog/pg_type.c              | pg_type.c          |     48
+ src/backend/catalog/pg_type.c              | pg_type.c          |    104
+ src/backend/catalog/toasting.c             | toasting.c         |    357
+ src/backend/cdb/cdbcat.c                   | cdbcat.c           |    333
+ src/backend/cdb/cdbpartindex.c             | cdbpartindex.c     |    324
+ src/backend/cdb/cdbpartindex.c             | cdbpartindex.c     |    360
+ src/backend/cdb/cdbpartindex.c             | cdbpartindex.c     |    546
+ src/backend/cdb/cdbpartindex.c             | cdbpartindex.c     |    797
+ src/backend/cdb/cdbpartindex.c             | cdbpartindex.c     |   1122
+ src/backend/cdb/cdbpartition.c             | cdbpartition.c     |   1235
+ src/backend/cdb/cdbpartition.c             | cdbpartition.c     |   1251
+ src/backend/cdb/cdbpartition.c             | cdbpartition.c     |   1264
+ src/backend/cdb/cdbpartition.c             | cdbpartition.c     |   2055
+ src/backend/cdb/cdbpartition.c             | cdbpartition.c     |   2396
+ src/backend/cdb/cdbpartition.c             | cdbpartition.c     |   2420
+ src/backend/cdb/cdbpartition.c             | cdbpartition.c     |   8059
+ src/backend/cdb/cdbpartition.c             | cdbpartition.c     |   8216
+ src/backend/cdb/cdbutil.c                  | cdbutil.c          |   1163
+ src/backend/cdb/cdbutil.c                  | cdbutil.c          |   1354
+ src/backend/cdb/cdbutil.c                  | cdbutil.c          |   1396
+ src/backend/commands/aggregatecmds.c       | aggregatecmds.c    |    327
+ src/backend/commands/aggregatecmds.c       | aggregatecmds.c    |    344
+ src/backend/commands/analyze.c             | analyze.c          |    690
+ src/backend/commands/cluster.c             | cluster.c          |    142
+ src/backend/commands/cluster.c             | cluster.c          |    373
+ src/backend/commands/cluster.c             | cluster.c          |    386
+ src/backend/commands/cluster.c             | cluster.c          |    563
+ src/backend/commands/cluster.c             | cluster.c          |    598
+ src/backend/commands/cluster.c             | cluster.c          |   1260
+ src/backend/commands/comment.c             | comment.c          |    220
+ src/backend/commands/comment.c             | comment.c          |    249
+ src/backend/commands/comment.c             | comment.c          |    312
+ src/backend/commands/comment.c             | comment.c          |    340
+ src/backend/commands/comment.c             | comment.c          |    725
+ src/backend/commands/comment.c             | comment.c          |    782
+ src/backend/commands/comment.c             | comment.c          |    831
+ src/backend/commands/comment.c             | comment.c          |   1024
+ src/backend/commands/comment.c             | comment.c          |   1093
+ src/backend/commands/comment.c             | comment.c          |   1183
+ src/backend/commands/comment.c             | comment.c          |   1229
+ src/backend/commands/comment.c             | comment.c          |   1261
+ src/backend/commands/comment.c             | comment.c          |   1281
+ src/backend/commands/comment.c             | comment.c          |   1389
+ src/backend/commands/comment.c             | comment.c          |   1442
+ src/backend/commands/conversioncmds.c      | conversioncmds.c   |    200
+ src/backend/commands/conversioncmds.c      | conversioncmds.c   |    214
+ src/backend/commands/conversioncmds.c      | conversioncmds.c   |    302
+ src/backend/commands/dbcommands.c          | dbcommands.c       |   1691
+ src/backend/commands/dbcommands.c          | dbcommands.c       |   1773
+ src/backend/commands/dbcommands.c          | dbcommands.c       |   1974
+ src/backend/commands/dbcommands.c          | dbcommands.c       |   2220
+ src/backend/commands/extprotocolcmds.c     | extprotocolcmds.c  |    213
+ src/backend/commands/extprotocolcmds.c     | extprotocolcmds.c  |    344
+ src/backend/commands/filespace.c           | filespace.c        |    868
+ src/backend/commands/filespace.c           | filespace.c        |    884
+ src/backend/commands/filespace.c           | filespace.c        |    923
+ src/backend/commands/filespace.c           | filespace.c        |   1022
+ src/backend/commands/filespace.c           | filespace.c        |   1057
+ src/backend/commands/filespace.c           | filespace.c        |   1104
+ src/backend/commands/filespace.c           | filespace.c        |   1521
+ src/backend/commands/filespace.c           | filespace.c        |   1576
+ src/backend/commands/filespace.c           | filespace.c        |   1591
+ src/backend/commands/foreigncmds.c         | foreigncmds.c      |    243
+ src/backend/commands/foreigncmds.c         | foreigncmds.c      |    294
+ src/backend/commands/foreigncmds.c         | foreigncmds.c      |    404
+ src/backend/commands/foreigncmds.c         | foreigncmds.c      |    498
+ src/backend/commands/foreigncmds.c         | foreigncmds.c      |    643
+ src/backend/commands/foreigncmds.c         | foreigncmds.c      |    700
+ src/backend/commands/foreigncmds.c         | foreigncmds.c      |    789
+ src/backend/commands/foreigncmds.c         | foreigncmds.c      |    924
+ src/backend/commands/foreigncmds.c         | foreigncmds.c      |    991
+ src/backend/commands/foreigncmds.c         | foreigncmds.c      |   1002
+ src/backend/commands/foreigncmds.c         | foreigncmds.c      |   1088
+ src/backend/commands/foreigncmds.c         | foreigncmds.c      |   1108
+ src/backend/commands/foreigncmds.c         | foreigncmds.c      |   1209
+ src/backend/commands/foreigncmds.c         | foreigncmds.c      |   1254
+ src/backend/commands/foreigncmds.c         | foreigncmds.c      |   1314
+ src/backend/commands/foreigncmds.c         | foreigncmds.c      |   1362
+ src/backend/commands/functioncmds.c        | functioncmds.c     |    549
+ src/backend/commands/functioncmds.c        | functioncmds.c     |    857
+ src/backend/commands/functioncmds.c        | functioncmds.c     |   1031
+ src/backend/commands/functioncmds.c        | functioncmds.c     |   1101
+ src/backend/commands/functioncmds.c        | functioncmds.c     |   1125
+ src/backend/commands/functioncmds.c        | functioncmds.c     |   1163
+ src/backend/commands/functioncmds.c        | functioncmds.c     |   1187
+ src/backend/commands/functioncmds.c        | functioncmds.c     |   1240
+ src/backend/commands/functioncmds.c        | functioncmds.c     |   1277
+ src/backend/commands/functioncmds.c        | functioncmds.c     |   1403
+ src/backend/commands/functioncmds.c        | functioncmds.c     |   1504
+ src/backend/commands/functioncmds.c        | functioncmds.c     |   1546
+ src/backend/commands/functioncmds.c        | functioncmds.c     |   1626
+ src/backend/commands/functioncmds.c        | functioncmds.c     |   1747
+ src/backend/commands/functioncmds.c        | functioncmds.c     |   1761
+ src/backend/commands/functioncmds.c        | functioncmds.c     |   1849
+ src/backend/commands/functioncmds.c        | functioncmds.c     |   1902
+ src/backend/commands/functioncmds.c        | functioncmds.c     |   1947
+ src/backend/commands/functioncmds.c        | functioncmds.c     |   1992
+ src/backend/commands/functioncmds.c        | functioncmds.c     |   2040
+ src/backend/commands/indexcmds.c           | indexcmds.c        |    346
+ src/backend/commands/indexcmds.c           | indexcmds.c        |    368
+ src/backend/commands/indexcmds.c           | indexcmds.c        |    861
+ src/backend/commands/indexcmds.c           | indexcmds.c        |   1112
+ src/backend/commands/indexcmds.c           | indexcmds.c        |   1128
+ src/backend/commands/indexcmds.c           | indexcmds.c        |   1397
+ src/backend/commands/indexcmds.c           | indexcmds.c        |   1446
+ src/backend/commands/indexcmds.c           | indexcmds.c        |   1494
+ src/backend/commands/indexcmds.c           | indexcmds.c        |   1546
+ src/backend/commands/indexcmds.c           | indexcmds.c        |   1625
+ src/backend/commands/indexcmds.c           | indexcmds.c        |   1734
+ src/backend/commands/opclasscmds.c         | opclasscmds.c      |    114
+ src/backend/commands/opclasscmds.c         | opclasscmds.c      |    297
+ src/backend/commands/opclasscmds.c         | opclasscmds.c      |    313
+ src/backend/commands/opclasscmds.c         | opclasscmds.c      |    335
+ src/backend/commands/opclasscmds.c         | opclasscmds.c      |    478
+ src/backend/commands/opclasscmds.c         | opclasscmds.c      |    539
+ src/backend/commands/opclasscmds.c         | opclasscmds.c      |    624
+ src/backend/commands/opclasscmds.c         | opclasscmds.c      |    669
+ src/backend/commands/opclasscmds.c         | opclasscmds.c      |    720
+ src/backend/commands/opclasscmds.c         | opclasscmds.c      |    750
+ src/backend/commands/opclasscmds.c         | opclasscmds.c      |    777
+ src/backend/commands/opclasscmds.c         | opclasscmds.c      |    839
+ src/backend/commands/opclasscmds.c         | opclasscmds.c      |    848
+ src/backend/commands/opclasscmds.c         | opclasscmds.c      |    857
+ src/backend/commands/opclasscmds.c         | opclasscmds.c      |    883
+ src/backend/commands/opclasscmds.c         | opclasscmds.c      |    913
+ src/backend/commands/opclasscmds.c         | opclasscmds.c      |    937
+ src/backend/commands/opclasscmds.c         | opclasscmds.c      |    954
+ src/backend/commands/opclasscmds.c         | opclasscmds.c      |   1030
+ src/backend/commands/opclasscmds.c         | opclasscmds.c      |   1062
+ src/backend/commands/opclasscmds.c         | opclasscmds.c      |   1086
+ src/backend/commands/operatorcmds.c        | operatorcmds.c     |    252
+ src/backend/commands/operatorcmds.c        | operatorcmds.c     |    290
+ src/backend/commands/operatorcmds.c        | operatorcmds.c     |    348
+ src/backend/commands/proclang.c            | proclang.c         |     85
+ src/backend/commands/proclang.c            | proclang.c         |    305
+ src/backend/commands/proclang.c            | proclang.c         |    369
+ src/backend/commands/proclang.c            | proclang.c         |    454
+ src/backend/commands/proclang.c            | proclang.c         |    497
+ src/backend/commands/proclang.c            | proclang.c         |    530
+ src/backend/commands/proclang.c            | proclang.c         |    543
+ src/backend/commands/queue.c               | queue.c            |     76
+ src/backend/commands/queue.c               | queue.c            |    361
+ src/backend/commands/queue.c               | queue.c            |    472
+ src/backend/commands/queue.c               | queue.c            |    563
+ src/backend/commands/queue.c               | queue.c            |    596
+ src/backend/commands/queue.c               | queue.c            |    929
+ src/backend/commands/queue.c               | queue.c            |    936
+ src/backend/commands/queue.c               | queue.c            |   1316
+ src/backend/commands/queue.c               | queue.c            |   1532
+ src/backend/commands/queue.c               | queue.c            |   1552
+ src/backend/commands/queue.c               | queue.c            |   1634
+ src/backend/commands/queue.c               | queue.c            |   1653
+ src/backend/commands/schemacmds.c          | schemacmds.c       |    335
+ src/backend/commands/schemacmds.c          | schemacmds.c       |    347
+ src/backend/commands/schemacmds.c          | schemacmds.c       |    416
+ src/backend/commands/schemacmds.c          | schemacmds.c       |    451
+ src/backend/commands/sequence.c            | sequence.c         |   1126
+ src/backend/commands/tablecmds.c           | tablecmds.c        |    889
+ src/backend/commands/tablecmds.c           | tablecmds.c        |   2734
+ src/backend/commands/tablecmds.c           | tablecmds.c        |   2770
+ src/backend/commands/tablecmds.c           | tablecmds.c        |   2795
+ src/backend/commands/tablecmds.c           | tablecmds.c        |   3104
+ src/backend/commands/tablecmds.c           | tablecmds.c        |   3113
+ src/backend/commands/tablecmds.c           | tablecmds.c        |   7020
+ src/backend/commands/tablecmds.c           | tablecmds.c        |   7597
+ src/backend/commands/tablecmds.c           | tablecmds.c        |   8289
+ src/backend/commands/tablecmds.c           | tablecmds.c        |   8381
+ src/backend/commands/tablecmds.c           | tablecmds.c        |  10935
+ src/backend/commands/tablecmds.c           | tablecmds.c        |  12141
+ src/backend/commands/tablecmds.c           | tablecmds.c        |  12201
+ src/backend/commands/tablecmds.c           | tablecmds.c        |  13275
+ src/backend/commands/tablecmds.c           | tablecmds.c        |  16378
+ src/backend/commands/tablespace.c          | tablespace.c       |    789
+ src/backend/commands/tablespace.c          | tablespace.c       |    819
+ src/backend/commands/tablespace.c          | tablespace.c       |    865
+ src/backend/commands/trigger.c             | trigger.c          |    193
+ src/backend/commands/trigger.c             | trigger.c          |    269
+ src/backend/commands/trigger.c             | trigger.c          |    426
+ src/backend/commands/trigger.c             | trigger.c          |    505
+ src/backend/commands/trigger.c             | trigger.c          |    561
+ src/backend/commands/trigger.c             | trigger.c          |    609
+ src/backend/commands/trigger.c             | trigger.c          |    682
+ src/backend/commands/trigger.c             | trigger.c          |    701
+ src/backend/commands/trigger.c             | trigger.c          |    778
+ src/backend/commands/trigger.c             | trigger.c          |    787
+ src/backend/commands/trigger.c             | trigger.c          |   3075
+ src/backend/commands/typecmds.c            | typecmds.c         |    159
+ src/backend/commands/typecmds.c            | typecmds.c         |    591
+ src/backend/commands/typecmds.c            | typecmds.c         |   1030
+ src/backend/commands/typecmds.c            | typecmds.c         |   1387
+ src/backend/commands/typecmds.c            | typecmds.c         |   1506
+ src/backend/commands/typecmds.c            | typecmds.c         |   1612
+ src/backend/commands/typecmds.c            | typecmds.c         |   1628
+ src/backend/commands/typecmds.c            | typecmds.c         |   1688
+ src/backend/commands/typecmds.c            | typecmds.c         |   1880
+ src/backend/commands/typecmds.c            | typecmds.c         |   2328
+ src/backend/commands/typecmds.c            | typecmds.c         |   2718
+ src/backend/commands/user.c                | user.c             |    110
+ src/backend/commands/user.c                | user.c             |   1224
+ src/backend/commands/user.c                | user.c             |   1550
+ src/backend/commands/user.c                | user.c             |   1584
+ src/backend/commands/user.c                | user.c             |   1934
+ src/backend/commands/user.c                | user.c             |   1977
+ src/backend/commands/user.c                | user.c             |   2392
+ src/backend/commands/user.c                | user.c             |   2536
+ src/backend/commands/vacuum.c              | vacuum.c           |    729
+ src/backend/commands/vacuum.c              | vacuum.c           |   1131
+ src/backend/executor/functions.c           | functions.c        |    955
+ src/backend/executor/nodeWindow.c          | nodeWindow.c       |   5267
+ src/backend/executor/spi.c                 | spi.c              |    871
+ src/backend/fts/fts.c                      | fts.c              |    597
+ src/backend/optimizer/plan/planpartition.c | planpartition.c    |    637
+ src/backend/optimizer/util/predtest.c      | predtest.c         |   1605
+ src/backend/optimizer/util/predtest.c      | predtest.c         |   1676
+ src/backend/parser/analyze.c               | analyze.c          |   8759
+ src/backend/parser/analyze.c               | analyze.c          |   8777
+ src/backend/parser/parse_func.c            | parse_func.c       |   1239
+ src/backend/parser/parse_func.c            | parse_func.c       |   1622
+ src/backend/parser/parse_utilcmd.c         | parse_utilcmd.c    |    100
+ src/backend/parser/parse_utilcmd.c         | parse_utilcmd.c    |    281
+ src/backend/rewrite/rewriteRemove.c        | rewriteRemove.c    |     56
+ src/backend/utils/adt/acl.c                | acl.c              |    459
+ src/backend/utils/adt/acl.c                | acl.c              |    495
+ src/backend/utils/adt/acl.c                | acl.c              |   1540
+ src/backend/utils/adt/acl.c                | acl.c              |   1570
+ src/backend/utils/adt/acl.c                | acl.c              |   1621
+ src/backend/utils/adt/acl.c                | acl.c              |   1785
+ src/backend/utils/adt/acl.c                | acl.c              |   1815
+ src/backend/utils/adt/acl.c                | acl.c              |   1866
+ src/backend/utils/adt/acl.c                | acl.c              |   2203
+ src/backend/utils/adt/acl.c                | acl.c              |   2233
+ src/backend/utils/adt/acl.c                | acl.c              |   2284
+ src/backend/utils/adt/acl.c                | acl.c              |   2429
+ src/backend/utils/adt/acl.c                | acl.c              |   2459
+ src/backend/utils/adt/acl.c                | acl.c              |   2510
+ src/backend/utils/adt/acl.c                | acl.c              |   2538
+ src/backend/utils/adt/acl.c                | acl.c              |   2658
+ src/backend/utils/adt/acl.c                | acl.c              |   2688
+ src/backend/utils/adt/acl.c                | acl.c              |   2739
+ src/backend/utils/adt/acl.c                | acl.c              |   2767
+ src/backend/utils/adt/acl.c                | acl.c              |   3452
+ src/backend/utils/adt/acl.c                | acl.c              |   3521
+ src/backend/utils/adt/acl.c                | acl.c              |   3606
+ src/backend/utils/adt/acl.c                | acl.c              |   3771
+ src/backend/utils/adt/dbsize.c             | dbsize.c           |    643
+ src/backend/utils/adt/format_type.c        | format_type.c      |    195
+ src/backend/utils/adt/regproc.c            | regproc.c          |     97
+ src/backend/utils/adt/regproc.c            | regproc.c          |    305
+ src/backend/utils/adt/regproc.c            | regproc.c          |    446
+ src/backend/utils/adt/regproc.c            | regproc.c          |    504
+ src/backend/utils/adt/regproc.c            | regproc.c          |    661
+ src/backend/utils/adt/regproc.c            | regproc.c          |    804
+ src/backend/utils/adt/regproc.c            | regproc.c          |    968
+ src/backend/utils/adt/ruleutils.c          | ruleutils.c        |    472
+ src/backend/utils/adt/ruleutils.c          | ruleutils.c        |    662
+ src/backend/utils/adt/ruleutils.c          | ruleutils.c        |    690
+ src/backend/utils/adt/ruleutils.c          | ruleutils.c        |    705
+ src/backend/utils/adt/ruleutils.c          | ruleutils.c        |   1300
+ src/backend/utils/adt/ruleutils.c          | ruleutils.c        |   1358
+ src/backend/utils/adt/ruleutils.c          | ruleutils.c        |   1394
+ src/backend/utils/adt/ruleutils.c          | ruleutils.c        |   4453
+ src/backend/utils/adt/ruleutils.c          | ruleutils.c        |   5563
+ src/backend/utils/adt/ruleutils.c          | ruleutils.c        |   5870
+ src/backend/utils/adt/ruleutils.c          | ruleutils.c        |   6120
+ src/backend/utils/adt/selfuncs.c           | selfuncs.c         |   3338
+ src/backend/utils/adt/selfuncs.c           | selfuncs.c         |   3489
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |    297
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |    456
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |    484
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |    630
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |    715
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   1030
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   1054
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   1078
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   1101
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   1129
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   1188
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   1213
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   1237
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   1261
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   1282
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   1408
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   1458
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   1771
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   2191
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   2465
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   2591
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   2727
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   2770
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   3083
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   3348
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   3367
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   3390
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   3469
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   3488
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   3514
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   3553
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   3584
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   3635
+ src/backend/utils/cache/lsyscache.c        | lsyscache.c        |   3702
+ src/backend/utils/fmgr/fmgr.c              | fmgr.c             |    912
+ src/backend/utils/gp/segadmin.c            | segadmin.c         |    108
+ src/backend/utils/gp/segadmin.c            | segadmin.c         |    153
+ src/backend/utils/gp/segadmin.c            | segadmin.c         |    196
+ src/backend/utils/gp/segadmin.c            | segadmin.c         |    633
+ src/backend/utils/gp/segadmin.c            | segadmin.c         |    698
+ src/backend/utils/gp/segadmin.c            | segadmin.c         |   1181
+ src/backend/utils/gp/segadmin.c            | segadmin.c         |   1192
+ src/backend/utils/gp/segadmin.c            | segadmin.c         |   1234
+ src/backend/utils/gp/segadmin.c            | segadmin.c         |   1241
+ src/backend/utils/init/miscinit.c          | miscinit.c         |    701
+ src/backend/utils/mb/mbutils.c             | mbutils.c          |    281
+(403 rows)
 
 -- start_ignore
 select caql_masterseg, count(*) from cq_logall group by caql_masterseg;

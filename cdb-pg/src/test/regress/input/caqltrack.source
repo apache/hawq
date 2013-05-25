@@ -45,11 +45,87 @@ set role caql_super_luser;
 create database caqltrack_db;
 
 \c caqltrack_db
-
 set role caql_super_luser;
 set gp_enable_caql_logging=false;
 
--- \d gp_toolkit.__gp_log_master_ext;
+-- start_ignore
+-- GPSQL-512 enable caqlcov 
+-- create my_gp_toolkit because the real gp_toolkit is empty in GPSQL
+create schema my_gp_toolkit;
+CREATE EXTERNAL WEB TABLE my_gp_toolkit.__gp_log_master_ext
+(
+    logtime timestamp with time zone,
+    loguser text,
+    logdatabase text,
+    logpid text,
+    logthread text,
+    loghost text,
+    logport text,
+    logsessiontime timestamp with time zone,
+    logtransaction int,
+    logsession text,
+    logcmdcount text,
+    logsegment text,
+    logslice text,
+    logdistxact text,
+    loglocalxact text,
+    logsubxact text,
+    logseverity text,
+    logstate text,
+    logmessage text,
+    logdetail text,
+    loghint text,
+    logquery text,
+    logquerypos int,
+    logcontext text,
+    logdebug text,
+    logcursorpos int,
+    logfunction text,
+    logfile text,
+    logline int,
+    logstack text
+)
+EXECUTE E'cat $GP_SEG_DATADIR/pg_log/*.csv' ON MASTER
+FORMAT 'CSV' (DELIMITER AS ',' NULL AS '' QUOTE AS '"');
+
+CREATE EXTERNAL WEB TABLE my_gp_toolkit.__gp_log_segment_ext
+(
+    logtime timestamp with time zone,
+    loguser text,
+    logdatabase text,
+    logpid text,
+    logthread text,
+    loghost text,
+    logport text,
+    logsessiontime timestamp with time zone,
+    logtransaction int,
+    logsession text,
+    logcmdcount text,
+    logsegment text,
+    logslice text,
+    logdistxact text,
+    loglocalxact text,
+    logsubxact text,
+    logseverity text,
+    logstate text,
+    logmessage text,
+    logdetail text,
+    loghint text,
+    logquery text,
+    logquerypos int,
+    logcontext text,
+    logdebug text,
+    logcursorpos int,
+    logfunction text,
+    logfile text,
+    logline int,
+    logstack text
+)
+EXECUTE E'cat $GP_SEG_DATADIR/pg_log/*.csv'
+FORMAT 'CSV' (DELIMITER AS ',' NULL AS '' QUOTE AS '"');
+-- end_ignore
+
+-- \d my_gp_toolkit.__gp_log_master_ext;
 
 -- start_ignore
 DROP TABLE caql_master_t1;
@@ -109,7 +185,7 @@ as select
     logline,
     logstack
 from
-gp_toolkit.__gp_log_master_ext
+my_gp_toolkit.__gp_log_master_ext
 where logmessage like ('catquery:%');
 
 CREATE TABLE caql_master_t1
@@ -194,7 +270,7 @@ as select
     logline,
     logstack
 from
-gp_toolkit.__gp_log_segment_ext
+my_gp_toolkit.__gp_log_segment_ext
 where logmessage like ('catquery:%');
 
 CREATE TABLE caql_segment_t1

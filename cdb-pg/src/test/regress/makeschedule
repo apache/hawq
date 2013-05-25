@@ -75,8 +75,8 @@ sub writeSchedule
 	# disruptive to the normal installcheck tests.  caqltrack won't work
 	# without -logquery build.
 	if ($ENV{caql_logquery_FLAGS} =~ /-logquery/){
-		print SCHED "test: caql\n";
-		print SCHED "test: caqlcov\n";
+		print SCHED "ignore: caql\n";
+		print SCHED "ignore: caqlcov\n";
 		print SCHED "test: caqltrack\n";
 	}
     close SCHED;
