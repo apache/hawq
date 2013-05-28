@@ -1,8 +1,6 @@
 package com.pivotal.pxf.rest.resources;
 
-import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -11,7 +9,6 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
-import javax.ws.rs.core.StreamingOutput;
 import javax.ws.rs.core.UriInfo;
 
 import org.apache.commons.logging.Log;
@@ -20,12 +17,12 @@ import org.apache.commons.logging.LogFactory;
 
 class Version 
 {
-	final static String PXF_VERSION = "v2";	
+	final static String PXF_PROTOCOL_VERSION = "v3";	
 }
 
 /*
  * Class for catching paths that are not defined by other resources.
- * For each path, the version is compared to the current version GPXF_VERSION.
+ * For each path, the version is compared to the current version PXF_VERSION.
  * The expected format of a path is "http://<host>:<port>/gpdb/<version>/<rest of path>
  * 
  * The returned value is always a Server Error code (500).
@@ -68,15 +65,15 @@ public class InvalidPathResource
 		String version = parseVersion(path);
 			
 		Log.debug("REST request: " +  rootUri.getAbsolutePath()  + ". " + 
-				  "Version " + version + ", supported version is " + Version.PXF_VERSION);
+				  "Version " + version + ", supported version is " + Version.PXF_PROTOCOL_VERSION);
 				  
-		if (version.equals(Version.PXF_VERSION))
+		if (version.equals(Version.PXF_PROTOCOL_VERSION))
 		{
 			errmsg = "Unknown path " + rootUri.getAbsolutePath();
 		}
 		else 
 		{
-			errmsg = "Wrong version " + version + ", supported version is " + Version.PXF_VERSION;
+			errmsg = "Wrong version " + version + ", supported version is " + Version.PXF_PROTOCOL_VERSION;
 		}
 		
 		return sendErrorMessage(errmsg);
@@ -87,39 +84,9 @@ public class InvalidPathResource
 	 */
 	private Response sendErrorMessage(String message)
 	{
-		final String returnmsg = new String(message);
-
-		StreamingOutput streaming = new StreamingOutput()
-		{
-			/*
-			 * writes given message to stream
-			 */			
-			@Override
-			public void write(final OutputStream out) throws IOException
-			{
-				DataOutputStream dos = new DataOutputStream(out);
-
-				try
-				{
-					dos.writeBytes(returnmsg);
-				} 
-				catch (org.eclipse.jetty.io.EofException e)
-				{
-					Log.error("Remote connection closed by GPDB", e);
-				}
-				catch (Exception e)
-				{
-					// API does not allow throwing Exception so need to convert to something
-					// I can throw without declaring...
-					Log.error("Exception thrown streaming", e);
-					throw new RuntimeException(e);
-				}				
-			}
-		};
-
 		ResponseBuilder b = Response.serverError();
-		b.entity(streaming);
-		b.type(MediaType.APPLICATION_OCTET_STREAM);
+		b.entity(message);
+		b.type(MediaType.TEXT_PLAIN_TYPE);
 		return b.build();
 	}
 

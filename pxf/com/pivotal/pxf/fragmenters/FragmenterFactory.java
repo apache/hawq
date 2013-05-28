@@ -5,13 +5,13 @@ import com.pivotal.pxf.utilities.Utilities;
 
 /*
  * Factory class for creation of Fragmenter objects. The actual Fragmenter object is "hidden" behind
- * an IDataFragmenter interface which is returned by the FragmenterFactory. 
+ * an Fragmenter abstract class which is returned by the FragmenterFactory. 
  */
 public class FragmenterFactory
 {
-	static public IDataFragmenter create(BaseMetaData conf) throws Exception
+	static public Fragmenter create(BaseMetaData conf) throws Exception
 	{
 		String fragmenterName = conf.getProperty("X-GP-FRAGMENTER");
-		return (IDataFragmenter)Utilities.createAnyInstance(BaseMetaData.class, fragmenterName, "fragmenters", conf);
+		return (Fragmenter)Utilities.createAnyInstance(BaseMetaData.class, fragmenterName, "fragmenters", conf);
 	}
 }

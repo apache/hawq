@@ -175,7 +175,7 @@ public class HiveDataFragmenter extends BaseDataFragmenter
 		Log.debug("Table: " + tblDesc.dbName + "." + tblDesc.tableName + ", type: " + tblType);
 		
 		if (TableType.valueOf(tblType) == TableType.VIRTUAL_VIEW)
-			throw new UnsupportedOperationException("GPXF doesn't support HIVE views"); 
+			throw new UnsupportedOperationException("PXF doesn't support HIVE views"); 
 		
 		List<Partition> partitions = client.get_partitions(tblDesc.dbName, tblDesc.tableName, (short)TODO_REMOVE_THIS_CONST); // guessing the max partitions - will have to further research this
 		StorageDescriptor descTable = tbl.getSd();

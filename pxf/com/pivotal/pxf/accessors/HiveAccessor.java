@@ -19,9 +19,9 @@ import com.pivotal.pxf.utilities.HDFSMetaData;
 
 
 /*
- * Specialization of SplittableFileAccessor for sequence files
+ * Specialization of HdfsSplittableDataAccessor for sequence files
  */
-public class HiveAccessor extends SplittableFileAccessor
+public class HiveAccessor extends HdfsSplittableDataAccessor
 {
 	private Log Log;
 	

@@ -22,13 +22,18 @@ import com.pivotal.pxf.utilities.HBaseMetaData;
  *
  * Currently, the class assumes all HBase values are stored as String object Bytes encoded
  */
-public class HBaseResolver implements IFieldsResolver
+public class HBaseResolver extends Resolver
 {
 	HBaseMetaData conf;
 
 	public HBaseResolver(HBaseMetaData configuration) throws Exception
 	{
-		conf = configuration;
+		super(configuration);
+		/* 
+		 * The conf variable will be discarded once we remove all specialized MetaData classes and remain 
+		 * only with BaseMetaData which wholds the sequence of properties
+		 */
+		conf = (HBaseMetaData)this.getMetaData();
 	}
 
 	public List<OneField> GetFields(OneRow onerow) throws Exception

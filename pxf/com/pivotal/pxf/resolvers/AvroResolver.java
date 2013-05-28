@@ -27,7 +27,7 @@ import com.pivotal.pxf.utilities.RecordkeyAdapter;
  * using the AVRO serialization framework. AvroResolver implements
  * IFieldsResolver exposing one method: GetFields
  */
-public class AvroResolver implements  IFieldsResolver
+public class AvroResolver extends  Resolver
 {
 	private HDFSMetaData connectorConfiguration;
 	// Avro variables
@@ -46,7 +46,12 @@ public class AvroResolver implements  IFieldsResolver
 	 */
 	public AvroResolver(HDFSMetaData conf) throws IOException
 	{
-		connectorConfiguration = conf; 
+		super(conf);
+		/* 
+		 * The conf variable will be discarded once we remove all specialized MetaData classes and remain 
+		 * only with BaseMetaData which wholds the sequence of properties
+		 */
+		connectorConfiguration = (HDFSMetaData)this.getMetaData();		
 				
 		if (isAvroFile())
 			schema = connectorConfiguration.GetAvroFileSchema();

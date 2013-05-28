@@ -8,7 +8,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 /*
- * Utilities class exposes helper method for GPXF classes
+ * Utilities class exposes helper method for PXF classes
  */
 public class Utilities
 {
@@ -16,7 +16,7 @@ public class Utilities
 	private static Log Log = LogFactory.getLog(Utilities.class);
 	
 	/*
-	 * creates an object using the class name. The class name can be a class located in the gphdfs
+	 * creates an object using the class name. The class name can be a class located in the pxf
 	 * package in which case the scope of the package name applies, or it can be a third-party
 	 * class, located in $GPHOME/lib/hadoop/schemafiles, in which case the package name does not
 	 * apply

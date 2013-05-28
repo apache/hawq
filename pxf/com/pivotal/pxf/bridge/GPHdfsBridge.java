@@ -1,9 +1,9 @@
 package com.pivotal.pxf.bridge;
 
-import com.pivotal.pxf.accessors.IHdfsFileAccessor;
+import com.pivotal.pxf.accessors.Accessor;
 import com.pivotal.pxf.analyzers.AnalyzerFactory;
 import com.pivotal.pxf.format.OutputFormat;
-import com.pivotal.pxf.resolvers.IFieldsResolver;
+import com.pivotal.pxf.resolvers.Resolver;
 import com.pivotal.pxf.utilities.HDFSMetaData;
 import com.pivotal.pxf.utilities.Utilities;
 
@@ -30,23 +30,23 @@ public class GPHdfsBridge extends BasicBridge
 	/*
 	 * Creates the file accessor based on the input file type
 	 */
-	static public IHdfsFileAccessor getFileAccessor(HDFSMetaData metaData) throws Exception
+	static public Accessor getFileAccessor(HDFSMetaData metaData) throws Exception
 	{
 		String className = (metaData.outputFormat() == OutputFormat.FORMAT_TEXT) ?
 				"TextFileAccessor" : metaData.accessor();
 
-		return (IHdfsFileAccessor)Utilities.createAnyInstance(HDFSMetaData.class, className, "accessors", metaData);
+		return (Accessor)Utilities.createAnyInstance(HDFSMetaData.class, className, "accessors", metaData);
 	}
 
 	/*
 	 * Creates the record fields resolver based on the input serialization method
 	 */	
-	static IFieldsResolver getFieldsResolver(HDFSMetaData metaData) throws Exception
+	static Resolver getFieldsResolver(HDFSMetaData metaData) throws Exception
 	{
 		String className = (metaData.outputFormat() == OutputFormat.FORMAT_TEXT) ?
 				"TextResolver" : metaData.resolver();
 
-		return (IFieldsResolver)Utilities.createAnyInstance(HDFSMetaData.class, className, "resolvers", metaData);
+		return (Resolver)Utilities.createAnyInstance(HDFSMetaData.class, className, "resolvers", metaData);
 	}
 
 }

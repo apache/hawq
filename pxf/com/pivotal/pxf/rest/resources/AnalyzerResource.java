@@ -21,7 +21,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import com.pivotal.pxf.analyzers.AnalyzerFactory;
-import com.pivotal.pxf.analyzers.IAnalyzer;
+import com.pivotal.pxf.analyzers.Analyzer;
 import com.pivotal.pxf.utilities.BaseMetaData;
 
 /*
@@ -32,7 +32,7 @@ import com.pivotal.pxf.utilities.BaseMetaData;
  * /gpdb/ is made part of the path when this package is registered in the jetty servlet
  * in NameNode.java in the hadoop package - /hadoop-core-X.X.X.jar
  */
-@Path("/" + Version.PXF_VERSION + "/Analyzer/")
+@Path("/" + Version.PXF_PROTOCOL_VERSION + "/Analyzer/")
 public class AnalyzerResource
 {
 	org.apache.hadoop.fs.Path path = null;
@@ -49,11 +49,11 @@ public class AnalyzerResource
 	 * Example for querying API ANALYZER from a web client
 	 * curl -i "http://localhost:50070/gpdb/v2/Analyzer/getEstimatedStats?path=/dir1/dir2/*txt"
 	 * A default answer, unless an analyzer implements GetEstimatedStats, would be:
-	 * {"GPXFDataSourceStats":[{"blockSize":67108864,"numberOfBlocks":1000,"numberOfTuples":1000000}]}
+	 * {"PXFDataSourceStats":[{"blockSize":67108864,"numberOfBlocks":1000,"numberOfTuples":1000000}]}
 	 * Currently only HDFS is implemented to calculate the block size and block number, 
 	 * and returns -1 for number of tuples.
 	 * Example:
-	 * {"GPXFDataSourceStats":[{"blockSize":67108864,"numberOfBlocks":3,"numberOfTuples":-1}]}
+	 * {"PXFDataSourceStats":[{"blockSize":67108864,"numberOfBlocks":3,"numberOfTuples":-1}]}
 	 */
 	@GET
 	@Path("getEstimatedStats")
@@ -83,13 +83,13 @@ public class AnalyzerResource
 		 */
 		params.put("X-GP-DATA-FRAGMENTS", "0");
 		
-		final IAnalyzer analyzer = AnalyzerFactory.create(new BaseMetaData(params));
+		final Analyzer analyzer = AnalyzerFactory.create(new BaseMetaData(params));
 		final String datapath = new String(path);
 		
 		StreamingOutput streaming = new StreamingOutput()
 		{
 			/*
-			 * Function queries the gpxf Analyzer for the data fragments of the resource
+			 * Function queries the pxf Analyzer for the data fragments of the resource
 			 * The fragments are returned in a string formatted in JSON	 
 			 */			
 			@Override

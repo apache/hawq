@@ -10,39 +10,39 @@ import java.util.zip.ZipException;
 
 import org.apache.hadoop.io.Writable;
 
-import com.pivotal.pxf.accessors.IHdfsFileAccessor;
+import com.pivotal.pxf.accessors.Accessor;
 import com.pivotal.pxf.exception.BadRecordException;
 import com.pivotal.pxf.format.BridgeOutputBuilder;
 import com.pivotal.pxf.format.OneRow;
-import com.pivotal.pxf.resolvers.IFieldsResolver;
+import com.pivotal.pxf.resolvers.Resolver;
 import com.pivotal.pxf.utilities.HDMetaData;
 
 /*
  * class BasicBridge is an abstract class implementing the "Template Method" design pattern
  * BasicBridge implements the IBridge interface. In order to implement the IBridge methods,
- * BasicBridge uses the methods of two other "internal" interfaces IHdfsFileAccessor and IFieldsResolver.
- * The use of these two internal interfaces (IHdfsFileAccessor and IFieldsResolver) inside BasicBridge 
+ * BasicBridge uses the methods of two other "internal" abstract classes Accessor and Resolver.
+ * The use of these two internal abstract classes (Accessor and Resolver) inside BasicBridge 
  * represents in fact the skeleton of the data access algorithm of the Bridge framework.
  * The actual details of file access and records deserialization for given file types or serialization methods
- * are located inside the implementations of the interfaces IHdfsFileAccessor and IFieldsResolver.
+ * are located inside the implementations of the abstract classes Accessor and Resolver.
  * The user cannot instantiate BasicBridge since it is abstract. 
  * Instead the user will instantiate a specialization of BasicBridge (like for instance GpHdfsBridge). 
  * The sole purpose of the BasicBridge specialization class is to instantiate the actual implementations 
- * of IHdfsFileAccessor and IFieldsResolver, and pass them to the BasicBridge class who uses the 
+ * of Accessor and Resolver, and pass them to the BasicBridge class who uses the 
  * interfaces without being aware of the actual implementations which hold the details of file access 
  * and deserialization.
  */
 abstract class BasicBridge implements IBridge
 {
     HDMetaData conf = null;
-	IHdfsFileAccessor fileAccessor = null;
-	IFieldsResolver fieldsResolver = null;
+	Accessor fileAccessor = null;
+	Resolver fieldsResolver = null;
 	BridgeOutputBuilder outputBuilder = null;
 
 	/*
 	 * C'tor - set the implementation of the bridge
 	 */
-	BasicBridge(HDMetaData configuration, IHdfsFileAccessor accessor, IFieldsResolver resolver)
+	BasicBridge(HDMetaData configuration, Accessor accessor, Resolver resolver)
 	{
         conf = configuration;
 		fileAccessor = accessor;

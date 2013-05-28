@@ -12,7 +12,7 @@ import com.pivotal.pxf.utilities.BaseMetaData;
 /*
  * Base class for the data fragmenters
  */
-public abstract class BaseDataFragmenter implements IDataFragmenter
+public abstract class BaseDataFragmenter extends Fragmenter
 {
 	protected BaseMetaData conf;
 	protected List<FragmentInfo> fragmentInfos;
@@ -23,7 +23,13 @@ public abstract class BaseDataFragmenter implements IDataFragmenter
 	 */
 	public BaseDataFragmenter(BaseMetaData inConf)
 	{
-		conf = inConf;
+		super(inConf);
+		/* 
+		 * The conf variable will be discarded once we remove all specialized MetaData classes and remain 
+		 * only with BaseMetaData which wholds the sequence of properties
+		 */
+		conf = this.getMetaData();
+		
 		fragmentInfos = new ArrayList<FragmentInfo>();
 		Log = LogFactory.getLog(BaseDataFragmenter.class);
 	}
@@ -51,9 +57,5 @@ public abstract class BaseDataFragmenter implements IDataFragmenter
 	/*
 	 * Returns specific fragment info from a fragmenter.
 	 */
-	protected void GetFragmentInfos(String data) throws Exception
-	{
-		/* empty default implementation */
-		throw new Exception("GetFragmentInfos not implemented!");
-	}
+	protected abstract void GetFragmentInfos(String data) throws Exception;
 }

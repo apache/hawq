@@ -17,9 +17,9 @@ import java.util.List;
 /*
  * Class WritableResolver handles deserialization of records that were serialized 
  * using Hadoop's Writable serialization framework. WritableResolver implements
- * IFieldsResolver exposing one method: GetFields
+ * Resolver abstract class exposing one method: GetFields
  */
-public class WritableResolver implements IFieldsResolver
+public class WritableResolver extends Resolver
 {
     private HDFSMetaData connectorConfiguration;
 	private RecordkeyAdapter recordkeyAdapter = new RecordkeyAdapter();
@@ -33,7 +33,12 @@ public class WritableResolver implements IFieldsResolver
 
 	public WritableResolver(HDFSMetaData conf) throws Exception
 	{
-        connectorConfiguration = conf;
+		super(conf);
+		/* 
+		 * The connectorConfiguration variable will be discarded once we remove all specialized MetaData classes and remain 
+		 * only with BaseMetaData which wholds the sequence of properties
+		 */
+		connectorConfiguration = (HDFSMetaData)this.getMetaData();		
 		InitInputObject();
 	}
 

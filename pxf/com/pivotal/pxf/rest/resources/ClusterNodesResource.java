@@ -24,7 +24,7 @@ import org.apache.commons.logging.LogFactory;
  * /gpdb/ is made part of the path when this package is registered in the jetty servlet
  * in Main.java in the hbase package - hbase-x.xx.x-sc.jar
  */
-@Path("/" + Version.PXF_VERSION + "/HadoopCluster/")
+@Path("/" + Version.PXF_PROTOCOL_VERSION + "/HadoopCluster/")
 public class ClusterNodesResource
 {
 	private Log Log;

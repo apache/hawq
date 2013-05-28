@@ -14,14 +14,11 @@ import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.utilities.HDFSMetaData;
 
 /*
- * Implementation of IHdfsFileAccessor for accessing a sequence file. A sequence file is splittable
+ * Implementation of Accessor for accessing a splittable data source
  * - it means that HDFS will divide the file into splits based on an internal algorithm (by default, the 
- * the block size 64 MB is also the split size). This code runs in the context of the java process 
- * spawned by a GPDB segment and so it will only process the splits that correspond to its segment id - 
- * exact algorithm in the Open() function. While fetching each record, this class needs to go over the records
- * located in all its splits.
+ * the block size 64 MB is also the split size).  
  */
-public abstract class SplittableFileAccessor implements IHdfsFileAccessor
+public abstract class HdfsSplittableDataAccessor extends Accessor
 {
 	protected Configuration conf = null;
 	protected HDFSMetaData metaData = null;
@@ -36,17 +33,23 @@ public abstract class SplittableFileAccessor implements IHdfsFileAccessor
 	/*
 	 * C'tor
 	 */ 
-	public SplittableFileAccessor(HDFSMetaData meta, 
+	public HdfsSplittableDataAccessor(HDFSMetaData meta, 
 						          FileInputFormat<?, ?> inFormat) throws Exception
 	{
-        metaData = meta;
+		super(meta);
+		/* 
+		 * The metaData variable will be discarded once we remove all specialized MetaData classes and remain 
+		 * only with BaseMetaData which wholds the sequence of properties
+		 */
+		metaData = (HDFSMetaData)this.getMetaData();		
+		
 		fformat = inFormat;
 
 		// 1. Load Hadoop configuration defined in $HADOOP_HOME/conf/*.xml files
 		conf = new Configuration();
 
 		// 2. variable required for the splits iteration logic 
-		jobConf = new JobConf(conf, SplittableFileAccessor.class);
+		jobConf = new JobConf(conf, HdfsSplittableDataAccessor.class);
 	}
 
 	/*

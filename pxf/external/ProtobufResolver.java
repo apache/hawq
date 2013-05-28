@@ -1,16 +1,16 @@
 import com.pivotal.pxf.format.OneField;
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.hadoop.io.GPDBWritable;
-import com.pivotal.pxf.resolvers.IFieldsResolver;
+import com.pivotal.pxf.resolvers.Resolver;
 import com.pivotal.pxf.utilities.HDFSMetaData;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.DynamicMessage;
 import java.util.List;
 
 /*
- * Implementation for protocol-buffers of IFieldsResolver
+ * Implementation for protocol-buffers of Resolver
  */
-public class ProtobufResolver implements  IFieldsResolver
+public class ProtobufResolver extends  Resolver
 {
 	private HDFSMetaData metaData;
 	// the reflection instances
@@ -23,7 +23,12 @@ public class ProtobufResolver implements  IFieldsResolver
 	 */
 	public ProtobufResolver(HDFSMetaData meta)
 	{
-		metaData = meta;
+		super(meta);
+		/* 
+		 * The metaData variable will be discarded once we remove all specialized MetaData classes and remain 
+		 * only with BaseMetaData which wholds the sequence of properties
+		 */
+		metaData = (HDFSMetaData)this.getMetaData();
 	}
 
 	/*

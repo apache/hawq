@@ -45,9 +45,9 @@ import com.pivotal.pxf.utilities.RecordkeyAdapter;
 /*
  * Class HiveResolver handles deserialization of records that were serialized 
  * using Hadoop's Hive serialization framework. HiveResolver implements
- * IFieldsResolver exposing one method: GetFields
+ * Resolver abstract class exposing one method: GetFields
  */
-public class HiveResolver implements IFieldsResolver
+public class HiveResolver extends Resolver
 {
     private HDFSMetaData connectorConfiguration;
 	private RecordkeyAdapter recordkeyAdapter = new RecordkeyAdapter();
@@ -62,7 +62,13 @@ public class HiveResolver implements IFieldsResolver
 		
 	public HiveResolver(HDFSMetaData conf) throws Exception
 	{
-        connectorConfiguration = conf;
+		super(conf);
+		/* 
+		 * The connectorConfiguration variable will be discarded once we remove all specialized MetaData classes and remain 
+		 * only with BaseMetaData which wholds the sequence of properties
+		 */
+		connectorConfiguration = (HDFSMetaData)this.getMetaData();
+		
 		String userData = connectorConfiguration.getProperty("X-GP-FRAGMENT-USER-DATA");
 		String[] toks = userData.split(HiveDataFragmenter.HIVE_USER_DATA_DELIM);		
 		

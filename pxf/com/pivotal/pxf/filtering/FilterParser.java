@@ -367,7 +367,7 @@ public class FilterParser
 	 * Create a translation table of opcodes to their enum meaning
 	 *
 	 * These codes corresponds the codes in GPDB C code
-	 * see gphdfilters.h in gpxf protocol
+	 * see gphdfilters.h in pxf protocol
 	 */
 	private void initOperatorTransMap()
 	{

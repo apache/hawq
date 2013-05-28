@@ -12,9 +12,9 @@ import org.apache.hadoop.mapred.SequenceFileRecordReader;
 import com.pivotal.pxf.utilities.HDFSMetaData;
 
 /*
- * Specialization of SplittableFileAccessor for sequence files
+ * Specialization of HdfsSplittableDataAccessor for sequence files
  */
-public class SequenceFileAccessor extends SplittableFileAccessor
+public class SequenceFileAccessor extends HdfsSplittableDataAccessor
 {
 	/*
 	 * C'tor

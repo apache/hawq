@@ -24,7 +24,7 @@ import com.pivotal.pxf.utilities.HDFSMetaData;
 /*
  * Specialization of SplittableFileAccessor for AVRO files
  */
-public class AvroFileAccessor extends SplittableFileAccessor
+public class AvroFileAccessor extends HdfsSplittableDataAccessor
 {
 	private Schema schema = null;
 	private AvroWrapper<GenericRecord>  avroWrapper = null;

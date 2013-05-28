@@ -18,10 +18,10 @@ import com.pivotal.pxf.utilities.HDFSMetaData;
  * file and we will observe in the query result, each record appearing number_of_segments times. To avoid this
  * we will only have one segment (segment 0) working for this case - enforced with isWorkingSegment() method.
  * Naturaly this is the less recomended working mode since we are not making use of segement parallelism.
- * Acessors for a specific file type should inherit from this class only if the file they are reading does 
- * not suport splitting: a protocol-buffer file, regular file, ...
+ * HDFS acessors for a specific file type should inherit from this class only if the file they are reading does 
+ * not support splitting: a protocol-buffer file, regular file, ...
 */
-public abstract class OddFileAccessor implements IHdfsFileAccessor
+public abstract class HdfsAtomicDataAccessor extends Accessor
 {
 	private Configuration conf = null; 
 	protected HDFSMetaData metaData = null;
@@ -30,10 +30,15 @@ public abstract class OddFileAccessor implements IHdfsFileAccessor
 	/*
 	 * C'tor
 	 */ 	
-	public OddFileAccessor(HDFSMetaData meta) throws Exception
+	public HdfsAtomicDataAccessor(HDFSMetaData meta) throws Exception
 	{
 		// 0. Hold the configuration data
-		metaData = meta;
+		super(meta);
+		/* 
+		 * The metaData variable will be discarded once we remove all specialized MetaData classes and remain 
+		 * only with BaseMetaData which wholds the sequence of properties
+		 */
+		metaData = (HDFSMetaData)this.getMetaData(); 
 				
 		// 1. Load Hadoop configuration defined in $HADOOP_HOME/conf/*.xml files
 		conf = new Configuration();

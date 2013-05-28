@@ -21,7 +21,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import com.pivotal.pxf.fragmenters.FragmenterFactory;
-import com.pivotal.pxf.fragmenters.IDataFragmenter;
+import com.pivotal.pxf.fragmenters.Fragmenter;
 import com.pivotal.pxf.utilities.BaseMetaData;
 
 /*
@@ -32,7 +32,7 @@ import com.pivotal.pxf.utilities.BaseMetaData;
  * /gpdb/ is made part of the path when this package is registered in the jetty servlet
  * in NameNode.java in the hadoop package - /hadoop-core-X.X.X.jar
  */
-@Path("/" + Version.PXF_VERSION + "/Fragmenter/")
+@Path("/" + Version.PXF_PROTOCOL_VERSION + "/Fragmenter/")
 public class FragmenterResource
 {
 	org.apache.hadoop.fs.Path path = null;
@@ -62,7 +62,7 @@ public class FragmenterResource
 				  
 		/* Convert headers into a regular map */
 		Map<String, String> params = convertToRegularMap(headers.getRequestHeaders());
-		final IDataFragmenter fragmenter = FragmenterFactory.create(new BaseMetaData(params));
+		final Fragmenter fragmenter = FragmenterFactory.create(new BaseMetaData(params));
 		final String datapath = new String(path);
 		
 		StreamingOutput streaming = new StreamingOutput()

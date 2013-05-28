@@ -34,7 +34,7 @@ import java.util.NavigableMap;
  * The class now supports filters using the HBaseFilterEvaluator.
  * Regions can be filtered out according to input from HBaseFilterEvaluator.
  */
-public class HBaseAccessor implements IHdfsFileAccessor
+public class HBaseAccessor extends Accessor
 {	
 	private HBaseMetaData conf;
 	private HTableInterface table;
@@ -67,7 +67,12 @@ public class HBaseAccessor implements IHdfsFileAccessor
 
 	public HBaseAccessor(HBaseMetaData configuration)
 	{
-		conf = configuration;
+		super(configuration);
+		/* 
+		 * The conf variable will be discarded once we remove all specialized MetaData classes and remain 
+		 * only with BaseMetaData which holds the sequence of properties
+		 */
+		conf = (HBaseMetaData)this.getMetaData(); 
 
 		splits = new ArrayList<SplitBoundary>();
 		currentRegionIndex = 0;

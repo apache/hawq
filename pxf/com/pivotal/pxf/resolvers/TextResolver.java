@@ -12,9 +12,9 @@ import org.apache.hadoop.io.Text;
 
 /*
  * Class TextResolver handles deserialization of Text records 
- * WritableResolver implements IFieldsResolver exposing one method: GetFields
+ * WritableResolver implements Resolver abstract class exposing one method: GetFields
  */
-public class TextResolver implements IFieldsResolver
+public class TextResolver extends Resolver
 {
     private HDFSMetaData connectorConfiguration;
 	private RecordkeyAdapter recordkeyAdapter = new RecordkeyAdapter();
@@ -29,7 +29,12 @@ public class TextResolver implements IFieldsResolver
 	 */
 	public TextResolver(HDFSMetaData conf) throws Exception
 	{
-        connectorConfiguration = conf;
+		super(conf);
+		/* 
+		 * The connectorConfiguration variable will be discarded once we remove all specialized MetaData classes and remain 
+		 * only with BaseMetaData which wholds the sequence of properties
+		 */
+		connectorConfiguration = (HDFSMetaData)this.getMetaData();		
 	}
 
 	/*

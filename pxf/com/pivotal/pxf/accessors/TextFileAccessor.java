@@ -10,9 +10,9 @@ import org.apache.hadoop.mapred.LineRecordReader;
 import com.pivotal.pxf.utilities.HDFSMetaData;
 
 /*
- * Specialization of SplittableFileAccessor for text files
+ * Specialization of HdfsSplittableDataAccessor for text files
  */
-public class TextFileAccessor extends SplittableFileAccessor
+public class TextFileAccessor extends HdfsSplittableDataAccessor
 {
 	/*
 	 * C'tor

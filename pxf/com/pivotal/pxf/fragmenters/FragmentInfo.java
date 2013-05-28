@@ -85,13 +85,13 @@ public class FragmentInfo
 	 * Given a list of FragmentInfos, serialize it in JSON to be used as
 	 * the result string for GPDB. An example result is as follows:
 	 *
-	 * {"GPXFFragments":[{"hosts":["sdw1.corp.emc.com","sdw3.corp.emc.com","sdw8.corp.emc.com"],"sourceName":"text2.csv","userData":"<data_specific_to_third_party_fragmenter>"},{"hosts":["sdw2.corp.emc.com","sdw4.corp.emc.com","sdw5.corp.emc.com"],"sourceName":"text_data.csv","userData":"<data_specific_to_third_party_fragmenter>"}]}
+	 * {"PXFFragments":[{"hosts":["sdw1.corp.emc.com","sdw3.corp.emc.com","sdw8.corp.emc.com"],"sourceName":"text2.csv","userData":"<data_specific_to_third_party_fragmenter>"},{"hosts":["sdw2.corp.emc.com","sdw4.corp.emc.com","sdw5.corp.emc.com"],"sourceName":"text_data.csv","userData":"<data_specific_to_third_party_fragmenter>"}]}
 	 */
 	public static String listToJSON(List<FragmentInfo> fragmentInfos) throws IOException
 	{
 		ObjectMapper	mapper	= new ObjectMapper();
 		
-		String			result	= new String("{\"GPXFFragments\":[");
+		String			result	= new String("{\"PXFFragments\":[");
 		boolean			isFirst	= true;
 		
 		for (FragmentInfo fi : fragmentInfos)

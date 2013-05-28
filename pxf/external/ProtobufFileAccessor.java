@@ -8,14 +8,14 @@ import com.google.protobuf.DescriptorProtos;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Descriptors.DescriptorValidationException;
 import com.google.protobuf.DynamicMessage;
-import com.pivotal.pxf.accessors.OddFileAccessor;
+import com.pivotal.pxf.accessors.HdfsAtomicDataAccessor;
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.utilities.HDFSMetaData;
 
 /*
- * Specialization of OddFileAccessor for protocol-buffer files
+ * Specialization of HdfsAtomicDataAccessor for protocol-buffer files
  */
-public class ProtobufFileAccessor extends OddFileAccessor
+public class ProtobufFileAccessor extends HdfsAtomicDataAccessor
 {
 	private int num_records = 0;
 	private int cur_record = 0;

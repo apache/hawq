@@ -1,5 +1,5 @@
 #
-# RPM Spec file for GPXF version @version@
+# RPM Spec file for PXF version @version@
 #
 
 # Build time settings, replaced by build.xml

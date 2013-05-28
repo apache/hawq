@@ -15,7 +15,7 @@ import com.pivotal.pxf.utilities.BaseMetaData;
 /*
  * Fragmenter class for HBase data resources.
  *
- * Implements the IDataFragmenter interface, with the purpose of transforming
+ * Extends the Fragmenter abstract class, with the purpose of transforming
  * an input data path (an HBase table name in this case) into a list of regions
  * that belong to this table. The result is a list of FragmentInfo objects, 
  * serialized in JSON.

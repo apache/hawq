@@ -30,7 +30,7 @@ import com.pivotal.pxf.utilities.HDMetaData;
  * This class handles the subpath /v2/Bridge/ of this
  * REST component
  */
-@Path("/" + Version.PXF_VERSION + "/Bridge/")
+@Path("/" + Version.PXF_PROTOCOL_VERSION + "/Bridge/")
 public class BridgeResource
 {
 	private Log Log;

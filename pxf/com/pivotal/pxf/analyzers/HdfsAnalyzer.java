@@ -12,7 +12,7 @@ import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 
-import com.pivotal.pxf.accessors.IHdfsFileAccessor;
+import com.pivotal.pxf.accessors.Accessor;
 import com.pivotal.pxf.bridge.GPHdfsBridge;
 import com.pivotal.pxf.utilities.BaseMetaData;
 import com.pivotal.pxf.utilities.GPFusionInputFormat;
@@ -26,7 +26,7 @@ import com.pivotal.pxf.utilities.HDMetaData;
  * Given an HDFS data source (a file, directory, or wild card pattern)
  * return statistics about it (number of blocks, number of tuples, etc.)
  */
-public class HdfsAnalyzer extends BaseAnalyzer
+public class HdfsAnalyzer extends Analyzer
 {	
 	private	JobConf jobConf;
 	private FileSystem fs;
@@ -97,8 +97,8 @@ public class HdfsAnalyzer extends BaseAnalyzer
 	{
 		long tuples = -1; /* default  - if we are not able to read data */
 		
-		HDFSMetaData hdfsConf = new HDFSMetaData(new HDMetaData(conf.getParametersMap()));
-		IHdfsFileAccessor accessor = GPHdfsBridge.getFileAccessor(hdfsConf);		
+		HDFSMetaData hdfsConf = new HDFSMetaData(new HDMetaData(this.getMetaData().getParametersMap()));
+		Accessor accessor = GPHdfsBridge.getFileAccessor(hdfsConf);		
 		if (accessor.Open());
 		{
 			tuples = 0;
