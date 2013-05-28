@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project name="gpxf" default="all" xmlns:ivy="antlib:org.apache.ivy.ant">
+<project name="pxf" default="all" xmlns:ivy="antlib:org.apache.ivy.ant">
 
 	<!-- Load product and build parameters from build.properties
 		 NOTE: Product name and version defined in build.properties -->
@@ -160,7 +160,7 @@
 				<include name="${package.name}.tar.gz" />
 			</fileset>
 		</copy>
-		<copy file="${src.dir}/packages/gpxf.spec" todir="${package.buildroot}/SPECS">
+		<copy file="${src.dir}/packages/pxf.spec" todir="${package.buildroot}/SPECS">
 			<filterchain>
 				<replacetokens>
 					<token key="component.basename" value="${component.basename}" />
@@ -176,7 +176,7 @@
 				</replacetokens>
 			</filterchain>
 		</copy>
-		<rpm specFile="gpxf.spec" command="-bb" topDir="${package.buildroot}" cleanBuildDir="true" failOnError="true"/>
+		<rpm specFile="pxf.spec" command="-bb" topDir="${package.buildroot}" cleanBuildDir="true" failOnError="true"/>
 		<copy todir="${build.dir}/" flatten="true">
 			<fileset dir="${package.buildroot}/RPMS">
 				<include name="**/${component.basename}*.rpm" />
