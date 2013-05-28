@@ -317,7 +317,7 @@ BEGIN
                         (SVEC, FLOAT[], or INTEGER[]).', expr_point;
 END
 $$
-    LANGUAGE plpgsql STRICT;
+    LANGUAGE plpgsql STRICT MODIFIES SQL DATA;
 
 
 
@@ -375,7 +375,7 @@ CREATE FUNCTION __lda_util_conorm_data(data_table text, vocab_table text, output
     return [[output_data_table,'normalized data table'],
         [output_vocab_table,'normalized vocab table']]
 $$
-    LANGUAGE plpythonu STRICT;
+    LANGUAGE plpythonu STRICT MODIFIES SQL DATA;
 
 
 
@@ -406,7 +406,7 @@ CREATE FUNCTION __lda_util_index_sort(arr double precision[]) RETURNS integer[]
 
     return lda.index_sort(arr)
 $$
-    LANGUAGE plpythonu STRICT;
+    LANGUAGE plpythonu STRICT READS SQL DATA;
 
 
 
@@ -438,7 +438,7 @@ CREATE FUNCTION __lda_util_norm_dataset(data_table text, norm_vocab_table text, 
     lda.norm_dataset(data_table, norm_vocab_table, output_data_table)
     return [[output_data_table,'normalized data table']]
 $$
-    LANGUAGE plpythonu STRICT;
+    LANGUAGE plpythonu STRICT MODIFIES SQL DATA;
 
 
 
@@ -470,7 +470,7 @@ CREATE FUNCTION __lda_util_norm_vocab(vocab_table text, output_vocab_table text)
     lda.norm_vocab(vocab_table, output_vocab_table)
     return [[output_vocab_table,'normalized vocbulary table']]
 $$
-    LANGUAGE plpythonu STRICT;
+    LANGUAGE plpythonu STRICT MODIFIES SQL DATA;
 
 
 
@@ -501,7 +501,7 @@ CREATE FUNCTION __lda_util_norm_with_smoothing(arr double precision[], smooth do
 
     return lda.l1_norm_with_smoothing(arr, smooth)
 $$
-    LANGUAGE plpythonu STRICT;
+    LANGUAGE plpythonu STRICT READS SQL DATA;
 
 
 
@@ -679,7 +679,7 @@ CREATE FUNCTION assoc_rules(support double precision, confidence double precisio
         );
 
 $$
-    LANGUAGE plpythonu;
+    LANGUAGE plpythonu MODIFIES SQL DATA;
 
 
 
@@ -725,7 +725,7 @@ CREATE FUNCTION assoc_rules(support double precision, confidence double precisio
         );
 
 $$
-    LANGUAGE plpythonu;
+    LANGUAGE plpythonu MODIFIES SQL DATA;
 
 
 
@@ -847,7 +847,7 @@ CREATE FUNCTION compute_cox_prop_hazards(source character varying, "indepColumn"
 
     return cox_prop_hazards.compute_cox_prop_hazards(**globals())
 $$
-    LANGUAGE plpythonu;
+    LANGUAGE plpythonu MODIFIES SQL DATA;
 
 
 
@@ -877,7 +877,7 @@ CREATE FUNCTION compute_logregr(source character varying, "depColumn" character 
 
     return logistic.compute_logregr(**globals())
 $$
-    LANGUAGE plpythonu;
+    LANGUAGE plpythonu MODIFIES SQL DATA;
 
 
 
@@ -907,7 +907,7 @@ CREATE FUNCTION compute_mlogregr(source character varying, depvar character vary
 
     return multilogistic.compute_mlogregr(**globals())
 $$
-    LANGUAGE plpythonu;
+    LANGUAGE plpythonu MODIFIES SQL DATA;
 
 
 
@@ -944,25 +944,25 @@ BEGIN
     RETURN theResult;
 END;
 $_$
-    LANGUAGE plpgsql;
+    LANGUAGE plpgsql MODIFIES SQL DATA;
 
 
 
 CREATE FUNCTION cox_prop_hazards(source character varying, "indepColumn" character varying, "depColumn" character varying) RETURNS cox_prop_hazards_result
     AS $_$SELECT madlib.cox_prop_hazards($1, $2, $3, 20, 'newton', 0.0001);$_$
-    LANGUAGE sql;
+    LANGUAGE sql MODIFIES SQL DATA;
 
 
 
 CREATE FUNCTION cox_prop_hazards(source character varying, "indepColumn" character varying, "depColumn" character varying, "maxNumIterations" integer) RETURNS cox_prop_hazards_result
     AS $_$SELECT madlib.cox_prop_hazards($1, $2, $3, $4, 'newton', 0.0001);$_$
-    LANGUAGE sql;
+    LANGUAGE sql MODIFIES SQL DATA;
 
 
 
 CREATE FUNCTION cox_prop_hazards(source character varying, "indepColumn" character varying, "depColumn" character varying, "maxNumIterations" integer, optimizer character varying) RETURNS cox_prop_hazards_result
     AS $_$SELECT madlib.cox_prop_hazards($1, $2, $3, $4, $5, 0.0001);$_$
-    LANGUAGE sql;
+    LANGUAGE sql MODIFIES SQL DATA;
 
 
 
@@ -987,7 +987,7 @@ BEGIN
     END IF;
 END;
 $$
-    LANGUAGE plpgsql;
+    LANGUAGE plpgsql MODIFIES SQL DATA;
 
 
 
@@ -1149,7 +1149,7 @@ CREATE FUNCTION internal_compute_kmeans(rel_args character varying, rel_state ch
 
     return kmeans.compute_kmeans(**globals())
 $$
-    LANGUAGE plpythonu;
+    LANGUAGE plpythonu MODIFIES SQL DATA;
 
 
 
@@ -1179,7 +1179,7 @@ CREATE FUNCTION internal_compute_kmeans_random_seeding(rel_args character varyin
 
     return kmeans.compute_kmeans_random_seeding(**globals())
 $$
-    LANGUAGE plpythonu;
+    LANGUAGE plpythonu MODIFIES SQL DATA;
 
 
 
@@ -1209,7 +1209,7 @@ CREATE FUNCTION internal_compute_kmeanspp_seeding(rel_args character varying, re
 
     return kmeans.compute_kmeanspp_seeding(**globals())
 $$
-    LANGUAGE plpythonu;
+    LANGUAGE plpythonu MODIFIES SQL DATA;
 
 
 
@@ -1402,7 +1402,7 @@ BEGIN
     RETURN theResult;
 END;
 $_$
-    LANGUAGE plpgsql;
+    LANGUAGE plpgsql MODIFIES SQL DATA;
 
 
 
@@ -1410,7 +1410,7 @@ CREATE FUNCTION kmeans(rel_source character varying, expr_point character varyin
     AS $_$
     SELECT madlib.kmeans($1, $2, $3, $4, $5, $6, 0.001)
 $_$
-    LANGUAGE sql STRICT;
+    LANGUAGE sql STRICT MODIFIES SQL DATA;
 
 
 
@@ -1418,7 +1418,7 @@ CREATE FUNCTION kmeans(rel_source character varying, expr_point character varyin
     AS $_$
     SELECT madlib.kmeans($1, $2, $3, $4, $5, 20, 0.001)
 $_$
-    LANGUAGE sql STRICT;
+    LANGUAGE sql STRICT MODIFIES SQL DATA;
 
 
 
@@ -1427,7 +1427,7 @@ CREATE FUNCTION kmeans(rel_source character varying, expr_point character varyin
     SELECT madlib.kmeans($1, $2, $3, $4, 'madlib.avg', 20,
         0.001)
 $_$
-    LANGUAGE sql STRICT;
+    LANGUAGE sql STRICT MODIFIES SQL DATA;
 
 
 
@@ -1436,7 +1436,7 @@ CREATE FUNCTION kmeans(rel_source character varying, expr_point character varyin
     SELECT madlib.kmeans($1, $2, $3,
         'madlib.squared_dist_norm2', 'madlib.avg', 20, 0.001)
 $_$
-    LANGUAGE sql STRICT;
+    LANGUAGE sql STRICT MODIFIES SQL DATA;
 
 
 
@@ -1463,7 +1463,7 @@ BEGIN
     RETURN theResult;
 END;
 $_$
-    LANGUAGE plpgsql STRICT;
+    LANGUAGE plpgsql STRICT MODIFIES SQL DATA;
 
 
 
@@ -1473,7 +1473,7 @@ CREATE FUNCTION kmeans(rel_source character varying, expr_point character varyin
         $1, $2,
         $3, $4, $5, $6, $7, 0.001)
 $_$
-    LANGUAGE sql STRICT;
+    LANGUAGE sql STRICT MODIFIES SQL DATA;
 
 
 
@@ -1483,7 +1483,7 @@ CREATE FUNCTION kmeans(rel_source character varying, expr_point character varyin
         $1, $2,
         $3, $4, $5, $6, 20, 0.001)
 $_$
-    LANGUAGE sql STRICT;
+    LANGUAGE sql STRICT MODIFIES SQL DATA;
 
 
 
@@ -1493,7 +1493,7 @@ CREATE FUNCTION kmeans(rel_source character varying, expr_point character varyin
         $1, $2,
         $3, $4, $5, 'madlib.avg', 20, 0.001)
 $_$
-    LANGUAGE sql STRICT;
+    LANGUAGE sql STRICT MODIFIES SQL DATA;
 
 
 
@@ -1504,7 +1504,7 @@ CREATE FUNCTION kmeans(rel_source character varying, expr_point character varyin
         $3, $4,
         'madlib.squared_dist_norm2', 'madlib.avg', 20, 0.001)
 $_$
-    LANGUAGE sql STRICT;
+    LANGUAGE sql STRICT MODIFIES SQL DATA;
 
 
 
@@ -1519,7 +1519,7 @@ BEGIN
     RETURN ret;
 END
 $_$
-    LANGUAGE plpgsql STRICT;
+    LANGUAGE plpgsql STRICT MODIFIES SQL DATA;
 
 
 
@@ -1534,7 +1534,7 @@ BEGIN
     RETURN ret;
 END
 $_$
-    LANGUAGE plpgsql STRICT;
+    LANGUAGE plpgsql STRICT MODIFIES SQL DATA;
 
 
 
@@ -1549,7 +1549,7 @@ BEGIN
     RETURN ret;
 END
 $_$
-    LANGUAGE plpgsql STRICT;
+    LANGUAGE plpgsql STRICT MODIFIES SQL DATA;
 
 
 
@@ -1565,7 +1565,7 @@ BEGIN
     RETURN ret;
 END
 $_$
-    LANGUAGE plpgsql STRICT;
+    LANGUAGE plpgsql STRICT MODIFIES SQL DATA;
 
 
 
@@ -1581,7 +1581,7 @@ BEGIN
     RETURN ret;
 END
 $_$
-    LANGUAGE plpgsql STRICT;
+    LANGUAGE plpgsql STRICT MODIFIES SQL DATA;
 
 
 
@@ -1647,7 +1647,7 @@ BEGIN
     RETURN theResult;
 END;
 $_$
-    LANGUAGE plpgsql;
+    LANGUAGE plpgsql MODIFIES SQL DATA;
 
 
 
@@ -1655,7 +1655,7 @@ CREATE FUNCTION kmeans_random_seeding(rel_source character varying, expr_point c
     AS $_$
     SELECT madlib.kmeans_random_seeding($1, $2, $3, NULL)
 $_$
-    LANGUAGE sql;
+    LANGUAGE sql MODIFIES SQL DATA;
 
 
 
@@ -1670,7 +1670,7 @@ BEGIN
     RETURN ret;
 END
 $_$
-    LANGUAGE plpgsql STRICT;
+    LANGUAGE plpgsql STRICT MODIFIES SQL DATA;
 
 
 
@@ -1685,7 +1685,7 @@ BEGIN
     RETURN ret;
 END
 $_$
-    LANGUAGE plpgsql STRICT;
+    LANGUAGE plpgsql STRICT MODIFIES SQL DATA;
 
 
 
@@ -1700,7 +1700,7 @@ BEGIN
     RETURN ret;
 END
 $_$
-    LANGUAGE plpgsql STRICT;
+    LANGUAGE plpgsql STRICT MODIFIES SQL DATA;
 
 
 
@@ -1715,7 +1715,7 @@ BEGIN
     RETURN ret;
 END
 $_$
-    LANGUAGE plpgsql STRICT;
+    LANGUAGE plpgsql STRICT MODIFIES SQL DATA;
 
 
 
@@ -1732,7 +1732,7 @@ BEGIN
     RETURN ret;
 END
 $_$
-    LANGUAGE plpgsql STRICT;
+    LANGUAGE plpgsql STRICT MODIFIES SQL DATA;
 
 
 
@@ -1804,7 +1804,7 @@ BEGIN
     RETURN theResult;
 END;
 $_$
-    LANGUAGE plpgsql;
+    LANGUAGE plpgsql MODIFIES SQL DATA;
 
 
 
@@ -1812,7 +1812,7 @@ CREATE FUNCTION kmeanspp_seeding(rel_source character varying, expr_point charac
     AS $_$
     SELECT madlib.kmeanspp_seeding($1, $2, $3, $4, NULL)
 $_$
-    LANGUAGE sql;
+    LANGUAGE sql MODIFIES SQL DATA;
 
 
 
@@ -1821,7 +1821,7 @@ CREATE FUNCTION kmeanspp_seeding(rel_source character varying, expr_point charac
     SELECT madlib.kmeanspp_seeding($1, $2, $3,
         'madlib.squared_dist_norm2', NULL)
 $_$
-    LANGUAGE sql;
+    LANGUAGE sql MODIFIES SQL DATA;
 
 
 
@@ -1914,25 +1914,25 @@ BEGIN
     RETURN theResult;
 END;
 $_$
-    LANGUAGE plpgsql;
+    LANGUAGE plpgsql MODIFIES SQL DATA;
 
 
 
 CREATE FUNCTION logregr(source character varying, "depColumn" character varying, "indepColumn" character varying) RETURNS logregr_result
     AS $_$SELECT madlib.logregr($1, $2, $3, 20, 'irls', 0.0001);$_$
-    LANGUAGE sql;
+    LANGUAGE sql MODIFIES SQL DATA;
 
 
 
 CREATE FUNCTION logregr(source character varying, "depColumn" character varying, "indepColumn" character varying, "maxNumIterations" integer) RETURNS logregr_result
     AS $_$SELECT madlib.logregr($1, $2, $3, $4, 'irls', 0.0001);$_$
-    LANGUAGE sql;
+    LANGUAGE sql MODIFIES SQL DATA;
 
 
 
 CREATE FUNCTION logregr(source character varying, "depColumn" character varying, "indepColumn" character varying, "maxNumIterations" integer, optimizer character varying) RETURNS logregr_result
     AS $_$SELECT madlib.logregr($1, $2, $3, $4, $5, 0.0001);$_$
-    LANGUAGE sql;
+    LANGUAGE sql MODIFIES SQL DATA;
 
 
 
@@ -2057,25 +2057,25 @@ BEGIN
     RETURN theResult;
 END;
 $_$
-    LANGUAGE plpgsql;
+    LANGUAGE plpgsql MODIFIES SQL DATA;
 
 
 
 CREATE FUNCTION mlogregr(source character varying, depvar character varying, numcategories integer, indepvar character varying) RETURNS mlogregr_result
     AS $_$SELECT madlib.mlogregr($1, $2, $3, $4, 20, 'irls', 0.0001);$_$
-    LANGUAGE sql;
+    LANGUAGE sql MODIFIES SQL DATA;
 
 
 
 CREATE FUNCTION mlogregr(source character varying, depvar character varying, numcategories integer, indepvar character varying, maxnumiterations integer) RETURNS mlogregr_result
     AS $_$SELECT madlib.mlogregr($1, $2, $3, $4, $5, 'irls', 0.0001);$_$
-    LANGUAGE sql;
+    LANGUAGE sql MODIFIES SQL DATA;
 
 
 
 CREATE FUNCTION mlogregr(source character varying, depvar character varying, numcategories integer, indepvar character varying, maxbumiterations integer, optimizer character varying) RETURNS mlogregr_result
     AS $_$SELECT madlib.mlogregr($1, $2, $3, $4, $5, $6, 0.0001);$_$
-    LANGUAGE sql;
+    LANGUAGE sql MODIFIES SQL DATA;
 
 
 
@@ -2141,7 +2141,7 @@ CREATE FUNCTION lda_get_topic_desc(model_table text, vocab_table text, desc_tabl
         """topic description, use "ORDER BY topicid, prob DESC" to check the
         results"""]]
 $$
-    LANGUAGE plpythonu STRICT;
+    LANGUAGE plpythonu STRICT MODIFIES SQL DATA;
 
 
 
@@ -2173,7 +2173,7 @@ CREATE FUNCTION lda_get_topic_word_count(model_table text, output_table text) RE
     lda.get_topic_word_count(schema_madlib, model_table, output_table)
     return [[output_table, 'per-topic word counts']]
 $$
-    LANGUAGE plpythonu STRICT;
+    LANGUAGE plpythonu STRICT MODIFIES SQL DATA;
 
 
 
@@ -2205,7 +2205,7 @@ CREATE FUNCTION lda_get_word_topic_count(model_table text, output_table text) RE
     lda.get_word_topic_count(schema_madlib, model_table, output_table)
     return [[output_table, 'per-word topic counts']]
 $$
-    LANGUAGE plpythonu STRICT;
+    LANGUAGE plpythonu STRICT MODIFIES SQL DATA;
 
 
 
@@ -2239,7 +2239,7 @@ CREATE FUNCTION lda_predict(data_table text, model_table text, output_table text
         output_table, 
         'per-doc topic distribution and per-word topic assignments']]
 $$
-    LANGUAGE plpythonu STRICT;
+    LANGUAGE plpythonu STRICT MODIFIES SQL DATA;
 
 
 
@@ -2275,7 +2275,7 @@ CREATE FUNCTION lda_train(data_table text, model_table text, output_data_table t
     return [[model_table, 'model table'], 
         [output_data_table, 'output data table']]
 $$
-    LANGUAGE plpythonu STRICT;
+    LANGUAGE plpythonu STRICT MODIFIES SQL DATA;
 
 
 
@@ -2396,7 +2396,7 @@ BEGIN
         centroids, proc_fn_dist);
 END;
 $_$
-    LANGUAGE plpgsql STABLE STRICT;
+    LANGUAGE plpgsql STABLE STRICT MODIFIES SQL DATA;
 
 
 
@@ -2405,7 +2405,7 @@ CREATE FUNCTION simple_silhouette(rel_source character varying, expr_point chara
     SELECT madlib.simple_silhouette($1, $2, $3,
         'madlib.dist_norm2')
 $_$
-    LANGUAGE sql STABLE STRICT;
+    LANGUAGE sql STABLE STRICT MODIFIES SQL DATA;
 
 
 
