@@ -1,27 +1,24 @@
 package com.pivotal.pxf.rest.resources;
 
-import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.util.Map;
 import java.util.HashMap;
+import java.util.Map;
 
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
-import javax.ws.rs.core.StreamingOutput;
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import com.pivotal.pxf.analyzers.AnalyzerFactory;
 import com.pivotal.pxf.analyzers.Analyzer;
+import com.pivotal.pxf.analyzers.AnalyzerFactory;
 import com.pivotal.pxf.utilities.BaseMetaData;
 
 /*
@@ -84,38 +81,14 @@ public class AnalyzerResource
 		params.put("X-GP-DATA-FRAGMENTS", "0");
 		
 		final Analyzer analyzer = AnalyzerFactory.create(new BaseMetaData(params));
-		final String datapath = new String(path);
-		
-		StreamingOutput streaming = new StreamingOutput()
-		{
-			/*
-			 * Function queries the pxf Analyzer for the data fragments of the resource
-			 * The fragments are returned in a string formatted in JSON	 
-			 */			
-			@Override
-			public void write(final OutputStream out) throws IOException
-			{
-				DataOutputStream dos = new DataOutputStream(out);
 				
-				try
-				{
-					dos.writeBytes(analyzer.GetEstimatedStats(datapath));
-				} 
-				catch (org.eclipse.jetty.io.EofException e)
-				{
-					Log.error("Remote connection closed by GPDB", e);
-				}
-				catch (Exception e)
-				{
-					// API does not allow throwing Exception so need to convert to something
-					// I can throw without declaring...
-					Log.error("Exception thrown streaming", e);
-					throw new RuntimeException(e);
-				}				
-			}
-		};
+		/*
+		 * Function queries the pxf Analyzer for the data fragments of the resource
+		 * The fragments are returned in a string formatted in JSON	 
+		 */		
+		String jsonOutput = analyzer.GetEstimatedStats(path);
 		
-		return Response.ok( streaming, MediaType.APPLICATION_OCTET_STREAM ).build();
+		return Response.ok(jsonOutput, MediaType.APPLICATION_JSON_TYPE).build();
 	}
 	
 	Map<String, String> convertToRegularMap(MultivaluedMap<String, String> multimap)

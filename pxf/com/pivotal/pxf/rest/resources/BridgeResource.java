@@ -10,6 +10,7 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
@@ -20,6 +21,7 @@ import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.io.Writable;
+import org.eclipse.jetty.io.RuntimeIOException;
 
 import com.pivotal.pxf.bridge.BridgeFactory;
 import com.pivotal.pxf.bridge.IBridge;
@@ -27,7 +29,7 @@ import com.pivotal.pxf.fragmenters.HiveDataFragmenter;
 import com.pivotal.pxf.utilities.HDMetaData;
 
 /*
- * This class handles the subpath /v2/Bridge/ of this
+ * This class handles the subpath /<version>/Bridge/ of this
  * REST component
  */
 @Path("/" + Version.PXF_PROTOCOL_VERSION + "/Bridge/")
@@ -46,7 +48,7 @@ public class BridgeResource
 	 *
 	 * Parameters come through HTTP header other than the fragments.
 	 * fragments is part of the url:
-	 * /v2/Bridge?fragments=
+	 * /<version>/Bridge?fragments=
 	 */
     @GET
     @Produces(MediaType.APPLICATION_OCTET_STREAM)
@@ -70,20 +72,30 @@ public class BridgeResource
 		if (!bridge.BeginIteration())
 			return Response.ok().build();
 
+		final String fragment = params.get("X-GP-DATA-FRAGMENTS");
+		final String dataDir = params.get("X-GP-DATA-DIR");
+		
 		// Creating an internal streaming class
 		// which will iterate the records and put them on the
 		// output stream
 		final StreamingOutput streaming = new StreamingOutput()
 		{
 			@Override
-			public void write(final OutputStream out) throws IOException
+			public void write(final OutputStream out) throws IOException, WebApplicationException
 			{
+				long recordCount = 0;
+		
 				try
 				{
 					Writable record = null;
 					DataOutputStream dos = new DataOutputStream(out);
+					Log.debug("Starting streaming fragment " + fragment + " of resource " + dataDir);
 					while ((record = bridge.GetNext()) != null)
+					{		
 						record.write(dos);
+						++recordCount;
+					}
+					Log.debug("Finished streaming fragment " + fragment + " of resource " + dataDir + ", " + recordCount + " records.");
 				}
 				catch (org.eclipse.jetty.io.EofException e)
 				{
@@ -94,8 +106,10 @@ public class BridgeResource
 				{
 					// API does not allow throwing Exception so need to convert to something
 					// I can throw without declaring...
+					// Jetty ignores most exceptions, so we need to throw a RuntimeIOException
+					// (see org.eclipse.jetty.servlet.ServletHandler)
 					Log.error("Exception thrown streaming", e);
-					throw new RuntimeException(e);
+					throw new RuntimeIOException(e.getMessage());
 				}
 			}
 		};
