@@ -40,31 +40,31 @@ VACUUM FREEZE pg_proc;
 -- Partition management functions for the optimizer
 --
 CREATE FUNCTION @gpupgradeschemaname@.gp_partition_propagation(int4, oid) RETURNS void  LANGUAGE internal VOLATILE STRICT AS 'gp_partition_propagation' WITH (OID=6083);
-COMMENT ON FUNCTION @gpupgradeschemaname@.gp_partition_propagation(int4, oid) IS  'inserts a partition oid into specified pid-index';
+SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.gp_partition_propagation(int4, oid) IS  ''inserts a partition oid into specified pid-index''');
 
 CREATE FUNCTION @gpupgradeschemaname@.gp_partition_selection(oid, anyelement) RETURNS oid LANGUAGE internal VOLATILE STRICT AS 'gp_partition_selection' WITH (OID=6084);
-COMMENT ON FUNCTION @gpupgradeschemaname@.gp_partition_selection(oid, anyelement)  IS 'selects the child partition oid which satisfies a given partition key value';
+SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.gp_partition_selection(oid, anyelement)  IS ''selects the child partition oid which satisfies a given partition key value''');
 
 CREATE FUNCTION @gpupgradeschemaname@.gp_partition_expansion(oid) RETURNS setof oid LANGUAGE internal VOLATILE STRICT AS 'gp_partition_expansion' WITH (OID=6085);
-COMMENT ON FUNCTION @gpupgradeschemaname@.gp_partition_expansion(oid) IS 'finds all child partition oids for the given parent oid';
+SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.gp_partition_expansion(oid) IS ''finds all child partition oids for the given parent oid''');
 
 CREATE FUNCTION @gpupgradeschemaname@.gp_partition_inverse(oid) RETURNS setof record LANGUAGE internal VOLATILE STRICT AS 'gp_partition_inverse' WITH (OID=6086);
-COMMENT ON FUNCTION @gpupgradeschemaname@.gp_partition_inverse(oid) IS 'returns all child partitition oids with their constraints for a given parent oid';
+SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.gp_partition_inverse(oid) IS ''returns all child partitition oids with their constraints for a given parent oid''');
 
 --
 -- Functions for enabling and disabling transformations
 --
 CREATE FUNCTION @gpupgradeschemaname@.disable_xform(text) RETURNS text LANGUAGE internal IMMUTABLE STRICT AS 'disable_xform' WITH (OID=6087);
-COMMENT ON FUNCTION @gpupgradeschemaname@.disable_xform(text) IS 'disables transformations in the optimizer';
+SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.disable_xform(text) IS ''disables transformations in the optimizer''');
 
 CREATE FUNCTION @gpupgradeschemaname@.enable_xform(text) RETURNS text LANGUAGE internal IMMUTABLE STRICT AS 'enable_xform' WITH (OID=6088);
-COMMENT ON FUNCTION @gpupgradeschemaname@.enable_xform(text) IS 'enables transformations in the optimizer';
+SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.enable_xform(text) IS ''enables transformations in the optimizer''');
 
 --
 -- Show Optimizer's version
 --
 CREATE FUNCTION @gpupgradeschemaname@.gp_opt_version() RETURNS text LANGUAGE internal IMMUTABLE STRICT AS 'gp_opt_version' WITH (OID=6089);
-COMMENT ON FUNCTION @gpupgradeschemaname@.gp_opt_version() IS 'returns the optimizer and gpos library versions';
+SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.gp_opt_version() IS ''Returns the optimizer and gpos library versions''');
 
 --
 -- Add access properties to MADLib functions
