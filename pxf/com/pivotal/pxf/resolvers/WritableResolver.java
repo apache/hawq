@@ -96,7 +96,15 @@ public class WritableResolver extends Resolver
 
 		try
 		{
-			if (javaType.compareTo("int") == 0)
+            if (javaType.compareTo("boolean") == 0)
+            {
+                addOneFieldToRecord(record, GPDBWritable.BOOLEAN, field.get(userObject));
+            }
+			else if (javaType.compareTo("[Z") == 0)
+			{
+				ret = SetArrayField(record, GPDBWritable.BOOLEAN, field);
+			}
+			else if (javaType.compareTo("int") == 0)
 			{
 				addOneFieldToRecord(record, GPDBWritable.INTEGER, field.get(userObject));
 			}

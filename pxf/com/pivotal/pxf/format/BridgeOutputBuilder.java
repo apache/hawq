@@ -11,6 +11,7 @@ import java.lang.reflect.Array;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.util.List;
+import java.sql.Timestamp;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 
@@ -240,6 +241,18 @@ public class BridgeOutputBuilder
 			{
 				GPDBoutput.setString(i, (String)oneField.val);
 			}
+            else if (type == GPDBWritable.BOOLEAN)
+            {
+                GPDBoutput.setBoolean(i, (Boolean)oneField.val);
+            }
+            else if (type == GPDBWritable.NUMERIC)
+            {
+                GPDBoutput.setString(i, (String)oneField.val);
+            }
+            else if (type == GPDBWritable.TIMESTAMP)
+            {
+                GPDBoutput.setString(i, ((Timestamp)oneField.val).toString());
+            }
 			else
 			{
 				throw new UnsupportedOperationException("Type " + type + " not supported for gpdb conversion");

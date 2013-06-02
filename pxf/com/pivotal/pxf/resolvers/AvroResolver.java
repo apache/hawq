@@ -157,6 +157,9 @@ public class AvroResolver extends  Resolver
 			case BYTES:
 				ret = addOneFieldToRecord(record, GPDBWritable.BYTEA, avroRecord.get(fieldName));
 				break;				
+            case BOOLEAN:
+				ret = addOneFieldToRecord(record, GPDBWritable.BOOLEAN, avroRecord.get(fieldName));
+				break;
 			default:
 				break;
 		}
@@ -193,6 +196,9 @@ public class AvroResolver extends  Resolver
 				break;
 			case BYTES:
 				ret = iterateArray(record, GPDBWritable.BYTEA, (GenericData.Array<?>)avroRecord.get(fieldName));
+                break;
+            case BOOLEAN:
+                ret = iterateArray(record, GPDBWritable.BOOLEAN, (GenericData.Array<?>)avroRecord.get(fieldName));
 				break;				
 			default:
 				break;

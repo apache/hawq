@@ -123,8 +123,6 @@ public class HiveResolver extends Resolver
 			
 			if (type.compareTo(Constants.STRING_TYPE_NAME) == 0)
 				addOneFieldToRecord(partitionFields, GPDBWritable.TEXT, val);
-			else if (type.compareTo(Constants.TINYINT_TYPE_NAME) == 0)
-				addOneFieldToRecord(partitionFields, GPDBWritable.CHAR, Byte.parseByte(val));
 			else if (type.compareTo(Constants.SMALLINT_TYPE_NAME) == 0)
 				addOneFieldToRecord(partitionFields, GPDBWritable.SMALLINT, Short.parseShort(val));
 			else if (type.compareTo(Constants.INT_TYPE_NAME) == 0)
@@ -135,8 +133,6 @@ public class HiveResolver extends Resolver
 				addOneFieldToRecord(partitionFields, GPDBWritable.REAL, Float.parseFloat(val));
 			else if (type.compareTo(Constants.DOUBLE_TYPE_NAME) == 0)
 				addOneFieldToRecord(partitionFields, GPDBWritable.FLOAT8, Double.parseDouble(val));
-			else if (type.compareTo(Constants.DATE_TYPE_NAME) == 0)
-				addOneFieldToRecord(partitionFields, GPDBWritable.DATE, dateFormat.parse(val, new ParsePosition(0)));
 			else if (type.compareTo(Constants.TIMESTAMP_TYPE_NAME) == 0)
 				addOneFieldToRecord(partitionFields, GPDBWritable.TIMESTAMP, Timestamp.valueOf(val));
 			else 
@@ -226,11 +222,6 @@ public class HiveResolver extends Resolver
 			{
 				boolean b = ((BooleanObjectInspector) oi).get(o);
 				addOneFieldToRecord(record, GPDBWritable.BOOLEAN, b);
-				break;
-			}
-			case BYTE: {
-				byte b = ((ByteObjectInspector) oi).get(o);
-				addOneFieldToRecord(record, GPDBWritable.CHAR, b);
 				break;
 			}
 			case SHORT: {

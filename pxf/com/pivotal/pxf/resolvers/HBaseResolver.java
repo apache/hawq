@@ -2,6 +2,7 @@ package com.pivotal.pxf.resolvers;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.sql.Timestamp;
 
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Result;
@@ -93,6 +94,15 @@ public class HBaseResolver extends Resolver
                 case GPDBWritable.BYTEA:
                     return val;
 
+                case GPDBWritable.BOOLEAN:
+                    return Boolean.valueOf(Bytes.toString(val));
+                  
+                case GPDBWritable.NUMERIC:
+                    return Bytes.toString(val);
+                    
+                case GPDBWritable.TIMESTAMP:
+                    return Timestamp.valueOf(Bytes.toString(val));
+                    
                 default:
                     throw new Exception("Unsupported data type " + type);
             }
