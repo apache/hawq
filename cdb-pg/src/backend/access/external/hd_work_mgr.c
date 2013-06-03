@@ -1,7 +1,7 @@
 /*-------------------------------------------------------------------------
  *
  * hd_work_mgr.c
- *	  distributes GPXF data fragments for processing between GP segments
+ *	  distributes PXF data fragments for processing between GP segments
  *
  * Copyright (c) 2007-2012, Greenplum inc
  *
@@ -11,10 +11,10 @@
 #include "postgres.h"
 #include <curl/curl.h>
 #include <json/json.h>
-#include "access/gpxfuriparser.h"
+#include "access/pxfuriparser.h"
 #include "access/hd_work_mgr.h"
 #include "access/libchurl.h"
-#include "access/gpxfheaders.h"
+#include "access/pxfheaders.h"
 #include "cdb/cdbutil.h"
 #include "cdb/cdbvars.h"
 #include "commands/copy.h"
@@ -123,7 +123,7 @@ static List* parse_get_fragments_response(List* fragments, StringInfo rest_buf);
 static void free_fragment(DataFragment *fragment);
 static List* free_fragment_list(List *fragments);
 static List* get_data_fragment_list(GPHDUri *hadoop_uri,  ClientContext* client_context);
-static char** distribute_work_2_gp_segments(List *data_fragments_list, int num_segs, int working_segs);
+static List** distribute_work_2_gp_segments(List *data_fragments_list, int num_segs, int working_segs);
 static void  print_fragment_list(List *frags_list);
 static char* make_allocation_output_string(List *segment_fragments);
 static List* free_allocated_frags(List *segment_fragments);
@@ -134,8 +134,8 @@ static void free_datanode_rest_servers(List *srvrs);
 static void process_request(ClientContext* client_context, char *uri);
 static void init_client_context(ClientContext *client_context);
 static GPHDUri* init(char* uri, ClientContext* cl_context);
-static GpxfStatsElem *get_data_statistics(GPHDUri* hadoop_uri, ClientContext *cl_context, StringInfo err_msg);
-static GpxfStatsElem* parse_get_stats_response(StringInfo rest_buf);
+static PxfStatsElem *get_data_statistics(GPHDUri* hadoop_uri, ClientContext *cl_context, StringInfo err_msg);
+static PxfStatsElem* parse_get_stats_response(StringInfo rest_buf);
 static List* allocate_fragments_to_datanodes(List *whole_data_fragments_list);
 static DatanodeProcessingLoad* get_dn_processing_load(List **allDNProcessingLoads, FragmentLocation *fragment_loc);
 static void print_data_nodes_allocation(List *allDNProcessingLoads, int total_data_frags);
@@ -144,6 +144,7 @@ static ListCell* pick_random_cell_in_list(List* list);
 static void clean_gphosts_list(List *hosts_list);
 static AllocatedDataFragment* create_allocated_fragment(DataFragment *fragment);
 static bool are_ips_equal(char *ip1, char *ip2);
+static char** create_output_strings(List **allocated_fragments, int total_segs);
 
 /*
  * the interface function of the hd_work_mgr module
@@ -159,9 +160,10 @@ static bool are_ips_equal(char *ip1, char *ip2);
 char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs)
 {
 	char **segs_work_map = NULL;
+	List **segs_data = NULL;
 	List *data_fragments = NIL;
 	ClientContext client_context; /* holds the communication info */
-	GpxfInputData inputData;
+	PxfInputData inputData;
 	
 	/*
 	 * 1. Cherrypick the data relevant for HADOOP from the input uri and init curl headers
@@ -179,7 +181,7 @@ char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs)
 	build_http_header(&inputData);
 	
 	/*
-	 * 2. Get the fragments data from the GPXF service
+	 * 2. Get the fragments data from the PXF service
 	 */
 	data_fragments = get_data_fragment_list(hadoop_uri, &client_context);
 
@@ -196,10 +198,15 @@ char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs)
 	/*
 	 * 3. Finally, call the actual work allocation algorithm
 	 */
-	segs_work_map = distribute_work_2_gp_segments(data_fragments, total_segs, working_segs);
+	segs_data = distribute_work_2_gp_segments(data_fragments, total_segs, working_segs);
 	
 	/*
-	 * 4. Release memory
+	 * 4. For each segment transform the list of allocated fragments into an output string
+	 */
+	segs_work_map = create_output_strings(segs_data, total_segs);
+	
+	/*
+	 * 5. Release memory
 	 */
 	free_fragment_list(data_fragments);
 	freeGPHDUri(hadoop_uri);
@@ -209,13 +216,13 @@ char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs)
 }
 
 /*
- * Fetches statistics of the GPXF datasource from the GPXF service
+ * Fetches statistics of the PXF datasource from the PXF service
  */
-GpxfStatsElem *get_gpxf_statistics(char *uri, Relation rel, StringInfo err_msg)
+PxfStatsElem *get_pxf_statistics(char *uri, Relation rel, StringInfo err_msg)
 {
 	ClientContext client_context; /* holds the communication info */
 	char *analyzer = NULL;
-	GpxfInputData inputData;
+	PxfInputData inputData;
 	
 	GPHDUri* hadoop_uri = init(uri, &client_context);
 	if (!hadoop_uri)
@@ -244,11 +251,11 @@ GpxfStatsElem *get_gpxf_statistics(char *uri, Relation rel, StringInfo err_msg)
 }
 
 /*
- * Fetch the statistics from the GPXF service
+ * Fetch the statistics from the PXF service
  */
-static GpxfStatsElem *get_data_statistics(GPHDUri* hadoop_uri,
-										  ClientContext *cl_context,
-										  StringInfo err_msg)
+static PxfStatsElem *get_data_statistics(GPHDUri* hadoop_uri,
+										 ClientContext *cl_context,
+										 StringInfo err_msg)
 {
 	StringInfoData request;	
 	initStringInfo(&request);
@@ -258,7 +265,7 @@ static GpxfStatsElem *get_data_statistics(GPHDUri* hadoop_uri,
 					 hadoop_uri->host,
 					 hadoop_uri->port,
 					 GPDB_REST_PREFIX,
-					 GPFX_VERSION,
+					 PFX_VERSION,
 					 hadoop_uri->data);
 
 	/* send the request. The response will exist in rest_buf.data */
@@ -269,7 +276,7 @@ static GpxfStatsElem *get_data_statistics(GPHDUri* hadoop_uri,
 	PG_CATCH();
 	{
 		/* 
-		 * communication problems with GPXF service 
+		 * communication problems with PXF service
 		 * Statistics for a table can be done as part of an ANALYZE procedure on many tables,
 		 * and we don't want to stop because of a communication error. So we catch the exception,
 		 * append its error to err_msg, and return a NULL,
@@ -297,13 +304,13 @@ static GpxfStatsElem *get_data_statistics(GPHDUri* hadoop_uri,
 }
 
 /*
- * Parse the json response from the GPXF Fragmenter.getSize
+ * Parse the json response from the PXF Fragmenter.getSize
  */
-static GpxfStatsElem *parse_get_stats_response(StringInfo rest_buf)
+static PxfStatsElem *parse_get_stats_response(StringInfo rest_buf)
 {
-	GpxfStatsElem* statsElem = (GpxfStatsElem*)palloc0(sizeof(GpxfStatsElem));
+	PxfStatsElem* statsElem = (PxfStatsElem*)palloc0(sizeof(PxfStatsElem));
 	struct json_object	*whole	= json_tokener_parse(rest_buf->data);
-	struct json_object	*head	= json_object_object_get(whole, "GPXFDataSourceStats");
+	struct json_object	*head	= json_object_object_get(whole, "PXFDataSourceStats");
 				
 	/* 0. block size */
 	struct json_object *js_block_size = json_object_object_get(head, "blockSize");
@@ -353,13 +360,13 @@ static GPHDUri* init(char* uri, ClientContext* cl_context)
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
 					 errmsg("No value assigned to the FRAGMENTER option in "
-							"the gpxf uri: %s", hadoop_uri->uri)));
+							"the pxf uri: %s", hadoop_uri->uri)));
 	}
 	else
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("Missing FRAGMENTER option in the gpxf uri: %s",
+				 errmsg("Missing FRAGMENTER option in the pxf uri: %s",
 						hadoop_uri->uri)));
 	}
 
@@ -408,18 +415,14 @@ void free_hddata_2gp_segments(char **segs_work_map, int num_segs)
  * The algorithm that decides which Hadoop data fragments will be processed
  * by each gp segment.
  *
- * Returns an array of strings where each string in the array represents the fragments
- * allocated to the corresponding GP segment: The string contains the fragment
- * indexes starting with a byte containing the fragment's size. Example of a string that allocates fragments 0, 3, 7
- * 'segwork=<size>data_node_host@0<size>data_node_host@3<size>data_node_host@7'. <segwork=> prefix is required to integrate this string into
- * <CREATE EXTERNAL TABLE> syntax. 
+ * Returns an array of Lists of AllocatedDataFragments
  * In case  a  given GP segment will not be allocated data fragments for processing,
- * we will put a NULL at it's index in the output strings array.
+ * we will put a NULL at it's index in the output  array.
  * total_segs - total number of active primary segments in the cluster
- * working_segs - the number of GP segments that will be used for processing the GPXF data. It is smaller or equal to total_segs,
+ * working_segs - the number of Hawq segments that will be used for processing the PXF data. It is smaller or equal to total_segs,
  *                and was obtained using the guc gp_external_max_segs
  */
-static char** 
+static List** 
 distribute_work_2_gp_segments(List *whole_data_fragments_list, int total_segs, int working_segs)
 {
 	/*
@@ -430,10 +433,10 @@ distribute_work_2_gp_segments(List *whole_data_fragments_list, int total_segs, i
 	int count_total_blocks_allocated = 0;
 	int total_data_frags = 0;
 	int blks_per_seg = 0;
-	List* allDNProcessingLoads = NIL; /* how many blocks are allocated for processing on each data node */
-	List* gpHosts = NIL; /* the hosts of the gp_cluster. Every host has several gp segments */
-	List* reserve_gpHosts = NIL;
-	char** segs_work_map = (char **)palloc0(total_segs * sizeof(char *));
+	List *allDNProcessingLoads = NIL; /* how many blocks are allocated for processing on each data node */
+	List *gpHosts = NIL; /* the hosts of the gp_cluster. Every host has several gp segments */
+	List *reserve_gpHosts = NIL;
+	List **segs_data = (List **)palloc0(total_segs * sizeof(List *));
 	initStringInfo(&msg);
 	
 	/* 
@@ -514,8 +517,8 @@ distribute_work_2_gp_segments(List *whole_data_fragments_list, int total_segs, i
 			DatanodeProcessingLoad *found_dn = NULL;
 			char *host_ip = seg->hostip;
 			
-			/* locality logic depends on gpxf_enable_locality_optimizations guc */
-			if (gpxf_enable_locality_optimizations)
+			/* locality logic depends on pxf_enable_locality_optimizations guc */
+			if (pxf_enable_locality_optimizations)
 			{
 				foreach(datanode_cell, allDNProcessingLoads) /* an attempt at locality - try and find a datanode sitting on the same host with the segment */
 				{
@@ -523,7 +526,7 @@ distribute_work_2_gp_segments(List *whole_data_fragments_list, int total_segs, i
 					if (are_ips_equal(host_ip, dn->dataNodeIp))
 					{
 						found_dn = dn;
-						appendStringInfo(&msg, "GPXF - Allocating the datanode blocks to a local segment. IP: %s\n", found_dn->dataNodeIp);
+						appendStringInfo(&msg, "PXF - Allocating the datanode blocks to a local segment. IP: %s\n", found_dn->dataNodeIp);
 						break;
 					}
 				}
@@ -532,7 +535,7 @@ distribute_work_2_gp_segments(List *whole_data_fragments_list, int total_segs, i
 			{
 				found_dn = linitial(allDNProcessingLoads);
 				if (found_dn)
-					appendStringInfo(&msg, "GPXF - Allocating the datanode blocks to a remote segment. Datanode IP: %s Segment IP: %s\n", 
+					appendStringInfo(&msg, "PXF - Allocating the datanode blocks to a remote segment. Datanode IP: %s Segment IP: %s\n",
 						 found_dn->dataNodeIp, host_ip);
 			}
 			
@@ -565,11 +568,8 @@ distribute_work_2_gp_segments(List *whole_data_fragments_list, int total_segs, i
 		resetStringInfo(&msg);
 		
 		if (allocatedBlocksPerSegment)
-		{
-			segs_work_map[seg->segindex] = make_allocation_output_string(allocatedBlocksPerSegment);
-			elog(FRAGDEBUG, "GPXF data fragments allocation for seg %d: %s", seg->segindex, segs_work_map[seg->segindex]);
-			free_allocated_frags(allocatedBlocksPerSegment);
-		}
+			segs_data[seg->segindex] = allocatedBlocksPerSegment;
+			
 	} /* i < working_segs; */
 	
 	Assert(count_total_blocks_allocated == total_data_frags); /* guarantee we allocated all the blocks */ 
@@ -579,6 +579,43 @@ distribute_work_2_gp_segments(List *whole_data_fragments_list, int total_segs, i
 	clean_gphosts_list(gpHosts);
 	clean_gphosts_list(reserve_gpHosts);
 			
+	return segs_data;
+}
+
+/* 
+ * create the allocation strings for each segments from the list of AllocatedDataFragment instances
+ * that each segment holds
+ * Returns an array of strings where each string in the array represents the fragments
+ * allocated to the corresponding GP segment: The string contains the fragment
+ * indexes starting with a byte containing the fragment's size. Example of a string that allocates fragments 0, 3, 7
+ * 'segwork=<size>data_node_host@0<size>data_node_host@3<size>data_node_host@7'. <segwork=> prefix is required to integrate this string into
+ * <CREATE EXTERNAL TABLE> syntax. 
+ * In case  a  given GP segment will not be allocated data fragments for processing,
+ * we will put a NULL at it's index in the output strings array.
+ * total_segs - total number of active primary segments in the cluster
+ * The allocated_fragments are freed after the data is transported to a strings array
+ */
+static char** create_output_strings(List **allocated_fragments, int total_segs)
+{
+	StringInfoData msg;
+	char** segs_work_map = (char **)palloc0(total_segs * sizeof(char *));
+	initStringInfo(&msg);
+	
+	for (int i = 0; i < total_segs; i++)
+	{
+		if (allocated_fragments[i])
+		{
+			segs_work_map[i] = make_allocation_output_string(allocated_fragments[i]);
+			appendStringInfo(&msg, "PXF data fragments allocation for seg %d: %s\n", i, segs_work_map[i]);
+			free_allocated_frags(allocated_fragments[i]);
+		}
+	}
+	
+	elog(FRAGDEBUG, "%s", msg.data);
+	if (msg.data)
+		pfree(msg.data);
+	pfree(allocated_fragments);
+	
 	return segs_work_map;
 }
 
@@ -847,19 +884,19 @@ free_allocated_frags(List *segment_fragments)
 }
 
 /*
- * parse the response of the GPXF Fragments call. An example:
+ * parse the response of the PXF Fragments call. An example:
  *
  * Request:
  * 		curl --header "X-GP-FRAGMENTER: HdfsDataFragmenter" "http://goldsa1mac.local:50070/gpdb/v2/Fragmenter/getFragments?path=demo" (demo is a directory)
  *
  * Response (left as a single line purposefully):
- * {"GPXFFragments":[{"hosts":["isengoldsa1mac.corp.emc.com","isengoldsa1mac.corp.emc.com","isengoldsa1mac.corp.emc.com"],"sourceName":"text2.csv"},{"hosts":["isengoldsa1mac.corp.emc.com","isengoldsa1mac.corp.emc.com","isengoldsa1mac.corp.emc.com"],"sourceName":"text_data.csv"}]}
+ * {"PXFFragments":[{"hosts":["isengoldsa1mac.corp.emc.com","isengoldsa1mac.corp.emc.com","isengoldsa1mac.corp.emc.com"],"sourceName":"text2.csv"},{"hosts":["isengoldsa1mac.corp.emc.com","isengoldsa1mac.corp.emc.com","isengoldsa1mac.corp.emc.com"],"sourceName":"text_data.csv"}]}
  */
 static List* 
 parse_get_fragments_response(List *fragments, StringInfo rest_buf)
 {
 	struct json_object	*whole	= json_tokener_parse(rest_buf->data);
-	struct json_object	*head	= json_object_object_get(whole, "GPXFFragments");
+	struct json_object	*head	= json_object_object_get(whole, "PXFFragments");
 	List* 				ret_frags = fragments;
 	int 				length	= json_object_array_length(head);
     char *cur_source_name = NULL;
@@ -878,7 +915,7 @@ parse_get_fragments_response(List *fragments, StringInfo rest_buf)
 		/* 1. fragment index, incremented per source name */
 		if ((cur_source_name==NULL) || (strcmp(cur_source_name, fragment->source_name) != 0))
 		{
-			elog(FRAGDEBUG, "gpxf: parse_get_fragments_response: "
+			elog(FRAGDEBUG, "pxf: parse_get_fragments_response: "
 						  "new source name %s, old name %s, init index counter %d",
 						  fragment->source_name,
 						  cur_source_name ? cur_source_name : "NONE",
@@ -971,7 +1008,7 @@ get_datanode_rest_servers(GPHDUri *hadoop_uri, ClientContext* client_context)
 											hadoop_uri->host,
 											hadoop_uri->port,
 											GPDB_REST_PREFIX,
-											GPFX_VERSION);
+											PFX_VERSION);
 	
 	process_request(client_context, get_srvrs_uri.data);
 
@@ -1011,7 +1048,7 @@ find_datanode_rest_server_port(List *rest_servers, char *host)
  *    Get a list of all REST servers and assign the listening port to
  *    each fragment that lives on a matching host.
  * NOTE:
- *    This relies on the assumption that GPXF services are always
+ *    This relies on the assumption that PXF services are always
  *    located on DataNode REST servers. In the future this won't be
  *    true, and we'll need to get this info from elsewhere.
  */
@@ -1138,8 +1175,8 @@ free_datanode_rest_servers(List *srvrs)
 /*
  * get_data_fragment_list
  *
- * 1. Request a list of fragments from the GPXF Fragmenter class
- * that was specified in the gpxf URL.
+ * 1. Request a list of fragments from the PXF Fragmenter class
+ * that was specified in the pxf URL.
  *
  * 2. Process the returned list and create a list of DataFragment with it.
  */
@@ -1157,7 +1194,7 @@ get_data_fragment_list(GPHDUri *hadoop_uri,
 								hadoop_uri->host,
 								hadoop_uri->port,
 								GPDB_REST_PREFIX,
-								GPFX_VERSION,
+								PFX_VERSION,
 								hadoop_uri->data);
 
 	/* send the request. The response will exist in rest_buf.data */

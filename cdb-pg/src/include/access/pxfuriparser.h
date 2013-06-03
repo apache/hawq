@@ -1,5 +1,5 @@
-#ifndef _GPXF_URIPARSER_H_
-#define _GPXF_URIPARSER_H_
+#ifndef _PXF_URIPARSER_H_
+#define _PXF_URIPARSER_H_
 
 #include "postgres.h"
 #include "fmgr.h"
@@ -10,7 +10,7 @@
  * All GPFX's resources are under /GPDB_REST_PREFIX/GPFX_VERSION/...
  */
 #define GPDB_REST_PREFIX "gpdb"
-#define GPFX_VERSION "v2" /* GPFX version */
+#define PFX_VERSION "v3" /* PFX version */
 
 /*
  * FragmentData - describes a single Hadoop file split / HBase table region
@@ -56,6 +56,6 @@ GPHDUri	*parseGPHDUri(const char *uri_str);
 void 	 freeGPHDUri(GPHDUri *uri);
 void	 GPHDUri_debug_print(GPHDUri *uri);
 int		 GPHDUri_get_value_for_opt(GPHDUri *uri, char *key, char **val);
-bool 	 RelationIsExternalGpxf(Relation rel, StringInfo location);
+bool 	 RelationIsExternalPxf(Relation rel, StringInfo location);
 
 #endif	// 

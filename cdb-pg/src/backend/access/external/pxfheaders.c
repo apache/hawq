@@ -5,7 +5,7 @@
 #include "access/fileam.h"
 #include "access/url.h"
 #include "catalog/pg_exttable.h"
-#include "access/gpxfheaders.h"
+#include "access/pxfheaders.h"
 
 static void add_alignment_size_httpheader(CHURL_HEADERS headers);
 static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel);
@@ -17,7 +17,7 @@ static char* prepend_x_gp(const char* key);
  * These values are the context of the query and used 
  * by the remote component. 
  */
-void build_http_header(GpxfInputData *input)
+void build_http_header(PxfInputData *input)
 {
 	extvar_t ev;
 	CHURL_HEADERS headers = input->headers; 
@@ -142,7 +142,7 @@ static void add_location_options_httpheader(CHURL_HEADERS headers, GPHDUri *gphd
 	}
 }
 
-/* Full name of the HEADER KEY expected by the GPXF service */
+/* Full name of the HEADER KEY expected by the PXF service */
 static char* prepend_x_gp(const char* key)
 {	
 	StringInfoData formatter;	initStringInfo(&formatter);

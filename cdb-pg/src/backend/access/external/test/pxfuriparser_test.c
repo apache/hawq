@@ -4,16 +4,16 @@
 #include "cmockery.h"
 
 #include "c.h"
-#include "../gpxfuriparser.c"
+#include "../pxfuriparser.c"
 
 
 /*
- * Test parsing of valid uri as given in LOCATION in a GPXF external table.
+ * Test parsing of valid uri as given in LOCATION in a PXF external table.
  */
 void 
 test__parseGPHDUri__ValidURI(void **state)
 {
-	char* uri = "gpxf://1.2.3.4:5678/some/path/and/table.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=AvroFileAccessor&RESOLVER=AvroResolver&ANALYZER=HdfsAnalyzer";
+	char* uri = "pxf://1.2.3.4:5678/some/path/and/table.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=AvroFileAccessor&RESOLVER=AvroResolver&ANALYZER=HdfsAnalyzer";
 	List* options = NIL;
 	ListCell* cell = NULL;
 	OptionData* option = NULL;
@@ -23,7 +23,7 @@ test__parseGPHDUri__ValidURI(void **state)
 	assert_true(parsed != NULL);
 	assert_string_equal(parsed->uri, uri);
 
-	assert_string_equal(parsed->protocol, "gpxf");
+	assert_string_equal(parsed->protocol, "pxf");
 	assert_string_equal(parsed->host, "1.2.3.4");
 	assert_string_equal(parsed->port, "5678");
 	assert_string_equal(parsed->data, "some/path/and/table.tbl");

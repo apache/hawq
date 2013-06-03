@@ -17318,7 +17318,7 @@ static Datum transformLocationUris(List *locs, bool isweb, bool iswritable)
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("URI protocols must be the same for all data sources"),
-					 errhint("Available protocols are 'http', 'file', 'gpxf', 'gpfdist' and 'gpfdists'"),
+					 errhint("Available protocols are 'http', 'file', 'pxf', 'gpfdist' and 'gpfdists'"),
 							   errOmitLocation(true)));
 
 		}

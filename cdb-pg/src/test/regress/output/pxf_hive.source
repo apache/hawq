@@ -1,5 +1,5 @@
 --
--- GPXF HIVE regression suite 
+-- PXF HIVE regression suite 
 --
 -- Prerequisites:
 --
@@ -10,82 +10,170 @@
 --
 -- TODO: test gpdbwritable write/read when it is enabled.
 -- TODO: test PB, AVRO, THRIFT when it is enabled (read only, with pre formatted files).
--- TODO: test protocol validator for gpxf once written.
+-- TODO: test protocol validator for pxf once written.
 -- TODO: test parameter passing, filter passing
-
 --------------------------------------------------------------------------------
 -- HIVE
 --------------------------------------------------------------------------------
 --
 -- 0. Compiling the HiveThinClient
 \! javac -cp `${HADOOP_ROOT}/bin/hadoop classpath` @abs_srcdir@/helpers/HiveThinClient.java
-
 -- 1. Hive table stored as text
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "create table reg_txt (s1 string,s2 string,n1 int, d1 double)row format delimited fields terminated by ','"
-\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "load data local inpath '@abs_srcdir@/data/gpxf/hive_small_data.txt' into table reg_txt"
-
+number of lines: 0
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "load data local inpath '@abs_srcdir@/data/pxf/hive_small_data.txt' into table reg_txt"
+number of lines: 0
 CREATE EXTERNAL TABLE hv_txt(
 t1    text,
 t2    text,  
 num1  integer, 
 dub1  double precision)
-LOCATION ('gpxf://@hostname@:50070/reg_txt?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
-format 'custom' (formatter='gpxfwritable_import');
+LOCATION ('pxf://@hostname@:50070/reg_txt?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
+format 'custom' (formatter='pxfwritable_import');
 select * from hv_txt order by t1;
+  t1   |  t2  | num1 | dub1 
+-------+------+------+------
+ row1  | s_6  |    1 |    6
+ row10 | s_15 |   10 |   15
+ row2  | s_7  |    2 |    7
+ row3  | s_8  |    3 |    8
+ row4  | s_9  |    4 |    9
+ row5  | s_10 |    5 |   10
+ row6  | s_11 |    6 |   11
+ row7  | s_12 |    7 |   12
+ row8  | s_13 |    8 |   13
+ row9  | s_14 |    9 |   14
+(10 rows)
 
 -- 2. Hive table stored as sequence
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "create table reg_seq (t0 string, t1 string, num1 int, d1 double) row format delimited fields terminated by ',' STORED AS SEQUENCEFILE"
+number of lines: 0
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "insert into table reg_seq select * from reg_txt"
-
+number of lines: 0
 CREATE EXTERNAL TABLE hv_seq(
 t1    text,
 t2    text,  
 num1  integer, 
 dub1  double precision)
-LOCATION ('gpxf://@hostname@:50070/reg_seq?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
-format 'custom' (formatter='gpxfwritable_import');
+LOCATION ('pxf://@hostname@:50070/reg_seq?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
+format 'custom' (formatter='pxfwritable_import');
 select * from hv_seq order by t1;
+  t1   |  t2  | num1 | dub1 
+-------+------+------+------
+ row1  | s_6  |    1 |    6
+ row10 | s_15 |   10 |   15
+ row2  | s_7  |    2 |    7
+ row3  | s_8  |    3 |    8
+ row4  | s_9  |    4 |    9
+ row5  | s_10 |    5 |   10
+ row6  | s_11 |    6 |   11
+ row7  | s_12 |    7 |   12
+ row8  | s_13 |    8 |   13
+ row9  | s_14 |    9 |   14
+(10 rows)
 
 -- 3. Hive table stored as rcfile
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "create table reg_rc (t0 string, t1 string, num1 int, d1 double) STORED AS RCFILE"
+number of lines: 0
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "insert into table reg_rc select * from reg_txt"
-
+number of lines: 0
 CREATE EXTERNAL TABLE hv_rc(
 t1    text,
 t2    text,  
 num1  integer, 
 dub1  double precision)
-LOCATION ('gpxf://@hostname@:50070/reg_rc?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
-format 'custom' (formatter='gpxfwritable_import');
+LOCATION ('pxf://@hostname@:50070/reg_rc?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
+format 'custom' (formatter='pxfwritable_import');
 select * from hv_rc order by t1;
+  t1   |  t2  | num1 | dub1 
+-------+------+------+------
+ row1  | s_6  |    1 |    6
+ row10 | s_15 |   10 |   15
+ row2  | s_7  |    2 |    7
+ row3  | s_8  |    3 |    8
+ row4  | s_9  |    4 |    9
+ row5  | s_10 |    5 |   10
+ row6  | s_11 |    6 |   11
+ row7  | s_12 |    7 |   12
+ row8  | s_13 |    8 |   13
+ row9  | s_14 |    9 |   14
+(10 rows)
 
 -- 4. Hive table stored in several partitions where each partition is stored in a diferrent format
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "create external table reg_heterogen (s1 string,s2 string,n1 int, d1 double) partitioned by (fmt string)  row format delimited fields terminated by ','"
+number of lines: 0
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "alter table reg_heterogen add partition (fmt = 'txt') location 'hdfs:/hive/warehouse/reg_txt'"
+number of lines: 0
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "alter table reg_heterogen add partition (fmt = 'rc') location 'hdfs:/hive/warehouse/reg_rc'"
+number of lines: 0
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "alter table reg_heterogen add partition (fmt = 'seq') location 'hdfs:/hive/warehouse/reg_seq'"
+number of lines: 0
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "alter table reg_heterogen partition (fmt='rc') set fileformat RCFILE"
+number of lines: 0
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "alter table reg_heterogen partition (fmt='seq') set fileformat SEQUENCEFILE"
+number of lines: 0
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "show partitions reg_heterogen"
-
+number of lines: 3
+fmt=rc
+fmt=seq
+fmt=txt
 CREATE EXTERNAL TABLE hv_heterogen(
 t1    text,
 t2    text,  
 num1  integer, 
 dub1  double precision,
 t3 text)
-LOCATION ('gpxf://@hostname@:50070/reg_heterogen?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
-format 'custom' (formatter='gpxfwritable_import');
+LOCATION ('pxf://@hostname@:50070/reg_heterogen?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
+format 'custom' (formatter='pxfwritable_import');
 select * from hv_heterogen order by t3, t1;
+  t1   |  t2  | num1 | dub1 | t3  
+-------+------+------+------+-----
+ row1  | s_6  |    1 |    6 | rc
+ row10 | s_15 |   10 |   15 | rc
+ row2  | s_7  |    2 |    7 | rc
+ row3  | s_8  |    3 |    8 | rc
+ row4  | s_9  |    4 |    9 | rc
+ row5  | s_10 |    5 |   10 | rc
+ row6  | s_11 |    6 |   11 | rc
+ row7  | s_12 |    7 |   12 | rc
+ row8  | s_13 |    8 |   13 | rc
+ row9  | s_14 |    9 |   14 | rc
+ row1  | s_6  |    1 |    6 | seq
+ row10 | s_15 |   10 |   15 | seq
+ row2  | s_7  |    2 |    7 | seq
+ row3  | s_8  |    3 |    8 | seq
+ row4  | s_9  |    4 |    9 | seq
+ row5  | s_10 |    5 |   10 | seq
+ row6  | s_11 |    6 |   11 | seq
+ row7  | s_12 |    7 |   12 | seq
+ row8  | s_13 |    8 |   13 | seq
+ row9  | s_14 |    9 |   14 | seq
+ row1  | s_6  |    1 |    6 | txt
+ row10 | s_15 |   10 |   15 | txt
+ row2  | s_7  |    2 |    7 | txt
+ row3  | s_8  |    3 |    8 | txt
+ row4  | s_9  |    4 |    9 | txt
+ row5  | s_10 |    5 |   10 | txt
+ row6  | s_11 |    6 |   11 | txt
+ row7  | s_12 |    7 |   12 | txt
+ row8  | s_13 |    8 |   13 | txt
+ row9  | s_14 |    9 |   14 | txt
+(30 rows)
 
 -- Test analyze for Hive table.
 ANALYZE hv_heterogen;
+WARNING:  skipping "hv_heterogen" --- error returned: no ANALYZER option in table definition
 select relpages, reltuples from pg_class where relname = 'hv_heterogen';
+ relpages | reltuples 
+----------+-----------
+     1000 |     1e+06
+(1 row)
 
 -- 5. Hive table with collection types (non primitive types)
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "CREATE TABLE reg_collections ( s1 STRING, f1 FLOAT, a1 ARRAY<STRING> , m1 MAP<STRING,  FLOAT > , sr1 STRUCT<street:STRING,  city:STRING,  state:STRING,  zip:INT > )  ROW FORMAT DELIMITED  FIELDS TERMINATED BY '\001' COLLECTION ITEMS TERMINATED BY '\002' MAP KEYS TERMINATED BY '\003'  LINES TERMINATED BY '\n'  STORED AS TEXTFILE"
-\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "load data local inpath '@abs_srcdir@/data/gpxf/hive_collections.txt' into table reg_collections"
-
+number of lines: 0
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "load data local inpath '@abs_srcdir@/data/pxf/hive_collections.txt' into table reg_collections"
+number of lines: 0
 CREATE EXTERNAL TABLE hv_collections(
 t1    text,   
 f1    real,
@@ -100,19 +188,26 @@ t7    text,
 t8    text,
 t9    text,
 num1  integer)
-LOCATION ('gpxf://@hostname@:50070/reg_collections?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
-format 'custom' (formatter='gpxfwritable_import');
+LOCATION ('pxf://@hostname@:50070/reg_collections?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
+format 'custom' (formatter='pxfwritable_import');
 select * from hv_collections order by t1;
+   t1    | f1 |    t2    |  t3   |  t4   |   t5   | f2 |   t6    | f3  |    t7    |  t8  |   t9   | num1  
+---------+----+----------+-------+-------+--------+----+---------+-----+----------+------+--------+-------
+ giraffe |  2 | Nige     | Kenya | Congo | height |  4 | wheight | 100 | agripas  | aviv | israel | 56303
+ lion    |  2 | Zanzibar | Kenya | Congo | height |  2 | wheight |  90 | horcanus | aviv | israel | 56303
+ panther |  2 | Somalia  | Kenya | Congo | height |  1 | wheight |  40 | herzog   | aviv | israel | 56303
+ zebra   |  2 | Tanzania | Kenya | Congo | height |  2 | wheight |  50 | zohar    | aviv | israel | 56303
+(4 rows)
 
 -- 6. View - negative test
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "create view reg_txt_view as select s1 from reg_txt"
-
+number of lines: 0
 CREATE EXTERNAL TABLE hv_view(
 t1    text)
-LOCATION ('gpxf://@hostname@:50070/reg_txt_view?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
-format 'custom' (formatter='gpxfwritable_import');
+LOCATION ('pxf://@hostname@:50070/reg_txt_view?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
+format 'custom' (formatter='pxfwritable_import');
 select * from hv_view order by t1;
-
+ERROR:  remote component error (500) from '127.0.0.1:50070': Problem accessing /gpdb/v3/Fragmenter/getFragments. Reason:     Server Error   Caused by:  java.lang.UnsupportedOperationException: PXF doesn't support HIVE views (SOMEFILE:SOMEFUNC)
 -- 7. Clean after Hive
 drop external table hv_view;
 drop external table hv_collections;
@@ -120,10 +215,15 @@ drop external table hv_heterogen;
 drop external table hv_rc;
 drop external table hv_seq;
 drop external table hv_txt;
-
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "drop view reg_txt_view"
+number of lines: 0
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "drop table reg_collections"
+number of lines: 0
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "drop table reg_heterogen"
+number of lines: 0
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "drop table reg_rc"
+number of lines: 0
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "drop table reg_seq"
+number of lines: 0
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "drop table reg_txt"
+number of lines: 0

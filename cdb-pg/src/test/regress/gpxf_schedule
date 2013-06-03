@@ -1,5 +1,0 @@
-test: gpxf_hdfs
-test: gpxf_hdfs_ext
-test: gpxf_hbase
-test: gpxf_hive
-test: exttab1

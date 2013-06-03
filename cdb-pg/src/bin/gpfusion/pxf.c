@@ -1,40 +1,40 @@
 #include "common.h"
-#include "access/gpxfuriparser.h"
+#include "access/pxfuriparser.h"
 
-PG_FUNCTION_INFO_V1(gpxfprotocol_export);
-PG_FUNCTION_INFO_V1(gpxfprotocol_import);
-PG_FUNCTION_INFO_V1(gpxfprotocol_validate_urls);
+PG_FUNCTION_INFO_V1(pxfprotocol_export);
+PG_FUNCTION_INFO_V1(pxfprotocol_import);
+PG_FUNCTION_INFO_V1(pxfprotocol_validate_urls);
 
-Datum gpxfprotocol_export(PG_FUNCTION_ARGS);
-Datum gpxfprotocol_import(PG_FUNCTION_ARGS);
-Datum gpxfprotocol_validate_urls(PG_FUNCTION_ARGS);
+Datum pxfprotocol_export(PG_FUNCTION_ARGS);
+Datum pxfprotocol_import(PG_FUNCTION_ARGS);
+Datum pxfprotocol_validate_urls(PG_FUNCTION_ARGS);
 
 Datum
-gpxfprotocol_export(PG_FUNCTION_ARGS)
+pxfprotocol_export(PG_FUNCTION_ARGS)
 {
 	ereport(ERROR,
 			(errcode(ERRCODE_GP_FEATURE_NOT_YET),
-			 errmsg("gpxf does not yet support writable external tables")));
+			 errmsg("pxf does not yet support writable external tables")));
 	PG_RETURN_VOID();
 }
 
 Datum
-gpxfprotocol_import(PG_FUNCTION_ARGS)
+pxfprotocol_import(PG_FUNCTION_ARGS)
 {
 	return gpbridge_import(fcinfo);
 }
 
 /*
- * Validate the user-specified gpxf URI supported functionality
+ * Validate the user-specified pxf URI supported functionality
  */
 Datum
-gpxfprotocol_validate_urls(PG_FUNCTION_ARGS)
+pxfprotocol_validate_urls(PG_FUNCTION_ARGS)
 {
 	GPHDUri	*uri;
 
 	/* Must be called via the external table format manager */
 	if (!CALLED_AS_EXTPROTOCOL_VALIDATOR(fcinfo))
-		elog(ERROR, "cannot execute gpxfprotocol_validate_urls outside protocol manager");
+		elog(ERROR, "cannot execute pxfprotocol_validate_urls outside protocol manager");
 
 	/*
 	 * Condition 1: there must be only ONE url.
@@ -50,7 +50,7 @@ gpxfprotocol_validate_urls(PG_FUNCTION_ARGS)
 	if (EXTPROTOCOL_VALIDATOR_GET_DIRECTION(fcinfo) == EXT_VALIDATE_WRITE)
             ereport(ERROR,
                     (errcode(ERRCODE_GP_FEATURE_NOT_YET),
-                     errmsg("gpxf does not yet support writable external tables")));
+                     errmsg("pxf does not yet support writable external tables")));
 
 	/*
 	 * Condition 3: url formatting of extra options.

@@ -1,5 +1,5 @@
 --
--- GPXF HDFS extended regression suite 
+-- PXF HDFS extended regression suite
 --
 -- Prerequisites:
 --
@@ -8,7 +8,7 @@
 --
 -- TODO: test gpdbwritable write/read when it is enabled.
 -- TODO: test PB, AVRO, THRIFT when it is enabled (read only, with pre formatted files).
--- TODO: test protocol validator for gpxf once written.
+-- TODO: test protocol validator for pxf once written.
 -- TODO: test parameter passing, filter passing
 --------------------------------------------------------------------------------
 -- GPHDFS
@@ -17,16 +17,16 @@
 -- Load HDFS with test data
 --
 \! ${HADOOP_ROOT}/bin/hadoop fs -mkdir /gpdb_regression_data
-\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gpxf/writable_inside_sequence1.tbl /gpdb_regression_data/writable_inside_sequence1.tbl
-\! sh @abs_srcdir@/helpers/create_table_file.sh @abs_srcdir@/data/gpxf/multiblock.tbl
-creating file @abs_srcdir@/data/gpxf/multiblock.tbl
-\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/gpxf/multiblock.tbl /gpdb_regression_data/multiblock.tbl
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/writable_inside_sequence1.tbl /gpdb_regression_data/writable_inside_sequence1.tbl
+\! sh @abs_srcdir@/helpers/create_table_file.sh @abs_srcdir@/data/pxf/multiblock.tbl
+creating file @abs_srcdir@/data/pxf/multiblock.tbl
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/multiblock.tbl /gpdb_regression_data/multiblock.tbl
 --
 -- Test multiblock file
 --
 CREATE EXTERNAL TABLE mbt(t1 text,
                           a1 integer)
-LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/multiblock.tbl?FRAGMENTER=HdfsDataFragmenter')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/multiblock.tbl?FRAGMENTER=HdfsDataFragmenter')
 FORMAT 'TEXT' (DELIMITER ',');
 SELECT t1, a1 FROM mbt ORDER BY t1 LIMIT 10;
  t1 | a1 
@@ -86,8 +86,8 @@ CREATE EXTERNAL TABLE extens(tmp1  timestamp,
                             ln2   bigint, 
                             ln3   bigint, 
                             bt    bytea)
-LOCATION ('gpxf://@hostname@:50070/gpdb_regression_data/writable_inside_sequence1.tbl?FRAGMENTER=TestHdfsDataFragmenter&ACCESSOR=TestSequenceFileAccessor&RESOLVER=TestWritableResolver&DATA-SCHEMA=CustomWritable&ANALYZER=TestHdfsAnalyzer')
-FORMAT 'custom' (formatter='gpxfwritable_import');
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable_inside_sequence1.tbl?FRAGMENTER=TestHdfsDataFragmenter&ACCESSOR=TestSequenceFileAccessor&RESOLVER=TestWritableResolver&DATA-SCHEMA=CustomWritable&ANALYZER=TestHdfsAnalyzer')
+FORMAT 'custom' (formatter='pxfwritable_import');
 SELECT num1, t1, t2, t3 FROM extens ORDER BY num1;
  num1 |               t1                |               t2                |               t3                
 ------+---------------------------------+---------------------------------+---------------------------------
@@ -120,5 +120,5 @@ DROP EXTERNAL TABLE extens;
 -- start_ignore
 \! ${HADOOP_ROOT}/bin/hadoop fs -rm -r /gpdb_regression_data
 Deleted hdfs://0.0.0.0:8020/gpdb_regression_data
-\! rm @abs_srcdir@/data/gpxf/multiblock.tbl
+\! rm @abs_srcdir@/data/pxf/multiblock.tbl
 -- end_ignore

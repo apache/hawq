@@ -8,7 +8,7 @@ import com.pivotal.pxf.exception.BadRecordException;
 import com.pivotal.pxf.format.OneField;
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.hadoop.io.GPDBWritable;
-import com.pivotal.pxf.resolvers.IFieldsResolver;
+import com.pivotal.pxf.resolvers.Resolver;
 import com.pivotal.pxf.utilities.HDFSMetaData;
 import com.pivotal.pxf.utilities.RecordkeyAdapter;
 
@@ -18,7 +18,7 @@ import com.pivotal.pxf.utilities.RecordkeyAdapter;
  * using Hadoop's Writable serialization framework. WritableResolver implements
  * IFieldsResolver exposing one method: GetFields
  */
-public class TestWritableResolver implements  IFieldsResolver
+public class TestWritableResolver extends  Resolver
 {
     private HDFSMetaData connectorConfiguration;
 	private RecordkeyAdapter recordkeyAdapter = new RecordkeyAdapter();
@@ -28,11 +28,16 @@ public class TestWritableResolver implements  IFieldsResolver
 	private Method[] methods = null;
 	private Field[] fields = null;
 	private int index_of_readFields = 0;
-	////////////////////////////
 
 	public TestWritableResolver(HDFSMetaData conf) throws Exception
 	{
-        connectorConfiguration = conf;
+		super(conf);
+		/* 
+		 * The connectorConfiguration variable will be discarded once we remove all specialized MetaData classes and remain 
+		 * only with BaseMetaData which holds the sequence of properties
+		 */
+		connectorConfiguration = (HDFSMetaData)this.getMetaData();	
+		
 		InitInputObject();
 	}
 

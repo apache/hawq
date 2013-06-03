@@ -22,7 +22,7 @@
 #include "access/catquery.h"
 #include "access/heapam.h"
 #include "access/aocssegfiles.h"
-#include "access/gpxfuriparser.h"
+#include "access/pxfuriparser.h"
 #include "catalog/gp_policy.h"
 #include "catalog/pg_inherits.h"
 #include "catalog/pg_exttable.h"
@@ -84,7 +84,7 @@ static void
 cdb_default_stats_warning_for_index(Oid reloid, Oid indexoid);
 
 static bool 
-need_to_get_stats_gpxf(Relation rel, StringInfo location, BlockNumber relpages, double reltuples);
+need_to_get_stats_pxf(Relation rel, StringInfo location, BlockNumber relpages, double reltuples);
 
 extern BlockNumber RelationGuessNumberOfBlocks(double totalbytes);
 
@@ -386,14 +386,14 @@ cdb_estimate_rel_size(RelOptInfo   *relOptInfo,
 	 * Asking the QE for the size of the relation is a bit expensive.
 	 * Do we want to do it all the time?  Or only for tables that have never had analyze run?
 	 */
-	if (need_to_get_stats_gpxf(rel, &location, relpages, reltuples))
+	if (need_to_get_stats_pxf(rel, &location, relpages, reltuples))
 	{
 		/*
-		 * rel is a gpxf external table, and it wasn't yet ANALYZE'ed.
+		 * rel is a pxf external table, and it wasn't yet ANALYZE'ed.
 		 */
 
 		float4 tuples, pages;
-		gp_statistics_estimate_reltuples_relpages_external_gpxf(rel, &location, &tuples, &pages, NULL);
+		gp_statistics_estimate_reltuples_relpages_external_pxf(rel, &location, &tuples, &pages, NULL);
 		
 		relpages = curpages = pages;
 		reltuples = tuples;
@@ -411,7 +411,7 @@ cdb_estimate_rel_size(RelOptInfo   *relOptInfo,
 
 		curpages = relpages;
 	}
-	else /* relpages is 0 and this is a regular table or an external non-GPXF table */
+	else /* relpages is 0 and this is a regular table or an external non-PXF table */
 	{
 
 		/*
@@ -492,19 +492,19 @@ cdb_estimate_rel_size(RelOptInfo   *relOptInfo,
 }                               /* cdb_estimate_rel_size */
 
 /* 
- * need_to_get_stats_gpxf
+ * need_to_get_stats_pxf
  *
- * 1. Table is GPXF external table, and
+ * 1. Table is PXF external table, and
  * 2. ANALYZE was not run on the table, and
- * 3. GUC gpxf_enable_stat_collection is on
+ * 3. GUC pxf_enable_stat_collection is on
  */
-static bool need_to_get_stats_gpxf(Relation rel, 
+static bool need_to_get_stats_pxf(Relation rel,
 								 StringInfo loc, 	
 								 BlockNumber relpages,
 								 double		reltuples)
 {
-	return gpxf_enable_stat_collection &&
-		   RelationIsExternalGpxf(rel, loc) &&
+	return pxf_enable_stat_collection &&
+		   RelationIsExternalPxf(rel, loc) &&
 		   relpages == gp_external_table_default_number_of_pages &&
 		   reltuples == gp_external_table_default_number_of_tuples;
 }

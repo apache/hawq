@@ -173,8 +173,8 @@ static Sort *make_sort(PlannerInfo *root, Plan *lefttree, int numCols,
 		  AttrNumber *sortColIdx, Oid *sortOperators);
 
 static List *flatten_grouping_list(List *groupcls);
-static bool is_gpxf_protocol(Uri *uri);
-static int gpxf_calc_max_participants_allowed(int total_segments);
+static bool is_pxf_protocol(Uri *uri);
+static int pxf_calc_max_participants_allowed(int total_segments);
 
 /*
  * create_plan
@@ -1110,15 +1110,15 @@ create_aocsscan_plan(CreatePlanContext *ctx, Path *best_path,
 }
 
 /*
- * is_gpxf_protocol
- * tests if the external table custom protocol is an HADOOP protocol - gpxf
+ * is_pxf_protocol
+ * tests if the external table custom protocol is an HADOOP protocol - pxf
  */
-static bool is_gpxf_protocol(Uri *uri)
+static bool is_pxf_protocol(Uri *uri)
 {	
 	if (uri->protocol != URI_CUSTOM || uri->customprotocol == NULL)
 		return false;
 	
-	if (strcmp(uri->customprotocol, "gpxf") == 0)
+	if (strcmp(uri->customprotocol, "pxf") == 0)
 		return true;
 
 	return false;
@@ -1151,7 +1151,7 @@ static bool is_gpxf_protocol(Uri *uri)
  *                      skipping some segdbs randomly.
  *   - 'exec' protocol: all segdbs get mapped to execute the command (this is
  *                      soon to be changed though).
- *   - 'gpxf' protocol: has its own mapping logic. See is_gpxf_protocol() and
+ *   - 'pxf' protocol: has its own mapping logic. See is_pxf_protocol() and
  *   					map_hddata_2gp_segments() below.
  */                     
 static ExternalScan *
@@ -1438,7 +1438,7 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 		 * randomly select 1 segdb to skip (7 - 6 = 1). so it may look like this:
 		 * [F F T F F F F] - in which case we know to skip the 3rd segment only.
 		 */
-		is_custom_hd = is_gpxf_protocol(uri);
+		is_custom_hd = is_pxf_protocol(uri);
 
 		/* total num of segs that will participate in the external operation */
 		num_segs_participating = total_primaries;
@@ -1450,7 +1450,7 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 		}
 		else if (is_custom_hd)
 		{
-			max_participants_allowed = gpxf_calc_max_participants_allowed(total_primaries);
+			max_participants_allowed = pxf_calc_max_participants_allowed(total_primaries);
 			num_segs_participating = max_participants_allowed;  /* same logic as for num_segs_participating > max_participants_allowed  - see below*/
 		}
 		else
@@ -1871,7 +1871,7 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 }
 
 /*
- * Calculate max_participants_allowed for gpxf. Calculation is based on gp_external_max_segs
+ * Calculate max_participants_allowed for pxf. Calculation is based on gp_external_max_segs
  * set by the user, the number of gp hosts - num_hosts and the number of segments - total_segments 
  * There are three cases:
  * a. The guc gp_external_max_segs is greater or equal to the total number of segments:
@@ -1887,7 +1887,7 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
  *    max_participants_allowed equals the guc gp_external_max_segs
  */
 static int
-gpxf_calc_max_participants_allowed(int total_segments)
+pxf_calc_max_participants_allowed(int total_segments)
 {
 	int max_participants_allowed = 0;
 	int num_hosts =  getgphostCount();

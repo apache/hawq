@@ -25,7 +25,7 @@
 
 #include <math.h>
 
-#include "access/gpxfuriparser.h"
+#include "access/pxfuriparser.h"
 #include "access/heapam.h"
 #include "access/hd_work_mgr.h"
 #include "access/catquery.h"
@@ -478,12 +478,12 @@ void analyzeStmt(VacuumStmt *stmt, List *relids)
 					/* Silently ignore tables that are temp tables of other backends. */
 					relation_close(candidateRelation, ShareUpdateExclusiveLock);
 				}
-				else if (RelationIsExternalGpxf(candidateRelation, &ext_uri) &&
-						 !gpxf_enable_stat_collection)
+				else if (RelationIsExternalPxf(candidateRelation, &ext_uri) &&
+						 !pxf_enable_stat_collection)
 				{
-					/* GPXF supports ANALYZE, but only when the GUC is on */
+					/* PXF supports ANALYZE, but only when the GUC is on */
 					ereport(WARNING,
-							(errmsg("skipping \"%s\" --- analyze for GPXF tables is turned off by 'gpxf_enable_stat_collection'",
+							(errmsg("skipping \"%s\" --- analyze for PXF tables is turned off by 'pxf_enable_stat_collection'",
 									RelationGetRelationName(candidateRelation))));
 					relation_close(candidateRelation, ShareUpdateExclusiveLock);
 				}
@@ -760,7 +760,7 @@ static void analyzeRelation(Relation relation, List *lAttributeNames)
 	Oid			sampleTableOid = InvalidOid;
 	float4		minSampleTableSize = 0;
 	bool		sampleTableRequired = true;
-	bool        isExternalGpxf = false;
+	bool        isExternalPxf = false;
 	ListCell	*le = NULL;
 	Oid			relationOid = InvalidOid;
 	float4 estimatedRelTuples = 0.0;
@@ -773,17 +773,17 @@ static void analyzeRelation(Relation relation, List *lAttributeNames)
 	
 	initStringInfo(&location);
 	relationOid		= RelationGetRelid(relation);
-	isExternalGpxf	= RelationIsExternalGpxf(relation, &location);
+	isExternalPxf	= RelationIsExternalPxf(relation, &location);
 
 	/* Step 1: estimate reltuples, relpages for the relation */
-	if (!isExternalGpxf)
+	if (!isExternalPxf)
 	{
 		analyzeEstimateReltuplesRelpages(relationOid, &estimatedRelTuples, &estimatedRelPages);
 	}
 	else
 	{
 		initStringInfo(&err_msg);
-		gp_statistics_estimate_reltuples_relpages_external_gpxf(relation, &location, &estimatedRelTuples, &estimatedRelPages, &err_msg);
+		gp_statistics_estimate_reltuples_relpages_external_pxf(relation, &location, &estimatedRelTuples, &estimatedRelPages, &err_msg);
 		if (err_msg.len > 0)
 		{
 			ereport(WARNING,
@@ -837,11 +837,11 @@ static void analyzeRelation(Relation relation, List *lAttributeNames)
 	pgstat_report_analyze(relation, estimatedRelTuples, 0 /*totaldeadrows*/);
 	
 	/**
-	 * For an external GPXF table, the next steps are irrelevant - it's time to leave
+	 * For an external PXF table, the next steps are irrelevant - it's time to leave
 	 */
-	if (isExternalGpxf)
+	if (isExternalPxf)
 	{
-		elog(elevel, "ANALYZE on GPXF table %s computes only reltuples and relpages.", RelationGetRelationName(relation));
+		elog(elevel, "ANALYZE on PXF table %s computes only reltuples and relpages.", RelationGetRelationName(relation));
 		return;
 	}	
 	/**
@@ -2661,21 +2661,21 @@ static void gp_statistics_estimate_reltuples_relpages_ao_rows(Relation rel, floa
 }
 
 /* --------------------------------
- *		gp_statistics_estimate_reltuples_relpages_external_gpxf -
+ *		gp_statistics_estimate_reltuples_relpages_external_pxf -
  *
- *		Fetch reltuples and relpages for an external table which is GPXF
+ *		Fetch reltuples and relpages for an external table which is PXF
  * --------------------------------
  */
-void gp_statistics_estimate_reltuples_relpages_external_gpxf(Relation rel, StringInfo location,
-															 float4 *reltuples, float4 *relpages,
-															 StringInfo err_msg)
+void gp_statistics_estimate_reltuples_relpages_external_pxf(Relation rel, StringInfo location,
+															float4 *reltuples, float4 *relpages,
+															StringInfo err_msg)
 {
 
-	GpxfStatsElem *elem = NULL;
-	elem = get_gpxf_statistics(location->data, rel, err_msg);
+	PxfStatsElem *elem = NULL;
+	elem = get_pxf_statistics(location->data, rel, err_msg);
 
 	/*
-	 * if get_gpxf_statistics returned NULL - probably a communication error, we fall back to former values
+	 * if get_pxf_statistics returned NULL - probably a communication error, we fall back to former values
 	 * for the relation (can be default if no analyze was run successfully before)
 	 * we don't want to stop the analyze, since this can be part of a long procedure performed on many tables
 	 * not just this one
@@ -2691,7 +2691,7 @@ void gp_statistics_estimate_reltuples_relpages_external_gpxf(Relation rel, Strin
 	*reltuples = elem->numTuples;
 	pfree(elem);
 	
-	/* in case there were problems with the GPXF service, keep the defaults */
+	/* in case there were problems with the PXF service, keep the defaults */
 	if (*relpages < 0)
 		*relpages =  gp_external_table_default_number_of_pages;
 	if (*reltuples < 0)

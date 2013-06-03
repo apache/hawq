@@ -8,10 +8,10 @@
 
 
 /*
- * Test gpxf_calc_max_participants_allowed returned value
+ * Test pxf_calc_max_participants_allowed returned value
  */
 void 
-test__gpxf_calc_max_participants_allowed(void **state)
+test__pxf_calc_max_participants_allowed(void **state)
 {
 	int test_params[11][4] =
 	{
@@ -44,65 +44,65 @@ test__gpxf_calc_max_participants_allowed(void **state)
 		gp_external_max_segs = max_segs_guc;
 		will_return(getgphostCount, number_of_hosts);
 
-		assert_int_equal(gpxf_calc_max_participants_allowed(total_segments), expected_result);
+		assert_int_equal(pxf_calc_max_participants_allowed(total_segments), expected_result);
 	}
 }
 
 /*
- * Test is_gpxf_protocol with gpxf protocol
+ * Test is_pxf_protocol with pxf protocol
  */
 void
-test__is_gpxf_protocol__CustomProtocolGPXF(void **state)
+test__is_pxf_protocol__CustomProtocolPXF(void **state)
 {
 	Uri *uri = (Uri *) palloc0(sizeof(Uri));
 
 	uri->protocol = URI_CUSTOM;
-	uri->customprotocol = "gpxf";
+	uri->customprotocol = "pxf";
 
-	assert_true(is_gpxf_protocol(uri));
+	assert_true(is_pxf_protocol(uri));
 
 	pfree(uri);
 }
 
 /*
- * Test is_gpxf_protocol with custom protocol but null value
+ * Test is_pxf_protocol with custom protocol but null value
  * for customprotocol.
  */
 void
-test__is_gpxf_protocol__CustomProtocolNull(void **state)
+test__is_pxf_protocol__CustomProtocolNull(void **state)
 {
 	Uri *uri = (Uri *) palloc0(sizeof(Uri));
 
 	uri->protocol = URI_CUSTOM;
 	uri->customprotocol = NULL;
 
-	assert_false(is_gpxf_protocol(uri));
+	assert_false(is_pxf_protocol(uri));
 
 	pfree(uri);
 }
 
 /*
- * Test is_gpxf_protocol with gpxf protocol but other protocol
+ * Test is_pxf_protocol with pxf protocol but other protocol
  * defined in customprotocol.
  */
 void
-test__is_gpxf_protocol__CustomProtocolOther(void **state)
+test__is_pxf_protocol__CustomProtocolOther(void **state)
 {
 	Uri *uri = (Uri *) palloc0(sizeof(Uri));
 
 	uri->protocol = URI_CUSTOM;
 	uri->customprotocol = "some_other_protocol";
 
-	assert_false(is_gpxf_protocol(uri));
+	assert_false(is_pxf_protocol(uri));
 
 	pfree(uri);
 }
 
 /*
- * Negative test for is_gpxf_protocol, with other protocols.
+ * Negative test for is_pxf_protocol, with other protocols.
  */
 void
-test__is_gpxf_protocol__OtherProtocols(void **state)
+test__is_pxf_protocol__OtherProtocols(void **state)
 {
 	UriProtocol protocol_array[] =
 	{
@@ -122,7 +122,7 @@ test__is_gpxf_protocol__OtherProtocols(void **state)
 	{
 		uri->protocol = protocol_array[i];
 
-		assert_false(is_gpxf_protocol(uri));
+		assert_false(is_pxf_protocol(uri));
 	}
 
 	pfree(uri);
@@ -135,11 +135,11 @@ main(int argc, char* argv[])
 	cmockery_parse_arguments(argc, argv);
 
 	const UnitTest tests[] = {
-			unit_test(test__gpxf_calc_max_participants_allowed),
-			unit_test(test__is_gpxf_protocol__CustomProtocolGPXF),
-			unit_test(test__is_gpxf_protocol__CustomProtocolNull),
-			unit_test(test__is_gpxf_protocol__CustomProtocolOther),
-			unit_test(test__is_gpxf_protocol__OtherProtocols)
+			unit_test(test__pxf_calc_max_participants_allowed),
+			unit_test(test__is_pxf_protocol__CustomProtocolPXF),
+			unit_test(test__is_pxf_protocol__CustomProtocolNull),
+			unit_test(test__is_pxf_protocol__CustomProtocolOther),
+			unit_test(test__is_pxf_protocol__OtherProtocols)
 	};
 	return run_tests(tests);
 }

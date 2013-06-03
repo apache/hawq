@@ -8,14 +8,14 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.SequenceFileInputFormat;
 import org.apache.hadoop.mapred.SequenceFileRecordReader;
 
-import com.pivotal.pxf.accessors.SplittableFileAccessor;
+import com.pivotal.pxf.accessors.HdfsSplittableDataAccessor;
 import com.pivotal.pxf.utilities.HDFSMetaData;
 
 
 /*
  * Specialization of SplittableFileAccessor for sequence files
  */
-public class TestSequenceFileAccessor extends SplittableFileAccessor
+public class TestSequenceFileAccessor extends HdfsSplittableDataAccessor
 {
 	/*
 	 * C'tor

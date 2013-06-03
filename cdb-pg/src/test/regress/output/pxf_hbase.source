@@ -1,5 +1,5 @@
 --
--- GPXF HBASE regression suite 
+-- PXF HBASE regression suite 
 --
 -- Prerequisites:
 --
@@ -10,7 +10,7 @@
 --
 -- TODO: test gpdbwritable write/read when it is enabled.
 -- TODO: test PB, AVRO, THRIFT when it is enabled (read only, with pre formatted files).
--- TODO: test protocol validator for gpxf once written.
+-- TODO: test protocol validator for pxf once written.
 -- TODO: test parameter passing, filter passing
 --------------------------------------------------------------------------------
 -- HBASE
@@ -19,13 +19,13 @@
 -- syntax validations
 --
 CREATE READABLE EXTERNAL TABLE gphbase_in(a int, b text, c bytea)
-LOCATION ('gpxf://@hostname@:50070/hbasetable')
-FORMAT 'CUSTOM' (formatter='gpxfwritable_import'); -- negative
-ERROR:  invalid URI gpxf://@hostname@:50070/hbasetable: missing options section
+LOCATION ('pxf://@hostname@:50070/hbasetable')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- negative
+ERROR:  invalid URI pxf://@hostname@:50070/hbasetable: missing options section
 CREATE WRITABLE EXTERNAL TABLE gphbase_out(a int, b text, c bytea)
-LOCATION ('gpxf://@hostname@:50070/hbasetable?FRAGMENTER=HBaseDataFragmenter')
+LOCATION ('pxf://@hostname@:50070/hbasetable?FRAGMENTER=HBaseDataFragmenter')
 FORMAT 'CUSTOM' (formatter='gpdbwritable_export');
-ERROR:  gpxf does not yet support writable external tables
+ERROR:  pxf does not yet support writable external tables
 -- Setup
 \! javac -cp `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar` @abs_srcdir@/helpers/HBaseCreateTables.java @abs_srcdir@/helpers/HBaseDropTables.java @abs_srcdir@/helpers/HBaseChangeLookupTable.java
 \! java -cp  `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar`:`echo ${HADOOP_ROOT}/lib/commons-logging-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-configuration-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-lang-[1-9]*.jar`:@abs_srcdir@/helpers HBaseCreateTables
@@ -49,7 +49,7 @@ create table
 populate table
 update lookup table
 leave
-SET gpxf_enable_filter_pushdown = on;
+SET pxf_enable_filter_pushdown = on;
 -- Test
 CREATE EXTERNAL TABLE gphbase_select(recordkey TEXT, 
                                      "cf1:q1" VARCHAR, 
@@ -61,8 +61,8 @@ CREATE EXTERNAL TABLE gphbase_select(recordkey TEXT,
                                      "cf1:q7" CHAR, 
                                      "cf1:q8" SMALLINT, 
                                      "cf1:q9" BIGINT) 
-LOCATION ('gpxf://@hostname@:50070/gphbase_test?FRAGMENTER=HBaseDataFragmenter')
-FORMAT 'CUSTOM' (formatter='gpxfwritable_import');
+LOCATION ('pxf://@hostname@:50070/gphbase_test?FRAGMENTER=HBaseDataFragmenter')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import');
 -- Test analyze for HBase table.
 ANALYZE gphbase_select;
 WARNING:  skipping "gphbase_select" --- error returned: no ANALYZER option in table definition
@@ -701,7 +701,7 @@ SELECT * FROM gphbase_select WHERE "cf1:q9" <= 9702990000000099 AND recordkey !=
  row00000299 | ASCII00000099 | UTF8_計算機用語_00000099 |    300 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
 (5 rows)
 
-SET gpxf_enable_filter_pushdown = off;
+SET pxf_enable_filter_pushdown = off;
 SELECT * FROM gphbase_select WHERE "cf1:q9" <= 9702990000000099 AND recordkey != 'row00000099' AND "cf1:q8" > 97 ORDER BY recordkey ASC;
   recordkey  |    cf1:q1     |          cf1:q2          | cf1:q3 |       q4       | cf1:q5 |   cf1:q6    | cf1:q7 | cf1:q8 |      cf1:q9       
 -------------+---------------+--------------------------+--------+----------------+--------+-------------+--------+--------+-------------------
@@ -712,7 +712,7 @@ SELECT * FROM gphbase_select WHERE "cf1:q9" <= 9702990000000099 AND recordkey !=
  row00000299 | ASCII00000099 | UTF8_計算機用語_00000099 |    300 | lookup00000198 |  99.99 | 99999999.99 | \u0083 |     99 | -9702990000000099
 (5 rows)
 
-SET gpxf_enable_filter_pushdown = on;
+SET pxf_enable_filter_pushdown = on;
 DROP EXTERNAL TABLE gphbase_select;
 -- Test null values
 CREATE EXTERNAL TABLE gphbase_null(recordkey TEXT, 
@@ -725,8 +725,8 @@ CREATE EXTERNAL TABLE gphbase_null(recordkey TEXT,
                                      "cf1:q7" CHAR, 
                                      "cf1:q8" SMALLINT, 
                                      "cf1:q9" BIGINT) 
-LOCATION ('gpxf://@hostname@:50070/gphbase_test_null?FRAGMENTER=HBaseDataFragmenter')
-FORMAT 'CUSTOM' (formatter='gpxfwritable_import');
+LOCATION ('pxf://@hostname@:50070/gphbase_test_null?FRAGMENTER=HBaseDataFragmenter')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import');
 SELECT * FROM gphbase_null WHERE "cf1:q1" is null ORDER BY recordkey ASC;
   recordkey  | cf1:q1 |          cf1:q2          | cf1:q3 |       q4       | cf1:q5 | cf1:q6 | cf1:q7 | cf1:q8 |    cf1:q9     
 -------------+--------+--------------------------+--------+----------------+--------+--------+--------+--------+---------------
@@ -764,8 +764,8 @@ CREATE EXTERNAL TABLE gphbase_upper(recordkey TEXT,
                                      "cf1:q7" CHAR, 
                                      "cf1:q8" SMALLINT, 
                                      "cf1:q9" BIGINT) 
-LOCATION ('gpxf://@hostname@:50070/gphbase_test_upper?FRAGMENTER=HBaseDataFragmenter')
-FORMAT 'CUSTOM' (formatter='gpxfwritable_import');
+LOCATION ('pxf://@hostname@:50070/gphbase_test_upper?FRAGMENTER=HBaseDataFragmenter')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import');
 SELECT * FROM gphbase_upper ORDER BY recordkey ASC;
   recordkey  |    cf1:q1     |          cf1:q2          | cf1:q3 |       q4       | cf1:q5 | cf1:q6 | cf1:q7 | cf1:q8 |    cf1:q9    
 -------------+---------------+--------------------------+--------+----------------+--------+--------+--------+--------+--------------
@@ -780,8 +780,8 @@ SELECT * FROM gphbase_upper ORDER BY recordkey ASC;
 DROP EXTERNAL TABLE gphbase_upper;
 -- Negative test
 CREATE EXTERNAL TABLE gphbase_error(recordkey int)
-LOCATION ('gpxf://@hostname@:50070/gphbase_test?FRAGMENTER=HBaseDataFragmenter')
-FORMAT 'CUSTOM' (formatter='gpxfwritable_import');
+LOCATION ('pxf://@hostname@:50070/gphbase_test?FRAGMENTER=HBaseDataFragmenter')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import');
 SELECT * FROM gphbase_error;
 ERROR:  Reporting a badly formatted data record which was detected by the java reader. See GPBridge log for more details
 DETAIL:  External table gphbase_error
@@ -797,8 +797,8 @@ CREATE EXTERNAL TABLE gphbase_lookup(recordkey TEXT,
                                      "cf1:q7" CHAR, 
                                      "cf1:q8" SMALLINT, 
                                      "cf1:q9" BIGINT) 
-LOCATION ('gpxf://@hostname@:50070/gphbase_test?FRAGMENTER=HBaseDataFragmenter')
-FORMAT 'CUSTOM' (formatter='gpxfwritable_import');
+LOCATION ('pxf://@hostname@:50070/gphbase_test?FRAGMENTER=HBaseDataFragmenter')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import');
 -- truncate lookup table
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar`:`echo ${HADOOP_ROOT}/lib/commons-logging-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-configuration-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-lang-[1-9]*.jar`:@abs_srcdir@/helpers HBaseChangeLookupTable truncate-table
 Command: [truncate-table]
@@ -877,9 +877,9 @@ CREATE EXTERNAL TABLE gphbase_integer_rowkey(recordkey INTEGER,
                                      "cf1:q7" CHAR, 
                                      "cf1:q8" SMALLINT, 
                                      "cf1:q9" BIGINT) 
-LOCATION ('gpxf://@hostname@:50070/gphbase_test_integer_rowkey?FRAGMENTER=HBaseDataFragmenter')
-FORMAT 'CUSTOM' (formatter='gpxfwritable_import');
-SET gpxf_enable_filter_pushdown = on;
+LOCATION ('pxf://@hostname@:50070/gphbase_test_integer_rowkey?FRAGMENTER=HBaseDataFragmenter')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import');
+SET pxf_enable_filter_pushdown = on;
 SELECT * FROM gphbase_integer_rowkey WHERE recordkey = 50;
  recordkey |    cf1:q1     |          cf1:q2          | cf1:q3 |     cf1:q4     | cf1:q5 | cf1:q6 | cf1:q7 | cf1:q8 | cf1:q9 
 -----------+---------------+--------------------------+--------+----------------+--------+--------+--------+--------+--------

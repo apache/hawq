@@ -1,8 +1,8 @@
 #include "common.h"
 #include "gphdfilters.h"
 #include "access/libchurl.h"
-#include "access/gpxfuriparser.h"
-#include "access/gpxfheaders.h"
+#include "access/pxfuriparser.h"
+#include "access/pxfheaders.h"
 
 static const char* remote_uri_template = "http://%s/%s/%s/Bridge/?fragments=%s";
 
@@ -125,7 +125,7 @@ gphadoop_context* create_context(PG_FUNCTION_ARGS)
  */
 void add_querydata_to_http_header(gphadoop_context* context, PG_FUNCTION_ARGS)
 {
-	GpxfInputData inputData;
+	PxfInputData inputData;
 	inputData.headers = context->churl_headers;
 	inputData.gphduri = context->gphd_uri;
 	inputData.rel = EXTPROTOCOL_GET_RELATION(fcinfo);
@@ -153,7 +153,7 @@ void append_churl_header_if_exists(gphadoop_context* context, const char* key, c
 void set_current_fragment_headers(gphadoop_context* context)
 {
 	FragmentData* frag_data = (FragmentData*)lfirst(context->current_fragment);
-	elog(DEBUG2, "gpxf: set_current_fragment_source_name: source_name %s, index %s, has user data: %s ",
+	elog(DEBUG2, "pxf: set_current_fragment_source_name: source_name %s, index %s, has user data: %s ",
 		 frag_data->source_name, frag_data->index, frag_data->user_data ? "TRUE" : "FALSE");
 	churl_headers_override(context->churl_headers, "X-GP-DATA-DIR", frag_data->source_name);
 
@@ -224,8 +224,8 @@ void build_uri_from_current_fragment(gphadoop_context* context)
 	FragmentData* data = (FragmentData*)lfirst(context->current_fragment);
 	resetStringInfo(&context->uri);
 	appendStringInfo(&context->uri, remote_uri_template,
-					 data->authority, GPDB_REST_PREFIX, GPFX_VERSION, data->index);
-	elog(DEBUG2, "gpxf: uri with current fragment: %s", context->uri.data);
+					 data->authority, GPDB_REST_PREFIX, PFX_VERSION, data->index);
+	elog(DEBUG2, "pxf: uri with current fragment: %s", context->uri.data);
 
 }
 

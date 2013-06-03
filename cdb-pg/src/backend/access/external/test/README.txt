@@ -1,3 +1,3 @@
 Directory with the following System Under Test (SUT):
- - gpxfuriparser.c
+ - pxfuriparser.c
  - hd_work_mgr.c

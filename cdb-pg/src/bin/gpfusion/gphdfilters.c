@@ -231,7 +231,7 @@ gphd_serialize_filter_list(List *filters)
 /*
  * opexpr_to_gphdfilter
  *
- * check if an OpExpr qualifies to be pushed-down to GPXF.
+ * check if an OpExpr qualifies to be pushed-down to PXF.
  * if it is - create it and return a success code.
  */
 static bool
@@ -381,7 +381,7 @@ char *serializeGPHDFilterQuals(List *quals)
 {
 	char	*result = NULL;
 
-	if (gpxf_enable_filter_pushdown)
+	if (pxf_enable_filter_pushdown)
 	{
 		List *filters = gphd_make_filter_list(quals);
 

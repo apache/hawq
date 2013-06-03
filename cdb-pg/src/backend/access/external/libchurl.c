@@ -740,7 +740,7 @@ get_http_error_msg(long http_ret_code, char* msg)
 	 *    In this case there is no Response from the server, so we issue our own message
 	 */
 	if (http_ret_code == 0) 
-		return "There is no gpxf servlet listening on the host and port specified in the external table url";
+		return "There is no pxf servlet listening on the host and port specified in the external table url";
 	
 	/*
 	 * 2. There is a response from the server since the http_ret_code is not 0, but there is no response message.

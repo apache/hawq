@@ -36,7 +36,7 @@ class HBaseCreateTable
 	boolean upperCaseLookup;
 	String rowKeyPrefix = "row";
 	final String valuePrefix = "value";
-	final String lookupTableName = "gpxflookup";
+	final String lookupTableName = "pxflookup";
 	final String lookupTableMappingColumnFamilyName = "mapping";
 
 	void go() throws Exception

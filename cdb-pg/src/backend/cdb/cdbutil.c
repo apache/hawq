@@ -373,7 +373,7 @@ getCdbComponentInfo(bool DNSLookupAsError)
  *
  *
  * Storage for the SegmentInstances block and all subsidiary
- * strucures are allocated from the caller's context.
+ * structures are allocated from the caller's context.
  */
 CdbComponentDatabases *
 getCdbComponentDatabases(void)
@@ -416,7 +416,7 @@ getCdbComponentDatabasesForGangs(void)
 		return getCdbComponentDatabases();
 
 	if (GpAliveSegmentsInfo.aliveSegmentsCount == 0)
-		elog(ERROR, "No alive segment in the cluser.");
+		elog(ERROR, "No alive segment in the cluster.");
 
 	newInfo = palloc0(sizeof(*newInfo));
 	newInfo->total_segment_dbs = GpAliveSegmentsInfo.cdbComponentDatabases->total_segment_dbs;

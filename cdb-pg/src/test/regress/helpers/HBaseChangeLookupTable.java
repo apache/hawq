@@ -42,7 +42,7 @@ class HBaseChangeLookupTable
 	Configuration config;
 	HBaseAdmin admin;
 	
-	final static String lookupTableName = "gpxflookup";
+	final static String lookupTableName = "pxflookup";
 	final static String lookupCfName = "mapping";
 
 	void printStep(String desc)

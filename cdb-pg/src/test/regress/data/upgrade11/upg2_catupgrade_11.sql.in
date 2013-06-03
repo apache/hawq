@@ -33,6 +33,27 @@ SELECT catDML(
            end'
 );
 
+-- Update external protocol from gpxf to pxf
+SELECT catDML(
+'UPDATE pg_proc SET proname = ''pxf_write'', prosrc = ''pxfprotocol_export'', probin = ''$libdir/pxf.so'' WHERE proname = ''gpxf_write''
+');
+SELECT catDML(
+'UPDATE pg_proc SET proname = ''pxf_read'', prosrc = ''pxfprotocol_import'', probin = ''$libdir/pxf.so'' WHERE proname = ''gpxf_read''
+');
+SELECT catDML(
+'UPDATE pg_proc SET proname = ''pxf_validate'', prosrc = ''pxfprotocol_validate_urls'', probin = ''$libdir/pxf.so'' WHERE proname = ''gpxf_validate''
+');
+SELECT catDML(
+'UPDATE pg_proc SET proname = ''pxfwritable_export'', prosrc = ''gpdbwritableformatter_export'', probin = ''$libdir/pxf.so'' WHERE proname = ''gpxfwritable_export''
+');
+SELECT catDML(
+'UPDATE pg_proc SET proname = ''pxfwritable_import'', prosrc = ''gpdbwritableformatter_import'', probin = ''$libdir/pxf.so'' WHERE proname = ''gpxfwritable_import''
+');
+SELECT catDML(
+'UPDATE pg_extprotocol SET ptcname = ''pxf'' WHERE ptcname = ''gpxf''
+');
+
+
 VACUUM FREEZE pg_proc;
 -- ... and the rest
 

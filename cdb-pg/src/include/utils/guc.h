@@ -374,9 +374,9 @@ extern char   *gp_snmp_debug_log;
 #endif
 
 /* Extension Framework GUCs */
-extern bool   gpxf_enable_filter_pushdown; /* turn pushdown logic on/off     */
-extern bool   gpxf_enable_stat_collection; /* turn off stats collection if needed */
-extern bool   gpxf_enable_locality_optimizations; /* turn locality optimization in the data allocation algorithm on/off     */
+extern bool   pxf_enable_filter_pushdown; /* turn pushdown logic on/off     */
+extern bool   pxf_enable_stat_collection; /* turn off stats collection if needed */
+extern bool   pxf_enable_locality_optimizations; /* turn locality optimization in the data allocation algorithm on/off     */
 
 /* Time based authentication GUC */
 extern char  *gp_auth_time_override_str;

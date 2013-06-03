@@ -543,8 +543,8 @@ select count(*) from pg_catalog.pg_exttable where reloid in (select r.oid from p
 SET gp_foreign_data_access = false;
 
 CREATE USER nonsuperproto;
-GRANT SELECT ON PROTOCOL gpxf TO nonsuperproto;
-GRANT INSERT ON PROTOCOL gpxf TO nonsuperproto;
-REVOKE SELECT ON PROTOCOL gpxf FROM nonsuperproto;
-REVOKE INSERT ON PROTOCOL gpxf FROM nonsuperproto;
+GRANT SELECT ON PROTOCOL pxf TO nonsuperproto;
+GRANT INSERT ON PROTOCOL pxf TO nonsuperproto;
+REVOKE SELECT ON PROTOCOL pxf FROM nonsuperproto;
+REVOKE INSERT ON PROTOCOL pxf FROM nonsuperproto;
 DROP USER nonsuperproto;

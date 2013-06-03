@@ -1,5 +1,5 @@
 
-#include "access/gpxfuriparser.h"
+#include "access/pxfuriparser.h"
 #include "catalog/pg_exttable.h"
 #include "utils/formatting.h"
 #include "utils/uri.h"
@@ -29,7 +29,7 @@ static void  GPHDUri_debug_print_segwork(GPHDUri *uri);
  * 		<protocol name>://<authority>/<data>?<option>&<option>&<...>&segwork=<segwork>
  *
  *
- * protocol name	- must be 'gpxf'
+ * protocol name	- must be 'pxf'
  * authority		- host:port
  * data				- data path (directory name/table name/etc., depending on target)
  * options			- valid options are dependent on the protocol. Each
@@ -132,7 +132,7 @@ GPHDUri_parse_protocol(GPHDUri *uri, char **cursor)
 	ptc_len = post_ptc - start;
 	uri->protocol = pnstrdup(start, ptc_len);
 
-	if (!IS_GPXF_URI(uri->uri))
+	if (!IS_PXF_URI(uri->uri))
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
 				 errmsg("invalid URI %s : unsupported protocol '%s'",
@@ -586,12 +586,12 @@ GPHDUri_dup_without_segwork(const char* uri)
 }
 
 /* --------------------------------
- *		RelationIsExternalGpxf -
+ *		RelationIsExternalPxf -
  *
- *		Check if a table is an external GPXF tbl.
+ *		Check if a table is an external PXF tbl.
  * --------------------------------
  */
-bool RelationIsExternalGpxf(Relation rel, StringInfo location)
+bool RelationIsExternalPxf(Relation rel, StringInfo location)
 {
 	ExtTableEntry	*tbl;
 	List			*locsList;
@@ -612,7 +612,7 @@ bool RelationIsExternalGpxf(Relation rel, StringInfo location)
 		if (!locsItem)
 			continue;
 
-		if (IS_GPXF_URI(locsItem))
+		if (IS_PXF_URI(locsItem))
 		{
 			appendStringInfoString(location, locsItem);
 			pfree(tbl);
