@@ -164,7 +164,7 @@ public class BridgeOutputBuilder
 	{
 		int size = recFields.size();
 		if (size == 0) /* size 0 means the resolver couldn't deserialize any of the record fields*/
-			throw new BadRecordException();
+			throw new BadRecordException("No fields in record");
 
 		for (int i = 0; i < size; i++)
 			fillOneGPDBWritableField(recFields.get(i), i);
@@ -260,7 +260,7 @@ public class BridgeOutputBuilder
 		}
 		catch (TypeMismatchException e)
 		{
-			throw new BadRecordException();
+			throw new BadRecordException(e);
 		}
 	}
 }

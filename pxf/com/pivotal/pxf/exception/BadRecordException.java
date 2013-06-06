@@ -9,4 +9,9 @@ package com.pivotal.pxf.exception;
  */
 public class BadRecordException extends Exception 
 {
+    public BadRecordException() {}
+    
+    public BadRecordException(Throwable cause) { super(cause); }
+    
+    public BadRecordException(String message) { super(message); }
 }

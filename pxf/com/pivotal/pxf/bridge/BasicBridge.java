@@ -8,6 +8,8 @@ import java.io.IOException;
 import java.io.UTFDataFormatException;
 import java.util.zip.ZipException;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.io.Writable;
 
 import com.pivotal.pxf.accessors.Accessor;
@@ -38,12 +40,15 @@ abstract class BasicBridge implements IBridge
 	Accessor fileAccessor = null;
 	Resolver fieldsResolver = null;
 	BridgeOutputBuilder outputBuilder = null;
-
+    
+    private Log Log;
+    
 	/*
 	 * C'tor - set the implementation of the bridge
 	 */
 	BasicBridge(HDMetaData configuration, Accessor accessor, Resolver resolver)
 	{
+        Log = LogFactory.getLog(BasicBridge.class);
         conf = configuration;
 		fileAccessor = accessor;
 		fieldsResolver = resolver;
@@ -64,10 +69,10 @@ abstract class BasicBridge implements IBridge
 	public Writable GetNext() throws Exception
 	{
 		Writable output = null;
-		
+		OneRow onerow = null;
 		try
 		{
-			OneRow onerow = fileAccessor.LoadNextObject();
+			onerow = fileAccessor.LoadNextObject();
 			if (onerow == null)
 			{
 				fileAccessor.Close();
@@ -84,6 +89,19 @@ abstract class BasicBridge implements IBridge
 		}
 		catch (BadRecordException ex)
 		{
+            String row_info = "null";
+            if (onerow != null)
+            {
+                row_info = onerow.toString();
+            }
+            if (ex.getCause() != null)
+            {
+                Log.debug("BadRecordException " + ex.getCause().toString() + ": " + row_info);
+            }
+            else
+            {
+                Log.debug(ex.toString() + ": " + row_info);
+            }
 			output = outputBuilder.getErrorOutput(ex);
 		}
 		

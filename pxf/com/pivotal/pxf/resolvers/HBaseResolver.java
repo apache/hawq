@@ -109,7 +109,7 @@ public class HBaseResolver extends Resolver
         } catch (NumberFormatException e)
         {
             // Replace exception with BadRecordException
-            throw new BadRecordException();
+            throw new BadRecordException(e);
         }
 	}
 

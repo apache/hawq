@@ -68,5 +68,31 @@ public class OneRow
 	{
 		return data;
 	}
+    
+    /*
+     * Show content
+     */
+    public String toString()
+    {
+        String content = new String("OneRow:");
+        if (key != null)
+        {
+            content += key.toString();
+        }
+        else
+        {
+            content += "null";
+        }
+        content += "->";
+        if (data != null)
+        {
+            content += data.toString();
+        }
+        else
+        {
+            content += "null";
+        }
+        return content;
+    }
 }
 

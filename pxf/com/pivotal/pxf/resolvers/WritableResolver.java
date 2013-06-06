@@ -151,7 +151,7 @@ public class WritableResolver extends Resolver
 		}
 		catch (IllegalAccessException ex)
 		{
-			throw new BadRecordException();
+			throw new BadRecordException(ex);
 		}
 		return ret;
 	}
