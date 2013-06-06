@@ -84,7 +84,7 @@ extern int HdfsFileTruncate(File file, int64 offset);
 extern int HdfsMakeDirectory(const char * path, mode_t mode);
 
 /* abstract file system */
-extern File FileNameOpenFile(FileName fileName, int fileFlags, int fileMode);
+extern File FileNameOpenFile(FileName fileName, const char *temp_dir, int fileFlags, int fileMode);
 extern File PathNameOpenFile(FileName fileName, int fileFlags, int fileMode);
 
 File
@@ -142,5 +142,7 @@ extern size_t GetTempFilePrefix(char * buf, size_t buflen, const char * fileName
 extern bool TestFileValid(File file);
 
 extern bool HdfsPathExist(char *path);
+
+extern FileName FileGetName(File file);
 
 #endif   /* FD_H */

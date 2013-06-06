@@ -37,7 +37,6 @@
 #include "cdb/cdbmirroredfilesysobj.h"
 #include "cdb/cdbvars.h"
 #include "cdb/cdbutil.h"
-#include "access/genam.h" 
 #include "access/catquery.h"
 #include "access/genam.h"
 #include "postmaster/primary_mirror_mode.h"
@@ -783,13 +782,6 @@ RemoveFileSpace(List *names, DropBehavior behavior, bool missing_ok)
 	 * Disallow drop of filespace if it is used for transaction files or
 	 * temporary files.
 	 */
-	if (isFilespaceUsedForTempFiles(fsoid))
-		ereport(ERROR,
-				(errmsg("cannot drop filespace %s because it is used "
-						"by temporary files \n"
-						"Use gpfilespace --movetempfilespace <newFilespaceName>	to move temporary files to a different filespace\n"
-						"and then attempt DROP FILESPACE", fsname)));
-
 	if (isFilespaceUsedForTxnFiles(fsoid))
 		ereport(ERROR,
                                 (errmsg("cannot drop filespace %s because it is used "

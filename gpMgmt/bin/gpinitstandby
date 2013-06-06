@@ -19,7 +19,7 @@ try:
     from gppylib.userinput import *
     from gppylib.gp_dbid import GpDbidFile
     from gppylib.operations.package import SyncPackages
-    from gppylib.operations.filespace import PG_SYSTEM_FILESPACE, GP_TRANSACTION_FILES_FILESPACE, GP_TEMPORARY_FILES_FILESPACE, GetFilespaceEntries, GetFilespaceEntriesDict, MoveFilespaceError
+    from gppylib.operations.filespace import PG_SYSTEM_FILESPACE, GP_TRANSACTION_FILES_FILESPACE, GP_TEMPORARY_FILES_FILESPACE, GetFilespaceEntries, GetFilespaceEntriesDict, MoveFilespaceError, create_temporary_directories, remove_temporary_directories
 except ImportError, e:
     sys.exit('ERROR: Cannot import modules.  Please check that you '
              'have sourced greenplum_path.sh.  Detail: ' + str(e))
@@ -362,6 +362,10 @@ def delete_standby(options):
         logger.error('Failed to stop gpsyncmaster process on standby master.')
         raise GpInitStandbyException(ex)
  
+	# delete temporary directories
+    remove_temporary_directories(array.standbyMaster.getSegmentHostName(),
+                                 array.standbyMaster.getSegmentDataDirectory())
+
     # delete directory
     remove_standby_filespace_dirs(array)
 
@@ -486,6 +490,8 @@ def create_standby(options):
         update_gpdbid_file(options, array)
         update_flat_file(array, standby_filespace_map, GP_TRANSACTION_FILES_FILESPACE)
         update_flat_file(array, standby_filespace_map, GP_TEMPORARY_FILES_FILESPACE)
+        create_temporary_directories(array.standbyMaster.getSegmentHostName(),
+                                     array.standbyMaster.getSegmentDataDirectory())
         cleanup_pg_hba_conf_backup(array)
 
         if master_mode == 'utility':
@@ -831,6 +837,38 @@ def update_gpdbid_file(options, array):
     except Exception, ex:
         logger.error('Failed to update standby master\'s gp_dbid file.')
         raise GpInitStandbyException(ex)
+
+#-------------------------------------------------------------------------
+def CreateTempDirectories1(options, array):
+    standby_data_dir = array.standbyMaster.getSegmentDataDirectory()
+    directories_file = os.path.join(standby_data_dir, 'gp_temporary_files_directories')
+    created_path_history = {}
+
+    # The temp directories file does not exist, nothing to do
+    if not os.path.exists(directories_file):
+        return
+
+    try:
+        with open(directories_file) as file:
+            for line in file:
+                path = line.strip()
+                # check the parent directories' permission
+                if unix.FileDirExists.remote('check temporary dir', options.standby_host, path):
+                   raise OSError('create temporary directory failed for %s(path already exists)' % path)
+                unix.MakeDirectory.remote('make temporary dir', options.standby_host, path)
+                created_path_history[path] = True
+
+    except Exception, e:
+        logger.error('create temporary directory failed.  %s' % str(e))
+        # cleanup the work, don't complain if this is an OSError.
+        for path in created_path_history:
+            try:
+                if created_path_history[path]:
+                    unix.RemoveDirectory.remote('remove temporary dir', options.standby_host, path)
+            except Exception, e:
+                logger.error('temporary directory cannot be removed. %s' % str(e))
+
+        raise e
 
 #-------------------------------------------------------------------------
 def write_temp_flat_file(flat_file_location, flat_file, array, standby_filespace_dict):

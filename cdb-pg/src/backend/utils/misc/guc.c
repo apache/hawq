@@ -247,6 +247,8 @@ extern const char *gpvars_assign_gp_resqueue_priority_default_value(const char *
 
 static const char *assign_password_hash_algorithm(const char *newval,
 												  bool doit, GucSource source);
+static bool	assign_gp_temporary_directory_mark_error(int newval, bool doit, GucSource source);
+
 /*
  * GUC option variables that are exported from this module
  */
@@ -3738,6 +3740,16 @@ static struct config_bool ConfigureNamesBool[] =
 		false, NULL, NULL
 	},
 
+	{
+		{"gp_force_use_default_temporary_directory", PGC_USERSET, UNGROUPED,
+		 gettext_noop("force all segments use default data directory for temporary files."),
+		 NULL,
+		 GUC_NOT_IN_SAMPLE
+		},
+		&gp_force_use_default_temporary_directory,
+		false, NULL, NULL
+	},
+
 	/* End-of-list marker */
 	{
 		{NULL, 0, 0, NULL, NULL}, NULL, false, NULL, NULL
@@ -5591,6 +5603,16 @@ static struct config_int ConfigureNamesInt[] =
 		7200, 300, 86400, NULL, NULL
 	},
 #endif
+
+	{
+		{"gp_temporary_directory_mark_error", PGC_SUSET, DEVELOPER_OPTIONS,
+			gettext_noop("mark temporary directory ok(positive) or error(negative), 0(reallocate a temporary directory)."),
+			NULL,
+			GUC_SUPERUSER_ONLY | GUC_DISALLOW_IN_FILE
+		},
+		&gp_temporary_directory_mark_error,
+		0, INT_MIN, INT_MAX, assign_gp_temporary_directory_mark_error, NULL
+	},
 
 	{
 		{"gp_opt_plan_id", PGC_USERSET, DEVELOPER_OPTIONS,
@@ -12281,6 +12303,15 @@ assign_gp_test_failed_segmentid_number(int newval, bool doit, GucSource source)
 	GpAliveSegmentsInfo.failed_segmentid_number = newval;
 	GpAliveSegmentsInfo.forceUpdate = true;
 	GpAliveSegmentsInfo.cleanGangs = true;
+
+	return true;
+}
+
+static bool
+assign_gp_temporary_directory_mark_error(int newval, bool doit, GucSource source)
+{
+	if (doit)
+		TemporaryDirectoryFaultInjection(newval);
 
 	return true;
 }

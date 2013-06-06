@@ -17,7 +17,7 @@
 
 #define MAX_TRANSITION_RESULT_EXTRA_INFO 256
 #define TXN_FILESPACE_FLATFILE "gp_transaction_files_filespace"
-#define TEMPFILES_FILESPACE_FLATFILE "gp_temporary_files_filespace"
+#define TEMPFILES_DIRECTORIES_FLATFILE "gp_temporary_files_directories"
 
 /*
  * Segment states are set only when mirroring is configured (that is, when
@@ -349,7 +349,6 @@ extern bool primaryMirrorPostmasterResetShouldRestartPeer(void);
 extern void primaryMirrorRecordSegmentStateToPostmasterLocalMemory(void);
 extern PrimaryMirrorModeTransitionArguments primaryMirrorGetArgumentsFromLocalMemory(void);
 
-extern Oid primaryMirrorGetTempFilespaceOID(void);
 extern Oid primaryMirrorGetTxnFilespaceOID(void);
 extern char* primaryMirrorGetTxnFilespacePath(void);
 extern char* primaryMirrorGetTempFilespacePath(void);
@@ -360,13 +359,14 @@ extern char* primaryMirrorGetPeerTxnFilespacePath(void);
 extern char* makeRelativeToPeerTxnFilespace(char *path);
 extern bool isTxnFilespaceInfoConsistent(void);
 extern bool isTempFilespaceInfoConsistent(void);
-extern bool isFilespaceInfoConsistent(void);
 extern void populateFilespaceInfo(void);
 extern void primaryMirrorPopulateFilespaceInfo(void);
 extern bool isTxnDir(char *path);
 extern bool isFilespaceUsedForTempFiles(Oid fsoid);
 extern bool isFilespaceUsedForTxnFiles(Oid fsoid);
 extern void primaryMirrorModeResetSpinLocks(void);
+extern void TemporaryDirectoryFaultInjection(int temp_dir_idx);
+extern void TemporaryDirectorySanityCheck(const char *path, int err, bool process_die);
 
 #define getCurrentTempFilePath                                 \
         primaryMirrorIsUsingDefaultFilespaceForTempFiles()?    \

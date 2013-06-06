@@ -37,6 +37,7 @@
 
 #include "storage/fd.h"
 #include "storage/buffile.h"
+#include "postmaster/primary_mirror_mode.h"
 
 /*
  * The maximum safe file size is presumed to be RELSEG_SIZE * BLCKSZ.
@@ -234,6 +235,7 @@ BufFileCreateTemp_ReaderWriter(const char* fileName, bool isWriter)
 							  false); /* closeAtEOXact */
 	if (pfile < 0)
 	{
+		TemporaryDirectorySanityCheck(fileName, errno, false);
 		elog(ERROR, "could not open temporary file \"%s\": %m", fileName);
 	}
 
@@ -408,6 +410,8 @@ static int BufFileLoadBuffer(BufFile *file, void* buffer, size_t bufsize)
 	{
 		if (FileSeek(thisfile, file->curOffset, SEEK_SET) != file->curOffset)
 		{
+			/* Do some sanity check and mark the path */
+			TemporaryDirectorySanityCheck(FileGetName(thisfile), errno, false);
 			elog(ERROR, "could not seek in temporary file: %m");
 		}
 		file->offsets[file->curFile] = file->curOffset;
@@ -419,6 +423,7 @@ static int BufFileLoadBuffer(BufFile *file, void* buffer, size_t bufsize)
 	nb = FileRead(thisfile, buffer, (int)bufsize);
 	if (nb < 0)
 	{
+		TemporaryDirectorySanityCheck(FileGetName(thisfile), errno, false);
 		elog(ERROR, "could not read from temporary file: %m");
 	}
 
@@ -462,6 +467,7 @@ static void BufFileDumpBuffer(BufFile *file, const void* buffer, Size nbytes)
 				File newTmpFile = extendBufFile(file);
 				if (newTmpFile < 0)
 				{
+					TemporaryDirectorySanityCheck(FileGetName(newTmpFile), errno, false);
 					elog(ERROR, "could not create (or extend) temporary file: %m");
 					return;
 				}
@@ -490,6 +496,7 @@ static void BufFileDumpBuffer(BufFile *file, const void* buffer, Size nbytes)
 		{
 			if (FileSeek(thisfile, file->curOffset, SEEK_SET) != file->curOffset)
 			{
+				TemporaryDirectorySanityCheck(FileGetName(thisfile), errno, false);
 				elog(ERROR, "could not seek in temporary file: %m");
 			}
 
@@ -498,6 +505,7 @@ static void BufFileDumpBuffer(BufFile *file, const void* buffer, Size nbytes)
 		wrote = FileWrite(thisfile, (char *)buffer + wpos, (int)bytestowrite);
 		if (wrote != bytestowrite)
 		{
+			TemporaryDirectorySanityCheck(FileGetName(thisfile), errno, false);
 			elog(ERROR, "could not write %d bytes to temporary file: %m", (int)bytestowrite);
 		}
 		file->offsets[file->curFile] += wrote;

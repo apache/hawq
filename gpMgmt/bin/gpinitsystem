@@ -419,6 +419,19 @@ CHK_PARAMS () {
 			fi
 		fi
 
+        # Temp directory
+        ((NUM_TEMP_DIR=${#TEMP_DIRECTORY[*]}))
+        TEMP_DIRECTORY_LIST=(`$ECHO ${TEMP_DIRECTORY[@]} | $TR ' ' '\n' | $SORT -u | $TR '\n' ' '`)
+        ((NUM_DEDUP_TEMP_DIR=${#TEMP_DIRECTORY_LIST[*]}))
+        if [ $NUM_TEMP_DIR -eq 0 ]; then
+            LOG_MSG "[INFO]:-Use the default temp directory" 1
+        elif [ "$NUM_TEMP_DIR" -ne "$NUM_DEDUP_TEMP_DIR" ]; then
+            LOG_MSG "[INFO]:-Use the user specified temp directory" 1
+            LOG_MSG "[WARN]:-One or more temp directories are same" 1
+        else
+            LOG_MSG "[INFO]:-Use the user specified temp directory" 1
+        fi
+
 		# Mirror configuration
 		if [ $MIRRORING -eq 1 ]; then
 			((NUM_MIRROR_DIRECTORY=${#MIRROR_DATA_DIRECTORY[@]}))
@@ -710,6 +723,7 @@ CHK_OPEN_FILES () {
 # HAWQ needs DFS_NAME set.
 CHK_DFS_NAME () { 
     LOG_MSG "[INFO]:-Start Function $FUNCNAME"
+    LOG_MSG "[INFO]:-Checking DFS name"
     if [ x"" == x"$DFS_NAME" ]; then 
         ERROR_EXIT "[FATAL]:-Issue with DFS_NAME: not set" 2
     fi   
@@ -724,6 +738,7 @@ CHK_DFS_NAME () {
 # HAWQ needs dfs url.
 CHK_DFS_URL () {
 	LOG_MSG "[INFO]:-Start Function $FUNCNAME"
+    LOG_MSG "[INFO]:-Checking DFS url" 1
 	
 	if [ x"" == x"$DFS_URL" ]; then
 		ERROR_EXIT "[FATAL]:-Issue with DFS_URL: not set" 2
@@ -741,7 +756,28 @@ CHK_DFS_URL () {
 	DFS_URL="$DFS_URL"/hawq_data
 	export DFS_URL
 
-	LOG_MSG "[INFO]:-End Function $FUNCNAME"	
+	LOG_MSG "[INFO]:-End Function $FUNCNAME" 1
+}
+
+# HAWQ supports multiple disks for pg_temp.
+CHK_TEMP_DIR () {
+    LOG_MSG "[INFO]:-Start Function $FUNCNAME"
+    LOG_MSG "[INFO]:-Checking temp directories" 1
+
+    ((num=${#TEMP_DIRECTORY_LIST[*]}))
+    # Remove and warn the duplicate temp directories.
+    for dir in "${TEMP_DIRECTORY_LIST[@]}"
+    do
+        # If there is no STANDBY_HOSTNAME, it will not check it here.
+        for machine in "${MACHINE_LIST[@]}" "$MASTER_HOSTNAME" $STANDBY_HOSTNAME
+        do
+            LOG_MSG "[INFO]:-Check directory: $dir on machine $machine" 1
+            CHK_DIR "$dir" "$machine"
+            CHK_WRITE_DIR "$dir" "$machine"
+        done
+    done
+
+    LOG_MSG "[INFO]:-End Function $FUNCNAME"
 }
 
 CHK_QES () {
@@ -1284,6 +1320,22 @@ CREATE_QD_DB () {
 		LOG_MSG "[INFO]:-Creating perfmon directories and configuration file"
 		BUILD_PERFMON $GP_DIR
 		ERROR_CHK $? "create perfmon directories and configuration file" 1
+
+		LOG_MSG "[INFO]:-Creating temporary directories for master"
+		for DIR in "${TEMP_DIRECTORY_LIST[@]}"
+		do
+			temp_master_dir="${DIR}/${SEG_PREFIX}-1"
+			LOG_MSG "[INFO]:-create temporary ${tmp_seg_dir}"
+			BACKOUT_COMMAND "$ECHO \"Remove temporary directory: ${temp_master_dir}\""
+			BACKOUT_COMMAND "$RM -rf ${temp_master_dir}"
+			$MKDIR $temp_master_dir >> $LOG_FILE 2>&1
+			RETVAL=$?
+			if [ $RETVAL -ne 0 ]; then
+				ERROR_EXIT "[FATAL]:-Could not create directory ${temp_master_dir}. Please check your configuration." 2
+			fi
+			$ECHO "${temp_master_dir}" >> "${GP_DIR}/${GP_TEMP_DIRECTORIES_FILE}"
+		done
+
 		LOG_MSG "[INFO]:-Starting the Master in admin mode" 1
 		export PGPORT=$GP_PORT;$PG_CTL -w -l $GP_DIR/pg_log/startup.log -D $GP_DIR -o "-i -p $GP_PORT -c gp_role=utility -M master -b -1 -C -1 -z 0 -m" start >> /dev/null 2>&1
 		RET_TEXT="`$PG_CTL status -D $GP_DIR`"
@@ -1448,7 +1500,11 @@ CREATE_QES_PRIMARY () {
                 HAS_MIRRORS_OPTION=no
             fi
 
-			$GPCREATESEG $FLAG $$ 1 $I IS_PRIMARY $HAS_MIRRORS_OPTION $INST_COUNT  $LOG_FILE \
+            # create temp directory with SEG_PREFIX.
+            TEMP_DIRECTORY_COMPACT_LIST=(`$ECHO ${TEMP_DIRECTORY_LIST[@]} | $TR ' ' ','`)
+            LOG_MSG "TEMP_DIRECTORY_COMPACT_LIST: $TEMP_DIRECTORY_COMPACT_LIST" 1
+
+			$GPCREATESEG $FLAG $$ 1 $I IS_PRIMARY "$TEMP_DIRECTORY_COMPACT_LIST" $SEG_PREFIX $HAS_MIRRORS_OPTION $INST_COUNT  $LOG_FILE \
 `$ECHO ${MASTER_IP_ADDRESS[@]}|$TR ' ' '~'` \
 `$ECHO ${STANDBY_IP_ADDRESS[@]}|$TR ' ' '~'` &
 			PARALLEL_COUNT $BATCH_LIMIT $BATCH_DEFAULT
@@ -2156,6 +2212,7 @@ if [ x"$INPUT_CONFIG" != x"" ] ; then
     CHK_QES_FROM_INPUTFILE
     CHK_DFS_NAME
     CHK_DFS_URL
+    CHK_TEMP_DIR
 
     if [ x"" != x"$OUTPUT_CONFIG" ] ; then
 	DUMP_OUTPUT_CONFIG
@@ -2173,6 +2230,7 @@ else
     CHK_DFS_URL
     CHK_QE_ARRAY_PORT_RANGES
     CHK_QES
+    CHK_TEMP_DIR
 
     if [ x"" != x"$OUTPUT_CONFIG" ] ; then
 	DUMP_OUTPUT_CONFIG

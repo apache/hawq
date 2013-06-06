@@ -968,16 +968,16 @@ LocalPathNameOpenFile(FileName fileName, int fileFlags, int fileMode)
  * acts like PathNameOpenFile.
  */
 File
-FileNameOpenFile(FileName fileName, int fileFlags, int fileMode)
+FileNameOpenFile(FileName fileName, const char *temp_dir, int fileFlags, int fileMode)
 {
 	File		fd;
 	char	   *fname;
 
 	Assert(!is_absolute_path(fileName));
 	fname = (char*)palloc(PATH_MAX);
-	if (snprintf(fname, PATH_MAX, "%s/%s", getCurrentTempFilePath, fileName) > PATH_MAX)
+	if (snprintf(fname, PATH_MAX, "%s/%s", temp_dir, fileName) > PATH_MAX)
 	{
-		ereport(ERROR, (errmsg("cannot generate path %s/%s", getCurrentTempFilePath,
+		ereport(ERROR, (errmsg("cannot generate path %s/%s", temp_dir,
                         fileName)));
 	}
 	fd = PathNameOpenFile(fname, fileFlags, fileMode);
@@ -1029,6 +1029,7 @@ OpenTemporaryFile(const char   *fileName,
 	File    file;
     int     fileFlags;
 	char	tempfilepath[MAXPGPATH];
+	char	*temp_dir;
 
 	Assert(fileName);
     AssertImply(makenameunique, create && delOnClose);
@@ -1067,7 +1068,9 @@ OpenTemporaryFile(const char   *fileName,
                  extentseqnum);
 	}
 
-	file = FileNameOpenFile(tempfilepath, fileFlags, 0600);
+	temp_dir = getCurrentTempFilePath;
+	elog(DEBUG1, "temporary direcotry is: \"%s\"", temp_dir);
+	file = FileNameOpenFile(tempfilepath, temp_dir, fileFlags, 0600);
 
 	if (file <= 0)
 	{
@@ -1085,11 +1088,11 @@ OpenTemporaryFile(const char   *fileName,
 		 * the second create attempt, instead.
 		 */
 		dirpath = (char*)palloc(PATH_MAX);
-		snprintf(dirpath, PATH_MAX, "%s/%s", getCurrentTempFilePath, PG_TEMP_FILES_DIR);
+		snprintf(dirpath, PATH_MAX, "%s/%s", temp_dir, PG_TEMP_FILES_DIR);
 		mkdir(dirpath, S_IRWXU);
 		pfree(dirpath);
 
-		file = FileNameOpenFile(tempfilepath, fileFlags, 0600);
+		file = FileNameOpenFile(tempfilepath, temp_dir, fileFlags, 0600);
 		if (file <= 0)
 			elog(ERROR, "could not create temporary file \"%s\": %m",
 			     tempfilepath);
@@ -3018,6 +3021,14 @@ HdfsPathExist(char *path)
 
 	HdfsFreeFileInfo(protocol, info, 1);
 	return true;
+}
+
+FileName
+FileGetName(File file)
+{
+	Assert(FileIsValid(file));
+
+	return VfdCache[file].fileName;
 }
 
 

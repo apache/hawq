@@ -86,6 +86,7 @@
 
 #include "storage/buffile.h"
 #include "access/distributedlog.h"
+#include "postmaster/primary_mirror_mode.h"
 
 static SharedSnapshotSlot *SharedSnapshotAdd(int4 slotId);
 static SharedSnapshotSlot *SharedSnapshotLookup(int4 slotId);
@@ -306,6 +307,7 @@ SharedSnapshotAdd(int4 slotId)
 	int nextSlot = -1;
 	int i;
 	int retryCount = gp_snapshotadd_timeout * 10; /* .1 s per wait */
+	char *temporary_directory = primaryMirrorGetTempFilespacePath();		/* Avoid get two locks a time. */
 
 retry:
 	LWLockAcquire(SharedSnapshotLock, LW_EXCLUSIVE);
@@ -395,6 +397,7 @@ retry:
 	slot->QDxid = 0;
 	slot->QDcid = 0;
 	slot->segmateSync = 0;
+	slot->session_temporary_directory = temporary_directory;
 
 	LWLockRelease(SharedSnapshotLock);
 

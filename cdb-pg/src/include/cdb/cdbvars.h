@@ -1200,4 +1200,9 @@ extern void increment_command_count(void);
  * switch to control inverse distribution function strategy.
  */
 extern char *gp_idf_deduplicate_str;
+
+/* Force query use data directory for temporary files. */
+extern bool	gp_force_use_default_temporary_directory;
+extern int	gp_temporary_directory_mark_error;
+
 #endif   /* GPVARS_H */

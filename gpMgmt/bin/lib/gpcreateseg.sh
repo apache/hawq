@@ -215,7 +215,27 @@ PROCESS_QE () {
 	CIDR_ADDR=$(GET_CIDRADDR $ADDR)
 	$TRUSTED_SHELL ${GP_HOSTADDRESS} "$ECHO host     all          $USER_NAME         $CIDR_ADDR      trust >> ${GP_DIR}/$PG_HBA"
     done
-    
+
+    # Create temp directories file
+    LOG_MSG "[INFO][$INST_COUNT]:-temporary directory: $TEMP_DIRECTORY_LIST"
+    if [ "${#TEMP_DIRECTORY_LIST[*]}" -ne 0 ]; then
+        BACKOUT_COMMAND "$TRUSTED_SHELL ${GP_HOSTADDRESS} \"$RM -rf ${GP_DIR}/${GP_TEMP_DIRECTORIES_FILE} > /dev/null 2>&1\""
+    fi
+    for DIR in "${TEMP_DIRECTORY_LIST[@]}"
+    do
+        tmp_seg_dir="${DIR}/${SEG_PREFIX}${GP_CONTENT}"
+        LOG_MSG "[INFO]:-create temporary ${tmp_seg_dir}"
+        BACKOUT_COMMAND "$TRUSTED_SHELL ${GP_HOSTADDRESS} \"$RM -rf ${tmp_seg_dir} > /dev/null 2>&1\""
+        $TRUSTED_SHELL ${GP_HOSTADDRESS} "$MKDIR ${tmp_seg_dir}"
+        RETVAL=$?
+        if [ $RETVAL -ne 0 ]; then
+            # should not happen, we check the permission in gpinitsystem.
+            LOG_MSG "[FATAL]:-temp directory created failed: ${tmp_seg_dir}"
+            exit 2
+        fi
+        $TRUSTED_SHELL ${GP_HOSTADDRESS} "$ECHO ${tmp_seg_dir} >> ${GP_DIR}/${GP_TEMP_DIRECTORIES_FILE}"
+    done
+
     if [ x"" = x"$COPY_FROM_PRIMARY_HOSTADDRESS" ]; then
 	# Primary: start the segment to fill in configuration
 	START_QE
@@ -291,6 +311,9 @@ case $TYPE in
 		        exit 2
             fi
         fi
+        TEMP_DIRECTORY_COMPACT_LIST=$1;shift
+        TEMP_DIRECTORY_LIST=(`$ECHO ${TEMP_DIRECTORY_COMPACT_LIST[@]} | $TR ',' ' '`)
+        SEG_PREFIX=$1;shift
         IS_FILEREP_MIRRORED_OPTION=$1;shift # yes or no, should we tell initdb to create persistent values
 		INST_COUNT=$1;shift		#Unique number for this parallel script, starts at 0
 		BACKOUT_FILE=/tmp/gpsegcreate.sh_backout.$$

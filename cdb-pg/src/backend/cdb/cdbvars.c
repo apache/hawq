@@ -365,6 +365,10 @@ bool 		coredump_on_memerror=false;
 /* if catquery.c is built with the logquery option, allow caql logging */
 bool		gp_enable_caql_logging = true;
 
+/* Force query use data directory for temporary files. */
+bool		gp_force_use_default_temporary_directory = false;
+int			gp_temporary_directory_mark_error = 0;
+
 /* Experimental feature for MPP-4082. Please read doc before setting this guc */
 GpAutoStatsModeValue gp_autostats_mode;
 char                *gp_autostats_mode_string;

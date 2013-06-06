@@ -10,8 +10,8 @@ import signal
 from gppylib.db import dbconn, catalog
 from gppylib.db.dbconn import UnexpectedRowsError
 from gppylib import gplog
-from gppylib.commands.gp import GpStop, GpStart, get_local_db_mode 
-from gppylib.commands.unix import Ping
+from gppylib.commands.gp import GpStop, GpStart, get_local_db_mode
+from gppylib.commands.unix import Ping, RemoveDirectory, RemoveFiles, MakeDirectory
 from gppylib.operations import Operation
 from gppylib.operations.utils import RemoteOperation, ParallelOperation
 from gppylib.operations.unix import CheckFile, CheckDir, ListFiles
@@ -49,15 +49,15 @@ class CheckFilespaceIsSame(Operation):
         self.gparray = gparray
         self.filespace_name = filespace_name
         self.file_type = file_type
-    
+
     def execute(self):
-        logger.info('Checking if filespace is same as current filespace') 
-        
+        logger.info('Checking if filespace is same as current filespace')
+
         try:
             if self.file_type == FileType.TRANSACTION_FILES:
-                filename = GP_TRANSACTION_FILES_FILESPACE 
+                filename = GP_TRANSACTION_FILES_FILESPACE
             else:
-                filename = GP_TEMPORARY_FILES_FILESPACE 
+                filename = GP_TEMPORARY_FILES_FILESPACE
 
             pg_system_filespace_entries = GetFilespaceEntries(self.gparray, PG_SYSTEM_FILESPACE).run()
 
@@ -70,7 +70,7 @@ class CheckFilespaceIsSame(Operation):
                 with open(file_path) as file:
                     oid = int(file.readline().strip())
                     if self.gparray.getFileSpaceName(oid) == self.filespace_name:
-                        return True 
+                        return True
         except Exception, e:
             raise MoveFilespaceError('Failed to check if filespace is same.')
 
@@ -79,7 +79,7 @@ class CheckFilespaceIsSame(Operation):
 class CheckFilespace(Operation):
     """
         Checks that the given filespace exists.
-        
+
         @return: True if Filespace exists False otherwise
     """
     SELECT_FILESPACENAME_QUERY = """
@@ -92,8 +92,8 @@ class CheckFilespace(Operation):
     def execute(self):
         logger.info('Checking if filespace %s exists' % self.filespace)
 
-        dburl = dbconn.DbURL() 
-        query = self.SELECT_FILESPACENAME_QUERY % self.filespace  
+        dburl = dbconn.DbURL()
+        query = self.SELECT_FILESPACENAME_QUERY % self.filespace
 
         logger.debug('Connecting to database')
         with dbconn.connect(dburl, utility=True) as conn:
@@ -125,16 +125,16 @@ class CheckSuperUser(Operation):
         except Exception, e:
             raise MoveFilespaceError(str(e))
         finally:
-           conn.close() 
+           conn.close()
 
         if not is_super:
             return False
 
         return True
-        
+
 class CheckConnectivity(Operation):
     """
-        Check if all hosts are reachable 
+        Check if all hosts are reachable
         in the cluster.
     """
     def __init__(self, gparray):
@@ -144,7 +144,7 @@ class CheckConnectivity(Operation):
         logger.info('Checking for connectivity')
 
         host_set = self.gparray.getHostList()
-    
+
         for host in host_set:
             try:
                 Ping.local("pinging host %s" % host, host)
@@ -164,10 +164,10 @@ class CheckFilespaceOidLocally(Operation):
     def execute(self):
         logger.info('flat file location = %s' % self.flat_file_location)
         if not CheckFile(self.flat_file_location).run():
-            return -1 
-        
+            return -1
+
         with open(self.flat_file_location, 'r') as file:
-            oid = file.readline().strip() 
+            oid = file.readline().strip()
         return oid
 
 class CheckFilespaceEntriesLocally(Operation):
@@ -185,7 +185,7 @@ class CheckFilespaceEntriesLocally(Operation):
             flat_file = GP_TRANSACTION_FILES_FILESPACE
         elif self.file_type == FileType.TEMPORARY_FILES:
             flat_file = GP_TEMPORARY_FILES_FILESPACE
-        
+
         is_consistent = True
         flat_file_location = os.path.join(self.filespace_location, flat_file)
 
@@ -208,17 +208,17 @@ class CheckFilespaceEntriesLocally(Operation):
                     logger.info('path = %s' % entries[1].strip())
                     logger.info('dbid = %s' % entries[0].strip())
                     entries_set.add(entries[0].strip() + ' ' + entries[1].strip())
-      
+
         required_set = set()
         required_set.add(str(self.cur_filespace_entry[1]) + ' ' + self.cur_filespace_entry[2])
-        
+
         if self.peer_filespace_entry is not None:
             required_set.add(str(self.peer_filespace_entry[1]) + ' ' + self.peer_filespace_entry[2])
-  
+
         if required_set != entries_set:
             is_consistent = False
 
-        return is_consistent 
+        return is_consistent
 
 class CheckFilespacePermissions(Operation):
     """
@@ -228,13 +228,13 @@ class CheckFilespacePermissions(Operation):
         self.location = location
 
     def execute(self):
-        
-        path = os.path.dirname(self.location) 
 
-        #In case of recoverseg, the segment directories will be 
+        path = os.path.dirname(self.location)
+
+        #In case of recoverseg, the segment directories will be
         #created by the backend code.
         if not os.path.exists(path):
-            path = os.path.dirname(path)    
+            path = os.path.dirname(path)
 
         self.location = os.path.join(path, os.path.basename(self.location))
 
@@ -244,7 +244,7 @@ class CheckFilespacePermissions(Operation):
             os.remove(self.location)
         except IOError, e:
             if e.errno == errno.EACCES:
-                return False 
+                return False
             else:
                 raise
         return True
@@ -266,27 +266,27 @@ class CheckFilespaceConsistency(Operation):
             flat_file = GP_TEMPORARY_FILES_FILESPACE
 
         operations = []
-        pg_system_fs_entries = GetFilespaceEntriesDict(GetFilespaceEntries(self.gparray, 
-                                                                            PG_SYSTEM_FILESPACE).run()).run() 
-        cur_filespace_entries = GetFilespaceEntriesDict(GetCurrentFilespaceEntries(self.gparray, 
+        pg_system_fs_entries = GetFilespaceEntriesDict(GetFilespaceEntries(self.gparray,
+                                                                            PG_SYSTEM_FILESPACE).run()).run()
+        cur_filespace_entries = GetFilespaceEntriesDict(GetCurrentFilespaceEntries(self.gparray,
                                                                                    self.file_type).run()).run()
         for seg in self.gparray.getDbList():
-            flat_file_location = os.path.join(pg_system_fs_entries[seg.getSegmentDbId()][2], 
+            flat_file_location = os.path.join(pg_system_fs_entries[seg.getSegmentDbId()][2],
                                               flat_file)
             logger.debug('flat file location = %s' % flat_file_location)
             operations.append(RemoteOperation(CheckFilespaceOidLocally(flat_file_location),
                                               seg.getSegmentHostName()
                                              )
                              )
-        ParallelOperation(operations, NUM_WORKERS).run() 
-      
-        try: 
-            oid_set = set([int(op.get_ret()) for op in operations]) 
+        ParallelOperation(operations, NUM_WORKERS).run()
+
+        try:
+            oid_set = set([int(op.get_ret()) for op in operations])
         except Exception, e:
             logger.error('Invalid OID in flat file on host %s' % op.host)
             return False
 
-        logger.debug('%s oid set = %s' % (FileType.lookup[self.file_type], oid_set)) 
+        logger.debug('%s oid set = %s' % (FileType.lookup[self.file_type], oid_set))
 
         if len(oid_set) != 1:
             logger.error('Multiple OIDs found in flat files')
@@ -305,7 +305,7 @@ class CheckFilespaceConsistency(Operation):
             return False
         logger.info('%s OIDs are consistent for %s filespace' % (FileType.lookup[self.file_type], fs_name))
 
-        #Now check for the filespace entries 
+        #Now check for the filespace entries
         operation_list = []
         for seg in self.gparray.getDbList():
             cur_filespace_entry = cur_filespace_entries[seg.getSegmentDbId()]
@@ -329,20 +329,20 @@ class CheckFilespaceConsistency(Operation):
                 return False
 
         logger.info('%s entries are consistent for %s filespace' % (FileType.lookup[self.file_type], fs_name))
-        
+
         return True
-            
+
 def get_peer_filespace_entry(filespace_entries, dbid, content_id, segments):
     """
-        Returns the filespace entry for a given 
-        DbId corresponding to its peer. 
-        i.e given primary, it returns the filespace 
-        entry of the mirror, and given mirror, it 
-        returns the filespace entry of the primary. 
-    
-        @param:  DbId of the primary segment    
+        Returns the filespace entry for a given
+        DbId corresponding to its peer.
+        i.e given primary, it returns the filespace
+        entry of the mirror, and given mirror, it
+        returns the filespace entry of the primary.
+
+        @param:  DbId of the primary segment
                  content id of the segment
-        @return: A tuple of the form 
+        @return: A tuple of the form
                  filespace oid, dbid, filespace directory
     """
     logger.debug('Getting peer filespace entry for %s' % dbid)
@@ -365,7 +365,7 @@ class UpdateFlatFilesLocally(Operation):
         logger.info('Updating flat files')
 
         #If flat file directory does not exist, we create it
-        if not os.path.exists(os.path.dirname(self.flat_file)): 
+        if not os.path.exists(os.path.dirname(self.flat_file)):
             os.mkdir(os.path.dirname(self.flat_file))
 
         temp_flat_file = self.flat_file + '.tmp'
@@ -381,17 +381,17 @@ class UpdateFlatFilesLocally(Operation):
 
         #Read back and check if what we've written is the same
         with open(temp_flat_file) as file:
-            contents = file.read() 
+            contents = file.read()
             if contents != lines_to_write:
-                raise MoveFilespaceError('Failed to write contents to flat file %s' % lines_to_write)       
+                raise MoveFilespaceError('Failed to write contents to flat file %s' % lines_to_write)
 
         shutil.move(temp_flat_file, self.flat_file)
-      
-        if not os.path.exists(self.cur_filespace_entry[2]):
-            os.makedirs(self.cur_filespace_entry[2])     
 
-        return self.flat_file + ' ' + contents 
- 
+        if not os.path.exists(self.cur_filespace_entry[2]):
+            os.makedirs(self.cur_filespace_entry[2])
+
+        return self.flat_file + ' ' + contents
+
 class UpdateFlatFiles(Operation):
     """
         Update the flat files on primaries separately
@@ -405,14 +405,14 @@ class UpdateFlatFiles(Operation):
         self.expansion = expansion
 
     def execute(self):
-        
+
         #Obtain list of segments from gparray
         if self.expansion:
             db_list = self.gparray.getExpansionSegDbList()
         else:
             db_list = self.gparray.getDbList()
 
-        if self.primaries: 
+        if self.primaries:
             segments = [seg for seg in db_list if seg.isSegmentPrimary()]
         else:
             segments = [seg for seg in db_list if seg.isSegmentMirror()]
@@ -421,13 +421,13 @@ class UpdateFlatFiles(Operation):
         logger.debug('segments on which flat files will be updated = %s' % segments)
         pg_system_filespace_entries = GetFilespaceEntriesDict(GetFilespaceEntries(self.gparray,
                                                                                  PG_SYSTEM_FILESPACE).run()
-                                                            ).run() 
+                                                            ).run()
         transaction_flat_file = os.path.join(pg_system_filespace_entries[1][2], GP_TRANSACTION_FILES_FILESPACE)
         if os.path.exists(transaction_flat_file):
             logger.debug('Updating transaction flat files')
-            cur_filespace_entries = GetFilespaceEntriesDict(GetCurrentFilespaceEntries(self.gparray, FileType.TRANSACTION_FILES 
+            cur_filespace_entries = GetFilespaceEntriesDict(GetCurrentFilespaceEntries(self.gparray, FileType.TRANSACTION_FILES
                                                                                       ).run()
-                                                            ).run()    
+                                                            ).run()
             operation_list = []
             for seg in segments:
                 filespace_oid = cur_filespace_entries[seg.getSegmentDbId()][0]
@@ -443,7 +443,7 @@ class UpdateFlatFiles(Operation):
                                                                                     peer_filespace_entry
                                                                                    ),
                                                       seg.getSegmentHostName())
-                                     ) 
+                                     )
 
             ParallelOperation(operation_list, NUM_WORKERS).run()
 
@@ -456,9 +456,9 @@ class UpdateFlatFiles(Operation):
         temporary_flat_file = os.path.join(pg_system_filespace_entries[1][2], GP_TEMPORARY_FILES_FILESPACE)
         if os.path.exists(temporary_flat_file):
             logger.debug('Updating temporary flat files')
-            cur_filespace_entries = GetFilespaceEntriesDict(GetCurrentFilespaceEntries(self.gparray, FileType.TEMPORARY_FILES 
+            cur_filespace_entries = GetFilespaceEntriesDict(GetCurrentFilespaceEntries(self.gparray, FileType.TEMPORARY_FILES
                                                                                       ).run()
-                                                            ).run()    
+                                                            ).run()
             operation_list = []
             for seg in segments:
                 filespace_oid = cur_filespace_entries[seg.getSegmentDbId()][0]
@@ -474,28 +474,28 @@ class UpdateFlatFiles(Operation):
                                                                                     peer_filespace_entry
                                                                                    ),
                                                       seg.getSegmentHostName())
-                                     ) 
+                                     )
 
             ParallelOperation(operation_list, NUM_WORKERS).run()
-            
+
             try:
                 for operation in operation_list:
                     operation.get_ret()
             except Exception, e:
                 raise MoveFilespaceError('Failed to update temporary flat file.')
- 
+
 class MoveTransFilespaceLocally(Operation):
     """
         Move the Filespace to the new location for
         transaction files.
-        This requires the pg_system filespace entry for a particular dbid 
-        because that information is needed to write the gp_transaction_files_filespace 
+        This requires the pg_system filespace entry for a particular dbid
+        because that information is needed to write the gp_transaction_files_filespace
         flat file.
 
         @param: filespace entries from the pg_filespace_entry table.
         @return: None
     """
-    TRANSACTION_FILES_DIRS = ['pg_xlog', 'pg_multixact', 'pg_subtrans', 'pg_clog', 
+    TRANSACTION_FILES_DIRS = ['pg_xlog', 'pg_multixact', 'pg_subtrans', 'pg_clog',
                                         'pg_distributedlog', 'pg_distributedxidmap']
 
     def __init__(self, current_filespace_entry, new_filespace_name, new_filespace_entry, peer_filespace_entry, pg_system_filespace_entry, rollback=False):
@@ -508,7 +508,7 @@ class MoveTransFilespaceLocally(Operation):
 
     def get_md5(self, directory):
         m = hashlib.md5()
-        
+
         files_to_hash = []
         for root, dirs, filenames in os.walk(directory):
             for filename in filenames:
@@ -524,7 +524,7 @@ class MoveTransFilespaceLocally(Operation):
                     if not data:
                         break
                     m.update(data)
-        return m.hexdigest() 
+        return m.hexdigest()
 
     def md5_check(self, src_dir, dst_dir):
             src_md5 = self.get_md5(src_dir)
@@ -539,7 +539,7 @@ class MoveTransFilespaceLocally(Operation):
     def execute(self):
 
         #if the filespace directory is not present on the segment,
-        #We simply return.         
+        #We simply return.
         if not CheckDir(self.current_filespace_entry[2]).run():
             return
 
@@ -548,7 +548,7 @@ class MoveTransFilespaceLocally(Operation):
             raise MoveFilespaceError('Invalid permissions for %s' % tmp_file)
 
         stats = os.statvfs(os.path.dirname(self.new_filespace_entry[2]))
-        free_bytes = stats.f_bfree * stats.f_frsize 
+        free_bytes = stats.f_bfree * stats.f_frsize
         logger.info('free_bytes for %s = %s' % (self.new_filespace_entry[2], free_bytes))
         if not free_bytes:
             raise MoveFilespaceError('Insufficient diskspace for %s' % self.new_filespace_entry[2])
@@ -560,13 +560,13 @@ class MoveTransFilespaceLocally(Operation):
 
             logger.info('Copying directories from %s to %s' % (src_dir, dst_dir))
             try:
-                #In case of a rollback, we need to retain the directories that 
-                #already exist on the source segment. If it doesn't then we do a 
+                #In case of a rollback, we need to retain the directories that
+                #already exist on the source segment. If it doesn't then we do a
                 #copy.
                 if self.rollback:
                     if CheckDir(src_dir).run() and not CheckDir(dst_dir).run():
                         logger.info('copying %s' % src_dir)
-                        shutil.copytree(src_dir, dst_dir) 
+                        shutil.copytree(src_dir, dst_dir)
                         try:
                             self.md5_check(src_dir, dst_dir)
                         except (IOError, OSError), e:
@@ -583,9 +583,9 @@ class MoveTransFilespaceLocally(Operation):
                         self.md5_check(src_dir, dst_dir)
                     except (IOError, OSError), e:
                         raise MoveFilespaceError('Failed to calculate md5 checksums !')
-                    
+
             except (IOError, OSError), e:
-                logger.error('Failed to copy transaction files to new Filespace location.') 
+                logger.error('Failed to copy transaction files to new Filespace location.')
                 raise
 
         #2. Drop the directories in current filespace
@@ -594,7 +594,7 @@ class MoveTransFilespaceLocally(Operation):
             try:
                 if CheckDir(src_dir).run():
                     logger.info('Dropping dir %s' % src_dir)
-                    shutil.rmtree(src_dir) 
+                    shutil.rmtree(src_dir)
             except (IOError, OSError), e:
                 logger.error('Failed to drop transaction files directories from current filespace.')
                 raise
@@ -603,20 +603,20 @@ class MoveTransFilespaceLocally(Operation):
         #If we are moving to default Filespace, then we need to delete the flat file
         if self.new_filespace_name == PG_SYSTEM_FILESPACE:
             if CheckFile(gp_transaction_files_filespace_path).run():
-                os.remove(gp_transaction_files_filespace_path) 
+                os.remove(gp_transaction_files_filespace_path)
             return
-         
+
         #3. Write the dbid and directories into tmp directory
         temp_gp_transaction_files_filespace_path = gp_transaction_files_filespace_path + '.tmp'
 
         logger.info('Writing filespace information into flat file')
-        with open(temp_gp_transaction_files_filespace_path, 'w') as file: 
+        with open(temp_gp_transaction_files_filespace_path, 'w') as file:
             lines_to_write = str(self.new_filespace_entry[0]) + '\n' +\
                              str(self.new_filespace_entry[1]) + ' ' + self.new_filespace_entry[2] + '\n'
             #In case of system without mirrors
             if self.peer_filespace_entry is not None:
                 lines_to_write += str(self.peer_filespace_entry[1]) + ' ' + self.peer_filespace_entry[2] + '\n'
-                
+
             file.write(lines_to_write)
 
         #Read back and check the file contents
@@ -624,9 +624,9 @@ class MoveTransFilespaceLocally(Operation):
             contents = file.read()
             if contents != lines_to_write:
                 raise MoveFilespaceError('Failed to write contents to flat file %s' % lines_to_write)
-             
-        #4. After the file copy has been completed successfully, 
-        #   copy over the tmp directory file 
+
+        #4. After the file copy has been completed successfully,
+        #   copy over the tmp directory file
         shutil.move(temp_gp_transaction_files_filespace_path, gp_transaction_files_filespace_path)
 
 class MoveTempFilespaceLocally(Operation):
@@ -634,9 +634,9 @@ class MoveTempFilespaceLocally(Operation):
         Move the Filespace to the new location for
         temporary files.
 
-        @return: None     
+        @return: None
     """
-    TEMPORARY_FILES_DIR = 'pgsql_tmp' 
+    TEMPORARY_FILES_DIR = 'pgsql_tmp'
 
     def __init__(self, current_filespace_entry, new_filespace_name, new_filespace_entry, peer_filespace_entry, pg_system_filespace_entry, rollback=None):
         self.new_filespace_name = new_filespace_name
@@ -647,23 +647,23 @@ class MoveTempFilespaceLocally(Operation):
         self.rollback = rollback
 
     def execute(self):
-        
+
         if not CheckDir(self.current_filespace_entry[2]).run():
             return
 
         tmp_file = os.path.join(self.new_filespace_entry[2], 'tmp_file')
         if not CheckFilespacePermissions(tmp_file).run():
             raise MoveFilespaceError('Invalid permissions for %s' % tmp_file)
-       
+
         stats = os.statvfs(os.path.dirname(self.new_filespace_entry[2]))
-        free_bytes = stats.f_bfree * stats.f_frsize 
+        free_bytes = stats.f_bfree * stats.f_frsize
         logger.info('free_bytes for %s = %s' % (self.new_filespace_entry[2], free_bytes))
         if not free_bytes:
             raise MoveFilespaceError('Insufficient diskspace for %s' % self.new_filespace_entry[2])
 
         #1. Drop the directories from old filespace location
-        #If the filespace is being moved from pg_system filespace 
-        #for temp files will be slightly different as they will be stored under 
+        #If the filespace is being moved from pg_system filespace
+        #for temp files will be slightly different as they will be stored under
         #<filespace_dir>/base/<database_oid>/
         gp_temporary_files_filespace_path = os.path.join(self.pg_system_filespace_entry[2], GP_TEMPORARY_FILES_FILESPACE)
 
@@ -684,12 +684,12 @@ class MoveTempFilespaceLocally(Operation):
                     dst_dir = os.path.join(base_dir, directory, self.TEMPORARY_FILES_DIR)
                     if CheckDir(dst_dir).run():
                         logger.info('Dropping dir %s' % dst_dir)
-                        shutil.rmtree(dst_dir) 
+                        shutil.rmtree(dst_dir)
                 except (IOError, OSError), e:
                     logger.error('Failed to delete temporary files')
                     raise
         else:
-        #else if filespace has been moved before, the temp files directory will always be under 
+        #else if filespace has been moved before, the temp files directory will always be under
         #<filespace_dir>/pgsql_tmp
             dst_dir = os.path.join(self.current_filespace_entry[2], self.TEMPORARY_FILES_DIR)
             try:
@@ -703,37 +703,37 @@ class MoveTempFilespaceLocally(Operation):
         #If we are moving to default Filespace, then we need to delete the flat file
         if self.new_filespace_name == PG_SYSTEM_FILESPACE:
             if CheckFile(gp_temporary_files_filespace_path).run():
-                os.remove(gp_temporary_files_filespace_path) 
+                os.remove(gp_temporary_files_filespace_path)
             return
 
         #2. Write the dbid and directories into tmp directory
         temp_gp_temporary_files_filespace_path = gp_temporary_files_filespace_path + '.tmp'
 
         logger.info('Writing filespace information into flat file')
-        with open(temp_gp_temporary_files_filespace_path, 'w') as file: 
+        with open(temp_gp_temporary_files_filespace_path, 'w') as file:
             lines_to_write = str(self.new_filespace_entry[0]) + '\n' +\
                              str(self.new_filespace_entry[1]) + ' ' + self.new_filespace_entry[2] + '\n'
             #In case of master, when there is no standby, peer will be None
             if self.peer_filespace_entry is not None:
                 lines_to_write += str(self.peer_filespace_entry[1]) + ' ' + self.peer_filespace_entry[2] + '\n'
-                
+
             file.write(lines_to_write)
-            
+
         #Read back and check the contents
         with open(temp_gp_temporary_files_filespace_path) as file:
             contents = file.read()
             if contents != lines_to_write:
-                raise MoveFilespaceError('Failed to write contents to flat file %s' % lines_to_write) 
+                raise MoveFilespaceError('Failed to write contents to flat file %s' % lines_to_write)
 
-        #3. After the file copy has been completed successfully, 
-        #   copy over the tmp directory file 
+        #3. After the file copy has been completed successfully,
+        #   copy over the tmp directory file
         shutil.move(temp_gp_temporary_files_filespace_path, gp_temporary_files_filespace_path)
 
 class GetFilespaceEntries(Operation):
     """
         Returns the pg_filespace_entry table contents for a given filespace.
         Each entry will be of the form oid, dbid, filespace_directory
- 
+
         @return: List containing the directories used by the filespace
     """
     def __init__(self, gparray, filespace_name):
@@ -752,15 +752,15 @@ class GetFilespaceEntries(Operation):
 
         if filespace_oid is None:
             raise MoveFilespaceError('Invalid filespace name.')
-        
+
         for seg in self.gparray.getDbList(includeExpansionSegs=True):
             filespace_entries.append((filespace_oid, seg.getSegmentDbId(), seg.getSegmentFilespaces()[filespace_oid]))
-            
+
         return filespace_entries
-   
+
 class GetCurrentFilespaceEntries(Operation):
     """
-        The results returned will contain the entries from 
+        The results returned will contain the entries from
         pg_filespace_entry table for the current filespace used
         by transaction/temporary files.
     """
@@ -773,20 +773,20 @@ class GetCurrentFilespaceEntries(Operation):
         logger.info('Obtaining current filespace entries used by %s' % FileType.lookup[self.file_type])
         filespace_entries = []
         default_filespace_entries = GetFilespaceEntries(self.gparray, PG_SYSTEM_FILESPACE).run()
-        flat_files_dir = default_filespace_entries[0][2] 
+        flat_files_dir = default_filespace_entries[0][2]
         flat_file = None
-    
+
         if self.file_type == FileType.TRANSACTION_FILES:
-            flat_file = GP_TRANSACTION_FILES_FILESPACE 
+            flat_file = GP_TRANSACTION_FILES_FILESPACE
         elif self.file_type == FileType.TEMPORARY_FILES:
             flat_file = GP_TEMPORARY_FILES_FILESPACE
 
-        gp_filespace_path = os.path.join(flat_files_dir, flat_file) 
-           
+        gp_filespace_path = os.path.join(flat_files_dir, flat_file)
+
         try:
             if CheckFile(gp_filespace_path).run():
                 with open(gp_filespace_path) as file:
-                    fs_oid = file.readline().strip() 
+                    fs_oid = file.readline().strip()
                 filespace_name = self.gparray.getFileSpaceName(int(fs_oid))
                 filespace_entries = GetFilespaceEntries(self.gparray, filespace_name).run()
         except TypeError, e:
@@ -794,35 +794,35 @@ class GetCurrentFilespaceEntries(Operation):
         except (IOError, OSError), e:
             raise MoveFilespaceError('Failed to read flat file.%s' % str(e))
 
-        if len(filespace_entries) == 0: 
+        if len(filespace_entries) == 0:
             filespace_entries = default_filespace_entries
 
         return filespace_entries
-   
+
 class GetFilespaceEntriesDict(Operation):
     """
-        @param:  A list of filespace entries 
+        @param:  A list of filespace entries
         @return: A dict containing the directories for each
                  corresponding database id.
     """
-    
+
     def __init__(self, filespace_entries):
         self.filespace_entries = filespace_entries
 
     def execute(self):
         logger.debug('Converting filespace entries into dict')
         db_directories_dict = {}
-        
+
         for entry in self.filespace_entries:
             dbid = entry[1]
-            db_directories_dict[dbid] = entry 
-        
+            db_directories_dict[dbid] = entry
+
         return db_directories_dict
 
 class RollBackFilespaceChanges(Operation):
     """
         This does the reverse operation of Move().
-        Since the Move from cur -> new Filespace failed, 
+        Since the Move from cur -> new Filespace failed,
         we do the reverse and move files back from new -> cur.
     """
     def __init__(self, segments, file_type, cur_filespace_name, cur_filespace_entries, new_filespace_entries, pg_system_filespace_entries):
@@ -834,7 +834,7 @@ class RollBackFilespaceChanges(Operation):
         self.pg_system_filespace_entries = pg_system_filespace_entries
 
     def execute(self):
-        logger.info('Rolling back filespace changes ...') 
+        logger.info('Rolling back filespace changes ...')
         operations = []
         for seg in self.segments:
             logger.debug('Creating RemoteOperation for segment %s' % seg)
@@ -842,19 +842,19 @@ class RollBackFilespaceChanges(Operation):
             if self.file_type == FileType.TRANSACTION_FILES:
                 #Move from new -> cur
                 operations.append(RemoteOperation(MoveTransFilespaceLocally(self.new_filespace_entries[seg.getSegmentDbId()],
-                                                                  self.cur_filespace_name, 
-                                                                  self.cur_filespace_entries[seg.getSegmentDbId()], 
+                                                                  self.cur_filespace_name,
+                                                                  self.cur_filespace_entries[seg.getSegmentDbId()],
                                                                   peer_filespace_entry,
                                                                   self.pg_system_filespace_entries[seg.getSegmentDbId()],
                                                                   rollback=True
                                                                            ),
                                  seg.getSegmentHostName()
                                                  ),
-                                 ) 
+                                 )
             elif self.file_type == FileType.TEMPORARY_FILES:
                 operations.append(RemoteOperation(MoveTempFilespaceLocally(self.new_filespace_entries[seg.getSegmentDbId()],
-                                                                  self.cur_filespace_name, 
-                                                                  self.cur_filespace_entries[seg.getSegmentDbId()], 
+                                                                  self.cur_filespace_name,
+                                                                  self.cur_filespace_entries[seg.getSegmentDbId()],
                                                                   peer_filespace_entry,
                                                                   self.pg_system_filespace_entries[seg.getSegmentDbId()],
                                                                   rollback=True
@@ -865,8 +865,8 @@ class RollBackFilespaceChanges(Operation):
 
         logger.debug('Running remote operations in parallel')
         ParallelOperation(operations, NUM_WORKERS).run()
-       
-        logger.debug('Checking results of parallel operations') 
+
+        logger.debug('Checking results of parallel operations')
         for operation in operations:
             operation.get_ret()
 
@@ -894,11 +894,11 @@ class GetMoveOperationList(Operation):
             peer_filespace_entry = get_peer_filespace_entry(self.new_filespace_entries, seg.getSegmentDbId(), seg.getSegmentContentId(), self.segments)
             if self.file_type == FileType.TRANSACTION_FILES:
                 operations.append(RemoteOperation(MoveTransFilespaceLocally(self.cur_filespace_entries[seg.getSegmentDbId()],
-                                                                     self.new_filespace_name, 
-                                                                     self.new_filespace_entries[seg.getSegmentDbId()], 
+                                                                     self.new_filespace_name,
+                                                                     self.new_filespace_entries[seg.getSegmentDbId()],
                                                                      peer_filespace_entry,
                                                                      self.pg_system_filespace_entries[seg.getSegmentDbId()]
-                                                  ), 
+                                                  ),
                                                   seg.getSegmentHostName()))
             elif self.file_type == FileType.TEMPORARY_FILES:
                 operations.append(RemoteOperation(MoveTempFilespaceLocally(self.cur_filespace_entries[seg.getSegmentDbId()],
@@ -912,9 +912,9 @@ class GetMoveOperationList(Operation):
 
 class MoveFilespace(Operation):
     """
-        Main class which configures the database to use a custom filespace 
+        Main class which configures the database to use a custom filespace
         for temporary and transaction files.
-    """  
+    """
 
     def __init__(self, new_filespace_name, file_type, user, pswd):
         self.user = user
@@ -937,7 +937,7 @@ class MoveFilespace(Operation):
         if cmd.get_results().rc != 0:
             logger.error('Failed to stop Greenplum Database in master only mode.')
             cmd.validate()
-        
+
     def start_database(self):
         logger.info('Starting Greenplum Database')
         cmd = GpStart('Start Greenplum Database')
@@ -946,7 +946,7 @@ class MoveFilespace(Operation):
             logger.error('Failed to start Greenplum Database.')
             cmd.validate()
 
-    def stop_database(self): 
+    def stop_database(self):
         logger.info('Stopping Greenplum Database')
         cmd = GpStop('Stop Greenplum Databse')
         cmd.run()
@@ -960,7 +960,7 @@ class MoveFilespace(Operation):
             logger.info('Database was started in %s mode' % mode)
         except Exception, e:
             logger.info('Database might already be stopped.')
-            return True 
+            return True
 
         return False
 
@@ -969,7 +969,7 @@ class MoveFilespace(Operation):
         try:
             #Disable Ctrl+C
             signal.signal(signal.SIGINT,signal.SIG_IGN)
-    
+
             #StopGPDB - Check for GPDB connections first and fail if connections exist
             if not self.check_database_stopped():
                 self.stop_database()
@@ -982,15 +982,15 @@ class MoveFilespace(Operation):
             self.start_master_only()
 
             try:
-                
+
                 if not CheckSuperUser(dbconn.DbURL(username=self.user, password=self.pswd)).run():
-                    raise MoveFilespaceError('gpfilespace requires database superuser privileges.')  
-                
+                    raise MoveFilespaceError('gpfilespace requires database superuser privileges.')
+
                 gparray = GpArray.initFromCatalog(dbconn.DbURL(), utility=True)
 
                 #CheckFilespace - Check if new filespace exists
                 if not CheckFilespace(self.new_filespace_name).run():
-                    raise MoveFilespaceError('Filespace %s does not exist' % self.new_filespace_name) 
+                    raise MoveFilespaceError('Filespace %s does not exist' % self.new_filespace_name)
 
                 #CheckFilespaceIsSame - Check if filespace is different from the old one
                 if CheckFilespaceIsSame(gparray, self.new_filespace_name, self.file_type).run():
@@ -999,7 +999,7 @@ class MoveFilespace(Operation):
                 #Bring GPDB Offline
                 self.stop_master_only()
                 #Restart the database
-                self.start_database()                 
+                self.start_database()
                 raise
 
             #Bring GPDB Offline
@@ -1009,14 +1009,14 @@ class MoveFilespace(Operation):
                 raise MoveFilespaceError('Database state is invalid.')
 
             if not CheckConnectivity(gparray).run():
-                raise MoveFilespaceError('Failed connectivity test') 
- 
+                raise MoveFilespaceError('Failed connectivity test')
+
             logger.info('Obtaining current filespace information')
             #Find the filespace directory used for each segment
             #query using pg_filespace, pg_filespace_entry, gp_segment_configuration
-            #If gp_transaction/temporary flat files exist and is not empty, then we know 
-            #the filespace being used. Otherwise, we assume that it is the pg_system 
-            #filespace by default 
+            #If gp_transaction/temporary flat files exist and is not empty, then we know
+            #the filespace being used. Otherwise, we assume that it is the pg_system
+            #filespace by default
 
             cur_filespace_entries = GetFilespaceEntriesDict(GetCurrentFilespaceEntries(gparray,
                                                                                self.file_type).run()).run()
@@ -1024,11 +1024,11 @@ class MoveFilespace(Operation):
                                                                         self.new_filespace_name).run()).run()
             pg_system_filespace_entries = GetFilespaceEntriesDict(GetFilespaceEntries(gparray,
                                                                               PG_SYSTEM_FILESPACE).run()).run()
- 
+
             cur_filespace_name = gparray.getFileSpaceName(int(cur_filespace_entries[1][0]))
 
             logger.info('Obtaining segment information ...')
-            segments = gparray.getDbList() 
+            segments = gparray.getDbList()
 
             #MoveTemp/Trans files
 
@@ -1056,10 +1056,91 @@ class MoveFilespace(Operation):
                     RollBackFilespaceChanges(segments, self.file_type, cur_filespace_name, cur_filespace_entries, new_filespace_entries, pg_system_filespace_entries).run()
                 except Exception, e:
                     raise MoveFilespaceError('Rollback Failed !')
-        
+
             #Bring GPDB online in normal mode
             self.start_database()
 
         finally:
             #Enable Ctrl+C
             signal.signal(signal.SIGINT,signal.default_int_handler)
+
+class CreateTempDirectories(Operation):
+    def __init__(self, data_dir):
+        self.directories_file = os.path.join(data_dir, 'gp_temporary_files_directories')
+        self.created_path_history = {}
+
+    def execute(self):
+        # The temp directories file does not exist, nothing to do
+        if not os.path.exists(self.directories_file):
+            logger.info('temporary directory is set to default path')
+            return True
+
+        logger.info('create temporary directories recorded in %s' % self.directories_file)
+        try:
+            with open(self.directories_file) as file:
+                for line in file:
+                    path = line.strip()
+                    # check the parent directories' permission
+                    if os.path.exists(path):
+                        raise OSError('create temporary directory failed for %s(path already exists)' % path)
+                    MakeDirectory.local('create temporary direcotry', path)
+                    self.created_path_history[path] = True
+
+        except Exception, e:
+            logger.error('create temporary directory failed.  %s' % str(e))
+            # cleanup the work, don't complain if this is an OSError.
+            for path in self.created_path_history:
+                try:
+                    if self.created_path_history[path]:
+                        RemoveFiles.local('remove temporary directory', path)
+                except Exception, e:
+                    logger.error('temporary directory cannot be removed. %s' % str(e))
+            return e
+
+        return True
+
+class DeleteTempDirectories(Operation):
+    def __init__(self, data_dir):
+        self.directories_file = os.path.join(data_dir, 'gp_temporary_files_directories')
+
+    def execute(self):
+        ret = True
+        # The temp directories file does not exist, nothing to do
+        if not os.path.exists(self.directories_file):
+            logger.info('temporary directory is set to default path')
+            return True
+
+        logger.info('remove temporary directories recorded in %s' % self.directories_file)
+        with open(self.directories_file) as file:
+            for line in file:
+                path = line.strip()
+                try:
+                    RemoveFiles.local('temporary directory cleanup', path)
+                except Exception, e:
+                    logger.error('remove temporary directory failed. %s' % str(e))
+                    # return the exception
+                    ret = e
+
+        return ret
+
+def create_temporary_directories(host, dir):
+    logger.info('Try to create temporary directories')
+    op = RemoteOperation(CreateTempDirectories(dir), host)
+    op.run()
+
+    try:
+        op.get_ret()
+    except Exception, e:
+        logger.error('create temporary directory failed. %s' % str(e))
+        raise e
+
+def remove_temporary_directories(host, dir):
+    logger.info('Try to remove temporary directories')
+    op = RemoteOperation(DeleteTempDirectories(dir), host)
+    op.run()
+
+    try:
+        op.get_ret()
+    except Exception, e:
+        logger.error('remove temporary directory failed. %s' % str(e))
+        raise e

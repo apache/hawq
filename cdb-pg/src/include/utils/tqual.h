@@ -117,7 +117,7 @@ typedef struct SharedSnapshotSlot
 	uint32			combocidcnt;
 	ComboCidKeyData combocids[MaxComboCids];
 	SnapshotData	snapshot;
-
+	char			*session_temporary_directory;	/* pointer to pmModuleState! */
 } SharedSnapshotSlot;
 
 extern volatile SharedSnapshotSlot *SharedLocalSnapshotSlot;

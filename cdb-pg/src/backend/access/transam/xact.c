@@ -4233,6 +4233,10 @@ AbortTransaction(void)
 		cleanupIdleReaderGangs();
 	}
 
+	/* Cleanup temporary directory. */
+	if (Gp_is_writer)
+		TemporaryDirectorySanityCheck(getCurrentTempFilePath, 0, true);
+
 	/* If memprot decides to kill process, make sure we destroy all processes
 	 * so that all mem/resource will be freed
 	 */

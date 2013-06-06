@@ -7482,8 +7482,6 @@ StartupXLOG_Pass4(void)
 	
 	PersistentFileSysObj_DoGlobalSequenceScan();
 
-	Insist(isFilespaceInfoConsistent());
-
 	ereport(LOG,
 			(errmsg("Finished startup integrity checking")));
 
