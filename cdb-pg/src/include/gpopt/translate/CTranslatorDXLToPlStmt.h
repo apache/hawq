@@ -149,10 +149,6 @@ namespace gpdxl
 					const ULONG ulTotalPrimaries
 					);
 
-			// test if the external table custom protocol is a HADOOP protocol - gpxf
-			static
-			BOOL FGpxf(Uri *pUri);
-
 			// segment mapping for tables with EXECUTE 'cmd' ON.
 			void MapLocationsExecute
 					(

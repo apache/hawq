@@ -465,6 +465,9 @@ namespace gpdb {
 	// parse external table URI
 	Uri *PuriParseExternalTable(const char *szUri);
 	
+	// check if the given uri is a HADOOP protocol - pxf
+	bool FPxfProtocol(Uri *pUri);
+
 	// returns ComponentDatabases
 	CdbComponentDatabases *PcdbComponentDatabases(void);
 

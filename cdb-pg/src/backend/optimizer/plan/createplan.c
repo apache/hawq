@@ -41,7 +41,6 @@
 #include "parser/parsetree.h"
 #include "parser/parse_oper.h"     /* ordering_oper_opid */
 #include "utils/lsyscache.h"
-#include "utils/uri.h"
 
 #include "cdb/cdbgroup.h"       /* adapt_flow_to_targetlist() */
 #include "cdb/cdblink.h"        /* getgphostCount() */
@@ -173,7 +172,6 @@ static Sort *make_sort(PlannerInfo *root, Plan *lefttree, int numCols,
 		  AttrNumber *sortColIdx, Oid *sortOperators);
 
 static List *flatten_grouping_list(List *groupcls);
-static bool is_pxf_protocol(Uri *uri);
 static int pxf_calc_max_participants_allowed(int total_segments);
 
 /*
@@ -1113,7 +1111,7 @@ create_aocsscan_plan(CreatePlanContext *ctx, Path *best_path,
  * is_pxf_protocol
  * tests if the external table custom protocol is an HADOOP protocol - pxf
  */
-static bool is_pxf_protocol(Uri *uri)
+bool is_pxf_protocol(Uri *uri)
 {	
 	if (uri->protocol != URI_CUSTOM || uri->customprotocol == NULL)
 		return false;

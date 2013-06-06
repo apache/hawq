@@ -495,28 +495,6 @@ CTranslatorDXLToPlStmt::MapLocationsFile
 
 //---------------------------------------------------------------------------
 //	@function:
-//		CTranslatorDXLToPlStmt::FGpxf
-//
-//	@doc:
-// 		Test if the external table custom protocol is a HADOOP protocol - gpxf
-//
-//---------------------------------------------------------------------------
-BOOL
-CTranslatorDXLToPlStmt::FGpxf
-	(
-	Uri *pUri
-	)
-{
-	if (URI_CUSTOM != pUri->protocol || NULL == pUri->customprotocol)
-	{
-		return false;
-	}
-
-	return (0 == gpos::clib::IStrCmp(pUri->customprotocol, "gpxf"));
-}
-
-//---------------------------------------------------------------------------
-//	@function:
 //		CTranslatorDXLToPlStmt::MapLocationsFdist
 //
 //	@doc:
@@ -541,10 +519,10 @@ CTranslatorDXLToPlStmt::MapLocationsFdist
 	ULONG ulMaxParticipants = ulParticipatingSegments;
 	const ULONG ulLocations = pmdrelext->UlLocations();
 
-	if (FGpxf(pUri))
+	if (gpdb::FPxfProtocol(pUri))
 	{
-		// TODO: elhela - May 22, 2013; add proper translation for gpxf
-		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiDXL2PlStmtConversion, GPOS_WSZ_LIT("GPXF external tables"));
+		// TODO: elhela - May 22, 2013; add proper translation for pxf
+		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiDXL2PlStmtConversion, GPOS_WSZ_LIT("PXF external tables"));
 	}
 
 	if (URI_GPFDIST == pUri->protocol || URI_GPFDISTS == pUri->protocol)

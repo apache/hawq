@@ -34,6 +34,7 @@ extern "C" {
 #include "utils/datum.h"
 #include "utils/array.h"
 #include "optimizer/walkers.h"
+#include "optimizer/planmain.h"
 #include "parser/parse_expr.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_exttable.h"

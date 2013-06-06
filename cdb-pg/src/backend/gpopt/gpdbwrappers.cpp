@@ -160,6 +160,7 @@
 #define ALLOW_makeNullConst
 #define ALLOW_coerce_to_common_type
 #define ALLOW_resolve_generic_type
+#define ALLOW_is_pxf_protocol
 
 #include "gpopt/utils/gpdbdefs.h"
 
@@ -2238,6 +2239,20 @@ gpdb::PuriParseExternalTable
 	}
 	GP_WRAP_END;
 	return NULL;
+}
+
+bool
+gpdb::FPxfProtocol
+	(
+	Uri *pUri
+	)
+{
+	GP_WRAP_START;
+	{
+		return is_pxf_protocol(pUri);
+	}
+	GP_WRAP_END;
+	return false;
 }
 
 CdbComponentDatabases *

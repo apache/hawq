@@ -18,6 +18,7 @@
 #include "nodes/plannodes.h"
 #include "nodes/relation.h"
 #include "optimizer/clauses.h" /* AggClauseCounts */
+#include "utils/uri.h"
 
 /* GUC parameters */
 #define DEFAULT_CURSOR_TUPLE_FRACTION 1.0 /* assume all rows will be fetched */
@@ -128,6 +129,7 @@ extern Plan *add_repeat_node(Plan *result_plan, int repeat_count, uint64 groupin
  * prototypes for plan/createplan.c
  */
 extern Plan *create_plan(PlannerInfo *root, Path *path);
+extern bool is_pxf_protocol(Uri *uri);
 extern SubqueryScan *make_subqueryscan(PlannerInfo *root, List *qptlist, List *qpqual,
 				  Index scanrelid, Plan *subplan, List *subrtable);
 extern Append *make_append(List *appendplans, bool isTarget, List *tlist);
