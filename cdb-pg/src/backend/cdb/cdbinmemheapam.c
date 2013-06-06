@@ -1,7 +1,7 @@
 /*-------------------------------------------------------------------------
  *
  * cdbinmemheapam.c
- *	  goh in-memory heap table access method
+ * goh in-memory heap table access method
  *
  * Copyright (c) 2007-2013, Greenplum inc
  *
@@ -18,7 +18,9 @@
 #include "nodes/memnodes.h"
 #include "nodes/parsenodes.h"
 #include "storage/lock.h"
+#include "utils/fmgroids.h"
 #include "utils/hsearch.h"
+
 
 
 HTAB *OidInMemHeapMapping = NULL;
@@ -210,19 +212,47 @@ InMemHeap_BeginScan(InMemHeapRelation memheap, int nkeys,
     scan->rs_rd = memheap;
     scan->rs_nkeys = nkeys;
     scan->rs_index = -1;
-
+    
     if (nkeys > 0)
         scan->rs_key = (ScanKey) palloc(sizeof(ScanKeyData) * nkeys);
     else
         scan->rs_key = NULL;
-
+ 
     if (key != NULL )
         memcpy(scan->rs_key, key, scan->rs_nkeys * sizeof(ScanKeyData));
 
     if (!inmemonly && scan->rs_rd->rel)
-        scan->hscan = heap_beginscan(scan->rs_rd->rel, SnapshotNow,
-                scan->rs_nkeys, scan->rs_key);
+    {
+         /*
+         * GPSQL-483, GPSQL-486
+         *
+         * When a QE exists on the master, we still want to
+         * leverage metadata that was extracted for query execution via metadata dispatch.
+         * (Otherwise, we'd have to reintroduce snapshot propagation for some sort of
+         * bastardized DTM that exists to coordinate the dispatcher with a master QE.) 
+         * In leveraging dispatched metadata on a master QE, we also need to ensure that
+         * we can't read duplicate metadata from the heap itself. To accomplish this,
+         * we constrain the fallback heap scan to only metadata which could not have
+         * been dispatched, namely the builtin catalog data. Thus, we add
+         * OID < FirstNormalOid to the scan key. 
+         */
 
+        int heap_nkeys = nkeys + 1;
+        ScanKey heap_key = (ScanKey) palloc0(sizeof(ScanKeyData) * heap_nkeys);
+        /* Copy the given input keys */
+        if (key != NULL)
+        {
+           memcpy(heap_key, key, nkeys * sizeof(ScanKeyData));
+        }
+
+        ScanKeyInit(&heap_key[heap_nkeys -1],
+                    ObjectIdAttributeNumber,
+                    BTLessStrategyNumber, F_OIDLT,
+                    ObjectIdGetDatum(FirstNormalObjectId));
+
+        scan->hscan = heap_beginscan(scan->rs_rd->rel, SnapshotNow,
+                heap_nkeys, heap_key);
+    }
     return scan;
 }
 
