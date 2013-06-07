@@ -483,6 +483,8 @@ def create_standby(options):
                                            standby_filespace_map)
         else:
             logger.info('-n option given, skipping catalog update')
+            remove_temporary_directories(array.standbyMaster.getSegmentHostName(),
+                                         array.standbyMaster.getSegmentDataDirectory())
             
         copy_master_filespaces_to_standby(options, array,
                                           master_filespace_map,
