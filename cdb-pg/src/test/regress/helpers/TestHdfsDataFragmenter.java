@@ -8,8 +8,8 @@ import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 
-import com.pivotal.pxf.fragmenters.BaseDataFragmenter;
-import com.pivotal.pxf.fragmenters.FragmentInfo;
+import com.pivotal.pxf.fragmenters.Fragmenter;
+import com.pivotal.pxf.fragmenters.FragmentsOutput;
 import com.pivotal.pxf.utilities.BaseMetaData;
 import com.pivotal.pxf.utilities.GPFusionInputFormat;
 
@@ -21,7 +21,7 @@ import com.pivotal.pxf.utilities.GPFusionInputFormat;
  * divide the data into fragments and return a list of them along with
  * a list of host:port locations for each.
  */
-public class TestHdfsDataFragmenter extends BaseDataFragmenter
+public class TestHdfsDataFragmenter extends Fragmenter
 {	
 	private	JobConf jobConf;
 	private Log Log;
@@ -42,7 +42,7 @@ public class TestHdfsDataFragmenter extends BaseDataFragmenter
 	 * name, a directory name  or a wildcard returns the data 
 	 * fragments in json format
 	 */	
-	public void GetFragmentInfos(String datapath) throws Exception
+	public FragmentsOutput GetFragments(String datapath) throws Exception
 	{
 		Path	path = new Path("/" + datapath); //yikes! any better way?		
 
@@ -60,15 +60,11 @@ public class TestHdfsDataFragmenter extends BaseDataFragmenter
 			
 			String filepath = fsp.getPath().toUri().getPath();
 			filepath = filepath.substring(1); // hack - remove the '/' from the beginning - we'll deal with this next 
-			FragmentInfo fi = new FragmentInfo(filepath,
-					fsp.getLocations());
-
-			fragmentInfos.add(fi);
+			
+			fragments.addFragment(filepath, fsp.getLocations());
 		}
 		
-		//print the raw fragment list to log when in debug level
-		Log.debug(FragmentInfo.listToString(fragmentInfos, path.toString()));
-		
+		return fragments;
 	}
 	
 	private InputSplit[] getSplits(Path path) throws IOException 
