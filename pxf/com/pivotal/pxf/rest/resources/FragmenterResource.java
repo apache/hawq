@@ -19,6 +19,8 @@ import org.apache.commons.logging.LogFactory;
 
 import com.pivotal.pxf.fragmenters.Fragmenter;
 import com.pivotal.pxf.fragmenters.FragmenterFactory;
+import com.pivotal.pxf.fragmenters.FragmentsOutput;
+import com.pivotal.pxf.fragmenters.FragmentsResponseFormatter;
 import com.pivotal.pxf.utilities.BaseMetaData;
 
 /*
@@ -60,8 +62,9 @@ public class FragmenterResource
 		/* Convert headers into a regular map */
 		Map<String, String> params = convertToRegularMap(headers.getRequestHeaders());
 		final Fragmenter fragmenter = FragmenterFactory.create(new BaseMetaData(params));
-		
-		String jsonOutput = fragmenter.GetFragments(path);
+
+		FragmentsOutput fragments = fragmenter.GetFragments(path);
+		String jsonOutput = FragmentsResponseFormatter.formatResponseString(fragments, path);		
 		
 		return Response.ok(jsonOutput, MediaType.APPLICATION_JSON_TYPE).build();
 	}

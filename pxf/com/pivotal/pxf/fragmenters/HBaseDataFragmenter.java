@@ -17,10 +17,10 @@ import com.pivotal.pxf.utilities.BaseMetaData;
  *
  * Extends the Fragmenter abstract class, with the purpose of transforming
  * an input data path (an HBase table name in this case) into a list of regions
- * that belong to this table. The result is a list of FragmentInfo objects, 
- * serialized in JSON.
+ * that belong to this table. The result is a FragmentsOutput object, 
+ * to be serialized in JSON.
  */
-public class HBaseDataFragmenter extends BaseDataFragmenter
+public class HBaseDataFragmenter extends Fragmenter
 {		
 	private Log Log;
 
@@ -30,7 +30,7 @@ public class HBaseDataFragmenter extends BaseDataFragmenter
 		Log = LogFactory.getLog(HBaseDataFragmenter.class);
 	}
 
-	public void GetFragmentInfos(String datapath) throws Exception
+	public FragmentsOutput GetFragments(String datapath) throws Exception
 	{
 
 		//get a handle on the table by passing a table name
@@ -47,14 +47,14 @@ public class HBaseDataFragmenter extends BaseDataFragmenter
 			String sourceName = datapath;
 			String[] hosts = new String[] {svrname.getHostname()};
 			
-			fragmentInfos.add(new FragmentInfo(sourceName, hosts));
+			fragments.addFragment(sourceName, hosts);
 		}
 
 		//free table resources
 		t.close();
 		
-		//print the raw fragment list to log when in debug level
-		Log.debug(FragmentInfo.listToString(fragmentInfos, datapath));
+        return fragments;
+
 
 	}
 }

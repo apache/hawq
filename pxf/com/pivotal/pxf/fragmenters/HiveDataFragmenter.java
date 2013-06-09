@@ -42,7 +42,7 @@ import com.pivotal.pxf.utilities.BaseMetaData;
  * b. hosts: a list of the datanode machines that hold a replica of this block
  * c. userData: file_input_format_name_DELIM_serde_name_DELIM_serialization_properties
  */
-public class HiveDataFragmenter extends BaseDataFragmenter
+public class HiveDataFragmenter extends Fragmenter
 {	
 	private	JobConf jobConf;
 	HiveClient client;
@@ -113,7 +113,7 @@ public class HiveDataFragmenter extends BaseDataFragmenter
 	 * name, a directory name  or a wildcard returns the data 
 	 * fragments in json format
 	 */	
-	public void GetFragmentInfos(String qualifiedTableName) throws Exception
+	public FragmentsOutput GetFragments(String qualifiedTableName) throws Exception
 	{
 		TblDesc tblDesc = parseTableQualifiedName(qualifiedTableName);
 		if (tblDesc == null) 
@@ -121,8 +121,7 @@ public class HiveDataFragmenter extends BaseDataFragmenter
 		
 		fetchTableMetaData(tblDesc);		
 
-		//print the raw fragment list to log when in debug level
-		Log.debug(FragmentInfo.listToString(fragmentInfos, qualifiedTableName));		
+		return fragments;
 	}
 	
 	/* Initialize the Hive client */
@@ -234,10 +233,7 @@ public class HiveDataFragmenter extends BaseDataFragmenter
 			String filepath = fsp.getPath().toUri().getPath();
 			filepath = filepath.substring(1); // TODO - remove the '/' from the beginning - will deal with this next 
 			
-			FragmentInfo fi = new FragmentInfo(filepath,
-											   fsp.getLocations());
-			fi.setUserData(makeUserData(tablePartition));
-			fragmentInfos.add(fi);
+			fragments.addFragment(filepath, fsp.getLocations(), makeUserData(tablePartition));
 		}
 	}
 	

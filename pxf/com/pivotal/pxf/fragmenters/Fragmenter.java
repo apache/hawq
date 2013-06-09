@@ -11,15 +11,18 @@ import com.pivotal.pxf.utilities.Plugin;
  */
 public abstract class Fragmenter extends Plugin
 {
+	protected FragmentsOutput fragments;
+	
 	public Fragmenter(BaseMetaData metaData)
 	{
 		super(metaData);
+		fragments = new FragmentsOutput();
 	}
 	
 	/*
 	 * path is a data source URI that can appear as a file name, a directory name  or a wildcard
-	 * returns the data fragments in json format
+	 * returns the data fragments
 	 */
-	public abstract String GetFragments(String data) throws Exception;
+	public abstract FragmentsOutput GetFragments(String data) throws Exception;
 	
 }
