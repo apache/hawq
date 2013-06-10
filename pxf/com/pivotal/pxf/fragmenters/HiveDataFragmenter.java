@@ -20,6 +20,7 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.TableType;
 
+import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -30,7 +31,7 @@ import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 
-import com.pivotal.pxf.utilities.BaseMetaData;
+import com.pivotal.pxf.utilities.InputData;
 
 /*
  * Fragmenter class for a HIVE table
@@ -51,7 +52,6 @@ public class HiveDataFragmenter extends Fragmenter
 	public static final String HIVE_USER_DATA_DELIM = "hive_usr_delim";
 	public static final String HIVE_ONE_PARTITION_DELIM = "hive_one_partition_delim";
 	public static final String HIVE_PARTITIONS_DELIM = "hive_partitions_delim";
-	public static final String HIVE_LINEFEED_REPLACE = "hive_linefeed_replace";
 	public static final String HIVE_TABLE_WITHOUT_PARTITIONS = "hive_table_without_partitions";
 	public static final int TODO_REMOVE_THIS_CONST = 1000; 
 	
@@ -99,7 +99,7 @@ public class HiveDataFragmenter extends Fragmenter
 	/*
 	 * C'tor
 	 */
-	public HiveDataFragmenter(BaseMetaData md) throws TTransportException
+	public HiveDataFragmenter(InputData md) throws TTransportException
 	{
 		super(md);
 		Log = LogFactory.getLog(HiveDataFragmenter.class);
@@ -113,11 +113,11 @@ public class HiveDataFragmenter extends Fragmenter
 	 * name, a directory name  or a wildcard returns the data 
 	 * fragments in json format
 	 */	
-	public FragmentsOutput GetFragments(String qualifiedTableName) throws Exception
+	public FragmentsOutput GetFragments() throws Exception
 	{
-		TblDesc tblDesc = parseTableQualifiedName(qualifiedTableName);
+		TblDesc tblDesc = parseTableQualifiedName(inputData.tableName());
 		if (tblDesc == null) 
-			throw new IllegalArgumentException(qualifiedTableName + " is not a valid Hive table name. Should be either <table_name> or <db_name.table_name>");
+			throw new IllegalArgumentException(inputData.tableName() + " is not a valid Hive table name. Should be either <table_name> or <db_name.table_name>");
 		
 		fetchTableMetaData(tblDesc);		
 
@@ -288,7 +288,7 @@ public class HiveDataFragmenter extends Fragmenter
 		return partitionKeys;
 	}
 	
-	private String makeUserData(HiveTablePartition partData) throws Exception
+	private byte[] makeUserData(HiveTablePartition partData) throws Exception
 	{
 		String inputFormatName = partData.storageDesc.getInputFormat();
 		String serdeName = partData.storageDesc.getSerdeInfo().getSerializationLib();
@@ -299,12 +299,7 @@ public class HiveDataFragmenter extends Fragmenter
 		                  propertiesString + HIVE_USER_DATA_DELIM +
 						  partionKeys;
 		
-		/*
-		 * we replace the LINEFEED, since Jetty will treat wrong this message once it will receive it from the GP Segment.
-		 * Jetty will remove all data coming after \n. So we replace all "\n" instances here and return them back in 
-		 * BridgeResource, once we passed the Jetty framework. The "\n" occurrences are embedded inside the propertiesString.
-		 */
-		return userData.replaceAll("\n", HIVE_LINEFEED_REPLACE);
+		return userData.getBytes();
 	}
 	
 }

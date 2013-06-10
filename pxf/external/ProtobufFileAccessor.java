@@ -10,7 +10,7 @@ import com.google.protobuf.Descriptors.DescriptorValidationException;
 import com.google.protobuf.DynamicMessage;
 import com.pivotal.pxf.accessors.HdfsAtomicDataAccessor;
 import com.pivotal.pxf.format.OneRow;
-import com.pivotal.pxf.utilities.HDFSMetaData;
+import com.pivotal.pxf.utilities.InputData;
 
 /*
  * Specialization of HdfsAtomicDataAccessor for protocol-buffer files
@@ -28,15 +28,15 @@ public class ProtobufFileAccessor extends HdfsAtomicDataAccessor
 	/*
 	 * C'tor
 	 */ 	
-	public ProtobufFileAccessor(HDFSMetaData meta) throws Exception
+	public ProtobufFileAccessor(InputData inputData) throws Exception
 	{
-		super(meta);		
-		protoFile = meta.srlzSchemaName();
+		super(inputData);		
+		protoFile = inputData.srlzSchemaName();
 		
 		// containerMessage is the name of a Message class in protocol-buffer that acts as 
 		// a container to the records - where all records are of the same message type (different
 		// type than the containerMessage).
-		// Normally, this value should be received as a parameter from the the HDFSMetaData.
+		// Normally, this value should be received as a parameter from the the InputData.
 		// We supply it hardcoded as a temporary solution, until there will be a mechanism  for 
 		// transferring additional parameters between the backend and the HDFSReader
 		containerMsg = "People";

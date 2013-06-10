@@ -4,7 +4,7 @@ import java.util.List;
 
 import com.pivotal.pxf.format.OneField;
 import com.pivotal.pxf.format.OneRow;
-import com.pivotal.pxf.utilities.BaseMetaData;
+import com.pivotal.pxf.utilities.InputData;
 import com.pivotal.pxf.utilities.Plugin;
 
 /*
@@ -14,7 +14,7 @@ import com.pivotal.pxf.utilities.Plugin;
  */
 public abstract class Resolver extends Plugin
 {
-	public Resolver(BaseMetaData metaData)
+	public Resolver(InputData metaData)
 	{
 		super(metaData);
 	}

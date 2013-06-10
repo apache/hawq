@@ -1,6 +1,6 @@
 package com.pivotal.pxf.fragmenters;
 
-import com.pivotal.pxf.utilities.BaseMetaData;
+import com.pivotal.pxf.utilities.InputData;
 import com.pivotal.pxf.utilities.Plugin;
 
 /*
@@ -13,7 +13,7 @@ public abstract class Fragmenter extends Plugin
 {
 	protected FragmentsOutput fragments;
 	
-	public Fragmenter(BaseMetaData metaData)
+	public Fragmenter(InputData metaData)
 	{
 		super(metaData);
 		fragments = new FragmentsOutput();
@@ -23,6 +23,6 @@ public abstract class Fragmenter extends Plugin
 	 * path is a data source URI that can appear as a file name, a directory name  or a wildcard
 	 * returns the data fragments
 	 */
-	public abstract FragmentsOutput GetFragments(String data) throws Exception;
+	public abstract FragmentsOutput GetFragments() throws Exception;
 	
 }

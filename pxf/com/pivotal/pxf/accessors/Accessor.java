@@ -1,7 +1,7 @@
 package com.pivotal.pxf.accessors;
 
 import com.pivotal.pxf.format.OneRow;
-import com.pivotal.pxf.utilities.BaseMetaData;
+import com.pivotal.pxf.utilities.InputData;
 import com.pivotal.pxf.utilities.Plugin;
 
 /*
@@ -11,7 +11,7 @@ import com.pivotal.pxf.utilities.Plugin;
  */
 public abstract class Accessor extends Plugin
 {
-	public Accessor(BaseMetaData metaData)
+	public Accessor(InputData metaData)
 	{
 		super(metaData);
 	}

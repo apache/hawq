@@ -1,5 +1,6 @@
 package com.pivotal.pxf.filtering;
 
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.filter.BinaryComparator;
 import org.apache.hadoop.hbase.filter.CompareFilter;
 import org.apache.hadoop.hbase.filter.Filter;
@@ -8,15 +9,14 @@ import org.apache.hadoop.hbase.filter.RowFilter;
 import org.apache.hadoop.hbase.filter.SingleColumnValueFilter;
 import org.apache.hadoop.hbase.filter.WritableByteArrayComparable;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.hadoop.hbase.HConstants;
 
 import com.pivotal.pxf.hadoop.io.GPDBWritable;
 import com.pivotal.pxf.hbase.IntegerComparator;
 import com.pivotal.pxf.utilities.HBaseColumnDescriptor;
-import com.pivotal.pxf.utilities.HBaseMetaData;
+import com.pivotal.pxf.utilities.HBaseTupleDescription;
 
-import java.util.Map;
 import java.util.HashMap;
+import java.util.Map;
 
 /*
  * This is the implementation of IFilterEvaluator for HBase.
@@ -30,25 +30,25 @@ import java.util.HashMap;
  *
  * HBase row key column is a special case
  * If the user defined row key column as TEXT and used <,>,<=,>=,= operators
- * the startkey (>/>=) and the endkey (</<=) are stored in addition to 
+ * the startkey (>/>=) and the endkey (</<=) are stored in addition to
  * the created filter.
  *
- * This is an addition on top of regular filters and does not replace 
+ * This is an addition on top of regular filters and does not replace
  * any logic in HBase filter objects
  */
 public class HBaseFilterEvaluator implements FilterParser.IFilterEvaluator
 {
-	private HBaseMetaData conf;
 	private Map<FilterParser.Operation,CompareFilter.CompareOp> operatorsMap;
 	private byte[] startKey;
 	private byte[] endKey;
+	private HBaseTupleDescription tupleDescription;
 
-	public HBaseFilterEvaluator(HBaseMetaData configuration)
+	public HBaseFilterEvaluator(HBaseTupleDescription tupleDescription)
 	{
-		conf = configuration;
 		initOperatorsMap();
 		startKey = HConstants.EMPTY_START_ROW;
 		endKey = HConstants.EMPTY_END_ROW;
+		this.tupleDescription = tupleDescription;
 	}
 
 	/*
@@ -89,7 +89,7 @@ public class HBaseFilterEvaluator implements FilterParser.IFilterEvaluator
 
 	/*
 	 * Implemented for IFilterEvaluator interface
-	 * 
+	 *
 	 * Called each time the parser comes across an operator.
 	 */
 	public Object evaluate(FilterParser.Operation opId,
@@ -136,16 +136,16 @@ public class HBaseFilterEvaluator implements FilterParser.IFilterEvaluator
 										  FilterParser.ColumnIndex column,
 										  FilterParser.Constant constant) throws Exception
 	{
-		HBaseColumnDescriptor hbaseColumn = (HBaseColumnDescriptor)conf.getColumn(column.index());
+		HBaseColumnDescriptor hbaseColumn = tupleDescription.getColumn(column.index());
 		WritableByteArrayComparable comparator = getComparator(hbaseColumn.columnType(),
 															   constant.constant());
 
-		// If row key is of type TEXT, allow filter in start/stop row key API in 
+		// If row key is of type TEXT, allow filter in start/stop row key API in
 		// HBaseAccessor/Scan object
 		if (textualRowKey(hbaseColumn))
 			storeStartEndKeys(opId, constant.constant());
 
-		if (hbaseColumn.isRowColumn())
+		if (hbaseColumn.isKeyColumn())
 			return new RowFilter(operatorsMap.get(opId), comparator);
 
 		return new SingleColumnValueFilter(hbaseColumn.columnFamilyBytes(),
@@ -178,11 +178,11 @@ public class HBaseFilterEvaluator implements FilterParser.IFilterEvaluator
 		return result;
 	}
 
-	/* 
+	/*
 	 * Handle AND of already calculated expressions
 	 * Currently only AND, in the future OR can be added
 	 *
-	 * Four cases here: 
+	 * Four cases here:
 	 * 1) both are simple filters
 	 * 2) left is a FilterList and right is a filter
 	 * 3) left is a filter and right is a FilterList
@@ -216,16 +216,16 @@ public class HBaseFilterEvaluator implements FilterParser.IFilterEvaluator
 	 */
 	private boolean textualRowKey(HBaseColumnDescriptor column)
 	{
-		return column.isRowColumn() &&
+		return column.isKeyColumn() &&
 			   column.columnType() == GPDBWritable.TEXT;
 	}
 
-	/* 
-	 * Sets startKey/endKey and their inclusiveness 
+	/*
+	 * Sets startKey/endKey and their inclusiveness
 	 * according to the operation op
 	 *
 	 * TODO allow only one assignment to start/end key
-	 * currently, multiple calls to this function might change 
+	 * currently, multiple calls to this function might change
 	 * previous assignments
 	 */
 	private void storeStartEndKeys(FilterParser.Operation op, Object data)

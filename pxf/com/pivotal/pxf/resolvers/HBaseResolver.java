@@ -13,7 +13,8 @@ import com.pivotal.pxf.format.OneField;
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.hadoop.io.GPDBWritable;
 import com.pivotal.pxf.utilities.HBaseColumnDescriptor;
-import com.pivotal.pxf.utilities.HBaseMetaData;
+import com.pivotal.pxf.utilities.InputData;
+import com.pivotal.pxf.utilities.HBaseTupleDescription;
 
 /*
  * The Bridge API resolver for gphbase protocol.
@@ -25,16 +26,12 @@ import com.pivotal.pxf.utilities.HBaseMetaData;
  */
 public class HBaseResolver extends Resolver
 {
-	HBaseMetaData conf;
+	private HBaseTupleDescription tupleDescription;
 
-	public HBaseResolver(HBaseMetaData configuration) throws Exception
+	public HBaseResolver(InputData input) throws Exception
 	{
-		super(configuration);
-		/* 
-		 * The conf variable will be discarded once we remove all specialized MetaData classes and remain 
-		 * only with BaseMetaData which wholds the sequence of properties
-		 */
-		conf = (HBaseMetaData)this.getMetaData();
+		super(input);
+		tupleDescription = new HBaseTupleDescription(input);
 	}
 
 	public List<OneField> GetFields(OneRow onerow) throws Exception
@@ -42,12 +39,12 @@ public class HBaseResolver extends Resolver
 		Result result = (Result)onerow.getData();
 		LinkedList<OneField> row = new LinkedList<OneField>();
 
-		for (int i = 0; i < conf.columns(); ++i)
+		for (int i = 0; i < tupleDescription.columns(); ++i)
 		{
-			HBaseColumnDescriptor column = (HBaseColumnDescriptor)conf.getColumn(i);
+			HBaseColumnDescriptor column = tupleDescription.getColumn(i);
 			byte[] value;
 			
-			if (column.isRowColumn()) // if a row column is requested
+			if (column.isKeyColumn()) // if a row column is requested
 				value = result.getRow(); // just return the row key
 			else // else, return column value
 				value = getColumnValue(result, column);

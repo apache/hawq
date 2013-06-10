@@ -1,6 +1,6 @@
 package com.pivotal.pxf.filtering;
 
-import com.pivotal.pxf.utilities.HDFSMetaData;
+import com.pivotal.pxf.utilities.InputData;
 
 import java.util.List;
 import java.util.LinkedList;
@@ -14,11 +14,11 @@ import java.util.LinkedList;
  */
 public class HiveFilterEvaluator implements FilterParser.IFilterEvaluator
 {
-	private HDFSMetaData conf;
+	private InputData inputData;
 
-	public HiveFilterEvaluator(HDFSMetaData configuration)
+	public HiveFilterEvaluator(InputData input)
 	{
-		conf = configuration;
+		inputData = input;
 	}
 
 	/*

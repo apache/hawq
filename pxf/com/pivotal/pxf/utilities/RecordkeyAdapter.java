@@ -40,11 +40,11 @@ public class RecordkeyAdapter
 	 *  is an AvroFile then onerow.getKey() will always return null.
 	 */ 
 	public int appendRecordkeyField(List<OneField> recFields,
-												   HDMetaData conf,
+												   InputData input,
 												   OneRow onerow) throws NoSuchFieldException, IOException
 	{		
 		/* user did not request the recordkey field in the "create external table" statement */
-		ColumnDescriptor recordkeyColumn = conf.getRecordkeyColumn();
+		ColumnDescriptor recordkeyColumn = input.getRecordkeyColumn();
 		if (recordkeyColumn == null)
 			return 0;
 		

@@ -13,11 +13,11 @@ import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 
 import com.pivotal.pxf.accessors.Accessor;
-import com.pivotal.pxf.bridge.GPHdfsBridge;
-import com.pivotal.pxf.utilities.BaseMetaData;
+import com.pivotal.pxf.bridge.Bridge;
+import com.pivotal.pxf.utilities.InputData;
 import com.pivotal.pxf.utilities.GPFusionInputFormat;
-import com.pivotal.pxf.utilities.HDFSMetaData;
-import com.pivotal.pxf.utilities.HDMetaData;
+import com.pivotal.pxf.utilities.InputData;
+
 
 
 /*
@@ -27,16 +27,16 @@ import com.pivotal.pxf.utilities.HDMetaData;
  * return statistics about it (number of blocks, number of tuples, etc.)
  */
 public class HdfsAnalyzer extends Analyzer
-{	
+{
 	private	JobConf jobConf;
 	private FileSystem fs;
 	private DataSourceStatsInfo stats;
 	private Log Log;
-	
+
 	/*
 	 * C'tor
 	 */
-	public HdfsAnalyzer(BaseMetaData md) throws IOException
+	public HdfsAnalyzer(InputData md) throws IOException
 	{
 		super(md);
 		Log = LogFactory.getLog(HdfsAnalyzer.class);
@@ -44,26 +44,26 @@ public class HdfsAnalyzer extends Analyzer
 		jobConf = new JobConf(new Configuration(), HdfsAnalyzer.class);
 		fs = FileSystem.get(jobConf);
 	}
-	
+
 	/*
-	 * path is a data source URI that can appear as a file 
-	 * name, a directory name  or a wildcard returns the data 
+	 * path is a data source URI that can appear as a file
+	 * name, a directory name  or a wildcard returns the data
 	 * fragments in json format
-	 */	
+	 */
 	public String GetEstimatedStats(String datapath) throws Exception
 	{
 		long blockSize = 0;
 		long numberOfBlocks = 0;
-		
+
 		Path	path = new Path("/" + datapath); //yikes! any better way?
-		long numberOfTuplesInBlock = getNumberOfTuplesInBlock(); 
-		
+		long numberOfTuplesInBlock = getNumberOfTuplesInBlock();
+
 		InputSplit[] splits = getSplits(path);
-		
+
 		for (InputSplit split : splits)
-		{	
+		{
 			FileSplit fsp = (FileSplit)split;
-			
+
 			if (blockSize == 0) // blockSize wasn't updated yet
 			{
 				Path filePath = fsp.getPath();
@@ -74,31 +74,29 @@ public class HdfsAnalyzer extends Analyzer
 				}
 			}
 		}
-	
+
 		// if no file is in path (only dirs), get default block size
 		if (blockSize == 0)
 			blockSize = fs.getDefaultBlockSize();
 		numberOfBlocks = splits.length;
-		
+
 		stats = new DataSourceStatsInfo(blockSize, numberOfBlocks, numberOfTuplesInBlock*numberOfBlocks);
-		
+
 		//print files size to log when in debug level
 		Log.debug(DataSourceStatsInfo.dataToString(stats, path.toString()));
 
 		return DataSourceStatsInfo.dataToJSON(stats);
 	}
-	
+
 	/*
-	 * Calculate the number of tuples in a split (block) 
+	 * Calculate the number of tuples in a split (block)
 	 * Reads one block from HDFS. Exception during reading will
 	 * filter upwards and handled in AnalyzerResource
 	 */
 	private long getNumberOfTuplesInBlock() throws Exception
 	{
 		long tuples = -1; /* default  - if we are not able to read data */
-		
-		HDFSMetaData hdfsConf = new HDFSMetaData(new HDMetaData(this.getMetaData().getParametersMap()));
-		Accessor accessor = GPHdfsBridge.getFileAccessor(hdfsConf);		
+		Accessor accessor = Bridge.getFileAccessor(inputData);
 		if (accessor.Open());
 		{
 			tuples = 0;
@@ -107,15 +105,15 @@ public class HdfsAnalyzer extends Analyzer
 
 			accessor.Close();
 		}
-		
+
 		return tuples;
-	}	
-	
-	private InputSplit[] getSplits(Path path) throws IOException 
+	}
+
+	private InputSplit[] getSplits(Path path) throws IOException
 	{
 		GPFusionInputFormat fformat = new GPFusionInputFormat();
 		GPFusionInputFormat.setInputPaths(jobConf, path);
 		return fformat.getSplits(jobConf, 1);
 	}
-	
+
 }

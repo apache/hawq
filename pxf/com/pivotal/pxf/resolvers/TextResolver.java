@@ -3,7 +3,7 @@ package com.pivotal.pxf.resolvers;
 import com.pivotal.pxf.hadoop.io.GPDBWritable;
 import com.pivotal.pxf.format.OneField;
 import com.pivotal.pxf.format.OneRow;
-import com.pivotal.pxf.utilities.HDFSMetaData;
+import com.pivotal.pxf.utilities.InputData;
 import com.pivotal.pxf.utilities.RecordkeyAdapter;
 
 import java.util.LinkedList;
@@ -16,7 +16,6 @@ import org.apache.hadoop.io.Text;
  */
 public class TextResolver extends Resolver
 {
-    private HDFSMetaData connectorConfiguration;
 	private RecordkeyAdapter recordkeyAdapter = new RecordkeyAdapter();
 	
 	/* hardcode argument delim is a temporary solution that will be used in case
@@ -27,14 +26,9 @@ public class TextResolver extends Resolver
 	/*
 	 * C'tor
 	 */
-	public TextResolver(HDFSMetaData conf) throws Exception
+	public TextResolver(InputData input) throws Exception
 	{
-		super(conf);
-		/* 
-		 * The connectorConfiguration variable will be discarded once we remove all specialized MetaData classes and remain 
-		 * only with BaseMetaData which wholds the sequence of properties
-		 */
-		connectorConfiguration = (HDFSMetaData)this.getMetaData();		
+		super(input);
 	}
 
 	/*

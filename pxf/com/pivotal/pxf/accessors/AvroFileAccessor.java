@@ -19,7 +19,7 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.Job;
 
 import com.pivotal.pxf.format.OneRow;
-import com.pivotal.pxf.utilities.HDFSMetaData;
+import com.pivotal.pxf.utilities.InputData;
 
 /*
  * Specialization of SplittableFileAccessor for AVRO files
@@ -34,23 +34,23 @@ public class AvroFileAccessor extends HdfsSplittableDataAccessor
 	 * Creates the job configuration object JobConf, and accesses the avro file to fetch
 	 * the avro schema
 	 */
-	public AvroFileAccessor(HDFSMetaData meta) throws Exception
+	public AvroFileAccessor(InputData input) throws Exception
 	{
 		// 1. Call the base class
-		super(meta,
+		super(input,
 			  new AvroInputFormat<GenericRecord>());
 		
 		// 2. Acessesing the avro file through the "unsplittable" API just to get the schema.
 		//    The splittable API (AvroInputFormat) which is the one we will be using to fetch 
 		//    the records, does not suport getting the avro schema yet.
-		Path p = new Path(metaData.path());
+		Path p = new Path(inputData.path());
 		FsInput inStream = new FsInput(p, conf);
 		DatumReader<GenericRecord> dummyReader = new GenericDatumReader<GenericRecord>();
 		DataFileReader<GenericRecord> dummyFileReader = new DataFileReader<GenericRecord>(inStream, dummyReader);
 		schema = dummyFileReader.getSchema();
 		
-		// 3. Pass the schema to the metaData for the AvroResolver to fetch
-		metaData.SetAvroFileSchema(schema);
+		// 3. Pass the schema to the inputData for the AvroResolver to fetch
+		inputData.SetAvroFileSchema(schema);
 		
 		// 4. Pass the schema to the AvroInputFormat
 		AvroJob.setInputSchema(jobConf, schema);

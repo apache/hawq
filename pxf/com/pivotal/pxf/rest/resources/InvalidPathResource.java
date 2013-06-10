@@ -15,16 +15,16 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 
-class Version 
+class Version
 {
-	final static String PXF_PROTOCOL_VERSION = "v3";	
+	final static String PXF_PROTOCOL_VERSION = "v4";
 }
 
 /*
  * Class for catching paths that are not defined by other resources.
  * For each path, the version is compared to the current version PXF_VERSION.
  * The expected format of a path is "http://<host>:<port>/gpdb/<version>/<rest of path>
- * 
+ *
  * The returned value is always a Server Error code (500).
  * If the version is different than the current version, an appropriate error is returned with version details.
  * Otherwise, an error about unknown path is returned.
@@ -34,11 +34,11 @@ public class InvalidPathResource
 {
 	@Context
 	UriInfo rootUri;
-	
+
 	private Log Log;
-	
+
 	public InvalidPathResource() throws IOException
-	{ 
+	{
 		Log = LogFactory.getLog(InvalidPathResource.class);
 	}
 
@@ -52,7 +52,7 @@ public class InvalidPathResource
 		String errmsg = "Unknown path " + rootUri.getAbsolutePath();
 		return sendErrorMessage(errmsg);
 	}
-	
+
 	/*
 	 * Catch paths of pattern /gpdb/*
 	 */
@@ -60,26 +60,26 @@ public class InvalidPathResource
 	@Path("/{path:.*}")
 	public Response wrongPath(@PathParam("path") String path) throws Exception
 	{
-	        
+
 		String errmsg;
 		String version = parseVersion(path);
-			
-		Log.debug("REST request: " +  rootUri.getAbsolutePath()  + ". " + 
+
+		Log.debug("REST request: " +  rootUri.getAbsolutePath()  + ". " +
 				  "Version " + version + ", supported version is " + Version.PXF_PROTOCOL_VERSION);
-				  
+
 		if (version.equals(Version.PXF_PROTOCOL_VERSION))
 		{
 			errmsg = "Unknown path " + rootUri.getAbsolutePath();
 		}
-		else 
+		else
 		{
 			errmsg = "Wrong version " + version + ", supported version is " + Version.PXF_PROTOCOL_VERSION;
 		}
-		
+
 		return sendErrorMessage(errmsg);
 	}
 
-	/* 
+	/*
 	 * Return error message
 	 */
 	private Response sendErrorMessage(String message)
@@ -92,10 +92,10 @@ public class InvalidPathResource
 
 	/*
 	 * Parse the version part from the path.
-	 * The the absolute path is 
+	 * The the absolute path is
 	 * http://<host>:<port>/gpdb/<version>/<rest of path>
-	 * 
-	 * path - the path part after /gpdb/ 
+	 *
+	 * path - the path part after /gpdb/
 	 * returns the first element after /gpdb/
 	 */
 	private String parseVersion(String path) {
@@ -103,7 +103,7 @@ public class InvalidPathResource
 		int slash = path.indexOf('/');
 		if (slash == -1)
 			return path;
-					
+
 		return path.substring(0, slash);
 	}
 }

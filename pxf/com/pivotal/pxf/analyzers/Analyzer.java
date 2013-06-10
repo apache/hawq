@@ -1,6 +1,6 @@
 package com.pivotal.pxf.analyzers;
 
-import com.pivotal.pxf.utilities.BaseMetaData;
+import com.pivotal.pxf.utilities.InputData;
 import com.pivotal.pxf.utilities.Plugin;
 
 /*
@@ -12,7 +12,7 @@ import com.pivotal.pxf.utilities.Plugin;
  */
 public abstract class Analyzer extends Plugin
 {
-	public Analyzer(BaseMetaData metaData)
+	public Analyzer(InputData metaData)
 	{
 		super(metaData);
 	}

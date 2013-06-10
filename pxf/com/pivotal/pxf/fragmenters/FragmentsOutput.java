@@ -18,7 +18,7 @@ public class FragmentsOutput {
 		private String[] hosts;	    // Fragment hostnames (1 or more)
 		
 
-		private String userData;	// ThirdParty data added to a fragment. Ignored if null
+		private byte[] userData;	// ThirdParty data added to a fragment. Ignored if null
 		
 		public FragmentInfo(String   sourceName,
 							String[] hosts)
@@ -29,7 +29,7 @@ public class FragmentsOutput {
 		
 		public FragmentInfo(String sourceName,
 							String[] hosts,
-							String userData)
+							byte[] userData)
 		{
 			this.sourceName	= sourceName;
 			this.hosts		= hosts;
@@ -50,12 +50,12 @@ public class FragmentsOutput {
 			this.hosts = hosts;
 		}
 		
-		public String getUserData()
+		public byte[] getUserData()
 		{
 			return this.userData;
 		}
 
-		public void setUserData(String data)
+		public void setUserData(byte[] data)
 		{
 			userData = data;
 		}	
@@ -77,7 +77,7 @@ public class FragmentsOutput {
 	
 	public void addFragment(String sourceName,
 							String[] hosts,
-							String userData)
+							byte[] userData)
 	{
 		fragments.add(new FragmentInfo(sourceName, hosts, userData));
 	}

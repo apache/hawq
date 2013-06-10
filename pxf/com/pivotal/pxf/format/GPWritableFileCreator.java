@@ -1,7 +1,7 @@
 package com.pivotal.pxf.format;
 
 import com.pivotal.pxf.hadoop.io.GPDBWritable;
-import com.pivotal.pxf.utilities.HDMetaData;
+import com.pivotal.pxf.utilities.InputData;
 import com.pivotal.pxf.format.OutputFormat;
 
 import java.io.IOException;
@@ -22,13 +22,13 @@ class GPWritableFileCreator
 	SequenceFile.Writer writer = null;
 	LongWritable key = null;
 	
-	GPWritableFileCreator(String outFullPath, int parKey, HDMetaData meta)
+	GPWritableFileCreator(String outFullPath, int parKey, InputData input)
 	{
 		path = new Path(outFullPath);
 		key = new LongWritable(parKey);
 		try 
 		{
-			Class recordClass = (meta.outputFormat() == OutputFormat.FORMAT_TEXT) ? 
+			Class recordClass = (input.outputFormat() == OutputFormat.FORMAT_TEXT) ? 
 						BridgeOutputBuilder.SimpleText.class : GPDBWritable.class;
 			writer =  SequenceFile.createWriter(conf, 
 												SequenceFile.Writer.file(path),

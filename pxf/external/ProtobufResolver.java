@@ -2,7 +2,7 @@ import com.pivotal.pxf.format.OneField;
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.hadoop.io.GPDBWritable;
 import com.pivotal.pxf.resolvers.Resolver;
-import com.pivotal.pxf.utilities.HDFSMetaData;
+import com.pivotal.pxf.utilities.InputData;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.DynamicMessage;
 import java.util.List;
@@ -12,7 +12,6 @@ import java.util.List;
  */
 public class ProtobufResolver extends  Resolver
 {
-	private HDFSMetaData metaData;
 	// the reflection instances
 	private DynamicMessage m = null;
 	private Descriptors.FieldDescriptor key = null;
@@ -21,14 +20,9 @@ public class ProtobufResolver extends  Resolver
 	/*
 	 * C'tor
 	 */
-	public ProtobufResolver(HDFSMetaData meta)
+	public ProtobufResolver(InputData input)
 	{
-		super(meta);
-		/* 
-		 * The metaData variable will be discarded once we remove all specialized MetaData classes and remain 
-		 * only with BaseMetaData which wholds the sequence of properties
-		 */
-		metaData = (HDFSMetaData)this.getMetaData();
+		super(input);
 	}
 
 	/*

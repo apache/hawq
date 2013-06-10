@@ -1,6 +1,6 @@
 package com.pivotal.pxf.fragmenters;
 
-import com.pivotal.pxf.utilities.BaseMetaData;
+import com.pivotal.pxf.utilities.InputData;
 import com.pivotal.pxf.utilities.Utilities;
 
 /*
@@ -9,9 +9,9 @@ import com.pivotal.pxf.utilities.Utilities;
  */
 public class FragmenterFactory
 {
-	static public Fragmenter create(BaseMetaData conf) throws Exception
+	static public Fragmenter create(InputData conf) throws Exception
 	{
 		String fragmenterName = conf.getProperty("X-GP-FRAGMENTER");
-		return (Fragmenter)Utilities.createAnyInstance(BaseMetaData.class, fragmenterName, "fragmenters", conf);
+		return (Fragmenter)Utilities.createAnyInstance(InputData.class, fragmenterName, "fragmenters", conf);
 	}
 }

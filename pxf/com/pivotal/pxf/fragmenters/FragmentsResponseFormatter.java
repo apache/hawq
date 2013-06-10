@@ -35,7 +35,7 @@ public class FragmentsResponseFormatter {
 
 		/* print the fragment list to log when in debug level */
 		Log.debug(FragmentsResponseFormatter.listToString(fragments, data));
-
+		
 		return FragmentsResponseFormatter.listToJSON(fragments);
 	}
 
@@ -94,6 +94,7 @@ public class FragmentsResponseFormatter {
 			if (!isFirst)
 				result += ",";
 
+			/* userData is automatically converted to Base64 */
 			result += mapper.writeValueAsString(fi);
 			isFirst = false;
 		}
@@ -102,7 +103,7 @@ public class FragmentsResponseFormatter {
 
 		return result;
 	}
-
+	
 	/*
 	 * Given a FragmentsOutput object, convert it to be readable. Intended
 	 * for debugging purposes only. 'datapath' is the data path part of 
@@ -124,13 +125,14 @@ public class FragmentsResponseFormatter {
 
 			for (String host : fi.getHosts())
 				result.append(" " + host);
-
-			result.append(", User Data: " + fi.getUserData());
+			
+			if (fi.getUserData() != null)
+				result.append(", User Data: " + new String(fi.getUserData()));
 			result.append("] ");
 		}
 		if (fragmentInfos.isEmpty())
 			result.append("no fragments");
-
+		
 		return result.toString();
 	}
 }

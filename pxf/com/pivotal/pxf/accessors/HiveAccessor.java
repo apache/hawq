@@ -15,7 +15,7 @@ import com.pivotal.pxf.filtering.FilterParser;
 import com.pivotal.pxf.filtering.HiveFilterEvaluator;
 import com.pivotal.pxf.fragmenters.HiveDataFragmenter;
 import com.pivotal.pxf.utilities.ColumnDescriptor;
-import com.pivotal.pxf.utilities.HDFSMetaData;
+import com.pivotal.pxf.utilities.InputData;
 
 
 /*
@@ -44,15 +44,15 @@ public class HiveAccessor extends HdfsSplittableDataAccessor
 	 * C'tor
 	 * Creates the InputFormat and the RecordReader object
 	 */	
-	public HiveAccessor(HDFSMetaData meta) throws Exception
+	public HiveAccessor(InputData input) throws Exception
 	{
 		/*
 		 * Unfortunately, Java does not allow us to call a function before calling the base constructor,
-		 * otherwise it would have been:  super(meta, createInputFormat(meta))
+		 * otherwise it would have been:  super(input, createInputFormat(input))
 		 */
-		super(meta,
+		super(input,
 			  (FileInputFormat<?, ?>)null);
-		fformat = createInputFormat(meta);
+		fformat = createInputFormat(input);
 		
 		Log = LogFactory.getLog(HiveAccessor.class);
  	}
@@ -79,9 +79,9 @@ public class HiveAccessor extends HdfsSplittableDataAccessor
 		return fformat.getRecordReader(split, jobConf, Reporter.NULL);
 	}
 	
-	private FileInputFormat<?, ?> createInputFormat(HDFSMetaData meta) throws Exception
+	private FileInputFormat<?, ?> createInputFormat(InputData input) throws Exception
 	{
-		String userData = meta.getProperty("X-GP-FRAGMENT-USER-DATA");
+		String userData = input.getProperty("X-GP-FRAGMENT-USER-DATA");
 		String[] toks = userData.split(HiveDataFragmenter.HIVE_USER_DATA_DELIM);
 		initPartitionFields(toks[3]);
 		return HiveDataFragmenter.makeInputFormat(toks[0]/* inputFormat name */, jobConf);
@@ -110,17 +110,17 @@ public class HiveAccessor extends HdfsSplittableDataAccessor
 	private boolean isOurDataInsideFilteredPartition() throws Exception
 	{
 		boolean returnData = true;
-		if (!metaData.hasFilter())
+		if (!inputData.hasFilter())
 			return returnData;
 		
-		String filterStr = metaData.filterString();
-		HiveFilterEvaluator eval = new HiveFilterEvaluator(metaData);
+		String filterStr = inputData.filterString();
+		HiveFilterEvaluator eval = new HiveFilterEvaluator(inputData);
 		Object filter = eval.getFilterObject(filterStr);
 		
 		returnData = isFiltered(partitions, filter);
 		
-		String dataSource = metaData.path();
-		int segmentId = metaData.segmentId();
+		String dataSource = inputData.path();
+		int segmentId = inputData.segmentId();
 		Log.debug("segmentId: " + segmentId  + " " + dataSource + "--" + filterStr + "returnData: " + returnData);
 			
 		if (filter instanceof List)
@@ -145,13 +145,13 @@ public class HiveAccessor extends HdfsSplittableDataAccessor
 			 */
 			for (Object f : (List)filter)
 			{
-				if (testOneFilter(partitionFields, f, metaData) == false)
+				if (testOneFilter(partitionFields, f, inputData) == false)
 					return false;
 			}
 			return true;
 		}
 		 
-		return testOneFilter(partitionFields, filter, metaData);
+		return testOneFilter(partitionFields, filter, inputData);
 	}
 	
 	/*
@@ -164,7 +164,7 @@ public class HiveAccessor extends HdfsSplittableDataAccessor
 	 * because it is not on a partition field.
 	 * 3. If fieldA = partittionOne and valueA != valueOne, then we return false.
 	 */
-	private boolean testOneFilter(List<Partition> partitionFields, Object filter, HDFSMetaData meta)
+	private boolean testOneFilter(List<Partition> partitionFields, Object filter, InputData input)
 	{
 		// Let's look first at the filter
 		FilterParser.BasicFilter bFilter = (FilterParser.BasicFilter)filter;
@@ -175,7 +175,7 @@ public class HiveAccessor extends HdfsSplittableDataAccessor
 		
 		int filterColumnIndex = bFilter.getColumn().index();
 		String filterValue = bFilter.getConstant().constant().toString();
-		ColumnDescriptor filterColumn = meta.getColumn(filterColumnIndex);
+		ColumnDescriptor filterColumn = input.getColumn(filterColumnIndex);
 		String filterColumnName = filterColumn.columnName();
 
 		for (Partition partition : partitionFields)

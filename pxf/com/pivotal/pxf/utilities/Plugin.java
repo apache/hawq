@@ -7,21 +7,14 @@ package com.pivotal.pxf.utilities;
  */
 public class Plugin
 {
-	private BaseMetaData metaData;
+	protected InputData inputData;
 	
 	/*
 	 * C'tor
 	 */
-	public Plugin(BaseMetaData metaData)
+	public Plugin(InputData input)
 	{
-		this.metaData = metaData;
+		this.inputData = input;
 	}
 	
-	/*
-	 * Access Method
-	 */
-	protected BaseMetaData getMetaData()
-	{
-		return metaData;
-	}
 }

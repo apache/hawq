@@ -39,7 +39,7 @@ import com.pivotal.pxf.format.OneField;
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.fragmenters.HiveDataFragmenter;
 import com.pivotal.pxf.hadoop.io.GPDBWritable;
-import com.pivotal.pxf.utilities.HDFSMetaData;
+import com.pivotal.pxf.utilities.InputData;
 import com.pivotal.pxf.utilities.RecordkeyAdapter;
 
 /*
@@ -49,7 +49,6 @@ import com.pivotal.pxf.utilities.RecordkeyAdapter;
  */
 public class HiveResolver extends Resolver
 {
-    private HDFSMetaData connectorConfiguration;
 	private RecordkeyAdapter recordkeyAdapter = new RecordkeyAdapter();
 
 	// reflection fields
@@ -60,16 +59,11 @@ public class HiveResolver extends Resolver
 	private Properties serdeProperties;
 	private List<OneField> partitionFields;
 		
-	public HiveResolver(HDFSMetaData conf) throws Exception
+	public HiveResolver(InputData input) throws Exception
 	{
-		super(conf);
-		/* 
-		 * The connectorConfiguration variable will be discarded once we remove all specialized MetaData classes and remain 
-		 * only with BaseMetaData which wholds the sequence of properties
-		 */
-		connectorConfiguration = (HDFSMetaData)this.getMetaData();
+		super(input);
 		
-		String userData = connectorConfiguration.getProperty("X-GP-FRAGMENT-USER-DATA");
+		String userData = inputData.getProperty("X-GP-FRAGMENT-USER-DATA");
 		String[] toks = userData.split(HiveDataFragmenter.HIVE_USER_DATA_DELIM);		
 		
 		String serdeName = toks[1]; /* look in HiveDataFragmenter to see how the userData was concatanated */

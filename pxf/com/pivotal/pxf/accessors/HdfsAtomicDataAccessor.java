@@ -8,7 +8,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
 import com.pivotal.pxf.format.OneRow;
-import com.pivotal.pxf.utilities.HDFSMetaData;
+import com.pivotal.pxf.utilities.InputData;
 
 /*
  * Base class for inforcing the complete access of a file in one accessor. Since we  are not accessing the
@@ -24,21 +24,15 @@ import com.pivotal.pxf.utilities.HDFSMetaData;
 public abstract class HdfsAtomicDataAccessor extends Accessor
 {
 	private Configuration conf = null; 
-	protected HDFSMetaData metaData = null;
 	protected InputStream inp = null;
 
 	/*
 	 * C'tor
 	 */ 	
-	public HdfsAtomicDataAccessor(HDFSMetaData meta) throws Exception
+	public HdfsAtomicDataAccessor(InputData input) throws Exception
 	{
 		// 0. Hold the configuration data
-		super(meta);
-		/* 
-		 * The metaData variable will be discarded once we remove all specialized MetaData classes and remain 
-		 * only with BaseMetaData which wholds the sequence of properties
-		 */
-		metaData = (HDFSMetaData)this.getMetaData(); 
+		super(input);
 				
 		// 1. Load Hadoop configuration defined in $HADOOP_HOME/conf/*.xml files
 		conf = new Configuration();
@@ -55,8 +49,8 @@ public abstract class HdfsAtomicDataAccessor extends Accessor
 			return false;
 		
 		// 1. input data stream
-		FileSystem  fs = FileSystem.get(URI.create(metaData.path()), conf); // FileSystem.get actually returns an FSDataInputStream
-		inp = fs.open(new Path(metaData.path()));
+		FileSystem  fs = FileSystem.get(URI.create(inputData.path()), conf); // FileSystem.get actually returns an FSDataInputStream
+		inp = fs.open(new Path(inputData.path()));
 		return (inp != null);
 	}
 
@@ -93,7 +87,7 @@ public abstract class HdfsAtomicDataAccessor extends Accessor
 	{
 		Integer frag0 = new Integer(0);		
 		
-		if (metaData.getDataFragments().contains(frag0))
+		if (inputData.getDataFragments().contains(frag0))
 			return true;
 		
 		return false;

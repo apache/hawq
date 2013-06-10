@@ -4,7 +4,7 @@ package com.pivotal.pxf.format;
 import com.pivotal.pxf.hadoop.io.GPDBWritable;
 import com.pivotal.pxf.hadoop.io.GPDBWritable.TypeMismatchException;
 import com.pivotal.pxf.exception.BadRecordException;
-import com.pivotal.pxf.utilities.HDMetaData;
+import com.pivotal.pxf.utilities.InputData;
 import com.pivotal.pxf.format.OutputFormat;
 
 import java.lang.reflect.Array;
@@ -24,7 +24,7 @@ import org.apache.hadoop.io.Writable;
  */
 public class BridgeOutputBuilder
 {
-	private HDMetaData connectorConf;
+	private InputData inputData;
 	private Writable output = null;
 	private GPDBWritable errorRecord = null;
 	private String delim = new String(",");
@@ -69,9 +69,9 @@ public class BridgeOutputBuilder
 	/*
 	 * C'tor
 	 */
-	public BridgeOutputBuilder(HDMetaData conf)
+	public BridgeOutputBuilder(InputData input)
 	{
-		connectorConf = conf;
+		inputData = input;
 		makeErrorRecord();
 	}
 	
@@ -88,7 +88,7 @@ public class BridgeOutputBuilder
 	{
 		int [] errSchema = {GPDBWritable.TEXT};
 		
-		if (connectorConf.outputFormat() != OutputFormat.FORMAT_GPDB_WRITABLE)
+		if (inputData.outputFormat() != OutputFormat.FORMAT_GPDB_WRITABLE)
 			return;
 		errorRecord = new GPDBWritable(errSchema);
 		errorRecord.setError(true);
@@ -101,7 +101,7 @@ public class BridgeOutputBuilder
 	{
 		Writable err = null;
 		
-		if (connectorConf.outputFormat() == OutputFormat.FORMAT_GPDB_WRITABLE)
+		if (inputData.outputFormat() == OutputFormat.FORMAT_GPDB_WRITABLE)
 			return errorRecord;
 		else 
 			throw ex;
@@ -125,7 +125,7 @@ public class BridgeOutputBuilder
 	 */	
 	void createOutputRecord(List<OneField> recFields)
 	{
-		if (connectorConf.outputFormat() == OutputFormat.FORMAT_GPDB_WRITABLE)
+		if (inputData.outputFormat() == OutputFormat.FORMAT_GPDB_WRITABLE)
 			makeGPDBWritableOutput(recFields);
 		else /* output is text*/
 			output = new SimpleText();
@@ -151,7 +151,7 @@ public class BridgeOutputBuilder
 	 */
 	void fillOutputRecord(List<OneField> recFields) throws BadRecordException
 	{
-		if (connectorConf.outputFormat() == OutputFormat.FORMAT_GPDB_WRITABLE)
+		if (inputData.outputFormat() == OutputFormat.FORMAT_GPDB_WRITABLE)
 			fillGPDBWritable(recFields);
 		else
 			fillText(recFields);

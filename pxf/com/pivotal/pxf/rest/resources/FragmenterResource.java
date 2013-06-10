@@ -21,7 +21,7 @@ import com.pivotal.pxf.fragmenters.Fragmenter;
 import com.pivotal.pxf.fragmenters.FragmenterFactory;
 import com.pivotal.pxf.fragmenters.FragmentsOutput;
 import com.pivotal.pxf.fragmenters.FragmentsResponseFormatter;
-import com.pivotal.pxf.utilities.BaseMetaData;
+import com.pivotal.pxf.utilities.InputData;
 
 /*
  * Class enhances the API of the WEBHDFS REST server.
@@ -61,9 +61,9 @@ public class FragmenterResource
 				  
 		/* Convert headers into a regular map */
 		Map<String, String> params = convertToRegularMap(headers.getRequestHeaders());
-		final Fragmenter fragmenter = FragmenterFactory.create(new BaseMetaData(params));
+		final Fragmenter fragmenter = FragmenterFactory.create(new InputData(params));
 
-		FragmentsOutput fragments = fragmenter.GetFragments(path);
+		FragmentsOutput fragments = fragmenter.GetFragments();
 		String jsonOutput = FragmentsResponseFormatter.formatResponseString(fragments, path);		
 		
 		return Response.ok(jsonOutput, MediaType.APPLICATION_JSON_TYPE).build();

@@ -1,6 +1,6 @@
 package com.pivotal.pxf.analyzers;
 
-import com.pivotal.pxf.utilities.BaseMetaData;
+import com.pivotal.pxf.utilities.InputData;
 import com.pivotal.pxf.utilities.Utilities;
 
 /*
@@ -9,9 +9,9 @@ import com.pivotal.pxf.utilities.Utilities;
  */
 public class AnalyzerFactory
 {
-	static public Analyzer create(BaseMetaData conf) throws Exception
+	static public Analyzer create(InputData conf) throws Exception
 	{
 		String analyzerName = conf.getProperty("X-GP-ANALYZER");
-		return (Analyzer)Utilities.createAnyInstance(BaseMetaData.class, analyzerName, "analyzers", conf);
+		return (Analyzer)Utilities.createAnyInstance(InputData.class, analyzerName, "analyzers", conf);
 	}
 }

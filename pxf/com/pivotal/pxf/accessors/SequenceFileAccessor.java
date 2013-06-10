@@ -9,7 +9,7 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.SequenceFileInputFormat;
 import org.apache.hadoop.mapred.SequenceFileRecordReader;
 
-import com.pivotal.pxf.utilities.HDFSMetaData;
+import com.pivotal.pxf.utilities.InputData;
 
 /*
  * Specialization of HdfsSplittableDataAccessor for sequence files
@@ -20,9 +20,9 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor
 	 * C'tor
 	 * Creates the InputFormat and the RecordReader object
 	 */	
-	public SequenceFileAccessor(HDFSMetaData meta) throws Exception
+	public SequenceFileAccessor(InputData input) throws Exception
 	{
-		super(meta,
+		super(input,
 			  new SequenceFileInputFormat<LongWritable, Writable>());
  	}
 	

@@ -1,5 +1,7 @@
 package com.pivotal.pxf.utilities;
 
+import java.util.Arrays;
+
 import org.apache.hadoop.hbase.util.Bytes;
 
 /*
@@ -10,43 +12,47 @@ import org.apache.hadoop.hbase.util.Bytes;
  */
 public class HBaseColumnDescriptor extends ColumnDescriptor
 {
-    byte[] columnFamily;
-    byte[] qualifier;
-    boolean isRowColumn;
+	byte[] columnFamily;
+	byte[] qualifier;
 
-    public HBaseColumnDescriptor(ColumnDescriptor copy)
-    {
-        super(copy);
+	public HBaseColumnDescriptor(ColumnDescriptor copy)
+	{
+		this(copy, copy.columnName().getBytes());
+	}
 
-        if (gpdbColumnName.compareToIgnoreCase(recordkeyName) == 0)
-        {
-            isRowColumn = true;
-            return;
-        }
+	public HBaseColumnDescriptor(ColumnDescriptor copy, byte[] newColumnName)
+	{
+		super(copy);
 
-        isRowColumn = false;
+		if (isKeyColumn())
+			return;
 
-        int seperatorIndex = gpdbColumnName.indexOf(':');
-        if (seperatorIndex == -1)
-            throw new IllegalArgumentException("Illegal HBase column name " + gpdbColumnName);
+		int seperatorIndex = getSeparatorIndex(newColumnName);
 
-        columnFamily = Bytes.toBytes(gpdbColumnName.substring(0, seperatorIndex));
-        qualifier = Bytes.toBytes(gpdbColumnName.substring(seperatorIndex + 1));
-    }
+		columnFamily = Arrays.copyOfRange(newColumnName, 0, seperatorIndex);
+		qualifier = Arrays.copyOfRange(newColumnName, seperatorIndex + 1, newColumnName.length);
+	}
 
-    public byte[] columnFamilyBytes()
-    {
-        return columnFamily;
-    }
+	public byte[] columnFamilyBytes()
+	{
+		return columnFamily;
+	}
 
-    public byte[] qualifierBytes()
-    {
-        return qualifier;
-    }
+	public byte[] qualifierBytes()
+	{
+		return qualifier;
+	}
 
-    public boolean isRowColumn()
-    {
-        return isRowColumn;
-    }
-};
+	private int getSeparatorIndex(byte[] columnName)
+	{
+		for (int i = 0; i < columnName.length; ++i)
+		{
+			if (columnName[i] == ':')
+				return i;
+		}
 
+		throw new IllegalArgumentException("Illegal HBase column name " +
+										   Bytes.toString(columnName) +
+										   ", missing :");
+	}
+}

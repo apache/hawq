@@ -10,7 +10,7 @@ import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 
-import com.pivotal.pxf.utilities.BaseMetaData;
+import com.pivotal.pxf.utilities.InputData;
 import com.pivotal.pxf.utilities.GPFusionInputFormat;
 
 
@@ -29,7 +29,7 @@ public class HdfsDataFragmenter extends Fragmenter
 	/*
 	 * C'tor
 	 */
-	public HdfsDataFragmenter(BaseMetaData md) throws IOException
+	public HdfsDataFragmenter(InputData md) throws IOException
 	{
 		super(md);
 		Log = LogFactory.getLog(HdfsDataFragmenter.class);
@@ -42,11 +42,9 @@ public class HdfsDataFragmenter extends Fragmenter
 	 * name, a directory name  or a wildcard returns the data 
 	 * fragments in json format
 	 */	
-	public FragmentsOutput GetFragments(String datapath) throws Exception
+	public FragmentsOutput GetFragments() throws Exception
 	{
-		Path	path = new Path("/" + datapath); //yikes! any better way?		
-
-		InputSplit[] splits = getSplits(path);
+		InputSplit[] splits = getSplits(new Path(inputData.path()));
 		
 		for (InputSplit split : splits)
 		{	

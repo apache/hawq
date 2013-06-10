@@ -18,15 +18,17 @@ import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 
+import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.io.Writable;
 import org.eclipse.jetty.io.RuntimeIOException;
 
-import com.pivotal.pxf.bridge.BridgeFactory;
+import com.pivotal.pxf.bridge.Bridge;
 import com.pivotal.pxf.bridge.IBridge;
+import com.pivotal.pxf.fragmenters.FragmentsResponseFormatter;
 import com.pivotal.pxf.fragmenters.HiveDataFragmenter;
-import com.pivotal.pxf.utilities.HDMetaData;
+import com.pivotal.pxf.utilities.InputData;
 
 /*
  * This class handles the subpath /<version>/Bridge/ of this
@@ -50,15 +52,15 @@ public class BridgeResource
 	 * fragments is part of the url:
 	 * /<version>/Bridge?fragments=
 	 */
-    @GET
-    @Produces(MediaType.APPLICATION_OCTET_STREAM)
+	@GET
+	@Produces(MediaType.APPLICATION_OCTET_STREAM)
 	public Response read(@Context HttpHeaders headers,
 						 @QueryParam("fragments") String fragments) throws Exception
 	{
 		// Convert headers into a regular map
 		Map<String, String> params = convertToRegularMap(headers.getRequestHeaders());
-		params.put("X-GP-DATA-FRAGMENTS", fragments);		
-		
+		params.put("X-GP-DATA-FRAGMENTS", fragments);
+
 		Log.debug("started with paramters: " + params.toString());
 
 		return readResponse(params);
@@ -66,15 +68,14 @@ public class BridgeResource
 
 	Response readResponse(Map<String, String> params) throws Exception
 	{
-		HDMetaData connectorConf = new HDMetaData(params);
-		final IBridge bridge = BridgeFactory.create(connectorConf);
+		final IBridge bridge = new Bridge(new InputData(params));
 
 		if (!bridge.BeginIteration())
 			return Response.ok().build();
 
 		final String fragment = params.get("X-GP-DATA-FRAGMENTS");
 		final String dataDir = params.get("X-GP-DATA-DIR");
-		
+
 		// Creating an internal streaming class
 		// which will iterate the records and put them on the
 		// output stream
@@ -84,14 +85,14 @@ public class BridgeResource
 			public void write(final OutputStream out) throws IOException, WebApplicationException
 			{
 				long recordCount = 0;
-		
+
 				try
 				{
 					Writable record = null;
 					DataOutputStream dos = new DataOutputStream(out);
 					Log.debug("Starting streaming fragment " + fragment + " of resource " + dataDir);
 					while ((record = bridge.GetNext()) != null)
-					{		
+					{
 						record.write(dos);
 						++recordCount;
 					}
@@ -117,7 +118,7 @@ public class BridgeResource
 		return Response.ok(streaming, MediaType.APPLICATION_OCTET_STREAM).build();
 	}
 
-	Map<String, String> convertToRegularMap(MultivaluedMap<String, String> multimap)
+	Map<String, String> convertToRegularMap(MultivaluedMap<String, String> multimap) throws Exception
 	{
 		Map<String, String> result = new HashMap<String, String>();
 		for (String key : multimap.keySet())
@@ -127,8 +128,15 @@ public class BridgeResource
 			String newKey = key;
 			if (key.startsWith("X-GP-"))
 				newKey = key.toUpperCase();
-			if (newKey.compareTo("X-GP-FRAGMENT-USER-DATA") == 0)
-				newVal = newVal.replaceAll(HiveDataFragmenter.HIVE_LINEFEED_REPLACE, "\n"); /* Replacing the '\n' that were removed in HiveDataFragmenter.makeUserData */
+			if (newKey.compareTo("X-GP-FRAGMENT-USER-DATA") == 0) 
+			{
+				/* FRAGMENT-USER-DATA must be Base64 encoded */
+				if (!Base64.isArrayByteBase64(newVal.getBytes()))
+					throw new IOException("Fragment user data must be Base64 encoded. " +
+										"(Bad value: " + newVal + ")");
+				newVal = new String(Base64.decodeBase64(newVal));
+				Log.debug("X-GP-FRAGMENT-USER-DATA: " + newVal);
+			}
 			result.put(newKey, newVal);
 		}
 

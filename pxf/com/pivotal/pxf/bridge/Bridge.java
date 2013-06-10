@@ -1,11 +1,10 @@
-
 package com.pivotal.pxf.bridge;
 
-import java.nio.charset.CharacterCodingException;
 import java.io.CharConversionException;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.UTFDataFormatException;
+import java.nio.charset.CharacterCodingException;
 import java.util.zip.ZipException;
 
 import org.apache.commons.logging.Log;
@@ -17,42 +16,36 @@ import com.pivotal.pxf.exception.BadRecordException;
 import com.pivotal.pxf.format.BridgeOutputBuilder;
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.resolvers.Resolver;
-import com.pivotal.pxf.utilities.HDMetaData;
+import com.pivotal.pxf.utilities.InputData;
+import com.pivotal.pxf.utilities.Utilities;
 
 /*
- * class BasicBridge is an abstract class implementing the "Template Method" design pattern
- * BasicBridge implements the IBridge interface. In order to implement the IBridge methods,
- * BasicBridge uses the methods of two other "internal" abstract classes Accessor and Resolver.
- * The use of these two internal abstract classes (Accessor and Resolver) inside BasicBridge 
- * represents in fact the skeleton of the data access algorithm of the Bridge framework.
- * The actual details of file access and records deserialization for given file types or serialization methods
- * are located inside the implementations of the abstract classes Accessor and Resolver.
- * The user cannot instantiate BasicBridge since it is abstract. 
- * Instead the user will instantiate a specialization of BasicBridge (like for instance GpHdfsBridge). 
- * The sole purpose of the BasicBridge specialization class is to instantiate the actual implementations 
- * of Accessor and Resolver, and pass them to the BasicBridge class who uses the 
- * interfaces without being aware of the actual implementations which hold the details of file access 
- * and deserialization.
+ * Bridge class creates appropriate accessor and resolver.
+ * It will then create the correct output conversion
+ * class (e.g. Text or GPDBWritable) and get records from accessor,
+ * let resolver deserialize them and reserialize them using the
+ * output conversion class.
+ *
+ * The class handles BadRecordException and other exception type
+ * and marks the record as invalid for GPDB.
  */
-abstract class BasicBridge implements IBridge
+public class Bridge implements IBridge
 {
-    HDMetaData conf = null;
 	Accessor fileAccessor = null;
 	Resolver fieldsResolver = null;
 	BridgeOutputBuilder outputBuilder = null;
-    
-    private Log Log;
-    
+
+	private Log Log;
+
 	/*
 	 * C'tor - set the implementation of the bridge
 	 */
-	BasicBridge(HDMetaData configuration, Accessor accessor, Resolver resolver)
+	public Bridge(InputData input) throws Exception
 	{
-        Log = LogFactory.getLog(BasicBridge.class);
-        conf = configuration;
-		fileAccessor = accessor;
-		fieldsResolver = resolver;
-		outputBuilder = new BridgeOutputBuilder(conf);
+		fileAccessor = getFileAccessor(input);
+		fieldsResolver = getFieldsResolver(input);
+		outputBuilder = new BridgeOutputBuilder(input);
+		Log = LogFactory.getLog(Bridge.class);
 	}
 
 	/*
@@ -63,7 +56,7 @@ abstract class BasicBridge implements IBridge
 		return fileAccessor.Open();
 	}
 
-	/* 
+	/*
 	 * Fetch next object from file and turn it into a record that the GPDB backend can process
 	 */
 	public Writable GetNext() throws Exception
@@ -89,25 +82,41 @@ abstract class BasicBridge implements IBridge
 		}
 		catch (BadRecordException ex)
 		{
-            String row_info = "null";
-            if (onerow != null)
-            {
-                row_info = onerow.toString();
-            }
-            if (ex.getCause() != null)
-            {
-                Log.debug("BadRecordException " + ex.getCause().toString() + ": " + row_info);
-            }
-            else
-            {
-                Log.debug(ex.toString() + ": " + row_info);
-            }
+			String row_info = "null";
+			if (onerow != null)
+			{
+				row_info = onerow.toString();
+			}
+			if (ex.getCause() != null)
+			{
+				Log.debug("BadRecordException " + ex.getCause().toString() + ": " + row_info);
+			}
+			else
+			{
+				Log.debug(ex.toString() + ": " + row_info);
+			}
 			output = outputBuilder.getErrorOutput(ex);
 		}
-		
+
 		return output;
 	}
-		
+
+	public static Accessor getFileAccessor(InputData inputData) throws Exception
+	{
+		return (Accessor)Utilities.createAnyInstance(InputData.class, 
+													 inputData.accessor(), 
+													 "accessors", 
+													 inputData);
+	}
+
+	public static Resolver getFieldsResolver(InputData inputData) throws Exception
+	{
+		return (Resolver)Utilities.createAnyInstance(InputData.class, 
+													 inputData.resolver(), 
+													 "resolvers", 
+													 inputData);
+	}
+
 	/*
 	 * There are many exceptions that inherit IOException. Some of them like EOFException are generated
 	 * due to a data problem, and not because of an IO/connection problem as the father IOException
@@ -120,10 +129,10 @@ abstract class BasicBridge implements IBridge
 	private boolean isDataException(IOException ex)
 	{
 		if (ex instanceof EOFException || ex instanceof CharacterCodingException ||
-			ex instanceof CharConversionException || ex instanceof UTFDataFormatException || 
+			ex instanceof CharConversionException || ex instanceof UTFDataFormatException ||
 			ex instanceof ZipException)
 				return true;
-		
+
 		return false;
-	}	
+	}
 }

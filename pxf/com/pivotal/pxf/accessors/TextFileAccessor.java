@@ -7,7 +7,7 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.TextInputFormat;	
 import org.apache.hadoop.mapred.LineRecordReader;
 
-import com.pivotal.pxf.utilities.HDFSMetaData;
+import com.pivotal.pxf.utilities.InputData;
 
 /*
  * Specialization of HdfsSplittableDataAccessor for text files
@@ -18,9 +18,9 @@ public class TextFileAccessor extends HdfsSplittableDataAccessor
 	 * C'tor
 	 * Creates the TextInputFormat and the LineRecordReader object
 	 */
-	public TextFileAccessor(HDFSMetaData meta) throws Exception
+	public TextFileAccessor(InputData input) throws Exception
 	{
-		super(meta,
+		super(input,
 			  new TextInputFormat());
 		((TextInputFormat)fformat).configure(jobConf);
  	}

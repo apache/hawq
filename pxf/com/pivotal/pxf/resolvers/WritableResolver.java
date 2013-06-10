@@ -4,7 +4,7 @@ import com.pivotal.pxf.hadoop.io.GPDBWritable;
 import com.pivotal.pxf.exception.BadRecordException;
 import com.pivotal.pxf.format.OneField;
 import com.pivotal.pxf.format.OneRow;
-import com.pivotal.pxf.utilities.HDFSMetaData;
+import com.pivotal.pxf.utilities.InputData;
 import com.pivotal.pxf.utilities.RecordkeyAdapter;
 
 import java.lang.IllegalAccessException;
@@ -21,7 +21,6 @@ import java.util.List;
  */
 public class WritableResolver extends Resolver
 {
-    private HDFSMetaData connectorConfiguration;
 	private RecordkeyAdapter recordkeyAdapter = new RecordkeyAdapter();
 
 	// reflection fields
@@ -31,14 +30,9 @@ public class WritableResolver extends Resolver
 	private int index_of_readFields = 0;
 	////////////////////////////
 
-	public WritableResolver(HDFSMetaData conf) throws Exception
+	public WritableResolver(InputData input) throws Exception
 	{
-		super(conf);
-		/* 
-		 * The connectorConfiguration variable will be discarded once we remove all specialized MetaData classes and remain 
-		 * only with BaseMetaData which wholds the sequence of properties
-		 */
-		connectorConfiguration = (HDFSMetaData)this.getMetaData();		
+		super(input);
 		InitInputObject();
 	}
 
@@ -52,14 +46,14 @@ public class WritableResolver extends Resolver
 	{
 		userObject = onerow.getData();
 		List<OneField> record =  new LinkedList<OneField>();
-		int recordkeyIndex = (connectorConfiguration.getRecordkeyColumn() == null) ? -1 :
-			connectorConfiguration.getRecordkeyColumn().columnIndex();
+		int recordkeyIndex = (inputData.getRecordkeyColumn() == null) ? -1 :
+			inputData.getRecordkeyColumn().columnIndex();
 		int currentIdx = 0;
 
 		for (Field field : fields)
 		{
 			if (currentIdx == recordkeyIndex)
-				currentIdx += recordkeyAdapter.appendRecordkeyField(record, connectorConfiguration, onerow);
+				currentIdx += recordkeyAdapter.appendRecordkeyField(record, inputData, onerow);
 				
 			currentIdx += populateRecord(record, field); 
 		}
@@ -158,7 +152,7 @@ public class WritableResolver extends Resolver
 
 	void InitInputObject() throws Exception
 	{
-		Class userClass = Class.forName(connectorConfiguration.srlzSchemaName());
+		Class userClass = Class.forName(inputData.srlzSchemaName());
 
 		//Use reflection to list methods and invoke them
 		methods = userClass.getMethods();

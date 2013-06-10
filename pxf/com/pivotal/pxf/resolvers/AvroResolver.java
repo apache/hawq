@@ -19,7 +19,7 @@ import org.apache.hadoop.io.BytesWritable;
 import com.pivotal.pxf.format.OneField;
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.hadoop.io.GPDBWritable;
-import com.pivotal.pxf.utilities.HDFSMetaData;
+import com.pivotal.pxf.utilities.InputData;
 import com.pivotal.pxf.utilities.RecordkeyAdapter;
 
 /*
@@ -29,7 +29,6 @@ import com.pivotal.pxf.utilities.RecordkeyAdapter;
  */
 public class AvroResolver extends  Resolver
 {
-	private HDFSMetaData connectorConfiguration;
 	// Avro variables
 	private Schema schema = null;
 	private GenericRecord avroRecord = null;
@@ -44,17 +43,12 @@ public class AvroResolver extends  Resolver
 	 * All Avro data is build from the Avro schema, which is based on the *.avsc file that was passed
 	 * by the user	 
 	 */
-	public AvroResolver(HDFSMetaData conf) throws IOException
+	public AvroResolver(InputData input) throws IOException
 	{
-		super(conf);
-		/* 
-		 * The conf variable will be discarded once we remove all specialized MetaData classes and remain 
-		 * only with BaseMetaData which wholds the sequence of properties
-		 */
-		connectorConfiguration = (HDFSMetaData)this.getMetaData();		
+		super(input);
 				
 		if (isAvroFile())
-			schema = connectorConfiguration.GetAvroFileSchema();
+			schema = inputData.GetAvroFileSchema();
 		else
 			schema = (new Schema.Parser()).parse(openExternalSchema());
 
@@ -73,8 +67,8 @@ public class AvroResolver extends  Resolver
 		avroRecord = makeAvroRecord(row.getData(), avroRecord);		
 		List<OneField> record =  new LinkedList<OneField>();
 		
-		int recordkeyIndex = (connectorConfiguration.getRecordkeyColumn() == null) ? -1 :
-			connectorConfiguration.getRecordkeyColumn().columnIndex();
+		int recordkeyIndex = (inputData.getRecordkeyColumn() == null) ? -1 :
+			inputData.getRecordkeyColumn().columnIndex();
 		int currentIndex = 0;
 		
 		for (Schema.Field field : fields)
@@ -83,7 +77,7 @@ public class AvroResolver extends  Resolver
 			 * Add the record key if exists
 			 */			
 			 if (currentIndex == recordkeyIndex)
-				 currentIndex += recordkeyAdapter.appendRecordkeyField(record, connectorConfiguration, row);
+				 currentIndex += recordkeyAdapter.appendRecordkeyField(record, inputData, row);
 				 
 			currentIndex += populateRecord(record, field);
 		}
@@ -98,7 +92,7 @@ public class AvroResolver extends  Resolver
 	 */
 	boolean isAvroFile()
 	{
-		return connectorConfiguration.accessor().toLowerCase().contains("avro");
+		return inputData.accessor().toLowerCase().contains("avro");
 	}
 		
 	/*
@@ -249,7 +243,7 @@ public class AvroResolver extends  Resolver
 
 	InputStream openExternalSchema() throws IOException
 	{
-		String schemaName = connectorConfiguration.srlzSchemaName();
+		String schemaName = inputData.srlzSchemaName();
 		ClassLoader loader = this.getClass().getClassLoader();
 		InputStream result = loader.getResourceAsStream(schemaName);
 

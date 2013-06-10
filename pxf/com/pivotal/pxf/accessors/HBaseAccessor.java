@@ -1,21 +1,22 @@
 package com.pivotal.pxf.accessors;
 
 import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.ServerName;
-import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.filter.Filter;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.hadoop.hbase.HConstants;
 
 import com.pivotal.pxf.filtering.HBaseFilterEvaluator;
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.utilities.HBaseColumnDescriptor;
-import com.pivotal.pxf.utilities.HBaseMetaData;
+import com.pivotal.pxf.utilities.HBaseTupleDescription;
+import com.pivotal.pxf.utilities.InputData;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -23,11 +24,11 @@ import java.util.List;
 import java.util.NavigableMap;
 
 /*
- * The Bridge API accessor for gphbase protocol.
+ * The Bridge API accessor for HBase.
  * This class is responsible for opening the HBase table requested and
- * for iterating over its relevant splits(regions) to return the relevant table's rows.
+ * for iterating over its relevant fragments(regions) to return the relevant table's rows.
  *
- * The table is divided into several splits. Each GP segment is responsible for 
+ * The table is divided into several splits. Each GP segment is responsible for
  * several splits according to the split function selectTableSplits().
  * For each region, a Scan object is used to describe the requested rows.
  *
@@ -35,8 +36,8 @@ import java.util.NavigableMap;
  * Regions can be filtered out according to input from HBaseFilterEvaluator.
  */
 public class HBaseAccessor extends Accessor
-{	
-	private HBaseMetaData conf;
+{
+	private HBaseTupleDescription tupleDescription;
 	private HTableInterface table;
 	private List<SplitBoundary> splits;
 	private Scan scanDetails;
@@ -45,7 +46,7 @@ public class HBaseAccessor extends Accessor
 	private byte[] scanStartKey;
 	private byte[] scanEndKey;
 
-	/* 
+	/*
 	 * The class represents a single split of a table
 	 * i.e. a start key and an end key
 	 */
@@ -65,14 +66,10 @@ public class HBaseAccessor extends Accessor
 		byte[] endKey() {return endKey;}
 	}
 
-	public HBaseAccessor(HBaseMetaData configuration)
+	public HBaseAccessor(InputData input)
 	{
-		super(configuration);
-		/* 
-		 * The conf variable will be discarded once we remove all specialized MetaData classes and remain 
-		 * only with BaseMetaData which holds the sequence of properties
-		 */
-		conf = (HBaseMetaData)this.getMetaData(); 
+		super(input);
+		tupleDescription = new HBaseTupleDescription(input);
 
 		splits = new ArrayList<SplitBoundary>();
 		currentRegionIndex = 0;
@@ -115,11 +112,11 @@ public class HBaseAccessor extends Accessor
 
 	private void openTable() throws IOException
 	{
-		table = new HTable(HBaseConfiguration.create(), conf.tableName().getBytes());
+		table = new HTable(HBaseConfiguration.create(), inputData.tableName().getBytes());
 	}
 
 	/*
-	 * The function creates an array of start,end keys pairs for each 
+	 * The function creates an array of start,end keys pairs for each
 	 * table split this segment is going to scan.
 	 *
 	 * Split selection is done by GP master
@@ -134,24 +131,24 @@ public class HBaseAccessor extends Accessor
 	{
 		NavigableMap<HRegionInfo, ServerName> regions = ((HTable)table).getRegionLocations();
 		int i = 0;
-		
-		ArrayList<Integer> fragments = conf.getDataFragments();
-		
-		for (HRegionInfo region : regions.keySet()) 
+
+		ArrayList<Integer> fragments = inputData.getDataFragments();
+
+		for (HRegionInfo region : regions.keySet())
 		{
-			if (fragments.contains(new Integer(i))) 
+			if (fragments.contains(new Integer(i)))
 			{
 				byte[] startKey = region.getStartKey();
 				byte[] endKey = region.getEndKey();
 
 				if (withinScanRange(startKey, endKey))
-					splits.add(new SplitBoundary(startKey, endKey));	
+					splits.add(new SplitBoundary(startKey, endKey));
 			}
 			++i;
 		}
 	}
 
-	/* 
+	/*
 	 * returns true if given start/end key pair is within the scan range
 	 */
 	private boolean withinScanRange(byte[] startKey, byte[] endKey)
@@ -169,7 +166,7 @@ public class HBaseAccessor extends Accessor
 	}
 
 	/*
-	 * The function creates the Scan object used to describe the query 
+	 * The function creates the Scan object used to describe the query
 	 * requested from HBase.
 	 * As the row key column always gets returned, no need to ask for it
 	 */
@@ -202,29 +199,28 @@ public class HBaseAccessor extends Accessor
 
 	private void addColumns()
 	{
-		// Set the scan to return only the columns requested
-		for (int i = 0; i < conf.columns(); ++i)
+		for (int i = 0; i < tupleDescription.columns(); ++i)
 		{
-			HBaseColumnDescriptor column = (HBaseColumnDescriptor)conf.getColumn(i);
-			if (!column.isRowColumn()) // Row keys return anyway
+			HBaseColumnDescriptor column = tupleDescription.getColumn(i);
+			if (!column.isKeyColumn()) // Row keys return anyway
 				scanDetails.addColumn(column.columnFamilyBytes(), column.qualifierBytes());
 		}
 	}
 
 	/*
-	 * Uses HBaseFilterEvaluator to translate a filter string into a 
-	 * HBase Filter object. The result is added as a filter to the 
+	 * Uses HBaseFilterEvaluator to translate a filter string into a
+	 * HBase Filter object. The result is added as a filter to the
 	 * Scan object
 	 *
 	 * use row key ranges to limit split count
 	 */
 	private void addFilters() throws Exception
 	{
-		if (!conf.hasFilter())
+		if (!inputData.hasFilter())
 			return;
 
-		HBaseFilterEvaluator eval = new HBaseFilterEvaluator(conf);
-		Filter filter = eval.getFilterObject(conf.filterString());
+		HBaseFilterEvaluator eval = new HBaseFilterEvaluator(tupleDescription);
+		Filter filter = eval.getFilterObject(inputData.filterString());
 		scanDetails.setFilter(filter);
 
 		scanStartKey = eval.startKey();

@@ -58,5 +58,7 @@
 	  			  conf="compile->master"/>
 	  <dependency org="commons-logging" name="commons-logging" rev="1.1.1" 
 	  			  conf="compile->master"/>
+	  <dependency org="commons-codec" name="commons-codec" rev="1.4" 
+	  			  conf="compile->master"/>
     </dependencies>
 </ivy-module>

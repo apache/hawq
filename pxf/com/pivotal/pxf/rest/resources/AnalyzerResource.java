@@ -19,7 +19,7 @@ import org.apache.commons.logging.LogFactory;
 
 import com.pivotal.pxf.analyzers.Analyzer;
 import com.pivotal.pxf.analyzers.AnalyzerFactory;
-import com.pivotal.pxf.utilities.BaseMetaData;
+import com.pivotal.pxf.utilities.InputData;
 
 /*
  * Class enhances the API of the WEBHDFS REST server.
@@ -80,7 +80,7 @@ public class AnalyzerResource
 		 */
 		params.put("X-GP-DATA-FRAGMENTS", "0");
 		
-		final Analyzer analyzer = AnalyzerFactory.create(new BaseMetaData(params));
+		final Analyzer analyzer = AnalyzerFactory.create(new InputData(params));
 				
 		/*
 		 * Function queries the pxf Analyzer for the data fragments of the resource

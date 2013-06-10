@@ -6,6 +6,14 @@ package com.pivotal.pxf.format;
  */
 public class OneField
 {
+    public OneField() {}
+    
+    public OneField(int Type, Object Val)
+    {
+        type = Type;
+        val = Val;
+    }
+    
 	public int type;
 	public Object val;
 }

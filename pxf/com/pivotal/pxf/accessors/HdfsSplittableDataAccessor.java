@@ -11,7 +11,7 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.RecordReader;
 
 import com.pivotal.pxf.format.OneRow;
-import com.pivotal.pxf.utilities.HDFSMetaData;
+import com.pivotal.pxf.utilities.InputData;
 
 /*
  * Implementation of Accessor for accessing a splittable data source
@@ -21,7 +21,6 @@ import com.pivotal.pxf.utilities.HDFSMetaData;
 public abstract class HdfsSplittableDataAccessor extends Accessor
 {
 	protected Configuration conf = null;
-	protected HDFSMetaData metaData = null;
 	private LinkedList<InputSplit> segSplits = null;
 	protected RecordReader<Object, Object> reader = null;
 	protected FileInputFormat<?, ?> fformat = null;
@@ -33,16 +32,10 @@ public abstract class HdfsSplittableDataAccessor extends Accessor
 	/*
 	 * C'tor
 	 */ 
-	public HdfsSplittableDataAccessor(HDFSMetaData meta, 
+	public HdfsSplittableDataAccessor(InputData input, 
 						          FileInputFormat<?, ?> inFormat) throws Exception
 	{
-		super(meta);
-		/* 
-		 * The metaData variable will be discarded once we remove all specialized MetaData classes and remain 
-		 * only with BaseMetaData which wholds the sequence of properties
-		 */
-		metaData = (HDFSMetaData)this.getMetaData();		
-		
+		super(input);
 		fformat = inFormat;
 
 		// 1. Load Hadoop configuration defined in $HADOOP_HOME/conf/*.xml files
@@ -60,9 +53,9 @@ public abstract class HdfsSplittableDataAccessor extends Accessor
 	public boolean Open() throws Exception
 	{
 		// 1. get the list of all splits the input file has
-		int segs = metaData.totalSegments();
-        int segId = metaData.segmentId();
-        FileInputFormat.setInputPaths(jobConf, new Path(metaData.path()));
+		int segs = inputData.totalSegments();
+        int segId = inputData.segmentId();
+        FileInputFormat.setInputPaths(jobConf, new Path(inputData.path()));
 		/*
 		 * We ask for 1 split, but this doesn't mean that we are always going to get 1 split
 		 * The number of splits depends on the data size. What we assured here is that always,
@@ -71,16 +64,16 @@ public abstract class HdfsSplittableDataAccessor extends Accessor
 		 */
 		InputSplit[] splits = fformat.getSplits(jobConf, 1);
 		int actual_splits_size = splits.length;
-		int allocated_splits_size = metaData.dataFragmentsSize(); // it's called dataFragments because it represents both hdfs and hbase
+		int allocated_splits_size = inputData.dataFragmentsSize(); // it's called dataFragments because it represents both hdfs and hbase
 
 		// 2. from all the splits choose only those that correspond to this segment id
 		segSplits = new LinkedList<InputSplit>();
 		for (int i = 0; i < allocated_splits_size; i++)
 		{
-			int alloc_split_idx = metaData.getDataFragment(i);
+			int alloc_split_idx = inputData.getDataFragment(i);
 			
 			/*
-			 * Testing for the case where between the time of the GP Master meta
+			 * Testing for the case where between the time of the GP Master input
 			 * data retrieval and now, the file was deleted or replaced by a smaller file.
 			 * This is an extreme case which shouldn't happen - but we want to make sure
 			 */
