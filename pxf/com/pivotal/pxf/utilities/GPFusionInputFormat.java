@@ -2,9 +2,10 @@ package com.pivotal.pxf.utilities;
 
 import java.io.IOException;
 import java.net.UnknownServiceException;
+
+import org.apache.hadoop.mapred.FileInputFormat;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapred.FileInputFormat;
 import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hadoop.mapred.Reporter;
 

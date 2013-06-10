@@ -2,12 +2,9 @@ package com.pivotal.pxf.utilities;
 
 import java.io.ByteArrayInputStream;
 import java.io.ObjectInputStream;
-
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
-
-import org.apache.commons.codec.binary.Base64;
 
 /*
  * The class extends the tuple description provided by InputData

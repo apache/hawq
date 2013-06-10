@@ -26,8 +26,6 @@ import org.eclipse.jetty.io.RuntimeIOException;
 
 import com.pivotal.pxf.bridge.Bridge;
 import com.pivotal.pxf.bridge.IBridge;
-import com.pivotal.pxf.fragmenters.FragmentsResponseFormatter;
-import com.pivotal.pxf.fragmenters.HiveDataFragmenter;
 import com.pivotal.pxf.utilities.InputData;
 
 /*

@@ -1,8 +1,8 @@
 package com.pivotal.pxf.resolvers;
 
+import java.sql.Timestamp;
 import java.util.LinkedList;
 import java.util.List;
-import java.sql.Timestamp;
 
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Result;
@@ -13,8 +13,8 @@ import com.pivotal.pxf.format.OneField;
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.hadoop.io.GPDBWritable;
 import com.pivotal.pxf.utilities.HBaseColumnDescriptor;
-import com.pivotal.pxf.utilities.InputData;
 import com.pivotal.pxf.utilities.HBaseTupleDescription;
+import com.pivotal.pxf.utilities.InputData;
 
 /*
  * The Bridge API resolver for gphbase protocol.

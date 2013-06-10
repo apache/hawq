@@ -1,15 +1,15 @@
 package com.pivotal.pxf.format;
 
-import com.pivotal.pxf.hadoop.io.GPDBWritable;
-import com.pivotal.pxf.utilities.InputData;
-import com.pivotal.pxf.format.OutputFormat;
-
 import java.io.IOException;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Writable;
+
+import com.pivotal.pxf.hadoop.io.GPDBWritable;
+import com.pivotal.pxf.utilities.InputData;
 
 /*
  * Class for creating a GPDBWritable sequence file based on the HDFS user input file.

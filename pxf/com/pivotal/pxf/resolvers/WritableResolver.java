@@ -1,18 +1,17 @@
 package com.pivotal.pxf.resolvers;
 
-import com.pivotal.pxf.hadoop.io.GPDBWritable;
-import com.pivotal.pxf.exception.BadRecordException;
-import com.pivotal.pxf.format.OneField;
-import com.pivotal.pxf.format.OneRow;
-import com.pivotal.pxf.utilities.InputData;
-import com.pivotal.pxf.utilities.RecordkeyAdapter;
-
-import java.lang.IllegalAccessException;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.LinkedList;
 import java.util.List;
+
+import com.pivotal.pxf.exception.BadRecordException;
+import com.pivotal.pxf.format.OneField;
+import com.pivotal.pxf.format.OneRow;
+import com.pivotal.pxf.hadoop.io.GPDBWritable;
+import com.pivotal.pxf.utilities.InputData;
+import com.pivotal.pxf.utilities.RecordkeyAdapter;
 
 /*
  * Class WritableResolver handles deserialization of records that were serialized 

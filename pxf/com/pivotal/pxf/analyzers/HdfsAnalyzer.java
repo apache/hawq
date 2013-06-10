@@ -14,7 +14,6 @@ import org.apache.hadoop.mapred.JobConf;
 
 import com.pivotal.pxf.accessors.Accessor;
 import com.pivotal.pxf.bridge.Bridge;
-import com.pivotal.pxf.utilities.InputData;
 import com.pivotal.pxf.utilities.GPFusionInputFormat;
 import com.pivotal.pxf.utilities.InputData;
 

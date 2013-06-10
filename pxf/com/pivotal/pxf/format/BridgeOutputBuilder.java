@@ -1,19 +1,19 @@
 
 package com.pivotal.pxf.format;
 
-import com.pivotal.pxf.hadoop.io.GPDBWritable;
-import com.pivotal.pxf.hadoop.io.GPDBWritable.TypeMismatchException;
-import com.pivotal.pxf.exception.BadRecordException;
-import com.pivotal.pxf.utilities.InputData;
-import com.pivotal.pxf.format.OutputFormat;
-
-import java.lang.reflect.Array;
 import java.io.DataOutput;
 import java.io.IOException;
-import java.util.List;
+import java.lang.reflect.Array;
 import java.sql.Timestamp;
+import java.util.List;
+
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
+
+import com.pivotal.pxf.exception.BadRecordException;
+import com.pivotal.pxf.hadoop.io.GPDBWritable;
+import com.pivotal.pxf.hadoop.io.GPDBWritable.TypeMismatchException;
+import com.pivotal.pxf.utilities.InputData;
 
 /*
  * Class creates the output record that is piped by the java process to the GPDB backend

@@ -1,7 +1,6 @@
 package com.pivotal.pxf.analyzers;
 
 import java.io.IOException;
-import java.lang.StringBuilder;
 
 import org.codehaus.jackson.map.ObjectMapper;
 

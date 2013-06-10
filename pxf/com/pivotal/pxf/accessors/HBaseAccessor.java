@@ -1,5 +1,10 @@
 package com.pivotal.pxf.accessors;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.NavigableMap;
+
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HRegionInfo;
@@ -17,11 +22,6 @@ import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.utilities.HBaseColumnDescriptor;
 import com.pivotal.pxf.utilities.HBaseTupleDescription;
 import com.pivotal.pxf.utilities.InputData;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.NavigableMap;
 
 /*
  * The Bridge API accessor for HBase.

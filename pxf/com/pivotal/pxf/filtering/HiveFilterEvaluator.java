@@ -1,9 +1,9 @@
 package com.pivotal.pxf.filtering;
 
-import com.pivotal.pxf.utilities.InputData;
-
-import java.util.List;
 import java.util.LinkedList;
+import java.util.List;
+
+import com.pivotal.pxf.utilities.InputData;
 
 /*
  * This is the implementation of IFilterEvaluator for Hive.

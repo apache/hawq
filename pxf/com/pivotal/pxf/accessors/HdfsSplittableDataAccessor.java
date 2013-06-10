@@ -3,6 +3,7 @@ package com.pivotal.pxf.accessors;
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.ListIterator;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.FileInputFormat;

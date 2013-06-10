@@ -1,8 +1,8 @@
 package com.pivotal.pxf.filtering;
 
-import java.util.Stack;
-import java.util.Map;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.Stack;
 
 /*
  * The parser code which goes over a filter string and pushes operands onto a stack

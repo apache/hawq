@@ -1,11 +1,11 @@
 package com.pivotal.pxf.hbase;
 
-import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.hadoop.hbase.filter.WritableByteArrayComparable;
-
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+
+import org.apache.hadoop.hbase.filter.WritableByteArrayComparable;
+import org.apache.hadoop.hbase.util.Bytes;
 
 /*
  * This is a Filter comparator for HBase

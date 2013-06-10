@@ -1,11 +1,12 @@
 package com.pivotal.pxf.accessors;
 
 import java.io.IOException;
+
 import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapred.TextInputFormat;	
 import org.apache.hadoop.mapred.LineRecordReader;
+import org.apache.hadoop.mapred.TextInputFormat;
 
 import com.pivotal.pxf.utilities.InputData;
 

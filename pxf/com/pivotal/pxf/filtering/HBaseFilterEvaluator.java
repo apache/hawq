@@ -1,5 +1,8 @@
 package com.pivotal.pxf.filtering;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.filter.BinaryComparator;
 import org.apache.hadoop.hbase.filter.CompareFilter;
@@ -14,9 +17,6 @@ import com.pivotal.pxf.hadoop.io.GPDBWritable;
 import com.pivotal.pxf.hbase.IntegerComparator;
 import com.pivotal.pxf.utilities.HBaseColumnDescriptor;
 import com.pivotal.pxf.utilities.HBaseTupleDescription;
-
-import java.util.HashMap;
-import java.util.Map;
 
 /*
  * This is the implementation of IFilterEvaluator for HBase.

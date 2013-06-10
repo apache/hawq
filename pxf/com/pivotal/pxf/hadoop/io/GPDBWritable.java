@@ -1,12 +1,12 @@
 package com.pivotal.pxf.hadoop.io;
 
-import java.io.IOException;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInput;
+import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.DataOutputStream;
-import java.io.DataInputStream;
+import java.io.IOException;
 
 import org.apache.hadoop.io.Writable;
 

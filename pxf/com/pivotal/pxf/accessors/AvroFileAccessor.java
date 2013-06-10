@@ -1,22 +1,22 @@
 package com.pivotal.pxf.accessors;
 
 import java.io.IOException;
+
+import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileReader;
-import org.apache.avro.io.DatumReader;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.DatumReader;
 import org.apache.avro.mapred.AvroInputFormat;
 import org.apache.avro.mapred.AvroJob;
 import org.apache.avro.mapred.AvroRecordReader;
 import org.apache.avro.mapred.AvroWrapper;
 import org.apache.avro.mapred.FsInput;
-import org.apache.avro.Schema;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapreduce.Job;
 
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.utilities.InputData;

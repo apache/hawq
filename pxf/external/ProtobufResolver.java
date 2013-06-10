@@ -1,11 +1,12 @@
+import java.util.List;
+
+import com.google.protobuf.Descriptors;
+import com.google.protobuf.DynamicMessage;
 import com.pivotal.pxf.format.OneField;
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.hadoop.io.GPDBWritable;
 import com.pivotal.pxf.resolvers.Resolver;
 import com.pivotal.pxf.utilities.InputData;
-import com.google.protobuf.Descriptors;
-import com.google.protobuf.DynamicMessage;
-import java.util.List;
 
 /*
  * Implementation for protocol-buffers of Resolver

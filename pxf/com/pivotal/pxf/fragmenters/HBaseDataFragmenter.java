@@ -3,19 +3,16 @@ package com.pivotal.pxf.fragmenters;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
-
 import java.util.Map;
 import java.util.NavigableMap;
-
-import org.apache.commons.codec.binary.Base64;
 
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.client.HTable;
 
-import com.pivotal.pxf.utilities.InputData;
 import com.pivotal.pxf.utilities.HBaseLookupTable;
+import com.pivotal.pxf.utilities.InputData;
 
 /*
  * Fragmenter class for HBase data resources.
