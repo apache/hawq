@@ -13,11 +13,11 @@ import org.apache.hadoop.mapred.JobConf;
 import com.pivotal.pxf.accessors.Accessor;
 import com.pivotal.pxf.analyzers.Analyzer;
 import com.pivotal.pxf.analyzers.DataSourceStatsInfo;
-import com.pivotal.pxf.bridge.GPHdfsBridge;
-import com.pivotal.pxf.utilities.BaseMetaData;
+import com.pivotal.pxf.bridge.Bridge;
+import com.pivotal.pxf.utilities.InputData;
 import com.pivotal.pxf.utilities.GPFusionInputFormat;
-import com.pivotal.pxf.utilities.HDFSMetaData;
-import com.pivotal.pxf.utilities.HDMetaData;
+import com.pivotal.pxf.utilities.InputData;
+
 
 
 /*
@@ -36,7 +36,7 @@ public class TestHdfsAnalyzer extends Analyzer
 	/*
 	 * C'tor
 	 */
-	public TestHdfsAnalyzer(BaseMetaData md) throws IOException
+	public TestHdfsAnalyzer(InputData md) throws IOException
 	{
 		super(md);
 		Log = LogFactory.getLog(TestHdfsAnalyzer.class);
@@ -96,9 +96,7 @@ public class TestHdfsAnalyzer extends Analyzer
 	private long getNumberOfTuplesInBlock() throws Exception
 	{
 		long tuples = -1; /* default  - if we are not able to read data */
-		
-		HDFSMetaData hdfsConf = new HDFSMetaData(new HDMetaData(this.getMetaData().getParametersMap()));
-		Accessor accessor = GPHdfsBridge.getFileAccessor(hdfsConf);		
+		Accessor accessor = Bridge.getFileAccessor(inputData);		
 		if (accessor.Open());
 		{
 			tuples = 0;

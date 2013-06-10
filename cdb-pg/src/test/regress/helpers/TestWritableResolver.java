@@ -1,43 +1,36 @@
+import com.pivotal.pxf.exception.BadRecordException;
+import com.pivotal.pxf.format.OneField;
+import com.pivotal.pxf.format.OneRow;
+import com.pivotal.pxf.hadoop.io.GPDBWritable;
+import com.pivotal.pxf.resolvers.Resolver;
+import com.pivotal.pxf.utilities.InputData;
+import com.pivotal.pxf.utilities.RecordkeyAdapter;
+
+import java.lang.IllegalAccessException;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.LinkedList;
 import java.util.List;
 
-import com.pivotal.pxf.exception.BadRecordException;
-import com.pivotal.pxf.format.OneField;
-import com.pivotal.pxf.format.OneRow;
-import com.pivotal.pxf.hadoop.io.GPDBWritable;
-import com.pivotal.pxf.resolvers.Resolver;
-import com.pivotal.pxf.utilities.HDFSMetaData;
-import com.pivotal.pxf.utilities.RecordkeyAdapter;
-
-
 /*
  * Class WritableResolver handles deserialization of records that were serialized 
  * using Hadoop's Writable serialization framework. WritableResolver implements
- * IFieldsResolver exposing one method: GetFields
+ * Resolver abstract class exposing one method: GetFields
  */
-public class TestWritableResolver extends  Resolver
+public class TestWritableResolver extends Resolver
 {
-    private HDFSMetaData connectorConfiguration;
 	private RecordkeyAdapter recordkeyAdapter = new RecordkeyAdapter();
 
-	// reflection fields
+	/* reflection fields */
 	private Object userObject = null;
 	private Method[] methods = null;
 	private Field[] fields = null;
 	private int index_of_readFields = 0;
 
-	public TestWritableResolver(HDFSMetaData conf) throws Exception
+	public TestWritableResolver(InputData input) throws Exception
 	{
-		super(conf);
-		/* 
-		 * The connectorConfiguration variable will be discarded once we remove all specialized MetaData classes and remain 
-		 * only with BaseMetaData which holds the sequence of properties
-		 */
-		connectorConfiguration = (HDFSMetaData)this.getMetaData();	
-		
+		super(input);
 		InitInputObject();
 	}
 
@@ -51,14 +44,14 @@ public class TestWritableResolver extends  Resolver
 	{
 		userObject = onerow.getData();
 		List<OneField> record =  new LinkedList<OneField>();
-		int recordkeyIndex = (connectorConfiguration.getRecordkeyColumn() == null) ? -1 :
-			connectorConfiguration.getRecordkeyColumn().columnIndex();
+		int recordkeyIndex = (inputData.getRecordkeyColumn() == null) ? -1 :
+			inputData.getRecordkeyColumn().columnIndex();
 		int currentIdx = 0;
 
 		for (Field field : fields)
 		{
 			if (currentIdx == recordkeyIndex)
-				currentIdx += recordkeyAdapter.appendRecordkeyField(record, connectorConfiguration, onerow);
+				currentIdx += recordkeyAdapter.appendRecordkeyField(record, inputData, onerow);
 				
 			currentIdx += populateRecord(record, field); 
 		}
@@ -95,7 +88,15 @@ public class TestWritableResolver extends  Resolver
 
 		try
 		{
-			if (javaType.compareTo("int") == 0)
+            if (javaType.compareTo("boolean") == 0)
+            {
+                addOneFieldToRecord(record, GPDBWritable.BOOLEAN, field.get(userObject));
+            }
+			else if (javaType.compareTo("[Z") == 0)
+			{
+				ret = SetArrayField(record, GPDBWritable.BOOLEAN, field);
+			}
+			else if (javaType.compareTo("int") == 0)
 			{
 				addOneFieldToRecord(record, GPDBWritable.INTEGER, field.get(userObject));
 			}
@@ -142,14 +143,14 @@ public class TestWritableResolver extends  Resolver
 		}
 		catch (IllegalAccessException ex)
 		{
-			throw new BadRecordException();
+			throw new BadRecordException(ex);
 		}
 		return ret;
 	}
 
 	void InitInputObject() throws Exception
 	{
-		Class userClass = Class.forName(connectorConfiguration.srlzSchemaName());
+		Class userClass = Class.forName(inputData.srlzSchemaName());
 
 		//Use reflection to list methods and invoke them
 		methods = userClass.getMethods();

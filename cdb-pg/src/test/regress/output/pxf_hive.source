@@ -207,7 +207,7 @@ t1    text)
 LOCATION ('pxf://@hostname@:50070/reg_txt_view?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
 format 'custom' (formatter='pxfwritable_import');
 select * from hv_view order by t1;
-ERROR:  remote component error (500) from '127.0.0.1:50070': Problem accessing /gpdb/v3/Fragmenter/getFragments. Reason:     Server Error   Caused by:  java.lang.UnsupportedOperationException: PXF doesn't support HIVE views (SOMEFILE:SOMEFUNC)
+ERROR:  remote component error (500) from '127.0.0.1:50070': Problem accessing /gpdb/v4/Fragmenter/getFragments. Reason:     Server Error   Caused by:  java.lang.UnsupportedOperationException: PXF doesn't support HIVE views (SOMEFILE:SOMEFUNC)
 -- 7. Clean after Hive
 drop external table hv_view;
 drop external table hv_collections;

@@ -70,7 +70,7 @@ CREATE EXTERNAL TABLE bigtext (s1 text,
 							   n15 int, 
 							   n16 int, 
 							   n17 int)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/text_data.csv?FRAGMENTER=HdfsDataFragmenter')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/text_data.csv?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=TextFileAccessor&RESOLVER=TextResolver')
 FORMAT 'TEXT' (DELIMITER ',');
 SELECT n1, n2, n3, n4, n5, s1, s2, s3, d1 FROM bigtext ORDER BY n1;
 SELECT n11, n12, n13, n14, n15, s11, s12, s13, d11 FROM bigtext ORDER BY n11;
@@ -291,7 +291,7 @@ DROP EXTERNAL TABLE seqquestion;
 --
 CREATE EXTERNAL TABLE host_err(t1 text,
                                a1 integer)
-LOCATION ('pxf://badhostname:50070/gpdb_regression_data/multiblock.tbl?FRAGMENTER=HdfsDataFragmenter')
+LOCATION ('pxf://badhostname:50070/gpdb_regression_data/multiblock.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=TextFileAccessor&RESOLVER=TextResolver')
 FORMAT 'TEXT' (DELIMITER ',');
 SELECT t1, a1 FROM host_err ORDER BY t1 LIMIT 10; -- negative
 DROP EXTERNAL TABLE host_err;
@@ -300,7 +300,7 @@ DROP EXTERNAL TABLE host_err;
 --
 CREATE EXTERNAL TABLE port_err(t1 text,
                                a1 integer)
-LOCATION ('pxf://@hostname@:9000/gpdb_regression_data/multiblock.tbl?FRAGMENTER=HdfsDataFragmenter')
+LOCATION ('pxf://@hostname@:9000/gpdb_regression_data/multiblock.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=TextFileAccessor&RESOLVER=TextResolver')
 FORMAT 'TEXT' (DELIMITER ',');
 SELECT t1, a1 FROM port_err ORDER BY t1 LIMIT 10; -- negative
 DROP EXTERNAL TABLE port_err;

@@ -1,5 +1,4 @@
 import java.io.IOException;
-
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.FileSplit;
@@ -9,11 +8,10 @@ import org.apache.hadoop.mapred.SequenceFileInputFormat;
 import org.apache.hadoop.mapred.SequenceFileRecordReader;
 
 import com.pivotal.pxf.accessors.HdfsSplittableDataAccessor;
-import com.pivotal.pxf.utilities.HDFSMetaData;
-
+import com.pivotal.pxf.utilities.InputData;
 
 /*
- * Specialization of SplittableFileAccessor for sequence files
+ * Specialization of HdfsSplittableDataAccessor for sequence files
  */
 public class TestSequenceFileAccessor extends HdfsSplittableDataAccessor
 {
@@ -21,9 +19,9 @@ public class TestSequenceFileAccessor extends HdfsSplittableDataAccessor
 	 * C'tor
 	 * Creates the InputFormat and the RecordReader object
 	 */	
-	public TestSequenceFileAccessor(HDFSMetaData meta) throws Exception
+	public TestSequenceFileAccessor(InputData input) throws Exception
 	{
-		super(meta,
+		super(input,
 			  new SequenceFileInputFormat<LongWritable, Writable>());
  	}
 	

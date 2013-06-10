@@ -1519,9 +1519,12 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 
 		if (is_custom_hd)
 		{
+			Relation relation = RelationIdGetRelation(planner_rt_fetch(scan_relid, ctx->root)->relid);
 			segdb_work_map = map_hddata_2gp_segments((char *) strVal(linitial(rel->locationlist)), 
-													total_primaries, max_participants_allowed);	
+													total_primaries, max_participants_allowed,
+													relation);	
 			Assert(segdb_work_map != NULL);
+			RelationClose(relation);
 		}
 		
 		/* 

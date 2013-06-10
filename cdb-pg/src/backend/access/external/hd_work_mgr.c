@@ -157,13 +157,18 @@ static char** create_output_strings(List **allocated_fragments, int total_segs);
  * The data fragments is a term that comes to represent any fragments
  * or a supported data source (e.g, HBase region, HDFS splits, etc).
  */
-char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs)
+char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs, Relation relation)
 {
 	char **segs_work_map = NULL;
 	List **segs_data = NULL;
 	List *data_fragments = NIL;
 	ClientContext client_context; /* holds the communication info */
 	PxfInputData inputData;
+
+	if (!RelationIsValid(relation))
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("invalid parameter relation")));
 	
 	/*
 	 * 1. Cherrypick the data relevant for HADOOP from the input uri and init curl headers
@@ -176,7 +181,7 @@ char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs)
 	 */
 	inputData.headers = client_context.http_headers;
 	inputData.gphduri = hadoop_uri;
-	inputData.rel = NULL; /* We do not supply Relation data to the HTTP header */
+	inputData.rel = relation;
 	inputData.filterstr = NULL; /* We do not supply filter data to the HTTP header */	
 	build_http_header(&inputData);
 	

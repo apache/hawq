@@ -26,7 +26,7 @@ creating file @abs_srcdir@/data/pxf/multiblock.tbl
 --
 CREATE EXTERNAL TABLE mbt(t1 text,
                           a1 integer)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/multiblock.tbl?FRAGMENTER=HdfsDataFragmenter')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/multiblock.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=TextFileAccessor&RESOLVER=TextResolver')
 FORMAT 'TEXT' (DELIMITER ',');
 SELECT t1, a1 FROM mbt ORDER BY t1 LIMIT 10;
  t1 | a1 

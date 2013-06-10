@@ -23,7 +23,7 @@ LOCATION ('pxf://@hostname@:50070/hbasetable')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- negative
 ERROR:  invalid URI pxf://@hostname@:50070/hbasetable: missing options section
 CREATE WRITABLE EXTERNAL TABLE gphbase_out(a int, b text, c bytea)
-LOCATION ('pxf://@hostname@:50070/hbasetable?FRAGMENTER=HBaseDataFragmenter')
+LOCATION ('pxf://@hostname@:50070/hbasetable?FRAGMENTER=HBaseDataFragmenter&ACCESSOR=HBaseAccessor&RESOLVER=HBaseResolver')
 FORMAT 'CUSTOM' (formatter='gpdbwritable_export');
 ERROR:  pxf does not yet support writable external tables
 -- Setup
@@ -61,7 +61,7 @@ CREATE EXTERNAL TABLE gphbase_select(recordkey TEXT,
                                      "cf1:q7" CHAR, 
                                      "cf1:q8" SMALLINT, 
                                      "cf1:q9" BIGINT) 
-LOCATION ('pxf://@hostname@:50070/gphbase_test?FRAGMENTER=HBaseDataFragmenter')
+LOCATION ('pxf://@hostname@:50070/gphbase_test?FRAGMENTER=HBaseDataFragmenter&ACCESSOR=HBaseAccessor&RESOLVER=HBaseResolver')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import');
 -- Test analyze for HBase table.
 ANALYZE gphbase_select;
@@ -725,7 +725,7 @@ CREATE EXTERNAL TABLE gphbase_null(recordkey TEXT,
                                      "cf1:q7" CHAR, 
                                      "cf1:q8" SMALLINT, 
                                      "cf1:q9" BIGINT) 
-LOCATION ('pxf://@hostname@:50070/gphbase_test_null?FRAGMENTER=HBaseDataFragmenter')
+LOCATION ('pxf://@hostname@:50070/gphbase_test_null?FRAGMENTER=HBaseDataFragmenter&ACCESSOR=HBaseAccessor&RESOLVER=HBaseResolver')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import');
 SELECT * FROM gphbase_null WHERE "cf1:q1" is null ORDER BY recordkey ASC;
   recordkey  | cf1:q1 |          cf1:q2          | cf1:q3 |       q4       | cf1:q5 | cf1:q6 | cf1:q7 | cf1:q8 |    cf1:q9     
@@ -764,7 +764,7 @@ CREATE EXTERNAL TABLE gphbase_upper(recordkey TEXT,
                                      "cf1:q7" CHAR, 
                                      "cf1:q8" SMALLINT, 
                                      "cf1:q9" BIGINT) 
-LOCATION ('pxf://@hostname@:50070/gphbase_test_upper?FRAGMENTER=HBaseDataFragmenter')
+LOCATION ('pxf://@hostname@:50070/gphbase_test_upper?FRAGMENTER=HBaseDataFragmenter&ACCESSOR=HBaseAccessor&RESOLVER=HBaseResolver')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import');
 SELECT * FROM gphbase_upper ORDER BY recordkey ASC;
   recordkey  |    cf1:q1     |          cf1:q2          | cf1:q3 |       q4       | cf1:q5 | cf1:q6 | cf1:q7 | cf1:q8 |    cf1:q9    
@@ -780,7 +780,7 @@ SELECT * FROM gphbase_upper ORDER BY recordkey ASC;
 DROP EXTERNAL TABLE gphbase_upper;
 -- Negative test
 CREATE EXTERNAL TABLE gphbase_error(recordkey int)
-LOCATION ('pxf://@hostname@:50070/gphbase_test?FRAGMENTER=HBaseDataFragmenter')
+LOCATION ('pxf://@hostname@:50070/gphbase_test?FRAGMENTER=HBaseDataFragmenter&ACCESSOR=HBaseAccessor&RESOLVER=HBaseResolver')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import');
 SELECT * FROM gphbase_error;
 ERROR:  Reporting a badly formatted data record which was detected by the java reader. See GPBridge log for more details
@@ -797,7 +797,7 @@ CREATE EXTERNAL TABLE gphbase_lookup(recordkey TEXT,
                                      "cf1:q7" CHAR, 
                                      "cf1:q8" SMALLINT, 
                                      "cf1:q9" BIGINT) 
-LOCATION ('pxf://@hostname@:50070/gphbase_test?FRAGMENTER=HBaseDataFragmenter')
+LOCATION ('pxf://@hostname@:50070/gphbase_test?FRAGMENTER=HBaseDataFragmenter&ACCESSOR=HBaseAccessor&RESOLVER=HBaseResolver')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import');
 -- truncate lookup table
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar`:`echo ${HADOOP_ROOT}/lib/commons-logging-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-configuration-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-lang-[1-9]*.jar`:@abs_srcdir@/helpers HBaseChangeLookupTable truncate-table
@@ -877,7 +877,7 @@ CREATE EXTERNAL TABLE gphbase_integer_rowkey(recordkey INTEGER,
                                      "cf1:q7" CHAR, 
                                      "cf1:q8" SMALLINT, 
                                      "cf1:q9" BIGINT) 
-LOCATION ('pxf://@hostname@:50070/gphbase_test_integer_rowkey?FRAGMENTER=HBaseDataFragmenter')
+LOCATION ('pxf://@hostname@:50070/gphbase_test_integer_rowkey?FRAGMENTER=HBaseDataFragmenter&ACCESSOR=HBaseAccessor&RESOLVER=HBaseResolver')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import');
 SET pxf_enable_filter_pushdown = on;
 SELECT * FROM gphbase_integer_rowkey WHERE recordkey = 50;
