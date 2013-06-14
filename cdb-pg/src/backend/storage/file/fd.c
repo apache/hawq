@@ -651,7 +651,7 @@ LruInsert(File file)
 
 	if (FileIsNotOpen(file))
 	{
-	    elog(LOG, "reopen file %s with flag %o", vfdP->fileName, vfdP->fileFlags);
+	    elog(LOG, "reopen file %s with flag %x", vfdP->fileName, vfdP->fileFlags);
 
 	    while (nfile + numAllocatedDescs >= max_safe_fds)
 		{
@@ -2452,7 +2452,7 @@ HdfsBasicOpenFile(FileName fileName, int fileFlags, int fileMode,
 	if (NULL == ConvertToUnixPath(fileName, path, sizeof(path)))
 		return FALSE;
 
-	if (!(fileFlags & O_APPEND) && (fileFlags & O_WRONLY))
+	if (!(fileFlags & O_APPEND) && ((fileFlags & O_WRONLY) || (fileFlags & O_CREAT)))
 		*hFile = HdfsOpenFile(protocol, *fs, path, fileFlags, 0, rep, 0);
 	else
 		*hFile = HdfsOpenFile(protocol, *fs, path, fileFlags, 0, 0, 0);
@@ -2524,11 +2524,12 @@ HdfsPathNameOpenFile(FileName fileName, int fileFlags, int fileMode)
 	vfdP->hFS = fs;
 	vfdP->hFile = hfile;
 	vfdP->hProtocol = protocol;
-	/*
-	 * we always set O_APPEND since it will be ignored if
-	 * the file is opened for read
-	 */
-	vfdP->fileFlags = (fileFlags & ~O_CREAT) | O_APPEND;
+
+	if (fileFlags & O_RDONLY)
+		vfdP->fileFlags = O_RDONLY;
+	else
+		vfdP->fileFlags = O_WRONLY | O_APPEND;
+
 	vfdP->fileMode = fileMode;
 	vfdP->seekPos = INT64CONST(0);
 

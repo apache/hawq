@@ -55,7 +55,7 @@ static void MirroredAppendOnly_DoOpen(
 
 	int 						*primaryError)
 {
-	int		fileFlags = O_RDWR | PG_BINARY;
+	int		fileFlags;
 	int		fileMode = 0600;
 						/*
 						 * File mode is S_IRUSR 00400 user has read permission
@@ -68,9 +68,6 @@ static void MirroredAppendOnly_DoOpen(
 	Assert(open != NULL);
 	
 	*primaryError = 0;
-
-	if (create)
-		fileFlags |= O_CREAT;
 
 	MemSet(open, 0, sizeof(MirroredAppendOnlyOpen));
 
@@ -112,18 +109,14 @@ static void MirroredAppendOnly_DoOpen(
 
 	errno = 0;
 
-	{
-		fileFlags = 0;
-		if (readOnly)
-			fileFlags |= O_RDONLY;
-		else
-			fileFlags |= O_WRONLY;
 
-		if (create)
-			fileFlags |= O_CREAT;
-		else
-			fileFlags |= O_APPEND;
-	}
+	if (create)
+		fileFlags = (O_CREAT | O_EXCL);
+	else if (readOnly)
+		fileFlags = O_RDONLY;
+	else
+		fileFlags = (O_WRONLY | O_APPEND);
+
 	open->primaryFile = PathNameOpenFile(path, fileFlags, fileMode);
 
 	if (open->primaryFile < 0)
