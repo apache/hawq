@@ -1144,3 +1144,54 @@ def remove_temporary_directories(host, dir):
     except Exception, e:
         logger.error('remove temporary directory failed. %s' % str(e))
         raise e
+
+def template_temporary_directories(data_dir, contentid):
+    directories_file = os.path.join(data_dir, 'gp_temporary_files_directories')
+    if not os.path.exists(directories_file):
+        logger.info('default temporary direcotry was used')
+        return
+
+    directories = []
+    with open(directories_file) as file:
+        for line in file:
+            path = line.strip()
+            # remove the contentid
+            contentid_pos = path.rfind(str(contentid))
+            if contentid_pos == -1:
+                raise Exception('contentid is wrong in %s' % directories_file)
+            path = path[0:contentid_pos]
+            directories.append(path)
+
+    os.remove(directories_file)
+    with open(directories_file, 'w' ) as file:
+        for d in directories:
+            file.write(d + '\n')
+
+
+def update_temporary_directories(data_dir, contentid):
+    directories_file = os.path.join(data_dir, 'gp_temporary_files_directories')
+    if not os.path.exists(directories_file):
+        logger.info('default temporary direcotry was used')
+        return
+
+    logger.info('updating temporary directory file')
+    directories = []
+    with open(directories_file) as file:
+        for line in file:
+            path = line.strip()
+            # append the contentid
+            path = path + str(contentid)
+            directories.append(path)
+
+    os.remove(directories_file)
+    with open(directories_file, 'w' ) as file:
+        for d in directories:
+            file.write(d + '\n')
+
+    # create the temporary directories
+    for d in directories:
+        if os.path.exists(d):
+            logger.warn('temporary directory %s is already exists' % d)
+
+        MakeDirectory.local('create temporary direcotry', d)
+

@@ -17,6 +17,7 @@ from gppylib.utils import canStringBeParsedAsInt
 from gppylib.gp_dbid import writeGpDbidFile
 from time import sleep
 from gppylib.operations.buildMirrorSegments import gDatabaseDirectories, gDatabaseFiles
+from gppylib.operations.filespace import update_temporary_directories
 
 description = (""" 
 
@@ -41,7 +42,7 @@ class ValidationException(Exception):
         return self.__msg
 
 class ConfExpSegCmd(Command):
-    def __init__(self, name, cmdstr, datadir, port, dbid, newseg, tarfile, useLighterDirectoryValidation, isPrimary,
+    def __init__(self, name, cmdstr, datadir, port, dbid, content, newseg, tarfile, useLighterDirectoryValidation, isPrimary,
                     filespaceOids, filespaceDirs, verbose, validationOnly, writeGpDbidFileOnly):
         """
         @param useLighterDirectoryValidation if True then we don't require an empty directory; we just require that
@@ -50,6 +51,7 @@ class ConfExpSegCmd(Command):
         self.datadir = datadir
         self.port = int(port)
         self.dbid = dbid
+        self.content = content
         self.newseg = newseg
         self.tarfile = tarfile
         self.verbose = verbose
@@ -196,6 +198,8 @@ class ConfExpSegCmd(Command):
                     logger.info("create gp_dbid file for segment")
                     writeGpDbidFile(self.datadir, self.dbid, logger=gplog.get_logger_if_verbose())
 
+                    logger.info('create temporary direcotries')
+                    update_temporary_directories(self.datadir, self.content)
 
                     logger.info("Updating %s/postgresql.conf" % self.datadir)
                     modifyPostgresqlConfCmd = ModifyPostgresqlConfSetting('Updating %s/postgresql.conf' % self.datadir,
@@ -339,8 +343,9 @@ try:
         isPrimary = seg[2] == "true"
         directoryValidationLevel = seg[3] == "true"
         dbid = int(seg[4])
-        if len(seg) >= 6:
-            filespaceOids, filespaceDirs = getOidDirLists(seg[5].split('+'))
+        content = int(seg[5])
+        if len(seg) >= 7:
+            filespaceOids, filespaceDirs = getOidDirLists(seg[6].split('+'))
         else:
             filespaceOids, filespaceDirs = [], []
 
@@ -349,6 +354,7 @@ try:
                            , datadir = dataDir
                            , port = port
                            , dbid = dbid
+                           , content = content
                            , newseg = options.newsegments
                            , tarfile = options.tarfile
                            , useLighterDirectoryValidation = directoryValidationLevel

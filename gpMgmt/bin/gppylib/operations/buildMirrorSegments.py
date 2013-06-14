@@ -16,10 +16,11 @@ from gppylib.gparray import GpArray
 from gppylib import gphostcache
 from gppylib.testold.testUtils import *
 from gppylib.operations import startSegments
+from gppylib.operations.filespace import template_temporary_directories
 from gppylib.gp_era import read_era
 from gppylib.operations.utils import ParallelOperation
 from gppylib.operations.filespace import PG_SYSTEM_FILESPACE, GP_TRANSACTION_FILES_FILESPACE, GP_TEMPORARY_FILES_FILESPACE, GetMoveOperationList, GetFilespaceEntriesDict, GetFilespaceEntries, GetCurrentFilespaceEntries, RollBackFilespaceChanges, UpdateFlatFiles, FileType, MoveFilespaceError
-    
+
 logger = get_default_logger()
 
 gDatabaseDirectories = [
@@ -47,7 +48,7 @@ gDatabaseSubDirectories = [
         ]
 
 #
-# Database files that may exist in the root directory and need deleting 
+# Database files that may exist in the root directory and need deleting
 #
 gDatabaseFiles = [
     "PG_VERSION",
@@ -64,7 +65,7 @@ def MPP_12038_fault_injection():
     """This function will check for the environment variable
     GP_MPP_12038 and if it is set will sleep for 2 * gp_fts_probe_interval.
     This is used in this module to check interaction with the FTS prober and
-    should only be used for testing.  Note this delay is long enough for a 
+    should only be used for testing.  Note this delay is long enough for a
     small test installation but would likely not be long enough for a large
     cluster."""
     if os.getenv("GP_MPP_12038_INJECT_DELAY", None):
@@ -169,7 +170,7 @@ class GpMirrorListToBuild:
         Returns a newly allocated list
         """
         return [m for m in self.__mirrorsToBuild]
-    
+
     def getAdditionalWarnings(self):
         """
         Returns any additional warnings generated during building of list
@@ -188,14 +189,14 @@ class GpMirrorListToBuild:
         pg_system_filespace_entries = GetFilespaceEntriesDict(GetFilespaceEntries(gparray,
                                                                                   PG_SYSTEM_FILESPACE).run()).run()
         cur_filespace_name = gparray.getFileSpaceName(int(cur_filespace_entries[1][0]))
-        segments = [target_segment] + [seg for seg in gparray.getDbList() if seg.getSegmentContentId() == target_segment.getSegmentContentId() and seg.getSegmentDbId() != target_segment.getSegmentDbId()] 
-        
+        segments = [target_segment] + [seg for seg in gparray.getDbList() if seg.getSegmentContentId() == target_segment.getSegmentContentId() and seg.getSegmentDbId() != target_segment.getSegmentDbId()]
+
         logger.info('Starting file move procedure for %s' % target_segment)
 
         if os.path.exists(os.path.join(default_filespace_dir, GP_TRANSACTION_FILES_FILESPACE)):
-            #On the expansion segments, the current filespace used by existing nodes will be the 
+            #On the expansion segments, the current filespace used by existing nodes will be the
             #new filespace to which we want to move the transaction and temp files.
-            #The filespace directories which have to be moved will be the default pg_system directories. 
+            #The filespace directories which have to be moved will be the default pg_system directories.
             new_filespace_entries = GetFilespaceEntriesDict(GetCurrentFilespaceEntries(gparray,
                                                                                 FileType.TRANSACTION_FILES).run()).run()
             logger.info('getting filespace information')
@@ -222,7 +223,7 @@ class GpMirrorListToBuild:
                                         cur_filespace_name,
                                         cur_filespace_entries,
                                         new_filespace_entries,
-                                        pg_system_filespace_entries).run() 
+                                        pg_system_filespace_entries).run()
                 raise
 
         if os.path.exists(os.path.join(default_filespace_dir, GP_TEMPORARY_FILES_FILESPACE)):
@@ -236,7 +237,7 @@ class GpMirrorListToBuild:
                                                   cur_filespace_entries,
                                                   pg_system_filespace_entries).run()
             logger.info('Starting temporary files move')
-            ParallelOperation(operation_list).run() 
+            ParallelOperation(operation_list).run()
 
             logger.debug('Checking temporary files move')
             try:
@@ -250,9 +251,9 @@ class GpMirrorListToBuild:
                                         cur_filespace_name,
                                         cur_filespace_entries,
                                         new_filespace_entries,
-                                        pg_system_filespace_entries).run() 
+                                        pg_system_filespace_entries).run()
                 raise
-        
+
     def buildMirrors(self, actionName, gpEnv, gpArray):
         """
         Build the mirrors.
@@ -316,7 +317,7 @@ class GpMirrorListToBuild:
             if toRecover.getFailoverSegment() is not None:
                 target_segment = toRecover.getFailoverSegment()
             elif toRecover.isFullSynchronization():
-                target_segment = toRecover.getFailedSegment() 
+                target_segment = toRecover.getFailedSegment()
 
             if target_segment is not None:
                 self.__moveFilespaces(gpArray, target_segment)
@@ -335,7 +336,7 @@ class GpMirrorListToBuild:
             except MoveFilespaceError, e:
                 logger.error(str(e))
                 raise
-            
+
         # update and save metadata in memory
         for toRecover in self.__mirrorsToBuild:
 
@@ -356,27 +357,15 @@ class GpMirrorListToBuild:
                 seg.setSegmentMode(gparray.MODE_RESYNCHRONIZATION)
 
         # figure out what needs to be started or transitioned
-        mirrorsToStart = []
-        primariesToConvert = []
-        convertPrimaryUsingFullResync = []
+        setToRestart = []
         fullResyncMirrorDbIds = {}
         for toRecover in self.__mirrorsToBuild:
             seg = toRecover.getFailoverSegment()
             if seg is None:
                 seg = toRecover.getFailedSegment() # we are recovering in place
-            mirrorsToStart.append(seg)
-            # GPSQL fullsync will recreate the directory.
-            if seg.isSegmentQE():
-                convertPrimaryUsingFullResync.append(toRecover.isFullSynchronization())
-                continue
+            setToRestart.append(seg)
 
             primarySeg = toRecover.getLiveSegment()
-            # The change in configuration to of the mirror to down requires
-            # that the primary also be change to change tracking if required.
-            if primarySeg.getSegmentMode() != gparray.MODE_CHANGELOGGING:
-                primarySeg.setSegmentMode(gparray.MODE_CHANGELOGGING)
-            primariesToConvert.append(primarySeg)
-            convertPrimaryUsingFullResync.append(toRecover.isFullSynchronization())
 
             if toRecover.isFullSynchronization() and seg.getSegmentDbId() > 0:
                 fullResyncMirrorDbIds[seg.getSegmentDbId()] = True
@@ -388,17 +377,18 @@ class GpMirrorListToBuild:
         signal.signal(signal.SIGINT,signal.SIG_IGN)
         try:
             if gpArray.getFaultStrategy() == gparray.FAULT_STRATEGY_NONE:
-                logger.info("GPSQL rescovery")
+                logger.info("HAWQ rescovery")
+
                 # Update the catalog to reflect the fact that recovery to a new
                 # host.
                 if len(fullResyncMirrorDbIds) > 0:
                    pass
 
                 logger.info("Starting failover segments")
-                self.__startAll(gpEnv, gpArray, mirrorsToStart)
+                self.__startAll(gpEnv, gpArray, setToRestart)
 
                 logger.info("Updating configuration to mark segments up")
-                for seg in mirrorsToStart:
+                for seg in setToRestart:
                     seg.setSegmentStatus(gparray.STATUS_UP)
 
 	            configInterface.getConfigurationProvider().updateSystemConfig(
@@ -413,50 +403,10 @@ class GpMirrorListToBuild:
                 signal.signal(signal.SIGINT,signal.default_int_handler)
                 return
 
-            logger.info("Updating configuration with new mirrors")
-            configInterface.getConfigurationProvider().updateSystemConfig(
-                gpArray,
-                "%s: segment config for resync" % programName,
-                dbIdToForceMirrorRemoveAdd = fullResyncMirrorDbIds, 
-                useUtilityMode = False, 
-                allowPrimary = False 
-            )
-            
-            MPP_12038_fault_injection()
-          
-            logger.info("Updating mirrors")
-            self.__updateGpIdFile(gpEnv, gpArray, mirrorsToStart)
-
-            logger.info("Starting mirrors")
-            self.__startAll(gpEnv, gpArray, mirrorsToStart)
-            
-            logger.info("Updating configuration to mark mirrors up")
-            for seg in mirrorsToStart:
-                seg.setSegmentStatus(gparray.STATUS_UP)
-            for seg in primariesToConvert:
-                seg.setSegmentMode(gparray.MODE_RESYNCHRONIZATION)
-            configInterface.getConfigurationProvider().updateSystemConfig(
-                gpArray,
-                "%s: segment resync marking mirrors up and primaries resync" % programName,
-                dbIdToForceMirrorRemoveAdd = {},
-                useUtilityMode = True,
-                allowPrimary = False
-            )
-
-            MPP_12038_fault_injection()
-
-            #
-            # note: converting the primaries may take a really long time to complete because of initializing
-            #       resynchronization
-            #
-            logger.info("Updating primaries")
-            self.__convertAllPrimaries(gpEnv, gpArray, primariesToConvert, convertPrimaryUsingFullResync)
-
-            logger.info("Done updating primaries")
         finally:
             # Reenable Ctrl-C
             signal.signal(signal.SIGINT,signal.default_int_handler)
-        
+
     def __verifyGpArrayContents(self, gpArray):
         """
         Run some simple assertions against gpArray contents
@@ -620,12 +570,13 @@ class GpMirrorListToBuild:
                                 templateDir + '/postmaster.pid')
             rmCmd.run(validateAfter=True)
 
+            # template the temporary directories file
+            template_temporary_directories(templateDir, srcSegments[0].content)
+
             tarFileName = "gpsqlSegmentTemplate.tar"
             blankTarFile = tempDir + "/" + tarFileName
             cmd = gp.CreateTar('gpbuildingmirrorsegment tar segment template', templateDir, blankTarFile)
             cmd.run(validateAfter=True)
-        else:
-            (tempDir, blankTarFile, tarFileName) = self.__buildTarFileForTransfer(gpEnv, gpArray.master, srcSegments[0], destSegments)
 
         def createConfigureNewSegmentCommand(hostName, cmdLabel, validationOnly):
             segmentInfo = newSegmentInfo[hostName]
@@ -731,7 +682,7 @@ class GpMirrorListToBuild:
 
     def __ensureMarkedDown(self, gpEnv, toEnsureMarkedDown):
         """Waits for FTS prober to mark segments as down"""
-        
+
         wait_time = 60 * 30 # Wait up to 30 minutes to handle very large, busy
                             # clusters that may have faults.  In most cases the
                             # actual time to wait will be small and this operation
@@ -739,7 +690,7 @@ class GpMirrorListToBuild:
                             # needed to be stopped, an uncommon operation.
 
         dburl = dbconn.DbURL(port=gpEnv.getMasterPort(), dbname='template1')
-        
+
         time_elapsed = 0
         seg_up_count = 0
         initial_seg_up_count = len(toEnsureMarkedDown)
@@ -751,14 +702,14 @@ class GpMirrorListToBuild:
 
         logger.info("Waiting for segments to be marked down.")
         logger.info("This may take up to %d seconds on large clusters." % wait_time)
-        
+
         # wait for all needed segments to be marked down by the prober.  We'll wait
-        # a max time of double the interval 
+        # a max time of double the interval
         while wait_time > time_elapsed:
             seg_up_count = 0
             current_gparray = GpArray.initFromCatalog(dburl, True)
             seg_db_map = current_gparray.getSegDbMap()
-            
+
             # go through and get the status of each segment we need to be marked down
             for segdb in toEnsureMarkedDown:
                 if segdb.getSegmentDbId() in seg_db_map and seg_db_map[segdb.getSegmentDbId()].isSegmentUp() == True:
@@ -768,24 +719,24 @@ class GpMirrorListToBuild:
             else:
                 if last_seg_up_count != seg_up_count:
                     print "\n",
-                    logger.info("%d of %d segments have been marked down." % 
+                    logger.info("%d of %d segments have been marked down." %
                                 (initial_seg_up_count - seg_up_count, initial_seg_up_count))
                     last_seg_up_count = seg_up_count
-                    
+
                 for _i in range(1,5):
                     time.sleep(1)
                     sys.stdout.write(".")
                     sys.stdout.flush()
-                    
+
                 time_elapsed += 5
 
         if seg_up_count == 0:
             print "\n",
-            logger.info("%d of %d segments have been marked down." % 
+            logger.info("%d of %d segments have been marked down." %
                         (initial_seg_up_count, initial_seg_up_count))
         else:
             raise Exception("%d segments were not marked down by FTS" % seg_up_count)
-    
+
 
     def __cleanUpSegmentDirectories(self, directives):
         if len(directives) == 0:
@@ -888,6 +839,6 @@ class GpCopySegmentDirectoryDirective:
 
     def getDestSegment(self):
         return self.__dest
-        
+
     def isTargetReusedLocation(self):
         return self.__isTargetReusedLocation
