@@ -36,7 +36,6 @@ try:
     from gppylib.gp_dbid import GpDbidFile
     from gppylib.gp_contentnum import GpContentnumFile
     from gppylib.gp_era import GpEraFile
-    from gppylib.operations.filespace import CheckFilespaceConsistency, FileType
 except ImportError, e:
     sys.exit('Cannot import modules.  Please check that you have sourced greenplum_path.sh.  Detail: ' + str(e))
 
@@ -128,13 +127,6 @@ class GpStart:
 
             self._check_standby_activated()
 
-            inconsistent_filespace = False
-            #Check for filespace consistency
-            if not CheckFilespaceConsistency(self.gparray, FileType.TRANSACTION_FILES).run() or\
-               not CheckFilespaceConsistency(self.gparray, FileType.TEMPORARY_FILES).run():
-                logger.error('Filespaces are inconsistent. Abort Greenplum Database start.')
-                inconsistent_filespace = True
-
             logger.info("Shutting down master")
             cmd=gp.GpStop("Shutting down master", masterOnly=True,
                           fast=True, quiet=logging_is_quiet(),
@@ -144,9 +136,6 @@ class GpStart:
             logger.debug("results of forcing master shutdown: %s" % cmd)
             #TODO: check results of command.
     
-            if inconsistent_filespace:
-                return 1
-
         finally:
             # Reenable Ctrl-C
             signal.signal(signal.SIGINT,signal.default_int_handler)
