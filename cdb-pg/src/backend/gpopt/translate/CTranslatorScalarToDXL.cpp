@@ -516,10 +516,10 @@ CTranslatorScalarToDXL::PdxlnScOpExprFromExpr
 	// check if this is a scalar comparison
 	CMDIdGPDB *pmdidReturnType = New(m_pmp) CMDIdGPDB(((OpExpr *) pexpr)->opresulttype);
 	const IMDType *pmdtype= m_pmda->Pmdtype(pmdidReturnType);
-	pmdidReturnType->Release();
 
 	if (IMDType::EtiBool ==  pmdtype->Eti())
 	{
+		pmdidReturnType->Release();
 		return PdxlnScCmpFromOpExpr(pexpr, pmapvarcolid);
 	}
 
@@ -537,12 +537,12 @@ CTranslatorScalarToDXL::PdxlnScOpExprFromExpr
 
 	GPOS_ASSERT(1 == gpdb::UlListLength(popexpr->args) || 2 == gpdb::UlListLength(popexpr->args));
 
-	// get operator name
+	// get operator name and id
 	IMDId *pmdid = New(m_pmp) CMDIdGPDB(popexpr->opno);
-
+	
 	const CWStringConst *pstr = PstrOpName(pmdid);
 
-	CDXLScalarOpExpr *pdxlop = New(m_pmp) CDXLScalarOpExpr(m_pmp, pmdid, New(m_pmp) CWStringConst(pstr->Wsz()));
+	CDXLScalarOpExpr *pdxlop = New(m_pmp) CDXLScalarOpExpr(m_pmp, pmdid, pmdidReturnType, New(m_pmp) CWStringConst(pstr->Wsz()));
 
 	// create the DXL node holding the scalar opexpr
 	CDXLNode *pdxln = New(m_pmp) CDXLNode(m_pmp, pdxlop);
@@ -1218,6 +1218,20 @@ CTranslatorScalarToDXL::PdxlnScFuncExprFromFuncExpr
 												pfuncexpr->funcretset
 												)
 									);
+
+	if (CTranslatorUtils::FReadsOrModifiesData(m_pmda, pmdidFunc))
+	{
+		ListCell *plc = NULL;
+		ForEach (plc, pfuncexpr->args)
+		{
+			Node *pnodeArg = (Node *) lfirst(plc);
+			if (CTranslatorUtils::FHasSubquery(pnodeArg))
+			{
+				GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature,
+						GPOS_WSZ_LIT("Functions which read or modify data with subqueries in arguments"));
+			}
+		}
+	}
 
 	TranslateScalarChildren(pdxln, pfuncexpr->args, pmapvarcolid);
 

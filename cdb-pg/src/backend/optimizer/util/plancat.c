@@ -1149,7 +1149,7 @@ find_inheritance_children(Oid inhparent)
 	 * Can skip the scan if pg_class shows the relation has never had a
 	 * subclass.
 	 */
-	if (!has_subclass(inhparent))
+	if (!has_subclass_fast(inhparent))
 		return NIL;
 
 	pcqCtx = caql_beginscan(
@@ -1166,42 +1166,6 @@ find_inheritance_children(Oid inhparent)
 	caql_endscan(pcqCtx);
 
 	return list;
-}
-
-/*
- * has_subclass
- *
- * In the current implementation, has_subclass returns whether a
- * particular class *might* have a subclass. It will not return the
- * correct result if a class had a subclass which was later dropped.
- * This is because relhassubclass in pg_class is not updated when a
- * subclass is dropped, primarily because of concurrency concerns.
- *
- * Currently has_subclass is only used as an efficiency hack to skip
- * unnecessary inheritance searches, so this is OK.
- */
-bool
-has_subclass(Oid relationId)
-{
-	HeapTuple	tuple;
-	bool		result;
-	cqContext  *pcqCtx;
-
-	pcqCtx = caql_beginscan(
-			NULL,
-			cql("SELECT * FROM pg_class "
-				" WHERE oid = :1 ",
-				ObjectIdGetDatum(relationId)));
-	
-	tuple = caql_getnext(pcqCtx);
-
-	if (!HeapTupleIsValid(tuple))
-		elog(ERROR, "cache lookup failed for relation %u", relationId);
-
-	result = ((Form_pg_class) GETSTRUCT(tuple))->relhassubclass;
-
-	caql_endscan(pcqCtx);
-	return result;
 }
 
 /*

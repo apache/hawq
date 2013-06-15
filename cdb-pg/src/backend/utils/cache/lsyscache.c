@@ -1299,6 +1299,34 @@ is_agg_ordered(Oid aggid)
 }
 
 /*
+ * has_agg_prelimfunc
+ *		Given aggregate id, check if it is has a prelim function
+ */
+bool has_agg_prelimfunc(Oid aggid)
+{
+	Relation aggRelation = heap_open(AggregateRelationId, AccessShareLock);
+	cqContext	cqc;
+	HeapTuple aggTuple = caql_getfirst(
+			caql_addrel(cqclr(&cqc), aggRelation),
+			cql("SELECT * from pg_aggregate"
+				" WHERE aggfnoid = :1",
+				ObjectIdGetDatum(aggid)));
+
+	if (!HeapTupleIsValid(aggTuple))
+	{
+		elog(ERROR, "cache lookup failed for aggregate %u", aggid);
+	}
+
+	Form_pg_aggregate aggform = (Form_pg_aggregate) GETSTRUCT(aggTuple);
+	bool has_prelimfunc = (InvalidOid != aggform->aggprelimfn);
+	
+	heap_freetuple(aggTuple);
+	heap_close(aggRelation, AccessShareLock);
+
+	return has_prelimfunc;
+}
+
+/*
  * get_func_nargs
  *		Given procedure id, return the number of arguments.
  */
@@ -3749,3 +3777,61 @@ get_comparison_operator
 	return InvalidOid;
 }
 
+/*
+ * has_subclass_fast
+ *
+ * In the current implementation, has_subclass returns whether a
+ * particular class *might* have a subclass. It will not return the
+ * correct result if a class had a subclass which was later dropped.
+ * This is because relhassubclass in pg_class is not updated when a
+ * subclass is dropped, primarily because of concurrency concerns.
+ *
+ * Currently has_subclass is only used as an efficiency hack to skip
+ * unnecessary inheritance searches, so this is OK.
+ */
+bool
+has_subclass_fast(Oid relationId)
+{
+	HeapTuple	tuple;
+	bool		result;
+	cqContext  *pcqCtx;
+
+	pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_class "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(relationId)));
+	
+	tuple = caql_getnext(pcqCtx);
+
+	if (!HeapTupleIsValid(tuple))
+		elog(ERROR, "cache lookup failed for relation %u", relationId);
+
+	result = ((Form_pg_class) GETSTRUCT(tuple))->relhassubclass;
+
+	caql_endscan(pcqCtx);
+	return result;
+}
+
+/*
+ * has_subclass
+ *
+ * Performs the exhaustive check whether a relation has a subclass. This is 
+ * different from has_subclass_fast, in that the latter can return true if a relation.
+ * *might* have a subclass. See comments in has_subclass_fast for more details.
+ * 
+ */
+bool
+has_subclass(Oid relationId)
+{
+	if (!has_subclass_fast(relationId))
+	{
+		return false;
+	}
+	
+	return (0 < caql_getcount(
+					NULL,
+					cql("SELECT COUNT(*) FROM pg_inherits "
+						" WHERE inhparent = :1 ",
+						ObjectIdGetDatum(relationId))));
+}

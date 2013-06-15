@@ -129,9 +129,11 @@ ExecHashJoin(HashJoinState *node)
 			 * outer plan node.  If we succeed, we have to stash it away for later
 			 * consumption by ExecHashJoinOuterGetTuple.
 			 */
-			if ((node->js.jointype == JOIN_LEFT) || (node->js.jointype == JOIN_LASJ) || 
-				(outerNode->plan->startup_cost < hashNode->ps.plan->total_cost &&
-				 !node->hj_OuterNotEmpty))
+			if ((node->js.jointype == JOIN_LEFT) ||
+					(node->js.jointype == JOIN_LASJ) ||
+					(node->js.jointype == JOIN_LASJ_NOTIN) ||
+					(outerNode->plan->startup_cost < hashNode->ps.plan->total_cost &&
+						!node->hj_OuterNotEmpty))
 			{
 				TupleTableSlot *slot;
 
@@ -180,14 +182,18 @@ ExecHashJoin(HashJoinState *node)
 		 */
 		hashNode->hashtable = hashtable;
 
-		hashNode->hs_quit_if_hashkeys_null = (node->js.jointype == JOIN_LASJ);
+		/*
+		 * Only if doing a LASJ_NOTIN join, we want to quit as soon as we find
+		 * a NULL key on the inner side
+		 */
+		hashNode->hs_quit_if_hashkeys_null = (node->js.jointype == JOIN_LASJ_NOTIN);
 
 		(void) MultiExecProcNode((PlanState *) hashNode);
 
 		/**
-		 * If LASJ and a null was found on the inner side, then clean out.
+		 * If LASJ_NOTIN and a null was found on the inner side, then clean out.
 		 */
-		if (node->js.jointype == JOIN_LASJ && hashNode->hs_hashkeys_null)
+		if (node->js.jointype == JOIN_LASJ_NOTIN && hashNode->hs_hashkeys_null)
 		{
 			/*
 			 * CDB: We'll read no more from outer subtree. To keep sibling
@@ -207,14 +213,28 @@ ExecHashJoin(HashJoinState *node)
 		 * If the inner relation is completely empty, and we're not doing an
 		 * outer join, we can quit without scanning the outer relation.
 		 */
-		if (node->js.jointype != JOIN_LEFT && node->js.jointype != JOIN_LASJ)
+		if (node->js.jointype != JOIN_LEFT
+				&& node->js.jointype != JOIN_LASJ
+				&& node->js.jointype != JOIN_LASJ_NOTIN)
         {
             int         i;
 
             /* Is there a nonempty batch? */
             for (i = 0; i < hashtable->nbatch; i++)
-                if (hashtable->batches[i]->innertuples)
+            {
+                /*
+                 * For batch 0, the number of inner tuples is stored in batches[i].innertuples.
+                 * For batches on disk (1 and above), the batches[i].innertuples is 0,
+                 * but batches[i].innerside.workfile is non-NULL if any tuples were written to disk.
+                 * Check both here.
+                 */
+                if ((hashtable->batches[i]->innertuples > 0) ||
+                        (NULL != hashtable->batches[i]->innerside.workfile))
+                {
+                    /* Found a non-empty batch, stop the search */
                     break;
+                }
+            }
 
 		    if (i == hashtable->nbatch)
 		    {
@@ -340,7 +360,7 @@ ExecHashJoin(HashJoinState *node)
 				node->hj_MatchedOuter = true;
 
 				/* In an antijoin, we never return a matched tuple */
-				if (node->js.jointype == JOIN_LASJ) 
+				if (node->js.jointype == JOIN_LASJ || node->js.jointype == JOIN_LASJ_NOTIN)
 				{
 					node->hj_NeedNewOuter = true;
 					break;		/* out of loop over hash bucket */
@@ -373,7 +393,8 @@ ExecHashJoin(HashJoinState *node)
 
 		if (!node->hj_MatchedOuter &&
 			(node->js.jointype == JOIN_LEFT ||
-			node->js.jointype == JOIN_LASJ))
+			node->js.jointype == JOIN_LASJ ||
+			node->js.jointype == JOIN_LASJ_NOTIN))
 		{
 			/*
 			 * We are doing an outer join and there were no join matches for
@@ -505,6 +526,7 @@ ExecInitHashJoin(HashJoin *node, EState *estate, int eflags)
 			break;
 		case JOIN_LEFT:
 		case JOIN_LASJ:
+		case JOIN_LASJ_NOTIN:
 			hjstate->hj_NullInnerTupleSlot =
 				ExecInitNullTupleSlot(estate,
 								 ExecGetResultType(innerPlanState(hjstate)));
@@ -683,11 +705,13 @@ ExecHashJoinOuterGetTuple(PlanState *outerNode,
 			econtext->ecxt_outertuple = slot;
 
 			bool hashkeys_null = false;
+			bool keep_nulls = (hjstate->js.jointype == JOIN_LEFT) ||
+					(hjstate->js.jointype == JOIN_LASJ) ||
+					(hjstate->js.jointype == JOIN_LASJ_NOTIN) ||
+					hjstate->hj_nonequijoin;
 			if (ExecHashGetHashValue(hashtable, econtext,
 						hjstate->hj_OuterHashKeys,
-						(hjstate->js.jointype == JOIN_LEFT) || 
-						(hjstate->js.jointype == JOIN_LASJ) || 
-						hjstate->hj_nonequijoin,
+						keep_nulls,
 						hashvalue,
 						&hashkeys_null
 						))
@@ -798,7 +822,8 @@ start_over:
         batch = hashtable->batches[curbatch];
 		if (batch->outerside.workfile != NULL &&
 			((hjstate->js.jointype == JOIN_LEFT) || 
-			 (hjstate->js.jointype == JOIN_LASJ)))
+			 (hjstate->js.jointype == JOIN_LASJ) ||
+			 (hjstate->js.jointype == JOIN_LASJ_NOTIN)))
 			break;				/* must process due to rule 1 */
 		if (batch->innerside.workfile != NULL &&
 			nbatch != hashtable->nbatch_original)
@@ -1129,6 +1154,7 @@ initGpmonPktForHashJoin(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estat
 				type = PMNT_HashLeftJoin;
 				break;
 			case JOIN_LASJ:
+			case JOIN_LASJ_NOTIN:
 				type = PMNT_HashLeftAntiSemiJoin;
 				break;
 			case JOIN_FULL:
@@ -1148,9 +1174,6 @@ initGpmonPktForHashJoin(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estat
 				break;
 			case JOIN_UNIQUE_INNER:
 				type = PMNT_HashUniqueInnerJoin;
-				break;
-			case JOIN_LASJ_NOTIN:
-				insist_log(false, "Join type not supported");
 				break;
 		}
 

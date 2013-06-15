@@ -63,13 +63,13 @@ VACUUM FREEZE pg_proc;
 CREATE FUNCTION @gpupgradeschemaname@.gp_partition_propagation(int4, oid) RETURNS void  LANGUAGE internal VOLATILE STRICT AS 'gp_partition_propagation' WITH (OID=6083);
 SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.gp_partition_propagation(int4, oid) IS  ''inserts a partition oid into specified pid-index''');
 
-CREATE FUNCTION @gpupgradeschemaname@.gp_partition_selection(oid, anyelement) RETURNS oid LANGUAGE internal VOLATILE STRICT AS 'gp_partition_selection' WITH (OID=6084);
+CREATE FUNCTION @gpupgradeschemaname@.gp_partition_selection(oid, anyelement) RETURNS oid LANGUAGE internal STABLE STRICT AS 'gp_partition_selection' WITH (OID=6084);
 SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.gp_partition_selection(oid, anyelement)  IS ''selects the child partition oid which satisfies a given partition key value''');
 
-CREATE FUNCTION @gpupgradeschemaname@.gp_partition_expansion(oid) RETURNS setof oid LANGUAGE internal VOLATILE STRICT AS 'gp_partition_expansion' WITH (OID=6085);
+CREATE FUNCTION @gpupgradeschemaname@.gp_partition_expansion(oid) RETURNS setof oid LANGUAGE internal STABLE STRICT AS 'gp_partition_expansion' WITH (OID=6085);
 SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.gp_partition_expansion(oid) IS ''finds all child partition oids for the given parent oid''');
 
-CREATE FUNCTION @gpupgradeschemaname@.gp_partition_inverse(oid) RETURNS setof record LANGUAGE internal VOLATILE STRICT AS 'gp_partition_inverse' WITH (OID=6086);
+CREATE FUNCTION @gpupgradeschemaname@.gp_partition_inverse(oid) RETURNS setof record LANGUAGE internal STABLE STRICT AS 'gp_partition_inverse' WITH (OID=6086);
 SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.gp_partition_inverse(oid) IS ''returns all child partitition oids with their constraints for a given parent oid''');
 
 --

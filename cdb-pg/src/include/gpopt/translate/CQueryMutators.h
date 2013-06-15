@@ -60,7 +60,7 @@ namespace gpdxl
 	//---------------------------------------------------------------------------
 	class CQueryMutators
 	{
-		typedef Node *(*Pnode) ();
+		typedef Node *(*Pfnode) ();
 		typedef struct SContextHavingQualMutator
 		{
 			public:
@@ -76,29 +76,33 @@ namespace gpdxl
 				// the target list of the new group by query
 				List *m_plTENewGroupByQuery;
 
-				// the target list of the new top query
-				List *m_plTENewRootQuery;
-
 				// the current query level
 				ULONG m_ulCurrLevelsUp;
 
+		 	 	// indicate whether we are mutating the argument of an aggregate
+				BOOL m_fAggregateArg;
+
+				// indicate the levels up of the aggregate we are mutating
+				ULONG m_ulAggregateLevelUp;
+				
 				// ctor
 				SContextHavingQualMutator
 					(
 					IMemoryPool *pmp,
 					CMDAccessor *pmda,
 					ULONG ulTECount,
-					List *plTENewGroupByQuery,
-					List *plTENewRootQuery
+					List *plTENewGroupByQuery
 					)
 					:
 					m_pmp(pmp),
 					m_pmda(pmda),
 					m_ulTECount(ulTECount),
 					m_plTENewGroupByQuery(plTENewGroupByQuery),
-					m_plTENewRootQuery(plTENewRootQuery)
+					m_ulCurrLevelsUp(0),
+					m_fAggregateArg(false),
+					m_ulAggregateLevelUp(ULONG_MAX)
 				{
-					m_ulCurrLevelsUp = 0;
+					GPOS_ASSERT(NULL != plTENewGroupByQuery);
 				}
 
 				// dtor
@@ -129,6 +133,12 @@ namespace gpdxl
 				// the sorting / grouping reference of the original target list entry
 				ULONG m_ulRessortgroupref;
 
+				// indicate whether we are mutating the argument of an aggregate
+				BOOL m_fAggregateArg;
+
+				// indicate whether we are mutating an expression representing a grouping column
+				BOOL m_fGroupingCol;
+				
 				// ctor
 				SContextGrpbyPlMutator
 					(
@@ -141,10 +151,12 @@ namespace gpdxl
 					m_pmp(pmp),
 					m_pmda(pmda),
 					m_pquery(pquery),
-					m_plTENewGroupByQuery(plTENewGroupByQuery)
+					m_plTENewGroupByQuery(plTENewGroupByQuery),
+					m_ulCurrLevelsUp(0),
+					m_ulRessortgroupref(0),
+					m_fAggregateArg(false),
+					m_fGroupingCol(false)
 				{
-					m_ulCurrLevelsUp = 0;
-					m_ulRessortgroupref = 0;
 				}
 
 				// dtor
@@ -225,6 +237,22 @@ namespace gpdxl
 			static
 			Query *PqueryNormalizeGrpByPrL(IMemoryPool *pmp, CMDAccessor *pmda, const Query *pquery);
 
+			// make a copy of the aggref (minus the arguments)
+			static
+			Aggref *PaggrefFlatCopy(Aggref *paggrefOld);
+
+			// create a new entry in the derived table and return its corresponding var
+			static
+			Var *PvarInsertIntoDerivedTable(Node *pnode, SContextHavingQualMutator *context);
+
+			// check if a matching node exists in the list of target entries
+			static
+			Node *PnodeFind(Node *pnode, SContextHavingQualMutator *pctx);
+
+			// increment the levels up of outer references
+			static
+			Var *PvarOuterReferenceIncrLevelsUp(Var *pvar);
+
 			// pull up having clause into a select
 			static
 			Query *PqueryNormalizeHaving(IMemoryPool *pmp, CMDAccessor *pmda, const Query *pquery);
@@ -241,6 +269,10 @@ namespace gpdxl
 			// extract all aggregate functions in an arbitrarily complex project element,
 			static
 			Node *PnodeGrpbyPrLMutator(Node *pnode, void *ctx);
+
+			// mutate the grouping columns, fix levels up when necessary
+			static
+			Node *PnodeGroupingColMutator(Node *pnode, TargetEntry *pteOriginal, SContextGrpbyPlMutator *pctxGrpByMutator);
 
 			// return a target entry for the aggregate or percentile expression
 			static

@@ -98,4 +98,10 @@ extern int	attnameAttNum(Relation rd, const char *attname, bool sysColOK);
 extern Name attnumAttName(Relation rd, int attid);
 extern Oid	attnumTypeId(Relation rd, int attid);
 
+/* Assign access permissions to the corresponding range table entry. */
+extern void assign_permissions(CmdType type, List *rangeTableEntries);
+
+extern void ExecCheckRTPerms(List *rangeTable);
+extern void ExecCheckRTEPerms(RangeTblEntry *rte);
+
 #endif   /* PARSE_RELATION_H */

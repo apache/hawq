@@ -198,7 +198,7 @@ ExplainResultDesc(ExplainStmt *stmt)
 /*
  * ExplainDXL -
  *	  print out the execution plan for one Query in DXL format
- *	  this function implicitly uses gp_optimizer
+ *	  this function implicitly uses optimizer
  */
 static void
 ExplainDXL(Query *query, ExplainStmt *stmt, const char *queryString,
@@ -230,19 +230,19 @@ ExplainDXL(Query *query, ExplainStmt *stmt, const char *queryString,
 	initStringInfoOfSize(&es->outbuf, 16000);
     MemoryContextSwitchTo(oldcxt);
 
-    bool enumerate = gp_opt_enumerate_plans;
+    bool enumerate = optimizer_enumerate_plans;
 
     /* Do the EXPLAIN. */
     PG_TRY();
     {
-    	// enable plan enumeration before calling gp_optimizer
-    	gp_opt_enumerate_plans = true;
+    	// enable plan enumeration before calling optimizer
+    	optimizer_enumerate_plans = true;
 
-    	// optimize query using gp_optimizer and get generated plan in DXL format
+    	// optimize query using optimizer and get generated plan in DXL format
     	char *dxl = SzDXLPlan(query);
 
     	// restore old value of enumerate plans GUC
-    	gp_opt_enumerate_plans = enumerate;
+    	optimizer_enumerate_plans = enumerate;
 
     	if (NULL == dxl)
     	{
@@ -262,7 +262,7 @@ ExplainDXL(Query *query, ExplainStmt *stmt, const char *queryString,
     PG_CATCH();
     {
     	// restore old value of enumerate plans GUC
-    	gp_opt_enumerate_plans = enumerate;
+    	optimizer_enumerate_plans = enumerate;
 
     	/* Free the memory we used. */
     	if (CurrentMemoryContext == explaincxt)

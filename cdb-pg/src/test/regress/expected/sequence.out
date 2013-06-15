@@ -9,7 +9,7 @@ INSERT INTO serialTest VALUES ('foo');
 INSERT INTO serialTest VALUES ('bar');
 INSERT INTO serialTest VALUES ('force', 100);
 INSERT INTO serialTest VALUES ('wrong', NULL);
-ERROR:  null value in column "f2" violates not-null constraint
+ERROR:  Not null constraint for table serialtest violated
  
 SELECT * FROM serialTest ORDER BY 2;
   f1   | f2  

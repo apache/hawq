@@ -27,6 +27,7 @@
 #include "catalog/pg_type.h"
 #include "catalog/indexing.h"
 #include "funcapi.h"
+#include "miscadmin.h"
 #include "nodes/makefuncs.h"
 #include "nodes/relation.h"                 /* CdbRelColumnInfo */
 #include "optimizer/pathnode.h"             /* cdb_rte_find_pseudo_column() */
@@ -35,6 +36,7 @@
 #include "parser/parse_relation.h"
 #include "parser/parse_type.h"
 #include "parser/parse_coerce.h"
+#include "utils/acl.h"
 #include "utils/builtins.h"
 #include "utils/lsyscache.h"
 #include "utils/syscache.h"
@@ -2568,3 +2570,121 @@ warnAutoRange(ParseState *pstate, RangeVar *relation, int location)
 				 parser_errposition(pstate, location)));
 	}
 }
+
+/*
+ * Sets permissions to the corresponding range table entry.
+ */
+void assign_permissions(CmdType type, List *rangeTableEntries) {
+
+	Assert(rangeTableEntries);
+	Assert(type);
+
+	AclMode required_access = ACL_NO_RIGHTS;
+
+	switch (type) {
+		case CMD_SELECT:
+			required_access = ACL_SELECT;
+			break;
+		case CMD_INSERT:
+			required_access = ACL_INSERT;
+			break;
+		case CMD_DELETE:
+			required_access = ACL_DELETE;
+			break;
+		case CMD_UPDATE:
+			required_access = ACL_UPDATE;
+			break;
+		default:
+			elog(DEBUG1, "no access right set for current query");
+			return;
+	}
+
+	ListCell *entry;
+	foreach(entry, rangeTableEntries)
+	{
+		RangeTblEntry *rte = lfirst(entry);
+
+		if (rte->rtekind != RTE_RELATION)
+		{
+			continue;
+		}
+
+		/* assign relation permissions. */
+		rte->requiredPerms |= required_access;
+
+		/* Consider also range table entries for subqueries. */
+		if (rte->subquery_rtable)
+		{
+			assign_permissions(type, rte->subquery_rtable);
+		}
+	}
+}
+
+/*
+ * ExecCheckRTPerms
+ *		Check access permissions for all relations listed in a range table.
+ */
+void
+ExecCheckRTPerms(List *rangeTable)
+{
+	ListCell   *l;
+
+	foreach(l, rangeTable)
+	{
+		ExecCheckRTEPerms((RangeTblEntry *) lfirst(l));
+	}
+}
+
+/*
+ * ExecCheckRTEPerms
+ *		Check access permissions for a single RTE.
+ */
+void
+ExecCheckRTEPerms(RangeTblEntry *rte)
+{
+	AclMode		requiredPerms;
+	Oid			relOid;
+	Oid			userid;
+
+	/*
+	 * Only plain-relation RTEs need to be checked here.  Function RTEs are
+	 * checked by init_fcache when the function is prepared for execution.
+	 * Join, subquery, and special RTEs need no checks.
+	 */
+	if (rte->rtekind != RTE_RELATION)
+		return;
+
+	/*
+	 * No work if requiredPerms is empty.
+	 */
+	requiredPerms = rte->requiredPerms;
+	if (requiredPerms == 0)
+		return;
+
+	relOid = rte->relid;
+
+	/*
+	 * userid to check as: current user unless we have a setuid indication.
+	 *
+	 * Note: GetUserId() is presently fast enough that there's no harm in
+	 * calling it separately for each RTE.	If that stops being true, we could
+	 * call it once in ExecCheckRTPerms and pass the userid down from there.
+	 * But for now, no need for the extra clutter.
+	 */
+	userid = rte->checkAsUser ? rte->checkAsUser : GetUserId();
+
+	/*
+	 * We must have *all* the requiredPerms bits, so use aclmask not aclcheck.
+	 */
+	if (pg_class_aclmask(relOid, userid, requiredPerms, ACLMASK_ALL)
+		!= requiredPerms)
+	{
+		/*
+		 * If the table is a partition, return an error message that includes
+		 * the name of the parent table.
+		 */
+		const char *rel_name = get_rel_name_partition(relOid);
+		aclcheck_error(ACLCHECK_NO_PRIV, ACL_KIND_CLASS, rel_name);
+	}
+}
+

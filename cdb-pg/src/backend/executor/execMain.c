@@ -64,6 +64,7 @@
 #include "optimizer/clauses.h"
 #include "parser/parse_clause.h"
 #include "parser/parse_expr.h"
+#include "parser/parse_relation.h"
 #include "parser/parsetree.h"
 #include "storage/smgr.h"
 #include "utils/acl.h"
@@ -131,8 +132,6 @@ static void ExecSelect(TupleTableSlot *slot,
 		   EState *estate);
 static TupleTableSlot *EvalPlanQualNext(EState *estate);
 static void EndEvalPlanQual(EState *estate);
-static void ExecCheckRTPerms(List *rangeTable);
-static void ExecCheckRTEPerms(RangeTblEntry *rte);
 static void ExecCheckXactReadOnly(PlannedStmt *plannedstmt);
 static void EvalPlanQualStart(evalPlanQual *epq, EState *estate,
 				  evalPlanQual *priorepq);
@@ -1182,73 +1181,6 @@ ExecutorRewind(QueryDesc *queryDesc)
 }
 
 
-/*
- * ExecCheckRTPerms
- *		Check access permissions for all relations listed in a range table.
- */
-static void
-ExecCheckRTPerms(List *rangeTable)
-{
-	ListCell   *l;
-
-	foreach(l, rangeTable)
-	{
-		ExecCheckRTEPerms((RangeTblEntry *) lfirst(l));
-	}
-}
-
-/*
- * ExecCheckRTEPerms
- *		Check access permissions for a single RTE.
- */
-static void
-ExecCheckRTEPerms(RangeTblEntry *rte)
-{
-	AclMode		requiredPerms;
-	Oid			relOid;
-	Oid			userid;
-
-	/*
-	 * Only plain-relation RTEs need to be checked here.  Function RTEs are
-	 * checked by init_fcache when the function is prepared for execution.
-	 * Join, subquery, and special RTEs need no checks.
-	 */
-	if (rte->rtekind != RTE_RELATION)
-		return;
-
-	/*
-	 * No work if requiredPerms is empty.
-	 */
-	requiredPerms = rte->requiredPerms;
-	if (requiredPerms == 0)
-		return;
-
-	relOid = rte->relid;
-
-	/*
-	 * userid to check as: current user unless we have a setuid indication.
-	 *
-	 * Note: GetUserId() is presently fast enough that there's no harm in
-	 * calling it separately for each RTE.	If that stops being true, we could
-	 * call it once in ExecCheckRTPerms and pass the userid down from there.
-	 * But for now, no need for the extra clutter.
-	 */
-	userid = rte->checkAsUser ? rte->checkAsUser : GetUserId();
-
-	/*
-	 * We must have *all* the requiredPerms bits, so use aclmask not aclcheck.
-	 */
-	if (pg_class_aclmask(relOid, userid, requiredPerms, ACLMASK_ALL)
-		!= requiredPerms)
-	{
-		/*
-		 * If the table is a partition, return an error message that includes
-		 * the name of the parent table.
-		 */
-		const char *rel_name = get_rel_name_partition(relOid);
-		aclcheck_error(ACLCHECK_NO_PRIV, ACL_KIND_CLASS, rel_name);
-	}
-}
 
 /*
  * This function is used to check if the current statement will perform any writes.
@@ -2789,20 +2721,22 @@ ExecutePlan(EState *estate,
 	 * Process BEFORE EACH STATEMENT triggers
 	 */
 	if (Gp_role != GP_ROLE_EXECUTE || Gp_is_writer)
-	switch (operation)
 	{
-		case CMD_UPDATE:
-			ExecBSUpdateTriggers(estate, estate->es_result_relation_info);
-			break;
-		case CMD_DELETE:
-			ExecBSDeleteTriggers(estate, estate->es_result_relation_info);
-			break;
-		case CMD_INSERT:
-			ExecBSInsertTriggers(estate, estate->es_result_relation_info);
-			break;
-		default:
-			/* do nothing */
-			break;
+		switch (operation)
+		{
+			case CMD_UPDATE:
+				ExecBSUpdateTriggers(estate, estate->es_result_relation_info);
+				break;
+			case CMD_DELETE:
+				ExecBSDeleteTriggers(estate, estate->es_result_relation_info);
+				break;
+			case CMD_INSERT:
+				ExecBSInsertTriggers(estate, estate->es_result_relation_info);
+				break;
+			default:
+				/* do nothing */
+				break;
+		}
 	}
 
 	/* Error out for unsupported updates */
@@ -3059,24 +2993,24 @@ lnext:	;
 	/*
 	 * Process AFTER EACH STATEMENT triggers
 	 */
-	if ((Gp_role != GP_ROLE_EXECUTE || Gp_is_writer) &&
-			estate->es_plannedstmt->planGen != PLANGEN_OPTIMIZER )
-	switch (operation)
+	if (Gp_role != GP_ROLE_EXECUTE || Gp_is_writer)
 	{
-		case CMD_UPDATE:
-			ExecASUpdateTriggers(estate, estate->es_result_relation_info);
-			break;
-		case CMD_DELETE:
-			ExecASDeleteTriggers(estate, estate->es_result_relation_info);
-			break;
-		case CMD_INSERT:
-			ExecASInsertTriggers(estate, estate->es_result_relation_info);
-			break;
-		default:
-			/* do nothing */
-			break;
+		switch (operation)
+		{
+			case CMD_UPDATE:
+				ExecASUpdateTriggers(estate, estate->es_result_relation_info);
+				break;
+			case CMD_DELETE:
+				ExecASDeleteTriggers(estate, estate->es_result_relation_info);
+				break;
+			case CMD_INSERT:
+				ExecASInsertTriggers(estate, estate->es_result_relation_info);
+				break;
+			default:
+				/* do nothing */
+				break;
+		}
 	}
-
 	/*
 	 * here, result is either a slot containing a tuple in the case of a
 	 * SELECT or NULL otherwise.

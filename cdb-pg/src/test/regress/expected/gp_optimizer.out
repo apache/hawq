@@ -5,7 +5,7 @@
 SELECT gp_opt_version();
                            gp_opt_version                           
 --------------------------------------------------------------------
- GPOPT version: 1.180, GPOS version: 1.82, Xerces version: 3.1.1-p1
+ GPOPT version: 1.204, GPOS version: 1.86, Xerces version: 3.1.1-p1
 (1 row)
 
 -- master only tables
@@ -20,11 +20,17 @@ NOTICE:  Table has no attributes to distribute on.
 alter table orca.s add column c int;
 alter table orca.s add column d int;
 insert into orca.s select i, i/2 from generate_series(1,30) i;
-set gp_log_optimizer=on;
-set gp_optimizer=on;
+set optimizer_log=on;
+set optimizer=on;
 ----------------------------------------------------------------------
+-- expected fall back to the planner
+select sum(distinct a), count(distinct b) from orca.r;
+ sum | count
+-----+-------
+ 210 |     7
+(1 row)
+
 select * from orca.r;
-NOTICE:  Optimizer successfully produced plan
  a  | b 
 ----+---
   1 | 0
@@ -50,7 +56,6 @@ NOTICE:  Optimizer successfully produced plan
 (20 rows)
 
 select * from orca.r, orca.s where r.a=s.c;
-NOTICE:  Optimizer successfully produced plan
  a  | b | c  | d  
 ----+---+----+----
   1 | 0 |  1 |  0
@@ -76,7 +81,6 @@ NOTICE:  Optimizer successfully produced plan
 (20 rows)
 
 select * from orca.r, orca.s where r.a<s.c+1 or r.a>s.c;
-NOTICE:  Optimizer successfully produced plan
  a  | b | c  | d  
 ----+---+----+----
   1 | 0 |  1 |  0
@@ -682,21 +686,18 @@ NOTICE:  Optimizer successfully produced plan
 (600 rows)
 
 select sum(r.a) from orca.r;
-NOTICE:  Optimizer successfully produced plan
  sum 
 -----
  210
 (1 row)
 
 select count(*) from orca.r;
-NOTICE:  Optimizer successfully produced plan
  count 
 -------
     20
 (1 row)
 
 select a, b from orca.r, orca.s group by a,b;
-NOTICE:  Optimizer successfully produced plan
  a  | b 
 ----+---
   1 | 0
@@ -722,7 +723,6 @@ NOTICE:  Optimizer successfully produced plan
 (20 rows)
 
 select r.a+1 from orca.r;
-NOTICE:  Optimizer successfully produced plan
  ?column? 
 ----------
         2
@@ -748,7 +748,6 @@ NOTICE:  Optimizer successfully produced plan
 (20 rows)
 
 select * from orca.r, orca.s where r.a<s.c or (r.b<s.d and r.b>s.c);
-NOTICE:  Optimizer successfully produced plan
  a  | b | c  | d  
 ----+---+----+----
   1 | 0 |  2 |  1
@@ -1144,7 +1143,6 @@ NOTICE:  Optimizer successfully produced plan
 (390 rows)
 
 select case when r.a<s.c then r.a<s.c else r.a<s.c end from orca.r, orca.s;
-NOTICE:  Optimizer successfully produced plan
  case 
 ------
  f
@@ -1750,7 +1748,6 @@ NOTICE:  Optimizer successfully produced plan
 (600 rows)
 
 select case r.b<s.c when true then r.b else s.c end from orca.r, orca.s where r.a = s.d;
-NOTICE:  Optimizer successfully produced plan
  c 
 ---
  0
@@ -1785,7 +1782,6 @@ NOTICE:  Optimizer successfully produced plan
 (29 rows)
 
 select * from orca.r limit 100;
-NOTICE:  Optimizer successfully produced plan
  a  | b 
 ----+---
   1 | 0
@@ -1811,7 +1807,6 @@ NOTICE:  Optimizer successfully produced plan
 (20 rows)
 
 select * from orca.r limit 10 offset 9;
-NOTICE:  Optimizer successfully produced plan
  a  | b 
 ----+---
  10 | 3
@@ -1827,7 +1822,6 @@ NOTICE:  Optimizer successfully produced plan
 (10 rows)
 
 select * from orca.r offset 10;
-NOTICE:  Optimizer successfully produced plan
  a  | b 
 ----+---
  11 | 3
@@ -1843,7 +1837,6 @@ NOTICE:  Optimizer successfully produced plan
 (10 rows)
 
 select sqrt(r.a) from orca.r;
-NOTICE:  Optimizer successfully produced plan
        sqrt       
 ------------------
                 1
@@ -1869,7 +1862,6 @@ NOTICE:  Optimizer successfully produced plan
 (20 rows)
 
 select pow(r.b,r.a) from orca.r;
-NOTICE:  Optimizer successfully produced plan
          pow          
 ----------------------
                     0
@@ -1895,7 +1887,6 @@ NOTICE:  Optimizer successfully produced plan
 (20 rows)
 
 select b from orca.r group by b having  count(*) > 2;
-NOTICE:  Optimizer successfully produced plan
  b 
 ---
  1
@@ -1907,7 +1898,6 @@ NOTICE:  Optimizer successfully produced plan
 (6 rows)
 
 select b from orca.r group by b having  count(*) <= avg(a) + (select count(*) from orca.s where s.c = r.b);
-NOTICE:  Optimizer successfully produced plan
  b 
 ---
  1
@@ -1919,7 +1909,6 @@ NOTICE:  Optimizer successfully produced plan
 (6 rows)
 
 select sum(a) from orca.r group by b having count(*) > 2 order by b+1;
-NOTICE:  Optimizer successfully produced plan
  sum 
 -----
   12
@@ -1931,7 +1920,6 @@ NOTICE:  Optimizer successfully produced plan
 (6 rows)
 
 select sum(a) from orca.r group by b having count(*) > 2 order by b+1;
-NOTICE:  Optimizer successfully produced plan
  sum 
 -----
   12
@@ -1944,7 +1932,6 @@ NOTICE:  Optimizer successfully produced plan
 
 -- constants
 select 0.001::numeric from orca.r;
-NOTICE:  Optimizer successfully produced plan
  numeric 
 ---------
    0.001
@@ -1970,7 +1957,6 @@ NOTICE:  Optimizer successfully produced plan
 (20 rows)
 
 select NULL::text, NULL::int from orca.r;
-NOTICE:  Optimizer successfully produced plan
  text | int4 
 ------+------
       |     
@@ -1996,7 +1982,6 @@ NOTICE:  Optimizer successfully produced plan
 (20 rows)
 
 select 'helloworld'::text, 'helloworld2'::varchar from orca.r;
-NOTICE:  Optimizer successfully produced plan
     text    |   varchar   
 ------------+-------------
  helloworld | helloworld2
@@ -2022,7 +2007,6 @@ NOTICE:  Optimizer successfully produced plan
 (20 rows)
 
 select 129::bigint, 5623::int, 45::smallint from orca.r;
-NOTICE:  Optimizer successfully produced plan
  int8 | int4 | int2 
 ------+------+------
   129 | 5623 |   45
@@ -2048,7 +2032,6 @@ NOTICE:  Optimizer successfully produced plan
 (20 rows)
 
 select 0.001::numeric from orca.r;
-NOTICE:  Optimizer successfully produced plan
  numeric 
 ---------
    0.001
@@ -2074,7 +2057,6 @@ NOTICE:  Optimizer successfully produced plan
 (20 rows)
 
 select NULL::text, NULL::int from orca.r;
-NOTICE:  Optimizer successfully produced plan
  text | int4 
 ------+------
       |     
@@ -2100,7 +2082,6 @@ NOTICE:  Optimizer successfully produced plan
 (20 rows)
 
 select 'helloworld'::text, 'helloworld2'::varchar from orca.r;
-NOTICE:  Optimizer successfully produced plan
     text    |   varchar   
 ------------+-------------
  helloworld | helloworld2
@@ -2126,7 +2107,6 @@ NOTICE:  Optimizer successfully produced plan
 (20 rows)
 
 select 129::bigint, 5623::int, 45::smallint from orca.r;
-NOTICE:  Optimizer successfully produced plan
  int8 | int4 | int2 
 ------+------+------
   129 | 5623 |   45
@@ -2153,7 +2133,7 @@ NOTICE:  Optimizer successfully produced plan
 
 --  distributed tables
 ----------------------------------------------------------------------
-set gp_optimizer=off;
+set optimizer=off;
 create table orca.foo (x1 int, x2 int, x3 int);
 NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'x1' as the Greenplum Database data distribution key for this table.
 HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
@@ -2162,11 +2142,10 @@ create table orca.bar2 (x1 int, x2 int, x3 int) distributed randomly;
 insert into orca.foo select i,i+1,i+2 from generate_series(1,10) i;
 insert into orca.bar1 select i,i+1,i+2 from generate_series(1,20) i;
 insert into orca.bar2 select i,i+1,i+2 from generate_series(1,30) i;
-set gp_optimizer=on;
+set optimizer=on;
 ----------------------------------------------------------------------
 -- produces result node
 select x2 from orca.foo where x1 in (select x2 from orca.bar1);
-NOTICE:  Optimizer successfully produced plan
  x2 
 ----
   3
@@ -2181,21 +2160,18 @@ NOTICE:  Optimizer successfully produced plan
 (9 rows)
 
 select 1;
-NOTICE:  Optimizer successfully produced plan
  ?column? 
 ----------
         1
 (1 row)
 
 SELECT 1 AS one FROM orca.foo having 1 < 2;
-NOTICE:  Optimizer successfully produced plan
  one 
 -----
    1
 (1 row)
 
 SELECT generate_series(1,5) AS one FROM orca.foo having 1 < 2;
-NOTICE:  Optimizer successfully produced plan
  one 
 -----
    1
@@ -2206,7 +2182,6 @@ NOTICE:  Optimizer successfully produced plan
 (5 rows)
 
 SELECT 1 AS one FROM orca.foo group by x1 having 1 < 2;
-NOTICE:  Optimizer successfully produced plan
  one 
 -----
    1
@@ -2224,7 +2199,7 @@ NOTICE:  Optimizer successfully produced plan
 SELECT x1 AS one FROM orca.foo having 1 < 2;
 ERROR:  column "foo.x1" must appear in the GROUP BY clause or be used in an aggregate function
 ----------------------------------------------------------------------
-set gp_optimizer=off;
+set optimizer=off;
 drop table orca.r cascade;
 create table orca.r(a int, b int);
 NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'a' as the Greenplum Database data distribution key for this table.
@@ -2239,10 +2214,9 @@ HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sur
 insert into orca.s select i%7, i%2 from generate_series(1,30) i;
 analyze orca.r;
 analyze orca.s;
-set gp_optimizer=on;
+set optimizer=on;
 ----------------------------------------------------------------------
 select * from orca.r, orca.s where r.a=s.c;
-NOTICE:  Optimizer successfully produced plan
  a | b | c | d 
 ---+---+---+---
  2 | 2 | 2 | 0
@@ -2275,7 +2249,6 @@ NOTICE:  Optimizer successfully produced plan
 
 -- Materialize node
 select * from orca.r, orca.s where r.a<s.c+1 or r.a>s.c;
-NOTICE:  Optimizer successfully produced plan
  a  | b | c | d 
 ----+---+---+---
   1 | 1 | 2 | 0
@@ -2882,7 +2855,6 @@ NOTICE:  Optimizer successfully produced plan
 
 -- empty target list
 select r.* from orca.r, orca.s where s.c=2;
-NOTICE:  Optimizer successfully produced plan
  a  | b 
 ----+---
   2 | 2
@@ -2988,7 +2960,7 @@ NOTICE:  Optimizer successfully produced plan
 (100 rows)
 
 ----------------------------------------------------------------------
-set gp_optimizer=off;
+set optimizer=off;
 create table orca.m();
 NOTICE:  Table has no attributes to distribute on.
 alter table orca.m add column a int;
@@ -3000,11 +2972,10 @@ alter table orca.m1 add column b int;
 insert into orca.m select i-1, i%2 from generate_series(1,35) i;
 insert into orca.m1 select i-2, i%3 from generate_series(1,25) i;
 insert into orca.r values (null, 1);
-set gp_optimizer=on;
+set optimizer=on;
 ----------------------------------------------------------------------
 -- join types
 select r.a, s.c from orca.r left outer join orca.s on(r.a=s.c);
-NOTICE:  Optimizer successfully produced plan
  a  | c 
 ----+---
   2 | 2
@@ -3051,7 +3022,6 @@ NOTICE:  Optimizer successfully produced plan
 (41 rows)
 
 select r.a, s.c from orca.r left outer join orca.s on(r.a=s.c and r.a=r.b and s.c=s.d) order by r.a,s.c;
-NOTICE:  Optimizer successfully produced plan
 a  | c 
 ----+---
  1 | 1
@@ -3080,7 +3050,6 @@ a  | c
 (23 rows)
 
 select r.a, s.c from orca.r left outer join orca.s on(r.a=s.c) where s.d > 2 or s.d is null order by r.a;
-NOTICE:  Optimizer successfully produced plan
 a  | c 
 ----+---
  7 |  
@@ -3101,7 +3070,6 @@ a  | c
 (15 rows)
 
 select r.a, s.c from orca.r right outer join orca.s on(r.a=s.c);
-NOTICE:  Optimizer successfully produced plan
  a | c 
 ---+---
  2 | 2
@@ -3137,7 +3105,6 @@ NOTICE:  Optimizer successfully produced plan
 (30 rows)
 
 select * from orca.r where exists (select * from orca.s where s.c=r.a + 2);
-NOTICE:  Optimizer successfully produced plan
  a | b 
 ---+---
  2 | 2
@@ -3147,7 +3114,6 @@ NOTICE:  Optimizer successfully produced plan
 (4 rows)
 
 select * from orca.r where exists (select * from orca.s where s.c=r.b);
-NOTICE:  Optimizer successfully produced plan
  a  | b 
 ----+---
   3 | 0
@@ -3174,7 +3140,6 @@ NOTICE:  Optimizer successfully produced plan
 (21 rows)
 
 select * from orca.m where m.a not in (select a from orca.m1 where a=5);
-NOTICE:  Optimizer successfully produced plan
  a  | b 
 ----+---
   0 | 1
@@ -3214,7 +3179,6 @@ NOTICE:  Optimizer successfully produced plan
 (34 rows)
 
 select * from orca.m where m.a not in (select a from orca.m1);
-NOTICE:  Optimizer successfully produced plan
  a  | b 
 ----+---
  24 | 1
@@ -3231,7 +3195,6 @@ NOTICE:  Optimizer successfully produced plan
 (11 rows)
 
 select * from orca.m where m.a in (select a from orca.m1 where m1.a-1 = m.b);
-NOTICE:  Optimizer successfully produced plan
  a | b 
 ---+---
  1 | 0
@@ -3240,7 +3203,6 @@ NOTICE:  Optimizer successfully produced plan
 
 -- enable_hashjoin=off; enable_mergejoin=on
 select 1 from orca.m, orca.m1 where m.a = m1.a and m.b!=m1.b;
-NOTICE:  Optimizer successfully produced plan
  ?column? 
 ----------
         1
@@ -3263,7 +3225,6 @@ NOTICE:  Optimizer successfully produced plan
 
 -- plan.qual vs hashclauses/join quals:
 select * from orca.r left outer join orca.s on (r.a=s.c and r.b<s.d) where s.d is null;
-NOTICE:  Optimizer successfully produced plan
  a  | b | c | d 
 ----+---+---+---
   1 | 1 |   |  
@@ -3290,7 +3251,6 @@ NOTICE:  Optimizer successfully produced plan
 -- select * from orca.r m full outer join orca.r m1 on (m.a=m1.a) where m.a is null;
 -- sort
 select * from orca.r join orca.s on(r.a=s.c) order by r.a, s.d;
-NOTICE:  Optimizer successfully produced plan
  a | b | c | d 
 ---+---+---+---
  1 | 1 | 1 | 0
@@ -3322,7 +3282,6 @@ NOTICE:  Optimizer successfully produced plan
 (26 rows)
 
 select * from orca.r join orca.s on(r.a=s.c) order by r.a, s.d limit 10;
-NOTICE:  Optimizer successfully produced plan
  a | b | c | d 
 ---+---+---+---
  1 | 1 | 1 | 0
@@ -3338,7 +3297,6 @@ NOTICE:  Optimizer successfully produced plan
 (10 rows)
 
 select * from orca.r join orca.s on(r.a=s.c) order by r.a + 5, s.d limit 10;
-NOTICE:  Optimizer successfully produced plan
  a | b | c | d 
 ---+---+---+---
  1 | 1 | 1 | 0
@@ -3355,7 +3313,6 @@ NOTICE:  Optimizer successfully produced plan
 
 -- group by
 select 1 from orca.m group by a+b;
-NOTICE:  Optimizer successfully produced plan
  ?column? 
 ----------
         1
@@ -3380,7 +3337,6 @@ NOTICE:  Optimizer successfully produced plan
 
 -- join with const table
 select * from orca.r where a = (select 1);
-NOTICE:  Optimizer successfully produced plan
  a | b 
 ---+---
  1 | 1
@@ -3388,7 +3344,6 @@ NOTICE:  Optimizer successfully produced plan
 
 -- union with const table
 select * from ((select a as x from orca.r) union (select 1 as x )) as foo order by x;
-NOTICE:  Optimizer successfully produced plan
  x  
 ----
   1
@@ -3415,13 +3370,12 @@ NOTICE:  Optimizer successfully produced plan
 (21 rows)
 
 ----------------------------------------------------------------------
-set gp_optimizer=off;
+set optimizer=off;
 insert into orca.m values (1,-1), (1,2), (1,1);
-set gp_optimizer=on;
+set optimizer=on;
 ----------------------------------------------------------------------
 -- computed columns
 select a,a,a+b from orca.m;
-NOTICE:  Optimizer successfully produced plan
  a  | a  | ?column? 
 ----+----+----------
   0 |  0 |        1
@@ -3465,7 +3419,6 @@ NOTICE:  Optimizer successfully produced plan
 (38 rows)
 
 select a,a+b,a+b from orca.m;
-NOTICE:  Optimizer successfully produced plan
  a  | ?column? | ?column? 
 ----+----------+----------
   0 |        1 |        1
@@ -3510,7 +3463,6 @@ NOTICE:  Optimizer successfully produced plan
 
 -- func expr
 select * from orca.m where a=abs(b);
-NOTICE:  Optimizer successfully produced plan
  a | b  
 ---+----
  1 | -1
@@ -3519,7 +3471,6 @@ NOTICE:  Optimizer successfully produced plan
 
 -- grouping sets
 select a,b,count(*) from orca.m group by grouping sets ((a), (a,b));
-NOTICE:  Optimizer successfully produced plan
  a  | b  | count 
 ----+----+-------
  30 |  1 |     1
@@ -3598,7 +3549,6 @@ NOTICE:  Optimizer successfully produced plan
 (73 rows)
 
 select b,count(*) from orca.m group by grouping sets ((a), (a,b));
-NOTICE:  Optimizer successfully produced plan
  b  | count 
 ----+-------
   1 |     1
@@ -3677,7 +3627,6 @@ NOTICE:  Optimizer successfully produced plan
 (73 rows)
 
 select a,count(*) from orca.m group by grouping sets ((a), (a,b));
-NOTICE:  Optimizer successfully produced plan
  a  | count 
 ----+-------
  30 |     1
@@ -3756,7 +3705,6 @@ NOTICE:  Optimizer successfully produced plan
 (73 rows)
 
 select a,count(*) from orca.m group by grouping sets ((a), (b));
-NOTICE:  Optimizer successfully produced plan
  a  | count 
 ----+-------
     |     1
@@ -3801,7 +3749,6 @@ NOTICE:  Optimizer successfully produced plan
 (39 rows)
 
 select a,b,count(*) from orca.m group by rollup(a, b);
-NOTICE:  Optimizer successfully produced plan
  a  | b  | count 
 ----+----+-------
  30 |  1 |     1
@@ -3880,15 +3827,92 @@ NOTICE:  Optimizer successfully produced plan
     |    |    38
 (74 rows)
 
+select a,b,count(*) from orca.m group by rollup((a),(a,b)) order by 1,2,3;
+a  | b  | count 
+----+----+-------
+ 0 |  1 |     1
+ 0 |    |     1
+ 1 | -1 |     1
+ 1 |  0 |     1
+ 1 |  1 |     1
+ 1 |  2 |     1
+ 1 |    |     4
+ 2 |  1 |     1
+ 2 |    |     1
+ 3 |  0 |     1
+ 3 |    |     1
+ 4 |  1 |     1
+ 4 |    |     1
+ 5 |  0 |     1
+ 5 |    |     1
+ 6 |  1 |     1
+ 6 |    |     1
+ 7 |  0 |     1
+ 7 |    |     1
+ 8 |  1 |     1
+ 8 |    |     1
+ 9 |  0 |     1
+ 9 |    |     1
+10 |  1 |     1
+10 |    |     1
+11 |  0 |     1
+11 |    |     1
+12 |  1 |     1
+12 |    |     1
+13 |  0 |     1
+13 |    |     1
+14 |  1 |     1
+14 |    |     1
+15 |  0 |     1
+15 |    |     1
+16 |  1 |     1
+16 |    |     1
+17 |  0 |     1
+17 |    |     1
+18 |  1 |     1
+18 |    |     1
+19 |  0 |     1
+19 |    |     1
+20 |  1 |     1
+20 |    |     1
+21 |  0 |     1
+21 |    |     1
+22 |  1 |     1
+22 |    |     1
+23 |  0 |     1
+23 |    |     1
+24 |  1 |     1
+24 |    |     1
+25 |  0 |     1
+25 |    |     1
+26 |  1 |     1
+26 |    |     1
+27 |  0 |     1
+27 |    |     1
+28 |  1 |     1
+28 |    |     1
+29 |  0 |     1
+29 |    |     1
+30 |  1 |     1
+30 |    |     1
+31 |  0 |     1
+31 |    |     1
+32 |  1 |     1
+32 |    |     1
+33 |  0 |     1
+33 |    |     1
+34 |  1 |     1
+34 |    |     1
+   |    |    38
+(74 rows)
+
 select count(*) from orca.m group by ();
-NOTICE:  Optimizer successfully produced plan
  count 
 -------
     38
 (1 row)
 
 select a, count(*) from orca.r group by (), a;
-NOTICE:  Optimizer successfully produced plan
  a  | count 
 ----+-------
   2 |     1
@@ -3915,7 +3939,6 @@ NOTICE:  Optimizer successfully produced plan
 (21 rows)
 
 select a, count(*) from orca.r group by grouping sets ((),(a));
-NOTICE:  Optimizer successfully produced plan
  a  | count 
 ----+-------
   2 |     1
@@ -4038,9 +4061,41 @@ select a, count(*) c from orca.r group by grouping sets ((),(a), (a,b)) order by
     | 21
 (43 rows)
 
+select 1 from orca.r group by ();
+ ?column? 
+----------
+        1
+(1 row)
+
+select a,1 from orca.r group by rollup(a);
+ a  | ?column? 
+----+----------
+  2 |        1
+  4 |        1
+  6 |        1
+  8 |        1
+ 10 |        1
+ 12 |        1
+ 14 |        1
+ 16 |        1
+ 18 |        1
+ 20 |        1
+  1 |        1
+  3 |        1
+  5 |        1
+  7 |        1
+  9 |        1
+ 11 |        1
+ 13 |        1
+ 15 |        1
+ 17 |        1
+ 19 |        1
+    |        1
+    |        1
+(22 rows)
+
 -- arrays
 select array[array[a,b]], array[b] from orca.r;
-NOTICE:  Optimizer successfully produced plan
    array    | array 
 ------------+-------
  {{2,2}}    | {2}
@@ -4072,7 +4127,7 @@ ERROR:  relation "m" does not exist
 SELECT a from m UNION ALL select b from orca.m UNION ALL select a+b from orca.m group by 1;
 ERROR:  relation "m" does not exist
 ----------------------------------------------------------------------
-set gp_optimizer=off;
+set optimizer=off;
 drop table if exists orca.foo;
 create table orca.foo(a int, b int, c int, d int);
 NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'a' as the Greenplum Database data distribution key for this table.
@@ -4084,11 +4139,10 @@ NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'a' as
 HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
 insert into orca.foo select i, i%2, i%4, i-1 from generate_series(1,40)i;
 insert into orca.bar select i, i%3, i%2 from generate_series(1,30)i;
-set gp_optimizer=on;
+set optimizer=on;
 ----------------------------------------------------------------------
 --- distinct operation
 SELECT distinct a, b from orca.foo;
-NOTICE:  Optimizer successfully produced plan
  a  | b 
 ----+---
   1 | 1
@@ -4134,7 +4188,6 @@ NOTICE:  Optimizer successfully produced plan
 (40 rows)
 
 SELECT distinct foo.a, bar.b from orca.foo, orca.bar where foo.b = bar.a;
-NOTICE:  Optimizer successfully produced plan
  a  | b 
 ----+---
   1 | 1
@@ -4160,7 +4213,6 @@ NOTICE:  Optimizer successfully produced plan
 (20 rows)
 
 SELECT distinct a, b from orca.foo;
-NOTICE:  Optimizer successfully produced plan
  a  | b 
 ----+---
   1 | 1
@@ -4206,7 +4258,6 @@ NOTICE:  Optimizer successfully produced plan
 (40 rows)
 
 SELECT distinct a, count(*) from orca.foo group by a;
-NOTICE:  Optimizer successfully produced plan
  a  | count 
 ----+-------
   1 |     1
@@ -4252,7 +4303,6 @@ NOTICE:  Optimizer successfully produced plan
 (40 rows)
 
 SELECT distinct foo.a, bar.b, sum(bar.c+foo.c) from orca.foo, orca.bar where foo.b = bar.a group by foo.a, bar.b;
-NOTICE:  Optimizer successfully produced plan
  a  | b | sum 
 ----+---+-----
   1 | 1 |   2
@@ -4278,7 +4328,6 @@ NOTICE:  Optimizer successfully produced plan
 (20 rows)
 
 SELECT distinct a, count(*) from orca.foo group by a;
-NOTICE:  Optimizer successfully produced plan
  a  | count 
 ----+-------
   1 |     1
@@ -4324,7 +4373,6 @@ NOTICE:  Optimizer successfully produced plan
 (40 rows)
 
 SELECT distinct foo.a, bar.b from orca.foo, orca.bar where foo.b = bar.a;
-NOTICE:  Optimizer successfully produced plan
  a  | b 
 ----+---
   1 | 1
@@ -4350,7 +4398,6 @@ NOTICE:  Optimizer successfully produced plan
 (20 rows)
 
 SELECT distinct foo.a, bar.b, sum(bar.c+foo.c) from orca.foo, orca.bar where foo.b = bar.a group by foo.a, bar.b;
-NOTICE:  Optimizer successfully produced plan
  a  | b | sum 
 ----+---+-----
   1 | 1 |   2
@@ -4376,7 +4423,6 @@ NOTICE:  Optimizer successfully produced plan
 (20 rows)
 
 SELECT distinct a, b from orca.foo;
-NOTICE:  Optimizer successfully produced plan
  a  | b 
 ----+---
   1 | 1
@@ -4422,7 +4468,6 @@ NOTICE:  Optimizer successfully produced plan
 (40 rows)
 
 SELECT distinct a, count(*) from orca.foo group by a;
-NOTICE:  Optimizer successfully produced plan
  a  | count 
 ----+-------
   1 |     1
@@ -4468,7 +4513,6 @@ NOTICE:  Optimizer successfully produced plan
 (40 rows)
 
 SELECT distinct foo.a, bar.b from orca.foo, orca.bar where foo.b = bar.a;
-NOTICE:  Optimizer successfully produced plan
  a  | b 
 ----+---
   1 | 1
@@ -4494,7 +4538,6 @@ NOTICE:  Optimizer successfully produced plan
 (20 rows)
 
 SELECT distinct foo.a, bar.b, sum(bar.c+foo.c) from orca.foo, orca.bar where foo.b = bar.a group by foo.a, bar.b;
-NOTICE:  Optimizer successfully produced plan
  a  | b | sum 
 ----+---+-----
   1 | 1 |   2
@@ -4521,7 +4564,6 @@ NOTICE:  Optimizer successfully produced plan
 
 --- window operations
 select row_number() over() from orca.foo order by 1;
-NOTICE:  Optimizer successfully produced plan
  row_number 
 ------------
           1
@@ -4567,7 +4609,6 @@ NOTICE:  Optimizer successfully produced plan
 (40 rows)
 
 select rank() over(partition by b order by count(*)/sum(a)) from orca.foo group by a, b order by 1;
-NOTICE:  Optimizer successfully produced plan
  rank 
 ------
     1
@@ -4613,7 +4654,6 @@ NOTICE:  Optimizer successfully produced plan
 (40 rows)
 
 select row_number() over(order by foo.a) from orca.foo inner join orca.bar using(b) group by foo.a, bar.b, bar.a;
-NOTICE:  Optimizer successfully produced plan
  row_number 
 ------------
           1
@@ -5019,7 +5059,6 @@ NOTICE:  Optimizer successfully produced plan
 (400 rows)
 
 select 1+row_number() over(order by foo.a+bar.a) from orca.foo inner join orca.bar using(b);
-NOTICE:  Optimizer successfully produced plan
  ?column? 
 ----------
         2
@@ -5425,7 +5464,6 @@ NOTICE:  Optimizer successfully produced plan
 (400 rows)
 
 select row_number() over(order by foo.a+ bar.a)/count(*) from orca.foo inner join orca.bar using(b) group by foo.a, bar.a, bar.b;
-NOTICE:  Optimizer successfully produced plan
  ?column? 
 ----------
         1
@@ -5831,7 +5869,6 @@ NOTICE:  Optimizer successfully produced plan
 (400 rows)
 
 select count(*) over(partition by b order by a range between 1 preceding and (select count(*) from orca.bar) following) from orca.foo;
-NOTICE:  Optimizer successfully produced plan
  count 
 -------
     16
@@ -5877,7 +5914,6 @@ NOTICE:  Optimizer successfully produced plan
 (40 rows)
 
 select a+1, rank() over(partition by b+1 order by a+1) from orca.foo order by 1, 2;
-NOTICE:  Optimizer successfully produced plan
  ?column? | rank 
 ----------+------
         2 |    1
@@ -5922,10 +5958,157 @@ NOTICE:  Optimizer successfully produced plan
        41 |   20
 (40 rows)
 
+select a , sum(a) over (order by a range '1'::float8 preceding) from orca.r order by 1,2;
+a  | sum 
+----+-----
+ 1 |   1
+ 2 |   3
+ 3 |   5
+ 4 |   7
+ 5 |   9
+ 6 |  11
+ 7 |  13
+ 8 |  15
+ 9 |  17
+10 |  19
+11 |  21
+12 |  23
+13 |  25
+14 |  27
+15 |  29
+16 |  31
+17 |  33
+18 |  35
+19 |  37
+20 |  39
+   |    
+(21 rows)
+
+select a, b, floor(avg(b) over(order by a desc, b desc rows between unbounded preceding and unbounded following)) as avg, dense_rank() over (order by a) from orca.r order by 1,2,3,4;
+a  | b | avg | dense_rank 
+----+---+-----+------------
+ 1 | 1 |   1 |          1
+ 2 | 2 |   1 |          2
+ 3 | 0 |   1 |          3
+ 4 | 1 |   1 |          4
+ 5 | 2 |   1 |          5
+ 6 | 0 |   1 |          6
+ 7 | 1 |   1 |          7
+ 8 | 2 |   1 |          8
+ 9 | 0 |   1 |          9
+10 | 1 |   1 |         10
+11 | 2 |   1 |         11
+12 | 0 |   1 |         12
+13 | 1 |   1 |         13
+14 | 2 |   1 |         14
+15 | 0 |   1 |         15
+16 | 1 |   1 |         16
+17 | 2 |   1 |         17
+18 | 0 |   1 |         18
+19 | 1 |   1 |         19
+20 | 2 |   1 |         20
+   | 1 |   1 |         21
+(21 rows)
+
+select lead(a) over(order by a) from orca.r order by 1;
+lead 
+------
+   2
+   3
+   4
+   5
+   6
+   7
+   8
+   9
+  10
+  11
+  12
+  13
+  14
+  15
+  16
+  17
+  18
+  19
+  20
+    
+    
+(21 rows)
+
+select lag(c,d) over(order by c,d) from orca.s order by 1;
+lag 
+-----
+  0
+  0
+  0
+  0
+  1
+  1
+  1
+  1
+  1
+  2
+  2
+  2
+  2
+  2
+  3
+  3
+  3
+  3
+  4
+  4
+  4
+  4
+  5
+  5
+  5
+  5
+  6
+  6
+  6
+  6
+(30 rows)
+
+select lead(c,c+d,1000) over(order by c,d) from orca.s order by 1;
+lead 
+------
+   0
+   0
+   0
+   1
+   1
+   1
+   1
+   2
+   2
+   2
+   2
+   2
+   3
+   3
+   3
+   4
+   4
+   4
+   5
+   5
+   5
+   6
+   6
+   6
+1000
+1000
+1000
+1000
+1000
+1000
+(30 rows)
+
 --- cte
 with x as (select a, b from orca.r)
 select rank() over(partition by a, case when b = 0 then a+b end order by b asc) as rank_within_parent from x order by a desc ,case when a+b = 0 then a end ,b;
-NOTICE:  Optimizer successfully produced plan
  rank_within_parent 
 --------------------
                   1
@@ -5952,7 +6135,7 @@ NOTICE:  Optimizer successfully produced plan
 (21 rows)
 
 ----------------------------------------------------------------------
-set gp_optimizer=off;
+set optimizer=off;
 drop table if exists orca.rcte;
 NOTICE:  table "rcte" does not exist, skipping
 create table orca.rcte(a int, b int, c int);
@@ -5960,10 +6143,9 @@ NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'a' as
 HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
 insert into orca.rcte select i, i%2, i%3 from generate_series(1,40)i;
 -- select disable_xform('CXformInlineCTEConsumer');
-set gp_optimizer=on;
+set optimizer=on;
 ----------------------------------------------------------------------
 with x as (select * from orca.rcte where a < 10) select * from x x1, x x2;
-NOTICE:  Optimizer successfully produced plan
  a | b | c | a | b | c 
 ---+---+---+---+---+---
  2 | 0 | 2 | 2 | 0 | 2
@@ -6050,7 +6232,6 @@ NOTICE:  Optimizer successfully produced plan
 (81 rows)
 
 with x as (select * from orca.rcte where a < 10) select * from x x1, x x2 where x2.a = x1.b;
-NOTICE:  Optimizer successfully produced plan
  a | b | c | a | b | c 
 ---+---+---+---+---+---
  9 | 1 | 0 | 1 | 1 | 1
@@ -6061,7 +6242,6 @@ NOTICE:  Optimizer successfully produced plan
 (5 rows)
 
 with x as (select * from orca.rcte where a < 10) select a from x union all select b from x;
-NOTICE:  Optimizer successfully produced plan
  a 
 ---
  2
@@ -6085,7 +6265,6 @@ NOTICE:  Optimizer successfully produced plan
 (18 rows)
 
 with x as (select * from orca.rcte where a < 10) select * from x x1 where x1.b = any (select x2.a from x x2 group by x2.a);
-NOTICE:  Optimizer successfully produced plan
  a | b | c 
 ---+---+---
  9 | 1 | 0
@@ -6096,13 +6275,11 @@ NOTICE:  Optimizer successfully produced plan
 (5 rows)
 
 with x as (select * from orca.rcte where a < 10) select * from x x1 where x1.b = all (select x2.a from x x2 group by x2.a);
-NOTICE:  Optimizer successfully produced plan
  a | b | c 
 ---+---+---
 (0 rows)
 
 with x as (select * from orca.rcte where a < 10) select * from x x1, x x2, x x3 where x2.a = x1.b and x3.b = x2.b                                                                                   ;
-NOTICE:  Optimizer successfully produced plan
  a | b | c | a | b | c | a | b | c 
 ---+---+---+---+---+---+---+---+---
  9 | 1 | 0 | 1 | 1 | 1 | 9 | 1 | 0
@@ -6133,7 +6310,6 @@ NOTICE:  Optimizer successfully produced plan
 (25 rows)
 
 with x as (select * from orca.rcte where a < 10) select * from x x2 where x2.b < (select avg(b) from x x1);
-NOTICE:  Optimizer successfully produced plan
  a | b | c 
 ---+---+---
  2 | 0 | 2
@@ -6143,7 +6319,6 @@ NOTICE:  Optimizer successfully produced plan
 (4 rows)
 
 with x as (select r.a from orca.r, orca.s  where r.a < 10 and s.d < 10 and r.a = s.d) select * from x x1, x x2;
-NOTICE:  Optimizer successfully produced plan
  a | a 
 ---+---
  1 | 1
@@ -6374,7 +6549,6 @@ NOTICE:  Optimizer successfully produced plan
 (225 rows)
 
 with x as (select r.a from orca.r, orca.s  where r.a < 10 and s.c < 10 and r.a = s.c) select * from x x1, x x2;
-NOTICE:  Optimizer successfully produced plan
  a | a 
 ---+---
  1 | 2
@@ -7056,7 +7230,6 @@ NOTICE:  Optimizer successfully produced plan
 (676 rows)
 
 with x as (select * from orca.rcte where a < 10) (select a from x x2) union all (select max(a) from x x1);	
-NOTICE:  Optimizer successfully produced plan
  a 
 ---
  2
@@ -7198,7 +7371,7 @@ select a, c from orca.r, orca.s where a  <> all (select c) order by a, c limit 1
 (10 rows)
  
 ----------------------------------------------------------------------
-set gp_optimizer=off;
+set optimizer=off;
 CREATE TABLE orca.onek (
 unique1 int4,
 unique2 int4,
@@ -7226,7 +7399,7 @@ insert into orca.onek values (883,4,1,3,3,3,3,83,83,383,883,6,7,'ZHAAAA','EAAAAA
 insert into orca.onek values (439,5,1,3,9,19,9,39,39,439,439,18,19,'XQAAAA','FAAAAA','HHHHxx');
 insert into orca.onek values (670,6,0,2,0,10,0,70,70,170,670,0,1,'UZAAAA','GAAAAA','OOOOxx');
 insert into orca.onek values (543,7,1,3,3,3,3,43,143,43,543,6,7,'XUAAAA','HAAAAA','VVVVxx');
-set gp_optimizer=on;
+set optimizer=on;
 ----------------------------------------------------------------------
 select ten, sum(distinct four) from orca.onek a
 group by ten 
@@ -7247,18 +7420,6 @@ HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sur
 NOTICE:  CREATE TABLE will create partition "pp_1_prt_pp1" for table "pp"
 create index pp_a on orca.pp(a);
 NOTICE:  building index for child partition "pp_1_prt_pp1"
-explain select * from orca.pp where a=5;
-                                           QUERY PLAN                                            
--------------------------------------------------------------------------------------------------
- Gather Motion 2:1  (slice1; segments: 2)  (cost=0.00..101.25 rows=1 width=8)
-   ->  Sequence  (cost=0.00..100.00 rows=1 width=8)
-         ->  Result  (cost=10.00..100.00 rows=50 width=4)
-               ->  Function Scan on gp_partition_expansion  (cost=10.00..100.00 rows=50 width=4)
-         ->  Dynamic Index Scan on pp  (cost=0.00..0.06 rows=1 width=8)
-               Index Cond: a = 5
- Settings:  gp_optimizer=on
-(7 rows)
-
 ----------------------------------------------------------------------
 -- list partition tests
 -- test homogeneous partitions
@@ -7301,6 +7462,54 @@ select * from orca.t order by 1, 2, 3, 4, 5 limit 4;
  1 | 1  | 1 | b  | 1
  2 | 2  | 2 | a  | 2
 (4 rows)
+
+create table orca.multilevel_p (a int, b int)
+partition by range(a)
+subpartition by range(a)
+subpartition template
+(
+subpartition sp1 start(0) end(10) every (5),
+subpartition sp2 start(10) end(200) every(50)
+)
+(partition aa start(0) end (100) every (50),
+partition bb start(100) end(200) every (50) );
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'a' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_aa_1" for table "multilevel_p"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_aa_2" for table "multilevel_p"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_bb_1" for table "multilevel_p"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_bb_2" for table "multilevel_p"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_aa_1_2_prt_sp1_1" for table "multilevel_p_1_prt_aa_1"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_aa_1_2_prt_sp1_2" for table "multilevel_p_1_prt_aa_1"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_aa_1_2_prt_sp2_1" for table "multilevel_p_1_prt_aa_1"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_aa_1_2_prt_sp2_2" for table "multilevel_p_1_prt_aa_1"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_aa_1_2_prt_sp2_3" for table "multilevel_p_1_prt_aa_1"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_aa_1_2_prt_sp2_4" for table "multilevel_p_1_prt_aa_1"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_aa_2_2_prt_sp1_1" for table "multilevel_p_1_prt_aa_2"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_aa_2_2_prt_sp1_2" for table "multilevel_p_1_prt_aa_2"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_aa_2_2_prt_sp2_1" for table "multilevel_p_1_prt_aa_2"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_aa_2_2_prt_sp2_2" for table "multilevel_p_1_prt_aa_2"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_aa_2_2_prt_sp2_3" for table "multilevel_p_1_prt_aa_2"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_aa_2_2_prt_sp2_4" for table "multilevel_p_1_prt_aa_2"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_bb_1_2_prt_sp1_1" for table "multilevel_p_1_prt_bb_1"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_bb_1_2_prt_sp1_2" for table "multilevel_p_1_prt_bb_1"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_bb_1_2_prt_sp2_1" for table "multilevel_p_1_prt_bb_1"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_bb_1_2_prt_sp2_2" for table "multilevel_p_1_prt_bb_1"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_bb_1_2_prt_sp2_3" for table "multilevel_p_1_prt_bb_1"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_bb_1_2_prt_sp2_4" for table "multilevel_p_1_prt_bb_1"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_bb_2_2_prt_sp1_1" for table "multilevel_p_1_prt_bb_2"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_bb_2_2_prt_sp1_2" for table "multilevel_p_1_prt_bb_2"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_bb_2_2_prt_sp2_1" for table "multilevel_p_1_prt_bb_2"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_bb_2_2_prt_sp2_2" for table "multilevel_p_1_prt_bb_2"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_bb_2_2_prt_sp2_3" for table "multilevel_p_1_prt_bb_2"
+NOTICE:  CREATE TABLE will create partition "multilevel_p_1_prt_bb_2_2_prt_sp2_4" for table "multilevel_p_1_prt_bb_2"
+insert into orca.multilevel_p values (1,1), (100,200);
+select * from orca.multilevel_p;
+  a  |  b  
+-----+-----
+ 100 | 200
+   1 |   1
+(2 rows)
 
 -- test appendonly
 drop table if exists orca.t;
@@ -7428,8 +7637,268 @@ SELECT * FROM orca.csq_r WHERE a IN (SELECT * FROM orca.csq_f(orca.csq_r.a));
  1
 (1 row)
 
+-- test algebrization of having clause
+drop table if exists orca.tab1;
+NOTICE:  table "tab1" does not exist, skipping
+create table orca.tab1(a int, b int, c int, d int, e int);
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'a' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+insert into orca.tab1 values (1,2,3,4,5);
+insert into orca.tab1 values (1,2,3,4,5);
+insert into orca.tab1 values (1,2,3,4,5);
+select b,d from orca.tab1 group by b,d having min(distinct d)>3;
+ b | d 
+---+---
+ 2 | 4
+(1 row)
+
+select b,d from orca.tab1 group by b,d having d>3;
+ b | d 
+---+---
+ 2 | 4
+(1 row)
+ 
+select b,d from orca.tab1 group by b,d having min(distinct d)>b;
+ b | d 
+---+---
+ 2 | 4
+(1 row)
+
+create table orca.fooh1 (a int, b int, c int);
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'a' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+create table orca.fooh2 (a int, b int, c int);
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'a' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+insert into orca.fooh1 select i%4, i%3, i from generate_series(1,20) i;
+insert into orca.fooh2 select i%3, i%2, i from generate_series(1,20) i;
+select sum(f1.b) from orca.fooh1 f1 group by f1.a;
+ sum 
+-----
+   4
+   6
+   5
+   6
+(4 rows)
+
+select 1 as one, f1.a from orca.fooh1 f1 group by f1.a having sum(f1.b) > 4;
+ one | a 
+-----+---
+   1 | 1
+   1 | 2
+   1 | 0
+(3 rows)
+
+select f1.a, 1 as one from orca.fooh1 f1 group by f1.a having 10 > (select f2.a from orca.fooh2 f2 group by f2.a having sum(f1.a) > count(*) order by f2.a limit 1) order by f1.a;
+ a | one 
+---+-----
+ 2 |   1
+ 3 |   1
+(2 rows)
+
+select 1 from orca.fooh1 f1 group by f1.a having 10 > (select f2.a from orca.fooh2 f2 group by f2.a having sum(f1.a) > count(*) order by f2.a limit 1) order by f1.a;
+ ?column? 
+----------
+        1
+        1
+(2 rows)
+
+select f1.a, 1 as one from orca.fooh1 f1 group by f1.a having 10 > (select 1 from orca.fooh2 f2 group by f2.a having sum(f1.b) > count(*) order by f2.a limit 1) order by f1.a;
+ a | one 
+---+-----
+(0 rows)
+
+select 1 from orca.fooh1 f1 group by f1.a having 10 > (select 1 from orca.fooh2 f2 group by f2.a having sum(f1.b) > count(*) order by f2.a limit 1) order by f1.a;
+ ?column? 
+----------
+(0 rows)
+
+select f1.a, 1 as one from orca.fooh1 f1 group by f1.a having 0 = (select f2.a from orca.fooh2 f2 group by f2.a having sum(f2.b) > 1 order by f2.a limit 1) order by f1.a;
+ a | one 
+---+-----
+ 0 |   1
+ 1 |   1
+ 2 |   1
+ 3 |   1
+(4 rows)
+
+select 1 as one from orca.fooh1 f1 group by f1.a having 0 = (select f2.a from orca.fooh2 f2 group by f2.a having sum(f2.b) > 1 order by f2.a limit 1) order by f1.a;
+ one 
+-----
+   1
+   1
+   1
+   1
+(4 rows)
+
+select f1.a, 1 as one from orca.fooh1 f1 group by f1.a having 0 = (select f2.a from orca.fooh2 f2 group by f2.a having sum(f2.b) > 1 order by f2.a limit 1) order by f1.a;
+ a | one 
+---+-----
+ 0 |   1
+ 1 |   1
+ 2 |   1
+ 3 |   1
+(4 rows)
+
+select f1.a, 1 as one from orca.fooh1 f1 group by f1.a having 0 = (select f2.a from orca.fooh2 f2 group by f2.a having sum(f2.b + f1.a) > 1 order by f2.a limit 1) order by f1.a;
+ a | one 
+---+-----
+ 0 |   1
+ 1 |   1
+ 2 |   1
+ 3 |   1
+(4 rows)
+
+select f1.a, 1 as one from orca.fooh1 f1 group by f1.a having 0 = (select f2.a from orca.fooh2 f2 group by f2.a having sum(f2.b + sum(f1.b)) > 1 order by f2.a limit 1) order by f1.a;
+ a | one 
+---+-----
+ 0 |   1
+ 1 |   1
+ 2 |   1
+ 3 |   1
+(4 rows)
+
+select f1.a, 1 as one from orca.fooh1 f1 group by f1.a having f1.a < (select f2.a from orca.fooh2 f2 group by f2.a having sum(f2.b + 1) > f1.a order by f2.a desc limit 1) order by f1.a;
+ a | one 
+---+-----
+ 0 |   1
+ 1 |   1
+(2 rows)
+
+select f1.a, 1 as one from orca.fooh1 f1 group by f1.a having f1.a = (select f2.a from orca.fooh2 f2 group by f2.a having sum(f2.b) + 1 > f1.a order by f2.a desc limit 1);
+ a | one 
+---+-----
+ 2 |   1
+(1 row)
+
+select f1.a, 1 as one from orca.fooh1 f1 group by f1.a having f1.a = (select f2.a from orca.fooh2 f2 group by f2.a having sum(f2.b) > 1 order by f2.a limit 1);
+ a | one 
+---+-----
+ 0 |   1
+(1 row)
+
+select sum(f1.a+1)+1 from orca.fooh1 f1 group by f1.a+1;
+ ?column? 
+----------
+       16
+        6
+       11
+       21
+(4 rows)
+
+select sum(f1.a+1)+sum(f1.a+1) from orca.fooh1 f1 group by f1.a+1;
+ ?column? 
+----------
+       20
+       40
+       30
+       10
+(4 rows)
+
+select sum(f1.a+1)+avg(f1.a+1), sum(f1.a), sum(f1.a+1) from orca.fooh1 f1 group by f1.a+1;
+ ?column? | sum | sum 
+----------+-----+-----
+        6 |   0 |   5
+       18 |  10 |  15
+       12 |   5 |  10
+       24 |  15 |  20
+(4 rows)
+
+create table orca.t77(C952 text) WITH (compresstype=zlib,compresslevel=2,appendonly=true,blocksize=393216,checksum=true);
+insert into orca.t77 select 'text'::text;
+insert into orca.t77 select 'mine'::text;
+insert into orca.t77 select 'apple'::text;
+insert into orca.t77 select 'orange'::text;
+SELECT to_char(AVG( char_length(DT466.C952) ), '9999999.9999999'), MAX( char_length(DT466.C952) ) FROM orca.t77 DT466 GROUP BY char_length(DT466.C952);
+     to_char      | max 
+------------------+-----
+        5.0000000 |   5
+        4.0000000 |   4
+        6.0000000 |   6
+(3 rows)
+
+create table orca.prod9 (sale integer, prodnm varchar,price integer);
+insert into orca.prod9 values (100, 'shirts', 500);
+insert into orca.prod9 values (200, 'pants',800);
+insert into orca.prod9 values (300, 't-shirts', 300);
+-- returning product and price using Havingand Group by clause
+select prodnm, price from orca.prod9 GROUP BY prodnm, price HAVING price !=300;
+ prodnm | price 
+--------+-------
+ pants  |   800
+ shirts |   500
+(2 rows)
+
+-- analyze on tables with dropped attributes
+create table orca.toanalyze(a int, b int);
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'a' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+insert into orca.toanalyze values (1,1), (2,2), (3,3);
+alter table orca.toanalyze drop column a;
+NOTICE:  Dropping a column that is part of the distribution policy forces a NULL distribution policy
+analyze orca.toanalyze;
+-- union 
+create table orca.ur (a int, b int);
+create table orca.us (c int, d int);
+create table orca.ut(a int);
+create table orca.uu(c int, d bigint);
+insert into orca.ur values (1,1);
+insert into orca.ur values (1,2);
+insert into orca.ur values (2,1);
+insert into orca.us values (1,3);
+insert into orca.ut values (3);
+insert into orca.uu values (1,3);
+select * from (select a, a from orca.ur union select c, d from orca.us) x(g,h);
+ g | h 
+---+---
+ 2 | 2
+ 1 | 1
+ 1 | 3
+(3 rows)
+
+select * from (select a, a from orca.ur union select c, d from orca.us) x(g,h), orca.ut t where t.a = x.h;
+ g | h | a 
+---+---+---
+ 1 | 3 | 3
+(1 row)
+
+select * from (select a, a from orca.ur union select c, d from orca.uu) x(g,h), orca.ut t where t.a = x.h;
+ g | h | a 
+---+---+---
+ 1 | 3 | 3
+(1 row)
+
+select 1 AS two UNION select 2.2;
+ two 
+-----
+   1
+ 2.2
+(2 rows)
+
+select 2.2 AS two UNION select 1;
+ two 
+-----
+   1
+ 2.2
+(2 rows)
+
+select * from (select 2.2 AS two UNION select 1) x(a), (select 1.0 AS two UNION ALL select 1) y(a) where y.a = x.a;
+ a |  a  
+---+-----
+ 1 | 1.0
+ 1 |   1
+(2 rows)
+
 -- clean up
 drop schema orca cascade;
+NOTICE:  drop cascades to table orca.ut
+NOTICE:  drop cascades to table orca.us
+NOTICE:  drop cascades to table orca.ur
+NOTICE:  drop cascades to table orca.prod9
+NOTICE:  drop cascades to table orca.t77
+NOTICE:  drop cascades to table orca.fooh2
+NOTICE:  drop cascades to table orca.fooh1
+NOTICE:  drop cascades to table orca.tab1
 NOTICE:  drop cascades to table orca.csq_r
 NOTICE:  drop cascades to function orca.csq_f(integer)
 NOTICE:  drop cascades to table orca.t_1_prt_part201208

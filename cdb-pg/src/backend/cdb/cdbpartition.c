@@ -254,6 +254,12 @@ rel_partition_key_attrs(Oid relid)
 		Index i;
 		Form_pg_partition p = (Form_pg_partition) GETSTRUCT(tuple);
 		
+		if (p->paristemplate)
+		{
+			tuple = systable_getnext(scan);
+			continue;
+		}
+		
 		for ( i = 0; i < p->parnatts; i++ )
 		{
 			pkeys = lappend_int(pkeys, (Oid)p->paratts.values[i]);
@@ -7128,7 +7134,7 @@ is_exchangeable(Relation rel, Relation oldrel, Relation newrel, bool throw)
 	}
 	
 	/* The new part table must not be involved in inheritance. */
-	if ( congruent && has_subclass(RelationGetRelid(newrel)))
+	if ( congruent && has_subclass_fast(RelationGetRelid(newrel)))
 	{
 		congruent = FALSE;
 		if ( throw )

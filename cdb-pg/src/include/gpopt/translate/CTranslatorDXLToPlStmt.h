@@ -127,6 +127,9 @@ namespace gpdxl
 			
 			// external scan counter
 			ULONG m_ulExternalScanCounter;
+			
+			// number of segments
+			ULONG m_ulSegments;
 
 			// private copy ctor
 			CTranslatorDXLToPlStmt(const CTranslatorDXLToPlStmt&);
@@ -210,7 +213,7 @@ namespace gpdxl
 
 		public:
 			// ctor
-			CTranslatorDXLToPlStmt(IMemoryPool *pmp, CMDAccessor *pmda, CContextDXLToPlStmt *pctxdxltoplstmt);
+			CTranslatorDXLToPlStmt(IMemoryPool *pmp, CMDAccessor *pmda, CContextDXLToPlStmt *pctxdxltoplstmt, ULONG ulSegments);
 
 			// dtor
 			~CTranslatorDXLToPlStmt();
@@ -629,6 +632,12 @@ namespace gpdxl
 				List **pplIndexStratgey,
 				List **pplIndexSubtype
 				);
+			
+			// compute directed dispatch segment ids
+			List *PlDirectDispatchSegIds(DrgPdxldatum *pdrgpdxldatum);
+			
+			// hash a DXL datum with GPDB's hash function
+			ULONG UlCdbHash(CDXLDatum *pdxldatum);
 
 	};
 }

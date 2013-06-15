@@ -2867,7 +2867,7 @@ order by
                            Hash Key: part.p_brand, part.p_type, part.p_size
                            ->  HashAggregate  (cost=13114180.91..13771259.51 rows=26283144 width=120)
                                  Group By: part.p_brand, part.p_type, part.p_size, partsupp.ps_suppkey
-                                 ->  Hash Left Anti Semi Join  (cost=3248727.04..12457102.30 rows=26283145 width=40)
+                                 ->  Hash Left Anti Semi Join (Not-In)  (cost=3248727.04..12457102.30 rows=26283145 width=40)
                                        Hash Cond: partsupp.ps_suppkey = "NotIn_SUBQUERY".s_suppkey
                                        ->  Hash Join  (cost=3158498.68..11708857.42 rows=26283150 width=40)
                                              Hash Cond: partsupp.ps_partkey = part.p_partkey

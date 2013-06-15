@@ -30,6 +30,7 @@
 #include "dxl/operators/CDXLDatumInt8.h"
 #include "dxl/operators/CDXLDatumGeneric.h"
 #include "dxl/operators/CDXLDatumOid.h"
+#include "dxl/xml/dxltokens.h"
 
 #include "gpopt/mdcache/CMDAccessor.h"
 #include "gpopt/mdcache/CMDAccessorUtils.h"
@@ -61,12 +62,14 @@ using namespace gpopt;
 CTranslatorDXLToScalar::CTranslatorDXLToScalar
 	(
 	IMemoryPool *pmp,
-	CMDAccessor *pmda
+	CMDAccessor *pmda,
+	ULONG ulSegments
 	)
 	:
 	m_pmp(pmp),
 	m_pmda(pmda),
-	m_fHasSubqueries(false)
+	m_fHasSubqueries(false),
+	m_ulSegments(ulSegments)
 {
 }
 
@@ -297,7 +300,16 @@ CTranslatorDXLToScalar::PopexprFromDXLNodeScOpExpr
 
 	const IMDScalarOp *pmdscop = m_pmda->Pmdscop(pdxlopOpExpr->Pmdid());
 	popexpr->opfuncid = CMDIdGPDB::PmdidConvert(pmdscop->PmdidFunc())->OidObjectId();
-	popexpr->opresulttype = OidFunctionReturnType(pmdscop->PmdidFunc());
+	
+	IMDId *pmdidReturnType = pdxlopOpExpr->PmdidReturnType();
+	if (NULL != pmdidReturnType)
+	{
+		popexpr->opresulttype = CMDIdGPDB::PmdidConvert(pmdidReturnType)->OidObjectId();
+	}
+	else 
+	{
+		popexpr->opresulttype = OidFunctionReturnType(pmdscop->PmdidFunc());
+	}
 
 	const IMDFunction *pmdfunc = m_pmda->Pmdfunc(pmdscop->PmdidFunc());
 	popexpr->opretset = pmdfunc->FReturnsSet();
@@ -593,7 +605,7 @@ CTranslatorDXLToScalar::PparamFromDXLNodeScInitPlan
 
 	// Since an init plan is not a scalar node, we create a new DXLTranslator to handle its translation
 	CContextDXLToPlStmt *pctxdxltoplstmt = (dynamic_cast<CMappingColIdVarPlStmt*>(pmapcidvar))->Pctxdxltoplstmt();
-	CTranslatorDXLToPlStmt trdxltoplstmt(m_pmp, m_pmda,pctxdxltoplstmt);
+	CTranslatorDXLToPlStmt trdxltoplstmt(m_pmp, m_pmda, pctxdxltoplstmt, m_ulSegments);
 	Plan *pplanChild = trdxltoplstmt.PplFromDXL(pdxlnChild, pdxltrctxOut, pplan);
 
 	// Step 2: Add the generated child to the root plan's subplan list
@@ -682,7 +694,8 @@ CTranslatorDXLToScalar::PsubplanFromDXLNodeScSubPlan
 							(
 							m_pmp,
 							m_pmda,
-							(dynamic_cast<CMappingColIdVarPlStmt*>(pmapcidvar))->Pctxdxltoplstmt()
+							(dynamic_cast<CMappingColIdVarPlStmt*>(pmapcidvar))->Pctxdxltoplstmt(),
+							m_ulSegments
 							);
 	Plan *pplanChild = trdxltoplstmt.PplFromDXL(pdxlnChild, pdxltrctxOut, pplan);
 
@@ -831,7 +844,7 @@ CTranslatorDXLToScalar::PsublinkFromDXLNodeSubqueryExists
 	GPOS_ASSERT(1 == pdxlnSubqueryExists->UlArity());
 	CDXLNode *pdxlnChild = (*pdxlnSubqueryExists)[0];
 
-	CTranslatorDXLToQuery trdxlquery(m_pmp, m_pmda);
+	CTranslatorDXLToQuery trdxlquery(m_pmp, m_pmda, m_ulSegments);
 	CStateDXLToQuery *pstatedxltoquery = New(m_pmp) CStateDXLToQuery(m_pmp);
 
 	// empty list of output columns
@@ -909,7 +922,7 @@ CTranslatorDXLToScalar::PsublinkFromDXLNodeQuantifiedSubquery
 	CDXLNode *pdxlnOuter = (*pdxlnQuantifiedSubquery)[0];
 	CDXLNode *pdxlnInner = (*pdxlnQuantifiedSubquery)[1];
 
-	CTranslatorDXLToQuery trdxlquery(m_pmp, m_pmda);
+	CTranslatorDXLToQuery trdxlquery(m_pmp, m_pmda, m_ulSegments);
 	CMappingColIdVarQuery *pmapcidvarquery = dynamic_cast<CMappingColIdVarQuery *>(pmapcidvar);
 
 	CStateDXLToQuery *pstatedxltoquery = New(m_pmp) CStateDXLToQuery(m_pmp);
@@ -970,7 +983,7 @@ CTranslatorDXLToScalar::PsublinkFromDXLNodeScalarSubquery
 	ULONG ulColId = CDXLScalarSubquery::PdxlopConvert(pdxlnSubquery->Pdxlop())->UlColId();
 	CDXLNode *pdxlnChild = (*pdxlnSubquery)[0];
 
-	CTranslatorDXLToQuery trdxlquery(m_pmp, m_pmda);
+	CTranslatorDXLToQuery trdxlquery(m_pmp, m_pmda, m_ulSegments);
 	CStateDXLToQuery *pstatedxltoquery = New(m_pmp) CStateDXLToQuery(m_pmp);
 
 	CMappingColIdVarQuery *pmapcidvarquery = dynamic_cast<CMappingColIdVarQuery *>(pmapcidvar);
@@ -1300,6 +1313,25 @@ CTranslatorDXLToScalar::PconstFromDXLNodeScConst
 	CDXLScalarConstValue *pdxlop = CDXLScalarConstValue::PdxlopConvert(pdxlnConst->Pdxlop());
 	CDXLDatum *pdxldatum = const_cast<CDXLDatum*>(pdxlop->Pdxldatum());
 
+	return PconstFromDXLDatum(pdxldatum);
+}
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorDXLToScalar::PconstFromDXLDatum
+//
+//	@doc:
+//		Translates a DXL datum into a GPDB scalar const node
+//
+//---------------------------------------------------------------------------
+Expr *
+CTranslatorDXLToScalar::PconstFromDXLDatum
+	(
+	CDXLDatum *pdxldatum
+	)
+{
+	GPOS_ASSERT(NULL != pdxldatum);
+	
 	SDatumTranslatorElem rgTranslators[] =
 		{
 			{CDXLDatum::EdxldatumInt4 , &CTranslatorDXLToScalar::PconstInt4},
@@ -1331,7 +1363,7 @@ CTranslatorDXLToScalar::PconstFromDXLNodeScConst
 
 	if (NULL == pf)
 	{
-		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiDXL2PlStmtConversion, pdxlnConst->Pdxlop()->PstrOpName()->Wsz());
+		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiDXL2PlStmtConversion, CDXLTokens::PstrToken(EdxltokenScalarConstValue)->Wsz());
 	}
 
 	return (Expr*) (this->*pf)(pdxldatum);

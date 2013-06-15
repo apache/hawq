@@ -64,6 +64,7 @@
 #define ALLOW_get_agg_transtype
 #define ALLOW_get_aggregate
 #define ALLOW_is_agg_ordered
+#define ALLOW_has_agg_prelimfunc
 #define ALLOW_get_array_type
 #define ALLOW_get_attstatsslot
 #define ALLOW_get_att_stats
@@ -160,6 +161,9 @@
 #define ALLOW_makeNullConst
 #define ALLOW_coerce_to_common_type
 #define ALLOW_resolve_generic_type
+#define ALLOW_has_subclass
+#define ALLOW_cdbhash_const
+#define ALLOW_ExecCheckRTPerms
 #define ALLOW_is_pxf_protocol
 
 #include "gpopt/utils/gpdbdefs.h"
@@ -810,6 +814,20 @@ gpdb::FOrderedAgg
 	return false;
 }
 
+bool
+gpdb::FAggHasPrelimFunc
+	(
+	Oid aggid
+	)
+{
+	GP_WRAP_START;
+	{
+		return has_agg_prelimfunc(aggid);
+	}
+	GP_WRAP_END;
+	return false;
+}
+
 Oid
 gpdb::OidAggregate
 	(
@@ -1251,12 +1269,13 @@ gpdb::SzOpName
 List *
 gpdb::PlPartitionAttrs
 	(
-	PartitionNode *pn
+	Oid oid
 	)
 {
 	GP_WRAP_START;
 	{
-		return get_partition_attrs(pn);
+		// return unique partition level attributes
+		return rel_partition_key_attrs(oid);
 	}
 	GP_WRAP_END;
 	return NIL;
@@ -2048,6 +2067,34 @@ gpdb::FRelPartIsRoot
 }
 
 bool
+gpdb::FRelPartIsInterior
+	(
+	Oid relid
+	)
+{
+	GP_WRAP_START;
+	{
+		return PART_STATUS_INTERIOR == rel_part_status(relid);
+	}
+	GP_WRAP_END;
+	return false;
+}
+
+bool
+gpdb::FRelPartIsNone
+	(
+	Oid relid
+	)
+{
+	GP_WRAP_START;
+	{
+		return PART_STATUS_NONE == rel_part_status(relid);
+	}
+	GP_WRAP_END;
+	return false;
+}
+
+bool
 gpdb::FHashPartitioned
 	(
 	char c
@@ -2056,6 +2103,20 @@ gpdb::FHashPartitioned
 	GP_WRAP_START;
 	{
 		return PARTTYP_HASH == char_to_parttype(c);
+	}
+	GP_WRAP_END;
+	return false;
+}
+
+bool
+gpdb::FHasSubclass
+	(
+	Oid oidRel
+	)
+{
+	GP_WRAP_START;
+	{
+		return has_subclass(oidRel);
 	}
 	GP_WRAP_END;
 	return false;
@@ -2375,6 +2436,37 @@ gpdb::OidResolveGenericType
 	}
 	GP_WRAP_END;
 	return 0;
+}
+
+// hash a const value with GPDB's hash function
+int32 
+gpdb::ICdbHash
+	(
+	Const *pconst,
+	int iSegments
+	)
+{
+	GP_WRAP_START;
+	{
+		return cdbhash_const(pconst, iSegments);	
+	}
+	GP_WRAP_END;
+	return 0;
+}
+
+// check permissions on range table
+void
+gpdb::CheckRTPermissions
+	(
+	List *plRangeTable
+	)
+{
+	GP_WRAP_START;
+	{
+		ExecCheckRTPerms(plRangeTable);	
+		return;
+	}
+	GP_WRAP_END;
 }
 
 // EOF

@@ -411,7 +411,7 @@ join_is_legal(PlannerInfo *root, RelOptInfo *rel1, RelOptInfo *rel2,
 			if (jointype != JOIN_INNER)
 				return false;			/* invalid join path */
 			jointype = ojinfo->join_type;
-			if (jointype != JOIN_FULL && jointype != JOIN_LASJ) 
+			if (jointype != JOIN_FULL && jointype != JOIN_LASJ && jointype != JOIN_LASJ_NOTIN)
 				jointype = JOIN_LEFT;
 		}
 		else if (bms_is_subset(ojinfo->min_lefthand, rel2->relids) &&
@@ -420,7 +420,7 @@ join_is_legal(PlannerInfo *root, RelOptInfo *rel1, RelOptInfo *rel2,
 			if (jointype != JOIN_INNER)
 				return false;			/* invalid join path */
 			jointype = ojinfo->join_type;
-			if (jointype != JOIN_FULL && jointype != JOIN_LASJ) 
+			if (jointype != JOIN_FULL && jointype != JOIN_LASJ && jointype != JOIN_LASJ_NOTIN)
 				jointype = JOIN_RIGHT;
 		}
 		else
@@ -545,7 +545,7 @@ make_join_rel(PlannerInfo *root, RelOptInfo *rel1, RelOptInfo *rel2)
     /*
 	 * For antijoins, the outer and inner rel are fixed.
 	 */
-	else if (jointype == JOIN_LASJ)
+	else if (jointype == JOIN_LASJ || jointype == JOIN_LASJ_NOTIN)
 	{
         add_paths_to_joinrel(root, joinrel, rel1, rel2, jointype, restrictlist);
 	}

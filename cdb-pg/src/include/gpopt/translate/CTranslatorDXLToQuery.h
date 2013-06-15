@@ -85,6 +85,9 @@ namespace gpdxl
 			ULONG m_ulSortgrouprefCounter;
 
 			CTranslatorDXLToScalar *m_pdxlsctranslator;
+			
+			// number of segments
+			ULONG m_ulSegments;
 
 			// private copy ctor
 			CTranslatorDXLToQuery(const CTranslatorDXLToQuery&);
@@ -268,9 +271,10 @@ namespace gpdxl
 
 
 		public:
-			// ctor/dtor
-			CTranslatorDXLToQuery(IMemoryPool *, CMDAccessor *);
+			// ctor
+			CTranslatorDXLToQuery(IMemoryPool *pmp, CMDAccessor *pmda, ULONG ulSegments);
 
+			// dtor
 			~CTranslatorDXLToQuery();
 
 			// main translation routine for DXL tree -> Query

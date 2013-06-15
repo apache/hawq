@@ -155,6 +155,19 @@ namespace gpdxl
 			// translate set operations
 			CDXLNode *PdxlnFromSetOp(Node *pnodeSetOp, List *plTargetList, HMIUl *phmiulOutputCols) const;
 
+			// create the set operation given its children, input and output columns
+			CDXLNode *PdxlnSetOp
+				(
+				EdxlSetOpType edxlsetop,
+				List *plTargetListOutput,
+				DrgPul *pdrgpulOutput,
+				DrgPdrgPul *pdrgpdrgulInputColIds,
+				DrgPdxln *pdrgpdxlnChildren,
+				BOOL fCastAcrossInput,
+				BOOL fKeepResjunked
+				)
+				const;
+
 			// check if the set operation need to cast any of its input columns
 			BOOL FCast(List *plTargetList, DrgPmdid *pdrgpmdid) const;
 			// translate a window operator
@@ -176,7 +189,7 @@ namespace gpdxl
 			void UpdateLeadLagWinSpecPos(CDXLNode *pdxlnPrL, DrgPdxlws *pdrgpdxlwinspec) const;
 
 			// manufucture window frame for lead/lag functions
-			CDXLWindowFrame *PdxlwfLeadLag(BOOL fLead) const;
+			CDXLWindowFrame *PdxlwfLeadLag(BOOL fLead, CDXLNode *pdxlnOffset) const;
 
 			// translate the child of a set operation
 			CDXLNode *PdxlnSetOpChild(Node *pnodeChild, DrgPul *pdrgpul, DrgPmdid *pdrgpmdid, List *plTargetList) const;
@@ -228,7 +241,7 @@ namespace gpdxl
 				);
 
 			// construct a project node with NULL values for columns not included in the grouping set
-			CDXLNode *PdxlnProjectNullsForGroupingSets(List *plTargetList, CDXLNode *pdxlnChild, CBitSet *pbs, HMIUl *phmiulOutputCols) const;
+			CDXLNode *PdxlnProjectNullsForGroupingSets(List *plTargetList, CDXLNode *pdxlnChild, CBitSet *pbs, HMIUl *phmiulSortgrouprefCols, HMIUl *phmiulOutputCols) const;
 
 			// construct a project node with appropriate values for the grouping funcs in the given target list
 			CDXLNode *PdxlnProjectGroupingFuncs(List *plTargetList, CDXLNode *pdxlnChild, CBitSet *pbs, HMIUl *phmiulOutputCols) const;
@@ -375,6 +388,10 @@ namespace gpdxl
 			// obtain the ids of the ctid and segmentid columns for the target
 			// table of a DML query
 			void GetCtidAndSegmentId(ULONG *pulCtid, ULONG *pulSegmentId);
+			
+			// obtain the column id for the tuple oid column of the target table
+			// of a DML statement
+			ULONG UlTupleOidColId();
 
 			// translate a grouping func expression
 			CDXLNode *PdxlnGroupingFunc(const Expr *pexpr, CBitSet *pbs) const;

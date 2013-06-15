@@ -1727,6 +1727,12 @@ typedef struct NestLoopState
         bool                require_inner_reset; /*CDB-OLAP*/
 
         struct TupleTableSlot *nl_NullInnerTupleSlot;
+
+        List           *nl_InnerJoinKeys;        /* list of ExprState nodes */
+        List           *nl_OuterJoinKeys;        /* list of ExprState nodes */
+        bool           nl_innerSideScanned;      /* set to true once we've scanned all inner tuples the first time */
+        bool           nl_qualResultForNull;     /* the value of the join condition when one of the sides contains a NULL */
+
 } NestLoopState;
 
 /* ----------------

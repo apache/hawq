@@ -122,7 +122,6 @@ CQueryMutators::PqueryNormalizeGrpByPrL
 			);
 	}
 
-
 	pqueryDrdTbl->targetList = ctxgrpbymutator.m_plTENewGroupByQuery;
 	pqueryNew->targetList = plTEcopy;
 
@@ -137,7 +136,7 @@ CQueryMutators::PqueryNormalizeGrpByPrL
 	pqueryDrdTbl->rtable = gpdb::PlMutateRangeTable
 									(
 									pqueryDrdTbl->rtable,
-									(Pnode) CQueryMutators::PnodeIncrementLevelsupMutator,
+									(Pfnode) CQueryMutators::PnodeIncrementLevelsupMutator,
 									&ctxgrpbymutator,
 									0 // mutate sub queries
 									);
@@ -201,7 +200,7 @@ CQueryMutators::PnodeIncrementLevelsupMutator
 		psublink->subselect = gpdb::PnodeMutateQueryOrExpressionTree
 										(
 										psublink->subselect,
-										(Pnode) CQueryMutators::PnodeIncrementLevelsupMutator,
+										(Pfnode) CQueryMutators::PnodeIncrementLevelsupMutator,
 										pvCtx,
 										0 // mutate into cte-lists
 										);
@@ -211,7 +210,7 @@ CQueryMutators::PnodeIncrementLevelsupMutator
 		return (Node *) psublink;
 	}
 
-	return gpdb::PnodeMutateExpressionTree(pnode, (Pnode) CQueryMutators::PnodeIncrementLevelsupMutator, pvCtx);
+	return gpdb::PnodeMutateExpressionTree(pnode, (Pfnode) CQueryMutators::PnodeIncrementLevelsupMutator, pvCtx);
 }
 
 //---------------------------------------------------------------------------
@@ -241,7 +240,7 @@ CQueryMutators::PnodeFixCTELevelsupMutator
 		Query *pquery = gpdb::PqueryMutateQueryTree
 								(
 								(Query *) pnode,
-								(Pnode) CQueryMutators::PnodeFixCTELevelsupMutator,
+								(Pfnode) CQueryMutators::PnodeFixCTELevelsupMutator,
 								pvCtx,
 								0 // mutate into cte-lists
 								);
@@ -279,7 +278,7 @@ CQueryMutators::PnodeFixCTELevelsupMutator
 		return (Node *) psublink;
 	}
 
-	return gpdb::PnodeMutateExpressionTree(pnode, (Pnode) CQueryMutators::PnodeFixCTELevelsupMutator, pvCtx);
+	return gpdb::PnodeMutateExpressionTree(pnode, (Pfnode) CQueryMutators::PnodeFixCTELevelsupMutator, pvCtx);
 }
 
 //---------------------------------------------------------------------------
@@ -323,21 +322,86 @@ CQueryMutators::PnodeGrpbyPrLMutator
 		return NULL;
 	}
 
-	SContextGrpbyPlMutator *pctxgrpbymutator = (SContextGrpbyPlMutator *) pctx;
+	if (IsA(pnode, Const))
+	{
+		return (Node *) gpdb::PvCopyObject(pnode);
+	}
 
+	SContextGrpbyPlMutator *pctxGrpByMutator = (SContextGrpbyPlMutator *) pctx;
+
+	if (IsA(pnode, Var) && (pctxGrpByMutator->m_fAggregateArg || pctxGrpByMutator->m_fGroupingCol))
+	{
+		// if we are mutating an aggregate argument do nothing since the aggregate will be place in the derived table's target list
+		// fix any outer references in the grouping column expression or arguments of an aggregate
+		return (Node *) PvarOuterReferenceIncrLevelsUp((Var*) pnode);
+	}
+	
 	// if we find an aggregate or precentile expression then insert into the new derived table
 	// and refer to it in the top-level query
-	if (IsA(pnode, Aggref) || IsA(pnode, PercentileExpr) || IsA(pnode, GroupingFunc))
+
+	if (IsA(pnode, Aggref))
 	{
-		const ULONG ulAttno = gpdb::UlListLength(pctxgrpbymutator->m_plTENewGroupByQuery) + 1;
-		TargetEntry *pte = PteAggregateOrPercentileExpr(pctxgrpbymutator->m_pmp, pctxgrpbymutator->m_pmda, pnode, ulAttno);
+		Aggref *paggrefOld = (Aggref*) pnode;
+		Aggref *paggref = PaggrefFlatCopy(paggrefOld);
+		paggref->agglevelsup = paggrefOld->agglevelsup;
+
+		List *plArgsNew = NIL;
+		ListCell *plc = NULL;
+
+		BOOL fAggregate = pctxGrpByMutator->m_fAggregateArg;
+		pctxGrpByMutator->m_fAggregateArg = true;
+
+		ForEach (plc, paggrefOld->args)
+		{
+			Node *pnodeArg = (Node *) gpdb::PvCopyObject((Node*) lfirst(plc));
+			GPOS_ASSERT(NULL != pnodeArg);
+			// traverse each argument and fix levels up when needed
+			plArgsNew = gpdb::PlAppendElement
+						(
+						plArgsNew,
+						gpdb::PnodeMutateQueryOrExpressionTree
+							(
+							pnodeArg,
+							(Pfnode) CQueryMutators::PnodeGrpbyPrLMutator,
+							(void *) pctx,
+							0 // flags -- mutate into cte-lists
+							)
+						);
+		}
+		pctxGrpByMutator->m_fAggregateArg = fAggregate;
+		paggref->args = plArgsNew;
+
+		const ULONG ulAttno = gpdb::UlListLength(pctxGrpByMutator->m_plTENewGroupByQuery) + 1;
+		TargetEntry *pte = PteAggregateOrPercentileExpr(pctxGrpByMutator->m_pmp, pctxGrpByMutator->m_pmda, (Node *) paggref, ulAttno);
 
 		// Add a new target entry to the query
-		pctxgrpbymutator->m_plTENewGroupByQuery = gpdb::PlAppendElement(pctxgrpbymutator->m_plTENewGroupByQuery, pte);
+		pctxGrpByMutator->m_plTENewGroupByQuery = gpdb::PlAppendElement(pctxGrpByMutator->m_plTENewGroupByQuery, pte);
+
+		Var *pvarNew = gpdb::PvarMakeVar
+						(
+						1, // varno
+						(AttrNumber) ulAttno,
+						gpdb::OidExprType(pnode),
+						gpdb::IExprTypeMod(pnode),
+						0 // query levelsup
+						);
+
+		return (Node*) pvarNew;
+	}
+
+	if (IsA(pnode, PercentileExpr) || IsA(pnode, GroupingFunc))
+	{
+		Node *pnodeCopy = (Node *) gpdb::PvCopyObject(pnode);
+
+		const ULONG ulAttno = gpdb::UlListLength(pctxGrpByMutator->m_plTENewGroupByQuery) + 1;
+		TargetEntry *pte = PteAggregateOrPercentileExpr(pctxGrpByMutator->m_pmp, pctxGrpByMutator->m_pmda, pnodeCopy, ulAttno);
+
+		// Add a new target entry to the query
+		pctxGrpByMutator->m_plTENewGroupByQuery = gpdb::PlAppendElement(pctxGrpByMutator->m_plTENewGroupByQuery, pte);
 
 		Var *pvarNew = gpdb::PvarMakeVar
 								(
-								1,
+								1, // varno
 								(AttrNumber) ulAttno,
 								gpdb::OidExprType(pnode),
 								gpdb::IExprTypeMod(pnode),
@@ -347,66 +411,98 @@ CQueryMutators::PnodeGrpbyPrLMutator
 		return (Node*) pvarNew;
 	}
 
-	TargetEntry *pteFound = gpdb::PteMember(pnode, pctxgrpbymutator->m_plTENewGroupByQuery);
-
-	// if we find a target entry in the new derived table then return the appropriate var
-	// else investigate it to see if it needs to be added to the new derived table
-
-	if (NULL != pteFound)
+	if (!pctxGrpByMutator->m_fAggregateArg)
 	{
-		Var *pvarNew = gpdb::PvarMakeVar
-								(
-								1,
-								pteFound->resno,
-								gpdb::OidExprType((Node*) pteFound->expr),
-								gpdb::IExprTypeMod( (Node*) pteFound->expr),
-								0 // query levelsup
-								);
+		// if we find a target entry in the new derived table then return the appropriate var
+		// else investigate it to see if it needs to be added to the new derived table
 
-		return (Node*) pvarNew;
+		TargetEntry *pteFound = gpdb::PteMember(pnode, pctxGrpByMutator->m_plTENewGroupByQuery);
+
+		if (NULL != pteFound)
+		{
+			pteFound->resjunk = false;
+			Var *pvarNew = gpdb::PvarMakeVar
+					(
+							1, // varno
+							pteFound->resno,
+							gpdb::OidExprType((Node*) pteFound->expr),
+							gpdb::IExprTypeMod( (Node*) pteFound->expr),
+							0 // query levelsup
+					);
+
+			return (Node*) pvarNew;
+		}
+
+		TargetEntry *pteFoundOriginal = gpdb::PteMember(pnode, pctxGrpByMutator->m_pquery->targetList);
+
+		// if it is grouping column then we need add it to the new derived table
+		// and refer to it in the top-level query
+		if (NULL != pteFoundOriginal  && CTranslatorUtils::FGroupingColumn(pteFoundOriginal, pctxGrpByMutator->m_pquery->groupClause))
+		{
+			return PnodeGroupingColMutator(pnode, pteFoundOriginal, pctxGrpByMutator);
+		}
 	}
 
-	TargetEntry *pteFoundOriginal = gpdb::PteMember(pnode, pctxgrpbymutator->m_pquery->targetList);
-
-	// if it is grouping column then we need add it to the new derived table
-	// and refer to it in the top-level query
-	if (NULL != pteFoundOriginal  && CTranslatorUtils::FGroupingColumn(pteFoundOriginal, pctxgrpbymutator->m_pquery->groupClause))
-	{
-		ULONG ulArity = gpdb::UlListLength(pctxgrpbymutator->m_plTENewGroupByQuery) + 1;
-
-		TargetEntry *pteNew = gpdb::PteMakeTargetEntry
-								(
-								(Expr*) pnode,
-								(AttrNumber) ulArity,
-								CQueryMutators::SzTEName(pteFoundOriginal,pctxgrpbymutator->m_pquery),
-								false
-								);
-
-		pteNew->ressortgroupref = pteFoundOriginal->ressortgroupref;
-		pteNew->resjunk = false;
-
-		pctxgrpbymutator->m_plTENewGroupByQuery = gpdb::PlAppendElement(pctxgrpbymutator->m_plTENewGroupByQuery, pteNew);
-
-		Var *pvarNew = gpdb::PvarMakeVar
-								(
-								1,
-								(AttrNumber) ulArity,
-								gpdb::OidExprType( (Node*) pteFoundOriginal->expr),
-								gpdb::IExprTypeMod( (Node*) pteFoundOriginal->expr),
-								0 // query levelsup
-								);
-
-		return (Node*) pvarNew;
-	}
-
-	// do not traverse into sub queries as they will be inserted are inserted into
-	// top-level query as is
+	// do not traverse into sub queries as they will be inserted into top-level query as is
 	if (IsA(pnode, SubLink))
 	{
 		return (Node *) gpdb::PvCopyObject(pnode);
 	}
 
-	return gpdb::PnodeMutateExpressionTree(pnode, (Pnode) CQueryMutators::PnodeGrpbyPrLMutator, pctx);
+	return gpdb::PnodeMutateExpressionTree(pnode, (Pfnode) CQueryMutators::PnodeGrpbyPrLMutator, pctx);
+}
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CQueryMutators::PnodeGroupingColMutator
+//
+//	@doc:
+// 		Mutate the grouping columns, fix levels up when necessary
+//---------------------------------------------------------------------------
+Node *
+CQueryMutators::PnodeGroupingColMutator
+	(
+	Node *pnode,
+	TargetEntry *pteOriginal,
+	SContextGrpbyPlMutator *pctxGrpBymutator
+	)
+{
+	GPOS_ASSERT(NULL != pnode);
+
+	ULONG ulArity = gpdb::UlListLength(pctxGrpBymutator->m_plTENewGroupByQuery) + 1;
+
+	Node *pnodeExpr = NULL;
+	if (IsA(pnode, Var))
+	{
+		pnodeExpr = (Node *) PvarOuterReferenceIncrLevelsUp((Var *) pnode);
+	}
+	else
+	{
+		// fix any outer references in the grouping column expression
+		BOOL fGroupingCol = pctxGrpBymutator->m_fGroupingCol;
+		pctxGrpBymutator->m_fGroupingCol = true;
+		pnodeExpr = gpdb::PnodeMutateExpressionTree(pnode, (Pfnode) CQueryMutators::PnodeGrpbyPrLMutator, pctxGrpBymutator);
+		pctxGrpBymutator->m_fGroupingCol = fGroupingCol;
+	}
+
+	CHAR* szName = CQueryMutators::SzTEName(pteOriginal,pctxGrpBymutator->m_pquery);
+	TargetEntry *pteNew = gpdb::PteMakeTargetEntry((Expr*) pnodeExpr, (AttrNumber) ulArity, szName, false /*resjunk */);
+
+	pteNew->ressortgroupref = pteOriginal->ressortgroupref;
+	pteNew->resjunk = false;
+
+	pctxGrpBymutator->m_plTENewGroupByQuery = gpdb::PlAppendElement(pctxGrpBymutator->m_plTENewGroupByQuery, pteNew);
+
+	Var *pvarNew = gpdb::PvarMakeVar
+			(
+					1, // varno
+					(AttrNumber) ulArity,
+					gpdb::OidExprType( (Node*) pteOriginal->expr),
+					gpdb::IExprTypeMod( (Node*) pteOriginal->expr),
+					0 // query levelsup
+			);
+
+	return (Node*) pvarNew;
 }
 
 //---------------------------------------------------------------------------
@@ -491,71 +587,50 @@ CQueryMutators::PnodeHavingQualMutator
 		return NULL;
 	}
 
-	SContextHavingQualMutator *context = (SContextHavingQualMutator *) pctx;
+	if (IsA(pnode, Const))
+	{
+		return (Node *) gpdb::PvCopyObject(pnode);
+	}
+
+	SContextHavingQualMutator *pctxHavingQualMutator = (SContextHavingQualMutator *) pctx;
 
 	// check to see if the node is in the target list of the derived table.
 	// check if we have the corresponding pte entry in derived tables target list
-	if (0 == context->m_ulCurrLevelsUp)
+	if (0 == pctxHavingQualMutator->m_ulCurrLevelsUp)
 	{
-		TargetEntry *pteFound = gpdb::PteMember(pnode, context->m_plTENewGroupByQuery);
-		if (NULL != pteFound)
+		if (IsA(pnode, Var) && pctxHavingQualMutator->m_fAggregateArg)
 		{
-			Var *pvarNew = gpdb::PvarMakeVar
-							(
-							1,
-							pteFound->resno,
-							gpdb::OidExprType( (Node*) pteFound->expr),
-							gpdb::IExprTypeMod( (Node*) pteFound->expr),
-							context->m_ulCurrLevelsUp
-							);
+			// fix outer references used in the aggregates
+			return (Node *) PvarOuterReferenceIncrLevelsUp((Var*) pnode);
+		}
 
-			return (Node*) pvarNew;
+		// check if an entry already exists, if so no need for duplicate
+		Node *pnodeFound = PnodeFind(pnode, pctxHavingQualMutator);
+		if (NULL != pnodeFound)
+		{
+			return pnodeFound;
 		}
 
 		if (IsA(pnode, PercentileExpr) || IsA(pnode, GroupingFunc))
 		{
+			// create a new entry in the derived table and return its corresponding var
 			Node *pnodeCopy = (Node*) gpdb::PvCopyObject(pnode);
-
-			const ULONG ulAttno = gpdb::UlListLength(context->m_plTENewGroupByQuery) + 1;
-			TargetEntry *pte = PteAggregateOrPercentileExpr(context->m_pmp, context->m_pmda, pnodeCopy, ulAttno);
-			context->m_plTENewGroupByQuery = gpdb::PlAppendElement(context->m_plTENewGroupByQuery, pte);
-
-			TargetEntry *pteNew = MakeNode(TargetEntry);
-			Var *pvarNew = gpdb::PvarMakeVar
-							(
-							1,
-							(AttrNumber) context->m_ulTECount,
-							gpdb::OidExprType(pnodeCopy),
-							gpdb::IExprTypeMod(pnodeCopy),
-							context->m_ulCurrLevelsUp
-							);
-
-			pteNew->expr = (Expr*) pvarNew;
-			pteNew->resno = (AttrNumber) context->m_ulTECount;
-			pteNew->resname = pte->resname;
-			pteNew->resjunk = true;
-
-			context->m_plTENewRootQuery = gpdb::PlAppendElement(context->m_plTENewRootQuery, pteNew);
-			context->m_ulTECount++;
-
-			return (Node*) gpdb::PvCopyObject(pvarNew);
+			return (Node *) PvarInsertIntoDerivedTable(pnodeCopy, pctxHavingQualMutator);
 		}
 	}
 
 	if (IsA(pnode, Aggref))
 	{
 		Aggref *paggrefOld = (Aggref *) pnode;
-		if (paggrefOld->agglevelsup == context->m_ulCurrLevelsUp)
+		if (paggrefOld->agglevelsup == pctxHavingQualMutator->m_ulCurrLevelsUp)
 		{
-			Aggref *paggrefNew = MakeNode(Aggref);
+			Aggref *paggrefNew = PaggrefFlatCopy(paggrefOld);
+			
+			BOOL fAggregateOld = pctxHavingQualMutator->m_fAggregateArg;
+			ULONG ulAggregateLevelUp = pctxHavingQualMutator->m_ulAggregateLevelUp;
 
-			paggrefNew->aggfnoid = paggrefOld->aggfnoid;
-			paggrefNew->aggdistinct = paggrefOld->aggdistinct;
-			paggrefNew->agglevelsup = 0;
-			paggrefNew->location = paggrefOld->location;
-			paggrefNew->aggtype = paggrefOld->aggtype;
-			paggrefNew->aggstage = paggrefOld->aggstage;
-			paggrefNew->aggstar = paggrefOld->aggstar;
+			pctxHavingQualMutator->m_fAggregateArg = true;
+			pctxHavingQualMutator->m_ulAggregateLevelUp = paggrefOld->agglevelsup;
 
 			List *plargsNew = NIL;
 			ListCell *plc = NULL;
@@ -571,73 +646,73 @@ CQueryMutators::PnodeHavingQualMutator
 									gpdb::PnodeMutateQueryOrExpressionTree
 											(
 											pnodeArg,
-											(Pnode) CQueryMutators::PnodeHavingQualMutator,
-											(void *) pctx,
+											(Pfnode) CQueryMutators::PnodeHavingQualMutator,
+											(void *) pctxHavingQualMutator,
 											0 // mutate into cte-lists
 											)
 									);
 			}
 			paggrefNew->args = plargsNew;
+			pctxHavingQualMutator->m_fAggregateArg = fAggregateOld;
+			pctxHavingQualMutator->m_ulAggregateLevelUp = ulAggregateLevelUp;
 
 			// check if an entry already exists, if so no need for duplicate
-			TargetEntry *pteFound = gpdb::PteMember((Node*) paggrefNew, context->m_plTENewGroupByQuery);
-			if (NULL != pteFound)
+			Node *pnodeFound = PnodeFind((Node*) paggrefNew, pctxHavingQualMutator);
+			if (NULL != pnodeFound)
 			{
-				gpdb::GPDBFree(paggrefNew);
-				Var *pvarNew = gpdb::PvarMakeVar
-									(
-									1,
-									pteFound->resno,
-									gpdb::OidExprType( (Node*) pteFound->expr),
-									gpdb::IExprTypeMod( (Node*) pteFound->expr),
-									context->m_ulCurrLevelsUp
-									);
-				return (Node*) pvarNew;
+				return pnodeFound;
 			}
 
-			const ULONG ulAttno = gpdb::UlListLength(context->m_plTENewGroupByQuery) + 1;
-			TargetEntry *pte = PteAggregateOrPercentileExpr(context->m_pmp, context->m_pmda, (Node *) paggrefNew, ulAttno);
-			context->m_plTENewGroupByQuery = gpdb::PlAppendElement(context->m_plTENewGroupByQuery, pte);
-
-			TargetEntry *pteNew = MakeNode(TargetEntry);
-			Var *pvarNew = gpdb::PvarMakeVar
-							(
-							1,
-							(AttrNumber) context->m_ulTECount,
-							gpdb::OidExprType((Node*) paggrefNew),
-							gpdb::IExprTypeMod((Node*) paggrefNew),
-							context->m_ulCurrLevelsUp
-							);
-
-			pteNew->expr = (Expr*) pvarNew;
-			pteNew->resno = (AttrNumber) context->m_ulTECount;
-			pteNew->resname = pte->resname;
-			pteNew->resjunk = true;
-
-			context->m_plTENewRootQuery = gpdb::PlAppendElement(context->m_plTENewRootQuery, pteNew);
-			context->m_ulTECount++;
-
-			return (Node*) gpdb::PvCopyObject(pvarNew);
+			// create a new entry in the derived table and return its corresponding var
+			return (Node *) PvarInsertIntoDerivedTable((Node *) paggrefNew, pctxHavingQualMutator);
 		}
 	}
 
 	if (IsA(pnode, Var))
 	{
 		Var *pvar = (Var *) gpdb::PvCopyObject(pnode);
-		if (pvar->varlevelsup == context->m_ulCurrLevelsUp)
+		if (pvar->varlevelsup == pctxHavingQualMutator->m_ulCurrLevelsUp)
 		{
-			pvar->varlevelsup = 0;
-			TargetEntry *pteFound = gpdb::PteMember( (Node*) pvar, context->m_plTENewGroupByQuery);
-
-			if (NULL != pteFound)
+			// process outer references
+			if (pvar->varlevelsup == pctxHavingQualMutator->m_ulAggregateLevelUp)
 			{
-				pvar->varlevelsup = context->m_ulCurrLevelsUp;
-				pvar->varno = 1;
-				pvar->varattno = pteFound->resno;
-				return (Node*) pvar;
+				// an argument of an outer aggregate
+				pvar->varlevelsup = 0;
+
+				return (Node *) pvar;
 			}
+
+			pvar->varlevelsup = 0;
+			TargetEntry *pteFound = gpdb::PteMember( (Node*) pvar, pctxHavingQualMutator->m_plTENewGroupByQuery);
+
+			GPOS_ASSERT(NULL != pteFound);
+			pvar->varlevelsup = pctxHavingQualMutator->m_ulCurrLevelsUp;
+			pvar->varno = 1;
+			pvar->varattno = pteFound->resno;
+			pteFound->resjunk = false;
+
+			return (Node*) pvar;
 		}
 		return (Node *) pvar;
+	}
+
+	if (IsA(pnode, CommonTableExpr))
+	{
+		CommonTableExpr *pcte = (CommonTableExpr *) gpdb::PvCopyObject(pnode);
+		pctxHavingQualMutator->m_ulCurrLevelsUp++;
+
+		GPOS_ASSERT(IsA(pcte->ctequery, Query));
+
+		pcte->ctequery = gpdb::PnodeMutateQueryOrExpressionTree
+									(
+									pcte->ctequery,
+									(Pfnode) CQueryMutators::PnodeHavingQualMutator,
+									(void *) pctxHavingQualMutator,
+									0 // flags --- mutate into cte-lists
+									);
+
+		pctxHavingQualMutator->m_ulCurrLevelsUp--;
+		return (Node *) pcte;
 	}
 
 	if (IsA(pnode, SubLink))
@@ -652,28 +727,150 @@ CQueryMutators::PnodeHavingQualMutator
 		psublinkNew->testexpr =	gpdb::PnodeMutateQueryOrExpressionTree
 										(
 										psublinkOld->testexpr,
-										(Pnode) CQueryMutators::PnodeHavingQualMutator,
-										(void *) pctx,
-										0 // mutate into cte-lists
+										(Pfnode) CQueryMutators::PnodeHavingQualMutator,
+										(void *) pctxHavingQualMutator,
+										0 // flags -- mutate into cte-lists
 										);
-		context->m_ulCurrLevelsUp++;
+		pctxHavingQualMutator->m_ulCurrLevelsUp++;
 
 		GPOS_ASSERT(IsA(psublinkOld->subselect, Query));
 
 		psublinkNew->subselect = gpdb::PnodeMutateQueryOrExpressionTree
 										(
 										psublinkOld->subselect,
-										(Pnode) CQueryMutators::PnodeHavingQualMutator,
-										(void *) pctx,
-										0 // mutate into cte-lists
+										(Pfnode) CQueryMutators::PnodeHavingQualMutator,
+										(void *) pctxHavingQualMutator,
+										0 // flags -- mutate into cte-lists
 										);
 
-		context->m_ulCurrLevelsUp--;
+		pctxHavingQualMutator->m_ulCurrLevelsUp--;
 
 		return (Node *) psublinkNew;
 	}
+	
+	return gpdb::PnodeMutateExpressionTree(pnode, (Pfnode) CQueryMutators::PnodeHavingQualMutator, pctxHavingQualMutator);
+}
 
-	return gpdb::PnodeMutateExpressionTree(pnode, (Pnode) CQueryMutators::PnodeHavingQualMutator, pctx);
+//---------------------------------------------------------------------------
+//	@function:
+//		CQueryMutators::PvarInsertIntoDerivedTable
+//
+//	@doc:
+//		Create a new entry in the derived table and return its corresponding var
+//---------------------------------------------------------------------------
+Var *
+CQueryMutators::PvarInsertIntoDerivedTable
+	(
+	Node *pnode,
+	SContextHavingQualMutator *context
+	)
+{
+	GPOS_ASSERT(NULL != pnode);
+	GPOS_ASSERT(NULL != context);
+	GPOS_ASSERT(IsA(pnode, PercentileExpr) || IsA(pnode, Aggref) || IsA(pnode, GroupingFunc));
+
+	const ULONG ulAttno = gpdb::UlListLength(context->m_plTENewGroupByQuery) + 1;
+	TargetEntry *pte = PteAggregateOrPercentileExpr(context->m_pmp, context->m_pmda, (Node *) pnode, ulAttno);
+	context->m_plTENewGroupByQuery = gpdb::PlAppendElement(context->m_plTENewGroupByQuery, pte);
+
+	Var *pvarNew = gpdb::PvarMakeVar
+					(
+					1, // varno
+					ulAttno,
+					gpdb::OidExprType((Node*) pnode),
+					gpdb::IExprTypeMod((Node*) pnode),
+					context->m_ulCurrLevelsUp
+					);
+
+	return pvarNew;
+}
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CQueryMutators::PnodeFind
+//
+//	@doc:
+//		Check if a matching entry already exists in the list of target
+//		entries, if yes return its corresponding var, otherwise return NULL
+//---------------------------------------------------------------------------
+Node *
+CQueryMutators::PnodeFind
+	(
+	Node *pnode,
+	SContextHavingQualMutator *context
+	)
+{
+	GPOS_ASSERT(NULL != pnode);
+	GPOS_ASSERT(NULL != context);
+	
+	TargetEntry *pteFound = gpdb::PteMember(pnode, context->m_plTENewGroupByQuery);
+	if (NULL != pteFound)
+	{
+		gpdb::GPDBFree(pnode);
+		Var *pvarNew = gpdb::PvarMakeVar
+						(
+						1, // varno
+						pteFound->resno,
+						gpdb::OidExprType( (Node*) pteFound->expr),
+						gpdb::IExprTypeMod( (Node*) pteFound->expr),
+						context->m_ulCurrLevelsUp
+						);
+
+		pteFound->resjunk = false;
+		return (Node*) pvarNew;
+	}
+
+	return NULL;
+}
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CQueryMutators::PaggrefFlatCopy
+//
+//	@doc:
+//		Make a copy of the aggref (minus the arguments)
+//---------------------------------------------------------------------------
+Aggref *
+CQueryMutators::PaggrefFlatCopy
+	(
+	Aggref *paggrefOld
+	)
+{
+	Aggref *paggrefNew = MakeNode(Aggref);
+
+	paggrefNew->aggfnoid = paggrefOld->aggfnoid;
+	paggrefNew->aggdistinct = paggrefOld->aggdistinct;
+	paggrefNew->agglevelsup = 0;
+	paggrefNew->location = paggrefOld->location;
+	paggrefNew->aggtype = paggrefOld->aggtype;
+	paggrefNew->aggstage = paggrefOld->aggstage;
+	paggrefNew->aggstar = paggrefOld->aggstar;
+
+	return paggrefNew;
+}
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CQueryMutators::PvarOuterReferenceIncrLevelsUp
+//
+//	@doc:
+//		Increment the levels up of outer references
+//---------------------------------------------------------------------------
+Var *
+CQueryMutators::PvarOuterReferenceIncrLevelsUp
+	(
+	Var *pvar
+	)
+{
+	GPOS_ASSERT(NULL != pvar);
+
+	Var *pvarCopy = (Var *) gpdb::PvCopyObject(pvar);
+	if (0 != pvarCopy->varlevelsup)
+	{
+		pvarCopy->varlevelsup++;
+	}
+
+	return pvarCopy;
 }
 
 //---------------------------------------------------------------------------
@@ -728,7 +925,7 @@ CQueryMutators::PqueryNormalizeHaving
 		}
 	}
 
-	SContextHavingQualMutator ctxhavingqualmutator(pmp, pmda, ulTECount, pqueryDrdTbl->targetList, pqueryNew->targetList);
+	SContextHavingQualMutator ctxhavingqualmutator(pmp, pmda, ulTECount, pqueryDrdTbl->targetList);
 
 	// fix outer references in the qual
 	pqueryNew->jointree->quals = CQueryMutators::PnodeHavingQualMutator(pqueryDrdTbl->havingQual, &ctxhavingqualmutator);
@@ -1220,7 +1417,7 @@ CQueryMutators::PqueryNormalizeWindowPrL
 	pqueryDrdTbl->rtable = gpdb::PlMutateRangeTable
 									(
 									pqueryDrdTbl->rtable,
-									(Pnode) CQueryMutators::PnodeIncrementLevelsupMutator,
+									(Pfnode) CQueryMutators::PnodeIncrementLevelsupMutator,
 									&ctxgrpbymutator,
 									0 // mutate sub queries
 									);
@@ -1339,7 +1536,7 @@ CQueryMutators::PnodeWindowPrLMutator
 		return (Node*) pvarNew;
 	}
 
-	return gpdb::PnodeMutateExpressionTree(pnode, (Pnode) CQueryMutators::PnodeWindowPrLMutator, pctx);
+	return gpdb::PnodeMutateExpressionTree(pnode, (Pfnode) CQueryMutators::PnodeWindowPrLMutator, pctx);
 }
 
 //---------------------------------------------------------------------------

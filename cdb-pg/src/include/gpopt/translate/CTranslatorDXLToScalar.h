@@ -108,6 +108,9 @@ namespace gpdxl
 
 			// indicates whether a sublink was encountered during translation of the scalar subtree
 			BOOL m_fHasSubqueries;
+			
+			// number of segments
+			ULONG m_ulSegments;
 
 			// translate a CDXLScalarArrayComp into a GPDB ScalarArrayOpExpr
 			Expr *PstrarrayopexprFromDXLNodeScArrayComp
@@ -295,11 +298,7 @@ namespace gpdxl
 
 		public:
 			// ctor
-			CTranslatorDXLToScalar
-				(
-				IMemoryPool *pmp,
-				CMDAccessor *pmda
-				);
+			CTranslatorDXLToScalar(IMemoryPool *pmp, CMDAccessor *pmda, ULONG ulSegments);
 
 			// Translate DXL scalar operator node into an Expr expression
 			// This function is called during the translation of DXL->Query or DXL->Query
@@ -324,7 +323,7 @@ namespace gpdxl
 				);
 
 
-			// Checks if the operator return a boolean result
+			// checks if the operator return a boolean result
 			static
 			BOOL FBoolean(CDXLNode *pdxln, CMDAccessor *pmda);
 
@@ -333,6 +332,9 @@ namespace gpdxl
 			{
 				return m_fHasSubqueries;
 			}
+			
+			// translate a DXL datum into GPDB const expression
+			Expr *PconstFromDXLDatum(CDXLDatum *pdxldatum);
 	};
 }
 #endif // !GPDXL_CTranslatorDXLToScalar_H

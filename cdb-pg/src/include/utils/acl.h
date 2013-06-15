@@ -306,5 +306,4 @@ extern bool pg_conversion_ownercheck(Oid conv_oid, Oid roleid);
 extern bool pg_foreign_server_ownercheck(Oid srv_oid, Oid roleid);
 extern bool pg_extprotocol_ownercheck(Oid ptc_oid, Oid roleid);
 
-
 #endif   /* ACL_H */

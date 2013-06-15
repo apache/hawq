@@ -297,11 +297,18 @@ CTranslatorUtils::Pdxltabdesc
 	)
 {
 	// generate an MDId for the table desc.
-	CMDIdGPDB *pmdid = CDXLUtils::Pmdid(pmp, prte->relid);
+	OID oidRel = prte->relid;
+	
+	CMDIdGPDB *pmdid = CDXLUtils::Pmdid(pmp, oidRel);
 
 	const IMDRelation *pmdrel = pmda->Pmdrel(pmdid);
+
+	if (!pmdrel->FPartitioned() && gpdb::FHasSubclass(oidRel))
+	{
+		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("Inherited tables"));
+	}
 	
-	if (1 < pmdrel->UlPartColumns())
+	if (1 < pmdrel->UlPartColumns() || gpdb::FRelPartIsInterior(oidRel))
 	{
 		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("Multi-level partitioning"));
 	}
@@ -310,7 +317,7 @@ CTranslatorUtils::Pdxltabdesc
 	const CWStringConst *pstrTblName = pmdrel->Mdname().Pstr();
 	CMDName *pmdnameTbl = New(pmp) CMDName(pmp, pstrTblName);
 
-	CDXLTableDescr *pdxltabdesc = New(pmp) CDXLTableDescr(pmp, pmdid, pmdnameTbl);
+	CDXLTableDescr *pdxltabdesc = New(pmp) CDXLTableDescr(pmp, pmdid, pmdnameTbl, prte->checkAsUser);
 
 	const ULONG ulLen = pmdrel->UlColumns();
 	
@@ -346,6 +353,28 @@ CTranslatorUtils::Pdxltabdesc
 
 //---------------------------------------------------------------------------
 //	@function:
+//		CTranslatorUtils::FReadsOrModifiesData
+//
+//	@doc:
+//		Check if the given function reads or modifies SQL data
+//
+//---------------------------------------------------------------------------
+BOOL
+CTranslatorUtils::FReadsOrModifiesData
+	(
+	CMDAccessor *pmda,
+	IMDId *pmdidFunc
+	)
+{
+	const IMDFunction *pmdfunc = pmda->Pmdfunc(pmdidFunc);
+	IMDFunction::EFuncDataAcc efda = pmdfunc->EfdaDataAccess();
+
+	return (IMDFunction::EfdaReadsSQLData == efda ||
+			IMDFunction::EfdaModifiesSQLData == efda);
+}
+
+//---------------------------------------------------------------------------
+//	@function:
 //		CTranslatorUtils::FSirvFunc
 //
 //	@doc:
@@ -363,8 +392,28 @@ CTranslatorUtils::FSirvFunc
 	const IMDFunction *pmdfunc = pmda->Pmdfunc(pmdidFunc);
 	IMDFunction::EFuncDataAcc efda = pmdfunc->EfdaDataAccess();
 
-	return (!pmdfunc->FReturnsSet() &&
-			(IMDFunction::EfdaReadsSQLData == efda || IMDFunction::EfdaModifiesSQLData == efda));
+	return !pmdfunc->FReturnsSet() && FReadsOrModifiesData(pmda, pmdidFunc);
+}
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorUtils::FHasSubquery
+//
+//	@doc:
+//		Check if the given tree contains a subquery
+//
+//---------------------------------------------------------------------------
+BOOL
+CTranslatorUtils::FHasSubquery
+	(
+	Node *pnode
+	)
+{
+	List *plUnsupported = ListMake1Int(T_SubLink);
+	INT iUnsupported = gpdb::IFindNodes(pnode, plUnsupported);
+	gpdb::GPDBFree(plUnsupported);
+
+	return (0 <= iUnsupported);
 }
 
 //---------------------------------------------------------------------------
@@ -862,6 +911,10 @@ CTranslatorUtils::EdxljtFromJoinType
 
 		case JOIN_LASJ:
 			edxljt = EdxljtLeftAntiSemijoin;
+			break;
+
+		case JOIN_LASJ_NOTIN:
+			edxljt = EdxljtLeftAntiSemijoinNotIn;
 			break;
 
 		default:
@@ -1487,34 +1540,66 @@ CTranslatorUtils::PdrgpbsRollup
 {
 	GPOS_ASSERT(NULL != pgrcl);
 
-	// construct an array of columns
-	DrgPul *pdrgpulGroupingCols = New(pmp) DrgPul(pmp);
+	DrgPbs *pdrgpbsGroupingSets = New(pmp) DrgPbs(pmp);
 	ListCell *plcGroupingSet = NULL;
 	ForEach (plcGroupingSet, pgrcl->groupsets)
 	{
-		GPOS_ASSERT(IsA((Node *) lfirst(plcGroupingSet), GroupClause));
+		Node *pnode = (Node *) lfirst(plcGroupingSet);
+		CBitSet *pbs = New(pmp) CBitSet(pmp);
+		if (IsA(pnode, GroupClause))
+		{
+			// simple group clause, create a singleton grouping set
+			GroupClause *pgrpcl = (GroupClause *) pnode;
+			(void) pbs->FExchangeSet(pgrpcl->tleSortGroupRef);
+			pdrgpbsGroupingSets->Append(pbs);
+		}
+		else if (IsA(pnode, List))
+		{
+			// list of group clauses, add all clauses into one grouping set
+			// for example, rollup((a,b),(c,d));
+			List *plist = (List *) pnode;
+			ListCell *plcGrpCl = NULL;
+			ForEach (plcGrpCl, plist)
+			{
+				Node *pnodeGrpCl = (Node *) lfirst(plcGrpCl);
+				if (!IsA(pnodeGrpCl, GroupClause))
+				{
+					// each list entry must be a group clause
+					// for example, rollup((a,b),(c,(d,e)));
+					GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("Nested grouping sets"));
+				}
 
-		GroupClause *pgrpcl = (GroupClause *) lfirst(plcGroupingSet);
-		pdrgpulGroupingCols->Append(New(pmp) ULONG(pgrpcl->tleSortGroupRef));
+				GroupClause *pgrpcl = (GroupClause *) pnodeGrpCl;
+				(void) pbs->FExchangeSet(pgrpcl->tleSortGroupRef);
+			}
+			pdrgpbsGroupingSets->Append(pbs);
+		}
+		else
+		{
+			// unsupported rollup operation
+			GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("Nested grouping sets"));
+		}
 	}
 
-	const ULONG ulGroupingCols = pdrgpulGroupingCols->UlLength();
+	const ULONG ulGroupingSets = pdrgpbsGroupingSets->UlLength();
 	DrgPbs *pdrgpbs = New(pmp) DrgPbs(pmp);
 
-	// compute prefixes of the array of columns
-	for (ULONG ulPrefix = 0; ulPrefix <= ulGroupingCols; ulPrefix++)
+	// compute prefixes of grouping sets array
+	for (ULONG ulPrefix = 0; ulPrefix <= ulGroupingSets; ulPrefix++)
 	{
-		CBitSet *pbs = New(pmp) CBitSet(pmp, ulCols);
+		CBitSet *pbs = New(pmp) CBitSet(pmp);
 		for (ULONG ulIdx = 0; ulIdx < ulPrefix; ulIdx++)
 		{
-			ULONG ulCol = *((*pdrgpulGroupingCols)[ulIdx]);
-			pbs->FExchangeSet(ulCol);
+			CBitSet *pbsCurrent = (*pdrgpbsGroupingSets)[ulIdx];
+			pbs->Union(pbsCurrent);
 		}
 		pdrgpbs->Append(pbs);
 	}
-	pdrgpulGroupingCols->Release();
+	pdrgpbsGroupingSets->Release();
+
 	return pdrgpbs;
 }
+
 
 //---------------------------------------------------------------------------
 //	@function:
@@ -1759,34 +1844,9 @@ CTranslatorUtils::Pdrgpdxlcd
 		{
 			continue;
 		}
-		
-		CMDName *pmdname = NULL;
-		if (NULL == pte->resname)
-		{
-			CWStringConst strUnnamedCol(GPOS_WSZ_LIT("?column?"));
-			pmdname = New(pmp) CMDName(pmp, &strUnnamedCol);
-		}
-		else
-		{
-			CWStringDynamic *pstrAlias = CDXLUtils::PstrFromSz(pmp, pte->resname);
-			pmdname = New(pmp) CMDName(pmp, pstrAlias);
-			// CName constructor copies string
-			delete pstrAlias;
-		}
 
-		// create a column descriptor
-		OID oidType = gpdb::OidExprType((Node *) pte->expr);
-		CMDIdGPDB *pmdidColType = New(pmp) CMDIdGPDB(oidType);
 		ULONG ulColId = *(*pdrgpulColIds)[ul];
-		CDXLColDescr *pdxlcd = New(pmp) CDXLColDescr
-										(
-										pmp,
-										pmdname,
-										ulColId,
-										ul + 1, /* attno */
-										pmdidColType,
-										false /* fColDropped */
-										);
+		CDXLColDescr *pdxlcd = Pdxlcd(pmp, pte, ulColId, ul+1 /*ulPos*/);
 		pdrgpdxlcd->Append(pdxlcd);
 		ul++;
 	}
@@ -1794,6 +1854,133 @@ CTranslatorUtils::Pdrgpdxlcd
 	GPOS_ASSERT(pdrgpdxlcd->UlLength() == pdrgpulColIds->UlLength());
 
 	return pdrgpdxlcd;
+}
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorUtils::PdrgpulPosInTargetList
+//
+//	@doc:
+//		Return the positions of the target list entries included in the output
+//		target list
+//---------------------------------------------------------------------------
+DrgPul *
+CTranslatorUtils::PdrgpulPosInTargetList
+	(
+	IMemoryPool *pmp,
+	List *plTargetList,
+	BOOL fKeepResjunked
+	)
+{
+	GPOS_ASSERT(NULL != plTargetList);
+
+	ListCell *plcTE = NULL;
+	DrgPul *pdrgul = New(pmp) DrgPul(pmp);
+	ULONG ul = 0;
+	ForEach (plcTE, plTargetList)
+	{
+		TargetEntry *pte = (TargetEntry *) lfirst(plcTE);
+
+		if (pte->resjunk && !fKeepResjunked)
+		{
+			continue;
+		}
+
+		pdrgul->Append(New(pmp) ULONG(ul));
+		ul++;
+	}
+
+	return pdrgul;
+}
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorUtils::Pdxlcd
+//
+//	@doc:
+//		Construct a column descriptor from the given target entry and column
+//		identifier
+//---------------------------------------------------------------------------
+CDXLColDescr *
+CTranslatorUtils::Pdxlcd
+	(
+	IMemoryPool *pmp,
+	TargetEntry *pte,
+	ULONG ulColId,
+	ULONG ulPos
+	)
+{
+	GPOS_ASSERT(NULL != pte);
+	GPOS_ASSERT(ULONG_MAX != ulColId);
+
+	CMDName *pmdname = NULL;
+	if (NULL == pte->resname)
+	{
+		CWStringConst strUnnamedCol(GPOS_WSZ_LIT("?column?"));
+		pmdname = New(pmp) CMDName(pmp, &strUnnamedCol);
+	}
+	else
+	{
+		CWStringDynamic *pstrAlias = CDXLUtils::PstrFromSz(pmp, pte->resname);
+		pmdname = New(pmp) CMDName(pmp, pstrAlias);
+		// CName constructor copies string
+		delete pstrAlias;
+	}
+
+	// create a column descriptor
+	OID oidType = gpdb::OidExprType((Node *) pte->expr);
+	CMDIdGPDB *pmdidColType = New(pmp) CMDIdGPDB(oidType);
+	CDXLColDescr *pdxlcd = New(pmp) CDXLColDescr
+									(
+									pmp,
+									pmdname,
+									ulColId,
+									ulPos, /* attno */
+									pmdidColType,
+									false /* fColDropped */
+									);
+
+	return pdxlcd;
+}
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorUtils::PdxlnDummyPrElem
+//
+//	@doc:
+//		Create a dummy project element to rename the input column identifier
+//---------------------------------------------------------------------------
+CDXLNode *
+CTranslatorUtils::PdxlnDummyPrElem
+	(
+	IMemoryPool *pmp,
+	ULONG ulColIdInput,
+	ULONG ulColIdOutput,
+	CDXLColDescr *pdxlcdOutput
+	)
+{
+	CMDIdGPDB *pmdidOriginal = CMDIdGPDB::PmdidConvert(pdxlcdOutput->PmdidType());
+	CMDIdGPDB *pmdidCopy = New(pmp) CMDIdGPDB(pmdidOriginal->OidObjectId(), pmdidOriginal->UlVersionMajor(), pmdidOriginal->UlVersionMinor());
+
+	// create a column reference for the scalar identifier to be casted
+	ULONG ulColId = pdxlcdOutput->UlID();
+	CMDName *pmdname = New(pmp) CMDName(pmp, pdxlcdOutput->Pmdname()->Pstr());
+	CDXLColRef *pdxlcr = New(pmp) CDXLColRef(pmp, pmdname, ulColIdInput);
+	CDXLScalarIdent *pdxlopIdent = New(pmp) CDXLScalarIdent(pmp, pdxlcr, pmdidCopy);
+
+	CDXLNode *pdxlnPrEl = New(pmp) CDXLNode
+										(
+										pmp,
+										New(pmp) CDXLScalarProjElem
+													(
+													pmp,
+													ulColIdOutput,
+													New(pmp) CMDName(pmp, pdxlcdOutput->Pmdname()->Pstr())
+													),
+										New(pmp) CDXLNode(pmp, pdxlopIdent)
+										);
+
+	return pdxlnPrEl;
 }
 
 //---------------------------------------------------------------------------
@@ -2244,7 +2431,7 @@ CTranslatorUtils::PdxlnPrElNull
 	const WCHAR *wszColName = pmdcol->Mdname().Pstr()->Wsz();
 	if (!pmdcol->FNullable())
 	{
-		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLMissingValue, wszColName);
+		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLNotNullViolation, wszColName);
 	}
 
 	ULONG ulColId = pidgtorCol->UlNextId();
@@ -2353,6 +2540,24 @@ CTranslatorUtils::PdxlnPrElNull
 	CDXLNode *pdxlnConst = New(pmp) CDXLNode(pmp, New(pmp) CDXLScalarConstValue(pmp, pdxldatum));
 
 	return New(pmp) CDXLNode(pmp, New(pmp) CDXLScalarProjElem(pmp, ulColId, pmdnameAlias), pdxlnConst);
+}
+
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorUtils::CheckRTEPermissions
+//
+//	@doc:
+//		Check permissions on range table
+//
+//---------------------------------------------------------------------------
+void
+CTranslatorUtils::CheckRTEPermissions
+	(
+	List *plRangeTable
+	)
+{
+	gpdb::CheckRTPermissions(plRangeTable);
 }
 
 // EOF

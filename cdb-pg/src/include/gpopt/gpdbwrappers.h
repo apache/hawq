@@ -149,6 +149,9 @@ namespace gpdb {
 
 	// is aggregate ordered
 	bool FOrderedAgg(Oid aggid);
+	
+	// does aggregate have a preliminary function
+	bool FAggHasPrelimFunc(Oid aggid);
 
 	// intermediate result type of given aggregate
 	Oid OidAggregate(const char*szArg, Oid oidType);
@@ -267,7 +270,7 @@ namespace gpdb {
 	Oid OidRootPartition(Oid oid);
 	
 	// partition attributes
-	List *PlPartitionAttrs(PartitionNode *pn);
+	List *PlPartitionAttrs(Oid oid);
 
 	// parts of a partitioned table
 	PartitionNode *PpnParts(Oid relid, int2 level, Oid parent, bool inctemplate, MemoryContext mcxt);
@@ -422,9 +425,18 @@ namespace gpdb {
 	// check whether the part with the given oid is the root of a partition table
 	bool FRelPartIsRoot(Oid relid);
 	
+	// check whether the part with the given oid is an interior subpartition
+	bool FRelPartIsInterior(Oid relid);
+	
+	// check whether table with the given oid is a regular table and not part of a partitioned table
+	bool FRelPartIsNone(Oid relid);
+
 	// check whether partitioning type encodes hash partitioning
 	bool FHashPartitioned(char c);
-	
+
+	// check whether a relation is inherited
+	bool FHasSubclass(Oid oidRel);
+
 	// does a relation exist with the given oid
 	bool FRelationExists(Oid oid);
 
@@ -491,6 +503,12 @@ namespace gpdb {
 
 	// deduce an individual actual datatype on the assumption that the rules for ANYARRAY/ANYELEMENT are being followed
 	Oid OidResolveGenericType(Oid declared_type, Oid context_actual_type, Oid context_declared_type);
+	
+	// hash a const value with GPDB's hash function
+	int32 ICdbHash(Const *pconst, int iSegments);
+	
+	// check permissions on range table 
+	void CheckRTPermissions(List *plRangeTable);
 
 } //namespace gpdb
 

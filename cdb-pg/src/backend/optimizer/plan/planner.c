@@ -43,6 +43,7 @@
 #endif
 #include "parser/parse_expr.h"
 #include "parser/parse_oper.h"
+#include "parser/parse_relation.h"
 #include "parser/parsetree.h"
 #include "utils/selfuncs.h"
 #include "utils/syscache.h"
@@ -69,8 +70,8 @@ planner_hook_type planner_hook = NULL;
 
 ParamListInfo PlannerBoundParamList = NULL;		/* current boundParams */
 
-extern bool		gp_optimizer; /* Enable the optimizer */
-extern bool		gp_log_optimizer; /* Enable logging of the optimizer */
+extern bool		optimizer; /* Enable the optimizer */
+extern bool		optimizer_log; /* Enable logging of the optimizer */
 
 /* Expression kind codes for preprocess_expression */
 #define EXPRKIND_QUAL			0
@@ -143,28 +144,12 @@ static Plan *pushdown_preliminary_limit(Plan *plan, Node *limitCount, int64 coun
 bool is_dummy_plan(Plan *plan);
 
 
-
-/*
- * Use optimizer process (server) to generate the query plan;
- * construc the planned statement from retrieved plan;
- */
-static PlannedStmt *optimize_remote(Query *pquery)
-{
-	char *error_buffer = palloc(OPT_ERROR_BUFFER_SIZE);
-	struct optimizer_params params;
-	params.query = pquery;
-	params.socketPath = OPT_SOCKET_NAME;
-
-	return libopt_exec("optimize_query", &params, error_buffer, OPT_ERROR_BUFFER_SIZE,
-	                   &QueryCancelPending);
-}
-
 /**
  * Logging of optimization outcome
  */
 static void log_optimizer(PlannedStmt *plan, bool fUnexpectedFailure)
 {
-	if (!gp_log_optimizer)
+	if (!optimizer_log)
 	{
 		//  optimizer logging is not enabled
 		return;
@@ -172,34 +157,28 @@ static void log_optimizer(PlannedStmt *plan, bool fUnexpectedFailure)
 
 	if (NULL != plan)
 	{
-		elog(DEBUG1, "Optimizer successfully produced plan");
+		elog(DEBUG1, "Optimizer produced plan");
 		return;
 	}
 
-	// optimizer failed to produce a plan, log failure based on the chosen type
-	if (GPOPT_ALL_FAIL == gp_opt_log_failure)
+	// optimizer failed to produce a plan, log failure
+	if (OPTIMIZER_ALL_FAIL == optimizer_log_failure)
 	{
-		if (fUnexpectedFailure)
-		{
-			elog(NOTICE, "Unexpected fall back to planner");
-		}
-		else
-		{
-			elog(NOTICE, "Expected fall back to planner");
-		}
+		elog(LOG, "Planner produced plan :%d", fUnexpectedFailure);
 		return;
 	}
 
-	if (fUnexpectedFailure && GPOPT_UNEXPECTED_FAIL == gp_opt_log_failure)
+	if (fUnexpectedFailure && OPTIMIZER_UNEXPECTED_FAIL == optimizer_log_failure)
 	{
-		elog(NOTICE, "Unexpected fall back to planner");
+		// unexpected fall back
+		elog(LOG, "Planner produced plan :%d", fUnexpectedFailure);
 		return;
 	}
 
-	if (!fUnexpectedFailure && GPOPT_EXPECTED_FAIL == gp_opt_log_failure)
+	if (!fUnexpectedFailure && OPTIMIZER_EXPECTED_FAIL == optimizer_log_failure)
 	{
 		// expected fall back
-		elog(NOTICE, "Expected fall back to planner");
+		elog(LOG, "Planner produced plan :%d", fUnexpectedFailure);
 	}
 }
 
@@ -233,6 +212,40 @@ static void postprocess_plan(PlannedStmt *plan)
 }
 
 
+/*
+ * optimize query using the new optimizer
+ */
+static PlannedStmt *
+optimize_query(Query *parse, ParamListInfo boundParams)
+{
+	/* flag to check if optimizer unexpectedly failed to produce a plan */
+	bool fUnexpectedFailure = false;
+
+	/* create a local copy and hand it to the optimizer */
+	Query *pqueryCopy = (Query *) copyObject(parse);
+
+	/* perform pre-processing of query tree before calling optimizer */
+	pqueryCopy = preprocess_query_optimizer(pqueryCopy, boundParams);
+
+	PlannedStmt *result = PplstmtOptimize(pqueryCopy, &fUnexpectedFailure);
+
+	if (result)
+	{
+		postprocess_plan(result);
+
+		/* assign access rights for the range table entries. */
+		if (NULL != result->rtable)
+		{
+			assign_permissions(result->commandType, result->rtable);
+		}
+	}
+
+	log_optimizer(result, fUnexpectedFailure);
+
+	return result;
+}
+
+
 /*****************************************************************************
  *
  *	   Query optimizer entry point
@@ -257,40 +270,19 @@ planner(Query *parse, int cursorOptions,
 	 * If the new optimizer is enabled, try that first. If it does not return a plan,
 	 * then fall back to the planner.
 	 */
-	if (gp_optimizer)
+	if (optimizer && (-1 == Gp_segment))
 	{
-		// flag to check if optimizer unexpectedly failed to produce a plan
-		bool fUnexpectedFailure = false;
-
-		// create a local copy and hand it to the optimizer
-		Query *pqueryCopy = (Query *) copyObject(parse);
-
-		/* perform pre-processing of query tree before calling optimizer */
-		pqueryCopy = preprocess_query_optimizer(pqueryCopy, boundParams);
-
-		if (gp_opt_local)
-		{
-			result = PplstmtOptimize(pqueryCopy, &fUnexpectedFailure);
-		}
-		else
-		{
-			result = optimize_remote(pqueryCopy);
-		}
-
-		if (result)
-		{
-			postprocess_plan(result);
-		}
-
-		log_optimizer(result, fUnexpectedFailure);
+		result = optimize_query(parse, boundParams);
 	}
 
 	if (!result)
 	{
 		result = standard_planner(parse, cursorOptions, boundParams);
 	}
+
 	return result;
 }
+
 
 PlannedStmt *
 standard_planner(Query *parse, int cursorOptions, ParamListInfo boundParams)
@@ -2217,6 +2209,7 @@ is_dummy_plan_walker(Node *node, bool *context)
 					break;
 					
 				case JOIN_IN:
+				case JOIN_LASJ_NOTIN:
 				case JOIN_LASJ: /* outer */
 					*context = is_dummy_plan(outerPlan(node));
 					break;

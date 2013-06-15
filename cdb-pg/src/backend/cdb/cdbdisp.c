@@ -165,7 +165,11 @@ bindCurrentOfParams(char *cursor_name,
 #define MPPEXEC_CAP_STR "MPPEXEC "
 #define MPPEXEC_STR "mppexec "
 
+#define GP_PARTITION_SELECTION_OID 6084
+#define GP_PARTITION_EXPANSION_OID 6085
+#define GP_PARTITION_INVERSE_OID 6086
 
+ 
 /*
  * Clear our "active" flags; so that we know that the writer gangs are busy -- and don't stomp on
  * internal dispatcher structures. See MPP-6253 and MPP-6579.
@@ -482,8 +486,13 @@ cdbdisp_dispatchToGang(struct CdbDispatcherState *ds,
 		/* Are we dispatching to the writer-gang when it is already busy ? */
 		if (gp == dispatchResults->writer_gang)
 		{
-			insist_log(!dispatchResults->writer_gang->dispatcherActive,
-					"cannot share active writer segworker");
+			if (dispatchResults->writer_gang->dispatcherActive)
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INTERNAL_ERROR),
+						 errmsg("Cannot dispatch multiple queries to the segments."),
+						 errhint("Likely caused by a function that reads or modifies data in a distributed table.")));
+			}
 			dispatchResults->writer_gang->dispatcherActive = true;
 		}
 	}
@@ -3182,6 +3191,18 @@ pre_dispatch_function_evaluation_mutator(Node *node,
 				 *
 				 * See MPP-3022 for what happened when we didn't do this.
 				 */
+				return (Node *)newexpr;
+			}
+
+			/* 
+			 * Ignored evaluation of gp_partition stable functions.
+			 * TODO: garcic12 - May 30, 2013, refactor gp_partition stable functions to be truly
+			 * stable (JIRA: MPP-19541).
+			 */
+			if (funcid == GP_PARTITION_SELECTION_OID 
+				|| funcid == GP_PARTITION_EXPANSION_OID 
+				|| funcid == GP_PARTITION_INVERSE_OID)
+			{
 				return (Node *)newexpr;
 			}
 

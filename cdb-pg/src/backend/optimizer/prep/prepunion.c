@@ -834,7 +834,7 @@ expand_inherited_rtentry(PlannerInfo *root, RangeTblEntry *rte, Index rti)
 	}
 	/* Fast path for common case of childless table */
 	parentOID = rte->relid;
-	if (!has_subclass(parentOID))
+	if (!has_subclass_fast(parentOID))
 	{
 		/* Clear flag before returning */
 		rte->inh = false;

@@ -45,7 +45,7 @@
 #include "executor/executor.h"
 
 /* Enable the optimizer */
-extern bool		gp_optimizer;
+extern bool		optimizer;
 
 /*
  * An ApplyMotionState holds state for the recursive apply_motion_mutator().
@@ -700,7 +700,7 @@ apply_motion(PlannerInfo *root, Plan *plan, Query *query)
 				 * The optimizer supports updating partitioning columns.
 				 */
 				if (query->commandType == CMD_UPDATE &&
-					!gp_optimizer &&
+					!optimizer &&
 					doesUpdateAffectPartitionCols(root, plan,query))
 				{
 					ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
@@ -2408,5 +2408,30 @@ Plan *zap_trivial_result(PlannerInfo *root, Plan *plan)
 	return plan;
 }
 			
-
+/* 
+ * Hash a const value with GPDB's hash function
+ */
+int32 
+cdbhash_const(Const *pconst, int iSegments)
+{
+	CdbHash *pcdbhash = makeCdbHash(iSegments, HASH_FNV_1);
+	cdbhashinit(pcdbhash);
+			
+	if (pconst->constisnull)
+	{
+		cdbhashnull(pcdbhash);
+	}
+	else
+	{
+		Assert(isGreenplumDbHashable(pconst->consttype));
+		Oid oidType = pconst->consttype;
+			
+		if (typeIsArrayType(oidType))
+		{
+			oidType = ANYARRAYOID;
+		}
+		cdbhash(pcdbhash, pconst->constvalue, oidType);
+	}		
+	return cdbhashreduce(pcdbhash);	
+}
 

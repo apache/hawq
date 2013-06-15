@@ -125,7 +125,6 @@ isHAWQ1100OrLater(void)
 	return retValue;
 }
 
-
 /*----------------
  * Handlers for various slash commands displaying some sort of list
  * of things in the database.

@@ -326,7 +326,7 @@ clauselist_selectivity(PlannerInfo *root,
 	 * For Anti Semi Join, selectivity is determined by the fraction of 
 	 * tuples that do no match 
 	 */
-	if (JOIN_LASJ == jointype) 
+	if (JOIN_LASJ == jointype || JOIN_LASJ_NOTIN == jointype)
 	{
 		s1 = (1 - s1);
 	}
@@ -528,6 +528,7 @@ clause_selectivity(PlannerInfo *root,
 				case JOIN_INNER:
 				case JOIN_LEFT:
 				case JOIN_LASJ:
+				case JOIN_LASJ_NOTIN:
 				case JOIN_FULL:
 				case JOIN_RIGHT:
 					/* Cacheable --- do we already have the result? */

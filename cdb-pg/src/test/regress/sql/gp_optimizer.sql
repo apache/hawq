@@ -21,9 +21,11 @@ alter table orca.s add column d int;
 
 insert into orca.s select i, i/2 from generate_series(1,30) i;
 
-set gp_log_optimizer=on;
-set gp_optimizer=on;
+set optimizer_log=on;
+set optimizer=on;
 ----------------------------------------------------------------------
+-- expected fall back to the planner
+select sum(distinct a), count(distinct b) from orca.r;
 
 select * from orca.r;
 select * from orca.r, orca.s where r.a=s.c;
@@ -60,7 +62,7 @@ select 129::bigint, 5623::int, 45::smallint from orca.r;
 --  distributed tables
 
 ----------------------------------------------------------------------
-set gp_optimizer=off;
+set optimizer=off;
 
 create table orca.foo (x1 int, x2 int, x3 int);
 create table orca.bar1 (x1 int, x2 int, x3 int) distributed randomly;
@@ -71,7 +73,7 @@ insert into orca.foo select i,i+1,i+2 from generate_series(1,10) i;
 insert into orca.bar1 select i,i+1,i+2 from generate_series(1,20) i;
 insert into orca.bar2 select i,i+1,i+2 from generate_series(1,30) i;
 
-set gp_optimizer=on;
+set optimizer=on;
 ----------------------------------------------------------------------
 
 -- produces result node
@@ -83,7 +85,7 @@ SELECT generate_series(1,5) AS one FROM orca.foo having 1 < 2;
 SELECT 1 AS one FROM orca.foo group by x1 having 1 < 2;
 SELECT x1 AS one FROM orca.foo having 1 < 2;
 ----------------------------------------------------------------------
-set gp_optimizer=off;
+set optimizer=off;
 
 drop table orca.r cascade;
 create table orca.r(a int, b int);
@@ -100,7 +102,7 @@ insert into orca.s select i%7, i%2 from generate_series(1,30) i;
 analyze orca.r;
 analyze orca.s;
 
-set gp_optimizer=on;
+set optimizer=on;
 ----------------------------------------------------------------------
 
 select * from orca.r, orca.s where r.a=s.c;
@@ -112,7 +114,7 @@ select * from orca.r, orca.s where r.a<s.c+1 or r.a>s.c;
 select r.* from orca.r, orca.s where s.c=2;
 
 ----------------------------------------------------------------------
-set gp_optimizer=off;
+set optimizer=off;
 
 create table orca.m();
 alter table orca.m add column a int;
@@ -127,7 +129,7 @@ insert into orca.m1 select i-2, i%3 from generate_series(1,25) i;
 
 insert into orca.r values (null, 1);
 
-set gp_optimizer=on;
+set optimizer=on;
 ----------------------------------------------------------------------
 
 -- join types
@@ -163,11 +165,11 @@ select * from orca.r where a = (select 1);
 select * from ((select a as x from orca.r) union (select 1 as x )) as foo order by x;
 
 ----------------------------------------------------------------------
-set gp_optimizer=off;
+set optimizer=off;
 
 insert into orca.m values (1,-1), (1,2), (1,1);
 
-set gp_optimizer=on;
+set optimizer=on;
 ----------------------------------------------------------------------
 
 -- computed columns
@@ -184,12 +186,16 @@ select b,count(*) from orca.m group by grouping sets ((a), (a,b));
 select a,count(*) from orca.m group by grouping sets ((a), (a,b));
 select a,count(*) from orca.m group by grouping sets ((a), (b));
 select a,b,count(*) from orca.m group by rollup(a, b);
+select a,b,count(*) from orca.m group by rollup((a),(a,b)) order by 1,2,3;
 select count(*) from orca.m group by ();
 select a, count(*) from orca.r group by (), a;
 select a, count(*) from orca.r group by grouping sets ((),(a));
 
 select a, b, count(*) c from orca.r group by grouping sets ((),(a), (a,b)) order by b,a,c;
 select a, count(*) c from orca.r group by grouping sets ((),(a), (a,b)) order by b,a,c;
+
+select 1 from orca.r group by ();
+select a,1 from orca.r group by rollup(a);
 
 -- arrays
 select array[array[a,b]], array[b] from orca.r;
@@ -199,7 +205,7 @@ select a, b from m union select b,a from orca.m;
 SELECT a from m UNION ALL select b from orca.m UNION ALL select a+b from orca.m group by 1;
 
 ----------------------------------------------------------------------
-set gp_optimizer=off;
+set optimizer=off;
 
 drop table if exists orca.foo;
 create table orca.foo(a int, b int, c int, d int);
@@ -210,7 +216,7 @@ create table orca.bar(a int, b int, c int);
 insert into orca.foo select i, i%2, i%4, i-1 from generate_series(1,40)i;
 insert into orca.bar select i, i%3, i%2 from generate_series(1,30)i;
 
-set gp_optimizer=on;
+set optimizer=on;
 ----------------------------------------------------------------------
 
 --- distinct operation
@@ -236,13 +242,18 @@ select 1+row_number() over(order by foo.a+bar.a) from orca.foo inner join orca.b
 select row_number() over(order by foo.a+ bar.a)/count(*) from orca.foo inner join orca.bar using(b) group by foo.a, bar.a, bar.b;
 select count(*) over(partition by b order by a range between 1 preceding and (select count(*) from orca.bar) following) from orca.foo;
 select a+1, rank() over(partition by b+1 order by a+1) from orca.foo order by 1, 2;
+select a , sum(a) over (order by a range '1'::float8 preceding) from orca.r order by 1,2;
+select a, b, floor(avg(b) over(order by a desc, b desc rows between unbounded preceding and unbounded following)) as avg, dense_rank() over (order by a) from orca.r order by 1,2,3,4;
+select lead(a) over(order by a) from orca.r order by 1;
+select lag(c,d) over(order by c,d) from orca.s order by 1;
+select lead(c,c+d,1000) over(order by c,d) from orca.s order by 1;
 
 --- cte 
 with x as (select a, b from orca.r)
 select rank() over(partition by a, case when b = 0 then a+b end order by b asc) as rank_within_parent from x order by a desc ,case when a+b = 0 then a end ,b;
 
 ----------------------------------------------------------------------
-set gp_optimizer=off;
+set optimizer=off;
 
 drop table if exists orca.rcte;
 create table orca.rcte(a int, b int, c int);
@@ -250,7 +261,7 @@ create table orca.rcte(a int, b int, c int);
 insert into orca.rcte select i, i%2, i%3 from generate_series(1,40)i;
 
 -- select disable_xform('CXformInlineCTEConsumer');
-set gp_optimizer=on;
+set optimizer=on;
 ----------------------------------------------------------------------
 
 with x as (select * from orca.rcte where a < 10) select * from x x1, x x2;
@@ -279,7 +290,7 @@ select a, c from orca.r, orca.s where a  not in  (select c) order by a, c limit 
 select a, c from orca.r, orca.s where a  = any  (select c from orca.r) order by a, c limit 10;
 select a, c from orca.r, orca.s where a  <> all (select c) order by a, c limit 10;
 ----------------------------------------------------------------------
-set gp_optimizer=off;
+set optimizer=off;
 
 CREATE TABLE orca.onek (
 unique1 int4,
@@ -308,7 +319,7 @@ insert into orca.onek values (439,5,1,3,9,19,9,39,39,439,439,18,19,'XQAAAA','FAA
 insert into orca.onek values (670,6,0,2,0,10,0,70,70,170,670,0,1,'UZAAAA','GAAAAA','OOOOxx');
 insert into orca.onek values (543,7,1,3,3,3,3,43,143,43,543,6,7,'XUAAAA','HAAAAA','VVVVxx');
 
-set gp_optimizer=on;
+set optimizer=on;
 ----------------------------------------------------------------------
 
 select ten, sum(distinct four) from orca.onek a
@@ -318,8 +329,6 @@ having exists (select 1 from orca.onek b where sum(distinct a.four) = b.four);
 -- indexes on partitioned tables
 create table orca.pp(a int) partition by range(a)(partition pp1 start(1) end(10));
 create index pp_a on orca.pp(a);
-explain select * from orca.pp where a=5;
-
 ----------------------------------------------------------------------
 
 -- list partition tests 
@@ -345,6 +354,20 @@ insert into orca.t (d, a) values('a', 0);
 insert into orca.t (a, d) values(0, 'b');
 
 select * from orca.t order by 1, 2, 3, 4, 5 limit 4;
+
+create table orca.multilevel_p (a int, b int)
+partition by range(a)
+subpartition by range(a)
+subpartition template
+(
+subpartition sp1 start(0) end(10) every (5),
+subpartition sp2 start(10) end(200) every(50)
+)
+(partition aa start(0) end (100) every (50),
+partition bb start(100) end(200) every (50) );
+
+insert into orca.multilevel_p values (1,1), (100,200);
+select * from orca.multilevel_p;
 
 
 -- test appendonly
@@ -414,5 +437,82 @@ INSERT INTO orca.csq_r VALUES (1);
 
 SELECT * FROM orca.csq_r WHERE a IN (SELECT * FROM orca.csq_f(orca.csq_r.a));
 
+-- test algebrization of having clause
+drop table if exists orca.tab1;
+create table orca.tab1(a int, b int, c int, d int, e int);
+insert into orca.tab1 values (1,2,3,4,5);
+insert into orca.tab1 values (1,2,3,4,5);
+insert into orca.tab1 values (1,2,3,4,5);
+select b,d from orca.tab1 group by b,d having min(distinct d)>3;
+select b,d from orca.tab1 group by b,d having d>3;
+select b,d from orca.tab1 group by b,d having min(distinct d)>b;
+
+create table orca.fooh1 (a int, b int, c int);
+create table orca.fooh2 (a int, b int, c int);
+insert into orca.fooh1 select i%4, i%3, i from generate_series(1,20) i;
+insert into orca.fooh2 select i%3, i%2, i from generate_series(1,20) i;
+
+select sum(f1.b) from orca.fooh1 f1 group by f1.a;
+select 1 as one, f1.a from orca.fooh1 f1 group by f1.a having sum(f1.b) > 4;
+select f1.a, 1 as one from orca.fooh1 f1 group by f1.a having 10 > (select f2.a from orca.fooh2 f2 group by f2.a having sum(f1.a) > count(*) order by f2.a limit 1) order by f1.a;
+select 1 from orca.fooh1 f1 group by f1.a having 10 > (select f2.a from orca.fooh2 f2 group by f2.a having sum(f1.a) > count(*) order by f2.a limit 1) order by f1.a;
+select f1.a, 1 as one from orca.fooh1 f1 group by f1.a having 10 > (select 1 from orca.fooh2 f2 group by f2.a having sum(f1.b) > count(*) order by f2.a limit 1) order by f1.a;
+select 1 from orca.fooh1 f1 group by f1.a having 10 > (select 1 from orca.fooh2 f2 group by f2.a having sum(f1.b) > count(*) order by f2.a limit 1) order by f1.a;
+
+select f1.a, 1 as one from orca.fooh1 f1 group by f1.a having 0 = (select f2.a from orca.fooh2 f2 group by f2.a having sum(f2.b) > 1 order by f2.a limit 1) order by f1.a;
+select 1 as one from orca.fooh1 f1 group by f1.a having 0 = (select f2.a from orca.fooh2 f2 group by f2.a having sum(f2.b) > 1 order by f2.a limit 1) order by f1.a;
+select f1.a, 1 as one from orca.fooh1 f1 group by f1.a having 0 = (select f2.a from orca.fooh2 f2 group by f2.a having sum(f2.b) > 1 order by f2.a limit 1) order by f1.a;
+select f1.a, 1 as one from orca.fooh1 f1 group by f1.a having 0 = (select f2.a from orca.fooh2 f2 group by f2.a having sum(f2.b + f1.a) > 1 order by f2.a limit 1) order by f1.a;
+
+select f1.a, 1 as one from orca.fooh1 f1 group by f1.a having 0 = (select f2.a from orca.fooh2 f2 group by f2.a having sum(f2.b + sum(f1.b)) > 1 order by f2.a limit 1) order by f1.a;
+select f1.a, 1 as one from orca.fooh1 f1 group by f1.a having f1.a < (select f2.a from orca.fooh2 f2 group by f2.a having sum(f2.b + 1) > f1.a order by f2.a desc limit 1) order by f1.a;
+select f1.a, 1 as one from orca.fooh1 f1 group by f1.a having f1.a = (select f2.a from orca.fooh2 f2 group by f2.a having sum(f2.b) + 1 > f1.a order by f2.a desc limit 1);
+select f1.a, 1 as one from orca.fooh1 f1 group by f1.a having f1.a = (select f2.a from orca.fooh2 f2 group by f2.a having sum(f2.b) > 1 order by f2.a limit 1);
+select sum(f1.a+1)+1 from orca.fooh1 f1 group by f1.a+1;
+select sum(f1.a+1)+sum(f1.a+1) from orca.fooh1 f1 group by f1.a+1;
+select sum(f1.a+1)+avg(f1.a+1), sum(f1.a), sum(f1.a+1) from orca.fooh1 f1 group by f1.a+1;
+
+create table orca.t77(C952 text) WITH (compresstype=zlib,compresslevel=2,appendonly=true,blocksize=393216,checksum=true);
+insert into orca.t77 select 'text'::text;
+insert into orca.t77 select 'mine'::text;
+insert into orca.t77 select 'apple'::text;
+insert into orca.t77 select 'orange'::text;
+
+SELECT to_char(AVG( char_length(DT466.C952) ), '9999999.9999999'), MAX( char_length(DT466.C952) ) FROM orca.t77 DT466 GROUP BY char_length(DT466.C952);
+
+create table orca.prod9 (sale integer, prodnm varchar,price integer);
+insert into orca.prod9 values (100, 'shirts', 500);
+insert into orca.prod9 values (200, 'pants',800);
+insert into orca.prod9 values (300, 't-shirts', 300);
+
+-- returning product and price using Having and Group by clause
+
+select prodnm, price from orca.prod9 GROUP BY prodnm, price HAVING price !=300;
+
+-- analyze on tables with dropped attributes
+create table orca.toanalyze(a int, b int);
+insert into orca.toanalyze values (1,1), (2,2), (3,3);
+alter table orca.toanalyze drop column a;
+analyze orca.toanalyze;
+
+-- union 
+
+create table orca.ur (a int, b int);
+create table orca.us (c int, d int);
+create table orca.ut(a int);
+create table orca.uu(c int, d bigint);
+insert into orca.ur values (1,1);
+insert into orca.ur values (1,2);
+insert into orca.ur values (2,1);
+insert into orca.us values (1,3);
+insert into orca.ut values (3);
+insert into orca.uu values (1,3);
+
+select * from (select a, a from orca.ur union select c, d from orca.us) x(g,h);
+select * from (select a, a from orca.ur union select c, d from orca.us) x(g,h), orca.ut t where t.a = x.h;
+select * from (select a, a from orca.ur union select c, d from orca.uu) x(g,h), orca.ut t where t.a = x.h;
+select 1 AS two UNION select 2.2;
+select 2.2 AS two UNION select 1;
+select * from (select 2.2 AS two UNION select 1) x(a), (select 1.0 AS two UNION ALL select 1) y(a) where y.a = x.a;
 -- clean up
 drop schema orca cascade;

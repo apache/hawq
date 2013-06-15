@@ -1233,7 +1233,8 @@ CTranslatorPlStmtToDXL::PdxlnSubqueryScanFromPlan
 											(
 											m_pmp,
 											New(m_pmp) CMDIdGPDB(CMDIdGPDB::m_mdidInvalidKey.OidObjectId()),
-											New(m_pmp) CMDName(pmdnameSubqScan->Pstr())
+											New(m_pmp) CMDName(pmdnameSubqScan->Pstr()),
+											prte->checkAsUser
 											);
 
 	ListCell *plcCol = NULL;

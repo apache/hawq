@@ -102,7 +102,8 @@ CTranslatorDXLToPlStmt::CTranslatorDXLToPlStmt
 	(
 	IMemoryPool *pmp,
 	CMDAccessor *pmda,
-	CContextDXLToPlStmt* pctxdxltoplstmt
+	CContextDXLToPlStmt* pctxdxltoplstmt,
+	ULONG ulSegments
 	)
 	:
 	m_pmp(pmp),
@@ -111,14 +112,10 @@ CTranslatorDXLToPlStmt::CTranslatorDXLToPlStmt
 	m_cmdtype(CMD_SELECT),
 	m_fTargetTableDistributed(false),
 	m_plResultRelations(NULL),
-	m_ulExternalScanCounter(0)
+	m_ulExternalScanCounter(0),
+	m_ulSegments(ulSegments)
 {
-	m_pdxlsctranslator = New (m_pmp) CTranslatorDXLToScalar
-										(
-										m_pmp,
-										m_pmda
-										);
-
+	m_pdxlsctranslator = New (m_pmp) CTranslatorDXLToScalar(m_pmp, m_pmda, m_ulSegments);
 	InitTranslators();
 }
 
@@ -4001,6 +3998,13 @@ CTranslatorDXLToPlStmt::PplanDML
 	pplan->plan_node_id = m_pctxdxltoplstmt->UlNextPlanId();
 	pplan->plan_parent_node_id = IPlanId(pplanParent);
 
+	if (CMD_INSERT == m_cmdtype && 0 == pplan->nMotionNodes)
+	{
+		List *plDirectDispatchSegIds = PlDirectDispatchSegIds(pdxlop->PdrgpdxldatumDirectDispatchInfo());
+		pplan->directDispatch.contentIds = plDirectDispatchSegIds;
+		pplan->directDispatch.isDirectDispatch = (NIL != plDirectDispatchSegIds);
+	}
+	
 	SetParamIds(pplan);
 
 	// cleanup
@@ -4018,6 +4022,65 @@ CTranslatorDXLToPlStmt::PplanDML
 		);
 
 	return (Plan *) pdml;
+}
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorDXLToPlStmt::PlDirectDispatchSegIds
+//
+//	@doc:
+//		Translate the direct dispatch info
+//
+//---------------------------------------------------------------------------
+List *
+CTranslatorDXLToPlStmt::PlDirectDispatchSegIds
+	(
+	DrgPdxldatum *pdrgpdxldatum
+	)
+{
+	if (0 == pdrgpdxldatum->UlSafeLength())
+	{
+		return NIL;
+	}
+	
+	CDXLDatum *pdxldatum = (*pdrgpdxldatum)[0];
+	
+	ULONG ulHashCode = UlCdbHash(pdxldatum);
+	
+	const ULONG ulDatums = pdrgpdxldatum->UlLength();
+	for (ULONG ul = 1; ul < ulDatums; ul++)
+	{
+		ULONG ulNewHash = UlCdbHash((*pdrgpdxldatum)[ul]);
+		if (ulHashCode != ulNewHash)
+		{
+			return NIL;
+		}
+	}
+	
+	List *plSegIds = gpdb::PlAppendInt(NIL, ulHashCode);
+	return plSegIds;
+}
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorDXLToPlStmt::UlCdbHash
+//
+//	@doc:
+//		Hash a DXL datum
+//
+//---------------------------------------------------------------------------
+ULONG
+CTranslatorDXLToPlStmt::UlCdbHash
+	(
+	CDXLDatum *pdxldatum
+	)
+{
+	Const *pconst = (Const *) m_pdxlsctranslator->PconstFromDXLDatum(pdxldatum);
+	ULONG ulHash = gpdb::ICdbHash(pconst, m_ulSegments);
+
+	gpdb::GPDBFree(pconst);
+	
+	return ulHash;
 }
 
 //---------------------------------------------------------------------------
@@ -4317,6 +4380,7 @@ CTranslatorDXLToPlStmt::PrteFromTblDescr
 	GPOS_ASSERT(InvalidOid != oid);
 
 	prte->relid = oid;
+	prte->checkAsUser = pdxltabdesc->UlExecuteAsUser();
 
 	// save oid and range index in translation context
 	pdxltrctxbtOut->SetOID(oid);
@@ -5008,6 +5072,9 @@ CTranslatorDXLToPlStmt::JtFromEdxljt
 			break;
 		case EdxljtLeftAntiSemijoin:
 			jt = JOIN_LASJ;
+			break;
+		case EdxljtLeftAntiSemijoinNotIn:
+			jt = JOIN_LASJ_NOTIN;
 			break;
 		default:
 			GPOS_ASSERT(!"Unrecognized join type");

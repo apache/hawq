@@ -304,6 +304,18 @@ namespace gpdxl
 			static
 			DrgPdxlcd *Pdrgpdxlcd(IMemoryPool *pmp, List *plTargetList, DrgPul *pdrgpulColIds, BOOL fKeepResjunked);
 
+			// return the positions of the target list entries included in the output
+			static
+			DrgPul *PdrgpulPosInTargetList(IMemoryPool *pmp, List *plTargetList, BOOL fKeepResjunked);
+
+			// construct a column descriptor from the given target entry, column identifier and position in the output
+			static
+			CDXLColDescr *Pdxlcd(IMemoryPool *pmp, TargetEntry *pte, ULONG ulColId, ULONG ulPos);
+
+			// create a dummy project element to rename the input column identifier
+			static
+			CDXLNode *PdxlnDummyPrElem(IMemoryPool *pmp, ULONG ulColIdInput, ULONG ulColIdOutput, CDXLColDescr *pdxlcd);
+
 			// construct a list of colids corresponding to the given target list
 			// using the given attno->colid map
 			static
@@ -362,6 +374,14 @@ namespace gpdxl
 			static 
 			HMUlUl *PhmululMap(IMemoryPool *pmp, DrgPul *pdrgpulOld, DrgPul *pdrgpulNew);
 
+			// check if the given tree contains a subquery
+			static
+			BOOL FHasSubquery(Node *pnode);
+
+			// check if the given function reads or modifies SQL data
+			static
+			BOOL FReadsOrModifiesData(CMDAccessor *pmda, IMDId *pmdidFunc);
+
 			// check if the given function is a SIRV (single row volatile) that reads
 			// or modifies SQL data
 			static
@@ -384,6 +404,9 @@ namespace gpdxl
 			static
 			CDXLNode *PdxlnPrElNull(IMemoryPool *pmp, CMDAccessor *pmda, CIdGenerator *pidgtorCol, const IMDColumn *pmdcol);
 
+			// check required permissions for the range table
+			static 
+			void CheckRTEPermissions(List *plRangeTable);
 	};
 }
 

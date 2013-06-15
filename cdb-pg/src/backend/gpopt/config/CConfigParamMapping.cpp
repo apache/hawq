@@ -20,124 +20,126 @@
 #include "utils/guc.h"
 
 #include "gpopt/config/CConfigParamMapping.h"
+#include "gpopt/xforms/CXform.h"
 
 using namespace gpos;
 using namespace gpdxl;
+using namespace gpopt;
 
 // array mapping GUCs to traceflags
 CConfigParamMapping::SConfigMappingElem CConfigParamMapping::m_elem[] =
 {
 		{
 		EopttracePrintQuery,
-		&gp_opt_print_query,
+		&optimizer_print_query,
 		GPOS_WSZ_LIT("Prints the optimizer's input query expression tree.")
 		},
 
 		{
 		EopttracePrintPlan,
-		&gp_opt_print_plan,
+		&optimizer_print_plan,
 		GPOS_WSZ_LIT("Prints the plan expression tree produced by the optimizer.")
 		},
 
 		{
 		EopttracePrintXform,
-		&gp_opt_print_xform,
+		&optimizer_print_xform,
 		GPOS_WSZ_LIT("Prints the input and output expression trees of the optimizer transformations.")
 		},
 
 		{
 		EopttraceDisablePrintXformRes,
-		&gp_opt_disable_xform_result_printing,
+		&optimizer_disable_xform_result_printing,
 		GPOS_WSZ_LIT("Disable printing input and output of xforms.")
 		},
 
 		{
 		EopttracePrintMemoExplrd,
-		&gp_opt_print_memo_after_exploration,
+		&optimizer_print_memo_after_exploration,
 		GPOS_WSZ_LIT("Prints MEMO after exploration.")
 		},
 
 		{
 		EopttracePrintMemoImpld,
-		&gp_opt_print_memo_after_implementation,
+		&optimizer_print_memo_after_implementation,
 		GPOS_WSZ_LIT("Prints MEMO after implementation.")
 		},
 
 		{
 		EopttracePrintMemoOptd,
-		&gp_opt_print_memo_after_optimization,
+		&optimizer_print_memo_after_optimization,
 		GPOS_WSZ_LIT("Prints MEMO after optimization.")
 		},
 
 		{
 		EopttracePrintScheduler,
-		&gp_opt_print_job_scheduler,
+		&optimizer_print_job_scheduler,
 		GPOS_WSZ_LIT("Prints jobs in scheduler on each job completion.")
 		},
 
 		{
 		EopttracePrintExprProps,
-		&gp_opt_print_expression_properties,
+		&optimizer_print_expression_properties,
 		GPOS_WSZ_LIT("Prints expression properties.")
 		},
 
 		{
 		EopttracePrintGrpProps,
-		&gp_opt_print_group_properties,
+		&optimizer_print_group_properties,
 		GPOS_WSZ_LIT("Prints group properties.")
 		},
 
 		{
 		EopttracePrintOptCtxt,
-		&gp_opt_print_optimization_context,
+		&optimizer_print_optimization_context,
 		GPOS_WSZ_LIT("Prints optimization context.")
 		},
 
 		{
 		EopttracePrintOptStats,
-		&gp_opt_print_optimization_stats,
+		&optimizer_print_optimization_stats,
 		GPOS_WSZ_LIT("Prints optimization stats.")
 		},
 
 		{
 		EopttraceParallel,
-		&gp_opt_parallel,
+		&optimizer_parallel,
 		GPOS_WSZ_LIT("Enable using threads in optimization engine.")
 		},
 
 		{
 		EopttraceMinidump,
-		&gp_opt_minidump,
-		GPOS_WSZ_LIT("Produce a minidump on every optimization.")
+		&optimizer_minidump,
+		GPOS_WSZ_LIT("Generate optimizer minidump.")
 		},
 
 		{
 		EopttraceExtractDXLStats,
-		&gp_opt_extract_dxl_stats,
+		&optimizer_extract_dxl_stats,
 		GPOS_WSZ_LIT("Extract plan stats in dxl.")
 		},
 
 		{
 		EopttraceExtractDXLStatsAllNodes,
-		&gp_opt_extract_dxl_stats_all_nodes,
+		&optimizer_extract_dxl_stats_all_nodes,
 		GPOS_WSZ_LIT("Extract plan stats for all physical dxl nodes.")
 		},
 
 		{
 		EopttraceEnumeratePlans,
-		&gp_opt_enumerate_plans,
+		&optimizer_enumerate_plans,
 		GPOS_WSZ_LIT("Enable plan enumeration.")
 		},
 
 		{
 		EopttraceSamplePlans,
-		&gp_opt_sample_plans,
+		&optimizer_sample_plans,
 		GPOS_WSZ_LIT("Enable plan sampling.")
 		},
 
 		{
 		EopttraceEnableCTEInlining,
-		&gp_opt_cte_inlining,
+		&optimizer_cte_inlining,
 		GPOS_WSZ_LIT("Enable CTE inlining.")
 		},
 
@@ -182,7 +184,7 @@ CConfigParamMapping::PbsPack
 		GPOS_ASSERT(!pbs->FBit(EopttraceDisableXformBase + ul) &&
 					"xform trace flag already set");
 
-		if (gp_opt_xforms[ul])
+		if (optimizer_xforms[ul])
 		{
 #ifdef GPOS_DEBUG
 			BOOL fSet =
@@ -191,6 +193,9 @@ CConfigParamMapping::PbsPack
 			GPOS_ASSERT(!fSet);
 		}
 	}
+
+	// TODO: solimm1 - May 31, 2013 enable dynamic index scan when executor support is complete
+	(void) pbs->FExchangeSet(EopttraceDisableXformBase + CXform::ExfDynamicIndexGet2DynamicIndexScan);
 
 	return pbs;
 }

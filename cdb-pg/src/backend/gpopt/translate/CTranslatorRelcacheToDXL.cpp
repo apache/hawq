@@ -280,15 +280,20 @@ CTranslatorRelcacheToDXL::PdrgpmdidRelIndexes
 
 	List *plIndexOids = NIL;
 	
-	if (!gpdb::FRelPartIsRoot(rel->rd_id))
+	if (gpdb::FRelPartIsNone(rel->rd_id))
 	{
 		// not a partitioned table: obtain indexes directly from the catalog
 		plIndexOids = gpdb::PlRelationIndexes(rel);
 	}
-	else 
+	else if (gpdb::FRelPartIsRoot(rel->rd_id))
 	{
-		// partitioned table: aggregate index information across different parts
+		// root of partitioned table: aggregate index information across different parts
 		plIndexOids = PlIndexOidsPartTable(rel);
+	}
+	else  
+	{
+		// interior or leaf partition: do not consider indexes
+		return pdrgpmdidIndexes;
 	}
 	
 	ListCell *plc = NULL;
@@ -493,6 +498,7 @@ CTranslatorRelcacheToDXL::Pmdrel
 	pmdid->AddRef();
 
 	BOOL fTemporary = rel->rd_istemp;
+	BOOL fHasOids = rel->rd_rel->relhasoids;
 
 	gpdb::CloseRelation(rel);
 	delete [] pulAttnoMapping;
@@ -576,7 +582,8 @@ CTranslatorRelcacheToDXL::Pmdrel
 							pdrgpmdidIndexes,
 							pdrgpmdidTriggers,
 							pdrgpmdidCheckConstraints,
-							pmdpartcnstr
+							pmdpartcnstr,
+							fHasOids
 							);
 	}
 
@@ -1667,6 +1674,13 @@ CTranslatorRelcacheToDXL::Pmdagg
 	IMDId *pmdidTypeIntermediate = PmdidAggIntermediateResultType(pmp, pmdid);
 
 	pmdid->AddRef();
+	
+	BOOL fOrdered = gpdb::FOrderedAgg(oidAgg);
+	
+	// GPDB does not support splitting of ordered aggs and aggs without a
+	// preliminary function
+	BOOL fSplittable = !fOrdered && gpdb::FAggHasPrelimFunc(oidAgg);
+	
 	CMDAggregateGPDB *pmdagg = New(pmp) CMDAggregateGPDB
 											(
 											pmp,
@@ -1674,7 +1688,8 @@ CTranslatorRelcacheToDXL::Pmdagg
 											pmdname,
 											pmdidTypeResult,
 											pmdidTypeIntermediate,
-											gpdb::FOrderedAgg(oidAgg)
+											fOrdered,
+											fSplittable
 											);
 	return pmdagg;
 }
@@ -2652,7 +2667,7 @@ CTranslatorRelcacheToDXL::PdrgpulPartKeys
 		GPOS_RAISE(gpdxl::ExmaMD, gpdxl::ExmiMDObjUnsupported, GPOS_WSZ_LIT("Hash partitioning"));
 	}
 	
-	List *plPartKeys = gpdb::PlPartitionAttrs(pn);
+	List *plPartKeys = gpdb::PlPartitionAttrs(oid);
 
 	ListCell *plc = NULL;
 	ForEach (plc, plPartKeys)

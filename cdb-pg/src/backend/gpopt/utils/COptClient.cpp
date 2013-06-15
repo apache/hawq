@@ -94,7 +94,7 @@ COptClient::PvRun
 	void *pv
 	)
 {
-	for (ULONG ul = 0; ul < (ULONG) gp_opt_retries; ul++)
+	for (ULONG ul = 0; ul < (ULONG) optimizer_retries; ul++)
 	{
 		CErrorHandlerStandard errhdl;
 		GPOS_TRY_HDL(&errhdl)
@@ -105,7 +105,7 @@ COptClient::PvRun
 		GPOS_CATCH_EX(ex)
 		{
 			if (!GPOS_MATCH_EX(ex, CException::ExmaSystem, CException::ExmiNetError) ||
-			    ul + 1 == (ULONG) gp_opt_retries)
+			    ul + 1 == (ULONG) optimizer_retries)
 			{
 				GPOS_RETHROW(ex);
 			}
@@ -377,7 +377,7 @@ COptClient::PplstmtConstruct
 		);
 
 	// translate DXL -> PlannedStmt
-	CTranslatorDXLToPlStmt trdxltoplstmt(m_pmp, pmda, &ctxdxltoplstmt);
+	CTranslatorDXLToPlStmt trdxltoplstmt(m_pmp, pmda, &ctxdxltoplstmt, gpdb::UlSegmentCountGP());
 	ULLONG ullPlanId = 0;
 	ULLONG ullPlanSpaceSize = 0;
 	CDXLNode *pdxlnPlan = CDXLUtils::PdxlnParsePlan(m_pmp, szPlan, NULL /*szXSDPath*/, &ullPlanId, &ullPlanSpaceSize);

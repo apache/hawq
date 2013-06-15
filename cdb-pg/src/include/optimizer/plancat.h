@@ -30,8 +30,6 @@ extern List *build_physical_tlist(PlannerInfo *root, RelOptInfo *rel);
 
 extern List *find_inheritance_children(Oid inhparent);
 
-extern bool has_subclass(Oid relationId);
-
 extern bool has_unique_index(RelOptInfo *rel, AttrNumber attno);
 
 extern Selectivity restriction_selectivity(PlannerInfo *root, Oid oper, List *args, int varRelid);

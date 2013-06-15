@@ -58,35 +58,97 @@ class COptTasks
 
 	private:
 
-		// execute a task given the argument
-		static void Execute ( void *(*pfunc) (void *), void *pfuncArg);
-
-		// routines related to serialization of pstmt and query to DXL and back
+		// context of optimizer input and output objects
 		struct SOptContext
 		{
-			CHAR *szQueryDXL;
-			Query *pquery;
-			CHAR *szPlanDXL;
-			PlannedStmt *pplstmt;
-			BOOL fGeneratePlStmt;
-			BOOL fUnexpectedFailure;
-			CHAR *szErrorMsg;
-		};
 
-		static void* PvDXLFromPlstmtTask(void *pv);
-		static void* PvPlstmtFromDXLTask(void *pv);
+			// mark which pointer member should NOT be released
+			// when calling Free() function
+			enum EPin
+			{
+				epinQueryDXL, // keep m_szQueryDXL
+				epinQuery, 	 // keep m_pquery
+				epinPlanDXL, // keep m_szPlanDXL
+				epinPlStmt, // keep m_pplstmt
+				epinErrorMsg // keep m_szErrorMsg
+			};
 
-		static void* PvDXLFromQueryTask(void *pv);
-		static void* PvQueryFromDXLTask(void *pv);
+			// query object serialized to DXL
+			CHAR *m_szQueryDXL;
 
-		// routines relating to serialization of catalog objects to DXL
+			// query object
+			Query *m_pquery;
+
+			// plan object serialized to DXL
+			CHAR *m_szPlanDXL;
+
+			// plan object
+			PlannedStmt *m_pplstmt;
+
+			// is generating a plan object required ?
+			BOOL m_fGeneratePlStmt;
+
+			// did the optimizer fail unexpectedly?
+			BOOL m_fUnexpectedFailure;
+
+			// buffer for optimizer error messages
+			CHAR *m_szErrorMsg;
+
+			// ctor
+			SOptContext();
+
+			// free all members except input and output pointers
+			void Free(EPin epinInput, EPin epinOutput);
+
+			// casting function
+			static
+			SOptContext *PoptctxtConvert(void *pv);
+
+		}; // struct SOptContext
+
+
+		// context of relcache input and output objects
 		struct SContextRelcacheToDXL
 		{
-			List *plOids;
-			ULONG ulCmpt;		// comparison type for tasks retriving scalar comparisons
-			const char *szFilename; // if filename is not null, then output will be written to file
-			char *szDXL;	  // if filename is null, then output will be stored here
+			// list of object oids to lookup
+			List *m_plistOids;
+
+			// comparison type for tasks retrieving scalar comparisons
+			ULONG m_ulCmpt;
+
+			// if filename is not null, then output will be written to file
+			const char *m_szFilename;
+
+			// if filename is null, then output will be stored here
+			char *m_szDXL;
+
+			// ctor
+			SContextRelcacheToDXL(List *plistOids, ULONG ulCmpt, const char *szFilename);
+
+			// casting function
+			static
+			SContextRelcacheToDXL *PctxrelcacheConvert(void *pv);
 		};
+
+		// execute a task given the argument
+		static
+		void Execute ( void *(*pfunc) (void *), void *pfuncArg);
+
+		// task that does the translation from planned stmt to XML
+		static
+		void* PvDXLFromPlstmtTask(void *pv);
+
+		// task that does the translation from xml to dxl to pplstmt
+		static
+		void* PvPlstmtFromDXLTask(void *pv);
+
+		// task that does the translation from query to XML
+		static
+		void* PvDXLFromQueryTask(void *pv);
+
+		// task that does the translation from xml to dxl to pquery
+		static
+		void* PvQueryFromDXLTask(void *pv);
 
 		// dump relcache info for an object into DXL
 		static
@@ -104,6 +166,7 @@ class COptTasks
 		static
 		void* PvDXLFromRelStatsTask(void *pv);
 
+		// create optimizer configuration object
 		static
 		COptimizerConfig *PoconfCreate(IMemoryPool *pmp);
 

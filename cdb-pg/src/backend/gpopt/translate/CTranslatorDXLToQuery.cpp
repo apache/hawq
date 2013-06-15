@@ -58,18 +58,16 @@ using namespace gpos;
 CTranslatorDXLToQuery::CTranslatorDXLToQuery
 	(
 	IMemoryPool *pmp,
-	CMDAccessor *pmda
+	CMDAccessor *pmda,
+	ULONG ulSegments
 	)
 	:
 	m_pmp(pmp),
 	m_pmda(pmda),
-	m_ulSortgrouprefCounter(0)
+	m_ulSortgrouprefCounter(0),
+	m_ulSegments(ulSegments)
 {
-	m_pdxlsctranslator = New (m_pmp) CTranslatorDXLToScalar
-										(
-										m_pmp,
-										m_pmda
-										);
+	m_pdxlsctranslator = New (m_pmp) CTranslatorDXLToScalar(m_pmp, m_pmda, m_ulSegments);
 }
 
 //---------------------------------------------------------------------------
