@@ -535,4 +535,26 @@ select * from t1,t2 where t1.x = 100 and t2.x >= t1.x;
 explain select * from t1,t2 where t1.x = 100 and t1.x = t2.y and t1.x <= t2.x;
 select * from t1,t2 where t1.x = 100 and t1.x = t2.y and t1.x <= t2.x;
 
+--
+-- MPP-18537: hash clause references a constant in outer child target list
+--
+
+create table hjn_test (i int, j int) distributed by (i,j);
+insert into hjn_test values(3, 4);
+create table int4_tbl (f1 int);
+insert into int4_tbl values(123456), (-2147483647), (0), (-123456), (2147483647);
+select count(*) from hjn_test, (select 3 as bar) foo where hjn_test.i = least (foo.bar,4) and hjn_test.j = 4;
+select count(*) from hjn_test, (select 3 as bar) foo where hjn_test.i = least (foo.bar,(array[4])[1]) and hjn_test.j = (array[4])[1];
+select count(*) from hjn_test, (select 3 as bar) foo where least (foo.bar,(array[4])[1]) = hjn_test.i and hjn_test.j = (array[4])[1];
+select count(*) from hjn_test, (select 3 as bar) foo where hjn_test.i = least (foo.bar, least(4,10)) and hjn_test.j = least(4,10);
+select * from int4_tbl a join int4_tbl b on (a.f1 = (select f1 from int4_tbl c where c.f1=b.f1));
+set enable_hashjoin to off;
+select count(*) from hjn_test, (select 3 as bar) foo where hjn_test.i = least (foo.bar,4) and hjn_test.j = 4;
+select count(*) from hjn_test, (select 3 as bar) foo where hjn_test.i = least (foo.bar,(array[4])[1]) and hjn_test.j = (array[4])[1];
+select count(*) from hjn_test, (select 3 as bar) foo where least (foo.bar,(array[4])[1]) = hjn_test.i and hjn_test.j = (array[4])[1];
+select count(*) from hjn_test, (select 3 as bar) foo where hjn_test.i = least (foo.bar, least(4,10)) and hjn_test.j = least(4,10);
+select * from int4_tbl a join int4_tbl b on (a.f1 = (select f1 from int4_tbl c where c.f1=b.f1));
+
+reset enable_hashjoin;
+
 drop schema pred cascade;
