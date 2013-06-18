@@ -2494,6 +2494,81 @@ grouping_rewrite_walker(Node *node, void *context)
 	return expression_tree_walker(node, grouping_rewrite_walker, context);
 }
 
+
+/*
+ *
+ * create_group_clause
+ * 	Order group clauses based on equivalent sort clauses to allow plans
+ * 	with sort-based grouping implementation,
+ *
+ * 	given a list of a GROUP-BY tle's, return a list of group clauses in the same order
+ * 	of matching ORDER-BY tle's
+ *
+ *  the remaining GROUP-BY tle's are stored in tlist_remainder
+ *
+ *
+ */
+static List *
+create_group_clause(List *tlist_group, List *targetlist,
+					List *sortClause, List **tlist_remainder)
+{
+	List	   *result = NIL;
+	ListCell   *l;
+	List *tlist = list_copy(tlist_group);
+
+	/*
+	 * Iterate through the ORDER BY clause. If we find a grouping element
+	 * that matches the ORDER BY element, append the grouping element to the
+	 * result set immediately. Otherwise, stop iterating. The effect of this
+	 * is to look for a prefix of the ORDER BY list in the grouping clauses,
+	 * and to move that prefix to the front of the GROUP BY.
+	 */
+	foreach(l, sortClause)
+	{
+		SortClause *sc = (SortClause *) lfirst(l);
+		ListCell   *prev = NULL;
+		ListCell   *tl = NULL;
+		bool		found = false;
+
+		foreach(tl, tlist)
+		{
+			Node        *node = (Node*)lfirst(tl);
+
+			if (IsA(node, TargetEntry))
+			{
+				TargetEntry *tle = (TargetEntry *) lfirst(tl);
+
+				if (!tle->resjunk &&
+					sc->tleSortGroupRef == tle->ressortgroupref)
+				{
+					GroupClause *gc;
+
+					tlist = list_delete_cell(tlist, tl, prev);
+
+					/* Use the sort clause's sorting operator */
+					gc = make_group_clause(tle, targetlist, sc->sortop);
+					result = lappend(result, gc);
+					found = true;
+					break;
+				}
+
+				prev = tl;
+			}
+		}
+
+		/* As soon as we've failed to match an ORDER BY element, stop */
+		if (!found)
+			break;
+	}
+
+	/* Save remaining GROUP-BY tle's */
+	*tlist_remainder = tlist;
+
+	return result;
+}
+
+
+
 /*
  * transformGroupClause -
  *	  transform a GROUP BY clause
@@ -2561,49 +2636,12 @@ transformGroupClause(ParseState *pstate, List *grouplist,
 		}
 	}
 
-	/*
-	 * Now iterate through the ORDER BY clause. If we find a grouping element
-	 * that matches the ORDER BY element, append the grouping element to the
-	 * result set immediately. Otherwise, stop iterating. The effect of this
-	 * is to look for a prefix of the ORDER BY list in the grouping clauses,
-	 * and to move that prefix to the front of the GROUP BY.
-	 */
-	foreach(l, sortClause)
-	{
-		SortClause *sc = (SortClause *) lfirst(l);
-		ListCell   *prev = NULL;
-		ListCell   *tl;
-		bool		found = false;
-
-		foreach(tl, tle_list)
-		{
-			Node        *node = (Node*)lfirst(tl);
-
-			if (IsA(node, TargetEntry))
-			{
-				TargetEntry *tle = (TargetEntry *) lfirst(tl);
-
-				if (sc->tleSortGroupRef == tle->ressortgroupref)
-				{
-					GroupClause *gc;
-
-					tle_list = list_delete_cell(tle_list, tl, prev);
-
-					/* Use the sort clause's sorting operator */
-					gc = make_group_clause(tle, *targetlist, sc->sortop);
-					result = lappend(result, gc);
-					found = true;
-					break;
-				}
-
-				prev = tl;
-			}
-		}
-
-		/* As soon as we've failed to match an ORDER BY element, stop */
-		if (!found)
-			break;
-	}
+	/* create first group clauses based on sort clauses */
+	List *tle_list_remainder = NIL;
+	result = create_group_clause(tle_list,
+								*targetlist,
+								sortClause,
+								&tle_list_remainder);
 
 	/*
 	 * Now add all remaining elements of the GROUP BY list to the result list.
@@ -2721,6 +2759,7 @@ transformGroupClause(ParseState *pstate, List *grouplist,
 	}
 
 	list_free(tle_list);
+	list_free(tle_list_remainder);
 	freeGroupList(reorder_grouplist);
 
 	return result;
@@ -2765,6 +2804,71 @@ transformSortClause(ParseState *pstate,
 }
 
 /*
+ *
+ * transformDistinctToGroupBy
+ *
+ * 		transform DISTINCT clause to GROUP-BY clause
+ *
+ */
+static List *
+transformDistinctToGroupBy(ParseState *pstate, List **targetlist,
+							List **sortClause, List **groupClause)
+{
+	List *group_tlist = list_copy(*targetlist);
+
+	/*
+	 * create first group clauses based on matching sort clauses, if any
+	 */
+	List *group_tlist_remainder = NIL;
+	List *group_clause_list = create_group_clause(group_tlist,
+												*targetlist,
+												*sortClause,
+												&group_tlist_remainder);
+
+	if (list_length(group_tlist_remainder) > 0)
+	{
+		/*
+		 * append remaining group clauses to the end of group clause list
+		 */
+		ListCell *lc = NULL;
+		foreach(lc, group_tlist_remainder)
+		{
+			TargetEntry *tle = (TargetEntry *) lfirst(lc);
+			if (!tle->resjunk)
+			{
+				group_clause_list = addTargetToSortList(pstate, tle,
+											   	   group_clause_list, *targetlist,
+											   	   SORTBY_ASC, NIL, true);
+			}
+		}
+
+		/*
+		 * fix tags of group clauses
+		 */
+		foreach(lc, group_clause_list)
+		{
+			Node *node = lfirst(lc);
+			if (IsA(node, SortClause))
+			{
+				SortClause *sc = (SortClause *) node;
+				sc->type = T_GroupClause;
+			}
+		}
+	}
+
+	*groupClause = group_clause_list;
+
+	list_free(group_tlist);
+	list_free(group_tlist_remainder);
+
+	/*
+	 * return empty distinct list, since we have created a grouping clause to do the job
+	 */
+	return NIL;
+}
+
+
+/*
  * transformDistinctClause -
  *	  transform a DISTINCT or DISTINCT ON clause
  *
@@ -2794,24 +2898,8 @@ transformDistinctClause(ParseState *pstate, List *distinctlist,
 			 * turn distinct clause into grouping clause to make both sort-based
 			 * and hash-based grouping implementations viable plan options
 			 */
-			*groupClause = addAllTargetsToSortList(pstate,
-													*groupClause,
-													*targetlist,
-													true);
-			/*
-			 * fix tags of group list entries
-			 */
-			ListCell *l;
-			foreach(l, *groupClause)
-			{
-				SortClause *s = (SortClause *) lfirst(l);
-				s->type = T_GroupClause;
-			}
 
-			/*
-			 * return empty distinct list, since we have created a grouping clause to do the job
-			 */
-			return NIL;
+			return transformDistinctToGroupBy(pstate, targetlist, sortClause, groupClause);
 		}
 
 		/*
