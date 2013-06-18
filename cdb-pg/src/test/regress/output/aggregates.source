@@ -920,6 +920,15 @@ select distinct two, sum(four) from tenk1 group by two having sum(four) > 5000;
    1 | 10000
 (1 row)
 
+select distinct t1.two, t2.two, t1.four, t2.four from tenk1 t1, tenk1 t2 where t1.hundred=t2.hundred order by t1.two, t1.four;
+ two | two | four | four 
+-----+-----+------+------
+   0 |   0 |    0 |    0
+   0 |   0 |    2 |    2
+   1 |   1 |    1 |    1
+   1 |   1 |    3 |    3
+(4 rows)
+
 drop table onek;
 drop table aggtest;
 drop table tenk1;
