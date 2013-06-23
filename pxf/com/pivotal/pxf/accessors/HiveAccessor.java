@@ -81,7 +81,7 @@ public class HiveAccessor extends HdfsSplittableDataAccessor
 	
 	private FileInputFormat<?, ?> createInputFormat(InputData input) throws Exception
 	{
-		String userData = input.getProperty("X-GP-FRAGMENT-USER-DATA");
+		String userData = new String(input.getFragmentUserData());
 		String[] toks = userData.split(HiveDataFragmenter.HIVE_USER_DATA_DELIM);
 		initPartitionFields(toks[3]);
 		return HiveDataFragmenter.makeInputFormat(toks[0]/* inputFormat name */, jobConf);

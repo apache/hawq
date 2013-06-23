@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.avro.Schema;
+import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -30,6 +31,8 @@ public class InputData
 	protected boolean filterStringValid;
 	protected String filterString;
 	protected ArrayList<Integer> dataFragments;
+	protected byte[] userData = null;
+	
 	/* 
 	 * The name of the recordkey column. It can appear in any location in the columns list.
 	 * By specifying the recordkey column, the user declares that he is interested to receive for every record 
@@ -120,6 +123,8 @@ public class InputData
 		 * TODO: once leading '/' is removed from the path variable, remove tableName and use path in HBase classes
 		 */
 		tableName = getProperty("X-GP-DATA-DIR"); /* for HBase and Hive */
+
+		parseUserData();
 	}
 	
 	/*
@@ -155,6 +160,11 @@ public class InputData
 		this.accessor = copy.accessor;
 		this.resolver = copy.resolver;
 		this.tableName = copy.tableName;
+	}
+
+	public byte[] getFragmentUserData() throws Exception
+	{
+		return userData;
 	}
 
 	/* 
@@ -473,4 +483,14 @@ public class InputData
 		
 		return false;
 	}	
+
+	private void parseUserData()
+	{
+		String encoded = getOptionalProperty("X-GP-FRAGMENT-USER-DATA");
+		if (encoded == null)
+			return;
+
+		userData = Base64.decodeBase64(encoded);
+		Log.debug("decoded X-GP-FRAGMENT-USER-DATA: " + new String(userData));
+	}
 }

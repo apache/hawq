@@ -45,15 +45,15 @@ public class HBaseTupleDescription
 	@SuppressWarnings("unchecked")
 	private void loadUserData()
 	{
-		String serializedTableMappings = conf.getOptionalProperty("X-GP-FRAGMENT-USER-DATA");
-
-		// No userdata means no mappings for our table in lookup table
-		if (serializedTableMappings == null)
-			return;
-
 		try
 		{
-			ByteArrayInputStream bytesStream = new ByteArrayInputStream(serializedTableMappings.getBytes());
+			byte[] serializedTableMappings = conf.getFragmentUserData();
+
+			// No userdata means no mappings for our table in lookup table
+			if (serializedTableMappings == null)
+				return;
+
+			ByteArrayInputStream bytesStream = new ByteArrayInputStream(serializedTableMappings);
 			ObjectInputStream objectStream = new ObjectInputStream(bytesStream);
 			tableMapping = (Map<String, byte[]>)objectStream.readObject();
 		}

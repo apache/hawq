@@ -132,7 +132,6 @@ public class BridgeResource
 				if (!Base64.isArrayByteBase64(newVal.getBytes()))
 					throw new IOException("Fragment user data must be Base64 encoded. " +
 										"(Bad value: " + newVal + ")");
-				newVal = new String(Base64.decodeBase64(newVal));
 				Log.debug("X-GP-FRAGMENT-USER-DATA: " + newVal);
 			}
 			result.put(newKey, newVal);

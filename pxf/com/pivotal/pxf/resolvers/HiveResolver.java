@@ -61,7 +61,7 @@ public class HiveResolver extends Resolver
 	{
 		super(input);
 		
-		String userData = inputData.getProperty("X-GP-FRAGMENT-USER-DATA");
+		String userData = new String(input.getFragmentUserData());
 		String[] toks = userData.split(HiveDataFragmenter.HIVE_USER_DATA_DELIM);		
 		
 		String serdeName = toks[1]; /* look in HiveDataFragmenter to see how the userData was concatanated */
