@@ -450,6 +450,21 @@ typedef struct
 {
 	int			delta_sublevels_up;
 	int			min_sublevels_up;
+
+	/*
+	 * MPP-19436: when a query mixes window function with group by or aggregates,
+	 * then a transformation will turn the original structure Q into an outer
+	 * query Q' and an inner query Q''
+	 * Q ->  Q'
+	 *       |
+	 *       |->Q''
+	 * All the structures will be copied from Q to Q'' except ctelists.
+	 * This causes Q'', and its inner structures, to have dangling cte references, since
+	 * ctelists are kept in Q'. In such a case, we need to ignore min_sublevels_up and
+	 * increment by delta_sublevels_up.
+	 *
+	 */
+	bool		        ignore_min_sublevels_up;
 } IncrementVarSublevelsUp_context;
 
 static bool
@@ -490,6 +505,16 @@ IncrementVarSublevelsUp_walker(Node *node,
 		{
 			if (rte->ctelevelsup >= context->min_sublevels_up)
 				rte->ctelevelsup += context->delta_sublevels_up;
+
+			/*
+			* Fix for MPP-19436: in transformGroupedWindows, min_sublevels_up
+			* is ignored. For RTE refer to the original query ctelist should
+			* all be incremented.
+			*/
+			if(context->ignore_min_sublevels_up && rte->ctelevelsup == context->min_sublevels_up - 1)
+			{
+				rte->ctelevelsup += context->delta_sublevels_up;
+			}
 		}
 		return false;			/* allow range_table_walker to continue */
 	}
@@ -517,6 +542,26 @@ IncrementVarSublevelsUp(Node *node, int delta_sublevels_up,
 
 	context.delta_sublevels_up = delta_sublevels_up;
 	context.min_sublevels_up = min_sublevels_up;
+
+	/*
+	 * Must be prepared to start with a Query or a bare expression tree; if
+	 * it's a Query, we don't want to increment sublevels_up.
+	 */
+	query_or_expression_tree_walker(node,
+									IncrementVarSublevelsUp_walker,
+									(void *) &context,
+									QTW_EXAMINE_RTES);
+}
+
+void
+IncrementVarSublevelsUpInTransformGroupedWindows(Node *node,
+		int delta_sublevels_up, int min_sublevels_up)
+{
+	IncrementVarSublevelsUp_context context;
+
+	context.delta_sublevels_up = delta_sublevels_up;
+	context.min_sublevels_up = min_sublevels_up;
+	context.ignore_min_sublevels_up = true;
 
 	/*
 	 * Must be prepared to start with a Query or a bare expression tree; if

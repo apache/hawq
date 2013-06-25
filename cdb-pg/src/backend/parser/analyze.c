@@ -9289,7 +9289,7 @@ transformGroupedWindows(Query *qry)
 
 	/* Accomodate depth change in new subquery, Q''.
 	 */
-	IncrementVarSublevelsUp((Node*)subq, 1, 1);
+	IncrementVarSublevelsUpInTransformGroupedWindows((Node*)subq, 1, 1);
 
 	/* Might have changed. */
 	subq->hasSubLinks = checkExprHasSubLink((Node*)subq);

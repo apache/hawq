@@ -346,3 +346,54 @@ with yy as (
 )
 select * from x, yy;
 -- End of MPP-17848
+
+drop table if exists eager_free_sisc; 
+create table eager_free_sisc (dim_year_month_key int, impression_count int);
+insert into eager_free_sisc select i / 2, i from generate_series(0,99) i;
+
+WITH
+       SEM_IMPRESSIONS as
+                  (select fsc.dim_year_month_key year_month_start_dt, sum(fsc.impression_count) impression_count
+                   from eager_free_sisc fsc
+                   where
+                         fsc.dim_year_month_key > 10
+                   group by fsc.dim_year_month_key
+                   ) 
+select imp.year_month_start_dt,
+       imp.impression_count
+from 
+     (
+       select ai.year_month_start_dt,
+              ai.impression_count as impression_count,
+              sum(impression_count) over () as acc_impressions
+       from 
+             (                 
+              select    
+            si.year_month_Start_dt year_month_start_dt,
+                    si.impression_count impression_count
+              from 
+               sem_impressions si 
+              ) ai
+      ) imp
+where 
+      acc_impressions > 0
+order by imp.year_month_start_dt, imp.impression_count;
+
+--
+-- MPP-19436
+-- Test queries mixes window functions with aggregate functions or grouping.
+--
+
+DROP TABLE IF EXISTS test_group_window;
+
+CREATE TABLE test_group_window(c1 int, c2 int);
+
+WITH tt AS (SELECT * FROM test_group_window)
+SELECT tt.c1, COUNT() over () as fraction
+FROM tt
+GROUP BY tt.c1
+ORDER BY tt.c1;
+
+DROP TABLE test_group_window;
+
+-- End of MPP-19436
