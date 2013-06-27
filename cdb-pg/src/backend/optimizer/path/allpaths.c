@@ -426,6 +426,9 @@ set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 	List	   *subpaths = NIL;
 	ListCell   *l;
 
+	/* weighted average of widths */
+	double width_avg = 0;
+
 	/*
 	 * XXX for now, can't handle inherited expansion of FOR UPDATE/SHARE; can
 	 * we do better?  (This will take some redesign because the executor
@@ -440,9 +443,12 @@ set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 	/* Mark rel with estimated output rows, width, etc */
 	set_baserel_size_estimates(root, rel);
 
-	/* global numbers desired */
-	rel->tuples = rel->tuples * root->config->cdbpath_segments;
-	rel->rows = rel->rows * root->config->cdbpath_segments;
+	/*
+	 * Initialize to compute size estimates for whole append relation
+	 */
+	rel->rows = 0;
+	rel->tuples = 0;
+	rel->width = 0;
 
 	/*
 	 * Generate access paths for each member relation, and pick the cheapest
@@ -517,13 +523,13 @@ set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 
 
 		/*
-		 * Propagate information from parent to child.
+		 * Propagate size information from the child back to the parent. For
+		 * simplicity, we use the largest widths from any child as the parent
+		 * estimates.
 		 */
-		childrel->tuples = rel->tuples / (list_length(root->append_rel_list) - 1);
-		childrel->tuples = Max(1.0, childrel->tuples);
-		childrel->rows = rel->rows / (list_length(root->append_rel_list) - 1);
-		childrel->rows = Max(1.0, childrel->rows);
-		childrel->width = rel->width;
+        rel->tuples += childrel->tuples;
+		rel->rows += cdbpath_rows(root, childrel->cheapest_total_path);
+		width_avg += cdbpath_rows(root, childrel->cheapest_total_path) * childrel->width;
 
 		forboth(parentvars, rel->reltargetlist,
 				childvars, childrel->reltargetlist)
@@ -542,6 +548,8 @@ set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 			}
 		}
 	}
+
+	rel->width = (int) (width_avg / Max(1.0, rel->rows));
 
     /* CDB: Just one child (or none)?  Set flag if result is at most 1 row. */
     if (!subpaths)

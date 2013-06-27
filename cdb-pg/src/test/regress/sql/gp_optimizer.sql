@@ -84,6 +84,18 @@ SELECT 1 AS one FROM orca.foo having 1 < 2;
 SELECT generate_series(1,5) AS one FROM orca.foo having 1 < 2;
 SELECT 1 AS one FROM orca.foo group by x1 having 1 < 2;
 SELECT x1 AS one FROM orca.foo having 1 < 2;
+
+-- distinct clause
+select distinct 1, null;
+select distinct 1, null from orca.foo;
+select distinct 1, sum(x1) from orca.foo;
+select distinct x1, rank() over(order by x1) from (select x1 from orca.foo order by x1) x;
+select distinct x1, sum(x3) from orca.foo group by x1,x2;
+select distinct s from (select sum(x2) s from orca.foo group by x1) x;
+select * from orca.foo a where a.x1 = (select distinct sum(b.x1)+avg(b.x1) sa from orca.bar1 b group by b.x3 order by sa limit 1);
+select distinct a.x1 from orca.foo a where a.x1 <= (select distinct sum(b.x1)+avg(b.x1) sa from orca.bar1 b group by b.x3 order by sa limit 1);
+select * from orca.foo a where a.x1 = (select distinct b.x1 from orca.bar1 b where b.x1=a.x1 limit 1);
+
 ----------------------------------------------------------------------
 set optimizer=off;
 
@@ -514,5 +526,22 @@ select * from (select a, a from orca.ur union select c, d from orca.uu) x(g,h), 
 select 1 AS two UNION select 2.2;
 select 2.2 AS two UNION select 1;
 select * from (select 2.2 AS two UNION select 1) x(a), (select 1.0 AS two UNION ALL select 1) y(a) where y.a = x.a;
+
+-- window functions inside inline CTE
+
+CREATE TABLE orca.twf1 AS SELECT i as a, i+1 as b from generate_series(1,10)i;
+CREATE TABLE orca.twf2 AS SELECT i as c, i+1 as d from generate_series(1,10)i;
+
+SET optimizer_cte_inlining_bound=1000;
+SET optimizer_cte_inlining = on;
+
+WITH CTE(a,b) AS
+(SELECT a,d FROM orca.twf1, orca.twf2 WHERE a = d),
+CTE1(e,f) AS
+( SELECT f1.a, rank() OVER (PARTITION BY f1.b ORDER BY CTE.a) FROM orca.twf1 f1, CTE )
+SELECT * FROM CTE1,CTE WHERE CTE.a = CTE1.f and CTE.a = 2 ORDER BY 1;
+
+SET optimizer_cte_inlining = off;
+
 -- clean up
 drop schema orca cascade;

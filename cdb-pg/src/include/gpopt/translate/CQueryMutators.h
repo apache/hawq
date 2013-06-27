@@ -174,30 +174,23 @@ namespace gpdxl
 				
 				// the comparison operation used to compare query levels
 				BOOL m_fOnlyCurrentLevel;
-				
-				// ctor
-				explicit
-				SContextIncLevelsupMutator
-					(
-					ULONG ulCurrLevelsUp
-					)
-					:
-					m_ulCurrLevelsUp(ulCurrLevelsUp)
-				{
-					m_fOnlyCurrentLevel = false;
-				}
+
+				// fix target list entry of the top level
+				BOOL m_fFixTargetListTopLevel;
 
 				// ctor
 				SContextIncLevelsupMutator
 					(
 					ULONG ulCurrLevelsUp,
-					BOOL fOnlyCurrentLevel
+					BOOL fOnlyCurrentLevel,
+					BOOL fFixTargetListTopLevel
 					)
 					:
 					m_ulCurrLevelsUp(ulCurrLevelsUp),
-					m_fOnlyCurrentLevel(fOnlyCurrentLevel)
-					{
-					}
+					m_fOnlyCurrentLevel(fOnlyCurrentLevel),
+					m_fFixTargetListTopLevel(fFixTargetListTopLevel)
+				{
+				}
 
 				// dtor
 				~SContextIncLevelsupMutator()
@@ -293,7 +286,7 @@ namespace gpdxl
 
 			// make the input query into a derived table and return a new root query
 			static
-			Query *PqueryConvertToDerivedTable(const Query *pquery);
+			Query *PqueryConvertToDerivedTable(const Query *pquery, BOOL fFixTargetList, BOOL fFixHavingQual);
 
 			// eliminate distinct clause
 			static

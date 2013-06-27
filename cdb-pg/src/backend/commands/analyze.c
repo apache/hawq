@@ -693,8 +693,7 @@ static List* analyzableRelations(void)
 	{
 		Oid candidateOid = HeapTupleGetOid(tuple);
 		if (analyzePermitted(candidateOid)
-				&& candidateOid != StatisticRelationId
-				&& !rel_is_child_partition(candidateOid))
+				&& candidateOid != StatisticRelationId)
 		{
 			lRelOids = lappend_oid(lRelOids, candidateOid);
 		}
