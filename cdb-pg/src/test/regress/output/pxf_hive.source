@@ -12,6 +12,14 @@
 -- TODO: test PB, AVRO, THRIFT when it is enabled (read only, with pre formatted files).
 -- TODO: test protocol validator for pxf once written.
 -- TODO: test parameter passing, filter passing
+-- start_matchsubs
+--                                                                                               
+-- # create a match/subs expression to handle ip addresses that change
+--
+-- m/(ERROR|WARNING):.*remote component error.*\(\d+\).*from.*'\d+\.\d+\.\d+\.\d+:\d+'.*/
+-- s/'\d+\.\d+\.\d+\.\d+:\d+'/'SOME_IP:SOME_PORT'/
+--
+-- end_matchsubs
 --------------------------------------------------------------------------------
 -- HIVE
 --------------------------------------------------------------------------------
@@ -207,7 +215,7 @@ t1    text)
 LOCATION ('pxf://@hostname@:50070/reg_txt_view?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
 format 'custom' (formatter='pxfwritable_import');
 select * from hv_view order by t1;
-ERROR:  remote component error (500) from '127.0.0.1:50070': Problem accessing /gpdb/v4/Fragmenter/getFragments. Reason:     Server Error   Caused by:  java.lang.UnsupportedOperationException: PXF doesn't support HIVE views (SOMEFILE:SOMEFUNC)
+ERROR:  remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v4/Fragmenter/getFragments. Reason:     Server Error   Caused by:  java.lang.UnsupportedOperationException: PXF doesn't support HIVE views (SOMEFILE:SOMEFUNC)
 -- 7. Clean after Hive
 drop external table hv_view;
 drop external table hv_collections;

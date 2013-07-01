@@ -2688,6 +2688,9 @@ void gp_statistics_estimate_reltuples_relpages_external_pxf(Relation rel, String
 	
 	*relpages = floor(( ((float4)elem->blockSize) * elem->numBlocks) / BLCKSZ);
 	*reltuples = elem->numTuples;
+	/* relpages can't be 0 if there are tuples in the table. */
+	if ((*relpages < 1.0) && (*reltuples > 0))
+		*relpages = 1.0;
 	pfree(elem);
 	
 	/* in case there were problems with the PXF service, keep the defaults */

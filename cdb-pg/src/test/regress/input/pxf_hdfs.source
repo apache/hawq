@@ -11,6 +11,15 @@
 -- TODO: test protocol validator for pxf once written.
 -- TODO: test parameter passing, filter passing
 
+-- start_matchsubs
+--                                                                                               
+-- # create a match/subs expression to handle ip addresses that change
+--
+-- m/(ERROR|WARNING):.*remote component error.*\(\d+\).*from.*'\d+\.\d+\.\d+\.\d+:\d+'.*/
+-- s/'\d+\.\d+\.\d+\.\d+:\d+'/'SOME_IP:SOME_PORT'/
+--
+-- end_matchsubs
+
 --------------------------------------------------------------------------------
 -- GPHDFS
 --------------------------------------------------------------------------------
@@ -36,7 +45,7 @@ DROP EXTERNAL TABLE gphdfs_in1;
 -- Load HDFS with test data
 --
 \! ${HADOOP_ROOT}/bin/hadoop fs -mkdir /gpdb_regression_data
-\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/writable_inside_sequence1.tbl /gpdb_regression_data/writable_inside_sequence1.tbl
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/writable_inside_sequence1.tbl /gpdb_regression_data/writable_inside_sequence.tbl
 \! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/avro_inside_sequence.tbl /gpdb_regression_data/avro_inside_sequence.tbl; 
 \! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/avroformat_inside_avrofile.avro /gpdb_regression_data/avroformat_inside_avrofile.avro
 \! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/text_data.csv /gpdb_regression_data/text_data.csv
@@ -45,8 +54,69 @@ DROP EXTERNAL TABLE gphdfs_in1;
 \! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/writable_inside_sequence1.tbl /gpdb_regression_data/wild/writable_inside_sequence1.tbl
 \! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/writable_inside_sequence2.tbl /gpdb_regression_data/wild/writable_inside_sequence2.tbl
 \! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/empty.tbl /gpdb_regression_data/empty.tbl
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/small.csv /gpdb_regression_data/small.csv
 --
 -- Test TEXT format on a file with many fields
+--
+CREATE EXTERNAL TABLE bigtext (s1 text, 
+                               s2 text, 
+							   s3 text, 
+							   d1 timestamp, 
+							   n1 int, 
+							   n2 int, 
+							   n3 int, 
+							   n4 int, 
+							   n5 int, 
+							   n6 int, 
+							   n7 int,
+                               s11 text, 
+							   s12 text, 
+							   s13 text, 
+							   d11 timestamp, 
+							   n11 int, 
+							   n12 int, 
+							   n13 int, 
+							   n14 int, 
+							   n15 int, 
+							   n16 int, 
+							   n17 int)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/text_data.csv?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=LineReaderAccessor&RESOLVER=StringPassResolver')
+FORMAT 'TEXT' (DELIMITER ',');
+SELECT n1, n2, n3, n4, n5, s1, s2, s3, d1 FROM bigtext ORDER BY n1;
+SELECT n11, n12, n13, n14, n15, s11, s12, s13, d11 FROM bigtext ORDER BY n11;
+DROP EXTERNAL TABLE bigtext;
+--
+-- Test CSV format on a file with many fields
+--
+CREATE EXTERNAL TABLE bigcsv (s1 text, 
+                               s2 text, 
+							   s3 text, 
+							   d1 timestamp, 
+							   n1 int, 
+							   n2 int, 
+							   n3 int, 
+							   n4 int, 
+							   n5 int, 
+							   n6 int, 
+							   n7 int,
+                               s11 text, 
+							   s12 text, 
+							   s13 text, 
+							   d11 timestamp, 
+							   n11 int, 
+							   n12 int, 
+							   n13 int, 
+							   n14 int, 
+							   n15 int, 
+							   n16 int, 
+							   n17 int)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/text_data.csv?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=LineReaderAccessor&RESOLVER=StringPassResolver')
+FORMAT 'CSV';
+SELECT n1, n2, n3, n4, n5, s1, s2, s3, d1 FROM bigcsv ORDER BY n1;
+SELECT n11, n12, n13, n14, n15, s11, s12, s13, d11 FROM bigcsv ORDER BY n11;
+DROP EXTERNAL TABLE bigcsv;
+--
+-- Test TEXT format on a file with many fields with deprecated ACCESSOR TextFileAccessor and deprecated RESOLVER TextResolver
 --
 CREATE EXTERNAL TABLE bigtext (s1 text, 
                                s2 text, 
@@ -75,7 +145,6 @@ FORMAT 'TEXT' (DELIMITER ',');
 SELECT n1, n2, n3, n4, n5, s1, s2, s3, d1 FROM bigtext ORDER BY n1;
 SELECT n11, n12, n13, n14, n15, s11, s12, s13, d11 FROM bigtext ORDER BY n11;
 DROP EXTERNAL TABLE bigtext;
-
 --
 -- Test Writable data inside a SequenceFile (read only).
 --
@@ -100,10 +169,13 @@ CREATE EXTERNAL TABLE seqwr(tmp1  timestamp,
                             ln1   bigint, 
                             ln2   bigint, 
                             ln3   bigint, 
-                            bt    bytea)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable_inside_sequence1.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+                            bt    bytea,
+							bool1 boolean,
+							bool2 boolean,
+							bool3 boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable_inside_sequence.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
 FORMAT 'custom' (formatter='pxfwritable_import');
-SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt FROM seqwr ORDER BY num1;
+SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt, bool1, bool2, bool3 FROM seqwr ORDER BY num1;
 SELECT num1, t1, t2, t3 FROM seqwr ORDER BY num1;
 DROP EXTERNAL TABLE seqwr;
 --
@@ -234,6 +306,16 @@ FORMAT 'custom' (formatter='pxfwritable_import');
 SELECT s1, num1, s2, s3, num2 from pb ORDER BY num1;
 DROP EXTERNAL TABLE pb;
 --
+-- Test quoted line break
+--
+CREATE EXTERNAL TABLE small_csv(num1 int, 
+                                word text, 
+                                num2 int)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/small.csv?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=QuotedLineBreakAccessor&RESOLVER=StringPassResolver') 
+FORMAT 'CSV';
+SELECT * FROM small_csv ORDER BY num1;
+DROP EXTERNAL TABLE small_csv;
+--
 -- Test wildcards in file name
 --
 CREATE EXTERNAL TABLE seqwild(tmp1  timestamp, 
@@ -256,7 +338,10 @@ CREATE EXTERNAL TABLE seqwild(tmp1  timestamp,
                               ln1   bigint, 
                               ln2   bigint, 
                               ln3   bigint, 
-                              bt    bytea)
+                              bt    bytea,
+							  bool1 boolean,
+							  bool2 boolean,
+							  bool3 boolean)
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/wild/*.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
 FORMAT 'custom' (formatter='pxfwritable_import');
 SELECT num1, t1, t2, t3 FROM seqwild ORDER BY num1;
@@ -281,7 +366,10 @@ CREATE EXTERNAL TABLE seqquestion(tmp1  timestamp,
                               ln1   bigint, 
                               ln2   bigint, 
                               ln3   bigint, 
-                              bt    bytea)
+                              bt    bytea,
+							  bool1 boolean,
+							  bool2 boolean,
+							  bool3 boolean)
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/wild/writable_inside_sequence?.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
 FORMAT 'custom' (formatter='pxfwritable_import');
 SELECT num1, t1, t2, t3 FROM seqquestion ORDER BY num1;
@@ -291,7 +379,7 @@ DROP EXTERNAL TABLE seqquestion;
 --
 CREATE EXTERNAL TABLE host_err(t1 text,
                                a1 integer)
-LOCATION ('pxf://badhostname:50070/gpdb_regression_data/multiblock.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=TextFileAccessor&RESOLVER=TextResolver')
+LOCATION ('pxf://badhostname:50070/gpdb_regression_data/multiblock.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=LineReaderAccessor&RESOLVER=StringPassResolver')
 FORMAT 'TEXT' (DELIMITER ',');
 SELECT t1, a1 FROM host_err ORDER BY t1 LIMIT 10; -- negative
 DROP EXTERNAL TABLE host_err;
@@ -300,7 +388,7 @@ DROP EXTERNAL TABLE host_err;
 --
 CREATE EXTERNAL TABLE port_err(t1 text,
                                a1 integer)
-LOCATION ('pxf://@hostname@:9000/gpdb_regression_data/multiblock.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=TextFileAccessor&RESOLVER=TextResolver')
+LOCATION ('pxf://@hostname@:9000/gpdb_regression_data/multiblock.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=LineReaderAccessor&RESOLVER=StringPassResolver')
 FORMAT 'TEXT' (DELIMITER ',');
 SELECT t1, a1 FROM port_err ORDER BY t1 LIMIT 10; -- negative
 DROP EXTERNAL TABLE port_err;

@@ -13,6 +13,15 @@
 -- TODO: test protocol validator for pxf once written.
 -- TODO: test parameter passing, filter passing
 
+-- start_matchsubs
+--                                                                                               
+-- # create a match/subs expression to handle ip addresses that change
+--
+-- m/(ERROR|WARNING):.*remote component error.*\(\d+\).*from.*'\d+\.\d+\.\d+\.\d+:\d+'.*/
+-- s/'\d+\.\d+\.\d+\.\d+:\d+'/'SOME_IP:SOME_PORT'/
+--
+-- end_matchsubs
+
 --------------------------------------------------------------------------------
 -- HIVE
 --------------------------------------------------------------------------------

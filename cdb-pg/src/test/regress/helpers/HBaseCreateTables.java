@@ -12,9 +12,11 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.Level;
 
 import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.TimeZone;
 
 /*
  * HBaseCreateTable creates a table named dataTableName with numberOfSplits splits in HBase.
@@ -141,6 +143,17 @@ class HBaseCreateTable
                 //Qualifier 9. bigint (long)
                 Long value9 = ((i * i * i * 10000000000L + i) % Long.MAX_VALUE) * (long)Math.pow(-1, i % 2);
                 addValue(newRow, columnFamily, "q9", value9.toString());
+
+				//Qualifier 10. boolean
+				addValue(newRow, columnFamily, "q10", Boolean.toString((i % 2) == 0));
+
+				//Qualifier 11. numeric (string)
+				addValue(newRow, columnFamily, "q11", (new Double(Math.pow(10, i))).toString());
+
+				//Qualifier 12. Timestamp
+				//Removing system timezone so tests will pass anywhere in the world :)
+				int timeZoneOffset = TimeZone.getDefault().getRawOffset();
+				addValue(newRow, columnFamily, "q12", (new Timestamp(6000 * i - timeZoneOffset)).toString());
 
 				rows.add(newRow);
 			}
