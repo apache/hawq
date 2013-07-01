@@ -56,7 +56,8 @@ public class InputData
 	So the AvroResolver needs to get the schema from the AvroFileAccessor, and
 	this schema variable is the way it's done.
 	*/
-	protected Schema avroSchema = null;	
+	protected Schema avroSchema = null;
+	
 	/*
 	 * When a property is not found we throw an exception from getProperty method(). The exception message
 	 * has a generic form containing the HTTP option name. For example:
@@ -115,13 +116,10 @@ public class InputData
 		accessor = getProperty("X-GP-ACCESSOR");
 		resolver = getProperty("X-GP-RESOLVER");			
 
-		/*
-		 * TODO: leading '/' is expected. gpdb ignores it. deal more gracefully...
-		 */
+		/* TODO: leading '/' is expected. gpdb ignores it. deal more gracefully... */
 		path = "/" + getProperty("X-GP-DATA-DIR");
-		/*
-		 * TODO: once leading '/' is removed from the path variable, remove tableName and use path in HBase classes
-		 */
+		
+		/* TODO: once leading '/' is removed from the path variable, remove tableName and use path in HBase classes */
 		tableName = getProperty("X-GP-DATA-DIR"); /* for HBase and Hive */
 
 		parseUserData();
@@ -235,21 +233,24 @@ public class InputData
 		return getIntProperty(property) != 0;
 	}
 	
-	/* returns the number of segments in GP
+	/* 
+	 * Returns the number of segments in GP
 	 */
 	public int totalSegments()
 	{
 		return totalSegments;
 	}
 
-	/* returns the current segment ID
+	/* 
+	 * Returns the current segment ID
 	 */
 	public int segmentId()
 	{
 		return segmentId;
 	}
 
-	/* returns the current outputFormat
+	/* 
+	 * Returns the current outputFormat
 	 * currently either text or gpdbwritable
 	 */
 	public OutputFormat outputFormat()
@@ -257,14 +258,16 @@ public class InputData
 		return outputFormat;
 	}
 
-	/* returns the server name providing the service
+	/* 
+	 * Returns the server name providing the service
 	 */
 	public String serverName()
 	{
 		return host;
 	}
 
-	/* returns the server port providing the service
+	/* 
+	 * Returns the server port providing the service
 	 */
 	public int serverPort()
 	{
@@ -287,14 +290,16 @@ public class InputData
 		return filterString;
 	}	
 	
-	/* returns the number of columns in Tuple Description
+	/* 
+	 * Returns the number of columns in Tuple Description
 	 */
 	public int columns()
 	{
 		return tupleDescription.size();
 	}
 	
-	/* returns column index from Tuple Description
+	/* 
+	 * Returns column index from Tuple Description
 	 */
 	public ColumnDescriptor getColumn(int index)
 	{
@@ -310,7 +315,8 @@ public class InputData
 		return dataFragments.size();
 	}
 	
-	/* returns a data fragment
+	/* 
+	 * Returns a data fragment
 	 */
 	public int getDataFragment(int index)
 	{
@@ -323,7 +329,7 @@ public class InputData
 	}
 	
 	/*
-	 * returns the column descriptor of the recordkey column.
+	 * Returns the column descriptor of the recordkey column.
 	 * If the recordkey column was not specified by the user in the create table statement,
 	 * then getRecordkeyColumn will return null.
 	 */
@@ -332,7 +338,8 @@ public class InputData
 		return recordkeyColumn;
 	}
 	
-	/* returns the path to the resource required
+	/* 
+	 * Returns the path to the resource required
 	 * (might be a file path or a table name)
 	 */
 	public String path()
@@ -340,7 +347,8 @@ public class InputData
 		return path;
 	}
 
-	/* returns the path of the schema used for various deserializers
+	/* 
+	 * Returns the path of the schema used for various deserializers
 	 * e.g, Avro file name, Java object file name.
 	 */
 	public String srlzSchemaName() throws  FileNotFoundException, IllegalArgumentException
@@ -362,7 +370,7 @@ public class InputData
 	}
 
 	/* 
-	 * returns the ClassName for the java class that handles the file access
+	 * Returns the ClassName for the java class that handles the file access
 	 */
 	public String accessor()
 	{
@@ -370,7 +378,7 @@ public class InputData
 	}
 	
 	/*
-	 * returns the ClassName for the java class that handles the record deserialization
+	 * Returns the ClassName for the java class that handles the record deserialization
 	 */
 	public String resolver()
 	{

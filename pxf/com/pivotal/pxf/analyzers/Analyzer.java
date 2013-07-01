@@ -7,8 +7,8 @@ import com.pivotal.pxf.utilities.Plugin;
  * Abstract class that defines getting statistics for ANALYZE.
  * GetEstimatedStats returns statistics for a given path 
  * (block size, number of blocks, number of tuples).
- * Used when calling ANALYZE on a GPXF external table, 
- * to get table's statistics that are used by the optimizer to plan queries. 
+ * Used when calling ANALYZE on a PXF external table, to get 
+ * table's statistics that are used by the optimizer to plan queries. 
  */
 public abstract class Analyzer extends Plugin
 {
@@ -18,14 +18,16 @@ public abstract class Analyzer extends Plugin
 	}
 	
 	/*
-	 * path is a data source URI that can appear as a file name, a directory name  or a wildcard
-	 * returns the data statistics in json format
+	 * 'path' is the data source name (e.g, file, dir, wildcard, table name).
+	 * returns the data statistics in json format.
+	 * 
+	 * NOTE: It is highly recommended to implement an extremely fast logic
+	 * that returns *estimated* statistics. Scanning all the data for exact
+	 * statistics is considered bad practice.
 	 */
-	public String GetEstimatedStats(String data) throws Exception
+	public DataSourceStatsInfo GetEstimatedStats(String data) throws Exception
 	{
-		/*
-		 * return default values
-		 */
-		return DataSourceStatsInfo.dataToJSON(new DataSourceStatsInfo());
+		/* Return default values */
+		return new DataSourceStatsInfo();
 	}	
 }

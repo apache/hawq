@@ -5,9 +5,10 @@ import com.pivotal.pxf.utilities.InputData;
 import com.pivotal.pxf.utilities.Plugin;
 
 /*
- * Internal interface that defines the access to a file on HDFS.  All classes
- * that implement actual access to an HDFS file (sequence file, avro file,...)
- * must respect this interface
+ * Internal interface that defines the access to data on the source
+ * data store (e.g, a file on HDFS, a region of an HBase table, etc).
+ * All classes that implement actual access such data sources must 
+ * respect this interface
  */
 public abstract class Accessor extends Plugin
 {

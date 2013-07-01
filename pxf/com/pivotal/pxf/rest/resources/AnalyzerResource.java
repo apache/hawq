@@ -19,6 +19,7 @@ import org.apache.commons.logging.LogFactory;
 
 import com.pivotal.pxf.analyzers.Analyzer;
 import com.pivotal.pxf.analyzers.AnalyzerFactory;
+import com.pivotal.pxf.analyzers.DataSourceStatsInfo;
 import com.pivotal.pxf.utilities.InputData;
 
 /*
@@ -86,7 +87,7 @@ public class AnalyzerResource
 		 * Function queries the pxf Analyzer for the data fragments of the resource
 		 * The fragments are returned in a string formatted in JSON	 
 		 */		
-		String jsonOutput = analyzer.GetEstimatedStats(path);
+		String jsonOutput = DataSourceStatsInfo.dataToJSON(analyzer.GetEstimatedStats(path));
 		
 		return Response.ok(jsonOutput, MediaType.APPLICATION_JSON_TYPE).build();
 	}

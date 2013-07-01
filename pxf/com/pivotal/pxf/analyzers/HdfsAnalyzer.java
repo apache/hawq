@@ -49,7 +49,7 @@ public class HdfsAnalyzer extends Analyzer
 	 * name, a directory name  or a wildcard returns the data
 	 * fragments in json format
 	 */
-	public String GetEstimatedStats(String datapath) throws Exception
+	public DataSourceStatsInfo GetEstimatedStats(String datapath) throws Exception
 	{
 		long blockSize = 0;
 		long numberOfBlocks = 0;
@@ -84,7 +84,7 @@ public class HdfsAnalyzer extends Analyzer
 		//print files size to log when in debug level
 		Log.debug(DataSourceStatsInfo.dataToString(stats, path.toString()));
 
-		return DataSourceStatsInfo.dataToJSON(stats);
+		return stats;
 	}
 
 	/*

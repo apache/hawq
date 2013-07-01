@@ -1,8 +1,9 @@
 package com.pivotal.pxf.format;
 
 /*
- * Defines one field ion a deserialized record the type is in OID values recognized by GPDBWritable
- * and val is the actual field value
+ * Defines one field on a deserialized record. 
+ * 'type' is in OID values recognized by GPDBWritable
+ * 'val' is the actual field value
  */
 public class OneField
 {

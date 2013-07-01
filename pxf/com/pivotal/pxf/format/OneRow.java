@@ -1,9 +1,10 @@
 package com.pivotal.pxf.format;
 
 /*
- * Represents one row in the external system data store. Supports the general case where one row contains
- * both a record and a separate key like in the HDFS key/value model for MapReduce. 
- * Example: HDFS sequence file
+ * Represents one row in the external system data store. Supports 
+ * the general case where one row contains both a record and a 
+ * separate key like in the HDFS key/value model for MapReduce 
+ * (Example: HDFS sequence file)
  */
 public class OneRow
 {

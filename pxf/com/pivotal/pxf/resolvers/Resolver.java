@@ -8,9 +8,9 @@ import com.pivotal.pxf.utilities.InputData;
 import com.pivotal.pxf.utilities.Plugin;
 
 /*
- * Abstract class that defines the deserializtion of one record brought from the external input data.
- * Every implementation of a deserialization method (Writable, Avro, BP, Thrift, ...)
- * must inherit this abstract class
+ * Abstract class that defines the deserializtion of one record brought from 
+ * the data Accessor. Every implementation of a deserialization method 
+ * (e.g, Writable, Avro, ...) must inherit this abstract class
  */
 public abstract class Resolver extends Plugin
 {
