@@ -264,6 +264,10 @@ aix5_ppc_32_CONFIG_SHELL=/usr/bin/bash
 BLD_CONFIG_SHELL=$($(BLD_ARCH)_CONFIG_SHELL)
 
 $(GPPGDIR)/GNUmakefile : $(GPPGDIR)/configure  env.sh
+	@if [ ! -d "$(BLD_TOP)/ext" ]; then \
+	    echo "Please do make sync_tools to resolve dependencies"; \
+	    exit 1; \
+	fi	
 	rm -rf $(INSTLOC)
 	mkdir -p $(GPPGDIR) 
 	cd $(GPPGDIR) && CC="$(strip $(BLD_CC) $(BLD_CFLAGS))" CFLAGS=$(INSTCFLAGS) $(BLD_CONFIG_SHELL) ../$(GPPGDIR)/configure $(CONFIGFLAGS) --prefix=$(INSTLOC) --with-docdir=$(INSTLOC)/doc --mandir=$(INSTLOC)/man
@@ -1385,6 +1389,7 @@ distclean :
 	@if [ -d $(GPCC) ]; then cd $(GPCC); $(MAKE) clean; fi
 	@if [ -d $(GPPERFMON) ]; then cd $(GPPERFMON); $(MAKE) clean; fi
 	@if [ -d client/odbc/src/Makefile ]; then cd client/odbc/src; $(MAKE) clean; fi
+	@rm -rf $(BLD_TOP)/ext	
 	@rm -f VERSION
 	@rm -f env.sh
 

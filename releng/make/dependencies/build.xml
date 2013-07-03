@@ -11,6 +11,29 @@
     <ivy:cleancache />
   </target>
 
+
+  <target name="post-resolve-trigger">
+    <echo>
+      ======================================================================
+        Post Resolve Trigger
+      ======================================================================
+      
+      organisation=${dep.organisation}
+      module=${dep.module}
+      revision=${dep.revision}
+      platform=${BLD_ARCH}      
+
+    </echo>
+
+   <exec executable="./ivy.sh">
+    <arg value="${dep.module}"/>
+    <arg value="${dep.revision}"/>
+    <arg value="${dep.organisation}"/>
+    <arg value="${BLD_ARCH}"/>
+  </exec>
+
+  </target>
+
   <target name="download-untar-trigger">
     <echo>
 ======================================================================
@@ -27,6 +50,13 @@
   <exec executable="./ivy_util.sh">
     <arg value="${dep.file}"/>
     <arg value="${dep.revision}"/>
+  </exec>
+
+   <exec executable="./ivy.sh">
+    <arg value="${dep.module}"/>
+    <arg value="${dep.revision}"/>
+    <arg value="${dep.organisation}"/>
+    <arg value="${BLD_ARCH}"/>
   </exec>
 
   </target>

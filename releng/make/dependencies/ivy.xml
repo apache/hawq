@@ -1,26 +1,56 @@
 <ivy-module version="2.0">
-    <info organisation="emc"
-          module="cdb2" />
+    <info organisation="Pivotal"
+          module="hawq" />
 
     <configurations>
-      <conf name="osx105_x86"     visibility="public"/>
-      <conf name="osx105_x86_32"  visibility="public"/>
-      <conf name="osx105_x86_64"  visibility="public"/>
-      <conf name="osx106_x86"     visibility="public"/>
-      <conf name="osx106_x86_32"  visibility="public"/>
-      <conf name="osx106_x86_64"  visibility="public"/>
-      <conf name="rhel5_x86_64"   visibility="public"/>
-      <conf name="sol10_x86_64"   visibility="public"/>
-      <conf name="suse10_x86_64"  visibility="public"/>
+      <conf name="osx105_x86"    description="osx105_x86"    visibility="public"/>
+      <conf name="osx106_x86"    description="osx106_x86"    visibility="public"/>
+      <conf name="osx106_x86_32" description="osx106_x86_32" visibility="public"/>
+      <conf name="rhel5_x86_64"  description="rhel5_x86_64"  visibility="public"/>
+      <conf name="rhel6_x86_64"  description="rhel6_x86_64"  visibility="public"/>
+      <conf name="sol10_x86_32"  description="sol10_x86_32"  visibility="public"/>
+      <conf name="sol10_x86_64"  description="sol10_x86_64"  visibility="public"/>
+      <conf name="suse10_x86_64" description="suse10_x86_64" visibility="public"/>
     </configurations>
 
     <dependencies>
-      <dependency org="gnu"       name="gperf"     rev="3.0.4"    conf="osx105_x86->osx105_x86;osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
-      <dependency org="gnu"       name="libstdc"   rev="6.0.13"   conf="osx105_x86->osx105_x86;osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
-      <dependency org="R-Project" name="R"         rev="2.13.0"   conf="osx105_x86->osx105_x86;osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64" />
-    <dependency org="emc"       name="optimizer" rev="1.209"    conf="osx105_x86->osx105_x86_32;osx105_x86_32->osx105_x86_32;osx105_x86_64->osx105_x86_64;osx106_x86->osx106_x86_32;osx106_x86_32->osx106_x86_32;osx106_x86_64->osx106_x86_64;rhel5_x86_64->rhel5_x86_64;sol10_x86_64->sol10_x86_64;suse10_x86_64->suse10_x86_64" />
-      <dependency org="emc"       name="libgpos"   rev="1.86"     conf="osx105_x86->osx105_x86_32;osx105_x86_32->osx105_x86_32;osx105_x86_64->osx105_x86_64;osx106_x86->osx106_x86_32;osx106_x86_32->osx106_x86_32;osx106_x86_64->osx106_x86_64;rhel5_x86_64->rhel5_x86_64;sol10_x86_64->sol10_x86_64;suse10_x86_64->suse10_x86_64" />
-      <dependency org="xerces"    name="xerces-c"  rev="3.1.1-p1" conf="osx105_x86->osx105_x86_32;osx105_x86_32->osx105_x86_32;osx105_x86_64->osx105_x86_64;osx106_x86->osx106_x86_32;osx106_x86_32->osx106_x86_32;osx106_x86_64->osx106_x86_64;rhel5_x86_64->rhel5_x86_64;sol10_x86_64->sol10_x86_64;suse10_x86_64->suse10_x86_64" />
-        </dependencies>
-
+      <dependency org="gnu"             name="libstdc"         rev="6.0.13"         conf="osx105_x86->osx105_x86;osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="emc"             name="optimizer"       rev="1.209"          conf="osx106_x86->osx106_x86_32;osx106_x86_32->osx106_x86_32;rhel5_x86_64->rhel5_x86_64;sol10_x86_64->sol10_x86_64;suse10_x86_64->suse10_x86_64" />
+      <dependency org="emc"             name="libgpos"         rev="1.86"           conf="osx106_x86->osx106_x86_32;osx106_x86_32->osx106_x86_32;rhel5_x86_64->rhel5_x86_64;sol10_x86_64->sol10_x86_64;suse10_x86_64->suse10_x86_64" />
+      <dependency org="xerces"          name="xerces-c"        rev="3.1.1-p1"       conf="osx106_x86->osx106_x86_32;osx106_x86_32->osx106_x86_32;rhel5_x86_64->rhel5_x86_64;sol10_x86_64->sol10_x86_64;suse10_x86_64->suse10_x86_64" />
+      <dependency org="Boost.org"       name="boost"           rev="1.49.0"         conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="Brian_Stafford"  name="libesmtp"        rev="1.0.4-p1"       conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="Hyperic"         name="sigar"           rev="1.6.3"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="MessageSystems"  name="gimli"           rev="1.1.54"         conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="OpenLDAP"        name="openldap"        rev="2.3.38"         conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="OpenSSL"         name="openssl"         rev="0.9.8u"         conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="PROJ.4"          name="proj"            rev="4.7.0"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="Pivotal"         name="libhdfs3"        rev="1.0.0"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="Pivotal"         name="libbm"           rev="1.0.0"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="PyYAML"          name="yaml"            rev="0.1.1"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="Python"          name="python"          rev="2.6.2"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="Python"          name="python-modules"  rev="2.6.2"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="RSA"             name="bsafe"           rev="1.0.0"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="RSA"             name="csp"             rev="1.0.0"          conf="rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="apache"          name="apr"             rev="1.2.12"         conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="apache"          name="apr-util"        rev="1.2.12"         conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="bzip"            name="bzip2"           rev="1.0.6"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="cURL"            name="curl"            rev="7.21.7"         conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="emc"             name="DDBoostSDK"      rev="2.4.2.2-347703" conf="rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="emc"             name="emcconnect"      rev="1.1"            conf="rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64" />
+      <dependency org="gnu"             name="gperf"           rev="3.0.4-1"        conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="google"          name="glog"            rev="0.3.2"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="google"          name="protobuf"        rev="2.4.1"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="libevent"        name="libevent"        rev="1.4.6"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="madlib"          name="libmadlib-hawq"  rev="0.5"            conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="metaparadigm"    name="json-c"          rev="0.6"            conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="mit"             name="krb5"            rev="1.6.2"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="net-snmp"        name="net-snmp"        rev="5.5"            conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="netlib"          name="clapack"         rev="3.1.1-p1"       conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="pcre"            name="pcre"            rev="7.8"            conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="thrysoee"        name="libedit"         rev="3.0"            conf="rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="xmlsoft"         name="libxml2"         rev="2.7.8"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="zlib"            name="zlib"            rev="1.2.3"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="R-Project"       name="R"               rev="2.13.0"         conf="osx105_x86->osx105_x86;osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64" />
+    </dependencies>
 </ivy-module>

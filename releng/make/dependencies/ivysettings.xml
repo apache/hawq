@@ -31,6 +31,12 @@
   <!-- ====================================================================== -->
 
   <triggers>
+    <ant-call target="post-resolve-trigger"
+              prefix="dep"
+              event="post-resolve-dependency"/>
+  </triggers>
+
+  <triggers>
     <ant-call target="download-untar-trigger"
               prefix="dep"
               event="post-download-artifact"
