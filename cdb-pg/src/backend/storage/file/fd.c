@@ -2525,10 +2525,10 @@ HdfsPathNameOpenFile(FileName fileName, int fileFlags, int fileMode)
 	vfdP->hFile = hfile;
 	vfdP->hProtocol = protocol;
 
-	if (fileFlags & O_RDONLY)
-		vfdP->fileFlags = O_RDONLY;
-	else
+	if ((fileFlags & O_WRONLY) || (fileFlags & O_CREAT))
 		vfdP->fileFlags = O_WRONLY | O_APPEND;
+	else
+		vfdP->fileFlags = O_RDONLY;
 
 	vfdP->fileMode = fileMode;
 	vfdP->seekPos = INT64CONST(0);
