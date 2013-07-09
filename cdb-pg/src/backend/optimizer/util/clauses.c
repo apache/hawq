@@ -327,15 +327,30 @@ make_ands_implicit(Expr *clause)
 	 * causes trouble, consider changing the parser's behavior.
 	 */
 	if (clause == NULL)
+	{
 		return NIL;				/* NULL -> NIL list == TRUE */
-	else if (and_clause((Node *) clause))
+	}
+	
+	if (and_clause((Node *) clause))
+	{
 		return ((BoolExpr *) clause)->args;
-	else if (IsA(clause, Const) &&
+	}
+	
+	if (IsA(clause, Const) &&
 			 !((Const *) clause)->constisnull &&
 			 DatumGetBool(((Const *) clause)->constvalue))
+	{
 		return NIL;				/* constant TRUE input -> NIL list */
-	else
-		return list_make1(clause);
+	}
+	
+	if (IsA(clause, List))
+	{
+		/* already a list */
+		Assert(list_length((List *) clause) == 0 || !IsA(list_nth((List *) clause, 0), List));
+		return (List *) clause;
+	}
+	
+	return list_make1(clause);
 }
 
 
