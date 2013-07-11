@@ -3685,8 +3685,7 @@ static struct config_bool ConfigureNamesBool[] =
 	{
 		{"pxf_enable_locality_optimizations", PGC_USERSET, CUSTOM_OPTIONS,
 			gettext_noop("Enables locality optimizations between database segments and remote data fragments whenever possible."),
-			NULL,
-			GUC_GPDB_ADDOPT
+			NULL
 		},
 		&pxf_enable_locality_optimizations,
 		true, NULL, NULL
