@@ -470,7 +470,15 @@ pg_relation_size_oid(PG_FUNCTION_ARGS)
 						errmsg("pg_relation_size: cannot be executed in segment")));
 	}
 
-	rel = relation_open(relOid, AccessShareLock);
+	rel = try_relation_open(relOid, AccessShareLock, false);
+		
+	/*
+	 * While we scan pg_class with an MVCC snapshot,
+ 	 * someone else might drop the table. It's better to return NULL for
+	 * already-dropped tables than throw an error and abort the whole query.
+	 */
+	if (!RelationIsValid(rel))
+  		PG_RETURN_NULL();
 	
 	if (relOid == 0 || rel->rd_node.relNode == 0)
 		size = 0;
@@ -499,7 +507,15 @@ pg_relation_size_name(PG_FUNCTION_ARGS)
 
 	relrv = makeRangeVarFromNameList(textToQualifiedNameList(relname));
 	
-	rel = relation_openrv(relrv, AccessShareLock);
+	rel = try_relation_openrv(relrv, AccessShareLock, false);
+	
+	/*
+	 * While we scan pg_class with an MVCC snapshot,
+	 * someone else might drop the table. It's better to return NULL for
+	 * already-dropped tables than throw an error and abort the whole query.
+	 */
+	if (!RelationIsValid(rel))
+  		PG_RETURN_NULL();
 	
 	if (rel->rd_node.relNode == 0)
 		size = 0;

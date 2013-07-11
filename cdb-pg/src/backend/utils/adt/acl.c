@@ -86,7 +86,7 @@ static AclMode convert_priv_string(text *priv_type_text);
 static AclMode convert_any_priv_string(text *priv_type_text,
 						const priv_map *privileges);
 
-static Oid	convert_table_name(text *tablename);
+static Oid	try_convert_table_name(text *tablename);
 static AclMode convert_table_priv_string(text *priv_type_text);
 static Oid	convert_database_name(text *databasename);
 static AclMode convert_database_priv_string(text *priv_type_text);
@@ -1482,7 +1482,15 @@ has_table_privilege_name_name(PG_FUNCTION_ARGS)
 	AclResult	aclresult;
 
 	roleid = get_roleid_checked(NameStr(*rolename));
-	tableoid = convert_table_name(tablename);
+	tableoid = try_convert_table_name(tablename);
+	
+	/*
+	 * While we scan pg_class with an MVCC snapshot,
+	 * someone else might drop the table. It's better to return NULL for
+	 * already-dropped tables than throw an error and abort the whole query.
+	 */
+	if (!OidIsValid(tableoid))
+		PG_RETURN_NULL();
 	mode = convert_table_priv_string(priv_type_text);
 
 	aclresult = pg_class_aclcheck(tableoid, roleid, mode);
@@ -1507,7 +1515,16 @@ has_table_privilege_name(PG_FUNCTION_ARGS)
 	AclResult	aclresult;
 
 	roleid = GetUserId();
-	tableoid = convert_table_name(tablename);
+	tableoid = try_convert_table_name(tablename);
+
+	/*
+	 * While we scan pg_class with an MVCC snapshot,
+	 * someone else might drop the table. It's better to return NULL for
+	 * already-dropped tables than throw an error and abort the whole query
+	 */
+	if (!OidIsValid(tableoid))
+		PG_RETURN_NULL();
+
 	mode = convert_table_priv_string(priv_type_text);
 
 	aclresult = pg_class_aclcheck(tableoid, roleid, mode);
@@ -1590,7 +1607,16 @@ has_table_privilege_id_name(PG_FUNCTION_ARGS)
 	AclMode		mode;
 	AclResult	aclresult;
 
-	tableoid = convert_table_name(tablename);
+	tableoid = try_convert_table_name(tablename);
+	
+	/*
+	 * While we scan pg_class with an MVCC snapshot,
+	 * someone else might drop the table. It's better to return NULL for
+	 * already-dropped tables than throw an error and abort the whole query.
+	 */
+	if (!OidIsValid(tableoid))
+		PG_RETURN_NULL();
+
 	mode = convert_table_priv_string(priv_type_text);
 
 	aclresult = pg_class_aclcheck(tableoid, roleid, mode);
@@ -1631,16 +1657,17 @@ has_table_privilege_id_id(PG_FUNCTION_ARGS)
  */
 
 /*
- * Given a table name expressed as a string, look it up and return Oid
+ * Given a table name expressed as a string, try look it up and return Oid if found.
+ * If not found return InvalidOid (because we are passing failOK=true to RangeVarGetRelId) 
  */
 static Oid
-convert_table_name(text *tablename)
+try_convert_table_name(text *tablename)
 {
 	RangeVar   *relrv;
 
 	relrv = makeRangeVarFromNameList(textToQualifiedNameList(tablename));
 
-	return RangeVarGetRelid(relrv, false);
+	return RangeVarGetRelid(relrv, true);
 }
 
 /*
