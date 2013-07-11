@@ -6,80 +6,6 @@
 #include "c.h"
 #include "hd_work_mgr_mock.h"
 
-
-/*
- * Helper functions copied from backend/cdb/cdbutils.c
- */
-
-/*
- * _freeCdbComponentDatabases
- *
- * Releases the storage occupied by the CdbComponentDatabases
- * struct pointed to by the argument.
- */
-void
-_freeCdbComponentDatabases(CdbComponentDatabases *pDBs)
-{
-	int	i;
-
-	if (pDBs == NULL)
-		return;
-
-	if (pDBs->segment_db_info != NULL)
-	{
-		for (i = 0; i < pDBs->total_segment_dbs; i++)
-		{
-			CdbComponentDatabaseInfo *cdi = &pDBs->segment_db_info[i];
-
-			_freeCdbComponentDatabaseInfo(cdi);
-		}
-
-		pfree(pDBs->segment_db_info);
-	}
-
-	if (pDBs->entry_db_info != NULL)
-	{
-		for (i = 0; i < pDBs->total_entry_dbs; i++)
-		{
-			CdbComponentDatabaseInfo *cdi = &pDBs->entry_db_info[i];
-
-			_freeCdbComponentDatabaseInfo(cdi);
-		}
-
-		pfree(pDBs->entry_db_info);
-	}
-
-	pfree(pDBs);
-}
-
-/*
- * _freeCdbComponentDatabaseInfo:
- * Releases any storage allocated for members variables of a CdbComponentDatabaseInfo struct.
- */
-void
-_freeCdbComponentDatabaseInfo(CdbComponentDatabaseInfo *cdi)
-{
-	int i;
-
-	if (cdi == NULL)
-		return;
-
-	if (cdi->hostname != NULL)
-		pfree(cdi->hostname);
-
-	if (cdi->address != NULL)
-		pfree(cdi->address);
-
-	for (i=0; i < COMPONENT_DBS_MAX_ADDRS; i++)
-	{
-		if (cdi->hostaddrs[i] != NULL)
-		{
-			pfree(cdi->hostaddrs[i]);
-			cdi->hostaddrs[i] = NULL;
-		}
-	}
-}
-
 /*
  * Helper functions to create and restore GpAliveSegmentsInfo.cdbComponentDatabases element
  * used by hd_work_mgr
@@ -120,9 +46,7 @@ void restoreCdbComponentDatabases()
 {
 	/* free test CdbComponentDatabases */
 	if (GpAliveSegmentsInfo.cdbComponentDatabases)
-	{
-		_freeCdbComponentDatabases(GpAliveSegmentsInfo.cdbComponentDatabases);
-	}
+		freeCdbComponentDatabases(GpAliveSegmentsInfo.cdbComponentDatabases);
 
 	GpAliveSegmentsInfo.cdbComponentDatabases = orig_cdb;
 	GpAliveSegmentsInfo.aliveSegmentsCount = orig_seg_count;

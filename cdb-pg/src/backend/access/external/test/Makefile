@@ -8,7 +8,6 @@ COMMON_REAL_OBJS=\
     $(top_srcdir)/src/backend/access/hash/hashfunc.o \
     $(top_srcdir)/src/backend/access/transam/filerepdefs.o \
     $(top_srcdir)/src/backend/bootstrap/bootparse.o \
-	$(top_srcdir)/src/backend/cdb/cdbutil.o \
     $(top_srcdir)/src/backend/lib/stringinfo.o \
     $(top_srcdir)/src/backend/nodes/bitmapset.o \
     $(top_srcdir)/src/backend/nodes/equalfuncs.o \
@@ -43,6 +42,7 @@ COMMON_REAL_OBJS=\
 pxfuriparser_REAL_OBJS=$(COMMON_REAL_OBJS) 
 
 hd_work_mgr_REAL_OBJS=$(COMMON_REAL_OBJS) \
+	$(top_srcdir)/src/backend/cdb/cdbutil.o \
 	$(top_srcdir)/src/backend/access/external/pxfuriparser.o
 
 
