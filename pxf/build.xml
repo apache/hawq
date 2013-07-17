@@ -3,7 +3,7 @@
 
 	<!-- Load product and build parameters from build.properties
 		 NOTE: Product name and version defined in build.properties -->
-	<property file="build.properties" />
+	<loadproperties srcfile="build.properties" />
 
 	<!-- Some basic properties -->
 	<property environment="env"/>
@@ -20,7 +20,7 @@
 	    <isset property="build.trunkbuild"/>
 	</condition>
 
-	<property name="src.dir" value="${basedir}" />
+	<property name="src.dir" value="${basedir}/src" />
 	<property name="build.dir" value="${basedir}/build" />
 	<property name="lib.dir" value="${build.dir}/lib" />
 	<property name="dist.dir" value="${build.dir}/${component.name}" />
@@ -160,7 +160,7 @@
 				<include name="${package.name}.tar.gz" />
 			</fileset>
 		</copy>
-		<copy file="${src.dir}/packages/rpm.spec" todir="${package.buildroot}/SPECS">
+		<copy file="${basedir}/packages/rpm.spec" todir="${package.buildroot}/SPECS">
 			<filterchain>
 				<replacetokens>
 					<token key="component.basename" value="${component.basename}" />
