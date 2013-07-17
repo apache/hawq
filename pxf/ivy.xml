@@ -13,8 +13,6 @@
       <conf name="master" description="contains the artifact but no dependencies"/>
       <conf name="compile" description="contains the artifact but no dependencies"/>
       <conf name="runtime" description="runtime but not the artifact"/>
-      <!-- Private configurations -->
-      <conf name="checkstyle" visibility="private"/>
     </configurations>
 
     <dependencies>
@@ -38,8 +36,6 @@
                   conf="compile->master"/>
 	  <dependency org="org.apache.thrift" name="libfb303" rev="0.7.0"
                   conf="compile->master"/>					  
-      <dependency org="checkstyle" name="checkstyle" rev="${checkstyle.version}"
-                  conf="checkstyle->default"/>
       <dependency org="com.google.protobuf" name="protobuf-java" rev="2.4.1" 
                   conf="compile->master"/>
       <dependency org="org.apache.hbase" name="hbase" rev="0.94.1" 
@@ -59,6 +55,10 @@
 	  <dependency org="commons-logging" name="commons-logging" rev="1.1.1" 
 	  			  conf="compile->master"/>
 	  <dependency org="commons-codec" name="commons-codec" rev="1.4" 
+	  			  conf="compile->master"/>
+	  <dependency org="junit" name="junit" rev="4.11" 
+	  			  conf="compile->master"/>
+	  <dependency org="org.hamcrest" name="hamcrest-core" rev="1.3" 
 	  			  conf="compile->master"/>
     </dependencies>
 </ivy-module>

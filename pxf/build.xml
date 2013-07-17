@@ -24,6 +24,8 @@
 	<property name="build.dir" value="${basedir}/build" />
 	<property name="lib.dir" value="${build.dir}/lib" />
 	<property name="dist.dir" value="${build.dir}/${component.name}" />
+	<property name="test.dir" value="${basedir}/test" />
+	<property name="testreports.dir" value="${build.dir}/test/reports" />
 
 	<property name="package.buildroot" value="/tmp/${component.basename}_package_build_${user.name}"/>
 	<property name="package.release" value="${build.number}${build.branch}"/>
@@ -101,7 +103,7 @@
 	</target>
 
 	<!-- Create JAR -->
-	<target name="jar" depends="compile" description="create the main jar files">
+	<target name="jar" depends="run-tests" description="create the main jar files">
 		<jar destfile="${build.dir}/${component.name}.jar">
 			<manifest>
 				<attribute name="Built-By" value="${user.name}"/>
@@ -209,5 +211,44 @@
 		<ivy:settings id="basic.settings" file="ivysettings.xml"/>
 		<ivy:retrieve settingsRef="basic.settings" pattern="${build.ivy.lib.dir}/${ivy.artifact.retrieve.pattern}" sync="true" conf="compile"/>
 		<ivy:cachepath pathid="ivy-classpath" conf="compile"/>
+	</target>
+
+	<target name="compile-tests" depends="compile" description="Compiling tests">
+		<mkdir dir="${build.dir}/test/classes" />
+		<javac classpathref="library.commons.classpath"
+			classpath="${build.dir}/classes"
+			destdir="${build.dir}/test/classes"
+			includeantruntime="${compiler.includeantruntime}"
+			debug="${compiler.debug}"
+			fork="yes"
+			verbose="${compiler.verbose}"
+			memoryMaximumSize="${compiler.max.memory}"
+			srcdir="${test.dir}">
+			<compilerarg line="-Werror -Xlint:unchecked -Xlint:deprecation -Xlint:finally -Xlint:fallthrough -Xlint:path"/>
+		</javac>
+	</target>
+
+	<target name="run-tests" depends="compile-tests" description="Run unit-tests">
+		<mkdir dir="${testreports.dir}" />
+		<junit printsummary="yes" fork="yes" haltonfailure="yes">
+
+			<classpath>
+				<pathelement location="${build.dir}/test/classes"/>
+				<pathelement location="${build.dir}/classes"/>
+				<fileset dir="${lib.dir}">
+					<include name="**/*.jar"/>
+				</fileset>
+			</classpath>
+
+			<formatter type="plain" usefile="false"/>
+			<formatter type="xml"/>
+
+			<batchtest todir="${testreports.dir}">
+				<fileset dir="${build.dir}/test/classes">
+					<include name="**/*.class"/>
+				</fileset>
+			</batchtest>
+
+		</junit>
 	</target>
 </project>
