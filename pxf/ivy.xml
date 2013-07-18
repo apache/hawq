@@ -38,7 +38,7 @@
                   conf="compile->master"/>					  
       <dependency org="com.google.protobuf" name="protobuf-java" rev="2.4.1" 
                   conf="compile->master"/>
-      <dependency org="org.apache.hbase" name="hbase" rev="0.94.1" 
+      <dependency org="org.apache.hbase" name="hbase" rev="0.94.8-gphd-2.0.1.0" 
                   conf="compile->master"/>
 	  <dependency org="org.apache.avro" name="avro" rev="1.5.4" 
 	  			  conf="compile->master"/>
