@@ -13,26 +13,13 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.common.JavaUtils;
 import org.apache.hadoop.hive.serde.Constants;
 import org.apache.hadoop.hive.serde2.Deserializer;
-import org.apache.hadoop.hive.serde2.objectinspector.ListObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.MapObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.StructField;
-import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.UnionObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.BinaryObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.BooleanObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.DoubleObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.FloatObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.IntObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.LongObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.ShortObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.StringObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.TimestampObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.*;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.*;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.JobConf;
 
+import com.pivotal.pxf.exception.FragmenterUserDataException;
 import com.pivotal.pxf.format.OneField;
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.fragmenters.HiveDataFragmenter;
@@ -48,34 +35,42 @@ import com.pivotal.pxf.utilities.RecordkeyAdapter;
 public class HiveResolver extends Resolver
 {
 	private RecordkeyAdapter recordkeyAdapter = new RecordkeyAdapter();
-
-	// reflection fields
-	private Object userObject = null;
-	private int index_of_readFields = 0;
-
 	private Deserializer deserializer;
 	private Properties serdeProperties;
 	private List<OneField> partitionFields;
-		
+	private String inputFormatName;
+	private String serdeName; 
+	private String propsString;
+	private String partitionKeys;
+			
 	public HiveResolver(InputData input) throws Exception
 	{
 		super(input);
 		
-		String userData = new String(input.getFragmentUserData());
-		String[] toks = userData.split(HiveDataFragmenter.HIVE_USER_DATA_DELIM);		
-		
-		String serdeName = toks[1]; /* look in HiveDataFragmenter to see how the userData was concatanated */
-		Class<?> c = Class.forName(serdeName, true, JavaUtils.getClassLoader());
-		deserializer = (Deserializer)c.newInstance();
-		String propsString = toks[2];
-		ByteArrayInputStream inStream = new ByteArrayInputStream(propsString.getBytes());
-		serdeProperties = new Properties();
-		serdeProperties.load(inStream);		
-		initPartitionFields(toks[3]);
-		
-		deserializer.initialize(new JobConf(new Configuration(), HiveResolver.class), serdeProperties);
+		ParseUserData(input);
+		InitSerde();
+		InitPartitionFields();
 	}
 
+	/*
+	 * parse user data string (arrived from fragmenter)
+	 */
+	private void ParseUserData(InputData input) throws Exception
+	{
+		final int EXPECTED_NUM_OF_TOKS = 4;
+		
+		String userData = new String(input.getFragmentUserData());
+		String[] toks = userData.split(HiveDataFragmenter.HIVE_UD_DELIM);	
+		
+		if (toks.length != EXPECTED_NUM_OF_TOKS)
+			throw new FragmenterUserDataException("HiveResolver expected " + EXPECTED_NUM_OF_TOKS + " tokens, but got " + toks.length);
+		
+		inputFormatName = toks[0];
+		serdeName = toks[1]; 
+		propsString = toks[2];
+		partitionKeys = toks[3];
+	}
+	
 	/*
 	 * GetFields returns a list of the fields of one record.
 	 * Each record field is represented by a OneField item.
@@ -92,23 +87,37 @@ public class HiveResolver extends Resolver
 		traverseTuple(tuple, oi, record);
 		/* We follow Hive convention. Partition fields are always added at the end of the record*/
 		addPartitionKeyValues(record);
+		
 		return record;
+	}
+	
+	/*
+	 * Get and init the deserializer for the records of this Hive data fragment
+	 */
+	private void InitSerde() throws Exception
+	{
+		Class<?> c = Class.forName(serdeName, true, JavaUtils.getClassLoader());
+		deserializer = (Deserializer)c.newInstance();
+		serdeProperties = new Properties();
+		ByteArrayInputStream inStream = new ByteArrayInputStream(propsString.getBytes());
+		serdeProperties.load(inStream);	
+		deserializer.initialize(new JobConf(new Configuration(), HiveResolver.class), serdeProperties);
 	}
 	
 	/*
 	 * The partition fields are initialized  one time  base on userData provided by the fragmenter
 	 */
-	private void initPartitionFields(String partitionKeys)
+	private void InitPartitionFields()
 	{
 		partitionFields	= new LinkedList<OneField>();
-		if (partitionKeys.compareTo(HiveDataFragmenter.HIVE_TABLE_WITHOUT_PARTITIONS) == 0)
+		if (partitionKeys.compareTo(HiveDataFragmenter.HIVE_NO_PART_TBL) == 0)
 			return;
 		
 		String[] partitionLevels = partitionKeys.split(HiveDataFragmenter.HIVE_PARTITIONS_DELIM);
 		for (String partLevel : partitionLevels)
 		{
 			SimpleDateFormat dateFormat = new SimpleDateFormat();
-			String[] levelKey = partLevel.split(HiveDataFragmenter.HIVE_ONE_PARTITION_DELIM);
+			String[] levelKey = partLevel.split(HiveDataFragmenter.HIVE_1_PART_DELIM);
 			String name = levelKey[0];
 			String type = levelKey[1];
 			String val = levelKey[2];

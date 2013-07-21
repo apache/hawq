@@ -68,8 +68,8 @@ public class HBaseAccessor extends Accessor
 	public HBaseAccessor(InputData input)
 	{
 		super(input);
+		
 		tupleDescription = new HBaseTupleDescription(input);
-
 		splits = new ArrayList<SplitBoundary>();
 		currentRegionIndex = 0;
 		scanStartKey = HConstants.EMPTY_START_ROW;
@@ -116,9 +116,7 @@ public class HBaseAccessor extends Accessor
 
 	/*
 	 * The function creates an array of start,end keys pairs for each
-	 * table split this segment is going to scan.
-	 *
-	 * Split selection is done by GP master
+	 * table split this Accessor instance is assigned to scan.
 	 *
 	 * The function verifies splits are within user supplied range
 	 *
@@ -156,10 +154,11 @@ public class HBaseAccessor extends Accessor
 			if (Bytes.equals(endKey, HConstants.EMPTY_END_ROW) || // endKey == table's end
 				Bytes.compareTo(endKey, scanStartKey) >= 0) // endKey >= scanStartKey
 				return true;
-		} else // startKey > scanStartKey
+		} 
+		else // startKey > scanStartKey
 			if (Bytes.equals(scanEndKey, HConstants.EMPTY_END_ROW) || //  scanEndKey == table's end
-				   Bytes.compareTo(startKey, scanEndKey) <= 0) // startKey <= scanEndKey
-			return true;
+				Bytes.compareTo(startKey, scanEndKey) <= 0) // startKey <= scanEndKey
+				return true;
 		return false;
 	}
 

@@ -103,7 +103,8 @@ public class HBaseResolver extends Resolver
                 default:
                     throw new Exception("Unsupported data type " + type);
             }
-        } catch (NumberFormatException e)
+        } 
+        catch (NumberFormatException e)
         {
             // Replace exception with BadRecordException
             throw new BadRecordException(e);

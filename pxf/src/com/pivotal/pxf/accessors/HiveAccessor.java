@@ -82,7 +82,7 @@ public class HiveAccessor extends HdfsSplittableDataAccessor
 	private FileInputFormat<?, ?> createInputFormat(InputData input) throws Exception
 	{
 		String userData = new String(input.getFragmentUserData());
-		String[] toks = userData.split(HiveDataFragmenter.HIVE_USER_DATA_DELIM);
+		String[] toks = userData.split(HiveDataFragmenter.HIVE_UD_DELIM);
 		initPartitionFields(toks[3]);
 		return HiveDataFragmenter.makeInputFormat(toks[0]/* inputFormat name */, jobConf);
 	}
@@ -93,13 +93,13 @@ public class HiveAccessor extends HdfsSplittableDataAccessor
 	private void initPartitionFields(String partitionKeys)
 	{
 		partitions	= new LinkedList<Partition>();
-		if (partitionKeys.compareTo(HiveDataFragmenter.HIVE_TABLE_WITHOUT_PARTITIONS) == 0)
+		if (partitionKeys.compareTo(HiveDataFragmenter.HIVE_NO_PART_TBL) == 0)
 			return;
 		
 		String[] partitionLevels = partitionKeys.split(HiveDataFragmenter.HIVE_PARTITIONS_DELIM);
 		for (String partLevel : partitionLevels)
 		{
-			String[] levelKey = partLevel.split(HiveDataFragmenter.HIVE_ONE_PARTITION_DELIM);
+			String[] levelKey = partLevel.split(HiveDataFragmenter.HIVE_1_PART_DELIM);
 			String name = levelKey[0];
 			String type = levelKey[1];
 			String val = levelKey[2];

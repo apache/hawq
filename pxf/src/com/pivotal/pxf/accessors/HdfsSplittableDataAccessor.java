@@ -21,14 +21,14 @@ import com.pivotal.pxf.utilities.InputData;
  */
 public abstract class HdfsSplittableDataAccessor extends Accessor
 {
+	private   LinkedList<InputSplit> segSplits = null;
+	private   InputSplit currSplit = null;
 	protected Configuration conf = null;
-	private LinkedList<InputSplit> segSplits = null;
 	protected RecordReader<Object, Object> reader = null;
 	protected FileInputFormat<?, ?> fformat = null;
-	ListIterator<InputSplit> iter = null;
-	private InputSplit currSplit = null;
+	protected ListIterator<InputSplit> iter = null;
 	protected JobConf jobConf = null;
-	Object key, data;
+	protected Object key, data;
 
 	/*
 	 * C'tor
@@ -54,33 +54,33 @@ public abstract class HdfsSplittableDataAccessor extends Accessor
 	public boolean Open() throws Exception
 	{
 		// 1. get the list of all splits the input file has
-		int segs = inputData.totalSegments();
-        int segId = inputData.segmentId();
         FileInputFormat.setInputPaths(jobConf, new Path(inputData.path()));
-		/*
+
+        /*
 		 * We ask for 1 split, but this doesn't mean that we are always going to get 1 split
 		 * The number of splits depends on the data size. What we assured here is that always,
 		 * the split size will be equal to the block size. To understand this, one should look
 		 * at the implementation of FileInputFormat.getSplits()
 		 */
 		InputSplit[] splits = fformat.getSplits(jobConf, 1);
-		int actual_splits_size = splits.length;
-		int allocated_splits_size = inputData.dataFragmentsSize(); // it's called dataFragments because it represents both hdfs and hbase
+		int actual_num_of_splits = splits.length;
+		int needed_num_of_splits = inputData.dataFragmentsSize(); // it's called dataFragments because it represents both hdfs and hbase
 
 		// 2. from all the splits choose only those that correspond to this segment id
 		segSplits = new LinkedList<InputSplit>();
-		for (int i = 0; i < allocated_splits_size; i++)
+		for (int i = 0; i < needed_num_of_splits; i++)
 		{
-			int alloc_split_idx = inputData.getDataFragment(i);
+			int needed_split_idx = inputData.getDataFragment(i);
 			
 			/*
 			 * Testing for the case where between the time of the GP Master input
 			 * data retrieval and now, the file was deleted or replaced by a smaller file.
 			 * This is an extreme case which shouldn't happen - but we want to make sure
 			 */
-			if (alloc_split_idx < actual_splits_size)
-				segSplits.add(splits[alloc_split_idx]);			
+			if (needed_split_idx < actual_num_of_splits)
+				segSplits.add(splits[needed_split_idx]);			
 		}
+		
 		// 3. Initialize record reader based on current split
 		iter = segSplits.listIterator(0);
 		return getNextSplit();	

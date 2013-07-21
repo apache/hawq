@@ -45,11 +45,16 @@ public class HiveDataFragmenter extends Fragmenter
 	HiveClient client;
 	private Log Log;
 	
-	public static final String HIVE_USER_DATA_DELIM = "hive_usr_delim";
-	public static final String HIVE_ONE_PARTITION_DELIM = "hive_one_partition_delim";
-	public static final String HIVE_PARTITIONS_DELIM = "hive_partitions_delim";
-	public static final String HIVE_TABLE_WITHOUT_PARTITIONS = "hive_table_without_partitions";
-	public static final int TODO_REMOVE_THIS_CONST = 1000; 
+	public static final String HIVE_DEFAULT_DBNAME = "default";
+	public static final String HIVE_UD_DELIM = "!HUDD!";
+	public static final String HIVE_1_PART_DELIM = "!H1PD!";
+	public static final String HIVE_PARTITIONS_DELIM = "!HPAD!";
+	public static final String HIVE_NO_PART_TBL = "!HNPT!";
+    
+	/* TODO: get rid of these */
+	public static final int HIVE_MAX_PARTS = 1000;
+	public static final int THRIFT_PORT = 10000;
+	public static final String THRIFT_HOST = "localhost";
 	
 	/* internal class used for parsing the qualified table name received as input to GetFragments() */
 	class TblDesc
@@ -123,10 +128,7 @@ public class HiveDataFragmenter extends Fragmenter
 	/* Initialize the Hive client */
 	private HiveClient InitHiveClient() throws TTransportException
 	{
-		/*
-		 * TODO  - must replace 10000, the hardcoded thrift server port with a generic value
-		 */
-		TSocket transport = new TSocket("localhost" , 10000);
+		TSocket transport = new TSocket(THRIFT_HOST , THRIFT_PORT);
 		TBinaryProtocol protocol = new TBinaryProtocol(transport);
 		HiveClient client = new org.apache.hadoop.hive.service.HiveClient(protocol);
 		transport.open();
@@ -145,7 +147,7 @@ public class HiveDataFragmenter extends Fragmenter
 		String[] toks = qualifiedName.split("[.]");
 		if (toks.length == 1)
 		{
-			tblDesc.dbName = "default";
+			tblDesc.dbName = HIVE_DEFAULT_DBNAME;
 			tblDesc.tableName = toks[0];
 		}
 		else if (toks.length == 2)
@@ -172,7 +174,7 @@ public class HiveDataFragmenter extends Fragmenter
 		if (TableType.valueOf(tblType) == TableType.VIRTUAL_VIEW)
 			throw new UnsupportedOperationException("PXF doesn't support HIVE views"); 
 		
-		List<Partition> partitions = client.get_partitions(tblDesc.dbName, tblDesc.tableName, (short)TODO_REMOVE_THIS_CONST); // guessing the max partitions - will have to further research this
+		List<Partition> partitions = client.get_partitions(tblDesc.dbName, tblDesc.tableName, (short)HIVE_MAX_PARTS); // guessing the max partitions - will have to further research this
 		StorageDescriptor descTable = tbl.getSd();
 		Properties props;
 		
@@ -271,7 +273,7 @@ public class HiveDataFragmenter extends Fragmenter
 	private String serializePartitionKeys(HiveTablePartition partData) throws Exception
 	{
 		if (partData.partition == null) /* this is a simple hive table - there are no partitions */
-			return HIVE_TABLE_WITHOUT_PARTITIONS;
+			return HIVE_NO_PART_TBL;
 		
 		String partitionKeys = new String("");
 		
@@ -287,7 +289,7 @@ public class HiveDataFragmenter extends Fragmenter
 			String type = key.getType(); 
 			String val = valsIter.next();
 			
-			String oneLevel = name + HIVE_ONE_PARTITION_DELIM + type + HIVE_ONE_PARTITION_DELIM + val;
+			String oneLevel = name + HIVE_1_PART_DELIM + type + HIVE_1_PART_DELIM + val;
 			partitionKeys = partitionKeys + oneLevel;			
 		}
 		
@@ -300,9 +302,9 @@ public class HiveDataFragmenter extends Fragmenter
 		String serdeName = partData.storageDesc.getSerdeInfo().getSerializationLib();
 		String propertiesString = serializeProperties(partData.properties);
 		String partionKeys = serializePartitionKeys(partData);
-		String userData = inputFormatName + HIVE_USER_DATA_DELIM + 
-						  serdeName + HIVE_USER_DATA_DELIM + 
-		                  propertiesString + HIVE_USER_DATA_DELIM +
+		String userData = inputFormatName + HIVE_UD_DELIM + 
+						  serdeName + HIVE_UD_DELIM + 
+		                  propertiesString + HIVE_UD_DELIM +
 						  partionKeys;
 		
 		return userData.getBytes();
