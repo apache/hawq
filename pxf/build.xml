@@ -44,7 +44,6 @@
 	<property name="ivy.jar.file" value="${ivy.jar.dir}/ivy.jar" />
 
 	<patternset id="library.patterns">
-		<include name="hadoop-${hadoop.version}/*.jar" />
 		<include name="*.jar" />
 	</patternset>
 
@@ -80,7 +79,7 @@
 	</target>
 
 	<!-- Compilation -->
-	<target name="compile" depends="ivy-retrieve-hadoop">
+	<target name="compile" depends="ivy-retrieve">
 		<mkdir dir="${build.dir}/classes" />
 
 		<!-- display the classpath used for compiling -->
@@ -206,7 +205,7 @@
 		<taskdef resource="org/apache/ivy/ant/antlib.xml" uri="antlib:org.apache.ivy.ant" classpathref="ivy.lib.path" />
 	</target>
 
-	<target name="ivy-retrieve-hadoop" depends="ivy-init"
+	<target name="ivy-retrieve" depends="ivy-init"
 		description="--> Retrieve Ivy-managed artifacts for the compile configurations">
 		<ivy:settings id="basic.settings" file="ivysettings.xml"/>
 		<ivy:retrieve settingsRef="basic.settings" pattern="${build.ivy.lib.dir}/${ivy.artifact.retrieve.pattern}" sync="true" conf="compile"/>

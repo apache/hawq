@@ -10,7 +10,6 @@ import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.client.HTable;
-import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
@@ -38,7 +37,7 @@ import com.pivotal.pxf.utilities.InputData;
 public class HBaseAccessor extends Accessor
 {
 	private HBaseTupleDescription tupleDescription;
-	private HTableInterface table;
+	private HTable table;
 	private List<SplitBoundary> splits;
 	private Scan scanDetails;
 	private ResultScanner currentScanner;
@@ -125,14 +124,13 @@ public class HBaseAccessor extends Accessor
 	 *
 	 * It is assumed, |startKeys| == |endKeys|
 	 * This assumption is made through HBase's code as well
-	 * We also assume, HTableInterface is implemented using HTable
 	 */
 	private void selectTableSplits() throws IOException
 	{
-		NavigableMap<HRegionInfo, ServerName> regions = ((HTable)table).getRegionLocations();
+		NavigableMap<HRegionInfo, ServerName> regions = table.getRegionLocations();
 		int i = 0;
 
-		ArrayList<Integer> fragments = inputData.getDataFragments();
+		List<Integer> fragments = inputData.getDataFragments();
 
 		for (HRegionInfo region : regions.keySet())
 		{
