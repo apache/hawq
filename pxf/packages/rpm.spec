@@ -12,6 +12,7 @@
 %define _package_name		@package.name@
 %define _package_summary	@package.summary@
 %define _package_vendor		@package.vendor@
+%define _package_obsoletes	@package.obsoletes@
 
 Name: %{_name}
 Version: %{_version}
@@ -25,6 +26,7 @@ Requires: hadoop >= 2.0.0, hadoop-mapreduce >= 2.0.0
 AutoReqProv: no
 Provides: %{_name}
 Prefix: %{_prefix}
+Obsoletes: %{_package_obsoletes}
 
 # package.description is replaced here and not in header as
 # description area cannot use %{}
