@@ -1377,10 +1377,6 @@ explain_outNode(StringInfo str,
 								 quote_identifier(valsname));
 			}
 			break;
-		case T_Material:
-			if (((Material *) plan)->cdb_strict)
-				appendStringInfo(str, " for deadlock safety");
-			break;
 		default:
 			break;
 	}
