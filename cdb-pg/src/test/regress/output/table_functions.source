@@ -1931,7 +1931,7 @@ explain WITH cte AS (SELECT * FROM example) SELECT x.* FROM multiset_5( TABLE ( 
          ->  Nested Loop  (cost=2.43..6.26 rows=5 width=36)
                ->  Table Function Scan on multiset_5 x  (cost=0.00..2.23 rows=5 width=36)
                      ->  Seq Scan on example  (cost=0.00..2.10 rows=5 width=16)
-               ->  Materialize for deadlock safety  (cost=2.43..2.51 rows=4 width=0)
+               ->  Materialize  (cost=2.43..2.51 rows=4 width=0)
                      ->  Broadcast Motion 1:2  (slice2; segments: 1)  (cost=2.24..2.42 rows=8 width=0)
                            ->  Subquery Scan y  (cost=2.24..2.26 rows=8 width=0)
                                  ->  Aggregate  (cost=2.24..2.25 rows=1 width=8)
@@ -1995,7 +1995,7 @@ explain SELECT x.* FROM multiset_5( TABLE ( SELECT 1 ) ) x right join (SELECT 1)
 ------------------------------------------------------------------------------------
  Nested Loop Left Join  (cost=0.03..1.33 rows=27 width=36)
    ->  Result  (cost=0.00..0.01 rows=1 width=0)
-   ->  Materialize for deadlock safety  (cost=0.03..0.11 rows=4 width=36)
+   ->  Materialize  (cost=0.03..0.11 rows=4 width=36)
          ->  Table Function Scan on multiset_5 x  (cost=0.00..0.02 rows=8 width=36)
                ->  Result  (cost=0.00..0.01 rows=1 width=0)
  Settings:  gp_segments_for_planner=8
