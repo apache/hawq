@@ -69,12 +69,9 @@ SELECT MADLib.lda_predict(
  (lda_pred,"per-doc topic distribution and per-word topic assignments")
 (1 row)
 
-SELECT (lda_get_perplexity('lda_model', 'lda_pred') - 18.6155002539)^2 < 1;
- ?column? 
-----------
- t
-(1 row)
-
+----------------------------------------------------------------------------
+--SELECT (lda_get_perplexity('lda_model', 'lda_pred') - 18.6155002539)^2 < 1;
+----------------------------------------------------------------------------
 SELECT MADLib.lda_get_topic_desc(
     'lda_model', 
     'lda_vocab', 
