@@ -500,12 +500,6 @@ void tuplestore_puttuple(Tuplestorestate *state, HeapTuple tuple)
 static void
 tuplestore_puttuple_common(Tuplestorestate *state, TuplestorePos *pos, void *tuple)
 {
-
-//#ifdef DEBUG
-//	Assert(!state->otherAccessed);
-//	Assert(&state.pos == pos);
-//#endif
-
 	switch (state->status)
 	{
 		case TSS_INMEM:
@@ -596,11 +590,6 @@ tuplestore_gettuple(Tuplestorestate *state, TuplestorePos *pos, bool forward,
 
 	Assert(forward || state->randomAccess);
 
-//#ifdef DEBUG
-//	if(&state->pos != pos)
-//		state->otherAccessed = true;
-//#endif
-
 	switch (state->status)
 	{
 		case TSS_INMEM:
@@ -688,7 +677,10 @@ tuplestore_gettuple(Tuplestorestate *state, TuplestorePos *pos, bool forward,
 			 * Back up to fetch previously-returned tuple's ending length
 			 * word. If seek fails, assume we are at start of file.
 			 */
-			if (BufFileSeek(state->myfile, 0, -(long) sizeof(uint32),
+
+			insist_log(false, "Backward scanning of tuplestores are not supported at this time");
+
+			if (BufFileSeek(state->myfile, -(long) sizeof(uint32) /* offset */,
 							SEEK_CUR) != 0)
 				return NULL;
 			tuplen = getlen(state, pos, false);
@@ -962,10 +954,8 @@ getlen(Tuplestorestate *state, TuplestorePos *pos, bool eofOK)
 	nbytes = BufFileRead(state->myfile, (void *) &len, sizeof(len));
 	if (nbytes == sizeof(len))
 		return len;
-	if (nbytes != 0)
-		elog(ERROR, "unexpected end of tape");
-	if (!eofOK)
-		elog(ERROR, "unexpected end of data");
+	insist_log(nbytes == 0, "unexpected end of tape");
+	insist_log(eofOK, "unexpected end of data");
 	return 0;
 }
 
@@ -1024,10 +1014,15 @@ readtup_heap(Tuplestorestate *state, TuplestorePos *pos, uint32 len)
 	void *tup = NULL;
 	uint32 tuplen = 0;  
 	
-	if(is_len_memtuplen(len)) 
+	if(is_len_memtuplen(len))
+	{
 		tuplen = memtuple_size_from_uint32(len);
-	else 
-		tuplen = len;
+	}
+	else
+	{
+		/* len is HeapTuple.t_len. The record size includes rest of the HeapTuple fields */
+		tuplen = len + HEAPTUPLESIZE;
+	}
 
 	tup = (void *) palloc(tuplen);
 	USEMEM(state, GetMemoryChunkSpace(tup));
@@ -1040,7 +1035,9 @@ readtup_heap(Tuplestorestate *state, TuplestorePos *pos, uint32 len)
 		if (BufFileRead(state->myfile, (void *) ((char *) tup + sizeof(uint32)), 
 					tuplen - sizeof(uint32)) 
 				!= (size_t) (tuplen - sizeof(uint32)))
-			elog(ERROR, "unexpected end of data");
+		{
+			insist_log(false, "unexpected end of data");
+		}
 	}
 	else
 	{
@@ -1050,13 +1047,17 @@ readtup_heap(Tuplestorestate *state, TuplestorePos *pos, uint32 len)
 		if (BufFileRead(state->myfile, (void *) ((char *) tup + sizeof(uint32)),
 					tuplen - sizeof(uint32))
 				!= (size_t) (tuplen - sizeof(uint32)))
-			elog(ERROR, "unexepcted end of data");
+		{
+			insist_log(false, "unexpected end of data");
+		}
 		htup->t_data = (HeapTupleHeader ) ((char *) tup + HEAPTUPLESIZE);
 	}
 
 	if (state->randomAccess)	/* need trailing length word? */
 		if (BufFileRead(state->myfile, (void *) &tuplen,
 						sizeof(tuplen)) != sizeof(tuplen))
-			elog(ERROR, "unexpected end of data");
+		{
+			insist_log(false, "unexpected end of data");
+		}
 	return (void *) tup;
 }
