@@ -209,7 +209,6 @@ test: madlib_lda
 test: madlib_logistic
 test: madlib_multilogistic
 test: madlib_kmeans
-test: madlib_newplda
 #
 # the following test needs some special filespace/tablespace.
 #

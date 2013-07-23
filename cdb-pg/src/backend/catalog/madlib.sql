@@ -321,21 +321,80 @@ $$
 
 
 
-CREATE FUNCTION __lda_count_topic_prefunc(state1 integer[], state2 integer[]) RETURNS integer[]
+CREATE FUNCTION __lda_count_topic_prefunc(state1 bigint[], state2 bigint[]) RETURNS bigint[]
     AS '$libdir/libmadlib.so', 'lda_count_topic_prefunc'
     LANGUAGE c IMMUTABLE STRICT;
 
 
 
-CREATE FUNCTION __lda_count_topic_sfunc(state integer[], words integer[], counts integer[], topic_assignment integer[], voc_size integer, topic_num integer) RETURNS integer[]
+CREATE FUNCTION __lda_count_topic_sfunc(state bigint[], words integer[], counts integer[], topic_assignment integer[], voc_size integer, topic_num integer) RETURNS bigint[]
     AS '$libdir/libmadlib.so', 'lda_count_topic_sfunc'
     LANGUAGE c;
 
 
 
-CREATE FUNCTION __lda_gibbs_sample(words integer[], counts integer[], doc_topic integer[], model integer[], alpha double precision, beta double precision, voc_size integer, topic_num integer, iter_num integer) RETURNS integer[]
+CREATE FUNCTION __lda_gibbs_sample(words integer[], counts integer[], doc_topic integer[], model bigint[], alpha double precision, beta double precision, voc_size integer, topic_num integer, iter_num integer) RETURNS integer[]
     AS '$libdir/libmadlib.so', 'lda_gibbs_sample'
     LANGUAGE c;
+
+
+
+CREATE FUNCTION __lda_perplexity_ffunc(state bigint[]) RETURNS double precision
+    AS '$libdir/libmadlib.so', 'lda_perplexity_ffunc'
+    LANGUAGE c IMMUTABLE STRICT;
+
+
+
+CREATE FUNCTION __lda_perplexity_prefunc(state1 bigint[], state2 bigint[]) RETURNS bigint[]
+    AS '$libdir/libmadlib.so', 'lda_perplexity_prefunc'
+    LANGUAGE c IMMUTABLE STRICT;
+
+
+
+CREATE FUNCTION __lda_perplexity_sfunc(state bigint[], words integer[], counts integer[], doc_topic integer[], model bigint[], alpha double precision, beta double precision, voc_size integer, topic_num integer) RETURNS bigint[]
+    AS '$libdir/libmadlib.so', 'lda_perplexity_sfunc'
+    LANGUAGE c IMMUTABLE;
+
+
+
+CREATE FUNCTION lda_get_perplexity(model_table text, output_data_table text) RETURNS double precision
+    AS $$
+    
+    import sys
+    from inspect import getframeinfo, currentframe
+    try:
+        from lda import lda
+    except:
+        sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
+        from lda import lda
+    
+    # Retrieve the schema name of the current function
+    # Make it available as variable: schema_madlib
+    fname = getframeinfo(currentframe()).function
+    foid  = fname.rsplit('_',1)[1]
+
+    # plpython names its functions "__plpython_procedure_<function name>_<oid>",
+    # of which we want the oid
+    rv = plpy.execute('SELECT nspname, proname FROM pg_proc p ' \
+         'JOIN pg_namespace n ON (p.pronamespace = n.oid) ' \
+         'WHERE p.oid = %s' % foid, 1)
+
+    global schema_madlib
+    schema_madlib = rv[0]['nspname']    
+
+    return lda.get_perplexity(
+        schema_madlib, model_table, output_data_table)
+$$
+    LANGUAGE plpythonu STRICT;
+
+
+
+CREATE AGGREGATE __lda_perplexity_agg(integer[], integer[], integer[], bigint[], double precision, double precision, integer, integer) (
+    SFUNC = __lda_perplexity_sfunc,
+    STYPE = bigint[],
+    PREFUNC = __lda_perplexity_prefunc,
+    FINALFUNC = __lda_perplexity_ffunc
+);
 
 
 
@@ -505,13 +564,13 @@ $$
 
 
 
-CREATE FUNCTION __lda_util_transpose(matrix integer[]) RETURNS integer[]
+CREATE FUNCTION __lda_util_transpose(matrix bigint[]) RETURNS bigint[]
     AS '$libdir/libmadlib.so', 'lda_transpose'
     LANGUAGE c IMMUTABLE STRICT;
 
 
 
-CREATE FUNCTION __lda_util_unnest(arr integer[]) RETURNS SETOF integer[]
+CREATE FUNCTION __lda_util_unnest(arr bigint[]) RETURNS SETOF bigint[]
     AS '$libdir/libmadlib.so', 'lda_unnest'
     LANGUAGE c IMMUTABLE STRICT;
 
@@ -2920,7 +2979,7 @@ CREATE FUNCTION wsr_test_transition(state double precision[], value double preci
 
 CREATE AGGREGATE __lda_count_topic_agg(integer[], integer[], integer[], integer, integer) (
     SFUNC = __lda_count_topic_sfunc,
-    STYPE = integer[],
+    STYPE = bigint[],
     PREFUNC = __lda_count_topic_prefunc
 );
 

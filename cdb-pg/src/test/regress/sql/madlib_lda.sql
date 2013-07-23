@@ -68,6 +68,8 @@ SELECT MADLib.lda_predict(
     'lda_model', 
     'lda_pred');
 
+SELECT (lda_get_perplexity('lda_model', 'lda_pred') - 18.6155002539)^2 < 1;
+
 SELECT MADLib.lda_get_topic_desc(
     'lda_model', 
     'lda_vocab', 
