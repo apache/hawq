@@ -738,7 +738,7 @@ CHK_DFS_NAME () {
 # HAWQ needs dfs url.
 CHK_DFS_URL () {
 	LOG_MSG "[INFO]:-Start Function $FUNCNAME"
-    LOG_MSG "[INFO]:-Checking DFS url" 1
+    LOG_MSG "[INFO]:-Checking DFS url"
 	
 	if [ x"" == x"$DFS_URL" ]; then
 		ERROR_EXIT "[FATAL]:-Issue with DFS_URL: not set" 2
@@ -756,7 +756,7 @@ CHK_DFS_URL () {
 	DFS_URL="$DFS_URL"/hawq_data
 	export DFS_URL
 
-	LOG_MSG "[INFO]:-End Function $FUNCNAME" 1
+	LOG_MSG "[INFO]:-End Function $FUNCNAME"
 }
 
 # HAWQ supports multiple disks for pg_temp.
@@ -1502,7 +1502,6 @@ CREATE_QES_PRIMARY () {
 
             # create temp directory with SEG_PREFIX.
             TEMP_DIRECTORY_COMPACT_LIST=(`$ECHO ${TEMP_DIRECTORY_LIST[@]} | $TR ' ' ','`)
-            LOG_MSG "TEMP_DIRECTORY_COMPACT_LIST: $TEMP_DIRECTORY_COMPACT_LIST" 1
 
 			$GPCREATESEG $FLAG $$ 1 $I IS_PRIMARY "$TEMP_DIRECTORY_COMPACT_LIST" $SEG_PREFIX $HAS_MIRRORS_OPTION $INST_COUNT  $LOG_FILE \
 `$ECHO ${MASTER_IP_ADDRESS[@]}|$TR ' ' '~'` \
