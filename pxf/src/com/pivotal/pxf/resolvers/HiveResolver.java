@@ -2,6 +2,7 @@ package com.pivotal.pxf.resolvers;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.LinkedList;
@@ -11,8 +12,9 @@ import java.util.Properties;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.common.JavaUtils;
-import org.apache.hadoop.hive.serde.Constants;
-import org.apache.hadoop.hive.serde2.Deserializer;
+import org.apache.hadoop.hive.common.type.HiveDecimal;
+import org.apache.hadoop.hive.serde.serdeConstants;
+import org.apache.hadoop.hive.serde2.*;
 import org.apache.hadoop.hive.serde2.objectinspector.*;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.*;
 import org.apache.hadoop.io.BytesWritable;
@@ -32,10 +34,18 @@ import com.pivotal.pxf.utilities.RecordkeyAdapter;
  * using Hadoop's Hive serialization framework. HiveResolver implements
  * Resolver abstract class exposing one method: GetFields
  */
+/*
+TODO - remove SupressWarning once Hive resolves the problem described below
+This line and the change of the deserialiazer member to Object instead of the original Deserializer...., All this changes stem from the same issue. 
+In 0.11.0 The API changed and all Serde types extend a new interface - AbstractSerde. 
+But this change was not adopted by the OrcSerde (which was also introduced in Hive 0.11.0). 
+In order to cope with this inconsistency... this bit of juggling has been necessary.
+*/
+@SuppressWarnings("deprecation")
 public class HiveResolver extends Resolver
 {
 	private RecordkeyAdapter recordkeyAdapter = new RecordkeyAdapter();
-	private Deserializer deserializer;
+	private Object deserializer;
 	private Properties serdeProperties;
 	private List<OneField> partitionFields;
 	private String inputFormatName;
@@ -81,8 +91,8 @@ public class HiveResolver extends Resolver
 	{
 		List<OneField> record =  new LinkedList<OneField>();
 		
-		Object tuple = deserializer.deserialize((Writable)onerow.getData());
-		ObjectInspector oi = deserializer.getObjectInspector();
+		Object tuple = ((SerDe)deserializer).deserialize((Writable)onerow.getData());
+		ObjectInspector oi = ((SerDe)deserializer).getObjectInspector();
 		
 		traverseTuple(tuple, oi, record);
 		/* We follow Hive convention. Partition fields are always added at the end of the record*/
@@ -97,11 +107,11 @@ public class HiveResolver extends Resolver
 	private void InitSerde() throws Exception
 	{
 		Class<?> c = Class.forName(serdeName, true, JavaUtils.getClassLoader());
-		deserializer = (Deserializer)c.newInstance();
+		deserializer = (SerDe)c.newInstance();
 		serdeProperties = new Properties();
 		ByteArrayInputStream inStream = new ByteArrayInputStream(propsString.getBytes());
 		serdeProperties.load(inStream);	
-		deserializer.initialize(new JobConf(new Configuration(), HiveResolver.class), serdeProperties);
+		((SerDe)deserializer).initialize(new JobConf(new Configuration(), HiveResolver.class), serdeProperties);
 	}
 	
 	/*
@@ -122,20 +132,22 @@ public class HiveResolver extends Resolver
 			String type = levelKey[1];
 			String val = levelKey[2];
 			
-			if (type.compareTo(Constants.STRING_TYPE_NAME) == 0)
+			if (type.compareTo(serdeConstants.STRING_TYPE_NAME) == 0)
 				addOneFieldToRecord(partitionFields, GPDBWritable.TEXT, val);
-			else if (type.compareTo(Constants.SMALLINT_TYPE_NAME) == 0)
+			else if (type.compareTo(serdeConstants.SMALLINT_TYPE_NAME) == 0)
 				addOneFieldToRecord(partitionFields, GPDBWritable.SMALLINT, Short.parseShort(val));
-			else if (type.compareTo(Constants.INT_TYPE_NAME) == 0)
+			else if (type.compareTo(serdeConstants.INT_TYPE_NAME) == 0)
 				addOneFieldToRecord(partitionFields, GPDBWritable.INTEGER, Integer.parseInt(val));
-			else if (type.compareTo(Constants.BIGINT_TYPE_NAME) == 0)
+			else if (type.compareTo(serdeConstants.BIGINT_TYPE_NAME) == 0)
 				addOneFieldToRecord(partitionFields, GPDBWritable.BIGINT, Long.parseLong(val));
-			else if (type.compareTo(Constants.FLOAT_TYPE_NAME) == 0)
+			else if (type.compareTo(serdeConstants.FLOAT_TYPE_NAME) == 0)
 				addOneFieldToRecord(partitionFields, GPDBWritable.REAL, Float.parseFloat(val));
-			else if (type.compareTo(Constants.DOUBLE_TYPE_NAME) == 0)
+			else if (type.compareTo(serdeConstants.DOUBLE_TYPE_NAME) == 0)
 				addOneFieldToRecord(partitionFields, GPDBWritable.FLOAT8, Double.parseDouble(val));
-			else if (type.compareTo(Constants.TIMESTAMP_TYPE_NAME) == 0)
+			else if (type.compareTo(serdeConstants.TIMESTAMP_TYPE_NAME) == 0)
 				addOneFieldToRecord(partitionFields, GPDBWritable.TIMESTAMP, Timestamp.valueOf(val));
+			else if (type.compareTo(serdeConstants.DECIMAL_TYPE_NAME) == 0)
+				addOneFieldToRecord(partitionFields, GPDBWritable.NUMERIC, new HiveDecimal(val).bigDecimalValue().toString());
 			else 
 				throw new RuntimeException("Unknown type: " + type);
 		}		
@@ -250,12 +262,16 @@ public class HiveResolver extends Resolver
 				addOneFieldToRecord(record, GPDBWritable.FLOAT8, d);
 				break;
 			}
+			case DECIMAL: {
+				BigDecimal bd = ((HiveDecimalObjectInspector) oi).getPrimitiveJavaObject(o).bigDecimalValue();
+				addOneFieldToRecord(record, GPDBWritable.NUMERIC, bd.toString());
+				break;
+			}
 			case STRING: {
 				String s = ((StringObjectInspector) oi).getPrimitiveJavaObject(o);
 				addOneFieldToRecord(record, GPDBWritable.TEXT, s);
 				break;
 			}
-				
 			case BINARY: {
 				BytesWritable bw = ((BinaryObjectInspector) oi).getPrimitiveWritableObject(o);
 				byte[] toEncode = new byte[bw.getLength()];
