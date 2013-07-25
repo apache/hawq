@@ -31,9 +31,11 @@ COPY (SELECT c, d FROM x ORDER BY c) TO stdout;
  * FAULT TOLENRANCE TEST
  */
 SET gp_test_failed_segmentid_number = 1;
+SELECT * FROM x; -- trigger failover
 
 -- SEGMENT ID 1 FAILED
 SET gp_test_failed_segmentid_start = 1;
+SELECT * FROM x; -- trigger failover
 SELECT COUNT(DISTINCT gp_segment_id) > 0 AS has_segment_id_1 FROM x WHERE gp_segment_id = 1; -- must be true
 INSERT INTO x VALUES(100, 'insert when segment id 1 failed');
 COPY x FROM stdin DELIMITER ',';
@@ -47,6 +49,7 @@ COPY (SELECT c, d FROM x WHERE c BETWEEN 100 AND 200 ORDER BY c) TO stdout; -- e
 
 -- SEGMENT ID 0 FAILED
 SET gp_test_failed_segmentid_start = 0;
+SELECT * FROM x; -- trigger failover
 SELECT COUNT(DISTINCT gp_segment_id) > 0 AS has_segment_id_0 FROM x WHERE gp_segment_id = 0; -- must be true
 INSERT INTO x VALUES(200, 'insert when segment id 0 failed');
 COPY x FROM stdin DELIMITER ',';
@@ -63,6 +66,7 @@ COPY (SELECT c, d FROM x WHERE c BETWEEN 200 AND 300 ORDER BY c) TO stdout; -- e
  * ALL SEGMENTS RECOVERYED
  */
 SET gp_test_failed_segmentid_number = 0;
+SELECT * FROM x; -- trigger failover
 
 -- All data should be returned
 SELECT c, d FROM x;
@@ -101,6 +105,8 @@ SELECT * FROM y;
 --
 -- end_matchsubs
 SET gp_test_failed_segmentid_number = 1;
+SELECT * FROM x; -- trigger failover
 SET gp_test_failed_segmentid_start = 1;
+SELECT * FROM x; -- trigger failover
 
 SELECT * FROM y;

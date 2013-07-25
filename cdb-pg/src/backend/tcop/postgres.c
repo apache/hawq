@@ -233,6 +233,7 @@ static void log_disconnections(int code, Datum arg);
 static bool CheckDebugDtmActionSqlCommandTag(const char *sqlCommandTag);
 static bool CheckDebugDtmActionProtocol(DtxProtocolCommand dtxProtocolCommand);
 static bool renice_current_process(int nice_level);
+static void UpdateAliveSegmentsAndGangs(void);
 
 /*
  * Change the priority of the current process to the specified level
@@ -1654,6 +1655,12 @@ exec_simple_query(const char *query_string, const char *seqServerHost, int seqSe
 		/* Make sure we are in a transaction command */
 		start_xact_command();
 
+		/*
+		 * In the transaction start, we get the segment alive information.
+		 * If the segment alive information changes, all of gangs must be released.
+		 */
+		UpdateAliveSegmentsAndGangs();
+		
 		/* If we got a cancel signal in parsing or prior command, quit */
 		CHECK_FOR_INTERRUPTS();
 		
@@ -1675,13 +1682,6 @@ exec_simple_query(const char *query_string, const char *seqServerHost, int seqSe
 		oldcontext = MemoryContextSwitchTo(MessageContext);
 
 		InitOidInMemHeapMapping(10, MessageContext);
-
-		/*
-		 * In the transaction start, we get the segment alive information.
-		 * If the segment alive information changes, all of gangs must be released.
-		 */
-		if (Gp_role == GP_ROLE_DISPATCH)
-			UpdateAliveSegmentsInfo();
 
 		querytree_list = pg_analyze_and_rewrite(parsetree, query_string,
 												NULL, 0);
@@ -1776,23 +1776,6 @@ exec_simple_query(const char *query_string, const char *seqServerHost, int seqSe
 		CleanupOidInMemHeapMapping();
 
 		PortalDrop(portal, false);
-
-		/*
-		 * We can release the gangs only not in the transaction. This is beacuse
-		 * that some gangs might be allocated to the portals. And cannot be released.
-		 *
-		 * TODO: The holdable cursor needs more changes!
-		 */
-		if (GpAliveSegmentsInfo.cleanGangs)
-		{
-			GpAliveSegmentsInfo.cleanGangs = false;
-			/* If segment */
-			if (gangsExist())
-			{
-				disconnectAndDestroyAllGangs();
-				elog(ERROR, "segment alive information changed, cleanup the gangs.");
-			}
-		}
 
 		if (IsA(parsetree, TransactionStmt))
 		{
@@ -1928,6 +1911,12 @@ exec_parse_message(const char *query_string,	/* string to execute */
 	 */
 	start_xact_command();
 
+	/*
+	 * In the transaction start, we get the segment alive information.
+	 * If the segment alive information changes, all of gangs must be released.
+	 */
+	UpdateAliveSegmentsAndGangs();
+	
 	/*
 	 * Switch to appropriate context for constructing parsetrees.
 	 *
@@ -2234,6 +2223,12 @@ exec_bind_message(StringInfo input_message)
 	 */
 	start_xact_command();
 
+	/*
+	 * In the transaction start, we get the segment alive information.
+	 * If the segment alive information changes, all of gangs must be released.
+	 */
+	UpdateAliveSegmentsInfo();
+	
 	/* Switch back to message context */
 	MemoryContextSwitchTo(MessageContext);
 
@@ -2663,6 +2658,12 @@ exec_execute_message(const char *portal_name, int64 max_rows)
 	 * case already due to prior BIND).
 	 */
 	start_xact_command();
+
+	/*
+	 * In the transaction start, we get the segment alive information.
+	 * If the segment alive information changes, all of gangs must be released.
+	 */
+	UpdateAliveSegmentsInfo();
 
 	/*
 	 * If we re-issue an Execute protocol request against an existing portal,
@@ -4670,7 +4671,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 			continue;
 		
 		elog((Debug_print_full_dtm ? LOG : DEBUG5), "First char: '%c'; gp_role = '%s'.",firstchar,role_to_string(Gp_role));
-		
+
 		switch (firstchar)
 		{
 			case 'Q':			/* simple query */
@@ -6197,3 +6198,35 @@ SyncAgentMain(int argc, char *argv[], const char *username)
 
 	return 1;					/* keep compiler quiet */
 }
+
+static void
+UpdateAliveSegmentsAndGangs(void)
+{
+	if (Gp_role != GP_ROLE_DISPATCH)
+		return;
+
+	/*
+	 * We can release the gangs only not in the transaction. This is beacuse
+	 * that some gangs might be allocated to the portals. And cannot be released.
+	 *
+	 * We have to in a valid transaction, temp namespace needs to access the
+	 * catalog.
+	 *
+	 * We have to elog(ERROR) here, the codes will set NeedResetSession to true,
+	 * CheckForResetSession() will assert !gangExist().
+	 *
+	 * TODO: The holdable cursor needs more changes!
+	 */
+	if (GpAliveSegmentsInfo.cleanGangs)
+	{
+		GpAliveSegmentsInfo.cleanGangs = false;
+		if (gangsExist())
+		{
+			disconnectAndDestroyAllGangs();
+			elog(ERROR, "segment alive information changed, cleanup the gangs.");
+		}
+	}
+
+	UpdateAliveSegmentsInfo();
+}
+
