@@ -67,6 +67,7 @@ static int64 DoPortalRunFetch(Portal portal,
 				 int64 count,
 				 DestReceiver *dest);
 static void DoPortalRewind(Portal portal);
+static int PortalSetBackoffWeight(Portal portal);
 
 
 /*
@@ -741,6 +742,9 @@ PortalStart(Portal portal, ParamListInfo params, Snapshot snapshot,
 		 */
 		portal->strategy = ChoosePortalStrategy(portal->stmts);
 
+		/* Initialize the backoff weight for this backend */
+		int backoff_weight = PortalSetBackoffWeight(portal);
+
 		/*
 		 * Fire her up according to the strategy
 		 */
@@ -795,15 +799,7 @@ PortalStart(Portal portal, ParamListInfo params, Snapshot snapshot,
 					Gp_role == GP_ROLE_DISPATCH  &&
 					gp_session_id > -1)
 				{
-					if (superuser())
-					{
-						queryDesc->plannedstmt->backoff_weight = BackoffSuperuserStatementWeight();
-
-					} else
-					{
-						queryDesc->plannedstmt->backoff_weight = ResourceQueueGetPriorityWeight(portal->queueId);
-					}
-					BackoffBackendEntryInit(gp_session_id, gp_command_count, queryDesc->plannedstmt->backoff_weight);
+					queryDesc->plannedstmt->backoff_weight = backoff_weight;
 				}
 
 				/*
@@ -2056,4 +2052,35 @@ DoPortalRewind(Portal portal)
 	portal->atEnd = false;
 	portal->portalPos = 0;
 	portal->posOverflow = false;
+}
+
+/*
+ * Computes the backoff weight (for query prioritization) for this backend,
+ * and initializes the corresponding BackoffBackendEntry.
+ *
+ * Returns the backoff_weight of this backend.
+ */
+static int
+PortalSetBackoffWeight(Portal portal)
+{
+	int weight = BackoffDefaultWeight();
+
+	if (gp_enable_resqueue_priority &&
+		Gp_role == GP_ROLE_DISPATCH  &&
+		gp_session_id > -1)
+	{
+		if (superuser())
+		{
+			weight = BackoffSuperuserStatementWeight();
+
+		} else
+		{
+			weight = ResourceQueueGetPriorityWeight(portal->queueId);
+		}
+
+		/* Initialize the SHM backend entry with the computed backoff weight */
+		BackoffBackendEntryInit(gp_session_id, gp_command_count, weight);
+	}
+
+	return weight;
 }
