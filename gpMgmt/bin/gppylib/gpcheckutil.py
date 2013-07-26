@@ -16,11 +16,6 @@ def hosttype_str(type):
     else:
         return "Undetected Platform"
 
-class sysctl:
-    def __init__(self):
-        self.variables = dict() # dictionary of values
-        self.errormsg = None
-
 class omreport:
     def __init__(self):
         self.biossetup = dict()     # key value pairs
@@ -33,7 +28,7 @@ class omreport:
         self.remoteaccess_errormsg = None
 
         self.vdisks = list()        # list of dicts, 1 for each virtual disk
-        self.vdisks_errormsg = None 
+        self.vdisks_errormsg = None
 
         self.controller = dict()    # key value pairs
         self.controller_errormsg = None
@@ -72,14 +67,6 @@ class inittab:
     def __str__(self):
         return "s1_declaration(%s) default_run_level(%s)" % (self.s1, self.defaultRunLevel)
 
-class uname:
-    def __init__(self):
-        self.output = None
-        self.errormsg = None
-
-    def __str__(self):
-        return self.output
-
 class connectemc:
     def __init__(self):
         self.output = None
@@ -91,7 +78,7 @@ class connectemc:
 class securetty:
     def __init__(self):
         self.errormsg = None
-        self.data = set() 
+        self.data = set()
 
 class bcu:
     def __init__(self):
@@ -102,22 +89,91 @@ class bcu:
     def __str__(self):
         return "firmware_version=%s|biosversion=%s" % (self.firmware, self.biosversion)
 
-class ioschedulers:
+class uname:
     def __init__(self):
-        self.devices = dict() # key is device name value is scheduler name
-        self.errormsg = ''
-
-class blockdev:
-    def __init__(self):
-        self.ra = dict() # key is device name value is getra value
-        self.errormsg = ''
-
-class rclocal:
-    def __init__(self):
-        self.isexecutable = False # check that /etc/rc.d/rc.local is executable permissions
+        self.output = None
+        self.errormsg = None
 
     def __str__(self):
-        return "executable(%s)" % self.isexecutable
+        if self.errormsg:
+            return "============= UNAME ERROR ===================\n" + self.errormsg
+        else:
+            return "============= UNAME =========================\n" + self.output
+
+
+# record machine CPU and memory info
+class machine:
+    def __init__(self):
+        self.total_cpucores = None
+        self.memory_in_MB = None
+        self.errormsg = None
+
+    def __str__(self):
+        if self.errormsg:
+            return "============= CPU / Memory Info ERROR =======\n" + self.errormsg
+        else:
+            output = "Total CPU cores: %s, Memory: %s MB" % (self.total_cpucores, self.memory_in_MB)
+            return "============= CPU / Memory Info =============\n" + output
+
+
+class hdfs:
+    def __init__(self):
+        self.max_heap_size = 0
+        self.namenode_heap_size = 0
+        self.datanode_heap_size = 0
+        self.site_config = dict()
+        self.errormsg = None
+
+    def __str__(self):
+        if self.errormsg:
+            return "============= HDFS ERROR ====================\n" + self.errormsg
+        else:
+            output  = "max heap size: %sM\n" % self.max_heap_size
+            output  = "namenode heap size: %sM\n" % self.namenode_heap_size
+            output  = "datanode heap size: %sM\n" % self.datanode_heap_size
+            output += "\n".join(["%s = %s" % (k, self.site_config[k]) for k in sorted(self.site_config.iterkeys())])
+            return "============= HDFS ==========================\n" + output
+
+
+class diskusage_entry:
+    def __init__(self, fs, size, used, avail, used_percent, mount):
+        self.fs = fs
+        self.size = size
+        self.used = used
+        self.avail = avail
+        self.used_percent = used_percent
+        self.mount = mount
+
+    def __str__(self):
+        return "%-40s %8s %8s %8s %8s %-20s" % (self.fs, self.size, self.used, self.avail, self.used_percent, self.mount)
+
+
+class diskusage:
+    def __init__(self):
+        self.lines = []
+        self.errormsg = None
+
+    def __str__(self):
+        if self.errormsg:
+            return "============= DISK USAGE ERROR ==============\n" + self.errormsg
+        else:
+            output = "%-40s %8s %8s %8s %8s %-20s\n" % ("Filesystem", "Size", "Used", "Avail", "Use%", "Mounted on")
+            output += "\n".join(str(ln) for ln in self.lines)
+            return "============= DISK USAGE ====================\n" + output
+
+
+class sysctl:
+    def __init__(self):
+        self.variables = dict() # option name => option value
+        self.errormsg = None
+
+    def __str__(self):
+        if self.errormsg:
+            return "============= SYSCTL ERROR ==================\n" + self.errormsg
+        else:
+            output = '\n'.join('%s = %s' % (k, self.variables[k]) for k in sorted(self.variables.iterkeys()))
+            return "============= SYSCTL ========================\n" + output
+
 
 class limitsconf_entry:
     def __init__(self, domain, type, item, value):
@@ -129,16 +185,32 @@ class limitsconf_entry:
     def __str__(self):
         return "%s %s %s %s" % (self.domain, self.type, self.item, self.value)
 
+
 class limitsconf:
     def __init__(self):
-        self.lines = list() 
+        self.lines = list()
         self.errormsg = None
 
     def __str__(self):
-        output = ""
-        for line in self.lines:
-            output = "%s\n%s" % (output, line)
-        return output
+        if self.errormsg:
+            return "============= LIMITS ERROR ==================\n" + self.errormsg
+        else:
+            output = "\n".join(str(ln) for ln in self.lines)
+            return "============= LIMITS ========================\n" + output
+
+
+class mounts:
+    def __init__(self):
+        self.entries = dict() # partition => mount object
+        self.errormsg = None
+
+    def __str__(self):
+        if self.errormsg:
+            return "============= MOUNT ERROR ===================\n" + self.errormsg
+        else:
+            output = "\n".join(str(self.entries[k]) for k in sorted(self.entries.keys()))
+            return "============= MOUNT =========================\n" + output
+
 
 class GpMount:
     def __init__(self):
@@ -148,18 +220,34 @@ class GpMount:
         self.options = set() # mount options
 
     def __str__(self):
-        optionstring = ''
-        first = True
-        for k in self.options:
+        return "%s on %s type %s (%s)" % (self.partition, self.dir, self.type, ",".join(self.options))
 
-            if not first:
-                optionstring = "%s," % optionstring
 
-            thisoption = k
-            optionstring = "%s%s" % (optionstring, thisoption)
-            first = False
+class ioschedulers:
+    def __init__(self):
+        self.devices = dict() # device name => scheduler name
+        self.errormsg = None
 
-        return "%s on %s type %s (%s)" % (self.partition, self.dir, self.type, optionstring)
+    def __str__(self):
+        if self.errormsg:
+            return "============= IO SCHEDULERS ERROR ===========\n" + self.errormsg
+        else:
+            output = "\n".join("%s: %s" % (k, v) for (k, v) in self.devices.items())
+            return "============= IO SCHEDULERS =================\n" + output
+
+
+class blockdev:
+    def __init__(self):
+        self.ra = dict() # device name => getra value
+        self.errormsg = None
+
+    def __str__(self):
+        if self.errormsg:
+            return "============= BLOCKDEV RA ERROR =============\n" + self.errormsg
+        else:
+            output = "\n".join("%s: %s" % (k, v) for (k, v) in self.ra.items())
+            return "============= BLOCKDEV RA ===================\n" + output
+
 
 class ntp:
     def __init__(self):
@@ -169,21 +257,19 @@ class ntp:
         self.errormsg = None
 
     def __str__(self):
-        return "(running %s) (time %f) (peers: %s)" % (self.running, self.currenttime, self.hosts)
+        if self.errormsg:
+            return "============= NTPD ERROR =====================\n" + self.errormsg
+        else:
+            output = "(running %s) (time %f) (peers: %s)" % (self.running, self.currenttime, self.hosts)
+            return "============= NTPD ==========================\n" + output
 
-                
- 
-class mounts:
 
+class rclocal:
     def __init__(self):
-        self.entries = dict() # dictionary key=partition value=mount object
-        self.errormsg = None
+        self.isexecutable = False # check that /etc/rc.d/rc.local is executable permissions
 
     def __str__(self):
-        output = ''
-        for k in self.entries.keys():
-            output = "%s\n%s" % (output, self.entries[k].__str__())
-        return output
+        return "executable(%s)" % self.isexecutable
 
 class solaris_etc_system:
     def __init__(self):
@@ -231,45 +317,22 @@ class GenericSolarisOutputData:
 
 class GenericLinuxOutputData:
     def __init__(self):
-        self.mounts = None
         self.uname = None
-        self.blockdev = None
-        self.ioschedulers = None
+        self.machine = None
+        self.hdfs = None
+        self.diskusage = None
         self.sysctl = None
         self.limitsconf = None
+        self.mounts = None
+        self.ioschedulers = None
+        self.blockdev = None
         self.ntp = None
 
     def __str__(self):
-
-        grc = "============= SYSCTL=========================\n"
-        gre = "============= SYSCTL ERRORMSG================\n"
-        output = "%s%s\n%s%s" % (grc, self.sysctl.variables.__str__(), gre, self.sysctl.errormsg)
-
-        grc = "============= LIMITS=========================\n"
-        gre = "============= LIMITS ERRORMSG================\n"
-        output = "%s\n%s%s\n%s%s" % (output, grc, self.limitsconf.__str__(), gre, self.limitsconf.errormsg)
-
-        mnt = "============= MOUNT==========================\n"
-        mte = "============= MOUNT ERRORMSG=================\n"
-        output = "%s\n%s%s\n%s%s" % (output, mnt, self.mounts.__str__(), mte, self.mounts.errormsg)
-
-        grc = "============= UNAME==========================\n"
-        gre = "============= UNAME ERRORMSG=================\n"
-        output = "%s\n%s%s\n%s%s" % (output, grc, self.uname.__str__(), gre, self.uname.errormsg)
-
-        grc = "============= IO SCHEDULERS==================\n"
-        gre = "============= IO SCHEDULERS  ERRORMSG========\n"
-        output = "%s\n%s%s\n%s%s" % (output, grc, self.ioschedulers.devices.__str__(), gre, self.ioschedulers.errormsg)
-
-        grc = "============= BLOCKDEV RA ====================\n"
-        gre = "============= BLOCKDEV RA ERRORMSG============\n"
-        output = "%s\n%s%s\n%s%s" % (output, grc, self.blockdev.ra.__str__(), gre, self.blockdev.errormsg)
-
-        grc = "============= NTPD ===========================\n"
-        gre = "============= NTPD ERRORMSG===================\n"
-        output = "%s\n%s%s\n%s%s" % (output, grc, self.ntp.__str__(), gre, self.ntp.errormsg)
-
-        return output
+        applied_checks = filter(lambda x: x is not None,
+                                [ self.uname, self.machine, self.hdfs, self.diskusage, self.sysctl,
+                                  self.limitsconf, self.mounts, self.ioschedulers, self.blockdev, self.ntp ])
+        return "\n".join(map(str, applied_checks))
 
 
 class ApplianceOutputData:

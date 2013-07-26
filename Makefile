@@ -1024,6 +1024,7 @@ SET_VERSION_SCRIPTS = \
 	bin/gpactivatestandby \
 	bin/gpaddmirrors \
 	bin/gpbitmapreindex \
+	bin/gpcheck \
 	bin/gpcheckos \
 	bin/gpcheckperf \
 	bin/gpcrondump.py \
