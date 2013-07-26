@@ -88,6 +88,9 @@ class COptTasks
 			// is generating a plan object required ?
 			BOOL m_fGeneratePlStmt;
 
+			// is serializing a plan to DXL required ?
+			BOOL m_fSerializePlanDXL;
+
 			// did the optimizer fail unexpectedly?
 			BOOL m_fUnexpectedFailure;
 

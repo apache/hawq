@@ -47,6 +47,7 @@ struct CdbComponentDatabases;
 struct StringInfoData;
 typedef StringInfoData *StringInfo;
 struct LogicalIndexes;
+struct LogicalIndexInfo;
 struct ParseState;
 
 namespace gpdb {
@@ -449,6 +450,9 @@ namespace gpdb {
 	// return the logical indexes for a partitioned table
 	LogicalIndexes *Plgidx(Oid oid);
 	
+	// return the logical info structure for a given logical index oid
+	LogicalIndexInfo *Plgidxinfo(Oid rootOid, Oid indexOid);
+	
 	// return a list of index oids for a given relation
 	List *PlRelationIndexes(Relation relation);
 
@@ -480,6 +484,15 @@ namespace gpdb {
 	// check if the given uri is a HADOOP protocol - pxf
 	bool FPxfProtocol(Uri *pUri);
 
+	// calculate max_participants_allowed for pxf
+	int IMaxParticipantsPxf(int total_segments);
+
+	// generate the mapping of the Hadoop data fragments to the segments
+	char** RgszMapHdDataToSegments(char *uri, int total_segs, int working_segs, Relation relation);
+
+	// release the memory allocated for the mapping of the Hadoop data fragments to the segments
+	void FreeHdDataToSegmentsMapping(char **segs_work_map, int total_segs);
+
 	// returns ComponentDatabases
 	CdbComponentDatabases *PcdbComponentDatabases(void);
 
@@ -489,11 +502,20 @@ namespace gpdb {
 	// construct random segment map
 	bool *RgfRandomSegMap(int total_primaries, int total_to_skip);
 
+	// initialize a StringInfoData struct with data buffer of 'size' bytes
+	void InitStringInfoOfSize(StringInfo str, int bufsize);
+
 	// create an empty 'StringInfoData' & return a pointer to it
 	StringInfo SiMakeStringInfo(void);
 
 	// append the two given strings to the StringInfo object
 	void AppendStringInfo(StringInfo str, const char *str1, const char *str2);
+
+	// append a null-terminated string to str
+	void AppendStringInfoString(StringInfo str, const char *s);
+
+	// append a single character to str
+	void AppendStringInfoChar(StringInfo str, char c);
 
 	// look for the given node tags in the given tree and return the index of
 	// the first one found, or -1 if there are none

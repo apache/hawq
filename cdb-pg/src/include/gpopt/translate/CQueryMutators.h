@@ -172,9 +172,6 @@ namespace gpdxl
 				// the current query level
 				ULONG m_ulCurrLevelsUp;
 				
-				// the comparison operation used to compare query levels
-				BOOL m_fOnlyCurrentLevel;
-
 				// fix target list entry of the top level
 				BOOL m_fFixTargetListTopLevel;
 
@@ -182,12 +179,10 @@ namespace gpdxl
 				SContextIncLevelsupMutator
 					(
 					ULONG ulCurrLevelsUp,
-					BOOL fOnlyCurrentLevel,
 					BOOL fFixTargetListTopLevel
 					)
 					:
 					m_ulCurrLevelsUp(ulCurrLevelsUp),
-					m_fOnlyCurrentLevel(fOnlyCurrentLevel),
 					m_fFixTargetListTopLevel(fFixTargetListTopLevel)
 				{
 				}

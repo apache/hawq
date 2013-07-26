@@ -36,6 +36,7 @@ static int	ExecHashJoinNewBatch(HashJoinState *hjstate);
 static bool isNotDistinctJoin(List *qualList);
 
 static void ReleaseHashTable(HashJoinState *node);
+static bool isHashtableEmpty(HashJoinTable hashtable);
 
 /* ----------------------------------------------------------------
  *		ExecHashJoin
@@ -210,47 +211,33 @@ ExecHashJoin(HashJoinState *node)
 		}
 
 		/*
+		 * We just scanned the entire inner side and built the hashtable
+		 * (and its overflow batches). Check here and remember if the inner
+		 * side is empty.
+		 */
+		node->hj_InnerEmpty = isHashtableEmpty(hashtable);
+
+		/*
 		 * If the inner relation is completely empty, and we're not doing an
 		 * outer join, we can quit without scanning the outer relation.
 		 */
 		if (node->js.jointype != JOIN_LEFT
 				&& node->js.jointype != JOIN_LASJ
-				&& node->js.jointype != JOIN_LASJ_NOTIN)
+				&& node->js.jointype != JOIN_LASJ_NOTIN
+				&& node->hj_InnerEmpty)
         {
-            int         i;
-
-            /* Is there a nonempty batch? */
-            for (i = 0; i < hashtable->nbatch; i++)
-            {
-                /*
-                 * For batch 0, the number of inner tuples is stored in batches[i].innertuples.
-                 * For batches on disk (1 and above), the batches[i].innertuples is 0,
-                 * but batches[i].innerside.workfile is non-NULL if any tuples were written to disk.
-                 * Check both here.
-                 */
-                if ((hashtable->batches[i]->innertuples > 0) ||
-                        (NULL != hashtable->batches[i]->innerside.workfile))
-                {
-                    /* Found a non-empty batch, stop the search */
-                    break;
-                }
-            }
-
-		    if (i == hashtable->nbatch)
-		    {
-			    /*
-			     * CDB: We'll read no more from outer subtree. To keep sibling
-			     * QEs from being starved, tell source QEs not to clog up the
-			     * pipeline with our never-to-be-consumed data.
-			     */
-			    ExecSquelchNode(outerNode);
-				/* end of join */
-				if (gp_eager_hashtable_release)
-				{
-					ExecEagerFreeHashJoin(node);
-				}
-			    return NULL;
-		    }
+			/*
+			 * CDB: We'll read no more from outer subtree. To keep sibling
+			 * QEs from being starved, tell source QEs not to clog up the
+			 * pipeline with our never-to-be-consumed data.
+			 */
+			ExecSquelchNode(outerNode);
+			/* end of join */
+			if (gp_eager_hashtable_release)
+			{
+				ExecEagerFreeHashJoin(node);
+			}
+			return NULL;
         }
 
 		/*
@@ -332,6 +319,20 @@ ExecHashJoin(HashJoinState *node)
 		 */
 		for (;;)
 		{
+			/*
+			 * OPT-3325: Handle NULLs in the outer side of LASJ_NOTIN
+			 *  - if tuple is NULL and inner is not empty, drop outer tuple
+			 *  - if tuple is NULL and inner is empty, keep going as we'll
+			 *    find no match for this tuple in the inner side
+			 */
+			if (node->js.jointype == JOIN_LASJ_NOTIN &&
+					!node->hj_InnerEmpty &&
+					isJoinExprNull(node->hj_OuterHashKeys,econtext))
+			{
+				node->hj_MatchedOuter = true;
+				break;		/* loop around for a new outer tuple */
+			}
+
 			curtuple = ExecScanHashBucket(node, econtext);
 			if (curtuple == NULL)
 				break;			/* out of matches */
@@ -355,7 +356,7 @@ ExecHashJoin(HashJoinState *node)
 			 * Only the joinquals determine MatchedOuter status, but all quals
 			 * must pass to actually return the tuple.
 			 */
-			if (joinqual == NIL || ExecQual(joinqual, econtext, false))
+			if (joinqual == NIL || ExecQual(joinqual, econtext, false /* resultForNull */))
 			{
 				node->hj_MatchedOuter = true;
 
@@ -1193,3 +1194,39 @@ ExecEagerFreeHashJoin(HashJoinState *node)
 		ReleaseHashTable(node);
 	}
 }
+
+/*
+ * isHashtableEmpty
+ *
+ *  After populating the hashtable with all the tuples from the innerside,
+ *  scan all the batches and return true if the hashtable is completely empty
+ *
+ */
+static bool
+isHashtableEmpty(HashJoinTable hashtable)
+{
+    int         i;
+    bool isEmpty = true;
+
+    /* Is there a nonempty batch? */
+    for (i = 0; i < hashtable->nbatch; i++)
+    {
+        /*
+         * For batch 0, the number of inner tuples is stored in batches[i].innertuples.
+         * For batches on disk (1 and above), the batches[i].innertuples is 0,
+         * but batches[i].innerside.workfile is non-NULL if any tuples were written to disk.
+         * Check both here.
+         */
+        if ((hashtable->batches[i]->innertuples > 0) ||
+                (NULL != hashtable->batches[i]->innerside.workfile))
+        {
+            /* Found a non-empty batch, stop the search */
+        	isEmpty = false;
+            break;
+        }
+    }
+
+    return isEmpty;
+}
+
+/* EOF */

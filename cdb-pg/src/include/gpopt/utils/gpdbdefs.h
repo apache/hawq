@@ -55,6 +55,7 @@ extern "C" {
 #include "utils/uri.h"
 #include "access/relscan.h"
 #include "access/heapam.h"
+#include "access/hd_work_mgr.h"
 #include "catalog/pg_proc.h"
 #include "tcop/dest.h"
 #include "commands/trigger.h"

@@ -97,6 +97,9 @@ static bool collapseIndexes(PartitionIndexNode **partitionIndexNode,
 static void createIndexHashTables(void);
 static IndexInfo *populateIndexInfo(cqContext *pcqCtx, HeapTuple tuple,
 					Form_pg_index indForm);
+static Node *mergeIntervals(Node *intervalFst, Node *intervalSnd);
+static void extractStartEndRange(Node *clause, Node **ppnodeStart, Node **ppnodeEnd);
+static void extractOpExprComponents(OpExpr *opexpr, Var **ppvar, Const **ppconst, Oid *opno);
 
 /*
  * TODO: similar routines in cdbpartition.c. Move up to cdbpartition.h ?
@@ -860,7 +863,7 @@ get_relation_part_constraints(Oid rootOid, bool *fDefaultPartition)
 		}
 		else
 		{
-			allCons = (Node *) make_orclause(list_make2(allCons, partCons));
+			allCons = (Node *) mergeIntervals(allCons, partCons);
 		}
 	}
 
@@ -963,11 +966,13 @@ generateLogicalIndexPred(LogicalIndexes *li,
 	
 				/* OR them to current constraints */
 				if (li->logicalIndexInfo[*curIdx]->partCons)
-					li->logicalIndexInfo[*curIdx]->partCons = (Node *)
-					make_orclause(list_make2(li->logicalIndexInfo[*curIdx]->partCons,
-								conList));
+				{
+					li->logicalIndexInfo[*curIdx]->partCons = mergeIntervals(li->logicalIndexInfo[*curIdx]->partCons, conList);						
+				}
 				else
+				{
 					li->logicalIndexInfo[*curIdx]->partCons = conList;
+				}
 			}
 		}
 
@@ -1211,4 +1216,248 @@ dumpPartsIndexInfo(PartitionIndexNode *n, int level)
 			appendStringInfo(&logicalIndexes, "     ");
 		}
 	}
+}
+
+/*
+ * 	mergeIntervals
+ *   merge the two intervals by creating a disjunction of the given intervals, or collapsing
+ *   them into one interval when possible
+ *   
+ *   This function's arguments represent two range constraints, which the function attempts
+ *   to collapse into one if they share a common boundary. If no collapse is possible, 
+ *   the function returns a disjunction of the two intervals.
+ */
+static Node *
+mergeIntervals(Node *intervalFst, Node *intervalSnd)
+{
+	Node *pnodeStart1 = NULL;
+	Node *pnodeEnd1 = NULL;
+	Node *pnodeStart2 = NULL;
+	Node *pnodeEnd2 = NULL;
+	
+	extractStartEndRange(intervalFst, &pnodeStart1, &pnodeEnd1);
+	extractStartEndRange(intervalSnd, &pnodeStart2, &pnodeEnd2);
+	
+	if (NULL != pnodeEnd1 && NULL != pnodeStart2)
+	{
+		OpExpr *opexprEnd1 = (OpExpr *) pnodeEnd1;
+		OpExpr *opexprStart2 = (OpExpr *) pnodeStart2;
+		Var *pvarEnd1 = NULL;
+		Var *pvarStart2 = NULL;
+		Const *pconstEnd1 = NULL;
+		Const *pconstStart2 = NULL;
+		Oid opnoEnd1 = InvalidOid;
+		Oid opnoStart2 = InvalidOid;
+		
+		/* extract boundaries of the two intervals */
+		extractOpExprComponents(opexprEnd1, &pvarEnd1, &pconstEnd1, &opnoEnd1);
+		extractOpExprComponents(opexprStart2, &pvarStart2, &pconstStart2, &opnoStart2);
+		if (InvalidOid != opnoEnd1 && InvalidOid != opnoStart2 && 
+			equal(pvarEnd1, pvarStart2) && equal(pconstEnd1, pconstStart2) && /* middle point is the same */
+			opnoEnd1 == get_negator(opnoStart2) /* this guaranteed that the middle point is included in exactly 1 of the intervals */
+			)
+		{
+			if (NULL != pnodeStart1 && NULL != pnodeEnd2)
+			{
+				/* merge intervals of the form (x,y), [y, z) into (x,z) */
+				return (Node *) make_andclause(list_make2(pnodeStart1, pnodeEnd2));
+			}
+			
+			if (NULL != pnodeStart1)
+			{
+				/* merge intervals of the form (x,y), [y, inf) into (x, inf) */
+				Var *pvarStart1 = NULL;
+				Const *pconstStart1 = NULL;
+				Oid opnoStart1 = InvalidOid;
+				OpExpr *opexprStart1 = (OpExpr *) pnodeStart1;
+				extractOpExprComponents(opexprStart1, &pvarStart1, &pconstStart1, &opnoStart1);
+				
+				return (Node *) make_opclause(opnoStart1, opexprStart1->opresulttype, opexprStart1->opretset, (Expr *) pvarStart1, (Expr *) pconstStart1);
+			}
+			
+			if (NULL != pnodeEnd2)
+			{
+				/* merge intervals of the form (-inf,x), [x, y) into (-inf, y) */
+				Var *pvarEnd2 = NULL;
+				Const *pconstEnd2 = NULL;
+				Oid opnoEnd2 = InvalidOid;
+				OpExpr *opexprEnd2 = (OpExpr *) pnodeEnd2;
+
+				extractOpExprComponents(opexprEnd2, &pvarEnd2, &pconstEnd2, &opnoEnd2);
+				
+				return (Node *) make_opclause(opnoEnd2, opexprEnd2->opresulttype, opexprEnd2->opretset, (Expr *) pvarEnd2, (Expr *) pconstEnd2);
+			}
+			
+			Assert(NULL == pnodeStart1 && NULL == pnodeEnd2);
+			
+			/* merge (-inf, x), [x,inf) into true */
+			
+			return (Node *) makeBoolConst(true /*value*/, false /*isnull*/);
+		}
+	}
+	return (Node *) make_orclause(list_make2(intervalFst, intervalSnd));
+}
+
+/*
+ * extractStartEndRange
+ *   Given an expression representing an interval constraint, extract the expressions defining the interval's start and end 
+ */
+static void extractStartEndRange(Node *clause, Node **ppnodeStart, Node **ppnodeEnd)
+{
+	if (IsA(clause, OpExpr))
+	{
+		OpExpr *opexpr = (OpExpr *) clause;
+		Expr *pexprLeft = list_nth(opexpr->args, 0);
+		Expr *pexprRight = list_nth(opexpr->args, 1);
+		CmpType cmptype = get_comparison_type(opexpr->opno, exprType((Node *) pexprLeft), exprType((Node *) pexprRight));
+
+		if (CmptEq == cmptype)
+		{
+			*ppnodeStart = *ppnodeEnd = clause;
+			return;
+		}
+		
+		if ((CmptLEq == cmptype || CmptLT == cmptype) && IsA(pexprRight, Const))
+		{
+			/* op expr of the form pk <= Const or pk < Const */
+			*ppnodeStart = NULL;
+			*ppnodeEnd = clause;
+			return;
+		}
+		
+		if ((CmptGEq == cmptype || CmptGT == cmptype) && IsA(pexprRight, Const))
+		{
+			/* op expr of the form pk >= Const or pk > Const */
+			*ppnodeEnd = NULL;
+			*ppnodeStart = clause;
+			return;
+		}
+	}
+	
+	/* only expressions of the form x > C1 and x < C2 supported: ignore all other expression types */
+
+	if (!IsA(clause, BoolExpr) || 
+			AND_EXPR != ((BoolExpr *) clause)->boolop || 
+			2 < list_length(((BoolExpr *) clause)->args))
+	{
+		return;
+	}
+	
+	BoolExpr *bool_expr = (BoolExpr *) clause;
+	
+	Node *nodeStart = list_nth(bool_expr->args, 0);
+	Node *nodeEnd = list_nth(bool_expr->args, 1);
+	
+	if (!IsA(nodeStart, OpExpr) || !IsA(nodeEnd, OpExpr))
+	{
+		return;
+	}
+	
+	OpExpr *opexprStart = (OpExpr *) nodeStart;
+	OpExpr *opexprEnd = (OpExpr *) nodeEnd;
+	
+	CmpType cmptLeft = get_comparison_type(opexprStart->opno, exprType(list_nth(opexprStart->args, 0)), exprType(list_nth(opexprStart->args, 1)));
+	CmpType cmptRight = get_comparison_type(opexprEnd->opno, exprType(list_nth(opexprEnd->args, 0)), exprType(list_nth(opexprEnd->args, 1)));
+	
+	if ((CmptGT != cmptLeft && CmptGEq != cmptLeft) || (CmptLT != cmptRight && CmptLEq != cmptRight))
+	{
+		return;
+	}
+	
+	*ppnodeStart = nodeStart;
+	*ppnodeEnd = nodeEnd;
+}
+
+/*
+ * extractOpExprComponents
+ *   for an opexpr of type Var op Const, extract its components
+ */
+static void extractOpExprComponents(OpExpr *opexpr, Var **ppvar, Const **ppconst, Oid *opno)
+{
+	Node *pnodeLeft = list_nth(opexpr->args, 0);
+	Node *pnodeRight = list_nth(opexpr->args, 1);
+	if (IsA(pnodeLeft, Var) && IsA(pnodeRight, Const))
+	{
+		*ppvar = (Var *) pnodeLeft;
+		*ppconst = (Const *) pnodeRight;
+		*opno = opexpr->opno;
+	}
+	else if (IsA(pnodeLeft, Const) && IsA(pnodeRight, Var) && InvalidOid != get_commutator(opexpr->opno))
+	{
+		*ppvar = (Var *) pnodeRight;
+		*ppconst = (Const *) pnodeLeft;
+		*opno = get_commutator(opexpr->opno);
+	}
+}
+
+
+/*
+ * LogicalIndexInfoForIndexOid
+ *   construct the logical index info for a given index oid
+ */
+LogicalIndexInfo *logicalIndexInfoForIndexOid(Oid rootOid, Oid indexOid)
+{
+	/* fetch index from catalog */
+	Relation indexRelation = heap_open(IndexRelationId, AccessShareLock);
+	
+	cqContext cqc;
+	cqContext *pcqCtx = caql_beginscan(
+			caql_addrel(cqclr(&cqc), indexRelation),
+			cql("SELECT * FROM pg_index "
+				" WHERE indexrelid = :1 ",
+				ObjectIdGetDatum(indexOid)));
+
+	HeapTuple tup = NULL;
+	
+	if (!HeapTupleIsValid(tup = caql_getnext(pcqCtx)))
+	{
+		caql_endscan(pcqCtx);
+		heap_close(indexRelation, AccessShareLock);
+		elog(ERROR, "Index not found: %u", indexOid);
+	}
+	
+	Form_pg_index indForm = (Form_pg_index) GETSTRUCT(tup);
+	IndexInfo *pindexInfo = populateIndexInfo(pcqCtx, tup, indForm);
+	Oid partOid = indForm->indrelid;
+	
+	caql_endscan(pcqCtx);
+	heap_close(indexRelation, AccessShareLock);
+
+	// remap attributes
+	Relation rootRel = heap_open(rootOid, AccessShareLock);
+	Relation partRel = heap_open(partOid, AccessShareLock);
+
+	TupleDesc rootTupDesc = rootRel->rd_att;
+	TupleDesc partTupDesc = partRel->rd_att;
+
+	AttrNumber	*attMap = varattnos_map(rootTupDesc, partTupDesc);
+	heap_close(rootRel, AccessShareLock);
+	heap_close(partRel, AccessShareLock);
+	
+	// populate the index information
+	LogicalIndexInfo *plogicalIndexInfo = (LogicalIndexInfo *) palloc0(sizeof(LogicalIndexInfo));
+	plogicalIndexInfo->nColumns = pindexInfo->ii_NumIndexAttrs;
+	plogicalIndexInfo->indIsUnique = pindexInfo->ii_Unique;
+	plogicalIndexInfo->logicalIndexOid = indexOid;
+	
+	int numIndexKeys = pindexInfo->ii_NumIndexAttrs;
+	plogicalIndexInfo->indexKeys = palloc(sizeof(AttrNumber) * numIndexKeys);
+	memcpy((char *)plogicalIndexInfo->indexKeys, &(pindexInfo->ii_KeyAttrNumbers), sizeof(AttrNumber) * numIndexKeys);
+
+	plogicalIndexInfo->indExprs = copyObject(pindexInfo->ii_Expressions);
+	plogicalIndexInfo->indPred = copyObject(pindexInfo->ii_Predicate);
+	
+	// remap expression fields
+	/* map the attrnos if necessary */
+	for (int i = 0; i < plogicalIndexInfo->nColumns; i++)
+	{
+		if (plogicalIndexInfo->indexKeys[i] != 0)
+		{
+			plogicalIndexInfo->indexKeys[i] = attMap[(plogicalIndexInfo->indexKeys[i]) - 1];
+		}
+	}
+	change_varattnos_of_a_node((Node *) plogicalIndexInfo->indExprs, attMap);
+	change_varattnos_of_a_node((Node *) plogicalIndexInfo->indPred, attMap);
+	
+	return plogicalIndexInfo;
 }

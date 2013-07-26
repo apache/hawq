@@ -1450,18 +1450,21 @@ CTranslatorUtils::PdrgpbsGroupBy
 	(
 	IMemoryPool *pmp,
 	List *plGroupClause,
-	ULONG ulCols
+	ULONG ulCols,
+	HMUlUl *phmululGrpColPos,	// mapping of grouping col positions to SortGroupRef ids
+	CBitSet *pbsGrpCols			// existing uniqueue grouping columns
 	)
 {
 	GPOS_ASSERT(NULL != plGroupClause);
 	GPOS_ASSERT(0 < gpdb::UlListLength(plGroupClause));
+	GPOS_ASSERT(NULL != phmululGrpColPos);
 
 	Node *pnode = (Node*) LInitial(plGroupClause);
 
 	if (NULL == pnode || IsA(pnode, GroupClause))
 	{
 		// simple group by
-		CBitSet *pbsGroupingSet = PbsGroupingSet(pmp, plGroupClause, ulCols);
+		CBitSet *pbsGroupingSet = PbsGroupingSet(pmp, plGroupClause, ulCols, phmululGrpColPos, pbsGrpCols);
 		DrgPbs *pdrgpbs = New(pmp) DrgPbs(pmp);
 		pdrgpbs->Append(pbsGroupingSet);
 		return pdrgpbs;
@@ -1482,7 +1485,7 @@ CTranslatorUtils::PdrgpbsGroupBy
 
 	if (GROUPINGTYPE_ROLLUP == pgrcl->groupType)
 	{
-		return PdrgpbsRollup(pmp, pgrcl, ulCols);
+		return PdrgpbsRollup(pmp, pgrcl, ulCols, phmululGrpColPos, pbsGrpCols);
 	}
 
 	if (GROUPINGTYPE_GROUPING_SETS != pgrcl->groupType)
@@ -1502,7 +1505,9 @@ CTranslatorUtils::PdrgpbsGroupBy
 		{
 			// grouping set contains a single grouping column
 			pbs = New(pmp) CBitSet(pmp, ulCols);
-			pbs->FExchangeSet(((GroupClause *) pnodeGroupingSet)->tleSortGroupRef);
+			ULONG ulSortGrpRef = ((GroupClause *) pnodeGroupingSet)->tleSortGroupRef;
+			pbs->FExchangeSet(ulSortGrpRef);
+			UpdateGrpColMapping(pmp, phmululGrpColPos, pbsGrpCols, ulSortGrpRef);
 		}
 		else if (IsA(pnodeGroupingSet, GroupingClause))
 		{
@@ -1514,7 +1519,7 @@ CTranslatorUtils::PdrgpbsGroupBy
 			GPOS_ASSERT(IsA(pnodeGroupingSet, List));
 
 			List *plGroupingSet = (List *) pnodeGroupingSet;
-			pbs = PbsGroupingSet(pmp, plGroupingSet, ulCols);
+			pbs = PbsGroupingSet(pmp, plGroupingSet, ulCols, phmululGrpColPos, pbsGrpCols);
 		}
 		pdrgpbs->Append(pbs);
 	}
@@ -1535,7 +1540,9 @@ CTranslatorUtils::PdrgpbsRollup
 	(
 	IMemoryPool *pmp,
 	GroupingClause *pgrcl,
-	ULONG ulCols
+	ULONG ulCols,
+	HMUlUl *phmululGrpColPos,	// mapping of grouping col positions to SortGroupRef ids,
+	CBitSet *pbsGrpCols			// existing grouping columns
 	)
 {
 	GPOS_ASSERT(NULL != pgrcl);
@@ -1550,8 +1557,10 @@ CTranslatorUtils::PdrgpbsRollup
 		{
 			// simple group clause, create a singleton grouping set
 			GroupClause *pgrpcl = (GroupClause *) pnode;
-			(void) pbs->FExchangeSet(pgrpcl->tleSortGroupRef);
+			ULONG ulSortGrpRef = pgrpcl->tleSortGroupRef;
+			(void) pbs->FExchangeSet(ulSortGrpRef);
 			pdrgpbsGroupingSets->Append(pbs);
+			UpdateGrpColMapping(pmp, phmululGrpColPos, pbsGrpCols, ulSortGrpRef);
 		}
 		else if (IsA(pnode, List))
 		{
@@ -1570,7 +1579,9 @@ CTranslatorUtils::PdrgpbsRollup
 				}
 
 				GroupClause *pgrpcl = (GroupClause *) pnodeGrpCl;
-				(void) pbs->FExchangeSet(pgrpcl->tleSortGroupRef);
+				ULONG ulSortGrpRef = pgrpcl->tleSortGroupRef;
+				(void) pbs->FExchangeSet(ulSortGrpRef);
+				UpdateGrpColMapping(pmp, phmululGrpColPos, pbsGrpCols, ulSortGrpRef);
 			}
 			pdrgpbsGroupingSets->Append(pbs);
 		}
@@ -1614,7 +1625,9 @@ CTranslatorUtils::PbsGroupingSet
 	(
 	IMemoryPool *pmp,
 	List *plGroupElems,
-	ULONG ulCols
+	ULONG ulCols,
+	HMUlUl *phmululGrpColPos,	// mapping of grouping col positions to SortGroupRef ids,
+	CBitSet *pbsGrpCols			// existing grouping columns
 	)
 {
 	GPOS_ASSERT(NULL != plGroupElems);
@@ -1637,9 +1650,12 @@ CTranslatorUtils::PbsGroupingSet
 			GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("Mixing grouping sets with simple group by lists"));
 		}
 
-		pbs->FExchangeSet(((GroupClause *) pnodeElem)->tleSortGroupRef);
+		ULONG ulSortGrpRef = ((GroupClause *) pnodeElem)->tleSortGroupRef;
+		pbs->FExchangeSet(ulSortGrpRef);
+		
+		UpdateGrpColMapping(pmp, phmululGrpColPos, pbsGrpCols, ulSortGrpRef);
 	}
-
+	
 	return pbs;
 }
 
@@ -2558,6 +2574,37 @@ CTranslatorUtils::CheckRTEPermissions
 	)
 {
 	gpdb::CheckRTPermissions(plRangeTable);
+}
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorUtils::UpdateGrpColMapping
+//
+//	@doc:
+//		Update grouping columns permission mappings
+//
+//---------------------------------------------------------------------------
+void
+CTranslatorUtils::UpdateGrpColMapping
+	(
+	IMemoryPool *pmp,
+	HMUlUl *phmululGrpColPos, 
+	CBitSet *pbsGrpCols,
+	ULONG ulSortGrpRef
+	)
+{
+	GPOS_ASSERT(NULL != phmululGrpColPos);
+	GPOS_ASSERT(NULL != pbsGrpCols);
+		
+	if (!pbsGrpCols->FBit(ulSortGrpRef))
+	{
+		ULONG ulUniqueGrpCols = pbsGrpCols->CElements();
+#ifdef GPOS_DEBUG
+		BOOL fResult = 
+#endif
+		phmululGrpColPos->FInsert(New(pmp) ULONG (ulUniqueGrpCols), New(pmp) ULONG(ulSortGrpRef));
+		(void) pbsGrpCols->FExchangeSet(ulSortGrpRef);
+	}
 }
 
 // EOF

@@ -509,22 +509,24 @@ CTranslatorDXLToPlStmt::MapLocationsFdist
 	char **rgszSegFileMap,
 	CdbComponentDatabases *pcdbCompDB,
 	Uri *pUri,
-	const ULONG ulTotalPrimaries
+	const ULONG ulTotalPrimaries,
+	IMDId *pmdidRel
 	)
 {
 	ULONG ulParticipatingSegments = ulTotalPrimaries;
 	ULONG ulMaxParticipants = ulParticipatingSegments;
 	const ULONG ulLocations = pmdrelext->UlLocations();
 
-	if (gpdb::FPxfProtocol(pUri))
-	{
-		// TODO: elhela - May 22, 2013; add proper translation for pxf
-		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiDXL2PlStmtConversion, GPOS_WSZ_LIT("PXF external tables"));
-	}
+	BOOL fPxfProtocol = gpdb::FPxfProtocol(pUri);
 
 	if (URI_GPFDIST == pUri->protocol || URI_GPFDISTS == pUri->protocol)
 	{
 		ulMaxParticipants = ulLocations * gp_external_max_segs;
+	}
+	else if (fPxfProtocol)
+	{
+		ulMaxParticipants = gpdb::IMaxParticipantsPxf(ulTotalPrimaries);
+		ulParticipatingSegments = ulMaxParticipants;
 	}
 
 	ULONG ulSkip = 0;
@@ -573,6 +575,17 @@ CTranslatorDXLToPlStmt::MapLocationsFdist
 		rgfSkipMap = gpdb::RgfRandomSegMap(ulTotalPrimaries, ulSkip);
 	}
 
+	CHAR **rgszSegWorkMap = NULL;
+	if (fPxfProtocol)
+	{
+		Relation rel = gpdb::RelGetRelation(CMDIdGPDB::PmdidConvert(pmdidRel)->OidObjectId());
+		CHAR *szUri = CTranslatorUtils::SzFromWsz(pmdrelext->PstrLocation(0)->Wsz());
+		rgszSegWorkMap = gpdb::RgszMapHdDataToSegments(szUri, ulTotalPrimaries, ulMaxParticipants, rel);
+
+		GPOS_ASSERT(NULL != rgszSegWorkMap);
+		gpdb::CloseRelation(rel);
+	}
+
 	// assign each URI from the new location list a primary segdb
 	ListCell *plc = NULL;
 	ForEach (plc, plModifiedLocations)
@@ -588,31 +601,58 @@ CTranslatorDXLToPlStmt::MapLocationsFdist
 			CdbComponentDatabaseInfo *pcdbCompDBInfo = &pcdbCompDB->segment_db_info[ul];
 			INT iSegInd = pcdbCompDBInfo->segindex;
 
-			if (SEGMENT_IS_ACTIVE_PRIMARY(pcdbCompDBInfo))
+			if (!SEGMENT_IS_ACTIVE_PRIMARY(pcdbCompDBInfo))
 			{
-				if (fSkipRandomly)
-				{
-					GPOS_ASSERT(iSegInd < ulTotalPrimaries);
-					if (rgfSkipMap[iSegInd])
-					{
-						continue;
-					}
-				}
+				continue;
+			}
 
-				fCandidateFound = true;
-				if (NULL == rgszSegFileMap[iSegInd])
+			if (fSkipRandomly)
+			{
+				GPOS_ASSERT(iSegInd < ulTotalPrimaries);
+				if (rgfSkipMap[iSegInd])
+				{
+					continue;
+				}
+			}
+
+			fCandidateFound = true;
+			if (NULL == rgszSegFileMap[iSegInd])
+			{
+				if (!fPxfProtocol)
 				{
 					rgszSegFileMap[iSegInd] = PStrDup(szUri);
+					fMatchFound = true;
+				}
+				else if (NULL != rgszSegWorkMap[iSegInd])
+				{
+					CHAR cDelim = '?';
+					StringInfoData seg_uri;
+
+					gpdb::InitStringInfoOfSize(&seg_uri, 512 /*size*/);
+					gpdb::AppendStringInfoString(&seg_uri, szUri);
+					// if the segwork string is the first option we delimit it with '?' otherwise with '&'
+					if (NULL != gpos::clib::SzStrChr(szUri, '?'))
+					{
+						cDelim = '&';
+					}
+					gpdb::AppendStringInfoChar(&seg_uri, cDelim);
+					gpdb::AppendStringInfoString(&seg_uri, rgszSegWorkMap[iSegInd]);
+					rgszSegFileMap[iSegInd] = seg_uri.data;
 					fMatchFound = true;
 				}
 			}
 		}
 
-		if (!fMatchFound)
+		if (!fMatchFound && !fPxfProtocol)
 		{
 			GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiDXL2PlStmtExternalScanError,
 					GPOS_WSZ_LIT("Unable to assign segments for gpfdist(s)"));
 		}
+	}
+
+	if (fPxfProtocol)
+	{
+		gpdb::FreeHdDataToSegmentsMapping(rgszSegWorkMap, ulTotalPrimaries);
 	}
 }
 
@@ -893,7 +933,8 @@ CTranslatorDXLToPlStmt::MapLocationsExecuteRandomSegments
 List*
 CTranslatorDXLToPlStmt::PlExternalScanUriList
 	(
-	const IMDRelationExternal *pmdrelext
+	const IMDRelationExternal *pmdrelext,
+	IMDId *pmdidRel
 	)
 {
 	if (pmdrelext->FWritable())
@@ -953,7 +994,7 @@ CTranslatorDXLToPlStmt::PlExternalScanUriList
 	}
 	else if (fUsingLocation && (URI_GPFDIST == pUri->protocol || URI_GPFDISTS == pUri->protocol || URI_CUSTOM == pUri->protocol))
 	{
-		MapLocationsFdist(pmdrelext, rgszSegFileMap, pcdbCompDB, pUri, ulTotalPrimaries);
+		MapLocationsFdist(pmdrelext, rgszSegFileMap, pcdbCompDB, pUri, ulTotalPrimaries, pmdidRel);
 	}
 	else if (fUsingExecute)
 	{
@@ -1039,7 +1080,8 @@ CTranslatorDXLToPlStmt::PtsFromDXLTblScan
 
 	const CDXLTableDescr *pdxltabdesc = pdxlopTS->Pdxltabdesc();
 	
-	const IMDRelation *pmdrel = m_pmda->Pmdrel(pdxltabdesc->Pmdid());
+	IMDId *pmdidRel = pdxltabdesc->Pmdid();
+	const IMDRelation *pmdrel = m_pmda->Pmdrel(pmdidRel);
 	const ULONG ulRelCols = pmdrel->UlColumns() - pmdrel->UlSystemColumns();
 	RangeTblEntry *prte = PrteFromTblDescr(pdxltabdesc, NULL /*pdxlid*/, ulRelCols, iRel, &dxltrctxbt);
 	GPOS_ASSERT(NULL != prte);
@@ -1054,7 +1096,7 @@ CTranslatorDXLToPlStmt::PtsFromDXLTblScan
 		// create external scan node
 		ExternalScan *pes = MakeNode(ExternalScan);
 		pes->scan.scanrelid = iRel;
-		pes->uriList = PlExternalScanUriList(pmdrelext);
+		pes->uriList = PlExternalScanUriList(pmdrelext, pmdidRel);
 		Value *pval = gpdb::PvalMakeString(CTranslatorUtils::SzFromWsz(pmdrelext->PstrFormatOptions()->Wsz()));
 		pes->fmtOpts = ListMake1(pval);
 		pes->fmtType = CExternalScanFormatType(pmdrelext->Erelextformat());
@@ -3768,18 +3810,23 @@ CTranslatorDXLToPlStmt::PplanDTS
 		&(pplan->plan_width)
 		);
 
-	// translate proj list
-	GPOS_ASSERT(1 == pdxlnDTS->UlArity());
-	CDXLNode *pdxlnPrL = (*pdxlnDTS)[0];
+	GPOS_ASSERT(2 == pdxlnDTS->UlArity());
 
-	pplan->targetlist = PlTargetListFromProjList
-						(
-						pdxlnPrL,
-						&dxltrctxbt,		// base table translation context
-						NULL,			// child translation contexts
-						pdxltrctxOut,
-						pplan
-						);
+	// translate proj list and filter
+	CDXLNode *pdxlnPrL = (*pdxlnDTS)[EdxltsIndexProjList];
+	CDXLNode *pdxlnFilter = (*pdxlnDTS)[EdxltsIndexFilter];
+
+	TranslateProjListAndFilter
+		(
+		pdxlnPrL,
+		pdxlnFilter,
+		&dxltrctxbt,	// translate context for the base table
+		NULL,			// pdxltrctxLeft and pdxltrctxRight,
+		&pplan->targetlist,
+		&pplan->qual,
+		pdxltrctxOut,
+		pplan
+		);
 
 	SetParamIds(pplan);
 
@@ -3815,6 +3862,7 @@ CTranslatorDXLToPlStmt::PplanDIS
 	RangeTblEntry *prte = PrteFromTblDescr(pdxlop->Pdxltabdesc(), NULL /*pdxlid*/, ulRelCols, iRel, &dxltrctxbt);
 	GPOS_ASSERT(NULL != prte);
 	m_pctxdxltoplstmt->AddRTE(prte);
+	m_pctxdxltoplstmt->AddPartitionedTable(prte->relid);
 
 	DynamicIndexScan *pdis = MakeNode(DynamicIndexScan);
 
@@ -3827,6 +3875,7 @@ CTranslatorDXLToPlStmt::PplanDIS
 
 	GPOS_ASSERT(InvalidOid != oidIndex);
 	pdis->indexid = oidIndex;
+	pdis->logicalIndexInfo = gpdb::Plgidxinfo(prte->relid, oidIndex);
 
 	Plan *pplan = &(pdis->scan.plan);
 	pplan->plan_node_id = m_pctxdxltoplstmt->UlNextPlanId();
@@ -3987,7 +4036,15 @@ CTranslatorDXLToPlStmt::PplanDML
 	pdml->oidColIdx = UlAddTargetEntryForColId(&plTargetListDML, &dxltrctxChild, pdxlop->UlOid(), true /*fResjunk*/);
 	pdml->actionColIdx = UlAddTargetEntryForColId(&plTargetListDML, &dxltrctxChild, pdxlop->UlAction(), true /*fResjunk*/);
 	pdml->ctidColIdx = UlAddTargetEntryForColId(&plTargetListDML, &dxltrctxChild, pdxlop->UlCtid(), true /*fResjunk*/);
-	
+	if (pdxlop->FPreserveOids())
+	{
+		pdml->tupleoidColIdx = UlAddTargetEntryForColId(&plTargetListDML, &dxltrctxChild, pdxlop->UlTupleOid(), true /*fResjunk*/);
+	}
+	else
+	{
+		pdml->tupleoidColIdx = 0;
+	}
+
 	GPOS_ASSERT(0 != pdml->actionColIdx);
 	GPOS_ASSERT(0 != pdml->oidColIdx);
 
@@ -4136,13 +4193,20 @@ CTranslatorDXLToPlStmt::PplanSplit
 	
 	const TargetEntry *pteActionCol = pdxltrctxOut->Pte(pdxlop->UlAction());
 	const TargetEntry *pteCtidCol = pdxltrctxOut->Pte(pdxlop->UlCtid());
-	
+	const TargetEntry *pteTupleOidCol = pdxltrctxOut->Pte(pdxlop->UlTupleOid());
+
 	GPOS_ASSERT(NULL != pteActionCol);
-	GPOS_ASSERT(NULL != pteCtidCol);
+	GPOS_ASSERT(NULL != pteCtidCol);	 
 	
 	psplit->actionColIdx = pteActionCol->resno;
 	psplit->ctidColIdx = pteCtidCol->resno;
 	
+	psplit->tupleoidColIdx = FirstLowInvalidHeapAttributeNumber;
+	if (NULL != pteTupleOidCol)
+	{
+		psplit->tupleoidColIdx = pteTupleOidCol->resno;
+	}
+
 	pplan->lefttree = pplanChild;
 	pplan->nMotionNodes = pplanChild->nMotionNodes;
 	pplan->plan_node_id = m_pctxdxltoplstmt->UlNextPlanId();

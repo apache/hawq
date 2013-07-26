@@ -1,0 +1,5 @@
+-- start_matchignore
+m/\s+(\W)?(\W)?\(\w+\.[cph]+:\d+\)/
+s/\s+(\W)?(\W)?\(\w+\.[cph]+:\d+\)/(SOMEFILE:SOMEFUNC)/
+-- end_matchignore
+

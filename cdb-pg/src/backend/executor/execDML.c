@@ -441,10 +441,37 @@ ldelete:;
 						 estate->es_snapshot->curcid,
 						 estate->es_crosscheck_snapshot,
 						 true /* wait for commit */ );
+
 	switch (result)
 	{
 		case HeapTupleSelfUpdated:
 			/* already deleted by self; nothing to do */
+		
+			/*
+			 * In an scenario in which R(a,b) and S(a,b) have 
+			 *        R               S
+			 *    ________         ________
+			 *     (1, 1)           (1, 2)
+			 *                      (1, 7)
+ 			 *
+   			 *  An update query such as:
+ 			 *   UPDATE R SET a = S.b  FROM S WHERE R.b = S.a;
+ 			 *   
+ 			 *  will have an non-deterministic output. The tuple in R 
+			 * can be updated to (2,1) or (7,1).
+ 			 * Since the introduction of SplitUpdate, these queries will 
+			 * send multiple requests to delete the same tuple. Therefore, 
+			 * in order to avoid a non-deterministic output, 
+			 * an error is reported in such scenario.
+ 			 */
+			if (isUpdate)
+			{
+
+				ereport(ERROR,
+					(errcode(ERRCODE_IN_FAILED_SQL_TRANSACTION ),
+					errmsg("multiple updates to a row by the same query is not allowed")));
+			}
+
 			return;
 
 		case HeapTupleMayBeUpdated:

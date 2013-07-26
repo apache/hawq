@@ -24,6 +24,7 @@
 #define GPDXL_CTE_ID_START 1
 #define GPDXL_COL_ID_START 1
 
+#define pg_stat_get_activity_oid  6071		// OID of pg_stat_get_activity function
 
 #include "gpopt/translate/CMappingVarColId.h"
 #include "gpopt/translate/CTranslatorScalarToDXL.h"
@@ -237,14 +238,24 @@ namespace gpdxl
 				BOOL fHasAggs,
 				DrgPbs *pdrgpbsGroupingSets,
 				HMIUl *phmiulSortGrpColsColId,
-				HMIUl *phmiulOutputCols
+				HMIUl *phmiulOutputCols,
+				HMUlUl *phmululGrpColPos		// mapping pos->unique grouping columns for grouping func arguments
 				);
 
 			// construct a project node with NULL values for columns not included in the grouping set
-			CDXLNode *PdxlnProjectNullsForGroupingSets(List *plTargetList, CDXLNode *pdxlnChild, CBitSet *pbs, HMIUl *phmiulSortgrouprefCols, HMIUl *phmiulOutputCols) const;
+			CDXLNode *PdxlnProjectNullsForGroupingSets
+				(
+				List *plTargetList, 
+				CDXLNode *pdxlnChild, 
+				CBitSet *pbs, 
+				HMIUl *phmiulSortgrouprefCols, 
+				HMIUl *phmiulOutputCols, 
+				HMUlUl *phmululGrpColPos
+				) 
+				const;
 
 			// construct a project node with appropriate values for the grouping funcs in the given target list
-			CDXLNode *PdxlnProjectGroupingFuncs(List *plTargetList, CDXLNode *pdxlnChild, CBitSet *pbs, HMIUl *phmiulOutputCols) const;
+			CDXLNode *PdxlnProjectGroupingFuncs(List *plTargetList, CDXLNode *pdxlnChild, CBitSet *pbs, HMIUl *phmiulOutputCols, HMUlUl *phmululGrpColPos) const;
 
 			// add sorting and grouping column into the hash map
 			void AddSortingGroupingColumn(TargetEntry *pte, HMIUl *phmiulSortGrpColsColId, ULONG ulColId) const;
@@ -394,7 +405,7 @@ namespace gpdxl
 			ULONG UlTupleOidColId();
 
 			// translate a grouping func expression
-			CDXLNode *PdxlnGroupingFunc(const Expr *pexpr, CBitSet *pbs) const;
+			CDXLNode *PdxlnGroupingFunc(const Expr *pexpr, CBitSet *pbs, HMUlUl *phmululGrpColPos) const;
 
 			// construct a list of CTE producers from the query's CTE list
 			void ConstructCTEProducerList(List *plCTE, ULONG ulQueryLevel);

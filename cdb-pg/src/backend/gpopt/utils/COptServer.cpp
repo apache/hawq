@@ -434,7 +434,8 @@ COptServer::PqcRecvQuery
 	delete pmsg;
 
 	CQueryToDXLResult *pqdxlr = CDXLUtils::PdxlnParseDXLQuery(pmp, szQuery, NULL /*szXSDPath*/);
-	CSerializableQuery serQuery(pmp, pqdxlr->Pdxln(), pqdxlr->PdrgpdxlnOutputCols(), pqdxlr->PdrgpdxlnCTE());
+	CSerializableQuery serQuery(pqdxlr->Pdxln(), pqdxlr->PdrgpdxlnOutputCols(), pqdxlr->PdrgpdxlnCTE());
+	serQuery.Serialize(pmp);
 
 	// translate DXL Tree -> Expr Tree
 	CTranslatorDXLToExpr *pdxltr = New(pmp) CTranslatorDXLToExpr(pmp, pmda);
@@ -505,7 +506,8 @@ COptServer::SendPlan
 
 	ULLONG ullPlanId = 0;
 	ULLONG ullPlanSpaceSize = 0;
-	CSerializablePlan serPlan(pmp, pdxlnPlan, ullPlanId, ullPlanSpaceSize);
+	CSerializablePlan serPlan(pdxlnPlan, ullPlanId, ullPlanSpaceSize);
+	serPlan.Serialize(pmp);
 
 	// serialize DXL to xml
 	CWStringDynamic *pstrPlan = CDXLUtils::PstrSerializePlan

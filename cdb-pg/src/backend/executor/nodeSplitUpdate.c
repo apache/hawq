@@ -42,54 +42,52 @@ ExecSplitUpdateExplainEnd(PlanState *planstate, struct StringInfoData *buf)
 void
 SplitTupleTableSlot(List *targetList, SplitUpdate *plannode, SplitUpdateState *node, Datum *values, bool *nulls)
 {
-		ListCell *element = NULL;
-        ListCell *deleteAtt = plannode->deleteColIdx->head;
-        ListCell *insertAtt = plannode->insertColIdx->head;
+	ListCell *element = NULL;
+	ListCell *deleteAtt = plannode->deleteColIdx->head;
+	ListCell *insertAtt = plannode->insertColIdx->head;
 
-        Datum *delete_values = slot_get_values(node->deleteTuple);
-        bool *delete_nulls = slot_get_isnull(node->deleteTuple);
-        Datum *insert_values = slot_get_values(node->insertTuple);
-        bool *insert_nulls = slot_get_isnull(node->insertTuple);
+	Datum *delete_values = slot_get_values(node->deleteTuple);
+	bool *delete_nulls = slot_get_isnull(node->deleteTuple);
+	Datum *insert_values = slot_get_values(node->insertTuple);
+	bool *insert_nulls = slot_get_isnull(node->insertTuple);
 
+	/* Iterate through new TargetList and match old and new values. The action is also added in this containsTuple. */
+	foreach (element, targetList)
+	{
+		TargetEntry *tle = lfirst(element);
+		int resno = tle->resno-1;
 
-        /* Iterate through new TargetList and match old and new values. The action is also added in this containsTuple. */
-        foreach (element, targetList)
-        {
-        	TargetEntry *tle = lfirst(element);
-        	int resno = tle->resno-1;
+		if (IsA(tle->expr, DMLActionExpr))
+		{
+			/* Set the corresponding action to the new tuples. */
+			delete_values[resno] = Int32GetDatum((int)DML_DELETE);
+			delete_nulls[resno] = false;
 
-			if (IsA(tle->expr, DMLActionExpr))
-			{
-					/* Set the corresponding action to the new tuples. */
-					delete_values[resno] = Int32GetDatum((int)DML_DELETE);
-					delete_nulls[resno] = false;
+			insert_values[resno] = Int32GetDatum((int)DML_INSERT);
+			insert_nulls[resno] = false;
+		}
+		else if (((int)tle->resno) < plannode->ctidColIdx)
+		{
+			/* Old and new values */
+			delete_values[resno] = values[deleteAtt->data.int_value-1];
+			delete_nulls[resno] = nulls[deleteAtt->data.int_value-1];
 
-					insert_values[resno] = Int32GetDatum((int)DML_INSERT);
-					insert_nulls[resno] = false;
-			}
-			else if (((int)tle->resno) < plannode->ctidColIdx)
-			{
-					/* Old and new values */
-					delete_values[resno] = values[deleteAtt->data.int_value-1];
-					delete_nulls[resno] = nulls[deleteAtt->data.int_value-1];
+			insert_values[resno] = values[insertAtt->data.int_value-1];
+			insert_nulls[resno] = nulls[insertAtt->data.int_value-1];
 
-					insert_values[resno] = values[insertAtt->data.int_value-1];
-					insert_nulls[resno] = nulls[insertAtt->data.int_value-1];
+			deleteAtt = deleteAtt->next;
+			insertAtt = insertAtt->next;
+		}
+		else
+		{
+			/* `Resjunk' values */
+			delete_values[resno] = values[((Var *)tle->expr)->varattno-1];
+			delete_nulls[resno] = nulls[((Var *)tle->expr)->varattno-1];
 
-					deleteAtt = deleteAtt->next;
-					insertAtt = insertAtt->next;
-			}
-			else
-			{
-					/* `Resjunk' values */
-					delete_values[resno] = values[((Var *)tle->expr)->varattno-1];
-					delete_nulls[resno] = nulls[((Var *)tle->expr)->varattno-1];
-
-					insert_values[resno] = values[((Var *)tle->expr)->varattno-1];
-					insert_nulls[resno] = nulls[((Var *)tle->expr)->varattno-1];
-			}
-        }
-
+			insert_values[resno] = values[((Var *)tle->expr)->varattno-1];
+			insert_nulls[resno] = nulls[((Var *)tle->expr)->varattno-1];
+		}
+	}
 }
 
 /**

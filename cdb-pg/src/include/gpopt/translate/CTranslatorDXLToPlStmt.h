@@ -149,7 +149,8 @@ namespace gpdxl
 					char **rgszSegFileMap,
 					CdbComponentDatabases *pcdbCompDB,
 					Uri *pUri,
-					const ULONG ulTotalPrimaries
+					const ULONG ulTotalPrimaries,
+					IMDId *pmdidRel
 					);
 
 			// segment mapping for tables with EXECUTE 'cmd' ON.
@@ -206,7 +207,7 @@ namespace gpdxl
 					);
 
 			// list of URIs for external scan
-			List* PlExternalScanUriList(const IMDRelationExternal *pmdrelext);
+			List* PlExternalScanUriList(const IMDRelationExternal *pmdrelext, IMDId *pmdidRel);
 
 			// return the char representation of external scan format type
 			CHAR CExternalScanFormatType(IMDRelationExternal::Erelextformattype erelextformat);

@@ -266,6 +266,7 @@ extern TupleTableSlot *ExecProject(ProjectionInfo *projInfo,
 			ExprDoneCond *isDone);
 extern Datum ExecEvalFunctionArgToConst(FuncExpr *fexpr, int argno, bool *isnull);
 extern void GetNeededColumnsForScan(Node *expr, bool *mask, int n);
+extern bool isJoinExprNull(List *joinExpr, ExprContext *econtext);
 
 /*
  * prototypes from functions in execScan.c

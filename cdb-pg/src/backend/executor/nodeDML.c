@@ -75,6 +75,16 @@ ExecDML(DMLState *node)
 		/* remove `junk' columns from tuple */
 		node->insertSlot = ExecFilterJunk(node->junkfilter, slot);
 
+		/* Respect any given tuple Oid when updating a tuple. */
+		if(isUpdate &&
+		    plannode->tupleoidColIdx != 0)
+		{
+			isnull = false;
+			oid = slot_getattr(slot, plannode->tupleoidColIdx, &isnull);
+			void *tuple = ExecFetchSlotHeapTuple(node->insertSlot);
+			HeapTupleSetOid((HeapTuple)tuple, oid);
+		}
+
 		/* The plan origin is required since ExecInsert performs different actions 
 		 * depending on the type of plan (constraint enforcement and triggers.) 
 		 */

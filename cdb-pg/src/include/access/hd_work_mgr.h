@@ -16,8 +16,8 @@
 #include "nodes/pg_list.h"
 #include "lib/stringinfo.h"
 
-char** map_hddata_2gp_segments(char *uri, int total_segs, int working_segs, Relation relation);
-void free_hddata_2gp_segments(char **segs_work_map, int total_segs);
+extern char** map_hddata_2gp_segments(char *uri, int total_segs, int working_segs, Relation relation);
+extern void free_hddata_2gp_segments(char **segs_work_map, int total_segs);
 
 /*
  * Structure that describes one Statistics element received from the PXF service

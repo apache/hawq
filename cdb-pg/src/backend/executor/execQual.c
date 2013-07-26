@@ -5530,3 +5530,44 @@ void GetNeededColumnsForScan(Node *expr, bool *mask, int n)
 
 	neededColumnContextWalker(expr, &c);
 }
+
+/* ----------------------------------------------------------------
+ *	isJoinExprNull
+ *
+ *	Checks if the join expression evaluates to NULL for a given
+ *	input tuple.
+ *
+ *	The input tuple has to be present in the correct TupleTableSlot
+ *	in the ExprContext. For example, if all the expressions
+ *	in joinExpr refer to the inner side of the join,
+ *	econtext->ecxt_innertuple must be valid.
+ * ----------------------------------------------------------------
+ */
+bool
+isJoinExprNull(List *joinExpr, ExprContext *econtext)
+{
+
+	Assert(NULL != joinExpr);
+	bool joinkeys_null = true;
+
+	ListCell   *lc;
+	foreach(lc, joinExpr)
+	{
+		ExprState  *keyexpr = (ExprState *) lfirst(lc);
+		bool		isNull = false;
+
+		/*
+		 * Evaluate the current join attribute value of the tuple
+		 */
+		ExecEvalExpr(keyexpr, econtext, &isNull, NULL);
+
+		if (!isNull)
+		{
+			/* Found at least one non-null join expression, we're done */
+			joinkeys_null = false;
+			break;
+		}
+	}
+
+	return joinkeys_null;
+}

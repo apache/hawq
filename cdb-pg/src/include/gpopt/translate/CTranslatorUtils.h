@@ -76,11 +76,11 @@ namespace gpdxl
 
 			// construct a set of column attnos corresponding to a single grouping set
 			static
-			CBitSet *PbsGroupingSet(IMemoryPool *pmp, List *plGroupElems, ULONG ulCols);
+			CBitSet *PbsGroupingSet(IMemoryPool *pmp, List *plGroupElems, ULONG ulCols, HMUlUl *phmululGrpColPos, CBitSet *pbsGrpCols);
 
 			// create a set of grouping sets for a rollup
 			static
-			DrgPbs *PdrgpbsRollup(IMemoryPool *pmp, GroupingClause *pgrcl, ULONG ulCols);
+			DrgPbs *PdrgpbsRollup(IMemoryPool *pmp, GroupingClause *pgrcl, ULONG ulCols, HMUlUl *phmululGrpColPos, CBitSet *pbsGrpCols);
 
 			// check if the given mdid array contains any of the polymorphic
 			// types (ANYELEMENT, ANYARRAY)
@@ -105,6 +105,10 @@ namespace gpdxl
 						List *plArgTypes,
 						List *plArgsFromQuery
 						);
+			
+			// update grouping col position mappings
+			static
+			void UpdateGrpColMapping(IMemoryPool *pmp, HMUlUl *phmululGrpColPos, CBitSet *pbsGrpCols, ULONG ulSortGrpRef);
 
 		public:
 
@@ -278,7 +282,7 @@ namespace gpdxl
 			// construct a dynamic array of sets of column attnos corresponding
 			// to the group by clause
 			static
-			DrgPbs *PdrgpbsGroupBy(IMemoryPool *pmp, List *plGroupClause, ULONG ulCols);
+			DrgPbs *PdrgpbsGroupBy(IMemoryPool *pmp, List *plGroupClause, ULONG ulCols, HMUlUl *phmululGrpColPos, CBitSet *pbsGrpCols);
 
 			// return a copy of the query with constant of unknown type being coerced
 			// to the common data type of the output target list

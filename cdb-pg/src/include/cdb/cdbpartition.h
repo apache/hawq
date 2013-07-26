@@ -68,18 +68,6 @@ typedef struct part_rule_cxt
 	Oid new_oid;
 } part_rule_cxt;
 
-typedef struct LogicalIndexInfo
-{
-	Oid	logicalIndexOid;	/* OID of the logical index */
-	int	nColumns;		/* Number of columns in the index */
-	AttrNumber	*indexKeys;	/* column numbers of index keys */
-	List	*indPred;		/* predicate if partial index, or NIL */
-	List	*indExprs;		/* index on expressions */
-	bool	indIsUnique;		/* unique index */
-	Node	*partCons;		/* concatenated list of check constraints 
-					 * of each partition on which this index is defined */
-	List	*defaultLevels;		/* Used to identify a default partition */
-} LogicalIndexInfo;
 
 typedef struct LogicalIndexes
 {
@@ -256,5 +244,9 @@ extern Datum *get_partition_encoding_attoptions(Relation rel, Oid paroid);
 
 extern LogicalIndexes * BuildLogicalIndexInfo(Oid relid);
 extern Oid getPhysicalIndexRelid(LogicalIndexInfo *iInfo, Oid rootOid, Oid partOid);
+extern Oid	exprType(Node *expr);
+extern Node *makeBoolConst(bool value, bool isnull);
+
+extern LogicalIndexInfo *logicalIndexInfoForIndexOid(Oid rootOid, Oid indexOid);
 
 #endif   /* CDBPARTITION_H */

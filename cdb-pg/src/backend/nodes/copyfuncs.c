@@ -127,6 +127,25 @@ CopyPlanFields(Plan *from, Plan *newnode)
 }
 
 /*
+ * CopyPlanFields
+ *
+ *		This function copies the fields of the Plan node.  It is used by
+ *		all the copy functions for classes which inherit from Plan.
+ */
+static void
+CopyLogicalIndexInfo(const LogicalIndexInfo *from, LogicalIndexInfo *newnode)
+{
+	COPY_SCALAR_FIELD(logicalIndexOid);
+	COPY_SCALAR_FIELD(nColumns);
+	COPY_POINTER_FIELD(indexKeys, from->nColumns * sizeof(AttrNumber));
+	COPY_NODE_FIELD(indPred);
+	COPY_NODE_FIELD(indExprs);
+	COPY_SCALAR_FIELD(indIsUnique);
+	COPY_NODE_FIELD(partCons);
+	COPY_NODE_FIELD(defaultLevels);
+}
+
+/*
  * _copyPlannedStmt 
  */
 static PlannedStmt *
@@ -478,7 +497,9 @@ _copyDynamicIndexScan(const DynamicIndexScan *from)
 	copyIndexScanFields((IndexScan *)from, (IndexScan *)newnode);
 
 	COPY_SCALAR_FIELD(partIndex);
-
+	
+	newnode->logicalIndexInfo = palloc(sizeof(LogicalIndexInfo));
+	CopyLogicalIndexInfo(((DynamicIndexScan *) from)->logicalIndexInfo, newnode->logicalIndexInfo);
 	return newnode;
 }
 
@@ -1012,7 +1033,8 @@ _copyDML(const DML *from)
 	COPY_SCALAR_FIELD(oidColIdx);
 	COPY_SCALAR_FIELD(actionColIdx);
 	COPY_SCALAR_FIELD(ctidColIdx);
-		
+	COPY_SCALAR_FIELD(tupleoidColIdx);
+
 	return newnode;
 }
 
@@ -1031,6 +1053,7 @@ _copySplitUpdate(const SplitUpdate *from)
 
 	COPY_SCALAR_FIELD(actionColIdx);
 	COPY_SCALAR_FIELD(ctidColIdx);
+	COPY_SCALAR_FIELD(tupleoidColIdx);
 	COPY_NODE_FIELD(insertColIdx);
 	COPY_NODE_FIELD(deleteColIdx);
 

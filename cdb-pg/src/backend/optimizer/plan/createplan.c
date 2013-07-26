@@ -172,7 +172,6 @@ static Sort *make_sort(PlannerInfo *root, Plan *lefttree, int numCols,
 		  AttrNumber *sortColIdx, Oid *sortOperators);
 
 static List *flatten_grouping_list(List *groupcls);
-static int pxf_calc_max_participants_allowed(int total_segments);
 
 /*
  * create_plan
@@ -1887,7 +1886,7 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
  * c. The guc gp_external_max_segs is smaller all equal to the number of hosts.
  *    max_participants_allowed equals the guc gp_external_max_segs
  */
-static int
+int
 pxf_calc_max_participants_allowed(int total_segments)
 {
 	int max_participants_allowed = 0;

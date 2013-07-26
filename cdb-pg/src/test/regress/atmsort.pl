@@ -1680,7 +1680,7 @@ EOF_formatfix
                 $ini =~ s/\s+(\W)?(\W)?\(seg.*pid.*\)//;
 
 				# also remove line numbers from errors
-				$ini =~ s/\s+(\W)?(\W)?\(\w+\.[ch]:\d+\)/ (SOMEFILE:SOMEFUNC)/;
+				$ini =~ s/\s+(\W)?(\W)?\(\w+\.[cph]+:\d+\)/ (SOMEFILE:SOMEFUNC)/;
                 my $outsize = scalar(@outarr);
 
                 my $lastguy = -1;

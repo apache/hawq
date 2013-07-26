@@ -758,11 +758,6 @@ CTranslatorQueryToDXL::PdxlnUpdate()
 	// get (resno -> colId) mapping of columns to be updated
 	HMIUl *phmiulUpdateCols = PhmiulUpdateCols();
 
-	if (pmdrel->FHasOids())
-	{
-		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("UPDATE on tables with OIDs"));
-	}
-
 	const ULONG ulRelColumns = pmdrel->UlColumns();
 	DrgPul *pdrgpulInsert = New(m_pmp) DrgPul(m_pmp);
 	DrgPul *pdrgpulDelete = New(m_pmp) DrgPul(m_pmp);
@@ -1633,7 +1628,11 @@ CTranslatorQueryToDXL::PdxlnGroupingSets
 		return pdxlnResult;
 	}
 
-	DrgPbs *pdrgpbs = CTranslatorUtils::PdrgpbsGroupBy(m_pmp, plGroupClause, ulCols);
+	// grouping functions refer to grouping col positions, so construct a map pos->grouping column
+	// while processing the grouping clause
+	HMUlUl *phmululGrpColPos = New(m_pmp) HMUlUl(m_pmp);
+	CBitSet *pbsUniqueueGrpCols = New(m_pmp) CBitSet(m_pmp, ulCols);
+	DrgPbs *pdrgpbs = CTranslatorUtils::PdrgpbsGroupBy(m_pmp, plGroupClause, ulCols, phmululGrpColPos, pbsUniqueueGrpCols);
 
 	const ULONG ulGroupingSets = pdrgpbs->UlLength();
 
@@ -1659,15 +1658,17 @@ CTranslatorQueryToDXL::PdxlnGroupingSets
 								phmiulOutputCols
 								);
 		
-		CDXLNode *pdxlnResult = PdxlnProjectGroupingFuncs(plTargetList, pdxlnGroupBy, pbs, phmiulOutputCols);
+		CDXLNode *pdxlnResult = PdxlnProjectGroupingFuncs(plTargetList, pdxlnGroupBy, pbs, phmiulOutputCols, phmululGrpColPos);
 
 		phmiulChild->Release();
 		pdrgpbs->Release();
-
+		pbsUniqueueGrpCols->Release();
+		phmululGrpColPos->Release();
+		
 		return pdxlnResult;
 	}
-
-	return PdxlnUnionAllForGroupingSets
+	
+	CDXLNode *pdxlnResult = PdxlnUnionAllForGroupingSets
 			(
 			pfromexpr,
 			plTargetList,
@@ -1675,8 +1676,14 @@ CTranslatorQueryToDXL::PdxlnGroupingSets
 			fHasAggs,
 			pdrgpbs,
 			phmiulSortgrouprefColId,
-			phmiulOutputCols
+			phmiulOutputCols,
+			phmululGrpColPos
 			);
+
+	pbsUniqueueGrpCols->Release();
+	phmululGrpColPos->Release();
+	
+	return pdxlnResult;
 }
 
 //---------------------------------------------------------------------------
@@ -1696,7 +1703,8 @@ CTranslatorQueryToDXL::PdxlnUnionAllForGroupingSets
 	BOOL fHasAggs,
 	DrgPbs *pdrgpbs,
 	HMIUl *phmiulSortgrouprefColId,
-	HMIUl *phmiulOutputCols
+	HMIUl *phmiulOutputCols,
+	HMUlUl *phmululGrpColPos		// mapping pos->unique grouping columns for grouping func arguments
 	)
 {
 	GPOS_ASSERT(NULL != pdrgpbs);
@@ -1755,7 +1763,7 @@ CTranslatorQueryToDXL::PdxlnUnionAllForGroupingSets
 					);
 
 		// add a project list for the NULL values
-		CDXLNode *pdxlnProject = PdxlnProjectNullsForGroupingSets(plTargetList, pdxlnGroupBy, pbsGroupingSet, phmiulSortgrouprefColIdConsumer, phmiulGroupBy);
+		CDXLNode *pdxlnProject = PdxlnProjectNullsForGroupingSets(plTargetList, pdxlnGroupBy, pbsGroupingSet, phmiulSortgrouprefColIdConsumer, phmiulGroupBy, phmululGrpColPos);
 
 		DrgPul *pdrgpulColIdsOuter = CTranslatorUtils::PdrgpulColIds(m_pmp, plTargetList, phmiulGroupBy);
 		if (NULL != pdxlnUnionAll)
@@ -2721,6 +2729,12 @@ CTranslatorQueryToDXL::PdxlnFromTVF
 {
 	GPOS_ASSERT(NULL != prte->funcexpr);
 
+	if (pg_stat_get_activity_oid == ((FuncExpr *)prte->funcexpr)->funcid)
+	{
+		// TODO 07/19/2013; solimm1: MPP-20686 remove exception when pg_stat_get_activity() properties are fixed in the catalog
+		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("pg_stat_get_activity() function"));
+	}
+
 	// if this is a folded function expression, generate a project over a CTG
 	if (!IsA(prte->funcexpr, FuncExpr))
 	{
@@ -3079,7 +3093,8 @@ CTranslatorQueryToDXL::PdxlnProjectNullsForGroupingSets
 	CDXLNode *pdxlnChild,
 	CBitSet *pbs,					// group by columns
 	HMIUl *phmiulSortgrouprefCols,	// mapping of sorting and grouping columns
-	HMIUl *phmiulOutputCols			// mapping of output columns
+	HMIUl *phmiulOutputCols,		// mapping of output columns
+	HMUlUl *phmululGrpColPos		// mapping of unique grouping col positions
 	)
 	const
 {
@@ -3101,7 +3116,7 @@ CTranslatorQueryToDXL::PdxlnProjectNullsForGroupingSets
 		if (IsA(pte->expr, GroupingFunc))
 		{
 			ulColId = m_pidgtorCol->UlNextId();
-			CDXLNode *pdxlnGroupingFunc = PdxlnGroupingFunc(pte->expr, pbs);
+			CDXLNode *pdxlnGroupingFunc = PdxlnGroupingFunc(pte->expr, pbs, phmululGrpColPos);
 			CMDName *pmdnameAlias = NULL;
 
 			if (NULL == pte->resname)
@@ -3167,7 +3182,8 @@ CTranslatorQueryToDXL::PdxlnProjectGroupingFuncs
 	List *plTargetList,
 	CDXLNode *pdxlnChild,
 	CBitSet *pbs,
-	HMIUl *phmiulOutputCols
+	HMIUl *phmiulOutputCols,
+	HMUlUl *phmululGrpColPos
 	)
 	const
 {
@@ -3187,7 +3203,7 @@ CTranslatorQueryToDXL::PdxlnProjectGroupingFuncs
 		if (IsA(pte->expr, GroupingFunc))
 		{
 			ULONG ulColId = m_pidgtorCol->UlNextId();
-			CDXLNode *pdxlnGroupingFunc = PdxlnGroupingFunc(pte->expr, pbs);
+			CDXLNode *pdxlnGroupingFunc = PdxlnGroupingFunc(pte->expr, pbs, phmululGrpColPos);
 			CMDName *pmdnameAlias = NULL;
 
 			if (NULL == pte->resname)
@@ -3399,11 +3415,13 @@ CDXLNode *
 CTranslatorQueryToDXL::PdxlnGroupingFunc
 	(
 	const Expr *pexpr,
-	CBitSet *pbs
+	CBitSet *pbs,
+	HMUlUl *phmululGrpColPos
 	)
 	const
 {
 	GPOS_ASSERT(IsA(pexpr, GroupingFunc));
+	GPOS_ASSERT(NULL != phmululGrpColPos);
 
 	const GroupingFunc *pgroupingfunc = (GroupingFunc *) pexpr;
 
@@ -3413,14 +3431,16 @@ CTranslatorQueryToDXL::PdxlnGroupingFunc
 	}
 	
 	Node *pnode = (Node *) gpdb::PvListNth(pgroupingfunc->args, 0);
-	INT iGroupingIndex = gpdb::IValue(pnode) + 1; 
+	ULONG ulGroupingIndex = gpdb::IValue(pnode); 
 		
 	// generate a constant value for the result of the grouping function as follows:
 	// if the grouping function argument is a group-by column, result is 0
 	// otherwise, the result is 1 
 	LINT lValue = 0;
 	
-	BOOL fGroupingCol = pbs->FBit(iGroupingIndex);	
+	ULONG *pulSortGrpRef = phmululGrpColPos->PtLookup(&ulGroupingIndex);
+	GPOS_ASSERT(NULL != pulSortGrpRef);
+	BOOL fGroupingCol = pbs->FBit(*pulSortGrpRef);	
 	if (!fGroupingCol)
 	{
 		// not a grouping column

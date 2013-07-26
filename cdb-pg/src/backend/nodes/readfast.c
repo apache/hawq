@@ -3011,6 +3011,18 @@ _readIndexScan(const char ** str)
 	READ_DONE();
 }
 
+static void
+readLogicalIndexInfo(const char ** str, LogicalIndexInfo *local_node)
+{
+	READ_OID_FIELD(logicalIndexOid);
+	READ_INT_FIELD(nColumns);
+	READ_INT_ARRAY(indexKeys, nColumns, AttrNumber);
+	READ_NODE_FIELD(indPred);
+	READ_NODE_FIELD(indExprs);
+	READ_BOOL_FIELD(indIsUnique);
+	READ_NODE_FIELD(partCons);
+	READ_NODE_FIELD(defaultLevels);
+}
 
 static DynamicIndexScan *
 _readDynamicIndexScan(const char **str)
@@ -3021,6 +3033,8 @@ _readDynamicIndexScan(const char **str)
 	readIndexScanFields(str, (IndexScan *)local_node);
 
 	READ_INT_FIELD(partIndex);
+	readLogicalIndexInfo(str, ((DynamicIndexScan *) local_node)->logicalIndexInfo);
+	
 	READ_DONE();
 }
 
@@ -3461,6 +3475,7 @@ _readDML(const char ** str)
 	READ_INT_FIELD(oidColIdx);
 	READ_INT_FIELD(actionColIdx);
 	READ_INT_FIELD(ctidColIdx);
+	READ_INT_FIELD(tupleoidColIdx);
 
 	readPlanInfo(str, (Plan *)local_node);
 
@@ -3477,6 +3492,7 @@ _readSplitUpdate(const char ** str)
 
 	READ_INT_FIELD(actionColIdx);
 	READ_INT_FIELD(ctidColIdx);
+	READ_INT_FIELD(tupleoidColIdx);
 	READ_NODE_FIELD(insertColIdx);
 	READ_NODE_FIELD(deleteColIdx);
 

@@ -554,6 +554,21 @@ outIndexScanFields(StringInfo str, IndexScan *node)
 }
 
 static void
+outLogicalIndexInfo(StringInfo str, LogicalIndexInfo *node)
+{	
+	WRITE_NODE_TYPE("LOGICALINDEXINFO");
+
+	WRITE_OID_FIELD(logicalIndexOid);
+	WRITE_INT_FIELD(nColumns);
+	WRITE_INT_ARRAY(indexKeys, nColumns, int);
+	WRITE_LIST_FIELD(indPred);
+	WRITE_LIST_FIELD(indExprs);
+	WRITE_BOOL_FIELD(indIsUnique);
+	WRITE_NODE_FIELD(partCons);
+	WRITE_LIST_FIELD(defaultLevels);
+}
+
+static void
 _outIndexScan(StringInfo str, IndexScan *node)
 {
 	WRITE_NODE_TYPE("INDEXSCAN");
@@ -569,6 +584,8 @@ _outDynamicIndexScan(StringInfo str, DynamicIndexScan *node)
 	outIndexScanFields(str, (IndexScan *) node);
 
 	WRITE_INT_FIELD(partIndex);
+	
+	outLogicalIndexInfo(str, node->logicalIndexInfo);
 }
 
 static void
@@ -885,6 +902,7 @@ _outDML(StringInfo str, DML *node)
 	WRITE_INT_FIELD(oidColIdx);
 	WRITE_INT_FIELD(actionColIdx);
 	WRITE_INT_FIELD(ctidColIdx);
+	WRITE_INT_FIELD(tupleoidColIdx);
 
 	_outPlanInfo(str, (Plan *) node);
 }
@@ -900,6 +918,7 @@ _outSplitUpdate(StringInfo str, SplitUpdate *node)
 
 	WRITE_INT_FIELD(actionColIdx);
 	WRITE_INT_FIELD(ctidColIdx);
+	WRITE_INT_FIELD(tupleoidColIdx);
 	WRITE_NODE_FIELD(insertColIdx);
 	WRITE_NODE_FIELD(deleteColIdx);
 

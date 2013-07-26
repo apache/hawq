@@ -1826,6 +1826,7 @@ typedef struct HashJoinState
         bool                hj_NeedNewOuter;
         bool                hj_MatchedOuter;
         bool                hj_OuterNotEmpty;
+        bool                hj_InnerEmpty;  /* set to true if inner side is empty */
         bool                prefetch_inner;
         bool                hj_nonequijoin;
 } HashJoinState;

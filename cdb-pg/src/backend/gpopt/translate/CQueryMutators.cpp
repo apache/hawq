@@ -211,7 +211,7 @@ CQueryMutators::PnodeIncrementLevelsupMutator
 								(Query *) pnode,
 								(Pfnode) CQueryMutators::PnodeIncrementLevelsupMutator,
 								pvCtx,
-								0 // mutate into cte-lists
+								0 // flag -- mutate into cte-lists
 								);
 
 		return (Node *) pquery;
@@ -249,7 +249,7 @@ CQueryMutators::PnodeFixCTELevelsupMutator
 								(Query *) pnode,
 								(Pfnode) CQueryMutators::PnodeFixCTELevelsupMutator,
 								pvCtx,
-								0 // mutate into cte-lists
+								0 // flag -- mutate into cte-lists
 								);
 
 		// fix the levels up for CTE range table entry when needed
@@ -258,19 +258,25 @@ CQueryMutators::PnodeFixCTELevelsupMutator
 		ForEach (plc, plRtable)
 		{
 			RangeTblEntry *prte = (RangeTblEntry *) lfirst(plc);
+			// the walker in GPDB does not walk range table entries of type CTE
 			if (RTE_CTE == prte->rtekind  && FNeedsLevelsUpCorrection(pctxinclvlmutator, prte->ctelevelsup))
 			{
 				prte->ctelevelsup++;
 			}
-			else if (RTE_SUBQUERY == prte->rtekind)
-			{
-				pctxinclvlmutator->m_ulCurrLevelsUp++;
-				prte->subquery = (Query *) CQueryMutators::PnodeFixCTELevelsupMutator( (Node *) prte->subquery, pctxinclvlmutator);
-				pctxinclvlmutator->m_ulCurrLevelsUp--;
-			}
 		}
 
 		return (Node *) pquery;
+	}
+
+	if (IsA(pnode, RangeTblEntry))
+	{
+		RangeTblEntry *prte = (RangeTblEntry *) pnode;
+		if (RTE_SUBQUERY == prte->rtekind)
+		{
+			pctxinclvlmutator->m_ulCurrLevelsUp++;
+			prte->subquery = (Query *) CQueryMutators::PnodeFixCTELevelsupMutator( (Node *) prte->subquery, pctxinclvlmutator);
+			pctxinclvlmutator->m_ulCurrLevelsUp--;
+		}
 	}
 
 	// recurse into a query attached to sublink
@@ -302,11 +308,9 @@ CQueryMutators::FNeedsLevelsUpCorrection
 	Index idxCtelevelsup
 	)
 {
-	if (pctxinclvlmutator->m_fOnlyCurrentLevel)
-	{
-		return (idxCtelevelsup == pctxinclvlmutator->m_ulCurrLevelsUp);
-	}
-	return (idxCtelevelsup > pctxinclvlmutator->m_ulCurrLevelsUp);
+	// when converting the query to derived table, all references to cte defined at the current level
+	// or above needs to be incremented
+	return (0 == pctxinclvlmutator->m_ulCurrLevelsUp) || (idxCtelevelsup > pctxinclvlmutator->m_ulCurrLevelsUp);
 }
 
 //---------------------------------------------------------------------------
@@ -942,26 +946,6 @@ CQueryMutators::PqueryNormalizeHaving
 	pqueryNew->jointree->quals = PnodeHavingQualMutator(pqueryDrdTbl->havingQual, &ctxHavingQualMutator);
 	pqueryDrdTbl->havingQual = NULL;
 
-	if (NULL != pqueryDrdTbl->cteList)
-	{
-		// the having quals has been translated into a select (qual) attached to the new query pqueryNew.
-		// Therefore, the cte list must now be associated with the new query
-		pqueryNew->cteList = pqueryDrdTbl->cteList;
-		pqueryDrdTbl->cteList = NIL;
-
-		// fix the CTE levels up of the derived table sub query since the CTE list is now associated with the top level query
-		SContextIncLevelsupMutator ctxinclvlmutator
-			(
-			0 /* query level */,
-			true /* fOnlyCurrentLevel bump references to ctes defined at the current level only*/,
-			true /*fFixTargetListTopLevel*/
-			);
-		prte->subquery  = (Query *) CQueryMutators::PnodeFixCTELevelsupMutator( (Node *) pqueryDrdTbl, &ctxinclvlmutator);
-
-		// clean up the old query object
-		gpdb::GPDBFree(pqueryDrdTbl);
-	}
-
 	ReassignSortClause(pqueryNew, prte->subquery);
 
 	if (!prte->subquery->hasAggs && NIL == prte->subquery->groupClause)
@@ -1130,7 +1114,7 @@ CQueryMutators::PqueryConvertToDerivedTable
 	Query *pqueryCopy = (Query *) gpdb::PvCopyObject(const_cast<Query*>(pquery));
 
 	// fix any outer references
-	SContextIncLevelsupMutator ctxIncLvlMutator(0, false /*fOnlyCurrentLevel*/, fFixTargetList);
+	SContextIncLevelsupMutator ctxIncLvlMutator(0, fFixTargetList);
 
 	Node *pnodeHavingQual = NULL;
 	if (!fFixHavingQual)
@@ -1139,37 +1123,35 @@ CQueryMutators::PqueryConvertToDerivedTable
 		pqueryCopy->havingQual = NULL;
 	}
 
+	// fix outer references
 	Query *pqueryDrvd = (Query *) PnodeIncrementLevelsupMutator((Node*) pqueryCopy, &ctxIncLvlMutator);
 	gpdb::GPDBFree(pqueryCopy);
 
-	if (NULL != pnodeHavingQual)
-	{
-		pqueryDrvd->havingQual = pnodeHavingQual;
-	}
+	// fix the CTE levels up -- while the old query is converted into a derived table, its cte list
+	// is re-assigned to the new top-level query. The references to the ctes listed in the old query
+	// as well as those listed before the current query level are accordingly adjusted in the new
+	// derived table.
+	List *plCteOriginal = pqueryDrvd->cteList;
+	pqueryDrvd->cteList = NIL;
+
+	SContextIncLevelsupMutator ctxinclvlmutator(0 /*starting level */, fFixTargetList);
+
+	Query *pqueryDrvdNew  = (Query *) PnodeFixCTELevelsupMutator( (Node *) pqueryDrvd, &ctxinclvlmutator);
+	gpdb::GPDBFree(pqueryDrvd);
+	pqueryDrvd = pqueryDrvdNew;
 
 	// create a range table entry for the query node
 	RangeTblEntry *prte = MakeNode(RangeTblEntry);
 	prte->rtekind = RTE_SUBQUERY;
 
-	// do not walk down the cte list as their cte-levels up will no change
-	List *plCTE = pqueryDrvd->cteList;
-	pqueryDrvd->cteList = NIL;
-
-	Node *pnodeHaving = pqueryDrvd->havingQual;
-	pqueryDrvd->havingQual = NULL;
-
-	// fix the CTE levels up
-	SContextIncLevelsupMutator ctxinclvlmutator
-		(
-		0 /*starting level */,
-		false /* bump all cte levels greater than the current level*/,
-		true /*fFixTargetListTopLevel*/
-		);
-	prte->subquery  = (Query *) PnodeFixCTELevelsupMutator( (Node *) pqueryDrvd, &ctxinclvlmutator);
+	prte->subquery = pqueryDrvd;
 	prte->inFromCl = true;
-	prte->subquery->cteList = plCTE;
-	prte->subquery->havingQual = pnodeHaving;
-	gpdb::GPDBFree(pqueryDrvd);
+	prte->subquery->cteList = NIL;
+
+	if (NULL != pnodeHavingQual)
+	{
+		pqueryDrvd->havingQual = pnodeHavingQual;
+	}
 
 	// create a new range table reference for the new RTE
 	RangeTblRef *prtref = MakeNode(RangeTblRef);
@@ -1177,7 +1159,7 @@ CQueryMutators::PqueryConvertToDerivedTable
 
 	// create a new top-level query with the new RTE in its from clause
 	Query *pqueryNew = MakeNode(Query);
-	pqueryNew->cteList = NIL;
+	pqueryNew->cteList = plCteOriginal;
 	pqueryNew->hasAggs = false;
 	pqueryNew->rtable = gpdb::PlAppendElement(pqueryNew->rtable, prte);
 

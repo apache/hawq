@@ -150,8 +150,11 @@
 #define ALLOW_getCdbComponentDatabases
 #define ALLOW_pg_strcasecmp
 #define ALLOW_makeRandomSegMap
+#define ALLOW_initStringInfoOfSize
 #define ALLOW_makeStringInfo
 #define ALLOW_appendStringInfo
+#define ALLOW_appendStringInfoString
+#define ALLOW_appendStringInfoChar
 #define ALLOW_get_cast_func
 #define ALLOW_get_relation_part_constraints
 #define ALLOW_get_operator_type
@@ -165,6 +168,9 @@
 #define ALLOW_cdbhash_const
 #define ALLOW_ExecCheckRTPerms
 #define ALLOW_is_pxf_protocol
+#define ALLOW_pxf_calc_max_participants_allowed
+#define ALLOW_map_hddata_2gp_segments
+#define ALLOW_free_hddata_2gp_segments
 
 #include "gpopt/utils/gpdbdefs.h"
 
@@ -2189,6 +2195,21 @@ gpdb::Plgidx
 	return NULL;
 }
 
+LogicalIndexInfo *
+gpdb::Plgidxinfo
+	(
+	Oid rootOid, 
+	Oid indexOid
+	)
+{
+	GP_WRAP_START;
+	{
+		return logicalIndexInfoForIndexOid(rootOid, indexOid);
+	}
+	GP_WRAP_END;
+	return NULL;
+}
+
 void
 gpdb::BuildRelationTriggers
 	(
@@ -2316,6 +2337,52 @@ gpdb::FPxfProtocol
 	return false;
 }
 
+int
+gpdb::IMaxParticipantsPxf
+	(
+	int total_segments
+	)
+{
+	GP_WRAP_START;
+	{
+		return pxf_calc_max_participants_allowed(total_segments);
+	}
+	GP_WRAP_END;
+	return 0;
+}
+
+char**
+gpdb::RgszMapHdDataToSegments
+	(
+	char *uri,
+	int total_segs,
+	int working_segs,
+	Relation relation
+	)
+{
+	GP_WRAP_START;
+	{
+		return map_hddata_2gp_segments(uri, total_segs, working_segs, relation);
+	}
+	GP_WRAP_END;
+	return NULL;
+}
+
+void
+gpdb::FreeHdDataToSegmentsMapping
+	(
+	char **segs_work_map,
+	int total_segs
+	)
+{
+	GP_WRAP_START;
+	{
+		free_hddata_2gp_segments(segs_work_map, total_segs);
+		return;
+	}
+	GP_WRAP_END;
+}
+
 CdbComponentDatabases *
 gpdb::PcdbComponentDatabases(void)
 {
@@ -2357,6 +2424,21 @@ gpdb::RgfRandomSegMap
 	return NULL;
 }
 
+void
+gpdb::InitStringInfoOfSize
+	(
+	StringInfo str,
+	int bufsize
+	)
+{
+	GP_WRAP_START;
+	{
+		initStringInfoOfSize(str, bufsize);
+		return;
+	}
+	GP_WRAP_END;
+}
+
 StringInfo
 gpdb::SiMakeStringInfo(void)
 {
@@ -2379,6 +2461,36 @@ gpdb::AppendStringInfo
 	GP_WRAP_START;
 	{
 		appendStringInfo(str, "%s%s", str1, str2);
+		return;
+	}
+	GP_WRAP_END;
+}
+
+void
+gpdb::AppendStringInfoString
+	(
+	StringInfo str,
+	const char *s
+	)
+{
+	GP_WRAP_START;
+	{
+		appendStringInfoString(str, s);
+		return;
+	}
+	GP_WRAP_END;
+}
+
+void
+gpdb::AppendStringInfoChar
+	(
+	StringInfo str,
+	char c
+	)
+{
+	GP_WRAP_START;
+	{
+		appendStringInfoChar(str, c);
 		return;
 	}
 	GP_WRAP_END;

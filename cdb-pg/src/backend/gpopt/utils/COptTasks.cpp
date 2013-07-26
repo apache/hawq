@@ -150,6 +150,7 @@ COptTasks::SOptContext::SOptContext()
 	m_szPlanDXL(NULL),
 	m_pplstmt(NULL),
 	m_fGeneratePlStmt(false),
+	m_fSerializePlanDXL(false),
 	m_fUnexpectedFailure(false),
 	m_szErrorMsg(NULL)
 {}
@@ -758,7 +759,10 @@ COptTasks::PvOptimizeTask
 	IMemoryPool *pmp = amp.Pmp();
 
 	// initialize metadata cache
-	CMDCache::Init();
+	if (!CMDCache::FInitialized())
+	{
+		CMDCache::Init();
+	}
 
 	// load search strategy
 	DrgPss *pdrgpss = PdrgPssLoad(pmp, optimizer_search_strategy_path);
@@ -820,9 +824,13 @@ COptTasks::PvOptimizeTask
 									pocconf
 									);
 
-			// serialize DXL to xml
-			CWStringDynamic *pstrPlan = CDXLUtils::PstrSerializePlan(pmp, pdxlnPlan, pocconf->Pec()->UllPlanId(), pocconf->Pec()->UllPlanSpaceSize(), true /*fSerializeHeaderFooter*/, true /*fIndent*/);
-			poctx->m_szPlanDXL = SzFromWsz(pstrPlan->Wsz());
+			if (poctx->m_fSerializePlanDXL)
+			{
+				// serialize DXL to xml
+				CWStringDynamic *pstrPlan = CDXLUtils::PstrSerializePlan(pmp, pdxlnPlan, pocconf->Pec()->UllPlanId(), pocconf->Pec()->UllPlanSpaceSize(), true /*fSerializeHeaderFooter*/, true /*fIndent*/);
+				poctx->m_szPlanDXL = SzFromWsz(pstrPlan->Wsz());
+				delete pstrPlan;
+			}
 
 			// translate DXL->PlStmt only when needed
 			if (poctx->m_fGeneratePlStmt)
@@ -830,7 +838,6 @@ COptTasks::PvOptimizeTask
 				poctx->m_pplstmt = (PlannedStmt *) gpdb::PvCopyObject(Pplstmt(pmp, &mda, pdxlnPlan));
 			}
 
-			delete pstrPlan;
 			pdxlnQuery->Release();
 			pocconf->Release();
 		}
@@ -859,7 +866,11 @@ COptTasks::PvOptimizeTask
 	// cleanup
 	pbsTraceFlags->Release();
 	CRefCount::SafeRelease(pdxlnPlan);
-	CMDCache::Shutdown();
+
+	if (optimizer_release_mdcache)
+	{
+		CMDCache::Shutdown();
+	}
 
 	return NULL;
 }
@@ -1232,6 +1243,7 @@ COptTasks::SzOptimize
 
 	SOptContext octx;
 	octx.m_pquery = pquery;
+	octx.m_fSerializePlanDXL = true;
 	Execute(&PvOptimizeTask, &octx);
 
 	// clean up context
@@ -1321,6 +1333,7 @@ COptTasks::SzDXL
 
 	SOptContext octx;
 	octx.m_pplstmt = pplstmt;
+	octx.m_fSerializePlanDXL = true;
 	Execute(&PvDXLFromPlstmtTask, &octx);
 
 	// clean up context

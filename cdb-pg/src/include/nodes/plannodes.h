@@ -484,6 +484,19 @@ typedef struct IndexScan
 	ScanDirection indexorderdir;	/* forward or backward or don't care */
 } IndexScan;
 
+typedef struct LogicalIndexInfo
+{
+	Oid	logicalIndexOid;	/* OID of the logical index */
+	int	nColumns;		/* Number of columns in the index */
+	AttrNumber	*indexKeys;	/* column numbers of index keys */
+	List	*indPred;		/* predicate if partial index, or NIL */
+	List	*indExprs;		/* index on expressions */
+	bool	indIsUnique;		/* unique index */
+	Node	*partCons;		/* concatenated list of check constraints 
+					 * of each partition on which this index is defined */
+	List	*defaultLevels;		/* Used to identify a default partition */
+} LogicalIndexInfo;
+
 /*
  * DynamicIndexScan
  *   Scan a list of indexes that will be determined at run time.
@@ -523,6 +536,9 @@ typedef struct DynamicIndexScan
 	 * This internal structure is maintained in EState.
 	 */
 	int partIndex;
+	
+	/* logical index to use */
+	LogicalIndexInfo *logicalIndexInfo;
 
 } DynamicIndexScan;
 
@@ -1114,6 +1130,7 @@ typedef struct DML
 	AttrNumber	oidColIdx;		/* index of table oid into the target list */
 	AttrNumber	actionColIdx;	/* index of action column into the target list */
 	AttrNumber	ctidColIdx;		/* index of ctid column into the target list */
+	AttrNumber	tupleoidColIdx;	/* index of tuple oid column into the target list */
 
 } DML;
 
@@ -1126,7 +1143,8 @@ typedef struct SplitUpdate
 	
 	Plan		plan;				
 	AttrNumber	actionColIdx;		/* index of action column into the target list */
-	AttrNumber	ctidColIdx;		/* index of ctid column into the target list */
+	AttrNumber	ctidColIdx;			/* index of ctid column into the target list */
+	AttrNumber	tupleoidColIdx;		/* index of tuple oid column into the target list */
 	List		*insertColIdx;		/* list of columns to INSERT into the target list */
 	List		*deleteColIdx;		/* list of columns to DELETE into the target list */
 
