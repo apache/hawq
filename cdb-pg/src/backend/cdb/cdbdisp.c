@@ -3786,6 +3786,47 @@ planner_make_plan_constant(struct PlannerInfo *root, Node *n, bool is_SRI)
 	return plan_tree_mutator(n, pre_dispatch_function_evaluation_mutator, &pcontext);
 }
 
+
+/*
+ *
+ * Remove subquery field in RTE's with subquery kind
+ * This is an optimization used to reduce plan size before serialization
+ *
+ */
+static
+void remove_subquery_in_RTEs(Node *node)
+{
+	if (node == NULL)
+	{
+		return;
+	}
+
+ 	if (IsA(node, RangeTblEntry))
+ 	{
+ 		RangeTblEntry *rte = (RangeTblEntry *)node;
+ 		if (RTE_SUBQUERY == rte->rtekind && NULL != rte->subquery)
+ 		{
+ 			/*
+ 			 * replace subquery with a dummy subquery
+ 			 */
+ 			rte->subquery = makeNode(Query);
+ 		}
+
+ 		return;
+ 	}
+
+ 	if (IsA(node, List))
+ 	{
+ 		List *list = (List *) node;
+ 		ListCell   *lc = NULL;
+ 		foreach(lc, list)
+ 		{
+ 			remove_subquery_in_RTEs((Node *) lfirst(lc));
+ 		}
+ 	}
+}
+
+
 /*
  * Compose and dispatch the MPPEXEC commands corresponding to a plan tree
  * within a complete parallel plan.  (A plan tree will correspond either
@@ -3946,6 +3987,14 @@ cdbdisp_dispatchPlan(struct QueryDesc *queryDesc,
 	{
 		verify_shared_snapshot_ready();
 	}
+
+	/*
+	 *	MPP-20785:
+	 *	remove subquery field from RTE's since it is not needed during query
+	 *	execution,
+	 *	this is an optimization to reduce size of serialized plan before dispatching
+	 */
+	remove_subquery_in_RTEs((Node *) (queryDesc->plannedstmt->rtable));
 
 	/*
 	 * serialized plan tree. Note that we're called for a single
