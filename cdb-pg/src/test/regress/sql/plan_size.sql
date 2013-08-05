@@ -71,9 +71,9 @@ $$
 language SQL;
 
 
-set gp_max_plan_size =30;
+set gp_max_plan_size =20;
 
--- Following queries should error out for plan size 30KB
+-- Following queries should error out for plan size 20KB
 -- simple select
 select * from plineitem;
 

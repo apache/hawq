@@ -92,19 +92,19 @@ create or replace function f2() returns bigint as $$
 select count(*) from plineitem;
 $$
 language SQL;
-set gp_max_plan_size =30;
--- Following queries should error out for plan size 30KB
+set gp_max_plan_size =20;
+-- Following queries should error out for plan size 20KB
 -- simple select
 select * from plineitem;
-ERROR:  Query plan size limit exceeded, current size: 85KB, max allowed size: 30KB
+ERROR:  Query plan size limit exceeded, current size: 85KB, max allowed size: 20KB
 HINT:  Size controlled by gp_max_plan_size
 -- UDFs
 select * from f();
-ERROR:  Query plan size limit exceeded, current size: 85KB, max allowed size: 30KB
+ERROR:  Query plan size limit exceeded, current size: 85KB, max allowed size: 20KB
 HINT:  Size controlled by gp_max_plan_size
 CONTEXT:  SQL function "f" statement 1
 select * from f2();
-ERROR:  Query plan size limit exceeded, current size: 47KB, max allowed size: 30KB
+ERROR:  Query plan size limit exceeded, current size: 27KB, max allowed size: 20KB
 HINT:  Size controlled by gp_max_plan_size
 CONTEXT:  SQL function "f2" statement 1
 -- Joins
@@ -128,7 +128,7 @@ group by
 order by
         l_returnflag,
         l_linestatus;
-ERROR:  Query plan size limit exceeded, current size: 169KB, max allowed size: 30KB
+ERROR:  Query plan size limit exceeded, current size: 123KB, max allowed size: 20KB
 HINT:  Size controlled by gp_max_plan_size
 select l_orderkey,
        sum(l_extendedprice * (1 - l_discount)) as revenue,
@@ -140,7 +140,7 @@ group by
 order by
        l_orderkey
 LIMIT 10;
-ERROR:  Query plan size limit exceeded, current size: 81KB, max allowed size: 30KB
+ERROR:  Query plan size limit exceeded, current size: 81KB, max allowed size: 20KB
 HINT:  Size controlled by gp_max_plan_size
 -- Init plans
 select p1.l_orderkey,
@@ -154,7 +154,7 @@ group by
 order by
        p1.l_orderkey
 LIMIT 10;
-ERROR:  Query plan size limit exceeded, current size: 356KB, max allowed size: 30KB
+ERROR:  Query plan size limit exceeded, current size: 307KB, max allowed size: 20KB
 HINT:  Size controlled by gp_max_plan_size
 set gp_max_plan_size ='700kB';
 -- Following queries should be dispatched for plan size 700kB
