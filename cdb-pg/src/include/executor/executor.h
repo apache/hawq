@@ -424,7 +424,7 @@ extern ShareNodeEntry * ExecGetShareNodeEntry(EState *estate, int shareid, bool 
 /* ResultRelInfo and Append Only segment assignment */
 extern void ResultRelInfoSetSegno(ResultRelInfo *resultRelInfo, List *mapping);
 
-extern void CreateAppendOnlySegFileOnMaster(ResultRelInfo *resultRelInfo, List *mapping);
+extern void CreateAppendOnlySegFileOnMaster(Oid relid, List *mapping);
 
 /* Additions for MPP Slice table utilities defined in execUtils.c */
 extern GpExecIdentity getGpExecIdentity(QueryDesc *queryDesc,

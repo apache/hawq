@@ -1545,6 +1545,13 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 			}
 
 			cstate->ao_segnos = assignPerRelSegno(all_relids);
+
+			ListCell *cell;
+			foreach(cell, all_relids)
+			{
+				Oid relid =  lfirst_oid(cell);
+				CreateAppendOnlySegFileOnMaster(relid, cstate->ao_segnos);
+			}
 		}
 		else
 		{
@@ -2656,17 +2663,6 @@ CopyFromDispatch(CopyState cstate)
             palloc0(resultRelInfo->ri_TrigDesc->numtriggers * sizeof(FmgrInfo));
     resultRelInfo->ri_TrigInstrument = NULL;
     ResultRelInfoSetSegno(resultRelInfo, cstate->ao_segnos);
-	CreateAppendOnlySegFileOnMaster(resultRelInfo, cstate->ao_segnos);
-
-	/*
-	 * lock segments files on master.
-	 */
-	/*
-	 * currently, we disable vacuum, do not lock since lock table is too small.
-	 */
-	/*if (Gp_role == GP_ROLE_DISPATCH)
-		LockSegfilesOnMaster(resultRelInfo->ri_RelationDesc, resultRelInfo->ri_aosegno);*/
-
 
 	ExecOpenIndices(resultRelInfo);
 

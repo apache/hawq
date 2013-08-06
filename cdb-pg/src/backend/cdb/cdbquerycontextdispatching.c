@@ -1479,7 +1479,7 @@ prepareDispatchedCatalogRelation(QueryContextInfo *cxt, Oid relid,
             Oid myrelid = lfirst_oid(child);
             if (forInsert)
             {
-				int32 mysegno = findSegnofromMap(relid, segnoMaps);
+				int32 mysegno = findSegnofromMap(myrelid, segnoMaps);
                 Assert(mysegno != InvalidFileSegNumber);
                 prepareDispatchedCatalogSingleRelation(cxt, myrelid, TRUE,
                         mysegno, htab);

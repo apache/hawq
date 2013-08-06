@@ -61,6 +61,7 @@
 #include "libpq/pqformat.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h" /* temporary */
+#include "nodes/pg_list.h"
 #include "optimizer/clauses.h"
 #include "parser/parse_clause.h"
 #include "parser/parse_expr.h"
@@ -72,6 +73,7 @@
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
 #include "utils/ps_status.h"
+#include "utils/rel.h"
 
 #include "catalog/pg_statistic.h"
 #include "catalog/pg_class.h"
@@ -1452,15 +1454,13 @@ InitializeResultRelations(PlannedStmt *plannedstmt, EState *estate, CmdType oper
 		{
 			relinfo = &(resultRelInfos[relno]);
 			ResultRelInfoSetSegno(relinfo, estate->es_result_aosegnos);
-			CreateAppendOnlySegFileOnMaster(relinfo, estate->es_result_aosegnos);
-			/*
-			 * lock segments files on master.
-			 */
-			/*
-			 * currently, we disable vacuum, do not lock since lock table is too small.
-			 */
-			/*if (Gp_role == GP_ROLE_DISPATCH)
-				LockSegfilesOnMaster(relinfo->ri_RelationDesc, relinfo->ri_aosegno);*/
+		}
+
+		ListCell *cell;
+		foreach(cell, all_relids)
+		{
+			Oid relid =  lfirst_oid(cell);
+			CreateAppendOnlySegFileOnMaster(relid, estate->es_result_aosegnos);
 		}
 
 	}
@@ -2098,39 +2098,44 @@ initResultRelInfo(ResultRelInfo *resultRelInfo,
 }
 
 void
-CreateAppendOnlySegFileOnMaster(ResultRelInfo *resultRelInfo, List *mapping)
+CreateAppendOnlySegFileOnMaster(Oid relid, List *mapping)
 {
    	ListCell *relid_to_segno;
    	bool	  found = false;
 
+   	Relation rel = heap_open(relid, AccessShareLock);
+
 	/* only relevant for AO relations */
-	if(!relstorage_is_ao(RelinfoGetStorage(resultRelInfo)))
+	if(!RelationIsAoCols(rel) && !RelationIsAoRows(rel))
+	{
+		heap_close(rel, AccessShareLock);
 		return;
+	}
 
 	Assert(mapping);
-	Assert(resultRelInfo->ri_RelationDesc);
 
    	/* lookup the segfile # to write into, according to my relid */
-
+	Oid myrelid = RelationGetRelid(rel);
    	foreach(relid_to_segno, mapping)
    	{
 		SegfileMapNode *n = (SegfileMapNode *)lfirst(relid_to_segno);
-		Oid myrelid = RelationGetRelid(resultRelInfo->ri_RelationDesc);
+
 		if(n->relid == myrelid)
 		{
 			Assert(n->segno != InvalidFileSegNumber);
-			resultRelInfo->ri_aosegno = n->segno;
 
 			/*
 			 * in hawq, master create all segfile for segments
 			 */
 			if (Gp_role == GP_ROLE_DISPATCH)
-				CreateAppendOnlySegFileForRelationOnMaster(resultRelInfo->ri_RelationDesc,
-						n->segno);
+				CreateAppendOnlySegFileForRelationOnMaster(rel, n->segno);
 
 			found = true;
+			break;
 		}
 	}
+
+   	heap_close(rel, AccessShareLock);
 
 	Assert(found);
 }
@@ -2278,37 +2283,18 @@ CreateAoCsSegFileForRelationOnMaster(Relation rel,
 void
 CreateAppendOnlySegFileForRelationOnMaster(Relation rel, int segno)
 {
-	List		*children = NIL;
-	ListCell	*lc;
-
 	Assert(NULL != rel->rd_segfile0_relationnodeinfos);
-
-	/* Let's deal with partition relation. */
-	children = find_all_inheritors(rel->rd_id);
 
 	SharedStorageOpTasks *tasks = CreateSharedStorageOpTasks();
 
-	foreach(lc, children)
-	{
-		Relation	child_rel = rel;
-		Oid			oid = lfirst_oid(lc);
+	AppendOnlyEntry *aoEntry = GetAppendOnlyEntry(rel->rd_id, SnapshotNow);
 
-		/* open/close the child relation. */
-		if (oid != rel->rd_id)
-			child_rel = heap_open(oid, AccessShareLock);
+	if(RelationIsAoRows(rel))
+		CreaateAoRowSegFileForRelationOnMaster(rel, aoEntry, segno, tasks);
+	else
+		CreateAoCsSegFileForRelationOnMaster(rel, aoEntry, segno, tasks);
 
-		AppendOnlyEntry *aoEntry = GetAppendOnlyEntry(child_rel->rd_id, SnapshotNow);
-
-		if(RelationIsAoRows(child_rel))
-			CreaateAoRowSegFileForRelationOnMaster(child_rel, aoEntry, segno, tasks);
-		else
-			CreateAoCsSegFileForRelationOnMaster(child_rel, aoEntry, segno, tasks);
-
-		if (oid != rel->rd_id)
-			heap_close(child_rel, AccessShareLock);
-
-		pfree(aoEntry);
-	}
+	pfree(aoEntry);
 
 	PerformSharedStorageOpTasks(tasks);
 	PostPerformSharedStorageOpTasks(tasks);
@@ -2354,11 +2340,8 @@ ResultRelInfoSetSegno(ResultRelInfo *resultRelInfo, List *mapping)
 			Assert(n->segno != InvalidFileSegNumber);
 			resultRelInfo->ri_aosegno = n->segno;
 
-			if (Debug_appendonly_print_insert)
-				elog(LOG, "Appendonly: setting pre-assigned segno %d in result "
-						  "relation with relid %d", n->segno, n->relid);
-
 			found = true;
+			break;
 		}
 	}
 

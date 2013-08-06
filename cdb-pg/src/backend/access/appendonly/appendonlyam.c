@@ -449,13 +449,6 @@ SetCurrentFileSegForWrite(AppendOnlyInsertDesc aoInsertDesc)
 	 * we should add the new catalog entry on master and then dispatch it to segments for update.
 	 */
 	Assert(aoInsertDesc->fsInfo != NULL);
-	/*if (aoInsertDesc->fsInfo == NULL)
-	{
-		InsertInitialSegnoEntry(aoInsertDesc->aoEntry, aoInsertDesc->cur_segno);
-
-		aoInsertDesc->fsInfo = NewFileSegInfo(aoInsertDesc->cur_segno);
-	}*/
-
 	fsinfo = aoInsertDesc->fsInfo;
 	Assert(fsinfo);
 	eof = (int64)fsinfo->eof;

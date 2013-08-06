@@ -281,7 +281,6 @@ ExecInsert(TupleTableSlot *slot,
 		{
 			/* Set the pre-assigned fileseg number to insert into */
 			ResultRelInfoSetSegno(resultRelInfo, estate->es_result_aosegnos);
-			CreateAppendOnlySegFileOnMaster(resultRelInfo, estate->es_result_aosegnos);
 
 			resultRelInfo->ri_aoInsertDesc =
 				appendonly_insert_init(resultRelationDesc,
@@ -296,7 +295,6 @@ ExecInsert(TupleTableSlot *slot,
 		if (resultRelInfo->ri_aocsInsertDesc == NULL)
 		{
 			ResultRelInfoSetSegno(resultRelInfo, estate->es_result_aosegnos);
-			CreateAppendOnlySegFileOnMaster(resultRelInfo, estate->es_result_aosegnos);
 			resultRelInfo->ri_aocsInsertDesc = aocs_insert_init(resultRelationDesc, resultRelInfo->ri_aosegno);
 		}
 
