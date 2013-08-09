@@ -192,12 +192,8 @@ def parseargs():
 
     HADOOP_HOME = options.hadoop if options.hadoop else os.environ.get("HADOOP_HOME")
 
-    if not options.zipin:
-        if not HADOOP_HOME:
-            checkFaild(None, "utility will SKIP HDFS configuration check because HADOOP_HOME is not specified in environment variable or --hadoop")
-
-        if not gpcheck_info.is_root:
-            logger.warning("utility will SKIP disk device read-ahead(blockdev) check when run as non-root user")
+    if not gpcheck_info.is_root and not HADOOP_HOME:
+        checkFaild(None, "utility will SKIP HDFS configuration check because HADOOP_HOME is not specified in environment variable or --hadoop")
 
     # params check
     if not options.file and not options.host and not options.zipin:
@@ -296,7 +292,7 @@ def createHostList():
     if options.verbose:
         logger.info("trying to deduplicate hosts [success]")
 
-    if HADOOP_HOME:
+    if not gpcheck_info.is_root and HADOOP_HOME:
         try:
             namenode_host = getHDFSNamenodeHost()
             gpcheck_info.hosts[namenode_host] = GpCheckHost(namenode_host, is_namenode=True)
@@ -319,24 +315,29 @@ def runCollections():
 
 
 def runCollectionOnServers():
-    if gpcheck_info.host_type == HostType.GPCHECK_HOSTTYPE_GENERIC_LINUX:
-        host_type_cl = "--linux"
-    elif gpcheck_info.host_type == HostType.GPCHECK_HOSTTYPE_GENERIC_SOLARIS:
-        host_type_cl = "--solaris"
-    else:
-        raise GpCheckError("unsupported host type")
-
     gpcheck_info.collection_start_time = time.time()
+
+    def getDumpCommand():
+        if gpcheck_info.host_type == HostType.GPCHECK_HOSTTYPE_GENERIC_LINUX:
+            host_type_cl = "--linux"
+        elif gpcheck_info.host_type == HostType.GPCHECK_HOSTTYPE_GENERIC_SOLARIS:
+            host_type_cl = "--solaris"
+        else:
+            raise GpCheckError("unsupported host type")
+
+        cmd = "%s/sbin/gpcheck_hostdump %s" % (GPHOME, host_type_cl)
+        if not gpcheck_info.is_root:
+            cmd += " --sysctl %s" % ",".join(gpcheck_config.sysctl_expected.keys())
+            if HADOOP_HOME:
+                cmd += " --hadoop %s" % HADOOP_HOME
+        return cmd
+
     try:
+        cmdStr = getDumpCommand()
         for host in gpcheck_info.hosts:
             if options.verbose:
                 logger.info("collect data on host: %s" % host)
 
-            cmdStr = "%s/sbin/gpcheck_hostdump %s --sysctl %s" % (
-                        GPHOME, host_type_cl,
-                        ",".join(gpcheck_config.sysctl_expected.keys())) # sysctl params to collect
-            if HADOOP_HOME:
-                cmdStr += " --hadoop %s" % HADOOP_HOME
             cmd = Command(host, cmdStr, REMOTE, host)
             pool.addCommand(cmd)
 
@@ -350,6 +351,7 @@ def runCollectionOnServers():
             
     except Exception, e:
         raise GpCheckError("Faild to collect data from servers:\n%s" % e)
+
     gpcheck_info.collection_end_time = time.time()
 
 
@@ -544,17 +546,17 @@ def testHAWQ(host):
         if num_segments > 1:
             checkFaild(host.hostname, "HAWQ master host has segments configured")
 
-        if actual_total_memory < guc_vmemsize_segment:
-            checkFaild(host.hostname, "HAWQ master host memory size '%s' is less then the '%s' size '%s'" % (actual_total_memory, HAWQ_GUC_MEMORY, guc_vmemsize_master))
-            logger.warning("please change the expeced data node memory 'dfs.mem.datanode.heap' in gpcheck.cnf file")
-            logger.warning("SKIP '%s' check" %(HAWQ_GUC_MEMORY))
-            return
-
-        # check HAWQ master's cpu cores and memory size
+        # check HAWQ master's cpu cores
         if abs(guc_cpucores_master - actual_total_cpucores) > 1024:
             checkFaild(host.hostname, "HAWQ master's %s GUC value is %s, expected %s" % (
                 HAWQ_GUC_CPU_CORES, guc_cpucores_master, actual_total_cpucores))
 
+        if actual_total_memory < guc_vmemsize_master:
+            checkFaild(host.hostname, "HAWQ master host memory size '%s' is less than the '%s' size '%s'" % (
+                actual_total_memory, HAWQ_GUC_MEMORY, guc_vmemsize_master))
+            return
+
+        # check HAWQ master's memory size
         if abs(guc_vmemsize_master - actual_total_memory) > 1024:
             checkFaild(host.hostname, "HAWQ master's %s GUC value is %s, expected %s" % (
                 HAWQ_GUC_MEMORY, guc_vmemsize_master, actual_total_memory))
@@ -562,20 +564,20 @@ def testHAWQ(host):
     else:
         datanode_mem = gpcheck_config.hdfs_expected["dfs.mem.datanode.heap"]
 
-        if actual_total_memory < datanode_mem:
-            checkFaild(host.hostname, "HAWQ segment's host memory size '%s' is less then the expected data node memory size '%s'" % (actual_total_memory, datanode_mem))
-            logger.warning("please change the expeced data node memory 'dfs.mem.datanode.heap' in gpcheck.cnf file")
-            logger.warning("SKIP '%s' check" %(HAWQ_GUC_MEMORY))
-            return
-
-        # check HAWQ segment's cpu cores and memory size
+        # check HAWQ segment's cpu cores
         expect_cpucores_per_segment = actual_total_cpucores / num_segments
-        expect_vmemsize_per_segment = (actual_total_memory - datanode_mem) / num_segments
-
         if abs(guc_cpucores_segment - expect_cpucores_per_segment) > 1024:
             checkFaild(host.hostname, "HAWQ segment's %s GUC value on this host is %s, expected %s" % (
                 HAWQ_GUC_CPU_CORES, guc_cpucores_segment, expect_cpucores_per_segment))
 
+        # check HAWQ memory size
+        if actual_total_memory < datanode_mem:
+            checkFaild(host.hostname, "HAWQ segment's host memory size '%s' is less than the expected data node memory size '%s'" % (
+                actual_total_memory, datanode_mem))
+            logger.warning("please change the expected data node memory 'dfs.mem.datanode.heap' in gpcheck.cnf file")
+            logger.warning("SKIP '%s' check" %(HAWQ_GUC_MEMORY))
+            return
+        expect_vmemsize_per_segment = (actual_total_memory - datanode_mem) / num_segments
         if abs(guc_vmemsize_segment - expect_vmemsize_per_segment) > 1024:
             checkFaild(host.hostname, "HAWQ segment's %s GUC value on this host is %s, expected %s" % (
                 HAWQ_GUC_MEMORY, guc_vmemsize_segment, expect_vmemsize_per_segment))
@@ -667,6 +669,7 @@ def testIOSchedulers(host):
                        "on device (%s) IO scheduler '%s' does not match expected value '%s'" % (dev, scheduler, expectedScheduler))
 
 
+# perform this test only run as root
 def testBlockdev(host):
     if host.data.blockdev is None:
         return
@@ -694,20 +697,7 @@ def testSysctl(host):
     real_values = host.data.sysctl.variables
 
     # gpcheck.conf specify a lowerbound value for these params, actual value can be larger
-    params_with_lowerbound = set([
-        "kernel.shmmax",
-        "kernel.shmmni",
-        "kernel.shmall",
-        "kernel.msgmnb",
-        "kernel.msgmax",
-        "kernel.msgmni",
-        "kernel.threads-max",
-        "kernel.pid_max",
-        "fs.nr_open",
-        "net.ipv4.tcp_max_syn_backlog",
-        "net.core.netdev_max_backlog",
-        "net.core.rmem_max",
-        "net.core.wmem_max"])
+    params_with_lowerbound = set() # sysctl params' value must be exactly the same
 
     for k in expected_values:
         if k in params_with_lowerbound:
@@ -779,24 +769,29 @@ def testNtp(host):
 def testGenericLinuxHost(host):
     logger.info("test on host: %s" % host.hostname)
 
-    if host.is_namenode:
-        testHDFSConfig(host)
-        testDiskCapacity(host)
-        testSysctl(host)
-        testLimitsConf(host)
-        testLinuxMounts(host)
-        testNtp(host)
+    if gpcheck_info.is_root:
+        if not host.is_namenode:
+            # only check block device's readahead when run as root
+            testBlockdev(host)
 
     else:
-        testHAWQ(host)
-        testDiskCapacity(host)
-        testHDFSConfig(host)
-        testIOSchedulers(host)
-        testBlockdev(host)
-        testSysctl(host)
-        testLimitsConf(host)
-        testLinuxMounts(host)
-        testNtp(host)
+        if host.is_namenode:
+            testHDFSConfig(host)
+            testDiskCapacity(host)
+            testSysctl(host)
+            testLimitsConf(host)
+            testLinuxMounts(host)
+            testNtp(host)
+
+        else:
+            testHAWQ(host)
+            testDiskCapacity(host)
+            testHDFSConfig(host)
+            testIOSchedulers(host)
+            testSysctl(host)
+            testLimitsConf(host)
+            testLinuxMounts(host)
+            testNtp(host)
 
 
 def testGenericSolarisHost(host):
@@ -962,6 +957,10 @@ def doPrint():
 
 
 if __name__ == '__main__':
+
+    if gpcheck_info.is_root:
+        logger.info("gpcheck will perform block device's readahead checks when run as root")
+
     try:
         checkPlatform()
         parseargs()
@@ -989,7 +988,8 @@ if __name__ == '__main__':
             # read collected data into gpcheck_info
             readDataFiles()
             # read HAWQ configuration
-            readHAWQConfiguration()
+            if not gpcheck_info.is_root:
+                readHAWQConfiguration()
 
         # Phase 2: generate output
         if options.stdout:

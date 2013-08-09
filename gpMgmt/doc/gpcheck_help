@@ -49,12 +49,6 @@ helpful, here is an example:
     [linux.diskusage]
     diskusage.monitor.mounts = /,/data1,/data2
 
-Pivotal recommends that you run gpcheck as root. 
-If you do not run gpcheck as root, the utility displays 
-a warning message and will not be able to validate all 
-configuration settings; Only some of these settings will 
-be validated.
-
 *****************************************************
 OPTIONS
 *****************************************************

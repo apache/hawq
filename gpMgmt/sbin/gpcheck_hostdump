@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 '''
-USAGE:   gpcheck_hostdump [--appliance] [--linux] [--solaris] --hadoop hadoop_home_path
+USAGE:   gpcheck_hostdump [--appliance] [--linux] [--solaris] --hadoop hadoop_home_path --sysctl comma_separated_sysctl_options
          where --appliance will do a dump of appliance server
          where --linux will do a dump of a generic linux server 
          where --solaris will do a dump of a generic solaris server 
@@ -397,6 +397,8 @@ def collectCPUandMemoryInfo():
 
 
 def collectHDFS():
+    if not options.hadoop:
+        return None
     data = hdfs()
     hadoop_config_file = os.path.join(options.hadoop, "libexec/hadoop-config.sh")
     hadoop_env_file = os.path.join(options.hadoop, "etc/hadoop/hadoop-env.sh")
@@ -418,7 +420,7 @@ def collectHDFS():
             stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     result = p.communicate()
 
-    if p.returncode:
+    if p.returncode or result[0] == '':
         data.namenode_heap_size = data.max_heap_size
     else:
         data.namenode_heap_size = int(re.sub(r'[^\d]+', '', result[0]))
@@ -428,7 +430,7 @@ def collectHDFS():
             stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     result = p.communicate()
 
-    if p.returncode:
+    if p.returncode or result[0] == '':
         data.datanode_heap_size = data.max_heap_size
     else:
         data.datanode_heap_size = int(re.sub(r'[^\d]+', '', result[0]))
@@ -440,7 +442,11 @@ def collectHDFS():
         with open(hdfs_site_file) as f:
             xmldoc = minidom.parse(f)
         for node in xmldoc.getElementsByTagName('property'):
-            data.site_config[getPropName(node)] = getPropValue(node).strip()
+            try:
+                data.site_config[getPropName(node)] = getPropValue(node).strip()
+
+            except IndexError:
+                pass # the <value> tag may be empty, which causes IndexError in getPropValue
 
     except Exception, e:
         data.errormsg = "Failed to read HDFS config file '%s': %s" % (hdfs_site_file, e)
@@ -776,20 +782,19 @@ def processGenericLinuxServer():
     global output
     output = GenericLinuxOutputData()
 
-    if options.hadoop:
-        output.hdfs = collectHDFS()
-
     if getpass.getuser() == "root":
         output.blockdev = collectBlockdev()
 
-    output.uname = collectUname()
-    output.machine = collectCPUandMemoryInfo()
-    output.diskusage = collectDiskUsage()
-    output.sysctl = collectSysctl()
-    output.limitsconf = collectLimits()
-    output.mounts = collectMounts()
-    output.ioschedulers = collectIOschedulers()
-    output.ntp = collectNtpd()
+    else:
+        output.hdfs = collectHDFS()
+        output.uname = collectUname()
+        output.machine = collectCPUandMemoryInfo()
+        output.diskusage = collectDiskUsage()
+        output.sysctl = collectSysctl()
+        output.limitsconf = collectLimits()
+        output.mounts = collectMounts()
+        output.ioschedulers = collectIOschedulers()
+        output.ntp = collectNtpd()
 
 
 def processApplianceServer():
