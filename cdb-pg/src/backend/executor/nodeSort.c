@@ -656,8 +656,10 @@ ExecEagerFreeSort(SortState *node)
 	{
 		Sort *sort = (Sort *) node->ss.ps.plan;
 
-		if(sort->share_type == SHARE_SORT_XSLICE)
+		if(sort->share_type == SHARE_SORT_XSLICE && NULL != node->share_lk_ctxt)
+		{
 			shareinput_writer_waitdone(node->share_lk_ctxt, sort->share_id, sort->nsharer_xslice);
+		}
 
 		if(gp_enable_mk_sort)
 			tuplesort_end_mk((Tuplesortstate_mk *) node->tuplesortstate);
