@@ -271,6 +271,12 @@ FaultInjectorIdentifierEnumToString[] = {
 		/* inject fault before dispatching out threads */
 	_("dispatch_thread_initialization"),
 		/* inject fault when dispatching thread needed structured creating*/
+	_("internal_flush_error"),
+		/* inject an error during internal_flush */
+	_("exec_simple_query_end_command"),
+		/* inject fault before EndCommand in exec_simple_query */
+	_("execsort_before_sorting"),
+		/* inject fault in ExecSort before doing the actual sort */
 	_("not recognized"),
 };
 
@@ -1041,6 +1047,7 @@ FaultInjector_NewHashEntry(
 		case AbortTransactionFail:
 		case UpdateCommittedEofInPersistentTable:
 		case FaultDuringExecDynamicTableScan:
+		case ExecSortBeforeSorting:
 			
 			if (fileRepRole != FileRepNoRoleConfigured && fileRepRole != FileRepPrimaryRole)
 			{

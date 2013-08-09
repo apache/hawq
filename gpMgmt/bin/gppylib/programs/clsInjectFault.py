@@ -378,6 +378,9 @@ class GpInjectFaultProgram:
 			      "transaction_abort_failure (inject fault to simulate transaction abort failure), " \
 			      "update_committed_eof_in_persistent_table (inject fault before committed EOF is updated in gp_persistent_relation_node for Append Only segment files), " \
 			      "fault_during_exec_dynamic_table_scan (inject fault during scanning of a partition), " \
+                             "internal_flush_error (inject an error during internal_flush), " \
+			      "exec_simple_query_end_command (inject fault before EndCommand in exec_simple_query), " \
+                  "execsort_before_sorting (inject fault in nodeSort after receiving all tuples and before sorting), " \
 			      "all (affects all faults injected, used for 'status' and 'reset'), ") 
         addTo.add_option("-c", "--ddl_statement", dest="ddlStatement", type="string",
                          metavar="ddlStatement",

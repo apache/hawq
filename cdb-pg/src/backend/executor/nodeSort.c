@@ -22,6 +22,9 @@
 #include "miscadmin.h"
 #include "utils/tuplesort.h"
 #include "cdb/cdbvars.h" /* CDB *//* gp_sort_flags */
+#include "utils/workfile_mgr.h"
+#include "executor/instrument.h"
+#include "utils/faultinjector.h"
 
 static void ExecSortExplainEnd(PlanState *planstate, struct StringInfoData *buf);
 
@@ -251,6 +254,15 @@ ExecSort(SortState *node)
 			else
 				tuplesort_puttupleslot(tuplesortstate, slot);
 		}
+
+#ifdef FAULT_INJECTOR
+		FaultInjector_InjectFaultIfSet(
+				ExecSortBeforeSorting,
+				DDLNotSpecified,
+				"" /* databaseName */,
+				"" /* tableName */
+				);
+#endif
 
 		/*
 		 * Complete the sort.

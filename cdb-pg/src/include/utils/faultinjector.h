@@ -181,6 +181,7 @@ typedef enum FaultInjectorIdentifier_e {
 	DispatchToGangThreadStructureInitialization,
 
 	FaultDuringExecDynamicTableScan,
+	ExecSortBeforeSorting,
 
 	/* INSERT has to be done before that line */
 	FaultInjectorIdMax,
