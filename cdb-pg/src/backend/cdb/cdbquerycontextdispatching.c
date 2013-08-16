@@ -17,6 +17,7 @@
 #include "catalog/catalog.h"
 #include "catalog/gp_fastsequence.h"
 #include "catalog/pg_attrdef.h"
+#include "catalog/pg_attribute_encoding.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_exttable.h"
 #include "catalog/pg_magic_oid.h"
@@ -940,6 +941,44 @@ prepareDispatchedCatalogAttributeDefault(QueryContextInfo *cxt,
 }
 
 /*
+ * collect relation's attribute encoding for dispatching
+ */
+static void
+prepareDispatchedCatalogAttributeEncoding(QueryContextInfo *cxt,
+		Oid reloid, HTAB *htab)
+{
+    Relation rel;
+    HeapTuple tuple;
+
+    ScanKeyData skey;
+    SysScanDesc scandesc;
+
+    Form_pg_attribute_encoding attr;
+
+    rel = heap_open(AttributeEncodingRelationId, AccessShareLock);
+    Assert(NULL != rel);
+
+    ScanKeyInit(&skey, Anum_pg_attribute_encoding_attrelid, BTEqualStrategyNumber,
+            F_OIDEQ, ObjectIdGetDatum(reloid));
+    scandesc = systable_beginscan(rel, AttributeEncodingAttrelidIndexId, TRUE, SnapshotNow, 1,
+            &skey);
+    tuple = systable_getnext(scandesc);
+    while (HeapTupleIsValid(tuple))
+    {
+        attr = (Form_pg_attribute_encoding) GETSTRUCT(tuple);
+
+        AddTupleToContextInfo(cxt, AttributeEncodingRelationId, "pg_attribute_encoding",
+                tuple, MASTER_CONTENT_ID);
+
+        tuple = systable_getnext(scandesc);
+    }
+    systable_endscan(scandesc);
+
+    heap_close(rel, AccessShareLock);
+
+}
+
+/*
  * collect relation's type info for dispatching
  */
 static void
@@ -1073,6 +1112,9 @@ prepareDispatchedCatalogSingleRelation(QueryContextInfo *cxt, Oid relid,
 
     /* collect pg_attrdef info */
     prepareDispatchedCatalogAttributeDefault(cxt, relid, htab);
+
+    /* collect pg_attribute_encoding info */
+    prepareDispatchedCatalogAttributeEncoding(cxt, relid, htab);
 
     /* collect pg_constraint info */
     prepareDispatchedCatalogConstraint(cxt, relid);
