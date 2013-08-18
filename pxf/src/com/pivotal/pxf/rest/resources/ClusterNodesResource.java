@@ -1,6 +1,5 @@
 package com.pivotal.pxf.rest.resources;
 
-import java.io.DataOutputStream;
 import java.io.IOException;
 
 import javax.ws.rs.GET;
@@ -56,7 +55,6 @@ public class ClusterNodesResource
 		{
 			/* 1. Initialize the HADOOP client side API for a distributed file system */
 			DatanodeInfo[] nodes      = null;
-			DataOutputStream dos      = null; 
 			Configuration conf        = new Configuration();
 			FileSystem fs             = FileSystem.get(conf);
 			DistributedFileSystem dfs = (DistributedFileSystem)fs;
@@ -99,6 +97,11 @@ public class ClusterNodesResource
 	}
 
 	private class NodeDataException extends java.io.IOException {
+
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = 1L;
 
 		public NodeDataException(String paramString)
 		{

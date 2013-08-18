@@ -12,14 +12,14 @@ import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.utilities.InputData;
 
 /*
- * Base class for inforcing the complete access of a file in one accessor. Since we  are not accessing the
+ * Base class for enforcing the complete access of a file in one accessor. Since we are not accessing the
  * file using the splittable API, but instead are using the "simple" stream API, it means that
- * we cannot fetch different parts (splits) of the file in different segment. Instead each file access
+ * we cannot fetch different parts (splits) of the file in different segments. Instead each file access
  * brings the complete file. And, if several segments would access the same file, then each one will return the whole
  * file and we will observe in the query result, each record appearing number_of_segments times. To avoid this
  * we will only have one segment (segment 0) working for this case - enforced with isWorkingSegment() method.
- * Naturaly this is the less recomended working mode since we are not making use of segement parallelism.
- * HDFS acessors for a specific file type should inherit from this class only if the file they are reading does 
+ * Naturally this is the less recommended working mode since we are not making use of segment parallelism.
+ * HDFS accessors for a specific file type should inherit from this class only if the file they are reading does 
  * not support splitting: a protocol-buffer file, regular file, ...
 */
 public abstract class HdfsAtomicDataAccessor extends Accessor
@@ -86,9 +86,8 @@ public abstract class HdfsAtomicDataAccessor extends Accessor
 	 */
 	private boolean isWorkingSegment()
 	{
-		Integer frag0 = new Integer(0);		
-		
-		if (inputData.getDataFragments().contains(frag0))
+
+		if (inputData.getDataFragment() == 0)
 			return true;
 		
 		return false;

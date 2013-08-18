@@ -21,6 +21,7 @@ import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.JobConf;
 
+import com.pivotal.pxf.exception.BadRecordException;
 import com.pivotal.pxf.exception.FragmenterUserDataException;
 import com.pivotal.pxf.format.OneField;
 import com.pivotal.pxf.format.OneRow;
@@ -159,14 +160,21 @@ public class HiveResolver extends Resolver
 			record.add(field);
 	}
 	
-	public void traverseTuple(Object obj, ObjectInspector objInspector, List<OneField> record) throws IOException
+	/*
+	 * If the object representing the whole record is null or if an object representing a composite sub-object (map, list,..)
+	 * is null - then BadRecordException will be thrown. If a primitive field value is null, then a null will appear for 
+	 * the field in the record in the query result.
+	 */
+	public void traverseTuple(Object obj, ObjectInspector objInspector, List<OneField> record) throws IOException, BadRecordException
 	{
 		
-		if (obj == null) 
-			return;
+		ObjectInspector.Category category = objInspector.getCategory();
+		
+		if ((obj == null) && (category != ObjectInspector.Category.PRIMITIVE)) 
+			throw new BadRecordException("NULL Hive composite object");
 		
 		List<?> list;
-		switch (objInspector.getCategory()) 
+		switch (category) 
 		{
 			case PRIMITIVE:
 				resolvePrimitive(obj, (PrimitiveObjectInspector) objInspector, record);
@@ -176,12 +184,10 @@ public class HiveResolver extends Resolver
 				list = loi.getList(obj);
 				ObjectInspector eoi = loi.getListElementObjectInspector();
 				if (list == null)
-					return;
-				else 
-				{
-					for (int i = 0; i < list.size(); i++) 
-						traverseTuple(list.get(i), eoi, record);
-				}
+					throw new BadRecordException("Illegal value NULL for Hive data type List");
+					
+				for (int i = 0; i < list.size(); i++) 
+					traverseTuple(list.get(i), eoi, record);
 				return;
 			case MAP:
 				MapObjectInspector moi = (MapObjectInspector) objInspector;
@@ -189,14 +195,12 @@ public class HiveResolver extends Resolver
 				ObjectInspector voi = moi.getMapValueObjectInspector();
 				Map<?, ?> map = moi.getMap(obj);
 				if (map == null)
-					return;
-				else 
+					throw new BadRecordException("Illegal value NULL for Hive data type Map");
+				
+				for (Map.Entry<?, ?> entry : map.entrySet()) 
 				{
-					for (Map.Entry<?, ?> entry : map.entrySet()) 
-					{
-						traverseTuple(entry.getKey(), koi, record);
-						traverseTuple(entry.getValue(), voi, record);
-					}
+					traverseTuple(entry.getKey(), koi, record);
+					traverseTuple(entry.getValue(), voi, record);
 				}
 				return;
 			case STRUCT:
@@ -204,20 +208,18 @@ public class HiveResolver extends Resolver
 				List<? extends StructField> fields = soi.getAllStructFieldRefs();
 				list = soi.getStructFieldsDataAsList(obj);
 				if (list == null)
-					return;
-				else 
-				{
-					for (int i = 0; i < list.size(); i++) 
-						traverseTuple(list.get(i), fields.get(i).getFieldObjectInspector(), record);
-				}
+					throw new BadRecordException("Illegal value NULL for Hive data type Struct");
+		
+				for (int i = 0; i < list.size(); i++) 
+					traverseTuple(list.get(i), fields.get(i).getFieldObjectInspector(), record);
 				return;
 			case UNION:
 				UnionObjectInspector uoi = (UnionObjectInspector) objInspector;
 				List<? extends ObjectInspector> ois = uoi.getObjectInspectors();
 				if (ois == null)
-					return;
-				else 
-					traverseTuple(uoi.getField(obj), ois.get(uoi.getTag(obj)), record);
+					throw new BadRecordException("Illegal value NULL for Hive data type Union");
+
+				traverseTuple(uoi.getField(obj), ois.get(uoi.getTag(obj)), record);
 				return;
 			default:
 				break;
@@ -229,59 +231,69 @@ public class HiveResolver extends Resolver
 	
 	public void resolvePrimitive(Object o, PrimitiveObjectInspector oi, List<OneField> record) throws IOException
 	{
+		Object val;
 		switch (oi.getPrimitiveCategory()) 
 		{
 			case BOOLEAN: 
 			{
-				boolean b = ((BooleanObjectInspector) oi).get(o);
-				addOneFieldToRecord(record, GPDBWritable.BOOLEAN, b);
+				val = (o != null) ? ((BooleanObjectInspector) oi).get(o) : o;
+				addOneFieldToRecord(record, GPDBWritable.BOOLEAN, val);
 				break;
 			}
 			case SHORT: {
-				short s = ((ShortObjectInspector) oi).get(o);
-				addOneFieldToRecord(record, GPDBWritable.SMALLINT, s);
+				val = (o != null) ? ((ShortObjectInspector) oi).get(o) : o;
+				addOneFieldToRecord(record, GPDBWritable.SMALLINT, val);
 				break;
 			}
 			case INT: {
-				int i = ((IntObjectInspector) oi).get(o);
-				addOneFieldToRecord(record, GPDBWritable.INTEGER, i);
+				val = (o != null) ? ((IntObjectInspector) oi).get(o) : o;
+				addOneFieldToRecord(record, GPDBWritable.INTEGER, val);
 				break;
 			}
 			case LONG: {
-				long l = ((LongObjectInspector) oi).get(o);
-				addOneFieldToRecord(record, GPDBWritable.BIGINT, l);
+				val = (o != null) ? ((LongObjectInspector) oi).get(o) : o;
+				addOneFieldToRecord(record, GPDBWritable.BIGINT, val);
 				break;
 			}
 			case FLOAT: {
-				float f = ((FloatObjectInspector) oi).get(o);
-				addOneFieldToRecord(record, GPDBWritable.REAL, f);
+				val = (o != null) ? ((FloatObjectInspector) oi).get(o) : o;
+				addOneFieldToRecord(record, GPDBWritable.REAL, val);
 				break;
 			}
 			case DOUBLE: {
-				double d = ((DoubleObjectInspector) oi).get(o);
-				addOneFieldToRecord(record, GPDBWritable.FLOAT8, d);
+				val = (o != null) ? ((DoubleObjectInspector) oi).get(o) : o;
+				addOneFieldToRecord(record, GPDBWritable.FLOAT8, val);
 				break;
 			}
 			case DECIMAL: {
-				BigDecimal bd = ((HiveDecimalObjectInspector) oi).getPrimitiveJavaObject(o).bigDecimalValue();
-				addOneFieldToRecord(record, GPDBWritable.NUMERIC, bd.toString());
+				String sVal = null;
+				if (o != null)
+				{
+					BigDecimal bd = ((HiveDecimalObjectInspector) oi).getPrimitiveJavaObject(o).bigDecimalValue();
+					sVal = bd.toString();
+				}
+				addOneFieldToRecord(record, GPDBWritable.NUMERIC, sVal);
 				break;
 			}
 			case STRING: {
-				String s = ((StringObjectInspector) oi).getPrimitiveJavaObject(o);
-				addOneFieldToRecord(record, GPDBWritable.TEXT, s);
+				val = (o != null) ? ((StringObjectInspector) oi).getPrimitiveJavaObject(o) : o;
+				addOneFieldToRecord(record, GPDBWritable.TEXT, val);
 				break;
 			}
 			case BINARY: {
-				BytesWritable bw = ((BinaryObjectInspector) oi).getPrimitiveWritableObject(o);
-				byte[] toEncode = new byte[bw.getLength()];
-				System.arraycopy(bw.getBytes(), 0,toEncode, 0, bw.getLength());
+				byte[] toEncode = null;
+				if (o != null)
+				{
+					BytesWritable bw = ((BinaryObjectInspector) oi).getPrimitiveWritableObject(o);
+					toEncode = new byte[bw.getLength()];
+					System.arraycopy(bw.getBytes(), 0,toEncode, 0, bw.getLength());
+				}
 				addOneFieldToRecord(record, GPDBWritable.BYTEA, toEncode);
 				break;
 			}
 			case TIMESTAMP: {
-				Timestamp t = ((TimestampObjectInspector) oi).getPrimitiveJavaObject(o);
-				addOneFieldToRecord(record, GPDBWritable.TIMESTAMP, t);
+				val = (o != null) ? ((TimestampObjectInspector) oi).getPrimitiveJavaObject(o) : o;
+				addOneFieldToRecord(record, GPDBWritable.TIMESTAMP, val);
 				break;
 			}
 			default: {

@@ -126,17 +126,13 @@ public class HBaseAccessorTest
 		when(fakeRegionsSet.iterator()).thenReturn(fakeIterator);
 
 		// fragments list doesn't contain any region
-		ArrayList mockFragments = mock(ArrayList.class);
-		when(inputData.getDataFragments()).thenReturn(mockFragments);
-		when(mockFragments.contains(anyInt())).thenReturn(false);
+		when(inputData.getDataFragment()).thenReturn(-1);
 
 		accessor = new HBaseAccessor(inputData);
 		assertFalse(accessor.Open());
 
 		verifyScannerDidNothing();
 
-		verify(mockFragments, times(3)).contains(anyInt());
-		verifyNoMoreInteractions(mockFragments);
     }
 
 	/*

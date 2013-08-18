@@ -128,11 +128,11 @@ public class HBaseAccessor extends Accessor
 		NavigableMap<HRegionInfo, ServerName> regions = table.getRegionLocations();
 		int i = 0;
 
-		List<Integer> fragments = inputData.getDataFragments();
+		int fragment = inputData.getDataFragment();
 
 		for (HRegionInfo region : regions.keySet())
 		{
-			if (fragments.contains(new Integer(i)))
+			if (fragment == i)
 			{
 				byte[] startKey = region.getStartKey();
 				byte[] endKey = region.getEndKey();

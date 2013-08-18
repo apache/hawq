@@ -18,7 +18,8 @@ Name: %{_name}
 Version: %{_version}
 Release: %{_package_release}
 Summary: %{_package_summary}
-License: Apache License v2.0
+License: Copyright (c) 2013, EMC Greenplum
+Group: Applications/Databases
 Source: %{_package_name}.tar.gz
 Vendor: %{_package_vendor}
 Buildarch: noarch
@@ -26,6 +27,7 @@ Requires: hadoop >= 2.0.0, hadoop-mapreduce >= 2.0.0
 AutoReqProv: no
 Provides: %{_name}
 Prefix: %{_prefix}
+BuildRoot: %{_topdir}/temp
 Obsoletes: %{_package_obsoletes}
 
 # package.description is replaced here and not in header as

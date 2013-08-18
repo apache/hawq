@@ -251,7 +251,8 @@ public class BridgeOutputBuilder
             }
             else if (type == GPDBWritable.TIMESTAMP)
             {
-                GPDBoutput.setString(i, ((Timestamp)oneField.val).toString());
+				String val = (oneField.val != null) ? ((Timestamp)oneField.val).toString() : null;
+                GPDBoutput.setString(i, val);
             }
 			else
 			{

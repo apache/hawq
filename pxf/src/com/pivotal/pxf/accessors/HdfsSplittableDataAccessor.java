@@ -64,22 +64,20 @@ public abstract class HdfsSplittableDataAccessor extends Accessor
 		 */
 		InputSplit[] splits = fformat.getSplits(jobConf, 1);
 		int actual_num_of_splits = splits.length;
-		int needed_num_of_splits = inputData.dataFragmentsSize(); // it's called dataFragments because it represents both hdfs and hbase
 
 		// 2. from all the splits choose only those that correspond to this segment id
 		segSplits = new LinkedList<InputSplit>();
-		for (int i = 0; i < needed_num_of_splits; i++)
-		{
-			int needed_split_idx = inputData.getDataFragment(i);
-			
-			/*
-			 * Testing for the case where between the time of the GP Master input
-			 * data retrieval and now, the file was deleted or replaced by a smaller file.
-			 * This is an extreme case which shouldn't happen - but we want to make sure
-			 */
-			if (needed_split_idx < actual_num_of_splits)
-				segSplits.add(splits[needed_split_idx]);			
-		}
+
+		int needed_split_idx = inputData.getDataFragment();
+
+		/*
+		 * Testing for the case where between the time of the GP Master input
+		 * data retrieval and now, the file was deleted or replaced by a smaller file.
+		 * This is an extreme case which shouldn't happen - but we want to make sure
+		 */
+		if ((needed_split_idx != InputData.INVALID_SPLIT_IDX) && (needed_split_idx < actual_num_of_splits))
+			segSplits.add(splits[needed_split_idx]);			
+		
 		
 		// 3. Initialize record reader based on current split
 		iter = segSplits.listIterator(0);

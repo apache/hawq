@@ -34,8 +34,7 @@ public class InputDataTest
 		assertFalse(input.hasFilter());
 		assertNull(input.filterString());
 		assertEquals(input.columns(), 0);
-		assertEquals(input.dataFragmentsSize(), 0);
-		assertEquals(input.getDataFragments(), new ArrayList<Integer>());
+		assertEquals(input.getDataFragment(), -1);
 		assertNull(input.getRecordkeyColumn());
 		assertEquals(input.accessor(), "are");
 		assertEquals(input.resolver(), "packed");

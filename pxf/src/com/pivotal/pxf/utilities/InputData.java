@@ -19,20 +19,27 @@ import com.pivotal.pxf.format.OutputFormat;
 
 public class InputData
 {
+	public static final int INVALID_SPLIT_IDX = -1;
+
+	private   Log Log;	
+
 	protected Map<String, String> requestParametersMap;
-	private   Log Log;
-		
+	protected OutputFormat outputFormat;
+	protected ArrayList<ColumnDescriptor> tupleDescription;
+	protected int dataFragment;
 	protected int segmentId;
 	protected int totalSegments;
-	protected OutputFormat outputFormat;
-	protected String host;
 	protected int port;
-	protected ArrayList<ColumnDescriptor> tupleDescription;
+	protected byte[] userData = null;
 	protected boolean filterStringValid;
 	protected String filterString;
-	protected ArrayList<Integer> dataFragments;
-	protected byte[] userData = null;
-	
+	protected String host;
+	protected String srlzSchemaName;
+	protected String path;
+	protected String accessor;
+	protected String resolver;
+	protected String tableName;
+
 	/* 
 	 * The name of the recordkey column. It can appear in any location in the columns list.
 	 * By specifying the recordkey column, the user declares that he is interested to receive for every record 
@@ -42,22 +49,17 @@ public class InputData
 	 * This field will always be the first field in the tuple returned
 	 */
 	protected ColumnDescriptor recordkeyColumn;	
-	protected String srlzSchemaName;
-	protected String path;
-	protected String accessor;
-	protected String resolver;
-	protected String tableName;
-	
+
 	/*
-	this schema object variable is special -  it is not filled from getProperty like all 
-	the others. Instead it is used by the AvroFileAccessor to pass the avro 
-	schema to the AvroResolver. In this case only the AvroFileAccessor can
-	fetch the schema because it is the only one that can read the Avro file.
-	So the AvroResolver needs to get the schema from the AvroFileAccessor, and
-	this schema variable is the way it's done.
-	*/
+	 * this schema object variable is special -  it is not filled from getProperty like all 
+	 * the others. Instead it is used by the AvroFileAccessor to pass the avro 
+	 * schema to the AvroResolver. In this case only the AvroFileAccessor can
+	 * fetch the schema because it is the only one that can read the Avro file.
+	 * So the AvroResolver needs to get the schema from the AvroFileAccessor, and
+	 *this schema variable is the way it's done.
+	 */
 	protected Schema avroSchema = null;
-	
+
 	/*
 	 * When a property is not found we throw an exception from getProperty method(). The exception message
 	 * has a generic form containing the HTTP option name. For example:
@@ -67,7 +69,7 @@ public class InputData
 	 * that will be used instead of the generic one.
 	 */
 	protected Map<String, String> propertyErrorMap = new HashMap<String, String>();
-	
+
 	/* Constructor of InputData
 	 * Parses greenplum.* configuration variables
 	 */
@@ -97,8 +99,8 @@ public class InputData
 		recordkeyColumn = null;
 		parseTupleDescription();
 
-		dataFragments    = new ArrayList<Integer>();
-		parseDataFragments(getOptionalProperty("X-GP-DATA-FRAGMENTS"));	
+		dataFragment = INVALID_SPLIT_IDX;
+		parseDataFragment(getOptionalProperty("X-GP-DATA-FRAGMENT"));	
 
 		/*
 		 * We don't want to fail if schema was not supplied. There are HDFS resources which do not require schema.
@@ -118,13 +120,13 @@ public class InputData
 
 		/* TODO: leading '/' is expected. gpdb ignores it. deal more gracefully... */
 		path = "/" + getProperty("X-GP-DATA-DIR");
-		
+
 		/* TODO: once leading '/' is removed from the path variable, remove tableName and use path in HBase classes */
 		tableName = getProperty("X-GP-DATA-DIR"); /* for HBase and Hive */
 
 		parseUserData();
 	}
-	
+
 	/*
 	 * Expose the parameters map
 	 */
@@ -139,17 +141,17 @@ public class InputData
 	public InputData(InputData copy)
 	{
 		Log = LogFactory.getLog(InputData.class);
-		
+
 		this.requestParametersMap = copy.requestParametersMap;
 		this.propertyErrorMap     = copy.propertyErrorMap;
-		
+
 		this.segmentId = copy.segmentId;
 		this.totalSegments = copy.totalSegments;
 		this.outputFormat = copy.outputFormat;
 		this.host = copy.host;
 		this.port = copy.port;
 		this.tupleDescription = copy.tupleDescription;
-		this.dataFragments = copy.dataFragments;
+		this.dataFragment = copy.dataFragment;
 		this.recordkeyColumn = copy.recordkeyColumn;
 		this.filterStringValid = copy.filterStringValid;
 		this.filterString = copy.filterString;
@@ -160,7 +162,7 @@ public class InputData
 		this.tableName = copy.tableName;
 	}
 
-	public byte[] getFragmentUserData() throws Exception
+	public byte[] getFragmentUserData()
 	{
 		return userData;
 	}
@@ -188,7 +190,7 @@ public class InputData
 
 		return result;
 	}
-	
+
 	/* 
 	 * Unlike getProperty(), it will not fail if the property is not found. It will just return null instead
 	 */	
@@ -232,7 +234,7 @@ public class InputData
 	{
 		return getIntProperty(property) != 0;
 	}
-	
+
 	/* 
 	 * Returns the number of segments in GP
 	 */
@@ -273,7 +275,7 @@ public class InputData
 	{
 		return port;
 	}
-	
+
 	/*
 	 * Returns true if there is a filter string to parse
 	 */
@@ -281,7 +283,7 @@ public class InputData
 	{
 		return filterStringValid;
 	}
-	
+
 	/*
 	 * The filter string
 	 */
@@ -289,7 +291,7 @@ public class InputData
 	{
 		return filterString;
 	}	
-	
+
 	/* 
 	 * Returns the number of columns in Tuple Description
 	 */
@@ -297,7 +299,7 @@ public class InputData
 	{
 		return tupleDescription.size();
 	}
-	
+
 	/* 
 	 * Returns column index from Tuple Description
 	 */
@@ -305,29 +307,15 @@ public class InputData
 	{
 		return tupleDescription.get(index);
 	}
-	
-	/* 
-	 * returns the number of data fragments that were allocated to
-	 * the GP segment attached to this GP Bridge
-	 */
-	public int dataFragmentsSize()
-	{
-		return dataFragments.size();
-	}
-	
+
 	/* 
 	 * Returns a data fragment
 	 */
-	public int getDataFragment(int index)
+	public int getDataFragment()
 	{
-		return dataFragments.get(index).intValue();
+		return dataFragment;
 	}
-	
-	public ArrayList<Integer> getDataFragments()
-	{
-		return dataFragments;
-	}
-	
+
 	/*
 	 * Returns the column descriptor of the recordkey column.
 	 * If the recordkey column was not specified by the user in the create table statement,
@@ -337,7 +325,7 @@ public class InputData
 	{
 		return recordkeyColumn;
 	}
-	
+
 	/* 
 	 * Returns the path to the resource required
 	 * (might be a file path or a table name)
@@ -364,8 +352,8 @@ public class InputData
 		 */
 		if (!isSchemaResourceOnClasspath(srlzSchemaName))
 			throw new FileNotFoundException("schema resource \"" + srlzSchemaName + "\" is not located on the classpath ");
-		
-		
+
+
 		return srlzSchemaName;
 	}
 
@@ -376,7 +364,7 @@ public class InputData
 	{
 		return accessor;
 	}
-	
+
 	/*
 	 * Returns the ClassName for the java class that handles the record deserialization
 	 */
@@ -384,7 +372,7 @@ public class InputData
 	{
 		return resolver;
 	}
-		
+
 	/*
 	 * The avroSchema fetched by the AvroResolver and used in case of Avro File
 	 * In case of avro records inside a sequence file this variable will be null
@@ -394,7 +382,7 @@ public class InputData
 	{
 		return avroSchema;
 	}
-	
+
 	/*
 	 * Returns table name
 	 */	
@@ -402,7 +390,7 @@ public class InputData
 	{
 		return tableName;
 	}	
-	
+
 	/*
 	 * The avroSchema is set from the outside by the AvroFileAccessor
 	 */
@@ -410,7 +398,7 @@ public class InputData
 	{
 		avroSchema = theAvroSchema;
 	}
-	
+
 	/* 
 	 * Sets the format type based on input string
 	 */			
@@ -425,28 +413,23 @@ public class InputData
 	}
 
 	/* 
-	 * Fills the list of the allocated data fragments
-	 * The input string contains a list of indexes. Example: "3,8,11,12"
+	 * Fills the index of allocated data fragments
 	 */			
-	protected void parseDataFragments(String fragments)
+	protected void parseDataFragment(String fragment)
 	{
-		String [] toks = null;
-		int toks_length = 0;
-		
+
 		/* 
 		 * 1. When the request made to the PXF bridge is GetFragments or Analyze, Hawq has no fragments list
 		 * to send so this list will be empty.
 		 */
-		if (fragments == null || fragments.isEmpty())
+		if (fragment == null || fragment.isEmpty())
 			return;
-
-		/*
-		 * 2. Tokenize and insert into container as integers
-		 */
-		toks = fragments.split(",");
-		toks_length = toks.length;
-		for(int i = 0; i < toks_length; i++)
-			dataFragments.add(new Integer(toks[i]));
+				
+		/* 
+		 * 2. Convert to int 
+		 * */
+		dataFragment = Integer.parseInt(fragment);
+		
 	}
 
 	/* 
@@ -461,7 +444,7 @@ public class InputData
 			int columnType = getIntProperty("X-GP-ATTR-TYPE" + i);
 			ColumnDescriptor column = new ColumnDescriptor(columnName, columnType, i);
 			tupleDescription.add(column);
-			
+
 			if (columnName.equalsIgnoreCase(ColumnDescriptor.recordkeyName))
 				recordkeyColumn = column;						
 		}		
@@ -477,7 +460,7 @@ public class InputData
 		propertyErrorMap.put("X-GP-RESOLVER", "Resolver was not supplied in the CREATE EXTERNAL TABLE statement " + 
 							 "Please supply resolver using option resolver ");
 	}
-	
+
 	/*
 	 * Tests for the case schema resource is a file like avro_schema.avsc
 	 * or for the case schema resource is a Java class. in which case we add <.class> suffix 
@@ -488,7 +471,7 @@ public class InputData
 			return true;
 		if (this.getClass().getClassLoader().getResource(resource + ".class") != null)
 			return true;
-		
+
 		return false;
 	}	
 

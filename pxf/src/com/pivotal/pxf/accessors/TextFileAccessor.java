@@ -1,7 +1,5 @@
 package com.pivotal.pxf.accessors;
 
-import java.io.IOException;
-
 import com.pivotal.pxf.accessors.LineReaderAccessor;
 import com.pivotal.pxf.utilities.InputData;
 

@@ -27,7 +27,7 @@
 	<property name="test.dir" value="${basedir}/test" />
 	<property name="testreports.dir" value="${build.dir}/test/reports" />
 
-	<property name="package.buildroot" value="/tmp/${component.basename}_package_build_${user.name}"/>
+	<property name="package.buildroot" value="${basedir}/${component.basename}_package_build_${user.name}"/>
 	<property name="package.release" value="${build.number}${build.branch}"/>
 	<property name="package.name" value="${component.name}-${package.release}"/>
 
@@ -121,7 +121,7 @@
 	</target>
 
 	<!-- Default -->
-	<target name="all" depends="jar" description="build all jar files" />
+	<target name="all" depends="clean,jar" description="build all jar files" />
 
 	<!-- Create package -->
 	<target name="package" depends="jar" description="create a package directory">

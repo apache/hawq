@@ -48,16 +48,16 @@ public class BridgeResource
 	 *
 	 * Parameters come through HTTP header other than the fragments.
 	 * fragments is part of the url:
-	 * /<version>/Bridge?fragments=
+	 * /<version>/Bridge?fragment=
 	 */
 	@GET
 	@Produces(MediaType.APPLICATION_OCTET_STREAM)
 	public Response read(@Context HttpHeaders headers,
-						 @QueryParam("fragments") String fragments) throws Exception
+						 @QueryParam("fragment") String fragment) throws Exception
 	{
 		// Convert headers into a regular map
 		Map<String, String> params = convertToRegularMap(headers.getRequestHeaders());
-		params.put("X-GP-DATA-FRAGMENTS", fragments);
+		params.put("X-GP-DATA-FRAGMENT", fragment);
 
 		Log.debug("started with paramters: " + params.toString());
 
@@ -71,7 +71,7 @@ public class BridgeResource
 		if (!bridge.BeginIteration())
 			return Response.ok().build();
 
-		final String fragment = params.get("X-GP-DATA-FRAGMENTS");
+		final String fragment = params.get("X-GP-DATA-FRAGMENT");
 		final String dataDir = params.get("X-GP-DATA-DIR");
 
 		// Creating an internal streaming class

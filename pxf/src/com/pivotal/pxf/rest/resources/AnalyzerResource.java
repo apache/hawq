@@ -76,10 +76,10 @@ public class AnalyzerResource
 		/*
 		 * Here - in AnalyzerResource.getEstimatedStats() - we implement the policy that the analyzer should process a single block
 		 * when calculating the tuples number. All data sources provided will have a split number 0.
-		 * X-GP-DATA-FRAGMENTS is set in the same manner in BridgeResource - there the splits are provided by
+		 * X-GP-DATA-FRAGMENT is set in the same manner in BridgeResource - there the splits are provided by
 		 * the GP segment on the URI string
 		 */
-		params.put("X-GP-DATA-FRAGMENTS", "0");
+		params.put("X-GP-DATA-FRAGMENT", "0");
 		
 		final Analyzer analyzer = AnalyzerFactory.create(new InputData(params));
 				
