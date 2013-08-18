@@ -4,7 +4,7 @@
 #include "access/pxfuriparser.h"
 #include "access/pxfheaders.h"
 
-static const char* remote_uri_template = "http://%s/%s/%s/Bridge/?fragments=%s";
+static const char* remote_uri_template = "http://%s/%s/%s/Bridge/?fragment=%s";
 
 typedef struct
 {
@@ -148,7 +148,7 @@ void append_churl_header_if_exists(gphadoop_context* context, const char* key, c
  * (can be with wildcard or just a directory name), and this value is changed here
  * to the specific source name of each fragment name.
  * 2. X-GP-FRAGMENT-USER-DATA header is changed to the current fragment's user data.
- * If the fragment doesn't user data, the header will be removed.
+ * If the fragment doesn't have user data, the header will be removed.
  */
 void set_current_fragment_headers(gphadoop_context* context)
 {

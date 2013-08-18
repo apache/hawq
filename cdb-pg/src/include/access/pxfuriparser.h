@@ -10,7 +10,7 @@
  * All GPFX's resources are under /GPDB_REST_PREFIX/GPFX_VERSION/...
  */
 #define GPDB_REST_PREFIX "gpdb"
-#define PFX_VERSION "v4" /* PFX version */
+#define PFX_VERSION "v5" /* PFX version */
 
 /*
  * FragmentData - describes a single Hadoop file split / HBase table region

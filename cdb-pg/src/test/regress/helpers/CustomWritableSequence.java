@@ -25,10 +25,10 @@ import java.util.Date;
  * $HADOOP_ROOT/share/hadoop/hdfs/\*:\
  *
  * To read:
- * java CustomWritableSequence <HDFS directory> <filename> 0
+ * java CustomWritableSequence <outdir> <filename> 0
  *
  * To Write:
- * java CustomWritableSequence <HDFS directory> <filename> 1
+ * java CustomWritableSequence <outdir> <filename> 1
  *
  * TODO: Dynamically compile this and create content for regressions
  */
@@ -47,7 +47,7 @@ public class CustomWritableSequence
 	public CustomWritableSequence(String[] args) throws Exception
 	{
 		conf        = new Configuration();
-		conf.set("fs.defaultFS", "hdfs://127.0.0.1:8020");
+		conf.set("fs.defaultFS", "file://./");
 
 		outPath     = args[0];
 		outFile     = args[1];

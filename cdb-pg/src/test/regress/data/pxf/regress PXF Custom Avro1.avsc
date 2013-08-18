@@ -15,6 +15,7 @@
 				{"name": "ft", "type": "float"},
 				{"name": "lngs", "type": {"type": "array", "items": "long"}},		
 				{"name": "lng", "type": "long"},
-				{"name": "bts", "type": "bytes"}
+				{"name": "bts", "type": "bytes"},
+				{"name": "bl", "type": "boolean"}
 	]
 }

@@ -29,7 +29,25 @@
 -- 0. Compiling the HiveThinClient
 \! javac -cp `${HADOOP_ROOT}/bin/hadoop classpath` @abs_srcdir@/helpers/HiveThinClient.java
 
--- 1. Hive table stored as text
+-- 1. Testing Hive support for the primitive data types
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "create table hive_types (s1 string,s2 string,n1 int, d1 double, dc1 decimal, tm timestamp, f float, bg bigint, b boolean)row format delimited fields terminated by ','"
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "load data local inpath '@abs_srcdir@/data/pxf/hive_types.txt' into table hive_types"
+
+CREATE EXTERNAL TABLE hawq_types(
+t1    text,
+t2    text,  
+num1  integer, 
+dub1  double precision,
+dec1  numeric,
+tm timestamp,
+r real,
+bg bigint,
+b boolean)
+LOCATION ('pxf://@hostname@:50070/hive_types?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
+format 'custom' (formatter='pxfwritable_import');
+select * from hawq_types order by t1;
+
+-- 2. Hive table stored as text
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "create table reg_txt (s1 string,s2 string,n1 int, d1 double)row format delimited fields terminated by ','"
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "load data local inpath '@abs_srcdir@/data/pxf/hive_small_data.txt' into table reg_txt"
 
@@ -42,7 +60,7 @@ LOCATION ('pxf://@hostname@:50070/reg_txt?FRAGMENTER=HiveDataFragmenter&ACCESSOR
 format 'custom' (formatter='pxfwritable_import');
 select * from hv_txt order by t1;
 
--- 2. Hive table stored as sequence
+-- 3. Hive table stored as sequence
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "create table reg_seq (t0 string, t1 string, num1 int, d1 double) row format delimited fields terminated by ',' STORED AS SEQUENCEFILE"
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "insert into table reg_seq select * from reg_txt"
 
@@ -55,7 +73,7 @@ LOCATION ('pxf://@hostname@:50070/reg_seq?FRAGMENTER=HiveDataFragmenter&ACCESSOR
 format 'custom' (formatter='pxfwritable_import');
 select * from hv_seq order by t1;
 
--- 3. Hive table stored as rcfile
+-- 4. Hive table stored as rcfile
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "create table reg_rc (t0 string, t1 string, num1 int, d1 double) STORED AS RCFILE"
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "insert into table reg_rc select * from reg_txt"
 
@@ -68,13 +86,28 @@ LOCATION ('pxf://@hostname@:50070/reg_rc?FRAGMENTER=HiveDataFragmenter&ACCESSOR=
 format 'custom' (formatter='pxfwritable_import');
 select * from hv_rc order by t1;
 
--- 4. Hive table stored in several partitions where each partition is stored in a diferrent format
+-- 5. Hive table stored as orc
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "create table reg_orc (t0 string, t1 string, num1 int, d1 double) STORED AS ORC"
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "insert into table reg_orc select * from reg_txt"
+
+CREATE EXTERNAL TABLE hv_orc(
+t1    text,
+t2    text,  
+num1  integer, 
+dub1  double precision)
+LOCATION ('pxf://@hostname@:50070/reg_orc?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
+format 'custom' (formatter='pxfwritable_import');
+select * from hv_orc order by t1;
+
+-- 6. Hive table stored in several partitions where each partition is stored in a diferrent format
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "create external table reg_heterogen (s1 string,s2 string,n1 int, d1 double) partitioned by (fmt string)  row format delimited fields terminated by ','"
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "alter table reg_heterogen add partition (fmt = 'txt') location 'hdfs:/hive/warehouse/reg_txt'"
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "alter table reg_heterogen add partition (fmt = 'rc') location 'hdfs:/hive/warehouse/reg_rc'"
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "alter table reg_heterogen add partition (fmt = 'seq') location 'hdfs:/hive/warehouse/reg_seq'"
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "alter table reg_heterogen add partition (fmt = 'orc') location 'hdfs:/hive/warehouse/reg_orc'"
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "alter table reg_heterogen partition (fmt='rc') set fileformat RCFILE"
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "alter table reg_heterogen partition (fmt='seq') set fileformat SEQUENCEFILE"
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "alter table reg_heterogen partition (fmt='orc') set fileformat ORC"
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "show partitions reg_heterogen"
 
 CREATE EXTERNAL TABLE hv_heterogen(
@@ -91,7 +124,7 @@ select * from hv_heterogen order by t3, t1;
 ANALYZE hv_heterogen;
 select relpages, reltuples from pg_class where relname = 'hv_heterogen';
 
--- 5. Hive table with collection types (non primitive types)
+-- 7. Hive table with collection types (non primitive types)
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "CREATE TABLE reg_collections ( s1 STRING, f1 FLOAT, a1 ARRAY<STRING> , m1 MAP<STRING,  FLOAT > , sr1 STRUCT<street:STRING,  city:STRING,  state:STRING,  zip:INT > )  ROW FORMAT DELIMITED  FIELDS TERMINATED BY '\001' COLLECTION ITEMS TERMINATED BY '\002' MAP KEYS TERMINATED BY '\003'  LINES TERMINATED BY '\n'  STORED AS TEXTFILE"
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "load data local inpath '@abs_srcdir@/data/pxf/hive_collections.txt' into table reg_collections"
 
@@ -113,7 +146,7 @@ LOCATION ('pxf://@hostname@:50070/reg_collections?FRAGMENTER=HiveDataFragmenter&
 format 'custom' (formatter='pxfwritable_import');
 select * from hv_collections order by t1;
 
--- 6. View - negative test
+-- 8. View - negative test
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "create view reg_txt_view as select s1 from reg_txt"
 
 CREATE EXTERNAL TABLE hv_view(
@@ -122,17 +155,39 @@ LOCATION ('pxf://@hostname@:50070/reg_txt_view?FRAGMENTER=HiveDataFragmenter&ACC
 format 'custom' (formatter='pxfwritable_import');
 select * from hv_view order by t1;
 
--- 7. Clean after Hive
+-- 9.  Decimal is a partition in the Hive Table
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "create table part_dec (s1 string,s2 string,n1 int, d1 double) partitioned by (dec decimal)  row format delimited fields terminated by ','"
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "load data local inpath '@abs_srcdir@/data/pxf/hive_small_data.txt' into table part_dec partition (dec = 10.1111111111111)"
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "load data local inpath '@abs_srcdir@/data/pxf/hive_small_data.txt' into table part_dec partition (dec = 10.2222222222222)"
+
+CREATE EXTERNAL TABLE hv_part_dec(
+t1    text,
+t2    text,  
+num1  integer, 
+dub1  double precision,
+dec1  numeric)
+LOCATION ('pxf://@hostname@:50070/part_dec?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
+format 'custom' (formatter='pxfwritable_import');
+select * from hv_part_dec order by dec1, t1;
+select * from hv_part_dec where dec1 = 10.2222222222222 order by t1;
+
+-- 10. Clean after Hive
 drop external table hv_view;
 drop external table hv_collections;
 drop external table hv_heterogen;
+drop external table hv_orc;
 drop external table hv_rc;
 drop external table hv_seq;
 drop external table hv_txt;
+drop external table hawq_types;
+drop external table hv_part_dec;
 
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "drop view reg_txt_view"
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "drop table reg_collections"
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "drop table reg_heterogen"
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "drop table reg_orc"
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "drop table reg_rc"
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "drop table reg_seq"
 \! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "drop table reg_txt"
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "drop table hive_types"
+\! java -cp `${HADOOP_ROOT}/bin/hadoop classpath`:@abs_srcdir@/helpers HiveThinClient "drop table part_dec"

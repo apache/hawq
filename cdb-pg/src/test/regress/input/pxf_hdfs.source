@@ -201,10 +201,11 @@ CREATE EXTERNAL TABLE seqav(tmp1 timestamp,
                             ln1   bigint, 
                             ln2   bigint, 
                             ln3   bigint, 
-                            bt    bytea)
+                            bt    bytea,
+							bl    boolean)
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/avro_inside_sequence.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=AvroResolver&DATA-SCHEMA=regressPXFCustomAvro.avsc')
 FORMAT 'custom' (formatter='pxfwritable_import');
-SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt FROM seqav ORDER BY num1;
+SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt, bl FROM seqav ORDER BY num1;
 SELECT num1, t1, t2, t3 FROM seqav ORDER BY num1;
 DROP EXTERNAL TABLE seqav;
 --
@@ -230,10 +231,11 @@ CREATE EXTERNAL TABLE seqav_space(tmp1 timestamp,
                             ln1   bigint, 
                             ln2   bigint, 
                             ln3   bigint, 
-                            bt    bytea)
+                            bt    bytea,
+							bl    boolean)
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/avro_inside_sequence.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=AvroResolver&DATA-SCHEMA=regress PXF Custom Avro1.avsc')
 FORMAT 'custom' (formatter='pxfwritable_import');
-SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt FROM seqav_space ORDER BY num1;
+SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt, bl FROM seqav_space ORDER BY num1;
 DROP EXTERNAL TABLE seqav_space;
 --
 -- Test options are case insensitive
@@ -258,10 +260,11 @@ CREATE EXTERNAL TABLE seqav_case(tmp1 timestamp,
                             ln1   bigint, 
                             ln2   bigint, 
                             ln3   bigint, 
-                            bt    bytea)
+                            bt    bytea,
+							bl    boolean)
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/avro_inside_sequence.tbl?fragmenter=HdfsDataFragmenter&Accessor=SequenceFileAccessor&ReSoLvEr=AvroResolver&Data-Schema=regressPXFCustomAvro.avsc')
 FORMAT 'custom' (formatter='pxfwritable_import');
-SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt FROM seqav_case ORDER BY num1;
+SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt, bl FROM seqav_case ORDER BY num1;
 DROP EXTERNAL TABLE seqav_case;
 --
 -- Test Avro data inside an AvroFile (read only).
@@ -286,10 +289,11 @@ CREATE EXTERNAL TABLE avfav(tmp1 timestamp,
                             ln1   bigint, 
                             ln2   bigint, 
                             ln3   bigint, 
-                            bt    bytea)
+                            bt    bytea,
+							bl    boolean)
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/avroformat_inside_avrofile.avro?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=AvroFileAccessor&RESOLVER=AvroResolver')
 FORMAT 'custom' (formatter='pxfwritable_import');
-SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt FROM avfav ORDER BY num1;
+SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt, bl FROM avfav ORDER BY num1;
 SELECT num1, t1, t2, t3 FROM avfav ORDER BY num1;
 DROP EXTERNAL TABLE avfav;
 --

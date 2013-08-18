@@ -664,6 +664,7 @@ void check_response_code(churl_context* context)
 			char	*dest_ip;
 			long	 dest_port = 0;
 			StringInfoData err;
+			char    *http_error_msg;
 
 			initStringInfo(&err);
 
@@ -689,7 +690,12 @@ void check_response_code(churl_context* context)
 			 * add detailed error message from the http response. response_text
 			 * could be NULL in some cases. get_http_error_msg checks for that.
 			 */
-			appendStringInfo(&err, ": %s", get_http_error_msg(response_code, response_text));
+			http_error_msg = get_http_error_msg(response_code, response_text);
+			/* check for a specific confusing error, and replace with a clearer one */
+			if(strstr(http_error_msg, "instance does not contain any root resource classes") != NULL)
+				appendStringInfo(&err, " : PXF not correctly installed in CLASSPATH");
+			else
+				appendStringInfo(&err, ": %s", http_error_msg);
 
 			elog(ERROR, "%s", err.data);
 		}

@@ -30,10 +30,10 @@ public class DummyAccessor extends Accessor
     {
         /* return next row , <key=fragmentNo.rowNo, val=rowNo,text,fragmentNo>*/
         /* check for EOF */
-        if (fragmentNumber >= this.inputData.dataFragmentsSize()) {
+        if (fragmentNumber > 0) 
             return null; /* signal EOF, close will be called */
-        }
-        int fragment = this.inputData.getDataFragment(fragmentNumber);
+        
+        int fragment = this.inputData.getDataFragment();
         /* generate row */
         OneRow row = new OneRow(Integer.toString(fragment) + "." + Integer.toString(rowNumber), /* key */
                                 Integer.toString(rowNumber) + ",text," + Integer.toString(fragment) /* value */);

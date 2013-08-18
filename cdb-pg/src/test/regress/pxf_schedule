@@ -2,4 +2,3 @@ test: pxf_hdfs
 test: pxf_hdfs_ext
 test: pxf_hbase
 test: pxf_hive
-test: exttab1

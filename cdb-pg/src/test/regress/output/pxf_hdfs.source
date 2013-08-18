@@ -425,42 +425,43 @@ CREATE EXTERNAL TABLE seqav(tmp1 timestamp,
                             ln1   bigint, 
                             ln2   bigint, 
                             ln3   bigint, 
-                            bt    bytea)
+                            bt    bytea,
+							bl    boolean)
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/avro_inside_sequence.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=AvroResolver&DATA-SCHEMA=regressPXFCustomAvro.avsc')
 FORMAT 'custom' (formatter='pxfwritable_import');
-SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt FROM seqav ORDER BY num1;
-             tmp1             | num1 | num2 | num3 | num4 | ln1  | ln2  | ln3 |    bt    
-------------------------------+------+------+------+------+------+------+-----+----------
- Mon Jan 23 13:44:32.504 2012 |  200 |  400 |  200 |  400 |  600 |  800 | 205 | AvroDude
- Mon Jan 23 13:44:32.697 2012 |  210 |  420 |  210 |  420 |  630 |  840 | 215 | AvroDude
- Mon Jan 23 13:44:32.698 2012 |  220 |  440 |  220 |  440 |  660 |  880 | 225 | AvroDude
- Mon Jan 23 13:44:32.7 2012   |  230 |  460 |  230 |  460 |  690 |  920 | 235 | AvroDude
- Mon Jan 23 13:44:32.701 2012 |  240 |  480 |  240 |  480 |  720 |  960 | 245 | AvroDude
- Mon Jan 23 13:44:32.702 2012 |  250 |  500 |  250 |  500 |  750 | 1000 | 255 | AvroDude
- Mon Jan 23 13:44:32.703 2012 |  260 |  520 |  260 |  520 |  780 | 1040 | 265 | AvroDude
- Mon Jan 23 13:44:32.704 2012 |  270 |  540 |  270 |  540 |  810 | 1080 | 275 | AvroDude
- Mon Jan 23 13:44:32.706 2012 |  280 |  560 |  280 |  560 |  840 | 1120 | 285 | AvroDude
- Mon Jan 23 13:44:32.707 2012 |  290 |  580 |  290 |  580 |  870 | 1160 | 295 | AvroDude
- Mon Jan 23 13:44:32.708 2012 |  300 |  600 |  300 |  600 |  900 | 1200 | 305 | AvroDude
- Mon Jan 23 13:44:32.709 2012 |  310 |  620 |  310 |  620 |  930 | 1240 | 315 | AvroDude
- Mon Jan 23 13:44:32.71 2012  |  320 |  640 |  320 |  640 |  960 | 1280 | 325 | AvroDude
- Mon Jan 23 13:44:32.711 2012 |  330 |  660 |  330 |  660 |  990 | 1320 | 335 | AvroDude
- Mon Jan 23 13:44:32.712 2012 |  340 |  680 |  340 |  680 | 1020 | 1360 | 345 | AvroDude
- Mon Jan 23 13:44:32.713 2012 |  350 |  700 |  350 |  700 | 1050 | 1400 | 355 | AvroDude
- Mon Jan 23 13:44:32.714 2012 |  360 |  720 |  360 |  720 | 1080 | 1440 | 365 | AvroDude
- Mon Jan 23 13:44:32.715 2012 |  370 |  740 |  370 |  740 | 1110 | 1480 | 375 | AvroDude
- Mon Jan 23 13:44:32.716 2012 |  380 |  760 |  380 |  760 | 1140 | 1520 | 385 | AvroDude
- Mon Jan 23 13:44:32.717 2012 |  390 |  780 |  390 |  780 | 1170 | 1560 | 395 | AvroDude
- Mon Jan 23 13:44:32.718 2012 |  400 |  800 |  400 |  800 | 1200 | 1600 | 405 | AvroDude
- Mon Jan 23 13:44:32.719 2012 |  410 |  820 |  410 |  820 | 1230 | 1640 | 415 | AvroDude
- Mon Jan 23 13:44:32.721 2012 |  420 |  840 |  420 |  840 | 1260 | 1680 | 425 | AvroDude
- Mon Jan 23 13:44:32.722 2012 |  430 |  860 |  430 |  860 | 1290 | 1720 | 435 | AvroDude
- Mon Jan 23 13:44:32.723 2012 |  440 |  880 |  440 |  880 | 1320 | 1760 | 445 | AvroDude
- Mon Jan 23 13:44:32.724 2012 |  450 |  900 |  450 |  900 | 1350 | 1800 | 455 | AvroDude
- Mon Jan 23 13:44:32.73 2012  |  460 |  920 |  460 |  920 | 1380 | 1840 | 465 | AvroDude
- Mon Jan 23 13:44:32.731 2012 |  470 |  940 |  470 |  940 | 1410 | 1880 | 475 | AvroDude
- Mon Jan 23 13:44:32.733 2012 |  480 |  960 |  480 |  960 | 1440 | 1920 | 485 | AvroDude
- Mon Jan 23 13:44:32.734 2012 |  490 |  980 |  490 |  980 | 1470 | 1960 | 495 | AvroDude
+SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt, bl FROM seqav ORDER BY num1;
+             tmp1             | num1 | num2 | num3 | num4 | ln1  | ln2  | ln3 |    bt    | bl 
+------------------------------+------+------+------+------+------+------+-----+----------+----
+ Wed Jul 24 17:41:56.685 2013 |  200 |  400 |  200 |  400 |  600 |  800 | 205 | AvroDude | t
+ Wed Jul 24 17:41:56.892 2013 |  210 |  420 |  210 |  420 |  630 |  840 | 215 | AvroDude | t
+ Wed Jul 24 17:41:56.893 2013 |  220 |  440 |  220 |  440 |  660 |  880 | 225 | AvroDude | t
+ Wed Jul 24 17:41:56.895 2013 |  230 |  460 |  230 |  460 |  690 |  920 | 235 | AvroDude | t
+ Wed Jul 24 17:41:56.896 2013 |  240 |  480 |  240 |  480 |  720 |  960 | 245 | AvroDude | t
+ Wed Jul 24 17:41:56.898 2013 |  250 |  500 |  250 |  500 |  750 | 1000 | 255 | AvroDude | t
+ Wed Jul 24 17:41:56.899 2013 |  260 |  520 |  260 |  520 |  780 | 1040 | 265 | AvroDude | t
+ Wed Jul 24 17:41:56.9 2013   |  270 |  540 |  270 |  540 |  810 | 1080 | 275 | AvroDude | t
+ Wed Jul 24 17:41:56.902 2013 |  280 |  560 |  280 |  560 |  840 | 1120 | 285 | AvroDude | t
+ Wed Jul 24 17:41:56.904 2013 |  290 |  580 |  290 |  580 |  870 | 1160 | 295 | AvroDude | t
+ Wed Jul 24 17:41:56.905 2013 |  300 |  600 |  300 |  600 |  900 | 1200 | 305 | AvroDude | t
+ Wed Jul 24 17:41:56.906 2013 |  310 |  620 |  310 |  620 |  930 | 1240 | 315 | AvroDude | t
+ Wed Jul 24 17:41:56.908 2013 |  320 |  640 |  320 |  640 |  960 | 1280 | 325 | AvroDude | t
+ Wed Jul 24 17:41:56.909 2013 |  330 |  660 |  330 |  660 |  990 | 1320 | 335 | AvroDude | t
+ Wed Jul 24 17:41:56.911 2013 |  340 |  680 |  340 |  680 | 1020 | 1360 | 345 | AvroDude | t
+ Wed Jul 24 17:41:56.912 2013 |  350 |  700 |  350 |  700 | 1050 | 1400 | 355 | AvroDude | t
+ Wed Jul 24 17:41:56.913 2013 |  360 |  720 |  360 |  720 | 1080 | 1440 | 365 | AvroDude | t
+ Wed Jul 24 17:41:56.915 2013 |  370 |  740 |  370 |  740 | 1110 | 1480 | 375 | AvroDude | t
+ Wed Jul 24 17:41:56.916 2013 |  380 |  760 |  380 |  760 | 1140 | 1520 | 385 | AvroDude | t
+ Wed Jul 24 17:41:56.918 2013 |  390 |  780 |  390 |  780 | 1170 | 1560 | 395 | AvroDude | t
+ Wed Jul 24 17:41:56.919 2013 |  400 |  800 |  400 |  800 | 1200 | 1600 | 405 | AvroDude | t
+ Wed Jul 24 17:41:56.92 2013  |  410 |  820 |  410 |  820 | 1230 | 1640 | 415 | AvroDude | t
+ Wed Jul 24 17:41:56.922 2013 |  420 |  840 |  420 |  840 | 1260 | 1680 | 425 | AvroDude | t
+ Wed Jul 24 17:41:56.923 2013 |  430 |  860 |  430 |  860 | 1290 | 1720 | 435 | AvroDude | t
+ Wed Jul 24 17:41:56.925 2013 |  440 |  880 |  440 |  880 | 1320 | 1760 | 445 | AvroDude | t
+ Wed Jul 24 17:41:56.926 2013 |  450 |  900 |  450 |  900 | 1350 | 1800 | 455 | AvroDude | t
+ Wed Jul 24 17:41:56.927 2013 |  460 |  920 |  460 |  920 | 1380 | 1840 | 465 | AvroDude | t
+ Wed Jul 24 17:41:56.929 2013 |  470 |  940 |  470 |  940 | 1410 | 1880 | 475 | AvroDude | t
+ Wed Jul 24 17:41:56.93 2013  |  480 |  960 |  480 |  960 | 1440 | 1920 | 485 | AvroDude | t
+ Wed Jul 24 17:41:56.932 2013 |  490 |  980 |  490 |  980 | 1470 | 1960 | 495 | AvroDude | t
 (30 rows)
 
 SELECT num1, t1, t2, t3 FROM seqav ORDER BY num1;
@@ -522,42 +523,43 @@ CREATE EXTERNAL TABLE seqav_space(tmp1 timestamp,
                             ln1   bigint, 
                             ln2   bigint, 
                             ln3   bigint, 
-                            bt    bytea)
+                            bt    bytea,
+							bl    boolean)
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/avro_inside_sequence.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=AvroResolver&DATA-SCHEMA=regress PXF Custom Avro1.avsc')
 FORMAT 'custom' (formatter='pxfwritable_import');
-SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt FROM seqav_space ORDER BY num1;
-             tmp1             | num1 | num2 | num3 | num4 | ln1  | ln2  | ln3 |    bt    
-------------------------------+------+------+------+------+------+------+-----+----------
- Mon Jan 23 13:44:32.504 2012 |  200 |  400 |  200 |  400 |  600 |  800 | 205 | AvroDude
- Mon Jan 23 13:44:32.697 2012 |  210 |  420 |  210 |  420 |  630 |  840 | 215 | AvroDude
- Mon Jan 23 13:44:32.698 2012 |  220 |  440 |  220 |  440 |  660 |  880 | 225 | AvroDude
- Mon Jan 23 13:44:32.7 2012   |  230 |  460 |  230 |  460 |  690 |  920 | 235 | AvroDude
- Mon Jan 23 13:44:32.701 2012 |  240 |  480 |  240 |  480 |  720 |  960 | 245 | AvroDude
- Mon Jan 23 13:44:32.702 2012 |  250 |  500 |  250 |  500 |  750 | 1000 | 255 | AvroDude
- Mon Jan 23 13:44:32.703 2012 |  260 |  520 |  260 |  520 |  780 | 1040 | 265 | AvroDude
- Mon Jan 23 13:44:32.704 2012 |  270 |  540 |  270 |  540 |  810 | 1080 | 275 | AvroDude
- Mon Jan 23 13:44:32.706 2012 |  280 |  560 |  280 |  560 |  840 | 1120 | 285 | AvroDude
- Mon Jan 23 13:44:32.707 2012 |  290 |  580 |  290 |  580 |  870 | 1160 | 295 | AvroDude
- Mon Jan 23 13:44:32.708 2012 |  300 |  600 |  300 |  600 |  900 | 1200 | 305 | AvroDude
- Mon Jan 23 13:44:32.709 2012 |  310 |  620 |  310 |  620 |  930 | 1240 | 315 | AvroDude
- Mon Jan 23 13:44:32.71 2012  |  320 |  640 |  320 |  640 |  960 | 1280 | 325 | AvroDude
- Mon Jan 23 13:44:32.711 2012 |  330 |  660 |  330 |  660 |  990 | 1320 | 335 | AvroDude
- Mon Jan 23 13:44:32.712 2012 |  340 |  680 |  340 |  680 | 1020 | 1360 | 345 | AvroDude
- Mon Jan 23 13:44:32.713 2012 |  350 |  700 |  350 |  700 | 1050 | 1400 | 355 | AvroDude
- Mon Jan 23 13:44:32.714 2012 |  360 |  720 |  360 |  720 | 1080 | 1440 | 365 | AvroDude
- Mon Jan 23 13:44:32.715 2012 |  370 |  740 |  370 |  740 | 1110 | 1480 | 375 | AvroDude
- Mon Jan 23 13:44:32.716 2012 |  380 |  760 |  380 |  760 | 1140 | 1520 | 385 | AvroDude
- Mon Jan 23 13:44:32.717 2012 |  390 |  780 |  390 |  780 | 1170 | 1560 | 395 | AvroDude
- Mon Jan 23 13:44:32.718 2012 |  400 |  800 |  400 |  800 | 1200 | 1600 | 405 | AvroDude
- Mon Jan 23 13:44:32.719 2012 |  410 |  820 |  410 |  820 | 1230 | 1640 | 415 | AvroDude
- Mon Jan 23 13:44:32.721 2012 |  420 |  840 |  420 |  840 | 1260 | 1680 | 425 | AvroDude
- Mon Jan 23 13:44:32.722 2012 |  430 |  860 |  430 |  860 | 1290 | 1720 | 435 | AvroDude
- Mon Jan 23 13:44:32.723 2012 |  440 |  880 |  440 |  880 | 1320 | 1760 | 445 | AvroDude
- Mon Jan 23 13:44:32.724 2012 |  450 |  900 |  450 |  900 | 1350 | 1800 | 455 | AvroDude
- Mon Jan 23 13:44:32.73 2012  |  460 |  920 |  460 |  920 | 1380 | 1840 | 465 | AvroDude
- Mon Jan 23 13:44:32.731 2012 |  470 |  940 |  470 |  940 | 1410 | 1880 | 475 | AvroDude
- Mon Jan 23 13:44:32.733 2012 |  480 |  960 |  480 |  960 | 1440 | 1920 | 485 | AvroDude
- Mon Jan 23 13:44:32.734 2012 |  490 |  980 |  490 |  980 | 1470 | 1960 | 495 | AvroDude
+SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt, bl FROM seqav_space ORDER BY num1;
+             tmp1             | num1 | num2 | num3 | num4 | ln1  | ln2  | ln3 |    bt    | bl 
+------------------------------+------+------+------+------+------+------+-----+----------+----
+ Wed Jul 24 17:41:56.685 2013 |  200 |  400 |  200 |  400 |  600 |  800 | 205 | AvroDude | t
+ Wed Jul 24 17:41:56.892 2013 |  210 |  420 |  210 |  420 |  630 |  840 | 215 | AvroDude | t
+ Wed Jul 24 17:41:56.893 2013 |  220 |  440 |  220 |  440 |  660 |  880 | 225 | AvroDude | t
+ Wed Jul 24 17:41:56.895 2013 |  230 |  460 |  230 |  460 |  690 |  920 | 235 | AvroDude | t
+ Wed Jul 24 17:41:56.896 2013 |  240 |  480 |  240 |  480 |  720 |  960 | 245 | AvroDude | t
+ Wed Jul 24 17:41:56.898 2013 |  250 |  500 |  250 |  500 |  750 | 1000 | 255 | AvroDude | t
+ Wed Jul 24 17:41:56.899 2013 |  260 |  520 |  260 |  520 |  780 | 1040 | 265 | AvroDude | t
+ Wed Jul 24 17:41:56.9 2013   |  270 |  540 |  270 |  540 |  810 | 1080 | 275 | AvroDude | t
+ Wed Jul 24 17:41:56.902 2013 |  280 |  560 |  280 |  560 |  840 | 1120 | 285 | AvroDude | t
+ Wed Jul 24 17:41:56.904 2013 |  290 |  580 |  290 |  580 |  870 | 1160 | 295 | AvroDude | t
+ Wed Jul 24 17:41:56.905 2013 |  300 |  600 |  300 |  600 |  900 | 1200 | 305 | AvroDude | t
+ Wed Jul 24 17:41:56.906 2013 |  310 |  620 |  310 |  620 |  930 | 1240 | 315 | AvroDude | t
+ Wed Jul 24 17:41:56.908 2013 |  320 |  640 |  320 |  640 |  960 | 1280 | 325 | AvroDude | t
+ Wed Jul 24 17:41:56.909 2013 |  330 |  660 |  330 |  660 |  990 | 1320 | 335 | AvroDude | t
+ Wed Jul 24 17:41:56.911 2013 |  340 |  680 |  340 |  680 | 1020 | 1360 | 345 | AvroDude | t
+ Wed Jul 24 17:41:56.912 2013 |  350 |  700 |  350 |  700 | 1050 | 1400 | 355 | AvroDude | t
+ Wed Jul 24 17:41:56.913 2013 |  360 |  720 |  360 |  720 | 1080 | 1440 | 365 | AvroDude | t
+ Wed Jul 24 17:41:56.915 2013 |  370 |  740 |  370 |  740 | 1110 | 1480 | 375 | AvroDude | t
+ Wed Jul 24 17:41:56.916 2013 |  380 |  760 |  380 |  760 | 1140 | 1520 | 385 | AvroDude | t
+ Wed Jul 24 17:41:56.918 2013 |  390 |  780 |  390 |  780 | 1170 | 1560 | 395 | AvroDude | t
+ Wed Jul 24 17:41:56.919 2013 |  400 |  800 |  400 |  800 | 1200 | 1600 | 405 | AvroDude | t
+ Wed Jul 24 17:41:56.92 2013  |  410 |  820 |  410 |  820 | 1230 | 1640 | 415 | AvroDude | t
+ Wed Jul 24 17:41:56.922 2013 |  420 |  840 |  420 |  840 | 1260 | 1680 | 425 | AvroDude | t
+ Wed Jul 24 17:41:56.923 2013 |  430 |  860 |  430 |  860 | 1290 | 1720 | 435 | AvroDude | t
+ Wed Jul 24 17:41:56.925 2013 |  440 |  880 |  440 |  880 | 1320 | 1760 | 445 | AvroDude | t
+ Wed Jul 24 17:41:56.926 2013 |  450 |  900 |  450 |  900 | 1350 | 1800 | 455 | AvroDude | t
+ Wed Jul 24 17:41:56.927 2013 |  460 |  920 |  460 |  920 | 1380 | 1840 | 465 | AvroDude | t
+ Wed Jul 24 17:41:56.929 2013 |  470 |  940 |  470 |  940 | 1410 | 1880 | 475 | AvroDude | t
+ Wed Jul 24 17:41:56.93 2013  |  480 |  960 |  480 |  960 | 1440 | 1920 | 485 | AvroDude | t
+ Wed Jul 24 17:41:56.932 2013 |  490 |  980 |  490 |  980 | 1470 | 1960 | 495 | AvroDude | t
 (30 rows)
 
 DROP EXTERNAL TABLE seqav_space;
@@ -584,42 +586,43 @@ CREATE EXTERNAL TABLE seqav_case(tmp1 timestamp,
                             ln1   bigint, 
                             ln2   bigint, 
                             ln3   bigint, 
-                            bt    bytea)
+                            bt    bytea,
+							bl    boolean)
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/avro_inside_sequence.tbl?fragmenter=HdfsDataFragmenter&Accessor=SequenceFileAccessor&ReSoLvEr=AvroResolver&Data-Schema=regressPXFCustomAvro.avsc')
 FORMAT 'custom' (formatter='pxfwritable_import');
-SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt FROM seqav_case ORDER BY num1;
-             tmp1             | num1 | num2 | num3 | num4 | ln1  | ln2  | ln3 |    bt    
-------------------------------+------+------+------+------+------+------+-----+----------
- Mon Jan 23 13:44:32.504 2012 |  200 |  400 |  200 |  400 |  600 |  800 | 205 | AvroDude
- Mon Jan 23 13:44:32.697 2012 |  210 |  420 |  210 |  420 |  630 |  840 | 215 | AvroDude
- Mon Jan 23 13:44:32.698 2012 |  220 |  440 |  220 |  440 |  660 |  880 | 225 | AvroDude
- Mon Jan 23 13:44:32.7 2012   |  230 |  460 |  230 |  460 |  690 |  920 | 235 | AvroDude
- Mon Jan 23 13:44:32.701 2012 |  240 |  480 |  240 |  480 |  720 |  960 | 245 | AvroDude
- Mon Jan 23 13:44:32.702 2012 |  250 |  500 |  250 |  500 |  750 | 1000 | 255 | AvroDude
- Mon Jan 23 13:44:32.703 2012 |  260 |  520 |  260 |  520 |  780 | 1040 | 265 | AvroDude
- Mon Jan 23 13:44:32.704 2012 |  270 |  540 |  270 |  540 |  810 | 1080 | 275 | AvroDude
- Mon Jan 23 13:44:32.706 2012 |  280 |  560 |  280 |  560 |  840 | 1120 | 285 | AvroDude
- Mon Jan 23 13:44:32.707 2012 |  290 |  580 |  290 |  580 |  870 | 1160 | 295 | AvroDude
- Mon Jan 23 13:44:32.708 2012 |  300 |  600 |  300 |  600 |  900 | 1200 | 305 | AvroDude
- Mon Jan 23 13:44:32.709 2012 |  310 |  620 |  310 |  620 |  930 | 1240 | 315 | AvroDude
- Mon Jan 23 13:44:32.71 2012  |  320 |  640 |  320 |  640 |  960 | 1280 | 325 | AvroDude
- Mon Jan 23 13:44:32.711 2012 |  330 |  660 |  330 |  660 |  990 | 1320 | 335 | AvroDude
- Mon Jan 23 13:44:32.712 2012 |  340 |  680 |  340 |  680 | 1020 | 1360 | 345 | AvroDude
- Mon Jan 23 13:44:32.713 2012 |  350 |  700 |  350 |  700 | 1050 | 1400 | 355 | AvroDude
- Mon Jan 23 13:44:32.714 2012 |  360 |  720 |  360 |  720 | 1080 | 1440 | 365 | AvroDude
- Mon Jan 23 13:44:32.715 2012 |  370 |  740 |  370 |  740 | 1110 | 1480 | 375 | AvroDude
- Mon Jan 23 13:44:32.716 2012 |  380 |  760 |  380 |  760 | 1140 | 1520 | 385 | AvroDude
- Mon Jan 23 13:44:32.717 2012 |  390 |  780 |  390 |  780 | 1170 | 1560 | 395 | AvroDude
- Mon Jan 23 13:44:32.718 2012 |  400 |  800 |  400 |  800 | 1200 | 1600 | 405 | AvroDude
- Mon Jan 23 13:44:32.719 2012 |  410 |  820 |  410 |  820 | 1230 | 1640 | 415 | AvroDude
- Mon Jan 23 13:44:32.721 2012 |  420 |  840 |  420 |  840 | 1260 | 1680 | 425 | AvroDude
- Mon Jan 23 13:44:32.722 2012 |  430 |  860 |  430 |  860 | 1290 | 1720 | 435 | AvroDude
- Mon Jan 23 13:44:32.723 2012 |  440 |  880 |  440 |  880 | 1320 | 1760 | 445 | AvroDude
- Mon Jan 23 13:44:32.724 2012 |  450 |  900 |  450 |  900 | 1350 | 1800 | 455 | AvroDude
- Mon Jan 23 13:44:32.73 2012  |  460 |  920 |  460 |  920 | 1380 | 1840 | 465 | AvroDude
- Mon Jan 23 13:44:32.731 2012 |  470 |  940 |  470 |  940 | 1410 | 1880 | 475 | AvroDude
- Mon Jan 23 13:44:32.733 2012 |  480 |  960 |  480 |  960 | 1440 | 1920 | 485 | AvroDude
- Mon Jan 23 13:44:32.734 2012 |  490 |  980 |  490 |  980 | 1470 | 1960 | 495 | AvroDude
+SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt, bl FROM seqav_case ORDER BY num1;
+             tmp1             | num1 | num2 | num3 | num4 | ln1  | ln2  | ln3 |    bt    | bl 
+------------------------------+------+------+------+------+------+------+-----+----------+----
+ Wed Jul 24 17:41:56.685 2013 |  200 |  400 |  200 |  400 |  600 |  800 | 205 | AvroDude | t
+ Wed Jul 24 17:41:56.892 2013 |  210 |  420 |  210 |  420 |  630 |  840 | 215 | AvroDude | t
+ Wed Jul 24 17:41:56.893 2013 |  220 |  440 |  220 |  440 |  660 |  880 | 225 | AvroDude | t
+ Wed Jul 24 17:41:56.895 2013 |  230 |  460 |  230 |  460 |  690 |  920 | 235 | AvroDude | t
+ Wed Jul 24 17:41:56.896 2013 |  240 |  480 |  240 |  480 |  720 |  960 | 245 | AvroDude | t
+ Wed Jul 24 17:41:56.898 2013 |  250 |  500 |  250 |  500 |  750 | 1000 | 255 | AvroDude | t
+ Wed Jul 24 17:41:56.899 2013 |  260 |  520 |  260 |  520 |  780 | 1040 | 265 | AvroDude | t
+ Wed Jul 24 17:41:56.9 2013   |  270 |  540 |  270 |  540 |  810 | 1080 | 275 | AvroDude | t
+ Wed Jul 24 17:41:56.902 2013 |  280 |  560 |  280 |  560 |  840 | 1120 | 285 | AvroDude | t
+ Wed Jul 24 17:41:56.904 2013 |  290 |  580 |  290 |  580 |  870 | 1160 | 295 | AvroDude | t
+ Wed Jul 24 17:41:56.905 2013 |  300 |  600 |  300 |  600 |  900 | 1200 | 305 | AvroDude | t
+ Wed Jul 24 17:41:56.906 2013 |  310 |  620 |  310 |  620 |  930 | 1240 | 315 | AvroDude | t
+ Wed Jul 24 17:41:56.908 2013 |  320 |  640 |  320 |  640 |  960 | 1280 | 325 | AvroDude | t
+ Wed Jul 24 17:41:56.909 2013 |  330 |  660 |  330 |  660 |  990 | 1320 | 335 | AvroDude | t
+ Wed Jul 24 17:41:56.911 2013 |  340 |  680 |  340 |  680 | 1020 | 1360 | 345 | AvroDude | t
+ Wed Jul 24 17:41:56.912 2013 |  350 |  700 |  350 |  700 | 1050 | 1400 | 355 | AvroDude | t
+ Wed Jul 24 17:41:56.913 2013 |  360 |  720 |  360 |  720 | 1080 | 1440 | 365 | AvroDude | t
+ Wed Jul 24 17:41:56.915 2013 |  370 |  740 |  370 |  740 | 1110 | 1480 | 375 | AvroDude | t
+ Wed Jul 24 17:41:56.916 2013 |  380 |  760 |  380 |  760 | 1140 | 1520 | 385 | AvroDude | t
+ Wed Jul 24 17:41:56.918 2013 |  390 |  780 |  390 |  780 | 1170 | 1560 | 395 | AvroDude | t
+ Wed Jul 24 17:41:56.919 2013 |  400 |  800 |  400 |  800 | 1200 | 1600 | 405 | AvroDude | t
+ Wed Jul 24 17:41:56.92 2013  |  410 |  820 |  410 |  820 | 1230 | 1640 | 415 | AvroDude | t
+ Wed Jul 24 17:41:56.922 2013 |  420 |  840 |  420 |  840 | 1260 | 1680 | 425 | AvroDude | t
+ Wed Jul 24 17:41:56.923 2013 |  430 |  860 |  430 |  860 | 1290 | 1720 | 435 | AvroDude | t
+ Wed Jul 24 17:41:56.925 2013 |  440 |  880 |  440 |  880 | 1320 | 1760 | 445 | AvroDude | t
+ Wed Jul 24 17:41:56.926 2013 |  450 |  900 |  450 |  900 | 1350 | 1800 | 455 | AvroDude | t
+ Wed Jul 24 17:41:56.927 2013 |  460 |  920 |  460 |  920 | 1380 | 1840 | 465 | AvroDude | t
+ Wed Jul 24 17:41:56.929 2013 |  470 |  940 |  470 |  940 | 1410 | 1880 | 475 | AvroDude | t
+ Wed Jul 24 17:41:56.93 2013  |  480 |  960 |  480 |  960 | 1440 | 1920 | 485 | AvroDude | t
+ Wed Jul 24 17:41:56.932 2013 |  490 |  980 |  490 |  980 | 1470 | 1960 | 495 | AvroDude | t
 (30 rows)
 
 DROP EXTERNAL TABLE seqav_case;
@@ -646,42 +649,43 @@ CREATE EXTERNAL TABLE avfav(tmp1 timestamp,
                             ln1   bigint, 
                             ln2   bigint, 
                             ln3   bigint, 
-                            bt    bytea)
+                            bt    bytea,
+							bl    boolean)
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/avroformat_inside_avrofile.avro?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=AvroFileAccessor&RESOLVER=AvroResolver')
 FORMAT 'custom' (formatter='pxfwritable_import');
-SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt FROM avfav ORDER BY num1;
-             tmp1             | num1 | num2 | num3 | num4 | ln1  | ln2  | ln3 |    bt    
-------------------------------+------+------+------+------+------+------+-----+----------
- Wed Feb 15 23:45:41.516 2012 |  200 |  400 |  200 |  400 |  600 |  800 | 205 | AvroDude
- Wed Feb 15 23:45:41.521 2012 |  210 |  420 |  210 |  420 |  630 |  840 | 215 | AvroDude
- Wed Feb 15 23:45:41.522 2012 |  220 |  440 |  220 |  440 |  660 |  880 | 225 | AvroDude
- Wed Feb 15 23:45:41.523 2012 |  230 |  460 |  230 |  460 |  690 |  920 | 235 | AvroDude
- Wed Feb 15 23:45:41.523 2012 |  240 |  480 |  240 |  480 |  720 |  960 | 245 | AvroDude
- Wed Feb 15 23:45:41.524 2012 |  250 |  500 |  250 |  500 |  750 | 1000 | 255 | AvroDude
- Wed Feb 15 23:45:41.525 2012 |  260 |  520 |  260 |  520 |  780 | 1040 | 265 | AvroDude
- Wed Feb 15 23:45:41.526 2012 |  270 |  540 |  270 |  540 |  810 | 1080 | 275 | AvroDude
- Wed Feb 15 23:45:41.527 2012 |  280 |  560 |  280 |  560 |  840 | 1120 | 285 | AvroDude
- Wed Feb 15 23:45:41.528 2012 |  290 |  580 |  290 |  580 |  870 | 1160 | 295 | AvroDude
- Wed Feb 15 23:45:41.529 2012 |  300 |  600 |  300 |  600 |  900 | 1200 | 305 | AvroDude
- Wed Feb 15 23:45:41.53 2012  |  310 |  620 |  310 |  620 |  930 | 1240 | 315 | AvroDude
- Wed Feb 15 23:45:41.53 2012  |  320 |  640 |  320 |  640 |  960 | 1280 | 325 | AvroDude
- Wed Feb 15 23:45:41.531 2012 |  330 |  660 |  330 |  660 |  990 | 1320 | 335 | AvroDude
- Wed Feb 15 23:45:41.532 2012 |  340 |  680 |  340 |  680 | 1020 | 1360 | 345 | AvroDude
- Wed Feb 15 23:45:41.533 2012 |  350 |  700 |  350 |  700 | 1050 | 1400 | 355 | AvroDude
- Wed Feb 15 23:45:41.534 2012 |  360 |  720 |  360 |  720 | 1080 | 1440 | 365 | AvroDude
- Wed Feb 15 23:45:41.535 2012 |  370 |  740 |  370 |  740 | 1110 | 1480 | 375 | AvroDude
- Wed Feb 15 23:45:41.536 2012 |  380 |  760 |  380 |  760 | 1140 | 1520 | 385 | AvroDude
- Wed Feb 15 23:45:41.536 2012 |  390 |  780 |  390 |  780 | 1170 | 1560 | 395 | AvroDude
- Wed Feb 15 23:45:41.537 2012 |  400 |  800 |  400 |  800 | 1200 | 1600 | 405 | AvroDude
- Wed Feb 15 23:45:41.538 2012 |  410 |  820 |  410 |  820 | 1230 | 1640 | 415 | AvroDude
- Wed Feb 15 23:45:41.539 2012 |  420 |  840 |  420 |  840 | 1260 | 1680 | 425 | AvroDude
- Wed Feb 15 23:45:41.54 2012  |  430 |  860 |  430 |  860 | 1290 | 1720 | 435 | AvroDude
- Wed Feb 15 23:45:41.541 2012 |  440 |  880 |  440 |  880 | 1320 | 1760 | 445 | AvroDude
- Wed Feb 15 23:45:41.542 2012 |  450 |  900 |  450 |  900 | 1350 | 1800 | 455 | AvroDude
- Wed Feb 15 23:45:41.542 2012 |  460 |  920 |  460 |  920 | 1380 | 1840 | 465 | AvroDude
- Wed Feb 15 23:45:41.543 2012 |  470 |  940 |  470 |  940 | 1410 | 1880 | 475 | AvroDude
- Wed Feb 15 23:45:41.544 2012 |  480 |  960 |  480 |  960 | 1440 | 1920 | 485 | AvroDude
- Wed Feb 15 23:45:41.545 2012 |  490 |  980 |  490 |  980 | 1470 | 1960 | 495 | AvroDude
+SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt, bl FROM avfav ORDER BY num1;
+             tmp1             | num1 | num2 | num3 | num4 | ln1  | ln2  | ln3 |    bt    | bl 
+------------------------------+------+------+------+------+------+------+-----+----------+----
+ Wed Jul 24 18:16:38.43 2013  |  200 |  400 |  200 |  400 |  600 |  800 | 205 | AvroDude | t
+ Wed Jul 24 18:16:38.435 2013 |  210 |  420 |  210 |  420 |  630 |  840 | 215 | AvroDude | f
+ Wed Jul 24 18:16:38.436 2013 |  220 |  440 |  220 |  440 |  660 |  880 | 225 | AvroDude | t
+ Wed Jul 24 18:16:38.437 2013 |  230 |  460 |  230 |  460 |  690 |  920 | 235 | AvroDude | f
+ Wed Jul 24 18:16:38.439 2013 |  240 |  480 |  240 |  480 |  720 |  960 | 245 | AvroDude | t
+ Wed Jul 24 18:16:38.44 2013  |  250 |  500 |  250 |  500 |  750 | 1000 | 255 | AvroDude | f
+ Wed Jul 24 18:16:38.441 2013 |  260 |  520 |  260 |  520 |  780 | 1040 | 265 | AvroDude | t
+ Wed Jul 24 18:16:38.442 2013 |  270 |  540 |  270 |  540 |  810 | 1080 | 275 | AvroDude | f
+ Wed Jul 24 18:16:38.443 2013 |  280 |  560 |  280 |  560 |  840 | 1120 | 285 | AvroDude | t
+ Wed Jul 24 18:16:38.444 2013 |  290 |  580 |  290 |  580 |  870 | 1160 | 295 | AvroDude | f
+ Wed Jul 24 18:16:38.445 2013 |  300 |  600 |  300 |  600 |  900 | 1200 | 305 | AvroDude | t
+ Wed Jul 24 18:16:38.447 2013 |  310 |  620 |  310 |  620 |  930 | 1240 | 315 | AvroDude | f
+ Wed Jul 24 18:16:38.448 2013 |  320 |  640 |  320 |  640 |  960 | 1280 | 325 | AvroDude | t
+ Wed Jul 24 18:16:38.449 2013 |  330 |  660 |  330 |  660 |  990 | 1320 | 335 | AvroDude | f
+ Wed Jul 24 18:16:38.45 2013  |  340 |  680 |  340 |  680 | 1020 | 1360 | 345 | AvroDude | t
+ Wed Jul 24 18:16:38.451 2013 |  350 |  700 |  350 |  700 | 1050 | 1400 | 355 | AvroDude | f
+ Wed Jul 24 18:16:38.452 2013 |  360 |  720 |  360 |  720 | 1080 | 1440 | 365 | AvroDude | t
+ Wed Jul 24 18:16:38.453 2013 |  370 |  740 |  370 |  740 | 1110 | 1480 | 375 | AvroDude | f
+ Wed Jul 24 18:16:38.455 2013 |  380 |  760 |  380 |  760 | 1140 | 1520 | 385 | AvroDude | t
+ Wed Jul 24 18:16:38.456 2013 |  390 |  780 |  390 |  780 | 1170 | 1560 | 395 | AvroDude | f
+ Wed Jul 24 18:16:38.457 2013 |  400 |  800 |  400 |  800 | 1200 | 1600 | 405 | AvroDude | t
+ Wed Jul 24 18:16:38.458 2013 |  410 |  820 |  410 |  820 | 1230 | 1640 | 415 | AvroDude | f
+ Wed Jul 24 18:16:38.459 2013 |  420 |  840 |  420 |  840 | 1260 | 1680 | 425 | AvroDude | t
+ Wed Jul 24 18:16:38.46 2013  |  430 |  860 |  430 |  860 | 1290 | 1720 | 435 | AvroDude | f
+ Wed Jul 24 18:16:38.461 2013 |  440 |  880 |  440 |  880 | 1320 | 1760 | 445 | AvroDude | t
+ Wed Jul 24 18:16:38.463 2013 |  450 |  900 |  450 |  900 | 1350 | 1800 | 455 | AvroDude | f
+ Wed Jul 24 18:16:38.464 2013 |  460 |  920 |  460 |  920 | 1380 | 1840 | 465 | AvroDude | t
+ Wed Jul 24 18:16:38.465 2013 |  470 |  940 |  470 |  940 | 1410 | 1880 | 475 | AvroDude | f
+ Wed Jul 24 18:16:38.466 2013 |  480 |  960 |  480 |  960 | 1440 | 1920 | 485 | AvroDude | t
+ Wed Jul 24 18:16:38.467 2013 |  490 |  980 |  490 |  980 | 1470 | 1960 | 495 | AvroDude | f
 (30 rows)
 
 SELECT num1, t1, t2, t3 FROM avfav ORDER BY num1;
@@ -1036,7 +1040,7 @@ SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_bad_port' AND relpa
 (1 row)
 
 ANALYZE avfav_analyze_bad_class;
-WARNING:  skipping "avfav_analyze_bad_class" --- error returned: remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v4/Analyzer/getEstimatedStats. Reason:     Server Error   Caused by:  java.lang.ClassNotFoundException: Class NoSuchAnalyzer could not be found on the CLASSPATH. NoSuchAnalyzer
+WARNING:  skipping "avfav_analyze_bad_class" --- error returned: remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v5/Analyzer/getEstimatedStats. Reason:     Server Error   Caused by:  java.lang.ClassNotFoundException: Class NoSuchAnalyzer could not be found on the CLASSPATH. NoSuchAnalyzer
 SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_bad_class' AND relpages = 1000 AND reltuples = 1000000;
  count 
 -------
