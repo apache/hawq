@@ -193,7 +193,7 @@ def parseargs():
     HADOOP_HOME = options.hadoop if options.hadoop else os.environ.get("HADOOP_HOME")
 
     if not gpcheck_info.is_root and not HADOOP_HOME:
-        checkFaild(None, "utility will SKIP HDFS configuration check because HADOOP_HOME is not specified in environment variable or --hadoop")
+        checkFailed(None, "utility will SKIP HDFS configuration check because HADOOP_HOME is not specified in environment variable or --hadoop")
 
     # params check
     if not options.file and not options.host and not options.zipin:
@@ -214,7 +214,7 @@ def readConfigFile():
         raise GpCheckError("Field to read gpcheck config file '%s':\n%s" % (GPCHECK_CONFIG_FILE, e))
 
 
-def checkFaild(host, msg):
+def checkFailed(host, msg):
     global found_errors
     found_errors += 1
     if host:
@@ -298,7 +298,7 @@ def createHostList():
             gpcheck_info.hosts[namenode_host] = GpCheckHost(namenode_host, is_namenode=True)
 
         except Exception, e:
-            checkFaild(None, "utility will SKIP HDFS namenode check: %s" % str(e))
+            checkFailed(None, "utility will SKIP HDFS namenode check: %s" % str(e))
 
 
 def runCollections():
@@ -350,7 +350,7 @@ def runCollectionOnServers():
             gpcheck_info.hosts[i.remoteHost].datafile = i.results.stdout.strip()
             
     except Exception, e:
-        raise GpCheckError("Faild to collect data from servers:\n%s" % e)
+        raise GpCheckError("Failed to collect data from servers:\n%s" % e)
 
     gpcheck_info.collection_end_time = time.time()
 
@@ -374,7 +374,7 @@ def copyFilesLocally():
                 raise Exception("error running command %s: %s" % (i.cmdStr, i.results.stderr.strip()))
 
     except Exception, e:
-        raise GpCheckError("Faild to scp remote hostdump file to master:\n%s" % e)
+        raise GpCheckError("Failed to scp remote hostdump file to master:\n%s" % e)
 
 
 def deleteRemoteFiles():
@@ -396,7 +396,7 @@ def deleteRemoteFiles():
                 raise Exception("error running command %s: %s" % (i.cmdStr, i.results.stderr.strip()))
 
     except Exception, e:
-        raise GpCheckError("Faild to delete remote hostdump file:\n%s" % e)
+        raise GpCheckError("Failed to delete remote hostdump file:\n%s" % e)
 
 
 def readDataFiles():
@@ -407,7 +407,7 @@ def readDataFiles():
                 gpcheck_info.hosts[host].data = pickle.load(f)
 
         except Exception, e:
-            raise GpCheckError("Faild to load pickle file '%s': %s" % (fname, e))
+            raise GpCheckError("Failed to load pickle file '%s': %s" % (fname, e))
 
 
 def readHAWQConfiguration():
@@ -418,7 +418,7 @@ def readHAWQConfiguration():
     try:
         db = pg.connect(dbname=dbname)
     except pg.InternalError, ex:
-        checkFaild(None, "utility cannot perform HAWQ CPU and Memory check because failed to connect to HAWQ")
+        checkFailed(None, "utility cannot perform HAWQ CPU and Memory check because failed to connect to HAWQ")
         return
 
     # read segment configurations
@@ -437,7 +437,7 @@ def readHAWQConfiguration():
         if match_master:
             gpcheck_info.hawq_gucs[guc_name] = (int(match_master.group(1)), int(match_segment.group(1)))
         else:
-            checkFaild(None, "utility cannot perform HAWQ CPU and Memory check because failed to get GUC value using '%s'" % command)
+            checkFailed(None, "utility cannot perform HAWQ CPU and Memory check because failed to get GUC value using '%s'" % command)
             return
 
     gpcheck_info.hawq_collected_ok = True
@@ -452,7 +452,7 @@ def testConnectEmc(host):
     expected = "Running"
 
     if host.data.connectemc.output != expected:
-        checkFaild(host.hostname, "Connect EMC is not running on master (try /etc/init.d/connectemc status)")
+        checkFailed(host.hostname, "Connect EMC is not running on master (try /etc/init.d/connectemc status)")
     
 
 
@@ -481,7 +481,7 @@ def testSolarisEtcSystem(host):
         if results[k]:
             continue
 
-        checkFaild(host.hostname, "/etc/system is missing expected line 'set %s=%s'" % (k, requiredValues[k]))
+        checkFailed(host.hostname, "/etc/system is missing expected line 'set %s=%s'" % (k, requiredValues[k]))
 
 
 def testSolarisEtcProject(host):
@@ -492,7 +492,7 @@ def testSolarisEtcProject(host):
 
     for line in host.data.etc_project.lines:
         if line in unexpectedValues:
-            checkFaild(host.hostname, "unexpected line in /etc/project: '%s'" % line)
+            checkFailed(host.hostname, "unexpected line in /etc/project: '%s'" % line)
             continue
 
         if line in requiredValues:
@@ -502,7 +502,7 @@ def testSolarisEtcProject(host):
         if requiredValues[line]:
             continue
 
-        checkFaild(host.hostname, "/etc/project is missing expected line '%s'" % line)
+        checkFailed(host.hostname, "/etc/project is missing expected line '%s'" % line)
         
 
 def testSolarisEtcUserAttr(host):
@@ -517,7 +517,7 @@ def testSolarisEtcUserAttr(host):
         if requiredValues[line]:
             continue
 
-        checkFaild(host.hostname, "/etc/user_attr is missing expected line '%s'" % line)
+        checkFailed(host.hostname, "/etc/user_attr is missing expected line '%s'" % line)
  
 
 def testHAWQ(host):
@@ -544,21 +544,21 @@ def testHAWQ(host):
 
     if host.hostname == master_hostname:
         if num_segments > 1:
-            checkFaild(host.hostname, "HAWQ master host has segments configured")
+            checkFailed(host.hostname, "HAWQ master host has segments configured")
 
         # check HAWQ master's cpu cores
         if abs(guc_cpucores_master - actual_total_cpucores) > 1024:
-            checkFaild(host.hostname, "HAWQ master's %s GUC value is %s, expected %s" % (
+            checkFailed(host.hostname, "HAWQ master's %s GUC value is %s, expected %s" % (
                 HAWQ_GUC_CPU_CORES, guc_cpucores_master, actual_total_cpucores))
 
         if actual_total_memory < guc_vmemsize_master:
-            checkFaild(host.hostname, "HAWQ master host memory size '%s' is less than the '%s' size '%s'" % (
+            checkFailed(host.hostname, "HAWQ master host memory size '%s' is less than the '%s' size '%s'" % (
                 actual_total_memory, HAWQ_GUC_MEMORY, guc_vmemsize_master))
             return
 
         # check HAWQ master's memory size
         if abs(guc_vmemsize_master - actual_total_memory) > 1024:
-            checkFaild(host.hostname, "HAWQ master's %s GUC value is %s, expected %s" % (
+            checkFailed(host.hostname, "HAWQ master's %s GUC value is %s, expected %s" % (
                 HAWQ_GUC_MEMORY, guc_vmemsize_master, actual_total_memory))
 
     else:
@@ -567,19 +567,19 @@ def testHAWQ(host):
         # check HAWQ segment's cpu cores
         expect_cpucores_per_segment = actual_total_cpucores / num_segments
         if abs(guc_cpucores_segment - expect_cpucores_per_segment) > 1024:
-            checkFaild(host.hostname, "HAWQ segment's %s GUC value on this host is %s, expected %s" % (
+            checkFailed(host.hostname, "HAWQ segment's %s GUC value on this host is %s, expected %s" % (
                 HAWQ_GUC_CPU_CORES, guc_cpucores_segment, expect_cpucores_per_segment))
 
         # check HAWQ memory size
         if actual_total_memory < datanode_mem:
-            checkFaild(host.hostname, "HAWQ segment's host memory size '%s' is less than the expected data node memory size '%s'" % (
+            checkFailed(host.hostname, "HAWQ segment's host memory size '%s' is less than the expected data node memory size '%s'" % (
                 actual_total_memory, datanode_mem))
             logger.warning("please change the expected data node memory 'dfs.mem.datanode.heap' in gpcheck.cnf file")
             logger.warning("SKIP '%s' check" %(HAWQ_GUC_MEMORY))
             return
         expect_vmemsize_per_segment = (actual_total_memory - datanode_mem) / num_segments
         if abs(guc_vmemsize_segment - expect_vmemsize_per_segment) > 1024:
-            checkFaild(host.hostname, "HAWQ segment's %s GUC value on this host is %s, expected %s" % (
+            checkFailed(host.hostname, "HAWQ segment's %s GUC value on this host is %s, expected %s" % (
                 HAWQ_GUC_MEMORY, guc_vmemsize_segment, expect_vmemsize_per_segment))
         
 
@@ -591,7 +591,7 @@ def testDiskCapacity(host):
         if len(gpcheck_config.diskusage_mounts) == 0 or line.mount in gpcheck_config.diskusage_mounts:
             actual_usage = int(line.used_percent[:-1])
             if actual_usage > gpcheck_config.diskusage_usagemax:
-                checkFaild(host.hostname,
+                checkFailed(host.hostname,
                            "potential disk full risk: %s mounted on %s has used %s space" % (
                                line.fs, line.mount, line.used_percent))
     return
@@ -606,7 +606,7 @@ def testHDFSConfig(host):
         logger.info("-- test HDFS config")
 
     if hdfs.errormsg:
-        checkFaild(host.hostname, "collect HDFS configuration error: %s" % hdfs.errormsg)
+        checkFailed(host.hostname, "collect HDFS configuration error: %s" % hdfs.errormsg)
         return
 
     expect_config = gpcheck_config.hdfs_expected
@@ -614,7 +614,7 @@ def testHDFSConfig(host):
     actual_heap_size = hdfs.namenode_heap_size if host.is_namenode else hdfs.datanode_heap_size
 
     if host.data.machine.memory_in_MB < actual_heap_size:
-        checkFaild(host.hostname, "host memory size '%s' is less than the java max heap size '%s'" % (host.data.machine.memory_in_MB, actual_heap_size)) 
+        checkFailed(host.hostname, "host memory size '%s' is less than the java max heap size '%s'" % (host.data.machine.memory_in_MB, actual_heap_size)) 
 
     # test hdfs_site.xml setting
     for exp_key, exp_val in expect_config.items():
@@ -622,7 +622,7 @@ def testHDFSConfig(host):
             continue # these options belongs to memory tests
 
         if exp_key not in actual_config:
-            checkFaild(host.hostname, "HDFS configuration missing: '%s' needs to be set to '%s'" % (exp_key, exp_val))
+            checkFailed(host.hostname, "HDFS configuration missing: '%s' needs to be set to '%s'" % (exp_key, exp_val))
 
         else:
             actual_val = actual_config[exp_key]
@@ -630,26 +630,26 @@ def testHDFSConfig(host):
 
             if exp_key == "dfs.block.local-path-access.user":
                 if exp_val not in actual_val.split(','):
-                    checkFaild(host.hostname, "HDFS configuration: '%s' should include user '%s', actual value is '%s'" % et)
+                    checkFailed(host.hostname, "HDFS configuration: '%s' should include user '%s', actual value is '%s'" % et)
 
             elif exp_key == "dfs.namenode.handler.count":
                 if int(exp_val) > int(actual_val):
-                    checkFaild(host.hostname, "HDFS configuration: '%s' should be at least '%s', actual value is '%s'" % et)
+                    checkFailed(host.hostname, "HDFS configuration: '%s' should be at least '%s', actual value is '%s'" % et)
 
             else:
                 if exp_val != actual_val:
-                    checkFaild(host.hostname, "HDFS configuration: expected '%s' for '%s', actual value is '%s'" % et)
+                    checkFailed(host.hostname, "HDFS configuration: expected '%s' for '%s', actual value is '%s'" % et)
 
     # test hadoop memory setting
     expect_namenode_heap = expect_config["dfs.mem.namenode.heap"]
     expect_datanode_heap = expect_config["dfs.mem.datanode.heap"]
 
     if host.is_namenode and actual_heap_size < expect_namenode_heap:
-        checkFaild(host.hostname, "Namenode Java heap size is only %sM, we recommends at least %sM" %
+        checkFailed(host.hostname, "Namenode Java heap size is only %sM, we recommends at least %sM" %
                                   (actual_heap_size, expect_namenode_heap))
 
     if not host.is_namenode and actual_heap_size < expect_datanode_heap:
-        checkFaild(host.hostname, "Datanode Java heap size is only %sM, expect value is %sM" %
+        checkFailed(host.hostname, "Datanode Java heap size is only %sM, expect value is %sM" %
                                   (actual_heap_size, expect_datanode_heap))
 
 
@@ -658,14 +658,14 @@ def testIOSchedulers(host):
         logger.info("-- test IO scheduler")
 
     if host.data.ioschedulers.errormsg:
-        checkFaild(host.hostname, "collect IO scheduler data error: %s" % host.data.ioschedulers.errormsg)
+        checkFailed(host.hostname, "collect IO scheduler data error: %s" % host.data.ioschedulers.errormsg)
         return
 
     expectedScheduler = "deadline"
     for dev in host.data.ioschedulers.devices:
         scheduler = host.data.ioschedulers.devices[dev]
         if scheduler != expectedScheduler:
-            checkFaild(host.hostname,
+            checkFailed(host.hostname,
                        "on device (%s) IO scheduler '%s' does not match expected value '%s'" % (dev, scheduler, expectedScheduler))
 
 
@@ -681,7 +681,7 @@ def testBlockdev(host):
     for dev in host.data.blockdev.ra:
         ra = host.data.blockdev.ra[dev]
         if ra != expectedReadAhead:
-            checkFaild(host.hostname,
+            checkFailed(host.hostname,
                        "on device (%s) blockdev readahead value '%s' does not match expected value '%s'" % (dev, ra, expectedReadAhead))
 
 
@@ -690,7 +690,7 @@ def testSysctl(host):
         logger.info("-- test sysctl value")
 
     if host.data.sysctl.errormsg:
-        checkFaild(host.hostname, "collect sysctl params error: %s" % host.data.sysctl.errormsg)
+        checkFailed(host.hostname, "collect sysctl params error: %s" % host.data.sysctl.errormsg)
         return
 
     expected_values = gpcheck_config.sysctl_expected
@@ -702,11 +702,11 @@ def testSysctl(host):
     for k in expected_values:
         if k in params_with_lowerbound:
             if int(real_values[k]) < int(expected_values[k]):
-                checkFaild(host.hostname,
+                checkFailed(host.hostname,
                         "sysctl value for key '%s' has value '%s', but we expect at least '%s'" % (k, real_values[k], expected_values[k]))
 
         elif real_values[k] != expected_values[k]: # for other params, we expect the actual value to be the same value
-            checkFaild(host.hostname,
+            checkFailed(host.hostname,
                     "sysctl value for key '%s' has value '%s' and expects '%s'" % (k, real_values[k], expected_values[k]))
 
 
@@ -715,7 +715,7 @@ def testLimitsConf(host):
         logger.info("-- test /etc/security/limits.conf")
 
     if host.data.limitsconf.errormsg:
-        checkFaild(host.hostname, "collect limits.conf data error: %s" % host.data.limitsconf.errormsg)
+        checkFailed(host.hostname, "collect limits.conf data error: %s" % host.data.limitsconf.errormsg)
         return
 
     # both dict has the form: (type, item) => value
@@ -728,12 +728,12 @@ def testLimitsConf(host):
         expect_val = int(expect_data[key])
         actual_val = int(actual_data[key])
         if actual_val < expect_val:
-            checkFaild(host.hostname,
+            checkFailed(host.hostname,
                        "%s in  /etc/security/limits.conf has value %d lower than expected value %d" % (
                             " ".join(key), actual_val, expect_val))
 
     for key in expect_keyset.difference(actual_keyset):
-        checkFaild(host.hostname,
+        checkFailed(host.hostname,
                    "%s not found in /etc/security/limits.conf" % " ".join(key))
 
 
@@ -751,7 +751,7 @@ def testLinuxMounts(host):
 
     if not actual_mount_points.issuperset(expected_mount_points):
         for failed_mount in expected_mount_points.difference(actual_mount_points):
-            checkFaild(host.hostname, "%s is not mounted" % failed_mount) 
+            checkFailed(host.hostname, "%s is not mounted" % failed_mount) 
 
 
 def testNtp(host):
@@ -759,39 +759,32 @@ def testNtp(host):
         logger.info("-- test NTP")
 
     if host.data.ntp.currenttime < (gpcheck_info.collection_start_time - 1):
-        checkFaild(host.hostname, "potential NTPD issue.  gpcheck start time (%s) time on machine (%s)" % (time.ctime(gpcheck_info.collection_start_time), time.ctime(host.data.ntp.currenttime)))
+        checkFailed(host.hostname, "potential NTPD issue.  gpcheck start time (%s) time on machine (%s)" % (time.ctime(gpcheck_info.collection_start_time), time.ctime(host.data.ntp.currenttime)))
     if host.data.ntp.currenttime > (gpcheck_info.collection_end_time + 1):
-        checkFaild(host.hostname, "potential NTPD issue.  gpcheck end time (%s) time on machine (%s)" % (time.ctime(gpcheck_info.collection_start_time), time.ctime(host.data.ntp.currenttime)))
+        checkFailed(host.hostname, "potential NTPD issue.  gpcheck end time (%s) time on machine (%s)" % (time.ctime(gpcheck_info.collection_start_time), time.ctime(host.data.ntp.currenttime)))
     if not host.data.ntp.running:
-        checkFaild(host.hostname, "ntpd not detected on machine")
+        checkFailed(host.hostname, "ntpd not detected on machine")
 
 
 def testGenericLinuxHost(host):
     logger.info("test on host: %s" % host.hostname)
-
-    if gpcheck_info.is_root:
-        if not host.is_namenode:
-            # only check block device's readahead when run as root
-            testBlockdev(host)
+    if host.is_namenode:
+        testHDFSConfig(host)
+        testDiskCapacity(host)
+        testSysctl(host)
+        testLimitsConf(host)
+        testLinuxMounts(host)
+        testNtp(host)
 
     else:
-        if host.is_namenode:
-            testHDFSConfig(host)
-            testDiskCapacity(host)
-            testSysctl(host)
-            testLimitsConf(host)
-            testLinuxMounts(host)
-            testNtp(host)
-
-        else:
-            testHAWQ(host)
-            testDiskCapacity(host)
-            testHDFSConfig(host)
-            testIOSchedulers(host)
-            testSysctl(host)
-            testLimitsConf(host)
-            testLinuxMounts(host)
-            testNtp(host)
+        testHAWQ(host)
+        testDiskCapacity(host)
+        testHDFSConfig(host)
+        testIOSchedulers(host)
+        testSysctl(host)
+        testLimitsConf(host)
+        testLinuxMounts(host)
+        testNtp(host)
 
 
 def testGenericSolarisHost(host):
@@ -807,7 +800,7 @@ def testUnameConsistency():
         uname = host.data.uname.output
         if firstUname:
             if firstUname != uname:
-                checkFaild(h, "uname -r output different among hosts: %s : %s != %s : %s" % (firstHost, firstUname, host.hostname, uname))
+                checkFailed(h, "uname -r output different among hosts: %s : %s != %s : %s" % (firstHost, firstUname, host.hostname, uname))
         else:
             firstUname = uname
             firstHost = host.hostname
@@ -818,6 +811,10 @@ def testGenericLinuxCluster():
         testGenericLinuxHost(host)
     testUnameConsistency()
 
+def testGenericLinuxClusterBlockDev():
+    for _, host in gpcheck_info.hosts.items():
+        if not host.is_namenode:
+            testBlockdev(host)
 
 def testGenericSolarisCluster():
     for _, host in gpcheck_info.hosts.items():
@@ -826,8 +823,11 @@ def testGenericSolarisCluster():
 
 
 def runTests():
-    if gpcheck_info.host_type == HostType.GPCHECK_HOSTTYPE_GENERIC_LINUX:
+    if gpcheck_info.host_type == HostType.GPCHECK_HOSTTYPE_GENERIC_LINUX and not gpcheck_info.is_root:
         testGenericLinuxCluster()
+
+    elif gpcheck_info.host_type == HostType.GPCHECK_HOSTTYPE_GENERIC_LINUX and gpcheck_info.is_root:
+        testGenericLinuxClusterBlockDev()
 
     elif gpcheck_info.host_type == HostType.GPCHECK_HOSTTYPE_GENERIC_SOLARIS:
         testGenericSolarisCluster()
@@ -839,7 +839,7 @@ def runTests():
     logger.info("GPCHECK Result:")
     logger.info("---------------------------------------")
     if found_errors:
-        logger.info("check faild!\tfound %s error(s)" % found_errors)
+        logger.info("check failed!\tfound %s error(s)" % found_errors)
     else:
         logger.info("all check succeed!")
     logger.info("---------------------------------------")
@@ -907,7 +907,7 @@ def doZip(fname):
             pickle.dump(gpcheck_info, f)
 
     except Exception, e:
-        raise GpCheckError("Faild to dump pickle file '%s':\n%s" % (fname, e))
+        raise GpCheckError("Failed to dump pickle file '%s':\n%s" % (fname, e))
 
     # make a tar ball
     cmdStr = "tar cfz %s.tar.gz %s" % (fname, fname)
@@ -923,7 +923,7 @@ def doZip(fname):
                 raise Exception("error running command '%s': %s" % (cmdStr, i.results.stderr.strip()))
 
     except Exception, e:
-        raise GpCheckError("Faild to dump gpcheck data into a zip file:\n%s" % e)
+        raise GpCheckError("Failed to dump gpcheck data into a zip file:\n%s" % e)
 
     # delete pickle file
     cmdStr = "rm -rf %s" % fname
@@ -939,7 +939,7 @@ def doZip(fname):
                 raise Exception("error running command '%s': %s" % (cmdStr, i.results.stderr.strip()))
 
     except Exception, e:
-        raise GpCheckError("Faild to delete pickle file '%s':\n%s" % (fname, e))
+        raise GpCheckError("Failed to delete pickle file '%s':\n%s" % (fname, e))
 
     logger.info("dump gpcheck data into a zip file '%s.tar.gz' [success]" % fname)
 
