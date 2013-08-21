@@ -2573,19 +2573,6 @@ exec_execute_message(const char *portal_name, int64 max_rows)
 	bool		was_logged = false;
 	char		msec_str[32];
 
-	if (Gp_role != GP_ROLE_EXECUTE)
-	{
-        increment_command_count();
-
-		MyProc->queryCommandId = gp_command_count;
-		if (gp_cancel_query_print_log)
-		{
-			elog(NOTICE, "running query (sessionId, commandId): (%d, %d)",
-				 MyProc->mppSessionId, gp_command_count);
-		}
-	}
-	
-
 	/* Adjust destination to tell printtup.c what to do */
 	dest = whereToSendOutput;
 	if (dest == DestRemote)
@@ -2606,6 +2593,46 @@ exec_execute_message(const char *portal_name, int64 max_rows)
 		Assert(portal->stmts == NIL);
 		NullCommand(dest);
 		return;
+	}
+
+	if (Gp_role != GP_ROLE_EXECUTE)
+	{
+
+		/*
+		 * MPP-20924
+		 * Increment command_count only if we're executing utility statements
+		 * In all other cases, we already incremented it in CreateQueryDescr
+		 */
+		bool is_utility_stmt = true;
+		ListCell   *stmtlist_item = NULL;
+		foreach(stmtlist_item, portal->stmts)
+		{
+			Node *stmt = lfirst(stmtlist_item);
+			if (IsA(stmt, PlannedStmt))
+			{
+				is_utility_stmt = false;
+				break;
+			}
+		}
+		if (is_utility_stmt)
+		{
+			increment_command_count();
+
+			MyProc->queryCommandId = gp_command_count;
+			if (gp_cancel_query_print_log)
+			{
+				elog(NOTICE, "running query (sessionId, commandId): (%d, %d)",
+						MyProc->mppSessionId, gp_command_count);
+				elog(LOG, "In exec_execute_message found utility statement, incrementing command_count");
+			}
+		}
+		else
+		{
+			if (gp_cancel_query_print_log)
+			{
+				elog(LOG, "In exec_execute_message found non-utility statement, NOT incrementing command count");
+			}
+		}
 	}
 
 	/* Does the portal contain a transaction command? */

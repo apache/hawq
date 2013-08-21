@@ -1287,6 +1287,15 @@ gpvars_assign_statement_mem(int newval, bool doit, GucSource source __attribute_
 void
 increment_command_count()
 {
+
+	if (gp_cancel_query_print_log)
+	{
+		ereport(LOG,
+				(errmsg("Incrementing command count from %d to %d",
+						gp_command_count, gp_command_count+1),
+						errprintstack(true)));
+	}
+
 	gp_command_count++;
 	if (gp_command_count <= 0)
 	{
