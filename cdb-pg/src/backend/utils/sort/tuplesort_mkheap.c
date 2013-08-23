@@ -9,6 +9,7 @@
 #include "utils/tuplesort_mk.h"
 #include "utils/datum.h"
 #include "utils/builtins.h"
+#include "miscadmin.h"
 
 #include "cdb/cdbvars.h"
 
@@ -67,6 +68,12 @@
  *    we are assuming that duplicates inside the heaps will be later detected by case b) above.
  */
 
+
+/* During merge phase, we check for interrupts every COMPARES_BETWEEN_INTERRUPT_CHECKS comparisons */
+#define COMPARES_BETWEEN_INTERRUPT_CHECKS 100000
+/* Counter to keep track of how many comparisons since last CHECK_FOR_INTERRUPTS */
+static uint32 compare_count = 0;
+
 static void mkheap_heapify(MKHeap *mkheap, bool doLv0);
 static bool mke_has_duplicates_with_root(MKHeap *mkheap);
 
@@ -123,6 +130,13 @@ static inline bool ISRIGHT(int n)
  */
 static inline int32 mkheap_compare(MKHeap *heap, MKEntry *a, MKEntry *b)
 {
+
+	/* Check for interrupts every COMPARES_BETWEEN_INTERRUPT_CHECKS comparisons */
+	if (compare_count++ % COMPARES_BETWEEN_INTERRUPT_CHECKS == 0)
+	{
+		CHECK_FOR_INTERRUPTS();
+	}
+
     int32 ret = (a->compflags & (~MKE_CF_NULLBITS)) -
                 (b->compflags & (~MKE_CF_NULLBITS));
 
