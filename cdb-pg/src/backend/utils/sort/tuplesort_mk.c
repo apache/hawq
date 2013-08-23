@@ -121,6 +121,7 @@
 #include "utils/builtins.h"
 #include "utils/tuplesort_mk.h"
 #include "utils/string_wrapper.h"
+#include "utils/faultinjector.h"
 
 #include "cdb/cdbvars.h"
 
@@ -1248,7 +1249,17 @@ tuplesort_performsort_mk(Tuplesortstate_mk *state)
             elog(INFO, "Done tuple dump.  Mem peak is now %ld", (long)MemoryContextGetPeakSpace(state->sortcontext));
 #endif // PRINT_SPILL_AND_MEMORY_MESSAGES
 
+            HOLD_INTERRUPTS();
+            /* MPP-18288: Do not change this log message, it is used to test mksort query cancellation */
+            elog(DEBUG1,"ExecSort: mksort starting merge runs  >>======== ");
+            RESUME_INTERRUPTS();
+
             mergeruns(state);
+
+            HOLD_INTERRUPTS();
+            /* MPP-18288: Do not change this log message, it is used to test mksort query cancellation */
+            elog(DEBUG1, "ExecSort: mksort finished merge runs  ++++++++>> ");
+            RESUME_INTERRUPTS();
 
             state->pos.eof_reached = false;
             state->pos.markpos.tapepos.blkNum = 0;
@@ -1762,6 +1773,21 @@ mergeruns(Tuplesortstate_mk *state)
     LogicalTape *lt = NULL;
 
     Assert(state->status == TSS_BUILDRUNS);
+
+#ifdef FAULT_INJECTOR
+    /*
+     * MPP-18288: We're injecting an interrupt here. We have to hold interrupts
+     * while we're injecting it to make sure the interrupt is not handled
+     * within the fault injector itself.
+     */
+    HOLD_INTERRUPTS();
+	FaultInjector_InjectFaultIfSet(
+			ExecSortMKSortMergeRuns,
+			DDLNotSpecified,
+			"",  // databaseName
+			""); // tableName
+	RESUME_INTERRUPTS();
+#endif
 
     /*
      * If we produced only one initial run (quite likely if the total data

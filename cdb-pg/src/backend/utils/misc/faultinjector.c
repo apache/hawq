@@ -33,6 +33,7 @@
 #include "storage/shmem.h"
 #include "utils/faultinjector.h"
 #include "utils/hsearch.h"
+#include "miscadmin.h"
 
 #ifdef FAULT_INJECTOR
 
@@ -99,6 +100,7 @@ FaultInjectorTypeEnumToString[] = {
 	_("connection_restore"),
 	_("user_cancel"),
 	_("proc_die"),
+	_("interrupt"),
 	_("not recognized"),
 };
 
@@ -277,6 +279,8 @@ FaultInjectorIdentifierEnumToString[] = {
 		/* inject fault before EndCommand in exec_simple_query */
 	_("execsort_before_sorting"),
 		/* inject fault in ExecSort before doing the actual sort */
+	_("execsort_mksort_mergeruns"),
+		/* inject fault in MKSort during the mergeruns phase */
 	_("not recognized"),
 };
 
@@ -718,6 +722,13 @@ FaultInjector_InjectFaultIfSet(
 		case FaultInjectorTypeUserCancel:
 		case FaultInjectorTypeProcDie:
 		{
+		case FaultInjectorTypeInterrupt:
+		{
+			/*
+			 * The place where this type of fault is injected must have
+			 * has HOLD_INTERRUPTS() .. RESUME_INTERRUPTS() around it, otherwise
+			 * the interrupt could be handled inside the fault injector itself
+			 */
 			ereport(LOG,
 					(errmsg("fault triggered, fault name:'%s' fault type:'%s' ",
 							FaultInjectorIdentifierEnumToString[entryLocal->faultInjectorIdentifier],
@@ -729,6 +740,12 @@ FaultInjector_InjectFaultIfSet(
 		{
 			break;
 		}
+
+			InterruptPending = true;
+			QueryCancelPending = true;
+			break;
+		}
+
 		default:
 			
 			ereport(LOG, 
@@ -964,6 +981,7 @@ FaultInjector_NewHashEntry(
 		case FinishPreparedTransactionAbortPass2AbortingCreateNeeded:
 		case TwoPhaseTransactionCommitPrepared:
 		case TwoPhaseTransactionAbortPrepared:
+		case ExecSortMKSortMergeRuns:
 		
 //		case SubtransactionFlushToFile:
 //		case SubtransactionReadFromFile:

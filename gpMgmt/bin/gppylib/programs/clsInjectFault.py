@@ -302,8 +302,9 @@ class GpInjectFaultProgram:
 			      "skip (inject skip i.e. skip checkpoint), " \
 			      "memory_full (all memory is consumed when injected), " \
 			      "reset (remove fault injection), status (report fault injection status), " \
-			      "panic_suppress (inject suppressed PANIC in critical section), "
-			      "segv (inject a SEGV) ")
+			      "panic_suppress (inject suppressed PANIC in critical section), " \
+			      "segv (inject a SEGV), " \
+			      "interrupt (inject an Interrupt) ")
         addTo.add_option("-z", "--sleep_time_s", dest="sleepTimeSeconds", type="int", default="10" ,
                             metavar="<sleepTime>",
                             help="For 'sleep' faults, the amount of time for the sleep.  Defaults to %default." \
@@ -380,7 +381,8 @@ class GpInjectFaultProgram:
 			      "fault_during_exec_dynamic_table_scan (inject fault during scanning of a partition), " \
                              "internal_flush_error (inject an error during internal_flush), " \
 			      "exec_simple_query_end_command (inject fault before EndCommand in exec_simple_query), " \
-                  "execsort_before_sorting (inject fault in nodeSort after receiving all tuples and before sorting), " \
+			      "execsort_before_sorting (inject fault in nodeSort after receiving all tuples and before sorting), " \
+			      "execsort_mksort_mergeruns (inject fault in MKSort during the mergeruns phase), " \
 			      "all (affects all faults injected, used for 'status' and 'reset'), ") 
         addTo.add_option("-c", "--ddl_statement", dest="ddlStatement", type="string",
                          metavar="ddlStatement",

@@ -182,6 +182,7 @@ typedef enum FaultInjectorIdentifier_e {
 
 	FaultDuringExecDynamicTableScan,
 	ExecSortBeforeSorting,
+	ExecSortMKSortMergeRuns,
 
 	/* INSERT has to be done before that line */
 	FaultInjectorIdMax,
@@ -237,6 +238,7 @@ typedef enum FaultInjectorType_e {
 	FaultInjectorTypeUserCancel,
 
 	FaultInjectorTypeProcDie,
+	FaultInjectorTypeInterrupt,
 
 	/* INSERT has to be done before that line */
 	FaultInjectorTypeMax,
