@@ -25,7 +25,7 @@ class GpCheckError(Exception):
 
 class GpCheckInfo:
     def __init__(self):
-        self.is_root = (getpass.getuser() == "root")
+        self.is_root = (os.geteuid == 0)
         self.host_type = HostType.GPCHECK_HOSTTYPE_UNDEFINED
         self.appliance_version = None
 
@@ -166,7 +166,7 @@ def checkPlatform():
 def parseargs():
     global options, GPHOME, HADOOP_HOME, GPCHECK_CONFIG_FILE
 
-    parser = OptParser(option_class=OptChecker, version='%prog version 1.1.1.0 build dev')
+    parser = OptParser(option_class=OptChecker, version='%prog version $Revision: #1 $')
     parser.remove_option('-h')
     parser.add_option('-?', '--help', action='help')
     parser.add_option('--verbose', action='store_true')
