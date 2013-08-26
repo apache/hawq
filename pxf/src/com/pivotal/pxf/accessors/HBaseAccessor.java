@@ -16,7 +16,7 @@ import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.filter.Filter;
 import org.apache.hadoop.hbase.util.Bytes;
 
-import com.pivotal.pxf.filtering.HBaseFilterEvaluator;
+import com.pivotal.pxf.filtering.HBaseFilterBuilder;
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.utilities.HBaseColumnDescriptor;
 import com.pivotal.pxf.utilities.HBaseTupleDescription;
@@ -31,8 +31,8 @@ import com.pivotal.pxf.utilities.InputData;
  * several splits according to the split function selectTableSplits().
  * For each region, a Scan object is used to describe the requested rows.
  *
- * The class now supports filters using the HBaseFilterEvaluator.
- * Regions can be filtered out according to input from HBaseFilterEvaluator.
+ * The class now supports filters using the HBaseFilterBuilder.
+ * Regions can be filtered out according to input from HBaseFilterBuilder.
  */
 public class HBaseAccessor extends Accessor
 {
@@ -205,7 +205,7 @@ public class HBaseAccessor extends Accessor
 	}
 
 	/*
-	 * Uses HBaseFilterEvaluator to translate a filter string into a
+	 * Uses HBaseFilterBuilder to translate a filter string into a
 	 * HBase Filter object. The result is added as a filter to the
 	 * Scan object
 	 *
@@ -216,7 +216,7 @@ public class HBaseAccessor extends Accessor
 		if (!inputData.hasFilter())
 			return;
 
-		HBaseFilterEvaluator eval = new HBaseFilterEvaluator(tupleDescription);
+		HBaseFilterBuilder eval = new HBaseFilterBuilder(tupleDescription);
 		Filter filter = eval.getFilterObject(inputData.filterString());
 		scanDetails.setFilter(filter);
 

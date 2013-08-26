@@ -6,17 +6,17 @@ import java.util.List;
 import com.pivotal.pxf.utilities.InputData;
 
 /*
- * This is the implementation of IFilterEvaluator for Hive.
+ * This is the implementation of IFilterBuilder for Hive.
  *
  * The class uses the filter parser code to build a filter object,
  * either simple (single BasicFilter class) or a compound (List<BasicFilter>)
  * for HiveAccessor to use for partition filtering
  */
-public class HiveFilterEvaluator implements FilterParser.IFilterEvaluator
+public class HiveFilterBuilder implements FilterParser.IFilterBuilder
 {
 	private InputData inputData;
 
-	public HiveFilterEvaluator(InputData input)
+	public HiveFilterBuilder(InputData input)
 	{
 		inputData = input;
 	}
@@ -36,12 +36,12 @@ public class HiveFilterEvaluator implements FilterParser.IFilterEvaluator
 	}
 
 	/*
-	 * Implemented for IFilterEvaluator interface
+	 * Implemented for IFilterBuilder interface
 	 * 
 	 * Called each time the parser comes across an operator.
 	 */
 	 @SuppressWarnings("unchecked")
-	public Object evaluate(FilterParser.Operation opId,
+	public Object build(FilterParser.Operation opId,
 						   Object leftOperand,
 						   Object rightOperand) throws Exception
 	{

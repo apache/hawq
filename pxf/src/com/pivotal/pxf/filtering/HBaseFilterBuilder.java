@@ -19,7 +19,7 @@ import com.pivotal.pxf.utilities.HBaseColumnDescriptor;
 import com.pivotal.pxf.utilities.HBaseTupleDescription;
 
 /*
- * This is the implementation of IFilterEvaluator for HBase.
+ * This is the implementation of IFilterBuilder for HBase.
  *
  * The class uses the filter parser code to build a filter object,
  * either simple (single Filter class) or a compound (FilterList)
@@ -36,14 +36,14 @@ import com.pivotal.pxf.utilities.HBaseTupleDescription;
  * This is an addition on top of regular filters and does not replace
  * any logic in HBase filter objects
  */
-public class HBaseFilterEvaluator implements FilterParser.IFilterEvaluator
+public class HBaseFilterBuilder implements FilterParser.IFilterBuilder
 {
 	private Map<FilterParser.Operation,CompareFilter.CompareOp> operatorsMap;
 	private byte[] startKey;
 	private byte[] endKey;
 	private HBaseTupleDescription tupleDescription;
 
-	public HBaseFilterEvaluator(HBaseTupleDescription tupleDescription)
+	public HBaseFilterBuilder(HBaseTupleDescription tupleDescription)
 	{
 		initOperatorsMap();
 		startKey = HConstants.EMPTY_START_ROW;
@@ -88,11 +88,11 @@ public class HBaseFilterEvaluator implements FilterParser.IFilterEvaluator
 	}
 
 	/*
-	 * Implemented for IFilterEvaluator interface
+	 * Implemented for IFilterBuilder interface
 	 *
 	 * Called each time the parser comes across an operator.
 	 */
-	public Object evaluate(FilterParser.Operation opId,
+	public Object build(FilterParser.Operation opId,
 						   Object leftOperand,
 						   Object rightOperand) throws Exception
 	{

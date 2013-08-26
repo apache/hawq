@@ -12,7 +12,7 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.Reporter;
 
 import com.pivotal.pxf.filtering.FilterParser;
-import com.pivotal.pxf.filtering.HiveFilterEvaluator;
+import com.pivotal.pxf.filtering.HiveFilterBuilder;
 import com.pivotal.pxf.fragmenters.HiveDataFragmenter;
 import com.pivotal.pxf.utilities.ColumnDescriptor;
 import com.pivotal.pxf.utilities.InputData;
@@ -114,7 +114,7 @@ public class HiveAccessor extends HdfsSplittableDataAccessor
 			return returnData;
 		
 		String filterStr = inputData.filterString();
-		HiveFilterEvaluator eval = new HiveFilterEvaluator(inputData);
+		HiveFilterBuilder eval = new HiveFilterBuilder(inputData);
 		Object filter = eval.getFilterObject(filterStr);
 		
 		returnData = isFiltered(partitions, filter);

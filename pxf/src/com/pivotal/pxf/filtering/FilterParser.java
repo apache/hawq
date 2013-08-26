@@ -6,7 +6,7 @@ import java.util.Stack;
 
 /*
  * The parser code which goes over a filter string and pushes operands onto a stack
- * Once an operation is read, the evaluate function is called for the IFilterEvaluator
+ * Once an operation is read, the evaluate function is called for the IFilterBuilder
  * interface with two pop-ed operands.
  *
  * A string of filters looks like this:
@@ -22,7 +22,7 @@ import java.util.Stack;
  * left to right easily.
  *
  * FilterParser only knows about columns and constants. The rest is up to the implementor 
- * of IFilterEvaluator.
+ * of IFilterBuilder.
  *
  * FilterParser makes sure a column objects are always on the left of the 
  * expression (when relevant)
@@ -32,7 +32,7 @@ public class FilterParser
 	private int index;
 	private String filterString;
 	private Stack<Object> operandsStack;
-	private IFilterEvaluator evaluator;
+	private IFilterBuilder filterBuilder;
 	private Map<Integer, Operation> operatorTranslationMap;
 
 	/*
@@ -51,15 +51,15 @@ public class FilterParser
 
 	/*
 	 * Interface a user of FilterParser should implement
-	 * This is used to let the user evaluate expressions in the manner she 
+	 * This is used to let the user build filter expressions in the manner she 
 	 * sees fit
 	 *
 	 * When an operator is parsed, this function is called to let the user decide
 	 * what to do with it operands.
 	 */
-	interface IFilterEvaluator
+	interface IFilterBuilder
 	{
-		public Object evaluate(Operation operation, Object left, Object right) throws Exception;
+		public Object build(Operation operation, Object left, Object right) throws Exception;
 	}
 
 	/*
@@ -100,8 +100,8 @@ public class FilterParser
 	
 	/*
 	 * Basic filter provided for cases where the target storage system does not provide it's own filter
-	 * For example: Hbase storage provides it's own filter but for a Writable based record in a sequence
-	 * file there is no filter provided and so we need to have a default
+	 * For example: Hbase storage provides it's own filter but for a Writable based record in a SequenceFile
+	 * there is no filter provided and so we need to have a default
 	 */
 	static public class BasicFilter
 	{
@@ -155,10 +155,10 @@ public class FilterParser
 		}
 	}
 
-	public FilterParser(IFilterEvaluator eval)
+	public FilterParser(IFilterBuilder eval)
 	{
 		operandsStack = new Stack<Object>();
-		evaluator = eval;
+		filterBuilder = eval;
 		initOperatorTransMap();
 	}
 
@@ -197,9 +197,9 @@ public class FilterParser
 					// Column should be on the left
 					Object result;
 					if (leftOperand instanceof Constant) // column on the right, reverse expression
-						result = evaluator.evaluate(reverseOp(operation), rightOperand, leftOperand);
+						result = filterBuilder.build(reverseOp(operation), rightOperand, leftOperand);
 					else // no swap, column on the left
-						result = evaluator.evaluate(operation, leftOperand, rightOperand);
+						result = filterBuilder.build(operation, leftOperand, rightOperand);
 
 					// Store result on stack
 					operandsStack.push(result);
