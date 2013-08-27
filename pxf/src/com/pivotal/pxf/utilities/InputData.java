@@ -135,7 +135,7 @@ public class InputData
 		return requestParametersMap;
 	}
 
-	/* Copy contructor of InputData
+	/* Copy constructor of InputData
 	 * Used to create from an extending class
 	 */
 	public InputData(InputData copy)

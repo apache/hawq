@@ -76,7 +76,7 @@ public class HdfsAnalyzer extends Analyzer
 
 		// if no file is in path (only dirs), get default block size
 		if (blockSize == 0)
-			blockSize = fs.getDefaultBlockSize();
+			blockSize = fs.getDefaultBlockSize(path);
 		numberOfBlocks = splits.length;
 
 		stats = new DataSourceStatsInfo(blockSize, numberOfBlocks, numberOfTuplesInBlock*numberOfBlocks);
