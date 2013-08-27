@@ -11,6 +11,8 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.JavaUtils;
+import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -43,7 +45,7 @@ public class HiveDataFragmenter extends Fragmenter
 {	
 	private	JobConf jobConf;
 	HiveClient client;
-	private Log Log;
+	private static Log Log = LogFactory.getLog(HiveDataFragmenter.class);
 	
 	public static final String HIVE_DEFAULT_DBNAME = "default";
 	public static final String HIVE_UD_DELIM = "!HUDD!";
@@ -53,8 +55,8 @@ public class HiveDataFragmenter extends Fragmenter
     
 	/* TODO: get rid of these */
 	public static final int HIVE_MAX_PARTS = 1000;
-	public static final int THRIFT_PORT = 10000;
-	public static final String THRIFT_HOST = "localhost";
+	public static int METASTORE_DEFAULT_PORT = 9083; /* default metastore port */
+	public static String METASTORE_DEFAULT_HOST = "localhost";
 	
 	/* internal class used for parsing the qualified table name received as input to GetFragments() */
 	class TblDesc
@@ -103,7 +105,6 @@ public class HiveDataFragmenter extends Fragmenter
 	public HiveDataFragmenter(InputData md) throws TTransportException
 	{
 		super(md);
-		Log = LogFactory.getLog(HiveDataFragmenter.class);
 
 		jobConf = new JobConf(new Configuration(), HiveDataFragmenter.class);
 		client = InitHiveClient();
@@ -128,11 +129,68 @@ public class HiveDataFragmenter extends Fragmenter
 	/* Initialize the Hive client */
 	private HiveClient InitHiveClient() throws TTransportException
 	{
-		TSocket transport = new TSocket(THRIFT_HOST , THRIFT_PORT);
+		loadHostAndPort();
+		TSocket transport = new TSocket(METASTORE_DEFAULT_HOST , METASTORE_DEFAULT_PORT);
 		TBinaryProtocol protocol = new TBinaryProtocol(transport);
 		HiveClient client = new org.apache.hadoop.hive.service.HiveClient(protocol);
 		transport.open();
 		return client;
+	}
+	
+	/* 
+	 * Load metastore host and port from configuration 
+	 * In case of corrupted or unset configuration we stay with the hardcoded 
+	 * METASTORE_DEFAULT_HOST and METASTORE_DEFAULT_PORT 
+	 */
+	private void loadHostAndPort()
+	{
+		HiveConf hiveConf = new HiveConf();
+		/* example of hive.metastore.uris: thrift://localhost:9084*/
+		parseMetastoreUri(hiveConf.getVar(ConfVars.METASTOREURIS));
+	}
+	
+	/*
+	 * Parse the Metastore uri
+	 * In case of corrupted or unset configuration we stay with the hardcoded 
+	 * METASTORE_DEFAULT_HOST and METASTORE_DEFAULT_PORT 	 
+	 */
+	static void parseMetastoreUri(String uri)
+	{
+		if (uri == null) /* non existent property hive.metastore.uris */
+		{
+			Log.warn("Property [hive.metastore.uris] is missing from hive-site.xml. will use " 
+					 + "default values for metastore service host:port - localhost:9083");
+			return;
+		}
+		
+		String[] arr = uri.split("\\/\\/");
+		if (arr == null || arr.length != 2) /* the value of  property hive.metastore.uris is corrupted */
+		{
+			Log.warn("Property [hive.metastore.uris] in hive-site.xml. is invalid. " 
+					 + "host:port section is missing."
+					 + "Will use default values for metastore service host:port - localhost:9083");			
+			return;
+		}
+		
+		String hostport = arr[1];
+		arr = hostport.split(":");
+		if (arr == null || arr.length != 2) /* the value of  property hive.metastore.uris is corrupted */
+		{
+			Log.warn("Property [hive.metastore.uris] in hive-site.xml. is invalid. " 
+					 + "There is no [:] between host and port."
+					 + "Will use default values for metastore service host:port - localhost:9083");						
+			return;
+		}
+		
+		String host = arr[0];
+		String sport = arr[1];
+		int nport = (sport != null) ? Integer.parseInt(sport) : 0;
+		
+		if (host != null && nport != 0)
+		{
+			METASTORE_DEFAULT_HOST = host;
+			METASTORE_DEFAULT_PORT = nport;
+		}		
 	}
 	
 	/*
@@ -169,7 +227,8 @@ public class HiveDataFragmenter extends Fragmenter
 		Table tbl = client.get_table(tblDesc.dbName, tblDesc.tableName);
 		String tblType = tbl.getTableType();
 		
-		Log.debug("Table: " + tblDesc.dbName + "." + tblDesc.tableName + ", type: " + tblType);
+		if (Log.isDebugEnabled())
+			Log.debug("Table: " + tblDesc.dbName + "." + tblDesc.tableName + ", type: " + tblType);
 		
 		if (TableType.valueOf(tblType) == TableType.VIRTUAL_VIEW)
 			throw new UnsupportedOperationException("PXF doesn't support HIVE views"); 
