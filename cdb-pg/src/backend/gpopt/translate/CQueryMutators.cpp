@@ -1078,18 +1078,6 @@ CQueryMutators::SzTEName
 		return pte->resname;
 	}
 
-	// Columns that do not appear in the final column do not have have column name. In this case, get the column name
-	if (IsA(pte->expr, Var))
-	{
-		Var *pvar = (Var*) pte->expr;
-
-		RangeTblEntry *prte = (RangeTblEntry *) gpdb::PvListNth(pquery->rtable, pvar->varno -1);
-		Alias *palias = prte->eref;
-
-		GPOS_ASSERT(NULL != palias->colnames && pvar->varattno <= gpdb::UlListLength(palias->colnames) && NULL != gpdb::PvListNth(palias->colnames, pvar->varattno-1));
-		return strVal(gpdb::PvListNth(palias->colnames, pvar->varattno-1));
-	}
-
 	// Since a resjunked target list entry will not have a column name create a dummy column name
 	CWStringConst strUnnamedCol(GPOS_WSZ_LIT("?column?"));
 

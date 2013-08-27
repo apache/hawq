@@ -551,5 +551,8 @@ SELECT * FROM CTE1,CTE WHERE CTE.a = CTE1.f and CTE.a = 2 ORDER BY 1;
 
 SET optimizer_cte_inlining = off;
 
+-- catalog queries
+select 1 from pg_class c group by c.oid limit 1;
+
 -- clean up
 drop schema orca cascade;

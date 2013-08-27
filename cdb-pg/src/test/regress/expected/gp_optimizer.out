@@ -8056,6 +8056,13 @@ SELECT * FROM CTE1,CTE WHERE CTE.a = CTE1.f and CTE.a = 2 ORDER BY 1;
 (10 rows)
 
 SET optimizer_cte_inlining = off;
+-- catalog queries
+select 1 from pg_class c group by c.oid limit 1;
+ ?column? 
+----------
+        1
+(1 row)
+
 -- clean up
 drop schema orca cascade;
 NOTICE:  drop cascades to table orca.twf2
