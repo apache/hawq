@@ -627,8 +627,7 @@ Exec_Jmp_IndexScan:
 	goto Exec_Jmp_Done;
 
 Exec_Jmp_DynamicIndexScan:
-	/* TODO: garcic12 Jan 14 2013; Implementation of DynamicIndexScan */
-	Assert(false);
+	result = ExecDynamicIndexScan((DynamicIndexScanState *) node);
 	goto Exec_Jmp_Done;
 	/* BitmapIndexScanState does not yield tuples */
 Exec_Jmp_BitmapIndexScan:

@@ -1394,15 +1394,20 @@ typedef struct DynamicIndexScanState
 	IndexScanState indexScanState;
 
 	/*
-	* Partition Id Index that mantains all unique ids for the
+	* Partition id index that mantains all unique partition ids for the
 	* DynamicIndexScan.
 	*/
 	HTAB *pidxIndex;
 
 	/*
-	* Status of the sequentially index scan of the pid index.
+	* Status of the part to retrieve (result of the sequential search in a hash table).
 	*/
 	HASH_SEQ_STATUS pidxStatus;
+
+	/* Like DynamicTableScanState, this flag is required to handle error condition.
+	 * This flag prevent ExecEndDynamicIndexScan from calling hash_seq_term() or
+	 * a NULL hash table. */
+	bool shouldCallHashSeqTerm;
 
 } DynamicIndexScanState;
 
@@ -1686,6 +1691,15 @@ typedef struct DynamicTableScanState
 	 */
 	HASH_SEQ_STATUS pidStatus;
 
+	/*
+	 * Should we call hash_seq_term()? This is required
+	 * to handle error condition, where we are required to explicitly
+	 * call hash_seq_term(). Also, if we don't have any partition, this
+	 * flag should prevent ExecEndDynamicTableScan from calling
+	 * hash_seq_term() on a NULL hash table.
+	 */
+	bool shouldCallHashSeqTerm;
+
 } DynamicTableScanState;
 
 /* ----------------------------------------------------------------
@@ -1857,6 +1871,7 @@ typedef struct MaterialState
         void       *ts_pos;
         void            *ts_markpos;
         void                  *share_lk_ctxt;
+
 } MaterialState;
 
 /* ----------------
@@ -1960,6 +1975,7 @@ typedef struct AggState
         bool *replIsnull;
         bool *doReplace;
 	List	   *percs;			/* all PercentileExpr nodes in targetlist & quals */
+
 } AggState;
 
 

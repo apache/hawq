@@ -456,6 +456,7 @@ const char* gpdb_getnodestatus(PerfmonNodeStatus status)
 #define QENODE_TYPE_SPLITUPDATE "Split Update"
 #define QENODE_TYPE_SUBQUERY_SCAN "Subquery Scan"
 #define QENODE_TYPE_TABLE_FUNCTION_SCAN "Table Function Scan"
+#define QENODE_TYPE_DYNAMICINDEX_SCAN "Dynamic Index Scan"
 #define QENODE_TYPE_DYNAMICTABLE_SCAN "Dynamic Table Scan"
 #define QENODE_TYPE_TID_SCAN "Tid Scan"
 #define QENODE_TYPE_UNIQUE "Unique"
@@ -494,6 +495,7 @@ const char* gpdb_getnodestatus(PerfmonNodeStatus status)
 #define QENODE_MEASURE_BITMAP_HEAP_SCAN_PAGES "Bitmap Heap Scan Pages"
 #define QENODE_MEASURE_BITMAP_HEAP_SCAN_RESCAN "Bitmap Heap Scan Rescan"
 #define QENODE_MEASURE_BITMAP_INDEX_SCAN_RESCAN "Bitmap Index Scan Rescan"
+#define QENODE_MEASURE_DYNAMICINDEX_SCAN_RESCAN "Dynamic Index Scan Rescan"
 #define QENODE_MEASURE_DYNAMICTABLE_SCAN_RESCAN "Dynamic Table Scan Rescan"
 #define QENODE_MEASURE_EXTERNAL_SCAN_RESCAN "External Scan Rescan"
 #define QENODE_MEASURE_HASH_SPILL_BATCHES "Hash Spill Batches"
@@ -640,6 +642,10 @@ QenodeNamesDescriptor nodetype_string_lookup[PMNT_MAXIMUM_ENUM] =
 	{PMNT_DML, QENODE_TYPE_DML,
 		{QENODE_MEASURE_ROWS_IN}, 
 		{QENODE_UNIT_ROWS}
+	},
+	{PMNT_DynamicIndexScan, QENODE_TYPE_DYNAMICINDEX_SCAN,
+		{QENODE_MEASURE_ROWS_IN, QENODE_MEASURE_DYNAMICINDEX_SCAN_RESCAN },
+		{QENODE_UNIT_ROWS, QENODE_UNIT_RESCANS}
 	},
 	{PMNT_DynamicTableScan, QENODE_TYPE_DYNAMICTABLE_SCAN, 
 		{QENODE_MEASURE_ROWS_IN, QENODE_MEASURE_DYNAMICTABLE_SCAN_RESCAN }, 

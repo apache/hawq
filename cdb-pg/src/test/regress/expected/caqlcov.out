@@ -53,7 +53,7 @@ $$
 begin
 raise notice 'testing trigger';
 end;
-$$ language plpgsql;
+$$ language plpgsql NO SQL;
 create trigger btrig before insert on ttable for each row execute procedure trig();
 alter trigger btrig on ttable rename to btrig_2;
 alter table ttable disable trigger btrig_2;
@@ -115,7 +115,7 @@ select (ttable2.*)::ttable1 from ttable2;
 -- ---------------------------------------------------------------------
 create function caql_cube_fn(numeric, numeric) RETURNS numeric
 AS 'select $1 + $2 * $2 * $2'
-language sql
+language sql CONTAINS SQL
 immutable
 returns NULL ON NULL INPUT;
 create aggregate caqlcube(numeric) (
@@ -262,7 +262,7 @@ reset role;
 -- ---------------------------------------------------------------------
 create function caql_fn(int, int) returns int
 AS 'select $1 + $2'
-language sql
+language sql CONTAINS SQL
 immutable
 returns NULL ON NULL INPUT;
 alter function caql_fn(int, int) rename to caql_function;
@@ -283,7 +283,7 @@ WARNING:  changing return type of function caql_fn_out from "opaque" to "cstring
 create type caql_type3 as (name int4);
 create function caql_type3_cast(caql_type3) returns int as
 ' select $1.name'
-language sql
+language sql CONTAINS SQL
 immutable;
 create cast (caql_type3 AS int4) WITH FUNCTION caql_type3_cast(caql_type3);
 drop cast (caql_type3 as int4);
@@ -608,7 +608,7 @@ begin
     perform * from pg_class;
 end;
 $$
-language plpgsql security definer;
+language plpgsql READS SQL DATA security definer;
 select security_definer_test();
  security_definer_test
 -----------------------

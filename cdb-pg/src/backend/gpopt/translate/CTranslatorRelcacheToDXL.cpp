@@ -950,7 +950,7 @@ CTranslatorRelcacheToDXL::Pmdindex
 	
 	CMDIdGPDB *pmdidRel = New(pmp) CMDIdGPDB(oidRel);
 	
-	IMDRelation *pmdrel = Pmdrel(pmp, pmda, pmdidRel);
+	const IMDRelation *pmdrel = pmda->Pmdrel(pmdidRel);
 
 	if (pmdrel->FPartitioned())
 	{
@@ -961,7 +961,6 @@ CTranslatorRelcacheToDXL::Pmdindex
 		
 		// cleanup
 		pmdidRel->Release();
-		pmdrel->Release();
 
 		gpdb::CloseRelation(relIndex);
 		gpdb::GPDBFree(plgidx);
@@ -1009,7 +1008,6 @@ CTranslatorRelcacheToDXL::Pmdindex
 
 	delete [] pul;
 	pmdidRel->Release();
-	pmdrel->Release();
 	gpdb::CloseRelation(relIndex);
 	gpdb::CloseRelation(relTable);
 	return pmdindex;
@@ -1030,7 +1028,7 @@ CTranslatorRelcacheToDXL::PmdindexPartTable
 	IMemoryPool *pmp,
 	CMDAccessor *pmda,
 	IMDId *pmdidIndex,
-	IMDRelation *pmdrel,
+	const IMDRelation *pmdrel,
 	LogicalIndexes *plind
 	)
 {
@@ -1095,7 +1093,7 @@ CTranslatorRelcacheToDXL::PmdindexPartTable
 	CMDAccessor *pmda,
 	LogicalIndexInfo *pidxinfo,
 	IMDId *pmdidIndex,
-	IMDRelation *pmdrel
+	const IMDRelation *pmdrel
 	)
 {
 	OID oidIndex = pidxinfo->logicalIndexOid;
@@ -1290,7 +1288,7 @@ ULONG *
 CTranslatorRelcacheToDXL::PulAttnoPositionMap
 	(
 	IMemoryPool *pmp,
-	IMDRelation *pmdrel,
+	const IMDRelation *pmdrel,
 	ULONG ulSize
 	)
 {
@@ -2080,7 +2078,7 @@ CTranslatorRelcacheToDXL::PimdobjColStats
 		GPOS_RAISE(gpdxl::ExmaMD, gpdxl::ExmiMDCacheEntryNotFound, pmdid->Wsz());
 	}
 
-	IMDRelation *pmdrel = Pmdrel(pmp, pmda, pmdidRel);
+	const IMDRelation *pmdrel = pmda->Pmdrel(pmdidRel);
 	const IMDColumn *pmdcol = pmdrel->Pmdcol(ulPos);
 	AttrNumber attrnum = (AttrNumber) pmdcol->IAttno();
 
@@ -2099,7 +2097,6 @@ CTranslatorRelcacheToDXL::PimdobjColStats
 	// if there is no colstats
 	if (!HeapTupleIsValid(heaptupleStats))
 	{
-		pmdrel->Release();
 		pdrgpdxlbucket->Release();
 		pmdidColStats->AddRef();
 		return CDXLColStats::PdxlcolstatsDummy
@@ -2188,7 +2185,6 @@ CTranslatorRelcacheToDXL::PimdobjColStats
 
 	gpdb::FreeHeapTuple(heaptupleStats);
 
-	pmdrel->Release();
 	pdrgpdxlbucketTransformed->Release();
 
 	// create col stats object
@@ -2346,12 +2342,13 @@ CTranslatorRelcacheToDXL::PdrgpdxlbucketTransformStats
 							dNullFrequency
 							);
 
-	CDouble dHistFreq = CDouble(1.0) - phistGPDBMCV->DFrequency();
-
-	(void) phistGPDBMCV->DNormalize();
 	GPOS_ASSERT(phistGPDBMCV->FValid());
 
 	CHistogram *phistGPDBHist = NULL;
+	CDouble dHistFreq = CDouble(1.0) - phistGPDBMCV->DFrequency();
+
+	// TODO: shene - Jul 23, 2013; The semantics is not very clear here - if there are
+	// no MCVs and no histogram, dHistFreq will be 1.0, which is counter-intuitive
 
 	// if histogram has any significant information, then extract it
 	if (dHistFreq > CStatistics::DEpsilon)
@@ -2366,20 +2363,28 @@ CTranslatorRelcacheToDXL::PdrgpdxlbucketTransformStats
 						dDistinct,
 						dHistFreq
 						);
-		(void) phistGPDBHist->DNormalize();
 	}
 
-	// TODO: siva - 02/21/2012 merge mcv and histogram
-	// for now, simply use the one that has more information
 	DrgPdxlbucket *pdrgpdxlbucket = NULL;
-	if (dHistFreq >= CDouble(0.5) && 0 < ulNumHistValues)
+
+	if (1 - CStatistics::DEpsilon < dHistFreq && 0 < ulNumHistValues)
 	{
-		GPOS_ASSERT(NULL != phistGPDBHist);
+		// if histogram exists and dominates, use histogram only
 		pdrgpdxlbucket = Pdrgpdxlbucket(pmp, pmdtype, phistGPDBHist);
 	}
+
+	else if (0 == ulNumHistValues || CStatistics::DEpsilon > dHistFreq)
+	{
+		// if MCV dominates, use MCV only
+		pdrgpdxlbucket = Pdrgpdxlbucket(pmp, pmdtype, phistGPDBMCV);
+	}
+
 	else
 	{
-		pdrgpdxlbucket = Pdrgpdxlbucket(pmp, pmdtype, phistGPDBMCV);
+		// otherwise, merge MCV and histogram buckets
+		CHistogram *phistMerged = CStatisticsUtils::PhistMergeMcvHist(pmp, phistGPDBMCV, phistGPDBHist);
+		pdrgpdxlbucket = Pdrgpdxlbucket(pmp, pmdtype, phistMerged);
+		delete phistMerged;
 	}
 
 	// cleanup
@@ -2414,69 +2419,38 @@ CTranslatorRelcacheToDXL::PhistTransformGPDBMCV
 	CDouble dNullFrequency
 	)
 {
-	// first put all IDatums in an array and sort them per datum's
-	// stats comparison function
 	DrgPdatum *pdrgpdatum = New(pmp) DrgPdatum(pmp);
+	DrgPdouble *pdrgpdFreq = New(pmp) DrgPdouble(pmp);
 
 	for (ULONG ul = 0; ul < ulNumMCVValues; ul++)
 	{
 		Datum datumMCV = pdrgdatumMCVValues[ul];
 		IDatum *pdatum = CTranslatorScalarToDXL::Pdatum(pmp, pmdtype, false /* fNull */, datumMCV);
 		pdrgpdatum->Append(pdatum);
+		pdrgpdFreq->Append(New(pmp) CDouble(pdrgfMCVFrequencies[ul]));
 
 		if (!pdatum->FHasStatsLessThan(pdatum))
 		{
 			// if less than operation is not supported on this datum, then no point
 			// building a histogram. return an empty histogram
 			pdrgpdatum->Release();
+			pdrgpdFreq->Release();
 			return New(pmp) CHistogram(New(pmp) DrgPbucket(pmp));
 		}
 	}
 
-	// sort the idatums
-	if (ulNumMCVValues > 1)
-	{
-		pdrgpdatum->Sort(IDatum::IStatsCmp);
-	}
+	CHistogram *phist = CStatisticsUtils::PhistTransformMCV
+												(
+												pmp,
+												pmdtype,
+												pdrgpdatum,
+												pdrgpdFreq,
+												ulNumMCVValues,
+												dNullFrequency
+												);
 
-	// now put these in buckets
-	DrgPbucket *pdrgpbucketMCV = New(pmp) DrgPbucket(pmp);
-
-	// add null element
-	if (dNullFrequency > CStatistics::DEpsilon)
-	{
-		IDatum *pdatumNull = CTranslatorScalarToDXL::Pdatum(pmp, pmdtype, true /* fNull*/,  Datum(0) /* Datum */);
-		pdatumNull->AddRef();
-		CBucket *pbucketNull = New(pmp) CBucket
-											(
-											New(pmp) CPoint(pdatumNull),
-											New(pmp) CPoint(pdatumNull),
-											true /* fLowerClosed */,
-											true /* fLowerClosed */,
-											dNullFrequency,
-											CDouble(1.0)
-											);
-		pdrgpbucketMCV->Append(pbucketNull);
-	}
-
-	for (ULONG ul = 0; ul < ulNumMCVValues; ul++)
-	{
-		IDatum *pdatum = (*pdrgpdatum)[ul];
-		pdatum->AddRef();
-		pdatum->AddRef();
-		CDouble dBucketFreq = CDouble(pdrgfMCVFrequencies[ul]);
-		CBucket *pbucket = New(pmp) CBucket
-										(
-										New(pmp) CPoint(pdatum),
-										New(pmp) CPoint(pdatum),
-										true /* fLowerClosed */,
-										true /* fUpperClosed */,
-										dBucketFreq, CDouble(1.0)
-										);
-		pdrgpbucketMCV->Append(pbucket);
-	}
-	CHistogram *phist = New(pmp) CHistogram(pdrgpbucketMCV);
 	pdrgpdatum->Release();
+	pdrgpdFreq->Release();
 	return phist;
 }
 
@@ -2552,6 +2526,7 @@ CTranslatorRelcacheToDXL::PhistTransformGPDBHist
 	CHistogram *phist = New(pmp) CHistogram(pdrgppbucket);
 	return phist;
 }
+
 
 //---------------------------------------------------------------------------
 //	@function:

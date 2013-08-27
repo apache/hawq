@@ -171,7 +171,11 @@ extern PartitionNode *
 get_parts(Oid relid, int2 level, Oid parent, bool inctemplate,
 		  MemoryContext mcxt);
 
-extern Oid  rel_partition_get_master(Oid relid);
+extern Oid 
+rel_partition_get_root(Oid relid);
+
+extern Oid  
+rel_partition_get_master(Oid relid);
 
 extern char *
 ChoosePartitionName(const char *tablename, int partDepth, const char *partname, Oid nspace);

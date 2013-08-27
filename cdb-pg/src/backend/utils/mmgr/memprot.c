@@ -239,6 +239,14 @@ static bool is_main_thread()
 
 static void gp_failed_to_alloc(int ec, int en, int sz, int availmb) 
 {
+	if(coredump_on_memerror)
+	{
+		/*
+		 * Generate a core dump by writing to NULL pointer
+		 */
+		*(int *) NULL = ec;
+	}
+
 	/* Give an extra chunk for error handling. */
     mop_add_hld_cnt(1);
 

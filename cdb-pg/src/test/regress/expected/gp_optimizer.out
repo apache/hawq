@@ -5,7 +5,7 @@
 SELECT gp_opt_version();
                            gp_opt_version                           
 --------------------------------------------------------------------
- GPOPT version: 1.228, GPOS version: 1.88, Xerces version: 3.1.1-p1
+ GPOPT version: 1.251, GPOS version: 1.90, Xerces version: 3.1.1-p1
 (1 row)
 
 -- master only tables
@@ -2268,7 +2268,7 @@ select * from orca.foo a where a.x1 = (select distinct sum(b.x1)+avg(b.x1) sa fr
   2 |  3 |  4
 (1 row)
 
-select distinct a.x1 from orca.foo a where a.x1 <= (select distinct sum(b.x1)+avg(b.x1) sa from orca.bar1 b group by b.x3 order by sa limit 1);
+select distinct a.x1 from orca.foo a where a.x1 <= (select distinct sum(b.x1)+avg(b.x1) sa from orca.bar1 b group by b.x3 order by sa limit 1) order by 1;
  x1 
 ----
   1

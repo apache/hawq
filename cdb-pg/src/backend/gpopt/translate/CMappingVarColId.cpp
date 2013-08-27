@@ -481,7 +481,7 @@ CMappingVarColId::PmapvarcolidCopy
 
 		if (pgpdbattinfo->UlQueryLevel() <= ulQueryLevel)
 		{
-			// include all variable defined at same query level or before
+			// include all variables defined at same query level or before
 			CGPDBAttInfo *pgpdbattinfoNew = New(m_pmp) CGPDBAttInfo(pgpdbattinfo->UlQueryLevel(), pgpdbattinfo->UlVarNo(), pgpdbattinfo->IAttNo());
 			COptColInfo *poptcolinfoNew = New(m_pmp) COptColInfo(poptcolinfo->UlColId(), New(m_pmp) CWStringConst(m_pmp, poptcolinfo->PstrColName()->Wsz()));
 			pgpdbattinfoNew->AddRef();

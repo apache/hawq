@@ -423,6 +423,7 @@ insert into caller
                     substring(logmessage from '.*: .*: (.*.c)'),
                     substring(logmessage from '.* ([0-9]*) [0-9]* [0-9]*')::int from caql_segment_t1
 ;
+-- start_ignore
 -- --------------------------------------
 -- caql callers that are not yet tested
 -- --------------------------------------
@@ -845,7 +846,6 @@ select path, file, lineno
  src/backend/utils/mb/mbutils.c             | mbutils.c          |    281
 (403 rows)
 
--- start_ignore
 select caql_masterseg, count(*) from cq_logall group by caql_masterseg;
 select count(distinct caql_basequery_code) from cq_logall;
 select count(distinct basequery_code) from udef;

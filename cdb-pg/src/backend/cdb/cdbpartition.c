@@ -2334,6 +2334,29 @@ all_prule_relids(PartitionRule *prule)
 	return oids;
 }
 
+/*
+ * Returns the parent Oid from the given part Oid.
+ */
+Oid
+rel_partition_get_root(Oid relid)
+{
+	int fetchCount = 0;
+
+	Oid masteroid = caql_getoid_plus(NULL,
+						&fetchCount,
+						NULL,
+						cql("SELECT inhparent FROM pg_inherits "
+							" WHERE inhrelid = :1 ", 
+							ObjectIdGetDatum(relid)));
+
+	if (!OidIsValid(masteroid))
+	{
+		return InvalidOid;
+	}
+
+	return masteroid;
+}
+
 /* Get the top relation of the partitioned table of which the given
  * relation is a part, or error.
  *

@@ -1511,13 +1511,12 @@ CTranslatorQueryToDXL::PdxlnSimpleGroupBy
 		return pdxlnChild;
 	}
 
+	List *plDQA = NIL;
 	// construct the project list of the group-by operator
 	CDXLNode *pdxlnPrLGrpBy = New(m_pmp) CDXLNode(m_pmp, New(m_pmp) CDXLScalarProjList(m_pmp));
 
 	ListCell *plcTE = NULL;
-	BOOL fHasDQAs = false;
 	ULONG ulDQAs = 0;
-	ULONG ulAggregates = 0;
 	ForEach (plcTE, plTargetList)
 	{
 		TargetEntry *pte = (TargetEntry *) lfirst(plcTE);
@@ -1535,16 +1534,17 @@ CTranslatorQueryToDXL::PdxlnSimpleGroupBy
 		}
 		else if (IsA(pte->expr, Aggref) || IsA(pte->expr, PercentileExpr))
 		{
-			if (IsA(pte->expr, Aggref) && ((Aggref *) pte->expr)->aggdistinct)
+			if (IsA(pte->expr, Aggref) && ((Aggref *) pte->expr)->aggdistinct && !FDuplicateDqaArg(plDQA, (Aggref *) pte->expr))
 			{
-				fHasDQAs = true;
+				plDQA = gpdb::PlAppendElement(plDQA, gpdb::PvCopyObject(pte->expr));
+				ulDQAs++;
 			}
+
 			// create a project element for aggregate
 			CDXLNode *pdxlnPrEl = PdxlnPrEFromGPDBExpr(pte->expr, pte->resname);
 			pdxlnPrLGrpBy->AddChild(pdxlnPrEl);
 			ulColId = CDXLScalarProjElem::PdxlopConvert(pdxlnPrEl->Pdxlop())->UlId();
 			AddSortingGroupingColumn(pte, phmiulSortgrouprefColId, ulColId);
-			ulAggregates ++;
 		}
 
 		if (fGroupingCol || IsA(pte->expr, Aggref) || IsA(pte->expr, PercentileExpr))
@@ -1559,13 +1559,19 @@ CTranslatorQueryToDXL::PdxlnSimpleGroupBy
 	}
 
 	// TODO: elhela - May 30, 2013; remove the following check when MDQAs are supported
-	if (fHasDQAs && 1 < ulAggregates)
+	if (1 < ulDQAs)
 	{
 		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("Multiple Distinct Qualified Aggregates"));
 	}
 
 	// initialize the array of grouping columns
 	DrgPul *pdrgpul = CTranslatorUtils::PdrgpulGroupingCols(m_pmp, pbsGroupByCols, phmiulSortgrouprefColId);
+
+	// clean up
+	if (NIL != plDQA)
+	{
+		gpdb::FreeList(plDQA);
+	}
 
 	return New(m_pmp) CDXLNode
 						(
@@ -1574,6 +1580,43 @@ CTranslatorQueryToDXL::PdxlnSimpleGroupBy
 						pdxlnPrLGrpBy,
 						pdxlnChild
 						);
+}
+
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorQueryToDXL::FDuplicateDqaArg
+//
+//	@doc:
+//		Check if the argument of a DQA has already being used by another DQA
+//---------------------------------------------------------------------------
+BOOL
+CTranslatorQueryToDXL::FDuplicateDqaArg
+	(
+	List *plDQA,
+	Aggref *paggref
+	)
+{
+	GPOS_ASSERT(NULL != paggref);
+
+	if (NIL == plDQA || 0 == gpdb::UlListLength(plDQA))
+	{
+		return false;
+	}
+
+	ListCell *plc = NULL;
+	ForEach (plc, plDQA)
+	{
+		Node *pnode = (Node *) lfirst(plc);
+		GPOS_ASSERT(IsA(pnode, Aggref));
+
+		if (gpdb::FEqual(paggref->args, ((Aggref *) pnode)->args))
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
 //---------------------------------------------------------------------------
@@ -1658,7 +1701,15 @@ CTranslatorQueryToDXL::PdxlnGroupingSets
 								phmiulOutputCols
 								);
 		
-		CDXLNode *pdxlnResult = PdxlnProjectGroupingFuncs(plTargetList, pdxlnGroupBy, pbs, phmiulOutputCols, phmululGrpColPos);
+		CDXLNode *pdxlnResult = PdxlnProjectGroupingFuncs
+									(
+									plTargetList,
+									pdxlnGroupBy,
+									pbs,
+									phmiulOutputCols,
+									phmululGrpColPos,
+									phmiulSortgrouprefColId
+									);
 
 		phmiulChild->Release();
 		pdrgpbs->Release();
@@ -1786,7 +1837,7 @@ CTranslatorQueryToDXL::PdxlnUnionAllForGroupingSets
 		}
 
 		pdrgpulColIdsInner = pdrgpulColIdsOuter;
-
+		
 		if (ul == ulGroupingSets - 1)
 		{
 			// add the sortgroup columns to output map of the last column
@@ -1796,26 +1847,17 @@ CTranslatorQueryToDXL::PdxlnUnionAllForGroupingSets
 			{
 				TargetEntry *pte = (TargetEntry *) lfirst(plcTE);
 
-				INT iSortGroupRef = INT (pte->ressortgroupref);
-				BOOL fSortGroupColum = false;
-				if (0 < iSortGroupRef)
+				INT iSortGrpRef = INT (pte->ressortgroupref);
+				if (0 < iSortGrpRef && NULL != phmiulSortgrouprefColIdConsumer->PtLookup(&iSortGrpRef))
 				{
-					fSortGroupColum = true;
+					// add the mapping information for sorting columns
+					AddSortingGroupingColumn(pte, phmiulSortgrouprefColId, *(*pdrgpulColIdsInner)[ulTargetEntryPos]);
 				}
 
-				if (fSortGroupColum && NULL != phmiulSortgrouprefColIdConsumer->PtLookup(&iSortGroupRef))
-				{
-					// the map is between the ressortgroupref of the target list entry and the DXL column identifier
-					phmiulSortgrouprefColId->FInsert(New(m_pmp) INT(iSortGroupRef), New(m_pmp) ULONG(*(*pdrgpulColIdsInner)[ulTargetEntryPos]));
-				}
-
-				if (!pte->resjunk)
-				{
-					ulTargetEntryPos++;
-				}
+				ulTargetEntryPos++;
 			}
 		}
-		
+
 		// cleanup
 		phmiulGroupBy->Release();
 		phmiulSPJConsumer->Release();
@@ -1825,7 +1867,6 @@ CTranslatorQueryToDXL::PdxlnUnionAllForGroupingSets
 	// cleanup
 	phmiulSPJ->Release();
 	phmiulSortgrouprefColIdProducer->Release();
-
 	delete pmapvarcolidOriginal;
 	pdrgpulColIdsInner->Release();
 
@@ -1841,11 +1882,16 @@ CTranslatorQueryToDXL::PdxlnUnionAllForGroupingSets
 		GPOS_ASSERT(0 < pte->resno);
 		ULONG ulResNo = pte->resno;
 
+		// note that all target list entries are kept in union all's output column
+		// this is achieved by the fKeepResjunked flag in CTranslatorUtils::Pdrgpdxlcd
+		const CDXLColDescr *pdxlcd = pdxlopUnion->Pdxlcd(ulOutputColIndex);
+		const ULONG ulColId = pdxlcd->UlID();
+		ulOutputColIndex++;
+
 		if (!pte->resjunk)
 		{
-			const CDXLColDescr *pdxlcd = pdxlopUnion->Pdxlcd(ulOutputColIndex);
-			StoreAttnoColIdMapping(phmiulOutputCols, ulResNo, pdxlcd->UlID());
-			ulOutputColIndex++;
+			// add non-resjunk columns to the hash map that maintains the output columns
+			StoreAttnoColIdMapping(phmiulOutputCols, ulResNo, ulColId);
 		}
 	}
 
@@ -2199,6 +2245,9 @@ CTranslatorQueryToDXL::PdxlnSetOpChild
 			// translate query representing the derived table to its DXL representation
 			CDXLNode *pdxln = trquerytodxl.PdxlnFromQueryInternal();
 			GPOS_ASSERT(NULL != pdxln);
+
+			DrgPdxln *pdrgpdxlnCTE = trquerytodxl.PdrgpdxlnCTE();
+			CUtils::AddRefAppend(m_pdrgpdxlnCTE, pdrgpdxlnCTE);
 
 			// get the output columns of the derived table
 			DrgPdxln *pdrgpdxln = trquerytodxl.PdrgpdxlnQueryOutput();
@@ -3183,7 +3232,8 @@ CTranslatorQueryToDXL::PdxlnProjectGroupingFuncs
 	CDXLNode *pdxlnChild,
 	CBitSet *pbs,
 	HMIUl *phmiulOutputCols,
-	HMUlUl *phmululGrpColPos
+	HMUlUl *phmululGrpColPos,
+	HMIUl *phmiulSortgrouprefColId
 	)
 	const
 {
@@ -3220,6 +3270,7 @@ CTranslatorQueryToDXL::PdxlnProjectGroupingFuncs
 			CDXLNode *pdxlnPrEl = New(m_pmp) CDXLNode(m_pmp, New(m_pmp) CDXLScalarProjElem(m_pmp, ulColId, pmdnameAlias), pdxlnGroupingFunc);
 			pdxlnPrL->AddChild(pdxlnPrEl);
 			StoreAttnoColIdMapping(phmiulOutputCols, ulResno, ulColId);
+			AddSortingGroupingColumn(pte, phmiulSortgrouprefColId, ulColId);
 		}
 	}
 

@@ -270,7 +270,7 @@ planner(Query *parse, int cursorOptions,
 	 * If the new optimizer is enabled, try that first. If it does not return a plan,
 	 * then fall back to the planner.
 	 */
-	if (optimizer && (-1 == Gp_segment))
+	if (optimizer)
 	{
 		result = optimize_query(parse, boundParams);
 	}

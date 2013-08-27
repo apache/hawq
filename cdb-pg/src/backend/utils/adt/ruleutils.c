@@ -4876,6 +4876,16 @@ get_windowref_expr(WindowRef *wref, deparse_context *context)
 	get_rule_expr((Node *) wref->args, context, true);
 	appendStringInfoChar(buf, ')');
 
+	/*
+	 * context->query can be NULL when called from explain.
+	 * In such cases, we do not attempt to extract OVER clause
+	 * details: MPP-20672.
+	 */
+	if (context->query == NULL)
+	{
+		return;
+	}
+
 	/* now for the OVER clause */
 	appendStringInfo(buf, " OVER");
 

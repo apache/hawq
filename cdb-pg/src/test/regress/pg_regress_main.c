@@ -31,7 +31,7 @@ psql_start_test(const char *testname,
 	PID_TYPE	pid;
 	char		infile[MAXPGPATH];
 	char		outfile[MAXPGPATH];
-	char		expectfile[MAXPGPATH];
+	char		expectfile[MAXPGPATH] = "";
 	char		psql_cmd[MAXPGPATH * 3];
 	char		use_utility_mode = 0;
 

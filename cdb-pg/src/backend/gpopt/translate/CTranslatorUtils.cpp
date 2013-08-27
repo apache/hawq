@@ -53,17 +53,12 @@
 #include "md/IMDTypeInt4.h"
 #include "md/IMDTypeInt8.h"
 #include "md/IMDTypeOid.h"
+#include "md/CMDTypeGenericGPDB.h"
 
 #include "dxl/operators/CDXLDatumInt4.h"
 #include "dxl/operators/CDXLDatumInt8.h"
 #include "dxl/operators/CDXLDatumBool.h"
-#include "dxl/operators/CDXLDatumGeneric.h"
-#include "dxl/operators/CDXLDatumDate.h"
-#include "dxl/operators/CDXLDatumTimestamp.h"
-#include "dxl/operators/CDXLDatumBpchar.h"
 #include "dxl/operators/CDXLDatumOid.h"
-#include "dxl/operators/CDXLDatumVarchar.h"
-
 
 #include "traceflags/traceflags.h"
 
@@ -2532,25 +2527,19 @@ CTranslatorUtils::PdxlnPrElNull
 	{
 		pdxldatum = New(pmp) CDXLDatumOid(pmp, pmdid, true /*fConstNull*/, 0 /*value*/);
 	}
-	else if (pmdid->FEquals(&CMDIdGPDB::m_mdidDate))
-	{
-		pdxldatum = New(pmp) CDXLDatumDate(pmp, pmdid, fByValue /*fConstByVal*/, true /*fConstNull*/, NULL, 0 /*ulLength*/, 0 /*lValue*/);
-	}
-	else if (pmdid->FEquals(&CMDIdGPDB::m_mdidTimestamp))
-	{
-		pdxldatum = New(pmp) CDXLDatumTimestamp(pmp, pmdid, fByValue /*fConstByVal*/, true /*fConstNull*/, NULL, 0 /*ulLength*/, 0 /*lValue*/);
-	}
-	else if (pmdid->FEquals(&CMDIdGPDB::m_mdidBPChar))
-	{
-		pdxldatum = New(pmp) CDXLDatumBpchar(pmp, pmdid, fByValue /*fConstByVal*/, true /*fConstNull*/, NULL, 0 /*ulLength*/, 0 /*lValue*/);
-	}
-	else if (pmdid->FEquals(&CMDIdGPDB::m_mdidVarChar))
-	{
-		pdxldatum = New(pmp) CDXLDatumVarchar(pmp, pmdid, fByValue /*fConstByVal*/, true /*fConstNull*/, NULL, 0 /*ulLength*/, 0 /*lValue*/);
-	}
 	else
 	{
-		pdxldatum = New(pmp) CDXLDatumGeneric(pmp, pmdid, fByValue /*fConstByVal*/, true /*fConstNull*/, NULL, 0 /*ulLength*/);
+		pdxldatum = CMDTypeGenericGPDB::Pdxldatum
+										(
+										pmp,
+										pmdid,
+										fByValue /*fConstByVal*/,
+										true /*fConstNull*/,
+										NULL, /*pba */
+										0 /*ulLength*/,
+										0 /*lValue*/,
+										0 /*dValue*/
+										);
 	}
 
 	CDXLNode *pdxlnConst = New(pmp) CDXLNode(pmp, New(pmp) CDXLScalarConstValue(pmp, pdxldatum));

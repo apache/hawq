@@ -469,6 +469,9 @@ namespace gpdb {
 	// equal to the given expression, or NULL if no such member exists
 	TargetEntry *PteMember(Node *node, List *targetlist);
 
+	// check if two gpdb objects are equal
+	bool FEqual(void *p1, void *p2);
+
 	// does a type exist with the given oid
 	bool FTypeExists(Oid oid);
 

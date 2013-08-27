@@ -21,6 +21,9 @@
 
 #define DYNAMIC_TABLE_SCAN_NSLOTS 2
 
+static inline void
+CleanupOnePartition(ScanState *scanState);
+
 DynamicTableScanState *
 ExecInitDynamicTableScan(DynamicTableScan *node, EState *estate, int eflags)
 {
@@ -149,10 +152,26 @@ initNextTableToScan(DynamicTableScanState *node)
 		Oid *pid = hash_seq_search(&node->pidStatus);
 		if (pid == NULL)
 		{
+			node->shouldCallHashSeqTerm = false;
 			return false;
 		}
 		
 		scanState->ss_currentRelation = OpenScanRelationByOid(*pid);
+
+		/*
+		 * Inside ExecInitScanTupleSlot() we set the tuple table slot's oid
+		 * to range table entry's relid, which for partitioned table always set
+		 * to parent table's oid. In queries where we need to read table oids
+		 * (MPP-20736) we use the tuple table slot's saved oid (refer to slot_getsysattr()).
+		 * This wrongly returns parent oid, instead of partition oid. Therefore,
+		 * to return correct partition oid, we need to update
+		 * our tuple table slot's oid to reflect the partition oid.
+		 */
+		for (int i = 0; i < DYNAMIC_TABLE_SCAN_NSLOTS; i++)
+		{
+			scanState->ss_ScanTupleSlot[i].tts_tableOid = *pid;
+		}
+
 		ExecAssignScanType(scanState, RelationGetDescr(scanState->ss_currentRelation));
 
 		if ( NULL != scanState->ps.plan->targetlist )
@@ -223,6 +242,7 @@ ExecDynamicTableScan(DynamicTableScanState *node)
 		}
 		
 		hash_seq_init(&node->pidStatus, node->pidIndex);
+		node->shouldCallHashSeqTerm = true;
 	}
 
 	/*
@@ -239,23 +259,42 @@ ExecDynamicTableScan(DynamicTableScanState *node)
 			Gpmon_M_Incr_Rows_Out(GpmonPktFromDynamicTableScanState(node));
 			CheckSendPlanStateGpmonPkt(&scanState->ps);
 		}
-		
 		else
 		{
-			EndTableScanRelation(scanState);
-
-			Assert(scanState->ss_currentRelation != NULL);
-			ExecCloseScanRelation(scanState->ss_currentRelation);
-			scanState->ss_currentRelation = NULL;
+			CleanupOnePartition(scanState);
 		}
 	}
 
 	return slot;
 }
 
+/*
+ * CleanupOnePartition
+ *		Cleans up a partition's relation and releases all locks.
+ */
+static inline void
+CleanupOnePartition(ScanState *scanState)
+{
+	Assert(NULL != scanState);
+	if ((scanState->scan_state & SCAN_SCAN) != 0)
+	{
+		EndTableScanRelation(scanState);
+
+		Assert(scanState->ss_currentRelation != NULL);
+		ExecCloseScanRelation(scanState->ss_currentRelation);
+		scanState->ss_currentRelation = NULL;
+	}
+}
+
 void
 ExecEndDynamicTableScan(DynamicTableScanState *node)
 {
+	CleanupOnePartition((ScanState*)node);
+
+	if (node->shouldCallHashSeqTerm)
+	{
+		hash_seq_term(&node->pidStatus);
+	}
 	FreeScanRelationInternal((ScanState *)node);
 	EndPlanStateGpmonPkt(&node->tableScanState.ss.ps);
 }

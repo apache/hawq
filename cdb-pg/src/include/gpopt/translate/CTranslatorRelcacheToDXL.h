@@ -40,6 +40,7 @@
 #include "md/IMDType.h"
 #include "md/CDXLColStats.h"
 #include "statistics/CHistogram.h"
+#include "statistics/CStatisticsUtils.h"
 #include "md/IMDIndex.h"
 #include "dxl/operators/CDXLColDescr.h"
 
@@ -65,7 +66,6 @@ namespace gpdxl
 	class CTranslatorRelcacheToDXL
 	{
 		private:
-
 			// get type name from the relcache
 			static
 			CMDName *PmdnameType(IMemoryPool *pmp, IMDId *pmdid);
@@ -101,8 +101,8 @@ namespace gpdxl
 			// retrieve scalar comparison object from the relcache
 			static
 			IMDCacheObject *PmdobjScCmp(IMemoryPool *pmp, IMDId *pmdid);
-			
-			// transform mcv information to optimizer's histogram structure
+
+			// transform GPDB's MCV information to optimizer's histogram structure
 			static
 			CHistogram *PhistTransformGPDBMCV
 								(
@@ -244,7 +244,7 @@ namespace gpdxl
 			
 			// retrieve an index over a partitioned table from the relcache
 			static
-			IMDIndex *PmdindexPartTable(IMemoryPool *pmp, CMDAccessor *pmda, IMDId *pmdidIndex, IMDRelation *pmdrel, LogicalIndexes *plind);
+			IMDIndex *PmdindexPartTable(IMemoryPool *pmp, CMDAccessor *pmda, IMDId *pmdidIndex, const IMDRelation *pmdrel, LogicalIndexes *plind);
 			
 			// lookup an index given its id from the logical indexes structure
 			static
@@ -252,7 +252,7 @@ namespace gpdxl
 			
 			// construct an MD cache index object given its logical index representation
 			static
-			IMDIndex *PmdindexPartTable(IMemoryPool *pmp, CMDAccessor *pmda, LogicalIndexInfo *pidxinfo, IMDId *pmdidIndex, IMDRelation *pmdrel);
+			IMDIndex *PmdindexPartTable(IMemoryPool *pmp, CMDAccessor *pmda, LogicalIndexInfo *pidxinfo, IMDId *pmdidIndex, const IMDRelation *pmdrel);
 
 			// return the triggers defined on the given relation
 			static
@@ -273,7 +273,7 @@ namespace gpdxl
 			// translate Optimizer comparison types to GPDB
 			static
 			ULONG UlCmpt(IMDType::ECmpType ecmpt);
-			
+
 		public:
 			// retrieve a metadata object from the relcache
 			static
@@ -297,7 +297,7 @@ namespace gpdxl
 
 			// populate the attribute number to position mapping
 			static
-			ULONG *PulAttnoPositionMap(IMemoryPool *pmp, IMDRelation *pmdrel, ULONG ulRgSize);
+			ULONG *PulAttnoPositionMap(IMemoryPool *pmp, const IMDRelation *pmdrel, ULONG ulRgSize);
 
 			// return the position of a given attribute number
 			static
@@ -330,7 +330,6 @@ namespace gpdxl
 			// translate GPDB comparison type
 			static
 			IMDType::ECmpType Ecmpt(ULONG ulCmpt);
-			
 	};
 }
 

@@ -14,9 +14,15 @@ extern TupleTableSlot *ExecDynamicIndexScan(DynamicIndexScanState *node);
 extern void ExecEndDynamicIndexScan(DynamicIndexScanState *node);
 extern void ExecDynamicIndexReScan(DynamicIndexScanState *node, ExprContext *exprCtxt);
 
+enum 
+{
+	GPMON_DYNAMICINDEXSCAN_RESCAN = GPMON_QEXEC_M_NODE_START,
+	GPMON_DYNAMICINDEXSCAN_TOTAL,
+};
+
 static inline gpmon_packet_t * GpmonPktFromDynamicIndexScanState(DynamicIndexScanState *node)
 {
-	return NULL;
+	return &node->indexScanState.ss.ps.gpmon_pkt;
 }
 #endif
 

@@ -33,6 +33,9 @@
 #define READ_LOCALS(nodeTypeName) \
 	nodeTypeName *local_node = makeNode(nodeTypeName)
 
+/* Allocate non-node variable */
+#define ALLOCATE_LOCAL(local, typeName, size) \
+	local = (typeName *)palloc0(sizeof(typeName) * size)
 
 /* Read an integer field  */
 #define READ_INT_FIELD(fldname) \
@@ -831,7 +834,7 @@ _readAlterTableStmt(const char ** str)
 	local_node->oidInfo = NULL;
 	if (local_node->oidInfoCount > 0)
 	{
-		local_node->oidInfo = palloc0(sizeof(TableOidInfo) * local_node->oidInfoCount);
+		ALLOCATE_LOCAL(local_node->oidInfo, TableOidInfo, local_node->oidInfoCount);
 		for (m = 0; m < local_node->oidInfoCount; m++)
 		{
 			READ_OID_FIELD(oidInfo[m].relOid);
@@ -3033,8 +3036,11 @@ _readDynamicIndexScan(const char **str)
 	readIndexScanFields(str, (IndexScan *)local_node);
 
 	READ_INT_FIELD(partIndex);
-	readLogicalIndexInfo(str, ((DynamicIndexScan *) local_node)->logicalIndexInfo);
-	
+
+	ALLOCATE_LOCAL(local_node->logicalIndexInfo, LogicalIndexInfo, 1 /* single node allocation  */);
+
+	readLogicalIndexInfo(str, local_node->logicalIndexInfo);
+
 	READ_DONE();
 }
 
@@ -4545,13 +4551,13 @@ readNodeBinary(const char ** str)
 			case T_GroupingClause:
 				return_value = _readGroupingClause(str);
 				break;
-		    case T_GroupingFunc:
+			case T_GroupingFunc:
 				return_value = _readGroupingFunc(str);
 				break;
-		    case T_Grouping:
+			case T_Grouping:
 				return_value = _readGrouping(str);
 				break;
-		    case T_GroupId:
+			case T_GroupId:
 				return_value = _readGroupId(str);
 				break;
 			case T_WindowSpecParse:
@@ -4674,13 +4680,13 @@ readNodeBinary(const char ** str)
 				return_value = _readDenyLoginPoint(str);
 				break;
 
-		case T_TableValueExpr:
-			return_value = _readTableValueExpr(str);
-			break;
+			case T_TableValueExpr:
+				return_value = _readTableValueExpr(str);
+				break;
 
-		case T_AlterTypeStmt:
-			return_value = _readAlterTypeStmt(str);
-			break;
+			case T_AlterTypeStmt:
+				return_value = _readAlterTypeStmt(str);
+				break;
 
 		case T_QueryContextInfo:
 		    return_value = _readQueryContextInfo(str);
@@ -4690,10 +4696,10 @@ readNodeBinary(const char ** str)
 			return_value = _readSharedStorageOpStmt(str);
 			break;
 
-		default:
-			return_value = NULL; /* keep the compiler silent */
-			elog(ERROR, "could not deserialize unrecognized node type: %d",
-					 (int) nt);
+			default:
+				return_value = NULL; /* keep the compiler silent */
+				elog(ERROR, "could not deserialize unrecognized node type: %d",
+						 (int) nt);
 
 			break;
 	}

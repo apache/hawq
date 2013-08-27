@@ -2340,6 +2340,7 @@ ResultRelInfoSetSegno(ResultRelInfo *resultRelInfo, List *mapping)
 			Assert(n->segno != InvalidFileSegNumber);
 			resultRelInfo->ri_aosegno = n->segno;
 
+
 			found = true;
 			break;
 		}
@@ -3784,7 +3785,7 @@ CreateIntoRel(QueryDesc *queryDesc)
 	Oid         intoComptypeOid;
 	GpPolicy   *targetPolicy;
 	int			safefswritesize = gp_safefswritesize;
-
+	
 	ItemPointerData persistentTid;
 	int64			persistentSerialNum;
 
@@ -4339,6 +4340,7 @@ get_part(EState *estate, Datum *values, bool *isnull, TupleDesc tupdesc)
 				 errmsg("no partition for partitioning key"),
 				 errOmitLocation(true)));
 
+
 	Assert(estate->es_result_partitions && estate->es_result_partitions->part);
 	Assert(estate->es_result_relations && estate->es_result_relations->ri_RelationDesc);
 	Oid parent = estate->es_result_partitions->part->parrelid;
@@ -4852,6 +4854,7 @@ map_part_attrs(Relation base, Relation part, AttrMap **map_ptr, bool throw)
 
 	if ( !compatible )
 	{
+
 		Assert( !throw );
 		if ( v != NULL )
 			pfree(v);

@@ -131,6 +131,7 @@
 #define ALLOW_operator_exists
 #define ALLOW_palloc
 #define ALLOW_pfree
+#define ALLOW_equal
 #define ALLOW_pg_detoast_datum
 #define ALLOW_query_or_expression_tree_walker
 #define ALLOW_query_or_expression_tree_mutator
@@ -2265,6 +2266,21 @@ gpdb::PteMember
 	}
 	GP_WRAP_END;
 	return NULL;
+}
+
+bool
+gpdb::FEqual
+	(
+	void *p1,
+	void *p2
+	)
+{
+	GP_WRAP_START;
+	{
+		return equal(p1, p2);
+	}
+	GP_WRAP_END;
+	return false;
 }
 
 bool

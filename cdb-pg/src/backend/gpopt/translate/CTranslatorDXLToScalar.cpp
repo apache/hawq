@@ -1343,6 +1343,7 @@ CTranslatorDXLToScalar::PconstFromDXLDatum
 			{CDXLDatum::EdxldatumTimeStamp, &CTranslatorDXLToScalar::PconstGeneric},
 			{CDXLDatum::EdxldatumBpchar, &CTranslatorDXLToScalar::PconstGeneric},
 			{CDXLDatum::EdxldatumVarchar, &CTranslatorDXLToScalar::PconstGeneric},
+			{CDXLDatum::EdxldatumText, &CTranslatorDXLToScalar::PconstGeneric},
 			{CDXLDatum::EdxldatumDouble, &CTranslatorDXLToScalar::PconstGeneric}
 		};
 

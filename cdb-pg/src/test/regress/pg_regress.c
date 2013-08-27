@@ -76,6 +76,7 @@ bool		debug = false;
 char	   *inputdir = ".";
 char	   *outputdir = ".";
 char	   *psqldir = PGBINDIR;
+bool 		optimizer_enabled = false;
 static _stringlist *loadlanguage = NULL;
 static int	max_connections = 0;
 static char *encoding = NULL;
@@ -1955,6 +1956,85 @@ make_absolute_path(const char *in)
 	return result;
 }
 
+static char *
+trim_white_space(char *str)
+{
+	char *end;
+	while (isspace(*str))
+	{
+		str++;
+	}
+
+	if (*str == 0)
+	{
+		return str;
+	}
+
+	end = str + strlen(str) - 1;
+	while (end > str && isspace(*end))
+	{
+		end--;
+	}
+
+	*(end+1) = 0;
+	return str;
+}
+
+/*
+ * Check whether the optimizer is on or off, and set the global
+ * variable "optimizer_enabled" accordingly.
+ */
+static void
+check_optimizer_status(void)
+{
+	char psql_cmd[MAXPGPATH];
+	char statusfilename[MAXPGPATH];
+	char line[1024];
+
+	header(_("checking optimizer status"));
+
+	snprintf(statusfilename, sizeof(statusfilename), SYSTEMQUOTE "%s/optimizer_status.out" SYSTEMQUOTE, outputdir);
+
+	snprintf(psql_cmd, sizeof(psql_cmd),
+			 SYSTEMQUOTE "\"%s%spsql\" -X -c \"show optimizer;\" -o \"%s\" -d \"postgres\"" SYSTEMQUOTE,
+			 psqldir ? psqldir : "",
+			 psqldir ? "/" : "",
+			 statusfilename);
+
+	if (system(psql_cmd) != 0)
+	{
+		exit_nicely(2);
+	}
+
+	FILE *statusfile = fopen(statusfilename, "r");
+	if (!statusfile)
+	{
+		fprintf(stderr, _("%s: could not open file \"%s\" for reading: %s\n"),
+				progname, statusfilename, strerror(errno));
+		exit_nicely(2);
+	}
+
+	while (fgets(line, sizeof(line), statusfile))
+	{
+		char *trimmed = trim_white_space(line);
+		if (strncmp(trimmed, "on", 2) == 0)
+		{
+			optimizer_enabled = true;
+			status(_("Optimizer enabled. Using optimizer answer files whenever possible"));
+			break;
+		}
+
+		if (strncmp(trimmed, "off", 3) == 0)
+		{
+			optimizer_enabled = false;
+			status(_("Optimizer disabled. Using planner answer files"));
+			break;
+		}
+	}
+	status_end();
+	fclose(statusfile);
+}
+
 static void
 help(void)
 {
@@ -2319,6 +2399,11 @@ regression_main(int argc, char *argv[], init_function ifunc, test_function tfunc
 		create_database(sl->str);
 	for (sl = extraroles; sl; sl = sl->next)
 		create_role(sl->str, dblist);
+
+	/*
+	 * Find out if optimizer is on or off
+	 */
+	check_optimizer_status();
 
 	/*
 	 * Ready to run the tests

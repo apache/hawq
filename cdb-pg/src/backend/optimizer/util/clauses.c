@@ -3408,6 +3408,7 @@ expression_tree_mutator(Node *node,
 		case T_CoerceToDomainValue:
 		case T_CurrentOfExpr:
 		case T_CaseTestExpr:
+		case T_DynamicIndexScan:
 		case T_SetToDefault:
 		case T_RangeTblRef:
 		case T_OuterJoinInfo:
@@ -3932,8 +3933,8 @@ expression_tree_mutator(Node *node,
 			}
 			break;
 		default:
-            ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR),
-                            errmsg_internal("unrecognized node type: %d",
+				ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR),
+                            		errmsg_internal("unrecognized node type: %d",
 				                            nodeTag(node)) ));
 			break;
 	}

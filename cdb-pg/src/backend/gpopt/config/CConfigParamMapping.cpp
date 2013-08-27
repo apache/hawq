@@ -194,9 +194,6 @@ CConfigParamMapping::PbsPack
 		}
 	}
 
-	// TODO: solimm1 - May 31, 2013 enable dynamic index scan when executor support is complete
-	(void) pbs->FExchangeSet(EopttraceDisableXformBase + CXform::ExfDynamicIndexGet2DynamicIndexScan);
-
 	return pbs;
 }
 

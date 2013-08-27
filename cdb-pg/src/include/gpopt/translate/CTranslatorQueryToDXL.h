@@ -218,6 +218,10 @@ namespace gpdxl
 				)
 				const;
 
+			// check if the argument of a DQA has already being used by another DQA
+			static
+			BOOL FDuplicateDqaArg(List *plDQA, Aggref *paggref);
+
 			// translate a query with grouping sets
 			CDXLNode *PdxlnGroupingSets
 				(
@@ -255,7 +259,16 @@ namespace gpdxl
 				const;
 
 			// construct a project node with appropriate values for the grouping funcs in the given target list
-			CDXLNode *PdxlnProjectGroupingFuncs(List *plTargetList, CDXLNode *pdxlnChild, CBitSet *pbs, HMIUl *phmiulOutputCols, HMUlUl *phmululGrpColPos) const;
+			CDXLNode *PdxlnProjectGroupingFuncs
+						(
+						List *plTargetList,
+						CDXLNode *pdxlnChild,
+						CBitSet *pbs,
+						HMIUl *phmiulOutputCols,
+						HMUlUl *phmululGrpColPos,
+						HMIUl *phmiulSortgrouprefColId
+						)
+						const;
 
 			// add sorting and grouping column into the hash map
 			void AddSortingGroupingColumn(TargetEntry *pte, HMIUl *phmiulSortGrpColsColId, ULONG ulColId) const;
