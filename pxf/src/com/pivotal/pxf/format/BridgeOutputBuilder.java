@@ -1,12 +1,11 @@
-
 package com.pivotal.pxf.format;
 
 import java.io.DataOutput;
 import java.io.IOException;
 import java.lang.reflect.Array;
-import java.sql.Timestamp;
 import java.util.List;
 
+import org.apache.commons.lang.ObjectUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 
@@ -27,8 +26,8 @@ public class BridgeOutputBuilder
 	private InputData inputData;
 	private Writable output = null;
 	private GPDBWritable errorRecord = null;
-	private String delim = new String(",");
-	private String endl = new String("\n");
+	private String delim = ",";
+	private String endl = "\n";
 
 	/*
 	 * Text class needs to be specialized since in the implementation of write() it serializes the 
@@ -134,8 +133,8 @@ public class BridgeOutputBuilder
 	/*
 	 * Creates the GPDBWritable object. The object is created one time
 	 * and is refilled from recFields for each record sent 
-	 */		
-	void makeGPDBWritableOutput(List<OneField> recFields)
+	 */
+    GPDBWritable makeGPDBWritableOutput(List<OneField> recFields)
 	{
 		int num_actual_fields = recFields.size();
 		int [] schema = new int[num_actual_fields];
@@ -144,6 +143,8 @@ public class BridgeOutputBuilder
 			schema[i] = recFields.get(i).type;
 
 		output = new GPDBWritable(schema);
+
+        return (GPDBWritable)output;
 	}
 
 	/*
@@ -188,80 +189,60 @@ public class BridgeOutputBuilder
 		((SimpleText)output).set(strline);
 	}
 
-	/*
-	 * Fills one GPDBWritable field
-	 */	
-	void fillOneGPDBWritableField(OneField oneField, int i) throws BadRecordException
-	{
-		int type = oneField.type;
-		GPDBWritable GPDBoutput = (GPDBWritable)output;
-
-		try
-		{
-			if (type == GPDBWritable.INTEGER)
-			{
-				GPDBoutput.setInt(i, (Integer)oneField.val);
-			}
-			else if (type == GPDBWritable.FLOAT8)
-			{
-				GPDBoutput.setDouble(i, (Double)oneField.val);
-			}
-			else if (type == GPDBWritable.VARCHAR)
-			{
-				GPDBoutput.setString(i, (String)oneField.val);
-			}
-			else if (type == GPDBWritable.BPCHAR)
-			{
-				GPDBoutput.setString(i, (String)oneField.val);
-			}
-			else if (type == GPDBWritable.REAL)
-			{
-				GPDBoutput.setFloat(i, (Float)oneField.val);
-			}
-			else if (type == GPDBWritable.BIGINT)
-			{
-				GPDBoutput.setLong(i, (Long)oneField.val);
-			}
-			else if (type == GPDBWritable.SMALLINT)
-			{
-				GPDBoutput.setShort(i, (Short)oneField.val);
-			}
-			else if (type == GPDBWritable.BYTEA)
-			{
-				int length = Array.getLength(oneField.val);
-				byte [] bts = new byte[length];
-				for (int j = 0; j < length; j++)
-				{
-					bts[j] = Array.getByte(oneField.val, j);
-				}
-
-				GPDBoutput.setBytes(i, bts);
-			}
-			else if (type == GPDBWritable.TEXT)
-			{
-				GPDBoutput.setString(i, (String)oneField.val);
-			}
-            else if (type == GPDBWritable.BOOLEAN)
+    /*
+     * Fills one GPDBWritable field
+     */
+    void fillOneGPDBWritableField(OneField oneField, int i) throws BadRecordException
+    {
+        int type = oneField.type;
+        Object val = oneField.val;
+        GPDBWritable GPDBoutput = (GPDBWritable) output;
+        try
+        {
+            switch (type)
             {
-                GPDBoutput.setBoolean(i, (Boolean)oneField.val);
+                case GPDBWritable.INTEGER:
+                    GPDBoutput.setInt(i, (Integer) val);
+                    break;
+                case GPDBWritable.FLOAT8:
+                    GPDBoutput.setDouble(i, (Double) val);
+                    break;
+                case GPDBWritable.REAL:
+                    GPDBoutput.setFloat(i, (Float) val);
+                    break;
+                case GPDBWritable.BIGINT:
+                    GPDBoutput.setLong(i, (Long) val);
+                    break;
+                case GPDBWritable.SMALLINT:
+                    GPDBoutput.setShort(i, (Short) val);
+                    break;
+                case GPDBWritable.BOOLEAN:
+                    GPDBoutput.setBoolean(i, (Boolean) val);
+                    break;
+                case GPDBWritable.BYTEA:
+                    int length = Array.getLength(val);
+                    byte[] bts = new byte[length];
+                    for (int j = 0; j < length; j++)
+                    {
+                        bts[j] = Array.getByte(val, j);
+                    }
+                    GPDBoutput.setBytes(i, bts);
+                    break;
+                case GPDBWritable.VARCHAR:
+                case GPDBWritable.BPCHAR:
+                case GPDBWritable.TEXT:
+                case GPDBWritable.NUMERIC:
+                case GPDBWritable.TIMESTAMP:
+                    GPDBoutput.setString(i, ObjectUtils.toString(val, null));
+                    break;
+                default:
+                    String valClassName = (val != null) ? val.getClass().getSimpleName() : null;
+                    throw new UnsupportedOperationException(valClassName + " is not supported for gpdb conversion");
             }
-            else if (type == GPDBWritable.NUMERIC)
-            {
-                GPDBoutput.setString(i, (String)oneField.val);
-            }
-            else if (type == GPDBWritable.TIMESTAMP)
-            {
-				String val = (oneField.val != null) ? ((Timestamp)oneField.val).toString() : null;
-                GPDBoutput.setString(i, val);
-            }
-			else
-			{
-				throw new UnsupportedOperationException("Type " + type + " not supported for gpdb conversion");
-			}
-		}
-		catch (TypeMismatchException e)
-		{
-			throw new BadRecordException(e);
-		}
-	}
+        }
+        catch (TypeMismatchException e)
+        {
+            throw new BadRecordException(e);
+        }
+    }
 }
