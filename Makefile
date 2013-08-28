@@ -192,7 +192,7 @@ PG_LANG=false
 endif
 
 ifneq (false, ${PG_LANG})
-CONFIGFLAGS+= --with-perl --with-python --with-java
+CONFIGFLAGS+= --with-perl --with-python
 ifdef TCL_CFG
 CONFIGFLAGS+= --with-tcl-config=${TCL_CFG}
 endif
