@@ -5,7 +5,7 @@
 SELECT gp_opt_version();
                            gp_opt_version                           
 --------------------------------------------------------------------
- GPOPT version: 1.251, GPOS version: 1.90, Xerces version: 3.1.1-p1
+ GPOPT version: 1.255, GPOS version: 1.90, Xerces version: 3.1.1-p1
 (1 row)
 
 -- master only tables
@@ -8099,6 +8099,26 @@ select 1 from pg_class c group by c.oid limit 1;
 ----------
         1
 (1 row)
+
+-- CSQ on volatile function
+drop table if exists orca.tab1;
+create table orca.tab1 (i, j) as select i,i%2 from generate_series(1,10) i;
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column(s) named 'i' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+select * from orca.tab1 where 0 < (select count(*) from generate_series(1,i)) order by 1;
+ i  | j 
+----+---
+  1 | 1
+  2 | 0
+  3 | 1
+  4 | 0
+  5 | 1
+  6 | 0
+  7 | 1
+  8 | 0
+  9 | 1
+ 10 | 0
+(10 rows)
 
 -- clean up
 drop schema orca cascade;

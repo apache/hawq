@@ -2373,7 +2373,7 @@ CTranslatorRelcacheToDXL::PdrgpdxlbucketTransformStats
 		pdrgpdxlbucket = Pdrgpdxlbucket(pmp, pmdtype, phistGPDBHist);
 	}
 
-	else if (0 == ulNumHistValues || CStatistics::DEpsilon > dHistFreq)
+	else if (1 >= ulNumHistValues || CStatistics::DEpsilon > dHistFreq)
 	{
 		// if MCV dominates, use MCV only
 		pdrgpdxlbucket = Pdrgpdxlbucket(pmp, pmdtype, phistGPDBMCV);
@@ -2476,7 +2476,7 @@ CTranslatorRelcacheToDXL::PhistTransformGPDBHist
 	// handle corner case of no histogram
 	if (ulNumHistValues <= 1)
 	{
-		return New(pmp) CHistogram(New(pmp) DrgPbucket(pmp), false /* fWellFormed */);
+		return New(pmp) CHistogram(New(pmp) DrgPbucket(pmp), false /* fWellDefined */);
 	}
 
 	GPOS_ASSERT(ulNumHistValues > 1);

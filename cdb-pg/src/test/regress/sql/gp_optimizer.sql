@@ -562,5 +562,10 @@ SET optimizer_cte_inlining = off;
 -- catalog queries
 select 1 from pg_class c group by c.oid limit 1;
 
+-- CSQ on volatile function
+drop table if exists orca.tab1;
+create table orca.tab1 (i, j) as select i,i%2 from generate_series(1,10) i;
+select * from orca.tab1 where 0 < (select count(*) from generate_series(1,i)) order by 1;
+
 -- clean up
 drop schema orca cascade;
