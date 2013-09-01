@@ -58,6 +58,8 @@
 	  			  conf="compile->master"/>
 	  <dependency org="junit" name="junit" rev="4.11" 
 	  			  conf="compile->master"/>
+      <dependency org="pl.pragmatists" name="JUnitParams" rev="1.0.2" 
+	  			  conf="compile->master"/>                  
 	  <dependency org="org.hamcrest" name="hamcrest-core" rev="1.3" 
 	  			  conf="compile->master"/>
 	  <dependency org="org.mockito" name="mockito-core" rev="1.9.5" 

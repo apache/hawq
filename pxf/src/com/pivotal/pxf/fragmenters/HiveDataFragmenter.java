@@ -45,7 +45,29 @@ public class HiveDataFragmenter extends Fragmenter
 {	
 	private	JobConf jobConf;
 	HiveClient client;
-	private static Log Log = LogFactory.getLog(HiveDataFragmenter.class);
+	Log Log = LogFactory.getLog(HiveDataFragmenter.class);
+	
+	/* Encapsulates Metastore host and port*/
+	static class Metastore 
+	{
+		/* C'tor */
+		Metastore(String host, int port)
+		{
+			this.host = host;
+			this.port = port;
+		}
+		
+		/* C'tor */
+		Metastore(Metastore other)
+		{
+			this.host = other.host;
+			this.port = other.port;
+		}
+		
+		String host;
+		int port;
+	}
+	private Metastore metastore;
 	
 	public static final String HIVE_DEFAULT_DBNAME = "default";
 	public static final String HIVE_UD_DELIM = "!HUDD!";
@@ -55,8 +77,8 @@ public class HiveDataFragmenter extends Fragmenter
     
 	/* TODO: get rid of these */
 	public static final int HIVE_MAX_PARTS = 1000;
-	public static int METASTORE_DEFAULT_PORT = 9083; /* default metastore port */
-	public static String METASTORE_DEFAULT_HOST = "localhost";
+	static final int METASTORE_DEFAULT_PORT = 9083; /* default metastore port */
+	static final String METASTORE_DEFAULT_HOST = "localhost";
 	
 	/* internal class used for parsing the qualified table name received as input to GetFragments() */
 	class TblDesc
@@ -130,7 +152,7 @@ public class HiveDataFragmenter extends Fragmenter
 	private HiveClient InitHiveClient() throws TTransportException
 	{
 		loadHostAndPort();
-		TSocket transport = new TSocket(METASTORE_DEFAULT_HOST , METASTORE_DEFAULT_PORT);
+		TSocket transport = new TSocket(metastore.host , metastore.port);
 		TBinaryProtocol protocol = new TBinaryProtocol(transport);
 		HiveClient client = new org.apache.hadoop.hive.service.HiveClient(protocol);
 		transport.open();
@@ -146,7 +168,7 @@ public class HiveDataFragmenter extends Fragmenter
 	{
 		HiveConf hiveConf = new HiveConf();
 		/* example of hive.metastore.uris: thrift://localhost:9084*/
-		parseMetastoreUri(hiveConf.getVar(ConfVars.METASTOREURIS));
+		metastore = parseMetastoreUri(hiveConf.getVar(ConfVars.METASTOREURIS), Log);
 	}
 	
 	/*
@@ -154,32 +176,33 @@ public class HiveDataFragmenter extends Fragmenter
 	 * In case of corrupted or unset configuration we stay with the hardcoded 
 	 * METASTORE_DEFAULT_HOST and METASTORE_DEFAULT_PORT 	 
 	 */
-	static void parseMetastoreUri(String uri)
+	static Metastore parseMetastoreUri(String uri, Log log)
 	{
+		Metastore ms = new Metastore(METASTORE_DEFAULT_HOST, METASTORE_DEFAULT_PORT);
 		if (uri == null) /* non existent property hive.metastore.uris */
 		{
-			Log.warn("Property [hive.metastore.uris] is missing from hive-site.xml. will use " 
+			log.warn("Property [hive.metastore.uris] is missing from hive-site.xml. will use " 
 					 + "default values for metastore service host:port - localhost:9083");
-			return;
+			return ms;
 		}
 		
 		String[] arr = uri.split("\\/\\/");
 		if (arr == null || arr.length != 2) /* the value of  property hive.metastore.uris is corrupted */
 		{
-			Log.warn("Property [hive.metastore.uris] in hive-site.xml. is invalid. " 
+			log.warn("Property [hive.metastore.uris] in hive-site.xml. is invalid. " 
 					 + "host:port section is missing."
 					 + "Will use default values for metastore service host:port - localhost:9083");			
-			return;
+			return ms;
 		}
 		
 		String hostport = arr[1];
 		arr = hostport.split(":");
 		if (arr == null || arr.length != 2) /* the value of  property hive.metastore.uris is corrupted */
 		{
-			Log.warn("Property [hive.metastore.uris] in hive-site.xml. is invalid. " 
+			log.warn("Property [hive.metastore.uris] in hive-site.xml. is invalid. " 
 					 + "There is no [:] between host and port."
 					 + "Will use default values for metastore service host:port - localhost:9083");						
-			return;
+			return ms;
 		}
 		
 		String host = arr[0];
@@ -187,10 +210,9 @@ public class HiveDataFragmenter extends Fragmenter
 		int nport = (sport != null) ? Integer.parseInt(sport) : 0;
 		
 		if (host != null && nport != 0)
-		{
-			METASTORE_DEFAULT_HOST = host;
-			METASTORE_DEFAULT_PORT = nport;
-		}		
+			ms = new Metastore(host, nport);
+		
+		return ms;
 	}
 	
 	/*
