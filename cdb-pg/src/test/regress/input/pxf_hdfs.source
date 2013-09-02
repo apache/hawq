@@ -24,14 +24,12 @@
 -- m/.*Unable to load native-hadoop library for your platform.*/
 --
 -- end_matchignore
---------------------------------------------------------------------------------
--- GPHDFS
---------------------------------------------------------------------------------
+
 --
 -- syntax validations
 --
 CREATE READABLE EXTERNAL TABLE gphdfs_in(a int, b text, c bytea)
-LOCATION ('pxf://@hostname@:50070/somepath/gpdb_regression_data?someuseropt=someuserval')
+LOCATION ('pxf://@hostname@:50070/somepath/gpdb_regression_data?ACCESSOR=xacc&RESOLVER=xres&someuseropt=someuserval')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- positive
 
 CREATE READABLE EXTERNAL TABLE gphdfs_in1(a int, b text, c bytea)
@@ -41,6 +39,14 @@ FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- positive
 CREATE READABLE EXTERNAL TABLE gphdfs_in2(a int, b text, c bytea)
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/*')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- negative
+
+CREATE READABLE EXTERNAL TABLE gphdfs_in2(a int, b text, c bytea)
+LOCATION ('pxf://@hostname@:50070/somepath/gpdb_regression_data?RESOLVER=xres&someuseropt=someuserval')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- negative, missing accessor
+
+CREATE READABLE EXTERNAL TABLE gphdfs_in2(a int, b text, c bytea)
+LOCATION ('pxf://@hostname@:50070/somepath/gpdb_regression_data?ACCESSOR=xacc')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- negative, missing resolver
 
 DROP EXTERNAL TABLE gphdfs_in;
 DROP EXTERNAL TABLE gphdfs_in1;

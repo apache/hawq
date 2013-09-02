@@ -236,7 +236,7 @@ PxfStatsElem *get_pxf_statistics(char *uri, Relation rel, StringInfo err_msg)
 	/*
 	 * Get the statistics info from REST only if analyzer is defined
      */
-	if(GPHDUri_get_value_for_opt(hadoop_uri, "analyzer", &analyzer) != 0)
+	if(GPHDUri_get_value_for_opt(hadoop_uri, "analyzer", &analyzer, false) != 0)
 	{
 		if (err_msg)
 			appendStringInfo(err_msg, "no ANALYZER option in table definition");
@@ -359,21 +359,7 @@ static GPHDUri* init(char* uri, ClientContext* cl_context)
 	/*
 	 * 3. Test that the Fragmenter was specified in the URI
 	 */
-	if(!GPHDUri_get_value_for_opt(hadoop_uri, "fragmenter", &fragmenter))
-	{
-		if (!fragmenter)
-			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("No value assigned to the FRAGMENTER option in "
-							"the pxf uri: %s", hadoop_uri->uri)));
-	}
-	else
-	{
-		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("Missing FRAGMENTER option in the pxf uri: %s",
-						hadoop_uri->uri)));
-	}
+	GPHDUri_get_value_for_opt(hadoop_uri, "fragmenter", &fragmenter, true);
 
 	return hadoop_uri;	
 }

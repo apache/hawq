@@ -31,6 +31,7 @@ Datum
 pxfprotocol_validate_urls(PG_FUNCTION_ARGS)
 {
 	GPHDUri	*uri;
+	bool	is_writable = EXTPROTOCOL_VALIDATOR_GET_DIRECTION(fcinfo) == EXT_VALIDATE_WRITE;
 
 	/* Must be called via the external table format manager */
 	if (!CALLED_AS_EXTPROTOCOL_VALIDATOR(fcinfo))
@@ -47,7 +48,7 @@ pxfprotocol_validate_urls(PG_FUNCTION_ARGS)
 	/*
 	 * Condition 2: write not supported
 	 */
-	if (EXTPROTOCOL_VALIDATOR_GET_DIRECTION(fcinfo) == EXT_VALIDATE_WRITE)
+	if (is_writable)
             ereport(ERROR,
                     (errcode(ERRCODE_GP_FEATURE_NOT_YET),
                      errmsg("pxf does not yet support writable external tables")));
@@ -56,6 +57,18 @@ pxfprotocol_validate_urls(PG_FUNCTION_ARGS)
 	 * Condition 3: url formatting of extra options.
 	 */
 	uri = parseGPHDUri(EXTPROTOCOL_VALIDATOR_GET_NTH_URL(fcinfo, 1));
+
+	/*
+	 * Condition 4: existence of core options
+	 */
+	if (!is_writable)
+	{
+		char *accessor;
+		char *resolver;
+
+		GPHDUri_get_value_for_opt(uri, "accessor", &accessor, true /* validate */);
+		GPHDUri_get_value_for_opt(uri, "resolver", &resolver, true /* validate */);
+	}
 
 	/* Temp: Uncomment for printing a NOTICE with parsed parameters */
 	/* GPHDUri_debug_print(uri); */
