@@ -453,13 +453,8 @@ ProcessQuery(Portal portal,
 		}
 		
 		/* MPP-4082. Issue automatic ANALYZE if conditions are satisfied. */
-		/*
-		 * in hawq, temporary disable auto stats
-		 *
-		 * TODO: enable it
-		 */
-		/*bool inFunction = false;
-		auto_stats(cmdType, relationOid, queryDesc->es_processed, inFunction);*/
+		bool inFunction = false;
+		auto_stats(cmdType, relationOid, queryDesc->es_processed, inFunction);
 	}
 
 	FreeQueryDesc(queryDesc);
