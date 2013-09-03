@@ -1755,6 +1755,11 @@ UpdateCatalogModifiedOnSegments(QueryContextDispatchingSendBack sendback)
 			sendback->nextFastSequence, sendback->contentid, &tid);
 
 	heap_close(rel, AccessShareLock);
+
+	/*
+	 * make the change available
+	 */
+	CommandCounterIncrement();
 }
 
 StringInfo
