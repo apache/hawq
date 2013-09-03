@@ -63,9 +63,11 @@ pxfprotocol_validate_urls(PG_FUNCTION_ARGS)
 	 */
 	if (!is_writable)
 	{
+		char *fragmenter;
 		char *accessor;
 		char *resolver;
 
+		GPHDUri_get_value_for_opt(uri, "fragmenter", &fragmenter, true /* validate */);
 		GPHDUri_get_value_for_opt(uri, "accessor", &accessor, true /* validate */);
 		GPHDUri_get_value_for_opt(uri, "resolver", &resolver, true /* validate */);
 	}
