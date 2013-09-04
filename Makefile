@@ -1031,6 +1031,7 @@ SET_VERSION_SCRIPTS = \
 	bin/gpdbrestore \
 	bin/gpdeletesystem \
 	bin/gpexpand \
+	bin/gpextract \
 	bin/gpfilespace \
 	bin/gpinitstandby \
 	bin/gpinitsystem \
