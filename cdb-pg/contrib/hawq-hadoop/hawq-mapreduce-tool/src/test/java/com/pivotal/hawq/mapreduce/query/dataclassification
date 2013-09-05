@@ -1,0 +1,7 @@
+point, lseg, box, circle, interval
+float8, int8, time, timestamp
+int4, float4, date
+macaddr
+int2
+bool
+text, varchar(10), char(10), numeric, bytea, path, bit, varbit, int4[]

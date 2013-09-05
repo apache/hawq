@@ -15,7 +15,8 @@ WANTED_DIRS = \
 		extprotocol \
 		gp_distribution_policy \
 		gp_internal_tools \
-		gp_cancel_query
+		gp_cancel_query \
+		hawq-hadoop
 
 ifeq ($(with_openssl),yes)
 WANTED_DIRS += sslinfo

@@ -847,6 +847,7 @@ esac
 
 PGAC_PATH_BISON
 PGAC_PATH_FLEX
+PGAC_PATH_MAVEN
 
 PGAC_PATH_PERL
 if test "$with_perl" = yes; then

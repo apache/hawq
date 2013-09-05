@@ -110,6 +110,16 @@ gperftmpPATH:=$(GPERF_DIR)/bin:$(PATH)
 export PATH=$(gperftmpPATH)
 endif
 
+## ---------------------------------------
+## Maven support
+## ---------------------------------------
+
+ifneq "$(wildcard $(BLD_TOP)/ext/$(BLD_ARCH)/apache-maven/bin/mvn)" ""
+MAVEN_DIR = $(BLD_TOP)/ext/$(BLD_ARCH)/apache-maven
+maventmpPATH:=$(MAVEN_DIR)/bin:$(PATH)
+export PATH=$(maventmpPATH)
+endif
+	
 display_dependent_vers:
 	@echo ""
 	@echo "======================================================================"

@@ -27,3 +27,6 @@ bin/test_fsync
 docs/cli_help/gpsuspend_help
 lib/python/gppylib/programs/clsInjectFault.py
 sbin/gpsuspend.py
+lib/postgresql/hawq-mr-io/hawq-mapreduce-ao-tests.jar
+lib/postgresql/hawq-mr-io/hawq-mapreduce-common-tests.jar
+lib/postgresql/hawq-mr-io/hawq-mapreduce-tool-tests.jar

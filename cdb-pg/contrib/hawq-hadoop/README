@@ -1,0 +1,8 @@
+To generate the clover code coverage report:
+    mvn clean clover2:setup test clover2:aggregate clover2:clover
+
+
+To export metadata of one table to hdfs, run:
+    com.pivotal.hawq.mapreduce.ao.tool.WriteMetadataToHDFS <database_url> <table_name> <pathInHdfs> [<username>] [<password>]
+      For example: com.pivotal.hawq.mapreduce.ao.tool.WriteMetadataToHDFS localhost:5432/postgres lineitem hdfs://localhost:9000/metadata/postgres_lineitem
+                   com.pivotal.hawq.mapreduce.ao.tool.WriteMetadataToHDFS localhost:5432/ao_nocomp_1g orders hdfs://localhost:9000/metadata/ao_nocomp_1g_orders wangj77

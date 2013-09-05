@@ -25,7 +25,7 @@ class GpCheckError(Exception):
 
 class GpCheckInfo:
     def __init__(self):
-        self.is_root = (os.geteuid == 0)
+        self.is_root = (os.geteuid() == 0)
         self.host_type = HostType.GPCHECK_HOSTTYPE_UNDEFINED
         self.appliance_version = None
 

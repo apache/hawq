@@ -1,0 +1,31 @@
+int4  #  -2147483648  -32768  -128  0  128  32767  2147483647  null
+int4[]  #  '{1,2,3,4}'  '{{1,2},{3,4}}'  '{{{1,2},{3,4}},{{5,6},{7,8}}}'  null
+char(10)  #  '123456789a'  null
+serial  #  1  2147483647  null
+bool  #  'true'  'false'  null
+text  #  'hello world'  null
+timestamp  #  '4713-01-01 BC'  '2942-12-31 AD'  null
+int8  #  -9223372036854775808  -2147483648  -32768  -128  0  128  32767  2147483647  9223372036854775807  null
+date  #  "4713 BC"  "5874897 AD"  null
+varchar(10)  #  '123456789a'  'bbccddeeff'  'aaaa'  null
+numeric  #  6.54  0.0001  null
+float4  #  -12.3456  0  128  123456  999999  null  'Infinity'  '-Infinity'  'NaN'
+bytea  #  'hello world'  'aaaaaaaaaaaaaaaaaaa'  null
+timestamptz  #  '4713 BC'  '5874897 AD'  null
+timetz  #  "00:00:00+1459"  "24:00:00-1459"  null
+path  #  '(1,1)'  '(1,1),(2,3),(4,5)'  null
+interval  #  '-178000000 years'  '178000000 years'  null
+lseg  #  '[(0,0),(6,6)]'  '[(1,1),(2,2)]'  null
+point  #  POINT(1,2)  POINT(100,200)  POINT(1000,2000)  null
+float8  #  -123.456  -12.8765  0  128  1298765  999999  12345  'Infinity'  '-Infinity'  'NaN'  null
+circle  #  '<(1,2),3>'  '<(100,200),300>'  null
+char(10)  #  '123456789a'  'bbccddeeff'  'aaaa'  null
+date  #  '4713-01-01 BC'  '4277-12-31 AD'  null
+money  #  -21474836.48  0  21474836.47  null
+time  #  '00:00:00'  '23:59:59'  null
+int2  #  -32768  -128  0  128  32767  null
+bit  #  '1'  '0'  null
+varbit  #  '1111'  '000000000011100'  null
+bit(5)  #  '10010'  '00010'  null
+macaddr  #  'FF:89:71:45:AE:01'  null
+box  #  '((0,1),(2,3))'  '((100,200),(200,400))'  null
