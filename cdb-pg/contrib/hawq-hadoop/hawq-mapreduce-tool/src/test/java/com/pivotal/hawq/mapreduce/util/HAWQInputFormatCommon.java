@@ -55,6 +55,22 @@ public class HAWQInputFormatCommon extends Configured {
 		}
 	}
 
+	public static class HAWQMapper_Performance extends
+			Mapper<Void, HAWQRecord, Text, Text> {
+		public void map(Void key, HAWQRecord value, Context context)
+				throws IOException, InterruptedException {
+			try {
+				int columnCount = value.getSchema().getFieldCount();
+				for (int j = 1; j <= columnCount; j++) {
+					String str = value.getString(j);
+				}
+			} catch (HAWQException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+	}
+
 	public static class HAWQReducer extends Reducer<Text, Text, Text, Text> {
 		public void reduce(Text key, Iterable<Text> values, Context context)
 				throws IOException, InterruptedException {
@@ -134,8 +150,8 @@ public class HAWQInputFormatCommon extends Configured {
 		return res;
 	}
 
-        public void extractMetadata(String dbname, String tablename, String output_path)  throws Exception {
-               String cmd = String.format("gpextract -d %s -o %s %s", dbname, output_path, tablename);
+        public void extractMetadata(String dbname, String port, String tablename, String output_path)  throws Exception {
+               String cmd = String.format("gpextract -p %s -d %s -o %s %s", port, dbname, output_path, tablename);
                Process process = Runtime.getRuntime().exec(cmd);
                process.waitFor();
                System.out.println("statement execute success :gpextract completed !");

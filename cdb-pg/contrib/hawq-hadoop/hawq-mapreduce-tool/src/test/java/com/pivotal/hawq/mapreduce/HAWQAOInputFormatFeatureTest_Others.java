@@ -160,7 +160,7 @@ public class HAWQAOInputFormatFeatureTest_Others{
            String tablename = "emptytable"; 
            String metadata_path = queryRoot + "metadata_" + dbname + "_" + tablename;
            String sqlout = queryRoot + "emptytable.out";
-           inputFormat.extractMetadata(dbname, tablename, metadata_path);
+           inputFormat.extractMetadata(dbname, jdbc.getMasterPort(), tablename, metadata_path);
            inputFormat.fetchFromMetadata("emptytable", metadata_path, sqlout);
            if(!result.checkResult(queryRoot + "emptytable.ans", queryRoot + "emptytable.out", "sortcheck"))
                Assert.fail("TEST FAILURE: The answer file and out file is different: emptytable");

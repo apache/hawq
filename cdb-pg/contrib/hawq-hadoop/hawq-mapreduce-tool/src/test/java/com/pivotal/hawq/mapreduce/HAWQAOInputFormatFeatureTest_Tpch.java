@@ -74,7 +74,7 @@ public class HAWQAOInputFormatFeatureTest_Tpch{
            String dburl = jdbc.getMasterAddress()+":"+jdbc.getMasterPort()+"/" + dbname; 
            if (frommd == "true"){
                 String metadata_path = "src/test/java/com/pivotal/hawq/mapreduce/query/metadata_" + dbname + "_" + tablename;
-                inputformat.extractMetadata(dbname, tablename, metadata_path);
+                inputformat.extractMetadata(dbname, jdbc.getMasterPort(), tablename, metadata_path);
                 inputformat.fetchFromMetadata(casename, metadata_path, sqlout);
            }else
            { 
