@@ -3736,7 +3736,7 @@ static struct config_bool ConfigureNamesBool[] =
 		{"gp_force_use_default_temporary_directory", PGC_USERSET, UNGROUPED,
 		 gettext_noop("force all segments use default data directory for temporary files."),
 		 NULL,
-		 GUC_NOT_IN_SAMPLE
+		 GUC_NOT_IN_SAMPLE | GUC_GPDB_ADDOPT
 		},
 		&gp_force_use_default_temporary_directory,
 		false, NULL, NULL
@@ -5590,7 +5590,7 @@ static struct config_int ConfigureNamesInt[] =
 		{"gp_temporary_directory_mark_error", PGC_SUSET, DEVELOPER_OPTIONS,
 			gettext_noop("mark temporary directory ok(positive) or error(negative), 0(reallocate a temporary directory)."),
 			NULL,
-			GUC_SUPERUSER_ONLY | GUC_DISALLOW_IN_FILE
+			GUC_SUPERUSER_ONLY | GUC_DISALLOW_IN_FILE | GUC_GPDB_ADDOPT
 		},
 		&gp_temporary_directory_mark_error,
 		0, INT_MIN, INT_MAX, assign_gp_temporary_directory_mark_error, NULL
