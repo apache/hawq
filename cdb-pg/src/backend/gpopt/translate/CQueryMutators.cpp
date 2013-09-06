@@ -178,22 +178,33 @@ CQueryMutators::PnodeIncrementLevelsupMutator
 		return (Node *) pvar;
 	}
 
+	if (IsA(pnode, CommonTableExpr))
+	{
+		CommonTableExpr *pcte = (CommonTableExpr *) gpdb::PvCopyObject(pnode);
+		GPOS_ASSERT(IsA(pcte->ctequery, Query));
+
+		Query *pqueryCte = (Query *) pcte->ctequery;
+
+		pctxIncLvlMutator->m_ulCurrLevelsUp++;
+		pcte->ctequery = PnodeIncrementLevelsupMutator((Node *) pqueryCte, pctxIncLvlMutator);
+		pctxIncLvlMutator->m_ulCurrLevelsUp--;
+
+		gpdb::GPDBFree(pqueryCte);
+
+		return (Node *) pcte;
+	}
+
 	if (IsA(pnode, SubLink))
 	{
 		SubLink *psublink = (SubLink *) gpdb::PvCopyObject(pnode);
-		pctxIncLvlMutator->m_ulCurrLevelsUp++;
-
 		GPOS_ASSERT(IsA(psublink->subselect, Query));
 
-		psublink->subselect = gpdb::PnodeMutateQueryOrExpressionTree
-										(
-										psublink->subselect,
-										(Pfnode) CQueryMutators::PnodeIncrementLevelsupMutator,
-										pvCtx,
-										0 // mutate into cte-lists
-										);
+		Query *pquerySublink = (Query *) psublink->subselect;
 
+		pctxIncLvlMutator->m_ulCurrLevelsUp++;
+		psublink->subselect = PnodeIncrementLevelsupMutator( (Node *) pquerySublink, pctxIncLvlMutator);
 		pctxIncLvlMutator->m_ulCurrLevelsUp--;
+		gpdb::GPDBFree(pquerySublink);
 
 		return (Node *) psublink;
 	}
@@ -210,15 +221,34 @@ CQueryMutators::PnodeIncrementLevelsupMutator
 								(
 								(Query *) pnode,
 								(Pfnode) CQueryMutators::PnodeIncrementLevelsupMutator,
-								pvCtx,
-								0 // flag -- mutate into cte-lists
+								pctxIncLvlMutator,
+								1 // flag -- do not mutate range table entries
 								);
+
+		// fix the outer reference in derived table entries
+		List *plRtable = pquery->rtable;
+		ListCell *plc = NULL;
+		ForEach (plc, plRtable)
+		{
+			RangeTblEntry *prte = (RangeTblEntry *) lfirst(plc);
+
+			if (RTE_SUBQUERY == prte->rtekind)
+			{
+				Query *pquerySubquery = prte->subquery;
+				// since we did not walk inside derived tables
+				pctxIncLvlMutator->m_ulCurrLevelsUp++;
+				prte->subquery = (Query *) PnodeIncrementLevelsupMutator( (Node *) pquerySubquery, pctxIncLvlMutator);
+				pctxIncLvlMutator->m_ulCurrLevelsUp--;
+				gpdb::GPDBFree(pquerySubquery);
+			}
+		}
 
 		return (Node *) pquery;
 	}
 
 	return gpdb::PnodeMutateExpressionTree(pnode, (Pfnode) CQueryMutators::PnodeIncrementLevelsupMutator, pvCtx);
 }
+
 
 //---------------------------------------------------------------------------
 //	@function:
