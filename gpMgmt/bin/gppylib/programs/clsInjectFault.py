@@ -380,7 +380,8 @@ class GpInjectFaultProgram:
 			      "update_committed_eof_in_persistent_table (inject fault before committed EOF is updated in gp_persistent_relation_node for Append Only segment files), " \
 			      "fault_during_exec_dynamic_table_scan (inject fault during scanning of a partition), " \
                              "internal_flush_error (inject an error during internal_flush), " \
-			      "exec_simple_query_end_command (inject fault before EndCommand in exec_simple_query), " \
+                  "exec_simple_query_end_command (inject fault before EndCommand in exec_simple_query), " \
+                  "multi_exec_hash_large_vmem (allocate large vmem using palloc inside MultiExecHash to attempt to exceed vmem limit), " \
 			      "execsort_before_sorting (inject fault in nodeSort after receiving all tuples and before sorting), " \
 			      "execsort_mksort_mergeruns (inject fault in MKSort during the mergeruns phase), " \
 			      "all (affects all faults injected, used for 'status' and 'reset'), ") 

@@ -277,6 +277,8 @@ FaultInjectorIdentifierEnumToString[] = {
 		/* inject an error during internal_flush */
 	_("exec_simple_query_end_command"),
 		/* inject fault before EndCommand in exec_simple_query */
+	_("multi_exec_hash_large_vmem"),
+		/* large palloc inside MultiExecHash to attempt to exceed vmem limit */
 	_("execsort_before_sorting"),
 		/* inject fault in ExecSort before doing the actual sort */
 	_("execsort_mksort_mergeruns"),
@@ -671,7 +673,9 @@ FaultInjector_InjectFaultIfSet(
 					(errmsg("fault triggered, fault name:'%s' fault type:'%s' ",
 							FaultInjectorIdentifierEnumToString[entryLocal->faultInjectorIdentifier],
 							FaultInjectorTypeEnumToString[entryLocal->faultInjectorType])));	
-			
+
+			buffer = (char*) palloc(BLCKSZ);
+
 			while (buffer != NULL)
 			{
 				buffer = (char*) palloc(BLCKSZ);
@@ -989,6 +993,9 @@ FaultInjector_NewHashEntry(
 //		case SubtransactionRollback:
 		/* Ashwin */
 		case FileRepChangeTrackingCompacting:
+
+		/* We do not use vmem on master. Therefore, we only attempt large palloc on segments. */
+		case MultiExecHashLargeVmem:
 			
 			if (fileRepRole != FileRepPrimaryRole)
 			{

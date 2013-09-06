@@ -170,6 +170,7 @@ typedef enum FaultInjectorIdentifier_e {
 	DispatchThreadCreation,
 	InternalFlushError,
 	ExecSimpleQueryEndCommand,
+	MultiExecHashLargeVmem,
 
 /*	DispatchWait,*/
 	ConnectionFailAfterGangCreation,

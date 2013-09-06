@@ -36,6 +36,7 @@
 #include "utils/memutils.h"
 #include "utils/lsyscache.h"
 #include "utils/debugbreak.h"
+#include "utils/faultinjector.h"
 
 #include "cdb/cdbexplain.h"
 #include "cdb/cdbvars.h"
@@ -97,6 +98,14 @@ MultiExecHash(HashState *node)
 	 */
 	hashkeys = node->hashkeys;
 	econtext = node->ps.ps_ExprContext;
+
+#ifdef FAULT_INJECTOR
+    FaultInjector_InjectFaultIfSet(
+    		MultiExecHashLargeVmem,
+            DDLNotSpecified,
+            "",  // databaseName
+            ""); // tableName
+#endif
 
 	/*
 	 * get all inner tuples and insert into the hash table (or temp files)
