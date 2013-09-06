@@ -33,22 +33,22 @@ public class HAWQAOInputFormatFeatureTest_SingleType{
     public static void tearDown() {
     }
 
-    @Ignore
+    @Test
     public void testSingleTypeInt2(){
         doTest("int2", true);
     }
 
-    @Ignore
+    @Test
     public void testSingleTypeInt4(){
         doTest("int4", true);
     }
     
-    @Ignore
+    @Test
     public void testSingleTypeInt8(){
         doTest("int8", true);
     }
     
-    @Ignore
+    @Test
     public void testSingleTypeBool(){
         doTest("bool", true);
     }
@@ -63,7 +63,7 @@ public class HAWQAOInputFormatFeatureTest_SingleType{
         doTest("float8", true);
     }
 
-    @Ignore
+    @Test
     public void testSingleTypeNumeric(){
         doTest("numeric", true);
     }
@@ -73,72 +73,72 @@ public class HAWQAOInputFormatFeatureTest_SingleType{
         doTest("point", true);
     }
 
-    @Ignore
+    @Test
     public void testSingleTypeVarchar(){
         doTest("varchar(10)", true);
     }
 
-    @Ignore
+    @Test
     public void testSingleTypeChar(){
         doTest("char(10)", true);
     }
 
-    @Ignore
+    @Test
     public void testSingleTypeTime(){
         doTest("time", true);
     }
     
-    @Ignore
+    @Test
     public void testSingleTypeDate(){
         doTest("date", true);
     }
 
-    @Ignore
+    @Test
     public void testSingleTypeInterval(){
         doTest("interval", true);
     }
 
-    @Ignore
+    @Test
     public void testSingleTypeTimeStamp(){
         doTest("timestamp", true);
     }
  
-    @Ignore
+    @Test
     public void testSingleTypeBytea(){
         doTest("bytea", true);
     }
 
-    @Ignore
+    @Test
     public void testSingleTypeCircle(){
         doTest("circle", true);
     }
 
-    @Ignore
+    @Test
     public void testSingleTypePath(){
         doTest("path", true);
     }
     
-    @Ignore
+    @Test
     public void testSingleTypeArray(){
         doTest("int4[]", true);
     }
 
-    @Ignore
+    @Test
     public void testSingleTypeBit(){
         doTest("bit", true);
     }
 
-    @Ignore
+    @Test
     public void testSingleTypevarBit(){
         doTest("varbit", true);
     }
 
-    @Ignore
+    @Test
     public void testSingleTypebit5(){
         doTest("bit(5)", true);
     }
 
-    @Ignore
+    @Test
     public void testSingleTypeMacAddr(){
         doTest("macaddr", true);
     }
