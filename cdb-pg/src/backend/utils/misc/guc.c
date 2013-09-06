@@ -4182,7 +4182,17 @@ static struct config_int ConfigureNamesInt[] =
 		&max_statement_mem,
 		2048000, 32768, INT_MAX, NULL, NULL
 	},
-	
+
+	{
+		{"gp_vmem_limit_per_query", PGC_POSTMASTER, RESOURCES_MEM,
+		 	gettext_noop("Sets the maximum allowed memory per-statement on each segment."),
+		 	NULL,
+			GUC_UNIT_KB | GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_vmem_limit_per_query,
+		0, 0, INT_MAX / 2, NULL, NULL
+	},
+
 	{
 		{"gp_max_plan_size", PGC_SUSET, RESOURCES_MEM,
 		 	gettext_noop("Sets the maximum size of a plan to be dispatched."),

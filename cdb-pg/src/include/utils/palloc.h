@@ -141,9 +141,12 @@ extern void pgport_pfree(void *pointer);
 #endif
 
 /* Mem Protection */
+extern int max_chunks_per_query;
+
 extern void GPMemoryProtectInit(void);
 extern void GPMemoryProtectReset(void);
 extern int64 getMOPHighWaterMark(void);
+extern int getMOPChunksReserved(void);
 extern int MemProtSemas(void);
 
 #ifdef USE_SYSV_SEMAPHORES
