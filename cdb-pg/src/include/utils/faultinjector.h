@@ -165,6 +165,7 @@ typedef enum FaultInjectorIdentifier_e {
 
 	UpdateCommittedEofInPersistentTable,
 
+	FaultDuringExecDynamicTableScan,
 	GangThreadCreation,
 	DispatchThreadCreation,
 

@@ -255,6 +255,8 @@ FaultInjectorIdentifierEnumToString[] = {
 		/* inject fault to simulate transaction abort failure  */
 	_("update_committed_eof_in_persistent_table"),
 		/* inject fault before committed EOF is updated in gp_persistent_relation_node for Append Only segment files */
+	_("fault_during_exec_dynamic_table_scan"),
+		/* inject fault during scanning of a partition */
 	_("gang_thread_creation_failure"),
 		/* inject fault after gang thread creation*/
 	_("dispatch_thread_creation_failure"),
@@ -1038,6 +1040,7 @@ FaultInjector_NewHashEntry(
 		case Checkpoint:
 		case AbortTransactionFail:
 		case UpdateCommittedEofInPersistentTable:
+		case FaultDuringExecDynamicTableScan:
 			
 			if (fileRepRole != FileRepNoRoleConfigured && fileRepRole != FileRepPrimaryRole)
 			{

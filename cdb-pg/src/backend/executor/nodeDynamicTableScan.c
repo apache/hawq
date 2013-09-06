@@ -18,6 +18,7 @@
 #include "parser/parsetree.h"
 #include "nodes/makefuncs.h"
 #include "access/sysattr.h"
+#include "utils/faultinjector.h"
 
 #define DYNAMIC_TABLE_SCAN_NSLOTS 2
 
@@ -254,6 +255,14 @@ ExecDynamicTableScan(DynamicTableScanState *node)
 	{
 		slot = ExecTableScanRelation(scanState);
 		
+#ifdef FAULT_INJECTOR
+    FaultInjector_InjectFaultIfSet(
+    		FaultDuringExecDynamicTableScan,
+            DDLNotSpecified,
+            "",  // databaseName
+            ""); // tableName
+#endif
+
 		if (!TupIsNull(slot))
 		{
 			Gpmon_M_Incr_Rows_Out(GpmonPktFromDynamicTableScanState(node));
