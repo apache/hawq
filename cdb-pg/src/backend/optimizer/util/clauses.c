@@ -56,6 +56,7 @@ typedef struct
 	Node	   *case_val;
 	bool		transform_stable_funcs;
 	bool		recurse_queries; /* recurse into query structures */
+	bool		recurse_sublink_testexpr; /* recurse into sublink test expressions */
 	bool		transform_saop; /* transform scalar array ops */
 	Size         max_size; /* max constant binary size in bytes, 0: no restrictions */
 } eval_const_expressions_context;
@@ -1519,6 +1520,7 @@ Query *fold_constants(Query *q, ParamListInfo boundParams, Size max_size)
 	context.case_val = NULL;	/* no CASE being examined */
 	context.transform_stable_funcs = true;	/* safe transformations only */
 	context.recurse_queries = true; /* recurse into query structures */
+	context.recurse_sublink_testexpr = false; /* do not recurse into sublink test expressions */
 	context.transform_saop = false; /* do not transform scalar array ops */
 	context.max_size = max_size;
 	
@@ -1580,6 +1582,7 @@ eval_const_expressions(PlannerInfo *root, Node *node)
 	context.case_val = NULL;	/* no CASE being examined */
 	context.transform_stable_funcs = true;	/* safe transformations only */
 	context.recurse_queries = false; /* do not recurse into query structures */
+	context.recurse_sublink_testexpr = true;
 	context.transform_saop = true; 	/* transform scalar array ops */
 	context.max_size = 0;
 
@@ -1612,6 +1615,7 @@ estimate_expression_value(PlannerInfo *root, Node *node)
 	context.case_val = NULL;	/* no CASE being examined */
 	context.transform_stable_funcs = true;	/* unsafe transformations OK */
 	context.recurse_queries = false; /* do not recurse into query structures */
+	context.recurse_sublink_testexpr = true;
 	context.transform_saop = true; 	/* transform scalar array ops */
 	context.max_size = 0;
 
@@ -2416,6 +2420,20 @@ eval_const_expressions_mutator(Node *node,
 		newbtest->arg = (Expr *) arg;
 		newbtest->booltesttype = btest->booltesttype;
 		return (Node *) newbtest;
+	}
+	
+	/* prevent recursion into sublinks */
+	if (IsA(node, SubLink) && !context->recurse_sublink_testexpr)
+	{
+		SubLink    *sublink = (SubLink *) node;
+		SubLink    *newnode = copyObject(sublink);
+
+		/*
+		 * Also invoke the mutator on the sublink's Query node, so it
+		 * can recurse into the sub-query if it wants to.
+		 */
+		newnode->subselect = (Node *) query_tree_mutator((Query *) sublink->subselect, eval_const_expressions_mutator, (void*) context, 0);
+		return (Node *) newnode;
 	}
 
 	/* recurse into query structure if requested */
@@ -3648,6 +3666,7 @@ expression_tree_mutator(Node *node,
 				SubLink    *newnode;
 
 				FLATCOPY(newnode, sublink, SubLink);
+				
 				MUTATE(newnode->testexpr, sublink->testexpr, Node *);
 
 				/*

@@ -379,6 +379,7 @@ int 		ddboost_buf_size = 512*1024;
 #define DEBUG_DTM_ACTION_PRIMARY_DEFAULT true
 bool		Debug_dtm_action_primary = DEBUG_DTM_ACTION_PRIMARY_DEFAULT;
 
+bool 		gp_log_optimization_time = false;
 bool		log_parser_stats = false;
 bool		log_planner_stats = false;
 bool		log_executor_stats = false;
@@ -3641,6 +3642,16 @@ static struct config_bool ConfigureNamesBool[] =
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
 		&optimizer_cte_inlining,
+		false, NULL, NULL
+	},
+
+	{
+		{"gp_log_optimization_time", PGC_USERSET, LOGGING_WHAT,
+			gettext_noop("Writes time spent producing a plan to the server log"),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+ 		&gp_log_optimization_time,
 		false, NULL, NULL
 	},
 

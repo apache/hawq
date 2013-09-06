@@ -225,6 +225,7 @@ extern bool	Debug_print_server_processes;
 extern bool Debug_print_control_checkpoints;
 extern bool	Debug_dtm_action_primary;
 
+extern bool gp_log_optimization_time;
 extern bool log_parser_stats;
 extern bool log_planner_stats;
 extern bool log_executor_stats;

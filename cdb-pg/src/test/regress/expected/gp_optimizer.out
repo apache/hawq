@@ -5,7 +5,7 @@
 SELECT gp_opt_version();
                            gp_opt_version                           
 --------------------------------------------------------------------
- GPOPT version: 1.255, GPOS version: 1.90, Xerces version: 3.1.1-p1
+ GPOPT version: 1.262, GPOS version: 1.90, Xerces version: 3.1.1-p1
 (1 row)
 
 -- master only tables
@@ -8100,10 +8100,15 @@ select 1 from pg_class c group by c.oid limit 1;
         1
 (1 row)
 
--- CSQ on volatile function
+-- CSQs
 drop table if exists orca.tab1;
+drop table if exists orca.tab2;
+NOTICE:  table "tab2" does not exist, skipping
 create table orca.tab1 (i, j) as select i,i%2 from generate_series(1,10) i;
 NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column(s) named 'i' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+create table orca.tab2 (a, b) as select 1, 2;
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column(s) named 'a' as the Greenplum Database data distribution key for this table.
 HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
 select * from orca.tab1 where 0 < (select count(*) from generate_series(1,i)) order by 1;
  i  | j 
@@ -8120,8 +8125,44 @@ select * from orca.tab1 where 0 < (select count(*) from generate_series(1,i)) or
  10 | 0
 (10 rows)
 
+select * from orca.tab1 where i > (select b from orca.tab2);
+ i  | j 
+----+---
+  4 | 0
+  6 | 0
+  8 | 0
+ 10 | 0
+  3 | 1
+  5 | 1
+  7 | 1
+  9 | 1
+(8 rows)
+
+-- subqueries
+select NULL in (select 1);
+ ?column? 
+----------
+ 
+(1 row)
+
+select 1 in (select 1);
+ ?column? 
+----------
+ t
+(1 row)
+
+select 1 in (select 2);
+ ?column? 
+----------
+ f
+(1 row)
+
+select NULL in (select 1/0);
+ERROR:  division by zero
 -- clean up
 drop schema orca cascade;
+NOTICE:  drop cascades to table orca.tab2
+NOTICE:  drop cascades to table orca.tab1
 NOTICE:  drop cascades to table orca.twf2
 NOTICE:  drop cascades to table orca.twf1
 NOTICE:  drop cascades to table orca.uu

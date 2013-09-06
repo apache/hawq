@@ -265,6 +265,7 @@ planner(Query *parse, int cursorOptions,
 		ParamListInfo boundParams)
 {
 	PlannedStmt *result = NULL;
+	instr_time	starttime, endtime;
 
 	/**
 	 * If the new optimizer is enabled, try that first. If it does not return a plan,
@@ -272,12 +273,37 @@ planner(Query *parse, int cursorOptions,
 	 */
 	if (optimizer)
 	{
+		if (gp_log_optimization_time)
+		{
+			INSTR_TIME_SET_CURRENT(starttime);
+		}
+
 		result = optimize_query(parse, boundParams);
+
+		if (gp_log_optimization_time)
+		{
+			INSTR_TIME_SET_CURRENT(endtime);
+			INSTR_TIME_SUBTRACT(endtime, starttime);
+			elog(LOG, "Optimizer Time: %.3f ms", INSTR_TIME_GET_MILLISEC(endtime));
+		}
+
 	}
 
 	if (!result)
 	{
+		if (gp_log_optimization_time)
+		{
+			INSTR_TIME_SET_CURRENT(starttime);
+		}
+
 		result = standard_planner(parse, cursorOptions, boundParams);
+
+		if (gp_log_optimization_time)
+		{
+			INSTR_TIME_SET_CURRENT(endtime);
+			INSTR_TIME_SUBTRACT(endtime, starttime);
+			elog(LOG, "Planner Time: %.3f ms", INSTR_TIME_GET_MILLISEC(endtime));
+		}
 	}
 
 	return result;
