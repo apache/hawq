@@ -2336,6 +2336,24 @@ with cte1 as (select * from orca.foo) select count(*)+1 from cte1 a where a.x1 <
         1
 (1 row)
 
+with x as (select * from orca.foo) select count(*) from (select * from x) y where y.x1 <= (select count(*) from x);
+ count 
+-------
+    10
+(1 row)
+
+with x as (select * from orca.foo) select count(*)+1 from (select * from x) y where y.x1 <= (select count(*) from x);
+ ?column? 
+----------
+       11
+(1 row)
+
+with x as (select * from orca.foo) select count(*) from (select * from x) y where y.x1 < (with z as (select * from x) select count(*) from z);
+ count 
+-------
+     9
+(1 row)
+
 ----------------------------------------------------------------------
 set optimizer=off;
 drop table orca.r cascade;

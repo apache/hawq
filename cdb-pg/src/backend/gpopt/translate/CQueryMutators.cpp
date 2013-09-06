@@ -249,49 +249,71 @@ CQueryMutators::PnodeFixCTELevelsupMutator
 								(Query *) pnode,
 								(Pfnode) CQueryMutators::PnodeFixCTELevelsupMutator,
 								pvCtx,
-								0 // flag -- mutate into cte-lists
+								1 // flag -- do not mutate range table entries
 								);
 
-		// fix the levels up for CTE range table entry when needed
 		List *plRtable = pquery->rtable;
 		ListCell *plc = NULL;
 		ForEach (plc, plRtable)
 		{
 			RangeTblEntry *prte = (RangeTblEntry *) lfirst(plc);
-			// the walker in GPDB does not walk range table entries of type CTE
 			if (RTE_CTE == prte->rtekind  && FNeedsLevelsUpCorrection(pctxinclvlmutator, prte->ctelevelsup))
 			{
+				// fix the levels up for CTE range table entry when needed
+				// the walker in GPDB does not walk range table entries of type CTE
 				prte->ctelevelsup++;
+			}
+
+			if (RTE_SUBQUERY == prte->rtekind)
+			{
+				Query *pquerySubquery = prte->subquery;
+				// since we did not walk inside derived tables
+				pctxinclvlmutator->m_ulCurrLevelsUp++;
+				prte->subquery = (Query *) PnodeFixCTELevelsupMutator( (Node *) pquerySubquery, pctxinclvlmutator);
+				pctxinclvlmutator->m_ulCurrLevelsUp--;
+				gpdb::GPDBFree(pquerySubquery);
 			}
 		}
 
 		return (Node *) pquery;
 	}
 
-	if (IsA(pnode, RangeTblEntry))
+	if (IsA(pnode, CommonTableExpr))
 	{
-		RangeTblEntry *prte = (RangeTblEntry *) pnode;
-		if (RTE_SUBQUERY == prte->rtekind)
-		{
-			pctxinclvlmutator->m_ulCurrLevelsUp++;
-			prte->subquery = (Query *) CQueryMutators::PnodeFixCTELevelsupMutator( (Node *) prte->subquery, pctxinclvlmutator);
-			pctxinclvlmutator->m_ulCurrLevelsUp--;
-		}
+		CommonTableExpr *pcte = (CommonTableExpr *) gpdb::PvCopyObject(pnode);
+		GPOS_ASSERT(IsA(pcte->ctequery, Query));
+
+		Query *pqueryCte = (Query *) pcte->ctequery;
+		pcte->ctequery = NULL;
+
+		pctxinclvlmutator->m_ulCurrLevelsUp++;
+		pcte->ctequery = PnodeFixCTELevelsupMutator((Node *) pqueryCte, pctxinclvlmutator);
+		pctxinclvlmutator->m_ulCurrLevelsUp--;
+
+		gpdb::GPDBFree(pqueryCte);
+
+		return (Node *) pcte;
 	}
 
 	// recurse into a query attached to sublink
 	if (IsA(pnode, SubLink))
 	{
 		SubLink *psublink = (SubLink *) gpdb::PvCopyObject(pnode);
-		pctxinclvlmutator->m_ulCurrLevelsUp++;
 		GPOS_ASSERT(IsA(psublink->subselect, Query));
-		psublink->subselect = CQueryMutators::PnodeFixCTELevelsupMutator(psublink->subselect, pctxinclvlmutator);
+
+		Query *pquerySublink = (Query *) psublink->subselect;
+		psublink->subselect = NULL;
+
+		pctxinclvlmutator->m_ulCurrLevelsUp++;
+		psublink->subselect = PnodeFixCTELevelsupMutator((Node *) pquerySublink, pctxinclvlmutator);
 		pctxinclvlmutator->m_ulCurrLevelsUp--;
+
+		gpdb::GPDBFree(pquerySublink);
 
 		return (Node *) psublink;
 	}
 
-	return gpdb::PnodeMutateExpressionTree(pnode, (Pfnode) CQueryMutators::PnodeFixCTELevelsupMutator, pvCtx);
+	return gpdb::PnodeMutateExpressionTree(pnode, (Pfnode) CQueryMutators::PnodeFixCTELevelsupMutator, pctxinclvlmutator);
 }
 
 //---------------------------------------------------------------------------
@@ -310,7 +332,7 @@ CQueryMutators::FNeedsLevelsUpCorrection
 {
 	// when converting the query to derived table, all references to cte defined at the current level
 	// or above needs to be incremented
-	return (0 == pctxinclvlmutator->m_ulCurrLevelsUp) || (idxCtelevelsup > pctxinclvlmutator->m_ulCurrLevelsUp);
+	return idxCtelevelsup >= pctxinclvlmutator->m_ulCurrLevelsUp;
 }
 
 //---------------------------------------------------------------------------
