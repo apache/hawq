@@ -2354,25 +2354,6 @@ with x as (select * from orca.foo) select count(*) from (select * from x) y wher
      9
 (1 row)
 
--- outer references
-select count(*)+1 from orca.foo x where x.x1 > (select count(*)+1 from orca.bar1 y where y.x1 = x.x2);
- ?column? 
-----------
-        9
-(1 row)
-
-select count(*)+1 from orca.foo x where x.x1 > (select count(*) from orca.bar1 y where y.x1 = x.x2);
- ?column? 
-----------
-       10
-(1 row)
-
-select count(*) from orca.foo x where x.x1 > (select count(*)+1 from orca.bar1 y where y.x1 = x.x2);
- count 
--------
-     8
-(1 row)
-
 ----------------------------------------------------------------------
 set optimizer=off;
 drop table orca.r cascade;
