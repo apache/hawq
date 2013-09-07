@@ -21,6 +21,8 @@
 #include "parser/parsetree.h"
 #include "access/genam.h"
 #include "access/catquery.h"
+#include "nodes/nodeFuncs.h"
+#include "utils/memutils.h"
 
 /* Number of slots required for DynamicIndexScan */
 #define DYNAMICINDEXSCAN_NSLOTS 2
@@ -51,9 +53,25 @@ ExecInitDynamicIndexScan(DynamicIndexScan *node, EState *estate, int eflags)
 
 	DynamicIndexScanState *dynamicIndexScanState = makeNode(DynamicIndexScanState);
 
+	/*
+	 * This context will be reset per-partition to free up per-partition
+	 * copy of LogicalIndexInfo
+	 */
+	dynamicIndexScanState->partitionMemoryContext = AllocSetContextCreate(CurrentMemoryContext,
+									 "DynamicIndexScanPerPartition",
+									 ALLOCSET_DEFAULT_MINSIZE,
+									 ALLOCSET_DEFAULT_INITSIZE,
+									 ALLOCSET_DEFAULT_MAXSIZE);
+
 	IndexScanState *indexState = &(dynamicIndexScanState->indexScanState);
 
 	InitCommonIndexScanState((IndexScanState *)dynamicIndexScanState, (IndexScan *)node, estate, eflags);
+
+	/*
+	 * We are shallow copying, without any palloc. The idea is, we will deep copy
+	 * node->logicalIndexInfo later on from dynamicIndexScanState->logicalIndexInfo
+	 */
+	dynamicIndexScanState->logicalIndexInfo = node->logicalIndexInfo;
 
 	initGpmonPktForDynamicIndexScan((Plan *)node, &indexState->ss.ps.gpmon_pkt, estate);
 
@@ -84,6 +102,21 @@ initNextIndexToScan(DynamicIndexScanState *node)
 
 		Oid rootOid = rel_partition_get_root(*pid);
 
+		MemoryContextReset(node->partitionMemoryContext);
+		MemoryContext oldCxt = MemoryContextSwitchTo(node->partitionMemoryContext);
+		/*
+		 * Note, in ExecInitDynamicIndexScan we shallow-copied this pointer into
+		 * DynamicIndexScanState's logicalIndexInfo. So, on the very first partition,
+		 * we just overwrite the previous pointer with new allocation. Later for each
+		 * partition, we free the previous partition's allocation by
+		 * resetting our per-partition memory context. So, there should not
+		 * be any memory leak
+		 */
+		dynamicIndexScan->logicalIndexInfo = palloc0(sizeof(LogicalIndexInfo));
+		/* Restore the original logicalIndexInfo */
+		CopyLogicalIndexInfo(node->logicalIndexInfo, dynamicIndexScan->logicalIndexInfo);
+		MemoryContextSwitchTo(oldCxt);
+
 		Oid pindex = getPhysicalIndexRelid(dynamicIndexScan->logicalIndexInfo,
 					 rootOid,
 					 *pid);
@@ -99,6 +132,24 @@ initNextIndexToScan(DynamicIndexScanState *node)
 		}
 
 		ExecAssignScanType(&indexState->ss, RelationGetDescr(currentRelation));
+
+		ScanState *scanState = (ScanState *)node;
+
+		if ( NULL != scanState->ps.plan->targetlist )
+		{
+			/* Update targetlist to the current partition.
+			 * This is important for heterogeneous partitions (e.g. dropped attributes.)
+			 */
+			scanState->ps.plan->targetlist =
+				GetPartitionTargetlist(scanState->ss_currentRelation->rd_att,
+						scanState->ps.plan->targetlist);
+
+			/* Update attribute number in expression target list. */
+			UpdateGenericExprState(scanState->ps.plan->targetlist,
+					 scanState->ps.targetlist);
+		}
+
+		ExecAssignScanProjectionInfo(scanState);
 
 		EState *estate = indexState->ss.ps.state;
 
@@ -247,6 +298,8 @@ ExecEndDynamicIndexScan(DynamicIndexScanState *node)
 	}
 
 	EndPlanStateGpmonPkt(&indexState->ss.ps);
+
+	MemoryContextDelete(node->partitionMemoryContext);
 }
 
 /*

@@ -31,6 +31,7 @@
 #include "nodes/relation.h"
 #include "utils/datum.h"
 #include "cdb/cdbgang.h"
+#include "nodes/nodeFuncs.h"
 
 /*
  * Macros to simplify copying of different kinds of fields.  Use these
@@ -127,12 +128,12 @@ CopyPlanFields(Plan *from, Plan *newnode)
 }
 
 /*
- * CopyPlanFields
+ * CopyLogicalIndexInfo
  *
- *		This function copies the fields of the Plan node.  It is used by
- *		all the copy functions for classes which inherit from Plan.
+ *		This function copies the LogicalIndexInfo, which is part of
+ *		DynamicIndexScan node.
  */
-static void
+void
 CopyLogicalIndexInfo(const LogicalIndexInfo *from, LogicalIndexInfo *newnode)
 {
 	COPY_SCALAR_FIELD(logicalIndexOid);

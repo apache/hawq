@@ -1409,6 +1409,20 @@ typedef struct DynamicIndexScanState
 	 * a NULL hash table. */
 	bool shouldCallHashSeqTerm;
 
+	/*
+	 * The original logicalIndexInfo before we started mapping columns to physical
+	 * indexes per-partition. We use this as a template to restore the logicalIndexInfo
+	 * in the plan node once per-partition before calling getPhysicalIndexRelid(),
+	 * which is modifies plan's logicalIndexInfo in-place (MPP-21029)
+	 */
+	LogicalIndexInfo *logicalIndexInfo;
+
+	/*
+	 * We will create a new copy of logicalIndexInfo in this memory context for
+	 * each partition. This memory context will be reset per-partition to free
+	 * up previous partition's logicalIndexInfo memory
+	 */
+	MemoryContext partitionMemoryContext;
 } DynamicIndexScanState;
 
 

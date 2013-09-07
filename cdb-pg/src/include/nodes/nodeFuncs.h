@@ -15,11 +15,14 @@
 
 #include "nodes/primnodes.h"
 #include "nodes/parsenodes.h"
+#include "nodes/plannodes.h"
 
 extern int	exprLocation(Node *expr);
 
 extern bool single_node(Node *node);
 extern bool var_is_outer(Var *var);
 extern bool var_is_rel(Var *var);
+
+extern void CopyLogicalIndexInfo(const LogicalIndexInfo *from, LogicalIndexInfo *newnode);
 
 #endif   /* NODEFUNCS_H */
