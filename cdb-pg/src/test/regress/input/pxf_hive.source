@@ -169,7 +169,20 @@ format 'custom' (formatter='pxfwritable_import');
 select * from hv_part_dec order by dec1, t1;
 select * from hv_part_dec where dec1 = 10.2222222222222 order by t1;
 
--- 10. Clean after Hive
+-- 10.  Unknown Type - negative test
+\! ${HIVE_ROOT}/bin/hive -e "create table un_supported_tbl (s1 string,s2 string,n1 tinyint, n2 int)row format delimited fields terminated by ','" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "load data local inpath '@abs_srcdir@/data/pxf/hive_small_data.txt' into table un_supported_tbl" 2>/dev/null
+
+CREATE EXTERNAL TABLE hv_un_supported_tbl(
+t1    text,
+t2    text,  
+num1  integer, 
+num2  integer)
+LOCATION ('pxf://@hostname@:50070/un_supported_tbl?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
+format 'custom' (formatter='pxfwritable_import');
+select * from hv_un_supported_tbl;
+
+-- 11. Clean after Hive
 drop external table hv_view;
 drop external table hv_collections;
 drop external table hv_heterogen;
@@ -179,6 +192,7 @@ drop external table hv_seq;
 drop external table hv_txt;
 drop external table hawq_types;
 drop external table hv_part_dec;
+drop external table hv_un_supported_tbl;
 
 \! ${HIVE_ROOT}/bin/hive -e "drop view reg_txt_view" 2>/dev/null
 \! ${HIVE_ROOT}/bin/hive -e "drop table reg_collections" 2>/dev/null
@@ -189,3 +203,4 @@ drop external table hv_part_dec;
 \! ${HIVE_ROOT}/bin/hive -e "drop table reg_txt" 2>/dev/null
 \! ${HIVE_ROOT}/bin/hive -e "drop table hive_types" 2>/dev/null
 \! ${HIVE_ROOT}/bin/hive -e "drop table part_dec" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "drop table un_supported_tbl" 2>/dev/null
