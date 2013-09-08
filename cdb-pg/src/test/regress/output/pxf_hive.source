@@ -338,7 +338,7 @@ num2  integer)
 LOCATION ('pxf://@hostname@:50070/un_supported_tbl?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
 format 'custom' (formatter='pxfwritable_import');
 select * from hv_un_supported_tbl;
-ERROR:  remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v5/Bridge/. Reason:     Server Error   Caused by:  java.io.IOException: Unknown type: BYTE (SOMEFILE:SOMEFUNC)
+ERROR:  remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v5/Bridge/. Reason:     Server Error   Caused by:  java.io.IOException: tinyint conversion is not supported by HiveResolver (SOMEFILE:SOMEFUNC)
 DETAIL:  External table hv_un_supported_tbl
 -- 11. Clean after Hive
 drop external table hv_view;
