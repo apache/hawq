@@ -297,7 +297,7 @@ public class HiveResolver extends Resolver
 				break;
 			}
 			default: {
-				throw new RuntimeException("Unknown type: " + oi.getPrimitiveCategory().toString());
+				throw new RuntimeException(oi.getTypeName() + " conversion is not supported by " + getClass().getSimpleName());
 			}
 		}		
 	}
