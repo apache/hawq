@@ -1581,6 +1581,8 @@ create_orca_installer:
 .PHONY : unittest-check
 unittest-check:
 	$(MAKE) -C cdb-pg/src/backend unittest-check
+    # run unittests of the hawq-hadoop project
+	$(MAKE) -C cdb-pg/contrib/hawq-hadoop unittest-check
 
 
 
