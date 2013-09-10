@@ -542,6 +542,17 @@ recordIndexesOnLeafPart(PartitionIndexNode **pNodePtr,
 	LogicalIndexInfoHashEntry	*logicalIndexInfoHashEntry;
 	PartitionIndexNode		*pNode = *pNodePtr;
 	
+	Relation partRel = heap_open(partOid, AccessShareLock);
+
+	if (RELSTORAGE_HEAP != partRel->rd_rel->relstorage)
+	{
+		/* do not cosider indexes on AO and AOCO partitions */
+		/* TODO: antova - Sep 10, 2013; remove this limitation when MPP-19808 is resolved */
+		heap_close(partRel, AccessShareLock);
+		return;
+	}
+	heap_close(partRel, AccessShareLock);
+
 	pcqCtx = caql_beginscan(
 			caql_addrel(cqclr(&cqc), indexRel),
 			cql("SELECT * FROM pg_index "
@@ -559,19 +570,20 @@ recordIndexesOnLeafPart(PartitionIndexNode **pNodePtr,
 		 */
 		if (!attmap)
 		{
-			Relation rootRel = heap_open(rootOid, AccessShareLock);
 			Relation partRel = heap_open(partOid, AccessShareLock);
+			Relation rootRel = heap_open(rootOid, AccessShareLock);
 
 			TupleDesc rootTupDesc = rootRel->rd_att;
 			TupleDesc partTupDesc = partRel->rd_att;
 		
 			attmap = varattnos_map(partTupDesc, rootTupDesc);
-
+			
 			/* can we close here ? */
-			heap_close(rootRel, AccessShareLock);
 			heap_close(partRel, AccessShareLock);
+			heap_close(rootRel, AccessShareLock);
 		}
 
+		
 		/* populate index info structure */
 		ii = populateIndexInfo(pcqCtx, tuple, indForm);
 			
@@ -632,7 +644,7 @@ recordIndexesOnLeafPart(PartitionIndexNode **pNodePtr,
 		/* update the PartitionIndexNode -> index bitmap */
 		pNode->index = bms_add_member(pNode->index, partIndexHashEntry->logicalIndexId);
 	}
-
+	
 	caql_endscan(pcqCtx);
 }
 
