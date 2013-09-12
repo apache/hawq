@@ -57,8 +57,9 @@ typedef struct
 	bool		transform_stable_funcs;
 	bool		recurse_queries; /* recurse into query structures */
 	bool		recurse_sublink_testexpr; /* recurse into sublink test expressions */
+	bool		transform_functions_returning_composite_values; /* transform functions returning constants of composite values */
 	bool		transform_saop; /* transform scalar array ops */
-	Size         max_size; /* max constant binary size in bytes, 0: no restrictions */
+	Size        max_size; /* max constant binary size in bytes, 0: no restrictions */
 } eval_const_expressions_context;
 
 typedef struct
@@ -106,6 +107,7 @@ static Node *substitute_actual_parameters_mutator(Node *node,
 static void sql_inline_error_callback(void *arg);
 static bool contain_grouping_clause_walker(Node *node, void *context);
 
+extern bool		optimizer; /* Enable the optimizer */
 
 /*****************************************************************************
  *		OPERATOR clause functions
@@ -1522,6 +1524,12 @@ Query *fold_constants(Query *q, ParamListInfo boundParams, Size max_size)
 	context.recurse_queries = true; /* recurse into query structures */
 	context.recurse_sublink_testexpr = false; /* do not recurse into sublink test expressions */
 	context.transform_saop = false; /* do not transform scalar array ops */
+	context.transform_functions_returning_composite_values = true;
+	if (optimizer)
+	{
+		/* when optimizer is on then do not fold functions that return a constant of composite values */
+		context.transform_functions_returning_composite_values = false;
+	}
 	context.max_size = max_size;
 	
 	return (Query *) query_or_expression_tree_mutator
@@ -1585,6 +1593,7 @@ eval_const_expressions(PlannerInfo *root, Node *node)
 	context.recurse_sublink_testexpr = true;
 	context.transform_saop = true; 	/* transform scalar array ops */
 	context.max_size = 0;
+	context.transform_functions_returning_composite_values = true;
 
 	return eval_const_expressions_mutator(node, &context);
 }
@@ -1618,6 +1627,7 @@ estimate_expression_value(PlannerInfo *root, Node *node)
 	context.recurse_sublink_testexpr = true;
 	context.transform_saop = true; 	/* transform scalar array ops */
 	context.max_size = 0;
+	context.transform_functions_returning_composite_values = true;
 
 	return eval_const_expressions_mutator(node, &context);
 }
@@ -1676,9 +1686,15 @@ eval_const_expressions_mutator(Node *node,
 	if (IsA(node, FuncExpr))
 	{
 		FuncExpr   *expr = (FuncExpr *) node;
-		List	   *args;
-		Expr	   *simple;
-		FuncExpr   *newexpr;
+
+		if (!context->transform_functions_returning_composite_values && type_is_rowtype(expr->funcresulttype))
+		{
+			return copyObject(expr);
+		}
+
+		List	   *args = NIL;
+		Expr	   *simple = NULL;
+		FuncExpr   *newexpr = NULL;
 
 		/*
 		 * Reduce constants in the FuncExpr's arguments.  We know args is
