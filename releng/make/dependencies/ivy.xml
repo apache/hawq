@@ -16,7 +16,7 @@
     <dependencies>
       <dependency org="Apache"          name="maven"           rev="3.0.5"          conf="osx105_x86->osx105_x86;osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
       <dependency org="gnu"             name="libstdc"         rev="6.0.13"         conf="osx105_x86->osx105_x86;osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
-      <dependency org="emc"             name="optimizer"       rev="1.266"          conf="osx106_x86->osx106_x86_32;osx106_x86_32->osx106_x86_32;rhel5_x86_64->rhel5_x86_64;sol10_x86_64->sol10_x86_64;suse10_x86_64->suse10_x86_64" />
+      <dependency org="emc"             name="optimizer"       rev="1.268"          conf="osx106_x86->osx106_x86_32;osx106_x86_32->osx106_x86_32;rhel5_x86_64->rhel5_x86_64;sol10_x86_64->sol10_x86_64;suse10_x86_64->suse10_x86_64" />
       <dependency org="emc"             name="libgpos"         rev="1.90"           conf="osx106_x86->osx106_x86_32;osx106_x86_32->osx106_x86_32;rhel5_x86_64->rhel5_x86_64;sol10_x86_64->sol10_x86_64;suse10_x86_64->suse10_x86_64" />
       <dependency org="xerces"          name="xerces-c"        rev="3.1.1-p1"       conf="osx106_x86->osx106_x86_32;osx106_x86_32->osx106_x86_32;rhel5_x86_64->rhel5_x86_64;sol10_x86_64->sol10_x86_64;suse10_x86_64->suse10_x86_64" />
       <dependency org="Boost.org"       name="boost"           rev="1.49.0"         conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
