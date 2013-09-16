@@ -2729,23 +2729,6 @@ ExecutePlan(EState *estate,
 		}
 	}
 
-	/* Error out for unsupported updates */
-	if (operation == CMD_UPDATE)
-	{
-		Assert(estate->es_result_relation_info->ri_RelationDesc);
-		Relation rel = estate->es_result_relation_info->ri_RelationDesc;
-		bool rel_is_aocols = RelationIsAoCols(rel);
-		bool rel_is_aorows = RelationIsAoRows(rel);
-		
-		if ((rel_is_aocols || rel_is_aorows))
-		{
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							errmsg("Append-only tables are not updatable. Operation not permitted."),
-							errOmitLocation(true)));
-		}
-	}
-
 	/*
 	 * Make sure slice dependencies are met
 	 */
