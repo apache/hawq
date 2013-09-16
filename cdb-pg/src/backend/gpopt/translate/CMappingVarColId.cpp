@@ -93,7 +93,11 @@ CMappingVarColId::Pgpdbattoptcol
 	CGPDBAttInfo *pgpdbattinfo = New(m_pmp) CGPDBAttInfo(ulAbsQueryLevel, ulVarNo, pvar->varattno);
 	CGPDBAttOptCol *pgpdbattoptcol = m_pmvcmap->PtLookup(pgpdbattinfo);
 	
-	GPOS_ASSERT(NULL != pgpdbattoptcol);
+	if (NULL == pgpdbattoptcol)
+	{
+		// TODO: raghav, Sept 09 2013, remove temporary fix (revert exception to assert) to avoid crash during algebrization
+		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLError, GPOS_WSZ_LIT("Variable"));
+	}
 
 	pgpdbattinfo->Release();
 	return pgpdbattoptcol;
