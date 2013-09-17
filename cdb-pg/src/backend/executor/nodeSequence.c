@@ -18,6 +18,8 @@
 #include "executor/executor.h"
 #include "miscadmin.h"
 
+#define SEQUENCE_NSLOTS 1
+
 SequenceState *
 ExecInitSequence(Sequence *node, EState *estate, int eflags)
 {
@@ -56,13 +58,14 @@ ExecInitSequence(Sequence *node, EState *estate, int eflags)
 	sequenceState->ps.ps_ProjInfo = NULL;
 
 	/*
-	 * Sequence does not need a result tuple slot. However, we need to set it to the
-	 * last child's result tuple slot, since its parent node might rely on this to
-	 * be set.
+	 * tuple table initialization
+	 *
+	 * MPP-20528: Even though we don't actually use the result slot to
+	 * return tuples, we need it to have the correct tuple descriptor
+	 * for this node.
 	 */
-	PlanState *lastChildPlan =
-		sequenceState->subplans[sequenceState->numSubplans - 1];
-	sequenceState->ps.ps_ResultTupleSlot = lastChildPlan->ps_ResultTupleSlot;
+	ExecInitResultTupleSlot(estate, &sequenceState->ps);
+	ExecAssignResultTypeFromTL(&sequenceState->ps);
 
 	initGpmonPktForSequence((Plan *)node, &sequenceState->ps.gpmon_pkt, estate);
 
@@ -81,7 +84,7 @@ ExecCountSlotsSequence(Sequence *node)
 		numSlots += ExecCountSlotsNode((Plan *)lfirst(lc));
 	}
 
-	return numSlots;
+	return numSlots + SEQUENCE_NSLOTS;
 }
 
 /*
@@ -128,6 +131,11 @@ ExecSequence(SequenceState *node)
 		CheckSendPlanStateGpmonPkt(&node->ps);
 	}
 
+	/*
+	 * Return the tuple as returned by the subplan as-is. We do
+	 * NOT make use of the result slot that was set up in
+	 * ExecInitSequence, because there's no reason to.
+	 */
 	return result;
 }
 
