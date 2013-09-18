@@ -317,6 +317,7 @@ select a, c from orca.r, orca.s where a = (select c) order by a, c limit 10;
 select a, c from orca.r, orca.s where a  not in  (select c) order by a, c limit 10;
 select a, c from orca.r, orca.s where a  = any  (select c from orca.r) order by a, c limit 10;
 select a, c from orca.r, orca.s where a  <> all (select c) order by a, c limit 10;
+select a, (select (select (select c from orca.s where a=c group by c))) as subq from orca.r order by a;
 ----------------------------------------------------------------------
 set optimizer=off;
 
