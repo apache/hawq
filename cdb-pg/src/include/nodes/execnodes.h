@@ -1714,6 +1714,32 @@ typedef struct DynamicTableScanState
 	 */
 	bool shouldCallHashSeqTerm;
 
+	/*
+	 * The first partition requires initialization of expression states,
+	 * such as qual and targetlist, regardless of whether we need to re-map varattno
+	 */
+	bool firstPartition;
+	/*
+	 * lastRelOid is the last relation that corresponds to the
+	 * varattno mapping of qual and target list. Each time we open a new partition, we will
+	 * compare the last relation with current relation by using varattnos_map()
+	 * and then convert the varattno to the new varattno
+	 */
+	Oid lastRelOid;
+
+	/*
+	 * scanrelid is the RTE index for this scan node. It will be used to select
+	 * varno whose varattno will be remapped, if necessary
+	 */
+	Index scanrelid;
+
+	/*
+	 * This memory context will be reset per-partition to free
+	 * up previous partition's memory
+	 */
+	MemoryContext partitionMemoryContext;
+
+
 } DynamicTableScanState;
 
 /* ----------------------------------------------------------------

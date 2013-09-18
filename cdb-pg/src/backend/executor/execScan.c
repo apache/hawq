@@ -320,18 +320,23 @@ InitScanStateInternal(ScanState *scanState, Plan *plan, EState *estate, int efla
 
 	/* Create expression evaluation context */
 	ExecAssignExprContext(estate, planState);
-
-	/* Initialize child expressions */
-	planState->targetlist = (List *)ExecInitExpr((Expr *)plan->targetlist, planState);
-	planState->qual = (List *)ExecInitExpr((Expr *)plan->qual, planState);
 	
 	/* Initialize tuple table slot */
 	ExecInitResultTupleSlot(estate, planState);
 	ExecInitScanTupleSlot(estate, scanState);
 	
-	/* For dynamic table scan, do not open the parent partition relation. */
+	/*
+	 * For dynamic table scan, We do not initialize expression states; instead
+	 * we wait until the first partition, and initialize the expression state
+	 * at that time. Also, for dynamic table scan, we do not need to open the
+	 * parent partition relation.
+	 */
 	if (!IsA(plan, DynamicTableScan))
 	{
+		/* Initialize child expressions */
+		planState->targetlist = (List *)ExecInitExpr((Expr *)plan->targetlist, planState);
+		planState->qual = (List *)ExecInitExpr((Expr *)plan->qual, planState);
+
 		Relation currentRelation = ExecOpenScanRelation(estate, ((Scan *)plan)->scanrelid);
 		scanState->ss_currentRelation = currentRelation;
 		ExecAssignScanType(scanState, RelationGetDescr(currentRelation));

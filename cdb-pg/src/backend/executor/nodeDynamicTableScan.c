@@ -16,6 +16,9 @@
 #include "utils/hsearch.h"
 #include "parser/parsetree.h"
 #include "utils/faultinjector.h"
+#include "commands/tablecmds.h"
+#include "nodes/pg_list.h"
+#include "utils/memutils.h"
 
 #define DYNAMIC_TABLE_SCAN_NSLOTS 2
 
@@ -30,6 +33,27 @@ ExecInitDynamicTableScan(DynamicTableScan *node, EState *estate, int eflags)
 	DynamicTableScanState *state = makeNode(DynamicTableScanState);
 	
 	InitScanStateInternal((ScanState *)state, (Plan *)node, estate, eflags);
+
+	Oid reloid = getrelid(node->scan.scanrelid, estate->es_range_table);
+
+	Assert(OidIsValid(reloid));
+
+	state->firstPartition = true;
+
+	/* lastRelOid is used to remap varattno for heterogeneous partitions */
+	state->lastRelOid = reloid;
+
+	state->scanrelid = node->scan.scanrelid;
+
+	/*
+	 * This context will be reset per-partition to free up per-partition
+	 * qual and targetlist allocations
+	 */
+	state->partitionMemoryContext = AllocSetContextCreate(CurrentMemoryContext,
+									 "DynamicTableScanPerPartition",
+									 ALLOCSET_DEFAULT_MINSIZE,
+									 ALLOCSET_DEFAULT_INITSIZE,
+									 ALLOCSET_DEFAULT_MAXSIZE);
 
 	initGpmonPktForDynamicTableScan((Plan *)node, &state->tableScanState.ss.ps.gpmon_pkt, estate);
 
@@ -60,8 +84,6 @@ initNextTableToScan(DynamicTableScanState *node)
 			return false;
 		}
 		
-		scanState->ss_currentRelation = OpenScanRelationByOid(*pid);
-
 		/*
 		 * Inside ExecInitScanTupleSlot() we set the tuple table slot's oid
 		 * to range table entry's relid, which for partitioned table always set
@@ -76,20 +98,48 @@ initNextTableToScan(DynamicTableScanState *node)
 			scanState->ss_ScanTupleSlot[i].tts_tableOid = *pid;
 		}
 
-		ExecAssignScanType(scanState, RelationGetDescr(scanState->ss_currentRelation));
+		scanState->ss_currentRelation = OpenScanRelationByOid(*pid);
+		Relation lastScannedRel = OpenScanRelationByOid(node->lastRelOid);
+		TupleDesc lastTupDesc = RelationGetDescr(lastScannedRel);
+		CloseScanRelation(lastScannedRel);
 
-		if ( NULL != scanState->ps.plan->targetlist )
+		TupleDesc partTupDesc = RelationGetDescr(scanState->ss_currentRelation);
+
+		ExecAssignScanType(scanState, partTupDesc);
+
+		AttrNumber	*attMap = NULL;
+
+		attMap = varattnos_map(lastTupDesc, partTupDesc);
+
+		/* If attribute remapping is not necessary, then do not change the varattno */
+		if (attMap)
 		{
-			/* Update targetlist to the current partition.
-			 * This is important for heterogeneous partitions (e.g. dropped attributes.)
-			 */
-			scanState->ps.plan->targetlist =
-				GetPartitionTargetlist(scanState->ss_currentRelation->rd_att, 
-						scanState->ps.plan->targetlist);
+			change_varattnos_of_a_varno((Node*)scanState->ps.plan->qual, attMap, node->scanrelid);
+			change_varattnos_of_a_varno((Node*)scanState->ps.plan->targetlist, attMap, node->scanrelid);
 
-			/* Update attribute number in expression target list. */
-			UpdateGenericExprState(scanState->ps.plan->targetlist,
-					 scanState->ps.targetlist);
+			/*
+			 * Now that the varattno mapping has been changed, change the relation that
+			 * the new varnos correspond to
+			 */
+			node->lastRelOid = *pid;
+		}
+
+		/*
+		 * For the very first partition, the targetlist of planstate is set to null. So, we must
+		 * initialize quals and targetlist, regardless of remapping requirements. For later
+		 * partitions, we only initialize quals and targetlist if a column re-mapping is necessary.
+		 */
+		if (attMap || node->firstPartition)
+		{
+			node->firstPartition = false;
+			MemoryContextReset(node->partitionMemoryContext);
+			MemoryContext oldCxt = MemoryContextSwitchTo(node->partitionMemoryContext);
+
+			/* Initialize child expressions */
+			scanState->ps.qual = (List *)ExecInitExpr((Expr *)scanState->ps.plan->qual, (PlanState*)scanState);
+			scanState->ps.targetlist = (List *)ExecInitExpr((Expr *)scanState->ps.plan->targetlist, (PlanState*)scanState);
+
+			MemoryContextSwitchTo(oldCxt);
 		}
 
 		ExecAssignScanProjectionInfo(scanState);

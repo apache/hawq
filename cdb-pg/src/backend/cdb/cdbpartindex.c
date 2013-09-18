@@ -418,8 +418,10 @@ constructIndexHashKey(Oid partOid,
 	/* map the attrnos in the indKey to root part */
 	for (int i = 0; i < ii->ii_NumIndexAttrs; i++)
 	{
-		if (ii->ii_KeyAttrNumbers[i] != 0)
+		if (attMap && ii->ii_KeyAttrNumbers[i] != 0)
+		{
 			ii->ii_KeyAttrNumbers[i] = attMap[(ii->ii_KeyAttrNumbers[i]) - 1];
+		}
 		appendStringInfo(&buf, "%d", ii->ii_KeyAttrNumbers[i]);
 	}	
 
@@ -1459,17 +1461,20 @@ LogicalIndexInfo *logicalIndexInfoForIndexOid(Oid rootOid, Oid indexOid)
 	plogicalIndexInfo->indExprs = copyObject(pindexInfo->ii_Expressions);
 	plogicalIndexInfo->indPred = copyObject(pindexInfo->ii_Predicate);
 	
-	// remap expression fields
+	/* remap expression fields */
 	/* map the attrnos if necessary */
-	for (int i = 0; i < plogicalIndexInfo->nColumns; i++)
+	if (attMap)
 	{
-		if (plogicalIndexInfo->indexKeys[i] != 0)
+		for (int i = 0; i < plogicalIndexInfo->nColumns; i++)
 		{
-			plogicalIndexInfo->indexKeys[i] = attMap[(plogicalIndexInfo->indexKeys[i]) - 1];
+			if (plogicalIndexInfo->indexKeys[i] != 0)
+			{
+				plogicalIndexInfo->indexKeys[i] = attMap[(plogicalIndexInfo->indexKeys[i]) - 1];
+			}
 		}
+		change_varattnos_of_a_node((Node *) plogicalIndexInfo->indExprs, attMap);
+		change_varattnos_of_a_node((Node *) plogicalIndexInfo->indPred, attMap);
 	}
-	change_varattnos_of_a_node((Node *) plogicalIndexInfo->indExprs, attMap);
-	change_varattnos_of_a_node((Node *) plogicalIndexInfo->indPred, attMap);
 	
 	return plogicalIndexInfo;
 }
