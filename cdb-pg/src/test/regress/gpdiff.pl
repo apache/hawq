@@ -31,6 +31,7 @@ on the standard options.  The following options are specific to gpdiff:
     -man                  full documentation
     -version              print gpdiff version and underlying diff version
     -gpd_ignore_headers   ignore header lines in query output
+    -gpd_ignore_plans     ignore explain plan content in input files
     -gpd_init <file>      load initialization file
 
 =head1 OPTIONS
@@ -58,6 +59,12 @@ pluses beneath, followed by the row output.  The psql utility performs
 some formatting to adjust the column widths to match the size of the
 row output.  Setting this parameter causes gpdiff to ignore any
 differences in the column naming and format widths globally.
+
+=item B<-gpd_ignore_plans> 
+
+Specify this option to ignore any explain plan diffs between the
+input files. This will completely ignore any plan content in 
+the input files thus masking differences in plans between the input files.
 
 =item B<-gpd_init> <file>
 
@@ -113,6 +120,7 @@ our $ATMSORT;
 our $ATMDIFF = "diff";
 
 my $glob_ignore_headers;
+my $glob_ignore_plans;
 my $glob_init_file = [];
 
 # assume atmsort.pl in same directory
@@ -361,11 +369,16 @@ if (1)
 			}
 			
     		# ENGINF-180: ignore header formatting
-			# allow gpd or gp_ignore for poor spellers
-			if ($arg =~ 
-				m/^\-(\-)*(gpd\_ignore\_headers|gpd\_ign.*|gp\_ign.*)$/i)
+                        if ($arg =~ 
+				m/^\-(\-)*(gpd\_ignore\_headers)$/i)
 			{
 				$glob_ignore_headers = 1;
+				next;
+			}
+                        if ($arg =~ 
+				m/^\-(\-)*(gpd\_ignore\_plans)$/i)
+			{
+				$glob_ignore_plans = 1;
 				next;
 			}
 			if ($arg =~ 
@@ -506,6 +519,13 @@ if (1)
 	{
 		$ATMSORT .= " --ignore_headers ";
 	}
+
+        # Tell atmsort to ignore plan content if -gpd_ignore_plans is set
+        if ($glob_ignore_plans)
+        {
+            $ATMSORT .= " --ignore_plans ";
+        }
+
 	# ENGINF-200: allow multiple init files
 	if (defined($glob_init_file) && scalar(@{$glob_init_file}))
 	{
@@ -518,6 +538,7 @@ if (1)
 
 		$ATMSORT .= " --init=". join(" --init=", @{$glob_init_file}) . " ";
 	}
+
 
     exit(filefunc($f1, $f2));
 }

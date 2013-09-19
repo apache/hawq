@@ -25,6 +25,7 @@ Options:
     -help            brief help message
     -man             full documentation
     -ignore_headers  ignore header lines in query output
+    -ignore_plans    ignore explain plan content in query output
     -init <file>     load initialization file
     -do_equiv        construct or compare equivalent query regions
 
@@ -49,6 +50,41 @@ pluses beneath, followed by the row output.  The psql utility performs
 some formatting to adjust the column widths to match the size of the
 row output.  Setting this parameter causes gpdiff to ignore any
 differences in the column naming and format widths globally.
+
+=item B<-ignore_plans> 
+
+Specify this option to ignore any explain plan diffs between the
+input files. This will completely ignore any plan content in 
+the input files thus masking differences in plans between the input files.
+
+For example, for the following plan: 
+explain select i from foo where i > 10;
+                                 QUERY PLAN
+-----------------------------------------------------------------------------
+ Gather Motion 2:1  (slice1; segments: 2)  (cost=0.00..2.72 rows=45 width=4)
+   ->  Table Scan on foo  (cost=0.00..1.55 rows=45 width=4)
+         Filter: i > 10
+ Settings:  optimizer=on
+(4 rows)
+
+atmsort.pl -ignore_plans will reduce this to: 
+
+explain select i from foo where i > 10;
+QUERY PLAN
+___________
+GP_IGNORE:{
+GP_IGNORE:  'child' => [
+GP_IGNORE:    {
+GP_IGNORE:      'id' => 2,
+GP_IGNORE:      'parent' => 1,
+GP_IGNORE:      'short' => 'Table Scan on foo'
+GP_IGNORE:    }
+GP_IGNORE:  ],
+GP_IGNORE:  'id' => 1,
+GP_IGNORE:  'short' => 'Gather Motion'
+GP_IGNORE:}
+GP_IGNORE:(4 rows)
+
 
 =item B<-init> <file>
 
@@ -334,6 +370,7 @@ my $dpref = '';
 my $glob_compare_equiv;
 my $glob_make_equiv_expected;
 my $glob_ignore_headers;
+my $glob_ignore_plans;
 my $glob_ignore_whitespace;
 my $glob_init;
 
@@ -349,6 +386,7 @@ BEGIN
     $glob_compare_equiv       = 0;
     $glob_make_equiv_expected = 0;
     $glob_ignore_headers      = 0;
+    $glob_ignore_plans        = 0;
     $glob_ignore_whitespace   = 0;
     $glob_init                = [];
 
@@ -364,6 +402,7 @@ BEGIN {
     my $make_equiv_expected = 0;
     my $do_equiv;
     my $ignore_headers;
+    my $ignore_plans;
     my @init_file;
     my $verbose;
     my $orderwarn;
@@ -371,6 +410,7 @@ BEGIN {
     GetOptions(
                'help|?' => \$help, man => \$man, 
                'gpd_ignore_headers|gp_ignore_headers|ignore_headers' => \$ignore_headers,
+               'gpd_ignore_plans|gp_ignore_plans|ignore_plans' => \$ignore_plans,
                'gpd_init|gp_init|init:s' => \@init_file,
                'do_equiv:s' => \$do_equiv,
 		        'order_warn|orderwarn' => \$orderwarn,
@@ -408,6 +448,7 @@ BEGIN {
     $glob_compare_equiv       = $compare_equiv;
     $glob_make_equiv_expected = $make_equiv_expected;
     $glob_ignore_headers      = $ignore_headers;
+    $glob_ignore_plans        = $ignore_plans;
 
     $glob_ignore_whitespace   = $ignore_headers; # XXX XXX: for now
 
@@ -831,9 +872,11 @@ sub format_explain
 	my $psuffix = "";
 
     $directive = {} unless (defined($directive));
-
+    
+    # Ignore plan content if its between start_ignore and end_ignore blocks
+    # or if -ignore_plans is specified.
     $prefix = "GP_IGNORE:"
-        if (exists($directive->{ignore}));
+         if (exists($directive->{ignore})) || ($glob_ignore_plans);
 
     {
         use IO::File;
@@ -869,7 +912,9 @@ sub format_explain
 
 		my $plantxt = "explain.pl -opt $xopt -prune heavily < $tmpnam $psuffix";
 
+                
 		my $xplan = `$plantxt`;
+
 
         unlink $tmpnam;
 
@@ -1577,8 +1622,17 @@ EOF_formatfix
             if ($ini =~ m/^\s*\(\d+\s+row(s)*\)\s*$/)
             {
 
+
                 format_query_output($glob_fqo,
 									$has_order, \@outarr, $directive);
+          
+      
+                # Always ignore the rowcount for explain plan out as the skeleton plans might be the 
+                # same even if the row counts differ because of session level GUCs. 
+                if (exists($directive->{explain}))
+                {
+                    $ini = "GP_IGNORE:" . $ini;
+                }
 
                 $directive = {};
                 @outarr = ();
