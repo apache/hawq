@@ -161,6 +161,66 @@ WorkfileQueryspace_Reserve(int64 bytes_to_reserve)
 }
 
 /*
+ * Reserve 'num_chunks_to_reserve' number of chunks for current QE from the per-query memory quota
+ *   This should be called every time we reserve vmem. Note: vmem is per-segment, but this is per-query.
+ *
+ *   If enough per-query memory is available, increments the per-query counter and returns true
+ *   Otherwise, returns false.
+ */
+bool
+PerQueryMemory_ReserveChunks(int32 num_chunks_to_reserve)
+{
+	bool success = false;
+
+	if (NULL == queryEntry || max_chunks_per_query == 0)
+	{
+		/*
+		 * Utility queries may not have queryEntry. Alternatively, if
+		 * max_chunks_per_query is 0 then no enforcement. Note,
+		 * max_chunks_per_query is derived from gp_vmem_limit_per_query
+		 * inside memprot.c. Also note, for QD we will derive
+		 * max_chunks_per_query from gp_vmem_limit_per_query, but
+		 * we will not enforce, as in QD we do not use vmem protect system
+		 * and instead call malloc directly.
+		 */
+		return true;
+	}
+
+	int32 total = gp_atomic_add_32(&queryEntry->chunksReserved, num_chunks_to_reserve);
+	Assert(total >= (int32) 0);
+
+	success = (total <= max_chunks_per_query);
+
+	if (!success)
+	{
+		/* Revert the reserved space */
+		gp_atomic_add_32(&queryEntry->chunksReserved, - num_chunks_to_reserve);
+	}
+
+	return success;
+}
+
+/*
+ * Reports the number of chunks that the current query has reserved across all the QEs
+ * 	in the current segment.
+ */
+int32
+PerQueryMemory_TotalChunksReserved()
+{
+	if (NULL == queryEntry || max_chunks_per_query == 0)
+	{
+		/*
+		 * Did not find entry for this query, it could be an utility query
+		 * and max_chunks_per_query is set to 0. Alternatively, we might have run out of
+		 * hash table slot. No enforcing of per-query memory limit for these cases.
+		 */
+		return 0;
+	}
+
+	return gp_atomic_add_32(&queryEntry->chunksReserved, 0);
+}
+
+/*
  * Notify of how many bytes were actually written to disk
  *
  * This should be called after writing to disk, with the actual number
@@ -204,7 +264,12 @@ WorkfileQueryspace_InitEntry(int session_id, int command_count)
 {
 	Assert(querySpaceNestingLevel >= 0);
 
-	if (gp_workfile_limit_per_query == 0)
+	/*
+	 * Note, we assume that if we are in a segment (for master, we don't
+	 * enforce any vmem limit) we already executed GPMemoryProtectInit(),
+	 * where max_chunks_per_query is derived from gp_vmem_limit_per_query.
+	 */
+	if (gp_workfile_limit_per_query == 0 && max_chunks_per_query == 0)
 	{
 		/* Per-query limit not enforced, don't allocate hashtable entry */
 		return NULL;
@@ -230,6 +295,38 @@ WorkfileQueryspace_InitEntry(int session_id, int command_count)
 
 	Assert(NULL == queryEntry);
 	queryEntry = SyncHTInsert(queryspace_Hashtable, &queryKey, &existing);
+
+	/*
+	 * If HT runs out of entry, we may have a NULL here, in which case
+	 * we cannot enforce any quota
+	 */
+	if (queryEntry != NULL)
+	{
+		/*
+		 * We are accounting for all the allocations that we have reserved before
+		 * we initialized our per-statement hash entry. Problem is: between
+		 * setting queryEntry and updating prior allocations, we might have
+		 * some allocations that are counted twice.
+		 * Hopefully this amount will be very small, as the time between this
+		 * assignment and queryEntry assignment is very small. We are loosing
+		 * precision for performance. We also DO NOT use PerQueryMemory_ReserveChunks()
+		 * to update chunksReserved, as that method automatically rolls back
+		 * reservation if the quota is exceeded. Instead we want to go over
+		 * the quota, if we have already exceeded it, and handle the error on
+		 * next allocation request. Note, due to QE being recycled, getMOPChunksReserved()
+		 * may return a higher than our limit. Although, the guc gp_vmem_limit_per_query
+		 * is system level, if the prior query hits a limit, and ERRORs out, we
+		 * end up extending our quota by 1 additional MB for error handling. So,
+		 * if such QE is reused, we might have mop limit set to higher than our per-query
+		 * limit. We therefore only want to enforce this limit if we try to
+		 * actually *allocate* beyond our limit.
+		 */
+		gp_atomic_add_32(&queryEntry->chunksReserved, getMOPChunksReserved());
+	}
+	else
+	{
+		elog(LOG, "Could not enforce per-query vmem limit: No resource left for storing per-query vmem details.");
+	}
 
 	if (!existing)
 	{
@@ -298,5 +395,6 @@ initQueryspaceElt(void *entry)
 {
 	QueryspaceDesc *hashElt = (QueryspaceDesc *) entry;
 	hashElt->queryDiskspace = 0L;
+	hashElt->chunksReserved = 0;
 	hashElt->pinCount = 0;
 }

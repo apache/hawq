@@ -154,6 +154,8 @@ typedef struct QueryspaceDesc
 	/* Total disk space used for workfiles for this query */
 	int64 queryDiskspace;
 
+	/* Number of memory chunks reserved for per-query QEs in this segment */
+	int chunksReserved;
 } QueryspaceDesc;
 
 /* Workfile Set operations */
@@ -199,6 +201,8 @@ void WorkfileQueryspace_Init(void);
 Size WorkfileQueryspace_ShMemSize(void);
 int64 WorkfileQueryspace_GetSize(int session_id, int command_count);
 bool WorkfileQueryspace_Reserve(int64 bytes_to_reserve);
+bool PerQueryMemory_ReserveChunks(int32 mb_to_reserve);
+int32 PerQueryMemory_TotalChunksReserved(void);
 void WorkfileQueryspace_Commit(int64 commit_bytes, int64 reserved_bytes);
 QueryspaceDesc *WorkfileQueryspace_InitEntry(int session_id, int command_count);
 void WorkfileQueryspace_ReleaseEntry(void);

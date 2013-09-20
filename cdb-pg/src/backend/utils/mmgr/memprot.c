@@ -384,8 +384,8 @@ void GPMemoryProtectInit()
  *
  * FIX ERROR HANDLER!
  */
-#define MOP_FAIL_REACHED_LIMIT 				1
-#define MOP_FAIL_SYSTEM        				2
+#define MOP_FAIL_REACHED_LIMIT 1
+#define MOP_FAIL_SYSTEM        2
 /* Reached per-query memory limit */
 #define MOP_FAIL_REACHED_QUERY_LIMIT		3
 
