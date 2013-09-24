@@ -1211,7 +1211,7 @@ ProcessUtility(Node *parsetree,
 				switch (stmt->kind)
 				{
 					case OBJECT_AGGREGATE:
-						if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) || (Gp_role == GP_ROLE_DISPATCH))) {
+						if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
 							ereport(ERROR,
 								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create aggregate statement yet") ));
 						}
@@ -1221,7 +1221,7 @@ ProcessUtility(Node *parsetree,
 																stmt->newOid, stmt->ordered);
 						break;
 					case OBJECT_OPERATOR:
-						if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) || (Gp_role == GP_ROLE_DISPATCH))) {
+						if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
 							ereport(ERROR,
 								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create operator statement yet") ));
 						}
@@ -1229,7 +1229,7 @@ ProcessUtility(Node *parsetree,
 						DefineOperator(stmt->defnames, stmt->definition, stmt->newOid);
 						break;
 					case OBJECT_TYPE:
-						if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) || (Gp_role == GP_ROLE_DISPATCH))) {
+						if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
 							ereport(ERROR,
 								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create type statement yet") ));
 						}
@@ -1237,7 +1237,7 @@ ProcessUtility(Node *parsetree,
 						DefineType(stmt->defnames, stmt->definition, stmt->newOid, stmt->shadowOid);
 						break;
 					case OBJECT_EXTPROTOCOL:
-						if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) || (Gp_role == GP_ROLE_DISPATCH))) {
+						if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
 							ereport(ERROR,
 								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create protocol statement yet") ));
 						}
@@ -1258,7 +1258,7 @@ ProcessUtility(Node *parsetree,
 
 		case T_CompositeTypeStmt:		/* CREATE TYPE (composite) */
 			{
-				if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) || (Gp_role == GP_ROLE_DISPATCH))) {
+				if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
 				    ereport(ERROR,
                         (errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create type yet") ));
                 }

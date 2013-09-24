@@ -35,6 +35,7 @@ ERROR:  Cannot support create domain statement yet
 alter domain alter1.posint set schema alter2;
 ERROR:  Cannot support alter domain schema statement yet
 create type alter1.ctype as (f1 int, f2 text);
+ERROR:  Cannot support create type yet
 alter type alter1.ctype set schema alter2;
 ERROR:  Cannot support alter type schema statement yet
 drop schema alter1 cascade;
