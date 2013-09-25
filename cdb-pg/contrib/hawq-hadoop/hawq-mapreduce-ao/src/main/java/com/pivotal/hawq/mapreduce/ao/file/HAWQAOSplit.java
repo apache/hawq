@@ -8,6 +8,11 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 
+/**
+ * A section of an input file. Returned by
+ * HAWQAOInputFormat.getSplits(JobContext) and passed to
+ * HAWQAOInputFormat.createRecordReader(InputSplit,TaskAttemptContext).
+ */
 public class HAWQAOSplit extends FileSplit
 {
 	private boolean checksum;

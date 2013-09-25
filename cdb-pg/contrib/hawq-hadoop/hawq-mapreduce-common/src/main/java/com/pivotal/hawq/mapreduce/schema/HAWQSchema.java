@@ -8,15 +8,25 @@ import java.util.List;
 import java.util.StringTokenizer;
 
 /**
- * User: gaod1
- * Date: 8/26/13
+ * This class represents HAWQ's schema. A HAWQ schema contains one or more fields,
+ * field can be primitive field or group field.
  */
 public class HAWQSchema extends HAWQGroupField {
 
+	/**
+	 * Constructor for HAWQSchema.
+	 * @param name name of the schema
+	 * @param fields fields of the schema
+	 */
 	public HAWQSchema(String name, HAWQField... fields) {
 		this(name, Arrays.asList(fields));
 	}
 
+	/**
+	 * Constructor for HAWQSchema.
+	 * @param name name of the schema
+	 * @param fields fields of the schema
+	 */
 	public HAWQSchema(String name, List<HAWQField> fields) {
 		super(false, false, name, null, fields);
 	}
@@ -29,8 +39,8 @@ public class HAWQSchema extends HAWQGroupField {
 	}
 
 	/***
-	 * Build HAWQSchema from schema string, inverse procedure of toString.
-	 * @param schemaString
+	 * Build HAWQSchema from schema string, which is an inverse procedure of toString.
+	 * @param schemaString string representation of HAWQSchema
 	 * @return schema constructed from string
 	 */
 	public static HAWQSchema fromString(String schemaString) {
@@ -212,34 +222,86 @@ public class HAWQSchema extends HAWQGroupField {
 	// Factory methods to create HAWQField
 	//-------------------------------------------------------------------------
 
+	/**
+	 * Construct a required non-array primitive field.
+	 * @param type type of the field
+	 * @param name name of the field
+	 * @return constructed field object
+	 */
 	public static HAWQField required_field(PrimitiveType type, String name) {
 		return new HAWQPrimitiveField(false, name, type, false);
 	}
 
+	/**
+	 * Construct a optional non-array primitive field.
+	 * @param type type of the field
+	 * @param name name of the field
+	 * @return constructed field object
+	 */
 	public static HAWQField optional_field(PrimitiveType type, String name) {
 		return new HAWQPrimitiveField(true, name, type, false);
 	}
 
+	/**
+	 * Construct a required primitive array field.
+	 * @param type type of the field
+	 * @param name name of the field
+	 * @return constructed field object
+	 */
 	public static HAWQField required_field_array(PrimitiveType type, String name) {
 		return new HAWQPrimitiveField(false, name, type, true);
 	}
 
+	/**
+	 * Construct a optional primitive array field.
+	 * @param type type of the field
+	 * @param name name of the field
+	 * @return constructed field object
+	 */
 	public static HAWQField optional_field_array(PrimitiveType type, String name) {
 		return new HAWQPrimitiveField(true, name, type, true);
 	}
 
+	/**
+	 * Construct a required non-array group field.
+	 * @param name name of the group
+	 * @param dataTypeName date type name of the group
+	 * @param fields fields of the group
+	 * @return constructed group field
+	 */
 	public static HAWQField required_group(String name, String dataTypeName, HAWQField... fields) {
 		return new HAWQGroupField(false, false, name, dataTypeName, fields);
 	}
 
+	/**
+	 * Construct a optional non-array group field.
+	 * @param name name of the group
+	 * @param dataTypeName date type name of the group
+	 * @param fields fields of the group
+	 * @return constructed group field
+	 */
 	public static HAWQField optional_group(String name, String dataTypeName, HAWQField... fields) {
 		return new HAWQGroupField(true, false, name, dataTypeName, fields);
 	}
 
+	/**
+	 * Construct a required group array field.
+	 * @param name name of the group
+	 * @param dataTypeName date type name of the group
+	 * @param fields fields of the group
+	 * @return constructed group field
+	 */
 	public static HAWQField required_group_array(String name, String dataTypeName, HAWQField... fields) {
 		return new HAWQGroupField(false, true, name, dataTypeName, fields);
 	}
 
+	/**
+	 * Construct a optional group array field.
+	 * @param name name of the group
+	 * @param dataTypeName date type name of the group
+	 * @param fields fields of the group
+	 * @return constructed group field
+	 */
 	public static HAWQField optional_group_array(String name, String dataTypeName, HAWQField... fields) {
 		return new HAWQGroupField(true, true, name, dataTypeName, fields);
 	}

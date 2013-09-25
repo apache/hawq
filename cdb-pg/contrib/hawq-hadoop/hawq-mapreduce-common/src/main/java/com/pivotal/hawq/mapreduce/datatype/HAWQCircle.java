@@ -2,6 +2,9 @@ package com.pivotal.hawq.mapreduce.datatype;
 
 import com.pivotal.hawq.mapreduce.HAWQException;
 
+/**
+ * Store value of circle in database
+ */
 public class HAWQCircle
 {
 	private HAWQPoint center;

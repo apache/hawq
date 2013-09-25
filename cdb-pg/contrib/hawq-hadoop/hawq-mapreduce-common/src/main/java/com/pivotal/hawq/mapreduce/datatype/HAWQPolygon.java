@@ -5,6 +5,9 @@ import java.util.List;
 
 import com.pivotal.hawq.mapreduce.HAWQException;
 
+/**
+ * Store value of polygon in database
+ */
 public class HAWQPolygon
 {
 	private HAWQBox boundbox;

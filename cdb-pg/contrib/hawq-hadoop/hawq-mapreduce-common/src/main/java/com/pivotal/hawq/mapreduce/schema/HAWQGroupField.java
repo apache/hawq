@@ -6,8 +6,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * User: gaod1
- * Date: 8/26/13
+ * Represent a group field in HAWQ's schema. A group field contains one or more sub fields.
+ * Note that with the group, sub field's index starts with 1 rather than 0.
  */
 public class HAWQGroupField extends HAWQField {
 
@@ -16,12 +16,50 @@ public class HAWQGroupField extends HAWQField {
 
 	private Map<String, Integer> indexByName;
 
-	protected HAWQGroupField(boolean isOptional, boolean isArray, String name,
+	/**
+	 * Constructor of HAWQGroupField.
+	 *
+	 * <p>Instead of using this constructor, we recommend you to use
+	 * factory methods defined in HAWQSchema:</p>
+	 *
+	 * <ul>
+	 *     <li>HAWQSchema.required_group(...)</li>
+	 *     <li>HAWQSchema.optional_group(...)</li>
+	 *     <li>HAWQSchema.required_group_array(...)</li>
+	 *     <li>HAWQSchema.optional_group_array(...)</li>
+	 * </ul>
+	 *
+	 * @param isOptional whether the field is optional or not
+	 * @param isArray whether the field is an array or not
+	 * @param name name of the field
+	 * @param dataTypeName name of the UDT type in HAWQ this group maps to. This is optional.
+	 * @param fields fields of the group field
+	 */
+	public HAWQGroupField(boolean isOptional, boolean isArray, String name,
 							 String dataTypeName, HAWQField... fields) {
 		this(isOptional, isArray, name, dataTypeName, Arrays.asList(fields));
 	}
 
-	protected HAWQGroupField(boolean isOptional, boolean isArray, String name,
+	/**
+	 * Constructor of HAWQGroupField.
+	 *
+	 * <p>Instead of using this constructor, we recommend you to use
+	 * factory methods defined in HAWQSchema:</p>
+	 *
+	 * <ul>
+	 *     <li>HAWQSchema.required_group(...)</li>
+	 *     <li>HAWQSchema.optional_group(...)</li>
+	 *     <li>HAWQSchema.required_group_array(...)</li>
+	 *     <li>HAWQSchema.optional_group_array(...)</li>
+	 * </ul>
+	 *
+	 * @param isOptional whether the field is optional or not
+	 * @param isArray whether the field is an array or not
+	 * @param name name of the field
+	 * @param dataTypeName name of the UDT type in HAWQ this group maps to. This is optional.
+	 * @param fields fields of the group field
+	 */
+	public HAWQGroupField(boolean isOptional, boolean isArray, String name,
 							 String dataTypeName, List<HAWQField> fields) {
 		super(isOptional, name, isArray);
 		// use empty string internally as missing value of data type name
@@ -36,29 +74,60 @@ public class HAWQGroupField extends HAWQField {
 		}
 	}
 
+	/**
+	 * Get number of fields this group contains.
+	 * @return fields' number
+	 */
 	public int getFieldCount() {
 		return fields.size();
 	}
 
 	/**
-	 * Get index of the field with given name.
-	 * NOTE: field index starts with 1 instead of 0.
+	 * Get index of a field by field index.
+	 * NOTE: field index starts with 1 rather than 0.
 	 *
-	 * @param fieldName
+	 * @param fieldName field's name
 	 * @return index of field
 	 */
 	public int getFieldIndex(String fieldName) {
+		/*
+		 * GPSQL-1031
+		 * 
+		 * When field is not existed in this schema, throw a readable exception for user
+		 */
+		if (!indexByName.containsKey(fieldName))
+			throw new IllegalArgumentException("Field '" + fieldName + "' not found");
 		return indexByName.get(fieldName) + 1;
 	}
 
+	/**
+	 * Get field by its index in the group.
+	 * NOTE: field index starts with 1 rather than 0.
+	 *
+	 * @param fieldIndex field's index in the group
+	 * @return field having the given index
+	 */
 	public HAWQField getField(int fieldIndex) {
 		return fields.get(fieldIndex - 1);
 	}
 
+	/**
+	 * Get field by field name.
+	 * @param fieldName field's name
+	 * @return field having the given name.
+	 */
 	public HAWQField getField(String fieldName) {
 		return getField(getFieldIndex(fieldName));
 	}
 
+	/**
+	 * Get field's type name in lowercase by field's index in the group. Group field's
+	 * type name is "group".
+	 * NOTE: field index starts with 1 rather than 0.
+	 *
+	 * @param fieldIndex field's index in the group
+	 * @return field's type name in lowercase
+	 */
 	public String getFieldType(int fieldIndex) {
 		HAWQField field = getField(fieldIndex);
 		if (field.isPrimitive())
@@ -66,6 +135,12 @@ public class HAWQGroupField extends HAWQField {
 		return "group";
 	}
 
+	/**
+	 * Get field's type name in lowercase by field's name. Group field's
+	 * type name is "group".
+	 * @param fieldName field's name
+	 * @return field's type name in lowercase
+	 */
 	public String getFieldType(String fieldName) {
 		return getFieldType(getFieldIndex(fieldName));
 	}
@@ -86,10 +161,18 @@ public class HAWQGroupField extends HAWQField {
 		return false;
 	}
 
+	/**
+	 * Get all fields of the group.
+	 * @return fields of the group
+	 */
 	public List<HAWQField> getFields() {
 		return fields;
 	}
 
+	/**
+	 * Get data type name of this group field.
+	 * @return data type name of the field
+	 */
 	public String getDataTypeName() {
 		return dataTypeName;
 	}

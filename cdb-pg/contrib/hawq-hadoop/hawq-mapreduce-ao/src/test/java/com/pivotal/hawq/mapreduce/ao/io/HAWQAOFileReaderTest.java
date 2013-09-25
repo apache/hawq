@@ -3,6 +3,8 @@ package com.pivotal.hawq.mapreduce.ao.io;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 
+import com.pivotal.hawq.mapreduce.HAWQException;
+import com.pivotal.hawq.mapreduce.ao.db.Database;
 import com.pivotal.hawq.mapreduce.ao.db.Metadata;
 import com.pivotal.hawq.mapreduce.ao.file.HAWQAOFileStatus;
 import com.pivotal.hawq.mapreduce.ao.file.HAWQAOSplit;
@@ -37,6 +39,8 @@ public class HAWQAOFileReaderTest
 		String whetherToLogStr = args[2];
 
 		Metadata metadata = new Metadata(db_url, null, "", table_name);
+		if (metadata.getTableType() != Database.TableType.AO_TABLE)
+			throw new HAWQException("Only ao is supported");
 		HAWQFileStatus[] fileAttributes = metadata.getFileStatus();
 
 		BufferedWriter bw = null;
@@ -82,10 +86,12 @@ public class HAWQAOFileReaderTest
 
 			String tableEncoding = metadata.getTableEncoding();
 			HAWQSchema schema = metadata.getSchema();
+			String version = metadata.getVersion();
 
 			HAWQAOFileReader reader = new HAWQAOFileReader(conf, aosplit);
 
-			HAWQAORecord record = new HAWQAORecord(schema, tableEncoding);
+			HAWQAORecord record = new HAWQAORecord(schema, tableEncoding,
+					version);
 
 			long begin = System.currentTimeMillis();
 			while (reader.readRecord(record))

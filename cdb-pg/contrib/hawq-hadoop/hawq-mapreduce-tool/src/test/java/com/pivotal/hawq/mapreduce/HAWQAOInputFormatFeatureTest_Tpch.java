@@ -23,6 +23,7 @@ public class HAWQAOInputFormatFeatureTest_Tpch{
 
     @Before
     public void setUp() {
+        System.out.println("Executing test suite: Tpch");
         prepareData = new HAWQInputFormatPrepareData();
         jdbc = new HAWQJDBCCommon();
         result = new HAWQInputFormatResult();
@@ -67,6 +68,7 @@ public class HAWQAOInputFormatFeatureTest_Tpch{
                casename += "_metadata";
            }
 
+	   System.out.println("Executing test case: " + casename);
            String sqlans = "src/test/java/com/pivotal/hawq/mapreduce/query/tpch_" + casename + ".ans";
            String sqlout = "src/test/java/com/pivotal/hawq/mapreduce/query/tpch_" + casename + ".out";
            jdbc.generateAnsFile(tablename, sqlans);
@@ -84,6 +86,7 @@ public class HAWQAOInputFormatFeatureTest_Tpch{
 
            if(!result.checkResult(sqlans, sqlout, "sortcheck"))
                Assert.fail("TEST FAILURE: The answer file and out file is different: " + casename);
+	   System.out.println("Successfully finish test case: " + casename);
 
         }catch(Exception e){
             e.printStackTrace();

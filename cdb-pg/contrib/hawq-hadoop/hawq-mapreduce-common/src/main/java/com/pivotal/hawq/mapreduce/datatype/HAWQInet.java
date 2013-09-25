@@ -2,6 +2,9 @@ package com.pivotal.hawq.mapreduce.datatype;
 
 import com.pivotal.hawq.mapreduce.HAWQException;
 
+/**
+ * Store value of inet in database
+ */
 public class HAWQInet
 {
 	public static enum InetType

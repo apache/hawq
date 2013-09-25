@@ -2,6 +2,9 @@ package com.pivotal.hawq.mapreduce.datatype;
 
 import com.pivotal.hawq.mapreduce.HAWQException;
 
+/**
+ * Store value of varbit/bit in database
+ */
 public class HAWQVarbit
 {
 	private byte[] bytes = null;
@@ -40,7 +43,7 @@ public class HAWQVarbit
 	 */
 	public HAWQVarbit(byte[] bytes, int numOfBits)
 	{
-		this(bytes, 0, bytes.length, numOfBits);
+		this(bytes, 0, numOfBits);
 	}
 
 	/**
@@ -51,13 +54,12 @@ public class HAWQVarbit
 	 *            the byte array that varbit init from
 	 * @param offset
 	 *            offset in this byte array
-	 * @param length
-	 *            length of byte array for init
 	 * @param numOfBits
 	 *            how may bit in this varbit
 	 */
-	public HAWQVarbit(byte[] bytes, int offset, int length, int numOfBits)
+	public HAWQVarbit(byte[] bytes, int offset, int numOfBits)
 	{
+		int length = (numOfBits - 1) / 8 + 1;
 		this.bytes = new byte[length];
 		for (int i = 0; i < length; i++)
 			this.bytes[i] = bytes[offset + i];

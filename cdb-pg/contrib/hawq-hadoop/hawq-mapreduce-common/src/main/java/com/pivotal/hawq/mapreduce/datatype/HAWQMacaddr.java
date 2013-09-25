@@ -1,5 +1,8 @@
 package com.pivotal.hawq.mapreduce.datatype;
 
+/**
+ * Store value of macaddr in database
+ */
 public class HAWQMacaddr
 {
 	private byte[] bytes = new byte[6];

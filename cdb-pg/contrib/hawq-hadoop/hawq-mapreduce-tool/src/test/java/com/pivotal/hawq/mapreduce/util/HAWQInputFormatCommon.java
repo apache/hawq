@@ -55,7 +55,7 @@ public class HAWQInputFormatCommon extends Configured {
 		}
 	}
 
-	public static class HAWQMapper_Performance extends
+	public static class HAWQMapper_Perf extends
 			Mapper<Void, HAWQRecord, Text, Text> {
 		public void map(Void key, HAWQRecord value, Context context)
 				throws IOException, InterruptedException {
@@ -94,6 +94,18 @@ public class HAWQInputFormatCommon extends Configured {
 	 */
 	public int runMapReduce(String job_name, String db_url, String table_name, String output_path) throws Exception {
                 
+                return runMapReduce(job_name, db_url, table_name, output_path, false);
+        }       
+
+	/**
+	 * The common method for map/reduce program. Invoke this method to submit the
+	 * map/reduce job.
+	 * 
+	 * @throws IOException
+	 *             When there is communication problems with the job tracker.
+	 */
+	public int runMapReduce(String job_name, String db_url, String table_name, String output_path, boolean perf_test) throws Exception {
+                
                 Configuration conf = new Configuration();
 		conf.addResource(new Path(HADOOP_HOME + "/etc/hadoop/hdfs-site.xml"));
                 conf.addResource(new Path(HADOOP_HOME + "/etc/hadoop/core-site.xml"));
@@ -101,7 +113,12 @@ public class HAWQInputFormatCommon extends Configured {
 		Job job = new Job(conf, job_name);
 
                 job.setJarByClass(HAWQInputFormatCommon.class);
-		job.setMapperClass(HAWQMapper.class);
+
+ 		//For performance test, set the specific Mapper.                
+                if(perf_test)
+			job.setMapperClass(HAWQMapper_Perf.class);
+                else job.setMapperClass(HAWQMapper.class);
+
 		job.setReducerClass(HAWQReducer.class);
 
 		job.setMapOutputKeyClass(Text.class);

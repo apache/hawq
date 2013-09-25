@@ -24,11 +24,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * An InputFormat that reads input data from HAWQ table.
+ * An InputFormat that reads input data from HAWQ append only table.
  * <p/>
- * HAWQInputFormat emits LongWritables containing the record number as key and
- * DBWritables as value.
- * 
+ * HAWQAOInputFormat emits LongWritables containing the record number as key and
+ * HAWQRecord as value.
  */
 public final class HAWQAOInputFormat extends FileInputFormat<Void, HAWQRecord>
 {
@@ -36,14 +35,42 @@ public final class HAWQAOInputFormat extends FileInputFormat<Void, HAWQRecord>
 
 	private static HAWQFileStatus[] filestatus = null;
 
+	/**
+	 * Initializes the map-part of the job with the appropriate input settings
+	 * through connecting to Database.
+	 * 
+	 * @param conf
+	 *            The map-reduce job configuration
+	 * @param metadata
+	 *            The metadata of this table get from database or metadataFile
+	 */
 	public static void setInput(Configuration conf, Metadata metadata)
 	{
 		HAWQConfiguration.setInputTableEncoding(conf,
 				metadata.getTableEncoding());
 		HAWQConfiguration.setInputTableSchema(conf, metadata.getSchema());
+		/*
+		 * GPSQL-1047
+		 * 
+		 * Set version into configuration to get working environment of database
+		 */
+		HAWQConfiguration.setDatabaseVersion(conf, metadata.getVersion());
 		filestatus = metadata.getFileStatus();
 	}
 
+	/**
+	 * Create a record reader for a given split. The framework will call
+	 * {@link RecordReader#initialize(InputSplit, TaskAttemptContext)} before
+	 * the split is used.
+	 * 
+	 * @param split
+	 *            the split to be read
+	 * @param context
+	 *            the information about the task
+	 * @return a new record reader
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
 	@Override
 	public RecordReader<Void, HAWQRecord> createRecordReader(InputSplit split,
 			TaskAttemptContext context) throws IOException,

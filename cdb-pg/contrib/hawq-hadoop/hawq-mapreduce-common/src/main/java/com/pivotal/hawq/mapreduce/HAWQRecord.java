@@ -19,6 +19,11 @@ import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
 
+/**
+ * Store schema and values for a record in database.
+ * 
+ * User can use getXXX method in input format.
+ */
 public abstract class HAWQRecord
 {
 

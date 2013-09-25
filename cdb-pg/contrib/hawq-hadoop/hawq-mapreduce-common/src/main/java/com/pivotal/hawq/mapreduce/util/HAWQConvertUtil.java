@@ -24,6 +24,9 @@ import java.util.ArrayList;
 import java.util.GregorianCalendar;
 import java.util.TimeZone;
 
+/**
+ * This class is an util class and supply static methods for type converting.
+ */
 public abstract class HAWQConvertUtil
 {
 	public static char[] decimalCharArray = null;
@@ -220,6 +223,33 @@ public abstract class HAWQConvertUtil
 	}
 
 	/**
+	 * Convert three bytes to integer
+	 * 
+	 * @param bytes
+	 *            byte array
+	 * @param offset
+	 *            offset in byte array
+	 * @return int value converted from byte array
+	 * @throws HAWQException
+	 *             when there is no 3 bytes from offset to end of bytes
+	 */
+	public static int threeBytesToInt(byte[] bytes, int offset)
+			throws HAWQException
+	{
+		try
+		{
+			return (0 << 24) | ((((int) bytes[offset + 2]) & 0x000000FF) << 16)
+					| ((((int) bytes[offset + 1]) & 0x000000FF) << 8)
+					| (((int) bytes[offset]) & 0x000000FF);
+		}
+		catch (ArrayIndexOutOfBoundsException e)
+		{
+			throw new HAWQException("Need at least 3 bytes: offset is "
+					+ offset + " while length of bytes is " + bytes.length);
+		}
+	}
+
+	/**
 	 * Convert four bytes to integer
 	 * 
 	 * @param bytes
@@ -324,7 +354,7 @@ public abstract class HAWQConvertUtil
 	 * @throws HAWQException
 	 *             when byte array doesn't have enough bytes for decimal
 	 */
-	public static Object bytesToDecimalStr(byte bytes[], int offset_numeric)
+	public static Object bytesToDecimal(byte bytes[], int offset_numeric)
 			throws HAWQException
 	{
 		if (decimalCharArray == null)
@@ -649,7 +679,6 @@ public abstract class HAWQConvertUtil
 			double box_y_2 = bytesToDouble(bytes, posInBytes);
 			posInBytes += 8;
 			HAWQBox boundbox = new HAWQBox(box_x_1, box_y_1, box_x_2, box_y_2);
-			System.out.println(boundbox);
 
 			ArrayList<HAWQPoint> points = new ArrayList<HAWQPoint>();
 			for (int i = 0; i < numOfPoints; ++i)
@@ -697,8 +726,7 @@ public abstract class HAWQConvertUtil
 			int posInBytes = offset;
 			int numOfBits = bytesToInt(bytes, posInBytes);
 			posInBytes += 4;
-			int numOfBytes = (numOfBits - 1) / 8 + 1;
-			return new HAWQVarbit(bytes, posInBytes, numOfBytes, numOfBits);
+			return new HAWQVarbit(bytes, posInBytes, numOfBits);
 		}
 		catch (ArrayIndexOutOfBoundsException e)
 		{

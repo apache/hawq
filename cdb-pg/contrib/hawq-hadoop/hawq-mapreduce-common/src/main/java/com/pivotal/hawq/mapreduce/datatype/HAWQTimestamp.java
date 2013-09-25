@@ -4,6 +4,9 @@ import java.sql.Date;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 
+/**
+ * Store value of timestamp/timestamptz in database
+ */
 public class HAWQTimestamp extends Timestamp
 {
 	private static final long serialVersionUID = 1L;

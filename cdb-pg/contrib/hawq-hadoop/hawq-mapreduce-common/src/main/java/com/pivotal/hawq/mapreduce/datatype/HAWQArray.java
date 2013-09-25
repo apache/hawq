@@ -7,6 +7,9 @@ import java.util.Map;
 
 import com.pivotal.hawq.mapreduce.schema.HAWQPrimitiveField;
 
+/**
+ * Store value of array (_int2, _int4, etc.) in database
+ */
 public final class HAWQArray implements Array
 {
 

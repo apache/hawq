@@ -2,6 +2,9 @@ package com.pivotal.hawq.mapreduce.datatype;
 
 import com.pivotal.hawq.mapreduce.HAWQException;
 
+/**
+ * Store value of point in database
+ */
 public class HAWQPoint
 {
 	private double x;

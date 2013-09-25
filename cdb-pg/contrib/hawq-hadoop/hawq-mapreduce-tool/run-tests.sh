@@ -69,3 +69,8 @@ for test in ${FEATURE_TEST_LIST}; do
     echo "======================================================================"
     echo ""
 done
+
+## 
+## Generate readable test report
+##
+python generate_mr_report.py

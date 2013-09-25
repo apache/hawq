@@ -15,6 +15,12 @@ import com.pivotal.hawq.mapreduce.ao.db.Database;
 import com.pivotal.hawq.mapreduce.ao.db.Metadata;
 import com.pivotal.hawq.mapreduce.ao.file.HAWQAOSplit;
 
+/**
+ * An InputFormat that reads input data from HAWQ table.
+ * <p/>
+ * HAWQInputFormat emits LongWritables containing the record number as key and
+ * HAWQRecord as value.
+ */
 public class HAWQInputFormat extends FileInputFormat<Void, HAWQRecord>
 {
 

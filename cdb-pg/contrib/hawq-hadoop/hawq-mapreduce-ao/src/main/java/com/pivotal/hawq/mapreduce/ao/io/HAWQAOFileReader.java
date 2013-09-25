@@ -14,12 +14,16 @@ import org.apache.hadoop.mapreduce.InputSplit;
 
 import java.io.IOException;
 
+/**
+ * Supply analysis of binary file. Get different header in file and analyze them
+ * to read correct data next.
+ */
 public final class HAWQAOFileReader
 {
 
-	private final int smallContentArraySize = 2 * 1024 * 1024; // 2M
-	private final int largeContentArraySize = 5 * smallContentArraySize; // 10M
-	private final int offsetArraySize = 4 * 1024; // 4K
+	private final int smallContentArraySize = 4 * 1024 * 1024; // 4M
+	private final int largeContentArraySize = 5 * smallContentArraySize; // 20M
+	private final int offsetArraySize = 32 * 1024; // 32K
 
 	private FileSystem fs = null;
 	private FSDataInputStream dis = null;
@@ -51,10 +55,11 @@ public final class HAWQAOFileReader
 	{
 		HAWQAOSplit aosplit = (HAWQAOSplit) split;
 		checksum = aosplit.getChecksum();
-		compressType = aosplit.getCompressType();
+		compressType = aosplit.getCompressType().toLowerCase();
 		if (!compressType.equals("none") && !compressType.equals("quicklz")
 				&& !compressType.equals("zlib") && !compressType.equals(""))
-			throw new IOException(compressType + " is not supported yet");
+			throw new IOException("Compression type " + compressType
+					+ " is not supported yet");
 		blockSize = aosplit.getBlockSize();
 		fileLength = aosplit.getLength();
 		readLength = 0;
@@ -273,9 +278,6 @@ public final class HAWQAOFileReader
 			if (moreReserved_varblock != 0)
 				throw new HAWQException("More reserved not 0",
 						HAWQException.WRONGFILEFORMAT_EXCEPTION);
-			int offsetAreSmall = (varblockHeader_0_3 >> 31) & 0x00000001;
-			if (offsetAreSmall == 0)
-				throw new IOException("Large offset is not supported yet");
 			int itemCount = (varblockHeader_4_7 & 0x00FFFFFF);
 			if (rowCount != itemCount)
 				throw new HAWQException("row count in content header is "
@@ -285,12 +287,26 @@ public final class HAWQAOFileReader
 			effectiveSmallTupleLength = itemLenByteSum + 8;
 			posInAllBytes += itemLenByteSum;
 			overallByteLen -= itemLenByteSum;
-			effectiveOffsetLength = overallByteLen / 2;
-			for (int i = 0; i < effectiveOffsetLength; ++i)
+			int offsetAreSmall = (varblockHeader_0_3 >> 31) & 0x00000001;
+			if (offsetAreSmall == 1)
 			{
-				offsets[i] = ((int) HAWQConvertUtil.bytesToShort(
-						smallTuple_Varblock, posInAllBytes)) & 0x0000FFFF;
-				posInAllBytes += 2;
+				effectiveOffsetLength = overallByteLen / 2;
+				for (int i = 0; i < effectiveOffsetLength; ++i)
+				{
+					offsets[i] = ((int) HAWQConvertUtil.bytesToShort(
+							smallTuple_Varblock, posInAllBytes)) & 0x0000FFFF;
+					posInAllBytes += 2;
+				}
+			}
+			else
+			{
+				effectiveOffsetLength = overallByteLen / 3;
+				for (int i = 0; i < effectiveOffsetLength; ++i)
+				{
+					offsets[i] = HAWQConvertUtil.threeBytesToInt(
+							smallTuple_Varblock, posInAllBytes);
+					posInAllBytes += 3;
+				}
 			}
 			currentPosInOffsets = 0;
 			break;

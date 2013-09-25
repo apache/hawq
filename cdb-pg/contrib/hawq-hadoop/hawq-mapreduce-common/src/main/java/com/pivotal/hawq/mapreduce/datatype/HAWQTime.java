@@ -4,13 +4,16 @@ import java.sql.Time;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 
-/*
- * GPSQL-937
- * 
- * Add HAWQTime and override toString() of java.sql.Time
+/**
+ * Store value of time/timetz in database
  */
 public class HAWQTime extends Time
 {
+	/*
+	 * GPSQL-937
+	 * 
+	 * Add HAWQTime and override toString() of java.sql.Time
+	 */
 	private static final long serialVersionUID = 1L;
 	private static long baseMillisecondOfDatabase = -1;
 

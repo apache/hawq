@@ -2,6 +2,9 @@ package com.pivotal.hawq.mapreduce.datatype;
 
 import com.pivotal.hawq.mapreduce.HAWQException;
 
+/**
+ * Store value of cidr in database
+ */
 public class HAWQCidr extends HAWQInet
 {
 	/**

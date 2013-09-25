@@ -1,11 +1,15 @@
 package com.pivotal.hawq.mapreduce.schema;
 
 /**
- * User: gaod1
- * Date: 8/26/13
+ * Represent a primitive field in HAWQ's schema.
+ * See PrimitiveType for all primitive types.
  */
 public class HAWQPrimitiveField extends HAWQField {
 
+	/**
+	 * Enumeration of all supported primitive type.
+	 * Note that CHAR and BPCHAR are the same, we include BPCHAR for internal usage.
+	 */
 	public static enum PrimitiveType {
 		BOOL, BIT, VARBIT, BYTEA, INT2, INT4, INT8, FLOAT4, FLOAT8, NUMERIC,
 		CHAR, BPCHAR, VARCHAR, TEXT, DATE, TIME, TIMETZ, TIMESTAMP, TIMESTAMPTZ, INTERVAL,
@@ -14,7 +18,25 @@ public class HAWQPrimitiveField extends HAWQField {
 
 	private PrimitiveType type;
 
-	protected HAWQPrimitiveField(boolean isOptional, String name, PrimitiveType type, boolean isArray) {
+	/**
+	 * Constructor for HAWQPrimitiveField.
+	 *
+	 * <p>Instead of using this constructor, we recommend you to use
+	 * factory methods defined in HAWQSchema:</p>
+	 *
+	 * <ul>
+	 *     <li>HAWQSchema.required_field(...)</li>
+	 *     <li>HAWQSchema.optional_field(...)</li>
+	 *     <li>HAWQSchema.required_field_array(...)</li>
+	 *     <li>HAWQSchema.optional_field_array(...)</li>
+	 * </ul>
+	 *
+	 * @param isOptional whether the field is optional or not
+	 * @param name name of the field
+	 * @param type type of the field
+	 * @param isArray whether the field is an array
+	 */
+	public HAWQPrimitiveField(boolean isOptional, String name, PrimitiveType type, boolean isArray) {
 		super(isOptional, name, isArray);
 		// use BPCHAR internally
 		if (type == PrimitiveType.CHAR) {
@@ -40,6 +62,10 @@ public class HAWQPrimitiveField extends HAWQField {
 		return true;
 	}
 
+	/**
+	 * Get field's type.
+	 * @return field's type
+	 */
 	public PrimitiveType getType() {
 		return type;
 	}

@@ -6,6 +6,9 @@ import java.util.List;
 
 import com.pivotal.hawq.mapreduce.HAWQException;
 
+/**
+ * Store value of path in database
+ */
 public class HAWQPath
 {
 	private List<HAWQPoint> points;

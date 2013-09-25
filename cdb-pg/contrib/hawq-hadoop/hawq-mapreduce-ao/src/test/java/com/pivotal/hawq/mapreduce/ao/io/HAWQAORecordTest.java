@@ -27,7 +27,7 @@ public class HAWQAORecordTest
 		HAWQAORecord record;
 		try
 		{
-			record = new HAWQAORecord(schema, encoding);
+			record = new HAWQAORecord(schema, encoding, "on i386-apple-darwin");
 			record.getSchema().getFieldCount();
 		}
 		catch (HAWQException e)
@@ -62,7 +62,7 @@ public class HAWQAORecordTest
 		fields.add(HAWQSchema.optional_field(
 				HAWQPrimitiveField.PrimitiveType.BYTEA, "l"));
 		HAWQAORecord record = new HAWQAORecord(
-				new HAWQSchema("alltype", fields), "UTF8");
+				new HAWQSchema("alltype", fields), "UTF8", "on i386-apple-darwin");
 
 		record.setShort(1, (short) 1);
 		record.setFloat(2, (float) 2.3);

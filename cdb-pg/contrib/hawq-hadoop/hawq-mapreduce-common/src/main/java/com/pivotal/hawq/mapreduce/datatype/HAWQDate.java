@@ -2,13 +2,16 @@ package com.pivotal.hawq.mapreduce.datatype;
 
 import java.sql.Date;
 
-/*
- * GPSQL-937
- * 
- * Add HAWQDate and override toString() of java.sql.Date
+/**
+ * Store value of date in database
  */
 public class HAWQDate extends Date
 {
+	/*
+	 * GPSQL-937
+	 * 
+	 * Add HAWQDate and override toString() of java.sql.Date
+	 */
 	private static final long serialVersionUID = 1L;
 	private boolean isBC;
 

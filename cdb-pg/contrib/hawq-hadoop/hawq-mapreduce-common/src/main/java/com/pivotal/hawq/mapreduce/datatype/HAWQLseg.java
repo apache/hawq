@@ -2,6 +2,9 @@ package com.pivotal.hawq.mapreduce.datatype;
 
 import com.pivotal.hawq.mapreduce.HAWQException;
 
+/**
+ * Store value of lseg in database
+ */
 public class HAWQLseg
 {
 	private HAWQPoint point1;

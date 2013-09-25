@@ -26,11 +26,22 @@ import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
 
+/**
+ * Extends {@link HAWQRecord} and realize abstract get/set methods in
+ * HAWQRecord. For append only file, object of this class is generated and
+ * return back to customer.
+ */
 public class HAWQAORecord extends HAWQRecord
 {
 	private Object[] value = null;
 
 	private String encoding;
+	/*
+	 * GPSQL-1047
+	 * 
+	 * If database is working on mac, this value is true;
+	 */
+	private boolean isMac;
 
 	private HAWQPrimitiveField.PrimitiveType[] schemaType = null;
 	private int columnNum;
@@ -58,7 +69,19 @@ public class HAWQAORecord extends HAWQRecord
 
 	private int nullmapExtraBytes;
 
-	public HAWQAORecord(HAWQSchema schema, String encoding)
+	/**
+	 * Constructor
+	 * 
+	 * @param schema
+	 *            schema
+	 * @param encoding
+	 *            encoding in this file
+	 * @param version
+	 *            version
+	 * @throws HAWQException
+	 *             when there are unsupproted types in schema
+	 */
+	public HAWQAORecord(HAWQSchema schema, String encoding, String version)
 			throws HAWQException
 	{
 		super(schema);
@@ -80,6 +103,7 @@ public class HAWQAORecord extends HAWQRecord
 		}
 		nullmapExtraBytes = -1;
 		initFromSchema();
+		isMac = version.contains("on i386-apple-darwin");
 		offsetOf8MoreBytes = new int[numOf8MoreBytes];
 		offsetOf4MoreBytes = new int[numOf4MoreBytes + numOfOffset];
 		offsetOf2Bytes = new int[numOf2Bytes + numOfOffset];
@@ -930,8 +954,8 @@ public class HAWQAORecord extends HAWQRecord
 						offset)) & 0x0000FFFF;
 			offset_numeric += start;
 			offset_numeric += nullmapExtraBytes;
-			value[i] = HAWQConvertUtil.bytesToDecimalStr(memtuples,
-					offset_numeric);
+			value[i] = HAWQConvertUtil
+					.bytesToDecimal(memtuples, offset_numeric);
 			break;
 		case TIME:
 			value[i] = HAWQConvertUtil.longToTime(HAWQConvertUtil.bytesToLong(
@@ -1117,6 +1141,42 @@ public class HAWQAORecord extends HAWQRecord
 			tempNumOf2Bytes = numOf2Bytes + numOfOffset;
 		}
 
+		if (numOf8MoreBytes != 0)
+		{
+			/*
+			 * GPSQL-990
+			 * 
+			 * nullmapExtraBytes should be calculated even though all data that
+			 * 8 more bytes is null
+			 */
+			int length = 4 + numOfNullmapBytes;
+			if (length == 8)
+				// Null map need 4 bytes, size of null map and length
+				// memtuple is 8 and no need to fill up
+				nullmapExtraBytes = 0;
+			else if (length % 8 == 0)
+				// Null map is 12, 20, etc. no need to fill up. But
+				// there is some bytes more for null map
+				nullmapExtraBytes = numOfNullmapBytes - 4;
+			else
+			{
+				// null map is 0, 8, etc. need to fill up 4 bytes, so we
+				// skip this 4 bytes
+				posInMemTuples += 4;
+				nullmapExtraBytes = numOfNullmapBytes;
+			}
+		}
+		else
+		{
+			/*
+			 * GPSQL-941
+			 * 
+			 * If there is no 8 more bytes and there is null value in tuple, the
+			 * nullmapExtraBytes is equal to numOfNullmapBytes rather than 0
+			 */
+			nullmapExtraBytes = numOfNullmapBytes;
+		}
+
 		int pos = 0;
 		for (int i = 0; i < numOf8MoreBytes; ++i)
 		{
@@ -1126,26 +1186,6 @@ public class HAWQAORecord extends HAWQRecord
 			}
 			else
 			{
-				if (nullmapExtraBytes == -1)
-				{
-					int length = 4 + numOfNullmapBytes;
-					if (length == 8)
-						// Null map need 4 bytes, size of null map and length
-						// memtuple is 8 and no need to fill up
-						nullmapExtraBytes = 0;
-					else if (length % 8 == 0)
-						// Null map is 12, 20, etc. no need to fill up. But
-						// there is some bytes more for null map
-						nullmapExtraBytes = numOfNullmapBytes - 4;
-					else
-					{
-						// null map is 0, 8, etc. need to fill up 4 bytes, so we
-						// skip this 4 bytes
-						posInMemTuples += 4;
-						nullmapExtraBytes = numOfNullmapBytes;
-					}
-				}
-
 				offsetOf8MoreBytes[i] = posInMemTuples;
 				switch (typesOf8MoreBytes[i])
 				{
@@ -1157,7 +1197,19 @@ public class HAWQAORecord extends HAWQRecord
 					posInMemTuples += 8;
 					break;
 				case TIMETZ:
-					posInMemTuples += 12;
+					/*
+					 * GPSQL-1047
+					 * 
+					 * For 64-bit os and db, timetz is aligned to 16 bits.
+					 */
+					if (isMac)
+						posInMemTuples += 12;
+					else
+					{
+						posInMemTuples += 16;
+						if (i == numOf8MoreBytes - 1)
+							posInMemTuples -= 4;
+					}
 					break;
 				case LSEG:
 				case BOX:
@@ -1176,14 +1228,6 @@ public class HAWQAORecord extends HAWQRecord
 			}
 			++pos;
 		}
-		/*
-		 * GPSQL-941
-		 * 
-		 * If there is no 8 more bytes and there is null value in tuple, the
-		 * nullmapExtraBytes is equal to numOfNullmapBytes rather than 0
-		 */
-		if (nullmapExtraBytes == -1)
-			nullmapExtraBytes = numOfNullmapBytes;
 		for (int i = 0; i < tempNumOf4Bytes; ++i)
 		{
 			if (hasNull != 0 && nullmap[pos])
@@ -1197,6 +1241,8 @@ public class HAWQAORecord extends HAWQRecord
 				{
 				case MACADDR:
 					posInMemTuples += 8;
+					if (i == tempNumOf4Bytes - 1)
+						posInMemTuples -= 2;
 					break;
 				case INT4:
 				case FLOAT4:
@@ -1206,9 +1252,6 @@ public class HAWQAORecord extends HAWQRecord
 				default:
 					break;
 				}
-				if (i == tempNumOf4Bytes - 1
-						&& typesOf4MoreBytes[i] == HAWQPrimitiveField.PrimitiveType.MACADDR)
-					posInMemTuples -= 2;
 			}
 			++pos;
 		}

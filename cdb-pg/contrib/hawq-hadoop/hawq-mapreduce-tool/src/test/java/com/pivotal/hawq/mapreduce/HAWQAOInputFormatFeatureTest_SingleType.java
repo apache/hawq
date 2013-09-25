@@ -23,6 +23,7 @@ public class HAWQAOInputFormatFeatureTest_SingleType{
 
     @BeforeClass
     public static void setUp() {
+        System.out.println("Executing test suite: SingleType");
         prepareData = new HAWQInputFormatPrepareData();
         jdbc = new HAWQJDBCCommon();
         result = new HAWQInputFormatResult();
@@ -143,6 +144,51 @@ public class HAWQAOInputFormatFeatureTest_SingleType{
         doTest("macaddr", true);
     }
 
+    @Test
+    public void testSingleTypeText(){
+        doTest("text", true);
+    }
+
+    @Ignore
+    public void testSingleTypeTimetz(){
+        doTest("timetz", true);
+    }
+
+    @Ignore
+    public void testSingleTypeTimestamptz(){
+        doTest("timestamptz", true);
+    }
+
+    @Test
+    public void testSingleTypeLseg(){
+        doTest("lseg", true);
+    }
+
+    @Test
+    public void testSingleTypeBox(){
+        doTest("box", true);
+    }
+
+    @Test
+    public void testSingleTypePolygon(){
+        doTest("polygon", true);
+    }
+
+    @Test
+    public void testSingleTypeInet(){
+        doTest("inet", true);
+    }
+
+    @Test
+    public void testSingleTypeCidr(){
+        doTest("cidr", true);
+    }
+
+    @Test
+    public void testSingleTypeXml(){
+        doTest("xml", true);
+    }
+
     //Common method for SingleType test
     private void doTest(String type_name, boolean checkresult){
         try{
@@ -163,6 +209,7 @@ public class HAWQAOInputFormatFeatureTest_SingleType{
                if(checkresult)
                    if(!result.checkResult("src/test/java/com/pivotal/hawq/mapreduce/query/"+filename+".ans", "src/test/java/com/pivotal/hawq/mapreduce/query/"+filename+".out", "sortcheck"))
                        Assert.fail("TEST FAILURE: The answer file and out file is different: " + filename);
+               System.out.println("Successfully finish test case: " + casename);
            }
         }catch(Exception e){
             e.printStackTrace();

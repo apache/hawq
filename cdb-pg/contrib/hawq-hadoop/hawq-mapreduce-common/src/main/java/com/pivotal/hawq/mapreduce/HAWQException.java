@@ -11,15 +11,30 @@ public class HAWQException extends Exception {
     public HAWQException() {
     }
 
+	/**
+	 * Constructor
+	 * 
+	 * @param emsg
+	 *            error message
+	 */
     public HAWQException(String emsg) {
         super(emsg);
     }
 
+	/**
+	 * Constructor
+	 * 
+	 * @param emsg
+	 *            error message
+	 * @param etype
+	 *            0 is default type, and 1 means wrong file format exception
+	 */
     public HAWQException(String emsg, int etype) {
         super(emsg);
         this.etype = etype;
     }
 
+    @Override
     public String getMessage() {
         StringBuffer buffer = new StringBuffer();
         switch (etype) {

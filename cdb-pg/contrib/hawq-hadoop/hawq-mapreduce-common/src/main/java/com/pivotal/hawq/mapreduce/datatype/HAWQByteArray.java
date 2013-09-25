@@ -2,13 +2,16 @@ package com.pivotal.hawq.mapreduce.datatype;
 
 import java.util.Arrays;
 
-/*
- * GPSQL-938
- * 
- * Add a class to handle bytea type in database
+/**
+ * Store value of bytea in database
  */
 public class HAWQByteArray
 {
+	/*
+	 * GPSQL-938
+	 * 
+	 * Add a class to handle bytea type in database
+	 */
 	private byte[] bytes = null;
 
 	/**

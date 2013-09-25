@@ -9,6 +9,10 @@ import com.pivotal.hawq.mapreduce.schema.HAWQSchema;
 import java.sql.*;
 import java.util.ArrayList;
 
+/**
+ * This class is encapsulation of HAWQ database and methods in this class supply
+ * way to get metadata and other information about table and database.
+ */
 public final class Database
 {
 	private String dbName;
@@ -277,6 +281,12 @@ public final class Database
 		return segAmount;
 	}
 
+	/**
+	 * Get list of segment hdfs path in this database
+	 * 
+	 * @return list of segment hdfs path
+	 * @throws SQLException
+	 */
 	public String[] getSegPaths() throws SQLException
 	{
 		if (segAmount == 0)
@@ -298,6 +308,12 @@ public final class Database
 		return segPath;
 	}
 
+	/**
+	 * Get id of table space where this database is in
+	 * 
+	 * @return id of table space for this database
+	 * @throws SQLException
+	 */
 	public int getTablespaceId() throws SQLException
 	{
 		resultSet = statement
@@ -309,6 +325,12 @@ public final class Database
 			return -1;
 	}
 
+	/**
+	 * Get oid of database
+	 * 
+	 * @return oid of database
+	 * @throws SQLException
+	 */
 	public int getDatabaseOid() throws SQLException
 	{
 		resultSet = statement
@@ -320,6 +342,12 @@ public final class Database
 			return -1;
 	}
 
+	/**
+	 * Get encoding of database
+	 * 
+	 * @return encoding of database
+	 * @throws SQLException
+	 */
 	public String getDatabaseEncoding() throws SQLException
 	{
 		resultSet = statement.executeQuery("SELECT getdatabaseencoding()");
@@ -329,6 +357,14 @@ public final class Database
 			return "";
 	}
 
+	/**
+	 * Get oid of pg_aoseg.pg_aoseg_* table
+	 * 
+	 * @param tableFilenode
+	 *            filenode of table
+	 * @return oid
+	 * @throws SQLException
+	 */
 	public int getPgaosegOid(int tableFilenode) throws SQLException
 	{
 		resultSet = statement
@@ -340,6 +376,14 @@ public final class Database
 			return -1;
 	}
 
+	/**
+	 * Get oid of pg_aoseg.pg_aoseg_*_index table
+	 * 
+	 * @param tableFilenode
+	 *            filenode of table
+	 * @return oid
+	 * @throws SQLException
+	 */
 	public int getPgaosegIndexOid(int tableFilenode) throws SQLException
 	{
 		resultSet = statement
@@ -351,6 +395,14 @@ public final class Database
 			return -1;
 	}
 
+	/**
+	 * Get oid of table by name
+	 * 
+	 * @param tableName
+	 *            name of table
+	 * @return oid of table
+	 * @throws SQLException
+	 */
 	public int getTableOid(String tableName) throws SQLException
 	{
 		resultSet = statement.executeQuery("SELECT '" + tableName
@@ -388,6 +440,17 @@ public final class Database
 			return TableType.PARQUET_TABLE;
 	}
 
+	/**
+	 * Get schmea of table
+	 * 
+	 * @param tableOid
+	 *            oid of table
+	 * @param tableName
+	 *            name of table
+	 * @return schema of table
+	 * @throws SQLException
+	 * @throws HAWQException
+	 */
 	public HAWQSchema getTableSchema(int tableOid, String tableName)
 			throws SQLException, HAWQException
 	{
@@ -453,6 +516,14 @@ public final class Database
 		return new HAWQSchema(tableName, fields);
 	}
 
+	/**
+	 * Get block size of table
+	 * 
+	 * @param tableOid
+	 *            oid of table
+	 * @return block size of table
+	 * @throws SQLException
+	 */
 	public int getTableBlocksize(int tableOid) throws SQLException
 	{
 		resultSet = statement
@@ -464,6 +535,14 @@ public final class Database
 			return -1;
 	}
 
+	/**
+	 * Get compress level of table
+	 * 
+	 * @param tableOid
+	 *            oid of table
+	 * @return compress level of table
+	 * @throws SQLException
+	 */
 	public int getTableCompresslevel(int tableOid) throws SQLException
 	{
 		resultSet = statement
@@ -475,6 +554,14 @@ public final class Database
 			return -1;
 	}
 
+	/**
+	 * Get checksum of table
+	 * 
+	 * @param tableOid
+	 *            oid of table
+	 * @return checksum of table
+	 * @throws SQLException
+	 */
 	public boolean getTableChecksum(int tableOid) throws SQLException
 	{
 		resultSet = statement
@@ -492,6 +579,14 @@ public final class Database
 			return false;
 	}
 
+	/**
+	 * Get compress type of table
+	 * 
+	 * @param tableOid
+	 *            oid of table
+	 * @return compress type of table
+	 * @throws SQLException
+	 */
 	public String getTableCompresstype(int tableOid) throws SQLException
 	{
 		resultSet = statement
@@ -507,6 +602,14 @@ public final class Database
 		return compressType.toLowerCase();
 	}
 
+	/**
+	 * Get file node of table
+	 * 
+	 * @param tableOid
+	 *            oid of table
+	 * @return file node of table
+	 * @throws SQLException
+	 */
 	public int getTableFileNode(int tableOid) throws SQLException
 	{
 		resultSet = statement
@@ -570,11 +673,34 @@ public final class Database
 		return aosplits;
 	}
 
+	/**
+	 * Get ao table file status from table
+	 * 
+	 * @param tableOid
+	 *            oid of table
+	 * @return ao table file status
+	 * @throws SQLException
+	 */
 	public HAWQAOFileStatus[] getAOTableFileAttributes(int tableOid)
 			throws SQLException
 	{
 		ArrayList<HAWQAOFileStatus> fileAttributes = getAOTableFileAttrList(tableOid);
 		return fileAttributes.toArray(new HAWQAOFileStatus[fileAttributes
 				.size()]);
+	}
+
+	/**
+	 * GPSQL-1047
+	 * 
+	 * Get version from database
+	 * 
+	 * @return version of database
+	 * @throws SQLException
+	 */
+	public String getDatabaseVersion() throws SQLException
+	{
+		resultSet = statement.executeQuery("SELECT version()");
+		resultSet.next();
+		return resultSet.getString(1);
 	}
 }

@@ -3,6 +3,10 @@ package com.pivotal.hawq.mapreduce.ao.file;
 import com.pivotal.hawq.mapreduce.HAWQException;
 import com.pivotal.hawq.mapreduce.file.HAWQFileStatus;
 
+/**
+ * Extends {@link HAWQFileStatus} and add particular attribute of file for
+ * append only files.
+ */
 public final class HAWQAOFileStatus extends HAWQFileStatus
 {
 	private boolean checksum;

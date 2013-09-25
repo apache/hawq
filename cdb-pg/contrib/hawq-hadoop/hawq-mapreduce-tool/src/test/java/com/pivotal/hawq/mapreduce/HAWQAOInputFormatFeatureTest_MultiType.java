@@ -24,6 +24,7 @@ public class HAWQAOInputFormatFeatureTest_MultiType{
 
     @BeforeClass
     public static void setUp() {
+        System.out.println("Executing test suite: MultiType");
         prepareData = new HAWQInputFormatPrepareData();
         jdbc = new HAWQJDBCCommon();
         result = new HAWQInputFormatResult();
@@ -63,6 +64,7 @@ public class HAWQAOInputFormatFeatureTest_MultiType{
            if(checkresult)
                if(!result.checkResult("src/test/java/com/pivotal/hawq/mapreduce/query/"+filename+".ans", "src/test/java/com/pivotal/hawq/mapreduce/query/"+filename+".out", "sortcheck"))
                    Assert.fail("TEST FAILURE: The answer file and out file is different: " + filename);
+           System.out.println("Successfully finish test case: " + filename);
         }catch(Exception e){
             e.printStackTrace();
             //clean up

@@ -37,6 +37,14 @@ public final class HAWQConfiguration
 	/** The encoding of the table */
 	public static final String TABLE_ENCODING_PROPERTY = "mapreduce.hawq.table.encoding";
 
+	/*
+	 * GOSQL-1047
+	 * 
+	 * Save version of database
+	 */
+	/** The version of the database */
+	public static final String DATABASE_VERSION_PROPERTY = "mapreduce.hawq.database.version";
+
 	/**
 	 * Get whether the table has a checksum from configuration
 	 * 
@@ -215,6 +223,36 @@ public final class HAWQConfiguration
 	public static void setInputTableType(Configuration conf, String tableType)
 	{
 		conf.set(TABLE_TYPE_PROPERTY, tableType);
+	}
+
+	/*
+	 * GOSQL-1047
+	 * 
+	 * Two functions below supply get/set method for version of database
+	 */
+	/**
+	 * Get version of database from configuration
+	 * 
+	 * @param conf
+	 *            The configuration
+	 * @return version of database
+	 */
+	public static String getDatabaseVersion(Configuration conf)
+	{
+		return conf.get(HAWQConfiguration.DATABASE_VERSION_PROPERTY);
+	}
+
+	/**
+	 * Set version of database into configuration
+	 * 
+	 * @param conf
+	 *            the configuration
+	 * @param version
+	 *            version of database
+	 */
+	public static void setDatabaseVersion(Configuration conf, String version)
+	{
+		conf.set(HAWQConfiguration.DATABASE_VERSION_PROPERTY, version);
 	}
 
 }
