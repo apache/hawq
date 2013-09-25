@@ -2072,10 +2072,8 @@ static bool shareinput_mutator_xslice_1(Node* node, ApplyShareInputContext *ctxt
 			int  shareSliceId = 0;
 			
 			shareinput_find_sharenode(ctxt, sisc->share_id, &plan_slicemark);
-			if (!plan_slicemark.plan)
-			{
-				return false;
-			}
+			Assert(NULL != plan_slicemark.plan);
+
 			shareSliceId = get_plan_driver_slice(plan_slicemark.plan);
 
 			if(shareSliceId != motId)
@@ -2256,12 +2254,19 @@ Plan *apply_shareinput_xslice(Plan *plan, PlannerGlobal *glob)
 	 * Note: We depends on the contxt of between the passes, so do not reset 
 	 * the context between calls.
 	 */
+
+	/*
+	 * a subplan might have a SharedScan consumer while the SharedScan producer
+	 * is in the main plan,
+	 * we need to store SharedScan nodes in main plan into traversal context
+	 * before traversing subplans
+	 */
+	shareinput_walker(shareinput_mutator_xslice_1, (Node *) plan, ctxt);
 	foreach (lp, glob->subplans)
 	{
 		Plan	   *subplan = (Plan *) lfirst(lp);
 		shareinput_walker(shareinput_mutator_xslice_1, (Node *) subplan, ctxt);
 	}
-	shareinput_walker(shareinput_mutator_xslice_1, (Node *) plan, ctxt);
 
 	foreach (lp, glob->subplans)
 	{
