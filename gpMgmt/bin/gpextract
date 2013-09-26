@@ -16,6 +16,7 @@ Options:
 gpextract output YAML file format:
 
 Version: string (xxx.xxx.xxx)
+DBVersion: string
 FileFormat: string (AO/Parquet)
 TableName: string (schemaname.tablename)
 DFS_URL: string (hdfs://127.0.0.1:9000)
@@ -82,6 +83,7 @@ class GpMetadataAccessor:
         self.dbname = rows[0]['datname']
         self.spcid  = rows[0]['dat2tablespace']
         self.dbencoding = rows[0]['encoding']
+        self.dbversion = self.exec_query('select version()')[0]['version']
 
     def exec_query(self, sql):
         return self.conn.query(sql).dictresult()
@@ -212,6 +214,7 @@ def extract_metadata(conn, tbname):
     DFS_URL = split_segment_location(segment_localtions[0])[0]
 
     metadata = { 'Version': '1.0.0',
+                 'DBVersion': accessor.dbversion,
                  'TableName': '%s.%s' % (nspname, relname),
                  'DFS_URL': DFS_URL,
                  'Encoding': accessor.dbencoding }

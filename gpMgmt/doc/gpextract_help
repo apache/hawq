@@ -102,6 +102,7 @@ The basic structure of the metadata file is:
 ---
 
 Version: string (1.0.0)
+DBVersion: string
 FileFormat: string (AO/Parquet)
 TableName: string (schemaname.tablename)
 DFS_URL: string (hdfs://127.0.0.1:9000)
@@ -198,6 +199,7 @@ AO_Schema:
   type: bpchar
 - name: count
   type: int4
+DBVersion: PostgreSQL 8.2.15 (Greenplum Database 4.2.0 build 1) (HAWQ 1.0.0.3 build) on i386-apple-darwin11.4.2, compiled by GCC gcc (GCC) 4.4.2
 DFS_URL: hdfs://127.0.0.1:9000
 Encoding: UTF8
 FileFormat: AO
