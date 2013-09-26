@@ -828,7 +828,8 @@ CTranslatorPlStmtToDXL::PdxlnAggFromPlan
 			GPOS_ASSERT(!"Invalid aggregation strategy");
 	}
 
-	CDXLPhysicalAgg *pdxlopAgg = New(m_pmp) CDXLPhysicalAgg(m_pmp, edxlaggstr);
+	BOOL fStreamSafe = pagg->streaming;
+	CDXLPhysicalAgg *pdxlopAgg = New(m_pmp) CDXLPhysicalAgg(m_pmp, edxlaggstr, fStreamSafe);
 
 	// translate child of aggregate operator
 	Plan *pplanChild = (pagg->plan).lefttree;

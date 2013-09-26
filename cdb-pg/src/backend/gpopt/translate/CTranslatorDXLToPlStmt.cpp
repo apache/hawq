@@ -2531,6 +2531,8 @@ CTranslatorDXLToPlStmt::PaggFromDXLAgg
 			GPOS_ASSERT(!"Invalid aggregation strategy");
 	}
 
+	pagg->streaming = pdxlopAgg->FStreamSafe();
+
 	// translate grouping cols
 	const DrgPul *pdrpulGroupingCols = pdxlopAgg->PdrgpulGroupingCols();
 	pagg->numCols = pdrpulGroupingCols->UlLength();
@@ -2551,6 +2553,7 @@ CTranslatorDXLToPlStmt::PaggFromDXLAgg
 		GPOS_ASSERT(NULL != pteGroupingCol);
 		pagg->grpColIdx[ul] = pteGroupingCol->resno;
 	}
+
 	SetParamIds(pplan);
 
 	// cleanup
