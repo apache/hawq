@@ -693,13 +693,13 @@ ExecInitSubPlan(SubPlanState *node, EState *estate, int eflags)
 	/*
 	 * Start up the subplan (this is a very cut-down form of InitPlan())
 	 *
-	 * The subplan will never need to do BACKWARD scan or MARK/RESTORE. If it
-	 * is a parameterless subplan (not initplan), we suggest that it be
-	 * prepared to handle REWIND efficiently; otherwise there is no need.
+	 * The subplan will never need to do BACKWARD scan or MARK/RESTORE.
+	 *
+	 * We set the REWIND flag to notify the subplan that it is likely to be
+	 * rescanned, and it must delay eagerfree.
 	 */
 	eflags &= EXEC_FLAG_EXPLAIN_ONLY;
-	if (subplan->parParam == NIL && subplan->setParam == NIL)
-		eflags |= EXEC_FLAG_REWIND;
+	eflags |= EXEC_FLAG_REWIND;
 
 	Plan *subplanplan = exec_subplan_get_plan(estate->es_plannedstmt, subplan);
 	Assert(subplanplan);

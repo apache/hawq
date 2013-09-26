@@ -1744,12 +1744,7 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 
 	/*
 	 * initialize child nodes
-	 *
-	 * If we are doing a hashed aggregation then the child plan does not need
-	 * to handle REWIND efficiently; see ExecReScanAgg.
 	 */
-	if (node->aggstrategy == AGG_HASHED)
-		eflags &= ~EXEC_FLAG_REWIND;
 	outerPlan = outerPlan(node);
 	outerPlanState(aggstate) = ExecInitNode(outerPlan, estate, eflags);
 

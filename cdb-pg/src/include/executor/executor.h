@@ -39,11 +39,8 @@ struct ChunkTransportState;             /* #include "cdb/cdbinterconnect.h" */
  * of startup should occur (such as creating a SELECT INTO target table).
  * However, error checks (such as permission checks) should be performed.
  *
- * REWIND indicates that the plan node should try to efficiently support
- * rescans without parameter changes.  (Nodes must support ExecReScan calls
- * in any case, but if this flag was not given, they are at liberty to do it
- * through complete recalculation.	Note that a parameter change forces a
- * full recalculation in any case.)
+ * REWIND indicates that the plan node should expect to be rescanned. This
+ * implies delaying freeing up resources when EagerFree is called.
  *
  * BACKWARD indicates that the plan node must respect the es_direction flag.
  * When this is not passed, the plan node will only be run forwards.
@@ -52,7 +49,7 @@ struct ChunkTransportState;             /* #include "cdb/cdbinterconnect.h" */
  * When this is not passed, no Mark/Restore will occur.
  */
 #define EXEC_FLAG_EXPLAIN_ONLY	0x0001	/* EXPLAIN, no ANALYZE */
-#define EXEC_FLAG_REWIND		0x0002	/* need efficient rescan */
+#define EXEC_FLAG_REWIND		0x0002	/* expect rescan */
 #define EXEC_FLAG_BACKWARD		0x0004	/* need backward scan */
 #define EXEC_FLAG_MARK			0x0008	/* need mark/restore */
 

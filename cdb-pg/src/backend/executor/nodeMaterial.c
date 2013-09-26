@@ -315,10 +315,21 @@ ExecInitMaterial(Material *node, EState *estate, int eflags)
 	/*
 	 * initialize child nodes
 	 *
-	 * We shield the child node from the need to support REWIND, BACKWARD, or
+	 * We shield the child node from the need to support BACKWARD, or
 	 * MARK/RESTORE.
 	 */
-	eflags &= ~(EXEC_FLAG_REWIND | EXEC_FLAG_BACKWARD | EXEC_FLAG_MARK);
+	eflags &= ~(EXEC_FLAG_BACKWARD | EXEC_FLAG_MARK);
+
+	/*
+	 * If Materialize does not have any external parameters, then it
+	 * can shield the child node from being rescanned as well, hence
+	 * we can clear the EXEC_FLAG_REWIND as well. If there are parameters,
+	 * don't clear the REWIND flag, as the child will be rewound.
+	 */
+	if (node->plan.allParam == NULL || node->plan.extParam == NULL)
+	{
+		eflags &= ~EXEC_FLAG_REWIND;
+	}
 
 	outerPlan = outerPlan(node);
 	outerPlanState(matstate) = ExecInitNode(outerPlan, estate, eflags);
