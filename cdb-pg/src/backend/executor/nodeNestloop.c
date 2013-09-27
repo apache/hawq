@@ -145,7 +145,7 @@ ExecNestLoop(NestLoopState *node)
 
 		if ((node->js.jointype == JOIN_LASJ_NOTIN) &&
 				(!node->nl_innerSideScanned) &&
-				(isJoinExprNull(node->nl_InnerJoinKeys, econtext)))
+				(node->nl_InnerJoinKeys && isJoinExprNull(node->nl_InnerJoinKeys, econtext)))
 		{
 			/*
 			 * If LASJ_NOTIN and a null was found on the inner side, then clean out.
@@ -313,7 +313,7 @@ ExecNestLoop(NestLoopState *node)
 
 		if ((node->js.jointype == JOIN_LASJ_NOTIN) &&
 				(!node->nl_innerSideScanned) &&
-				(isJoinExprNull(node->nl_InnerJoinKeys, econtext)))
+				(node->nl_InnerJoinKeys && isJoinExprNull(node->nl_InnerJoinKeys, econtext)))
 		{
 			/*
 			 * If LASJ_NOTIN and a null was found on the inner side, then clean out.
@@ -520,7 +520,6 @@ ExecInitNestLoop(NestLoop *node, EState *estate, int eflags)
     if (node->join.jointype == JOIN_LASJ_NOTIN)
     {
     	splitJoinQualExpr(nlstate);
-    	Assert(NIL != nlstate->nl_InnerJoinKeys && NIL != nlstate->nl_OuterJoinKeys);
     	/*
     	 * For LASJ_NOTIN, when we evaluate the join condition, we want to
     	 * return true when one of the conditions is NULL, so we exclude
@@ -666,7 +665,9 @@ initGpmonPktForNestLoop(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estat
  * splitJoinQualExpr
  *
  * Deconstruct the join clauses into outer and inner argument values, so
- * that we can evaluate those subexpressions separately.
+ * that we can evaluate those subexpressions separately. Note: for constant
+ * expression we don't need to split (MPP-21294). However, if constant expressions
+ * have peer splittable expressions we *do* split those.
  *
  * This is used for NOTIN joins, as we need to look for NULLs on both
  * inner and outer side.
@@ -699,6 +700,21 @@ splitJoinQualExpr(NestLoopState *nlstate)
 			}
 			break;
 		}
+		case T_ExprState:
+			/* For constant expression we don't need to split */
+			if (exprstate->xprstate.expr->type == T_Const)
+			{
+				/*
+				 * Constant expressions do not need to be splitted into left and
+				 * right as they don't need to be considered for NULL value special
+				 * cases
+				 */
+				continue;
+			}
+
+			insist_log(false, "unexpected expression type in NestLoopJoin qual");
+
+			break; /* Unreachable */
 		default:
 			insist_log(false, "unexpected expression type in NestLoopJoin qual");
 		}
