@@ -7571,6 +7571,18 @@ select a, (select (select (select c from orca.s where a=c group by c))) as subq 
     |     
 (21 rows)
 
+with v as (select a,b from orca.r, orca.s where a=c)  select c from orca.s group by c having count(*) not in (select b from v where a=c) order by c;
+ c 
+---
+ 0
+ 1
+ 2
+ 3
+ 4
+ 5
+ 6
+(7 rows)
+
 ----------------------------------------------------------------------
 set optimizer=off;
 CREATE TABLE orca.onek (
