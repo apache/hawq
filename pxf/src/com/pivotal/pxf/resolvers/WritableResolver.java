@@ -1,47 +1,63 @@
 package com.pivotal.pxf.resolvers;
 
+import java.io.DataInputStream;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import com.pivotal.pxf.exception.BadRecordException;
+import com.pivotal.pxf.exception.UnsupportedTypeException;
+import com.pivotal.pxf.format.GPDBWritableMapper;
 import com.pivotal.pxf.format.OneField;
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.hadoop.io.GPDBWritable;
+import com.pivotal.pxf.hadoop.io.GPDBWritable.TypeMismatchException;
 import com.pivotal.pxf.utilities.InputData;
+import com.pivotal.pxf.utilities.Plugin;
 import com.pivotal.pxf.utilities.RecordkeyAdapter;
 
 /*
- * Class WritableResolver handles deserialization of records that were serialized 
- * using Hadoop's Writable serialization framework. WritableResolver implements
- * Resolver abstract class exposing one method: GetFields
+ * Class WritableResolver handles serialization and deserialization of records that were 
+ * serialized using Hadoop's Writable serialization framework. 
+ * WritableResolver implements IReadResolver and IWriteResolver interfaces.
  */
-public class WritableResolver extends Resolver
+public class WritableResolver extends Plugin implements IReadResolver, IWriteResolver
 {
 	private RecordkeyAdapter recordkeyAdapter = new RecordkeyAdapter();
-
+	private GPDBWritable gpdbWritable;
+	private GPDBWritableMapper gpdbWritableMapper;
+	
 	// reflection fields
 	private Object userObject = null;
 	private Method[] methods = null;
 	private Field[] fields = null;
 	private int index_of_readFields = 0;
 	////////////////////////////
+	
+	private Log Log;
 
 	public WritableResolver(InputData input) throws Exception
 	{
 		super(input);
-		InitInputObject();
+		gpdbWritable = new GPDBWritable();
+		Log = LogFactory.getLog(WritableResolver.class);
+
+		InitInputObject();		
 	}
 
 	/*
-	 * GetFields returns a list of the fields of one record.
+	 * getFields returns a list of the fields of one record.
 	 * Each record field is represented by a OneField item.
 	 * OneField item contains two fields: an integer representing the field type and a Java
 	 * Object representing the field value.
 	 */
-	public List<OneField> GetFields(OneRow onerow) throws Exception
+	public List<OneField> getFields(OneRow onerow) throws Exception
 	{
 		userObject = onerow.getData();
 		List<OneField> record =  new LinkedList<OneField>();
@@ -141,12 +157,95 @@ public class WritableResolver extends Resolver
 			{
 				addOneFieldToRecord(record, GPDBWritable.BYTEA, field.get(userObject));
 			}
+			else 
+			{
+				throw new UnsupportedTypeException("Unsupported java type " + javaType + 
+						                           " (simple name: " + field.getType().getSimpleName() + ")");
+			}
 		}
 		catch (IllegalAccessException ex)
 		{
 			throw new BadRecordException(ex);
 		}
 		return ret;
+	}
+	
+	/*
+	 * Reads data from inputStream and set customWritable fields. 
+	 */
+	public OneRow setFields(DataInputStream inputStream) throws Exception
+	{
+		if (inputStream.available() == 0)
+		{
+			Log.debug("reached end of stream");
+			return null;
+		}
+		
+		gpdbWritable.readFields(inputStream);
+		gpdbWritableMapper = new GPDBWritableMapper(gpdbWritable);
+		
+		// convert to custom writable
+		// go over fields in gpdbWritable one by the other, extract value and set it in userObject.
+		int colIdx = 0;
+		for (Field field : fields)
+		{
+			if (Modifier.isPrivate(field.getModifiers())) 
+				continue;
+			
+			colIdx = populateField(field, colIdx);
+		}
+		
+		return new OneRow(null, userObject);
+	}
+	
+	/*
+	 * Populate field with data from gpdbWritable.
+	 * Field can be an array - in this case a few fields will be extracted from gpdbWritable.
+	 * colIdx - the index of relevant field in gpdbWritable.
+	 * Returned index is the next field in gpdbWritable (in case of array it will be colIdx + array length).
+	 */
+	int populateField(Field field, int colIdx) throws BadRecordException
+	{		
+		String javaType = field.getType().getName();
+		boolean isArray = GPDBWritableMapper.isArray(javaType);
+		int curColIdx = colIdx;
+		Object value = null;
+		
+		try
+		{
+			gpdbWritableMapper.setDataType(javaType);
+			if (isArray)
+			{
+					value = field.get(userObject);
+					int length = Array.getLength(value);
+
+					for (int j = 0; j < length; j++, curColIdx++)
+					{
+
+						Object obj = gpdbWritableMapper.getData(curColIdx);
+						Array.set(value, j, obj);
+					}
+			}
+			else { // not array
+				value = gpdbWritableMapper.getData(curColIdx);		
+				++curColIdx;
+			}
+			field.set(userObject, value);
+		}
+		catch (IllegalAccessException ex)
+		{
+			throw new BadRecordException(ex);
+		} 
+		catch (TypeMismatchException ex) 
+		{
+			throw new BadRecordException(ex);
+		} 
+		catch (UnsupportedTypeException ex) 
+		{
+			throw new BadRecordException(ex);
+		}
+    
+		return curColIdx;
 	}
 
 	void InitInputObject() throws Exception
@@ -167,5 +266,23 @@ public class WritableResolver extends Resolver
 				break;
 			}
 		}
+		
+		// fields details:
+		if (Log.isDebugEnabled())
+		{
+			for (int i = 0; i < fields.length; i++)
+			{
+				Field field = fields[i];
+				String javaType = field.getType().getName();
+				boolean isPrivate = Modifier.isPrivate(field.getModifiers());
+				
+				Log.debug("Field #" + i + ", name: " + field.getName() + 
+						" type: " + javaType + ", " + 
+						(GPDBWritableMapper.isArray(javaType) ? "Array" : "Primitive") + ", " +
+						(isPrivate ? "Private" : "accessible") + " field");
+
+			}
+		}
+		
 	} 
 }

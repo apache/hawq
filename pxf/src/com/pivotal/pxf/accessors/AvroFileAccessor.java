@@ -68,12 +68,12 @@ public class AvroFileAccessor extends HdfsSplittableDataAccessor
 	}		
 
 	/*
-	 * LoadNextObject
+	 * readNextObject
 	 * The AVRO accessor is currently the only specialized accessor that overrides this method
 	 * This happens, because the special AvroRecordReader.next() semantics (use of the AvroWrapper), so it
 	 * cannot use the RecordReader's default implementation in SplittableFileAccessor
 	 */	
-	public OneRow LoadNextObject() throws IOException
+	public OneRow readNextObject() throws IOException
 	{
 		if (reader.next(avroWrapper, NullWritable.get())) // if there is one more record in the current split
 		{

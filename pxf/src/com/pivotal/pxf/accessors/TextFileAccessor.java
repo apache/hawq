@@ -1,13 +1,13 @@
 package com.pivotal.pxf.accessors;
 
-import com.pivotal.pxf.accessors.LineReaderAccessor;
+import com.pivotal.pxf.accessors.LineBreakAccessor;
 import com.pivotal.pxf.utilities.InputData;
 
 /*
- * @deprecated - use LineReaderAccessor
+ * @deprecated - use LineBreakAccessor
  */
 @Deprecated
-public class TextFileAccessor extends LineReaderAccessor
+public class TextFileAccessor extends LineBreakAccessor
 {
 	/*
 	 * C'tor

@@ -446,7 +446,7 @@ public class GPDBWritable implements Writable {
 	/**
 	 * Return the byte form
 	 * @return the binary representation of this object
-	 * @throws if an I/O error occured
+	 * @throws if an I/O error occurred
 	 */
 	public byte[] toBytes() throws IOException {
 		ByteArrayOutputStream baos = new ByteArrayOutputStream(256);
@@ -740,7 +740,7 @@ public class GPDBWritable implements Writable {
 	}
 	
 	/**
-	 * Private Helper to get the type name for rasing error.
+	 * Private Helper to get the type name for raising error.
 	 * If a given oid is not in the commonly used list, we
 	 * would expect a TEXT for it (for the error message).
 	 */

@@ -23,17 +23,18 @@ import org.apache.hadoop.mapred.JobConf;
 
 import com.pivotal.pxf.exception.BadRecordException;
 import com.pivotal.pxf.exception.FragmenterUserDataException;
+import com.pivotal.pxf.exception.UnsupportedTypeException;
 import com.pivotal.pxf.format.OneField;
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.fragmenters.HiveDataFragmenter;
 import com.pivotal.pxf.hadoop.io.GPDBWritable;
 import com.pivotal.pxf.utilities.InputData;
-import com.pivotal.pxf.utilities.RecordkeyAdapter;
+import com.pivotal.pxf.utilities.Plugin;
 
 /*
  * Class HiveResolver handles deserialization of records that were serialized 
  * using Hadoop's Hive serialization framework. HiveResolver implements
- * Resolver abstract class exposing one method: GetFields
+ * IReadResolver interface.
  */
 /*
 TODO - remove SupressWarning once Hive resolves the problem described below
@@ -43,11 +44,9 @@ But this change was not adopted by the OrcSerde (which was also introduced in Hi
 In order to cope with this inconsistency... this bit of juggling has been necessary.
 */
 @SuppressWarnings("deprecation")
-public class HiveResolver extends Resolver
+public class HiveResolver extends Plugin implements IReadResolver 
 {
-	private RecordkeyAdapter recordkeyAdapter = new RecordkeyAdapter();
 	private Object deserializer;
-	private Properties serdeProperties;
 	private List<OneField> partitionFields;
 	private String inputFormatName;
 	private String serdeName; 
@@ -83,12 +82,12 @@ public class HiveResolver extends Resolver
 	}
 	
 	/*
-	 * GetFields returns a list of the fields of one record.
+	 * getFields returns a list of the fields of one record.
 	 * Each record field is represented by a OneField item.
 	 * OneField item contains two fields: an integer representing the field type and a Java
 	 * Object representing the field value.
 	 */
-	public List<OneField> GetFields(OneRow onerow) throws Exception
+	public List<OneField> getFields(OneRow onerow) throws Exception
 	{
 		List<OneField> record =  new LinkedList<OneField>();
 		
@@ -107,6 +106,8 @@ public class HiveResolver extends Resolver
 	 */
 	private void InitSerde() throws Exception
 	{
+		Properties serdeProperties;
+
 		Class<?> c = Class.forName(serdeName, true, JavaUtils.getClassLoader());
 		deserializer = (SerDe)c.newInstance();
 		serdeProperties = new Properties();
@@ -150,7 +151,7 @@ public class HiveResolver extends Resolver
 			else if (type.compareTo(serdeConstants.DECIMAL_TYPE_NAME) == 0)
 				addOneFieldToRecord(partitionFields, GPDBWritable.NUMERIC, new HiveDecimal(val).bigDecimalValue().toString());
 			else 
-				throw new RuntimeException("Unknown type: " + type);
+				throw new UnsupportedTypeException("Unknown type: " + type);
 		}		
 	}
 	
@@ -225,8 +226,8 @@ public class HiveResolver extends Resolver
 				break;
 		}
 		
-		throw new RuntimeException("Unknown category type: "
-								   + objInspector.getCategory());
+		throw new UnsupportedTypeException("Unknown category type: "
+								   	       + objInspector.getCategory());
 	}
 	
 	public void resolvePrimitive(Object o, PrimitiveObjectInspector oi, List<OneField> record) throws IOException
@@ -297,7 +298,7 @@ public class HiveResolver extends Resolver
 				break;
 			}
 			default: {
-				throw new RuntimeException(oi.getTypeName() + " conversion is not supported by " + getClass().getSimpleName());
+				throw new UnsupportedTypeException(oi.getTypeName() + " conversion is not supported by " + getClass().getSimpleName());
 			}
 		}		
 	}

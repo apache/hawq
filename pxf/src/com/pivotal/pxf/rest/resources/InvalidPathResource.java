@@ -3,6 +3,7 @@ package com.pivotal.pxf.rest.resources;
 import java.io.IOException;
 
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.core.Context;
@@ -17,7 +18,7 @@ import org.apache.commons.logging.LogFactory;
 
 class Version
 {
-	final static String PXF_PROTOCOL_VERSION = "v5";
+	final static String PXF_PROTOCOL_VERSION = "v7";
 }
 
 /*
@@ -47,18 +48,46 @@ public class InvalidPathResource
 	 */
 	@GET
 	@Path("/")
-	public Response noPath() throws Exception
+	public Response noPathGet() throws Exception
+	{
+		return noPath();
+	}
+
+	@POST
+	@Path("/")
+	public Response noPathPost() throws Exception
+	{
+		return noPath();
+	}
+	
+	private Response noPath() throws Exception
 	{
 		String errmsg = "Unknown path " + rootUri.getAbsolutePath();
 		return sendErrorMessage(errmsg);
 	}
-
+	
 	/*
 	 * Catch paths of pattern /gpdb/*
 	 */
 	@GET
 	@Path("/{path:.*}")
-	public Response wrongPath(@PathParam("path") String path) throws Exception
+	public Response wrongPathGet(@PathParam("path") String path) throws Exception
+	{
+		return wrongPath(path);
+	}
+	
+	/*
+	 * Catch paths of pattern /gpdb/*
+	 */
+	@POST
+	@Path("/{path:.*}")
+	public Response wrongPathPost(@PathParam("path") String path) throws Exception
+	{
+		return wrongPath(path);
+	}
+	
+	
+	private Response wrongPath(String path) throws Exception
 	{
 
 		String errmsg;

@@ -22,7 +22,7 @@ public class RecordkeyAdapter
 	/*
 	 * We need to transform Record keys to java primitive types.
 	 * Since the type of the key is the same throughout the file we do the type resolution
-	 * in the first call (for the first record) and then use a "Java variation on Function poiner"
+	 * in the first call (for the first record) and then use a "Java variation on Function pointer"
 	 * to do the extraction for the rest of the records.
 	 */
 	private interface ValExtractor
@@ -67,7 +67,7 @@ public class RecordkeyAdapter
 			throw new NoSuchFieldException("Value for field \"recordkey\" was requested but the queried HDFS resource type does not support key"); 
 		
 		OneField oneField = new OneField();
-		oneField.type = recordkeyColumn.columnType();
+		oneField.type = recordkeyColumn.columnTypeCode();
 		oneField.val = extractVal(recordkey);
 		recFields.add(oneField);
 		return 1;

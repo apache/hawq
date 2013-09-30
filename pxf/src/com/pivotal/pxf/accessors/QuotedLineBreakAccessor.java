@@ -25,21 +25,21 @@ public class QuotedLineBreakAccessor extends HdfsAtomicDataAccessor
 		super(input);
  	}
 
-	public boolean Open() throws Exception
+	public boolean openForRead() throws Exception
 	{		
-		if (!super.Open())
+		if (!super.openForRead())
 			return false;
 		reader = new BufferedReader(new InputStreamReader(inp));
         return reader != null;
 	}
 	
 	/*
-	 * LoadNextObject
+	 * readNextObject
 	 * Fetches one record (maybe partial) from the  file. The record is returned as a Java object.
 	 */			
-	public OneRow LoadNextObject() throws IOException
+	public OneRow readNextObject() throws IOException
 	{
-		if (super.LoadNextObject() == null) /* check if working segment */
+		if (super.readNextObject() == null) /* check if working segment */
 			return null;
 		
         String next_line = reader.readLine();

@@ -109,6 +109,7 @@
 				<attribute name="Built-Date" value="${TODAY}"/> 
 			</manifest>
 			<fileset dir="${build.dir}/classes" includes="**/*.class" excludes="Protobuf*.class"/>
+            <fileset dir="${src.dir}" includes="resources/*.xml"/>
 		</jar>
 
 		<jar destfile="${build.dir}/protobuf-appendix.jar">
@@ -127,6 +128,7 @@
 	<target name="package" depends="jar" description="create a package directory">
 		<delete dir="${dist.dir}"/>
 		<mkdir dir="${dist.dir}"/>
+        <mkdir dir="${dist.dir}/conf"/>
 		<copy todir="${dist.dir}">
 			<fileset dir="${lib.dir}">
 				<include name="avro*.jar"/>
@@ -138,6 +140,7 @@
 				<include name="protobuf-appendix.jar"/>
 			</fileset>
 		</copy>
+        <copy file="${src.dir}/resources/pxf-profiles-default.xml" tofile="${dist.dir}/conf/pxf-profiles.xml"/>
 	</target>
 
 	<!-- Create TAR -->
@@ -234,8 +237,9 @@
 
 			<classpath>
 				<pathelement location="${build.dir}/test/classes"/>
-				<pathelement location="${build.dir}/classes"/>
-				<fileset dir="${lib.dir}">
+                <pathelement location="${build.dir}/classes"/>
+                <pathelement location="${src.dir}"/>
+                <fileset dir="${lib.dir}">
 					<include name="**/*.jar"/>
 				</fileset>
 			</classpath>

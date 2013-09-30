@@ -54,6 +54,10 @@
 	  			  conf="compile->master"/>
 	  <dependency org="commons-logging" name="commons-logging" rev="1.1.1" 
 	  			  conf="compile->master"/>
+	  <dependency org="commons-configuration" name="commons-configuration" rev="1.6"
+	  			  conf="compile->master"/>
+	  <dependency org="commons-collections" name="commons-collections" rev="3.2.1" 
+	  			  conf="compile->master"/>
 	  <dependency org="commons-codec" name="commons-codec" rev="1.4" 
 	  			  conf="compile->master"/>
 	  <dependency org="junit" name="junit" rev="4.11" 

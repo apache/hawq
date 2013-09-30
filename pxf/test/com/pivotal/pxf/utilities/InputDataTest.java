@@ -1,19 +1,17 @@
 package com.pivotal.pxf.utilities;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-
+import com.pivotal.pxf.exception.ProfileConfException;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 import com.pivotal.pxf.format.OutputFormat;
+import static com.pivotal.pxf.exception.ProfileConfException.NO_PROFILE_DEF;
+import static org.junit.Assert.*;
 
 @RunWith(JUnit4.class)
 public class InputDataTest 
@@ -21,8 +19,8 @@ public class InputDataTest
 	Map<String, String> parameters;
 
     @Test
-    public void inputDataCreated() 
-	{
+    public void inputDataCreated()
+    {
 		InputData input = new InputData(parameters);
 
 		assertEquals(System.getProperty("greenplum.alignment"), "all");
@@ -53,8 +51,50 @@ public class InputDataTest
 		assertEquals(copy.getParametersMap(), input.getParametersMap());
 	}
 
-	/*
-	 * setUp function called before each test
+    @Test
+    public void testProfileWithDuplicateProperty()
+    {
+        parameters.put("X-GP-PROFILE", "HIVE");
+        try
+        {
+            new InputData(parameters);
+            fail("Duplicate property should throw ProfileConfException");
+        }
+        catch (IllegalArgumentException iae)
+        {
+            assertEquals("HIVE already defines: [ACCESSOR, RESOLVER]", iae.getMessage());
+        }
+    }
+
+    @Test
+    public void testDefinedProfile()
+    {
+        parameters.put("X-GP-PROFILE", "HIVE");
+        parameters.remove("X-GP-ACCESSOR");
+        parameters.remove("X-GP-RESOLVER");
+        InputData input = new InputData(parameters);
+        assertEquals(input.getProperty("X-GP-FRAGMENTER"), "HiveDataFragmenter");
+        assertEquals(input.accessor, "HiveAccessor");
+        assertEquals(input.resolver, "HiveResolver");
+    }
+
+    @Test
+    public void testUndefinedProfile()
+    {
+        parameters.put("X-GP-PROFILE", "THIS_PROFILE_NEVER_EXISTED!");
+        try
+        {
+            new InputData(parameters);
+            fail("Undefined profile should throw ProfileConfException");
+        }
+        catch (ProfileConfException pce)
+        {
+            assertEquals(pce.getMsgFormat(), NO_PROFILE_DEF);
+        }
+    }
+
+    /*
+     * setUp function called before each test
 	 */
 	@Before
 	public void setUp()

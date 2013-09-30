@@ -29,7 +29,7 @@ class GPWritableFileCreator
 		try 
 		{
 			Class recordClass = (input.outputFormat() == OutputFormat.FORMAT_TEXT) ? 
-						BridgeOutputBuilder.SimpleText.class : GPDBWritable.class;
+						SimpleText.class : GPDBWritable.class;
 			writer =  SequenceFile.createWriter(conf, 
 												SequenceFile.Writer.file(path),
 												SequenceFile.Writer.keyClass(LongWritable.class),

@@ -24,7 +24,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.io.Writable;
 import org.eclipse.jetty.io.RuntimeIOException;
 
-import com.pivotal.pxf.bridge.Bridge;
+import com.pivotal.pxf.bridge.ReadBridge;
 import com.pivotal.pxf.bridge.IBridge;
 import com.pivotal.pxf.utilities.InputData;
 
@@ -66,9 +66,9 @@ public class BridgeResource
 
 	Response readResponse(Map<String, String> params) throws Exception
 	{
-		final IBridge bridge = new Bridge(new InputData(params));
+		final IBridge bridge = new ReadBridge(new InputData(params));
 
-		if (!bridge.BeginIteration())
+		if (!bridge.beginIteration())
 			return Response.ok().build();
 
 		final String fragment = params.get("X-GP-DATA-FRAGMENT");
@@ -84,38 +84,38 @@ public class BridgeResource
 			{
 				long recordCount = 0;
 
-                try
-                {
-                    Writable record = null;
-                    DataOutputStream dos = new DataOutputStream(out);
-                    Log.debug("Starting streaming fragment " + fragment + " of resource " + dataDir);
-                    while ((record = bridge.GetNext()) != null)
-                    {
-                        record.write(dos);
-                        ++recordCount;
-                    }
-                    Log.debug("Finished streaming fragment " + fragment + " of resource " + dataDir + ", " + recordCount + " records.");
-                }
-                catch (org.eclipse.jetty.io.EofException e)
-                {
-                    // Occurs whenever GPDB decides the end the connection
-                    Log.error("Remote connection closed by GPDB", e);
-                }
-                catch (Exception e)
-                {
-                    Log.error("Exception thrown streaming", e);
-                    // API does not allow throwing Exception so need to convert to something
-                    // I can throw without declaring...
-                    // Jetty ignores most exceptions while streaming (i.e recordCount > 0), so we need to throw a RuntimeIOException
-                    // (see org.eclipse.jetty.servlet.ServletHandler)
-                    if (recordCount > 0)
-                    {
-                        throw new RuntimeIOException(e.getMessage());
-                    }
-                    throw new IOException(e.getMessage());
-                }
-            }
-        };
+				try
+				{
+					Writable record = null;
+					DataOutputStream dos = new DataOutputStream(out);
+					Log.debug("Starting streaming fragment " + fragment + " of resource " + dataDir);
+					while ((record = bridge.getNext()) != null)
+					{
+						record.write(dos);
+						++recordCount;
+					}
+					Log.debug("Finished streaming fragment " + fragment + " of resource " + dataDir + ", " + recordCount + " records.");
+				}
+				catch (org.eclipse.jetty.io.EofException e)
+				{
+					// Occurs whenever GPDB decides the end the connection
+					Log.error("Remote connection closed by GPDB", e);
+				}
+				catch (Exception e)
+				{
+					Log.error("Exception thrown streaming", e);
+					// API does not allow throwing Exception so need to convert to something
+					// I can throw without declaring...
+					// Jetty ignores most exceptions while streaming (i.e recordCount > 0), so we need to throw a RuntimeIOException
+					// (see org.eclipse.jetty.servlet.ServletHandler)
+					if (recordCount > 0)
+					{
+						throw new RuntimeIOException(e.getMessage());
+					}
+					throw new IOException(e.getMessage());
+				}
+			}
+		};
 
 		return Response.ok(streaming, MediaType.APPLICATION_OCTET_STREAM).build();
 	}

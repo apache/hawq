@@ -91,7 +91,7 @@ public class HBaseAccessorTest
 
 		accessor = new HBaseAccessor(inputData);
 
-		assertFalse(accessor.Open());
+		assertFalse(accessor.openForRead());
 
 		verifyScannerDidNothing();
 	}
@@ -129,7 +129,7 @@ public class HBaseAccessorTest
 		when(inputData.getDataFragment()).thenReturn(-1);
 
 		accessor = new HBaseAccessor(inputData);
-		assertFalse(accessor.Open());
+		assertFalse(accessor.openForRead());
 
 		verifyScannerDidNothing();
 
@@ -199,7 +199,7 @@ public class HBaseAccessorTest
 	 */
 	private void closeAccessor() throws Exception
 	{
-		accessor.Close();
+		accessor.closeForRead();
 		verify(table).close();
 	}
 }

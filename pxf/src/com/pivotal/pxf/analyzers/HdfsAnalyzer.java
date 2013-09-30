@@ -12,8 +12,8 @@ import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 
-import com.pivotal.pxf.accessors.Accessor;
-import com.pivotal.pxf.bridge.Bridge;
+import com.pivotal.pxf.accessors.IReadAccessor;
+import com.pivotal.pxf.bridge.ReadBridge;
 import com.pivotal.pxf.utilities.GPFusionInputFormat;
 import com.pivotal.pxf.utilities.InputData;
 
@@ -95,14 +95,14 @@ public class HdfsAnalyzer extends Analyzer
 	private long getNumberOfTuplesInBlock() throws Exception
 	{
 		long tuples = -1; /* default  - if we are not able to read data */
-		Accessor accessor = Bridge.getFileAccessor(inputData);
-		if (accessor.Open());
+		IReadAccessor accessor = ReadBridge.getFileAccessor(inputData);
+		if (accessor.openForRead());
 		{
 			tuples = 0;
-			while (accessor.LoadNextObject() != null)
+			while (accessor.readNextObject() != null)
 				tuples++;
 
-			accessor.Close();
+			accessor.closeForRead();
 		}
 
 		return tuples;

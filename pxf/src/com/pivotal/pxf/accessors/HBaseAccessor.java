@@ -18,9 +18,11 @@ import org.apache.hadoop.hbase.util.Bytes;
 
 import com.pivotal.pxf.filtering.HBaseFilterBuilder;
 import com.pivotal.pxf.format.OneRow;
+import com.pivotal.pxf.resolvers.IReadResolver;
 import com.pivotal.pxf.utilities.HBaseColumnDescriptor;
 import com.pivotal.pxf.utilities.HBaseTupleDescription;
 import com.pivotal.pxf.utilities.InputData;
+import com.pivotal.pxf.utilities.Plugin;
 
 /*
  * The Bridge API accessor for HBase.
@@ -34,7 +36,7 @@ import com.pivotal.pxf.utilities.InputData;
  * The class now supports filters using the HBaseFilterBuilder.
  * Regions can be filtered out according to input from HBaseFilterBuilder.
  */
-public class HBaseAccessor extends Accessor
+public class HBaseAccessor extends Plugin implements IReadAccessor 
 {
 	private HBaseTupleDescription tupleDescription;
 	private HTable table;
@@ -76,7 +78,7 @@ public class HBaseAccessor extends Accessor
 		scanEndKey = HConstants.EMPTY_END_ROW;
 	}
 
-	public boolean Open() throws Exception
+	public boolean openForRead() throws Exception
 	{
 		openTable();
 		createScanner();
@@ -88,12 +90,12 @@ public class HBaseAccessor extends Accessor
 	/*
 	 * Close the table
 	 */
-	public void Close() throws Exception
+	public void closeForRead() throws Exception
 	{
 		table.close();
 	}
 
-	public OneRow LoadNextObject() throws IOException
+	public OneRow readNextObject() throws IOException
 	{
 		Result result;
 

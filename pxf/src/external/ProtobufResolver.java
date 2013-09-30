@@ -2,16 +2,18 @@ import java.util.List;
 
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.DynamicMessage;
+import com.pivotal.pxf.accessors.IReadAccessor;
 import com.pivotal.pxf.format.OneField;
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.hadoop.io.GPDBWritable;
-import com.pivotal.pxf.resolvers.Resolver;
+import com.pivotal.pxf.resolvers.IReadResolver;
 import com.pivotal.pxf.utilities.InputData;
+import com.pivotal.pxf.utilities.Plugin;
 
 /*
  * Implementation for protocol-buffers of Resolver
  */
-public class ProtobufResolver extends  Resolver
+public class ProtobufResolver extends Plugin implements IReadResolver
 {
 	// the reflection instances
 	private DynamicMessage m = null;
@@ -30,7 +32,7 @@ public class ProtobufResolver extends  Resolver
 	 * Interface method - returns a list of OneField objects - each object
 	 * represents a field in a record
 	 */	
-	public List<OneField> GetFields(OneRow onerow)
+	public List<OneField> getFields(OneRow onerow)
 	{
 		java.util.List<OneField> list = new java.util.LinkedList<OneField>();
 		
@@ -49,7 +51,7 @@ public class ProtobufResolver extends  Resolver
 				// we can deal with a simple embedded message
 				if (key.isRepeated() == false)
 				{
-					java.util.List<OneField> embList = GetFields(new OneRow(null, val));
+					java.util.List<OneField> embList = getFields(new OneRow(null, val));
 					list.addAll(embList);
 				}
 				// or a repeated embedded message (that is a list of embedded messages)
@@ -60,7 +62,7 @@ public class ProtobufResolver extends  Resolver
 					for (int i = 0; i < num_records; i++)
 					{
 						Object one_of_many = record.getRepeatedField(key, i);
-						java.util.List<OneField> embRepList = GetFields(new OneRow(null, one_of_many));
+						java.util.List<OneField> embRepList = getFields(new OneRow(null, one_of_many));
 						list.addAll(embRepList);
 					}
 				}

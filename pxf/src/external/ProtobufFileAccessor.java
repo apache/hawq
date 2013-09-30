@@ -42,21 +42,21 @@ public class ProtobufFileAccessor extends HdfsAtomicDataAccessor
 		containerMsg = "People";
 	}
 	
-	public boolean Open() throws Exception
+	public boolean openForRead() throws Exception
 	{		
-		if (!super.Open())
+		if (!super.openForRead())
 			return false;
 		return open(inp);
 	}
 
 	/*
-	 * LoadNextObject
+	 * readNextObject
 	 * Fetches one record from the  file. The record is returned as a Java object.
 	 */			
-	public OneRow LoadNextObject() throws IOException
+	public OneRow readNextObject() throws IOException
 	{
 		// 1. The base class makes sure we can proceed - it tests that we are running in segment 0
-		if (super.LoadNextObject() == null)
+		if (super.readNextObject() == null)
 			return null;
 
 		// 2. If we reached the end of the records sequence, we leave

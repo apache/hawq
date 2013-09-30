@@ -1,6 +1,7 @@
 package com.pivotal.pxf.bridge;
 
 import java.io.CharConversionException;
+import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.UTFDataFormatException;
@@ -11,16 +12,16 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.io.Writable;
 
-import com.pivotal.pxf.accessors.Accessor;
+import com.pivotal.pxf.accessors.IReadAccessor;
 import com.pivotal.pxf.exception.BadRecordException;
 import com.pivotal.pxf.format.BridgeOutputBuilder;
 import com.pivotal.pxf.format.OneRow;
-import com.pivotal.pxf.resolvers.Resolver;
+import com.pivotal.pxf.resolvers.IReadResolver;
 import com.pivotal.pxf.utilities.InputData;
 import com.pivotal.pxf.utilities.Utilities;
 
 /*
- * Bridge class creates appropriate accessor and resolver.
+ * ReadBridge class creates appropriate accessor and resolver.
  * It will then create the correct output conversion
  * class (e.g. Text or GPDBWritable) and get records from accessor,
  * let resolver deserialize them and reserialize them using the
@@ -29,10 +30,10 @@ import com.pivotal.pxf.utilities.Utilities;
  * The class handles BadRecordException and other exception type
  * and marks the record as invalid for GPDB.
  */
-public class Bridge implements IBridge
+public class ReadBridge implements IBridge
 {
-	Accessor fileAccessor = null;
-	Resolver fieldsResolver = null;
+	IReadAccessor fileAccessor = null;
+	IReadResolver fieldsResolver = null;
 	BridgeOutputBuilder outputBuilder = null;
 
 	private Log Log;
@@ -40,39 +41,39 @@ public class Bridge implements IBridge
 	/*
 	 * C'tor - set the implementation of the bridge
 	 */
-	public Bridge(InputData input) throws Exception
+	public ReadBridge(InputData input) throws Exception
 	{
 		fileAccessor = getFileAccessor(input);
 		fieldsResolver = getFieldsResolver(input);
 		outputBuilder = new BridgeOutputBuilder(input);
-		Log = LogFactory.getLog(Bridge.class);
+		Log = LogFactory.getLog(ReadBridge.class);
 	}
 
 	/*
 	 * Accesses the underlying HDFS file
 	 */
-	public boolean BeginIteration() throws Exception
+	public boolean beginIteration() throws Exception
 	{
-		return fileAccessor.Open();
+		return fileAccessor.openForRead();
 	}
 
 	/*
 	 * Fetch next object from file and turn it into a record that the GPDB backend can process
 	 */
-	public Writable GetNext() throws Exception
+	public Writable getNext() throws Exception
 	{
 		Writable output = null;
 		OneRow onerow = null;
 		try
 		{
-			onerow = fileAccessor.LoadNextObject();
+			onerow = fileAccessor.readNextObject();
 			if (onerow == null)
 			{
-				fileAccessor.Close();
+				fileAccessor.closeForRead();
 				return null;
 			}
 
-			output = outputBuilder.makeOutput(fieldsResolver.GetFields(onerow));
+			output = outputBuilder.makeOutput(fieldsResolver.getFields(onerow));
 		}
 		catch (IOException ex)
 		{
@@ -101,17 +102,17 @@ public class Bridge implements IBridge
 		return output;
 	}
 
-	public static Accessor getFileAccessor(InputData inputData) throws Exception
+	public static IReadAccessor getFileAccessor(InputData inputData) throws Exception
 	{
-		return (Accessor)Utilities.createAnyInstance(InputData.class, 
+		return (IReadAccessor)Utilities.createAnyInstance(InputData.class, 
 													 inputData.accessor(), 
 													 "accessors", 
 													 inputData);
 	}
 
-	public static Resolver getFieldsResolver(InputData inputData) throws Exception
+	public static IReadResolver getFieldsResolver(InputData inputData) throws Exception
 	{
-		return (Resolver)Utilities.createAnyInstance(InputData.class, 
+		return (IReadResolver)Utilities.createAnyInstance(InputData.class, 
 													 inputData.resolver(), 
 													 "resolvers", 
 													 inputData);
@@ -134,5 +135,11 @@ public class Bridge implements IBridge
 				return true;
 
 		return false;
+	}
+
+	@Override
+	public boolean setNext(DataInputStream inputStream) throws Exception 
+	{
+		throw new Exception("setNext is not implemented");
 	}
 }

@@ -58,17 +58,17 @@ public class HiveAccessor extends HdfsSplittableDataAccessor
  	}
 	
 	/*
-	 * Open
-	 * Overriding open to enable partition filtering
+	 * openForRead
+	 * Overriding openForRead to enable partition filtering
 	 * If partition filter is set and the file currently opened by the accessor does not belong
 	 * to the partition we return false and stop processing for this file
 	 */	
-	public boolean Open() throws Exception
+	public boolean openForRead() throws Exception
 	{
 		if (!isOurDataInsideFilteredPartition())
 			return false;
 		
-		return super.Open();
+		return super.openForRead();
 	}
 	
 	/*

@@ -10,6 +10,7 @@ import org.apache.hadoop.fs.Path;
 
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.utilities.InputData;
+import com.pivotal.pxf.utilities.Plugin;
 
 /*
  * Base class for enforcing the complete access of a file in one accessor. Since we are not accessing the
@@ -22,7 +23,7 @@ import com.pivotal.pxf.utilities.InputData;
  * HDFS accessors for a specific file type should inherit from this class only if the file they are reading does 
  * not support splitting: a protocol-buffer file, regular file, ...
 */
-public abstract class HdfsAtomicDataAccessor extends Accessor
+public abstract class HdfsAtomicDataAccessor extends Plugin implements IReadAccessor
 {
 	private Configuration conf = null; 
 	protected InputStream inp = null;
@@ -40,11 +41,11 @@ public abstract class HdfsAtomicDataAccessor extends Accessor
 	}
 
 	/*
-	 * Open
+	 * openForRead
 	 * Opens the file the file, using the non-splittable API for HADOOP HDFS file access
 	 * This means that instead of using a FileInputFormat for access, we use a Java stream
 	 */	
-	public boolean Open() throws Exception
+	public boolean openForRead() throws Exception
 	{
 		if (!isWorkingSegment())
 			return false;
@@ -56,10 +57,10 @@ public abstract class HdfsAtomicDataAccessor extends Accessor
 	}
 
 	/*
-	 * LoadNextObject
+	 * readNextObject
 	 * Fetches one record from the  file. The record is returned as a Java object.
 	 */			
-	public OneRow LoadNextObject() throws IOException
+	public OneRow readNextObject() throws IOException
 	{
 		if (!isWorkingSegment())
 			return null;
@@ -68,10 +69,10 @@ public abstract class HdfsAtomicDataAccessor extends Accessor
 	}
 
 	/*
-	 * Close
+	 * closeForRead
 	 * When user finished reading the file, it closes the access stream
 	 */			
-	public void Close() throws Exception
+	public void closeForRead() throws Exception
 	{
 		if (!isWorkingSegment())
 			return;

@@ -21,19 +21,21 @@ import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.hadoop.io.GPDBWritable;
 import com.pivotal.pxf.utilities.InputData;
 import com.pivotal.pxf.utilities.RecordkeyAdapter;
+import com.pivotal.pxf.utilities.Plugin;
+
 
 /*
  * Class AvroResolver handles deserialization of records that were serialized 
  * using the AVRO serialization framework. AvroResolver implements
- * IFieldsResolver exposing one method: GetFields
+ * IReadResolver interface.
  */
-public class AvroResolver extends  Resolver
+public class AvroResolver extends Plugin implements IReadResolver 
 {
 	// Avro variables
 	private Schema schema = null;
 	private GenericRecord avroRecord = null;
 	private DatumReader<GenericRecord> reader = null;
-	private BinaryDecoder decoder = null;  // member kept to inable reuse, and thus avoid repeated allocation
+	private BinaryDecoder decoder = null;  // member kept to enable reuse, and thus avoid repeated allocation
 	private List<Schema.Field> fields = null;
 	private RecordkeyAdapter recordkeyAdapter = new RecordkeyAdapter();
 
@@ -57,12 +59,12 @@ public class AvroResolver extends  Resolver
 	}
 	
 	/*
-	 * GetFields returns a list of the fields of one record.
+	 * getFields returns a list of the fields of one record.
 	 * Each record field is represented by a OneField item.
 	 * OneField item contains two fields: an integer representing the field type and a Java
 	 * Object representing the field value.
 	 */
-	public List<OneField> GetFields(OneRow row) throws Exception
+	public List<OneField> getFields(OneRow row) throws Exception
 	{
 		avroRecord = makeAvroRecord(row.getData(), avroRecord);		
 		List<OneField> record =  new LinkedList<OneField>();
@@ -118,7 +120,7 @@ public class AvroResolver extends  Resolver
 	}
 	
 	/*
-	 * For a given field in the Avro record we extract it's value and insert it into the output
+	 * For a given field in the Avro record we extract its value and insert it into the output
 	 * List<OneField> record. An Avro field can be a primitive type or an array type.
 	 */
 	int populateRecord(List<OneField> record, Schema.Field field) throws IllegalAccessException

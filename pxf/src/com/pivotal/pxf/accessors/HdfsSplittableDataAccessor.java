@@ -13,13 +13,14 @@ import org.apache.hadoop.mapred.RecordReader;
 
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.utilities.InputData;
+import com.pivotal.pxf.utilities.Plugin;
 
 /*
  * Implementation of Accessor for accessing a splittable data source
  * - it means that HDFS will divide the file into splits based on an internal algorithm (by default, the 
  * the block size 64 MB is also the split size).  
  */
-public abstract class HdfsSplittableDataAccessor extends Accessor
+public abstract class HdfsSplittableDataAccessor extends Plugin implements IReadAccessor
 {
 	private   LinkedList<InputSplit> segSplits = null;
 	private   InputSplit currSplit = null;
@@ -47,11 +48,11 @@ public abstract class HdfsSplittableDataAccessor extends Accessor
 	}
 
 	/*
-	 * Open
+	 * openForRead
 	 * Fetches the first split (relevant to this segment) in the file, using
 	 * the splittable API - InputFormat
 	 */	
-	public boolean Open() throws Exception
+	public boolean openForRead() throws Exception
 	{
 		// 1. get the list of all splits the input file has
         FileInputFormat.setInputPaths(jobConf, new Path(inputData.path()));
@@ -107,10 +108,10 @@ public abstract class HdfsSplittableDataAccessor extends Accessor
 	}
 
 	/*
-	 * LoadNextObject
+	 * readNextObject
 	 * Fetches one record from the  file. The record is returned as a Java object.
 	 */		
-	public OneRow LoadNextObject() throws IOException
+	public OneRow readNextObject() throws IOException
 	{
 		if (!reader.next(key, data)) // if there is one more record in the current split
 		{
@@ -132,10 +133,10 @@ public abstract class HdfsSplittableDataAccessor extends Accessor
 	}
 
 	/*
-	 * Close
+	 * closeForRead
 	 * When user finished reading the file, it closes the RecordReader
 	 */		
-	public void Close() throws Exception
+	public void closeForRead() throws Exception
 	{
 		if (reader != null)
 			reader.close();

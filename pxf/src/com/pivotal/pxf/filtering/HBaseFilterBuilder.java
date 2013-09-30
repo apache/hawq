@@ -137,7 +137,7 @@ public class HBaseFilterBuilder implements FilterParser.IFilterBuilder
 										  FilterParser.Constant constant) throws Exception
 	{
 		HBaseColumnDescriptor hbaseColumn = tupleDescription.getColumn(column.index());
-		WritableByteArrayComparable comparator = getComparator(hbaseColumn.columnType(),
+		WritableByteArrayComparable comparator = getComparator(hbaseColumn.columnTypeCode(),
 															   constant.constant());
 
 		// If row key is of type TEXT, allow filter in start/stop row key API in
@@ -217,7 +217,7 @@ public class HBaseFilterBuilder implements FilterParser.IFilterBuilder
 	private boolean textualRowKey(HBaseColumnDescriptor column)
 	{
 		return column.isKeyColumn() &&
-			   column.columnType() == GPDBWritable.TEXT;
+			   column.columnTypeCode() == GPDBWritable.TEXT;
 	}
 
 	/*

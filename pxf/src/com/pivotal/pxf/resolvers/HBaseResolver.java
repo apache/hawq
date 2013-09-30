@@ -9,22 +9,25 @@ import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import com.pivotal.pxf.exception.BadRecordException;
+import com.pivotal.pxf.exception.UnsupportedTypeException;
 import com.pivotal.pxf.format.OneField;
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.hadoop.io.GPDBWritable;
 import com.pivotal.pxf.utilities.HBaseColumnDescriptor;
 import com.pivotal.pxf.utilities.HBaseTupleDescription;
 import com.pivotal.pxf.utilities.InputData;
+import com.pivotal.pxf.utilities.Plugin;
 
 /*
- * The Bridge API resolver for gphbase protocol.
+ * Record resolver for HBase.
+ * 
  * The class is responsible to convert rows from HBase scans (returned as Result objects)
  * into a List of OneField objects which later translates into GPDBWritable objects.
  * That also includes the conversion process of each HBase column's value into its GP assigned type.
  *
  * Currently, the class assumes all HBase values are stored as String object Bytes encoded
  */
-public class HBaseResolver extends Resolver
+public class HBaseResolver extends Plugin implements IReadResolver 
 {
 	private HBaseTupleDescription tupleDescription;
 
@@ -34,10 +37,10 @@ public class HBaseResolver extends Resolver
 		tupleDescription = new HBaseTupleDescription(input);
 	}
 
-	public List<OneField> GetFields(OneRow onerow) throws Exception
+	public List<OneField> getFields(OneRow onerow) throws Exception
 	{
 		Result result = (Result)onerow.getData();
-		LinkedList<OneField> row = new LinkedList<OneField>();
+		LinkedList<OneField> fields = new LinkedList<OneField>();
 
 		for (int i = 0; i < tupleDescription.columns(); ++i)
 		{
@@ -50,23 +53,23 @@ public class HBaseResolver extends Resolver
 				value = getColumnValue(result, column);
 
 			OneField oneField = new OneField();
-			oneField.type = column.columnType();
-			oneField.val = convertToJavaObject(oneField.type, value);
-			row.add(oneField);
+			oneField.type = column.columnTypeCode();
+			oneField.val = convertToJavaObject(oneField.type, column.columnTypeName(), value);
+			fields.add(oneField);
 		}
-		return row;
+		return fields;
 	}
 
 	/*
 	 * Call the conversion function for type
 	 */
-	Object convertToJavaObject(int type, byte[] val) throws Exception
+	Object convertToJavaObject(int typeCode, String typeName, byte[] val) throws Exception
 	{
 		if (val == null)
 			return null;
         try
         {
-            switch(type)
+            switch(typeCode)
             {
                 case GPDBWritable.TEXT:
                 case GPDBWritable.VARCHAR:
@@ -101,13 +104,14 @@ public class HBaseResolver extends Resolver
                     return Timestamp.valueOf(Bytes.toString(val));
                     
                 default:
-                    throw new Exception("Unsupported data type " + type);
+                    throw new UnsupportedTypeException("Unsupported data type " + typeName);
             }
         } 
         catch (NumberFormatException e)
         {
-            // Replace exception with BadRecordException
-            throw new BadRecordException(e);
+            throw new BadRecordException("Error converting value '" + Bytes.toString(val) + "' " +
+            							 "to type " + typeName + ". " +
+            							 "(original error: " + e.getMessage() + ")");
         }
 	}
 

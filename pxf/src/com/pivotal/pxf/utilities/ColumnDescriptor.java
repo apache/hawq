@@ -2,28 +2,31 @@ package com.pivotal.pxf.utilities;
 
 
 /*
- * ColumnDescriptor describes one column in greenplum database.
- * Currently it means a name and a type (GPDB OID)
+ * ColumnDescriptor describes one column in hawq database.
+ * Currently it means a name, a type id (HAWQ/GPDB OID), and a type name.
  */
 public class ColumnDescriptor
 {
-	int gpdbColumnType;
+	int gpdbColumnTypeCode;
 	String gpdbColumnName;
+	String gpdbColumnTypeName;
 	int gpdbColumnIndex;
 	public static final String recordkeyName = "recordkey";
 
-	public ColumnDescriptor(String name, int type, int index)
+	public ColumnDescriptor(String name, int typecode, int index, String typename)
 	{
-		gpdbColumnType = type;
+		gpdbColumnTypeCode = typecode;
+		gpdbColumnTypeName = typename;
 		gpdbColumnName = name;
 		gpdbColumnIndex = index;
 	}
 
 	public ColumnDescriptor(ColumnDescriptor copy)
 	{
-		this.gpdbColumnType = copy.gpdbColumnType;
+		this.gpdbColumnTypeCode = copy.gpdbColumnTypeCode;
 		this.gpdbColumnName = copy.gpdbColumnName;
 		this.gpdbColumnIndex = copy.gpdbColumnIndex;
+		this.gpdbColumnTypeName = copy.gpdbColumnTypeName;
 	}
 
 	public String columnName()
@@ -31,14 +34,19 @@ public class ColumnDescriptor
 		return gpdbColumnName;
 	}
 
-	public int columnType()
+	public int columnTypeCode()
 	{
-		return gpdbColumnType;
+		return gpdbColumnTypeCode;
 	}
 
 	public int columnIndex()
 	{
 		return gpdbColumnIndex;
+	}
+	
+	public String columnTypeName()
+	{
+		return gpdbColumnTypeName;
 	}
 
 	public boolean isKeyColumn()
