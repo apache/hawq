@@ -62,7 +62,7 @@ test__parseGPHDUri__ValidURI(void **state)
 void
 test__parseGPHDUri__NegativeTestNoProtocol(void **state)
 {
-	char* uri_no_protocol = "gpxf:/1.2.3.4:5678/some/path/and/table.tbl?FRAGMENTER=HdfsDataFragmenter";
+	char* uri_no_protocol = "pxf:/1.2.3.4:5678/some/path/and/table.tbl?FRAGMENTER=HdfsDataFragmenter";
 
 	/* Setting the test -- code omitted -- */
 	PG_TRY();
@@ -78,15 +78,133 @@ test__parseGPHDUri__NegativeTestNoProtocol(void **state)
 		/*Validate the type of expected error */
 		assert_true(edata->sqlerrcode == ERRCODE_SYNTAX_ERROR);
 		assert_true(edata->elevel == ERROR);
-		assert_string_equal(edata->message, "Invalid URI gpxf:/1.2.3.4:5678/some/path/and/table.tbl?FRAGMENTER=HdfsDataFragmenter");
+		assert_string_equal(edata->message, "Invalid URI pxf:/1.2.3.4:5678/some/path/and/table.tbl?FRAGMENTER=HdfsDataFragmenter");
 		return;
 	}
 	PG_END_TRY();
 
 	assert_true(false);
-
 }
 
+/*
+ * Negative test: parsing of a uri with a missing equal
+ */
+void
+test__parseGPHDUri__NegativeTestMissingEqual(void **state)
+{
+	char* uri_missing_equal = "pxf://1.2.3.4:5678/some/path/and/table.tbl?FRAGMENTER";
+
+	/* Setting the test -- code omitted -- */
+	PG_TRY();
+	{
+		/* This will throw a ereport(ERROR).*/
+		GPHDUri* parsed = parseGPHDUri(uri_missing_equal);
+	}
+	PG_CATCH();
+	{
+		CurrentMemoryContext = 1;
+		ErrorData *edata = CopyErrorData();
+
+		/*Validate the type of expected error */
+		assert_true(edata->sqlerrcode == ERRCODE_SYNTAX_ERROR);
+		assert_true(edata->elevel == ERROR);
+		assert_string_equal(edata->message, "Invalid URI pxf://1.2.3.4:5678/some/path/and/table.tbl?FRAGMENTER: option 'FRAGMENTER' missing '='");
+		return;
+	}
+	PG_END_TRY();
+
+	assert_true(false);
+}
+
+/*
+ * Negative test: parsing of a uri with duplicate equals
+ */
+void
+test__parseGPHDUri__NegativeTestDuplicateEquals(void **state)
+{
+	char* uri_duplicate_equals = "pxf://1.2.3.4:5678/some/path/and/table.tbl?FRAGMENTER=HdfsDataFragmenter=DuplicateFragmenter";
+
+	/* Setting the test -- code omitted -- */
+	PG_TRY();
+	{
+		/* This will throw a ereport(ERROR).*/
+		GPHDUri* parsed = parseGPHDUri(uri_duplicate_equals);
+	}
+	PG_CATCH();
+	{
+		CurrentMemoryContext = 1;
+		ErrorData *edata = CopyErrorData();
+
+		/*Validate the type of expected error */
+		assert_true(edata->sqlerrcode == ERRCODE_SYNTAX_ERROR);
+		assert_true(edata->elevel == ERROR);
+		assert_string_equal(edata->message, "Invalid URI pxf://1.2.3.4:5678/some/path/and/table.tbl?FRAGMENTER=HdfsDataFragmenter=DuplicateFragmenter: option 'FRAGMENTER=HdfsDataFragmenter=DuplicateFragmenter' contains duplicate '='");
+		return;
+	}
+	PG_END_TRY();
+
+	assert_true(false);
+}
+
+/*
+ * Negative test: parsing of a uri with a missing key
+ */
+void
+test__parseGPHDUri__NegativeTestMissingKey(void **state)
+{
+	char* uri_missing_key = "pxf://1.2.3.4:5678/some/path/and/table.tbl?=HdfsDataFragmenter";
+
+	/* Setting the test -- code omitted -- */
+	PG_TRY();
+	{
+		/* This will throw a ereport(ERROR).*/
+		GPHDUri* parsed = parseGPHDUri(uri_missing_key);
+	}
+	PG_CATCH();
+	{
+		CurrentMemoryContext = 1;
+		ErrorData *edata = CopyErrorData();
+
+		/*Validate the type of expected error */
+		assert_true(edata->sqlerrcode == ERRCODE_SYNTAX_ERROR);
+		assert_true(edata->elevel == ERROR);
+		assert_string_equal(edata->message, "Invalid URI pxf://1.2.3.4:5678/some/path/and/table.tbl?=HdfsDataFragmenter: option '=HdfsDataFragmenter' missing key before '='");
+		return;
+	}
+	PG_END_TRY();
+
+	assert_true(false);
+}
+
+/*
+ * Negative test: parsing of a uri with a missing value
+ */
+void
+test__parseGPHDUri__NegativeTestMissingValue(void **state)
+{
+	char* uri_missing_value = "pxf://1.2.3.4:5678/some/path/and/table.tbl?FRAGMENTER=";
+
+	/* Setting the test -- code omitted -- */
+	PG_TRY();
+	{
+		/* This will throw a ereport(ERROR).*/
+		GPHDUri* parsed = parseGPHDUri(uri_missing_value);
+	}
+	PG_CATCH();
+	{
+		CurrentMemoryContext = 1;
+		ErrorData *edata = CopyErrorData();
+
+		/*Validate the type of expected error */
+		assert_true(edata->sqlerrcode == ERRCODE_SYNTAX_ERROR);
+		assert_true(edata->elevel == ERROR);
+		assert_string_equal(edata->message, "Invalid URI pxf://1.2.3.4:5678/some/path/and/table.tbl?FRAGMENTER=: option 'FRAGMENTER=' missing value after '='");
+		return;
+	}
+	PG_END_TRY();
+
+	assert_true(false);
+}
 
 int 
 main(int argc, char* argv[]) 
@@ -95,7 +213,11 @@ main(int argc, char* argv[])
 
 	const UnitTest tests[] = {
 			unit_test(test__parseGPHDUri__ValidURI),
-			unit_test(test__parseGPHDUri__NegativeTestNoProtocol)
+			unit_test(test__parseGPHDUri__NegativeTestNoProtocol),
+			unit_test(test__parseGPHDUri__NegativeTestMissingEqual),
+			unit_test(test__parseGPHDUri__NegativeTestDuplicateEquals),
+			unit_test(test__parseGPHDUri__NegativeTestMissingKey),
+			unit_test(test__parseGPHDUri__NegativeTestMissingValue)
 	};
 	return run_tests(tests);
 }

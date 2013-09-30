@@ -14,6 +14,11 @@
 -- TODO: test parameter passing, filter passing
 -- start_matchsubs
 --                                                                                               
+-- # create a match/subs expression to handle file name and line number in error messages
+--
+-- m/\w+\.c:\d+/
+-- s/\w+\.c:\d+/SOME_FILE:SOME_LINE/
+--
 -- # create a match/subs expression to handle ip addresses that change
 --
 -- m/(ERROR|WARNING):.*remote component error.*\(\d+\).*from.*'\d+\.\d+\.\d+\.\d+:\d+'.*/
@@ -32,8 +37,8 @@ FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- negative
 ERROR:  invalid URI pxf://@hostname@:50070/hbasetable: missing options section
 CREATE WRITABLE EXTERNAL TABLE gphbase_out(a int, b text, c bytea)
 LOCATION ('pxf://@hostname@:50070/hbasetable?FRAGMENTER=HBaseDataFragmenter&ACCESSOR=HBaseAccessor&RESOLVER=HBaseResolver')
-FORMAT 'CUSTOM' (formatter='gpdbwritable_export');
-ERROR:  pxf does not yet support writable external tables
+FORMAT 'CUSTOM' (formatter='gpdbwritable_export'); -- positive
+DROP EXTERNAL TABLE gphbase_out;
 -- Setup
 \! javac -cp `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar` @abs_srcdir@/helpers/HBaseCreateTables.java @abs_srcdir@/helpers/HBaseDropTables.java @abs_srcdir@/helpers/HBaseChangeLookupTable.java
 \! java -cp  `${HADOOP_ROOT}/bin/hadoop classpath`:`echo ${HBASE_ROOT}/lib/log4j-*.jar`:`echo ${HADOOP_ROOT}/lib/commons-logging-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-configuration-[1-9]*.jar`:`echo ${HADOOP_ROOT}/lib/commons-lang-[1-9]*.jar`:@abs_srcdir@/helpers HBaseCreateTables
@@ -75,9 +80,28 @@ CREATE EXTERNAL TABLE gphbase_select(recordkey TEXT,
 									 "cf1:q12" TIMESTAMP) 
 LOCATION ('pxf://@hostname@:50070/gphbase_test?FRAGMENTER=HBaseDataFragmenter&ACCESSOR=HBaseAccessor&RESOLVER=HBaseResolver')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import');
+-- Test unsupported data type
+CREATE EXTERNAL TABLE gphbase_unsupported_type(recordkey TEXT, 
+                                     "cf1:q1" VARCHAR, 
+                                     "cf1:q2" TEXT, 
+                                     "cf1:q3" INT, 
+                                     q4 BYTEA, 
+                                     "cf1:q5" REAL, 
+                                     "cf1:q6" FLOAT, 
+                                     "cf1:q7" BYTEA, 
+                                     "cf1:q8" POINT, -- the unsupported type 
+                                     "cf1:q9" BIGINT,
+									 "cf1:q10" BOOLEAN,
+									 "cf1:q11" NUMERIC,
+									 "cf1:q12" TIMESTAMP) 
+LOCATION ('pxf://@hostname@:50070/gphbase_test?FRAGMENTER=HBaseDataFragmenter&ACCESSOR=HBaseAccessor&RESOLVER=HBaseResolver')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import');
+SELECT * FROM gphbase_unsupported_type;
+ERROR:  remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v7/Bridge/. Reason:     Server Error   Caused by:  java.io.IOException: Unsupported data type point (SOME_FILE:SOME_LINE)
+DETAIL:  External table gphbase_unsupported_type
 -- Test analyze for HBase table.
 ANALYZE gphbase_select;
-WARNING:  skipping "gphbase_select" --- error returned: no ANALYZER option in table definition
+WARNING:  skipping "gphbase_select" --- error returned: no ANALYZER or PROFILE option in table definition
 select relpages, reltuples from pg_class where relname = 'gphbase_select';
  relpages | reltuples 
 ----------+-----------

@@ -4,7 +4,8 @@ import java.util.LinkedList;
 import com.pivotal.pxf.format.OneField;
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.utilities.InputData;
-import com.pivotal.pxf.resolvers.Resolver;
+import com.pivotal.pxf.utilities.Plugin;
+import com.pivotal.pxf.resolvers.IReadResolver;
 import com.pivotal.pxf.hadoop.io.GPDBWritable;
 
 
@@ -14,14 +15,14 @@ import com.pivotal.pxf.hadoop.io.GPDBWritable;
  * must inherit this abstract class
  * Dummy implementation, for documentation
  */
-public class DummyResolver extends Resolver
+public class DummyResolver extends Plugin implements IReadResolver
 {
 	public DummyResolver(InputData metaData)
 	{
 		super(metaData);
 	}
 	
-	public List<OneField> GetFields(OneRow row) throws Exception
+	public List<OneField> getFields(OneRow row) throws Exception
     {
         /* break up the row into fields */
         List<OneField> output = new LinkedList<OneField>();

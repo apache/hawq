@@ -11,41 +11,14 @@
 #include "postgres.h"
 #include <curl/curl.h>
 #include <json/json.h>
-#include "access/pxfuriparser.h"
+#include "access/pxfmasterapi.h"
 #include "access/hd_work_mgr.h"
 #include "access/libchurl.h"
 #include "access/pxfheaders.h"
 #include "cdb/cdbutil.h"
 #include "cdb/cdbvars.h"
-#include "commands/copy.h"
 #include "utils/guc.h"
 #include "utils/elog.h"
-
-/*
- * One debug level for all log messages from the data allocation algorithm
- */
-#define FRAGDEBUG DEBUG2
-
-/*
- * Represents a fragment location replica
- */
-typedef struct sFragmentLocation
-{
-	char *ip;
-	int   rest_port;
-} FragmentLocation;
-
-/*
- * A DataFragment instance contains the fragment data necessary
- * for the allocation algorithm
- */
-typedef struct sDataFragment
-{
-	int   index; /* index per source name */
-	char *source_name;
-	List *locations;
-	char *user_data;
-} DataFragment;
 
 /*
  * Contains the information about the allocated data fragment that will be sent to the
@@ -92,22 +65,7 @@ typedef struct sGpHost
 	List *segs; /* list of CdbComponentDatabaseInfo* */
 } GpHost;
 
-typedef struct sDataNodeRestSrv
-{
-	char *host;
-	int port;
-} DataNodeRestSrv;
 
-typedef struct sClientContext
-{
-	CHURL_HEADERS http_headers;
-	CHURL_HANDLE handle;
-	char chunk_buf[RAW_BUF_SIZE];	/* part of the HTTP response - received	*/
-									/* from one call to churl_read 			*/
-	StringInfoData the_rest_buf; 	/* contains the complete HTTP response 	*/
-} ClientContext;
-
-static const char *REST_HEADER_JSON_RESPONSE = "Accept: application/json";
 
 /*
  * segwork is the output string that describes the data fragments that were
@@ -119,23 +77,14 @@ static const char *REST_HEADER_JSON_RESPONSE = "Accept: application/json";
 static const char *SEGWORK_PREFIX = "segwork=";
 static const char SEGWORK_IN_PAIR_DELIM = '@';
 
-static List* parse_get_fragments_response(List* fragments, StringInfo rest_buf);
-static void free_fragment(DataFragment *fragment);
 static List* free_fragment_list(List *fragments);
-static List* get_data_fragment_list(GPHDUri *hadoop_uri,  ClientContext* client_context);
 static List** distribute_work_2_gp_segments(List *data_fragments_list, int num_segs, int working_segs);
 static void  print_fragment_list(List *frags_list);
 static char* make_allocation_output_string(List *segment_fragments);
 static List* free_allocated_frags(List *segment_fragments);
-static List* get_datanode_rest_servers(GPHDUri *hadoop_uri, ClientContext* client_context);
 static void assign_rest_ports_to_fragments(ClientContext *client_context, GPHDUri *hadoop_uri, List *fragments);
-static List* parse_datanodes_response(List *rest_srvrs, StringInfo rest_buf);
-static void free_datanode_rest_servers(List *srvrs);
-static void process_request(ClientContext* client_context, char *uri);
 static void init_client_context(ClientContext *client_context);
 static GPHDUri* init(char* uri, ClientContext* cl_context);
-static PxfStatsElem *get_data_statistics(GPHDUri* hadoop_uri, ClientContext *cl_context, StringInfo err_msg);
-static PxfStatsElem* parse_get_stats_response(StringInfo rest_buf);
 static List* allocate_fragments_to_datanodes(List *whole_data_fragments_list);
 static DatanodeProcessingLoad* get_dn_processing_load(List **allDNProcessingLoads, FragmentLocation *fragment_loc);
 static void print_data_nodes_allocation(List *allDNProcessingLoads, int total_data_frags);
@@ -227,6 +176,7 @@ PxfStatsElem *get_pxf_statistics(char *uri, Relation rel, StringInfo err_msg)
 {
 	ClientContext client_context; /* holds the communication info */
 	char *analyzer = NULL;
+	char *profile = NULL;
 	PxfInputData inputData;
 	
 	GPHDUri* hadoop_uri = init(uri, &client_context);
@@ -236,10 +186,11 @@ PxfStatsElem *get_pxf_statistics(char *uri, Relation rel, StringInfo err_msg)
 	/*
 	 * Get the statistics info from REST only if analyzer is defined
      */
-	if(GPHDUri_get_value_for_opt(hadoop_uri, "analyzer", &analyzer, false) != 0)
+	if(GPHDUri_get_value_for_opt(hadoop_uri, "analyzer", &analyzer, false) != 0 &&
+		GPHDUri_get_value_for_opt(hadoop_uri, "profile", &profile, false) != 0)
 	{
 		if (err_msg)
-			appendStringInfo(err_msg, "no ANALYZER option in table definition");
+			appendStringInfo(err_msg, "no ANALYZER or PROFILE option in table definition");
 		return NULL;
 	}
 	
@@ -255,82 +206,6 @@ PxfStatsElem *get_pxf_statistics(char *uri, Relation rel, StringInfo err_msg)
 	return get_data_statistics(hadoop_uri, &client_context, err_msg);
 }
 
-/*
- * Fetch the statistics from the PXF service
- */
-static PxfStatsElem *get_data_statistics(GPHDUri* hadoop_uri,
-										 ClientContext *cl_context,
-										 StringInfo err_msg)
-{
-	StringInfoData request;	
-	initStringInfo(&request);
-	
-	/* construct the request */
-	appendStringInfo(&request, "http://%s:%s/%s/%s/Analyzer/getEstimatedStats?path=%s",
-					 hadoop_uri->host,
-					 hadoop_uri->port,
-					 GPDB_REST_PREFIX,
-					 PFX_VERSION,
-					 hadoop_uri->data);
-
-	/* send the request. The response will exist in rest_buf.data */
-	PG_TRY();
-	{
-		process_request(cl_context, request.data);
-	}
-	PG_CATCH();
-	{
-		/* 
-		 * communication problems with PXF service
-		 * Statistics for a table can be done as part of an ANALYZE procedure on many tables,
-		 * and we don't want to stop because of a communication error. So we catch the exception,
-		 * append its error to err_msg, and return a NULL,
-		 * which will force the the analyze code to use former calculated values or defaults.
-		 */
-		if (err_msg)
-		{
-			char* message = elog_message();
-			if (message)
-				appendStringInfo(err_msg, "%s", message);
-			else
-				appendStringInfo(err_msg, "Unknown error");
-
-		}
-		/* release error state */
-		if (!elog_dismiss(DEBUG5))
-			PG_RE_THROW(); /* hope to never get here! */
-
-		return NULL;	
-	}
-	PG_END_TRY();
-	
-	/* parse the JSON response and form a fragments list to return */
-	return parse_get_stats_response(&(cl_context->the_rest_buf));
-}
-
-/*
- * Parse the json response from the PXF Fragmenter.getSize
- */
-static PxfStatsElem *parse_get_stats_response(StringInfo rest_buf)
-{
-	PxfStatsElem* statsElem = (PxfStatsElem*)palloc0(sizeof(PxfStatsElem));
-	struct json_object	*whole	= json_tokener_parse(rest_buf->data);
-	struct json_object	*head	= json_object_object_get(whole, "PXFDataSourceStats");
-				
-	/* 0. block size */
-	struct json_object *js_block_size = json_object_object_get(head, "blockSize");
-	statsElem->blockSize = json_object_get_int(js_block_size);
-	
-	/* 1. number of blocks */
-	struct json_object *js_num_blocks = json_object_object_get(head, "numberOfBlocks");
-	statsElem->numBlocks = json_object_get_int(js_num_blocks);
-	
-	/* 2. number of tuples */
-	struct json_object *js_num_tuples = json_object_object_get(head, "numberOfTuples");
-	statsElem->numTuples = json_object_get_int(js_num_tuples);
-		
-	return statsElem;	
-}
 
 /*
  * Preliminary uri parsing and curl initializations for the REST communication
@@ -338,6 +213,7 @@ static PxfStatsElem *parse_get_stats_response(StringInfo rest_buf)
 static GPHDUri* init(char* uri, ClientContext* cl_context)
 {	
 	char *fragmenter = NULL;
+	char *profile = NULL;
 
 	/*
 	 * 1. Cherrypick the data relevant for HADOOP from the input uri
@@ -357,33 +233,19 @@ static GPHDUri* init(char* uri, ClientContext* cl_context)
 		return NULL;
 	
 	/*
-	 * 3. Test that the Fragmenter was specified in the URI
+	 * 3. Test that Fragmenter or Profile was specified in the URI
 	 */
-	GPHDUri_get_value_for_opt(hadoop_uri, "fragmenter", &fragmenter, true);
+	if(GPHDUri_get_value_for_opt(hadoop_uri, "fragmenter", &fragmenter, false) != 0 
+		&& GPHDUri_get_value_for_opt(hadoop_uri, "profile", &profile, false) != 0)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_SYNTAX_ERROR),
+				 errmsg("FRAGMENTER or PROFILE option must exist in %s", hadoop_uri->uri)));
+	}
 
 	return hadoop_uri;	
 }
 
-/*
- * Wrapper for libchurl
- */
-static void process_request(ClientContext* client_context, char *uri)
-{
-	size_t n = 0;
-
-	print_http_headers(client_context->http_headers);
-	client_context->handle = churl_init_download(uri, client_context->http_headers);
-	memset(client_context->chunk_buf, 0, RAW_BUF_SIZE);
-	resetStringInfo(&(client_context->the_rest_buf));
-	
-	while ((n = churl_read(client_context->handle, client_context->chunk_buf, sizeof(client_context->chunk_buf))) != 0)
-	{
-		appendBinaryStringInfo(&(client_context->the_rest_buf), client_context->chunk_buf, n);
-		memset(client_context->chunk_buf, 0, RAW_BUF_SIZE);
-	}
-	
-	churl_cleanup(client_context->handle);
-}
 
 /*
  * Interface function that releases the memory allocated for the strings array
@@ -478,7 +340,7 @@ distribute_work_2_gp_segments(List *whole_data_fragments_list, int total_segs, i
 		}
 		Assert(gpHosts != NIL);
 		
-		/* pick the starting segment on the host randomaly */
+		/* pick the starting segment on the host randomly */
 		gp_host_cell = pick_random_cell_in_list(gpHosts);
 		GpHost* gp_host = (GpHost*)lfirst(gp_host_cell);
 		seg_cell = pick_random_cell_in_list(gp_host->segs);
@@ -875,145 +737,6 @@ free_allocated_frags(List *segment_fragments)
 }
 
 /*
- * parse the response of the PXF Fragments call. An example:
- *
- * Request:
- * 		curl --header "X-GP-FRAGMENTER: HdfsDataFragmenter" "http://goldsa1mac.local:50070/gpdb/v2/Fragmenter/getFragments?path=demo" (demo is a directory)
- *
- * Response (left as a single line purposefully):
- * {"PXFFragments":[{"hosts":["isengoldsa1mac.corp.emc.com","isengoldsa1mac.corp.emc.com","isengoldsa1mac.corp.emc.com"],"sourceName":"text2.csv"},{"hosts":["isengoldsa1mac.corp.emc.com","isengoldsa1mac.corp.emc.com","isengoldsa1mac.corp.emc.com"],"sourceName":"text_data.csv"}]}
- */
-static List* 
-parse_get_fragments_response(List *fragments, StringInfo rest_buf)
-{
-	struct json_object	*whole	= json_tokener_parse(rest_buf->data);
-	struct json_object	*head	= json_object_object_get(whole, "PXFFragments");
-	List* 				ret_frags = fragments;
-	int 				length	= json_object_array_length(head);
-    char *cur_source_name = NULL;
-	int cur_index_count = 0;
-	
-	/* obtain split information from the block */
-	for (int i = 0; i < length; i++)
-	{
-		struct json_object *js_fragment = json_object_array_get_idx(head, i);
-		DataFragment* fragment = (DataFragment*)palloc0(sizeof(DataFragment));
-		
-		/* 0. source name */
-		struct json_object *block_data = json_object_object_get(js_fragment, "sourceName");
-		fragment->source_name = pstrdup(json_object_get_string(block_data));
-
-		/* 1. fragment index, incremented per source name */
-		if ((cur_source_name==NULL) || (strcmp(cur_source_name, fragment->source_name) != 0))
-		{
-			elog(FRAGDEBUG, "pxf: parse_get_fragments_response: "
-						  "new source name %s, old name %s, init index counter %d",
-						  fragment->source_name,
-						  cur_source_name ? cur_source_name : "NONE",
-						  cur_index_count);
-
-			cur_index_count = 0;
-
-			if (cur_source_name)
-				pfree(cur_source_name);
-			cur_source_name = pstrdup(fragment->source_name);
-		}
-		fragment->index = cur_index_count;
-		++cur_index_count;
-
-		/* 2. hosts - list of all machines that contain this fragment */
-		struct json_object *js_fragment_hosts = json_object_object_get(js_fragment, "hosts");
-		int num_hosts = json_object_array_length(js_fragment_hosts);
-		
-		for (int j = 0; j < num_hosts; j++)
-		{
-			FragmentLocation* floc = (FragmentLocation*)palloc(sizeof(FragmentLocation));
-			struct json_object *loc = json_object_array_get_idx(js_fragment_hosts, j);
-
-			floc->ip = pstrdup(json_object_get_string(loc));
-			
-			fragment->locations = lappend(fragment->locations, floc);
-		}
-
-		/* 3. userdata - additional user information */
-		struct json_object *js_user_data = json_object_object_get(js_fragment, "userData");
-		if (js_user_data)
-			fragment->user_data = pstrdup(json_object_get_string(js_user_data));
-
-		/*
-		 * HD-2547:
-		 * Ignore fragment if it doesn't contain any host locations,
-		 * for example if the file is empty.
-		 */
-		if (fragment->locations)
-			ret_frags = lappend(ret_frags, fragment);
-		else
-			free_fragment(fragment);
-
-	}
-	if (cur_source_name)
-		pfree(cur_source_name);
-	return ret_frags;	
-}
-
-/*
- * Obtain the datanode REST servers host/port data
- */
-static List*
-parse_datanodes_response(List *rest_srvrs, StringInfo rest_buf)
-{
-	struct json_object *whole = json_tokener_parse(rest_buf->data);
-	struct json_object *nodes = json_object_object_get(whole, "regions");
-	int length = json_object_array_length(nodes);
-	
-	/* obtain host/port data for the REST server running on each HDFS data node */
-	for (int i = 0; i < length; i++)
-	{
-		DataNodeRestSrv* srv = (DataNodeRestSrv*)palloc(sizeof(DataNodeRestSrv));
-		
-		struct json_object *js_node = json_object_array_get_idx(nodes, i);
-		struct json_object *js_host = json_object_object_get(js_node, "host");
-		srv->host = pstrdup(json_object_get_string(js_host));
-		struct json_object *js_port = json_object_object_get(js_node, "port");
-		srv->port = json_object_get_int(js_port);
-		
-		rest_srvrs = lappend(rest_srvrs, srv);
-	}
-	
-	return rest_srvrs;	
-}
-
-/*
- * Get host/port data for the REST servers running on each datanode
- */
-static List* 
-get_datanode_rest_servers(GPHDUri *hadoop_uri, ClientContext* client_context)
-{
-	List* rest_srvrs_list = NIL;
-	StringInfoData get_srvrs_uri;
-	initStringInfo(&get_srvrs_uri);
-	
-	Assert(hadoop_uri->host != NULL && hadoop_uri->port != NULL);
-
-	appendStringInfo(&get_srvrs_uri, "http://%s:%s/%s/%s/HadoopCluster/getNodesInfo",
-											hadoop_uri->host,
-											hadoop_uri->port,
-											GPDB_REST_PREFIX,
-											PFX_VERSION);
-	
-	process_request(client_context, get_srvrs_uri.data);
-
-	/* 
-	 * the curl client finished the communication. The response from
-	 * the backend lies at rest_buf->data
-	 */
-	rest_srvrs_list = parse_datanodes_response(rest_srvrs_list, &(client_context->the_rest_buf));		
-	pfree(get_srvrs_uri.data);
-
-	return rest_srvrs_list;	
-}
-
-/*
  * find the port of the REST server on a given region host
  */
 static int
@@ -1106,33 +829,6 @@ print_fragment_list(List *fragments)
 }
 
 /*
- * release memory of a single fragment
- */
-static void free_fragment(DataFragment *fragment)
-{
-	ListCell *loc_cell = NULL;
-
-	Assert(fragment != NULL);
-
-	if (fragment->source_name)
-		pfree(fragment->source_name);
-
-	foreach(loc_cell, fragment->locations)
-	{
-		FragmentLocation* location = (FragmentLocation*)lfirst(loc_cell);
-
-		if (location->ip)
-			pfree(location->ip);
-		pfree(location);
-	}
-	list_free(fragment->locations);
-
-	if (fragment->user_data)
-		pfree(fragment->user_data);
-	pfree(fragment);
-}
-
-/*
  * release the fragment list
  */
 static List* 
@@ -1147,54 +843,6 @@ free_fragment_list(List *fragments)
 	}
 	list_free(fragments);
 	return NIL;
-}
-
-static void
-free_datanode_rest_servers(List *srvrs)
-{
-	ListCell *srv_cell = NULL;
-	foreach(srv_cell, srvrs)
-	{
-		DataNodeRestSrv* srv = (DataNodeRestSrv*)lfirst(srv_cell);
-		if (srv->host)
-			pfree(srv->host);
-		pfree(srv);
-	}
-	list_free(srvrs);
-}
-
-/*
- * get_data_fragment_list
- *
- * 1. Request a list of fragments from the PXF Fragmenter class
- * that was specified in the pxf URL.
- *
- * 2. Process the returned list and create a list of DataFragment with it.
- */
-static List* 
-get_data_fragment_list(GPHDUri *hadoop_uri,
-					   ClientContext *client_context)
-{
-	List *data_fragments = NIL;
-	StringInfoData request;
-	
-	initStringInfo(&request);
-
-	/* construct the request */
-	appendStringInfo(&request, "http://%s:%s/%s/%s/Fragmenter/getFragments?path=%s",
-								hadoop_uri->host,
-								hadoop_uri->port,
-								GPDB_REST_PREFIX,
-								PFX_VERSION,
-								hadoop_uri->data);
-
-	/* send the request. The response will exist in rest_buf.data */
-	process_request(client_context, request.data);
-
-	/* parse the JSON response and form a fragments list to return */
-	data_fragments = parse_get_fragments_response(data_fragments, &(client_context->the_rest_buf));
-
-	return data_fragments;
 }
 
 /*

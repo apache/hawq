@@ -7,10 +7,10 @@
 
 /*
  * Path constants for accessing GPFX.
- * All GPFX's resources are under /GPDB_REST_PREFIX/GPFX_VERSION/...
+ * All PXF's resources are under /GPDB_REST_PREFIX/PXF_VERSION/...
  */
 #define GPDB_REST_PREFIX "gpdb"
-#define PFX_VERSION "v5" /* PFX version */
+#define PXF_VERSION "v7" /* PXF version */
 
 /*
  * FragmentData - describes a single Hadoop file split / HBase table region
@@ -58,4 +58,4 @@ void	 GPHDUri_debug_print(GPHDUri *uri);
 int		 GPHDUri_get_value_for_opt(GPHDUri *uri, char *key, char **val, bool emit_error);
 bool 	 RelationIsExternalPxf(Relation rel, StringInfo location);
 
-#endif	// 
+#endif	// _PXF_URIPARSER_H_

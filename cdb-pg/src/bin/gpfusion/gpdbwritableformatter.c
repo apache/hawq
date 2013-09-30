@@ -23,6 +23,7 @@
 #include "common.h"
 
 #include "access/formatter.h"
+#include "catalog/namespace.h"
 #include "catalog/pg_proc.h"
 #include "utils/builtins.h"
 #include "utils/memutils.h"
@@ -249,22 +250,6 @@ static void byteArrayToBoolArray(bits8* data, int len, bool** booldata, int bool
 	}
 }
 
-/*
- * Get the name of the type, given the OID
- */
-static void getTypeName(Oid typeid, char* data)
-{
-	HeapTuple type_tuple;
-	char*     name;
-
-	type_tuple = SearchSysCache(TYPEOID, ObjectIdGetDatum(typeid), 0, 0, 0);
-	Insist(HeapTupleIsValid(type_tuple));
-	name = ((Form_pg_type) GETSTRUCT(type_tuple))->typname.data;
-
-	strcpy(data, name);
-	ReleaseSysCache(type_tuple);
-}
-
 Datum
 gpdbwritableformatter_export(PG_FUNCTION_ARGS)
 {
@@ -396,7 +381,7 @@ gpdbwritableformatter_export(PG_FUNCTION_ARGS)
 
 			/* For variable length type, we added a 4 byte length header.
 			 * So, it'll be aligned int4.
-			 * For fixed length type, we'll use the type aligment.
+			 * For fixed length type, we'll use the type alignment.
 			 */
 			if (isVariableLength(type))
 			{
@@ -647,8 +632,8 @@ gpdbwritableformatter_import(PG_FUNCTION_ARGS)
 		if ((isBinaryFormatType(defined_type) || isBinaryFormatType(input_type)) &&
 			input_type != defined_type)
 		{
-			char intype[NAMEDATALEN];
-			getTypeName(input_type, intype);
+			char *intype = TypeOidGetTypename(input_type);
+
 			ereport(ERROR, (errcode(ERRCODE_DATA_EXCEPTION),
 							errmsg("input data column %d of type \"%s\" did not match the external table definition",
 									i+1, intype),

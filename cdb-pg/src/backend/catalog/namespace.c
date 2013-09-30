@@ -475,6 +475,26 @@ TypenameGetTypid(const char *typname)
 }
 
 /*
+ * TypeOidGetTypename
+ * 		Get the name of the type, given the OID
+ */
+char*
+TypeOidGetTypename(Oid typeid)
+{
+	HeapTuple type_tuple;
+	StringInfoData tname;
+	initStringInfo(&tname);
+
+	type_tuple = SearchSysCache(TYPEOID, ObjectIdGetDatum(typeid), 0, 0, 0);
+	Insist(HeapTupleIsValid(type_tuple));
+
+	appendStringInfo(&tname, "%s", ((Form_pg_type) GETSTRUCT(type_tuple))->typname.data);
+	ReleaseSysCache(type_tuple);
+
+	return tname.data;
+}
+
+/*
  * TypeIsVisible
  *		Determine whether a type (identified by OID) is visible in the
  *		current search path.  Visible means "would be found by searching

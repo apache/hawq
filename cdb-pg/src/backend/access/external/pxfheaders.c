@@ -4,6 +4,7 @@
 #include "access/extprotocol.h"
 #include "access/fileam.h"
 #include "access/url.h"
+#include "catalog/namespace.h"
 #include "catalog/pg_exttable.h"
 #include "access/pxfheaders.h"
 
@@ -92,14 +93,15 @@ static void add_alignment_size_httpheader(CHURL_HEADERS headers)
  * Each attribute has a pair of key/value 
  * where X is the number of the attribute
  * X-GP-ATTR-NAMEX - attribute X's name 
- * X-GP-ATTR-TYPEX - attribute X's type 
+ * X-GP-ATTR-TYPECODEX - attribute X's type OID (e.g, 16)
+ * X-GP-ATTR-TYPENAMEX - attribute X's type name (e.g, "boolean")
  */
 static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel)
 {	
     char long_number[32];	
     StringInfoData formatter;	
     TupleDesc tuple;		
-    initStringInfo(&formatter);	
+    initStringInfo(&formatter);
 	
     /* Get tuple description itself */	
     tuple = RelationGetDescr(rel);	
@@ -118,9 +120,14 @@ static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel)
 		
 		/* Add a key/value pair for attribute type */		
         resetStringInfo(&formatter);		
-        appendStringInfo(&formatter, "X-GP-ATTR-TYPE%u", i);		
+        appendStringInfo(&formatter, "X-GP-ATTR-TYPECODE%u", i);
         pg_ltoa(tuple->attrs[i]->atttypid, long_number);		
-        churl_headers_append(headers, formatter.data, long_number);		
+        churl_headers_append(headers, formatter.data, long_number);
+
+        /* Add a key/value pair for attribute type name */
+        resetStringInfo(&formatter);
+        appendStringInfo(&formatter, "X-GP-ATTR-TYPENAME%u", i);
+        churl_headers_append(headers, formatter.data, TypeOidGetTypename(tuple->attrs[i]->atttypid));
     }
 	
 	pfree(formatter.data);
@@ -146,7 +153,8 @@ static void add_location_options_httpheader(CHURL_HEADERS headers, GPHDUri *gphd
 /* Full name of the HEADER KEY expected by the PXF service */
 static char* prepend_x_gp(const char* key)
 {	
-	StringInfoData formatter;	initStringInfo(&formatter);
+	StringInfoData formatter;
+	initStringInfo(&formatter);
 	appendStringInfo(&formatter, "X-GP-%s", key);
 	
 	return formatter.data;

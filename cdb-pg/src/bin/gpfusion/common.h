@@ -26,5 +26,6 @@ Datum gpdbwritableformatter_export(PG_FUNCTION_ARGS);
 Datum gpdbwritableformatter_import(PG_FUNCTION_ARGS);
 
 Datum gpbridge_import(PG_FUNCTION_ARGS);
+Datum gpbridge_export(PG_FUNCTION_ARGS);
 
 #endif

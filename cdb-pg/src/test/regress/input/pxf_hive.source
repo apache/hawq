@@ -182,7 +182,17 @@ LOCATION ('pxf://@hostname@:50070/un_supported_tbl?FRAGMENTER=HiveDataFragmenter
 format 'custom' (formatter='pxfwritable_import');
 select * from hv_un_supported_tbl;
 
--- 11. Clean after Hive
+-- 11.  Create external table with Profile option
+CREATE EXTERNAL TABLE tbl_with_profile(
+t1    text,
+t2    text,  
+num1  integer, 
+dub1  double precision)
+LOCATION ('pxf://@hostname@:50070/reg_seq?PROFILE=HIVE')
+format 'custom' (formatter='pxfwritable_import');
+select * from tbl_with_profile order by t1;
+
+-- 12. Clean after Hive
 drop external table hv_view;
 drop external table hv_collections;
 drop external table hv_heterogen;
@@ -193,6 +203,7 @@ drop external table hv_txt;
 drop external table hawq_types;
 drop external table hv_part_dec;
 drop external table hv_un_supported_tbl;
+drop external table tbl_with_profile;
 
 \! ${HIVE_ROOT}/bin/hive -e "drop view reg_txt_view" 2>/dev/null
 \! ${HIVE_ROOT}/bin/hive -e "drop table reg_collections" 2>/dev/null

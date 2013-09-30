@@ -95,7 +95,7 @@ void print_http_headers(CHURL_HEADERS headers);
  */
 void print_http_headers(CHURL_HEADERS headers)
 {
-	if (DEBUG2 >= log_min_messages)
+	if ((DEBUG2 >= log_min_messages) || (DEBUG2 >= client_min_messages))
 	{
 		churl_settings* settings = (churl_settings*)headers;
 		struct curl_slist* header_cell = settings->headers;
@@ -284,15 +284,19 @@ CHURL_HANDLE churl_init_upload(const char* url, CHURL_HEADERS headers)
 	set_curl_option(context, CURLOPT_URL, url);
 	set_curl_option(context, CURLOPT_VERBOSE, (const void*)FALSE);
 	set_curl_option(context, CURLOPT_IPRESOLVE, (const void*)CURL_IPRESOLVE_V4);
-	set_curl_option(context, CURLOPT_UPLOAD, (const void*)TRUE);
+	set_curl_option(context, CURLOPT_POST, (const void*)TRUE);
 	set_curl_option(context, CURLOPT_READFUNCTION, read_callback);
 	set_curl_option(context, CURLOPT_READDATA, context);
+	set_curl_option(context, CURLOPT_WRITEFUNCTION, write_callback);
+	set_curl_option(context, CURLOPT_WRITEDATA, context);
 	set_curl_option(context, CURLOPT_HEADERFUNCTION, header_callback);
-	set_curl_option(context, CURLOPT_WRITEHEADER, context);
+	set_curl_option(context, CURLOPT_HEADERDATA, context);
 	churl_headers_append(headers, "Content-Type", "application/octet-stream");
 	churl_headers_append(headers, "Transfer-Encoding", "chunked");
+	churl_headers_append(headers, "Expect", "100-continue");
 	churl_headers_set(context, headers);
 
+	print_http_headers(headers);
 	setup_multi_handle(context);
 
 	return (CHURL_HANDLE)context;
@@ -312,7 +316,7 @@ CHURL_HANDLE churl_init_download(const char* url, CHURL_HEADERS headers)
 	set_curl_option(context, CURLOPT_WRITEFUNCTION, write_callback);
 	set_curl_option(context, CURLOPT_WRITEDATA, context);
 	set_curl_option(context, CURLOPT_HEADERFUNCTION, header_callback);
-	set_curl_option(context, CURLOPT_WRITEHEADER, context);
+	set_curl_option(context, CURLOPT_HEADERDATA, context);
 	churl_headers_set(context, headers);
 
 	print_http_headers(headers);
@@ -386,6 +390,9 @@ size_t churl_read(CHURL_HANDLE handle, char* buf, size_t max_size)
 void churl_cleanup(CHURL_HANDLE handle)
 {
 	churl_context* context = (churl_context*)handle;
+	if (!context)
+		return;
+
 	if (context->upload)
 		finish_upload(context);
 
@@ -431,6 +438,7 @@ size_t read_callback(void *ptr, size_t size, size_t nmemb, void *userdata)
 	churl_context* context = (churl_context*)userdata;
 
 	int written = Min(size * nmemb, context->top - context->bot);
+
 	memcpy(ptr, context->ptr, written);
 	context->bot += written;
 
@@ -554,7 +562,8 @@ void cleanup_internal_buffer(churl_context* context)
 
 void churl_cleanup_context(churl_context* context)
 {
-	pfree(context);
+	if (context)
+		pfree(context);
 }
 
 /*
@@ -657,7 +666,12 @@ void check_response_code(churl_context* context)
 		elog(ERROR, "internal error: curl_easy_getinfo failed(%d - %s)",
 			 curl_error, curl_easy_strerror(curl_error));
 
-	if (response_code != 200 && response_code != 100)
+	elog(DEBUG2, "http response code: %ld", response_code);
+	if ((response_code == 0) && (context->curl_still_running > 0))
+	{
+		elog(DEBUG2, "check_response_code: curl is still running, but no data was received.");
+	}
+	else if (response_code != 200 && response_code != 100)
 	{
 		if (!handle_special_error(response_code))
 		{

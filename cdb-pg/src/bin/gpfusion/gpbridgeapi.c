@@ -3,8 +3,9 @@
 #include "access/libchurl.h"
 #include "access/pxfuriparser.h"
 #include "access/pxfheaders.h"
-
-static const char* remote_uri_template = "http://%s/%s/%s/Bridge/?fragment=%s";
+#include "access/pxfmasterapi.h"
+#include "cdb/cdbvars.h"
+#include "cdb/cdbtm.h"
 
 typedef struct
 {
@@ -13,32 +14,38 @@ typedef struct
 	GPHDUri *gphd_uri;
 	StringInfoData uri;
 	ListCell* current_fragment;
+	StringInfoData write_file_name;
 } gphadoop_context;
 
-void	gpbridge_check_inside_extproto(PG_FUNCTION_ARGS);
+void	gpbridge_check_inside_extproto(PG_FUNCTION_ARGS, const char* func_name);
 bool	gpbridge_last_call(PG_FUNCTION_ARGS);
 bool	gpbridge_first_call(PG_FUNCTION_ARGS);
 int		gpbridge_cleanup(PG_FUNCTION_ARGS);
 void	cleanup_churl_handle(gphadoop_context* context);
-void	cleanup_context(PG_FUNCTION_ARGS, gphadoop_context* context);
+void	cleanup_churl_headers(gphadoop_context* context);
 void	cleanup_gphd_uri(gphadoop_context* context);
+void	cleanup_context(PG_FUNCTION_ARGS, gphadoop_context* context);
+gphadoop_context*	create_context(PG_FUNCTION_ARGS);
 void	add_querydata_to_http_header(gphadoop_context* context, PG_FUNCTION_ARGS);
 void	append_churl_header_if_exists(gphadoop_context* context,
 									  const char* key, const char* value);
 void    set_current_fragment_headers(gphadoop_context* context);
 void	gpbridge_import_start(PG_FUNCTION_ARGS);
+void	gpbridge_export_start(PG_FUNCTION_ARGS);
+DataNodeRestSrv* get_pxf_server(GPHDUri* gphd_uri, const Relation rel);
 size_t	gpbridge_read(PG_FUNCTION_ARGS);
-void	cleanup_churl_headers(gphadoop_context* context);
-void	parse_gphd_uri(gphadoop_context* context, PG_FUNCTION_ARGS);
-gphadoop_context*	create_context(PG_FUNCTION_ARGS);
+size_t	gpbridge_write(PG_FUNCTION_ARGS);
+void	parse_gphd_uri(gphadoop_context* context, bool is_import, PG_FUNCTION_ARGS);
 void	build_uri_from_current_fragment(gphadoop_context* context);
+void 	build_file_name_for_write(gphadoop_context* context);
+void 	build_uri_for_write(gphadoop_context* context, DataNodeRestSrv* rest_server);
 size_t	fill_buffer(gphadoop_context* context, char* start, size_t size);
 
 /* Custom protocol entry point for read
  */
 Datum gpbridge_import(PG_FUNCTION_ARGS)
 {
-	gpbridge_check_inside_extproto(fcinfo);
+	gpbridge_check_inside_extproto(fcinfo, "gpbridge_import");
 
 	if (gpbridge_last_call(fcinfo))
 		PG_RETURN_INT32(gpbridge_cleanup(fcinfo));
@@ -49,10 +56,30 @@ Datum gpbridge_import(PG_FUNCTION_ARGS)
 	PG_RETURN_INT32((int)gpbridge_read(fcinfo));
 }
 
-void gpbridge_check_inside_extproto(PG_FUNCTION_ARGS)
+Datum gpbridge_export(PG_FUNCTION_ARGS)
+{
+	gpbridge_check_inside_extproto(fcinfo, "gpbridge_export");
+
+	if (gpbridge_last_call(fcinfo))
+	{
+		PG_RETURN_INT32(gpbridge_cleanup(fcinfo));
+	}
+
+	if (gpbridge_first_call(fcinfo))
+	{
+		gpbridge_export_start(fcinfo);
+	}
+
+	PG_RETURN_INT32((int)gpbridge_write(fcinfo));
+
+}
+
+void gpbridge_check_inside_extproto(PG_FUNCTION_ARGS, const char* func_name)
 {
 	if (!CALLED_AS_EXTPROTOCOL(fcinfo))
-		elog(ERROR, "cannot execute gpbridge_import outside protocol manager");
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+						errmsg("cannot execute %s outside protocol manager", func_name)));
 }
 
 bool gpbridge_last_call(PG_FUNCTION_ARGS)
@@ -102,6 +129,7 @@ void cleanup_gphd_uri(gphadoop_context* context)
 void cleanup_context(PG_FUNCTION_ARGS, gphadoop_context* context)
 {
 	pfree(context->uri.data);
+	pfree(context->write_file_name.data);
 	pfree(context);
 	EXTPROTOCOL_SET_USER_CTX(fcinfo, NULL);
 }
@@ -115,6 +143,7 @@ gphadoop_context* create_context(PG_FUNCTION_ARGS)
 	EXTPROTOCOL_SET_USER_CTX(fcinfo, context);
 
 	initStringInfo(&context->uri);
+	initStringInfo(&context->write_file_name);
 	return context;
 }
 
@@ -172,7 +201,7 @@ void gpbridge_import_start(PG_FUNCTION_ARGS)
 {
 	gphadoop_context* context = create_context(fcinfo);
 
-	parse_gphd_uri(context, fcinfo);
+	parse_gphd_uri(context, true, fcinfo);
 	context->current_fragment = list_head(context->gphd_uri->fragments);
 	build_uri_from_current_fragment(context);
 	context->churl_headers = churl_headers_init();
@@ -183,6 +212,103 @@ void gpbridge_import_start(PG_FUNCTION_ARGS)
 	context->churl_handle = churl_init_download(context->uri.data,
 												context->churl_headers);
 }
+
+void gpbridge_export_start(PG_FUNCTION_ARGS)
+{
+	gphadoop_context* context = create_context(fcinfo);
+
+	parse_gphd_uri(context, false, fcinfo);
+
+	/* get rest servers list and choose one */
+	Relation rel = EXTPROTOCOL_GET_RELATION(fcinfo);
+	DataNodeRestSrv* rest_server = get_pxf_server(context->gphd_uri, rel);
+
+	if (!rest_server)
+		ereport(ERROR,
+				(errcode(ERRCODE_CONNECTION_FAILURE),
+						errmsg("No REST servers were found (by accessing PXF URI %s)",
+							   context->gphd_uri->uri)));
+
+	elog(DEBUG2, "chosen pxf rest_server = %s:%d", rest_server->host, rest_server->port);
+
+	build_file_name_for_write(context);
+	build_uri_for_write(context, rest_server);
+	free_datanode_rest_server(rest_server);
+
+	context->churl_headers = churl_headers_init();
+	add_querydata_to_http_header(context, fcinfo);
+
+	context->churl_handle = churl_init_upload(context->uri.data,
+											  context->churl_headers);
+
+}
+
+/*
+ * Initializes the client context
+ */
+static void init_client_context(ClientContext *client_context)
+{
+	client_context->http_headers = NULL;
+	client_context->handle = NULL;
+	memset(client_context->chunk_buf, 0, RAW_BUF_SIZE);
+	initStringInfo(&(client_context->the_rest_buf));
+}
+
+/*
+ * get list of data nodes' rest servers,
+ * and choose one (based on modulo segment id)
+ * TODO: add locality
+ */
+DataNodeRestSrv* get_pxf_server(GPHDUri* gphd_uri, const Relation rel)
+{
+
+	ClientContext client_context; /* holds the communication info */
+	PxfInputData inputData;
+	List	 	*rest_servers = NIL;
+	DataNodeRestSrv *found_server = NULL, *ret_server = NULL;
+	int 		 server_index = 0;
+
+	Assert(gphd_uri);
+
+	/* init context */
+	init_client_context(&client_context);
+	client_context.http_headers = churl_headers_init();
+
+	/* set HTTP header that guarantees response in JSON format */
+	churl_headers_append(client_context.http_headers, REST_HEADER_JSON_RESPONSE, NULL);
+	if (!client_context.http_headers)
+		return NULL;
+
+	/*
+	 * Enrich the curl HTTP header
+	 */
+	inputData.headers = client_context.http_headers;
+	inputData.gphduri = gphd_uri;
+	inputData.rel = rel;
+	inputData.filterstr = NULL; /* We do not supply filter data to the HTTP header */
+	build_http_header(&inputData);
+
+	/* send request */
+	rest_servers = get_datanode_rest_servers(gphd_uri, &client_context);
+
+	/* choose server by segment id */
+	server_index = Gp_segment % list_length(rest_servers);
+	elog(DEBUG3, "get_pxf_server: server index %d, segment id %d, rest servers number %d",
+			server_index, Gp_segment, list_length(rest_servers));
+
+	found_server = (DataNodeRestSrv*)list_nth(rest_servers, server_index);
+	ret_server = (DataNodeRestSrv*)palloc(sizeof(DataNodeRestSrv));
+	ret_server->host = pstrdup(found_server->host);
+	ret_server->port = found_server->port;
+
+	/* cleanup */
+	free_datanode_rest_servers(rest_servers);
+	churl_headers_cleanup(client_context.http_headers);
+
+	/* return chosen server */
+	return ret_server;
+}
+
 
 /* read as much as possible until we get a zero.
  * if necessary, move to next uri
@@ -213,19 +339,65 @@ size_t gpbridge_read(PG_FUNCTION_ARGS)
 	return n;
 }
 
-void parse_gphd_uri(gphadoop_context* context, PG_FUNCTION_ARGS)
+/* write data into churl handler: send it as a chunked POST message.
+ */
+size_t gpbridge_write(PG_FUNCTION_ARGS)
+{
+	char* databuf;
+	size_t datalen;
+	size_t n = 0;
+	gphadoop_context* context;
+
+	context = EXTPROTOCOL_GET_USER_CTX(fcinfo);
+	databuf = EXTPROTOCOL_GET_DATABUF(fcinfo);
+	datalen = EXTPROTOCOL_GET_DATALEN(fcinfo);
+
+	if (datalen > 0)
+	{
+		n = churl_write(context->churl_handle, databuf, datalen);
+		elog(DEBUG5, "pxf gpbridge_write: wrote %zu bytes to %s", n, context->write_file_name.data);
+	}
+
+	return n;
+}
+
+
+void parse_gphd_uri(gphadoop_context* context, bool is_import, PG_FUNCTION_ARGS)
 {
 	context->gphd_uri = parseGPHDUri(EXTPROTOCOL_GET_URL(fcinfo));
-	Assert(context->gphd_uri->fragments != NULL);
+	if (is_import)
+		Assert(context->gphd_uri->fragments != NULL);
 }
 
 void build_uri_from_current_fragment(gphadoop_context* context)
 {
 	FragmentData* data = (FragmentData*)lfirst(context->current_fragment);
 	resetStringInfo(&context->uri);
-	appendStringInfo(&context->uri, remote_uri_template,
-					 data->authority, GPDB_REST_PREFIX, PFX_VERSION, data->index);
+	appendStringInfo(&context->uri, "http://%s/%s/%s/Bridge/?fragment=%s",
+					 data->authority, GPDB_REST_PREFIX,PXF_VERSION, data->index);
 	elog(DEBUG2, "pxf: uri with current fragment: %s", context->uri.data);
+
+}
+
+/*
+ * Builds a unique file name for write per segment, based on
+ * directory name from the table's URI, the transaction id (XID) and segment id.
+ * e.g. with path in URI '/data/writable/table1', XID 1234 and segment id 3,
+ * the file name will be '/data/writable/table1/1234_3'.
+ */
+void build_file_name_for_write(gphadoop_context* context)
+{
+	appendStringInfo(&context->write_file_name, "/%s/%d_%d",
+					 context->gphd_uri->data, GetMasterTransactionId() /* xid */, Gp_segment);
+	elog(DEBUG2, "pxf: file name for write: %s", context->write_file_name.data);
+}
+
+void build_uri_for_write(gphadoop_context* context, DataNodeRestSrv* rest_server )
+{
+	appendStringInfo(&context->uri, "http://%s:%d/%s/%s/Writable/stream?path=%s",
+					 rest_server->host, rest_server->port,
+					 GPDB_REST_PREFIX, PXF_VERSION, context->write_file_name.data);
+	elog(DEBUG2, "pxf: uri %s with file name for write: %s", context->uri.data, context->write_file_name.data);
 
 }
 
@@ -246,3 +418,5 @@ size_t fill_buffer(gphadoop_context* context, char* start, size_t size)
 
 	return ptr - start;
 }
+
+

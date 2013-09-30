@@ -1,6 +1,7 @@
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.utilities.InputData;
-import com.pivotal.pxf.accessors.Accessor;
+import com.pivotal.pxf.utilities.Plugin;
+import com.pivotal.pxf.accessors.IReadAccessor;
 
 /*
  * Internal interface that defines the access to a file on HDFS.  All classes
@@ -8,7 +9,7 @@ import com.pivotal.pxf.accessors.Accessor;
  * must respect this interface
  * Dummy implementation, for documentation
  */
-public class DummyAccessor extends Accessor
+public class DummyAccessor extends Plugin implements IReadAccessor
 {
     private int rowNumber;
     private int fragmentNumber;
@@ -20,13 +21,13 @@ public class DummyAccessor extends Accessor
         fragmentNumber = 0;
 	}
 	
-	public boolean Open() throws Exception
+	public boolean openForRead() throws Exception
     {
         /* fopen or similar */
         return true;
     }
 	
-    public OneRow LoadNextObject() throws Exception
+    public OneRow readNextObject() throws Exception
     {
         /* return next row , <key=fragmentNo.rowNo, val=rowNo,text,fragmentNo>*/
         /* check for EOF */
@@ -47,7 +48,7 @@ public class DummyAccessor extends Accessor
         return row;
     }
     
-	public void Close() throws Exception
+	public void closeForRead() throws Exception
     {
         /* fclose or similar */
     }

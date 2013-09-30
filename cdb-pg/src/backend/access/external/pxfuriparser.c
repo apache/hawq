@@ -6,6 +6,7 @@
 
 static const char* segwork_substring = "segwork=";
 static const char segwork_separator = '@';
+static const int EMPTY_VALUE_LEN = 2;
 
 static void  GPHDUri_parse_protocol(GPHDUri *uri, char **cursor);
 static void  GPHDUri_parse_authority(GPHDUri *uri, char **cursor);
@@ -342,14 +343,27 @@ GPHDUri_parse_option(char* pair, List* options, const char* uri)
 				 errmsg("Invalid URI %s: option '%s' missing '='", uri, pair)));
 	}
 
+	if (strchr(sep + 1, '=') != NULL) {
+		ereport(ERROR,
+				(errcode(ERRCODE_SYNTAX_ERROR),
+				 errmsg("Invalid URI %s: option '%s' contains duplicate '='", uri, pair)));
+	}
+
 	key_len = sep - pair;
 	if (key_len == 0) {
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
 				 errmsg("Invalid URI %s: option '%s' missing key before '='", uri, pair)));
 	}
-	option_data->key = pnstrdup(pair,key_len);
+	
 	value_len = pair_len - key_len + 1;
+	if (value_len == EMPTY_VALUE_LEN) {
+		ereport(ERROR,
+				(errcode(ERRCODE_SYNTAX_ERROR),
+				 errmsg("Invalid URI %s: option '%s' missing value after '='", uri, pair)));
+	}
+    
+	option_data->key = pnstrdup(pair,key_len);
 	option_data->value = pnstrdup(sep + 1, value_len);
 
 	return lappend(options, option_data);
