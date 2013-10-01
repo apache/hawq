@@ -45,7 +45,7 @@
     <profile>
         <name>HdfsTextMulti</name>
         <description>This profile is suitable for using when reading delimited single or multi line records (with quoted
-            linefeeds) from plain text files on HDFS
+            linefeeds) from plain text files on HDFS. It is not splittable (non parallel) and slower than HdfsTextSimple.
         </description>
         <plugins>
             <fragmenter>HdfsDataFragmenter</fragmenter>
