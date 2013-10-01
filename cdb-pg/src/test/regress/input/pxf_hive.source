@@ -192,7 +192,18 @@ LOCATION ('pxf://@hostname@:50070/reg_seq?PROFILE=HIVE')
 format 'custom' (formatter='pxfwritable_import');
 select * from tbl_with_profile order by t1;
 
--- 12. Clean after Hive
+-- 12. Test analyze for Hive table with profile without analyzer - negative test
+CREATE EXTERNAL TABLE hv_heterogen_profile_wo_analyzer(
+t1    text,
+t2    text,  
+num1  integer, 
+dub1  double precision,
+t3 text)
+LOCATION ('pxf://@hostname@:50070/reg_heterogen?PROFILE=Hive')
+format 'custom' (formatter='pxfwritable_import');
+ANALYZE hv_heterogen_profile_wo_analyzer;
+
+-- 13. Clean after Hive
 drop external table hv_view;
 drop external table hv_collections;
 drop external table hv_heterogen;
@@ -204,6 +215,7 @@ drop external table hawq_types;
 drop external table hv_part_dec;
 drop external table hv_un_supported_tbl;
 drop external table tbl_with_profile;
+drop external table hv_heterogen_profile_wo_analyzer;
 
 \! ${HIVE_ROOT}/bin/hive -e "drop view reg_txt_view" 2>/dev/null
 \! ${HIVE_ROOT}/bin/hive -e "drop table reg_collections" 2>/dev/null
