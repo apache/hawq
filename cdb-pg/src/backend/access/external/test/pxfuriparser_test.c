@@ -206,6 +206,68 @@ test__parseGPHDUri__NegativeTestMissingValue(void **state)
 	assert_true(false);
 }
 
+/*
+ * Negative test: parsing of a uri with duplicate options
+ */
+void
+test__parseGPHDUri__NegativeTestDuplicateOpts(void **state)
+{
+	char* uri_duplicate_opts = "pxf://1.2.3.4:5678/some/path/and/table.tbl?Profile=a&Analyzer=b&PROFILE=c";
+
+	/* Setting the test -- code omitted -- */
+	PG_TRY();
+	{
+		GPHDUri* parsed = parseGPHDUri(uri_duplicate_opts);
+		/* This will throw a ereport(ERROR).*/
+		GPHDUri_verify_no_duplicate_options(parsed);
+	}
+	PG_CATCH();
+	{
+		CurrentMemoryContext = 1;
+		ErrorData *edata = CopyErrorData();
+
+		/*Validate the type of expected error */
+		assert_true(edata->sqlerrcode == ERRCODE_SYNTAX_ERROR);
+		assert_true(edata->elevel == ERROR);
+		assert_string_equal(edata->message, "Invalid URI pxf://1.2.3.4:5678/some/path/and/table.tbl?Profile=a&Analyzer=b&PROFILE=c: Duplicate option(s): PROFILE");
+		return;
+	}
+	PG_END_TRY();
+
+	assert_true(false);
+}
+
+/*
+ * Negative test: Missing core options
+ */
+void
+test__parseGPHDUri__NegativeTestMissingCoreOpts(void **state)
+{
+	char* missing_core_opts = "pxf://1.2.3.4:5678/some/path/and/table.tbl?FRAGMENTER=a";
+
+	/* Setting the test -- code omitted -- */
+	PG_TRY();
+	{
+		GPHDUri* parsed = parseGPHDUri(missing_core_opts);
+		/* This will throw a ereport(ERROR).*/
+		GPHDUri_verify_core_options_exist(parsed, list_make3("fragmenter", "accessor", "resolver"));
+	}
+	PG_CATCH();
+	{
+		CurrentMemoryContext = 1;
+		ErrorData *edata = CopyErrorData();
+
+		/*Validate the type of expected error */
+		assert_true(edata->sqlerrcode == ERRCODE_SYNTAX_ERROR);
+		assert_true(edata->elevel == ERROR);
+		assert_string_equal(edata->message, "Invalid URI pxf://1.2.3.4:5678/some/path/and/table.tbl?FRAGMENTER=a: PROFILE or ACCESSOR and RESOLVER option(s) missing");
+		return;
+	}
+	PG_END_TRY();
+
+	assert_true(false);
+}
+
 int 
 main(int argc, char* argv[]) 
 {
@@ -217,7 +279,9 @@ main(int argc, char* argv[])
 			unit_test(test__parseGPHDUri__NegativeTestMissingEqual),
 			unit_test(test__parseGPHDUri__NegativeTestDuplicateEquals),
 			unit_test(test__parseGPHDUri__NegativeTestMissingKey),
-			unit_test(test__parseGPHDUri__NegativeTestMissingValue)
+			unit_test(test__parseGPHDUri__NegativeTestMissingValue),
+			unit_test(test__parseGPHDUri__NegativeTestDuplicateOpts),
+			unit_test(test__parseGPHDUri__NegativeTestMissingCoreOpts)
 	};
 	return run_tests(tests);
 }

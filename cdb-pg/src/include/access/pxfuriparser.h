@@ -57,5 +57,7 @@ void 	 freeGPHDUri(GPHDUri *uri);
 void	 GPHDUri_debug_print(GPHDUri *uri);
 int		 GPHDUri_get_value_for_opt(GPHDUri *uri, char *key, char **val, bool emit_error);
 bool 	 RelationIsExternalPxf(Relation rel, StringInfo location);
+void 	 GPHDUri_verify_no_duplicate_options(GPHDUri *uri);
+void 	 GPHDUri_verify_core_options_exist(GPHDUri *uri, List *coreOptions);
 
 #endif	// _PXF_URIPARSER_H_

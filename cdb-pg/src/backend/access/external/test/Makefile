@@ -25,7 +25,7 @@ COMMON_REAL_OBJS=\
     $(top_srcdir)/src/backend/utils/hash/hashfn.o \
     $(top_srcdir)/src/backend/utils/init/globals.o \
     $(top_srcdir)/src/backend/utils/mb/mbutils.o \
-	$(top_srcdir)/src/backend/utils/mb/wchar.o \
+    $(top_srcdir)/src/backend/utils/mb/wchar.o \
     $(top_srcdir)/src/backend/utils/misc/guc.o \
     $(top_srcdir)/src/port/exec.o \
     $(top_srcdir)/src/port/path.o \
@@ -39,8 +39,9 @@ COMMON_REAL_OBJS=\
     $(top_srcdir)/src/timezone/strftime.o  
 
 # Objects from backend, which don't need to be mocked but need to be linked.
-pxfuriparser_REAL_OBJS=$(COMMON_REAL_OBJS) 
-
+pxfuriparser_REAL_OBJS=$(COMMON_REAL_OBJS) \
+    $(top_srcdir)/src/backend/utils/adt/formatting.o \
+    $(top_srcdir)/src/backend/nodes/value.o
 hd_work_mgr_REAL_OBJS=$(COMMON_REAL_OBJS) \
 	$(top_srcdir)/src/backend/cdb/cdbutil.o \
 	$(top_srcdir)/src/backend/access/external/pxfuriparser.o

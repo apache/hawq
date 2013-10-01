@@ -119,6 +119,86 @@ GPHDUri_get_value_for_opt(GPHDUri *uri, char *key, char **val, bool emit_error)
 	return -1;
 }
 
+/*
+ * GPHDUri_verify_no_duplicate_options
+ * verify each option appears only once (case insensitive)
+ */
+void
+GPHDUri_verify_no_duplicate_options(GPHDUri *uri)
+{
+	ListCell *option = NULL;
+	List *duplicateKeys = NIL;
+	List *previousKeys = NIL;
+	StringInfoData duplicates;
+	initStringInfo(&duplicates);
+
+	foreach(option, uri->options)
+	{
+		OptionData *data = (OptionData*)lfirst(option);
+		Value *key = makeString(str_toupper(data->key, strlen(data->key)));
+
+		if(!list_member(previousKeys, key))
+		{
+			previousKeys = lappend(previousKeys, key);
+		}	
+		else if(!list_member(duplicateKeys, key))
+		{
+			duplicateKeys = lappend(duplicateKeys, key);
+			appendStringInfo(&duplicates, "%s, ", strVal(key));
+		}
+	}
+
+	if(duplicates.len > 0)
+	{
+		truncateStringInfo(&duplicates, duplicates.len - strlen(", ")); //omit trailing ', ' 
+		ereport(ERROR,
+				(errcode(ERRCODE_SYNTAX_ERROR),
+					 errmsg("Invalid URI %s: Duplicate option(s): %s", uri->uri, duplicates.data)));
+	}
+	list_free(duplicateKeys);
+	list_free(previousKeys);
+	pfree(duplicates.data);
+}
+
+/*
+ * GPHDUri_verify_core_options_exist
+ */
+void
+GPHDUri_verify_core_options_exist(GPHDUri *uri, List *coreOptions)
+{
+	char *key = NULL;
+	ListCell *coreOption = NULL;	
+	StringInfoData missing;
+	initStringInfo(&missing);
+	
+	foreach(coreOption, coreOptions)
+	{
+		bool optExist = FALSE;
+		ListCell *option = NULL;
+		foreach(option, uri->options)
+		{
+			key = ((OptionData*)lfirst(option))->key;
+			if (pg_strcasecmp(key, lfirst(coreOption)) == 0)
+			{
+				optExist = TRUE;
+				break;
+			}
+		}
+		if(!optExist)
+		{
+			appendStringInfo(&missing, "%s and ", str_toupper(lfirst(coreOption), strlen(lfirst(coreOption))));
+		}
+	}
+
+	if(missing.len > 0)
+	{
+		truncateStringInfo(&missing, missing.len - strlen(" and ")); //omit trailing ' and ' 
+		ereport(ERROR,
+				(errcode(ERRCODE_SYNTAX_ERROR),
+					 errmsg("Invalid URI %s: PROFILE or %s option(s) missing", uri->uri, missing.data)));
+	}
+	pfree(missing.data);		
+}
 
 /*
  * GPHDUri_parse_protocol
@@ -317,7 +397,6 @@ GPHDUri_parse_options(GPHDUri *uri, char **cursor)
 	}
 
 	pfree(dup);
-
 }
 
 /*
