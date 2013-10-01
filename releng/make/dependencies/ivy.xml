@@ -50,7 +50,7 @@
       <dependency org="zlib"            name="zlib"            rev="1.2.3"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
       <dependency org="gnu"             name="libgsasl"        rev="1.8.0"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64" />
       <dependency org="R-Project" name="R"         rev="2.13.0"   conf="osx105_x86->osx105_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64" />
-      <dependency org="emc"       name="optimizer" rev="1.285"    conf="osx105_x86->osx105_x86_32;osx105_x86_32->osx105_x86_32;osx105_x86_64->osx105_x86_64;rhel5_x86_64->rhel5_x86_64;sol10_x86_64->sol10_x86_64;suse10_x86_64->suse10_x86_64" />
+      <dependency org="emc"       name="optimizer" rev="1.286"    conf="osx105_x86->osx105_x86_32;osx105_x86_32->osx105_x86_32;osx105_x86_64->osx105_x86_64;rhel5_x86_64->rhel5_x86_64;sol10_x86_64->sol10_x86_64;suse10_x86_64->suse10_x86_64" />
       <dependency org="emc"       name="libgpos"   rev="1.90"     conf="osx105_x86->osx105_x86_32;osx105_x86_32->osx105_x86_32;osx105_x86_64->osx105_x86_64;rhel5_x86_64->rhel5_x86_64;sol10_x86_64->sol10_x86_64;suse10_x86_64->suse10_x86_64" />
       <dependency org="xerces"    name="xerces-c"  rev="3.1.1-p1" conf="osx105_x86->osx105_x86_32;osx105_x86_32->osx105_x86_32;osx105_x86_64->osx105_x86_64;rhel5_x86_64->rhel5_x86_64;sol10_x86_64->sol10_x86_64;suse10_x86_64->suse10_x86_64" />
     </dependencies>

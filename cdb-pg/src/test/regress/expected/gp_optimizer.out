@@ -5,7 +5,7 @@
 SELECT gp_opt_version();
                            gp_opt_version
 --------------------------------------------------------------------
- GPOPT version: 1.285, GPOS version: 1.90, Xerces version: 3.1.1-p1
+ GPOPT version: 1.286, GPOS version: 1.90, Xerces version: 3.1.1-p1
 (1 row)
 
 -- master only tables
