@@ -370,13 +370,13 @@ if (1)
 			
     		# ENGINF-180: ignore header formatting
                         if ($arg =~ 
-				m/^\-(\-)*(gpd\_ignore\_headers)$/i)
+				m/^\-(\-)*(gpd\_ignore\_headers|gp\_ignore\_headers)$/i)
 			{
 				$glob_ignore_headers = 1;
 				next;
 			}
                         if ($arg =~ 
-				m/^\-(\-)*(gpd\_ignore\_plans)$/i)
+				m/^\-(\-)*(gpd\_ignore\_plans|gp\_ignore\_plans)$/i)
 			{
 				$glob_ignore_plans = 1;
 				next;
