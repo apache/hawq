@@ -62,7 +62,7 @@ public class InputDataTest
         }
         catch (IllegalArgumentException iae)
         {
-            assertEquals("HIVE already defines: [ACCESSOR, RESOLVER]", iae.getMessage());
+            assertEquals("Profile 'HIVE' already defines: [ACCESSOR, RESOLVER]", iae.getMessage());
         }
     }
 

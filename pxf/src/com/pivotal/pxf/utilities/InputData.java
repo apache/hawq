@@ -137,6 +137,9 @@ public class InputData
 		compressCodec = getOptionalProperty("X-GP-COMPRESSION_CODEC");
     }
 
+    /**
+     * Sets the requested profile plugins from profile file into requestParametersMap
+     */
     private void setProfilePlugins()
     {
         Map<String, String> pluginsMap = ProfilesConf.getProfilePluginsMap(profile);
@@ -146,11 +149,11 @@ public class InputData
 
     private void checkForDuplicates(Set<String> plugins, Set<String> params)
     {
-        @SuppressWarnings("unchecked")
+        @SuppressWarnings("unchecked")  //CollectionUtils doesn't yet support generics.
         Collection<String> duplicates = CollectionUtils.intersection(plugins, params);
         if (!duplicates.isEmpty())
         {
-            throw new IllegalArgumentException(profile + " already defines: " + String.valueOf(duplicates).replace("X-GP-", ""));
+            throw new IllegalArgumentException("Profile '" + profile + "' already defines: " + String.valueOf(duplicates).replace("X-GP-", ""));
         }
     }
 

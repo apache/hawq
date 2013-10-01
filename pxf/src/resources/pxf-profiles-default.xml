@@ -1,3 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    PXF profiles definition file.
+    New profiles can be added in the form:
+        <profile>
+            <name>...</name>
+            <description>...</description>
+            <plugins>
+                <plugin_A>...</plugin_A>
+                <plugin_B>...</plugin_B>
+                ...
+            </plugins>
+         </profile>
+-->
 <profiles>
     <profile>
         <name>HBase</name>
@@ -24,7 +38,7 @@
         </description>
         <plugins>
             <fragmenter>HdfsDataFragmenter</fragmenter>
-            <accessor>LineReaderAccessor</accessor>
+            <accessor>LineBreakAccessor</accessor>
             <resolver>StringPassResolver</resolver>
         </plugins>
     </profile>

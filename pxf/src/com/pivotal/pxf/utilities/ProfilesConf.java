@@ -2,6 +2,8 @@ package com.pivotal.pxf.utilities;
 
 import com.pivotal.pxf.exception.ProfileConfException;
 import org.apache.commons.collections.IteratorUtils;
+import org.apache.commons.collections.ListUtils;
+import org.apache.commons.collections.Predicate;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.XMLConfiguration;
@@ -11,12 +13,14 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import java.net.URL;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static com.pivotal.pxf.exception.ProfileConfException.*;
 
+/**
+ *  This enum holds the profiles files: pxf-profiles.xml and pxf-profiles-default.xml.
+ *  It exposes a public static method getProfilePluginsMap(String plugin) which returns the requested profile plugins
+ */
 public enum ProfilesConf
 {
     PROFILES_CONF("pxf-profiles.xml"),
@@ -44,7 +48,7 @@ public enum ProfilesConf
 
     /**
      * Get requested profile plugins map.
-     * In case pxf-profiles.xml is not on the classpath, or it doesn't contains the requested profile.
+     * In case pxf-profiles.xml is not on the classpath, or it doesn't contains the requested profile,
      * Fallback to pxf-profiles-default.xml occurs (@see useProfilesDefaults(String msgFormat))
      * @param profile The requested profile
      * @return Plugins map of the requested profile
@@ -71,7 +75,7 @@ public enum ProfilesConf
         return msgFormat.equals(PROFILES_FILE_NOT_FOUND) || msgFormat.equals(NO_PROFILE_DEF);
     }
 
-    public XMLConfiguration getConf()
+    private XMLConfiguration getConf()
     {
         if (url == null)
         {
@@ -99,10 +103,10 @@ public enum ProfilesConf
         return conf;
     }
 
-    public Map<String, String> getPluginsMap(String profile)
+    private Map<String, String> getPluginsMap(String profile)
     {
         Configuration profileSubset = getProfileSubset(profile);
-        @SuppressWarnings("unchecked")
+        @SuppressWarnings("unchecked") //IteratorUtils doesn't yet support generics.
         List<String> plugins = IteratorUtils.toList(profileSubset.getKeys());
         Map<String, String> pluginsMap = new HashMap<String, String>();
         for (String plugin : plugins)
