@@ -692,6 +692,7 @@ int			optimizer_cte_inlining_bound;
 double 		optimizer_damping_factor_filter;
 double		optimizer_damping_factor_join;
 double 		optimizer_damping_factor_groupby;
+int			optimizer_segments;
 
 /* Security */
 bool		gp_reject_internal_tcp_conn = true;
@@ -5668,6 +5669,15 @@ static struct config_int ConfigureNamesInt[] =
 		43200000, 0, INT_MAX, NULL, NULL
 	},
 
+		{"optimizer_segments", PGC_USERSET, QUERY_TUNING_METHOD,
+            gettext_noop("Number of segments to be considered by the optimizer during costing, or 0 to take the actual number of segments."),
+            NULL,
+            GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&optimizer_segments,
+		0, 0, INT_MAX, NULL, NULL
+	},
+	
 	/* End-of-list marker */
 	{
 		{NULL, 0, 0, NULL, NULL}, NULL, 0, 0, 0, NULL, NULL
@@ -5916,6 +5926,7 @@ static struct config_real ConfigureNamesReal[] =
 		&optimizer_cost_threshold,
 		0.0, 0.0, INT_MAX, NULL, NULL
 	},
+	
 
 /* End-of-list marker */
 	{

@@ -810,6 +810,12 @@ COptTasks::PvOptimizeTask
 			GPOS_ASSERT(NULL != pdrgpdxlnQueryOutput);
 
 			ULONG ulSegments = gpdb::UlSegmentCountGP();
+			ULONG ulSegmentsForCosting = optimizer_segments;
+			
+			if (0 == ulSegmentsForCosting)
+			{
+				ulSegmentsForCosting = gpdb::UlSegmentCountGP();
+			}
 
 			pdxlnPlan = COptimizer::PdxlnOptimize
 									(
@@ -821,6 +827,7 @@ COptTasks::PvOptimizeTask
 									pmdpRelcache,
 									sysidDefault,
 									ulSegments,
+									ulSegmentsForCosting,
 									gp_session_id,
 									gp_command_count,
 									pdrgpss,

@@ -360,6 +360,8 @@ extern int optimizer_cte_inlining_bound;
 extern double optimizer_damping_factor_filter;
 extern double optimizer_damping_factor_join;
 extern double optimizer_damping_factor_groupby;
+extern int optimizer_segments;
+
 
 #if USE_EMAIL
 extern char  *gp_email_smtp_server;
