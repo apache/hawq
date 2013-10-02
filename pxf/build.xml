@@ -170,7 +170,8 @@
 					<token key="component.basename" value="${component.basename}" />
 					<token key="component.version" value="${component.version}" />
 					<token key="package.release" value="${package.release}" />
-					<token key="package.prefix" value="${package.prefix}" />
+					<token key="package.libprefix" value="${package.libprefix}" />
+                    <token key="package.etcprefix" value="${package.etcprefix}" />
 					<token key="component.name" value="${component.name}" />
 					<token key="package.name" value="${package.name}" />
 					<token key="package.publicstage" value="${package.publicstage}" />

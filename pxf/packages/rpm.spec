@@ -7,7 +7,8 @@
 %define _publicstage		@package.publicstage@
 %define _version			@component.version@
 %define _package_release	@package.release@
-%define _prefix				@package.prefix@
+%define _lib_prefix			@package.libprefix@
+%define _etc_prefix			@package.etcprefix@
 %define _component_name		@component.name@
 %define _package_name		@package.name@
 %define _package_summary	@package.summary@
@@ -26,7 +27,6 @@ Buildarch: noarch
 Requires: hadoop >= 2.0.0, hadoop-mapreduce >= 2.0.0
 AutoReqProv: no
 Provides: %{_name}
-Prefix: %{_prefix}
 BuildRoot: %{_topdir}/temp
 Obsoletes: %{_package_obsoletes}
 
@@ -39,22 +39,29 @@ Obsoletes: %{_package_obsoletes}
 %setup -n %{_component_name}
 
 %install
-if [ -d $RPM_BUILD_ROOT/%{_prefix}/%{_package_name} ]; then
-	rm -rf $RPM_BUILD_ROOT/%{_prefix}/%{_package_name}
+if [ -d $RPM_BUILD_ROOT/%{_lib_prefix}/%{_package_name} ]; then
+	rm -rf $RPM_BUILD_ROOT/%{_lib_prefix}/%{_package_name}
 fi
 
-mkdir -p $RPM_BUILD_ROOT/%{_prefix}/%{_package_name}
-cp *.jar $RPM_BUILD_ROOT/%{_prefix}/%{_package_name}
+mkdir -p $RPM_BUILD_ROOT/%{_lib_prefix}/%{_package_name}
+cp *.jar $RPM_BUILD_ROOT/%{_lib_prefix}/%{_package_name}
+
+if [ -d $RPM_BUILD_ROOT/%{_etc_prefix}/%{_package_name} ]; then
+	rm -rf $RPM_BUILD_ROOT/%{_etc_prefix}/%{_package_name}
+fi
+
+mkdir -p $RPM_BUILD_ROOT/%{_etc_prefix}/%{_package_name}
+cp -r conf/ $RPM_BUILD_ROOT/%{_etc_prefix}/%{_package_name}
 
 %post
 
-if [ ! -d $RPM_BUILD_ROOT/%{_prefix}/%{_publicstage} ]; then
-	mkdir -p $RPM_BUILD_ROOT/%{_prefix}/%{_publicstage}
-	getent passwd hdfs > /dev/null && chown hdfs $RPM_BUILD_ROOT/%{_prefix}/%{_publicstage}
-	chmod 777 $RPM_BUILD_ROOT/%{_prefix}/%{_publicstage}
+if [ ! -d $RPM_BUILD_ROOT/%{_lib_prefix}/%{_publicstage} ]; then
+	mkdir -p $RPM_BUILD_ROOT/%{_lib_prefix}/%{_publicstage}
+	getent passwd hdfs > /dev/null && chown hdfs $RPM_BUILD_ROOT/%{_lib_prefix}/%{_publicstage}
+	chmod 777 $RPM_BUILD_ROOT/%{_lib_prefix}/%{_publicstage}
 fi
 
-pushd $RPM_BUILD_ROOT/%{prefix} > /dev/null
+pushd $RPM_BUILD_ROOT/%{_lib_prefix} > /dev/null
 if [ -h %{_name} ]; then
 	rm %{_name}
 fi
@@ -66,7 +73,7 @@ popd > /dev/null
 
 %preun
 
-pushd $RPM_BUILD_ROOT/%{prefix} > /dev/null
+pushd $RPM_BUILD_ROOT/%{_lib_prefix} > /dev/null
 
 if [ -h %{_name} -a "`readlink %{_name} | xargs basename`" == "%{_package_name}" ]; then
 	rm %{_name}
@@ -80,4 +87,5 @@ fi
 popd > /dev/null
 
 %files
-%{_prefix}
+%{_lib_prefix}
+%{_etc_prefix}
