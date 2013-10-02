@@ -55,13 +55,16 @@ pxfprotocol_validate_urls(PG_FUNCTION_ARGS)
 	/*
 	 * Condition 4: existence of core options if profile wasn't supplied
 	 */
-	if (!is_writable)
+	char *option;
+	if(GPHDUri_get_value_for_opt(uri, "profile", &option, false) < 0)
 	{
-		char *option;
-		if(GPHDUri_get_value_for_opt(uri, "profile", &option, false) < 0)
+		List *coreOptions = list_make2("ACCESSOR", "RESOLVER");
+		if (!is_writable)
 		{
-			GPHDUri_verify_core_options_exist(uri, list_make3("fragmenter", "accessor", "resolver"));
-		}	
+			coreOptions = lcons("FRAGMENTER", coreOptions);
+		}
+		GPHDUri_verify_core_options_exist(uri, coreOptions);
+		list_free(coreOptions);
 	}
 
 	/* Temp: Uncomment for printing a NOTICE with parsed parameters */
