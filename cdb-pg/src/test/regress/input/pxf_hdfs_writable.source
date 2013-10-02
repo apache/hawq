@@ -53,7 +53,21 @@ CREATE WRITABLE EXTERNAL TABLE wrtext (s1 text,
 							   		   n2 int)
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrtext?ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver')
 FORMAT 'TEXT' (DELIMITER ',');
-INSERT INTO wrtext VALUES ('first',1,11), ('second',2,22), ('third',3,33);
+INSERT INTO wrtext VALUES ('first',1,11), 
+                          ('second',2,22),
+                          ('third',3,33),
+                          ('fourth',4,44),
+                          ('fifth',5,55),
+                          ('sixth',6,66),
+                          ('seventh',7,77),
+                          ('eighth',8,88),
+                          ('ninth',9,99),
+                          ('tenth',10,1010),
+                          ('eleventh',11,1111),
+                          ('twelfth',12,1212),
+                          ('thirteenth',13,1313),
+                          ('fourteenth',14,1414), 
+                          ('fifteenth',15,1515);
 DROP EXTERNAL TABLE wrtext;
 --
 -- Test data was written
@@ -63,7 +77,7 @@ CREATE READABLE EXTERNAL TABLE readtext (s1 text,
 							   		     n2 int)
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrtext?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver')
 FORMAT 'TEXT' (DELIMITER ',');
-SELECT * FROM readtext ORDER BY s1;
+SELECT * FROM readtext ORDER BY n1;
 DROP EXTERNAL TABLE readtext;
 --
 -- 2. Test writable table with TEXT format - compressions
@@ -80,10 +94,25 @@ COPY wrgzip FROM STDIN CSV;
 I,1,11
 am,2,22
 Gzipped,3,33
+I,1,11
+am,2,22
+Gzipped,3,33
+I,1,11
+am,2,22
+Gzipped,3,33
+I,1,11
+am,2,22
+Gzipped,3,33
+I,1,11
+am,2,22
+Gzipped,3,33
+I,1,11
+am,2,22
+Gzipped,3,33
 \.
 COPY wrgzip FROM STDIN DELIMITER ':';
 OOF:4:44
-LL:5:55
+OOF:5:55
 \.
 DROP EXTERNAL TABLE wrgzip;
 --
@@ -107,7 +136,17 @@ FORMAT 'TEXT' (DELIMITER ',');
 CREATE TEMP TABLE data_for_bzip2 (s1 text,
                                   n1 int,
                                   n2 int);
-INSERT INTO data_for_bzip2 VALUES ('I',1,11), ('am',2,22), ('BZip2',3,33);
+INSERT INTO data_for_bzip2 VALUES ('I',1,10),
+                                  (' ',2,20), 
+                                  ('a',3,30),
+                                  ('m',4,40),
+                                  (' ',5,50),
+                                  ('B',6,60),
+                                  ('Z',7,70),
+                                  ('i',8,80),
+                                  ('p',9,90),
+                                  ('2',10,100), 
+                                  ('!!!',11,110);
 INSERT INTO wrbzip2 SELECT * FROM data_for_bzip2;
 DROP TABLE data_for_bzip2;
 DROP EXTERNAL TABLE wrbzip2;

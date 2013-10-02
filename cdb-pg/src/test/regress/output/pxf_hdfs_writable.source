@@ -48,7 +48,21 @@ CREATE WRITABLE EXTERNAL TABLE wrtext (s1 text,
 							   		   n2 int)
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrtext?ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver')
 FORMAT 'TEXT' (DELIMITER ',');
-INSERT INTO wrtext VALUES ('first',1,11), ('second',2,22), ('third',3,33);
+INSERT INTO wrtext VALUES ('first',1,11), 
+                          ('second',2,22),
+                          ('third',3,33),
+                          ('fourth',4,44),
+                          ('fifth',5,55),
+                          ('sixth',6,66),
+                          ('seventh',7,77),
+                          ('eighth',8,88),
+                          ('ninth',9,99),
+                          ('tenth',10,1010),
+                          ('eleventh',11,1111),
+                          ('twelfth',12,1212),
+                          ('thirteenth',13,1313),
+                          ('fourteenth',14,1414), 
+                          ('fifteenth',15,1515);
 DROP EXTERNAL TABLE wrtext;
 --
 -- Test data was written
@@ -58,13 +72,25 @@ CREATE READABLE EXTERNAL TABLE readtext (s1 text,
 							   		     n2 int)
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrtext?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver')
 FORMAT 'TEXT' (DELIMITER ',');
-SELECT * FROM readtext ORDER BY s1;
-   s1   | n1 | n2 
---------+----+----
- first  |  1 | 11
- second |  2 | 22
- third  |  3 | 33
-(3 rows)
+SELECT * FROM readtext ORDER BY n1;
+     s1     | n1 |  n2  
+------------+----+------
+ first      |  1 |   11
+ second     |  2 |   22
+ third      |  3 |   33
+ fourth     |  4 |   44
+ fifth      |  5 |   55
+ sixth      |  6 |   66
+ seventh    |  7 |   77
+ eighth     |  8 |   88
+ ninth      |  9 |   99
+ tenth      | 10 | 1010
+ eleventh   | 11 | 1111
+ twelfth    | 12 | 1212
+ thirteenth | 13 | 1313
+ fourteenth | 14 | 1414
+ fifteenth  | 15 | 1515
+(15 rows)
 
 DROP EXTERNAL TABLE readtext;
 --
@@ -93,11 +119,26 @@ SELECT * FROM readgzip ORDER BY n1;
    s1    | n1 | n2 
 ---------+----+----
  I       |  1 | 11
+ I       |  1 | 11
+ I       |  1 | 11
+ I       |  1 | 11
+ I       |  1 | 11
+ I       |  1 | 11
+ am      |  2 | 22
+ am      |  2 | 22
+ am      |  2 | 22
+ am      |  2 | 22
+ am      |  2 | 22
  am      |  2 | 22
  Gzipped |  3 | 33
+ Gzipped |  3 | 33
+ Gzipped |  3 | 33
+ Gzipped |  3 | 33
+ Gzipped |  3 | 33
+ Gzipped |  3 | 33
  OOF     |  4 | 44
- LL      |  5 | 55
-(5 rows)
+ OOF     |  5 | 55
+(20 rows)
 
 DROP EXTERNAL TABLE readgzip;
 --
@@ -111,7 +152,17 @@ FORMAT 'TEXT' (DELIMITER ',');
 CREATE TEMP TABLE data_for_bzip2 (s1 text,
                                   n1 int,
                                   n2 int);
-INSERT INTO data_for_bzip2 VALUES ('I',1,11), ('am',2,22), ('BZip2',3,33);
+INSERT INTO data_for_bzip2 VALUES ('I',1,10),
+                                  (' ',2,20), 
+                                  ('a',3,30),
+                                  ('m',4,40),
+                                  (' ',5,50),
+                                  ('B',6,60),
+                                  ('Z',7,70),
+                                  ('i',8,80),
+                                  ('p',9,90),
+                                  ('2',10,100), 
+                                  ('!!!',11,110);
 INSERT INTO wrbzip2 SELECT * FROM data_for_bzip2;
 DROP TABLE data_for_bzip2;
 DROP EXTERNAL TABLE wrbzip2;
@@ -124,12 +175,20 @@ CREATE READABLE EXTERNAL TABLE readbzip2 (s1 text,
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrbzip2?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver')
 FORMAT 'TEXT' (DELIMITER ',');
 SELECT * FROM readbzip2 ORDER BY n1;
-  s1   | n1 | n2 
--------+----+----
- I     |  1 | 11
- am    |  2 | 22
- BZip2 |  3 | 33
-(3 rows)
+ s1  | n1 | n2  
+-----+----+-----
+ I   |  1 |  10
+     |  2 |  20
+ a   |  3 |  30
+ m   |  4 |  40
+     |  5 |  50
+ B   |  6 |  60
+ Z   |  7 |  70
+ i   |  8 |  80
+ p   |  9 |  90
+ 2   | 10 | 100
+ !!! | 11 | 110
+(11 rows)
 
 DROP EXTERNAL TABLE readbzip2;
 --
