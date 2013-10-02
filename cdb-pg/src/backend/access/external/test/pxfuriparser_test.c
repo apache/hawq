@@ -87,6 +87,36 @@ test__parseGPHDUri__NegativeTestNoProtocol(void **state)
 }
 
 /*
+ * Negative test: parsing of uri without options part
+ */
+void
+test__parseGPHDUri__NegativeTestNoOptions(void **state)
+{
+	char* uri_no_options = "pxf://1.2.3.4:5678/some/path/and/table.tbl";
+
+	/* Setting the test -- code omitted -- */
+	PG_TRY();
+	{
+		/* This will throw a ereport(ERROR).*/
+		GPHDUri* parsed = parseGPHDUri(uri_no_options);
+	}
+	PG_CATCH();
+	{
+		CurrentMemoryContext = 1;
+		ErrorData *edata = CopyErrorData();
+
+		/*Validate the type of expected error */
+		assert_true(edata->sqlerrcode == ERRCODE_SYNTAX_ERROR);
+		assert_true(edata->elevel == ERROR);
+		assert_string_equal(edata->message, "Invalid URI pxf://1.2.3.4:5678/some/path/and/table.tbl: missing options section");
+		return;
+	}
+	PG_END_TRY();
+
+	assert_true(false);
+}
+
+/*
  * Negative test: parsing of a uri with a missing equal
  */
 void
@@ -308,6 +338,7 @@ main(int argc, char* argv[])
 	const UnitTest tests[] = {
 			unit_test(test__parseGPHDUri__ValidURI),
 			unit_test(test__parseGPHDUri__NegativeTestNoProtocol),
+			unit_test(test__parseGPHDUri__NegativeTestNoOptions),
 			unit_test(test__parseGPHDUri__NegativeTestMissingEqual),
 			unit_test(test__parseGPHDUri__NegativeTestDuplicateEquals),
 			unit_test(test__parseGPHDUri__NegativeTestMissingKey),

@@ -232,7 +232,7 @@ GPHDUri_parse_protocol(GPHDUri *uri, char **cursor)
 	if (!IS_PXF_URI(uri->uri))
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("invalid URI %s : unsupported protocol '%s'",
+				 errmsg("Invalid URI %s : unsupported protocol '%s'",
 						uri->uri, uri->protocol)));
 
 	/* set cursor to new position and return */
@@ -261,7 +261,7 @@ GPHDUri_parse_authority(GPHDUri *uri, char **cursor)
 		/* implicit authority 'localhost:defport' (<ptc>:///) */
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("invalid URI %s : missing authority section",
+				 errmsg("Invalid URI %s : missing authority section",
 						 uri->uri)));
 	}
 	else
@@ -272,7 +272,7 @@ GPHDUri_parse_authority(GPHDUri *uri, char **cursor)
 		{
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("invalid URI %s : missing authority section",
+					 errmsg("Invalid URI %s : missing authority section",
 							 uri->uri)));
 		}
 		else
@@ -371,7 +371,7 @@ GPHDUri_parse_options(GPHDUri *uri, char **cursor)
 	if (!start || start[0] != '?')
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("invalid URI %s: missing options section",
+				 errmsg("Invalid URI %s: missing options section",
 						uri->uri)));
 
 	/* skip '?' */
@@ -381,7 +381,7 @@ GPHDUri_parse_options(GPHDUri *uri, char **cursor)
 	if (strlen(start) < 2)
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("invalid URI %s: invalid option after '?'",
+				 errmsg("Invalid URI %s: invalid option after '?'",
 						uri->uri)));
 
 	/* ok, parse the options now */

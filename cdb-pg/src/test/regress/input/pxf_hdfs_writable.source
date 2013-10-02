@@ -27,19 +27,18 @@
 -- 0. syntax validations
 --
 CREATE WRITABLE EXTERNAL TABLE pxf_out(a int, b text, c bytea)
-LOCATION ('pxf://@hostname@:50070/somepath/gpdb_regression_data?someuseropt=someuserval')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data?ACCESSOR=SequenceFileAccessor&RESOLVER=AvroResolver&DATA-SCHEMA=MySchema')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- positive
 
 CREATE WRITABLE EXTERNAL TABLE pxf_out1(a int, b text, c bytea)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data?ACCESSOR=SequenceFileAccessor&RESOLVER=AvroResolver&DATA-SCHEMA=MySchema')
-FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- positive
+LOCATION ('pxf://@hostname@:50070/somepath/gpdb_regression_data?someuseropt=someuserval')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- negative
 
 CREATE WRITABLE EXTERNAL TABLE pxf_out2(a int, b text, c bytea)
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/*')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- negative
 
 DROP EXTERNAL TABLE pxf_out;
-DROP EXTERNAL TABLE pxf_out1;
 
 --
 -- Load HDFS with test data

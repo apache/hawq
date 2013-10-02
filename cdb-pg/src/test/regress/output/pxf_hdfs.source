@@ -35,7 +35,7 @@ FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- positive
 CREATE READABLE EXTERNAL TABLE gphdfs_in2(a int, b text, c bytea)
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/*')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- negative
-ERROR:  invalid URI pxf://@hostname@:50070/gpdb_regression_data/*: missing options section
+ERROR:  Invalid URI pxf://@hostname@:50070/gpdb_regression_data/*: missing options section
 CREATE READABLE EXTERNAL TABLE gphdfs_in2(a int, b text, c bytea)
 LOCATION ('pxf://@hostname@:50070/somepath/gpdb_regression_data?ACCESSOR=xacc&RESOLVER=xres&someuseropt=someuserval')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- negative, missing fragmenter

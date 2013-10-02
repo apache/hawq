@@ -1,7 +1,11 @@
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.utilities.InputData;
 import com.pivotal.pxf.utilities.Plugin;
 import com.pivotal.pxf.accessors.IReadAccessor;
+import com.pivotal.pxf.accessors.IWriteAccessor;
 
 /*
  * Internal interface that defines the access to a file on HDFS.  All classes
@@ -9,16 +13,19 @@ import com.pivotal.pxf.accessors.IReadAccessor;
  * must respect this interface
  * Dummy implementation, for documentation
  */
-public class DummyAccessor extends Plugin implements IReadAccessor
+public class DummyAccessor extends Plugin implements IReadAccessor, IWriteAccessor
 {
     private int rowNumber;
     private int fragmentNumber;
+    private Log Log;
     
 	public DummyAccessor(InputData metaData)
 	{
 		super(metaData);
         rowNumber = 0;
         fragmentNumber = 0;
+		Log = LogFactory.getLog(DummyAccessor.class);
+
 	}
 	
 	public boolean openForRead() throws Exception
@@ -52,4 +59,22 @@ public class DummyAccessor extends Plugin implements IReadAccessor
     {
         /* fclose or similar */
     }
+
+	@Override
+	public boolean openForWrite() throws Exception {
+		/* fopen or similar */
+        return true;
+	}
+
+	@Override
+	public boolean writeNextObject(OneRow onerow) throws Exception {
+		
+		Log.info(onerow.getData());
+		return true;
+	}
+
+	@Override
+	public void closeForWrite() throws Exception {
+		/* fclose or similar */
+	}
 }
