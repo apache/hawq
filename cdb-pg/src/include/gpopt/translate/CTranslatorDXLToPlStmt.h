@@ -112,8 +112,11 @@ namespace gpdxl
 			PfPplan m_rgpfTranslators[EdxlopSentinel];
 
 			CContextDXLToPlStmt *m_pctxdxltoplstmt;
-
+			
 			CTranslatorDXLToScalar *m_pdxlsctranslator;
+
+			// map of outer references indexed by colid
+			HMUlVar *m_phmulvarOuterRefs;
 
 			// command type
 			CmdType m_cmdtype;
@@ -214,7 +217,7 @@ namespace gpdxl
 
 		public:
 			// ctor
-			CTranslatorDXLToPlStmt(IMemoryPool *pmp, CMDAccessor *pmda, CContextDXLToPlStmt *pctxdxltoplstmt, ULONG ulSegments);
+			CTranslatorDXLToPlStmt(IMemoryPool *pmp, CMDAccessor *pmda, CContextDXLToPlStmt *pctxdxltoplstmt, ULONG ulSegments, HMUlVar *phmulvarOuterRefs);
 
 			// dtor
 			~CTranslatorDXLToPlStmt();

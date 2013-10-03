@@ -570,10 +570,16 @@ COptTasks::Pplstmt
 							&plRTable,
 							&plSubplans
 							);
+	
+	HMUlVar *phmulvarOuterRefs = New(pmp) HMUlVar(pmp);
 
 	// translate DXL -> PlannedStmt
-	CTranslatorDXLToPlStmt trdxltoplstmt(pmp, pmda, &ctxdxltoplstmt, gpdb::UlSegmentCountGP());
-	return trdxltoplstmt.PplstmtFromDXL(pdxln);
+	CTranslatorDXLToPlStmt trdxltoplstmt(pmp, pmda, &ctxdxltoplstmt, gpdb::UlSegmentCountGP(), phmulvarOuterRefs);
+	PlannedStmt *pplstmt = trdxltoplstmt.PplstmtFromDXL(pdxln);
+	
+	phmulvarOuterRefs->Release();
+	
+	return pplstmt;
 }
 
 
@@ -998,6 +1004,8 @@ COptTasks::PvPlstmtFromDXLTask
 							&plSubplans
 							);
 
+	HMUlVar *phmulvarOuterRefs = New(pmp) HMUlVar(pmp);
+
 	// relcache MD provider
 	CMDProviderRelcache *pmdpr = New(pmp) CMDProviderRelcache(pmp);
 
@@ -1005,7 +1013,7 @@ COptTasks::PvPlstmtFromDXLTask
 		CAutoMDAccessor amda(pmp, pmdpr, sysidDefault);
 
 		// translate DXL -> PlannedStmt
-		CTranslatorDXLToPlStmt trdxltoplstmt(pmp, amda.Pmda(), &ctxdxlplstmt, gpdb::UlSegmentCountGP());
+		CTranslatorDXLToPlStmt trdxltoplstmt(pmp, amda.Pmda(), &ctxdxlplstmt, gpdb::UlSegmentCountGP(), phmulvarOuterRefs);
 		PlannedStmt *pplstmt = trdxltoplstmt.PplstmtFromDXL(pdxlnOriginal);
 		if (optimizer_print_plan)
 		{
@@ -1020,6 +1028,7 @@ COptTasks::PvPlstmtFromDXLTask
 
 	// cleanup
 	pdxlnOriginal->Release();
+	phmulvarOuterRefs->Release();
 
 	return NULL;
 }

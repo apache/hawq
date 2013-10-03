@@ -110,7 +110,10 @@ namespace gpdxl
 			BOOL m_fHasSubqueries;
 			
 			// number of segments
-			ULONG m_ulSegments;
+			ULONG m_ulSegments; 
+			
+			// context passed from DXL->PlStmt translator
+			HMUlVar *m_phmulvarOuterRefs;
 
 			// translate a CDXLScalarArrayComp into a GPDB ScalarArrayOpExpr
 			Expr *PstrarrayopexprFromDXLNodeScArrayComp
@@ -298,9 +301,9 @@ namespace gpdxl
 
 		public:
 			// ctor
-			CTranslatorDXLToScalar(IMemoryPool *pmp, CMDAccessor *pmda, ULONG ulSegments);
+			CTranslatorDXLToScalar(IMemoryPool *pmp, CMDAccessor *pmda, ULONG ulSegments, HMUlVar *phmulvarOuterRefs);
 
-			// Translate DXL scalar operator node into an Expr expression
+			// translate DXL scalar operator node into an Expr expression
 			// This function is called during the translation of DXL->Query or DXL->Query
 			Expr *PexprFromDXLNodeScalar
 				(

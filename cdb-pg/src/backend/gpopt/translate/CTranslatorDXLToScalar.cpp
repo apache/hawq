@@ -63,13 +63,15 @@ CTranslatorDXLToScalar::CTranslatorDXLToScalar
 	(
 	IMemoryPool *pmp,
 	CMDAccessor *pmda,
-	ULONG ulSegments
+	ULONG ulSegments, 
+	HMUlVar *phmulvarOuterRefs
 	)
 	:
 	m_pmp(pmp),
 	m_pmda(pmda),
 	m_fHasSubqueries(false),
-	m_ulSegments(ulSegments)
+	m_ulSegments(ulSegments),
+	m_phmulvarOuterRefs(phmulvarOuterRefs)
 {
 }
 
@@ -605,7 +607,7 @@ CTranslatorDXLToScalar::PparamFromDXLNodeScInitPlan
 
 	// Since an init plan is not a scalar node, we create a new DXLTranslator to handle its translation
 	CContextDXLToPlStmt *pctxdxltoplstmt = (dynamic_cast<CMappingColIdVarPlStmt*>(pmapcidvar))->Pctxdxltoplstmt();
-	CTranslatorDXLToPlStmt trdxltoplstmt(m_pmp, m_pmda, pctxdxltoplstmt, m_ulSegments);
+	CTranslatorDXLToPlStmt trdxltoplstmt(m_pmp, m_pmda, pctxdxltoplstmt, m_ulSegments, NULL /*phmulvarOuterRefs*/);
 	Plan *pplanChild = trdxltoplstmt.PplFromDXL(pdxlnChild, pdxltrctxOut, pplan);
 
 	// Step 2: Add the generated child to the root plan's subplan list
@@ -664,13 +666,30 @@ CTranslatorDXLToScalar::PsubplanFromDXLNodeScSubPlan
 	// insert outer reference mappings in the translate context
 	for (ULONG ul = 0; ul < ulLen; ul++)
 	{
-		ULONG ulid = (*m_pdrgdxlcrOuterRefs)[ul]->UlID();
 		IMDId *pmdid = (*m_pdrgmdidOuterRefs)[ul];
-		if (NULL == pdxltrctxOut->Pmecolidparamid(ulid))
+		CDXLColRef *pdxlcr = (*m_pdrgdxlcrOuterRefs)[ul];
+		ULONG ulColid = pdxlcr->UlID();
+		
+		if (NULL == pdxltrctxOut->Pmecolidparamid(ulColid))
 		{
-			CMappingElementColIdParamId *pmecolidparamid = New (m_pmp) CMappingElementColIdParamId(ulid, pctxdxltoplstmt->UlNextParamId(), pmdid);
-			pdxltrctxOut->FInsertParamMapping(ulid, pmecolidparamid);
+			// keep outer reference mapping to the original column for subsequent subplans
+			CMappingElementColIdParamId *pmecolidparamid = New (m_pmp) CMappingElementColIdParamId(ulColid, pctxdxltoplstmt->UlNextParamId(), pmdid);
+			pdxltrctxOut->FInsertParamMapping(ulColid, pmecolidparamid);
 		}
+		
+		pdxlcr->AddRef();
+		pmdid->AddRef();
+		
+		CDXLScalarIdent *pdxlopIdent = New(m_pmp) CDXLScalarIdent(m_pmp, pdxlcr, pmdid);
+		Var *pvar = (Var *) pmapcidvar->PvarFromDXLNodeScId(pdxlopIdent);
+		
+		GPOS_ASSERT(NULL != pvar || m_phmulvarOuterRefs->PtLookup(&ulColid));
+		
+		if (NULL != pvar && NULL == m_phmulvarOuterRefs->PtLookup(&ulColid))
+		{
+			m_phmulvarOuterRefs->FInsert(New(m_pmp) ULONG(ulColid), pvar);
+		}
+		pdxlopIdent->Release();
 	}
 
 	Plan *pplan = ((CMappingColIdVarPlStmt*) pmapcidvar)->Pplan();
@@ -695,7 +714,8 @@ CTranslatorDXLToScalar::PsubplanFromDXLNodeScSubPlan
 							m_pmp,
 							m_pmda,
 							(dynamic_cast<CMappingColIdVarPlStmt*>(pmapcidvar))->Pctxdxltoplstmt(),
-							m_ulSegments
+							m_ulSegments,
+							m_phmulvarOuterRefs
 							);
 	Plan *pplanChild = trdxltoplstmt.PplFromDXL(pdxlnChild, pdxltrctxOut, pplan);
 
@@ -708,6 +728,7 @@ CTranslatorDXLToScalar::PsubplanFromDXLNodeScSubPlan
 	for (ULONG ul = 0; ul < ulSize; ul++)
 	{
 		CDXLColRef *pdxlcr = (*m_pdrgdxlcrOuterRefs)[ul];
+		ULONG ulColId = pdxlcr->UlID();
 		pdxlcr->AddRef();
 		const CMappingElementColIdParamId *pmecolidparamid = pdxltrctxOut->Pmecolidparamid(pdxlcr->UlID());
 
@@ -719,6 +740,14 @@ CTranslatorDXLToScalar::PsubplanFromDXLNodeScSubPlan
 
 		CDXLScalarIdent *pdxlopIdent = New(m_pmp) CDXLScalarIdent(m_pmp, pdxlcr, pmdidType);
 		Expr *parg = (Expr *) pmapcidvar->PvarFromDXLNodeScId(pdxlopIdent);
+		
+		// not found in mapping, it must be an external parameter		
+		if (NULL == parg)
+		{
+			parg = (Expr*) m_phmulvarOuterRefs->PtLookup(&ulColId);
+			GPOS_ASSERT(NULL != parg);
+		}
+		
 		pdxlopIdent->Release();
 
 		psubplan->args = gpdb::PlAppendElement(psubplan->args, parg);

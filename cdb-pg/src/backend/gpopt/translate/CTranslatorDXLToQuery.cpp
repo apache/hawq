@@ -67,7 +67,7 @@ CTranslatorDXLToQuery::CTranslatorDXLToQuery
 	m_ulSortgrouprefCounter(0),
 	m_ulSegments(ulSegments)
 {
-	m_pdxlsctranslator = New (m_pmp) CTranslatorDXLToScalar(m_pmp, m_pmda, m_ulSegments);
+	m_pdxlsctranslator = New (m_pmp) CTranslatorDXLToScalar(m_pmp, m_pmda, m_ulSegments, NULL /*phmulvarOuterRefs*/);
 }
 
 //---------------------------------------------------------------------------

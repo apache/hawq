@@ -375,9 +375,10 @@ COptClient::PplstmtConstruct
 		&plRTable,
 		&plSubplans
 		);
+	HMUlVar *phmulvarOuterRefs = New(m_pmp) HMUlVar(m_pmp);
 
 	// translate DXL -> PlannedStmt
-	CTranslatorDXLToPlStmt trdxltoplstmt(m_pmp, pmda, &ctxdxltoplstmt, gpdb::UlSegmentCountGP());
+	CTranslatorDXLToPlStmt trdxltoplstmt(m_pmp, pmda, &ctxdxltoplstmt, gpdb::UlSegmentCountGP(), phmulvarOuterRefs);
 	ULLONG ullPlanId = 0;
 	ULLONG ullPlanSpaceSize = 0;
 	CDXLNode *pdxlnPlan = CDXLUtils::PdxlnParsePlan(m_pmp, szPlan, NULL /*szXSDPath*/, &ullPlanId, &ullPlanSpaceSize);
@@ -386,7 +387,8 @@ COptClient::PplstmtConstruct
 	GPOS_ASSERT(NULL != pplstmt);
 	GPOS_ASSERT(CurrentMemoryContext);
 
-	return (PlannedStmt *) gpdb::PvCopyObject(pplstmt);
+	phmulvarOuterRefs->Release();
+	return (PlannedStmt *) gpdb::PvCopyObject(pplstmt);;
 }
 
 //---------------------------------------------------------------------------
