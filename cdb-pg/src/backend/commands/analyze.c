@@ -199,7 +199,8 @@ static void spiCallback_getSingleResultRowColumnAsFloat4(void *clientData);
 extern List 		*find_all_inheritors(Oid parentrel);
 extern BlockNumber RelationGuessNumberOfBlocks(double totalbytes);
 extern Oid	LookupFuncName(List *funcname, int nargs, const Oid *argtypes, bool noError);
-
+extern bool	optimizer; /* status of the new optimizer */
+extern bool optimizer_analyze_root_partition; /* GUC for stats collection on root partitions */
 /*
  * To avoid consuming too much memory during analysis and/or too much space
  * in the resulting pg_statistic rows, we ignore varlena datums that are wider
@@ -229,15 +230,18 @@ void analyzeStatement(VacuumStmt *stmt, List *relids)
 
 	GpAutoStatsModeValue autostatvalBackup = gp_autostats_mode;
 	GpAutoStatsModeValue autostatInFunctionsvalBackup = gp_autostats_mode_in_functions;
+	bool optimizerBackup = optimizer;
 
 	gp_autostats_mode = GP_AUTOSTATS_NONE;
 	gp_autostats_mode_in_functions = GP_AUTOSTATS_NONE;
+	optimizer = false;
 
 	PG_TRY();
 	{
 		analyzeStmt(stmt, relids);
 		gp_autostats_mode = autostatvalBackup;
 		gp_autostats_mode_in_functions = autostatInFunctionsvalBackup;
+		optimizer = optimizerBackup;
 	}
 
 	/* Clean up in case of error. */
@@ -245,6 +249,7 @@ void analyzeStatement(VacuumStmt *stmt, List *relids)
 	{
 		gp_autostats_mode = autostatvalBackup;
 		gp_autostats_mode_in_functions = autostatInFunctionsvalBackup;
+		optimizer = optimizerBackup;
 
 		/* Carry on with error handling. */
 		PG_RE_THROW();
@@ -252,6 +257,7 @@ void analyzeStatement(VacuumStmt *stmt, List *relids)
 	PG_END_TRY();
 	Assert(gp_autostats_mode == autostatvalBackup);
 	Assert(gp_autostats_mode_in_functions == autostatInFunctionsvalBackup);
+	Assert(optimizer == optimizerBackup);
 }
 
 /**
@@ -1329,7 +1335,10 @@ static void analyzeEstimateReltuplesRelpages(Oid relationOid, float4 *relTuples,
 	*relTuples = 0.0;			
 
 	List *allRelOids = NIL;
-	if (rel_is_partitioned(relationOid))
+	/* if GUC optimizer_analyze_root_partition is off, we do not analyze root partitions.
+	 * This is done by estimating the reltuples to be 0 and thus bypass the actual analyze.
+	 * See MPP-21427 */
+	if (rel_is_partitioned(relationOid) && optimizer_analyze_root_partition)
 	{
 		PartitionNode *pn = get_parts(relationOid, 0 /*level*/ ,
 				0 /*parent*/, false /* inctemplate */, CurrentMemoryContext);

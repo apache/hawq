@@ -694,6 +694,7 @@ double 		optimizer_damping_factor_filter;
 double		optimizer_damping_factor_join;
 double 		optimizer_damping_factor_groupby;
 int			optimizer_segments;
+bool		optimizer_analyze_root_partition;
 
 /* Security */
 bool		gp_reject_internal_tcp_conn = true;
@@ -3654,6 +3655,16 @@ static struct config_bool ConfigureNamesBool[] =
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
 		&optimizer_cte_inlining,
+		false, NULL, NULL
+	},
+
+	{
+		{"optimizer_analyze_root_partition", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Enable statistics collection on root partitions during ANALYZE"),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&optimizer_analyze_root_partition,
 		false, NULL, NULL
 	},
 
