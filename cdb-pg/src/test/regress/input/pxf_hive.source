@@ -203,7 +203,19 @@ LOCATION ('pxf://@hostname@:50070/reg_heterogen?PROFILE=Hive')
 format 'custom' (formatter='pxfwritable_import');
 ANALYZE hv_heterogen_profile_wo_analyzer;
 
--- 13. Clean after Hive
+-- 13. Index table
+\! ${HIVE_ROOT}/bin/hive -e "create index reg_txt_index on table reg_txt (s1) as 'COMPACT' with deferred rebuild" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "alter index reg_txt_index on reg_txt rebuild" 2>/dev/null
+CREATE EXTERNAL TABLE hv_index(
+t1    text,
+t2    text,
+n1 bigint)
+LOCATION ('pxf://@hostname@:50070/default__reg_txt_reg_txt_index__?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import');
+SELECT * FROM hv_index ORDER BY t1;
+
+-- 14. Clean after Hive
+drop external table hv_index;
 drop external table hv_view;
 drop external table hv_collections;
 drop external table hv_heterogen;
@@ -217,6 +229,8 @@ drop external table hv_un_supported_tbl;
 drop external table tbl_with_profile;
 drop external table hv_heterogen_profile_wo_analyzer;
 
+\! ${HIVE_ROOT}/bin/hive -e "drop index reg_index on reg_txt" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "drop table default__reg_txt_reg_txt_index__" 2>/dev/null
 \! ${HIVE_ROOT}/bin/hive -e "drop view reg_txt_view" 2>/dev/null
 \! ${HIVE_ROOT}/bin/hive -e "drop table reg_collections" 2>/dev/null
 \! ${HIVE_ROOT}/bin/hive -e "drop table reg_heterogen" 2>/dev/null
