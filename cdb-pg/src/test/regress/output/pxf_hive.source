@@ -382,7 +382,7 @@ CREATE EXTERNAL TABLE hv_index(
 t1    text,
 t2    text,
 n1 bigint)
-LOCATION ('pxf://@hostname@:50070/default__reg_txt_reg_txt_index__?FRAGMENTER=HiveDataFragmenter&ACCESSOR=HiveAccessor&RESOLVER=HiveResolver')
+LOCATION ('pxf://@hostname@:50070/default__reg_txt_reg_txt_index__?PROFILE=Hive')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import');
 SELECT * FROM hv_index ORDER BY t1;
   t1   |                               t2                               | n1  
