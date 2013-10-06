@@ -51,7 +51,7 @@ if [ -d $RPM_BUILD_ROOT/%{_etc_prefix}/%{_package_name} ]; then
 fi
 
 mkdir -p $RPM_BUILD_ROOT/%{_etc_prefix}/%{_package_name}
-cp -r conf/ $RPM_BUILD_ROOT/%{_etc_prefix}/%{_package_name}
+cp -r conf $RPM_BUILD_ROOT/%{_etc_prefix}/%{_package_name}
 
 %post
 
