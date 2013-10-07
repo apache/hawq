@@ -115,9 +115,6 @@ namespace gpdxl
 			
 			CTranslatorDXLToScalar *m_pdxlsctranslator;
 
-			// map of outer references indexed by colid
-			HMUlVar *m_phmulvarOuterRefs;
-
 			// command type
 			CmdType m_cmdtype;
 			
@@ -217,7 +214,7 @@ namespace gpdxl
 
 		public:
 			// ctor
-			CTranslatorDXLToPlStmt(IMemoryPool *pmp, CMDAccessor *pmda, CContextDXLToPlStmt *pctxdxltoplstmt, ULONG ulSegments, HMUlVar *phmulvarOuterRefs);
+			CTranslatorDXLToPlStmt(IMemoryPool *pmp, CMDAccessor *pmda, CContextDXLToPlStmt *pctxdxltoplstmt, ULONG ulSegments);
 
 			// dtor
 			~CTranslatorDXLToPlStmt();

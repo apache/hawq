@@ -29,7 +29,6 @@
 
 // fwd decl
 struct TargetEntry;
-struct Var;
 
 namespace gpdxl
 {
@@ -46,10 +45,6 @@ namespace gpdxl
 
 	typedef CHashMapIter<ULONG, CMappingElementColIdParamId, gpos::UlHash<ULONG>, gpos::FEqual<ULONG>,
 					CleanupDelete<ULONG>, CleanupRelease<CMappingElementColIdParamId> > HMColParamIter;
-	
-	// hash maps mapping ULONG -> Var
-	typedef CHashMap<ULONG, Var, gpos::UlHash<ULONG>, gpos::FEqual<ULONG>,
-		CleanupDelete<ULONG>, CleanupNULL > HMUlVar;
 
 
 	//---------------------------------------------------------------------------

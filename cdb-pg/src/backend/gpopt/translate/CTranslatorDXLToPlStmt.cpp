@@ -103,8 +103,7 @@ CTranslatorDXLToPlStmt::CTranslatorDXLToPlStmt
 	IMemoryPool *pmp,
 	CMDAccessor *pmda,
 	CContextDXLToPlStmt* pctxdxltoplstmt,
-	ULONG ulSegments,
-	HMUlVar *phmulvarOuterRefs
+	ULONG ulSegments
 	)
 	:
 	m_pmp(pmp),
@@ -114,10 +113,9 @@ CTranslatorDXLToPlStmt::CTranslatorDXLToPlStmt
 	m_fTargetTableDistributed(false),
 	m_plResultRelations(NULL),
 	m_ulExternalScanCounter(0),
-	m_ulSegments(ulSegments),
-	m_phmulvarOuterRefs(phmulvarOuterRefs)
+	m_ulSegments(ulSegments)
 {
-	m_pdxlsctranslator = New (m_pmp) CTranslatorDXLToScalar(m_pmp, m_pmda, m_ulSegments, m_phmulvarOuterRefs);
+	m_pdxlsctranslator = New (m_pmp) CTranslatorDXLToScalar(m_pmp, m_pmda, m_ulSegments);
 	InitTranslators();
 }
 
