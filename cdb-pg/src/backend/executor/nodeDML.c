@@ -72,8 +72,19 @@ ExecDML(DMLState *node)
 
 	if (DML_INSERT == action)
 	{
+
+		/*
+		 * Reset per-tuple memory context to free any expression evaluation
+		 * storage allocated in the previous tuple cycle.
+		 */
+		ExprContext *econtext = node->ps.ps_ExprContext;
+		ResetExprContext(econtext);
+
+		econtext->ecxt_outertuple = slot;
+		TupleTableSlot *projectedSlot = ExecProject(node->ps.ps_ProjInfo, NULL);
+
 		/* remove `junk' columns from tuple */
-		node->insertSlot = ExecFilterJunk(node->junkfilter, slot);
+		node->insertSlot = ExecFilterJunk(node->junkfilter, projectedSlot);
 
 		/* Respect any given tuple Oid when updating a tuple. */
 		if(isUpdate &&
@@ -81,14 +92,15 @@ ExecDML(DMLState *node)
 		{
 			isnull = false;
 			oid = slot_getattr(slot, plannode->tupleoidColIdx, &isnull);
-			void *tuple = ExecFetchSlotHeapTuple(node->insertSlot);
-			HeapTupleSetOid((HeapTuple)tuple, oid);
+			HeapTuple htuple = ExecFetchSlotHeapTuple(node->insertSlot);
+			Assert(htuple == node->insertSlot->PRIVATE_tts_heaptuple);
+			HeapTupleSetOid(htuple, oid);
 		}
 
 		/* The plan origin is required since ExecInsert performs different actions 
 		 * depending on the type of plan (constraint enforcement and triggers.) 
 		 */
-		ExecInsert(node->insertSlot, NULL, NULL,
+		ExecInsert(node->insertSlot, NULL /* destReceiver */,
 				node->ps.state, PLANGEN_OPTIMIZER /* Plan origin */, 
 				isUpdate);
 
@@ -135,22 +147,31 @@ ExecInitDML(DML *node, EState *estate, int eflags)
 	Plan *outerPlan  = outerPlan(node);
 	outerPlanState(dmlstate) = ExecInitNode(outerPlan, estate, eflags);
 
-	/*
-	 * DML nodes do not project (ExecProject).
-	 */
 	ExecAssignResultTypeFromTL(&dmlstate->ps);
-	ExecAssignProjectionInfo(&dmlstate->ps, NULL);
+
+	/* Create expression evaluation context. This will be used for projections */
+	ExecAssignExprContext(estate, &dmlstate->ps);
+
+	/*
+	 * Create projection info from the child tuple descriptor and our target list
+	 * Projection will be placed in the ResultSlot
+	 */
+	TupleTableSlot *childResultSlot = outerPlanState(dmlstate)->ps_ResultTupleSlot;
+	ExecAssignProjectionInfo(&dmlstate->ps, childResultSlot->tts_tupleDescriptor);
 	
 	/*
 	 * Initialize slot to insert/delete using output relation descriptor.
 	 */
 	dmlstate->insertSlot = ExecInitExtraTupleSlot(estate);
-	ExecSetSlotDescriptor(dmlstate->insertSlot,
-							dmlstate->ps.state->es_result_relation_info->ri_RelationDesc->rd_att);
 
-	/* ExecInitJunkFilterConversion considers dropped attributes */
-	dmlstate->junkfilter = ExecInitJunkFilterConversion(node->plan.targetlist, 
-		dmlstate->ps.state->es_result_relation_info->ri_RelationDesc->rd_att, NULL /* slot */);
+	/*
+	 * Both input and output of the junk filter include dropped attributes, so
+	 * the junk filter doesn't need to do anything special there about them
+	 */
+	TupleDesc cleanTupType = CreateTupleDescCopy(dmlstate->ps.state->es_result_relation_info->ri_RelationDesc->rd_att); 
+	dmlstate->junkfilter = ExecInitJunkFilter(node->plan.targetlist,
+			cleanTupType,
+			dmlstate->insertSlot);
 
 	if (estate->es_instrument)
 	{

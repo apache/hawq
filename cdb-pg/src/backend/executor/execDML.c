@@ -141,7 +141,6 @@ reconstructMatchingTupleSlot(TupleTableSlot *slot, ResultRelInfo *resultRelInfo)
  */
 void
 ExecInsert(TupleTableSlot *slot,
-		   TupleTableSlot *planSlot,
 		   DestReceiver *dest,
 		   EState *estate,
 		   PlanGenerator planGen,
@@ -150,7 +149,6 @@ ExecInsert(TupleTableSlot *slot,
 	void		*tuple = NULL;
 	ResultRelInfo *resultRelInfo = NULL;
 	Relation	resultRelationDesc = NULL;
-	Relation	baseRelationDesc = NULL;
 	Oid			newId = InvalidOid;
 	TupleTableSlot *partslot = NULL;
 
@@ -178,16 +176,6 @@ ExecInsert(TupleTableSlot *slot,
 	Assert (!resultRelInfo->ri_projectReturning);
 
 	resultRelationDesc = resultRelInfo->ri_RelationDesc;
-	baseRelationDesc = estate->es_result_relations[0].ri_RelationDesc;
-
-	/* It may seem as if the base and result should be the same if and only if
-	 * non-partitioned, however, insertion directly to a part is an exception.
-	 *
-	 * Assert((resultRelationDesc == baseRelationDesc)
-	 *         == (estate->es_result_partitions == NULL) );
-	 *
-	 * is invalid.  MPP-11341
-	 */
 
 	rel_is_heap = RelationIsHeap(resultRelationDesc);
 	rel_is_aocols = RelationIsAoCols(resultRelationDesc);

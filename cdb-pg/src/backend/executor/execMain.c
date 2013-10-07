@@ -1824,9 +1824,11 @@ InitPlan(QueryDesc *queryDesc, int eflags)
 						ExecCheckPlanOutput(resultRelInfo->ri_RelationDesc,
 											subplan->targetlist);
 
+					TupleDesc cleanTupType = ExecCleanTypeFromTL(subplan->targetlist, 
+										     resultRelInfo->ri_RelationDesc->rd_att->tdhasoid);
 					j = ExecInitJunkFilter(subplan->targetlist,
-							resultRelInfo->ri_RelationDesc->rd_att->tdhasoid,
-								  ExecAllocTableSlot(estate->es_tupleTable));
+							       cleanTupType,
+							       ExecAllocTableSlot(estate->es_tupleTable));
 					resultRelInfo->ri_junkFilter = j;
 					resultRelInfo++;
 				}
@@ -1848,9 +1850,13 @@ InitPlan(QueryDesc *queryDesc, int eflags)
 					ExecCheckPlanOutput(estate->es_result_relation_info->ri_RelationDesc,
 										planstate->plan->targetlist);
 
+				TupleDesc cleanTupType = ExecCleanTypeFromTL(planstate->plan->targetlist, 
+									     tupType->tdhasoid);
+
 				j = ExecInitJunkFilter(planstate->plan->targetlist,
-									   tupType->tdhasoid,
-								  ExecAllocTableSlot(estate->es_tupleTable));
+						       cleanTupType,
+						       ExecAllocTableSlot(estate->es_tupleTable));
+
 				estate->es_junkFilter = j;
 				if (estate->es_result_relation_info)
 					estate->es_result_relation_info->ri_junkFilter = j;
@@ -2940,7 +2946,7 @@ lnext:	;
 						break;
 
 					case CMD_INSERT:
-						ExecInsert(slot, /*tupleid,*/ planSlot, dest, estate, PLANGEN_PLANNER, false /* isUpdate */);
+						ExecInsert(slot, dest, estate, PLANGEN_PLANNER, false /* isUpdate */);
 						result = NULL;
 						break;
 
