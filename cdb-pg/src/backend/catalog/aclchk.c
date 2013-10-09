@@ -530,12 +530,6 @@ ExecGrantStmt_oids(InternalGrant *istmt)
 			ExecGrant_ForeignServer(istmt);
 			break;
 		case ACL_OBJECT_FUNCTION:
-			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) 
-				|| gp_called_by_pgdump))
-			{
-                        	ereport(ERROR,
-                                	(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support GRANT/REVOKE on FUNCTION statement") ));
-			}
 			ExecGrant_Function(istmt);
 			break;
 		case ACL_OBJECT_LANGUAGE:

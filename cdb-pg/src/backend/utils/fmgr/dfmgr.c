@@ -327,6 +327,9 @@ get_magic_product(const Pg_magic_struct *module_magic_data)
 		case PgMagicProductGreenplum:
 			return "Greenplum";
 
+		case PgMagicProductHAWQ:
+			return "HAWQ";
+
 		/* Handle Unrecognized product codes */
 		default:
 		{

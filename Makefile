@@ -39,7 +39,7 @@ all : devel
 .PHONY : test2 test3
 
 # Internal functions which are invoked by other rules within this makefile
-.PHONY : groupSession mkgpcc copydocs mgmtcopy copylibs
+.PHONY : groupSession mkgpcc pgcrypto copydocs mgmtcopy copylibs
 .PHONY : greenplum_path RECONFIG HOMEDEP GPROOTDEP GPROOTDEP GPROOTFAIL goh
 .PHONY : version gccVersionCheck pygres authlibs clients loaders connectivity gppkg
 
@@ -88,6 +88,7 @@ endif
 GPPGDIR=cdb-pg
 GPMGMT=gpMgmt
 GPCC=gpcc
+PGCRYPTO=$(GPPGDIR)/contrib/pgcrypto
 GPPERFMON=gpperfmon
 PLATFORM=platform
 BUILDDIR=$(GPPGDIR)
@@ -362,6 +363,7 @@ define BUILD_STEPS
 	@$(MAKE) goh INSTLOC=$(INSTLOC)
 	@$(MAKE) groupSession INSTLOC=$(INSTLOC)
 	@$(MAKE) mkgpcc INSTCFLAGS=$(INSTCFLAGS)
+	@$(MAKE) pgcrypto
 	@$(MAKE) mgmtcopy INSTLOC=$(INSTLOC)
 	@$(MAKE) mkpgbench INSTLOC=$(INSTLOC) BUILDDIR=$(BUILDDIR)
 #	@$(MAKE) mkgpperfmon INSTLOC=$(INSTLOC) BUILDDIR=$(BUILDDIR)
@@ -1091,6 +1093,21 @@ groupSession:
 mkgpcc:
 	@cd $(GPCC) && $(MAKE) OPT="$(INSTCFLAGS)"
 
+pgcrypto:
+ifeq "$(BLD_ARCH)" "rhel5_x86_64"
+	@echo "Building pgcrypto project and creating tarball."
+	@cd $(PGCRYPTO) && $(MAKE)
+	(cd $(PGCRYPTO); \
+	 rm -rf tmpdir; \
+	 mkdir -p tmpdir/share/postgresql/contrib tmpdir/lib/postgresql; \
+	 cp pgcrypto.so tmpdir/lib/postgresql; \
+	 cp uninstall_pgcrypto.sql pgcrypto.sql tmpdir/share/postgresql/contrib; \
+	 cp pgcrypto_install.sh tmpdir; \
+	 tar zcvf $(BLD_TOP)/pgcrypto.tgz -C tmpdir .)
+else
+	@echo "INFO: pgcrypto is not built automatically on this platform"
+endif
+
 mkpgbench:
 	@cd $(BUILDDIR)/contrib/pgbench && $(MAKE) install
 
@@ -1300,7 +1317,7 @@ endif
 endif
 	# Copy glider stack trace capture tool
 	-cp -rp $(BLD_THIRDPARTY_BIN_DIR)/glider $(INSTLOC)/sbin/
-	
+
 ifneq "$(BLD_GPDB_BUILDSET)" "partial"
 	# Copy GP Optimizer libraries 
 	echo "Copying Orca libraries";
@@ -1313,12 +1330,12 @@ ifneq "$(BLD_GPDB_BUILDSET)" "partial"
 	cp $(LIBGPOS_LIBDIR)/libgpos.$(LDSFX) $(INSTLOC)/lib;
 	rm -f $(INSTLOC)/lib/libxerces-c-3.1.$(LDSFX);
 	cp $(XERCES_LIBDIR)/libxerces-c-3.1.$(LDSFX) $(INSTLOC)/lib;
-	
+
 	# Copy DXL translators library
 	echo "Copy DXL translators library";	
 	cp $(BLD_TOP)/cdb-pg/src/backend/gpopt/libdxltranslators.$(LDSFX) $(INSTLOC)/lib;
 	rm -f $(BLD_TOP)/cdb-pg/src/backend/gpopt/libdxltranslators.$(LDSFX);
-	
+
 	cd $(LIBSTDC++_LIBDIR); tar cvf - * | (cd $(INSTLOC)/lib; tar xfp -)
 
 	# Create GP Optimizer UDFs library  
@@ -1583,6 +1600,3 @@ unittest-check:
 	$(MAKE) -C cdb-pg/src/backend unittest-check
     # run unittests of the hawq-hadoop project
 	$(MAKE) -C cdb-pg/contrib/hawq-hadoop unittest-check
-
-
-

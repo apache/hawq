@@ -27,7 +27,6 @@ select * from alter2.v1;
 (2 rows)
 
 create function alter1.plus1(int) returns int as 'select $1+1' language sql;
-ERROR:  Cannot support create function statement yet
 alter function alter1.plus1(int) set schema alter2;
 ERROR:  Cannot support alter function schema statement yet
 create domain alter1.posint integer check (value > 0);

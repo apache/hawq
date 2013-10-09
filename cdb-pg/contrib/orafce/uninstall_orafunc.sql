@@ -43,8 +43,6 @@ DROP FUNCTION IF EXISTS nanvl(numeric, numeric);
 
 DROP FUNCTION IF EXISTS bitand(bigint, bigint);
 
-DROP AGGREGATE IF EXISTS listagg(text);
-DROP AGGREGATE IF EXISTS listagg(text, text);
 DROP FUNCTION IF EXISTS listagg1_transfn(text, text);
 DROP FUNCTION IF EXISTS listagg2_transfn(text, text, text);
 

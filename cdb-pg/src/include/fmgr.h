@@ -452,6 +452,7 @@ typedef enum {
 	PgMagicProductNone		   = 0,
 	PgMagicProductPostgres	   = 1,
 	PgMagicProductGreenplum	   = 2180,     /* 'GPDB' cast to an integer */
+	PgMagicProductHAWQ         = 3209,     /* Last 3 chars of MD5('HAWQ') */
 } Pg_magic_product_code;
 
 
@@ -465,7 +466,7 @@ typedef enum {
 	NAMEDATALEN,								\
 	FLOAT4PASSBYVAL,							\
 	FLOAT8PASSBYVAL,							\
-	PgMagicProductGreenplum,					\
+	PgMagicProductHAWQ,							\
 }
 
 #ifndef FLOAT4PASSBYVAL
