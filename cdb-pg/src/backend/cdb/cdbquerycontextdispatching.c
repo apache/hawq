@@ -16,6 +16,7 @@
 #include "catalog/aoseg.h"
 #include "catalog/catalog.h"
 #include "catalog/gp_fastsequence.h"
+#include "catalog/gp_fastsequence.h"
 #include "catalog/pg_attrdef.h"
 #include "catalog/pg_attribute_encoding.h"
 #include "catalog/pg_constraint.h"
@@ -24,8 +25,8 @@
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_tablespace.h"
-#include "catalog/gp_fastsequence.h"
 #include "cdb/cdbdispatchedtablespaceinfo.h"
+#include "cdb/cdbfilesystemcredential.h"
 #include "cdb/cdbpartition.h"
 #include "cdb/cdbquerycontextdispatching.h"
 #include "cdb/cdbtm.h"
@@ -76,7 +77,7 @@ int QueryContextDispatchingSizeMemoryLimit = 100 * 1024; /* KB */
 
 enum QueryContextDispatchingItemType
 {
-    MasterXid, TablespaceLocation, TupleType, EmptyTable
+    MasterXid, TablespaceLocation, TupleType, EmptyTable, FileSystemCredential
 };
 typedef enum QueryContextDispatchingItemType QueryContextDispatchingItemType;
 
@@ -102,6 +103,9 @@ prepareDispatchedCatalogForAoCo(QueryContextInfo *cxt, Oid relid,
 
 static void
 prepareDispatchedCatalogExternalTable(QueryContextInfo *cxt, Oid relid);
+
+static void
+WriteData(QueryContextInfo *cxt, const char *buffer, int size);
 
 /**
  * construct the file location for query context dispatching.
@@ -164,10 +168,13 @@ InitQueryContextInfoFromFile(QueryContextInfo *cxt)
 
     cxt->file = PathNameOpenFile(cxt->sharedPath, O_RDONLY, 0);
 
+    if (cxt->file < 0)
+		elog(ERROR, "cannot open file %s %m", cxt->sharedPath);
+
 }
 
 /*
- * clsoe  a QueryContextInfo and close its file if it is opened.
+ * close  a QueryContextInfo and close its file if it is opened.
  */
 void
 CloseQueryContextInfo(QueryContextInfo *cxt)
@@ -183,6 +190,26 @@ CloseQueryContextInfo(QueryContextInfo *cxt)
         elog(LOG, "query context size: %d bytes, passed by %s",
                 size, (cxt->useFile? "shared storage" : "dispatching"));
 
+    }
+
+    if (enable_secure_filesystem && Gp_role != GP_ROLE_EXECUTE)
+    {
+    	int size;
+    	char *credential;
+
+        StringInfoData buffer;
+        initStringInfo(&buffer);
+
+        credential = serialize_filesystem_credentials(&size);
+
+        if (credential && size > 0)
+        {
+			pq_sendint(&buffer, (int) FileSystemCredential, sizeof(char));
+			pq_sendint(&buffer, size, sizeof(int));
+
+			WriteData(cxt, buffer.data, buffer.len);
+			WriteData(cxt, credential, size);
+        }
     }
 
     if (cxt->useFile)
@@ -366,7 +393,7 @@ WriteData(QueryContextInfo *cxt, const char *buffer, int size)
     }
 
     /* switch to file*/
-    if (cxt->cursor + size > QueryContextDispatchingSizeMemoryLimit *1024)
+    if (false /*disable this feature*/ && cxt->cursor + size > QueryContextDispatchingSizeMemoryLimit *1024)
     {
         elog(LOG, "Switch to use file on shared storage : %s "
                 "instead of dispatching the query context "
@@ -388,9 +415,12 @@ WriteData(QueryContextInfo *cxt, const char *buffer, int size)
         }
         *p = 0;
 
-        MakeDirectory(dir, 0400);
+        MakeDirectory(dir, 0700);
 
-        cxt->file = PathNameOpenFile(cxt->sharedPath, O_CREAT | O_WRONLY, 0400);
+        cxt->file = PathNameOpenFile(cxt->sharedPath, O_CREAT | O_WRONLY, 0500);
+
+        if (cxt->file < 0)
+        	elog(ERROR, "cannot create file %s %m", cxt->sharedPath);
 
         AddToDropList(cxt->sharedPath);
 
@@ -416,11 +446,8 @@ WriteData(QueryContextInfo *cxt, const char *buffer, int size)
         {
             cxt->size = (1 + cxt->size) * 2;
 
-            if (cxt->size < cxt->cursor + size)
-                cxt->size = cxt->cursor + size;
-
-            if (cxt->size > QueryContextDispatchingSizeMemoryLimit * 1024)
-                cxt->size = QueryContextDispatchingSizeMemoryLimit * 1024;
+			if (cxt->size < cxt->cursor + size)
+				cxt->size = cxt->cursor + size;
 
             if (cxt->buffer)
                 cxt->buffer = repalloc(cxt->buffer, cxt->size);
@@ -449,6 +476,27 @@ RebuildMasterTransactionId(QueryContextInfo *cxt)
 
     SetMasterTransactionId(masterXid);
 
+}
+
+static void
+RebuildFilesystemCrentials(QueryContextInfo *cxt)
+{
+	Assert(Gp_role == GP_ROLE_EXECUTE);
+
+	int len;
+	char buffer[4], *binary;
+
+	Insist(enable_secure_filesystem);
+
+	ReadData(cxt, buffer, sizeof(buffer), TRUE);
+
+	len = (int) ntohl(*(uint32 *)buffer);
+
+	binary = palloc(len);
+	ReadData(cxt, binary, len, TRUE);
+	deserialize_filesystem_credentials(binary, len);
+
+	pfree(binary);
 }
 
 /*
@@ -607,6 +655,9 @@ RebuildQueryContext(QueryContextInfo *cxt)
         case EmptyTable:
             RebuildEmptyTable(cxt);
             break;
+        case FileSystemCredential:
+        	RebuildFilesystemCrentials(cxt);
+        	break;
         default:
             ereport(ERROR,
                     (errcode(ERRCODE_GP_INTERNAL_ERROR), errmsg( "unrecognized "
@@ -779,6 +830,17 @@ prepareDispatchedCatalogNamespace(QueryContextInfo *cxt, Oid namespace, HTAB *ht
     ReleaseSysCache(tuple);
 }
 
+static void
+prepareDispatchedCatalogFileSystemCredential(const char *path)
+{
+	if (!enable_secure_filesystem)
+		return;
+
+	Insist(Gp_role != GP_ROLE_EXECUTE);
+
+	add_filesystem_credential(path);
+}
+
 /*
  * collect pg_tablespace tuples for oid.
  * add them to in-memory heap table for dispatcher
@@ -805,6 +867,8 @@ prepareDispatchedCatalogTablespace(QueryContextInfo *cxt, Oid tablespace, HTAB *
 
     Assert(NULL != path);
     Assert(strlen(path) < FilespaceLocationBlankPaddedWithNullTermLen);
+
+    prepareDispatchedCatalogFileSystemCredential(path);
 
     pos = path + strlen(path) - 1;
     Assert('0' == *pos);

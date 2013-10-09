@@ -218,11 +218,11 @@ BLD_CURL_CONFIG=CURL_CONFIG=$(BLD_THIRDPARTY_BIN_DIR)/curl-config
 endif
 # ...and do not include the authlibs on Windows or AIX
 ifeq "$(findstring $(BLD_ARCH),aix5_ppc_32 aix5_ppc_64 win32 win64)" ""
-CONFIGFLAGS+= --with-openssl --with-pam --with-krb5 --with-ldap $(BLD_CURL_CONFIG)
+CONFIGFLAGS+= --with-openssl --with-pam --with-krb5 --with-gssapi --with-ldap $(BLD_CURL_CONFIG)
 endif
 # ...but do include some of the authlibs on AIX
 ifneq "$(findstring $(BLD_ARCH),aix5_ppc_32 aix5_ppc_64)" ""
-CONFIGFLAGS+= --with-openssl --with-pam --without-krb5 --with-ldap $(BLD_CURL_CONFIG)
+CONFIGFLAGS+= --with-openssl --with-pam --without-krb5 --with-gssapi --with-ldap $(BLD_CURL_CONFIG)
 endif
 
 # build with libxml2 on these platforms
@@ -1282,6 +1282,8 @@ copylibs : thirdparty-dist copy-rsa-libs
 	mkdir -p $(INSTLOC)/include
 	# Copy libhdfs3
 	cp -rp $(BLD_THIRDPARTY_INCLUDE_DIR)/hdfs $(INSTLOC)/include/
+	# Copy kinit
+	cp -rp $(BLD_THIRDPARTY_BIN_DIR)/kinit $(INSTLOC)/bin/
 ifeq "$(findstring $(BLD_ARCH),aix5_ppc_32 aix5_ppc_64 win32 win64)" ""
 	# Copy curl header file
 	cp -rp $(BLD_THIRDPARTY_INCLUDE_DIR)/curl $(INSTLOC)/include/

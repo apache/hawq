@@ -49,6 +49,8 @@ ENCODING=UNICODE
 
 DFS_NAME=hdfs
 DFS_URL=localhost:9000/gpsql
+KERBEROS_KEYFILE=/etc/krb5.keytab
+ENABLE_SECURE_FILESYSTEM=off
 
 ################################################
 #### OTHER OPTIONAL PARAMETERS

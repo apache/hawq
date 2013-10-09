@@ -58,6 +58,7 @@ install: all installdirs
 	$(INSTALL_DATA) $(srcdir)/cdb/cdbinmemheapam.h   $(DESTDIR)$(includedir_internal_cdb)
 	$(INSTALL_DATA) $(srcdir)/cdb/cdbdispatchedtablespaceinfo.h   $(DESTDIR)$(includedir_internal_cdb)
 	$(INSTALL_DATA) $(srcdir)/cdb/cdbquerycontextdispatching.h   $(DESTDIR)$(includedir_internal_cdb)
+	$(INSTALL_DATA) $(srcdir)/cdb/cdbfilesystemcredential.h   $(DESTDIR)$(includedir_internal_cdb)
 
 installdirs:
 	$(MKDIR_P) '$(DESTDIR)$(includedir)/libpq' '$(DESTDIR)$(includedir_internal)/libpq' \

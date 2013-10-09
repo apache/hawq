@@ -126,6 +126,9 @@ void PerformSharedStorageOpTasks(SharedStorageOpTasks *tasks)
 	int serializedQuerytree_len;
 	CdbDispatcherState ds =	{ NULL, NULL };
 
+	if (tasks->numTasks == 0)
+		return;
+
 	SharedStorageOpTask **masterWork = palloc(sizeof(SharedStorageOpTask*));
 
 	Query *q = makeNode(Query);
@@ -242,6 +245,9 @@ void PostPerformSharedStorageOpTasks(SharedStorageOpTasks *tasks)
 	Relation gp_relation_node;
 
 	Assert(NULL != tasks);
+
+	if (tasks->numTasks == 0)
+		return;
 
 	gp_relation_node = heap_open(GpRelationNodeRelationId, RowExclusiveLock);
 

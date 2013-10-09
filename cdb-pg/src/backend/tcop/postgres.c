@@ -82,6 +82,7 @@
 #include "cdb/cdbdisp.h"
 #include "cdb/cdbdispatchresult.h"
 #include "cdb/cdbgang.h"
+#include "cdb/cdbfilesystemcredential.h"
 #include "cdb/ml_ipc.h"
 #include "utils/guc.h"
 #include "access/twophase.h"
@@ -1283,6 +1284,8 @@ exec_mpp_query(const char *query_string,
 						  list_make1(plan ? (Node*)plan : (Node*)utilityStmt),
 						  MessageContext);
 		
+		set_filesystem_credentials(portal);
+
 		/*
 		 * Start the portal.  No parameters here.
 		 */
@@ -1716,6 +1719,8 @@ exec_simple_query(const char *query_string, const char *seqServerHost, int seqSe
 						  commandTag,
 						  plantree_list,
 						  MessageContext);
+
+		create_filesystem_credentials(portal);
 
 		/*
 		 * Start the portal.  No parameters here.
@@ -2499,6 +2504,8 @@ exec_bind_message(StringInfo input_message)
 					  stmt_list,
 					  qContext);
 	
+	create_filesystem_credentials(portal);
+
 	PortalStart(portal, params, InvalidSnapshot,
 				savedSeqServerHost, savedSeqServerPort);
 

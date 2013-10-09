@@ -77,6 +77,8 @@
 #krb_server_keyfile = ''
 #krb_srvname = 'postgres'		# (Kerberos only)
 #krb_caseins_users = off
+#krb5_ccname = '/tmp/postgres.ccname'
+#enable_secure_filesystem = off;
 
 # - TCP Keepalives -
 # see "man 7 tcp" for details

@@ -50,7 +50,7 @@ LIBS := $(filter-out -lpgport, $(LIBS)) $(LDAP_LIBS_BE) $(CONNECTEMCLIB)
 
 # The backend doesn't need everything that's in LIBS, however
 LIBS := $(filter-out -lreadline -ledit -ltermcap -lncurses -lcurses, $(LIBS))
-LIBS := -lglog -lprotobuf -lboost_thread -lboost_system -lboost_date_time -lstdc++ -lhdfs3 $(LIBS)
+LIBS := -lglog -lprotobuf -lboost_thread -lboost_system -lboost_date_time -lstdc++ -lhdfs3 -lgsasl $(LIBS)
 
 # Add in the bsafe wrapper. This is only needed on platforms which support 
 # RSA BSAFE Crypto-C ME (Linux 64 bit, Mac 10.6 and Solaris)

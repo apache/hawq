@@ -49,6 +49,8 @@ typedef struct FileSystemUdfData
 	NodeTag			type;                 /* see T_FileSystemFunctionData */
 	char*			fsys_host;
 	int				fsys_port;
+	void*			fsys_token;           /* filesystem token, can be NULL */
+	char*			fsys_ccname;		  /* kerberos ticket chache path, can be NULL */
 	hdfsFS			fsys_hdfs;
 	hdfsFile		fsys_hfile;
 	char*			fsys_filepath;
@@ -91,9 +93,12 @@ typedef struct FileSystemUdfData
 #define FSYS_UDF_SET_HFILE(fcinfo, hFile)     (((FileSystemUdfData *) (fcinfo)->context)->fsys_hfile=hFile)
 #define FSYS_UDF_SET_FILEINFO(fcinfo, info)   (((FileSystemUdfData *) (fcinfo)->context)->fsys_fileinfo=info)
 
+#define FSYS_UDF_GET_TOKEN(fcinfo)			(((FileSystemUdfData *) (fcinfo)->context)->fsys_token)
+#define FSYS_UDF_GET_CCNAME(fcinfo)			(((FileSystemUdfData *) (fcinfo)->context)->fsys_ccname)
+
 
 /* wrapper for hdfs functions */
-hdfsFS HdfsConnect(FsysName protocol, char * host, uint16_t port);
+hdfsFS HdfsConnect(FsysName protocol, char * host, uint16_t port, char *ccname, void *token);
 int HdfsDisconnect(FsysName protocol, hdfsFS fileSystem);
 hdfsFile HdfsOpenFile(FsysName protocol, hdfsFS fileSystem, char * path, int flags,
 					  int bufferSize, short replication, int64_t blocksize);

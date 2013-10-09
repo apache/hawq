@@ -197,6 +197,16 @@ typedef struct PortalData
 	/* MPP: is this portal a CURSOR, or protocol level portal? */	
 	bool		is_extended_query; /* simple or extended query protocol? */
 	bool		is_simply_updatable;
+
+	/*
+	 * The file system credentials information bind to this portal.
+	 * It is used to access the file system which needs credentials.
+	 * File system credentials are created by master, and then dispatched to segments.
+	 * Master is responsible for canceling these credentials when drop the portal.
+	 */
+	MemoryContext filesystem_credentials_memory;
+	HTAB		 *filesystem_credentials;
+
 } PortalData;
 
 extern PortalStatus PortalGetStatus(PortalData *p);

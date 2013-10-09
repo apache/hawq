@@ -285,7 +285,7 @@ FsysInterfaceGetFunc(FsysName name, FileSystemFuncType funcType)
 }
 
 hdfsFS
-HdfsConnect(FsysName protocol, char * host, uint16_t port)
+HdfsConnect(FsysName protocol, char * host, uint16_t port, char *ccname, void *token)
 {
 	FunctionCallInfoData fcinfo;
 	FileSystemUdfData fsysUdf;
@@ -300,6 +300,8 @@ HdfsConnect(FsysName protocol, char * host, uint16_t port)
 	fsysUdf.fsys_host = host;
 	fsysUdf.fsys_port = port;
 	fsysUdf.fsys_hdfs = NULL;
+	fsysUdf.fsys_ccname = ccname;
+	fsysUdf.fsys_token = token;
 
 	InitFunctionCallInfoData(/* FunctionCallInfoData */ fcinfo,
 							 /* FmgrInfo */ fsysFunc,

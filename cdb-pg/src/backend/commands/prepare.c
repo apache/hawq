@@ -20,6 +20,7 @@
 #include "access/xact.h"
 #include "catalog/gp_policy.h"
 #include "catalog/pg_type.h"
+#include "cdb/cdbfilesystemcredential.h"
 #include "commands/explain.h"
 #include "commands/prepare.h"
 #include "executor/executor.h"
@@ -257,6 +258,8 @@ ExecuteQuery(ExecuteStmt *stmt, const char *queryString,
 					  entry->commandTag,
 					  stmt_list,
 					  qcontext);
+
+	create_filesystem_credentials(portal);
 
 	/*
 	 * Run the portal to completion.

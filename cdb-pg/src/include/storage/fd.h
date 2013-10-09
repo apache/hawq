@@ -53,6 +53,7 @@ typedef int File;
 
 /* GUC parameter */
 extern int	max_files_per_process;
+extern bool	enable_secure_filesystem;
 
 
 /*
@@ -72,6 +73,7 @@ extern int LocalRemovePath(FileName fileName, int recursive);
 extern int LocalFileTruncate(File file, int64 offset);
 
 /* access hdfs file system */
+extern int HdfsParsePath(const char * path, char **protocol, char **host, int *port, short *replica);
 extern File HdfsPathNameOpenFile(FileName fileName, int fileFlags, int fileMode);
 extern void HdfsFileClose(File file, bool canReportError);
 extern int HdfsFileRead(File file, char *buffer, int amount);
@@ -81,7 +83,13 @@ extern int64 HdfsFileTell(File file);
 extern int HdfsFileSync(File file);
 extern int HdfsRemovePath(FileName fileName, int recursive);
 extern int HdfsFileTruncate(File file, int64 offset);
-extern int HdfsMakeDirectory(const char * path, mode_t mode);
+extern int HdfsMakeDirectory(const char *path, mode_t mode);
+extern void *HdfsGetDelegationToken(const char *uri, int *size, void **fs);
+extern void HdfsRenewDelegationToken(void *fs, void *credential, int credentialSize);
+extern void HdfsCancelDelegationToken(void *fs, void *credential, int credentialSize);
+
+extern void cleanup_lru_opened_files(void);
+extern void cleanup_filesystem_handler(void);
 
 /* abstract file system */
 extern File FileNameOpenFile(FileName fileName, const char *temp_dir, int fileFlags, int fileMode);
@@ -144,5 +152,7 @@ extern bool TestFileValid(File file);
 extern bool HdfsPathExist(char *path);
 
 extern FileName FileGetName(File file);
+
+/* secure enabled hdfs */
 
 #endif   /* FD_H */

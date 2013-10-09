@@ -47,12 +47,16 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "miscadmin.h"
 #include "access/xact.h"
 #include "cdb/cdbfilerep.h"
+#include "cdb/cdbfilesystemcredential.h"
+#include "cdb/cdbvars.h"
+#include "miscadmin.h"
 #include "storage/fd.h"
-#include "storage/ipc.h"
 #include "storage/filesystem.h"
+#include "storage/ipc.h"
+#include "libpq/auth.h"
+#include "libpq/pqformat.h"
 
 #include "utils/debugbreak.h"
 /* Debug_filerep_print guc temporaly added for troubleshooting */
@@ -60,6 +64,8 @@
 #include "utils/faultinjector.h"
 
 #include "utils/memutils.h"
+
+bool	enable_secure_filesystem = 0;
 
 // Provide some indirection here in case we have problems with lseek and
 // 64 bits on some platforms
@@ -131,6 +137,7 @@ static int	max_safe_fds = 32;	/* default if not changed */
 /* these are the assigned bits in fdstate below: */
 #define FD_TEMPORARY		(1 << 0)	/* T = delete when closed */
 #define FD_CLOSE_AT_EOXACT	(1 << 1)	/* T = close at eoXact */
+#define FD_CLOSE_AT_EOQUERY	(1 << 2)	/* T = close at eoXact */
 
 typedef struct vfd
 {
@@ -198,6 +205,22 @@ typedef struct
 	struct	dirent ret;
 } AllocateDesc;
 
+/*
+ * hash table of hdfs file systems, key = hdfs:/<host>:<port>, value = hdfsFS
+ */
+static HTAB * HdfsFsTable = NULL;
+static MemoryContext HdfsGlobalContext = NULL;
+#define EXPECTED_MAX_HDFS_CONNECTIONS 10
+
+struct FsEntry
+{
+	char host[MAXPGPATH + 1];
+	hdfsFS fs;
+};
+
+static const char * fsys_protocol_sep = "://";
+static const char * local_prefix = "local://";
+
 static int	numAllocatedDescs = 0;
 static AllocateDesc allocatedDescs[MAX_ALLOCATED_DESCS];
 static int	RecentRemoteAllocatedDesc = -1;
@@ -254,13 +277,14 @@ static void CleanupTempFiles(bool isProcExit);
 static void RemovePgTempFilesInDir(const char *tmpdirname);
 static bool HasTempFilePrefix(char * fileName);
 
-static hdfsFS HdfsGetConnection(const char * protocol, const char * path);
+static hdfsFS HdfsGetConnection(const char * path);
 static bool HdfsBasicOpenFile(FileName fileName, int fileFlags, int fileMode,
 							  char **hProtocol, hdfsFS *fs, hdfsFile *hFile);
-static bool HdfsGetProtocol(const char *fileName, char *buf, size_t size);
 static const char * ConvertToUnixPath(const char * fileName, char * buffer,
 		int len);
 static int IsLocalPath(const char * fileName);
+
+static hdfsToken *DeserializeDelegationToken(void *binary, int size);
 
 /*
  * pg_fsync --- do fsync with or without writethrough
@@ -681,8 +705,10 @@ LruInsert(File file)
 		}
 		else
 		{
+			char * p;
+
 			if (!HdfsBasicOpenFile(vfdP->fileName, vfdP->fileFlags,
-					vfdP->fileMode, &vfdP->hProtocol, &vfdP->hFS, &vfdP->hFile))
+					vfdP->fileMode, &p, &vfdP->hFS, &vfdP->hFile))
 			{
 				DO_DB(elog(LOG, "RE_OPEN FAILED: %d", errno));
 				return -1;
@@ -692,6 +718,9 @@ LruInsert(File file)
 				DO_DB(elog(LOG, "RE_OPEN SUCCESS"));
 				++nfile;
 			}
+
+			vfdP->hProtocol = strdup(p);
+			pfree(p);
 		}
 
 		/* seek to the right position */
@@ -1708,17 +1737,17 @@ AllocateDir(const char *dirname)
 	{
 		int				num;
 		HdfsFileInfo	*info;
-		char			protocol[MAXPGPATH];
+		char			*protocol;
 		char			unixpath[MAXPGPATH];
 		hdfsFS			fs;
 		AllocateDesc *desc = &allocatedDescs[numAllocatedDescs];
 
 		/* Remote storage */
-		if (!HdfsGetProtocol(dirname, protocol, sizeof(protocol)))
+		if (HdfsParsePath(dirname, &protocol, NULL, NULL, NULL) || protocol == NULL)
 			return NULL;
 		if (ConvertToUnixPath(dirname, unixpath, sizeof(unixpath)) == NULL)
 			return NULL;
-		if ((fs = HdfsGetConnection(protocol, dirname)) == NULL)
+		if ((fs = HdfsGetConnection(dirname)) == NULL)
 			return NULL;
 		/* TODO: add to filesystem! */
 		if ((info = hdfsListDirectory(fs, unixpath, &num)) == NULL)
@@ -1903,6 +1932,58 @@ FreeDir(DIR *dir)
 	Assert(false);
 
 	return closedir(dir);
+}
+
+void
+cleanup_lru_opened_files(void)
+{
+	Index 	i;
+	if (SizeVfdCache > 0)
+	{
+		Assert(FileIsNotOpen(0)); /* Make sure ring not corrupted */
+		for (i = 1; i < SizeVfdCache; i++)
+		{
+			unsigned short fdstate = VfdCache[i].fdstate;
+
+			if (fdstate & FD_CLOSE_AT_EOQUERY)
+			{
+				if (VfdCache[i].fileName != NULL
+						&& !IsLocalPath(VfdCache[i].fileName) && !FileIsNotOpen(i))
+					LruDelete(i);
+			}
+		}
+	}
+}
+
+void
+cleanup_filesystem_handler(void)
+{
+	HASH_SEQ_STATUS	status;
+	struct FsEntry *entry;
+	char *protocol;
+
+	if (NULL == HdfsFsTable)
+		return;
+
+	hash_seq_init(&status, HdfsFsTable);
+
+	while (NULL != (entry = hash_seq_search(&status)))
+	{
+		if (HdfsParsePath(entry->host, &protocol, NULL, NULL, NULL) || NULL == protocol)
+		{
+			elog(WARNING, "cannot get protocol for host: %s", entry->host);
+			continue;
+		}
+
+		if (entry->fs)
+			HdfsDisconnect(protocol, entry->fs);
+		pfree(protocol);
+	}
+
+	hash_destroy(HdfsFsTable);
+	HdfsFsTable = NULL;
+
+	MemoryContextResetAndDeleteChildren(HdfsGlobalContext);
 }
 
 
@@ -2174,77 +2255,34 @@ HasTempFilePrefix(char * fileName)
 }
 
 /*
- * hash table of hdfs file systems, key = hdfs:/<host>:<port>, value = hdfsFS
- */
-static HTAB * HdfsFsTable = NULL;
-static MemoryContext HdfsGlobalContext = NULL;
-#define EXPECTED_MAX_HDFS_CONNECTIONS 10
-
-struct FsEntry
-{
-	char host[MAXPGPATH + 1];
-	hdfsFS fs;
-};
-
-//static const char * hdfs_prefix = "hdfs://";
-static const char * fsys_protocol_sep = "://";
-static const char * local_prefix = "local://";
-
-/*
  * get/create a hdfs file system from path
  *
  * hdfs path schema :
  * 		hdfs:/<host>:<port>/...
  */
 static hdfsFS
-HdfsGetConnection(const char * protocol, const char * path)
+HdfsGetConnection(const char * path)
 {
 	struct FsEntry * entry;
 	HASHCTL hash_ctl;
 	bool found;
-	char * host = NULL, *p, *location = NULL;
 
-	int port = 0;
+	char *host = NULL, *location = NULL, *protocol;
+	int port;
+
+	char *ccname = NULL;
+	void *credential = NULL;
+	int credentialSize;
+	hdfsToken *token = NULL;
+
 	hdfsFS retval = NULL;
 
 	do {
-		p = strstr(path, fsys_protocol_sep);
-		if (NULL == p)
-		{
-			elog(WARNING, "no filesystem protocol found: %s", path);
-			errno = EINVAL;
+		if (HdfsParsePath(path, &protocol, &host, &port, NULL))
 			break;
-		}
 
-		/* skip option field. liugd TODO : ugly */
-		/*should change to uri later, wangzw*/
-		p += strlen(fsys_protocol_sep);
-		if (*p == '{')
-		{
-			p = strstr(p + 1, "}") + 1;
-		}
-
-		host = palloc0(strlen(path));
-		strcpy(host, p);
-		p = strstr(host, ":");
-		if (NULL == p)
-		{
-			elog(WARNING, "cannot find hdfs port in path: %s", path);
-			errno = EINVAL;
-			break;
-		}
-		*p++ = 0;
-		errno = 0;
-		port = (int) strtol(p, NULL, 0);
-		if (EINVAL == errno || ERANGE == errno || !(0 < port && port < 65536))
-		{
-			elog(WARNING, "cannot find hdfs port in path: %s", path);
-			errno = EINVAL;
-			break;
-		}
-
-		location = palloc0(strlen(host) + 10);
-		sprintf(location, "%s:%d", host, port);
+		location = palloc0(strlen(host) + strlen(protocol) + 64);
+		sprintf(location, "%s://%s:%d", protocol, host, port);
 
 		if (NULL == HdfsFsTable)
 		{
@@ -2280,9 +2318,41 @@ HdfsGetConnection(const char * protocol, const char * path)
 		if (!found)
 		{
 			Assert(NULL != entry);
-			DO_DB(elog(LOG, "connect webhdfs host: %s, port: %d", host, port));
+			DO_DB(elog(LOG, "connect hdfs host: %s, port: %d", host, port));
 
-			entry->fs = HdfsConnect(protocol, host, port);
+			if (enable_secure_filesystem)
+			{
+				if (Gp_role == GP_ROLE_EXECUTE)
+				{
+					credential = find_filesystem_credential(protocol, host, port, &credentialSize);
+					if (credential == token)
+					{
+						elog(WARNING, "failed to get filesystem credential.");
+						hash_search(HdfsFsTable, location, HASH_REMOVE, &found);
+						errno = EACCES;
+						break;
+					}
+
+					token = DeserializeDelegationToken(credential, credentialSize);
+				}
+				else
+				{
+					if (!login())
+					{
+						hash_search(HdfsFsTable, location, HASH_REMOVE, &found);
+						errno = EACCES;
+						break;
+					}
+					ccname = pstrdup(krb5_ccname);
+				}
+
+			}
+
+			entry->fs = HdfsConnect(protocol, host, port, ccname, token);
+
+			if (token)
+				pfree(token);
+
 			if (NULL == entry->fs)
 			{
 				hash_search(HdfsFsTable, location, HASH_REMOVE, &found);
@@ -2300,8 +2370,12 @@ HdfsGetConnection(const char * protocol, const char * path)
 
 	if (host)
 		pfree(host);
+	if (protocol)
+		pfree(protocol);
 	if (location)
 		pfree(location);
+	if (ccname)
+		pfree(ccname);
 
 	return retval;
 }
@@ -2319,73 +2393,55 @@ IsLocalPath(const char * fileName)
 	return 0;
 }
 
-/*
- * get protocol from filepath
- */
-static bool
-HdfsGetProtocol(const char *fileName, char *buf, size_t size)
-{
-	const char	*p;
-
-	p = strstr(fileName, fsys_protocol_sep);
-	if (NULL == p)
-	{
-		errno = EINVAL;
-		return false ;
-	}
-
-	if (size < ((p - fileName + 1) * sizeof(char)))
-	{
-		errno = ENOMEM;
-		return false ;
-	}
-
-	strncpy(buf, fileName, p - fileName);
-	buf[p - fileName] = '\0';
-	return true ;
-}
-
-/*
- * get options from fileName, get rep number
- * liugd TODO : this function is VERY BAD
- */
-/*
- * should change to uri later.
- */
-static int
-HdfsParseOptions(const char *fileName, short *rep)
+int
+HdfsParsePath(const char * path, char **protocol, char **host, int *port, short *replica)
 {
 	const char *pb = NULL;
 	const char *p = NULL;
 	const char *pe = NULL;
 
-	p = strstr(fileName, fsys_protocol_sep);
-	if (NULL == p)
-	{
+	p = strstr(path, fsys_protocol_sep);
+	if (NULL == p) {
 		errno = EINVAL;
-		elog(WARNING, "internal error HdfsParseOptions: no filesystem protocol found in path \"%s\"",
-				fileName);
+		elog(WARNING, "internal error HdfsParsePath: no filesystem protocol found in path \"%s\"",
+				path);
 		return -1;
 	}
+	if (protocol)
+		*protocol = pnstrdup(path, p - path);
+
 	p += strlen(fsys_protocol_sep);
-	if (*p != '{') /* no options found, return */
-		return 0;
+	if (*p == '{') {
+		pb = p + 1;
+		pe = strstr(pb, "}");
+		if (NULL == pe) {
+			errno = EINVAL;
+			elog(WARNING, "internal error HdfsParsePath: options format error in path \"%s\"",
+					path);
+			return -1;
+		}
 
-	pb = p + 1;
-	pe = strstr(pb, "}");
-	if (NULL == pe)
-	{
+		if (strncmp(pb, "replica=", strlen("replica=")) == 0) {
+			pb = pb + strlen("replica=");
+			if (replica)
+				*replica = (short)atoi(pb);
+		}
+		p = pe + 1;
+	}
+
+	pb = strchr(p, ':');
+	if (NULL == pb) {
+		elog(WARNING, "cannot find hdfs port in path: %s", path);
 		errno = EINVAL;
-		elog(WARNING, "internal error HdfsParseOptions: options format error in path \"%s\"",
-				fileName);
 		return -1;
 	}
 
-	if (strncmp(pb, "replica=", strlen("replica=")) == 0)
-	{
-		pb = pb + strlen("replica=");
-		*rep = atoi(pb);
-	}
+	if (host)
+		*host = pnstrdup(p, pb - p);
+
+	if (port)
+		*port = atoi(pb + 1);
+
 	return 0;
 }
 
@@ -2430,22 +2486,20 @@ HdfsBasicOpenFile(FileName fileName, int fileFlags, int fileMode,
 		char **hProtocol, hdfsFS *fs, hdfsFile *hFile)
 {
 	char path[MAXPGPATH + 1];
-	char protocol[MAXPGPATH];
+	char *protocol = NULL;
 	short rep = FS_DEFAULT_REPLICA_NUM;
 
 	DO_DB(elog(LOG, "HdfsBasicOpenFile, path: %s, fileFlags: %x, fileMode: %o",
 					fileName, fileFlags, fileMode));
 
-	if (!HdfsGetProtocol(fileName, protocol, sizeof(protocol)))
+	if (HdfsParsePath(fileName, &protocol, NULL, NULL, &rep) || NULL == protocol)
 	{
-		elog(WARNING, "cannot get protocol for path: %s", fileName);
+		elog(WARNING, "cannot get parse path: %s", fileName);
 		return FALSE;
 	}
 
-	HdfsParseOptions(fileName, &rep);
-
-	*hProtocol = strdup(protocol);
-	*fs = HdfsGetConnection(protocol, fileName);
+	*hProtocol = protocol;
+	*fs = HdfsGetConnection(fileName);
 	if (*fs == NULL)
 		return FALSE;
 
@@ -2523,7 +2577,8 @@ HdfsPathNameOpenFile(FileName fileName, int fileFlags, int fileMode)
 	vfdP->fileName = pathname;
 	vfdP->hFS = fs;
 	vfdP->hFile = hfile;
-	vfdP->hProtocol = protocol;
+	vfdP->hProtocol = strdup(protocol);
+	pfree(protocol);
 
 	if ((fileFlags & O_WRONLY) || (fileFlags & O_CREAT))
 		vfdP->fileFlags = O_WRONLY | O_APPEND;
@@ -2536,7 +2591,7 @@ HdfsPathNameOpenFile(FileName fileName, int fileFlags, int fileMode)
 	/*
 	 * all hdfs files should be closed after transaction committed/aborted
 	 */
-	vfdP->fdstate |= FD_CLOSE_AT_EOXACT;
+	vfdP->fdstate |= FD_CLOSE_AT_EOXACT | FD_CLOSE_AT_EOQUERY;
 	vfdP->create_subid = GetCurrentSubTransactionId();
 
 	++nfile;
@@ -2788,14 +2843,14 @@ int
 HdfsRemovePath(FileName fileName, int recursive)
 {
 	char path[MAXPGPATH + 1];
-	char protocol[MAXPGPATH];
+	char *protocol;
 
 	DO_DB(elog(LOG, "HdfsRemovePath, path: %s, recursive: %d", fileName, recursive));
 
-	if (!HdfsGetProtocol(fileName, protocol, sizeof(protocol)))
+	if (HdfsParsePath(fileName, &protocol, NULL, NULL, NULL) || NULL == protocol)
 		return -1;
 
-	hdfsFS fs = HdfsGetConnection(protocol, fileName);
+	hdfsFS fs = HdfsGetConnection(fileName);
 	if (NULL == fs)
 		return -1;
 	if (NULL == ConvertToUnixPath(fileName, path, sizeof(path)))
@@ -2810,14 +2865,14 @@ int
 HdfsMakeDirectory(const char * path, mode_t mode)
 {
 	char p[MAXPGPATH + 1];
-	char protocol[MAXPGPATH];
+	char *protocol;
 
 	DO_DB(elog(LOG, "HdfsMakeDirectory: %s, mode: %o", path, mode));
 
-	if (!HdfsGetProtocol(path, protocol, sizeof(protocol)))
+	if (HdfsParsePath(path, &protocol, NULL, NULL, NULL) || protocol == NULL)
 		return -1;
 
-	hdfsFS fs = HdfsGetConnection(protocol, path);
+	hdfsFS fs = HdfsGetConnection(path);
 	if (NULL == fs)
 		return -1;
 	if (NULL == ConvertToUnixPath(path, p, sizeof(p)))
@@ -2839,9 +2894,9 @@ int
 HdfsFileTruncate(File file, int64 offset)
 {
 	Vfd *vfdP;
-	char protocol[MAXPGPATH + 1];
+	char *protocol;
 	hdfsFS fs;
-	char p[MAXPGPATH + 1];
+	char path[MAXPGPATH + 1];
 
 	Assert(FileIsValid(file));
 
@@ -2852,27 +2907,29 @@ HdfsFileTruncate(File file, int64 offset)
 	DO_DB(elog(LOG, "HdfsFileTruncate %d (%s)",
 					file, VfdCache[file].fileName));
 
-	strncpy(protocol, vfdP->hProtocol, MAXPGPATH);
-
 	fs = vfdP->hFS;
+	protocol = pstrdup(vfdP->hProtocol);
 
 	if (!FileIsNotOpen(file)) //file is open
 		LruDelete(file);
 
-	if (NULL == ConvertToUnixPath(vfdP->fileName, p, sizeof(p)))
+	if (NULL == ConvertToUnixPath(vfdP->fileName, path, sizeof(path)))
 		return -1;
 
-	if (0 != HdfsTruncate(protocol, fs, p, offset))
+	if (0 != HdfsTruncate(protocol, fs, path, offset))
 	    return -1;
 
+	pfree(protocol);
 	/*
 	 * reopen file after truncate
 	 */
-
 	Insist((vfdP->fileFlags & O_WRONLY) && (vfdP->fileFlags & O_APPEND));
 	if (FALSE == HdfsBasicOpenFile(vfdP->fileName, vfdP->fileFlags, vfdP->fileMode,
-	        &vfdP->hProtocol, &vfdP->hFS, &vfdP->hFile))
+	        &protocol, &vfdP->hFS, &vfdP->hFile))
 	    return -1;
+
+	vfdP->hProtocol = strdup(protocol);
+	pfree(protocol);
 
 	++nfile;
 	Insert(file);
@@ -2894,6 +2951,114 @@ HdfsFileTruncate(File file, int64 offset)
 
 	return 0;
 }
+
+static void *
+SerializeDelegationToken(hdfsToken *token, int *size)
+{
+	Assert(NULL != token && NULL != size);
+
+	StringInfoData buffer;
+	initStringInfo(&buffer);
+
+	pq_sendint(&buffer, token->identifierLength, sizeof(token->identifierLength));
+	pq_sendint(&buffer, token->passwordLength, sizeof(token->passwordLength));
+	pq_sendint(&buffer, token->kindLength, sizeof(token->kindLength));
+	pq_sendint(&buffer, token->serviceLength, sizeof(token->serviceLength));
+
+	pq_sendbytes(&buffer, token->identifier, token->identifierLength);
+	pq_sendbytes(&buffer, token->password, token->passwordLength);
+	pq_sendbytes(&buffer, token->kind, token->kindLength);
+	pq_sendbytes(&buffer, token->service, token->serviceLength);
+
+	*size = buffer.len;
+
+	return buffer.data;
+}
+
+
+hdfsToken *
+DeserializeDelegationToken(void *binary, int size)
+{
+	hdfsToken *token;
+
+	StringInfoData buffer;
+	initStringInfoOfString(&buffer, binary, size);
+
+	token = palloc(sizeof(hdfsToken));
+
+	token->identifierLength = pq_getmsgint(&buffer, sizeof(token->identifierLength));
+	token->passwordLength = pq_getmsgint(&buffer, sizeof(token->passwordLength));
+	token->kindLength = pq_getmsgint(&buffer, sizeof(token->kindLength));
+	token->serviceLength = pq_getmsgint(&buffer, sizeof(token->serviceLength));
+
+	token->identifier = palloc(token->identifierLength);
+	token->password = palloc(token->passwordLength);
+	token->kind = palloc(token->kindLength);
+	token->service = palloc(token->serviceLength);
+
+	memcpy(token->identifier, pq_getmsgbytes(&buffer, token->identifierLength), token->identifierLength);
+	memcpy(token->password, pq_getmsgbytes(&buffer, token->passwordLength), token->passwordLength);
+	memcpy(token->kind, pq_getmsgbytes(&buffer, token->kindLength), token->kindLength);
+	memcpy(token->service, pq_getmsgbytes(&buffer, token->serviceLength), token->serviceLength);
+
+	return token;
+}
+
+void *
+HdfsGetDelegationToken(const char *uri, int *size, void **fs)
+{
+	hdfsToken *token;
+	void *retval;
+
+	*fs = HdfsGetConnection(uri);
+	if (*fs == NULL)
+		return NULL;
+
+	/**
+	 * hack: call hdfsGetDelegationToken directly. bypass pg_filesystem.
+	 * XXX: since in this release we cannot modify catalog.
+	 * FIXME
+	 */
+
+	token = hdfsGetDelegationToken(*fs, pg_krb_srvnam);
+	if (NULL == token)
+	{
+		elog(WARNING, "cannot get HDFS delegation token for renewer: %s", pg_krb_srvnam);
+		return NULL;
+	}
+
+	retval = SerializeDelegationToken(token, size);
+
+	hdfsFreeDelegationToken(token);
+
+	return (void *)retval;
+}
+
+void
+HdfsRenewDelegationToken(void *fs, void *credential, int credentialSize)
+{
+	Assert(NULL != fs && NULL != credential);
+
+	hdfsToken * token = DeserializeDelegationToken(credential, credentialSize);
+
+	if (0 < hdfsRenewDelegationToken(fs, token))
+		elog(WARNING, "failed to renew hdfs delegation token.");
+
+	pfree(token);
+}
+
+void HdfsCancelDelegationToken(void *fs, void *credential, int credentialSize)
+{
+	Assert(NULL != fs && NULL != credential);
+
+	hdfsToken * token = DeserializeDelegationToken(credential, credentialSize);
+
+	if (hdfsCancelDelegationToken(fs, token))
+		elog(WARNING, "failed to cancel hdfs delegation token.");
+
+	pfree(token);
+}
+
 
 File
 PathNameOpenFile(FileName fileName, int fileFlags, int fileMode) {
@@ -2997,19 +3162,17 @@ bool
 HdfsPathExist(char *path)
 {
 	char	relative_path[MAXPGPATH + 1];
-	char	protocol[MAXPGPATH];
-	short	rep = FS_DEFAULT_REPLICA_NUM;
+	char	*protocol;
 	hdfsFS	fs = NULL;
 	HdfsFileInfo	*info;
 
 	DO_DB(elog(LOG, "HdfsPathExist, path: %s", path));
 
-	if (!HdfsGetProtocol(path, protocol, sizeof(protocol)))
+	if (HdfsParsePath(path, &protocol, NULL, NULL, NULL) || NULL == protocol)
 		elog(ERROR, "cannot get protocol for path: %s", path);
 
-	HdfsParseOptions(path, &rep);
+	fs = HdfsGetConnection(path);
 
-	fs = HdfsGetConnection(protocol, path);
 	if (fs == NULL)
 		return false;
 
@@ -3021,6 +3184,8 @@ HdfsPathExist(char *path)
 		return false;
 
 	HdfsFreeFileInfo(protocol, info, 1);
+
+	pfree(protocol);
 	return true;
 }
 

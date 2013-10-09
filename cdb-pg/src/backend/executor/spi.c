@@ -44,6 +44,7 @@
 #include "catalog/namespace.h"
 #include "catalog/pg_namespace.h"
 #include "executor/functions.h"
+#include "cdb/cdbfilesystemcredential.h"
 #include "cdb/memquota.h"
 #include "executor/nodeFunctionscan.h"
 #include "nodes/stack.h"
@@ -1117,6 +1118,8 @@ SPI_cursor_open(const char *name, SPIPlanPtr plan,
 					  CreateCommandTag(PortalListGetPrimaryStmt(qtlist)),
 					  ptlist,
 					  PortalGetHeapMemory(portal));
+
+	create_filesystem_credentials(portal);
 
 	MemoryContextSwitchTo(oldcontext);
 

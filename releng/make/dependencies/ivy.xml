@@ -26,7 +26,7 @@
       <dependency org="OpenLDAP"        name="openldap"        rev="2.3.38"         conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
       <dependency org="OpenSSL"         name="openssl"         rev="0.9.8u"         conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
       <dependency org="PROJ.4"          name="proj"            rev="4.7.0"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
-      <dependency org="Pivotal"         name="libhdfs3"        rev="1.1.0"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="Pivotal"         name="libhdfs3"        rev="1.2.0"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
       <dependency org="Pivotal"         name="libbm"           rev="1.0.0"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
       <dependency org="PyYAML"          name="yaml"            rev="0.1.1"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
       <dependency org="Python"          name="python"          rev="2.6.2"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
@@ -51,5 +51,6 @@
       <dependency org="thrysoee"        name="libedit"         rev="3.0"            conf="rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
       <dependency org="xmlsoft"         name="libxml2"         rev="2.7.8"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
       <dependency org="zlib"            name="zlib"            rev="1.2.3"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="gnu"             name="libgsasl"        rev="1.8.0"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64" />
     </dependencies>
 </ivy-module>

@@ -40,6 +40,7 @@
 #include "catalog/pg_type.h"
 #include "cdb/cdbappendonlyam.h"
 #include "cdb/cdbfilerep.h"
+#include "cdb/cdbfilesystemcredential.h"
 #include "cdb/tupchunk.h"
 #include "commands/async.h"
 #include "commands/vacuum.h"
@@ -3742,6 +3743,16 @@ static struct config_bool ConfigureNamesBool[] =
 		false, NULL, NULL
 	},
 
+	{
+		{"enable_secure_filesystem", PGC_USERSET, CONN_AUTH,
+		 gettext_noop("support to access secure enabled filesystem."),
+		 NULL,
+		 GUC_GPDB_ADDOPT | GUC_SUPERUSER_ONLY
+		},
+		&enable_secure_filesystem,
+		false, NULL, NULL
+	},
+
 	/* End-of-list marker */
 	{
 		{NULL, 0, 0, NULL, NULL}, NULL, false, NULL, NULL
@@ -5626,6 +5637,15 @@ static struct config_int ConfigureNamesInt[] =
 		0, 0, INT_MAX, NULL, NULL
 	},
 
+	{
+		{"server_ticket_renew_interval", PGC_USERSET, CONN_AUTH,
+			gettext_noop("Set the kerberos renew interval"),
+			NULL,
+			GUC_UNIT_MS | GUC_SUPERUSER_ONLY
+		},
+		&server_ticket_renew_interval,
+		43200000, 0, INT_MAX, NULL, NULL
+	},
 
 	/* End-of-list marker */
 	{
@@ -6903,6 +6923,16 @@ static struct config_string ConfigureNamesString[] =
 		},
 		&optimizer_search_strategy_path,
 		"default", NULL, NULL
+	},
+
+	{
+		{"krb5_ccname", PGC_POSTMASTER, CONN_AUTH,
+			gettext_noop("Sets Kerberos cache name."),
+			NULL,
+			GUC_SUPERUSER_ONLY
+		},
+		&krb5_ccname,
+		"/tmp/postgres.ccname", NULL, NULL
 	},
 
 	/* End-of-list marker */

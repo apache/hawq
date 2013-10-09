@@ -64,6 +64,8 @@ PORT_TXT="#port"
 LOG_STATEMENT_TXT="#log_statement ="
 LISTEN_ADR_TXT="listen_addresses"
 CHKPOINT_SEG_TXT="checkpoint_segments"
+KERBEROS_KEYFILE_TXT="krb_server_keyfile"
+ENABLE_SECURE_FILESYSTEM_TXT="enable_secure_filesystem"
 INIT_STANDBY_PROG=$GPINITSTANDBY
 QE_MIRROR_ARRAY=""
 GP_PASSWD=gparray
@@ -374,6 +376,16 @@ CHK_PARAMS () {
 		if [ ! $CHECK_POINT_SEGMENTS ]; then
 			LOG_MSG "[WARN]:-CHECK_POINT_SEGMENTS variable not set, will set to default value"  1
 			CHECK_POINT_SEGMENTS=$DEFAULT_CHK_PT_SEG
+		fi
+		# KERBEROS_KEYFILE
+		if [ ! $KERBEROS_KEYFILE ]; then
+			LOG_MSG "[INFO]:-KERBEROS_KEYFILE variable not set, will set to default value"  1
+			KERBEROS_KEYFILE=$DEFAULT_DFS_KERBEROS_KEYFILE
+		fi
+		# ENABLE_SECURE_FILESYSTEM
+		if [ ! $ENABLE_SECURE_FILESYSTEM ]; then
+			LOG_MSG "[INFO]:-ENABLE_SECURE_FILESYSTEM variable not set, will set to default value"  1
+			ENABLE_SECURE_FILESYSTEM=off
 		fi
 		# ENCODING
 		if [ ! $ENCODING ]; then
@@ -1136,6 +1148,8 @@ DISPLAY_CONFIG () {
 		LOG_MSG "[INFO]:-Segment connections        = $QE_MAX_CONNECT" 1
 		LOG_MSG "[INFO]:-Segment buffers            = $QE_SHARED_BUFFERS" 1
 		LOG_MSG "[INFO]:-Checkpoint segments        = $CHECK_POINT_SEGMENTS" 1
+		LOG_MSG "[INFO]:-Kerberos key files         = $KERBEROS_KEYFILE" 1
+		LOG_MSG "[INFO]:-Enable secure filesystem   = $ENABLE_SECURE_FILESYSTEM" 1
 		LOG_MSG "[INFO]:-Encoding                   = $ENCODING" 1
 		LOG_MSG "[INFO]:-Postgres param file        = $PG_ADD" 1
 		LOG_MSG "[INFO]:-Initdb to be used          = $INITDB" 1
@@ -1305,6 +1319,14 @@ CREATE_QD_DB () {
 		ED_PG_CONF ${GP_DIR}/$PG_CONF "$CHKPOINT_SEG_TXT" "checkpoint_segments=$CHECK_POINT_SEGMENTS" 0
 		ERROR_CHK $? "set checkpoint_segments=$CHECK_POINT_SEGMENTS in ${GP_DIR}/$PG_CONF" 1
 		
+		if [ x"" != x"$KERBEROS_KEYFILE" ] ; then
+			ED_PG_CONF ${GP_DIR}/$PG_CONF "$KERBEROS_KEYFILE_TXT" "krb_server_keyfile='$KERBEROS_KEYFILE'" 0
+			ERROR_CHK $? "set krb_server_keyfile=$KERBEROS_KEYFILE in ${GP_DIR}/$PG_CONF" 1
+		fi
+		if [ xoff != x"$ENABLE_SECURE_FILESYSTEM" ] ; then
+			ED_PG_CONF ${GP_DIR}/$PG_CONF "$ENABLE_SECURE_FILESYSTEM_TXT" "enable_secure_filesystem=$ENABLE_SECURE_FILESYSTEM" 0
+			ERROR_CHK $? "set enable_secure_filesystem=$ENABLE_SECURE_FILESYSTEM in ${GP_DIR}/$PG_CONF" 1
+		fi
 		if [  x"" != x"$PG_CONF_ADD_FILE" ]; then
 				LOG_MSG "[INFO]:-Processing additional configuration parameters"
 				for NEW_PARAM in `$CAT $PG_CONF_ADD_FILE|$TR -s ' '|$TR -d ' '|$GREP -v "^#"`
@@ -1484,6 +1506,8 @@ CREATE_QES_PRIMARY () {
 			export TOTAL_SEG
 			export ARRAY_NAME
 			export CHECK_POINT_SEGMENTS
+			export KERBEROS_KEYFILE
+			export ENABLE_SECURE_FILESYSTEM
 			export QE_MAX_CONNECT
 			export QE_SHARED_BUFFERS
 			export SEG_PREFIX
@@ -1556,6 +1580,8 @@ CREATE_QES_MIRROR () {
 		export QE_MAX_CONNECT
 		export QE_SHARED_BUFFERS
 		export CHECK_POINT_SEGMENTS
+		export KERBEROS_KEYFILE
+		export ENABLE_SECURE_FILESYSTEM
 		export SEG_PREFIX
 		if [ $DEBUG_LEVEL -eq 0 ] && [ x"" != x"$VERBOSE" ];then $NOLINE_ECHO ".\c";fi
 		FLAG=""
@@ -1819,6 +1845,12 @@ DUMP_OUTPUT_CONFIG () {
     fi
     if [ x"" != x"$CHECK_POINT_SEGMENTS" ] ; then
 	$ECHO "CHECK_POINT_SEGMENTS=$CHECK_POINT_SEGMENTS" >> $OUTPUT_CONFIG
+	fi
+	if [ x"" != x"$KERBEROS_KEYFILE" ] ; then
+	$ECHO "KERBEROS_KEYFILE=$KERBEROS_KEYFILE" >> $OUTPUT_CONFIG
+    fi
+    if [ x"" != x"$ENABLE_SECURE_FILESYSTEM" ] ; then
+	$ECHO "ENABLE_SECURE_FILESYSTEM=$ENABLE_SECURE_FILESYSTEM" >> $OUTPUT_CONFIG
     fi
     if [ x"" != x"$ENCODING" ] ; then
 	$ECHO "ENCODING=$ENCODING" >> $OUTPUT_CONFIG

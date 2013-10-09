@@ -36,6 +36,7 @@
 #include "catalog/catalog.h"
 #include "postmaster/autovacuum.h"
 #include "postmaster/backoff.h"
+#include "cdb/cdbfilesystemcredential.h"
 #include "cdb/ml_ipc.h"
 #include "cdb/memquota.h"
 #include "executor/spi.h"
@@ -700,6 +701,9 @@ PortalStart(Portal portal, ParamListInfo params, Snapshot snapshot,
 	QueryDesc  *queryDesc;
 	int			eflags;
 
+	MemoryContext saveFilesystemCredentialsMemoryContext;
+	HTAB 		 *saveFilesystemCredentials;
+
 	AssertArg(PortalIsValid(portal));
 	AssertState(portal->queryContext != NULL);	/* query defined? */
 	AssertState(PortalGetStatus(portal)  == PORTAL_NEW);	/* else extra PortalStart */
@@ -716,12 +720,16 @@ PortalStart(Portal portal, ParamListInfo params, Snapshot snapshot,
 	saveActiveSnapshot = ActiveSnapshot;
 	saveResourceOwner = CurrentResourceOwner;
 	savePortalContext = PortalContext;
+	saveFilesystemCredentialsMemoryContext = CurrentFilesystemCredentialsMemoryContext;
+	saveFilesystemCredentials = CurrentFilesystemCredentials;
 	PG_TRY();
 	{
 		ActivePortal = portal;
 		ActiveSnapshot = NULL;	/* will be set later */
 		CurrentResourceOwner = portal->resowner;
 		PortalContext = PortalGetHeapMemory(portal);
+		CurrentFilesystemCredentials = portal->filesystem_credentials;
+		CurrentFilesystemCredentialsMemoryContext = portal->filesystem_credentials_memory;
 
 		MemoryContextSwitchTo(PortalGetHeapMemory(portal));
 
@@ -946,6 +954,8 @@ PortalStart(Portal portal, ParamListInfo params, Snapshot snapshot,
 		ActiveSnapshot = saveActiveSnapshot;
 		CurrentResourceOwner = saveResourceOwner;
 		PortalContext = savePortalContext;
+		CurrentFilesystemCredentialsMemoryContext = saveFilesystemCredentialsMemoryContext;
+		CurrentFilesystemCredentials = saveFilesystemCredentials;
 
 		PG_RE_THROW();
 	}
@@ -957,6 +967,8 @@ PortalStart(Portal portal, ParamListInfo params, Snapshot snapshot,
 	ActiveSnapshot = saveActiveSnapshot;
 	CurrentResourceOwner = saveResourceOwner;
 	PortalContext = savePortalContext;
+	CurrentFilesystemCredentialsMemoryContext = saveFilesystemCredentialsMemoryContext;
+	CurrentFilesystemCredentials = saveFilesystemCredentials;
 
 	PortalSetStatus(portal, PORTAL_READY);
 }
@@ -1045,6 +1057,8 @@ PortalRun(Portal portal, int64 count, bool isTopLevel,
 	MemoryContext savePortalContext;
 	MemoryContext saveQueryContext;
 	MemoryContext saveMemoryContext;
+	MemoryContext saveFilesystemCredentialsMemoryContext;
+	HTAB 		 *saveFilesystemCredentials;
 
 	AssertArg(PortalIsValid(portal));
 
@@ -1093,6 +1107,8 @@ PortalRun(Portal portal, int64 count, bool isTopLevel,
 	savePortalContext = PortalContext;
 	saveQueryContext = QueryContext;
 	saveMemoryContext = CurrentMemoryContext;
+	saveFilesystemCredentialsMemoryContext = CurrentFilesystemCredentialsMemoryContext;
+	saveFilesystemCredentials = CurrentFilesystemCredentials;
 	PG_TRY();
 	{
 		ActivePortal = portal;
@@ -1100,6 +1116,8 @@ PortalRun(Portal portal, int64 count, bool isTopLevel,
 		CurrentResourceOwner = portal->resowner;
 		PortalContext = PortalGetHeapMemory(portal);
 		QueryContext = portal->queryContext;
+		CurrentFilesystemCredentials = portal->filesystem_credentials;
+		CurrentFilesystemCredentialsMemoryContext = portal->filesystem_credentials_memory;
 
 		MemoryContextSwitchTo(PortalContext);
 
@@ -1184,6 +1202,9 @@ PortalRun(Portal portal, int64 count, bool isTopLevel,
 		PortalContext = savePortalContext;
 		QueryContext = saveQueryContext;
 
+		CurrentFilesystemCredentialsMemoryContext = saveFilesystemCredentialsMemoryContext;
+		CurrentFilesystemCredentials = saveFilesystemCredentials;
+
 		TeardownSequenceServer();
 
 		PG_RE_THROW();
@@ -1202,6 +1223,9 @@ PortalRun(Portal portal, int64 count, bool isTopLevel,
 		CurrentResourceOwner = saveResourceOwner;
 	PortalContext = savePortalContext;
 	QueryContext = saveQueryContext;
+
+	CurrentFilesystemCredentialsMemoryContext = saveFilesystemCredentialsMemoryContext;
+	CurrentFilesystemCredentials = saveFilesystemCredentials;
 
 	if (log_executor_stats && portal->strategy != PORTAL_MULTI_QUERY)
 		ShowUsage("EXECUTOR STATISTICS");

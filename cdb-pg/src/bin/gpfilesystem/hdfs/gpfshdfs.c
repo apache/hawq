@@ -79,6 +79,10 @@ gpfs_hdfs_connect(PG_FUNCTION_ARGS)
 	int port = 0;
 	hdfsFS hdfs = NULL;
 	int retval = 0;
+	void *token = NULL;
+	char *ccname = NULL;
+
+	struct hdfsBuilder *builder;
 
 	/* Must be called via the filesystem manager */
 	if (!CALLED_AS_GPFILESYSTEM(fcinfo)) {
@@ -90,6 +94,9 @@ gpfs_hdfs_connect(PG_FUNCTION_ARGS)
 
 	host = FSYS_UDF_GET_HOST(fcinfo);
 	port = FSYS_UDF_GET_PORT(fcinfo);
+	token = FSYS_UDF_GET_TOKEN(fcinfo);
+	ccname = FSYS_UDF_GET_CCNAME(fcinfo);
+
 	if (NULL == host) {
 		elog(WARNING, "get host invalid in gpfs_hdfs_connect");
 		retval = -1;
@@ -103,7 +110,29 @@ gpfs_hdfs_connect(PG_FUNCTION_ARGS)
 		PG_RETURN_INT32(retval);
 	}
 
-	hdfs = hdfsConnect(host, port);
+	builder = hdfsNewBuilder();
+
+	if (NULL == builder) {
+		elog(WARNING, "failed to create hdfs connection builder in gpfs_hdfs_connect");
+		retval = -1;
+		errno = EINVAL;
+		PG_RETURN_INT32(retval);
+	}
+
+	hdfsBuilderSetNameNode(builder, host);
+	hdfsBuilderSetNameNodePort(builder, port);
+
+	if (token) {
+		hdfsBuilderSetToken(builder, token);
+	}
+
+	if (ccname) {
+		hdfsBuilderSetKerbTicketCachePath(builder, ccname);
+	}
+
+	hdfs = hdfsBuilderConnect(builder);
+	hdfsFreeBuilder(builder);
+
 	if (NULL == hdfs) {
 		retval = -1;
 	}

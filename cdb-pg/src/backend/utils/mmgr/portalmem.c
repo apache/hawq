@@ -35,6 +35,7 @@
 #include "cdb/cdbdisp.h"                /* CdbShutdownPortals, CdbCheckDispatchResult */
 #include "cdb/cdbvars.h"
 #include "cdb/cdbgang.h"
+#include "cdb/cdbfilesystemcredential.h"
 #include "cdb/ml_ipc.h"
 
 /*
@@ -259,6 +260,9 @@ CreatePortal(const char *name, bool allowDup, bool dupSilent)
 	}
 	portal->is_extended_query = false; /* default value */	
 
+	portal->filesystem_credentials = NULL;
+	portal->filesystem_credentials_memory = NULL;
+
 	/* put portal in table (sets portal->name) */
 	PortalHashTableInsert(portal, name);
 
@@ -386,6 +390,11 @@ PortalDrop(Portal portal, bool isTopCommit)
 	 * infinite error-recovery loop.
 	 */
 	PortalHashTableDelete(portal);
+
+	/*
+	 * cancel all file system credentials, and close files and file system handlers if necessary.
+	 */
+	cleanup_filesystem_credentials(portal);
 
     if (portal->releaseResLock)
     {

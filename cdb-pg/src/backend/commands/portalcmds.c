@@ -23,6 +23,7 @@
 #include <limits.h>
 
 #include "access/xact.h"
+#include "cdb/cdbfilesystemcredential.h"
 #include "commands/portalcmds.h"
 #include "executor/executor.h"
 #include "executor/tstoreReceiver.h"
@@ -117,6 +118,8 @@ PerformCursorOpen(PlannedStmt *stmt, ParamListInfo params,
 					  list_make1(stmt),
 					  PortalGetHeapMemory(portal));
 	
+	create_filesystem_credentials(portal);
+
 	portal->is_extended_query = true; /* cursors run in extended query mode */
 
 	/* 
