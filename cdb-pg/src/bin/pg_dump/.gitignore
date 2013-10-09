@@ -1,0 +1,4 @@
+pg_dump
+pg_dumpall
+pg_restore
+kwlookup.c
