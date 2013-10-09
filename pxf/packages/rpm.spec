@@ -50,8 +50,8 @@ if [ -d $RPM_BUILD_ROOT/%{_etc_prefix}/%{_package_name} ]; then
 	rm -rf $RPM_BUILD_ROOT/%{_etc_prefix}/%{_package_name}
 fi
 
-mkdir -p $RPM_BUILD_ROOT/%{_etc_prefix}/%{_package_name}
-cp -r conf $RPM_BUILD_ROOT/%{_etc_prefix}/%{_package_name}
+mkdir -p $RPM_BUILD_ROOT/%{_etc_prefix}/%{_package_name}/conf
+cp conf/* $RPM_BUILD_ROOT/%{_etc_prefix}/%{_package_name}/conf/
 
 %post
 
@@ -71,6 +71,18 @@ cd %{_package_name}
 ln -s %{_component_name}.jar %{_name}.jar
 popd > /dev/null
 
+pushd $RPM_BUILD_ROOT/%{_etc_prefix} > /dev/null
+if [ -h %{_name} -a "`readlink %{_name} | xargs basename`" != "%{_package_name}" ]; then
+	if [ -f %{_name}/conf/pxf-profiles.xml ]; then
+		echo pxf-profiles.xml replaced, old copy is `readlink -f %{_name}/conf/pxf_profiles.xml`
+	fi
+	rm %{_name}
+fi
+
+ln -s %{_package_name} %{_name}
+
+popd > /dev/null
+
 %preun
 
 pushd $RPM_BUILD_ROOT/%{_lib_prefix} > /dev/null
@@ -82,6 +94,14 @@ fi
 cd %{_package_name}
 if [ -h %{_name}.jar ]; then
 	rm %{_name}.jar
+fi
+
+popd > /dev/null
+
+pushd $RPM_BUILD_ROOT/%{_etc_prefix} > /dev/null
+
+if [ -h %{_name} -a "`readlink %{_name} | xargs basename`" == "%{_package_name}" ]; then
+	rm %{_name}
 fi
 
 popd > /dev/null
