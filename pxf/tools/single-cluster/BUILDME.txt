@@ -1,0 +1,23 @@
+1. Preparation
+==============
+
+In order to build a single-cluster you'll need to add stack binaries in the
+form of tarballs (no need to extract, just keep the .tar.gz):
+
+1) hadoop
+2) hbase
+3) zookeeper
+4) hive
+5) pxf
+
+put these in a subdirectory under tars/ which includes the name of the release
+
+Currently, we have release-head and dev-head
+Each has a script to update its components from Jenkins jobs
+
+2. Build
+========
+
+make RELEASE=<release name> clean all
+
+Note: You have to do clean
