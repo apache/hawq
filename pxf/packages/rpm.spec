@@ -72,7 +72,7 @@ ln -s %{_component_name}.jar %{_name}.jar
 popd > /dev/null
 
 pushd $RPM_BUILD_ROOT/%{_etc_prefix} > /dev/null
-if [ -h %{_name} -a "`readlink %{_name} | xargs basename`" != "%{_package_name}" ]; then
+if [ -h %{_name} ] && [ "`readlink %{_name} | xargs basename`" != "%{_package_name}" ]; then
 	if [ -f %{_name}/conf/pxf-profiles.xml ]; then
 		echo pxf-profiles.xml replaced, old copy is `readlink -f %{_name}/conf/pxf_profiles.xml`
 	fi
