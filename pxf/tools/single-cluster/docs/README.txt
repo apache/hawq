@@ -70,6 +70,7 @@ CentOS
 v1.7.1
 ------
 
+- added -f to rm in copy_templates
 - make clean doens't fail on rm -rf
 - ENGINF-810: Please chmod 777 for DFS_URL/../ per the hdfs privilege check involved in hawq
 

@@ -63,7 +63,7 @@ extract_products: $(EXTRACTEDTARS)
 .PHONY: copy_templates
 copy_templates: $(TEMPLATES)
 	cp -rv $(TEMPLATESROOT)/* $(BUILDROOT)/
-	-find $(BUILDROOT) -iname "*~" | xargs rm
+	-find $(BUILDROOT) -iname "*~" | xargs rm -f
 
 .PHONY: copy_docs
 copy_docs: $(DOCSROOT)/README.txt
