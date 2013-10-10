@@ -3,13 +3,13 @@
 all: gpsmon gpmmon
 
 gpsmon:
-	$(MAKE) -C src/gpmon gpsmon BUILDDIR=$(BUILDDIR)
+#	$(MAKE) -C src/gpmon gpsmon BUILDDIR=$(BUILDDIR)
 
 gpmmon:
-	$(MAKE) -C src/gpmon gpmmon BUILDDIR=$(BUILDDIR)
+#	$(MAKE) -C src/gpmon gpmmon BUILDDIR=$(BUILDDIR)
 
 webapi:
-	@echo webapi
+#	@echo webapi
 
 clean:
-	$(MAKE) -C src/gpmon clean
+#	$(MAKE) -C src/gpmon clean

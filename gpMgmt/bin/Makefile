@@ -176,7 +176,7 @@ unittest2:
 	cp -r $(PYLIB_SRC)/$(UNITTEST2_DIR)/build/lib/unittest2  $(PYLIB_DIR)/
 
 
-PYTHON_FILES=`grep -l --exclude=Makefile --exclude=gplogfilter "/bin/env python" *`\
+PYTHON_FILES=`grep -l --exclude=Makefile --exclude=gplogfilter --exclude=gpcheckos --exclude=gpgenfsmap.py --exclude=throttlingD.py "/bin/env python" *`\
 			 `grep -l "/bin/env python" $(SRC)/../sbin/*`\
 			 `find ./gppylib -name "*.py"`\
 			 `find $(SRC)/../sbin -name "*.py"`

@@ -13,7 +13,7 @@ all:
 	$(MAKE) -C src all
 	$(MAKE) -C config all
 	$(MAKE) -C contrib/xlogdump all
-	$(MAKE) -C contrib/changetrackingdump all
+#	$(MAKE) -C contrib/changetrackingdump all
 	$(MAKE) -C contrib/formatter all
 	$(MAKE) -C contrib/formatter_fixedwidth all
 	$(MAKE) -C contrib/extprotocol all	
@@ -30,7 +30,7 @@ install:
 	$(MAKE) -C src $@
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib/xlogdump $@
-	$(MAKE) -C contrib/changetrackingdump $@
+#	$(MAKE) -C contrib/changetrackingdump $@
 	$(MAKE) -C contrib/formatter $@
 	$(MAKE) -C contrib/formatter_fixedwidth $@
 	$(MAKE) -C contrib/extprotocol $@
@@ -47,7 +47,7 @@ installdirs uninstall:
 	$(MAKE) -C src $@
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib/xlogdump $@
-	$(MAKE) -C contrib/changetrackingdump $@
+#	$(MAKE) -C contrib/changetrackingdump $@
 	$(MAKE) -C contrib/formatter $@
 	$(MAKE) -C contrib/formatter_fixedwidth $@
 	$(MAKE) -C contrib/extprotocol $@
@@ -72,7 +72,7 @@ clean:
 	$(MAKE) -C src $@
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib/xlogdump $@
-	$(MAKE) -C contrib/changetrackingdump $@
+#	$(MAKE) -C contrib/changetrackingdump $@
 	$(MAKE) -C contrib/formatter $@
 	$(MAKE) -C contrib/formatter_fixedwidth $@
 	$(MAKE) -C contrib/extprotocol $@

@@ -39,7 +39,7 @@ all : devel
 .PHONY : test2 test3
 
 # Internal functions which are invoked by other rules within this makefile
-.PHONY : groupSession mkgpcc mkgpperfmon copydocs mgmtcopy copylibs
+.PHONY : groupSession mkgpcc copydocs mgmtcopy copylibs
 .PHONY : greenplum_path RECONFIG HOMEDEP GPROOTDEP GPROOTDEP GPROOTFAIL goh
 .PHONY : version gccVersionCheck pygres authlibs clients loaders connectivity gppkg
 
@@ -364,7 +364,7 @@ define BUILD_STEPS
 	@$(MAKE) mkgpcc INSTCFLAGS=$(INSTCFLAGS)
 	@$(MAKE) mgmtcopy INSTLOC=$(INSTLOC)
 	@$(MAKE) mkpgbench INSTLOC=$(INSTLOC) BUILDDIR=$(BUILDDIR)
-	@$(MAKE) mkgpperfmon INSTLOC=$(INSTLOC) BUILDDIR=$(BUILDDIR)
+#	@$(MAKE) mkgpperfmon INSTLOC=$(INSTLOC) BUILDDIR=$(BUILDDIR)
 	@$(MAKE) mkplatform INSTLOC=$(INSTLOC)
 	@$(MAKE) copydocs INSTLOC=$(INSTLOC)
 	@$(MAKE) copylibs INSTLOC=$(INSTLOC)
@@ -988,7 +988,6 @@ PVK_SCRIPTS = \
 	bin/generate_load_tpch.pl	\
 	bin/gpscp			\
 	bin/gpssh			\
-	bin/gpcheckos			\
 	bin/gpcheckperf			\
 	bin/run_operator_tests.pl	\
 	$(NULL)
@@ -1025,7 +1024,6 @@ SET_VERSION_SCRIPTS = \
 	bin/gpaddmirrors \
 	bin/gpbitmapreindex \
 	bin/gpcheck \
-	bin/gpcheckos \
 	bin/gpcheckperf \
 	bin/gpcrondump.py \
 	bin/gpdbrestore \
@@ -1096,17 +1094,17 @@ mkgpcc:
 mkpgbench:
 	@cd $(BUILDDIR)/contrib/pgbench && $(MAKE) install
 
-mkgpperfmon:
-	@cd $(GPPERFMON) && $(MAKE) BUILDDIR=$(BUILDDIR)
-	cp -p gpperfmon/src/gpmon/gpmmon gpperfmon/src/gpmon/gpsmon $(INSTLOC)/bin
-	cp -p gpperfmon/src/gpmon/gpmon_catqrynow.py $(INSTLOC)/sbin
-	cp -p gpperfmon/src/gpmon/gpperfmon_install $(INSTLOC)/bin
-	mkdir -p $(INSTLOC)/lib/gpperfmon
-	cp -p gpperfmon/src/gpmon/gpperfmon3.sql $(INSTLOC)/lib/gpperfmon
-	cp -p gpperfmon/src/gpmon/gpperfmon4.sql $(INSTLOC)/lib/gpperfmon
-	cp -p gpperfmon/src/gpmon/gpperfmon41.sql $(INSTLOC)/lib/gpperfmon
-	cp -p gpperfmon/src/gpmon/gpperfmon42.sql $(INSTLOC)/lib/gpperfmon
-	cp -p gpperfmon/src/gpmon/gpperfmonC.sql $(INSTLOC)/lib/gpperfmon
+#mkgpperfmon:
+#	@cd $(GPPERFMON) && $(MAKE) BUILDDIR=$(BUILDDIR)
+#	cp -p gpperfmon/src/gpmon/gpmmon gpperfmon/src/gpmon/gpsmon $(INSTLOC)/bin
+#	cp -p gpperfmon/src/gpmon/gpmon_catqrynow.py $(INSTLOC)/sbin
+#	cp -p gpperfmon/src/gpmon/gpperfmon_install $(INSTLOC)/bin
+#	mkdir -p $(INSTLOC)/lib/gpperfmon
+#	cp -p gpperfmon/src/gpmon/gpperfmon3.sql $(INSTLOC)/lib/gpperfmon
+#	cp -p gpperfmon/src/gpmon/gpperfmon4.sql $(INSTLOC)/lib/gpperfmon
+#	cp -p gpperfmon/src/gpmon/gpperfmon41.sql $(INSTLOC)/lib/gpperfmon
+#	cp -p gpperfmon/src/gpmon/gpperfmon42.sql $(INSTLOC)/lib/gpperfmon
+#	cp -p gpperfmon/src/gpmon/gpperfmonC.sql $(INSTLOC)/lib/gpperfmon
 
 mkplatform:
 	@cd $(PLATFORM) && $(MAKE)
@@ -1153,10 +1151,10 @@ endif
 	cp $(GPPGDIR)/src/test/regress/*.pl $(INSTLOC)/bin
 	if [ ! -d ${INSTLOC}/docs ] ; then mkdir ${INSTLOC}/docs ; fi
 	if [ -d $(GPMGMT)/doc ]; then cp -rp $(GPMGMT)/doc $(INSTLOC)/docs/cli_help; fi
-	if [ -d $(GPMGMT)/demo/gpmapreduce ]; then \
-	  mkdir -p $(INSTLOC)/demo; \
-	  $(TAR) -C $(GPMGMT)/demo -czf $(INSTLOC)/demo/gpmapreduce.tar.gz gpmapreduce; \
-	fi
+#	if [ -d $(GPMGMT)/demo/gpmapreduce ]; then \
+#	  mkdir -p $(INSTLOC)/demo; \
+#	  $(TAR) -C $(GPMGMT)/demo -czf $(INSTLOC)/demo/gpmapreduce.tar.gz gpmapreduce; \
+#	fi
 	if [ -d $(GPMGMT)/demo/gpfdist_transform ]; then \
 	  mkdir -p $(INSTLOC)/demo; \
 	  $(TAR) -C $(GPMGMT)/demo -czf $(INSTLOC)/demo/gpfdist_transform.tar.gz gpfdist_transform; \

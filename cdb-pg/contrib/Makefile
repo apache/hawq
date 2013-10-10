@@ -9,7 +9,6 @@ WANTED_DIRS = \
 		xlogdump \
 		pgbench \
 		orafce \
-		changetrackingdump \
 		formatter \
 		formatter_fixedwidth \
 		extprotocol \

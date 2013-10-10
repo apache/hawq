@@ -16,12 +16,13 @@ include $(top_builddir)/src/Makefile.global
 DIRS = initdb ipcclean pg_ctl pg_dump \
 	psql scripts pg_config pg_controldata pg_resetxlog \
 	gpfilesystem/hdfs \
-	gpmapreduce gpmirrortransition gpupgrade \
+	gpmirrortransition gpupgrade \
     gpfusion
+#gpmapreduce 
 
-ifeq ($(enable_snmp),yes)
-DIRS+=gpsnmpd
-endif
+#ifeq ($(enable_snmp),yes)
+#DIRS+=gpsnmpd
+#endif
 
 ifeq ($(PORTNAME), win32)
 DIRS+=pgevent

@@ -24,7 +24,7 @@ LIBS := $(filter-out -llapack -lblas -lf2c -lresolv -lbz2, $(LIBS))
 LIBS := $(filter-out -lreadline -ledit -ltermcap -lncurses -lcurses -lcurl -lssl -lcrypto -lz, $(LIBS))
 
 
-PROGRAMS = createdb createlang createuser dropdb droplang dropuser clusterdb vacuumdb reindexdb
+PROGRAMS = createdb createuser dropdb dropuser vacuumdb
 
 override CPPFLAGS := -DFRONTEND -I$(top_srcdir)/src/bin/pg_dump -I$(top_srcdir)/src/bin/psql -I$(libpq_srcdir) $(CPPFLAGS)
 
@@ -38,14 +38,14 @@ all: submake-libpq submake-libpgport $(PROGRAMS)
 	$(CC) $(CFLAGS) $^ $(libpq_pgport) $(LDFLAGS) $(LIBS) -o $@$(X)
 
 createdb: createdb.o common.o dumputils.o kwlookup.o keywords.o
-createlang: createlang.o common.o print.o mbprint.o
+#createlang: createlang.o common.o print.o mbprint.o
 createuser: createuser.o common.o dumputils.o kwlookup.o keywords.o
 dropdb: dropdb.o common.o dumputils.o kwlookup.o keywords.o
-droplang: droplang.o common.o print.o mbprint.o
+#droplang: droplang.o common.o print.o mbprint.o
 dropuser: dropuser.o common.o dumputils.o kwlookup.o keywords.o
-clusterdb: clusterdb.o common.o dumputils.o kwlookup.o keywords.o
+#clusterdb: clusterdb.o common.o dumputils.o kwlookup.o keywords.o
 vacuumdb: vacuumdb.o common.o
-reindexdb: reindexdb.o common.o dumputils.o kwlookup.o keywords.o
+#reindexdb: reindexdb.o common.o dumputils.o kwlookup.o keywords.o
 
 dumputils.c keywords.c: % : $(top_srcdir)/src/bin/pg_dump/%
 	rm -f $@ && $(LN_S) $< .
@@ -59,13 +59,13 @@ kwlookup.c: % : $(top_srcdir)/src/backend/parser/%
 install: all installdirs
 	$(INSTALL_PROGRAM) createdb$(X)   '$(DESTDIR)$(bindir)'/createdb$(X)
 	$(INSTALL_PROGRAM) dropdb$(X)     '$(DESTDIR)$(bindir)'/dropdb$(X)
-	$(INSTALL_PROGRAM) createlang$(X) '$(DESTDIR)$(bindir)'/createlang$(X)
-	$(INSTALL_PROGRAM) droplang$(X)   '$(DESTDIR)$(bindir)'/droplang$(X)
+#	$(INSTALL_PROGRAM) createlang$(X) '$(DESTDIR)$(bindir)'/createlang$(X)
+#	$(INSTALL_PROGRAM) droplang$(X)   '$(DESTDIR)$(bindir)'/droplang$(X)
 	$(INSTALL_PROGRAM) createuser$(X) '$(DESTDIR)$(bindir)'/createuser$(X)
 	$(INSTALL_PROGRAM) dropuser$(X)   '$(DESTDIR)$(bindir)'/dropuser$(X)
-	$(INSTALL_PROGRAM) clusterdb$(X)  '$(DESTDIR)$(bindir)'/clusterdb$(X)
+#	$(INSTALL_PROGRAM) clusterdb$(X)  '$(DESTDIR)$(bindir)'/clusterdb$(X)
 	$(INSTALL_PROGRAM) vacuumdb$(X)   '$(DESTDIR)$(bindir)'/vacuumdb$(X)
-	$(INSTALL_PROGRAM) reindexdb$(X)  '$(DESTDIR)$(bindir)'/reindexdb$(X)
+#	$(INSTALL_PROGRAM) reindexdb$(X)  '$(DESTDIR)$(bindir)'/reindexdb$(X)
 
 installdirs:
 	$(MKDIR_P) '$(DESTDIR)$(bindir)'
