@@ -72,3 +72,4 @@ pg_class32.data
 tidyddl.sql
 wet_region.out
 gpcheckmirrorseg.data
+upg_catupgrade_11.sql
