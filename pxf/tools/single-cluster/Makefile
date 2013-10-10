@@ -36,8 +36,8 @@ all: clean $(TARGET)
 
 .PHONY: clean
 clean:
-	rm -rf $(TARGET)
-	rm -rf $(DIRT)
+	-rm -rf $(TARGET)
+	-rm -rf $(DIRT)
 
 $(BUILDROOT): copy_binfiles create_versions_file extract_products copy_templates copy_docs
 	chmod -R +w $(BUILDROOT)
