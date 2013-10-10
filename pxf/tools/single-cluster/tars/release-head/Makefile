@@ -24,7 +24,7 @@ all: $(TARGET)
 .PHONY: clean
 clean:
 	-rm -rf $(TARGET)
-	-rm *~
+	-rm -f *~
 
 %.fetched:
 	$(JENKINS_FETCH) $(JENKINS_$*) $*

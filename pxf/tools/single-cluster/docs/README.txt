@@ -70,9 +70,11 @@ CentOS
 v1.7.1
 ------
 
-- added -f to rm in copy_templates
+- added -f to rm in copy_templates, tars/release-head/Makefile and
+  tars/dev-head/Makefile
 - make clean doens't fail on rm -rf
-- ENGINF-810: Please chmod 777 for DFS_URL/../ per the hdfs privilege check involved in hawq
+- ENGINF-810: Please chmod 777 for DFS_URL/../ per the hdfs privilege 
+  check involved in hawq
 
 v1.7.0
 ------
