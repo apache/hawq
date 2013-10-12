@@ -366,8 +366,8 @@ select * from tbl_with_profile order by t1;
 -- 12. Test analyze for Hive table with profile without analyzer - negative test
 CREATE EXTERNAL TABLE hv_heterogen_profile_wo_analyzer(
 t1    text,
-t2    text,  
-num1  integer, 
+t2    text,
+num1  integer,
 dub1  double precision,
 t3 text)
 LOCATION ('pxf://@hostname@:50070/reg_heterogen?PROFILE=Hive')
@@ -399,7 +399,18 @@ SELECT * FROM hv_index ORDER BY t1;
  row9  | hdfs://0.0.0.0:8020/hive/warehouse/reg_txt/hive_small_data.txt | 112
 (10 rows)
 
--- 14. Clean after Hive
+-- 14. Create external table with wrong column definitions - negative test
+CREATE EXTERNAL TABLE tbl_with_wrong_col_def(
+t1    text,
+t2    text,
+wrong1  double precision,
+wrong2  smallint)
+LOCATION ('pxf://@hostname@:50070/reg_seq?PROFILE=HIVE')
+format 'custom' (formatter='pxfwritable_import');
+select * from tbl_with_wrong_col_def order by t1;
+ERROR:  External table definition did not match input data: column "wrong1" (type "double precision", input data type "integer"), column "wrong2" (type "smallint", input data type "double precision")  (SOMEFILE:SOMEFUNC)
+DETAIL:  External table tbl_with_wrong_col_def
+-- 15. Clean after Hive
 drop external table hv_index;
 drop external table hv_view;
 drop external table hv_collections;
@@ -413,6 +424,7 @@ drop external table hv_part_dec;
 drop external table hv_un_supported_tbl;
 drop external table tbl_with_profile;
 drop external table hv_heterogen_profile_wo_analyzer;
+drop external table tbl_with_wrong_col_def;
 \! ${HIVE_ROOT}/bin/hive -e "drop index reg_index on reg_txt" 2>/dev/null
 \! ${HIVE_ROOT}/bin/hive -e "drop table default__reg_txt_reg_txt_index__" 2>/dev/null
 \! ${HIVE_ROOT}/bin/hive -e "drop view reg_txt_view" 2>/dev/null
