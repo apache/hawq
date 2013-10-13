@@ -43,7 +43,7 @@ DROP EXTERNAL TABLE pxf_out;
 --
 -- Load HDFS with test data
 --
-\! ${HADOOP_ROOT}/bin/hadoop fs -mkdir /gpdb_regression_data
+\! ${HADOOP_ROOT}/bin/hdfs dfs -mkdir /gpdb_regression_data
 --
 -- 1. Test writable table with TEXT format 
 --
@@ -70,6 +70,11 @@ INSERT INTO wrtext VALUES ('first',1,11),
 DROP EXTERNAL TABLE wrtext;
 --
 -- Test data was written
+--
+\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrtext | grep Found | awk '{ if ($2>0) print "ok";}'  
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrtext | awk '{ if ($1>0) print "ok";}'  
+--
+-- Read data
 --
 CREATE READABLE EXTERNAL TABLE readtext (s1 text, 
                                		     n1 int, 
@@ -117,6 +122,11 @@ DROP EXTERNAL TABLE wrgzip;
 --
 -- Test data was written
 --
+\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrgzip | grep Found | awk '{ if ($2>0) print "ok";}'  
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrgzip | awk '{ if ($1>0) print "ok";}'  
+--
+-- Read data
+--
 CREATE READABLE EXTERNAL TABLE readgzip (s1 text, 
                                		     n1 int, 
 							   		     n2 int)
@@ -152,6 +162,11 @@ DROP EXTERNAL TABLE wrbzip2;
 --
 -- Test data was written
 --
+\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrbzip2 | grep Found | awk '{ if ($2>0) print "ok";}'  
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrbzip2 | awk '{ if ($1>0) print "ok";}'  
+--
+-- Read data
+--
 CREATE READABLE EXTERNAL TABLE readbzip2 (s1 text, 
                                		      n1 int, 
 							   		      n2 int)
@@ -171,6 +186,11 @@ INSERT INTO wrdefault VALUES ('I',1,11), ('am',2,22), ('deflated',3,33);
 DROP EXTERNAL TABLE wrdefault;
 --
 -- Test data was written
+--
+\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrdefault | grep Found | awk '{ if ($2>0) print "ok";}'  
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrdefault | awk '{ if ($1>0) print "ok";}'  
+--
+-- Read data
 --
 CREATE READABLE EXTERNAL TABLE readdefault (s1 text, 
                                		        n1 int, 
@@ -212,6 +232,11 @@ COPY wrseq FROM '@abs_srcdir@/data/pxf/customwritable_data.txt';
 DROP EXTERNAL TABLE wrseq;
 --
 -- Test data was written
+--
+\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrcustom | grep Found | awk '{ if ($2>0) print "ok";}'  
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrcustom | awk '{ if ($1>0) print "ok";}'  
+--
+-- Read data
 --
 CREATE READABLE EXTERNAL TABLE readseq (tmp1  timestamp, 
                                         num1  integer, 
@@ -285,5 +310,5 @@ DROP EXTERNAL TABLE wr_char_err;
 -- Cleanup: delete all data that was written into hdfs
 --
 -- start_ignore
-\! ${HADOOP_ROOT}/bin/hadoop fs -rm -r /gpdb_regression_data
+\! ${HADOOP_ROOT}/bin/hdfs dfs -rm -r /gpdb_regression_data
 -- end_ignore

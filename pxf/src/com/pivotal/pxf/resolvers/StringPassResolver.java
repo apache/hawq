@@ -24,9 +24,13 @@ public class StringPassResolver extends Plugin implements IReadResolver, IWriteR
 {
 	// for write
 	private byte[] buf;
-	private OneRow onerow;
+	private OneRow oneRow;
+	SimpleText text;
+	int curLoc;
 	private static final char LINE_DELIMITER = '\n';
 	private static final int BUF_SIZE = 1024; 
+	private static final int EOF = -1; 
+
 
 	private Log Log;
 	
@@ -37,7 +41,9 @@ public class StringPassResolver extends Plugin implements IReadResolver, IWriteR
 	{
 		super(input);
 		buf = new byte[BUF_SIZE];
-		onerow = new OneRow();
+		oneRow = new OneRow();
+		text = new SimpleText();
+		curLoc = 0;
 
 		Log = LogFactory.getLog(StringPassResolver.class);
 	}
@@ -81,27 +87,16 @@ public class StringPassResolver extends Plugin implements IReadResolver, IWriteR
 	 * Reads a row (line) from inputStream and flushes it into SimpleText object.
 	 */
 	public OneRow setFields(DataInputStream inputStream) throws Exception
-	{
-		SimpleText text = new SimpleText();
-		int expected = inputStream.available();
-		int curLoc = 0;
-		byte c = 0;
+	{	
 		
-		while (expected > 0) 
+		byte c = 0;
+		curLoc = 0;
+		text.clear();
+		
+		while ((c = (byte)inputStream.read()) != EOF)
 		{
-			c = (byte) inputStream.read();
-			
 			buf[curLoc] = c;
-			
 			curLoc++;
-			expected--;	
-
-			if (curLoc == BUF_SIZE)
-			{
-				// flush 
-				text.append(buf, 0, BUF_SIZE);
-				curLoc = 0;
-			}
 			
 			if (c==LINE_DELIMITER)
 			{
@@ -109,29 +104,46 @@ public class StringPassResolver extends Plugin implements IReadResolver, IWriteR
 				break;
 			}	
 			
+			if (isBufferFull())
+			{
+				flushBuffer();
+			}
 		}
-		
-		// the buffer doesn't end with a line break.
-		// we assume it's the last line.
-		if (c != LINE_DELIMITER)
+
+		if (!isBufferEmpty())
 		{
-			Log.warn("Stream ended without line break");
+			// the buffer doesn't end with a line break.
+			if (c == EOF) 
+			{
+				Log.warn("Stream ended without line break");
+			}
+			flushBuffer();
 		}
-		
-		if (curLoc > 0)
-		{
-			// flush 
-			text.append(buf, 0, curLoc);
-		}
-		
+
 		if (text.getLength() > 0)
 		{
-			onerow.setData(text);
-			return onerow;
+			oneRow.setData(text);
+			return oneRow;
 		}
 		
 		// else
 		return null;
+	}
+	
+	private boolean isBufferEmpty()
+	{
+		return (curLoc == 0);
+	}
+	
+	private boolean isBufferFull()
+	{
+		return (curLoc == BUF_SIZE);
+	}
+	
+	private void flushBuffer()
+	{
+		text.append(buf, 0, curLoc);
+		curLoc = 0;
 	}
 }
 	
