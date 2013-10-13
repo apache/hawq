@@ -122,7 +122,16 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements 
 	public void closeForWrite() throws Exception
 	{
 		if (writer != null)
+		{
+			writer.sync();
+			/*
+			 * From release 0.21.0 sync() is deprecated in favor of hflush(), 
+			 * which only guarantees that new readers will see all data written to that point, 
+			 * and hsync(), which makes a stronger guarantee that the operating system has flushed 
+			 * the data to disk (like POSIX fsync), although data may still be in the disk cache.
+			 */
+			writer.hsync(); 
 			writer.close();
+		}
 	}
-
 }

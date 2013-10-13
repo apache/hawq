@@ -28,6 +28,7 @@ import com.pivotal.pxf.utilities.Utilities;
 public class LineBreakAccessor extends HdfsSplittableDataAccessor implements IWriteAccessor
 {
 	private DataOutputStream dos;
+	private FSDataOutputStream fsdos;
 	private Configuration conf;
 	private FileSystem fs;
 	private Path file;
@@ -102,13 +103,16 @@ public class LineBreakAccessor extends HdfsSplittableDataAccessor implements IWr
 	 */
 	private void createOutputStream(Path file, CompressionCodec codec) throws IOException
 	{
+		fsdos = fs.create(file, false);
 		if (codec != null)
-		{
-			FSDataOutputStream fileOut = fs.create(file, false);
-			dos = new DataOutputStream(codec.createOutputStream(fileOut));
+		{			
+			dos = new DataOutputStream(codec.createOutputStream(fsdos));
 		}
 		else 
-			dos = fs.create(file, false);
+		{
+			dos = fsdos;
+		}
+			
 	}
 	
 	// write row into stream
@@ -123,9 +127,16 @@ public class LineBreakAccessor extends HdfsSplittableDataAccessor implements IWr
 
 	public void closeForWrite() throws Exception
 	{
-		if (dos != null)
-		{
+		if ((dos != null) && (fsdos != null))
+		{	
 			dos.flush();
+			/*
+			 * From release 0.21.0 sync() is deprecated in favor of hflush(), 
+			 * which only guarantees that new readers will see all data written to that point, 
+			 * and hsync(), which makes a stronger guarantee that the operating system has flushed 
+			 * the data to disk (like POSIX fsync), although data may still be in the disk cache.
+			 */
+			fsdos.hsync();
 			dos.close();
 		}
 	}
