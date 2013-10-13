@@ -408,7 +408,7 @@ wrong2  smallint)
 LOCATION ('pxf://@hostname@:50070/reg_seq?PROFILE=HIVE')
 format 'custom' (formatter='pxfwritable_import');
 select * from tbl_with_wrong_col_def order by t1;
-ERROR:  External table definition did not match input data: column "wrong1" (type "double precision", input data type "integer"), column "wrong2" (type "smallint", input data type "double precision")  (SOMEFILE:SOMEFUNC)
+ERROR:  External table definition did not match input data: column "wrong1" (type "double precision", input data type "integer"), column "wrong2" (type "smallint", input data type "double precision")
 DETAIL:  External table tbl_with_wrong_col_def
 -- 15. Clean after Hive
 drop external table hv_index;
