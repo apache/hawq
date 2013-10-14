@@ -26,6 +26,7 @@ struct Gang;                        /* #include "cdb/cdbgang.h" */
 struct Node;                        /* #include "nodes/nodes.h" */
 struct QueryDesc;                   /* #include "executor/execdesc.h" */
 struct SegmentDatabaseDescriptor;   /* #include "cdb/cdbconn.h" */
+struct pollfd;
 
 typedef enum
 {
@@ -143,9 +144,10 @@ typedef struct DispatchCommandParms
 	volatile bool pleaseCancel;
 
 	/*
-	 * mpp_fd_set supports more file descriptors than an ordinary fd_set
+	 * pollfd supports for libpq
 	 */
-	mpp_fd_set	mask;
+	int				nfds;
+	struct pollfd	*fds;
 	
 	/*
 	 * The pthread_t thread handle.

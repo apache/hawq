@@ -403,6 +403,7 @@ def collectHDFS():
     hadoop_config_file = os.path.join(options.hadoop, "libexec/hadoop-config.sh")
     hadoop_env_file = os.path.join(options.hadoop, "etc/hadoop/hadoop-env.sh")
     hdfs_site_file = os.path.join(options.hadoop, "etc/hadoop/hdfs-site.xml")
+    core_site_file = os.path.join(options.hadoop, "etc/hadoop/core-site.xml")
 
     # collect java heap size config
     p = subprocess.Popen("source %s; echo $JAVA_HEAP_MAX" % hadoop_config_file, shell = True,
@@ -438,18 +439,18 @@ def collectHDFS():
     # collect HDFS site config
     getPropName =  lambda node: node.getElementsByTagName('name')[0].childNodes[0].data
     getPropValue = lambda node: node.getElementsByTagName('value')[0].childNodes[0].data
-    try:
-        with open(hdfs_site_file) as f:
-            xmldoc = minidom.parse(f)
-        for node in xmldoc.getElementsByTagName('property'):
-            try:
-                data.site_config[getPropName(node)] = getPropValue(node).strip()
+    for filename in (hdfs_site_file, core_site_file):
+        try:
+            with open(filename) as f:
+                xmldoc = minidom.parse(f)
+            for node in xmldoc.getElementsByTagName('property'):
+                try:
+                    data.site_config[getPropName(node)] = getPropValue(node).strip()
+                except IndexError:
+                    pass # the <value> tag may be empty, which causes IndexError in getPropValue
 
-            except IndexError:
-                pass # the <value> tag may be empty, which causes IndexError in getPropValue
-
-    except Exception, e:
-        data.errormsg = "Failed to read HDFS config file '%s': %s" % (hdfs_site_file, e)
+        except Exception, e:
+            data.errormsg = "Failed to read HDFS config file '%s': %s" % (filename, e)
 
     return data
 
