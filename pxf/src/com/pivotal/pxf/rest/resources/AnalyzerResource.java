@@ -31,7 +31,7 @@ import com.pivotal.pxf.utilities.InputData;
  * in NameNode.java in the hadoop package - /hadoop-core-X.X.X.jar
  */
 @Path("/" + Version.PXF_PROTOCOL_VERSION + "/Analyzer/")
-public class AnalyzerResource
+public class AnalyzerResource extends SecuredResource
 {
 	org.apache.hadoop.fs.Path path = null;
 	private Log Log;

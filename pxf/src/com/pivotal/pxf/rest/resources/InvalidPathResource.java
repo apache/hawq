@@ -31,7 +31,7 @@ class Version
  * Otherwise, an error about unknown path is returned.
  */
 @Path("/")
-public class InvalidPathResource
+public class InvalidPathResource extends SecuredResource
 {
 	@Context
 	UriInfo rootUri;
@@ -40,6 +40,7 @@ public class InvalidPathResource
 
 	public InvalidPathResource() throws IOException
 	{
+		super();
 		Log = LogFactory.getLog(InvalidPathResource.class);
 	}
 

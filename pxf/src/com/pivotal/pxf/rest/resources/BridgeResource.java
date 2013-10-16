@@ -33,7 +33,7 @@ import com.pivotal.pxf.utilities.InputData;
  * REST component
  */
 @Path("/" + Version.PXF_PROTOCOL_VERSION + "/Bridge/")
-public class BridgeResource
+public class BridgeResource extends SecuredResource
 {
 	private Log Log;
 	public BridgeResource()

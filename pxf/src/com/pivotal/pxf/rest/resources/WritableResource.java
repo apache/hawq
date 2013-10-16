@@ -36,7 +36,7 @@ import com.pivotal.pxf.utilities.Utilities;
  * REST component
  */
 @Path("/" + Version.PXF_PROTOCOL_VERSION + "/Writable/")
-public class WritableResource
+public class WritableResource extends SecuredResource
 {
 	IWriteAccessor fileAccessor = null;
 	IWriteResolver fieldsResolver = null;
