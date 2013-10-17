@@ -53,21 +53,20 @@ CREATE WRITABLE EXTERNAL TABLE wrtext (s1 text,
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrtext?ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver')
 FORMAT 'TEXT' (DELIMITER ',');
 INSERT INTO wrtext VALUES ('first',1,11), 
-                          ('second',2,22),
-                          ('third',3,33),
-                          ('fourth',4,44),
-                          ('fifth',5,55),
-                          ('sixth',6,66),
-                          ('seventh',7,77),
-                          ('eighth',8,88),
-                          ('ninth',9,99),
-                          ('tenth',10,1010),
-                          ('eleventh',11,1111),
-                          ('twelfth',12,1212),
-                          ('thirteenth',13,1313),
+                          ('second',2,22);
+INSERT INTO wrtext VALUES ('third',3,33),
+                          ('fourth',4,44);
+INSERT INTO wrtext VALUES ('fifth',5,55),
+                          ('sixth',6,66);
+INSERT INTO wrtext VALUES ('seventh',7,77),
+                          ('eighth',8,88);
+INSERT INTO wrtext VALUES ('ninth',9,99),
+                          ('tenth',10,1010);
+INSERT INTO wrtext VALUES ('eleventh',11,1111),
+                          ('twelfth',12,1212);
+INSERT INTO wrtext VALUES ('thirteenth',13,1313),
                           ('fourteenth',14,1414), 
                           ('fifteenth',15,1515);
-DROP EXTERNAL TABLE wrtext;
 --
 -- Test data was written
 --
@@ -82,6 +81,16 @@ CREATE READABLE EXTERNAL TABLE readtext (s1 text,
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrtext?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver')
 FORMAT 'TEXT' (DELIMITER ',');
 SELECT * FROM readtext ORDER BY n1;
+--
+-- 1.1 Insert into writable table from read table
+--
+INSERT INTO wrtext SELECT * FROM readtext WHERE n1<=10;
+INSERT INTO wrtext SELECT * FROM readtext WHERE n2<100;
+SELECT * FROM readtext ORDER BY n1;
+--
+-- Cleanup
+--
+DROP EXTERNAL TABLE wrtext;
 DROP EXTERNAL TABLE readtext;
 --
 -- 2. Test writable table with TEXT format - compressions

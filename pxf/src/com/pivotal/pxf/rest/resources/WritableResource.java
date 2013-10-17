@@ -20,16 +20,13 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.io.Writable;
 
 import com.pivotal.pxf.accessors.IWriteAccessor;
 import com.pivotal.pxf.bridge.IBridge;
 import com.pivotal.pxf.bridge.WriteBridge;
-import com.pivotal.pxf.exception.BadRecordException;
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.resolvers.IWriteResolver;
 import com.pivotal.pxf.utilities.InputData;
-import com.pivotal.pxf.utilities.Utilities;
 
 /*
  * This class handles the subpath /<version>/Writable/ of this
