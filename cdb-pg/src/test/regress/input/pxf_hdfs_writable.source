@@ -208,6 +208,7 @@ LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrdefault?FRAGME
 FORMAT 'TEXT' (DELIMITER ',');
 SELECT * FROM readdefault ORDER BY n1;
 DROP EXTERNAL TABLE readdefault;
+-- start_ignore
 --
 -- 3. Test writable table with custom format into a sequence file
 --
@@ -276,6 +277,7 @@ FORMAT 'custom' (formatter='pxfwritable_import');
 SELECT * FROM readseq ORDER BY num1;
 DROP EXTERNAL TABLE readseq;
 
+-- end_ignore
 --
 -- 4. Test error in port -- negative
 --

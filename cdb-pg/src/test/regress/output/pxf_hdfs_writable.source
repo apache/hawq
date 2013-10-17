@@ -302,6 +302,7 @@ SELECT * FROM readdefault ORDER BY n1;
 (3 rows)
 
 DROP EXTERNAL TABLE readdefault;
+-- start_ignore
 --
 -- 3. Test writable table with custom format into a sequence file
 --
@@ -425,6 +426,7 @@ SELECT * FROM readseq ORDER BY num1;
 (50 rows)
 
 DROP EXTERNAL TABLE readseq;
+-- end_ignore
 --
 -- 4. Test error in port -- negative
 --
