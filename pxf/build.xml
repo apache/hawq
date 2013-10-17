@@ -6,19 +6,21 @@
 	<loadproperties srcfile="build.properties" />
 
 	<!-- Some basic properties -->
-	<property environment="env"/>
+	<property environment="env" />
 	<property name="component.name" value="${component.basename}-${component.version}" />
 
 	<!-- If BUILD_NUMBER is in environment, use it, o/w use current username -->
-	<condition property="build.number" value="${env.BUILD_NUMBER}" else="${user.name}" >
-	    <isset property="env.BUILD_NUMBER" />
+	<condition property="build.number" value="${env.BUILD_NUMBER}" else="${user.name}">
+		<isset property="env.BUILD_NUMBER" />
 	</condition>
 
 	<!-- If build.trunkbuild is defined (-D) then add _dev
 		 Used for trunk builds -->
-	<condition property="build.branch" value="_dev" else="" >
-	    <isset property="build.trunkbuild"/>
+	<condition property="build.branch" value="_dev" else="">
+		<isset property="build.trunkbuild" />
 	</condition>
+
+
 
 	<property name="src.dir" value="${basedir}/src" />
 	<property name="build.dir" value="${basedir}/build" />
@@ -27,9 +29,9 @@
 	<property name="test.dir" value="${basedir}/test" />
 	<property name="testreports.dir" value="${build.dir}/test/reports" />
 
-	<property name="package.buildroot" value="${basedir}/${component.basename}_package_build_${user.name}"/>
-	<property name="package.release" value="${build.number}${build.branch}"/>
-	<property name="package.name" value="${component.name}-${package.release}"/>
+	<property name="package.buildroot" value="${basedir}/${component.basename}_package_build_${user.name}" />
+	<property name="package.release" value="${build.number}${build.branch}" />
+	<property name="package.name" value="${component.name}-${package.release}" />
 
 	<!--Apache Ivy(http://ant.apache.org/ivy/history/latest-milestone/install.html) -->
 	<loadproperties srcfile="${basedir}/ivy/libraries.properties" />
@@ -64,7 +66,7 @@
 
 		<fileset dir="${lib.dir}">
 			<patternset refid="library.patterns" />
-		</fileset>	
+		</fileset>
 
 		<path refid="ivy-classpath" />
 	</path>
@@ -74,8 +76,8 @@
 
 	<!-- Cleanup -->
 	<target name="clean">
-		<delete dir="${build.dir}"/>
-		<delete dir="${package.buildroot}"/>
+		<delete dir="${build.dir}" />
+		<delete dir="${package.buildroot}" />
 	</target>
 
 	<!-- Compilation -->
@@ -83,20 +85,13 @@
 		<mkdir dir="${build.dir}/classes" />
 
 		<!-- display the classpath used for compiling -->
-		<property name="myclasspath" refid="library.commons.classpath"/>
+		<property name="myclasspath" refid="library.commons.classpath" />
 		<!-- enable the following line to echo classpath -->
 		<!-- echo message="classpath used in javac target: ${myclasspath}"/-->
 
 		<!-- compile the core gpdhfs connector source -->
-		<javac classpathref="library.commons.classpath"
-			destdir="${build.dir}/classes"
-			includeantruntime="${compiler.includeantruntime}"
-			debug="${compiler.debug}"
-			fork="yes"
-			verbose="${compiler.verbose}"
-			memoryMaximumSize="${compiler.max.memory}"
-			srcdir="${src.dir}">
-			<compilerarg line="-Werror -Xlint:unchecked -Xlint:deprecation -Xlint:finally -Xlint:fallthrough -Xlint:path"/>
+		<javac classpathref="library.commons.classpath" destdir="${build.dir}/classes" includeantruntime="${compiler.includeantruntime}" debug="${compiler.debug}" fork="yes" verbose="${compiler.verbose}" memoryMaximumSize="${compiler.max.memory}" srcdir="${src.dir}">
+			<compilerarg line="-Werror -Xlint:unchecked -Xlint:deprecation -Xlint:finally -Xlint:fallthrough -Xlint:path" />
 		</javac>
 
 	</target>
@@ -105,19 +100,19 @@
 	<target name="jar" depends="run-tests" description="create the main jar files">
 		<jar destfile="${build.dir}/${component.name}.jar">
 			<manifest>
-				<attribute name="Built-By" value="${user.name}"/>
-				<attribute name="Built-Date" value="${TODAY}"/> 
+				<attribute name="Built-By" value="${user.name}" />
+				<attribute name="Built-Date" value="${TODAY}" />
 			</manifest>
-			<fileset dir="${build.dir}/classes" includes="**/*.class" excludes="Protobuf*.class"/>
-            <fileset dir="${src.dir}" includes="resources/*.xml"/>
+			<fileset dir="${build.dir}/classes" includes="**/*.class" excludes="Protobuf*.class" />
+			<fileset dir="${src.dir}" includes="resources/*.xml" />
 		</jar>
 
 		<jar destfile="${build.dir}/protobuf-appendix.jar">
 			<manifest>
-				<attribute name="Built-By" value="${user.name}"/>
-				<attribute name="Built-Date" value="${TODAY}"/> 
+				<attribute name="Built-By" value="${user.name}" />
+				<attribute name="Built-Date" value="${TODAY}" />
 			</manifest>
-			<fileset dir="${build.dir}/classes" includes="Protobuf*.class"/>
+			<fileset dir="${build.dir}/classes" includes="Protobuf*.class" />
 		</jar>
 	</target>
 
@@ -126,30 +121,28 @@
 
 	<!-- Create package -->
 	<target name="package" depends="jar" description="create a package directory">
-		<delete dir="${dist.dir}"/>
-		<mkdir dir="${dist.dir}"/>
-        <mkdir dir="${dist.dir}/conf"/>
+		<delete dir="${dist.dir}" />
+		<mkdir dir="${dist.dir}" />
+		<mkdir dir="${dist.dir}/conf" />
 		<copy todir="${dist.dir}">
 			<fileset dir="${lib.dir}">
-				<include name="avro*.jar"/>
-				<include name="jackson*.jar"/>  
-				<include name="protobuf*.jar"/>      
+				<include name="avro*.jar" />
+				<include name="jackson*.jar" />
+				<include name="protobuf*.jar" />
 			</fileset>
 			<fileset dir="${build.dir}">
-				<include name="${component.basename}*.jar"/>
-				<include name="protobuf-appendix.jar"/>
+				<include name="${component.basename}*.jar" />
+				<include name="protobuf-appendix.jar" />
 			</fileset>
 		</copy>
-        <copy file="${src.dir}/resources/pxf-profiles-default.xml" tofile="${dist.dir}/conf/pxf-profiles.xml"/>
+		<copy file="${src.dir}/resources/pxf-profiles-default.xml" tofile="${dist.dir}/conf/pxf-profiles.xml" />
 	</target>
 
 	<!-- Create TAR -->
 	<target name="tar" depends="package" description="create a tarball">
-		<tar destfile="${build.dir}/${component.name}-${package.release}.tar.gz"
-			compression="gzip" 
-			longfile="gnu">
-			<tarfileset dir="${dist.dir}" prefix="${component.name}"/>
-	    </tar>
+		<tar destfile="${build.dir}/${component.name}-${package.release}.tar.gz" compression="gzip" longfile="gnu">
+			<tarfileset dir="${dist.dir}" prefix="${component.name}" />
+		</tar>
 	</target>
 
 	<!-- Create RPM -->
@@ -171,7 +164,7 @@
 					<token key="component.version" value="${component.version}" />
 					<token key="package.release" value="${package.release}" />
 					<token key="package.libprefix" value="${package.libprefix}" />
-                    <token key="package.etcprefix" value="${package.etcprefix}" />
+					<token key="package.etcprefix" value="${package.etcprefix}" />
 					<token key="component.name" value="${component.name}" />
 					<token key="package.name" value="${package.name}" />
 					<token key="package.publicstage" value="${package.publicstage}" />
@@ -182,13 +175,13 @@
 				</replacetokens>
 			</filterchain>
 		</copy>
-		<rpm specFile="rpm.spec" command="-bb" topDir="${package.buildroot}" cleanBuildDir="true" failOnError="true"/>
+		<rpm specFile="rpm.spec" command="-bb" topDir="${package.buildroot}" cleanBuildDir="true" failOnError="true" />
 		<copy todir="${build.dir}/" flatten="true">
 			<fileset dir="${package.buildroot}/RPMS">
 				<include name="**/${component.basename}*.rpm" />
 			</fileset>
 		</copy>
-		<delete dir="${package.buildroot}" quiet="true" verbose="false"/>
+		<delete dir="${package.buildroot}" quiet="true" verbose="false" />
 	</target>
 
 	<!-- Ivy -->
@@ -210,25 +203,16 @@
 		<taskdef resource="org/apache/ivy/ant/antlib.xml" uri="antlib:org.apache.ivy.ant" classpathref="ivy.lib.path" />
 	</target>
 
-	<target name="ivy-retrieve" depends="ivy-init"
-		description="--> Retrieve Ivy-managed artifacts for the compile configurations">
-		<ivy:settings id="basic.settings" file="ivysettings.xml"/>
-		<ivy:retrieve settingsRef="basic.settings" pattern="${build.ivy.lib.dir}/${ivy.artifact.retrieve.pattern}" sync="true" conf="compile"/>
-		<ivy:cachepath pathid="ivy-classpath" conf="compile"/>
+	<target name="ivy-retrieve" depends="ivy-init" description="--> Retrieve Ivy-managed artifacts for the compile configurations">
+		<ivy:settings id="basic.settings" file="ivysettings.xml" />
+		<ivy:retrieve settingsRef="basic.settings" pattern="${build.ivy.lib.dir}/${ivy.artifact.retrieve.pattern}" sync="true" conf="compile" />
+		<ivy:cachepath pathid="ivy-classpath" conf="compile" />
 	</target>
 
 	<target name="compile-tests" depends="compile" description="Compiling tests">
 		<mkdir dir="${build.dir}/test/classes" />
-		<javac classpathref="library.commons.classpath"
-			classpath="${build.dir}/classes"
-			destdir="${build.dir}/test/classes"
-			includeantruntime="${compiler.includeantruntime}"
-			debug="${compiler.debug}"
-			fork="yes"
-			verbose="${compiler.verbose}"
-			memoryMaximumSize="${compiler.max.memory}"
-			srcdir="${test.dir}">
-			<compilerarg line="-Werror -Xlint:unchecked -Xlint:deprecation -Xlint:finally -Xlint:fallthrough -Xlint:path"/>
+		<javac classpathref="library.commons.classpath" classpath="${build.dir}/classes" destdir="${build.dir}/test/classes" includeantruntime="${compiler.includeantruntime}" debug="${compiler.debug}" fork="yes" verbose="${compiler.verbose}" memoryMaximumSize="${compiler.max.memory}" srcdir="${test.dir}">
+			<compilerarg line="-Werror -Xlint:unchecked -Xlint:deprecation -Xlint:finally -Xlint:fallthrough -Xlint:path" />
 		</javac>
 	</target>
 
@@ -237,20 +221,20 @@
 		<junit printsummary="yes" fork="yes" haltonfailure="yes">
 
 			<classpath>
-				<pathelement location="${build.dir}/test/classes"/>
-                <pathelement location="${build.dir}/classes"/>
-                <pathelement location="${src.dir}"/>
-                <fileset dir="${lib.dir}">
-					<include name="**/*.jar"/>
+				<pathelement location="${build.dir}/test/classes" />
+				<pathelement location="${build.dir}/classes" />
+				<pathelement location="${src.dir}" />
+				<fileset dir="${lib.dir}">
+					<include name="**/*.jar" />
 				</fileset>
 			</classpath>
 
-			<formatter type="plain" usefile="false"/>
-			<formatter type="xml"/>
+			<formatter type="plain" usefile="false" />
+			<formatter type="xml" />
 
 			<batchtest todir="${testreports.dir}">
 				<fileset dir="${build.dir}/test/classes">
-					<include name="**/*.class"/>
+					<include name="**/*.class" />
 				</fileset>
 			</batchtest>
 
