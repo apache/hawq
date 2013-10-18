@@ -820,7 +820,7 @@ COptTasks::PvOptimizeTask
 			pdxlnPlan = COptimizer::PdxlnOptimize
 									(
 									pmp,
-									CMDCache::Pcache(),
+									&mda,
 									pdxlnQuery,
 									pdrgpdxlnQueryOutput,
 									pdrgpdxlnCTE,
