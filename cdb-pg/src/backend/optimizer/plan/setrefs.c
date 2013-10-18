@@ -145,6 +145,13 @@ static void record_plan_function_dependency(PlannerGlobal *glob,
 
 static bool extract_query_dependencies_walker(Node *node,
 											  PlannerGlobal *context);
+/* fix the target lists of projection-incapable nodes to use the target list of the child node */
+static void fix_projection_incapable_nodes(Plan *plan);
+
+/* fix the target lists of  projection-incapable nodes in subplans to use the target list of the child node */
+static void fix_projection_incapable_nodes_in_subplans(PlannerGlobal *context, Plan *plan);
+
+
 extern bool is_plan_node(Node *node);
 
 #ifdef USE_ASSERT_CHECKING
@@ -407,6 +414,9 @@ set_plan_references(PlannerGlobal *glob, Plan *plan, List *rtable)
 	}
 	
 	/* Now fix the Plan tree */
+	fix_projection_incapable_nodes(plan);
+	fix_projection_incapable_nodes_in_subplans(glob, plan);
+
 	Plan *retPlan = set_plan_refs(glob, plan, rtoffset);
 
 #ifdef USE_ASSERT_CHECKING
@@ -2397,6 +2407,74 @@ extract_query_dependencies_walker(Node *node, PlannerGlobal *context)
 								  (void *) context);
 }
 
+/*
+ * fix_projection_incapable_nodes
+ * 		Fix the project list of projection incapable nodes by copying the project list
+ * 		of the child node
+ */
+static void 
+fix_projection_incapable_nodes(Plan *plan) 
+{
+	if (plan == NULL)
+	{
+		return;
+	}
+	
+	fix_projection_incapable_nodes(plan->lefttree);
+	fix_projection_incapable_nodes(plan->righttree);
+	
+
+	if (IsA(plan, ShareInputScan) || IsA(plan, SetOp)) 
+	{
+		if (NULL != plan->lefttree)
+		{
+			insist_target_lists_aligned(plan->targetlist, plan->lefttree->targetlist);
+		}
+		
+		if (NULL != plan->righttree)
+		{
+			insist_target_lists_aligned(plan->targetlist, plan->righttree->targetlist);
+		}
+	}	
+	else if (!is_projection_capable_plan(plan) && !IsA(plan, Append) && NULL != plan->lefttree)
+	{
+		/*
+		 * while Append does not evaluate projections, we cannot always copy the child's target list,
+		 * as Append nodes are used for updating partitioned and inherited tables, in which
+		 * cases the target lists may be legally different, e.g. in the presence of dropped columns
+		 */
+		List *oldTargetList = plan->targetlist;
+		plan->targetlist = copyObject(plan->lefttree->targetlist);
+		if (NIL != oldTargetList)
+		{
+			list_free(oldTargetList);
+		}	
+	}
+}
+
+/*
+ * fix_projection_incapable_nodes_in_subplans
+ * 		Fix the project list of projection incapable nodes in subplans by copying the project list
+ * 		of the child node
+ */
+static void 
+fix_projection_incapable_nodes_in_subplans(PlannerGlobal *context, Plan *plan) 
+{
+	if (plan == NULL)
+	{
+		return;
+	}
+	
+	List *subplans = extract_nodes(context, (Node*) plan, T_SubPlan);
+	
+	ListCell *lcSubPlan = NULL;
+	foreach (lcSubPlan, subplans)
+	{
+		SubPlan *sp = lfirst(lcSubPlan);
+		Plan *spPlan = list_nth(context->subplans, sp->plan_id - 1);
+		fix_projection_incapable_nodes(spPlan);
+	}			
+}
 
 /*
  * cdb_expr_requires_full_eval
