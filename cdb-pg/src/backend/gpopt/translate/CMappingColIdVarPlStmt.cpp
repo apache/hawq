@@ -214,11 +214,8 @@ CMappingColIdVarPlStmt::PvarFromDXLNodeScId
 			GPOS_ASSERT(NULL != pte);
 			idxVarno = INNER;
 		}
-	
-		if (NULL != pte)
-		{
-			GPOS_ASSERT(NULL != pte);
-		}
+		
+		GPOS_ASSERT(NULL != pte);
 
 		attno = pte->resno;
 
