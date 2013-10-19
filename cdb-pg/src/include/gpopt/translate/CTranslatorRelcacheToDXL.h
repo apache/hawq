@@ -110,8 +110,7 @@ namespace gpdxl
 								const IMDType *pmdtype,
 								const Datum *pdrgdatumMCVValues,
 								const float4 *pdrgfMCVFrequencies,
-								ULONG ulNumMCVValues,
-								CDouble dNullFrequency
+								ULONG ulNumMCVValues
 								);
 
 			// transform GPDB's hist information to optimizer's histogram structure
@@ -142,7 +141,6 @@ namespace gpdxl
 								IMemoryPool *pmp,
 								OID oidAttType,
 								CDouble dDistinct,
-								CDouble dNullFrequency,
 								const Datum *pdrgdatumMCVValues,
 								const float4 *pdrgfMCVFrequencies,
 								ULONG ulNumMCVValues,

@@ -2160,6 +2160,10 @@ CTranslatorRelcacheToDXL::PimdobjColStats
 
 	// number of nulls
 	CDouble dNullFrequency(fpsStats->stanullfrac);
+	if (dNullFrequency < CStatistics::DEpsilon)
+	{
+		dNullFrequency = 0.0;
+	}
 
 	// transform all the bits and pieces from pg_stats
 	// to a single bucket structure
@@ -2169,7 +2173,6 @@ CTranslatorRelcacheToDXL::PimdobjColStats
 					pmp,
 					oidAttType,
 					dDistinct,
-					dNullFrequency,
 					pdrgdatumMCVValues,
 					pdrgfMCVFrequencies,
 					ULONG(iNumMCVValues),
@@ -2195,6 +2198,7 @@ CTranslatorRelcacheToDXL::PimdobjColStats
 											pmdidColStats,
 											pmdnameCol,
 											dWidth,
+											dNullFrequency,
 											pdrgpdxlbucket
 											);
 
@@ -2320,7 +2324,6 @@ CTranslatorRelcacheToDXL::PdrgpdxlbucketTransformStats
 	IMemoryPool *pmp,
 	OID oidAttType,
 	CDouble dDistinct,
-	CDouble dNullFrequency,
 	const Datum *pdrgdatumMCVValues,
 	const float4 *pdrgfMCVFrequencies,
 	ULONG ulNumMCVValues,
@@ -2338,8 +2341,7 @@ CTranslatorRelcacheToDXL::PdrgpdxlbucketTransformStats
 							pmdtype,
 							pdrgdatumMCVValues,
 							pdrgfMCVFrequencies,
-							ulNumMCVValues,
-							dNullFrequency
+							ulNumMCVValues
 							);
 
 	GPOS_ASSERT(phistGPDBMCV->FValid());
@@ -2415,8 +2417,7 @@ CTranslatorRelcacheToDXL::PhistTransformGPDBMCV
 	const IMDType *pmdtype,
 	const Datum *pdrgdatumMCVValues,
 	const float4 *pdrgfMCVFrequencies,
-	ULONG ulNumMCVValues,
-	CDouble dNullFrequency
+	ULONG ulNumMCVValues
 	)
 {
 	DrgPdatum *pdrgpdatum = New(pmp) DrgPdatum(pmp);
@@ -2445,8 +2446,7 @@ CTranslatorRelcacheToDXL::PhistTransformGPDBMCV
 												pmdtype,
 												pdrgpdatum,
 												pdrgpdFreq,
-												ulNumMCVValues,
-												dNullFrequency
+												ulNumMCVValues
 												);
 
 	pdrgpdatum->Release();
