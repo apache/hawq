@@ -855,7 +855,7 @@ class GpStandbyStart(Command):
     def validate(self, expected_rt=0):
         if self.results.rc != 0:
             raise ExecutionError("non-zero rc: %d" % self.results.rc, self)
-        if len(self.results.stderr) != 0:
+        if len(self.results.stderr) != 0 and (self.results.stderr.strip() != "FIPS mode initialized"):
             raise ExecutionError("messages on stderr: %s" % self.results.stderr, self)
 
 #-----------------------------------------------
