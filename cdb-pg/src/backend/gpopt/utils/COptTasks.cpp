@@ -824,8 +824,6 @@ COptTasks::PvOptimizeTask
 									pdxlnQuery,
 									pdrgpdxlnQueryOutput,
 									pdrgpdxlnCTE,
-									pmdpRelcache,
-									sysidDefault,
 									ulSegments,
 									ulSegmentsForCosting,
 									gp_session_id,
