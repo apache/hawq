@@ -271,14 +271,6 @@ CreateProceduralLanguage(CreatePLangStmt *stmt)
 		/* ok, create it */
 		create_proc_lang(languageName, handlerOid, valOid, stmt->pltrusted, &(stmt->plangOid));
 	}
-	
-	
-	if (Gp_role == GP_ROLE_DISPATCH)
-	{
-		stmt->plhandlerOid = handlerOid;
-		stmt->plvalidatorOid = valOid;
-		CdbDispatchUtilityStatement((Node *) stmt, "CreateProceduralLanguage");
-	}
 }
 
 /*
@@ -477,11 +469,6 @@ DropProceduralLanguage(DropPLangStmt *stmt)
 	 * Do the deletion
 	 */
 	performDeletion(&object, stmt->behavior);
-
-	if (Gp_role == GP_ROLE_DISPATCH)
-	{
-		CdbDispatchUtilityStatement((Node *) stmt, "DropProceduralLanguage");
-	}
 }
 
 /*

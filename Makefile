@@ -39,7 +39,7 @@ all : devel
 .PHONY : test2 test3
 
 # Internal functions which are invoked by other rules within this makefile
-.PHONY : groupSession mkgpcc pgcrypto copydocs mgmtcopy copylibs
+.PHONY : groupSession mkgpcc pgcrypto plr copydocs mgmtcopy copylibs
 .PHONY : greenplum_path RECONFIG HOMEDEP GPROOTDEP GPROOTDEP GPROOTFAIL goh
 .PHONY : version gccVersionCheck pygres authlibs clients loaders connectivity gppkg
 
@@ -89,6 +89,7 @@ GPPGDIR=cdb-pg
 GPMGMT=gpMgmt
 GPCC=gpcc
 PGCRYPTO=$(GPPGDIR)/contrib/pgcrypto
+PLR=$(GPPGDIR)/src/pl/plr
 GPPERFMON=gpperfmon
 PLATFORM=platform
 BUILDDIR=$(GPPGDIR)
@@ -192,13 +193,16 @@ ifneq "$(findstring $(BLD_ARCH),aix5_ppc_64 aix5_ppc_32 osx104_x86)" ""
 PG_LANG=false
 endif
 
+# Set R_HOME, make sync_tools download the appropriate R
+R_HOME=/opt/releng/tools/R-Project/R/2.13.0-1/$(BLD_ARCH)/R-2.13.0/lib64/R
+ifneq "$(findstring $(BLD_ARCH),osx106_x86)" ""
+	R_HOME=/opt/releng/tools/R-Project/R/2.13.0-1/$(BLD_ARCH)/R-2.13.0/lib/R
+endif
+
 ifneq (false, ${PG_LANG})
 CONFIGFLAGS+= --with-perl --with-python
 ifdef TCL_CFG
 CONFIGFLAGS+= --with-tcl-config=${TCL_CFG}
-endif
-ifneq "$(wildcard $(R_HOME))" ""
-CONFIGFLAGS+= --with-r
 endif
 endif
 
@@ -364,6 +368,7 @@ define BUILD_STEPS
 	@$(MAKE) groupSession INSTLOC=$(INSTLOC)
 	@$(MAKE) mkgpcc INSTCFLAGS=$(INSTCFLAGS)
 	@$(MAKE) pgcrypto
+	@$(MAKE) plr
 	@$(MAKE) mgmtcopy INSTLOC=$(INSTLOC)
 	@$(MAKE) mkpgbench INSTLOC=$(INSTLOC) BUILDDIR=$(BUILDDIR)
 #	@$(MAKE) mkgpperfmon INSTLOC=$(INSTLOC) BUILDDIR=$(BUILDDIR)
@@ -1094,7 +1099,7 @@ mkgpcc:
 	@cd $(GPCC) && $(MAKE) OPT="$(INSTCFLAGS)"
 
 pgcrypto:
-ifeq "$(BLD_ARCH)" "rhel5_x86_64"
+ifeq "$(findstring $(BLD_ARCH),sol8_sparc_32 sol9_sparc_32 aix5_ppc_32 aix5_ppc_64 win32 win64)" ""
 	@echo "Building pgcrypto project and creating tarball."
 	@cd $(PGCRYPTO) && $(MAKE)
 	(cd $(PGCRYPTO); \
@@ -1106,6 +1111,24 @@ ifeq "$(BLD_ARCH)" "rhel5_x86_64"
 	 tar zcvf $(BLD_TOP)/pgcrypto.tgz -C tmpdir .)
 else
 	@echo "INFO: pgcrypto is not built automatically on this platform"
+endif
+
+# In artifactory, we only have R for osx106_x86, rhel5_x86_64
+plr:
+ifneq "$(findstring $(BLD_ARCH),osx106_x86 rhel5_x86_64)" ""
+	@echo "Building plr project and creating tarball."
+	@cd $(PLR) && $(MAKE) R_HOME=$(R_HOME)
+	(cd $(PLR); \
+ 	rm -rf tmpdir; \
+	mkdir -p tmpdir/share/postgresql/contrib tmpdir/lib/postgresql \
+	tmpdir/R-2.13.0-1; \
+ 	cp plr.so tmpdir/lib/postgresql; \
+	cp sql/plr.sql tmpdir/share/postgresql/contrib; \
+	tar -cf - -C $(R_HOME) . | tar -xpf - -C tmpdir/R-2.13.0-1; \
+	cp plr_install.sh tmpdir; \
+ 	tar -zcf $(BLD_TOP)/plr.tgz -C tmpdir .)
+else
+	@echo "INFO: plr is not built automatically on this platform"
 endif
 
 mkpgbench:

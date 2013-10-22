@@ -49,11 +49,6 @@ ExecRenameStmt(RenameStmt *stmt)
 	switch (stmt->renameType)
 	{
 		case OBJECT_AGGREGATE:
-			if (!gp_called_by_pgdump)
-			{
-				ereport(ERROR,
-					(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support rename aggregate statement yet") ));
-			}
 			RenameAggregate(stmt->object, stmt->objarg, stmt->newname);
 			break;
 
@@ -226,8 +221,6 @@ ExecAlterObjectSchemaStmt(AlterObjectSchemaStmt *stmt)
 	switch (stmt->objectType)
 	{
 		case OBJECT_AGGREGATE:
-			ereport(ERROR,
-                            (errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter aggregate schema statement yet") ));
 			AlterFunctionNamespace(stmt->object, stmt->objarg, true,
 								   stmt->newschema);
 			break;
@@ -272,9 +265,6 @@ ExecAlterOwnerStmt(AlterOwnerStmt *stmt)
 	switch (stmt->objectType)
 	{
 		case OBJECT_AGGREGATE:
-			if (!gp_called_by_pgdump)
-				ereport(ERROR,
-						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter aggregate owner statement yet") ));
 			AlterAggregateOwner(stmt->object, stmt->objarg, newowner);
 			break;
 

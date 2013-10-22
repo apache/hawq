@@ -225,7 +225,7 @@ DefineAggregate(List *name, List *args, bool oldstyle, List *parameters,
 									ordered,		/* ordered aggregates */
 									newOid);
 					
-	if (Gp_role == GP_ROLE_DISPATCH)
+	if (gp_upgrade_mode && Gp_role == GP_ROLE_DISPATCH)
 	{
 		DefineStmt * stmt = makeNode(DefineStmt);
 		stmt->kind = OBJECT_AGGREGATE;
@@ -291,11 +291,6 @@ RemoveAggregate(RemoveFuncStmt *stmt)
 	object.objectSubId = 0;
 
 	performDeletion(&object, stmt->behavior);
-	
-	if (Gp_role == GP_ROLE_DISPATCH)
-	{
-		CdbDispatchUtilityStatement((Node *) stmt, "RemoveAggregate");
-	}
 }
 
 

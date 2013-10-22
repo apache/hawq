@@ -1216,11 +1216,6 @@ ProcessUtility(Node *parsetree,
 				switch (stmt->kind)
 				{
 					case OBJECT_AGGREGATE:
-						if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
-							ereport(ERROR,
-								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create aggregate statement yet") ));
-						}
-
 						DefineAggregate(stmt->defnames, stmt->args,
 																stmt->oldstyle, stmt->definition,
 																stmt->newOid, stmt->ordered);
@@ -1620,24 +1615,10 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_CreatePLangStmt:
-			/* if guc variable not set, or bootstrap mode, or utility mode connection, throw exception*/
-			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) || gp_upgrade_mode
-					|| gp_called_by_pgdump))
-			{
-				ereport(ERROR,
-						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create plang statement yet") ));
-			}
-
 			CreateProceduralLanguage((CreatePLangStmt *) parsetree);
 			break;
 
 		case T_DropPLangStmt:
-			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) || gp_upgrade_mode)) {
-						ereport(ERROR,
-								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support drop plang statement yet") ));
-						DropProceduralLanguage((DropPLangStmt *) parsetree);
-					}
-
 			DropProceduralLanguage((DropPLangStmt *) parsetree);
 			break;
 

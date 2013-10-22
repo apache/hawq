@@ -847,14 +847,10 @@ HINT:  No function matches the given name and argument types. You may need to ad
 SELECT UNNEST(ARRAY(SELECT f(x) from foo));
 ERROR:  cache lookup failed for function 16528 (fmgr.c:222)  (seg1 slice1 localhost.localdomain:40001 pid=20948) (cdbdisp.c:1553)
 -- LANGUAGES not yet supported
-CREATE LANGUAGE plr;
-ERROR:  Cannot support create plang statement yet
-CREATE LANGUAGE plpython;
-ERROR:  Cannot support create plang statement yet
-CREATE LANGUAGE pljava;
-ERROR:  Cannot support create plang statement yet
-CREATE LANGUAGE plperl;
-ERROR:  Cannot support create plang statement yet
+-- CREATE LANGUAGE plr;
+-- CREATE LANGUAGE plpython;
+-- CREATE LANGUAGE pljava;
+-- CREATE LANGUAGE plperl;
 -- NESTED FUNCTION
 CREATE FUNCTION inner(int) RETURNS INTEGER AS 'SELECT 1' LANGUAGE SQL IMMUTABLE;
 CREATE FUNCTION outer(x INT) RETURNS INT AS $$

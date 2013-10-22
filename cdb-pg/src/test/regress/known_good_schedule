@@ -4,7 +4,6 @@ test: querycontext
 ignore: goh_create_type
 ignore: goh_create_table
 test: goh_copy
-ignore: goh_create_aggregate
 ignore: goh_vacuum
 ignore: goh_subselect
 ignore: goh_array
@@ -66,14 +65,14 @@ test: create_function_1
 test: function
 test: function_extensions
 ignore: create_type
-ignore: create_table
+test: create_table_test
 ignore: create_function_2
 ignore: copy
 ignore: copyselect
 ignore: constraints
 ignore: triggers
 ignore: create_misc
-ignore: create_aggregate
+test: create_aggregate
 ignore: create_operator
 ignore: create_index
 ignore: drop_if_exists
@@ -94,7 +93,7 @@ ignore: union
 ignore: case
 ignore: join
 ignore: indexjoin
-ignore: aggregates
+test: aggregates
 ignore: leastsquares
 ignore: naivebayes
 ignore: direct_dispatch
@@ -134,7 +133,7 @@ ignore: conversion
 ignore: truncate
 ignore: alter_table
 test: sequence
-ignore: polymorphism
+test: polymorphism
 ignore: rowtypes
 ignore: returning
 ignore: stats

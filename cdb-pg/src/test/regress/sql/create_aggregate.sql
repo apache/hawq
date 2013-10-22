@@ -124,3 +124,181 @@ select string_concat(t) from (select * from aggtest2 limit 2000) tmp;
 drop table aggtest2;
 drop aggregate string_concat(text);
 drop function str_concat(text, text);
+
+-- Test aggregates with prefunc and finalfunc property
+CREATE FUNCTION sum(numeric, numeric) RETURNS
+numeric
+    AS 'select $1 + $2'
+    LANGUAGE SQL
+    IMMUTABLE
+    RETURNS NULL ON NULL INPUT;
+
+CREATE FUNCTION pre_sum(numeric, numeric) RETURNS
+numeric
+    AS 'select $1 + $2'
+    LANGUAGE SQL
+    IMMUTABLE
+    RETURNS NULL ON NULL INPUT;
+
+CREATE FUNCTION final_sum(numeric) RETURNS
+numeric
+    AS 'select $1 + $1'
+    LANGUAGE SQL
+    IMMUTABLE
+    RETURNS NULL ON NULL INPUT;
+
+CREATE AGGREGATE agg_sum(numeric) (
+    SFUNC = sum,
+    STYPE = numeric,
+    INITCOND = 0);
+
+CREATE AGGREGATE agg_prefunc(numeric) (
+    SFUNC = sum,
+    STYPE = numeric,
+    PREFUNC =pre_sum,
+    INITCOND = 0);
+
+CREATE AGGREGATE agg_finalfunc(numeric) (
+    SFUNC = sum,
+    STYPE = numeric,
+    FINALFUNC =final_sum,
+    INITCOND = 0);
+
+CREATE AGGREGATE agg_pre_final(numeric) (
+    SFUNC = sum,
+    STYPE = numeric,
+    PREFUNC =pre_sum,
+    FINALFUNC =final_sum,
+    INITCOND = 0);
+
+create table aggtest2(a int);
+insert into aggtest2 select * from generate_series(1,3);
+insert into aggtest2 select * from generate_series(1,3);
+
+select agg_sum(a) from aggtest2;
+select agg_prefunc(a) from aggtest2;
+select agg_finalfunc(a) from aggtest2;
+select agg_pre_final(a) from aggtest2;
+
+-- Test initcond functionality
+CREATE FUNCTION simple_func(numeric, numeric) RETURNS
+numeric
+    AS 'select $1 + $2'
+    LANGUAGE SQL
+    IMMUTABLE
+    RETURNS NULL ON NULL INPUT;
+
+create aggregate simple_agg(numeric)(sfunc = simple_func, stype = numeric, initcond = 10);
+create table foo as select i from generate_series(1, 20)i;
+select simple_agg(i) from foo;
+drop aggregate simple_agg(numeric);
+create aggregate simple_agg(numeric)(sfunc = simple_func, stype = numeric, initcond = -10);
+select simple_agg(i) from foo;
+drop table foo;
+drop aggregate simple_agg(numeric);
+
+-- Test multiple aggregates in the same query
+create aggregate simple_agg(numeric)(sfunc = simple_func, stype = numeric, initcond = 0);
+create table foo (a int, b int);
+insert into foo values (1,2);
+insert into foo values (3,4);
+insert into foo values (5,6);  
+select simple_agg(a), simple_agg(b) from foo;
+drop table foo;
+drop function simple_func(numeric, numeric) cascade;
+
+-- Test ordered aggregate
+create table sch_quantity ( prod_key integer, qty integer, price integer, product character(3));
+insert into sch_quantity values (1,100, 50, 'p1');
+insert into sch_quantity values (2,200, 100, 'p2');
+insert into sch_quantity values (3,300, 200, 'p3');
+insert into sch_quantity values (4,400, 35, 'p4');
+insert into sch_quantity values (5,500, 40, 'p5');
+insert into sch_quantity values (1,150, 50, 'p1');
+insert into sch_quantity values (2,50, 100, 'p2');
+insert into sch_quantity values (3,150, 200, 'p3');
+insert into sch_quantity values (4,200, 35, 'p4');
+insert into sch_quantity values (5,300, 40, 'p5');
+CREATE ORDERED AGGREGATE sch_array_accum_final (anyelement)
+(
+      sfunc = array_append,
+      stype = anyarray,
+      finalfunc = array_out,
+      initcond = '{}'
+);
+select prod_key, sch_array_accum_final(qty order by prod_key,qty) from sch_quantity group by prod_key having prod_key < 5 order by prod_key;
+drop table sch_quantity;
+drop aggregate sch_array_accum_final(anyelement);
+
+
+-- Test privileges with aggregates
+create role aggregate_user1 with login nosuperuser nocreatedb;
+create role aggregate_user2 with login nosuperuser nocreatedb;
+create role aggregate_user3 with login nosuperuser nocreatedb;
+
+set session authorization aggregate_user1;
+
+CREATE AGGREGATE user1_aggregate_avg (
+   sfunc = int4_avg_accum, basetype = int4, stype = bytea, 
+   finalfunc = int8_avg,
+   initcond1 = '{0}'
+);
+create table user1_aggregate_table(i int, j int);
+insert into user1_aggregate_table select i , i %3 from generate_series(1, 20) i;
+select user1_aggregate_avg(i) from user1_aggregate_table;
+
+GRANT ALL on table user1_aggregate_table to aggregate_user2;
+GRANT ALL on function user1_aggregate_avg(integer) to aggregate_user2;
+
+-- only grant permissions on the table to user3
+GRANT ALL on table user1_aggregate_table to aggregate_user3;
+reset session authorization;
+
+
+set session authorization aggregate_user2;
+-- should work fine since user2 has permissions on aggregate and table
+select user1_aggregate_avg(i) from user1_aggregate_table;
+--drops should fail
+drop table user1_aggregate_table;
+drop aggregate user1_aggregate_avg(integer);
+reset session authorization;
+
+
+set session authorization aggregate_user3;
+-- user3 is able to execute the average even if no permissions ? 
+SELECT user1_aggregate_avg(i) from user1_aggregate_table;
+-- drop should fail
+drop aggregate user1_aggregate_avg(integer);
+reset session authorization;
+
+set session authorization aggregate_user1;
+-- drops should work fine 
+drop table user1_aggregate_table;
+drop aggregate user1_aggregate_avg(integer);
+reset session authorization;
+
+set session authorization aggregate_user1;
+CREATE AGGREGATE user1_aggregate_avg (
+   sfunc = int4_avg_accum, basetype = int4, stype = bytea, 
+   finalfunc = int8_avg,
+   initcond1 = '{0}'
+);
+reset session authorization;
+ALTER AGGREGATE user1_aggregate_avg(integer) OWNER to aggregate_user2;
+
+set session authorization aggregate_user2;
+ALTER AGGREGATE user1_aggregate_avg(integer) RENAME to aggregate_rename;
+select proname from pg_proc where proname = 'aggregate_rename';
+create table user1_aggregate_table(i int, j int);
+insert into user1_aggregate_table select i , i %3 from generate_series(1, 20) i;
+SELECT aggregate_rename(i) from user1_aggregate_table;
+reset session authorization;
+
+create schema aggschema;
+alter aggregate aggregate_rename(integer) set schema aggschema;
+SELECT aggschema.aggregate_rename(i) from user1_aggregate_table;
+drop aggregate aggschema.aggregate_rename(integer);
+drop table user1_aggregate_table;
+drop role aggregate_user1;
+drop role aggregate_user2;
+drop role aggregate_user3;

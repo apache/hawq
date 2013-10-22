@@ -18,6 +18,8 @@
 #include "catalog/catalog.h"
 #include "catalog/gp_fastsequence.h"
 #include "catalog/gp_fastsequence.h"
+#include "catalog/pg_aggregate.h"
+#include "catalog/pg_language.h"
 #include "catalog/pg_attrdef.h"
 #include "catalog/pg_attribute_encoding.h"
 #include "catalog/pg_constraint.h"
@@ -84,7 +86,7 @@ typedef enum QueryContextDispatchingItemType QueryContextDispatchingItemType;
 
 enum QueryContextDispatchingObjType
 {
-    RelationType, TablespaceType, NamespaceType, ProcType
+  RelationType, TablespaceType, NamespaceType, ProcType, AggType, LangType
 };
 typedef enum QueryContextDispatchingObjType QueryContextDispatchingObjType;
 
@@ -97,6 +99,12 @@ typedef struct QueryContextDispatchingHashItem QueryContextDispatchingHashItem;
 
 static void
 prepareDispatchedCatalogFunction(QueryContextInfo *ctx, Oid procOid, HTAB *htab);
+
+static void
+prepareDispatchedCatalogLanguage(QueryContextInfo *ctx, Oid langOid, HTAB *htab);
+
+static void
+prepareDispatchedCatalogAggregate(QueryContextInfo *ctx, Oid aggfuncoid, HTAB *htab);
 
 static void
 prepareDispatchedCatalogFunctionExpr(QueryContextInfo *cxt, Expr *expr, HTAB *htab);
@@ -1562,6 +1570,21 @@ static bool collect_func_walker(Node *node, FuncWalkerContext *context)
 		return expression_tree_walker((Node *)func->args,
 									  collect_func_walker, context);
 	}
+	if (IsA(node, Aggref))
+	{
+		Aggref * aggnode = (Aggref *) node;
+		/*
+		 * An aggregate has two catalog entries, one in pg_aggregate
+		 * and the other in pg_proc.  Both need to be dispatched to
+		 * segments.
+		 */
+		prepareDispatchedCatalogAggregate(context->qcxt, aggnode->aggfnoid,
+										  context->htab);
+		prepareDispatchedCatalogFunction(context->qcxt, aggnode->aggfnoid,
+										 context->htab);
+		return expression_tree_walker((Node *)aggnode->args,
+									  collect_func_walker, context);
+	}
 	return plan_tree_walker(node, collect_func_walker, context);
 }
 /*
@@ -1581,7 +1604,9 @@ static void
 prepareDispatchedCatalogFunction(QueryContextInfo *cxt, Oid procOid, HTAB *htab)
 {
 	HeapTuple proctuple;
-
+	Datum langDatum;
+	Oid langOid;
+	bool isNull = false;
 
     Assert(procOid != InvalidOid);
 
@@ -1603,9 +1628,112 @@ prepareDispatchedCatalogFunction(QueryContextInfo *cxt, Oid procOid, HTAB *htab)
 	proctuple = caql_getnext(pcqCtx);
     if (!HeapTupleIsValid(proctuple))
         elog(ERROR, "cache lookup failed for proc %u", procOid);
+
+	langDatum = caql_getattr(pcqCtx, Anum_pg_proc_prolang, &isNull);
+	if (!isNull && langDatum)
+	{
+		langOid = DatumGetObjectId(langDatum);
+		prepareDispatchedCatalogLanguage(cxt, langOid, htab);
+	}
 	
 	AddTupleToContextInfo(cxt, ProcedureRelationId, "pg_proc", proctuple, MASTER_CONTENT_ID);
 	
+	caql_endscan(pcqCtx);
+}
+
+static void
+prepareDispatchedCatalogLanguage(QueryContextInfo *ctx, Oid langOid, HTAB *htab)
+{
+	HeapTuple langtuple;
+
+	Assert(langOid != InvalidOid);
+
+	/*   
+	 * buildin object, dispatch nothing
+	 */
+	if (langOid < FirstNormalObjectId)
+		return;
+
+	if (alreadyAddedForDispatching(htab, langOid, LangType))
+		return;
+
+	/* look up the tuple in pg_language */
+	cqContext  *pcqCtx;
+	pcqCtx = caql_beginscan(NULL,
+							cql("SELECT * FROM pg_language "
+								" WHERE oid = :1 ",
+								ObjectIdGetDatum(langOid)));											
+	langtuple = caql_getnext(pcqCtx);
+
+	if (!HeapTupleIsValid(langtuple))
+		elog(ERROR, "cache lookup failed for lang %u", langOid);				
+
+	AddTupleToContextInfo(ctx, LanguageRelationId, "pg_language", langtuple, MASTER_CONTENT_ID);	
+
+	/* dispatch the language handler function*/
+	bool lang_handler_isNull = false;
+	Datum lang_handler_Datum = caql_getattr(pcqCtx, Anum_pg_language_lanplcallfoid, &lang_handler_isNull);
+	if (!lang_handler_isNull && lang_handler_Datum)	
+	{
+		prepareDispatchedCatalogFunction(ctx, DatumGetObjectId(lang_handler_Datum), htab);
+	}
+
+
+	caql_endscan(pcqCtx);			
+}
+
+static void
+prepareDispatchedCatalogAggregate(QueryContextInfo *cxt, Oid aggfuncoid, HTAB *htab)
+{
+	HeapTuple aggtuple;
+	bool isNull = false;
+	Datum procDatum = 0;
+
+    Assert(aggfuncoid != InvalidOid);
+
+    /*
+     * buildin object, dispatch nothing
+     */
+    if (aggfuncoid < FirstNormalObjectId)
+        return;
+
+    if (alreadyAddedForDispatching(htab, aggfuncoid, AggType))
+        return;
+
+    /* find relid in pg_class */
+    cqContext  *pcqCtx;
+    pcqCtx = caql_beginscan(NULL,
+							cql("SELECT * FROM pg_aggregate "
+								" WHERE aggfnoid = :1 ",
+								ObjectIdGetDatum(aggfuncoid)));
+	aggtuple = caql_getnext(pcqCtx);
+    if (!HeapTupleIsValid(aggtuple))
+        elog(ERROR, "cache lookup failed for aggregate %u", aggfuncoid);
+
+	/*
+	 * Include all possible pg_proc tuples in query context this
+	 * aggregate may refer to.  Excluding agginvtransfn and
+	 * agginvprelimfn because they are not put to any use anywhere in
+	 * the codebase.
+	 */
+	procDatum = caql_getattr(pcqCtx, Anum_pg_aggregate_aggtransfn, &isNull);
+	if (!isNull && procDatum)
+	{
+		prepareDispatchedCatalogFunction(cxt, DatumGetObjectId(procDatum), htab);
+	}
+	procDatum = caql_getattr(pcqCtx, Anum_pg_aggregate_aggprelimfn, &isNull);
+	if (!isNull && procDatum)
+	{
+		prepareDispatchedCatalogFunction(cxt, DatumGetObjectId(procDatum), htab);
+	}
+	procDatum = caql_getattr(pcqCtx, Anum_pg_aggregate_aggfinalfn, &isNull);
+	if (!isNull && procDatum)
+	{
+		prepareDispatchedCatalogFunction(cxt, DatumGetObjectId(procDatum), htab);
+	}
+
+	AddTupleToContextInfo(cxt, AggregateRelationId, "pg_aggregate",
+						  aggtuple, MASTER_CONTENT_ID);
 	caql_endscan(pcqCtx);
 }
 
