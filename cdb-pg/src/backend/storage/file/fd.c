@@ -3023,7 +3023,7 @@ HdfsGetDelegationToken(const char *uri, int *size, void **fs)
 	token = hdfsGetDelegationToken(*fs, pg_krb_srvnam);
 	if (NULL == token)
 	{
-		elog(WARNING, "cannot get HDFS delegation token for renewer: %s", pg_krb_srvnam);
+		elog(LOG, "cannot get HDFS delegation token for renewer: %s", pg_krb_srvnam);
 		return NULL;
 	}
 
