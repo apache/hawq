@@ -87,6 +87,36 @@ test__parseGPHDUri__NegativeTestNoProtocol(void **state)
 }
 
 /*
+ * Negative test: parsing of uri without options part
+ */
+void
+test__parseGPHDUri__NegativeTestNoOptions(void **state)
+{
+	char* uri_no_options = "pxf://1.2.3.4:5678/some/path/and/table.tbl";
+
+	/* Setting the test -- code omitted -- */
+	PG_TRY();
+	{
+		/* This will throw a ereport(ERROR).*/
+		GPHDUri* parsed = parseGPHDUri(uri_no_options);
+	}
+	PG_CATCH();
+	{
+		CurrentMemoryContext = 1;
+		ErrorData *edata = CopyErrorData();
+
+		/*Validate the type of expected error */
+		assert_true(edata->sqlerrcode == ERRCODE_SYNTAX_ERROR);
+		assert_true(edata->elevel == ERROR);
+		assert_string_equal(edata->message, "Invalid URI pxf://1.2.3.4:5678/some/path/and/table.tbl: missing options section");
+		return;
+	}
+	PG_END_TRY();
+
+	assert_true(false);
+}
+
+/*
  * Negative test: parsing of a uri with a missing equal
  */
 void
@@ -207,10 +237,24 @@ test__parseGPHDUri__NegativeTestMissingValue(void **state)
 }
 
 /*
- * Negative test: parsing of a uri with duplicate options
+ * Test GPHDUri_verify_no_duplicate_options: valid uri
  */
 void
-test__parseGPHDUri__NegativeTestDuplicateOpts(void **state)
+test__GPHDUri_verify_no_duplicate_options__ValidURI(void **state)
+{
+	char* valid_uri = "pxf://1.2.3.4:5678/some/path/and/table.tbl?Profile=a&Analyzer=b";
+
+	/* Setting the test -- code omitted -- */
+	GPHDUri* parsed = parseGPHDUri(valid_uri);
+	GPHDUri_verify_no_duplicate_options(parsed);
+	freeGPHDUri(parsed);
+}
+
+/*
+ * Negative test of GPHDUri_verify_no_duplicate_options: parsing of a uri with duplicate options
+ */
+void
+test__GPHDUri_verify_no_duplicate_options__NegativeTestDuplicateOpts(void **state)
 {
 	char* uri_duplicate_opts = "pxf://1.2.3.4:5678/some/path/and/table.tbl?Profile=a&Analyzer=b&PROFILE=c";
 
@@ -238,19 +282,36 @@ test__parseGPHDUri__NegativeTestDuplicateOpts(void **state)
 }
 
 /*
- * Negative test: Missing core options
+ * Test GPHDUri_verify_core_options_exist with a valid uri
  */
 void
-test__parseGPHDUri__NegativeTestMissingCoreOpts(void **state)
+test__GPHDUri_verify_core_options_exist__ValidURI(void **state)
+{
+	char* valid_uri = "pxf://1.2.3.4:5678/some/path/and/table.tbl?Fragmenter=1&Accessor=2&Resolver=3";
+
+	/* Setting the test -- code omitted -- */
+	GPHDUri* parsed = parseGPHDUri(valid_uri);
+	List *coreOptions = list_make3("FRAGMENTER", "ACCESSOR", "RESOLVER");
+	GPHDUri_verify_core_options_exist(parsed, coreOptions);
+	freeGPHDUri(parsed);
+	list_free(coreOptions);
+}
+
+/*
+ * Negative test of GPHDUri_verify_core_options_exist: Missing core options
+ */
+void
+test__GPHDUri_verify_core_options_exist__NegativeTestMissingCoreOpts(void **state)
 {
 	char* missing_core_opts = "pxf://1.2.3.4:5678/some/path/and/table.tbl?FRAGMENTER=a";
-
+	List *coreOptions;
 	/* Setting the test -- code omitted -- */
 	PG_TRY();
 	{
 		GPHDUri* parsed = parseGPHDUri(missing_core_opts);
+		coreOptions = list_make3("FRAGMENTER", "ACCESSOR", "RESOLVER");
 		/* This will throw a ereport(ERROR).*/
-		GPHDUri_verify_core_options_exist(parsed, list_make3("fragmenter", "accessor", "resolver"));
+		GPHDUri_verify_core_options_exist(parsed, coreOptions);
 	}
 	PG_CATCH();
 	{
@@ -261,6 +322,7 @@ test__parseGPHDUri__NegativeTestMissingCoreOpts(void **state)
 		assert_true(edata->sqlerrcode == ERRCODE_SYNTAX_ERROR);
 		assert_true(edata->elevel == ERROR);
 		assert_string_equal(edata->message, "Invalid URI pxf://1.2.3.4:5678/some/path/and/table.tbl?FRAGMENTER=a: PROFILE or ACCESSOR and RESOLVER option(s) missing");
+		list_free(coreOptions);
 		return;
 	}
 	PG_END_TRY();
@@ -276,12 +338,15 @@ main(int argc, char* argv[])
 	const UnitTest tests[] = {
 			unit_test(test__parseGPHDUri__ValidURI),
 			unit_test(test__parseGPHDUri__NegativeTestNoProtocol),
+			unit_test(test__parseGPHDUri__NegativeTestNoOptions),
 			unit_test(test__parseGPHDUri__NegativeTestMissingEqual),
 			unit_test(test__parseGPHDUri__NegativeTestDuplicateEquals),
 			unit_test(test__parseGPHDUri__NegativeTestMissingKey),
 			unit_test(test__parseGPHDUri__NegativeTestMissingValue),
-			unit_test(test__parseGPHDUri__NegativeTestDuplicateOpts),
-			unit_test(test__parseGPHDUri__NegativeTestMissingCoreOpts)
+			unit_test(test__GPHDUri_verify_no_duplicate_options__ValidURI),
+			unit_test(test__GPHDUri_verify_no_duplicate_options__NegativeTestDuplicateOpts),
+			unit_test(test__GPHDUri_verify_core_options_exist__ValidURI),
+			unit_test(test__GPHDUri_verify_core_options_exist__NegativeTestMissingCoreOpts)
 	};
 	return run_tests(tests);
 }

@@ -34,7 +34,7 @@
 CREATE READABLE EXTERNAL TABLE gphbase_in(a int, b text, c bytea)
 LOCATION ('pxf://@hostname@:50070/hbasetable')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- negative
-ERROR:  invalid URI pxf://@hostname@:50070/hbasetable: missing options section
+ERROR:  Invalid URI pxf://@hostname@:50070/hbasetable: missing options section
 CREATE WRITABLE EXTERNAL TABLE gphbase_out(a int, b text, c bytea)
 LOCATION ('pxf://@hostname@:50070/hbasetable?FRAGMENTER=HBaseDataFragmenter&ACCESSOR=HBaseAccessor&RESOLVER=HBaseResolver')
 FORMAT 'CUSTOM' (formatter='gpdbwritable_export'); -- positive

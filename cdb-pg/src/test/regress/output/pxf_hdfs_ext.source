@@ -75,7 +75,7 @@ SELECT cnt < 32768000 AS check FROM (SELECT COUNT(*) AS cnt FROM mbt WHERE gp_se
 
 DROP EXTERNAL TABLE mbt;
 --
--- Test extensibility
+-- Test extensibility - read
 --
 CREATE EXTERNAL TABLE extens(num1   integer,
                             t1      text,
@@ -95,6 +95,14 @@ SELECT num1, t1 FROM extens ORDER BY num1;
 
 ANALYZE extens;
 DROP EXTERNAL TABLE extens;
+--
+-- Test extensibility - write
+--
+CREATE WRITABLE EXTERNAL TABLE extens_write(t1 text, t2 text)
+LOCATION ('pxf://@hostname@:50070/regression_location?ACCESSOR=DummyAccessor&RESOLVER=DummyResolver')
+FORMAT 'custom' (formatter = 'pxfwritable_export');
+INSERT INTO extens_write VALUES ('something', 'big'), ('is', 'going'), ('to', 'happen');
+DROP EXTERNAL TABLE extens_write;
 --
 -- Cleanup: delete all data that was copied into hdfs
 --

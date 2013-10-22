@@ -2851,7 +2851,16 @@ CTranslatorQueryToDXL::PdxlnFromCTE
 {
 	const ULONG ulCteQueryLevel = ulCurrQueryLevel - prte->ctelevelsup;
 	const CCTEListEntry *pctelistentry = m_phmulCTEEntries->PtLookup(&ulCteQueryLevel);
-	GPOS_ASSERT(NULL != pctelistentry);
+	if (NULL == pctelistentry)
+	{
+		// TODO: raghav, Sept 09 2013, remove temporary fix  (revert exception to assert) to avoid crash during algebrization
+		GPOS_RAISE
+			(
+			gpdxl::ExmaDXL,
+			gpdxl::ExmiQuery2DXLError,
+			GPOS_WSZ_LIT("CTE")
+			);
+	}
 
 	const CDXLNode *pdxlnCTEProducer = pctelistentry->PdxlnCTEProducer(prte->ctename);
 	const List *plCTEProducerTargetList = pctelistentry->PlCTEProducerTL(prte->ctename);

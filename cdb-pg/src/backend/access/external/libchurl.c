@@ -13,17 +13,6 @@
 #undef CURL_DISABLE_TYPECHECK
 
 
-/* curl multi API handle
- * created a single time and used throughout the
- * life of the process
- */
-static CURLM* single_multi_handle = NULL;
-/* curl API puts internal errors in this buffer
- * used for error reporting
- */
-static char curl_error_buffer[CURL_ERROR_SIZE];
-
-
 /*
  * internal context of libchurl
  */
@@ -31,6 +20,16 @@ typedef struct
 {
 	/* curl easy API handle */
 	CURL* curl_handle;
+
+	/* curl multi API handle
+	 * used to allow non-blocking callbacks
+	 */
+	CURLM* multi_handle;
+
+	/* curl API puts internal errors in this buffer
+	 * used for error reporting
+	 */
+	char curl_error_buffer[CURL_ERROR_SIZE];
 
 	/* perform() (libcurl API) lets us know
 	 * if the session is over using this int
@@ -79,7 +78,7 @@ int fill_internal_buffer(churl_context* context, int want);
 int bring_alldata_to_internal_buffer(churl_context* context);
 void churl_headers_set(churl_context* context, CHURL_HEADERS settings);
 void check_response_code(churl_context* context);
-void clear_error_buffer(void);
+void clear_error_buffer(churl_context* context);
 size_t header_callback(char *buffer, size_t size, size_t nitems, void *userp);
 void free_http_response(churl_context* context);
 void compact_internal_buffer(churl_context* context);
@@ -279,10 +278,11 @@ CHURL_HANDLE churl_init_upload(const char* url, CHURL_HEADERS headers)
 	churl_context* context = churl_new_context();
 	create_curl_handle(context);
 	context->upload = true;
-	clear_error_buffer();
+	clear_error_buffer(context);
 
 	set_curl_option(context, CURLOPT_URL, url);
 	set_curl_option(context, CURLOPT_VERBOSE, (const void*)FALSE);
+	set_curl_option(context, CURLOPT_ERRORBUFFER, context->curl_error_buffer);
 	set_curl_option(context, CURLOPT_IPRESOLVE, (const void*)CURL_IPRESOLVE_V4);
 	set_curl_option(context, CURLOPT_POST, (const void*)TRUE);
 	set_curl_option(context, CURLOPT_READFUNCTION, read_callback);
@@ -307,11 +307,11 @@ CHURL_HANDLE churl_init_download(const char* url, CHURL_HEADERS headers)
 	churl_context* context = churl_new_context();
 	create_curl_handle(context);
 	context->upload = false;
-	clear_error_buffer();
+	clear_error_buffer(context);
 
 	set_curl_option(context, CURLOPT_URL, url);
 	set_curl_option(context, CURLOPT_VERBOSE, (const void*)FALSE);
-	set_curl_option(context, CURLOPT_ERRORBUFFER, curl_error_buffer);
+	set_curl_option(context, CURLOPT_ERRORBUFFER, context->curl_error_buffer);
 	set_curl_option(context, CURLOPT_IPRESOLVE, (const void*)CURL_IPRESOLVE_V4);
 	set_curl_option(context, CURLOPT_WRITEFUNCTION, write_callback);
 	set_curl_option(context, CURLOPT_WRITEDATA, context);
@@ -332,7 +332,7 @@ void churl_download_restart(CHURL_HANDLE handle, const char* url, CHURL_HEADERS 
 	Assert(!context->upload);
 
 	/* halt current transfer */
-	curl_multi_remove_handle(single_multi_handle, context->curl_handle);
+	curl_multi_remove_handle(context->multi_handle, context->curl_handle);
 	/* set a new url */
 	set_curl_option(context, CURLOPT_URL, url);
 
@@ -403,14 +403,15 @@ void churl_cleanup(CHURL_HANDLE handle)
 
 churl_context* churl_new_context()
 {
-	churl_context* context = palloc(sizeof(churl_context));
-	memset(context, 0, sizeof(churl_context));
+	churl_context* context = palloc0(sizeof(churl_context));
 	return context;
 }
 
-void clear_error_buffer()
+void clear_error_buffer(churl_context* context)
 {
-	curl_error_buffer[0] = 0;
+	if (!context)
+		return;
+	context->curl_error_buffer[0] = 0;
 }
 
 void create_curl_handle(churl_context* context)
@@ -453,13 +454,13 @@ void setup_multi_handle(churl_context* context)
 	int curl_error;
 
 	/* Create multi handle on first use */
-	if (!single_multi_handle)
-		if (!(single_multi_handle = curl_multi_init()))
+	if (!context->multi_handle)
+		if (!(context->multi_handle = curl_multi_init()))
 			elog(ERROR, "internal error: curl_multi_init failed");
 
 	/* add the easy handle to the multi handle */
 	/* don't blame me, blame libcurl */
-	if (CURLM_OK != (curl_error = curl_multi_add_handle(single_multi_handle, context->curl_handle)))
+	if (CURLM_OK != (curl_error = curl_multi_add_handle(context->multi_handle, context->curl_handle)))
 		if (CURLM_CALL_MULTI_PERFORM != curl_error)
 			elog(ERROR, "internal error: curl_multi_add_handle failed (%d - %s)",
 				 curl_error, curl_easy_strerror(curl_error));
@@ -477,7 +478,7 @@ void multi_perform(churl_context* context)
 {
 	int curl_error;
 	while (CURLM_CALL_MULTI_PERFORM ==
-		   (curl_error = curl_multi_perform(single_multi_handle, &context->curl_still_running)));
+		   (curl_error = curl_multi_perform(context->multi_handle, &context->curl_still_running)));
 
 	if (curl_error != CURLM_OK)
 		elog(ERROR, "internal error: curl_multi_perform failed (%d - %s)",
@@ -528,7 +529,7 @@ void enlarge_internal_buffer(churl_context* context, size_t required)
  */
 void finish_upload(churl_context* context)
 {
-	if (!single_multi_handle)
+	if (!context->multi_handle)
 		return;
 
 	flush_internal_buffer(context);
@@ -545,10 +546,12 @@ void cleanup_curl_handle(churl_context* context)
 {
 	if (!context->curl_handle)
 		return;
-	if (single_multi_handle)
-		curl_multi_remove_handle(single_multi_handle, context->curl_handle);
+	if (context->multi_handle)
+		curl_multi_remove_handle(context->multi_handle, context->curl_handle);
 	curl_easy_cleanup(context->curl_handle);
 	context->curl_handle = NULL;
+	curl_multi_cleanup(context->multi_handle);
+	context->multi_handle = NULL;
 }
 
 void cleanup_internal_buffer(churl_context* context)
@@ -620,7 +623,7 @@ int fill_internal_buffer(churl_context* context, int want)
         timeout.tv_usec = 0;
 
         /* get file descriptors from the transfers */
-        if (CURLE_OK != (curl_error = curl_multi_fdset(single_multi_handle, &fdread, &fdwrite, &fdexcep, &maxfd)))
+        if (CURLE_OK != (curl_error = curl_multi_fdset(context->multi_handle, &fdread, &fdwrite, &fdexcep, &maxfd)))
 			elog(ERROR, "internal error: curl_multi_fdset failed (%d - %s)",
 						curl_error, curl_easy_strerror(curl_error));
 

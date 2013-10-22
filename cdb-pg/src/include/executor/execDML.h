@@ -21,7 +21,6 @@ reconstructMatchingTupleSlot(TupleTableSlot *slot, ResultRelInfo *resultRelInfo)
 
 extern void
 ExecInsert(TupleTableSlot *slot,
-		   TupleTableSlot *planSlot,
 		   DestReceiver *dest,
 		   EState *estate,
 		   PlanGenerator planGen,

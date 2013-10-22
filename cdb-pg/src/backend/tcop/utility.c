@@ -1278,20 +1278,10 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_CreateFunctionStmt:		/* CREATE FUNCTION */
-			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) || gp_upgrade_mode)) {
-						ereport(ERROR,
-								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create function statement yet") ));
-					}
-
 			CreateFunction((CreateFunctionStmt *) parsetree);
 			break;
 
 		case T_AlterFunctionStmt:		/* ALTER FUNCTION */
-			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) || gp_upgrade_mode)) {
-						ereport(ERROR,
-								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter function statement yet") ));
-					}
-
 			AlterFunction((AlterFunctionStmt *) parsetree);
 			break;
 
@@ -1352,11 +1342,6 @@ ProcessUtility(Node *parsetree,
 
 		case T_RemoveFuncStmt:
 			{
-				if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) || gp_upgrade_mode)) {
-							ereport(ERROR,
-									(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support remove function statement yet") ));
-						}
-
 				RemoveFuncStmt *stmt = (RemoveFuncStmt *) parsetree;
 
 				switch (stmt->kind)

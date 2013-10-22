@@ -37,12 +37,13 @@ Vendor:         EMC Greenplum
 Group:          Applications/Databases
 URL:            http://www.greenplum.com/products/pivotal-hd
 BuildArch:      %{arch}
-
-# This prevents rpmbuild from generating automatic dependecies on libraries and
-# binaries. Some of these dependencies cause problems while installing the
-# generated RPMS. However, we tested the rpm generated after turning AutoReq off
-# and it seemed to work fine.
-AutoReq:        no
+# This prevents rpmbuild from generating automatic dependecies on
+# libraries and binaries. Some of these dependencies cause problems
+# while installing the generated RPMS. However, we tested the rpm
+# generated after turning AutoReq off and it seemed to work fine.
+# Disabled "automatic providing" mechanism.  As we ship syhstem files
+# with the same names, this can cause conflicts.
+AutoReqProv:    no
 
 BuildRoot:      %{_topdir}/temp
 Prefix:         /usr/local

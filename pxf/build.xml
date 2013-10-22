@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="${component.basename}" default="all" xmlns:ivy="antlib:org.apache.ivy.ant">
+
+	<!-- Load product and build parameters from build.properties
+		 NOTE: Product name and version defined in build.properties -->
+	<loadproperties srcfile="build.properties" />
+
+	<!-- Some basic properties -->
+	<property environment="env" />
+	<property name="component.name" value="${component.basename}-${component.version}" />
+
+	<!-- If BUILD_NUMBER is in environment, use it, o/w use current username -->
+	<condition property="build.number" value="${env.BUILD_NUMBER}" else="${user.name}">
+		<isset property="env.BUILD_NUMBER" />
+	</condition>
+
+	<!-- If build.trunkbuild is defined (-D) then add _dev
+		 Used for trunk builds -->
+	<condition property="build.branch" value="_dev" else="">
+		<isset property="build.trunkbuild" />
+	</condition>
+
+
+
+	<property name="src.dir" value="${basedir}/src" />
+	<property name="build.dir" value="${basedir}/build" />
+	<property name="lib.dir" value="${build.dir}/lib" />
+	<property name="dist.dir" value="${build.dir}/${component.name}" />
+	<property name="test.dir" value="${basedir}/test" />
+	<property name="testreports.dir" value="${build.dir}/test/reports" />
+
+	<property name="package.buildroot" value="${basedir}/${component.basename}_package_build_${user.name}" />
+	<property name="package.release" value="${build.number}${build.branch}" />
+	<property name="package.name" value="${component.name}-${package.release}" />
+
+	<!--Apache Ivy(http://ant.apache.org/ivy/history/latest-milestone/install.html) -->
+	<loadproperties srcfile="${basedir}/ivy/libraries.properties" />
+	<property name="build.ivy.lib.dir" value="${build.dir}/lib" />
+	<property name="ivy.artifact.retrieve.pattern" value="[artifact]-[revision].[ext]" />
+	<property name="ivy.install.version" value="2.2.0" />
+	<condition property="ivy.home" value="${env.IVY_HOME}">
+		<isset property="env.IVY_HOME" />
+	</condition>
+	<property name="ivy.home" value="${user.home}/.ant" />
+	<property name="ivy.jar.dir" value="${ivy.home}/lib" />
+	<property name="ivy.jar.file" value="${ivy.jar.dir}/ivy.jar" />
+
+	<patternset id="library.patterns">
+		<include name="*.jar" />
+	</patternset>
+
+
+	<!-- Project Libraries -->
+
+	<path id="library.commons.classpath">
+
+		<!-- sort the files in reversed name order. We need to put -->
+		<!-- avro-tools behind hadoop in the class path since it   -->
+		<!-- includes hadoop and breaks the build otherwise...     -->
+		<sort>
+			<fileset dir="${lib.dir}" />
+			<reverse xmlns="antlib:org.apache.tools.ant.types.resources.comparators">
+				<name />
+			</reverse>
+		</sort>
+
+		<fileset dir="${lib.dir}">
+			<patternset refid="library.patterns" />
+		</fileset>
+
+		<path refid="ivy-classpath" />
+	</path>
+
+	<target name="init" description="Build initialization">
+	</target>
+
+	<!-- Cleanup -->
+	<target name="clean">
+		<delete dir="${build.dir}" />
+		<delete dir="${package.buildroot}" />
+	</target>
+
+	<!-- Compilation -->
+	<target name="compile" depends="ivy-retrieve">
+		<mkdir dir="${build.dir}/classes" />
+
+		<!-- display the classpath used for compiling -->
+		<property name="myclasspath" refid="library.commons.classpath" />
+		<!-- enable the following line to echo classpath -->
+		<!-- echo message="classpath used in javac target: ${myclasspath}"/-->
+
+		<!-- compile the core gpdhfs connector source -->
+		<javac classpathref="library.commons.classpath" destdir="${build.dir}/classes" includeantruntime="${compiler.includeantruntime}" debug="${compiler.debug}" fork="yes" verbose="${compiler.verbose}" memoryMaximumSize="${compiler.max.memory}" srcdir="${src.dir}">
+			<compilerarg line="-Werror -Xlint:unchecked -Xlint:deprecation -Xlint:finally -Xlint:fallthrough -Xlint:path" />
+		</javac>
+
+	</target>
+
+	<!-- Create JAR -->
+	<target name="jar" depends="run-tests" description="create the main jar files">
+		<jar destfile="${build.dir}/${component.name}.jar">
+			<manifest>
+				<attribute name="Built-By" value="${user.name}" />
+				<attribute name="Built-Date" value="${TODAY}" />
+			</manifest>
+			<fileset dir="${build.dir}/classes" includes="**/*.class" excludes="Protobuf*.class" />
+			<fileset dir="${src.dir}" includes="resources/*.xml" />
+		</jar>
+
+		<jar destfile="${build.dir}/protobuf-appendix.jar">
+			<manifest>
+				<attribute name="Built-By" value="${user.name}" />
+				<attribute name="Built-Date" value="${TODAY}" />
+			</manifest>
+			<fileset dir="${build.dir}/classes" includes="Protobuf*.class" />
+		</jar>
+	</target>
+
+	<!-- Default -->
+	<target name="all" depends="clean,jar" description="build all jar files" />
+
+	<!-- Create package -->
+	<target name="package" depends="jar" description="create a package directory">
+		<delete dir="${dist.dir}" />
+		<mkdir dir="${dist.dir}" />
+		<mkdir dir="${dist.dir}/conf" />
+		<copy todir="${dist.dir}">
+			<fileset dir="${lib.dir}">
+				<include name="avro*.jar" />
+				<include name="jackson*.jar" />
+				<include name="protobuf*.jar" />
+			</fileset>
+			<fileset dir="${build.dir}">
+				<include name="${component.basename}*.jar" />
+				<include name="protobuf-appendix.jar" />
+			</fileset>
+		</copy>
+		<copy file="${src.dir}/resources/pxf-profiles-default.xml" tofile="${dist.dir}/conf/pxf-profiles.xml" />
+	</target>
+
+	<!-- Create TAR -->
+	<target name="tar" depends="package" description="create a tarball">
+		<tar destfile="${build.dir}/${component.name}-${package.release}.tar.gz" compression="gzip" longfile="gnu">
+			<tarfileset dir="${dist.dir}" prefix="${component.name}" />
+		</tar>
+	</target>
+
+	<!-- Create RPM -->
+	<target name="rpm" depends="tar" description="create an RPM package">
+		<mkdir dir="${package.buildroot}/BUILD" />
+		<mkdir dir="${package.buildroot}/RPMS" />
+		<mkdir dir="${package.buildroot}/SRPMS" />
+		<mkdir dir="${package.buildroot}/SOURCES" />
+		<mkdir dir="${package.buildroot}/SPECS" />
+		<copy todir="${package.buildroot}/SOURCES">
+			<fileset dir="${build.dir}">
+				<include name="${package.name}.tar.gz" />
+			</fileset>
+		</copy>
+		<copy file="${basedir}/packages/rpm.spec" todir="${package.buildroot}/SPECS">
+			<filterchain>
+				<replacetokens>
+					<token key="component.basename" value="${component.basename}" />
+					<token key="component.version" value="${component.version}" />
+					<token key="package.release" value="${package.release}" />
+					<token key="package.libprefix" value="${package.libprefix}" />
+					<token key="package.etcprefix" value="${package.etcprefix}" />
+					<token key="component.name" value="${component.name}" />
+					<token key="package.name" value="${package.name}" />
+					<token key="package.publicstage" value="${package.publicstage}" />
+					<token key="package.summary" value="${package.summary}" />
+					<token key="package.vendor" value="${package.vendor}" />
+					<token key="package.description" value="${package.description}" />
+					<token key="package.obsoletes" value="${package.obsoletes}" />
+				</replacetokens>
+			</filterchain>
+		</copy>
+		<rpm specFile="rpm.spec" command="-bb" topDir="${package.buildroot}" cleanBuildDir="true" failOnError="true" />
+		<copy todir="${build.dir}/" flatten="true">
+			<fileset dir="${package.buildroot}/RPMS">
+				<include name="**/${component.basename}*.rpm" />
+			</fileset>
+		</copy>
+		<delete dir="${package.buildroot}" quiet="true" verbose="false" />
+	</target>
+
+	<!-- Ivy -->
+	<target name="ivy-probe-antlib">
+		<condition property="ivy.found">
+			<typefound uri="antlib:org.apache.ivy.ant" name="cleancache" />
+		</condition>
+	</target>
+
+	<target name="download-ivy" unless="offline">
+		<mkdir dir="${ivy.jar.dir}" />
+		<get src="http://repo2.maven.org/maven2/org/apache/ivy/ivy/${ivy.install.version}/ivy-${ivy.install.version}.jar" dest="${ivy.jar.file}" usetimestamp="true" />
+	</target>
+
+	<target name="ivy-init" depends="download-ivy">
+		<path id="ivy.lib.path">
+			<fileset dir="${ivy.jar.dir}" includes="*.jar" />
+		</path>
+		<taskdef resource="org/apache/ivy/ant/antlib.xml" uri="antlib:org.apache.ivy.ant" classpathref="ivy.lib.path" />
+	</target>
+
+	<target name="ivy-retrieve" depends="ivy-init" description="--> Retrieve Ivy-managed artifacts for the compile configurations">
+		<ivy:settings id="basic.settings" file="ivysettings.xml" />
+		<ivy:retrieve settingsRef="basic.settings" pattern="${build.ivy.lib.dir}/${ivy.artifact.retrieve.pattern}" sync="true" conf="compile" />
+		<ivy:cachepath pathid="ivy-classpath" conf="compile" />
+	</target>
+
+	<target name="compile-tests" depends="compile" description="Compiling tests">
+		<mkdir dir="${build.dir}/test/classes" />
+		<javac classpathref="library.commons.classpath" classpath="${build.dir}/classes" destdir="${build.dir}/test/classes" includeantruntime="${compiler.includeantruntime}" debug="${compiler.debug}" fork="yes" verbose="${compiler.verbose}" memoryMaximumSize="${compiler.max.memory}" srcdir="${test.dir}">
+			<compilerarg line="-Werror -Xlint:unchecked -Xlint:deprecation -Xlint:finally -Xlint:fallthrough -Xlint:path" />
+		</javac>
+	</target>
+
+	<target name="run-tests" depends="compile-tests" description="Run unit-tests">
+		<mkdir dir="${testreports.dir}" />
+		<junit printsummary="yes" fork="yes" haltonfailure="yes">
+
+			<classpath>
+				<pathelement location="${build.dir}/test/classes" />
+				<pathelement location="${build.dir}/classes" />
+				<pathelement location="${src.dir}" />
+				<fileset dir="${lib.dir}">
+					<include name="**/*.jar" />
+				</fileset>
+			</classpath>
+
+			<formatter type="plain" usefile="false" />
+			<formatter type="xml" />
+
+			<batchtest todir="${testreports.dir}">
+				<fileset dir="${build.dir}/test/classes">
+					<include name="**/*.class" />
+				</fileset>
+			</batchtest>
+
+		</junit>
+	</target>
+</project>

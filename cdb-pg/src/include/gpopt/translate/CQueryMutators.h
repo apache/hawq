@@ -61,6 +61,8 @@ namespace gpdxl
 	class CQueryMutators
 	{
 		typedef Node *(*Pfnode) ();
+		typedef BOOL (*PfFallback) ();
+
 		typedef struct SContextHavingQualMutator
 		{
 			public:
@@ -85,6 +87,10 @@ namespace gpdxl
 				// indicate the levels up of the aggregate we are mutating
 				ULONG m_ulAggregateLevelUp;
 				
+				// fall back to the planner by raising an expression since we encountered an
+				// expression / attribute that we could not resolve
+				BOOL m_fFallbackToPlanner;
+
 				// ctor
 				SContextHavingQualMutator
 					(
@@ -100,7 +106,8 @@ namespace gpdxl
 					m_plTENewGroupByQuery(plTENewGroupByQuery),
 					m_ulCurrLevelsUp(0),
 					m_fAggregateArg(false),
-					m_ulAggregateLevelUp(ULONG_MAX)
+					m_ulAggregateLevelUp(ULONG_MAX),
+					m_fFallbackToPlanner(false)
 				{
 					GPOS_ASSERT(NULL != plTENewGroupByQuery);
 				}
@@ -193,6 +200,35 @@ namespace gpdxl
 
 		} CContextIncLevelsupMutator;
 
+		// context for walker that iterates over the expression in the target entry
+		typedef struct SContextTLWalker
+				{
+					public:
+
+						// list of target list entries in the query
+						List *m_plTE;
+
+						// list of grouping clauses
+						List *m_groupClause;
+
+						// ctor
+						SContextTLWalker
+							(
+							List *plTE,
+							List *groupClause
+							)
+							:
+							m_plTE(plTE),
+							m_groupClause(groupClause)
+						{
+						}
+
+						// dtor
+						~SContextTLWalker()
+						{}
+
+				} CContextTLWalker;
+
 		private:
 
 			// check if the cte levels up needs to be corrected
@@ -200,6 +236,10 @@ namespace gpdxl
 			BOOL FNeedsLevelsUpCorrection(SContextIncLevelsupMutator *pctxinclvlmutator, Index idxCtelevelsup);
 
 		public:
+
+			// fall back during since the target list refers to a attribute which algebrizer at this point cannot resolve
+			static
+			BOOL FNeedsToFallback(Node *pnode, void *pctx);
 
 			// check if the project list contains expressions on aggregates thereby needing normalization
 			static

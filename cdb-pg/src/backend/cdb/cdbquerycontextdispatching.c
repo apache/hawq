@@ -11,6 +11,7 @@
 
 #include <sys/fcntl.h>
 
+#include "access/catquery.h"
 #include "access/genam.h"
 #include "access/heapam.h"
 #include "catalog/aoseg.h"
@@ -83,7 +84,7 @@ typedef enum QueryContextDispatchingItemType QueryContextDispatchingItemType;
 
 enum QueryContextDispatchingObjType
 {
-    RelationType, TablespaceType, NamespaceType
+    RelationType, TablespaceType, NamespaceType, ProcType
 };
 typedef enum QueryContextDispatchingObjType QueryContextDispatchingObjType;
 
@@ -93,6 +94,9 @@ struct QueryContextDispatchingHashItem
     QueryContextDispatchingObjType type;
 };
 typedef struct QueryContextDispatchingHashItem QueryContextDispatchingHashItem;
+
+static void
+prepareDispatchedCatalogFunction(QueryContextInfo *ctx, Oid procOid, HTAB *htab);
 
 static void
 prepareDispatchedCatalogFunctionExpr(QueryContextInfo *cxt, Expr *expr, HTAB *htab);
@@ -479,7 +483,7 @@ RebuildMasterTransactionId(QueryContextInfo *cxt)
 }
 
 static void
-RebuildFilesystemCrentials(QueryContextInfo *cxt)
+RebuildFilesystemCredentials(QueryContextInfo *cxt)
 {
 	Assert(Gp_role == GP_ROLE_EXECUTE);
 
@@ -656,7 +660,7 @@ RebuildQueryContext(QueryContextInfo *cxt)
             RebuildEmptyTable(cxt);
             break;
         case FileSystemCredential:
-        	RebuildFilesystemCrentials(cxt);
+        	RebuildFilesystemCredentials(cxt);
         	break;
         default:
             ereport(ERROR,
@@ -1483,6 +1487,83 @@ prepareDispatchedCatalogExternalTable(QueryContextInfo *cxt,
     heap_close(rel, AccessShareLock);
 }
 
+
+typedef struct func_walker_context
+{
+	QueryContextInfo *qcxt;
+	HTAB *htab;
+} FuncWalkerContext;
+
+static bool collect_func_walker(Node *node, FuncWalkerContext *context)
+{
+	if (node == NULL)
+		return false;
+	/* AK: I don't like this hack. */
+	if (IsA(node, SubPlan))
+		return true;
+	if (IsA(node, FuncExpr))
+	{
+		FuncExpr *func = (FuncExpr *) node;
+		switch (func->funcid)
+		{
+		case NEXTVAL_FUNC_OID:
+		{
+			Const *arg;
+			Oid seqoid;
+
+			arg = (Const *) linitial(func->args);
+			if (arg->xpr.type == T_Const && arg->consttype == REGCLASSOID)
+			{
+				seqoid = DatumGetObjectId(arg->constvalue);
+            
+				/* 
+				 * aclchecks for nextval are done on the segments. But in HAWQ
+				 * we are executing as bootstrap user on the segments. So any
+				 * aclchecks on segments defeats the purpose.  Do the aclchecks
+				 * on the master, prior to dispatch
+				 */
+				if (pg_class_aclcheck(seqoid, GetUserId(), ACL_UPDATE) != ACLCHECK_OK)
+					ereport(ERROR,
+							(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+							 errmsg("permission denied for sequence %s",
+									get_rel_name(seqoid))));
+				prepareDispatchedCatalogSingleRelation(context->qcxt,
+													   seqoid, FALSE, 0,
+													   context->htab);
+			}
+			else
+			{
+				ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+								errmsg("Non const argument in function "
+								"\"NEXTVAL\" is not support yet.")));
+			}
+		}
+        break;
+		default:
+			/* Check if this is a UDF*/
+			if(func->funcid > FirstNormalObjectId)
+			{
+				/* do aclcheck on master, because HAWQ segments lacks user knowledge */
+				AclResult aclresult;
+				aclresult = pg_proc_aclcheck(func->funcid, GetUserId(), ACL_EXECUTE);
+				if (aclresult != ACLCHECK_OK)
+					aclcheck_error(aclresult, ACL_KIND_PROC, get_func_name(func->funcid));
+
+				/* build the dispacth for the function itself */
+				prepareDispatchedCatalogFunction(context->qcxt, func->funcid,
+												 context->htab);
+			}
+			break;
+		}
+		/* 
+		 * Continue recursion in expression_tree_walker as arguments subtree may
+		 * have FuncExpr's.  E.g. f(g() + h())
+		 */
+		return expression_tree_walker((Node *)func->args,
+									  collect_func_walker, context);
+	}
+	return plan_tree_walker(node, collect_func_walker, context);
+}
 /*
  * recursively scan the expression chain and collect function information
  */
@@ -1490,59 +1571,42 @@ static void
 prepareDispatchedCatalogFunctionExpr(QueryContextInfo *cxt, Expr *expr, HTAB *htab)
 {
     Assert(NULL != cxt && NULL != expr && NULL != htab);
+	FuncWalkerContext context;
+	context.qcxt = cxt;
+	context.htab = htab;
+	collect_func_walker((Node *)expr, &context);
+}
 
-    if (!IsA(expr, FuncExpr))
+static void
+prepareDispatchedCatalogFunction(QueryContextInfo *cxt, Oid procOid, HTAB *htab)
+{
+	HeapTuple proctuple;
+
+
+    Assert(procOid != InvalidOid);
+
+    /*   
+     * buildin object, dispatch nothing
+     */
+    if (procOid < FirstNormalObjectId)
         return;
 
-    FuncExpr *func = (FuncExpr *) expr;
+    if (alreadyAddedForDispatching(htab, procOid, ProcType))
+        return;
 
-    switch (func->funcid)
-    {
-    case NEXTVAL_FUNC_OID:
-    {
-        Const *arg;
-        Oid seqoid;
-
-        arg = (Const *) linitial(func->args);
-        if (arg->xpr.type == T_Const && arg->consttype == REGCLASSOID)
-        {
-            seqoid = DatumGetObjectId(arg->constvalue);
-            
-            /* 
-             * aclchecks for nextval are done on the segments. But in HAWQ
-             * we are executing as bootstrap user on the segments. So any aclchecks
-             * on segments defeats the purpose. 
-             * Do the aclchecks on the master, prior to dispatch
-             */
-            if (pg_class_aclcheck(seqoid, GetUserId(), ACL_UPDATE) != ACLCHECK_OK)
-                ereport(ERROR,
-                                (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-                                 errmsg("permission denied for sequence %s",
-                                                get_rel_name(seqoid))));
-            prepareDispatchedCatalogSingleRelation(cxt, seqoid, FALSE, 0, htab);
-        }
-        else
-        {
-            ereport(ERROR,
-                    (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
-                            errmsg("Non const argument in function \"NEXTVAL\" is not support yet.")));
-        }
-
-
-    }
-        break;
-    default:
-    {
-        ListCell *tlist;
-        Expr *next;
-        foreach(tlist, func->args)
-        {
-            next = (Expr *) lfirst(tlist);
-            prepareDispatchedCatalogFunctionExpr(cxt, next, htab);
-        }
-    }
-        break;
-    }
+    /* find relid in pg_class */
+    cqContext  *pcqCtx;
+    pcqCtx = caql_beginscan(NULL,
+							cql("SELECT * FROM pg_proc "
+								" WHERE oid = :1 ",
+								ObjectIdGetDatum(procOid)));
+	proctuple = caql_getnext(pcqCtx);
+    if (!HeapTupleIsValid(proctuple))
+        elog(ERROR, "cache lookup failed for proc %u", procOid);
+	
+	AddTupleToContextInfo(cxt, ProcedureRelationId, "pg_proc", proctuple, MASTER_CONTENT_ID);
+	
+	caql_endscan(pcqCtx);
 }
 
 static int32
@@ -1650,13 +1714,10 @@ prepareDispatchedCatalogPlan(QueryContextInfo *cxt, Plan *plan, HTAB *htab)
 
     Assert(NULL != cxt && NULL != htab);
 
-    if (plan->targetlist)
-        prepareDispatchedCatalogTargets(cxt, plan->targetlist, htab);
-
-    prepareDispatchedCatalogPlan(cxt, plan->lefttree, htab);
-
-    prepareDispatchedCatalogPlan(cxt, plan->righttree, htab);
-
+    FuncWalkerContext context;
+    context.qcxt = cxt;
+    context.htab = htab;
+    collect_func_walker((Node *)plan, &context);
 }
 
 /*

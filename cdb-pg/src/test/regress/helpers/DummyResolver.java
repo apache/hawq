@@ -1,3 +1,4 @@
+import java.io.DataInputStream;
 import java.util.List;
 import java.util.LinkedList;
 
@@ -6,6 +7,7 @@ import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.utilities.InputData;
 import com.pivotal.pxf.utilities.Plugin;
 import com.pivotal.pxf.resolvers.IReadResolver;
+import com.pivotal.pxf.resolvers.IWriteResolver;
 import com.pivotal.pxf.hadoop.io.GPDBWritable;
 
 
@@ -15,11 +17,14 @@ import com.pivotal.pxf.hadoop.io.GPDBWritable;
  * must inherit this abstract class
  * Dummy implementation, for documentation
  */
-public class DummyResolver extends Plugin implements IReadResolver
+public class DummyResolver extends Plugin implements IReadResolver, IWriteResolver
 {
+	private int rowNumber;
+	
 	public DummyResolver(InputData metaData)
 	{
 		super(metaData);
+		rowNumber = 0;
 	}
 	
 	public List<OneField> getFields(OneRow row) throws Exception
@@ -34,4 +39,14 @@ public class DummyResolver extends Plugin implements IReadResolver
         
         return output;
     }
+
+	@Override
+	public OneRow setFields(DataInputStream inputStream) throws Exception {
+		
+		/* should read inputStream row by row */
+		
+		if (rowNumber > 5)
+			return null;
+		return new OneRow(null, new String("row number " + rowNumber++));
+	}
 }

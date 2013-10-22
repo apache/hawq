@@ -7,7 +7,7 @@
 --   Must have HADOOP_ROOT set.
 
 -- start_matchsubs
---                                                                                               
+--
 -- # create a match/subs expression to handle ip addresses that change
 --
 -- m/(ERROR|WARNING):.*remote component error.*\(\d+\).*from.*'\d+\.\d+\.\d+\.\d+:\d+'.*/
@@ -27,24 +27,23 @@
 -- 0. syntax validations
 --
 CREATE WRITABLE EXTERNAL TABLE pxf_out(a int, b text, c bytea)
-LOCATION ('pxf://@hostname@:50070/somepath/gpdb_regression_data?someuseropt=someuserval')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data?ACCESSOR=SequenceFileAccessor&RESOLVER=AvroResolver&DATA-SCHEMA=MySchema')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- positive
 
 CREATE WRITABLE EXTERNAL TABLE pxf_out1(a int, b text, c bytea)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data?ACCESSOR=SequenceFileAccessor&RESOLVER=AvroResolver&DATA-SCHEMA=MySchema')
-FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- positive
+LOCATION ('pxf://@hostname@:50070/somepath/gpdb_regression_data?someuseropt=someuserval')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- negative
 
 CREATE WRITABLE EXTERNAL TABLE pxf_out2(a int, b text, c bytea)
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/*')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- negative
 
 DROP EXTERNAL TABLE pxf_out;
-DROP EXTERNAL TABLE pxf_out1;
 
 --
 -- Load HDFS with test data
 --
-\! ${HADOOP_ROOT}/bin/hadoop fs -mkdir /gpdb_regression_data
+\! ${HADOOP_ROOT}/bin/hdfs dfs -mkdir /gpdb_regression_data
 --
 -- 1. Test writable table with TEXT format 
 --
@@ -53,17 +52,45 @@ CREATE WRITABLE EXTERNAL TABLE wrtext (s1 text,
 							   		   n2 int)
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrtext?ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver')
 FORMAT 'TEXT' (DELIMITER ',');
-INSERT INTO wrtext VALUES ('first',1,11), ('second',2,22), ('third',3,33);
-DROP EXTERNAL TABLE wrtext;
+INSERT INTO wrtext VALUES ('first',1,11), 
+                          ('second',2,22);
+INSERT INTO wrtext VALUES ('third',3,33),
+                          ('fourth',4,44);
+INSERT INTO wrtext VALUES ('fifth',5,55),
+                          ('sixth',6,66);
+INSERT INTO wrtext VALUES ('seventh',7,77),
+                          ('eighth',8,88);
+INSERT INTO wrtext VALUES ('ninth',9,99),
+                          ('tenth',10,1010);
+INSERT INTO wrtext VALUES ('eleventh',11,1111),
+                          ('twelfth',12,1212);
+INSERT INTO wrtext VALUES ('thirteenth',13,1313),
+                          ('fourteenth',14,1414), 
+                          ('fifteenth',15,1515);
 --
 -- Test data was written
+--
+\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrtext | grep Found | awk '{ if ($2>0) print "ok";}'  
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrtext | awk '{ if ($1>0) print "ok";}'  
+--
+-- Read data
 --
 CREATE READABLE EXTERNAL TABLE readtext (s1 text, 
                                		     n1 int, 
 							   		     n2 int)
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrtext?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver')
 FORMAT 'TEXT' (DELIMITER ',');
-SELECT * FROM readtext ORDER BY s1;
+SELECT * FROM readtext ORDER BY n1;
+--
+-- 1.1 Insert into writable table from read table
+--
+INSERT INTO wrtext SELECT * FROM readtext WHERE n1<=10;
+INSERT INTO wrtext SELECT * FROM readtext WHERE n2<100;
+SELECT * FROM readtext ORDER BY n1;
+--
+-- Cleanup
+--
+DROP EXTERNAL TABLE wrtext;
 DROP EXTERNAL TABLE readtext;
 --
 -- 2. Test writable table with TEXT format - compressions
@@ -80,14 +107,34 @@ COPY wrgzip FROM STDIN CSV;
 I,1,11
 am,2,22
 Gzipped,3,33
+I,1,11
+am,2,22
+Gzipped,3,33
+I,1,11
+am,2,22
+Gzipped,3,33
+I,1,11
+am,2,22
+Gzipped,3,33
+I,1,11
+am,2,22
+Gzipped,3,33
+I,1,11
+am,2,22
+Gzipped,3,33
 \.
 COPY wrgzip FROM STDIN DELIMITER ':';
 OOF:4:44
-LL:5:55
+OOF:5:55
 \.
 DROP EXTERNAL TABLE wrgzip;
 --
 -- Test data was written
+--
+\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrgzip | grep Found | awk '{ if ($2>0) print "ok";}'  
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrgzip | awk '{ if ($1>0) print "ok";}'  
+--
+-- Read data
 --
 CREATE READABLE EXTERNAL TABLE readgzip (s1 text, 
                                		     n1 int, 
@@ -107,12 +154,27 @@ FORMAT 'TEXT' (DELIMITER ',');
 CREATE TEMP TABLE data_for_bzip2 (s1 text,
                                   n1 int,
                                   n2 int);
-INSERT INTO data_for_bzip2 VALUES ('I',1,11), ('am',2,22), ('BZip2',3,33);
+INSERT INTO data_for_bzip2 VALUES ('I',1,10),
+                                  (' ',2,20), 
+                                  ('a',3,30),
+                                  ('m',4,40),
+                                  (' ',5,50),
+                                  ('B',6,60),
+                                  ('Z',7,70),
+                                  ('i',8,80),
+                                  ('p',9,90),
+                                  ('2',10,100), 
+                                  ('!!!',11,110);
 INSERT INTO wrbzip2 SELECT * FROM data_for_bzip2;
 DROP TABLE data_for_bzip2;
 DROP EXTERNAL TABLE wrbzip2;
 --
 -- Test data was written
+--
+\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrbzip2 | grep Found | awk '{ if ($2>0) print "ok";}'  
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrbzip2 | awk '{ if ($1>0) print "ok";}'  
+--
+-- Read data
 --
 CREATE READABLE EXTERNAL TABLE readbzip2 (s1 text, 
                                		      n1 int, 
@@ -134,6 +196,11 @@ DROP EXTERNAL TABLE wrdefault;
 --
 -- Test data was written
 --
+\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrdefault | grep Found | awk '{ if ($2>0) print "ok";}'  
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrdefault | awk '{ if ($1>0) print "ok";}'  
+--
+-- Read data
+--
 CREATE READABLE EXTERNAL TABLE readdefault (s1 text, 
                                		        n1 int, 
 							   		        n2 int)
@@ -142,70 +209,7 @@ FORMAT 'TEXT' (DELIMITER ',');
 SELECT * FROM readdefault ORDER BY n1;
 DROP EXTERNAL TABLE readdefault;
 --
--- 3. Test writable table with custom format into a sequence file
---
-CREATE WRITABLE EXTERNAL TABLE wrseq (tmp1  timestamp, 
-                                      num1  integer, 
-                                      num2  integer, 
-                                      num3  integer, 
-                                      num4  integer,
-                                      t1    text, 
-                                      t2    text, 
-                                      t3    text, 
-                                      t4    text, 
-                                      t5    text, 
-                                      t6    text, 
-                                      dub1  double precision, 
-                                      dub2  double precision, 
-                                      dub3  double precision, 
-                                      ft1   real, 
-                                      ft2   real, 
-                                      ft3   real, 
-                                      ln1   bigint, 
-                                      ln2   bigint, 
-                                      ln3   bigint, 
-                                      bt    bytea,
-                                      bool1 boolean,
-							          bool2 boolean,
-                                      bool3 boolean)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrcustom?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
-FORMAT 'custom' (formatter='pxfwritable_export');
-COPY wrseq FROM '@abs_srcdir@/data/pxf/customwritable_data.txt';
-DROP EXTERNAL TABLE wrseq;
---
--- Test data was written
---
-CREATE READABLE EXTERNAL TABLE readseq (tmp1  timestamp, 
-                                        num1  integer, 
-                                        num2  integer, 
-                                        num3  integer, 
-                                        num4  integer,
-                                        t1    text, 
-                                        t2    text, 
-                                        t3    text, 
-                                        t4    text, 
-                                        t5    text, 
-                                        t6    text, 
-                                        dub1  double precision, 
-                                        dub2  double precision, 
-                                        dub3  double precision, 
-                                        ft1   real, 
-                                        ft2   real, 
-                                        ft3   real, 
-                                        ln1   bigint, 
-                                        ln2   bigint, 
-                                        ln3   bigint, 
-                                        bt    bytea,
-                                        bool1 boolean,
-							            bool2 boolean,
-                                        bool3 boolean)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrcustom?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
-FORMAT 'custom' (formatter='pxfwritable_import');
-SELECT * FROM readseq ORDER BY num1;
-DROP EXTERNAL TABLE readseq;
-
---
--- 4. Test error in port -- negative
+-- 3. Test error in port -- negative
 --
 CREATE WRITABLE EXTERNAL TABLE wr_port_err(t1 text,
                                            a1 integer)
@@ -213,10 +217,9 @@ LOCATION ('pxf://@hostname@:9000/gpdb_regression_data/writable/err?ACCESSOR=Text
 FORMAT 'TEXT' (DELIMITER ',');
 INSERT INTO wr_port_err VALUES ('first',1), ('second',2), ('third',3);
 DROP EXTERNAL TABLE wr_port_err;
-
 --
 -- Cleanup: delete all data that was written into hdfs
 --
 -- start_ignore
-\! ${HADOOP_ROOT}/bin/hadoop fs -rm -r /gpdb_regression_data
+\! ${HADOOP_ROOT}/bin/hdfs dfs -rm -r /gpdb_regression_data
 -- end_ignore

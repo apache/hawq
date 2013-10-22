@@ -89,7 +89,7 @@ static void appendIntToBuffer(StringInfo buf, int val)
 }
 
 /*
- * Read a int to the buffer, given the offset;
+ * Read a int from the buffer, given the offset;
  * it will return the int value and increase the offset
  */
 static int readIntFromBuffer(char* buffer, int *offset)
@@ -110,7 +110,7 @@ static void appendInt2ToBuffer(StringInfo buf, uint16 val)
 }
 
 /*
- * Read a int2 to the buffer, given the offset;
+ * Read a int2 from the buffer, given the offset;
  * it will return the int value and increase the offset
  */
 static uint16 readInt2FromBuffer(char* buffer, int *offset)
@@ -132,7 +132,7 @@ static void appendInt1ToBuffer(StringInfo buf, uint8 val)
 }
 
 /*
- * Read a int1 to the buffer, given the offset;
+ * Read a int1 from the buffer, given the offset;
  * it will return the int value and increase the offset
  */
 static uint8 readInt1FromBuffer(char* buffer, int *offset)
@@ -250,6 +250,45 @@ static void byteArrayToBoolArray(bits8* data, int len, bool** booldata, int bool
 	}
 }
 
+/*
+ * Verify external table definition matches to input data columns
+ */
+static void
+verifyExternalTableDefinition(AttrNumber ncolumns, TupleDesc tupdesc, char *data_buf, int *bufidx)
+{
+	StringInfoData errMsg;
+	initStringInfo(&errMsg);
+
+	for(int i = 0; i < ncolumns; i++)
+	{
+		Oid   input_type = 0;
+		Oid   defined_type = tupdesc->attrs[i]->atttypid;
+		int8  enumType   = readInt1FromBuffer(data_buf, bufidx);
+
+		/* Convert enumType to type oid */
+		input_type = getTypeOidFromJavaEnumOrdinal(enumType);
+		if ((isBinaryFormatType(defined_type) || isBinaryFormatType(input_type)) &&
+			input_type != defined_type)
+		{
+			char *intype = format_type_be(input_type);
+			char *deftype = format_type_be(defined_type);
+			char *attname = NameStr(tupdesc->attrs[i]->attname);
+			appendStringInfo(&errMsg, "column \"%s\" (type \"%s\", input data type \"%s\"), ",
+									attname, deftype, intype);
+			pfree(intype);
+			pfree(deftype);
+		}
+	}
+	if(errMsg.len > 0)
+	{
+		truncateStringInfo(&errMsg, errMsg.len - strlen(", ")); //omit trailing ', '
+		ereport(ERROR, (errcode(ERRCODE_DATA_EXCEPTION),
+			errmsg("External table definition did not match input data: %s", errMsg.data),
+			errOmitLocation(true)));
+	}
+	pfree(errMsg.data);
+}
+
 Datum
 gpdbwritableformatter_export(PG_FUNCTION_ARGS)
 {
@@ -284,8 +323,8 @@ gpdbwritableformatter_export(PG_FUNCTION_ARGS)
 	{
 		if (FORMATTER_GET_EXTENCODING(fcinfo) != PG_UTF8)
 			ereport(ERROR, (errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
-							errmsg("gpdbwritable formatter can only export UTF8 formatted data. Define the external table with ENCODING UTF8"), 
-							errOmitLocation(true)));		
+							errmsg("gpdbwritable formatter can only export UTF8 formatted data. Define the external table with ENCODING UTF8"),
+							errOmitLocation(true)));
 
 		myData          = palloc(sizeof(format_t));
 		myData->values  = palloc(sizeof(Datum) * ncolumns);
@@ -502,7 +541,7 @@ gpdbwritableformatter_import(PG_FUNCTION_ARGS)
 	{
 		if (FORMATTER_GET_EXTENCODING(fcinfo) != PG_UTF8)
 			ereport(ERROR, (errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
-							errmsg("gpdbwritable formatter can only import UTF8 formatted data. Define the external table with ENCODING UTF8"), 
+							errmsg("gpdbwritable formatter can only import UTF8 formatted data. Define the external table with ENCODING UTF8"),
 							errOmitLocation(true)));
 
 		myData          = palloc(sizeof(format_t));
@@ -621,25 +660,8 @@ gpdbwritableformatter_import(PG_FUNCTION_ARGS)
 					    errOmitLocation(true)));
 
 	/* Extract Column Type and check against External Table definition */
-	for(i = 0; i < ncolumns; i++)
-	{
-		Oid   input_type = 0;
-		Oid   defined_type = tupdesc->attrs[i]->atttypid;
-		int8  enumType   = readInt1FromBuffer(data_buf, &bufidx);
+	verifyExternalTableDefinition(ncolumns, tupdesc, data_buf, &bufidx);
 
-		/* Convert enumType to type oid */
-		input_type = getTypeOidFromJavaEnumOrdinal(enumType);
-		if ((isBinaryFormatType(defined_type) || isBinaryFormatType(input_type)) &&
-			input_type != defined_type)
-		{
-			char *intype = TypeOidGetTypename(input_type);
-
-			ereport(ERROR, (errcode(ERRCODE_DATA_EXCEPTION),
-							errmsg("input data column %d of type \"%s\" did not match the external table definition",
-									i+1, intype),
-						    errOmitLocation(true)));
-		}
-	}
 	/* Extract null bit array */
 	{
 		int nullByteLen = getNullByteArraySize(ncolumns);

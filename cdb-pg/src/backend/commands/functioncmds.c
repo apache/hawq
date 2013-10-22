@@ -238,7 +238,10 @@ examine_parameter_list(List *parameters, Oid languageOid,
 
 				/* Keep track of the number of anytable arguments */
 				if (toid == ANYTABLEOID)
-					multisetCount++;
+					ereport(ERROR,
+							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+							 errmsg("TABLE functions not supported")));
+				/*	multisetCount++; */
 
 				/* Other input parameters cannot follow VARIADIC parameter */
 				if (fp->mode == FUNC_PARAM_VARIADIC)
@@ -851,6 +854,11 @@ CreateFunction(CreateFunctionStmt *stmt)
 				   &as_clause, &languageOid, &languageName, &volatility,
 				   &isStrict, &security, &dataAccess);
 
+	if (security)
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("SECURITY DEFINER not supported")));
+
 	languageTuple = caql_getfirst(NULL,
 			cql("SELECT * FROM pg_language "
 				"WHERE oid = :1",
@@ -902,6 +910,10 @@ CreateFunction(CreateFunctionStmt *stmt)
 		/* explicit RETURNS clause */
 		compute_return_type(stmt->returnType, languageOid,
 							&prorettype, &returnsSet, stmt->shelltypeOid);
+		if (returnsSet && !(gp_upgrade_mode || IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY)))
+			ereport(ERROR,
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					 errmsg("set returning functions not supported")));
 		if (OidIsValid(requiredResultType) && prorettype != requiredResultType)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
@@ -988,11 +1000,9 @@ CreateFunction(CreateFunctionStmt *stmt)
 					PointerGetDatum(parameterNames),
 					dataAccess,
 					stmt->funcOid);
-					
-	if (Gp_role == GP_ROLE_DISPATCH)
-	{
+	
+	if (gp_upgrade_mode && Gp_role == GP_ROLE_DISPATCH)
 		CdbDispatchUtilityStatement((Node *) stmt, "CreateFunction");
-	}
 }
 
 
@@ -1058,7 +1068,7 @@ RemoveFunction(RemoveFuncStmt *stmt)
 				 errmsg("removing built-in function \"%s\"",
 						NameListToString(functionName))));
 	}
-
+	
 	caql_endscan(pcqCtx);
 
 	/*
@@ -1069,11 +1079,9 @@ RemoveFunction(RemoveFuncStmt *stmt)
 	object.objectSubId = 0;
 
 	performDeletion(&object, stmt->behavior);
-	
-	if (Gp_role == GP_ROLE_DISPATCH)
-	{
+
+	if (gp_upgrade_mode && Gp_role == GP_ROLE_DISPATCH)
 		CdbDispatchUtilityStatement((Node *) stmt, "RemoveFunction");
-	}
 }
 
 /*
@@ -1437,6 +1445,12 @@ AlterFunction(AlterFunctionStmt *stmt)
 		procForm->proisstrict = intVal(strict_item->arg);
 	if (security_def_item)
 		procForm->prosecdef = intVal(security_def_item->arg);
+
+	if (procForm->prosecdef)
+        ereport(ERROR,
+                (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+                 errmsg("SECURITY DEFINER not supported")));
+
 	if (data_access_item)
 	{
 		Datum		repl_val[Natts_pg_proc];
@@ -1469,11 +1483,6 @@ AlterFunction(AlterFunctionStmt *stmt)
 
 	heap_close(rel, NoLock);
 	heap_freetuple(tup);
-	
-	if (Gp_role == GP_ROLE_DISPATCH)
-	{
-		CdbDispatchUtilityStatement((Node *) stmt, "AlterFunction");
-	}
 }
 
 /*

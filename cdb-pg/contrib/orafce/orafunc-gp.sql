@@ -169,18 +169,6 @@ RETURNS text
 AS 'MODULE_PATHNAME','orafce_listagg2_transfn'
 LANGUAGE C IMMUTABLE;
 
-DROP AGGREGATE IF EXISTS :ORA_SCHEMA.listagg(text);
-CREATE  AGGREGATE :ORA_SCHEMA.listagg(text) (
-  SFUNC=:ORA_SCHEMA.listagg1_transfn,
-  STYPE=text
-);
-
-DROP AGGREGATE IF EXISTS :ORA_SCHEMA.listagg(text, text);
-CREATE AGGREGATE :ORA_SCHEMA.listagg(text, text) (
-  SFUNC=:ORA_SCHEMA.listagg2_transfn,
-  STYPE=text
-);
-
 -- NVL2
 CREATE OR REPLACE FUNCTION nvl2(anyelement, anyelement, anyelement)
 RETURNS anyelement

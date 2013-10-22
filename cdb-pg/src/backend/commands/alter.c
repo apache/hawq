@@ -85,11 +85,6 @@ ExecRenameStmt(RenameStmt *stmt)
 			break;
 
 		case OBJECT_FUNCTION:
-			if (!gp_called_by_pgdump)
-			{
-				ereport(ERROR,
-						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support rename function statement yet") ));
-			}
 			RenameFunction(stmt->object, stmt->objarg, stmt->newname);
 			break;
 
@@ -238,8 +233,6 @@ ExecAlterObjectSchemaStmt(AlterObjectSchemaStmt *stmt)
 			break;
 
 		case OBJECT_FUNCTION:
-			ereport(ERROR,
-                            (errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter function schema statement yet") ));
 			AlterFunctionNamespace(stmt->object, stmt->objarg, false,
 								   stmt->newschema);
 			break;
@@ -300,9 +293,6 @@ ExecAlterOwnerStmt(AlterOwnerStmt *stmt)
 			break;
 
 		case OBJECT_FUNCTION:
-			if (!gp_called_by_pgdump)
-				ereport(ERROR,
-						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter function owner statement yet") ));
 			AlterFunctionOwner(stmt->object, stmt->objarg, newowner);
 			break;
 
