@@ -127,7 +127,7 @@ create_filesystem_credentials_cache(MemoryContext mcxt)
 }
 
 static void
-create_filesystem_credentials_intenal(HTAB **credentials, MemoryContext *mcxt)
+create_filesystem_credentials_internal(HTAB **credentials, MemoryContext *mcxt)
 {
 	if (!enable_secure_filesystem)
 		return;
@@ -146,7 +146,7 @@ create_filesystem_credentials_intenal(HTAB **credentials, MemoryContext *mcxt)
 void
 create_filesystem_credentials(Portal portal)
 {
-	create_filesystem_credentials_intenal(&portal->filesystem_credentials,
+	create_filesystem_credentials_internal(&portal->filesystem_credentials,
 			&portal->filesystem_credentials_memory);
 }
 
@@ -322,7 +322,7 @@ deserialize_filesystem_credentials(char *binary, int len)
 
 	Insist(NULL != binary && Gp_role == GP_ROLE_EXECUTE && len > 0);
 
-	create_filesystem_credentials_intenal(&CurrentFilesystemCredentials, &CurrentFilesystemCredentialsMemoryContext);
+	create_filesystem_credentials_internal(&CurrentFilesystemCredentials, &CurrentFilesystemCredentialsMemoryContext);
 
 	MemoryContext old = MemoryContextSwitchTo(CurrentFilesystemCredentialsMemoryContext);
 

@@ -483,7 +483,7 @@ RebuildMasterTransactionId(QueryContextInfo *cxt)
 }
 
 static void
-RebuildFilesystemCrentials(QueryContextInfo *cxt)
+RebuildFilesystemCredentials(QueryContextInfo *cxt)
 {
 	Assert(Gp_role == GP_ROLE_EXECUTE);
 
@@ -660,7 +660,7 @@ RebuildQueryContext(QueryContextInfo *cxt)
             RebuildEmptyTable(cxt);
             break;
         case FileSystemCredential:
-        	RebuildFilesystemCrentials(cxt);
+        	RebuildFilesystemCredentials(cxt);
         	break;
         default:
             ereport(ERROR,
