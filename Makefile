@@ -1297,8 +1297,12 @@ copylibs : thirdparty-dist copy-rsa-libs
 	mkdir -p $(INSTLOC)/include
 	# Copy libhdfs3
 	cp -rp $(BLD_THIRDPARTY_INCLUDE_DIR)/hdfs $(INSTLOC)/include/
-	# Copy kinit
+	# Copy kerberos binary
 	cp -rp $(BLD_THIRDPARTY_BIN_DIR)/kinit $(INSTLOC)/bin/
+	cp -rp $(BLD_THIRDPARTY_BIN_DIR)/kpasswd $(INSTLOC)/bin/
+	cp -rp $(BLD_THIRDPARTY_BIN_DIR)/kdestroy $(INSTLOC)/bin/
+	cp -rp $(BLD_THIRDPARTY_BIN_DIR)/klist $(INSTLOC)/bin/
+	
 ifeq "$(findstring $(BLD_ARCH),aix5_ppc_32 aix5_ppc_64 win32 win64)" ""
 	# Copy curl header file
 	cp -rp $(BLD_THIRDPARTY_INCLUDE_DIR)/curl $(INSTLOC)/include/
