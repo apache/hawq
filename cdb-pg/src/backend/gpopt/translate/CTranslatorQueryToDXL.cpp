@@ -2527,8 +2527,19 @@ CTranslatorQueryToDXL::PdxlnFromRelation
 {
 	// construct table descriptor for the scan node from the range table entry
 	CDXLTableDescr *pdxltabdesc = CTranslatorUtils::Pdxltabdesc(m_pmp, m_pmda, m_pidgtorCol, prte);
-	CDXLNode *pdxlnGet = New(m_pmp) CDXLNode(m_pmp, New(m_pmp) CDXLLogicalGet(m_pmp, pdxltabdesc));
-	GPOS_ASSERT(NULL != pdxlnGet);
+
+	CDXLLogicalGet *pdxlop = NULL;
+	const IMDRelation *pmdrel = m_pmda->Pmdrel(pdxltabdesc->Pmdid());
+	if (IMDRelation::ErelstorageExternal == pmdrel->Erelstorage())
+	{
+		pdxlop = New(m_pmp) CDXLLogicalExternalGet(m_pmp, pdxltabdesc);
+	}
+	else
+	{
+		pdxlop = New(m_pmp) CDXLLogicalGet(m_pmp, pdxltabdesc);
+	}
+
+	CDXLNode *pdxlnGet = New(m_pmp) CDXLNode(m_pmp, pdxlop);
 
 	// make note of new columns from base relation
 	m_pmapvarcolid->LoadTblColumns(m_ulQueryLevel, ulRTIndex, pdxltabdesc);

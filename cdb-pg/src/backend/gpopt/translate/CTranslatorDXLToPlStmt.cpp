@@ -152,6 +152,7 @@ CTranslatorDXLToPlStmt::InitTranslators()
 	STranslatorMapping rgTranslators[] =
 	{
 			{EdxlopPhysicalTableScan,				&gpopt::CTranslatorDXLToPlStmt::PtsFromDXLTblScan},
+			{EdxlopPhysicalExternalScan,			&gpopt::CTranslatorDXLToPlStmt::PtsFromDXLTblScan},
 			//{EdxlopPhysicalIndexOnlyScan,			&gpopt::CTranslatorDXLToPlStmt::PiosFromDXLIndexOnlyScan},
 			{EdxlopPhysicalIndexScan,				&gpopt::CTranslatorDXLToPlStmt::PisFromDXLIndexScan},
 			{EdxlopPhysicalHashJoin, 				&gpopt::CTranslatorDXLToPlStmt::PhjFromDXLHJ},
