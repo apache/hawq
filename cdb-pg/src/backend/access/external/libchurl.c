@@ -84,7 +84,7 @@ void free_http_response(churl_context* context);
 void compact_internal_buffer(churl_context* context);
 void realloc_internal_buffer(churl_context* context, size_t required);
 bool handle_special_error(long response);
-char* get_http_error_msg(long http_ret_code, char* msg);
+char* get_http_error_msg(long http_ret_code, char* msg, char* curl_error_buffer);
 char* build_header_str(const char* format, const char* name, const char* value);
 void print_http_headers(CHURL_HEADERS headers);
 
@@ -707,7 +707,7 @@ void check_response_code(churl_context* context)
 			 * add detailed error message from the http response. response_text
 			 * could be NULL in some cases. get_http_error_msg checks for that.
 			 */
-			http_error_msg = get_http_error_msg(response_code, response_text);
+			http_error_msg = get_http_error_msg(response_code, response_text, context->curl_error_buffer);
 			/* check for a specific confusing error, and replace with a clearer one */
 			if(strstr(http_error_msg, "instance does not contain any root resource classes") != NULL)
 				appendStringInfo(&err, " : PXF not correctly installed in CLASSPATH");
@@ -752,7 +752,7 @@ void check_response_code(churl_context* context)
  * the <title>.
  */
 char*
-get_http_error_msg(long http_ret_code, char* msg)
+get_http_error_msg(long http_ret_code, char* msg, char* curl_error_buffer)
 {
 	char *start, *end, *ret;
 	StringInfoData errMsg;
@@ -762,8 +762,16 @@ get_http_error_msg(long http_ret_code, char* msg)
 	 * 1. The server not listening on the port specified in the <create external...> statement" 
 	 *    In this case there is no Response from the server, so we issue our own message
 	 */
-	if (http_ret_code == 0) 
-		return "There is no pxf servlet listening on the host and port specified in the external table url";
+
+	if (http_ret_code == 0)
+	{
+		if(curl_error_buffer == NULL)
+			return "There is no pxf servlet listening on the host and port specified in the external table url";
+		else
+		{
+			return curl_error_buffer;
+		}
+	}
 	
 	/*
 	 * 2. There is a response from the server since the http_ret_code is not 0, but there is no response message.

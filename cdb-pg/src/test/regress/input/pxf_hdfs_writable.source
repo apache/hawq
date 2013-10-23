@@ -13,6 +13,9 @@
 -- m/(ERROR|WARNING):.*remote component error.*\(\d+\).*from.*'\d+\.\d+\.\d+\.\d+:\d+'.*/
 -- s/'\d+\.\d+\.\d+\.\d+:\d+'/'SOME_IP:SOME_PORT'/
 --
+-- m/(remote component error \(0\): Failed connect to @hostname@:12345; Connection refused|remote component error \(0\): couldn't connect to host).*/
+-- s/(Failed connect to @hostname@:12345; Connection refused|couldn't connect to host)/CURL_CON_ERROR/
+--
 -- end_matchsubs
 -- start_matchignore
 --
@@ -252,13 +255,23 @@ DROP EXTERNAL TABLE readseq;
 --
 CREATE WRITABLE EXTERNAL TABLE wr_port_err(t1 text,
                                            a1 integer)
-LOCATION ('pxf://@hostname@:9000/gpdb_regression_data/writable/err?ACCESSOR=TextFileWAccessor&RESOLVER=TextWResolver')
+LOCATION ('pxf://@hostname@:12345/gpdb_regression_data/writable/err?ACCESSOR=TextFileWAccessor&RESOLVER=TextWResolver')
 FORMAT 'TEXT' (DELIMITER ',');
 INSERT INTO wr_port_err VALUES ('first',1), ('second',2), ('third',3);
 DROP EXTERNAL TABLE wr_port_err;
 
 --
--- 5. Test circle type converted to text and back
+-- 5. Test error in host -- negative
+--
+CREATE WRITABLE EXTERNAL TABLE wr_host_err(t1 text,
+                                           a1 integer)
+LOCATION ('pxf://badhostname:50070/gpdb_regression_data/writable/err?ACCESSOR=TextFileWAccessor&RESOLVER=TextWResolver')
+FORMAT 'TEXT' (DELIMITER ',');
+INSERT INTO wr_host_err VALUES ('first',1), ('second',2), ('third',3);
+DROP EXTERNAL TABLE wr_host_err;
+
+--
+-- 6. Test circle type converted to text and back
 --
 CREATE WRITABLE EXTERNAL TABLE wr_circle(a1 integer,
                                          c1 circle)
@@ -277,7 +290,7 @@ SELECT * FROM read_circle ORDER BY a1;
 DROP EXTERNAL TABLE read_circle;
 
 --
--- 6. Test unsupported type in writable resolver -- negative
+-- 7. Test unsupported type in writable resolver -- negative
 --
 CREATE WRITABLE EXTERNAL TABLE wr_char_err(a1 integer,
                                            c1 char)
