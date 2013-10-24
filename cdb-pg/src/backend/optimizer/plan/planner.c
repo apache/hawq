@@ -296,7 +296,14 @@ planner(Query *parse, int cursorOptions,
 			INSTR_TIME_SET_CURRENT(starttime);
 		}
 
-		result = standard_planner(parse, cursorOptions, boundParams);
+		if (NULL != planner_hook)
+		{
+			result = (*planner_hook) (parse, cursorOptions, boundParams);
+		}
+		else
+		{
+			result = standard_planner(parse, cursorOptions, boundParams);
+		}
 
 		if (gp_log_optimization_time)
 		{
