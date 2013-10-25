@@ -78,6 +78,7 @@
 #define NEED_eval_pv
 #define NEED_newRV_noinc
 #define NEED_sv_2pv_flags
+#include "ppport.h"
 
 /* perl may have a different width of "bool", don't buy it */
 #ifdef bool
@@ -89,6 +90,11 @@
 #define HeUTF8(he)			   ((HeKLEN(he) == HEf_SVKEY) ?			   \
 								SvUTF8(HeKEY_sv(he)) :				   \
 								(U32)HeKUTF8(he))
+#endif
+
+/* supply GvCV_set if it's missing - ppport.h doesn't supply it, unfortunately */
+#ifndef GvCV_set
+#define GvCV_set(gv, cv)		(GvCV(gv) = cv)
 #endif
 
 /* declare routines from plperl.c for access by .xs files */
