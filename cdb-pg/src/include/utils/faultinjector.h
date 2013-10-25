@@ -168,6 +168,8 @@ typedef enum FaultInjectorIdentifier_e {
 	FaultDuringExecDynamicTableScan,
 	GangThreadCreation,
 	DispatchThreadCreation,
+	InternalFlushError,
+	ExecSimpleQueryEndCommand,
 
 /*	DispatchWait,*/
 	ConnectionFailAfterGangCreation,
@@ -177,6 +179,8 @@ typedef enum FaultInjectorIdentifier_e {
 	BeforeDispatch,
 
 	DispatchToGangThreadStructureInitialization,
+
+	FaultDuringExecDynamicTableScan,
 
 	/* INSERT has to be done before that line */
 	FaultInjectorIdMax,
