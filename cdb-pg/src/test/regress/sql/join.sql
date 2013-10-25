@@ -501,6 +501,15 @@ select * from nhtest a join nhtest b using (i);
 
 
 --
+-- test hash join
+--
+
+create table hjtest (i int, j int) distributed by (i,j);
+insert into hjtest values(3, 4);
+
+select count(*) from hjtest a1, hjtest a2 where a2.i = least (a1.i,4) and a2.j = 4;
+
+--
 -- Predicate propagation over equality conditions
 --
 
