@@ -2572,55 +2572,6 @@ warnAutoRange(ParseState *pstate, RangeVar *relation, int location)
 }
 
 /*
- * Sets permissions to the corresponding range table entry.
- */
-void assign_permissions(CmdType type, List *rangeTableEntries) {
-
-	Assert(rangeTableEntries);
-	Assert(type);
-
-	AclMode required_access = ACL_NO_RIGHTS;
-
-	switch (type) {
-		case CMD_SELECT:
-			required_access = ACL_SELECT;
-			break;
-		case CMD_INSERT:
-			required_access = ACL_INSERT;
-			break;
-		case CMD_DELETE:
-			required_access = ACL_DELETE;
-			break;
-		case CMD_UPDATE:
-			required_access = ACL_UPDATE;
-			break;
-		default:
-			elog(DEBUG1, "no access right set for current query");
-			return;
-	}
-
-	ListCell *entry;
-	foreach(entry, rangeTableEntries)
-	{
-		RangeTblEntry *rte = lfirst(entry);
-
-		if (rte->rtekind != RTE_RELATION)
-		{
-			continue;
-		}
-
-		/* assign relation permissions. */
-		rte->requiredPerms |= required_access;
-
-		/* Consider also range table entries for subqueries. */
-		if (rte->subquery_rtable)
-		{
-			assign_permissions(type, rte->subquery_rtable);
-		}
-	}
-}
-
-/*
  * ExecCheckRTPerms
  *		Check access permissions for all relations listed in a range table.
  */

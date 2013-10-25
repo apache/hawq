@@ -1086,6 +1086,7 @@ CTranslatorDXLToPlStmt::PtsFromDXLTblScan
 	const ULONG ulRelCols = pmdrel->UlColumns() - pmdrel->UlSystemColumns();
 	RangeTblEntry *prte = PrteFromTblDescr(pdxltabdesc, NULL /*pdxlid*/, ulRelCols, iRel, &dxltrctxbt);
 	GPOS_ASSERT(NULL != prte);
+	prte->requiredPerms |= ACL_SELECT;
 	m_pctxdxltoplstmt->AddRTE(prte);
 
 	Plan *pplan = NULL;
@@ -1223,6 +1224,7 @@ CTranslatorDXLToPlStmt::PisFromDXLIndexScan
 	const ULONG ulRelCols = pmdrel->UlColumns() - pmdrel->UlSystemColumns();
 	RangeTblEntry *prte = PrteFromTblDescr(pdxlopIndexScan->Pdxltabdesc(), pdxlid, ulRelCols, iRel, &dxltrctxbt);
 	GPOS_ASSERT(NULL != prte);
+	prte->requiredPerms |= ACL_SELECT;
 	m_pctxdxltoplstmt->AddRTE(prte);
 
 	IndexScan *pis = NULL;
@@ -3789,6 +3791,7 @@ CTranslatorDXLToPlStmt::PplanDTS
 	
 	RangeTblEntry *prte = PrteFromTblDescr(pdxlop->Pdxltabdesc(), NULL /*pdxlid*/, ulRelCols, iRel, &dxltrctxbt);
 	GPOS_ASSERT(NULL != prte);
+	prte->requiredPerms |= ACL_SELECT;
 
 	m_pctxdxltoplstmt->AddRTE(prte);
 	m_pctxdxltoplstmt->AddPartitionedTable(prte->relid);
@@ -3865,6 +3868,7 @@ CTranslatorDXLToPlStmt::PplanDIS
 
 	RangeTblEntry *prte = PrteFromTblDescr(pdxlop->Pdxltabdesc(), NULL /*pdxlid*/, ulRelCols, iRel, &dxltrctxbt);
 	GPOS_ASSERT(NULL != prte);
+	prte->requiredPerms |= ACL_SELECT;
 	m_pctxdxltoplstmt->AddRTE(prte);
 	m_pctxdxltoplstmt->AddPartitionedTable(prte->relid);
 
@@ -3962,20 +3966,28 @@ CTranslatorDXLToPlStmt::PplanDML
 	// create DML node
 	DML *pdml = MakeNode(DML);
 	Plan *pplan = &(pdml->plan);
+	AclMode aclmode = ACL_NO_RIGHTS;
 	
 	switch (pdxlop->EdxlDmlOpType())
 	{
 		case Edxldmldelete:
+		{
 			m_cmdtype = CMD_DELETE;
+			aclmode = ACL_DELETE;
 			break;
-		
+		}
 		case Edxldmlupdate:
+		{
 			m_cmdtype = CMD_UPDATE;
+			aclmode = ACL_UPDATE;
 			break;
-
+		}
 		case Edxldmlinsert:
+		{
 			m_cmdtype = CMD_INSERT;
+			aclmode = ACL_INSERT;
 			break;
+		}
 	}
 	
 	IMDId *pmdidTargetTable = pdxlop->Pdxltabdesc()->Pmdid();
@@ -3999,7 +4011,7 @@ CTranslatorDXLToPlStmt::PplanDML
 	CDXLTableDescr *pdxltabdesc = pdxlop->Pdxltabdesc();
 	RangeTblEntry *prte = PrteFromTblDescr(pdxltabdesc, NULL /*pdxlid*/, ulRelCols, iRel, &dxltrctxbt);
 	GPOS_ASSERT(NULL != prte);
-
+	prte->requiredPerms |= aclmode;
 	m_pctxdxltoplstmt->AddRTE(prte);
 	
 	if (pmdrel->FPartitioned())
@@ -4449,6 +4461,7 @@ CTranslatorDXLToPlStmt::PrteFromTblDescr
 
 	prte->relid = oid;
 	prte->checkAsUser = pdxltabdesc->UlExecuteAsUser();
+	prte->requiredPerms |= ACL_NO_RIGHTS;
 
 	// save oid and range index in translation context
 	pdxltrctxbtOut->SetOID(oid);

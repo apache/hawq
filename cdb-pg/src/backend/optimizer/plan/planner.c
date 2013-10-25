@@ -232,12 +232,6 @@ optimize_query(Query *parse, ParamListInfo boundParams)
 	if (result)
 	{
 		postprocess_plan(result);
-
-		/* assign access rights for the range table entries. */
-		if (NULL != result->rtable)
-		{
-			assign_permissions(result->commandType, result->rtable);
-		}
 	}
 
 	log_optimizer(result, fUnexpectedFailure);
