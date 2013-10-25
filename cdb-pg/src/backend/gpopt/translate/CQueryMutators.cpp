@@ -1346,7 +1346,9 @@ CQueryMutators::PqueryEliminateDistinctClause
 			pqueryNew->targetList = gpdb::PlAppendElement(pqueryNew->targetList, pteNew);
 		}
 
-		if (0 < pte->ressortgroupref && !CTranslatorUtils::FGroupingColumn(pte, pqueryDrdTbl->groupClause))
+		if (0 < pte->ressortgroupref &&
+			!CTranslatorUtils::FGroupingColumn(pte, pqueryDrdTbl->groupClause) &&
+			!CTranslatorUtils::FWindowSpec(pte, pqueryDrdTbl->windowClause))
 		{
 			// initialize the ressortgroupref of target entries not used in the grouping clause
 			 pte->ressortgroupref = 0;
