@@ -142,7 +142,6 @@ public class WritableResource extends SecuredResource
 		
 		DataInputStream dataStream = new DataInputStream(inputStream);
 		
-		OneRow onerow = null;
 		long totalRead = 0;
 
 		try
