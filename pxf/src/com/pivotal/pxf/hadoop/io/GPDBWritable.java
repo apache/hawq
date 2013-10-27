@@ -6,8 +6,11 @@ import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.io.Writable;
 
 
@@ -29,6 +32,8 @@ public class GPDBWritable implements Writable {
      * For var length type, col val is <4 byte length><payload val>
 	 */
 
+	private static Log Log = LogFactory.getLog(GPDBWritable.class);
+	private static final int EOF = -1;
 
 	/*
 	 * "DEFINE" of the Database Datatype OID
@@ -98,7 +103,7 @@ public class GPDBWritable implements Writable {
 	 * Constants
 	 */
 	private static final int    PREV_VERSION = 1;
-	private static final int    VERSION = 2; /* for backward compatability */
+	private static final int    VERSION = 2; /* for backward compatibility */
 	private static final String CHARSET = "UTF-8";
 	
 	/*
@@ -108,6 +113,7 @@ public class GPDBWritable implements Writable {
 	protected Object[] colValue;
 	protected int	   alignmentOfEightBytes = 8;
 	protected byte     errorFlag = 0;
+	protected int	   pktlen = EOF; 
 	
 	/**
 	 * An exception class for column type definition and
@@ -151,13 +157,48 @@ public class GPDBWritable implements Writable {
 		this.readFields(dis);
 	}
 	
-
+	/*
+	 * Read first 4 bytes, and verify it's a valid packet length.
+	 * Upon error returns EOF.
+	 */
+	private int readPktLen(DataInput in) throws IOException
+	{
+		pktlen = EOF;
+		
+		try 
+		{
+			pktlen = in.readInt();
+		}
+		catch (EOFException e)
+		{
+			Log.debug("Reached end of stream (EOFException)");
+			return EOF;
+		}
+		if (pktlen == EOF)
+		{
+			Log.debug("Reached end of stream (returned -1)");
+		}
+		
+		return pktlen;
+	}
+	
 	/**
 	 *  Implement {@link org.apache.hadoop.io.Writable#readFields(DataInput)} 
 	 */
 	public void readFields(DataInput in) throws IOException {
+		/* 
+		 * extract pkt len. 
+		 * 
+		 * GPSQL-1107: 
+		 * The DataInput might already be empty (EOF), but we can't check it beforehand.
+		 * If that's the case, pktlen is updated to -1, to mark that the object is still empty.
+		 * (can be checked with isEmpty()). 
+		 */
+		pktlen = readPktLen(in);
+		if (isEmpty())
+			return;
+		
 		/* extract the version and col cnt */
-		int pklen   = in.readInt();
 		int version = in.readShort();
 		int curOffset = 4 + 2;
 		int colCnt;
@@ -775,5 +816,15 @@ public class GPDBWritable implements Writable {
 		if (alignment == null)
 			return;
 		alignmentOfEightBytes = Integer.parseInt(alignment);
+	}
+	
+	/* 
+	 * Returns if the writable object is empty,
+	 * based on the pkt len as read from stream.
+	 * -1 means nothing was read (eof).
+	 */
+	public boolean isEmpty()
+	{
+		return pktlen == EOF;
 	}
 }
