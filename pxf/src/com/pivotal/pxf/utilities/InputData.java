@@ -20,6 +20,7 @@ import com.pivotal.pxf.format.OutputFormat;
 public class InputData
 {
     public static final int INVALID_SPLIT_IDX = -1;
+    private static final String BZIP2CODEC = "org.apache.hadoop.io.compress.BZip2Codec";
     private static final Log LOG = LogFactory.getLog(InputData.class);
 
     protected Map<String, String> requestParametersMap;
@@ -134,7 +135,7 @@ public class InputData
         /*
 		 * compression codec name (relevant for writable)
 		 */
-		compressCodec = getOptionalProperty("X-GP-COMPRESSION_CODEC");
+        parseCompressionCodec();
     }
 
     /**
@@ -420,6 +421,17 @@ public class InputData
         avroSchema = theAvroSchema;
     }
 
+    protected void parseCompressionCodec()
+    {
+		compressCodec = getOptionalProperty("X-GP-COMPRESSION_CODEC");
+		if (compressCodec == null)
+			return;
+		if (compressCodec.compareTo(BZIP2CODEC) == 0)
+		{
+			throw new IllegalArgumentException("BZip2 compression is not supported");
+		}
+    }
+    
 	/*
 	 * Returns the compression codec (can be null - means no compression)
 	 */

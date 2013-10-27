@@ -129,6 +129,7 @@ public class LineBreakAccessor extends HdfsSplittableDataAccessor implements IWr
 	{
 		if ((dos != null) && (fsdos != null))
 		{	
+			Log.debug("Closing writing stream for path " + file);
 			dos.flush();
 			/*
 			 * From release 0.21.0 sync() is deprecated in favor of hflush(), 
