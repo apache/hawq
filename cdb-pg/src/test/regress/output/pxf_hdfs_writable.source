@@ -35,6 +35,10 @@ CREATE WRITABLE EXTERNAL TABLE pxf_out2(a int, b text, c bytea)
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/*')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- negative
 ERROR:  Invalid URI pxf://@hostname@:50070/gpdb_regression_data/*: missing options section
+CREATE WRITABLE EXTERNAL TABLE pxf_out3(a int, b text, c bytea)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data?ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver&COMPRESSION_CODEC=org.apache.hadoop.io.compress.BZip2Codec')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- negative
+ERROR:  BZip2 compression is not supported
 DROP EXTERNAL TABLE pxf_out;
 --
 -- Load HDFS with test data
@@ -67,9 +71,10 @@ INSERT INTO wrtext VALUES ('thirteenth',13,1313),
 -- Test data was written
 --
 \! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrtext | grep Found | awk '{ if ($2>0) print "ok";}'
-ok  
+ok
 \! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrtext | awk '{ if ($1>0) print "ok";}'
-ok  
+ok
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du /gpdb_regression_data/writable/wrtext | awk '{if ($1<=0) print $0,": error";}'
 --
 -- Read data
 --
@@ -174,9 +179,10 @@ DROP EXTERNAL TABLE wrgzip;
 -- Test data was written
 --
 \! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrgzip | grep Found | awk '{ if ($2>0) print "ok";}'
-ok  
+ok
 \! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrgzip | awk '{ if ($1>0) print "ok";}'
-ok  
+ok
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du /gpdb_regression_data/writable/wrgzip | awk '{if ($1<=0) print $0,": error";}'
 --
 -- Read data
 --
@@ -212,64 +218,7 @@ SELECT * FROM readgzip ORDER BY n1;
 
 DROP EXTERNAL TABLE readgzip;
 --
--- 2.2 BZip2 compression
---
-CREATE WRITABLE EXTERNAL TABLE wrbzip2 (s1 text, 
-                               		    n1 int, 
-							   		    n2 int)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrbzip2?ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver&COMPRESSION_CODEC=org.apache.hadoop.io.compress.BZip2Codec')
-FORMAT 'TEXT' (DELIMITER ',');
-CREATE TEMP TABLE data_for_bzip2 (s1 text,
-                                  n1 int,
-                                  n2 int);
-INSERT INTO data_for_bzip2 VALUES ('I',1,10),
-                                  (' ',2,20), 
-                                  ('a',3,30),
-                                  ('m',4,40),
-                                  (' ',5,50),
-                                  ('B',6,60),
-                                  ('Z',7,70),
-                                  ('i',8,80),
-                                  ('p',9,90),
-                                  ('2',10,100), 
-                                  ('!!!',11,110);
-INSERT INTO wrbzip2 SELECT * FROM data_for_bzip2;
-DROP TABLE data_for_bzip2;
-DROP EXTERNAL TABLE wrbzip2;
---
--- Test data was written
---
-\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrbzip2 | grep Found | awk '{ if ($2>0) print "ok";}'
-ok  
-\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrbzip2 | awk '{ if ($1>0) print "ok";}'
-ok  
---
--- Read data
---
-CREATE READABLE EXTERNAL TABLE readbzip2 (s1 text, 
-                               		      n1 int, 
-							   		      n2 int)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrbzip2?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver')
-FORMAT 'TEXT' (DELIMITER ',');
-SELECT * FROM readbzip2 ORDER BY n1;
- s1  | n1 | n2  
------+----+-----
- I   |  1 |  10
-     |  2 |  20
- a   |  3 |  30
- m   |  4 |  40
-     |  5 |  50
- B   |  6 |  60
- Z   |  7 |  70
- i   |  8 |  80
- p   |  9 |  90
- 2   | 10 | 100
- !!! | 11 | 110
-(11 rows)
-
-DROP EXTERNAL TABLE readbzip2;
---
--- 2.3 Default compression (.deflate)
+-- 2.2 Default compression (.deflate)
 --
 CREATE WRITABLE EXTERNAL TABLE wrdefault (s1 text, 
                                		      n1 int, 
@@ -282,9 +231,10 @@ DROP EXTERNAL TABLE wrdefault;
 -- Test data was written
 --
 \! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrdefault | grep Found | awk '{ if ($2>0) print "ok";}'
-ok  
+ok
 \! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrdefault | awk '{ if ($1>0) print "ok";}'
-ok  
+ok
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du /gpdb_regression_data/writable/wrdefault | awk '{if ($1<=0) print $0,": error";}'
 --
 -- Read data
 --

@@ -35,7 +35,9 @@ import com.pivotal.pxf.utilities.InputData;
 @Path("/" + Version.PXF_PROTOCOL_VERSION + "/Bridge/")
 public class BridgeResource extends SecuredResource
 {
+
 	private Log Log;
+	
 	public BridgeResource()
 	{
 		Log = LogFactory.getLog(BridgeResource.class);
@@ -53,7 +55,7 @@ public class BridgeResource extends SecuredResource
 	@GET
 	@Produces(MediaType.APPLICATION_OCTET_STREAM)
 	public Response read(@Context HttpHeaders headers,
-						 @QueryParam("fragment") String fragment) throws Exception
+					     @QueryParam("fragment") String fragment) throws Exception
 	{
 		// Convert headers into a regular map
 		Map<String, String> params = convertToRegularMap(headers.getRequestHeaders());
@@ -62,17 +64,18 @@ public class BridgeResource extends SecuredResource
 		Log.debug("started with paramters: " + params.toString());
 
 		return readResponse(params);
-	}
+			}
 
 	Response readResponse(Map<String, String> params) throws Exception
 	{
-		final IBridge bridge = new ReadBridge(new InputData(params));
+		final IBridge bridge = new ReadBridge(new InputData(params));	
 
 		if (!bridge.beginIteration())
 			return Response.ok().build();
 
 		final String fragment = params.get("X-GP-DATA-FRAGMENT");
 		final String dataDir = params.get("X-GP-DATA-DIR");
+
 
 		// Creating an internal streaming class
 		// which will iterate the records and put them on the
@@ -135,7 +138,7 @@ public class BridgeResource extends SecuredResource
 				/* FRAGMENT-USER-DATA must be Base64 encoded */
 				if (!Base64.isArrayByteBase64(newVal.getBytes()))
 					throw new IOException("Fragment user data must be Base64 encoded. " +
-										"(Bad value: " + newVal + ")");
+							"(Bad value: " + newVal + ")");
 				Log.debug("X-GP-FRAGMENT-USER-DATA: " + newVal);
 			}
 			result.put(newKey, newVal);
@@ -143,4 +146,5 @@ public class BridgeResource extends SecuredResource
 
 		return result;
 	}
+
 }

@@ -28,6 +28,7 @@ Datum
 pxfprotocol_validate_urls(PG_FUNCTION_ARGS)
 {
 	GPHDUri	*uri;
+	char *option;
 	bool	is_writable = EXTPROTOCOL_VALIDATOR_GET_DIRECTION(fcinfo) == EXT_VALIDATE_WRITE;
 
 	/* Must be called via the external table format manager */
@@ -55,8 +56,7 @@ pxfprotocol_validate_urls(PG_FUNCTION_ARGS)
 	/*
 	 * Condition 4: existence of core options if profile wasn't supplied
 	 */
-	char *option;
-	if(GPHDUri_get_value_for_opt(uri, "profile", &option, false) < 0)
+	if (GPHDUri_get_value_for_opt(uri, "profile", &option, false) < 0)
 	{
 		List *coreOptions = list_make2("ACCESSOR", "RESOLVER");
 		if (!is_writable)
@@ -65,6 +65,23 @@ pxfprotocol_validate_urls(PG_FUNCTION_ARGS)
 		}
 		GPHDUri_verify_core_options_exist(uri, coreOptions);
 		list_free(coreOptions);
+	}
+
+	/*
+	 * Condition 5: disallow codec BZip2 for writable tables
+	 * COMPRESSION_CODEC=org.apache.hadoop.io.compress.BZip2Codec
+	 */
+	if (is_writable)
+	{
+		if (GPHDUri_get_value_for_opt(uri, "compression_codec", &option, false) == 0)
+		{
+			if (strcmp("org.apache.hadoop.io.compress.BZip2Codec", option) == 0)
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_SYNTAX_ERROR),
+										 errmsg("BZip2 compression is not supported")));
+			}
+		}
 	}
 
 	/* Temp: Uncomment for printing a NOTICE with parsed parameters */

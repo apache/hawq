@@ -92,7 +92,30 @@ public class InputDataTest
             assertEquals(pce.getMsgFormat(), NO_PROFILE_DEF);
         }
     }
+    
+    @Test
+    public void testCompressCodec()
+    {
+        parameters.put("X-GP-COMPRESSION_CODEC", "So I asked, who is he? He goes by the name of Wayne Rooney");   
+        InputData input = new InputData(parameters);
+        assertEquals(input.compressCodec, "So I asked, who is he? He goes by the name of Wayne Rooney");
+    }
 
+    @Test
+    public void testCompressCodecBZip2()
+    {
+        parameters.put("X-GP-COMPRESSION_CODEC", "org.apache.hadoop.io.compress.BZip2Codec");
+        try
+        {
+            new InputData(parameters);
+            fail("org.apache.hadoop.io.compress.BZip2Codec should throw IllegalArgumentException");
+        }
+        catch (IllegalArgumentException e)
+        {
+            assertEquals(e.getMessage(), "BZip2 compression is not supported");
+        }
+    }
+    
     /*
      * setUp function called before each test
 	 */
