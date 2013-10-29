@@ -60,7 +60,8 @@ typedef struct
 		indexed_tlist *inner_itlist;
 		Index		skip_rel;
 		int			rtoffset;
-		bool        use_other_child_tlist_for_matching_nonvars;
+		bool        use_outer_tlist_for_matching_nonvars;
+		bool        use_inner_tlist_for_matching_nonvars;
 	} fix_join_expr_context;
 
 typedef struct
@@ -123,7 +124,8 @@ static List *fix_child_hashclauses(PlannerGlobal *glob,
                            List *clauses,
                            indexed_tlist *outer_itlist,
                            indexed_tlist *inner_itlist,
-                           Index skip_rel, int rtoffset);
+                           Index skip_rel, int rtoffset,
+                           Index child);
 static Node *fix_upper_expr(PlannerGlobal *glob,
 							Node *node,
 							indexed_tlist *subplan_itlist,
@@ -1911,7 +1913,8 @@ fix_join_expr(PlannerGlobal *glob,
 	context.inner_itlist = inner_itlist;
 	context.skip_rel = skip_rel;
 	context.rtoffset = rtoffset;
-	context.use_other_child_tlist_for_matching_nonvars = true;
+	context.use_outer_tlist_for_matching_nonvars = true;
+	context.use_inner_tlist_for_matching_nonvars = true;
 	return (List *) fix_join_expr_mutator((Node *) clauses, &context);
 }
 
@@ -1950,7 +1953,8 @@ static List *fix_hashclauses(PlannerGlobal *glob,
                 outer_itlist,
                 inner_itlist,
                 (Index) 0,
-                rtoffset);
+                rtoffset,
+                OUTER);
         /*
          * for inner argument, we cannot refer to target entries
          * in join's outer child target list, otherwise hash table
@@ -1962,7 +1966,8 @@ static List *fix_hashclauses(PlannerGlobal *glob,
                 outer_itlist,
                 inner_itlist,
                 (Index) 0,
-                rtoffset);
+                rtoffset,
+                INNER);
         new_args = lappend(new_args, new_outer_arg);
         new_args = lappend(new_args, new_inner_arg);
         /* replace old arguments with the fixed arguments */
@@ -1994,7 +1999,8 @@ fix_child_hashclauses(PlannerGlobal *glob,
               indexed_tlist *outer_itlist,
               indexed_tlist *inner_itlist,
               Index skip_rel,
-              int rtoffset)
+              int rtoffset,
+              Index child)
 {
     fix_join_expr_context context;
     context.glob = glob;
@@ -2002,8 +2008,18 @@ fix_child_hashclauses(PlannerGlobal *glob,
     context.inner_itlist = inner_itlist;
     context.skip_rel = skip_rel;
     context.rtoffset = rtoffset;
-    /* skips using target list of other child when matching non-vars */
-    context.use_other_child_tlist_for_matching_nonvars = false;
+    if (INNER == child)
+    {
+    	/* skips using outer target list when matching non-vars */
+    	context.use_outer_tlist_for_matching_nonvars = false;
+    	context.use_inner_tlist_for_matching_nonvars = true;
+	}
+	else
+	{
+    	/* skips using inner target list when matching non-vars */
+    	context.use_inner_tlist_for_matching_nonvars = false;
+    	context.use_outer_tlist_for_matching_nonvars = true;
+	}	
     return (List *) fix_join_expr_mutator((Node *) clauses, &context);
 }
 
@@ -2045,7 +2061,7 @@ fix_join_expr_mutator(Node *node, fix_join_expr_context *context)
 		elog(ERROR, "variable not found in subplan target lists");
 	}
 	if (context->outer_itlist && context->outer_itlist->has_non_vars &&
-	        context->use_other_child_tlist_for_matching_nonvars)
+	        context->use_outer_tlist_for_matching_nonvars)
 	{
 		newvar = search_indexed_tlist_for_non_var(node,
 												  context->outer_itlist,
@@ -2054,7 +2070,7 @@ fix_join_expr_mutator(Node *node, fix_join_expr_context *context)
 			return (Node *) newvar;
 	}
 	if (context->inner_itlist && context->inner_itlist->has_non_vars &&
-	        context->use_other_child_tlist_for_matching_nonvars)
+	        context->use_inner_tlist_for_matching_nonvars)
 	{
 		newvar = search_indexed_tlist_for_non_var(node,
 												  context->inner_itlist,
