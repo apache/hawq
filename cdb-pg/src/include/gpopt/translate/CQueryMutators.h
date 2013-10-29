@@ -143,9 +143,6 @@ namespace gpdxl
 				// indicate whether we are mutating the argument of an aggregate
 				BOOL m_fAggregateArg;
 
-				// indicate whether we are mutating an expression representing a grouping column
-				BOOL m_fGroupingCol;
-				
 				// ctor
 				SContextGrpbyPlMutator
 					(
@@ -161,8 +158,7 @@ namespace gpdxl
 					m_plTENewGroupByQuery(plTENewGroupByQuery),
 					m_ulCurrLevelsUp(0),
 					m_ulRessortgroupref(0),
-					m_fAggregateArg(false),
-					m_fGroupingCol(false)
+					m_fAggregateArg(false)
 				{
 				}
 
@@ -300,7 +296,11 @@ namespace gpdxl
 
 			// mutate the grouping columns, fix levels up when necessary
 			static
-			Node *PnodeGroupingColMutator(Node *pnode, TargetEntry *pteOriginal, SContextGrpbyPlMutator *pctxGrpByMutator);
+			Node *PnodeGrpColMutator(Node *pnode, void *pctx);
+
+			// fix the level up of grouping columns when necessary
+			static
+			Node *PnodeFixGrpCol(Node *pnode, TargetEntry *pteOriginal, SContextGrpbyPlMutator *pctxGrpByMutator);
 
 			// return a target entry for the aggregate or percentile expression
 			static

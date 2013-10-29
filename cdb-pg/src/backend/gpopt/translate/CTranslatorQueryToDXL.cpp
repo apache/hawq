@@ -2880,7 +2880,7 @@ CTranslatorQueryToDXL::PdxlnFromCTE
 			(
 			gpdxl::ExmaDXL,
 			gpdxl::ExmiQuery2DXLError,
-			GPOS_WSZ_LIT("CTE")
+			GPOS_WSZ_LIT("No CTE")
 			);
 	}
 

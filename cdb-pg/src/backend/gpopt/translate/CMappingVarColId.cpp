@@ -96,7 +96,7 @@ CMappingVarColId::Pgpdbattoptcol
 	if (NULL == pgpdbattoptcol)
 	{
 		// TODO: raghav, Sept 09 2013, remove temporary fix (revert exception to assert) to avoid crash during algebrization
-		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLError, GPOS_WSZ_LIT("Variable"));
+		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLError, GPOS_WSZ_LIT("No variable"));
 	}
 
 	pgpdbattinfo->Release();
