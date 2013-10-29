@@ -13,11 +13,16 @@
   <!-- ====================================================================== -->
 
   <property name="repo.dir" value="/opt/repo"/>
-  <settings defaultResolver="public"/>
+  <settings defaultResolver="chain"/>
 
   <!-- ====================================================================== -->
 
   <resolvers>
+    <!-- this resolver is used for integration test of third-part library such as libhdfs3, ${HAWQ_ROOT}/repo directory should be empty in main branch -->
+    <filesystem name="integration">
+      <ivy      pattern="${ivy.settings.dir}/../../../repo/[organization]/[module]/[revision]/[type]s/ivy-[revision].xml" />
+      <artifact pattern="${ivy.settings.dir}/../../../repo/[organization]/[module]/[revision]/[type]s/[artifact]-[revision].[ext]" />
+    </filesystem>
     <filesystem name="local">
       <ivy      pattern="${repo.dir}/[organization]/[module]/[revision]/[type]s/ivy-[revision].xml" />
       <artifact pattern="${repo.dir}/[organization]/[module]/[revision]/[type]s/[artifact]-[revision].[ext]" />
@@ -26,6 +31,10 @@
       <ivy      pattern="http://artifactory.greenplum.com/gpdb-ext-release-local/[organization]/[module]/[revision]/[type]s/ivy-[revision].xml" />
       <artifact pattern="http://artifactory.greenplum.com/gpdb-ext-release-local/[organization]/[module]/[revision]/[type]s/[artifact]-[revision].[ext]" />
     </url>
+    <chain name="chain">
+      <resolver ref="public"/>
+      <resolver ref="integration"/>
+    </chain>
   </resolvers>
 
   <!-- ====================================================================== -->
