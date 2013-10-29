@@ -476,21 +476,24 @@ TypenameGetTypid(const char *typname)
 
 /*
  * TypeOidGetTypename
- * 		Get the name of the type, given the OID
+ * Get the name of the type, given the OID
  */
 char*
 TypeOidGetTypename(Oid typeid)
 {
-	HeapTuple type_tuple;
 	StringInfoData tname;
 	initStringInfo(&tname);
-
-	type_tuple = SearchSysCache(TYPEOID, ObjectIdGetDatum(typeid), 0, 0, 0);
-	Insist(HeapTupleIsValid(type_tuple));
-
-	appendStringInfo(&tname, "%s", ((Form_pg_type) GETSTRUCT(type_tuple))->typname.data);
-	ReleaseSysCache(type_tuple);
-
+	
+	Assert(OidIsValid(typeid));	
+	char* typename = caql_getcstring(
+									 NULL,
+									 cql("SELECT typname FROM pg_type "
+										 " WHERE oid = :1",
+										 ObjectIdGetDatum(typeid)));
+	if (typename == NULL)
+		elog(ERROR, "oid [%u] not found in table pg_type", typeid);
+	
+	appendStringInfo(&tname, "%s", typename);
 	return tname.data;
 }
 
