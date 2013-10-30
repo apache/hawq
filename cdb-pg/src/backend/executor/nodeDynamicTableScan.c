@@ -19,6 +19,8 @@
 #include "commands/tablecmds.h"
 #include "nodes/pg_list.h"
 #include "utils/memutils.h"
+#include "cdb/cdbpartition.h"
+#include "cdb/cdbvars.h"
 
 #define DYNAMIC_TABLE_SCAN_NSLOTS 2
 
@@ -173,6 +175,11 @@ setPidIndex(DynamicTableScanState *node)
 	{
 		Assert(estate->dynamicTableScanInfo->numScans > plan->partIndex);
 		node->pidIndex = estate->dynamicTableScanInfo->pidIndexes[plan->partIndex];
+	}
+
+	if (optimizer_partition_selection_log)
+	{
+		LogSelectedPartitionOids(node->pidIndex);
 	}
 }
 

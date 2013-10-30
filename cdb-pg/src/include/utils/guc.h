@@ -361,7 +361,11 @@ extern double optimizer_damping_factor_filter;
 extern double optimizer_damping_factor_join;
 extern double optimizer_damping_factor_groupby;
 extern int optimizer_segments;
-
+extern bool optimizer_analyze_root_partition;
+/**
+ * Enable logging of DPE match in optimizer.
+ */
+extern bool	optimizer_partition_selection_log;
 
 #if USE_EMAIL
 extern char  *gp_email_smtp_server;

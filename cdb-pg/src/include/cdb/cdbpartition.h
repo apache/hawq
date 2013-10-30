@@ -253,4 +253,13 @@ extern Node *makeBoolConst(bool value, bool isnull);
 
 extern LogicalIndexInfo *logicalIndexInfoForIndexOid(Oid rootOid, Oid indexOid);
 
+extern char *
+DebugPartitionOid(Datum *elements, int n);
+
+extern void
+GetSelectedPartitionOids(HTAB *partOidHash, Datum **partOids, long *partCount);
+
+extern void
+LogSelectedPartitionOids(HTAB *pidIndex);
+
 #endif   /* CDBPARTITION_H */

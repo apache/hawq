@@ -659,6 +659,7 @@ bool gp_disable_catalog_access_on_segment = false;
 /* ORCA related gucs */
 bool		optimizer;
 bool		optimizer_log;
+bool		optimizer_partition_selection_log;
 bool		optimizer_minidump;
 bool		optimizer_print_query;
 bool		optimizer_print_plan;
@@ -3446,6 +3447,16 @@ static struct config_bool ConfigureNamesBool[] =
 		},
 		&optimizer_log,
 		true, NULL, NULL
+	},
+
+	{
+		{"optimizer_partition_selection_log", PGC_USERSET, LOGGING_WHAT,
+			gettext_noop("Log optimizer partition selection."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE | GUC_GPDB_ADDOPT
+		},
+		&optimizer_partition_selection_log,
+		false, NULL, NULL
 	},
 
 	{

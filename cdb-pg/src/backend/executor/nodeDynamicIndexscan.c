@@ -23,6 +23,7 @@
 #include "access/catquery.h"
 #include "nodes/nodeFuncs.h"
 #include "utils/memutils.h"
+#include "cdb/cdbvars.h"
 
 /* Number of slots required for DynamicIndexScan */
 #define DYNAMICINDEXSCAN_NSLOTS 2
@@ -204,6 +205,11 @@ setPidIndex(DynamicIndexScanState *node)
 	{
 		Assert(estate->dynamicTableScanInfo->numScans > plan->partIndex);
 		node->pidxIndex = estate->dynamicTableScanInfo->pidIndexes[plan->partIndex];
+	}
+
+	if (optimizer_partition_selection_log)
+	{
+		LogSelectedPartitionOids(node->pidxIndex);
 	}
 }
 

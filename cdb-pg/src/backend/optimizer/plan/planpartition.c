@@ -1207,44 +1207,14 @@ static ArrayType *CreateEmptyPartitionOidArray()
 }
 
 /**
- * Function that returns a string representation of partitions chosen from oid array.
- */
-static char* DebugPartitionOid(Datum *elements, int n)
-{
-
-	StringInfoData str;
-	initStringInfo(&str);
-	appendStringInfo(&str, "{");
-	for (int i=0;i<n;i++)
-	{
-		Oid o = DatumGetObjectId(elements[i]);
-		appendStringInfo(&str, "%s, ", get_rel_name(o));
-	}
-	appendStringInfo(&str, "}");
-	return str.data;
-}
-
-/**
  * Construct an array of partition oids from partition match info.
  */
 static ArrayType *ExtractPartitionOidArray(PartitionMatchInfo *pmi)
 {
-	long numPartitions = hash_get_num_entries(pmi->matchingPartitionOids);
-
-	Datum *elements = (Datum *) palloc(numPartitions * sizeof(Datum));
-	HASH_SEQ_STATUS status;
-	hash_seq_init(&status, pmi->matchingPartitionOids);
-
-	Oid *partOid = NULL;
-	int i = 0;
-	while ((partOid = (Oid *) hash_seq_search(&status)) != NULL)
-	{
-		Assert(partOid);
-		Assert(i < numPartitions);
-		elements[i] = ObjectIdGetDatum(*partOid);
-		i++;
-	}
-	Assert(i == numPartitions);
+	Datum *elements = NULL;
+	long numPartitions = 0;
+	GetSelectedPartitionOids(pmi->matchingPartitionOids, &elements, &numPartitions);
+	Assert(NULL != elements);
 
 	ArrayType *array = construct_array(elements, numPartitions, OIDOID, sizeof(Oid), true, 'i');
 
@@ -1252,6 +1222,8 @@ static ArrayType *ExtractPartitionOidArray(PartitionMatchInfo *pmi)
 	{
 		elog(LOG, "DPE matched partitions: %s", DebugPartitionOid(elements, numPartitions));
 	}
+
+	pfree(elements);
 
 	return array;
 }
