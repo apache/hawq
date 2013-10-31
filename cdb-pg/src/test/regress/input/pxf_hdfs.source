@@ -535,12 +535,16 @@ SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_good' AND relpages 
 -- NOTE: we can't guarantee the same results on each machine. We just check that defaults were changed
 SET pxf_enable_stat_collection = true;
 ANALYZE avfav_analyze_good;
-SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_good' AND relpages != 1000 AND relpages > 0; -- TODO: add reltuples when implemented
+SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_good' 
+                              AND relpages != 1000 AND relpages > 0
+                              AND reltuples != 1000000 AND reltuples > 0;
 
 -- verify that stats stay updated to most recent value after ANALYZE with GUC off
 SET pxf_enable_stat_collection = false;
 ANALYZE avfav_analyze_good;
-SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_good' AND relpages != 1000 AND relpages > 0; -- TODO: add reltuples when implemented
+SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_good' 
+                              AND relpages != 1000 AND relpages > 0
+                              AND reltuples != 1000000 AND reltuples > 0;
 
 -- verify that ANALYZE doesn't break while checking out a table that can't connect to the analyzer module
 -- TODO: find a way to verify that previous stat values remain.

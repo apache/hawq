@@ -288,9 +288,11 @@ DROP EXTERNAL TABLE wrseq;
 -- Test data was written
 --
 \! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrcustom | grep Found | awk '{ if ($2>0) print "ok";}'
-ok  
+ok
 \! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrcustom | awk '{ if ($1>0) print "ok";}'
-ok  
+ok
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du /gpdb_regression_data/writable/wrcustom | awk '{if ($1<=0) print $0,": error";}'
+ok
 --
 -- Read data
 --
@@ -421,6 +423,48 @@ FORMAT 'custom' (formatter='pxfwritable_export');
 INSERT INTO wr_char_err VALUES (100, 'a'), (1000, 'b');
 ERROR:  remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v7/Writable/stream. Reason:     Server Error   Caused by:  com.pivotal.pxf.exception.BadRecordException: com.pivotal.pxf.exception.UnsupportedTypeException: Type char is not supported by GPDBWritable (SOMEFILE:SOMEFUNC)
 DROP EXTERNAL TABLE wr_char_err;
+--
+-- 8. Test ANALYZE on writable table
+--
+SET pxf_enable_stat_collection = true;
+CREATE WRITABLE EXTERNAL TABLE writable_analyze_no_analyzer(s1 text, 
+                               		                        n1 int, 
+							   		                        n2 int)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/analyze/noanalyzer?ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver')
+FORMAT 'TEXT';
+ANALYZE writable_analyze_no_analyzer;
+SELECT COUNT(*) FROM pg_class WHERE relname = 'writable_analyze_no_analyzer' AND relpages = 1 AND reltuples = 0;
+ count 
+-------
+     1
+(1 row)
+
+INSERT INTO writable_analyze_no_analyzer VALUES ('nothing', 0, 0), ('will', 0, 0), ('happen', 0, 0);
+SELECT COUNT(*) FROM pg_class WHERE relname = 'writable_analyze_no_analyzer' AND relpages = 1 AND reltuples = 0;
+ count 
+-------
+     1
+(1 row)
+
+CREATE WRITABLE EXTERNAL TABLE writable_analyze_with_analyzer(s1 text, 
+                               		                          n1 int, 
+							   		                          n2 int)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/analyze/analyzer?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver&ANLYZER=HdfsAnalyzer')
+FORMAT 'TEXT';
+ANALYZE writable_analyze_with_analyzer;
+SELECT COUNT(*) FROM pg_class WHERE relname = 'writable_analyze_with_analyzer' AND relpages = 1 AND reltuples = 0;
+ count 
+-------
+     1
+(1 row)
+
+INSERT INTO writable_analyze_with_analyzer VALUES ('nothing', 0, 0), ('will', 0, 0), ('happen', 0, 0);
+SELECT COUNT(*) FROM pg_class WHERE relname = 'writable_analyze_with_analyzer' AND relpages = 1 AND reltuples = 0;
+ count 
+-------
+     1
+(1 row)
+
 --
 -- Cleanup: delete all data that was written into hdfs
 --
