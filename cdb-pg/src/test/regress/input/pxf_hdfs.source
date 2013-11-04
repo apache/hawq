@@ -18,6 +18,9 @@
 -- m/(ERROR|WARNING):.*remote component error.*\(\d+\).*from.*'\d+\.\d+\.\d+\.\d+:\d+'.*/
 -- s/'\d+\.\d+\.\d+\.\d+:\d+'/'SOME_IP:SOME_PORT'/
 --
+-- m/(remote component error \(0\): Failed connect to @hostname@:12345; Connection refused|remote component error \(0\): couldn't connect to host).*/
+-- s/(Failed connect to @hostname@:12345; Connection refused|couldn't connect to host)/CURL_CON_ERROR/
+--
 -- end_matchsubs
 -- start_matchignore
 --
@@ -436,7 +439,7 @@ DROP EXTERNAL TABLE host_err;
 --
 CREATE EXTERNAL TABLE port_err(t1 text,
                                a1 integer)
-LOCATION ('pxf://@hostname@:9000/gpdb_regression_data/multiblock.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver')
+LOCATION ('pxf://@hostname@:12345/gpdb_regression_data/multiblock.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver')
 FORMAT 'TEXT' (DELIMITER ',');
 SELECT t1, a1 FROM port_err ORDER BY t1 LIMIT 10; -- negative
 DROP EXTERNAL TABLE port_err;
