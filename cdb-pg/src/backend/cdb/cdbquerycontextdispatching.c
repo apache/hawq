@@ -21,6 +21,7 @@
 #include "catalog/gp_fastsequence.h"
 #include "catalog/pg_aggregate.h"
 #include "catalog/pg_language.h"
+#include "catalog/pg_type.h"
 #include "catalog/pg_attrdef.h"
 #include "catalog/pg_attribute_encoding.h"
 #include "catalog/pg_constraint.h"
@@ -88,7 +89,7 @@ typedef enum QueryContextDispatchingItemType QueryContextDispatchingItemType;
 
 enum QueryContextDispatchingObjType
 {
-  RelationType, TablespaceType, NamespaceType, ProcType, AggType, LangType
+  RelationType, TablespaceType, NamespaceType, ProcType, AggType, LangType, TypeType
 };
 typedef enum QueryContextDispatchingObjType QueryContextDispatchingObjType;
 
@@ -104,6 +105,9 @@ prepareDispatchedCatalogFunction(QueryContextInfo *ctx, Oid procOid, HTAB *htab)
 
 static void
 prepareDispatchedCatalogLanguage(QueryContextInfo *ctx, Oid langOid, HTAB *htab);
+
+static void
+prepareDispatchedCatalogType(QueryContextInfo *ctx, Oid typeOid, HTAB *htab);
 
 static void
 prepareDispatchedCatalogAggregate(QueryContextInfo *ctx, Oid aggfuncoid, HTAB *htab);
@@ -1686,7 +1690,10 @@ prepareDispatchedCatalogFunction(QueryContextInfo *cxt, Oid procOid, HTAB *htab)
 	HeapTuple proctuple;
 	Datum langDatum;
 	Oid langOid;
-	bool isNull = false;
+	bool langisNull = false;
+	Datum typeDatum;
+	Oid typeOid;
+	bool typeisNull = false;
 
     Assert(procOid != InvalidOid);
 
@@ -1709,13 +1716,20 @@ prepareDispatchedCatalogFunction(QueryContextInfo *cxt, Oid procOid, HTAB *htab)
     if (!HeapTupleIsValid(proctuple))
         elog(ERROR, "cache lookup failed for proc %u", procOid);
 
-	langDatum = caql_getattr(pcqCtx, Anum_pg_proc_prolang, &isNull);
-	if (!isNull && langDatum)
+	langDatum = caql_getattr(pcqCtx, Anum_pg_proc_prolang, &langisNull);
+	if (!langisNull && langDatum)
 	{
 		langOid = DatumGetObjectId(langDatum);
 		prepareDispatchedCatalogLanguage(cxt, langOid, htab);
 	}
 	
+	typeDatum = caql_getattr(pcqCtx, Anum_pg_proc_prorettype, &typeisNull);
+	if (!typeisNull && typeDatum)
+	{
+		typeOid = DatumGetObjectId(typeDatum);
+		prepareDispatchedCatalogType(cxt, typeOid, htab);
+	}
+
 	AddTupleToContextInfo(cxt, ProcedureRelationId, "pg_proc", proctuple, MASTER_CONTENT_ID);
 	
 	caql_endscan(pcqCtx);
@@ -1758,6 +1772,38 @@ prepareDispatchedCatalogLanguage(QueryContextInfo *ctx, Oid langOid, HTAB *htab)
 		prepareDispatchedCatalogFunction(ctx, DatumGetObjectId(lang_handler_Datum), htab);
 	}
 
+
+	caql_endscan(pcqCtx);			
+}
+
+static void
+prepareDispatchedCatalogType(QueryContextInfo *ctx, Oid typeOid, HTAB *htab)
+{
+	HeapTuple typetuple;
+
+	Assert(typeOid != InvalidOid);
+
+	/*   
+	 * buildin object, dispatch nothing
+	 */
+	if (typeOid < FirstNormalObjectId)
+		return;
+
+	if (alreadyAddedForDispatching(htab, typeOid, TypeType))
+		return;
+
+	/* look up the tuple in pg_type */
+	cqContext  *pcqCtx;
+	pcqCtx = caql_beginscan(NULL,
+							cql("SELECT * FROM pg_type "
+								" WHERE oid = :1 ",
+								ObjectIdGetDatum(typeOid)));											
+	typetuple = caql_getnext(pcqCtx);
+
+	if (!HeapTupleIsValid(typetuple))
+		elog(ERROR, "cache lookup failed for type %u", typeOid);				
+
+	AddTupleToContextInfo(ctx, TypeRelationId, "pg_type", typetuple, MASTER_CONTENT_ID);	
 
 	caql_endscan(pcqCtx);			
 }
