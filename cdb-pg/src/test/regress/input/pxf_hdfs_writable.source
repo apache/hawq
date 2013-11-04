@@ -324,6 +324,31 @@ INSERT INTO writable_analyze_with_analyzer VALUES ('nothing', 0, 0), ('will', 0,
 SELECT COUNT(*) FROM pg_class WHERE relname = 'writable_analyze_with_analyzer' AND relpages = 1 AND reltuples = 0;
 
 --
+-- 10. Test CSV format 
+--
+CREATE WRITABLE EXTERNAL TABLE writable_csv(number int,
+                                            name text,
+                                            position char)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/csv?ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver')
+FORMAT 'CSV';
+INSERT INTO writable_csv VALUES (4, 'H Waldman', 'P'),
+                                (6, 'Papi Turgeman', 'S'),
+                                (13, 'Radisav Ćurčić', 'C'),
+                                (11, 'Derrick Hamilton', 'F'),
+                                (15, 'Kenny Williams', 'F');
+DROP EXTERNAL TABLE writable_csv;
+--
+-- Test data was written
+--
+CREATE EXTERNAL TABLE readable_csv(number int,
+                                   name text,
+                                   position char)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/csv?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver')
+FORMAT 'CSV';
+SELECT * FROM readable_csv ORDER BY number;
+DROP EXTERNAL TABLE readable_csv;
+
+--
 -- Cleanup: delete all data that was written into hdfs
 --
 -- start_ignore
