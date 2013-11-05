@@ -12,6 +12,9 @@
 -- m/(ERROR|WARNING):.*remote component error.*\(\d+\).*from.*'\d+\.\d+\.\d+\.\d+:\d+'.*/
 -- s/'\d+\.\d+\.\d+\.\d+:\d+'/'SOME_IP:SOME_PORT'/
 --
+-- m/(remote component error \(0\): Failed connect to @hostname@:12345; Connection refused|remote component error \(0\): couldn't connect to host).*/
+-- s/(Failed connect to @hostname@:12345; Connection refused|couldn't connect to host)/CURL_CON_ERROR/
+--
 -- end_matchsubs
 -- start_matchignore
 --
@@ -288,9 +291,11 @@ DROP EXTERNAL TABLE wrseq;
 -- Test data was written
 --
 \! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrcustom | grep Found | awk '{ if ($2>0) print "ok";}'
-ok  
+ok
 \! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrcustom | awk '{ if ($1>0) print "ok";}'
-ok  
+ok
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du /gpdb_regression_data/writable/wrcustom | awk '{if ($1<=0) print $0,": error";}'
+ok
 --
 -- Read data
 --
@@ -382,13 +387,23 @@ DROP EXTERNAL TABLE readseq;
 --
 CREATE WRITABLE EXTERNAL TABLE wr_port_err(t1 text,
                                            a1 integer)
-LOCATION ('pxf://@hostname@:9000/gpdb_regression_data/writable/err?ACCESSOR=TextFileWAccessor&RESOLVER=TextWResolver')
+LOCATION ('pxf://@hostname@:12345/gpdb_regression_data/writable/err?ACCESSOR=TextFileWAccessor&RESOLVER=TextWResolver')
 FORMAT 'TEXT' (DELIMITER ',');
 INSERT INTO wr_port_err VALUES ('first',1), ('second',2), ('third',3);
-ERROR:  remote component error (0): There is no pxf servlet listening on the host and port specified in the external table url (SOMEFILE:SOMEFUNC)
+ERROR:  remote component error (0): CURL_CON_ERROR (SOMEFILE:SOMEFUNC)
 DROP EXTERNAL TABLE wr_port_err;
 --
--- 5. Test circle type converted to text and back
+-- 5. Test error in host -- negative
+--
+CREATE WRITABLE EXTERNAL TABLE wr_host_err(t1 text,
+                                           a1 integer)
+LOCATION ('pxf://badhostname:50070/gpdb_regression_data/writable/err?ACCESSOR=TextFileWAccessor&RESOLVER=TextWResolver')
+FORMAT 'TEXT' (DELIMITER ',');
+INSERT INTO wr_host_err VALUES ('first',1), ('second',2), ('third',3);
+ERROR:  remote component error (0): Couldn't resolve host 'badhostname' (SOMEFILE:SOMEFUNC)
+DROP EXTERNAL TABLE wr_host_err;
+--
+-- 6. Test circle type converted to text and back
 --
 CREATE WRITABLE EXTERNAL TABLE wr_circle(a1 integer,
                                          c1 circle)
@@ -412,7 +427,7 @@ SELECT * FROM read_circle ORDER BY a1;
 
 DROP EXTERNAL TABLE read_circle;
 --
--- 6. Test unsupported type in writable resolver -- negative
+-- 7. Test unsupported type in writable resolver -- negative
 --
 CREATE WRITABLE EXTERNAL TABLE wr_char_err(a1 integer,
                                            c1 char)
@@ -421,6 +436,48 @@ FORMAT 'custom' (formatter='pxfwritable_export');
 INSERT INTO wr_char_err VALUES (100, 'a'), (1000, 'b');
 ERROR:  remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v7/Writable/stream. Reason:     Server Error   Caused by:  com.pivotal.pxf.exception.BadRecordException: com.pivotal.pxf.exception.UnsupportedTypeException: Type char is not supported by GPDBWritable (SOMEFILE:SOMEFUNC)
 DROP EXTERNAL TABLE wr_char_err;
+--
+-- 8. Test ANALYZE on writable table
+--
+SET pxf_enable_stat_collection = true;
+CREATE WRITABLE EXTERNAL TABLE writable_analyze_no_analyzer(s1 text, 
+                               		                        n1 int, 
+							   		                        n2 int)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/analyze/noanalyzer?ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver')
+FORMAT 'TEXT';
+ANALYZE writable_analyze_no_analyzer;
+SELECT COUNT(*) FROM pg_class WHERE relname = 'writable_analyze_no_analyzer' AND relpages = 1 AND reltuples = 0;
+ count 
+-------
+     1
+(1 row)
+
+INSERT INTO writable_analyze_no_analyzer VALUES ('nothing', 0, 0), ('will', 0, 0), ('happen', 0, 0);
+SELECT COUNT(*) FROM pg_class WHERE relname = 'writable_analyze_no_analyzer' AND relpages = 1 AND reltuples = 0;
+ count 
+-------
+     1
+(1 row)
+
+CREATE WRITABLE EXTERNAL TABLE writable_analyze_with_analyzer(s1 text, 
+                               		                          n1 int, 
+							   		                          n2 int)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/analyze/analyzer?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver&ANLYZER=HdfsAnalyzer')
+FORMAT 'TEXT';
+ANALYZE writable_analyze_with_analyzer;
+SELECT COUNT(*) FROM pg_class WHERE relname = 'writable_analyze_with_analyzer' AND relpages = 1 AND reltuples = 0;
+ count 
+-------
+     1
+(1 row)
+
+INSERT INTO writable_analyze_with_analyzer VALUES ('nothing', 0, 0), ('will', 0, 0), ('happen', 0, 0);
+SELECT COUNT(*) FROM pg_class WHERE relname = 'writable_analyze_with_analyzer' AND relpages = 1 AND reltuples = 0;
+ count 
+-------
+     1
+(1 row)
+
 --
 -- Cleanup: delete all data that was written into hdfs
 --

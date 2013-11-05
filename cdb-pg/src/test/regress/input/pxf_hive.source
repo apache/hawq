@@ -212,7 +212,7 @@ t2    text,
 n1 bigint)
 LOCATION ('pxf://@hostname@:50070/default__reg_txt_reg_txt_index__?PROFILE=Hive')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import');
-SELECT * FROM hv_index ORDER BY t1;
+SELECT t1, n1 FROM hv_index ORDER BY t1;
 
 -- 14. Create external table with wrong column definitions - negative test
 CREATE EXTERNAL TABLE tbl_with_wrong_col_def(

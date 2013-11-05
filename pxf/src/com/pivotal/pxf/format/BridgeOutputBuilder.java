@@ -52,23 +52,26 @@ public class BridgeOutputBuilder
 		
 		if (inputData.outputFormat() != OutputFormat.FORMAT_GPDB_WRITABLE)
 			return;
-		errorRecord = new GPDBWritable(errSchema);
-		errorRecord.setError(true);
-	}
-	
-	/*
-	 * Returns the error record
-	 */
-	public Writable getErrorOutput(Exception ex) throws Exception
-	{
-		
-		if (inputData.outputFormat() == OutputFormat.FORMAT_GPDB_WRITABLE)
-			return errorRecord;
-		else 
-			throw ex;
-	}
-	
-	/*
+
+        errorRecord = new GPDBWritable(errSchema);
+        errorRecord.setError(true);
+    }
+
+    /*
+     * Returns the error record
+     */
+    public Writable getErrorOutput(Exception ex) throws Exception
+    {
+        if (inputData.outputFormat() == OutputFormat.FORMAT_GPDB_WRITABLE)
+        {
+            errorRecord.setString(0, ex.getMessage());
+            return errorRecord;
+        }
+        else
+            throw ex;
+    }
+
+    /*
 	 * Translates recFields (obtained from the Resolver) into an output record.
 	 */
 	public Writable makeOutput(List<OneField> recFields) throws BadRecordException
@@ -139,7 +142,7 @@ public class BridgeOutputBuilder
 	void fillText(List<OneField> recFields)
 	{
 		int size = recFields.size();
-		String strline = new String();
+		String strline = "";
 
 		for (int i = 0; i < size; i++)
 		{

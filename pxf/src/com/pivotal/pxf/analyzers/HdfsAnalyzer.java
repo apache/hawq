@@ -14,7 +14,7 @@ import org.apache.hadoop.mapred.JobConf;
 
 import com.pivotal.pxf.accessors.IReadAccessor;
 import com.pivotal.pxf.bridge.ReadBridge;
-import com.pivotal.pxf.utilities.GPFusionInputFormat;
+import com.pivotal.pxf.utilities.PxfInputFormat;
 import com.pivotal.pxf.utilities.InputData;
 
 
@@ -110,8 +110,8 @@ public class HdfsAnalyzer extends Analyzer
 
 	private InputSplit[] getSplits(Path path) throws IOException
 	{
-		GPFusionInputFormat fformat = new GPFusionInputFormat();
-		GPFusionInputFormat.setInputPaths(jobConf, path);
+		PxfInputFormat fformat = new PxfInputFormat(jobConf);
+		PxfInputFormat.setInputPaths(jobConf, path);
 		return fformat.getSplits(jobConf, 1);
 	}
 

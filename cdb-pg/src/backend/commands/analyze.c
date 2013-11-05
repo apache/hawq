@@ -478,7 +478,7 @@ void analyzeStmt(VacuumStmt *stmt, List *relids)
 					/* Silently ignore tables that are temp tables of other backends. */
 					relation_close(candidateRelation, ShareUpdateExclusiveLock);
 				}
-				else if (RelationIsExternalPxf(candidateRelation, &ext_uri) &&
+				else if (RelationIsExternalPxfReadOnly(candidateRelation, &ext_uri) &&
 						 !pxf_enable_stat_collection)
 				{
 					/* PXF supports ANALYZE, but only when the GUC is on */
@@ -759,7 +759,7 @@ static void analyzeRelation(Relation relation, List *lAttributeNames)
 	Oid			sampleTableOid = InvalidOid;
 	float4		minSampleTableSize = 0;
 	bool		sampleTableRequired = true;
-	bool        isExternalPxf = false;
+	bool        isExternalPxfReadOnly = false;
 	ListCell	*le = NULL;
 	Oid			relationOid = InvalidOid;
 	float4 estimatedRelTuples = 0.0;
@@ -772,10 +772,10 @@ static void analyzeRelation(Relation relation, List *lAttributeNames)
 	
 	initStringInfo(&location);
 	relationOid		= RelationGetRelid(relation);
-	isExternalPxf	= RelationIsExternalPxf(relation, &location);
+	isExternalPxfReadOnly	= RelationIsExternalPxfReadOnly(relation, &location);
 
 	/* Step 1: estimate reltuples, relpages for the relation */
-	if (!isExternalPxf)
+	if (!isExternalPxfReadOnly)
 	{
 		analyzeEstimateReltuplesRelpages(relationOid, &estimatedRelTuples, &estimatedRelPages);
 	}
@@ -838,7 +838,7 @@ static void analyzeRelation(Relation relation, List *lAttributeNames)
 	/**
 	 * For an external PXF table, the next steps are irrelevant - it's time to leave
 	 */
-	if (isExternalPxf)
+	if (isExternalPxfReadOnly)
 	{
 		elog(elevel, "ANALYZE on PXF table %s computes only reltuples and relpages.", RelationGetRelationName(relation));
 		return;

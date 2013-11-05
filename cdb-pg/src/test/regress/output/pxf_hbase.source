@@ -821,11 +821,12 @@ SELECT * FROM gphbase_upper ORDER BY recordkey ASC;
 
 DROP EXTERNAL TABLE gphbase_upper;
 -- Negative test
-CREATE EXTERNAL TABLE gphbase_error(recordkey int)
-LOCATION ('pxf://@hostname@:50070/gphbase_test?FRAGMENTER=HBaseDataFragmenter&ACCESSOR=HBaseAccessor&RESOLVER=HBaseResolver')
+CREATE EXTERNAL TABLE gphbase_error("cf1:q1" INT, -- wrong column type
+                                    recordkey TEXT)
+LOCATION ('pxf://@hostname@:50070/gphbase_test?PROFILE=HBase')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import');
-SELECT * FROM gphbase_error;
-ERROR:  Reporting a badly formatted data record which was detected by the java reader. See GPBridge log for more details
+SELECT * FROM gphbase_error ORDER BY recordkey ASC;
+ERROR:  Error converting value 'ASCII00000000' to type int4. (original error: For input string: "ASCII00000000")
 DETAIL:  External table gphbase_error
 DROP EXTERNAL TABLE gphbase_error;
 -- query without lookup table

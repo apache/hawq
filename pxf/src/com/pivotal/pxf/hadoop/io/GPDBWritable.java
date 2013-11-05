@@ -8,6 +8,7 @@ import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
+import java.util.Arrays;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -23,8 +24,8 @@ import org.apache.hadoop.io.Writable;
 public class GPDBWritable implements Writable {
 	/*
 	 * GPDBWritable is using the following serialization form:
-	 * Total Length | Version | #columns | Col type | Col type |... | Null Bit array   | Col val...
-     * 4 byte		| 2 byte	2 byte	   1 byte     1 byte	      ceil(#col/8) byte	 fixed length or var len
+	 * Total Length | Version | Error Flag | # of columns | Col type |...| Col type | Null Bit array            |   Col val...
+     * 4 byte		| 2 byte  |	1 byte     |   2 byte     |  1 byte  |...|  1 byte  | ceil(# of columns/8) byte |   Fixed or Var length
      * 
      * For fixed length type, we know the length.
      * In the col val, we align pad according to the alignment requirement of the type.
@@ -56,30 +57,28 @@ public class GPDBWritable implements Writable {
 	public static final int TIME      = 1083;
 	public static final int TIMESTAMP = 1114;
 	public static final int NUMERIC   = 1700;
-	
+
 	/*
 	 * Enum of the Database type
 	 */
 	private enum DBType 
 	{
-		BIGINT(8, 8, false), 
-		BOOLEAN(1, 1, false), 
-		FLOAT8(8, 8, false), 
-		INTEGER(4, 4, false), 
-		REAL(4, 4, false),
-		SMALLINT(2, 2, false), 
-		BYTEA(4, -1, false), 
-		TEXT(4, -1, true);
+		BIGINT(8, 8),
+		BOOLEAN(1, 1),
+		FLOAT8(8, 8),
+		INTEGER(4, 4),
+		REAL(4, 4),
+		SMALLINT(2, 2),
+		BYTEA(4, -1),
+		TEXT(4, -1);
 		
 		private final int typelength; // -1 means var length
 		private final int alignment;
-		private final boolean isTextFormat;
 
-		DBType(int align, int len, boolean istext)
+		DBType(int align, int len)
 		{
 			this.typelength = len;
 			this.alignment  = align;
-			this.isTextFormat = istext;
 		}
 		
 		public int getTypeLength()
@@ -264,12 +263,12 @@ public class GPDBWritable implements Writable {
 					curOffset += coldbtype[i].getTypeLength();
 				
 				switch(colType[i]) {
-					case BIGINT:   { long    val = in.readLong();    colValue[i] = new Long(val);    break; } 
-					case BOOLEAN:  { boolean val = in.readBoolean(); colValue[i] = new Boolean(val); break; }
-					case FLOAT8:   { double  val = in.readDouble();  colValue[i] = new Double(val);  break; }
-					case INTEGER:  { int     val = in.readInt();     colValue[i] = new Integer(val); break; }
-					case REAL:     { float   val = in.readFloat();   colValue[i] = new Float(val);   break; }
-					case SMALLINT: { short   val = in.readShort();   colValue[i] = new Short(val);   break; }
+					case BIGINT:   { long    val = in.readLong();    colValue[i] = val;    break; }
+					case BOOLEAN:  { boolean val = in.readBoolean(); colValue[i] = val; break; }
+					case FLOAT8:   { double  val = in.readDouble();  colValue[i] = val;  break; }
+					case INTEGER:  { int     val = in.readInt();     colValue[i] = val; break; }
+					case REAL:     { float   val = in.readFloat();   colValue[i] = val;   break; }
+					case SMALLINT: { short   val = in.readShort();   colValue[i] = val;   break; }
 					
 					/* For BYTEA column, it has a 4 byte var length header. */
 					case BYTEA:    { 
@@ -302,7 +301,7 @@ public class GPDBWritable implements Writable {
 		
 		if (errorFlag != 0)
 		{
-			throw new IOException("Recieved error value " + errorFlag + " from format");
+			throw new IOException("Received error value " + errorFlag + " from format");
 		}
 	}
 
@@ -327,8 +326,8 @@ public class GPDBWritable implements Writable {
 		int datlen = 4 + 2 + 1 + 2;
 		datlen += numCol;
 		datlen += getNullByteArraySize(numCol);
-		
-		for (int i = 0; i < numCol; i++) 
+
+		for (int i = 0; i < numCol; i++)
 		{
 			/* Get the enum type */
 			DBType coldbtype;
@@ -346,7 +345,7 @@ public class GPDBWritable implements Writable {
 			enumType[i] = (byte)(coldbtype.ordinal());
 
 			/* Get the actual value, and set the null bit */
-			if (colValue[i] == null) 
+			if (colValue[i] == null)
 			{
 				nullBits[i]  = true;
 				colLength[i] = 0;
@@ -358,7 +357,7 @@ public class GPDBWritable implements Writable {
 				/* 
 				 * For fixed length type, we get the fixed length.
 				 * For var len binary format, the length is in the col value.
-				 * For text format, we must must convert encoding first.
+				 * For text format, we must convert encoding first.
 				 */
 				if (!coldbtype.isVarLength())
 					colLength[i] = coldbtype.getTypeLength();
@@ -410,12 +409,12 @@ public class GPDBWritable implements Writable {
 				/* Now, write the actual column value */
 				switch(colType[i]) 
 				{
-					case BIGINT:   out.writeLong(   ((Long)   colValue[i]).longValue());    break;
-					case BOOLEAN:  out.writeBoolean(((Boolean)colValue[i]).booleanValue()); break;
-					case FLOAT8:   out.writeDouble( ((Double) colValue[i]).doubleValue());  break;
-					case INTEGER:  out.writeInt(    ((Integer)colValue[i]).intValue());     break;
-					case REAL:     out.writeFloat(  ((Float)  colValue[i]).floatValue());   break;
-					case SMALLINT: out.writeShort(  ((Short)  colValue[i]).shortValue());   break;
+					case BIGINT:   out.writeLong(   ((Long)   colValue[i]));    break;
+					case BOOLEAN:  out.writeBoolean(((Boolean)colValue[i])); break;
+					case FLOAT8:   out.writeDouble( ((Double) colValue[i]));  break;
+					case INTEGER:  out.writeInt(    ((Integer)colValue[i]));     break;
+					case REAL:     out.writeFloat(  ((Float)  colValue[i]));   break;
+					case SMALLINT: out.writeShort(  ((Short)  colValue[i]));   break;
 						
 					/* For BYTEA format, add 4byte length header at the beginning  */
 					case BYTEA:
@@ -433,7 +432,7 @@ public class GPDBWritable implements Writable {
 				}	
 			}
 		}
-		
+
 		/* End padding */
 		out.write(padbytes, 0, endpadding);
 	}
@@ -768,19 +767,12 @@ public class GPDBWritable implements Writable {
 	 * Private Helper routine to tell whether a type is Text form or not
 	 * @param type the type OID that we want to check
 	 */
-	private boolean isTextForm(int type) {
-		if (type==BIGINT ||
-			type==BOOLEAN ||
-			type==BYTEA ||
-			type==FLOAT8 ||
-			type==INTEGER ||
-			type==REAL ||
-			type==SMALLINT)
-			return false;
-		return true;
-	}
-	
-	/**
+    private boolean isTextForm(int type)
+    {
+        return !Arrays.asList(BIGINT, BOOLEAN, BYTEA, FLOAT8, INTEGER, REAL, SMALLINT).contains(type);
+    }
+
+    /**
 	 * Private Helper to get the type name for raising error.
 	 * If a given oid is not in the commonly used list, we
 	 * would expect a TEXT for it (for the error message).

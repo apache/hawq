@@ -39,6 +39,8 @@ PG_MODULE_MAGIC;
 PG_FUNCTION_INFO_V1(gpdbwritableformatter_export);
 PG_FUNCTION_INFO_V1(gpdbwritableformatter_import);
 
+static const int ERR_COL_OFFSET = 9;
+
 typedef struct {
 	/* The Datum/null of the tuple */
 	Datum     *values;
@@ -149,15 +151,13 @@ static uint8 readInt1FromBuffer(char* buffer, int *offset)
 static inline bool isBinaryFormatType(Oid typeid)
 {
 	/* For version 1, we support binary format for these type */
-	if (typeid == BOOLOID   ||
+	return(typeid == BOOLOID   ||
 		typeid == BYTEAOID  ||
 		typeid == FLOAT4OID ||
 		typeid == FLOAT8OID ||
 		typeid == INT2OID   ||
 		typeid == INT4OID   ||
-		typeid == INT8OID)
-		return true;
-	return false;
+		typeid == INT8OID);
 }
 
 /*
@@ -165,9 +165,7 @@ static inline bool isBinaryFormatType(Oid typeid)
  */
 static inline bool isVariableLength(Oid typeid)
 {
-	if (typeid == BYTEAOID || !isBinaryFormatType(typeid))
-		return true;
-	return false;
+	return (typeid == BYTEAOID || !isBinaryFormatType(typeid));
 }
 
 /*
@@ -649,7 +647,7 @@ gpdbwritableformatter_import(PG_FUNCTION_ARGS)
 
 	if(error_flag)
 		ereport(ERROR, (errcode(ERRCODE_DATA_EXCEPTION),
-				errmsg("Reporting a badly formatted data record which was detected by the java reader. See GPBridge log for more details")));
+				errmsg("%s", data_buf + bufidx + ERR_COL_OFFSET)));
 
 	colcnt  = readInt2FromBuffer(data_buf, &bufidx);
 
@@ -677,22 +675,22 @@ gpdbwritableformatter_import(PG_FUNCTION_ARGS)
 		{
 			FmgrInfo *iofunc = &(myData->io_functions[i]);
 
-			/* Skip the aligment padding
-			 * For fixed length type, use the type aligment.
-			 * For var length type, always align int4 because we'reading a length header.
+			/* Skip the alignment padding for variable length type: always align int4 because we're reading a length header.
+			 * we'll get the payload length from the first 4 byte.
 			 */
 			if (isVariableLength(tupdesc->attrs[i]->atttypid))
+			{
 				bufidx = INTALIGN(bufidx);
-			else
-				bufidx = att_align(bufidx, tupdesc->attrs[i]->attalign);
-
-			/* For fixed length type, we can use the type length attribute.
-			 * For variable length type, we'll get the payload length from the first 4 byte.
-			 */
-			if (isVariableLength(tupdesc->attrs[i]->atttypid))
 				myData->outlen[i] = readIntFromBuffer(data_buf, &bufidx);
+			}
+			/* Skip the alignment padding for fixed length type: use the type alignment.
+			 * we can use the type length attribute.
+			 */
 			else
+			{
+				bufidx = att_align(bufidx, tupdesc->attrs[i]->attalign);
 				myData->outlen[i] = tupdesc->attrs[i]->attlen;
+            }
 
 			if (isBinaryFormatType(tupdesc->attrs[i]->atttypid))
 			{

@@ -384,19 +384,19 @@ t2    text,
 n1 bigint)
 LOCATION ('pxf://@hostname@:50070/default__reg_txt_reg_txt_index__?PROFILE=Hive')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import');
-SELECT * FROM hv_index ORDER BY t1;
-  t1   |                               t2                               | n1  
--------+----------------------------------------------------------------+-----
- row1  | hdfs://0.0.0.0:8020/hive/warehouse/reg_txt/hive_small_data.txt |   0
- row10 | hdfs://0.0.0.0:8020/hive/warehouse/reg_txt/hive_small_data.txt | 127
- row2  | hdfs://0.0.0.0:8020/hive/warehouse/reg_txt/hive_small_data.txt |  13
- row3  | hdfs://0.0.0.0:8020/hive/warehouse/reg_txt/hive_small_data.txt |  26
- row4  | hdfs://0.0.0.0:8020/hive/warehouse/reg_txt/hive_small_data.txt |  39
- row5  | hdfs://0.0.0.0:8020/hive/warehouse/reg_txt/hive_small_data.txt |  52
- row6  | hdfs://0.0.0.0:8020/hive/warehouse/reg_txt/hive_small_data.txt |  67
- row7  | hdfs://0.0.0.0:8020/hive/warehouse/reg_txt/hive_small_data.txt |  82
- row8  | hdfs://0.0.0.0:8020/hive/warehouse/reg_txt/hive_small_data.txt |  97
- row9  | hdfs://0.0.0.0:8020/hive/warehouse/reg_txt/hive_small_data.txt | 112
+SELECT t1, n1  FROM hv_index ORDER BY t1;
+  t1   | n1  
+-------+-----
+ row1  |   0
+ row10 | 127
+ row2  |  13
+ row3  |  26
+ row4  |  39
+ row5  |  52
+ row6  |  67
+ row7  |  82
+ row8  |  97
+ row9  | 112
 (10 rows)
 
 -- 14. Create external table with wrong column definitions - negative test
