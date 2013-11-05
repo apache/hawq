@@ -4,6 +4,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.pivotal.pxf.exception.ProfileConfException;
+
+import org.apache.hadoop.io.SequenceFile.CompressionType;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -52,7 +54,7 @@ public class InputDataTest
 	}
 
     @Test
-    public void testProfileWithDuplicateProperty()
+    public void profileWithDuplicateProperty()
     {
         parameters.put("X-GP-PROFILE", "HIVE");
         try
@@ -67,7 +69,7 @@ public class InputDataTest
     }
 
     @Test
-    public void testDefinedProfile()
+    public void definedProfile()
     {
         parameters.put("X-GP-PROFILE", "HIVE");
         parameters.remove("X-GP-ACCESSOR");
@@ -79,7 +81,7 @@ public class InputDataTest
     }
 
     @Test
-    public void testUndefinedProfile()
+    public void undefinedProfile()
     {
         parameters.put("X-GP-PROFILE", "THIS_PROFILE_NEVER_EXISTED!");
         try
@@ -94,7 +96,7 @@ public class InputDataTest
     }
     
     @Test
-    public void testCompressCodec()
+    public void compressCodec()
     {
         parameters.put("X-GP-COMPRESSION_CODEC", "So I asked, who is he? He goes by the name of Wayne Rooney");   
         InputData input = new InputData(parameters);
@@ -102,7 +104,7 @@ public class InputDataTest
     }
 
     @Test
-    public void testCompressCodecBZip2()
+    public void compressCodecBZip2()
     {
         parameters.put("X-GP-COMPRESSION_CODEC", "org.apache.hadoop.io.compress.BZip2Codec");
         try
@@ -114,6 +116,45 @@ public class InputDataTest
         {
             assertEquals(e.getMessage(), "BZip2 compression is not supported");
         }
+    }
+    
+    @Test
+    public void compressType()
+    {
+        parameters.put("X-GP-COMPRESSION_TYPE", "BLOCK");   
+        InputData input = new InputData(parameters);
+        assertEquals(input.compressType, "BLOCK");
+        
+        parameters.put("X-GP-COMPRESSION_TYPE", "ReCoRd");   
+        input = new InputData(parameters);
+        assertEquals(input.compressType, "RECORD");
+        
+        parameters.remove("X-GP-COMPRESSION_TYPE");   
+        input = new InputData(parameters);
+        assertEquals(input.compressType, "RECORD");
+        
+        parameters.put("X-GP-COMPRESSION_TYPE", "Oy");   
+        try
+        {
+            new InputData(parameters);
+            fail("illegal COMPRESSION_TYPE should throw IllegalArgumentException");
+        }
+        catch (IllegalArgumentException e)
+        {
+            assertEquals(e.getMessage(), "Illegal compression type 'Oy'");
+        }   
+
+        parameters.put("X-GP-COMPRESSION_TYPE", "none");   
+        try
+        {
+        	new InputData(parameters);
+        	fail("illegal COMPRESSION_TYPE should throw IllegalArgumentException");
+        }
+        catch (IllegalArgumentException e)
+        {
+        	assertEquals(e.getMessage(), "Illegal compression type 'NONE'. " +
+        			"For disabling compression remove COMPRESSION_CODEC parameter.");
+        }   	
     }
     
     /*

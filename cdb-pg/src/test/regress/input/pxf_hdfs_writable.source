@@ -179,9 +179,13 @@ LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrdefault?FRAGME
 FORMAT 'TEXT' (DELIMITER ',');
 SELECT * FROM readdefault ORDER BY n1;
 DROP EXTERNAL TABLE readdefault;
--- start_ignore
+
 --
 -- 3. Test writable table with custom format into a sequence file
+--
+
+--
+-- 3.0 Test sequence file - no compression
 --
 CREATE WRITABLE EXTERNAL TABLE wrseq (tmp1  timestamp, 
                                       num1  integer, 
@@ -249,7 +253,282 @@ FORMAT 'custom' (formatter='pxfwritable_import');
 SELECT * FROM readseq ORDER BY num1;
 DROP EXTERNAL TABLE readseq;
 
--- end_ignore
+--
+-- 3.1 Test sequence file compression - gzip codec, no compression type
+--
+CREATE WRITABLE EXTERNAL TABLE wrseqgzip (tmp1  timestamp, 
+                                          num1  integer, 
+                                          num2  integer, 
+                                          num3  integer, 
+                                          num4  integer,
+                                          t1    text, 
+                                          t2    text, 
+                                          t3    text, 
+                                          t4    text, 
+                                          t5    text, 
+                                          t6    text, 
+                                          dub1  double precision, 
+                                          dub2  double precision, 
+                                          dub3  double precision, 
+                                          ft1   real, 
+                                          ft2   real, 
+                                          ft3   real, 
+                                          ln1   bigint, 
+                                          ln2   bigint, 
+                                          ln3   bigint, 
+                                          bt    bytea,
+                                          bool1 boolean,
+							              bool2 boolean,
+                                          bool3 boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqgzip?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable&COMPRESSION_CODEC=org.apache.hadoop.io.compress.GzipCodec')
+FORMAT 'custom' (formatter='pxfwritable_export');
+COPY wrseqgzip FROM '@abs_srcdir@/data/pxf/customwritable_data.txt';
+--
+-- Test data was written
+--
+\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrseqgzip | grep Found | awk '{ if ($2>0) print "ok";}'
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrseqgzip | awk '{ if ($1>0) print "ok";}'
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du /gpdb_regression_data/writable/wrseqgzip | awk '{if ($1<=0) print $0,": error";}'
+--
+-- Read data
+--
+CREATE READABLE EXTERNAL TABLE readseqgzip (LIKE wrseqgzip)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqgzip?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT * FROM readseqgzip ORDER BY num1;
+DROP EXTERNAL TABLE readseqgzip;
+DROP EXTERNAL TABLE wrseqgzip;
+
+--
+-- 3.2 Test sequence file compression - gzip codec, record compression
+--
+CREATE WRITABLE EXTERNAL TABLE wrseqgziprecord (tmp1  timestamp, 
+                                                num1  integer, 
+                                                num2  integer, 
+                                                num3  integer, 
+                                                num4  integer,
+                                                t1    text, 
+                                                t2    text, 
+                                                t3    text, 
+                                                t4    text, 
+                                                t5    text, 
+                                                t6    text, 
+                                                dub1  double precision, 
+                                                dub2  double precision, 
+                                                dub3  double precision, 
+                                                ft1   real, 
+                                                ft2   real, 
+                                                ft3   real, 
+                                                ln1   bigint, 
+                                                ln2   bigint, 
+                                                ln3   bigint, 
+                                                bt    bytea,
+                                                bool1 boolean,
+							                    bool2 boolean,
+                                                bool3 boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqgziprecord?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable&COMPRESSION_CODEC=org.apache.hadoop.io.compress.GzipCodec&COMPRESSION_TYPE=RECORD')
+FORMAT 'custom' (formatter='pxfwritable_export');
+COPY wrseqgziprecord FROM '@abs_srcdir@/data/pxf/customwritable_data.txt';
+--
+-- Test data was written
+--
+\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrseqgziprecord | grep Found | awk '{ if ($2>0) print "ok";}'
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrseqgziprecord | awk '{ if ($1>0) print "ok";}'
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du /gpdb_regression_data/writable/wrseqgziprecord | awk '{if ($1<=0) print $0,": error";}'
+--
+-- Read data
+--
+CREATE READABLE EXTERNAL TABLE readseqgziprecord (LIKE wrseqgziprecord)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqgziprecord?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT * FROM readseqgziprecord ORDER BY num1;
+DROP EXTERNAL TABLE readseqgziprecord;
+DROP EXTERNAL TABLE wrseqgziprecord;
+
+--
+-- 3.3 Test sequence file compression - gzip codec, block compression
+--
+CREATE WRITABLE EXTERNAL TABLE wrseqgzipblock (tmp1  timestamp, 
+                                               num1  integer, 
+                                               num2  integer, 
+                                               num3  integer, 
+                                               num4  integer,
+                                               t1    text, 
+                                               t2    text, 
+                                               t3    text, 
+                                               t4    text, 
+                                               t5    text, 
+                                               t6    text, 
+                                               dub1  double precision, 
+                                               dub2  double precision, 
+                                               dub3  double precision, 
+                                               ft1   real, 
+                                               ft2   real, 
+                                               ft3   real, 
+                                               ln1   bigint, 
+                                               ln2   bigint, 
+                                               ln3   bigint, 
+                                               bt    bytea,
+                                               bool1 boolean,
+							                   bool2 boolean,
+                                               bool3 boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqgzipblock?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable&COMPRESSION_CODEC=org.apache.hadoop.io.compress.GzipCodec&COMPRESSION_TYPE=BLOCK')
+FORMAT 'custom' (formatter='pxfwritable_export');
+COPY wrseqgzipblock FROM '@abs_srcdir@/data/pxf/customwritable_data.txt';
+--
+-- Test data was written
+--
+\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrseqgzipblock | grep Found | awk '{ if ($2>0) print "ok";}'
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrseqgzipblock | awk '{ if ($1>0) print "ok";}'
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du /gpdb_regression_data/writable/wrseqgzipblock | awk '{if ($1<=0) print $0,": error";}'
+--
+-- Read data
+--
+CREATE READABLE EXTERNAL TABLE readseqgzipblock (LIKE wrseqgzipblock)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqgzipblock?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT * FROM readseqgzipblock ORDER BY num1;
+DROP EXTERNAL TABLE readseqgzipblock;
+DROP EXTERNAL TABLE wrseqgzipblock;
+
+--
+-- 3.4 Test sequence file compression - deflate codec, no compression type
+--
+CREATE WRITABLE EXTERNAL TABLE wrseqdeflate (tmp1  timestamp, 
+                                             num1  integer, 
+                                             num2  integer, 
+                                             num3  integer, 
+                                             num4  integer,
+                                             t1    text, 
+                                             t2    text, 
+                                             t3    text, 
+                                             t4    text, 
+                                             t5    text, 
+                                             t6    text, 
+                                             dub1  double precision, 
+                                             dub2  double precision, 
+                                             dub3  double precision, 
+                                             ft1   real, 
+                                             ft2   real, 
+                                             ft3   real, 
+                                             ln1   bigint, 
+                                             ln2   bigint, 
+                                             ln3   bigint, 
+                                             bt    bytea,
+                                             bool1 boolean,
+							                 bool2 boolean,
+                                             bool3 boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqdeflate?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable&COMPRESSION_CODEC=org.apache.hadoop.io.compress.DefaultCodec')
+FORMAT 'custom' (formatter='pxfwritable_export');
+COPY wrseqdeflate FROM '@abs_srcdir@/data/pxf/customwritable_data.txt';
+--
+-- Test data was written
+--
+\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrseqdeflate | grep Found | awk '{ if ($2>0) print "ok";}'
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrseqdeflate | awk '{ if ($1>0) print "ok";}'
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du /gpdb_regression_data/writable/wrseqdeflate | awk '{if ($1<=0) print $0,": error";}'
+--
+-- Read data
+--
+CREATE READABLE EXTERNAL TABLE readseqdeflate (LIKE wrseqdeflate)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqdeflate?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT * FROM readseqdeflate ORDER BY num1;
+DROP EXTERNAL TABLE readseqdeflate;
+DROP EXTERNAL TABLE wrseqdeflate;
+
+--
+-- 3.5 Test sequence file compression - deflate codec, record compression
+--
+CREATE WRITABLE EXTERNAL TABLE wrseqdeflaterecord (tmp1  timestamp, 
+                                                   num1  integer, 
+                                                   num2  integer, 
+                                                   num3  integer, 
+                                                   num4  integer,
+                                                   t1    text, 
+                                                   t2    text, 
+                                                   t3    text, 
+                                                   t4    text, 
+                                                   t5    text, 
+                                                   t6    text, 
+                                                   dub1  double precision, 
+                                                   dub2  double precision, 
+                                                   dub3  double precision, 
+                                                   ft1   real, 
+                                                   ft2   real, 
+                                                   ft3   real, 
+                                                   ln1   bigint, 
+                                                   ln2   bigint, 
+                                                   ln3   bigint, 
+                                                   bt    bytea,
+                                                   bool1 boolean,
+							                       bool2 boolean,
+                                                   bool3 boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqdeflaterecord?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable&COMPRESSION_CODEC=org.apache.hadoop.io.compress.DefaultCodec&COMPRESSION_TYPE=RECORD')
+FORMAT 'custom' (formatter='pxfwritable_export');
+COPY wrseqdeflaterecord FROM '@abs_srcdir@/data/pxf/customwritable_data.txt';
+--
+-- Test data was written
+--
+\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrseqdeflaterecord | grep Found | awk '{ if ($2>0) print "ok";}'
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrseqdeflaterecord | awk '{ if ($1>0) print "ok";}'
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du /gpdb_regression_data/writable/wrseqdeflaterecord | awk '{if ($1<=0) print $0,": error";}'
+--
+-- Read data
+--
+CREATE READABLE EXTERNAL TABLE readseqdeflaterecord (LIKE wrseqdeflaterecord)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqdeflaterecord?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT * FROM readseqdeflaterecord ORDER BY num1;
+DROP EXTERNAL TABLE readseqdeflaterecord;
+DROP EXTERNAL TABLE wrseqdeflaterecord;
+
+--
+-- 3.6 Test sequence file compression - deflate codec, block compression
+--
+CREATE WRITABLE EXTERNAL TABLE wrseqdeflateblock (tmp1  timestamp, 
+                                                  num1  integer, 
+                                                  num2  integer, 
+                                                  num3  integer, 
+                                                  num4  integer,
+                                                  t1    text, 
+                                                  t2    text, 
+                                                  t3    text, 
+                                                  t4    text, 
+                                                  t5    text, 
+                                                  t6    text, 
+                                                  dub1  double precision, 
+                                                  dub2  double precision, 
+                                                  dub3  double precision, 
+                                                  ft1   real, 
+                                                  ft2   real, 
+                                                  ft3   real, 
+                                                  ln1   bigint, 
+                                                  ln2   bigint, 
+                                                  ln3   bigint, 
+                                                  bt    bytea,
+                                                  bool1 boolean,
+							                      bool2 boolean,
+                                                  bool3 boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqdeflateblock?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable&COMPRESSION_CODEC=org.apache.hadoop.io.compress.DefaultCodec&COMPRESSION_TYPE=BLOCK')
+FORMAT 'custom' (formatter='pxfwritable_export');
+COPY wrseqdeflateblock FROM '@abs_srcdir@/data/pxf/customwritable_data.txt';
+--
+-- Test data was written
+--
+\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrseqdeflateblock | grep Found | awk '{ if ($2>0) print "ok";}'
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrseqdeflateblock | awk '{ if ($1>0) print "ok";}'
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du /gpdb_regression_data/writable/wrseqdeflateblock | awk '{if ($1<=0) print $0,": error";}'
+--
+-- Read data
+--
+CREATE READABLE EXTERNAL TABLE readseqdeflateblock (LIKE wrseqdeflateblock)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqdeflateblock?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT * FROM readseqdeflateblock ORDER BY num1;
+DROP EXTERNAL TABLE readseqdeflateblock;
+DROP EXTERNAL TABLE wrseqdeflateblock;
+
 --
 -- 4. Test error in port -- negative
 --
@@ -322,6 +601,16 @@ ANALYZE writable_analyze_with_analyzer;
 SELECT COUNT(*) FROM pg_class WHERE relname = 'writable_analyze_with_analyzer' AND relpages = 1 AND reltuples = 0;
 INSERT INTO writable_analyze_with_analyzer VALUES ('nothing', 0, 0), ('will', 0, 0), ('happen', 0, 0);
 SELECT COUNT(*) FROM pg_class WHERE relname = 'writable_analyze_with_analyzer' AND relpages = 1 AND reltuples = 0;
+
+--
+-- 9. Test COMPRESSION_TYPE = NONE -- negative 
+--
+CREATE WRITABLE EXTERNAL TABLE compress_type_none(a1 integer,
+                                                  c1 char)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/err?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=SomeClass&COMPRESSION_TYPE=NONE')
+FORMAT 'custom' (formatter='pxfwritable_export');
+INSERT INTO compress_type_none VALUES (100, 'a'), (1000, 'b');
+DROP EXTERNAL TABLE compress_type_none;
 
 --
 -- 10. Test CSV format 

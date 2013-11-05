@@ -255,9 +255,11 @@ SELECT * FROM readdefault ORDER BY n1;
 (3 rows)
 
 DROP EXTERNAL TABLE readdefault;
--- start_ignore
 --
 -- 3. Test writable table with custom format into a sequence file
+--
+--
+-- 3.0 Test sequence file - no compression
 --
 CREATE WRITABLE EXTERNAL TABLE wrseq (tmp1  timestamp, 
                                       num1  integer, 
@@ -295,7 +297,6 @@ ok
 \! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrcustom | awk '{ if ($1>0) print "ok";}'
 ok
 \! ${HADOOP_ROOT}/bin/hdfs dfs -du /gpdb_regression_data/writable/wrcustom | awk '{if ($1<=0) print $0,": error";}'
-ok
 --
 -- Read data
 --
@@ -381,7 +382,612 @@ SELECT * FROM readseq ORDER BY num1;
 (50 rows)
 
 DROP EXTERNAL TABLE readseq;
--- end_ignore
+--
+-- 3.1 Test sequence file compression - gzip codec, no compression type
+--
+CREATE WRITABLE EXTERNAL TABLE wrseqgzip (tmp1  timestamp, 
+                                          num1  integer, 
+                                          num2  integer, 
+                                          num3  integer, 
+                                          num4  integer,
+                                          t1    text, 
+                                          t2    text, 
+                                          t3    text, 
+                                          t4    text, 
+                                          t5    text, 
+                                          t6    text, 
+                                          dub1  double precision, 
+                                          dub2  double precision, 
+                                          dub3  double precision, 
+                                          ft1   real, 
+                                          ft2   real, 
+                                          ft3   real, 
+                                          ln1   bigint, 
+                                          ln2   bigint, 
+                                          ln3   bigint, 
+                                          bt    bytea,
+                                          bool1 boolean,
+							              bool2 boolean,
+                                          bool3 boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqgzip?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable&COMPRESSION_CODEC=org.apache.hadoop.io.compress.GzipCodec')
+FORMAT 'custom' (formatter='pxfwritable_export');
+COPY wrseqgzip FROM '@abs_srcdir@/data/pxf/customwritable_data.txt';
+--
+-- Test data was written
+--
+\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrseqgzip | grep Found | awk '{ if ($2>0) print "ok";}'
+ok
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrseqgzip | awk '{ if ($1>0) print "ok";}'
+ok
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du /gpdb_regression_data/writable/wrseqgzip | awk '{if ($1<=0) print $0,": error";}'
+--
+-- Read data
+--
+CREATE READABLE EXTERNAL TABLE readseqgzip (LIKE wrseqgzip)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqgzip?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT * FROM readseqgzip ORDER BY num1;
+            tmp1             | num1 | num2 | num3 | num4 |    t1     |    t2     |     t3      |     t4     |     t5     |    t6     | dub1 | dub2 | dub3 |  ft1  |  ft2  |  ft3  |  ln1  |  ln2  |  ln3  |   bt   | bool1 | bool2 | bool3 
+-----------------------------+------+------+------+------+-----------+-----------+-------------+------------+------------+-----------+------+------+------+-------+-------+-------+-------+-------+-------+--------+-------+-------+-------
+ Wed Sep 11 10:00:00 2013    |  100 |  101 |  102 |  103 | one_CPGWB | two_CPGWB | three_CPGWB | four_CPGWB | five_CPGWB | six_CPGWB |  0.2 | 0.15 |  0.6 | 22.22 |   1.1 | 11.11 |  2000 | 30000 | 18000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.1 2013  |  101 |  102 |  103 |  104 | one_VQEPV | two_VQEPV | three_VQEPV | four_VQEPV | five_VQEPV | six_VQEPV | 0.21 | 0.16 |  0.4 | 15.15 | 21.21 | 17.17 | 21000 | 32000 | 12000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.2 2013  |  102 |  103 |  104 |  105 | one_WQDHY | two_WQDHY | three_WQDHY | four_WQDHY | five_WQDHY | six_WQDHY | 0.22 | 0.16 |  0.3 |   7.7 | 24.24 |  20.2 | 22000 | 32000 |  9000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.3 2013  |  103 |  104 |  105 |  106 | one_JTBNE | two_JTBNE | three_JTBNE | four_JTBNE | five_JTBNE | six_JTBNE |  0.9 | 0.19 |  0.1 | 13.13 |   4.4 | 12.12 |  9000 | 38000 |  3000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.4 2013  |  104 |  105 |  106 |  107 | one_GHTMX | two_GHTMX | three_GHTMX | four_GHTMX | five_GHTMX | six_GHTMX |  0.6 |  0.7 | 0.19 | 12.12 | 23.23 |  10.1 |  6000 | 14000 | 57000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.5 2013  |  105 |  106 |  107 |  108 | one_NAQAW | two_NAQAW | three_NAQAW | four_NAQAW | five_NAQAW | six_NAQAW | 0.13 |    0 | 0.16 |     0 | 22.22 |   1.1 | 13000 |     0 | 48000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.6 2013  |  106 |  107 |  108 |  109 | one_DDTCG | two_DDTCG | three_DDTCG | four_DDTCG | five_DDTCG | six_DDTCG |  0.3 |  0.3 | 0.19 |   2.2 |   6.6 | 12.12 |  3000 |  6000 | 57000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.7 2013  |  107 |  108 |  109 |  110 | one_DXXOU | two_DXXOU | three_DXXOU | four_DXXOU | five_DXXOU | six_DXXOU |  0.3 | 0.23 | 0.23 | 14.14 |  20.2 |   9.9 |  3000 | 46000 | 69000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.8 2013  |  108 |  109 |  110 |  111 | one_JNMAR | two_JNMAR | three_JNMAR | four_JNMAR | five_JNMAR | six_JNMAR |  0.9 | 0.13 | 0.12 |     0 | 17.17 |   7.7 |  9000 | 26000 | 36000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.9 2013  |  109 |  110 |  111 |  112 | one_AOFNS | two_AOFNS | three_AOFNS | four_AOFNS | five_AOFNS | six_AOFNS |    0 | 0.14 |  0.5 | 13.13 | 18.18 | 24.24 |     0 | 28000 | 15000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.1 2013  |  110 |  111 |  112 |  113 | one_ICCPS | two_ICCPS | three_ICCPS | four_ICCPS | five_ICCPS | six_ICCPS |  0.8 |  0.2 |  0.2 | 15.15 | 18.18 |     0 |  8000 |  4000 |  6000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.11 2013 |  111 |  112 |  113 |  114 | one_VMUVC | two_VMUVC | three_VMUVC | four_VMUVC | five_VMUVC | six_VMUVC | 0.21 | 0.12 |  0.2 | 21.21 |   2.2 | 23.23 | 21000 | 24000 | 60000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.12 2013 |  112 |  113 |  114 |  115 | one_IGRJV | two_IGRJV | three_IGRJV | four_IGRJV | five_IGRJV | six_IGRJV |  0.8 |  0.6 | 0.17 |   9.9 | 21.21 |   9.9 |  8000 | 12000 | 51000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.13 2013 |  113 |  114 |  115 |  116 | one_HXRRY | two_HXRRY | three_HXRRY | four_HXRRY | five_HXRRY | six_HXRRY |  0.7 | 0.23 | 0.17 | 17.17 | 24.24 |     0 |  7000 | 46000 | 51000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.14 2013 |  114 |  115 |  116 |  117 | one_JMXNN | two_JMXNN | three_JMXNN | four_JMXNN | five_JMXNN | six_JMXNN |  0.9 | 0.12 | 0.23 | 13.13 | 13.13 |   2.2 |  9000 | 24000 | 69000 | Rooney | f     | t     | f
+ Wed Sep 11 10:00:00.15 2013 |  115 |  116 |  117 |  118 | one_SWKIQ | two_SWKIQ | three_SWKIQ | four_SWKIQ | five_SWKIQ | six_SWKIQ | 0.18 | 0.22 |  0.1 |   8.8 | 16.16 |   2.2 | 18000 | 44000 | 30000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.16 2013 |  116 |  117 |  118 |  119 | one_DNIVJ | two_DNIVJ | three_DNIVJ | four_DNIVJ | five_DNIVJ | six_DNIVJ |  0.3 | 0.13 |  0.8 | 21.21 |   9.9 |   7.7 |  3000 | 26000 | 24000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.17 2013 |  117 |  118 |  119 |  120 | one_QTOUV | two_QTOUV | three_QTOUV | four_QTOUV | five_QTOUV | six_QTOUV | 0.16 | 0.19 | 0.14 |  20.2 | 21.21 |   9.9 | 16000 | 38000 | 42000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.18 2013 |  118 |  119 |  120 |  121 | one_WSXRT | two_WSXRT | three_WSXRT | four_WSXRT | five_WSXRT | six_WSXRT | 0.22 | 0.18 | 0.23 | 17.17 | 19.19 | 13.13 | 22000 | 36000 | 69000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.19 2013 |  119 |  120 |  121 |  122 | one_MWVEW | two_MWVEW | three_MWVEW | four_MWVEW | five_MWVEW | six_MWVEW | 0.12 | 0.22 | 0.21 |   4.4 | 22.22 |     0 | 12000 | 44000 | 63000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.2 2013  |  120 |  121 |  122 |  123 | one_GASAC | two_GASAC | three_GASAC | four_GASAC | five_GASAC | six_GASAC |  0.6 |    0 | 0.18 |     0 |   2.2 |   4.4 |  6000 |     0 | 54000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.21 2013 |  121 |  122 |  123 |  124 | one_JTHNW | two_JTHNW | three_JTHNW | four_JTHNW | five_JTHNW | six_JTHNW |  0.9 | 0.19 |  0.7 | 13.13 | 22.22 |   5.5 |  9000 | 38000 | 21000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.22 2013 |  122 |  123 |  124 |  125 | one_VUWUB | two_VUWUB | three_VUWUB | four_VUWUB | five_VUWUB | six_VUWUB | 0.21 |  0.2 | 0.22 |  20.2 |   1.1 |     0 | 21000 | 40000 | 66000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.23 2013 |  123 |  124 |  125 |  126 | one_KIRJY | two_KIRJY | three_KIRJY | four_KIRJY | five_KIRJY | six_KIRJY |  0.1 |  0.8 | 0.17 |   9.9 | 24.24 |   1.1 | 10000 | 16000 | 51000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.24 2013 |  124 |  125 |  126 |  127 | one_PIDCI | two_PIDCI | three_PIDCI | four_PIDCI | five_PIDCI | six_PIDCI | 0.15 |  0.8 |  0.3 |   2.2 |   8.8 | 24.24 | 15000 | 16000 |  9000 | Rooney | f     | t     | f
+ Wed Sep 11 10:00:00.25 2013 |  125 |  126 |  127 |  128 | one_UAYGY | two_UAYGY | three_UAYGY | four_UAYGY | five_UAYGY | six_UAYGY |  0.2 |    0 | 0.24 |   6.6 | 24.24 | 17.17 | 20000 |     0 | 72000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.26 2013 |  126 |  127 |  128 |  129 | one_QMOXW | two_QMOXW | three_QMOXW | four_QMOXW | five_QMOXW | six_QMOXW | 0.16 | 0.12 | 0.14 | 23.23 | 22.22 | 13.13 | 16000 | 24000 | 42000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.27 2013 |  127 |  128 |  129 |  130 | one_BFERO | two_BFERO | three_BFERO | four_BFERO | five_BFERO | six_BFERO |  0.1 |  0.5 |  0.4 | 17.17 | 14.14 | 12.12 |  1000 | 10000 | 12000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.28 2013 |  128 |  129 |  130 |  131 | one_WHDWR | two_WHDWR | three_WHDWR | four_WHDWR | five_WHDWR | six_WHDWR | 0.22 |  0.7 |  0.3 | 22.22 | 17.17 | 15.15 | 22000 | 14000 |  9000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.29 2013 |  129 |  130 |  131 |  132 | one_NLGQV | two_NLGQV | three_NLGQV | four_NLGQV | five_NLGQV | six_NLGQV | 0.13 | 0.11 |  0.6 | 16.16 | 21.21 | 19.19 | 13000 | 22000 | 18000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.3 2013  |  130 |  131 |  132 |  133 | one_QLUTA | two_QLUTA | three_QLUTA | four_QLUTA | five_QLUTA | six_QLUTA | 0.16 | 0.11 |  0.2 | 19.19 |     0 | 14.14 | 16000 | 22000 | 60000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.31 2013 |  131 |  132 |  133 |  134 | one_HPNGM | two_HPNGM | three_HPNGM | four_HPNGM | five_HPNGM | six_HPNGM |  0.7 | 0.15 | 0.13 |   6.6 | 12.12 | 16.16 |  7000 | 30000 | 39000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.32 2013 |  132 |  133 |  134 |  135 | one_KXDKY | two_KXDKY | three_KXDKY | four_KXDKY | five_KXDKY | six_KXDKY |  0.1 | 0.23 |  0.3 |  10.1 | 24.24 | 11.11 | 10000 | 46000 |  9000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.33 2013 |  133 |  134 |  135 |  136 | one_LYMCX | two_LYMCX | three_LYMCX | four_LYMCX | five_LYMCX | six_LYMCX | 0.11 | 0.24 | 0.12 |   2.2 | 23.23 |   3.3 | 11000 | 48000 | 36000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.34 2013 |  134 |  135 |  136 |  137 | one_WTAKY | two_WTAKY | three_WTAKY | four_WTAKY | five_WTAKY | six_WTAKY | 0.22 | 0.19 |    0 |  10.1 | 24.24 |   4.4 | 22000 | 38000 |     0 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.35 2013 |  135 |  136 |  137 |  138 | one_UEKYJ | two_UEKYJ | three_UEKYJ | four_UEKYJ | five_UEKYJ | six_UEKYJ |  0.2 |  0.4 |  0.1 | 24.24 |   9.9 |   9.9 | 20000 |  8000 | 30000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.36 2013 |  136 |  137 |  138 |  139 | one_OPMXN | two_OPMXN | three_OPMXN | four_OPMXN | five_OPMXN | six_OPMXN | 0.14 | 0.15 | 0.12 | 23.23 | 13.13 |   5.5 | 14000 | 30000 | 36000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.37 2013 |  137 |  138 |  139 |  140 | one_CFERM | two_CFERM | three_CFERM | four_CFERM | five_CFERM | six_CFERM |  0.2 |  0.5 |  0.4 | 17.17 | 12.12 | 13.13 |  2000 | 10000 | 12000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.38 2013 |  138 |  139 |  140 |  141 | one_SXVUH | two_SXVUH | three_SXVUH | four_SXVUH | five_SXVUH | six_SXVUH | 0.18 | 0.23 | 0.21 |  20.2 |   7.7 | 17.17 | 18000 | 46000 | 63000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.39 2013 |  139 |  140 |  141 |  142 | one_HBODD | two_HBODD | three_HBODD | four_HBODD | five_HBODD | six_HBODD |  0.7 |  0.1 | 0.14 |   3.3 |   3.3 | 11.11 |  7000 |  2000 | 42000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.4 2013  |  140 |  141 |  142 |  143 | one_ULXUR | two_ULXUR | three_ULXUR | four_ULXUR | five_ULXUR | six_ULXUR |  0.2 | 0.11 | 0.23 |  20.2 | 17.17 | 11.11 | 20000 | 22000 | 69000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.41 2013 |  141 |  142 |  143 |  144 | one_NUYWV | two_NUYWV | three_NUYWV | four_NUYWV | five_NUYWV | six_NUYWV | 0.13 |  0.2 | 0.24 | 22.22 | 21.21 | 16.16 | 13000 | 40000 | 72000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.42 2013 |  142 |  143 |  144 |  145 | one_SULQK | two_SULQK | three_SULQK | four_SULQK | five_SULQK | six_SULQK | 0.18 |  0.2 | 0.11 | 16.16 |  10.1 | 13.13 | 18000 | 40000 | 33000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.43 2013 |  143 |  144 |  145 |  146 | one_SXGHX | two_SXGHX | three_SXGHX | four_SXGHX | five_SXGHX | six_SXGHX | 0.18 | 0.23 |  0.6 |   7.7 | 23.23 | 16.16 | 18000 | 46000 | 18000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.44 2013 |  144 |  145 |  146 |  147 | one_TKKSO | two_TKKSO | three_TKKSO | four_TKKSO | five_TKKSO | six_TKKSO | 0.19 |  0.1 |  0.1 | 18.18 | 14.14 | 18.18 | 19000 | 20000 | 30000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.45 2013 |  145 |  146 |  147 |  148 | one_WNITJ | two_WNITJ | three_WNITJ | four_WNITJ | five_WNITJ | six_WNITJ | 0.22 | 0.13 |  0.8 | 19.19 |   9.9 | 17.17 | 22000 | 26000 | 24000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.46 2013 |  146 |  147 |  148 |  149 | one_VNIKA | two_VNIKA | three_VNIKA | four_VNIKA | five_VNIKA | six_VNIKA | 0.21 | 0.13 |  0.8 |  10.1 |     0 | 11.11 | 21000 | 26000 | 24000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.47 2013 |  147 |  148 |  149 |  150 | one_SOPMI | two_SOPMI | three_SOPMI | four_SOPMI | five_SOPMI | six_SOPMI | 0.18 | 0.14 | 0.15 | 12.12 |   8.8 | 18.18 | 18000 | 28000 | 45000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.48 2013 |  148 |  149 |  150 |  151 | one_BHTWJ | two_BHTWJ | three_BHTWJ | four_BHTWJ | five_BHTWJ | six_BHTWJ |  0.1 |  0.7 | 0.19 | 22.22 |   9.9 |   9.9 |  1000 | 14000 | 57000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.49 2013 |  149 |  150 |  151 |  152 | one_GEQDT | two_GEQDT | three_GEQDT | four_GEQDT | five_GEQDT | six_GEQDT |  0.6 |  0.4 | 0.16 |   3.3 | 19.19 |   3.3 |  6000 |  8000 | 48000 | Rooney | t     | t     | t
+(50 rows)
+
+DROP EXTERNAL TABLE readseqgzip;
+DROP EXTERNAL TABLE wrseqgzip;
+--
+-- 3.2 Test sequence file compression - gzip codec, record compression
+--
+CREATE WRITABLE EXTERNAL TABLE wrseqgziprecord (tmp1  timestamp, 
+                                                num1  integer, 
+                                                num2  integer, 
+                                                num3  integer, 
+                                                num4  integer,
+                                                t1    text, 
+                                                t2    text, 
+                                                t3    text, 
+                                                t4    text, 
+                                                t5    text, 
+                                                t6    text, 
+                                                dub1  double precision, 
+                                                dub2  double precision, 
+                                                dub3  double precision, 
+                                                ft1   real, 
+                                                ft2   real, 
+                                                ft3   real, 
+                                                ln1   bigint, 
+                                                ln2   bigint, 
+                                                ln3   bigint, 
+                                                bt    bytea,
+                                                bool1 boolean,
+							                    bool2 boolean,
+                                                bool3 boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqgziprecord?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable&COMPRESSION_CODEC=org.apache.hadoop.io.compress.GzipCodec&COMPRESSION_TYPE=RECORD')
+FORMAT 'custom' (formatter='pxfwritable_export');
+COPY wrseqgziprecord FROM '@abs_srcdir@/data/pxf/customwritable_data.txt';
+--
+-- Test data was written
+--
+\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrseqgziprecord | grep Found | awk '{ if ($2>0) print "ok";}'
+ok
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrseqgziprecord | awk '{ if ($1>0) print "ok";}'
+ok
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du /gpdb_regression_data/writable/wrseqgziprecord | awk '{if ($1<=0) print $0,": error";}'
+--
+-- Read data
+--
+CREATE READABLE EXTERNAL TABLE readseqgziprecord (LIKE wrseqgziprecord)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqgziprecord?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT * FROM readseqgziprecord ORDER BY num1;
+            tmp1             | num1 | num2 | num3 | num4 |    t1     |    t2     |     t3      |     t4     |     t5     |    t6     | dub1 | dub2 | dub3 |  ft1  |  ft2  |  ft3  |  ln1  |  ln2  |  ln3  |   bt   | bool1 | bool2 | bool3 
+-----------------------------+------+------+------+------+-----------+-----------+-------------+------------+------------+-----------+------+------+------+-------+-------+-------+-------+-------+-------+--------+-------+-------+-------
+ Wed Sep 11 10:00:00 2013    |  100 |  101 |  102 |  103 | one_CPGWB | two_CPGWB | three_CPGWB | four_CPGWB | five_CPGWB | six_CPGWB |  0.2 | 0.15 |  0.6 | 22.22 |   1.1 | 11.11 |  2000 | 30000 | 18000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.1 2013  |  101 |  102 |  103 |  104 | one_VQEPV | two_VQEPV | three_VQEPV | four_VQEPV | five_VQEPV | six_VQEPV | 0.21 | 0.16 |  0.4 | 15.15 | 21.21 | 17.17 | 21000 | 32000 | 12000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.2 2013  |  102 |  103 |  104 |  105 | one_WQDHY | two_WQDHY | three_WQDHY | four_WQDHY | five_WQDHY | six_WQDHY | 0.22 | 0.16 |  0.3 |   7.7 | 24.24 |  20.2 | 22000 | 32000 |  9000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.3 2013  |  103 |  104 |  105 |  106 | one_JTBNE | two_JTBNE | three_JTBNE | four_JTBNE | five_JTBNE | six_JTBNE |  0.9 | 0.19 |  0.1 | 13.13 |   4.4 | 12.12 |  9000 | 38000 |  3000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.4 2013  |  104 |  105 |  106 |  107 | one_GHTMX | two_GHTMX | three_GHTMX | four_GHTMX | five_GHTMX | six_GHTMX |  0.6 |  0.7 | 0.19 | 12.12 | 23.23 |  10.1 |  6000 | 14000 | 57000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.5 2013  |  105 |  106 |  107 |  108 | one_NAQAW | two_NAQAW | three_NAQAW | four_NAQAW | five_NAQAW | six_NAQAW | 0.13 |    0 | 0.16 |     0 | 22.22 |   1.1 | 13000 |     0 | 48000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.6 2013  |  106 |  107 |  108 |  109 | one_DDTCG | two_DDTCG | three_DDTCG | four_DDTCG | five_DDTCG | six_DDTCG |  0.3 |  0.3 | 0.19 |   2.2 |   6.6 | 12.12 |  3000 |  6000 | 57000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.7 2013  |  107 |  108 |  109 |  110 | one_DXXOU | two_DXXOU | three_DXXOU | four_DXXOU | five_DXXOU | six_DXXOU |  0.3 | 0.23 | 0.23 | 14.14 |  20.2 |   9.9 |  3000 | 46000 | 69000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.8 2013  |  108 |  109 |  110 |  111 | one_JNMAR | two_JNMAR | three_JNMAR | four_JNMAR | five_JNMAR | six_JNMAR |  0.9 | 0.13 | 0.12 |     0 | 17.17 |   7.7 |  9000 | 26000 | 36000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.9 2013  |  109 |  110 |  111 |  112 | one_AOFNS | two_AOFNS | three_AOFNS | four_AOFNS | five_AOFNS | six_AOFNS |    0 | 0.14 |  0.5 | 13.13 | 18.18 | 24.24 |     0 | 28000 | 15000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.1 2013  |  110 |  111 |  112 |  113 | one_ICCPS | two_ICCPS | three_ICCPS | four_ICCPS | five_ICCPS | six_ICCPS |  0.8 |  0.2 |  0.2 | 15.15 | 18.18 |     0 |  8000 |  4000 |  6000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.11 2013 |  111 |  112 |  113 |  114 | one_VMUVC | two_VMUVC | three_VMUVC | four_VMUVC | five_VMUVC | six_VMUVC | 0.21 | 0.12 |  0.2 | 21.21 |   2.2 | 23.23 | 21000 | 24000 | 60000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.12 2013 |  112 |  113 |  114 |  115 | one_IGRJV | two_IGRJV | three_IGRJV | four_IGRJV | five_IGRJV | six_IGRJV |  0.8 |  0.6 | 0.17 |   9.9 | 21.21 |   9.9 |  8000 | 12000 | 51000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.13 2013 |  113 |  114 |  115 |  116 | one_HXRRY | two_HXRRY | three_HXRRY | four_HXRRY | five_HXRRY | six_HXRRY |  0.7 | 0.23 | 0.17 | 17.17 | 24.24 |     0 |  7000 | 46000 | 51000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.14 2013 |  114 |  115 |  116 |  117 | one_JMXNN | two_JMXNN | three_JMXNN | four_JMXNN | five_JMXNN | six_JMXNN |  0.9 | 0.12 | 0.23 | 13.13 | 13.13 |   2.2 |  9000 | 24000 | 69000 | Rooney | f     | t     | f
+ Wed Sep 11 10:00:00.15 2013 |  115 |  116 |  117 |  118 | one_SWKIQ | two_SWKIQ | three_SWKIQ | four_SWKIQ | five_SWKIQ | six_SWKIQ | 0.18 | 0.22 |  0.1 |   8.8 | 16.16 |   2.2 | 18000 | 44000 | 30000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.16 2013 |  116 |  117 |  118 |  119 | one_DNIVJ | two_DNIVJ | three_DNIVJ | four_DNIVJ | five_DNIVJ | six_DNIVJ |  0.3 | 0.13 |  0.8 | 21.21 |   9.9 |   7.7 |  3000 | 26000 | 24000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.17 2013 |  117 |  118 |  119 |  120 | one_QTOUV | two_QTOUV | three_QTOUV | four_QTOUV | five_QTOUV | six_QTOUV | 0.16 | 0.19 | 0.14 |  20.2 | 21.21 |   9.9 | 16000 | 38000 | 42000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.18 2013 |  118 |  119 |  120 |  121 | one_WSXRT | two_WSXRT | three_WSXRT | four_WSXRT | five_WSXRT | six_WSXRT | 0.22 | 0.18 | 0.23 | 17.17 | 19.19 | 13.13 | 22000 | 36000 | 69000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.19 2013 |  119 |  120 |  121 |  122 | one_MWVEW | two_MWVEW | three_MWVEW | four_MWVEW | five_MWVEW | six_MWVEW | 0.12 | 0.22 | 0.21 |   4.4 | 22.22 |     0 | 12000 | 44000 | 63000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.2 2013  |  120 |  121 |  122 |  123 | one_GASAC | two_GASAC | three_GASAC | four_GASAC | five_GASAC | six_GASAC |  0.6 |    0 | 0.18 |     0 |   2.2 |   4.4 |  6000 |     0 | 54000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.21 2013 |  121 |  122 |  123 |  124 | one_JTHNW | two_JTHNW | three_JTHNW | four_JTHNW | five_JTHNW | six_JTHNW |  0.9 | 0.19 |  0.7 | 13.13 | 22.22 |   5.5 |  9000 | 38000 | 21000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.22 2013 |  122 |  123 |  124 |  125 | one_VUWUB | two_VUWUB | three_VUWUB | four_VUWUB | five_VUWUB | six_VUWUB | 0.21 |  0.2 | 0.22 |  20.2 |   1.1 |     0 | 21000 | 40000 | 66000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.23 2013 |  123 |  124 |  125 |  126 | one_KIRJY | two_KIRJY | three_KIRJY | four_KIRJY | five_KIRJY | six_KIRJY |  0.1 |  0.8 | 0.17 |   9.9 | 24.24 |   1.1 | 10000 | 16000 | 51000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.24 2013 |  124 |  125 |  126 |  127 | one_PIDCI | two_PIDCI | three_PIDCI | four_PIDCI | five_PIDCI | six_PIDCI | 0.15 |  0.8 |  0.3 |   2.2 |   8.8 | 24.24 | 15000 | 16000 |  9000 | Rooney | f     | t     | f
+ Wed Sep 11 10:00:00.25 2013 |  125 |  126 |  127 |  128 | one_UAYGY | two_UAYGY | three_UAYGY | four_UAYGY | five_UAYGY | six_UAYGY |  0.2 |    0 | 0.24 |   6.6 | 24.24 | 17.17 | 20000 |     0 | 72000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.26 2013 |  126 |  127 |  128 |  129 | one_QMOXW | two_QMOXW | three_QMOXW | four_QMOXW | five_QMOXW | six_QMOXW | 0.16 | 0.12 | 0.14 | 23.23 | 22.22 | 13.13 | 16000 | 24000 | 42000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.27 2013 |  127 |  128 |  129 |  130 | one_BFERO | two_BFERO | three_BFERO | four_BFERO | five_BFERO | six_BFERO |  0.1 |  0.5 |  0.4 | 17.17 | 14.14 | 12.12 |  1000 | 10000 | 12000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.28 2013 |  128 |  129 |  130 |  131 | one_WHDWR | two_WHDWR | three_WHDWR | four_WHDWR | five_WHDWR | six_WHDWR | 0.22 |  0.7 |  0.3 | 22.22 | 17.17 | 15.15 | 22000 | 14000 |  9000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.29 2013 |  129 |  130 |  131 |  132 | one_NLGQV | two_NLGQV | three_NLGQV | four_NLGQV | five_NLGQV | six_NLGQV | 0.13 | 0.11 |  0.6 | 16.16 | 21.21 | 19.19 | 13000 | 22000 | 18000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.3 2013  |  130 |  131 |  132 |  133 | one_QLUTA | two_QLUTA | three_QLUTA | four_QLUTA | five_QLUTA | six_QLUTA | 0.16 | 0.11 |  0.2 | 19.19 |     0 | 14.14 | 16000 | 22000 | 60000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.31 2013 |  131 |  132 |  133 |  134 | one_HPNGM | two_HPNGM | three_HPNGM | four_HPNGM | five_HPNGM | six_HPNGM |  0.7 | 0.15 | 0.13 |   6.6 | 12.12 | 16.16 |  7000 | 30000 | 39000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.32 2013 |  132 |  133 |  134 |  135 | one_KXDKY | two_KXDKY | three_KXDKY | four_KXDKY | five_KXDKY | six_KXDKY |  0.1 | 0.23 |  0.3 |  10.1 | 24.24 | 11.11 | 10000 | 46000 |  9000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.33 2013 |  133 |  134 |  135 |  136 | one_LYMCX | two_LYMCX | three_LYMCX | four_LYMCX | five_LYMCX | six_LYMCX | 0.11 | 0.24 | 0.12 |   2.2 | 23.23 |   3.3 | 11000 | 48000 | 36000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.34 2013 |  134 |  135 |  136 |  137 | one_WTAKY | two_WTAKY | three_WTAKY | four_WTAKY | five_WTAKY | six_WTAKY | 0.22 | 0.19 |    0 |  10.1 | 24.24 |   4.4 | 22000 | 38000 |     0 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.35 2013 |  135 |  136 |  137 |  138 | one_UEKYJ | two_UEKYJ | three_UEKYJ | four_UEKYJ | five_UEKYJ | six_UEKYJ |  0.2 |  0.4 |  0.1 | 24.24 |   9.9 |   9.9 | 20000 |  8000 | 30000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.36 2013 |  136 |  137 |  138 |  139 | one_OPMXN | two_OPMXN | three_OPMXN | four_OPMXN | five_OPMXN | six_OPMXN | 0.14 | 0.15 | 0.12 | 23.23 | 13.13 |   5.5 | 14000 | 30000 | 36000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.37 2013 |  137 |  138 |  139 |  140 | one_CFERM | two_CFERM | three_CFERM | four_CFERM | five_CFERM | six_CFERM |  0.2 |  0.5 |  0.4 | 17.17 | 12.12 | 13.13 |  2000 | 10000 | 12000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.38 2013 |  138 |  139 |  140 |  141 | one_SXVUH | two_SXVUH | three_SXVUH | four_SXVUH | five_SXVUH | six_SXVUH | 0.18 | 0.23 | 0.21 |  20.2 |   7.7 | 17.17 | 18000 | 46000 | 63000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.39 2013 |  139 |  140 |  141 |  142 | one_HBODD | two_HBODD | three_HBODD | four_HBODD | five_HBODD | six_HBODD |  0.7 |  0.1 | 0.14 |   3.3 |   3.3 | 11.11 |  7000 |  2000 | 42000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.4 2013  |  140 |  141 |  142 |  143 | one_ULXUR | two_ULXUR | three_ULXUR | four_ULXUR | five_ULXUR | six_ULXUR |  0.2 | 0.11 | 0.23 |  20.2 | 17.17 | 11.11 | 20000 | 22000 | 69000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.41 2013 |  141 |  142 |  143 |  144 | one_NUYWV | two_NUYWV | three_NUYWV | four_NUYWV | five_NUYWV | six_NUYWV | 0.13 |  0.2 | 0.24 | 22.22 | 21.21 | 16.16 | 13000 | 40000 | 72000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.42 2013 |  142 |  143 |  144 |  145 | one_SULQK | two_SULQK | three_SULQK | four_SULQK | five_SULQK | six_SULQK | 0.18 |  0.2 | 0.11 | 16.16 |  10.1 | 13.13 | 18000 | 40000 | 33000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.43 2013 |  143 |  144 |  145 |  146 | one_SXGHX | two_SXGHX | three_SXGHX | four_SXGHX | five_SXGHX | six_SXGHX | 0.18 | 0.23 |  0.6 |   7.7 | 23.23 | 16.16 | 18000 | 46000 | 18000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.44 2013 |  144 |  145 |  146 |  147 | one_TKKSO | two_TKKSO | three_TKKSO | four_TKKSO | five_TKKSO | six_TKKSO | 0.19 |  0.1 |  0.1 | 18.18 | 14.14 | 18.18 | 19000 | 20000 | 30000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.45 2013 |  145 |  146 |  147 |  148 | one_WNITJ | two_WNITJ | three_WNITJ | four_WNITJ | five_WNITJ | six_WNITJ | 0.22 | 0.13 |  0.8 | 19.19 |   9.9 | 17.17 | 22000 | 26000 | 24000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.46 2013 |  146 |  147 |  148 |  149 | one_VNIKA | two_VNIKA | three_VNIKA | four_VNIKA | five_VNIKA | six_VNIKA | 0.21 | 0.13 |  0.8 |  10.1 |     0 | 11.11 | 21000 | 26000 | 24000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.47 2013 |  147 |  148 |  149 |  150 | one_SOPMI | two_SOPMI | three_SOPMI | four_SOPMI | five_SOPMI | six_SOPMI | 0.18 | 0.14 | 0.15 | 12.12 |   8.8 | 18.18 | 18000 | 28000 | 45000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.48 2013 |  148 |  149 |  150 |  151 | one_BHTWJ | two_BHTWJ | three_BHTWJ | four_BHTWJ | five_BHTWJ | six_BHTWJ |  0.1 |  0.7 | 0.19 | 22.22 |   9.9 |   9.9 |  1000 | 14000 | 57000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.49 2013 |  149 |  150 |  151 |  152 | one_GEQDT | two_GEQDT | three_GEQDT | four_GEQDT | five_GEQDT | six_GEQDT |  0.6 |  0.4 | 0.16 |   3.3 | 19.19 |   3.3 |  6000 |  8000 | 48000 | Rooney | t     | t     | t
+(50 rows)
+
+DROP EXTERNAL TABLE readseqgziprecord;
+DROP EXTERNAL TABLE wrseqgziprecord;
+--
+-- 3.3 Test sequence file compression - gzip codec, block compression
+--
+CREATE WRITABLE EXTERNAL TABLE wrseqgzipblock (tmp1  timestamp, 
+                                               num1  integer, 
+                                               num2  integer, 
+                                               num3  integer, 
+                                               num4  integer,
+                                               t1    text, 
+                                               t2    text, 
+                                               t3    text, 
+                                               t4    text, 
+                                               t5    text, 
+                                               t6    text, 
+                                               dub1  double precision, 
+                                               dub2  double precision, 
+                                               dub3  double precision, 
+                                               ft1   real, 
+                                               ft2   real, 
+                                               ft3   real, 
+                                               ln1   bigint, 
+                                               ln2   bigint, 
+                                               ln3   bigint, 
+                                               bt    bytea,
+                                               bool1 boolean,
+							                   bool2 boolean,
+                                               bool3 boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqgzipblock?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable&COMPRESSION_CODEC=org.apache.hadoop.io.compress.GzipCodec&COMPRESSION_TYPE=BLOCK')
+FORMAT 'custom' (formatter='pxfwritable_export');
+COPY wrseqgzipblock FROM '@abs_srcdir@/data/pxf/customwritable_data.txt';
+--
+-- Test data was written
+--
+\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrseqgzipblock | grep Found | awk '{ if ($2>0) print "ok";}'
+ok
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrseqgzipblock | awk '{ if ($1>0) print "ok";}'
+ok
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du /gpdb_regression_data/writable/wrseqgzipblock | awk '{if ($1<=0) print $0,": error";}'
+--
+-- Read data
+--
+CREATE READABLE EXTERNAL TABLE readseqgzipblock (LIKE wrseqgzipblock)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqgzipblock?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT * FROM readseqgzipblock ORDER BY num1;
+            tmp1             | num1 | num2 | num3 | num4 |    t1     |    t2     |     t3      |     t4     |     t5     |    t6     | dub1 | dub2 | dub3 |  ft1  |  ft2  |  ft3  |  ln1  |  ln2  |  ln3  |   bt   | bool1 | bool2 | bool3 
+-----------------------------+------+------+------+------+-----------+-----------+-------------+------------+------------+-----------+------+------+------+-------+-------+-------+-------+-------+-------+--------+-------+-------+-------
+ Wed Sep 11 10:00:00 2013    |  100 |  101 |  102 |  103 | one_CPGWB | two_CPGWB | three_CPGWB | four_CPGWB | five_CPGWB | six_CPGWB |  0.2 | 0.15 |  0.6 | 22.22 |   1.1 | 11.11 |  2000 | 30000 | 18000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.1 2013  |  101 |  102 |  103 |  104 | one_VQEPV | two_VQEPV | three_VQEPV | four_VQEPV | five_VQEPV | six_VQEPV | 0.21 | 0.16 |  0.4 | 15.15 | 21.21 | 17.17 | 21000 | 32000 | 12000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.2 2013  |  102 |  103 |  104 |  105 | one_WQDHY | two_WQDHY | three_WQDHY | four_WQDHY | five_WQDHY | six_WQDHY | 0.22 | 0.16 |  0.3 |   7.7 | 24.24 |  20.2 | 22000 | 32000 |  9000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.3 2013  |  103 |  104 |  105 |  106 | one_JTBNE | two_JTBNE | three_JTBNE | four_JTBNE | five_JTBNE | six_JTBNE |  0.9 | 0.19 |  0.1 | 13.13 |   4.4 | 12.12 |  9000 | 38000 |  3000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.4 2013  |  104 |  105 |  106 |  107 | one_GHTMX | two_GHTMX | three_GHTMX | four_GHTMX | five_GHTMX | six_GHTMX |  0.6 |  0.7 | 0.19 | 12.12 | 23.23 |  10.1 |  6000 | 14000 | 57000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.5 2013  |  105 |  106 |  107 |  108 | one_NAQAW | two_NAQAW | three_NAQAW | four_NAQAW | five_NAQAW | six_NAQAW | 0.13 |    0 | 0.16 |     0 | 22.22 |   1.1 | 13000 |     0 | 48000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.6 2013  |  106 |  107 |  108 |  109 | one_DDTCG | two_DDTCG | three_DDTCG | four_DDTCG | five_DDTCG | six_DDTCG |  0.3 |  0.3 | 0.19 |   2.2 |   6.6 | 12.12 |  3000 |  6000 | 57000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.7 2013  |  107 |  108 |  109 |  110 | one_DXXOU | two_DXXOU | three_DXXOU | four_DXXOU | five_DXXOU | six_DXXOU |  0.3 | 0.23 | 0.23 | 14.14 |  20.2 |   9.9 |  3000 | 46000 | 69000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.8 2013  |  108 |  109 |  110 |  111 | one_JNMAR | two_JNMAR | three_JNMAR | four_JNMAR | five_JNMAR | six_JNMAR |  0.9 | 0.13 | 0.12 |     0 | 17.17 |   7.7 |  9000 | 26000 | 36000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.9 2013  |  109 |  110 |  111 |  112 | one_AOFNS | two_AOFNS | three_AOFNS | four_AOFNS | five_AOFNS | six_AOFNS |    0 | 0.14 |  0.5 | 13.13 | 18.18 | 24.24 |     0 | 28000 | 15000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.1 2013  |  110 |  111 |  112 |  113 | one_ICCPS | two_ICCPS | three_ICCPS | four_ICCPS | five_ICCPS | six_ICCPS |  0.8 |  0.2 |  0.2 | 15.15 | 18.18 |     0 |  8000 |  4000 |  6000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.11 2013 |  111 |  112 |  113 |  114 | one_VMUVC | two_VMUVC | three_VMUVC | four_VMUVC | five_VMUVC | six_VMUVC | 0.21 | 0.12 |  0.2 | 21.21 |   2.2 | 23.23 | 21000 | 24000 | 60000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.12 2013 |  112 |  113 |  114 |  115 | one_IGRJV | two_IGRJV | three_IGRJV | four_IGRJV | five_IGRJV | six_IGRJV |  0.8 |  0.6 | 0.17 |   9.9 | 21.21 |   9.9 |  8000 | 12000 | 51000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.13 2013 |  113 |  114 |  115 |  116 | one_HXRRY | two_HXRRY | three_HXRRY | four_HXRRY | five_HXRRY | six_HXRRY |  0.7 | 0.23 | 0.17 | 17.17 | 24.24 |     0 |  7000 | 46000 | 51000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.14 2013 |  114 |  115 |  116 |  117 | one_JMXNN | two_JMXNN | three_JMXNN | four_JMXNN | five_JMXNN | six_JMXNN |  0.9 | 0.12 | 0.23 | 13.13 | 13.13 |   2.2 |  9000 | 24000 | 69000 | Rooney | f     | t     | f
+ Wed Sep 11 10:00:00.15 2013 |  115 |  116 |  117 |  118 | one_SWKIQ | two_SWKIQ | three_SWKIQ | four_SWKIQ | five_SWKIQ | six_SWKIQ | 0.18 | 0.22 |  0.1 |   8.8 | 16.16 |   2.2 | 18000 | 44000 | 30000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.16 2013 |  116 |  117 |  118 |  119 | one_DNIVJ | two_DNIVJ | three_DNIVJ | four_DNIVJ | five_DNIVJ | six_DNIVJ |  0.3 | 0.13 |  0.8 | 21.21 |   9.9 |   7.7 |  3000 | 26000 | 24000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.17 2013 |  117 |  118 |  119 |  120 | one_QTOUV | two_QTOUV | three_QTOUV | four_QTOUV | five_QTOUV | six_QTOUV | 0.16 | 0.19 | 0.14 |  20.2 | 21.21 |   9.9 | 16000 | 38000 | 42000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.18 2013 |  118 |  119 |  120 |  121 | one_WSXRT | two_WSXRT | three_WSXRT | four_WSXRT | five_WSXRT | six_WSXRT | 0.22 | 0.18 | 0.23 | 17.17 | 19.19 | 13.13 | 22000 | 36000 | 69000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.19 2013 |  119 |  120 |  121 |  122 | one_MWVEW | two_MWVEW | three_MWVEW | four_MWVEW | five_MWVEW | six_MWVEW | 0.12 | 0.22 | 0.21 |   4.4 | 22.22 |     0 | 12000 | 44000 | 63000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.2 2013  |  120 |  121 |  122 |  123 | one_GASAC | two_GASAC | three_GASAC | four_GASAC | five_GASAC | six_GASAC |  0.6 |    0 | 0.18 |     0 |   2.2 |   4.4 |  6000 |     0 | 54000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.21 2013 |  121 |  122 |  123 |  124 | one_JTHNW | two_JTHNW | three_JTHNW | four_JTHNW | five_JTHNW | six_JTHNW |  0.9 | 0.19 |  0.7 | 13.13 | 22.22 |   5.5 |  9000 | 38000 | 21000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.22 2013 |  122 |  123 |  124 |  125 | one_VUWUB | two_VUWUB | three_VUWUB | four_VUWUB | five_VUWUB | six_VUWUB | 0.21 |  0.2 | 0.22 |  20.2 |   1.1 |     0 | 21000 | 40000 | 66000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.23 2013 |  123 |  124 |  125 |  126 | one_KIRJY | two_KIRJY | three_KIRJY | four_KIRJY | five_KIRJY | six_KIRJY |  0.1 |  0.8 | 0.17 |   9.9 | 24.24 |   1.1 | 10000 | 16000 | 51000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.24 2013 |  124 |  125 |  126 |  127 | one_PIDCI | two_PIDCI | three_PIDCI | four_PIDCI | five_PIDCI | six_PIDCI | 0.15 |  0.8 |  0.3 |   2.2 |   8.8 | 24.24 | 15000 | 16000 |  9000 | Rooney | f     | t     | f
+ Wed Sep 11 10:00:00.25 2013 |  125 |  126 |  127 |  128 | one_UAYGY | two_UAYGY | three_UAYGY | four_UAYGY | five_UAYGY | six_UAYGY |  0.2 |    0 | 0.24 |   6.6 | 24.24 | 17.17 | 20000 |     0 | 72000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.26 2013 |  126 |  127 |  128 |  129 | one_QMOXW | two_QMOXW | three_QMOXW | four_QMOXW | five_QMOXW | six_QMOXW | 0.16 | 0.12 | 0.14 | 23.23 | 22.22 | 13.13 | 16000 | 24000 | 42000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.27 2013 |  127 |  128 |  129 |  130 | one_BFERO | two_BFERO | three_BFERO | four_BFERO | five_BFERO | six_BFERO |  0.1 |  0.5 |  0.4 | 17.17 | 14.14 | 12.12 |  1000 | 10000 | 12000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.28 2013 |  128 |  129 |  130 |  131 | one_WHDWR | two_WHDWR | three_WHDWR | four_WHDWR | five_WHDWR | six_WHDWR | 0.22 |  0.7 |  0.3 | 22.22 | 17.17 | 15.15 | 22000 | 14000 |  9000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.29 2013 |  129 |  130 |  131 |  132 | one_NLGQV | two_NLGQV | three_NLGQV | four_NLGQV | five_NLGQV | six_NLGQV | 0.13 | 0.11 |  0.6 | 16.16 | 21.21 | 19.19 | 13000 | 22000 | 18000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.3 2013  |  130 |  131 |  132 |  133 | one_QLUTA | two_QLUTA | three_QLUTA | four_QLUTA | five_QLUTA | six_QLUTA | 0.16 | 0.11 |  0.2 | 19.19 |     0 | 14.14 | 16000 | 22000 | 60000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.31 2013 |  131 |  132 |  133 |  134 | one_HPNGM | two_HPNGM | three_HPNGM | four_HPNGM | five_HPNGM | six_HPNGM |  0.7 | 0.15 | 0.13 |   6.6 | 12.12 | 16.16 |  7000 | 30000 | 39000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.32 2013 |  132 |  133 |  134 |  135 | one_KXDKY | two_KXDKY | three_KXDKY | four_KXDKY | five_KXDKY | six_KXDKY |  0.1 | 0.23 |  0.3 |  10.1 | 24.24 | 11.11 | 10000 | 46000 |  9000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.33 2013 |  133 |  134 |  135 |  136 | one_LYMCX | two_LYMCX | three_LYMCX | four_LYMCX | five_LYMCX | six_LYMCX | 0.11 | 0.24 | 0.12 |   2.2 | 23.23 |   3.3 | 11000 | 48000 | 36000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.34 2013 |  134 |  135 |  136 |  137 | one_WTAKY | two_WTAKY | three_WTAKY | four_WTAKY | five_WTAKY | six_WTAKY | 0.22 | 0.19 |    0 |  10.1 | 24.24 |   4.4 | 22000 | 38000 |     0 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.35 2013 |  135 |  136 |  137 |  138 | one_UEKYJ | two_UEKYJ | three_UEKYJ | four_UEKYJ | five_UEKYJ | six_UEKYJ |  0.2 |  0.4 |  0.1 | 24.24 |   9.9 |   9.9 | 20000 |  8000 | 30000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.36 2013 |  136 |  137 |  138 |  139 | one_OPMXN | two_OPMXN | three_OPMXN | four_OPMXN | five_OPMXN | six_OPMXN | 0.14 | 0.15 | 0.12 | 23.23 | 13.13 |   5.5 | 14000 | 30000 | 36000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.37 2013 |  137 |  138 |  139 |  140 | one_CFERM | two_CFERM | three_CFERM | four_CFERM | five_CFERM | six_CFERM |  0.2 |  0.5 |  0.4 | 17.17 | 12.12 | 13.13 |  2000 | 10000 | 12000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.38 2013 |  138 |  139 |  140 |  141 | one_SXVUH | two_SXVUH | three_SXVUH | four_SXVUH | five_SXVUH | six_SXVUH | 0.18 | 0.23 | 0.21 |  20.2 |   7.7 | 17.17 | 18000 | 46000 | 63000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.39 2013 |  139 |  140 |  141 |  142 | one_HBODD | two_HBODD | three_HBODD | four_HBODD | five_HBODD | six_HBODD |  0.7 |  0.1 | 0.14 |   3.3 |   3.3 | 11.11 |  7000 |  2000 | 42000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.4 2013  |  140 |  141 |  142 |  143 | one_ULXUR | two_ULXUR | three_ULXUR | four_ULXUR | five_ULXUR | six_ULXUR |  0.2 | 0.11 | 0.23 |  20.2 | 17.17 | 11.11 | 20000 | 22000 | 69000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.41 2013 |  141 |  142 |  143 |  144 | one_NUYWV | two_NUYWV | three_NUYWV | four_NUYWV | five_NUYWV | six_NUYWV | 0.13 |  0.2 | 0.24 | 22.22 | 21.21 | 16.16 | 13000 | 40000 | 72000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.42 2013 |  142 |  143 |  144 |  145 | one_SULQK | two_SULQK | three_SULQK | four_SULQK | five_SULQK | six_SULQK | 0.18 |  0.2 | 0.11 | 16.16 |  10.1 | 13.13 | 18000 | 40000 | 33000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.43 2013 |  143 |  144 |  145 |  146 | one_SXGHX | two_SXGHX | three_SXGHX | four_SXGHX | five_SXGHX | six_SXGHX | 0.18 | 0.23 |  0.6 |   7.7 | 23.23 | 16.16 | 18000 | 46000 | 18000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.44 2013 |  144 |  145 |  146 |  147 | one_TKKSO | two_TKKSO | three_TKKSO | four_TKKSO | five_TKKSO | six_TKKSO | 0.19 |  0.1 |  0.1 | 18.18 | 14.14 | 18.18 | 19000 | 20000 | 30000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.45 2013 |  145 |  146 |  147 |  148 | one_WNITJ | two_WNITJ | three_WNITJ | four_WNITJ | five_WNITJ | six_WNITJ | 0.22 | 0.13 |  0.8 | 19.19 |   9.9 | 17.17 | 22000 | 26000 | 24000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.46 2013 |  146 |  147 |  148 |  149 | one_VNIKA | two_VNIKA | three_VNIKA | four_VNIKA | five_VNIKA | six_VNIKA | 0.21 | 0.13 |  0.8 |  10.1 |     0 | 11.11 | 21000 | 26000 | 24000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.47 2013 |  147 |  148 |  149 |  150 | one_SOPMI | two_SOPMI | three_SOPMI | four_SOPMI | five_SOPMI | six_SOPMI | 0.18 | 0.14 | 0.15 | 12.12 |   8.8 | 18.18 | 18000 | 28000 | 45000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.48 2013 |  148 |  149 |  150 |  151 | one_BHTWJ | two_BHTWJ | three_BHTWJ | four_BHTWJ | five_BHTWJ | six_BHTWJ |  0.1 |  0.7 | 0.19 | 22.22 |   9.9 |   9.9 |  1000 | 14000 | 57000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.49 2013 |  149 |  150 |  151 |  152 | one_GEQDT | two_GEQDT | three_GEQDT | four_GEQDT | five_GEQDT | six_GEQDT |  0.6 |  0.4 | 0.16 |   3.3 | 19.19 |   3.3 |  6000 |  8000 | 48000 | Rooney | t     | t     | t
+(50 rows)
+
+DROP EXTERNAL TABLE readseqgzipblock;
+DROP EXTERNAL TABLE wrseqgzipblock;
+--
+-- 3.4 Test sequence file compression - deflate codec, no compression type
+--
+CREATE WRITABLE EXTERNAL TABLE wrseqdeflate (tmp1  timestamp, 
+                                             num1  integer, 
+                                             num2  integer, 
+                                             num3  integer, 
+                                             num4  integer,
+                                             t1    text, 
+                                             t2    text, 
+                                             t3    text, 
+                                             t4    text, 
+                                             t5    text, 
+                                             t6    text, 
+                                             dub1  double precision, 
+                                             dub2  double precision, 
+                                             dub3  double precision, 
+                                             ft1   real, 
+                                             ft2   real, 
+                                             ft3   real, 
+                                             ln1   bigint, 
+                                             ln2   bigint, 
+                                             ln3   bigint, 
+                                             bt    bytea,
+                                             bool1 boolean,
+							                 bool2 boolean,
+                                             bool3 boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqdeflate?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable&COMPRESSION_CODEC=org.apache.hadoop.io.compress.DefaultCodec')
+FORMAT 'custom' (formatter='pxfwritable_export');
+COPY wrseqdeflate FROM '@abs_srcdir@/data/pxf/customwritable_data.txt';
+--
+-- Test data was written
+--
+\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrseqdeflate | grep Found | awk '{ if ($2>0) print "ok";}'
+ok
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrseqdeflate | awk '{ if ($1>0) print "ok";}'
+ok
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du /gpdb_regression_data/writable/wrseqdeflate | awk '{if ($1<=0) print $0,": error";}'
+--
+-- Read data
+--
+CREATE READABLE EXTERNAL TABLE readseqdeflate (LIKE wrseqdeflate)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqdeflate?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT * FROM readseqdeflate ORDER BY num1;
+            tmp1             | num1 | num2 | num3 | num4 |    t1     |    t2     |     t3      |     t4     |     t5     |    t6     | dub1 | dub2 | dub3 |  ft1  |  ft2  |  ft3  |  ln1  |  ln2  |  ln3  |   bt   | bool1 | bool2 | bool3 
+-----------------------------+------+------+------+------+-----------+-----------+-------------+------------+------------+-----------+------+------+------+-------+-------+-------+-------+-------+-------+--------+-------+-------+-------
+ Wed Sep 11 10:00:00 2013    |  100 |  101 |  102 |  103 | one_CPGWB | two_CPGWB | three_CPGWB | four_CPGWB | five_CPGWB | six_CPGWB |  0.2 | 0.15 |  0.6 | 22.22 |   1.1 | 11.11 |  2000 | 30000 | 18000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.1 2013  |  101 |  102 |  103 |  104 | one_VQEPV | two_VQEPV | three_VQEPV | four_VQEPV | five_VQEPV | six_VQEPV | 0.21 | 0.16 |  0.4 | 15.15 | 21.21 | 17.17 | 21000 | 32000 | 12000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.2 2013  |  102 |  103 |  104 |  105 | one_WQDHY | two_WQDHY | three_WQDHY | four_WQDHY | five_WQDHY | six_WQDHY | 0.22 | 0.16 |  0.3 |   7.7 | 24.24 |  20.2 | 22000 | 32000 |  9000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.3 2013  |  103 |  104 |  105 |  106 | one_JTBNE | two_JTBNE | three_JTBNE | four_JTBNE | five_JTBNE | six_JTBNE |  0.9 | 0.19 |  0.1 | 13.13 |   4.4 | 12.12 |  9000 | 38000 |  3000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.4 2013  |  104 |  105 |  106 |  107 | one_GHTMX | two_GHTMX | three_GHTMX | four_GHTMX | five_GHTMX | six_GHTMX |  0.6 |  0.7 | 0.19 | 12.12 | 23.23 |  10.1 |  6000 | 14000 | 57000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.5 2013  |  105 |  106 |  107 |  108 | one_NAQAW | two_NAQAW | three_NAQAW | four_NAQAW | five_NAQAW | six_NAQAW | 0.13 |    0 | 0.16 |     0 | 22.22 |   1.1 | 13000 |     0 | 48000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.6 2013  |  106 |  107 |  108 |  109 | one_DDTCG | two_DDTCG | three_DDTCG | four_DDTCG | five_DDTCG | six_DDTCG |  0.3 |  0.3 | 0.19 |   2.2 |   6.6 | 12.12 |  3000 |  6000 | 57000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.7 2013  |  107 |  108 |  109 |  110 | one_DXXOU | two_DXXOU | three_DXXOU | four_DXXOU | five_DXXOU | six_DXXOU |  0.3 | 0.23 | 0.23 | 14.14 |  20.2 |   9.9 |  3000 | 46000 | 69000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.8 2013  |  108 |  109 |  110 |  111 | one_JNMAR | two_JNMAR | three_JNMAR | four_JNMAR | five_JNMAR | six_JNMAR |  0.9 | 0.13 | 0.12 |     0 | 17.17 |   7.7 |  9000 | 26000 | 36000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.9 2013  |  109 |  110 |  111 |  112 | one_AOFNS | two_AOFNS | three_AOFNS | four_AOFNS | five_AOFNS | six_AOFNS |    0 | 0.14 |  0.5 | 13.13 | 18.18 | 24.24 |     0 | 28000 | 15000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.1 2013  |  110 |  111 |  112 |  113 | one_ICCPS | two_ICCPS | three_ICCPS | four_ICCPS | five_ICCPS | six_ICCPS |  0.8 |  0.2 |  0.2 | 15.15 | 18.18 |     0 |  8000 |  4000 |  6000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.11 2013 |  111 |  112 |  113 |  114 | one_VMUVC | two_VMUVC | three_VMUVC | four_VMUVC | five_VMUVC | six_VMUVC | 0.21 | 0.12 |  0.2 | 21.21 |   2.2 | 23.23 | 21000 | 24000 | 60000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.12 2013 |  112 |  113 |  114 |  115 | one_IGRJV | two_IGRJV | three_IGRJV | four_IGRJV | five_IGRJV | six_IGRJV |  0.8 |  0.6 | 0.17 |   9.9 | 21.21 |   9.9 |  8000 | 12000 | 51000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.13 2013 |  113 |  114 |  115 |  116 | one_HXRRY | two_HXRRY | three_HXRRY | four_HXRRY | five_HXRRY | six_HXRRY |  0.7 | 0.23 | 0.17 | 17.17 | 24.24 |     0 |  7000 | 46000 | 51000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.14 2013 |  114 |  115 |  116 |  117 | one_JMXNN | two_JMXNN | three_JMXNN | four_JMXNN | five_JMXNN | six_JMXNN |  0.9 | 0.12 | 0.23 | 13.13 | 13.13 |   2.2 |  9000 | 24000 | 69000 | Rooney | f     | t     | f
+ Wed Sep 11 10:00:00.15 2013 |  115 |  116 |  117 |  118 | one_SWKIQ | two_SWKIQ | three_SWKIQ | four_SWKIQ | five_SWKIQ | six_SWKIQ | 0.18 | 0.22 |  0.1 |   8.8 | 16.16 |   2.2 | 18000 | 44000 | 30000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.16 2013 |  116 |  117 |  118 |  119 | one_DNIVJ | two_DNIVJ | three_DNIVJ | four_DNIVJ | five_DNIVJ | six_DNIVJ |  0.3 | 0.13 |  0.8 | 21.21 |   9.9 |   7.7 |  3000 | 26000 | 24000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.17 2013 |  117 |  118 |  119 |  120 | one_QTOUV | two_QTOUV | three_QTOUV | four_QTOUV | five_QTOUV | six_QTOUV | 0.16 | 0.19 | 0.14 |  20.2 | 21.21 |   9.9 | 16000 | 38000 | 42000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.18 2013 |  118 |  119 |  120 |  121 | one_WSXRT | two_WSXRT | three_WSXRT | four_WSXRT | five_WSXRT | six_WSXRT | 0.22 | 0.18 | 0.23 | 17.17 | 19.19 | 13.13 | 22000 | 36000 | 69000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.19 2013 |  119 |  120 |  121 |  122 | one_MWVEW | two_MWVEW | three_MWVEW | four_MWVEW | five_MWVEW | six_MWVEW | 0.12 | 0.22 | 0.21 |   4.4 | 22.22 |     0 | 12000 | 44000 | 63000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.2 2013  |  120 |  121 |  122 |  123 | one_GASAC | two_GASAC | three_GASAC | four_GASAC | five_GASAC | six_GASAC |  0.6 |    0 | 0.18 |     0 |   2.2 |   4.4 |  6000 |     0 | 54000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.21 2013 |  121 |  122 |  123 |  124 | one_JTHNW | two_JTHNW | three_JTHNW | four_JTHNW | five_JTHNW | six_JTHNW |  0.9 | 0.19 |  0.7 | 13.13 | 22.22 |   5.5 |  9000 | 38000 | 21000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.22 2013 |  122 |  123 |  124 |  125 | one_VUWUB | two_VUWUB | three_VUWUB | four_VUWUB | five_VUWUB | six_VUWUB | 0.21 |  0.2 | 0.22 |  20.2 |   1.1 |     0 | 21000 | 40000 | 66000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.23 2013 |  123 |  124 |  125 |  126 | one_KIRJY | two_KIRJY | three_KIRJY | four_KIRJY | five_KIRJY | six_KIRJY |  0.1 |  0.8 | 0.17 |   9.9 | 24.24 |   1.1 | 10000 | 16000 | 51000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.24 2013 |  124 |  125 |  126 |  127 | one_PIDCI | two_PIDCI | three_PIDCI | four_PIDCI | five_PIDCI | six_PIDCI | 0.15 |  0.8 |  0.3 |   2.2 |   8.8 | 24.24 | 15000 | 16000 |  9000 | Rooney | f     | t     | f
+ Wed Sep 11 10:00:00.25 2013 |  125 |  126 |  127 |  128 | one_UAYGY | two_UAYGY | three_UAYGY | four_UAYGY | five_UAYGY | six_UAYGY |  0.2 |    0 | 0.24 |   6.6 | 24.24 | 17.17 | 20000 |     0 | 72000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.26 2013 |  126 |  127 |  128 |  129 | one_QMOXW | two_QMOXW | three_QMOXW | four_QMOXW | five_QMOXW | six_QMOXW | 0.16 | 0.12 | 0.14 | 23.23 | 22.22 | 13.13 | 16000 | 24000 | 42000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.27 2013 |  127 |  128 |  129 |  130 | one_BFERO | two_BFERO | three_BFERO | four_BFERO | five_BFERO | six_BFERO |  0.1 |  0.5 |  0.4 | 17.17 | 14.14 | 12.12 |  1000 | 10000 | 12000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.28 2013 |  128 |  129 |  130 |  131 | one_WHDWR | two_WHDWR | three_WHDWR | four_WHDWR | five_WHDWR | six_WHDWR | 0.22 |  0.7 |  0.3 | 22.22 | 17.17 | 15.15 | 22000 | 14000 |  9000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.29 2013 |  129 |  130 |  131 |  132 | one_NLGQV | two_NLGQV | three_NLGQV | four_NLGQV | five_NLGQV | six_NLGQV | 0.13 | 0.11 |  0.6 | 16.16 | 21.21 | 19.19 | 13000 | 22000 | 18000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.3 2013  |  130 |  131 |  132 |  133 | one_QLUTA | two_QLUTA | three_QLUTA | four_QLUTA | five_QLUTA | six_QLUTA | 0.16 | 0.11 |  0.2 | 19.19 |     0 | 14.14 | 16000 | 22000 | 60000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.31 2013 |  131 |  132 |  133 |  134 | one_HPNGM | two_HPNGM | three_HPNGM | four_HPNGM | five_HPNGM | six_HPNGM |  0.7 | 0.15 | 0.13 |   6.6 | 12.12 | 16.16 |  7000 | 30000 | 39000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.32 2013 |  132 |  133 |  134 |  135 | one_KXDKY | two_KXDKY | three_KXDKY | four_KXDKY | five_KXDKY | six_KXDKY |  0.1 | 0.23 |  0.3 |  10.1 | 24.24 | 11.11 | 10000 | 46000 |  9000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.33 2013 |  133 |  134 |  135 |  136 | one_LYMCX | two_LYMCX | three_LYMCX | four_LYMCX | five_LYMCX | six_LYMCX | 0.11 | 0.24 | 0.12 |   2.2 | 23.23 |   3.3 | 11000 | 48000 | 36000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.34 2013 |  134 |  135 |  136 |  137 | one_WTAKY | two_WTAKY | three_WTAKY | four_WTAKY | five_WTAKY | six_WTAKY | 0.22 | 0.19 |    0 |  10.1 | 24.24 |   4.4 | 22000 | 38000 |     0 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.35 2013 |  135 |  136 |  137 |  138 | one_UEKYJ | two_UEKYJ | three_UEKYJ | four_UEKYJ | five_UEKYJ | six_UEKYJ |  0.2 |  0.4 |  0.1 | 24.24 |   9.9 |   9.9 | 20000 |  8000 | 30000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.36 2013 |  136 |  137 |  138 |  139 | one_OPMXN | two_OPMXN | three_OPMXN | four_OPMXN | five_OPMXN | six_OPMXN | 0.14 | 0.15 | 0.12 | 23.23 | 13.13 |   5.5 | 14000 | 30000 | 36000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.37 2013 |  137 |  138 |  139 |  140 | one_CFERM | two_CFERM | three_CFERM | four_CFERM | five_CFERM | six_CFERM |  0.2 |  0.5 |  0.4 | 17.17 | 12.12 | 13.13 |  2000 | 10000 | 12000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.38 2013 |  138 |  139 |  140 |  141 | one_SXVUH | two_SXVUH | three_SXVUH | four_SXVUH | five_SXVUH | six_SXVUH | 0.18 | 0.23 | 0.21 |  20.2 |   7.7 | 17.17 | 18000 | 46000 | 63000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.39 2013 |  139 |  140 |  141 |  142 | one_HBODD | two_HBODD | three_HBODD | four_HBODD | five_HBODD | six_HBODD |  0.7 |  0.1 | 0.14 |   3.3 |   3.3 | 11.11 |  7000 |  2000 | 42000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.4 2013  |  140 |  141 |  142 |  143 | one_ULXUR | two_ULXUR | three_ULXUR | four_ULXUR | five_ULXUR | six_ULXUR |  0.2 | 0.11 | 0.23 |  20.2 | 17.17 | 11.11 | 20000 | 22000 | 69000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.41 2013 |  141 |  142 |  143 |  144 | one_NUYWV | two_NUYWV | three_NUYWV | four_NUYWV | five_NUYWV | six_NUYWV | 0.13 |  0.2 | 0.24 | 22.22 | 21.21 | 16.16 | 13000 | 40000 | 72000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.42 2013 |  142 |  143 |  144 |  145 | one_SULQK | two_SULQK | three_SULQK | four_SULQK | five_SULQK | six_SULQK | 0.18 |  0.2 | 0.11 | 16.16 |  10.1 | 13.13 | 18000 | 40000 | 33000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.43 2013 |  143 |  144 |  145 |  146 | one_SXGHX | two_SXGHX | three_SXGHX | four_SXGHX | five_SXGHX | six_SXGHX | 0.18 | 0.23 |  0.6 |   7.7 | 23.23 | 16.16 | 18000 | 46000 | 18000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.44 2013 |  144 |  145 |  146 |  147 | one_TKKSO | two_TKKSO | three_TKKSO | four_TKKSO | five_TKKSO | six_TKKSO | 0.19 |  0.1 |  0.1 | 18.18 | 14.14 | 18.18 | 19000 | 20000 | 30000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.45 2013 |  145 |  146 |  147 |  148 | one_WNITJ | two_WNITJ | three_WNITJ | four_WNITJ | five_WNITJ | six_WNITJ | 0.22 | 0.13 |  0.8 | 19.19 |   9.9 | 17.17 | 22000 | 26000 | 24000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.46 2013 |  146 |  147 |  148 |  149 | one_VNIKA | two_VNIKA | three_VNIKA | four_VNIKA | five_VNIKA | six_VNIKA | 0.21 | 0.13 |  0.8 |  10.1 |     0 | 11.11 | 21000 | 26000 | 24000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.47 2013 |  147 |  148 |  149 |  150 | one_SOPMI | two_SOPMI | three_SOPMI | four_SOPMI | five_SOPMI | six_SOPMI | 0.18 | 0.14 | 0.15 | 12.12 |   8.8 | 18.18 | 18000 | 28000 | 45000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.48 2013 |  148 |  149 |  150 |  151 | one_BHTWJ | two_BHTWJ | three_BHTWJ | four_BHTWJ | five_BHTWJ | six_BHTWJ |  0.1 |  0.7 | 0.19 | 22.22 |   9.9 |   9.9 |  1000 | 14000 | 57000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.49 2013 |  149 |  150 |  151 |  152 | one_GEQDT | two_GEQDT | three_GEQDT | four_GEQDT | five_GEQDT | six_GEQDT |  0.6 |  0.4 | 0.16 |   3.3 | 19.19 |   3.3 |  6000 |  8000 | 48000 | Rooney | t     | t     | t
+(50 rows)
+
+DROP EXTERNAL TABLE readseqdeflate;
+DROP EXTERNAL TABLE wrseqdeflate;
+--
+-- 3.5 Test sequence file compression - deflate codec, record compression
+--
+CREATE WRITABLE EXTERNAL TABLE wrseqdeflaterecord (tmp1  timestamp, 
+                                                   num1  integer, 
+                                                   num2  integer, 
+                                                   num3  integer, 
+                                                   num4  integer,
+                                                   t1    text, 
+                                                   t2    text, 
+                                                   t3    text, 
+                                                   t4    text, 
+                                                   t5    text, 
+                                                   t6    text, 
+                                                   dub1  double precision, 
+                                                   dub2  double precision, 
+                                                   dub3  double precision, 
+                                                   ft1   real, 
+                                                   ft2   real, 
+                                                   ft3   real, 
+                                                   ln1   bigint, 
+                                                   ln2   bigint, 
+                                                   ln3   bigint, 
+                                                   bt    bytea,
+                                                   bool1 boolean,
+							                       bool2 boolean,
+                                                   bool3 boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqdeflaterecord?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable&COMPRESSION_CODEC=org.apache.hadoop.io.compress.DefaultCodec&COMPRESSION_TYPE=RECORD')
+FORMAT 'custom' (formatter='pxfwritable_export');
+COPY wrseqdeflaterecord FROM '@abs_srcdir@/data/pxf/customwritable_data.txt';
+--
+-- Test data was written
+--
+\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrseqdeflaterecord | grep Found | awk '{ if ($2>0) print "ok";}'
+ok
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrseqdeflaterecord | awk '{ if ($1>0) print "ok";}'
+ok
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du /gpdb_regression_data/writable/wrseqdeflaterecord | awk '{if ($1<=0) print $0,": error";}'
+--
+-- Read data
+--
+CREATE READABLE EXTERNAL TABLE readseqdeflaterecord (LIKE wrseqdeflaterecord)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqdeflaterecord?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT * FROM readseqdeflaterecord ORDER BY num1;
+            tmp1             | num1 | num2 | num3 | num4 |    t1     |    t2     |     t3      |     t4     |     t5     |    t6     | dub1 | dub2 | dub3 |  ft1  |  ft2  |  ft3  |  ln1  |  ln2  |  ln3  |   bt   | bool1 | bool2 | bool3 
+-----------------------------+------+------+------+------+-----------+-----------+-------------+------------+------------+-----------+------+------+------+-------+-------+-------+-------+-------+-------+--------+-------+-------+-------
+ Wed Sep 11 10:00:00 2013    |  100 |  101 |  102 |  103 | one_CPGWB | two_CPGWB | three_CPGWB | four_CPGWB | five_CPGWB | six_CPGWB |  0.2 | 0.15 |  0.6 | 22.22 |   1.1 | 11.11 |  2000 | 30000 | 18000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.1 2013  |  101 |  102 |  103 |  104 | one_VQEPV | two_VQEPV | three_VQEPV | four_VQEPV | five_VQEPV | six_VQEPV | 0.21 | 0.16 |  0.4 | 15.15 | 21.21 | 17.17 | 21000 | 32000 | 12000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.2 2013  |  102 |  103 |  104 |  105 | one_WQDHY | two_WQDHY | three_WQDHY | four_WQDHY | five_WQDHY | six_WQDHY | 0.22 | 0.16 |  0.3 |   7.7 | 24.24 |  20.2 | 22000 | 32000 |  9000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.3 2013  |  103 |  104 |  105 |  106 | one_JTBNE | two_JTBNE | three_JTBNE | four_JTBNE | five_JTBNE | six_JTBNE |  0.9 | 0.19 |  0.1 | 13.13 |   4.4 | 12.12 |  9000 | 38000 |  3000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.4 2013  |  104 |  105 |  106 |  107 | one_GHTMX | two_GHTMX | three_GHTMX | four_GHTMX | five_GHTMX | six_GHTMX |  0.6 |  0.7 | 0.19 | 12.12 | 23.23 |  10.1 |  6000 | 14000 | 57000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.5 2013  |  105 |  106 |  107 |  108 | one_NAQAW | two_NAQAW | three_NAQAW | four_NAQAW | five_NAQAW | six_NAQAW | 0.13 |    0 | 0.16 |     0 | 22.22 |   1.1 | 13000 |     0 | 48000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.6 2013  |  106 |  107 |  108 |  109 | one_DDTCG | two_DDTCG | three_DDTCG | four_DDTCG | five_DDTCG | six_DDTCG |  0.3 |  0.3 | 0.19 |   2.2 |   6.6 | 12.12 |  3000 |  6000 | 57000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.7 2013  |  107 |  108 |  109 |  110 | one_DXXOU | two_DXXOU | three_DXXOU | four_DXXOU | five_DXXOU | six_DXXOU |  0.3 | 0.23 | 0.23 | 14.14 |  20.2 |   9.9 |  3000 | 46000 | 69000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.8 2013  |  108 |  109 |  110 |  111 | one_JNMAR | two_JNMAR | three_JNMAR | four_JNMAR | five_JNMAR | six_JNMAR |  0.9 | 0.13 | 0.12 |     0 | 17.17 |   7.7 |  9000 | 26000 | 36000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.9 2013  |  109 |  110 |  111 |  112 | one_AOFNS | two_AOFNS | three_AOFNS | four_AOFNS | five_AOFNS | six_AOFNS |    0 | 0.14 |  0.5 | 13.13 | 18.18 | 24.24 |     0 | 28000 | 15000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.1 2013  |  110 |  111 |  112 |  113 | one_ICCPS | two_ICCPS | three_ICCPS | four_ICCPS | five_ICCPS | six_ICCPS |  0.8 |  0.2 |  0.2 | 15.15 | 18.18 |     0 |  8000 |  4000 |  6000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.11 2013 |  111 |  112 |  113 |  114 | one_VMUVC | two_VMUVC | three_VMUVC | four_VMUVC | five_VMUVC | six_VMUVC | 0.21 | 0.12 |  0.2 | 21.21 |   2.2 | 23.23 | 21000 | 24000 | 60000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.12 2013 |  112 |  113 |  114 |  115 | one_IGRJV | two_IGRJV | three_IGRJV | four_IGRJV | five_IGRJV | six_IGRJV |  0.8 |  0.6 | 0.17 |   9.9 | 21.21 |   9.9 |  8000 | 12000 | 51000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.13 2013 |  113 |  114 |  115 |  116 | one_HXRRY | two_HXRRY | three_HXRRY | four_HXRRY | five_HXRRY | six_HXRRY |  0.7 | 0.23 | 0.17 | 17.17 | 24.24 |     0 |  7000 | 46000 | 51000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.14 2013 |  114 |  115 |  116 |  117 | one_JMXNN | two_JMXNN | three_JMXNN | four_JMXNN | five_JMXNN | six_JMXNN |  0.9 | 0.12 | 0.23 | 13.13 | 13.13 |   2.2 |  9000 | 24000 | 69000 | Rooney | f     | t     | f
+ Wed Sep 11 10:00:00.15 2013 |  115 |  116 |  117 |  118 | one_SWKIQ | two_SWKIQ | three_SWKIQ | four_SWKIQ | five_SWKIQ | six_SWKIQ | 0.18 | 0.22 |  0.1 |   8.8 | 16.16 |   2.2 | 18000 | 44000 | 30000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.16 2013 |  116 |  117 |  118 |  119 | one_DNIVJ | two_DNIVJ | three_DNIVJ | four_DNIVJ | five_DNIVJ | six_DNIVJ |  0.3 | 0.13 |  0.8 | 21.21 |   9.9 |   7.7 |  3000 | 26000 | 24000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.17 2013 |  117 |  118 |  119 |  120 | one_QTOUV | two_QTOUV | three_QTOUV | four_QTOUV | five_QTOUV | six_QTOUV | 0.16 | 0.19 | 0.14 |  20.2 | 21.21 |   9.9 | 16000 | 38000 | 42000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.18 2013 |  118 |  119 |  120 |  121 | one_WSXRT | two_WSXRT | three_WSXRT | four_WSXRT | five_WSXRT | six_WSXRT | 0.22 | 0.18 | 0.23 | 17.17 | 19.19 | 13.13 | 22000 | 36000 | 69000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.19 2013 |  119 |  120 |  121 |  122 | one_MWVEW | two_MWVEW | three_MWVEW | four_MWVEW | five_MWVEW | six_MWVEW | 0.12 | 0.22 | 0.21 |   4.4 | 22.22 |     0 | 12000 | 44000 | 63000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.2 2013  |  120 |  121 |  122 |  123 | one_GASAC | two_GASAC | three_GASAC | four_GASAC | five_GASAC | six_GASAC |  0.6 |    0 | 0.18 |     0 |   2.2 |   4.4 |  6000 |     0 | 54000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.21 2013 |  121 |  122 |  123 |  124 | one_JTHNW | two_JTHNW | three_JTHNW | four_JTHNW | five_JTHNW | six_JTHNW |  0.9 | 0.19 |  0.7 | 13.13 | 22.22 |   5.5 |  9000 | 38000 | 21000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.22 2013 |  122 |  123 |  124 |  125 | one_VUWUB | two_VUWUB | three_VUWUB | four_VUWUB | five_VUWUB | six_VUWUB | 0.21 |  0.2 | 0.22 |  20.2 |   1.1 |     0 | 21000 | 40000 | 66000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.23 2013 |  123 |  124 |  125 |  126 | one_KIRJY | two_KIRJY | three_KIRJY | four_KIRJY | five_KIRJY | six_KIRJY |  0.1 |  0.8 | 0.17 |   9.9 | 24.24 |   1.1 | 10000 | 16000 | 51000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.24 2013 |  124 |  125 |  126 |  127 | one_PIDCI | two_PIDCI | three_PIDCI | four_PIDCI | five_PIDCI | six_PIDCI | 0.15 |  0.8 |  0.3 |   2.2 |   8.8 | 24.24 | 15000 | 16000 |  9000 | Rooney | f     | t     | f
+ Wed Sep 11 10:00:00.25 2013 |  125 |  126 |  127 |  128 | one_UAYGY | two_UAYGY | three_UAYGY | four_UAYGY | five_UAYGY | six_UAYGY |  0.2 |    0 | 0.24 |   6.6 | 24.24 | 17.17 | 20000 |     0 | 72000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.26 2013 |  126 |  127 |  128 |  129 | one_QMOXW | two_QMOXW | three_QMOXW | four_QMOXW | five_QMOXW | six_QMOXW | 0.16 | 0.12 | 0.14 | 23.23 | 22.22 | 13.13 | 16000 | 24000 | 42000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.27 2013 |  127 |  128 |  129 |  130 | one_BFERO | two_BFERO | three_BFERO | four_BFERO | five_BFERO | six_BFERO |  0.1 |  0.5 |  0.4 | 17.17 | 14.14 | 12.12 |  1000 | 10000 | 12000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.28 2013 |  128 |  129 |  130 |  131 | one_WHDWR | two_WHDWR | three_WHDWR | four_WHDWR | five_WHDWR | six_WHDWR | 0.22 |  0.7 |  0.3 | 22.22 | 17.17 | 15.15 | 22000 | 14000 |  9000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.29 2013 |  129 |  130 |  131 |  132 | one_NLGQV | two_NLGQV | three_NLGQV | four_NLGQV | five_NLGQV | six_NLGQV | 0.13 | 0.11 |  0.6 | 16.16 | 21.21 | 19.19 | 13000 | 22000 | 18000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.3 2013  |  130 |  131 |  132 |  133 | one_QLUTA | two_QLUTA | three_QLUTA | four_QLUTA | five_QLUTA | six_QLUTA | 0.16 | 0.11 |  0.2 | 19.19 |     0 | 14.14 | 16000 | 22000 | 60000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.31 2013 |  131 |  132 |  133 |  134 | one_HPNGM | two_HPNGM | three_HPNGM | four_HPNGM | five_HPNGM | six_HPNGM |  0.7 | 0.15 | 0.13 |   6.6 | 12.12 | 16.16 |  7000 | 30000 | 39000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.32 2013 |  132 |  133 |  134 |  135 | one_KXDKY | two_KXDKY | three_KXDKY | four_KXDKY | five_KXDKY | six_KXDKY |  0.1 | 0.23 |  0.3 |  10.1 | 24.24 | 11.11 | 10000 | 46000 |  9000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.33 2013 |  133 |  134 |  135 |  136 | one_LYMCX | two_LYMCX | three_LYMCX | four_LYMCX | five_LYMCX | six_LYMCX | 0.11 | 0.24 | 0.12 |   2.2 | 23.23 |   3.3 | 11000 | 48000 | 36000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.34 2013 |  134 |  135 |  136 |  137 | one_WTAKY | two_WTAKY | three_WTAKY | four_WTAKY | five_WTAKY | six_WTAKY | 0.22 | 0.19 |    0 |  10.1 | 24.24 |   4.4 | 22000 | 38000 |     0 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.35 2013 |  135 |  136 |  137 |  138 | one_UEKYJ | two_UEKYJ | three_UEKYJ | four_UEKYJ | five_UEKYJ | six_UEKYJ |  0.2 |  0.4 |  0.1 | 24.24 |   9.9 |   9.9 | 20000 |  8000 | 30000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.36 2013 |  136 |  137 |  138 |  139 | one_OPMXN | two_OPMXN | three_OPMXN | four_OPMXN | five_OPMXN | six_OPMXN | 0.14 | 0.15 | 0.12 | 23.23 | 13.13 |   5.5 | 14000 | 30000 | 36000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.37 2013 |  137 |  138 |  139 |  140 | one_CFERM | two_CFERM | three_CFERM | four_CFERM | five_CFERM | six_CFERM |  0.2 |  0.5 |  0.4 | 17.17 | 12.12 | 13.13 |  2000 | 10000 | 12000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.38 2013 |  138 |  139 |  140 |  141 | one_SXVUH | two_SXVUH | three_SXVUH | four_SXVUH | five_SXVUH | six_SXVUH | 0.18 | 0.23 | 0.21 |  20.2 |   7.7 | 17.17 | 18000 | 46000 | 63000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.39 2013 |  139 |  140 |  141 |  142 | one_HBODD | two_HBODD | three_HBODD | four_HBODD | five_HBODD | six_HBODD |  0.7 |  0.1 | 0.14 |   3.3 |   3.3 | 11.11 |  7000 |  2000 | 42000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.4 2013  |  140 |  141 |  142 |  143 | one_ULXUR | two_ULXUR | three_ULXUR | four_ULXUR | five_ULXUR | six_ULXUR |  0.2 | 0.11 | 0.23 |  20.2 | 17.17 | 11.11 | 20000 | 22000 | 69000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.41 2013 |  141 |  142 |  143 |  144 | one_NUYWV | two_NUYWV | three_NUYWV | four_NUYWV | five_NUYWV | six_NUYWV | 0.13 |  0.2 | 0.24 | 22.22 | 21.21 | 16.16 | 13000 | 40000 | 72000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.42 2013 |  142 |  143 |  144 |  145 | one_SULQK | two_SULQK | three_SULQK | four_SULQK | five_SULQK | six_SULQK | 0.18 |  0.2 | 0.11 | 16.16 |  10.1 | 13.13 | 18000 | 40000 | 33000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.43 2013 |  143 |  144 |  145 |  146 | one_SXGHX | two_SXGHX | three_SXGHX | four_SXGHX | five_SXGHX | six_SXGHX | 0.18 | 0.23 |  0.6 |   7.7 | 23.23 | 16.16 | 18000 | 46000 | 18000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.44 2013 |  144 |  145 |  146 |  147 | one_TKKSO | two_TKKSO | three_TKKSO | four_TKKSO | five_TKKSO | six_TKKSO | 0.19 |  0.1 |  0.1 | 18.18 | 14.14 | 18.18 | 19000 | 20000 | 30000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.45 2013 |  145 |  146 |  147 |  148 | one_WNITJ | two_WNITJ | three_WNITJ | four_WNITJ | five_WNITJ | six_WNITJ | 0.22 | 0.13 |  0.8 | 19.19 |   9.9 | 17.17 | 22000 | 26000 | 24000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.46 2013 |  146 |  147 |  148 |  149 | one_VNIKA | two_VNIKA | three_VNIKA | four_VNIKA | five_VNIKA | six_VNIKA | 0.21 | 0.13 |  0.8 |  10.1 |     0 | 11.11 | 21000 | 26000 | 24000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.47 2013 |  147 |  148 |  149 |  150 | one_SOPMI | two_SOPMI | three_SOPMI | four_SOPMI | five_SOPMI | six_SOPMI | 0.18 | 0.14 | 0.15 | 12.12 |   8.8 | 18.18 | 18000 | 28000 | 45000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.48 2013 |  148 |  149 |  150 |  151 | one_BHTWJ | two_BHTWJ | three_BHTWJ | four_BHTWJ | five_BHTWJ | six_BHTWJ |  0.1 |  0.7 | 0.19 | 22.22 |   9.9 |   9.9 |  1000 | 14000 | 57000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.49 2013 |  149 |  150 |  151 |  152 | one_GEQDT | two_GEQDT | three_GEQDT | four_GEQDT | five_GEQDT | six_GEQDT |  0.6 |  0.4 | 0.16 |   3.3 | 19.19 |   3.3 |  6000 |  8000 | 48000 | Rooney | t     | t     | t
+(50 rows)
+
+DROP EXTERNAL TABLE readseqdeflaterecord;
+DROP EXTERNAL TABLE wrseqdeflaterecord;
+--
+-- 3.6 Test sequence file compression - deflate codec, block compression
+--
+CREATE WRITABLE EXTERNAL TABLE wrseqdeflateblock (tmp1  timestamp, 
+                                                  num1  integer, 
+                                                  num2  integer, 
+                                                  num3  integer, 
+                                                  num4  integer,
+                                                  t1    text, 
+                                                  t2    text, 
+                                                  t3    text, 
+                                                  t4    text, 
+                                                  t5    text, 
+                                                  t6    text, 
+                                                  dub1  double precision, 
+                                                  dub2  double precision, 
+                                                  dub3  double precision, 
+                                                  ft1   real, 
+                                                  ft2   real, 
+                                                  ft3   real, 
+                                                  ln1   bigint, 
+                                                  ln2   bigint, 
+                                                  ln3   bigint, 
+                                                  bt    bytea,
+                                                  bool1 boolean,
+							                      bool2 boolean,
+                                                  bool3 boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqdeflateblock?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable&COMPRESSION_CODEC=org.apache.hadoop.io.compress.DefaultCodec&COMPRESSION_TYPE=BLOCK')
+FORMAT 'custom' (formatter='pxfwritable_export');
+COPY wrseqdeflateblock FROM '@abs_srcdir@/data/pxf/customwritable_data.txt';
+--
+-- Test data was written
+--
+\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrseqdeflateblock | grep Found | awk '{ if ($2>0) print "ok";}'
+ok
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrseqdeflateblock | awk '{ if ($1>0) print "ok";}'
+ok
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du /gpdb_regression_data/writable/wrseqdeflateblock | awk '{if ($1<=0) print $0,": error";}'
+--
+-- Read data
+--
+CREATE READABLE EXTERNAL TABLE readseqdeflateblock (LIKE wrseqdeflateblock)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqdeflateblock?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT * FROM readseqdeflateblock ORDER BY num1;
+            tmp1             | num1 | num2 | num3 | num4 |    t1     |    t2     |     t3      |     t4     |     t5     |    t6     | dub1 | dub2 | dub3 |  ft1  |  ft2  |  ft3  |  ln1  |  ln2  |  ln3  |   bt   | bool1 | bool2 | bool3 
+-----------------------------+------+------+------+------+-----------+-----------+-------------+------------+------------+-----------+------+------+------+-------+-------+-------+-------+-------+-------+--------+-------+-------+-------
+ Wed Sep 11 10:00:00 2013    |  100 |  101 |  102 |  103 | one_CPGWB | two_CPGWB | three_CPGWB | four_CPGWB | five_CPGWB | six_CPGWB |  0.2 | 0.15 |  0.6 | 22.22 |   1.1 | 11.11 |  2000 | 30000 | 18000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.1 2013  |  101 |  102 |  103 |  104 | one_VQEPV | two_VQEPV | three_VQEPV | four_VQEPV | five_VQEPV | six_VQEPV | 0.21 | 0.16 |  0.4 | 15.15 | 21.21 | 17.17 | 21000 | 32000 | 12000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.2 2013  |  102 |  103 |  104 |  105 | one_WQDHY | two_WQDHY | three_WQDHY | four_WQDHY | five_WQDHY | six_WQDHY | 0.22 | 0.16 |  0.3 |   7.7 | 24.24 |  20.2 | 22000 | 32000 |  9000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.3 2013  |  103 |  104 |  105 |  106 | one_JTBNE | two_JTBNE | three_JTBNE | four_JTBNE | five_JTBNE | six_JTBNE |  0.9 | 0.19 |  0.1 | 13.13 |   4.4 | 12.12 |  9000 | 38000 |  3000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.4 2013  |  104 |  105 |  106 |  107 | one_GHTMX | two_GHTMX | three_GHTMX | four_GHTMX | five_GHTMX | six_GHTMX |  0.6 |  0.7 | 0.19 | 12.12 | 23.23 |  10.1 |  6000 | 14000 | 57000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.5 2013  |  105 |  106 |  107 |  108 | one_NAQAW | two_NAQAW | three_NAQAW | four_NAQAW | five_NAQAW | six_NAQAW | 0.13 |    0 | 0.16 |     0 | 22.22 |   1.1 | 13000 |     0 | 48000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.6 2013  |  106 |  107 |  108 |  109 | one_DDTCG | two_DDTCG | three_DDTCG | four_DDTCG | five_DDTCG | six_DDTCG |  0.3 |  0.3 | 0.19 |   2.2 |   6.6 | 12.12 |  3000 |  6000 | 57000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.7 2013  |  107 |  108 |  109 |  110 | one_DXXOU | two_DXXOU | three_DXXOU | four_DXXOU | five_DXXOU | six_DXXOU |  0.3 | 0.23 | 0.23 | 14.14 |  20.2 |   9.9 |  3000 | 46000 | 69000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.8 2013  |  108 |  109 |  110 |  111 | one_JNMAR | two_JNMAR | three_JNMAR | four_JNMAR | five_JNMAR | six_JNMAR |  0.9 | 0.13 | 0.12 |     0 | 17.17 |   7.7 |  9000 | 26000 | 36000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.9 2013  |  109 |  110 |  111 |  112 | one_AOFNS | two_AOFNS | three_AOFNS | four_AOFNS | five_AOFNS | six_AOFNS |    0 | 0.14 |  0.5 | 13.13 | 18.18 | 24.24 |     0 | 28000 | 15000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.1 2013  |  110 |  111 |  112 |  113 | one_ICCPS | two_ICCPS | three_ICCPS | four_ICCPS | five_ICCPS | six_ICCPS |  0.8 |  0.2 |  0.2 | 15.15 | 18.18 |     0 |  8000 |  4000 |  6000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.11 2013 |  111 |  112 |  113 |  114 | one_VMUVC | two_VMUVC | three_VMUVC | four_VMUVC | five_VMUVC | six_VMUVC | 0.21 | 0.12 |  0.2 | 21.21 |   2.2 | 23.23 | 21000 | 24000 | 60000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.12 2013 |  112 |  113 |  114 |  115 | one_IGRJV | two_IGRJV | three_IGRJV | four_IGRJV | five_IGRJV | six_IGRJV |  0.8 |  0.6 | 0.17 |   9.9 | 21.21 |   9.9 |  8000 | 12000 | 51000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.13 2013 |  113 |  114 |  115 |  116 | one_HXRRY | two_HXRRY | three_HXRRY | four_HXRRY | five_HXRRY | six_HXRRY |  0.7 | 0.23 | 0.17 | 17.17 | 24.24 |     0 |  7000 | 46000 | 51000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.14 2013 |  114 |  115 |  116 |  117 | one_JMXNN | two_JMXNN | three_JMXNN | four_JMXNN | five_JMXNN | six_JMXNN |  0.9 | 0.12 | 0.23 | 13.13 | 13.13 |   2.2 |  9000 | 24000 | 69000 | Rooney | f     | t     | f
+ Wed Sep 11 10:00:00.15 2013 |  115 |  116 |  117 |  118 | one_SWKIQ | two_SWKIQ | three_SWKIQ | four_SWKIQ | five_SWKIQ | six_SWKIQ | 0.18 | 0.22 |  0.1 |   8.8 | 16.16 |   2.2 | 18000 | 44000 | 30000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.16 2013 |  116 |  117 |  118 |  119 | one_DNIVJ | two_DNIVJ | three_DNIVJ | four_DNIVJ | five_DNIVJ | six_DNIVJ |  0.3 | 0.13 |  0.8 | 21.21 |   9.9 |   7.7 |  3000 | 26000 | 24000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.17 2013 |  117 |  118 |  119 |  120 | one_QTOUV | two_QTOUV | three_QTOUV | four_QTOUV | five_QTOUV | six_QTOUV | 0.16 | 0.19 | 0.14 |  20.2 | 21.21 |   9.9 | 16000 | 38000 | 42000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.18 2013 |  118 |  119 |  120 |  121 | one_WSXRT | two_WSXRT | three_WSXRT | four_WSXRT | five_WSXRT | six_WSXRT | 0.22 | 0.18 | 0.23 | 17.17 | 19.19 | 13.13 | 22000 | 36000 | 69000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.19 2013 |  119 |  120 |  121 |  122 | one_MWVEW | two_MWVEW | three_MWVEW | four_MWVEW | five_MWVEW | six_MWVEW | 0.12 | 0.22 | 0.21 |   4.4 | 22.22 |     0 | 12000 | 44000 | 63000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.2 2013  |  120 |  121 |  122 |  123 | one_GASAC | two_GASAC | three_GASAC | four_GASAC | five_GASAC | six_GASAC |  0.6 |    0 | 0.18 |     0 |   2.2 |   4.4 |  6000 |     0 | 54000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.21 2013 |  121 |  122 |  123 |  124 | one_JTHNW | two_JTHNW | three_JTHNW | four_JTHNW | five_JTHNW | six_JTHNW |  0.9 | 0.19 |  0.7 | 13.13 | 22.22 |   5.5 |  9000 | 38000 | 21000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.22 2013 |  122 |  123 |  124 |  125 | one_VUWUB | two_VUWUB | three_VUWUB | four_VUWUB | five_VUWUB | six_VUWUB | 0.21 |  0.2 | 0.22 |  20.2 |   1.1 |     0 | 21000 | 40000 | 66000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.23 2013 |  123 |  124 |  125 |  126 | one_KIRJY | two_KIRJY | three_KIRJY | four_KIRJY | five_KIRJY | six_KIRJY |  0.1 |  0.8 | 0.17 |   9.9 | 24.24 |   1.1 | 10000 | 16000 | 51000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.24 2013 |  124 |  125 |  126 |  127 | one_PIDCI | two_PIDCI | three_PIDCI | four_PIDCI | five_PIDCI | six_PIDCI | 0.15 |  0.8 |  0.3 |   2.2 |   8.8 | 24.24 | 15000 | 16000 |  9000 | Rooney | f     | t     | f
+ Wed Sep 11 10:00:00.25 2013 |  125 |  126 |  127 |  128 | one_UAYGY | two_UAYGY | three_UAYGY | four_UAYGY | five_UAYGY | six_UAYGY |  0.2 |    0 | 0.24 |   6.6 | 24.24 | 17.17 | 20000 |     0 | 72000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.26 2013 |  126 |  127 |  128 |  129 | one_QMOXW | two_QMOXW | three_QMOXW | four_QMOXW | five_QMOXW | six_QMOXW | 0.16 | 0.12 | 0.14 | 23.23 | 22.22 | 13.13 | 16000 | 24000 | 42000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.27 2013 |  127 |  128 |  129 |  130 | one_BFERO | two_BFERO | three_BFERO | four_BFERO | five_BFERO | six_BFERO |  0.1 |  0.5 |  0.4 | 17.17 | 14.14 | 12.12 |  1000 | 10000 | 12000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.28 2013 |  128 |  129 |  130 |  131 | one_WHDWR | two_WHDWR | three_WHDWR | four_WHDWR | five_WHDWR | six_WHDWR | 0.22 |  0.7 |  0.3 | 22.22 | 17.17 | 15.15 | 22000 | 14000 |  9000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.29 2013 |  129 |  130 |  131 |  132 | one_NLGQV | two_NLGQV | three_NLGQV | four_NLGQV | five_NLGQV | six_NLGQV | 0.13 | 0.11 |  0.6 | 16.16 | 21.21 | 19.19 | 13000 | 22000 | 18000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.3 2013  |  130 |  131 |  132 |  133 | one_QLUTA | two_QLUTA | three_QLUTA | four_QLUTA | five_QLUTA | six_QLUTA | 0.16 | 0.11 |  0.2 | 19.19 |     0 | 14.14 | 16000 | 22000 | 60000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.31 2013 |  131 |  132 |  133 |  134 | one_HPNGM | two_HPNGM | three_HPNGM | four_HPNGM | five_HPNGM | six_HPNGM |  0.7 | 0.15 | 0.13 |   6.6 | 12.12 | 16.16 |  7000 | 30000 | 39000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.32 2013 |  132 |  133 |  134 |  135 | one_KXDKY | two_KXDKY | three_KXDKY | four_KXDKY | five_KXDKY | six_KXDKY |  0.1 | 0.23 |  0.3 |  10.1 | 24.24 | 11.11 | 10000 | 46000 |  9000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.33 2013 |  133 |  134 |  135 |  136 | one_LYMCX | two_LYMCX | three_LYMCX | four_LYMCX | five_LYMCX | six_LYMCX | 0.11 | 0.24 | 0.12 |   2.2 | 23.23 |   3.3 | 11000 | 48000 | 36000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.34 2013 |  134 |  135 |  136 |  137 | one_WTAKY | two_WTAKY | three_WTAKY | four_WTAKY | five_WTAKY | six_WTAKY | 0.22 | 0.19 |    0 |  10.1 | 24.24 |   4.4 | 22000 | 38000 |     0 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.35 2013 |  135 |  136 |  137 |  138 | one_UEKYJ | two_UEKYJ | three_UEKYJ | four_UEKYJ | five_UEKYJ | six_UEKYJ |  0.2 |  0.4 |  0.1 | 24.24 |   9.9 |   9.9 | 20000 |  8000 | 30000 | Rooney | t     | t     | t
+ Wed Sep 11 10:00:00.36 2013 |  136 |  137 |  138 |  139 | one_OPMXN | two_OPMXN | three_OPMXN | four_OPMXN | five_OPMXN | six_OPMXN | 0.14 | 0.15 | 0.12 | 23.23 | 13.13 |   5.5 | 14000 | 30000 | 36000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.37 2013 |  137 |  138 |  139 |  140 | one_CFERM | two_CFERM | three_CFERM | four_CFERM | five_CFERM | six_CFERM |  0.2 |  0.5 |  0.4 | 17.17 | 12.12 | 13.13 |  2000 | 10000 | 12000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.38 2013 |  138 |  139 |  140 |  141 | one_SXVUH | two_SXVUH | three_SXVUH | four_SXVUH | five_SXVUH | six_SXVUH | 0.18 | 0.23 | 0.21 |  20.2 |   7.7 | 17.17 | 18000 | 46000 | 63000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.39 2013 |  139 |  140 |  141 |  142 | one_HBODD | two_HBODD | three_HBODD | four_HBODD | five_HBODD | six_HBODD |  0.7 |  0.1 | 0.14 |   3.3 |   3.3 | 11.11 |  7000 |  2000 | 42000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.4 2013  |  140 |  141 |  142 |  143 | one_ULXUR | two_ULXUR | three_ULXUR | four_ULXUR | five_ULXUR | six_ULXUR |  0.2 | 0.11 | 0.23 |  20.2 | 17.17 | 11.11 | 20000 | 22000 | 69000 | Rooney | t     | f     | f
+ Wed Sep 11 10:00:00.41 2013 |  141 |  142 |  143 |  144 | one_NUYWV | two_NUYWV | three_NUYWV | four_NUYWV | five_NUYWV | six_NUYWV | 0.13 |  0.2 | 0.24 | 22.22 | 21.21 | 16.16 | 13000 | 40000 | 72000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.42 2013 |  142 |  143 |  144 |  145 | one_SULQK | two_SULQK | three_SULQK | four_SULQK | five_SULQK | six_SULQK | 0.18 |  0.2 | 0.11 | 16.16 |  10.1 | 13.13 | 18000 | 40000 | 33000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.43 2013 |  143 |  144 |  145 |  146 | one_SXGHX | two_SXGHX | three_SXGHX | four_SXGHX | five_SXGHX | six_SXGHX | 0.18 | 0.23 |  0.6 |   7.7 | 23.23 | 16.16 | 18000 | 46000 | 18000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.44 2013 |  144 |  145 |  146 |  147 | one_TKKSO | two_TKKSO | three_TKKSO | four_TKKSO | five_TKKSO | six_TKKSO | 0.19 |  0.1 |  0.1 | 18.18 | 14.14 | 18.18 | 19000 | 20000 | 30000 | Rooney | f     | t     | t
+ Wed Sep 11 10:00:00.45 2013 |  145 |  146 |  147 |  148 | one_WNITJ | two_WNITJ | three_WNITJ | four_WNITJ | five_WNITJ | six_WNITJ | 0.22 | 0.13 |  0.8 | 19.19 |   9.9 | 17.17 | 22000 | 26000 | 24000 | Rooney | t     | f     | t
+ Wed Sep 11 10:00:00.46 2013 |  146 |  147 |  148 |  149 | one_VNIKA | two_VNIKA | three_VNIKA | four_VNIKA | five_VNIKA | six_VNIKA | 0.21 | 0.13 |  0.8 |  10.1 |     0 | 11.11 | 21000 | 26000 | 24000 | Rooney | f     | f     | t
+ Wed Sep 11 10:00:00.47 2013 |  147 |  148 |  149 |  150 | one_SOPMI | two_SOPMI | three_SOPMI | four_SOPMI | five_SOPMI | six_SOPMI | 0.18 | 0.14 | 0.15 | 12.12 |   8.8 | 18.18 | 18000 | 28000 | 45000 | Rooney | t     | t     | f
+ Wed Sep 11 10:00:00.48 2013 |  148 |  149 |  150 |  151 | one_BHTWJ | two_BHTWJ | three_BHTWJ | four_BHTWJ | five_BHTWJ | six_BHTWJ |  0.1 |  0.7 | 0.19 | 22.22 |   9.9 |   9.9 |  1000 | 14000 | 57000 | Rooney | f     | f     | f
+ Wed Sep 11 10:00:00.49 2013 |  149 |  150 |  151 |  152 | one_GEQDT | two_GEQDT | three_GEQDT | four_GEQDT | five_GEQDT | six_GEQDT |  0.6 |  0.4 | 0.16 |   3.3 | 19.19 |   3.3 |  6000 |  8000 | 48000 | Rooney | t     | t     | t
+(50 rows)
+
+DROP EXTERNAL TABLE readseqdeflateblock;
+DROP EXTERNAL TABLE wrseqdeflateblock;
 --
 -- 4. Test error in port -- negative
 --
@@ -478,6 +1084,16 @@ SELECT COUNT(*) FROM pg_class WHERE relname = 'writable_analyze_with_analyzer' A
      1
 (1 row)
 
+--
+-- 9. Test COMPRESSION_TYPE = NONE -- negative 
+--
+CREATE WRITABLE EXTERNAL TABLE compress_type_none(a1 integer,
+                                                  c1 char)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/err?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=SomeClass&COMPRESSION_TYPE=NONE')
+FORMAT 'custom' (formatter='pxfwritable_export');
+INSERT INTO compress_type_none VALUES (100, 'a'), (1000, 'b');
+ERROR:  remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v7/Writable/stream. Reason:     Server Error   Caused by:  java.lang.IllegalArgumentException: Illegal compression type 'NONE'. For disabling compression remove COMPRESSION_CODEC parameter. (SOMEFILE:SOMEFUNC)
+DROP EXTERNAL TABLE compress_type_none;
 --
 -- 10. Test CSV format 
 --

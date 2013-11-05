@@ -15,7 +15,6 @@ import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.LineRecordReader;
 import org.apache.hadoop.mapred.TextInputFormat;
-import org.apache.hadoop.util.ReflectionUtils;
 
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.format.SimpleText;
@@ -70,10 +69,7 @@ public class LineBreakAccessor extends HdfsSplittableDataAccessor implements IWr
 		// get compression codec
 		if (compressCodec != null)
 		{
-			// default codec is Gzip
-			codec = (CompressionCodec) ReflectionUtils.newInstance(
-					Utilities.getCodecClass(conf, compressCodec),
-					conf);
+			codec = Utilities.getCodec(conf, compressCodec);
 			String extension = codec.getDefaultExtension();
 			fileName += extension;
 		}

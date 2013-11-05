@@ -20,9 +20,11 @@ import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.SequenceFileInputFormat;
 import org.apache.hadoop.mapred.SequenceFileRecordReader;
+import org.apache.hadoop.util.ReflectionUtils;
 
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.utilities.InputData;
+import com.pivotal.pxf.utilities.Utilities;
 
 /*
  * Specialization of HdfsSplittableDataAccessor for sequence files, and sequence files writer
@@ -66,17 +68,16 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements 
 	{
 		FileSystem fs;
 		Path parent;
+		String fileName = inputData.getProperty("X-GP-DATA-PATH");	
+		conf = new Configuration(); 
+		
+		getCompressionCodec(inputData);
+		fileName = updateFileExtension(fileName, codec);
 		
 		// construct the output stream
-		conf = new Configuration();   
-		file = new Path(inputData.getProperty("X-GP-DATA-PATH"));
+		file = new Path(fileName);
 		fs = file.getFileSystem(conf);
 		fc = FileContext.getFileContext();
-
-		// TODO: add compression
-		compressionType = SequenceFile.CompressionType.NONE;
-		codec = null;
-
 		key = new LongWritable(inputData.segmentId());
 
 		if (fs.exists(file))
@@ -94,6 +95,56 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements 
 		return true;
 	}
 
+	/**
+	 * Compression: based on compression codec and compression type (default value RECORD).
+	 * If there is no codec, compression type is ignored, and NONE is used. 
+	 * 
+	 * @param inputData - container where compression codec and type are held.
+	 */
+	private void getCompressionCodec(InputData inputData) {
+		
+		String compressCodec = inputData.compressCodec();
+		String compressType = inputData.compressType();
+		
+		compressionType = SequenceFile.CompressionType.NONE;
+		codec = null;
+		if (compressCodec != null)
+		{
+			codec = Utilities.getCodec(conf, compressCodec);
+			
+			try {
+				compressionType = CompressionType.valueOf(compressType);
+			}
+			catch (IllegalArgumentException e) {
+				throw new IllegalArgumentException("Illegal value for compression type " +
+						                           "'" + compressType + "'");
+			}			
+			if (compressionType == null) {
+				throw new IllegalArgumentException("Compression type must be defined");
+			}
+			
+			Log.debug("Compression ON: " +
+					  "compression codec: " + compressCodec + 
+					  ", compression type: " + compressionType);
+		}
+	}
+	
+	/**
+	 * Returns fileName with the codec's file extension 
+	 * 
+	 * @param fileName
+	 * @param codec
+	 * @return fileName with the codec's file extension appended
+	 */
+	private String updateFileExtension(String fileName, CompressionCodec codec) {
+		
+		if (codec != null) {
+			fileName += codec.getDefaultExtension();
+		}
+		Log.debug("File name for write: " + fileName);
+		return fileName;
+	}
+	
 	public boolean writeNextObject(OneRow onerow) throws IOException 
 	{
 		// init writer on first approach here, based on onerow.getData type

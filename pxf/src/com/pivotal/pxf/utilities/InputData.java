@@ -10,6 +10,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.collections.MapUtils;
+
 import com.pivotal.pxf.format.OutputFormat;
 
 /*
@@ -41,6 +42,7 @@ public class InputData
     protected String profile;
     protected String tableName;
 	protected String compressCodec;
+	protected String compressType;
 
     /*
      * The name of the recordkey column. It can appear in any location in the columns list.
@@ -133,9 +135,10 @@ public class InputData
         parseUserData();
 
         /*
-		 * compression codec name (relevant for writable)
+		 * compression codec name and compression type (relevant for writable)
 		 */
         parseCompressionCodec();
+        parseCompressionType();
     }
 
     /**
@@ -189,6 +192,8 @@ public class InputData
         this.accessor = copy.accessor;
         this.resolver = copy.resolver;
         this.tableName = copy.tableName;
+        this.compressCodec = copy.compressCodec;
+        this.compressType = copy.compressType;
     }
 
     public byte[] getFragmentUserData()
@@ -421,7 +426,7 @@ public class InputData
         avroSchema = theAvroSchema;
     }
 
-    protected void parseCompressionCodec()
+    private void parseCompressionCodec()
     {
 		compressCodec = getOptionalProperty("X-GP-COMPRESSION_CODEC");
 		if (compressCodec == null)
@@ -438,6 +443,44 @@ public class InputData
 	public String compressCodec()
 	{
 		return compressCodec;
+	}
+	
+	/*
+	 * Parse compression type for sequence file. If null, default to RECORD.
+	 * Allowed values: RECORD, BLOCK.
+	 */
+	private void parseCompressionType()
+	{
+		final String COMPRESSION_TYPE_RECORD = "RECORD";
+		final String COMPRESSION_TYPE_BLOCK = "BLOCK";
+		final String COMPRESSION_TYPE_NONE = "NONE";
+
+		compressType = getOptionalProperty("X-GP-COMPRESSION_TYPE");
+				
+		if (compressType == null) {
+			compressType = COMPRESSION_TYPE_RECORD;
+			return;
+		}
+		
+		if (compressType.equalsIgnoreCase(COMPRESSION_TYPE_NONE)) {
+			throw new IllegalArgumentException("Illegal compression type 'NONE'. " +
+					"For disabling compression remove COMPRESSION_CODEC parameter.");
+		}
+		
+		if (!compressType.equalsIgnoreCase(COMPRESSION_TYPE_RECORD) && 
+	        !compressType.equalsIgnoreCase(COMPRESSION_TYPE_BLOCK)) {
+			throw new IllegalArgumentException("Illegal compression type '" + compressType + "'");
+		}
+		
+		compressType = compressType.toUpperCase();
+	}
+	
+	/*
+	 * Returns the compression type (can be null)
+	 */
+	public String compressType()
+	{
+		return compressType;
 	}
 
     /*
