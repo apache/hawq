@@ -2,38 +2,40 @@ ROOT = .
 
 TARGET = allinall-singlecluster.tar.bz2
 
-BUILD_ROOT = $(TARGET:%.tar.bz2=%)
-DEPS_ROOT = $(ROOT)/deps
-SINGLECLUSTER_ROOT = $(BUILD_ROOT)/phd
-HAWQ_ROOT = $(BUILD_ROOT)/hawq
-HAWQCFG_ROOT = $(HAWQ_ROOT)/conf
+SINGLECLUSTER_ROOT = ../single-cluster
+HAWQ_ROOT = ../../..
 
-HAWQ_VERSIONFILE = $(HAWQ_ROOT)/version.txt
+BUILDROOT = $(TARGET:%.tar.bz2=%)
+SINGLECLUSTER_BUILDROOT = $(BUILDROOT)/phd
+HAWQ_BUILDROOT = $(BUILDROOT)/hawq
+HAWQ_BUILDROOT_CFG = $(HAWQ_BUILDROOT)/conf
+
+HAWQ_VERSIONFILE = $(HAWQ_BUILDROOT)/version.txt
 
 all: $(TARGET)
 
-untar_hawq: $(DEPS_ROOT)/hawq-*-x86_64.tar.gz
-	mkdir -p $(HAWQ_ROOT)
-	tar -xvzf $< -C $(HAWQ_ROOT)
-	mv $(HAWQ_ROOT)/hawq/* $(HAWQ_ROOT)
-	rm $(HAWQ_ROOT)/hawq
-	rmdir $(HAWQ_ROOT)/hawq-*
+untar_hawq: $(HAWQ_ROOT)/hawq-*-x86_64.tar.gz
+	mkdir -p $(HAWQ_BUILDROOT)
+	tar -xvzf $< -C $(HAWQ_BUILDROOT)
+	mv $(HAWQ_BUILDROOT)/hawq/* $(HAWQ_BUILDROOT)
+	rm $(HAWQ_BUILDROOT)/hawq
+	rmdir $(HAWQ_BUILDROOT)/hawq-*
 
-hawq_version: $(HAWQ_ROOT)/include/pg_config.h
+hawq_version: $(HAWQ_BUILDROOT)/include/pg_config.h
 	cat $< | grep HQ_VERSION | grep -o "\".\+\"" | tr -d \" | sed -e 's/^/Hawq version: /' >> $(HAWQ_VERSIONFILE)
 
 hawq_conf: $(ROOT)/hawq_config
-	mkdir -p $(HAWQCFG_ROOT)
-	cp $^ $(HAWQCFG_ROOT)
+	mkdir -p $(HAWQ_BUILDROOT_CFG)
+	cp $^ $(HAWQ_BUILDROOT_CFG)
 
-untar_singlecluster: $(DEPS_ROOT)/singlecluster.tar.gz
-	mkdir -p $(SINGLECLUSTER_ROOT)
-	tar -xvzf $< --strip-components 1 -C $(SINGLECLUSTER_ROOT)
+untar_singlecluster: $(SINGLECLUSTER_ROOT)/singlecluster.tar.gz
+	mkdir -p $(SINGLECLUSTER_BUILDROOT)
+	tar -xvzf $< --strip-components 1 -C $(SINGLECLUSTER_BUILDROOT)
 
 copy_files: $(ROOT)/README.txt $(ROOT)/init-cluster.sh
-	cp $^ $(BUILD_ROOT)
+	cp $^ $(BUILDROOT)
 
-$(BUILD_ROOT): untar_hawq hawq_version hawq_conf untar_singlecluster copy_files
+$(BUILDROOT): untar_hawq hawq_version hawq_conf untar_singlecluster copy_files
 	chmod -R +w $@
 
 %.bz2: %
@@ -43,6 +45,6 @@ $(BUILD_ROOT): untar_hawq hawq_version hawq_conf untar_singlecluster copy_files
 	tar -cvf $@ $<
 
 clean:
-	-rm -rf $(BUILD_ROOT)
+	-rm -rf $(BUILDROOT)
 	-rm -f *~
 	-rm -f $(TARGET)

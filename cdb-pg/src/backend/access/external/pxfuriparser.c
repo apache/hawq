@@ -697,10 +697,10 @@ GPHDUri_dup_without_segwork(const char* uri)
 /* --------------------------------
  *		RelationIsExternalPxf -
  *
- *		Check if a table is an external PXF tbl.
+ *		Check if a table is a readable external PXF tbl.
  * --------------------------------
  */
-bool RelationIsExternalPxf(Relation rel, StringInfo location)
+bool RelationIsExternalPxfReadOnly(Relation rel, StringInfo location)
 {
 	ExtTableEntry	*tbl;
 	List			*locsList;
@@ -711,6 +711,14 @@ bool RelationIsExternalPxf(Relation rel, StringInfo location)
 
 	tbl = GetExtTableEntry(rel->rd_id);
 	Assert(tbl);
+
+	/* Nothing to do for writable tables */
+	if (tbl->iswritable)
+	{
+		elog(DEBUG2, "RelationIsExternalPxfReadOnly: relation %s is writable external table",
+			 RelationGetRelationName(rel));
+		return false;
+	}
 
 	locsList = tbl->locations;
 

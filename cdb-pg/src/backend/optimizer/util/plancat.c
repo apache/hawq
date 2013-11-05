@@ -516,7 +516,7 @@ static bool need_to_get_stats_pxf(Relation rel,
 								 double		reltuples)
 {
 	return pxf_enable_stat_collection &&
-		   RelationIsExternalPxf(rel, loc) &&
+		   RelationIsExternalPxfReadOnly(rel, loc) &&
 		   relpages == gp_external_table_default_number_of_pages &&
 		   reltuples == gp_external_table_default_number_of_tuples;
 }
