@@ -2301,6 +2301,20 @@ typedef struct RemoveOpClassStmt
 	bool		missing_ok;		/* skip error if missing? */
 } RemoveOpClassStmt;
 
+
+/* ----------------------
+ * 		Alter FILESPACE name LOCATION TO location
+ * ----------------------
+ */
+
+typedef struct AlterFileSpaceStmt
+{
+	NodeTag		type;
+	char	   *fsname;			/* file space name to be altered */
+	char	   *location;		/* new location to be changed to */
+} AlterFileSpaceStmt;
+
+
 /* ----------------------
  *		Alter Object Rename Statement
  * ----------------------

@@ -23,6 +23,9 @@ extern void CreateFileSpace(CreateFileSpaceStmt *stmt);
 extern void RemoveFileSpace(List *names, DropBehavior behavior, bool missing_ok);
 extern void RemoveFileSpaceById(Oid fsoid);
 
+/* ALTER FILESPACE ... LOCATION TO ... */
+extern void AlterFilespaceSetLocation(AlterFileSpaceStmt *stmt);
+
 /* ALTER FILESPACE ... OWNER TO ... */
 extern void AlterFileSpaceOwner(List *names, Oid newowner);
 
