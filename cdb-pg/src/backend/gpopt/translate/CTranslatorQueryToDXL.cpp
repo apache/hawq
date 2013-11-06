@@ -1452,17 +1452,6 @@ CTranslatorQueryToDXL::AddSortingGroupingColumn
 {
 	if (0 < pte->ressortgroupref)
 	{
-		if (IsA(pte->expr, Var))
-		{
-			// TODO, raghav Oct 7 2013, in ORCA we currently crash when we group/sort on outer references
-			// This temporary fix enables us to falls back to planner cleanly.
-			// This fix will be removed when we fix the issue in MPP-21456
-			Var *pvar = (Var *) pte->expr;
-			if (0 < pvar->varlevelsup)
-			{
-				GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("Grouping / Sorting on Outer References"));
-			}
-		}
 		INT *piKey = New(m_pmp) INT(pte->ressortgroupref);
 		ULONG *pulValue = New(m_pmp) ULONG(ulColId);
 
