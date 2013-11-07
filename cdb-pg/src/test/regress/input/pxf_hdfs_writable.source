@@ -253,6 +253,7 @@ FORMAT 'custom' (formatter='pxfwritable_import');
 SELECT * FROM readseq ORDER BY num1;
 DROP EXTERNAL TABLE readseq;
 
+-- start_ignore
 --
 -- 3.1 Test sequence file compression - gzip codec, no compression type
 --
@@ -390,6 +391,7 @@ FORMAT 'custom' (formatter='pxfwritable_import');
 SELECT * FROM readseqgzipblock ORDER BY num1;
 DROP EXTERNAL TABLE readseqgzipblock;
 DROP EXTERNAL TABLE wrseqgzipblock;
+-- end_ignore
 
 --
 -- 3.4 Test sequence file compression - deflate codec, no compression type
