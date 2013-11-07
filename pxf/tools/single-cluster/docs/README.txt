@@ -75,6 +75,7 @@ v1.7.1
 - make clean doens't fail on rm -rf
 - ENGINF-810: Please chmod 777 for DFS_URL/../ per the hdfs privilege 
   check involved in hawq
+- GPSQL-1180: hbase jar file name changed in dev-stack
 
 v1.7.0
 ------

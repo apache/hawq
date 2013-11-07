@@ -5,6 +5,7 @@ export HADOOP_CLASSPATH=\
 `echo $PXF_ROOT/pxf-*[0-9].jar`:\
 `echo $HBASE_ROOT/hbase-*-gphd-*[0-9].jar`:\
 `echo $HBASE_ROOT/hbase-*-gphd-*[0-9]-SNAPSHOT.jar`:\
+`echo $HBASE_ROOT/hbase-*-gphd-*[0-9]-SNAPSHOT-security.jar`:\
 `echo $ZOOKEEPER_ROOT/zookeeper-*-gphd-*[0-9].jar`:\
 `echo $ZOOKEEPER_ROOT/zookeeper-*-gphd-*[0-9]-SNAPSHOT.jar`:\
 `echo $HIVE_ROOT/lib/hive-service-*-gphd-*[0-9].jar`:\
