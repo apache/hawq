@@ -264,8 +264,9 @@ planner(Query *parse, int cursorOptions,
 	/**
 	 * If the new optimizer is enabled, try that first. If it does not return a plan,
 	 * then fall back to the planner.
+	 * TODO: caragg 11/08/2013: Enable ORCA when running in utility mode (MPP-21841)
 	 */
-	if (optimizer)
+	if (optimizer && (GP_ROLE_UTILITY != Gp_role))
 	{
 		if (gp_log_optimization_time)
 		{
