@@ -603,6 +603,7 @@ show_allow_system_table_mods(void);
 bool   pxf_enable_filter_pushdown = true;
 bool   pxf_enable_stat_collection = true;
 bool   pxf_enable_locality_optimizations = true;
+bool   pxf_local_storage = true;
 
 /* Time based authentication GUC */
 char  *gp_auth_time_override_str = NULL;
@@ -2305,7 +2306,7 @@ static struct config_bool ConfigureNamesBool[] =
 		&gp_external_grant_privileges,
 		false, NULL, NULL
     },
-
+	
 	{
 		{"resource_scheduler", PGC_POSTMASTER, RESOURCES_MGM,
 			gettext_noop("Enable resource scheduling."),
@@ -3712,7 +3713,16 @@ static struct config_bool ConfigureNamesBool[] =
 		&pxf_enable_stat_collection,
 		true, NULL, NULL
 	},
-
+	
+	{
+		{"pxf_local_storage", PGC_POSTMASTER, EXTERNAL_TABLES,
+			gettext_noop("Is PXF target storage system local or remote?"),
+			NULL
+		},
+		&pxf_local_storage,
+		true, NULL, NULL
+    },
+	
 	{
 		{"gp_disable_catalog_access_on_segment", PGC_USERSET, DEVELOPER_OPTIONS,
 		 gettext_noop("Disables non-builtin object access on segments"),

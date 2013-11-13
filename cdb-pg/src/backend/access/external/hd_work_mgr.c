@@ -94,6 +94,7 @@ static void clean_gphosts_list(List *hosts_list);
 static AllocatedDataFragment* create_allocated_fragment(DataFragment *fragment);
 static bool are_ips_equal(char *ip1, char *ip2);
 static char** create_output_strings(List **allocated_fragments, int total_segs);
+static void assign_remote_port_to_fragments(int remote_rest_port, List *fragments);
 
 /*
  * the interface function of the hd_work_mgr module
@@ -140,11 +141,18 @@ char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs, Rela
 	data_fragments = get_data_fragment_list(hadoop_uri, &client_context);
 
 	/*
-	 * Get a list of all REST servers and assign the listening port to
-	 * each fragment that lives on a matching host. This is a temporary
-	 * solution. See function header for more info.
+	 * if pxf_local_storage == true (example: HDFS) 
+	 *   get a list of all REST servers and assign the listening port to
+	 *   each fragment that lives on a matching host. 
+	 * if pxf_local_storage == false (example: ISILON)
+	 *   in this case PXF is installed on a propietery server on the same hosts
+	 *   as the Hawq segments. The target port for all fragments is the port
+	 *   supplied in the URI.
 	 */
-	assign_rest_ports_to_fragments(&client_context, hadoop_uri, data_fragments);
+	if (pxf_local_storage)
+		assign_rest_ports_to_fragments(&client_context, hadoop_uri, data_fragments);
+	else 
+		assign_remote_port_to_fragments(atoi(hadoop_uri->port), data_fragments);
 
 	/* debug - enable when tracing */
 	print_fragment_list(data_fragments);
@@ -167,6 +175,26 @@ char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs, Rela
 	churl_headers_cleanup(client_context.http_headers);
 		
 	return segs_work_map;
+}
+
+/*
+ * Assign the remote rest port to each fragment
+ */
+static void assign_remote_port_to_fragments(int remote_rest_port, List *fragments)
+{
+	ListCell *frag_c = NULL;
+	
+	foreach(frag_c, fragments)
+	{
+		ListCell 		*loc_c 		= NULL;
+		DataFragment 	*fragdata	= (DataFragment*)lfirst(frag_c);
+		
+		foreach(loc_c, fragdata->locations)
+		{
+			FragmentLocation *fraglocs = (FragmentLocation*)lfirst(loc_c);
+			fraglocs->rest_port = remote_rest_port;
+		}
+	}	
 }
 
 /*
@@ -370,8 +398,12 @@ distribute_work_2_gp_segments(List *whole_data_fragments_list, int total_segs, i
 			DatanodeProcessingLoad *found_dn = NULL;
 			char *host_ip = seg->hostip;
 			
-			/* locality logic depends on pxf_enable_locality_optimizations guc */
-			if (pxf_enable_locality_optimizations)
+			/* 
+			 * locality logic depends on whether we require optimizations (pxf_enable_locality_optimizations guc)
+			 * and on whether the target storage system is local (pxf_local_storage). ex: plain hdfs is local while 
+			 * hdfs on isilon is remote
+			 */
+			if (pxf_enable_locality_optimizations && pxf_local_storage)
 			{
 				foreach(datanode_cell, allDNProcessingLoads) /* an attempt at locality - try and find a datanode sitting on the same host with the segment */
 				{
@@ -399,6 +431,15 @@ distribute_work_2_gp_segments(List *whole_data_fragments_list, int total_segs, i
 			while ( (block_cell = list_head(found_dn->datanodeBlocks)) )
 			{
 				AllocatedDataFragment* allocated = (AllocatedDataFragment*)lfirst(block_cell);
+				/* 
+				 * in case of remote storage, the segment host is also where the PXF will be running
+				 * so we set allocated->host accordingly, instead of the remote storage system - datanode ip.
+				 */
+				if (!pxf_local_storage) 
+				{
+					pfree(allocated->host);
+					allocated->host = pstrdup(host_ip);
+				}
 				allocatedBlocksPerSegment = lappend(allocatedBlocksPerSegment, allocated);
 				
 				found_dn->datanodeBlocks = list_delete_first(found_dn->datanodeBlocks);

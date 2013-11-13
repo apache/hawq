@@ -382,6 +382,12 @@ extern char   *gp_snmp_debug_log;
 extern bool   pxf_enable_filter_pushdown; /* turn pushdown logic on/off     */
 extern bool   pxf_enable_stat_collection; /* turn off stats collection if needed */
 extern bool   pxf_enable_locality_optimizations; /* turn locality optimization in the data allocation algorithm on/off     */
+/*
+ * Is the target storage system local or remote?
+ * local - if hawq segments are collocated with the datanodes (e.g, PHD), 
+ * remote - if hawq segments and datanodes are on separate physical servers (e.g Isilon)
+ */
+extern bool   pxf_local_storage;
 
 /* Time based authentication GUC */
 extern char  *gp_auth_time_override_str;

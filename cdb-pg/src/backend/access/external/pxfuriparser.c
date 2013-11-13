@@ -254,7 +254,7 @@ GPHDUri_parse_authority(GPHDUri *uri, char **cursor)
 	char		*start = *cursor;
 	char		*end;
 	const char	*default_port = "9000"; /* TODO: port is no longer used, so no need for that */
-
+	const long  max_port_number = 65535;
 
 	if (*start == '/')
 	{
@@ -302,12 +302,20 @@ GPHDUri_parse_authority(GPHDUri *uri, char **cursor)
 			/* port */
 			if (colon)
 			{
+				long port;
 				uri->port = pstrdup(colon + 1);
 
 				/* now truncate ":<port>" from hostname */
 				uri->host[len - strlen(colon)] = '\0';
 
 				*colon = 0;
+				
+				port = atol(uri->port);
+				if (port <=0 || port > max_port_number)
+					ereport(ERROR,
+							(errcode(ERRCODE_SYNTAX_ERROR),
+							 errmsg("Invalid port: %s ",
+									uri->port)));				
 			}
 			else
 			{
