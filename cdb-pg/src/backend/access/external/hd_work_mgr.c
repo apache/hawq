@@ -94,6 +94,9 @@ static void clean_gphosts_list(List *hosts_list);
 static AllocatedDataFragment* create_allocated_fragment(DataFragment *fragment);
 static bool are_ips_equal(char *ip1, char *ip2);
 static char** create_output_strings(List **allocated_fragments, int total_segs);
+static bool is_storage_local(GPHDUri* hadoop_uri, int* remote_rest_port);
+static void assign_remote_port_to_fragments(int remote_rest_port, List *fragments);
+static List** distribute_remote_work_2_gp_segments(List *whole_data_fragments_list, int total_segs, int working_segs);
 
 /*
  * the interface function of the hd_work_mgr module
@@ -112,6 +115,8 @@ char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs, Rela
 	List **segs_data = NULL;
 	List *data_fragments = NIL;
 	ClientContext client_context; /* holds the communication info */
+	bool is_local_storage = TRUE;
+	int remote_rest_port = 0;
 	PxfInputData inputData;
 
 	if (!RelationIsValid(relation))
@@ -135,6 +140,12 @@ char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs, Rela
 	build_http_header(&inputData);
 	
 	/*
+	 * Is the target storage system remote or local ?
+	 * Examples: local storage - HDFS cluster, remote storage - ISILON
+	 */
+	is_local_storage = is_storage_local(hadoop_uri, &remote_rest_port);
+	
+	/*
 	 * 2. Get the fragments data from the PXF service
 	 */
 	data_fragments = get_data_fragment_list(hadoop_uri, &client_context);
@@ -144,7 +155,10 @@ char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs, Rela
 	 * each fragment that lives on a matching host. This is a temporary
 	 * solution. See function header for more info.
 	 */
-	assign_rest_ports_to_fragments(&client_context, hadoop_uri, data_fragments);
+	if (is_local_storage)
+		assign_rest_ports_to_fragments(&client_context, hadoop_uri, data_fragments);
+	else 
+		assign_remote_port_to_fragments(remote_rest_port, data_fragments);
 
 	/* debug - enable when tracing */
 	print_fragment_list(data_fragments);
@@ -152,7 +166,10 @@ char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs, Rela
 	/*
 	 * 3. Finally, call the actual work allocation algorithm
 	 */
-	segs_data = distribute_work_2_gp_segments(data_fragments, total_segs, working_segs);
+	if (is_local_storage)
+		segs_data = distribute_work_2_gp_segments(data_fragments, total_segs, working_segs);
+	else
+		segs_data = distribute_remote_work_2_gp_segments(data_fragments, total_segs, working_segs);
 	
 	/*
 	 * 4. For each segment transform the list of allocated fragments into an output string
@@ -167,6 +184,59 @@ char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs, Rela
 	churl_headers_cleanup(client_context.http_headers);
 		
 	return segs_work_map;
+}
+
+/*
+ * Is the [target storage system] remote or local ?
+ * default - local (return TRUE)
+ * specifying option 'LOCAL=0' in the CREATE... statement is the only way
+ * to make this function return false
+ */
+static bool is_storage_local(GPHDUri* hadoop_uri, int *remote_rest_port)
+{
+	char* local;
+	bool blocal;
+	
+	/* in case LOCAL opt was not specified we assume local storage - meaning return true*/
+	if( GPHDUri_get_value_for_opt(hadoop_uri, "local", &local, false) != 0 
+	    || !local)
+		return TRUE;
+	
+	blocal = atoi(local) != 0;
+	if (!blocal) /* remote target storage system */
+	{
+		char* sport; 
+		if( GPHDUri_get_value_for_opt(hadoop_uri, "REMOTE_PORT", &sport, false) != 0 
+		   || !sport)
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_SYNTAX_ERROR),
+					 errmsg("For the case LOCAL=0, need to specify remote port: REMOTE_PORT=xxxxx")));
+		}
+		*remote_rest_port = atoi(sport);
+	}
+	
+	return blocal;
+}
+
+/*
+ * Assign the remote rest port to each fragment
+ */
+static void assign_remote_port_to_fragments(int remote_rest_port, List *fragments)
+{
+	ListCell *frag_c = NULL;
+	
+	foreach(frag_c, fragments)
+	{
+		ListCell 		*loc_c 		= NULL;
+		DataFragment 	*fragdata	= (DataFragment*)lfirst(frag_c);
+		
+		foreach(loc_c, fragdata->locations)
+		{
+			FragmentLocation *fraglocs = (FragmentLocation*)lfirst(loc_c);
+			fraglocs->rest_port = remote_rest_port;
+		}
+	}	
 }
 
 /*
@@ -432,6 +502,159 @@ distribute_work_2_gp_segments(List *whole_data_fragments_list, int total_segs, i
 	clean_gphosts_list(gpHosts);
 	clean_gphosts_list(reserve_gpHosts);
 			
+	return segs_data;
+}
+
+/*
+ * A version of distribute_work_2_gp_segments used for [remote target storage system]
+ * A case where the data nodes are not collocated with the segments - so the algorithm
+ * does not try to exploit locality when allocating work
+ * Example ISILON
+ */
+static List** 
+distribute_remote_work_2_gp_segments(List *whole_data_fragments_list, int total_segs, int working_segs)
+{
+	/*
+	 * Example of a string representing the data fragments allocated to one segment: 
+	 * 'segwork=<size>data_node_host@0-data_node_host@1-data_node_host@5<size>data_node_host@8-data_node_host@9'
+	 */
+	StringInfoData msg;
+	int count_total_blocks_allocated = 0;
+	int total_data_frags = 0;
+	int blks_per_seg = 0;
+	List *allDNProcessingLoads = NIL; /* how many blocks are allocated for processing on each data node */
+	List *gpHosts = NIL; /* the hosts of the gp_cluster. Every host has several gp segments */
+	List *reserve_gpHosts = NIL;
+	List **segs_data = (List **)palloc0(total_segs * sizeof(List *));
+	initStringInfo(&msg);
+	
+	/* 
+	 * We copy each fragment from whole_data_fragments_list into allDNProcessingLoads, but now
+	 * each fragment will point to just one datanode - the processing data node, instead of several replicas.
+	 */
+	allDNProcessingLoads = allocate_fragments_to_datanodes(whole_data_fragments_list);
+	/* arrange all segments in groups where each group has all the segments which sit on the same host */
+	gpHosts =  do_segment_clustering_by_host();
+	
+	/* 
+	 * define the job at hand: how many fragments we have to allocate and what is the allocation load on each 
+	 * GP segment. We will distribute the load evenly between the segments
+	 */
+	total_data_frags = list_length(whole_data_fragments_list);
+	if (total_data_frags > working_segs)
+		blks_per_seg = (total_data_frags % working_segs == 0) ? total_data_frags / working_segs :
+		total_data_frags / working_segs + 1; /* rounding up - when total_data_frags is not divided by working_segs */
+	else /* total_data_frags < working_segs */
+	{
+		blks_per_seg = 1;
+		working_segs = total_data_frags;
+	}
+	
+	print_data_nodes_allocation(allDNProcessingLoads, total_data_frags);
+	
+	/* Allocate blks_per_seg to each working segment */
+	for (int i = 0; i < working_segs; i++) 
+	{
+		ListCell *gp_host_cell = NULL;
+		ListCell *seg_cell = NULL;
+		ListCell *block_cell = NULL;
+		List *allocatedBlocksPerSegment = NIL; /* list of the data fragments for one segment */
+		CdbComponentDatabaseInfo *seg = NULL;
+		
+		if (!allDNProcessingLoads) /* the blocks are finished */
+			break;
+		
+		/*
+		 * If gpHosts is empty, it means that we removed one segment from each host 
+		 * and went over all hosts. Let's go over the hosts again and take another segment  
+		 */
+		if (gpHosts == NIL)
+		{
+			gpHosts = reserve_gpHosts;
+			reserve_gpHosts = NIL;
+		}
+		Assert(gpHosts != NIL);
+		
+		/* pick the starting segment on the host randomly */
+		gp_host_cell = pick_random_cell_in_list(gpHosts);
+		GpHost* gp_host = (GpHost*)lfirst(gp_host_cell);
+		seg_cell = pick_random_cell_in_list(gp_host->segs);
+		
+		/* We found our working segment. let's remove it from the list so it won't get picked up again*/
+		seg = (CdbComponentDatabaseInfo*)lfirst(seg_cell);
+		gp_host->segs = list_delete_ptr(gp_host->segs, seg); /* we remove the segment from the group but do not delete the segment */
+		
+		/* 
+		 * We pass the group to the reserve groups so there is no chance, next iteration will pick the same host
+		 * unless we went over all hosts and took a segment from each one.
+		 */
+		gpHosts = list_delete_ptr(gpHosts, gp_host);
+		if (gp_host->segs != NIL)
+			reserve_gpHosts = lappend(reserve_gpHosts, gp_host);
+		else
+			pfree(gp_host);
+		
+		/*
+		 * Allocating blocks for this segment. We are going to look in two places.
+		 * The first place that supplies block for the segment wins.
+		 * a. Look in allDNProcessingLoads for a datanode on the same host with the segment
+		 * b. Look for a datanode at the head of the allDNProcessingLoads list
+		 */
+		while (list_length(allocatedBlocksPerSegment) < blks_per_seg && count_total_blocks_allocated < total_data_frags)
+		{
+			DatanodeProcessingLoad *found_dn = NULL;
+			char *host_ip = seg->hostip;
+			
+			if (allDNProcessingLoads && !found_dn) /* there is no datanode on the segment's host. Let's just pick the first data node */
+			{
+				found_dn = linitial(allDNProcessingLoads);
+				if (found_dn)
+					appendStringInfo(&msg, "PXF - Allocating the datanode blocks to a remote segment. Datanode IP: %s Segment IP: %s\n",
+									 found_dn->dataNodeIp, host_ip);
+			}
+			
+			if (!found_dn) /* there is No datanode found at the head of allDNProcessingLoads, it means we just finished the blocks*/
+				break;
+			
+			/* we have a datanode */
+			while ( (block_cell = list_head(found_dn->datanodeBlocks)) )
+			{
+				AllocatedDataFragment* allocated = (AllocatedDataFragment*)lfirst(block_cell);
+				pfree(allocated->host);
+				allocated->host = pstrdup(host_ip);
+				allocatedBlocksPerSegment = lappend(allocatedBlocksPerSegment, allocated);
+				
+				found_dn->datanodeBlocks = list_delete_first(found_dn->datanodeBlocks);
+				found_dn->num_fragments_read--;
+				count_total_blocks_allocated++;
+				if (list_length(allocatedBlocksPerSegment) == blks_per_seg || count_total_blocks_allocated == total_data_frags) /* we load blocks on a segment up to blks_per_seg */
+					break;
+			}
+			
+			/* test if the DatanodeProcessingLoad is empty */
+			if (found_dn->num_fragments_read == 0)
+			{
+				Assert(found_dn->datanodeBlocks == NIL); /* ensure datastructure is consistent */
+				allDNProcessingLoads = list_delete_ptr(allDNProcessingLoads, found_dn); /* clean allDNProcessingLoads */
+				pfree(found_dn->dataNodeIp); /* this one is ours */
+				pfree(found_dn);
+			}
+		} /* Finished allocating blocks for this segment */
+		elog(FRAGDEBUG, "%s", msg.data);
+		resetStringInfo(&msg);
+		
+		if (allocatedBlocksPerSegment)
+			segs_data[seg->segindex] = allocatedBlocksPerSegment;
+		
+	} /* i < working_segs; */
+	
+	Assert(count_total_blocks_allocated == total_data_frags); /* guarantee we allocated all the blocks */ 
+	
+	/* cleanup */
+	pfree(msg.data);
+	clean_gphosts_list(gpHosts);
+	clean_gphosts_list(reserve_gpHosts);
+	
 	return segs_data;
 }
 
