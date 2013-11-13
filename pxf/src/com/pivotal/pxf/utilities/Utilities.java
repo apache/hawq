@@ -5,11 +5,6 @@ import java.lang.reflect.InvocationTargetException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.hadoop.util.ReflectionUtils;
-
-import com.pivotal.pxf.utilities.Utilities;
 
 /*
  * Utilities class exposes helper method for PXF classes
@@ -74,37 +69,4 @@ public class Utilities
 			throw e;
 		}
 	}
-	
-	/*
-	 * Helper routine to get a compression codec class
-	 */
-	private static Class<? extends CompressionCodec> getCodecClass(
-			Configuration conf, String name) {
-		
-		Class<? extends CompressionCodec> codecClass;
-		try 
-		{
-			codecClass = conf.getClassByName(name).asSubclass(CompressionCodec.class);
-		} catch (ClassNotFoundException e) 
-		{
-			throw new IllegalArgumentException("Compression codec " + name + " was not found.", e);
-		}
-		return codecClass;
-	}
-	
-	/**
-	 * Helper routine to get compression codec through reflection
-	 * 
-	 * @param conf - configuration used for reflection
-	 * @param name - codec name
-	 * @returns generated CompressionCodec
-	 */
-	public static CompressionCodec getCodec(Configuration conf, String name) {
-		
-		return (CompressionCodec) ReflectionUtils.newInstance(
-				getCodecClass(conf, name),
-				conf);
-	}
-	
-	
 }

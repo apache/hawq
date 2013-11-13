@@ -67,23 +67,6 @@ pxfprotocol_validate_urls(PG_FUNCTION_ARGS)
 		list_free(coreOptions);
 	}
 
-	/*
-	 * Condition 5: disallow codec BZip2 for writable tables
-	 * COMPRESSION_CODEC=org.apache.hadoop.io.compress.BZip2Codec
-	 */
-	if (is_writable)
-	{
-		if (GPHDUri_get_value_for_opt(uri, "compression_codec", &option, false) == 0)
-		{
-			if (strcmp("org.apache.hadoop.io.compress.BZip2Codec", option) == 0)
-			{
-				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
-										 errmsg("BZip2 compression is not supported")));
-			}
-		}
-	}
-
 	/* Temp: Uncomment for printing a NOTICE with parsed parameters */
 	/*   GPHDUri_debug_print(uri); */
 

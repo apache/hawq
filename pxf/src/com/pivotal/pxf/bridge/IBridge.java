@@ -15,4 +15,5 @@ public interface IBridge
 	boolean beginIteration() throws Exception;
 	Writable getNext() throws Exception;
 	boolean setNext(DataInputStream inputStream) throws Exception;
+	boolean isThreadSafe();
 }

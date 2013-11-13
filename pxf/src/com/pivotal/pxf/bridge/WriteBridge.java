@@ -11,6 +11,7 @@ import com.pivotal.pxf.exception.BadRecordException;
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.resolvers.IWriteResolver;
 import com.pivotal.pxf.utilities.InputData;
+import com.pivotal.pxf.utilities.Plugin;
 import com.pivotal.pxf.utilities.Utilities;
 
 /*
@@ -100,4 +101,8 @@ public class WriteBridge implements IBridge
 		throw new Exception("getNext is not implemented");
 	}
 	
+	@Override
+	public boolean isThreadSafe() {
+		return ((Plugin)fileAccessor).isThreadSafe() && ((Plugin)fieldsResolver).isThreadSafe();
+	}
 }

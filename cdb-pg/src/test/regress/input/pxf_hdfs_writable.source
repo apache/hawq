@@ -41,10 +41,6 @@ CREATE WRITABLE EXTERNAL TABLE pxf_out2(a int, b text, c bytea)
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/*')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- negative
 
-CREATE WRITABLE EXTERNAL TABLE pxf_out3(a int, b text, c bytea)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data?ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver&COMPRESSION_CODEC=org.apache.hadoop.io.compress.BZip2Codec')
-FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- negative
-
 DROP EXTERNAL TABLE pxf_out;
 
 --
@@ -179,6 +175,48 @@ LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrdefault?FRAGME
 FORMAT 'TEXT' (DELIMITER ',');
 SELECT * FROM readdefault ORDER BY n1;
 DROP EXTERNAL TABLE readdefault;
+
+--
+-- 2.3 BZip2 compression
+--
+CREATE WRITABLE EXTERNAL TABLE wrbzip2 (s1 text, 
+                               		    n1 int, 
+							   		    n2 int)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrbzip2?ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver&COMPRESSION_CODEC=org.apache.hadoop.io.compress.BZip2Codec')
+FORMAT 'TEXT' (DELIMITER ',');
+CREATE TEMP TABLE data_for_bzip2 (s1 text,
+                                  n1 int,
+                                  n2 int);
+INSERT INTO data_for_bzip2 VALUES ('I',1,10),
+                                  (' ',2,20), 
+                                  ('a',3,30),
+                                  ('m',4,40),
+                                  (' ',5,50),
+                                  ('B',6,60),
+                                  ('Z',7,70),
+                                  ('i',8,80),
+                                  ('p',9,90),
+                                  ('2',10,100), 
+                                  ('!!!',11,110);
+INSERT INTO wrbzip2 SELECT * FROM data_for_bzip2;
+DROP TABLE data_for_bzip2;
+DROP EXTERNAL TABLE wrbzip2;
+--
+-- Test data was written
+--
+\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/wrbzip2 | grep Found | awk '{ if ($2>0) print "ok";}'
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/wrbzip2 | awk '{ if ($1>0) print "ok";}'
+--
+-- Read data
+--
+CREATE READABLE EXTERNAL TABLE readbzip2 (s1 text, 
+                               		      n1 int, 
+							   		      n2 int)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrbzip2?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver')
+FORMAT 'TEXT' (DELIMITER ',');
+SELECT * FROM readbzip2 ORDER BY n1;
+
+DROP EXTERNAL TABLE readbzip2;
 
 --
 -- 3. Test writable table with custom format into a sequence file
@@ -638,6 +676,33 @@ LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/csv?FRAGMENTER=H
 FORMAT 'CSV';
 SELECT * FROM readable_csv ORDER BY number;
 DROP EXTERNAL TABLE readable_csv;
+
+--
+-- 11. Test THREAD-SAFE parameter
+--
+CREATE WRITABLE EXTERNAL TABLE writable_threadsafe(number int,
+                                            	   name text,
+                                            	   position char)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/thread?ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver&THREAD-SAFE=FALSE')
+FORMAT 'CSV';
+INSERT INTO writable_threadsafe VALUES (4, 'H Waldman', 'P'),
+                                       (6, 'Papi Turgeman', 'S'),
+                                       (13, 'Radisav Ćurčić', 'C'),
+                                       (11, 'Derrick Hamilton', 'F'),
+                                       (15, 'Kenny Williams', 'F');
+INSERT INTO writable_threadsafe VALUES (8, 'Doron Shefa', 'S'),
+                                       (13, 'Erez Katz', 'P');
+DROP EXTERNAL TABLE writable_threadsafe;
+--
+-- Test data was written
+--
+CREATE EXTERNAL TABLE readable_threadsafe(number int,
+                                          name text,
+                                          position char)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/thread?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver&THREAD-SAFE=FALSE')
+FORMAT 'CSV';
+SELECT * FROM readable_threadsafe ORDER BY number, name;
+DROP EXTERNAL TABLE readable_threadsafe;
 
 --
 -- Cleanup: delete all data that was written into hdfs

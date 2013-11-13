@@ -20,11 +20,10 @@ import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.SequenceFileInputFormat;
 import org.apache.hadoop.mapred.SequenceFileRecordReader;
-import org.apache.hadoop.util.ReflectionUtils;
 
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.utilities.InputData;
-import com.pivotal.pxf.utilities.Utilities;
+import com.pivotal.pxf.utilities.HdfsUtilities;
 
 /*
  * Specialization of HdfsSplittableDataAccessor for sequence files, and sequence files writer
@@ -110,7 +109,7 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements 
 		codec = null;
 		if (compressCodec != null)
 		{
-			codec = Utilities.getCodec(conf, compressCodec);
+			codec = HdfsUtilities.getCodec(conf, compressCodec);
 			
 			try {
 				compressionType = CompressionType.valueOf(compressType);

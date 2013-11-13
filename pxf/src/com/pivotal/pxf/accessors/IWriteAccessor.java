@@ -10,7 +10,6 @@ import com.pivotal.pxf.format.OneRow;
  */
 public interface IWriteAccessor 
 {
-	
 	// opens file for write
 	public boolean openForWrite() throws Exception;
 	public boolean writeNextObject(OneRow onerow) throws Exception;

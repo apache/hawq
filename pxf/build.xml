@@ -234,7 +234,7 @@
 
 			<batchtest todir="${testreports.dir}">
 				<fileset dir="${build.dir}/test/classes">
-					<include name="**/*.class" />
+					<include name="**/*Test.class" />
 				</fileset>
 			</batchtest>
 

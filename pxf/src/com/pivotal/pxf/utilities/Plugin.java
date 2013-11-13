@@ -17,4 +17,12 @@ public class Plugin
 		this.inputData = input;
 	}
 	
+	/**
+	 * Checks if the plugin is thread safe or not, based on inputData.
+	 * 
+	 * @return if plugin is thread safe or not
+	 */
+	public boolean isThreadSafe() {
+		return true;
+	}
 }

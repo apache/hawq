@@ -9,6 +9,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
 import com.pivotal.pxf.format.OneRow;
+import com.pivotal.pxf.utilities.HdfsUtilities;
 import com.pivotal.pxf.utilities.InputData;
 import com.pivotal.pxf.utilities.Plugin;
 
@@ -92,5 +93,10 @@ public abstract class HdfsAtomicDataAccessor extends Plugin implements IReadAcce
 			return true;
 		
 		return false;
+	}
+	
+	@Override
+	public boolean isThreadSafe() {
+		return HdfsUtilities.isThreadSafe(inputData);
 	}
 }

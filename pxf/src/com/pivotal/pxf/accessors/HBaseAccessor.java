@@ -18,7 +18,6 @@ import org.apache.hadoop.hbase.util.Bytes;
 
 import com.pivotal.pxf.filtering.HBaseFilterBuilder;
 import com.pivotal.pxf.format.OneRow;
-import com.pivotal.pxf.resolvers.IReadResolver;
 import com.pivotal.pxf.utilities.HBaseColumnDescriptor;
 import com.pivotal.pxf.utilities.HBaseTupleDescription;
 import com.pivotal.pxf.utilities.InputData;
@@ -84,7 +83,7 @@ public class HBaseAccessor extends Plugin implements IReadAccessor
 		createScanner();
 		selectTableSplits();
 
-		return openCurrnetRegion();
+		return openCurrentRegion();
 	}
 
 	/*
@@ -104,7 +103,7 @@ public class HBaseAccessor extends Plugin implements IReadAccessor
 			currentScanner.close(); // close it
 			++currentRegionIndex; // open next region
 
-			if (!openCurrnetRegion())
+			if (!openCurrentRegion())
 				return null; // no more splits on the list
 		}
 
@@ -183,7 +182,7 @@ public class HBaseAccessor extends Plugin implements IReadAccessor
 	 * Open the region of index currentRegionIndex from splits list.
 	 * Update the Scan object to retrieve only rows from that region.
 	 */
-	private boolean openCurrnetRegion() throws IOException
+	private boolean openCurrentRegion() throws IOException
 	{
 		if (currentRegionIndex == splits.size())
 			return false;

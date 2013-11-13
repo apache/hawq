@@ -19,7 +19,7 @@ import org.apache.hadoop.mapred.TextInputFormat;
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.format.SimpleText;
 import com.pivotal.pxf.utilities.InputData;
-import com.pivotal.pxf.utilities.Utilities;
+import com.pivotal.pxf.utilities.HdfsUtilities;
 
 /*
  * Specialization of HdfsSplittableDataAccessor for \n delimited files
@@ -69,7 +69,7 @@ public class LineBreakAccessor extends HdfsSplittableDataAccessor implements IWr
 		// get compression codec
 		if (compressCodec != null)
 		{
-			codec = Utilities.getCodec(conf, compressCodec);
+			codec = HdfsUtilities.getCodec(conf, compressCodec);
 			String extension = codec.getDefaultExtension();
 			fileName += extension;
 		}

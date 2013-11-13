@@ -24,8 +24,8 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.io.Writable;
 import org.eclipse.jetty.io.RuntimeIOException;
 
-import com.pivotal.pxf.bridge.ReadBridge;
 import com.pivotal.pxf.bridge.IBridge;
+import com.pivotal.pxf.bridge.ReadBridge;
 import com.pivotal.pxf.utilities.InputData;
 
 /*
@@ -36,12 +36,9 @@ import com.pivotal.pxf.utilities.InputData;
 public class BridgeResource extends SecuredResource
 {
 
-	private Log Log;
+	private static Log Log = LogFactory.getLog(BridgeResource.class);
 	
-	public BridgeResource()
-	{
-		Log = LogFactory.getLog(BridgeResource.class);
-	}
+	public BridgeResource() {}
 
 	/*
 	 * Used to be HDFSReader. Creates a bridge instance and iterates over
@@ -63,19 +60,36 @@ public class BridgeResource extends SecuredResource
 
 		Log.debug("started with paramters: " + params.toString());
 
-		return readResponse(params);
-			}
-
-	Response readResponse(Map<String, String> params) throws Exception
+		InputData inputData = new InputData(params);
+		IBridge bridge = new ReadBridge(inputData);	
+		String dataDir = inputData.path();
+		// THREAD-SAFE parameter has precedence 
+		boolean isThreadSafe = inputData.threadSafe() && bridge.isThreadSafe();
+		Log.debug("Request for " + dataDir + " handled " +
+				  (isThreadSafe ? "without" : "with") + " synchronization"); 
+		
+		return isThreadSafe ? readResponse(bridge, inputData) : 
+			synchronizedReadResponse(bridge, inputData);
+	}
+	
+	/*
+	 * Used to handle requests for formats that do not support multithreading.
+	 * E.g. - BZip2 files (*.bz2)
+	 */
+	private static synchronized Response synchronizedReadResponse(IBridge bridge, InputData inputData) throws Exception
 	{
-		final IBridge bridge = new ReadBridge(new InputData(params));	
+		return readResponse(bridge, inputData);
+	}
+
+	static Response readResponse(IBridge ibridge, InputData inputData) throws Exception
+	{
+		final IBridge bridge = ibridge;	
 
 		if (!bridge.beginIteration())
 			return Response.ok().build();
 
-		final String fragment = params.get("X-GP-DATA-FRAGMENT");
-		final String dataDir = params.get("X-GP-DATA-DIR");
-
+		final int fragment = inputData.getDataFragment();
+		final String dataDir = inputData.getProperty("X-GP-DATA-DIR");
 
 		// Creating an internal streaming class
 		// which will iterate the records and put them on the

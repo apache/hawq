@@ -12,6 +12,7 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.RecordReader;
 
 import com.pivotal.pxf.format.OneRow;
+import com.pivotal.pxf.utilities.HdfsUtilities;
 import com.pivotal.pxf.utilities.InputData;
 import com.pivotal.pxf.utilities.Plugin;
 
@@ -140,5 +141,11 @@ public abstract class HdfsSplittableDataAccessor extends Plugin implements IRead
 	{
 		if (reader != null)
 			reader.close();
-	}	
+	}
+	
+	@Override
+	public boolean isThreadSafe() {
+		return HdfsUtilities.isThreadSafe(inputData);
+	}
+	
 }

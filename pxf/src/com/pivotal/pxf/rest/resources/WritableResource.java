@@ -24,7 +24,6 @@ import org.apache.hadoop.fs.FileSystem;
 import com.pivotal.pxf.accessors.IWriteAccessor;
 import com.pivotal.pxf.bridge.IBridge;
 import com.pivotal.pxf.bridge.WriteBridge;
-import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.resolvers.IWriteResolver;
 import com.pivotal.pxf.utilities.InputData;
 
@@ -37,11 +36,9 @@ public class WritableResource extends SecuredResource
 {
 	IWriteAccessor fileAccessor = null;
 	IWriteResolver fieldsResolver = null;
-	private Log Log;
-	public WritableResource()
-	{
-		Log = LogFactory.getLog(WritableResource.class);
-	}
+	private static Log Log = LogFactory.getLog(WritableResource.class);
+	
+	public WritableResource() {}
 
 	/*
 	 * run:
@@ -126,9 +123,8 @@ public class WritableResource extends SecuredResource
 	@Consumes(MediaType.APPLICATION_OCTET_STREAM)
 	public Response stream(@Context HttpHeaders headers, 
 			               @QueryParam("path") String path,
-			               InputStream inputStream) throws Exception
-	{	
-		String returnMsg;
+			               InputStream inputStream) throws Exception {	
+		
 		// Convert headers into a regular map
 		Map<String, String> params = convertToRegularMap(headers.getRequestHeaders());
 		params.put("X-GP-DATA-PATH", path);
@@ -136,6 +132,29 @@ public class WritableResource extends SecuredResource
 		
 		InputData inputData = new InputData(params);
 		IBridge bridge = new WriteBridge(inputData);
+
+		// THREAD-SAFE parameter has precedence 
+		boolean isThreadSafe = inputData.threadSafe() && bridge.isThreadSafe();
+		Log.debug("Request for " + path + " handled " +
+				  (isThreadSafe ? "without" : "with") + " synchronization"); 
+		
+		return isThreadSafe ? 
+				writeResponse(bridge, path, inputStream) : 
+				synchronizedWriteResponse(bridge, path, inputStream);
+	}
+	
+	private static synchronized Response synchronizedWriteResponse(IBridge bridge, 
+																   String path,
+			                                                       InputStream inputStream) 
+			                                                    		   throws Exception {
+		return writeResponse(bridge, path, inputStream);
+	}	
+	
+	private static Response writeResponse(IBridge bridge, 
+										  String path,
+			                              InputStream inputStream) throws Exception {
+		
+		String returnMsg;
 		
 		// Open the output file	
 		bridge.beginIteration();

@@ -107,15 +107,8 @@ public class InputDataTest
     public void compressCodecBZip2()
     {
         parameters.put("X-GP-COMPRESSION_CODEC", "org.apache.hadoop.io.compress.BZip2Codec");
-        try
-        {
-            new InputData(parameters);
-            fail("org.apache.hadoop.io.compress.BZip2Codec should throw IllegalArgumentException");
-        }
-        catch (IllegalArgumentException e)
-        {
-            assertEquals(e.getMessage(), "BZip2 compression is not supported");
-        }
+        InputData input = new InputData(parameters);
+        assertEquals(input.compressCodec, "org.apache.hadoop.io.compress.BZip2Codec");
     }
     
     @Test
@@ -155,6 +148,22 @@ public class InputDataTest
         	assertEquals(e.getMessage(), "Illegal compression type 'NONE'. " +
         			"For disabling compression remove COMPRESSION_CODEC parameter.");
         }   	
+    }
+    
+    @Test
+    public void threadSafe()
+    {
+        parameters.put("X-GP-THREAD-SAFE", "TRUE");   
+        InputData input = new InputData(parameters);
+        assertEquals(input.threadSafe, true);
+        
+        parameters.put("X-GP-THREAD-SAFE", "FALSE");   
+        input = new InputData(parameters);
+        assertEquals(input.threadSafe, false);
+        	
+        parameters.remove("X-GP-THREAD-SAFE");
+        input = new InputData(parameters);
+        assertEquals(input.threadSafe, true);   
     }
     
     /*

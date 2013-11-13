@@ -7,6 +7,7 @@ import java.io.IOException;
 import org.apache.hadoop.io.Text;
 
 import com.pivotal.pxf.format.OneRow;
+import com.pivotal.pxf.utilities.HdfsUtilities;
 import com.pivotal.pxf.utilities.InputData;
 
 /*

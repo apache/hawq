@@ -18,6 +18,7 @@ import com.pivotal.pxf.format.BridgeOutputBuilder;
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.resolvers.IReadResolver;
 import com.pivotal.pxf.utilities.InputData;
+import com.pivotal.pxf.utilities.Plugin;
 import com.pivotal.pxf.utilities.Utilities;
 
 /*
@@ -48,7 +49,7 @@ public class ReadBridge implements IBridge
 		outputBuilder = new BridgeOutputBuilder(input);
 		Log = LogFactory.getLog(ReadBridge.class);
 	}
-
+	
 	/*
 	 * Accesses the underlying HDFS file
 	 */
@@ -142,4 +143,9 @@ public class ReadBridge implements IBridge
 	{
 		throw new Exception("setNext is not implemented");
 	}
+
+	@Override
+	public boolean isThreadSafe() {
+		return ((Plugin)fileAccessor).isThreadSafe() && ((Plugin)fieldsResolver).isThreadSafe();
+	}	
 }

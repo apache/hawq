@@ -21,7 +21,6 @@ import com.pivotal.pxf.format.OutputFormat;
 public class InputData
 {
     public static final int INVALID_SPLIT_IDX = -1;
-    private static final String BZIP2CODEC = "org.apache.hadoop.io.compress.BZip2Codec";
     private static final Log LOG = LogFactory.getLog(InputData.class);
 
     protected Map<String, String> requestParametersMap;
@@ -44,6 +43,13 @@ public class InputData
 	protected String compressCodec;
 	protected String compressType;
 
+	/*
+	 * When false the bridge has to run in synchronized mode.
+	 * default value - true.
+	 */
+	protected boolean threadSafe;
+
+	
     /*
      * The name of the recordkey column. It can appear in any location in the columns list.
      * By specifying the recordkey column, the user declares that he is interested to receive for every record
@@ -139,9 +145,11 @@ public class InputData
 		 */
         parseCompressionCodec();
         parseCompressionType();
+        
+        parseThreadSafe();
     }
 
-    /**
+	/**
      * Sets the requested profile plugins from profile file into requestParametersMap
      */
     private void setProfilePlugins()
@@ -194,6 +202,7 @@ public class InputData
         this.tableName = copy.tableName;
         this.compressCodec = copy.compressCodec;
         this.compressType = copy.compressType;
+        this.threadSafe = copy.threadSafe;
     }
 
     public byte[] getFragmentUserData()
@@ -429,12 +438,6 @@ public class InputData
     private void parseCompressionCodec()
     {
 		compressCodec = getOptionalProperty("X-GP-COMPRESSION_CODEC");
-		if (compressCodec == null)
-			return;
-		if (compressCodec.compareTo(BZIP2CODEC) == 0)
-		{
-			throw new IllegalArgumentException("BZip2 compression is not supported");
-		}
     }
     
 	/*
@@ -483,6 +486,23 @@ public class InputData
 		return compressType;
 	}
 
+	 /*
+     * Sets the thread safe parameter.
+     * Default value - true.
+     */
+    private void parseThreadSafe() {
+		
+    	threadSafe = true;
+    	String threadSafeStr = getOptionalProperty("X-GP-THREAD-SAFE");
+		if (threadSafeStr != null) {
+			threadSafe = Boolean.parseBoolean(threadSafeStr);
+		}
+	}
+    
+    public boolean threadSafe() {
+    	return threadSafe;
+    }
+	
     /*
      * Sets the format type based on input string
      */
@@ -495,7 +515,7 @@ public class InputData
         else
             throw new IllegalArgumentException("Wrong value for greenplum.format " + formatString);
     }
-
+    
     /*
      * Fills the index of allocated data fragments
      */
