@@ -277,7 +277,8 @@ CTranslatorDXLToPlStmt::PplFromDXL
 	(
 	const CDXLNode *pdxln,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	GPOS_ASSERT(NULL != pdxln);
@@ -292,7 +293,7 @@ CTranslatorDXLToPlStmt::PplFromDXL
 		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiDXL2PlStmtConversion, pdxln->Pdxlop()->PstrOpName()->Wsz());
 	}
 
-	return (this->* pf)(pdxln, pdxltrctxOut, pplanParent);
+	return (this->* pf)(pdxln, pdxltrctxOut, pplanParent, pdrgpdxltrctxPrevSiblings);
 }
 
 //---------------------------------------------------------------------------
@@ -1067,7 +1068,8 @@ CTranslatorDXLToPlStmt::PtsFromDXLTblScan
 	(
 	const CDXLNode *pdxlnTblScan,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	// translate table descriptor into a range table entry
@@ -1169,6 +1171,64 @@ CTranslatorDXLToPlStmt::PtsFromDXLTblScan
 	return pplanReturn;
 }
 
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorDXLToPlStmt::FSetIndexVarAttno
+//
+//	@doc:
+//		Walker to set index var attno's,
+//		attnos of index vars are set to their relative positions in index keys,
+//		skip any outer references while walking the expression tree
+//
+//---------------------------------------------------------------------------
+BOOL
+CTranslatorDXLToPlStmt::FSetIndexVarAttno
+	(
+	Node *pnode,
+	SContextIndexVarAttno *pctxtidxvarattno
+	)
+{
+	if (NULL == pnode)
+	{
+		return false;
+	}
+
+	if (IsA(pnode, Var) && ((Var *)pnode)->varno != OUTER)
+	{
+		INT iAttno = ((Var *)pnode)->varattno;
+		const IMDRelation *pmdrel = pctxtidxvarattno->m_pmdrel;
+		const IMDIndex *pmdindex = pctxtidxvarattno->m_pmdindex;
+
+		ULONG ulIndexColPos = ULONG_MAX;
+		const ULONG ulArity = pmdrel->UlColumns();
+		for (ULONG ulColPos = 0; ulColPos < ulArity; ulColPos++)
+		{
+			const IMDColumn *pmdcol = pmdrel->Pmdcol(ulColPos);
+			if (iAttno == pmdcol->IAttno())
+			{
+				ulIndexColPos = ulColPos;
+				break;
+			}
+		}
+
+		if (ULONG_MAX > ulIndexColPos)
+		{
+			((Var *)pnode)->varattno =  1 + pmdindex->UlPosInKey(ulIndexColPos);
+		}
+
+		return false;
+	}
+
+	return gpdb::FWalkExpressionTree
+			(
+			pnode,
+			(BOOL (*)()) CTranslatorDXLToPlStmt::FSetIndexVarAttno,
+			pctxtidxvarattno
+			);
+}
+
+
 //---------------------------------------------------------------------------
 //	@function:
 //		CTranslatorDXLToPlStmt::PisFromDXLIndexScan
@@ -1182,13 +1242,14 @@ CTranslatorDXLToPlStmt::PisFromDXLIndexScan
 	(
 	const CDXLNode *pdxlnIndexScan,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	// translate table descriptor into a range table entry
 	CDXLPhysicalIndexScan *pdxlopIndexScan = CDXLPhysicalIndexScan::PdxlopConvert(pdxlnIndexScan->Pdxlop());
 
-	return PisFromDXLIndexScan(pdxlnIndexScan, pdxlopIndexScan, pdxltrctxOut, pplanParent, false /*fIndexOnlyScan*/);
+	return PisFromDXLIndexScan(pdxlnIndexScan, pdxlopIndexScan, pdxltrctxOut, pplanParent, false /*fIndexOnlyScan*/, pdrgpdxltrctxPrevSiblings);
 }
 
 //---------------------------------------------------------------------------
@@ -1206,7 +1267,8 @@ CTranslatorDXLToPlStmt::PisFromDXLIndexScan
 	CDXLPhysicalIndexScan *pdxlopIndexScan,
 	CDXLTranslateContext *pdxltrctxOut,
 	Plan *pplanParent,
-	BOOL fIndexOnlyScan
+	BOOL fIndexOnlyScan,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	// translation context for column mappings in the base relation
@@ -1266,8 +1328,6 @@ CTranslatorDXLToPlStmt::PisFromDXLIndexScan
 
 	pis->indexorderdir = CTranslatorUtils::Scandirection(pdxlopIndexScan->EdxlScanDirection());
 
-	CMappingColIdVarPlStmt mapcidvarplstmt(m_pmp, &dxltrctxbt, NULL, pdxltrctxOut, m_pctxdxltoplstmt, pplan);
-
 	// translate index condition list
 	List *plIndexConditions = NIL;
 	List *plIndexOrigConditions = NIL;
@@ -1281,8 +1341,10 @@ CTranslatorDXLToPlStmt::PisFromDXLIndexScan
 		fIndexOnlyScan, 
 		pmdindex, 
 		pmdrel,
+		pdxltrctxOut,
 		&dxltrctxbt, 
-		&mapcidvarplstmt,
+		pdrgpdxltrctxPrevSiblings,
+		pplan,
 		&plIndexConditions, 
 		&plIndexOrigConditions, 
 		&plIndexStratgey, 
@@ -1314,8 +1376,10 @@ CTranslatorDXLToPlStmt::TranslateIndexConditions
 	BOOL fIndexOnlyScan,
 	const IMDIndex *pmdindex,
 	const IMDRelation *pmdrel,
+	CDXLTranslateContext *pdxltrctxOut,
 	CDXLTranslateContextBaseTable *pdxltrctxbt,
-	CMappingColIdVarPlStmt *pmapcidvarplstmt,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings,
+	Plan *pplanParent,
 	List **pplIndexConditions,
 	List **pplIndexOrigConditions,
 	List **pplIndexStratgey,
@@ -1325,93 +1389,50 @@ CTranslatorDXLToPlStmt::TranslateIndexConditions
 	// array of index qual info
 	DrgPindexqualinfo *pdrgpindexqualinfo = New(m_pmp) DrgPindexqualinfo(m_pmp);
 
+	// build colid->var mapping
+	CMappingColIdVarPlStmt mapcidvarplstmt(m_pmp, pdxltrctxbt, pdrgpdxltrctxPrevSiblings, pdxltrctxOut, m_pctxdxltoplstmt, pplanParent);
+
 	const ULONG ulArity = pdxlnIndexCondList->UlArity();
 	for (ULONG ul = 0; ul < ulArity; ul++)
 	{
 		CDXLNode *pdxlnIndexCond = (*pdxlnIndexCondList)[ul];
 
-		// we special case index quals as the scalar identifiers must be
-		// translated into vars whose varattno refers to the index column rather
-		// than the base table column
-		GPOS_ASSERT(2 == pdxlnIndexCond->UlArity());
+		Expr *pexprOrigIndexCond = m_pdxlsctranslator->PexprFromDXLNodeScalar(pdxlnIndexCond, &mapcidvarplstmt);
+		Expr *pexprIndexCond = m_pdxlsctranslator->PexprFromDXLNodeScalar(pdxlnIndexCond, &mapcidvarplstmt);
+		GPOS_ASSERT(IsA(pexprIndexCond, OpExpr) && "expected OpExpr in index qual");
 
-		CDXLNode *pdxlnLeftScChild = (*pdxlnIndexCond)[0];
-		CDXLNode *pdxlnRightScChild = (*pdxlnIndexCond)[1];
-
-		// translate the left scalar child
-		CDXLScalarIdent *pdxlopIdent = CDXLScalarIdent::PdxlopConvert(pdxlnLeftScChild->Pdxlop());
-
-		INT iAttno = pdxltrctxbt->IAttnoForColId(pdxlopIdent->Pdxlcr()->UlID());
-		INT iAttnoOld = iAttno;
-		// if this is an indexonlyscan, then we already have the attno referring
-		// to the index. Otherwise, we need to perform this mapping here
+		// for indexonlyscan, we already have the attno referring to the index
 		if (!fIndexOnlyScan)
 		{
-			ULONG ulIndexColPos = ULONG_MAX;
-			const ULONG ulArity = pmdrel->UlColumns(); 
-			for (ULONG ulColPos = 0; ulColPos < ulArity; ulColPos++)
-			{
-				const IMDColumn *pmdcol = pmdrel->Pmdcol(ulColPos);
-				if (iAttno == pmdcol->IAttno())
-				{
-					ulIndexColPos = ulColPos;
-					break;
-				}
-			}
-			
-			GPOS_ASSERT(ULONG_MAX > ulIndexColPos);
-			iAttno = 1 + pmdindex->UlPosInKey(ulIndexColPos);
+			// Otherwise, we need to perform mapping of Varattnos relative to column positions in index keys
+			SContextIndexVarAttno ctxtidxvarattno(pmdrel, pmdindex);
+			FSetIndexVarAttno((Node *) pexprIndexCond, &ctxtidxvarattno);
 		}
 
-		Index idxVarno = 1;
-		Var *pvarLeft = gpdb::PvarMakeVar
-					(
-					idxVarno,
-					(AttrNumber) iAttno,
-					CMDIdGPDB::PmdidConvert(pdxlopIdent->PmdidType())->OidObjectId(),
-					-1,	// vartypmod
-					0	// varlevelsup
-					);
-		pvarLeft->varnoold = 1;
-		pvarLeft->varoattno =  (AttrNumber) iAttnoOld;
-
-		Var *pvarLeftOrig =	gpdb::PvarMakeVar
-				(
-				idxVarno,
-				(AttrNumber) iAttnoOld,
-				CMDIdGPDB::PmdidConvert(pdxlopIdent->PmdidType())->OidObjectId(),
-				-1,	// vartypmod
-				0	// varlevelsup
-				);
-		pvarLeft->varnoold = 1;
-		pvarLeft->varoattno = (AttrNumber) iAttnoOld;
-  
-		// translate right scalar child
-		Expr *pexprRight = m_pdxlsctranslator->PexprFromDXLNodeScalar(pdxlnRightScChild, pmapcidvarplstmt);
-
-		// construct the GPDB operator and add to the list of index conditions
-		CDXLScalarComp *pdxlopCmp = CDXLScalarComp::PdxlopConvert(pdxlnIndexCond->Pdxlop());
-		OpExpr *popexpr = MakeNode(OpExpr);
-		popexpr->opno = CMDIdGPDB::PmdidConvert(pdxlopCmp->Pmdid())->OidObjectId();
-
-		const IMDScalarOp *pmdscop = m_pmda->Pmdscop(pdxlopCmp->Pmdid());
-		popexpr->opfuncid = CMDIdGPDB::PmdidConvert(pmdscop->PmdidFunc())->OidObjectId();
-		popexpr->opresulttype = CMDIdGPDB::PmdidConvert(m_pmda->PtMDType<IMDTypeBool>()->Pmdid())->OidObjectId();
-		popexpr->opretset = false;
-		popexpr->args = ListMake2(pvarLeft, pexprRight);
-
-		OpExpr *popexprOrig = MakeNode(OpExpr);
-		popexprOrig->opno = CMDIdGPDB::PmdidConvert(pdxlopCmp->Pmdid())->OidObjectId();
-
-		popexprOrig->opfuncid = CMDIdGPDB::PmdidConvert(pmdscop->PmdidFunc())->OidObjectId();
-		popexprOrig->opresulttype = CMDIdGPDB::PmdidConvert(m_pmda->PtMDType<IMDTypeBool>()->Pmdid())->OidObjectId();
-		popexprOrig->opretset = false;
-		popexprOrig->args = ListMake2(pvarLeftOrig, pexprRight);
-		
 		// get the index strategy
-		StrategyNumber sn = CTranslatorUtils::Strategynumber(m_pmp, m_pmda, (Expr *) popexpr);
+		StrategyNumber sn = CTranslatorUtils::Strategynumber(m_pmp, m_pmda, pexprIndexCond);
 
-		pdrgpindexqualinfo->Append(New(m_pmp) CIndexQualInfo(iAttno, popexpr, popexprOrig, sn));
+		// find index key's attno
+		List *plistArgs = ((OpExpr *) pexprIndexCond)->args;
+		Node *pnodeFst = (Node *) lfirst(gpdb::PlcListHead(plistArgs));
+		Node *pnodeSnd = (Node *) lfirst(gpdb::PlcListTail(plistArgs));
+		GPOS_ASSERT(IsA(pnodeFst, Var) || IsA(pnodeSnd, Var) && "expected index key in index qual");
+
+		INT iAttno = 0;
+		if (IsA(pnodeFst, Var) && ((Var *) pnodeFst)->varno != OUTER)
+		{
+			// index key is on the left side
+			iAttno =  ((Var *) pnodeFst)->varattno;
+		}
+		else
+		{
+			// index key is on the right side
+			GPOS_ASSERT(((Var *) pnodeSnd)->varno != OUTER && "unexpected outer reference in index qual");
+			iAttno = ((Var *) pnodeSnd)->varattno;
+		}
+
+		// create index qual
+		pdrgpindexqualinfo->Append(New(m_pmp) CIndexQualInfo(iAttno, (OpExpr *)pexprIndexCond, (OpExpr *)pexprOrigIndexCond, sn));
 	}
 
 	// the index quals much be ordered by attribute number
@@ -1444,7 +1465,8 @@ CTranslatorDXLToPlStmt::PlimitFromDXLLimit
 	(
 	const CDXLNode *pdxlnLimit,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	// translate table descriptor into a range table entry
@@ -1530,7 +1552,8 @@ CTranslatorDXLToPlStmt::PhjFromDXLHJ
 	(
 	const CDXLNode *pdxlnHJ,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	GPOS_ASSERT(pdxlnHJ->Pdxlop()->Edxlop() == EdxlopPhysicalHashJoin);
@@ -1713,7 +1736,8 @@ CTranslatorDXLToPlStmt::PplanFunctionScanFromDXLTVF
 	(
 	const CDXLNode *pdxlnTVF,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	CDXLPhysicalTVF *pdxlopTVF = CDXLPhysicalTVF::PdxlopConvert(pdxlnTVF->Pdxlop());
@@ -1881,7 +1905,8 @@ CTranslatorDXLToPlStmt::PnljFromDXLNLJ
 	(
 	const CDXLNode *pdxlnNLJ,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	GPOS_ASSERT(pdxlnNLJ->Pdxlop()->Edxlop() == EdxlopPhysicalNLJoin);
@@ -1921,14 +1946,17 @@ CTranslatorDXLToPlStmt::PnljFromDXLNLJ
 	CDXLTranslateContext dxltrctxLeft(m_pmp, false, pdxltrctxOut->PhmColParam());
 	CDXLTranslateContext dxltrctxRight(m_pmp, false, pdxltrctxOut->PhmColParam());
 
-	// setting of prefetch_inner setting similar to what is done in the planner
-	pj->prefetch_inner = true;
+	// setting of prefetch_inner to true except for the case of index NLJ where we cannot prefetch inner
+	// because inner child depends on variables coming from outer child
+	pj->prefetch_inner = !pdxlnlj->FIndexNLJ();
 
 	Plan *pplanLeft = PplFromDXL(pdxlnLeft, &dxltrctxLeft, pplan);
-	Plan *pplanRight = PplFromDXL(pdxlnRight, &dxltrctxRight, pplan);
 
 	DrgPdxltrctx *pdrgpdxltrctx = New(m_pmp) DrgPdxltrctx(m_pmp);
 	pdrgpdxltrctx->Append(&dxltrctxLeft);
+
+	Plan *pplanRight = PplFromDXL(pdxlnRight, &dxltrctxRight, pplan, pdrgpdxltrctx);
+
 	pdrgpdxltrctx->Append(&dxltrctxRight);
 
 	// translate proj list and filter
@@ -1978,7 +2006,8 @@ CTranslatorDXLToPlStmt::PmjFromDXLMJ
 	(
 	const CDXLNode *pdxlnMJ,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	GPOS_ASSERT(pdxlnMJ->Pdxlop()->Edxlop() == EdxlopPhysicalMergeJoin);
@@ -2097,7 +2126,8 @@ CTranslatorDXLToPlStmt::PhhashFromDXL
 	(
 	const CDXLNode *pdxln,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	Hash *ph = MakeNode(Hash);
@@ -2150,7 +2180,8 @@ CTranslatorDXLToPlStmt::PplanTranslateDXLMotion
 	(
 	const CDXLNode *pdxlnMotion,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	CDXLPhysicalMotion *pdxlopMotion = CDXLPhysicalMotion::PdxlopConvert(pdxlnMotion->Pdxlop());
@@ -2175,7 +2206,8 @@ CTranslatorDXLToPlStmt::PplanMotionFromDXLMotion
 	(
 	const CDXLNode *pdxlnMotion,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	CDXLPhysicalMotion *pdxlopMotion = CDXLPhysicalMotion::PdxlopConvert(pdxlnMotion->Pdxlop());
@@ -2379,7 +2411,8 @@ CTranslatorDXLToPlStmt::PplanResultHashFilters
 	(
 	const CDXLNode *pdxlnMotion,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	// create motion node
@@ -2467,7 +2500,8 @@ CTranslatorDXLToPlStmt::PaggFromDXLAgg
 	(
 	const CDXLNode *pdxlnAgg,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	// create aggregate plan node
@@ -2578,7 +2612,8 @@ CTranslatorDXLToPlStmt::PwindowFromDXLWindow
 	(
 	const CDXLNode *pdxlnWindow,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	// create a window plan node
@@ -2763,7 +2798,8 @@ CTranslatorDXLToPlStmt::PsortFromDXLSort
 	(
 	const CDXLNode *pdxlnSort,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	// create sort plan node
@@ -2887,7 +2923,8 @@ CTranslatorDXLToPlStmt::PsubqscanFromDXLSubqScan
 	(
 	const CDXLNode *pdxlnSubqScan,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	// create sort plan node
@@ -2996,7 +3033,8 @@ CTranslatorDXLToPlStmt::PresultFromDXLResult
 	(
 	const CDXLNode *pdxlnResult,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	// create result plan node
@@ -3094,7 +3132,8 @@ CTranslatorDXLToPlStmt::PappendFromDXLAppend
 	(
 	const CDXLNode *pdxlnAppend,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	// create append plan node
@@ -3212,7 +3251,8 @@ CTranslatorDXLToPlStmt::PmatFromDXLMaterialize
 	(
 	const CDXLNode *pdxlnMaterialize,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	// create materialize plan node
@@ -3300,7 +3340,8 @@ CTranslatorDXLToPlStmt::PshscanFromDXLSharedScan
 	(
 	const CDXLNode *pdxlnSharedScan,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	// create sort plan node
@@ -3396,7 +3437,8 @@ CTranslatorDXLToPlStmt::PshscanFromDXLCTEProducer
 	(
 	const CDXLNode *pdxlnCTEProducer,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	CDXLPhysicalCTEProducer *pdxlopCTEProducer = CDXLPhysicalCTEProducer::PdxlopConvert(pdxlnCTEProducer->Pdxlop());
@@ -3620,7 +3662,8 @@ CTranslatorDXLToPlStmt::PshscanFromDXLCTEConsumer
 	(
 	const CDXLNode *pdxlnCTEConsumer,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	CDXLPhysicalCTEConsumer *pdxlopCTEConsumer = CDXLPhysicalCTEConsumer::PdxlopConvert(pdxlnCTEConsumer->Pdxlop());
@@ -3693,7 +3736,8 @@ CTranslatorDXLToPlStmt::PplanSequence
 	(
 	const CDXLNode *pdxlnSequence,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	// create append plan node
@@ -3774,7 +3818,8 @@ CTranslatorDXLToPlStmt::PplanDTS
 	(
 	const CDXLNode *pdxlnDTS,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	// translate table descriptor into a range table entry
@@ -3853,7 +3898,8 @@ CTranslatorDXLToPlStmt::PplanDIS
 	(
 	const CDXLNode *pdxlnDIS,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	CDXLPhysicalDynamicIndexScan *pdxlop = CDXLPhysicalDynamicIndexScan::PdxlopConvert(pdxlnDIS->Pdxlop());
@@ -3912,8 +3958,6 @@ CTranslatorDXLToPlStmt::PplanDIS
 
 	pdis->indexorderdir = CTranslatorUtils::Scandirection(pdxlop->EdxlScanDirection());
 
-	CMappingColIdVarPlStmt mapcidvarplstmt(m_pmp, &dxltrctxbt, NULL, pdxltrctxOut, m_pctxdxltoplstmt, pplan);
-
 	// translate index condition list
 	List *plIndexConditions = NIL;
 	List *plIndexOrigConditions = NIL;
@@ -3927,8 +3971,10 @@ CTranslatorDXLToPlStmt::PplanDIS
 		false, // fIndexOnlyScan 
 		pmdindex, 
 		pmdrel,
-		&dxltrctxbt, 
-		&mapcidvarplstmt,
+		pdxltrctxOut,
+		&dxltrctxbt,
+		NULL, // pdrgpdxltrctxPrevSiblings
+		pplan,
 		&plIndexConditions, 
 		&plIndexOrigConditions, 
 		&plIndexStratgey, 
@@ -3957,7 +4003,8 @@ CTranslatorDXLToPlStmt::PplanDML
 	(
 	const CDXLNode *pdxlnDML,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	// translate table descriptor into a range table entry
@@ -4169,7 +4216,8 @@ CTranslatorDXLToPlStmt::PplanSplit
 	(
 	const CDXLNode *pdxlnSplit,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	CDXLPhysicalSplit *pdxlop = CDXLPhysicalSplit::PdxlopConvert(pdxlnSplit->Pdxlop());
@@ -4259,7 +4307,8 @@ CTranslatorDXLToPlStmt::PplanAssert
 	(
 	const CDXLNode *pdxlnAssert,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	// create assert plan node
@@ -4343,7 +4392,8 @@ CTranslatorDXLToPlStmt::PplanRowTrigger
 	(
 	const CDXLNode *pdxlnRowTrigger,
 	CDXLTranslateContext *pdxltrctxOut,
-	Plan *pplanParent
+	Plan *pplanParent,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings
 	)
 {
 	CDXLPhysicalRowTrigger *pdxlop = CDXLPhysicalRowTrigger::PdxlopConvert(pdxlnRowTrigger->Pdxlop());

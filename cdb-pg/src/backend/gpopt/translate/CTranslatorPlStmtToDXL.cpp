@@ -393,10 +393,12 @@ CTranslatorPlStmtToDXL::PdxlnNLJoinFromPlan
 
 	EdxlJoinType edxljt = CTranslatorUtils::EdxljtFromJoinType((pnlj->join).jointype);
 
-	// construct hash join operator
-	CDXLPhysicalNLJoin *pdxlnlj = New(m_pmp) CDXLPhysicalNLJoin(m_pmp, edxljt);
+	BOOL fIndexNLJ = IsA(pplan->righttree, IndexScan);
 
-	// construct hash join operator node
+	// construct nested loop join operator
+	CDXLPhysicalNLJoin *pdxlnlj = New(m_pmp) CDXLPhysicalNLJoin(m_pmp, edxljt, fIndexNLJ);
+
+	// construct nested loop join operator node
 	CDXLNode *pdxlnNLJ = New(m_pmp) CDXLNode(m_pmp, pdxlnlj);
 	pdxlnNLJ->SetProperties(pdxlprop);
 
