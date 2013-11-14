@@ -19,7 +19,7 @@
 <configuration>
    <property>
       <name>dfs.permissions</name>
-      <value>false</value>
+      <value>true</value>
    </property>
     <property>
         <name>dfs.support.append</name>
@@ -47,9 +47,5 @@
     <property>
         <name>dfs.webhdfs.enabled</name>
         <value>true</value>
-    </property>
-    <property>
-        <name>dfs.umaskmode</name>
-        <value>000</value>
     </property>
 </configuration>
