@@ -1293,7 +1293,16 @@ CTranslatorScalarToDXL::PdxlnScAggrefFromAggref
 	}
 
 	GPOS_ASSERT(0 == paggref->agglevelsup);
-	CDXLScalarAggref *pdxlopAggref = New(m_pmp) CDXLScalarAggref(m_pmp, pmdidAgg, paggref->aggdistinct, edxlaggstage);
+
+	IMDId *pmdidRetType = CScalarAggFunc::PmdidLookupReturnType(pmdidAgg, (EdxlaggstageNormal == edxlaggstage), m_pmda);
+	IMDId *pmdidResolvedRetType = NULL;
+	if (m_pmda->Pmdtype(pmdidRetType)->FAmbiguous())
+	{
+		// if return type given by MD cache is ambiguous, use type provided by aggref node
+		pmdidResolvedRetType = New(m_pmp) CMDIdGPDB(paggref->aggtype);
+	}
+
+	CDXLScalarAggref *pdxlopAggref = New(m_pmp) CDXLScalarAggref(m_pmp, pmdidAgg, pmdidResolvedRetType, paggref->aggdistinct, edxlaggstage);
 
 	// create the DXL node holding the scalar aggref
 	CDXLNode *pdxln = New(m_pmp) CDXLNode(m_pmp, pdxlopAggref);

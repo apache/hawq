@@ -578,6 +578,15 @@ select 1 in (select 1);
 select 1 in (select 2);
 select NULL in (select 1/0);
 
+-- UDAs
+CREATE FUNCTION sum_sfunc(anyelement,anyelement) returns anyelement AS 'select $1+$2' LANGUAGE SQL STRICT;
+CREATE FUNCTION sum_prefunc(anyelement,anyelement) returns anyelement AS 'select $1+$2' LANGUAGE SQL STRICT;
+CREATE AGGREGATE myagg1(anyelement) (SFUNC = sum_sfunc, PREFUNC = sum_prefunc, STYPE = anyelement, INITCOND = '0');
+SELECT myagg1(i) FROM orca.tab1;
+
+CREATE FUNCTION sum_sfunc2(anyelement,anyelement,anyelement) returns anyelement AS 'select $1+$2+$3' LANGUAGE SQL STRICT;
+CREATE AGGREGATE myagg2(anyelement,anyelement) (SFUNC = sum_sfunc2, STYPE = anyelement, INITCOND = '0');
+SELECT myagg2(i,j) FROM orca.tab1;
 
 -- clean up
 drop schema orca cascade;

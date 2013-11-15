@@ -446,7 +446,13 @@ CTranslatorDXLToScalar::PaggrefFromDXLNodeScAggref
 	const IMDAggregate *pmdagg = m_pmda->Pmdagg(pmdidAgg);
 	pmdidAgg->Release();
 
-	if(EdxlaggstageIntermediate == pdxlop->Edxlaggstage() || EdxlaggstagePartial == pdxlop->Edxlaggstage())
+	EdxlAggrefStage edxlaggstage = pdxlop->Edxlaggstage();
+	if (NULL != pdxlop->PmdidResolvedRetType())
+	{
+		// use resolved type
+		paggref->aggtype = CMDIdGPDB::PmdidConvert(pdxlop->PmdidResolvedRetType())->OidObjectId();
+	}
+	else if (EdxlaggstageIntermediate == edxlaggstage || EdxlaggstagePartial == edxlaggstage)
 	{
 		paggref->aggtype = CMDIdGPDB::PmdidConvert(pmdagg->PmdidTypeIntermediate())->OidObjectId();
 	}
@@ -454,7 +460,6 @@ CTranslatorDXLToScalar::PaggrefFromDXLNodeScAggref
 	{
 		paggref->aggtype = CMDIdGPDB::PmdidConvert(pmdagg->PmdidTypeResult())->OidObjectId();
 	}
-
 
 	switch(pdxlop->Edxlaggstage())
 	{
