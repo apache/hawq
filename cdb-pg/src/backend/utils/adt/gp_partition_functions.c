@@ -115,6 +115,8 @@ gp_partition_propagation(PG_FUNCTION_ARGS)
 	Assert(dynamicTableScanInfo != NULL &&
 		   dynamicTableScanInfo->memoryContext != NULL);
 
+	MemoryContext oldCxt = MemoryContextSwitchTo(dynamicTableScanInfo->memoryContext);
+
 	if (index >= dynamicTableScanInfo->numScans)
 	{
 		increaseScanArraySize(index);
@@ -135,6 +137,8 @@ gp_partition_propagation(PG_FUNCTION_ARGS)
 					&partOid, HASH_ENTER, NULL /* foundPtr */);
 	
 	Assert(*pidInHash == partOid);
+
+	MemoryContextSwitchTo(oldCxt);
 
 	PG_RETURN_VOID();
 }
@@ -245,11 +249,15 @@ gp_partition_selection(PG_FUNCTION_ARGS)
 	/* set the memory context for the access methods */
 	metadata->accessMethods->part_cxt = dynamicTableScanInfo->memoryContext;
 	
+	MemoryContext oldCxt = MemoryContextSwitchTo(dynamicTableScanInfo->memoryContext);
+
 	Oid childOid = selectPartition(metadata->partsAndRules,
 								   values,
 								   isnull,
 								   tupDesc,
 								   metadata->accessMethods);
+
+	MemoryContextSwitchTo(oldCxt);
 
 	freeValueArrays(values, isnull);
 	
