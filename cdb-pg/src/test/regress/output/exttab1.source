@@ -810,7 +810,6 @@ GRANT INSERT ON PROTOCOL pxf TO nonsuperproto;
 REVOKE SELECT ON PROTOCOL pxf FROM nonsuperproto;
 REVOKE INSERT ON PROTOCOL pxf FROM nonsuperproto;
 DROP USER nonsuperproto;
-
 -- Tests for MPP17980: generating artificial CTIDs for external table scans
 -- This is necessary because the planner currently generates plans that include
 -- the CTID attribute for external tables.
