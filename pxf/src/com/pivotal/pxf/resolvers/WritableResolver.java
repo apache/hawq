@@ -1,8 +1,6 @@
 package com.pivotal.pxf.resolvers;
 
 import java.io.DataInputStream;
-import java.io.EOFException;
-import java.io.IOException;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -12,6 +10,7 @@ import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.io.Writable;
 
 import com.pivotal.pxf.exception.BadRecordException;
 import com.pivotal.pxf.exception.UnsupportedTypeException;
@@ -26,11 +25,17 @@ import com.pivotal.pxf.utilities.RecordkeyAdapter;
 
 /*
  * Class WritableResolver handles serialization and deserialization of records that were 
- * serialized using Hadoop's Writable serialization framework. 
+ * serialized using Hadoop's Writable serialization framework.
+ * 
+ * A field named 'recordkey' is treated as a key of the given row, and not as 
+ * part of the data schema. @See RecordkeyAdapter.
+ * 
  * WritableResolver implements IReadResolver and IWriteResolver interfaces.
  */
 public class WritableResolver extends Plugin implements IReadResolver, IWriteResolver
 {
+	private final static int RECORDKEY_UNDEFINED = -1;
+	
 	private RecordkeyAdapter recordkeyAdapter = new RecordkeyAdapter();
 	private GPDBWritable gpdbWritable;
 	private GPDBWritableMapper gpdbWritableMapper;
@@ -63,7 +68,7 @@ public class WritableResolver extends Plugin implements IReadResolver, IWriteRes
 	{
 		userObject = onerow.getData();
 		List<OneField> record =  new LinkedList<OneField>();
-		int recordkeyIndex = (inputData.getRecordkeyColumn() == null) ? -1 :
+		int recordkeyIndex = (inputData.getRecordkeyColumn() == null) ? RECORDKEY_UNDEFINED :
 			inputData.getRecordkeyColumn().columnIndex();
 		int currentIdx = 0;
 
@@ -177,7 +182,10 @@ public class WritableResolver extends Plugin implements IReadResolver, IWriteRes
 	 */
 	public OneRow setFields(DataInputStream inputStream) throws Exception 
 	{
-				
+		int recordkeyIndex = (inputData.getRecordkeyColumn() == null) ? RECORDKEY_UNDEFINED :
+			inputData.getRecordkeyColumn().columnIndex();
+		Writable key = null;
+		
 		gpdbWritable.readFields(inputStream);
 		/*
 		 * if the stream is empty (EOF), readFields() 
@@ -196,13 +204,22 @@ public class WritableResolver extends Plugin implements IReadResolver, IWriteRes
 		int colIdx = 0;
 		for (Field field : fields)
 		{
+			/*
+			 * extract recordkey based on the column descriptor type
+			 * and add to OneRow.key
+			 */
+			if (colIdx == recordkeyIndex) {
+				key = populateKey(colIdx);
+				++colIdx;
+			}
+			
 			if (Modifier.isPrivate(field.getModifiers())) 
 				continue;
 			
 			colIdx = populateField(field, colIdx);
 		}
 		
-		return new OneRow(null, userObject);
+		return new OneRow(key, userObject);
 	}
 	
 	/*
@@ -237,6 +254,7 @@ public class WritableResolver extends Plugin implements IReadResolver, IWriteRes
 				value = gpdbWritableMapper.getData(curColIdx);		
 				++curColIdx;
 			}
+	
 			field.set(userObject, value);
 		}
 		catch (IllegalAccessException ex)
@@ -255,6 +273,35 @@ public class WritableResolver extends Plugin implements IReadResolver, IWriteRes
 		return curColIdx;
 	}
 
+	/**
+	 * Reads data in column index colIdx of current row,
+	 * and converts to a Writable object matching the 
+	 * HAWQ field definition.
+	 * If the colIdx is illegal (out of bounds), 
+	 * or the data conversion fails (value doesn't match given type),
+	 * a BadRecordException is thrown. 
+	 *  
+	 * @param colIdx column index to read
+	 * @return Writable object containing the key value
+	 * @throws BadRecordException in case of wrong colIdx or data not matching HAWQ type.
+	 */
+	Writable populateKey(int colIdx) throws BadRecordException {
+		
+		Writable key = null;
+					
+		gpdbWritableMapper.setDataType(inputData.getRecordkeyColumn().columnTypeCode());
+		try {
+			key = recordkeyAdapter.convertKeyValue(gpdbWritableMapper.getData(colIdx));
+		} catch (TypeMismatchException ex) {
+			throw new BadRecordException(ex);
+		} catch (ClassCastException ex) {
+			throw new BadRecordException(ex);
+		}
+		
+		return key;
+	}
+	
+	
 	void InitInputObject() throws Exception
 	{
 		Class userClass = Class.forName(inputData.srlzSchemaName());

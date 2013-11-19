@@ -550,7 +550,7 @@ public class InputData
 			ColumnDescriptor column = new ColumnDescriptor(columnName, columnTypeCode, i, columnTypeName);
 			tupleDescription.add(column);
 
-            if (columnName.equalsIgnoreCase(ColumnDescriptor.recordkeyName))
+            if (columnName.equalsIgnoreCase(ColumnDescriptor.RECORD_KEY_NAME))
                 recordkeyColumn = column;
         }
     }

@@ -705,6 +705,105 @@ SELECT * FROM readable_threadsafe ORDER BY number, name;
 DROP EXTERNAL TABLE readable_threadsafe;
 
 --
+-- 12. Test recordkey for sequence file
+--
+
+--
+-- 12.1 recordkey of type text
+-- 
+CREATE WRITABLE EXTERNAL TABLE writable_recordkey_text(recordkey text,
+                                                       tmp1  timestamp, 
+                                                       num1  integer, 
+                                                       num2  integer, 
+                                                       num3  integer, 
+                                                       num4  integer,
+                                                       t1    text, 
+                                                       t2    text, 
+                                                       t3    text, 
+                                                       t4    text, 
+                                                       t5    text, 
+                                                       t6    text, 
+                                                       dub1  double precision, 
+                                                       dub2  double precision, 
+                                                       dub3  double precision, 
+                                                       ft1   real, 
+                                                       ft2   real, 
+                                                       ft3   real, 
+                                                       ln1   bigint, 
+                                                       ln2   bigint, 
+                                                       ln3   bigint, 
+                                                       bt    bytea,
+                                                       bool1 boolean,
+                                                       bool2 boolean,
+                                                       bool3 boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/recordkey_text?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_export');
+COPY writable_recordkey_text FROM '@abs_srcdir@/data/pxf/customwritable_recordkey_data.txt';
+--
+-- Test data was written
+--
+\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/recordkey_text | grep Found | awk '{ if ($2>0) print "ok";}'
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/recordkey_text | awk '{ if ($1>0) print "ok";}'
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du /gpdb_regression_data/writable/recordkey_text | awk '{if ($1<=0) print $0,": error";}'
+--
+-- Read data
+--
+CREATE READABLE EXTERNAL TABLE read_recordkey_text (LIKE writable_recordkey_text)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/recordkey_text?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT * FROM read_recordkey_text ORDER BY num1 LIMIT 10;
+DROP EXTERNAL TABLE writable_recordkey_text;
+DROP EXTERNAL TABLE read_recordkey_text;
+
+--
+-- 12.2 recordkey of type int (one row with error)
+-- 
+CREATE WRITABLE EXTERNAL TABLE writable_recordkey_int(recordkey int,
+                                                      tmp1  timestamp, 
+                                                      num1  integer, 
+                                                      num2  integer, 
+                                                      num3  integer, 
+                                                      num4  integer,
+                                                      t1    text, 
+                                                      t2    text, 
+                                                      t3    text, 
+                                                      t4    text, 
+                                                      t5    text, 
+                                                      t6    text, 
+                                                      dub1  double precision, 
+                                                      dub2  double precision, 
+                                                      dub3  double precision, 
+                                                      ft1   real, 
+                                                      ft2   real, 
+                                                      ft3   real, 
+                                                      ln1   bigint, 
+                                                      ln2   bigint, 
+                                                      ln3   bigint, 
+                                                      bt    bytea,
+                                                      bool1 boolean,
+			             		    		          bool2 boolean,
+                                                      bool3 boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/recordkey_int?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_export');
+COPY writable_recordkey_int FROM '@abs_srcdir@/data/pxf/customwritable_recordkey_data.txt'
+SEGMENT REJECT LIMIT 5 ROWS;
+--
+-- Test data was written
+--
+\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/recordkey_int | grep Found | awk '{ if ($2>0) print "ok";}'
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/recordkey_int | awk '{ if ($1>0) print "ok";}'
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du /gpdb_regression_data/writable/recordkey_int | awk '{if ($1<=0) print $0,": error";}'
+--
+-- Read data
+--
+CREATE READABLE EXTERNAL TABLE read_recordkey_int (LIKE writable_recordkey_int)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/recordkey_int?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT * FROM read_recordkey_int ORDER BY num1;
+DROP EXTERNAL TABLE writable_recordkey_int;
+DROP EXTERNAL TABLE read_recordkey_int;
+
+--
 -- Cleanup: delete all data that was written into hdfs
 --
 -- start_ignore

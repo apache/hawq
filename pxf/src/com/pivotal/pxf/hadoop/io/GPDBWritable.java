@@ -773,11 +773,11 @@ public class GPDBWritable implements Writable {
     }
 
     /**
-	 * Private Helper to get the type name for raising error.
+	 * Helper to get the type name.
 	 * If a given oid is not in the commonly used list, we
 	 * would expect a TEXT for it (for the error message).
 	 */
-	private static String getTypeName(int oid) {
+	public static String getTypeName(int oid) {
 		switch(oid) {
 		case BOOLEAN  : return "BOOLEAN";
 		case BYTEA    : return "BYTEA";

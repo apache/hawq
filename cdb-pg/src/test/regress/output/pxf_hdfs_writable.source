@@ -1220,6 +1220,173 @@ SELECT * FROM readable_threadsafe ORDER BY number, name;
 
 DROP EXTERNAL TABLE readable_threadsafe;
 --
+-- 12. Test recordkey for sequence file
+--
+--
+-- 12.1 recordkey of type text
+-- 
+CREATE WRITABLE EXTERNAL TABLE writable_recordkey_text(recordkey text,
+                                                       tmp1  timestamp, 
+                                                       num1  integer, 
+                                                       num2  integer, 
+                                                       num3  integer, 
+                                                       num4  integer,
+                                                       t1    text, 
+                                                       t2    text, 
+                                                       t3    text, 
+                                                       t4    text, 
+                                                       t5    text, 
+                                                       t6    text, 
+                                                       dub1  double precision, 
+                                                       dub2  double precision, 
+                                                       dub3  double precision, 
+                                                       ft1   real, 
+                                                       ft2   real, 
+                                                       ft3   real, 
+                                                       ln1   bigint, 
+                                                       ln2   bigint, 
+                                                       ln3   bigint, 
+                                                       bt    bytea,
+                                                       bool1 boolean,
+                                                       bool2 boolean,
+                                                       bool3 boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/recordkey_text?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_export');
+COPY writable_recordkey_text FROM '@abs_srcdir@/data/pxf/customwritable_recordkey_data.txt';
+--
+-- Test data was written
+--
+\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/recordkey_text | grep Found | awk '{ if ($2>0) print "ok";}'
+ok
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/recordkey_text | awk '{ if ($1>0) print "ok";}'
+ok
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du /gpdb_regression_data/writable/recordkey_text | awk '{if ($1<=0) print $0,": error";}'
+--
+-- Read data
+--
+CREATE READABLE EXTERNAL TABLE read_recordkey_text (LIKE writable_recordkey_text)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/recordkey_text?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT * FROM read_recordkey_text ORDER BY num1 LIMIT 10;
+  recordkey  |            tmp1            | num1 | num2 | num3 | num4 |    t1     |    t2     |     t3      |     t4     |     t5     |    t6     | dub1 | dub2 | dub3 |  ft1  |  ft2  |  ft3  |  ln1  |  ln2  |  ln3  |   bt   | bool1 | bool2 | bool3 
+-------------+----------------------------+------+------+------+------+-----------+-----------+-------------+------------+------------+-----------+------+------+------+-------+-------+-------+-------+-------+-------+--------+-------+-------+-------
+ 1000        | Wed Sep 11 10:00:00 2013   |   20 |   21 |   22 |   23 | one_EOTQT | two_EOTQT | three_EOTQT | four_EOTQT | five_EOTQT | six_EOTQT |  0.4 | 0.14 | 0.19 | 16.16 | 19.19 | 15.15 |  4000 | 28000 | 57000 | Rooney | t     | t     | f
+ NotANumber! | Wed Sep 11 10:00:00.1 2013 |   21 |   22 |   23 |   24 | one_FFIFK | two_FFIFK | three_FFIFK | four_FFIFK | five_FFIFK | six_FFIFK |  0.5 |  0.5 |  0.8 |   5.5 |  10.1 |   7.7 |  5000 | 10000 | 24000 | Rooney | f     | f     | t
+ 3000        | Wed Sep 11 10:00:00.2 2013 |   22 |   23 |   24 |   25 | one_TQXCQ | two_TQXCQ | three_TQXCQ | four_TQXCQ | five_TQXCQ | six_TQXCQ | 0.19 | 0.16 | 0.23 |   2.2 | 16.16 |   1.1 | 19000 | 32000 | 69000 | Rooney | f     | t     | f
+ 4000        | Wed Sep 11 10:00:00.3 2013 |   23 |   24 |   25 |   26 | one_JQLMU | two_JQLMU | three_JQLMU | four_JQLMU | five_JQLMU | six_JQLMU |  0.9 | 0.16 | 0.11 | 12.12 |  20.2 | 11.11 |  9000 | 32000 | 33000 | Rooney | f     | t     | f
+ 5000        | Wed Sep 11 10:00:00.4 2013 |   24 |   25 |   26 |   27 | one_AYEUM | two_AYEUM | three_AYEUM | four_AYEUM | five_AYEUM | six_AYEUM |    0 | 0.24 |  0.4 |  20.2 | 12.12 | 23.23 |     0 | 48000 | 12000 | Rooney | t     | t     | t
+ 1000        | Wed Sep 11 10:00:00.5 2013 |   25 |   26 |   27 |   28 | one_WQYWN | two_WQYWN | three_WQYWN | four_WQYWN | five_WQYWN | six_WQYWN | 0.22 | 0.16 | 0.24 | 22.22 | 13.13 | 24.24 | 22000 | 32000 | 72000 | Rooney | t     | t     | t
+ 2000        | Wed Sep 11 10:00:00.6 2013 |   26 |   27 |   28 |   29 | one_FSRQP | two_FSRQP | three_FSRQP | four_FSRQP | five_FSRQP | six_FSRQP |  0.5 | 0.18 | 0.17 | 16.16 | 15.15 |   4.4 |  5000 | 36000 | 51000 | Rooney | f     | t     | f
+ 3000        | Wed Sep 11 10:00:00.7 2013 |   27 |   28 |   29 |   30 | one_JTMWG | two_JTMWG | three_JTMWG | four_JTMWG | five_JTMWG | six_JTMWG |  0.9 | 0.19 | 0.12 | 22.22 |   6.6 | 23.23 |  9000 | 38000 | 36000 | Rooney | f     | f     | t
+ 4000        | Wed Sep 11 10:00:00.8 2013 |   28 |   29 |   30 |   31 | one_EHVID | two_EHVID | three_EHVID | four_EHVID | five_EHVID | six_EHVID |  0.4 |  0.7 | 0.21 |   8.8 |   3.3 |  20.2 |  4000 | 14000 | 63000 | Rooney | t     | f     | f
+ 5000        | Wed Sep 11 10:00:00.9 2013 |   29 |   30 |   31 |   32 | one_WJNKA | two_WJNKA | three_WJNKA | four_WJNKA | five_WJNKA | six_WJNKA | 0.22 |  0.9 | 0.13 |  10.1 |     0 | 12.12 | 22000 | 18000 | 39000 | Rooney | t     | f     | f
+(10 rows)
+
+DROP EXTERNAL TABLE writable_recordkey_text;
+DROP EXTERNAL TABLE read_recordkey_text;
+--
+-- 12.2 recordkey of type int (one row with error)
+-- 
+CREATE WRITABLE EXTERNAL TABLE writable_recordkey_int(recordkey int,
+                                                      tmp1  timestamp, 
+                                                      num1  integer, 
+                                                      num2  integer, 
+                                                      num3  integer, 
+                                                      num4  integer,
+                                                      t1    text, 
+                                                      t2    text, 
+                                                      t3    text, 
+                                                      t4    text, 
+                                                      t5    text, 
+                                                      t6    text, 
+                                                      dub1  double precision, 
+                                                      dub2  double precision, 
+                                                      dub3  double precision, 
+                                                      ft1   real, 
+                                                      ft2   real, 
+                                                      ft3   real, 
+                                                      ln1   bigint, 
+                                                      ln2   bigint, 
+                                                      ln3   bigint, 
+                                                      bt    bytea,
+                                                      bool1 boolean,
+			             		    		          bool2 boolean,
+                                                      bool3 boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/recordkey_int?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_export');
+COPY writable_recordkey_int FROM '@abs_srcdir@/data/pxf/customwritable_recordkey_data.txt'
+SEGMENT REJECT LIMIT 5 ROWS;
+--
+-- Test data was written
+--
+\! ${HADOOP_ROOT}/bin/hdfs dfs -ls /gpdb_regression_data/writable/recordkey_int | grep Found | awk '{ if ($2>0) print "ok";}'
+ok
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du -s /gpdb_regression_data/writable/recordkey_int | awk '{ if ($1>0) print "ok";}'
+ok
+\! ${HADOOP_ROOT}/bin/hdfs dfs -du /gpdb_regression_data/writable/recordkey_int | awk '{if ($1<=0) print $0,": error";}'
+--
+-- Read data
+--
+CREATE READABLE EXTERNAL TABLE read_recordkey_int (LIKE writable_recordkey_int)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/recordkey_int?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT * FROM read_recordkey_int ORDER BY num1;
+ recordkey |            tmp1             | num1 | num2 | num3 | num4 |    t1     |    t2     |     t3      |     t4     |     t5     |    t6     | dub1 | dub2 | dub3 |  ft1  |  ft2  |  ft3  |  ln1  |  ln2  |  ln3  |   bt   | bool1 | bool2 | bool3 
+-----------+-----------------------------+------+------+------+------+-----------+-----------+-------------+------------+------------+-----------+------+------+------+-------+-------+-------+-------+-------+-------+--------+-------+-------+-------
+      1000 | Wed Sep 11 10:00:00 2013    |   20 |   21 |   22 |   23 | one_EOTQT | two_EOTQT | three_EOTQT | four_EOTQT | five_EOTQT | six_EOTQT |  0.4 | 0.14 | 0.19 | 16.16 | 19.19 | 15.15 |  4000 | 28000 | 57000 | Rooney | t     | t     | f
+      3000 | Wed Sep 11 10:00:00.2 2013  |   22 |   23 |   24 |   25 | one_TQXCQ | two_TQXCQ | three_TQXCQ | four_TQXCQ | five_TQXCQ | six_TQXCQ | 0.19 | 0.16 | 0.23 |   2.2 | 16.16 |   1.1 | 19000 | 32000 | 69000 | Rooney | f     | t     | f
+      4000 | Wed Sep 11 10:00:00.3 2013  |   23 |   24 |   25 |   26 | one_JQLMU | two_JQLMU | three_JQLMU | four_JQLMU | five_JQLMU | six_JQLMU |  0.9 | 0.16 | 0.11 | 12.12 |  20.2 | 11.11 |  9000 | 32000 | 33000 | Rooney | f     | t     | f
+      5000 | Wed Sep 11 10:00:00.4 2013  |   24 |   25 |   26 |   27 | one_AYEUM | two_AYEUM | three_AYEUM | four_AYEUM | five_AYEUM | six_AYEUM |    0 | 0.24 |  0.4 |  20.2 | 12.12 | 23.23 |     0 | 48000 | 12000 | Rooney | t     | t     | t
+      1000 | Wed Sep 11 10:00:00.5 2013  |   25 |   26 |   27 |   28 | one_WQYWN | two_WQYWN | three_WQYWN | four_WQYWN | five_WQYWN | six_WQYWN | 0.22 | 0.16 | 0.24 | 22.22 | 13.13 | 24.24 | 22000 | 32000 | 72000 | Rooney | t     | t     | t
+      2000 | Wed Sep 11 10:00:00.6 2013  |   26 |   27 |   28 |   29 | one_FSRQP | two_FSRQP | three_FSRQP | four_FSRQP | five_FSRQP | six_FSRQP |  0.5 | 0.18 | 0.17 | 16.16 | 15.15 |   4.4 |  5000 | 36000 | 51000 | Rooney | f     | t     | f
+      3000 | Wed Sep 11 10:00:00.7 2013  |   27 |   28 |   29 |   30 | one_JTMWG | two_JTMWG | three_JTMWG | four_JTMWG | five_JTMWG | six_JTMWG |  0.9 | 0.19 | 0.12 | 22.22 |   6.6 | 23.23 |  9000 | 38000 | 36000 | Rooney | f     | f     | t
+      4000 | Wed Sep 11 10:00:00.8 2013  |   28 |   29 |   30 |   31 | one_EHVID | two_EHVID | three_EHVID | four_EHVID | five_EHVID | six_EHVID |  0.4 |  0.7 | 0.21 |   8.8 |   3.3 |  20.2 |  4000 | 14000 | 63000 | Rooney | t     | f     | f
+      5000 | Wed Sep 11 10:00:00.9 2013  |   29 |   30 |   31 |   32 | one_WJNKA | two_WJNKA | three_WJNKA | four_WJNKA | five_WJNKA | six_WJNKA | 0.22 |  0.9 | 0.13 |  10.1 |     0 | 12.12 | 22000 | 18000 | 39000 | Rooney | t     | f     | f
+      1000 | Wed Sep 11 10:00:00.1 2013  |   30 |   31 |   32 |   33 | one_WEKDV | two_WEKDV | three_WEKDV | four_WEKDV | five_WEKDV | six_WEKDV | 0.22 |  0.4 |  0.1 |   3.3 | 21.21 |   5.5 | 22000 |  8000 | 30000 | Rooney | t     | t     | t
+      2000 | Wed Sep 11 10:00:00.11 2013 |   31 |   32 |   33 |   34 | one_IUMGR | two_IUMGR | three_IUMGR | four_IUMGR | five_IUMGR | six_IUMGR |  0.8 |  0.2 | 0.12 |   6.6 | 17.17 | 22.22 |  8000 | 40000 | 36000 | Rooney | t     | t     | t
+      3000 | Wed Sep 11 10:00:00.12 2013 |   32 |   33 |   34 |   35 | one_LTTLN | two_LTTLN | three_LTTLN | four_LTTLN | five_LTTLN | six_LTTLN | 0.11 | 0.19 | 0.19 | 11.11 | 13.13 | 21.21 | 11000 | 38000 | 57000 | Rooney | f     | f     | f
+      4000 | Wed Sep 11 10:00:00.13 2013 |   33 |   34 |   35 |   36 | one_VLYAA | two_VLYAA | three_VLYAA | four_VLYAA | five_VLYAA | six_VLYAA | 0.21 | 0.11 | 0.24 |     0 |     0 |   3.3 | 21000 | 22000 | 72000 | Rooney | f     | f     | t
+      5000 | Wed Sep 11 10:00:00.14 2013 |   34 |   35 |   36 |   37 | one_UGDHB | two_UGDHB | three_UGDHB | four_UGDHB | five_UGDHB | six_UGDHB |  0.2 |  0.6 |  0.3 |   7.7 |   1.1 | 14.14 | 20000 | 12000 |  9000 | Rooney | t     | t     | f
+      1000 | Wed Sep 11 10:00:00.15 2013 |   35 |   36 |   37 |   38 | one_CVYVA | two_CVYVA | three_CVYVA | four_CVYVA | five_CVYVA | six_CVYVA |  0.2 | 0.21 | 0.24 | 21.21 |     0 | 22.22 |  2000 | 42000 | 72000 | Rooney | t     | f     | t
+      2000 | Wed Sep 11 10:00:00.16 2013 |   36 |   37 |   38 |   39 | one_ECGCH | two_ECGCH | three_ECGCH | four_ECGCH | five_ECGCH | six_ECGCH |  0.4 |  0.2 |  0.6 |   2.2 |   7.7 | 19.19 |  4000 |  4000 | 18000 | Rooney | t     | t     | t
+      3000 | Wed Sep 11 10:00:00.17 2013 |   37 |   38 |   39 |   40 | one_JVUBP | two_JVUBP | three_JVUBP | four_JVUBP | five_JVUBP | six_JVUBP |  0.9 | 0.21 |  0.2 |   1.1 | 15.15 |   8.8 |  9000 | 42000 | 60000 | Rooney | f     | f     | t
+      4000 | Wed Sep 11 10:00:00.18 2013 |   38 |   39 |   40 |   41 | one_UXNTF | two_UXNTF | three_UXNTF | four_UXNTF | five_UXNTF | six_UXNTF |  0.2 | 0.23 | 0.13 | 19.19 |   5.5 | 15.15 | 20000 | 46000 | 39000 | Rooney | t     | f     | f
+      5000 | Wed Sep 11 10:00:00.19 2013 |   39 |   40 |   41 |   42 | one_BILBB | two_BILBB | three_BILBB | four_BILBB | five_BILBB | six_BILBB |  0.1 |  0.8 | 0.11 |   1.1 |   1.1 | 23.23 |  1000 | 16000 | 33000 | Rooney | f     | t     | f
+      1000 | Wed Sep 11 10:00:00.2 2013  |   40 |   41 |   42 |   43 | one_LYBPI | two_LYBPI | three_LYBPI | four_LYBPI | five_LYBPI | six_LYBPI | 0.11 | 0.24 |  0.1 | 15.15 |   8.8 |  10.1 | 11000 | 48000 |  3000 | Rooney | f     | t     | f
+      2000 | Wed Sep 11 10:00:00.21 2013 |   41 |   42 |   43 |   44 | one_BYHRC | two_BYHRC | three_BYHRC | four_BYHRC | five_BYHRC | six_BYHRC |  0.1 | 0.24 |  0.7 | 17.17 |   2.2 | 14.14 |  1000 | 48000 | 21000 | Rooney | f     | t     | f
+      3000 | Wed Sep 11 10:00:00.22 2013 |   42 |   43 |   44 |   45 | one_TVIWR | two_TVIWR | three_TVIWR | four_TVIWR | five_TVIWR | six_TVIWR | 0.19 | 0.21 |  0.8 | 22.22 | 17.17 | 14.14 | 19000 | 42000 | 24000 | Rooney | f     | f     | t
+      4000 | Wed Sep 11 10:00:00.23 2013 |   43 |   44 |   45 |   46 | one_FQQNX | two_FQQNX | three_FQQNX | four_FQQNX | five_FQQNX | six_FQQNX |  0.5 | 0.16 | 0.16 | 13.13 | 23.23 | 13.13 |  5000 | 32000 | 48000 | Rooney | f     | t     | t
+      5000 | Wed Sep 11 10:00:00.24 2013 |   44 |   45 |   46 |   47 | one_VBJSK | two_VBJSK | three_VBJSK | four_VBJSK | five_VBJSK | six_VBJSK | 0.21 |  0.1 |  0.9 | 18.18 |  10.1 | 24.24 | 21000 |  2000 | 27000 | Rooney | f     | f     | f
+      1000 | Wed Sep 11 10:00:00.25 2013 |   45 |   46 |   47 |   48 | one_YJAEA | two_YJAEA | three_YJAEA | four_YJAEA | five_YJAEA | six_YJAEA | 0.24 |  0.9 |    0 |   4.4 |     0 | 12.12 | 24000 | 18000 |     0 | Rooney | t     | f     | t
+      2000 | Wed Sep 11 10:00:00.26 2013 |   46 |   47 |   48 |   49 | one_DDQJA | two_DDQJA | three_DDQJA | four_DDQJA | five_DDQJA | six_DDQJA |  0.3 |  0.3 | 0.16 |   9.9 |     0 | 14.14 |  3000 |  6000 | 48000 | Rooney | f     | f     | t
+      3000 | Wed Sep 11 10:00:00.27 2013 |   47 |   48 |   49 |   50 | one_DEPMQ | two_DEPMQ | three_DEPMQ | four_DEPMQ | five_DEPMQ | six_DEPMQ |  0.3 |  0.4 | 0.15 | 12.12 | 16.16 | 13.13 |  3000 |  8000 | 45000 | Rooney | f     | t     | f
+      4000 | Wed Sep 11 10:00:00.28 2013 |   48 |   49 |   50 |   51 | one_JYUTQ | two_JYUTQ | three_JYUTQ | four_JYUTQ | five_JYUTQ | six_JYUTQ |  0.9 | 0.24 |  0.2 | 19.19 | 16.16 |  10.1 |  9000 | 48000 | 60000 | Rooney | f     | t     | t
+      5000 | Wed Sep 11 10:00:00.29 2013 |   49 |   50 |   51 |   52 | one_CWHMI | two_CWHMI | three_CWHMI | four_CWHMI | five_CWHMI | six_CWHMI |  0.2 | 0.22 |  0.7 | 12.12 |   8.8 |     0 |  2000 | 44000 | 21000 | Rooney | t     | t     | f
+      1000 | Wed Sep 11 10:00:00.3 2013  |   50 |   51 |   52 |   53 | one_YORNW | two_YORNW | three_YORNW | four_YORNW | five_YORNW | six_YORNW | 0.24 | 0.14 | 0.17 | 13.13 | 22.22 | 13.13 | 24000 | 28000 | 51000 | Rooney | t     | t     | f
+      2000 | Wed Sep 11 10:00:00.31 2013 |   51 |   52 |   53 |   54 | one_CUBYA | two_CUBYA | three_CUBYA | four_CUBYA | five_CUBYA | six_CUBYA |  0.2 |  0.2 |  0.1 | 24.24 |     0 |  10.1 |  2000 | 40000 |  3000 | Rooney | t     | t     | f
+      3000 | Wed Sep 11 10:00:00.32 2013 |   52 |   53 |   54 |   55 | one_MJMOO | two_MJMOO | three_MJMOO | four_MJMOO | five_MJMOO | six_MJMOO | 0.12 |  0.9 | 0.12 | 14.14 | 14.14 | 21.21 | 12000 | 18000 | 36000 | Rooney | t     | f     | t
+      4000 | Wed Sep 11 10:00:00.33 2013 |   53 |   54 |   55 |   56 | one_MWONL | two_MWONL | three_MWONL | four_MWONL | five_MWONL | six_MWONL | 0.12 | 0.22 | 0.14 | 13.13 | 11.11 | 21.21 | 12000 | 44000 | 42000 | Rooney | t     | t     | t
+      5000 | Wed Sep 11 10:00:00.34 2013 |   54 |   55 |   56 |   57 | one_CNSEO | two_CNSEO | three_CNSEO | four_CNSEO | five_CNSEO | six_CNSEO |  0.2 | 0.13 | 0.18 |   4.4 | 14.14 |   1.1 |  2000 | 26000 | 54000 | Rooney | t     | f     | t
+      1000 | Wed Sep 11 10:00:00.35 2013 |   55 |   56 |   57 |   58 | one_VKHHV | two_VKHHV | three_VKHHV | four_VKHHV | five_VKHHV | six_VKHHV | 0.21 |  0.1 |  0.7 |   7.7 | 21.21 | 11.11 | 21000 | 20000 | 21000 | Rooney | f     | t     | f
+      2000 | Wed Sep 11 10:00:00.36 2013 |   56 |   57 |   58 |   59 | one_PJIDF | two_PJIDF | three_PJIDF | four_PJIDF | five_PJIDF | six_PJIDF | 0.15 |  0.9 |  0.8 |   3.3 |   5.5 |     0 | 15000 | 18000 | 24000 | Rooney | f     | f     | t
+      3000 | Wed Sep 11 10:00:00.37 2013 |   57 |   58 |   59 |   60 | one_RUOOK | two_RUOOK | three_RUOOK | four_RUOOK | five_RUOOK | six_RUOOK | 0.17 |  0.2 | 0.14 | 14.14 |  10.1 | 17.17 | 17000 | 40000 | 42000 | Rooney | f     | t     | t
+      4000 | Wed Sep 11 10:00:00.38 2013 |   58 |   59 |   60 |   61 | one_ILTSU | two_ILTSU | three_ILTSU | four_ILTSU | five_ILTSU | six_ILTSU |  0.8 | 0.11 | 0.19 | 18.18 |  20.2 | 12.12 |  8000 | 22000 | 57000 | Rooney | t     | f     | f
+      5000 | Wed Sep 11 10:00:00.39 2013 |   59 |   60 |   61 |   62 | one_EOHVJ | two_EOHVJ | three_EOHVJ | four_EOHVJ | five_EOHVJ | six_EOHVJ |  0.4 | 0.14 |  0.7 | 21.21 |   9.9 | 18.18 |  4000 | 28000 | 21000 | Rooney | t     | t     | f
+      1000 | Wed Sep 11 10:00:00.4 2013  |   60 |   61 |   62 |   63 | one_DRSIN | two_DRSIN | three_DRSIN | four_DRSIN | five_DRSIN | six_DRSIN |  0.3 | 0.17 | 0.18 |   8.8 | 13.13 | 14.14 |  3000 | 34000 | 54000 | Rooney | f     | f     | t
+      2000 | Wed Sep 11 10:00:00.41 2013 |   61 |   62 |   63 |   64 | one_GPYML | two_GPYML | three_GPYML | four_GPYML | five_GPYML | six_GPYML |  0.6 | 0.15 | 0.24 | 12.12 | 11.11 |   4.4 |  6000 | 30000 | 72000 | Rooney | t     | f     | t
+      3000 | Wed Sep 11 10:00:00.42 2013 |   62 |   63 |   64 |   65 | one_KAOII | two_KAOII | three_KAOII | four_KAOII | five_KAOII | six_KAOII |  0.1 |    0 | 0.14 |   8.8 |   8.8 | 24.24 | 10000 |     0 | 42000 | Rooney | t     | t     | t
+      4000 | Wed Sep 11 10:00:00.43 2013 |   63 |   64 |   65 |   66 | one_URTKF | two_URTKF | three_URTKF | four_URTKF | five_URTKF | six_URTKF |  0.2 | 0.17 | 0.19 |  10.1 |   5.5 | 21.21 | 20000 | 34000 | 57000 | Rooney | t     | f     | f
+      5000 | Wed Sep 11 10:00:00.44 2013 |   64 |   65 |   66 |   67 | one_DBUOB | two_DBUOB | three_DBUOB | four_DBUOB | five_DBUOB | six_DBUOB |  0.3 |  0.1 |  0.2 | 14.14 |   1.1 |     0 |  3000 |  2000 | 60000 | Rooney | f     | f     | t
+      1000 | Wed Sep 11 10:00:00.45 2013 |   65 |   66 |   67 |   68 | one_EEUAJ | two_EEUAJ | three_EEUAJ | four_EEUAJ | five_EEUAJ | six_EEUAJ |  0.4 |  0.4 |  0.2 |     0 |   9.9 |  20.2 |  4000 |  8000 | 60000 | Rooney | t     | t     | t
+      2000 | Wed Sep 11 10:00:00.46 2013 |   66 |   67 |   68 |   69 | one_CBMVO | two_CBMVO | three_CBMVO | four_CBMVO | five_CBMVO | six_CBMVO |  0.2 |  0.1 | 0.12 | 21.21 | 14.14 | 15.15 |  2000 |  2000 | 36000 | Rooney | t     | f     | t
+      3000 | Wed Sep 11 10:00:00.47 2013 |   67 |   68 |   69 |   70 | one_NTVNO | two_NTVNO | three_NTVNO | four_NTVNO | five_NTVNO | six_NTVNO | 0.13 | 0.19 | 0.21 | 13.13 | 14.14 | 23.23 | 13000 | 38000 | 63000 | Rooney | f     | f     | f
+      4000 | Wed Sep 11 10:00:00.48 2013 |   68 |   69 |   70 |   71 | one_SQTAA | two_SQTAA | three_SQTAA | four_SQTAA | five_SQTAA | six_SQTAA | 0.18 | 0.16 | 0.19 |     0 |     0 |  20.2 | 18000 | 32000 | 57000 | Rooney | t     | t     | f
+      5000 | Wed Sep 11 10:00:00.49 2013 |   69 |   70 |   71 |   72 | one_LVLWW | two_LVLWW | three_LVLWW | four_LVLWW | five_LVLWW | six_LVLWW | 0.11 | 0.21 | 0.11 | 22.22 | 22.22 |   9.9 | 11000 | 42000 | 33000 | Rooney | f     | f     | f
+(49 rows)
+
+DROP EXTERNAL TABLE writable_recordkey_int;
+DROP EXTERNAL TABLE read_recordkey_int;
+--
 -- Cleanup: delete all data that was written into hdfs
 --
 -- start_ignore

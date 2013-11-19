@@ -10,7 +10,7 @@ import com.pivotal.pxf.hadoop.io.GPDBWritable.TypeMismatchException;
 public class GPDBWritableMapper {
 
 	private GPDBWritable gpdbWritable;
-	private String type;
+	private int type;
 	private DataGetter getter = null;
 	
 	public GPDBWritableMapper(GPDBWritable gpdbWritable)
@@ -18,46 +18,86 @@ public class GPDBWritableMapper {
 		this.gpdbWritable = gpdbWritable;
 	}
 	
-	public void setDataType(String type) throws UnsupportedTypeException
-	{
-		this.type = type;
-
+	public static int convertJavaToGPDBType(String type) {
+		
 		if ((type.compareTo("boolean") == 0) || (type.compareTo("[Z") == 0))
 		{
-			getter = new BooleanDataGetter();
+			return GPDBWritable.BOOLEAN;
 		}
 		else if ((type.compareTo("int") == 0) || (type.compareTo("[I") == 0))
 		{
-			getter = new IntDataGetter();
+			return GPDBWritable.INTEGER;
 		}
 		else if ((type.compareTo("double") == 0) || (type.compareTo("[D") == 0))
 		{
-			getter = new DoubleDataGetter();
+			return GPDBWritable.FLOAT8;
 		}
 		else if ((type.compareTo("java.lang.String") == 0) || 
 				 (type.compareTo("[Ljava.lang.String;") == 0))
 		{
-			getter = new StringDataGetter();
+			return GPDBWritable.TEXT;
 		}
 		else if ((type.compareTo("float") == 0) || (type.compareTo("[F") == 0))
 		{
-			getter = new FloatDataGetter();
+			return GPDBWritable.REAL;
+
 		}
 		else if ((type.compareTo("long") == 0) || (type.compareTo("[J") == 0))
 		{
-			getter = new LongDataGetter();
+			return GPDBWritable.BIGINT;
 		}
 		else if (type.compareTo("[B") == 0)
 		{
-			getter = new BytesDataGetter();
+			return GPDBWritable.BYTEA;
 		}
 		else if ((type.compareTo("short") == 0) || (type.compareTo("[S") == 0)) 
 		{
-			getter = new ShortDataGetter();
+			return GPDBWritable.SMALLINT;
 		}
 		else 
 		{
 			throw new UnsupportedTypeException("Type " + type + " is not supported by GPDBWritable");
+		}
+	}
+	
+	public void setDataType(String javaType) throws UnsupportedTypeException {
+		int type = convertJavaToGPDBType(javaType);
+		setDataType(type);
+	}
+	
+	public void setDataType(int type) throws UnsupportedTypeException
+	{
+		this.type = type;
+		
+		switch (type) {
+		case GPDBWritable.BOOLEAN  : 
+			getter = new BooleanDataGetter();
+			break;
+		case GPDBWritable.BYTEA	   : 
+			getter = new BytesDataGetter();
+			break;
+		case GPDBWritable.BIGINT   : 
+			getter = new LongDataGetter();
+			break;
+		case GPDBWritable.SMALLINT : 
+			getter = new ShortDataGetter();
+			break;
+		case GPDBWritable.INTEGER  : 
+			getter = new IntDataGetter();
+			break;
+		case GPDBWritable.TEXT     : 
+			getter = new StringDataGetter();
+			break;
+		case GPDBWritable.REAL     : 
+			getter = new FloatDataGetter();
+			break;
+		case GPDBWritable.FLOAT8   : 
+			getter = new DoubleDataGetter();
+			break;
+		default:
+			throw new UnsupportedTypeException(
+					"Type " + GPDBWritable.getTypeName(type) + 
+					" is not supported by GPDBWritable");
 		}
 	}
 	
@@ -137,12 +177,12 @@ public class GPDBWritableMapper {
 	
 	public String toString() 
 	{
-		return "getter type = " + type;
+		return "getter type = " + GPDBWritable.getTypeName(type);
 	}
 	
-	public static boolean isArray(String type)
+	public static boolean isArray(String javaType)
 	{
-		return ((type.startsWith("[") && (type.compareTo("[B") != 0)));
+		return ((javaType.startsWith("[") && (javaType.compareTo("[B") != 0)));
 	}
 	
 }

@@ -12,8 +12,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.SequenceFile;
-import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.SequenceFile.CompressionType;
+import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
@@ -37,7 +37,7 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements 
 	private CompressionCodec codec;
 	private CompressionType compressionType;
 	private SequenceFile.Writer writer;
-	private LongWritable key;
+	private LongWritable defaultKey; // used when recordkey is not defined
 
 	private Log Log;
 
@@ -49,7 +49,7 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements 
 	{
 
 		super(input,
-		      new SequenceFileInputFormat<LongWritable, Writable>());
+		      new SequenceFileInputFormat<Writable, Writable>());
 
 		Log = LogFactory.getLog(SequenceFileAccessor.class);		
 	}
@@ -77,7 +77,7 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements 
 		file = new Path(fileName);
 		fs = file.getFileSystem(conf);
 		fc = FileContext.getFileContext();
-		key = new LongWritable(inputData.segmentId());
+		defaultKey = new LongWritable(inputData.segmentId());
 
 		if (fs.exists(file))
 		{
@@ -146,20 +146,23 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements 
 	
 	public boolean writeNextObject(OneRow onerow) throws IOException 
 	{
+		Writable value = (Writable) onerow.getData();
+		Writable key = (Writable) onerow.getKey();
+		
 		// init writer on first approach here, based on onerow.getData type
 		// TODO: verify data is serializable.
 		if (writer == null)
 		{
-			Class valueClass = onerow.getData().getClass();
+			Class valueClass = value.getClass();
+			Class keyClass = (key == null) ? LongWritable.class : key.getClass();
 			// create writer - do not allow overwriting existing file
-			writer = SequenceFile.createWriter(fc, conf, file, LongWritable.class, valueClass, 
+			writer = SequenceFile.createWriter(fc, conf, file, keyClass, valueClass, 
 					compressionType, codec, new SequenceFile.Metadata(), EnumSet.of(CreateFlag.CREATE));
-		}    
-
-		Writable writable = (Writable) onerow.getData();		
+		}
+		
 		try 
 		{
-			writer.append(key, writable);
+			writer.append((key == null) ? defaultKey : key, value);
 		} catch (IOException e) 
 		{
 			Log.error("Failed to write data to file: " + e.getMessage());
