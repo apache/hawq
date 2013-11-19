@@ -4753,7 +4753,7 @@ map_part_attrs(Relation base, Relation part, AttrMap **map_ptr, bool throw)
 								RelationGetRelationName(part),
 								RelationGetRelationName(base)),
 						 errOmitLocation(true)));
-			is_compatible = FALSE;
+			compatible = FALSE;
 			break;
 		}
 
@@ -4766,7 +4766,7 @@ map_part_attrs(Relation base, Relation part, AttrMap **map_ptr, bool throw)
 						 errmsg("type mismatch for attribute \"%s\"",
 								NameStr((battr->attname))),
 						 errOmitLocation(true)));
-			is_compatible = FALSE;
+			compatible = FALSE;
 			break;
 		}
 
@@ -4779,7 +4779,7 @@ map_part_attrs(Relation base, Relation part, AttrMap **map_ptr, bool throw)
 						 errmsg("alignment mismatch for attribute \"%s\"",
 								NameStr((battr->attname))),
 						 errOmitLocation(true)));
-			is_compatible = FALSE;
+			compatible = FALSE;
 			break;
 		}
 
@@ -4819,7 +4819,7 @@ map_part_attrs(Relation base, Relation part, AttrMap **map_ptr, bool throw)
 									RelationGetRelationName(part),
 									RelationGetRelationName(base)),
 							 errOmitLocation(true)));
-				is_compatible = FALSE;
+				compatible = FALSE;
 			}
 		}
 
@@ -4836,7 +4836,7 @@ map_part_attrs(Relation base, Relation part, AttrMap **map_ptr, bool throw)
 									RelationGetRelationName(part),
 									RelationGetRelationName(base)),
 							 errOmitLocation(true)));
-				is_compatible = FALSE;
+				compatible = FALSE;
 			}
 		}
 	}
@@ -4844,7 +4844,7 @@ map_part_attrs(Relation base, Relation part, AttrMap **map_ptr, bool throw)
 	/* Identical tuple descriptors should have the same number of columns */
 	if (n != m)
 	{
-		is_identical = FALSE;
+		identical = FALSE;
 	}
 	
 	if ( !compatible )
@@ -4857,7 +4857,7 @@ map_part_attrs(Relation base, Relation part, AttrMap **map_ptr, bool throw)
 	}
 
 	/* If parent and part are the same, don't use a map */
-	if ( is_identical && v != NULL )
+	if ( identical && v != NULL )
 	{
 		pfree(v);
 		v = NULL;

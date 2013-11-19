@@ -179,7 +179,7 @@ void PerformSharedStorageOpTasks(SharedStorageOpTasks *tasks)
 	stat->numTasks = j;
 
 	CloseQueryContextInfo(q->contextdisp);
-	serializedQuerytree = serializeNode((Node *) q, &serializedQuerytree_len);
+	serializedQuerytree = serializeNode((Node *) q, &serializedQuerytree_len, NULL /*uncompressed_size_out*/);
 	Assert(serializedQuerytree != NULL);
 	hash_destroy(htab);
 

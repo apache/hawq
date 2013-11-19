@@ -5700,6 +5700,7 @@ static struct config_int ConfigureNamesInt[] =
 		43200000, 0, INT_MAX, NULL, NULL
 	},
 
+	{
 		{"optimizer_segments", PGC_USERSET, QUERY_TUNING_METHOD,
             gettext_noop("Number of segments to be considered by the optimizer during costing, or 0 to take the actual number of segments."),
             NULL,

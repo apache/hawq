@@ -1292,8 +1292,7 @@ increment_command_count()
 	{
 		ereport(LOG,
 				(errmsg("Incrementing command count from %d to %d",
-						gp_command_count, gp_command_count+1),
-						errprintstack(true)));
+						gp_command_count, gp_command_count+1)));
 	}
 
 	gp_command_count++;

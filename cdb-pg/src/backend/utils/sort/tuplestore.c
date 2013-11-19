@@ -680,7 +680,7 @@ tuplestore_gettuple(Tuplestorestate *state, TuplestorePos *pos, bool forward,
 
 			insist_log(false, "Backward scanning of tuplestores are not supported at this time");
 
-			if (BufFileSeek(state->myfile, -(long) sizeof(uint32) /* offset */,
+			if (BufFileSeek(state->myfile, 0, -(long) sizeof(uint32) /* offset */,
 							SEEK_CUR) != 0)
 				return NULL;
 			tuplen = getlen(state, pos, false);

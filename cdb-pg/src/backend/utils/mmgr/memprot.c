@@ -34,7 +34,6 @@
 #include "utils/debugbreak.h"
 #include "utils/faultinjection.h" 
 #include "utils/simex.h"
-#include "utils/workfile_mgr.h"
 
 #ifndef HAVE_UNION_SEMUN
 union semun
@@ -111,12 +110,6 @@ static uint64 ConvertMBToBytes(int value_mb);
 static int gpsema_vmem_prot_max;
 static int gp_memprot_chunksize_shift = 20; 
 
-/*
- * A derived parameter from gp_vmem_limit_per_query in chunks unit,
- * considering the current chunk size
- */
-int max_chunks_per_query = 0;
-
 /* total allocation in bytes */
 static volatile int64 mop_bytes;         /* bytes allocated */
 static volatile int mop_hld_cnt;          /* mop hold counter */
@@ -158,11 +151,6 @@ int64 getMOPHighWaterMark(void)
 {
     int64 hwm = mop_add_hld_cnt(0);
     return hwm << gp_memprot_chunksize_shift;
-}
-
-int getMOPChunksReserved(void)
-{
-    return mop_add_hld_cnt(0);
 }
 
 static bool gp_mp_inited = false;
@@ -209,12 +197,6 @@ void GPMemoryProtectInit()
             gpsema_vmem_prot_max >>= 1;
         }
 
-        /*
-         * gp_vmem_limit_per_query is in kB. So, first convert it to MB, and then shift it
-         * to adjust for cases where we enlarged our chunk size
-         */
-        max_chunks_per_query = ceil(gp_vmem_limit_per_query / (1024.0 * (1 << (gp_memprot_chunksize_shift - 20))));
-
 #ifdef USE_TEST_UTILS
         PGSemaphoreCreateInitVal(&gpsema_vmem_prot, gpsema_vmem_prot_max);
         PGSemaphoreCreateInitVal(&gpsema_mp_fault, gpsema_vmem_prot_max);
@@ -247,10 +229,8 @@ void GPMemoryProtectInit()
  *
  * FIX ERROR HANDLER!
  */
-#define MOP_FAIL_REACHED_LIMIT 				1
-#define MOP_FAIL_SYSTEM        				2
-/* Reached per-query memory limit */
-#define MOP_FAIL_REACHED_QUERY_LIMIT		3
+#define MOP_FAIL_REACHED_LIMIT 1
+#define MOP_FAIL_SYSTEM        2
 
 static bool is_main_thread()
 {
@@ -285,23 +265,6 @@ static void gp_failed_to_alloc(int ec, int en, int sz, int availmb)
         else
         {
             write_log("Out of memory: Hit VM Protect limit");
-        }
-    }
-    else if (ec == MOP_FAIL_REACHED_QUERY_LIMIT)
-    {
-        if(is_main_thread())
-        {
-            /* Hit MOP limit */
-            ereport(ERROR, (errcode(ERRCODE_GP_MEMPROT_KILL),
-                        errmsg("Out of memory"),
-                        errdetail("Per-query VM protect limit reached: current limit is %d kB, requested %d bytes, available %d MB",
-                        		gp_vmem_limit_per_query, sz, availmb
-                            )
-                        ));
-        }
-        else
-        {
-            write_log("Out of memory: Hit per-query VM protect limit");
         }
     }
     else if (ec == MOP_FAIL_SYSTEM)
@@ -367,14 +330,6 @@ static void *gp_malloc_internal(int64 sz1, int64 sz2, bool ismalloc)
 
 		if(mem_avail >= need_chunk)
         {
-			bool query_mem_success = PerQueryMemory_ReserveChunks(need_chunk);
-
-			if (!query_mem_success)
-			{
-	            gp_failed_to_alloc(MOP_FAIL_REACHED_QUERY_LIMIT, 0, sz, (max_chunks_per_query - PerQueryMemory_TotalChunksReserved()) << (gp_memprot_chunksize_shift - 20));
-	            return NULL;
-			}
-
 			err_code = gpmemprot_down_sem(&gpsema_vmem_prot, need_chunk, true);
 
 		    if(err_code != 0)
@@ -486,14 +441,6 @@ void *gp_realloc(void *ptr, int64 sz, int64 newsz)
 
 				if(mem_avail >= need_chunk)
                 {
-					bool query_mem_success = PerQueryMemory_ReserveChunks(need_chunk);
-
-					if (!query_mem_success)
-					{
-			            gp_failed_to_alloc(MOP_FAIL_REACHED_QUERY_LIMIT, 0, sz, (max_chunks_per_query - PerQueryMemory_TotalChunksReserved()) << (gp_memprot_chunksize_shift - 20));
-			            return NULL;
-					}
-
 					err_code = gpmemprot_down_sem(&gpsema_vmem_prot, need_chunk, true);
 				    if(err_code != 0)
                     {

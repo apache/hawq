@@ -60,6 +60,7 @@ typedef struct
 		indexed_tlist *inner_itlist;
 		Index		skip_rel;
 		int			rtoffset;
+		bool use_outer_tlist_for_matching_nonvars;
 	} fix_join_expr_context;
 
 typedef struct

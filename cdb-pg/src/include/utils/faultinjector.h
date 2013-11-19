@@ -181,7 +181,6 @@ typedef enum FaultInjectorIdentifier_e {
 
 	DispatchToGangThreadStructureInitialization,
 
-	FaultDuringExecDynamicTableScan,
 	ExecSortBeforeSorting,
 	ExecSortMKSortMergeRuns,
 
