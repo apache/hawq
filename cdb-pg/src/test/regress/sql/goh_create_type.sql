@@ -7,7 +7,8 @@
 -- prior shell-type creation.  These commands therefore complete a test
 -- of the "old style" approach of making the functions first.
 --
-
+drop database hdfs;
+create database hdfs;
 \c hdfs
 
 CREATE TYPE widget (
