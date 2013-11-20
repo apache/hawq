@@ -40,6 +40,7 @@
             <fragmenter>HdfsDataFragmenter</fragmenter>
             <accessor>LineBreakAccessor</accessor>
             <resolver>StringPassResolver</resolver>
+            <analyzer>HdfsAnalyzer</analyzer>
         </plugins>
     </profile>
     <profile>
@@ -51,6 +52,7 @@
             <fragmenter>HdfsDataFragmenter</fragmenter>
             <accessor>QuotedLineBreakAccessor</accessor>
             <resolver>StringPassResolver</resolver>
+            <analyzer>HdfsAnalyzer</analyzer>
         </plugins>
     </profile>
     <profile>
@@ -60,6 +62,7 @@
             <fragmenter>HdfsDataFragmenter</fragmenter>
             <accessor>AvroFileAccessor</accessor>
             <resolver>AvroResolver</resolver>
+            <analyzer>HdfsAnalyzer</analyzer>
         </plugins>
     </profile>
     <profile>

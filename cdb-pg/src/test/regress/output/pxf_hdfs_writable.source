@@ -1123,7 +1123,7 @@ SELECT COUNT(*) FROM pg_class WHERE relname = 'writable_analyze_no_analyzer' AND
 CREATE WRITABLE EXTERNAL TABLE writable_analyze_with_analyzer(s1 text, 
                                		                          n1 int, 
 							   		                          n2 int)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/analyze/analyzer?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver&ANLYZER=HdfsAnalyzer')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/analyze/analyzer?PROFILE=HdfsTextSimple')
 FORMAT 'TEXT';
 ANALYZE writable_analyze_with_analyzer;
 SELECT COUNT(*) FROM pg_class WHERE relname = 'writable_analyze_with_analyzer' AND relpages = 1 AND reltuples = 0;

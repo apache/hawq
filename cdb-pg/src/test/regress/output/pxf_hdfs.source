@@ -1063,7 +1063,7 @@ CREATE EXTERNAL TABLE avfav_analyze_good(tmp1 timestamp,
                             ln2   bigint, 
                             ln3   bigint, 
                             bt    bytea)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/avroformat_inside_avrofile.avro?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=AvroFileAccessor&RESOLVER=AvroResolver&ANALYZER=HdfsAnalyzer')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/avroformat_inside_avrofile.avro?PROFILE=Avro')
 FORMAT 'custom' (formatter='pxfwritable_import');
 -- Table that points to a wrong port.
 CREATE EXTERNAL TABLE avfav_analyze_bad_port(tmp1 timestamp, 
@@ -1087,7 +1087,7 @@ CREATE EXTERNAL TABLE avfav_analyze_bad_port(tmp1 timestamp,
                             ln2   bigint, 
                             ln3   bigint, 
                             bt    bytea)
-LOCATION ('pxf://@hostname@:12345/gpdb_regression_data/avroformat_inside_avrofile.avro?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=AvroFileAccessor&RESOLVER=AvroResolver&ANALYZER=HdfsAnalyzer')
+LOCATION ('pxf://@hostname@:12345/gpdb_regression_data/avroformat_inside_avrofile.avro?PROFILE=Avro')
 FORMAT 'custom' (formatter='pxfwritable_import');
 -- Table that points to a wrong analyzer class.
 CREATE EXTERNAL TABLE avfav_analyze_bad_class(tmp1 timestamp, 
