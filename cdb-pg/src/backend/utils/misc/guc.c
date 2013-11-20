@@ -3665,7 +3665,7 @@ static struct config_bool ConfigureNamesBool[] =
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
 		&optimizer_analyze_root_partition,
-		false, NULL, NULL
+		true, NULL, NULL
 	},
 
 	{
