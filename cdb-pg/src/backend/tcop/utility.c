@@ -512,7 +512,6 @@ check_xact_readonly(Node *parsetree)
 		case T_CreateSeqStmt:
 		case T_CreateExternalStmt:
 		case T_CreateFileSpaceStmt:
-		case T_AlterFileSpaceStmt:
 		case T_CreateTableSpaceStmt:
 		case T_CreateTrigStmt:
 		case T_CompositeTypeStmt:
@@ -983,10 +982,6 @@ ProcessUtility(Node *parsetree,
 			
 		case T_CreateFileSpaceStmt:
 			CreateFileSpace((CreateFileSpaceStmt *) parsetree);
-			break;
-
-		case T_AlterFileSpaceStmt:
-			AlterFilespaceSetLocation((AlterFileSpaceStmt *) parsetree);
 			break;
 
 		case T_CreateTableSpaceStmt:
@@ -2669,11 +2664,6 @@ CreateCommandTag(Node *parsetree)
 		case T_AlterTypeStmt:
 			tag = "ALTER TYPE";
 			break;
-
-		case T_AlterFileSpaceStmt:
-			tag = "ALTER FILESPACE";
-			break;
-
 		default:
 			Assert(false);
 			elog(WARNING, "unrecognized node type: %d",
@@ -2749,7 +2739,6 @@ GetCommandLogLevel(Node *parsetree)
 			break;
 
 		case T_CreateFileSpaceStmt:
-		case T_AlterFileSpaceStmt:
 			lev = LOGSTMT_DDL;
 			break;
 

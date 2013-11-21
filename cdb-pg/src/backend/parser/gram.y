@@ -195,7 +195,7 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 		GrantStmt GrantRoleStmt IndexStmt InsertStmt ListenStmt LoadStmt
 		LockStmt NotifyStmt OptSingleRowErrorHandling ExplainableStmt PreparableStmt
 		CreateFunctionStmt AlterFunctionStmt ReindexStmt RemoveAggrStmt
-		RemoveFuncStmt RemoveOperStmt AlterFileSpaceStmt RenameStmt RevokeStmt RevokeRoleStmt
+		RemoveFuncStmt RemoveOperStmt RenameStmt RevokeStmt RevokeRoleStmt
 		RuleActionStmt RuleActionStmtOrEmpty RuleStmt
 		SelectStmt TransactionStmt TruncateStmt
 		UnlistenStmt UpdateStmt VacuumStmt
@@ -1066,7 +1066,6 @@ stmt :
 			| RemoveAggrStmt
 			| RemoveFuncStmt
 			| RemoveOperStmt
-			| AlterFileSpaceStmt
 			| RenameStmt
 			| RevokeStmt
 			| RevokeRoleStmt
@@ -7303,22 +7302,6 @@ AlterTypeStmt: ALTER TYPE_P SimpleTypename SET DEFAULT ENCODING definition
 					$$ = (Node *)n;
 				}
 		;
-
-
-/*****************************************************************************
- *
- * ALTER FILESPACE name LOCATION TO newlocation
- *
- *****************************************************************************/
- 
-AlterFileSpaceStmt: ALTER FILESPACE name LOCATION TO Sconst
-				{
-					AlterFileSpaceStmt *n = makeNode(AlterFileSpaceStmt);
-					n->fsname = $3;
-					n->location = $6;
-					$$ = (Node *)n;
-				}
-
 
 /*****************************************************************************
  *
