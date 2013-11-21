@@ -40,11 +40,14 @@ PG_FUNCTION_INFO_V1(gpdbwritableformatter_export);
 PG_FUNCTION_INFO_V1(gpdbwritableformatter_import);
 
 static const int ERR_COL_OFFSET = 9;
+static const int FIRST_LINE_NUM = 1;
 
 typedef struct {
 	/* The Datum/null of the tuple */
 	Datum     *values;
 	bool      *nulls;
+
+	int lineno;
 
 	/* The export formatted value/len */
 	char*     *outval;
@@ -252,11 +255,17 @@ static void byteArrayToBoolArray(bits8* data, int len, bool** booldata, int bool
  * Verify external table definition matches to input data columns
  */
 static void
-verifyExternalTableDefinition(AttrNumber ncolumns, TupleDesc tupdesc, char *data_buf, int *bufidx)
+verifyExternalTableDefinition(int16 ncolumns_remote, AttrNumber ncolumns, TupleDesc tupdesc, char *data_buf, int *bufidx)
 {
-	StringInfoData errMsg;
-	initStringInfo(&errMsg);
+    if (ncolumns_remote != ncolumns)
+        		ereport(ERROR, (errcode(ERRCODE_INVALID_TABLE_DEFINITION),
+        						errmsg("input data column count (%d) did not match the external table definition",
+        								ncolumns_remote),
+        					    errOmitLocation(true)));
 
+	StringInfoData errMsg;
+
+    /* Extract Column Type and check against External Table definition */
 	for(int i = 0; i < ncolumns; i++)
 	{
 		Oid   input_type = 0;
@@ -268,6 +277,9 @@ verifyExternalTableDefinition(AttrNumber ncolumns, TupleDesc tupdesc, char *data
 		if ((isBinaryFormatType(defined_type) || isBinaryFormatType(input_type)) &&
 			input_type != defined_type)
 		{
+		    if(errMsg.len == 0)
+		        initStringInfo(&errMsg);
+
 			char *intype = format_type_be(input_type);
 			char *deftype = format_type_be(defined_type);
 			char *attname = NameStr(tupdesc->attrs[i]->attname);
@@ -280,11 +292,10 @@ verifyExternalTableDefinition(AttrNumber ncolumns, TupleDesc tupdesc, char *data
 	if(errMsg.len > 0)
 	{
 		truncateStringInfo(&errMsg, errMsg.len - strlen(", ")); //omit trailing ', '
-		ereport(ERROR, (errcode(ERRCODE_DATA_EXCEPTION),
+		ereport(ERROR, (errcode(ERRCODE_INVALID_TABLE_DEFINITION),
 			errmsg("External table definition did not match input data: %s", errMsg.data),
 			errOmitLocation(true)));
 	}
-	pfree(errMsg.data);
 }
 
 Datum
@@ -517,7 +528,7 @@ gpdbwritableformatter_import(PG_FUNCTION_ARGS)
 	int                 bufidx = 0;
 	int16               version = 0;
 	int8				error_flag = 0;
-	int16               colcnt = 0;
+	int16               ncolumns_remote = 0;
 	int                 remaining = 0;
 
 	/* Must be called via the external table format manager */
@@ -545,6 +556,7 @@ gpdbwritableformatter_import(PG_FUNCTION_ARGS)
 		myData          = palloc(sizeof(format_t));
 		myData->values  = palloc(sizeof(Datum) * ncolumns);
 		myData->nulls   = palloc(sizeof(bool) * ncolumns);
+	    myData->lineno  = FIRST_LINE_NUM;
 		myData->outlen  = palloc(sizeof(int) * ncolumns);
 		myData->typioparams = (Oid *) palloc(ncolumns * sizeof(Oid));
 		myData->io_functions = palloc(sizeof(FmgrInfo) * ncolumns);
@@ -649,16 +661,13 @@ gpdbwritableformatter_import(PG_FUNCTION_ARGS)
 		ereport(ERROR, (errcode(ERRCODE_DATA_EXCEPTION),
 				errmsg("%s", data_buf + bufidx + ERR_COL_OFFSET)));
 
-	colcnt  = readInt2FromBuffer(data_buf, &bufidx);
+	ncolumns_remote  = readInt2FromBuffer(data_buf, &bufidx);
 
-	if (colcnt != ncolumns)
-		ereport(ERROR, (errcode(ERRCODE_DATA_EXCEPTION),
-						errmsg("input data column count (%d) did not match the external table definition",
-								colcnt),
-					    errOmitLocation(true)));
-
-	/* Extract Column Type and check against External Table definition */
-	verifyExternalTableDefinition(ncolumns, tupdesc, data_buf, &bufidx);
+	/* Verify once on the first row*/
+	if(FIRST_LINE_NUM == myData->lineno++)
+	{
+        	verifyExternalTableDefinition(ncolumns_remote, ncolumns, tupdesc, data_buf, &bufidx);
+	}
 
 	/* Extract null bit array */
 	{
