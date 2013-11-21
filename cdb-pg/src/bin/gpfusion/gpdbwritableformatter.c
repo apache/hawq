@@ -257,13 +257,14 @@ static void byteArrayToBoolArray(bits8* data, int len, bool** booldata, int bool
 static void
 verifyExternalTableDefinition(int16 ncolumns_remote, AttrNumber ncolumns, TupleDesc tupdesc, char *data_buf, int *bufidx)
 {
+    StringInfoData errMsg;
+    memset(&errMsg, 0, sizeof(errMsg));
+
     if (ncolumns_remote != ncolumns)
         		ereport(ERROR, (errcode(ERRCODE_INVALID_TABLE_DEFINITION),
         						errmsg("input data column count (%d) did not match the external table definition",
         								ncolumns_remote),
         					    errOmitLocation(true)));
-
-	StringInfoData errMsg;
 
     /* Extract Column Type and check against External Table definition */
 	for(int i = 0; i < ncolumns; i++)
