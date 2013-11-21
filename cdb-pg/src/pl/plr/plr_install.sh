@@ -51,9 +51,9 @@ if [[ $output == *ERROR* ]]; then
 fi
 
 if [ "$BLD_ARCH" == "" ]; then
-    if [[ $(uname) == "Darwin*" ]]; then
+    if [[ $(uname) =~ "Darwin*" ]]; then
 	BLD_ARCH=osx106_x86
-    elif [[ $(uname) == "Linux*" ]]; then
+    elif [[ $(uname) =~ "Linux*" ]]; then
 	BLD_ARCH=rhel5_x86_64
     else
 	echo "Platform not supported."
