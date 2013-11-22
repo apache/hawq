@@ -239,8 +239,10 @@ ExecAlterObjectSchemaStmt(AlterObjectSchemaStmt *stmt)
 			break;
 
 		case OBJECT_TYPE:
-			ereport(ERROR,
-			                            (errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter type schema statement yet") ));
+		  /* Permissions are checked inside the function. */
+			AlterTypeNamespace(stmt->object, stmt->newschema);
+			break;
+
 		case OBJECT_DOMAIN:
 			ereport(ERROR,
                             (errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter domain schema statement yet") ));

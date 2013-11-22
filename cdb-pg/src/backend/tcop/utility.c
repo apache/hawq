@@ -615,9 +615,6 @@ ProcessDropStatement(DropStmt *stmt)
 				break;
 
 			case OBJECT_TYPE:
-				ereport(ERROR,
-						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support drop type statement yet") ));
-
 				/* RemoveType does its own permissions checks */
 				RemoveType(names, stmt->behavior,
 						   stmt->missing_ok);
@@ -1253,13 +1250,7 @@ ProcessUtility(Node *parsetree,
 
 		case T_CompositeTypeStmt:		/* CREATE TYPE (composite) */
 			{
-				if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
-				    ereport(ERROR,
-                        (errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create type yet") ));
-                }
-
 				CompositeTypeStmt *stmt = (CompositeTypeStmt *) parsetree;
-
 				DefineCompositeType(stmt->typevar, stmt->coldeflist, stmt->relOid, stmt->comptypeOid);
 			}
 			break;
@@ -1803,9 +1794,6 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_AlterTypeStmt:
-			ereport(ERROR,
-							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter type statement yet") ));
-
 			AlterType((AlterTypeStmt *) parsetree);
 			break;
 
