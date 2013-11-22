@@ -9,23 +9,18 @@ bin=$root/bin
 . $bin/gphd-env.sh
 
 # Check to see HDFS is up
-`jps | grep -q NameNode`
+hdfs_running
 if [ $? != 0 ]; then
-	echo HDFS is not running, HBase cant start
-	exit 1
-fi
-
-# Check to see HDFS is not in safemode
-`$bin/hdfs dfsadmin -safemode get | grep -q OFF`
-if [ $? != 0 ]; then
-	echo HDFS is in safemode, HBase cant start
+	echo HDFS is not ready, HBase cannot start
+	echo Please see HDFS is up and out of safemode
 	exit 1
 fi
 
 # Check to see Zookeeper is up
-`jps | grep -q QuorumPeerMain`
+zookeeper_running
 if [ $? != 0 ]; then
-	echo Zookeeper is not running, HBase cant start
+	echo Zookeeper is not running, HBase cannot start
+	echo Have you start-zookeeper.sh ?
 	exit 1
 fi
 

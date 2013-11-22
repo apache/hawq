@@ -67,6 +67,12 @@ CentOS
 7. Changes
 ==========
 
+v1.7.2
+------
+
+- GPSQL-1235: Stop using jps tool
+- GPSQL-1272: stop-hbase.sh sometimes hangs forever
+
 v1.7.1
 ------
 

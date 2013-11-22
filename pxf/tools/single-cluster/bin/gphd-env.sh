@@ -52,3 +52,15 @@ function cluster_initialized()
 		return 1
 	fi
 }
+
+function hdfs_running()
+{
+	`$bin/hdfs dfsadmin -Dipc.client.connect.max.retries.on.timeouts=0 -safemode get 2>&1 | grep -q "Safe mode is OFF"`
+	return $?
+}
+
+function zookeeper_running()
+{
+	$ZOOKEEPER_BIN/zkServer.sh status > /dev/null 2>&1
+	return $?
+}

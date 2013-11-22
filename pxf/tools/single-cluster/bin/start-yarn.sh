@@ -9,9 +9,10 @@ bin=$root/bin
 . $bin/gphd-env.sh
 
 # Check to see HDFS is up
-`jps | grep -q NameNode`
+hdfs_running
 if [ $? != 0 ]; then
 	echo HDFS is not running, YARN cant start
+	echo Please see HDFS is up and out of safemode
 	exit 1
 fi
 
