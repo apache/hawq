@@ -5,7 +5,7 @@
 SELECT gp_opt_version();
                            gp_opt_version
 --------------------------------------------------------------------
- GPOPT version: 1.323, GPOS version: 1.90, Xerces version: 3.1.1-p1
+ GPOPT version: 1.325, GPOS version: 1.90, Xerces version: 3.1.1-p1
 (1 row)
 
 -- master only tables
@@ -8214,6 +8214,26 @@ SELECT myagg2(i,j) FROM orca.tab1;
 --------
      60
 (1 row)
+
+CREATE FUNCTION tfp(anyarray,anyelement) RETURNS anyarray AS 'select $1 || $2' LANGUAGE SQL;
+CREATE FUNCTION ffp(anyarray) RETURNS anyarray AS 'select $1' LANGUAGE SQL;
+CREATE AGGREGATE myagg3(BASETYPE = anyelement, SFUNC = tfp, STYPE = anyarray, FINALFUNC = ffp, INITCOND = '{}');
+CREATE TABLE array_table(f1 int, f2 int[], f3 text);
+INSERT INTO array_table values(1,array[1],'a');
+INSERT INTO array_table values(1,array[11],'b');
+INSERT INTO array_table values(1,array[111],'c');
+INSERT INTO array_table values(2,array[2],'a');
+INSERT INTO array_table values(2,array[22],'b');
+INSERT INTO array_table values(2,array[222],'c');
+INSERT INTO array_table values(3,array[3],'a');
+INSERT INTO array_table values(3,array[3],'b');
+SELECT f3, myagg3(f1) from array_table GROUP BY f3 ORDER BY f3;
+f3 | myagg3  
+----+---------
+a  | {2,3,1}
+b  | {2,1,3}
+c  | {1,2}
+(3 rows)
 
 -- clean up
 drop schema orca cascade;

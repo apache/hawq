@@ -588,5 +588,19 @@ CREATE FUNCTION sum_sfunc2(anyelement,anyelement,anyelement) returns anyelement 
 CREATE AGGREGATE myagg2(anyelement,anyelement) (SFUNC = sum_sfunc2, STYPE = anyelement, INITCOND = '0');
 SELECT myagg2(i,j) FROM orca.tab1;
 
+CREATE FUNCTION tfp(anyarray,anyelement) RETURNS anyarray AS 'select $1 || $2' LANGUAGE SQL;
+CREATE FUNCTION ffp(anyarray) RETURNS anyarray AS 'select $1' LANGUAGE SQL;
+CREATE AGGREGATE myagg3(BASETYPE = anyelement, SFUNC = tfp, STYPE = anyarray, FINALFUNC = ffp, INITCOND = '{}');
+CREATE TABLE array_table(f1 int, f2 int[], f3 text);
+INSERT INTO array_table values(1,array[1],'a');
+INSERT INTO array_table values(1,array[11],'b');
+INSERT INTO array_table values(1,array[111],'c');
+INSERT INTO array_table values(2,array[2],'a');
+INSERT INTO array_table values(2,array[22],'b');
+INSERT INTO array_table values(2,array[222],'c');
+INSERT INTO array_table values(3,array[3],'a');
+INSERT INTO array_table values(3,array[3],'b');
+SELECT f3, myagg3(f1) from array_table GROUP BY f3 ORDER BY f3;
+
 -- clean up
 drop schema orca cascade;
