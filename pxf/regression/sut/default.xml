@@ -1,0 +1,43 @@
+<sut>
+
+	<cluster>
+		<class>com.pxf.infra.cluster.SingleCluster</class>
+
+		<host>localhost</host>
+		<userName>koazu</userName>
+		<password>20Aug20!#</password>
+
+	</cluster>
+
+	<hawq>
+		<class>com.pxf.infra.hawq.Hawq</class>
+		<host>localhost</host>
+		<sshUserName>koazu</sshUserName>
+		<sshPassword>20Aug20!#</sshPassword>
+		<db>pxf_regression</db>
+	</hawq>
+
+
+	<hdfs>
+		<class>com.pxf.infra.hdfs.Hdfs</class>
+		<host>localhost</host>
+		<port>8020</port>
+		<workingDirectory>pxf_regression_data</workingDirectory>
+		<func>
+			<class>com.pxf.infra.hdfs.HdfsFunctionalityJavaApi</class>
+		</func>
+
+	</hdfs>
+
+	<hbase>
+		<class>com.pxf.infra.hbase.HBase</class>
+		<host>localhost</host>
+	</hbase>
+
+	<hive>
+		<class>com.pxf.infra.hive.Hive</class>
+		<host>localhost</host>
+		<port>10004</port>
+	</hive>
+
+</sut>

@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="${component.basename}" default="all" xmlns:ivy="antlib:org.apache.ivy.ant">
+
+
+	<property name="testClass" value="*" />
+
+
+	<!-- Load product and build parameters from build.properties
+		 NOTE: Product name and version defined in build.properties -->
+	<loadproperties srcfile="build.properties" />
+
+	<!-- Some basic properties -->
+	<property environment="env" />
+	<property name="component.name" value="${component.basename}-${component.version}" />
+
+	<!-- If BUILD_NUMBER is in environment, use it, o/w use current username -->
+	<condition property="build.number" value="${env.BUILD_NUMBER}" else="${user.name}">
+		<isset property="env.BUILD_NUMBER" />
+	</condition>
+
+	<!-- If build.trunkbuild is defined (-D) then add _dev
+		 Used for trunk builds -->
+	<condition property="build.branch" value="_dev" else="">
+		<isset property="build.trunkbuild" />
+	</condition>
+
+
+
+	<property name="src.dir" value="${basedir}/regression" />
+	<property name="build.dir" value="${basedir}/build" />
+	<property name="lib.dir" value="${build.dir}/regression-lib" />
+	<property name="dist.dir" value="${build.dir}/${component.name}" />
+	<property name="test.dir" value="${basedir}/regression/com/pxf/tests/basic" />
+	<property name="testreports.dir" value="${build.dir}/regression/reports" />
+
+	<property name="package.buildroot" value="${basedir}/${component.basename}_package_build_${user.name}" />
+	<property name="package.release" value="${build.number}${build.branch}" />
+	<property name="package.name" value="${component.name}-${package.release}" />
+
+	<!--Apache Ivy(http://ant.apache.org/ivy/history/latest-milestone/install.html) -->
+	<loadproperties srcfile="${basedir}/ivy/libraries.properties" />
+	<property name="build.ivy.lib.dir" value="${build.dir}/regression-lib" />
+	<property name="ivy.artifact.retrieve.pattern" value="[artifact]-[revision].[ext]" />
+	<property name="ivy.install.version" value="2.2.0" />
+	<condition property="ivy.home" value="${env.IVY_HOME}">
+		<isset property="env.IVY_HOME" />
+	</condition>
+	<property name="ivy.home" value="${user.home}/.ant" />
+	<property name="ivy.jar.dir" value="${ivy.home}/lib" />
+	<property name="ivy.jar.file" value="${ivy.jar.dir}/ivy.jar" />
+
+	<patternset id="library.patterns">
+		<include name="*.jar" />
+	</patternset>
+
+
+	<!-- Project Libraries -->
+
+	<path id="library.commons.classpath">
+
+		<!-- sort the files in reversed name order. We need to put -->
+		<!-- avro-tools behind hadoop in the class path since it   -->
+		<!-- includes hadoop and breaks the build otherwise...     -->
+		<sort>
+			<fileset dir="${lib.dir}" />
+			<reverse xmlns="antlib:org.apache.tools.ant.types.resources.comparators">
+				<name />
+			</reverse>
+		</sort>
+
+		<fileset dir="${lib.dir}">
+			<patternset refid="library.patterns" />
+		</fileset>
+
+		<path refid="ivy-classpath" />
+
+
+		<fileset dir="${basedir}/lib" includes="**/*.jar" />
+
+		<fileset dir="${env.HADOOP_ROOT}/share/hadoop/hdfs" includes="hadoop-hdfs*.jar" />
+		<fileset dir="${env.HADOOP_ROOT}/share/hadoop/hdfs/lib" includes="**/*.jar" />
+		<fileset dir="${env.HBASE_ROOT}" includes="*.jar" />
+		<fileset dir="${env.HIVE_ROOT}/lib" includes="**/*.jar" />
+		<fileset dir="${env.HADOOP_ROOT}/share/hadoop/common" includes="**/*hadoop-*.jar" />
+
+	</path>
+
+	<target name="init" description="Build initialization">
+	</target>
+
+	<!-- Cleanup -->
+	<target name="clean">
+		<delete dir="${build.dir}" />
+	</target>
+
+	<!-- Compilation -->
+	<target name="compile" depends="ivy-retrieve">
+		<mkdir dir="${build.dir}/regression/classes" />
+
+		<!-- display the classpath used for compiling -->
+		<property name="myclasspath" refid="library.commons.classpath" />
+		<!-- enable the following line to echo classpath -->
+		<!-- echo message="classpath used in javac target: ${myclasspath}"/-->
+
+		<!-- compile the core gpdhfs connector source -->
+		<javac classpathref="library.commons.classpath" destdir="${build.dir}/regression/classes" includeantruntime="${compiler.includeantruntime}" debug="${compiler.debug}" fork="yes" verbose="${compiler.verbose}" memoryMaximumSize="${compiler.max.memory}" srcdir="${src.dir}">
+			<compilerarg line="-Werror -Xlint:unchecked -Xlint:deprecation -Xlint:finally -Xlint:fallthrough -Xlint:-path" />
+		</javac>
+
+		<copy todir="${build.dir}/regression/classes/resources">
+			<fileset dir="${src.dir}/resources" />
+		</copy>
+
+
+		<copy todir="${build.dir}/regression/classes/sut">
+			<fileset dir="${src.dir}/sut" />
+		</copy>
+
+
+	</target>
+
+
+
+	<!-- Default -->
+	<target name="all" depends="clean,compile, run-tests" description="build all jar files" />
+
+
+
+	<!-- Ivy -->
+	<target name="ivy-probe-antlib">
+		<condition property="ivy.found">
+			<typefound uri="antlib:org.apache.ivy.ant" name="cleancache" />
+		</condition>
+	</target>
+
+	<target name="download-ivy" unless="offline">
+		<mkdir dir="${ivy.jar.dir}" />
+		<get src="http://repo2.maven.org/maven2/org/apache/ivy/ivy/${ivy.install.version}/ivy-${ivy.install.version}.jar" dest="${ivy.jar.file}" usetimestamp="true" />
+	</target>
+
+	<target name="ivy-init" depends="download-ivy">
+		<path id="ivy.lib.path">
+			<fileset dir="${ivy.jar.dir}" includes="*.jar" />
+		</path>
+		<taskdef resource="org/apache/ivy/ant/antlib.xml" uri="antlib:org.apache.ivy.ant" classpathref="ivy.lib.path" />
+	</target>
+
+	<target name="ivy-retrieve" depends="ivy-init" description="--> Retrieve Ivy-managed artifacts for the compile configurations">
+		<ivy:settings id="basic.settings" file="ivysettings.xml" />
+		<ivy:retrieve settingsRef="basic.settings" pattern="${build.ivy.lib.dir}/${ivy.artifact.retrieve.pattern}" sync="true" conf="compile" file="regression-ivy.xml" />
+		<ivy:cachepath pathid="ivy-classpath" conf="compile" />
+	</target>
+
+
+
+	<target name="run-tests" depends="compile" description="Run regression-tests">
+		<echo message="Run Regression Batch: com/pxf/tests/basic/${testClass}.class">
+		</echo>
+		<mkdir dir="${testreports.dir}" />
+		<junit printsummary="yes" fork="yes" haltonfailure="yes" showoutput="yes">
+
+			<classpath>
+
+				<pathelement location="${build.dir}/regression/classes" />
+				<pathelement location="${src.dir}" />
+				<pathelement location="${src.dir}/resources" />
+				<pathelement location="${env.HADOOP_ROOT}/etc/hadoop" />
+
+				<fileset dir="${lib.dir}">
+					<include name="**/*.jar" />
+				</fileset>
+				<fileset dir="${basedir}/lib">
+					<include name="**/*.jar" />
+				</fileset>
+
+				<fileset dir="${env.HADOOP_ROOT}/share/hadoop/hdfs" includes="hadoop-hdfs*.jar" />
+				<fileset dir="${env.HADOOP_ROOT}/share/hadoop/hdfs/lib" includes="**/*.jar" />
+				<fileset dir="${env.HADOOP_ROOT}/share/hadoop/mapreduce" includes="**/*.jar" />
+				<fileset dir="${env.HADOOP_ROOT}/share/hadoop/yarn" includes="*.jar" />
+				<fileset dir="${env.HBASE_ROOT}" includes="*.jar" />
+				<fileset dir="${env.HIVE_ROOT}/lib" includes="**/*.jar" />
+				<fileset dir="${env.HADOOP_ROOT}/share/hadoop/common" includes="**/*hadoop-*.jar" />
+				<fileset dir="${env.ZOOKEEPER_ROOT}" includes="*.jar" />
+
+
+			</classpath>
+
+			<formatter type="plain" usefile="false" />
+			<formatter type="xml" />
+
+			<batchtest todir="${testreports.dir}">
+				<fileset dir="${build.dir}/regression/classes">
+					<include name="com/pxf/tests/basic/${testClass}.class" />
+
+				</fileset>
+			</batchtest>
+
+		</junit>
+	</target>
+</project>
