@@ -21,6 +21,9 @@ import com.pivotal.pxf.format.OutputFormat;
 public class InputData
 {
     public static final int INVALID_SPLIT_IDX = -1;
+	private static final String TRUE_LCASE = "true";
+	private static final String FALSE_LCASE = "false";
+
     private static final Log LOG = LogFactory.getLog(InputData.class);
 
     protected Map<String, String> requestParametersMap;
@@ -495,11 +498,21 @@ public class InputData
     	threadSafe = true;
     	String threadSafeStr = getOptionalProperty("X-GP-THREAD-SAFE");
 		if (threadSafeStr != null) {
-			threadSafe = Boolean.parseBoolean(threadSafeStr);
+			threadSafe = parseBooleanValue(threadSafeStr);
 		}
 	}
     
-    public boolean threadSafe() {
+    private boolean parseBooleanValue(String threadSafeStr) {
+    	
+    	if (threadSafeStr.equalsIgnoreCase(TRUE_LCASE))
+			return true;
+		if (threadSafeStr.equalsIgnoreCase(FALSE_LCASE))
+			return false;
+		throw new IllegalArgumentException("Illegal boolean value '" + threadSafeStr + "'." +
+										   " Usage: [TRUE|FALSE]");
+	}
+
+	public boolean threadSafe() {
     	return threadSafe;
     }
 	
