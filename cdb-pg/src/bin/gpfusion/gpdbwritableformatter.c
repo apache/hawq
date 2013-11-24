@@ -667,7 +667,12 @@ gpdbwritableformatter_import(PG_FUNCTION_ARGS)
 	/* Verify once on the first row*/
 	if(FIRST_LINE_NUM == myData->lineno++)
 	{
-        	verifyExternalTableDefinition(ncolumns_remote, ncolumns, tupdesc, data_buf, &bufidx);
+        verifyExternalTableDefinition(ncolumns_remote, ncolumns, tupdesc, data_buf, &bufidx);
+	}
+	/* Skipping the columns' enum types*/
+	else
+	{
+	    bufidx += ncolumns;
 	}
 
 	/* Extract null bit array */
