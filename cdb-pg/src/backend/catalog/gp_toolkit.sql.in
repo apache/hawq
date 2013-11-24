@@ -172,13 +172,13 @@ GRANT SELECT ON TABLE %%JETPACK_PREFIX_AUX%%user_data_tables_readable TO public;
 --		External table that determines the local segment id
 --		
 --------------------------------------------------------------------------------
-CREATE EXTERNAL WEB TABLE %%JETPACK_PREFIX_AUX%%localid
-(
-	localid	int
-)
-EXECUTE E'echo $GP_SEGMENT_ID' FORMAT 'TEXT';
+-- CREATE EXTERNAL WEB TABLE %%JETPACK_PREFIX_AUX%%localid
+-- (
+-- 	localid	int
+-- )
+-- EXECUTE E'echo $GP_SEGMENT_ID' FORMAT 'TEXT';
 
-GRANT SELECT ON TABLE %%JETPACK_PREFIX_AUX%%localid TO public;
+-- GRANT SELECT ON TABLE %%JETPACK_PREFIX_AUX%%localid TO public;
 
 
 --------------------------------------------------------------------------------
@@ -189,13 +189,13 @@ GRANT SELECT ON TABLE %%JETPACK_PREFIX_AUX%%localid TO public;
 --		External table that determines the master's segment id
 --		
 --------------------------------------------------------------------------------
-CREATE EXTERNAL WEB TABLE %%JETPACK_PREFIX_AUX%%masterid
-(
-	masterid	int
-)
-EXECUTE E'echo $GP_SEGMENT_ID' ON MASTER FORMAT 'TEXT';
+-- CREATE EXTERNAL WEB TABLE %%JETPACK_PREFIX_AUX%%masterid
+-- (
+-- 	masterid	int
+-- )
+-- EXECUTE E'echo $GP_SEGMENT_ID' ON MASTER FORMAT 'TEXT';
 
-GRANT SELECT ON TABLE %%JETPACK_PREFIX_AUX%%masterid TO public;
+-- GRANT SELECT ON TABLE %%JETPACK_PREFIX_AUX%%masterid TO public;
 
 
 --------------------------------------------------------------------------------
@@ -206,17 +206,17 @@ GRANT SELECT ON TABLE %%JETPACK_PREFIX_AUX%%masterid TO public;
 --		Determines number of segments in a system
 --		
 --------------------------------------------------------------------------------
-CREATE VIEW %%JETPACK_PREFIX_AUX%%number_of_segments
-AS
-	SELECT 
-		count(*)::smallint as numsegments
-	FROM 
-		pg_catalog.gp_segment_configuration
-	WHERE 
-		preferred_role = 'p'
-		AND content >= 0;
+-- CREATE VIEW %%JETPACK_PREFIX_AUX%%number_of_segments
+-- AS
+--	SELECT 
+--		count(*)::smallint as numsegments
+--	FROM 
+--		pg_catalog.gp_segment_configuration
+--	WHERE 
+--		preferred_role = 'p'
+--		AND content >= 0;
 
-GRANT SELECT ON TABLE %%JETPACK_PREFIX_AUX%%number_of_segments TO public;
+-- GRANT SELECT ON TABLE %%JETPACK_PREFIX_AUX%%number_of_segments TO public;
 
 
 --------------------------------------------------------------------------------
@@ -442,13 +442,13 @@ REVOKE ALL ON TABLE %%JETPACK_PREFIX%%log_command_timings FROM public;
 --		Record type to combine segment id, param's name and param's value
 --		
 --------------------------------------------------------------------------------
-CREATE TYPE %%JETPACK_PREFIX%%param_setting_t
-AS 
-(
-	paramsegment int, 
-	paramname text, 
-	paramvalue text
-);
+-- CREATE TYPE %%JETPACK_PREFIX%%param_setting_t
+-- AS 
+-- (
+--	paramsegment int, 
+--	paramname text, 
+--	paramvalue text
+-- );
 
 
 --------------------------------------------------------------------------------
@@ -466,16 +466,16 @@ AS
 --		executed on segments;
 --		
 --------------------------------------------------------------------------------
-CREATE FUNCTION %%JETPACK_PREFIX_AUX%%param_local_setting(varchar)
-RETURNS SETOF %%JETPACK_PREFIX%%param_setting_t
-AS
-$$
-	SELECT gp_execution_segment(), $1, current_setting($1)::text;
-$$
-LANGUAGE SQL
-IMMUTABLE CONTAINS SQL;
+-- CREATE FUNCTION %%JETPACK_PREFIX_AUX%%param_local_setting(varchar)
+-- RETURNS SETOF %%JETPACK_PREFIX%%param_setting_t
+-- AS
+-- $$
+--	SELECT gp_execution_segment(), $1, current_setting($1)::text;
+-- $$
+-- LANGUAGE SQL
+-- IMMUTABLE CONTAINS SQL;
 
-GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX_AUX%%param_local_setting(varchar) TO public;
+-- GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX_AUX%%param_local_setting(varchar) TO public;
 
 
 --------------------------------------------------------------------------------
@@ -492,35 +492,35 @@ GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX_AUX%%param_local_setting(varchar) TO 
 --		Collect value of a PARAM from all segments
 --		
 --------------------------------------------------------------------------------
-CREATE FUNCTION %%JETPACK_PREFIX%%param_setting(varchar)
-RETURNS SETOF %%JETPACK_PREFIX%%param_setting_t
-AS
-$$
-DECLARE
-	paramsettings %%JETPACK_PREFIX%%param_setting_t;
-	paramdummy record;
-	
-BEGIN
-	-- attempt local execution first to validate the name of the PARAM
-	SELECT %%JETPACK_PREFIX_AUX%%param_local_setting($1) INTO paramdummy;
+-- CREATE FUNCTION %%JETPACK_PREFIX%%param_setting(varchar)
+-- RETURNS SETOF %%JETPACK_PREFIX%%param_setting_t
+-- AS
+-- $$
+-- DECLARE
+--	paramsettings %%JETPACK_PREFIX%%param_setting_t;
+--	paramdummy record;
+--	
+-- BEGIN
+--	-- attempt local execution first to validate the name of the PARAM
+--	SELECT %%JETPACK_PREFIX_AUX%%param_local_setting($1) INTO paramdummy;
+--
+--	FOR paramsettings IN
+--		SELECT gs.*
+--		FROM %%JETPACK_PREFIX_AUX%%localid, %%JETPACK_PREFIX_AUX%%param_local_setting($1) AS gs
+--		
+--		UNION ALL
+--		
+--		SELECT gs.*
+--		FROM %%JETPACK_PREFIX_AUX%%masterid, %%JETPACK_PREFIX_AUX%%param_local_setting($1) AS gs
+--		
+--	LOOP
+--		RETURN NEXT paramsettings;
+--	END LOOP;
+-- END
+-- $$
+-- LANGUAGE plpgSQL READS SQL DATA;
 
-	FOR paramsettings IN
-		SELECT gs.*
-		FROM %%JETPACK_PREFIX_AUX%%localid, %%JETPACK_PREFIX_AUX%%param_local_setting($1) AS gs
-		
-		UNION ALL
-		
-		SELECT gs.*
-		FROM %%JETPACK_PREFIX_AUX%%masterid, %%JETPACK_PREFIX_AUX%%param_local_setting($1) AS gs
-		
-	LOOP
-		RETURN NEXT paramsettings;
-	END LOOP;
-END
-$$
-LANGUAGE plpgSQL READS SQL DATA;
-
-GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX%%param_setting(varchar) TO public;
+-- GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX%%param_setting(varchar) TO public;
 
 
 --------------------------------------------------------------------------------
@@ -531,28 +531,28 @@ GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX%%param_setting(varchar) TO public;
 --        Collect values of a all parameters from all segments
 --        
 --------------------------------------------------------------------------------
-CREATE FUNCTION %%JETPACK_PREFIX%%param_settings() 
-RETURNS SETOF %%JETPACK_PREFIX%%param_setting_t
-AS
-$$
-DECLARE
-	paramsettings %%JETPACK_PREFIX%%param_setting_t;
-	param text;
-    
-BEGIN
-	FOR param in (SELECT name FROM pg_settings order by name) LOOP
-		FOR paramsettings IN
-			SELECT pls.*
-			FROM %%JETPACK_PREFIX_AUX%%localid, %%JETPACK_PREFIX_AUX%%param_local_setting(param) AS pls
-		LOOP
-			RETURN NEXT paramsettings;
-		END LOOP;
-	END LOOP;
-END
-$$
-LANGUAGE plpgSQL READS SQL DATA;
+-- CREATE FUNCTION %%JETPACK_PREFIX%%param_settings() 
+-- RETURNS SETOF %%JETPACK_PREFIX%%param_setting_t
+-- AS
+-- $$
+-- DECLARE
+--	paramsettings %%JETPACK_PREFIX%%param_setting_t;
+--	param text;
+--    
+-- BEGIN
+--	FOR param in (SELECT name FROM pg_settings order by name) LOOP
+--		FOR paramsettings IN
+--			SELECT pls.*
+--			FROM %%JETPACK_PREFIX_AUX%%localid, %%JETPACK_PREFIX_AUX%%param_local_setting(param) AS pls
+--		LOOP
+--			RETURN NEXT paramsettings;
+--		END LOOP;
+--	END LOOP;
+-- END
+-- $$
+-- LANGUAGE plpgSQL READS SQL DATA;
 
-GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX%%param_settings() TO public;
+-- GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX%%param_settings() TO public;
 
 
 --------------------------------------------------------------------------------
@@ -564,25 +564,25 @@ GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX%%param_settings() TO public;
 --        (parameters that are supposed to have different values are excluded)
 --        
 --------------------------------------------------------------------------------
-CREATE VIEW %%JETPACK_PREFIX%%param_settings_seg_value_diffs
-AS
-	SELECT
-		paramname  AS psdname, 
-		paramvalue AS psdvalue, 
-		count(*)   AS psdcount
-	FROM 
-		%%JETPACK_PREFIX%%param_settings()
-	WHERE
-		paramname NOT IN ('config_file', 'data_directory', 'gp_contentid', 'gp_dbid', 'hba_file', 'ident_file', 'port')
-	GROUP BY 
-		1,2
-	HAVING 
-		count(*) < (select numsegments from %%JETPACK_PREFIX_AUX%%number_of_segments)
-	ORDER BY 
-		1,2,3;
+-- CREATE VIEW %%JETPACK_PREFIX%%param_settings_seg_value_diffs
+-- AS
+--	SELECT
+--		paramname  AS psdname, 
+--		paramvalue AS psdvalue, 
+--		count(*)   AS psdcount
+--	FROM 
+--		%%JETPACK_PREFIX%%param_settings()
+--	WHERE
+--		paramname NOT IN ('config_file', 'data_directory', 'gp_contentid', 'gp_dbid', 'hba_file', 'ident_file', 'port')
+--	GROUP BY 
+--		1,2
+--	HAVING 
+--		count(*) < (select numsegments from %%JETPACK_PREFIX_AUX%%number_of_segments)
+--	ORDER BY 
+--		1,2,3;
 
 
-GRANT SELECT ON TABLE %%JETPACK_PREFIX%%param_settings_seg_value_diffs TO public;
+-- GRANT SELECT ON TABLE %%JETPACK_PREFIX%%param_settings_seg_value_diffs TO public;
 
 
 --------------------------------------------------------------------------------
@@ -593,22 +593,22 @@ GRANT SELECT ON TABLE %%JETPACK_PREFIX%%param_settings_seg_value_diffs TO public
 --        Information about the invalid segments only
 --        
 --------------------------------------------------------------------------------
-CREATE VIEW %%JETPACK_PREFIX%%pgdatabase_invalid 
-AS
-	SELECT 
-		dbid           AS pgdbidbid,
-		isprimary      AS pgdbiisprimary,
-		content        AS pgdbicontent,
-		valid          AS pgdbivalid,
-		definedprimary AS pgdbidefinedprimary
-	FROM 
-		pg_catalog.gp_pgdatabase 
-	WHERE 
-		not valid
-	ORDER BY 
-		dbid;
+-- CREATE VIEW %%JETPACK_PREFIX%%pgdatabase_invalid 
+-- AS
+--	SELECT 
+--		dbid           AS pgdbidbid,
+--		isprimary      AS pgdbiisprimary,
+--		content        AS pgdbicontent,
+--		valid          AS pgdbivalid,
+--		definedprimary AS pgdbidefinedprimary
+--	FROM 
+--		pg_catalog.gp_pgdatabase 
+--	WHERE 
+--		not valid
+--	ORDER BY 
+--		dbid;
 
-GRANT SELECT ON TABLE %%JETPACK_PREFIX%%pgdatabase_invalid TO public;
+-- GRANT SELECT ON TABLE %%JETPACK_PREFIX%%pgdatabase_invalid TO public;
 
 
 --------------------------------------------------------------------------------
@@ -622,13 +622,13 @@ GRANT SELECT ON TABLE %%JETPACK_PREFIX%%pgdatabase_invalid TO public;
 --		Type to accomodate skew details
 --		
 --------------------------------------------------------------------------------
-CREATE TYPE %%JETPACK_PREFIX%%skew_details_t
-AS
-(
-	segoid oid,
-	segid int,
-	segtupcount bigint
-);
+-- CREATE TYPE %%JETPACK_PREFIX%%skew_details_t
+-- AS
+-- (
+--	segoid oid,
+--	segid int,
+--	segtupcount bigint
+-- );
 
 --------------------------------------------------------------------------------
 -- @function: 
@@ -644,75 +644,75 @@ AS
 --		Get details for skew
 --		
 --------------------------------------------------------------------------------
-CREATE FUNCTION %%JETPACK_PREFIX%%skew_details(oid)
-RETURNS setof %%JETPACK_PREFIX%%skew_details_t
-AS
-$$
-DECLARE
-	skewcrs refcursor;
-	skewrec record;
-	skewarray bigint[];
-	skewaot bool;
-	skewsegid int;
-	skewtablename record;
+-- CREATE FUNCTION %%JETPACK_PREFIX%%skew_details(oid)
+-- RETURNS setof %%JETPACK_PREFIX%%skew_details_t
+-- AS
+-- $$
+-- DECLARE
+--	skewcrs refcursor;
+--	skewrec record;
+--	skewarray bigint[];
+--	skewaot bool;
+--	skewsegid int;
+--	skewtablename record;
 
-BEGIN
+-- BEGIN
 
-	SELECT INTO skewrec * 
-	FROM pg_catalog.pg_appendonly pga, pg_catalog.pg_roles pgr
-	WHERE pga.relid = $1::regclass and pgr.rolname = current_user and pgr.rolsuper = 't';
+--	SELECT INTO skewrec * 
+--	FROM pg_catalog.pg_appendonly pga, pg_catalog.pg_roles pgr
+--	WHERE pga.relid = $1::regclass and pgr.rolname = current_user and pgr.rolsuper = 't';
 
-	IF FOUND THEN
-		-- append only table
+--	IF FOUND THEN
+--		-- append only table
 	
-		FOR skewrec IN
-			SELECT $1, segid, COALESCE(tupcount, 0)::bigint AS cnt
-			FROM (SELECT generate_series(0, numsegments - 1) FROM %%JETPACK_PREFIX_AUX%%number_of_segments) segs(segid)
-			LEFT OUTER JOIN pg_catalog.get_ao_distribution($1)
-			ON segid = segmentid
-		LOOP
-			RETURN NEXT skewrec;
-		END LOOP;
+--		FOR skewrec IN
+--			SELECT $1, segid, COALESCE(tupcount, 0)::bigint AS cnt
+--			FROM (SELECT generate_series(0, numsegments - 1) FROM %%JETPACK_PREFIX_AUX%%number_of_segments) segs(segid)
+--			LEFT OUTER JOIN pg_catalog.get_ao_distribution($1)
+--			ON segid = segmentid
+--		LOOP
+--			RETURN NEXT skewrec;
+--		END LOOP;
 
-	ELSE
-		-- heap table
+--	ELSE
+--		-- heap table
 	
-		SELECT * INTO skewtablename FROM %%JETPACK_PREFIX_AUX%%fullname
-		WHERE fnoid = $1;
+--		SELECT * INTO skewtablename FROM %%JETPACK_PREFIX_AUX%%fullname
+--		WHERE fnoid = $1;
 
-		OPEN skewcrs 
-			FOR 
-			EXECUTE 
-				'SELECT ' || $1 || '::oid, segid, CASE WHEN gp_segment_id IS NULL THEN 0 ELSE cnt END ' ||
-				'FROM (SELECT generate_series(0, numsegments - 1) FROM %%JETPACK_PREFIX_AUX%%number_of_segments) segs(segid) ' ||
-				'LEFT OUTER JOIN ' ||
-					'(SELECT gp_segment_id, COUNT(*) AS cnt FROM ' || 
-						quote_ident(skewtablename.fnnspname) || 
-						'.' || 
-						quote_ident(skewtablename.fnrelname) ||
-					' GROUP BY 1) details ' ||
-				'ON segid = gp_segment_id';
+--		OPEN skewcrs 
+--			FOR 
+--			EXECUTE 
+--				'SELECT ' || $1 || '::oid, segid, CASE WHEN gp_segment_id IS NULL THEN 0 ELSE cnt END ' ||
+--				'FROM (SELECT generate_series(0, numsegments - 1) FROM %%JETPACK_PREFIX_AUX%%number_of_segments) segs(segid) ' ||
+--				'LEFT OUTER JOIN ' ||
+--					'(SELECT gp_segment_id, COUNT(*) AS cnt FROM ' || 
+--						quote_ident(skewtablename.fnnspname) || 
+--						'.' || 
+--						quote_ident(skewtablename.fnrelname) ||
+--					' GROUP BY 1) details ' ||
+--				'ON segid = gp_segment_id';
 
-		FOR skewsegid IN 
-			SELECT generate_series(1, numsegments)
-			FROM %%JETPACK_PREFIX_AUX%%number_of_segments
-		LOOP 
-			FETCH skewcrs INTO skewrec;			
-			IF FOUND THEN
-				RETURN NEXT skewrec;
-			ELSE
-				RETURN;
-			END IF;
-		END LOOP;
-		CLOSE skewcrs;
-	END IF;
+--		FOR skewsegid IN 
+--			SELECT generate_series(1, numsegments)
+--			FROM %%JETPACK_PREFIX_AUX%%number_of_segments
+--		LOOP 
+--			FETCH skewcrs INTO skewrec;			
+--			IF FOUND THEN
+--				RETURN NEXT skewrec;
+--			ELSE
+--				RETURN;
+--			END IF;
+--		END LOOP;
+--		CLOSE skewcrs;
+--	END IF;
 	
-	RETURN;	
-END
-$$
-LANGUAGE plpgSQL READS SQL DATA;
+--	RETURN;	
+-- END
+-- $$
+-- LANGUAGE plpgSQL READS SQL DATA;
 
-GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX%%skew_details(oid) TO public;
+-- GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX%%skew_details(oid) TO public;
 
 
 --------------------------------------------------------------------------------
@@ -723,12 +723,12 @@ GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX%%skew_details(oid) TO public;
 --		Type to accomodate skew analysis
 --		
 --------------------------------------------------------------------------------
-CREATE TYPE %%JETPACK_PREFIX%%skew_analysis_t
-AS
-(
-	skewoid oid,
-	skewval numeric
-);
+-- CREATE TYPE %%JETPACK_PREFIX%%skew_analysis_t
+-- AS
+-- (
+--	skewoid oid,
+--	skewval numeric
+-- );
 
 
 --------------------------------------------------------------------------------
@@ -745,27 +745,27 @@ AS
 --		Multiply by 100 to be in sync with gpperfmon's measure
 --		
 --------------------------------------------------------------------------------
-CREATE FUNCTION %%JETPACK_PREFIX%%skew_coefficient(targetoid oid, OUT skcoid oid, OUT skccoeff numeric)
-RETURNS record
-AS
-$$
-	SELECT 
-		$1 as skcoid,
-		CASE 
-			WHEN skewmean > 0 THEN ((skewdev/skewmean) * 100.0) 
-			ELSE 0
-		END
-		AS skccoeff
-	FROM
-	(
-		SELECT STDDEV(segtupcount) AS skewdev, AVG(segtupcount) AS skewmean, COUNT(*) AS skewcnt
-		FROM %%JETPACK_PREFIX%%skew_details($1)
-	) AS skew
+-- CREATE FUNCTION %%JETPACK_PREFIX%%skew_coefficient(targetoid oid, OUT skcoid oid, OUT skccoeff numeric)
+-- RETURNS record
+-- AS
+-- $$
+--	SELECT 
+--		$1 as skcoid,
+--		CASE 
+--			WHEN skewmean > 0 THEN ((skewdev/skewmean) * 100.0) 
+--			ELSE 0
+--		END
+--		AS skccoeff
+--	FROM
+--	(
+--		SELECT STDDEV(segtupcount) AS skewdev, AVG(segtupcount) AS skewmean, COUNT(*) AS skewcnt
+--		FROM %%JETPACK_PREFIX%%skew_details($1)
+--	) AS skew
 
-$$
-LANGUAGE sql READS SQL DATA;
+-- $$
+-- LANGUAGE sql READS SQL DATA;
 
-GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX%%skew_coefficient(oid, OUT oid, OUT numeric) TO public;
+-- GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX%%skew_coefficient(oid, OUT oid, OUT numeric) TO public;
 
 
 --------------------------------------------------------------------------------
@@ -780,27 +780,27 @@ GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX%%skew_coefficient(oid, OUT oid, OUT n
 --		Wrapper to call coefficient function on all user tables
 --		
 --------------------------------------------------------------------------------
-CREATE FUNCTION %%JETPACK_PREFIX_AUX%%skew_coefficients()
-RETURNS SETOF %%JETPACK_PREFIX%%skew_analysis_t
-AS
-$$
-DECLARE
-	skcoid oid;
-	skcrec record;
+-- CREATE FUNCTION %%JETPACK_PREFIX_AUX%%skew_coefficients()
+-- RETURNS SETOF %%JETPACK_PREFIX%%skew_analysis_t
+-- AS
+-- $$
+-- DECLARE
+--	skcoid oid;
+--	skcrec record;
 	
-BEGIN
-	FOR skcoid IN SELECT autoid from %%JETPACK_PREFIX_AUX%%user_data_tables_readable WHERE autrelstorage != 'x'
-	LOOP
-		SELECT * INTO skcrec
-		FROM
-			%%JETPACK_PREFIX%%skew_coefficient(skcoid);
-		RETURN NEXT skcrec;
-	END LOOP;
-END
-$$
-LANGUAGE plpgsql READS SQL DATA;
+-- BEGIN
+--	FOR skcoid IN SELECT autoid from %%JETPACK_PREFIX_AUX%%user_data_tables_readable WHERE autrelstorage != 'x'
+--	LOOP
+--		SELECT * INTO skcrec
+--		FROM
+--			%%JETPACK_PREFIX%%skew_coefficient(skcoid);
+--		RETURN NEXT skcrec;
+--	END LOOP;
+-- END
+-- $$
+-- LANGUAGE plpgsql READS SQL DATA;
 
-GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX_AUX%%skew_coefficients() TO public;
+-- GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX_AUX%%skew_coefficients() TO public;
 
 
 --------------------------------------------------------------------------------
@@ -811,24 +811,24 @@ GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX_AUX%%skew_coefficients() TO public;
 --		Wrapper view around previous function
 --		
 --------------------------------------------------------------------------------
-CREATE VIEW %%JETPACK_PREFIX%%skew_coefficients
-AS
-	SELECT
-		skew.skewoid AS skcoid,
-		pgn.nspname  AS skcnamespace,
-		pgc.relname  AS skcrelname,
-		skew.skewval AS skccoeff
-	FROM %%JETPACK_PREFIX_AUX%%skew_coefficients() skew
+-- CREATE VIEW %%JETPACK_PREFIX%%skew_coefficients
+-- AS
+--	SELECT
+--		skew.skewoid AS skcoid,
+--		pgn.nspname  AS skcnamespace,
+--		pgc.relname  AS skcrelname,
+--		skew.skewval AS skccoeff
+--	FROM %%JETPACK_PREFIX_AUX%%skew_coefficients() skew
 
-	JOIN
-	pg_catalog.pg_class pgc
-	ON (skew.skewoid = pgc.oid)
+--	JOIN
+--	pg_catalog.pg_class pgc
+--	ON (skew.skewoid = pgc.oid)
 
-	JOIN
-	pg_catalog.pg_namespace pgn
-	ON (pgc.relnamespace = pgn.oid);
+--	JOIN
+--	pg_catalog.pg_namespace pgn
+--	ON (pgc.relnamespace = pgn.oid);
 
-GRANT SELECT ON TABLE %%JETPACK_PREFIX%%skew_coefficients TO public;
+-- GRANT SELECT ON TABLE %%JETPACK_PREFIX%%skew_coefficients TO public;
 
 
 --------------------------------------------------------------------------------
@@ -844,27 +844,27 @@ GRANT SELECT ON TABLE %%JETPACK_PREFIX%%skew_coefficients TO public;
 --		Compute skew area quotient for a given table
 --		
 --------------------------------------------------------------------------------
-CREATE FUNCTION %%JETPACK_PREFIX%%skew_idle_fraction(targetoid oid, OUT sifoid oid, OUT siffraction numeric)
-RETURNS record
-AS
-$$
-	SELECT 
-		$1 as sifoid,
-		CASE
-			WHEN MIN(skewmax) = 0 THEN 0
-			ELSE (SUM(skewmax - segtupcount) / (MIN(skewmax) * MIN(numsegments)))
-		END
-		AS siffraction
-	FROM
-	(
-		SELECT segid, segtupcount, COUNT(segid) OVER () AS numsegments, MAX(segtupcount) OVER () AS skewmax
-		FROM %%JETPACK_PREFIX%%skew_details($1)
-	) AS skewbaseline
+-- CREATE FUNCTION %%JETPACK_PREFIX%%skew_idle_fraction(targetoid oid, OUT sifoid oid, OUT siffraction numeric)
+-- RETURNS record
+-- AS
+-- $$
+--	SELECT 
+--		$1 as sifoid,
+--		CASE
+--			WHEN MIN(skewmax) = 0 THEN 0
+--			ELSE (SUM(skewmax - segtupcount) / (MIN(skewmax) * MIN(numsegments)))
+--		END
+--		AS siffraction
+--	FROM
+--	(
+--		SELECT segid, segtupcount, COUNT(segid) OVER () AS numsegments, MAX(segtupcount) OVER () AS skewmax
+--		FROM %%JETPACK_PREFIX%%skew_details($1)
+--	) AS skewbaseline
 
-$$
-LANGUAGE sql READS SQL DATA;
+-- $$
+-- LANGUAGE sql READS SQL DATA;
 
-GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX%%skew_idle_fraction(oid, OUT oid, OUT numeric) TO public;
+-- GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX%%skew_idle_fraction(oid, OUT oid, OUT numeric) TO public;
 
 
 --------------------------------------------------------------------------------
@@ -879,27 +879,27 @@ GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX%%skew_idle_fraction(oid, OUT oid, OUT
 --		Wrapper to call fraction calculation on all user tables
 --		
 --------------------------------------------------------------------------------
-CREATE FUNCTION %%JETPACK_PREFIX_AUX%%skew_idle_fractions()
-RETURNS SETOF %%JETPACK_PREFIX%%skew_analysis_t
-AS
-$$
-DECLARE
-	skcoid oid;
-	skcrec record;
+-- CREATE FUNCTION %%JETPACK_PREFIX_AUX%%skew_idle_fractions()
+-- RETURNS SETOF %%JETPACK_PREFIX%%skew_analysis_t
+-- AS
+-- $$
+-- DECLARE
+--	skcoid oid;
+--	skcrec record;
 	
-BEGIN
-	FOR skcoid IN SELECT autoid from %%JETPACK_PREFIX_AUX%%user_data_tables_readable WHERE autrelstorage != 'x'
-	LOOP
-		SELECT * INTO skcrec
-		FROM
-			%%JETPACK_PREFIX%%skew_idle_fraction(skcoid);
-		RETURN NEXT skcrec;
-	END LOOP;
-END
-$$
-LANGUAGE plpgsql READS SQL DATA;
+-- BEGIN
+--	FOR skcoid IN SELECT autoid from %%JETPACK_PREFIX_AUX%%user_data_tables_readable WHERE autrelstorage != 'x'
+--	LOOP
+--		SELECT * INTO skcrec
+--		FROM
+--			%%JETPACK_PREFIX%%skew_idle_fraction(skcoid);
+--		RETURN NEXT skcrec;
+--	END LOOP;
+-- END
+-- $$
+-- LANGUAGE plpgsql READS SQL DATA;
 
-GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX_AUX%%skew_idle_fractions() TO public;
+-- GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX_AUX%%skew_idle_fractions() TO public;
 
 
 --------------------------------------------------------------------------------
@@ -910,24 +910,24 @@ GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX_AUX%%skew_idle_fractions() TO public;
 --		Wrapper view around previous function
 --		
 --------------------------------------------------------------------------------
-CREATE VIEW %%JETPACK_PREFIX%%skew_idle_fractions
-AS
-	SELECT
-		skew.skewoid AS sifoid,
-		pgn.nspname  AS sifnamespace,
-		pgc.relname  AS sifrelname,
-		skew.skewval AS siffraction
-	FROM %%JETPACK_PREFIX_AUX%%skew_idle_fractions() skew
+-- CREATE VIEW %%JETPACK_PREFIX%%skew_idle_fractions
+-- AS
+--	SELECT
+--		skew.skewoid AS sifoid,
+--		pgn.nspname  AS sifnamespace,
+--		pgc.relname  AS sifrelname,
+--		skew.skewval AS siffraction
+--	FROM %%JETPACK_PREFIX_AUX%%skew_idle_fractions() skew
 
-	JOIN
-	pg_catalog.pg_class pgc
-	ON (skew.skewoid = pgc.oid)
+--	JOIN
+--	pg_catalog.pg_class pgc
+--	ON (skew.skewoid = pgc.oid)
 
-	JOIN
-	pg_catalog.pg_namespace pgn
-	ON (pgc.relnamespace = pgn.oid);
+--	JOIN
+--	pg_catalog.pg_namespace pgn
+--	ON (pgc.relnamespace = pgn.oid);
 
-GRANT SELECT ON TABLE %%JETPACK_PREFIX%%skew_idle_fractions TO public;
+-- GRANT SELECT ON TABLE %%JETPACK_PREFIX%%skew_idle_fractions TO public;
 
 
 --------------------------------------------------------------------------------
@@ -987,14 +987,14 @@ GRANT SELECT ON TABLE %%JETPACK_PREFIX%%stats_missing TO public;
 --		External table to determine free space on disk on a per-segment basis
 --		
 --------------------------------------------------------------------------------
-CREATE EXTERNAL WEB TABLE %%JETPACK_PREFIX%%disk_free
-(
-	dfsegment int,
-	dfhostname text,
-	dfdevice text,
-	dfspace bigint
-)
-EXECUTE E'python -c "from gppylib.commands import unix; df=unix.DiskFree.get_disk_free_info_local(''token'',''$GP_SEG_DATADIR''); print ''%s, %s, %s, %s'' % (''$GP_SEGMENT_ID'', unix.getLocalHostname(), df[0], df[3])"' FORMAT 'CSV';
+-- CREATE EXTERNAL WEB TABLE %%JETPACK_PREFIX%%disk_free
+-- (
+--	dfsegment int,
+--	dfhostname text,
+--	dfdevice text,
+--	dfspace bigint
+-- )
+-- EXECUTE E'python -c "from gppylib.commands import unix; df=unix.DiskFree.get_disk_free_info_local(''token'',''$GP_SEG_DATADIR''); print ''%s, %s, %s, %s'' % (''$GP_SEGMENT_ID'', unix.getLocalHostname(), df[0], df[3])"' FORMAT 'CSV';
 
 
 --------------------------------------------------------------------------------
@@ -1012,46 +1012,46 @@ EXECUTE E'python -c "from gppylib.commands import unix; df=unix.DiskFree.get_dis
 --		granularity of modelling
 --		
 --------------------------------------------------------------------------------
-CREATE VIEW %%JETPACK_PREFIX%%bloat_expected_pages
-AS
-	SELECT
-		btdrelid,
-		btdrelpages,
-		CASE WHEN btdexppages < numsegments
-			THEN numsegments
-			ELSE btdexppages
-		END as btdexppages
-	FROM
-	(
-		SELECT
-			oid as btdrelid,
-			pgc.relpages as btdrelpages,
-			CEIL((pgc.reltuples * (25 + width))::numeric / current_setting('block_size')::numeric) AS btdexppages,
-			(select numsegments from %%JETPACK_PREFIX_AUX%%number_of_segments) as numsegments
-		FROM 
-			(
-				SELECT pgc.oid, pgc.reltuples, pgc.relpages
-				FROM pg_class pgc
-				WHERE NOT EXISTS 
-				(
-					SELECT iaooid 
-					FROM %%JETPACK_PREFIX_AUX%%is_append_only 
-					WHERE iaooid = pgc.oid AND iaotype = 't'
-				)
-			)
-			AS pgc
-		LEFT OUTER JOIN
-			(
-				SELECT  starelid, SUM(stawidth * (1.0 - stanullfrac)) AS width
-				FROM pg_statistic pgs
-				GROUP BY 1
-			) 
-			AS btwcols
-		ON pgc.oid = btwcols.starelid
-		WHERE starelid IS NOT NULL
-	) AS subq;
+-- CREATE VIEW %%JETPACK_PREFIX%%bloat_expected_pages
+-- AS
+--	SELECT
+--		btdrelid,
+--		btdrelpages,
+--		CASE WHEN btdexppages < numsegments
+--			THEN numsegments
+--			ELSE btdexppages
+--		END as btdexppages
+--	FROM
+--	(
+--		SELECT
+--			oid as btdrelid,
+--			pgc.relpages as btdrelpages,
+--			CEIL((pgc.reltuples * (25 + width))::numeric / current_setting('block_size')::numeric) AS btdexppages,
+--			(select numsegments from %%JETPACK_PREFIX_AUX%%number_of_segments) as numsegments
+--		FROM 
+--			(
+--				SELECT pgc.oid, pgc.reltuples, pgc.relpages
+--				FROM pg_class pgc
+--				WHERE NOT EXISTS 
+--				(
+--					SELECT iaooid 
+--					FROM %%JETPACK_PREFIX_AUX%%is_append_only 
+--					WHERE iaooid = pgc.oid AND iaotype = 't'
+--				)
+--			)
+--			AS pgc
+--		LEFT OUTER JOIN
+--			(
+--				SELECT  starelid, SUM(stawidth * (1.0 - stanullfrac)) AS width
+--				FROM pg_statistic pgs
+--				GROUP BY 1
+--			) 
+--			AS btwcols
+--		ON pgc.oid = btwcols.starelid
+--		WHERE starelid IS NOT NULL
+--	) AS subq;
 
-GRANT SELECT ON TABLE %%JETPACK_PREFIX%%bloat_expected_pages TO public;	
+--GRANT SELECT ON TABLE %%JETPACK_PREFIX%%bloat_expected_pages TO public;	
 
 
 --------------------------------------------------------------------------------
@@ -1069,40 +1069,40 @@ GRANT SELECT ON TABLE %%JETPACK_PREFIX%%bloat_expected_pages TO public;
 --		diagnose table bloat based on expected and actual number of pages
 --		
 --------------------------------------------------------------------------------
-CREATE FUNCTION %%JETPACK_PREFIX%%bloat_diag(btdrelpages int, btdexppages int, aotable bool,
-	OUT bltidx int, OUT bltdiag text)
-AS
-$$
-	SELECT 
-		bloatidx,
-		CASE
-			WHEN bloatidx = 0
-				THEN 'no bloat detected'::text
-			WHEN bloatidx = 1
-				THEN 'moderate amount of bloat suspected'::text
-			WHEN bloatidx = 2
-				THEN 'significant amount of bloat suspected'::text
-			WHEN bloatidx = -1
-				THEN 'diagnosis inconclusive or no bloat suspected'::text
-		END AS bloatdiag
-	FROM 
-	(
-		SELECT 
-			CASE
-				WHEN $3 = 't' THEN 0 
-				WHEN $1 < 10 AND $2 = 0 THEN -1
-				WHEN $2 = 0 THEN 2
-				WHEN $1 < $2 THEN 0
-				WHEN ($1/$2)::numeric > 10 THEN 2
-				WHEN ($1/$2)::numeric > 3 THEN 1
-				ELSE -1
-			END AS bloatidx
-	) AS bloatmapping
+--CREATE FUNCTION %%JETPACK_PREFIX%%bloat_diag(btdrelpages int, btdexppages int, aotable bool,
+--	OUT bltidx int, OUT bltdiag text)
+--AS
+--$$
+--	SELECT 
+--		bloatidx,
+--		CASE
+--			WHEN bloatidx = 0
+--				THEN 'no bloat detected'::text
+--			WHEN bloatidx = 1
+--				THEN 'moderate amount of bloat suspected'::text
+--			WHEN bloatidx = 2
+--				THEN 'significant amount of bloat suspected'::text
+--			WHEN bloatidx = -1
+--				THEN 'diagnosis inconclusive or no bloat suspected'::text
+--		END AS bloatdiag
+--	FROM 
+--	(
+--		SELECT 
+--			CASE
+--				WHEN $3 = 't' THEN 0 
+--				WHEN $1 < 10 AND $2 = 0 THEN -1
+--				WHEN $2 = 0 THEN 2
+--				WHEN $1 < $2 THEN 0
+--				WHEN ($1/$2)::numeric > 10 THEN 2
+--				WHEN ($1/$2)::numeric > 3 THEN 1
+--				ELSE -1
+--			END AS bloatidx
+--	) AS bloatmapping
 		
-$$
-LANGUAGE SQL READS SQL DATA;
+--$$
+--LANGUAGE SQL READS SQL DATA;
 
-GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX%%bloat_diag(int, int, bool, OUT int, OUT text) TO public;	
+--GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX%%bloat_diag(int, int, bool, OUT int, OUT text) TO public;	
 
 
 --------------------------------------------------------------------------------
@@ -1113,33 +1113,33 @@ GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX%%bloat_diag(int, int, bool, OUT int, 
 --		Shorthand for running bloat diag over all tables, incl. catalog
 --		
 --------------------------------------------------------------------------------
-CREATE VIEW %%JETPACK_PREFIX%%bloat_diag
-AS
-	SELECT 
-		btdrelid AS bdirelid,
-		fnnspname AS bdinspname, 
-		fnrelname AS bdirelname,
-		btdrelpages AS bdirelpages,
-		btdexppages AS bdiexppages,
-		bltdiag(bd) AS bdidiag
-	FROM
-	(
-		SELECT 
-			fn.*, beg.*,
-			%%JETPACK_PREFIX%%bloat_diag(btdrelpages::int, btdexppages::int, iao.iaotype::bool) AS bd
-		FROM 
-			%%JETPACK_PREFIX%%bloat_expected_pages beg, 
-			pg_catalog.pg_class pgc,			
-			%%JETPACK_PREFIX_AUX%%fullname fn,
-			%%JETPACK_PREFIX_AUX%%is_append_only iao
+--CREATE VIEW %%JETPACK_PREFIX%%bloat_diag
+--AS
+--	SELECT 
+--		btdrelid AS bdirelid,
+--		fnnspname AS bdinspname, 
+--		fnrelname AS bdirelname,
+--		btdrelpages AS bdirelpages,
+--		btdexppages AS bdiexppages,
+--		bltdiag(bd) AS bdidiag
+--	FROM
+--	(
+--		SELECT 
+--			fn.*, beg.*,
+--			%%JETPACK_PREFIX%%bloat_diag(btdrelpages::int, btdexppages::int, iao.iaotype::bool) AS bd
+--		FROM 
+--			%%JETPACK_PREFIX%%bloat_expected_pages beg, 
+--			pg_catalog.pg_class pgc,			
+--			%%JETPACK_PREFIX_AUX%%fullname fn,
+--			%%JETPACK_PREFIX_AUX%%is_append_only iao
 			
-		WHERE beg.btdrelid = pgc.oid 
-			AND pgc.oid = fn.fnoid
-			AND iao.iaooid = pgc.oid
-	) as bloatsummary
-	WHERE bltidx(bd) > 0;
+--		WHERE beg.btdrelid = pgc.oid 
+--			AND pgc.oid = fn.fnoid
+--			AND iao.iaooid = pgc.oid
+--	) as bloatsummary
+--	WHERE bltidx(bd) > 0;
 	
-GRANT SELECT ON TABLE %%JETPACK_PREFIX%%bloat_diag TO public;	
+--GRANT SELECT ON TABLE %%JETPACK_PREFIX%%bloat_diag TO public;	
 
 
 --------------------------------------------------------------------------------
@@ -1154,37 +1154,37 @@ GRANT SELECT ON TABLE %%JETPACK_PREFIX%%bloat_diag TO public;
 --		View that summarizes all activity in the system wrt resource queues
 --		
 --------------------------------------------------------------------------------
-CREATE VIEW %%JETPACK_PREFIX%%resq_activity
-AS
-	SELECT 
-		psa.procpid as resqprocpid,
-		psa.usename as resqrole,
-		resq.resqoid,
-		resq.rsqname as resqname,
-		psa.query_start as resqstart,
-		CASE 
-			WHEN resqgranted = 'f' THEN 'waiting' ELSE 'running'
-		END as resqstatus
-	FROM
-		pg_catalog.pg_stat_activity psa
-	JOIN
-	(
-		SELECT 
-			pgrq.oid as resqoid,
-			pgrq.rsqname,
-			pgl.pid as resqprocid,
-			pgl.granted as resqgranted
-		FROM
-			pg_catalog.pg_resqueue pgrq,
-			pg_catalog.pg_locks pgl
-		WHERE
-			pgl.objid = pgrq.oid
-	) as resq
-	ON resqprocid = procpid
-	WHERE current_query != '<IDLE>'
-	ORDER BY resqstart;
+--CREATE VIEW %%JETPACK_PREFIX%%resq_activity
+--AS
+--	SELECT 
+--		psa.procpid as resqprocpid,
+--		psa.usename as resqrole,
+--		resq.resqoid,
+--		resq.rsqname as resqname,
+--		psa.query_start as resqstart,
+--		CASE 
+--			WHEN resqgranted = 'f' THEN 'waiting' ELSE 'running'
+--		END as resqstatus
+--	FROM
+--		pg_catalog.pg_stat_activity psa
+--	JOIN
+--	(
+--		SELECT 
+--			pgrq.oid as resqoid,
+--			pgrq.rsqname,
+--			pgl.pid as resqprocid,
+--			pgl.granted as resqgranted
+--		FROM
+--			pg_catalog.pg_resqueue pgrq,
+--			pg_catalog.pg_locks pgl
+--		WHERE
+--			pgl.objid = pgrq.oid
+--	) as resq
+--	ON resqprocid = procpid
+--	WHERE current_query != '<IDLE>'
+--	ORDER BY resqstart;
 
-GRANT SELECT ON TABLE %%JETPACK_PREFIX%%resq_activity TO public;
+--GRANT SELECT ON TABLE %%JETPACK_PREFIX%%resq_activity TO public;
 
 
 --------------------------------------------------------------------------------
@@ -1195,21 +1195,21 @@ GRANT SELECT ON TABLE %%JETPACK_PREFIX%%resq_activity TO public;
 --		Rollup of activity view
 --		
 --------------------------------------------------------------------------------
-CREATE VIEW %%JETPACK_PREFIX%%resq_activity_by_queue
-AS
-	SELECT 
-		resqoid,
-		resqname,
-		MAX(resqstart) as resqlast,
-		resqstatus,
-		COUNT(*) as resqtotal
-	FROM
-		%%JETPACK_PREFIX%%resq_activity
-	GROUP BY
-		resqoid, resqname, resqstatus
-	ORDER BY resqoid, resqlast;
+--CREATE VIEW %%JETPACK_PREFIX%%resq_activity_by_queue
+--AS
+--	SELECT 
+--		resqoid,
+--		resqname,
+--		MAX(resqstart) as resqlast,
+--		resqstatus,
+--		COUNT(*) as resqtotal
+--	FROM
+--		%%JETPACK_PREFIX%%resq_activity
+--	GROUP BY
+--		resqoid, resqname, resqstatus
+--	ORDER BY resqoid, resqlast;
 
-GRANT SELECT ON TABLE %%JETPACK_PREFIX%%resq_activity_by_queue TO public;
+--GRANT SELECT ON TABLE %%JETPACK_PREFIX%%resq_activity_by_queue TO public;
 
 --------------------------------------------------------------------------------
 -- @view: 
@@ -1219,18 +1219,18 @@ GRANT SELECT ON TABLE %%JETPACK_PREFIX%%resq_activity_by_queue TO public;
 --		Priorities associated with each backend executing currently
 --		
 --------------------------------------------------------------------------------
-CREATE VIEW %%JETPACK_PREFIX%%resq_priority_backend
-AS
-	SELECT 
-		session_id as rqpsession,
-		command_count as rqpcommand,
-		priority as rqppriority,
-		weight as rqpweight
-	FROM
-		gp_list_backend_priorities() 
-			AS L(session_id int, command_count int, priority text, weight int);
+--CREATE VIEW %%JETPACK_PREFIX%%resq_priority_backend
+--AS
+--	SELECT 
+--		session_id as rqpsession,
+--		command_count as rqpcommand,
+--		priority as rqppriority,
+--		weight as rqpweight
+--	FROM
+--		gp_list_backend_priorities() 
+--			AS L(session_id int, command_count int, priority text, weight int);
 
-GRANT SELECT ON TABLE %%JETPACK_PREFIX%%resq_priority_backend TO public;
+--GRANT SELECT ON TABLE %%JETPACK_PREFIX%%resq_priority_backend TO public;
 
 
 --------------------------------------------------------------------------------
@@ -1241,22 +1241,22 @@ GRANT SELECT ON TABLE %%JETPACK_PREFIX%%resq_priority_backend TO public;
 --		Priorities associated with each statement
 --		
 --------------------------------------------------------------------------------
-CREATE VIEW %%JETPACK_PREFIX%%resq_priority_statement
-AS
-	SELECT 
-		psa.datname AS rqpdatname, 
-		psa.usename AS rqpusename, 
-		rpb.rqpsession,
-		rpb.rqpcommand, 
-		rpb.rqppriority, 
-		rpb.rqpweight, 
-		psa.current_query AS rqpquery
-	FROM 
-		%%JETPACK_PREFIX%%resq_priority_backend rpb
-		JOIN pg_stat_activity psa ON (rpb.rqpsession = psa.sess_id)
-	WHERE psa.current_query != '<IDLE>';
+--CREATE VIEW %%JETPACK_PREFIX%%resq_priority_statement
+--AS
+--	SELECT 
+--		psa.datname AS rqpdatname, 
+--		psa.usename AS rqpusename, 
+--		rpb.rqpsession,
+--		rpb.rqpcommand, 
+--		rpb.rqppriority, 
+--		rpb.rqpweight, 
+--		psa.current_query AS rqpquery
+--	FROM 
+--		%%JETPACK_PREFIX%%resq_priority_backend rpb
+--		JOIN pg_stat_activity psa ON (rpb.rqpsession = psa.sess_id)
+--	WHERE psa.current_query != '<IDLE>';
 
-GRANT SELECT ON TABLE %%JETPACK_PREFIX%%resq_priority_statement TO public;
+--GRANT SELECT ON TABLE %%JETPACK_PREFIX%%resq_priority_statement TO public;
 
 
 --------------------------------------------------------------------------------
@@ -1267,18 +1267,18 @@ GRANT SELECT ON TABLE %%JETPACK_PREFIX%%resq_priority_statement TO public;
 --        Assigned resource queue to roles
 --        
 --------------------------------------------------------------------------------
-CREATE VIEW %%JETPACK_PREFIX%%resq_role
-AS
-	SELECT 
-		pgr.rolname  AS rrrolname,
-		pgrq.rsqname AS rrrsqname
-	FROM pg_catalog.pg_roles pgr
+-- CREATE VIEW %%JETPACK_PREFIX%%resq_role
+-- AS
+--	SELECT 
+--		pgr.rolname  AS rrrolname,
+--		pgrq.rsqname AS rrrsqname
+--	FROM pg_catalog.pg_roles pgr
 
-	LEFT JOIN pg_catalog.pg_resqueue pgrq 
-	ON (pgr.rolresqueue = pgrq.oid) 
-;
+--	LEFT JOIN pg_catalog.pg_resqueue pgrq 
+--	ON (pgr.rolresqueue = pgrq.oid) 
+--;
 
-GRANT SELECT ON TABLE %%JETPACK_PREFIX%%resq_role TO public;
+--GRANT SELECT ON TABLE %%JETPACK_PREFIX%%resq_role TO public;
 
 
 --------------------------------------------------------------------------------
@@ -1290,27 +1290,27 @@ GRANT SELECT ON TABLE %%JETPACK_PREFIX%%resq_role TO public;
 --        resource queue restrictions)
 --        
 --------------------------------------------------------------------------------
-CREATE VIEW %%JETPACK_PREFIX%%locks_on_resqueue
-AS
-	SELECT 
-		pgsa.usename     AS lorusename, 
-		pgrq.rsqname     AS lorrsqname, 
-		pgl.locktype     AS lorlocktype, 
-		pgl.objid        AS lorobjid, 
-		pgl.transaction  AS lortransaction, 
-		pgl.pid          AS lorpid, 
-		pgl.mode         AS lormode, 
-		pgl.granted      AS lorgranted, 
-		pgsa.waiting     AS lorwaiting 
-	FROM pg_catalog.pg_stat_activity pgsa
+--CREATE VIEW %%JETPACK_PREFIX%%locks_on_resqueue
+--AS
+--	SELECT 
+--		pgsa.usename     AS lorusename, 
+--		pgrq.rsqname     AS lorrsqname, 
+--		pgl.locktype     AS lorlocktype, 
+--		pgl.objid        AS lorobjid, 
+--		pgl.transaction  AS lortransaction, 
+--		pgl.pid          AS lorpid, 
+--		pgl.mode         AS lormode, 
+--		pgl.granted      AS lorgranted, 
+--		pgsa.waiting     AS lorwaiting 
+--	FROM pg_catalog.pg_stat_activity pgsa
    
-	JOIN pg_catalog.pg_locks pgl
-	ON (pgsa.procpid = pgl.pid)
+--	JOIN pg_catalog.pg_locks pgl
+--	ON (pgsa.procpid = pgl.pid)
    
-	JOIN pg_catalog.pg_resqueue pgrq
-	ON (pgl.objid = pgrq.oid); 
+--	JOIN pg_catalog.pg_resqueue pgrq
+--	ON (pgl.objid = pgrq.oid); 
 
-GRANT SELECT ON TABLE %%JETPACK_PREFIX%%locks_on_resqueue TO public;
+-- GRANT SELECT ON TABLE %%JETPACK_PREFIX%%locks_on_resqueue TO public;
 
 
 --------------------------------------------------------------------------------
@@ -1321,31 +1321,31 @@ GRANT SELECT ON TABLE %%JETPACK_PREFIX%%locks_on_resqueue TO public;
 --        Locks of type 'relation' (sessions waiting because of relation locks)
 --        
 --------------------------------------------------------------------------------
-CREATE VIEW %%JETPACK_PREFIX%%locks_on_relation
-AS
-	SELECT 
-		pgl.locktype       AS lorlocktype, 
-		pgl.database       AS lordatabase, 
-		pgc.relname        AS lorrelname, 
-		pgl.relation       AS lorrelation, 
-		pgl.transaction    AS lortransaction, 
-		pgl.pid            AS lorpid, 
-		pgl.mode           AS lormode, 
-		pgl.granted        AS lorgranted, 
-		pgsa.current_query AS lorcurrentquery 
-	FROM pg_catalog.pg_locks pgl
+--CREATE VIEW %%JETPACK_PREFIX%%locks_on_relation
+--AS
+--	SELECT 
+--		pgl.locktype       AS lorlocktype, 
+--		pgl.database       AS lordatabase, 
+--		pgc.relname        AS lorrelname, 
+--		pgl.relation       AS lorrelation, 
+--		pgl.transaction    AS lortransaction, 
+--		pgl.pid            AS lorpid, 
+--		pgl.mode           AS lormode, 
+--		pgl.granted        AS lorgranted, 
+--		pgsa.current_query AS lorcurrentquery 
+--	FROM pg_catalog.pg_locks pgl
 
-	JOIN pg_catalog.pg_class pgc 
-	ON (pgl.relation = pgc.oid)
+--	JOIN pg_catalog.pg_class pgc 
+--	ON (pgl.relation = pgc.oid)
 
-	JOIN pg_catalog.pg_stat_activity pgsa 
-	ON (pgl.pid = pgsa.procpid)
+--	JOIN pg_catalog.pg_stat_activity pgsa 
+--	ON (pgl.pid = pgsa.procpid)
    
-	ORDER BY 
-		pgc.relname
-; 
+--	ORDER BY 
+--		pgc.relname
+--; 
 
-GRANT SELECT ON TABLE %%JETPACK_PREFIX%%locks_on_relation TO public;
+--GRANT SELECT ON TABLE %%JETPACK_PREFIX%%locks_on_relation TO public;
 
 
 --------------------------------------------------------------------------------
@@ -1356,24 +1356,24 @@ GRANT SELECT ON TABLE %%JETPACK_PREFIX%%locks_on_relation TO public;
 --        Shows directly assigned roles
 --        
 --------------------------------------------------------------------------------
-CREATE VIEW %%JETPACK_PREFIX%%roles_assigned
-AS
-	SELECT
-		pgr.oid      AS raroleid,
-		pgr.rolname  AS rarolename,
-		pgam.member  AS ramemberid,
-		pgr2.rolname AS ramembername
-	FROM
-	pg_catalog.pg_roles pgr
+--CREATE VIEW %%JETPACK_PREFIX%%roles_assigned
+--AS
+--	SELECT
+--		pgr.oid      AS raroleid,
+--		pgr.rolname  AS rarolename,
+--		pgam.member  AS ramemberid,
+--		pgr2.rolname AS ramembername
+--	FROM
+--	pg_catalog.pg_roles pgr
 
-	LEFT JOIN pg_catalog.pg_auth_members pgam
-	ON (pgr.oid = pgam.roleid)
+--	LEFT JOIN pg_catalog.pg_auth_members pgam
+--	ON (pgr.oid = pgam.roleid)
 
-	LEFT JOIN pg_catalog.pg_roles pgr2
-	ON (pgam.member = pgr2.oid)
-;
+--	LEFT JOIN pg_catalog.pg_roles pgr2
+--	ON (pgam.member = pgr2.oid)
+--;
 
-GRANT SELECT ON TABLE %%JETPACK_PREFIX%%roles_assigned TO public;
+--GRANT SELECT ON TABLE %%JETPACK_PREFIX%%roles_assigned TO public;
 
 
 
@@ -1781,49 +1781,49 @@ GRANT SELECT ON TABLE %%JETPACK_PREFIX%%size_of_database TO public;
 --              
 --------------------------------------------------------------------------------
 
-CREATE VIEW %%JETPACK_PREFIX%%resqueue_status
-AS
-	SELECT 
-		q.oid as queueid, 
-		q.rsqname as rsqname,
-		t1.value::int as rsqcountlimit, 
-		t2.value::int as rsqcountvalue, 
-		t3.value::real as rsqcostlimit, 
-		t4.value::real as rsqcostvalue, 
-		t5.value::real as rsqmemorylimit, 
-		t6.value::real as rsqmemoryvalue,
-		t7.value::int as rsqwaiters, 
-		t8.value::int as rsqholders
-	FROM
-		pg_resqueue q,
-		pg_resqueue_status_kv() t1 (queueid oid, key text, value text),
-		pg_resqueue_status_kv() t2 (queueid oid, key text, value text),
-		pg_resqueue_status_kv() t3 (queueid oid, key text, value text),
-		pg_resqueue_status_kv() t4 (queueid oid, key text, value text),
-		pg_resqueue_status_kv() t5 (queueid oid, key text, value text),
-		pg_resqueue_status_kv() t6 (queueid oid, key text, value text),
-		pg_resqueue_status_kv() t7 (queueid oid, key text, value text),
-		pg_resqueue_status_kv() t8 (queueid oid, key text, value text)
-	WHERE
-		q.oid = t1.queueid 
-		AND t1.queueid = t2.queueid 
-		AND t2.queueid = t3.queueid 
-		AND t3.queueid = t4.queueid 
-		AND t4.queueid = t5.queueid 
-		AND t5.queueid = t6.queueid 
-		AND t6.queueid = t7.queueid 
-		AND t7.queueid = t8.queueid
-		AND t1.key = 'rsqcountlimit'
-		AND t2.key = 'rsqcountvalue'
-		AND t3.key = 'rsqcostlimit'
-		AND t4.key = 'rsqcostvalue'
-		AND t5.key = 'rsqmemorylimit'
-		AND t6.key = 'rsqmemoryvalue'
-		AND t7.key = 'rsqwaiters'
-		AND t8.key = 'rsqholders'
-	;
+-- CREATE VIEW %%JETPACK_PREFIX%%resqueue_status
+-- AS
+--	SELECT 
+--		q.oid as queueid, 
+--		q.rsqname as rsqname,
+--		t1.value::int as rsqcountlimit, 
+--		t2.value::int as rsqcountvalue, 
+--		t3.value::real as rsqcostlimit, 
+--		t4.value::real as rsqcostvalue, 
+--		t5.value::real as rsqmemorylimit, 
+--		t6.value::real as rsqmemoryvalue,
+--		t7.value::int as rsqwaiters, 
+--		t8.value::int as rsqholders
+--	FROM
+--		pg_resqueue q,
+--		pg_resqueue_status_kv() t1 (queueid oid, key text, value text),
+--		pg_resqueue_status_kv() t2 (queueid oid, key text, value text),
+--		pg_resqueue_status_kv() t3 (queueid oid, key text, value text),
+--		pg_resqueue_status_kv() t4 (queueid oid, key text, value text),
+--		pg_resqueue_status_kv() t5 (queueid oid, key text, value text),
+--		pg_resqueue_status_kv() t6 (queueid oid, key text, value text),
+--		pg_resqueue_status_kv() t7 (queueid oid, key text, value text),
+--		pg_resqueue_status_kv() t8 (queueid oid, key text, value text)
+--	WHERE
+--		q.oid = t1.queueid 
+--		AND t1.queueid = t2.queueid 
+--		AND t2.queueid = t3.queueid 
+--		AND t3.queueid = t4.queueid 
+--		AND t4.queueid = t5.queueid 
+--		AND t5.queueid = t6.queueid 
+--		AND t6.queueid = t7.queueid 
+--		AND t7.queueid = t8.queueid
+--		AND t1.key = 'rsqcountlimit'
+--		AND t2.key = 'rsqcountvalue'
+--		AND t3.key = 'rsqcostlimit'
+--		AND t4.key = 'rsqcostvalue'
+--		AND t5.key = 'rsqmemorylimit'
+--		AND t6.key = 'rsqmemoryvalue'
+--		AND t7.key = 'rsqwaiters'
+--		AND t8.key = 'rsqholders'
+--	;
 
-GRANT SELECT ON %%JETPACK_PREFIX%%resqueue_status TO public;
+--GRANT SELECT ON %%JETPACK_PREFIX%%resqueue_status TO public;
 
 -- Finalize install
 COMMIT;

@@ -53,6 +53,6 @@ CREATE LANGUAGE plpgsql;
 
 ALTER RESOURCE QUEUE pg_default WITH (priority=medium, memory_limit='-1');
 
-CREATE SCHEMA gp_toolkit;
+CREATE SCHEMA hawq_toolkit;
 
 RESET log_min_messages;

@@ -40,6 +40,7 @@
 
 #include "cdb/cdbvars.h"
 #include "cdb/cdbdisp.h"
+#include "cdb/cdbdispatchedtablespaceinfo.h"
 #include "cdb/cdbpersistenttablespace.h"
 
 extern int64
@@ -129,28 +130,36 @@ db_dir_size(const char *path)
 	if (!dirdesc)
 		return 0;
 
-	while ((direntry = ReadDir(dirdesc, path)) != NULL)
+	/* Deal with remote shared storage */
+	if (!IsLocalPath(path))
 	{
-		struct stat fst;
-
-		if (strcmp(direntry->d_name, ".") == 0 ||
-			strcmp(direntry->d_name, "..") == 0)
-			continue;
-
-		snprintf(filename, MAXPGPATH, "%s/%s", path, direntry->d_name);
-
-		if (stat(filename, &fst) < 0)
-		{
-			if (errno == ENOENT)
-				continue;
-			else
-				ereport(ERROR,
-						(errcode_for_file_access(),
-						 errmsg("could not stat file \"%s\": %m", filename)));
-		}
-		dirsize += fst.st_size;
+		dirsize += HdfsPathSize(dirdesc);
 	}
+	/* Local storage */
+	else
+	{
+		while ((direntry = ReadDir(dirdesc, path)) != NULL)
+		{
+			struct stat fst;
 
+			if (strcmp(direntry->d_name, ".") == 0 ||
+					strcmp(direntry->d_name, "..") == 0)
+				continue;
+
+			snprintf(filename, MAXPGPATH, "%s/%s", path, direntry->d_name);
+
+			if (stat(filename, &fst) < 0)
+			{
+				if (errno == ENOENT)
+					continue;
+				else
+					ereport(ERROR,
+							(errcode_for_file_access(),
+									errmsg("could not stat file \"%s\": %m", filename)));
+			}
+			dirsize += fst.st_size;
+		}
+	}
 	FreeDir(dirdesc);
 	return dirsize;
 }
@@ -168,47 +177,70 @@ calculate_database_size(Oid dbOid)
 	HeapTuple    tuple;
 	AclResult	 aclresult;
 
-	/* User must have connect privilege for target database */
-	aclresult = pg_database_aclcheck(dbOid, GetUserId(), ACL_CONNECT);
-	if (aclresult != ACLCHECK_OK)
-		aclcheck_error(aclresult, ACL_KIND_DATABASE,
-					   get_database_name(dbOid));
-
-	/* Scan through all tablespaces */
-	rel = heap_open(TableSpaceRelationId, AccessShareLock);
-	scandesc = heap_beginscan(rel, SnapshotNow, 0, NULL);
-	tuple = heap_getnext(scandesc, ForwardScanDirection);
-	while (HeapTupleIsValid(tuple))
+	if (Gp_role != GP_ROLE_EXECUTE)
 	{
+		/* User must have connect privilege for target database */
+		aclresult = pg_database_aclcheck(dbOid, GetUserId(), ACL_CONNECT);
+		if (aclresult != ACLCHECK_OK)
+			aclcheck_error(aclresult, ACL_KIND_DATABASE,
+					   	   get_database_name(dbOid));
+
+		/* Scan through all tablespaces */
+		rel = heap_open(TableSpaceRelationId, AccessShareLock);
+		scandesc = heap_beginscan(rel, SnapshotNow, 0, NULL);
+		tuple = heap_getnext(scandesc, ForwardScanDirection);
+		while (HeapTupleIsValid(tuple))
+		{
+			char *priFilespace, *mirFilespace;
+			Oid   tsOid;
+		
+			tsOid = HeapTupleGetOid(tuple);
+		
+			/* Don't include shared relations */
+			if (tsOid != GLOBALTABLESPACE_OID)
+			{
+				/* Find the filespace path for this tablespace */
+				/* Master access its own database only. */
+				PersistentTablespace_GetPrimaryAndMirrorFilespaces(
+						GpIdentity.segindex, tsOid, FALSE, &priFilespace, &mirFilespace);
+
+				/* Build the path for this database in this tablespace */
+				FormDatabasePath(pathname, priFilespace, tsOid, dbOid);
+				totalsize += db_dir_size(pathname);
+			}
+
+			tuple = heap_getnext(scandesc, ForwardScanDirection);
+		}
+		heap_endscan(scandesc);
+		heap_close(rel, AccessShareLock);
+
+		/* Complain if we found no trace of the DB at all */
+		if (totalsize == 0)
+			ereport(ERROR,
+					(ERRCODE_UNDEFINED_DATABASE,
+					 errmsg("database with OID %u does not exist", dbOid)));
+
+	}
+	else
+	{
+		DispatchedFilespaceDirEntry entry;
+		Oid tsOid;
 		char *priFilespace, *mirFilespace;
-		Oid   tsOid;
-		
-		tsOid = HeapTupleGetOid(tuple);
-		
-		/* Don't include shared relations */
-		if (tsOid != GLOBALTABLESPACE_OID)
-		{			
-			/* Find the filespace path for this tablespace */
-			/* Master access its own database only. */
+
+		while ((entry = DispatchedFilespace_SeqSearch_GetNext()))
+		{
+			tsOid = entry->tablespace;
+			/*
+			 * For QE, dispatched Filespace information is needed
+			 */
 			PersistentTablespace_GetPrimaryAndMirrorFilespaces(
-				GpIdentity.segindex, tsOid, FALSE, &priFilespace, &mirFilespace);
+					GpIdentity.segindex, tsOid, TRUE, &priFilespace, &mirFilespace);
 
 			/* Build the path for this database in this tablespace */
 			FormDatabasePath(pathname, priFilespace, tsOid, dbOid);
-			
 			totalsize += db_dir_size(pathname);
 		}
-
-		tuple = heap_getnext(scandesc, ForwardScanDirection);
 	}
-	heap_endscan(scandesc);
-	heap_close(rel, AccessShareLock);
-
-	/* Complain if we found no trace of the DB at all */
-	if (totalsize == 0)
-		ereport(ERROR,
-				(ERRCODE_UNDEFINED_DATABASE,
-				 errmsg("database with OID %u does not exist", dbOid)));
 
 	return totalsize;
 }
@@ -218,11 +250,6 @@ pg_database_size_oid(PG_FUNCTION_ARGS)
 {
 	int64		size = 0;
 	Oid			dbOid = PG_GETARG_OID(0);
-
-	ereport(ERROR,
-			(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-		errmsg("pg_database_size function not supported"),
-				   errOmitLocation(true)));
 
 	size = calculate_database_size(dbOid);
 
@@ -247,11 +274,6 @@ pg_database_size_name(PG_FUNCTION_ARGS)
 	Name		dbName = PG_GETARG_NAME(0);
 	Oid			dbOid = get_database_oid(NameStr(*dbName));
 
-	ereport(ERROR,
-			(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-		errmsg("pg_database_size function not supported"),
-				   errOmitLocation(true)));
-
 	if (!OidIsValid(dbOid))
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_DATABASE),
@@ -266,7 +288,7 @@ pg_database_size_name(PG_FUNCTION_ARGS)
 		
 		initStringInfo(&buffer);
 
-		appendStringInfo(&buffer, "select sum(pg_database_size('%s'))::int8 from gp_dist_random('gp_id');", NameStr(*dbName));
+		appendStringInfo(&buffer, "select sum(pg_database_size(%u))::int8 from gp_dist_random('gp_id');", dbOid);
 
 		size += get_size_from_segDBs(buffer.data);
 	}
@@ -605,7 +627,8 @@ pg_total_relation_size_oid(PG_FUNCTION_ARGS)
 	Oid			relOid = PG_GETARG_OID(0);
 	
 	size = calculate_total_relation_size(relOid);
-	
+
+/*
 	if (Gp_role == GP_ROLE_DISPATCH)
 	{
 		StringInfoData buffer;
@@ -630,7 +653,7 @@ pg_total_relation_size_oid(PG_FUNCTION_ARGS)
 
 		size += get_size_from_segDBs(buffer.data);
 	}
-
+*/
 	PG_RETURN_INT64(size);
 }
 
@@ -664,7 +687,8 @@ pg_total_relation_size_name(PG_FUNCTION_ARGS)
 		relid = RangeVarGetRelid(relrv, false);
 
 	size = calculate_total_relation_size(relid);
-	
+
+/*
 	if (Gp_role == GP_ROLE_DISPATCH)
 	{
 		char * rawname;
@@ -679,7 +703,7 @@ pg_total_relation_size_name(PG_FUNCTION_ARGS)
 		
 		size += get_size_from_segDBs(buffer.data);
 	}
-
+*/
 	PG_RETURN_INT64(size);
 }
 

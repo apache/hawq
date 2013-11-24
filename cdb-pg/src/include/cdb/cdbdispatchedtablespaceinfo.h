@@ -28,6 +28,7 @@ typedef DispatchedFilespaceDirEntryData *DispatchedFilespaceDirEntry;
 
 extern void DispatchedFilespace_GetPathForTablespace(Oid tablespace, char **filespacePath, bool * found);
 extern void DispatchedFilespace_AddForTablespace(Oid tablespace, const char * path);
-
+extern DispatchedFilespaceDirEntry DispatchedFilespace_SeqSearch_GetNext(void);
+extern void DispatchedFilespace_SeqSearch_Term(void);
 
 #endif /* _CDBDISPATCHEDTABLESPACEINFO_H_ */

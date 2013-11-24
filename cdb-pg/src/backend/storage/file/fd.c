@@ -282,7 +282,6 @@ static bool HdfsBasicOpenFile(FileName fileName, int fileFlags, int fileMode,
 							  char **hProtocol, hdfsFS *fs, hdfsFile *hFile);
 static const char * ConvertToUnixPath(const char * fileName, char * buffer,
 		int len);
-static int IsLocalPath(const char * fileName);
 
 static hdfsToken *DeserializeDelegationToken(void *binary, int size);
 
@@ -2383,7 +2382,7 @@ HdfsGetConnection(const char * path)
 /*
  * return non-zero if fileName is a well formated hdfs path
  */
-static int
+int
 IsLocalPath(const char * fileName)
 {
 	if (0 == strncmp(fileName, local_prefix, strlen(local_prefix)))
@@ -3197,4 +3196,32 @@ FileGetName(File file)
 	return VfdCache[file].fileName;
 }
 
+int64
+HdfsPathSize(DIR *dirdesc)
+{
+	/* This cache may be changed. But most of time it is correct. */
+	int idx;
+	int64 total_size = 0;
+	AllocateDesc *desc = NULL;
+
+	for (idx = 0; idx < numAllocatedDescs; idx++)
+	{
+		desc = &allocatedDescs[idx];
+		if (desc->kind == AllocateDescRemoteDir &&
+				desc->desc.dir == dirdesc)
+		{
+			break;
+		}
+	}
+
+	/* Should not happen! */
+	Assert(idx < numAllocatedDescs);
+
+	for (idx = 0; idx < desc->num; idx++)
+	{
+		total_size += ((HdfsFileInfo *) desc->filelist)[idx].mSize;
+	}
+
+	return total_size;
+}
 

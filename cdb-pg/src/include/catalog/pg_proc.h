@@ -7627,10 +7627,12 @@ DESCR("Calculate total disk space usage for the specified tablespace");
 /* pg_database_size(oid) => int8 */ 
 DATA(insert OID = 2324 ( pg_database_size  PGNSP PGUID 12 f f t f v 1 20 f "26" _null_ _null_ _null_ pg_database_size_oid - _null_ r ));
 DESCR("Calculate total disk space usage for the specified database");
+#define PgDatabaseSizeOidProcId (2324)
 
 /* pg_database_size(name) => int8 */ 
 DATA(insert OID = 2168 ( pg_database_size  PGNSP PGUID 12 f f t f v 1 20 f "19" _null_ _null_ _null_ pg_database_size_name - _null_ r ));
 DESCR("Calculate total disk space usage for the specified database");
+#define PgDatabaseSizeNameProcId (2168)
 
 /* pg_relation_size(oid) => int8 */ 
 DATA(insert OID = 2325 ( pg_relation_size  PGNSP PGUID 12 f f t f v 1 20 f "26" _null_ _null_ _null_ pg_relation_size_oid - _null_ r ));

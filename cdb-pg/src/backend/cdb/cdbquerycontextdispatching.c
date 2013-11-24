@@ -119,6 +119,9 @@ prepareDispatchedCatalogExternalTable(QueryContextInfo *cxt, Oid relid);
 static void
 WriteData(QueryContextInfo *cxt, const char *buffer, int size);
 
+static void
+prepareAllDispatchedCatalogTablespace(QueryContextInfo *ctx, HTAB *htab);
+
 /**
  * construct the file location for query context dispatching.
  */
@@ -895,6 +898,39 @@ prepareDispatchedCatalogTablespace(QueryContextInfo *cxt, Oid tablespace, HTAB *
 }
 
 /*
+ * collect all pg_tablespace tuples for oid.
+ * add them to in-memory heap table for dispatcher.
+ */
+static void
+prepareAllDispatchedCatalogTablespace(QueryContextInfo *ctx, HTAB *htab)
+{
+	Relation rel;
+	HeapScanDesc scandesc;
+	HeapTuple tuple;
+
+	/* Scan through all tablespaces */
+	rel = heap_open(TableSpaceRelationId, AccessShareLock);
+	scandesc = heap_beginscan(rel, SnapshotNow, 0, NULL);
+	tuple = heap_getnext(scandesc, ForwardScanDirection);
+	while (HeapTupleIsValid(tuple))
+	{
+		Oid tsOid;
+
+		tsOid = HeapTupleGetOid(tuple);
+		/*Don't include shared relations */
+		if (!IsBuiltinTablespace(tsOid))
+		{
+			prepareDispatchedCatalogTablespace(ctx, tsOid, htab);
+		}
+		tuple = heap_getnext(scandesc, ForwardScanDirection);
+	}
+	heap_endscan(scandesc);
+	heap_close(rel, AccessShareLock);
+
+	return;
+}
+
+/*
  * to check if a type is a composite type,
  * dispatching type info if it is.
  */
@@ -1560,6 +1596,12 @@ static bool collect_func_walker(Node *node, FuncWalkerContext *context)
 				/* build the dispacth for the function itself */
 				prepareDispatchedCatalogFunction(context->qcxt, func->funcid,
 												 context->htab);
+			}
+			/* Treat pg_database_size specially */
+			else if (PgDatabaseSizeOidProcId == func->funcid || PgDatabaseSizeNameProcId == func->funcid)
+			{
+				/* dispatch all the table space information for calculating database size */
+				prepareAllDispatchedCatalogTablespace(context->qcxt, context->htab);
 			}
 			break;
 		}

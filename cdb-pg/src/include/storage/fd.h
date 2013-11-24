@@ -151,7 +151,11 @@ extern bool TestFileValid(File file);
 
 extern bool HdfsPathExist(char *path);
 
+extern int64 HdfsPathSize(DIR *dirdesc);
+
 extern FileName FileGetName(File file);
+
+extern int IsLocalPath(const char *filename);
 
 /* secure enabled hdfs */
 

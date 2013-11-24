@@ -19,6 +19,8 @@
  * never destroy it until process exit
  */
 static HTAB * DispatchedFilespaceDirHashTable = NULL;
+static bool DispatchedFileSpace_SeqSearch_Initialized = false;
+static HASH_SEQ_STATUS DispatchedFileSpace_SeqSearch;
 
 /*
  * init gloal hash table DispatchedFilespaceDirHashTable
@@ -28,6 +30,9 @@ DispatchedFilespace_HashTableInit(void)
 {
 	HASHCTL			info;
 	int				hash_flags;
+
+	/* Make sure the seq search is not initialized */
+	DispatchedFileSpace_SeqSearch_Initialized = false;
 
 	if (DispatchedFilespaceDirHashTable)
 		return;
@@ -107,4 +112,58 @@ DispatchedFilespace_GetPathForTablespace(Oid tablespace, char **filespacePath, b
 		*filespacePath = NULL;
 	else
 		*filespacePath = pstrdup(entry->location);
+}
+
+/*
+ * initialize the seq search of the DispatchedFilespaceDirHashTable.
+ */
+static void
+DispatchedFilespace_SeqSearch_Init(void)
+{
+	if (DispatchedFileSpace_SeqSearch_Initialized || (!DispatchedFilespaceDirHashTable))
+	{
+		return;
+	}
+	hash_seq_init(&DispatchedFileSpace_SeqSearch, DispatchedFilespaceDirHashTable);
+	DispatchedFileSpace_SeqSearch_Initialized = true;
+}
+
+/*
+ * Get the next DispatchedFilespaceDirEntry
+ * from the DispatchedFilespaceDirHashTable.
+ */
+DispatchedFilespaceDirEntry
+DispatchedFilespace_SeqSearch_GetNext(void)
+{
+	DispatchedFilespaceDirEntry entry;
+
+	if (!DispatchedFilespaceDirHashTable)
+	{
+		return NULL;
+	}
+	if (!DispatchedFileSpace_SeqSearch_Initialized)
+	{
+		DispatchedFilespace_SeqSearch_Init();
+	}
+
+	entry = (DispatchedFilespaceDirEntry)hash_seq_search(&DispatchedFileSpace_SeqSearch);
+	if (!entry)
+	{
+		DispatchedFileSpace_SeqSearch_Initialized = false;
+	}
+	return entry;
+}
+
+/*
+ * Terminate the seq search of the DispatchedFilespaceDirHashTable.
+ */
+void
+DispatchedFilespace_SeqSearch_Term(void)
+{
+	if (!DispatchedFileSpace_SeqSearch_Initialized)
+	{
+		return;
+	}
+	hash_seq_term(&DispatchedFileSpace_SeqSearch);
+	DispatchedFileSpace_SeqSearch_Initialized = false;
 }
