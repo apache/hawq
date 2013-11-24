@@ -593,14 +593,14 @@ CREATE FUNCTION ffp(anyarray) RETURNS anyarray AS 'select $1' LANGUAGE SQL;
 CREATE AGGREGATE myagg3(BASETYPE = anyelement, SFUNC = tfp, STYPE = anyarray, FINALFUNC = ffp, INITCOND = '{}');
 CREATE TABLE array_table(f1 int, f2 int[], f3 text);
 INSERT INTO array_table values(1,array[1],'a');
-INSERT INTO array_table values(1,array[11],'b');
-INSERT INTO array_table values(1,array[111],'c');
-INSERT INTO array_table values(2,array[2],'a');
-INSERT INTO array_table values(2,array[22],'b');
-INSERT INTO array_table values(2,array[222],'c');
-INSERT INTO array_table values(3,array[3],'a');
-INSERT INTO array_table values(3,array[3],'b');
-SELECT f3, myagg3(f1) from array_table GROUP BY f3 ORDER BY f3;
+INSERT INTO array_table values(2,array[11],'b');
+INSERT INTO array_table values(3,array[111],'c');
+INSERT INTO array_table values(4,array[2],'a');
+INSERT INTO array_table values(5,array[22],'b');
+INSERT INTO array_table values(6,array[222],'c');
+INSERT INTO array_table values(7,array[3],'a');
+INSERT INTO array_table values(8,array[3],'b');
+SELECT f3, myagg3(f1) from (select * from array_table order by f1 limit 10) as foo GROUP BY f3 ORDER BY f3;
 
 -- clean up
 drop schema orca cascade;
