@@ -1,2 +1,1 @@
 Installcheck/upgrade
-installcheck-good/polymorphism

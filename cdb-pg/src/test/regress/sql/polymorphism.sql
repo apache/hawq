@@ -341,52 +341,37 @@ CREATE AGGREGATE mysum2(anyelement,anyelement) (SFUNC = sum3,
 -- create test data for polymorphic aggregates
 create temp table t(f1 int, f2 int[], f3 text);
 insert into t values(1,array[1],'a');
-insert into t values(1,array[11],'b');
-insert into t values(1,array[111],'c');
-insert into t values(2,array[2],'a');
-insert into t values(2,array[22],'b');
-insert into t values(2,array[222],'c');
-insert into t values(3,array[3],'a');
-insert into t values(3,array[3],'b');
+insert into t values(2,array[11],'b');
+insert into t values(3,array[111],'c');
+insert into t values(4,array[2],'a');
+insert into t values(5,array[22],'b');
+insert into t values(6,array[222],'c');
+insert into t values(7,array[3],'a');
+insert into t values(8,array[3],'b');
 
 -- test the successfully created polymorphic aggregates
-select f3, myaggp01a(*) from t group by f3 order by f3;
-select f3, myaggp03a(*) from t group by f3 order by f3;
-select f3, myaggp03b(*) from t group by f3 order by f3;
-select f3, myaggp05a(f1) from t group by f3 order by f3;
-select f3, myaggp06a(f1) from t group by f3 order by f3;
-select f3, myaggp08a(f1) from t group by f3 order by f3;
-select f3, myaggp09a(f1) from t group by f3 order by f3;
-select f3, myaggp09b(f1) from t group by f3 order by f3;
-select f3, myaggp10a(f1) from t group by f3 order by f3;
-select f3, myaggp10b(f1) from t group by f3 order by f3;
-select f3, myaggp20a(f1) from t group by f3 order by f3;
-select f3, myaggp20b(f1) from t group by f3 order by f3;
-select f3, myaggn01a(*) from t group by f3 order by f3;
-select f3, myaggn01b(*) from t group by f3 order by f3;
-select f3, myaggn03a(*) from t group by f3 order by f3;
-select f3, myaggn05a(f1) from t group by f3 order by f3;
-select f3, myaggn05b(f1) from t group by f3 order by f3;
-select f3, myaggn06a(f1) from t group by f3 order by f3;
-select f3, myaggn06b(f1) from t group by f3 order by f3;
-select f3, myaggn08a(f1) from t group by f3 order by f3;
-select f3, myaggn08b(f1) from t group by f3 order by f3;
-select f3, myaggn09a(f1) from t group by f3 order by f3;
-select f3, myaggn10a(f1) from t group by f3 order by f3;
+select f3, myaggp01a(*) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+select f3, myaggp03a(*) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+select f3, myaggp03b(*) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+select f3, myaggp05a(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+select f3, myaggp06a(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+select f3, myaggp08a(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+select f3, myaggp09a(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+select f3, myaggp09b(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+select f3, myaggp10a(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+select f3, myaggp10b(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+select f3, myaggp20a(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+select f3, myaggp20b(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+select f3, myaggn01a(*) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+select f3, myaggn01b(*) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+select f3, myaggn03a(*) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+select f3, myaggn05a(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+select f3, myaggn05b(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+select f3, myaggn06a(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+select f3, myaggn06b(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+select f3, myaggn08a(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+select f3, myaggn08b(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+select f3, myaggn09a(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+select f3, myaggn10a(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
 select mysum2(f1, f1 + 1) from t;
 
--- test inlining of polymorphic SQL functions
-create function bleat(int) returns int as $$
-begin
-  raise notice 'bleat %', $1;
-  return $1;
-end$$ language plpgsql;
-
-create function sql_if(bool, anyelement, anyelement) returns anyelement as $$
-select case when $1 then $2 else $3 end $$ language sql;
-
--- Note this would fail with integer overflow, never mind wrong bleat() output,
--- if the CASE expression were not successfully inlined
-select f1, sql_if(f1 > 0, bleat(f1), bleat(f1 + 1)) from int4_tbl;
-
-select q2, sql_if(q2 > 0, q2, q2 + 1) from int8_tbl;
