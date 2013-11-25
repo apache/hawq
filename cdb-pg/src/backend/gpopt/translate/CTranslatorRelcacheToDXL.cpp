@@ -2165,6 +2165,27 @@ CTranslatorRelcacheToDXL::PimdobjColStats
 		dNullFrequency = 0.0;
 	}
 
+	// total MCV frequency
+	CDouble dMCFSum = 0.0;
+	for (ULONG ul = 0; ul < iNumMCVValues; ul++)
+	{
+		dMCFSum = dMCFSum + CDouble(pdrgfMCVFrequencies[ul]);
+	}
+
+	// ndistinct and frequency of remaining tuples
+	// that are not covered by MCV or histogram
+	CDouble dDistinctRemain = 0.0;
+	CDouble dFreqRemain = 0.0;
+
+	// there will be remaining tuples when both conditions below are met:
+	// 1. no GPDB histogram is available
+	// 2. the MCVs do not cover all the tuples, i.e. sum(MCFs) < 1
+	if (1 >= iNumHistValues && 1 - CStatistics::DEpsilon > dMCFSum)
+	{
+		dDistinctRemain = dDistinct - iNumMCVValues;
+		dFreqRemain = 1 - dMCFSum;
+	}
+
 	// transform all the bits and pieces from pg_stats
 	// to a single bucket structure
 	DrgPdxlbucket *pdrgpdxlbucketTransformed =
@@ -2199,6 +2220,8 @@ CTranslatorRelcacheToDXL::PimdobjColStats
 											pmdnameCol,
 											dWidth,
 											dNullFrequency,
+											dDistinctRemain,
+											dFreqRemain,
 											pdrgpdxlbucket
 											);
 
