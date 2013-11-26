@@ -1,0 +1,160 @@
+--
+-- CREATE_TYPE
+--
+--
+-- Note: widget_in/out were created in create_function_1, without any
+-- prior shell-type creation.  These commands therefore complete a test
+-- of the "old style" approach of making the functions first.
+--
+drop database hdfs;
+create database hdfs;
+\c hdfs
+-- Test stand-alone composite type
+create type temp_type_1 as (a int, b int);
+create type temp_type_2 as (a int, b int);
+create table temp_table (a temp_type_1, b temp_type_2);
+NOTICE:  Table doesn't have 'distributed by' clause, and no column type is suitable for a distribution key. Creating a NULL policy entry.
+insert into temp_table values ((1,2), (3,4));
+insert into temp_table values ((5,6), (7,8));
+insert into temp_table values ((9,10), (11,12));
+\d temp_table
+Append-Only Table "public.temp_table"
+ Column |    Type     | Modifiers 
+--------+-------------+-----------
+ a      | temp_type_1 | 
+ b      | temp_type_2 | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Distributed randomly
+
+select gp_segment_id, * from temp_table;
+ gp_segment_id |   a    |    b    
+---------------+--------+---------
+             1 | (1,2)  | (3,4)
+             0 | (5,6)  | (7,8)
+             0 | (9,10) | (11,12)
+(3 rows)
+
+drop table temp_table;
+create type temp_type_3 as (a temp_type_1, b temp_type_2);
+CREATE table temp_table (a temp_type_1, b temp_type_3);
+NOTICE:  Table doesn't have 'distributed by' clause, and no column type is suitable for a distribution key. Creating a NULL policy entry.
+insert into temp_table values ((9,10), ((11,12),(7,8)));
+insert into temp_table values ((1,2), ((3,4),(5,6)));
+select gp_segment_id, * from temp_table;
+ gp_segment_id |   a    |          b          
+---------------+--------+---------------------
+             1 | (9,10) | ("(11,12)","(7,8)")
+             0 | (1,2)  | ("(3,4)","(5,6)")
+(2 rows)
+
+-- check catalog entries for types
+select typname, typrelid from pg_type where typname like 'temp_type_%';
+   typname   | typrelid 
+-------------+----------
+ temp_type_1 |    90266
+ temp_type_2 |    90268
+ temp_type_3 |    90275
+(3 rows)
+
+comment on type temp_type_1 is 'test composite type';
+\dT temp_type_1
+             List of data types
+ Schema |    Name     |     Description     
+--------+-------------+---------------------
+ public | temp_type_1 | test composite type
+(1 row)
+
+select relname, reltype, relfilenode from pg_class where relname like 'temp_type%';
+   relname   | reltype | relfilenode 
+-------------+---------+-------------
+ temp_type_1 |   90267 |       90266
+ temp_type_2 |   90269 |       90268
+ temp_type_3 |   90276 |       90275
+(3 rows)
+
+create table test_func (foo temp_type_1);
+NOTICE:  Table doesn't have 'distributed by' clause, and no column type is suitable for a distribution key. Creating a NULL policy entry.
+insert into test_func values( (1,2));
+insert into test_func values( (3,4));
+insert into test_func values( (5,6));
+insert into test_func values( (7,8));
+-- Functions with UDTs
+create function test_temp_func(temp_type_1, temp_type_2) RETURNS temp_type_1 AS '
+  select foo from test_func where (foo).a = 3;
+' LANGUAGE SQL; 
+SELECT * FROM test_temp_func((7,8), (5,6));
+ a | b 
+---+---
+ 3 | 4
+(1 row)
+
+drop function test_temp_func(temp_type_1, temp_type_2);
+-- Check alter schema
+create schema type_test;
+alter type temp_type_1 set schema type_test;
+\dT temp_type_1
+     List of data types
+ Schema | Name | Description 
+--------+------+-------------
+(0 rows)
+
+\dT type_test.temp_type_1
+                   List of data types
+  Schema   |         Name          |     Description     
+-----------+-----------------------+---------------------
+ type_test | type_test.temp_type_1 | test composite type
+(1 row)
+
+\d test_func
+    Append-Only Table "public.test_func"
+ Column |         Type          | Modifiers 
+--------+-----------------------+-----------
+ foo    | type_test.temp_type_1 | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Distributed randomly
+
+select foo from test_func where (foo).a = 3;
+  foo  
+-------
+ (3,4)
+(1 row)
+
+-- type name with truncation
+create type abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890 as (a int, b int);
+NOTICE:  identifier "abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890" will be truncated to "abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1"
+create table huge_type_table (a abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890);
+NOTICE:  identifier "abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890" will be truncated to "abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1"
+NOTICE:  Table doesn't have 'distributed by' clause, and no column type is suitable for a distribution key. Creating a NULL policy entry.
+insert into huge_type_table values ((1,2));
+insert into huge_type_table values ((3,4));
+select * from huge_type_table;
+   a   
+-------
+ (1,2)
+ (3,4)
+(2 rows)
+
+\d huge_type_table;
+                      Append-Only Table "public.huge_type_table"
+ Column |                              Type                               | Modifiers 
+--------+-----------------------------------------------------------------+-----------
+ a      | abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1 | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Distributed randomly
+
+drop table huge_type_table;
+drop type abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890;
+NOTICE:  identifier "abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890" will be truncated to "abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1"
+-- composite type array tests ..negative test
+create table type_array_table (col_one type_test.temp_type_1[]);
+ERROR:  type "type_test.temp_type_1[]" does not exist
+\c regression
