@@ -1363,12 +1363,12 @@ prepareDispatchedCatalogAoSegfile(QueryContextInfo *cxt,
                 F_INT4EQ, segno);
 
         aosegScanDesc = systable_beginscan(ao_seg_rel, InvalidOid, FALSE,
-                SnapshotNow, 1, &key);
+        		ActiveSnapshot, 1, &key);
     }
     else
     {
         aosegScanDesc = systable_beginscan(ao_seg_rel, InvalidOid, FALSE,
-                SnapshotNow, 0, NULL );
+        		ActiveSnapshot, 0, NULL );
     }
 
     while (HeapTupleIsValid(pg_aoseg_tuple = systable_getnext(aosegScanDesc)))
