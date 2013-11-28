@@ -146,6 +146,8 @@ public class ReadBridge implements IBridge
 
 	@Override
 	public boolean isThreadSafe() {
-		return ((Plugin)fileAccessor).isThreadSafe() && ((Plugin)fieldsResolver).isThreadSafe();
+		boolean result = ((Plugin)fileAccessor).isThreadSafe() && ((Plugin)fieldsResolver).isThreadSafe();
+		Log.debug("Bridge is " + (result ? "" : "not ") + "thread safe");
+		return result;
 	}	
 }

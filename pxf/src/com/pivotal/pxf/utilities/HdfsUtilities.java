@@ -7,6 +7,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.compress.BZip2Codec;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.CompressionCodecFactory;
+import org.apache.hadoop.io.compress.SplittableCompressionCodec;
 import org.apache.hadoop.util.ReflectionUtils;
 
 /*
@@ -62,6 +63,23 @@ public class HdfsUtilities
 		Log.debug((codecClass == null ? "No codec" : "Codec " + codecClass)  
 				+ " was found for file " + path);
 		return codecClass;
+	}
+	
+	/**
+	 * Returns true if the needed codec is splittable. 
+	 * If no codec is needed returns true as well.
+	 * @param path path of the file to be read
+	 * @return if the codec needed for reading the specified path is splittable.
+	 */
+	public static boolean isSplittableCodec(Path path) {
+		
+		final CompressionCodec codec = factory.getCodec(path);
+		if (null == codec) 
+		{
+			return true;
+		}
+		
+		return codec instanceof SplittableCompressionCodec;
 	}
 	
 	/**

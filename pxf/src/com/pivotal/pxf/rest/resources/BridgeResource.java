@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.locks.ReentrantLock;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -37,6 +38,16 @@ public class BridgeResource extends SecuredResource
 {
 
 	private static Log Log = LogFactory.getLog(BridgeResource.class);
+	/**
+	 * Lock is needed here in the case of a non-thread-safe plugin.
+	 * Using synchronized methods is not enough because the bridge work
+	 * is called by jetty ({@link StreamingOutput}), after we are getting 
+	 * out of this class's context.
+	 * 
+	 * BRIDGE_LOCK is accessed through lock() and unlock() functions, based on the 
+	 * isThreadSafe parameter that is determined by the bridge.
+	 */
+	private static final ReentrantLock BRIDGE_LOCK = new ReentrantLock();
 	
 	public BridgeResource() {}
 
@@ -65,32 +76,19 @@ public class BridgeResource extends SecuredResource
 		String dataDir = inputData.path();
 		// THREAD-SAFE parameter has precedence 
 		boolean isThreadSafe = inputData.threadSafe() && bridge.isThreadSafe();
-		Log.debug("Request for " + dataDir + " handled " +
+		Log.debug("Request for " + dataDir + " will be handled " +
 				  (isThreadSafe ? "without" : "with") + " synchronization"); 
 		
-		return isThreadSafe ? readResponse(bridge, inputData) : 
-			synchronizedReadResponse(bridge, inputData);
-	}
-	
-	/*
-	 * Used to handle requests for formats that do not support multithreading.
-	 * E.g. - BZip2 files (*.bz2)
-	 */
-	private static synchronized Response synchronizedReadResponse(IBridge bridge, InputData inputData) throws Exception
-	{
-		return readResponse(bridge, inputData);
+		return readResponse(bridge, inputData, isThreadSafe);
 	}
 
-	static Response readResponse(IBridge ibridge, InputData inputData) throws Exception
+	Response readResponse(IBridge ibridge, InputData inputData, boolean threadSafe) throws Exception
 	{
-		final IBridge bridge = ibridge;	
-
-		if (!bridge.beginIteration())
-			return Response.ok().build();
-
+		final IBridge bridge = ibridge;
+		final boolean isThreadSafe = threadSafe;
 		final int fragment = inputData.getDataFragment();
 		final String dataDir = inputData.getProperty("X-GP-DATA-DIR");
-
+				
 		// Creating an internal streaming class
 		// which will iterate the records and put them on the
 		// output stream
@@ -101,8 +99,15 @@ public class BridgeResource extends SecuredResource
 			{
 				long recordCount = 0;
 
-				try
-				{
+				if (!isThreadSafe) {
+					lock(dataDir);
+				}
+				try {
+					
+					if (!bridge.beginIteration()) {
+						return;
+					}
+					
 					Writable record = null;
 					DataOutputStream dos = new DataOutputStream(out);
 					Log.debug("Starting streaming fragment " + fragment + " of resource " + dataDir);
@@ -131,12 +136,17 @@ public class BridgeResource extends SecuredResource
 					}
 					throw new IOException(e.getMessage());
 				}
+				finally {
+					if (!isThreadSafe) {
+						unlock(dataDir);
+					}
+				}
 			}
 		};
 
 		return Response.ok(streaming, MediaType.APPLICATION_OCTET_STREAM).build();
 	}
-
+	
 	Map<String, String> convertToRegularMap(MultivaluedMap<String, String> multimap) throws Exception
 	{
 		Map<String, String> result = new HashMap<String, String>();
@@ -159,6 +169,28 @@ public class BridgeResource extends SecuredResource
 		}
 
 		return result;
+	}
+	
+	/**
+	 * Lock BRIDGE_LOCK
+	 * 
+	 * @param path path for the request, used for logging.
+	 */
+	private void lock(String path) {
+		Log.trace("Locking BridgeResource for " + path);
+		BRIDGE_LOCK.lock();
+		Log.trace("Locked BridgeResource for " + path);
+	}
+	
+	/**
+	 * Unlock BRIDGE_LOCK
+	 * 
+	 * @param path path for the request, used for logging.
+	 */
+	private void unlock(String path) {
+		Log.trace("Unlocking BridgeResource for " + path);
+		BRIDGE_LOCK.unlock();
+		Log.trace("Unlocked BridgeResource for " + path);
 	}
 
 }

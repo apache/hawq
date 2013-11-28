@@ -13,6 +13,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.compress.BZip2Codec;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.CompressionCodecFactory;
+import org.apache.hadoop.io.compress.DefaultCodec;
 import org.apache.hadoop.io.compress.GzipCodec;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.junit.Before;
@@ -125,14 +126,13 @@ public class HdfsUtilitiesTest {
 				"writable compression, some compression codec - thread safe",
 				"some/path", true,
 				"I.am.a.nice.codec", new NotSoNiceCodec(),
-				true);	
+				true);
 
 		testIsThreadSafe(
 				"writable compression, compression codec bzip2 - not thread safe",
 				"some/path", true,
 				"org.apache.hadoop.io.compress.BZip2Codec", new BZip2Codec(),
 				false);
-				
 	}
 
 	private void testIsThreadSafe(
@@ -145,7 +145,6 @@ public class HdfsUtilitiesTest {
 
 		boolean result = HdfsUtilities.isThreadSafe(inputData);
 		assertTrue(testDescription, result==expectedResult);
-
 	}
 
 	private void prepareDataForIsThreadSafe(
@@ -170,7 +169,28 @@ public class HdfsUtilitiesTest {
 		else {
 			PowerMockito.stub(PowerMockito.method(HdfsUtilities.class, "getCodecClass")).toReturn(codec.getClass());
 		}
-
+	}
+	
+	@Test
+	public void isSplittableCodec() {
+		
+		testIsSplittableCodec("no codec - splittable", 
+		                      "some/innocent.file", null, true);
+		testIsSplittableCodec("gzip codec - not splittable", 
+		                      "/gzip.gz", new GzipCodec(), false);
+		testIsSplittableCodec("default codec - not splittable", 
+		                      "/default.deflate", new DefaultCodec(), false);
+		testIsSplittableCodec("bzip2 codec - splittable",
+		                      "bzip2.bz2", new BZip2Codec(), true);
+	}
+	
+	private void testIsSplittableCodec(String description,
+									   String pathName, CompressionCodec codec, boolean expected) {
+		Path path = new Path(pathName);
+		when(factory.getCodec(path)).thenReturn(codec);
+		
+		boolean result = HdfsUtilities.isSplittableCodec(path);
+		assertEquals(description, result, expected);
 	}
 
 }
