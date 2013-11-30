@@ -180,7 +180,10 @@ typedef enum FaultInjectorIdentifier_e {
 	BeforeDispatch,
 
 	DispatchToGangThreadStructureInitialization,
-
+	
+	InternalFlushError,
+	ExecSimpleQueryEndCommand,
+	MultiExecHashLargeVmem,
 	ExecSortBeforeSorting,
 	ExecSortMKSortMergeRuns,
 
