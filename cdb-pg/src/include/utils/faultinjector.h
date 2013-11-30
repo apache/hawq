@@ -168,9 +168,6 @@ typedef enum FaultInjectorIdentifier_e {
 	FaultDuringExecDynamicTableScan,
 	GangThreadCreation,
 	DispatchThreadCreation,
-	InternalFlushError,
-	ExecSimpleQueryEndCommand,
-	MultiExecHashLargeVmem,
 
 /*	DispatchWait,*/
 	ConnectionFailAfterGangCreation,
