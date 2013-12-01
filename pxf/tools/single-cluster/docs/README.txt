@@ -72,6 +72,7 @@ v1.7.2
 
 - GPSQL-1235: Stop using jps tool
 - GPSQL-1272: stop-hbase.sh sometimes hangs forever
+- GPSQL-1363: Add a temporary delay before checking Zookeeper's status
 
 v1.7.1
 ------
