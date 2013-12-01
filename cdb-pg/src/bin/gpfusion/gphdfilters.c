@@ -15,6 +15,7 @@
 
 static bool opexpr_to_gphdfilter(OpExpr *expr, GPHDFilterDesc *filter);
 static void const_to_str(Const *constval, StringInfo buf);
+static bool supported_filter_type(Oid type);
 
 /*
  * All supported GPDB operators, and their respective HFDS operator code.
@@ -56,6 +57,21 @@ gpop_hdop_map gphd_supported_opr[] =
 	{531 /* textlt  */, HDOP_NE},
 };
 
+Oid gphd_supported_types[] =
+{
+	INT2OID,
+	INT4OID,
+	INT8OID,
+	FLOAT4OID,
+	FLOAT8OID,
+	NUMERICOID,
+	TEXTOID,
+	VARCHAROID,
+	BPCHAROID,
+	CHAROID,
+	BYTEAOID,
+	BOOLOID
+};
 
 /*
  * gphd_make_filter_list
@@ -241,17 +257,24 @@ opexpr_to_gphdfilter(OpExpr *expr, GPHDFilterDesc *filter)
 	int		 nargs 		= sizeof(gphd_supported_opr) / sizeof(gpop_hdop_map);
 	Node	*leftop 	= get_leftop((Expr*)expr);
 	Node	*rightop	= get_rightop((Expr*)expr);
+	Oid		 rightop_type = exprType(rightop);
 
 	/* only binary oprs supported currently */
 	if (!rightop)
 		return false;
 
+	elog(DEBUG5, "opexpr_to_gphdfilter: leftop_type: %d, rightop_type: %d",
+		 exprType(leftop), rightop_type);
 	/* both side data types must be identical (for now) */
-	if (exprType(rightop) != exprType(leftop))
+	if (rightop_type != exprType(leftop))
 		return false;
 
-	/* TODO: is it a supported data type? This may actually not be needed *
-	 * as the supported operator list implicitly does the work for us     */
+	/*
+	 * check if supported type -
+	 * enough to check only one side because of above condition
+	 */
+	if (!supported_filter_type(rightop_type))
+		return false;
 
 	/* arguments must be VAR and CONST */
 	if (IsA(leftop,  Var) && IsA(rightop, Const))
@@ -300,6 +323,27 @@ opexpr_to_gphdfilter(OpExpr *expr, GPHDFilterDesc *filter)
 	/* NOTE: if more validation needed, add it before the operators test
 	 * or alternatively change it to use a false flag and return true below */
 
+	return false;
+}
+
+/*
+ * supported_filter_type
+ *
+ * Return true if the type is supported by gphdfilters.
+ * Supported defines are defined in gphd_supported_types.
+ */
+static bool
+supported_filter_type(Oid type)
+{
+	int		 nargs 		= sizeof(gphd_supported_types) / sizeof(Oid);
+	int 	 i;
+
+	/* is type supported? */
+	for (i = 0; i < nargs; i++)
+	{
+		if (type == gphd_supported_types[i])
+			return true;
+	}
 	return false;
 }
 
@@ -359,7 +403,8 @@ const_to_str(Const *constval, StringInfo buf)
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
 					 errmsg("internal error in gphdfilters.c:const_to_str. "
-							"Using unsupported data type")));
+							"Using unsupported data type (%d) (value %s)",
+							constval->consttype, extval)));
 
 	}
 
