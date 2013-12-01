@@ -283,7 +283,6 @@ static bool HdfsBasicOpenFile(FileName fileName, int fileFlags, int fileMode,
 static const char * ConvertToUnixPath(const char * fileName, char * buffer,
 		int len);
 
-static hdfsToken *DeserializeDelegationToken(void *binary, int size);
 
 /*
  * pg_fsync --- do fsync with or without writethrough

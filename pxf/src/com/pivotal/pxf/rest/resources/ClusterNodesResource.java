@@ -23,7 +23,7 @@ import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
  * in Main.java in the hbase package - hbase-x.xx.x-sc.jar
  */
 @Path("/" + Version.PXF_PROTOCOL_VERSION + "/HadoopCluster/")
-public class ClusterNodesResource extends SecuredResource
+public class ClusterNodesResource
 {
 	private Log Log;
 	public ClusterNodesResource() throws IOException

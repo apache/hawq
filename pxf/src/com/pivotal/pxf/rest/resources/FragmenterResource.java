@@ -3,7 +3,9 @@ package com.pivotal.pxf.rest.resources;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.security.PrivilegedExceptionAction;
 
+import javax.servlet.ServletContext;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -32,7 +34,7 @@ import com.pivotal.pxf.utilities.InputData;
  * in NameNode.java in the hadoop package - /hadoop-core-X.X.X.jar
  */
 @Path("/" + Version.PXF_PROTOCOL_VERSION + "/Fragmenter/")
-public class FragmenterResource extends SecuredResource
+public class FragmenterResource
 {
 	org.apache.hadoop.fs.Path path = null;
 	private Log Log;
@@ -42,13 +44,21 @@ public class FragmenterResource extends SecuredResource
 		Log = LogFactory.getLog(FragmenterResource.class);
 	}
 	
+	/*
+	 * The function is called when http://nn:port/gpdb/vx/Fragmenter/getFragments?path=...
+	 * is used
+	 *
+	 * @param servletContext Servlet context contains attributes required by SecuredHDFS
+	 * @param headers Holds HTTP headers from request
+	 * @param path Holds URI path option used in this request
+	 */
 	@GET
 	@Path("getFragments")
 	@Produces("application/json")
-	public Response getFragments(@Context HttpHeaders headers,
-						  		  @QueryParam("path") String path) throws Exception
+	public Response getFragments(@Context final ServletContext servletContext,
+								 @Context final HttpHeaders headers,
+								 @QueryParam("path") final String path) throws Exception
 	{
-	
 		String startmsg = new String("FRAGMENTER started for path \"" + path + "\"");
 				
 		if (headers != null) 
@@ -61,14 +71,14 @@ public class FragmenterResource extends SecuredResource
 				  
 		/* Convert headers into a regular map */
 		Map<String, String> params = convertToRegularMap(headers.getRequestHeaders());
-		final Fragmenter fragmenter = FragmenterFactory.create(new InputData(params));
+		final Fragmenter fragmenter = FragmenterFactory.create(new InputData(params, servletContext));
 
 		FragmentsOutput fragments = fragmenter.GetFragments();
 		String jsonOutput = FragmentsResponseFormatter.formatResponseString(fragments, path);		
 		
 		return Response.ok(jsonOutput, MediaType.APPLICATION_JSON_TYPE).build();
 	}
-	
+
 	Map<String, String> convertToRegularMap(MultivaluedMap<String, String> multimap)
 	{
 		Map<String, String> result = new HashMap<String, String>();

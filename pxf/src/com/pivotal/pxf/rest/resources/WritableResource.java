@@ -6,6 +6,7 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 
+import javax.servlet.ServletContext;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -28,11 +29,49 @@ import com.pivotal.pxf.resolvers.IWriteResolver;
 import com.pivotal.pxf.utilities.InputData;
 
 /*
+ * Running this resource manually:
+ *
+ * run: 
+ 	curl -i -X post "http://localhost:50070/gpdb/v5w/Writable/stream?path=/data/curl/curl`date \"+%h%d_%H%M%s\"`" \
+ 	--header "X-GP-Accessor: TextFileWAccessor" \
+ 	--header "X-GP-Resolver: TextWResolver" \
+ 	--header "Content-Type:application/octet-stream" \
+ 	--header "Expect: 100-continue" \
+  	--header "X-GP-ALIGNMENT: 4" \
+ 	--header "X-GP-SEGMENT-ID: 0" \
+ 	--header "X-GP-SEGMENT-COUNT: 3" \
+ 	--header "X-GP-HAS-FILTER: 0" \
+ 	--header "X-GP-FORMAT: TEXT" \
+ 	--header "X-GP-URI: pxf://localhost:50070/data/curl/?Accessor=TextFileWAccessor&Resolver=TextWResolver" \
+ 	--header "X-GP-URL-HOST: localhost" \
+ 	--header "X-GP-URL-PORT: 50070" \
+ 	--header "X-GP-ATTRS: 0" \
+ 	--header "X-GP-DATA-DIR: data/curl/" \
+ 	  -d "data111" -d "data222"
+
+ * 	result:
+
+  	HTTP/1.1 200 OK
+	Content-Type: text/plain;charset=UTF-8
+	Content-Type: text/plain
+	Transfer-Encoding: chunked
+	Server: Jetty(7.6.10.v20130312)
+
+	wrote 15 bytes to curlAug11_17271376231245
+
+	file content:
+	bin/hdfs dfs -cat /data/curl/*45 
+	data111&data222
+
+ */
+
+
+/*
  * This class handles the subpath /<version>/Writable/ of this
  * REST component
  */
 @Path("/" + Version.PXF_PROTOCOL_VERSION + "/Writable/")
-public class WritableResource extends SecuredResource
+public class WritableResource
 {
 	IWriteAccessor fileAccessor = null;
 	IWriteResolver fieldsResolver = null;
@@ -85,43 +124,19 @@ public class WritableResource extends SecuredResource
 	}
 
 	/*
- 	run: 
- 	curl -i -X post "http://localhost:50070/gpdb/v5w/Writable/stream?path=/data/curl/curl`date \"+%h%d_%H%M%s\"`" \
- 	--header "X-GP-Accessor: TextFileWAccessor" \
- 	--header "X-GP-Resolver: TextWResolver" \
- 	--header "Content-Type:application/octet-stream" \
- 	--header "Expect: 100-continue" \
-  	--header "X-GP-ALIGNMENT: 4" \
- 	--header "X-GP-SEGMENT-ID: 0" \
- 	--header "X-GP-SEGMENT-COUNT: 3" \
- 	--header "X-GP-HAS-FILTER: 0" \
- 	--header "X-GP-FORMAT: TEXT" \
- 	--header "X-GP-URI: pxf://localhost:50070/data/curl/?Accessor=TextFileWAccessor&Resolver=TextWResolver" \
- 	--header "X-GP-URL-HOST: localhost" \
- 	--header "X-GP-URL-PORT: 50070" \
- 	--header "X-GP-ATTRS: 0" \
- 	--header "X-GP-DATA-DIR: data/curl/" \
- 	  -d "data111" -d "data222"
-
-  	result:
-
-  	HTTP/1.1 200 OK
-	Content-Type: text/plain;charset=UTF-8
-	Content-Type: text/plain
-	Transfer-Encoding: chunked
-	Server: Jetty(7.6.10.v20130312)
-
-	wrote 15 bytes to curlAug11_17271376231245
-
-	file content:
-	bin/hdfs dfs -cat /data/curl/*45 
-	data111&data222
-
+	 * This function is called when http://nn:port/gpdb/vx/Writable/stream?path=...
+	 * is used.
+	 *
+	 * @param servletContext Servlet context contains attributes required by SecuredHDFS
+	 * @param headers Holds HTTP headers from request
+	 * @param path Holds URI path option used in this request
+	 * @param inputStream stream of bytes to write from Hawq
 	 */
 	@POST
 	@Path("stream")
 	@Consumes(MediaType.APPLICATION_OCTET_STREAM)
-	public Response stream(@Context HttpHeaders headers, 
+	public Response stream(@Context final ServletContext servletContext,
+						   @Context HttpHeaders headers, 
 			               @QueryParam("path") String path,
 			               InputStream inputStream) throws Exception {	
 		
@@ -130,7 +145,7 @@ public class WritableResource extends SecuredResource
 		params.put("X-GP-DATA-PATH", path);
 		Log.debug("WritableResource started with parameters: " + params.toString());
 		
-		InputData inputData = new InputData(params);
+		InputData inputData = new InputData(params, servletContext);
 		IBridge bridge = new WriteBridge(inputData);
 
 		// THREAD-SAFE parameter has precedence 

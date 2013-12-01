@@ -14,6 +14,7 @@
 #include "access/catquery.h"
 #include "access/genam.h"
 #include "access/heapam.h"
+#include "access/pxfuriparser.h"
 #include "catalog/aoseg.h"
 #include "catalog/catalog.h"
 #include "catalog/gp_fastsequence.h"
@@ -46,6 +47,7 @@
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
 #include "utils/syscache.h"
+#include "utils/uri.h"
 
 /* include last until fix dependencies in this file */
 #include "access/aocssegfiles.h"
@@ -121,6 +123,14 @@ WriteData(QueryContextInfo *cxt, const char *buffer, int size);
 
 static void
 prepareAllDispatchedCatalogTablespace(QueryContextInfo *ctx, HTAB *htab);
+
+static void GetExtTableLocationsArray(HeapTuple tuple, TupleDesc exttab_desc, 
+									  Datum **array, int *array_size);
+static char* 
+GetExtTableFirstLocation(Datum *array);
+
+static void 
+AddFileSystemCredentialForPxfTable(char *uri);
 
 /**
  * construct the file location for query context dispatching.
@@ -1501,6 +1511,9 @@ prepareDispatchedCatalogExternalTable(QueryContextInfo *cxt,
     HeapTuple tuple;
     ScanKeyData key;
     SysScanDesc extscan;
+	Datum *array;
+	int array_size;
+	char *location = NULL;
 
     Relation rel;
 
@@ -1521,8 +1534,20 @@ prepareDispatchedCatalogExternalTable(QueryContextInfo *cxt,
                 (errcode(ERRCODE_UNDEFINED_OBJECT), errmsg("missing "
                 "pg_exttable entry for relation \"%s\"", RelationGetRelationName(rel))));
 
-    AddTupleToContextInfo(cxt, ExtTableRelationId, "pg_exttable", tuple,
-            MASTER_CONTENT_ID);
+	GetExtTableLocationsArray(tuple, pg_exttable_dsc,
+							  &array, &array_size);
+
+	location = GetExtTableFirstLocation(array);
+	Insist(location != NULL);
+
+	if (IS_PXF_URI(location))
+	{
+		Insist(array_size == 1);
+		AddFileSystemCredentialForPxfTable(location);
+	}
+
+	AddTupleToContextInfo(cxt, ExtTableRelationId, "pg_exttable", tuple,
+						  MASTER_CONTENT_ID);
 
     systable_endscan(extscan);
 
@@ -2130,4 +2155,49 @@ FinishSendbackChangedCatalog(StringInfo buf)
 {
 	pq_endmessage(buf);
 	pfree(buf);
+}
+
+static void GetExtTableLocationsArray(HeapTuple tuple,
+									  TupleDesc exttab_desc,
+									  Datum **array,
+									  int *array_size)
+{
+	Datum locations;
+	bool isNull = false;
+
+	locations = heap_getattr(tuple,
+							 Anum_pg_exttable_location,
+							 exttab_desc,
+							 &isNull);
+	Insist(!isNull);
+
+	deconstruct_array(DatumGetArrayTypeP(locations),
+					  TEXTOID, -1, false, 'i',
+					  array, NULL, array_size);
+	Insist(*array_size > 0);
+}
+
+static char* GetExtTableFirstLocation(Datum *array)
+{
+	return DatumGetCString(DirectFunctionCall1(textout, array[0]));
+}
+
+/* 
+ * Using host from uri, dispatch HDFS credentials to 
+ * segments.
+ *
+ * TODO Get HDFS port from someplace else, currently hard coded
+ */
+static void AddFileSystemCredentialForPxfTable(char *uri)
+{
+	StringInfoData hdfs_uri;
+
+	initStringInfo(&hdfs_uri);
+	GPHDUri *gphd_uri = parseGPHDUri(uri);
+	appendStringInfo(&hdfs_uri, "hdfs://%s:8020/", gphd_uri->host);
+
+	prepareDispatchedCatalogFileSystemCredential(hdfs_uri.data);
+
+	freeGPHDUri(gphd_uri);
+	pfree(hdfs_uri.data);
 }

@@ -6,6 +6,7 @@
 #include "access/pxfmasterapi.h"
 #include "cdb/cdbvars.h"
 #include "cdb/cdbtm.h"
+#include "cdb/cdbfilesystemcredential.h"
 
 typedef struct
 {
@@ -40,6 +41,8 @@ void	build_uri_from_current_fragment(gphadoop_context* context);
 void 	build_file_name_for_write(gphadoop_context* context);
 void 	build_uri_for_write(gphadoop_context* context, DataNodeRestSrv* rest_server);
 size_t	fill_buffer(gphadoop_context* context, char* start, size_t size);
+void	add_delegation_token(PxfInputData *inputData);
+void	free_token_resources(PxfInputData *inputData);
 
 /* Custom protocol entry point for read
  */
@@ -154,13 +157,15 @@ gphadoop_context* create_context(PG_FUNCTION_ARGS)
  */
 void add_querydata_to_http_header(gphadoop_context* context, PG_FUNCTION_ARGS)
 {
-	PxfInputData inputData;
+	PxfInputData inputData = {0};
 	inputData.headers = context->churl_headers;
 	inputData.gphduri = context->gphd_uri;
 	inputData.rel = EXTPROTOCOL_GET_RELATION(fcinfo);
 	inputData.filterstr = serializeGPHDFilterQuals(EXTPROTOCOL_GET_SCANQUALS(fcinfo));
+	add_delegation_token(&inputData);
 	
 	build_http_header(&inputData);
+	free_token_resources(&inputData);
 }
 
 void append_churl_header_if_exists(gphadoop_context* context, const char* key, const char* value)
@@ -263,7 +268,7 @@ DataNodeRestSrv* get_pxf_server(GPHDUri* gphd_uri, const Relation rel)
 {
 
 	ClientContext client_context; /* holds the communication info */
-	PxfInputData inputData;
+	PxfInputData inputData = {0};
 	List	 	*rest_servers = NIL;
 	DataNodeRestSrv *found_server = NULL, *ret_server = NULL;
 	int 		 server_index = 0;
@@ -286,6 +291,7 @@ DataNodeRestSrv* get_pxf_server(GPHDUri* gphd_uri, const Relation rel)
 	inputData.gphduri = gphd_uri;
 	inputData.rel = rel;
 	inputData.filterstr = NULL; /* We do not supply filter data to the HTTP header */
+	add_delegation_token(&inputData);
 	build_http_header(&inputData);
 
 	/* send request */
@@ -303,6 +309,7 @@ DataNodeRestSrv* get_pxf_server(GPHDUri* gphd_uri, const Relation rel)
 
 	/* cleanup */
 	free_datanode_rest_servers(rest_servers);
+	free_token_resources(&inputData);
 	churl_headers_cleanup(client_context.http_headers);
 
 	/* return chosen server */
@@ -419,4 +426,35 @@ size_t fill_buffer(gphadoop_context* context, char* start, size_t size)
 	return ptr - start;
 }
 
+/*
+ * The function will get the cached delegation token
+ * for remote host and add it to inputData
+ * 
+ * TODO Get "hdfs" and port from somplace else.
+ */
+void add_delegation_token(PxfInputData *inputData)
+{
+	if (!enable_secure_filesystem)
+		return;
 
+	PxfHdfsTokenData *token = NULL;
+	token = palloc0(sizeof(PxfHdfsTokenData));
+
+	token->hdfs_token = find_filesystem_credential("hdfs", 
+												   inputData->gphduri->host, 
+												   8020,
+												   &token->hdfs_token_size);
+	if (token->hdfs_token == NULL)
+		elog(ERROR, "failed to find delegation token for %s", inputData->gphduri->host);
+	elog(DEBUG2, "Delegation token for %s found", inputData->gphduri->host);
+
+	inputData->token = token;
+}
+
+void free_token_resources(PxfInputData *inputData)
+{
+	if (inputData->token == NULL)
+		return;
+
+	pfree(inputData->token);
+}

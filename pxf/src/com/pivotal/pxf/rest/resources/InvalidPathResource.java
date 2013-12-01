@@ -18,7 +18,7 @@ import org.apache.commons.logging.LogFactory;
 
 class Version
 {
-	final static String PXF_PROTOCOL_VERSION = "v7";
+	final static String PXF_PROTOCOL_VERSION = "v8";
 }
 
 /*
@@ -31,7 +31,7 @@ class Version
  * Otherwise, an error about unknown path is returned.
  */
 @Path("/")
-public class InvalidPathResource extends SecuredResource
+public class InvalidPathResource
 {
 	@Context
 	UriInfo rootUri;

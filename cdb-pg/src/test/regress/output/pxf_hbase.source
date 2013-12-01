@@ -97,7 +97,7 @@ CREATE EXTERNAL TABLE gphbase_unsupported_type(recordkey TEXT,
 LOCATION ('pxf://@hostname@:50070/gphbase_test?FRAGMENTER=HBaseDataFragmenter&ACCESSOR=HBaseAccessor&RESOLVER=HBaseResolver')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import');
 SELECT * FROM gphbase_unsupported_type;
-ERROR:  remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v7/Bridge/. Reason:     Server Error   Caused by:  java.io.IOException: Unsupported data type point (SOME_FILE:SOME_LINE)
+ERROR:  remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v8/Bridge/. Reason:     Server Error   Caused by:  java.io.IOException: Unsupported data type point (SOME_FILE:SOME_LINE)
 DETAIL:  External table gphbase_unsupported_type
 -- Test analyze for HBase table.
 ANALYZE gphbase_select;

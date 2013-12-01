@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
+import javax.servlet.ServletContext;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -34,7 +35,7 @@ import com.pivotal.pxf.utilities.InputData;
  * REST component
  */
 @Path("/" + Version.PXF_PROTOCOL_VERSION + "/Bridge/")
-public class BridgeResource extends SecuredResource
+public class BridgeResource
 {
 
 	private static Log Log = LogFactory.getLog(BridgeResource.class);
@@ -59,10 +60,15 @@ public class BridgeResource extends SecuredResource
 	 * Parameters come through HTTP header other than the fragments.
 	 * fragments is part of the url:
 	 * /<version>/Bridge?fragment=
+	 *
+	 * @param servletContext Servlet context contains attributes required by SecuredHDFS
+	 * @param headers Holds HTTP headers from request
+	 * @param fragment Holds the fragment URI option
 	 */
 	@GET
 	@Produces(MediaType.APPLICATION_OCTET_STREAM)
-	public Response read(@Context HttpHeaders headers,
+	public Response read(@Context final ServletContext servletContext,
+						 @Context HttpHeaders headers,
 					     @QueryParam("fragment") String fragment) throws Exception
 	{
 		// Convert headers into a regular map
@@ -71,7 +77,7 @@ public class BridgeResource extends SecuredResource
 
 		Log.debug("started with paramters: " + params.toString());
 
-		InputData inputData = new InputData(params);
+		InputData inputData = new InputData(params, servletContext);
 		IBridge bridge = new ReadBridge(inputData);	
 		String dataDir = inputData.path();
 		// THREAD-SAFE parameter has precedence 

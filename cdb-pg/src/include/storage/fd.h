@@ -87,6 +87,7 @@ extern int HdfsMakeDirectory(const char *path, mode_t mode);
 extern void *HdfsGetDelegationToken(const char *uri, int *size, void **fs);
 extern void HdfsRenewDelegationToken(void *fs, void *credential, int credentialSize);
 extern void HdfsCancelDelegationToken(void *fs, void *credential, int credentialSize);
+extern hdfsToken *DeserializeDelegationToken(void *binary, int size);
 
 extern void cleanup_lru_opened_files(void);
 extern void cleanup_filesystem_handler(void);

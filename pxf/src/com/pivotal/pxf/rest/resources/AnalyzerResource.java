@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import javax.servlet.ServletContext;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -31,7 +32,7 @@ import com.pivotal.pxf.utilities.InputData;
  * in NameNode.java in the hadoop package - /hadoop-core-X.X.X.jar
  */
 @Path("/" + Version.PXF_PROTOCOL_VERSION + "/Analyzer/")
-public class AnalyzerResource extends SecuredResource
+public class AnalyzerResource
 {
 	org.apache.hadoop.fs.Path path = null;
 	private Log Log;
@@ -52,12 +53,17 @@ public class AnalyzerResource extends SecuredResource
 	 * and returns -1 for number of tuples.
 	 * Example:
 	 * {"PXFDataSourceStats":[{"blockSize":67108864,"numberOfBlocks":3,"numberOfTuples":-1}]}
+	 *
+	 * @param servletContext Servlet context contains attributes required by SecuredHDFS
+	 * @param headers Holds HTTP headers from request
+	 * @param path Holds URI path option used in this request
 	 */
 	@GET
 	@Path("getEstimatedStats")
 	@Produces("application/json")
-	public Response getEstimatedStats(@Context HttpHeaders headers,
-			                 @QueryParam("path") String path) throws Exception
+	public Response getEstimatedStats(@Context ServletContext servletContext,
+									  @Context HttpHeaders headers,
+			 		                  @QueryParam("path") String path) throws Exception
 	{
 	                  
 		String startmsg = new String("ANALYZER/getEstimatedStats started for path \"" + path + "\"");
@@ -81,7 +87,7 @@ public class AnalyzerResource extends SecuredResource
 		 */
 		params.put("X-GP-DATA-FRAGMENT", "0");
 		
-		final Analyzer analyzer = AnalyzerFactory.create(new InputData(params));
+		final Analyzer analyzer = AnalyzerFactory.create(new InputData(params, servletContext));
 				
 		/*
 		 * Function queries the pxf Analyzer for the data fragments of the resource

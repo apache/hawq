@@ -115,5 +115,4 @@ public class HdfsUtilities
 		
 		return true;
 	}
-	
 }

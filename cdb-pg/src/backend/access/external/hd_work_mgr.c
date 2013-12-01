@@ -15,8 +15,10 @@
 #include "access/hd_work_mgr.h"
 #include "access/libchurl.h"
 #include "access/pxfheaders.h"
+#include "cdb/cdbfilesystemcredential.h"
 #include "cdb/cdbutil.h"
 #include "cdb/cdbvars.h"
+#include "storage/fd.h"
 #include "utils/guc.h"
 #include "utils/elog.h"
 
@@ -95,6 +97,8 @@ static AllocatedDataFragment* create_allocated_fragment(DataFragment *fragment);
 static bool are_ips_equal(char *ip1, char *ip2);
 static char** create_output_strings(List **allocated_fragments, int total_segs);
 static void assign_remote_port_to_fragments(int remote_rest_port, List *fragments);
+static void generate_delegation_token(PxfInputData *inputData);
+static void cancel_delegation_token(PxfInputData *inputData);
 
 /*
  * the interface function of the hd_work_mgr module
@@ -106,6 +110,9 @@ static void assign_remote_port_to_fragments(int remote_rest_port, List *fragment
  * data fragments that will be processed by the GP segment i.
  * The data fragments is a term that comes to represent any fragments
  * or a supported data source (e.g, HBase region, HDFS splits, etc).
+ *
+ * The function will generate a delegation token when secure filesystem mode 
+ * is on and cancel it right after. PXF segment code will get a new token.
  */
 char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs, Relation relation)
 {
@@ -113,7 +120,7 @@ char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs, Rela
 	List **segs_data = NULL;
 	List *data_fragments = NIL;
 	ClientContext client_context; /* holds the communication info */
-	PxfInputData inputData;
+	PxfInputData inputData = {0};
 
 	if (!RelationIsValid(relation))
 		ereport(ERROR,
@@ -133,6 +140,7 @@ char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs, Rela
 	inputData.gphduri = hadoop_uri;
 	inputData.rel = relation;
 	inputData.filterstr = NULL; /* We do not supply filter data to the HTTP header */	
+    generate_delegation_token(&inputData);
 	build_http_header(&inputData);
 	
 	/*
@@ -173,6 +181,7 @@ char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs, Rela
 	free_fragment_list(data_fragments);
 	freeGPHDUri(hadoop_uri);
 	churl_headers_cleanup(client_context.http_headers);
+    cancel_delegation_token(&inputData);
 		
 	return segs_work_map;
 }
@@ -199,13 +208,17 @@ static void assign_remote_port_to_fragments(int remote_rest_port, List *fragment
 
 /*
  * Fetches statistics of the PXF datasource from the PXF service
+ *
+ * The function will generate a delegation token when secure filesystem mode 
+ * is on and cancel it right after.
  */
 PxfStatsElem *get_pxf_statistics(char *uri, Relation rel, StringInfo err_msg)
 {
 	ClientContext client_context; /* holds the communication info */
 	char *analyzer = NULL;
 	char *profile = NULL;
-	PxfInputData inputData;
+	PxfInputData inputData = {0};
+	PxfStatsElem *result = NULL;
 	
 	GPHDUri* hadoop_uri = init(uri, &client_context);
 	if (!hadoop_uri)
@@ -215,7 +228,7 @@ PxfStatsElem *get_pxf_statistics(char *uri, Relation rel, StringInfo err_msg)
 	 * Get the statistics info from REST only if analyzer is defined
      */
 	if(GPHDUri_get_value_for_opt(hadoop_uri, "analyzer", &analyzer, false) != 0 &&
-		GPHDUri_get_value_for_opt(hadoop_uri, "profile", &profile, false) != 0)
+	   GPHDUri_get_value_for_opt(hadoop_uri, "profile", &profile, false) != 0)
 	{
 		if (err_msg)
 			appendStringInfo(err_msg, "no ANALYZER or PROFILE option in table definition");
@@ -229,9 +242,13 @@ PxfStatsElem *get_pxf_statistics(char *uri, Relation rel, StringInfo err_msg)
 	inputData.gphduri = hadoop_uri;
 	inputData.rel = rel; 
 	inputData.filterstr = NULL; /* We do not supply filter data to the HTTP header */	
+    generate_delegation_token(&inputData);
 	build_http_header(&inputData);
 	
-	return get_data_statistics(hadoop_uri, &client_context, err_msg);
+	result = get_data_statistics(hadoop_uri, &client_context, err_msg);
+
+	cancel_delegation_token(&inputData);
+	return result;
 }
 
 
@@ -809,7 +826,7 @@ find_datanode_rest_server_port(List *rest_servers, char *host)
  */
 static void
 assign_rest_ports_to_fragments(ClientContext	*client_context,
-							   GPHDUri 			*hadoop_uri,
+							   GPHDUri			*hadoop_uri,
 							   List				*fragments)
 {
 	List	 *rest_servers = NIL;
@@ -819,8 +836,8 @@ assign_rest_ports_to_fragments(ClientContext	*client_context,
 
 	foreach(frag_c, fragments)
 	{
-		ListCell 		*loc_c 		= NULL;
-		DataFragment 	*fragdata	= (DataFragment*)lfirst(frag_c);
+		ListCell		*loc_c		= NULL;
+		DataFragment	*fragdata	= (DataFragment*)lfirst(frag_c);
 
 		foreach(loc_c, fragdata->locations)
 		{
@@ -849,8 +866,8 @@ print_fragment_list(List *fragments)
 
 	foreach(fragment_cell, fragments)
 	{
-		DataFragment 	*frag 	= (DataFragment*)lfirst(fragment_cell);
-		ListCell 		*lc 	= NULL;
+		DataFragment	*frag	= (DataFragment*)lfirst(fragment_cell);
+		ListCell		*lc		= NULL;
 
 		appendStringInfo(&log_str, "Fragment index: %d\n", frag->index);
 
@@ -895,4 +912,60 @@ static void init_client_context(ClientContext *client_context)
 	client_context->handle = NULL;
 	memset(client_context->chunk_buf, 0, RAW_BUF_SIZE);
 	initStringInfo(&(client_context->the_rest_buf));
+}
+
+/*
+ * The function will use libhdfs API to get a delegation token.
+ * The serialized token will be stored in inputData.
+ *
+ * The function does nothing when Hawq isn't in secure filesystem mode.
+ *
+ * On regular tables, a delegation token is created when a portal 
+ * is created. We cannot use that token because hd_work_mgr.c code gets 
+ * executed before a portal is created.
+ *
+ * TODO 8020 is hard-coded. Must find the NameNode port somehow.
+ */
+static void generate_delegation_token(PxfInputData *inputData)
+{
+	StringInfoData hdfs_uri;
+
+	if (!enable_secure_filesystem)
+		return;
+
+	initStringInfo(&hdfs_uri);
+	appendStringInfo(&hdfs_uri, "hdfs://%s:8020/", inputData->gphduri->host);
+
+	inputData->token = palloc0(sizeof(PxfHdfsTokenData));
+
+	inputData->token->hdfs_token = HdfsGetDelegationToken(hdfs_uri.data, 
+														  &inputData->token->hdfs_token_size, 
+														  &inputData->token->hdfs_handle);
+
+	if (inputData->token->hdfs_token == NULL)
+		elog(ERROR, "Failed to acquire a delegation token for uri %s", hdfs_uri.data);
+
+	pfree(hdfs_uri.data);
+}
+
+/*
+ * The function will cancel the delegation token in inputData
+ * and free the allocated memory reserved for token details
+ *
+ * TODO might need to pfree(hdfs_token)
+ */
+static void cancel_delegation_token(PxfInputData *inputData)
+{
+	if (inputData->token == NULL)
+		return;
+
+	Insist(inputData->token->hdfs_handle != NULL);
+	Insist(inputData->token->hdfs_token != NULL);
+
+	HdfsCancelDelegationToken(inputData->token->hdfs_handle, 
+							  inputData->token->hdfs_token, 
+							  inputData->token->hdfs_token_size);
+
+	pfree(inputData->token);
+	inputData->token = NULL;
 }

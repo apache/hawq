@@ -6,6 +6,8 @@ import java.util.*;
 import org.apache.avro.Schema;
 import org.apache.commons.codec.binary.Base64;
 
+import javax.servlet.ServletContext;
+
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -83,10 +85,14 @@ public class InputData
      */
     protected Map<String, String> propertyErrorMap = new HashMap<String, String>();
 
-    /* Constructor of InputData
-     * Parses greenplum.* configuration variables
+    /* 
+	 * Constructor of InputData
+     * Parses X-GP-* configuration variables
+	 *
+	 * @param paramsMap contains all query-specific parameters from Hawq
+	 * @param servletContext Servlet context contains attributes required by SecuredHDFS
      */
-    public InputData(Map<String, String> paramsMap)
+    public InputData(Map<String, String> paramsMap, final ServletContext servletContext)
     {
         requestParametersMap = paramsMap;
         InitPropertyNotFoundMessages();
@@ -150,6 +156,8 @@ public class InputData
         parseCompressionType();
         
         parseThreadSafe();
+
+		verifyToken(servletContext);
     }
 
 	/**
@@ -608,4 +616,49 @@ public class InputData
         userData = Base64.decodeBase64(encoded);
         LOG.debug("decoded X-GP-FRAGMENT-USER-DATA: " + new String(userData));
     }
+
+	/*
+	 * The function will get the token information from parameters
+	 * and call SecuredHDFS to verify the token.
+	 *
+	 * X-GP data will be deserialied from hex string to a byte array
+	 */
+	private void verifyToken(ServletContext context)
+	{
+		if (SecuredHDFS.isDisabled())
+			return;
+
+		byte[] identifier = hexStringToByteArray(getProperty("X-GP-TOKEN-IDNT"));
+		byte[] password = hexStringToByteArray(getProperty("X-GP-TOKEN-PASS"));
+		byte[] kind = hexStringToByteArray(getProperty("X-GP-TOKEN-KIND"));
+		byte[] service = hexStringToByteArray(getProperty("X-GP-TOKEN-SRVC"));
+
+		SecuredHDFS.verifyToken(identifier, password, kind, service, context);
+	}
+
+	/*
+	 * Convert a hex string to a byte array.
+	 *
+	 * @throws IllegalArgumentException when data is not even
+	 *
+	 * @param hex HEX string to deserialize
+	 */
+	private byte[] hexStringToByteArray(String hex)
+	{
+		final int HEX_RADIX = 16;
+		final int NIBBLE_SIZE_IN_BITS = 4;
+
+		if (hex.length() % 2 != 0)
+			throw new IllegalArgumentException("Internal server error. String " + 
+											   hex + " isn't a valid hex string");
+
+		byte[] result = new byte[hex.length() / 2];
+		for (int i = 0; i < hex.length(); i = i + 2)
+		{
+			result[i / 2] = (byte)((Character.digit(hex.charAt(i), HEX_RADIX) << NIBBLE_SIZE_IN_BITS) +
+									Character.digit(hex.charAt(i + 1), HEX_RADIX));
+		}
+
+		return result;
+	}
 }

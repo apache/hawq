@@ -1159,7 +1159,7 @@ SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_bad_port' AND relpa
 (1 row)
 
 ANALYZE avfav_analyze_bad_class;
-WARNING:  skipping "avfav_analyze_bad_class" --- error returned: remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v7/Analyzer/getEstimatedStats. Reason:     Server Error   Caused by:  java.lang.ClassNotFoundException: Class NoSuchAnalyzer could not be found on the CLASSPATH. NoSuchAnalyzer
+WARNING:  skipping "avfav_analyze_bad_class" --- error returned: remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v8/Analyzer/getEstimatedStats. Reason:     Server Error   Caused by:  java.lang.ClassNotFoundException: Class NoSuchAnalyzer could not be found on the CLASSPATH. NoSuchAnalyzer
 SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_bad_class' AND relpages = 1000 AND reltuples = 1000000;
  count 
 -------
