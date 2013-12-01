@@ -61,6 +61,7 @@ function hdfs_running()
 
 function zookeeper_running()
 {
+	sleep 5s
 	$ZOOKEEPER_BIN/zkServer.sh status > /dev/null 2>&1
 	return $?
 }
