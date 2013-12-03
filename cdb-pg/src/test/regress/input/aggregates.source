@@ -1,7 +1,3 @@
-COPY onek FROM '@abs_srcdir@/data/onek.data';
-COPY aggtest FROM '@abs_srcdir@/data/agg.data';
-COPY student FROM '@abs_srcdir@/data/student.data';
-COPY tenk1 FROM '@abs_srcdir@/data/tenk.data';
 --
 -- AGGREGATES
 --

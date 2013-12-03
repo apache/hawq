@@ -3,7 +3,6 @@
 test: querycontext
 test: goh_create_type_composite
 ignore: goh_create_table
-test: goh_copy
 ignore: goh_vacuum
 ignore: goh_subselect
 ignore: goh_array
@@ -68,7 +67,7 @@ test: subplan
 ignore: create_type
 test: create_table_test
 ignore: create_function_2
-ignore: copy
+test: copy
 ignore: copyselect
 ignore: constraints
 ignore: triggers

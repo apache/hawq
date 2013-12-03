@@ -1,7 +1,6 @@
 --
 -- COPY
 --
-
 -- CLASS POPULATION
 --	(any resemblance to real life is purely coincidental)
 --
@@ -11,7 +10,7 @@ COPY onek FROM '@abs_srcdir@/data/onek.data';
 
 COPY onek TO '@abs_builddir@/results/onek.data';
 
-DELETE FROM onek;
+TRUNCATE onek;
 
 COPY onek FROM '@abs_builddir@/results/onek.data';
 
@@ -104,4 +103,3 @@ this is just a line full of junk that would error out if parsed
 \.
 
 copy copytest3 to stdout csv header;
-

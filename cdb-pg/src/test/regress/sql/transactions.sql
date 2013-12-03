@@ -2,16 +2,6 @@
 -- TRANSACTIONS
 --
 
-CREATE TABLE aggtest (
-	a 			int2,
-	b			float4
-);
-
-INSERT INTO aggtest (a, b) VALUES (56, 7.8);
-INSERT INTO aggtest (a, b) VALUES (100, 99.097);
-INSERT INTO aggtest (a, b) VALUES (0, 0.09561);
-INSERT INTO aggtest (a, b) VALUES (42, 324.78);
-
 BEGIN;
 
 SELECT * 

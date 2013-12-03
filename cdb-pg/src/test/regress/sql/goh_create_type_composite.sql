@@ -14,37 +14,37 @@ create database hdfs;
 -- Test stand-alone composite type
 create type temp_type_1 as (a int, b int);
 create type temp_type_2 as (a int, b int);
-create table temp_table (a temp_type_1, b temp_type_2);
+create table temp_table (id int, a temp_type_1, b temp_type_2) distributed randomly;
 
-insert into temp_table values ((1,2), (3,4));
-insert into temp_table values ((5,6), (7,8));
-insert into temp_table values ((9,10), (11,12));
+insert into temp_table values (1, (1,2), (3,4));
+insert into temp_table values (2, (5,6), (7,8));
+insert into temp_table values (3, (9,10), (11,12));
 
 \d temp_table
-select gp_segment_id, * from temp_table;
+select * from temp_table order by 1;
 
 drop table temp_table;
 
 create type temp_type_3 as (a temp_type_1, b temp_type_2);
-CREATE table temp_table (a temp_type_1, b temp_type_3);
-insert into temp_table values ((9,10), ((11,12),(7,8)));
-insert into temp_table values ((1,2), ((3,4),(5,6)));
+CREATE table temp_table (id int, a temp_type_1, b temp_type_3) distributed randomly;
+insert into temp_table values (1, (9,10), ((11,12),(7,8)));
+insert into temp_table values (2, (1,2), ((3,4),(5,6)));
 
-select gp_segment_id, * from temp_table;
+select * from temp_table order by 1;
 
 -- check catalog entries for types
-select typname, typrelid from pg_type where typname like 'temp_type_%';
+select count(typrelid) from pg_type where typname like 'temp_type_%';
 
 comment on type temp_type_1 is 'test composite type';
 \dT temp_type_1
 
-select relname, reltype, relfilenode from pg_class where relname like 'temp_type%';
+select count(reltype) from pg_class where relname like 'temp_type%';
 
 create table test_func (foo temp_type_1);
-insert into test_func values( (1,2));
-insert into test_func values( (3,4));
-insert into test_func values( (5,6));
-insert into test_func values( (7,8));
+insert into test_func values((1,2));
+insert into test_func values((3,4));
+insert into test_func values((5,6));
+insert into test_func values((7,8));
 
 -- Functions with UDTs
 create function test_temp_func(temp_type_1, temp_type_2) RETURNS temp_type_1 AS '

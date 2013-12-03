@@ -51,12 +51,12 @@ select * from people;
 -- at the moment this will not work due to ALTER TABLE inadequacy:
 alter table fullname add column suffix text default '';
 
--- but this should work:
+-- Not supported in HAWQ
 alter table fullname add column suffix text default null;
 
 select * from people;
 
--- test insertion/updating of subfields
+-- test insertion/updating of subfields, not supported in HAWQ
 update people set fn.suffix = 'Jr';
 
 select * from people;
@@ -71,8 +71,8 @@ select * from quadtable;
 
 create temp table pp (f1 text);
 insert into pp values (repeat('abcdefghijkl', 100000));
-
-insert into people select ('Jim', f1, null)::fullname, current_date from pp;
+-- HAWQ does not support alter, so remove third column null
+insert into people select ('Jim', f1)::fullname, current_date from pp;
 
 select (fn).first, substr((fn).last, 1, 20), length((fn).last) from people;
 
