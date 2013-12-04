@@ -52,8 +52,18 @@ create function test_temp_func(temp_type_1, temp_type_2) RETURNS temp_type_1 AS 
 ' LANGUAGE SQL; 
 
 SELECT * FROM test_temp_func((7,8), (5,6));
-
 drop function test_temp_func(temp_type_1, temp_type_2);
+
+-- UDT and UDA
+create or replace function test_temp_func_2(temp_type_1, temp_type_1) RETURNS temp_type_1 AS '
+  select ($1.a + $2.a, $1.b + $2.b)::temp_type_1;
+' LANGUAGE SQL; 
+
+CREATE AGGREGATE agg_comp_type (temp_type_1) (
+   sfunc = test_temp_func_2, stype = temp_type_1,
+   initcond = '(0,0)'
+);
+select agg_comp_type(foo) from test_func;
 
 -- Check alter schema
 create schema type_test;
