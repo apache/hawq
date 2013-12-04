@@ -1,6 +1,6 @@
 #!/bin/bash
 
-GP_VERSION=1.1.4.0
+GP_VERSION=1.2.0.0
 
 GP_BUILDNUMBER=dev
 if [ -f BUILD_NUMBER ] ; then
