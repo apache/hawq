@@ -646,6 +646,17 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
 
 				prepareDispatchedCatalogPlan(plannedstmt->contextdisp, plannedstmt->planTree, htab);
 
+				if (plannedstmt->subplans)
+				{
+					ListCell *lc;
+					foreach(lc, plannedstmt->subplans)
+					{
+						Plan *plantree = lfirst(lc);
+						if (plantree)
+							prepareDispatchedCatalogPlan(plannedstmt->contextdisp, plantree, htab);
+					}
+				}
+
 				hash_destroy(htab);
 				CloseQueryContextInfo(plannedstmt->contextdisp);
 			}

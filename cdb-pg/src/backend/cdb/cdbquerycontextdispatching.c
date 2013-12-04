@@ -1569,7 +1569,20 @@ static bool collect_func_walker(Node *node, FuncWalkerContext *context)
 		return false;
 	/* AK: I don't like this hack. */
 	if (IsA(node, SubPlan))
+	{
+		SubPlan *subplan = (SubPlan *) node;
+		if (subplan->testexpr)
+		{
+			return expression_tree_walker(subplan->testexpr,
+										  collect_func_walker,
+										  context);
+		}
+		/*
+		 * SubPlan node has nothing interesting other than testexpr.
+		 * We terminate recursion for SubPlans with no testexpr.
+		 */
 		return true;
+	}
 	if (IsA(node, FuncExpr))
 	{
 		FuncExpr *func = (FuncExpr *) node;

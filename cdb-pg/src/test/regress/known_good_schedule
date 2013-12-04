@@ -64,6 +64,7 @@ test: insert
 test: create_function_1
 test: function
 test: function_extensions
+test: subplan
 ignore: create_type
 test: create_table_test
 ignore: create_function_2
