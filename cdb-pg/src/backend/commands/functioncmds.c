@@ -910,11 +910,8 @@ CreateFunction(CreateFunctionStmt *stmt)
 		/* explicit RETURNS clause */
 		compute_return_type(stmt->returnType, languageOid,
 							&prorettype, &returnsSet, stmt->shelltypeOid);
-		if (returnsSet && !(gp_upgrade_mode || IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY)))
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("set returning functions not supported")));
-		if (OidIsValid(requiredResultType) && prorettype != requiredResultType)
+		
+        if (OidIsValid(requiredResultType) && prorettype != requiredResultType)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
 					 errmsg("function result type must be %s because of OUT parameters",
