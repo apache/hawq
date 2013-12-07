@@ -221,13 +221,6 @@ examine_parameter_list(List *parameters, Oid languageOid,
 							TypeNameToString(t))));
 		}
 
-		if (t->setof)
-		{
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
-					 errmsg("functions cannot accept set arguments")));
-		}
-
 		/* track input vs output parameters */
 		switch (fp->mode)
 		{

@@ -1571,6 +1571,22 @@ static bool collect_func_walker(Node *node, FuncWalkerContext *context)
 {
 	if (node == NULL)
 		return false;
+	if (IsA(node, RowExpr))
+	{
+		/*
+		 * RowExpr is ROW(x,y, ...).  It may appear as argument to a UDF
+		 * in place of a composite type value.  E.g.
+		 *
+		 *    SELECT foo(ROW(x,y,z), ...) FROM ...
+		 *
+		 * Assumption: By the time we reach here, ROW() is mapped to the
+		 * correct composite type given by RowExpr->row_typeid.
+		 */  
+		RowExpr *rowexpr = (RowExpr *) node;
+		prepareDispatchedCatalogType(context->qcxt, rowexpr->row_typeid,
+									 context->htab);
+		/* TODO: Should we return false from here? */
+	}
 	/* AK: I don't like this hack. */
 	if (IsA(node, SubPlan))
 	{
@@ -1780,6 +1796,8 @@ static void
 prepareDispatchedCatalogType(QueryContextInfo *ctx, Oid typeOid, HTAB *htab)
 {
 	HeapTuple typetuple;
+	bool isNull = false;
+	Datum typeDatum = 0;
 
 	Assert(typeOid != InvalidOid);
 
@@ -1805,7 +1823,19 @@ prepareDispatchedCatalogType(QueryContextInfo *ctx, Oid typeOid, HTAB *htab)
 
 	AddTupleToContextInfo(ctx, TypeRelationId, "pg_type", typetuple, MASTER_CONTENT_ID);	
 
-	caql_endscan(pcqCtx);			
+	/*
+	 * ROW(f1, f2, ...) expression may not have corresponding pg_type
+	 * tuple and related metadata included in the context.  If it is
+	 * already included, the following is a no-op.
+	 */
+	typeDatum = caql_getattr(pcqCtx, Anum_pg_type_typrelid, &isNull);
+	if (!isNull && typeDatum)
+	{
+		prepareDispatchedCatalogSingleRelation(ctx, DatumGetObjectId(typeDatum),
+											   FALSE, 0, htab);
+	}
+
+	caql_endscan(pcqCtx);
 }
 
 static void

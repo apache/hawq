@@ -90,17 +90,17 @@ SELECT foo(5);
 (1 row)
 
 DROP FUNCTION foo(int);
--- DDL, CREATE FUNCTION, SRF, NEGATIVE
+-- DDL, CREATE FUNCTION, SRF
 CREATE FUNCTION g(x setof int) RETURNS INT
     AS $$ SELECT 1 $$ LANGUAGE SQL;
-ERROR:  functions cannot accept set arguments
+DROP FUNCTION g(setof int);
 CREATE FUNCTION g() RETURNS setof INT
     AS $$ SELECT 1 $$ LANGUAGE SQL;
-ERROR:  set returning functions not supported
+DROP FUNCTION g();
 -- DDL, CREATE FUNCTION, TABLE, NEGATIVE
 CREATE FUNCTION g() RETURNS TABLE(x int)
     AS $$ SELECT * FROM foo $$ LANGUAGE SQL;
-ERROR:  set returning functions not supported
+DROP FUNCTION g();
 CREATE FUNCTION g(anytable) RETURNS int
     AS 'does_not_exist', 'does_not_exist' LANGUAGE C;
 ERROR:  TABLE functions not supported
@@ -790,16 +790,16 @@ WITH t AS (SELECT x from foo)
 SELECT UNNEST(ARRAY(SELECT x FROM foo));
  unnest 
 --------
-      2
-      4
-      6
-      8
-     10
       1
       3
       5
       7
       9
+      2
+      4
+      6
+      8
+     10
 (10 rows)
 
 SELECT UNNEST(ARRAY(SELECT f(1)));
@@ -845,18 +845,18 @@ LINE 1: SELECT h(1);
 HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
 -- DML, InitPlan
 SELECT UNNEST(ARRAY(SELECT f(x) from foo));
- unnest
+ unnest 
 --------
-      1
-      3
-      5
-      7
-      9
       2
       4
       6
       8
      10
+      1
+      3
+      5
+      7
+      9
 (10 rows)
 
 -- LANGUAGES not yet supported
@@ -878,7 +878,7 @@ SELECT outer(0);
 (1 row)
 
 SELECT outer(0) FROM foo;
-ERROR:  function inner(integer) does not exist  (seg0 slice1 localhost.localdomain:40000 pid=20946)
+ERROR:  function inner(integer) does not exist  (seg0 slice1 usxxpraveam2.corp.emc.com:40000 pid=67068)
 DETAIL:  PL/pgSQL function "outer" line 2 at return
 DROP FUNCTION outer(int);
 DROP FUNCTION inner(int);
