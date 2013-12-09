@@ -124,6 +124,7 @@ ignore: plpgsql
 ignore: copy2
 test: temp
 ignore: domain
+test: set_functions
 ignore: rangefuncs
 ignore: table_functions
 ignore: rangefuncs_cdb
