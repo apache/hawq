@@ -9,3 +9,5 @@ libregress.so.0.0
 regress.so
 regression.diffs
 regression.out
+/TempStatsStore
+/testtablespace

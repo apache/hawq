@@ -581,10 +581,14 @@ public class InputData
      */
     private void InitPropertyNotFoundMessages()
     {
-        propertyErrorMap.put("X-GP-ACCESSOR", "Accessor was not supplied in the CREATE EXTERNAL TABLE statement " +
-                "Please supply accessor using option accessor ");
-        propertyErrorMap.put("X-GP-RESOLVER", "Resolver was not supplied in the CREATE EXTERNAL TABLE statement " +
-                "Please supply resolver using option resolver ");
+    	propertyErrorMap.put("X-GP-FRAGMENTER", "Fragmenter was not supplied in the CREATE EXTERNAL TABLE statement. " +
+                "Please supply fragmenter using option fragmenter or profile ");
+        propertyErrorMap.put("X-GP-ACCESSOR", "Accessor was not supplied in the CREATE EXTERNAL TABLE statement. " +
+                "Please supply accessor using option accessor or profile ");
+        propertyErrorMap.put("X-GP-RESOLVER", "Resolver was not supplied in the CREATE EXTERNAL TABLE statement. " +
+                "Please supply resolver using option resolver or profile ");
+        propertyErrorMap.put("X-GP-ANALYZER", "PXF 'Analyzer' class was not found. " +
+        		"Please supply it in the LOCATION clause or use it in a PXF profile in order to run ANALYZE on this table ");
     }
 
 	/*

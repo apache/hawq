@@ -1,1 +1,6 @@
 build
+/log
+/runnerState.properties
+/jsystem.properties.bu
+/.classpath
+/.testdir.tmp

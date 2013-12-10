@@ -373,7 +373,7 @@ t3 text)
 LOCATION ('pxf://@hostname@:50070/reg_heterogen?PROFILE=Hive')
 format 'custom' (formatter='pxfwritable_import');
 ANALYZE hv_heterogen_profile_wo_analyzer;
-WARNING:  skipping "hv_heterogen_profile_wo_analyzer" --- error returned: remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v8/Analyzer/getEstimatedStats. Reason:     Server Error   Caused by:  java.lang.IllegalArgumentException: Internal server error. Property "X-GP-ANALYZER" has no value in current request
+WARNING:  skipping "hv_heterogen_profile_wo_analyzer" --- error returned: remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v8/Analyzer/getEstimatedStats. Reason:     Server Error   Caused by:  java.lang.IllegalArgumentException: PXF 'Analyzer' class was not found. Please supply it in the LOCATION clause or use it in a PXF profile in order to run ANALYZE on this table
 -- 13. Index table
 \! ${HIVE_ROOT}/bin/hive -e "create index reg_txt_index on table reg_txt (s1) as 'COMPACT' with deferred rebuild" 2>/dev/null
 \! ${HIVE_ROOT}/bin/hive -e "alter index reg_txt_index on reg_txt rebuild" 2>/dev/null
@@ -384,7 +384,7 @@ t2    text,
 n1 bigint)
 LOCATION ('pxf://@hostname@:50070/default__reg_txt_reg_txt_index__?PROFILE=Hive')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import');
-SELECT t1, n1  FROM hv_index ORDER BY t1;
+SELECT t1, n1 FROM hv_index ORDER BY t1;
   t1   | n1  
 -------+-----
  row1  |   0
