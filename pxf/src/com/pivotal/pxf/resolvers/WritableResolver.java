@@ -77,6 +77,9 @@ public class WritableResolver extends Plugin implements IReadResolver, IWriteRes
 			if (currentIdx == recordkeyIndex)
 				currentIdx += recordkeyAdapter.appendRecordkeyField(record, inputData, onerow);
 				
+			if (Modifier.isPrivate(field.getModifiers())) 
+				continue;
+			
 			currentIdx += populateRecord(record, field); 
 		}
 
@@ -159,6 +162,14 @@ public class WritableResolver extends Plugin implements IReadResolver, IWriteRes
 			else if (javaType.compareTo("[J") == 0)
 			{
 				ret = SetArrayField(record, GPDBWritable.BIGINT, field);
+			}
+			else if (javaType.compareTo("short") == 0)
+			{
+				addOneFieldToRecord(record, GPDBWritable.SMALLINT, field.get(userObject));
+			}			
+			else if (javaType.compareTo("[S") == 0)
+			{
+				ret = SetArrayField(record, GPDBWritable.SMALLINT, field);
 			}
 			else if (javaType.compareTo("[B") == 0)
 			{

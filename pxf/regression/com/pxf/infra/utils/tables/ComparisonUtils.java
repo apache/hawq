@@ -47,7 +47,7 @@ public class ComparisonUtils {
 			throw new Exception("Table: " + table1.getFullName() + " size = " + t1Data.size() + " not equal to Table: " + table2.getFullName() + " size = " + t2Data.size());
 		}
 
-		boolean isFail = false;
+		boolean result = true;
 
 		StringBuilder htmlFormat1 = new StringBuilder();
 		htmlFormat1.append("<table border=\"1\">");
@@ -80,7 +80,7 @@ public class ComparisonUtils {
 
 		for (int i = 0; i < t1Data.size(); i++) {
 
-			compareRowData(t1Types, t1Data.get(i), htmlFormat1, t2Types, t2Data.get(i), htmlFormat2);
+			result &= compareRowData(t1Types, t1Data.get(i), htmlFormat1, t2Types, t2Data.get(i), htmlFormat2);
 
 			htmlFormat1.append("</tr>");
 			htmlFormat2.append("</tr>");
@@ -91,7 +91,7 @@ public class ComparisonUtils {
 
 		htmlReport.append(table1.getFullName() + "<br>" + htmlFormat1 + "<br><br>" + table2.getFullName() + "<br>" + htmlFormat2);
 
-		return !isFail;
+		return result;
 	}
 
 	/**
@@ -178,11 +178,14 @@ public class ComparisonUtils {
 	 *            data of row
 	 * @param row2HtmlReport
 	 *            html collector
+	 * @return true if rows are equal
 	 * @throws ParseException
 	 */
-	private static void compareRowData(List<Integer> row1Types, List<String> row1Data, StringBuilder row1HtmlReport, List<Integer> row2Types, List<String> row2Data, StringBuilder row2HtmlReport)
+	private static boolean compareRowData(List<Integer> row1Types, List<String> row1Data, StringBuilder row1HtmlReport, List<Integer> row2Types, List<String> row2Data, StringBuilder row2HtmlReport)
 			throws ParseException {
 
+		boolean result = true;
+		
 		for (int table1Index = 0, table2Index = 0; table1Index < row1Data.size(); table1Index++, table2Index++) {
 
 			String dataColT1 = "null";
@@ -215,7 +218,8 @@ public class ComparisonUtils {
 					isEqual = checkColData(row1Types.get(table1Index)
 							.intValue(), array[k].trim(), row2Data.get(table2Index)
 							.trim());
-
+					result &= isEqual;
+					
 					row2HtmlReport.append("<td>" + ((isEqual) ? "" : "<font color=\"red\">") + row2Data.get(table2Index)
 							.trim() + ((isEqual) ? "" : "</font>") + "</td>");
 
@@ -237,7 +241,8 @@ public class ComparisonUtils {
 					isEqual = checkColData(row1Types.get(table1Index)
 							.intValue(), array[k].trim(), row1Data.get(table1Index)
 							.trim());
-
+					result &= isEqual;
+					
 					row1HtmlReport.append("<td>" + ((isEqual) ? "" : "<font color=\"red\">") + row1Data.get(table1Index)
 							.trim() + ((isEqual) ? "" : "</font>") + "</td>");
 
@@ -261,13 +266,15 @@ public class ComparisonUtils {
 
 					isEqual = checkColData(row2Types.get(table2Index)
 							.intValue(), key, row2Data.get(table2Index).trim());
-
+					result &= isEqual;
+					
 					row2HtmlReport.append("<td>" + ((isEqual) ? "" : "<font color=\"red\">") + row2Data.get(table2Index)
 							.trim() + ((isEqual) ? "" : "</font>") + "</td>");
 
 					isEqual = checkColData(row2Types.get(table2Index + 1)
 							.intValue(), value, row2Data.get(table2Index + 1)
 							.trim());
+					result &= isEqual;
 
 					row2HtmlReport.append("<td>" + ((isEqual) ? "" : "<font color=\"red\">") + row2Data.get(table2Index + 1)
 							.trim() + ((isEqual) ? "" : "</font>") + "</td>");
@@ -293,13 +300,15 @@ public class ComparisonUtils {
 
 					isEqual = checkColData(row1Types.get(table1Index)
 							.intValue(), key, row1Data.get(table1Index).trim());
-
+					result &= isEqual;
+					
 					row1HtmlReport.append("<td>" + ((isEqual) ? "" : "<font color=\"red\">") + row1Data.get(table1Index)
 							.trim() + ((isEqual) ? "" : "</font>") + "</td>");
 
 					isEqual = checkColData(row1Types.get(table1Index + 1)
 							.intValue(), value, row1Data.get(table1Index + 1)
 							.trim());
+					result &= isEqual;
 
 					row1HtmlReport.append("<td>" + ((isEqual) ? "" : "<font color=\"red\">") + row1Data.get(table1Index + 1)
 							.trim() + ((isEqual) ? "" : "</font>") + "</td>");
@@ -311,6 +320,7 @@ public class ComparisonUtils {
 			} else {
 
 				isEqual = checkColData(row1Types.get(table1Index).intValue(), dataColT1, dataColT2);
+				result &= isEqual;
 			}
 
 			if (!arrayT1) {
@@ -324,6 +334,8 @@ public class ComparisonUtils {
 
 		row1HtmlReport.append("</tr>");
 		row2HtmlReport.append("</tr>");
+		
+		return result;
 	}
 
 	/***

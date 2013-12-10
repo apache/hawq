@@ -121,10 +121,32 @@ public class CustomSequenceReader implements IFileReader {
 
 				row.add(new String(bts));
 
-				row.add(String.valueOf(false));
-				row.add(String.valueOf(false));
-				row.add(String.valueOf(true));
+				boolean[] bools = ((boolean[]) cwArr[i].getClass()
+						.getField("bools")
+						.get(cwArr[i]));
+				for (int j = 0; j < bools.length; j++) {
+					row.add(String.valueOf(bools[j]));
+				}
+				
+				boolean bool = ((Boolean) cwArr[i].getClass()
+								.getField("bool")
+								.get(cwArr[i]));
+				row.add(String.valueOf(bool));
 
+				short[] shrts = ((short[]) cwArr[i].getClass()
+						.getField("shrts")
+						.get(cwArr[i]));
+				
+				for (int j = 0; j < shrts.length; j++) {
+					row.add(String.valueOf(shrts[j]));
+				}
+				
+				long shrt = ((Short) cwArr[i].getClass()
+						.getField("shrt")
+						.get(cwArr[i]));
+
+				row.add(String.valueOf(shrt));
+				
 				dataTable.addRow(row);
 			}
 		}

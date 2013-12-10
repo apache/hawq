@@ -401,7 +401,12 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"bt    bytea",
 				"bool1 boolean",
 				"bool2 boolean",
-				"bool3 boolean" }, (hdfsWorkingFolder + "/my_writable_inside_sequence.tbl"), "custom");
+				"bool3 boolean",
+				"short1 smallint",
+				"short2 smallint",
+				"short3 smallint",
+				"short4 smallint",
+				"short5 smallint" }, (hdfsWorkingFolder + "/my_writable_inside_sequence.tbl"), "custom");
 
 		exTable.setFragmenter("HdfsDataFragmenter");
 		exTable.setAccessor("SequenceFileAccessor");
@@ -737,7 +742,12 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"bt    bytea",
 				"bool1 boolean",
 				"bool2 boolean",
-				"bool3 boolean" }, (hdfsWorkingFolder + "/wildcard/*.tbl"), "custom");
+				"bool3 boolean",
+				"short1 smallint",
+				"short2 smallint",
+				"short3 smallint",
+				"short4 smallint",
+				"short5 smallint" }, (hdfsWorkingFolder + "/wildcard/*.tbl"), "custom");
 
 		exTable.setFragmenter("HdfsDataFragmenter");
 		exTable.setAccessor("SequenceFileAccessor");
@@ -763,8 +773,20 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		File regResourcesFolder = new File("regression/resources/");
 
+		Table sudoDataTable = new Table("dataTable", null);
+		
+		Object[] data = FileFormatsUtils.prepareData(new CustomSequenceReader(), 100, sudoDataTable);
+		
+		sudoDataTable.pumpUpTableData(2);
+		
 		hdfs.getFunc()
-				.copyFromLocal(regResourcesFolder.getAbsolutePath() + "/writable_inside_sequence1.tbl", (hdfsWorkingFolder + "/wild/writable_inside_sequence.tbl"));
+		.writeSequnceFile(data, (hdfsWorkingFolder + "/wild/my_writable_inside_sequence1.tbl"));
+		
+		hdfs.getFunc()
+		.writeSequnceFile(data, (hdfsWorkingFolder + "/wild/my_writable_inside_sequence2.tbl"));
+		
+		//hdfs.getFunc()
+		//		.copyFromLocal(regResourcesFolder.getAbsolutePath() + "/writable_inside_sequence1.tbl", (hdfsWorkingFolder + "/wild/writable_inside_sequence.tbl"));
 
 		ReadbleExternalTable exTable = new ReadbleExternalTable("seqwild", new String[] {
 				"tmp1  timestamp",
@@ -790,7 +812,12 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"bt    bytea",
 				"bool1 boolean",
 				"bool2 boolean",
-				"bool3 boolean" }, (hdfsWorkingFolder + "/wild/writable_inside_sequence.tbl"), "custom");
+				"bool3 boolean",
+				"short1 smallint",
+				"short2 smallint",
+				"short3 smallint",
+				"short4 smallint",
+				"short5 smallint" }, (hdfsWorkingFolder + "/wild/my_writable_inside_sequence?.tbl"), "custom");
 
 		exTable.setFragmenter("HdfsDataFragmenter");
 		exTable.setAccessor("SequenceFileAccessor");
@@ -801,6 +828,8 @@ public class PxfHdfsRegression extends PxfTestCase {
 		createHawqTable(exTable);
 
 		hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY num1");
+		
+		compareTables(exTable, sudoDataTable);
 	}
 
 	/**

@@ -172,6 +172,25 @@ public class Table {
 	}
 
 	/**
+	 * duplicate table's data by factor times
+	 * @param factor
+	 */
+	public void pumpUpTableData(int factor) {
+		
+		if (data == null)
+			return;
+		
+		List<List<String>> pumped = new ArrayList<List<String>>();
+		
+		for (List<String> row : data) {
+			for (int i = 0; i < factor; ++i) {
+				pumped.add(row);
+			}
+		}
+		data = pumped;
+	}
+	
+	/**
 	 * Generates HTML table from Data List
 	 * 
 	 * @return

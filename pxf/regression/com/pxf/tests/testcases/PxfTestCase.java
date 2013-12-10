@@ -71,11 +71,11 @@ public class PxfTestCase extends SystemTestCase4 {
 	 */
 	protected void compareTables(Table t1, Table t2) throws Exception {
 
-		boolean comparationResult = ComparisonUtils.compareTableData(t1, t2);
+		boolean comparisonResult = ComparisonUtils.compareTableData(t1, t2);
 
-		String reportTitle = "Tables Compartion " + ((comparationResult) ? " Passed" : "Failed");
+		String reportTitle = "Tables Comparison " + ((comparisonResult) ? " Passed" : "Failed");
 
-		ReportUtils.reportHtmlLink(report, getClass(), reportTitle, ComparisonUtils.getHtmlReport(), ((comparationResult) ? Reporter.PASS : Reporter.FAIL));
+		ReportUtils.reportHtmlLink(report, getClass(), reportTitle, ComparisonUtils.getHtmlReport(), ((comparisonResult) ? Reporter.PASS : Reporter.FAIL));
 	}
 
 	/**
