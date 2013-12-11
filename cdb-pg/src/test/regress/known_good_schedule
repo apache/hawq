@@ -1,5 +1,6 @@
 # $PostgreSQL: pgsql/src/test/regress/serial_schedule,v 1.33 2006/08/30 23:34:22 tgl Exp $
 # This should probably be in an order similar to parallel_schedule.
+test: type_sanity
 test: querycontext
 test: goh_create_type_composite
 ignore: goh_create_table
@@ -55,7 +56,6 @@ ignore: tinterval
 ignore: inet
 ignore: comments
 ignore: oidjoins
-test: type_sanity
 ignore: opr_sanity
 ignore: geometry
 ignore: horology
