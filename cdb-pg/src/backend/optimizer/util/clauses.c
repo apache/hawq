@@ -4112,6 +4112,154 @@ range_table_mutator(List *rtable,
 	return newrt;
 }
 
+
+/*
+ * flatten_join_alias_var_optimizer
+ *	  Replace Vars that reference JOIN outputs with references to the original
+ *	  relation variables instead.
+ */
+Query *
+flatten_join_alias_var_optimizer(Query *query, int queryLevel)
+{
+	Query *queryNew = (Query *) copyObject(query);
+
+	/* Create a PlannerInfo data structure for this subquery */
+	PlannerInfo *root = makeNode(PlannerInfo);
+	root->parse = queryNew;
+	root->query_level = queryLevel;
+
+	root->glob = makeNode(PlannerGlobal);
+	root->glob->boundParams = NULL;
+	root->glob->paramlist = NIL;
+	root->glob->subplans = NIL;
+	root->glob->subrtables = NIL;
+	root->glob->rewindPlanIDs = NULL;
+	root->glob->finalrtable = NIL;
+	root->glob->relationOids = NIL;
+	root->glob->invalItems = NIL;
+	root->glob->transientPlan = false;
+
+	root->config = DefaultPlannerConfig();
+
+	root->parent_root = NULL;
+	root->planner_cxt = CurrentMemoryContext;
+	root->init_plans = NIL;
+
+	root->list_cteplaninfo = NIL;
+	root->in_info_list = NIL;
+	root->append_rel_list = NIL;
+
+	root->hasJoinRTEs = false;
+	root->hasOuterJoins = false;
+
+	ListCell *plc = NULL;
+	foreach(plc, queryNew->rtable)
+	{
+		RangeTblEntry *rte = (RangeTblEntry *) lfirst(plc);
+
+		if (rte->rtekind == RTE_JOIN)
+		{
+			root->hasJoinRTEs = true;
+			if (IS_OUTER_JOIN(rte->jointype))
+			{
+				root->hasOuterJoins = true;
+				break;
+			}
+		}
+	}
+
+	/*
+	 * Flatten join alias for expression in
+	 * 1. targetlist
+	 * 2. returningList
+	 * 3. having qual
+	 * 4. scatterClause
+	 * 5. limit offset
+	 * 6. limit count
+	 * 
+	 * We flatten the above expressions since these entries may be moved during the query 
+	 * normalization step before algebrization. In contrast, the planner flattens alias 
+	 * inside quals to allow predicates involving such vars to be pushed down. 
+	 * 
+	 * Here we ignore the flattening of quals due to the following reasons:
+	 * 1. we assume that the function will be called before Query->DXL translation:
+	 * 2. the quals never gets moved from old query to the new top-level query in the 
+	 * query normalization phase before algebrization. In other words, the quals hang of 
+	 * the same query structure that is now the new derived table.
+	 * 3. the algebrizer can resolve the abiquity of join aliases in quals since we maintain 
+	 * all combinations of <query level, varno, varattno> to DXL-ColId during Query->DXL translation.
+	 * 
+	 */
+
+	List *targetList = queryNew->targetList;
+	if (NIL != targetList)
+	{
+		queryNew->targetList = (List *) flatten_join_alias_vars(root, (Node *) targetList);
+		pfree(targetList);
+	}
+
+	List * returningList = queryNew->returningList;
+	if (NIL != returningList)
+	{
+		queryNew->returningList = (List *) flatten_join_alias_vars(root, (Node *) returningList);
+		pfree(returningList);
+	}
+
+	Node *havingQual = queryNew->havingQual;
+	if (NULL != havingQual)
+	{
+		queryNew->havingQual = flatten_join_alias_vars(root, havingQual);
+		pfree(havingQual);
+	}
+
+	List *scatterClause = queryNew->scatterClause;
+	if (NIL != scatterClause)
+	{
+		queryNew->scatterClause = (List *) flatten_join_alias_vars(root, (Node *) scatterClause);
+		pfree(scatterClause);
+	}
+
+	Node *limitOffset = queryNew->limitOffset;
+	if (NULL != limitOffset)
+	{
+		queryNew->limitOffset = flatten_join_alias_vars(root, limitOffset);
+		pfree(limitOffset);
+	}
+
+	List *windowClause = queryNew->windowClause;
+	if (NIL != queryNew->windowClause)
+	{
+		ListCell *l = NULL;
+		foreach (l, windowClause)
+		{
+			WindowSpec *w =(WindowSpec*)lfirst(l);
+
+			if ( w != NULL && w->frame != NULL )
+			{
+				WindowFrame *f = w->frame;
+
+				if (f->trail != NULL )
+				{
+					f->trail->val = flatten_join_alias_vars(root, f->trail->val);
+				}
+				if ( f->lead != NULL )
+				{
+					f->lead->val = flatten_join_alias_vars(root, f->lead->val);
+				}
+			}
+		}
+	}
+
+	Node *limitCount = queryNew->limitCount;
+	if (NULL != limitCount)
+	{
+		queryNew->limitCount = flatten_join_alias_vars(root, limitCount);
+		pfree(limitCount);
+	}
+
+    return queryNew;
+}
+
 /*
  * query_or_expression_tree_mutator --- hybrid form
  *

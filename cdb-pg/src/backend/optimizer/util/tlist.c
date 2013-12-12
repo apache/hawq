@@ -58,6 +58,34 @@ tlist_member(Node *node, List *targetlist)
 	return NULL;
 }
 
+/*
+ * tlist_members
+ *	  Finds all members of the given tlist whose expression is
+ *	  equal() to the given expression.	Result is NIL if no such member.
+ *	  Note: We do not make a copy of the tlist entries that match. 
+ *	  The caller is responsible for cleaning up the memory allocated 
+ *	  to the List returned.
+ */
+List *
+tlist_members(Node *node, List *targetlist)
+{
+	List *tlist = NIL;
+	ListCell   *temp = NULL;
+
+	foreach(temp, targetlist)
+	{
+		TargetEntry *tlentry = (TargetEntry *) lfirst(temp);
+
+        Assert(IsA(tlentry, TargetEntry));
+
+		if (equal(node, tlentry->expr))
+		{
+			tlist = lappend(tlist, tlentry);
+		}
+	}
+	
+	return tlist;
+}
 
 /*
  * tlist_member_ignoring_RelabelType

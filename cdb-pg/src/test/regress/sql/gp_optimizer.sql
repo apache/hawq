@@ -280,6 +280,12 @@ select lead(c,c+d,1000) over(order by c,d) from orca.s order by 1;
 with x as (select a, b from orca.r)
 select rank() over(partition by a, case when b = 0 then a+b end order by b asc) as rank_within_parent from x order by a desc ,case when a+b = 0 then a end ,b;
 
+-- alias
+select foo.d from orca.foo full join orca.bar on (foo.d = bar.a) group by d;
+select 1 as v from orca.foo full join orca.bar on (foo.d = bar.a) group by d;
+select * from orca.r where a in (select count(*)+1 as v from orca.foo full join orca.bar on (foo.d = bar.a) group by d+r.b);
+select * from orca.r where r.a in (select d+r.b+1 as v from orca.foo full join orca.bar on (foo.d = bar.a) group by d+r.b) order by r.a, r.b;
+
 ----------------------------------------------------------------------
 set optimizer=off;
 

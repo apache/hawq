@@ -62,6 +62,7 @@
 #define ALLOW_function_exists
 #define ALLOW_function_oids
 #define ALLOW_get_agg_transtype
+#define ALLOW_flatten_join_alias_var_optimizer
 #define ALLOW_get_aggregate
 #define ALLOW_is_agg_ordered
 #define ALLOW_has_agg_prelimfunc
@@ -145,6 +146,7 @@
 #define ALLOW_RelationBuildTriggers
 #define ALLOW_RelationIdGetRelation
 #define ALLOW_tlist_member
+#define ALLOW_tlist_members
 #define ALLOW_type_exists
 #define ALLOW_GetExtTableEntry
 #define ALLOW_ParseExternalTableUri
@@ -805,6 +807,22 @@ gpdb::OidAggIntermediateResultType
 	}
 	GP_WRAP_END;
 	return 0;
+}
+
+Query *
+gpdb::PqueryFlattenJoinAliasVar
+	(
+	Query *pquery,
+	ULONG ulQueryLevel
+	)
+{
+	GP_WRAP_START;
+	{
+		return flatten_join_alias_var_optimizer(pquery, ulQueryLevel);
+	}
+	GP_WRAP_END;
+
+	return NULL;
 }
 
 bool
@@ -2266,6 +2284,22 @@ gpdb::PteMember
 	}
 	GP_WRAP_END;
 	return NULL;
+}
+
+List *
+gpdb::PteMembers
+	(
+	Node *pnode,
+	List *targetlist
+	)
+{
+	GP_WRAP_START;
+	{
+		return tlist_members(pnode, targetlist);
+	}
+	GP_WRAP_END;
+
+	return NIL;
 }
 
 bool

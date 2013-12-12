@@ -72,7 +72,7 @@ CQueryMutators::FNeedsPrLNormalization
 
 		// Normalize when there is an expression that is neither used for grouping
 		// nor is an aggregate function
-		if (!IsA(pte->expr, PercentileExpr) && !IsA(pte->expr, Aggref) && !IsA(pte->expr, GroupingFunc) && !CTranslatorUtils::FGroupingColumn(pte, pquery->groupClause))
+		if (!IsA(pte->expr, PercentileExpr) && !IsA(pte->expr, Aggref) && !IsA(pte->expr, GroupingFunc) && !CTranslatorUtils::FGroupingColumn( (Node*) pte->expr, pquery->groupClause, pquery->targetList))
 		{
 			return true;
 		}
@@ -110,7 +110,7 @@ CQueryMutators::FNeedsToFallback
 	SContextTLWalker *pctx = (SContextTLWalker *) pvCtx;
 
 	TargetEntry *pteFound = gpdb::PteMember(pnode, pctx->m_plTE);
-	if (NULL != pteFound && CTranslatorUtils::FGroupingColumn(pteFound, pctx->m_groupClause))
+	if (NULL != pteFound && CTranslatorUtils::FGroupingColumn( (Node *) pteFound->expr, pctx->m_groupClause, pctx->m_plTE))
 	{
 		return false;
 	}
@@ -181,18 +181,35 @@ CQueryMutators::PqueryNormalizeGrpByPrL
 	List *plTEcopy = (List*) gpdb::PvCopyObject(pqueryDrdTbl->targetList);
 	ListCell *plc = NULL;
 
-	// normalize each project element
+	// first normalize grouping columns
 	ForEach (plc, plTEcopy)
 	{
 		TargetEntry *pte  = (TargetEntry*) lfirst(plc);
 		GPOS_ASSERT(NULL != pte);
 
-		pte->expr = (Expr*) PnodeGrpbyPrLMutator( (Node*) pte->expr, &ctxGbPrLMutator);
-		GPOS_ASSERT
-			(
-			(!IsA(pte->expr, Aggref) && !IsA(pte->expr, PercentileExpr)) && !IsA(pte->expr, GroupingFunc) &&
-			"New target list entry should not contain any Aggrefs or PercentileExpr"
-			);
+		if (CTranslatorUtils::FGroupingColumn(pte, pqueryDrdTbl->groupClause))
+		{
+			pte->expr = (Expr*) PnodeFixGrpCol( (Node*) pte->expr, pte, &ctxGbPrLMutator);
+		}
+	}
+
+	plc = NULL;
+	// normalize remaining project elements
+	ForEach (plc, plTEcopy)
+	{
+		TargetEntry *pte  = (TargetEntry*) lfirst(plc);
+		GPOS_ASSERT(NULL != pte);
+
+		BOOL fGroupingCol = CTranslatorUtils::FGroupingColumn(pte, pqueryDrdTbl->groupClause);
+		if (!fGroupingCol)
+		{
+			pte->expr = (Expr*) PnodeGrpbyPrLMutator( (Node*) pte->expr, &ctxGbPrLMutator);
+			GPOS_ASSERT
+				(
+				(!IsA(pte->expr, Aggref) && !IsA(pte->expr, PercentileExpr)) && !IsA(pte->expr, GroupingFunc) &&
+				"New target list entry should not contain any Aggrefs or PercentileExpr"
+				);
+		}
 	}
 
 	pqueryDrdTbl->targetList = ctxGbPrLMutator.m_plTENewGroupByQuery;
@@ -566,13 +583,19 @@ CQueryMutators::PnodeGrpbyPrLMutator
 			return (Node*) pvarNew;
 		}
 
-		TargetEntry *pteFoundOriginal = gpdb::PteMember(pnode, pctxGrpByMutator->m_pquery->targetList);
-
-		// if it is grouping column then we need add it to the new derived table
-		// and refer to it in the top-level query
-		if (NULL != pteFoundOriginal  && CTranslatorUtils::FGroupingColumn(pteFoundOriginal, pctxGrpByMutator->m_pquery->groupClause))
+		// if it is grouping column then we have already added it to the derived table
+		// so merely refer to it in the top-level query
+		TargetEntry *pteFoundNewDrvdTable = gpdb::PteMember(pnode, pctxGrpByMutator->m_plTENewGroupByQuery);
+		if (NULL != pteFoundNewDrvdTable)
 		{
-			return PnodeFixGrpCol(pnode, pteFoundOriginal, pctxGrpByMutator);
+			return (Node *) gpdb::PvarMakeVar
+							(
+							1, // varno
+							(AttrNumber) pteFoundNewDrvdTable->resno,
+							gpdb::OidExprType( (Node*) pteFoundNewDrvdTable->expr),
+							gpdb::IExprTypeMod( (Node*) pteFoundNewDrvdTable->expr),
+							0 // query levelsup
+							);
 		}
 	}
 
@@ -1302,12 +1325,17 @@ CQueryMutators::PqueryNormalize
 	(
 	IMemoryPool *pmp,
 	CMDAccessor *pmda,
-	const Query *pquery
+	const Query *pquery,
+	ULONG ulQueryLevel
 	)
 {
+	// flatten join alias vars defined at the current level of the query
+	Query *pqueryResolveJoinVarReferences = gpdb::PqueryFlattenJoinAliasVar(const_cast<Query*>(pquery), ulQueryLevel);
+
 	// eliminate distinct clause
-	Query *pqueryEliminateDistinct = CQueryMutators::PqueryEliminateDistinctClause(pquery);
+	Query *pqueryEliminateDistinct = CQueryMutators::PqueryEliminateDistinctClause(pqueryResolveJoinVarReferences);
 	GPOS_ASSERT(NULL == pqueryEliminateDistinct->distinctClause);
+	gpdb::GPDBFree(pqueryResolveJoinVarReferences);
 
 	// fix window frame edge boundary
 	Query *pqueryFixedWindowFrameEdge = CQueryMutators::PqueryFixWindowFrameEdgeBoundary(pqueryEliminateDistinct);
@@ -1571,7 +1599,7 @@ CQueryMutators::FNeedsWindowPrLNormalization
 	{
 		TargetEntry *pte  = (TargetEntry*) gpdb::PvListNth(pquery->targetList, ul);
 
-		if (!CTranslatorUtils::FWindowSpec(pte, pquery->windowClause) && !IsA(pte->expr, WindowRef) && !IsA(pte->expr, Var))
+		if (!CTranslatorUtils::FWindowSpec( (Node *) pte->expr, pquery->windowClause, pquery->targetList) && !IsA(pte->expr, WindowRef) && !IsA(pte->expr, Var))
 		{
 			// computed columns in the target list that is not
 			// used in the order by or partition by of the window specification(s)

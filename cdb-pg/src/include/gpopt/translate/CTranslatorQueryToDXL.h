@@ -206,6 +206,7 @@ namespace gpdxl
 			CDXLNode *PdxlnSimpleGroupBy
 				(
 				List *plTargetList,
+				List *plGroupClause,
 				CBitSet *pbs,
 				BOOL fHasAggs,
 				BOOL fGroupingSets,				// is this GB part of a GS query

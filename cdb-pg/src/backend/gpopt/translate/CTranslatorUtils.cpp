@@ -2091,6 +2091,68 @@ CTranslatorUtils::UlColId
 	return ulColId;
 }
 
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorUtils::PteWindowSpec
+//
+//	@doc:
+//		Extract a matching target entry that is a window spec
+//		
+//---------------------------------------------------------------------------
+TargetEntry *
+CTranslatorUtils::PteWindowSpec
+	(
+	Node *pnode,
+	List *plWindowClause,
+	List *plTargetList
+	)
+{
+	GPOS_ASSERT(NULL != pnode);
+	List *plTargetListSubset = gpdb::PteMembers(pnode, plTargetList);
+
+	ListCell *plcTE = NULL;
+	ForEach (plcTE, plTargetListSubset)
+	{
+		TargetEntry *pteCurr = (TargetEntry*) lfirst(plcTE);
+		if (FWindowSpec(pteCurr, plWindowClause))
+		{
+			gpdb::GPDBFree(plTargetListSubset);
+			return pteCurr;
+		}
+	}
+
+	if (NIL != plTargetListSubset)
+	{
+		gpdb::GPDBFree(plTargetListSubset);
+	}
+	return NULL;
+}
+
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorUtils::FWindowSpec
+//
+//	@doc:
+//		Check if the expression has a matching target entry that is a window spec
+//---------------------------------------------------------------------------
+BOOL
+CTranslatorUtils::FWindowSpec
+	(
+	Node *pnode,
+	List *plWindowClause,
+	List *plTargetList
+	)
+{
+	GPOS_ASSERT(NULL != pnode);
+	
+	TargetEntry *pteWindoSpec = PteWindowSpec(pnode, plWindowClause, plTargetList);
+
+	return (NULL != pteWindoSpec);
+}
+
+
 //---------------------------------------------------------------------------
 //	@function:
 //		CTranslatorUtils::FWindowSpec
@@ -2171,6 +2233,67 @@ CTranslatorUtils::FSortingColumn
 
 	return false;
 }
+
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorUtils::PteGroupingColumn
+//
+//	@doc:
+//		Extract a matching target entry that is a grouping column
+//---------------------------------------------------------------------------
+TargetEntry *
+CTranslatorUtils::PteGroupingColumn
+	(
+	Node *pnode,
+	List *plGrpCl,
+	List *plTargetList
+	)
+{
+	GPOS_ASSERT(NULL != pnode);
+	List *plTargetListSubset = gpdb::PteMembers(pnode, plTargetList);
+
+	ListCell *plcTE = NULL;
+	ForEach (plcTE, plTargetListSubset)
+	{
+		TargetEntry *pteNext = (TargetEntry*) lfirst(plcTE);
+		if (FGroupingColumn(pteNext, plGrpCl))
+		{
+			gpdb::GPDBFree(plTargetListSubset);
+			return pteNext;
+		}
+	}
+
+	if (NIL != plTargetListSubset)
+	{
+		gpdb::GPDBFree(plTargetListSubset);
+	}
+	return NULL;
+}
+
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorUtils::FGroupingColumn
+//
+//	@doc:
+//		Check if the expression has a matching target entry that is a grouping column
+//---------------------------------------------------------------------------
+BOOL
+CTranslatorUtils::FGroupingColumn
+	(
+	Node *pnode,
+	List *plGrpCl,
+	List *plTargetList
+	)
+{
+	GPOS_ASSERT(NULL != pnode);
+
+	TargetEntry *pteGroupingCol = PteGroupingColumn(pnode, plGrpCl, plTargetList);
+
+	return (NULL != pteGroupingCol);
+}
+
 
 //---------------------------------------------------------------------------
 //	@function:

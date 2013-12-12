@@ -6309,6 +6309,126 @@ select rank() over(partition by a, case when b = 0 then a+b end order by b asc) 
                   1
 (21 rows)
 
+-- alias
+select foo.d from orca.foo full join orca.bar on (foo.d = bar.a) group by d;
+ d  
+----
+  3
+ 27
+ 11
+ 25
+ 37
+  9
+ 17
+  1
+  7
+ 35
+ 23
+ 21
+ 39
+ 19
+ 33
+ 29
+ 13
+  5
+ 15
+ 31
+ 20
+  2
+ 12
+ 18
+  6
+ 24
+ 16
+ 14
+ 38
+ 34
+ 26
+ 28
+ 30
+ 22
+  0
+ 32
+ 36
+  8
+ 10
+  4
+(40 rows)
+
+select 1 as v from orca.foo full join orca.bar on (foo.d = bar.a) group by d;
+ v 
+---
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+ 1
+(40 rows)
+
+select * from orca.r where a in (select count(*)+1 as v from orca.foo full join orca.bar on (foo.d = bar.a) group by d+r.b);
+ a | b 
+---+---
+ 2 | 2
+(1 row)
+
+select * from orca.r where r.a in (select d+r.b+1 as v from orca.foo full join orca.bar on (foo.d = bar.a) group by d+r.b) order by r.a, r.b;
+ a  | b 
+----+---
+  3 | 0
+  4 | 1
+  5 | 2
+  6 | 0
+  7 | 1
+  8 | 2
+  9 | 0
+ 10 | 1
+ 11 | 2
+ 12 | 0
+ 13 | 1
+ 14 | 2
+ 15 | 0
+ 16 | 1
+ 17 | 2
+ 18 | 0
+ 19 | 1
+ 20 | 2
+(18 rows)
+
 ----------------------------------------------------------------------
 set optimizer=off;
 drop table if exists orca.rcte;

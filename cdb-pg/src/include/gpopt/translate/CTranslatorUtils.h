@@ -345,6 +345,14 @@ namespace gpdxl
 			static
 			BOOL FWindowSpec(const TargetEntry *pte, List *plWindowClause);
 
+			// extract a matching target entry that is a window spec
+			static
+			TargetEntry *PteWindowSpec(Node *pnode, List *plWindowClause, List *plTargetList);
+
+			// check if the expression has a matching target entry that is a window spec
+			static
+			BOOL FWindowSpec(Node *pnode, List *plWindowClause, List *plTargetList);
+
 			// create a scalar const value expression for the given int4 value
 			static
 			CDXLNode *PdxlnInt4Const(IMemoryPool *pmp, CMDAccessor *pmda, INT iVal);
@@ -360,6 +368,14 @@ namespace gpdxl
 			// check to see if the sorting column entry is a grouping column
 			static
 			BOOL FGroupingColumn(const SortClause *psortcl, List *plGrpCl);
+
+			// check if the expression has a matching target entry that is a grouping column
+			static
+			BOOL FGroupingColumn(Node *pnode, List *plGrpCl, List *plTargetList);
+
+			// extract a matching target entry that is a grouping column
+			static
+			TargetEntry *PteGroupingColumn(Node *pnode, List *plGrpCl, List *plTargetList);
 
 			// convert a list of column ids to a list of attribute numbers using
 			// the provided context with mappings

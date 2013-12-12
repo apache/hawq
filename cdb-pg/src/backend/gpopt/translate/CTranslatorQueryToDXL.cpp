@@ -197,7 +197,7 @@ CTranslatorQueryToDXL::CTranslatorQueryToDXL
 	CheckUnsupportedNodeTypes(pquery);
 
 	// first normalize the query
-	m_pquery = CQueryMutators::PqueryNormalize(m_pmp, m_pmda, pquery);
+	m_pquery = CQueryMutators::PqueryNormalize(m_pmp, m_pmda, pquery, ulQueryLevel);
 
 	if (NULL != m_pquery->cteList)
 	{
@@ -1154,15 +1154,20 @@ CTranslatorQueryToDXL::PdxlnWindow
 	ListCell *plcTE = NULL;
 	ULONG ulResno = 1;
 
+	// target entries that are result of flattening join alias and 
+	// are equivalent to a defined Window specs target entry
+	List *plTEOmitted = NIL; 
+	List *plResno = NIL;
+	
 	ForEach (plcTE, plTargetList)
 	{
+		BOOL fInsertSortInfo = true;
 		TargetEntry *pte = (TargetEntry *) lfirst(plcTE);
 		GPOS_ASSERT(IsA(pte, TargetEntry));
 
 		// create the DXL node holding the target list entry
 		CDXLNode *pdxlnPrEl =  PdxlnPrEFromGPDBExpr(pte->expr, pte->resname);
 		ULONG ulColId = CDXLScalarProjElem::PdxlopConvert(pdxlnPrEl->Pdxlop())->UlId();
-		AddSortingGroupingColumn(pte, phmiulSortColsColId, ulColId);
 
 		if (!pte->resjunk)
 		{
@@ -1170,12 +1175,13 @@ CTranslatorQueryToDXL::PdxlnWindow
 			{
 				// add window functions and non-computed columns to the project list of the window operator
 				pdxlnPrL->AddChild(pdxlnPrEl);
+
+				StoreAttnoColIdMapping(phmiulOutputCols, ulResno, ulColId);
 			}
-			else
+			else if (CTranslatorUtils::FWindowSpec(pte, plWindowClause))
 			{
 				// add computed column used in window specification needed in the output columns
 				// to the child's project list
-				GPOS_ASSERT(CTranslatorUtils::FWindowSpec(pte, plWindowClause));
 				pdxlnNewChildScPrL->AddChild(pdxlnPrEl);
 
 				// construct a scalar identifier that points to the computed column and
@@ -1206,8 +1212,17 @@ CTranslatorQueryToDXL::PdxlnWindow
 															);
 				pdxlnPrElNew->AddChild(pdxlnPrElNewChild);
 				pdxlnPrL->AddChild(pdxlnPrElNew);
+
+				StoreAttnoColIdMapping(phmiulOutputCols, ulResno, ulColId);
 			}
-			StoreAttnoColIdMapping(phmiulOutputCols, ulResno, ulColId);
+			else
+			{
+				fInsertSortInfo = false;
+				plTEOmitted = gpdb::PlAppendElement(plTEOmitted, pte);
+				plResno = gpdb::PlAppendInt(plResno, ulResno);
+
+				pdxlnPrEl->Release();
+			}
 		}
 		else if (IsA(pte->expr, WindowRef))
 		{
@@ -1224,7 +1239,38 @@ CTranslatorQueryToDXL::PdxlnWindow
 		{
 			pdxlnPrEl->Release();
 		}
+
+		if (fInsertSortInfo)
+		{
+			AddSortingGroupingColumn(pte, phmiulSortColsColId, ulColId);
+		}
+
 		ulResno++;
+	}
+
+	plcTE = NULL;
+
+	// process target entries that are a result of flattening join alias
+	ListCell *plcResno = NULL;
+	ForBoth (plcTE, plTEOmitted,
+			plcResno, plResno)
+	{
+		TargetEntry *pte = (TargetEntry *) lfirst(plcTE);
+		INT iResno = (INT) lfirst_int(plcResno);
+
+		INT iSortGroupRef = (INT) pte->ressortgroupref;
+
+		TargetEntry *pteWindowSpec = CTranslatorUtils::PteWindowSpec( (Node*) pte->expr, plWindowClause, plTargetList);
+		if (NULL != pteWindowSpec)
+		{
+			const ULONG ulColId = CTranslatorUtils::UlColId( (INT) pteWindowSpec->ressortgroupref, phmiulSortColsColId);
+			StoreAttnoColIdMapping(phmiulOutputCols, iResno, ulColId);
+			AddSortingGroupingColumn(pte, phmiulSortColsColId, ulColId);
+		}
+	}
+	if (NIL != plTEOmitted)
+	{
+		gpdb::GPDBFree(plTEOmitted);
 	}
 
 	// translate window spec
@@ -1477,6 +1523,7 @@ CDXLNode *
 CTranslatorQueryToDXL::PdxlnSimpleGroupBy
 	(
 	List *plTargetList,
+	List *plGroupClause,
 	CBitSet *pbsGroupByCols,
 	BOOL fHasAggs,
 	BOOL fGroupingSets,
@@ -1524,7 +1571,9 @@ CTranslatorQueryToDXL::PdxlnSimpleGroupBy
 		GPOS_ASSERT(0 < pte->resno);
 		ULONG ulResNo = pte->resno;
 
-		BOOL fGroupingCol = pbsGroupByCols->FBit(pte->ressortgroupref);
+		TargetEntry *pteEquivalent = CTranslatorUtils::PteGroupingColumn( (Node *) pte->expr, plGroupClause, plTargetList);
+
+		BOOL fGroupingCol = pbsGroupByCols->FBit(pte->ressortgroupref) || (NULL != pteEquivalent && pbsGroupByCols->FBit(pteEquivalent->ressortgroupref));
 		ULONG ulColId = 0;
 
 		if (fGroupingCol)
@@ -1656,6 +1705,7 @@ CTranslatorQueryToDXL::PdxlnGroupingSets
 		CDXLNode *pdxlnResult = PdxlnSimpleGroupBy
 								(
 								plTargetList,
+								plGroupClause,
 								pbs,
 								fHasAggs,
 								false, // fGroupingSets
@@ -1692,6 +1742,7 @@ CTranslatorQueryToDXL::PdxlnGroupingSets
 		CDXLNode *pdxlnGroupBy = PdxlnSimpleGroupBy
 								(
 								plTargetList,
+								plGroupClause,
 								pbs,
 								fHasAggs,
 								false, // fGroupingSets
@@ -1804,6 +1855,7 @@ CTranslatorQueryToDXL::PdxlnUnionAllForGroupingSets
 		CDXLNode *pdxlnGroupBy = PdxlnSimpleGroupBy
 					(
 					plTargetList,
+					plGroupClause,
 					pbsGroupingSet,
 					fHasAggs,
 					true, // fGroupingSets
@@ -3068,6 +3120,10 @@ CTranslatorQueryToDXL::PdxlnLgProjectFromGPDBTL
 	// construct a proj element node for each entry in the target list
 	ListCell *plcTE = NULL;
 	
+	// target entries that are result of flattening join alias
+	// and are equivalent to a defined grouping column target entry
+	List *plOmittedTE = NIL; 
+
 	// list for all vars used in aggref expressions
 	List *plVars = NULL;
 	ULONG ulResno = 0;
@@ -3103,6 +3159,33 @@ CTranslatorQueryToDXL::PdxlnLgProjectFromGPDBTL
 		{
 			plVars = gpdb::PlConcat(plVars, gpdb::PlExtractNodesExpression((Node *) pte->expr, T_Var));
 		}
+		else if (!IsA(pte->expr, Aggref))
+		{
+			plOmittedTE = gpdb::PlAppendElement(plOmittedTE, pte);
+		}
+	}
+
+	// process target entries that are a result of flattening join alias
+	plcTE = NULL;
+	ForEach(plcTE, plOmittedTE)
+	{
+		TargetEntry *pte = (TargetEntry *) lfirst(plcTE);
+		INT iSortGroupRef = (INT) pte->ressortgroupref;
+
+		TargetEntry *pteGroupingColumn = CTranslatorUtils::PteGroupingColumn( (Node*) pte->expr, plgrpcl, plTargetList);
+		if (NULL != pteGroupingColumn)
+		{
+			const ULONG ulColId = CTranslatorUtils::UlColId((INT) pteGroupingColumn->ressortgroupref, phmiulSortgrouprefColId);
+			StoreAttnoColIdMapping(phmiulOutputCols, pte->resno, ulColId);
+			if (0 < iSortGroupRef && 0 < ulColId && NULL == phmiulSortgrouprefColId->PtLookup(&iSortGroupRef))
+			{
+				AddSortingGroupingColumn(pte, phmiulSortgrouprefColId, ulColId);
+			}
+		}
+	}
+	if (NIL != plOmittedTE)
+	{
+		gpdb::GPDBFree(plOmittedTE);
 	}
 
 	GPOS_ASSERT_IMP(!fExpandAggrefExpr, NULL == plVars);
@@ -3550,7 +3633,7 @@ CTranslatorQueryToDXL::ConstructCTEProducerList
 		CommonTableExpr *pcte = (CommonTableExpr *) lfirst(plc);
 		GPOS_ASSERT(IsA(pcte->ctequery, Query));
 		
-		Query *pqueryCte = CQueryMutators::PqueryNormalize(m_pmp, m_pmda, (Query *) pcte->ctequery);
+		Query *pqueryCte = CQueryMutators::PqueryNormalize(m_pmp, m_pmda, (Query *) pcte->ctequery, ulCteQueryLevel + 1);
 		
 		// the query representing the cte can only access variables defined in the current level as well as
 		// those defined at prior query levels

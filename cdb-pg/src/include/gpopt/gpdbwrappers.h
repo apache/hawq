@@ -148,6 +148,10 @@ namespace gpdb {
 	// intermediate result type of given aggregate
 	Oid OidAggIntermediateResultType(Oid aggid);
 
+	// replace Vars that reference JOIN outputs with references to the original
+	// relation variables instead
+	Query *PqueryFlattenJoinAliasVar(Query *pquery, ULONG ulQueryLevel);
+
 	// is aggregate ordered
 	bool FOrderedAgg(Oid aggid);
 	
@@ -468,6 +472,10 @@ namespace gpdb {
 	// return the first member of the given targetlist whose expression is
 	// equal to the given expression, or NULL if no such member exists
 	TargetEntry *PteMember(Node *node, List *targetlist);
+
+	// return a list of members of the given targetlist whose expression is
+	// equal to the given expression, or NULL if no such member exists
+	List *PteMembers(Node *node, List *targetlist);
 
 	// check if two gpdb objects are equal
 	bool FEqual(void *p1, void *p2);

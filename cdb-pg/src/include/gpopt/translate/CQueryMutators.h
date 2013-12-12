@@ -243,7 +243,7 @@ namespace gpdxl
 
 			// normalize query
 			static
-			Query *PqueryNormalize(IMemoryPool *pmp, CMDAccessor *pmda, const Query *pquery);
+			Query *PqueryNormalize(IMemoryPool *pmp, CMDAccessor *pmda, const Query *pquery, ULONG ulQueryLevel);
 
 			// check if the project list contains expressions on window operators thereby needing normalization
 			static
