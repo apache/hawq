@@ -12,6 +12,16 @@
 #include <curl/curl.h>
 #undef CURL_DISABLE_TYPECHECK
 
+/*
+ * internal buffer for libchurl internal context
+ */
+typedef struct
+{
+	char* ptr;
+	int max;
+	int bot, top;
+
+} churl_buffer;
 
 /*
  * internal context of libchurl
@@ -36,10 +46,11 @@ typedef struct
 	 */
 	int curl_still_running;
 
-	/* internal buffer for read */
-	char* ptr;
-	int max;
-	int bot, top;
+	/* internal buffer for download */
+	churl_buffer* download_buffer;
+
+	/* internal buffer for upload */
+	churl_buffer* upload_buffer;
 
 	/* holds http error code returned from
 	 * remote server
@@ -65,24 +76,22 @@ void set_curl_option(churl_context* context, CURLoption option, const void* data
 size_t read_callback(void *ptr, size_t size, size_t nmemb, void *userdata);
 void setup_multi_handle(churl_context* context);
 void multi_perform(churl_context* context);
-bool internal_buffer_large_enough(churl_context* context, size_t required);
+bool internal_buffer_large_enough(churl_buffer* buffer, size_t required);
 void flush_internal_buffer(churl_context* context);
-void enlarge_internal_buffer(churl_context* context, size_t required);
+void enlarge_internal_buffer(churl_buffer* buffer, size_t required);
 void finish_upload(churl_context* context);
 void cleanup_curl_handle(churl_context* context);
-void cleanup_curl_header(churl_context* context);
-void cleanup_internal_buffer(churl_context* context);
+void cleanup_internal_buffer(churl_buffer* buffer);
 void churl_cleanup_context(churl_context* context);
 size_t write_callback(char *buffer, size_t size, size_t nitems, void *userp);
 int fill_internal_buffer(churl_context* context, int want);
-int bring_alldata_to_internal_buffer(churl_context* context);
 void churl_headers_set(churl_context* context, CHURL_HEADERS settings);
 void check_response_code(churl_context* context);
 void clear_error_buffer(churl_context* context);
 size_t header_callback(char *buffer, size_t size, size_t nitems, void *userp);
 void free_http_response(churl_context* context);
-void compact_internal_buffer(churl_context* context);
-void realloc_internal_buffer(churl_context* context, size_t required);
+void compact_internal_buffer(churl_buffer* buffer);
+void realloc_internal_buffer(churl_buffer* buffer, size_t required);
 bool handle_special_error(long response);
 char* get_http_error_msg(long http_ret_code, char* msg, char* curl_error_buffer);
 char* build_header_str(const char* format, const char* name, const char* value);
@@ -344,34 +353,42 @@ void churl_download_restart(CHURL_HANDLE handle, const char* url, CHURL_HEADERS 
 	setup_multi_handle(context);
 }
 
+/*
+ * upload
+ */
 size_t churl_write(CHURL_HANDLE handle, const char* buf, size_t bufsize)
 {
 	churl_context* context = (churl_context*)handle;
+	churl_buffer* context_buffer = context->upload_buffer;
 	Assert(context->upload);
 
-	if (!internal_buffer_large_enough(context, bufsize))
+	if (!internal_buffer_large_enough(context_buffer, bufsize))
 	{
 		flush_internal_buffer(context);
-		if (!internal_buffer_large_enough(context, bufsize))
-			enlarge_internal_buffer(context, bufsize);
+		if (!internal_buffer_large_enough(context_buffer, bufsize))
+			enlarge_internal_buffer(context_buffer, bufsize);
 	}
 
-	memcpy(context->ptr + context->top, buf, bufsize);
-	context->top += bufsize;
+	memcpy(context_buffer->ptr + context_buffer->top, buf, bufsize);
+	context_buffer->top += bufsize;
 
 	return bufsize;
 }
 
+/*
+ * download
+ */
 size_t churl_read(CHURL_HANDLE handle, char* buf, size_t max_size)
 {
 	int	n = 0;
 	churl_context* context = (churl_context*)handle;
+	churl_buffer* context_buffer = context->download_buffer;
 	Assert(!context->upload);
 
 	fill_internal_buffer(context, max_size);
 	check_response_code(context);
 
-	n = context->top - context->bot;
+	n = context_buffer->top - context_buffer->bot;
 	/* TODO: this means we are done.
 	 * Should we do something with it?
 	 * if (n == 0 && !context->curl_still_running)
@@ -381,8 +398,8 @@ size_t churl_read(CHURL_HANDLE handle, char* buf, size_t max_size)
 	if (n > max_size)
 		n = max_size;
 
-	memcpy(buf, context->ptr + context->bot, n);
-	context->bot += n;
+	memcpy(buf, context_buffer->ptr + context_buffer->bot, n);
+	context_buffer->bot += n;
 
 	return n;
 }
@@ -397,13 +414,16 @@ void churl_cleanup(CHURL_HANDLE handle)
 		finish_upload(context);
 
 	cleanup_curl_handle(context);
-	cleanup_internal_buffer(context);
+	cleanup_internal_buffer(context->download_buffer);
+	cleanup_internal_buffer(context->upload_buffer);
 	churl_cleanup_context(context);
 }
 
 churl_context* churl_new_context()
 {
 	churl_context* context = palloc0(sizeof(churl_context));
+	context->download_buffer = palloc0(sizeof(churl_buffer));
+	context->upload_buffer = palloc0(sizeof(churl_buffer));
 	return context;
 }
 
@@ -437,11 +457,12 @@ void set_curl_option(churl_context* context, CURLoption option, const void* data
 size_t read_callback(void *ptr, size_t size, size_t nmemb, void *userdata)
 {
 	churl_context* context = (churl_context*)userdata;
+	churl_buffer* context_buffer = context->upload_buffer;
 
-	int written = Min(size * nmemb, context->top - context->bot);
+	int written = Min(size * nmemb, context_buffer->top - context_buffer->bot);
 
-	memcpy(ptr, context->ptr, written);
-	context->bot += written;
+	memcpy(ptr, context_buffer->ptr, written);
+	context_buffer->bot += written;
 
 	return written;
 }
@@ -485,17 +506,19 @@ void multi_perform(churl_context* context)
 			 curl_error, curl_easy_strerror(curl_error));
 }
 
-bool internal_buffer_large_enough(churl_context* context, size_t required)
+bool internal_buffer_large_enough(churl_buffer* buffer, size_t required)
 {
-	return ((context->top + required) <= context->max);
+	return ((buffer->top + required) <= buffer->max);
 }
 
 void flush_internal_buffer(churl_context* context)
 {
-	if (context->top == 0)
+	churl_buffer* context_buffer = context->upload_buffer;
+	if (context_buffer->top == 0)
 		return;
 
-	while((context->curl_still_running != 0) && ((context->top - context->bot) > 0))
+	while((context->curl_still_running != 0) &&
+		  ((context_buffer->top - context_buffer->bot) > 0))
 	{
 		/*
 		 * Allow canceling a query while waiting for input from remote service
@@ -506,21 +529,21 @@ void flush_internal_buffer(churl_context* context)
 	}
 
 	if ((context->curl_still_running == 0) &&
-		((context->top - context->bot) > 0))
+		((context_buffer->top - context_buffer->bot) > 0))
 		elog(ERROR, "failed sending to remote component");
 	check_response_code(context);
 
-	context->top = 0;
-	context->bot = 0;
+	context_buffer->top = 0;
+	context_buffer->bot = 0;
 }
 
-void enlarge_internal_buffer(churl_context* context, size_t required)
+void enlarge_internal_buffer(churl_buffer* buffer, size_t required)
 {
-	if (context->ptr != NULL)
-		pfree(context->ptr);
+	if (buffer->ptr != NULL)
+		pfree(buffer->ptr);
 
-	context->max = required + 1024;
-	context->ptr = palloc(context->max);
+	buffer->max = required + 1024;
+	buffer->ptr = palloc(buffer->max);
 }
 
 /*
@@ -539,6 +562,7 @@ void finish_upload(churl_context* context)
 	 */
 	while(context->curl_still_running != 0)
 		multi_perform(context);
+
 	check_response_code(context);
 }
 
@@ -554,19 +578,29 @@ void cleanup_curl_handle(churl_context* context)
 	context->multi_handle = NULL;
 }
 
-void cleanup_internal_buffer(churl_context* context)
+void cleanup_internal_buffer(churl_buffer* buffer)
 {
-	if (!context->ptr)
-		return;
-
-	pfree(context->ptr);
-	context->ptr = NULL;
+	if ((buffer) && (buffer->ptr))
+	{
+		pfree(buffer->ptr);
+		buffer->ptr = NULL;
+		buffer->bot = 0;
+		buffer->top = 0;
+		buffer->max = 0;
+	}
 }
 
 void churl_cleanup_context(churl_context* context)
 {
 	if (context)
+	{
+		if (context->download_buffer)
+			pfree(context->download_buffer);
+		if (context->upload_buffer)
+			pfree(context->upload_buffer);
+
 		pfree(context);
+	}
 }
 
 /*
@@ -577,18 +611,19 @@ void churl_cleanup_context(churl_context* context)
 size_t write_callback(char *buffer, size_t size, size_t nitems, void *userp)
 {
     churl_context* context = (churl_context*)userp;
+    churl_buffer* context_buffer = context->download_buffer;
 	const int 	nbytes = size * nitems;
 
-	if (!internal_buffer_large_enough(context, nbytes))
+	if (!internal_buffer_large_enough(context_buffer, nbytes))
 	{
-		compact_internal_buffer(context);
-		if (!internal_buffer_large_enough(context, nbytes))
-			realloc_internal_buffer(context, nbytes);
+		compact_internal_buffer(context_buffer);
+		if (!internal_buffer_large_enough(context_buffer, nbytes))
+			realloc_internal_buffer(context_buffer, nbytes);
 	}
 
 	/* enough space. copy buffer into curl->buf */
-	memcpy(context->ptr + context->top, buffer, nbytes);
-	context->top += nbytes;
+	memcpy(context_buffer->ptr + context_buffer->top, buffer, nbytes);
+	context_buffer->top += nbytes;
 
 	return nbytes;
 }
@@ -607,7 +642,8 @@ int fill_internal_buffer(churl_context* context, int want)
     int 	nfds, curl_error;
 
     /* attempt to fill buffer */
-	while (context->curl_still_running && ((context->top - context->bot) < want))
+	while (context->curl_still_running &&
+		   ((context->download_buffer->top - context->download_buffer->bot) < want))
     {
         FD_ZERO(&fdread);
         FD_ZERO(&fdwrite);
@@ -686,10 +722,10 @@ void check_response_code(churl_context* context)
 			initStringInfo(&err);
 
 			/* prepare response text if any */
-			if (context->ptr)
+			if (context->download_buffer->ptr)
 			{
-				context->ptr[context->top] = '\0';
-				response_text = context->ptr + context->bot;
+				context->download_buffer->ptr[context->download_buffer->top] = '\0';
+				response_text = context->download_buffer->ptr + context->download_buffer->bot;
 			}
 
 			/* add remote http error code */
@@ -888,31 +924,31 @@ size_t header_callback(char *buffer, size_t size,
 	return nbytes;
 }
 
-void compact_internal_buffer(churl_context* context)
+void compact_internal_buffer(churl_buffer* buffer)
 {
 	int n;
 	/* no compaction required */
-	if (context->bot == 0)
+	if (buffer->bot == 0)
 		return;
 
-	n = context->top - context->bot;
-	memmove(context->ptr, context->ptr + context->bot, n);
-	context->bot = 0;
-	context->top = n;
+	n = buffer->top - buffer->bot;
+	memmove(buffer->ptr, buffer->ptr + buffer->bot, n);
+	buffer->bot = 0;
+	buffer->top = n;
 }
 
-void realloc_internal_buffer(churl_context* context, size_t required)
+void realloc_internal_buffer(churl_buffer* buffer, size_t required)
 {
 	int n;
 
-	n = context->top - context->bot + required + 1024;
-	if (context->ptr == NULL)
-		context->ptr = palloc(n);
+	n = buffer->top - buffer->bot + required + 1024;
+	if (buffer->ptr == NULL)
+		buffer->ptr = palloc(n);
 	else
 		/* repalloc does not support NULL ptr */
-		context->ptr = repalloc(context->ptr, n);
+		buffer->ptr = repalloc(buffer->ptr, n);
 
-	context->max = n;
+	buffer->max = n;
 }
 
 bool handle_special_error(long response)
