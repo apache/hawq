@@ -7,7 +7,9 @@
 -- prior shell-type creation.  These commands therefore complete a test
 -- of the "old style" approach of making the functions first.
 --
+-- start_ignore
 drop database hdfs;
+-- end_ignore
 create database hdfs;
 \c hdfs
 
