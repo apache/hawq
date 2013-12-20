@@ -59,7 +59,7 @@ typedef struct CdbCopy
 /* global function declarations */
 CdbCopy    *makeCdbCopy(bool copy_in);
 int			cdbCopyGetDbCount(int total_segs, int seg);
-void		cdbCopyStart(CdbCopy *cdbCopy, char *copyCmd, Oid relid, Oid relerror);
+void		cdbCopyStart(CdbCopy *cdbCopy, char *copyCmd, Oid relid, Oid relerror, int err_aosegno);
 void		cdbCopySendData(CdbCopy *c, int target_seg, const char *buffer, int nbytes);
 void		cdbCopySendDataSingle(CdbCopy *c, int target_seg, const char *buffer, int nbytes);
 bool		cdbCopyGetData(CdbCopy *c, bool cancel, uint64 *rows_processed);

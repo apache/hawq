@@ -454,6 +454,7 @@ _copyExternalScan(ExternalScan *from)
 	COPY_SCALAR_FIELD(rejLimit);
 	COPY_SCALAR_FIELD(rejLimitInRows);
 	COPY_SCALAR_FIELD(fmterrtbl);
+	COPY_SCALAR_FIELD(errAosegno);
 	COPY_SCALAR_FIELD(encoding);
 	COPY_SCALAR_FIELD(scancounter);
 
@@ -2792,6 +2793,7 @@ _copyCopyStmt(CopyStmt *from)
 	COPY_STRING_FIELD(filename);
 	COPY_NODE_FIELD(options);
 	COPY_NODE_FIELD(sreh);
+	COPY_SCALAR_FIELD(err_aosegno);
 
 	return newnode;
 }

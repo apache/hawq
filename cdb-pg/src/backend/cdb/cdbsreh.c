@@ -22,6 +22,7 @@
 #include "nodes/makefuncs.h"
 #include "access/transam.h"
 
+#include "cdb/cdbappendonlyam.h"
 #include "cdb/cdbsreh.h"
 #include "cdb/cdbvars.h"
 #include "cdb/cdbdisp.h"
@@ -48,8 +49,8 @@ static void PreprocessByteaData(char *src);
  */
 CdbSreh *
 makeCdbSreh(bool is_keep, bool reusing_existing_errtable,
-			int rejectlimit, bool is_limit_in_rows, 
-			RangeVar *errortable, char *filename, char *relname)
+			int rejectlimit, bool is_limit_in_rows,
+			RangeVar *errortable, int aosegno, char *filename, char *relname)
 {
 	CdbSreh	*h;
 
@@ -69,6 +70,8 @@ makeCdbSreh(bool is_keep, bool reusing_existing_errtable,
 	h->reusing_errtbl = reusing_existing_errtable;
 	h->cdbcopy = NULL;
 	h->errtbl = NULL;
+	h->err_aoInsertDesc = NULL;
+	h->err_aosegno = aosegno;
 	h->lastsegid = 0;
 	h->consec_csv_err = 0;
 	
@@ -98,13 +101,35 @@ void
 destroyCdbSreh(CdbSreh *cdbsreh)
 {
 	
+	if (cdbsreh->err_aoInsertDesc)
+	{
+		StringInfo buf = NULL;
+		buf = PreSendbackChangedCatalog(1);
+
+		QueryContextDispatchingSendBack sendback = NULL;
+
+		sendback = CreateQueryContextDispatchingSendBack(1);
+		cdbsreh->err_aoInsertDesc->sendback = sendback;
+		sendback->relid = RelationGetRelid(cdbsreh->errtbl);
+
+		appendonly_insert_finish(cdbsreh->err_aoInsertDesc);
+
+		if (sendback && Gp_role == GP_ROLE_EXECUTE)
+			AddSendbackChangedCatalogContent(buf, sendback);
+
+		DropQueryContextDispatchingSendBack(sendback);
+
+		if (sendback && Gp_role == GP_ROLE_EXECUTE)
+			FinishSendbackChangedCatalog(buf);
+	}
+
 	/* delete the bad row context */
-    MemoryContextDelete(cdbsreh->badrowcontext);
-	
+	MemoryContextDelete(cdbsreh->badrowcontext);
+
 	/* close error table */
 	if (cdbsreh->errtbl)
 		CloseErrorTable(cdbsreh);
-	
+
 	/* drop error table if need to */
 	if (cdbsreh->should_drop && Gp_role == GP_ROLE_DISPATCH)
 		DropErrorTable(cdbsreh);
@@ -205,10 +230,10 @@ void OpenErrorTable(CdbSreh *cdbsreh, RangeVar *errortable)
 				 errmsg("\"%s\" exists in the database but is a non table relation",
 						RelationGetRelationName(cdbsreh->errtbl))));
 
-	if (cdbsreh->errtbl->rd_rel->relstorage != RELSTORAGE_HEAP)	
+	if (!RelationIsAoRows(cdbsreh->errtbl))
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("\"%s\" exists in the database but is a non heap stored relation",
+				 errmsg("\"%s\" exists in the database but is a non appendonly relation",
 						RelationGetRelationName(cdbsreh->errtbl))));
 }
 
@@ -235,7 +260,6 @@ void CloseErrorTable(CdbSreh *cdbsreh)
 static
 void DropErrorTable(CdbSreh *cdbsreh)
 {
-	StringInfoData dropstmt;
 	RangeVar *errtbl_rv;
 	
 	Insist(Gp_role == GP_ROLE_DISPATCH);
@@ -245,22 +269,11 @@ void DropErrorTable(CdbSreh *cdbsreh)
 			 errmsg("Dropping the auto-generated unused error table"),
 			 errhint("Use KEEP in LOG INTO clause to force keeping the error table alive")));								
 	
-	initStringInfo(&dropstmt); 
-	
-	appendStringInfo(&dropstmt, "DROP TABLE %s.%s",
-					 quote_identifier(get_namespace_name(RelationGetNamespace(cdbsreh->errtbl))),
-					 quote_identifier(RelationGetRelationName(cdbsreh->errtbl)));
-	
 	errtbl_rv = makeRangeVar(get_namespace_name(RelationGetNamespace(cdbsreh->errtbl)),
 							 RelationGetRelationName(cdbsreh->errtbl), -1);
 
 	/* DROP the relation on the QD */
 	RemoveRelation(errtbl_rv,DROP_RESTRICT, NULL);
-				   
-	/* dispatch the DROP to the QEs */
-	CdbDoCommand(dropstmt.data, false, /*no txn */ false);
-
-	pfree(dropstmt.data);
 }
 
 /*
@@ -270,7 +283,9 @@ void DropErrorTable(CdbSreh *cdbsreh)
  */
 void InsertIntoErrorTable(CdbSreh *cdbsreh)
 {
-	HeapTuple	tuple;
+	MemTuple	tuple;
+	Oid			tupleOid;
+	AOTupleId	aoTupleId;
 	bool		nulls[NUM_ERRORTABLE_ATTR];
 	Datum		values[NUM_ERRORTABLE_ATTR];
 	MemoryContext oldcontext;
@@ -321,20 +336,25 @@ void InsertIntoErrorTable(CdbSreh *cdbsreh)
 	values[errtable_errmsg - 1] = DirectFunctionCall1(textin, CStringGetDatum(cdbsreh->errmsg));
 	nulls[errtable_errmsg - 1] = false;
 	
-	
 	MemoryContextSwitchTo(oldcontext);
-	
+
 	/*
-	 * And now we can form the input tuple.
+	 * cdbsreh->err_aoInsertDesc should be available untile the end of statement.
 	 */
-	tuple = heap_form_tuple(RelationGetDescr(cdbsreh->errtbl), values, nulls);
+	oldcontext = MemoryContextSwitchTo(PortalContext);
+
+	if (cdbsreh->err_aoInsertDesc == NULL)
+		cdbsreh->err_aoInsertDesc = appendonly_insert_init(cdbsreh->errtbl,
+				cdbsreh->err_aosegno);
 
 	MemoryContextSwitchTo(oldcontext);
 
-	/* store and freeze the tuple */
-	frozen_heap_insert(cdbsreh->errtbl, tuple);
-	
-	heap_freetuple(tuple);	
+	/* form a mem tuple */
+	tuple = memtuple_form_to(cdbsreh->err_aoInsertDesc->mt_bind, values, nulls,	NULL, NULL, true);
+
+	/* inserting into an append only relation */
+	appendonly_insert(cdbsreh->err_aoInsertDesc, tuple, &tupleOid, &aoTupleId);
+
 }
 
 
@@ -407,7 +427,7 @@ void ValidateErrorTableMetaData(Relation rel)
 				 errmsg("Relation \"%s\" already exists and is not of a valid "
 						"error table format (expected %d attributes, found %d)",
 						relname, NUM_ERRORTABLE_ATTR, attr_count)));
-	
+
 	/*
 	 * Verify this table has no constraints
 	 *
@@ -419,13 +439,24 @@ void ValidateErrorTableMetaData(Relation rel)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
 				 errmsg("Relation \"%s\" already exists and is not of a valid "
-						"error table format. If appears to have constraints "
+						"error table format. It appears to have constraints "
 						"defined.", relname)));
-	
-	/*
-	 * TODO: verify it's distributed randomly.
-	 */
-	
+
+	if (!RelationIsAoRows(rel))
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
+					 errmsg("Relation \"%s\" already exists and is not of a valid "
+							"error table format. It appears to not a appendonly table", relname)));
+
+	if (rel->rd_cdbpolicy == NULL
+			|| rel->rd_cdbpolicy->ptype != POLICYTYPE_PARTITIONED
+			|| rel->rd_cdbpolicy->nattrs != 0)
+		ereport(ERROR,
+					(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
+					 errmsg("Relation \"%s\" already exists and is not of a valid "
+							"error table format. It appears to not distributed randomly", relname)));
+
+
 	/*
 	 * run through each attribute at a time and verify it's what we expect
 	 */

@@ -3109,6 +3109,7 @@ CopyStmt:	COPY opt_binary qualified_name opt_column_list opt_oids
 					n->partitions = NULL;
 					n->ao_segnos = NIL;
 					n->options = NIL;
+					n->err_aosegno = 0;
 					
 					/* Concatenate user-supplied flags */
 					if ($2)

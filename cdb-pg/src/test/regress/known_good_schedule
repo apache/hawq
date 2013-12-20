@@ -2,6 +2,7 @@
 # This should probably be in an order similar to parallel_schedule.
 test: type_sanity
 test: querycontext
+test: errortbl
 test: goh_create_type_composite
 ignore: goh_create_table
 ignore: goh_vacuum

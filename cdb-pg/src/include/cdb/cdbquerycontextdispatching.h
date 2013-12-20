@@ -39,16 +39,20 @@ QueryContextDispatchingSizeMemoryLimit;
 
 struct QueryContextInfo
 {
-    NodeTag type;
+    NodeTag 	type;
 
-    bool useFile;
+    bool 		useFile;
 
-    char *sharedPath;     /* path on shared storage */
-    File file;             /* opened file on shared storage */
+    char 	   *sharedPath;     /* path on shared storage */
+    File 		file;           /* opened file on shared storage */
 
-    char *buffer;
-    int size;
-    int cursor;
+    char 	   *buffer;
+    int 		size;
+    int 		cursor;
+
+    HTAB	   *htab;			/* a hash table used to dedup */
+
+    List	   *errTblOid;		/* already handled error table oid in the statement */
 };
 
 typedef struct QueryContextInfo QueryContextInfo;
@@ -130,27 +134,27 @@ AddAoFastSequenceToContextInfo(QueryContextInfo *cxt, Relation rel,
         Oid fastsequence, int numOfTuples, const char *buffer, int size);
 
 extern void
-prepareDispatchedCatalogTargets(QueryContextInfo *cxt, List *targets, HTAB *htab);
+prepareDispatchedCatalogTargets(QueryContextInfo *cxt, List *targets);
 
 extern void
-prepareDispatchedCatalogPlan(QueryContextInfo *cxt, struct Plan *plan, HTAB *htab);
+prepareDispatchedCatalogPlan(QueryContextInfo *cxt, struct Plan *plan);
 
 extern void
-prepareDispatchedCatalog(QueryContextInfo *cxt, List *rtable, HTAB *htab);
+prepareDispatchedCatalog(QueryContextInfo *cxt, List *rtable);
 
 extern void
 prepareDispatchedCatalogRelation(QueryContextInfo *cxt, Oid relid,
-        bool forInsert, List *segnoMaps, HTAB *htab);
+        bool forInsert, List *segnoMaps);
 
 extern void
-prepareDispatchedCatalogNamespace(QueryContextInfo *cxt, Oid tablespace, HTAB *htab);
+prepareDispatchedCatalogNamespace(QueryContextInfo *cxt, Oid tablespace);
 
 extern void
-prepareDispatchedCatalogTablespace(QueryContextInfo *cxt, Oid tablespace, HTAB *htab);
+prepareDispatchedCatalogTablespace(QueryContextInfo *cxt, Oid tablespace);
 
 extern void
 prepareDispatchedCatalogSingleRelation(QueryContextInfo *cxt, Oid oid,
-        bool forInsert, int32 segno, HTAB *htab);
+        bool forInsert, int32 segno);
 
 extern HTAB *
 createPrepareDispatchedCatalogRelationDisctinctHashTable(void);

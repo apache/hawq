@@ -293,7 +293,8 @@ ExecInsert(TupleTableSlot *slot,
 	{
 		/* Writable external table */
 		if (resultRelInfo->ri_extInsertDesc == NULL)
-			resultRelInfo->ri_extInsertDesc = external_insert_init(resultRelationDesc);
+			resultRelInfo->ri_extInsertDesc = external_insert_init(
+					resultRelationDesc, 0);
 
 		newId = external_insert(resultRelInfo->ri_extInsertDesc, tuple);
 	}

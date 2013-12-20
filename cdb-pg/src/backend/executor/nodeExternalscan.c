@@ -189,6 +189,7 @@ ExecInitExternalScan(ExternalScan *node, EState *estate, int eflags)
 									 node->rejLimit,
 									 node->rejLimitInRows,
 									 node->fmterrtbl,
+									 node->errAosegno,
 									 node->encoding,
 									 node->scan.plan.qual);
 

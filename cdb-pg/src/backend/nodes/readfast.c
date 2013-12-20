@@ -2678,6 +2678,7 @@ _readCopyStmt(const char ** str)
 	READ_NODE_FIELD(sreh);
 	READ_NODE_FIELD(partitions);
 	READ_NODE_FIELD(ao_segnos);
+	READ_INT_FIELD(err_aosegno);
 
 	READ_DONE();
 
@@ -2982,6 +2983,7 @@ _readExternalScan(const char ** str)
 	READ_INT_FIELD(rejLimit);
 	READ_BOOL_FIELD(rejLimitInRows);
 	READ_OID_FIELD(fmterrtbl);
+	READ_INT_FIELD(errAosegno);
 	READ_INT_FIELD(encoding);
 	READ_INT_FIELD(scancounter);
 

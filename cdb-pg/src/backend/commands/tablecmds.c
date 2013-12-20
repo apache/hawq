@@ -6154,7 +6154,6 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 	{
 		AlterRewriteTableInfo *ar_tab;
 		QueryContextInfo *contextdisp;
-		HTAB *htab;
 
 		/*
 		 * We create seg files for the new relation here.
@@ -6173,7 +6172,6 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 
 		/* prepare for the metadata dispatch */
 		contextdisp = CreateQueryContextInfo();
-		htab = createPrepareDispatchedCatalogRelationDisctinctHashTable();
 		ar_tab = prepareAlteredTableInfo(tab);
 
 		/*
@@ -6184,8 +6182,7 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 		prepareDispatchedCatalogRelation(contextdisp,
 										 tab->relid,
 										 false,
-										 NULL,
-										 htab);
+										 NULL);
 
 		/*
 		 * Specify the segno directly as we don't have segno mapping here.
@@ -6194,9 +6191,7 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 			prepareDispatchedCatalogSingleRelation(contextdisp,
 												   OIDNewHeap,
 												   true,
-												   RESERVED_SEGNO,
-												   htab);
-		hash_destroy(htab);
+												   RESERVED_SEGNO);
 		CloseQueryContextInfo(contextdisp);
 
 		ar_tab->newheap_oid = OIDNewHeap;
@@ -16512,7 +16507,6 @@ ATPExecPartSplit(Relation rel,
 	{
 		
 		QueryContextInfo *contextdisp;
-		HTAB *htab;
 
 		/* create the segfiles for the new relations here */
 		CreateAppendOnlySegFileForRelationOnMaster(intoa, RESERVED_SEGNO);
@@ -16530,28 +16524,23 @@ ATPExecPartSplit(Relation rel,
 
 		/* prepare for the metadata dispatch */	
 		contextdisp = CreateQueryContextInfo();
-		htab = createPrepareDispatchedCatalogRelationDisctinctHashTable();
 		
 		prepareDispatchedCatalogSingleRelation(contextdisp, 
 							intoa->rd_id,
 							true, 
-							RESERVED_SEGNO, 
-							htab);
+							RESERVED_SEGNO);
 
 		prepareDispatchedCatalogSingleRelation(contextdisp, 
 							intob->rd_id,
 							true, 
-							RESERVED_SEGNO, 
-							htab);
+							RESERVED_SEGNO);
 
 		prepareDispatchedCatalogRelation(contextdisp,
 							(Oid)intVal((Value *)pc->partid), 
 							false,
-							NULL,
-							htab);
+							NULL);
 
-		hash_destroy(htab);
-                CloseQueryContextInfo(contextdisp);
+        CloseQueryContextInfo(contextdisp);
 
 		CdbDispatchUtilityStatementContext((Node *) pc, contextdisp, TRUE);
 	}

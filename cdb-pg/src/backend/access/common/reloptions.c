@@ -578,11 +578,11 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 					 errmsg("usage of parameter \"errortable\" in a non relation object is not supported"),
 					 errOmitLocation(false)));
 
-		if (appendonly)
+		if (!appendonly)
 			ereport(ERROR,
 					(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
 					 errmsg("invalid option \"errortable\" for base relation. "
-							"Only valid for heap relations"),
+							"Only valid for appendonly relations"),
 									   errOmitLocation(true)));
 
 		if (!(pg_strcasecmp(values[7], "true") == 0 ||

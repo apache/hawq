@@ -12572,11 +12572,12 @@ transformSingleRowErrorHandling(ParseState *pstate, CreateStmtContext *cxt,
 		createStmt->tableElts = attrList;
 		createStmt->inhRelations = NIL;
 		createStmt->constraints = NIL;
-		createStmt->options = list_make1(makeDefElem("errortable", (Node *) makeString("true")));
+		createStmt->options = list_make2(makeDefElem("errortable", (Node *) makeString("true")),
+				makeDefElem("appendonly", (Node *) makeString("true")));
 		createStmt->oncommit = ONCOMMIT_NOOP;
 		createStmt->tablespacename = NULL;
 		createStmt->relKind = RELKIND_RELATION;
-		createStmt->relStorage = RELSTORAGE_HEAP;
+		createStmt->relStorage = RELSTORAGE_AOROWS;
 		createStmt->distributedBy = list_make1(NULL); /* DISTRIBUTED RANDOMLY */
 
 

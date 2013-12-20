@@ -101,23 +101,23 @@ struct QueryContextDispatchingHashItem
 typedef struct QueryContextDispatchingHashItem QueryContextDispatchingHashItem;
 
 static void
-prepareDispatchedCatalogFunction(QueryContextInfo *ctx, Oid procOid, HTAB *htab);
+prepareDispatchedCatalogFunction(QueryContextInfo *ctx, Oid procOid);
 
 static void
-prepareDispatchedCatalogLanguage(QueryContextInfo *ctx, Oid langOid, HTAB *htab);
+prepareDispatchedCatalogLanguage(QueryContextInfo *ctx, Oid langOid);
 
 static void
-prepareDispatchedCatalogType(QueryContextInfo *ctx, Oid typeOid, HTAB *htab);
+prepareDispatchedCatalogType(QueryContextInfo *ctx, Oid typeOid);
 
 static void
-prepareDispatchedCatalogAggregate(QueryContextInfo *ctx, Oid aggfuncoid, HTAB *htab);
+prepareDispatchedCatalogAggregate(QueryContextInfo *ctx, Oid aggfuncoid);
 
 static void
-prepareDispatchedCatalogFunctionExpr(QueryContextInfo *cxt, Expr *expr, HTAB *htab);
+prepareDispatchedCatalogFunctionExpr(QueryContextInfo *cxt, Expr *expr);
 
 static void
 prepareDispatchedCatalogForAoCo(QueryContextInfo *cxt, Oid relid,
-        bool forInsert, int32 segno, HTAB *htab);
+        bool forInsert, int32 segno);
 
 static void
 prepareDispatchedCatalogExternalTable(QueryContextInfo *cxt, Oid relid);
@@ -126,7 +126,7 @@ static void
 WriteData(QueryContextInfo *cxt, const char *buffer, int size);
 
 static void
-prepareAllDispatchedCatalogTablespace(QueryContextInfo *ctx, HTAB *htab);
+prepareAllDispatchedCatalogTablespace(QueryContextInfo *ctx);
 
 static void GetExtTableLocationsArray(HeapTuple tuple, TupleDesc exttab_desc, 
 									  Datum **array, int *array_size);
@@ -179,6 +179,8 @@ CreateQueryContextInfo(void)
 {
     QueryContextInfo *retval = makeNode(QueryContextInfo);
 
+    retval->htab = createPrepareDispatchedCatalogRelationDisctinctHashTable();
+
     GetQueryContextDipsatchingFileLocation(&retval->sharedPath);
 
     AddAuxInfoToQueryContextInfo(retval);
@@ -220,6 +222,9 @@ CloseQueryContextInfo(QueryContextInfo *cxt)
                 size, (cxt->useFile? "shared storage" : "dispatching"));
 
     }
+
+    if (cxt->htab)
+    	hash_destroy(cxt->htab);
 
     if (enable_secure_filesystem && Gp_role != GP_ROLE_EXECUTE)
     {
@@ -264,6 +269,9 @@ DropQueryContextInfo(QueryContextInfo *cxt)
 
     if (cxt->buffer)
         pfree(cxt->buffer);
+
+    if (cxt->errTblOid)
+    	list_free(cxt->errTblOid);
 
     pfree(cxt);
 }
@@ -835,7 +843,7 @@ alreadyAddedForDispatching(HTAB *rels, Oid objid, QueryContextDispatchingObjType
  * add them to in-memory heap table for dispatcher
  */
 void
-prepareDispatchedCatalogNamespace(QueryContextInfo *cxt, Oid namespace, HTAB *htab)
+prepareDispatchedCatalogNamespace(QueryContextInfo *cxt, Oid namespace)
 {
     HeapTuple tuple;
 
@@ -845,7 +853,7 @@ prepareDispatchedCatalogNamespace(QueryContextInfo *cxt, Oid namespace, HTAB *ht
             || namespace == PG_AOSEGMENT_NAMESPACE)
         return;
 
-    if (alreadyAddedForDispatching(htab, namespace, NamespaceType))
+    if (alreadyAddedForDispatching(cxt->htab, namespace, NamespaceType))
         return;
 
     tuple = SearchSysCache(NAMESPACEOID, ObjectIdGetDatum(namespace), 0, 0, 0);
@@ -875,7 +883,7 @@ prepareDispatchedCatalogFileSystemCredential(const char *path)
  * add them to in-memory heap table for dispatcher
  */
 void
-prepareDispatchedCatalogTablespace(QueryContextInfo *cxt, Oid tablespace, HTAB *htab)
+prepareDispatchedCatalogTablespace(QueryContextInfo *cxt, Oid tablespace)
 {
 
     char *path = NULL, *pos;
@@ -884,7 +892,7 @@ prepareDispatchedCatalogTablespace(QueryContextInfo *cxt, Oid tablespace, HTAB *
     if (IsBuiltinTablespace(tablespace) || tablespace == InvalidOid )
         return;
 
-    if (alreadyAddedForDispatching(htab, tablespace, TablespaceType))
+    if (alreadyAddedForDispatching(cxt->htab, tablespace, TablespaceType))
         return;
 
     /*
@@ -916,7 +924,7 @@ prepareDispatchedCatalogTablespace(QueryContextInfo *cxt, Oid tablespace, HTAB *
  * add them to in-memory heap table for dispatcher.
  */
 static void
-prepareAllDispatchedCatalogTablespace(QueryContextInfo *ctx, HTAB *htab)
+prepareAllDispatchedCatalogTablespace(QueryContextInfo *ctx)
 {
 	Relation rel;
 	HeapScanDesc scandesc;
@@ -934,7 +942,7 @@ prepareAllDispatchedCatalogTablespace(QueryContextInfo *ctx, HTAB *htab)
 		/*Don't include shared relations */
 		if (!IsBuiltinTablespace(tsOid))
 		{
-			prepareDispatchedCatalogTablespace(ctx, tsOid, htab);
+			prepareDispatchedCatalogTablespace(ctx, tsOid);
 		}
 		tuple = heap_getnext(scandesc, ForwardScanDirection);
 	}
@@ -950,7 +958,7 @@ prepareAllDispatchedCatalogTablespace(QueryContextInfo *ctx, HTAB *htab)
  */
 static void
 prepareDispatchedCatalogCompositeType(QueryContextInfo *cxt,
-        Oid typeid, HTAB *htab)
+        Oid typeid)
 {
     HeapTuple tuple;
 
@@ -966,7 +974,7 @@ prepareDispatchedCatalogCompositeType(QueryContextInfo *cxt,
     attr = (Form_pg_type) GETSTRUCT(tuple);
 
     if (attr->typtype == TYPTYPE_COMPOSITE)
-        prepareDispatchedCatalogSingleRelation(cxt, attr->typrelid, FALSE, 0, htab);
+        prepareDispatchedCatalogSingleRelation(cxt, attr->typrelid, FALSE, 0);
 
     ReleaseSysCache(tuple);
 }
@@ -976,7 +984,7 @@ prepareDispatchedCatalogCompositeType(QueryContextInfo *cxt,
  */
 static void
 prepareDispatchedCatalogAttribute(QueryContextInfo *cxt,
-        Oid reloid, HTAB *htab)
+        Oid reloid)
 {
     Relation rel;
     HeapTuple attrtuple;
@@ -1002,7 +1010,7 @@ prepareDispatchedCatalogAttribute(QueryContextInfo *cxt,
         {
             /* check attribute type */
             if (OidIsValid(attr->atttypid))
-                prepareDispatchedCatalogCompositeType(cxt, attr->atttypid, htab);
+                prepareDispatchedCatalogCompositeType(cxt, attr->atttypid);
         }
 
         AddTupleToContextInfo(cxt, AttributeRelationId, "pg_attribute",
@@ -1020,7 +1028,7 @@ prepareDispatchedCatalogAttribute(QueryContextInfo *cxt,
  */
 static void
 prepareDispatchedCatalogAttributeDefault(QueryContextInfo *cxt,
-        Oid reloid, HTAB *htab)
+        Oid reloid)
 {
     Relation rel;
     Datum value;
@@ -1052,7 +1060,7 @@ prepareDispatchedCatalogAttributeDefault(QueryContextInfo *cxt,
         expr = stringToNode(TextDatumGetCString(value));
         if (expr)
         {
-            prepareDispatchedCatalogFunctionExpr(cxt, expr, htab);
+            prepareDispatchedCatalogFunctionExpr(cxt, expr);
             pfree(expr);
         }
 
@@ -1071,7 +1079,7 @@ prepareDispatchedCatalogAttributeDefault(QueryContextInfo *cxt,
  */
 static void
 prepareDispatchedCatalogAttributeEncoding(QueryContextInfo *cxt,
-		Oid reloid, HTAB *htab)
+		Oid reloid)
 {
     Relation rel;
     HeapTuple tuple;
@@ -1109,7 +1117,7 @@ prepareDispatchedCatalogAttributeEncoding(QueryContextInfo *cxt,
  */
 static void
 prepareDispatchedCatalogTypeByRelation(QueryContextInfo *cxt,
-        Oid relid, HeapTuple classtuple, HTAB *htab)
+        Oid relid, HeapTuple classtuple)
 {
     Datum typeid;
     HeapTuple typetuple;
@@ -1171,7 +1179,7 @@ prepareDispatchedCatalogConstraint(QueryContextInfo *cxt,
  */
 void
 prepareDispatchedCatalogSingleRelation(QueryContextInfo *cxt, Oid relid,
-        bool forInsert, int32 segno, HTAB *htab)
+        bool forInsert, int32 segno)
 {
     HeapTuple classtuple;
 
@@ -1185,7 +1193,7 @@ prepareDispatchedCatalogSingleRelation(QueryContextInfo *cxt, Oid relid,
     if (relid < FirstNormalObjectId)
         return;
 
-    if (alreadyAddedForDispatching(htab, relid, RelationType))
+    if (alreadyAddedForDispatching(cxt->htab, relid, RelationType))
         return;
 
     /* find relid in pg_class */
@@ -1214,7 +1222,7 @@ prepareDispatchedCatalogSingleRelation(QueryContextInfo *cxt, Oid relid,
     if (InvalidOid == DatumGetObjectId(namespace))
         elog(ERROR, "relnamespace field in pg_class of %u is invalid", relid);
 
-    prepareDispatchedCatalogNamespace(cxt, DatumGetObjectId(namespace), htab);
+    prepareDispatchedCatalogNamespace(cxt, DatumGetObjectId(namespace));
 
     /* collect pg_tablespace info */
     tablespace = SysCacheGetAttr(RELOID, classtuple,
@@ -1231,16 +1239,16 @@ prepareDispatchedCatalogSingleRelation(QueryContextInfo *cxt, Oid relid,
     }
 
     /* collect pg_type info */
-    prepareDispatchedCatalogTypeByRelation(cxt, relid, classtuple, htab);
+    prepareDispatchedCatalogTypeByRelation(cxt, relid, classtuple);
 
     /* collect pg_attribute info */
-    prepareDispatchedCatalogAttribute(cxt, relid, htab);
+    prepareDispatchedCatalogAttribute(cxt, relid);
 
     /* collect pg_attrdef info */
-    prepareDispatchedCatalogAttributeDefault(cxt, relid, htab);
+    prepareDispatchedCatalogAttributeDefault(cxt, relid);
 
     /* collect pg_attribute_encoding info */
-    prepareDispatchedCatalogAttributeEncoding(cxt, relid, htab);
+    prepareDispatchedCatalogAttributeEncoding(cxt, relid);
 
     /* collect pg_constraint info */
     prepareDispatchedCatalogConstraint(cxt, relid);
@@ -1255,15 +1263,15 @@ prepareDispatchedCatalogSingleRelation(QueryContextInfo *cxt, Oid relid,
 
 	/* The dfs tablespace oid must be dispatched. */
 	if (DatumGetObjectId(tablespace) == InvalidOid && relstorage_is_ao(relstorage))
-		prepareDispatchedCatalogTablespace(cxt, get_database_dts(MyDatabaseId), htab);
+		prepareDispatchedCatalogTablespace(cxt, get_database_dts(MyDatabaseId));
 	else
-		prepareDispatchedCatalogTablespace(cxt, DatumGetObjectId(tablespace), htab);
+		prepareDispatchedCatalogTablespace(cxt, DatumGetObjectId(tablespace));
 
 	switch (DatumGetChar(relstorage))
 	{
 	case RELSTORAGE_AOROWS:
 	case RELSTORAGE_AOCOLS:
-		prepareDispatchedCatalogForAoCo(cxt, relid, forInsert, segno, htab);
+		prepareDispatchedCatalogForAoCo(cxt, relid, forInsert, segno);
 		break;
 	case RELSTORAGE_EXTERNAL:
 	    prepareDispatchedCatalogExternalTable(cxt, relid);
@@ -1463,7 +1471,7 @@ prepareDispatchedCatalogAoSegfile(QueryContextInfo *cxt,
  */
 static void
 prepareDispatchedCatalogForAoCo(QueryContextInfo *cxt, Oid relid,
-        bool forInsert, int32 segno, HTAB *htab)
+        bool forInsert, int32 segno)
 {
 
     Relation rel;
@@ -1484,7 +1492,7 @@ prepareDispatchedCatalogForAoCo(QueryContextInfo *cxt, Oid relid,
     /*
      * add pg_aoseg_XXX's metadata
      */
-    prepareDispatchedCatalogSingleRelation(cxt, segrelid, FALSE, 0, htab);
+    prepareDispatchedCatalogSingleRelation(cxt, segrelid, FALSE, 0);
 
     /*
      * add gp_aoseg_xxx's content
@@ -1560,14 +1568,7 @@ prepareDispatchedCatalogExternalTable(QueryContextInfo *cxt,
     heap_close(rel, AccessShareLock);
 }
 
-
-typedef struct func_walker_context
-{
-	QueryContextInfo *qcxt;
-	HTAB *htab;
-} FuncWalkerContext;
-
-static bool collect_func_walker(Node *node, FuncWalkerContext *context)
+static bool collect_func_walker(Node *node, QueryContextInfo *context)
 {
 	if (node == NULL)
 		return false;
@@ -1583,8 +1584,7 @@ static bool collect_func_walker(Node *node, FuncWalkerContext *context)
 		 * correct composite type given by RowExpr->row_typeid.
 		 */  
 		RowExpr *rowexpr = (RowExpr *) node;
-		prepareDispatchedCatalogType(context->qcxt, rowexpr->row_typeid,
-									 context->htab);
+		prepareDispatchedCatalogType(context, rowexpr->row_typeid);
 		/* TODO: Should we return false from here? */
 	}
 	/* AK: I don't like this hack. */
@@ -1629,9 +1629,8 @@ static bool collect_func_walker(Node *node, FuncWalkerContext *context)
 							(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 							 errmsg("permission denied for sequence %s",
 									get_rel_name(seqoid))));
-				prepareDispatchedCatalogSingleRelation(context->qcxt,
-													   seqoid, FALSE, 0,
-													   context->htab);
+				prepareDispatchedCatalogSingleRelation(context,
+													   seqoid, FALSE, 0);
 			}
 			else
 			{
@@ -1652,14 +1651,13 @@ static bool collect_func_walker(Node *node, FuncWalkerContext *context)
 					aclcheck_error(aclresult, ACL_KIND_PROC, get_func_name(func->funcid));
 
 				/* build the dispacth for the function itself */
-				prepareDispatchedCatalogFunction(context->qcxt, func->funcid,
-												 context->htab);
+				prepareDispatchedCatalogFunction(context, func->funcid);
 			}
 			/* Treat pg_database_size specially */
 			else if (PgDatabaseSizeOidProcId == func->funcid || PgDatabaseSizeNameProcId == func->funcid)
 			{
 				/* dispatch all the table space information for calculating database size */
-				prepareAllDispatchedCatalogTablespace(context->qcxt, context->htab);
+				prepareAllDispatchedCatalogTablespace(context);
 			}
 			break;
 		}
@@ -1678,10 +1676,8 @@ static bool collect_func_walker(Node *node, FuncWalkerContext *context)
 		 * and the other in pg_proc.  Both need to be dispatched to
 		 * segments.
 		 */
-		prepareDispatchedCatalogAggregate(context->qcxt, aggnode->aggfnoid,
-										  context->htab);
-		prepareDispatchedCatalogFunction(context->qcxt, aggnode->aggfnoid,
-										 context->htab);
+		prepareDispatchedCatalogAggregate(context, aggnode->aggfnoid);
+		prepareDispatchedCatalogFunction(context, aggnode->aggfnoid);
 		return expression_tree_walker((Node *)aggnode->args,
 									  collect_func_walker, context);
 	}
@@ -1691,17 +1687,14 @@ static bool collect_func_walker(Node *node, FuncWalkerContext *context)
  * recursively scan the expression chain and collect function information
  */
 static void
-prepareDispatchedCatalogFunctionExpr(QueryContextInfo *cxt, Expr *expr, HTAB *htab)
+prepareDispatchedCatalogFunctionExpr(QueryContextInfo *cxt, Expr *expr)
 {
-    Assert(NULL != cxt && NULL != expr && NULL != htab);
-	FuncWalkerContext context;
-	context.qcxt = cxt;
-	context.htab = htab;
-	collect_func_walker((Node *)expr, &context);
+    Assert(NULL != cxt && NULL != expr);
+	collect_func_walker((Node *)expr, cxt);
 }
 
 static void
-prepareDispatchedCatalogFunction(QueryContextInfo *cxt, Oid procOid, HTAB *htab)
+prepareDispatchedCatalogFunction(QueryContextInfo *cxt, Oid procOid)
 {
 	HeapTuple proctuple;
 	Datum langDatum;
@@ -1719,7 +1712,7 @@ prepareDispatchedCatalogFunction(QueryContextInfo *cxt, Oid procOid, HTAB *htab)
     if (procOid < FirstNormalObjectId)
         return;
 
-    if (alreadyAddedForDispatching(htab, procOid, ProcType))
+    if (alreadyAddedForDispatching(cxt->htab, procOid, ProcType))
         return;
 
     /* find relid in pg_class */
@@ -1736,14 +1729,14 @@ prepareDispatchedCatalogFunction(QueryContextInfo *cxt, Oid procOid, HTAB *htab)
 	if (!langisNull && langDatum)
 	{
 		langOid = DatumGetObjectId(langDatum);
-		prepareDispatchedCatalogLanguage(cxt, langOid, htab);
+		prepareDispatchedCatalogLanguage(cxt, langOid);
 	}
 	
 	typeDatum = caql_getattr(pcqCtx, Anum_pg_proc_prorettype, &typeisNull);
 	if (!typeisNull && typeDatum)
 	{
 		typeOid = DatumGetObjectId(typeDatum);
-		prepareDispatchedCatalogType(cxt, typeOid, htab);
+		prepareDispatchedCatalogType(cxt, typeOid);
 	}
 
 	AddTupleToContextInfo(cxt, ProcedureRelationId, "pg_proc", proctuple, MASTER_CONTENT_ID);
@@ -1752,7 +1745,7 @@ prepareDispatchedCatalogFunction(QueryContextInfo *cxt, Oid procOid, HTAB *htab)
 }
 
 static void
-prepareDispatchedCatalogLanguage(QueryContextInfo *ctx, Oid langOid, HTAB *htab)
+prepareDispatchedCatalogLanguage(QueryContextInfo *ctx, Oid langOid)
 {
 	HeapTuple langtuple;
 
@@ -1764,7 +1757,7 @@ prepareDispatchedCatalogLanguage(QueryContextInfo *ctx, Oid langOid, HTAB *htab)
 	if (langOid < FirstNormalObjectId)
 		return;
 
-	if (alreadyAddedForDispatching(htab, langOid, LangType))
+	if (alreadyAddedForDispatching(ctx->htab, langOid, LangType))
 		return;
 
 	/* look up the tuple in pg_language */
@@ -1785,7 +1778,7 @@ prepareDispatchedCatalogLanguage(QueryContextInfo *ctx, Oid langOid, HTAB *htab)
 	Datum lang_handler_Datum = caql_getattr(pcqCtx, Anum_pg_language_lanplcallfoid, &lang_handler_isNull);
 	if (!lang_handler_isNull && lang_handler_Datum)	
 	{
-		prepareDispatchedCatalogFunction(ctx, DatumGetObjectId(lang_handler_Datum), htab);
+		prepareDispatchedCatalogFunction(ctx, DatumGetObjectId(lang_handler_Datum));
 	}
 
 
@@ -1793,7 +1786,7 @@ prepareDispatchedCatalogLanguage(QueryContextInfo *ctx, Oid langOid, HTAB *htab)
 }
 
 static void
-prepareDispatchedCatalogType(QueryContextInfo *ctx, Oid typeOid, HTAB *htab)
+prepareDispatchedCatalogType(QueryContextInfo *ctx, Oid typeOid)
 {
 	HeapTuple typetuple;
 	bool isNull = false;
@@ -1801,13 +1794,13 @@ prepareDispatchedCatalogType(QueryContextInfo *ctx, Oid typeOid, HTAB *htab)
 
 	Assert(typeOid != InvalidOid);
 
-	/*   
+	/*
 	 * buildin object, dispatch nothing
 	 */
 	if (typeOid < FirstNormalObjectId)
 		return;
 
-	if (alreadyAddedForDispatching(htab, typeOid, TypeType))
+	if (alreadyAddedForDispatching(ctx->htab, typeOid, TypeType))
 		return;
 
 	/* look up the tuple in pg_type */
@@ -1815,13 +1808,13 @@ prepareDispatchedCatalogType(QueryContextInfo *ctx, Oid typeOid, HTAB *htab)
 	pcqCtx = caql_beginscan(NULL,
 							cql("SELECT * FROM pg_type "
 								" WHERE oid = :1 ",
-								ObjectIdGetDatum(typeOid)));											
+								ObjectIdGetDatum(typeOid)));
 	typetuple = caql_getnext(pcqCtx);
 
 	if (!HeapTupleIsValid(typetuple))
-		elog(ERROR, "cache lookup failed for type %u", typeOid);				
+		elog(ERROR, "cache lookup failed for type %u", typeOid);
 
-	AddTupleToContextInfo(ctx, TypeRelationId, "pg_type", typetuple, MASTER_CONTENT_ID);	
+	AddTupleToContextInfo(ctx, TypeRelationId, "pg_type", typetuple, MASTER_CONTENT_ID);
 
 	/*
 	 * ROW(f1, f2, ...) expression may not have corresponding pg_type
@@ -1832,14 +1825,14 @@ prepareDispatchedCatalogType(QueryContextInfo *ctx, Oid typeOid, HTAB *htab)
 	if (!isNull && typeDatum)
 	{
 		prepareDispatchedCatalogSingleRelation(ctx, DatumGetObjectId(typeDatum),
-											   FALSE, 0, htab);
+											   FALSE, 0);
 	}
 
 	caql_endscan(pcqCtx);
 }
 
 static void
-prepareDispatchedCatalogAggregate(QueryContextInfo *cxt, Oid aggfuncoid, HTAB *htab)
+prepareDispatchedCatalogAggregate(QueryContextInfo *cxt, Oid aggfuncoid)
 {
 	HeapTuple aggtuple;
 	bool isNull = false;
@@ -1853,7 +1846,7 @@ prepareDispatchedCatalogAggregate(QueryContextInfo *cxt, Oid aggfuncoid, HTAB *h
     if (aggfuncoid < FirstNormalObjectId)
         return;
 
-    if (alreadyAddedForDispatching(htab, aggfuncoid, AggType))
+    if (alreadyAddedForDispatching(cxt->htab, aggfuncoid, AggType))
         return;
 
     /* find relid in pg_class */
@@ -1875,17 +1868,17 @@ prepareDispatchedCatalogAggregate(QueryContextInfo *cxt, Oid aggfuncoid, HTAB *h
 	procDatum = caql_getattr(pcqCtx, Anum_pg_aggregate_aggtransfn, &isNull);
 	if (!isNull && procDatum)
 	{
-		prepareDispatchedCatalogFunction(cxt, DatumGetObjectId(procDatum), htab);
+		prepareDispatchedCatalogFunction(cxt, DatumGetObjectId(procDatum));
 	}
 	procDatum = caql_getattr(pcqCtx, Anum_pg_aggregate_aggprelimfn, &isNull);
 	if (!isNull && procDatum)
 	{
-		prepareDispatchedCatalogFunction(cxt, DatumGetObjectId(procDatum), htab);
+		prepareDispatchedCatalogFunction(cxt, DatumGetObjectId(procDatum));
 	}
 	procDatum = caql_getattr(pcqCtx, Anum_pg_aggregate_aggfinalfn, &isNull);
 	if (!isNull && procDatum)
 	{
-		prepareDispatchedCatalogFunction(cxt, DatumGetObjectId(procDatum), htab);
+		prepareDispatchedCatalogFunction(cxt, DatumGetObjectId(procDatum));
 	}
 
 	AddTupleToContextInfo(cxt, AggregateRelationId, "pg_aggregate",
@@ -1919,11 +1912,10 @@ findSegnofromMap(Oid relid, List *segnoMaps)
  */
 void
 prepareDispatchedCatalogRelation(QueryContextInfo *cxt, Oid relid,
-        bool forInsert, List *segnoMaps, HTAB *htab)
+        bool forInsert, List *segnoMaps)
 {
     List *children = NIL;
     ListCell *child;
-
 
     if (rel_is_partitioned(relid))
     {
@@ -1936,13 +1928,12 @@ prepareDispatchedCatalogRelation(QueryContextInfo *cxt, Oid relid,
 				int32 mysegno = findSegnofromMap(myrelid, segnoMaps);
                 Assert(mysegno != InvalidFileSegNumber);
                 prepareDispatchedCatalogSingleRelation(cxt, myrelid, TRUE,
-                        mysegno, htab);
+                        mysegno);
 
             }
             else
             {
-                prepareDispatchedCatalogSingleRelation(cxt, myrelid, FALSE, 0,
-                        htab);
+                prepareDispatchedCatalogSingleRelation(cxt, myrelid, FALSE, 0);
             }
         }
         list_free(children);
@@ -1954,12 +1945,11 @@ prepareDispatchedCatalogRelation(QueryContextInfo *cxt, Oid relid,
             int32 mysegno = findSegnofromMap(relid, segnoMaps);
 
             Assert(mysegno != InvalidFileSegNumber);
-            prepareDispatchedCatalogSingleRelation(cxt, relid, TRUE, mysegno,
-                    htab);
+            prepareDispatchedCatalogSingleRelation(cxt, relid, TRUE, mysegno);
         }
         else
         {
-            prepareDispatchedCatalogSingleRelation(cxt, relid, FALSE, 0, htab);
+            prepareDispatchedCatalogSingleRelation(cxt, relid, FALSE, 0);
         }
     }
 }
@@ -1968,12 +1958,11 @@ prepareDispatchedCatalogRelation(QueryContextInfo *cxt, Oid relid,
  * parse target list to handle function.
  */
 void
-prepareDispatchedCatalogTargets(QueryContextInfo *cxt, List *targets, HTAB *htab)
+prepareDispatchedCatalogTargets(QueryContextInfo *cxt, List *targets)
 {
     ListCell *lc;
-
     Assert(NULL != targets);
-    Assert(NULL != cxt && NULL != htab);
+    Assert(NULL != cxt);
 
     foreach(lc, targets)
     {
@@ -1983,7 +1972,7 @@ prepareDispatchedCatalogTargets(QueryContextInfo *cxt, List *targets, HTAB *htab
             continue;
 
         if (te->expr)
-            prepareDispatchedCatalogFunctionExpr(cxt, te->expr, htab);
+            prepareDispatchedCatalogFunctionExpr(cxt, te->expr);
     }
 }
 
@@ -1991,17 +1980,14 @@ prepareDispatchedCatalogTargets(QueryContextInfo *cxt, List *targets, HTAB *htab
  * parse plan for some functions in plan's targets.
  */
 void
-prepareDispatchedCatalogPlan(QueryContextInfo *cxt, Plan *plan, HTAB *htab)
+prepareDispatchedCatalogPlan(QueryContextInfo *cxt, Plan *plan)
 {
     if (!plan)
         return;
 
-    Assert(NULL != cxt && NULL != htab);
+    Assert(NULL != cxt);
 
-    FuncWalkerContext context;
-    context.qcxt = cxt;
-    context.htab = htab;
-    collect_func_walker((Node *)plan, &context);
+    collect_func_walker((Node *)plan, cxt);
 }
 
 /*
@@ -2009,12 +1995,12 @@ prepareDispatchedCatalogPlan(QueryContextInfo *cxt, Plan *plan, HTAB *htab)
  * add them to in-memory heap table for dispatcher.
  */
 void
-prepareDispatchedCatalog(QueryContextInfo *cxt, List *rtable, HTAB *htab)
+prepareDispatchedCatalog(QueryContextInfo *cxt, List *rtable)
 {
     ListCell *lc;
 
     Assert(NULL != rtable);
-    Assert(NULL != cxt && NULL != htab);
+    Assert(NULL != cxt);
 
     foreach(lc, rtable)
     {
@@ -2022,12 +2008,12 @@ prepareDispatchedCatalog(QueryContextInfo *cxt, List *rtable, HTAB *htab)
         switch (rte->rtekind)
         {
         case RTE_RELATION:             /*ordinary relation reference */
-            prepareDispatchedCatalogRelation(cxt, rte->relid, FALSE, NULL, htab);
+            prepareDispatchedCatalogRelation(cxt, rte->relid, FALSE, NULL);
             break;
 
         case RTE_FUNCTION:             /*function in FROM */
             if (rte->funcexpr)
-                    prepareDispatchedCatalogFunctionExpr(cxt, (Expr *)rte->funcexpr, htab);
+                    prepareDispatchedCatalogFunctionExpr(cxt, (Expr *)rte->funcexpr);
             break;
 
         case RTE_SUBQUERY:             /*subquery in FROM */
@@ -2036,9 +2022,9 @@ prepareDispatchedCatalog(QueryContextInfo *cxt, List *rtable, HTAB *htab)
                 List *sub_rtable = rte->subquery->rtable;
                 List *sub_targets = rte->subquery->targetList;
                 if (sub_rtable)
-                    prepareDispatchedCatalog(cxt, sub_rtable, htab);
+                    prepareDispatchedCatalog(cxt, sub_rtable);
                 if (sub_targets)
-                    prepareDispatchedCatalogTargets(cxt, sub_targets, htab);
+                    prepareDispatchedCatalogTargets(cxt, sub_targets);
             }
             break;
 
@@ -2059,8 +2045,7 @@ prepareDispatchedCatalog(QueryContextInfo *cxt, List *rtable, HTAB *htab)
                         {
                             Expr *expr = lfirst(cell);
 
-                            prepareDispatchedCatalogFunctionExpr(cxt, expr,
-                                    htab);
+                            prepareDispatchedCatalogFunctionExpr(cxt, expr);
                         }
                     }
                 }

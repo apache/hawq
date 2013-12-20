@@ -67,7 +67,7 @@ static void InitParseState(CopyState pstate, Relation relation,
 						   Datum* values, bool* nulls, bool writable,
 						   List *fmtOpts, char fmtType,
 						   char *uri, int rejectlimit,
-						   bool islimitinrows, Oid fmterrtbl, int encoding);
+						   bool islimitinrows, Oid fmterrtbl, int errAosegno, int encoding);
 
 static void FunctionCallPrepareFormatter(FunctionCallInfoData*	fcinfo,
 										 int					nArgs,
@@ -122,7 +122,7 @@ static FILE *g_dataSource = NULL;
 FileScanDesc
 external_beginscan(Relation relation, Index scanrelid, uint32 scancounter,
 			   List *uriList, List *fmtOpts, char fmtType, bool isMasterOnly,
-			   int rejLimit, bool rejLimitInRows, Oid fmterrtbl, int encoding,
+			   int rejLimit, bool rejLimitInRows, Oid fmterrtbl, int errAosegno, int encoding,
 			   List *scanquals)
 {
 	FileScanDesc scan;
@@ -258,7 +258,7 @@ external_beginscan(Relation relation, Index scanrelid, uint32 scancounter,
 
 	/* Initialize all the parsing and state variables */
 	InitParseState(scan->fs_pstate, relation, NULL, NULL, false, fmtOpts, fmtType,
-				   scan->fs_uri, rejLimit, rejLimitInRows, fmterrtbl, encoding);
+				   scan->fs_uri, rejLimit, rejLimitInRows, fmterrtbl, errAosegno, encoding);
 
 	if(fmttype_is_custom(fmtType))
 	{
@@ -499,7 +499,7 @@ external_getnext(FileScanDesc scan, ScanDirection direction)
  * this function to initialize our various structures and state..
  */
 ExternalInsertDesc
-external_insert_init(Relation rel)
+external_insert_init(Relation rel, int errAosegno)
 {
 	ExternalInsertDesc	extInsertDesc;
 	ExtTableEntry*		extentry;
@@ -583,6 +583,7 @@ external_insert_init(Relation rel)
 				   extentry->rejectlimit,
 				   (extentry->rejectlimittype == 'r'),
 				   extentry->fmterrtbl,
+				   errAosegno,
 				   extentry->encoding);
 
 	if(fmttype_is_custom(extentry->fmtcode))
@@ -1322,7 +1323,7 @@ InitParseState(CopyState pstate, Relation relation,
 			   Datum* values, bool* nulls, bool iswritable,
 			   List *fmtOpts, char fmtType,
 			   char *uri, int rejectlimit,
-			   bool islimitinrows, Oid fmterrtbl, int encoding)
+			   bool islimitinrows, Oid fmterrtbl, int errAosegno, int encoding)
 {
 	TupleDesc	tupDesc = NULL;
 	char	   *format_str = NULL;
@@ -1413,6 +1414,7 @@ InitParseState(CopyState pstate, Relation relation,
 									  rejectlimit,
 									  islimitinrows,
 									  errtbl_rv,
+									  errAosegno,
 									  pstate->filename,
 									  (char *)pstate->cur_relname);
 

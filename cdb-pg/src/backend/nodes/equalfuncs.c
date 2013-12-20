@@ -1051,6 +1051,7 @@ _equalCopyStmt(CopyStmt *a, CopyStmt *b)
 	COMPARE_STRING_FIELD(filename);
 	COMPARE_NODE_FIELD(options);
 	COMPARE_NODE_FIELD(sreh);
+	COMPARE_SCALAR_FIELD(err_aosegno);
 
 
 	return true;

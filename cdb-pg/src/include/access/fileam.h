@@ -60,13 +60,13 @@ extern FileScanDesc external_beginscan(Relation relation, Index scanrelid,
 								   uint32 scancounter, List *uriList,
 								   List *fmtOpts, char fmtType, bool isMasterOnly,
 								   int rejLimit, bool rejLimitInRows,
-								   Oid fmterrtbl, int encoding,
+								   Oid fmterrtbl, int errAosegno, int encoding,
 								   List *scanquals);
 extern void external_rescan(FileScanDesc scan);
 extern void external_endscan(FileScanDesc scan);
 extern void external_stopscan(FileScanDesc scan);
 extern HeapTuple external_getnext(FileScanDesc scan, ScanDirection direction);
-extern ExternalInsertDesc external_insert_init(Relation rel);
+extern ExternalInsertDesc external_insert_init(Relation rel, int errAosegno);
 extern Oid external_insert(ExternalInsertDesc extInsertDesc, HeapTuple instup);
 extern void external_insert_finish(ExternalInsertDesc extInsertDesc);
 extern void external_set_env_vars(extvar_t *extvar, char* uri, bool csv, char* escape, char* quote, bool header, uint32 scancounter);

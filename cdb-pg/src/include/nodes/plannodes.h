@@ -708,6 +708,7 @@ typedef struct ExternalScan
 	int			rejLimit;       /* reject limit (-1 for no sreh)      */
 	bool		rejLimitInRows; /* true if ROWS false if PERCENT      */
 	Oid			fmterrtbl;      /* format error table, InvalidOid if none */
+	int			errAosegno;		/* AO segno for error table */
 	int			encoding;		/* encoding of external table data    */
 	uint32      scancounter;	/* counter incr per scan node created */
 

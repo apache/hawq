@@ -91,7 +91,7 @@ makeCdbCopy(bool is_copy_in)
  * may pg_throw via elog/ereport.
  */
 void
-cdbCopyStart(CdbCopy *c, char *copyCmd, Oid relid, Oid relerror)
+cdbCopyStart(CdbCopy *c, char *copyCmd, Oid relid, Oid relerror, int err_aosegno)
 {
 	int			seg;
 	MemoryContext oldcontext;
@@ -102,7 +102,6 @@ cdbCopyStart(CdbCopy *c, char *copyCmd, Oid relid, Oid relerror)
 	char	   *serializedQuerytree;
 	int			serializedQuerytree_len;
 	Query	   *q = makeNode(Query);
-    HTAB        *htab = NULL;
 	
 	/* clean err message */
 	c->err_msg.len = 0;
@@ -177,28 +176,24 @@ cdbCopyStart(CdbCopy *c, char *copyCmd, Oid relid, Oid relerror)
 	/* add in AO segno map for dispatch */
 	((CopyStmt *)q->utilityStmt)->ao_segnos = c->ao_segnos;
 	
+	((CopyStmt *)q->utilityStmt)->err_aosegno = err_aosegno;
+
 	MemoryContextSwitchTo(oldcontext);
 
     q->contextdisp = CreateQueryContextInfo();
 
-	htab = createPrepareDispatchedCatalogRelationDisctinctHashTable();
-
 	if (c->copy_in)
 	{
 		prepareDispatchedCatalogRelation(q->contextdisp, relid, TRUE,
-				c->ao_segnos, htab);
+				c->ao_segnos);
+
+		if (OidIsValid(relerror))
+			prepareDispatchedCatalogSingleRelation(q->contextdisp, relerror, TRUE, err_aosegno);
 	}
 	else
 	{
-		prepareDispatchedCatalogRelation(q->contextdisp, relid, FALSE, NULL,
-				htab);
+		prepareDispatchedCatalogRelation(q->contextdisp, relid, FALSE, NULL);
 	}
-
-	if (OidIsValid(relerror))
-		prepareDispatchedCatalogRelation(q->contextdisp, relerror, FALSE, NULL,
-				htab);
-
-    hash_destroy(htab);
 
     CloseQueryContextInfo(q->contextdisp);
 

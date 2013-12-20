@@ -147,15 +147,13 @@ void PerformSharedStorageOpTasks(SharedStorageOpTasks *tasks)
 	stat->contentid = palloc(sizeof(int) * tasks->numTasks);
 
 	q->contextdisp = CreateQueryContextInfo();
-	HTAB * htab = createPrepareDispatchedCatalogRelationDisctinctHashTable();
 
 	for (i = 0, j = 0; i < tasks->numTasks; ++i) {
 		SharedStorageOpTask *task = tasks->tasks + i;
 
 		if (MASTER_CONTENT_ID != task->contentid)
 		{
-			prepareDispatchedCatalogTablespace(q->contextdisp, task->node.spcNode,
-					htab);
+			prepareDispatchedCatalogTablespace(q->contextdisp, task->node.spcNode);
 
 			stat->relFileNode[j] = task->node;
 			stat->segmentFileNum[j] = task->segno;
@@ -181,7 +179,6 @@ void PerformSharedStorageOpTasks(SharedStorageOpTasks *tasks)
 	CloseQueryContextInfo(q->contextdisp);
 	serializedQuerytree = serializeNode((Node *) q, &serializedQuerytree_len, NULL /*uncompressed_size_out*/);
 	Assert(serializedQuerytree != NULL);
-	hash_destroy(htab);
 
 	DropQueryContextInfo(q->contextdisp);
 

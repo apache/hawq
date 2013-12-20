@@ -1366,7 +1366,8 @@ typedef struct CopyStmt
 	Node	   *sreh;			/* Single row error handling info */
 	/* Convenient location for dispatch of misc meta data */
 	PartitionNode *partitions;
-	List		*ao_segnos;		/* AO segno map */
+	List	   *ao_segnos;		/* AO segno map */
+	int			err_aosegno;	/* AO segno for error table */
 } CopyStmt;
 
 /* ----------------------

@@ -536,6 +536,7 @@ _outExternalScan(StringInfo str, ExternalScan *node)
 	WRITE_INT_FIELD(rejLimit);
 	WRITE_BOOL_FIELD(rejLimitInRows);
 	WRITE_OID_FIELD(fmterrtbl);
+	WRITE_INT_FIELD(errAosegno);
 	WRITE_INT_FIELD(encoding);
 	WRITE_INT_FIELD(scancounter);
 }
@@ -2812,6 +2813,7 @@ _outCopyStmt(StringInfo str, CopyStmt *node)
 	WRITE_NODE_FIELD(sreh);
 	WRITE_NODE_FIELD(partitions);
 	WRITE_NODE_FIELD(ao_segnos);
+	WRITE_INT_FIELD(err_aosegno);
 }
 
 

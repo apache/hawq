@@ -1427,26 +1427,9 @@ heap_create_with_catalog(const char *relname,
 			relstorage = RELSTORAGE_AOROWS;
         }
 	}
-
 	
-	/*
-	 * All old GPDB finished here, GOH will run some sanity checks and change
-	 * some behaviors. We require the caller changing the tablespace correctly
-	 * for us, if the storage criteria was not satisified, raise an error.
-	 */
-	if (stdRdOptions->errorTable)
-	{
-		ereport(ERROR,
-				(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
-						errmsg("Cannot support error table yet")));
-
-		/* If this is a error log table, we have to save it in local tablespace. */
-		override = false;
-		reltablespace = MyDatabaseTableSpace;
-	}
-	else
-		reltablespace = GetSuitableTablespace(relkind, relstorage,
-										  reltablespace, &override);
+	reltablespace = GetSuitableTablespace(relkind, relstorage,
+									  reltablespace, &override);
 	if (override)
 	{
 		if (stdRdOptions->forceHeap)

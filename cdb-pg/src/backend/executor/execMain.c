@@ -218,6 +218,75 @@ CopyDirectDispatchFromPlanToSliceTable(PlannedStmt *stmt, EState *estate)
 	CopyDirectDispatchFromPlanToSliceTableWalker((Node *) stmt->planTree, &context);
 }
 
+
+typedef struct QueryCxtWalkerCxt {
+	plan_tree_base_prefix	base;
+	QueryContextInfo	   *info;
+} QueryCxtWalkerCxt;
+
+/**
+ * SetupSegnoForErrorTable
+ * 		travel the query plan to find out the external table scan, assign segfile for error table if exist.
+ */
+static bool
+SetupSegnoForErrorTable(Node *node, QueryCxtWalkerCxt *cxt)
+{
+	ExternalScan   *scan = (ExternalScan *)node;
+	QueryContextInfo *info = cxt->info;
+
+	if (NULL == node)
+		return false;
+
+	switch (nodeTag(node))
+	{
+	case T_ExternalScan:
+		/*
+		 * has no error table
+		 */
+		if (!OidIsValid(scan->fmterrtbl))
+			return false;
+
+		/*
+		 * check if two external table use the same error table in a statement
+		 */
+		if (info->errTblOid)
+		{
+			ListCell	   *c;
+			Oid				errtbloid;
+			foreach(c, info->errTblOid)
+			{
+				errtbloid = lfirst_oid(c);
+				if (errtbloid == scan->fmterrtbl)
+				{
+					Relation rel = heap_open(scan->fmterrtbl, AccessShareLock);
+					elog(ERROR, "Two or more external tables use the same error table \"%s\" in a statement",
+							RelationGetRelationName(rel));
+				}
+			}
+		}
+
+		/*
+		 * Prepare error table for insert.
+		 */
+		Assert(!rel_is_partitioned(scan->fmterrtbl));
+		int errSegno = SetSegnoForWrite(InvalidFileSegNumber, scan->fmterrtbl);
+		scan->errAosegno = errSegno;
+		info->errTblOid = lcons_oid(scan->fmterrtbl, info->errTblOid);
+
+		Relation errRel = heap_open(scan->fmterrtbl, RowExclusiveLock);
+		CreateAppendOnlySegFileForRelationOnMaster(errRel, errSegno);
+		prepareDispatchedCatalogSingleRelation(info, scan->fmterrtbl, TRUE, errSegno);
+		heap_close(errRel, RowExclusiveLock);
+
+		return false;
+	default:
+		break;
+
+	}
+
+	return plan_tree_walker(node, SetupSegnoForErrorTable, cxt);
+}
+
 /* ----------------------------------------------------------------
  *		ExecutorStart
  *
@@ -609,8 +678,6 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
 			{
 				int i;
 
-				HTAB * htab = createPrepareDispatchedCatalogRelationDisctinctHashTable();
-
 				PlannedStmt *plannedstmt = queryDesc->plannedstmt;
 				Assert(NULL == plannedstmt->contextdisp);
 				plannedstmt->contextdisp = CreateQueryContextInfo();
@@ -620,17 +687,17 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
 					ResultRelInfo * relinfo;
 					relinfo = &estate->es_result_relation_info[i];
 					prepareDispatchedCatalogRelation(plannedstmt->contextdisp,
-							RelationGetRelid(relinfo->ri_RelationDesc), TRUE, estate->es_result_aosegnos, htab);
+							RelationGetRelid(relinfo->ri_RelationDesc), TRUE, estate->es_result_aosegnos);
 				}
 
 				if (plannedstmt->intoClause != NULL)
 				{
 					prepareDispatchedCatalogSingleRelation(plannedstmt->contextdisp,
-							plannedstmt->intoClause->oidInfo.relOid, TRUE, 1, htab);
+							plannedstmt->intoClause->oidInfo.relOid, TRUE, 1);
 				}
 
 				if (plannedstmt->rtable)
-					prepareDispatchedCatalog(plannedstmt->contextdisp, plannedstmt->rtable, htab);
+					prepareDispatchedCatalog(plannedstmt->contextdisp, plannedstmt->rtable);
 
 				if (plannedstmt->returningLists)
 				{
@@ -640,11 +707,11 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
 						List *targets = lfirst(lc);
 
 						if (targets)
-							prepareDispatchedCatalogTargets(plannedstmt->contextdisp, targets, htab);
+							prepareDispatchedCatalogTargets(plannedstmt->contextdisp, targets);
 					}
 				}
 
-				prepareDispatchedCatalogPlan(plannedstmt->contextdisp, plannedstmt->planTree, htab);
+				prepareDispatchedCatalogPlan(plannedstmt->contextdisp, plannedstmt->planTree);
 
 				if (plannedstmt->subplans)
 				{
@@ -653,11 +720,18 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
 					{
 						Plan *plantree = lfirst(lc);
 						if (plantree)
-							prepareDispatchedCatalogPlan(plannedstmt->contextdisp, plantree, htab);
+							prepareDispatchedCatalogPlan(plannedstmt->contextdisp, plantree);
 					}
 				}
 
-				hash_destroy(htab);
+				/**
+				 * travel the plan for external table scan to setup error table segno.
+				 */
+				QueryCxtWalkerCxt cxt;
+				cxt.base.node = (Node *)plannedstmt;
+				cxt.info = plannedstmt->contextdisp;
+				plan_tree_walker((Node *)plannedstmt->planTree, SetupSegnoForErrorTable, &cxt);
+
 				CloseQueryContextInfo(plannedstmt->contextdisp);
 			}
 

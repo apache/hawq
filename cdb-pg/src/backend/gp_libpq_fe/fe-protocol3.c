@@ -539,8 +539,9 @@ pqParseInput3(PGconn *conn)
 					break;
 				case 'h':
 					/* in HAWQ, send back modified catalog from QE */
+					/* because of error table, this message may be received twice */
 				{
-					int i;
+					int i, numSendback;
 					int contentid = 0;
 
 					if (conn->result == NULL)
@@ -557,19 +558,27 @@ pqParseInput3(PGconn *conn)
 							return;
 
 					/*
-					 * 2, get get number of relation
+					 * 2, get number of relation
 					 */
-					if (pqGetInt(&(conn->result->numSendback), 4, conn))
+					if (pqGetInt(&(numSendback), 4, conn))
 							return;
 
-					conn->result->sendback =
+					i = conn->result->numSendback;
+					conn->result->numSendback += numSendback;
+
+					if (conn->result->sendback == NULL)
+						conn->result->sendback =
 							malloc(conn->result->numSendback
+									* sizeof(struct QueryContextDispatchingSendBackData));
+					else
+						conn->result->sendback =
+							realloc(conn->result->sendback, conn->result->numSendback
 									* sizeof(struct QueryContextDispatchingSendBackData));
 
 					QueryContextDispatchingSendBack sendback =
 							conn->result->sendback;
 
-					for (i = 0 ; i < conn->result->numSendback ; ++i) {
+					for (; i < conn->result->numSendback ; ++i) {
 						sendback[i].contentid = contentid;
 
 						/*

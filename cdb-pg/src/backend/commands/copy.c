@@ -1126,6 +1126,7 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 									  sreh->rejectlimit,
 									  sreh->is_limit_in_rows,
 									  sreh->errtable,
+									  0, /* assign a value later */
 									  stmt->filename,
 									  stmt->relation->relname);
 
@@ -1552,6 +1553,18 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 				Oid relid =  lfirst_oid(cell);
 				CreateAppendOnlySegFileOnMaster(relid, cstate->ao_segnos);
 			}
+
+			/* allocate segno for error table */
+			if (stmt->sreh && cstate->cdbsreh->errtbl)
+			{
+				Oid		relid = RelationGetRelid(cstate->cdbsreh->errtbl);
+				Assert(!rel_is_partitioned(relid));
+				cstate->cdbsreh->err_aosegno = SetSegnoForWrite(InvalidFileSegNumber, relid);
+				if (Gp_role == GP_ROLE_DISPATCH)
+					CreateAppendOnlySegFileForRelationOnMaster(
+							cstate->cdbsreh->errtbl,
+							cstate->cdbsreh->err_aosegno);
+			}
 		}
 		else
 		{
@@ -1559,6 +1572,8 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 			{
 				/* We must be a QE if we received the aosegnos config */
 				Assert(Gp_role == GP_ROLE_EXECUTE);
+				if (cstate->cdbsreh)
+					cstate->cdbsreh->err_aosegno = stmt->err_aosegno;
 				cstate->ao_segnos = stmt->ao_segnos;
 			}
 			else
@@ -1872,7 +1887,7 @@ CopyToDispatch(CopyState cstate)
 
 	PG_TRY();
 	{
-		cdbCopyStart(cdbCopy, cdbcopy_cmd.data, RelationGetRelid(cstate->rel), InvalidOid);
+		cdbCopyStart(cdbCopy, cdbcopy_cmd.data, RelationGetRelid(cstate->rel), InvalidOid, 0);
 	}
 	PG_CATCH();
 	{
@@ -2906,7 +2921,9 @@ CopyFromDispatch(CopyState cstate)
 	    if (cstate->cdbsreh && cstate->cdbsreh->errtbl)
 	        relerror = RelationGetRelid(cstate->cdbsreh->errtbl);
 
-		cdbCopyStart(cdbCopy, cdbcopy_cmd.data, RelationGetRelid(cstate->rel), relerror);
+		cdbCopyStart(cdbCopy, cdbcopy_cmd.data,
+				RelationGetRelid(cstate->rel), relerror,
+				cstate->cdbsreh ? cstate->cdbsreh->err_aosegno : 0);
 	}
 	PG_CATCH();
 	{
@@ -4052,7 +4069,7 @@ CopyFrom(CopyState cstate)
 						 resultRelInfo->ri_extInsertDesc == NULL)
 				{
 					resultRelInfo->ri_extInsertDesc =
-						external_insert_init(resultRelInfo->ri_RelationDesc);
+						external_insert_init(resultRelInfo->ri_RelationDesc, 0);
 				}
 
 				MemoryContextSwitchTo(GetPerTupleMemoryContext(estate));

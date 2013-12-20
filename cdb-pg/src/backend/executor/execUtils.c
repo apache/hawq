@@ -2147,10 +2147,10 @@ void mppExecutorFinishup(QueryDesc *queryDesc)
 				cdbdisp_sumCmdTuples(pr, LocallyExecutingSliceIndex(estate));
 			estate->es_lastoid =
 				cdbdisp_maxLastOid(pr, LocallyExecutingSliceIndex(estate));
-			cdbdisp_handleModifiedCatalogOnSegments(pr, UpdateCatalogModifiedOnSegments);
 			aopartcounts = cdbdisp_sumAoPartTupCount(estate->es_result_partitions, pr);
-
 		}
+
+		cdbdisp_handleModifiedCatalogOnSegments(pr, UpdateCatalogModifiedOnSegments);
 
 		/* sum up rejected rows if any (single row error handling only) */
 		cdbdisp_sumRejectedRows(pr);

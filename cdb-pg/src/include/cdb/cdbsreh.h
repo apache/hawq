@@ -79,6 +79,8 @@ typedef struct CdbSreh
 	
 	/* the error table */
 	Relation errtbl;		/* the error table we use (if any) */
+	struct AppendOnlyInsertDescData *err_aoInsertDesc;
+	int		err_aosegno;
 	
 	/* error table lifespan */
 	bool	is_keep;		/* if true error table should not get DROP'ed */
@@ -95,8 +97,8 @@ typedef struct CdbSreh
 } CdbSreh;
 
 extern CdbSreh *makeCdbSreh(bool is_keep, bool reusing_existing_errtable, 
-							int rejectlimit, 
-							bool is_limit_in_rows, RangeVar *errtbl,
+							int rejectlimit,
+							bool is_limit_in_rows, RangeVar *errtbl, int aosegno,
 							char *filename, char *relname);
 extern void destroyCdbSreh(CdbSreh *cdbsreh);
 extern void HandleSingleRowError(CdbSreh *cdbsreh);
