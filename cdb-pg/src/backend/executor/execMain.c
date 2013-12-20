@@ -682,6 +682,40 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
 				Assert(NULL == plannedstmt->contextdisp);
 				plannedstmt->contextdisp = CreateQueryContextInfo();
 
+				/*
+				 * (GPSQL-872) Include all tuples from pg_aoseg_*
+				 * catalog for relations that are used in FROM clause.
+				 */
+				if (plannedstmt->rtable)
+				{
+					ListCell *rtc;
+					int rti=0;
+					foreach(rtc, plannedstmt->rtable)
+					{
+						++rti; /* List indices start with 1. */
+						RangeTblEntry *rte = lfirst(rtc);
+						if (rte->rtekind == RTE_RELATION)
+						{
+							ListCell *relc;
+							bool relForInsert = FALSE;
+							foreach(relc, plannedstmt->resultRelations)
+							{
+								int reli = lfirst_int(relc);
+								if (reli == rti)
+								{
+									relForInsert = TRUE;
+									break;
+								}
+							}
+							if (!relForInsert)
+							{
+								prepareDispatchedCatalogRelation(plannedstmt->contextdisp,
+																 rte->relid, FALSE, NULL);
+							}
+						}
+					}
+				}
+
 				for (i = 0; i < estate->es_num_result_relations; ++i)
 				{
 					ResultRelInfo * relinfo;

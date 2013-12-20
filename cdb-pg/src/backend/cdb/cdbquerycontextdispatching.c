@@ -93,12 +93,20 @@ enum QueryContextDispatchingObjType
 };
 typedef enum QueryContextDispatchingObjType QueryContextDispatchingObjType;
 
-struct QueryContextDispatchingHashItem
+struct QueryContextDispatchingHashKey
 {
     Oid objid;
     QueryContextDispatchingObjType type;
 };
-typedef struct QueryContextDispatchingHashItem QueryContextDispatchingHashItem;
+typedef struct QueryContextDispatchingHashKey QueryContextDispatchingHashKey;
+
+struct QueryContextDispatchingHashEntry
+{
+    QueryContextDispatchingHashKey key;
+    Oid aoseg_relid;  /* pg_aoseg_* or pg_aocsseg_* relid */
+   /* aoseg_index_relid in future */
+};
+typedef struct QueryContextDispatchingHashEntry QueryContextDispatchingHashEntry;
 
 static void
 prepareDispatchedCatalogFunction(QueryContextInfo *ctx, Oid procOid);
@@ -827,7 +835,7 @@ alreadyAddedForDispatching(HTAB *rels, Oid objid, QueryContextDispatchingObjType
 
     Assert(NULL != rels);
 
-    QueryContextDispatchingHashItem item;
+    QueryContextDispatchingHashKey item;
 
     item.objid = objid;
     item.type = type;
@@ -1174,6 +1182,56 @@ prepareDispatchedCatalogConstraint(QueryContextInfo *cxt,
 }
 
 /*
+ * parse fast_sequence for dispatch
+ */
+static void
+prepareDispatchedCatalogFastSequence(QueryContextInfo *cxt, Oid relid,
+									 int32 segno)
+{
+    QueryContextDispatchingHashKey hkey;
+    QueryContextDispatchingHashEntry *hentry = NULL;
+    bool found;
+
+    SysScanDesc scanDesc;
+    HeapTuple tuple;
+    Datum contentid;
+
+    Relation fast_seq_rel;
+
+    hkey.objid = relid;
+    hkey.type = RelationType;
+    hentry = hash_search(cxt->htab, &hkey, HASH_FIND, &found);
+    Assert(found);
+    Assert(hentry);
+
+    fast_seq_rel = heap_open(FastSequenceRelationId, AccessShareLock);
+
+    ScanKeyData scanKeys[2];
+
+    ScanKeyInit(&scanKeys[0], Anum_gp_fastsequence_objid, BTEqualStrategyNumber,
+            F_OIDEQ, ObjectIdGetDatum(hentry->aoseg_relid));
+
+    ScanKeyInit(&scanKeys[1], Anum_gp_fastsequence_objmod,
+            BTEqualStrategyNumber, F_INT8EQ, Int64GetDatum(segno));
+
+    scanDesc = systable_beginscan(fast_seq_rel, InvalidOid, FALSE,
+            SnapshotNow, 2, scanKeys);
+
+    while (HeapTupleIsValid(tuple = systable_getnext(scanDesc)))
+    {
+        contentid = heap_getattr(tuple, Anum_gp_fastsequence_contentid,
+                RelationGetDescr(fast_seq_rel), NULL );
+
+        AddTupleToContextInfo(cxt, FastSequenceRelationId, "gp_fastsequence",
+                tuple, DatumGetInt32(contentid));
+    }
+
+    systable_endscan(scanDesc);
+
+    heap_close(fast_seq_rel, AccessShareLock);
+}
+
+/*
  * collect pg_class/pg_type/pg_attribute tuples for oid.
  * add them to in-memory heap table for dispatcher.
  */
@@ -1194,7 +1252,17 @@ prepareDispatchedCatalogSingleRelation(QueryContextInfo *cxt, Oid relid,
         return;
 
     if (alreadyAddedForDispatching(cxt->htab, relid, RelationType))
+	{
+        if (forInsert)
+        {
+            /*
+             * We will be here whenever the same relation is used in
+             * an INSERT clause and a FROM clause (GPSQL-872).
+             */
+            prepareDispatchedCatalogFastSequence(cxt, relid, segno);
+        }
         return;
+    }
 
     /* find relid in pg_class */
     classtuple = SearchSysCache(RELOID, ObjectIdGetDatum(relid), 0, 0, 0);
@@ -1296,47 +1364,6 @@ prepareDispatchedCatalogSingleRelation(QueryContextInfo *cxt, Oid relid,
 }
 
 /*
- * parse fast_sequence for dispatch
- */
-static void
-prepareDispatchedCatalogFastSequence(QueryContextInfo *cxt,
-        Oid objid, int64 objmod)
-{
-
-    SysScanDesc scanDesc;
-    HeapTuple tuple;
-    Datum contentid;
-
-    Relation fast_seq_rel;
-
-    fast_seq_rel = heap_open(FastSequenceRelationId, AccessShareLock);
-
-    ScanKeyData scanKeys[2];
-
-    ScanKeyInit(&scanKeys[0], Anum_gp_fastsequence_objid, BTEqualStrategyNumber,
-            F_OIDEQ, ObjectIdGetDatum(objid));
-
-    ScanKeyInit(&scanKeys[1], Anum_gp_fastsequence_objmod,
-            BTEqualStrategyNumber, F_INT8EQ, Int64GetDatum(objmod));
-
-    scanDesc = systable_beginscan(fast_seq_rel, InvalidOid, FALSE,
-            SnapshotNow, 2, scanKeys);
-
-    while (HeapTupleIsValid(tuple = systable_getnext(scanDesc)))
-    {
-        contentid = heap_getattr(tuple, Anum_gp_fastsequence_contentid,
-                RelationGetDescr(fast_seq_rel), NULL );
-
-        AddTupleToContextInfo(cxt, FastSequenceRelationId, "gp_fastsequence",
-                tuple, DatumGetInt32(contentid));
-    }
-
-    systable_endscan(scanDesc);
-
-    heap_close(fast_seq_rel, AccessShareLock);
-}
-
-/*
  * parse pg_appendonly for dispatch
  */
 static void
@@ -1431,12 +1458,9 @@ prepareDispatchedCatalogAoSegfile(QueryContextInfo *cxt,
 
     while (HeapTupleIsValid(pg_aoseg_tuple = systable_getnext(aosegScanDesc)))
     {
-        Datum segno, contentid;
+        Datum contentid;
 
         empty = false;
-
-        segno = heap_getattr(pg_aoseg_tuple, 1, RelationGetDescr(ao_seg_rel),
-                NULL );
 
         if (RelationIsAoRows(rel))
         {
@@ -1476,6 +1500,9 @@ prepareDispatchedCatalogForAoCo(QueryContextInfo *cxt, Oid relid,
 
     Relation rel;
     Oid segrelid, segidxid;
+    QueryContextDispatchingHashKey hkey;
+    QueryContextDispatchingHashEntry *hentry = NULL;
+    bool found;
 
     rel = heap_open(relid, AccessShareLock);
 
@@ -1489,6 +1516,20 @@ prepareDispatchedCatalogForAoCo(QueryContextInfo *cxt, Oid relid,
 
     Assert(segrelid != InvalidOid);
 
+    hkey.objid = relid;
+    hkey.type = RelationType;
+    hentry = hash_search(cxt->htab, &hkey, HASH_FIND, &found);
+
+    Assert(found);
+    Assert(hentry);
+    /*
+     * Save pg_aoseg_* / pg_aocsseg_* relid in HTAB.  We may need it
+     * later, e.g. to add gp_fastsequence tuple to dispatch context.
+     * HTAB lookups are much faster than scanning pg_appendonly
+     * catalog table.
+     */
+    hentry->aoseg_relid = segrelid;
+
     /*
      * add pg_aoseg_XXX's metadata
      */
@@ -1499,13 +1540,16 @@ prepareDispatchedCatalogForAoCo(QueryContextInfo *cxt, Oid relid,
      */
     prepareDispatchedCatalogAoSegfile(cxt, rel, segrelid, forInsert, segno);
 
-    /*
-     * add gp_fastsequence
-     */
+	/*
+	 * Although we have segrelid available here, we do not pass it to
+	 * prepareDispatchedCatalogFastSequence().  We record it in hash
+	 * table instead and look it up from the hash table inside the
+	 * function.  This is redundant but necessary to be able to call
+	 * this function from elsewhere.  This change is made as part of
+	 * fix for GPSQL-872.
+	 */
     if (forInsert)
-        prepareDispatchedCatalogFastSequence(cxt, segrelid, segno);
-
-    /*TODO index for ao/cs*/
+        prepareDispatchedCatalogFastSequence(cxt, relid, segno);
 
     heap_close(rel, AccessShareLock);
 }
@@ -2008,7 +2052,10 @@ prepareDispatchedCatalog(QueryContextInfo *cxt, List *rtable)
         switch (rte->rtekind)
         {
         case RTE_RELATION:             /*ordinary relation reference */
-            prepareDispatchedCatalogRelation(cxt, rte->relid, FALSE, NULL);
+            /*
+             * Relations in range table are already included by calls to
+             * prepareDispatchedCatalogRelation from ExecutorStart().
+             */
             break;
 
         case RTE_FUNCTION:             /*function in FROM */
@@ -2081,8 +2128,8 @@ createPrepareDispatchedCatalogRelationDisctinctHashTable(void)
     MemSet(&info, 0, sizeof(info));
 
     info.hash = tag_hash;
-    info.keysize = sizeof(QueryContextDispatchingHashItem);
-    info.entrysize = sizeof(QueryContextDispatchingHashItem);
+    info.keysize = sizeof(QueryContextDispatchingHashKey);
+    info.entrysize = sizeof(QueryContextDispatchingHashEntry);
 
     rels = hash_create("all relations", 10, &info, HASH_FUNCTION | HASH_ELEM);
 
