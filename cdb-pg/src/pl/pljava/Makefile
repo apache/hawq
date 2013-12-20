@@ -64,6 +64,7 @@ install: all c_install
 	$(INSTALL_DATA) '$(SQLDIR)/install.sql' '$(datadir)/pljava/.'
 	$(INSTALL_DATA) '$(SQLDIR)/uninstall.sql' '$(datadir)/pljava/.'
 	$(INSTALL_DATA) '$(SQLDIR)/examples.sql' '$(datadir)/pljava/.'
+	$(INSTALL_DATA) '$(SQLDIR)/pljava_install.sh' '$(datadir)/pljava/.'
 	$(INSTALL_DATA) '$(TARGETDIR)/examples.jar' '$(datadir)/pljava/.'
 	$(INSTALL_DATA) '$(TARGETDIR)/examples.jar' '$(pkglibdir)/java/.'
 	$(INSTALL_DATA) '$(top_srcdir)/$(subdir)/COPYRIGHT' '$(datadir)/pljava/.'
