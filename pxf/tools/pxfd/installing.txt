@@ -1,0 +1,33 @@
+BUILD RPM - FINAL
+
+open:  tar -zxvf pxfd.tar.gz
+compress:  tar -pczf pxfd.tar.gz usr
+
+rpmbuild -bb --buildroot /home/gpadmin/rpmbuild/BUILD pxfd.spec
+
+/home/gpadmin/rpmbuild/RPMS/noarch/pxfd-1.0-1.noarch.rpm
+sudo scp gpadmin@hdc1:/home/gpadmin/rpmbuild/RPMS/noarch/pxfd-1.0-1.noarch.rpm .
+
+
+
+THE PROCEDURE - FINAL
+
+[gpadmin@hdc1 ~]scp pxfd-1.0-1.noarch.rpm gpadmin@hdc4:~;scp  pxfd-1.0-1.noarch.rpm gpadmin@hdc5:~;scp  pxfd-1.0-1.noarch.rpm gpadmin@hdc6:~;scp pxfd-1.0-1.noarch.rpm gpadmin@hdc7:~;scp  pxfd-1.0-1.noarch.rpm gpadmin@hdc8:~;
+
+[gpadmin@hdc1 ~]$ gpssh -f hostfile_gpssh
+
+=>sudo rpm -i pxfd-1.0-1.noarch.rpm
+
+=>export JAVA_HOME=/usr/java/latest # because on the cluster default java is: "1.5.0"
+
+=>/usr/lib/gphd/pxfd/start-pxf.sh
+=>ps -ef | grep port=45000 | grep -v grep
+
+=>/usr/lib/gphd/pxfd/stop-pxf.sh
+
+=>sudo rpm -e pxfd-1.0-1.noarch
+
+
+PXF_JAVA=/usr/java/jdk1.7.0_45/bin/java
+/usr/java/latest
+
