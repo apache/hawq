@@ -15,7 +15,6 @@ struct bfz;
 
 struct bfz_freeable_stuff
 {
-	int64 tot_bytes;
 	char *buffer_pointer;
 	char *buffer_end;
 
@@ -66,6 +65,9 @@ typedef struct bfz
 	int64 numBlocks;
 	int64 blockNo;
 	int64 chosenBlockNo;
+
+	int64 tot_bytes;
+
 }	bfz_t;
 
 /* These functions are internal to bfz. */
@@ -93,7 +95,7 @@ extern ssize_t writeAndRetry(int fd, const void *buffer, size_t size);
 static inline int64
 bfz_totalbytes(bfz_t * bfz)
 {
-	return bfz->freeable_stuff->tot_bytes;
+	return bfz->tot_bytes;
 }
 
 static inline void

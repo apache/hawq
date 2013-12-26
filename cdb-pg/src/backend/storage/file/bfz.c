@@ -116,7 +116,7 @@ write_bfz_buffer(bfz_t *bfz, bool isLast)
 	AssertImply(!isLast, fs->buffer_pointer -  fs->buffer ==
 				sizeof(fs->buffer) - BFZ_CHECKSUM_SIZE(bfz->has_checksum));
 	
-	fs->tot_bytes += fs->buffer_pointer - fs->buffer + BFZ_CHECKSUM_SIZE(bfz->has_checksum);
+	bfz->tot_bytes += fs->buffer_pointer - fs->buffer + BFZ_CHECKSUM_SIZE(bfz->has_checksum);
 
 	if (bfz->has_checksum)
 	{
@@ -307,10 +307,9 @@ bfz_create_internal(bfz_t * thiz, const char *filePrefix, int compress)
 		srandom((unsigned int) time(NULL));
 	}
 
-	thiz->numBlocks = thiz->blockNo = thiz->chosenBlockNo = 0;
+	thiz->numBlocks = thiz->blockNo = thiz->chosenBlockNo = thiz->tot_bytes = 0;
 	
 	fs = thiz->freeable_stuff;
-	fs->tot_bytes = 0;
 	fs->buffer_pointer = fs->buffer;
 	fs->buffer_end = fs->buffer + sizeof(fs->buffer) - BFZ_CHECKSUM_SIZE(thiz->has_checksum);
 
@@ -358,7 +357,7 @@ bfz_append_end(bfz_t * thiz)
 	Assert(thiz->mode == BFZ_MODE_APPEND);
 
 	write_bfz_buffer(thiz, true);
-	tot_bytes = fs->tot_bytes;
+	tot_bytes = thiz->tot_bytes;
 
 	if ((tot_compressed = lseek(thiz->fd, 0, SEEK_END)) == -1)
 		ereport(ERROR,
