@@ -2339,8 +2339,7 @@ get_database_dts(Oid dbid)
 	HeapTuple	dbtuple;
 	Oid	   		result;
 
-	if (IsBootstrapProcessingMode() ||
-		dbid == TemplateDbOid)
+	if (IsBootstrapProcessingMode())
 		return MyDatabaseTableSpace;
 
 	dbtuple = SearchSysCache(DATABASEOID,

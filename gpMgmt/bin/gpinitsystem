@@ -1742,6 +1742,11 @@ CREATE_DFS_TABLESPACE () {
 	$PSQL -p $GP_PORT -d "$DEFAULTDB" -c"create tablespace \"$GP_TABLESPACE_NAME\" filespace \"$GP_FILESPACE_NAME\";" >> $LOG_FILE 2>&1
     CHECK_CREATE_DFS_ERROR
 
+	# update template0 tablespace
+	LOG_MSG "[INFO]:-Update template0 tablespace" 1
+	$PSQL -p $GP_PORT -d "$DEFAULTDB" -c"SET allow_system_table_mods='dml';UPDATE pg_database SET dat2tablespace = (SELECT oid FROM pg_tablespace WHERE spcname = '$GP_TABLESPACE_NAME') WHERE datname = '$DEFAULTDB';" >> $LOG_FILE 2>&1
+	CHECK_CREATE_DFS_ERROR
+
 	LOG_MSG "[INFO]:-End Function $FUNCNAME"
 }
 
