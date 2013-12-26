@@ -575,6 +575,7 @@ prepare_for_client_read(void)
 		/* Enable immediate processing of asynchronous signals */
 		EnableNotifyInterrupt();
 		EnableCatchupInterrupt();
+		EnableClientWaitTimeoutInterrupt();
 
 		/* Allow "die" interrupt to be processed while waiting */
 		ImmediateInterruptOK = true;
@@ -596,6 +597,7 @@ client_read_ended(void)
 		ImmediateInterruptOK = false;
 		QueryCancelPending = false;		/* forget any CANCEL signal */
 
+		DisableClientWaitTimeoutInterrupt();
 		DisableNotifyInterrupt();
 		DisableCatchupInterrupt();
 	}
@@ -4502,6 +4504,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 		DoingCommandRead = false;
 		DisableNotifyInterrupt();
 		DisableCatchupInterrupt();
+		DisableClientWaitTimeoutInterrupt();
 
 		/* Make sure libpq is in a good state */
 		pq_comm_reset();

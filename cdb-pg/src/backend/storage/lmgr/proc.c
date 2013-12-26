@@ -38,9 +38,11 @@
 
 #include "access/transam.h"
 #include "access/xact.h"
+#include "commands/async.h"
 #include "miscadmin.h"
 #include "storage/ipc.h"
 #include "storage/spin.h"
+#include "storage/sinval.h"
 #include "storage/proc.h"
 #include "storage/procarray.h"
 #include "storage/pmsignal.h"
@@ -77,6 +79,8 @@ static LOCALLOCK *lockAwaited = NULL;
 /* Mark these volatile because they can be changed by signal handler */
 static volatile bool statement_timeout_active = false;
 static volatile bool deadlock_timeout_active = false;
+static volatile sig_atomic_t clientWaitTimeoutInterruptEnabled = 0;
+static volatile sig_atomic_t clientWaitTimeoutInterruptOccurred = 0;
 volatile bool cancel_from_timeout = false;
 
 /* statement_fin_time is valid only if statement_timeout_active is true */
@@ -87,6 +91,8 @@ static void RemoveProcFromArray(int code, Datum arg);
 static void ProcKill(int code, Datum arg);
 static void AuxiliaryProcKill(int code, Datum arg);
 static bool CheckStatementTimeout(void);
+static void ClientWaitTimeoutInterruptHandler(void);
+static void ProcessClientWaitTimeout(void);
 
 /*
  * Report shared-memory space needed by InitProcGlobal.
@@ -1553,12 +1559,119 @@ handle_sig_alarm(SIGNAL_ARGS)
 	 */
 	if (DoingCommandRead)
 	{
-		(void) HandleClientWaitTimeout();
+		(void) ClientWaitTimeoutInterruptHandler();
 		deadlock_timeout_active = false;
 	}
 
 
 	errno = save_errno;
+}
+
+static void
+ClientWaitTimeoutInterruptHandler(void)
+{
+	int			save_errno = errno;
+
+	/* Don't joggle the elbow of proc_exit */
+	if (proc_exit_inprogress)
+		return;
+
+	if (clientWaitTimeoutInterruptEnabled)
+	{
+		bool		save_ImmediateInterruptOK = ImmediateInterruptOK;
+
+		/*
+		 * We may be called while ImmediateInterruptOK is true; turn it off
+		 * while messing with the client wait timeout state.  (We would have to save and
+		 * restore it anyway, because PGSemaphore operations inside
+		 * HandleClientWaitTimeout() might reset it.)
+		 */
+		ImmediateInterruptOK = false;
+
+		/*
+		 * I'm not sure whether some flavors of Unix might allow another
+		 * SIGUSR2 occurrence to recursively interrupt this routine. To cope
+		 * with the possibility, we do the same sort of dance that
+		 * EnableNotifyInterrupt must do --- see that routine for comments.
+		 */
+		clientWaitTimeoutInterruptEnabled = 0;		/* disable any recursive signal */
+		clientWaitTimeoutInterruptOccurred = 1;		/* do at least one iteration */
+		for (;;)
+		{
+			clientWaitTimeoutInterruptEnabled = 1;
+			if (!clientWaitTimeoutInterruptOccurred)
+				break;
+			clientWaitTimeoutInterruptEnabled = 0;
+			if (clientWaitTimeoutInterruptOccurred)
+			{
+				ProcessClientWaitTimeout();
+			}
+		}
+
+		/*
+		 * Restore ImmediateInterruptOK, and check for interrupts if needed.
+		 */
+		ImmediateInterruptOK = save_ImmediateInterruptOK;
+		if (save_ImmediateInterruptOK)
+			CHECK_FOR_INTERRUPTS();
+	}
+	else
+	{
+		/*
+		 * In this path it is NOT SAFE to do much of anything, except this:
+		 */
+		clientWaitTimeoutInterruptOccurred = 1;
+	}
+
+	errno = save_errno;
+}
+
+void
+EnableClientWaitTimeoutInterrupt(void)
+{
+	for (;;)
+	{
+		clientWaitTimeoutInterruptEnabled = 1;
+		if (!clientWaitTimeoutInterruptOccurred)
+			break;
+		clientWaitTimeoutInterruptEnabled = 0;
+		if (clientWaitTimeoutInterruptOccurred)
+		{
+			ProcessClientWaitTimeout();
+		}
+	}
+}
+
+/*
+ * DisableClientWaitTimeoutInterrupt
+ */
+bool
+DisableClientWaitTimeoutInterrupt(void)
+{
+	bool		result = (clientWaitTimeoutInterruptEnabled != 0);
+
+	clientWaitTimeoutInterruptEnabled = 0;
+
+	return result;
+}
+
+static void
+ProcessClientWaitTimeout(void)
+{
+	bool		notify_enabled;
+	bool		catchup_enabled;
+
+	/* Must prevent SIGUSR2 interrupt while I am running */
+	notify_enabled = DisableNotifyInterrupt();
+	catchup_enabled = DisableCatchupInterrupt();
+
+	clientWaitTimeoutInterruptOccurred = 0;
+	HandleClientWaitTimeout();
+
+	if (notify_enabled)
+		EnableNotifyInterrupt();
+	if (catchup_enabled)
+		EnableCatchupInterrupt();
 }
 
 /*
