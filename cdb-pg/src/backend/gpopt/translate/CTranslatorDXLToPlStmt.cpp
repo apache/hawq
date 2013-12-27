@@ -1324,7 +1324,18 @@ CTranslatorDXLToPlStmt::PisFromDXLIndexScan
 	CDXLNode *pdxlnFilter = (*pdxlnIndexScan)[EdxlisIndexFilter];
 	CDXLNode *pdxlnIndexCondList = (*pdxlnIndexScan)[EdxlisIndexCondition];
 
-	TranslateProjListAndFilter(pdxlnPrL, pdxlnFilter, &dxltrctxbt, NULL, &pplan->targetlist, &pplan->qual, pdxltrctxOut, pplan);
+	// translate proj list
+	pplan->targetlist = PlTargetListFromProjList(pdxlnPrL, &dxltrctxbt, NULL /*pdrgpdxltrctx*/, pdxltrctxOut, pplan);
+
+	// translate index filter
+	pplan->qual = PlTranslateIndexFilter
+					(
+					pdxlnFilter,
+					pdxltrctxOut,
+					&dxltrctxbt,
+					pdrgpdxltrctxPrevSiblings,
+					pplan
+					);
 
 	pis->indexorderdir = CTranslatorUtils::Scandirection(pdxlopIndexScan->EdxlScanDirection());
 
@@ -1359,6 +1370,43 @@ CTranslatorDXLToPlStmt::PisFromDXLIndexScan
 
 	return (Plan *) pis;
 }
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorDXLToPlStmt::TranslateIndexFilter
+//
+//	@doc:
+//		Translate the index filter list in an Index scan
+//
+//---------------------------------------------------------------------------
+List *
+CTranslatorDXLToPlStmt::PlTranslateIndexFilter
+	(
+	CDXLNode *pdxlnFilter,
+	CDXLTranslateContext *pdxltrctxOut,
+	CDXLTranslateContextBaseTable *pdxltrctxbt,
+	DrgPdxltrctx *pdrgpdxltrctxPrevSiblings,
+	Plan *pplanParent
+	)
+{
+	List *plQuals = NIL;
+
+	// build colid->var mapping
+	CMappingColIdVarPlStmt mapcidvarplstmt(m_pmp, pdxltrctxbt, pdrgpdxltrctxPrevSiblings, pdxltrctxOut, m_pctxdxltoplstmt, pplanParent);
+
+	const ULONG ulArity = pdxlnFilter->UlArity();
+	for (ULONG ul = 0; ul < ulArity; ul++)
+	{
+		CDXLNode *pdxlnIndexFilter = (*pdxlnFilter)[ul];
+		Expr *pexprIndexFilter = m_pdxlsctranslator->PexprFromDXLNodeScalar(pdxlnIndexFilter, &mapcidvarplstmt);
+		GPOS_ASSERT(IsA(pexprIndexFilter, OpExpr) && "expected OpExpr in index filter");
+
+		plQuals = gpdb::PlAppendElement(plQuals, pexprIndexFilter);
+	}
+
+	return plQuals;
+}
+
 
 //---------------------------------------------------------------------------
 //	@function:
@@ -3954,7 +4002,18 @@ CTranslatorDXLToPlStmt::PplanDIS
 	CDXLNode *pdxlnFilter = (*pdxlnDIS)[CDXLPhysicalDynamicIndexScan::EdxldisIndexFilter];
 	CDXLNode *pdxlnIndexCondList = (*pdxlnDIS)[CDXLPhysicalDynamicIndexScan::EdxldisIndexCondition];
 
-	TranslateProjListAndFilter(pdxlnPrL, pdxlnFilter, &dxltrctxbt, NULL, &pplan->targetlist, &pplan->qual, pdxltrctxOut, pplan);
+	// translate proj list
+	pplan->targetlist = PlTargetListFromProjList(pdxlnPrL, &dxltrctxbt, NULL /*pdrgpdxltrctx*/, pdxltrctxOut, pplan);
+
+	// translate index filter
+	pplan->qual = PlTranslateIndexFilter
+					(
+					pdxlnFilter,
+					pdxltrctxOut,
+					&dxltrctxbt,
+					pdrgpdxltrctxPrevSiblings,
+					pplan
+					);
 
 	pdis->indexorderdir = CTranslatorUtils::Scandirection(pdxlop->EdxlScanDirection());
 
@@ -3980,6 +4039,7 @@ CTranslatorDXLToPlStmt::PplanDIS
 		&plIndexStratgey, 
 		&plIndexSubtype
 		);
+
 
 	pdis->indexqual = plIndexConditions;
 	pdis->indexqualorig = plIndexOrigConditions;

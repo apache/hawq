@@ -696,6 +696,16 @@ namespace gpdxl
 				List **pplIndexSubtype
 				);
 			
+			// translate the index filters
+			List *PlTranslateIndexFilter
+				(
+				CDXLNode *pdxlnFilter,
+				CDXLTranslateContext *pdxltrctxOut,
+				CDXLTranslateContextBaseTable *pdxltrctxbt,
+				DrgPdxltrctx *pdrgpdxltrctxPrevSiblings,
+				Plan *pplanParent
+				);
+
 			// compute directed dispatch segment ids
 			List *PlDirectDispatchSegIds(DrgPdxldatum *pdrgpdxldatum);
 			
