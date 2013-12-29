@@ -1,12 +1,19 @@
 
 In order to run JSystem regression you will need:
 
-1. Make sure that the GPHD_ROOT, HADOOP_ROOT , HIVE_ROOT and HBASE_ROOT environment variables 
+1. Make sure that the GPHOME, GPHD_ROOT, HADOOP_ROOT , HIVE_ROOT and HBASE_ROOT environment variables 
 are set before running the ant.
 
 2. Open the default.xml sut file located in the regression/sut folder and change the required parameters: 
-in the "cluster" section add you userName and password.
+add your required host, ports, userName and password in each component.
 The clusterFolder will be taken from GPHD_ROOT variable if exists - if needed you can put the location in the sut.
+Pay attention and replace escape characters in the default.xml file ​​as in the following table:
+
+"	->	&quot;
+'	->	&apos;
+<	->	&lt;
+>	->	&gt;
+&	->	&amp;
 
 3. Run from root directory of PXF project: ant -buildfile regression.xml 
 to run all regression tests exists. (Currently will run POC of HDFS, Writable and Hive regression)

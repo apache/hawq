@@ -1,19 +1,25 @@
 package com.pxf.tests.basic;
 
 import java.io.File;
+import java.util.List;
 
 import org.junit.Test;
 import org.postgresql.util.PSQLException;
 
-import com.pxf.infra.structures.tables.basic.Table;
-import com.pxf.infra.structures.tables.pxf.ReadbleExternalTable;
-import com.pxf.infra.utils.exception.ExceptionUtils;
-import com.pxf.infra.utils.fileformats.FileFormatsUtils;
-import com.pxf.infra.utils.fileformats.avro.schema.CustomrAvroInSequenceReader;
-import com.pxf.infra.utils.fileformats.avro.schema.CustomrAvroReader;
-import com.pxf.infra.utils.fileformats.avro.schema.IAvroSchema;
-import com.pxf.infra.utils.fileformats.sequence.CustomSequenceReader;
-import com.pxf.infra.utils.jsystem.report.ReportUtils;
+import com.google.protobuf.GeneratedMessage;
+import com.pivotal.pxfauto.infra.fileformats.IAvroSchema;
+import com.pivotal.pxfauto.infra.structures.tables.basic.Table;
+import com.pivotal.pxfauto.infra.structures.tables.pxf.ReadableExternalTable;
+import com.pivotal.pxfauto.infra.utils.exception.ExceptionUtils;
+import com.pivotal.pxfauto.infra.utils.fileformats.FileFormatsUtils;
+import com.pivotal.pxfauto.infra.utils.jsystem.report.ReportUtils;
+import com.pivotal.pxfauto.infra.utils.tables.ComparisonUtils;
+import com.pxf.tests.dataprepares.avro.CustomAvroPreparer;
+import com.pxf.tests.dataprepares.protobuf.schema.CustomProtobuffPreparer;
+import com.pxf.tests.dataprepares.sequence.CustomAvroInSequencePreparer;
+import com.pxf.tests.dataprepares.sequence.CustomSequencePreparer;
+import com.pxf.tests.dataprepares.text.CustomTextPreparer;
+import com.pxf.tests.dataprepares.text.QuotedLineTextPreparer;
 import com.pxf.tests.testcases.PxfTestCase;
 
 /**
@@ -21,7 +27,7 @@ import com.pxf.tests.testcases.PxfTestCase;
  */
 public class PxfHdfsRegression extends PxfTestCase {
 
-	ReadbleExternalTable exTable;
+	ReadableExternalTable exTable;
 
 	/**
 	 * General Table creation Validations with Fragmenter, Accessor and Resolver
@@ -34,18 +40,15 @@ public class PxfHdfsRegression extends PxfTestCase {
 		/**
 		 * gphdfs_in
 		 */
-		exTable = new ReadbleExternalTable("gphdfs_in", new String[] {
-				"a int",
-				"b text",
-				"c bytea" }, ("somepath/" + hdfsWorkingFolder), "CUSTOM");
+		exTable = new ReadableExternalTable("gphdfs_in", new String[] { "a int", "b text", "c bytea" }, ("somepath/" + hdfsWorkingFolder), "CUSTOM");
 
 		exTable.setFragmenter("xfrag");
 		exTable.setAccessor("xacc");
 		exTable.setResolver("xres");
-		exTable.setUserParamters(new String[] { "someuseropt=someuserval" });
+		exTable.setUserParameters(new String[] { "someuseropt=someuserval" });
 		exTable.setFormatter("pxfwritable_import");
 
-		createHawqTable(exTable);
+		hawq.createTableAndVerify(exTable);
 
 		/**
 		 * gphdfs_in1
@@ -56,9 +59,9 @@ public class PxfHdfsRegression extends PxfTestCase {
 		exTable.setResolver("AvroResolver");
 		exTable.setDataSchema("MySchema");
 
-		exTable.setUserParamters(null);
+		exTable.setUserParameters(null);
 
-		createHawqTable(exTable);
+		hawq.createTableAndVerify(exTable);
 	}
 
 	/**
@@ -70,7 +73,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 	@Test
 	public void neagtiveNoFragmenterNoAccossorNoResolver() throws Exception {
 
-		exTable = new ReadbleExternalTable("gphdfs_in2", new String[] {
+		exTable = new ReadableExternalTable("gphdfs_in2", new String[] {
 				"a int",
 				"b text",
 				"c bytea" }, (hdfsWorkingFolder + "/*"), "CUSTOM");
@@ -79,7 +82,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		try {
 
-			createHawqTable(exTable);
+			hawq.createTableAndVerify(exTable);
 
 		} catch (Exception e) {
 			ExceptionUtils.validate(report, e, new PSQLException("ERROR: Invalid URI pxf://" + hawq.getHost() + ":50070/" + exTable.getPath() + "?: invalid option after '?'", null), false);
@@ -94,18 +97,18 @@ public class PxfHdfsRegression extends PxfTestCase {
 	@Test
 	public void neagtiveMissingFragmenter() throws Exception {
 
-		exTable = new ReadbleExternalTable("gphdfs_in2", new String[] {
+		exTable = new ReadableExternalTable("gphdfs_in2", new String[] {
 				"a int",
 				"b text",
 				"c bytea" }, ("somepath/" + hdfsWorkingFolder), "CUSTOM");
 
 		exTable.setAccessor("xacc");
 		exTable.setResolver("xres");
-		exTable.setUserParamters(new String[] { "someuseropt=someuserval" });
+		exTable.setUserParameters(new String[] { "someuseropt=someuserval" });
 		exTable.setFormatter("pxfwritable_import");
 
 		try {
-			createHawqTable(exTable);
+			hawq.createTableAndVerify(exTable);
 		} catch (Exception e) {
 			ExceptionUtils.validate(report, e, new PSQLException("ERROR: Invalid URI pxf://" + hawq.getHost() + ":50070/" + exTable.getPath() + "?ACCESSOR=xacc&RESOLVER=xres&someuseropt=someuserval: PROFILE or FRAGMENTER option(s) missing", null), false);
 		}
@@ -119,18 +122,18 @@ public class PxfHdfsRegression extends PxfTestCase {
 	@Test
 	public void neagtiveMissingAccessor() throws Exception {
 
-		exTable = new ReadbleExternalTable("gphdfs_in2", new String[] {
+		exTable = new ReadableExternalTable("gphdfs_in2", new String[] {
 				"a int",
 				"b text",
 				"c bytea" }, ("somepath/" + hdfsWorkingFolder), "CUSTOM");
 
 		exTable.setFragmenter("xfrag");
 		exTable.setResolver("xres");
-		exTable.setUserParamters(new String[] { "someuseropt=someuserval" });
+		exTable.setUserParameters(new String[] { "someuseropt=someuserval" });
 		exTable.setFormatter("pxfwritable_import");
 
 		try {
-			createHawqTable(exTable);
+			hawq.createTableAndVerify(exTable);
 		} catch (Exception e) {
 			ExceptionUtils.validate(report, e, new PSQLException("ERROR: Invalid URI pxf://" + hawq.getHost() + ":50070/" + exTable.getPath() + "?FRAGMENTER=xfrag&RESOLVER=xres&someuseropt=someuserval: PROFILE or ACCESSOR option(s) missing", null), false);
 		}
@@ -144,7 +147,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 	@Test
 	public void neagtiveMissingResolver() throws Exception {
 
-		exTable = new ReadbleExternalTable("gphdfs_in2", new String[] {
+		exTable = new ReadableExternalTable("gphdfs_in2", new String[] {
 				"a int",
 				"b text",
 				"c bytea" }, ("somepath/" + hdfsWorkingFolder), "CUSTOM");
@@ -155,7 +158,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		try {
 
-			createHawqTable(exTable);
+			hawq.createTableAndVerify(exTable);
 
 		} catch (Exception e) {
 			ExceptionUtils.validate(report, e, new PSQLException("ERROR: Invalid URI pxf://" + hawq.getHost() + ":50070/" + exTable.getPath() + "?FRAGMENTER=xfrag&ACCESSOR=xacc: PROFILE or RESOLVER option(s) missing", null), false);
@@ -171,12 +174,15 @@ public class PxfHdfsRegression extends PxfTestCase {
 	@Test
 	public void textFormatsManyFields() throws Exception {
 
-		File localCsvFile = new File("regression/resources/text_data.csv");
+		String csvPath = hdfsWorkingFolder + "/text_data.csv";
 
-		hdfs.getFunc()
-				.copyFromLocal(localCsvFile.getAbsolutePath(), (hdfsWorkingFolder + "/text_data.csv"));
+		Table dataTable = new Table("dataTable", null);
 
-		exTable = new ReadbleExternalTable("bigtext", new String[] {
+		FileFormatsUtils.prepareData(new CustomTextPreparer(), 1000, dataTable);
+
+		hdfs.writeTextFile(csvPath, dataTable.getData(), ",");
+
+		exTable = new ReadableExternalTable("bigtext", new String[] {
 				"s1 text",
 				"s2 text",
 				"s3 text",
@@ -198,18 +204,35 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"n14 int",
 				"n15 int",
 				"n16 int",
-				"n17 int" }, (hdfsWorkingFolder + "/text_data.csv"), "TEXT");
+				"n17 int" }, csvPath, "TEXT");
 
 		exTable.setFragmenter("HdfsDataFragmenter");
 		exTable.setAccessor("LineBreakAccessor");
 		exTable.setResolver("StringPassResolver");
 		exTable.setDelimiter(",");
 
-		createHawqTable(exTable);
+		hawq.createTableAndVerify(exTable);
 
 		hawq.queryResults(exTable, "SELECT * FROM bigtext ORDER BY n1");
 
-		compareCsv(localCsvFile, exTable);
+		ComparisonUtils.compareTables(exTable, dataTable, report);
+		
+		ReportUtils.report(report, getClass(), "single condition - remove elements from dataTable and compare");
+		hawq.queryResults(exTable, "SELECT * FROM bigtext " +
+				"WHERE n2 > 500 ORDER BY n1");
+		
+		List<List<String>> data = dataTable.getData();
+		dataTable.setData(data.subList(50, 1000));
+		
+		ComparisonUtils.compareTables(exTable, dataTable, report);
+		
+		ReportUtils.report(report, getClass(), "two conditions - remove elements from dataTable and compare");
+		hawq.queryResults(exTable, "SELECT * FROM bigtext " +
+				"WHERE (n2 > 500) AND (n1 <= 60) ORDER BY n1");
+		
+		dataTable.setData(data.subList(50, 60));
+		
+		ComparisonUtils.compareTables(exTable, dataTable, report);
 	}
 
 	/**
@@ -221,12 +244,15 @@ public class PxfHdfsRegression extends PxfTestCase {
 	@Test
 	public void textCsvFormatOnManyFields() throws Exception {
 
-		File localCsvFile = new File("regression/resources/text_data.csv");
+		String csvPath = hdfsWorkingFolder + "/text_data.csv";
 
-		hdfs.getFunc()
-				.copyFromLocal(localCsvFile.getAbsolutePath(), (hdfsWorkingFolder + "/text_data.csv"));
+		Table dataTable = new Table("dataTable", null);
 
-		exTable = new ReadbleExternalTable("bigtext", new String[] {
+		FileFormatsUtils.prepareData(new CustomTextPreparer(), 1000, dataTable);
+
+		hdfs.writeTextFile(csvPath, dataTable.getData(), ",");
+
+		exTable = new ReadableExternalTable("bigtext", new String[] {
 				"s1 text",
 				"s2 text",
 				"s3 text",
@@ -254,11 +280,11 @@ public class PxfHdfsRegression extends PxfTestCase {
 		exTable.setAccessor("LineBreakAccessor");
 		exTable.setResolver("StringPassResolver");
 
-		createHawqTable(exTable);
+		hawq.createTableAndVerify(exTable);
 
 		hawq.queryResults(exTable, "SELECT * FROM  " + exTable.getName() + " ORDER BY n1");
 
-		compareCsv(localCsvFile, exTable);
+		ComparisonUtils.compareTables(exTable, dataTable, report);
 	}
 
 	/**
@@ -268,14 +294,17 @@ public class PxfHdfsRegression extends PxfTestCase {
 	 * @throws Exception
 	 */
 	@Test
-	public void textManyFieldsFeprecatedAccessorAndResolver() throws Exception {
+	public void textManyFieldsDeprecatedAccessorAndResolver() throws Exception {
 
-		File localCsvFile = new File("regression/resources/text_data.csv");
+		String csvPath = hdfsWorkingFolder + "/text_data.csv";
 
-		hdfs.getFunc()
-				.copyFromLocal(localCsvFile.getAbsolutePath(), (hdfsWorkingFolder + "/text_data.csv"));
+		Table dataTable = new Table("dataTable", null);
 
-		exTable = new ReadbleExternalTable("bigtext", new String[] {
+		FileFormatsUtils.prepareData(new CustomTextPreparer(), 1000, dataTable);
+
+		hdfs.writeTextFile(csvPath, dataTable.getData(), ",");
+
+		exTable = new ReadableExternalTable("bigtext", new String[] {
 				"s1 text",
 				"s2 text",
 				"s3 text",
@@ -304,11 +333,11 @@ public class PxfHdfsRegression extends PxfTestCase {
 		exTable.setResolver("TextResolver");
 		exTable.setDelimiter(",");
 
-		createHawqTable(exTable);
+		hawq.createTableAndVerify(exTable);
 
 		hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY n1");
 
-		compareCsv(localCsvFile, exTable);
+		ComparisonUtils.compareTables(exTable, dataTable, report);
 	}
 
 	/**
@@ -318,14 +347,17 @@ public class PxfHdfsRegression extends PxfTestCase {
 	 * @throws Exception
 	 */
 	@Test
-	public void textManyFieldsFeprecatedAccessor() throws Exception {
+	public void textManyFieldsDeprecatedAccessor() throws Exception {
 
-		File localCsvFile = new File("regression/resources/text_data.csv");
+		String csvPath = hdfsWorkingFolder + "/text_data.csv";
 
-		hdfs.getFunc()
-				.copyFromLocal(localCsvFile.getAbsolutePath(), (hdfsWorkingFolder + "/text_data.csv"));
+		Table dataTable = new Table("dataTable", null);
 
-		exTable = new ReadbleExternalTable("bigtext", new String[] {
+		FileFormatsUtils.prepareData(new CustomTextPreparer(), 1000, dataTable);
+
+		hdfs.writeTextFile(csvPath, dataTable.getData(), ",");
+
+		exTable = new ReadableExternalTable("bigtext", new String[] {
 				"s1 text",
 				"s2 text",
 				"s3 text",
@@ -354,11 +386,11 @@ public class PxfHdfsRegression extends PxfTestCase {
 		exTable.setResolver("StringPassResolver");
 		exTable.setDelimiter(",");
 
-		createHawqTable(exTable);
+		hawq.createTableAndVerify(exTable);
 
 		hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY n1");
 
-		compareCsv(localCsvFile, exTable);
+		ComparisonUtils.compareTables(exTable, dataTable, report);
 	}
 
 	/**
@@ -372,12 +404,12 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		Table sudoDataTable = new Table("dataTable", null);
 
-		Object[] data = FileFormatsUtils.prepareData(new CustomSequenceReader(), 100, sudoDataTable);
+		Object[] data = FileFormatsUtils.prepareData(new CustomSequencePreparer(), 100, sudoDataTable);
 
-		hdfs.getFunc()
+		hdfs
 				.writeSequnceFile(data, (hdfsWorkingFolder + "/my_writable_inside_sequence.tbl"));
 
-		ReadbleExternalTable exTable = new ReadbleExternalTable("seqwr", new String[] {
+		ReadableExternalTable exTable = new ReadableExternalTable("seqwr", new String[] {
 				"tmp1  timestamp",
 				"num1  integer",
 				"num2  integer",
@@ -406,7 +438,8 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"short2 smallint",
 				"short3 smallint",
 				"short4 smallint",
-				"short5 smallint" }, (hdfsWorkingFolder + "/my_writable_inside_sequence.tbl"), "custom");
+				"short5 smallint"
+		}, (hdfsWorkingFolder + "/my_writable_inside_sequence.tbl"), "custom");
 
 		exTable.setFragmenter("HdfsDataFragmenter");
 		exTable.setAccessor("SequenceFileAccessor");
@@ -414,11 +447,11 @@ public class PxfHdfsRegression extends PxfTestCase {
 		exTable.setDataSchema("CustomWritable");
 		exTable.setFormatter("pxfwritable_import");
 
-		createHawqTable(exTable);
+		hawq.createTableAndVerify(exTable);
 
 		hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY num1");
 
-		compareTables(exTable, sudoDataTable);
+		ComparisonUtils.compareTables(exTable, sudoDataTable, report);
 	}
 
 	/**
@@ -433,12 +466,12 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		String schemaName = "regression/resources/regressPXFCustomAvro.avsc";
 
-		Object[] data = FileFormatsUtils.prepareData(new CustomrAvroInSequenceReader(schemaName), 100, dataTable);
+		Object[] data = FileFormatsUtils.prepareData(new CustomAvroInSequencePreparer(schemaName), 100, dataTable);
 
-		hdfs.getFunc()
+		hdfs
 				.writeAvroInSequnceFile(hdfsWorkingFolder + "/avro_in_seq.tbl", schemaName, (IAvroSchema[]) data);
 
-		ReadbleExternalTable exTable = new ReadbleExternalTable("seqav", new String[] {
+		ReadableExternalTable exTable = new ReadableExternalTable("seqav", new String[] {
 				"tmp1  timestamp",
 				"num1  integer",
 				"num2  integer",
@@ -468,11 +501,11 @@ public class PxfHdfsRegression extends PxfTestCase {
 		exTable.setDataSchema("regressPXFCustomAvro.avsc");
 		exTable.setFormatter("pxfwritable_import");
 
-		createHawqTable(exTable);
+		hawq.createTableAndVerify(exTable);
 
 		hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY num1;");
 
-		compareTables(exTable, dataTable);
+		ComparisonUtils.compareTables(exTable, dataTable, report);
 	}
 
 	/**
@@ -487,12 +520,12 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		String schemaName = "regression/resources/regressPXFCustomAvro.avsc";
 
-		Object[] data = FileFormatsUtils.prepareData(new CustomrAvroInSequenceReader(schemaName), 1000, dataTable);
+		Object[] data = FileFormatsUtils.prepareData(new CustomAvroInSequencePreparer(schemaName), 1000, dataTable);
 
-		hdfs.getFunc()
+		hdfs
 				.writeAvroInSequnceFile(hdfsWorkingFolder + "/avro_in_seq.tbl", schemaName, (IAvroSchema[]) data);
 
-		ReadbleExternalTable exTable = new ReadbleExternalTable("seqav_space", new String[] {
+		ReadableExternalTable exTable = new ReadableExternalTable("seqav_space", new String[] {
 				"tmp1  timestamp",
 				"num1  integer",
 				"num2  integer",
@@ -522,11 +555,11 @@ public class PxfHdfsRegression extends PxfTestCase {
 		exTable.setDataSchema("regress PXF Custom Avro1.avsc");
 		exTable.setFormatter("pxfwritable_import");
 
-		createHawqTable(exTable);
+		hawq.createTableAndVerify(exTable);
 
 		hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY num1;");
 
-		compareTables(exTable, dataTable);
+		ComparisonUtils.compareTables(exTable, dataTable, report);
 	}
 
 	/**
@@ -541,12 +574,12 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		String schemaName = "regression/resources/regressPXFCustomAvro.avsc";
 
-		Object[] data = FileFormatsUtils.prepareData(new CustomrAvroInSequenceReader(schemaName), 1000, dataTable);
+		Object[] data = FileFormatsUtils.prepareData(new CustomAvroInSequencePreparer(schemaName), 1000, dataTable);
 
-		hdfs.getFunc()
+		hdfs
 				.writeAvroInSequnceFile(hdfsWorkingFolder + "/avro_in_seq.tbl", schemaName, (IAvroSchema[]) data);
 
-		ReadbleExternalTable exTable = new ReadbleExternalTable("seqav_case", new String[] {
+		ReadableExternalTable exTable = new ReadableExternalTable("seqav_case", new String[] {
 				"tmp1  timestamp",
 				"num1  integer",
 				"num2  integer",
@@ -570,7 +603,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"bt    bytea",
 				"bl boolean" }, (hdfsWorkingFolder + "/avro_in_seq.tbl"), "custom");
 
-		exTable.setUserParamters(new String[] {
+		exTable.setUserParameters(new String[] {
 				"fragmenter=HdfsDataFragmenter",
 				"Accessor=SequenceFileAccessor",
 				"ReSoLvEr=AvroResolver",
@@ -578,11 +611,11 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		exTable.setFormatter("pxfwritable_import");
 
-		createHawqTable(exTable);
+		hawq.createTableAndVerify(exTable);
 
 		hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY num1;");
 
-		compareTables(exTable, dataTable);
+		ComparisonUtils.compareTables(exTable, dataTable, report);
 	}
 
 	/**
@@ -597,12 +630,12 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		String avroSchemName = "regression/resources/regressPXFCustomAvro.avsc";
 
-		IAvroSchema[] avroData = (IAvroSchema[]) FileFormatsUtils.prepareData(new CustomrAvroReader(avroSchemName), 100, dataTable);
+		IAvroSchema[] avroData = (IAvroSchema[]) FileFormatsUtils.prepareData(new CustomAvroPreparer(avroSchemName), 100, dataTable);
 
-		hdfs.getFunc()
+		hdfs
 				.writeAvroFile((hdfsWorkingFolder + "/avro_in_avro.avro"), avroSchemName, avroData);
 
-		ReadbleExternalTable exTable = new ReadbleExternalTable("avfav", new String[] {
+		ReadableExternalTable exTable = new ReadableExternalTable("avfav", new String[] {
 				"tmp1  timestamp",
 				"num1  integer",
 				"num2  integer",
@@ -632,11 +665,11 @@ public class PxfHdfsRegression extends PxfTestCase {
 		exTable.setDataSchema("regressPXFCustomAvro.avsc");
 		exTable.setFormatter("pxfwritable_import");
 
-		createHawqTable(exTable);
+		hawq.createTableAndVerify(exTable);
 
 		hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY num1;");
 
-		compareTables(exTable, dataTable);
+		ComparisonUtils.compareTables(exTable, dataTable, report);
 	}
 
 	/**
@@ -648,17 +681,21 @@ public class PxfHdfsRegression extends PxfTestCase {
 	@Test
 	public void protocolBuffer() throws Exception {
 
-		File regResourcesFolder = new File("regression/resources/");
+		String protoBuffFile = (hdfsWorkingFolder + "/protobuf_data.tbl");
 
-		hdfs.getFunc()
-				.copyFromLocal(regResourcesFolder.getAbsolutePath() + "/protobuf_data.tbl", (hdfsWorkingFolder + "/protobuf_data.tbl"));
+		Table dataTable = new Table("dataTable", null);
 
-		ReadbleExternalTable exTable = new ReadbleExternalTable("pb", new String[] {
+		Object[] generatedMessages = FileFormatsUtils.prepareData(new CustomProtobuffPreparer(), 5, dataTable);
+
+		hdfs
+				.writeProtocolBufferFile(protoBuffFile, (GeneratedMessage) generatedMessages[0]);
+
+		ReadableExternalTable exTable = new ReadableExternalTable("pb", new String[] {
 				"s1 text",
 				"num1 int",
 				"s2 text",
 				"s3 text",
-				"num2 int" }, (hdfsWorkingFolder + "/protobuf_data.tbl"), "custom");
+				"num2 int" }, protoBuffFile, "custom");
 
 		exTable.setFragmenter("HdfsDataFragmenter");
 		exTable.setAccessor("ProtobufFileAccessor");
@@ -666,11 +703,11 @@ public class PxfHdfsRegression extends PxfTestCase {
 		exTable.setDataSchema("pbgp.desc");
 		exTable.setFormatter("pxfwritable_import");
 
-		createHawqTable(exTable);
+		hawq.createTableAndVerify(exTable);
 
 		hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY num1;");
 
-		// TODO: get protbuf into table and compare it
+		ComparisonUtils.compareTables(exTable, dataTable, report);
 	}
 
 	/**
@@ -681,25 +718,28 @@ public class PxfHdfsRegression extends PxfTestCase {
 	@Test
 	public void quotedLineBreak() throws Exception {
 
-		File localCsvFile = new File("regression/resources/small.csv");
+		String csvPath = hdfsWorkingFolder + "/small.csv";
 
-		hdfs.getFunc()
-				.copyFromLocal(localCsvFile.getAbsolutePath(), (hdfsWorkingFolder + "/small.csv"));
+		Table dataTable = new Table("dataTable", null);
 
-		exTable = new ReadbleExternalTable("small_csv", new String[] {
+		FileFormatsUtils.prepareData(new QuotedLineTextPreparer(), 1000, dataTable);
+
+		hdfs.writeTextFile(csvPath, dataTable.getData(), ",");
+
+		exTable = new ReadableExternalTable("small_csv", new String[] {
 				"num1 int",
 				"word text",
-				"num2 int" }, (hdfsWorkingFolder + "/small.csv"), "CSV");
+				"num2 int" }, csvPath, "CSV");
 
 		exTable.setFragmenter("HdfsDataFragmenter");
 		exTable.setAccessor("QuotedLineBreakAccessor");
 		exTable.setResolver("StringPassResolver");
 
-		createHawqTable(exTable);
+		hawq.createTableAndVerify(exTable);
 
 		hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY num1");
 
-		compareCsv(localCsvFile, exTable);
+		ComparisonUtils.compareTables(exTable, dataTable, report, "\"");
 	}
 
 	/**
@@ -713,12 +753,12 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		Table sudoDataTable = new Table("dataTable", null);
 
-		Object[] data = FileFormatsUtils.prepareData(new CustomSequenceReader(), 100, sudoDataTable);
+		Object[] data = FileFormatsUtils.prepareData(new CustomSequencePreparer(), 100, sudoDataTable);
 
-		hdfs.getFunc()
+		hdfs
 				.writeSequnceFile(data, (hdfsWorkingFolder + "/wildcard/my_writable_inside_sequence.tbl"));
 
-		ReadbleExternalTable exTable = new ReadbleExternalTable("seqwild", new String[] {
+		ReadableExternalTable exTable = new ReadableExternalTable("seqwild", new String[] {
 				"tmp1  timestamp",
 				"num1  integer",
 				"num2  integer",
@@ -755,11 +795,11 @@ public class PxfHdfsRegression extends PxfTestCase {
 		exTable.setDataSchema("CustomWritable");
 		exTable.setFormatter("pxfwritable_import");
 
-		createHawqTable(exTable);
+		hawq.createTableAndVerify(exTable);
 
 		hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY num1");
 
-		compareTables(exTable, sudoDataTable);
+		ComparisonUtils.compareTables(exTable, sudoDataTable, report);
 	}
 
 	/**
@@ -771,24 +811,18 @@ public class PxfHdfsRegression extends PxfTestCase {
 	@Test
 	public void sequenceWildcardsTabInName() throws Exception {
 
-		File regResourcesFolder = new File("regression/resources/");
-
 		Table sudoDataTable = new Table("dataTable", null);
-		
-		Object[] data = FileFormatsUtils.prepareData(new CustomSequenceReader(), 100, sudoDataTable);
-		
-		sudoDataTable.pumpUpTableData(2);
-		
-		hdfs.getFunc()
-		.writeSequnceFile(data, (hdfsWorkingFolder + "/wild/my_writable_inside_sequence1.tbl"));
-		
-		hdfs.getFunc()
-		.writeSequnceFile(data, (hdfsWorkingFolder + "/wild/my_writable_inside_sequence2.tbl"));
-		
-		//hdfs.getFunc()
-		//		.copyFromLocal(regResourcesFolder.getAbsolutePath() + "/writable_inside_sequence1.tbl", (hdfsWorkingFolder + "/wild/writable_inside_sequence.tbl"));
 
-		ReadbleExternalTable exTable = new ReadbleExternalTable("seqwild", new String[] {
+		Object[] data = FileFormatsUtils.prepareData(new CustomSequencePreparer(), 100, sudoDataTable);
+
+		sudoDataTable.pumpUpTableData(2);
+
+		hdfs.writeSequnceFile(data, (hdfsWorkingFolder + "/wild/my_writable_inside_sequence1.tbl"));
+
+		hdfs
+				.writeSequnceFile(data, (hdfsWorkingFolder + "/wild/my_writable_inside_sequence2.tbl"));
+
+		ReadableExternalTable exTable = new ReadableExternalTable("seqwild", new String[] {
 				"tmp1  timestamp",
 				"num1  integer",
 				"num2  integer",
@@ -825,11 +859,11 @@ public class PxfHdfsRegression extends PxfTestCase {
 		exTable.setDataSchema("CustomWritable");
 		exTable.setFormatter("pxfwritable_import");
 
-		createHawqTable(exTable);
+		hawq.createTableAndVerify(exTable);
 
 		hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY num1");
-		
-		compareTables(exTable, sudoDataTable);
+
+		ComparisonUtils.compareTables(exTable, sudoDataTable, report);
 	}
 
 	/**
@@ -841,7 +875,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 	@Test
 	public void negativeErrorInHostName() throws Exception {
 
-		ReadbleExternalTable exTable = new ReadbleExternalTable("host_err", new String[] {
+		ReadableExternalTable exTable = new ReadableExternalTable("host_err", new String[] {
 				"tmp1  timestamp",
 				"num1  integer", }, (hdfsWorkingFolder + "/multiblock.tbl"), "TEXT");
 
@@ -851,7 +885,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 		exTable.setResolver("StringPassResolver");
 		exTable.setDelimiter(",");
 
-		createHawqTable(exTable);
+		hawq.createTableAndVerify(exTable);
 
 		try {
 			hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY num1");
@@ -869,7 +903,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 	@Test
 	public void negativeErrorInPort() throws Exception {
 
-		ReadbleExternalTable exTable = new ReadbleExternalTable("port_err", new String[] {
+		ReadableExternalTable exTable = new ReadableExternalTable("port_err", new String[] {
 				"tmp1  timestamp",
 				"num1  integer", }, (hdfsWorkingFolder + "/multiblock.tbl"), "TEXT");
 
@@ -879,7 +913,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 		exTable.setResolver("StringPassResolver");
 		exTable.setDelimiter(",");
 
-		createHawqTable(exTable);
+		hawq.createTableAndVerify(exTable);
 
 		try {
 			hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY num1");
@@ -899,10 +933,10 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		File regResourcesFolder = new File("regression/resources/");
 
-		hdfs.getFunc()
+		hdfs
 				.copyFromLocal(regResourcesFolder.getAbsolutePath() + "/empty.tbl", (hdfsWorkingFolder + "/empty.tbl"));
 
-		ReadbleExternalTable exTable = new ReadbleExternalTable("empty", new String[] {
+		ReadableExternalTable exTable = new ReadableExternalTable("empty", new String[] {
 				"t1  text",
 				"a1  integer" }, (hdfsWorkingFolder + "/empty.tbl"), "custom");
 
@@ -912,11 +946,11 @@ public class PxfHdfsRegression extends PxfTestCase {
 		exTable.setDataSchema("CustomWritable");
 		exTable.setFormatter("pxfwritable_import");
 
-		createHawqTable(exTable);
+		hawq.createTableAndVerify(exTable);
 
 		hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY t1");
 
-		compareTables(exTable, new Table("emptySudoTable", null));
+		ComparisonUtils.compareTables(exTable, new Table("emptySudoTable", null), report);
 	}
 
 	/**
@@ -929,10 +963,10 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		File regResourcesFolder = new File("regression/resources/");
 
-		hdfs.getFunc()
+		hdfs
 				.copyFromLocal(regResourcesFolder.getAbsolutePath() + "/avroformat_inside_avrofile.avro", (hdfsWorkingFolder + "/avroformat_inside_avrofile.avro"));
 
-		ReadbleExternalTable exTable = new ReadbleExternalTable("avfav_analyze_good", new String[] {
+		ReadableExternalTable exTable = new ReadableExternalTable("avfav_analyze_good", new String[] {
 				"tmp1  timestamp",
 				"num1  integer",
 				"num2  integer",
@@ -962,7 +996,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 		exTable.setFormatter("pxfwritable_import");
 		exTable.setAnalyzer("HdfsAnalyzer");
 
-		createHawqTable(exTable);
+		hawq.createTableAndVerify(exTable);
 
 		verifyAnalyze(exTable);
 	}
@@ -977,10 +1011,10 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		File regResourcesFolder = new File("regression/resources/");
 
-		hdfs.getFunc()
+		hdfs
 				.copyFromLocal(regResourcesFolder.getAbsolutePath() + "/avroformat_inside_avrofile.avro", (hdfsWorkingFolder + "/avroformat_inside_avrofile.avro"));
 
-		ReadbleExternalTable exTable = new ReadbleExternalTable("avfav_analyze_bad_port", new String[] {
+		ReadableExternalTable exTable = new ReadableExternalTable("avfav_analyze_bad_port", new String[] {
 				"tmp1  timestamp",
 				"num1  integer",
 				"num2  integer",
@@ -1011,7 +1045,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 		exTable.setFormatter("pxfwritable_import");
 		exTable.setAnalyzer("HdfsAnalyzer");
 
-		createHawqTable(exTable);
+		hawq.createTableAndVerify(exTable);
 
 		ReportUtils.startLevel(report, getClass(), "verify that default stats remain after ANALYZE with GUC on");
 
@@ -1029,7 +1063,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		sudoResults.addRow(new String[] { "1" });
 
-		compareTables(analyzeResults, sudoResults);
+		ComparisonUtils.compareTables(analyzeResults, sudoResults, report);
 
 		ReportUtils.stopLevel(report);
 	}
@@ -1044,10 +1078,10 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		File regResourcesFolder = new File("regression/resources/");
 
-		hdfs.getFunc()
+		hdfs
 				.copyFromLocal(regResourcesFolder.getAbsolutePath() + "/avroformat_inside_avrofile.avro", (hdfsWorkingFolder + "/avroformat_inside_avrofile.avro"));
 
-		ReadbleExternalTable exTable = new ReadbleExternalTable("avfav_analyze_bad_class", new String[] {
+		ReadableExternalTable exTable = new ReadableExternalTable("avfav_analyze_bad_class", new String[] {
 				"tmp1  timestamp",
 				"num1  integer",
 				"num2  integer",
@@ -1077,7 +1111,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 		exTable.setFormatter("pxfwritable_import");
 		exTable.setAnalyzer("NoSuchAnalyzer");
 
-		createHawqTable(exTable);
+		hawq.createTableAndVerify(exTable);
 
 		ReportUtils.startLevel(report, getClass(), "verify that default stats remain after ANALYZE with GUC on");
 
@@ -1095,12 +1129,12 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		sudoResults.addRow(new String[] { "1" });
 
-		compareTables(analyzeResults, sudoResults);
+		ComparisonUtils.compareTables(analyzeResults, sudoResults, report);
 
 		ReportUtils.stopLevel(report);
 	}
 
-	private void verifyAnalyze(ReadbleExternalTable exTable) throws Exception {
+	private void verifyAnalyze(ReadableExternalTable exTable) throws Exception {
 
 		ReportUtils.startLevel(report, getClass(), "verify that default stats remain after ANALYZE with GUC off");
 
@@ -1116,7 +1150,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		sudoResults.addRow(new String[] { "1" });
 
-		compareTables(analyzeResults, sudoResults);
+		ComparisonUtils.compareTables(analyzeResults, sudoResults, report);
 
 		ReportUtils.stopLevel(report);
 
@@ -1129,7 +1163,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		hawq.queryResults(analyzeResults, "SELECT COUNT(*) FROM pg_class WHERE relname = '" + exTable.getName() + "' AND relpages != 1000 AND relpages > 0 AND reltuples != 1000000 AND reltuples > 0");
 
-		compareTables(analyzeResults, sudoResults);
+		ComparisonUtils.compareTables(analyzeResults, sudoResults, report);
 
 		ReportUtils.stopLevel(report);
 
@@ -1142,7 +1176,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		hawq.queryResults(analyzeResults, "SELECT COUNT(*) FROM pg_class WHERE relname = '" + exTable.getName() + "' AND relpages != 1000 AND relpages > 0 AND reltuples != 1000000 AND reltuples > 0");
 
-		compareTables(analyzeResults, sudoResults);
+		ComparisonUtils.compareTables(analyzeResults, sudoResults, report);
 
 		ReportUtils.stopLevel(report);
 	}

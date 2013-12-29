@@ -5,14 +5,15 @@ import java.io.File;
 import org.junit.Test;
 import org.postgresql.util.PSQLException;
 
-import com.pxf.infra.fixtures.PxfHiveFixture;
-import com.pxf.infra.hive.Hive;
-import com.pxf.infra.structures.tables.basic.Table;
-import com.pxf.infra.structures.tables.hive.HiveExternalTable;
-import com.pxf.infra.structures.tables.hive.HiveTable;
-import com.pxf.infra.structures.tables.pxf.ReadbleExternalTable;
-import com.pxf.infra.structures.tables.utils.TableFactory;
-import com.pxf.infra.utils.exception.ExceptionUtils;
+import com.pivotal.pxfauto.infra.hive.Hive;
+import com.pivotal.pxfauto.infra.structures.tables.basic.Table;
+import com.pivotal.pxfauto.infra.structures.tables.hive.HiveExternalTable;
+import com.pivotal.pxfauto.infra.structures.tables.hive.HiveTable;
+import com.pivotal.pxfauto.infra.structures.tables.pxf.ReadableExternalTable;
+import com.pivotal.pxfauto.infra.structures.tables.utils.TableFactory;
+import com.pivotal.pxfauto.infra.utils.exception.ExceptionUtils;
+import com.pivotal.pxfauto.infra.utils.tables.ComparisonUtils;
+import com.pxf.tests.fixtures.PxfHiveFixture;
 import com.pxf.tests.testcases.PxfTestCase;
 
 /**
@@ -24,7 +25,7 @@ public class PxfHiveRegression extends PxfTestCase {
 
 	HiveTable hiveTable;
 
-	ReadbleExternalTable hawqExternalTable;
+	ReadableExternalTable hawqExternalTable;
 
 	public PxfHiveRegression() {
 		setFixture(PxfHiveFixture.class);
@@ -61,7 +62,7 @@ public class PxfHiveRegression extends PxfTestCase {
 	 * @throws Exception
 	 */
 	@Test
-	public void premitiveTypes() throws Exception {
+	public void primitiveTypes() throws Exception {
 
 		hiveTable = TableFactory.getHivebyRowCommaTable("hive_types", new String[] {
 				"s1 string",
@@ -84,7 +85,7 @@ public class PxfHiveRegression extends PxfTestCase {
 
 		hive.queryResults(hiveTable, "SELECT * FROM " + hiveTable.getName() + " ORDER BY s1");
 
-		hawqExternalTable = TableFactory.getPxfHiveReadbleTable("hawq_types", new String[] {
+		hawqExternalTable = TableFactory.getPxfHiveReadableTable("hawq_types", new String[] {
 				"t1    text",
 				"t2    text",
 				"num1  integer",
@@ -93,13 +94,13 @@ public class PxfHiveRegression extends PxfTestCase {
 				"tm timestamp",
 				"r real",
 				"bg bigint",
-				"b boolean" }, hiveTable.getName());
+				"b boolean" }, hiveTable);
 
-		createHawqTable(hawqExternalTable);
+		hawq.createTableAndVerify(hawqExternalTable);
 
 		hawq.queryResults(hawqExternalTable, "SELECT * FROM " + hawqExternalTable.getName() + " ORDER BY t1");
 
-		compareTables(hiveTable, hawqExternalTable);
+		ComparisonUtils.compareTables(hiveTable, hawqExternalTable, report);
 	}
 
 	/**
@@ -116,17 +117,17 @@ public class PxfHiveRegression extends PxfTestCase {
 
 		hive.queryResults(hiveTable, "SELECT * FROM " + hiveTable.getName() + " ORDER BY t0");
 
-		hawqExternalTable = TableFactory.getPxfHiveReadbleTable("hv_seq", new String[] {
+		hawqExternalTable = TableFactory.getPxfHiveReadableTable("hv_seq", new String[] {
 				"t1    text",
 				"t2    text",
 				"num1  integer",
-				"dub1  double precision" }, hiveTable.getName());
+				"dub1  double precision" }, hiveTable);
 
-		createHawqTable(hawqExternalTable);
+		hawq.createTableAndVerify(hawqExternalTable);
 
 		hawq.queryResults(hawqExternalTable, "SELECT * FROM " + hawqExternalTable.getName() + " ORDER BY t1");
 
-		compareTables(hiveTable, hawqExternalTable);
+		ComparisonUtils.compareTables(hiveTable, hawqExternalTable, report);
 	}
 
 	/**
@@ -143,17 +144,17 @@ public class PxfHiveRegression extends PxfTestCase {
 
 		hive.queryResults(hiveTable, "SELECT * FROM " + hiveTable.getName() + " ORDER BY t0");
 
-		hawqExternalTable = TableFactory.getPxfHiveReadbleTable("hv_rc", new String[] {
+		hawqExternalTable = TableFactory.getPxfHiveReadableTable("hv_rc", new String[] {
 				"t1    text",
 				"t2    text",
 				"num1  integer",
-				"dub1  double precision" }, hiveTable.getName());
+				"dub1  double precision" }, hiveTable);
 
-		createHawqTable(hawqExternalTable);
+		hawq.createTableAndVerify(hawqExternalTable);
 
 		hawq.queryResults(hawqExternalTable, "SELECT * FROM " + hawqExternalTable.getName() + " ORDER BY t1");
 
-		compareTables(hiveTable, hawqExternalTable);
+		ComparisonUtils.compareTables(hiveTable, hawqExternalTable, report);
 	}
 
 	/**
@@ -170,17 +171,17 @@ public class PxfHiveRegression extends PxfTestCase {
 
 		hive.queryResults(hiveTable, "SELECT * FROM " + hiveTable.getName() + " ORDER BY t0");
 
-		hawqExternalTable = TableFactory.getPxfHiveReadbleTable("hv_orc", new String[] {
+		hawqExternalTable = TableFactory.getPxfHiveReadableTable("hv_orc", new String[] {
 				"t1    text",
 				"t2    text",
 				"num1  integer",
-				"dub1  double precision" }, hiveTable.getName());
+				"dub1  double precision" }, hiveTable);
 
-		createHawqTable(hawqExternalTable);
+		hawq.createTableAndVerify(hawqExternalTable);
 
 		hawq.queryResults(hawqExternalTable, "SELECT * FROM " + hawqExternalTable.getName() + " ORDER BY t1");
 
-		compareTables(hiveTable, hawqExternalTable);
+		ComparisonUtils.compareTables(hiveTable, hawqExternalTable, report);
 	}
 
 	/**
@@ -192,6 +193,9 @@ public class PxfHiveRegression extends PxfTestCase {
 	@Test
 	public void severalPartitions() throws Exception {
 
+		/**
+		 * Create used partition tables
+		 */
 		createSequenceHive();
 
 		createRcFileHive();
@@ -208,6 +212,7 @@ public class PxfHiveRegression extends PxfTestCase {
 
 		hive.dropTable(hiveTable);
 		hive.createTable(hiveTable);
+
 		hive.runQuery("ALTER TABLE " + hiveTable.getName() + " ADD PARTITION (fmt = 'txt') LOCATION 'hdfs:/hive/warehouse/reg_txt'");
 		hive.runQuery("ALTER TABLE " + hiveTable.getName() + " ADD PARTITION (fmt = 'rc') LOCATION 'hdfs:/hive/warehouse/reg_rc'");
 		hive.runQuery("ALTER TABLE " + hiveTable.getName() + " ADD PARTITION (fmt = 'seq') LOCATION 'hdfs:/hive/warehouse/reg_seq'");
@@ -217,29 +222,59 @@ public class PxfHiveRegression extends PxfTestCase {
 		hive.runQuery("ALTER TABLE  " + hiveTable.getName() + " PARTITION (fmt='orc') SET FILEFORMAT ORC");
 		hive.queryResults(hiveTable, "SELECT * FROM " + hiveTable.getName() + " ORDER BY fmt, t0");
 
-		hawqExternalTable = TableFactory.getPxfHiveReadbleTable("hv_heterogen", new String[] {
+		/**
+		 * Create HAWQ Table using Hive Hive profile
+		 */
+		ReadableExternalTable extTableUsingProfile = TableFactory.getPxfHiveReadableTable("hv_heterogen_uainf_profile", new String[] {
 				"t1    text",
 				"t2    text",
 				"num1  integer",
 				"dub1  double precision",
-				"t3 text" }, hiveTable.getName());
+				"t3 text" }, hiveTable);
 
-		createHawqTable(hawqExternalTable);
+		hawq.createTableAndVerify(extTableUsingProfile);
 
-		hawq.queryResults(hawqExternalTable, "SELECT * FROM " + hawqExternalTable.getName() + " ORDER BY t3, t1");
+		/**
+		 * Create HAWQ table with not using profiles
+		 */
+		ReadableExternalTable extTableNoProfile = new ReadableExternalTable("hv_heterogen_no_profile", new String[] {
+				"t1    text",
+				"t2    text",
+				"num1  integer",
+				"dub1  double precision",
+				"t3 text" }, hiveTable.getName(), "custom");
 
-		compareTables(hiveTable, hawqExternalTable);
+		extTableNoProfile.setFormatter("pxfwritable_import");
+		extTableNoProfile.setFragmenter("HiveDataFragmenter");
+		extTableNoProfile.setAccessor("HiveAccessor");
+		extTableNoProfile.setResolver("HiveResolver");
 
-		hawq.runQuery("ANALYZE " + hawqExternalTable.getName());
+		hawq.createTableAndVerify(extTableNoProfile);
 
+		hawq.queryResults(extTableUsingProfile, "SELECT * FROM " + extTableUsingProfile.getName() + " ORDER BY t3, t1");
+		hawq.queryResults(extTableNoProfile, "SELECT * FROM " + extTableNoProfile.getName() + " ORDER BY t3, t1");
+
+		ComparisonUtils.compareTables(hiveTable, extTableUsingProfile, report);
+		ComparisonUtils.compareTables(hiveTable, extTableNoProfile, report);
+
+		/**
+		 * Perform Analyze on two kind of external tables and check suitable
+		 * Warnings.
+		 */
+		hawq.runQueryWithExpectedWarning("ANALYZE " + extTableUsingProfile.getName(), "PXF 'Analyzer' class was not found. Please supply it in the LOCATION clause or use it in a PXF profile in order to run ANALYZE on this table", true);
+		hawq.runQueryWithExpectedWarning("ANALYZE " + extTableNoProfile.getName(), "no ANALYZER or PROFILE option in table definition", true);
+
+		/**
+		 * Check the default analyze results still exists
+		 */
 		Table analyzeResultsTable = new Table("pg_class", null);
 
-		hawq.queryResults(analyzeResultsTable, "SELECT relpages, reltuples FROM " + analyzeResultsTable.getName() + " WHERE relname = '" + hawqExternalTable.getName() + "'");
+		hawq.queryResults(analyzeResultsTable, "SELECT relpages, reltuples FROM " + analyzeResultsTable.getName() + " WHERE relname = '" + extTableUsingProfile.getName() + "'");
 
 		Table dataSudoTable = new Table("sudoTable", null);
 		dataSudoTable.addRow(new String[] { "1000", "1000000" });
 
-		compareTables(analyzeResultsTable, dataSudoTable);
+		ComparisonUtils.compareTables(analyzeResultsTable, dataSudoTable, report);
 	}
 
 	/**
@@ -274,7 +309,7 @@ public class PxfHiveRegression extends PxfTestCase {
 
 		hive.queryResults(hiveTable, "SELECT * FROM " + hiveTable.getName() + " ORDER BY s1");
 
-		hawqExternalTable = TableFactory.getPxfHiveReadbleTable("hv_collections", new String[] {
+		hawqExternalTable = TableFactory.getPxfHiveReadableTable("hv_collections", new String[] {
 				"t1    text",
 				"f1    real",
 				"t2    text",
@@ -287,13 +322,13 @@ public class PxfHiveRegression extends PxfTestCase {
 				"t7    text",
 				"t8    text",
 				"t9    text",
-				"num1  integer" }, hiveTable.getName());
+				"num1  integer" }, hiveTable);
 
-		createHawqTable(hawqExternalTable);
+		hawq.createTableAndVerify(hawqExternalTable);
 
 		hawq.queryResults(hawqExternalTable, "SELECT * FROM " + hawqExternalTable.getName() + " ORDER BY t1");
 
-		compareTables(hiveTable, hawqExternalTable);
+		ComparisonUtils.compareTables(hiveTable, hawqExternalTable, report);
 	}
 
 	/**
@@ -308,9 +343,9 @@ public class PxfHiveRegression extends PxfTestCase {
 
 		hive.runQuery("CREATE VIEW reg_txt_view AS SELECT s1 FROM reg_txt");
 
-		hawqExternalTable = TableFactory.getPxfHiveReadbleTable("hv_view", new String[] { "t1 text" }, "reg_txt_view");
+		hawqExternalTable = TableFactory.getPxfHiveReadableTable("hv_view", new String[] { "t1 text" }, new HiveTable("reg_txt_view", null));
 
-		createHawqTable(hawqExternalTable);
+		hawq.createTableAndVerify(hawqExternalTable);
 
 		try {
 
@@ -338,16 +373,16 @@ public class PxfHiveRegression extends PxfTestCase {
 
 		hive.queryResults(hiveTable, "SELECT * FROM " + hiveTable.getName() + " ORDER BY s1");
 
-		hawqExternalTable = TableFactory.getPxfHiveReadbleTable("hv_index", new String[] {
+		hawqExternalTable = TableFactory.getPxfHiveReadableTable("hv_index", new String[] {
 				"t1 text",
 				"t2 text",
-				"t3 bigint" }, hiveTable.getName());
+				"t3 bigint" }, hiveTable);
 
-		createHawqTable(hawqExternalTable);
+		hawq.createTableAndVerify(hawqExternalTable);
 
 		hawq.queryResults(hawqExternalTable, "SELECT * FROM " + hawqExternalTable.getName() + " ORDER BY t1");
 
-		compareTables(hiveTable, hawqExternalTable);
+		ComparisonUtils.compareTables(hiveTable, hawqExternalTable, report);
 	}
 
 	private void createSequenceHive() throws Exception {

@@ -1,8 +1,7 @@
 <sut>
 
 	<cluster>
-		<class>com.pxf.infra.cluster.SingleCluster</class>
-
+		<class>com.pivotal.pxfauto.infra.cluster.SingleCluster</class>
 		<host>localhost</host>
 		<userName>koazu</userName>
 		<password>20Aug20!#</password>
@@ -10,16 +9,17 @@
 	</cluster>
 
 	<hawq>
-		<class>com.pxf.infra.hawq.Hawq</class>
+		<class>com.pivotal.pxfauto.infra.hawq.Hawq</class>
 		<host>localhost</host>
 		<sshUserName>koazu</sshUserName>
 		<sshPassword>20Aug20!#</sshPassword>
 		<db>pxf_regression</db>
+		<gphome>$GPHOME</gphome>
 	</hawq>
 
 
 	<hdfs>
-		<class>com.pxf.infra.hdfs.Hdfs</class>
+		<class>com.pivotal.pxfauto.infra.hdfs.Hdfs</class>
 		<host>localhost</host>
 		<port>8020</port>
 		<workingDirectory>pxf_regression_data</workingDirectory>
@@ -30,14 +30,24 @@
 	</hdfs>
 
 	<hbase>
-		<class>com.pxf.infra.hbase.HBase</class>
+		<class>com.pivotal.pxfauto.infra.hbase.HBase</class>
 		<host>localhost</host>
 	</hbase>
 
 	<hive>
-		<class>com.pxf.infra.hive.Hive</class>
+		<class>com.pivotal.pxfauto.infra.hive.Hive</class>
 		<host>localhost</host>
 		<port>10004</port>
 	</hive>
+
+	<tinc>
+		<class>com.pivotal.pxfauto.infra.tinc.Tinc</class>
+		<host>localhost</host>
+		<userName>koazu</userName>
+		<password>20Aug20!#</password>
+		<gphome>$GPHOME</gphome>
+		<tincFolder>/Users/koazu/work/workspace/tinc/main</tincFolder>
+		<tincTestsFolder>/Users/koazu/work/workspace/tincrepo/main</tincTestsFolder>
+	</tinc>
 
 </sut>

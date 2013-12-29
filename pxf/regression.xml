@@ -77,12 +77,6 @@
 
 		<fileset dir="${basedir}/lib" includes="**/*.jar" />
 
-		<fileset dir="${env.HADOOP_ROOT}/share/hadoop/hdfs" includes="hadoop-hdfs*.jar" />
-		<fileset dir="${env.HADOOP_ROOT}/share/hadoop/hdfs/lib" includes="**/*.jar" />
-		<fileset dir="${env.HBASE_ROOT}" includes="*.jar" />
-		<fileset dir="${env.HIVE_ROOT}/lib" includes="**/*.jar" />
-		<fileset dir="${env.HADOOP_ROOT}/share/hadoop/common" includes="**/*hadoop-*.jar" />
-
 	</path>
 
 	<target name="init" description="Build initialization">
@@ -90,7 +84,8 @@
 
 	<!-- Cleanup -->
 	<target name="clean">
-		<delete dir="${build.dir}" />
+		<delete dir="${lib.dir}" />
+		<delete dir="${dist.dir}" />
 	</target>
 
 	<!-- Compilation -->
@@ -154,8 +149,8 @@
 
 
 	<target name="run-tests" depends="compile" description="Run regression-tests">
-		<echo message="Run Regression Batch: com/pxf/tests/basic/${testClass}.class">
-		</echo>
+		<echo message="Run Regression Batch: com/pxf/tests/basic/${testClass}.class" />
+		<taskdef resource="net/sf/antcontrib/antcontrib.properties" />
 		<mkdir dir="${testreports.dir}" />
 		<junit printsummary="yes" fork="yes" haltonfailure="yes" showoutput="yes">
 
@@ -164,7 +159,6 @@
 				<pathelement location="${build.dir}/regression/classes" />
 				<pathelement location="${src.dir}" />
 				<pathelement location="${src.dir}/resources" />
-				<pathelement location="${env.HADOOP_ROOT}/etc/hadoop" />
 
 				<fileset dir="${lib.dir}">
 					<include name="**/*.jar" />
@@ -172,16 +166,6 @@
 				<fileset dir="${basedir}/lib">
 					<include name="**/*.jar" />
 				</fileset>
-
-				<fileset dir="${env.HADOOP_ROOT}/share/hadoop/hdfs" includes="hadoop-hdfs*.jar" />
-				<fileset dir="${env.HADOOP_ROOT}/share/hadoop/hdfs/lib" includes="**/*.jar" />
-				<fileset dir="${env.HADOOP_ROOT}/share/hadoop/mapreduce" includes="**/*.jar" />
-				<fileset dir="${env.HADOOP_ROOT}/share/hadoop/yarn" includes="*.jar" />
-				<fileset dir="${env.HBASE_ROOT}" includes="*.jar" />
-				<fileset dir="${env.HIVE_ROOT}/lib" includes="**/*.jar" />
-				<fileset dir="${env.HADOOP_ROOT}/share/hadoop/common" includes="**/*hadoop-*.jar" />
-				<fileset dir="${env.ZOOKEEPER_ROOT}" includes="*.jar" />
-
 
 			</classpath>
 
@@ -196,5 +180,40 @@
 			</batchtest>
 
 		</junit>
+	</target>
+
+
+	<target name="execute.test">
+
+		<!-- we need to have relative path -->
+		<pathconvert property="test.source.relative">
+			<fileset file="${test.source.absolute}" />
+			<map from="${test.sources}/" to="" />
+		</pathconvert>
+
+		<!-- run one particular test -->
+		<junit fork="true" printsummary="true">
+
+			<classpath>
+				<path refid="${test.classes}" />
+			</classpath>
+
+			<formatter type="xml" />
+
+			<batchtest todir="${test.reports}">
+				<fileset dir="${test.sources}">
+					<filename name="${test.source.relative}" />
+				</fileset>
+			</batchtest>
+		</junit>
+
+		<foreach target="execute.test" maxthreads="5" inheritall="true" inheritrefs="true" parallel="true" param="test.source.absolute">
+			<path>
+				<fileset dir="${test.sources}">
+					<include name="**/*.java" />
+				</fileset>
+			</path>
+		</foreach>
+
 	</target>
 </project>
