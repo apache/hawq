@@ -140,7 +140,7 @@ display_dependent_vers:
 ## ----------------------------------------------------------------------
 
 opt_write_test:
-	@if [ ! -w /opt ]; then \
+	@if [ ! -e /opt/releng -o ! -w /opt/releng ] && [ ! -w /opt ]; then \
 	    echo ""; \
 	    echo "======================================================================"; \
 	    echo "ERROR: /opt is not writable."; \
