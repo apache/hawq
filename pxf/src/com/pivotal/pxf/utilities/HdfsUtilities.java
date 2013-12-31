@@ -1,5 +1,12 @@
 package com.pivotal.pxf.utilities;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -8,6 +15,7 @@ import org.apache.hadoop.io.compress.BZip2Codec;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.CompressionCodecFactory;
 import org.apache.hadoop.io.compress.SplittableCompressionCodec;
+import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.util.ReflectionUtils;
 
 /*
@@ -114,5 +122,64 @@ public class HdfsUtilities
 		}
 		
 		return true;
+	}
+	
+	
+	/**
+	 * Prepare byte serialization of a file split information 
+	 * (start, length, hosts) using {@link ObjectOutputStream}.
+	 * 
+	 * @param fsp file split to be serialized
+	 * @return byte serialization of fsp
+	 * @throws IOException 
+	 */
+	public static byte[] prepareFragmentMetadata(FileSplit fsp) throws IOException {
+		ByteArrayOutputStream byteArrayStream = new ByteArrayOutputStream();
+		ObjectOutputStream objectStream = new ObjectOutputStream(byteArrayStream);
+		objectStream.writeLong(fsp.getStart());
+		objectStream.writeLong(fsp.getLength());
+		objectStream.writeObject(fsp.getLocations());
+		
+		byte[] serializedFragmentMetadata = byteArrayStream.toByteArray();
+		return serializedFragmentMetadata;
+	}
+	
+	/**
+	 * Parse fragment metadata and return matching {@link FileSplit} 
+	 * @param inputData request input data
+	 * @return FileSplit with fragment metadata
+	 */
+	public static FileSplit parseFragmentMetadata(InputData inputData) {
+		
+		try {
+			
+			byte[] serializedLocation = inputData.getFragmentMetadata();
+			if (serializedLocation == null) {
+				throw new IllegalArgumentException("Missing fragment location information");
+			}
+
+			ByteArrayInputStream bytesStream = new ByteArrayInputStream(serializedLocation);
+			ObjectInputStream objectStream = new ObjectInputStream(bytesStream);
+
+			long start = objectStream.readLong();
+			long end = objectStream.readLong();
+
+			String[] hosts = (String[])objectStream.readObject();
+
+			FileSplit fileSplit = new FileSplit(new Path(inputData.path()),
+			                                    start,
+			                                    end,
+			                                    hosts);
+			
+			Log.debug("parsed file split: path " + inputData.path() +
+			          ", start " + start + ", end " + end +
+			          ", hosts " + ArrayUtils.toString(hosts));
+			
+			return fileSplit;
+			
+		} catch (Exception e)
+		{
+			throw new RuntimeException("Exception while reading expected fragment metadata", e);
+		}
 	}
 }

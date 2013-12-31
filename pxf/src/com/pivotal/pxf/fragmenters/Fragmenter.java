@@ -11,6 +11,11 @@ import com.pivotal.pxf.utilities.Plugin;
  */
 public abstract class Fragmenter extends Plugin
 {
+	/**
+	 * Delimiter between fragment location elements
+	 */
+	public static final String FRAGMENTER_LOCATION_DELIM = "!FLD!";
+	
 	protected FragmentsOutput fragments;
 	
 	public Fragmenter(InputData metaData)

@@ -18,7 +18,7 @@ import org.apache.commons.logging.LogFactory;
 
 class Version
 {
-	final static String PXF_PROTOCOL_VERSION = "v8";
+	final static String PXF_PROTOCOL_VERSION = "v9";
 }
 
 /*

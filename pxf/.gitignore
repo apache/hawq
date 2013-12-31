@@ -4,3 +4,4 @@ build
 /jsystem.properties.bu
 /.classpath
 /.testdir.tmp
+/bin

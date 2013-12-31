@@ -78,19 +78,19 @@ DROP EXTERNAL TABLE mbt;
 -- Test extensibility - read
 --
 CREATE EXTERNAL TABLE extens(num1   integer,
-                            t1      text,
-                            num2    integer)
+                             t1      text,
+                             num2    integer)
 LOCATION ('pxf://@hostname@:50070/regression_location?FRAGMENTER=DummyFragmenter&ACCESSOR=DummyAccessor&RESOLVER=DummyResolver&ANALYZER=DummyAnalyzer')
 FORMAT 'custom' (formatter = 'pxfwritable_import');
-SELECT num1, t1 FROM extens ORDER BY num1;
- num1 |  t1  
-------+------
-    0 | text
-    0 | text
-    0 | text
-    1 | text
-    1 | text
-    1 | text
+SELECT num1, t1 FROM extens ORDER BY num1, t1;
+ num1 |    t1     
+------+-----------
+    0 | fragment1
+    0 | fragment2
+    0 | fragment3
+    1 | fragment1
+    1 | fragment2
+    1 | fragment3
 (6 rows)
 
 ANALYZE extens;

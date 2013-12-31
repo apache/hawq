@@ -60,7 +60,7 @@ void build_http_header(PxfInputData *input)
 	churl_headers_append(headers, "X-GP-URL-HOST", gphduri->host);
 	churl_headers_append(headers, "X-GP-URL-PORT", gphduri->port);
 	churl_headers_append(headers, "X-GP-DATA-DIR", gphduri->data);
-	
+
 	/* location options */
 	add_location_options_httpheader(headers, gphduri);
 	

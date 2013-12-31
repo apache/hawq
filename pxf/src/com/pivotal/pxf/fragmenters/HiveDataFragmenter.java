@@ -29,6 +29,7 @@ import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.transport.TSocket;
 import org.apache.thrift.transport.TTransportException;
 
+import com.pivotal.pxf.utilities.HdfsUtilities;
 import com.pivotal.pxf.utilities.InputData;
 
 /*
@@ -319,10 +320,13 @@ public class HiveDataFragmenter extends Fragmenter
 		for (InputSplit split : splits)
 		{	
 			FileSplit fsp = (FileSplit)split;
+			String[] hosts = fsp.getLocations();
 			String filepath = fsp.getPath().toUri().getPath();
-			filepath = filepath.substring(1); // TODO - remove the '/' from the beginning - will deal with this next 
+			filepath = filepath.substring(1); // TODO - remove the '/' from the beginning - will deal with this next
 			
-			fragments.addFragment(filepath, fsp.getLocations(), makeUserData(tablePartition));
+			byte[] locationInfo = HdfsUtilities.prepareFragmentMetadata(fsp);
+			
+			fragments.addFragment(filepath, hosts, locationInfo, makeUserData(tablePartition));
 		}
 	}
 	

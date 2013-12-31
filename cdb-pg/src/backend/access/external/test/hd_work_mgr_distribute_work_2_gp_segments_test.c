@@ -574,7 +574,6 @@ spread_fragments_in_cluster(int number_of_fragments,
 {
 	int first_host, target_host;
 	List* fragments_list = NIL;
-	DataFragment* fragment = NULL;
 	StringInfoData string_info;
 	initStringInfo(&string_info);
 	
@@ -592,15 +591,18 @@ spread_fragments_in_cluster(int number_of_fragments,
 		
 		for (int j = 0; j < replication_factor; ++j)
 		{
-			FragmentLocation* floc = (FragmentLocation*)palloc0(sizeof(FragmentLocation));
+			FragmentHost* fhost = (FragmentHost*)palloc0(sizeof(FragmentHost));
 			appendStringInfo(&string_info, cluster[target_host]);
-			floc->ip = pstrdup(string_info.data);
+			fhost->ip = pstrdup(string_info.data);
 			resetStringInfo(&string_info);
-			fragment->locations = lappend(fragment->locations, floc);
+			fragment->replicas = lappend(fragment->replicas, fhost);
 			
 			target_host = ((j + i + first_host) % number_of_hosts);
 		}
-		assert_int_equal(list_length(fragment->locations), replication_factor);
+		assert_int_equal(list_length(fragment->replicas), replication_factor);
+		appendStringInfo(&string_info, "metadata %d", i);
+		fragment->fragment_md = pstrdup(string_info.data);
+		resetStringInfo(&string_info);
 		appendStringInfo(&string_info, "user data %d", i);
 		fragment->user_data = pstrdup(string_info.data);
 		resetStringInfo(&string_info);

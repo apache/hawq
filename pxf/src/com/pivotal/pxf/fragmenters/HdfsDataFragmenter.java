@@ -1,6 +1,8 @@
 package com.pivotal.pxf.fragmenters;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -10,6 +12,7 @@ import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 
+import com.pivotal.pxf.utilities.HdfsUtilities;
 import com.pivotal.pxf.utilities.PxfInputFormat;
 import com.pivotal.pxf.utilities.InputData;
 
@@ -49,22 +52,31 @@ public class HdfsDataFragmenter extends Fragmenter
 		for (InputSplit split : splits)
 		{	
 			FileSplit fsp = (FileSplit)split;
+			
 			/*
 			 * HD-2547: If the file is empty, an empty split is returned:
 			 * no locations and no length.
 			 */
 			if (fsp.getLength() <= 0)
 				continue;
-			
+					
 			String filepath = fsp.getPath().toUri().getPath();
+			String[] hosts = fsp.getLocations();
+			
+			/*
+			 * metadata information includes: file split's
+			 * start, length and hosts (locations).
+			 */
+			byte[] fragmentMetadata = HdfsUtilities.prepareFragmentMetadata(fsp);
+
 			filepath = filepath.substring(1); // hack - remove the '/' from the beginning - we'll deal with this next 
 			
-			fragments.addFragment(filepath, fsp.getLocations());
+			fragments.addFragment(filepath, hosts, fragmentMetadata);
 		}
 		
 		return fragments;
 	}
-	
+
 	private InputSplit[] getSplits(Path path) throws IOException 
 	{
 		PxfInputFormat fformat = new PxfInputFormat(jobConf);

@@ -1,8 +1,14 @@
 package com.pivotal.pxf.accessors;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.*;
-import static org.junit.Assert.assertFalse;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.client.Scan;
 import org.junit.After;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -12,20 +18,6 @@ import org.powermock.modules.junit4.PowerMockRunner;
 
 import com.pivotal.pxf.utilities.HBaseTupleDescription;
 import com.pivotal.pxf.utilities.InputData;
-
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.client.HTable;
-import org.apache.hadoop.hbase.client.Scan;
-import org.apache.hadoop.hbase.HConstants;
-import org.apache.hadoop.hbase.HRegionInfo;
-import org.apache.hadoop.hbase.ServerName;
-
-import java.util.NavigableMap;
-import java.util.Set;
-import java.util.Iterator;
-import java.util.ArrayList;
-import java.util.TreeMap;
 
 @RunWith(PowerMockRunner.class)
 @PrepareForTest({HBaseAccessor.class, HBaseConfiguration.class})
@@ -80,60 +72,26 @@ public class HBaseAccessorTest
 	 * Verify Scan object doesn't contain any columns / filters
 	 * Verify scan did not start
 	 */
-    public void tableHasNoRegions() throws Exception
+    public void tableHasNoMetadata() throws Exception
 	{
 		prepareConstruction();
 		prepareTableOpen();
 		prepareEmptyScanner();
 
-		NavigableMap<HRegionInfo, ServerName> emptyRegionsMap = new TreeMap<HRegionInfo, ServerName>();
-		when(table.getRegionLocations()).thenReturn(emptyRegionsMap);
-
+		when(inputData.getFragmentMetadata()).thenReturn(null);
+		
 		accessor = new HBaseAccessor(inputData);
-
-		assertFalse(accessor.openForRead());
+		
+		try {
+			accessor.openForRead();
+			fail("should throw no metadata exception");
+		} 
+		catch (Exception e) {
+			assertEquals("Missing fragment metadata information", e.getMessage());
+		}
 
 		verifyScannerDidNothing();
 	}
-
-    @Test
-	@SuppressWarnings("unchecked")
-	/*
-	 * Test Open returns false when fragment list doesn't contain
-	 * any of the regions in the table
-	 *
-	 * Done by faking 3 items on the list (iterator.hasNext()
-	 * returns true, true, true, false)
-	 * To avoid creation of real HRegionInfo and ServerName, 
-	 * Map, Set and Iterator are faked
-	 *
-	 * Verify mockFragments.contains was called 3 times
-	 */
-	public void noRegionsInFragmentsList() throws Exception
-	{
-		prepareConstruction();
-		prepareTableOpen();
-		prepareEmptyScanner();
-
-		NavigableMap fakeRegionsMap = mock(NavigableMap.class);
-		Set fakeRegionsSet = mock(Set.class);
-		Iterator fakeIterator = mock(Iterator.class);
-		// fake 3 items
-		when(fakeIterator.hasNext()).thenReturn(true, true, true, false);
-
-		when(table.getRegionLocations()).thenReturn(fakeRegionsMap);
-		when(fakeRegionsMap.keySet()).thenReturn(fakeRegionsSet);
-		when(fakeRegionsSet.iterator()).thenReturn(fakeIterator);
-
-		// fragments list doesn't contain any region
-		when(inputData.getDataFragment()).thenReturn(-1);
-
-		accessor = new HBaseAccessor(inputData);
-		assertFalse(accessor.openForRead());
-
-		verifyScannerDidNothing();
-
-    }
 
 	/*
 	 * Helper for test setup. 

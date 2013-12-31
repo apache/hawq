@@ -1,6 +1,8 @@
 package com.pivotal.pxf.accessors;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NavigableMap;
@@ -28,7 +30,7 @@ import com.pivotal.pxf.utilities.Plugin;
  * This class is responsible for opening the HBase table requested and
  * for iterating over its relevant fragments(regions) to return the relevant table's rows.
  *
- * The table is divided into several splits. Each GP segment is responsible for
+ * The table is divided into several splits. Each HAWQ segment is responsible for
  * several splits according to the split function selectTableSplits().
  * For each region, a Scan object is used to describe the requested rows.
  *
@@ -124,24 +126,26 @@ public class HBaseAccessor extends Plugin implements IReadAccessor
 	 * It is assumed, |startKeys| == |endKeys|
 	 * This assumption is made through HBase's code as well
 	 */
-	private void selectTableSplits() throws IOException
-	{
-		NavigableMap<HRegionInfo, ServerName> regions = table.getRegionLocations();
-		int i = 0;
+	private void selectTableSplits() {
 
-		int fragment = inputData.getDataFragment();
+		
+		byte[] serializedMetadata = inputData.getFragmentMetadata();
+		if (serializedMetadata == null) {
+			throw new IllegalArgumentException("Missing fragment metadata information");
+		}
+		try {
+			ByteArrayInputStream bytesStream = new ByteArrayInputStream(serializedMetadata);
+			ObjectInputStream objectStream = new ObjectInputStream(bytesStream);
 
-		for (HRegionInfo region : regions.keySet())
+			byte[] startKey = (byte[])objectStream.readObject();
+			byte[] endKey = (byte[])objectStream.readObject();
+
+			if (withinScanRange(startKey, endKey))
+				splits.add(new SplitBoundary(startKey, endKey));
+
+		} catch (Exception e)
 		{
-			if (fragment == i)
-			{
-				byte[] startKey = region.getStartKey();
-				byte[] endKey = region.getEndKey();
-
-				if (withinScanRange(startKey, endKey))
-					splits.add(new SplitBoundary(startKey, endKey));
-			}
-			++i;
+			throw new RuntimeException("Exception while reading expected fragment metadata", e);
 		}
 	}
 

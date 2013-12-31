@@ -32,6 +32,7 @@ typedef struct sAllocatedDataFragment
 	int   rest_port;
 	int   index; /* index per source name */
 	char *source_name; /* source name */
+	char *fragment_md; /* fragment meta data */
 	char *user_data; /* additional user data */
 } AllocatedDataFragment;
 
@@ -42,7 +43,7 @@ typedef struct sAllocatedDataFragment
  * Example: Let's say we have 10 blocks, and all 10 blocks are replicated on 2 data
  * nodes. Meaning dn0 has a copy of each one of the the 10 blocks and also dn1 
  * has a copy of each one of the 10 blocks. We wouldn't like to process the whole 
- * 10 blocks only on dn0 or only on dn1. What we would like to achive, is that 
+ * 10 blocks only on dn0 or only on dn1. What we would like to achieve, is that
  * blocks 0 - 4 are processed on dn0 and blocks 5 - 9 are processed in dn1.
  * sDatanodeProcessingLoad is used to achieve this.
  */
@@ -88,7 +89,7 @@ static void assign_rest_ports_to_fragments(ClientContext *client_context, GPHDUr
 static void init_client_context(ClientContext *client_context);
 static GPHDUri* init(char* uri, ClientContext* cl_context);
 static List* allocate_fragments_to_datanodes(List *whole_data_fragments_list);
-static DatanodeProcessingLoad* get_dn_processing_load(List **allDNProcessingLoads, FragmentLocation *fragment_loc);
+static DatanodeProcessingLoad* get_dn_processing_load(List **allDNProcessingLoads, FragmentHost *fragment_host);
 static void print_data_nodes_allocation(List *allDNProcessingLoads, int total_data_frags);
 static List* do_segment_clustering_by_host(void);
 static ListCell* pick_random_cell_in_list(List* list);
@@ -195,13 +196,13 @@ static void assign_remote_port_to_fragments(int remote_rest_port, List *fragment
 	
 	foreach(frag_c, fragments)
 	{
-		ListCell 		*loc_c 		= NULL;
+		ListCell 		*host_c 		= NULL;
 		DataFragment 	*fragdata	= (DataFragment*)lfirst(frag_c);
 		
-		foreach(loc_c, fragdata->locations)
+		foreach(host_c, fragdata->replicas)
 		{
-			FragmentLocation *fraglocs = (FragmentLocation*)lfirst(loc_c);
-			fraglocs->rest_port = remote_rest_port;
+			FragmentHost *fraghost = (FragmentHost*)lfirst(host_c);
+			fraghost->rest_port = remote_rest_port;
 		}
 	}	
 }
@@ -618,8 +619,8 @@ print_data_nodes_allocation(List *allDNProcessingLoads, int total_data_frags)
 		foreach (data_frag_cell, dn->datanodeBlocks)
 		{
 			AllocatedDataFragment *frag = (AllocatedDataFragment*)lfirst(data_frag_cell);
-			appendStringInfo(&msg, "file name: %s, split index: %d, dn host: %s, dn port: %d\n", 
-							 frag->source_name, frag->index, frag->host, frag->rest_port);
+			appendStringInfo(&msg, "file name: %s, split index: %d, dn host: %s, dn port: %d, fragment_md: %s\n",
+							 frag->source_name, frag->index, frag->host, frag->rest_port, frag->fragment_md);
 		}
 		elog(FRAGDEBUG, "%s", msg.data);
 		resetStringInfo(&msg);
@@ -637,7 +638,7 @@ allocate_fragments_to_datanodes(List *whole_data_fragments_list)
 	List* allDNProcessingLoads = NIL;
 	AllocatedDataFragment* allocated = NULL;
 	ListCell *cur_frag_cell = NULL;
-	ListCell *fragment_location_cell = NULL;
+	ListCell *fragment_host_cell = NULL;
 		
 	foreach(cur_frag_cell, whole_data_fragments_list)
 	{
@@ -651,10 +652,10 @@ allocate_fragments_to_datanodes(List *whole_data_fragments_list)
 		 * the least number of blocks. The number of processing blocks for each dn is
 		 * held in the list allDNProcessingLoads
 		 */
-		foreach(fragment_location_cell, fragment->locations)
+		foreach(fragment_host_cell, fragment->replicas)
 		{
-			FragmentLocation *loc = lfirst(fragment_location_cell);
-			DatanodeProcessingLoad* loc_dn = get_dn_processing_load(&allDNProcessingLoads, loc);
+			FragmentHost *host = lfirst(fragment_host_cell);
+			DatanodeProcessingLoad* loc_dn = get_dn_processing_load(&allDNProcessingLoads, host);
 			loc_dn->num_fragments_residing++;
 			if (!previous_dn)
 				previous_dn = loc_dn;
@@ -680,6 +681,7 @@ create_allocated_fragment(DataFragment *fragment)
 	AllocatedDataFragment* allocated = palloc0(sizeof(AllocatedDataFragment));
 	allocated->index = fragment->index; /* index per source */
 	allocated->source_name = pstrdup(fragment->source_name);
+	allocated->fragment_md = (fragment->fragment_md) ? pstrdup(fragment->fragment_md) : NULL;
 	allocated->user_data = (fragment->user_data) ? pstrdup(fragment->user_data) : NULL;
 	return allocated;
 }
@@ -689,7 +691,7 @@ create_allocated_fragment(DataFragment *fragment)
  * If this fragment's datanode is not represented in the allDNProcessingLoads, we will create a DatanodeProcessingLoad
  * structure for this fragment's datanode and, and add this new structure to allDNProcessingLoads
  */
-static DatanodeProcessingLoad* get_dn_processing_load(List **allDNProcessingLoads, FragmentLocation *fragment_loc)
+static DatanodeProcessingLoad* get_dn_processing_load(List **allDNProcessingLoads, FragmentHost *fragment_host)
 {
 	ListCell *dn_blocks_cell = NULL;
 	DatanodeProcessingLoad *dn_found = NULL;
@@ -697,8 +699,8 @@ static DatanodeProcessingLoad* get_dn_processing_load(List **allDNProcessingLoad
 	foreach(dn_blocks_cell, *allDNProcessingLoads)
 	{
 		DatanodeProcessingLoad *dn_blocks = (DatanodeProcessingLoad*)lfirst(dn_blocks_cell);
-		if ( are_ips_equal(dn_blocks->dataNodeIp, fragment_loc->ip) && 
-			 (dn_blocks->port == fragment_loc->rest_port) )
+		if ( are_ips_equal(dn_blocks->dataNodeIp, fragment_host->ip) &&
+			 (dn_blocks->port == fragment_host->rest_port) )
 		{
 			dn_found = dn_blocks;
 			break;
@@ -709,8 +711,8 @@ static DatanodeProcessingLoad* get_dn_processing_load(List **allDNProcessingLoad
 	{
 		dn_found = palloc0(sizeof(DatanodeProcessingLoad));
 		dn_found->datanodeBlocks = NIL;
-		dn_found->dataNodeIp = pstrdup(fragment_loc->ip);
-		dn_found->port = fragment_loc->rest_port;
+		dn_found->dataNodeIp = pstrdup(fragment_host->ip);
+		dn_found->port = fragment_host->rest_port;
 		dn_found->num_fragments_read = 0;
 		dn_found->num_fragments_residing = 0;
 		*allDNProcessingLoads = lappend(*allDNProcessingLoads, dn_found);
@@ -755,6 +757,9 @@ make_allocation_output_string(List *segment_fragments)
 		appendStringInfo(&fragment_str, "%s", frag->source_name);
 		appendStringInfoChar(&fragment_str, SEGWORK_IN_PAIR_DELIM);
 		appendStringInfo(&fragment_str, "%d", frag->index);
+		appendStringInfoChar(&fragment_str, SEGWORK_IN_PAIR_DELIM);
+		if (frag->fragment_md)
+			appendStringInfo(&fragment_str, "%s", frag->fragment_md);
 		if (frag->user_data)
 		{
 			appendStringInfoChar(&fragment_str, SEGWORK_IN_PAIR_DELIM);
@@ -785,6 +790,8 @@ free_allocated_frags(List *segment_fragments)
 		AllocatedDataFragment *frag = (AllocatedDataFragment*)lfirst(frag_cell);
 		pfree(frag->source_name);
 		pfree(frag->host);
+		if (frag->fragment_md)
+			pfree(frag->fragment_md);
 		if (frag->user_data)
 			pfree(frag->user_data);
 		pfree(frag);
@@ -836,15 +843,15 @@ assign_rest_ports_to_fragments(ClientContext	*client_context,
 
 	foreach(frag_c, fragments)
 	{
-		ListCell		*loc_c		= NULL;
+		ListCell		*host_c		= NULL;
 		DataFragment	*fragdata	= (DataFragment*)lfirst(frag_c);
 
-		foreach(loc_c, fragdata->locations)
+		foreach(host_c, fragdata->replicas)
 		{
-			FragmentLocation *fraglocs = (FragmentLocation*)lfirst(loc_c);
+			FragmentHost *fraghost = (FragmentHost*)lfirst(host_c);
 
-			fraglocs->rest_port = find_datanode_rest_server_port(rest_servers,
-																 fraglocs->ip);
+			fraghost->rest_port = find_datanode_rest_server_port(rest_servers,
+																 fraghost->ip);
 		}
 	}
 
@@ -871,11 +878,13 @@ print_fragment_list(List *fragments)
 
 		appendStringInfo(&log_str, "Fragment index: %d\n", frag->index);
 
-		foreach(lc, frag->locations)
+		foreach(lc, frag->replicas)
 		{
-			FragmentLocation* location = (FragmentLocation*)lfirst(lc);
-			appendStringInfo(&log_str, "location: host: %s\n", location->ip);
+			FragmentHost* host = (FragmentHost*)lfirst(lc);
+			appendStringInfo(&log_str, "replicas: host: %s\n", host->ip);
 		}
+		appendStringInfo(&log_str, "metadata: %s\n", frag->fragment_md ? frag->fragment_md : "NULL");
+
 		if (frag->user_data)
 		{
 			appendStringInfo(&log_str, "user data: %s\n", frag->user_data);

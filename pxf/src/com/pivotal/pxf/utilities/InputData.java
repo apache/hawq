@@ -35,6 +35,7 @@ public class InputData
     protected int segmentId;
     protected int totalSegments;
     protected int port;
+    protected byte[] fragmentMetadata = null;
     protected byte[] userData = null;
     protected boolean filterStringValid;
     protected String filterString;
@@ -147,6 +148,7 @@ public class InputData
 		/* TODO: once leading '/' is removed from the path variable, remove tableName and use path in HBase classes */
         tableName = getProperty("X-GP-DATA-DIR"); /* for HBase and Hive */
 
+        parseFragmentMetadata();
         parseUserData();
 
         /*
@@ -201,6 +203,8 @@ public class InputData
         this.outputFormat = copy.outputFormat;
         this.host = copy.host;
         this.port = copy.port;
+        this.fragmentMetadata = copy.fragmentMetadata;
+        this.userData = copy.userData;
         this.tupleDescription = copy.tupleDescription;
         this.dataFragment = copy.dataFragment;
         this.recordkeyColumn = copy.recordkeyColumn;
@@ -216,6 +220,23 @@ public class InputData
         this.threadSafe = copy.threadSafe;
     }
 
+    /*
+     * Set fragment serialized metadata
+     */
+    public void setFragmentMetadata(byte[] location) {
+		this.fragmentMetadata = location;
+	}
+    
+    /*
+     * Returns fragment serialized metadata
+     */
+    public byte[] getFragmentMetadata() {
+    	return fragmentMetadata;
+    }
+    
+    /*
+     * Returns fragment user data
+     */
     public byte[] getFragmentUserData()
     {
         return userData;
@@ -356,7 +377,7 @@ public class InputData
     }
 
     /*
-     * Returns a data fragment
+     * Returns a data fragment index
      */
     public int getDataFragment()
     {
@@ -611,21 +632,35 @@ public class InputData
         return false;
     }
 
+	private void parseFragmentMetadata() {
+		fragmentMetadata = parseBase64("X-GP-FRAGMENT-METADATA", "Fragment metadata information");
+	}
+	
     private void parseUserData()
     {
-        String encoded = getOptionalProperty("X-GP-FRAGMENT-USER-DATA");
-        if (encoded == null)
-            return;
+        userData = parseBase64("X-GP-FRAGMENT-USER-DATA", "Fragment user data");
+    }
 
-        userData = Base64.decodeBase64(encoded);
-        LOG.debug("decoded X-GP-FRAGMENT-USER-DATA: " + new String(userData));
+    private byte[] parseBase64(String key, String errName) {
+    	
+    	byte[] parsed = null;
+    	String encoded = getOptionalProperty(key);
+    	if (encoded == null)
+    		return null;
+    	if (!Base64.isArrayByteBase64(encoded.getBytes())) {
+    		throw new IllegalArgumentException(errName + " must be Base64 encoded." +
+    				"(Bad value: " + encoded + ")");
+    	}
+    	parsed = Base64.decodeBase64(encoded);
+    	LOG.debug("decoded " + key + ": " + new String(parsed));
+    	return parsed;
     }
 
 	/*
 	 * The function will get the token information from parameters
 	 * and call SecuredHDFS to verify the token.
 	 *
-	 * X-GP data will be deserialied from hex string to a byte array
+	 * X-GP data will be deserialized from hex string to a byte array
 	 */
 	private void verifyToken(ServletContext context)
 	{

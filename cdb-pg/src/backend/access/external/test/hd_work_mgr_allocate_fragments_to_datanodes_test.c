@@ -38,6 +38,7 @@ void check_dn_load(DatanodeProcessingLoad* dn,
 		assert_string_equal(block->host, expected_block->host);
 		assert_int_equal(block->rest_port, expected_block->rest_port);
 		assert_string_equal(block->source_name, expected_block->source_name);
+		assert_string_equal(block->fragment_md, expected_block->fragment_md);
 		assert_string_equal(block->user_data, expected_block->user_data);
 		assert_int_equal(block->index, expected_block->index);
 	}
@@ -55,7 +56,7 @@ test__get_dn_processing_load(void **state)
 {
 	List* allDNProcessingLoads = NIL;
 	ListCell* cell = NULL;
-	FragmentLocation *fragment_loc = NULL;
+	FragmentHost *fragment_loc = NULL;
 	DatanodeProcessingLoad* dn_found = NULL;
 
 	char* ip_array[] =
@@ -88,7 +89,7 @@ test__get_dn_processing_load(void **state)
 	assert_int_equal(array_size, (sizeof(port_array) / sizeof(port_array[0])));
 	assert_int_equal(array_size, (sizeof(expected_list_size) / sizeof(expected_list_size[0])));
 
-	fragment_loc = (FragmentLocation*) palloc0(sizeof(FragmentLocation));
+	fragment_loc = (FragmentHost*) palloc0(sizeof(FragmentHost));
 
 	for (int i = 0; i < array_size; ++i)
 	{
@@ -124,6 +125,7 @@ void check_create_allocated_fragment(DataFragment* fragment, bool has_user_data)
 	assert_true(allocated != NULL);
 	assert_int_equal(allocated->index, fragment->index);
 	assert_string_equal(allocated->source_name, fragment->source_name);
+	assert_string_equal(allocated->fragment_md, fragment->fragment_md);
 	if (has_user_data)
 		assert_string_equal(allocated->user_data, fragment->user_data);
 	else
@@ -151,6 +153,7 @@ test__create_allocated_fragment__NoUserData(void **state)
 	fragment->index = 13;
 	fragment->source_name = "source name!!!";
 	fragment->user_data = NULL;
+	fragment->fragment_md = "METADATA";
 
 	check_create_allocated_fragment(fragment, false);
 
@@ -169,6 +172,7 @@ test__create_allocated_fragment__WithUserData(void **state)
 	fragment->index = 13;
 	fragment->source_name = "source name!!!";
 	fragment->user_data = "Wish You Were Here";
+	fragment->fragment_md = "METADATA";
 
 	check_create_allocated_fragment(fragment, true);
 
@@ -177,7 +181,7 @@ test__create_allocated_fragment__WithUserData(void **state)
 
 /*
  * Creates a list of DataFragment for one file ("file.txt").
- * The important thing here is the fragments' location. It is deteremined by the parameters:
+ * The important thing here is the fragments' location. It is determined by the parameters:
  * replication_factor - number of copies of each fragment on the different hosts.
  * number_of_hosts - number of hosts, so that the IP pool we use is 1.2.3.{1-number_of_hosts}
  * number_of_fragments - number of fragments in the file.
@@ -189,7 +193,6 @@ test__create_allocated_fragment__WithUserData(void **state)
 List* build_data_fragments_list(int number_of_fragments, int number_of_hosts, int replication_factor)
 {
 	List* fragments_list = NIL;
-	DataFragment* fragment = NULL;
 	StringInfoData string_info;
 	initStringInfo(&string_info);
 
@@ -202,13 +205,16 @@ List* build_data_fragments_list(int number_of_fragments, int number_of_hosts, in
 
 		for (int j = 0; j < replication_factor; ++j)
 		{
-			FragmentLocation* floc = (FragmentLocation*)palloc0(sizeof(FragmentLocation));
+			FragmentHost* fhost = (FragmentHost*)palloc0(sizeof(FragmentHost));
 			appendStringInfo(&string_info, "1.2.3.%d", ((j + i) % number_of_hosts) + 1);
-			floc->ip = pstrdup(string_info.data);
+			fhost->ip = pstrdup(string_info.data);
 			resetStringInfo(&string_info);
-			fragment->locations = lappend(fragment->locations, floc);
+			fragment->replicas = lappend(fragment->replicas, fhost);
 		}
-		assert_int_equal(list_length(fragment->locations), replication_factor);
+		assert_int_equal(list_length(fragment->replicas), replication_factor);
+		appendStringInfo(&string_info, "metadata %d", i);
+		fragment->fragment_md = pstrdup(string_info.data);
+		resetStringInfo(&string_info);
 		appendStringInfo(&string_info, "user data %d", i);
 		fragment->user_data = pstrdup(string_info.data);
 		resetStringInfo(&string_info);
@@ -273,6 +279,7 @@ test__allocate_fragments_to_datanodes__4Fragments10Hosts3Replicates(void **state
 	allocated->index = 0;
 	allocated->rest_port = 0;
 	allocated->source_name = "file.txt";
+	allocated->fragment_md = "metadata 0";
 	allocated->user_data = "user data 0";
 	check_dn_load(datanode_load,
 			      "1.2.3.1", 0, blocks_list, 1, 1);
@@ -280,6 +287,7 @@ test__allocate_fragments_to_datanodes__4Fragments10Hosts3Replicates(void **state
 	datanode_load = (DatanodeProcessingLoad*)lfirst(list_nth_cell(allDNProcessingLoads, 1));
 	allocated->host = "1.2.3.2";
 	allocated->index = 1;
+	allocated->fragment_md = "metadata 1";
 	allocated->user_data = "user data 1";
 	check_dn_load(datanode_load,
 				  "1.2.3.2", 0, blocks_list, 1, 2);
@@ -287,6 +295,7 @@ test__allocate_fragments_to_datanodes__4Fragments10Hosts3Replicates(void **state
 	datanode_load = (DatanodeProcessingLoad*)lfirst(list_nth_cell(allDNProcessingLoads, 2));
 	allocated->host = "1.2.3.3";
 	allocated->index = 2;
+	allocated->fragment_md = "metadata 2";
 	allocated->user_data = "user data 2";
 	check_dn_load(datanode_load,
 				  "1.2.3.3", 0, blocks_list, 1, 3);
@@ -294,6 +303,7 @@ test__allocate_fragments_to_datanodes__4Fragments10Hosts3Replicates(void **state
 	datanode_load = (DatanodeProcessingLoad*)lfirst(list_nth_cell(allDNProcessingLoads, 3));
 	allocated->host = "1.2.3.4";
 	allocated->index = 3;
+	allocated->fragment_md = "metadata 3";
 	allocated->user_data = "user data 3";
 	check_dn_load(datanode_load,
 				  "1.2.3.4", 0, blocks_list, 1, 3);
@@ -353,12 +363,14 @@ test__allocate_fragments_to_datanodes__4Fragments3Hosts2Replicates(void **state)
 	allocated->index = 0;
 	allocated->rest_port = 0;
 	allocated->source_name = "file.txt";
+	allocated->fragment_md = "metadata 0";
 	allocated->user_data = "user data 0";
 	allocated = lfirst(list_nth_cell(blocks_list, 1));
 	allocated->host = "1.2.3.1";
 	allocated->index = 3;
 	allocated->rest_port = 0;
 	allocated->source_name = "file.txt";
+	allocated->fragment_md = "metadata 3";
 	allocated->user_data = "user data 3";
 	check_dn_load(datanode_load,
 			      "1.2.3.1", 0, blocks_list, 2, 3);
@@ -371,6 +383,7 @@ test__allocate_fragments_to_datanodes__4Fragments3Hosts2Replicates(void **state)
 	allocated->index = 1;
 	allocated->rest_port = 0;
 	allocated->source_name = "file.txt";
+	allocated->fragment_md = "metadata 1";
 	allocated->user_data = "user data 1";
 	check_dn_load(datanode_load,
 				  "1.2.3.2", 0, blocks_list, 1, 3);
@@ -378,6 +391,7 @@ test__allocate_fragments_to_datanodes__4Fragments3Hosts2Replicates(void **state)
 	datanode_load = (DatanodeProcessingLoad*)lfirst(list_nth_cell(allDNProcessingLoads, 2));
 	allocated->host = "1.2.3.3";
 	allocated->index = 2;
+	allocated->fragment_md = "metadata 2";
 	allocated->user_data = "user data 2";
 	check_dn_load(datanode_load,
 				  "1.2.3.3", 0, blocks_list, 1, 2);
@@ -430,12 +444,14 @@ test__allocate_fragments_to_datanodes__4Fragments3Hosts1Replicates(void **state)
 	allocated->index = 0;
 	allocated->rest_port = 0;
 	allocated->source_name = "file.txt";
+	allocated->fragment_md = "metadata 0";
 	allocated->user_data = "user data 0";
 	allocated = lfirst(list_nth_cell(blocks_list, 1));
 	allocated->host = "1.2.3.1";
 	allocated->index = 3;
 	allocated->rest_port = 0;
 	allocated->source_name = "file.txt";
+	allocated->fragment_md = "metadata 3";
 	allocated->user_data = "user data 3";
 	check_dn_load(datanode_load,
 			      "1.2.3.1", 0, blocks_list, 2, 2);
@@ -448,6 +464,7 @@ test__allocate_fragments_to_datanodes__4Fragments3Hosts1Replicates(void **state)
 	allocated->index = 1;
 	allocated->rest_port = 0;
 	allocated->source_name = "file.txt";
+	allocated->fragment_md = "metadata 1";
 	allocated->user_data = "user data 1";
 	check_dn_load(datanode_load,
 				  "1.2.3.2", 0, blocks_list, 1, 1);
@@ -455,6 +472,7 @@ test__allocate_fragments_to_datanodes__4Fragments3Hosts1Replicates(void **state)
 	datanode_load = (DatanodeProcessingLoad*)lfirst(list_nth_cell(allDNProcessingLoads, 2));
 	allocated->host = "1.2.3.3";
 	allocated->index = 2;
+	allocated->fragment_md = "metadata 2";
 	allocated->user_data = "user data 2";
 	check_dn_load(datanode_load,
 				  "1.2.3.3", 0, blocks_list, 1, 1);
@@ -515,6 +533,7 @@ test__allocate_fragments_to_datanodes__7Fragments10Hosts1Replicates(void **state
 	allocated->index = 0;
 	allocated->rest_port = 0;
 	allocated->source_name = "file.txt";
+	allocated->fragment_md = "metadata 0";
 	allocated->user_data = "user data 0";
 	check_dn_load(datanode_load,
 			      "1.2.3.1", 0, blocks_list, 1, 1);
@@ -522,6 +541,7 @@ test__allocate_fragments_to_datanodes__7Fragments10Hosts1Replicates(void **state
 	datanode_load = (DatanodeProcessingLoad*)lfirst(list_nth_cell(allDNProcessingLoads, 1));
 	allocated->host = "1.2.3.2";
 	allocated->index = 1;
+	allocated->fragment_md = "metadata 1";
 	allocated->user_data = "user data 1";
 	check_dn_load(datanode_load,
 				  "1.2.3.2", 0, blocks_list, 1, 1);
@@ -529,6 +549,7 @@ test__allocate_fragments_to_datanodes__7Fragments10Hosts1Replicates(void **state
 	datanode_load = (DatanodeProcessingLoad*)lfirst(list_nth_cell(allDNProcessingLoads, 2));
 	allocated->host = "1.2.3.3";
 	allocated->index = 2;
+	allocated->fragment_md = "metadata 2";
 	allocated->user_data = "user data 2";
 	check_dn_load(datanode_load,
 			"1.2.3.3", 0, blocks_list, 1, 1);
@@ -536,6 +557,7 @@ test__allocate_fragments_to_datanodes__7Fragments10Hosts1Replicates(void **state
 	datanode_load = (DatanodeProcessingLoad*)lfirst(list_nth_cell(allDNProcessingLoads, 3));
 	allocated->host = "1.2.3.4";
 	allocated->index = 3;
+	allocated->fragment_md = "metadata 3";
 	allocated->user_data = "user data 3";
 	check_dn_load(datanode_load,
 			"1.2.3.4", 0, blocks_list, 1, 1);
@@ -543,6 +565,7 @@ test__allocate_fragments_to_datanodes__7Fragments10Hosts1Replicates(void **state
 	datanode_load = (DatanodeProcessingLoad*)lfirst(list_nth_cell(allDNProcessingLoads, 4));
 	allocated->host = "1.2.3.5";
 	allocated->index = 4;
+	allocated->fragment_md = "metadata 4";
 	allocated->user_data = "user data 4";
 	check_dn_load(datanode_load,
 			"1.2.3.5", 0, blocks_list, 1, 1);
@@ -550,6 +573,7 @@ test__allocate_fragments_to_datanodes__7Fragments10Hosts1Replicates(void **state
 	datanode_load = (DatanodeProcessingLoad*)lfirst(list_nth_cell(allDNProcessingLoads, 5));
 	allocated->host = "1.2.3.6";
 	allocated->index = 5;
+	allocated->fragment_md = "metadata 5";
 	allocated->user_data = "user data 5";
 	check_dn_load(datanode_load,
 			"1.2.3.6", 0, blocks_list, 1, 1);
@@ -557,6 +581,7 @@ test__allocate_fragments_to_datanodes__7Fragments10Hosts1Replicates(void **state
 	datanode_load = (DatanodeProcessingLoad*)lfirst(list_nth_cell(allDNProcessingLoads, 6));
 	allocated->host = "1.2.3.7";
 	allocated->index = 6;
+	allocated->fragment_md = "metadata 6";
 	allocated->user_data = "user data 6";
 	check_dn_load(datanode_load,
 			"1.2.3.7", 0, blocks_list, 1, 1);

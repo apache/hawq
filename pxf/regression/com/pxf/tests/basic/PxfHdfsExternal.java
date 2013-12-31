@@ -43,16 +43,16 @@ public class PxfHdfsExternal extends PxfTestCase {
 		exTable.setFormatter("pxfwritable_import");
 
 		hawq.createTableAndVerify(exTable);
-		hawq.queryResults(exTable, "SELECT num1, t1 FROM " + exTable.getName() + " ORDER BY num1");
+		hawq.queryResults(exTable, "SELECT num1, t1 FROM " + exTable.getName() + " ORDER BY num1, t1");
 
 		Table dataCompareTable = new Table("dataCompareTable", null);
 
-		dataCompareTable.addRow(new String[] { "0", "text" });
-		dataCompareTable.addRow(new String[] { "0", "text" });
-		dataCompareTable.addRow(new String[] { "0", "text" });
-		dataCompareTable.addRow(new String[] { "1", "text" });
-		dataCompareTable.addRow(new String[] { "1", "text" });
-		dataCompareTable.addRow(new String[] { "1", "text" });
+		dataCompareTable.addRow(new String[] { "0", "fragment1" });
+		dataCompareTable.addRow(new String[] { "0", "fragment2" });
+		dataCompareTable.addRow(new String[] { "0", "fragment3" });
+		dataCompareTable.addRow(new String[] { "1", "fragment1" });
+		dataCompareTable.addRow(new String[] { "1", "fragment2" });
+		dataCompareTable.addRow(new String[] { "1", "fragment3" });
 
 		ComparisonUtils.compareTables(exTable, dataCompareTable, report);
 

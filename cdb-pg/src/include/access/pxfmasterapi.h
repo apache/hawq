@@ -46,18 +46,19 @@ typedef struct sDataFragment
 {
 	int   index; /* index per source name */
 	char *source_name;
-	List *locations;
+	List *replicas;
+	char *fragment_md; /* fragment meta data (start, end, length, etc.) */
 	char *user_data;
 } DataFragment;
 
 /*
  * Represents a fragment location replica
  */
-typedef struct sFragmentLocation
+typedef struct sFragmentHost
 {
 	char *ip;
 	int   rest_port;
-} FragmentLocation;
+} FragmentHost;
 
 extern void process_request(ClientContext* client_context, char *uri);
 extern List* get_datanode_rest_servers(GPHDUri *hadoop_uri, ClientContext* client_context);

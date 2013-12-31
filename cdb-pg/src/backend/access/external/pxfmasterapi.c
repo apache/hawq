@@ -230,7 +230,7 @@ get_data_fragment_list(GPHDUri *hadoop_uri,
  * 		curl --header "X-GP-FRAGMENTER: HdfsDataFragmenter" "http://goldsa1mac.local:50070/gpdb/v2/Fragmenter/getFragments?path=demo" (demo is a directory)
  *
  * Response (left as a single line purposefully):
- * {"PXFFragments":[{"hosts":["isengoldsa1mac.corp.emc.com","isengoldsa1mac.corp.emc.com","isengoldsa1mac.corp.emc.com"],"sourceName":"text2.csv"},{"hosts":["isengoldsa1mac.corp.emc.com","isengoldsa1mac.corp.emc.com","isengoldsa1mac.corp.emc.com"],"sourceName":"text_data.csv"}]}
+ * {"PXFFragments":[{"index":0,"userData":null,"sourceName":"demo/text2.csv","metadata":"rO0ABXcQAAAAAAAAAAAAAAAAAAAABXVyABNbTGphdmEubGFuZy5TdHJpbmc7rdJW5+kde0cCAAB4cAAAAAN0ABxhZXZjZWZlcm5hczdtYnAuY29ycC5lbWMuY29tdAAcYWV2Y2VmZXJuYXM3bWJwLmNvcnAuZW1jLmNvbXQAHGFldmNlZmVybmFzN21icC5jb3JwLmVtYy5jb20=","replicas":["10.207.4.23","10.207.4.23","10.207.4.23"]},{"index":0,"userData":null,"sourceName":"demo/text_csv.csv","metadata":"rO0ABXcQAAAAAAAAAAAAAAAAAAAABnVyABNbTGphdmEubGFuZy5TdHJpbmc7rdJW5+kde0cCAAB4cAAAAAN0ABxhZXZjZWZlcm5hczdtYnAuY29ycC5lbWMuY29tdAAcYWV2Y2VmZXJuYXM3bWJwLmNvcnAuZW1jLmNvbXQAHGFldmNlZmVybmFzN21icC5jb3JwLmVtYy5jb20=","replicas":["10.207.4.23","10.207.4.23","10.207.4.23"]}]}
  */
 static List*
 parse_get_fragments_response(List *fragments, StringInfo rest_buf)
@@ -239,8 +239,6 @@ parse_get_fragments_response(List *fragments, StringInfo rest_buf)
 	struct json_object	*head	= json_object_object_get(whole, "PXFFragments");
 	List* 				ret_frags = fragments;
 	int 				length	= json_object_array_length(head);
-    char *cur_source_name = NULL;
-	int cur_index_count = 0;
 
 	/* obtain split information from the block */
 	for (int i = 0; i < length; i++)
@@ -253,38 +251,30 @@ parse_get_fragments_response(List *fragments, StringInfo rest_buf)
 		fragment->source_name = pstrdup(json_object_get_string(block_data));
 
 		/* 1. fragment index, incremented per source name */
-		if ((cur_source_name==NULL) || (strcmp(cur_source_name, fragment->source_name) != 0))
+		struct json_object *index = json_object_object_get(js_fragment, "index");
+		fragment->index = json_object_get_int(index);
+
+		/* 2. replicas - list of all machines that contain this fragment */
+		struct json_object *js_fragment_replicas = json_object_object_get(js_fragment, "replicas");
+		int num_replicas = json_object_array_length(js_fragment_replicas);
+
+		for (int j = 0; j < num_replicas; j++)
 		{
-			elog(FRAGDEBUG, "pxf: parse_get_fragments_response: "
-						  "new source name %s, old name %s, init index counter %d",
-						  fragment->source_name,
-						  cur_source_name ? cur_source_name : "NONE",
-						  cur_index_count);
+			FragmentHost* fhost = (FragmentHost*)palloc(sizeof(FragmentHost));
+			struct json_object *host = json_object_array_get_idx(js_fragment_replicas, j);
 
-			cur_index_count = 0;
+			fhost->ip = pstrdup(json_object_get_string(host));
 
-			if (cur_source_name)
-				pfree(cur_source_name);
-			cur_source_name = pstrdup(fragment->source_name);
-		}
-		fragment->index = cur_index_count;
-		++cur_index_count;
-
-		/* 2. hosts - list of all machines that contain this fragment */
-		struct json_object *js_fragment_hosts = json_object_object_get(js_fragment, "hosts");
-		int num_hosts = json_object_array_length(js_fragment_hosts);
-
-		for (int j = 0; j < num_hosts; j++)
-		{
-			FragmentLocation* floc = (FragmentLocation*)palloc(sizeof(FragmentLocation));
-			struct json_object *loc = json_object_array_get_idx(js_fragment_hosts, j);
-
-			floc->ip = pstrdup(json_object_get_string(loc));
-
-			fragment->locations = lappend(fragment->locations, floc);
+			fragment->replicas = lappend(fragment->replicas, fhost);
 		}
 
-		/* 3. userdata - additional user information */
+		/* 3. location - fragment meta data */
+		struct json_object *js_fragment_metadata = json_object_object_get(js_fragment, "metadata");
+		if (js_fragment_metadata)
+			fragment->fragment_md = pstrdup(json_object_get_string(js_fragment_metadata));
+
+
+		/* 4. userdata - additional user information */
 		struct json_object *js_user_data = json_object_object_get(js_fragment, "userData");
 		if (js_user_data)
 			fragment->user_data = pstrdup(json_object_get_string(js_user_data));
@@ -294,14 +284,13 @@ parse_get_fragments_response(List *fragments, StringInfo rest_buf)
 		 * Ignore fragment if it doesn't contain any host locations,
 		 * for example if the file is empty.
 		 */
-		if (fragment->locations)
+		if (fragment->replicas)
 			ret_frags = lappend(ret_frags, fragment);
 		else
 			free_fragment(fragment);
 
 	}
-	if (cur_source_name)
-		pfree(cur_source_name);
+
 	return ret_frags;
 }
 
@@ -317,15 +306,18 @@ void free_fragment(DataFragment *fragment)
 	if (fragment->source_name)
 		pfree(fragment->source_name);
 
-	foreach(loc_cell, fragment->locations)
+	foreach(loc_cell, fragment->replicas)
 	{
-		FragmentLocation* location = (FragmentLocation*)lfirst(loc_cell);
+		FragmentHost* host = (FragmentHost*)lfirst(loc_cell);
 
-		if (location->ip)
-			pfree(location->ip);
-		pfree(location);
+		if (host->ip)
+			pfree(host->ip);
+		pfree(host);
 	}
-	list_free(fragment->locations);
+	list_free(fragment->replicas);
+
+	if (fragment->fragment_md)
+		pfree(fragment->fragment_md);
 
 	if (fragment->user_data)
 		pfree(fragment->user_data);

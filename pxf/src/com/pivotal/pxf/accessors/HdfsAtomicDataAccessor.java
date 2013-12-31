@@ -7,6 +7,7 @@ import java.net.URI;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapred.FileSplit;
 
 import com.pivotal.pxf.format.OneRow;
 import com.pivotal.pxf.utilities.HdfsUtilities;
@@ -28,6 +29,7 @@ public abstract class HdfsAtomicDataAccessor extends Plugin implements IReadAcce
 {
 	private Configuration conf = null; 
 	protected InputStream inp = null;
+	private FileSplit fileSplit = null; 
 
 	/*
 	 * C'tor
@@ -39,6 +41,8 @@ public abstract class HdfsAtomicDataAccessor extends Plugin implements IReadAcce
 				
 		// 1. Load Hadoop configuration defined in $HADOOP_HOME/conf/*.xml files
 		conf = new Configuration();
+		
+		fileSplit = HdfsUtilities.parseFragmentMetadata(inputData);
 	}
 
 	/*
@@ -88,11 +92,7 @@ public abstract class HdfsAtomicDataAccessor extends Plugin implements IReadAcce
 	 */
 	private boolean isWorkingSegment()
 	{
-
-		if (inputData.getDataFragment() == 0)
-			return true;
-		
-		return false;
+		return (fileSplit.getStart() == 0);
 	}
 	
 	@Override

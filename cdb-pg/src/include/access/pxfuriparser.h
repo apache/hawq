@@ -10,7 +10,7 @@
  * All PXF's resources are under /GPDB_REST_PREFIX/PXF_VERSION/...
  */
 #define GPDB_REST_PREFIX "gpdb"
-#define PXF_VERSION "v8" /* PXF version */
+#define PXF_VERSION "v9" /* PXF version */
 
 /*
  * FragmentData - describes a single Hadoop file split / HBase table region
@@ -24,6 +24,7 @@ typedef struct FragmentData
 	char	 *authority;
 	char	 *index;
 	char	 *source_name;
+	char	 *fragment_md;
 	char	 *user_data;
 } FragmentData;
 

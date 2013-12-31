@@ -1095,7 +1095,7 @@ CREATE WRITABLE EXTERNAL TABLE wr_char_err(a1 integer,
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/err?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritableWithChar')
 FORMAT 'custom' (formatter='pxfwritable_export');
 INSERT INTO wr_char_err VALUES (100, 'a'), (1000, 'b');
-ERROR:  remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v8/Writable/stream. Reason:     Server Error   Caused by:  com.pivotal.pxf.exception.BadRecordException: com.pivotal.pxf.exception.UnsupportedTypeException: Type char is not supported by GPDBWritable (SOMEFILE:SOMEFUNC)
+ERROR:  remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v9/Writable/stream. Reason:     Server Error   Caused by:  com.pivotal.pxf.exception.BadRecordException: com.pivotal.pxf.exception.UnsupportedTypeException: Type char is not supported by GPDBWritable (SOMEFILE:SOMEFUNC)
 DROP EXTERNAL TABLE wr_char_err;
 --
 -- 8. Test ANALYZE on writable table
@@ -1147,7 +1147,7 @@ CREATE WRITABLE EXTERNAL TABLE compress_type_none(a1 integer,
 LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/err?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=SomeClass&COMPRESSION_TYPE=NONE')
 FORMAT 'custom' (formatter='pxfwritable_export');
 INSERT INTO compress_type_none VALUES (100, 'a'), (1000, 'b');
-ERROR:  remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v8/Writable/stream. Reason:     Server Error   Caused by:  java.lang.IllegalArgumentException: Illegal compression type 'NONE'. For disabling compression remove COMPRESSION_CODEC parameter. (SOMEFILE:SOMEFUNC)
+ERROR:  remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v9/Writable/stream. Reason:     Server Error   Caused by:  java.lang.IllegalArgumentException: Illegal compression type 'NONE'. For disabling compression remove COMPRESSION_CODEC parameter. (SOMEFILE:SOMEFUNC)
 DROP EXTERNAL TABLE compress_type_none;
 --
 -- 10. Test CSV format 

@@ -37,7 +37,7 @@ DataNodeRestSrv* get_pxf_server(GPHDUri* gphd_uri, const Relation rel);
 size_t	gpbridge_read(PG_FUNCTION_ARGS);
 size_t	gpbridge_write(PG_FUNCTION_ARGS);
 void	parse_gphd_uri(gphadoop_context* context, bool is_import, PG_FUNCTION_ARGS);
-void	build_uri_from_current_fragment(gphadoop_context* context);
+void	build_uri_for_read(gphadoop_context* context);
 void 	build_file_name_for_write(gphadoop_context* context);
 void 	build_uri_for_write(gphadoop_context* context, DataNodeRestSrv* rest_server);
 size_t	fill_buffer(gphadoop_context* context, char* start, size_t size);
@@ -189,7 +189,10 @@ void set_current_fragment_headers(gphadoop_context* context)
 	FragmentData* frag_data = (FragmentData*)lfirst(context->current_fragment);
 	elog(DEBUG2, "pxf: set_current_fragment_source_name: source_name %s, index %s, has user data: %s ",
 		 frag_data->source_name, frag_data->index, frag_data->user_data ? "TRUE" : "FALSE");
+
 	churl_headers_override(context->churl_headers, "X-GP-DATA-DIR", frag_data->source_name);
+	churl_headers_override(context->churl_headers, "X-GP-DATA-FRAGMENT", frag_data->index);
+	churl_headers_override(context->churl_headers, "X-GP-FRAGMENT-METADATA", frag_data->fragment_md);
 
 	if (frag_data->user_data)
 	{
@@ -208,7 +211,7 @@ void gpbridge_import_start(PG_FUNCTION_ARGS)
 
 	parse_gphd_uri(context, true, fcinfo);
 	context->current_fragment = list_head(context->gphd_uri->fragments);
-	build_uri_from_current_fragment(context);
+	build_uri_for_read(context);
 	context->churl_headers = churl_headers_init();
 	add_querydata_to_http_header(context, fcinfo);
 
@@ -338,7 +341,6 @@ size_t gpbridge_read(PG_FUNCTION_ARGS)
 		if (context->current_fragment == NULL)
 			return 0;
 
-		build_uri_from_current_fragment(context);
 		set_current_fragment_headers(context);
 		churl_download_restart(context->churl_handle, context->uri.data, context->churl_headers);
 	}
@@ -376,14 +378,13 @@ void parse_gphd_uri(gphadoop_context* context, bool is_import, PG_FUNCTION_ARGS)
 		Assert(context->gphd_uri->fragments != NULL);
 }
 
-void build_uri_from_current_fragment(gphadoop_context* context)
+void build_uri_for_read(gphadoop_context* context)
 {
 	FragmentData* data = (FragmentData*)lfirst(context->current_fragment);
 	resetStringInfo(&context->uri);
-	appendStringInfo(&context->uri, "http://%s/%s/%s/Bridge/?fragment=%s",
-					 data->authority, GPDB_REST_PREFIX,PXF_VERSION, data->index);
-	elog(DEBUG2, "pxf: uri with current fragment: %s", context->uri.data);
-
+	appendStringInfo(&context->uri, "http://%s/%s/%s/Bridge/",
+					 data->authority, GPDB_REST_PREFIX, PXF_VERSION);
+	elog(DEBUG2, "pxf: uri %s for read", context->uri.data);
 }
 
 /*

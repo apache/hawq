@@ -33,10 +33,34 @@ public class FragmentsResponseFormatter {
 		/* HD-2550: convert host names to IPs */
 		FragmentsResponseFormatter.convertHostsToIPs(fragments);
 
+		FragmentsResponseFormatter.updateFragmentIndex(fragments);
+		
 		/* print the fragment list to log when in debug level */
 		Log.debug(FragmentsResponseFormatter.listToString(fragments, data));
 		
 		return FragmentsResponseFormatter.listToJSON(fragments);
+	}
+
+	/**
+	 * Update the fragments' indexes so that it is incremented by sourceName.
+	 * (E.g.: {"a", 0}, {"a", 1}, {"b", 0} ... )
+	 * @param fragments fragments to be updated
+	 */
+	private static void updateFragmentIndex(FragmentsOutput fragments) {
+		
+		String sourceName = null;
+		int index = 0;
+		List<FragmentInfo> fragmentInfos = fragments.getFragments();
+		
+		for (FragmentInfo fragment : fragmentInfos) {
+			
+			String currentSourceName = fragment.getSourceName();
+			if (!currentSourceName.equals(sourceName)) {
+				index = 0;
+				sourceName = currentSourceName;
+			}
+			fragment.setIndex(index++);
+		}
 	}
 
 	/*
@@ -50,7 +74,7 @@ public class FragmentsResponseFormatter {
 
 		for (FragmentInfo fragment : fragmentInfos)
 		{
-			String[] hosts = fragment.getHosts();
+			String[] hosts = fragment.getReplicas();
 			if (hosts == null)
 				continue;
 			String[] ips = new String[hosts.length];
@@ -71,15 +95,15 @@ public class FragmentsResponseFormatter {
 				ips[index] = convertedIp;
 				++index;
 			}
-			fragment.setHosts(ips);
-		}	
+			fragment.setReplicas(ips);
+		}
 	}
 
 	/*
 	 * Given a FragmentsOutput object, serialize it in JSON to be used as
 	 * the result string for GPDB. An example result is as follows:
 	 *
-	 * {"PXFFragments":[{"hosts":["sdw1.corp.emc.com","sdw3.corp.emc.com","sdw8.corp.emc.com"],"sourceName":"text2.csv","userData":"<data_specific_to_third_party_fragmenter>"},{"hosts":["sdw2.corp.emc.com","sdw4.corp.emc.com","sdw5.corp.emc.com"],"sourceName":"text_data.csv","userData":"<data_specific_to_third_party_fragmenter>"}]}
+	 * {"PXFFragments":[{"replicas":["sdw1.corp.emc.com","sdw3.corp.emc.com","sdw8.corp.emc.com"],"sourceName":"text2.csv", "index":"0", "metadata":<base64 metadata for fragment>, "userData":"<data_specific_to_third_party_fragmenter>"},{"replicas":["sdw2.corp.emc.com","sdw4.corp.emc.com","sdw5.corp.emc.com"],"sourceName":"text_data.csv","index":"0","metadata":<base64 metadata for fragment>,"userData":"<data_specific_to_third_party_fragmenter>"}]}
 	 */
 	private static String listToJSON(FragmentsOutput fragments) throws IOException
 	{
@@ -121,10 +145,13 @@ public class FragmentsResponseFormatter {
 		{
 			++i;
 			result.append("Fragment #" + i + ": [");
-			result.append("Source: " + fi.getSourceName() + ", Hosts:");
+			result.append("Source: " + fi.getSourceName() + 
+			              ", index: " + fi.getIndex() + ", Replicas:");
 
-			for (String host : fi.getHosts())
+			for (String host : fi.getReplicas())
 				result.append(" " + host);
+
+			result.append(", Metadata: " + fi.getMetadata());
 			
 			if (fi.getUserData() != null)
 				result.append(", User Data: " + new String(fi.getUserData()));

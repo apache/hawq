@@ -14,8 +14,9 @@ import org.apache.hadoop.mapred.JobConf;
 
 import com.pivotal.pxf.accessors.IReadAccessor;
 import com.pivotal.pxf.bridge.ReadBridge;
-import com.pivotal.pxf.utilities.PxfInputFormat;
+import com.pivotal.pxf.utilities.HdfsUtilities;
 import com.pivotal.pxf.utilities.InputData;
+import com.pivotal.pxf.utilities.PxfInputFormat;
 
 
 
@@ -55,10 +56,11 @@ public class HdfsAnalyzer extends Analyzer
 		long numberOfBlocks = 0;
 
 		Path	path = new Path("/" + datapath); //yikes! any better way?
-		long numberOfTuplesInBlock = getNumberOfTuplesInBlock();
-
+		
 		InputSplit[] splits = getSplits(path);
-
+		
+		long numberOfTuplesInBlock = getNumberOfTuplesInBlock(splits);
+			
 		for (InputSplit split : splits)
 		{
 			FileSplit fsp = (FileSplit)split;
@@ -92,10 +94,23 @@ public class HdfsAnalyzer extends Analyzer
 	 * Reads one block from HDFS. Exception during reading will
 	 * filter upwards and handled in AnalyzerResource
 	 */
-	private long getNumberOfTuplesInBlock() throws Exception
+	private long getNumberOfTuplesInBlock(InputSplit[] splits) throws Exception
 	{
 		long tuples = -1; /* default  - if we are not able to read data */
+		
+		if (splits.length == 0) {
+			return tuples;
+		}
+		
+		/*
+		 * metadata information includes: file split's
+		 * start, length and hosts (locations).
+		 */
+		byte[] fragmentMetadata = HdfsUtilities.prepareFragmentMetadata((FileSplit)splits[0]);
+		inputData.setFragmentMetadata(fragmentMetadata);
+		
 		IReadAccessor accessor = ReadBridge.getFileAccessor(inputData);
+		
 		if (accessor.openForRead());
 		{
 			tuples = 0;

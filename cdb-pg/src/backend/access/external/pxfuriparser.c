@@ -528,25 +528,24 @@ GPHDUri_debug_print_segwork(GPHDUri *uri)
 {
 	ListCell	*item;
 	int			count = 0;
+	StringInfoData fragment_data;
+	initStringInfo(&fragment_data);
 
 	elog(NOTICE, "segwork section data: ");
 	foreach(item, uri->fragments)
 	{
 		FragmentData *data = (FragmentData*)lfirst(item);
+		appendStringInfo(&fragment_data, "%u: authority: %s, index %s",
+				         count, data->authority, data->index);
+		appendStringInfo(&fragment_data, ", fragment metadata: %s",
+				 	 	 data->fragment_md ? data->fragment_md : "NULL");
 		if (data->user_data)
-		{
-			elog(NOTICE,
-				 "%u: authority: %s, index %s, user data: %s",
-				 count, data->authority, data->index, data->user_data);
-		}
-		else
-		{
-			elog(NOTICE,
-				 "%u: authority: %s, index %s",
-				 count, data->authority, data->index);
-		}
+			appendStringInfo(&fragment_data, ", user data : %s", data->user_data);
+		elog(NOTICE, "%s", fragment_data.data);
 		++count;
+		resetStringInfo(&fragment_data);
 	}
+	pfree(fragment_data.data);
 }
 
 /*
@@ -635,6 +634,12 @@ GPHDUri_parse_fragment(char* fragment, List* fragments)
 	fragment_data->source_name = pstrdup(value_start);
 	value_start = value_end + 1;
 	/* expect index */
+	value_end = strchr(value_start, segwork_separator);
+	Assert(value_end != NULL);
+	*value_end = '\0';
+	fragment_data->index = pstrdup(value_start);
+	value_start = value_end + 1;
+	/* expect fragment metadata */
 	Assert(value_start);
 
 	/* check for user data */
@@ -644,7 +649,7 @@ GPHDUri_parse_fragment(char* fragment, List* fragments)
 		has_user_data = true;
 		*value_end = '\0';
 	}
-	fragment_data->index = pstrdup(value_start);
+	fragment_data->fragment_md = pstrdup(value_start);
 
 	/* read user data */
 	if (has_user_data)

@@ -1,12 +1,18 @@
 package com.pivotal.pxf.accessors;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.util.LinkedList;
 import java.util.ListIterator;
 
+import org.apache.commons.lang.ArrayUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.FileInputFormat;
+import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.RecordReader;
@@ -31,6 +37,8 @@ public abstract class HdfsSplittableDataAccessor extends Plugin implements IRead
 	protected ListIterator<InputSplit> iter = null;
 	protected JobConf jobConf = null;
 	protected Object key, data;
+	
+	static private Log Log = LogFactory.getLog(HdfsSplittableDataAccessor.class);
 
 	/*
 	 * C'tor
@@ -55,37 +63,17 @@ public abstract class HdfsSplittableDataAccessor extends Plugin implements IRead
 	 */	
 	public boolean openForRead() throws Exception
 	{
-		// 1. get the list of all splits the input file has
-        FileInputFormat.setInputPaths(jobConf, new Path(inputData.path()));
-
-        /*
-		 * We ask for 1 split, but this doesn't mean that we are always going to get 1 split
-		 * The number of splits depends on the data size. What we assured here is that always,
-		 * the split size will be equal to the block size. To understand this, one should look
-		 * at the implementation of FileInputFormat.getSplits()
-		 */
-		InputSplit[] splits = fformat.getSplits(jobConf, 1);
-		int actual_num_of_splits = splits.length;
-
-		// 2. from all the splits choose only those that correspond to this segment id
+		
+		// add split from inputData.getFragmentMetadata
 		segSplits = new LinkedList<InputSplit>();
-
-		int needed_split_idx = inputData.getDataFragment();
-
-		/*
-		 * Testing for the case where between the time of the GP Master input
-		 * data retrieval and now, the file was deleted or replaced by a smaller file.
-		 * This is an extreme case which shouldn't happen - but we want to make sure
-		 */
-		if ((needed_split_idx != InputData.INVALID_SPLIT_IDX) && (needed_split_idx < actual_num_of_splits))
-			segSplits.add(splits[needed_split_idx]);			
+		FileSplit fileSplit = HdfsUtilities.parseFragmentMetadata(inputData);
+		segSplits.add(fileSplit);
 		
-		
-		// 3. Initialize record reader based on current split
+		// Initialize record reader based on current split
 		iter = segSplits.listIterator(0);
 		return getNextSplit();	
 	}
-	
+
 	/*
 	 * Specialized accessors will override this method and implement their own recordReader
 	 */

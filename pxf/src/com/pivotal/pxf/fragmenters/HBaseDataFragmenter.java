@@ -26,6 +26,7 @@ import com.pivotal.pxf.utilities.InputData;
  */
 public class HBaseDataFragmenter extends Fragmenter
 {
+		
 	public HBaseDataFragmenter(InputData inConf)
 	{
 		super(inConf);
@@ -33,10 +34,8 @@ public class HBaseDataFragmenter extends Fragmenter
 
 	public FragmentsOutput GetFragments() throws Exception
 	{
-		FragmentsOutput fragments = new FragmentsOutput();
-
 		byte[] userData = prepareUserData();
-		addTableFragments(fragments, userData);
+		addTableFragments(userData);
 
 		return fragments;
 	}
@@ -52,26 +51,38 @@ public class HBaseDataFragmenter extends Fragmenter
 
 		return null;
 	}
+	
+	private byte[] prepareFragmentMetadata(HRegionInfo region) throws IOException {
+		
+		ByteArrayOutputStream byteArrayStream = new ByteArrayOutputStream();
+		ObjectOutputStream objectStream = new ObjectOutputStream(byteArrayStream);
+		objectStream.writeObject(region.getStartKey());
+		objectStream.writeObject(region.getEndKey());
 
-	private void addTableFragments(FragmentsOutput fragments, byte[] userData) throws IOException
+		byte[] serializedFragmentMetadata = byteArrayStream.toByteArray();
+		return serializedFragmentMetadata;
+	}
+
+	private void addTableFragments(byte[] userData) throws IOException
 	{
 		HTable table = new HTable(HBaseConfiguration.create(), inputData.tableName());
 		NavigableMap<HRegionInfo, ServerName> locations = table.getRegionLocations();
 
 		for (Map.Entry<HRegionInfo, ServerName> entry: locations.entrySet())
-			addFragment(fragments, entry, userData);
+			addFragment(entry, userData);
 
 		table.close();
 	}
 
-	private void addFragment(FragmentsOutput fragments, 
-							 Map.Entry<HRegionInfo, ServerName> entry, 
-							 byte[] userData)
+	private void addFragment(Map.Entry<HRegionInfo, ServerName> entry, 
+							 byte[] userData) throws IOException
 	{
 		ServerName serverInfo = entry.getValue();
 		String[] hosts = new String[] {serverInfo.getHostname()};
-
-		fragments.addFragment(inputData.tableName(), hosts, userData);
+		HRegionInfo region = entry.getKey();
+		byte[] fragmentMetadata = prepareFragmentMetadata(region); 
+		
+		fragments.addFragment(inputData.tableName(), hosts, fragmentMetadata, userData);
 	}
 
 	private byte[] serializeMap(Map<String, byte[]> tableMappings) throws IOException

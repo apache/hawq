@@ -79,16 +79,8 @@ public class AnalyzerResource
 		/* Convert headers into a regular map */
 		Map<String, String> params = convertToRegularMap(headers.getRequestHeaders());
 		
-		/*
-		 * Here - in AnalyzerResource.getEstimatedStats() - we implement the policy that the analyzer should process a single block
-		 * when calculating the tuples number. All data sources provided will have a split number 0.
-		 * X-GP-DATA-FRAGMENT is set in the same manner in BridgeResource - there the splits are provided by
-		 * the GP segment on the URI string
-		 */
-		params.put("X-GP-DATA-FRAGMENT", "0");
-		
 		final Analyzer analyzer = AnalyzerFactory.create(new InputData(params, servletContext));
-				
+		
 		/*
 		 * Function queries the pxf Analyzer for the data fragments of the resource
 		 * The fragments are returned in a string formatted in JSON	 

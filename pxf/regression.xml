@@ -98,8 +98,10 @@
 		<!-- echo message="classpath used in javac target: ${myclasspath}"/-->
 
 		<!-- compile the core gpdhfs connector source -->
-		<javac classpathref="library.commons.classpath" destdir="${build.dir}/regression/classes" includeantruntime="${compiler.includeantruntime}" debug="${compiler.debug}" fork="yes" verbose="${compiler.verbose}" memoryMaximumSize="${compiler.max.memory}" srcdir="${src.dir}">
+		<javac classpathref="library.commons.classpath" destdir="${build.dir}/regression/classes" includeantruntime="${compiler.includeantruntime}" debug="${compiler.debug}" fork="yes" verbose="${compiler.verbose}" memoryMaximumSize="${compiler.max.memory}">
 			<compilerarg line="-Werror -Xlint:unchecked -Xlint:deprecation -Xlint:finally -Xlint:fallthrough -Xlint:-path" />
+			<src path="${src.dir}" />
+			<exclude name="resources/**" />
 		</javac>
 
 		<copy todir="${build.dir}/regression/classes/resources">

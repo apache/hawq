@@ -57,23 +57,18 @@ public class BridgeResource
 	 * its records, printing it out to outgoing stream.
 	 * Outputs GPDBWritable.
 	 *
-	 * Parameters come through HTTP header other than the fragments.
-	 * fragments is part of the url:
-	 * /<version>/Bridge?fragment=
+	 * Parameters come through HTTP header.
 	 *
 	 * @param servletContext Servlet context contains attributes required by SecuredHDFS
 	 * @param headers Holds HTTP headers from request
-	 * @param fragment Holds the fragment URI option
 	 */
 	@GET
 	@Produces(MediaType.APPLICATION_OCTET_STREAM)
 	public Response read(@Context final ServletContext servletContext,
-						 @Context HttpHeaders headers,
-					     @QueryParam("fragment") String fragment) throws Exception
+						 @Context HttpHeaders headers) throws Exception
 	{
 		// Convert headers into a regular map
 		Map<String, String> params = convertToRegularMap(headers.getRequestHeaders());
-		params.put("X-GP-DATA-FRAGMENT", fragment);
 
 		Log.debug("started with paramters: " + params.toString());
 

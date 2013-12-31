@@ -10,7 +10,6 @@ import java.util.Map;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
 
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
@@ -331,6 +330,7 @@ public class InputDataTest
 		}
 	}
 
+	@Test
 	public void inputDataVerifiesToken()
 	{
 		when(SecuredHDFS.isDisabled()).thenReturn(false);
@@ -352,6 +352,34 @@ public class InputDataTest
 								mockContext);
 	}
 
+	@Test
+	public void getFragmentMetadata() {
+		InputData input = new InputData(parameters, mockContext);
+		byte[] location = input.getFragmentMetadata();
+		assertEquals(new String(location), "Something in the way");
+	}
+	
+	@Test
+	public void getFragmentMetadataNull() {
+		parameters.remove("X-GP-FRAGMENT-METADATA");
+		InputData inputData = new InputData(parameters, mockContext);
+		assertNull(inputData.getFragmentMetadata());
+	}
+	
+	@Test
+	public void getFragmentMetadataNotBase64() {
+		String badValue = "so b@d";
+		parameters.put("X-GP-FRAGMENT-METADATA", badValue);
+		try {
+			InputData inputData = new InputData(parameters, mockContext);
+			fail("should fail with bad fragment metadata");
+		}
+		catch (Exception e) {
+			assertEquals(e.getMessage(), "Fragment metadata information must be Base64 encoded." +
+    				"(Bad value: " + badValue + ")");
+		}
+	}
+	
     /*
      * setUp function called before each test
 	 */
@@ -370,8 +398,9 @@ public class InputDataTest
 		parameters.put("X-GP-ACCESSOR", "are");
 		parameters.put("X-GP-RESOLVER", "packed");
 		parameters.put("X-GP-DATA-DIR", "i'm/ready/to/go");
+		parameters.put("X-GP-FRAGMENT-METADATA", "U29tZXRoaW5nIGluIHRoZSB3YXk=");
 		parameters.put("X-GP-I'M-STANDING-HERE", "outside-your-door");
-
+	
 		mockContext = mock(ServletContext.class);
 
 		PowerMockito.mockStatic(SecuredHDFS.class);
