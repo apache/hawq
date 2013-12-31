@@ -20,6 +20,7 @@ import com.pxf.tests.dataprepares.sequence.CustomAvroInSequencePreparer;
 import com.pxf.tests.dataprepares.sequence.CustomSequencePreparer;
 import com.pxf.tests.dataprepares.text.CustomTextPreparer;
 import com.pxf.tests.dataprepares.text.QuotedLineTextPreparer;
+import com.pxf.tests.dataprepares.text.QuatedLineTextPreparer;
 import com.pxf.tests.testcases.PxfTestCase;
 
 /**
@@ -722,7 +723,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		Table dataTable = new Table("dataTable", null);
 
-		FileFormatsUtils.prepareData(new QuotedLineTextPreparer(), 1000, dataTable);
+		FileFormatsUtils.prepareData(new QuatedLineTextPreparer(), 1000, dataTable);
 
 		hdfs.writeTextFile(csvPath, dataTable.getData(), ",");
 

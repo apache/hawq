@@ -11,6 +11,7 @@ import com.pivotal.pxfauto.infra.utils.fileformats.FileFormatsUtils;
 import com.pivotal.pxfauto.infra.utils.tables.ComparisonUtils;
 import com.pivotal.pxfauto.infra.utils.tables.comparators.TableRowsComparator;
 import com.pxf.tests.dataprepares.text.MultiLinePreparer;
+import com.pivotal.pxfauto.infra.utils.tables.ComparisonUtils;
 import com.pxf.tests.testcases.PxfTestCase;
 
 /**

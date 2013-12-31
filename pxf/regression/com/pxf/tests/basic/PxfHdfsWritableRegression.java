@@ -384,7 +384,11 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 		String schema = "CustomWritable";
 		String[] codecs = new String[] {
 				null,
-				"org.apache.hadoop.io.compress.GzipCodec",
+				/**
+				*Gzip is not supported in Mac and RHEL 5 [JIRA:GPSQL-1179]
+				*
+				*"org.apache.hadoop.io.compress.GzipCodec",
+				**/
 				"org.apache.hadoop.io.compress.DefaultCodec",
 				"org.apache.hadoop.io.compress.BZip2Codec"
 		};

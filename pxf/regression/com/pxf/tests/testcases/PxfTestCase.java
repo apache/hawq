@@ -37,7 +37,7 @@ public class PxfTestCase extends SystemTestCase4 {
 		hdfsWorkingFolder = hdfs.getWorkingDirectory();
 
 		hdfs.removeDirectory(hdfsWorkingFolder);
-		new File(loaclTempFolder).mkdir();
+		new File(loaclTempFolder).mkdirs();
 
 		ReportUtils.stopLevel(report);
 	}

@@ -73,9 +73,9 @@
 		</fileset>
 
 		<path refid="ivy-classpath" />
-
-
+		
 		<fileset dir="${basedir}/lib" includes="**/*.jar" />
+		<fileset dir="${env.GPHD_ROOT}/pxf" includes="**/*.jar"/>
 
 	</path>
 
@@ -112,16 +112,10 @@
 		<copy todir="${build.dir}/regression/classes/sut">
 			<fileset dir="${src.dir}/sut" />
 		</copy>
-
-
 	</target>
-
-
 
 	<!-- Default -->
 	<target name="all" depends="clean,compile, run-tests" description="build all jar files" />
-
-
 
 	<!-- Ivy -->
 	<target name="ivy-probe-antlib">
@@ -148,8 +142,6 @@
 		<ivy:cachepath pathid="ivy-classpath" conf="compile" />
 	</target>
 
-
-
 	<target name="run-tests" depends="compile" description="Run regression-tests">
 		<echo message="Run Regression Batch: com/pxf/tests/basic/${testClass}.class" />
 		<taskdef resource="net/sf/antcontrib/antcontrib.properties" />
@@ -168,7 +160,7 @@
 				<fileset dir="${basedir}/lib">
 					<include name="**/*.jar" />
 				</fileset>
-
+				<fileset dir="${env.GPHD_ROOT}/pxf" includes="**/*.jar"/>
 			</classpath>
 
 			<formatter type="plain" usefile="false" />
