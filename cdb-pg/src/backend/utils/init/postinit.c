@@ -305,6 +305,13 @@ InitCommunication(void)
 		 */
 		CreateSharedMemoryAndSemaphores(true, 0);
 	}
+
+	/*
+	 * We only call GPMemoryProtectInit() through CreateSharedMemoryAndSemaphores()
+	 * if not under postmaster. However, we need to initialize per-process OOM
+	 * tracking data structures regardless of IsUnderPostMaster status.
+	 */
+	InitPerProcessOOMTracking();
 }
 
 

@@ -155,7 +155,7 @@ static void ClearPartitionState(EState *estate);
  * part OID -> ResultRelInfo and avoids repeated calculation of the
  * result information.
  */
-typedef struct ResultPartHashEntry
+typedef struct ResultPartHashEntry 
 {
 	Oid targetid; /* OID of part relation */
 	int offset; /* Index ResultRelInfo in es_result_partitions */
@@ -320,20 +320,28 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
 	bool		shouldDispatch;
 	bool		needDtxTwoPhase;
 
+	/*
+	 * Create a memory account with disowned account included. The disowned memory
+	 * account will be used to account for interconnect or any other subsystem memory consumption
+	 */
+	MemoryAccount *curMemoryAccount = MemoryAccounting_CreateAccount(0, MEMORY_OWNER_TYPE_EXECUTOR);
+
+	START_MEMORY_ACCOUNT(curMemoryAccount);
+	{
 	/* sanity checks: queryDesc must not be started already */
 	Assert(queryDesc != NULL);
 	Assert(queryDesc->estate == NULL);
 
-	Assert(queryDesc->plannedstmt->intoPolicy == NULL
+	Assert(queryDesc->plannedstmt->intoPolicy == NULL 
 		   || queryDesc->plannedstmt->intoPolicy->ptype == POLICYTYPE_PARTITIONED);
-
+    
     /**
 	 * Perfmon related stuff.
 	 */
-	if (gp_enable_gpperfmon
-			&& Gp_role == GP_ROLE_DISPATCH
+	if (gp_enable_gpperfmon 
+			&& Gp_role == GP_ROLE_DISPATCH 
 			&& queryDesc->gpmon_pkt)
-	{
+	{			
 		gpmon_qlog_query_start(queryDesc->gpmon_pkt);
 	}
 
@@ -345,7 +353,7 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
 		if (gp_resqueue_memory_policy != RESQUEUE_MEMORY_POLICY_NONE &&
 			gp_log_resqueue_memory)
 		{
-			elog(gp_resqueue_memory_log_level, "query requested %.0fKB of memory",
+			elog(gp_resqueue_memory_log_level, "query requested %.0fKB of memory", 
 				 (double) queryDesc->plannedstmt->query_mem / 1024.0);
 		}
 
@@ -358,11 +366,11 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
 			switch(gp_resqueue_memory_policy)
 			{
 				case RESQUEUE_MEMORY_POLICY_AUTO:
-					PolicyAutoAssignOperatorMemoryKB(queryDesc->plannedstmt,
+					PolicyAutoAssignOperatorMemoryKB(queryDesc->plannedstmt, 
 													 queryDesc->plannedstmt->query_mem);
 					break;
 				case RESQUEUE_MEMORY_POLICY_EAGER_FREE:
-					PolicyEagerFreeAssignOperatorMemoryKB(queryDesc->plannedstmt,
+					PolicyEagerFreeAssignOperatorMemoryKB(queryDesc->plannedstmt, 
 														 queryDesc->plannedstmt->query_mem);
 					break;
 				default:
@@ -371,7 +379,7 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
 			}
 		}
 	}
-
+	
 	/*
 	 * If the transaction is read-only, we need to check if any writes are
 	 * planned to non-temporary tables.  EXPLAIN is considered read-only.
@@ -383,6 +391,7 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
 	 * Build EState, switch into per-query memory context for startup.
 	 */
 	estate = CreateExecutorState();
+		estate->memoryAccount = curMemoryAccount;
 	queryDesc->estate = estate;
 
 	oldcontext = MemoryContextSwitchTo(estate->es_query_cxt);
@@ -429,7 +438,7 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
 	/*
 	 * Handling of the Slice table depends on context.
 	 */
-	if (Gp_role == GP_ROLE_DISPATCH && queryDesc->plannedstmt->planTree->dispatch == DISPATCH_PARALLEL)
+	if (Gp_role == GP_ROLE_DISPATCH && queryDesc->plannedstmt->planTree->dispatch == DISPATCH_PARALLEL) 
 	{
 		/*
          * If this is an extended query (normally cursor or bind/exec) - before
@@ -488,9 +497,9 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
 			else
 			{
 				reltablespace = GetDefaultTablespace();
-
+				
 				/* Need the real tablespace id for dispatch */
-				if (!OidIsValid(reltablespace))
+				if (!OidIsValid(reltablespace)) 
 					/*reltablespace = MyDatabaseTableSpace;*/
 					reltablespace = get_database_dts(MyDatabaseId);
 
@@ -589,7 +598,7 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
 
 		Assert(queryDesc->planstate);
 
-		if (Gp_role == GP_ROLE_DISPATCH &&
+		if (Gp_role == GP_ROLE_DISPATCH && 
 			queryDesc->plannedstmt->planTree->dispatch == DISPATCH_PARALLEL)
 		{
 			/* Assign gang descriptions to the root slices of the slice forest. */
@@ -662,7 +671,7 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
 		 * a QD and the plan is a parallel plan.
 		 */
 		if (Gp_role == GP_ROLE_DISPATCH &&
-			queryDesc->plannedstmt->planTree->dispatch == DISPATCH_PARALLEL &&
+			queryDesc->plannedstmt->planTree->dispatch == DISPATCH_PARALLEL && 
 			!(eflags & EXEC_FLAG_EXPLAIN_ONLY))
 		{
 			shouldDispatch = true;
@@ -815,8 +824,8 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
             DropQueryContextInfo(queryDesc->plannedstmt->contextdisp);
             queryDesc->plannedstmt->contextdisp = NULL;
 		}
-
-
+		
+		
 		/*
 		 * Get executor identity (who does the executor serve). we can assume
 		 * Forward scan direction for now just for retrieving the identity.
@@ -894,6 +903,8 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
 				break;
 		}
 	}
+	}
+	END_MEMORY_ACCOUNT();
 
 	MemoryContextSwitchTo(oldcontext);
 }
@@ -929,7 +940,6 @@ ExecutorRun(QueryDesc *queryDesc,
 	bool		sendTuples;
 	TupleTableSlot *result = NULL;
 	MemoryContext oldcontext;
-
 	/*
 	 * NOTE: Any local vars that are set in the PG_TRY block and examined in the
 	 * PG_CATCH block should be declared 'volatile'. (setjmp shenanigans)
@@ -943,6 +953,8 @@ ExecutorRun(QueryDesc *queryDesc,
 	estate = queryDesc->estate;
 
 	Assert(estate != NULL);
+
+	START_MEMORY_ACCOUNT(estate->memoryAccount);
 
 	/*
 	 * Set dynamicTableScanInfo to the one in estate, and reset its value at
@@ -1115,6 +1127,7 @@ ExecutorRun(QueryDesc *queryDesc,
 		(*dest->rShutdown) (dest);
 
 	MemoryContextSwitchTo(oldcontext);
+	END_MEMORY_ACCOUNT();
 
 	return result;
 }
@@ -1138,6 +1151,8 @@ ExecutorEnd(QueryDesc *queryDesc)
 	estate = queryDesc->estate;
 
 	Assert(estate != NULL);
+
+	START_MEMORY_ACCOUNT(estate->memoryAccount);
 
 	if (DEBUG1 >= log_min_messages)
 	{
@@ -1244,14 +1259,14 @@ ExecutorEnd(QueryDesc *queryDesc)
 	 * everything the executor has allocated.
 	 */
 	FreeExecutorState(estate);
-
+	
 	/**
 	 * Perfmon related stuff.
 	 */
-	if (gp_enable_gpperfmon
+	if (gp_enable_gpperfmon 
 			&& Gp_role == GP_ROLE_DISPATCH
 			&& queryDesc->gpmon_pkt)
-	{
+	{			
 		gpmon_qlog_query_end(queryDesc->gpmon_pkt);
 		queryDesc->gpmon_pkt = NULL;
 	}
@@ -1272,6 +1287,13 @@ ExecutorEnd(QueryDesc *queryDesc)
 				break;
 		}
 	}
+	END_MEMORY_ACCOUNT();
+
+	if (gp_dump_memory_usage)
+	{
+		MemoryAccounting_SaveToFile(currentSliceId);
+	}
+	ReportOOMConsumption();
 }
 
 /* ----------------------------------------------------------------
@@ -1294,6 +1316,8 @@ ExecutorRewind(QueryDesc *queryDesc)
 
 	Assert(estate != NULL);
 
+	START_MEMORY_ACCOUNT(estate->memoryAccount);
+
 	/* It's probably not sensible to rescan updating queries */
 	Assert(queryDesc->operation == CMD_SELECT);
 
@@ -1308,6 +1332,8 @@ ExecutorRewind(QueryDesc *queryDesc)
 	ExecReScan(queryDesc->planstate, NULL);
 
 	MemoryContextSwitchTo(oldcontext);
+
+	END_MEMORY_ACCOUNT();
 }
 
 
@@ -1563,18 +1589,18 @@ InitializeResultRelations(PlannedStmt *plannedstmt, EState *estate, CmdType oper
 		    all_relids = list_concat(all_relids, all_partition_relids(estate->es_result_partitions));
 		
 		estate->es_result_aosegnos = assignPerRelSegno(all_relids);
-		
+
 		plannedstmt->result_partitions = estate->es_result_partitions;
 		plannedstmt->result_aosegnos = estate->es_result_aosegnos;
 		
 		/* Set any QD resultrels segno, just in case. The QEs set their own in ExecInsert(). */
-		int relno = 0;
-		ResultRelInfo* relinfo;
-		for (relno = 0; relno < numResultRelations; relno ++)
-		{
-			relinfo = &(resultRelInfos[relno]);
-			ResultRelInfoSetSegno(relinfo, estate->es_result_aosegnos);
-		}
+        int relno = 0;
+        ResultRelInfo* relinfo;
+        for (relno = 0; relno < numResultRelations; relno ++)
+        {
+            relinfo = &(resultRelInfos[relno]);
+            ResultRelInfoSetSegno(relinfo, estate->es_result_aosegnos);
+        }
 
 		ListCell *cell;
 		foreach(cell, all_relids)
@@ -1861,7 +1887,7 @@ InitPlan(QueryDesc *queryDesc, int eflags)
 
 	if (RootSliceIndex(estate) != LocallyExecutingSliceIndex(estate))
 		return;
-
+	
 	/*
 	 * Get the tuple descriptor describing the type of tuples to return. (this
 	 * is especially important if we are creating a relation with "SELECT
@@ -2127,7 +2153,7 @@ initResultRelInfo(ResultRelInfo *resultRelInfo,
 	{
 		resultRelationDesc = CdbOpenRelation(resultRelationOid,
 											 lockmode,
-											 false, /* noWait */
+											 false, /* noWait */ 
 											 NULL); /* lockUpgraded */
 	}
 	else
@@ -2157,16 +2183,16 @@ initResultRelInfo(ResultRelInfo *resultRelInfo,
 							RelationGetRelationName(resultRelationDesc))));
 			break;
 		case RELKIND_AOSEGMENTS:
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("cannot change AO segment listing relation \"%s\"",
-							RelationGetRelationName(resultRelationDesc))));
+				ereport(ERROR,
+						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+						 errmsg("cannot change AO segment listing relation \"%s\"",
+								RelationGetRelationName(resultRelationDesc))));
 			break;
 		case RELKIND_AOBLOCKDIR:
-			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("cannot change AO block directory relation \"%s\"",
-							RelationGetRelationName(resultRelationDesc))));
+				ereport(ERROR,
+						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+						 errmsg("cannot change AO block directory relation \"%s\"",
+								RelationGetRelationName(resultRelationDesc))));
 			break;
 		case RELKIND_VIEW:
 			ereport(ERROR,
@@ -2730,7 +2756,7 @@ ExecEndPlan(PlanState *planstate, EState *estate)
 
 			appendonly_insert_finish(resultRelInfo->ri_aoInsertDesc);
 		}
-        if (resultRelInfo->ri_aocsInsertDesc)
+		if (resultRelInfo->ri_aocsInsertDesc)
 		{
 			sendback = CreateQueryContextDispatchingSendBack(
 					resultRelInfo->ri_aocsInsertDesc->aoi_rel->rd_att->natts);
@@ -2747,8 +2773,8 @@ ExecEndPlan(PlanState *planstate, EState *estate)
 
         	parquet_insert_finish(resultRelInfo->ri_parquetInsertDesc);
         }
-        if (resultRelInfo->ri_extInsertDesc)
-        	external_insert_finish(resultRelInfo->ri_extInsertDesc);
+		if (resultRelInfo->ri_extInsertDesc)
+			external_insert_finish(resultRelInfo->ri_extInsertDesc);
 
 		if (resultRelInfo->ri_resultSlot)
 		{
@@ -2781,7 +2807,7 @@ ExecEndPlan(PlanState *planstate, EState *estate)
 
 		heap_close(erm->relation, NoLock);
 	}
-
+	
 	/*
 	 * Release partition-related resources (esp. TupleDesc ref counts).
 	 */
@@ -3733,10 +3759,10 @@ EvalPlanQualStart(evalPlanQual *epq, EState *estate, evalPlanQual *priorepq)
 	epqstate->es_into_relation_descriptor = estate->es_into_relation_descriptor;
 	epqstate->es_into_relation_is_bulkload = estate->es_into_relation_is_bulkload;
 	epqstate->es_into_relation_last_heap_tid = estate->es_into_relation_last_heap_tid;
-
+	
 	epqstate->es_into_relation_bulkloadinfo = (struct MirroredBufferPoolBulkLoadInfo *) palloc0(sizeof(MirroredBufferPoolBulkLoadInfo));
 	memcpy(epqstate->es_into_relation_bulkloadinfo, estate->es_into_relation_bulkloadinfo, sizeof(MirroredBufferPoolBulkLoadInfo));
-
+	
 	epqstate->es_param_list_info = estate->es_param_list_info;
 	if (estate->es_plannedstmt->planTree->nParamExec > 0)
 		epqstate->es_param_exec_vals = (ParamExecData *)
@@ -3968,7 +3994,7 @@ typedef struct
 	DestReceiver pub;			/* publicly-known function pointers */
 	EState	   *estate;			/* EState we are working with */
 	AppendOnlyInsertDescData *ao_insertDesc; /* descriptor to AO tables */
-	AOCSInsertDescData *aocs_ins;           /* descriptor for aocs */
+        AOCSInsertDescData *aocs_ins;           /* descriptor for aocs */
 	ParquetInsertDescData *parquet_insertDesc; /* descriptor to parquet tables */
 } DR_intorel;
 
@@ -3990,13 +4016,13 @@ CreateIntoRel(QueryDesc *queryDesc)
 	AclResult	aclresult;
 	Oid			intoRelationId;
 	TupleDesc	tupdesc;
-	Oid         intoOid;
-	Oid         intoComptypeOid;
-	GpPolicy   *targetPolicy;
+    Oid         intoOid;
+    Oid         intoComptypeOid;
+    GpPolicy   *targetPolicy;
 	int			safefswritesize = gp_safefswritesize;
 	ItemPointerData persistentTid;
 	int64			persistentSerialNum;
-
+	
 	Assert(Gp_role != GP_ROLE_EXECUTE);
 
 	targetPolicy = queryDesc->plannedstmt->intoPolicy;
@@ -4010,11 +4036,11 @@ CreateIntoRel(QueryDesc *queryDesc)
 				(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
 				 errmsg("ON COMMIT can only be used on temporary tables"),
 				 errOmitLocation(true)));
-
+	
 	/* MPP specific stuff */
-	intoOid = intoClause->oidInfo.relOid;
-	intoComptypeOid = intoClause->oidInfo.comptypeOid;
-
+    intoOid = intoClause->oidInfo.relOid;
+    intoComptypeOid = intoClause->oidInfo.comptypeOid;
+	
 	/*
 	 * Find namespace to create in, check its permissions
 	 */
@@ -4026,7 +4052,7 @@ CreateIntoRel(QueryDesc *queryDesc)
 	if (aclresult != ACLCHECK_OK)
 		aclcheck_error(aclresult, ACL_KIND_NAMESPACE,
 					   get_namespace_name(namespaceId));
-
+	
 	/*
 	 * Select tablespace to use.  If not specified, use default_tablespace
 	 * (which may in turn default to database's default).
@@ -4045,27 +4071,27 @@ CreateIntoRel(QueryDesc *queryDesc)
 		tablespaceId = GetDefaultTablespace();
 
 		/* Need the real tablespace id for dispatch */
-		if (!OidIsValid(tablespaceId))
+		if (!OidIsValid(tablespaceId)) 
 			tablespaceId = MyDatabaseTableSpace;
 
 		/* MPP-10329 - must dispatch tablespace */
 		intoClause->tableSpaceName = get_tablespace_name(tablespaceId);
 	}
-
+	
 	/* Check permissions except when using the database's default space */
 	if (tablespaceId != MyDatabaseTableSpace &&
 		tablespaceId != get_database_dts(MyDatabaseId))
 	{
 		AclResult	aclresult;
-
+		
 		aclresult = pg_tablespace_aclcheck(tablespaceId, GetUserId(),
 										   ACL_CREATE);
-
+		
 		if (aclresult != ACLCHECK_OK)
 			aclcheck_error(aclresult, ACL_KIND_TABLESPACE,
 						   get_tablespace_name(tablespaceId));
 	}
-
+	
 
 	/*
 	 * check options, report if user want to create heap table.
@@ -4122,7 +4148,7 @@ CreateIntoRel(QueryDesc *queryDesc)
 				 errmsg("gpsql does not support heap table, use append only table instead"),
 				 errOmitLocation(true)));
 	}
-
+	
 	/* have to copy the actual tupdesc to get rid of any constraints */
 	tupdesc = CreateTupleDescCopy(queryDesc->tupDesc);
 
@@ -4145,32 +4171,32 @@ CreateIntoRel(QueryDesc *queryDesc)
 											  reloptions,
 											  allowSystemTableModsDDL,
 											  &intoComptypeOid, 	/* MPP */
-											  &persistentTid,
-											  &persistentSerialNum);
-
+						 					  &persistentTid,
+						 					  &persistentSerialNum);
+	
 	FreeTupleDesc(tupdesc);
-
+	
 	/*
 	 * Advance command counter so that the newly-created relation's catalog
 	 * tuples will be visible to heap_open.
 	 */
 	CommandCounterIncrement();
-
+	
 	/*
 	 * If necessary, create a TOAST table for the new relation, or an Append
 	 * Only segment table. Note that AlterTableCreateXXXTable ends with
 	 * CommandCounterIncrement(), so that the new tables will be visible for
 	 * insertion.
 	 */
-	AlterTableCreateToastTableWithOid(intoRelationId,
-									  intoClause->oidInfo.toastOid,
-									  intoClause->oidInfo.toastIndexOid,
-									  &intoClause->oidInfo.toastComptypeOid,
+	AlterTableCreateToastTableWithOid(intoRelationId, 
+									  intoClause->oidInfo.toastOid, 
+									  intoClause->oidInfo.toastIndexOid, 
+									  &intoClause->oidInfo.toastComptypeOid, 
 									  false);
-	AlterTableCreateAoSegTableWithOid(intoRelationId,
-									  intoClause->oidInfo.aosegOid,
+	AlterTableCreateAoSegTableWithOid(intoRelationId, 
+									  intoClause->oidInfo.aosegOid, 
 									  intoClause->oidInfo.aosegIndexOid,
-									  &intoClause->oidInfo.aosegComptypeOid,
+									  &intoClause->oidInfo.aosegComptypeOid, 
 									  false);
 	/* don't create AO block directory here, it'll be created when needed */
 
@@ -4184,7 +4210,7 @@ CreateIntoRel(QueryDesc *queryDesc)
 	 * And open the constructed table for writing.
 	 */
 	intoRelationDesc = heap_open(intoRelationId, AccessExclusiveLock);
-
+	
 	/*
 	 * Add column encoding entries based on the WITH clause.
 	 *
@@ -4202,10 +4228,10 @@ CreateIntoRel(QueryDesc *queryDesc)
 	 * create segment 0 for insert.
 	 */
 	CreateAppendOnlyParquetSegFileForRelationOnMaster(intoRelationDesc, RESERVED_SEGNO);
-
+	
 	intoClause->oidInfo.relOid = intoRelationId;
 	estate->es_into_relation_descriptor = intoRelationDesc;
-
+				
 	return intoRelationDesc;
 }
 
@@ -4218,7 +4244,7 @@ CreateIntoRel(QueryDesc *queryDesc)
  */
 static void
 OpenIntoRel(QueryDesc *queryDesc)
-{
+	{
 	EState	   *estate = queryDesc->estate;
 	Relation	intoRelationDesc;
 
@@ -4245,7 +4271,7 @@ OpenIntoRel(QueryDesc *queryDesc)
 	Assert(intoRelationDesc->rd_targblock == InvalidBlockNumber);
 
 	Assert (!estate->es_into_relation_is_bulkload);
-
+	
 	/*
 	 * Now replace the query's DestReceiver with one for SELECT INTO
 	 */
@@ -4272,7 +4298,7 @@ CloseIntoRel(QueryDesc *queryDesc)
 	{
 		/* APPEND_ONLY is closed in the intorel_shutdown */
 		if (!(RelationIsAoRows(rel) || RelationIsAoCols(rel)  || RelationIsParquet(rel)))
-		{
+				{
 			Insist(!"gpsql does not support heap table, use append only table instead");
 		}
 
@@ -4303,7 +4329,7 @@ CreateIntoRelDestReceiver(void)
 
 	self->estate = NULL;
 	self->ao_insertDesc = NULL;
-    self->aocs_ins = NULL;
+        self->aocs_ins = NULL;
     self->parquet_insertDesc = NULL;
 
 	return (DestReceiver *) self;
@@ -4419,7 +4445,7 @@ intorel_shutdown(DestReceiver *self)
 		sendback->relid = RelationGetRelid(myState->aocs_ins->aoi_rel);
 
         aocs_insert_finish(myState->aocs_ins);
-	}
+}
 	else if (RelationIsParquet(into_rel) && myState->parquet_insertDesc)
 	{
 		sendback = CreateQueryContextDispatchingSendBack(1);
@@ -4569,14 +4595,14 @@ get_part(EState *estate, Datum *values, bool *isnull, TupleDesc tupdesc)
 						  CMD_INSERT,
 						  estate->es_instrument,
 						  (Gp_role != GP_ROLE_EXECUTE || Gp_is_writer));
-
-		map_part_attrs(estate->es_result_relations->ri_RelationDesc,
+		
+		map_part_attrs(estate->es_result_relations->ri_RelationDesc, 
 					   resultRelInfo->ri_RelationDesc,
 					   &(resultRelInfo->ri_partInsertMap),
 					   TRUE); /* throw on error, so result not needed */
 
 		if (resultRelInfo->ri_partInsertMap)
-			resultRelInfo->ri_partSlot =
+			resultRelInfo->ri_partSlot = 
 				MakeSingleTupleTableSlot(resultRelInfo->ri_RelationDesc->rd_att);
 	}
 	return resultRelInfo;
@@ -4632,27 +4658,27 @@ AttrMap *makeAttrMap(int base_count, AttrNumber *base_map)
 {
 	int i, n, p;
 	AttrMap *map;
-
+	
 	if ( base_count < 1 || base_map == NULL )
 		return NULL;
-
+	
 	map = palloc0(sizeof(AttrMap) + base_count * sizeof(AttrNumber));
-
+	
 	for ( i = n = p = 0; i <= base_count; i++ )
 	{
 		map->attr_map[i] = base_map[i];
-
-		if ( map->attr_map[i] != 0 )
+		
+		if ( map->attr_map[i] != 0 ) 
 		{
 			if ( map->attr_map[i] > p ) p = map->attr_map[i];
 			n++;
 		}
-	}
-
+	}	
+	
 	map->live_count = n;
 	map->attr_max = p;
 	map->attr_count = base_count;
-
+	
 	return map;
 }
 
@@ -4667,29 +4693,29 @@ AttrMap *invertedAttrMap(AttrMap *base_map, int inv_count)
 {
 	AttrMap *inv_map;
 	int i;
-
+	
 	if ( base_map == NULL )
 		return NULL;
-
+	
 	if ( inv_count < base_map->attr_max )
 	{
 		inv_count = base_map->attr_max;
-	}
-
+	}	
+	
 	inv_map = palloc0(sizeof(AttrMap) + inv_count * sizeof(AttrNumber));
-
+	
 	inv_map->live_count = base_map->live_count;
 	inv_map->attr_max = base_map->attr_count;
 	inv_map->attr_count = inv_count;
-
+	
 	for ( i = 1; i <= base_map->attr_count; i++ )
 	{
 		AttrNumber inv = base_map->attr_map[i];
-
+		
 		if ( inv == 0 ) continue;
 		inv_map->attr_map[inv] = i;
 	}
-
+	
 	return inv_map;
 }
 
@@ -4697,13 +4723,13 @@ static AttrMap *copyAttrMap(AttrMap *original)
 {
 	AttrMap *copy;
 	size_t sz;
-
+	
 	if ( original == NULL ) return NULL;
-
+	
 	sz = sizeof(AttrMap) + original->attr_count *sizeof(AttrNumber);
 	copy = palloc0(sz);
 	memcpy(copy, original, sz);
-
+	
 	return copy;
 }
 
@@ -4714,21 +4740,21 @@ AttrMap *compositeAttrMap(AttrMap *input_map, AttrMap *output_map)
 {
 	AttrMap *composite_map;
 	int i;
-
+	
 	if ( input_map == NULL )
 		return copyAttrMap(output_map);
 	if ( output_map == NULL )
 	    return copyAttrMap(input_map);
-
+	
 	composite_map = copyAttrMap(input_map);
 	composite_map->attr_max = output_map->attr_max;
-
+	
 	for ( i = 1; i <=input_map->attr_count; i++ )
 	{
 		AttrNumber k = attrMap(output_map, attrMap(input_map, i));
 		composite_map->attr_map[i] = k;
 	}
-
+	
 	return composite_map;
 }
 
@@ -4752,7 +4778,7 @@ List *attrMapIntList(AttrMap *map, List *attrs)
 {
 	ListCell *lc;
 	List *remapped_list = NIL;
-
+	
 	foreach (lc, attrs)
 	{
 		int anum = (int)attrMap(map, (AttrNumber)lfirst_int(lc));
@@ -4771,14 +4797,14 @@ static Node *apply_attrmap_mutator(Node *node, AttrMap *map)
 {
 	if ( node == NULL )
 		return NULL;
-
+	
 	if (IsA(node, Var) )
 	{
 		AttrNumber anum = 0;
 		Var *var = (Var*)node;
 		Assert(var->varno == 1); /* in CHECK contraints */
 		anum = attrMap(map, var->varattno);
-
+		
 		if ( anum == 0 )
 		{
 			/* Should never happen, but best caught early. */
@@ -4853,51 +4879,51 @@ Node *attrMapExpr(AttrMap *map, Node *expr)
  * and alignment, attribute numbers must agree with their
  * position in tuple, etc.
  */
-bool
+bool 
 map_part_attrs(Relation base, Relation part, AttrMap **map_ptr, bool throw)
-{
+{	
 	AttrNumber i = 1;
 	AttrNumber n = base->rd_att->natts;
 	FormData_pg_attribute *battr = NULL;
-
+	
 	AttrNumber j = 1;
 	AttrNumber m = part->rd_att->natts;
 	FormData_pg_attribute *pattr = NULL;
-
+	
 	AttrNumber *v = NULL;
-
+	
 	/* If we might want a map, allocate one. */
 	if ( map_ptr != NULL )
 	{
 		v = palloc0(sizeof(AttrNumber)*(n+1));
 		*map_ptr = NULL;
 	}
-
+	
 	bool identical = TRUE;
 	bool compatible = TRUE;
-
+	
 	/* For each matched pair of attributes ... */
 	while ( i <= n && j <= m )
 	{
 		battr = base->rd_att->attrs[i-1];
 		pattr = part->rd_att->attrs[j-1];
-
+		
 		/* Skip dropped attributes. */
-
+		
 		if ( battr->attisdropped )
 		{
 			i++;
 			continue;
 		}
-
+		
 		if ( pattr->attisdropped )
 		{
 			j++;
 			continue;
 		}
-
+		
 		/* Check attribute conformability requirements. */
-
+		
 		/* -- Names must match. */
 		if ( strncmp(NameStr(battr->attname), NameStr(pattr->attname), NAMEDATALEN) != 0 )
 		{
@@ -4912,7 +4938,7 @@ map_part_attrs(Relation base, Relation part, AttrMap **map_ptr, bool throw)
 			compatible = FALSE;
 			break;
 		}
-
+		
 		/* -- Types must match. */
 		if (battr->atttypid != pattr->atttypid)
 		{
@@ -4925,7 +4951,7 @@ map_part_attrs(Relation base, Relation part, AttrMap **map_ptr, bool throw)
 			compatible = FALSE;
 			break;
 		}
-
+		
 		/* -- Alignment should match, but check just to be safe. */
 		if (battr->attalign != pattr->attalign )
 		{
@@ -4938,7 +4964,7 @@ map_part_attrs(Relation base, Relation part, AttrMap **map_ptr, bool throw)
 			compatible = FALSE;
 			break;
 		}
-
+		
 		/* -- Attribute numbers must match position (+1) in tuple. 
 		 *    This is a hard requirement so always throw.  This could
 		 *    be an assertion, except that we want to fail even in a 
@@ -4947,19 +4973,19 @@ map_part_attrs(Relation base, Relation part, AttrMap **map_ptr, bool throw)
 		if ( battr->attnum != i || pattr->attnum != j )
 			elog(ERROR,
 				 "attribute numbers out of order");
-
+		
 		/* Note any attribute number difference. */
 		if ( i != j )
 			identical = FALSE;
-
+		
 		/* If we're building a map, update it. */
 		if ( v != NULL )
 			v[i] = j;
-
+		
 		i++;
 		j++;
 	}
-
+	
 	if ( compatible )
 	{
 		/* Any excess attributes in parent better be marked dropped */
@@ -5018,7 +5044,7 @@ map_part_attrs(Relation base, Relation part, AttrMap **map_ptr, bool throw)
 		pfree(v);
 		v = NULL;
 	}
-
+	
 	if ( map_ptr != NULL && v != NULL )
 	{
 		*map_ptr = makeAttrMap(n, v);
@@ -5101,12 +5127,12 @@ ClearPartitionState(EState *estate)
 	PartitionState *pstate = estate->es_partition_state;
 	HASH_SEQ_STATUS hash_seq_status;
 	ResultPartHashEntry *entry;
-
+	
 	if ( pstate == NULL || pstate->result_partition_hash == NULL )
 		return;
-
+	
 	/* Examine each hash table entry. */
-	hash_freeze(pstate->result_partition_hash);
+	hash_freeze(pstate->result_partition_hash); 
 	hash_seq_init(&hash_seq_status, pstate->result_partition_hash);
 	while ( (entry = hash_seq_search(&hash_seq_status)) )
 	{

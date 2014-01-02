@@ -290,6 +290,8 @@ typedef enum NodeTag
 	T_MemoryContext = 600,
 	T_AllocSetContext,
 	T_MPoolContext,
+	T_MemoryAccount,
+	T_SerializedMemoryAccount,
 
     T_AsetDirectContext = 610,                                      /*CDB*/
 

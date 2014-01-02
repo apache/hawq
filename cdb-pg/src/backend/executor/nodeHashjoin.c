@@ -191,8 +191,8 @@ ExecHashJoin(HashJoinState *node)
 		/*
 		 * create the hash table
 		 */
-		hashtable = ExecHashTableCreate(node,
-										(Hash *) hashNode->ps.plan,
+		hashtable = ExecHashTableCreate(hashNode,
+										node,
 										node->hj_HashOperators,
 										PlanStateOperatorMemKB((PlanState *) hashNode),
 										work_set);
@@ -202,7 +202,7 @@ ExecHashJoin(HashJoinState *node)
          * CDB: Offer extra info for EXPLAIN ANALYZE.
          */
         if (estate->es_instrument)
-            ExecHashTableExplainInit(node, hashtable);
+            ExecHashTableExplainInit(hashNode, node, hashtable);
 
 
 		/*
@@ -418,7 +418,7 @@ ExecHashJoin(HashJoinState *node)
 				break;		/* loop around for a new outer tuple */
 			}
 
-			curtuple = ExecScanHashBucket(node, econtext);
+			curtuple = ExecScanHashBucket(hashNode, node, econtext);
 			if (curtuple == NULL)
 				break;			/* out of matches */
 
@@ -712,7 +712,6 @@ ExecCountSlotsHashJoin(HashJoin *node)
 void
 ExecEndHashJoin(HashJoinState *node)
 {
-
 	/*
 	 * Free hash table
 	 */
@@ -720,7 +719,8 @@ ExecEndHashJoin(HashJoinState *node)
 	{
 		if (!node->hj_HashTable->eagerlyReleased)
 		{
-			ExecHashTableDestroy(node->hj_HashTable);
+			HashState *hashState = (HashState *) innerPlanState(node);
+			ExecHashTableDestroy(hashState, node->hj_HashTable);
 		}
 		pfree(node->hj_HashTable);
 		node->hj_HashTable = NULL;
@@ -768,6 +768,8 @@ ExecHashJoinOuterGetTuple(PlanState *outerNode,
 	TupleTableSlot *slot;
 	ExprContext    *econtext;
 
+	HashState *hashState = (HashState *) innerPlanState(hjstate);
+
 	/* Read tuples from outer relation only if it's the first batch
 	 * and we're not loading from cached workfiles.  */
 	if (curbatch == 0 && !hjstate->cached_workfiles_loaded)
@@ -800,7 +802,7 @@ ExecHashJoinOuterGetTuple(PlanState *outerNode,
 					(hjstate->js.jointype == JOIN_LASJ) ||
 					(hjstate->js.jointype == JOIN_LASJ_NOTIN) ||
 					hjstate->hj_nonequijoin;
-			if (ExecHashGetHashValue(hashtable, econtext,
+			if (ExecHashGetHashValue(hashState, hashtable, econtext,
 						hjstate->hj_OuterHashKeys,
 						keep_nulls,
 						hashvalue,
@@ -896,6 +898,8 @@ ExecHashJoinNewBatch(HashJoinState *hjstate)
 	TupleTableSlot *slot;
 	uint32		hashvalue;
 
+	HashState *hashState = (HashState *) innerPlanState(hjstate);
+
 start_over:
 	nbatch = hashtable->nbatch;
 	curbatch = hashtable->curbatch;
@@ -904,7 +908,7 @@ start_over:
         return nbatch;
 
     if (curbatch >= 0 && hashtable->stats)
-        ExecHashTableExplainBatchEnd(hashtable);
+        ExecHashTableExplainBatchEnd(hashState, hashtable);
 
 	if (curbatch > 0)
 	{
@@ -992,7 +996,7 @@ start_over:
     /*
      * Reload the hash table with the new inner batch (which could be empty)
      */
-    ExecHashTableReset(hashtable);
+    ExecHashTableReset(hashState, hashtable);
 
 	if (batch->innerside.workfile != NULL)
 	{
@@ -1022,7 +1026,7 @@ start_over:
 		     * NOTE: some tuples may be sent to future batches.  Also, it is
 		     * possible for hashtable->nbatch to be increased here!
 		     */
-		    ExecHashTableInsert(NULL, hashtable, slot, hashvalue);
+		    ExecHashTableInsert(hashState, hashtable, slot, hashvalue);
 		    hashtable->totalTuples += 1;
 	    }
 
@@ -1228,7 +1232,8 @@ ExecReScanHashJoin(HashJoinState *node, ExprContext *exprCtxt)
 			/* must destroy and rebuild hash table */
 			if (!node->hj_HashTable->eagerlyReleased)
 			{
-				ExecHashTableDestroy(node->hj_HashTable);
+				HashState *hashState = (HashState *) innerPlanState(node);
+				ExecHashTableDestroy(hashState, node->hj_HashTable);
 			}
 			pfree(node->hj_HashTable);
 			node->hj_HashTable = NULL;
@@ -1272,14 +1277,16 @@ static void ReleaseHashTable(HashJoinState *node)
 	
 	if (node->hj_HashTable)
 	{
+		HashState *hashState = (HashState *) innerPlanState(node);
+
 		/* This hashtable should not have been released already! */
 		Assert(!node->hj_HashTable->eagerlyReleased);
 	    if (node->hj_HashTable->stats)
 	    {
 	    	/* Report on batch in progress. */
-	    	ExecHashTableExplainBatchEnd(node->hj_HashTable);
+	    	ExecHashTableExplainBatchEnd(hashState, node->hj_HashTable);
 	    }
-		ExecHashTableDestroy(node->hj_HashTable);
+		ExecHashTableDestroy(hashState, node->hj_HashTable);
 		node->hj_HashTable->eagerlyReleased = true;
 	}
 	

@@ -23,6 +23,7 @@
 #include "utils/memutils.h"             /* MemoryContextGetPeakSpace() */
 #include "cdb/memquota.h"
 #include "cdb/cdbgang.h"
+#include "inttypes.h"
 
 /* EXPLAIN ANALYZE statistics for one plan node of a slice */
 typedef struct CdbExplain_StatInst
@@ -42,6 +43,7 @@ typedef struct CdbExplain_StatInst
 	bool        workfileReused; /* workfile reused in this node */
 	bool        workfileCreated;/* workfile created in this node */
 	instr_time	firststart;		/* Start time of first iteration of node */
+	double		peakMemBalance; /* Max mem account balance */
     int         bnotes;         /* Offset to beginning of node's extra text */
     int         enotes;         /* Offset to end of node's extra text */
 } CdbExplain_StatInst;
@@ -51,6 +53,8 @@ typedef struct CdbExplain_StatInst
 typedef struct CdbExplain_SliceWorker
 {
     double      peakmemused;    /* bytes alloc in per-query mem context tree */
+    double		vmem_reserved;	/* vmem reserved by a QE */
+    double		memory_accounting_global_peak;	/* peak memory observed during memory accounting */
 } CdbExplain_SliceWorker;
 
 
@@ -62,9 +66,18 @@ typedef struct CdbExplain_StatHdr
     int         nInst;          /* num of StatInst entries following StatHdr */
     int         bnotes;         /* offset to extra text area */
     int         enotes;         /* offset to end of extra text area */
+
+    int			memAccountTreeNodeCount;     /* How many mem account we serialized */
+    int			memAccountTreeStartOffset; /* Where in the header our mem account tree is serialized */
+
     CdbExplain_SliceWorker  worker;     /* qExec's overall stats for slice */
 
-    /* Array [0..nInst-1] of StatInst entries is appended starting here */
+    /*
+     * During serialization, we use this as a temporary StatInst and save "one-at-a-time"
+     * StatInst into this variable. We then write this variable into buffer (serialize it)
+     * and then "recycle" the same inst for next plan node's StatInst.
+     * During deserialization, an Array [0..nInst-1] of StatInst entries is appended starting here.
+     */
     CdbExplain_StatInst inst[1];
 
     /* extra text is appended after that */
@@ -83,7 +96,7 @@ typedef struct CdbExplain_DispatchSummary
 } CdbExplain_DispatchSummary;
 
 
-/* One node's EXPLAIN ANALYZE statistics for all the workers of its gang */
+/* One node's EXPLAIN ANALYZE statistics for all the workers of its segworker group */
 typedef struct CdbExplain_NodeSummary
 {
     /* Summary over all the node's workers */
@@ -93,6 +106,7 @@ typedef struct CdbExplain_NodeSummary
     CdbExplain_Agg  workmemwanted;
 	CdbExplain_Agg  totalWorkfileReused;
 	CdbExplain_Agg  totalWorkfileCreated;
+    CdbExplain_Agg  peakMemBalance;
 
     /* insts array info */
     int             segindex0;      /* segment id of insts[0] */
@@ -103,7 +117,7 @@ typedef struct CdbExplain_NodeSummary
 } CdbExplain_NodeSummary;
 
 
-/* One slice's statistics for all the workers of its gang */
+/* One slice's statistics for all the workers of its segworker group */
 typedef struct CdbExplain_SliceSummary
 {
     Slice          *slice;
@@ -113,8 +127,13 @@ typedef struct CdbExplain_SliceSummary
     int             segindex0;      /* segment id of workers[0] */
     CdbExplain_SliceWorker *workers;    /* -> array [0..nworker-1] of SliceWorker */
 
-    /* Summary of SliceWorker stats over all of the slice's workers */
-    CdbExplain_Agg  peakmemused;
+    SerializedMemoryAccount **memoryTreeRoots; /* Array of pointers to pseudo roots [0...nworker-1] */
+
+    CdbExplain_Agg  peakmemused; /* Summary of SliceWorker stats over all of the slice's workers */
+
+    CdbExplain_Agg	vmem_reserved; /* vmem reserved by QEs */
+
+    CdbExplain_Agg	memory_accounting_global_peak; /* Peak memory accounting balance by QEs */
 
     /* Rollup of per-node stats over all of the slice's workers and nodes */
     double          workmemused_max;
@@ -154,12 +173,35 @@ typedef struct CdbExplain_SendStatCtx
 /* State for cdbexplain_recvStatWalker() and cdbexplain_depositStatsToNode() */
 typedef struct CdbExplain_RecvStatCtx
 {
+	/*
+	 * iStatInst is the current StatInst serial during the depositing process for a slice.
+	 * We walk the plan tree, and for each node we deposit stat from all the QEs
+	 * of the segworker group for current slice. After we finish one node, we increase
+	 * iStatInst, which means we are done with one plan node's stat across
+	 * all segments and now moving forward to the next one. Once we are done
+	 * processing all the plan node of a PARTICULAR slice, then we switch to the
+	 * next slice, read the messages from all the QEs of the next slice (another
+	 * segworker group) store them in the msgptrs, reset the iStatInst and then start
+	 * parsing these messages and depositing them in the nodes of the new slice.
+	 */
     int                     iStatInst;
+    /*
+     * nStatInst is the total number of StatInst for current slice. Typically this is
+     * the number of plan nodes in the current slice.
+     */
     int                     nStatInst;
+    /* segIndexMin is the min of segment index from which we collected message (i.e., saved msgptrs) */
     int                     segindexMin;
+    /* segIndexMax is the max of segment index from which we collected message (i.e., saved msgptrs) */
     int                     segindexMax;
+    /* We deposit stat for one slice at a time. sliceIndex saves the current slice */
     int                     sliceIndex;
+    /*
+     * The number of msgptrs that we have saved for current slice. This is
+     * typically the number of QE processes
+     */
     int                     nmsgptr;
+    /* The actual messages. Contains an array of StatInst too */
     CdbExplain_StatHdr    **msgptrs;
     CdbDispatchResults     *dispatchResults;
     StringInfoData         *extratextbuf;
@@ -298,6 +340,9 @@ cdbexplain_sendExecStats(QueryDesc *queryDesc)
     PlanState              *planstate;
     CdbExplain_SendStatCtx  ctx;
     StringInfoData          notebuf;
+    StringInfoData			memoryAccountTreeBuffer;
+
+    /* Header offset (where header begins in the message buffer) */
     int                     hoff;
 
     Assert(Gp_role == GP_ROLE_EXECUTE);
@@ -336,7 +381,11 @@ cdbexplain_sendExecStats(QueryDesc *queryDesc)
 
     /* Reserve buffer space for the message header (excluding 'inst' array). */
     pq_beginmessage(&ctx.buf, 'Y');
+
+    /* Where the actual StatHdr begins*/
     hoff = ctx.buf.len;
+
+    /* Write everything until inst member including "CdbExplain_SliceWorker worker" */
     appendBinaryStringInfo(&ctx.buf, (char *)&ctx.hdr, sizeof(ctx.hdr) - sizeof(ctx.hdr.inst));
 
     /* Append statistics from each PlanState node in this slice. */
@@ -345,13 +394,26 @@ cdbexplain_sendExecStats(QueryDesc *queryDesc)
     /* Obtain per-slice stats and put them in StatHdr. */
     cdbexplain_collectSliceStats(planstate, &ctx.hdr.worker);
 
+    /* Append MemoryAccount Tree */
+    ctx.hdr.memAccountTreeStartOffset = ctx.buf.len - hoff;
+    initStringInfo(&memoryAccountTreeBuffer);
+    uint totalSerialized = MemoryAccounting_Serialize(&memoryAccountTreeBuffer);
+
+    ctx.hdr.memAccountTreeNodeCount = totalSerialized;
+    appendBinaryStringInfo(&ctx.buf, memoryAccountTreeBuffer.data, memoryAccountTreeBuffer.len);
+    pfree(memoryAccountTreeBuffer.data);
+
     /* Append the extra message text. */
     ctx.hdr.bnotes = ctx.buf.len - hoff;
     appendBinaryStringInfo(&ctx.buf, notebuf.data, notebuf.len);
     ctx.hdr.enotes = ctx.buf.len - hoff;
     pfree(notebuf.data);
 
-    /* Move the message header into the buffer. */
+    /*
+     * Move the message header into the buffer. Rewrite the updated header (with bnotes, enotes, nInst etc.)
+     * Note: this is the second time we are writing the header. The first write merely reserves space for
+     * the header
+     */
     memcpy(ctx.buf.data+hoff, (char *)&ctx.hdr, sizeof(ctx.hdr) - sizeof(ctx.hdr.inst));
 
     /* Send message to qDisp process. */
@@ -481,8 +543,9 @@ cdbexplain_recvExecStats(struct PlanState              *planstate,
         hdr = (CdbExplain_StatHdr *)statcell->data;
         if ((size_t)statcell->len < sizeof(*hdr) ||
             (size_t)statcell->len != (sizeof(*hdr) - sizeof(hdr->inst) +
-                                      hdr->nInst * sizeof(hdr->inst) +
-                                      hdr->enotes - hdr->bnotes) ||
+            							hdr->nInst * sizeof(hdr->inst) +
+            							hdr->memAccountTreeNodeCount * sizeof(SerializedMemoryAccount) +
+            							hdr->enotes - hdr->bnotes) ||
             statcell->len != hdr->enotes ||
             hdr->segindex < -1 ||
             hdr->segindex >= gpsegmentCount)
@@ -604,6 +667,10 @@ cdbexplain_collectSliceStats(PlanState                 *planstate,
     out_worker->peakmemused =
         (double)MemoryContextGetPeakSpace(estate->es_query_cxt);
 
+    out_worker->vmem_reserved = (double) getMOPHighWaterMark();
+
+    out_worker->memory_accounting_global_peak = (double) MemoryAccountingPeakBalance;
+
 }                               /* cdbexplain_collectSliceStats */
 
 
@@ -659,6 +726,7 @@ cdbexplain_depositSliceStats(CdbExplain_StatHdr        *hdr,
         ss->segindex0 = recvstatctx->segindexMin;
         ss->nworker = recvstatctx->segindexMax + 1 - ss->segindex0;
         ss->workers = (CdbExplain_SliceWorker *)palloc0(ss->nworker * sizeof(ss->workers[0]));
+        ss->memoryTreeRoots = (SerializedMemoryAccount **)palloc0(ss->nworker * sizeof(ss->memoryTreeRoots[0]));
     }
 
     /* Save a copy of this SliceWorker instance in the worker array. */
@@ -668,8 +736,24 @@ cdbexplain_depositSliceStats(CdbExplain_StatHdr        *hdr,
     Insist(ssw->peakmemused == 0);  /* each worker should be seen just once */
     *ssw = hdr->worker;
 
+    const char *originalSerializedMemoryAccountingStartAddress = ((const char*) hdr) +
+    		hdr->memAccountTreeStartOffset;
+
+    size_t bitCount = sizeof(SerializedMemoryAccount) * hdr->memAccountTreeNodeCount;
+    /*
+     * We need to copy of the serialized bits. These bits have shorter lifespan
+     * and can get out of scope before we finish explain analyze.
+     */
+    void *copiedSerializedMemoryAccountingStartAddress = palloc(bitCount);
+    memcpy(copiedSerializedMemoryAccountingStartAddress, originalSerializedMemoryAccountingStartAddress, bitCount);
+
+    ss->memoryTreeRoots[iworker] = MemoryAccounting_Deserialize(copiedSerializedMemoryAccountingStartAddress,
+    		hdr->memAccountTreeNodeCount);
+
     /* Rollup of per-worker stats into SliceSummary */
     cdbexplain_agg_upd(&ss->peakmemused, hdr->worker.peakmemused, hdr->segindex);
+    cdbexplain_agg_upd(&ss->vmem_reserved, hdr->worker.vmem_reserved, hdr->segindex);
+    cdbexplain_agg_upd(&ss->memory_accounting_global_peak, hdr->worker.memory_accounting_global_peak, hdr->segindex);
 
     /* Rollup of per-node stats over all nodes of the slice into SliceSummary */
     ss->workmemused_max = recvstatctx->workmemused_max;
@@ -729,6 +813,7 @@ cdbexplain_collectStatsFromNode(PlanState *planstate, CdbExplain_SendStatCtx *ct
     si->workmemwanted   = instr->workmemwanted;
     si->workfileReused   = instr->workfileReused;
     si->workfileCreated  = instr->workfileCreated;
+	si->peakMemBalance	 = MemoryAccounting_GetPeak(planstate->memoryAccount);
 	si->firststart      = instr->firststart;
 }                               /* cdbexplain_collectStatsFromNode */
 
@@ -814,9 +899,19 @@ static void
 cdbexplain_depositStatsToNode(PlanState *planstate, CdbExplain_RecvStatCtx *ctx)
 {
     Instrumentation            *instr = planstate->instrument;
-    CdbExplain_StatHdr         *rsh;
-    CdbExplain_StatInst        *rsi;
+    CdbExplain_StatHdr         *rsh; /* The header (which includes StatInst) */
+    CdbExplain_StatInst        *rsi; /* The current StatInst */
+
+    /*
+     * Points to the insts array of node summary (CdbExplain_NodeSummary). Used
+     * for saving every rsi in the node summary (in addition to saving the max/avg).
+     */
     CdbExplain_StatInst        *nsi;
+
+    /*
+     * ns is the node summary across all QEs of the segworker group. It also contains detailed "unsummarized"
+     * raw stat for a node across all QEs in current segworker group (in the insts array)
+     */
     CdbExplain_NodeSummary     *ns;
     CdbExplain_DepStatAcc       ntuples;
     CdbExplain_DepStatAcc       execmemused;
@@ -825,6 +920,9 @@ cdbexplain_depositStatsToNode(PlanState *planstate, CdbExplain_RecvStatCtx *ctx)
     CdbExplain_DepStatAcc       totalWorkfileReused;
     CdbExplain_DepStatAcc       totalWorkfileCreated;
     CdbExplain_DepStatAcc       peakmemused;
+    CdbExplain_DepStatAcc		vmem_reserved;
+    CdbExplain_DepStatAcc		memory_accounting_global_peak;
+    CdbExplain_DepStatAcc       peakMemBalance;
     int                         imsgptr;
     int                         nInst;
 
@@ -851,9 +949,12 @@ cdbexplain_depositStatsToNode(PlanState *planstate, CdbExplain_RecvStatCtx *ctx)
     cdbexplain_depStatAcc_init0(&workmemwanted);
 	cdbexplain_depStatAcc_init0(&totalWorkfileReused);
 	cdbexplain_depStatAcc_init0(&totalWorkfileCreated);
+    cdbexplain_depStatAcc_init0(&peakMemBalance);
 
     /* Initialize per-slice accumulators. */
     cdbexplain_depStatAcc_init0(&peakmemused);
+    cdbexplain_depStatAcc_init0(&vmem_reserved);
+    cdbexplain_depStatAcc_init0(&memory_accounting_global_peak);
 
     /* Examine the statistics from each qExec. */
     for (imsgptr = 0; imsgptr < ctx->nmsgptr; imsgptr++)
@@ -887,9 +988,12 @@ cdbexplain_depositStatsToNode(PlanState *planstate, CdbExplain_RecvStatCtx *ctx)
         cdbexplain_depStatAcc_upd(&workmemwanted, rsi->workmemwanted, rsh, rsi, nsi);
 		cdbexplain_depStatAcc_upd(&totalWorkfileReused, (rsi->workfileReused ? 1 : 0), rsh, rsi, nsi);
 		cdbexplain_depStatAcc_upd(&totalWorkfileCreated, (rsi->workfileCreated ? 1 : 0), rsh, rsi, nsi);
+        cdbexplain_depStatAcc_upd(&peakMemBalance, rsi->peakMemBalance, rsh, rsi, nsi);
 
         /* Update per-slice accumulators. */
         cdbexplain_depStatAcc_upd(&peakmemused, rsh->worker.peakmemused, rsh, rsi, nsi);
+        cdbexplain_depStatAcc_upd(&vmem_reserved, rsh->worker.vmem_reserved, rsh, rsi, nsi);
+        cdbexplain_depStatAcc_upd(&memory_accounting_global_peak, rsh->worker.memory_accounting_global_peak, rsh, rsi, nsi);
     }
 
     /* Save per-node accumulated stats in NodeSummary. */
@@ -899,6 +1003,7 @@ cdbexplain_depositStatsToNode(PlanState *planstate, CdbExplain_RecvStatCtx *ctx)
     ns->workmemwanted = workmemwanted.agg;
 	ns->totalWorkfileReused = totalWorkfileReused.agg;
 	ns->totalWorkfileCreated = totalWorkfileCreated.agg;
+    ns->peakMemBalance = peakMemBalance.agg;
 
     /* Roll up summary over all nodes of slice into RecvStatCtx. */
     ctx->workmemused_max = Max(ctx->workmemused_max, workmemused.agg.vmax);
@@ -1215,11 +1320,9 @@ nodeSupportWorkfileCaching(PlanState *planstate)
  *
  * 'planstate' is the node whose statistics are to be displayed.
  * 'str' is the output buffer.
+ * 'indent' is the root indentation for all the text generated for explain output
  * 'ctx' is a CdbExplain_ShowStatCtx object which was created by a call to
  *      cdbexplain_showExecStatsBegin().
- * 'extratextbuf' is the buffer in which extra message text was saved by
- *      cdbexplain_recvExecStats().  Some more extra message text might be
- *      appended to this buffer.
  */
 void
 cdbexplain_showExecStats(struct PlanState              *planstate,
@@ -1363,6 +1466,22 @@ cdbexplain_showExecStats(struct PlanState              *planstate,
 
     appendStringInfoString(str, ".\n");
 
+	if ((EXPLAIN_MEMORY_VERBOSITY_DETAIL <= explain_memory_verbosity)
+			&& planstate->type == T_MotionState)
+    {
+		Motion	   *pMotion = (Motion *) planstate->plan;
+		int curSliceId = pMotion->motionID;
+
+    	for (int iWorker = 0; iWorker < ctx->slices[curSliceId].nworker; iWorker++)
+    	{
+    	    appendStringInfoFill(str, 2*indent, ' ');
+    		appendStringInfo(str, "slice %d, seg %d\n", curSliceId, iWorker);
+
+    		MemoryAccounting_ToString(&(ctx->slices[curSliceId].memoryTreeRoots[iWorker]->memoryAccount), str, indent + 1);
+    	}
+    }
+
+
     /*
      * Executor memory used by this individual node, if it allocates from a
      * memory context of its own instead of sharing the per-query context.
@@ -1423,6 +1542,31 @@ cdbexplain_showExecStats(struct PlanState              *planstate,
 
     }
 
+    if (EXPLAIN_MEMORY_VERBOSITY_SUPPRESS < explain_memory_verbosity)
+    {
+		/*
+		 * Memory account balance without overhead
+		 */
+		appendStringInfoFill(str, 2*indent, ' ');
+		cdbexplain_formatMemory(maxbuf, sizeof(maxbuf), ns->peakMemBalance.vmax);
+		if (ns->peakMemBalance.vcnt == 1)
+		{
+			appendStringInfo(str,
+							 "Memory:  %s.\n",
+							 maxbuf);
+		}
+		else
+		{
+			cdbexplain_formatSeg(segbuf, sizeof(segbuf), ns->peakMemBalance.imax, ns->ninst);
+			cdbexplain_formatMemory(avgbuf, sizeof(avgbuf), cdbexplain_agg_avg(&ns->peakMemBalance));
+			appendStringInfo(str,
+							 "Memory:  %s avg, %s max%s.\n",
+							 avgbuf,
+							 maxbuf,
+							 segbuf);
+		}
+    }
+
     /*
      * What value of work_mem would suffice to eliminate workfile I/O?
      */
@@ -1431,9 +1575,11 @@ cdbexplain_showExecStats(struct PlanState              *planstate,
         appendStringInfoFill(str, 2*indent, ' ');
         cdbexplain_formatMemory(maxbuf, sizeof(maxbuf), ns->workmemwanted.vmax);
         if (ns->ninst == 1)
+        {
             appendStringInfo(str,
                 "Work_mem wanted: %s to lessen workfile I/O.\n",
                 maxbuf);
+        }
         else
         {
             cdbexplain_formatMemory(avgbuf, sizeof(avgbuf), cdbexplain_agg_avg(&ns->workmemwanted));
@@ -1456,6 +1602,7 @@ cdbexplain_showExecStats(struct PlanState              *planstate,
         CdbExplain_StatInst    *nsi = &ns->insts[i];
 
         if (nsi->bnotes < nsi->enotes)
+        {
             cdbexplain_formatExtraText(str,
                                        indent,
                                        (ns->ninst == 1) ? -1
@@ -1463,6 +1610,7 @@ cdbexplain_showExecStats(struct PlanState              *planstate,
 									   nsi->workfileReused,
                                        ctx->extratextbuf.data + nsi->bnotes,
                                        nsi->enotes - nsi->bnotes);
+        }
     }
 
     /*
@@ -1487,7 +1635,9 @@ cdbexplain_showExecStats(struct PlanState              *planstate,
             CdbExplain_StatInst    *nsi = &ns->insts[i];
 
 	        if (INSTR_TIME_IS_ZERO(nsi->firststart))
+	        {
                 continue;
+	        }
 
 	        /* Time from start of query on qDisp to worker's first result row */
 			INSTR_TIME_SET_ZERO(timediff);
@@ -1571,29 +1721,41 @@ cdbexplain_showExecStatsEnd(struct PlannedStmt *stmt,
 
             appendStringInfoString(str, "Workers:");
             if (ds->nError == 1)
+            {
                 appendStringInfo(str,
                                  " %d error;",
                                  ds->nError);
+            }
             else if (ds->nError > 1)
+            {
                 appendStringInfo(str,
                                  " %d errors;",
                                  ds->nError);
+            }
             if (ds->nCanceled > 0)
+            {
                 appendStringInfo(str,
                                  " %d canceled;",
                                  ds->nCanceled);
+            }
             if (nNotDispatched > 0)
+            {
                 appendStringInfo(str,
                                  " %d not dispatched;",
                                  nNotDispatched);
+            }
             if (ds->nIgnorableError > 0)
+            {
                 appendStringInfo(str,
                                  " %d aborted;",
                                  ds->nIgnorableError);
+            }
             if (ds->nOk > 0)
+            {
                 appendStringInfo(str,
                                  " %d ok;",
                                  ds->nOk);
+            }
             str->len--;
             appendStringInfoString(str, ".  ");
         }
@@ -1605,12 +1767,18 @@ cdbexplain_showExecStatsEnd(struct PlannedStmt *stmt,
             const char *seg = segbuf;
 
             if (ss->peakmemused.imax >= 0)
+            {
                 cdbexplain_formatSeg(segbuf, sizeof(segbuf), ss->peakmemused.imax, 999);
+            }
             else if (slice &&
                      slice->gangSize > 0)
+            {
                 seg = " (entry db)";
+            }
             else
+            {
                 seg = "";
+            }
             appendStringInfo(str,
                              "Executor memory: %s%s.",
                              maxbuf,
@@ -1626,6 +1794,81 @@ cdbexplain_showExecStatsEnd(struct PlannedStmt *stmt,
                              ss->peakmemused.vcnt,
                              maxbuf,
                              segbuf);
+        }
+
+        if (EXPLAIN_MEMORY_VERBOSITY_SUPPRESS < explain_memory_verbosity)
+        {
+			/* Memory accounting global peak memory usage */
+			cdbexplain_formatMemory(maxbuf, sizeof(maxbuf), ss->memory_accounting_global_peak.vmax);
+			if (ss->memory_accounting_global_peak.vcnt == 1)
+			{
+				const char *seg = segbuf;
+
+				if (ss->memory_accounting_global_peak.imax >= 0)
+				{
+					cdbexplain_formatSeg(segbuf, sizeof(segbuf), ss->memory_accounting_global_peak.imax, 999);
+				}
+				else if (slice &&
+						 slice->gangSize > 0)
+				{
+					seg = " (entry db)";
+				}
+				else
+				{
+					seg = "";
+				}
+				appendStringInfo(str,
+								 "  Peak memory: %s%s.",
+								 maxbuf,
+								 seg);
+			}
+			else if (ss->memory_accounting_global_peak.vcnt > 1)
+			{
+				cdbexplain_formatMemory(avgbuf, sizeof(avgbuf), cdbexplain_agg_avg(&ss->memory_accounting_global_peak));
+				cdbexplain_formatSeg(segbuf, sizeof(segbuf), ss->memory_accounting_global_peak.imax, ss->nworker);
+				appendStringInfo(str,
+								 "  Peak memory: %s avg x %d workers, %s max%s.",
+								 avgbuf,
+								 ss->memory_accounting_global_peak.vcnt,
+								 maxbuf,
+								 segbuf);
+			}
+
+			/* Vmem reserved by QEs */
+			cdbexplain_formatMemory(maxbuf, sizeof(maxbuf), ss->vmem_reserved.vmax);
+			if (ss->vmem_reserved.vcnt == 1)
+			{
+				const char *seg = segbuf;
+
+				if (ss->vmem_reserved.imax >= 0)
+				{
+					cdbexplain_formatSeg(segbuf, sizeof(segbuf), ss->vmem_reserved.imax, 999);
+				}
+				else if (slice &&
+						 slice->gangSize > 0)
+				{
+					seg = " (entry db)";
+				}
+				else
+				{
+					seg = "";
+				}
+				appendStringInfo(str,
+								 "  Vmem reserved: %s%s.",
+								 maxbuf,
+								 seg);
+			}
+			else if (ss->vmem_reserved.vcnt > 1)
+			{
+				cdbexplain_formatMemory(avgbuf, sizeof(avgbuf), cdbexplain_agg_avg(&ss->vmem_reserved));
+				cdbexplain_formatSeg(segbuf, sizeof(segbuf), ss->vmem_reserved.imax, ss->nworker);
+				appendStringInfo(str,
+								 "  Vmem reserved: %s avg x %d workers, %s max%s.",
+								 avgbuf,
+								 ss->vmem_reserved.vcnt,
+								 maxbuf,
+								 segbuf);
+			}
         }
 
         /* Work_mem used/wanted (max over all nodes and workers of slice) */
@@ -1658,6 +1901,4 @@ cdbexplain_showExecStatsEnd(struct PlannedStmt *stmt,
         
         appendStringInfoChar(str, '\n');
     }
-    
-
 }                               /* cdbexplain_showExecStatsEnd */

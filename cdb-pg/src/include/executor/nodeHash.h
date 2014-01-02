@@ -26,12 +26,12 @@ extern Node *MultiExecHash(HashState *node);
 extern void ExecEndHash(HashState *node);
 extern void ExecReScanHash(HashState *node, ExprContext *exprCtxt);
 
-extern HashJoinTable ExecHashTableCreate(HashJoinState *hjstate, Hash *node, List *hashOperators, uint64 operatorMemKB, workfile_set * sfs);
-extern void ExecHashTableDestroy(HashJoinTable hashtable);
-extern void ExecHashTableInsert(PlanState *ps, HashJoinTable hashtable,
+extern HashJoinTable ExecHashTableCreate(HashState *hashState, HashJoinState *hjstate, List *hashOperators, uint64 operatorMemKB, workfile_set * sfs);
+extern void ExecHashTableDestroy(HashState *hashState, HashJoinTable hashtable);
+extern void ExecHashTableInsert(HashState *hashState, HashJoinTable hashtable,
 					struct TupleTableSlot *slot,
 					uint32 hashvalue);
-extern bool ExecHashGetHashValue(HashJoinTable hashtable,
+extern bool ExecHashGetHashValue(HashState *hashState, HashJoinTable hashtable,
 					 ExprContext *econtext,
 					 List *hashkeys,
 					 bool keep_nulls,
@@ -41,17 +41,12 @@ extern void ExecHashGetBucketAndBatch(HashJoinTable hashtable,
 						  uint32 hashvalue,
 						  int *bucketno,
 						  int *batchno);
-extern HashJoinTuple ExecScanHashBucket(HashJoinState *hjstate,
+extern HashJoinTuple ExecScanHashBucket(HashState *hashState, HashJoinState *hjstate,
 				   ExprContext *econtext);
-extern void ExecHashTableReset(HashJoinTable hashtable);
-extern void ExecChooseHashTableSize(double ntuples, int tupwidth,
-						int *numbuckets,
-						int *numbatches,
-						uint64 operatorMemKB
-						);
-extern void ExecHashTableExplainInit(HashJoinState *hjstate, 
+extern void ExecHashTableReset(HashState *hashState, HashJoinTable hashtable);
+extern void ExecHashTableExplainInit(HashState *hashState, HashJoinState *hjstate,
                                      HashJoinTable  hashtable);
-extern void ExecHashTableExplainBatchEnd(HashJoinTable hashtable);
+extern void ExecHashTableExplainBatchEnd(HashState *hashState, HashJoinTable hashtable);
 
 enum 
 {

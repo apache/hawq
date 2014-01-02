@@ -274,8 +274,11 @@ planner(Query *parse, int cursorOptions,
 		{
 			INSTR_TIME_SET_CURRENT(starttime);
 		}
-
-		result = optimize_query(parse, boundParams);
+		START_MEMORY_ACCOUNT(MemoryAccounting_CreateAccount(0, MEMORY_OWNER_TYPE_Optimizer));
+		{
+			result = optimize_query(parse, boundParams);
+		}
+		END_MEMORY_ACCOUNT();
 
 		if (gp_log_optimization_time)
 		{
@@ -292,22 +295,25 @@ planner(Query *parse, int cursorOptions,
 		{
 			INSTR_TIME_SET_CURRENT(starttime);
 		}
+		START_MEMORY_ACCOUNT(MemoryAccounting_CreateAccount(0, MEMORY_OWNER_TYPE_Planner));
+		{
+			if (NULL != planner_hook)
+			{
+				result = (*planner_hook) (parse, cursorOptions, boundParams);
+			}
+			else
+			{
+				result = standard_planner(parse, cursorOptions, boundParams);
+			}
 
-		if (NULL != planner_hook)
-		{
-			result = (*planner_hook) (parse, cursorOptions, boundParams);
+			if (gp_log_optimization_time)
+			{
+				INSTR_TIME_SET_CURRENT(endtime);
+				INSTR_TIME_SUBTRACT(endtime, starttime);
+				elog(LOG, "Planner Time: %.3f ms", INSTR_TIME_GET_MILLISEC(endtime));
+			}
 		}
-		else
-		{
-			result = standard_planner(parse, cursorOptions, boundParams);
-		}
-
-		if (gp_log_optimization_time)
-		{
-			INSTR_TIME_SET_CURRENT(endtime);
-			INSTR_TIME_SUBTRACT(endtime, starttime);
-			elog(LOG, "Planner Time: %.3f ms", INSTR_TIME_GET_MILLISEC(endtime));
-		}
+		END_MEMORY_ACCOUNT();
 	}
 
 	return result;

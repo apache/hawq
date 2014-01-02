@@ -58,6 +58,7 @@
 #include "utils/guc.h"
 #include "utils/memutils.h"
 #include "utils/resowner.h"
+#include "utils/faultinjector.h"
 
 #include "tcop/tcopprot.h" /* quickdie() */
 
@@ -282,6 +283,15 @@ BackgroundWriterMain(void)
 		if (!PostmasterIsAlive(true))
 			exit(1);
 
+#ifdef USE_ASSERT_CHECKING
+#ifdef FAULT_INJECTOR
+    FaultInjector_InjectFaultIfSet(
+    		FaultInBackgroundWriterMain,
+            DDLNotSpecified,
+            "",  // databaseName
+            ""); // tableName
+#endif
+#endif
 		/*
 		 * Process any requests or signals received recently.
 		 */

@@ -64,6 +64,20 @@
 #endif
 
 #include "pg_trace.h"
+#include "utils/memaccounting.h"
+
+/*
+ * We track last OOM time to identify culprit processes that
+ * consume too much memory. For 64-bit platform we have high
+ * precision time variable based on TimeStampTz. However, on
+ * 32-bit platform we only have "per-second" precision.
+ * OOMTimeType abstracts this different types.
+ */
+#if defined(__x86_64__)
+typedef int64 OOMTimeType;
+#else
+typedef uint32 OOMTimeType;
+#endif
 
 /*
  * Type MemoryContextData is declared in nodes/memnodes.h.	Most users
@@ -78,6 +92,11 @@ typedef struct MemoryContextData *MemoryContext;
  * directly!  Instead, use MemoryContextSwitchTo() to change the setting.
  */
 extern PGDLLIMPORT MemoryContext CurrentMemoryContext;
+
+extern bool gp_mp_inited;
+extern volatile OOMTimeType* segmentOOMTime;
+extern volatile OOMTimeType oomTrackerStartTime;
+extern volatile OOMTimeType alreadyReportedOOMTime;
 
 /*
  * Fundamental memory-allocation operations (more are in utils/memutils.h)
@@ -129,6 +148,7 @@ MemoryContextSwitchTo(MemoryContext context)
  * allocated in a context, not with malloc().
  */
 extern char * __attribute__((malloc)) MemoryContextStrdup(MemoryContext context, const char *string);
+extern void MemoryContextStats(MemoryContext context);
 
 #define pstrdup(str)  MemoryContextStrdup(CurrentMemoryContext, (str))
 
@@ -143,11 +163,34 @@ extern void pgport_pfree(void *pointer);
 /* Mem Protection */
 extern int max_chunks_per_query;
 
+extern PGDLLIMPORT MemoryContext TopMemoryContext;
+
+extern void InitPerProcessOOMTracking(void);
 extern void GPMemoryProtectInit(void);
 extern void GPMemoryProtectReset(void);
 extern int64 getMOPHighWaterMark(void);
 extern int getMOPChunksReserved(void);
+extern int64 getMOPCurrentMemoryUsage(void);
 extern int MemProtSemas(void);
+extern void UpdateTimeAtomically(volatile OOMTimeType* time_var);
+
+/*
+ * ReportOOMConsumption
+ *
+ * Checks if there was any new OOM event in this segment.
+ * In case of a new OOM, it reports the memory consumption
+ * of the current process.
+ */
+#define ReportOOMConsumption()\
+{\
+	if (pthread_equal(main_tid, pthread_self()) && gp_mp_inited && *segmentOOMTime >= oomTrackerStartTime && *segmentOOMTime > alreadyReportedOOMTime)\
+	{\
+		UpdateTimeAtomically(&alreadyReportedOOMTime);\
+		write_stderr("One or more query execution processes ran out of memory on this segment. Logging memory usage.");\
+		MemoryAccounting_SaveToLog();\
+		MemoryContextStats(TopMemoryContext);\
+	}\
+}
 
 #ifdef USE_SYSV_SEMAPHORES
 extern void *gp_malloc(int64 sz); 

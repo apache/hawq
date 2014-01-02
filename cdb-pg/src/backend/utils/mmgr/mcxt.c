@@ -24,6 +24,7 @@
 
 #include "miscadmin.h"                      /* MyProcPid */
 #include "utils/memutils.h"
+#include "utils/memaccounting.h"
 
 #include "utils/debugbreak.h"
 
@@ -68,6 +69,7 @@ MemoryContext CacheMemoryContext = NULL;
 MemoryContext MessageContext = NULL;
 MemoryContext TopTransactionContext = NULL;
 MemoryContext CurTransactionContext = NULL;
+MemoryContext MemoryAccountMemoryContext = NULL;
 
 /* These two are transient links to contexts owned by other objects: */
 MemoryContext QueryContext = NULL;
@@ -98,6 +100,8 @@ void
 MemoryContextInit(void)
 {
 	AssertState(TopMemoryContext == NULL);
+	AssertState(CurrentMemoryContext == NULL);
+	AssertState(MemoryAccountMemoryContext == NULL);
 
 	/*
 	 * Initialize TopMemoryContext as an AllocSetContext with slow growth rate
@@ -130,6 +134,8 @@ MemoryContextInit(void)
 										 8 * 1024,
 										 8 * 1024,
 										 8 * 1024);
+
+	MemoryAccounting_Reset();
 }
 
 /*
@@ -286,9 +292,9 @@ GetMemoryChunkSpace(void *pointer)
 	header = (StandardChunkHeader *)
 		((char *) pointer - STANDARDCHUNKHEADERSIZE);
 
-	AssertArg(MemoryContextIsValid(header->context));
+	AssertArg(MemoryContextIsValid(header->sharedHeader->context));
 
-	return (*header->context->methods.get_chunk_space) (header->context,
+	return (*header->sharedHeader->context->methods.get_chunk_space) (header->sharedHeader->context,
 														 pointer);
 }
 
@@ -316,9 +322,9 @@ GetMemoryChunkContext(void *pointer)
 	header = (StandardChunkHeader *)
 		((char *) pointer - STANDARDCHUNKHEADERSIZE);
 
-	AssertArg(MemoryContextIsValid(header->context));
+	AssertArg(MemoryContextIsValid(header->sharedHeader->context));
 
-	return header->context;
+	return header->sharedHeader->context;
 }
 
 /*
@@ -405,7 +411,7 @@ MemoryContextNoteFree(MemoryContext context, Size nbytes)
  * MemoryContextError
  *		Report failure of a memory context operation.  Does not return.
  */
-	void
+void
 MemoryContextError(int errorcode, MemoryContext context,
 		const char *sfile, int sline,
 		const char *fmt, ...)
@@ -413,11 +419,20 @@ MemoryContextError(int errorcode, MemoryContext context,
 	va_list args;
 	char    buf[200];
 
+	/*
+	 * Don't use elog, as we might have a malloc problem.
+	 * Also, don't use write_log, as this method might be
+	 * called from syslogger, which does not support
+	 * write_log calls
+	 */
+	write_stderr("Logging memory usage for memory context error");
+
+	MemoryAccounting_SaveToLog();
 	MemoryContextStats(TopMemoryContext);
 
 	if(coredump_on_memerror)
 	{
-		/* 
+		/*
 		 * Turn memory context into a SIGSEGV, so will generate
 		 * a core dump.
 		 *
@@ -426,7 +441,7 @@ MemoryContextError(int errorcode, MemoryContext context,
 		*(int *) NULL = errorcode;
 	}
 
-	if(errorcode != ERRCODE_OUT_OF_MEMORY) 
+	if(errorcode != ERRCODE_OUT_OF_MEMORY)
 	{
 		Assert(!"Memory context error!");
 	}
@@ -436,6 +451,18 @@ MemoryContextError(int errorcode, MemoryContext context,
 	vsnprintf(buf, sizeof(buf)-32, fmt, args);
 	va_end(args);
 
+	/*
+	 * This might fail if we run out of memory at the system level
+	 * (i.e., malloc returned null), and the system is running so
+	 * low in memory that ereport cannot format its parameter.
+	 * However, we already dumped our usage information using
+	 * write_stderr, so we are gonna take a chance by calling ereport.
+	 * If we fail, we at least have OOM message in the log. If we succeed,
+	 * we will also have the detail error code and location of the error.
+	 * Note, ereport should switch to ErrorContext which should have
+	 * some preallocated memory to handle this message. Therefore,
+	 * our chance of success is quite high
+	 */
 	ereport(ERROR, (errcode(errorcode),
 				errmsg("%s (context '%s') (%s:%d)",
 					buf,
@@ -625,11 +652,17 @@ MemoryContextCheck(MemoryContext context)
  *		Detect whether an allocated chunk of memory belongs to a given
  *		context or not.
  *
- * Caution: this test is reliable as long as 'pointer' does point to
+ * Note: this test assumes that the pointer was allocated using palloc.
+ * If unsure, please use the generic version (MemoryContextContainsGenericAllocation).
+ *
+ * Caution: this test is reliable as long as the 'pointer' does point to
  * a chunk of memory allocated from *some* context.  If 'pointer' points
  * at memory obtained in some other way, there is a small chance of a
- * false-positive result, since the bits right before it might look like
- * a valid chunk header by chance.
+ * false-positive result since the bits right before it might look like
+ * a valid chunk header by chance. In the latter case (when the memory
+ * was not palloc'ed), we are more likely to crash. Please use the generic
+ * version of this method if you have any doubt that the tested memory
+ * region may not be palloc'ed.
  */
 bool
 MemoryContextContains(MemoryContext context, void *pointer)
@@ -642,7 +675,9 @@ MemoryContextContains(MemoryContext context, void *pointer)
 	 * allocated chunk.
 	 */
 	if (pointer == NULL || pointer != (void *) MAXALIGN(pointer))
+	{
 		return false;
+	}
 
 	/*
 	 * OK, it's probably safe to look at the chunk header.
@@ -650,13 +685,83 @@ MemoryContextContains(MemoryContext context, void *pointer)
 	header = (StandardChunkHeader *)
 		((char *) pointer - STANDARDCHUNKHEADERSIZE);
 
+	if (header->sharedHeader == NULL || (void*)header->sharedHeader != (void *) MAXALIGN(header->sharedHeader) || !AllocSizeIsValid(header->size))
+	{
+		return false;
+	}
+
+	SharedChunkHeader *sharedHeader = (SharedChunkHeader *)header->sharedHeader;
+
 	/*
 	 * If the context link doesn't match then we certainly have a non-member
 	 * chunk.  Also check for a reasonable-looking size as extra guard against
 	 * being fooled by bogus pointers.
 	 */
-	if (header->context == context && AllocSizeIsValid(header->size))
+	if (sharedHeader->context == context)
+	{
 		return true;
+	}
+	return false;
+}
+
+/*
+ * MemoryContextContainsGenericAllocation
+ *		Detects whether a generic (may or may not be allocated by
+ *		palloc) chunk of memory belongs to a given context or not.
+ *		Note, the "generic" means it will be ready to
+ *		handle chunks not allocated using palloc.
+ *
+ * Caution: this test has the same problem as MemoryContextContains
+ * 		where it can falsely detect a chunk belonging to a context,
+ * 		while it does not. In addition, it can also falsely conclude
+ * 		that a chunk does *not* belong to a context, while in reality
+ * 		it does. The latter weakness stems from its versatility to
+ * 		handle non-palloc'ed chunks.
+ */
+bool
+MemoryContextContainsGenericAllocation(MemoryContext context, void *pointer)
+{
+	StandardChunkHeader *header;
+
+	/*
+	 * Try to detect bogus pointers handed to us, poorly though we can.
+	 * Presumably, a pointer that isn't MAXALIGNED isn't pointing at an
+	 * allocated chunk.
+	 */
+	if (pointer == NULL || pointer != (void *) MAXALIGN(pointer))
+	{
+		return false;
+	}
+
+	/*
+	 * OK, it's probably safe to look at the chunk header.
+	 */
+	header = (StandardChunkHeader *)
+		((char *) pointer - STANDARDCHUNKHEADERSIZE);
+
+	AllocSet set = (AllocSet)context;
+
+	if (header->sharedHeader == set->sharedHeaderList ||
+			(set->sharedHeaderList != NULL && set->sharedHeaderList->next == header->sharedHeader) ||
+			(set->sharedHeaderList != NULL && set->sharedHeaderList->next != NULL && set->sharedHeaderList->next->next == header->sharedHeader))
+	{
+		/*
+		 * At this point we know that one of the sharedHeader pointers of the
+		 * provided context (AllocSet) is the same as the sharedHeader
+		 * pointer of the provided chunk. Therefore, the chunk should
+		 * belong to the AllocSet (with a false positive chance coming
+		 * from some third party allocated memory region having the
+		 * same value as the sharedHeaderList pointer address
+		 */
+		return true;
+	}
+
+	/*
+	 * We might falsely conclude that the chunk does not belong
+	 * to the context, if we fail to match the chunk's sharedHeader
+	 * pointer with one of the leading sharedHeader pointers in the
+	 * context's sharedHeaderList.
+	 */
 	return false;
 }
 
@@ -888,8 +993,6 @@ MemoryContextAllocZeroAlignedImpl(MemoryContext context, Size size, const char* 
 void
 MemoryContextFreeImpl(void *pointer, const char *sfile, const char *sfunc, int sline)
 {
-	StandardChunkHeader *header;
-
 	/*
 	 * Try to detect bogus pointers handed to us, poorly though we can.
 	 * Presumably, a pointer that isn't MAXALIGNED isn't pointing at an
@@ -901,10 +1004,10 @@ MemoryContextFreeImpl(void *pointer, const char *sfile, const char *sfunc, int s
 	/*
 	 * OK, it's probably safe to look at the chunk header.
 	 */
-	header = (StandardChunkHeader *)
+	StandardChunkHeader* header = (StandardChunkHeader *)
 		((char *) pointer - STANDARDCHUNKHEADERSIZE);
 
-	AssertArg(MemoryContextIsValid(header->context));
+	AssertArg(MemoryContextIsValid(header->sharedHeader->context));
 
 #ifdef PGTRACE_ENABLED
 	PG_TRACE5(memctxt__free, 0, 0, 
@@ -913,16 +1016,16 @@ MemoryContextFreeImpl(void *pointer, const char *sfile, const char *sfunc, int s
 #else
 		0, header->size, 
 #endif
-		(long) header->context->name); 
+		(long) header->sharedHeader->context->name);
 #endif
 
 #ifdef CDB_PALLOC_CALLER_ID
-	header->context->callerFile = sfile;
-	header->context->callerLine = sline;
+	header->sharedHeader->context->callerFile = sfile;
+	header->sharedHeader->context->callerLine = sline;
 #endif
 
-	if (header->context->methods.free_p)
-		(*header->context->methods.free_p) (header->context, pointer);
+	if (header->sharedHeader->context->methods.free_p)
+		(*header->sharedHeader->context->methods.free_p) (header->sharedHeader->context, pointer);
 	else
 		Assert(header);   /* this assert never fails. Just here so we can set breakpoint in debugger. */
 }
@@ -956,7 +1059,7 @@ MemoryContextReallocImpl(void *pointer, Size size, const char *sfile, const char
 	header = (StandardChunkHeader *)
 		((char *) pointer - STANDARDCHUNKHEADERSIZE);
 
-	AssertArg(MemoryContextIsValid(header->context));
+	AssertArg(MemoryContextIsValid(header->sharedHeader->context));
 
 #ifdef PGTRACE_ENABLED
 #ifdef MEMORY_CONTEXT_CHECKING
@@ -968,22 +1071,22 @@ MemoryContextReallocImpl(void *pointer, Size size, const char *sfile, const char
 #endif
 
 #ifdef CDB_PALLOC_CALLER_ID
-	header->context->callerFile = sfile;
-	header->context->callerLine = sline;
+	header->sharedHeader->context->callerFile = sfile;
+	header->sharedHeader->context->callerLine = sline;
 #endif
 
 	if (!AllocSizeIsValid(size))
 		MemoryContextError(ERRCODE_INTERNAL_ERROR,
-				header->context, CDB_MCXT_WHERE(header->context),
+				header->sharedHeader->context, CDB_MCXT_WHERE(header->sharedHeader->context),
 				"invalid memory alloc request size %lu",
 				(unsigned long)size);
 
-	ret = (*header->context->methods.realloc) (header->context, pointer, size);
+	ret = (*header->sharedHeader->context->methods.realloc) (header->sharedHeader->context, pointer, size);
 
 #ifdef PGTRACE_ENABLED
 	header = (StandardChunkHeader *)
 		((char *) ret - STANDARDCHUNKHEADERSIZE);
-	PG_TRACE5(memctxt__realloc, size, header->size, old_reqsize, old_size, (long) header->context->name);
+	PG_TRACE5(memctxt__realloc, size, header->size, old_reqsize, old_size, (long) header->sharedHeader->context->name);
 #endif
 
 	return ret;

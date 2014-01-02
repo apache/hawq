@@ -51,6 +51,11 @@ ExecHashTableExplainBatches(HashJoinTable   hashtable,
                             const char     *title);
 static void ExecHashTableReallocBatchData(HashJoinTable hashtable, int new_nbatch);
 
+void ExecChooseHashTableSize(double ntuples, int tupwidth,
+						int *numbuckets,
+						int *numbatches,
+						uint64 operatorMemKB
+						);
 
 #define BLOOMVAL(hk)  (((uint64)1) << (((hk) >> 13) & 0x3f))
 
@@ -123,9 +128,9 @@ MultiExecHash(HashState *node)
 		econtext->ecxt_innertuple = slot;
 		bool hashkeys_null = false;
 
-		if (ExecHashGetHashValue(hashtable, econtext, hashkeys, node->hs_keepnull, &hashvalue, &hashkeys_null))
+		if (ExecHashGetHashValue(node, hashtable, econtext, hashkeys, node->hs_keepnull, &hashvalue, &hashkeys_null))
 		{
-			ExecHashTableInsert(&node->ps, hashtable, slot, hashvalue);
+			ExecHashTableInsert(node, hashtable, slot, hashvalue);
 		}
 
 		if (hashkeys_null)
@@ -254,7 +259,6 @@ ExecEndHash(HashState *node)
 	EndPlanStateGpmonPkt(&node->ps);
 }
 
-
 /* ----------------------------------------------------------------
  *		ExecHashTableCreate
  *
@@ -262,7 +266,7 @@ ExecEndHash(HashState *node)
  * ----------------------------------------------------------------
  */
 HashJoinTable
-ExecHashTableCreate(HashJoinState *hjstate, Hash *node, List *hashOperators, uint64 operatorMemKB, workfile_set * workfile_set)
+ExecHashTableCreate(HashState *hashState, HashJoinState *hjstate, List *hashOperators, uint64 operatorMemKB, workfile_set * workfile_set)
 {
 	HashJoinTable hashtable;
 	Plan	   *outerNode;
@@ -272,6 +276,11 @@ ExecHashTableCreate(HashJoinState *hjstate, Hash *node, List *hashOperators, uin
 	int			i;
 	ListCell   *ho;
 	MemoryContext oldcxt;
+
+	START_MEMORY_ACCOUNT(hashState->ps.memoryAccount);
+	{
+
+	Hash *node = (Hash *) hashState->ps.plan;
 
 	/*
 	 * Get information about the size of the relation to be hashed (it's the
@@ -398,7 +407,8 @@ ExecHashTableCreate(HashJoinState *hjstate, Hash *node, List *hashOperators, uin
 		hashtable->bloom = (uint64*) palloc0(nbuckets * sizeof(uint64));
 
 	MemoryContextSwitchTo(oldcxt);
-
+	}
+	END_MEMORY_ACCOUNT();
 	return hashtable;
 }
 
@@ -546,12 +556,15 @@ ExecChooseHashTableSize(double ntuples, int tupwidth,
  * ----------------------------------------------------------------
  */
 void
-ExecHashTableDestroy(HashJoinTable hashtable)
+ExecHashTableDestroy(HashState *hashState, HashJoinTable hashtable)
 {
 	int			i;
 	Assert(hashtable);
 	Assert(!hashtable->eagerlyReleased);
 	
+	START_MEMORY_ACCOUNT(hashState->ps.memoryAccount);
+	{
+
 	/*
 	 * Make sure all the temp files are closed.
 	 */
@@ -588,6 +601,8 @@ ExecHashTableDestroy(HashJoinTable hashtable)
 	/* Release working memory (batchCxt is a child, so it goes away too) */
 	MemoryContextDelete(hashtable->hashCxt);
 	hashtable->batches = NULL;
+	}
+	END_MEMORY_ACCOUNT();
 }
 
 /*
@@ -808,7 +823,7 @@ ExecHashTableReallocBatchData(HashJoinTable hashtable, int new_nbatch)
  * worth the messiness required.
  */
 void
-ExecHashTableInsert(PlanState *ps, HashJoinTable hashtable,
+ExecHashTableInsert(HashState *hashState, HashJoinTable hashtable,
 					TupleTableSlot *slot,
 					uint32 hashvalue)
 {
@@ -817,6 +832,10 @@ ExecHashTableInsert(PlanState *ps, HashJoinTable hashtable,
 	int			bucketno;
 	int			batchno;
 	int			hashTupleSize;
+
+	START_MEMORY_ACCOUNT(hashState->ps.memoryAccount);
+	{
+	PlanState *ps = &hashState->ps;
 
 	ExecHashGetBucketAndBatch(hashtable, hashvalue,
 			&bucketno, &batchno);
@@ -880,6 +899,8 @@ ExecHashTableInsert(PlanState *ps, HashJoinTable hashtable,
 			ExecHashJoinSaveTuple(ps, tuple, hashvalue, hashtable, &batch->innerside, hashtable->bfCxt);
 		}
 	}
+	}
+	END_MEMORY_ACCOUNT();
 }
 
 /*
@@ -897,7 +918,7 @@ ExecHashTableInsert(PlanState *ps, HashJoinTable hashtable,
  * Found_null indicates all the hashkeys are null.
  */
 bool
-ExecHashGetHashValue(HashJoinTable hashtable,
+ExecHashGetHashValue(HashState *hashState, HashJoinTable hashtable,
 					 ExprContext *econtext,
 					 List *hashkeys,
 					 bool keep_nulls,
@@ -909,6 +930,9 @@ ExecHashGetHashValue(HashJoinTable hashtable,
 	int			i = 0;
 	MemoryContext oldContext;
 	bool		result = true;
+
+	START_MEMORY_ACCOUNT(hashState->ps.memoryAccount);
+	{
 
 	Assert(hashkeys_null);
 
@@ -978,6 +1002,8 @@ ExecHashGetHashValue(HashJoinTable hashtable,
 	MemoryContextSwitchTo(oldContext);
 
 	*hashvalue = hashkey;
+	}
+	END_MEMORY_ACCOUNT();
 	return result;
 }
 
@@ -1029,7 +1055,7 @@ ExecHashGetBucketAndBatch(HashJoinTable hashtable,
  * The current outer tuple must be stored in econtext->ecxt_outertuple.
  */
 HashJoinTuple
-ExecScanHashBucket(HashJoinState *hjstate,
+ExecScanHashBucket(HashState *hashState, HashJoinState *hjstate,
 		ExprContext *econtext)
 {
 	List	   *hjclauses = hjstate->hashqualclauses;
@@ -1037,6 +1063,8 @@ ExecScanHashBucket(HashJoinState *hjstate,
 	HashJoinTuple hashTuple = hjstate->hj_CurTuple;
 	uint32		hashvalue = hjstate->hj_CurHashValue;
 
+	START_MEMORY_ACCOUNT(hashState->ps.memoryAccount);
+	{
 	/*
 	 * hj_CurTuple is NULL to start scanning a new bucket, or the address of
 	 * the last tuple returned from the current bucket.
@@ -1074,7 +1102,8 @@ ExecScanHashBucket(HashJoinState *hjstate,
 
 		hashTuple = hashTuple->next;
 	}
-
+	}
+	END_MEMORY_ACCOUNT();
 	/*
 	 * no match
 	 */
@@ -1087,10 +1116,13 @@ ExecScanHashBucket(HashJoinState *hjstate,
  *		reset hash table header for new batch
  */
 void
-ExecHashTableReset(HashJoinTable hashtable)
+ExecHashTableReset(HashState *hashState, HashJoinTable hashtable)
 {	
 	MemoryContext oldcxt;
 	int			nbuckets = 0;
+
+	START_MEMORY_ACCOUNT(hashState->ps.memoryAccount);
+	{
 	Assert(hashtable);
 	Assert(!hashtable->eagerlyReleased);
 
@@ -1115,6 +1147,8 @@ ExecHashTableReset(HashJoinTable hashtable)
 	hashtable->totalTuples = 0;
 
 	MemoryContextSwitchTo(oldcxt);
+	}
+	END_MEMORY_ACCOUNT();
 }
 
 void
@@ -1134,12 +1168,14 @@ ExecReScanHash(HashState *node, ExprContext *exprCtxt)
  *      Called after ExecHashTableCreate to set up EXPLAIN ANALYZE reporting.
  */
 void
-ExecHashTableExplainInit(HashJoinState *hjstate,
+ExecHashTableExplainInit(HashState *hashState, HashJoinState *hjstate,
                          HashJoinTable  hashtable)
 {
     MemoryContext   oldcxt;
     int             nbatch = Max(hashtable->nbatch, 1);
 
+    START_MEMORY_ACCOUNT(hashState->ps.memoryAccount);
+    {
     /* Switch to a memory context that survives until ExecutorEnd. */
     oldcxt = MemoryContextSwitchTo(hjstate->js.ps.state->es_query_cxt);
 
@@ -1157,6 +1193,8 @@ ExecHashTableExplainInit(HashJoinState *hjstate,
 
     /* Restore caller's memory context. */
     MemoryContextSwitchTo(oldcxt);
+    }
+    END_MEMORY_ACCOUNT();
 }                               /* ExecHashTableExplainInit */
 
 
@@ -1192,8 +1230,10 @@ ExecHashTableExplainEnd(PlanState *planstate, struct StringInfoData *buf)
 
 	if (!hashtable->eagerlyReleased)
 	{		
+		HashState *hashState = (HashState *) innerPlanState(hjstate);
+
 		/* Report on batch in progress, in case the join is being ended early. */
-		ExecHashTableExplainBatchEnd(hashtable);
+		ExecHashTableExplainBatchEnd(hashState, hashtable);
 
 		/* Report executor memory used by our memory context. */
 		jinstrument->execmemused +=
@@ -1421,7 +1461,7 @@ ExecHashTableExplainBatches(HashJoinTable   hashtable,
  *      Called at end of each batch to collect statistics for EXPLAIN ANALYZE.
  */
 void
-ExecHashTableExplainBatchEnd(HashJoinTable hashtable)
+ExecHashTableExplainBatchEnd(HashState *hashState, HashJoinTable hashtable)
 {
     int                 curbatch = hashtable->curbatch;
     HashJoinTableStats *stats = hashtable->stats;
@@ -1429,6 +1469,8 @@ ExecHashTableExplainBatchEnd(HashJoinTable hashtable)
     HashJoinBatchData  *batch = NULL;
     int                 i;
     
+    START_MEMORY_ACCOUNT(hashState->ps.memoryAccount);
+    {
     Assert(!hashtable->eagerlyReleased);
     Assert(hashtable->batches);
 
@@ -1514,6 +1556,8 @@ ExecHashTableExplainBatchEnd(HashJoinTable hashtable)
             }
         }
     }
+    }
+    END_MEMORY_ACCOUNT();
 }                               /* ExecHashTableExplainBatchEnd */
 
 void

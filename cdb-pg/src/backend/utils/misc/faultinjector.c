@@ -283,6 +283,8 @@ FaultInjectorIdentifierEnumToString[] = {
 		/* inject fault in ExecSort before doing the actual sort */
 	_("execsort_mksort_mergeruns"),
 		/* inject fault in MKSort during the mergeruns phase */
+	_("fault_in_background_writer_main"),
+		/* inject fault at the beginning of rxThreadFunc */
 	_("not recognized"),
 };
 
@@ -464,13 +466,13 @@ FaultInjector_InjectFaultIfSet(
 	char					databaseNameLocal[NAMEDATALEN];
 	char					tableNameLocal[NAMEDATALEN];
 	int						ii = 0;
-	
+
 	getFileRepRoleAndState(&fileRepRole, &segmentState, &dataState, NULL, NULL);
 			
 	LockAcquire();
 	
 	entryLocal = FaultInjector_LookupHashEntry(identifier);
-	
+
 	LockRelease();
 	
 	/* Verify if fault injection is set */
@@ -509,14 +511,14 @@ FaultInjector_InjectFaultIfSet(
 		{
 			entryLocal->occurrence--;
 			return FALSE;
-		} 
+		}
 		else 
 			entryLocal->faultInjectorState = FaultInjectorStateTriggered;
 	}
+
+		FaultInjector_UpdateHashEntry(entryLocal);
 	
-	FaultInjector_UpdateHashEntry(entryLocal);	
-	
-	
+
 	/* Inject fault */
 	
 	switch (entryLocal->faultInjectorType) {
@@ -571,9 +573,9 @@ FaultInjector_InjectFaultIfSet(
 			
 			break;
 		case FaultInjectorTypeFatal:
-			entryLocal->faultInjectorState = FaultInjectorStateCompleted;
+				entryLocal->faultInjectorState = FaultInjectorStateCompleted;
 			
-			FaultInjector_UpdateHashEntry(entryLocal);	
+				FaultInjector_UpdateHashEntry(entryLocal);
 			
 			ereport(FATAL, 
 					(errmsg("fault triggered, fault name:'%s' fault type:'%s' ",
@@ -582,9 +584,9 @@ FaultInjector_InjectFaultIfSet(
 
 			break;
 		case FaultInjectorTypePanic:
-			entryLocal->faultInjectorState = FaultInjectorStateCompleted;
+				entryLocal->faultInjectorState = FaultInjectorStateCompleted;
 			
-			FaultInjector_UpdateHashEntry(entryLocal);	
+				FaultInjector_UpdateHashEntry(entryLocal);
 			
 			ereport(PANIC, 
 					(errmsg("fault triggered, fault name:'%s' fault type:'%s' ",
@@ -593,10 +595,10 @@ FaultInjector_InjectFaultIfSet(
 
 			break;
 		case FaultInjectorTypeError:
-			entryLocal->faultInjectorState = FaultInjectorStateCompleted;
+				entryLocal->faultInjectorState = FaultInjectorStateCompleted;
 			
-			FaultInjector_UpdateHashEntry(entryLocal);	
-			
+				FaultInjector_UpdateHashEntry(entryLocal);
+
 			ereport(ERROR, 
 					(errmsg("fault triggered, fault name:'%s' fault type:'%s' ",
 							FaultInjectorIdentifierEnumToString[entryLocal->faultInjectorIdentifier],
@@ -996,6 +998,7 @@ FaultInjector_NewHashEntry(
 
 		/* We do not use vmem on master. Therefore, we only attempt large palloc on segments. */
 		case MultiExecHashLargeVmem:
+		case FaultInBackgroundWriterMain:
 			
 			if (fileRepRole != FileRepPrimaryRole)
 			{

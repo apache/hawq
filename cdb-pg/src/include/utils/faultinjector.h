@@ -184,6 +184,8 @@ typedef enum FaultInjectorIdentifier_e {
 	ExecSortBeforeSorting,
 	ExecSortMKSortMergeRuns,
 
+	FaultInBackgroundWriterMain,
+
 	/* INSERT has to be done before that line */
 	FaultInjectorIdMax,
 	

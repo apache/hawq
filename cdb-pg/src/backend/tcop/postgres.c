@@ -1321,7 +1321,7 @@ exec_mpp_query(const char *query_string,
 						 completionTag);
 		
 		(*receiver->rDestroy) (receiver);
-
+		
 
 		/*
 		 * cleanup all temporary in-memory heap table after each query
@@ -1821,7 +1821,7 @@ exec_simple_query(const char *query_string, const char *seqServerHost, int seqSe
 			elog(ERROR,"Raise ERROR for debug_dtm_action = %d, commandTag = %s",
 				 Debug_dtm_action, commandTag);
 		}
-		
+
 		/*
 		 * Tell client that we're done with this query.  Note we emit exactly
 		 * one EndCommand report for each raw parsetree, thus one for each SQL
@@ -3566,24 +3566,24 @@ ProcessInterrupts(void)
 	if (QueryCancelPending)
 	{
 		elog(LOG,"Process interrupt for 'query cancel pending'.");
-		
+
 		QueryCancelPending = false;
-		ImmediateInterruptOK = false;	/* not idle anymore */
-		DisableNotifyInterrupt();
-		DisableCatchupInterrupt();
-        if (Gp_role == GP_ROLE_EXECUTE || Gp_role == GP_ROLE_DISPATCHAGENT)
-		    ereport(ERROR,
-			    	(errcode(ERRCODE_GP_OPERATION_CANCELED),
-				     errmsg("canceling MPP operation")));
-        else if (cancel_from_timeout)
-			ereport(ERROR,
-					(errcode(ERRCODE_QUERY_CANCELED),
-					 errmsg("canceling statement due to statement timeout")));
-		else
-			ereport(ERROR,
-					(errcode(ERRCODE_QUERY_CANCELED),
-					 errmsg("canceling statement due to user request")));
-	}
+			ImmediateInterruptOK = false;	/* not idle anymore */
+			DisableNotifyInterrupt();
+			DisableCatchupInterrupt();
+			if (Gp_role == GP_ROLE_EXECUTE || Gp_role == GP_ROLE_DISPATCHAGENT)
+				ereport(ERROR,
+						(errcode(ERRCODE_GP_OPERATION_CANCELED),
+						 errmsg("canceling MPP operation")));
+			else if (cancel_from_timeout)
+				ereport(ERROR,
+						(errcode(ERRCODE_QUERY_CANCELED),
+						 errmsg("canceling statement due to statement timeout")));
+			else
+				ereport(ERROR,
+						(errcode(ERRCODE_QUERY_CANCELED),
+						 errmsg("canceling statement due to user request")));
+		}
 	/* If we get here, do nothing (probably, QueryCancelPending was reset) */
 
 #ifdef USE_TEST_UTILS
@@ -3820,6 +3820,8 @@ PostgresMain(int argc, char *argv[], const char *username)
 	int			topErrLevel;
 
 
+	MemoryAccount *postgresMainMemoryAccount = NULL;
+
     /*
 	 * CDB: Catch program error signals.
 	 *
@@ -3847,6 +3849,14 @@ PostgresMain(int argc, char *argv[], const char *username)
 	 */
 	if (!IsUnderPostmaster)
 		MemoryContextInit();
+
+	/*
+	 * Do not save the return value in any oldMemoryAccount variable.
+	 * In that case, we risk switching to a stale memoryAccount that is no
+	 * longer valid. This is because we reset the memory accounts frequently.
+	 */
+	postgresMainMemoryAccount = MemoryAccounting_CreateAccount(0, MEMORY_OWNER_TYPE_MainEntry);
+	MemoryAccounting_SwitchAccount(postgresMainMemoryAccount);
 
 	set_ps_display("startup", false);
 
@@ -3891,12 +3901,12 @@ PostgresMain(int argc, char *argv[], const char *username)
 	 * ----------------
 	 */
 
-	/* Ignore the initial --single argument, if present */
-	if (argc > 1 && strcmp(argv[1], "--single") == 0)
-	{
-		argv++;
-		argc--;
-	}
+		/* Ignore the initial --single argument, if present */
+		if (argc > 1 && strcmp(argv[1], "--single") == 0)
+		{
+			argv++;
+			argc--;
+		}
 
 	/* all options are allowed until '-p' */
 	secure = true;
@@ -3920,13 +3930,13 @@ PostgresMain(int argc, char *argv[], const char *username)
 				SetConfigOption("shared_buffers", optarg, ctx, gucsource);
 				break;
 
-            case 'b':
-                SetConfigOption("gp_dbid", optarg, ctx, gucsource);
-                break;
+			case 'b':
+				SetConfigOption("gp_dbid", optarg, ctx, gucsource);
+				break;
 
-            case 'C':
-                SetConfigOption("gp_contentid", optarg, ctx, gucsource);
-                break;
+			case 'C':
+				SetConfigOption("gp_contentid", optarg, ctx, gucsource);
+				break;
 
 			case 'D':
 				if (secure)
@@ -4029,8 +4039,8 @@ PostgresMain(int argc, char *argv[], const char *username)
 				if (ctx == PGC_BACKEND)
 					PendingConfigOption("log_statement_stats", "true");
 				else
-					SetConfigOption("log_statement_stats", "true",
-									ctx, gucsource);
+				SetConfigOption("log_statement_stats", "true",
+								ctx, gucsource);
 				break;
 
 			case 'T':
@@ -4046,7 +4056,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 						if (ctx == PGC_BACKEND)
 							PendingConfigOption(tmp, "true");
 						else
-							SetConfigOption(tmp, "true", ctx, gucsource);
+						SetConfigOption(tmp, "true", ctx, gucsource);
 					}
 					else
 						errs++;
@@ -4120,7 +4130,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 					if (ctx == PGC_BACKEND && IsSuperuserConfigOption(name))
 						PendingConfigOption(name, value);
 					else
-						SetConfigOption(name, value, ctx, gucsource);
+					SetConfigOption(name, value, ctx, gucsource);
 					free(name);
 					if (value)
 						free(value);
@@ -4141,7 +4151,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 		}
 	}
 
-	/* 
+	/*
 	 * MPP:  If we were started in utility mode then we only want to allow
 	 * incoming sessions that specify gp_session_role=utility as well.  This
 	 * lets the bash scripts start the QD in utility mode and connect in but
@@ -4150,7 +4160,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 	 */
 	if ((Gp_role == GP_ROLE_UTILITY) && (Gp_session_role != GP_ROLE_UTILITY))
 	{
-		ereport(FATAL,
+			ereport(FATAL,
 				(errcode(ERRCODE_CANNOT_CONNECT_NOW),
 				 errmsg("System was started in master-only utility mode - only utility mode connections are allowed")));
 	}
@@ -4158,9 +4168,9 @@ PostgresMain(int argc, char *argv[], const char *username)
 	/*
 	 * Process any additional GUC variable settings passed in startup packet.
 	 * These are handled exactly like command-line variables.
-	 */
+ */
 	if (MyProcPort != NULL)
-	{
+{
 		ListCell   *gucopts = list_head(MyProcPort->guc_options);
 
 		while (gucopts)
@@ -4178,7 +4188,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 				PendingConfigOption(name, value);
 			else
 				SetConfigOption(name, value, PGC_BACKEND, PGC_S_CLIENT);
-		}
+	}
 	}
 
 	/* Acquire configuration parameters, unless inherited from postmaster */
@@ -4220,37 +4230,37 @@ PostgresMain(int argc, char *argv[], const char *username)
 	 * an issue for signals that are locally generated, such as SIGALRM and
 	 * SIGPIPE.)
 	 */
-	pqsignal(SIGHUP, SigHupHandler);	/* set flag to read config file */
-	pqsignal(SIGINT, StatementCancelHandler);	/* cancel current query */
-	pqsignal(SIGTERM, die);		/* cancel current query and exit */
-	pqsignal(SIGQUIT, quickdie);	/* hard crash time */
-	pqsignal(SIGALRM, handle_sig_alarm);		/* timeout conditions */
+		pqsignal(SIGHUP, SigHupHandler);	/* set flag to read config file */
+		pqsignal(SIGINT, StatementCancelHandler);	/* cancel current query */
+		pqsignal(SIGTERM, die);		/* cancel current query and exit */
+		pqsignal(SIGQUIT, quickdie);	/* hard crash time */
+		pqsignal(SIGALRM, handle_sig_alarm);		/* timeout conditions */
 
-	/*
-	 * Ignore failure to write to frontend. Note: if frontend closes
-	 * connection, we will notice it and exit cleanly when control next
-	 * returns to outer loop.  This seems safer than forcing exit in the midst
-	 * of output during who-knows-what operation...
-	 */
-	pqsignal(SIGPIPE, SIG_IGN);
+		/*
+		 * Ignore failure to write to frontend. Note: if frontend closes
+		 * connection, we will notice it and exit cleanly when control next
+		 * returns to outer loop.  This seems safer than forcing exit in the midst
+		 * of output during who-knows-what operation...
+		 */
+		pqsignal(SIGPIPE, SIG_IGN);
 	pqsignal(SIGUSR1, CatchupInterruptHandler);
-	pqsignal(SIGUSR2, NotifyInterruptHandler);
-	pqsignal(SIGFPE, FloatExceptionHandler);
+		pqsignal(SIGUSR2, NotifyInterruptHandler);
+		pqsignal(SIGFPE, FloatExceptionHandler);
 
-	/*
-	 * Reset some signals that are accepted by postmaster but not by backend
-	 */
-	pqsignal(SIGCHLD, SIG_DFL); /* system() requires this on some platforms */
+		/*
+		 * Reset some signals that are accepted by postmaster but not by backend
+		 */
+		pqsignal(SIGCHLD, SIG_DFL); /* system() requires this on some platforms */
 
 #ifndef _WIN32
 #ifdef SIGILL
-    pqsignal(SIGILL, CdbProgramErrorHandler);
+		pqsignal(SIGILL, CdbProgramErrorHandler);
 #endif
 #ifdef SIGSEGV
-    pqsignal(SIGSEGV, CdbProgramErrorHandler);
+		pqsignal(SIGSEGV, CdbProgramErrorHandler);
 #endif
 #ifdef SIGBUS
-    pqsignal(SIGBUS, CdbProgramErrorHandler);
+		pqsignal(SIGBUS, CdbProgramErrorHandler);
 #endif
 #endif
 
@@ -4419,7 +4429,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 	 * likewise can't be done until GUC settings are complete)
 	 */
 	process_local_preload_libraries();
-
+	
 	/*
 	 * DA requires these be cleared at start
 	 */
@@ -4525,7 +4535,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 			elog((Debug_print_full_dtm ? LOG : DEBUG5), "PostgresMain seeing cancel 0x%x",
 			     topErrCode);
 		}
-
+				
 		/*
 		 * cleanup all temporary in-memory heap table after each query
 		 * AbortCurrentTransaction will release the resource owner,
@@ -4542,9 +4552,9 @@ PostgresMain(int argc, char *argv[], const char *username)
 		topErrLevel = elog_getelevel();
 		if (topErrLevel <= ERROR)
 		{
-		/*
+			/*
 			 * Let's see if the DTM has phase 2 retry work.
-		 */
+			 */
 			if (Gp_role == GP_ROLE_DISPATCH)
 				doDtxPhase2Retry();
 		}
@@ -4698,6 +4708,27 @@ PostgresMain(int argc, char *argv[], const char *username)
 
 		firstchar = ReadCommand(&input_message);
 
+		if (!IsTransactionOrTransactionBlock()){
+			/* Reset memory accounting */
+
+			/*
+			 * We finished processing the last query and currently we are not under
+			 * any transaction. So reset memory accounting. Note: any memory
+			 * allocated before resetting will go into the rollover memory account,
+			 * allocated under top memory context.
+			 */
+			MemoryAccounting_Reset();
+
+			postgresMainMemoryAccount = MemoryAccounting_CreateAccount(0, MEMORY_OWNER_TYPE_MainEntry);
+			/*
+			 * Don't attempt to save previous memory account. This will be invalid by the time we attempt to restore.
+			 * This is why we are not using our START_MEMORY_ACCOUNT and END_MEMORY_ACCOUNT macros
+			 */
+			MemoryAccounting_SwitchAccount(postgresMainMemoryAccount);
+
+			/* End of memory accounting setup */
+		}
+
 		/*
 		 * (4) disable async signal conditions again.
 		 */
@@ -4721,7 +4752,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 			continue;
 		
 		elog((Debug_print_full_dtm ? LOG : DEBUG5), "First char: '%c'; gp_role = '%s'.",firstchar,role_to_string(Gp_role));
-
+		
 		switch (firstchar)
 		{
 			case 'Q':			/* simple query */

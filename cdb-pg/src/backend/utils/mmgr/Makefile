@@ -12,6 +12,6 @@ subdir = src/backend/utils/mmgr
 top_builddir = ../../../..
 include $(top_builddir)/src/Makefile.global
 
-OBJS = aset.o asetDirect.o mcxt.o mpool.o portalmem.o memprot.o
+OBJS =  aset.o asetDirect.o mcxt.o memaccounting.o mpool.o portalmem.o memprot.o 
 
 include $(top_srcdir)/src/backend/common.mk

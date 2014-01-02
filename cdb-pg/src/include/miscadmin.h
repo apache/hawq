@@ -116,6 +116,7 @@ do { \
 		ProcessInterrupts(); \
 	if (gp_enable_resqueue_priority)	\
 		BackoffBackendTick(); \
+	ReportOOMConsumption(); \
 } while(0)
 #else
 #define CHECK_FOR_INTERRUPTS() \
@@ -124,6 +125,7 @@ do { \
 		ProcessInterrupts(); \
 	if (gp_enable_resqueue_priority)	\
 		BackoffBackendTick(); \
+	ReportOOMConsumption(); \
 } while(0)
 #endif   /* USE_TEST_UTILS */
 

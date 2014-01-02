@@ -893,7 +893,6 @@ static void
 explain_outNode(StringInfo str,
 				Plan *plan, PlanState *planstate,
 				Plan *outer_plan,
-
 				int indent, ExplainState *es)
 {
 	const char	   *pname = NULL;
@@ -1695,11 +1694,12 @@ explain_outNode(StringInfo str,
 
     /* CDB: Show actual row count, etc. */
 	if (planstate->instrument)
+	{
         cdbexplain_showExecStats(planstate,
                                  str,
                                  indent+1,
                                  es->showstatctx);
-
+	}
 	/* initPlan-s */
 	if (plan->initPlan)
 	{

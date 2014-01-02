@@ -46,6 +46,8 @@ typedef struct MemoryContextMethods
 	Size		(*get_chunk_space) (MemoryContext context, void *pointer);
 	bool		(*is_empty) (MemoryContext context);
 	void		(*stats) (MemoryContext context, const char* contextName);
+	void		(*release_accounting)(MemoryContext context);
+	void		(*update_generation)(MemoryContext context);
 #ifdef MEMORY_CONTEXT_CHECKING
 	void		(*check) (MemoryContext context);
 #endif
@@ -85,5 +87,6 @@ typedef struct MemoryContextData
 	 ( IsA((context), AllocSetContext) || \
        IsA((context), AsetDirectContext) || \
        IsA((context), MPoolContext) ))
+
 
 #endif   /* MEMNODES_H */

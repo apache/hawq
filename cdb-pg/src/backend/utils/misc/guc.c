@@ -206,6 +206,7 @@ static const char *show_num_temp_buffers(void);
 static bool assign_phony_autocommit(bool newval, bool doit, GucSource source);
 static const char *assign_custom_variable_classes(const char *newval, bool doit,
 							   GucSource source);
+static const char *assign_explain_memory_verbosity(const char *newval, bool doit, GucSource source);
 static bool assign_debug_assertions(bool newval, bool doit, GucSource source);
 static bool assign_ssl(bool newval, bool doit, GucSource source);
 static bool assign_stage_log_stats(bool newval, bool doit, GucSource source);
@@ -340,6 +341,13 @@ bool		Debug_datumstream_read_print_varlena_info = false;
 bool		Debug_datumstream_write_use_small_initial_buffers = false;
 bool		gp_temporary_files_filespace_repair = false;
 
+int			explain_memory_verbosity = 0;
+char* 		memory_profiler_run_id = "none";
+char* 		memory_profiler_dataset_id = "none";
+char* 		memory_profiler_query_id = "none";
+int 		memory_profiler_dataset_size = 0;
+bool 		gp_dump_memory_usage = FALSE;
+
 #define VERIFY_CHECKPOINT_INTERVAL_DEFAULT 180
 int         verify_checkpoint_interval =
 	VERIFY_CHECKPOINT_INTERVAL_DEFAULT;
@@ -377,7 +385,7 @@ bool		filerep_inject_listener_fault = false;
 bool		filerep_inject_db_startup_fault = false;
 bool		filerep_inject_change_tracking_recovery_fault = false;
 bool		gp_crash_recovery_suppress_ao_eof = false;
-bool        gp_keep_all_xlog = false;
+bool 	        gp_keep_all_xlog = false;
 int 		ddboost_buf_size = 512*1024;
 
 #define DEBUG_DTM_ACTION_PRIMARY_DEFAULT true
@@ -506,6 +514,7 @@ static char *log_min_error_statement_str;
 static char *log_destination_string;
 static char *gp_log_format_string;
 static char *gp_workfile_caching_loglevel_str;
+static char *explain_memory_verbosity_str;
 
 #ifdef HAVE_SYSLOG
 static char *syslog_facility_str;
@@ -1885,6 +1894,16 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
+		{"gp_dump_memory_usage", PGC_USERSET, CLIENT_CONN_OTHER,
+			gettext_noop("Save memory usage in each segment."),
+			NULL,
+			GUC_GPDB_ADDOPT | GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_dump_memory_usage,
+		false, NULL, NULL
+	},
+
+	{
 		{"gp_enable_sort_limit", PGC_USERSET, QUERY_TUNING_METHOD,
             gettext_noop("Enable LIMIT operation to be performed while sorting."),
 			gettext_noop("Sort more efficiently when plan requires the first <n> rows at most.")
@@ -2346,7 +2365,7 @@ static struct config_bool ConfigureNamesBool[] =
 		&gp_external_grant_privileges,
 		false, NULL, NULL
     },
-	
+
 	{
 		{"resource_scheduler", PGC_POSTMASTER, RESOURCES_MGM,
 			gettext_noop("Enable resource scheduling."),
@@ -2513,7 +2532,7 @@ static struct config_bool ConfigureNamesBool[] =
 		&Debug_appendonly_print_append_block,
 		false, NULL, NULL
 	},
-
+	
 	{
 		{"debug_appendonly_print_insert", PGC_SUSET, DEVELOPER_OPTIONS,
 			gettext_noop("Print log messages for append-only insert."),
@@ -2618,13 +2637,13 @@ static struct config_bool ConfigureNamesBool[] =
     {
         {"Debug_querycontext_print", PGC_SUSET, DEVELOPER_OPTIONS,
              gettext_noop("Print query context content message for debug."),
-             NULL,
-             GUC_SUPERUSER_ONLY |  GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
-        },
+			NULL,
+			GUC_SUPERUSER_ONLY |  GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
          &Debug_querycontext_print,
-         false, NULL, NULL
-    },
-
+		false, NULL, NULL
+	},
+	
 	{
 		{"debug_gp_relation_node_fetch_wait_for_debugging", PGC_SUSET, DEVELOPER_OPTIONS,
 			gettext_noop("Wait for debugger attach for MPP-16395 RelationFetchGpRelationNodeForXLog issue."),
@@ -2634,7 +2653,7 @@ static struct config_bool ConfigureNamesBool[] =
 		&Debug_gp_relation_node_fetch_wait_for_debugging,
 		false, NULL, NULL
 	},
-	
+
 	{
 		{"debug_xlog_insert_print", PGC_SUSET, DEVELOPER_OPTIONS,
 			gettext_noop("Print XLOG Insert record debugging information."),
@@ -2684,7 +2703,7 @@ static struct config_bool ConfigureNamesBool[] =
 		&Debug_persistent_bootstrap_print,
 		false, NULL, NULL
 	},
-
+	
 	{
 		{"Debug_bulk_load_bypass_wal", PGC_SUSET, DEVELOPER_OPTIONS,
 			gettext_noop("Use new bulk load bypass WAL logic."),
@@ -2885,7 +2904,7 @@ static struct config_bool ConfigureNamesBool[] =
 		false, NULL, NULL
 	},
 
-		{
+	{
 			{"gohdb_appendonly_override", PGC_SUSET, DEVELOPER_OPTIONS,
 				gettext_noop("For testing purposes, change the default of the appendonly create table option. This setting only affect the heap relation created in shared database with default tablespace."),
 				NULL,
@@ -3885,8 +3904,8 @@ static struct config_bool ConfigureNamesBool[] =
 	{
 		{"gp_enable_caql_logging", PGC_USERSET, DEVELOPER_OPTIONS,
 			gettext_noop("Enable caql logging."),
-			NULL,
-            GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		 NULL, 
+		 GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
 		&gp_enable_caql_logging,
 		true, NULL, NULL
@@ -3909,7 +3928,7 @@ static struct config_bool ConfigureNamesBool[] =
 		},
 		&pxf_enable_locality_optimizations,
 		true, NULL, NULL
-	},		
+	},
 
 	{
 		{"pxf_enable_stat_collection", PGC_USERSET, CUSTOM_OPTIONS,
@@ -5904,12 +5923,21 @@ static struct config_int ConfigureNamesInt[] =
 		&server_ticket_renew_interval,
 		43200000, 0, INT_MAX, NULL, NULL
 	},
+	{
+		{"memory_profiler_dataset_size", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Set the size in GB"),
+			NULL,
+			GUC_GPDB_ADDOPT | GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&memory_profiler_dataset_size,
+		0, 0, INT_MAX, NULL, NULL
+	},
 
 	{
 		{"optimizer_segments", PGC_USERSET, QUERY_TUNING_METHOD,
             gettext_noop("Number of segments to be considered by the optimizer during costing, or 0 to take the actual number of segments."),
-            NULL,
-            GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
 		&optimizer_segments,
 		0, 0, INT_MAX, NULL, NULL
@@ -6287,6 +6315,46 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
+		{"explain_memory_verbosity", PGC_USERSET, RESOURCES_MEM,
+			gettext_noop("Experimental feature: show memory account usage in EXPLAIN ANALYZE."),
+			gettext_noop("Valid values are SUPPRESS, SUMMARY, and DETAIL."),
+			GUC_GPDB_ADDOPT
+		},
+		&explain_memory_verbosity_str,
+		"suppress", assign_explain_memory_verbosity, NULL
+	},
+
+	{
+		{"memory_profiler_run_id", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Set the unique run ID for memory profiling"),
+			gettext_noop("Any string is acceptable"),
+			GUC_GPDB_ADDOPT | GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&memory_profiler_run_id,
+		"none", NULL, NULL
+	},
+
+	{
+		{"memory_profiler_dataset_id", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Set the dataset ID for memory profiling"),
+			gettext_noop("Any string is acceptable"),
+			GUC_GPDB_ADDOPT | GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&memory_profiler_dataset_id,
+		"none", NULL, NULL
+	},
+
+	{
+		{"memory_profiler_query_id", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Set the query ID for memory profiling"),
+			gettext_noop("Any string is acceptable"),
+			GUC_GPDB_ADDOPT | GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&memory_profiler_query_id,
+		"none", NULL, NULL
+	},
+
+	{
 		{"optimizer_log_failure", PGC_USERSET, LOGGING_WHEN,
 			gettext_noop("Sets which optimizer failures are logged."),
 			gettext_noop("Valid values are unexpected, expected, all"),
@@ -6305,7 +6373,7 @@ static struct config_string ConfigureNamesString[] =
 		"onerror", assign_optimizer_minidump, NULL
 	},
 
-        {
+	{
                 {"optimizer_cost_model", PGC_USERSET, LOGGING_WHEN,
                         gettext_noop("Set optimizer cost model."),
                         gettext_noop("Valid values are legacy, calibrated"),
@@ -11842,6 +11910,33 @@ assign_msglvl(int *var, const char *newval, bool doit, GucSource source)
 	else
 		return NULL;			/* fail */
 	return newval;				/* OK */
+}
+
+static const char *
+assign_explain_memory_verbosity(const char *newval, bool doit, GucSource source)
+{
+	if (pg_strcasecmp(newval, "suppress") == 0)
+	{
+		if (doit)
+			explain_memory_verbosity = EXPLAIN_MEMORY_VERBOSITY_SUPPRESS;
+	}
+	else if (pg_strcasecmp(newval, "summary") == 0)
+	{
+		if (doit)
+			explain_memory_verbosity = EXPLAIN_MEMORY_VERBOSITY_SUMMARY;
+	}
+	else if (pg_strcasecmp(newval, "detail") == 0)
+	{
+		if (doit)
+			explain_memory_verbosity = EXPLAIN_MEMORY_VERBOSITY_DETAIL;
+	}
+	else
+	{
+		printf("Unknown memory verbosity.");
+		return NULL;
+	}
+
+	return newval;
 }
 
 static const char *
