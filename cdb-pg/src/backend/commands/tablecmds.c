@@ -6044,6 +6044,19 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 					econtext->ecxt_scantuple = newslot;
 				}
 
+				/* check if any NOT NULL constraint is violated */
+				foreach(l, notnull_attrs)
+				{
+					int					attn = lfirst_int(l);
+					
+					if (slot_attisnull(econtext->ecxt_scantuple, attn + 1))
+						ereport(ERROR,
+								(errcode(ERRCODE_NOT_NULL_VIOLATION),
+								 errmsg("column \"%s\" contains null values",
+										NameStr(newTupDesc->attrs[attn]->attname)),
+								 errOmitLocation(true)));
+				}
+
 				/* Check constraints */
 				foreach (l, tab->constraints)
 				{
@@ -6898,15 +6911,16 @@ ATExecAddColumn(AlteredTableInfo *tab, Relation rel,
 	}
 
 	/*
-	 * MPP-14367 - Handling of default NULL for AO tables. Currently
-	 * memtuples cannot deal with the scenario where the number of 
-  	 * attributes in the tuple data don't match the attnum. We will generate 
-	 * an explicit NULL default value and force a rewrite of the table below. 
-	 * Note: This is inefficient and there is already another JIRA MPP-5419 open 
-	 * to track adding columns without default values to AO tables efficiently. 
-	 * When that JIRA is fixed, the following piece of code may be removed 
+	 * MPP-14367/MPP-19664 - Handling of default NULL for AO/CO tables. Currently
+	 * memtuples cannot deal with the scenario where the number of
+  	 * attributes in the tuple data don't match the attnum. We will generate
+	 * an explicit NULL default value and force a rewrite of the table below.
+	 * Note: This is inefficient and there is already another JIRA MPP-5419 open
+	 * to track adding columns without default values to AO tables efficiently.
+	 * When that JIRA is fixed, the following piece of code may be removed
 	 */
-	if (!defval && (RelationIsAoRows(rel) && colDef->default_is_null))
+	if (!defval && (RelationIsAoRows(rel) || RelationIsAoCols(rel))
+			&& colDef->default_is_null)
 	{
 		defval = (Expr *) makeNullConst(typeOid, -1);
 	}
