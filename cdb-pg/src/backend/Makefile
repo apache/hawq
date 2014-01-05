@@ -63,6 +63,7 @@ endif
 LIBS := $(LIBS) -L$(LIBGPOS)/$(OBJDIR_DEFAULT) -lgpos
 LIBS := $(LIBS) -L$(XERCES_LIBDIR) -lxerces-c-3.1
 LIBS := $(LIBS) -L$(OPTIMIZER)/libnaucrates/$(OBJDIR_DEFAULT) -lnaucrates
+LIBS := $(LIBS) -L$(OPTIMIZER)/libgpdbcost/$(OBJDIR_DEFAULT) -lgpdbcost
 LIBS := $(LIBS) -L$(OPTIMIZER)/libgpopt/$(OBJDIR_DEFAULT) -lgpopt -lpthread
 LIBS := $(LIBS) -L$(top_builddir)/src/backend/gpopt -ldxltranslators
 JSONLIB = -ljson

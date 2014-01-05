@@ -94,12 +94,15 @@
 #include "dxl/CIdGenerator.h"
 #include "exception.h"
 
+#include "CCostModelGPDB.h"
+
 
 #include "gpopt/gpdbwrappers.h"
 
 using namespace gpos;
 using namespace gpopt;
 using namespace gpdxl;
+using namespace gpdbcost;
 
 // size of error buffer
 #define GPOPT_ERROR_BUFFER_SIZE 10 * 1024 * 1024
@@ -793,14 +796,23 @@ COptTasks::PvOptimizeTask
 			// map that stores gpdb att to optimizer col mapping
 			CMappingVarColId *pmapvarcolid = New(pmp) CMappingVarColId(pmp);
 
+			ULONG ulSegments = gpdb::UlSegmentCountGP();
+			ULONG ulSegmentsForCosting = optimizer_segments;
+			if (0 == ulSegmentsForCosting)
+			{
+				ulSegmentsForCosting = ulSegments;
+			}
+
 			CTranslatorQueryToDXL trquerytodxl(pmp, &mda, &idgtorColId, &idgtorCTE, pmapvarcolid, (Query*) poctx->m_pquery, 0 /* ulQueryLevel */);
 			COptimizerConfig *pocconf = PoconfCreate(pmp);
+			ICostModel *pcm = New(pmp) CCostModelGPDB(pmp, ulSegmentsForCosting);
 
 			// preload metadata if optimizer uses multiple threads
 			if (optimizer_parallel)
 			{
 				// install opt context in TLS
-				CAutoOptCtxt aoc(pmp, &mda, NULL /* pec */, pocconf);
+				pcm->AddRef();
+				CAutoOptCtxt aoc(pmp, &mda, pcm, pocconf);
 				CTranslatorUtils::PreloadMD(pmp, &mda, sysidDefault, (Query*) poctx->m_pquery);
 			}
 
@@ -809,14 +821,6 @@ COptTasks::PvOptimizeTask
 			DrgPdxln *pdrgpdxlnCTE = trquerytodxl.PdrgpdxlnCTE();
 			GPOS_ASSERT(NULL != pdrgpdxlnQueryOutput);
 
-			ULONG ulSegments = gpdb::UlSegmentCountGP();
-			ULONG ulSegmentsForCosting = optimizer_segments;
-			
-			if (0 == ulSegmentsForCosting)
-			{
-				ulSegmentsForCosting = gpdb::UlSegmentCountGP();
-			}
-
 			pdxlnPlan = COptimizer::PdxlnOptimize
 									(
 									pmp,
@@ -824,8 +828,8 @@ COptTasks::PvOptimizeTask
 									pdxlnQuery,
 									pdrgpdxlnQueryOutput,
 									pdrgpdxlnCTE,
+									pcm,
 									ulSegments,
-									ulSegmentsForCosting,
 									gp_session_id,
 									gp_command_count,
 									pdrgpss,
@@ -848,6 +852,7 @@ COptTasks::PvOptimizeTask
 
 			pdxlnQuery->Release();
 			pocconf->Release();
+			pcm->Release();
 		}
 	}
 	GPOS_CATCH_EX(ex)
@@ -1176,7 +1181,8 @@ COptTasks::PvDXLFromRelStatsTask
 	// relcache MD provider
 	CMDProviderRelcache *pmdpr = New(pmp) CMDProviderRelcache(pmp);
 	CAutoMDAccessor amda(pmp, pmdpr, sysidDefault);
-	CAutoOptCtxt aoc(pmp, amda.Pmda(), NULL /* pec */, NULL /* poconf */);
+	ICostModel *pcm = New(pmp) CCostModelGPDB(pmp, gpdb::UlSegmentCountGP());
+	CAutoOptCtxt aoc(pmp, amda.Pmda(), pcm, NULL /* poconf */);
 
 	DrgPimdobj *pdrgpmdobj = New(pmp) DrgPimdobj(pmp);
 

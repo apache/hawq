@@ -72,10 +72,13 @@
 
 #include "gpopt/gpdbwrappers.h"
 
+#include "CCostModelGPDB.h"
+
 using namespace gpos;
 using namespace gpmd;
 using namespace gpnaucrates;
 using namespace gpoptudfs;
+using namespace gpdbcost;
 
 #define GPOPT_FILE_NAME_LEN 		(1024)
 #define GPOPT_CONN_HT_SIZE			(ULONG(128))
@@ -354,6 +357,7 @@ COptServer::PvOptimize
 	CCommunicator comm(pmp, psocket);
 	CCommunicator *pcomm = &comm;
 
+	const ULONG ulSegments = gpdb::UlSegmentCountGP();
 	// scope for setup objects
 	{
 		// setup loggers
@@ -378,7 +382,7 @@ COptServer::PvOptimize
 			CSerializableMDAccessor serMDA(amda.Pmda());
 
 			// install opt context in TLS
-			CAutoOptCtxt aoc(pmp, amda.Pmda(), NULL /* CCostParams */, NULL /* COptimizerConfig */);
+			CAutoOptCtxt aoc(pmp, amda.Pmda(), New(pmp) CCostModelGPDB(pmp, ulSegments), NULL /* COptimizerConfig */);
 
 			// build query context from requested query
 			CQueryContext *pqc = PqcRecvQuery(pmp, pcomm, amda.Pmda());
@@ -443,8 +447,7 @@ COptServer::PqcRecvQuery
 	gpdxl::DrgPul *pdrgul = pdxltr->PdrgpulOutputColRefs();
 	gpmd::DrgPmdname *pdrgpmdname = pdxltr->Pdrgpmdname();
 
-	const ULONG ulSegments = gpdb::UlSegmentCountGP();
-	CQueryContext *pqc = CQueryContext::PqcGenerate(pmp, pexprTranslated, pdrgul, pdrgpmdname, ulSegments, true /*fDeriveStats*/);
+	CQueryContext *pqc = CQueryContext::PqcGenerate(pmp, pexprTranslated, pdrgul, pdrgpmdname, true /*fDeriveStats*/);
 
 	if (GPOS_FTRACE(EopttracePrintQuery))
 	{

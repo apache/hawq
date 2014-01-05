@@ -1348,7 +1348,7 @@ endif
 ifneq "$(BLD_GPDB_BUILDSET)" "partial"
 	# Copy GP Optimizer libraries 
 	echo "Copying Orca libraries";
-	for b in libnaucrates libgpopt; do \
+	for b in libnaucrates libgpdbcost libgpopt; do \
 		rm -f $(INSTLOC)/lib/$$b.$(LDSFX); \
 		echo "Copying $$b"; \
 		cp  $(OPTIMIZER)/$$b/$(OBJDIR_DEFAULT)/$$b.$(LDSFX) $(INSTLOC)/lib ; \
@@ -1368,7 +1368,7 @@ ifneq "$(BLD_GPDB_BUILDSET)" "partial"
 	# Create GP Optimizer UDFs library  
 	echo "Create GP Optimizer UDFs library";
 	rm -f $(INSTLOC)/lib/libgpoptudf.$(LDSFX);
-	g++ $(GPOPT_UDF_FLAGS) -L$(INSTLOC)/lib -lgpos -lnaucrates -lgpopt -o $(INSTLOC)/lib/libgpoptudf.$(LDSFX)  ./cdb-pg/src/backend/gpopt/utils/funcs.o ;
+	g++ $(GPOPT_UDF_FLAGS) -L$(INSTLOC)/lib -lgpos -lnaucrates -lgpdbcost -lgpopt -o $(INSTLOC)/lib/libgpoptudf.$(LDSFX)  ./cdb-pg/src/backend/gpopt/utils/funcs.o ;
 endif
 
 
@@ -1602,7 +1602,7 @@ endif
 create_orca_installer:
 	rm -rf $(BLD_TOP)/orca_tmp
 	mkdir -p $(BLD_TOP)/orca_tmp
-	for b in libnaucrates libgpopt; do \
+	for b in libnaucrates libgpdbcost libgpopt; do \
 		cp $(OPTIMIZER)/$$b/$(OBJDIR_DEFAULT)/$$b.$(LDSFX) $(BLD_TOP)/orca_tmp; \
 	done
 	cp $(LIBGPOS_LIBDIR)/libgpos.$(LDSFX)  $(BLD_TOP)/orca_tmp
