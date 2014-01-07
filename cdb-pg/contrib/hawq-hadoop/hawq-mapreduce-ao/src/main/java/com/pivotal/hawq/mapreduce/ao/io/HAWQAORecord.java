@@ -165,7 +165,12 @@ public class HAWQAORecord extends HAWQRecord
 		if (value[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		return Boolean.getBoolean(value[fieldIndex - 1].toString());
+		if (value[fieldIndex - 1] == null)
+		{
+			return false;
+		}
+		
+		return ((Boolean)(value[fieldIndex - 1])).booleanValue();
 	}
 
 	@Override
