@@ -20,7 +20,6 @@ import com.pxf.tests.dataprepares.sequence.CustomAvroInSequencePreparer;
 import com.pxf.tests.dataprepares.sequence.CustomSequencePreparer;
 import com.pxf.tests.dataprepares.text.CustomTextPreparer;
 import com.pxf.tests.dataprepares.text.QuotedLineTextPreparer;
-import com.pxf.tests.dataprepares.text.QuatedLineTextPreparer;
 import com.pxf.tests.testcases.PxfTestCase;
 
 /**
@@ -723,7 +722,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		Table dataTable = new Table("dataTable", null);
 
-		FileFormatsUtils.prepareData(new QuatedLineTextPreparer(), 1000, dataTable);
+		FileFormatsUtils.prepareData(new QuotedLineTextPreparer(), 1000, dataTable);
 
 		hdfs.writeTextFile(csvPath, dataTable.getData(), ",");
 
@@ -999,6 +998,13 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		hawq.createTableAndVerify(exTable);
 
+		verifyAnalyze(exTable);
+		
+		ReportUtils.report(report, getClass(), "verify ANALYZE on path with directory");
+		exTable.setName("analyze_dir");
+		exTable.setPath(hdfsWorkingFolder + "/");
+		
+		hawq.createTableAndVerify(exTable);
 		verifyAnalyze(exTable);
 	}
 

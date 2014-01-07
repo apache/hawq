@@ -106,9 +106,10 @@ public class HdfsAnalyzer extends Analyzer
 		 * metadata information includes: file split's
 		 * start, length and hosts (locations).
 		 */
-		byte[] fragmentMetadata = HdfsUtilities.prepareFragmentMetadata((FileSplit)splits[0]);
+		FileSplit firstSplit = (FileSplit)splits[0];
+		byte[] fragmentMetadata = HdfsUtilities.prepareFragmentMetadata(firstSplit);
 		inputData.setFragmentMetadata(fragmentMetadata);
-		
+		inputData.setPath(firstSplit.getPath().toUri().getPath());
 		IReadAccessor accessor = ReadBridge.getFileAccessor(inputData);
 		
 		if (accessor.openForRead());

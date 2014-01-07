@@ -1,16 +1,10 @@
 package com.pxf.tests.basic;
 
-import java.util.Collections;
-
 import org.junit.Test;
 
 import com.pivotal.pxfauto.infra.structures.tables.basic.Table;
 import com.pivotal.pxfauto.infra.structures.tables.pxf.ReadableExternalTable;
 import com.pivotal.pxfauto.infra.structures.tables.pxf.WritableExternalTable;
-import com.pivotal.pxfauto.infra.utils.fileformats.FileFormatsUtils;
-import com.pivotal.pxfauto.infra.utils.tables.ComparisonUtils;
-import com.pivotal.pxfauto.infra.utils.tables.comparators.TableRowsComparator;
-import com.pxf.tests.dataprepares.text.MultiLinePreparer;
 import com.pivotal.pxfauto.infra.utils.tables.ComparisonUtils;
 import com.pxf.tests.testcases.PxfTestCase;
 

@@ -402,6 +402,13 @@ public class InputData
     {
         return path;
     }
+    
+    /*
+     * Sets path into given path.
+     */
+    public void setPath(String path) {
+    	this.path = path;
+    }
 
     /*
      * Returns the path of the schema used for various deserializers
