@@ -33,7 +33,8 @@ public class FilterParser
 	private String filterString;
 	private Stack<Object> operandsStack;
 	private IFilterBuilder filterBuilder;
-	private Map<Integer, Operation> operatorTranslationMap;
+	
+	private static Map<Integer, Operation> operatorTranslationMap = initOperatorTransMap();
 
 	/*
 	 * Operations supported by the parser
@@ -100,8 +101,8 @@ public class FilterParser
 	
 	/*
 	 * Basic filter provided for cases where the target storage system does not provide it's own filter
-	 * For example: Hbase storage provides it's own filter but for a Writable based record in a SequenceFile
-	 * there is no filter provided and so we need to have a default
+	 * For example: Hbase storage provides its own filter but for a Writable based record in a 
+	 * SequenceFile there is no filter provided and so we need to have a default
 	 */
 	static public class BasicFilter
 	{
@@ -151,7 +152,7 @@ public class FilterParser
 	{
 		FilterStringSyntaxException(String desc)
 		{
-			super(desc);
+			super(desc + " (filter string: '" + filterString + "')");
 		}
 	}
 
@@ -159,7 +160,6 @@ public class FilterParser
 	{
 		operandsStack = new Stack<Object>();
 		filterBuilder = eval;
-		initOperatorTransMap();
 	}
 
 	public Object parse(String filter) throws Exception
@@ -167,6 +167,10 @@ public class FilterParser
 		index = 0;
 		filterString = filter;
 
+		if (filter == null) {
+			throw new FilterStringSyntaxException("filter parsing ended with no result");
+		}
+		
 		while (index < filterString.length())
 		{
 			char op = filterString.charAt(index);
@@ -182,6 +186,9 @@ public class FilterParser
 				case 'o':
 					// Parse and translate opcode
 					Operation operation = operatorTranslationMap.get(safeToInt(parseNumber()));
+					if (operation == null) {
+						throw new FilterStringSyntaxException("unknown op ending at " + index);
+					}
 
 					// Pop right operand
 					if (operandsStack.empty())
@@ -205,6 +212,7 @@ public class FilterParser
 					operandsStack.push(result);
 					break;
 				default:
+					index--; // move index back to operand location
 					throw new FilterStringSyntaxException("unknown opcode " + op + 
 														  "(" + (int)op + ") at " + index);
 			}
@@ -214,18 +222,23 @@ public class FilterParser
 			throw new FilterStringSyntaxException("filter parsing ended with no result");
 
 		Object result = operandsStack.pop();
-
+		
 		if (!operandsStack.empty())
 			throw new FilterStringSyntaxException("Stack not empty, missing operators?");
+		
+		if ((result instanceof Constant) || (result instanceof ColumnIndex)) {
+			throw new FilterStringSyntaxException("filter parsing failed, missing operators?");
+		}
 
 		return result;
 	}
 
 	int safeToInt(Long value) throws FilterStringSyntaxException
 	{
-		if (value > Integer.MAX_VALUE)
-			throw new FilterStringSyntaxException("value " + value + " larger than intmax at " + index);
-
+		if (value > Integer.MAX_VALUE || value < Integer.MIN_VALUE) {
+			throw new FilterStringSyntaxException("value " + value + " larger than intmax ending at " + index);
+		}
+		
 		return value.intValue();
 	}
 
@@ -248,58 +261,48 @@ public class FilterParser
 		return filterString.charAt(index) == '"';
 	}
 
-	/*
-	 * Parses a - or a +
-	 * True if -, false o/w
-	 * Increments index if either +/-
-	 */
-	private boolean parseSign()
-	{
-		int chr = filterString.charAt(index);
-
-		if (chr != '-' &&
-			chr != '+')
-			return false;
-
-		++index;
-		return (chr == '-');
-	}
-
 	private Long parseNumber() throws Exception
 	{
 		if (index == filterString.length())
 			throw new FilterStringSyntaxException("numeric argument expected at " + index);
 
-		boolean negative = parseSign();
-		Long number = parseDigits();
+		String digits = parseDigits();
 
-		if (negative)
-			number *= -1L;
-
-		return number;
+		try {
+			return Long.parseLong(digits);
+		} catch (NumberFormatException e) {
+			throw new FilterStringSyntaxException("invalid numeric argument " + digits);
+		}
+		
 	}
 
 	/*
 	 * Parses the longest sequence of digits into a number
 	 * advances the index accordingly
 	 */
-	private Long parseDigits() throws Exception
+	private String parseDigits() throws Exception
 	{
-		Long result = 0L;
-		int i = 0;
-		for (i = index; i < filterString.length(); ++i)
+		String result;
+		int i = index;
+		int filterLength = filterString.length();
+		
+		// allow sign
+		if (filterLength > 0) {
+			int chr = filterString.charAt(i);
+			if (chr == '-' || chr == '+')
+				++i;
+		}
+		for (; i < filterLength; ++i)
 		{
 			int chr = filterString.charAt(i);
 			if (chr < '0' || chr > '9')
 				break;
-
-			result = result * 10L;
-			result = result + (chr - '0');
 		}
-
+		
 		if (i == index)
 			throw new FilterStringSyntaxException("numeric argument expected at " + index);
 
+		result = filterString.substring(index, i);
 		index = i;
 		return result;
 	}
@@ -366,12 +369,12 @@ public class FilterParser
 	/*
 	 * Create a translation table of opcodes to their enum meaning
 	 *
-	 * These codes corresponds the codes in GPDB C code
+	 * These codes correspond to the codes in GPDB C code
 	 * see gphdfilters.h in pxf protocol
 	 */
-	private void initOperatorTransMap()
+	static private Map<Integer, Operation> initOperatorTransMap()
 	{
-		operatorTranslationMap = new HashMap<Integer, Operation>();
+		Map<Integer, Operation> operatorTranslationMap = new HashMap<Integer, Operation>();
 		operatorTranslationMap.put(1, Operation.HDOP_LT);
 		operatorTranslationMap.put(2, Operation.HDOP_GT);
 		operatorTranslationMap.put(3, Operation.HDOP_LE);
@@ -379,5 +382,7 @@ public class FilterParser
 		operatorTranslationMap.put(5, Operation.HDOP_EQ);
 		operatorTranslationMap.put(6, Operation.HDOP_NE);
 		operatorTranslationMap.put(7, Operation.HDOP_AND);
+		return operatorTranslationMap;
+		
 	}
 }

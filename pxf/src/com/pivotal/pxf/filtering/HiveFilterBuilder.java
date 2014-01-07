@@ -89,13 +89,13 @@ public class HiveFilterBuilder implements FilterParser.IFilterBuilder
 	 *
 	 * Currently, 1, 2 can occur, since no parenthesis are used
 	 */	 
-	private  List handleCompoundOperations(List<FilterParser.BasicFilter> left, FilterParser.BasicFilter right)
+	private  List<FilterParser.BasicFilter> handleCompoundOperations(List<FilterParser.BasicFilter> left, FilterParser.BasicFilter right)
 	{
 		left.add(right);
 		return left;
 	}
 	
-	private  List handleCompoundOperations(FilterParser.BasicFilter left, FilterParser.BasicFilter right)
+	private  List<FilterParser.BasicFilter> handleCompoundOperations(FilterParser.BasicFilter left, FilterParser.BasicFilter right)
 	{
 		List<FilterParser.BasicFilter> result = new LinkedList<FilterParser.BasicFilter>();
 		
