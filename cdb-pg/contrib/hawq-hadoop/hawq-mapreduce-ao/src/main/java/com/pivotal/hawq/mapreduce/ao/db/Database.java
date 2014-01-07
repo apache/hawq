@@ -630,7 +630,7 @@ public final class Database
 		int blocksize = getTableBlocksize(tableOid);
 		resultSet = statement
 				.executeQuery("SELECT COUNT(*) FROM pg_aoseg.pg_aoseg_"
-						+ tableFileNode + " WHERE content>=0");
+						+ tableOid + " WHERE content>=0");
 		resultSet.next();
 		int fileNum = resultSet.getInt(1);
 		ArrayList<HAWQAOFileStatus> aosplits = new ArrayList<HAWQAOFileStatus>();
@@ -641,7 +641,7 @@ public final class Database
 			int dboid = this.getDatabaseOid();
 			resultSet = statement
 					.executeQuery("SELECT segno,content,eof FROM pg_aoseg.pg_aoseg_"
-							+ tableFileNode + " WHERE content>=0");
+							+ tableOid + " WHERE content>=0");
 			String tablePath = "/" + tablespaceId + "/" + dboid + "/"
 					+ tableFileNode;
 			while (resultSet.next())
