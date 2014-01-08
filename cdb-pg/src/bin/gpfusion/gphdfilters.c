@@ -175,15 +175,15 @@ gphd_free_filter_list(List *filters)
 static char *
 gphd_serialize_filter_list(List *filters)
 {
-	StringInfo	 oldbuf;
+	StringInfo	 resbuf;
 	StringInfo	 curbuf;
 	ListCell	*lc = NULL;
 
 	if (list_length(filters) == 0)
 		return NULL;
 
-	oldbuf = makeStringInfo();
-	initStringInfo(oldbuf);
+	resbuf = makeStringInfo();
+	initStringInfo(resbuf);
 	curbuf = makeStringInfo();
 	initStringInfo(curbuf);
 
@@ -200,9 +200,7 @@ gphd_serialize_filter_list(List *filters)
 		GPHDOperand			 r 		= filter->r;
 		GPHDOperatorCode	 o 		= filter->op;
 
-		/* store last result in 'oldbuf'. start 'curbuf' clean */
-		resetStringInfo(oldbuf);
-		appendBinaryStringInfo(oldbuf, curbuf->data, curbuf->len);
+		/* last result is stored in 'oldbuf'. start 'curbuf' clean */
 		resetStringInfo(curbuf);
 
 		/* format the operands */
@@ -230,17 +228,19 @@ gphd_serialize_filter_list(List *filters)
 		/* format the operator */
 		appendStringInfo(curbuf, "%c%d", GPHD_OPERATOR_CODE, o);
 
-		/* append the previous result, if any, with a trailing AND operator */
-		if(oldbuf->len > 0)
+		/* append this result to the previous result */
+		appendBinaryStringInfo(resbuf, curbuf->data, curbuf->len);
+
+		/* if there was a previous result, append a trailing AND operator */
+		if(resbuf->len > curbuf->len)
 		{
-			appendBinaryStringInfo(curbuf, oldbuf->data, oldbuf->len);
-			appendStringInfo(curbuf, "%c%d", GPHD_OPERATOR_CODE, HDOP_AND);
+			appendStringInfo(resbuf, "%c%d", GPHD_OPERATOR_CODE, HDOP_AND);
 		}
 	}
 
-	pfree(oldbuf->data);
+	pfree(curbuf->data);
 
-	return curbuf->data;
+	return resbuf->data;
 }
 
 

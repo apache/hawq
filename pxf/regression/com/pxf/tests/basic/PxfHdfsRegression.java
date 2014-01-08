@@ -5,11 +5,14 @@ import java.util.List;
 
 import org.junit.Test;
 import org.postgresql.util.PSQLException;
+import org.springframework.util.Assert;
 
 import com.google.protobuf.GeneratedMessage;
+import com.pivotal.pxfauto.infra.common.ShellSystemObject;
 import com.pivotal.pxfauto.infra.fileformats.IAvroSchema;
 import com.pivotal.pxfauto.infra.structures.tables.basic.Table;
 import com.pivotal.pxfauto.infra.structures.tables.pxf.ReadableExternalTable;
+import com.pivotal.pxfauto.infra.structures.tables.utils.TableFactory;
 import com.pivotal.pxfauto.infra.utils.exception.ExceptionUtils;
 import com.pivotal.pxfauto.infra.utils.fileformats.FileFormatsUtils;
 import com.pivotal.pxfauto.infra.utils.jsystem.report.ReportUtils;
@@ -1141,6 +1144,107 @@ public class PxfHdfsRegression extends PxfTestCase {
 		ReportUtils.stopLevel(report);
 	}
 
+	/**
+	 * Verify that filter pushdown is working, and we send a filter to PXF
+	 * In this test we check that a query condition (WHERE ...) is 
+	 * serialized and passe correctly to PXF, by reading the debug logs of HAWQ.
+	 * 
+	 * The filter serialization is done using RPN, see more details 
+	 * in {@link com.pivotal.pxf.filtering.FilterParser} header.
+	 * 
+	 * @throws Exception
+	 */
+	@Test
+	public void filterPushdown() throws Exception {
+			
+		String[] fields = new String[] {
+				"s1 text",
+				"n1 int",
+		};
+		String csvPath = hdfsWorkingFolder + "/text_data_small.csv";
+
+		Table dataTable = new Table("dataTable", null);
+
+		dataTable.addRow(new String[] {"nobody", "5" });
+		dataTable.addRow(new String[] {"loves", "3" });
+		dataTable.addRow(new String[] {"you", "10" });
+		dataTable.addRow(new String[] {"when", "6" });
+		dataTable.addRow(new String[] {"you're", "11" });
+		dataTable.addRow(new String[] {"down", "4" });
+		dataTable.addRow(new String[] {"and", "1" });
+		dataTable.addRow(new String[] {"out", "0" });
+		
+		hdfs.writeTextFile(csvPath, dataTable.getData(), ",");
+
+		exTable = TableFactory.getPxfReadableTextTable("filter_pushdown", fields, csvPath, ",");
+	
+		hawq.createTableAndVerify(exTable);
+
+		ShellSystemObject sso = hawq.openPsql();
+		try {
+			
+			// TODO: SET optimizer = false should be removed once GPSQL-1465 is resolved.
+			ReportUtils.report(report, getClass(), 
+					"set optimizer to false until ORCA fix pushdown to external scan");
+			hawq.runSqlCmd(sso, "SET optimizer = false;", true);
+			hawq.runSqlCmd(sso, "SET client_min_messages = debug2;", true);
+			
+			ReportUtils.report(report, getClass(), "filter with one condition");
+			String queryFilter = "WHERE s1 = 'you'";
+			String serializedFilter = "a0c\\\"you\\\"o5";
+			verifyFilterPushdown(sso, queryFilter, serializedFilter, 1);
+			
+			ReportUtils.report(report, getClass(), "filter with AND condition");
+			queryFilter = "WHERE s1 != 'nobody' AND n1 <= 5";
+			serializedFilter = "a0c\\\"nobody\\\"o6a1c5o3o7";
+			verifyFilterPushdown(sso, queryFilter, serializedFilter, 4);
+			
+			ReportUtils.report(report, getClass(), "no pushdown: filter with OR condition");
+			queryFilter = "WHERE s1 = 'nobody' OR n1 <= 5";
+			serializedFilter = null;
+			verifyFilterPushdown(sso, queryFilter, serializedFilter, 5);
+			
+			ReportUtils.report(report, getClass(), "no pushdown: run no filter");
+			queryFilter = "";
+			serializedFilter = null;
+			verifyFilterPushdown(sso, queryFilter, serializedFilter, 8);			
+			
+			ReportUtils.report(report, getClass(), 
+					"set optimizer to true again");
+			hawq.runSqlCmd(sso, "SET optimizer = true;", true);
+			
+			hawq.runSqlCmd(sso, "set client_min_messages = notice;", true);
+		} finally {
+			hawq.closePsql(sso);
+		}
+	}
+	
+	private void verifyFilterPushdown(ShellSystemObject sso,
+			String queryFilter, String serializedFilter, int rows) throws Exception {
+		
+		ReportUtils.startLevel(report, getClass(), "run query with filter '" + queryFilter + "'");
+		String result = hawq.runSqlCmd(sso, 
+				"SELECT s1 FROM " + exTable.getName() + " " + queryFilter + ";", true);
+		
+		ReportUtils.report(report, getClass(), "verify query returned " + rows + " rows");
+		if (rows ==1) {
+			Assert.isTrue(result.contains("1 row"), "expecting 1 row");
+		} else {
+			Assert.isTrue(result.contains(rows + " row"), "expecting " + rows +" row");
+		}
+		if (serializedFilter == null) {
+			ReportUtils.report(report, getClass(), "verify filter no was pushed");
+			Assert.isTrue(result.contains("X-GP-HAS-FILTER: 0"), "expecting to have no filter");
+		} else {
+			ReportUtils.report(report, getClass(), "verify filter was pushed");
+			Assert.isTrue(result.contains("X-GP-HAS-FILTER: 1"), "expecting to have filter");
+			ReportUtils.report(report, getClass(), "verify filter is '" + serializedFilter + "'");
+			Assert.isTrue(result.contains("X-GP-FILTER: " + serializedFilter), 
+					"expecting filter to be '" + serializedFilter + "'");
+		}
+		ReportUtils.stopLevel(report);	
+	}
+	
 	private void verifyAnalyze(ReadableExternalTable exTable) throws Exception {
 
 		ReportUtils.startLevel(report, getClass(), "verify that default stats remain after ANALYZE with GUC off");

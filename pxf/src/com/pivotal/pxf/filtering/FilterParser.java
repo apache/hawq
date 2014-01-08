@@ -267,7 +267,7 @@ public class FilterParser
 			throw new FilterStringSyntaxException("numeric argument expected at " + index);
 
 		String digits = parseDigits();
-
+		
 		try {
 			return Long.parseLong(digits);
 		} catch (NumberFormatException e) {
