@@ -16,6 +16,7 @@ import com.pivotal.pxfauto.infra.structures.tables.utils.TableFactory;
 import com.pivotal.pxfauto.infra.utils.exception.ExceptionUtils;
 import com.pivotal.pxfauto.infra.utils.fileformats.FileFormatsUtils;
 import com.pivotal.pxfauto.infra.utils.jsystem.report.ReportUtils;
+import com.pivotal.pxfauto.infra.utils.regex.RegexUtils;
 import com.pivotal.pxfauto.infra.utils.tables.ComparisonUtils;
 import com.pxf.tests.dataprepares.avro.CustomAvroPreparer;
 import com.pxf.tests.dataprepares.protobuf.schema.CustomProtobuffPreparer;
@@ -43,7 +44,10 @@ public class PxfHdfsRegression extends PxfTestCase {
 		/**
 		 * gphdfs_in
 		 */
-		exTable = new ReadableExternalTable("gphdfs_in", new String[] { "a int", "b text", "c bytea" }, ("somepath/" + hdfsWorkingFolder), "CUSTOM");
+		exTable = new ReadableExternalTable("gphdfs_in", new String[] {
+				"a int",
+				"b text",
+				"c bytea" }, ("somepath/" + hdfsWorkingFolder), "CUSTOM");
 
 		exTable.setFragmenter("xfrag");
 		exTable.setAccessor("xacc");
@@ -113,6 +117,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 		try {
 			hawq.createTableAndVerify(exTable);
 		} catch (Exception e) {
+
 			ExceptionUtils.validate(report, e, new PSQLException("ERROR: Invalid URI pxf://" + hawq.getHost() + ":50070/" + exTable.getPath() + "?ACCESSOR=xacc&RESOLVER=xres&someuseropt=someuserval: PROFILE or FRAGMENTER option(s) missing", null), false);
 		}
 	}
@@ -219,22 +224,20 @@ public class PxfHdfsRegression extends PxfTestCase {
 		hawq.queryResults(exTable, "SELECT * FROM bigtext ORDER BY n1");
 
 		ComparisonUtils.compareTables(exTable, dataTable, report);
-		
+
 		ReportUtils.report(report, getClass(), "single condition - remove elements from dataTable and compare");
-		hawq.queryResults(exTable, "SELECT * FROM bigtext " +
-				"WHERE n2 > 500 ORDER BY n1");
-		
+		hawq.queryResults(exTable, "SELECT * FROM bigtext " + "WHERE n2 > 500 ORDER BY n1");
+
 		List<List<String>> data = dataTable.getData();
 		dataTable.setData(data.subList(50, 1000));
-		
+
 		ComparisonUtils.compareTables(exTable, dataTable, report);
-		
+
 		ReportUtils.report(report, getClass(), "two conditions - remove elements from dataTable and compare");
-		hawq.queryResults(exTable, "SELECT * FROM bigtext " +
-				"WHERE (n2 > 500) AND (n1 <= 60) ORDER BY n1");
-		
+		hawq.queryResults(exTable, "SELECT * FROM bigtext " + "WHERE (n2 > 500) AND (n1 <= 60) ORDER BY n1");
+
 		dataTable.setData(data.subList(50, 60));
-		
+
 		ComparisonUtils.compareTables(exTable, dataTable, report);
 	}
 
@@ -409,8 +412,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		Object[] data = FileFormatsUtils.prepareData(new CustomSequencePreparer(), 100, sudoDataTable);
 
-		hdfs
-				.writeSequnceFile(data, (hdfsWorkingFolder + "/my_writable_inside_sequence.tbl"));
+		hdfs.writeSequnceFile(data, (hdfsWorkingFolder + "/my_writable_inside_sequence.tbl"));
 
 		ReadableExternalTable exTable = new ReadableExternalTable("seqwr", new String[] {
 				"tmp1  timestamp",
@@ -441,8 +443,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"short2 smallint",
 				"short3 smallint",
 				"short4 smallint",
-				"short5 smallint"
-		}, (hdfsWorkingFolder + "/my_writable_inside_sequence.tbl"), "custom");
+				"short5 smallint" }, (hdfsWorkingFolder + "/my_writable_inside_sequence.tbl"), "custom");
 
 		exTable.setFragmenter("HdfsDataFragmenter");
 		exTable.setAccessor("SequenceFileAccessor");
@@ -471,8 +472,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		Object[] data = FileFormatsUtils.prepareData(new CustomAvroInSequencePreparer(schemaName), 100, dataTable);
 
-		hdfs
-				.writeAvroInSequnceFile(hdfsWorkingFolder + "/avro_in_seq.tbl", schemaName, (IAvroSchema[]) data);
+		hdfs.writeAvroInSequnceFile(hdfsWorkingFolder + "/avro_in_seq.tbl", schemaName, (IAvroSchema[]) data);
 
 		ReadableExternalTable exTable = new ReadableExternalTable("seqav", new String[] {
 				"tmp1  timestamp",
@@ -525,8 +525,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		Object[] data = FileFormatsUtils.prepareData(new CustomAvroInSequencePreparer(schemaName), 1000, dataTable);
 
-		hdfs
-				.writeAvroInSequnceFile(hdfsWorkingFolder + "/avro_in_seq.tbl", schemaName, (IAvroSchema[]) data);
+		hdfs.writeAvroInSequnceFile(hdfsWorkingFolder + "/avro_in_seq.tbl", schemaName, (IAvroSchema[]) data);
 
 		ReadableExternalTable exTable = new ReadableExternalTable("seqav_space", new String[] {
 				"tmp1  timestamp",
@@ -579,8 +578,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		Object[] data = FileFormatsUtils.prepareData(new CustomAvroInSequencePreparer(schemaName), 1000, dataTable);
 
-		hdfs
-				.writeAvroInSequnceFile(hdfsWorkingFolder + "/avro_in_seq.tbl", schemaName, (IAvroSchema[]) data);
+		hdfs.writeAvroInSequnceFile(hdfsWorkingFolder + "/avro_in_seq.tbl", schemaName, (IAvroSchema[]) data);
 
 		ReadableExternalTable exTable = new ReadableExternalTable("seqav_case", new String[] {
 				"tmp1  timestamp",
@@ -635,8 +633,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		IAvroSchema[] avroData = (IAvroSchema[]) FileFormatsUtils.prepareData(new CustomAvroPreparer(avroSchemName), 100, dataTable);
 
-		hdfs
-				.writeAvroFile((hdfsWorkingFolder + "/avro_in_avro.avro"), avroSchemName, avroData);
+		hdfs.writeAvroFile((hdfsWorkingFolder + "/avro_in_avro.avro"), avroSchemName, avroData);
 
 		ReadableExternalTable exTable = new ReadableExternalTable("avfav", new String[] {
 				"tmp1  timestamp",
@@ -690,8 +687,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		Object[] generatedMessages = FileFormatsUtils.prepareData(new CustomProtobuffPreparer(), 5, dataTable);
 
-		hdfs
-				.writeProtocolBufferFile(protoBuffFile, (GeneratedMessage) generatedMessages[0]);
+		hdfs.writeProtocolBufferFile(protoBuffFile, (GeneratedMessage) generatedMessages[0]);
 
 		ReadableExternalTable exTable = new ReadableExternalTable("pb", new String[] {
 				"s1 text",
@@ -758,8 +754,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		Object[] data = FileFormatsUtils.prepareData(new CustomSequencePreparer(), 100, sudoDataTable);
 
-		hdfs
-				.writeSequnceFile(data, (hdfsWorkingFolder + "/wildcard/my_writable_inside_sequence.tbl"));
+		hdfs.writeSequnceFile(data, (hdfsWorkingFolder + "/wildcard/my_writable_inside_sequence.tbl"));
 
 		ReadableExternalTable exTable = new ReadableExternalTable("seqwild", new String[] {
 				"tmp1  timestamp",
@@ -822,8 +817,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		hdfs.writeSequnceFile(data, (hdfsWorkingFolder + "/wild/my_writable_inside_sequence1.tbl"));
 
-		hdfs
-				.writeSequnceFile(data, (hdfsWorkingFolder + "/wild/my_writable_inside_sequence2.tbl"));
+		hdfs.writeSequnceFile(data, (hdfsWorkingFolder + "/wild/my_writable_inside_sequence2.tbl"));
 
 		ReadableExternalTable exTable = new ReadableExternalTable("seqwild", new String[] {
 				"tmp1  timestamp",
@@ -921,8 +915,22 @@ public class PxfHdfsRegression extends PxfTestCase {
 		try {
 			hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY num1");
 		} catch (Exception e) {
-			ExceptionUtils.validate(report, e, new PSQLException("Failed connect to " + exTable.getHostname() + ":" + exTable.getPort() + "; Connection refused", null), true);
+
+			/**
+			 * Different Curel versions can provide different ERROR messages.
+			 */
+			String[] possibleErrMessages = {
+					"Failed connect to " + exTable.getHostname() + ":" + exTable.getPort() + "; Connection refused",
+					"couldn't connect to host" };
+
+			ExceptionUtils.validate(report, e, new PSQLException(possibleErrMessages[0] + "|" + possibleErrMessages[1], null), true);
 		}
+	}
+
+	public static void main(String[] args) {
+		boolean b = RegexUtils.match("[couldn't connect to host | Failed connect to]", "Failed connect to");
+
+		System.out.println(b);
 	}
 
 	/**
@@ -936,8 +944,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		File regResourcesFolder = new File("regression/resources/");
 
-		hdfs
-				.copyFromLocal(regResourcesFolder.getAbsolutePath() + "/empty.tbl", (hdfsWorkingFolder + "/empty.tbl"));
+		hdfs.copyFromLocal(regResourcesFolder.getAbsolutePath() + "/empty.tbl", (hdfsWorkingFolder + "/empty.tbl"));
 
 		ReadableExternalTable exTable = new ReadableExternalTable("empty", new String[] {
 				"t1  text",
@@ -966,8 +973,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		File regResourcesFolder = new File("regression/resources/");
 
-		hdfs
-				.copyFromLocal(regResourcesFolder.getAbsolutePath() + "/avroformat_inside_avrofile.avro", (hdfsWorkingFolder + "/avroformat_inside_avrofile.avro"));
+		hdfs.copyFromLocal(regResourcesFolder.getAbsolutePath() + "/avroformat_inside_avrofile.avro", (hdfsWorkingFolder + "/avroformat_inside_avrofile.avro"));
 
 		ReadableExternalTable exTable = new ReadableExternalTable("avfav_analyze_good", new String[] {
 				"tmp1  timestamp",
@@ -1021,8 +1027,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		File regResourcesFolder = new File("regression/resources/");
 
-		hdfs
-				.copyFromLocal(regResourcesFolder.getAbsolutePath() + "/avroformat_inside_avrofile.avro", (hdfsWorkingFolder + "/avroformat_inside_avrofile.avro"));
+		hdfs.copyFromLocal(regResourcesFolder.getAbsolutePath() + "/avroformat_inside_avrofile.avro", (hdfsWorkingFolder + "/avroformat_inside_avrofile.avro"));
 
 		ReadableExternalTable exTable = new ReadableExternalTable("avfav_analyze_bad_port", new String[] {
 				"tmp1  timestamp",
@@ -1061,9 +1066,14 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		hawq.runQuery("SET pxf_enable_stat_collection = true;");
 
-		String expectedWarning = "skipping \"" + exTable.getName() + "\" --- error returned: remote component error (0): Failed connect to localhost:" + exTable.getPort() + "; Connection refused";
+		/**
+		 * Different Curel versions can provide different ERROR messages.
+		 */
+		String[] possibleErrMessages = {
+				"Failed connect to " + exTable.getHostname() + ":" + exTable.getPort() + "; Connection refused",
+				"couldn't connect to host" };
 
-		hawq.runQueryWithExpectedWarning("ANALYZE " + exTable.getName(), expectedWarning, false);
+		hawq.runQueryWithExpectedWarning("ANALYZE " + exTable.getName(), possibleErrMessages[0] + "|" + possibleErrMessages[1], true);
 
 		Table analyzeResults = new Table("results", null);
 
@@ -1088,8 +1098,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		File regResourcesFolder = new File("regression/resources/");
 
-		hdfs
-				.copyFromLocal(regResourcesFolder.getAbsolutePath() + "/avroformat_inside_avrofile.avro", (hdfsWorkingFolder + "/avroformat_inside_avrofile.avro"));
+		hdfs.copyFromLocal(regResourcesFolder.getAbsolutePath() + "/avroformat_inside_avrofile.avro", (hdfsWorkingFolder + "/avroformat_inside_avrofile.avro"));
 
 		ReadableExternalTable exTable = new ReadableExternalTable("avfav_analyze_bad_class", new String[] {
 				"tmp1  timestamp",

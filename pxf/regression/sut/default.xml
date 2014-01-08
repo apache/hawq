@@ -3,16 +3,11 @@
 	<cluster>
 		<class>com.pivotal.pxfauto.infra.cluster.SingleCluster</class>
 		<host>localhost</host>
-		<userName>koazu</userName>
-		<password>20Aug20!#</password>
-
 	</cluster>
 
 	<hawq>
 		<class>com.pivotal.pxfauto.infra.hawq.Hawq</class>
 		<host>localhost</host>
-		<sshUserName>koazu</sshUserName>
-		<sshPassword>20Aug20!#</sshPassword>
 		<db>pxf_regression</db>
 		<gphome>$GPHOME</gphome>
 	</hawq>
@@ -23,10 +18,6 @@
 		<host>localhost</host>
 		<port>8020</port>
 		<workingDirectory>pxf_regression_data</workingDirectory>
-		<func>
-			<class>com.pxf.infra.hdfs.HdfsFunctionalityJavaApi</class>
-		</func>
-
 	</hdfs>
 
 	<hbase>
@@ -43,8 +34,6 @@
 	<tinc>
 		<class>com.pivotal.pxfauto.infra.tinc.Tinc</class>
 		<host>localhost</host>
-		<userName>koazu</userName>
-		<password>20Aug20!#</password>
 		<gphome>$GPHOME</gphome>
 		<tincFolder>/Users/koazu/work/workspace/tinc/main</tincFolder>
 		<tincTestsFolder>/Users/koazu/work/workspace/tincrepo/main</tincTestsFolder>

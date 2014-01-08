@@ -5,7 +5,7 @@ In order to run JSystem regression you will need:
 are set before running the ant.
 
 2. Open the default.xml sut file located in the regression/sut folder and change the required parameters: 
-add your required host, ports, userName and password in each component.
+add your required host, ports.
 The clusterFolder will be taken from GPHD_ROOT variable if exists - if needed you can put the location in the sut.
 Pay attention and replace escape characters in the default.xml file ​​as in the following table:
 

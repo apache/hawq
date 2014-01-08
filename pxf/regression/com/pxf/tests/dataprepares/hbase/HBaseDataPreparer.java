@@ -37,50 +37,62 @@ public class HBaseDataPreparer implements IDataPreparer {
 			for (int i = 0, chars = FIRST_PRINTABLE_CHAR; i < rows; ++i, chars = nextChar(chars)) {
 
 				// Row Key
-				String rowKey = String.format("%s%08d", rowKeyPrefix, i + splitIndex * rows);
+				String rowKey = String.format("%s%08d", rowKeyPrefix, i
+						+ splitIndex * rows);
 				Put newRow = new Put(Bytes.toBytes(rowKey));
 
 				// Qualifier 1. regular ascii string
 				if ((!useNull) || (i % 2 == 0))
-					addValue(newRow, columnFamily, "q1", String.format("ASCII%08d", i));
+					addValue(newRow, columnFamily, "q1",
+							String.format("ASCII%08d", i));
 
 				// Qualifier 2. multibyte utf8 string.
-				addValue(newRow, columnFamily, "q2", String.format("UTF8_計算機用語_%08d", i).getBytes());
+				addValue(newRow, columnFamily, "q2",
+						String.format("UTF8_計算機用語_%08d", i).getBytes());
 
 				// Qualifier 3. integer value.
 				if ((!useNull) || (i % 3 == 0))
-					addValue(newRow, columnFamily, "q3", String.format("%08d", 1 + i + splitIndex * rows));
+					addValue(newRow, columnFamily, "q3",
+							String.format("%08d", 1 + i + splitIndex * rows));
 
 				// Qualifier 4. regular ascii (for a lookup table redirection)
-				addValue(newRow, columnFamily, "q4", String.format("lookup%08d", i * 2));
+				addValue(newRow, columnFamily, "q4",
+						String.format("lookup%08d", i * 2));
 
 				// Qualifier 5. real (float)
-				addValue(newRow, columnFamily, "q5", String.format("%d.%d", i, i));
+				addValue(newRow, columnFamily, "q5",
+						String.format("%d.%d", i, i));
 
 				// Qualifier 6. float (double)
-				addValue(newRow, columnFamily, "q6", String.format("%d%d%d%d.%d", i, i, i, i, i));
+				addValue(newRow, columnFamily, "q6",
+						String.format("%d%d%d%d.%d", i, i, i, i, i));
 
 				// Qualifier 7. bpchar (char)
 				addValue(newRow, columnFamily, "q7", String.format("%c", chars));
 
 				// Qualifier 8. smallint (short)
-				addValue(newRow, columnFamily, "q8", String.format("%d", (i % Short.MAX_VALUE)));
+				addValue(newRow, columnFamily, "q8",
+						String.format("%d", (i % Short.MAX_VALUE)));
 
 				// Qualifier 9. bigint (long)
-				Long value9 = ((i * i * i * 10000000000L + i) % Long.MAX_VALUE) * (long) Math.pow(-1, i % 2);
+				Long value9 = ((i * i * i * 10000000000L + i) % Long.MAX_VALUE)
+						* (long) Math.pow(-1, i % 2);
 				addValue(newRow, columnFamily, "q9", value9.toString());
 
 				// Qualifier 10. boolean
-				addValue(newRow, columnFamily, "q10", Boolean.toString((i % 2) == 0));
+				addValue(newRow, columnFamily, "q10",
+						Boolean.toString((i % 2) == 0));
 
 				// Qualifier 11. numeric (string)
-				addValue(newRow, columnFamily, "q11", (new Double(Math.pow(10, i))).toString());
+				addValue(newRow, columnFamily, "q11",
+						(new Double(Math.pow(10, i))).toString());
 
 				// Qualifier 12. Timestamp
 				// Removing system timezone so tests will pass anywhere in the
 				// world :)
 				int timeZoneOffset = TimeZone.getDefault().getRawOffset();
-				addValue(newRow, columnFamily, "q12", (new Timestamp(6000 * i - timeZoneOffset)).toString());
+				addValue(newRow, columnFamily, "q12", (new Timestamp(6000 * i
+						- timeZoneOffset)).toString());
 
 				generatedRows.add(newRow);
 
@@ -100,7 +112,7 @@ public class HBaseDataPreparer implements IDataPreparer {
 	private int nextChar(int chars) {
 
 		if (chars == LAST_PRINTABLE_CHAR) {
-			return FIRST_PRINTABLE_CHAR - 1;
+			return FIRST_PRINTABLE_CHAR;
 		}
 
 		chars++;
@@ -112,13 +124,12 @@ public class HBaseDataPreparer implements IDataPreparer {
 		return chars;
 	}
 
-	private void addValue(Put row, byte[] cf, String ql, byte[] value)
-	{
+	private void addValue(Put row, byte[] cf, String ql, byte[] value) {
 		row.add(cf, ql.getBytes(), value);
 	}
 
-	private void addValue(Put row, byte[] cf, String ql, String value) throws java.io.UnsupportedEncodingException
-	{
+	private void addValue(Put row, byte[] cf, String ql, String value)
+			throws java.io.UnsupportedEncodingException {
 		addValue(row, cf, ql, value.getBytes("UTF-8"));
 	}
 

@@ -29,7 +29,7 @@
 	<property name="src.dir" value="${basedir}/regression" />
 	<property name="build.dir" value="${basedir}/build" />
 	<property name="lib.dir" value="${build.dir}/regression-lib" />
-	<property name="dist.dir" value="${build.dir}/${component.name}" />
+	<property name="dist.dir" value="${build.dir}/regression" />
 	<property name="test.dir" value="${basedir}/regression/com/pxf/tests/basic" />
 	<property name="testreports.dir" value="${build.dir}/regression/reports" />
 
@@ -73,9 +73,9 @@
 		</fileset>
 
 		<path refid="ivy-classpath" />
-		
+
 		<fileset dir="${basedir}/lib" includes="**/*.jar" />
-		<fileset dir="${env.GPHD_ROOT}/pxf" includes="**/*.jar"/>
+		<fileset dir="${env.GPHD_ROOT}/pxf" includes="**/*.jar" />
 
 	</path>
 
@@ -160,7 +160,7 @@
 				<fileset dir="${basedir}/lib">
 					<include name="**/*.jar" />
 				</fileset>
-				<fileset dir="${env.GPHD_ROOT}/pxf" includes="**/*.jar"/>
+				<fileset dir="${env.GPHD_ROOT}/pxf" includes="**/*.jar" />
 			</classpath>
 
 			<formatter type="plain" usefile="false" />
@@ -174,40 +174,5 @@
 			</batchtest>
 
 		</junit>
-	</target>
-
-
-	<target name="execute.test">
-
-		<!-- we need to have relative path -->
-		<pathconvert property="test.source.relative">
-			<fileset file="${test.source.absolute}" />
-			<map from="${test.sources}/" to="" />
-		</pathconvert>
-
-		<!-- run one particular test -->
-		<junit fork="true" printsummary="true">
-
-			<classpath>
-				<path refid="${test.classes}" />
-			</classpath>
-
-			<formatter type="xml" />
-
-			<batchtest todir="${test.reports}">
-				<fileset dir="${test.sources}">
-					<filename name="${test.source.relative}" />
-				</fileset>
-			</batchtest>
-		</junit>
-
-		<foreach target="execute.test" maxthreads="5" inheritall="true" inheritrefs="true" parallel="true" param="test.source.absolute">
-			<path>
-				<fileset dir="${test.sources}">
-					<include name="**/*.java" />
-				</fileset>
-			</path>
-		</foreach>
-
 	</target>
 </project>

@@ -26,6 +26,7 @@ import com.pivotal.pxfauto.infra.utils.exception.ExceptionUtils;
 import com.pivotal.pxfauto.infra.utils.jsystem.report.ReportUtils;
 import com.pivotal.pxfauto.infra.utils.tables.ComparisonUtils;
 import com.pxf.tests.dataprepares.hbase.HBaseDataPreparer;
+import com.pxf.tests.fixtures.PxfHbaseFixture;
 import com.pxf.tests.testcases.PxfTestCase;
 
 public class PxfHBaseRegression extends PxfTestCase {
@@ -84,6 +85,10 @@ public class PxfHBaseRegression extends PxfTestCase {
 			"\"cf1:q11\" NUMERIC",
 			"\"cf1:q12\" TIMESTAMP" };
 
+	public PxfHBaseRegression() {
+		setFixture(PxfHbaseFixture.class);
+	}
+
 	@Before
 	public void defaultBefore() throws Throwable {
 
@@ -127,23 +132,17 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		ArrayList<Put> lookUpData = new ArrayList<Put>();
 		Put mapping = new Put(hTable.getName().getBytes());
-		mapping.add(Bytes.toBytes("mapping"),
-				Bytes.toBytes("q4"),
-				Bytes.toBytes("cf1:q4"));
+		mapping.add(Bytes.toBytes("mapping"), Bytes.toBytes("q4"), Bytes.toBytes("cf1:q4"));
 
 		lookUpData.add(mapping);
 
 		mapping = new Put(hNullTable.getName().getBytes());
-		mapping.add(Bytes.toBytes("mapping"),
-				Bytes.toBytes("q4"),
-				Bytes.toBytes("cf1:q4"));
+		mapping.add(Bytes.toBytes("mapping"), Bytes.toBytes("q4"), Bytes.toBytes("cf1:q4"));
 
 		lookUpData.add(mapping);
 
 		mapping = new Put(hIntegerRowKey.getName().getBytes());
-		mapping.add(Bytes.toBytes("mapping"),
-				Bytes.toBytes("q4"),
-				Bytes.toBytes("cf1:q4"));
+		mapping.add(Bytes.toBytes("mapping"), Bytes.toBytes("q4"), Bytes.toBytes("cf1:q4"));
 
 		lookUpData.add(mapping);
 
@@ -179,18 +178,23 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		initAndPopulateHBaseTable(hTable, false);
 
-		ReadableExternalTable exTable = new ReadableExternalTable("pxf_extable_validations", new String[] { "a int", "b text", "c bytea" }, hTable.getName(), "CUSTOM");
+		ReadableExternalTable exTable = new ReadableExternalTable("pxf_extable_validations", new String[] {
+				"a int",
+				"b text",
+				"c bytea" }, hTable.getName(), "CUSTOM");
 
 		try {
 			hawq.createTable(exTable);
 		} catch (Exception e) {
-			ExceptionUtils.validate(report, e, new PSQLException("ERROR: Invalid URI pxf://"
-					+ exTable.getHostname() + ":" + exTable.getPort() + "/" + exTable.getPath() + "?: invalid option after '?'", null), false);
+			ExceptionUtils.validate(report, e, new PSQLException("ERROR: Invalid URI pxf://" + exTable.getHostname() + ":" + exTable.getPort() + "/" + exTable.getPath() + "?: invalid option after '?'", null), false);
 		}
 
 		ReportUtils.reportBold(report, getClass(), "Create Writable external table directed to HBase table");
 
-		exTable = TableFactory.getPxfHbaseWritableTable("pxf_writable_extable_validations", new String[] { "a int", "b text", "c bytea" }, hTable);
+		exTable = TableFactory.getPxfHbaseWritableTable("pxf_writable_extable_validations", new String[] {
+				"a int",
+				"b text",
+				"c bytea" }, hTable);
 
 		hawq.createTableAndVerify(exTable);
 	}
@@ -230,8 +234,7 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		initAndPopulateHBaseTable(hTable, false);
 
-		hawq.queryResults(externalTableHbase, "SELECT cnt < 300 AS check FROM (SELECT COUNT(*) AS cnt FROM " + externalTableHbase.getName()
-				+ " WHERE gp_segment_id = 0) AS a");
+		hawq.queryResults(externalTableHbase, "SELECT cnt < 300 AS check FROM (SELECT COUNT(*) AS cnt FROM " + externalTableHbase.getName() + " WHERE gp_segment_id = 0) AS a");
 
 		Table expectedTable = new Table("expected", null);
 
@@ -249,8 +252,7 @@ public class PxfHBaseRegression extends PxfTestCase {
 		hTable.addFilter(new RowFilter(CompareFilter.CompareOp.LESS_OR_EQUAL, new BinaryComparator(Bytes.toBytes("row00000103"))));
 
 		hbase.queryResults(hTable, null);
-		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName()
-				+ " WHERE recordkey > 'row00000090' AND recordkey <= 'row00000103' ORDER BY recordkey ASC");
+		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE recordkey > 'row00000090' AND recordkey <= 'row00000103' ORDER BY recordkey ASC");
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
 	}
@@ -278,8 +280,7 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		hbase.queryResults(hTable, null);
 
-		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName()
-				+ " WHERE recordkey != 'row00000090' AND recordkey <= 'row00000103' ORDER BY recordkey ASC");
+		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE recordkey != 'row00000090' AND recordkey <= 'row00000103' ORDER BY recordkey ASC");
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
 	}
@@ -295,8 +296,7 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		hbase.queryResults(hTable, null);
 
-		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName()
-				+ " WHERE recordkey != 'row00000090' AND recordkey <= 'row00000095' AND \"cf1:q7\" > 'o' ORDER BY recordkey ASC");
+		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE recordkey != 'row00000090' AND recordkey <= 'row00000095' AND \"cf1:q7\" > 'o' ORDER BY recordkey ASC");
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
 	}
@@ -311,8 +311,7 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		hbase.queryResults(hTable, null);
 
-		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName()
-				+ " WHERE \"cf1:q1\" > 'ASCII00000090' AND q4 <= 'lookup00000198' ORDER BY recordkey ASC");
+		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE \"cf1:q1\" > 'ASCII00000090' AND q4 <= 'lookup00000198' ORDER BY recordkey ASC");
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
 	}
@@ -327,8 +326,7 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		hbase.queryResults(hTable, null);
 
-		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName()
-				+ " WHERE \"cf1:q2\" > 'UTF8_計算機用語_00000090' AND \"cf1:q3\" <= 990000 ORDER BY recordkey ASC");
+		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE \"cf1:q2\" > 'UTF8_計算機用語_00000090' AND \"cf1:q3\" <= 990000 ORDER BY recordkey ASC");
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
 	}
@@ -358,8 +356,7 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		hbase.queryResults(hTable, null);
 
-		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName()
-				+ " WHERE \"cf1:q8\" > 97 AND \"cf1:q9\" <= 9702990000000099 ORDER BY recordkey ASC");
+		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE \"cf1:q8\" > 97 AND \"cf1:q9\" <= 9702990000000099 ORDER BY recordkey ASC");
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
 	}
@@ -373,8 +370,7 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		hbase.queryResults(hTable, null);
 
-		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName()
-				+ " WHERE \"cf1:q9\" < -7000000000000000 ORDER BY recordkey ASC");
+		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE \"cf1:q9\" < -7000000000000000 ORDER BY recordkey ASC");
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
 	}
@@ -397,8 +393,7 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		hbase.queryResults(hTable, null);
 
-		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName()
-				+ " WHERE (((recordkey > 'row00000090') AND (recordkey <= 'row00000103')) OR (recordkey = 'row00000105')) ORDER BY recordkey ASC");
+		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE (((recordkey > 'row00000090') AND (recordkey <= 'row00000103')) OR (recordkey = 'row00000105')) ORDER BY recordkey ASC");
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
 	}
@@ -414,20 +409,17 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		hbase.queryResults(hTable, null);
 
-		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() +
-				" WHERE recordkey != 'row00000099' AND \"cf1:q8\" > 97 AND \"cf1:q9\" <= 9702990000000099 ORDER BY recordkey ASC");
+		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE recordkey != 'row00000099' AND \"cf1:q8\" > 97 AND \"cf1:q9\" <= 9702990000000099 ORDER BY recordkey ASC");
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
 
-		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() +
-				" WHERE \"cf1:q9\" <= 9702990000000099 AND recordkey != 'row00000099' AND \"cf1:q8\" > 97 ORDER BY recordkey ASC");
+		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE \"cf1:q9\" <= 9702990000000099 AND recordkey != 'row00000099' AND \"cf1:q8\" > 97 ORDER BY recordkey ASC");
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
 
 		hawq.runQuery("SET pxf_enable_filter_pushdown = off");
 
-		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() +
-				" WHERE \"cf1:q9\" <= 9702990000000099 AND recordkey != 'row00000099' AND \"cf1:q8\" > 97 ORDER BY recordkey ASC");
+		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE \"cf1:q9\" <= 9702990000000099 AND recordkey != 'row00000099' AND \"cf1:q8\" > 97 ORDER BY recordkey ASC");
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
 	}
@@ -452,8 +444,7 @@ public class PxfHBaseRegression extends PxfTestCase {
 	@Test
 	public void lookupTableUpperCase() throws Exception {
 
-		ReportUtils.reportBold(report, getClass(), "Remove lower case q4 from lookup table for "
-				+ hNullTable.getName() + " table and add Q4 upper case mapping");
+		ReportUtils.reportBold(report, getClass(), "Remove lower case q4 from lookup table for " + hNullTable.getName() + " table and add Q4 upper case mapping");
 
 		hbase.removeRow(lookUpTable, new String[] { hNullTable.getName() });
 
@@ -613,8 +604,7 @@ public class PxfHBaseRegression extends PxfTestCase {
 		hIntegerRowKey.addFilter(orFilter);
 		hbase.queryResults(hIntegerRowKey, null);
 
-		hawq.queryResults(exTableIntegerRowKey, "SELECT * FROM " + exTableIntegerRowKey.getName()
-				+ " WHERE recordkey <= 30 OR recordkey > 145 ORDER BY recordkey;");
+		hawq.queryResults(exTableIntegerRowKey, "SELECT * FROM " + exTableIntegerRowKey.getName() + " WHERE recordkey <= 30 OR recordkey > 145 ORDER BY recordkey;");
 
 		ComparisonUtils.compareTables(exTableIntegerRowKey, hIntegerRowKey, report);
 	}
@@ -656,7 +646,8 @@ public class PxfHBaseRegression extends PxfTestCase {
 	 * @param useNullsInData
 	 * @throws Exception
 	 */
-	private void initAndPopulateHBaseTable(HBaseTable table, boolean useNullsInData) throws Exception {
+	private void initAndPopulateHBaseTable(HBaseTable table, boolean useNullsInData)
+			throws Exception {
 
 		ReportUtils.startLevel(report, getClass(), "Init and populate HBase table: " + table.getName());
 
