@@ -29,7 +29,6 @@ import java.util.TimeZone;
  */
 public abstract class HAWQConvertUtil
 {
-	public static char[] decimalCharArray = null;
 	private static long microsecondsPerDay = 86400000000l;
 
 	/**
@@ -357,8 +356,7 @@ public abstract class HAWQConvertUtil
 	public static Object bytesToDecimal(byte bytes[], int offset_numeric)
 			throws HAWQException
 	{
-		if (decimalCharArray == null)
-			decimalCharArray = new char[1001];
+		char[] decimalCharArray = new char[1001];
 		byte lead = bytes[offset_numeric];
 		int offset, length;
 		if ((lead & 0x80) != 0)
@@ -442,8 +440,10 @@ public abstract class HAWQConvertUtil
 			}
 			for (int i = 0; i < displayScale; ++i)
 				decimalCharArray[length_charArray++] = '0';
-			return new BigDecimal(HAWQConvertUtil.decimalCharArray, 0, dotPos
+			Object result = new BigDecimal(decimalCharArray, 0, dotPos
 					+ displayScale + 1);
+			decimalCharArray = null;
+			return result;
 		}
 		catch (ArrayIndexOutOfBoundsException e)
 		{

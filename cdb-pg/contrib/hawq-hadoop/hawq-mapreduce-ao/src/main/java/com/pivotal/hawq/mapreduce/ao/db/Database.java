@@ -459,58 +459,58 @@ public final class Database
 		resultSet.next();
 		int catalogOid = resultSet.getInt(1);
 		ArrayList<HAWQField> fields = new ArrayList<HAWQField>();
-		for (int i = 1;; i++)
+		
+		/*
+		 * Get all attributes of a table.
+		 */
+		resultSet = statement.executeQuery("SELECT attname, typname, typnamespace from " +
+				"pg_attribute a JOIN pg_type t ON a.atttypid = t.oid " +
+				"WHERE a.attrelid =" + tableOid + " AND a.attnum > 0 ORDER BY a.attnum ASC;");
+		
+		while (resultSet.next())
 		{
-			resultSet = statement
-					.executeQuery("SELECT attname from pg_attribute where attrelid="
-							+ tableOid + " and attnum=" + i);
-			if (!resultSet.next())
-				break;
 			String attname = resultSet.getString(1);
-
-			resultSet = statement
-					.executeQuery("SELECT typname,typnamespace from pg_type where oid="
-							+ "(SELECT atttypid from pg_attribute where attrelid="
-							+ tableOid + " and attnum=" + i + ")");
-			resultSet.next();
-			String fieldStr = resultSet.getString(1);
-			int typnamespace = resultSet.getInt(2);
+			String typname = resultSet.getString(2);
+			int typnamespace = resultSet.getInt(3);
 			if (typnamespace != catalogOid)
-				throw new HAWQException("Type " + fieldStr
+				throw new HAWQException("Type " + typname
 						+ " is not in pg_catalog and is not supported yet");
+			
 			try
 			{
-				if (fieldStr.startsWith("_"))
+				if (typname.startsWith("_"))
 				{
 					// array type
-					if (fieldStr.equals("_int4") || fieldStr.equals("_int8")
-							|| fieldStr.equals("_int2")
-							|| fieldStr.equals("_float4")
-							|| fieldStr.equals("_float8")
-							|| fieldStr.equals("_bool")
-							|| fieldStr.equals("_time")
-							|| fieldStr.equals("_date")
-							|| fieldStr.equals("_interval"))
+					if (typname.equals("_int4") || typname.equals("_int8")
+							|| typname.equals("_int2")
+							|| typname.equals("_float4")
+							|| typname.equals("_float8")
+							|| typname.equals("_bool")
+							|| typname.equals("_time")
+							|| typname.equals("_date")
+							|| typname.equals("_interval"))
 					{
 						HAWQPrimitiveField.PrimitiveType type = HAWQPrimitiveField.PrimitiveType
-								.valueOf(fieldStr.substring(1).toUpperCase());
+								.valueOf(typname.substring(1).toUpperCase());
 						fields.add(HAWQSchema.optional_field_array(type,
 								attname));
 					}
 					else
-						throw new HAWQException(fieldStr
+					{
+						throw new HAWQException(typname
 								+ " is not supported yet.");
+					}
 				}
 				else
 				{
 					HAWQPrimitiveField.PrimitiveType type = HAWQPrimitiveField.PrimitiveType
-							.valueOf(fieldStr.toUpperCase());
+							.valueOf(typname.toUpperCase());
 					fields.add(HAWQSchema.optional_field(type, attname));
 				}
 			}
 			catch (IllegalArgumentException e)
 			{
-				throw new HAWQException(fieldStr + " is not supported yet.");
+				throw new HAWQException(typname + " is not supported yet.");
 			}
 		}
 		return new HAWQSchema(tableName, fields);
