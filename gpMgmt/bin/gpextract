@@ -107,9 +107,9 @@ class GpMetadataAccessor:
         rows = self.exec_query(qry)
         return [r['fselocation'] for r in rows]
 
-    def get_aoseg_files(self, relfilenode):
+    def get_aoseg_files(self, oid):
         '''
-        Return rows in pg_aoseg_`relfilenode` table, excluding
+        Return rows in pg_aoseg_`oid` table, excluding
         rows whose content id is -1.
 
         Example:
@@ -122,7 +122,7 @@ class GpMetadataAccessor:
         SELECT content, segno as fileno, eof as filesize 
         FROM pg_aoseg.pg_aoseg_%d
         WHERE content >= 0 ORDER by content, fileno;
-        """ % relfilenode
+        """ % oid
         return self.exec_query(qry)
 
     def get_pgclass(self, nspname, relname):
@@ -219,9 +219,9 @@ def extract_metadata(conn, tbname):
                  'DFS_URL': DFS_URL,
                  'Encoding': accessor.dbencoding }
 
-    def get_table_files(relfilenode):
+    def get_table_files(oid, relfilenode):
         '''
-        Given table's relfilenode, return path and size of all its data files
+        Given table's oid and relfilenode, return path and size of all its data files
         on HDFS as [{'path': path1, 'size': size1}, {...}].
         
         Path doesn't include DFS URL.
@@ -229,19 +229,19 @@ def extract_metadata(conn, tbname):
         Example:
         >>> segment_localtions
         >>> ['hdfs://127.0.0.1:9000/gpseg0', 'hdfs://127.0.0.1:9000/gpseg1']
-        >>> tablespace_oid, database_oid, relfilenode
-        >>> (16385, 35469, 35470)
-        >>> accessor.get_aoseg_files(35470)
+        >>> tablespace_oid, database_oid, relfilenode, oid
+        >>> (16385, 35469, 35470, 35488)
+        >>> accessor.get_aoseg_files(35488)
         >>> [{'content': '0', 'fileno': '1', 'filesize': '180'},
         ...  {'content': '0', 'fileno': '2', 'filesize': '150'},
         ...  {'content': '1', 'fileno': '1', 'filesize': '320'}]
-        >>> get_table_files(35470)
+        >>> get_table_files(35488, 35470)
         >>> [{'path' :'/gpseg0/16385/35469/35470.1', 'size': 180},
         ...  {'path' :'/gpseg0/16385/35469/35470.2', 'size': 150},
         ...  {'path' :'/gpseg1/16385/35469/35470.1', 'size': 320}]
         '''
         files = []
-        for f in accessor.get_aoseg_files(relfilenode):
+        for f in accessor.get_aoseg_files(oid):
             segloc = segment_localtions[int(f['content'])]
             segprefix = split_segment_location(segloc)[1]
             path = '%s/%d/%d/%d.%d' % (
@@ -272,7 +272,7 @@ def extract_metadata(conn, tbname):
                 'Checksum': True if rel_appendonly['checksum']=='t' else False,
                 'CompressionType': rel_appendonly['compresstype'],
                 'CompressionLevel': rel_appendonly['compresslevel'],
-                'Files': get_table_files(rel_pgclass['relfilenode'])
+                'Files': get_table_files(rel_pgclass['oid'], rel_pgclass['relfilenode'])
         }
 
         if partitions:
@@ -301,7 +301,7 @@ def extract_metadata(conn, tbname):
                         'CompressionLevel': p_appendonly['compresslevel'],
                         'Name': p['partitionname'],
                         'Constraint': p['partitionboundary'],
-                        'Files': get_table_files(p_pgclass['relfilenode'])
+                        'Files': get_table_files(p_pgclass['oid'], p_pgclass['relfilenode'])
                 }
                 file_locations['Partitions'].append(par_info)
 
