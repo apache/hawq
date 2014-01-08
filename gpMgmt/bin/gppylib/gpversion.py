@@ -19,7 +19,7 @@ if sys.version_info < (2, 5, 0) or sys.version_info >= (3, 0, 0):
     sys.exit(1)
 
 
-MAIN_VERSION = [1,1,99,99]    # version number for main
+MAIN_VERSION = [1,2,99,99]    # version number for main
 
 
 #============================================================
