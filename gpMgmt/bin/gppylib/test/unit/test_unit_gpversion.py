@@ -7,6 +7,7 @@ Unit testing for gpversion module
 """
 import unittest
 
+import gpversion
 from gpversion import *
 
 class GpVersionTestCase(unittest.TestCase):
@@ -21,6 +22,7 @@ class GpVersionTestCase(unittest.TestCase):
         self.assertTrue(str(vMain) == 'main build dev')
 
     def test_case_2(self):
+        gpversion.MAIN_VERSION = [1,2,99,99]
         vTuple = GpVersion([3,3,0,0])
 
         self.assertTrue(vTuple.isVersionCurrentRelease() == False )
@@ -32,6 +34,7 @@ class GpVersionTestCase(unittest.TestCase):
         self.assertTrue(vTuple < "4.0")
 
     def test_case_3(self):
+        gpversion.MAIN_VERSION = [1,2,99,99]
         v33 = GpVersion("3.3 build dev")
 
         self.assertTrue(v33.isVersionCurrentRelease() == False )
@@ -43,6 +46,7 @@ class GpVersionTestCase(unittest.TestCase):
         self.assertTrue(v33 < "4.0")
 
     def test_case_4(self):
+        gpversion.MAIN_VERSION = [1,2,99,99]
         v34 = GpVersion("3.4.filerep")
 
         self.assertTrue(v34.isVersionCurrentRelease() == False )
@@ -54,6 +58,7 @@ class GpVersionTestCase(unittest.TestCase):
         self.assertTrue(v34 < "4.0")
 
     def test_case_5(self):
+        gpversion.MAIN_VERSION = [1,2,99,99]
         vShort = GpVersion("postgres (HAWQ) 1.0.0.3 build dev")
 
         self.assertTrue(vShort.isVersionCurrentRelease() == False )
@@ -66,6 +71,7 @@ class GpVersionTestCase(unittest.TestCase):
 
 
     def test_case_6(self):
+        gpversion.MAIN_VERSION = [1,1,99,99]
         vLong = GpVersion("PostgreSQL 8.2.15 (Greenplum Database 4.2.0 build 1) (HAWQ 1.1.0.0 build dev) on i386-apple-darwin12.2.1, compiled by GCC gcc (GCC) 4.4.2 compiled on May 10 2013 11:31:49 (with assert checking)")
     
         self.assertTrue(vLong.isVersionCurrentRelease())
