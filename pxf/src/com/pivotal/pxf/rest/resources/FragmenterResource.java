@@ -3,7 +3,6 @@ package com.pivotal.pxf.rest.resources;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.security.PrivilegedExceptionAction;
 
 import javax.servlet.ServletContext;
 import javax.ws.rs.GET;

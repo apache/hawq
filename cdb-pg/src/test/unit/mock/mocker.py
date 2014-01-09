@@ -245,9 +245,12 @@ class FuncSignature(object):
         for arg in self.args:
             if self.is_variadic(arg):
                 continue
-            elif not self.is_pointer_type(arg[0]):
+            argtype = arg[0]
+            argname = arg[1]
+            if not self.is_pointer_type(argtype):
                 continue
             ref = '&' if special.ByValStructs.has(argtype) else ''
+            argname = subscript.sub('', argname)
             buf.append('\toptional_assignment({ref}{arg});'.format(ref=ref, arg=argname))
 
         # Currently, local function doesn't check arguments.
