@@ -2456,7 +2456,9 @@ class GPUpgrade(GPUpgradeBase):
         '''
 
         logger.info('Modifying catalog version of skeleton cluster')
-        releases = {"1.0": "201303110"}
+        releases = {"1.0": "201303110",
+                    "1.1": "201306170",
+                    "1.2": "201401010"}
         
         self.CheckDown()
 

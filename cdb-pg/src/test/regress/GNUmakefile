@@ -174,7 +174,7 @@ endif
 # 2. tablespace pg_global
 # 3. (oid=...)
 upg2-setup:
-	rm -rf data/upg_catupgrade_11.sql
+	rm -rf data/upg_catupgrade_12.sql
 	perl -pi \
 		-e 's/(, )?(indexid|relid|reltype_oid|toast_oid|toast_index|toast_relid|toast_reltype|shared|CamelCase)=[0-9a-zA-Z]+//gi;' \
 		-e 's/oid=false//g;' \
@@ -183,9 +183,9 @@ upg2-setup:
 		-e 's/tablespace pg_global//g;' \
 		-e 's/oids=true, /oids=true/;' \
 		-e 's/\(,/(/;' \
- 		< $(srcdir)/data/upgrade11/upg2_catupgrade_11.sql.in \
-		> data/upg_catupgrade_11.sql
-	@gpstringsubs.pl data/upg_catupgrade_11.sql
+ 		< $(srcdir)/data/upgrade12/upg2_catupgrade_12.sql.in \
+		> data/upg_catupgrade_12.sql
+	@gpstringsubs.pl data/upg_catupgrade_12.sql
 
 ugpart-setup:
 	@cp -f $(srcdir)/data/upgrade_pg_partitions.sql.in data/upgrade_pg_partitions.sql
