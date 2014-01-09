@@ -1741,12 +1741,9 @@ static void
 prepareDispatchedCatalogFunction(QueryContextInfo *cxt, Oid procOid)
 {
 	HeapTuple proctuple;
-	Datum langDatum;
-	Oid langOid;
-	bool langisNull = false;
-	Datum typeDatum;
-	Oid typeOid;
-	bool typeisNull = false;
+	Datum datum;
+	Oid oidval;
+	bool isNull = false;
 
     Assert(procOid != InvalidOid);
 
@@ -1769,22 +1766,29 @@ prepareDispatchedCatalogFunction(QueryContextInfo *cxt, Oid procOid)
     if (!HeapTupleIsValid(proctuple))
         elog(ERROR, "cache lookup failed for proc %u", procOid);
 
-	langDatum = caql_getattr(pcqCtx, Anum_pg_proc_prolang, &langisNull);
-	if (!langisNull && langDatum)
+	datum = caql_getattr(pcqCtx, Anum_pg_proc_prolang, &isNull);
+	if (!isNull && datum)
 	{
-		langOid = DatumGetObjectId(langDatum);
-		prepareDispatchedCatalogLanguage(cxt, langOid);
+		oidval = DatumGetObjectId(datum);
+		prepareDispatchedCatalogLanguage(cxt, oidval);
 	}
-	
-	typeDatum = caql_getattr(pcqCtx, Anum_pg_proc_prorettype, &typeisNull);
-	if (!typeisNull && typeDatum)
+
+	datum = caql_getattr(pcqCtx, Anum_pg_proc_pronamespace, &isNull);
+	if (!isNull && datum)
 	{
-		typeOid = DatumGetObjectId(typeDatum);
-		prepareDispatchedCatalogType(cxt, typeOid);
+		oidval = DatumGetObjectId(datum);
+		prepareDispatchedCatalogNamespace(cxt, oidval);
+	}
+
+	datum = caql_getattr(pcqCtx, Anum_pg_proc_prorettype, &isNull);
+	if (!isNull && datum)
+	{
+		oidval = DatumGetObjectId(datum);
+		prepareDispatchedCatalogType(cxt, oidval);
 	}
 
 	AddTupleToContextInfo(cxt, ProcedureRelationId, "pg_proc", proctuple, MASTER_CONTENT_ID);
-	
+
 	caql_endscan(pcqCtx);
 }
 
