@@ -73,6 +73,8 @@
 #undef ALLOW_MemoryContextFreeImpl
 
 #define GPDB_COUNT_AGG_OID 2147
+#define GPDB_PG_GET_PART_RULE_DEF_1 5027
+#define GPDB_PG_GET_PART_RULE_DEF_2 5028
 
 #include "gpos/base.h"
 #include "gpos/error/CException.h"
@@ -112,6 +114,15 @@ const ULONG rgulCmpTypeMappings[][2] =
 	{IMDType::EcmptG, CmptGT},
 	{IMDType::EcmptGEq, CmptGEq},
 	{IMDType::EcmptLEq, CmptLEq}
+};
+
+// TODO: solimm1 - 01/09/2014: remove function properties map when catalog is fixed to include correct properties
+
+// initialization of function properties map
+const CTranslatorRelcacheToDXL::SFuncProps CTranslatorRelcacheToDXL::m_rgfp[] =
+{
+	{GPDB_PG_GET_PART_RULE_DEF_1, IMDFunction::EfsStable, IMDFunction::EfdaReadsSQLData, true, true}, // pg_get_partition_rule_def(oid)
+	{GPDB_PG_GET_PART_RULE_DEF_2, IMDFunction::EfsStable, IMDFunction::EfdaReadsSQLData, true, true}, // pg_get_partition_rule_def(oid, bool)
 };
 
 //---------------------------------------------------------------------------
@@ -1543,6 +1554,56 @@ CTranslatorRelcacheToDXL::Pmdscop
 	return pmdscop;
 }
 
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorRelcacheToDXL::LookupFuncProps
+//
+//	@doc:
+//		Lookup function properties
+//
+//---------------------------------------------------------------------------
+void
+CTranslatorRelcacheToDXL::LookupFuncProps
+	(
+	OID oidFunc,
+	IMDFunction::EFuncStbl *pefs, // output: function stability
+	IMDFunction::EFuncDataAcc *pefda, // output: function datya access
+	BOOL *fStrict, // output: is function strict?
+	BOOL *fReturnsSet // output: does function return set?
+	)
+{
+	GPOS_ASSERT(NULL != pefs);
+	GPOS_ASSERT(NULL != pefda);
+	GPOS_ASSERT(NULL != fStrict);
+	GPOS_ASSERT(NULL != fReturnsSet);
+
+	// lookup function properties first n the local map
+	const ULONG ulSize = GPOS_ARRAY_SIZE(m_rgfp);
+	for (ULONG ul = 0; ul < ulSize; ul++)
+	{
+		if (m_rgfp[ul].Oid() == oidFunc)
+		{
+			*pefs = m_rgfp[ul].Efs();
+			*pefda = m_rgfp[ul].Efda();
+			*fStrict = m_rgfp[ul].FStrict();
+			*fReturnsSet = m_rgfp[ul].FReturnsSet();
+
+			return;
+		}
+	}
+
+	CHAR cFuncStability = gpdb::CFuncStability(oidFunc);
+	*pefs = EFuncStability(cFuncStability);
+
+	CHAR cFuncDataAccess = gpdb::CFuncDataAccess(oidFunc);
+	*pefda = EFuncDataAccess(cFuncDataAccess);
+
+	*fReturnsSet = gpdb::FFuncRetset(oidFunc);
+	*fStrict = gpdb::FFuncStrict(oidFunc);
+}
+
+
 //---------------------------------------------------------------------------
 //	@function:
 //		CTranslatorRelcacheToDXL::Pmdfunc
@@ -1604,14 +1665,11 @@ CTranslatorRelcacheToDXL::Pmdfunc
 		gpdb::GPDBFree(plOutArgTypes);
 	}
 
-	BOOL fReturnSet = gpdb::FFuncRetset(oidFunc);
-	BOOL fStrict = gpdb::FFuncStrict(oidFunc);
-
-	CHAR cFuncStability = gpdb::CFuncStability(oidFunc);
-	CMDFunctionGPDB::EFuncStbl efuncstbl = EFuncStability(cFuncStability);
-
-	CHAR cFuncDataAccess = gpdb::CFuncDataAccess(oidFunc);
-	CMDFunctionGPDB::EFuncDataAcc efda = EFuncDataAccess(cFuncDataAccess);
+	IMDFunction::EFuncStbl efs = IMDFunction::EfsImmutable;
+	IMDFunction::EFuncDataAcc efda = IMDFunction::EfdaNoSQL;
+	BOOL fStrict = true;
+	BOOL fReturnsSet = true;
+	LookupFuncProps(oidFunc, &efs, &efda, &fStrict, &fReturnsSet);
 
 	pmdid->AddRef();
 	CMDFunctionGPDB *pmdfunc = New(pmp) CMDFunctionGPDB
@@ -1621,11 +1679,12 @@ CTranslatorRelcacheToDXL::Pmdfunc
 											pmdname,
 											pmdidTypeResult,
 											pdrgpmdidArgTypes,
-											fReturnSet,
-											efuncstbl,
+											fReturnsSet,
+											efs,
 											efda,
 											fStrict
 											);
+
 	return pmdfunc;
 }
 

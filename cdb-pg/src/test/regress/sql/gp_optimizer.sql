@@ -602,5 +602,26 @@ INSERT INTO array_table values(7,array[3],'a');
 INSERT INTO array_table values(8,array[3],'b');
 SELECT f3, myagg3(f1) from (select * from array_table order by f1 limit 10) as foo GROUP BY f3 ORDER BY f3;
 
+-- Functions that are wrongly annotated in the catalog as NOSQL
+CREATE TABLE orca.test_part (i int) PARTITION BY RANGE(i) (start(1) exclusive end(2) inclusive);
+CREATE TABLE orca.test_distributed(i int);
+INSERT INTO orca.test_distributed SELECT i from generate_series(1,2) i;
+
+-- Function pg_get_partition_rule_def(oid, bool)
+SELECT pg_get_partition_rule_def(pr1.oid, true) AS partitionboundary ,n.nspname AS schemaname, cl.relname AS tablename 
+FROM orca.test_distributed, pg_namespace n, pg_namespace n2, pg_class cl
+LEFT JOIN pg_tablespace sp ON cl.reltablespace = sp.oid, pg_class cl2
+LEFT JOIN pg_tablespace sp3 ON cl2.reltablespace = sp3.oid, pg_partition pp, pg_partition_rule pr1
+WHERE pp.paristemplate = false AND pp.parrelid = cl.oid AND pr1.paroid = pp.oid AND cl2.oid = pr1.parchildrelid
+AND cl.relnamespace = n.oid AND cl2.relnamespace = n2.oid and cl.relname ='test_part';
+
+-- Function pg_get_partition_rule_def(oid)
+SELECT pg_get_partition_rule_def(pr1.oid) AS partitionboundary ,n.nspname AS schemaname, cl.relname AS tablename 
+FROM orca.test_distributed, pg_namespace n, pg_namespace n2, pg_class cl
+LEFT JOIN pg_tablespace sp ON cl.reltablespace = sp.oid, pg_class cl2
+LEFT JOIN pg_tablespace sp3 ON cl2.reltablespace = sp3.oid, pg_partition pp, pg_partition_rule pr1
+WHERE pp.paristemplate = false AND pp.parrelid = cl.oid AND pr1.paroid = pp.oid AND cl2.oid = pr1.parchildrelid
+AND cl.relnamespace = n.oid AND cl2.relnamespace = n2.oid and cl.relname ='test_part';
+
 -- clean up
 drop schema orca cascade;

@@ -38,6 +38,7 @@
 #include "md/CMDPartConstraintGPDB.h"
 #include "md/CMDScalarOpGPDB.h"
 #include "md/IMDType.h"
+#include "md/IMDFunction.h"
 #include "md/CDXLColStats.h"
 #include "statistics/CHistogram.h"
 #include "statistics/CStatisticsUtils.h"
@@ -66,6 +67,110 @@ namespace gpdxl
 	class CTranslatorRelcacheToDXL
 	{
 		private:
+
+		//---------------------------------------------------------------------------
+		//	@class:
+		//		SFuncProps
+		//
+		//	@doc:
+		//		Internal structure to capture exceptional cases where
+		//		function properties are wrongly defined in the catalog,
+		//
+		//		this information is used to correct function properties during
+		//		translation
+		//
+		//---------------------------------------------------------------------------
+		struct SFuncProps
+		{
+
+			private:
+
+				// function identifier
+				OID m_oid;
+
+				// function stability
+				IMDFunction::EFuncStbl m_efs;
+
+				// function data access
+				IMDFunction::EFuncDataAcc m_efda;
+
+				// is function strict?
+				BOOL m_fStrict;
+
+				// can the function return multiple rows?
+				BOOL m_fReturnsSet;
+
+			public:
+
+				// ctor
+				SFuncProps
+					(
+					OID oid,
+					IMDFunction::EFuncStbl efs,
+					IMDFunction::EFuncDataAcc efda,
+					BOOL fStrict,
+					BOOL fReturnsSet
+					)
+					:
+					m_oid(oid),
+					m_efs(efs),
+					m_efda(efda),
+					m_fStrict(fStrict),
+					m_fReturnsSet(fReturnsSet)
+				{}
+
+				// dtor
+				virtual
+				~SFuncProps()
+				{};
+
+				// return function identifier
+				OID Oid() const
+				{
+					return m_oid;
+				}
+
+				// return function stability
+				IMDFunction::EFuncStbl Efs() const
+				{
+					return m_efs;
+				}
+
+				// return data access property
+				IMDFunction::EFuncDataAcc Efda() const
+				{
+					return m_efda;
+				}
+
+				// is function strict?
+				BOOL FStrict() const
+				{
+					return m_fStrict;
+				}
+
+				// does function return set?
+				BOOL FReturnsSet() const
+				{
+					return m_fReturnsSet;
+				}
+
+			}; // struct SFuncProps
+
+			// array of function properties map
+			static
+			const SFuncProps m_rgfp[];
+
+			// lookup function properties
+			static
+			void LookupFuncProps
+				(
+				OID oidFunc,
+				IMDFunction::EFuncStbl *pefs, // output: function stability
+				IMDFunction::EFuncDataAcc *pefda, // output: function data access
+				BOOL *fStrict, // output: is function strict?
+				BOOL *fReturnsSet // output: does function return set?
+				);
+
 			// get type name from the relcache
 			static
 			CMDName *PmdnameType(IMemoryPool *pmp, IMDId *pmdid);

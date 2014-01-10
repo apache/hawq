@@ -8235,128 +8235,35 @@ b  | {5,2,8}
 c  | {3,6}
 (3 rows)
 
+-- Functions that are wrongly annotated in the catalog as NOSQL
+CREATE TABLE orca.test_part (i int) PARTITION BY RANGE(i) (start(1) exclusive end(2) inclusive);
+CREATE TABLE orca.test_distributed(i int);
+INSERT INTO orca.test_distributed SELECT i from generate_series(1,2) i;
+-- Function pg_get_partition_rule_def(oid, bool)
+SELECT pg_get_partition_rule_def(pr1.oid, true) AS partitionboundary ,n.nspname AS schemaname, cl.relname AS tablename 
+FROM orca.test_distributed, pg_namespace n, pg_namespace n2, pg_class cl
+LEFT JOIN pg_tablespace sp ON cl.reltablespace = sp.oid, pg_class cl2
+LEFT JOIN pg_tablespace sp3 ON cl2.reltablespace = sp3.oid, pg_partition pp, pg_partition_rule pr1
+WHERE pp.paristemplate = false AND pp.parrelid = cl.oid AND pr1.paroid = pp.oid AND cl2.oid = pr1.parchildrelid
+AND cl.relnamespace = n.oid AND cl2.relnamespace = n2.oid and cl.relname ='test_part';
+partitionboundary           | schemaname | tablename 
+---------------------------------------+------------+-----------
+START (1) EXCLUSIVE END (2) INCLUSIVE | orca       | test_part
+START (1) EXCLUSIVE END (2) INCLUSIVE | orca       | test_part
+(2 rows)
+
+-- Function pg_get_partition_rule_def(oid)
+SELECT pg_get_partition_rule_def(pr1.oid) AS partitionboundary ,n.nspname AS schemaname, cl.relname AS tablename 
+FROM orca.test_distributed, pg_namespace n, pg_namespace n2, pg_class cl
+LEFT JOIN pg_tablespace sp ON cl.reltablespace = sp.oid, pg_class cl2
+LEFT JOIN pg_tablespace sp3 ON cl2.reltablespace = sp3.oid, pg_partition pp, pg_partition_rule pr1
+WHERE pp.paristemplate = false AND pp.parrelid = cl.oid AND pr1.paroid = pp.oid AND cl2.oid = pr1.parchildrelid
+AND cl.relnamespace = n.oid AND cl2.relnamespace = n2.oid and cl.relname ='test_part';
+partitionboundary           | schemaname | tablename 
+---------------------------------------+------------+-----------
+START (1) EXCLUSIVE END (2) INCLUSIVE | orca       | test_part
+START (1) EXCLUSIVE END (2) INCLUSIVE | orca       | test_part
+(2 rows)
+
 -- clean up
 drop schema orca cascade;
-NOTICE:  drop cascades to table orca.tab2
-NOTICE:  drop cascades to table orca.tab1
-NOTICE:  drop cascades to table orca.twf2
-NOTICE:  drop cascades to table orca.twf1
-NOTICE:  drop cascades to table orca.uu
-NOTICE:  drop cascades to table orca.ut
-NOTICE:  drop cascades to table orca.us
-NOTICE:  drop cascades to table orca.ur
-NOTICE:  drop cascades to table orca.toanalyze
-NOTICE:  drop cascades to table orca.prod9
-NOTICE:  drop cascades to append only table orca.t77
-NOTICE:  drop cascades to table orca.fooh2
-NOTICE:  drop cascades to table orca.fooh1
-NOTICE:  drop cascades to table orca.tab1
-NOTICE:  drop cascades to table orca.csq_r
-NOTICE:  drop cascades to function orca.csq_f(integer)
-NOTICE:  drop cascades to table orca.t_1_prt_part201208
-NOTICE:  drop cascades to constraint t_1_prt_part201208_check on table orca.t_1_prt_part201208
-NOTICE:  drop cascades to append only table orca.t_1_prt_part201207
-NOTICE:  drop cascades to constraint t_1_prt_part201207_check on append only table orca.t_1_prt_part201207
-NOTICE:  drop cascades to append only columnar table orca.t_1_prt_part201206
-NOTICE:  drop cascades to constraint t_1_prt_part201206_check on append only columnar table orca.t_1_prt_part201206
-NOTICE:  drop cascades to table orca.t_1_prt_part201205
-NOTICE:  drop cascades to constraint t_1_prt_part201205_check on table orca.t_1_prt_part201205
-NOTICE:  drop cascades to append only table orca.t_1_prt_part201204
-NOTICE:  drop cascades to constraint t_1_prt_part201204_check on append only table orca.t_1_prt_part201204
-NOTICE:  drop cascades to append only columnar table orca.t_1_prt_part201203
-NOTICE:  drop cascades to constraint t_1_prt_part201203_check on append only columnar table orca.t_1_prt_part201203
-NOTICE:  drop cascades to table orca.t
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_bb_2_2_prt_sp2_4
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_bb_2_2_prt_sp2_4_check on table orca.multilevel_p_1_prt_bb_2_2_prt_sp2_4
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_bb_2_check on table orca.multilevel_p_1_prt_bb_2_2_prt_sp2_4
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_bb_2_2_prt_sp2_3
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_bb_2_2_prt_sp2_3_check on table orca.multilevel_p_1_prt_bb_2_2_prt_sp2_3
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_bb_2_check on table orca.multilevel_p_1_prt_bb_2_2_prt_sp2_3
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_bb_2_2_prt_sp2_2
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_bb_2_2_prt_sp2_2_check on table orca.multilevel_p_1_prt_bb_2_2_prt_sp2_2
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_bb_2_check on table orca.multilevel_p_1_prt_bb_2_2_prt_sp2_2
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_bb_2_2_prt_sp2_1
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_bb_2_2_prt_sp2_1_check on table orca.multilevel_p_1_prt_bb_2_2_prt_sp2_1
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_bb_2_check on table orca.multilevel_p_1_prt_bb_2_2_prt_sp2_1
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_bb_2_2_prt_sp1_2
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_bb_2_2_prt_sp1_2_check on table orca.multilevel_p_1_prt_bb_2_2_prt_sp1_2
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_bb_2_check on table orca.multilevel_p_1_prt_bb_2_2_prt_sp1_2
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_bb_2_2_prt_sp1_1
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_bb_2_2_prt_sp1_1_check on table orca.multilevel_p_1_prt_bb_2_2_prt_sp1_1
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_bb_2_check on table orca.multilevel_p_1_prt_bb_2_2_prt_sp1_1
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_bb_2
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_bb_2_check on table orca.multilevel_p_1_prt_bb_2
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_bb_1_2_prt_sp2_4
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_bb_1_2_prt_sp2_4_check on table orca.multilevel_p_1_prt_bb_1_2_prt_sp2_4
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_bb_1_check on table orca.multilevel_p_1_prt_bb_1_2_prt_sp2_4
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_bb_1_2_prt_sp2_3
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_bb_1_2_prt_sp2_3_check on table orca.multilevel_p_1_prt_bb_1_2_prt_sp2_3
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_bb_1_check on table orca.multilevel_p_1_prt_bb_1_2_prt_sp2_3
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_bb_1_2_prt_sp2_2
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_bb_1_2_prt_sp2_2_check on table orca.multilevel_p_1_prt_bb_1_2_prt_sp2_2
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_bb_1_check on table orca.multilevel_p_1_prt_bb_1_2_prt_sp2_2
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_bb_1_2_prt_sp2_1
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_bb_1_2_prt_sp2_1_check on table orca.multilevel_p_1_prt_bb_1_2_prt_sp2_1
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_bb_1_check on table orca.multilevel_p_1_prt_bb_1_2_prt_sp2_1
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_bb_1_2_prt_sp1_2
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_bb_1_2_prt_sp1_2_check on table orca.multilevel_p_1_prt_bb_1_2_prt_sp1_2
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_bb_1_check on table orca.multilevel_p_1_prt_bb_1_2_prt_sp1_2
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_bb_1_2_prt_sp1_1
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_bb_1_2_prt_sp1_1_check on table orca.multilevel_p_1_prt_bb_1_2_prt_sp1_1
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_bb_1_check on table orca.multilevel_p_1_prt_bb_1_2_prt_sp1_1
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_bb_1
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_bb_1_check on table orca.multilevel_p_1_prt_bb_1
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_aa_2_2_prt_sp2_4
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_aa_2_2_prt_sp2_4_check on table orca.multilevel_p_1_prt_aa_2_2_prt_sp2_4
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_aa_2_check on table orca.multilevel_p_1_prt_aa_2_2_prt_sp2_4
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_aa_2_2_prt_sp2_3
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_aa_2_2_prt_sp2_3_check on table orca.multilevel_p_1_prt_aa_2_2_prt_sp2_3
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_aa_2_check on table orca.multilevel_p_1_prt_aa_2_2_prt_sp2_3
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_aa_2_2_prt_sp2_2
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_aa_2_2_prt_sp2_2_check on table orca.multilevel_p_1_prt_aa_2_2_prt_sp2_2
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_aa_2_check on table orca.multilevel_p_1_prt_aa_2_2_prt_sp2_2
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_aa_2_2_prt_sp2_1
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_aa_2_2_prt_sp2_1_check on table orca.multilevel_p_1_prt_aa_2_2_prt_sp2_1
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_aa_2_check on table orca.multilevel_p_1_prt_aa_2_2_prt_sp2_1
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_aa_2_2_prt_sp1_2
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_aa_2_2_prt_sp1_2_check on table orca.multilevel_p_1_prt_aa_2_2_prt_sp1_2
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_aa_2_check on table orca.multilevel_p_1_prt_aa_2_2_prt_sp1_2
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_aa_2_2_prt_sp1_1
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_aa_2_2_prt_sp1_1_check on table orca.multilevel_p_1_prt_aa_2_2_prt_sp1_1
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_aa_2_check on table orca.multilevel_p_1_prt_aa_2_2_prt_sp1_1
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_aa_2
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_aa_2_check on table orca.multilevel_p_1_prt_aa_2
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_aa_1_2_prt_sp2_4
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_aa_1_2_prt_sp2_4_check on table orca.multilevel_p_1_prt_aa_1_2_prt_sp2_4
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_aa_1_check on table orca.multilevel_p_1_prt_aa_1_2_prt_sp2_4
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_aa_1_2_prt_sp2_3
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_aa_1_2_prt_sp2_3_check on table orca.multilevel_p_1_prt_aa_1_2_prt_sp2_3
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_aa_1_check on table orca.multilevel_p_1_prt_aa_1_2_prt_sp2_3
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_aa_1_2_prt_sp2_2
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_aa_1_2_prt_sp2_2_check on table orca.multilevel_p_1_prt_aa_1_2_prt_sp2_2
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_aa_1_check on table orca.multilevel_p_1_prt_aa_1_2_prt_sp2_2
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_aa_1_2_prt_sp2_1
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_aa_1_2_prt_sp2_1_check on table orca.multilevel_p_1_prt_aa_1_2_prt_sp2_1
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_aa_1_check on table orca.multilevel_p_1_prt_aa_1_2_prt_sp2_1
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_aa_1_2_prt_sp1_2
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_aa_1_2_prt_sp1_2_check on table orca.multilevel_p_1_prt_aa_1_2_prt_sp1_2
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_aa_1_check on table orca.multilevel_p_1_prt_aa_1_2_prt_sp1_2
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_aa_1_2_prt_sp1_1
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_aa_1_2_prt_sp1_1_check on table orca.multilevel_p_1_prt_aa_1_2_prt_sp1_1
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_aa_1_check on table orca.multilevel_p_1_prt_aa_1_2_prt_sp1_1
-NOTICE:  drop cascades to table orca.multilevel_p_1_prt_aa_1
-NOTICE:  drop cascades to constraint multilevel_p_1_prt_aa_1_check on table orca.multilevel_p_1_prt_aa_1
-NOTICE:  drop cascades to table orca.multilevel_p
-NOTICE:  drop cascades to table orca.pp_1_prt_pp1
-NOTICE:  drop cascades to constraint pp_1_prt_pp1_check on table orca.pp_1_prt_pp1
-NOTICE:  drop cascades to table orca.pp
-NOTICE:  drop cascades to table orca.onek
-NOTICE:  drop cascades to table orca.rcte
-NOTICE:  drop cascades to table orca.bar
-NOTICE:  drop cascades to table orca.foo
-NOTICE:  drop cascades to table orca.m1
-NOTICE:  drop cascades to table orca.m
-NOTICE:  drop cascades to table orca.s
-NOTICE:  drop cascades to table orca.r
-NOTICE:  drop cascades to table orca.bar2
-NOTICE:  drop cascades to table orca.bar1
