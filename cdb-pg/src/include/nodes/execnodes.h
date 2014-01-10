@@ -27,6 +27,12 @@
 #include "utils/relcache.h"
 #include "gpmon/gpmon.h"                /* gpmon_packet_t */
 
+/*
+ * Currently, since grouping is defined as uint64 internally, it limits the
+ * maximum number of grouping attributes to 64.
+ */
+#define MAX_GROUPING_ATTRS_IN_GROUPING_EXTENSION 64
+
 struct CdbDispatchResults;              /* in cdbdispatchresult.h */
 struct CdbExplain_ShowStatCtx;          /* private, in "cdb/cdbexplain.c" */
 struct ChunkTransportState;             /* #include "cdb/cdbinterconnect.h" */
@@ -1989,6 +1995,29 @@ typedef struct SortState
 typedef struct AggStatePerAggData *AggStatePerAgg;
 typedef struct AggStatePerGroupData *AggStatePerGroup;
 
+/*
+ * There are four different types of Agg nodes:
+ *   (1) Scalar (Plain) Agg: Inputs are read in and aggregated into a single value. This Agg
+ *       always returns a single value, even when there are no inputs at all.
+ *   (2) Ordinary Grouping Agg node: Inputs come in as groups. Each group is aggregated.
+ *       This Agg will handle the ordinary grouping and first stage of rollup Agg.
+ *   (3) Intermediate Rollup Agg node: There are two different inputs:
+ *       (a) Inputs that just need to be pass-through. These tuples are coming from
+ *           2+ level downstream of rollup Aggs, and do not need to be aggregated.
+ *       (b) Inputs that need to be aggregated as groups. These tuples also need to
+ *           be pass-through.
+ *   (4) Final Rollup Agg node: This is similar to (3), except that the pass-through
+ *       tuples need to be finalized.
+ */
+typedef enum AggregateType
+{
+        AggTypeScalar,
+        AggTypeGroup,
+        AggTypeIntermediateRollup,
+        AggTypeFinalRollup
+} AggregateType;
+
+
 typedef struct AggState
 {
         ScanState        ss;                                /* its first field is NodeTag */
@@ -2000,9 +2029,6 @@ typedef struct AggState
         MemoryContext aggcontext;        /* memory context for long-lived data */
         ExprContext *tmpcontext;        /* econtext for input expressions */
         bool                agg_done;                /* indicates completion of Agg scan */
-        bool        has_partial_agg;/* indicate if a partial aggregate result
-                                                                 * has been calculated in the previous call.
-                                                                  */
 
         /* these fields are used in AGG_PLAIN and AGG_SORTED modes: */
         AggStatePerGroup pergroup;        /* per-Aggref-per-group working state */
@@ -2016,6 +2042,8 @@ typedef struct AggState
         /* MPP */
         struct HashAggTable *hhashtable;
         MemoryManagerContainer mem_manager;
+
+        AggregateType aggType;
 
         /* ROLLUP */
         AggStatePerGroup perpassthru; /* per-Aggref-per-pass-through-tuple working state */

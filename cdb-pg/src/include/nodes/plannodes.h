@@ -933,7 +933,7 @@ typedef struct Agg
 	 *   Agg(a,b,c) ==> Agg(a,b) ==> Agg(a) ==> Agg()
 	 *
 	 * The GROUPING value of input tuples for Agg(a,b,c) is 0, and the values
-	 * for Agg(a,b), Agg(a), Agg() are 0, 1, 3, respectively.
+	 * for Agg(a,b), Agg(a), Agg() are 1, 3, 7, respectively.
 	 *
 	 * We also use the value "-1" to indicate an Agg node is the final
 	 * one that brings back all rollup results from different segments. This final
