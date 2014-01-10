@@ -2086,7 +2086,7 @@
 
  CREATE FUNCTION pg_get_triggerdef(oid) RETURNS text LANGUAGE internal STABLE STRICT AS 'pg_get_triggerdef' WITH (OID=1662, DESCRIPTION="trigger description");
 
- CREATE FUNCTION pg_get_constraintdef(oid) RETURNS text LANGUAGE internal STABLE STRICT AS 'pg_get_constraintdef' WITH (OID=1387, DESCRIPTION="constraint description");
+ CREATE FUNCTION pg_get_constraintdef(oid) RETURNS text LANGUAGE internal STABLE STRICT READS SQL DATA AS 'pg_get_constraintdef' WITH (OID=1387, DESCRIPTION="constraint description");
 
  CREATE FUNCTION pg_get_expr(text, oid) RETURNS text LANGUAGE internal STABLE STRICT AS 'pg_get_expr' WITH (OID=1716, DESCRIPTION="deparse an encoded expression");
 
@@ -2098,9 +2098,9 @@
 
  CREATE FUNCTION pg_get_partition_def(oid, bool, bool) RETURNS text LANGUAGE internal STABLE STRICT AS 'pg_get_partition_def_ext2' WITH (OID=5034, DESCRIPTION="partition configuration for a given relation");
 
- CREATE FUNCTION pg_get_partition_rule_def(oid) RETURNS text LANGUAGE internal STABLE STRICT AS 'pg_get_partition_rule_def' WITH (OID=5027);
+ CREATE FUNCTION pg_get_partition_rule_def(oid) RETURNS text LANGUAGE internal STABLE STRICT READS SQL DATA AS 'pg_get_partition_rule_def' WITH (OID=5027);
 
- CREATE FUNCTION pg_get_partition_rule_def(oid, bool) RETURNS text LANGUAGE internal STABLE STRICT AS 'pg_get_partition_rule_def_ext' WITH (OID=5028, DESCRIPTION="partition configuration for a given rule");
+ CREATE FUNCTION pg_get_partition_rule_def(oid, bool) RETURNS text LANGUAGE internal STABLE STRICT READS SQL DATA AS 'pg_get_partition_rule_def_ext' WITH (OID=5028, DESCRIPTION="partition configuration for a given rule");
 
  CREATE FUNCTION pg_get_partition_template_def(oid, bool, bool) RETURNS text LANGUAGE internal STABLE STRICT AS 'pg_get_partition_template_def' WITH (OID=5037, DESCRIPTION="ALTER statement to recreate subpartition templates for a give relation");
 
@@ -4347,7 +4347,7 @@
 
  CREATE FUNCTION pg_get_indexdef(oid, int4, bool) RETURNS text LANGUAGE internal STABLE STRICT AS 'pg_get_indexdef_ext' WITH (OID=2507, DESCRIPTION="index description (full create statement or single expression) with pretty-print option");
 
- CREATE FUNCTION pg_get_constraintdef(oid, bool) RETURNS text LANGUAGE internal STABLE STRICT AS 'pg_get_constraintdef_ext' WITH (OID=2508, DESCRIPTION="constraint description with pretty-print option");
+ CREATE FUNCTION pg_get_constraintdef(oid, bool) RETURNS text LANGUAGE internal STABLE STRICT READS SQL DATA AS 'pg_get_constraintdef_ext' WITH (OID=2508, DESCRIPTION="constraint description with pretty-print option");
 
  CREATE FUNCTION pg_get_expr(text, oid, bool) RETURNS text LANGUAGE internal STABLE STRICT AS 'pg_get_expr_ext' WITH (OID=2509, DESCRIPTION="deparse an encoded expression with pretty-print option");
 
