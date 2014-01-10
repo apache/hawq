@@ -86,6 +86,7 @@
 
 #include "md/CMDTypeBoolGPDB.h"
 #include "md/CMDTypeGenericGPDB.h"
+#include "md/CMDTypeInt2GPDB.h"
 #include "md/CMDTypeInt4GPDB.h"
 #include "md/CMDTypeInt8GPDB.h"
 #include "md/CMDTypeOidGPDB.h"
@@ -1346,30 +1347,27 @@ CTranslatorRelcacheToDXL::Pmdtype
 {
 	OID oidType = CMDIdGPDB::PmdidConvert(pmdid)->OidObjectId();
 	GPOS_ASSERT(InvalidOid != oidType);
-
 	
 	// check for supported base types
-	if (GPDB_INT4_OID == oidType)
+	switch (oidType)
 	{
-		return New(pmp) CMDTypeInt4GPDB(pmp);
+		case GPDB_INT2_OID:
+			return New(pmp) CMDTypeInt2GPDB(pmp);
+
+		case GPDB_INT4_OID:
+			return New(pmp) CMDTypeInt4GPDB(pmp);
+
+		case GPDB_INT8_OID:
+			return New(pmp) CMDTypeInt8GPDB(pmp);
+
+		case GPDB_BOOL:
+			return New(pmp) CMDTypeBoolGPDB(pmp);
+
+		case GPDB_OID_OID:
+			return New(pmp) CMDTypeOidGPDB(pmp);
 	}
 
-	if (GPDB_INT8_OID == oidType)
-	{
-		return New(pmp) CMDTypeInt8GPDB(pmp);
-	}
-
-	if (GPDB_BOOL == oidType)
-	{
-		return New(pmp) CMDTypeBoolGPDB(pmp);
-	}
-
-	if (GPDB_OID_OID == oidType)
-	{
-		return New(pmp) CMDTypeOidGPDB(pmp);
-	}
-
-	// construct a generic type
+	// continue to construct a generic type
 	INT iFlags = TYPECACHE_EQ_OPR | TYPECACHE_LT_OPR | TYPECACHE_GT_OPR |
 				 TYPECACHE_CMP_PROC | TYPECACHE_EQ_OPR_FINFO | TYPECACHE_CMP_PROC_FINFO | TYPECACHE_TUPDESC;
 

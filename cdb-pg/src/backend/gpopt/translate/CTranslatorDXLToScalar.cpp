@@ -26,6 +26,7 @@
 
 #include "dxl/CDXLUtils.h"
 #include "dxl/operators/CDXLDatumBool.h"
+#include "dxl/operators/CDXLDatumInt2.h"
 #include "dxl/operators/CDXLDatumInt4.h"
 #include "dxl/operators/CDXLDatumInt8.h"
 #include "dxl/operators/CDXLDatumGeneric.h"
@@ -1351,6 +1352,7 @@ CTranslatorDXLToScalar::PconstFromDXLDatum
 	
 	SDatumTranslatorElem rgTranslators[] =
 		{
+			{CDXLDatum::EdxldatumInt2 , &CTranslatorDXLToScalar::PconstInt2},
 			{CDXLDatum::EdxldatumInt4 , &CTranslatorDXLToScalar::PconstInt4},
 			{CDXLDatum::EdxldatumInt8 , &CTranslatorDXLToScalar::PconstInt8},
 			{CDXLDatum::EdxldatumBool , &CTranslatorDXLToScalar::PconstBool},
@@ -1413,6 +1415,35 @@ CTranslatorDXLToScalar::PconstOid
 
 	return pconst;
 }
+
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorDXLToScalar::PconstInt2
+//
+//	@doc:
+//		Translates an int2 datum into a constant
+//
+//---------------------------------------------------------------------------
+Const *
+CTranslatorDXLToScalar::PconstInt2
+	(
+	CDXLDatum *pdxldatum
+	)
+{
+	CDXLDatumInt2 *pdxldatumint2 = CDXLDatumInt2::PdxldatumConvert(pdxldatum);
+	Datum datum = gpdb::DDatumFromInt16(pdxldatumint2->SValue());
+
+	Const *pconst = MakeNode(Const);
+	pconst->consttype = CMDIdGPDB::PmdidConvert(pdxldatumint2->Pmdid())->OidObjectId();
+	pconst->constbyval = pdxldatumint2->FByValue();
+	pconst->constisnull = pdxldatumint2->FNull();
+	pconst->constlen = pdxldatumint2->UlLength();
+	pconst->constvalue = datum;
+
+	return pconst;
+}
+
 
 //---------------------------------------------------------------------------
 //	@function:

@@ -24,11 +24,6 @@
 
 #include "gpos/io/COstreamString.h"
 
-#include "md/CMDTypeInt4GPDB.h"
-#include "md/CMDTypeInt8GPDB.h"
-#include "md/CMDTypeBoolGPDB.h"
-#include "md/CMDTypeOidGPDB.h"
-
 #include "dxl/CDXLUtils.h"
 
 #include "exception.h"

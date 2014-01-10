@@ -287,7 +287,9 @@ namespace gpdxl
 			// return the operator return type oid for the given func id.
 			OID OidFunctionReturnType(IMDId *pmdid) const;
 
+			// translate dxldatum to GPDB Const
 			Const *PconstOid(CDXLDatum *pdxldatum);
+			Const *PconstInt2(CDXLDatum *pdxldatum);
 			Const *PconstInt4(CDXLDatum *pdxldatum);
 			Const *PconstInt8(CDXLDatum *pdxldatum);
 			Const *PconstBool(CDXLDatum *pdxldatum);

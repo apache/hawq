@@ -50,11 +50,13 @@
 #include "md/IMDRelation.h"
 #include "md/IMDIndex.h"
 #include "md/IMDTypeBool.h"
+#include "md/IMDTypeInt2.h"
 #include "md/IMDTypeInt4.h"
 #include "md/IMDTypeInt8.h"
 #include "md/IMDTypeOid.h"
 #include "md/CMDTypeGenericGPDB.h"
 
+#include "dxl/operators/CDXLDatumInt2.h"
 #include "dxl/operators/CDXLDatumInt4.h"
 #include "dxl/operators/CDXLDatumInt8.h"
 #include "dxl/operators/CDXLDatumBool.h"
@@ -102,9 +104,11 @@ CTranslatorUtils::PreloadMD
 				&ctxpreloadmd
 				);
 
-	// preload types bool, oid, int4 and int8
+	// preload types bool, oid, int2, int4 and int8
 	const IMDType *pmdtypeBool = pmda->PtMDType<IMDTypeBool>(sysid);
 	PreloadMDType(pmda, pmdtypeBool);
+	const IMDType *pmdtypeInt2 = pmda->PtMDType<IMDTypeInt2>(sysid);
+	PreloadMDType(pmda, pmdtypeInt2);
 	const IMDType *pmdtypeInt4 = pmda->PtMDType<IMDTypeInt4>(sysid);
 	PreloadMDType(pmda, pmdtypeInt4);
 	const IMDType *pmdtypeInt8 = pmda->PtMDType<IMDTypeInt8>(sysid);
@@ -2511,7 +2515,11 @@ CTranslatorUtils::PdxlnPrElNull
 	}
 
 	CDXLDatum *pdxldatum = NULL;
-	if (pmdid->FEquals(&CMDIdGPDB::m_mdidInt4))
+	if (pmdid->FEquals(&CMDIdGPDB::m_mdidInt2))
+	{
+		pdxldatum = New(pmp) CDXLDatumInt2(pmp, pmdid, true /*fConstNull*/, 0 /*value*/);
+	}
+	else if (pmdid->FEquals(&CMDIdGPDB::m_mdidInt4))
 	{
 		pdxldatum = New(pmp) CDXLDatumInt4(pmp, pmdid, true /*fConstNull*/, 0 /*value*/);
 	}

@@ -474,6 +474,7 @@ namespace gpdxl
 				PfPdxldatumFromDatum *pf;
 			};
 
+			// datum to oid CDXLDatum
 			static
 			CDXLDatum *PdxldatumOid
 				(
@@ -484,6 +485,18 @@ namespace gpdxl
 				Datum datum
 				);
 
+			// datum to int2 CDXLDatum
+			static
+			CDXLDatum *PdxldatumInt2
+				(
+				IMemoryPool *pmp,
+				const IMDType *pmdtype,
+				BOOL fNull,
+				ULONG ulLen,
+				Datum datum
+				);
+
+			// datum to int4 CDXLDatum
 			static
 			CDXLDatum *PdxldatumInt4
 				(
@@ -494,6 +507,7 @@ namespace gpdxl
 				Datum datum
 				);
 
+			// datum to int8 CDXLDatum
 			static
 			CDXLDatum *PdxldatumInt8
 				(
@@ -504,6 +518,7 @@ namespace gpdxl
 				Datum datum
 				);
 
+			// datum to bool CDXLDatum
 			static
 			CDXLDatum *PdxldatumBool
 				(
@@ -514,6 +529,7 @@ namespace gpdxl
 				Datum datum
 				);
 
+			// datum to generic CDXLDatum
 			static
 			CDXLDatum *PdxldatumGeneric
 				(

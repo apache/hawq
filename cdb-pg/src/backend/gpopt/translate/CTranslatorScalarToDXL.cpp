@@ -37,6 +37,7 @@
 #include "gpos/string/CWStringDynamic.h"
 
 #include "dxl/operators/CDXLDatumBool.h"
+#include "dxl/operators/CDXLDatumInt2.h"
 #include "dxl/operators/CDXLDatumInt4.h"
 #include "dxl/operators/CDXLDatumInt8.h"
 #include "dxl/operators/CDXLDatumOid.h"
@@ -2025,6 +2026,7 @@ CTranslatorScalarToDXL::Pdxldatum
 {
 	SDXLDatumTranslatorElem rgTranslators[] =
 		{
+			{IMDType::EtiInt2  , &CTranslatorScalarToDXL::PdxldatumInt2},
 			{IMDType::EtiInt4  , &CTranslatorScalarToDXL::PdxldatumInt4},
 			{IMDType::EtiInt8 , &CTranslatorScalarToDXL::PdxldatumInt8},
 			{IMDType::EtiBool , &CTranslatorScalarToDXL::PdxldatumBool},
@@ -2146,6 +2148,31 @@ CTranslatorScalarToDXL::PdxldatumOid
 	CMDIdGPDB *pmdid = New(pmp) CMDIdGPDB(*pmdidMDC);
 
 	return New(pmp) CDXLDatumOid(pmp, pmdid, fNull, gpdb::OidFromDatum(datum));
+}
+
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorScalarToDXL::PdxldatumInt2
+//
+//	@doc:
+//		Translate a datum of type int2
+//---------------------------------------------------------------------------
+CDXLDatum *
+CTranslatorScalarToDXL::PdxldatumInt2
+	(
+	IMemoryPool *pmp,
+	const IMDType *pmdtype,
+	BOOL fNull,
+	ULONG , //ulLen,
+	Datum datum
+	)
+{
+	GPOS_ASSERT(pmdtype->FByValue());
+	CMDIdGPDB *pmdidMDC = CMDIdGPDB::PmdidConvert(pmdtype->Pmdid());
+	CMDIdGPDB *pmdid = New(pmp) CMDIdGPDB(*pmdidMDC);
+
+	return New(pmp) CDXLDatumInt2(pmp, pmdid, fNull, gpdb::SInt16FromDatum(datum));
 }
 
 
