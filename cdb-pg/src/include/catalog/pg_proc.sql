@@ -2760,7 +2760,7 @@
 
  CREATE FUNCTION pg_renice_session(int4, int4) RETURNS int4 LANGUAGE internal VOLATILE STRICT AS 'pg_renice_session' WITH (OID=6042, DESCRIPTION="change priority of all the backends for a given session id");
 
- CREATE FUNCTION pg_stat_get_activity(IN pid int4, OUT datid oid, OUT procpid int4, OUT usesysid oid, OUT application_name text, OUT current_query text, OUT waiting bool, OUT xact_start timestamptz, OUT query_start timestamptz, OUT backend_start timestamptz, OUT client_addr inet, OUT client_port int4, OUT sess_id int4) RETURNS SETOF pg_catalog.record LANGUAGE internal STABLE AS 'pg_stat_get_activity' WITH (OID=6071, DESCRIPTION="statistics: information about currently active backends");
+ CREATE FUNCTION pg_stat_get_activity(IN pid int4, OUT datid oid, OUT procpid int4, OUT usesysid oid, OUT application_name text, OUT current_query text, OUT waiting bool, OUT xact_start timestamptz, OUT query_start timestamptz, OUT backend_start timestamptz, OUT client_addr inet, OUT client_port int4, OUT sess_id int4) RETURNS SETOF pg_catalog.record LANGUAGE internal VOLATILE AS 'pg_stat_get_activity' WITH (OID=6071, DESCRIPTION="statistics: information about currently active backends");
 
  CREATE FUNCTION encode(bytea, text) RETURNS text LANGUAGE internal IMMUTABLE STRICT AS 'binary_encode' WITH (OID=1946, DESCRIPTION="Convert bytea value into some ascii-only text string");
 
