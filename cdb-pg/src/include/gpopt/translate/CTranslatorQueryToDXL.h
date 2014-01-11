@@ -24,8 +24,6 @@
 #define GPDXL_CTE_ID_START 1
 #define GPDXL_COL_ID_START 1
 
-#define pg_stat_get_activity_oid  6071		// OID of pg_stat_get_activity function
-
 #include "gpopt/translate/CMappingVarColId.h"
 #include "gpopt/translate/CTranslatorScalarToDXL.h"
 #include "gpopt/translate/CTranslatorUtils.h"

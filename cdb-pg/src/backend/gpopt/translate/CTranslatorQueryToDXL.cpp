@@ -2789,12 +2789,6 @@ CTranslatorQueryToDXL::PdxlnFromTVF
 {
 	GPOS_ASSERT(NULL != prte->funcexpr);
 
-	if (pg_stat_get_activity_oid == ((FuncExpr *)prte->funcexpr)->funcid)
-	{
-		// TODO 07/19/2013; solimm1: MPP-20686 remove exception when pg_stat_get_activity() properties are fixed in the catalog
-		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("pg_stat_get_activity() function"));
-	}
-
 	// if this is a folded function expression, generate a project over a CTG
 	if (!IsA(prte->funcexpr, FuncExpr))
 	{

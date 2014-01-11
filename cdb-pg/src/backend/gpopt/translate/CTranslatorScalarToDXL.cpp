@@ -1192,12 +1192,6 @@ CTranslatorScalarToDXL::PdxlnScFuncExprFromFuncExpr
 	GPOS_ASSERT(IsA(pexpr, FuncExpr));
 	const FuncExpr *pfuncexpr = (FuncExpr *) pexpr;
 
-	if (pg_stat_get_activity_oid == pfuncexpr->funcid)
-	{
-		// TODO 07/19/2013; solimm1: remove exception when pg_stat_get_activity() properties are fixed in the catalog
-		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("pg_stat_get_activity() function"));
-	}
-
 	CMDIdGPDB *pmdidFunc = New(m_pmp) CMDIdGPDB(pfuncexpr->funcid);
 
 	// In the planner, scalar functions that are volatile (SIRV) or read or modify SQL
