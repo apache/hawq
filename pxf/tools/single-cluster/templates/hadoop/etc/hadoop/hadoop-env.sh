@@ -2,7 +2,8 @@
 . $bin/../../bin/gphd-env.sh
 
 export HADOOP_CLASSPATH=\
-`echo $PXF_ROOT/pxf-*[0-9].jar`:\
+`echo $PXF_ROOT/pxf-core-*[0-9].jar`:\
+`echo $PXF_ROOT/pxf-api-*[0-9].jar`:\
 `echo $HBASE_ROOT/hbase-*-gphd-*[0-9].jar`:\
 `echo $HBASE_ROOT/hbase-*-gphd-*[0-9]-SNAPSHOT.jar`:\
 `echo $HBASE_ROOT/hbase-*-gphd-*[0-9]-SNAPSHOT-security.jar`:\

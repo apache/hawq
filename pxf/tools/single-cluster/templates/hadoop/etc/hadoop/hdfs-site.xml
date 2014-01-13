@@ -26,10 +26,6 @@
         <value>true</value>
     </property>
    <property>
-       <name>dfs.client.read.shortcircuit</name>
-       <value>true</value>
-   </property>
-   <property>
        <name>dfs.block.local-path-access.user</name>
 	   <value>${user.name}</value>
    </property>

@@ -67,6 +67,14 @@ CentOS
 7. Changes
 ==========
 
+v1.7.3
+------
+
+- GPSQL-1445: Use stack build from new Jenkins job
+- tar fetch is now logged
+- GPSQL-1374: reduce verbosity
+- GPSQL-1258: Use multiple pxf-*
+
 v1.7.2
 ------
 

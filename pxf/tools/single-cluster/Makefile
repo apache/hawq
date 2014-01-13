@@ -53,8 +53,22 @@ create_versions_file:
 	echo release: $(RELEASE) >> $(VERSIONSFILE)
 	echo single_cluster-$(BUILDVER) >> $(VERSIONSFILE)
 
+.PHONY: extract_stack
+extract_stack:
+	find $(BUILDROOT) -iwholename "*PHD*.tar.gz" | grep "\/\(hadoop\|hbase\|zookeeper\|hive\)" | xargs -n1 tar -C $(BUILDROOT) -xzf
+	find $(BUILDROOT) -type d -a -iname "PHD-*" | xargs rm -rf
+	find $(BUILDROOT) -maxdepth 1 -type d | grep "\/\(hadoop\|hbase\|zookeeper\|hive\)" | xargs -n1 basename >> $(VERSIONSFILE)
+
+.PHONY: merge_pxf
+merge_pxf:
+	mkdir $(BUILDROOT)/pxf
+	for X in $(BUILDROOT)/pxf-*; do \
+		mv $$X/* $(BUILDROOT)/pxf; \
+		rmdir $$X; \
+	done;
+
 .PHONY: extract_products
-extract_products: $(EXTRACTEDTARS)
+extract_products: $(EXTRACTEDTARS) extract_stack merge_pxf
 	for X in $(BUILDROOT)/*-[0-9]*; do \
 		mv $$X `echo $$X | sed -e 's/^\($(BUILDROOT)\/[A-Za-z0-9]*\).*$$/\1/'`; \
 	done;
@@ -62,7 +76,7 @@ extract_products: $(EXTRACTEDTARS)
 
 .PHONY: copy_templates
 copy_templates: $(TEMPLATES)
-	cp -rv $(TEMPLATESROOT)/* $(BUILDROOT)/
+	cp -r $(TEMPLATESROOT)/* $(BUILDROOT)/
 	-find $(BUILDROOT) -iname "*~" | xargs rm -f
 
 .PHONY: copy_docs
@@ -77,10 +91,10 @@ refresh_tars:
 	gzip --best -c $< > $@
 
 %.tar: %
-	tar -cvf $@ $<
+	tar -cf $@ $<
 
 %.extracted: $(TARSROOT)/%.tar.gz
-	tar xvzf $^ -C $(BUILDROOT)
+	tar xzf $^ -C $(BUILDROOT)
 	touch $@
 	echo $* >> $(VERSIONSFILE)
 
