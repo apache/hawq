@@ -4292,14 +4292,14 @@ DATA(insert OID = 1665 ( pg_get_serial_sequence  PGNSP PGUID 12 f f t f s 2 25 f
 DESCR("name of sequence for a serial column");
 
 /* pg_get_partition_def(oid) => text */ 
-DATA(insert OID = 5024 ( pg_get_partition_def  PGNSP PGUID 12 f f t f s 1 25 f "26" _null_ _null_ _null_ pg_get_partition_def - _null_ n ));
+DATA(insert OID = 5024 ( pg_get_partition_def  PGNSP PGUID 12 f f t f s 1 25 f "26" _null_ _null_ _null_ pg_get_partition_def - _null_ r ));
 
 /* pg_get_partition_def(oid, bool) => text */ 
-DATA(insert OID = 5025 ( pg_get_partition_def  PGNSP PGUID 12 f f t f s 2 25 f "26 16" _null_ _null_ _null_ pg_get_partition_def_ext - _null_ n ));
+DATA(insert OID = 5025 ( pg_get_partition_def  PGNSP PGUID 12 f f t f s 2 25 f "26 16" _null_ _null_ _null_ pg_get_partition_def_ext - _null_ r ));
 DESCR("partition configuration for a given relation");
 
 /* pg_get_partition_def(oid, bool, bool) => text */ 
-DATA(insert OID = 5034 ( pg_get_partition_def  PGNSP PGUID 12 f f t f s 3 25 f "26 16 16" _null_ _null_ _null_ pg_get_partition_def_ext2 - _null_ n ));
+DATA(insert OID = 5034 ( pg_get_partition_def  PGNSP PGUID 12 f f t f s 3 25 f "26 16 16" _null_ _null_ _null_ pg_get_partition_def_ext2 - _null_ r ));
 DESCR("partition configuration for a given relation");
 
 /* pg_get_partition_rule_def(oid) => text */ 
