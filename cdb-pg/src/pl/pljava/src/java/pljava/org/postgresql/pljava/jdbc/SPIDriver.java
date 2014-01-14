@@ -11,6 +11,8 @@ import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.DriverPropertyInfo;
 import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
+import java.util.logging.Logger;
 import java.util.Properties;
 
 /**
@@ -35,6 +37,16 @@ public class SPIDriver implements Driver
 		{
 			throw new ExceptionInInitializerError(e);
 		}
+	}
+
+	/*
+	 * Unused function, defined here only to make the code build
+	 * successfully with JDK 1.7.
+	 */
+	public Logger getParentLogger()
+	throws SQLFeatureNotSupportedException
+	{
+		throw new SQLFeatureNotSupportedException();
 	}
 
 	public Connection connect(String url, Properties info)

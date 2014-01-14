@@ -10,6 +10,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
 import java.sql.SQLWarning;
 import java.util.ArrayList;
 
@@ -39,6 +40,26 @@ public class SPIStatement implements Statement
 	public SPIStatement(SPIConnection conn)
 	{
 		m_connection = conn;
+	}
+
+	/*
+	 * Unused function, defined here only to make the code build
+	 * successfully with JDK 1.7.
+	 */
+	public boolean isCloseOnCompletion()
+	throws SQLException
+	{
+		return false;
+	}
+
+	/*
+	 * Unused function, defined here only to make the code build
+	 * successfully with JDK 1.7.
+	 */
+	public void closeOnCompletion()
+	throws SQLException
+	{
+		throw new SQLFeatureNotSupportedException();
 	}
 
 	public void addBatch(String statement)

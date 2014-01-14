@@ -46,6 +46,26 @@ public abstract class AbstractResultSet implements ResultSet
         return null;
     }
 
+    /*
+     * Unused function, defined here only to make the code build
+     * successfully with JDK 1.7.
+     */
+    public <T> T getObject(int i, Class<T> type)
+    throws SQLException
+    {
+        return null;
+    }
+
+    /*
+     * Unused function, defined here only to make the code build
+     * successfully with JDK 1.7.
+     */
+    public <T> T getObject(String s, Class<T> type)
+    throws SQLException
+    {
+        return null;
+    }
+
     /**
      * Retrieves the value of the designated column in the current row of this
      * ResultSet object as an Array object in the Java programming language.

@@ -25,6 +25,7 @@ import java.sql.Statement;
 import java.sql.Struct;
 import java.sql.SQLClientInfoException;
 import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
 import java.sql.SQLWarning;
 import java.sql.SQLXML;
 import java.sql.Time;
@@ -32,6 +33,7 @@ import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.BitSet;
 import java.util.Calendar;
+import java.util.concurrent.Executor;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -78,6 +80,56 @@ public class SPIConnection implements Connection
 	private static final void addType(Class clazz, int sqlType)
 	{
 		s_sqlType2Class.put(clazz, new Integer(sqlType));
+	}
+
+	/*
+	 * Unused function, defined here only to make the code build
+	 * successfully with JDK 1.7.
+	 */
+	public int getNetworkTimeout()
+	throws SQLException
+	{
+		return 0;
+	}
+
+	/*
+	 * Unused function, defined here only to make the code build
+	 * successfully with JDK 1.7.
+	 */
+	public void setNetworkTimeout(Executor e, int millisec)
+	throws SQLException
+	{
+		throw new SQLFeatureNotSupportedException();
+	}
+
+	/*
+	 * Unused function, defined here only to make the code build
+	 * successfully with JDK 1.7.
+	 */
+	public void abort(Executor e)
+	throws SQLException
+	{
+		throw new SQLFeatureNotSupportedException();
+	}
+
+	/*
+	 * Unused function, defined here only to make the code build
+	 * successfully with JDK 1.7.
+	 */
+	public void setSchema(String schema)
+	throws SQLException
+	{
+		throw new SQLFeatureNotSupportedException();
+	}
+
+	/*
+	 * Unused function, defined here only to make the code build
+	 * successfully with JDK 1.7.
+	 */
+	public String getSchema()
+	throws SQLException
+	{
+		throw new SQLFeatureNotSupportedException();
 	}
 
 	/**

@@ -9,6 +9,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.RowIdLifetime;
 import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -69,6 +70,29 @@ public class SPIDatabaseMetaData implements DatabaseMetaData
 			rs.close();
 		}
 		return NAMEDATALEN - 1;
+	}
+
+	/*
+	 * Unused function, defined here only to make the code build
+	 * successfully with JDK 1.7.
+	 */
+	public boolean generatedKeyAlwaysReturned()
+	throws SQLException
+	{
+		return true;
+	}
+
+	/*
+	 * Unused function, defined here only to make the code build
+	 * successfully with JDK 1.7.
+	 */
+	public ResultSet getPseudoColumns(String catalog,
+					  String schemaPattern,
+					  String tableNamePattern,
+					  String columnNamePattern)
+	throws SQLException
+	{
+		throw new SQLFeatureNotSupportedException();
 	}
 
 	/*
