@@ -3,28 +3,33 @@
 #
 
 # Build time settings, replaced by build.xml
-%define _name				@component.basename@
-%define _publicstage		@package.publicstage@
-%define _version			@component.version@
-%define _package_release	@package.release@
-%define _lib_prefix			@package.libprefix@
-%define _etc_prefix			@package.etcprefix@
-%define _component_name		@component.name@
-%define _package_name		@package.name@
-%define _package_summary	@package.summary@
-%define _package_vendor		@package.vendor@
-%define _package_obsoletes	@package.obsoletes@
+%define _version			@comp.version@
+%define _component_name		@comp.name@
+%define _package_link		@comp.basename@
+%define _dependencies	    @comp.deps@
+%define _name				@pkg.filename@
+%define _publicstage		@pkg.publicstage@
+%define _package_release	@pkg.release@
+%define _lib_prefix			@pkg.libprefix@
+%define _etc_prefix			@pkg.etcprefix@
+%define _package_name		@pkg.name@
+%define _package_dir		@pkg.dir@
+%define _package_summary	@pkg.summary@
+%define _package_vendor		@pkg.vendor@
+%define _package_obsoletes	@pkg.obsoletes@
+
+
 
 Name: %{_name}
 Version: %{_version}
 Release: %{_package_release}
 Summary: %{_package_summary}
-License: Copyright (c) 2013, EMC Greenplum
+License: Copyright (c) 2014, Pivotal
 Group: Applications/Databases
 Source: %{_package_name}.tar.gz
 Vendor: %{_package_vendor}
 Buildarch: noarch
-Requires: hadoop >= 2.0.0, hadoop-mapreduce >= 2.0.0
+Requires: %{_dependencies}
 AutoReqProv: no
 Provides: %{_name}
 BuildRoot: %{_topdir}/temp
@@ -39,19 +44,19 @@ Obsoletes: %{_package_obsoletes}
 %setup -n %{_component_name}
 
 %install
-if [ -d $RPM_BUILD_ROOT/%{_lib_prefix}/%{_package_name} ]; then
-	rm -rf $RPM_BUILD_ROOT/%{_lib_prefix}/%{_package_name}
+if [ -d $RPM_BUILD_ROOT/%{_lib_prefix}/%{_package_dir} ]; then
+	rm -rf $RPM_BUILD_ROOT/%{_lib_prefix}/%{_package_dir}
 fi
 
-mkdir -p $RPM_BUILD_ROOT/%{_lib_prefix}/%{_package_name}
-cp *.jar $RPM_BUILD_ROOT/%{_lib_prefix}/%{_package_name}
+mkdir -p $RPM_BUILD_ROOT/%{_lib_prefix}/%{_package_dir}
+cp *.jar $RPM_BUILD_ROOT/%{_lib_prefix}/%{_package_dir}
 
-if [ -d $RPM_BUILD_ROOT/%{_etc_prefix}/%{_package_name} ]; then
-	rm -rf $RPM_BUILD_ROOT/%{_etc_prefix}/%{_package_name}
+if [ -d $RPM_BUILD_ROOT/%{_etc_prefix}/%{_package_dir} ]; then
+	rm -rf $RPM_BUILD_ROOT/%{_etc_prefix}/%{_package_dir}
 fi
 
-mkdir -p $RPM_BUILD_ROOT/%{_etc_prefix}/%{_package_name}/conf
-cp conf/* $RPM_BUILD_ROOT/%{_etc_prefix}/%{_package_name}/conf/
+mkdir -p $RPM_BUILD_ROOT/%{_etc_prefix}/%{_package_dir}/conf
+test -e conf/* && cp conf/* $RPM_BUILD_ROOT/%{_etc_prefix}/%{_package_dir}/conf/
 
 %post
 
@@ -62,24 +67,24 @@ if [ ! -d $RPM_BUILD_ROOT/%{_lib_prefix}/%{_publicstage} ]; then
 fi
 
 pushd $RPM_BUILD_ROOT/%{_lib_prefix} > /dev/null
-if [ -h %{_name} ]; then
-	rm %{_name}
+if [ -L %{_package_link} ]; then
+	rm %{_package_link}
 fi
-ln -s %{_package_name} %{_name}
+ln -s %{_package_dir} %{_package_link}
 
-cd %{_package_name}
+cd %{_package_dir}
 ln -s %{_component_name}.jar %{_name}.jar
 popd > /dev/null
 
 pushd $RPM_BUILD_ROOT/%{_etc_prefix} > /dev/null
-if [ -h %{_name} ] && [ "`readlink %{_name} | xargs basename`" != "%{_package_name}" ]; then
-	if [ -f %{_name}/conf/pxf-profiles.xml ]; then
-		echo pxf-profiles.xml replaced, old copy is `readlink -f %{_name}/conf/pxf_profiles.xml`
+if [ -L %{_package_link} ]; then
+    if [ "`readlink %{_package_link} | xargs basename`" != "%{_package_dir}" ] && [ -f %{_package_link}/conf/pxf-profiles.xml ]; then
+		echo pxf-profiles.xml replaced, old copy is `readlink -f %{_package_link}/conf/pxf_profiles.xml`
 	fi
-	rm %{_name}
+	rm %{_package_link}
 fi
 
-ln -s %{_package_name} %{_name}
+ln -s %{_package_dir} %{_package_link}
 
 popd > /dev/null
 
@@ -87,21 +92,28 @@ popd > /dev/null
 
 pushd $RPM_BUILD_ROOT/%{_lib_prefix} > /dev/null
 
-if [ -h %{_name} -a "`readlink %{_name} | xargs basename`" == "%{_package_name}" ]; then
-	rm %{_name}
+
+cd %{_package_dir}
+if [ -L %{_name}.jar ]; then
+	rm %{_name}.jar
 fi
 
-cd %{_package_name}
-if [ -h %{_name}.jar ]; then
-	rm %{_name}.jar
+popd > /dev/null
+
+%postun
+
+pushd $RPM_BUILD_ROOT/%{_lib_prefix} > /dev/null
+
+if [ ! -e %{_package_link} ]; then
+	rm %{_package_link}
 fi
 
 popd > /dev/null
 
 pushd $RPM_BUILD_ROOT/%{_etc_prefix} > /dev/null
 
-if [ -h %{_name} -a "`readlink %{_name} | xargs basename`" == "%{_package_name}" ]; then
-	rm %{_name}
+if [ ! -e %{_package_link} ]; then
+	rm %{_package_link}
 fi
 
 popd > /dev/null

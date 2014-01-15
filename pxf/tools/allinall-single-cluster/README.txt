@@ -14,6 +14,7 @@ Usage:
 Changes
 =======
 
+- Fixed GPSQL-1374
 - Fixed GPSQL-1145
 - Fixed HD-6970
 

@@ -2,18 +2,18 @@ import java.util.List;
 
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.DynamicMessage;
-import com.pivotal.pxf.accessors.IReadAccessor;
-import com.pivotal.pxf.format.OneField;
-import com.pivotal.pxf.format.OneRow;
-import com.pivotal.pxf.hadoop.io.GPDBWritable;
-import com.pivotal.pxf.resolvers.IReadResolver;
-import com.pivotal.pxf.utilities.InputData;
-import com.pivotal.pxf.utilities.Plugin;
+import com.pivotal.pxf.api.format.OneField;
+import com.pivotal.pxf.api.format.OneRow;
+import static com.pivotal.pxf.api.io.DataType.*;
+
+import com.pivotal.pxf.api.resolvers.ReadResolver;
+import com.pivotal.pxf.api.utilities.InputData;
+import com.pivotal.pxf.api.utilities.Plugin;
 
 /*
  * Implementation for protocol-buffers of Resolver
  */
-public class ProtobufResolver extends Plugin implements IReadResolver
+public class ProtobufResolver extends Plugin implements ReadResolver
 {
 	// the reflection instances
 	private DynamicMessage m = null;
@@ -49,7 +49,7 @@ public class ProtobufResolver extends Plugin implements IReadResolver
 				// It turns out that one of the fields of the record-message, is a message on its own - an embedded message
 			{
 				// we can deal with a simple embedded message
-				if (key.isRepeated() == false)
+				if (!key.isRepeated())
 				{
 					java.util.List<OneField> embList = getFields(new OneRow(null, val));
 					list.addAll(embList);
@@ -108,48 +108,37 @@ public class ProtobufResolver extends Plugin implements IReadResolver
 		}
 		
 		return oneField;
-	}	
-
-	/*
-	 * Translating java types to GPDBWritable types
-	 */	
-	int fromPBtoGP(Descriptors.FieldDescriptor.JavaType javaType)
-	{
-		int gpType = 0;
-		
-		if (javaType.equals(Descriptors.FieldDescriptor.JavaType.INT))
-		{
-			gpType = GPDBWritable.INTEGER;
-		}
-		else if (javaType.equals(Descriptors.FieldDescriptor.JavaType.LONG))
-		{
-			gpType = GPDBWritable.BIGINT;
-		}
-		else if (javaType.equals(Descriptors.FieldDescriptor.JavaType.ENUM))
-		{
-			gpType = GPDBWritable.INTEGER;
-		}
-		else if (javaType.equals(Descriptors.FieldDescriptor.JavaType.BOOLEAN))
-		{
-			//gpType = ;
-		}
-		else if (javaType.equals(Descriptors.FieldDescriptor.JavaType.DOUBLE))
-		{
-			gpType = GPDBWritable.FLOAT8;
-		}
-		else if (javaType.equals(Descriptors.FieldDescriptor.JavaType.FLOAT))
-		{
-			gpType = GPDBWritable.REAL;
-		}
-		else if (javaType.equals(Descriptors.FieldDescriptor.JavaType.STRING))
-		{
-			gpType = GPDBWritable.VARCHAR;
-		}
-		else if (javaType.equals(Descriptors.FieldDescriptor.JavaType.BYTE_STRING))
-		{
-			gpType = GPDBWritable.BYTEA;
-		}
-		
-		return gpType;
 	}
+
+    /*
+     * Translating java types to GPDBWritable types
+     */
+    int fromPBtoGP(Descriptors.FieldDescriptor.JavaType javaType) {
+        if (javaType.equals(Descriptors.FieldDescriptor.JavaType.INT)) {
+            return INTEGER.getOID();
+        }
+        if (javaType.equals(Descriptors.FieldDescriptor.JavaType.LONG)) {
+            return BIGINT.getOID();
+        }
+        if (javaType.equals(Descriptors.FieldDescriptor.JavaType.ENUM)) {
+            return INTEGER.getOID();
+        }
+        if (javaType.equals(Descriptors.FieldDescriptor.JavaType.BOOLEAN)) {
+            return BOOLEAN.getOID();
+        }
+        if (javaType.equals(Descriptors.FieldDescriptor.JavaType.DOUBLE)) {
+            return FLOAT8.getOID();
+        }
+        if (javaType.equals(Descriptors.FieldDescriptor.JavaType.FLOAT)) {
+            return REAL.getOID();
+        }
+        if (javaType.equals(Descriptors.FieldDescriptor.JavaType.STRING)) {
+            return VARCHAR.getOID();
+        }
+        if (javaType.equals(Descriptors.FieldDescriptor.JavaType.BYTE_STRING)) {
+            return BYTEA.getOID();
+        }
+
+        return 0;
+    }
 }

@@ -1,14 +1,15 @@
-import java.io.DataInputStream;
-import java.util.List;
-import java.util.LinkedList;
+import com.pivotal.pxf.api.format.OneField;
+import com.pivotal.pxf.api.format.OneRow;
+import com.pivotal.pxf.api.resolvers.ReadResolver;
+import com.pivotal.pxf.api.resolvers.WriteResolver;
+import com.pivotal.pxf.api.utilities.InputData;
+import com.pivotal.pxf.api.utilities.Plugin;
 
-import com.pivotal.pxf.format.OneField;
-import com.pivotal.pxf.format.OneRow;
-import com.pivotal.pxf.utilities.InputData;
-import com.pivotal.pxf.utilities.Plugin;
-import com.pivotal.pxf.resolvers.IReadResolver;
-import com.pivotal.pxf.resolvers.IWriteResolver;
-import com.pivotal.pxf.hadoop.io.GPDBWritable;
+import java.util.LinkedList;
+import java.util.List;
+
+import static com.pivotal.pxf.api.io.DataType.INTEGER;
+import static com.pivotal.pxf.api.io.DataType.VARCHAR;
 
 
 /*
@@ -17,36 +18,31 @@ import com.pivotal.pxf.hadoop.io.GPDBWritable;
  * must inherit this abstract class
  * Dummy implementation, for documentation
  */
-public class DummyResolver extends Plugin implements IReadResolver, IWriteResolver
-{
-	private int rowNumber;
-	
-	public DummyResolver(InputData metaData)
-	{
-		super(metaData);
-		rowNumber = 0;
-	}
-	
-	public List<OneField> getFields(OneRow row) throws Exception
-    {
+public class DummyResolver extends Plugin implements ReadResolver, WriteResolver {
+    private int rowNumber;
+
+    public DummyResolver(InputData metaData) {
+        super(metaData);
+        rowNumber = 0;
+    }
+
+    public List<OneField> getFields(OneRow row) throws Exception {
         /* break up the row into fields */
         List<OneField> output = new LinkedList<OneField>();
-        String[] fields = ((String)row.getData()).split(",");
-        
-        output.add(new OneField(GPDBWritable.INTEGER /* type */,Integer.parseInt(fields[0]) /* value */));
-        output.add(new OneField(GPDBWritable.VARCHAR ,fields[1]));
-        output.add(new OneField(GPDBWritable.INTEGER ,Integer.parseInt(fields[2])));
-        
+        String[] fields = ((String) row.getData()).split(",");
+
+        output.add(new OneField(INTEGER.getOID() /* type */, Integer.parseInt(fields[0]) /* value */));
+        output.add(new OneField(VARCHAR.getOID(), fields[1]));
+        output.add(new OneField(INTEGER.getOID(), Integer.parseInt(fields[2])));
+
         return output;
     }
 
-	@Override
-	public OneRow setFields(DataInputStream inputStream) throws Exception {
-		
-		/* should read inputStream row by row */
-		
-		if (rowNumber > 5)
-			return null;
-		return new OneRow(null, new String("row number " + rowNumber++));
-	}
+    @Override
+    public OneRow setFields(List<OneField> record) throws Exception {
+        /* should read inputStream row by row */
+        return rowNumber > 5
+                ? null
+                : new OneRow(null, "row number " + rowNumber++);
+    }
 }

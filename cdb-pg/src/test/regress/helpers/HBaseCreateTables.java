@@ -1,6 +1,7 @@
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Put;
@@ -84,7 +85,7 @@ class HBaseCreateTable
 	{
 		String[] splits = generateSplits();
 
-		HTableDescriptor tableDescription = new HTableDescriptor(dataTableName);
+		HTableDescriptor tableDescription = new HTableDescriptor(TableName.valueOf(dataTableName));
 		tableDescription.addFamily(new HColumnDescriptor(columnFamilyName));
 
 		admin.createTable(tableDescription,
@@ -196,7 +197,7 @@ class HBaseCreateTable
 
 	void createLookupTable() throws IOException
 	{
-		HTableDescriptor tableDescription = new HTableDescriptor(lookupTableName);
+		HTableDescriptor tableDescription = new HTableDescriptor(TableName.valueOf(lookupTableName));
 		tableDescription.addFamily(new HColumnDescriptor(lookupTableMappingColumnFamilyName));
 
 		admin.createTable(tableDescription);

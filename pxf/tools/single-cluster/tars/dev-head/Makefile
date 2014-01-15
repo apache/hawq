@@ -1,7 +1,11 @@
 ROOT = ../..
 
 COMPONENTS = \
-			 pxf \
+			 pxf-api \
+			 pxf-core \
+			 pxf-hbase \
+			 pxf-hdfs \
+			 pxf-hive \
 			 stack \
 
 ARTIFACTS = $(ROOT)/artifacts

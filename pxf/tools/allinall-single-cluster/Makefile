@@ -16,7 +16,7 @@ all: $(TARGET)
 
 untar_hawq: $(HAWQ_ROOT)/hawq-*-x86_64.tar.gz
 	mkdir -p $(HAWQ_BUILDROOT)
-	tar -xvzf $< -C $(HAWQ_BUILDROOT)
+	tar -xzf $< -C $(HAWQ_BUILDROOT)
 	mv $(HAWQ_BUILDROOT)/hawq/* $(HAWQ_BUILDROOT)
 	rm $(HAWQ_BUILDROOT)/hawq
 	rmdir $(HAWQ_BUILDROOT)/hawq-*
@@ -30,7 +30,7 @@ hawq_conf: $(ROOT)/hawq_config
 
 untar_singlecluster: $(SINGLECLUSTER_ROOT)/singlecluster.tar.gz
 	mkdir -p $(SINGLECLUSTER_BUILDROOT)
-	tar -xvzf $< --strip-components 1 -C $(SINGLECLUSTER_BUILDROOT)
+	tar -xzf $< --strip-components 1 -C $(SINGLECLUSTER_BUILDROOT)
 
 copy_files: $(ROOT)/README.txt $(ROOT)/init-cluster.sh
 	cp $^ $(BUILDROOT)
@@ -42,7 +42,7 @@ $(BUILDROOT): untar_hawq hawq_version hawq_conf untar_singlecluster copy_files
 	bzip2 --best -c $< > $@
 
 %.tar: %
-	tar -cvf $@ $<
+	tar -cf $@ $<
 
 clean:
 	-rm -rf $(BUILDROOT)

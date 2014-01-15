@@ -17,18 +17,18 @@
         <name>HBase</name>
         <description>This profile is suitable for using when connecting to an HBase data store engine</description>
         <plugins>
-            <fragmenter>HBaseDataFragmenter</fragmenter>
-            <accessor>HBaseAccessor</accessor>
-            <resolver>HBaseResolver</resolver>
+            <fragmenter>com.pivotal.pxf.plugins.hbase.fragmenters.HBaseDataFragmenter</fragmenter>
+            <accessor>com.pivotal.pxf.plugins.hbase.accessors.HBaseAccessor</accessor>
+            <resolver>com.pivotal.pxf.plugins.hbase.resolvers.HBaseResolver</resolver>
         </plugins>
     </profile>
     <profile>
         <name>Hive</name>
         <description>This profile is suitable for using when connecting to Hive</description>
         <plugins>
-            <fragmenter>HiveDataFragmenter</fragmenter>
-            <accessor>HiveAccessor</accessor>
-            <resolver>HiveResolver</resolver>
+            <fragmenter>com.pivotal.pxf.plugins.hive.fragmenters.HiveDataFragmenter</fragmenter>
+            <accessor>com.pivotal.pxf.plugins.hive.accessors.HiveAccessor</accessor>
+            <resolver>com.pivotal.pxf.plugins.hive.resolvers.HiveResolver</resolver>
         </plugins>
     </profile>
     <profile>
@@ -37,10 +37,10 @@
             on HDFS
         </description>
         <plugins>
-            <fragmenter>HdfsDataFragmenter</fragmenter>
-            <accessor>LineBreakAccessor</accessor>
-            <resolver>StringPassResolver</resolver>
-            <analyzer>HdfsAnalyzer</analyzer>
+            <fragmenter>com.pivotal.pxf.plugins.hdfs.fragmenters.HdfsDataFragmenter</fragmenter>
+            <accessor>com.pivotal.pxf.plugins.hdfs.accessors.LineBreakAccessor</accessor>
+            <resolver>com.pivotal.pxf.plugins.hdfs.resolvers.StringPassResolver</resolver>
+            <analyzer>com.pivotal.pxf.plugins.hdfs.analyzers.HdfsAnalyzer</analyzer>
         </plugins>
     </profile>
     <profile>
@@ -49,29 +49,29 @@
             linefeeds) from plain text files on HDFS. It is not splittable (non parallel) and slower than HdfsTextSimple.
         </description>
         <plugins>
-            <fragmenter>HdfsDataFragmenter</fragmenter>
-            <accessor>QuotedLineBreakAccessor</accessor>
-            <resolver>StringPassResolver</resolver>
-            <analyzer>HdfsAnalyzer</analyzer>
+            <fragmenter>com.pivotal.pxf.plugins.hdfs.fragmenters.HdfsDataFragmenter</fragmenter>
+            <accessor>com.pivotal.pxf.plugins.hdfs.accessors.QuotedLineBreakAccessor</accessor>
+            <resolver>com.pivotal.pxf.plugins.hdfs.resolvers.StringPassResolver</resolver>
+            <analyzer>com.pivotal.pxf.plugins.hdfs.analyzers.HdfsAnalyzer</analyzer>
         </plugins>
     </profile>
     <profile>
         <name>Avro</name>
         <description>This profile is suitable for using when reading Avro files (i.e fileName.avro)</description>
         <plugins>
-            <fragmenter>HdfsDataFragmenter</fragmenter>
-            <accessor>AvroFileAccessor</accessor>
-            <resolver>AvroResolver</resolver>
-            <analyzer>HdfsAnalyzer</analyzer>
+            <fragmenter>com.pivotal.pxf.plugins.hdfs.fragmenters.HdfsDataFragmenter</fragmenter>
+            <accessor>com.pivotal.pxf.plugins.hdfs.accessors.AvroFileAccessor</accessor>
+            <resolver>com.pivotal.pxf.plugins.hdfs.resolvers.AvroResolver</resolver>
+            <analyzer>com.pivotal.pxf.plugins.hdfs.analyzers.HdfsAnalyzer</analyzer>
         </plugins>
     </profile>
     <profile>
         <name>GemFireXD</name>
         <description>This profile is suitable for using when connecting to GemFireXD</description>
         <plugins>
-            <fragmenter>GemFireXDFragmenter</fragmenter>
-            <accessor>GemFireXDAccessor</accessor>
-            <resolver>GemFireXDResolver</resolver>
+            <fragmenter>com.pivotal.pxf.plugins.gemfire.fragmenters.GemFireXDFragmenter</fragmenter>
+            <accessor>com.pivotal.pxf.plugins.gemfire.accessors.GemFireXDAccessor</accessor>
+            <resolver>com.pivotal.pxf.plugins.gemfire.resolvers.GemFireXDResolver</resolver>
         </plugins>
     </profile>
 </profiles>

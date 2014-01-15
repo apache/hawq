@@ -8,9 +8,9 @@ import com.google.protobuf.DescriptorProtos;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Descriptors.DescriptorValidationException;
 import com.google.protobuf.DynamicMessage;
-import com.pivotal.pxf.accessors.HdfsAtomicDataAccessor;
-import com.pivotal.pxf.format.OneRow;
-import com.pivotal.pxf.utilities.InputData;
+import com.pivotal.pxf.plugins.hdfs.accessors.HdfsAtomicDataAccessor;
+import com.pivotal.pxf.api.format.OneRow;
+import com.pivotal.pxf.api.utilities.InputData;
 
 /*
  * Specialization of HdfsAtomicDataAccessor for protocol-buffer files

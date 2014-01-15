@@ -31,12 +31,12 @@
 		<!-- Other Third party dependencies -->
 		<dependency org="org.apache.cassandra.deps" name="libthrift" rev="0.5.0" conf="compile->master" />
 		<dependency org="org.apache.thrift" name="libfb303" rev="0.7.0" conf="compile->master" />
-		<dependency org="com.google.protobuf" name="protobuf-java" rev="2.4.1" conf="compile->master" />
-		<dependency org="org.apache.avro" name="avro" rev="1.5.4" conf="compile->master" />
-		<dependency org="org.apache.avro" name="avro-mapred" rev="1.5.4" conf="compile->master" />
+		<dependency org="com.google.protobuf" name="protobuf-java" rev="2.5.0" conf="compile->master" />
+		<dependency org="org.apache.avro" name="avro" rev="1.7.4" conf="compile->master" />
+		<dependency org="org.apache.avro" name="avro-mapred" rev="1.7.4" conf="compile->master" />
 		<dependency org="org.codehaus.jackson" name="jackson-core-asl" rev="1.9.3" conf="compile->master" />
 		<dependency org="org.codehaus.jackson" name="jackson-mapper-asl" rev="1.9.3" conf="compile->master" />
-		<dependency org="com.sun.jersey" name="jersey-core" rev="1.8" conf="compile->master" />
+		<dependency org="com.sun.jersey" name="jersey-core" rev="1.9" conf="compile->master" />
 		<dependency org="org.eclipse.jetty" name="jetty-io" rev="7.6.10.v20130312" conf="compile->master" />
 		<dependency org="commons-logging" name="commons-logging" rev="1.1.1" conf="compile->master" />
 		<dependency org="commons-configuration" name="commons-configuration" rev="1.6" conf="compile->master" />

@@ -10,6 +10,9 @@ unittest:
 jar:
 	$(ANT) jar
 	
+tar:
+	$(ANT) tar
+
 rpm:
 	$(ANT) rpm
 	

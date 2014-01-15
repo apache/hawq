@@ -28,7 +28,7 @@
 -- 0. syntax validations
 --
 CREATE WRITABLE EXTERNAL TABLE pxf_out(a int, b text, c bytea)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data?ACCESSOR=SequenceFileAccessor&RESOLVER=AvroResolver&DATA-SCHEMA=MySchema')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data?ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.AvroResolver&DATA-SCHEMA=MySchema')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- positive
 CREATE WRITABLE EXTERNAL TABLE pxf_out1(a int, b text, c bytea)
 LOCATION ('pxf://@hostname@:50070/somepath/gpdb_regression_data?someuseropt=someuserval')
@@ -49,7 +49,7 @@ DROP EXTERNAL TABLE pxf_out;
 CREATE WRITABLE EXTERNAL TABLE wrtext (s1 text, 
                                		   n1 int, 
 							   		   n2 int)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrtext?ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrtext?PROFILE=HdfsTextSimple')
 FORMAT 'TEXT' (DELIMITER ',');
 INSERT INTO wrtext VALUES ('first',1,11), 
                           ('second',2,22);
@@ -80,7 +80,7 @@ ok
 CREATE READABLE EXTERNAL TABLE readtext (s1 text, 
                                		     n1 int, 
 							   		     n2 int)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrtext?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrtext?PROFILE=HdfsTextSimple')
 FORMAT 'TEXT' (DELIMITER ',');
 SELECT * FROM readtext ORDER BY n1;
      s1     | n1 |  n2  
@@ -169,7 +169,7 @@ DROP EXTERNAL TABLE readtext;
 CREATE WRITABLE EXTERNAL TABLE wrgzip (s1 text, 
                                		   n1 int, 
 							   		   n2 int)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrgzip?ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver&COMPRESSION_CODEC=org.apache.hadoop.io.compress.GzipCodec')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrgzip?ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.LineBreakAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.StringPassResolver&COMPRESSION_CODEC=org.apache.hadoop.io.compress.GzipCodec')
 FORMAT 'TEXT' (DELIMITER ',');
 COPY wrgzip FROM STDIN CSV;
 COPY wrgzip FROM STDIN DELIMITER ':';
@@ -188,7 +188,7 @@ ok
 CREATE READABLE EXTERNAL TABLE readgzip (s1 text, 
                                		     n1 int, 
 							   		     n2 int)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrgzip?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrgzip?PROFILE=HdfsTextSimple')
 FORMAT 'TEXT' (DELIMITER ',');
 SELECT * FROM readgzip ORDER BY n1;
    s1    | n1 | n2 
@@ -222,7 +222,7 @@ DROP EXTERNAL TABLE readgzip;
 CREATE WRITABLE EXTERNAL TABLE wrdefault (s1 text, 
                                		      n1 int, 
 							   		      n2 int)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrdefault?ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver&COMPRESSION_CODEC=org.apache.hadoop.io.compress.DefaultCodec')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrdefault?ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.LineBreakAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.StringPassResolver&COMPRESSION_CODEC=org.apache.hadoop.io.compress.DefaultCodec')
 FORMAT 'TEXT' (DELIMITER ',');
 INSERT INTO wrdefault VALUES ('I',1,11), ('am',2,22), ('deflated',3,33);
 DROP EXTERNAL TABLE wrdefault;
@@ -240,7 +240,7 @@ ok
 CREATE READABLE EXTERNAL TABLE readdefault (s1 text, 
                                		        n1 int, 
 							   		        n2 int)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrdefault?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrdefault?PROFILE=HdfsTextSimple')
 FORMAT 'TEXT' (DELIMITER ',');
 SELECT * FROM readdefault ORDER BY n1;
     s1    | n1 | n2 
@@ -257,7 +257,7 @@ DROP EXTERNAL TABLE readdefault;
 CREATE WRITABLE EXTERNAL TABLE wrbzip2 (s1 text, 
                                		    n1 int, 
 							   		    n2 int)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrbzip2?ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver&COMPRESSION_CODEC=org.apache.hadoop.io.compress.BZip2Codec')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrbzip2?PROFILE=HdfsTextSimple&COMPRESSION_CODEC=org.apache.hadoop.io.compress.BZip2Codec')
 FORMAT 'TEXT' (DELIMITER ',');
 CREATE TEMP TABLE data_for_bzip2 (s1 text,
                                   n1 int,
@@ -289,7 +289,7 @@ ok
 CREATE READABLE EXTERNAL TABLE readbzip2 (s1 text, 
                                		      n1 int, 
 							   		      n2 int)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrbzip2?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrbzip2?PROFILE=HdfsTextSimple')
 FORMAT 'TEXT' (DELIMITER ',');
 SELECT * FROM readbzip2 ORDER BY n1;
  s1  | n1 | n2  
@@ -338,7 +338,7 @@ CREATE WRITABLE EXTERNAL TABLE wrseq (tmp1  timestamp,
                                       bool1 boolean,
 							          bool2 boolean,
                                       bool3 boolean)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrcustom?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrcustom?ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.WritableResolver&DATA-SCHEMA=CustomWritable')
 FORMAT 'custom' (formatter='pxfwritable_export');
 COPY wrseq FROM '@abs_srcdir@/data/pxf/customwritable_data.txt';
 DROP EXTERNAL TABLE wrseq;
@@ -377,7 +377,7 @@ CREATE READABLE EXTERNAL TABLE readseq (tmp1  timestamp,
                                         bool1 boolean,
 							            bool2 boolean,
                                         bool3 boolean)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrcustom?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrcustom?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.fragmenters.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.WritableResolver&DATA-SCHEMA=CustomWritable')
 FORMAT 'custom' (formatter='pxfwritable_import');
 SELECT * FROM readseq ORDER BY num1;
             tmp1             | num1 | num2 | num3 | num4 |    t1     |    t2     |     t3      |     t4     |     t5     |    t6     | dub1 | dub2 | dub3 |  ft1  |  ft2  |  ft3  |  ln1  |  ln2  |  ln3  |   bt   | bool1 | bool2 | bool3 
@@ -463,7 +463,7 @@ CREATE WRITABLE EXTERNAL TABLE wrseqgzip (tmp1  timestamp,
                                           bool1 boolean,
 							              bool2 boolean,
                                           bool3 boolean)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqgzip?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable&COMPRESSION_CODEC=org.apache.hadoop.io.compress.GzipCodec')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqgzip?ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.WritableResolver&DATA-SCHEMA=CustomWritable&COMPRESSION_CODEC=org.apache.hadoop.io.compress.GzipCodec')
 FORMAT 'custom' (formatter='pxfwritable_export');
 COPY wrseqgzip FROM '@abs_srcdir@/data/pxf/customwritable_data.txt';
 --
@@ -478,7 +478,7 @@ ok
 -- Read data
 --
 CREATE READABLE EXTERNAL TABLE readseqgzip (LIKE wrseqgzip)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqgzip?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqgzip?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.fragmenters.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.WritableResolver&DATA-SCHEMA=CustomWritable')
 FORMAT 'custom' (formatter='pxfwritable_import');
 SELECT * FROM readseqgzip ORDER BY num1;
             tmp1             | num1 | num2 | num3 | num4 |    t1     |    t2     |     t3      |     t4     |     t5     |    t6     | dub1 | dub2 | dub3 |  ft1  |  ft2  |  ft3  |  ln1  |  ln2  |  ln3  |   bt   | bool1 | bool2 | bool3 
@@ -564,7 +564,7 @@ CREATE WRITABLE EXTERNAL TABLE wrseqgziprecord (tmp1  timestamp,
                                                 bool1 boolean,
 							                    bool2 boolean,
                                                 bool3 boolean)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqgziprecord?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable&COMPRESSION_CODEC=org.apache.hadoop.io.compress.GzipCodec&COMPRESSION_TYPE=RECORD')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqgziprecord?ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.WritableResolver&DATA-SCHEMA=CustomWritable&COMPRESSION_CODEC=org.apache.hadoop.io.compress.GzipCodec&COMPRESSION_TYPE=RECORD')
 FORMAT 'custom' (formatter='pxfwritable_export');
 COPY wrseqgziprecord FROM '@abs_srcdir@/data/pxf/customwritable_data.txt';
 --
@@ -579,7 +579,7 @@ ok
 -- Read data
 --
 CREATE READABLE EXTERNAL TABLE readseqgziprecord (LIKE wrseqgziprecord)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqgziprecord?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqgziprecord?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.fragmenters.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.WritableResolver&DATA-SCHEMA=CustomWritable')
 FORMAT 'custom' (formatter='pxfwritable_import');
 SELECT * FROM readseqgziprecord ORDER BY num1;
             tmp1             | num1 | num2 | num3 | num4 |    t1     |    t2     |     t3      |     t4     |     t5     |    t6     | dub1 | dub2 | dub3 |  ft1  |  ft2  |  ft3  |  ln1  |  ln2  |  ln3  |   bt   | bool1 | bool2 | bool3 
@@ -665,7 +665,7 @@ CREATE WRITABLE EXTERNAL TABLE wrseqgzipblock (tmp1  timestamp,
                                                bool1 boolean,
 							                   bool2 boolean,
                                                bool3 boolean)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqgzipblock?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable&COMPRESSION_CODEC=org.apache.hadoop.io.compress.GzipCodec&COMPRESSION_TYPE=BLOCK')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqgzipblock?ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.WritableResolver&DATA-SCHEMA=CustomWritable&COMPRESSION_CODEC=org.apache.hadoop.io.compress.GzipCodec&COMPRESSION_TYPE=BLOCK')
 FORMAT 'custom' (formatter='pxfwritable_export');
 COPY wrseqgzipblock FROM '@abs_srcdir@/data/pxf/customwritable_data.txt';
 --
@@ -680,7 +680,7 @@ ok
 -- Read data
 --
 CREATE READABLE EXTERNAL TABLE readseqgzipblock (LIKE wrseqgzipblock)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqgzipblock?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqgzipblock?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.fragmenters.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.WritableResolver&DATA-SCHEMA=CustomWritable')
 FORMAT 'custom' (formatter='pxfwritable_import');
 SELECT * FROM readseqgzipblock ORDER BY num1;
             tmp1             | num1 | num2 | num3 | num4 |    t1     |    t2     |     t3      |     t4     |     t5     |    t6     | dub1 | dub2 | dub3 |  ft1  |  ft2  |  ft3  |  ln1  |  ln2  |  ln3  |   bt   | bool1 | bool2 | bool3 
@@ -767,7 +767,7 @@ CREATE WRITABLE EXTERNAL TABLE wrseqdeflate (tmp1  timestamp,
                                              bool1 boolean,
 							                 bool2 boolean,
                                              bool3 boolean)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqdeflate?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable&COMPRESSION_CODEC=org.apache.hadoop.io.compress.DefaultCodec')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqdeflate?ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.WritableResolver&DATA-SCHEMA=CustomWritable&COMPRESSION_CODEC=org.apache.hadoop.io.compress.DefaultCodec')
 FORMAT 'custom' (formatter='pxfwritable_export');
 COPY wrseqdeflate FROM '@abs_srcdir@/data/pxf/customwritable_data.txt';
 --
@@ -782,7 +782,7 @@ ok
 -- Read data
 --
 CREATE READABLE EXTERNAL TABLE readseqdeflate (LIKE wrseqdeflate)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqdeflate?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqdeflate?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.fragmenters.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.WritableResolver&DATA-SCHEMA=CustomWritable')
 FORMAT 'custom' (formatter='pxfwritable_import');
 SELECT * FROM readseqdeflate ORDER BY num1;
             tmp1             | num1 | num2 | num3 | num4 |    t1     |    t2     |     t3      |     t4     |     t5     |    t6     | dub1 | dub2 | dub3 |  ft1  |  ft2  |  ft3  |  ln1  |  ln2  |  ln3  |   bt   | bool1 | bool2 | bool3 
@@ -868,7 +868,7 @@ CREATE WRITABLE EXTERNAL TABLE wrseqdeflaterecord (tmp1  timestamp,
                                                    bool1 boolean,
 							                       bool2 boolean,
                                                    bool3 boolean)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqdeflaterecord?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable&COMPRESSION_CODEC=org.apache.hadoop.io.compress.DefaultCodec&COMPRESSION_TYPE=RECORD')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqdeflaterecord?ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.WritableResolver&DATA-SCHEMA=CustomWritable&COMPRESSION_CODEC=org.apache.hadoop.io.compress.DefaultCodec&COMPRESSION_TYPE=RECORD')
 FORMAT 'custom' (formatter='pxfwritable_export');
 COPY wrseqdeflaterecord FROM '@abs_srcdir@/data/pxf/customwritable_data.txt';
 --
@@ -883,7 +883,7 @@ ok
 -- Read data
 --
 CREATE READABLE EXTERNAL TABLE readseqdeflaterecord (LIKE wrseqdeflaterecord)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqdeflaterecord?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqdeflaterecord?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.fragmenters.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.WritableResolver&DATA-SCHEMA=CustomWritable')
 FORMAT 'custom' (formatter='pxfwritable_import');
 SELECT * FROM readseqdeflaterecord ORDER BY num1;
             tmp1             | num1 | num2 | num3 | num4 |    t1     |    t2     |     t3      |     t4     |     t5     |    t6     | dub1 | dub2 | dub3 |  ft1  |  ft2  |  ft3  |  ln1  |  ln2  |  ln3  |   bt   | bool1 | bool2 | bool3 
@@ -969,7 +969,7 @@ CREATE WRITABLE EXTERNAL TABLE wrseqdeflateblock (tmp1  timestamp,
                                                   bool1 boolean,
 							                      bool2 boolean,
                                                   bool3 boolean)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqdeflateblock?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable&COMPRESSION_CODEC=org.apache.hadoop.io.compress.DefaultCodec&COMPRESSION_TYPE=BLOCK')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqdeflateblock?ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.WritableResolver&DATA-SCHEMA=CustomWritable&COMPRESSION_CODEC=org.apache.hadoop.io.compress.DefaultCodec&COMPRESSION_TYPE=BLOCK')
 FORMAT 'custom' (formatter='pxfwritable_export');
 COPY wrseqdeflateblock FROM '@abs_srcdir@/data/pxf/customwritable_data.txt';
 --
@@ -984,7 +984,7 @@ ok
 -- Read data
 --
 CREATE READABLE EXTERNAL TABLE readseqdeflateblock (LIKE wrseqdeflateblock)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqdeflateblock?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/wrseqdeflateblock?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.fragmenters.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.WritableResolver&DATA-SCHEMA=CustomWritable')
 FORMAT 'custom' (formatter='pxfwritable_import');
 SELECT * FROM readseqdeflateblock ORDER BY num1;
             tmp1             | num1 | num2 | num3 | num4 |    t1     |    t2     |     t3      |     t4     |     t5     |    t6     | dub1 | dub2 | dub3 |  ft1  |  ft2  |  ft3  |  ln1  |  ln2  |  ln3  |   bt   | bool1 | bool2 | bool3 
@@ -1048,7 +1048,7 @@ DROP EXTERNAL TABLE wrseqdeflateblock;
 --
 CREATE WRITABLE EXTERNAL TABLE wr_port_err(t1 text,
                                            a1 integer)
-LOCATION ('pxf://@hostname@:12345/gpdb_regression_data/writable/err?ACCESSOR=TextFileWAccessor&RESOLVER=TextWResolver')
+LOCATION ('pxf://@hostname@:12345/gpdb_regression_data/writable/err?ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.TextFileWAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.TextWResolver')
 FORMAT 'TEXT' (DELIMITER ',');
 INSERT INTO wr_port_err VALUES ('first',1), ('second',2), ('third',3);
 ERROR:  remote component error (0): CURL_CON_ERROR (SOMEFILE:SOMEFUNC)
@@ -1058,7 +1058,7 @@ DROP EXTERNAL TABLE wr_port_err;
 --
 CREATE WRITABLE EXTERNAL TABLE wr_host_err(t1 text,
                                            a1 integer)
-LOCATION ('pxf://badhostname:50070/gpdb_regression_data/writable/err?ACCESSOR=TextFileWAccessor&RESOLVER=TextWResolver')
+LOCATION ('pxf://badhostname:50070/gpdb_regression_data/writable/err?ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.TextFileWAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.TextWResolver')
 FORMAT 'TEXT' (DELIMITER ',');
 INSERT INTO wr_host_err VALUES ('first',1), ('second',2), ('third',3);
 ERROR:  remote component error (0): Couldn't resolve host 'badhostname' (SOMEFILE:SOMEFUNC)
@@ -1068,7 +1068,7 @@ DROP EXTERNAL TABLE wr_host_err;
 --
 CREATE WRITABLE EXTERNAL TABLE wr_circle(a1 integer,
                                          c1 circle)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/circle?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritableWithCircle')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/circle?ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.WritableResolver&DATA-SCHEMA=CustomWritableWithCircle')
 FORMAT 'custom' (formatter='pxfwritable_export');
 INSERT INTO wr_circle VALUES (1, '<(3,3),9>'), (2, '<(4,4),16>');
 DROP EXTERNAL TABLE wr_circle;
@@ -1077,7 +1077,7 @@ DROP EXTERNAL TABLE wr_circle;
 --
 CREATE EXTERNAL TABLE read_circle(a1 integer,
                                            c1 circle)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/circle?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritableWithCircle')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/circle?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.fragmenters.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.WritableResolver&DATA-SCHEMA=CustomWritableWithCircle')
 FORMAT 'custom' (formatter='pxfwritable_import');
 SELECT * FROM read_circle ORDER BY a1;
  a1 |     c1     
@@ -1092,10 +1092,10 @@ DROP EXTERNAL TABLE read_circle;
 --
 CREATE WRITABLE EXTERNAL TABLE wr_char_err(a1 integer,
                                            c1 char)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/err?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritableWithChar')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/err?ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.WritableResolver&DATA-SCHEMA=CustomWritableWithChar')
 FORMAT 'custom' (formatter='pxfwritable_export');
 INSERT INTO wr_char_err VALUES (100, 'a'), (1000, 'b');
-ERROR:  remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v9/Writable/stream. Reason:     Server Error   Caused by:  com.pivotal.pxf.exception.BadRecordException: com.pivotal.pxf.exception.UnsupportedTypeException: Type char is not supported by GPDBWritable (SOMEFILE:SOMEFUNC)
+ERROR:  remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v9/Writable/stream. Reason:     Server Error   Caused by:  com.pivotal.pxf.api.exception.UnsupportedTypeException: Type char is not supported by GPDBWritable (SOMEFILE:SOMEFUNC)
 DROP EXTERNAL TABLE wr_char_err;
 --
 -- 8. Test ANALYZE on writable table
@@ -1104,7 +1104,7 @@ SET pxf_enable_stat_collection = true;
 CREATE WRITABLE EXTERNAL TABLE writable_analyze_no_analyzer(s1 text, 
                                		                        n1 int, 
 							   		                        n2 int)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/analyze/noanalyzer?ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/analyze/noanalyzer?ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.LineBreakAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.StringPassResolver')
 FORMAT 'TEXT';
 ANALYZE writable_analyze_no_analyzer;
 SELECT COUNT(*) FROM pg_class WHERE relname = 'writable_analyze_no_analyzer' AND relpages = 1 AND reltuples = 0;
@@ -1144,7 +1144,7 @@ SELECT COUNT(*) FROM pg_class WHERE relname = 'writable_analyze_with_analyzer' A
 --
 CREATE WRITABLE EXTERNAL TABLE compress_type_none(a1 integer,
                                                   c1 char)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/err?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=SomeClass&COMPRESSION_TYPE=NONE')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/err?ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.WritableResolver&DATA-SCHEMA=SomeClass&COMPRESSION_TYPE=NONE')
 FORMAT 'custom' (formatter='pxfwritable_export');
 INSERT INTO compress_type_none VALUES (100, 'a'), (1000, 'b');
 ERROR:  remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v9/Writable/stream. Reason:     Server Error   Caused by:  java.lang.IllegalArgumentException: Illegal compression type 'NONE'. For disabling compression remove COMPRESSION_CODEC parameter. (SOMEFILE:SOMEFUNC)
@@ -1155,7 +1155,7 @@ DROP EXTERNAL TABLE compress_type_none;
 CREATE WRITABLE EXTERNAL TABLE writable_csv(number int,
                                             name text,
                                             position char)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/csv?ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/csv?ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.LineBreakAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.StringPassResolver')
 FORMAT 'CSV';
 INSERT INTO writable_csv VALUES (4, 'H Waldman', 'P'),
                                 (6, 'Papi Turgeman', 'S'),
@@ -1169,7 +1169,7 @@ DROP EXTERNAL TABLE writable_csv;
 CREATE EXTERNAL TABLE readable_csv(number int,
                                    name text,
                                    position char)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/csv?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/csv?PROFILE=HdfsTextSimple')
 FORMAT 'CSV';
 SELECT * FROM readable_csv ORDER BY number;
  number |       name       | position 
@@ -1188,7 +1188,7 @@ DROP EXTERNAL TABLE readable_csv;
 CREATE WRITABLE EXTERNAL TABLE writable_threadsafe(number int,
                                             	   name text,
                                             	   position char)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/thread?ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver&THREAD-SAFE=FALSE')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/thread?ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.LineBreakAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.StringPassResolver&THREAD-SAFE=FALSE')
 FORMAT 'CSV';
 INSERT INTO writable_threadsafe VALUES (4, 'H Waldman', 'P'),
                                        (6, 'Papi Turgeman', 'S'),
@@ -1204,7 +1204,7 @@ DROP EXTERNAL TABLE writable_threadsafe;
 CREATE EXTERNAL TABLE readable_threadsafe(number int,
                                           name text,
                                           position char)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/thread?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=LineBreakAccessor&RESOLVER=StringPassResolver&THREAD-SAFE=FALSE')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/thread?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.fragmenters.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.LineBreakAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.StringPassResolver&THREAD-SAFE=FALSE')
 FORMAT 'CSV';
 SELECT * FROM readable_threadsafe ORDER BY number, name;
  number |       name       | position 
@@ -1250,7 +1250,7 @@ CREATE WRITABLE EXTERNAL TABLE writable_recordkey_text(recordkey text,
                                                        bool1 boolean,
                                                        bool2 boolean,
                                                        bool3 boolean)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/recordkey_text?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/recordkey_text?ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.WritableResolver&DATA-SCHEMA=CustomWritable')
 FORMAT 'custom' (formatter='pxfwritable_export');
 COPY writable_recordkey_text FROM '@abs_srcdir@/data/pxf/customwritable_recordkey_data.txt';
 --
@@ -1265,7 +1265,7 @@ ok
 -- Read data
 --
 CREATE READABLE EXTERNAL TABLE read_recordkey_text (LIKE writable_recordkey_text)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/recordkey_text?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/recordkey_text?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.fragmenters.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.WritableResolver&DATA-SCHEMA=CustomWritable')
 FORMAT 'custom' (formatter='pxfwritable_import');
 SELECT * FROM read_recordkey_text ORDER BY num1 LIMIT 10;
   recordkey  |            tmp1            | num1 | num2 | num3 | num4 |    t1     |    t2     |     t3      |     t4     |     t5     |    t6     | dub1 | dub2 | dub3 |  ft1  |  ft2  |  ft3  |  ln1  |  ln2  |  ln3  |   bt   | bool1 | bool2 | bool3 
@@ -1312,7 +1312,7 @@ CREATE WRITABLE EXTERNAL TABLE writable_recordkey_int(recordkey int,
                                                       bool1 boolean,
 			             		    		          bool2 boolean,
                                                       bool3 boolean)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/recordkey_int?ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/recordkey_int?ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.WritableResolver&DATA-SCHEMA=CustomWritable')
 FORMAT 'custom' (formatter='pxfwritable_export');
 COPY writable_recordkey_int FROM '@abs_srcdir@/data/pxf/customwritable_recordkey_data.txt'
 SEGMENT REJECT LIMIT 5 ROWS;
@@ -1328,7 +1328,7 @@ ok
 -- Read data
 --
 CREATE READABLE EXTERNAL TABLE read_recordkey_int (LIKE writable_recordkey_int)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/recordkey_int?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=SequenceFileAccessor&RESOLVER=WritableResolver&DATA-SCHEMA=CustomWritable')
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable/recordkey_int?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.fragmenters.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.accessors.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.resolvers.WritableResolver&DATA-SCHEMA=CustomWritable')
 FORMAT 'custom' (formatter='pxfwritable_import');
 SELECT * FROM read_recordkey_int ORDER BY num1;
  recordkey |            tmp1             | num1 | num2 | num3 | num4 |    t1     |    t2     |     t3      |     t4     |     t5     |    t6     | dub1 | dub2 | dub3 |  ft1  |  ft2  |  ft3  |  ln1  |  ln2  |  ln3  |   bt   | bool1 | bool2 | bool3 
