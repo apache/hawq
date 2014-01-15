@@ -1123,7 +1123,7 @@ ifneq "$(findstring $(BLD_ARCH),osx106_x86 rhel5_x86_64)" ""
 	mkdir -p tmpdir/share/postgresql/contrib tmpdir/lib/postgresql \
 	tmpdir/R-2.13.0-1; \
  	cp plr.so tmpdir/lib/postgresql; \
-	cp sql/plr.sql tmpdir/share/postgresql/contrib; \
+	cp plr.sql tmpdir/share/postgresql/contrib; \
 	tar -cf - -C $(R_HOME) . | tar -xpf - -C tmpdir/R-2.13.0-1; \
 	cp plr_install.sh tmpdir; \
  	tar -zcf $(BLD_TOP)/plr.tgz -C tmpdir .)
