@@ -2363,12 +2363,13 @@ primaryMirrorGetTempFilespacePath(void)
 	if (i <= numOfDirectories)
 	{
 		pmModuleState->lastAllocateIdx = (lastAllocateIdx + i) % numOfDirectories;
+                lastAllocateIdx = pmModuleState->lastAllocateIdx; 
 		SpinLockRelease(&pmModuleState->tempFilespaceLock);
 
 		elog(DEBUG1, "Temp directory id %d path: \"%s\" was chosen",
-					pmModuleState->lastAllocateIdx,
-					(char *) pmModuleState->tempFilespacePath[pmModuleState->lastAllocateIdx]);
-		return (char *) pmModuleState->tempFilespacePath[pmModuleState->lastAllocateIdx];
+					lastAllocateIdx,
+					(char *) pmModuleState->tempFilespacePath[lastAllocateIdx]);
+		return (char *) pmModuleState->tempFilespacePath[lastAllocateIdx];
 	}
 
 	/* Use the default temporary directory. */
