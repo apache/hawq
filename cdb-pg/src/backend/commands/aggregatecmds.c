@@ -291,6 +291,10 @@ RemoveAggregate(RemoveFuncStmt *stmt)
 	object.objectSubId = 0;
 
 	performDeletion(&object, stmt->behavior);
+	if (gp_upgrade_mode && Gp_role == GP_ROLE_DISPATCH)
+	{
+		CdbDispatchUtilityStatement((Node *) stmt, "RemoveAggregate");
+	}
 }
 
 
