@@ -206,7 +206,7 @@ create_toast_table(Relation rel, Oid toastOid, Oid toastIndexOid,
 	/*
 	 * Is it already toasted?
 	 */
-	if (rel->rd_rel->reltoastrelid != InvalidOid)
+	if (!gp_upgrade_mode && rel->rd_rel->reltoastrelid != InvalidOid)
 		return false;
 
 	/*
@@ -428,7 +428,7 @@ RelationNeedsToastTable(Relation rel)
 	if (RelationIsAoRows(rel) || RelationIsAoCols(rel))
 		return false ;
 
-	if (!IsBootstrapProcessingMode() && Gp_role == GP_ROLE_DISPATCH)
+	if (!IsBootstrapProcessingMode() && !gp_upgrade_mode && Gp_role == GP_ROLE_DISPATCH)
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_CDB_FEATURE_NOT_YET),

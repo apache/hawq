@@ -420,6 +420,11 @@ DefineRelation(CreateStmt *stmt, char relkind, char relstorage)
 
     reloid = DefineRelation_int(stmt, relkind, relstorage, NULL);
 
+    if(gp_upgrade_mode && Gp_role == GP_ROLE_DISPATCH)
+    {
+        CdbDispatchUtilityStatement((Node *)stmt, "DefineRelation");
+    }
+
     return reloid;
 }
 
@@ -529,7 +534,8 @@ DefineRelation_int(CreateStmt *stmt,
 		 * Get the default tablespace specified via default_tablespace, or fall
 		 * back on the database tablespace.
 		 */
-		tablespaceId = GetDefaultTablespace();
+        
+		tablespaceId = (gp_upgrade_mode) ? DEFAULTTABLESPACE_OID : GetDefaultTablespace();
 
 		/* Need the real tablespace id for dispatch */
 		if (!OidIsValid(tablespaceId))
@@ -630,6 +636,15 @@ DefineRelation_int(CreateStmt *stmt,
 	stmt->oidInfo.aoblkdirOid = InvalidOid;
 	stmt->oidInfo.aoblkdirIndexOid = InvalidOid;
 	stmt->ownerid = GetUserId();
+
+    if(gp_upgrade_mode && tidycatOptions && (tidycatOptions->relid != InvalidOid))
+    {
+        stmt->oidInfo.relOid = tidycatOptions->relid;
+        stmt->oidInfo.comptypeOid = tidycatOptions->reltype_oid;
+        stmt->oidInfo.toastOid = tidycatOptions->toast_oid;
+        stmt->oidInfo.toastIndexOid = tidycatOptions->toast_index;
+        stmt->oidInfo.toastComptypeOid = tidycatOptions->toast_reltype;
+    }
 
 	/* MPP-8405: disallow OIDS on partitioned tables */
 	if ((stmt->partitionBy ||

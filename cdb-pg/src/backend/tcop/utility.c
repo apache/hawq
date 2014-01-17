@@ -912,7 +912,7 @@ ProcessUtility(Node *parsetree,
 				char		relStorage = RELSTORAGE_HEAP;
 
 
-				Assert (Gp_role != GP_ROLE_EXECUTE);
+				Assert (gp_upgrade_mode || Gp_role != GP_ROLE_EXECUTE);
 
 
 				relOid = DefineRelation((CreateStmt *) parsetree,
@@ -1273,8 +1273,11 @@ ProcessUtility(Node *parsetree,
 
 		case T_IndexStmt:		/* CREATE INDEX */
 			{
-				ereport(ERROR,
-								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create index statement yet") ));
+				if (!gp_upgrade_mode)
+				{
+					ereport(ERROR,
+									(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create index statement yet") ));
+				}
 
 				IndexStmt  *stmt = (IndexStmt *) parsetree;
 

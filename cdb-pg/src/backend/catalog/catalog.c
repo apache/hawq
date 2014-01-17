@@ -1138,7 +1138,7 @@ GetNewRelFileNode(Oid reltablespace, bool relisshared, Relation pg_class, bool i
 		pfree(rpath);
 	} while (collides);
 	
-	if (Gp_role == GP_ROLE_EXECUTE)
+	if (!gp_upgrade_mode && Gp_role == GP_ROLE_EXECUTE)
 		Insist(!PointerIsValid(pg_class));
 
 	elog(DEBUG1, "Calling GetNewRelFileNode in %s mode %s pg_class. "

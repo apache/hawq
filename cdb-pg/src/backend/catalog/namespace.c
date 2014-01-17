@@ -308,15 +308,28 @@ RangeVarGetCreationNamespace(const RangeVar *newRelation)
 	}
 	else
 	{
-		/* use the default creation namespace */
-		recomputeNamespacePath();
-		if (tempCreationPending)
+		if (gp_upgrade_mode)
 		{
-			/* Need to initialize temp namespace */
-			InitTempTableNamespace();
-			return myTempNamespace;
+			namespaceId = caql_getoid(
+				NULL,
+				cql("SELECT oid FROM pg_namespace "
+					" WHERE nspname = :1 ",
+					CStringGetDatum("pg_catalog")));
+						
 		}
-		namespaceId = defaultCreationNamespace;
+		else
+		{
+			/* use the default creation namespace */
+			recomputeNamespacePath();
+			if (tempCreationPending)
+			{
+				/* Need to initialize temp namespace */
+				InitTempTableNamespace();
+				return myTempNamespace;
+			}
+			namespaceId = defaultCreationNamespace;
+		}
+
 		if (!OidIsValid(namespaceId))
 			ereport(ERROR,
 					(errcode(ERRCODE_UNDEFINED_SCHEMA),
