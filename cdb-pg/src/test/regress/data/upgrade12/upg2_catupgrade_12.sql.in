@@ -1,3 +1,34 @@
+--
+-- Catalog Upgrade Script (from 1.1 to 1.2)
+--
+
+-- update definitions of built-in functions
+
+CREATE OR REPLACE FUNCTION @gpupgradeschemaname@.pg_get_constraintdef(oid) RETURNS text LANGUAGE internal STABLE STRICT READS SQL DATA AS 'pg_get_constraintdef' WITH (OID=1387);
+SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.pg_get_constraintdef(oid) IS ''constraint description''');
+
+CREATE OR REPLACE FUNCTION @gpupgradeschemaname@.pg_get_constraintdef(oid, bool) RETURNS text LANGUAGE internal STABLE STRICT READS SQL DATA AS 'pg_get_constraintdef_ext' WITH (OID=2508);
+SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.pg_get_constraintdef(oid, bool) IS ''constraint description with pretty-print option''');
+
+CREATE OR REPLACE FUNCTION @gpupgradeschemaname@.pg_get_partition_rule_def(oid) RETURNS text LANGUAGE internal STABLE STRICT READS SQL DATA AS 'pg_get_partition_rule_def' WITH (OID=5027);
+SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.pg_get_partition_rule_def(oid) IS ''partition configuration for a given rule''');
+
+CREATE OR REPLACE FUNCTION @gpupgradeschemaname@.pg_get_partition_rule_def(oid, bool) RETURNS text LANGUAGE internal STABLE STRICT READS SQL DATA AS 'pg_get_partition_rule_def_ext' WITH (OID=5028);
+SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.pg_get_partition_rule_def(oid, bool) IS ''partition configuration for a given rule''');
+
+CREATE OR REPLACE FUNCTION @gpupgradeschemaname@.pg_get_partition_def(oid) RETURNS text LANGUAGE internal STABLE STRICT READS SQL DATA AS 'pg_get_partition_def' WITH (OID=5024);
+SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.pg_get_partition_def(oid) IS ''partition configuration for a given relation''');
+
+CREATE OR REPLACE FUNCTION @gpupgradeschemaname@.pg_get_partition_def(oid, bool) RETURNS text LANGUAGE internal STABLE STRICT READS SQL DATA AS 'pg_get_partition_def_ext' WITH (OID=5025);
+SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.pg_get_partition_def(oid, bool) IS ''partition configuration for a given relation''');
+
+CREATE OR REPLACE FUNCTION @gpupgradeschemaname@.pg_get_partition_def(oid, bool, bool) RETURNS text LANGUAGE internal STABLE STRICT READS SQL DATA AS 'pg_get_partition_def_ext2' WITH (OID=5034);
+SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.pg_get_partition_def(oid, bool, bool) IS ''partition configuration for a given relation''');
+
+CREATE OR REPLACE FUNCTION @gpupgradeschemaname@.pg_stat_get_activity(pid integer, OUT datid oid, OUT procpid integer, OUT usesysid oid, OUT application_name text, OUT current_query text, OUT waiting boolean, OUT xact_start timestamp with time zone, OUT query_start timestamp with time zone, OUT backend_start timestamp with time zone, OUT client_addr inet, OUT client_port integer, OUT sess_id integer) RETURNS SETOF @gpupgradeschemaname@.record LANGUAGE internal VOLATILE AS 'pg_stat_get_activity' WITH (OID=6071);
+SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.pg_stat_get_activity(pid integer, OUT datid oid, OUT procpid integer, OUT usesysid oid, OUT application_name text, OUT current_query text, OUT waiting boolean, OUT xact_start timestamp with time zone, OUT query_start timestamp with time zone, OUT backend_start timestamp with time zone, OUT client_addr inet, OUT client_port integer, OUT sess_id integer) IS ''statistics: information about currently active backends''');
+
+-- madlib
 SET search_path = madlib, pg_catalog;
 
 DROP AGGREGATE __lda_count_topic_agg(integer[], integer[], integer[], integer, integer);
