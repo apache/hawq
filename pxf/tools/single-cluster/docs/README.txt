@@ -70,6 +70,7 @@ CentOS
 v1.7.3
 ------
 
+- GPSQL-1618: yarn.nodemanager.aux-services value changed to mapreduce_shuffle.  
 - GPSQL-1445: Use stack build from new Jenkins job
 - tar fetch is now logged
 - GPSQL-1374: reduce verbosity
