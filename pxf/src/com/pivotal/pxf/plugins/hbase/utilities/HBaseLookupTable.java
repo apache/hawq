@@ -5,16 +5,13 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HTableDescriptor;
-import org.apache.hadoop.hbase.client.Get;
-import org.apache.hadoop.hbase.client.HBaseAdmin;
-import org.apache.hadoop.hbase.client.HTableInterface;
-import org.apache.hadoop.hbase.client.HTablePool;
-import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
 
 /*
@@ -30,21 +27,16 @@ public class HBaseLookupTable implements Closeable
 	private static final byte[] LOOKUPTABLENAME = Bytes.toBytes("pxflookup");
 	private static final byte[] LOOKUPCOLUMNFAMILY = Bytes.toBytes("mapping");
 
-	// Setting up HTable pool. Limit pool size to 10 instead of Integer.MAX_VALUE
-	private static final int POOLSIZE = 10;
 	private static final Configuration hbaseConfiguration = initConfiguration();
-	// initPool must be called after hbaseConfiguration is initialized.
-	private static final HTablePool pool = initPool();
+    private static final Log LOG = LogFactory.getLog(HBaseLookupTable.class);
 
 	private HBaseAdmin admin;
 	private Map<byte[], byte[]> rawTableMapping;
-	private Log Log;
 	private HTableInterface lookupTable;
 
 	public HBaseLookupTable() throws IOException
 	{
 		admin = new HBaseAdmin(hbaseConfiguration);
-		Log = LogFactory.getLog(HBaseLookupTable.class);
 	}
 
 	public Map<String, byte[]> getMappings(String tableName) throws IOException
@@ -87,7 +79,7 @@ public class HBaseLookupTable implements Closeable
 
 	private boolean tableHasNoMappings()
 	{
-		return rawTableMapping == null || rawTableMapping.size() == 0;
+        return MapUtils.isEmpty(rawTableMapping);
 	}
 
 	private Map<String, byte[]> lowerCaseMappings()
@@ -102,7 +94,7 @@ public class HBaseLookupTable implements Closeable
 
 	private void openLookupTable() throws IOException
 	{
-		lookupTable = pool.getTable(LOOKUPTABLENAME);
+        lookupTable = new HTable(hbaseConfiguration, LOOKUPTABLENAME);
 	}
 
 	private void loadMappingMap(String tableName) throws IOException
@@ -114,7 +106,7 @@ public class HBaseLookupTable implements Closeable
 
 		row = lookupTable.get(lookupRow);
 		rawTableMapping = row.getFamilyMap(LOOKUPCOLUMNFAMILY);
-		Log.debug("lookup table mapping for " + tableName +
+		LOG.debug("lookup table mapping for " + tableName +
 				  " has " + (rawTableMapping == null ? 0 : rawTableMapping.size()) + " entries");
 	}
 
@@ -131,10 +123,5 @@ public class HBaseLookupTable implements Closeable
 	private static Configuration initConfiguration()
 	{
 		return HBaseConfiguration.create();
-	}
-
-	private static HTablePool initPool()
-	{
-		return new HTablePool(hbaseConfiguration, POOLSIZE);
 	}
 }

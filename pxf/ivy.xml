@@ -18,15 +18,20 @@
 	<dependencies>
 
 		<!-- Hadoop/Hive/HBase dependencies -->
-		<dependency org="org.apache.hadoop" name="hadoop-common" rev="${gphd.hadoop.version}-alpha-gphd-${gphd.stack.version}" conf="compile->master" />
-		<dependency org="org.apache.hadoop" name="hadoop-mapreduce-client-core" rev="${gphd.hadoop.version}-alpha-gphd-${gphd.stack.version}" conf="compile->master" />
-		<dependency org="org.apache.hadoop" name="hadoop-hdfs" rev="${gphd.hadoop.version}-alpha-gphd-${gphd.stack.version}" conf="compile->master" />
-		<dependency org="org.apache.hadoop" name="hadoop-annotations" rev="${gphd.hadoop.version}-alpha-gphd-${gphd.stack.version}" conf="compile->master" />
-		<dependency org="org.apache.hive" name="hive-service" rev="${gphd.hive.version}-gphd-${gphd.stack.version}" conf="compile->master" />
+        <dependency org="org.apache.hadoop" name="hadoop-common" rev="${gphd.hadoop.version}-gphd-${gphd.stack.version}" conf="compile->master" />
+        <dependency org="org.apache.hadoop" name="hadoop-mapreduce-client-core" rev="${gphd.hadoop.version}-gphd-${gphd.stack.version}" conf="compile->master" />
+        <dependency org="org.apache.hadoop" name="hadoop-hdfs" rev="${gphd.hadoop.version}-gphd-${gphd.stack.version}" conf="compile->master" />
+        <dependency org="org.apache.hadoop" name="hadoop-annotations" rev="${gphd.hadoop.version}-gphd-${gphd.stack.version}" conf="compile->master" />
+        <dependency org="org.apache.hadoop" name="hadoop-auth" rev="${gphd.hadoop.version}-gphd-${gphd.stack.version}" conf="compile->master" />
+        <dependency org="org.apache.hive" name="hive-service" rev="${gphd.hive.version}-gphd-${gphd.stack.version}" conf="compile->master" />
 		<dependency org="org.apache.hive" name="hive-metastore" rev="${gphd.hive.version}-gphd-${gphd.stack.version}" conf="compile->master" />
 		<dependency org="org.apache.hive" name="hive-common" rev="${gphd.hive.version}-gphd-${gphd.stack.version}" conf="compile->master" />
 		<dependency org="org.apache.hive" name="hive-serde" rev="${gphd.hive.version}-gphd-${gphd.stack.version}" conf="compile->master" />
-		<dependency org="org.apache.hbase" name="hbase" rev="${gphd.hbase.version}-gphd-${gphd.stack.version}" conf="compile->master" />
+        <dependency org="org.apache.hbase" name="hbase-common" rev="${gphd.hbase.version}-gphd-${gphd.stack.version}" conf="compile->master" />
+        <dependency org="org.apache.hbase" name="hbase-protocol" rev="${gphd.hbase.version}-gphd-${gphd.stack.version}" conf="compile->master" />
+        <dependency org="org.apache.hbase" name="hbase-client" rev="${gphd.hbase.version}-gphd-${gphd.stack.version}" conf="compile->master" />
+        <dependency org="org.apache.hbase" name="hbase-thrift" rev="${gphd.hbase.version}-gphd-${gphd.stack.version}" conf="compile->master" />
+        <dependency org="org.apache.hbase" name="hbase-server" rev="${gphd.hbase.version}-gphd-${gphd.stack.version}" conf="compile->master" />
 
 		<!-- Other Third party dependencies -->
 		<dependency org="org.apache.cassandra.deps" name="libthrift" rev="0.5.0" conf="compile->master" />

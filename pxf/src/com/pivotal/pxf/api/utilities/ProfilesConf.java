@@ -1,6 +1,5 @@
 package com.pivotal.pxf.api.utilities;
 
-import com.pivotal.pxf.api.exception.ProfileConfException;
 import org.apache.commons.collections.IteratorUtils;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
@@ -13,7 +12,7 @@ import org.apache.commons.logging.LogFactory;
 import java.net.URL;
 import java.util.*;
 
-import static com.pivotal.pxf.api.exception.ProfileConfException.*;
+import static com.pivotal.pxf.api.utilities.ProfileConfException.*;
 
 /**
  *  This enum holds the profiles files: pxf-profiles.xml and pxf-profiles-default.xml.

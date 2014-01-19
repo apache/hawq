@@ -16,8 +16,8 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 
-import com.pivotal.pxf.core.bridge.Bridge;
-import com.pivotal.pxf.core.bridge.WriteBridge;
+import com.pivotal.pxf.core.Bridge;
+import com.pivotal.pxf.core.WriteBridge;
 import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.core.utilities.SecuredHDFS;
 import org.apache.commons.logging.Log;
@@ -72,39 +72,15 @@ public class WritableResource
 	
 	public WritableResource() {}
 
-	/*
- 	run: 
- 	curl -i -X post "http://localhost:50070/gpdb/v5w/Writable/stream?path=/data/curl/curl`date \"+%h%d_%H%M%s\"`" \
- 	--header "X-GP-Accessor: TextFileWAccessor" \
- 	--header "X-GP-Resolver: TextWResolver" \
- 	--header "Content-Type:application/octet-stream" \
- 	--header "Expect: 100-continue" \
-  	--header "X-GP-ALIGNMENT: 4" \
- 	--header "X-GP-SEGMENT-ID: 0" \
- 	--header "X-GP-SEGMENT-COUNT: 3" \
- 	--header "X-GP-HAS-FILTER: 0" \
- 	--header "X-GP-FORMAT: TEXT" \
- 	--header "X-GP-URI: pxf://localhost:50070/data/curl/?Accessor=TextFileWAccessor&Resolver=TextWResolver" \
- 	--header "X-GP-URL-HOST: localhost" \
- 	--header "X-GP-URL-PORT: 50070" \
- 	--header "X-GP-ATTRS: 0" \
- 	--header "X-GP-DATA-DIR: data/curl/" \
- 	  -d "data111" -d "data222"
-
-  	result:
-
-  	HTTP/1.1 200 OK
-	Content-Type: text/plain;charset=UTF-8
-	Content-Type: text/plain
-	Transfer-Encoding: chunked
-	Server: Jetty(7.6.10.v20130312)
-
-	wrote 15 bytes to curlAug11_17271376231245
-
-	file content:
-	bin/hdfs dfs -cat /data/curl/*45 
-	data111&data222
-	 */
+    /*
+     * This function is called when http://nn:port/gpdb/vx/Writable/stream?path=...
+	 * is used.
+	 *
+	 * @param servletContext Servlet context contains attributes required by SecuredHDFS
+	 * @param headers Holds HTTP headers from request
+	 * @param path Holds URI path option used in this request
+	 * @param inputStream stream of bytes to write from Hawq
+     */
 	@POST
 	@Path("stream")
 	@Consumes(MediaType.APPLICATION_OCTET_STREAM)

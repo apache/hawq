@@ -1,15 +1,13 @@
 package com.pivotal.pxf.api.utilities;
 
-import static com.pivotal.pxf.api.exception.ProfileConfException.NO_PROFILE_DEF;
+import static com.pivotal.pxf.api.utilities.ProfileConfException.NO_PROFILE_DEF;
 import static org.mockito.Mockito.*;
 import static org.junit.Assert.*;
 
 import java.util.HashMap;
 import java.util.Map;
 
-import com.pivotal.pxf.api.exception.ProfileConfException;
-
-import com.pivotal.pxf.api.format.OutputFormat;
+import com.pivotal.pxf.api.OutputFormat;
 import com.pivotal.pxf.core.utilities.SecuredHDFS;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Before;
@@ -38,7 +36,7 @@ public class InputDataTest
 		assertEquals(System.getProperty("greenplum.alignment"), "all");
 		assertEquals(input.totalSegments(), 2);
 		assertEquals(input.segmentId(), -44);
-		assertEquals(input.outputFormat(), OutputFormat.FORMAT_TEXT);
+		assertEquals(input.outputFormat(), OutputFormat.TEXT);
 		assertEquals(input.serverName(), "my://bags");
 		assertEquals(input.serverPort(), -8020);
 		assertFalse(input.hasFilter());
@@ -97,9 +95,9 @@ public class InputDataTest
 		parameters.remove("X-GP-ACCESSOR");
 		parameters.remove("X-GP-RESOLVER");
 		InputData input = new InputData(parameters);
-		assertEquals(input.getProperty("X-GP-FRAGMENTER"), "com.pivotal.pxf.plugins.hive.fragmenters.HiveDataFragmenter");
-		assertEquals(input.accessor, "com.pivotal.pxf.plugins.hive.accessors.HiveAccessor");
-		assertEquals(input.resolver, "com.pivotal.pxf.plugins.hive.resolvers.HiveResolver");
+		assertEquals(input.getProperty("X-GP-FRAGMENTER"), "com.pivotal.pxf.plugins.hive.HiveDataFragmenter");
+		assertEquals(input.accessor, "com.pivotal.pxf.plugins.hive.HiveAccessor");
+		assertEquals(input.resolver, "com.pivotal.pxf.plugins.hive.HiveResolver");
 	}
 
 	@Test

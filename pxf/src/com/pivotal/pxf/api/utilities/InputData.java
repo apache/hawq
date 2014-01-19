@@ -3,7 +3,7 @@ package com.pivotal.pxf.api.utilities;
 import java.io.FileNotFoundException;
 import java.util.*;
 
-import com.pivotal.pxf.api.format.OutputFormat;
+import com.pivotal.pxf.api.OutputFormat;
 import org.apache.commons.codec.binary.Base64;
 
 import org.apache.commons.collections.CollectionUtils;
@@ -126,9 +126,9 @@ public class InputData
         srlzSchemaName = getOptionalProperty("X-GP-DATA-SCHEMA");
 
 		/* 
-         * accessor - will throw exception from getPropery() if outputFormat is FORMAT_GPDB_WRITABLE
+         * accessor - will throw exception from getPropery() if outputFormat is BINARY
 		 * and the user did not supply accessor=... or profile=...
-		 * resolver - will throw exception from getPropery() if outputFormat is FORMAT_GPDB_WRITABLE 
+		 * resolver - will throw exception from getPropery() if outputFormat is BINARY
 		 * and the user did not supply resolver=... or profile=...
 		 */
         profile = getOptionalProperty("X-GP-PROFILE");
@@ -235,6 +235,10 @@ public class InputData
     public byte[] getFragmentUserData()
     {
         return userData;
+    }
+
+    public void setFragmentUserData(byte[] userData){
+            this.userData = userData;
     }
 
     /*
@@ -553,9 +557,9 @@ public class InputData
     protected void parseFormat(String formatString)
     {
         if (formatString.equals("TEXT"))
-            outputFormat = OutputFormat.FORMAT_TEXT;
+            outputFormat = OutputFormat.TEXT;
         else if (formatString.equals("GPDBWritable"))
-            outputFormat = OutputFormat.FORMAT_GPDB_WRITABLE;
+            outputFormat = OutputFormat.BINARY;
         else
             throw new IllegalArgumentException("Wrong value for greenplum.format " + formatString);
     }

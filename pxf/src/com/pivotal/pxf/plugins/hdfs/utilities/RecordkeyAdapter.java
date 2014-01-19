@@ -6,7 +6,7 @@ import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.io.BooleanWritable;
-import com.pivotal.pxf.api.format.OneRow;
+import com.pivotal.pxf.api.OneRow;
 import com.pivotal.pxf.api.utilities.ColumnDescriptor;
 import com.pivotal.pxf.api.utilities.InputData;
 import org.apache.hadoop.io.ByteWritable;
@@ -18,7 +18,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.VIntWritable;
 import org.apache.hadoop.io.Writable;
 
-import com.pivotal.pxf.api.format.OneField;
+import com.pivotal.pxf.api.OneField;
 
 /*
  * Adapter used for adding a recordkey field to the records output List<OneField>

@@ -1,6 +1,6 @@
-import com.pivotal.pxf.api.accessors.ReadAccessor;
-import com.pivotal.pxf.api.accessors.WriteAccessor;
-import com.pivotal.pxf.api.format.OneRow;
+import com.pivotal.pxf.api.ReadAccessor;
+import com.pivotal.pxf.api.WriteAccessor;
+import com.pivotal.pxf.api.OneRow;
 import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.api.utilities.Plugin;
 import org.apache.commons.logging.Log;
@@ -21,11 +21,13 @@ public class DummyAccessor extends Plugin implements ReadAccessor, WriteAccessor
         super(metaData);
     }
 
+    @Override
     public boolean openForRead() throws Exception {
         /* fopen or similar */
         return true;
     }
 
+    @Override
     public OneRow readNextObject() throws Exception {
         /* return next row , <key=fragmentNo.rowNo, val=rowNo,text,fragmentNo>*/
         /* check for EOF */
@@ -47,6 +49,7 @@ public class DummyAccessor extends Plugin implements ReadAccessor, WriteAccessor
         return row;
     }
 
+    @Override
     public void closeForRead() throws Exception {
         /* fclose or similar */
     }

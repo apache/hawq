@@ -4,7 +4,7 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
-import org.apache.hadoop.hbase.filter.WritableByteArrayComparable;
+import org.apache.hadoop.hbase.filter.ByteArrayComparable;
 import org.apache.hadoop.hbase.util.Bytes;
 
 /*
@@ -18,24 +18,18 @@ import org.apache.hadoop.hbase.util.Bytes;
  * The filter is good for any integer numeric comparison
  * i.e. integer, bigint, smallint
  */
-public class HBaseIntegerComparator extends WritableByteArrayComparable
+public class HBaseIntegerComparator extends ByteArrayComparable
 {
     private Long val;
     
-	/*
-	 * Used for serialization
-	 */
-    public HBaseIntegerComparator()
-    {
-        super();
-    }
-
     public HBaseIntegerComparator(Long inVal)
     {
+        super(Bytes.toBytes(inVal));
         this.val = inVal;
     }
 
-    public byte[] getValue() 
+    @Override
+    public byte[] toByteArray()
     {
         return Bytes.toBytes(val);
     }
@@ -64,8 +58,7 @@ public class HBaseIntegerComparator extends WritableByteArrayComparable
 	 * Used for serialization
 	 */
     public void readFields(DataInput in) throws IOException {
-        Long inVal = in.readLong();
-        this.val = inVal;
+        val = in.readLong();
     }
 
 	/*

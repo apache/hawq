@@ -118,7 +118,7 @@ public class GPDBWritableTest
 			assertTrue(false);
 		}
 		
-		assertFalse(gpdbWritable.isEmpty()); // len > 0	
+		assertFalse(gpdbWritable.isEmpty()); // len > 0
 	}
 	
 	
@@ -129,7 +129,7 @@ public class GPDBWritableTest
 	private GPDBWritable buildGPDBWritable()
 		throws Exception
 	{
-		return new GPDBWritable();	
+		return new GPDBWritable();
 	}
 	
 	// add data to stream, end with EOFException on demand.

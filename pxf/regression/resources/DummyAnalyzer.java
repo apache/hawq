@@ -1,6 +1,6 @@
-import com.pivotal.pxf.api.accessors.ReadAccessor;
-import com.pivotal.pxf.api.analyzers.Analyzer;
-import com.pivotal.pxf.api.analyzers.DataSourceStatsInfo;
+import com.pivotal.pxf.api.AnalyzerStats;
+import com.pivotal.pxf.api.ReadAccessor;
+import com.pivotal.pxf.api.Analyzer;
 import com.pivotal.pxf.api.utilities.InputData;
 
 /*
@@ -21,8 +21,8 @@ public class DummyAnalyzer extends Analyzer {
      * returns the data statistics in json format
      */
     @Override
-    public DataSourceStatsInfo getEstimatedStats(String data, ReadAccessor accessor) throws Exception {
-        return new DataSourceStatsInfo(160000 /* disk block size in bytes */,
+    public AnalyzerStats getEstimatedStats(String data, ReadAccessor accessor) throws Exception {
+        return new AnalyzerStats(160000 /* disk block size in bytes */,
                 3 /* number of disk blocks */,
                 6 /* total number of rows */);
     }

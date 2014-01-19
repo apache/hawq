@@ -15,16 +15,16 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 
-import com.pivotal.pxf.api.accessors.ReadAccessor;
-import com.pivotal.pxf.core.analyzers.AnalyzerFactory;
-import com.pivotal.pxf.api.analyzers.DataSourceStatsInfo;
+import com.pivotal.pxf.api.ReadAccessor;
+import com.pivotal.pxf.core.AnalyzerFactory;
+import com.pivotal.pxf.api.AnalyzerStats;
 import com.pivotal.pxf.api.utilities.InputData;
-import com.pivotal.pxf.core.bridge.ReadBridge;
+import com.pivotal.pxf.core.ReadBridge;
 import com.pivotal.pxf.core.utilities.SecuredHDFS;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import com.pivotal.pxf.api.analyzers.Analyzer;
+import com.pivotal.pxf.api.Analyzer;
 
 /*
  * Class enhances the API of the WEBHDFS REST server.
@@ -89,7 +89,7 @@ public class AnalyzerResource
 		 * Function queries the pxf Analyzer for the data fragments of the resource
 		 * The fragments are returned in a string formatted in JSON	 
 		 */		
-		String jsonOutput = DataSourceStatsInfo.dataToJSON(analyzer.getEstimatedStats(path, accessor));
+		String jsonOutput = AnalyzerStats.dataToJSON(analyzer.getEstimatedStats(path, accessor));
 		
 		return Response.ok(jsonOutput, MediaType.APPLICATION_JSON_TYPE).build();
 	}

@@ -16,15 +16,15 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 
-import com.pivotal.pxf.api.fragmenters.Fragment;
-import com.pivotal.pxf.api.fragmenters.Fragmenter;
+import com.pivotal.pxf.api.Fragment;
+import com.pivotal.pxf.api.Fragmenter;
 import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.core.utilities.SecuredHDFS;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import com.pivotal.pxf.core.fragmenters.FragmenterFactory;
-import com.pivotal.pxf.core.fragmenters.FragmentsResponseFormatter;
+import com.pivotal.pxf.core.FragmenterFactory;
+import com.pivotal.pxf.core.FragmentsResponseFormatter;
 
 /*
  * Class enhances the API of the WEBHDFS REST server.

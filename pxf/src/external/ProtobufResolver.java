@@ -2,11 +2,11 @@ import java.util.List;
 
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.DynamicMessage;
-import com.pivotal.pxf.api.format.OneField;
-import com.pivotal.pxf.api.format.OneRow;
+import com.pivotal.pxf.api.OneField;
+import com.pivotal.pxf.api.OneRow;
 import static com.pivotal.pxf.api.io.DataType.*;
 
-import com.pivotal.pxf.api.resolvers.ReadResolver;
+import com.pivotal.pxf.api.ReadResolver;
 import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.api.utilities.Plugin;
 

@@ -1,7 +1,7 @@
-import com.pivotal.pxf.api.format.OneField;
-import com.pivotal.pxf.api.format.OneRow;
-import com.pivotal.pxf.api.resolvers.ReadResolver;
-import com.pivotal.pxf.api.resolvers.WriteResolver;
+import com.pivotal.pxf.api.OneField;
+import com.pivotal.pxf.api.OneRow;
+import com.pivotal.pxf.api.ReadResolver;
+import com.pivotal.pxf.api.WriteResolver;
 import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.api.utilities.Plugin;
 
@@ -26,6 +26,7 @@ public class DummyResolver extends Plugin implements ReadResolver, WriteResolver
         rowNumber = 0;
     }
 
+    @Override
     public List<OneField> getFields(OneRow row) throws Exception {
         /* break up the row into fields */
         List<OneField> output = new LinkedList<OneField>();

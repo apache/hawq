@@ -19,8 +19,8 @@ import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 
-import com.pivotal.pxf.core.bridge.Bridge;
-import com.pivotal.pxf.core.bridge.ReadBridge;
+import com.pivotal.pxf.core.Bridge;
+import com.pivotal.pxf.core.ReadBridge;
 import com.pivotal.pxf.core.io.Writable;
 import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.core.utilities.SecuredHDFS;
