@@ -7,6 +7,7 @@
  */
 
 #include "gphdfilters.h"
+#include "catalog/pg_operator.h"
 #include "optimizer/clauses.h"
 #include "parser/parse_expr.h"
 #include "utils/builtins.h"
@@ -21,11 +22,12 @@ static bool supported_filter_type(Oid type);
  * All supported GPDB operators, and their respective HFDS operator code.
  * Note that it is OK to use hardcoded OIDs, since these are all pinned
  * down system catalog operators.
+ * see pg_operator.h
  */
 gpop_hdop_map gphd_supported_opr[] =
 {
 	/* int2 */
-	{94  /* int2eq */, HDOP_EQ},
+	{Int2EqualOperator  /* int2eq */, HDOP_EQ},
 	{95  /* int2lt */, HDOP_LT},
 	{520 /* int2gt */, HDOP_GT},
 	{524 /* int2ge */, HDOP_GE},
@@ -33,7 +35,7 @@ gpop_hdop_map gphd_supported_opr[] =
 	{519 /* int2ne */, HDOP_NE},
 
 	/* int4 */
-	{96  /* int4eq */, HDOP_EQ},
+	{Int4EqualOperator  /* int4eq */, HDOP_EQ},
 	{97  /* int4lt */, HDOP_LT},
 	{521 /* int4gt */, HDOP_GT},
 	{525 /* int4ge */, HDOP_GE},
@@ -41,7 +43,7 @@ gpop_hdop_map gphd_supported_opr[] =
 	{518 /* int4lt */, HDOP_NE},
 
 	/* int8 */
-	{410 /* int8eq */, HDOP_EQ},
+	{Int8EqualOperator /* int8eq */, HDOP_EQ},
 	{412 /* int8lt */, HDOP_LT},
 	{413 /* int8gt */, HDOP_GT},
 	{415 /* int8ge */, HDOP_GE},
@@ -49,7 +51,7 @@ gpop_hdop_map gphd_supported_opr[] =
 	{411 /* int8lt */, HDOP_NE},
 
 	/* text */
-	{98  /* texteq  */, HDOP_EQ},
+	{TextEqualOperator  /* texteq  */, HDOP_EQ},
 	{664 /* text_lt */, HDOP_LT},
 	{666 /* text_gt */, HDOP_GT},
 	{667 /* text_ge */, HDOP_GE},
@@ -98,8 +100,9 @@ gphd_make_filter_list(List *quals)
 	foreach (lc, quals)
 	{
 		Node *node = (Node *) lfirst(lc);
-
-		switch (nodeTag(node))
+		NodeTag tag = nodeTag(node);
+		elog(DEBUG5, "gphd_make_filter_list: node tag %d. %s", tag, tag==T_OpExpr? "(T_OpExpr)": "");
+		switch (tag)
 		{
 			case T_OpExpr:
 			{
@@ -124,6 +127,28 @@ gphd_make_filter_list(List *quals)
 	return result;
 }
 
+static void
+gphd_free_filter(GPHDFilterDesc* filter)
+{
+	if (!filter)
+		return;
+
+	if (filter->l.conststr)
+	{
+		if (filter->l.conststr->data)
+			pfree(filter->l.conststr->data);
+		pfree(filter->l.conststr);
+	}
+	if (filter->r.conststr)
+	{
+		if (filter->r.conststr->data)
+			pfree(filter->r.conststr->data);
+		pfree(filter->r.conststr);
+	}
+
+	pfree(filter);
+}
+
 /*
  * gphd_free_filter_list
  *
@@ -144,7 +169,7 @@ gphd_free_filter_list(List *filters)
 	foreach (lc, filters)
 	{
 		filter	= (GPHDFilterDesc *) lfirst(lc);
-		pfree(filter);
+		gphd_free_filter(filter);
 	}
 }
 
@@ -255,16 +280,27 @@ opexpr_to_gphdfilter(OpExpr *expr, GPHDFilterDesc *filter)
 {
 	int		 i;
 	int		 nargs 		= sizeof(gphd_supported_opr) / sizeof(gpop_hdop_map);
-	Node	*leftop 	= get_leftop((Expr*)expr);
-	Node	*rightop	= get_rightop((Expr*)expr);
-	Oid		 rightop_type = exprType(rightop);
+	Node	*leftop 	= NULL;
+	Node	*rightop	= NULL;
+	Oid		 rightop_type = 0;
+
+	if ((!expr) || (!filter))
+		return false;
+
+	leftop = get_leftop((Expr*)expr);
+	rightop	= get_rightop((Expr*)expr);
+	rightop_type = exprType(rightop);
 
 	/* only binary oprs supported currently */
 	if (!rightop)
+	{
+		elog(DEBUG5, "opexpr_to_gphdfilter: unary op! leftop_type: %d, op: %d",
+				 	 exprType(leftop), expr->opno);
 		return false;
+	}
 
-	elog(DEBUG5, "opexpr_to_gphdfilter: leftop_type: %d, rightop_type: %d",
-		 exprType(leftop), rightop_type);
+	elog(DEBUG5, "opexpr_to_gphdfilter: leftop_type: %d, rightop_type: %d, op: %d",
+		 exprType(leftop), rightop_type, expr->opno);
 	/* both side data types must be identical (for now) */
 	if (rightop_type != exprType(leftop))
 		return false;
