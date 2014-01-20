@@ -168,7 +168,7 @@ add_filesystem_credential(const char * uri)
 	memset(&key, 0, sizeof(key));
 
 	if (HdfsParsePath(uri, &protocol, &host, &key.port, NULL)
-			|| NULL == protocol || NULL == host || 0 == key.port)
+			|| NULL == protocol || NULL == host)
 		elog(ERROR, "fail to parse uri: %s", uri);
 
 	strncpy(key.protocol, protocol, sizeof(key.protocol));
@@ -211,9 +211,6 @@ cancel_filesystem_credential(struct FileSystemCredential *entry)
 			(struct FileSystemCredentialKey*) entry;
 	Insist(strcasecmp(key->protocol, "hdfs") == 0);
 
-	char uri[1024];
-	snprintf(uri, sizeof(uri), "%s://%s:%d", key->protocol, key->host,
-			key->port);
 	HdfsCancelDelegationToken(entry->fs, entry->credential,
 			entry->credentialSize);
 }
@@ -395,9 +392,6 @@ renew_filesystem_credential(struct FileSystemCredential *entry)
 			(struct FileSystemCredentialKey*) entry;
 	Insist(strcasecmp(key->protocol, "hdfs") == 0);
 
-	char uri[1024];
-	snprintf(uri, sizeof(uri), "%s://%s:%d", key->protocol, key->host,
-			key->port);
 	Assert(NULL != entry->credential);
 	HdfsRenewDelegationToken(entry->fs, entry->credential, entry->credentialSize);
 }

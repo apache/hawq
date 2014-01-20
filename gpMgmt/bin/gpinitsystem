@@ -762,7 +762,8 @@ CHK_DFS_URL () {
 	fi
 
 	dfs_host=`$ECHO "$DFS_URL" | $SED 's,[:/].*,,'`
-	PING_HOST "$dfs_host"
+	# do not ping host because it may be configured using namenode HA
+	#PING_HOST "$dfs_host"
 
 	# We must create the filespace in a relative path
 	DFS_URL="$DFS_URL"/hawq_data

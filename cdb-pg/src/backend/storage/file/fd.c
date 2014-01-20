@@ -2280,7 +2280,10 @@ HdfsGetConnection(const char * path)
 			break;
 
 		location = palloc0(strlen(host) + strlen(protocol) + 64);
-		sprintf(location, "%s://%s:%d", protocol, host, port);
+		if (port > 0)
+			sprintf(location, "%s://%s:%d/", protocol, host, port);
+		else
+			sprintf(location, "%s://%s/", protocol, host);
 
 		if (NULL == HdfsFsTable)
 		{
@@ -2428,8 +2431,11 @@ HdfsParsePath(const char * path, char **protocol, char **host, int *port, short 
 	}
 
 	pb = strchr(p, ':');
+	if (NULL == pb)
+		pb = strchr(p, '/');
+
 	if (NULL == pb) {
-		elog(WARNING, "cannot find hdfs port in path: %s", path);
+		elog(WARNING, "cannot find hdfs host or port in path: %s", path);
 		errno = EINVAL;
 		return -1;
 	}
@@ -2438,7 +2444,12 @@ HdfsParsePath(const char * path, char **protocol, char **host, int *port, short 
 		*host = pnstrdup(p, pb - p);
 
 	if (port)
-		*port = atoi(pb + 1);
+	{
+		if (*pb == ':')
+			*port = atoi(pb + 1);
+		else
+			*port = 0;
+	}
 
 	return 0;
 }

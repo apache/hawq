@@ -103,7 +103,7 @@ gpfs_hdfs_connect(PG_FUNCTION_ARGS)
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
 	}
-	if (port <= 0) {
+	if (port < 0) {
 		elog(WARNING, "get port invalid in gpfs_hdfs_connect: %d", port);
 		retval = -1;
 		errno = EINVAL;
@@ -120,7 +120,8 @@ gpfs_hdfs_connect(PG_FUNCTION_ARGS)
 	}
 
 	hdfsBuilderSetNameNode(builder, host);
-	hdfsBuilderSetNameNodePort(builder, port);
+	if (port != 0)
+		hdfsBuilderSetNameNodePort(builder, port);
 
 	if (token) {
 		hdfsBuilderSetToken(builder, token);
