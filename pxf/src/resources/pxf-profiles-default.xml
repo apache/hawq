@@ -69,9 +69,9 @@
         <name>GemFireXD</name>
         <description>This profile is suitable for using when connecting to GemFireXD</description>
         <plugins>
-            <fragmenter>com.pivotal.pxf.plugins.gemfire.fragmenters.GemFireXDFragmenter</fragmenter>
-            <accessor>com.pivotal.pxf.plugins.gemfire.accessors.GemFireXDAccessor</accessor>
-            <resolver>com.pivotal.pxf.plugins.gemfire.resolvers.GemFireXDResolver</resolver>
+            <fragmenter>com.pivotal.pxf.plugins.gemfirexd.GemFireXDFragmenter</fragmenter>
+            <accessor>com.pivotal.pxf.plugins.gemfirexd.GemFireXDAccessor</accessor>
+            <resolver>com.pivotal.pxf.plugins.gemfirexd.GemFireXDResolver</resolver>
         </plugins>
     </profile>
 </profiles>
