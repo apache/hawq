@@ -157,125 +157,125 @@ public class PxfHiveRegression extends PxfTestCase {
 		ComparisonUtils.compareTables(hiveTable, hawqExternalTable, report);
 	}
 
-	/**
-	 * Create Hive table stored as ORC file and PXF it.
-	 * 
-	 * @throws Exception
-	 */
-	@Test
-	public void storeAsOrc() throws Exception {
-
-		createOrcFileHive();
-
-		hive.runQuery("insert into table " + hiveTable.getName() + " SELECT * FROM reg_txt");
-
-		hive.queryResults(hiveTable, "SELECT * FROM " + hiveTable.getName() + " ORDER BY t0");
-
-		hawqExternalTable = TableFactory.getPxfHiveReadableTable("hv_orc", new String[] {
-				"t1    text",
-				"t2    text",
-				"num1  integer",
-				"dub1  double precision" }, hiveTable);
-
-		hawq.createTableAndVerify(hawqExternalTable);
-
-		hawq.queryResults(hawqExternalTable, "SELECT * FROM " + hawqExternalTable.getName() + " ORDER BY t1");
-
-		ComparisonUtils.compareTables(hiveTable, hawqExternalTable, report);
-	}
-
-	/**
-	 * Create Hive table separated to different partitions and PXF it. Also
-	 * check pg_class table after ANALYZE.
-	 * 
-	 * @throws Exception
-	 */
-	@Test
-	public void severalPartitions() throws Exception {
-
-		/**
-		 * Create used partition tables
-		 */
-		createSequenceHive();
-
-		createRcFileHive();
-
-		createOrcFileHive();
-
-		HiveExternalTable hiveTable = TableFactory.getHiveByRowCommaExternalTable("reg_heterogen", new String[] {
-				"t0 string",
-				"t1 string",
-				"num1 int",
-				"d1 double" });
-
-		hiveTable.setPartitionBy("fmt string");
-
-		hive.dropTable(hiveTable);
-		hive.createTable(hiveTable);
-
-		hive.runQuery("ALTER TABLE " + hiveTable.getName() + " ADD PARTITION (fmt = 'txt') LOCATION 'hdfs:/hive/warehouse/reg_txt'");
-		hive.runQuery("ALTER TABLE " + hiveTable.getName() + " ADD PARTITION (fmt = 'rc') LOCATION 'hdfs:/hive/warehouse/reg_rc'");
-		hive.runQuery("ALTER TABLE " + hiveTable.getName() + " ADD PARTITION (fmt = 'seq') LOCATION 'hdfs:/hive/warehouse/reg_seq'");
-		hive.runQuery("ALTER TABLE " + hiveTable.getName() + " ADD PARTITION (fmt = 'orc') LOCATION 'hdfs:/hive/warehouse/reg_orc'");
-		hive.runQuery("ALTER TABLE  " + hiveTable.getName() + " PARTITION (fmt='rc') SET FILEFORMAT RCFILE");
-		hive.runQuery("ALTER TABLE  " + hiveTable.getName() + " PARTITION (fmt='seq') SET FILEFORMAT SEQUENCEFILE");
-		hive.runQuery("ALTER TABLE  " + hiveTable.getName() + " PARTITION (fmt='orc') SET FILEFORMAT ORC");
-		hive.queryResults(hiveTable, "SELECT * FROM " + hiveTable.getName() + " ORDER BY fmt, t0");
-
-		/**
-		 * Create HAWQ Table using Hive Hive profile
-		 */
-		ReadableExternalTable extTableUsingProfile = TableFactory.getPxfHiveReadableTable("hv_heterogen_uainf_profile", new String[] {
-				"t1    text",
-				"t2    text",
-				"num1  integer",
-				"dub1  double precision",
-				"t3 text" }, hiveTable);
-
-		hawq.createTableAndVerify(extTableUsingProfile);
-
-		/**
-		 * Create HAWQ table with not using profiles
-		 */
-		ReadableExternalTable extTableNoProfile = new ReadableExternalTable("hv_heterogen_no_profile", new String[] {
-				"t1    text",
-				"t2    text",
-				"num1  integer",
-				"dub1  double precision",
-				"t3 text" }, hiveTable.getName(), "custom");
-
-		extTableNoProfile.setFormatter("pxfwritable_import");
-		extTableNoProfile.setFragmenter("HiveDataFragmenter");
-		extTableNoProfile.setAccessor("HiveAccessor");
-		extTableNoProfile.setResolver("HiveResolver");
-
-		hawq.createTableAndVerify(extTableNoProfile);
-
-		hawq.queryResults(extTableUsingProfile, "SELECT * FROM " + extTableUsingProfile.getName() + " ORDER BY t3, t1");
-		hawq.queryResults(extTableNoProfile, "SELECT * FROM " + extTableNoProfile.getName() + " ORDER BY t3, t1");
-
-		ComparisonUtils.compareTables(hiveTable, extTableUsingProfile, report);
-		ComparisonUtils.compareTables(hiveTable, extTableNoProfile, report);
-
-		/**
-		 * Perform Analyze on two kind of external tables and check suitable
-		 * Warnings.
-		 */
-		hawq.runQueryWithExpectedWarning("ANALYZE " + extTableUsingProfile.getName(), "PXF 'Analyzer' class was not found. Please supply it in the LOCATION clause or use it in a PXF profile in order to run ANALYZE on this table", true);
-		hawq.runQueryWithExpectedWarning("ANALYZE " + extTableNoProfile.getName(), "no ANALYZER or PROFILE option in table definition", true);
-
-		/**
-		 * Check the default analyze results still exists
-		 */
-		Table analyzeResultsTable = new Table("pg_class", null);
-
-		hawq.queryResults(analyzeResultsTable, "SELECT relpages, reltuples FROM " + analyzeResultsTable.getName() + " WHERE relname = '" + extTableUsingProfile.getName() + "'");
-
-		Table dataSudoTable = new Table("sudoTable", null);
-		dataSudoTable.addRow(new String[] { "1000", "1000000" });
-
-		ComparisonUtils.compareTables(analyzeResultsTable, dataSudoTable, report);
-	}
+//	/**
+//	 * Create Hive table stored as ORC file and PXF it.
+//	 * 
+//	 * @throws Exception
+//	 */
+//	@Test
+//	public void storeAsOrc() throws Exception {
+//
+//		createOrcFileHive();
+//
+//		hive.runQuery("insert into table " + hiveTable.getName() + " SELECT * FROM reg_txt");
+//
+//		hive.queryResults(hiveTable, "SELECT * FROM " + hiveTable.getName() + " ORDER BY t0");
+//
+//		hawqExternalTable = TableFactory.getPxfHiveReadableTable("hv_orc", new String[] {
+//				"t1    text",
+//				"t2    text",
+//				"num1  integer",
+//				"dub1  double precision" }, hiveTable);
+//
+//		hawq.createTableAndVerify(hawqExternalTable);
+//
+//		hawq.queryResults(hawqExternalTable, "SELECT * FROM " + hawqExternalTable.getName() + " ORDER BY t1");
+//
+//		ComparisonUtils.compareTables(hiveTable, hawqExternalTable, report);
+//	}
+//
+//	/**
+//	 * Create Hive table separated to different partitions and PXF it. Also
+//	 * check pg_class table after ANALYZE.
+//	 * 
+//	 * @throws Exception
+//	 */
+//	@Test
+//	public void severalPartitions() throws Exception {
+//
+//		/**
+//		 * Create used partition tables
+//		 */
+//		createSequenceHive();
+//
+//		createRcFileHive();
+//
+//		createOrcFileHive();
+//
+//		HiveExternalTable hiveTable = TableFactory.getHiveByRowCommaExternalTable("reg_heterogen", new String[] {
+//				"t0 string",
+//				"t1 string",
+//				"num1 int",
+//				"d1 double" });
+//
+//		hiveTable.setPartitionBy("fmt string");
+//
+//		hive.dropTable(hiveTable);
+//		hive.createTable(hiveTable);
+//
+//		hive.runQuery("ALTER TABLE " + hiveTable.getName() + " ADD PARTITION (fmt = 'txt') LOCATION 'hdfs:/hive/warehouse/reg_txt'");
+//		hive.runQuery("ALTER TABLE " + hiveTable.getName() + " ADD PARTITION (fmt = 'rc') LOCATION 'hdfs:/hive/warehouse/reg_rc'");
+//		hive.runQuery("ALTER TABLE " + hiveTable.getName() + " ADD PARTITION (fmt = 'seq') LOCATION 'hdfs:/hive/warehouse/reg_seq'");
+//		hive.runQuery("ALTER TABLE " + hiveTable.getName() + " ADD PARTITION (fmt = 'orc') LOCATION 'hdfs:/hive/warehouse/reg_orc'");
+//		hive.runQuery("ALTER TABLE  " + hiveTable.getName() + " PARTITION (fmt='rc') SET FILEFORMAT RCFILE");
+//		hive.runQuery("ALTER TABLE  " + hiveTable.getName() + " PARTITION (fmt='seq') SET FILEFORMAT SEQUENCEFILE");
+//		hive.runQuery("ALTER TABLE  " + hiveTable.getName() + " PARTITION (fmt='orc') SET FILEFORMAT ORC");
+//		hive.queryResults(hiveTable, "SELECT * FROM " + hiveTable.getName() + " ORDER BY fmt, t0");
+//
+//		/**
+//		 * Create HAWQ Table using Hive Hive profile
+//		 */
+//		ReadableExternalTable extTableUsingProfile = TableFactory.getPxfHiveReadableTable("hv_heterogen_uainf_profile", new String[] {
+//				"t1    text",
+//				"t2    text",
+//				"num1  integer",
+//				"dub1  double precision",
+//				"t3 text" }, hiveTable);
+//
+//		hawq.createTableAndVerify(extTableUsingProfile);
+//
+//		/**
+//		 * Create HAWQ table with not using profiles
+//		 */
+//		ReadableExternalTable extTableNoProfile = new ReadableExternalTable("hv_heterogen_no_profile", new String[] {
+//				"t1    text",
+//				"t2    text",
+//				"num1  integer",
+//				"dub1  double precision",
+//				"t3 text" }, hiveTable.getName(), "custom");
+//
+//		extTableNoProfile.setFormatter("pxfwritable_import");
+//		extTableNoProfile.setFragmenter("HiveDataFragmenter");
+//		extTableNoProfile.setAccessor("HiveAccessor");
+//		extTableNoProfile.setResolver("HiveResolver");
+//
+//		hawq.createTableAndVerify(extTableNoProfile);
+//
+//		hawq.queryResults(extTableUsingProfile, "SELECT * FROM " + extTableUsingProfile.getName() + " ORDER BY t3, t1");
+//		hawq.queryResults(extTableNoProfile, "SELECT * FROM " + extTableNoProfile.getName() + " ORDER BY t3, t1");
+//
+//		ComparisonUtils.compareTables(hiveTable, extTableUsingProfile, report);
+//		ComparisonUtils.compareTables(hiveTable, extTableNoProfile, report);
+//
+//		/**
+//		 * Perform Analyze on two kind of external tables and check suitable
+//		 * Warnings.
+//		 */
+//		hawq.runQueryWithExpectedWarning("ANALYZE " + extTableUsingProfile.getName(), "PXF 'Analyzer' class was not found. Please supply it in the LOCATION clause or use it in a PXF profile in order to run ANALYZE on this table", true);
+//		hawq.runQueryWithExpectedWarning("ANALYZE " + extTableNoProfile.getName(), "no ANALYZER or PROFILE option in table definition", true);
+//
+//		/**
+//		 * Check the default analyze results still exists
+//		 */
+//		Table analyzeResultsTable = new Table("pg_class", null);
+//
+//		hawq.queryResults(analyzeResultsTable, "SELECT relpages, reltuples FROM " + analyzeResultsTable.getName() + " WHERE relname = '" + extTableUsingProfile.getName() + "'");
+//
+//		Table dataSudoTable = new Table("sudoTable", null);
+//		dataSudoTable.addRow(new String[] { "1000", "1000000" });
+//
+//		ComparisonUtils.compareTables(analyzeResultsTable, dataSudoTable, report);
+//	}
 
 	/**
 	 * Create Hive table using collections and PXF it

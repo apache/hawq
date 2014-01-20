@@ -18,33 +18,37 @@
 		<dependencies>
 	
 		<!-- Hadoop/Hive/HBase dependencies -->
-		<dependency org="org.apache.hadoop" name="hadoop-common" rev="${gphd.hadoop.version}-alpha-gphd-${gphd.stack.version}" conf="compile->master" />
-		<dependency org="org.apache.hadoop" name="hadoop-auth" rev="${gphd.hadoop.version}-alpha-gphd-${gphd.stack.version}" conf="compile->master" />
-		<dependency org="org.apache.hadoop" name="hadoop-mapreduce-client-core" rev="${gphd.hadoop.version}-alpha-gphd-${gphd.stack.version}" conf="compile->master" />
-		<dependency org="org.apache.hadoop" name="hadoop-hdfs" rev="${gphd.hadoop.version}-alpha-gphd-${gphd.stack.version}" conf="compile->master" />
-		<dependency org="org.apache.hadoop" name="hadoop-annotations" rev="${gphd.hadoop.version}-alpha-gphd-${gphd.stack.version}" conf="compile->master" />
+		<dependency org="org.apache.hadoop" name="hadoop-common" rev="${gphd.hadoop.version}-gphd-${gphd.stack.version}" conf="compile->master" />
+		<dependency org="org.apache.hadoop" name="hadoop-auth" rev="${gphd.hadoop.version}-gphd-${gphd.stack.version}" conf="compile->master" />
+		<dependency org="org.apache.hadoop" name="hadoop-mapreduce-client-core" rev="${gphd.hadoop.version}-gphd-${gphd.stack.version}" conf="compile->master" />
+		<dependency org="org.apache.hadoop" name="hadoop-hdfs" rev="${gphd.hadoop.version}-gphd-${gphd.stack.version}" conf="compile->master" />
+		<dependency org="org.apache.hadoop" name="hadoop-annotations" rev="${gphd.hadoop.version}-gphd-${gphd.stack.version}" conf="compile->master" />
 		<dependency org="org.apache.hive" name="hive-service" rev="${gphd.hive.version}-gphd-${gphd.stack.version}" conf="compile->master" />
 		<dependency org="org.apache.hive" name="hive-metastore" rev="${gphd.hive.version}-gphd-${gphd.stack.version}" conf="compile->master" />
 		<dependency org="org.apache.hive" name="hive-common" rev="${gphd.hive.version}-gphd-${gphd.stack.version}" conf="compile->master" />
 		<dependency org="org.apache.hive" name="hive-serde" rev="${gphd.hive.version}-gphd-${gphd.stack.version}" conf="compile->master" />
 		<dependency org="org.apache.hive" name="hive-jdbc" rev="${gphd.hive.version}-gphd-${gphd.stack.version}" conf="compile->master" />
 		<dependency org="org.apache.hive" name="hive-exec" rev="${gphd.hive.version}-gphd-${gphd.stack.version}" conf="compile->master" />
-		<dependency org="org.apache.hbase" name="hbase" rev="${gphd.hbase.version}-gphd-${gphd.stack.version}" conf="compile->master" />
+		<dependency org="org.apache.hbase" name="hbase-common" rev="${gphd.hbase.version}-gphd-${gphd.stack.version}" conf="compile->master" />
+        <dependency org="org.apache.hbase" name="hbase-protocol" rev="${gphd.hbase.version}-gphd-${gphd.stack.version}" conf="compile->master" />
+        <dependency org="org.apache.hbase" name="hbase-client" rev="${gphd.hbase.version}-gphd-${gphd.stack.version}" conf="compile->master" />
+        <dependency org="org.apache.hbase" name="hbase-thrift" rev="${gphd.hbase.version}-gphd-${gphd.stack.version}" conf="compile->master" />
+        <dependency org="org.apache.hbase" name="hbase-server" rev="${gphd.hbase.version}-gphd-${gphd.stack.version}" conf="compile->master" />
 		<dependency org="org.apache.zookeeper" name="zookeeper" rev="${gphd.zookeeper.version}-gphd-${gphd.stack.version}" conf="compile->master" />
 		
 		<!-- Third party dependencies -->
-		<dependency org="org.apache.thrift" name="libfb303" rev="0.9.0" conf="compile->master"/>
+		<dependency org="org.apache.thrift" name="libfb303" rev="0.7.0" conf="compile->master"/>
 		<dependency org="commons-cli" name="commons-cli" rev="1.2" conf="compile->master"/>
 		<dependency org="log4j" name="log4j" rev="1.2.17" conf="compile->master"/>
 		<dependency org="org.slf4j" name="slf4j-api" rev="1.7.5" conf="compile->master"/>
 		<dependency org="com.google.inject" name="guice" rev="3.0" conf="compile->master"/>
 		<dependency org="com.google.guava" name="guava" rev="11.0.2" conf="compile->master"/>
-		<dependency org="com.google.protobuf" name="protobuf-java" rev="2.4.1" conf="compile->master" />
-		<dependency org="org.apache.avro" name="avro" rev="1.5.4" conf="compile->master" />
-		<dependency org="org.apache.avro" name="avro-mapred" rev="1.5.4" conf="compile->master" />
+		<dependency org="com.google.protobuf" name="protobuf-java" rev="2.5.0" conf="compile->master" />
+		<dependency org="org.apache.avro" name="avro" rev="1.7.4" conf="compile->master" />
+		<dependency org="org.apache.avro" name="avro-mapred" rev="1.7.4" conf="compile->master" />
 		<dependency org="org.codehaus.jackson" name="jackson-core-asl" rev="1.9.3" conf="compile->master" />
 		<dependency org="org.codehaus.jackson" name="jackson-mapper-asl" rev="1.9.3" conf="compile->master" />
-		<dependency org="com.sun.jersey" name="jersey-core" rev="1.8" conf="compile->master" />
+		<dependency org="com.sun.jersey" name="jersey-core" rev="1.9" conf="compile->master" />
 		<dependency org="org.eclipse.jetty" name="jetty-io" rev="7.6.10.v20130312" conf="compile->master" />
 		<dependency org="commons-logging" name="commons-logging" rev="1.1.1" conf="compile->master" />
 		<dependency org="commons-configuration" name="commons-configuration" rev="1.6" conf="compile->master" />

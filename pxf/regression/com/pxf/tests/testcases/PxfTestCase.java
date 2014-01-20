@@ -2,9 +2,9 @@ package com.pxf.tests.testcases;
 
 import java.io.File;
 
+import jsystem.utils.FileUtils;
 import junit.framework.SystemTestCase4;
 
-import org.apache.commons.io.FileUtils;
 import org.junit.After;
 import org.junit.Before;
 

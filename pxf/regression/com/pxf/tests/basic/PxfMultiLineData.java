@@ -24,26 +24,25 @@ public class PxfMultiLineData extends PxfTestCase {
 
 		Table dataTable = new Table("dataTable", null);
 
-		FileFormatsUtils.prepareData(new MultiLinePreparer(), 1000,
-				dataTable);
+		FileFormatsUtils.prepareData(new MultiLinePreparer(), 1000, dataTable);
 		FileFormatsUtils.prepareDataFile(dataTable, 32000, localDataFile);
 
 		hdfs.copyFromLocal(localDataFile, textFilePath);
 
 		ReadableExternalTable exTable = new ReadableExternalTable("mbt", new String[] {
-				"t1 text", "a1 integer" }, textFilePath, "TEXT");
+				"t1 text",
+				"a1 integer" }, textFilePath, "TEXT");
 
-		exTable.setFragmenter("HdfsDataFragmenter");
-		exTable.setAccessor("LineBreakAccessor");
-		exTable.setResolver("StringPassResolver");
+		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
+		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.LineBreakAccessor");
+		exTable.setResolver("com.pivotal.pxf.plugins.hdfs.StringPassResolver");
 		exTable.setDelimiter(",");
 
 		hawq.createTableAndVerify(exTable);
 
 		int limit = 10;
 
-		hawq.queryResults(exTable, "SELECT t1, a1 FROM " + exTable.getName()
-				+ " ORDER BY t1 LIMIT " + limit);
+		hawq.queryResults(exTable, "SELECT t1, a1 FROM " + exTable.getName() + " ORDER BY t1 LIMIT " + limit);
 
 		dataTable.initDataStructures();
 
@@ -51,8 +50,7 @@ public class PxfMultiLineData extends PxfTestCase {
 			dataTable.addRow(new String[] { "t1", "1" });
 		}
 
-		ComparisonUtils.compareTables(exTable, dataTable, report, 10, new
-				String[] {});
+		ComparisonUtils.compareTables(exTable, dataTable, report, 10, new String[] {});
 
 		hawq.runAnalyticQuery("SELECT COUNT(*) from " + exTable.getName(), "32000000");
 

@@ -8,8 +8,7 @@ import com.pivotal.pxfauto.infra.structures.tables.basic.Table;
 public class MultiLinePreparer implements IDataPreparer {
 
 	@Override
-	public Object[] prepareData(int rows, Table dataTable)
-			throws Exception {
+	public Object[] prepareData(int rows, Table dataTable) throws Exception {
 
 		Object[] data = new Object[rows];
 

@@ -3,9 +3,9 @@ package com.pxf.tests.basic;
 import java.io.File;
 import java.util.List;
 
+import org.junit.Assert;
 import org.junit.Test;
 import org.postgresql.util.PSQLException;
-import org.springframework.util.Assert;
 
 import com.google.protobuf.GeneratedMessage;
 import com.pivotal.pxfauto.infra.common.ShellSystemObject;
@@ -62,8 +62,8 @@ public class PxfHdfsRegression extends PxfTestCase {
 		 */
 		exTable.setName("gphdfs_in1");
 		exTable.setPath(hdfsWorkingFolder);
-		exTable.setAccessor("SequenceFileAccessor");
-		exTable.setResolver("AvroResolver");
+		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor");
+		exTable.setResolver("com.pivotal.pxf.plugin.hdfs.AvroResolver");
 		exTable.setDataSchema("MySchema");
 
 		exTable.setUserParameters(null);
@@ -174,8 +174,9 @@ public class PxfHdfsRegression extends PxfTestCase {
 	}
 
 	/**
-	 * Use "HdfsDataFragmenter" + "LineReaderAccessor" + "StringPassResolver"
-	 * and TEXT delimiter for parsing CSV file.
+	 * Use "com.pivotal.pxf.plugins.hdfs.fragmenters.HdfsDataFragmenter" +
+	 * "LineReaderAccessor" + "StringPassResolver" and TEXT delimiter for
+	 * parsing CSV file.
 	 * 
 	 * @throws Exception
 	 */
@@ -214,9 +215,9 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"n16 int",
 				"n17 int" }, csvPath, "TEXT");
 
-		exTable.setFragmenter("HdfsDataFragmenter");
-		exTable.setAccessor("LineBreakAccessor");
-		exTable.setResolver("StringPassResolver");
+		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
+		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.LineBreakAccessor");
+		exTable.setResolver("com.pivotal.pxf.plugins.hdfs.StringPassResolver");
 		exTable.setDelimiter(",");
 
 		hawq.createTableAndVerify(exTable);
@@ -242,8 +243,8 @@ public class PxfHdfsRegression extends PxfTestCase {
 	}
 
 	/**
-	 * Use "HdfsDataFragmenter" + "LineReaderAccessor" + "StringPassResolver"
-	 * along with Format("CSV")
+	 * Use "com.pivotal.pxf.plugins.hdfs.fragmenters.HdfsDataFragmenter" +
+	 * "LineReaderAccessor" + "StringPassResolver" along with Format("CSV")
 	 * 
 	 * @throws Exception
 	 */
@@ -282,9 +283,9 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"n16 int",
 				"n17 int" }, (hdfsWorkingFolder + "/text_data.csv"), "CSV");
 
-		exTable.setFragmenter("HdfsDataFragmenter");
-		exTable.setAccessor("LineBreakAccessor");
-		exTable.setResolver("StringPassResolver");
+		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
+		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.LineBreakAccessor");
+		exTable.setResolver("com.pivotal.pxf.plugins.hdfs.StringPassResolver");
 
 		hawq.createTableAndVerify(exTable);
 
@@ -334,9 +335,9 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"n16 int",
 				"n17 int" }, (hdfsWorkingFolder + "/text_data.csv"), "TEXT");
 
-		exTable.setFragmenter("HdfsDataFragmenter");
-		exTable.setAccessor("TextFileAccessor");
-		exTable.setResolver("TextResolver");
+		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
+		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.TextFileAccessor");
+		exTable.setResolver("com.pivotal.pxf.plugins.hdfs.TextResolver");
 		exTable.setDelimiter(",");
 
 		hawq.createTableAndVerify(exTable);
@@ -387,9 +388,9 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"n16 int",
 				"n17 int" }, (hdfsWorkingFolder + "/text_data.csv"), "TEXT");
 
-		exTable.setFragmenter("HdfsDataFragmenter");
-		exTable.setAccessor("LineReaderAccessor");
-		exTable.setResolver("StringPassResolver");
+		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
+		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.LineReaderAccessor");
+		exTable.setResolver("com.pivotal.pxf.plugins.hdfs.StringPassResolver");
 		exTable.setDelimiter(",");
 
 		hawq.createTableAndVerify(exTable);
@@ -445,9 +446,9 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"short4 smallint",
 				"short5 smallint" }, (hdfsWorkingFolder + "/my_writable_inside_sequence.tbl"), "custom");
 
-		exTable.setFragmenter("HdfsDataFragmenter");
-		exTable.setAccessor("SequenceFileAccessor");
-		exTable.setResolver("WritableResolver");
+		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
+		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor");
+		exTable.setResolver("com.pivotal.pxf.plugins.hdfs.WritableResolver");
 		exTable.setDataSchema("CustomWritable");
 		exTable.setFormatter("pxfwritable_import");
 
@@ -498,9 +499,9 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"bt    bytea",
 				"bl boolean" }, (hdfsWorkingFolder + "/avro_in_seq.tbl"), "custom");
 
-		exTable.setFragmenter("HdfsDataFragmenter");
-		exTable.setAccessor("SequenceFileAccessor");
-		exTable.setResolver("AvroResolver");
+		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
+		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor");
+		exTable.setResolver("com.pivotal.pxf.plugins.hdfs.AvroResolver");
 		exTable.setDataSchema("regressPXFCustomAvro.avsc");
 		exTable.setFormatter("pxfwritable_import");
 
@@ -551,9 +552,9 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"bt    bytea",
 				"bl boolean" }, (hdfsWorkingFolder + "/avro_in_seq.tbl"), "custom");
 
-		exTable.setFragmenter("HdfsDataFragmenter");
-		exTable.setAccessor("SequenceFileAccessor");
-		exTable.setResolver("AvroResolver");
+		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
+		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor");
+		exTable.setResolver("com.pivotal.pxf.plugins.hdfs.AvroResolver");
 		exTable.setDataSchema("regress PXF Custom Avro1.avsc");
 		exTable.setFormatter("pxfwritable_import");
 
@@ -605,9 +606,9 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"bl boolean" }, (hdfsWorkingFolder + "/avro_in_seq.tbl"), "custom");
 
 		exTable.setUserParameters(new String[] {
-				"fragmenter=HdfsDataFragmenter",
-				"Accessor=SequenceFileAccessor",
-				"ReSoLvEr=AvroResolver",
+				"fragmenter=com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter",
+				"Accessor=com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor",
+				"ReSoLvEr=com.pivotal.pxf.plugins.hdfs.AvroResolver",
 				"Data-Schema=regressPXFCustomAvro.avsc" });
 
 		exTable.setFormatter("pxfwritable_import");
@@ -659,9 +660,9 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"bt    bytea",
 				"bl boolean" }, (hdfsWorkingFolder + "/avro_in_avro.avro"), "custom");
 
-		exTable.setFragmenter("HdfsDataFragmenter");
-		exTable.setAccessor("AvroFileAccessor");
-		exTable.setResolver("AvroResolver");
+		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
+		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.AvroFileAccessor");
+		exTable.setResolver("com.pivotal.pxf.plugins.hdfs.AvroResolver");
 		exTable.setDataSchema("regressPXFCustomAvro.avsc");
 		exTable.setFormatter("pxfwritable_import");
 
@@ -672,42 +673,46 @@ public class PxfHdfsRegression extends PxfTestCase {
 		ComparisonUtils.compareTables(exTable, dataTable, report);
 	}
 
-	/**
-	 * Test Protocol Buffer (read only). Create external table for the
-	 * protocol-buffers and query the data
-	 * 
-	 * @throws Exception
-	 */
-	@Test
-	public void protocolBuffer() throws Exception {
-
-		String protoBuffFile = (hdfsWorkingFolder + "/protobuf_data.tbl");
-
-		Table dataTable = new Table("dataTable", null);
-
-		Object[] generatedMessages = FileFormatsUtils.prepareData(new CustomProtobuffPreparer(), 5, dataTable);
-
-		hdfs.writeProtocolBufferFile(protoBuffFile, (GeneratedMessage) generatedMessages[0]);
-
-		ReadableExternalTable exTable = new ReadableExternalTable("pb", new String[] {
-				"s1 text",
-				"num1 int",
-				"s2 text",
-				"s3 text",
-				"num2 int" }, protoBuffFile, "custom");
-
-		exTable.setFragmenter("HdfsDataFragmenter");
-		exTable.setAccessor("ProtobufFileAccessor");
-		exTable.setResolver("ProtobufResolver");
-		exTable.setDataSchema("pbgp.desc");
-		exTable.setFormatter("pxfwritable_import");
-
-		hawq.createTableAndVerify(exTable);
-
-		hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY num1;");
-
-		ComparisonUtils.compareTables(exTable, dataTable, report);
-	}
+	// /**
+	// * Test Protocol Buffer (read only). Create external table for the
+	// * protocol-buffers and query the data
+	// *
+	// * @throws Exception
+	// */
+	// @Test
+	// public void protocolBuffer() throws Exception {
+	//
+	// String protoBuffFile = (hdfsWorkingFolder + "/protobuf_data.tbl");
+	//
+	// Table dataTable = new Table("dataTable", null);
+	//
+	// Object[] generatedMessages = FileFormatsUtils.prepareData(new
+	// CustomProtobuffPreparer(), 5, dataTable);
+	//
+	// hdfs.writeProtocolBufferFile(protoBuffFile, (GeneratedMessage)
+	// generatedMessages[0]);
+	//
+	// ReadableExternalTable exTable = new ReadableExternalTable("pb", new
+	// String[] {
+	// "s1 text",
+	// "num1 int",
+	// "s2 text",
+	// "s3 text",
+	// "num2 int" }, protoBuffFile, "custom");
+	//
+	// exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
+	// exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.ProtobufFileAccessor");
+	// exTable.setResolver("com.pivotal.pxf.plugins.hdfs.ProtobufResolver");
+	// exTable.setDataSchema("pbgp.desc");
+	// exTable.setFormatter("pxfwritable_import");
+	//
+	// hawq.createTableAndVerify(exTable);
+	//
+	// hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() +
+	// " ORDER BY num1;");
+	//
+	// ComparisonUtils.compareTables(exTable, dataTable, report);
+	// }
 
 	/**
 	 * Test Quoted Line Break
@@ -730,9 +735,9 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"word text",
 				"num2 int" }, csvPath, "CSV");
 
-		exTable.setFragmenter("HdfsDataFragmenter");
-		exTable.setAccessor("QuotedLineBreakAccessor");
-		exTable.setResolver("StringPassResolver");
+		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
+		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.QuotedLineBreakAccessor");
+		exTable.setResolver("com.pivotal.pxf.plugins.hdfs.StringPassResolver");
 
 		hawq.createTableAndVerify(exTable);
 
@@ -787,9 +792,9 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"short4 smallint",
 				"short5 smallint" }, (hdfsWorkingFolder + "/wildcard/*.tbl"), "custom");
 
-		exTable.setFragmenter("HdfsDataFragmenter");
-		exTable.setAccessor("SequenceFileAccessor");
-		exTable.setResolver("WritableResolver");
+		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
+		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor");
+		exTable.setResolver("com.pivotal.pxf.plugins.hdfs.WritableResolver");
 		exTable.setDataSchema("CustomWritable");
 		exTable.setFormatter("pxfwritable_import");
 
@@ -850,9 +855,9 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"short4 smallint",
 				"short5 smallint" }, (hdfsWorkingFolder + "/wild/my_writable_inside_sequence?.tbl"), "custom");
 
-		exTable.setFragmenter("HdfsDataFragmenter");
-		exTable.setAccessor("SequenceFileAccessor");
-		exTable.setResolver("WritableResolver");
+		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
+		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor");
+		exTable.setResolver("com.pivotal.pxf.plugins.hdfs.WritableResolver");
 		exTable.setDataSchema("CustomWritable");
 		exTable.setFormatter("pxfwritable_import");
 
@@ -877,9 +882,9 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"num1  integer", }, (hdfsWorkingFolder + "/multiblock.tbl"), "TEXT");
 
 		exTable.setHostname("badhostname");
-		exTable.setFragmenter("HdfsDataFragmenter");
-		exTable.setAccessor("LineBreakAccessor");
-		exTable.setResolver("StringPassResolver");
+		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
+		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.LineBreakAccessor");
+		exTable.setResolver("com.pivotal.pxf.plugins.hdfs.StringPassResolver");
 		exTable.setDelimiter(",");
 
 		hawq.createTableAndVerify(exTable);
@@ -905,9 +910,9 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"num1  integer", }, (hdfsWorkingFolder + "/multiblock.tbl"), "TEXT");
 
 		exTable.setPort("12345");
-		exTable.setFragmenter("HdfsDataFragmenter");
-		exTable.setAccessor("LineBreakAccessor");
-		exTable.setResolver("StringPassResolver");
+		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
+		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.LineBreakAccessor");
+		exTable.setResolver("com.pivotal.pxf.plugins.hdfs.StringPassResolver");
 		exTable.setDelimiter(",");
 
 		hawq.createTableAndVerify(exTable);
@@ -950,9 +955,9 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"t1  text",
 				"a1  integer" }, (hdfsWorkingFolder + "/empty.tbl"), "custom");
 
-		exTable.setFragmenter("HdfsDataFragmenter");
-		exTable.setAccessor("SequenceFileAccessor");
-		exTable.setResolver("WritableResolver");
+		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
+		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor");
+		exTable.setResolver("com.pivotal.pxf.plugins.hdfs.WritableResolver");
 		exTable.setDataSchema("CustomWritable");
 		exTable.setFormatter("pxfwritable_import");
 
@@ -998,23 +1003,23 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"ln3   bigint",
 				"bt    bytea" }, (hdfsWorkingFolder + "/avroformat_inside_avrofile.avro"), "custom");
 
-		exTable.setFragmenter("HdfsDataFragmenter");
-		exTable.setAccessor("AvroFileAccessor");
-		exTable.setResolver("AvroResolver");
+		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
+		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.AvroFileAccessor");
+		exTable.setResolver("com.pivotal.pxf.plugins.hdfs.AvroResolver");
 		exTable.setDataSchema("regressPXFCustomAvro.avsc");
 		exTable.setFormatter("pxfwritable_import");
-		exTable.setAnalyzer("HdfsAnalyzer");
+		exTable.setAnalyzer("com.pivotal.pxf.plugins.hdfs.HdfsAnalyzer");
 
 		hawq.createTableAndVerify(exTable);
 
 		verifyAnalyze(exTable);
-		
-		ReportUtils.report(report, getClass(), "verify ANALYZE on path with directory");
-		exTable.setName("analyze_dir");
-		exTable.setPath(hdfsWorkingFolder + "/");
-		
-		hawq.createTableAndVerify(exTable);
-		verifyAnalyze(exTable);
+
+//		ReportUtils.report(report, getClass(), "verify ANALYZE on path with directory");
+//		exTable.setName("analyze_dir");
+//		exTable.setPath(hdfsWorkingFolder + "/");
+//
+//		hawq.createTableAndVerify(exTable);
+//		verifyAnalyze(exTable);
 	}
 
 	/**
@@ -1053,12 +1058,12 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"bt    bytea" }, (hdfsWorkingFolder + "/avroformat_inside_avrofile.avro"), "custom");
 
 		exTable.setPort("12345");
-		exTable.setFragmenter("HdfsDataFragmenter");
-		exTable.setAccessor("AvroFileAccessor");
-		exTable.setResolver("AvroResolver");
+		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
+		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.AvroFileAccessor");
+		exTable.setResolver("com.pivotal.pxf.plugins.hdfs.AvroResolver");
 		exTable.setDataSchema("regressPXFCustomAvro.avsc");
 		exTable.setFormatter("pxfwritable_import");
-		exTable.setAnalyzer("HdfsAnalyzer");
+		exTable.setAnalyzer("com.pivotal.pxf.plugins.hdfs.HdfsAnalyzer");
 
 		hawq.createTableAndVerify(exTable);
 
@@ -1123,9 +1128,9 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"ln3   bigint",
 				"bt    bytea" }, (hdfsWorkingFolder + "/avroformat_inside_avrofile.avro"), "custom");
 
-		exTable.setFragmenter("HdfsDataFragmenter");
-		exTable.setAccessor("AvroFileAccessor");
-		exTable.setResolver("AvroResolver");
+		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
+		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.AvroFileAccessor");
+		exTable.setResolver("com.pivotal.pxf.plugins.hdfs.AvroResolver");
 		exTable.setDataSchema("regressPXFCustomAvro.avsc");
 		exTable.setFormatter("pxfwritable_import");
 		exTable.setAnalyzer("NoSuchAnalyzer");
@@ -1136,7 +1141,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		hawq.runQuery("SET pxf_enable_stat_collection = true;");
 
-		String expectedWarning = "Class NoSuchAnalyzer could not be found on the CLASSPATH. NoSuchAnalyzer";
+		String expectedWarning = "java.lang.ClassNotFoundException: NoSuchAnalyzer";
 
 		hawq.runQueryWithExpectedWarning("ANALYZE " + exTable.getName(), expectedWarning, true);
 
@@ -1154,106 +1159,100 @@ public class PxfHdfsRegression extends PxfTestCase {
 	}
 
 	/**
-	 * Verify that filter pushdown is working, and we send a filter to PXF
-	 * In this test we check that a query condition (WHERE ...) is 
-	 * serialized and passe correctly to PXF, by reading the debug logs of HAWQ.
+	 * Verify that filter pushdown is working, and we send a filter to PXF In
+	 * this test we check that a query condition (WHERE ...) is serialized and
+	 * passe correctly to PXF, by reading the debug logs of HAWQ.
 	 * 
-	 * The filter serialization is done using RPN, see more details 
-	 * in {@link com.pivotal.pxf.filtering.FilterParser} header.
+	 * The filter serialization is done using RPN, see more details in
+	 * {@link com.pivotal.pxf.filtering.FilterParser} header.
 	 * 
 	 * @throws Exception
 	 */
 	@Test
 	public void filterPushdown() throws Exception {
-			
-		String[] fields = new String[] {
-				"s1 text",
-				"n1 int",
-		};
+
+		String[] fields = new String[] { "s1 text", "n1 int", };
 		String csvPath = hdfsWorkingFolder + "/text_data_small.csv";
 
 		Table dataTable = new Table("dataTable", null);
 
-		dataTable.addRow(new String[] {"nobody", "5" });
-		dataTable.addRow(new String[] {"loves", "3" });
-		dataTable.addRow(new String[] {"you", "10" });
-		dataTable.addRow(new String[] {"when", "6" });
-		dataTable.addRow(new String[] {"you're", "11" });
-		dataTable.addRow(new String[] {"down", "4" });
-		dataTable.addRow(new String[] {"and", "1" });
-		dataTable.addRow(new String[] {"out", "0" });
-		
+		dataTable.addRow(new String[] { "nobody", "5" });
+		dataTable.addRow(new String[] { "loves", "3" });
+		dataTable.addRow(new String[] { "you", "10" });
+		dataTable.addRow(new String[] { "when", "6" });
+		dataTable.addRow(new String[] { "you're", "11" });
+		dataTable.addRow(new String[] { "down", "4" });
+		dataTable.addRow(new String[] { "and", "1" });
+		dataTable.addRow(new String[] { "out", "0" });
+
 		hdfs.writeTextFile(csvPath, dataTable.getData(), ",");
 
 		exTable = TableFactory.getPxfReadableTextTable("filter_pushdown", fields, csvPath, ",");
-	
+
 		hawq.createTableAndVerify(exTable);
 
 		ShellSystemObject sso = hawq.openPsql();
 		try {
-			
-			// TODO: SET optimizer = false should be removed once GPSQL-1465 is resolved.
-			ReportUtils.report(report, getClass(), 
-					"set optimizer to false until ORCA fix pushdown to external scan");
+
+			// TODO: SET optimizer = false should be removed once GPSQL-1465 is
+			// resolved.
+			ReportUtils.report(report, getClass(), "set optimizer to false until ORCA fix pushdown to external scan");
 			hawq.runSqlCmd(sso, "SET optimizer = false;", true);
 			hawq.runSqlCmd(sso, "SET client_min_messages = debug2;", true);
-			
+
 			ReportUtils.report(report, getClass(), "filter with one condition");
 			String queryFilter = "WHERE s1 = 'you'";
 			String serializedFilter = "a0c\\\"you\\\"o5";
 			verifyFilterPushdown(sso, queryFilter, serializedFilter, 1);
-			
+
 			ReportUtils.report(report, getClass(), "filter with AND condition");
 			queryFilter = "WHERE s1 != 'nobody' AND n1 <= 5";
 			serializedFilter = "a0c\\\"nobody\\\"o6a1c5o3o7";
 			verifyFilterPushdown(sso, queryFilter, serializedFilter, 4);
-			
+
 			ReportUtils.report(report, getClass(), "no pushdown: filter with OR condition");
 			queryFilter = "WHERE s1 = 'nobody' OR n1 <= 5";
 			serializedFilter = null;
 			verifyFilterPushdown(sso, queryFilter, serializedFilter, 5);
-			
+
 			ReportUtils.report(report, getClass(), "no pushdown: run no filter");
 			queryFilter = "";
 			serializedFilter = null;
-			verifyFilterPushdown(sso, queryFilter, serializedFilter, 8);			
-			
-			ReportUtils.report(report, getClass(), 
-					"set optimizer to true again");
+			verifyFilterPushdown(sso, queryFilter, serializedFilter, 8);
+
+			ReportUtils.report(report, getClass(), "set optimizer to true again");
 			hawq.runSqlCmd(sso, "SET optimizer = true;", true);
-			
+
 			hawq.runSqlCmd(sso, "set client_min_messages = notice;", true);
 		} finally {
 			hawq.closePsql(sso);
 		}
 	}
-	
-	private void verifyFilterPushdown(ShellSystemObject sso,
-			String queryFilter, String serializedFilter, int rows) throws Exception {
-		
+
+	private void verifyFilterPushdown(ShellSystemObject sso, String queryFilter, String serializedFilter, int rows)
+			throws Exception {
+
 		ReportUtils.startLevel(report, getClass(), "run query with filter '" + queryFilter + "'");
-		String result = hawq.runSqlCmd(sso, 
-				"SELECT s1 FROM " + exTable.getName() + " " + queryFilter + ";", true);
-		
+		String result = hawq.runSqlCmd(sso, "SELECT s1 FROM " + exTable.getName() + " " + queryFilter + ";", true);
+
 		ReportUtils.report(report, getClass(), "verify query returned " + rows + " rows");
-		if (rows ==1) {
-			Assert.isTrue(result.contains("1 row"), "expecting 1 row");
+		if (rows == 1) {
+			Assert.assertTrue("expecting 1 row", result.contains("1 row"));
 		} else {
-			Assert.isTrue(result.contains(rows + " row"), "expecting " + rows +" row");
+			Assert.assertTrue("expecting " + rows + " row", result.contains(rows + " row"));
 		}
 		if (serializedFilter == null) {
 			ReportUtils.report(report, getClass(), "verify filter no was pushed");
-			Assert.isTrue(result.contains("X-GP-HAS-FILTER: 0"), "expecting to have no filter");
+			Assert.assertTrue("expecting to have no filter", result.contains("X-GP-HAS-FILTER: 0"));
 		} else {
 			ReportUtils.report(report, getClass(), "verify filter was pushed");
-			Assert.isTrue(result.contains("X-GP-HAS-FILTER: 1"), "expecting to have filter");
+			Assert.assertTrue("expecting to have filter", result.contains("X-GP-HAS-FILTER: 1"));
 			ReportUtils.report(report, getClass(), "verify filter is '" + serializedFilter + "'");
-			Assert.isTrue(result.contains("X-GP-FILTER: " + serializedFilter), 
-					"expecting filter to be '" + serializedFilter + "'");
+			Assert.assertTrue("expecting filter to be '" + serializedFilter + "'", result.contains("X-GP-FILTER: " + serializedFilter));
 		}
-		ReportUtils.stopLevel(report);	
+		ReportUtils.stopLevel(report);
 	}
-	
+
 	private void verifyAnalyze(ReadableExternalTable exTable) throws Exception {
 
 		ReportUtils.startLevel(report, getClass(), "verify that default stats remain after ANALYZE with GUC off");
