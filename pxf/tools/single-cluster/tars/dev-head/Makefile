@@ -11,8 +11,8 @@ COMPONENTS = \
 ARTIFACTS = $(ROOT)/artifacts
 JENKINS_FETCH = $(ROOT)/tools/fetchBuild.sh
 
-JENKINS_VIEW = view/PHD_2_x_DevBuild/job
-JENKINS_stack = $(JENKINS_VIEW)/HudsonHD2_2_0HadoopStackBuild_Git
+JENKINS_VIEW = job
+JENKINS_stack = $(JENKINS_VIEW)/HudsonHD2_2_0HadoopStackBuild_Release
 
 TARGET = $(COMPONENTS:%=%.fetched)
 
@@ -25,7 +25,7 @@ clean:
 	-rm -f *~
 
 stack.fetched:
-	$(JENKINS_FETCH) $(JENKINS_stack) "PHD-[\.0-9]*-bin-dev-[0-9]*"
+	$(JENKINS_FETCH) $(JENKINS_stack) "PHD-[\.0-9]*-bin-[0-9]*"
 	touch $@
 
 %.fetched: $(ARTIFACTS)/%*.tar.gz %.single

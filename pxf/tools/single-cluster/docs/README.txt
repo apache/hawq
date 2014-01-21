@@ -67,6 +67,11 @@ CentOS
 7. Changes
 ==========
 
+v1.7.4
+------
+
+- GPSQL-1641: Use HudsonHD2_2_0HadoopStackBuild_Release
+
 v1.7.3
 ------
 
