@@ -100,7 +100,7 @@ if [ $single_node -eq 0 ]; then
 fi
 
 # Copy plr.so to master and segments.
-echo "Installing plr extenstion on master"
+echo "Installing plr extension on master"
 cp lib/postgresql/plr.so $GPHOME/lib/postgresql
 if [ 0 -ne $? ]; then
     echo "Failed to copy plr artifacts on master."
