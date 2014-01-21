@@ -28,7 +28,7 @@ dov.dorin AT gopivotal.com
 3. Requirements
 ===============
 
-1.  Oracle Java 1.6.x JDK
+1.  Oracle Java 1.7.x JDK
 	(not JRE as scripts currently use jps, will be fixed in the future)
 
 4. Setup
