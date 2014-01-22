@@ -12,7 +12,7 @@ ARTIFACTS = $(ROOT)/artifacts
 JENKINS_FETCH = $(ROOT)/tools/fetchBuild.sh
 
 JENKINS_VIEW = job
-JENKINS_stack = $(JENKINS_VIEW)/HudsonHD2_2_0HadoopStackBuild_Release
+JENKINS_stack = $(JENKINS_VIEW)/stack-phd2.0-release
 
 TARGET = $(COMPONENTS:%=%.fetched)
 
