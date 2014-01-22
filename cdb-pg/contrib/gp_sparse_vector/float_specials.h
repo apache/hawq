@@ -1,3 +1,7 @@
+/**
+ * @file
+ * \brief Special floating-point numbers
+ */
 #ifndef FLOATSPECIALS_H
 #define FLOATSPECIALS_H
 
@@ -131,14 +135,18 @@ typedef enum
 #define NEGINF_i  	NEG_INFINITY_MIN64
 #define NVP_i		NEG_QUIET_NAN_MIN64
 
-static const int64 COMPVEC_I[] = {5,ZERO_i,INF_i,NEGINF_i,NVP_i};
-static const double *COMPVEC = (double *)COMPVEC_I; //This initializes the double array to the literals properly
+// Reading a member of a union different from the one written to is undefined in
+// C99, yet it is very common practice.
+static const union {
+    uint64_t asInt64;
+    double asDouble;
+} COMPVEC[] = { { 5 }, { ZERO_i }, { INF_i }, { NEGINF_i }, { NVP_i } };
 
-static inline double _LAL_for_compiler_unused_warning(void) {return(COMPVEC[0]);}
+static inline double _LAL_for_compiler_unused_warning(void) {return(COMPVEC[0].asDouble);}
 
-#define ZERO		COMPVEC[1]
-#define INF		COMPVEC[2]
-#define NEGINF		COMPVEC[3]
-#define NVP		COMPVEC[4]
+#define ZERO		COMPVEC[1].asDouble
+#define INF		COMPVEC[2].asDouble
+#define NEGINF		COMPVEC[3].asDouble
+#define NVP		COMPVEC[4].asDouble
 
 #endif 	/* FLOATSPECIALS_H */

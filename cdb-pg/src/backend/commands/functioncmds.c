@@ -58,7 +58,7 @@
 #include "cdb/cdbdisp.h"
 
 static void AlterFunctionOwner_internal(cqContext *pcqCtx,
-										Relation rel, HeapTuple tup, 
+										Relation rel, HeapTuple tup,
 										Oid newOwnerId);
 
 /*
@@ -588,9 +588,9 @@ compute_attributes_sql_style(List *options,
  *------------
  */
 static void
-compute_attributes_with_style(List *parameters, 
-							  bool *isStrict_p, 
-							  char *volatility_p, 
+compute_attributes_with_style(List *parameters,
+							  bool *isStrict_p,
+							  char *volatility_p,
 							  Oid* oid_p,
 							  List **describeQualName_p)
 {
@@ -677,8 +677,8 @@ interpret_AS_clause(Oid languageOid, const char *languageName, List *as,
  * Handle functions that try to define a "DESCRIBE" callback.
  */
 static Oid
-validate_describe_callback(List *describeQualName, 
-						   Oid returnTypeOid, 
+validate_describe_callback(List *describeQualName,
+						   Oid returnTypeOid,
 						   ArrayType *parameterModes)
 {
 	int					 nargs			  = 1;
@@ -696,7 +696,7 @@ validate_describe_callback(List *describeQualName,
 	if (describeQualName == NIL)
 		return InvalidOid;
 
-	/* 
+	/*
 	 * describe callbacks only supported for functions that return either
 	 * a pseudotype or a generic record.
 	 */
@@ -711,7 +711,7 @@ validate_describe_callback(List *describeQualName,
 	{
 		int   len   = ARR_DIMS(parameterModes)[0];
 		char *modes = ARR_DATA_PTR(parameterModes);
-		
+
 		Insist(ARR_NDIM(parameterModes) == 1);
 		for (i = 0; i < len; i++)
 		{
@@ -735,7 +735,7 @@ validate_describe_callback(List *describeQualName,
 							(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
 							 errmsg("DESCRIBE is not supported for functions "
 									"that return TABLE"),
-							 errOmitLocation(true)));				
+							 errOmitLocation(true)));
 					break;
 
 				/* above list should be exhaustive */
@@ -749,13 +749,13 @@ validate_describe_callback(List *describeQualName,
 	/* Lookup the function in the catalog */
 	fdResult = func_get_detail(describeQualName,
 							   NIL,   /* argument expressions */
-							   nargs, 
+							   nargs,
 							   inputTypeOids,
 							   &describeFuncOid,
-							   &describeReturnTypeOid, 
+							   &describeReturnTypeOid,
 							   &describeReturnsSet,
-							   &describeIsStrict, 
-							   &describeIsOrdered, 
+							   &describeIsStrict,
+							   &describeIsOrdered,
 							   &actualInputTypeOids);
 
 	if (fdResult != FUNCDETAIL_NORMAL || !OidIsValid(describeFuncOid))
@@ -903,7 +903,7 @@ CreateFunction(CreateFunctionStmt *stmt)
 		/* explicit RETURNS clause */
 		compute_return_type(stmt->returnType, languageOid,
 							&prorettype, &returnsSet, stmt->shelltypeOid);
-		
+
         if (OidIsValid(requiredResultType) && prorettype != requiredResultType)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
@@ -954,7 +954,7 @@ CreateFunction(CreateFunctionStmt *stmt)
 		if (strcmp(prosrc_str, "-") == 0)
 			prosrc_str = funcname;
 	}
-	
+
 	/* double check that we really have a function body */
 	if (prosrc_str == NULL)
 		prosrc_str = strdup("");
@@ -990,7 +990,7 @@ CreateFunction(CreateFunctionStmt *stmt)
 					PointerGetDatum(parameterNames),
 					dataAccess,
 					stmt->funcOid);
-	
+
 	if (gp_upgrade_mode && Gp_role == GP_ROLE_DISPATCH)
 		CdbDispatchUtilityStatement((Node *) stmt, "CreateFunction");
 }
@@ -1058,7 +1058,7 @@ RemoveFunction(RemoveFuncStmt *stmt)
 				 errmsg("removing built-in function \"%s\"",
 						NameListToString(functionName))));
 	}
-	
+
 	caql_endscan(pcqCtx);
 
 	/*
@@ -1120,10 +1120,10 @@ RemoveFunctionById(Oid funcOid)
 					NULL,
 					cql("DELETE FROM pg_aggregate "
 						" WHERE aggfnoid = :1 ",
-						ObjectIdGetDatum(funcOid)))) 
+						ObjectIdGetDatum(funcOid))))
 		{
 			/* should not happen */
-			elog(ERROR, 
+			elog(ERROR,
 				 "cache lookup failed for pg_aggregate tuple for function %u",
 				 funcOid);
 		}
@@ -1351,7 +1351,7 @@ AlterFunctionOwner_internal(cqContext *pcqCtx,
 		}
 
 		newtuple = caql_modify_current(pcqCtx, repl_val, repl_null, repl_repl);
-		
+
 		caql_update_current(pcqCtx, newtuple);
 		/* and Update indexes (implicit) */
 
@@ -1741,7 +1741,7 @@ CreateCast(CreateCastStmt *stmt)
 
 	relation = heap_open(CastRelationId, RowExclusiveLock);
 	pcqCtx = caql_beginscan(
-							caql_addrel(cqclr(&cqc), relation), 
+							caql_addrel(cqclr(&cqc), relation),
 							cql("INSERT INTO pg_cast",
 								NULL));
 
@@ -1752,7 +1752,7 @@ CreateCast(CreateCastStmt *stmt)
 	 */
 
 	if (caql_getcount(
-				caql_addrel(cqclr(&cqc2), relation), 
+				caql_addrel(cqclr(&cqc2), relation),
 				cql("SELECT COUNT(*) FROM pg_cast "
 					" WHERE castsource = :1 "
 					" AND casttarget = :2 ",
@@ -1777,7 +1777,7 @@ CreateCast(CreateCastStmt *stmt)
 
 	if (stmt->castOid != 0)
 		HeapTupleSetOid(tuple, stmt->castOid);
-		
+
 	stmt->castOid = caql_insert(pcqCtx, tuple);
 	/* and Update indexes (implicit) */
 
@@ -1811,12 +1811,12 @@ CreateCast(CreateCastStmt *stmt)
 
 	caql_endscan(pcqCtx);
 	heap_close(relation, RowExclusiveLock);
-	
+
 	if (Gp_role == GP_ROLE_DISPATCH)
 	{
 		CdbDispatchUtilityStatement((Node *) stmt, "CreateCast");
 	}
-	
+
 }
 
 
@@ -1881,7 +1881,7 @@ DropCast(DropCastStmt *stmt)
 	object.objectSubId = 0;
 
 	performDeletion(&object, stmt->behavior);
-	
+
 	if (Gp_role == GP_ROLE_DISPATCH)
 	{
 		CdbDispatchUtilityStatement((Node *) stmt, "DropCast");
@@ -1978,7 +1978,7 @@ AlterFunctionNamespace(List *name, List *argtypes, bool isagg,
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("cannot move objects into or out of AO SEGMENT schema")));
-	
+
 	/* check for duplicate name (more friendly than unique-index failure) */
 	if (caql_getcount(
 				caql_addrel(cqclr(&cqc2), procRel),

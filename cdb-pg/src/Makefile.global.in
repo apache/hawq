@@ -278,7 +278,7 @@ RANLIB = @RANLIB@
 WINDRES = @WINDRES@
 X = @EXEEXT@
 
-# Perl 
+# Perl
 
 ifneq (@PERL@,)
     # quoted to protect pathname with spaces

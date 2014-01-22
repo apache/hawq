@@ -18,13 +18,14 @@ import sys, os
 
 # Python version 2.6.2 is expected, must be between 2.5-3.0
 if sys.version_info < (2, 5, 0) or sys.version_info >= (3, 0, 0):
-    sys.stderr.write("Error: %s is supported on Python versions 2.5 or greater\n" 
-                     "Please upgrade python installed on this machine." 
+    sys.stderr.write("Error: %s is supported on Python versions 2.5 or greater\n"
+                     "Please upgrade python installed on this machine."
                      % os.path.split(__file__)[-1])
     sys.exit(1)
 
 try:
     from gppylib.operations.gpMigratorUtil import *
+    from gppylib.operations.madlib_depcheck.depcheck import depcheck_for_madlib
 except ImportError, e:
     sys.exit('Error: unable to import module: ' + str(e))
 
@@ -59,7 +60,7 @@ def makeCommand(oldHome, newHome, oldVersion, newVersion,
 
         cmd = [
             EXECNAME,
-            oldHome, 
+            oldHome,
             newHome,
             '--internal-oldversion=' + urllib.quote(str(oldVersion)),
             '--internal-newversion=' + urllib.quote(str(newVersion)),
@@ -143,7 +144,7 @@ class GPUpgrade(GPUpgradeBase):
         The most basic of initialization
         '''
         super(GPUpgrade, self).__init__()
-                
+
         self.resume     = False
         self.mirrormode = None
 
@@ -151,7 +152,7 @@ class GPUpgrade(GPUpgradeBase):
 
         # Non-master variables
         self.option2   = None     # Argument passed to cmd
-        
+
         # Environment and system info
         self.datadirs  = None     # Set of all data and mirror directories
         self.filespaces= None     # Set of filespace directory (dboid as key)
@@ -181,7 +182,7 @@ class GPUpgrade(GPUpgradeBase):
 
         # GPHOME, PYTHONPATH must be setup properly
         #    GPHOME must match the location of this file
-        #    The first PYTHONPATH must be based on the proper gphome 
+        #    The first PYTHONPATH must be based on the proper gphome
         gphome_bin = os.path.realpath(os.path.split(__file__)[0])
         gphome     = os.path.split(gphome_bin)[0]
         env_GPHOME = os.path.realpath(os.environ.get('GPHOME'))
@@ -206,7 +207,7 @@ class GPUpgrade(GPUpgradeBase):
         self.user      = os.environ.get('USER') or os.environ.get('LOGNAME')
         self.host      = self.RunCmd('hostname')
         self.masterdir = os.environ.get('MASTER_DATA_DIRECTORY')
-        
+
         self.ParseInput()
 
         # Setup worker pool
@@ -277,7 +278,7 @@ class GPUpgrade(GPUpgradeBase):
                               help=optparse.SUPPRESS_HELP)
             parser.add_option('-h', '--help', action='store_true',
                               help=optparse.SUPPRESS_HELP)
-            parser.add_option('-d', dest='directory', 
+            parser.add_option('-d', dest='directory',
                               help=optparse.SUPPRESS_HELP)
             parser.add_option('-l', dest='logdir',
                               help=optparse.SUPPRESS_HELP)
@@ -287,7 +288,7 @@ class GPUpgrade(GPUpgradeBase):
                               help=optparse.SUPPRESS_HELP)
             parser.add_option('-c', '--check-only', dest='checkonly', action='store_true',
                               help=optparse.SUPPRESS_HELP)
-            
+
             parser.add_option('--debug', action='store_true',
                               help=optparse.SUPPRESS_HELP)
             parser.add_option('--internal-disable-checkschema',
@@ -323,7 +324,7 @@ class GPUpgrade(GPUpgradeBase):
             parser.add_option('--fault-injection', dest='faultinjection',
                               type='int', help=optparse.SUPPRESS_HELP)
             (options, args) = parser.parse_args()
-            
+
             if options.version:
                 print EXECNAME + ' ' + __version__
                 sys.exit(0)
@@ -345,7 +346,7 @@ class GPUpgrade(GPUpgradeBase):
 
         if options.revert:
             self.revert = True
-        
+
         if options.checkonly:
             self.checkonly = True
 
@@ -394,7 +395,7 @@ class GPUpgrade(GPUpgradeBase):
         except OSError, e:
             logger.fatal('cannot log to %s: %s' % (self.logdir, str(e)))
             exit(1)
-        
+
         if options.nocheckschema:
             self.checkschema = False
 
@@ -447,7 +448,7 @@ class GPUpgrade(GPUpgradeBase):
     def Cleanup(self):
         '''
         Cleanup open connections.
-        Separate from __del__ because that caused weird issues with exit() 
+        Separate from __del__ because that caused weird issues with exit()
         behavior.
         '''
         if self.cmd == 'MASTER':
@@ -473,7 +474,7 @@ class GPUpgrade(GPUpgradeBase):
         Sets the state in the upgrader state file
         '''
 
-        # Set state across all hosts, if all hosts succeed then set the 
+        # Set state across all hosts, if all hosts succeed then set the
         # master state
         if self.cmd == 'MASTER':
             self.CallSlaves('SETSTATE', newstate)
@@ -499,10 +500,10 @@ class GPUpgrade(GPUpgradeBase):
     #------------------------------------------------------------
     def CallSlaves(self, cmd, option='', option2='', includeMirrors=False):
         '''
-        Calls every host to execute the given command with the given option 
+        Calls every host to execute the given command with the given option
         value
         '''
-  
+
         logger.debug("Remote call: %s" % cmd)
 
         # Check for things that should never happen
@@ -519,7 +520,7 @@ class GPUpgrade(GPUpgradeBase):
             gphome = self.newhome
         else:
             gphome = self.oldhome
-        
+
         # Construct the commands to pass to the worker pool
         hosts = self.hostcache.get_hosts()
         for host in hosts:
@@ -561,7 +562,7 @@ class GPUpgrade(GPUpgradeBase):
                              isUpgrade=self.upgrade,
                              isRevert=self.revert,
                              mirrors=self.mirrors)
-            
+
             c = GpUpgradeCmd("gpmigrator_mirror remote call",
                              cmdList,
                              ctxt=base.REMOTE,
@@ -575,7 +576,7 @@ class GPUpgrade(GPUpgradeBase):
         except:
             self.pool.haltWork()
             self.pool.joinWorkers()
-            
+
         failure = False
         results = []
         for cmd in self.pool.getCompletedItems():
@@ -591,7 +592,7 @@ class GPUpgrade(GPUpgradeBase):
             # sys.stderr.write(r.stderr)
             msg = r.stdout.strip()
             results.append(msg)
-            
+
             if not cmd.was_successful():
                 log_literal(logger, logging.ERROR, msg)
                 failure=True
@@ -627,7 +628,7 @@ class GPUpgrade(GPUpgradeBase):
 
         if err:
             raise UpgradeError('Directories exist')
-            
+
 
 
     #------------------------------------------------------------
@@ -644,8 +645,8 @@ class GPUpgrade(GPUpgradeBase):
             except UpgradeError:
                 pass
 
-            # We use the catalog versions we cached during versionCheck to 
-            # determine if the MASTER_DATA_DIRECTORY is actually an old 
+            # We use the catalog versions we cached during versionCheck to
+            # determine if the MASTER_DATA_DIRECTORY is actually an old
             # master data directory, or a partially upgraded one.
             #
             # Note: it would be better to adjust gpstop so that it knows how
@@ -674,7 +675,7 @@ class GPUpgrade(GPUpgradeBase):
             logger.fatal('***************************************')
             raise UpgradeError("Unable to REVERT\nShutdown the running " +
                                "database and rerun gpmigrator with '-R'")
-            
+
         logger.info('Reverting to Backup')
         self.revert = True
 
@@ -696,7 +697,7 @@ class GPUpgrade(GPUpgradeBase):
             needunlock = True
         else:
             needunlock = False
-        
+
         if (needrevert or needunlock):
             try:
                 self.ReadInfo()
@@ -773,15 +774,15 @@ class GPUpgrade(GPUpgradeBase):
         is_supported_version(newversion, self.upgrade)
 
         if newversion == oldversion:
-            raise UpgradeError("HAWQ is already version '%s'" 
+            raise UpgradeError("HAWQ is already version '%s'"
                                % str(newversion))
         elif newversion.isVersionRelease(oldversion):
-            raise UpgradeError("Upgrade not needed to go from version '%s' to version '%s'" 
+            raise UpgradeError("Upgrade not needed to go from version '%s' to version '%s'"
                                % (str(oldversion), str(newversion)))
 
         # We don't support downgrade
         if not self.upgrade:
-            raise UpgradeError("Downgrade to HAWQ %s not supported from gpmigrator" 
+            raise UpgradeError("Downgrade to HAWQ %s not supported from gpmigrator"
                                % str(newversion))
 
         if self.upgrade and not newversion.isVersionCurrentRelease():
@@ -792,7 +793,7 @@ class GPUpgrade(GPUpgradeBase):
 
         logger.debug('Using %s method for migration' % self.method)
 
-        # Compare old version catalog number with the catalog in 
+        # Compare old version catalog number with the catalog in
         # MASTER_DATA_DIRECTORY
         catalog_re = re.compile('Catalog version number: *(.*)')
         oldcat = self.RunCmd('postgres --catalog-version', env=self.oldenv)
@@ -820,7 +821,7 @@ class GPUpgrade(GPUpgradeBase):
 
         # For the moment everything goes:
         #   - Additional checks will be made once the old database is up
-        logger.info('Versions are compatible')        
+        logger.info('Versions are compatible')
 
 
     #------------------------------------------------------------
@@ -859,12 +860,12 @@ class GPUpgrade(GPUpgradeBase):
                     continue
 
                 if dpid != self.pid:
-                    logger.warn('Directory %s owned by pid %s' 
+                    logger.warn('Directory %s owned by pid %s'
                              % (d, dpid))
                     doerror = True
                     continue
-                
-            # Regardless of the setting of force, if there is an active 
+
+            # Regardless of the setting of force, if there is an active
             # process running, we won't remove the directory.
             running = self.RunCmd('find %s -name postmaster.pid -print' % d)
             if (running):
@@ -888,28 +889,28 @@ class GPUpgrade(GPUpgradeBase):
         if self.cmd == 'MASTER':
 
             dirs_exist = False
-            try: 
+            try:
                 self.CheckDirectories()
                 self.CallSlaves('CHKDIR', includeMirrors=True)
             except UpgradeError, e:
                 dirs_exist = True
             if dirs_exist:
                 self.RemoveDirectories(force=True)
-            
 
-            logger.info('Creating temporary directories')                
+
+            logger.info('Creating temporary directories')
 
             # Have the slaves create their directories
             self.CallSlaves('MKDIR', includeMirrors=True)
-            
+
             fsdirs = self.masterfilespace
 
         else:
             fsdirs = self.filespaces
-            if self.cmd != 'MKDIR': 
+            if self.cmd != 'MKDIR':
                 raise Exception(self.cmd + ' != MKDIR]')
 
-        # Given all the actual segment datadirs we need to look one 
+        # Given all the actual segment datadirs we need to look one
         # directory up for the datadir locations and create the gpmigrator
         # subdirectory there.
         locations = set()
@@ -922,7 +923,7 @@ class GPUpgrade(GPUpgradeBase):
 
         # Actually create the directory, none of the should exist yet!
         for d in locations:
-            # Creating directories is an atomic operation, if mkdir 
+            # Creating directories is an atomic operation, if mkdir
             # succeeds then it did not exist previously making it ours
             # This prevents mulitiple upgrades running simultaneously.
             os.mkdir(d)
@@ -942,7 +943,7 @@ class GPUpgrade(GPUpgradeBase):
             backuppath = os.path.join(d, BACKUPDIR)
             os.mkdir(backuppath)
             self.RunCmd('chmod 700 %s' % backuppath)
-                        
+
         if (self.cmd == 'MASTER'):
             # Finally now that we have those directories we'll make a state file
             self.state = open('%s/state' % self.workdir, 'w')
@@ -953,7 +954,7 @@ class GPUpgrade(GPUpgradeBase):
         Creates 'gp_databases' 'gp_array_config' and 'gp_config' files
         '''
 
-        logger.info('Generating config files')        
+        logger.info('Generating config files')
 
         # Write a dump of the databases hash
         db_file = os.path.join(self.workdir, 'gp_databases')
@@ -981,9 +982,9 @@ class GPUpgrade(GPUpgradeBase):
 
     #------------------------------------------------------------
     def ReadInfo(self):
-        ''' 
+        '''
         When restarting an upgrade this method reads the configuration
-        information from the cached status files.  
+        information from the cached status files.
 
         It corresponds directly with ExtractInfo() which gathers the same
         information from an active database.
@@ -1069,7 +1070,7 @@ class GPUpgrade(GPUpgradeBase):
         invalid = array.get_invalid_segdbs()
         if len(invalid) > 0:
             for db in invalid:
-                logger.fatal('INVALID SEGMENT: %s:/%s' % 
+                logger.fatal('INVALID SEGMENT: %s:/%s' %
                              (db.getSegmentHostName(),
                               db.getSegmentDataDirectory()))
             raise UpgradeError('Cannot upgrade database with invalid segments')
@@ -1109,7 +1110,7 @@ class GPUpgrade(GPUpgradeBase):
         self.masterfilespace = []
         for (id, loc) in self.array.master.getSegmentFilespaces().iteritems():
             self.masterfilespace.append(loc)
-        
+
         master = array.master
         standbymaster = array.standbyMaster
 
@@ -1118,7 +1119,7 @@ class GPUpgrade(GPUpgradeBase):
         dbs = array.getSegDbList()
         self.segments = filter(GpDB.isSegmentPrimary, dbs)
         self.mirrors  = filter(GpDB.isSegmentMirror, dbs)
-        
+
         # We don't support mirror any more in this script.
         if (self.mirrors):
             raise UpgradeError(
@@ -1131,7 +1132,7 @@ class GPUpgrade(GPUpgradeBase):
             raise UpgradeError('Cannot upgrade while standbymaster is running')
 
 
-        # To upgrade mirrors from 3.3 format mirrors to 4.0 format mirrors we 
+        # To upgrade mirrors from 3.3 format mirrors to 4.0 format mirrors we
         # must have been provided with the replication ports.
         if len(self.mirrors) > 0:
             if (not self.config['REPLICATION_PORT_BASE'] or
@@ -1147,7 +1148,7 @@ class GPUpgrade(GPUpgradeBase):
                 if not self.mirrormode:
                     logger.fatal("  missing option:  --mirror-mode")
                 raise UpgradeError("Missing required upgrade options")
-            
+
             if self.mirrormode not in ('redundant', 'single'):
                 logger.fatal("Unrecognised mirror-mode: %s" % self.mirrormode)
                 logger.fatal("Valid modes are: redundant, single")
@@ -1165,7 +1166,7 @@ class GPUpgrade(GPUpgradeBase):
                 mir_port     = [65535, 0]
                 pri_rep_port = [65535, 0]
                 mir_rep_port = [65535, 0]
-        
+
                 for seg in host.dbs:
                     port = seg.getSegmentPort()
                     if seg.isSegmentPrimary():
@@ -1185,24 +1186,24 @@ class GPUpgrade(GPUpgradeBase):
 
                 # Check for overlapping port ranges:
                 port_mat = [pri_port, mir_port, pri_rep_port, mir_rep_port]
-                label_mat = ["Primary", "Mirror", "Replication", 
+                label_mat = ["Primary", "Mirror", "Replication",
                              "Mirror-Replication"]
 
                 for x in range(0, 4):
                     for y in range(x+1, 4):
-                        if ((port_mat[x][0] >= port_mat[y][0] and 
+                        if ((port_mat[x][0] >= port_mat[y][0] and
                              port_mat[x][0] <= port_mat[y][1]) or
-                            (port_mat[x][1] >= port_mat[y][0] and 
+                            (port_mat[x][1] >= port_mat[y][0] and
                              port_mat[x][1] <= port_mat[y][1])):
                             logger.error("Port collision on host %s" %
                                          host.hostname)
-                            logger.error("... %s port range: [%d-%d]" % 
-                                         (label_mat[x], 
-                                          port_mat[x][0], 
+                            logger.error("... %s port range: [%d-%d]" %
+                                         (label_mat[x],
+                                          port_mat[x][0],
                                           port_mat[x][1]))
                             logger.error("... %s port range: [%d-%d]" %
-                                         (label_mat[y], 
-                                          port_mat[y][0], 
+                                         (label_mat[y],
+                                          port_mat[y][0],
                                           port_mat[y][1]))
                             raise UpgradeError("Port collision on host %s" %
                                                host.hostname)
@@ -1214,15 +1215,15 @@ class GPUpgrade(GPUpgradeBase):
         for dboid in oids:
             db = self.dbs[dboid]
 
-            if db == "template0": 
+            if db == "template0":
                 continue
             indexes = self.Select('''
-               SELECT quote_ident(n.nspname) || '.' || 
-                      quote_ident(c.relname) as index, 
+               SELECT quote_ident(n.nspname) || '.' ||
+                      quote_ident(c.relname) as index,
                       m.amname as kind
-               FROM   pg_class c 
-                 join pg_namespace n on (c.relnamespace = n.oid) 
-                 join pg_am m on (c.relam = m.oid) 
+               FROM   pg_class c
+                 join pg_namespace n on (c.relnamespace = n.oid)
+                 join pg_am m on (c.relam = m.oid)
                WHERE  c.relkind = 'i' and m.amname in ('gin', 'hash')
             ''', db=db)
             if len(indexes) > 0:
@@ -1271,7 +1272,7 @@ class GPUpgrade(GPUpgradeBase):
         # TRUSTED_SHELL, set manually since there's only one supported value
         self.config['TRUSTED_SHELL'] = 'ssh'
 
-        # CHECK_POINT_SEGMENTS 
+        # CHECK_POINT_SEGMENTS
         self.config['CHECKPOINT_SEGMENTS'] = \
             self.Select('show checkpoint_segments')[0]
 
@@ -1381,7 +1382,7 @@ class GPUpgrade(GPUpgradeBase):
 
             logger.info('... Creating pg_hba.conf ')
 
-            # To write out a new pg_hba.conf we need to know all the ip 
+            # To write out a new pg_hba.conf we need to know all the ip
             # addresses that the master identifies with.
             #
             # If we re-enable segment locking then this will need to be
@@ -1389,7 +1390,7 @@ class GPUpgrade(GPUpgradeBase):
             if os_type == 'sunos':
                 cmd = 'ifconfig -a inet'
             else:
-                cmd = 'ifconfig'        
+                cmd = 'ifconfig'
             ifconf = self.RunCmd(cmd)
             ipv4_re = re.compile('inet (?:addr:)?(\d+\.\d+\.\d+\.\d+)')
             ipv6_re = re.compile('inet6 (?:addr: )?([a-zA-Z0-9:\.]+[a-zA-Z0-9:])')
@@ -1407,13 +1408,13 @@ class GPUpgrade(GPUpgradeBase):
             # locking down the segments requires having gpstart
             # pass the PGUSER to the segments otherwise the segments
             # don't have the permissions to startup.
-            # 
-            # This leaves a "hole" in the lockdown that still allows 
+            #
+            # This leaves a "hole" in the lockdown that still allows
             # utility connections to the segments.
             hba   = os.path.join(self.masterdir, 'pg_hba.conf')
             ident = os.path.join(self.masterdir, 'pg_ident.conf')
 
-            if env == self.oldenv or not os.path.exists(hba + LOCKEXT): 
+            if env == self.oldenv or not os.path.exists(hba + LOCKEXT):
                 # pre-upgrade database makes a backup of files and then
                 # writes a new one
 
@@ -1421,9 +1422,9 @@ class GPUpgrade(GPUpgradeBase):
                 if os_type != 'sunos':
                     self.RunCmd('mv -f %s %s' % (ident, ident+LOCKEXT))
                     file = open(ident, 'w')
-                    file.write('%s %s %s\n' % 
+                    file.write('%s %s %s\n' %
                                (MIGRATIONUSER, self.user, MIGRATIONUSER))
-                    file.write('%s %s %s\n' % 
+                    file.write('%s %s %s\n' %
                                (self.user, self.user, self.user))
                     file.close()
 
@@ -1431,7 +1432,7 @@ class GPUpgrade(GPUpgradeBase):
                 file = open(hba, 'w')
                 if os_type == 'sunos':
                     file.write('local all %s trust\n' % MIGRATIONUSER)
-                    file.write('local all %s trust\n' % self.user)                    
+                    file.write('local all %s trust\n' % self.user)
                 else:
                     file.write('local all %s ident map=%s\n'
                                 % (MIGRATIONUSER, MIGRATIONUSER))
@@ -1448,7 +1449,7 @@ class GPUpgrade(GPUpgradeBase):
                 file.close()
 
             if env == self.newenv:
-                # upgrade database just copies all locking information 
+                # upgrade database just copies all locking information
                 # from the pre-upgrade database which should already be
                 # locked
                 dir = self.newmaster
@@ -1554,8 +1555,8 @@ class GPUpgrade(GPUpgradeBase):
             # MPP-10107 - The server is still running with PGUSER set in its
             # environment, which is wrong since that user doesn't exist.
             # Ideally that shouldn't matter, but unfortunately it does.  We
-            # deal with this by restarting the server.  
-            # 
+            # deal with this by restarting the server.
+            #
             # Note: the step above is still required because otherwise we
             # can't even run this gpstop due to pg_hba.conf lock.
             #
@@ -1569,8 +1570,8 @@ class GPUpgrade(GPUpgradeBase):
         # safe to do so here because we unlock the source database before we
         # are done with the upgrade.
         return
- 
-        
+
+
     #------------------------------------------------------------
     def ResetXLogs(self):
         '''
@@ -1592,11 +1593,11 @@ class GPUpgrade(GPUpgradeBase):
             (d, seg) = os.path.split(olddir)
             newdir = os.path.join(d, WORKDIR, UPGRADEDIR, seg)
 
-            # Links are in place, but data will not be visible until 
+            # Links are in place, but data will not be visible until
             # we sync the pg_control info
-            oldsync = self.RunCmd('pg_resetxlog -n ' + olddir, 
+            oldsync = self.RunCmd('pg_resetxlog -n ' + olddir,
                                   env=self.oldenv)
-            newsync = self.RunCmd('pg_resetxlog -n ' + newdir, 
+            newsync = self.RunCmd('pg_resetxlog -n ' + newdir,
                                   env=self.newenv)
 
             logger.debug('*****************************')
@@ -1606,7 +1607,7 @@ class GPUpgrade(GPUpgradeBase):
             logger.debug(' - new xlog -')
             logger.debug(newsync)
             logger.debug('*****************************')
-                    
+
 
             # Nasty bit of code to turn the control data into a
             # nice dict object
@@ -1623,18 +1624,18 @@ class GPUpgrade(GPUpgradeBase):
             else:
                 nextxid = sync["Latest checkpoint's NextXID"][x+1:]
 
-            self.RunCmd('pg_resetxlog -f -x %s %s' % (nextxid, newdir), 
+            self.RunCmd('pg_resetxlog -f -x %s %s' % (nextxid, newdir),
                         env=self.newenv)
 
             # Set the WAL archives
-            self.RunCmd('pg_resetxlog -l %s,%s,%s %s' % 
+            self.RunCmd('pg_resetxlog -l %s,%s,%s %s' %
                         (sync["Latest checkpoint's TimeLineID"],
                          sync["Current log file ID"],
                          sync["Next log file segment"],
                          newdir), env=self.newenv)
 
             # Set next oid
-            self.RunCmd('pg_resetxlog -o %s %s' % 
+            self.RunCmd('pg_resetxlog -o %s %s' %
                         (sync["Latest checkpoint's NextOID"],
                          newdir), env=self.newenv)
 
@@ -1648,15 +1649,15 @@ class GPUpgrade(GPUpgradeBase):
 
             # Replace the transaction logs with the old ones
             # since the old logs actually correspond to the data
-            for f in ['pg_clog', 
-                      'pg_distributedlog', 
+            for f in ['pg_clog',
+                      'pg_distributedlog',
                       'pg_subtrans',
                       'pg_multixact']:
                 oldlogs = os.path.join(olddir, f)
                 newlogs = os.path.join(newdir, f)
 
                 # the only one that wouldn't exist is pg_distributedlog
-                # and only if we were upgrading/downgrading to/from a 
+                # and only if we were upgrading/downgrading to/from a
                 # version < 3.1.1.5
                 if (os.path.exists(newlogs)):
                     self.RunCmd('rm -rf %s' % newlogs)
@@ -1673,8 +1674,8 @@ class GPUpgrade(GPUpgradeBase):
             return
 
         if style not in ['BACKUP', 'INSTALL', 'REVERT', 'SKELETON']:
-            raise UpgradeError('FATAL', ' DeepLink(%s)!?' % style)            
-        
+            raise UpgradeError('FATAL', ' DeepLink(%s)!?' % style)
+
         if self.cmd == 'MASTER':
             fsdirs = self.masterfilespace
             if style == 'BACKUP':
@@ -1703,7 +1704,7 @@ class GPUpgrade(GPUpgradeBase):
 
         for dir in fsdirs:
             (location, content) = os.path.split(dir)
-            
+
             # For Backup fsdirs is the source, for INSTALL it's the target
             if style == 'BACKUP':
                 source      = os.path.join(location, content)
@@ -1717,7 +1718,7 @@ class GPUpgrade(GPUpgradeBase):
             if style == 'REVERT':
                 source      = os.path.join(location, WORKDIR, BACKUPDIR, content)
                 destination = os.path.join(location, content)
-            
+
                 if not os.path.exists(source):
                     continue
 
@@ -1737,8 +1738,8 @@ class GPUpgrade(GPUpgradeBase):
             # Also not including the workdir and contents
             #if os.path.exists(destination):
             #    for file in os.listdir(destination):
-                    # If the file/directory also exists in the source 
-                    # then delete it in anticipation of receiving the 
+                    # If the file/directory also exists in the source
+                    # then delete it in anticipation of receiving the
                     # replacement.
             #        if os.path.exists(os.path.join(source, file)):
             #            self.RunCmd('rm -rf ' + os.path.join(destination, file))
@@ -1752,7 +1753,7 @@ class GPUpgrade(GPUpgradeBase):
             # Note: This is deleted in the SOURCE, it will NOT be restored
             # if the upgrade fails or reverts.  This is deemed acceptable
             # because with this many files the system was almost certainly
-            # misconfigured to begin with.  Removing the directory will 
+            # misconfigured to begin with.  Removing the directory will
             # prevent further acrual of files.
             gpperfdir = os.path.join(source, 'gpperfmon', 'data')
             if os.path.exists(gpperfdir):
@@ -1796,7 +1797,7 @@ class GPUpgrade(GPUpgradeBase):
         # We can do this in utility mode since the master host is the only
         # host that contains gp_configuration information
         logger.info('Adjusting configuration')
-        
+
         if self.cmd == 'MASTER':
             self.Startup(self.newenv, utility=True)
             self.Update("""
@@ -1804,7 +1805,7 @@ class GPUpgrade(GPUpgradeBase):
                   regexp_replace(fselocation, E'/gpmigrator/upgrade/','/')
             """, forceutility=True, upgradeMode=True, modSysTbl=True)
             self.Update("VACUUM FREEZE pg_filespace_entry", forceutility=True, upgradeMode=True, modSysTbl=True)
-            
+
             self.Shutdown()
             self.Startup(self.newenv, upgrade=True)
 
@@ -1814,7 +1815,7 @@ class GPUpgrade(GPUpgradeBase):
             datadirs = self.datadirs
 
         # Update the persistent table for each segment
-        for dir in datadirs:                
+        for dir in datadirs:
             # Find the last line in the conf file that matches our expression
             conf = os.path.join(dir, 'postgresql.conf')
             def getconf(x):
@@ -1864,7 +1865,7 @@ class GPUpgrade(GPUpgradeBase):
             # Move datadirectory location to gpmigrator/upgrade subdirectories
             self.Update("""
                 UPDATE pg_filespace_entry SET fselocation =
-                   regexp_replace(fselocation, E'(/[^/]*)$', 
+                   regexp_replace(fselocation, E'(/[^/]*)$',
                                   E'/gpmigrator/upgrade\\\\1')
                 """, forceutility=True, upgradeMode=True, modSysTbl=True)
             self.Update("VACUUM FREEZE pg_filespace_entry", forceutility=True, upgradeMode=True)
@@ -1877,7 +1878,7 @@ class GPUpgrade(GPUpgradeBase):
                 rport    = db.getSegmentReplicationPort() or "null"
 
                 self.Update("""
-                   UPDATE gp_segment_configuration 
+                   UPDATE gp_segment_configuration
                    SET hostname='%s', replication_port=%s
                    WHERE dbid=%s
                    """ % (hostname, rport, dbid), forceutility=True, upgradeMode=True, modSysTbl=True)
@@ -1893,7 +1894,7 @@ class GPUpgrade(GPUpgradeBase):
             datadirs = self.datadirs
 
         # Update the persistent table for each segment
-        for dir in datadirs:                
+        for dir in datadirs:
             # Find the last line in the conf file that matches our expression
             conf = os.path.join(dir, 'postgresql.conf')
             def getconf(x):
@@ -1920,7 +1921,7 @@ class GPUpgrade(GPUpgradeBase):
                    E'/gpmigrator/upgrade\\\\1')
                    where persistent_state = 2
                 """, port=port, forceutility=True, upgradeMode=True, modSysTbl=True)
-            
+
         if self.cmd == 'MASTER':
             self.Shutdown()
 
@@ -1928,7 +1929,7 @@ class GPUpgrade(GPUpgradeBase):
     #------------------------------------------------------------
     def ExtractCatFiles(self):
         '''
-        Get the set of data files which are necessary to bring up a skeleton 
+        Get the set of data files which are necessary to bring up a skeleton
         system: just those necessary for bringing up the system in utility
         mode and querying the catalogs -- no user data.
 
@@ -1947,7 +1948,7 @@ class GPUpgrade(GPUpgradeBase):
             # The directory for this segment
             (d, seg) = os.path.split(dir)
             logdir = os.path.join(d, WORKDIR)
-                
+
             # Open the mapping file
             mapfilename = os.path.join(logdir, '%s_catfiles' % seg)
             mapfile = open(mapfilename, 'w')
@@ -1978,8 +1979,8 @@ class GPUpgrade(GPUpgradeBase):
             #   a method of passing the database dictionary to the slaves.
             databases = self.Select(
             '''
-               SELECT 
-                  datname 
+               SELECT
+                  datname
                FROM pg_database where datname != 'template0'
                ORDER BY datname
             ''', port=port)
@@ -2014,7 +2015,7 @@ class GPUpgrade(GPUpgradeBase):
                       and ts.spcfsoid = fs.oid
                       and d.datname = '%s';
                 ''' % (dir, db), port=port, db=db)
-                
+
                 first = True
                 f = []
                 nlist = ["1", "2", "3"]
@@ -2034,7 +2035,7 @@ class GPUpgrade(GPUpgradeBase):
 'found path "%s" for table "%s" but file does not exist' % (dfile, row['rel'+n]))
                             f.append(dfile)
                 files[db] = f
-                                
+
             # make sure tblspc dir is empty
             pgtblspc = os.path.join(dir, 'pg_tblspc')
             if os.path.exists(pgtblspc):
@@ -2055,9 +2056,9 @@ class GPUpgrade(GPUpgradeBase):
                 for f in fs:
                     # Prefix each name with the database it's in
                     mapfile.write('db:%s\n' % f)
-                    
+
             # add template0
-            r = self.Select("""select oid from pg_database where 
+            r = self.Select("""select oid from pg_database where
                                datname = 'template0'""", port=port)
             if len(r) > 0:
                 mapfile.write('dir:%s\n' % os.path.join('base', str(r[0])))
@@ -2074,7 +2075,7 @@ class GPUpgrade(GPUpgradeBase):
                       'postmaster.pid',
                       'postmaster.opts']
             for f in os.listdir(dir):
-                if (os.path.isfile(os.path.join(dir, f)) and 
+                if (os.path.isfile(os.path.join(dir, f)) and
                     f not in meta and
                     f not in nolink):
                     # logger.debug('adding link for file %s' % f)
@@ -2092,7 +2093,7 @@ class GPUpgrade(GPUpgradeBase):
         '''
 
         logger.info('Building append only segment upgrader')
-        
+
         if self.cmd == 'MASTER':
             self.CallSlaves('EXTRACTAOSEGS')
             datadirs = [ self.masterdir ]
@@ -2146,7 +2147,7 @@ class GPUpgrade(GPUpgradeBase):
                 # The addition of eofuncompressed was 32 => 33
                 #
                 # Because this version of the upgrader does not support upgrades
-                # directly from 32 the old query is removed.  
+                # directly from 32 the old query is removed.
                 #
                 # See the version of gpmigrator that shipped with 33 for
                 # details.
@@ -2163,7 +2164,7 @@ class GPUpgrade(GPUpgradeBase):
             #   - template1 must be processed first and handles the updates for
             #     the shared tables
             #   - the master is always called with gp_persistent_build_db(false)
-            #   - segments call gp_peristent_build_db(true) when there are 
+            #   - segments call gp_peristent_build_db(true) when there are
             #     mirrors
             fname = os.path.join(logdir, 'persistent_master.sql')
             f = open(fname, 'w')
@@ -2185,7 +2186,7 @@ class GPUpgrade(GPUpgradeBase):
         '''
 
         logger.info('Building skeleton cluster')
-        
+
         if self.cmd == 'MASTER':
 
             # It would be nice to avoid having to make a full deep link,
@@ -2222,7 +2223,7 @@ class GPUpgrade(GPUpgradeBase):
                     os.remove(os.path.join(dst,f))
                 logger.debug('cp(%s)' % os.path.join(dst,f))
                 shutil.copy2(os.path.join(src, f), os.path.join(dst, f))
-        
+
                 # for this is a file, copy all segments
                 if os.path.isfile(os.path.join(src, f)):
                     for i in range(1, 66000):
@@ -2246,10 +2247,10 @@ class GPUpgrade(GPUpgradeBase):
             # Open the mapping file
             mapfilename = os.path.join(logdir, '%s_catfiles' % seg)
             mapfile = open(mapfilename, 'r')
-    
+
             # build list for directories to create
             dirs = []
-                
+
             for line in mapfile:
                 line = line[:-1]
                 (maptype, f) = line.split(':')
@@ -2262,11 +2263,11 @@ class GPUpgrade(GPUpgradeBase):
 
             dirs = list(set(dirs)) # make unique
             logger.debug('dirs = %s' % str(dirs))
-                
+
             # make sure dst exists
             if not os.path.exists(dst):
                 os.mkdir(dst, 0700)
-                
+
             dirs.append(os.path.join(dst, 'pg_log'))
             dirs.append(os.path.join(dst, 'pg_changetracking'))
             for dir in dirs:
@@ -2275,7 +2276,7 @@ class GPUpgrade(GPUpgradeBase):
                     os.makedirs(dir, 0700)
 
             logger.debug("copying files")
-                
+
             # rewind
             mapfile.seek(0)
             for line in mapfile:
@@ -2285,7 +2286,7 @@ class GPUpgrade(GPUpgradeBase):
                     left = os.path.join(src, f)
                     right = os.path.join(dst, f)
                     logger.debug('linking %s to %s' % (left, right))
-                    
+
                     if os.path.exists(right):
                         os.remove(right)
                     os.link(left, right)
@@ -2348,7 +2349,7 @@ class GPUpgrade(GPUpgradeBase):
                     setting = m.group(1)
                     value   = m.group(2)
                     rest    = m.group(3)
-                    
+
                     # Comment out defunct gucs
                     if setting in ('gp_fault_action'):
                         t.write('#%s = %s   # defunct setting\n' % (setting, value))
@@ -2389,19 +2390,19 @@ class GPUpgrade(GPUpgradeBase):
         '''
         Transform the databases.
         '''
- 
+
         logger.info('Performing catalog transformation')
 
         def transform(dbs, tfile):
 
             # MPP-10166 - because some of our transformations involve creates
-            # of views with unstable oids we must make sure that we process 
+            # of views with unstable oids we must make sure that we process
             # the databases in exactly the same order on every segment, so
             # sorting the oids is essential.
             oids = sorted(dbs.keys())
             for dboid in oids:
                 db = dbs[dboid]
-                
+
                 logger.info('... ' + db)
 
                 # XXX: only dispatch mode for template1 because segment catalogs blah...
@@ -2414,7 +2415,7 @@ class GPUpgrade(GPUpgradeBase):
                 if self.faultinjection == 1:
                     raise UpgradeError("faultinjection=%d" % self.faultinjection)
 
-        
+
         def transform_db(dbname, dboid, tfile, utility):
             '''
             Transform the specified database for a single database.
@@ -2431,11 +2432,11 @@ class GPUpgrade(GPUpgradeBase):
             logger.debug('running ' + cmd)
             p = subprocess.Popen(cmd, shell = True,
                                   close_fds = True,
-                                  stdout=subprocess.PIPE, 
-                                  stderr=subprocess.PIPE, 
+                                  stdout=subprocess.PIPE,
+                                  stderr=subprocess.PIPE,
                                   env=self.newenv)
             result = p.communicate()
-        
+
             if p.returncode == 0:
                 logger.debug('successfully transformed ' + dbname)
                 logger.debug(result[0].strip())
@@ -2459,14 +2460,14 @@ class GPUpgrade(GPUpgradeBase):
         releases = {"1.0": "201303110",
                     "1.1": "201306170",
                     "1.2": "201401010"}
-        
+
         self.CheckDown()
 
         def release2catverno(rno):
              if not rno in releases.keys():
                   raise Exception("unknown version %s" % rno)
              return releases[rno]
-        
+
         def get_control_data(datadir):
              '''
              Parse the output of pg_controldata run on data directory, returning
@@ -2477,10 +2478,10 @@ class GPUpgrade(GPUpgradeBase):
                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                   env=self.newenv)
              result = p.communicate()
-        
+
              if p.returncode != 0:
                  raise CmdError(cmd, result[0], result[1])
-        
+
              out = result[0].strip()
              ver = ""
              state = ""
@@ -2490,23 +2491,23 @@ class GPUpgrade(GPUpgradeBase):
                         ver = s[1].strip()
                   elif s[0] == 'Database cluster state':
                         state = s[1].strip()
-        
+
              return [ver, state]
-        
+
         def setcatversion(datadir, frm, to):
             '''
             Set catalog version to 'to' from 'frm'. Make sure the database
             is already set to frm.
             '''
             (ver, state) = get_control_data(datadir)
-        
+
             frmcatverno = release2catverno(frm)
             if ver != frmcatverno:
                  raise Exception("Expected version %s but found %s" % (frmcatverno, ver))
-        
-            
+
+
             # It is an error if the current state is not "shut down", that
-            # means that there may be pending xlog records which will cause 
+            # means that there may be pending xlog records which will cause
             # problems for the upgrade.
             if state != "shut down":
                 raise UpgradeError("Cannot upgrade: Database did not shutdown cleanly")
@@ -2546,14 +2547,14 @@ class GPUpgrade(GPUpgradeBase):
     def GetHighestOid(self):
         '''
         Get the highest OID declared on the node, according to the control
-        file. We use this number to reset all the control files in the 
+        file. We use this number to reset all the control files in the
         new cluster we're building, so that all the new objects will be
         added with the same OID. Since we're not dispatching the SQL to create
         the objects, this is our only way to synchronise the OIDs.
 
         Database must be down.
         '''
-        
+
         logger.info('Looking for highest OID')
         self.CheckDown(self.revert)
         self.highestoid = 16384 # first normal OID
@@ -2595,7 +2596,7 @@ class GPUpgrade(GPUpgradeBase):
         Populates the gp_dbid file for every segment
         '''
         logger.info("Adding gp_dbid file")
-        
+
         # Already handled the master during TouchupConfig()
         for seg in self.segments:
             c = GpCreateDBIdFile('create gp_dbid file',
@@ -2642,7 +2643,7 @@ class GPUpgrade(GPUpgradeBase):
         # Execution on the master
         if self.cmd == 'MASTER':
             self.PerformUpgrade()
-        
+
         # The rest of the options are executed on remote hosts
         elif self.cmd == 'SETSTATE':
             self.SetState(self.option)
@@ -2679,7 +2680,7 @@ class GPUpgrade(GPUpgradeBase):
         elif self.cmd == 'FIXCONFIG':
             self.FixConfig()
         elif self.cmd == 'SETCATVERSION':
-            self.SetCatVersion(self.oldversion.getVersionRelease(), 
+            self.SetCatVersion(self.oldversion.getVersionRelease(),
                             self.newversion.getVersionRelease())
         elif self.cmd == 'TRANSFORMCAT':
             self.TransformDbs()
@@ -2689,7 +2690,7 @@ class GPUpgrade(GPUpgradeBase):
             self.GetHighestOid()
         else:
             raise Exception('Unknown cmd: ' + str(self.cmd))
-    
+
         if self.pool:
             t = self.pool
             self.pool = None
@@ -2703,7 +2704,7 @@ class GPUpgrade(GPUpgradeBase):
         """
         logger.info('gpmigrator version ' + __version__)
         logger.info('Python version %d.%d.%d %s %d' % sys.version_info)
-    
+
         # Check that we can do the upgrade between the versions
         self.CheckVersions()
 
@@ -2729,7 +2730,7 @@ class GPUpgrade(GPUpgradeBase):
         # Be careful if the last upgrade died in an unstable state
         if 'BACKUP_VALID' in current_state:
             self.Revert()
-        
+
         # Determine if it is safe to continue from where we left off, or
         # if we need to start over from the beginning.
         #   1) We only try to resume if we made it to NEWDB_VALID
@@ -2762,7 +2763,7 @@ class GPUpgrade(GPUpgradeBase):
 
         # --------
         # Stage 1:
-        # --------         
+        # --------
         # We have 1 main restart state which is the state of NEWDB_VALID.  This
         # is the state we record right before we start remirroring.  After the
         # first phase of remirroring we stop the script to allow for the
@@ -2813,11 +2814,16 @@ class GPUpgrade(GPUpgradeBase):
             #   - we should stop it again
             if self.faultinjection == 3:
                 raise UpgradeError("faultinjection=%d" % self.faultinjection)
-    
+
+            try:
+                depcheck_for_madlib()
+            except RuntimeError as e:
+                raise UpgradeError(str(e))
+
             # The way things are structured we will only issue selects against
             # the database that's "up" so mark the oldenv as running.
             self.ExtractInfo()
-    
+
             # Create working directories on all hosts
             # + Requires configuration info collected in ExtractInfo
             # + Requires Execution on all hosts
@@ -2825,13 +2831,13 @@ class GPUpgrade(GPUpgradeBase):
                 self.CreateDirectories()
                 self.SetState('BOOTSTRAP: ' + self.RunCmd('date +%Y%m%d:%H:%M:%S'))
                 self.SetState('CREATE_DIRS')
-    
+
 
             # Run the common pre-upgrade check
             if 'CHECKCAT' not in current_state and self.checkcat:
                 self.PreUpgradeCheck()
                 self.SetState('CHECKCAT')
-                
+
             # If we're in checkcat only mode, return here. Don't do the actual upgrade
             if self.checkonly:
                 return
@@ -2843,22 +2849,22 @@ class GPUpgrade(GPUpgradeBase):
             # + Adjusts hba_conf to only allow upgrade user access
             # + Database is left down
             self.SetupLockdown()
-            
+
             # Test failure after we have locked the database
             #   - we should unlock it
             if self.faultinjection == 4:
                 raise UpgradeError("faultinjection=%d" % self.faultinjection)
 
-            # Write configuration files 
+            # Write configuration files
             # + Required for Revert() to work correctly
             if 'CONFIG_FILES' not in current_state:
                 self.GenerateConfigFiles()
                 self.SetState('CONFIG_FILES')
-            
+
             if 'EXTRACTCATFILES' not in current_state:
                 self.ExtractCatFiles()
                 self.SetState('EXTRACTCATFILES')
-    
+
             #if 'EXTRACTAOSEGS' not in current_state:
             #    self.ExtractAosegs()
             #    self.SetState('EXTRACTAOSEGS')
@@ -2872,24 +2878,24 @@ class GPUpgrade(GPUpgradeBase):
             #  - unlock database
             if self.faultinjection == 5:
                 raise UpgradeError("faultinjection=%d" % self.faultinjection)
-    
+
             if 'GETHIGHESTOID' not in current_state:
                 self.GetHighestOid()
                 self.SetState('GETHIGHESTOID')
-    
+
             # Note: Because the source array is already in a lockdown state
             # the skeleton we build will also automatically be in a lockdown
             # state, so there is no need to Explicitly lock it.
             if 'BUILDSKEL' not in current_state:
                 self.BuildSkel()
                 self.SetState('BUILDSKEL')
-            
+
             if 'SETCATVERSION' not in current_state:
                 sov = self.oldversion.getVersionRelease()
                 snv = self.newversion.getVersionRelease()
                 self.SetCatVersion(sov, snv)
                 self.SetState('SETCATVERSION')
-    
+
             # TouchupConfig() performs final modifications to the catalog
             # to get the configuration information in line with the upgrade.
             # This involves adjusting the replication ports, hostnames,
@@ -2903,7 +2909,7 @@ class GPUpgrade(GPUpgradeBase):
                 self.TransformDbs()
                 self.SetState('TRANSFORMCAT')
                 self.Shutdown()
-    
+
             # Test failure
             #  - unlock database
             if self.faultinjection == 6:
@@ -2911,7 +2917,7 @@ class GPUpgrade(GPUpgradeBase):
 
             # Release the lockdown on the old database
             self.ReleaseLockdown(self.oldenv)
-    
+
             # Test failure
             #  - unlock database
             if self.faultinjection == 7:
@@ -2929,10 +2935,10 @@ class GPUpgrade(GPUpgradeBase):
             logger.info("--------------------------------------------------")
             logger.info("Stage 1 complete")
             logger.info("--------------------------------------------------")
-        
+
         # --------
         # Stage 2:
-        # -------- 
+        # --------
         # We have no fully upgraded the existing old configuration into a
         # new configuration.
         #
@@ -2950,7 +2956,7 @@ class GPUpgrade(GPUpgradeBase):
         # Test failure after releasing the lockdown
         if self.faultinjection == 8:
             raise UpgradeError("faultinjection=%d" % self.faultinjection)
-               
+
         # Add the gp_dbid file to every segment
         #  + Requires all mirror directories to exist
         if 'GP_DBID' not in current_state:
@@ -2965,7 +2971,7 @@ class GPUpgrade(GPUpgradeBase):
         if 'BACKUP_VALID' not in current_state:
             self.DeepLink('BACKUP')
             self.SetState('BACKUP_VALID')
-    
+
         try:
             # Test failure after installing the backup
             #   - Revert is necessary
@@ -2979,7 +2985,7 @@ class GPUpgrade(GPUpgradeBase):
 
             # --------
             # Stage 3:
-            # -------- 
+            # --------
             # The current state of the world is as follows
             #    DATA_DIR/         = contents unreliable
             #    DATA_DIR/upgrade  = fully upgraded new db
@@ -2993,14 +2999,14 @@ class GPUpgrade(GPUpgradeBase):
             #   - Revert is necessary
             if self.faultinjection == 10:
                 raise UpgradeError("faultinjection=%d" % self.faultinjection)
-    
+
             # Everything upgraded and validated
             # + Mark install valid
             self.Startup(self.newenv)
 
             # Install the gp_toolkit schema
             # + Requires a fully running 4.0 system including dispatch
-            #   and thus must occur after remirroring.  
+            #   and thus must occur after remirroring.
             if 'POSTUPGRADE' not in current_state:
                 self.SetState('POSTUPGRADE')
 
@@ -3017,7 +3023,7 @@ class GPUpgrade(GPUpgradeBase):
                 self.Update('DROP USER ' + MIGRATIONUSER, forceUseEnvUser=True)
             except:
                 logger.warn('Objects owned by gpmigrator reassigned to dba')
-                admin = self.Select('''select rolname from pg_authid 
+                admin = self.Select('''select rolname from pg_authid
                                     where oid = 10''', forceUseEnvUser=True)[0];
                 oids = sorted(self.dbs.keys())
                 for dboid in oids:
@@ -3033,12 +3039,12 @@ class GPUpgrade(GPUpgradeBase):
             #   - gpmigrator user no longer exists
             if self.faultinjection == 11:
                 raise UpgradeError("faultinjection=%d" % self.faultinjection)
-    
+
             if self.warnings:
                 logger.warn('***************************************')
                 logger.warn('Warnings encountered during upgrade.')
                 logger.warn('***************************************')
-    
+
             # Release the lockdown
             self.ReleaseLockdown(self.newenv)
 
@@ -3046,10 +3052,10 @@ class GPUpgrade(GPUpgradeBase):
             logger.fatal(str(e))
             self.Revert()
             raise
-    
+
         # --------
         # Stage 4:
-        # -------- 
+        # --------
         # The current state of the world is as follows
         #    DATA_DIR/         = fully upgraded new db
         #    DATA_DIR/upgrade  = fully upgraded new db
@@ -3057,7 +3063,7 @@ class GPUpgrade(GPUpgradeBase):
         # => Remove redundant DATA_DIR/upgrade
         # => Remove historical DATA_DIR/backup
         self.RemoveDirectories(force=True)
-    
+
         # -----------------
         # Upgrade Complete:
         # -----------------
@@ -3077,52 +3083,52 @@ class GPUpgrade(GPUpgradeBase):
 if __name__ == '__main__':
     coverage = GpCoverage()
     coverage.start()
-    
+
     # Create a new GPUpgrade - should never throw exception
     u = GPUpgrade()
-    
+
     # parses and validates input
     try:
         u.Setup()
     except Exception, e:
         logger.fatal(str(e))
         sys.exit(1)
-    
+
     # Execute the main upgrade routine, the Run() function itself is
     # just a switch on the "cmd", which switches between the main
     # PerformUpgrade() function and all the various subcommands that
     # are upgraded by backend executions.
     try:
-        u.Run()    
-    
+        u.Run()
+
     # Any error that can happen
     except KeyboardInterrupt:
         try:    u.Cleanup()
-        except Exception, e2: 
+        except Exception, e2:
             logger.fatal(str(e2))
         logger.fatal('***************************************')
         logger.fatal('==  Upgrade interrupted by user ==        <<<<< ')
         logger.fatal('***************************************')
         sys.exit(1)
-    
+
     except ConnectionError, e:
         try:   u.Cleanup()
-        except Exception, e2: 
+        except Exception, e2:
             logger.fatal(str(e2))
         logger.fatal('***************************************')
         logger.fatal(str(e))
         logger.fatal('***************************************')
         sys.exit(1)
-    
+
     except UpgradeError, e:
         try:   u.Cleanup()
-        except Exception, e2: 
+        except Exception, e2:
             logger.fatal(str(e2))
         logger.fatal('***************************************')
         logger.fatal(str(e))
         logger.fatal('***************************************')
         sys.exit(1)
-    
+
     except CmdError, e:
         try:   u.Cleanup()
         except Exception, e2:
@@ -3133,12 +3139,12 @@ if __name__ == '__main__':
         logger.fatal('  ' + str(e.stderr.strip()))
         logger.fatal('***************************************')
         sys.exit(1)
-    
+
     # Shouldn't get any of these, if they occur it is probably a bug in
     # the upgrader.
     except Exception, e:
         try:   u.Cleanup()
-        except Exception, e2: 
+        except Exception, e2:
             logger.fatal(str(e2))
         logger.fatal('***************************************')
         logger.fatal(str(e))
@@ -3148,7 +3154,7 @@ if __name__ == '__main__':
     finally:
         coverage.stop()
         coverage.generate_report()
-    
+
     # This shouldn't need to be explicit, but if something goes wrong in
     # thread shutdown it forces the issue.
     sys.exit(0)

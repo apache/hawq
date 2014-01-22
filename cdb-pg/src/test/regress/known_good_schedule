@@ -201,17 +201,8 @@ ignore: percentile
 ignore: resource_queue_function
 ignore: gp_optimizer
 ignore: co_nestloop_idxscan
-test: madlib_array_ops
+ignore: madlib_array_ops
 test: madlib_svec_test
-test: madlib_chi2_test
-test: madlib_sample
-test: madlib_linalg
-test: madlib_assoc_rules
-test: madlib_linear
-test: madlib_lda
-test: madlib_logistic
-test: madlib_multilogistic
-test: madlib_kmeans
 #
 # the following test needs some special filespace/tablespace.
 #

@@ -1,4 +1,4 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python
 #
 # This is a common util lib for gpmigrator and gpmigrator_mirror.
 #
@@ -40,10 +40,10 @@ def make_conn(ug, user, db, options, port, sockdir):
     for i in range(retries):
         try:
             logger.debug("making database connection: user = %s, "
-                         "dbname = %s port = %i" 
+                         "dbname = %s port = %i"
                          % (user, db, port))
             conn = pg.connect(user=user,
-                              dbname=db, 
+                              dbname=db,
                               opt=options,
                               port=port)
             break
@@ -92,7 +92,7 @@ def is_supported_version(version, upgrade=True):
       Versions > main
       Versions with unusual "builds" (eg 3.4.0.0_EAP1)
     '''
-    
+
     if upgrade:
         upstr = "upgrade"
     else:
@@ -104,7 +104,7 @@ def is_supported_version(version, upgrade=True):
     if not re.match(r"(dev|filerep|\d+)", build):
         raise UpgradeError(
             "HAWQ '%s' is not supported for %s"
-            % (str(version), upstr))            
+            % (str(version), upstr))
 
     if version >= "1.0.0.0" and version <= 'main':
         return True
@@ -116,9 +116,9 @@ def is_supported_version(version, upgrade=True):
     else:
         raise UpgradeError(
             "To %s HAWQ '%s' use the %s tool "
-            "shipped with that release" 
+            "shipped with that release"
             % (upstr, str(version), upstr))
-        
+
 
 #============================================================
 class GpUpgradeCmd(base.Command):
@@ -126,7 +126,7 @@ class GpUpgradeCmd(base.Command):
         cmdStr = ' '.join(cmd)
         base.Command.__init__(self, name, cmdStr, ctxt, remoteHost)
 
-        
+
 #============================================================
 class GPUpgradeBase(object):
     def __init__(self):
@@ -168,8 +168,8 @@ class GPUpgradeBase(object):
         else:
             logger.warn("Unknown RunCmd datatype '%s'" % str(type(cmd)))
             cmdstr = str(cmd)
-        
-        if self.debug and not supressDebug: 
+
+        if self.debug and not supressDebug:
             logger.debug("ENV: " + str(env))
             logger.debug("CMD: " + cmdstr)
 
@@ -181,8 +181,8 @@ class GPUpgradeBase(object):
             env['PGOPTIONS'] = '-c gp_session_role=utility'
 
         try:
-            pipe = subprocess.Popen(cmd, env=env, 
-                                    stdout=subprocess.PIPE, 
+            pipe = subprocess.Popen(cmd, env=env,
+                                    stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE,
                                     close_fds=True)
             result  = pipe.communicate();
@@ -301,13 +301,13 @@ class GPUpgradeBase(object):
 
         rows = []
         for tuple in curs.dictresult():
-            if len(tuple) == 1: 
+            if len(tuple) == 1:
                 rows.append(tuple.values()[0])
-            else: 
+            else:
                 rows.append(tuple)
         conn.close()
         return rows
-    
+
     #------------------------------------------------------------
     def Update(self, qry, db='template0', port=None, forceutility=False, upgradeMode=False, modSysTbl=False, forceUseEnvUser=False):
         # forceUseEnvUser: user will be GPMIGRATOR if we're in lockdown mode(gpmigrator); otherwise
@@ -334,7 +334,7 @@ class GPUpgradeBase(object):
                 raise UpgradeError('database is down')
             [env, utility] = self.dbup
 
-            locked = os.path.join(env['MASTER_DATA_DIRECTORY'], 
+            locked = os.path.join(env['MASTER_DATA_DIRECTORY'],
                                   'pg_hba.conf'+LOCKEXT)
             if os.path.exists(locked) and not forceUseEnvUser:
                 user = MIGRATIONUSER
@@ -350,10 +350,10 @@ class GPUpgradeBase(object):
 
         if port == None:
             port = self.masterport
-        
+
         options = ' '
         if modSysTbl:               options += ' -c allow_system_table_mods=dml'
-        if utility or forceutility: options += ' -c gp_session_role=utility'          
+        if utility or forceutility: options += ' -c gp_session_role=utility'
         if upgradeMode:             options += ' -c gp_maintenance_conn=true'
 
         if self.__dict__.get('sock_dir'):
@@ -409,7 +409,7 @@ class GPUpgradeBase(object):
     #------------------------------------------------------------
     def CheckDown(self, warn=False):
         '''
-        Checks that neither postmaster is running and that the database 
+        Checks that neither postmaster is running and that the database
         was cleanly shutdown.
         '''
         if self.cmd == 'MASTER':
@@ -418,11 +418,11 @@ class GPUpgradeBase(object):
             datadirs = self.datadirs
 
         shutdown_re = re.compile('Database cluster state: *(.*)')
-            
+
         for oldseg in datadirs:
             (d, content) = os.path.split(oldseg)
             newseg = os.path.join(d, WORKDIR, UPGRADEDIR, content)
- 
+
             # Only check the upgrade directory if its not legacy
             if self.datadirs:
                 dirs = [oldseg, newseg]
@@ -445,7 +445,7 @@ class GPUpgradeBase(object):
                 for line in shutdown.split('\n'):
                     m = shutdown_re.match(line)
                     if m:
-                        if m.group(1) == 'shut down': 
+                        if m.group(1) == 'shut down':
                             break
                         msg  = 'pg_controldata: "Database cluster state: %s"\n' % m.group(1)
                         msg += 'Greenplum segment %s did not shutdown cleanly' % dir
@@ -453,10 +453,10 @@ class GPUpgradeBase(object):
                             logger.warn(msg)
                         else:
                             raise UpgradeError(msg)
-            
+
         if self.cmd == 'MASTER' and self.datadirs:
             self.CallSlaves('CHKDOWN')
-            
+
         return True
 
     #------------------------------------------------------------
@@ -502,8 +502,8 @@ class GPUpgradeBase(object):
                 logger.debug("Starting cluster with env = %s" % str(env))
                 pid = subprocess.Popen(cmd, preexec_fn=os.setpgrp,
                                        env=env, shell=True,
-                                       stdout=self.logfile, 
-                                       stderr=self.logfile, 
+                                       stdout=self.logfile,
+                                       stderr=self.logfile,
                                        close_fds=True)
             finally:
                 if os.path.exists(locked):
@@ -513,7 +513,7 @@ class GPUpgradeBase(object):
             error = None
             retcode = None
             while retcode == None:
-                try: 
+                try:
                     retcode = pid.wait();
 
                 except KeyboardInterrupt, e:
@@ -545,7 +545,7 @@ class GPUpgradeBase(object):
                 raise UpgradeError('Startup failed')
 
             # If we recieved an interrupt, resignal it now that the startup is done
-            if error: 
+            if error:
                 raise error
 
         except OSError, e:
@@ -553,8 +553,8 @@ class GPUpgradeBase(object):
             raise UpgradeError('Startup failed')
 
         self.CheckUp();
-        
-        
+
+
     #------------------------------------------------------------
     def Shutdown(self):
         '''
@@ -583,28 +583,28 @@ class GPUpgradeBase(object):
             # Note on arguments to gpstop:
             #   This code has gone back and forth on -s vs -f for shutdown:
             #
-            #   -f aborts active connections.  This is a good thing.  If 
+            #   -f aborts active connections.  This is a good thing.  If
             #      a user or script snuck in a connection before we were able
-            #      to establish the lockdown then we want to abort that 
-            #      connection otherwise it will cause the upgrade to fail and 
+            #      to establish the lockdown then we want to abort that
+            #      connection otherwise it will cause the upgrade to fail and
             #      that is bad.
             #
-            #      Prior versions would sometimes issue a kill for fast 
-            #      shutdown, this is a problem since we need the database 
+            #      Prior versions would sometimes issue a kill for fast
+            #      shutdown, this is a problem since we need the database
             #      shutdown cleanly with no pending xlog transactions.
             #      Because of that we switched to -s.
-            # 
-            #   -s causes problems because it is a stop that will fail if a 
+            #
+            #   -s causes problems because it is a stop that will fail if a
             #      session is connected and we want to abort active sessions.
             #      Because of that we switched back to -f.
             #
             #   The belief is currently that the current version of gpstop
             #   should be good with passing -f.  To help safeguard this belief
-            #   there is a check when we set the catalog version to ensure 
+            #   there is a check when we set the catalog version to ensure
             #   that the database shutdown cleanly.
-            #   
+            #
             # If this needs to be changed again please read the above,
-            # consider what happens if you try to upgrade with an active 
+            # consider what happens if you try to upgrade with an active
             # connection open to the database, and procede cautiously.
 
             if utility:  cmd = 'gpstop -a -f -m'
@@ -623,7 +623,7 @@ class GPUpgradeBase(object):
 
                 pid = subprocess.Popen(cmd, preexec_fn=os.setpgrp,
                                        env=env, shell=True,
-                                       stdout=self.logfile, 
+                                       stdout=self.logfile,
                                        stderr=self.logfile,
                                        close_fds=True)
             finally:
@@ -635,7 +635,7 @@ class GPUpgradeBase(object):
             error = None
             retcode = None
             while retcode == None:
-                try: 
+                try:
                     retcode = pid.wait();
 
                 except KeyboardInterrupt, e:
@@ -666,7 +666,7 @@ class GPUpgradeBase(object):
                 raise UpgradeError('Shutdown failed')
 
             # If we recieved an interrupt, resignal it now that the startup is done
-            if error: 
+            if error:
                 raise error
 
         except OSError, e:
@@ -674,7 +674,7 @@ class GPUpgradeBase(object):
             raise UpgradeError('Shutdown failed')
 
         self.CheckDown();
-        
+
 
     #------------------------------------------------------------
     def PreUpgradeCheck(self):
@@ -754,7 +754,7 @@ class GPUpgradeBase(object):
             logger.fatal('Please make sure that there is at least 2GB of free space on the master.')
             logger.fatal('***************************************')
             raise UpgradeError('Insufficient Space on Master')
-        
+
     #------------------------------------------------------------
     def CheckCatalog(self):
         '''
@@ -773,17 +773,17 @@ class GPUpgradeBase(object):
 
         exec_cmd = libdir + '/gpcheckcat -p %d -U %s -B %i ' % \
             (self.masterport, user, PARALLELISM)
-        
+
         oids = sorted(self.dbs.keys())
         for dboid in oids:
             db = self.dbs[dboid]
-                
+
             if db == 'template0':
                 continue
-            
+
             if db == 'gpperfmon':
                 self.Checkgpperfmon()
-                
+
             cmd = exec_cmd + db
             logger.info('... Checking ' + db)
 
@@ -800,8 +800,8 @@ class GPUpgradeBase(object):
                 raise UpgradeError('Catalog Check terminated by signal')
             if retcode > 0:
                 raise UpgradeError('Catalog Check Failed - see %s for details' % outfilename)
-            
-            
+
+
     #------------------------------------------------------------
     def Checkgpperfmon(self):
         '''
@@ -815,7 +815,7 @@ class GPUpgradeBase(object):
             if (os.path.isdir(perfdatadir)):
                 perfdatabkup = os.path.join(self.masterdir, "gpperfmon", "data.%s" % time())
                 os.rename(perfdatadir, perfdatabkup)
-            
+
             # test run gpperfmon upgrade script
             rolname = self.Select("select rolname from pg_authid where oid=10")[0]
             fname = os.path.join(self.newhome, "lib/gpperfmon/gpperfmon42.sql")
@@ -827,7 +827,7 @@ class GPUpgradeBase(object):
             sys.stderr.write(traceback.format_exc())
             sys.stderr.write(str(e))
             raise e
-        
+
     #------------------------------------------------------------
     def getversion(self, home,env):
         binary = os.path.join(home, 'bin', 'pg_ctl')
