@@ -15,16 +15,14 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 
-import com.pivotal.pxf.api.ReadAccessor;
-import com.pivotal.pxf.core.AnalyzerFactory;
-import com.pivotal.pxf.api.AnalyzerStats;
-import com.pivotal.pxf.api.utilities.InputData;
-import com.pivotal.pxf.core.ReadBridge;
-import com.pivotal.pxf.core.utilities.SecuredHDFS;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import com.pivotal.pxf.api.Analyzer;
+import com.pivotal.pxf.api.AnalyzerStats;
+import com.pivotal.pxf.api.utilities.InputData;
+import com.pivotal.pxf.core.AnalyzerFactory;
+import com.pivotal.pxf.core.utilities.SecuredHDFS;
 
 /*
  * Class enhances the API of the WEBHDFS REST server.
@@ -83,13 +81,12 @@ public class AnalyzerResource
 		final InputData inputData = new InputData(params);
         SecuredHDFS.verifyToken(inputData, servletContext);
 		final Analyzer analyzer = AnalyzerFactory.create(inputData);
-        final ReadAccessor accessor = ReadBridge.getFileAccessor(inputData);
 
 		/*
 		 * Function queries the pxf Analyzer for the data fragments of the resource
 		 * The fragments are returned in a string formatted in JSON	 
 		 */		
-		String jsonOutput = AnalyzerStats.dataToJSON(analyzer.getEstimatedStats(path, accessor));
+		String jsonOutput = AnalyzerStats.dataToJSON(analyzer.getEstimatedStats(path));
 		
 		return Response.ok(jsonOutput, MediaType.APPLICATION_JSON_TYPE).build();
 	}

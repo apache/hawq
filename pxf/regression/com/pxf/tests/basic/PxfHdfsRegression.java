@@ -1014,12 +1014,14 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		verifyAnalyze(exTable);
 
-//		ReportUtils.report(report, getClass(), "verify ANALYZE on path with directory");
-//		exTable.setName("analyze_dir");
-//		exTable.setPath(hdfsWorkingFolder + "/");
-//
-//		hawq.createTableAndVerify(exTable);
-//		verifyAnalyze(exTable);
+		ReportUtils.report(report, getClass(), "verify ANALYZE on path with directory");
+		Assert.assertFalse(hdfs.list(hdfsWorkingFolder + "/").isEmpty());
+
+		exTable.setName("analyze_dir");
+		exTable.setPath(hdfsWorkingFolder);
+
+		hawq.createTableAndVerify(exTable);
+		verifyAnalyze(exTable);
 	}
 
 	/**
@@ -1072,7 +1074,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 		hawq.runQuery("SET pxf_enable_stat_collection = true;");
 
 		/**
-		 * Different Curel versions can provide different ERROR messages.
+		 * Different Curl versions can provide different ERROR messages.
 		 */
 		String[] possibleErrMessages = {
 				"Failed connect to " + exTable.getHostname() + ":" + exTable.getPort() + "; Connection refused",

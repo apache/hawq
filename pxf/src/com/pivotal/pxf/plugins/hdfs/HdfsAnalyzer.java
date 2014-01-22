@@ -18,6 +18,7 @@ import org.apache.hadoop.mapred.JobConf;
 
 import com.pivotal.pxf.plugins.hdfs.utilities.PxfInputFormat;
 import com.pivotal.pxf.api.utilities.InputData;
+import com.pivotal.pxf.core.ReadBridge;
 
 
 
@@ -36,9 +37,9 @@ public class HdfsAnalyzer extends Analyzer
 	/*
 	 * C'tor
 	 */
-	public HdfsAnalyzer(InputData md) throws IOException
+	public HdfsAnalyzer(InputData inputData) throws IOException
 	{
-		super(md);
+		super(inputData);
 		Log = LogFactory.getLog(HdfsAnalyzer.class);
 
 		jobConf = new JobConf(new Configuration(), HdfsAnalyzer.class);
@@ -51,7 +52,7 @@ public class HdfsAnalyzer extends Analyzer
 	 * fragments in json format
 	 */
     @Override
-	public AnalyzerStats getEstimatedStats(String datapath, ReadAccessor accessor) throws Exception
+	public AnalyzerStats getEstimatedStats(String datapath) throws Exception
 	{
 		long blockSize = 0;
 		long numberOfBlocks;
@@ -75,7 +76,8 @@ public class HdfsAnalyzer extends Analyzer
         }
 		numberOfBlocks = splits.length;
 
-        long numberOfTuplesInBlock = getNumberOfTuplesInBlock(splits, accessor);
+		
+        long numberOfTuplesInBlock = getNumberOfTuplesInBlock(splits);
         AnalyzerStats stats = new AnalyzerStats(blockSize, numberOfBlocks, numberOfTuplesInBlock*numberOfBlocks);
 
 		//print files size to log when in debug level
@@ -89,9 +91,10 @@ public class HdfsAnalyzer extends Analyzer
 	 * Reads one block from HDFS. Exception during reading will
 	 * filter upwards and handled in AnalyzerResource
 	 */
-	private long getNumberOfTuplesInBlock(InputSplit[] splits, ReadAccessor accessor) throws Exception
+	private long getNumberOfTuplesInBlock(InputSplit[] splits) throws Exception
 	{
 		long tuples = -1; /* default  - if we are not able to read data */
+		ReadAccessor accessor;
 		
 		if (splits.length == 0) {
 			return tuples;
@@ -105,7 +108,8 @@ public class HdfsAnalyzer extends Analyzer
 		byte[] fragmentMetadata = HdfsUtilities.prepareFragmentMetadata(firstSplit);
 		inputData.setFragmentMetadata(fragmentMetadata);
 		inputData.setPath(firstSplit.getPath().toUri().getPath());
-
+		accessor = ReadBridge.getFileAccessor(inputData);
+		
 		if (accessor.openForRead())
 		{
 			tuples = 0;

@@ -12,9 +12,9 @@ import com.pivotal.pxf.api.utilities.Plugin;
  */
 public abstract class Analyzer extends Plugin
 {
-	public Analyzer(InputData metaData)
+	public Analyzer(InputData inputData)
 	{
-		super(metaData);
+		super(inputData);
 	}
 	
 	/*
@@ -25,7 +25,7 @@ public abstract class Analyzer extends Plugin
 	 * that returns *estimated* statistics. Scanning all the data for exact
 	 * statistics is considered bad practice.
 	 */
-	public AnalyzerStats getEstimatedStats(String data, ReadAccessor accessor) throws Exception
+	public AnalyzerStats getEstimatedStats(String data) throws Exception
 	{
 		/* Return default values */
 		return new AnalyzerStats();
