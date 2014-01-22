@@ -1437,6 +1437,11 @@ RemoveRelation(const RangeVar *relation, DropBehavior behavior,
 
 	/* if we got here then we should proceed. */
 	performDeletion(&object, behavior);
+    
+    if(gp_upgrade_mode && Gp_role == GP_ROLE_DISPATCH)
+    {
+        CdbDispatchUtilityStatement((Node *)stmt, "RemoveRelation");
+    }
 }
 
 /*
