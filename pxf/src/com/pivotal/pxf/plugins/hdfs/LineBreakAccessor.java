@@ -46,10 +46,8 @@ public class LineBreakAccessor extends HdfsSplittableDataAccessor implements Wri
 		Log = LogFactory.getLog(LineBreakAccessor.class);
 
  	}
-	
-	/*
-	 * Override virtual method to create specialized record reader
-	 */	
+
+    @Override
 	protected Object getReader(JobConf jobConf, InputSplit split) throws IOException
 	{
 		return new LineRecordReader(jobConf, (FileSplit)split);

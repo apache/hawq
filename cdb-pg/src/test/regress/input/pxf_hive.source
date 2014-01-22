@@ -12,7 +12,6 @@
 -- TODO: test PB, AVRO, THRIFT when it is enabled (read only, with pre formatted files).
 -- TODO: test protocol validator for pxf once written.
 -- TODO: test parameter passing, filter passing
-
 -- start_matchsubs
 --                                                                                               
 -- # create a match/subs expression to handle ip addresses that change
@@ -21,12 +20,10 @@
 -- s/'\d+\.\d+\.\d+\.\d+:\d+'/'SOME_IP:SOME_PORT'/
 --
 -- end_matchsubs
-
 --------------------------------------------------------------------------------
 -- HIVE
 --------------------------------------------------------------------------------
 --
-
 -- 1. Testing Hive support for the primitive data types
 \! ${HIVE_ROOT}/bin/hive -e "create table hive_types (s1 string,s2 string,n1 int, d1 double, dc1 decimal, tm timestamp, f float, bg bigint, b boolean)row format delimited fields terminated by ','" 2>/dev/null
 \! ${HIVE_ROOT}/bin/hive -e "load data local inpath '@abs_srcdir@/data/pxf/hive_types.txt' into table hive_types" 2>/dev/null

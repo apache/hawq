@@ -232,7 +232,7 @@ select * from hv_heterogen order by t3, t1;
 
 -- Test analyze for Hive table.
 ANALYZE hv_heterogen;
-WARNING:  skipping "hv_heterogen" --- error returned: no ANALYZER or PROFILE option in table definition
+WARNING:  skipping "hv_heterogen" --- error returned: remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v9/Analyzer/getEstimatedStats. Reason:     Server Error   Caused by:  java.lang.IllegalArgumentException: PXF 'Analyzer' class was not found. Please supply it in the LOCATION clause or use it in a PXF profile in order to run ANALYZE on this table
 select relpages, reltuples from pg_class where relname = 'hv_heterogen';
  relpages | reltuples 
 ----------+-----------
@@ -377,7 +377,6 @@ WARNING:  skipping "hv_heterogen_profile_wo_analyzer" --- error returned: remote
 -- 13. Index table
 \! ${HIVE_ROOT}/bin/hive -e "create index reg_txt_index on table reg_txt (s1) as 'COMPACT' with deferred rebuild" 2>/dev/null
 \! ${HIVE_ROOT}/bin/hive -e "alter index reg_txt_index on reg_txt rebuild" 2>/dev/null
-Deleted /hive/warehouse/default__reg_txt_reg_txt_index__
 CREATE EXTERNAL TABLE hv_index(
 t1    text,
 t2    text,
