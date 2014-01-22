@@ -310,12 +310,7 @@ RangeVarGetCreationNamespace(const RangeVar *newRelation)
 	{
 		if (gp_upgrade_mode)
 		{
-			namespaceId = caql_getoid(
-				NULL,
-				cql("SELECT oid FROM pg_namespace "
-					" WHERE nspname = :1 ",
-					CStringGetDatum("pg_catalog")));
-						
+            namespaceId = PG_CATALOG_NAMESPACE;
 		}
 		else
 		{
