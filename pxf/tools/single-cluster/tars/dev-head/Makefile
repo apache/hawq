@@ -29,7 +29,7 @@ stack.fetched:
 	touch $@
 
 %.fetched: $(ARTIFACTS)/%*.tar.gz %.single
-	mv $< .
+	cp $< .
 	touch $@
 
 %.single:

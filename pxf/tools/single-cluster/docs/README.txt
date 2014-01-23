@@ -72,6 +72,7 @@ v1.7.5
 
 - GPSQL-1647: Enable release-head and use stack-phd2.0-release
 - GPSQL-1647: Use stack-phd2.0-release for dev-head
+- GPSQL-1650: cp PXF tarballs instead of mv
 
 v1.7.4
 ------
