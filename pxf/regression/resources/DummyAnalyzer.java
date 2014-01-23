@@ -17,11 +17,11 @@ public class DummyAnalyzer extends Analyzer {
     }
 
     /*
-     * path is a data source URI that can appear as a file name, a directory name  or a wildcard
+     * path is a data source URI that can appear as a file name, a directory name or a wildcard
      * returns the data statistics in json format
      */
     @Override
-    public AnalyzerStats getEstimatedStats(String data, ReadAccessor accessor) throws Exception {
+    public AnalyzerStats getEstimatedStats(String data) throws Exception {
         return new AnalyzerStats(160000 /* disk block size in bytes */,
                 3 /* number of disk blocks */,
                 6 /* total number of rows */);
