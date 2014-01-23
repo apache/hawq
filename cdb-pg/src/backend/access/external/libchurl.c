@@ -94,7 +94,7 @@ void compact_internal_buffer(churl_buffer* buffer);
 void realloc_internal_buffer(churl_buffer* buffer, size_t required);
 bool handle_special_error(long response);
 char* get_http_error_msg(long http_ret_code, char* msg, char* curl_error_buffer);
-char* build_header_str(const char* format, const char* name, const char* value);
+char* build_header_str(const char* format, const char* key, const char* value);
 void print_http_headers(CHURL_HEADERS headers);
 
 
@@ -128,35 +128,35 @@ CHURL_HEADERS churl_headers_init(void)
 
 /*
  * Build a header string, in the form of given format (e.g. "%s: %s"),
- * and populate <name> and <value> in it.
- * If value is empty, return <name>.
+ * and populate <key> and <value> in it.
+ * If value is empty, return <key>.
  */
 char* build_header_str(const char* format,
-					   const char* name,
+					   const char* key,
 					   const char* value)
 {
 	char* header_option = NULL;
 
-	if (value == NULL)  /* the option is just a "name" */
-		header_option = pstrdup(name);
-	else /* the option is a "name: value" */
+	if (value == NULL)  /* the option is just a "key" */
+		header_option = pstrdup(key);
+	else /* the option is a "key: value" */
 	{
 		StringInfoData formatter;
 		initStringInfo(&formatter);
-		appendStringInfo(&formatter, format, name, value);
+		appendStringInfo(&formatter, format, key, value);
 		header_option = formatter.data;
 	}
 	return header_option;
 }
 
 void churl_headers_append(CHURL_HEADERS headers,
-						  const char* name,
+						  const char* key,
 						  const char* value)
 {
 	churl_settings* settings = (churl_settings*)headers;
 	char* header_option = NULL;
 
-	header_option = build_header_str("%s: %s", name, value);
+	header_option = build_header_str("%s: %s", key, value);
 	
 	settings->headers = curl_slist_append(settings->headers,
 										  header_option);
@@ -164,7 +164,7 @@ void churl_headers_append(CHURL_HEADERS headers,
 }
 
 void churl_headers_override(CHURL_HEADERS headers,
-							const char* name,
+							const char* key,
 							const char* value)
 {
 
@@ -173,11 +173,11 @@ void churl_headers_override(CHURL_HEADERS headers,
 	char* key_option = NULL;
 	char* header_data = NULL;
 
-	/* name must not be empty */
-	Assert(name != NULL);
+	/* key must not be empty */
+	Assert(key != NULL);
 
 	/* key to compare with in the headers */
-	key_option = build_header_str("%s:%s", name, value ? "" : NULL);
+	key_option = build_header_str("%s:%s", key, value ? "" : NULL);
 
 	/* find key in headers list */
 	while (header_cell != NULL)
@@ -195,7 +195,7 @@ void churl_headers_override(CHURL_HEADERS headers,
 
 	if (header_cell != NULL) /* found key */
 	{
-		char* new_data = build_header_str("%s: %s", name, value);
+		char* new_data = build_header_str("%s: %s", key, value);
 		char* old_data = header_cell->data;
 		header_cell->data = strdup(new_data);
 		elog(DEBUG4, "churl_headers_override: new data: %s, old data: %s", new_data, old_data);
@@ -204,14 +204,14 @@ void churl_headers_override(CHURL_HEADERS headers,
 	}
 	else
 	{
-		churl_headers_append(headers, name, value);
+		churl_headers_append(headers, key, value);
 	}
 
 	pfree(key_option);
 }
 
 void churl_headers_remove(CHURL_HEADERS headers,
-						  const char* name,
+						  const char* key,
 						  bool has_value)
 {
 
@@ -221,11 +221,11 @@ void churl_headers_remove(CHURL_HEADERS headers,
 	char* key_option = NULL;
 	char* header_data = NULL;
 
-	/* name must not be empty */
-	Assert(name != NULL);
+	/* key must not be empty */
+	Assert(key != NULL);
 
 	/* key to compare with in the headers */
-	key_option = build_header_str("%s:%s", name, has_value ? "" : NULL);
+	key_option = build_header_str("%s:%s", key, has_value ? "" : NULL);
 
 	/* find key in headers list */
 	while (to_del_cell != NULL)

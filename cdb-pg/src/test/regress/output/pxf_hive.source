@@ -232,7 +232,7 @@ select * from hv_heterogen order by t3, t1;
 
 -- Test analyze for Hive table.
 ANALYZE hv_heterogen;
-WARNING:  skipping "hv_heterogen" --- error returned: remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v9/Analyzer/getEstimatedStats. Reason:     Server Error   Caused by:  java.lang.IllegalArgumentException: PXF 'Analyzer' class was not found. Please supply it in the LOCATION clause or use it in a PXF profile in order to run ANALYZE on this table
+WARNING:  skipping "hv_heterogen" --- error returned: remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v10/Analyzer/getEstimatedStats. Reason:     Server Error   Caused by:  java.lang.IllegalArgumentException: PXF 'Analyzer' class was not found. Please supply it in the LOCATION clause or use it in a PXF profile in order to run ANALYZE on this table
 select relpages, reltuples from pg_class where relname = 'hv_heterogen';
  relpages | reltuples 
 ----------+-----------
@@ -274,7 +274,7 @@ t1    text)
 LOCATION ('pxf://@hostname@:50070/reg_txt_view?PROFILE=Hive')
 format 'custom' (formatter='pxfwritable_import');
 select * from hv_view order by t1;
-ERROR:  remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v9/Fragmenter/getFragments. Reason:     Server Error   Caused by:  java.lang.UnsupportedOperationException: PXF doesn't support HIVE views (SOMEFILE:SOMEFUNC)
+ERROR:  remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v10/Fragmenter/getFragments. Reason:     Server Error   Caused by:  java.lang.UnsupportedOperationException: PXF doesn't support HIVE views (SOMEFILE:SOMEFUNC)
 -- 9.  Decimal is a partition in the Hive Table
 \! ${HIVE_ROOT}/bin/hive -e "create table part_dec (s1 string,s2 string,n1 int, d1 double) partitioned by (dec decimal)  row format delimited fields terminated by ','" 2>/dev/null
 \! ${HIVE_ROOT}/bin/hive -e "load data local inpath '@abs_srcdir@/data/pxf/hive_small_data.txt' into table part_dec partition (dec = 10.1111111111111)" 2>/dev/null
@@ -338,7 +338,7 @@ num2  integer)
 LOCATION ('pxf://@hostname@:50070/un_supported_tbl?PROFILE=Hive')
 format 'custom' (formatter='pxfwritable_import');
 select * from hv_un_supported_tbl;
-ERROR:  remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v9/Bridge/. Reason:     Server Error   Caused by:  java.io.IOException: tinyint conversion is not supported by HiveResolver (SOMEFILE:SOMEFUNC)
+ERROR:  remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v10/Bridge/. Reason:     Server Error   Caused by:  java.io.IOException: tinyint conversion is not supported by HiveResolver (SOMEFILE:SOMEFUNC)
 DETAIL:  External table hv_un_supported_tbl
 -- 11.  Create external table with Profile option
 CREATE EXTERNAL TABLE tbl_with_profile(
@@ -373,7 +373,7 @@ t3 text)
 LOCATION ('pxf://@hostname@:50070/reg_heterogen?PROFILE=Hive')
 format 'custom' (formatter='pxfwritable_import');
 ANALYZE hv_heterogen_profile_wo_analyzer;
-WARNING:  skipping "hv_heterogen_profile_wo_analyzer" --- error returned: remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v9/Analyzer/getEstimatedStats. Reason:     Server Error   Caused by:  java.lang.IllegalArgumentException: PXF 'Analyzer' class was not found. Please supply it in the LOCATION clause or use it in a PXF profile in order to run ANALYZE on this table
+WARNING:  skipping "hv_heterogen_profile_wo_analyzer" --- error returned: remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v10/Analyzer/getEstimatedStats. Reason:     Server Error   Caused by:  java.lang.IllegalArgumentException: PXF 'Analyzer' class was not found. Please supply it in the LOCATION clause or use it in a PXF profile in order to run ANALYZE on this table
 -- 13. Index table
 \! ${HIVE_ROOT}/bin/hive -e "create index reg_txt_index on table reg_txt (s1) as 'COMPACT' with deferred rebuild" 2>/dev/null
 \! ${HIVE_ROOT}/bin/hive -e "alter index reg_txt_index on reg_txt rebuild" 2>/dev/null

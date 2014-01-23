@@ -396,6 +396,16 @@ extern bool   pxf_enable_locality_optimizations; /* turn locality optimization i
  */
 extern bool   pxf_local_storage;
 
+/*
+ * Temporary GUCs to forward login/password information to PXF
+ * connector. These can be used to access remote services requiring
+ * authentication.
+ *
+ * These GUCs will be deprecated once a credentials table is introduced.
+ */
+extern char   *pxf_remote_service_login;
+extern char   *pxf_remote_service_secret;
+
 /* Time based authentication GUC */
 extern char  *gp_auth_time_override_str;
 

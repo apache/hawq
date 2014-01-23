@@ -45,6 +45,8 @@ public class InputData
     protected String tableName;
 	protected String compressCodec;
 	protected String compressType;
+	protected String remoteLogin;
+	protected String remoteSecret;
 
 	/*
 	 * When false the bridge has to run in synchronized mode.
@@ -155,6 +157,7 @@ public class InputData
         parseCompressionType();
 
         parseThreadSafe();
+		parseRemoteCredentials();
     }
 
 	/**
@@ -213,6 +216,8 @@ public class InputData
         this.compressCodec = copy.compressCodec;
         this.compressType = copy.compressType;
         this.threadSafe = copy.threadSafe;
+		this.remoteLogin = copy.remoteLogin;
+		this.remoteSecret = copy.remoteSecret;
     }
 
     /*
@@ -524,6 +529,30 @@ public class InputData
 		return compressType;
 	}
 
+	/*
+	 * The function will return the contents of pxf_remote_service_login
+	 * set in Hawq. Should the user set it to an empty string this
+	 * function will return null.
+	 *
+	 * @returns	remote login details if set, null otherwise
+	 */
+	public String getLogin()
+	{
+		return remoteLogin;
+	}
+
+	/*
+	 * The function will return the contents of pxf_remote_service_secret
+	 * set in Hawq. Should the user set it to an empty string this
+	 * function will return null.
+	 *
+	 * @returns	remote password if set, null otherwise
+	 */
+	public String getSecret()
+	{
+		return remoteSecret;
+	}
+
 	 /*
      * Sets the thread safe parameter.
      * Default value - true.
@@ -661,4 +690,10 @@ public class InputData
     	LOG.debug("decoded " + key + ": " + new String(parsed));
     	return parsed;
     }
+
+	private void parseRemoteCredentials()
+	{
+		remoteLogin = getOptionalProperty("X-GP-REMOTE-USER");
+		remoteSecret = getOptionalProperty("X-GP-REMOTE-PASS");
+	}
 }

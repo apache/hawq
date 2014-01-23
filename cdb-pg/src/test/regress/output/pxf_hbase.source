@@ -97,11 +97,11 @@ CREATE EXTERNAL TABLE gphbase_unsupported_type(recordkey TEXT,
 LOCATION ('pxf://@hostname@:50070/gphbase_test?PROFILE=HBase')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import');
 SELECT * FROM gphbase_unsupported_type;
-ERROR:  remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v9/Bridge/. Reason:     Server Error   Caused by:  java.io.IOException: Unsupported data type point (SOME_FILE:SOME_LINE)
+ERROR:  remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v10/Bridge/. Reason:     Server Error   Caused by:  java.io.IOException: Unsupported data type point (SOME_FILE:SOME_LINE)
 DETAIL:  External table gphbase_unsupported_type
 -- Test analyze for HBase table.
 ANALYZE gphbase_select;
-WARNING:  skipping "gphbase_select" --- error returned: remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v9/Analyzer/getEstimatedStats. Reason:     Server Error   Caused by:  java.lang.IllegalArgumentException: PXF 'Analyzer' class was not found. Please supply it in the LOCATION clause or use it in a PXF profile in order to run ANALYZE on this table
+WARNING:  skipping "gphbase_select" --- error returned: remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v10/Analyzer/getEstimatedStats. Reason:     Server Error   Caused by:  java.lang.IllegalArgumentException: PXF 'Analyzer' class was not found. Please supply it in the LOCATION clause or use it in a PXF profile in order to run ANALYZE on this table
 select relpages, reltuples from pg_class where relname = 'gphbase_select';
  relpages | reltuples 
 ----------+-----------

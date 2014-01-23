@@ -7,6 +7,7 @@
 #include "catalog/namespace.h"
 #include "catalog/pg_exttable.h"
 #include "access/pxfheaders.h"
+#include "utils/guc.h"
 
 static void add_alignment_size_httpheader(CHURL_HEADERS headers);
 static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel);
@@ -15,6 +16,7 @@ static char* prepend_x_gp(const char* key);
 static void add_delegation_token_headers(CHURL_HEADERS headers, PxfInputData *inputData);
 static hdfsToken* deserialize_token(PxfHdfsToken serializedToken);
 static void serialize_buffer_to_hex_string(char* buf, int size, StringInfo string);
+static void add_remote_credentials(CHURL_HEADERS headers);
 
 /* 
  * Add key/value pairs to connection header. 
@@ -77,6 +79,7 @@ void build_http_header(PxfInputData *input)
 		churl_headers_append(headers, "X-GP-HAS-FILTER", "0");
 
 	add_delegation_token_headers(headers, input);
+	add_remote_credentials(headers);
 }
 
 /* Report alignment size to remote component
@@ -234,4 +237,19 @@ static void serialize_buffer_to_hex_string(char* buf, int size, StringInfo strin
 {
 	for (int i = 0; i < size; ++i)
 		appendStringInfo(string, "%02X", (unsigned char)buf[i]);
+}
+
+/*
+ * Add contents of pxf_remote_service_login and
+ * pxf_remote_service_secret as headers.
+ *
+ * Content of a GUC is not added if it is NULL
+ */
+static void add_remote_credentials(CHURL_HEADERS headers)
+{
+	if (pxf_remote_service_login != NULL)
+		churl_headers_append(headers, "X-GP-REMOTE-USER", pxf_remote_service_login);
+
+	if (pxf_remote_service_secret != NULL)
+	churl_headers_append(headers, "X-GP-REMOTE-PASS", pxf_remote_service_secret);
 }

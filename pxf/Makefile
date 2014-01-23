@@ -18,3 +18,6 @@ rpm:
 	
 clean:
 	$(ANT) clean
+
+regressions:
+	$(ANT) -buildfile regression.xml

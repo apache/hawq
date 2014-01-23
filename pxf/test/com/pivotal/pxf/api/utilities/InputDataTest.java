@@ -52,6 +52,8 @@ public class InputDataTest
 		assertEquals(input.getUserProperty("i'm-standing-here"),
 					 "outside-your-door");
 		assertEquals(input.getParametersMap(), parameters);
+		assertNull(input.getLogin());
+		assertNull(input.getSecret());
     }
 
 	@Test

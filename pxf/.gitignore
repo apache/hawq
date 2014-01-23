@@ -5,3 +5,4 @@ build
 /.classpath
 /.testdir.tmp
 /bin
+.ant_targets

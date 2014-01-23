@@ -605,6 +605,8 @@ bool   pxf_enable_filter_pushdown = true;
 bool   pxf_enable_stat_collection = true;
 bool   pxf_enable_locality_optimizations = true;
 bool   pxf_local_storage = true;
+char   *pxf_remote_service_login = NULL;
+char   *pxf_remote_service_secret = NULL;
 
 /* Time based authentication GUC */
 char  *gp_auth_time_override_str = NULL;
@@ -7009,6 +7011,26 @@ static struct config_string ConfigureNamesString[] =
 		&krb5_ccname,
 		"/tmp/postgres.ccname", NULL, NULL
 	},
+
+	{
+		{"pxf_remote_service_login", PGC_USERSET, CUSTOM_OPTIONS,
+			gettext_noop("Login details passed to remote PXF plugin"),
+			NULL,
+			GUC_GPDB_ADDOPT
+		},
+		&pxf_remote_service_login,
+		"", NULL, NULL
+    },
+
+	{
+		{"pxf_remote_service_secret", PGC_USERSET, CUSTOM_OPTIONS,
+			gettext_noop("Password details passed to remote PXF plugin"),
+			NULL,
+			GUC_GPDB_ADDOPT
+		},
+		&pxf_remote_service_secret,
+		"", NULL, NULL
+    },
 
 	/* End-of-list marker */
 	{
