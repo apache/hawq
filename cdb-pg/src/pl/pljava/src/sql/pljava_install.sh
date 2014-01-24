@@ -2,7 +2,13 @@
 #
 # Copyright (c) Greenplum Inc 2013. All Rights Reserved.
 #
-USAGE="$0 -f <hosts file>"
+# Disclaimer: There is a lot of common code among pgcrypto_install.sh,
+# plr_install.sh and pljava_install.sh.  These scripts must be
+# refactored at an opportune time.  In fact, HAWQ segments should be
+# intelligent enough so as to pick up a list of packages from master
+# and install them.
+
+USAGE="$0 -f <hosts file> [-x]"
 
 if [[ $(uname) =~ "Linux*" ]]; then
     BLD_ARCH=rhel5_x86_64
@@ -53,10 +59,14 @@ if [ 0 -ne $? ]; then
 fi
 
 hosts=""
-while getopts f:d: opt; do
+expand_mode=0
+while getopts f:x opt; do
   case $opt in
   f)
       hosts=$OPTARG
+      ;;
+  x)
+      expand_mode=1
       ;;
   esac
 done
@@ -64,6 +74,10 @@ done
 if [ "$hosts" = "" ]; then
     echo "<hosts file> not specified."
     echo $USAGE
+    exit 1
+fi
+if [ ! -f $hosts ]; then
+    echo "Cannot read file: $hosts."
     exit 1
 fi
 
@@ -79,6 +93,40 @@ if [[ $output == *ERROR* ]]; then
     echo "Command: $cmd"
     echo "Output: $output"
     exit 1
+fi
+
+# Copy modified greenplum_path.sh on segments.
+function install_pljava_segments() {
+    # Ensure that JAVA_HOME is the same on segments.
+    cmd="gpssh -f $hosts -e test -x $jvmso"
+    output=$($cmd)
+    if [ 0 -ne $? ]; then
+	echo "$jvmso not found on one or more segments."
+	exit 1
+    fi
+    if [[ $output == *ERROR* ]]; then
+	echo "Error running gpssh."
+	echo "Command: $cmd"
+	exit 1
+    fi
+    cmd="gpscp -f $hosts $GPHOME/greenplum_path.sh =:$GPHOME"
+    output=$($cmd)
+    if [ 0 -ne $? ]; then
+	echo "Failed to copy greenplum_path.sh to one or more segments."
+	exit 1
+    fi
+    if [[ $output == *ERROR* ]]; then
+	echo "Error running gpscp."
+	echo "Command: $cmd"
+	exit 1
+    fi
+}
+
+if [ $expand_mode -eq 1 ]; then
+    install_pljava_segments
+    echo "pljava installation succeeded on new segments."
+    echo "Restart HAWQ using 'gpstop -ar' for the changes to take effect."
+    exit 0
 fi
 
 # Patch greenplum_path.sh to include JNI library in LD_LIBRARY_PATH.
@@ -117,30 +165,7 @@ if [ 0 -ne $? ]; then
 fi
 # Following steps are needed only for multi-node clusters.
 if [ $nodes -gt 1 ]; then
-    # Ensure that JAVA_HOME is the same on segments.
-    cmd="gpssh -f $hosts -e test -x $jvmso"
-    output=$($cmd)
-    if [ 0 -ne $? ]; then
-	echo "$jvmso not found on one or more segments."
-	exit 1
-    fi
-    if [[ $output == *ERROR* ]]; then
-	echo "Error running gpssh."
-	echo "Command: $cmd"
-	exit 1
-    fi
-    # Copy modified greenplum_path.sh to segments.
-    cmd="gpscp -f $hosts $GPHOME/greenplum_path.sh =:$GPHOME"
-    output=$($cmd)
-    if [ 0 -ne $? ]; then
-	echo "Failed to copy greenplum_path.sh to one or more segments."
-	exit 1
-    fi
-    if [[ $output == *ERROR* ]]; then
-	echo "Error running gpscp."
-	echo "Command: $cmd"
-	exit 1
-    fi
+    install_pljava_segments
 fi
 
 echo "pljava installation was successful."
