@@ -10,11 +10,14 @@
 
 #include "access/catquery.h"
 #include "catalog/gp_segment_config.h"
+#include "catalog/pg_database.h"
 #include "catalog/pg_filespace.h"
 #include "catalog/pg_filespace_entry.h"
 #include "catalog/pg_proc.h"
 #include "cdb/cdbresynchronizechangetracking.h"
+#include "cdb/cdbdatabaseinfo.h"
 #include "cdb/cdbdisp.h"
+#include "cdb/cdbmirroredfilesysobj.h"
 #include "cdb/cdbpersistentdatabase.h"
 #include "cdb/cdbpersistentfilespace.h"
 #include "cdb/cdbpersistentrelation.h"
@@ -22,6 +25,7 @@
 #include "cdb/cdbutil.h"
 #include "cdb/cdbvars.h"
 #include "commands/filespace.h"
+#include "commands/tablespace.h"
 #include "executor/spi.h"
 #include "lib/stringinfo.h"
 #include "utils/builtins.h"
@@ -402,6 +406,252 @@ desist_all_filespaces(int16 dbid)
 }
 
 /*
+ * Add or remove persistent entries for filespaces of this content.
+ */
+static void
+update_persistent_filespaces(int16 dbid, int16 contentid, bool add)
+{
+	ItemPointerData persistentTid;
+	int64 persistentSerialNum;
+	cqContext cqc, *pcqCtx;
+	bool			isnull;
+
+	pcqCtx = caql_beginscan(
+			cqclr(&cqc),
+			cql("SELECT * FROM pg_filespace_entry", NULL));
+
+	while (HeapTupleIsValid(caql_getnext(pcqCtx)))
+	{
+		char *path;
+		Oid fsoid;
+		int16 fsedbid;
+
+		fsedbid = DatumGetInt16(caql_getattr(pcqCtx, Anum_pg_filespace_entry_fsedbid, &isnull));
+		if (fsedbid != dbid)
+			continue;
+		fsoid = DatumGetObjectId(caql_getattr(pcqCtx, Anum_pg_filespace_entry_fsefsoid, &isnull));
+		/* We care only shared filespaces.  Local one is not registred. */
+		if (!is_filespace_shared(fsoid))
+			continue;
+
+		if (add)
+		{
+			path = TextDatumGetCString(caql_getattr(pcqCtx, Anum_pg_filespace_entry_fselocation, &isnull));
+
+			MirroredFileSysObj_TransactionCreateFilespaceDir(
+					fsoid, dbid, path, InvalidOid, NULL,
+					&persistentTid, &persistentSerialNum);
+		}
+		else
+			MirroredFileSysObj_ScheduleDropFilespaceDir(
+					contentid, fsoid, true);
+
+	}
+	caql_endscan(pcqCtx);
+}
+
+/*
+ * Add or remove persistent entries for tablespaces of this content.
+ */
+static void
+update_persistent_tablespaces(int16 contentid, bool add)
+{
+	ItemPointerData persistentTid;
+	int64 persistentSerialNum;
+	cqContext cqc, *pcqCtx;
+	bool			isnull;
+
+	pcqCtx = caql_beginscan(
+			cqclr(&cqc),
+			cql("SELECT * FROM pg_tablespace", NULL));
+
+	while (HeapTupleIsValid(caql_getnext(pcqCtx)))
+	{
+		TablespaceDirNode tablespaceDirNode;
+		Oid tablespaceOid, filespaceOid;
+
+		tablespaceOid = DatumGetObjectId(caql_getattr(pcqCtx, ObjectIdAttributeNumber, &isnull));
+		filespaceOid = DatumGetObjectId(caql_getattr(pcqCtx, Anum_pg_tablespace_spcfsoid, &isnull));
+
+		tablespaceDirNode.tablespace = tablespaceOid;
+		tablespaceDirNode.filespace = filespaceOid;
+		/* We care only shared filespaces.  Local one is not registred. */
+		if (!is_filespace_shared(filespaceOid))
+			continue;
+		if (add)
+			MirroredFileSysObj_TransactionCreateTablespaceDir(
+					contentid,
+					&tablespaceDirNode,
+					&persistentTid,
+					&persistentSerialNum);
+		else
+			MirroredFileSysObj_ScheduleDropTablespaceDir(
+					contentid,
+					tablespaceOid,
+					true);
+	}
+	caql_endscan(pcqCtx);
+}
+
+/*
+ * Remove persistent entries for relations that exist in this content.
+ * If there is such one, it loses the data.  It is user's responsibility
+ * to deal with that and that's fine because this is currently used to
+ * only revert the added segment by gp_add_segment.
+ */
+static void
+remove_persistent_relations(int16 contentid, Oid databaseOid, Oid dbTablespaceOid)
+{
+	DatabaseInfo *info;
+	int i, j;
+
+	/*
+	 * Collect information of relations on the database from gp_relation_node.
+	 */
+	info = DatabaseInfo_Collect(databaseOid,
+								dbTablespaceOid,
+								true,
+								false,
+								false);
+
+	for (i = 0; i < info->dbInfoRelArrayCount; i++)
+	{
+		DbInfoRel *dbInfoRel = &info->dbInfoRelArray[i];
+		RelFileNode relFileNode;
+		PersistentFileSysRelStorageMgr relStorageMgr;
+
+		if (!is_filespace_shared(get_tablespace_fsoid(
+						dbInfoRel->reltablespace)))
+			continue;
+
+		relFileNode.spcNode = dbInfoRel->reltablespace;
+		relFileNode.dbNode = databaseOid;
+		relFileNode.relNode = dbInfoRel->relfilenodeOid;
+
+		/*
+		 * Schedule the relation drop.
+		 */
+		relStorageMgr = (
+				 (dbInfoRel->relstorage == RELSTORAGE_AOROWS ||
+				  dbInfoRel->relstorage == RELSTORAGE_AOCOLS    ) ?
+								PersistentFileSysRelStorageMgr_AppendOnly :
+								PersistentFileSysRelStorageMgr_BufferPool);
+
+		/*
+		 * Since this is about shared filesystem, we should see only AO rels.
+		 */
+		Assert(relStorageMgr == PersistentFileSysRelStorageMgr_AppendOnly);
+
+		for (j = 0; j < dbInfoRel->gpRelationNodesCount; j++)
+		{
+			DbInfoGpRelationNode *dbInfoGpRelationNode;
+
+			dbInfoGpRelationNode = &dbInfoRel->gpRelationNodes[j];
+			if (dbInfoGpRelationNode->contentid != contentid)
+				continue;
+			MirroredFileSysObj_ScheduleDropAppendOnlyFile(
+					&relFileNode,
+					dbInfoGpRelationNode->segmentFileNum,
+					contentid,
+					dbInfoRel->relname,
+					&dbInfoGpRelationNode->persistentTid,
+					dbInfoGpRelationNode->persistentSerialNum);
+		}
+	}
+}
+
+/*
+ * Add or remove persistent entries for databases of this content.
+ */
+static void
+update_persistent_databases(int16 contentid, bool add)
+{
+	ItemPointerData persistentTid;
+	int64 persistentSerialNum;
+	cqContext cqc, *pcqCtx;
+	bool			isnull;
+
+	pcqCtx = caql_beginscan(
+			cqclr(&cqc),
+			cql("SELECT * FROM pg_database", NULL));
+
+	while (HeapTupleIsValid(caql_getnext(pcqCtx)))
+	{
+		DbDirNode dbDirNode;
+		Oid metaTablespaceOid, tablespaceOid, databaseOid;
+
+		metaTablespaceOid = DatumGetObjectId(
+				caql_getattr(pcqCtx, Anum_pg_database_dattablespace, &isnull));
+		Assert(!isnull);
+		tablespaceOid = DatumGetObjectId(
+				caql_getattr(pcqCtx, Anum_pg_database_dat2tablespace, &isnull));
+		Assert(!isnull);
+		databaseOid = DatumGetObjectId(
+				caql_getattr(pcqCtx, ObjectIdAttributeNumber, &isnull));
+		Assert(!isnull);
+
+		dbDirNode.tablespace = tablespaceOid;
+		dbDirNode.database = databaseOid;
+
+		if (!is_filespace_shared(get_tablespace_fsoid(tablespaceOid)))
+			continue;
+		if (add)
+		{
+			MirroredFileSysObj_TransactionCreateDbDir(
+					contentid,
+					&dbDirNode,
+					&persistentTid,
+					&persistentSerialNum);
+			set_short_version(contentid, NULL, &dbDirNode, true);
+			/*
+			 * We don't need to update persistent entries for relations,
+			 * since we are adding a new node and it can live without
+			 * new relation files.
+			 */
+		}
+		else
+		{
+			PersistentFileSysState state;
+			int4 ptContentid;
+
+			PersistentDatabase_DirIterateInit();
+			while (PersistentDatabase_DirIterateNext(
+											&ptContentid,
+											&dbDirNode,
+											&state,
+											&persistentTid,
+											&persistentSerialNum))
+			{
+				if (dbDirNode.database != databaseOid)
+					continue;
+				if (ptContentid != contentid)
+					continue;
+				if (state != PersistentFileSysState_Created)
+					continue;
+
+				/*
+				 * Even though this path is most likely to revert the
+				 * node addition, we may still have some relations leftover.
+				 * Unless we cleanup persistent entries for relations,
+				 * crash recovery will be confused with disagreement of
+				 * filesystem state.
+				 */
+				remove_persistent_relations(contentid,
+											databaseOid,
+											metaTablespaceOid);
+				MirroredFileSysObj_ScheduleDropDbDir(
+						contentid,
+						&dbDirNode,
+						&persistentTid,
+						persistentSerialNum,
+						true);
+			}
+		}
+	}
+	caql_endscan(pcqCtx);
+}
+
+/*
  * Either add or remove knowledge of filespaces for a given segment.
  */
 static void
@@ -673,11 +923,36 @@ add_segment_config(seginfo *i)
 static void
 add_segment_config_entry(int16 pridbid, seginfo *i, ArrayType *fsmap)
 {
+	int16	contentid;
+
 	/* Add gp_segment_configuration entry */
 	add_segment_config(i);
 
 	/* and the rest */
 	add_segment_persistent_entries(pridbid, i, fsmap);
+
+	/*
+	 * We need CCI to see the updated catalog.
+	 */
+	CommandCounterIncrement();
+	contentid = get_contentid_from_dbid(pridbid);
+	/* -2 is an invalid id to be returned by get_contentid_from_dbid */
+	Assert(contentid != -2);
+
+	/*
+	   Register new persistent entries for filespace/tablespace/database
+	   Master standby addition does not need auto update Persistent Tables
+	 */
+	if (contentid != MASTER_CONTENT_ID)
+	{
+        update_persistent_filespaces(pridbid, contentid, true);
+        update_persistent_tablespaces(contentid, true);
+        update_persistent_databases(contentid, true);
+	}
+	/*
+	 * We don't need to care relations since new segment does not
+	 * have anything.
+	 */
 }
 
 /*
@@ -776,6 +1051,16 @@ static void
 remove_segment(int16 pridbid, int16 mirdbid)
 {
 	seginfo *i;
+	int16	contentid;
+
+	contentid = get_contentid_from_dbid(pridbid);
+	/* -2 is an invalid id to be returned by get_contentid_from_dbid */
+	Assert(contentid != -2);
+
+	/* relations are taken care of along with database */
+	update_persistent_databases(contentid, false);
+	update_persistent_tablespaces(contentid, false);
+	update_persistent_filespaces(pridbid, contentid, false);
 
 	/* Check that we're removing a mirror, not a primary */
 	i = get_seginfo(mirdbid);
@@ -902,6 +1187,8 @@ gp_add_segment_mirror(PG_FUNCTION_ARGS)
  *
  * Returns:
  *   true upon success, otherwise throws error.
+ *
+ * XXX: This is not effective in HAWQ.
  */
 Datum
 gp_remove_segment_mirror(PG_FUNCTION_ARGS)
@@ -1086,6 +1373,8 @@ gp_remove_master_standby(PG_FUNCTION_ARGS)
  *
  * Returns:
  *   true upon success, otherwise throws error
+ *
+ * XXX: This is not effective in HAWQ.
  */
 Datum
 gp_prep_new_segment(PG_FUNCTION_ARGS)

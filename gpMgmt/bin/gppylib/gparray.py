@@ -424,7 +424,6 @@ class GpDB:
         """
         Create a tempate given the information in this GpDB.
         """
-        
         # Make sure we have enough room in the dstDir to fit the segment and its filespaces.
         requiredSize = DiskUsage.get_size( name = "srcDir"
                                          , remote_host = self.address
@@ -447,30 +446,12 @@ class GpDB:
         cpCmd = Scp("Copy system data directory", self.getSegmentDataDirectory() + '/*', dstDir, self.address, None, True)
         cpCmd.run(validateAfter = True)
         res = cpCmd.get_results()
-            
-        if len(self.__filespaces) > 1:
-            """ Make directory to hold file spaces """
-            fullPathFsDir = dstDir + "/" +  DESTINATION_FILE_SPACES_DIRECTORY
-            cmd = FileDirExists( name = "check for existance of template filespace directory"
-                                 , directory = fullPathFsDir
-                                )
-            cmd.run(validateAfter = True)
-            MakeDirectory.local("gpexpand make directory to hold file spaces", fullPathFsDir)
-            for oid in self.__filespaces:
-                MakeDirectory.local("gpexpand make directory to hold file space oid: " + str(oid), fullPathFsDir)
-                dir = self.__filespaces[oid]
-                destDir = fullPathFsDir + "/" + str(oid)
-                MakeDirectory.local("gpexpand make directory to hold file space: " + destDir, destDir)
-                name = "GpSegCopy %s to %s" % (dir, destDir)
-                cpCmd = LocalDirCopy(name, dir, destDir)
-                cpCmd.run(validateAfter = True)
-                res = cpCmd.get_results()
-        
-            # Remove the gp_dbid file from the data dir
-            RemoveFiles.local('Remove gp_dbid file', os.path.normpath(dstDir + '/gp_dbid'))
-            logger.info("Cleaning up catalog for schema only copy on destination")
-            # We need 700 permissions or postgres won't start
-            Chmod.local('set template permissions', dstDir, '0700')
+
+        # Remove the gp_dbid file from the data dir
+        RemoveFiles.local('Remove gp_dbid file', os.path.normpath(dstDir + '/gp_dbid'))
+        logger.info("Cleaning up catalog for schema only copy on destination")
+        # We need 700 permissions or postgres won't start
+        Chmod.local('set template permissions', dstDir, '0700')
 
 
     # --------------------------------------------------------------------
@@ -1476,10 +1457,6 @@ class GpArray:
                 if mode == MODE_SYNCHRONIZED and status == STATUS_UP:
                     recoveredSegmentDbids.append(dbid)
 
-            # In GPSQL, only master maintain the filespace information.
-            if content != MASTER_CONTENT_ID and fsoid != SYSTEM_FILESPACE:
-                continue
-            
             # The query returns all the filespaces for a segment on separate
             # rows.  If this row is the same dbid as the previous row simply
             # add this filespace to the existing list, otherwise create a
@@ -1684,11 +1661,10 @@ class GpArray:
         """
         @return a newly allocated list of GpFilespaceObj objects, will have been sorted by filespace name
         """
-        # if includeSystemFilespace:
-        #    return [fs for fs in self.__filespaceArr]
-        # else:
-        #    return [fs for fs in self.__filespaceArr if not fs.isSystemFilespace()]
-        return [fs for fs in self.__filespaceArr if fs.isSystemFilespace()]
+        if includeSystemFilespace:
+           return [fs for fs in self.__filespaceArr]
+        else:
+           return [fs for fs in self.__filespaceArr if not fs.isSystemFilespace()]
 
     # --------------------------------------------------------------
     def getFileSpaceName(self, filespaceOid):

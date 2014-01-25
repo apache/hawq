@@ -1,6 +1,6 @@
 COMMAND NAME:  gpexpand
 
-Expands an existing Greenplum Database across new hosts in the array.
+Expands an existing HAWQ cluster across new hosts in the array.
 
 ******************************************************
 SYNOPSIS
@@ -24,13 +24,13 @@ gpexpand --version
 PREREQUISITES
 ******************************************************
 
-* You are logged in as the Greenplum Database superuser (gpadmin).
+* You are logged in as the HAWQ superuser (gpadmin).
 
 * The new segment hosts have been installed and configured as per 
   the existing segment hosts. This involves:
 
   * Configuring the hardware and OS
-  * Installing the Greenplum software
+  * Installing the HAWQ software
   * Creating the gpadmin user account
   * Exchanging SSH keys. 
 
@@ -135,8 +135,8 @@ OPTIONS
  in the format of:
 
   filespaceOrder=<filespace1_name>:<filespace2_name>: ...
-  dbid:</path/for/filespace1>:</path/for/filespace2>: ...
-  dbid:</path/for/filespace1>:</path/for/filespace2>: ...
+  dbid|</path/for/filespace1>|</path/for/filespace2>| ...
+  dbid|</path/for/filespace1>|</path/for/filespace2>| ...
   ...
 
 
@@ -167,10 +167,6 @@ OPTIONS
 
 --version
  Display the utility's version number and exit.
-
-
--V | --novacuum
- Do not vacuum catalog tables before creating schema copy.
 
 
 -? | -h | --help

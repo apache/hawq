@@ -1046,8 +1046,10 @@ PersistentTablespace_RemoveSegment(int16 dbid, bool ismirror)
 {
 	TablespaceDirEntry tablespaceDirEntry;
 	HASH_SEQ_STATUS hstat;
+	int16 contentid;
 	WRITE_PERSISTENT_STATE_ORDERED_LOCK_DECLARE;
 
+	contentid = get_contentid_from_dbid(dbid);
 	hash_seq_init(&hstat, persistentTablespaceSharedHashTable);
 
 	if (Persistent_BeforePersistenceWork())
@@ -1062,7 +1064,7 @@ PersistentTablespace_RemoveSegment(int16 dbid, bool ismirror)
 		PersistentFileSysObjName fsObjName;
 		Oid tblspc = tablespaceDirEntry->key.tablespaceOid;
 
-		tablespaceDirEntry = PersistentTablespace_FindEntryUnderLock(dbid, tblspc);
+		tablespaceDirEntry = PersistentTablespace_FindEntryUnderLock(contentid, tblspc);
 
 		if (tablespaceDirEntry == NULL)
 			elog(ERROR, "Did not find persistent tablespace entry %u", 
