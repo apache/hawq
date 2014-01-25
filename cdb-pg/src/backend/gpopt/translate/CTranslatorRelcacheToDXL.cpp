@@ -73,8 +73,6 @@
 #undef ALLOW_MemoryContextFreeImpl
 
 #define GPDB_COUNT_AGG_OID 2147
-#define GPDB_PG_GET_PART_RULE_DEF_1 5027
-#define GPDB_PG_GET_PART_RULE_DEF_2 5028
 
 #include "gpos/base.h"
 #include "gpos/error/CException.h"
@@ -122,8 +120,6 @@ const ULONG rgulCmpTypeMappings[][2] =
 // initialization of function properties map
 const CTranslatorRelcacheToDXL::SFuncProps CTranslatorRelcacheToDXL::m_rgfp[] =
 {
-	{GPDB_PG_GET_PART_RULE_DEF_1, IMDFunction::EfsStable, IMDFunction::EfdaReadsSQLData, true, true}, // pg_get_partition_rule_def(oid)
-	{GPDB_PG_GET_PART_RULE_DEF_2, IMDFunction::EfsStable, IMDFunction::EfdaReadsSQLData, true, true}, // pg_get_partition_rule_def(oid, bool)
 };
 
 //---------------------------------------------------------------------------
