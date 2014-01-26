@@ -364,7 +364,7 @@
         </javac>
     </target>
 
-    <target name="run-tests" depends="compile-tests" description="Run unit-tests">
+    <target name="run-tests" depends="compile-tests" description="Run unit-tests" unless="skipTests">
         <mkdir dir="${testreports.dir}"/>
         <junit printsummary="yes" fork="yes" haltonfailure="yes">
 

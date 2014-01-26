@@ -25,9 +25,6 @@ export HADOOP_CLASSPATH=\
 `echo $HIVE_ROOT/lib/hive-common-*-gphd-*[0-9]-SNAPSHOT.jar`:\
 `echo $HIVE_ROOT/lib/hive-exec-*-gphd-*[0-9].jar`:\
 `echo $HIVE_ROOT/lib/hive-exec-*-gphd-*[0-9]-SNAPSHOT.jar`:\
-`echo $PXF_ROOT/avro-[0-9]*[0-9].jar`:\
-`echo $PXF_ROOT/avro-mapred-[0-9]*[0-9].jar`:\
-`echo $PXF_ROOT/protobuf-java-*[0-9].jar`:\
 $HBASE_CONF:\
 $HIVE_CONF:\
 $HADOOP_CLASSPATH:\
