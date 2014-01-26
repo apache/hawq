@@ -67,6 +67,11 @@ CentOS
 7. Changes
 ==========
 
+v1.7.6
+------
+
+- GPSQL-1558: mapreduce.input.fileinputformat.input.dir.recursive is set to true.
+
 v1.7.5
 ------
 

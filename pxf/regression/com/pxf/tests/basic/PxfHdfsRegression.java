@@ -7,7 +7,6 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.postgresql.util.PSQLException;
 
-import com.google.protobuf.GeneratedMessage;
 import com.pivotal.pxfauto.infra.common.ShellSystemObject;
 import com.pivotal.pxfauto.infra.fileformats.IAvroSchema;
 import com.pivotal.pxfauto.infra.structures.tables.basic.Table;
@@ -19,7 +18,6 @@ import com.pivotal.pxfauto.infra.utils.jsystem.report.ReportUtils;
 import com.pivotal.pxfauto.infra.utils.regex.RegexUtils;
 import com.pivotal.pxfauto.infra.utils.tables.ComparisonUtils;
 import com.pxf.tests.dataprepares.avro.CustomAvroPreparer;
-import com.pxf.tests.dataprepares.protobuf.schema.CustomProtobuffPreparer;
 import com.pxf.tests.dataprepares.sequence.CustomAvroInSequencePreparer;
 import com.pxf.tests.dataprepares.sequence.CustomSequencePreparer;
 import com.pxf.tests.dataprepares.text.CustomTextPreparer;
@@ -1230,7 +1228,88 @@ public class PxfHdfsRegression extends PxfTestCase {
 			hawq.closePsql(sso);
 		}
 	}
+	
+	/**
+	 * Test mapreduce.input.fileinputformat.input.dir.recursive parameter
+	 * is working in PXF when set to true.
+	 * The test runs a query on a table with directory name in its location, 
+	 * and should successfully find all files in the nested directories.
+	 * 
+	 * @throws Exception
+	 */
+	@Test
+	public void recursiveDirs() throws Exception {
+		
+		final String recursiveParam = "mapreduce.input.fileinputformat.input.dir.recursive";
+		String baseDir = hdfsWorkingFolder + "/recursive";
+		String[] fields = new String[] {
+				"lyrics text",
+				"line text",
+		};
+		String delim = ":";
+		
+		ReportUtils.report(report, getClass(), recursiveParam + " is TRUE, query should be successful");
+		
+		// build environment and prepare data:
+		Table dataTable = prepareRecursiveDirsData(baseDir, delim);
+	
+		exTable = TableFactory.getPxfReadableTextTable("recursive_dirs", fields, baseDir, delim);
+		hawq.createTableAndVerify(exTable);
+		String sqlQuery = "SELECT * FROM " + exTable.getName() + " ORDER BY line";
+		hawq.queryResults(exTable, sqlQuery);
+		ComparisonUtils.compareTables(exTable, dataTable, report);
+	}
 
+	private Table prepareRecursiveDirsData(String baseDir, String delim) throws Exception {
+		
+		Table fileTable = new Table("file", null);
+		Table dataTable = new Table("dataTable", null);
+		
+		/*
+		 * - recursive/
+		 *  	 -level1leaf1/
+		 * 					 file1
+		 *  	 -level1leaf2/
+		 *   				 -level2leaf1/
+		 *  							  file2
+		 * 								  file3
+		 *   				  	 		 -level3/
+		 * 						    	   		 file4
+		 *   				 -level2leaf2/
+		 */
+		hdfs.createDirectory(baseDir);
+		hdfs.createDirectory(baseDir + "/level1leaf1");
+		hdfs.createDirectory(baseDir + "/level1leaf2");
+		hdfs.createDirectory(baseDir + "/level1leaf2/level2leaf1");
+		hdfs.createDirectory(baseDir + "/level1leaf2/level2leaf1/level3");
+		hdfs.createDirectory(baseDir + "/level1leaf2/level2leaf2");
+		
+		
+		fileTable.addRow(new String[] {"When the truth is found to be lies", "line1" });
+		fileTable.addRow(new String[] {"And all the joy within you dies", "line2" });
+		hdfs.writeTextFile(baseDir + "/level1leaf1/file1", fileTable.getData(), delim);
+		dataTable.appendRows(fileTable);
+		fileTable.setData(null);
+
+		fileTable.addRow(new String[] {"Don't you want somebody to love, don't you", "line3" });
+		fileTable.addRow(new String[] {"Need somebody to love, wouldn't you", "line4" });
+		hdfs.writeTextFile(baseDir + "/level1leaf2/level2leaf1/file2", fileTable.getData(), delim);
+		dataTable.appendRows(fileTable);
+		fileTable.setData(null);
+		
+		fileTable.addRow(new String[] {"Love somebody to love, you better", "line5" });
+		hdfs.writeTextFile(baseDir + "/level1leaf2/level2leaf1/file3", fileTable.getData(), delim);
+		dataTable.appendRows(fileTable);
+		fileTable.setData(null);
+		
+		fileTable.addRow(new String[] {"Find somebody to love", "line6" });
+		hdfs.writeTextFile(baseDir + "/level1leaf2/level2leaf1/level3/file4", fileTable.getData(), delim);
+		dataTable.appendRows(fileTable);
+		fileTable.setData(null);
+		
+		return dataTable;
+	}
+	
 	private void verifyFilterPushdown(ShellSystemObject sso, String queryFilter, String serializedFilter, int rows)
 			throws Exception {
 

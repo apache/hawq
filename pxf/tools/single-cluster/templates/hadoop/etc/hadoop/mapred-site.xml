@@ -3,4 +3,8 @@
 		<name>mapreduce.framework.name</name>
 		<value>yarn</value>
 	</property>
+	<property>
+		<name>mapreduce.input.fileinputformat.input.dir.recursive</name>
+		<value>true</value>
+	</property>
 </configuration>
