@@ -1,6 +1,6 @@
+import com.pivotal.pxf.api.OneRow;
 import com.pivotal.pxf.api.ReadAccessor;
 import com.pivotal.pxf.api.WriteAccessor;
-import com.pivotal.pxf.api.OneRow;
 import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.api.utilities.Plugin;
 import org.apache.commons.logging.Log;
@@ -31,8 +31,9 @@ public class DummyAccessor extends Plugin implements ReadAccessor, WriteAccessor
     public OneRow readNextObject() throws Exception {
         /* return next row , <key=fragmentNo.rowNo, val=rowNo,text,fragmentNo>*/
         /* check for EOF */
-        if (fragmentNumber > 0)
+        if (fragmentNumber > 0) {
             return null; /* signal EOF, close will be called */
+        }
 
         int fragment = inputData.getDataFragment();
         String fragmentMetadata = new String(inputData.getFragmentMetadata());

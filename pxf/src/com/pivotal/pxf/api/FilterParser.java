@@ -27,362 +27,342 @@ import java.util.Stack;
  * FilterParser makes sure a column objects are always on the left of the 
  * expression (when relevant)
  */
-public class FilterParser
-{
-	private int index;
-	private String filterString;
-	private Stack<Object> operandsStack;
-	private FilterBuilder filterBuilder;
-	
-	private static Map<Integer, Operation> operatorTranslationMap = initOperatorTransMap();
+public class FilterParser {
+    private int index;
+    private String filterString;
+    private Stack<Object> operandsStack;
+    private FilterBuilder filterBuilder;
 
-	/*
-	 * Operations supported by the parser
-	 */
-	public enum Operation
-	{
-		HDOP_LT,
-		HDOP_GT,
-		HDOP_LE,
-		HDOP_GE,
-		HDOP_EQ,
-		HDOP_NE,
-		HDOP_AND
-	}
+    private static Map<Integer, Operation> operatorTranslationMap = initOperatorTransMap();
 
-	/*
-	 * Interface a user of FilterParser should implement
-	 * This is used to let the user build filter expressions in the manner she 
-	 * sees fit
-	 *
-	 * When an operator is parsed, this function is called to let the user decide
-	 * what to do with it operands.
-	 */
-public interface FilterBuilder
-	{
-		public Object build(Operation operation, Object left, Object right) throws Exception;
-	}
+    /*
+     * Operations supported by the parser
+     */
+    public enum Operation {
+        HDOP_LT,
+        HDOP_GT,
+        HDOP_LE,
+        HDOP_GE,
+        HDOP_EQ,
+        HDOP_NE,
+        HDOP_AND
+    }
 
-	/*
-	 * The class represents a column index
-	 * It used to know the type of an operand in the stack
-	 */
-	public class ColumnIndex
-	{
-		private int index;
-		public ColumnIndex(int idx)
-		{
-			index = idx;
-		}
+    /*
+     * Interface a user of FilterParser should implement
+     * This is used to let the user build filter expressions in the manner she
+     * sees fit
+     *
+     * When an operator is parsed, this function is called to let the user decide
+     * what to do with it operands.
+     */
+    public interface FilterBuilder {
+        public Object build(Operation operation, Object left, Object right) throws Exception;
+    }
 
-		public int index()
-		{
-			return index;
-		}
-	}
+    /*
+     * The class represents a column index
+     * It used to know the type of an operand in the stack
+     */
+    public class ColumnIndex {
+        private int index;
 
-	/*
-	 * The class represents a constant object (String, Long, ...)
-	 * It used to know the type of an operand in the stack
-	 */
-	public class Constant
-	{
-		private Object constant;
-		public Constant(Object obj)
-		{
-			constant = obj;
-		}
+        public ColumnIndex(int idx) {
+            index = idx;
+        }
 
-		public Object constant()
-		{
-			return constant;
-		}
-	}
-	
-	/*
-	 * Basic filter provided for cases where the target storage system does not provide it's own filter
-	 * For example: Hbase storage provides its own filter but for a Writable based record in a 
-	 * SequenceFile there is no filter provided and so we need to have a default
-	 */
-	static public class BasicFilter
-	{
-		private Operation oper;
-		private ColumnIndex column;
-		private Constant constant;
-		
-		/*
-		 * C'tor
-		 */
-		public BasicFilter(Operation inOper, ColumnIndex inColumn, Constant inConstant)
-		{
-			oper = inOper;
-			column = inColumn;
-			constant = inConstant;
-		}
-		
-		/*
-		 * returns oper field
-		 */
-		public Operation getOperation()
-		{
-			return oper;
-		}
-		
-		/*
-		 * returns column field
-		 */
-		public ColumnIndex getColumn()
-		{
-			return column;
-		}
-		
-		/*
-		 * returns constant field
-		 */
-		public Constant getConstant()
-		{
-			return constant;
-		}
-	}
+        public int index() {
+            return index;
+        }
+    }
 
-	/*
-	 * Exception that can occur while parsing the string
-	 */
-	class FilterStringSyntaxException extends Exception
-	{
-		FilterStringSyntaxException(String desc)
-		{
-			super(desc + " (filter string: '" + filterString + "')");
-		}
-	}
+    /*
+     * The class represents a constant object (String, Long, ...)
+     * It used to know the type of an operand in the stack
+     */
+    public class Constant {
+        private Object constant;
 
-	public FilterParser(FilterBuilder eval)
-	{
-		operandsStack = new Stack<Object>();
-		filterBuilder = eval;
-	}
+        public Constant(Object obj) {
+            constant = obj;
+        }
 
-	public Object parse(String filter) throws Exception
-	{
-		index = 0;
-		filterString = filter;
+        public Object constant() {
+            return constant;
+        }
+    }
 
-		if (filter == null) {
-			throw new FilterStringSyntaxException("filter parsing ended with no result");
-		}
-		
-		while (index < filterString.length())
-		{
-			char op = filterString.charAt(index);
-			++index; // skip op character
-			switch(op)
-			{
-				case 'a':
-					operandsStack.push(new ColumnIndex(safeToInt(parseNumber())));
-					break;
-				case 'c':
-					operandsStack.push(new Constant(parseParameter()));
-					break;
-				case 'o':
-					// Parse and translate opcode
-					Operation operation = operatorTranslationMap.get(safeToInt(parseNumber()));
-					if (operation == null) {
-						throw new FilterStringSyntaxException("unknown op ending at " + index);
-					}
+    /*
+     * Basic filter provided for cases where the target storage system does not provide it's own filter
+     * For example: Hbase storage provides its own filter but for a Writable based record in a
+     * SequenceFile there is no filter provided and so we need to have a default
+     */
+    static public class BasicFilter {
+        private Operation oper;
+        private ColumnIndex column;
+        private Constant constant;
 
-					// Pop right operand
-					if (operandsStack.empty())
-						throw new FilterStringSyntaxException("missing operands for op " + operation + " at " + index);
-					Object rightOperand = operandsStack.pop();
+        /*
+         * C'tor
+         */
+        public BasicFilter(Operation inOper, ColumnIndex inColumn, Constant inConstant) {
+            oper = inOper;
+            column = inColumn;
+            constant = inConstant;
+        }
 
-					// Pop left operand
-					if (operandsStack.empty())
-						throw new FilterStringSyntaxException("missing operands for op " + operation + " at " + index);
-					Object leftOperand = operandsStack.pop();
+        /*
+         * returns oper field
+         */
+        public Operation getOperation() {
+            return oper;
+        }
 
-					// Normalize order, evaluate
-					// Column should be on the left
-					Object result;
-					if (leftOperand instanceof Constant) // column on the right, reverse expression
-						result = filterBuilder.build(reverseOp(operation), rightOperand, leftOperand);
-					else // no swap, column on the left
-						result = filterBuilder.build(operation, leftOperand, rightOperand);
+        /*
+         * returns column field
+         */
+        public ColumnIndex getColumn() {
+            return column;
+        }
 
-					// Store result on stack
-					operandsStack.push(result);
-					break;
-				default:
-					index--; // move index back to operand location
-					throw new FilterStringSyntaxException("unknown opcode " + op + 
-														  "(" + (int)op + ") at " + index);
-			}
-		}
+        /*
+         * returns constant field
+         */
+        public Constant getConstant() {
+            return constant;
+        }
+    }
 
-		if (operandsStack.empty())
-			throw new FilterStringSyntaxException("filter parsing ended with no result");
+    /*
+     * Exception that can occur while parsing the string
+     */
+    class FilterStringSyntaxException extends Exception {
+        FilterStringSyntaxException(String desc) {
+            super(desc + " (filter string: '" + filterString + "')");
+        }
+    }
 
-		Object result = operandsStack.pop();
-		
-		if (!operandsStack.empty())
-			throw new FilterStringSyntaxException("Stack not empty, missing operators?");
-		
-		if ((result instanceof Constant) || (result instanceof ColumnIndex)) {
-			throw new FilterStringSyntaxException("filter parsing failed, missing operators?");
-		}
+    public FilterParser(FilterBuilder eval) {
+        operandsStack = new Stack<Object>();
+        filterBuilder = eval;
+    }
 
-		return result;
-	}
+    public Object parse(String filter) throws Exception {
+        index = 0;
+        filterString = filter;
 
-	int safeToInt(Long value) throws FilterStringSyntaxException
-	{
-		if (value > Integer.MAX_VALUE || value < Integer.MIN_VALUE) {
-			throw new FilterStringSyntaxException("value " + value + " larger than intmax ending at " + index);
-		}
-		
-		return value.intValue();
-	}
+        if (filter == null) {
+            throw new FilterStringSyntaxException("filter parsing ended with no result");
+        }
 
-	/*
-	 * Parses either a number or a string
-	 */
-	private Object parseParameter() throws Exception
-	{
-		if (index == filterString.length())
-			throw new FilterStringSyntaxException("argument should follow at " + index);
+        while (index < filterString.length()) {
+            char op = filterString.charAt(index);
+            ++index; // skip op character
+            switch (op) {
+                case 'a':
+                    operandsStack.push(new ColumnIndex(safeToInt(parseNumber())));
+                    break;
+                case 'c':
+                    operandsStack.push(new Constant(parseParameter()));
+                    break;
+                case 'o':
+                    // Parse and translate opcode
+                    Operation operation = operatorTranslationMap.get(safeToInt(parseNumber()));
+                    if (operation == null) {
+                        throw new FilterStringSyntaxException("unknown op ending at " + index);
+                    }
 
-		if (senseString())
-			return parseString();
+                    // Pop right operand
+                    if (operandsStack.empty()) {
+                        throw new FilterStringSyntaxException("missing operands for op " + operation + " at " + index);
+                    }
+                    Object rightOperand = operandsStack.pop();
 
-		return parseNumber();
-	}
+                    // Pop left operand
+                    if (operandsStack.empty()) {
+                        throw new FilterStringSyntaxException("missing operands for op " + operation + " at " + index);
+                    }
+                    Object leftOperand = operandsStack.pop();
 
-	private boolean senseString()
-	{
-		return filterString.charAt(index) == '"';
-	}
+                    // Normalize order, evaluate
+                    // Column should be on the left
+                    Object result = (leftOperand instanceof Constant)
+                            // column on the right, reverse expression
+                            ? filterBuilder.build(reverseOp(operation), rightOperand, leftOperand)
+                            // no swap, column on the left
+                            : filterBuilder.build(operation, leftOperand, rightOperand);
 
-	private Long parseNumber() throws Exception
-	{
-		if (index == filterString.length())
-			throw new FilterStringSyntaxException("numeric argument expected at " + index);
+                    // Store result on stack
+                    operandsStack.push(result);
+                    break;
+                default:
+                    index--; // move index back to operand location
+                    throw new FilterStringSyntaxException("unknown opcode " + op +
+                            "(" + (int) op + ") at " + index);
+            }
+        }
 
-		String digits = parseDigits();
-		
-		try {
-			return Long.parseLong(digits);
-		} catch (NumberFormatException e) {
-			throw new FilterStringSyntaxException("invalid numeric argument " + digits);
-		}
-		
-	}
+        if (operandsStack.empty()) {
+            throw new FilterStringSyntaxException("filter parsing ended with no result");
+        }
 
-	/*
-	 * Parses the longest sequence of digits into a number
-	 * advances the index accordingly
-	 */
-	private String parseDigits() throws Exception
-	{
-		String result;
-		int i = index;
-		int filterLength = filterString.length();
-		
-		// allow sign
-		if (filterLength > 0) {
-			int chr = filterString.charAt(i);
-			if (chr == '-' || chr == '+')
-				++i;
-		}
-		for (; i < filterLength; ++i)
-		{
-			int chr = filterString.charAt(i);
-			if (chr < '0' || chr > '9')
-				break;
-		}
-		
-		if (i == index)
-			throw new FilterStringSyntaxException("numeric argument expected at " + index);
+        Object result = operandsStack.pop();
 
-		result = filterString.substring(index, i);
-		index = i;
-		return result;
-	}
+        if (!operandsStack.empty()) {
+            throw new FilterStringSyntaxException("Stack not empty, missing operators?");
+        }
 
-	/*
-	 * Parses a string after its beginning '"' until its ending '"'
-	 * advances the index accordingly
-	 *
-	 * Currently the string cannot contain '"' itself
-	 * TODO add support for '"' inside the string
-	 */
-	private String parseString() throws Exception
-	{
-		String result = "";
-		boolean ended = false;
-		int i = 0;
+        if ((result instanceof Constant) || (result instanceof ColumnIndex)) {
+            throw new FilterStringSyntaxException("filter parsing failed, missing operators?");
+        }
 
-		// starting from index + 1 to skip leading "
-		for (i = index + 1; i < filterString.length(); ++i)
-		{
-			char chr = filterString.charAt(i);
-			if (chr == '"')
-			{
-				ended = true;
-				break;
-			}
-			result += chr;
-		}
+        return result;
+    }
 
-		if (!ended)
-			throw new FilterStringSyntaxException("string started at " + index + " not ended with \"");
+    int safeToInt(Long value) throws FilterStringSyntaxException {
+        if (value > Integer.MAX_VALUE || value < Integer.MIN_VALUE) {
+            throw new FilterStringSyntaxException("value " + value + " larger than intmax ending at " + index);
+        }
 
-		index = i + 1; // +1 to skip ending "
-		return result;
-	}
+        return value.intValue();
+    }
 
-	/*
-	 * The function takes an operator and reverses it
-	 * e.g. > turns into <
-	 */
-	private Operation reverseOp(Operation operation)
-	{
-		switch (operation)
-		{
-			case HDOP_LT:
-				operation = Operation.HDOP_GT;
-				break;
-			case HDOP_GT:
-				operation = Operation.HDOP_LT;
-				break;
-			case HDOP_LE:
-				operation = Operation.HDOP_GE;
-				break;
-			case HDOP_GE:
-				operation = Operation.HDOP_LE;
-				break;
-			default:
-				// no change o/w
-		}
+    /*
+     * Parses either a number or a string
+     */
+    private Object parseParameter() throws Exception {
+        if (index == filterString.length()) {
+            throw new FilterStringSyntaxException("argument should follow at " + index);
+        }
 
-		return operation;
-	}
+        if (senseString()) {
+            return parseString();
+        }
 
-	/*
-	 * Create a translation table of opcodes to their enum meaning
-	 *
-	 * These codes correspond to the codes in GPDB C code
-	 * see gphdfilters.h in pxf protocol
-	 */
-	static private Map<Integer, Operation> initOperatorTransMap()
-	{
-		Map<Integer, Operation> operatorTranslationMap = new HashMap<Integer, Operation>();
-		operatorTranslationMap.put(1, Operation.HDOP_LT);
-		operatorTranslationMap.put(2, Operation.HDOP_GT);
-		operatorTranslationMap.put(3, Operation.HDOP_LE);
-		operatorTranslationMap.put(4, Operation.HDOP_GE);
-		operatorTranslationMap.put(5, Operation.HDOP_EQ);
-		operatorTranslationMap.put(6, Operation.HDOP_NE);
-		operatorTranslationMap.put(7, Operation.HDOP_AND);
-		return operatorTranslationMap;
-		
-	}
+        return parseNumber();
+    }
+
+    private boolean senseString() {
+        return filterString.charAt(index) == '"';
+    }
+
+    private Long parseNumber() throws Exception {
+        if (index == filterString.length()) {
+            throw new FilterStringSyntaxException("numeric argument expected at " + index);
+        }
+
+        String digits = parseDigits();
+
+        try {
+            return Long.parseLong(digits);
+        } catch (NumberFormatException e) {
+            throw new FilterStringSyntaxException("invalid numeric argument " + digits);
+        }
+
+    }
+
+    /*
+     * Parses the longest sequence of digits into a number
+     * advances the index accordingly
+     */
+    private String parseDigits() throws Exception {
+        String result;
+        int i = index;
+        int filterLength = filterString.length();
+
+        // allow sign
+        if (filterLength > 0) {
+            int chr = filterString.charAt(i);
+            if (chr == '-' || chr == '+') {
+                ++i;
+            }
+        }
+        for (; i < filterLength; ++i) {
+            int chr = filterString.charAt(i);
+            if (chr < '0' || chr > '9') {
+                break;
+            }
+        }
+
+        if (i == index) {
+            throw new FilterStringSyntaxException("numeric argument expected at " + index);
+        }
+
+        result = filterString.substring(index, i);
+        index = i;
+        return result;
+    }
+
+    /*
+     * Parses a string after its beginning '"' until its ending '"'
+     * advances the index accordingly
+     *
+     * Currently the string cannot contain '"' itself
+     * TODO add support for '"' inside the string
+     */
+    private String parseString() throws Exception {
+        StringBuilder result = new StringBuilder();
+        boolean ended = false;
+        int i;
+
+        // starting from index + 1 to skip leading "
+        for (i = index + 1; i < filterString.length(); ++i) {
+            char chr = filterString.charAt(i);
+            if (chr == '"') {
+                ended = true;
+                break;
+            }
+            result.append(chr);
+        }
+
+        if (!ended) {
+            throw new FilterStringSyntaxException("string started at " + index + " not ended with \"");
+        }
+
+        index = i + 1; // +1 to skip ending "
+        return result.toString();
+    }
+
+    /*
+     * The function takes an operator and reverses it
+     * e.g. > turns into <
+     */
+    private Operation reverseOp(Operation operation) {
+        switch (operation) {
+            case HDOP_LT:
+                operation = Operation.HDOP_GT;
+                break;
+            case HDOP_GT:
+                operation = Operation.HDOP_LT;
+                break;
+            case HDOP_LE:
+                operation = Operation.HDOP_GE;
+                break;
+            case HDOP_GE:
+                operation = Operation.HDOP_LE;
+                break;
+            default:
+                // no change o/w
+        }
+
+        return operation;
+    }
+
+    /*
+     * Create a translation table of opcodes to their enum meaning
+     *
+     * These codes correspond to the codes in GPDB C code
+     * see gphdfilters.h in pxf protocol
+     */
+    static private Map<Integer, Operation> initOperatorTransMap() {
+        Map<Integer, Operation> operatorTranslationMap = new HashMap<Integer, Operation>();
+        operatorTranslationMap.put(1, Operation.HDOP_LT);
+        operatorTranslationMap.put(2, Operation.HDOP_GT);
+        operatorTranslationMap.put(3, Operation.HDOP_LE);
+        operatorTranslationMap.put(4, Operation.HDOP_GE);
+        operatorTranslationMap.put(5, Operation.HDOP_EQ);
+        operatorTranslationMap.put(6, Operation.HDOP_NE);
+        operatorTranslationMap.put(7, Operation.HDOP_AND);
+        return operatorTranslationMap;
+    }
 }

@@ -21,7 +21,6 @@ public interface Writable {
 
     /**
      * Deserialize the fields of this object from <code>in</code>.
-     *
      * <p>For efficiency, implementations should attempt to re-use storage in the
      * existing object where possible.</p>
      *

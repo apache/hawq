@@ -10,10 +10,12 @@ import java.io.DataInputStream;
  * should implement getNext (for reading) or setNext (for writing) 
  * for handling accessed data.
  */
-public interface Bridge
-{
-	boolean beginIteration() throws Exception;
-	Writable getNext() throws Exception;
-	boolean setNext(DataInputStream inputStream) throws Exception;
-	boolean isThreadSafe();
+public interface Bridge {
+    boolean beginIteration() throws Exception;
+
+    Writable getNext() throws Exception;
+
+    boolean setNext(DataInputStream inputStream) throws Exception;
+
+    boolean isThreadSafe();
 }

@@ -1,27 +1,22 @@
 package com.pivotal.pxf.core.rest.resources;
 
-import java.io.DataInputStream;
-import java.io.InputStream;
-import java.util.HashMap;
-import java.util.Map;
+import com.pivotal.pxf.api.utilities.InputData;
+import com.pivotal.pxf.core.Bridge;
+import com.pivotal.pxf.core.WriteBridge;
+import com.pivotal.pxf.core.utilities.SecuredHDFS;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 import javax.servlet.ServletContext;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.MultivaluedMap;
-import javax.ws.rs.core.Response;
-
-import com.pivotal.pxf.core.Bridge;
-import com.pivotal.pxf.core.WriteBridge;
-import com.pivotal.pxf.api.utilities.InputData;
-import com.pivotal.pxf.core.utilities.SecuredHDFS;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import javax.ws.rs.core.*;
+import java.io.DataInputStream;
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
 
 /*
  * Running this resource manually:
@@ -66,11 +61,11 @@ import org.apache.commons.logging.LogFactory;
  * REST component
  */
 @Path("/" + Version.PXF_PROTOCOL_VERSION + "/Writable/")
-public class WritableResource
-{
-	private static final Log LOG = LogFactory.getLog(WritableResource.class);
-	
-	public WritableResource() {}
+public class WritableResource {
+    private static final Log LOG = LogFactory.getLog(WritableResource.class);
+
+    public WritableResource() {
+    }
 
     /*
      * This function is called when http://nn:port/gpdb/vx/Writable/stream?path=...
@@ -81,89 +76,80 @@ public class WritableResource
 	 * @param path Holds URI path option used in this request
 	 * @param inputStream stream of bytes to write from Hawq
      */
-	@POST
-	@Path("stream")
-	@Consumes(MediaType.APPLICATION_OCTET_STREAM)
-	public Response stream(@Context final ServletContext servletContext,
-						   @Context HttpHeaders headers, 
-			               @QueryParam("path") String path,
-			               InputStream inputStream) throws Exception {	
-		
-		// Convert headers into a regular map
-		Map<String, String> params = convertToRegularMap(headers.getRequestHeaders());
-		params.put("X-GP-DATA-PATH", path);
-		LOG.debug("WritableResource started with parameters: " + params);
-		
-		InputData inputData = new InputData(params);
+    @POST
+    @Path("stream")
+    @Consumes(MediaType.APPLICATION_OCTET_STREAM)
+    public Response stream(@Context final ServletContext servletContext,
+                           @Context HttpHeaders headers,
+                           @QueryParam("path") String path,
+                           InputStream inputStream) throws Exception {
+
+        // Convert headers into a regular map
+        Map<String, String> params = convertToRegularMap(headers.getRequestHeaders());
+        params.put("X-GP-DATA-PATH", path);
+        LOG.debug("WritableResource started with parameters: " + params);
+
+        InputData inputData = new InputData(params);
         SecuredHDFS.verifyToken(inputData, servletContext);
-		Bridge bridge = new WriteBridge(inputData);
+        Bridge bridge = new WriteBridge(inputData);
 
-		// THREAD-SAFE parameter has precedence 
-		boolean isThreadSafe = inputData.threadSafe() && bridge.isThreadSafe();
+        // THREAD-SAFE parameter has precedence
+        boolean isThreadSafe = inputData.threadSafe() && bridge.isThreadSafe();
         LOG.debug("Request for " + path + " handled " +
-				  (isThreadSafe ? "without" : "with") + " synchronization"); 
-		
-		return isThreadSafe ? 
-				writeResponse(bridge, path, inputStream) : 
-				synchronizedWriteResponse(bridge, path, inputStream);
-	}
-	
-	private static synchronized Response synchronizedWriteResponse(Bridge bridge,
-																   String path,
-			                                                       InputStream inputStream) 
-			                                                    		   throws Exception {
-		return writeResponse(bridge, path, inputStream);
-	}	
-	
-	private static Response writeResponse(Bridge bridge,
-										  String path,
-			                              InputStream inputStream) throws Exception {
-		
-		String returnMsg;
-		
-		// Open the output file	
-		bridge.beginIteration();
-		
-		DataInputStream dataStream = new DataInputStream(inputStream);
-		
-		long totalRead = 0;
+                (isThreadSafe ? "without" : "with") + " synchronization");
 
-		try
-		{
-			while (bridge.setNext(dataStream))
-			{
-				++totalRead;
-			}
-		}
-		catch (org.eclipse.jetty.io.EofException e)
-		{
+        return isThreadSafe ?
+                writeResponse(bridge, path, inputStream) :
+                synchronizedWriteResponse(bridge, path, inputStream);
+    }
+
+    private static synchronized Response synchronizedWriteResponse(Bridge bridge,
+                                                                   String path,
+                                                                   InputStream inputStream)
+            throws Exception {
+        return writeResponse(bridge, path, inputStream);
+    }
+
+    private static Response writeResponse(Bridge bridge,
+                                          String path,
+                                          InputStream inputStream) throws Exception {
+
+        String returnMsg;
+
+        // Open the output file
+        bridge.beginIteration();
+
+        DataInputStream dataStream = new DataInputStream(inputStream);
+
+        long totalRead = 0;
+
+        try {
+            while (bridge.setNext(dataStream)) {
+                ++totalRead;
+            }
+        } catch (org.eclipse.jetty.io.EofException e) {
             LOG.debug("EofException timeout: connection closed on client side");
-		}
-		catch (Exception ex)
-		{
+        } catch (Exception ex) {
             LOG.debug("totalRead so far " + totalRead + " to " + path);
-			throw ex;
-		}
-		finally 
-		{
-			inputStream.close();
-		}
-		returnMsg = "wrote " + totalRead + " bulks to " + path;
+            throw ex;
+        } finally {
+            inputStream.close();
+        }
+        returnMsg = "wrote " + totalRead + " bulks to " + path;
         LOG.debug(returnMsg);
-		
-		return Response.ok(returnMsg).build();
-	}
-	
-	Map<String, String> convertToRegularMap(MultivaluedMap<String, String> multimap)
-	{
-		Map<String, String> result = new HashMap<String, String>();
-		for (String key : multimap.keySet())
-		{
-			String newKey = key;
-			if (key.startsWith("X-GP-"))
-				newKey = key.toUpperCase();
-			result.put(newKey, multimap.getFirst(key).replace("\\\"", "\""));
-		}
-		return result;
-	}	
+
+        return Response.ok(returnMsg).build();
+    }
+
+    Map<String, String> convertToRegularMap(MultivaluedMap<String, String> multimap) {
+        Map<String, String> result = new HashMap<String, String>();
+        for (String key : multimap.keySet()) {
+            String newKey = key;
+            if (key.startsWith("X-GP-")) {
+                newKey = key.toUpperCase();
+            }
+            result.put(newKey, multimap.getFirst(key).replace("\\\"", "\""));
+        }
+        return result;
+    }
 }

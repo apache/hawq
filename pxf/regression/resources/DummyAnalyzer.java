@@ -1,6 +1,5 @@
-import com.pivotal.pxf.api.AnalyzerStats;
-import com.pivotal.pxf.api.ReadAccessor;
 import com.pivotal.pxf.api.Analyzer;
+import com.pivotal.pxf.api.AnalyzerStats;
 import com.pivotal.pxf.api.utilities.InputData;
 
 /*

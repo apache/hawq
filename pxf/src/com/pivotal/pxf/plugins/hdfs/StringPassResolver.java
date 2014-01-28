@@ -39,7 +39,7 @@ public class StringPassResolver extends Plugin implements ReadResolver, WriteRes
     @Override
     public List<OneField> getFields(OneRow onerow) {
         /*
-		 * This call forces a whole text line into a single varchar field and replaces 
+         * This call forces a whole text line into a single varchar field and replaces
 		 * the proper field separation code can be found in previous revisions. The reasons 
 		 * for doing so as this point are:
 		 * 1. performance
@@ -56,12 +56,13 @@ public class StringPassResolver extends Plugin implements ReadResolver, WriteRes
      */
     @Override
     public OneRow setFields(List<OneField> record) throws Exception {
-        if (((byte[]) record.get(0).val).length == 0)
+        if (((byte[]) record.get(0).val).length == 0) {
             return null;
+        }
 
         oneRow.setData(record.get(0).val);
         return oneRow;
     }
 }
-	
+
 

@@ -1,14 +1,10 @@
 package com.pivotal.pxf.plugins.hdfs.utilities;
 
-import java.io.IOException;
-
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.mapred.FileInputFormat;
-import org.apache.hadoop.mapred.InputSplit;
-import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapred.RecordReader;
-import org.apache.hadoop.mapred.Reporter;
+import org.apache.hadoop.mapred.*;
+
+import java.io.IOException;
 
 /*
  * Class is not intended to read a specific format, hence it implements a dummy getRecordReader
@@ -16,24 +12,21 @@ import org.apache.hadoop.mapred.Reporter;
  * which are valid for the actual InputFormats, since all of them we use inherit FileInputFormat but do not 
  * override getSplits.
  */
-public class PxfInputFormat extends FileInputFormat  
-{
+public class PxfInputFormat extends FileInputFormat {
 
     @Override
-	public RecordReader getRecordReader(InputSplit split,
-									    JobConf conf,
-									    Reporter reporter) throws IOException
-	{
-		throw new UnsupportedOperationException("PxfInputFormat should not be used for reading data, but only for obtaining the splits of a file");
-	}
+    public RecordReader getRecordReader(InputSplit split,
+                                        JobConf conf,
+                                        Reporter reporter) throws IOException {
+        throw new UnsupportedOperationException("PxfInputFormat should not be used for reading data, but only for obtaining the splits of a file");
+    }
 
-	/* 
-	 *  Return if this file can be split (HD-6863)  
-	 */
-	@Override
-	protected boolean isSplitable(FileSystem fs, Path filename) 
-	{	
-		return HdfsUtilities.isSplittableCodec(filename);
-	}
-	
+    /*
+     *  Return if this file can be split (HD-6863)
+     */
+    @Override
+    protected boolean isSplitable(FileSystem fs, Path filename) {
+        return HdfsUtilities.isSplittableCodec(filename);
+    }
+
 }

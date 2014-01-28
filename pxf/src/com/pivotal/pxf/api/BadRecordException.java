@@ -7,11 +7,15 @@ package com.pivotal.pxf.api;
  * bridge code that catches the exception, and reacts by issuing a GPDBWritable record
  * with the errorFlag set. - This catch logic is located in ReadBridge.GetNext()
  */
-public class BadRecordException extends Exception 
-{
-	public BadRecordException() {}
-    
-    public BadRecordException(Throwable cause) { super(cause); }
-    
-    public BadRecordException(String message) { super(message); }
+public class BadRecordException extends Exception {
+    public BadRecordException() {
+    }
+
+    public BadRecordException(Throwable cause) {
+        super(cause);
+    }
+
+    public BadRecordException(String message) {
+        super(message);
+    }
 }

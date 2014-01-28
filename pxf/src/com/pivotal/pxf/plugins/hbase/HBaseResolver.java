@@ -1,23 +1,18 @@
 package com.pivotal.pxf.plugins.hbase;
 
-import java.sql.Timestamp;
-import java.util.LinkedList;
-import java.util.List;
-
-import com.pivotal.pxf.api.OneRow;
+import com.pivotal.pxf.api.*;
 import com.pivotal.pxf.api.io.DataType;
-import com.pivotal.pxf.api.ReadResolver;
+import com.pivotal.pxf.api.utilities.InputData;
+import com.pivotal.pxf.api.utilities.Plugin;
+import com.pivotal.pxf.plugins.hbase.utilities.HBaseColumnDescriptor;
 import com.pivotal.pxf.plugins.hbase.utilities.HBaseTupleDescription;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.util.Bytes;
 
-import com.pivotal.pxf.api.BadRecordException;
-import com.pivotal.pxf.api.UnsupportedTypeException;
-import com.pivotal.pxf.api.OneField;
-import com.pivotal.pxf.plugins.hbase.utilities.HBaseColumnDescriptor;
-import com.pivotal.pxf.api.utilities.InputData;
-import com.pivotal.pxf.api.utilities.Plugin;
+import java.sql.Timestamp;
+import java.util.LinkedList;
+import java.util.List;
 
 /*
  * Record resolver for HBase.
@@ -28,50 +23,47 @@ import com.pivotal.pxf.api.utilities.Plugin;
  *
  * Currently, the class assumes all HBase values are stored as String object Bytes encoded
  */
-public class HBaseResolver extends Plugin implements ReadResolver
-{
-	private HBaseTupleDescription tupleDescription;
+public class HBaseResolver extends Plugin implements ReadResolver {
+    private HBaseTupleDescription tupleDescription;
 
-	public HBaseResolver(InputData input) throws Exception
-	{
-		super(input);
-		tupleDescription = new HBaseTupleDescription(input);
-	}
+    public HBaseResolver(InputData input) throws Exception {
+        super(input);
+        tupleDescription = new HBaseTupleDescription(input);
+    }
 
-	public List<OneField> getFields(OneRow onerow) throws Exception
-	{
-		Result result = (Result)onerow.getData();
-		LinkedList<OneField> fields = new LinkedList<OneField>();
+    public List<OneField> getFields(OneRow onerow) throws Exception {
+        Result result = (Result) onerow.getData();
+        LinkedList<OneField> fields = new LinkedList<OneField>();
 
-		for (int i = 0; i < tupleDescription.columns(); ++i)
-		{
-			HBaseColumnDescriptor column = tupleDescription.getColumn(i);
-			byte[] value;
-			
-			if (column.isKeyColumn()) // if a row column is requested
-				value = result.getRow(); // just return the row key
-			else // else, return column value
-				value = getColumnValue(result, column);
+        for (int i = 0; i < tupleDescription.columns(); ++i) {
+            HBaseColumnDescriptor column = tupleDescription.getColumn(i);
+            byte[] value;
 
-			OneField oneField = new OneField();
-			oneField.type = column.columnTypeCode();
-			oneField.val = convertToJavaObject(oneField.type, column.columnTypeName(), value);
-			fields.add(oneField);
-		}
-		return fields;
-	}
-
-	/*
-	 * Call the conversion function for type
-	 */
-	Object convertToJavaObject(int typeCode, String typeName, byte[] val) throws Exception
-	{
-		if (val == null)
-			return null;
-        try
-        {
-            switch(DataType.get(typeCode))
+            if (column.isKeyColumn()) // if a row column is requested
             {
+                value = result.getRow(); // just return the row key
+            } else // else, return column value
+            {
+                value = getColumnValue(result, column);
+            }
+
+            OneField oneField = new OneField();
+            oneField.type = column.columnTypeCode();
+            oneField.val = convertToJavaObject(oneField.type, column.columnTypeName(), value);
+            fields.add(oneField);
+        }
+        return fields;
+    }
+
+    /*
+     * Call the conversion function for type
+     */
+    Object convertToJavaObject(int typeCode, String typeName, byte[] val) throws Exception {
+        if (val == null) {
+            return null;
+        }
+        try {
+            switch (DataType.get(typeCode)) {
                 case TEXT:
                 case VARCHAR:
                 case BPCHAR:
@@ -97,37 +89,35 @@ public class HBaseResolver extends Plugin implements ReadResolver
 
                 case BOOLEAN:
                     return Boolean.valueOf(Bytes.toString(val));
-                  
+
                 case NUMERIC:
                     return Bytes.toString(val);
-                    
+
                 case TIMESTAMP:
                     return Timestamp.valueOf(Bytes.toString(val));
-                    
+
                 default:
                     throw new UnsupportedTypeException("Unsupported data type " + typeName);
             }
-        } 
-        catch (NumberFormatException e)
-        {
+        } catch (NumberFormatException e) {
             throw new BadRecordException("Error converting value '" + Bytes.toString(val) + "' " +
-            							 "to type " + typeName + ". " +
-            							 "(original error: " + e.getMessage() + ")");
+                    "to type " + typeName + ". " +
+                    "(original error: " + e.getMessage() + ")");
         }
-	}
+    }
 
-	byte[] getColumnValue(Result result, HBaseColumnDescriptor column)
-	{
-		// if column does not contain a value, return null
-		if (!result.containsColumn(column.columnFamilyBytes(),
-								   column.qualifierBytes()))
-			return null;
+    byte[] getColumnValue(Result result, HBaseColumnDescriptor column) {
+        // if column does not contain a value, return null
+        if (!result.containsColumn(column.columnFamilyBytes(),
+                column.qualifierBytes())) {
+            return null;
+        }
 
-		// else, get the latest version of the requested column
+        // else, get the latest version of the requested column
         Cell cell = result.getColumnLatestCell(column.columnFamilyBytes(), column.qualifierBytes());
         int len = cell.getValueLength();
-        byte [] res = new byte[len];
+        byte[] res = new byte[len];
         System.arraycopy(cell.getValueArray(), cell.getValueOffset(), res, 0, len);
         return res;
-	}
+    }
 }

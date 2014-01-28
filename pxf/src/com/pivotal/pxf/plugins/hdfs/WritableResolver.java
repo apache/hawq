@@ -1,12 +1,7 @@
 package com.pivotal.pxf.plugins.hdfs;
 
-import com.pivotal.pxf.api.BadRecordException;
-import com.pivotal.pxf.api.UnsupportedTypeException;
-import com.pivotal.pxf.api.OneField;
-import com.pivotal.pxf.api.OneRow;
+import com.pivotal.pxf.api.*;
 import com.pivotal.pxf.api.io.DataType;
-import com.pivotal.pxf.api.ReadResolver;
-import com.pivotal.pxf.api.WriteResolver;
 import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.api.utilities.Plugin;
 import com.pivotal.pxf.plugins.hdfs.utilities.RecordkeyAdapter;
@@ -81,11 +76,13 @@ public class WritableResolver extends Plugin implements ReadResolver, WriteResol
 
         int currentIdx = 0;
         for (Field field : fields) {
-            if (currentIdx == recordkeyIndex)
+            if (currentIdx == recordkeyIndex) {
                 currentIdx += recordkeyAdapter.appendRecordkeyField(record, inputData, onerow);
+            }
 
-            if (Modifier.isPrivate(field.getModifiers()))
+            if (Modifier.isPrivate(field.getModifiers())) {
                 continue;
+            }
 
             currentIdx += populateRecord(record, field);
         }
@@ -134,7 +131,7 @@ public class WritableResolver extends Plugin implements ReadResolver, WriteResol
         String javaType = field.getType().getName();
         try {
             DataType dataType = convertJavaToGPDBType(javaType);
-            if(isArray(javaType)){
+            if (isArray(javaType)) {
                 return setArrayField(record, dataType.getOID(), field);
             }
             record.add(new OneField(dataType.getOID(), field.get(userObject)));

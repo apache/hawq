@@ -1,6 +1,7 @@
 package com.pivotal.pxf.core.rest.resources;
 
-import java.io.IOException;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -11,14 +12,11 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
 import javax.ws.rs.core.UriInfo;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import java.io.IOException;
 
 
-class Version
-{
-	final static String PXF_PROTOCOL_VERSION = "v10";
+class Version {
+    final static String PXF_PROTOCOL_VERSION = "v10";
 }
 
 /*
@@ -31,109 +29,98 @@ class Version
  * Otherwise, an error about unknown path is returned.
  */
 @Path("/")
-public class InvalidPathResource
-{
-	@Context
-	UriInfo rootUri;
+public class InvalidPathResource {
+    @Context
+    UriInfo rootUri;
 
-	private Log Log;
+    private Log Log;
 
-	public InvalidPathResource() throws IOException
-	{
-		super();
-		Log = LogFactory.getLog(InvalidPathResource.class);
-	}
+    public InvalidPathResource() throws IOException {
+        super();
+        Log = LogFactory.getLog(InvalidPathResource.class);
+    }
 
-	/*
-	 * Catch path /gpdb/
-	 */
-	@GET
-	@Path("/")
-	public Response noPathGet() throws Exception
-	{
-		return noPath();
-	}
+    /*
+     * Catch path /gpdb/
+     */
+    @GET
+    @Path("/")
+    public Response noPathGet() throws Exception {
+        return noPath();
+    }
 
-	@POST
-	@Path("/")
-	public Response noPathPost() throws Exception
-	{
-		return noPath();
-	}
-	
-	private Response noPath() throws Exception
-	{
-		String errmsg = "Unknown path " + rootUri.getAbsolutePath();
-		return sendErrorMessage(errmsg);
-	}
-	
-	/*
-	 * Catch paths of pattern /gpdb/*
-	 */
-	@GET
-	@Path("/{path:.*}")
-	public Response wrongPathGet(@PathParam("path") String path) throws Exception
-	{
-		return wrongPath(path);
-	}
-	
-	/*
-	 * Catch paths of pattern /gpdb/*
-	 */
-	@POST
-	@Path("/{path:.*}")
-	public Response wrongPathPost(@PathParam("path") String path) throws Exception
-	{
-		return wrongPath(path);
-	}
-	
-	
-	private Response wrongPath(String path) throws Exception
-	{
+    @POST
+    @Path("/")
+    public Response noPathPost() throws Exception {
+        return noPath();
+    }
 
-		String errmsg;
-		String version = parseVersion(path);
+    private Response noPath() throws Exception {
+        String errmsg = "Unknown path " + rootUri.getAbsolutePath();
+        return sendErrorMessage(errmsg);
+    }
 
-		Log.debug("REST request: " +  rootUri.getAbsolutePath()  + ". " +
-				  "Version " + version + ", supported version is " + Version.PXF_PROTOCOL_VERSION);
+    /*
+     * Catch paths of pattern /gpdb/*
+     */
+    @GET
+    @Path("/{path:.*}")
+    public Response wrongPathGet(@PathParam("path") String path) throws Exception {
+        return wrongPath(path);
+    }
 
-		if (version.equals(Version.PXF_PROTOCOL_VERSION))
-		{
-			errmsg = "Unknown path " + rootUri.getAbsolutePath();
-		}
-		else
-		{
-			errmsg = "Wrong version " + version + ", supported version is " + Version.PXF_PROTOCOL_VERSION;
-		}
+    /*
+     * Catch paths of pattern /gpdb/*
+     */
+    @POST
+    @Path("/{path:.*}")
+    public Response wrongPathPost(@PathParam("path") String path) throws Exception {
+        return wrongPath(path);
+    }
 
-		return sendErrorMessage(errmsg);
-	}
 
-	/*
-	 * Return error message
-	 */
-	private Response sendErrorMessage(String message)
-	{
-		ResponseBuilder b = Response.serverError();
-		b.entity(message);
-		b.type(MediaType.TEXT_PLAIN_TYPE);
-		return b.build();
-	}
+    private Response wrongPath(String path) throws Exception {
 
-	/*
-	 * Parse the version part from the path.
-	 * The the absolute path is
-	 * http://<host>:<port>/gpdb/<version>/<rest of path>
-	 *
-	 * path - the path part after /gpdb/
-	 * returns the first element after /gpdb/
-	 */
-	private String parseVersion(String path) {
+        String errmsg;
+        String version = parseVersion(path);
 
-		int slash = path.indexOf('/');
-		if (slash == -1)
-			return path;
+        Log.debug("REST request: " + rootUri.getAbsolutePath() + ". " +
+                "Version " + version + ", supported version is " + Version.PXF_PROTOCOL_VERSION);
 
-		return path.substring(0, slash);
-	}
+        if (version.equals(Version.PXF_PROTOCOL_VERSION)) {
+            errmsg = "Unknown path " + rootUri.getAbsolutePath();
+        } else {
+            errmsg = "Wrong version " + version + ", supported version is " + Version.PXF_PROTOCOL_VERSION;
+        }
+
+        return sendErrorMessage(errmsg);
+    }
+
+    /*
+     * Return error message
+     */
+    private Response sendErrorMessage(String message) {
+        ResponseBuilder b = Response.serverError();
+        b.entity(message);
+        b.type(MediaType.TEXT_PLAIN_TYPE);
+        return b.build();
+    }
+
+    /*
+     * Parse the version part from the path.
+     * The the absolute path is
+     * http://<host>:<port>/gpdb/<version>/<rest of path>
+     *
+     * path - the path part after /gpdb/
+     * returns the first element after /gpdb/
+     */
+    private String parseVersion(String path) {
+
+        int slash = path.indexOf('/');
+        if (slash == -1) {
+            return path;
+        }
+
+        return path.substring(0, slash);
+    }
 }

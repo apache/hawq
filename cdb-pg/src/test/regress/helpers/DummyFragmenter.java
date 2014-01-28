@@ -1,5 +1,5 @@
-import com.pivotal.pxf.api.Fragmenter;
 import com.pivotal.pxf.api.Fragment;
+import com.pivotal.pxf.api.Fragmenter;
 import com.pivotal.pxf.api.utilities.InputData;
 
 import java.util.List;
@@ -7,7 +7,7 @@ import java.util.List;
 /*
  * Class that defines the splitting of a data resource into fragments that can
  * be processed in parallel
- * * getFragments returns the fragments information of a given path (source name and location of each fragment).
+ * getFragments() returns the fragments information of a given path (source name and location of each fragment).
  * Used to get fragments of data that could be read in parallel from the different segments.
  * Dummy implementation, for documentation
  */

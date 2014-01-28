@@ -33,9 +33,10 @@ public class SecuredHDFS {
         final int HEX_RADIX = 16;
         final int NIBBLE_SIZE_IN_BITS = 4;
 
-        if (hex.length() % 2 != 0)
+        if (hex.length() % 2 != 0) {
             throw new IllegalArgumentException("Internal server error. String " +
                     hex + " isn't a valid hex string");
+        }
 
         byte[] result = new byte[hex.length() / 2];
         for (int i = 0; i < hex.length(); i = i + 2) {
@@ -47,7 +48,7 @@ public class SecuredHDFS {
     }
 
     /*
-	 * The function will get the token information from parameters
+     * The function will get the token information from parameters
 	 * and call SecuredHDFS to verify the token.
 	 *
 	 * X-GP data will be deserialied from hex string to a byte array
@@ -75,8 +76,8 @@ public class SecuredHDFS {
      * @throws SecurityException Thrown when authentication fails
      */
     private static void verifyToken(byte[] identifier, byte[] password,
-                                   byte[] kind, byte[] service,
-                                   ServletContext servletContext) {
+                                    byte[] kind, byte[] service,
+                                    ServletContext servletContext) {
         try {
             Token<DelegationTokenIdentifier> token = new Token<DelegationTokenIdentifier>(
                     identifier,

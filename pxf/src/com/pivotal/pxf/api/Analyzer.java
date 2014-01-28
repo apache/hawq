@@ -10,24 +10,21 @@ import com.pivotal.pxf.api.utilities.Plugin;
  * Used when calling ANALYZE on a PXF external table, to get 
  * table's statistics that are used by the optimizer to plan queries. 
  */
-public abstract class Analyzer extends Plugin
-{
-	public Analyzer(InputData inputData)
-	{
-		super(inputData);
-	}
-	
-	/*
-	 * 'path' is the data source name (e.g, file, dir, wildcard, table name).
-	 * returns the data statistics in json format.
-	 * 
-	 * NOTE: It is highly recommended to implement an extremely fast logic
-	 * that returns *estimated* statistics. Scanning all the data for exact
-	 * statistics is considered bad practice.
-	 */
-	public AnalyzerStats getEstimatedStats(String data) throws Exception
-	{
-		/* Return default values */
-		return new AnalyzerStats();
-	}	
+public abstract class Analyzer extends Plugin {
+    public Analyzer(InputData inputData) {
+        super(inputData);
+    }
+
+    /*
+     * 'path' is the data source name (e.g, file, dir, wildcard, table name).
+     * returns the data statistics in json format.
+     *
+     * NOTE: It is highly recommended to implement an extremely fast logic
+     * that returns *estimated* statistics. Scanning all the data for exact
+     * statistics is considered bad practice.
+     */
+    public AnalyzerStats getEstimatedStats(String data) throws Exception {
+        /* Return default values */
+        return new AnalyzerStats();
+    }
 }

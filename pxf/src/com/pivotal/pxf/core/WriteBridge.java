@@ -1,10 +1,6 @@
 package com.pivotal.pxf.core;
 
-import com.pivotal.pxf.api.WriteAccessor;
-import com.pivotal.pxf.api.BadRecordException;
-import com.pivotal.pxf.api.OneField;
-import com.pivotal.pxf.api.OneRow;
-import com.pivotal.pxf.api.WriteResolver;
+import com.pivotal.pxf.api.*;
 import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.api.utilities.Plugin;
 import com.pivotal.pxf.core.io.Writable;

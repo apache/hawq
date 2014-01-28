@@ -6,69 +6,53 @@ package com.pivotal.pxf.api;
  * separate key like in the HDFS key/value model for MapReduce 
  * (Example: HDFS sequence file)
  */
-public class OneRow
-{
-	private Object key;
-	private Object data;
-	
-	/*
-	 * Default constructor
-	 */
-	public OneRow()
-	{
-		key = null;
-		data = null;
-	}
-	
-	/*
-	 * Constructor sets key and data
-	 */
-	public OneRow(Object inKey, Object inData)
-	{
-		key = inKey;
-		data = inData;
-	}
-	
-	/*
-	 * Copy constructor 
-	 */	
-	public OneRow(OneRow copy)
-	{
-		this.key = copy.key;
-		this.data = copy.data;
-	}
-	
-	/*
-	 * Setter for key
-	 */
-	public void setKey(Object inKey)
-	{
-		key = inKey;
-	}
+public class OneRow {
+    private Object key;
+    private Object data;
 
-	/*
-	 * Setter for data
-	 */	
-	public void setData(Object inData)
-	{
-		data = inData;
-	}
+    /*
+     * Default constructor
+     */
+    public OneRow() {
+        key = null;
+        data = null;
+    }
 
-	/*
-	 * Accessor for key
-	 */		
-	public Object getKey()
-	{
-		return key;
-	}
+    /*
+     * Constructor sets key and data
+     */
+    public OneRow(Object inKey, Object inData) {
+        key = inKey;
+        data = inData;
+    }
 
-	/*
-	 * Accessor for data
-	 */		
-	public Object getData()
-	{
-		return data;
-	}
+    /*
+     * Setter for key
+     */
+    public void setKey(Object inKey) {
+        key = inKey;
+    }
+
+    /*
+     * Setter for data
+     */
+    public void setData(Object inData) {
+        data = inData;
+    }
+
+    /*
+     * Accessor for key
+     */
+    public Object getKey() {
+        return key;
+    }
+
+    /*
+     * Accessor for data
+     */
+    public Object getData() {
+        return data;
+    }
 
     /*
      * Show content

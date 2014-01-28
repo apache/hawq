@@ -293,12 +293,12 @@ public class Text implements Writable {
      * deserialize
      */
     @Override
-    public void readFields(DataInput inputStream) throws IOException{
+    public void readFields(DataInput inputStream) throws IOException {
 
         byte c;
         curLoc = 0;
         clear();
-        while ((c = (byte) ((DataInputStream)inputStream).read()) != EOF) {
+        while ((c = (byte) ((DataInputStream) inputStream).read()) != EOF) {
             buf[curLoc] = c;
             curLoc++;
 

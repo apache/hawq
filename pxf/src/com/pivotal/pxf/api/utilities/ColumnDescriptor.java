@@ -5,43 +5,43 @@ package com.pivotal.pxf.api.utilities;
  * Currently it means a name, a type id (HAWQ/GPDB OID), and a type name.
  */
 public class ColumnDescriptor {
-	int gpdbColumnTypeCode;
-	String gpdbColumnName;
-	String gpdbColumnTypeName;
-	int gpdbColumnIndex;
-	public static final String RECORD_KEY_NAME = "recordkey";
+    int gpdbColumnTypeCode;
+    String gpdbColumnName;
+    String gpdbColumnTypeName;
+    int gpdbColumnIndex;
+    public static final String RECORD_KEY_NAME = "recordkey";
 
-	public ColumnDescriptor(String name, int typecode, int index, String typename) {
-		gpdbColumnTypeCode = typecode;
-		gpdbColumnTypeName = typename;
-		gpdbColumnName = name;
-		gpdbColumnIndex = index;
-	}
+    public ColumnDescriptor(String name, int typecode, int index, String typename) {
+        gpdbColumnTypeCode = typecode;
+        gpdbColumnTypeName = typename;
+        gpdbColumnName = name;
+        gpdbColumnIndex = index;
+    }
 
-	public ColumnDescriptor(ColumnDescriptor copy) {
-		this.gpdbColumnTypeCode = copy.gpdbColumnTypeCode;
-		this.gpdbColumnName = copy.gpdbColumnName;
-		this.gpdbColumnIndex = copy.gpdbColumnIndex;
-		this.gpdbColumnTypeName = copy.gpdbColumnTypeName;
-	}
+    public ColumnDescriptor(ColumnDescriptor copy) {
+        this.gpdbColumnTypeCode = copy.gpdbColumnTypeCode;
+        this.gpdbColumnName = copy.gpdbColumnName;
+        this.gpdbColumnIndex = copy.gpdbColumnIndex;
+        this.gpdbColumnTypeName = copy.gpdbColumnTypeName;
+    }
 
-	public String columnName() {
-		return gpdbColumnName;
-	}
+    public String columnName() {
+        return gpdbColumnName;
+    }
 
-	public int columnTypeCode() {
-		return gpdbColumnTypeCode;
-	}
+    public int columnTypeCode() {
+        return gpdbColumnTypeCode;
+    }
 
-	public int columnIndex() {
-		return gpdbColumnIndex;
-	}
+    public int columnIndex() {
+        return gpdbColumnIndex;
+    }
 
-	public String columnTypeName() {
-		return gpdbColumnTypeName;
-	}
+    public String columnTypeName() {
+        return gpdbColumnTypeName;
+    }
 
-	public boolean isKeyColumn() {
-		return gpdbColumnName.compareToIgnoreCase(RECORD_KEY_NAME) == 0;
-	}
+    public boolean isKeyColumn() {
+        return RECORD_KEY_NAME.equalsIgnoreCase(gpdbColumnName);
+    }
 }

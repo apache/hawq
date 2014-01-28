@@ -1,8 +1,8 @@
 package com.pivotal.pxf.core;
 
 import com.pivotal.pxf.api.Analyzer;
-import com.pivotal.pxf.core.utilities.Utilities;
 import com.pivotal.pxf.api.utilities.InputData;
+import com.pivotal.pxf.core.utilities.Utilities;
 
 /*
  * Factory class for creation of Analyzer objects. The actual Analyzer object is "hidden" behind

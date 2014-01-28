@@ -100,7 +100,7 @@ public class StringPassResolverTest {
     }
 
     @Test
-	/*
+    /*
 	 * Test the setFields method: empty stream (returns -1)
 	 */
     public void testSetFieldsEmptyStream() throws Exception {
@@ -139,7 +139,7 @@ public class StringPassResolverTest {
 
     private void verifyOneRow(OneRow oneRow, byte[] expected) {
         assertNull(oneRow.getKey());
-        byte[] bytes = (byte[])oneRow.getData();
+        byte[] bytes = (byte[]) oneRow.getData();
         byte[] result = Arrays.copyOfRange(bytes, 0, bytes.length);
         assertEquals(result.length, expected.length);
         assertTrue(Arrays.equals(result, expected));
