@@ -945,9 +945,9 @@ add_segment_config_entry(int16 pridbid, seginfo *i, ArrayType *fsmap)
 	 */
 	if (contentid != MASTER_CONTENT_ID)
 	{
-        update_persistent_filespaces(pridbid, contentid, true);
-        update_persistent_tablespaces(contentid, true);
-        update_persistent_databases(contentid, true);
+		update_persistent_filespaces(pridbid, contentid, true);
+		update_persistent_tablespaces(contentid, true);
+		update_persistent_databases(contentid, true);
 	}
 	/*
 	 * We don't need to care relations since new segment does not
@@ -1057,10 +1057,18 @@ remove_segment(int16 pridbid, int16 mirdbid)
 	/* -2 is an invalid id to be returned by get_contentid_from_dbid */
 	Assert(contentid != -2);
 
-	/* relations are taken care of along with database */
-	update_persistent_databases(contentid, false);
-	update_persistent_tablespaces(contentid, false);
-	update_persistent_filespaces(pridbid, contentid, false);
+	/*
+	 * Drop/Remove database, tablespace, filespace paths in that order.
+	 * Note :- We don't have to do this for Master standby because the data
+	 * managed by the Master and the standby although identical is not stored on
+	 * shared filesystem unlike data managed by HAWQ/GPSQL segments
+	 */
+	if (contentid != MASTER_CONTENT_ID)
+	{
+		update_persistent_databases(contentid, false);
+		update_persistent_tablespaces(contentid, false);
+		update_persistent_filespaces(pridbid, contentid, false);
+	}
 
 	/* Check that we're removing a mirror, not a primary */
 	i = get_seginfo(mirdbid);
