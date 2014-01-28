@@ -1,5 +1,6 @@
 
 #include "access/pxfuriparser.h"
+#include "access/ha_config.h"
 #include "catalog/pg_exttable.h"
 #include "utils/formatting.h"
 #include "utils/uri.h"
@@ -20,6 +21,7 @@ static void  GPHDUri_free_fragments(GPHDUri *uri);
 static char* GPHDUri_dup_without_segwork(const char* uri);
 static void  GPHDUri_debug_print_options(GPHDUri *uri);
 static void  GPHDUri_debug_print_segwork(GPHDUri *uri);
+static void  GPHDUri_fetch_authority_from_ha_nn(GPHDUri *uri, char *nameservice);
 
 /* parseGPHDUri
  *
@@ -245,90 +247,89 @@ GPHDUri_parse_protocol(GPHDUri *uri, char **cursor)
  * Parse the authority section of the URI which is passed down
  * in 'cursor', having 'cursor' point at the current string
  * location.
+ * authority string can have one of two (2) forms:
+ *    host:port
+ *    ha_nameservice_string
  *
  * See parseGPHDUri header for URI structure description.
  */
 static void
 GPHDUri_parse_authority(GPHDUri *uri, char **cursor)
 {
-	char		*start = *cursor;
-	char		*end;
-	const char	*default_port = "9000"; /* TODO: port is no longer used, so no need for that */
+	char		*portstart, *end, *ipv6, *hostport;
+	int         totlen, hostlen; 
 	const long  max_port_number = 65535;
+	long        port;
+	
+	char		*hoststart = *cursor;
 
-	if (*start == '/')
-	{
-		/* implicit authority 'localhost:defport' (<ptc>:///) */
+	/* implicit authority 'localhost:defport' (<ptc>:///) */
+	if (*hoststart == '/')		
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
 				 errmsg("Invalid URI %s : missing authority section",
 						 uri->uri)));
-	}
-	else
+	
+	end = strchr(hoststart, '/');
+	if (!end)
+		ereport(ERROR,
+				(errcode(ERRCODE_SYNTAX_ERROR),
+				 errmsg("Invalid URI %s : missing authority section",
+						 uri->uri)));
+	/* host:port string*/	
+	totlen = end - hoststart;
+	hostport = pnstrdup(hoststart, totlen);
+		
+	/* find the portstart ':' */
+	ipv6 = strchr(hostport, ']');
+	if (ipv6) /* IPV6 */
+		portstart = strchr(ipv6, ':');
+	else /* IPV4 */
+		portstart = strchr(hostport, ':');
+
+	if (portstart) /* the authority is of the form host:port */
 	{
-		end = strchr(start, '/');
-
-		if (!end)
-		{
-			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("Invalid URI %s : missing authority section",
-							 uri->uri)));
-		}
-		else
-		{
-			char	*colon;
-			char	*p;
-			int		 len = end - start;
-
-			/* host */
-			uri->host = pnstrdup(start, len);
-
-			/* find the port ':' */
-			p = strchr(uri->host, ']');
-			if (p)
-			{
-				/* IPV6 */
-				colon = strchr(p, ':');
-
-				/* TODO: may need to remove brackets from host. Ask Alex */
-			}
-			else
-			{
-				/* IPV4 */
-				colon = strchr(uri->host, ':');
-			}
-
-			/* port */
-			if (colon)
-			{
-				long port;
-				uri->port = pstrdup(colon + 1);
-
-				/* now truncate ":<port>" from hostname */
-				uri->host[len - strlen(colon)] = '\0';
-
-				*colon = 0;
-				
-				port = atol(uri->port);
-				if (port <=0 || port > max_port_number)
-					ereport(ERROR,
-							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("Invalid port: %s ",
-									uri->port)));				
-			}
-			else
-			{
-				/* default port value */
-
-				uri->port = pstrdup(default_port);
-			}
-		}
+		uri->port = pstrdup(portstart + 1);
+		hostlen = portstart - hostport;
+		uri->host = pnstrdup(hostport, hostlen);
 	}
+	else /* the authority is a nameservice string - we are going to find the HighAvailibility NN */
+		GPHDUri_fetch_authority_from_ha_nn(uri, hostport);
 
-	/* skip the authority trailing slash */
+	pfree(hostport);
 	*cursor = ++end;
+	
+	port = atol(uri->port);
+	if (port <=0 || port > max_port_number)
+		ereport(ERROR,
+				(errcode(ERRCODE_SYNTAX_ERROR),
+				 errmsg("Invalid port: %s for authority host %s",
+						uri->port, uri->host)));	
 }
+
+/*
+ * GPHDUri_fetch_authority_from_ha_nn
+ *
+ * Fetch authority from the high-availibility Namenode pair.
+ * In case we got a simple string for the authority instead
+ * of a host:port form, we assume that we received a nameservice 
+ * string describing a High-Availibility Namenode couple.
+ * For this case we are going to read the HDFS client configuration
+ * in order to retrieve the active Namenode host:port based on the
+ * nameservice string.
+ * TODO:
+ * This is a temporary solution that will be removed once the PXF servlet
+ * will stop using the HDFS namenode/datanodes as a hosting application
+ * server and will move to an independent stand-alone application server 
+ */
+static void
+GPHDUri_fetch_authority_from_ha_nn(GPHDUri *uri, char *nameservice)
+{
+	NNHAConf* hac = load_nn_ha_config(nameservice);
+	uri->host = pstrdup(hac->nodes[hac->active]);
+	uri->port = pstrdup(hac->restports[hac->active]);
+	release_nn_ha_config(hac);
+}	
 
 /*
  * GPHDUri_parse_data
