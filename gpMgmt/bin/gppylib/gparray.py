@@ -1457,6 +1457,10 @@ class GpArray:
                 if mode == MODE_SYNCHRONIZED and status == STATUS_UP:
                     recoveredSegmentDbids.append(dbid)
 
+            # In GPSQL, only master maintain the filespace information.
+            if content != MASTER_CONTENT_ID and fsoid != SYSTEM_FILESPACE:
+                continue
+
             # The query returns all the filespaces for a segment on separate
             # rows.  If this row is the same dbid as the previous row simply
             # add this filespace to the existing list, otherwise create a
@@ -1661,10 +1665,19 @@ class GpArray:
         """
         @return a newly allocated list of GpFilespaceObj objects, will have been sorted by filespace name
         """
-        if includeSystemFilespace:
-           return [fs for fs in self.__filespaceArr]
-        else:
-           return [fs for fs in self.__filespaceArr if not fs.isSystemFilespace()]
+        return [fs for fs in self.__filespaceArr if fs.isSystemFilespace()]
+
+    def getNonSystemFilespaces(self):
+        """
+        @return a newly allocated list of GpFilespaceObj objects, will have been sorted by filespace name
+        """
+        return [fs for fs in self.__filespaceArr if not fs.isSystemFilespace()]
+
+    def getAllFilespaces(self):
+        """
+        @return a newly allocated list of GpFilespaceObj objects, will have been sorted by filespace name
+        """
+        return [fs for fs in self.__filespaceArr]
 
     # --------------------------------------------------------------
     def getFileSpaceName(self, filespaceOid):

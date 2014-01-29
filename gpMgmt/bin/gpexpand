@@ -1364,7 +1364,7 @@ Set PGDATABASE or use the -D option to specify the correct database to use.""" %
         contain filespaces, then return the name of the file, else return
         None.
         """
-        filespaces = self.gparray.getFilespaces(includeSystemFilespace = False)
+        filespaces = self.gparray.getNonSystemFilespaces()
         if filespaces != None and len(filespaces) > 0:
            outputfile = outFileNamePrefix + FILE_SPACES_INPUT_FILENAME_SUFFIX
         else:
@@ -1438,7 +1438,7 @@ Set PGDATABASE or use the -D option to specify the correct database to use.""" %
            existsCmd = FileDirExists(name = "gpexpand see if .fs file exists", directory = fsInputFilename)
            existsCmd.run(validateAfter = True)
            exists = existsCmd.filedir_exists()
-           if exists == False and len(self.gparray.getFilespaces(includeSystemFilespace = False)) != 0:
+           if exists == False and len(self.gparray.getNonSystemFilespaces()) != 0:
               raise ExpansionError("Expecting filespaces input file: " + fsInputFilename)
            if exists == True:
               # We'll save filespace paths for segment 0 to verify if the Filespace paths in the input .fs file
@@ -1464,9 +1464,9 @@ Set PGDATABASE or use the -D option to specify the correct database to use.""" %
                          fsPaths.append(GpDB.getDataDirPrefix(filespaceDict[oid]))
 
                      # Make sure all the filepace names are specified.
-                     if len(fsNameList) != len(self.gparray.getFilespaces(includeSystemFilespace = False)):
+                     if len(fsNameList) != len(self.gparray.getNonSystemFilespaces()):
                         missingFsNames = []
-                        filespaces = self.gparray.getFilespaces()
+                        filespaces = self.gparray.getAllFilespaces()
                         for fs in filespaces:
                             if fs.getName() not in fsNameList:
                                missingFsNames.append(fs.getName())
@@ -2693,7 +2693,7 @@ before continuing by re-running this utility and providing the input file. """
         new_datadirs = []
         new_fsDirs = []
 
-        gpFSobjList = gparray.getFilespaces(includeSystemFilespace = False)
+        gpFSobjList = gparray.getNonSystemFilespaces()
         
         for i in range(1,num_new_datadirs + 1):
             new_datadir = ask_input(None,'Enter new primary data directory %d' % i, '',
