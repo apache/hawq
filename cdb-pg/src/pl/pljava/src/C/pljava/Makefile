@@ -45,8 +45,8 @@ ifeq ($(PORTNAME), darwin)
     # override with JAVAVM_FWX_ROOT=/... on command line
     # if something else is needed
     #
-	JAVAVM_FWX_ROOT := /System/Library/Frameworks
-	PLJAVA_CPPFLAGS += -I$(JAVAVM_FWX_ROOT)/JavaVM.framework/Headers/
+	PLJAVA_CPPFLAGS += -I$(JAVA_HOME)/include
+	PLJAVA_CPPFLAGS += -I$(JAVA_HOME)/include/darwin
 else
 ifeq ($(PORTNAME), ibmos2)
 	DLL_BUILD := 1

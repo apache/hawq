@@ -10,12 +10,15 @@
 
 USAGE="$0 -f <hosts file> [-x]"
 
-if [[ $(uname) =~ "Linux*" ]]; then
-    BLD_ARCH=rhel5_x86_64
-fi
-if [ ! $BLD_ARCH ]; then
-    echo "PL/Java is currently supported only on RHEL platform."
-    exit 1
+if [ "$BLD_ARCH" == "" ]; then
+    if [[ $(uname) =~ "Darwin*" ]]; then
+	BLD_ARCH=osx106_x86
+    elif [[ $(uname) =~ "Linux*" ]]; then
+	BLD_ARCH=rhel5_x86_64
+    else
+	echo "PL/Java is not supported on your platform."
+	exit 1
+    fi
 fi
 
 if [ ! -d $GPHOME ]; then
@@ -23,20 +26,20 @@ if [ ! -d $GPHOME ]; then
     exit 1
 fi
 
-if [ ! -d $JAVA_HOME ]; then
-    echo "JAVA_HOME is not either not set or is invalid."
+if [ "$JAVA_HOME" == "" ]; then
+    echo "JAVA_HOME not set."
     exit 1
 fi
 
-jvmso=$(find $JAVA_HOME -name libjvm.so)
+jvmso=$(find $JAVA_HOME -name libjvm.*)
 if [ ! $jvmso ]; then
-    echo "JAVA_HOME is invalid, cannot find libjvm.so."
+    echo "JAVA_HOME is invalid, cannot find libjvm."
     exit 1
 fi
 jvmsodir=$(dirname $jvmso)
 # Being paranoid...
 if [ ! -d $jvmsodir ]; then
-    echo "Cannot get directory name for libjvm.so."
+    echo "Cannot get directory name for libjvm."
     exit 1
 fi
 
@@ -129,9 +132,9 @@ if [ $expand_mode -eq 1 ]; then
     exit 0
 fi
 
-# Patch greenplum_path.sh to include JNI library in LD_LIBRARY_PATH.
-# Remove existing JAVA_HOME related lines, if any, so that we don't
-# end up appending the same lines again.
+# Patch greenplum_path.sh to include JNI library in
+# (DY)LD_LIBRARY_PATH.  Remove existing JAVA_HOME related lines, if
+# any, so that we don't end up appending the same lines again.
 grep -v "$jvmsodir" $GPHOME/greenplum_path.sh > ./greenplum_path.sh.tmp
 if [ ! -f ./greenplum_path.sh.tmp ]; then
     echo "Failed to patch $GPHOME/greenplum_path.sh."
@@ -140,7 +143,12 @@ if [ ! -f ./greenplum_path.sh.tmp ]; then
     exit 1
 fi
 
-echo "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:$jvmsodir" >> ./greenplum_path.sh.tmp
+if [ $BLD_ARCH == "rhel5_x86_64" ]; then
+    echo "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:$jvmsodir" >> ./greenplum_path.sh.tmp
+else
+    echo "export DYLD_LIBRARY_PATH=\$DYLD_LIBRARY_PATH:$jvmsodir" >> ./greenplum_path.sh.tmp
+fi
+
 cmd="mv ./greenplum_path.sh.tmp $GPHOME/greenplum_path.sh"
 output=$($cmd)
 if [ 0 -ne $? ]; then
