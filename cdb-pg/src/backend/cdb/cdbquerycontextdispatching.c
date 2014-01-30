@@ -1725,8 +1725,26 @@ static bool collect_func_walker(Node *node, QueryContextInfo *context)
 		return expression_tree_walker((Node *)aggnode->args,
 									  collect_func_walker, context);
 	}
+	if (IsA(node, WindowRef))
+	{
+		/* 
+		 * Window functions are nothing but aggregate functions
+		 * invoked with "OVER(...)" clause.  Therefore, treat them as
+		 * aggregates.
+		 */
+		WindowRef * wnode = (WindowRef *) node;
+		prepareDispatchedCatalogAggregate(context, wnode->winfnoid);
+		prepareDispatchedCatalogFunction(context, wnode->winfnoid);
+		/*
+		 * Should return type of the aggregate (window) function be
+		 * included explicity?
+		 */
+		return expression_tree_walker((Node *)wnode->args,
+									  collect_func_walker, context);
+	}
 	return plan_tree_walker(node, collect_func_walker, context);
 }
+
 /*
  * recursively scan the expression chain and collect function information
  */
