@@ -11,13 +11,11 @@ CREATE OR REPLACE FUNCTION @gpupgradeschemaname@.pg_get_constraintdef(oid, bool)
 SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.pg_get_constraintdef(oid, bool) IS ''constraint description with pretty-print option''');
 
 CREATE OR REPLACE FUNCTION @gpupgradeschemaname@.pg_get_partition_rule_def(oid) RETURNS text LANGUAGE internal STABLE STRICT READS SQL DATA AS 'pg_get_partition_rule_def' WITH (OID=5027);
-SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.pg_get_partition_rule_def(oid) IS ''partition configuration for a given rule''');
 
 CREATE OR REPLACE FUNCTION @gpupgradeschemaname@.pg_get_partition_rule_def(oid, bool) RETURNS text LANGUAGE internal STABLE STRICT READS SQL DATA AS 'pg_get_partition_rule_def_ext' WITH (OID=5028);
 SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.pg_get_partition_rule_def(oid, bool) IS ''partition configuration for a given rule''');
 
 CREATE OR REPLACE FUNCTION @gpupgradeschemaname@.pg_get_partition_def(oid) RETURNS text LANGUAGE internal STABLE STRICT READS SQL DATA AS 'pg_get_partition_def' WITH (OID=5024);
-SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.pg_get_partition_def(oid) IS ''partition configuration for a given relation''');
 
 CREATE OR REPLACE FUNCTION @gpupgradeschemaname@.pg_get_partition_def(oid, bool) RETURNS text LANGUAGE internal STABLE STRICT READS SQL DATA AS 'pg_get_partition_def_ext' WITH (OID=5025);
 SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.pg_get_partition_def(oid, bool) IS ''partition configuration for a given relation''');
