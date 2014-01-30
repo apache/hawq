@@ -99,6 +99,7 @@ public class PxfHBaseRegression extends PxfTestCase {
 		hbase = (HBase) system.getSystemObject("hbase");
 
 		hawq.runQuery("SET pxf_enable_filter_pushdown = on");
+		hawq.runQuery("SET optimizer = off");
 
 		hTable = new HBaseTable("hbase_table", new String[] { "cf1" });
 
@@ -314,26 +315,20 @@ public class PxfHBaseRegression extends PxfTestCase {
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
 	}
 
-	// @Test
-	// public void filterTextAndNumeric() throws Exception {
-	//
-	// initAndPopulateHBaseTable(hTable, false);
-	//
-	// hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(),
-	// "q2".getBytes(), CompareOp.GREATER,
-	// "UTF8_計算機用語_00000090".getBytes("UTF-8")));
-	// hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(),
-	// "q3".getBytes(), CompareOp.LESS_OR_EQUAL, new
-	// HBaseIntegerComparator(990000L)));
-	//
-	// hbase.queryResults(hTable, null);
-	//
-	// hawq.queryResults(externalTableHbase, "SELECT * FROM " +
-	// externalTableHbase.getName() +
-	// " WHERE \"cf1:q2\" > 'UTF8_計算機用語_00000090' AND \"cf1:q3\" <= 990000 ORDER BY recordkey ASC");
-	//
-	// ComparisonUtils.compareTables(externalTableHbase, hTable, report);
-	// }
+	@Test
+	public void filterTextAndNumeric() throws Exception {
+
+		initAndPopulateHBaseTable(hTable, false);
+
+		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q2".getBytes(), CompareOp.GREATER, "UTF8_計算機用語_00000090".getBytes("UTF-8")));
+		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q3".getBytes(), CompareOp.LESS_OR_EQUAL, new HBaseIntegerComparator(990000L)));
+
+		hbase.queryResults(hTable, null);
+
+		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE \"cf1:q2\" > 'UTF8_計算機用語_00000090' AND \"cf1:q3\" <= 990000 ORDER BY recordkey ASC");
+
+		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
+	}
 
 	@Test
 	public void filterDouble() throws Exception {
@@ -350,39 +345,34 @@ public class PxfHBaseRegression extends PxfTestCase {
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
 	}
 
-	// @Test
-	// public void filterSmallAndBigInt() throws Exception {
-	//
-	// initAndPopulateHBaseTable(hTable, false);
-	//
-	// hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(),
-	// "q8".getBytes(), CompareOp.GREATER, new HBaseIntegerComparator(97L)));
-	// hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(),
-	// "q9".getBytes(), CompareOp.LESS_OR_EQUAL, new
-	// HBaseIntegerComparator(9702990000000099L)));
-	//
-	// hbase.queryResults(hTable, null);
-	//
-	// hawq.queryResults(externalTableHbase, "SELECT * FROM " +
-	// externalTableHbase.getName() +
-	// " WHERE \"cf1:q8\" > 97 AND \"cf1:q9\" <= 9702990000000099 ORDER BY recordkey ASC");
-	//
-	// ComparisonUtils.compareTables(externalTableHbase, hTable, report);
-	// }
+	@Test
+	public void filterSmallAndBigInt() throws Exception {
 
-//	@Test
-//	public void filterBigInt() throws Exception {
-//
-//		initAndPopulateHBaseTable(hTable, false);
-//
-//		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q9".getBytes(), CompareOp.LESS, new HBaseIntegerComparator(-7000000000000000L)));
-//
-//		hbase.queryResults(hTable, null);
-//
-//		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE \"cf1:q9\" < -7000000000000000 ORDER BY recordkey ASC");
-//
-//		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
-//	}
+		initAndPopulateHBaseTable(hTable, false);
+
+		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q8".getBytes(), CompareOp.GREATER, new HBaseIntegerComparator(97L)));
+		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q9".getBytes(), CompareOp.LESS_OR_EQUAL, new HBaseIntegerComparator(9702990000000099L)));
+
+		hbase.queryResults(hTable, null);
+
+		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE \"cf1:q8\" > 97 AND \"cf1:q9\" <= 9702990000000099 ORDER BY recordkey ASC");
+
+		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
+	}
+
+	@Test
+	public void filterBigInt() throws Exception {
+
+		initAndPopulateHBaseTable(hTable, false);
+
+		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q9".getBytes(), CompareOp.LESS, new HBaseIntegerComparator(-7000000000000000L)));
+
+		hbase.queryResults(hTable, null);
+
+		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE \"cf1:q9\" < -7000000000000000 ORDER BY recordkey ASC");
+
+		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
+	}
 
 	@Test
 	public void filterOrAnd() throws Exception {
