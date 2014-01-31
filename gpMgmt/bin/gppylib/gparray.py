@@ -1341,9 +1341,15 @@ class GpArray:
 
     # --------------------------------------------------------------------
     @staticmethod
-    def initFromCatalog(dbURL, utility=False):
+    def initFromCatalog(dbURL, utility=False, useAllSegmentFileSpaces=False):
         """
         Factory method, initializes a GpArray from provided database URL
+
+        Please note that -
+        useAllSegmentFilespaces when set to true makes this method add *all* filespaces
+        to the segments of gparray. If false, only returns Master/Standby all filespaces
+        This is *hacky* and we know that it is not the right way to design methods/interfaces
+        We are doing this so that we do not affect behavior of existing tools like upgrade, gprecoverseg etc
         """
 
         conn = dbconn.connect(dbURL, utility)
@@ -1458,7 +1464,7 @@ class GpArray:
                     recoveredSegmentDbids.append(dbid)
 
             # In GPSQL, only master maintain the filespace information.
-            if content != MASTER_CONTENT_ID and fsoid != SYSTEM_FILESPACE:
+            if content != MASTER_CONTENT_ID and fsoid != SYSTEM_FILESPACE and not useAllSegmentFileSpaces:
                 continue
 
             # The query returns all the filespaces for a segment on separate

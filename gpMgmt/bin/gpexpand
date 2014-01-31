@@ -1303,7 +1303,7 @@ Set PGDATABASE or use the -D option to specify the correct database to use.""" %
             elif status[0] == 'UPDATE_CATALOG_STARTED':
                 self.logger.info('Rolling back master update')
                 self.restore_master()
-                self.gparray = GpArray.initFromCatalog(dburl, utility=True)
+                self.gparray = GpArray.initFromCatalog(dburl, utility=True, useAllSegmentFileSpaces=True)
 
             elif status[0] == 'SETUP_EXPANSION_SCHEMA_STARTED':
                 cleanSchema = True
@@ -1844,7 +1844,7 @@ Set PGDATABASE or use the -D option to specify the correct database to use.""" %
 
         if not self.conn:
             self.conn = dbconn.connect(self.dburl, encoding='UTF8', allowSystemTableMods='dml')
-            self.gparray = GpArray.initFromCatalog(self.dburl)
+            self.gparray = GpArray.initFromCatalog(self.dburl, useAllSegmentFileSpaces=True)
 
         nowStr = datetime.datetime.now()
         statusSQL = "INSERT INTO %s.%s VALUES ( 'SETUP', '%s' ) " % (gpexpand_schema,status_table,nowStr)
@@ -2796,7 +2796,7 @@ try:
 
     # Get array configuration
     try:
-        gparray = GpArray.initFromCatalog(dburl,utility=True)
+        gparray = GpArray.initFromCatalog(dburl,utility=True, useAllSegmentFileSpaces=True)
     except DatabaseError, ex:
         logger.error('Failed to connect to database.  Make sure the')
         logger.error('HAWQ instance you wish to expand is running')

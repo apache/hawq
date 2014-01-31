@@ -434,7 +434,7 @@ class GpConfigurationProviderUsingGpdbCatalog(GpConfigurationProvider) :
         for inclusion into the call to gp_add_segment_mirror().
         """
         filespaceArrayString = []
-        for fs in gpArray.getFilespaces():
+        for fs in gpArray.getAllFilespaces():
             path = seg.getSegmentFilespaces()[ fs.getOid() ]
             filespaceArrayString.append("{%s,%s}" % \
                         (self.__toSqlArrayStringValue(fs.getName()), \
