@@ -2,7 +2,9 @@ package com.pxf.tests.basic;
 
 import java.io.File;
 import java.util.List;
+import java.util.ListIterator;
 
+import org.apache.commons.lang.StringUtils;
 import org.junit.Assert;
 import org.junit.Test;
 import org.postgresql.util.PSQLException;
@@ -10,6 +12,7 @@ import org.postgresql.util.PSQLException;
 import com.pivotal.pxfauto.infra.common.ShellSystemObject;
 import com.pivotal.pxfauto.infra.fileformats.IAvroSchema;
 import com.pivotal.pxfauto.infra.structures.tables.basic.Table;
+import com.pivotal.pxfauto.infra.structures.tables.pxf.ErrorTable;
 import com.pivotal.pxfauto.infra.structures.tables.pxf.ReadableExternalTable;
 import com.pivotal.pxfauto.infra.structures.tables.utils.TableFactory;
 import com.pivotal.pxfauto.infra.utils.exception.ExceptionUtils;
@@ -89,7 +92,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 			hawq.createTableAndVerify(exTable);
 
-		} catch (Exception e) {
+		} catch (PSQLException e) {
 			ExceptionUtils.validate(report, e, new PSQLException("ERROR: Invalid URI pxf://" + hawq.getHost() + ":50070/" + exTable.getPath() + "?: invalid option after '?'", null), false);
 		}
 	}
@@ -114,7 +117,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		try {
 			hawq.createTableAndVerify(exTable);
-		} catch (Exception e) {
+		} catch (PSQLException e) {
 
 			ExceptionUtils.validate(report, e, new PSQLException("ERROR: Invalid URI pxf://" + hawq.getHost() + ":50070/" + exTable.getPath() + "?ACCESSOR=xacc&RESOLVER=xres&someuseropt=someuserval: PROFILE or FRAGMENTER option(s) missing", null), false);
 		}
@@ -140,7 +143,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		try {
 			hawq.createTableAndVerify(exTable);
-		} catch (Exception e) {
+		} catch (PSQLException e) {
 			ExceptionUtils.validate(report, e, new PSQLException("ERROR: Invalid URI pxf://" + hawq.getHost() + ":50070/" + exTable.getPath() + "?FRAGMENTER=xfrag&RESOLVER=xres&someuseropt=someuserval: PROFILE or ACCESSOR option(s) missing", null), false);
 		}
 	}
@@ -166,7 +169,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 			hawq.createTableAndVerify(exTable);
 
-		} catch (Exception e) {
+		} catch (PSQLException e) {
 			ExceptionUtils.validate(report, e, new PSQLException("ERROR: Invalid URI pxf://" + hawq.getHost() + ":50070/" + exTable.getPath() + "?FRAGMENTER=xfrag&ACCESSOR=xacc: PROFILE or RESOLVER option(s) missing", null), false);
 		}
 	}
@@ -411,7 +414,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		Object[] data = FileFormatsUtils.prepareData(new CustomSequencePreparer(), 100, sudoDataTable);
 
-		hdfs.writeSequnceFile(data, (hdfsWorkingFolder + "/my_writable_inside_sequence.tbl"));
+		hdfs.writeSequenceFile(data, (hdfsWorkingFolder + "/my_writable_inside_sequence.tbl"));
 
 		ReadableExternalTable exTable = new ReadableExternalTable("seqwr", new String[] {
 				"tmp1  timestamp",
@@ -442,7 +445,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"short2 smallint",
 				"short3 smallint",
 				"short4 smallint",
-				"short5 smallint" }, (hdfsWorkingFolder + "/my_writable_inside_sequence.tbl"), "custom");
+				"short5 smallint" }, hdfsWorkingFolder + "/my_writable_inside_sequence.tbl", "custom");
 
 		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
 		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor");
@@ -471,7 +474,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		Object[] data = FileFormatsUtils.prepareData(new CustomAvroInSequencePreparer(schemaName), 100, dataTable);
 
-		hdfs.writeAvroInSequnceFile(hdfsWorkingFolder + "/avro_in_seq.tbl", schemaName, (IAvroSchema[]) data);
+		hdfs.writeAvroInSequenceFile(hdfsWorkingFolder + "/avro_in_seq.tbl", schemaName, (IAvroSchema[]) data);
 
 		ReadableExternalTable exTable = new ReadableExternalTable("seqav", new String[] {
 				"tmp1  timestamp",
@@ -524,7 +527,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		Object[] data = FileFormatsUtils.prepareData(new CustomAvroInSequencePreparer(schemaName), 1000, dataTable);
 
-		hdfs.writeAvroInSequnceFile(hdfsWorkingFolder + "/avro_in_seq.tbl", schemaName, (IAvroSchema[]) data);
+		hdfs.writeAvroInSequenceFile(hdfsWorkingFolder + "/avro_in_seq.tbl", schemaName, (IAvroSchema[]) data);
 
 		ReadableExternalTable exTable = new ReadableExternalTable("seqav_space", new String[] {
 				"tmp1  timestamp",
@@ -577,7 +580,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		Object[] data = FileFormatsUtils.prepareData(new CustomAvroInSequencePreparer(schemaName), 1000, dataTable);
 
-		hdfs.writeAvroInSequnceFile(hdfsWorkingFolder + "/avro_in_seq.tbl", schemaName, (IAvroSchema[]) data);
+		hdfs.writeAvroInSequenceFile(hdfsWorkingFolder + "/avro_in_seq.tbl", schemaName, (IAvroSchema[]) data);
 
 		ReadableExternalTable exTable = new ReadableExternalTable("seqav_case", new String[] {
 				"tmp1  timestamp",
@@ -757,7 +760,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		Object[] data = FileFormatsUtils.prepareData(new CustomSequencePreparer(), 100, sudoDataTable);
 
-		hdfs.writeSequnceFile(data, (hdfsWorkingFolder + "/wildcard/my_writable_inside_sequence.tbl"));
+		hdfs.writeSequenceFile(data, (hdfsWorkingFolder + "/wildcard/my_writable_inside_sequence.tbl"));
 
 		ReadableExternalTable exTable = new ReadableExternalTable("seqwild", new String[] {
 				"tmp1  timestamp",
@@ -818,9 +821,9 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		sudoDataTable.pumpUpTableData(2);
 
-		hdfs.writeSequnceFile(data, (hdfsWorkingFolder + "/wild/my_writable_inside_sequence1.tbl"));
+		hdfs.writeSequenceFile(data, (hdfsWorkingFolder + "/wild/my_writable_inside_sequence1.tbl"));
 
-		hdfs.writeSequnceFile(data, (hdfsWorkingFolder + "/wild/my_writable_inside_sequence2.tbl"));
+		hdfs.writeSequenceFile(data, (hdfsWorkingFolder + "/wild/my_writable_inside_sequence2.tbl"));
 
 		ReadableExternalTable exTable = new ReadableExternalTable("seqwild", new String[] {
 				"tmp1  timestamp",
@@ -889,7 +892,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		try {
 			hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY num1");
-		} catch (Exception e) {
+		} catch (PSQLException e) {
 			ExceptionUtils.validate(report, e, new PSQLException("Couldn't resolve host '" + exTable.getHostname() + "'", null), true);
 		}
 	}
@@ -917,7 +920,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		try {
 			hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY num1");
-		} catch (Exception e) {
+		} catch (PSQLException e) {
 
 			/**
 			 * Different Curel versions can provide different ERROR messages.
@@ -1260,6 +1263,114 @@ public class PxfHdfsRegression extends PxfTestCase {
 		ComparisonUtils.compareTables(exTable, dataTable, report);
 	}
 
+	/**
+	 * Test error table option: LOG ERRORS INTO <err_table> SEGMENT REJECT LIMIT <number_of_errors> 
+	 * When reading data from external table, errors in formatting are stored 
+	 * in an error table until the limit of allowed errors is reached. 
+	 * 
+	 * The test covers a case when the number of errors is lower than limit
+	 * and a case when the errors breach the limit.
+	 * 
+	 * @throws Exception
+	 */
+	@Test
+	public void errorTables() throws Exception {
+		
+		String[] fields = new String[] {
+			"num int",
+			"words text"
+		};
+		
+		String dataPath = hdfsWorkingFolder + "/dataWithErr.txt";
+		
+		Table dataTable = new Table("dataTable", null);
+		
+		dataTable.addRow(new String[] {"All Together Now", "The Beatles"});
+		dataTable.addRow(new String[] {"1", "one"});
+		dataTable.addRow(new String[] {"2", "two"});
+		dataTable.addRow(new String[] {"3", "three"});
+		dataTable.addRow(new String[] {"4", "four"});
+		dataTable.addRow(new String[] {"can", "I"});
+		dataTable.addRow(new String[] {"have", "a"});
+		dataTable.addRow(new String[] {"little", "more"});
+		dataTable.addRow(new String[] {"5", "five"});
+		dataTable.addRow(new String[] {"6", "six"});
+		dataTable.addRow(new String[] {"7", "seven"});
+		dataTable.addRow(new String[] {"8", "eight"});
+		dataTable.addRow(new String[] {"9", "nine"});
+		dataTable.addRow(new String[] {"10", "ten - I love you!"});
+		
+		hdfs.writeTextFile(dataPath, dataTable.getData(), ",");
+		
+		ErrorTable errorTable = new ErrorTable("err_table"); 
+		hawq.runQueryWithExpectedWarning(errorTable.constructDropStmt(true), 
+				"(drop cascades to external table err_table_test|" +
+				"table \"" + errorTable.getName() + "\" does not exist, skipping)", 
+				true, true);
+		
+		exTable = TableFactory.getPxfReadableTextTable("err_table_test", fields, dataPath, ",");
+		exTable.setErrorTable(errorTable.getName());
+		exTable.setSegmentRejectLimit(10);
+		
+		ReportUtils.startLevel(report, getClass(), "Drop and create table, expect error table notice");
+		hawq.dropTable(exTable, false);
+		hawq.runQueryWithExpectedWarning(exTable.constructCreateStmt(), 
+				"Error table \"" + errorTable.getName() + "\" does not exist. " +
+				"Auto generating an error table with the same name", 
+				true, true);
+		
+		Assert.assertTrue(hawq.checkTableExists(exTable));
+		ReportUtils.stopLevel(report);
+		
+		hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY num ASC");
+		
+		hawq.verifyWarning("Found 4 data formatting errors \\(4 or more input rows\\). " +
+				"Rejected related input data.", true, false);
+		
+		// remove erroneous rows
+		ReportUtils.report(report, getClass(), "Remove erroneous rows from dataTable");
+		List<List<String>> data = dataTable.getData();
+		ListIterator<List<String>> iter = data.listIterator();
+		while(iter.hasNext()){
+			List<String> element = iter.next();
+			if (!StringUtils.isNumeric(element.get(0))) {
+					iter.remove();
+			}
+		}
+		dataTable.setData(data);
+				
+		ComparisonUtils.compareTables(exTable, dataTable, report);
+
+		hawq.queryResults(errorTable, 
+				"SELECT relname, linenum, errmsg, rawdata FROM " + 
+						errorTable.getName() + " ORDER BY cmdtime ASC");
+		
+		Table errData = new Table("errData", null);
+		errData.addRow(new String[] {
+				exTable.getName(), "1", 
+				"invalid input syntax for integer: \"All Together Now\", column num", 
+				"All Together Now,The Beatles"});
+		errData.addRow(new String[] {exTable.getName(), "6", "invalid input syntax for integer: \"can\", column num", "can,I"});
+		errData.addRow(new String[] {exTable.getName(), "7", "invalid input syntax for integer: \"have\", column num", "have,a"});
+		errData.addRow(new String[] {exTable.getName(), "8", "invalid input syntax for integer: \"little\", column num", "little,more"});
+		
+		ComparisonUtils.compareTables(errorTable, errData, report);
+		
+		ReportUtils.startLevel(report, getClass(), "table with too many errors");
+		exTable.setSegmentRejectLimit(3);
+		hawq.createTableAndVerify(exTable);
+		
+		try {
+			hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY num ASC");
+		} catch (PSQLException e) {
+			PSQLException expected = new PSQLException("Segment reject limit reached. Aborting operation. " +
+					"Last error was: invalid input syntax for integer: \"have\", column num", null);
+			ExceptionUtils.validate(report, e, expected, true);
+		}
+		
+		ReportUtils.stopLevel(report);
+	}
+	
 	private Table prepareRecursiveDirsData(String baseDir, String delim) throws Exception {
 		
 		Table fileTable = new Table("file", null);

@@ -481,7 +481,7 @@ public class PxfHBaseRegression extends PxfTestCase {
 		initAndPopulateHBaseTable(hTable, false);
 		initAndPopulateHBaseTable(hNullTable, true);
 
-		hbase.dropTable(lookUpTable);
+		hbase.dropTable(lookUpTable, false);
 
 		try {
 			hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + "  WHERE \"cf1:q1\" is null ORDER BY recordkey ASC");

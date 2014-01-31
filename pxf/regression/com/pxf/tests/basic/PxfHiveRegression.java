@@ -49,7 +49,7 @@ public class PxfHiveRegression extends PxfTestCase {
 				"n1 int",
 				"d1 double" });
 
-		hive.dropTable(hiveTable);
+		hive.dropTable(hiveTable, false);
 
 		hive.createTable(hiveTable);
 
@@ -77,7 +77,7 @@ public class PxfHiveRegression extends PxfTestCase {
 				"bg bigint",
 				"b boolean" });
 
-		hive.dropTable(hiveTable);
+		hive.dropTable(hiveTable, false);
 
 		hive.createTable(hiveTable);
 
@@ -212,7 +212,7 @@ public class PxfHiveRegression extends PxfTestCase {
 
 		hiveTable.setPartitionBy("fmt string");
 
-		hive.dropTable(hiveTable);
+		hive.dropTable(hiveTable, false);
 		hive.createTable(hiveTable);
 
 		hive.runQuery("ALTER TABLE " + hiveTable.getName() + " ADD PARTITION (fmt = 'txt') LOCATION 'hdfs:/hive/warehouse/reg_txt'");
@@ -301,7 +301,7 @@ public class PxfHiveRegression extends PxfTestCase {
 		hiveTable.setDelimiterLinesBy("\\n");
 		hiveTable.setStoredAs("TEXTFILE");
 
-		hive.dropTable(hiveTable);
+		hive.dropTable(hiveTable, false);
 
 		hive.createTable(hiveTable);
 
@@ -397,7 +397,7 @@ public class PxfHiveRegression extends PxfTestCase {
 
 		hiveTable.setStoredAs("SEQUENCEFILE");
 
-		hive.dropTable(hiveTable);
+		hive.dropTable(hiveTable, false);
 
 		hive.createTable(hiveTable);
 	}
@@ -411,7 +411,7 @@ public class PxfHiveRegression extends PxfTestCase {
 
 		hiveTable.setStoredAs("RCFILE");
 
-		hive.dropTable(hiveTable);
+		hive.dropTable(hiveTable, false);
 
 		hive.createTable(hiveTable);
 	}
@@ -425,7 +425,7 @@ public class PxfHiveRegression extends PxfTestCase {
 
 		hiveTable.setStoredAs("ORC");
 
-		hive.dropTable(hiveTable);
+		hive.dropTable(hiveTable, false);
 
 		hive.createTable(hiveTable);
 	}

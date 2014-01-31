@@ -24,7 +24,7 @@ public class PxfHbaseFixture extends BasicFixture {
 		for (int i = 0; i < hbaseTables.length; i++) {
 
 			if (hbase.checkTableExists(hbaseTables[i])) {
-				hbase.dropTable(hbaseTables[i]);
+				hbase.dropTable(hbaseTables[i], false);
 			}
 		}
 
