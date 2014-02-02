@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# fetches latest build from a Jenkins job
+# fetches latest build from a dist server
 
 if [ "x$1" == "x" ]; then
 	echo "usage: $0 <job path> <artifact pattern>"
@@ -17,17 +17,18 @@ name=$2
 
 version_file=stackversion.txt
 log_file=fetch.log
-jenkins_server=http://hdsh132.lss.emc.com:8080
+dist_server=http://hdsh129.lss.emc.com/dist/PHD
 tmpfile=/tmp/curldata.${RANDOM}.tmp
-url=$jenkins_server/$jobpath
+sort_order=?O=A
+url=$dist_server/$jobpath
 
 # reset log file
 echo -n > $log_file
 
-echo Parsing Jenkins page
-echo Parsing Jenkins page $url/ >> $log_file
-curl -s $url/ > $tmpfile
-last_build_path=`cat $tmpfile | grep -o "href=\"lastSuccessfulBuild[-_\/\.a-zA-Z0-9]*$name\.tar\.gz\"" | grep -o "lastSuccessful.*\.gz" | grep -v "\-src" | grep -v "SNAPSHOT" | head -n1`
+echo Parsing Dist Server page
+echo Parsing Dist Server page $url/$sort_order >> $log_file
+curl -s $url/$sort_order > $tmpfile
+last_build_path=`cat $tmpfile | grep -o "href=\"$name\.tar\.gz\"" | grep -o "$name.tar.gz" | grep -v "\-src" | grep -v "SNAPSHOT" | tail -n1`
 
 echo ----- page start ----- >> $log_file
 cat $tmpfile >> $log_file

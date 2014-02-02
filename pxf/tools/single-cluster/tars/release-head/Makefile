@@ -9,10 +9,10 @@ COMPONENTS = \
 			 stack \
 
 ARTIFACTS = $(ROOT)/artifacts
-JENKINS_FETCH = $(ROOT)/tools/fetchBuild.sh
+DISTSVR_FETCH = $(ROOT)/tools/fetchBuild.sh
 
-JENKINS_VIEW = job
-JENKINS_stack = $(JENKINS_VIEW)/stack-phd2.0-release
+DISTSVR_VIEW = latest
+DISTSVR_stack = $(DISTSVR_VIEW)
 
 TARGET = $(COMPONENTS:%=%.fetched)
 
@@ -25,7 +25,7 @@ clean:
 	-rm -f *~
 
 stack.fetched:
-	$(JENKINS_FETCH) $(JENKINS_stack) "PHD-[\.0-9]*-bin-[0-9]*"
+	$(DISTSVR_FETCH) $(DISTSVR_stack) "PHD-[\.0-9]*-bin-[0-9]*"
 	touch $@
 
 %.fetched: $(ARTIFACTS)/%*.tar.gz %.single
