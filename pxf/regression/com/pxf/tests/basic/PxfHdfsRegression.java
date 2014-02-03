@@ -674,47 +674,6 @@ public class PxfHdfsRegression extends PxfTestCase {
 		ComparisonUtils.compareTables(exTable, dataTable, report);
 	}
 
-	// /**
-	// * Test Protocol Buffer (read only). Create external table for the
-	// * protocol-buffers and query the data
-	// *
-	// * @throws Exception
-	// */
-	// @Test
-	// public void protocolBuffer() throws Exception {
-	//
-	// String protoBuffFile = (hdfsWorkingFolder + "/protobuf_data.tbl");
-	//
-	// Table dataTable = new Table("dataTable", null);
-	//
-	// Object[] generatedMessages = FileFormatsUtils.prepareData(new
-	// CustomProtobuffPreparer(), 5, dataTable);
-	//
-	// hdfs.writeProtocolBufferFile(protoBuffFile, (GeneratedMessage)
-	// generatedMessages[0]);
-	//
-	// ReadableExternalTable exTable = new ReadableExternalTable("pb", new
-	// String[] {
-	// "s1 text",
-	// "num1 int",
-	// "s2 text",
-	// "s3 text",
-	// "num2 int" }, protoBuffFile, "custom");
-	//
-	// exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
-	// exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.ProtobufFileAccessor");
-	// exTable.setResolver("com.pivotal.pxf.plugins.hdfs.ProtobufResolver");
-	// exTable.setDataSchema("pbgp.desc");
-	// exTable.setFormatter("pxfwritable_import");
-	//
-	// hawq.createTableAndVerify(exTable);
-	//
-	// hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() +
-	// " ORDER BY num1;");
-	//
-	// ComparisonUtils.compareTables(exTable, dataTable, report);
-	// }
-
 	/**
 	 * Test Quoted Line Break
 	 * 

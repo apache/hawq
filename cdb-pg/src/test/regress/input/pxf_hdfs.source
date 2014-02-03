@@ -66,7 +66,6 @@ DROP EXTERNAL TABLE gphdfs_in1;
 \! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/avro_inside_sequence.tbl /gpdb_regression_data/avro_inside_sequence.tbl; 
 \! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/avroformat_inside_avrofile.avro /gpdb_regression_data/avroformat_inside_avrofile.avro
 \! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/text_data.csv /gpdb_regression_data/text_data.csv
-\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/protobuf_data.tbl /gpdb_regression_data/protobuf_data.tbl
 \! ${HADOOP_ROOT}/bin/hadoop fs -mkdir /gpdb_regression_data/wild
 \! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/writable_inside_sequence1.tbl /gpdb_regression_data/wild/writable_inside_sequence1.tbl
 \! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/writable_inside_sequence2.tbl /gpdb_regression_data/wild/writable_inside_sequence2.tbl
@@ -343,19 +342,6 @@ FORMAT 'custom' (formatter='pxfwritable_import');
 SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt, bl FROM avfav ORDER BY num1;
 SELECT num1, t1, t2, t3 FROM avfav ORDER BY num1;
 DROP EXTERNAL TABLE avfav;
---
--- Test Protocol-Buffers (read only).
---
--- create the external table for the protocol-buffers and query the data
-CREATE EXTERNAL TABLE pb(s1 text, 
-                         num1 int, 
-						 s2 text, 
-						 s3 text, 
-						 num2 int)
-LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/protobuf_data.tbl?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter&ACCESSOR=ProtobufFileAccessor&RESOLVER=ProtobufResolver&DATA-SCHEMA=pbgp.desc')
-FORMAT 'custom' (formatter='pxfwritable_import');
-SELECT s1, num1, s2, s3, num2 from pb ORDER BY num1;
-DROP EXTERNAL TABLE pb;
 --
 -- Test quoted line break
 --

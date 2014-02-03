@@ -172,14 +172,6 @@
             </manifest>
             <fileset dir="${build.dir}/classes" includes="com/pivotal/pxf/plugins/hive/**"/>
         </jar>
-        <jar destfile="${build.dir}/protobuf-appendix.jar">
-            <manifest>
-                <attribute name="Built-By" value="${user.name}"/>
-                <attribute name="Built-Date" value="${TODAY}"/>
-                <attribute name="Class-Path" value="${comp.hdfs}.jar"/>
-            </manifest>
-            <fileset dir="${build.dir}/classes" includes="Protobuf*.class"/>
-        </jar>
     </target>
 
     <!-- Default -->
@@ -210,7 +202,6 @@
         <copy todir="${dist.dir.hdfs}">
             <fileset dir="${build.dir}">
                 <include name="${comp.hdfs}.jar"/>
-                <include name="protobuf-appendix.jar"/>
             </fileset>
         </copy>
 
