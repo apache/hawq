@@ -8,10 +8,10 @@
 
 
 /*
- * Test pxf_calc_max_participants_allowed returned value
+ * Test pxf_calc_participating_segments() returned value
  */
 void 
-test__pxf_calc_max_participants_allowed(void **state)
+test__pxf_calc_participating_segments(void **state)
 {
 	int test_params[11][4] =
 	{
@@ -44,7 +44,7 @@ test__pxf_calc_max_participants_allowed(void **state)
 		gp_external_max_segs = max_segs_guc;
 		will_return(getgphostCount, number_of_hosts);
 
-		assert_int_equal(pxf_calc_max_participants_allowed(total_segments), expected_result);
+		assert_int_equal(pxf_calc_participating_segments(total_segments), expected_result);
 	}
 }
 
@@ -135,7 +135,7 @@ main(int argc, char* argv[])
 	cmockery_parse_arguments(argc, argv);
 
 	const UnitTest tests[] = {
-			unit_test(test__pxf_calc_max_participants_allowed),
+			unit_test(test__pxf_calc_participating_segments),
 			unit_test(test__is_pxf_protocol__CustomProtocolPXF),
 			unit_test(test__is_pxf_protocol__CustomProtocolNull),
 			unit_test(test__is_pxf_protocol__CustomProtocolOther),

@@ -130,7 +130,7 @@ extern Plan *add_repeat_node(Plan *result_plan, int repeat_count, uint64 groupin
  */
 extern Plan *create_plan(PlannerInfo *root, Path *path);
 extern bool is_pxf_protocol(Uri *uri);
-extern int pxf_calc_max_participants_allowed(int total_segments);
+extern int pxf_calc_participating_segments(int total_segments);
 
 extern SubqueryScan *make_subqueryscan(PlannerInfo *root, List *qptlist, List *qpqual,
 				  Index scanrelid, Plan *subplan, List *subrtable);
