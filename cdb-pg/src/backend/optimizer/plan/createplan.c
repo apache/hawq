@@ -172,6 +172,8 @@ static Sort *make_sort(PlannerInfo *root, Plan *lefttree, int numCols,
 		  AttrNumber *sortColIdx, Oid *sortOperators);
 
 static List *flatten_grouping_list(List *groupcls);
+static char** create_pxf_plan(char **segdb_file_map, RelOptInfo *rel, int total_segs, 
+							  CreatePlanContext *ctx, Index scan_relid);
 
 /*
  * create_plan
@@ -1121,6 +1123,52 @@ bool is_pxf_protocol(Uri *uri)
 	return false;
 }
 
+/*
+ * create plan for pxf
+ */
+static char** create_pxf_plan(char **segdb_file_map, RelOptInfo *rel, int total_segs, 
+							  CreatePlanContext *ctx, Index scan_relid)
+{
+	int i;
+	char **segdb_work_map;
+	int segs_participating = pxf_calc_participating_segments(total_segs);
+	char *uri_str = (char *) strVal(linitial(rel->locationlist));
+	
+	if(total_segs > segs_participating)
+		elog(NOTICE, "External scan using PXF protocol will utilize %d out "
+			 "of %d segment databases", segs_participating, total_segs);
+	
+	
+	Relation relation = RelationIdGetRelation(planner_rt_fetch(scan_relid, ctx->root)->relid);
+	segdb_work_map = map_hddata_2gp_segments(uri_str, 
+											 total_segs, segs_participating,
+											 relation);	
+	Assert(segdb_work_map != NULL);
+	RelationClose(relation);
+	
+	for (i = 0; i < total_segs; i++)
+	{
+		if(segdb_work_map[i] == NULL)
+			continue;
+				
+		/* 
+		 * We require a data-fragments allocation in
+		 * segdb_work_map for segment i in order to activate segment
+		 * in segdb_file_map[i]
+		 */
+		char opt_delim = (strchr(uri_str, '?') == NULL) ? '?' : '&';
+		StringInfoData seg_uri;
+		
+		initStringInfoOfSize(&seg_uri, 512);
+		appendStringInfoString(&seg_uri, uri_str);
+		appendStringInfoChar(&seg_uri, opt_delim);
+		appendStringInfoString(&seg_uri, segdb_work_map[i]);
+		segdb_file_map[i] = seg_uri.data;						
+	}
+	free_hddata_2gp_segments(segdb_work_map, total_segs);
+	return segdb_file_map;
+}
+
 
 /*
  * create_externalscan_plan
@@ -1165,7 +1213,6 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 	List			*modifiedloclist = NIL;
 	ListCell		*c = NULL;
 	char			**segdb_file_map = NULL;
-	char			**segdb_work_map = NULL;
 	char			*first_uri_str = NULL;
 	bool			ismasteronly = false;
 	bool			islimitinrows = false;
@@ -1188,7 +1235,6 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 	int			    num_segs_participating = 0;
 	bool			*skip_map = NULL;
 	bool			should_skip_randomly = false;
-	bool            is_custom_hd = false;
 
 	/* it should be an external rel... */
 	Assert(scan_relid > 0);
@@ -1404,11 +1450,16 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 		}
 
 
+	} /* PXF */
+	else if (uri->protocol == URI_CUSTOM && is_pxf_protocol(uri))
+	{
+		segdb_file_map = create_pxf_plan(segdb_file_map, rel, total_primaries, ctx, scan_relid);
+
 	}
 	/* (2) */
 	else if(using_location && (uri->protocol == URI_GPFDIST || 
 							   uri->protocol == URI_GPFDISTS || 
-							   uri->protocol == URI_CUSTOM))
+							   (uri->protocol == URI_CUSTOM && !is_pxf_protocol(uri)) ))
 	{
 		/*
 		 * Re-write the location list for GPFDIST or GPFDISTS before mapping to segments.
@@ -1435,20 +1486,14 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 		 * randomly select 1 segdb to skip (7 - 6 = 1). so it may look like this:
 		 * [F F T F F F F] - in which case we know to skip the 3rd segment only.
 		 */
-		is_custom_hd = is_pxf_protocol(uri);
-
 		/* total num of segs that will participate in the external operation */
 		num_segs_participating = total_primaries;
 
 		/* max num of segs that are allowed to participate in the operation */
-		if ((uri->protocol == URI_GPFDIST) || (uri->protocol == URI_GPFDISTS)){
-		max_participants_allowed = list_length(rel->locationlist) * 
-			gp_external_max_segs;
-		}
-		else if (is_custom_hd)
+		if ((uri->protocol == URI_GPFDIST) || (uri->protocol == URI_GPFDISTS))
 		{
-			max_participants_allowed = pxf_calc_max_participants_allowed(total_primaries);
-			num_segs_participating = max_participants_allowed;  /* same logic as for num_segs_participating > max_participants_allowed  - see below*/
+			max_participants_allowed = list_length(rel->locationlist) * 
+			gp_external_max_segs;
 		}
 		else
 		{
@@ -1515,16 +1560,6 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 		/* See (***) above for details */
 		if(should_skip_randomly)
 			skip_map = makeRandomSegMap(total_primaries, total_to_skip);
-
-		if (is_custom_hd)
-		{
-			Relation relation = RelationIdGetRelation(planner_rt_fetch(scan_relid, ctx->root)->relid);
-			segdb_work_map = map_hddata_2gp_segments((char *) strVal(linitial(rel->locationlist)), 
-													total_primaries, max_participants_allowed,
-													relation);	
-			Assert(segdb_work_map != NULL);
-			RelationClose(relation);
-		}
 		
 		/* 
 		 * assign each URI from the new location list a primary segdb 
@@ -1532,7 +1567,6 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 		foreach(c, modifiedloclist)
 		{
 			const char	*uri_str = (char *) strVal(lfirst(c));
-			uri = ParseExternalTableUri(uri_str);
 			found_match = false;
 
 			/*
@@ -1565,30 +1599,8 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 
 					if (segdb_file_map[segind] == NULL) /* segment was not already activated */
 					{
-						if (!is_custom_hd) /* non-hadoop protocols */
-					    {
-							segdb_file_map[segind] = pstrdup(uri_str);
-							found_match = true;					
-						}
-						else if(segdb_work_map[segind] != NULL)
-						{
-							/* 
-							 * if in hadoop protocol we require a data-fragments allocation in
-							 * segdb_work_map for this segment in order to activate segment
-							 */
-							char opt_delim = '?';
-							StringInfoData seg_uri;
-
-							initStringInfoOfSize(&seg_uri, 512);
-							appendStringInfoString(&seg_uri, uri_str);
-							/*if the segwork string is the first option we delimit it with '?' otherwise with '&'*/
-							if (strchr(uri_str, '?') != NULL) 
-								opt_delim = '&';
-							appendStringInfoChar(&seg_uri, opt_delim);
-							appendStringInfoString(&seg_uri, segdb_work_map[segind]);
-							segdb_file_map[segind] = seg_uri.data;	
-							found_match = true;
-						}
+						segdb_file_map[segind] = pstrdup(uri_str);
+						found_match = true;					
 					}
 				}
 			}
@@ -1598,7 +1610,7 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 			 * when is_custom_hd is true it means that the HD segment allocation algorithm
 			 * is activated and in this case it is not necessarily true that all segments are allocated
 			 */
-			if(!found_match && !is_custom_hd)
+			if(!found_match)
 			{
 				/* should never happen */
 				elog(LOG, "external tables gpfdist(s) allocation error. "
@@ -1613,9 +1625,6 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 								" when trying to assign segments for gpfdist(s)")));
 			}		
 		}
-
-		if (is_custom_hd)
-			free_hddata_2gp_segments(segdb_work_map, total_primaries);
 	}
 	/* (3) */
 	else if(using_execute)
@@ -1871,36 +1880,36 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 }
 
 /*
- * Calculate max_participants_allowed for pxf. Calculation is based on gp_external_max_segs
+ * Calculate participating_segments for pxf. Calculation is based on gp_external_max_segs
  * set by the user, the number of gp hosts - num_hosts and the number of segments - total_segments 
  * There are three cases:
  * a. The guc gp_external_max_segs is greater or equal to the total number of segments:
- *    max_participants_allowed will be equal to the total number of segments
+ *    participating_segments will be equal to the total number of segments
  * b. The guc gp_external_max_segs is between the number of GP hosts and the total number of segments
  *    In this case we distinguish between two subcases: 
  *    b.1 The guc gp_external_max_segs is a multiplication of the number of hosts: 
- *        max_participants_allowed equals the guc gp_external_max_segs
+ *        participating_segments equals the guc gp_external_max_segs
  *    b.2 The guc gp_external_max_segs is not a multiply of the number of hosts:
- *        max_participants_allowed will equal the smallest multiplication of the number of hosts
+ *        participating_segments will equal the smallest multiplication of the number of hosts
  *        that is greater than the guc gp_external_max_segs
  * c. The guc gp_external_max_segs is smaller all equal to the number of hosts.
- *    max_participants_allowed equals the guc gp_external_max_segs
+ *    participating_segments equals the guc gp_external_max_segs
  */
 int
-pxf_calc_max_participants_allowed(int total_segments)
+pxf_calc_participating_segments(int total_segments)
 {
-	int max_participants_allowed = 0;
+	int participating_segments = 0;
 	int num_hosts =  getgphostCount();
 	
 	if (gp_external_max_segs >= total_segments)
-		max_participants_allowed = total_segments;
+		participating_segments = total_segments;
 	else if ( gp_external_max_segs < total_segments && gp_external_max_segs > num_hosts)
-		max_participants_allowed = (gp_external_max_segs % num_hosts == 0) ? gp_external_max_segs : 
+		participating_segments = (gp_external_max_segs % num_hosts == 0) ? gp_external_max_segs : 
 		    num_hosts * (gp_external_max_segs / num_hosts + 1);
 	else /* gp_external_max_segs <= num_hosts */
-		max_participants_allowed = gp_external_max_segs;
+		participating_segments = gp_external_max_segs;
 				
-	return max_participants_allowed;
+	return participating_segments;
 }
 
 /*
