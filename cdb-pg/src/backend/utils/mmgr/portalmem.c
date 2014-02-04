@@ -391,11 +391,6 @@ PortalDrop(Portal portal, bool isTopCommit)
 	 */
 	PortalHashTableDelete(portal);
 
-	/*
-	 * cancel all file system credentials, and close files and file system handlers if necessary.
-	 */
-	cleanup_filesystem_credentials(portal);
-
     if (portal->releaseResLock)
     {
         portal->releaseResLock = false;
@@ -405,6 +400,15 @@ PortalDrop(Portal portal, bool isTopCommit)
 	/* let portalcmds.c clean up the state it knows about */
 	if (portal->cleanup)
 		(*portal->cleanup) (portal);
+
+	/*
+	 * Cancel all file system credentials, and close files and file system
+	 * handlers if necessary.  This has to be *after* the portal cleanup,
+	 * which guarantees QE has sent ReadyForQuery.  Otherwise, QE might still
+	 * be attempting to connect NameNode, which would fail to find
+	 * credential token.
+	 */
+	cleanup_filesystem_credentials(portal);
 
 	/*
 	 * Release any resources still attached to the portal.	There are several
