@@ -2524,9 +2524,49 @@ CTranslatorDXLToPlStmt::PplanResultHashFilters
 		for (ULONG ul = 0; ul < ulLength; ul++)
 		{
 			CDXLNode *pdxlnHashExpr = (*pdxlnHashExprList)[ul];
-			CDXLNode *pdxlnScIdent = (*pdxlnHashExpr)[0];
-			ULONG ulColId = CDXLScalarIdent::PdxlopConvert(pdxlnScIdent->Pdxlop())->Pdxlcr()->UlID();
-			presult->hashList = gpdb::PlAppendInt(presult->hashList, pdxltrctxOut->Pte(ulColId)->resno);
+			CDXLNode *pdxlnExpr = (*pdxlnHashExpr)[0];
+			
+			INT iResno = INT_MAX;
+			if (EdxlopScalarIdent == pdxlnExpr->Pdxlop()->Edxlop())
+			{
+				ULONG ulColId = CDXLScalarIdent::PdxlopConvert(pdxlnExpr->Pdxlop())->Pdxlcr()->UlID();
+				iResno = pdxltrctxOut->Pte(ulColId)->resno;
+			}
+			else
+			{
+				// The expression is not a scalar ident that points to an output column in the child node.
+				// Rather, it is an expresssion that is evaluated by the hash filter such as CAST(a) or a+b.
+				// We therefore, create a corresponding GPDB scalar expression and add it to the project list
+				// of the hash filter
+				CMappingColIdVarPlStmt mapcidvarplstmt = CMappingColIdVarPlStmt
+															(
+															m_pmp,
+															NULL, // translate context for the base table
+															pdrgpdxltrctx,
+															pdxltrctxOut,
+															m_pctxdxltoplstmt,
+															pplanParent
+															);
+				
+				Expr *pexpr = m_pdxlsctranslator->PexprFromDXLNodeScalar(pdxlnExpr, &mapcidvarplstmt);
+				GPOS_ASSERT(NULL != pexpr);
+
+				// create a target entry for the hash filter
+				CWStringConst strUnnamedCol(GPOS_WSZ_LIT("?column?"));
+				TargetEntry *pte = gpdb::PteMakeTargetEntry
+											(
+											pexpr, 
+											gpdb::UlListLength(pplan->targetlist) + 1, 
+											CTranslatorUtils::SzFromWsz(strUnnamedCol.Wsz()), 
+											false /* resjunk */
+											);
+				pplan->targetlist = gpdb::PlAppendElement(pplan->targetlist, pte);
+
+				iResno = pte->resno;
+			}
+			GPOS_ASSERT(INT_MAX != iResno);
+			
+			presult->hashList = gpdb::PlAppendInt(presult->hashList, iResno);
 		}
 	}
 	
