@@ -32,7 +32,6 @@ export HBASE_CLASSPATH=\
 `echo $PXF_ROOT/pxf-core-*[0-9].jar`:\
 `echo $PXF_ROOT/pxf-api-*[0-9].jar`:\
 `echo $PXF_ROOT/pxf-hbase-*[0-9].jar`:\
-
 $HADOOP_CONF:\
 
 # The maximum amount of heap to use, in MB. Default is 1000.
