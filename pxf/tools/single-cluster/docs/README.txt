@@ -71,6 +71,8 @@ v1.7.6
 ------
 
 - GPSQL-1558: mapreduce.input.fileinputformat.input.dir.recursive is set to true.
+- GPSQL-1712: Pull stack from dist server (hdsh129) instead of Jenkins
+- GPSQL-1723: Add pxf-hbase.jar to HBase's classpath
 
 v1.7.5
 ------
