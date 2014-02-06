@@ -1,5 +1,4 @@
 <sut>
-
 	<cluster>
 		<class>com.pivotal.pxfauto.infra.cluster.SingleCluster</class>
 		<host>localhost</host>
@@ -9,9 +8,7 @@
 		<class>com.pivotal.pxfauto.infra.hawq.Hawq</class>
 		<host>localhost</host>
 		<db>pxf_regression</db>
-		<gphome>$GPHOME</gphome>
 	</hawq>
-
 
 	<hdfs>
 		<class>com.pivotal.pxfauto.infra.hdfs.Hdfs</class>
@@ -39,4 +36,12 @@
 		<tincTestsFolder>/Users/koazu/work/workspace/tincrepo/main</tincTestsFolder>
 	</tinc>
 
+	<shellsystemobject>
+		<JAVA_HOME></JAVA_HOME>
+		<GPHOME></GPHOME>
+		<GPHD_ROOT></GPHD_ROOT>
+		<GPDATA></GPDATA>
+		<MASTER_DATA_DIRECTORY></MASTER_DATA_DIRECTORY>
+		<PGPORT></PGPORT>
+	</shellsystemobject>
 </sut>
