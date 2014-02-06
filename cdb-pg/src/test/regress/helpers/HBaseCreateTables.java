@@ -18,6 +18,7 @@ import java.io.InputStreamReader;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.TimeZone;
+import java.math.BigInteger;
 
 /*
  * HBaseCreateTable creates a table named dataTableName with numberOfSplits splits in HBase.
@@ -106,6 +107,7 @@ class HBaseCreateTable
 	{
 		byte[] columnFamily = Bytes.toBytes(columnFamilyName);
 		ArrayList<Put> rows = new ArrayList<Put>();
+		final BigInteger ten = BigInteger.valueOf(10);
 
 		for (int splitIndex = 0; splitIndex < (numberOfSplits + 1); ++splitIndex)
 		{
@@ -149,7 +151,7 @@ class HBaseCreateTable
 				addValue(newRow, columnFamily, "q10", Boolean.toString((i % 2) == 0));
 
 				//Qualifier 11. numeric (string)
-				addValue(newRow, columnFamily, "q11", (new Double(Math.pow(10, i))).toString());
+				addValue(newRow, columnFamily, "q11", (ten.pow(i)).toString());
 
 				//Qualifier 12. Timestamp
 				//Removing system timezone so tests will pass anywhere in the world :)
