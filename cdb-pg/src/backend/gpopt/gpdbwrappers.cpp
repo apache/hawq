@@ -169,7 +169,7 @@
 #define ALLOW_cdbhash_const
 #define ALLOW_ExecCheckRTPerms
 #define ALLOW_is_pxf_protocol
-#define ALLOW_pxf_calc_participating_segments
+#define ALLOW_pxf_calc_max_participants_allowed
 #define ALLOW_map_hddata_2gp_segments
 #define ALLOW_free_hddata_2gp_segments
 
@@ -2361,7 +2361,7 @@ gpdb::IMaxParticipantsPxf
 {
 	GP_WRAP_START;
 	{
-		return pxf_calc_participating_segments(total_segments);
+		return pxf_calc_max_participants_allowed(total_segments);
 	}
 	GP_WRAP_END;
 	return 0;
