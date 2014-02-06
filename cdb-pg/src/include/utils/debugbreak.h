@@ -15,12 +15,14 @@ extern void debug_break(void);
 extern void debug_break_n(int n);
 extern void enable_debug_break_n(int n);
 extern void disable_debug_break_n(int n);
+extern void debug_break_timed(int sec, bool singleton);
 
 #else
 #define debug_break()
 #define debug_break_n(n)
 #define enable_debug_break_n(n)
 #define disable_debug_break_n(n)
+#define debug_break_timed(sec, singleton);
 #endif
 
 #endif /* _DEBUG_BREAK_H_ */

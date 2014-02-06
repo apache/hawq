@@ -259,7 +259,7 @@ open_many_files(int file_type)
 #if USE_ASSERT_CHECKING
 			bfz_t *bfz_file =
 #endif
-			bfz_create(file_name, file_type);
+			bfz_create(file_name, true /* delOnClose */, file_type);
 			Assert(NULL != bfz_file);
 			break;
 

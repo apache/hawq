@@ -27,9 +27,12 @@ extern void ExecEndHashJoin(HashJoinState *node);
 extern void ExecReScanHashJoin(HashJoinState *node, ExprContext *exprCtxt);
 
 extern void ExecHashJoinSaveTuple(PlanState *ps, MemTuple tuple, uint32 hashvalue,
-					              struct HashJoinBatchSide *batchside,
+								  HashJoinTable hashtable, struct HashJoinBatchSide *batchside,
 								  MemoryContext bfCxt);
 extern void ExecEagerFreeHashJoin(HashJoinState *node);
+
+extern void ExecHashJoinSaveFirstInnerBatch(HashJoinTable hashtable);
+extern bool ExecHashJoinLoadBucketsBatches(HashJoinTable hashtable);
 
 enum 
 {

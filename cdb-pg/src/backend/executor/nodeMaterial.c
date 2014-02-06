@@ -24,6 +24,7 @@
 
 #include "executor/executor.h"
 #include "executor/nodeMaterial.h"
+#include "executor/instrument.h"        /* Instrumentation */
 #include "utils/tuplestorenew.h"
 
 #include "miscadmin.h"
@@ -33,6 +34,7 @@
 static void ExecMaterialExplainEnd(PlanState *planstate, struct StringInfoData *buf);
 static void ExecChildRescan(MaterialState *node, ExprContext *exprCtxt);
 static void DestroyTupleStore(MaterialState *node);
+static void ExecMaterialResetWorkfileState(MaterialState *node);
 
 
 /* ----------------------------------------------------------------
@@ -98,8 +100,54 @@ ExecMaterial(MaterialState *node)
 		}
 		else
 		{
-			ts = ntuplestore_create(PlanStateOperatorMemKB((PlanState *) node) * 1024);
-			tsa = ntuplestore_create_accessor(ts, true);
+			/* Non-shared Materialize node */
+			bool isWriter = true;
+			workfile_set *work_set = NULL;
+
+			if (gp_workfile_caching)
+			{
+				work_set = workfile_mgr_find_set( &node->ss.ps);
+
+				if (NULL != work_set)
+				{
+					/* Reusing cached workfiles. Tell subplan we won't be needing any tuples */
+					elog(gp_workfile_caching_loglevel, "Materialize reusing cached workfiles, initiating Squelch walker");
+
+					isWriter = false;
+					ExecSquelchNode(outerPlanState(node));
+					node->eof_underlying = true;
+					node->cached_workfiles_found = true;
+
+					if (node->ss.ps.instrument)
+					{
+						node->ss.ps.instrument->workfileReused = true;
+					}
+				}
+			}
+
+			if (NULL == work_set)
+			{
+				/*
+				 * No work_set found, this is because:
+				 *  a. workfile caching is enabled but we didn't find any reusable set
+				 *  b. workfile caching is disabled
+				 * Creating new empty workset
+				 */
+				Assert(!node->cached_workfiles_found);
+
+				/* Don't try to cache when running under a ShareInputScan node */
+				bool can_reuse = (ma->share_type == SHARE_NOTSHARED);
+
+				work_set = workfile_mgr_create_set(BUFFILE, can_reuse, &node->ss.ps, NULL_SNAPSHOT);
+				isWriter = true;
+			}
+
+			Assert(NULL != work_set);
+			AssertEquivalent(node->cached_workfiles_found, !isWriter);
+
+			ts = ntuplestore_create_workset(work_set, node->cached_workfiles_found,
+					PlanStateOperatorMemKB((PlanState *) node) * 1024);
+			tsa = ntuplestore_create_accessor(ts, isWriter);
 		}
 		
 		Assert(ts && tsa);
@@ -126,14 +174,29 @@ ExecMaterial(MaterialState *node)
 		 * is used to share input, we will need to fetch all rows and put
 		 * them in tuple store
 		 */
-		while (((Material *) node->ss.ps.plan)->cdb_strict 
+		while (((Material *) node->ss.ps.plan)->cdb_strict
 				|| ma->share_type != SHARE_NOTSHARED)
 		{
+			/*
+			 * When reusing cached workfiles, we already have all the tuples,
+			 * and we don't need to read anything from subplan.
+			 */
+			if (node->cached_workfiles_found)
+			{
+				break;
+			}
 			TupleTableSlot *outerslot = ExecProcNode(outerPlanState(node));
 
 			if (TupIsNull(outerslot))
 			{
 				node->eof_underlying = true;
+
+				if (ntuplestore_created_reusable_workfiles(ts))
+				{
+					ntuplestore_flush(ts);
+					ntuplestore_mark_workset_complete(ts);
+				}
+
 				ntuplestore_acc_seek_bof(tsa);
 
 				break;
@@ -203,11 +266,14 @@ ExecMaterial(MaterialState *node)
 	 * subplan calls.  It's not optional, unfortunately, because some plan
 	 * node types are not robust about being called again when they've already
 	 * returned NULL.
+	 * If reusing cached workfiles, there is no need to execute subplan at all.
 	 */
 	if (eof_tuplestore && !node->eof_underlying)
 	{
 		PlanState  *outerNode;
 		TupleTableSlot *outerslot;
+
+		Assert(!node->cached_workfiles_found && "we shouldn't get here when using cached workfiles");
 
 		/*
 		 * We can only get here with forward==true, so no need to worry about
@@ -218,6 +284,11 @@ ExecMaterial(MaterialState *node)
 		if (TupIsNull(outerslot))
 		{
 			node->eof_underlying = true;
+			if (ntuplestore_created_reusable_workfiles(ts))
+			{
+				ntuplestore_flush(ts);
+				ntuplestore_mark_workset_complete(ts);
+			}
 
 			if (!node->ss.ps.delayEagerFree)
 			{
@@ -287,6 +358,7 @@ ExecInitMaterial(Material *node, EState *estate, int eflags)
 	matstate->ts_markpos = NULL;
 	matstate->share_lk_ctxt = NULL;
 	matstate->ts_destroyed = false;
+	ExecMaterialResetWorkfileState(matstate);
 
 	/*
 	 * Miscellaneous initialization
@@ -494,8 +566,17 @@ DestroyTupleStore(MaterialState *node)
 	node->ts_markpos = NULL;
 	node->eof_underlying = false;
 	node->ts_destroyed = true;
+	ExecMaterialResetWorkfileState(node);
 }
 
+/*
+ * Reset workfile caching state
+ */
+static void
+ExecMaterialResetWorkfileState(MaterialState *node)
+{
+	node->cached_workfiles_found = false;
+}
 
 /*
  * ExecChildRescan

@@ -247,7 +247,7 @@ where t1.d = t2.d;
  Statement statistics:
    Memory used: 128000K bytes
  Settings:  enable_hashjoin=off; enable_nestloop=on; gp_enable_agg_distinct=on
- Total runtime: 27.715 ms
+ Total runtime: 27.318 ms
 (42 rows)
 
 set enable_nestloop=off;

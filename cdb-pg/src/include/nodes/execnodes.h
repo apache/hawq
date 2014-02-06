@@ -1903,6 +1903,18 @@ typedef struct HashJoinState
         bool                hj_InnerEmpty;  /* set to true if inner side is empty */
         bool                prefetch_inner;
         bool                hj_nonequijoin;
+
+        /* true if found matching and usable cached workfiles */
+        bool cached_workfiles_found;
+        /* set after loading nbatch and nbuckets from cached workfile */
+        bool cached_workfiles_batches_buckets_loaded;
+        /* set after loading cached workfiles */
+        bool cached_workfiles_loaded;
+        /* set if the operator created workfiles */
+        bool workfiles_created;
+        /* number of batches when we loaded from the state. -1 means not loaded yet */
+        int nbatch_loaded_state;
+
 } HashJoinState;
 
 
@@ -1932,6 +1944,7 @@ typedef struct MaterialState
         void            *ts_markpos;
         void                  *share_lk_ctxt;
 
+        bool cached_workfiles_found;  /* true if found matching and usable cached workfiles */
 } MaterialState;
 
 /* ----------------
@@ -1977,6 +1990,11 @@ typedef struct SortState
         bool                noduplicates;   /* true if discard duplicate rows */
 
         void                 *share_lk_ctxt;
+
+        /* true if found matching and usable cached workfiles */
+        bool cached_workfiles_found;
+        /* set after loading cached workfiles */
+        bool cached_workfiles_loaded;
 } SortState;
 
 /* ---------------------
@@ -2057,6 +2075,13 @@ typedef struct AggState
         bool *replIsnull;
         bool *doReplace;
 	List	   *percs;			/* all PercentileExpr nodes in targetlist & quals */
+
+	/* true if found matching and usable cached workfiles */
+	bool cached_workfiles_found;
+	/* set after loading cached workfiles */
+	bool cached_workfiles_loaded;
+	/* set if the operator created workfiles */
+	bool workfiles_created;
 
 } AggState;
 

@@ -2097,6 +2097,12 @@ BeginResetOfPostmasterAfterChildrenAreShutDown(void)
 	shmem_exit(0 /*code*/);
 	reset_shared(PostPortNumber, true /*isReset*/);
 
+	/*
+	 * Remove old temporary files.	At this point there can be no other
+	 * Postgres processes running in this directory, so this should be safe.
+	 */
+	RemovePgTempFiles();
+
 	if (primaryMirrorPostmasterResetShouldRestartPeer())
 	{
 		elog(LOG, "BeginResetOfPostmasterAfterChildrenAreShutDown: should restart peer");

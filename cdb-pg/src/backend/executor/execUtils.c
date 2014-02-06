@@ -53,6 +53,7 @@
 #include "parser/parsetree.h"
 #include "utils/memutils.h"
 #include "utils/relcache.h"
+#include "utils/workfile_mgr.h"
 
 #include "cdb/cdbvars.h"
 #include "nodes/primnodes.h"
@@ -2296,6 +2297,9 @@ void mppExecutorCleanup(QueryDesc *queryDesc)
 		pfree(queryDesc->gpmon_pkt);
 		queryDesc->gpmon_pkt = NULL;
 	}
+
+	/* Workfile manager per-query resource accounting */
+	WorkfileQueryspace_ReleaseEntry();
 
 	/**
 	 * Since there was an error, clean up the function scan stack.

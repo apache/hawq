@@ -71,6 +71,40 @@ debug_break()
     }
 }
 
+static bool hit_once = false;
+
+/*
+ * debug_break_timed
+ *
+ * debug_break_timed inserts a sec seconds break in the execution code.
+ * If singleton is true, it will only fire up once, the first time it is
+ * encoutered, otherwise it will break every time.
+ */
+void
+debug_break_timed(int sec, bool singleton)
+{
+	volatile int debug_break_loop;
+
+	if (singleton && hit_once)
+	{
+		return;
+	}
+
+	hit_once = true;
+	debug_break_loop = 0;
+
+	++debug_break_loop;
+
+	if(debug_break_loop == 1)
+		elog(LOG, "Debug break timed");
+
+	while(debug_break_loop++ < sec )
+    {
+        CHECK_FOR_INTERRUPTS();
+		sleep(1);
+    }
+}
+
 #define DEBUG_BREAK_N_MAX (sizeof(int) * 8)
 
 /* by default, only enable debug_break_point 1, (Assert) */

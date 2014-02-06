@@ -182,6 +182,8 @@ static const char *assign_optimizer_minidump(const char *newval,
 							bool doit, GucSource source);
 static const char *assign_min_error_statement(const char *newval, bool doit,
 						   GucSource source);
+static const char *assign_gp_workfile_caching_loglevel(const char *newval,
+						   bool doit, GucSource source);
 static const char *assign_time_slice_report_level(const char *newval, bool doit,
 						   GucSource source);
 static const char *assign_deadlock_hazard_report_level(const char *newval, bool doit,
@@ -500,6 +502,7 @@ static char *log_statement_str;
 static char *log_min_error_statement_str;
 static char *log_destination_string;
 static char *gp_log_format_string;
+static char *gp_workfile_caching_loglevel_str;
 
 #ifdef HAVE_SYSLOG
 static char *syslog_facility_str;
@@ -1084,6 +1087,16 @@ static struct config_bool ConfigureNamesBool[] =
 		},
 		&gp_workfile_checksumming,
 		true, NULL, NULL
+	},
+	{
+		{"gp_workfile_caching", PGC_SUSET, QUERY_TUNING_OTHER,
+			gettext_noop("Enable work file caching"),
+			gettext_noop("When enabled, work files are persistent "
+					     "and their contents can be reused."),
+			GUC_GPDB_ADDOPT | GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_workfile_caching,
+		false, NULL, NULL
 	},
 	{
 		{"gp_workfile_faultinject", PGC_SUSET, DEVELOPER_OPTIONS,
@@ -2089,7 +2102,7 @@ static struct config_bool ConfigureNamesBool[] =
 		&gp_heap_require_relhasoids_match,
 		true, NULL, NULL
 	},
-
+	
 	{
 		{"debug_appendonly_rezero_quicklz_compress_scratch", PGC_USERSET, DEVELOPER_OPTIONS,
 		 gettext_noop("Zero the QuickLZ scratch buffer before each append-only block that is being compressed."),
@@ -4302,6 +4315,16 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
+		{"gp_workfile_max_entries", PGC_POSTMASTER, RESOURCES,
+			gettext_noop("Sets the maximum number of entries that can be stored in the workfile directory"),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_workfile_max_entries,
+		8192, 32, INT_MAX, NULL, NULL
+	},
+
+	{
 		{"max_files_per_process", PGC_POSTMASTER, RESOURCES_KERNEL,
 			gettext_noop("Sets the maximum number of simultaneously open files for each server process."),
 			NULL
@@ -5856,6 +5879,26 @@ static struct config_real ConfigureNamesReal[] =
 	},
 
 	{
+		{"gp_workfile_limit_per_segment", PGC_POSTMASTER, RESOURCES,
+			gettext_noop("Maximum disk space (in KB) used for workfiles per segment."),
+			gettext_noop("0 for no limit. Current query is terminated when limit is exceeded."),
+			GUC_UNIT_KB
+		},
+		&gp_workfile_limit_per_segment,
+		0, 0, SIZE_MAX/1024, NULL, NULL,
+	},
+
+	{
+		{"gp_workfile_limit_per_query", PGC_USERSET, RESOURCES,
+			gettext_noop("Maximum disk space (in KB) used for workfiles per query per segment."),
+			gettext_noop("0 for no limit. Current query is terminated when limit is exceeded."),
+			GUC_GPDB_ADDOPT | GUC_UNIT_KB
+		},
+		&gp_workfile_limit_per_query,
+		0, 0, SIZE_MAX/1024, NULL, NULL,
+	},
+
+	{
 		{"gp_motion_cost_per_row", PGC_USERSET, QUERY_TUNING_COST,
 			gettext_noop("Sets the planner's estimate of the cost of "
 						 "moving a row between worker processes."),
@@ -6093,6 +6136,18 @@ static struct config_string ConfigureNamesString[] =
 		},
 		&log_min_messages_str,
 		"warning", assign_log_min_messages, NULL
+	},
+	{
+		{"gp_workfile_caching_loglevel", PGC_SUSET, DEVELOPER_OPTIONS,
+			gettext_noop("Sets the logging level for workfile caching debugging messages"),
+			gettext_noop("Valid values are DEBUG5, DEBUG4, DEBUG3, DEBUG2, "
+						 "DEBUG1, LOG, NOTICE, WARNING, and ERROR. Each level includes all the "
+						 "levels that follow it. The later the level, the fewer messages are "
+						 "sent."),
+			GUC_GPDB_ADDOPT | GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&gp_workfile_caching_loglevel_str,
+		"debug1", assign_gp_workfile_caching_loglevel, NULL
 	},
 
 	{
@@ -11479,6 +11534,12 @@ assign_optimizer_minidump(const char *val, bool assign, GucSource source)
 	return val;
 }
 
+static const char *
+assign_gp_workfile_caching_loglevel(const char *newval,
+						bool doit, GucSource source)
+{
+	return (assign_msglvl(&gp_workfile_caching_loglevel, newval, doit, source));
+}
 
 static const char *
 assign_min_error_statement(const char *newval, bool doit, GucSource source)

@@ -513,7 +513,7 @@ loadSharedComboCommandId(TransactionId xmin, CommandId combocid, CommandId *cmin
 	Assert(combocid_map != NULL);
 
 	/* Seek to the beginning to start our search ? */
-	if (BufFileSeek(combocid_map, 0, 0, SEEK_SET) != 0)
+	if (BufFileSeek(combocid_map, 0 /* offset */, SEEK_SET) != 0)
 	{
 		elog(ERROR, "loadSharedComboCommandId: seek to beginning failed.");
 	}

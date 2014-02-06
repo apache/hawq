@@ -158,3 +158,145 @@ int32 gp_atomic_add_32(volatile int32 *ptr, int32 inc)
 
 	return newValue;
 }
+
+/*
+ * gp_atomic_add_64
+ *   Atomic increment a 64-bit address, and return the incremented value
+ *   inc can be a positive or negative quantity
+ */
+int64 gp_atomic_add_64(int64 *ptr, int64 inc)
+{
+	Assert(NULL != ptr);
+
+	volatile int64 newValue = 0;
+
+#if defined(__x86_64__)
+	int64 oldValue = __sync_fetch_and_add(ptr, inc);
+	newValue = oldValue + inc;
+
+#elif defined(__i386)
+
+	volatile int64* newValuePtr = &newValue;
+	int addValueLow = (int) inc;
+	int addValueHigh = (int) (inc>>32);
+	__asm__ __volatile__ (
+		  "PUSHL %%ebx; \n\t" /* Save ebx, it's a special register we can't clobber */
+
+	      "MOVL %0, %%edi; \n\t" /* Load ptr */
+	      "MOVL (%%edi), %%eax; \n\t" /* Load first word from *ptr */
+	      "MOVL 0x4(%%edi), %%edx; \n\t" /* Load second word from *ptr + 4 */
+	   "tryAgain_add_64: \n\t"
+	      "MOVL %1, %%ebx; \n\t"   /* Load addValueLow */
+	      "MOVL %2, %%ecx; \n\t"   /* Load addValueHigh */
+	      "ADDL %%eax, %%ebx; \n\t"  /* Add first word */
+	      "ADCL %%edx, %%ecx; \n\t"  /* Add second word */
+	      "lock cmpxchg8b (%%edi); \n\t"  /* Compare and exchange 8 bytes atomically */
+	      "jnz tryAgain_add_64; \n\t"  /* If ptr has changed, try again with new value */
+
+		  "MOVL %3, %%edi; \n\t"  /* Put result in *newValuePtr */
+		  "MOVL %%ebx, (%%edi); \n\t"  /* first word */
+		  "MOVL %%ecx, 0x4(%%edi); \n\t" /* second word */
+		  "POPL %%ebx; \n\t" /* Restore ebx */
+
+		: /* no output registers */
+		: "m" (ptr), "m" (addValueLow), "m" (addValueHigh), "m" (newValuePtr) /* input registers */
+		: "memory", "%edi", "%edx", "%ecx", "%eax" /* clobber list */
+	);
+
+#elif defined(__sparc__)
+#error unsupported platform sparc: requires atomic_add_64 operation
+	/* For sparc we can probably use __sync_fetch_and_add as well */
+#else
+#error unsupported/unknown platform: requires atomic_add_64 operation
+#endif
+
+	return newValue;
+}
+
+
+/*
+ * atomic_incmod_value
+ *
+ * Atomically adds 1 to a value, modulo 'mod'
+ *
+ * Algorithm:
+ *   *loc = (*loc + 1) % mod
+ *
+ */
+int32
+gp_atomic_incmod_32(volatile int32 *loc, int32 mod)
+{
+	Assert(NULL != loc);
+	int32 oldval = gp_atomic_add_32(loc, 1);
+	if (oldval >= mod)
+	{
+		/* we have overflow */
+		if (oldval == mod)
+		{
+			/* exactly at overflow, reduce by one cycle */
+			gp_atomic_add_32(loc, -mod);
+		}
+		/* must reduce result */
+		oldval %= mod;
+	}
+	return(oldval);
+}
+
+
+/*
+ * gp_atomic_dec_positive_32
+ *
+ * Atomically decrements a value by a positive amount dec. If result was negative,
+ * sets value to 0
+ *
+ * Returns new decremented value, which is never negative
+ */
+uint32
+gp_atomic_dec_positive_32(volatile uint32 *loc, uint32 dec)
+{
+	uint32 newVal = 0;
+	while (true)
+	{
+		uint32 oldVal = (uint32) *loc;
+		newVal = 0;
+		if (oldVal > dec)
+		{
+			newVal = oldVal - dec;
+		}
+		bool casResult = compare_and_swap_32((uint32 *)loc, oldVal, newVal);
+		if (true == casResult)
+		{
+			break;
+		}
+	}
+	return newVal;
+}
+
+/*
+ * gp_atomic_inc_ceiling_32
+ *
+ * Atomically increments a value by a positive amount inc. If result is over
+ * a ceiling ceil, set value to ceil.
+ *
+ * Returns new incremented value, which is <= ceil.
+ */
+uint32
+gp_atomic_inc_ceiling_32(volatile uint32 *loc, uint32 inc, uint32 ceil)
+{
+	uint32 newVal = 0;
+	while (true)
+	{
+		uint32 oldVal = (uint32) *loc;
+		newVal = oldVal + inc;
+		if (newVal > ceil)
+		{
+			newVal = ceil;
+		}
+		bool casResult = compare_and_swap_32((uint32 *)loc, oldVal, newVal);
+		if (true == casResult)
+		{
+			break;
+		}
+	}
+	return newVal;
+}

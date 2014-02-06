@@ -104,6 +104,12 @@ OpenTemporaryFile(const char   *fileName,
                   bool          delOnClose,
                   bool          closeAtEOXact);
 
+File
+OpenNamedFile(const char   *fileName,
+                  bool          create,
+                  bool          delOnClose,
+                  bool          closeAtEOXact);
+
 extern void FileClose(File file);
 extern void FileUnlink(File file);
 extern int	FileRead(File file, char *buffer, int amount);
@@ -113,6 +119,7 @@ extern int	FileSync(File file);
 extern int64 FileSeek(File file, int64 offset, int whence);
 extern int64 FileNonVirtualTell(File file);
 extern int	FileTruncate(File file, int64 offset);
+extern int64 FileDiskSize(File file);
 
 /* Operations that allow use of regular stdio --- USE WITH CAUTION */
 extern FILE *AllocateFile(const char *name, const char *mode);
@@ -141,6 +148,7 @@ extern int	pg_fdatasync(int fd);
 extern int  gp_retry_close(int fd);
 extern int  RemovePath(FileName fileName, int recursive);
 extern int  MakeDirectory(const char * path, mode_t mode);
+extern char *make_database_relative(const char *filename);
 
 /* Filename components for OpenTemporaryFile */
 #define PG_TEMP_FILES_DIR "pgsql_tmp"

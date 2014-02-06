@@ -19,6 +19,8 @@
 #include "executor/nodeAgg.h" /* Must see AggStatePerGroupData. */
 #include "cdb/cdbpublic.h"    /* CdbExplain_Agg / CdbCellBuf */
 #include "utils/memutils.h"
+#include "executor/execWorkfile.h"
+#include "utils/workfile_mgr.h"
 
 typedef uint32 HashKey;
 typedef struct BatchFileInfo BatchFileInfo;
@@ -92,6 +94,10 @@ typedef struct SpillFile
 	/* Reflect our controlling spill set.  */
 	struct SpillSet *parent_spill_set;
 	unsigned index_in_parent;
+	/* Number of bits to shift key before hashing for tuples in this batch */
+	unsigned batch_hash_bit;
+	/* Indicates if this spillfile could not fit in memory and was respilled to another SpillSet */
+	bool respilled;
 } SpillFile;
 
 /* A SpillSet is sequence of SpillFiles that partition a range of
@@ -108,7 +114,6 @@ typedef struct SpillSet
 	SpillFile *parent_spill_file;
 	int level;
 	unsigned num_spill_files;
-	unsigned parent_hash_bit;
 	SpillFile spill_files[1]; /* 1st of num_spill_file contiguous SpillFile. */
 } SpillSet;
 
@@ -162,6 +167,11 @@ typedef struct HashAggTable
 
 	/* Overflow batches */
 	SpillSet       *spill_set;
+	/* Representation of all workfile names, used by the workfile manager */
+	workfile_set *work_set;
+	/* Metadata file containing information required to restore the state
+	 * from a cached workfile for reuse */
+	ExecWorkFile *state_file;
 
 	/* The batch file is currently being processed. */
 	SpillFile *curr_spill_file;
@@ -214,6 +224,9 @@ extern bool agg_hash_stream(AggState *aggstate);
 extern bool agg_hash_next_pass(AggState *aggstate);
 extern bool agg_hash_continue_pass(AggState *aggstate);
 extern void destroy_agg_hash_table(AggState *aggstate);
+extern void agg_hash_reset_workfile_state(AggState *aggstate);
+extern void agg_hash_mark_spillset_complete(AggState *aggstate);
+extern void agg_hash_close_state_file(HashAggTable *hashtable);
 
 extern HashAggEntry *agg_hash_iter(AggState *aggstate);
 

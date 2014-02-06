@@ -191,6 +191,7 @@ extern PGDLLIMPORT char *DataDir;
 extern PGDLLIMPORT int NBuffers;
 extern int	MaxBackends;
 extern int	MaxConnections;
+extern int gp_workfile_max_entries;
 
 extern PGDLLIMPORT int MyProcPid;
 extern PGDLLIMPORT pg_time_t MyStartTime;

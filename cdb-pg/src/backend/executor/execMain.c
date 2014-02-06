@@ -74,6 +74,7 @@
 #include "utils/memutils.h"
 #include "utils/ps_status.h"
 #include "utils/rel.h"
+#include "utils/workfile_mgr.h"
 
 #include "catalog/pg_statistic.h"
 #include "catalog/pg_class.h"
@@ -418,6 +419,11 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
 	 * NOTE: need to be in estate->es_query_cxt before the call.
 	 */
 	initMotionLayerStructs((MotionLayerState **)&estate->motionlayer_context);
+
+	/* Reset workfile disk full flag */
+	WorkfileDiskspace_SetFull(false /* isFull */);
+	/* Initialize per-query resource (diskspace) tracking */
+	WorkfileQueryspace_InitEntry(gp_session_id, gp_command_count);
 
 	/*
 	 * Handling of the Slice table depends on context.
@@ -1204,6 +1210,8 @@ ExecutorEnd(QueryDesc *queryDesc)
      * structures in an inconsistent state.
      */
 	ExecEndPlan(queryDesc->planstate, estate);
+
+	WorkfileQueryspace_ReleaseEntry();
 
 	/*
 	 * Release any gangs we may have assigned.

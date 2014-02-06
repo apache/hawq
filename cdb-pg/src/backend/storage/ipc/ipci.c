@@ -65,6 +65,7 @@
 #include "postmaster/backoff.h"
 #include "cdb/memquota.h"
 #include "executor/spi.h"
+#include "utils/workfile_mgr.h"
 
 shmem_startup_hook_type shmem_startup_hook = NULL;
 
@@ -135,6 +136,7 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
 												 sizeof(ShmemIndexEnt)));
 		size = add_size(size, BufferShmemSize());
 		size = add_size(size, LockShmemSize());
+		size = add_size(size, workfile_mgr_shmem_size());
 		if (Gp_role == GP_ROLE_DISPATCH)
 		{
 			size = add_size(size, AppendOnlyWriterShmemSize());
@@ -390,6 +392,7 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
 	 * Set up other modules that need some shared memory space
 	 */
 	BTreeShmemInit();
+	workfile_mgr_cache_init();
 
 #ifdef EXEC_BACKEND
 

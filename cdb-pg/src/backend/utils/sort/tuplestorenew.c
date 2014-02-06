@@ -6,8 +6,9 @@
 #include "postgres.h"
 #include "access/heapam.h"
 #include "executor/instrument.h"
-#include "storage/buffile.h"
+#include "executor/execWorkfile.h"
 #include "utils/tuplestorenew.h"
+#include "utils/memutils.h"
 
 #include "cdb/cdbvars.h"                /* currentSliceId */
 
@@ -43,7 +44,7 @@ typedef struct NTupleStorePage
 typedef struct NTupleStoreLobRef
 {
 	int64 start;
-	int64 size;
+	Size size;
 } NTupleStoreLobRef;
 
 /* some convinient macro/inline functions */
@@ -159,8 +160,14 @@ struct NTupleStore
 	long first_ondisk_blockn;           /* first blockn that is written to disk */
 	int rwflag;  /* if I am ordinary store, or a reader, or a writer of readerwriter (share input) */
 
-	BufFile *pfile; 	/* underlying backed file */
-	BufFile *plobfile;  /* underlying backed file for lobs (entries does not fit one page) */
+
+	bool cached_workfiles_found; /* true if found matching and usable cached workfiles */
+	bool cached_workfiles_loaded; /* set after loading cached workfiles */
+	bool workfiles_created; /* set if the operator created workfiles */
+	workfile_set *work_set; /* workfile set to use when using workfile manager */
+
+	ExecWorkFile *pfile; 	/* underlying backed file */
+	ExecWorkFile *plobfile;  /* underlying backed file for lobs (entries does not fit one page) */
 	int64     lobbytes;  /* number of bytes written to lob file */
 
 	List *accessors;    /* all current accessors of the store */
@@ -196,6 +203,9 @@ struct NTupleStoreAccessor
 
 	NTupleStorePos  pos;
 };
+
+static void ntuplestore_init_reader(NTupleStore *store, int maxBytes);
+static void ntuplestore_create_spill_files(NTupleStore *nts);
 
 void ntuplestore_setinstrument(NTupleStore *st, struct Instrumentation *instr)
 {
@@ -306,9 +316,11 @@ static bool ntsReadBlock(NTupleStore *ts, int blockn, NTupleStorePage *page)
 	
 	Assert(ts->first_ondisk_blockn >= 0);
 	Assert(ts && diskblockn >= 0 && page);
-	if(BufFileSeekBlock(ts->pfile, diskblockn) != 0 ||
-			BufFileRead(ts->pfile, page, BLCKSZ) != BLCKSZ)
+	if(ExecWorkFile_Seek(ts->pfile, diskblockn * BLCKSZ, SEEK_SET) != 0 ||
+			ExecWorkFile_Read(ts->pfile, page, BLCKSZ) != BLCKSZ)
+	{
 		return false;
+	}
 
 	Assert(nts_page_blockn(page) == blockn); 
 	Assert(!nts_page_is_dirty(page)); 
@@ -337,9 +349,12 @@ static bool ntsWriteBlock(NTupleStore *ts, NTupleStorePage *page)
 
 	nts_page_set_dirty(page, false);
 
-	if(BufFileSeekBlock(ts->pfile, nts_page_blockn(page) - ts->first_ondisk_blockn) != 0 || 
-			BufFileWrite(ts->pfile, page, BLCKSZ) != BLCKSZ)
+	if(ExecWorkFile_Seek(ts->pfile, (nts_page_blockn(page) - ts->first_ondisk_blockn) * BLCKSZ, SEEK_SET) != 0 ||
+			!ExecWorkFile_Write(ts->pfile, page, BLCKSZ))
+	{
 		return false;
+	}
+
 	
 	return true;
 }
@@ -390,11 +405,26 @@ static NTupleStorePage *nts_get_free_page(NTupleStore *nts)
 	{
 		if(!nts->pfile)
 		{
-			char tmpprefix[50];
-			snprintf(tmpprefix, 50, "slice%d_ntuplestore", currentSliceId);
-			nts->pfile = BufFileCreateTemp(tmpprefix, false);
-		}
+			if (nts->work_set != NULL)
+			{
+				/* We have a usable workfile_set. Use that to generate temp files */
+				ntuplestore_create_spill_files(nts);
+			}
+			else
+			{
+				char tmpprefix[MAXPGPATH];
+				snprintf(tmpprefix, MAXPGPATH, "%s/slice%d_ntuplestore", PG_TEMP_FILES_DIR, currentSliceId);
+				nts->pfile = ExecWorkFile_CreateUnique(tmpprefix, BUFFILE, true /* delOnClose */, 0 /* compressType */ );
+			}
 
+			nts->workfiles_created = true;
+			
+			if (nts->instrument)
+			{
+				nts->instrument->workfileCreated = true;
+			}
+		}
+		
 		page = nts->first_page;
 
 		while(page) 
@@ -409,7 +439,9 @@ static NTupleStorePage *nts_get_free_page(NTupleStore *nts)
 				{
 					Assert(nts->rwflag != NTS_IS_READER);
 					if(!ntsWriteBlock(nts, page_next))
-						elog(ERROR, "NTupleStore shrink write page failed");
+					{
+						workfile_mgr_report_error();
+					}
 				}
 
 				if(nts->page_cnt >= page_max)
@@ -599,12 +631,21 @@ static void ntuplestore_cleanup(NTupleStore *ts, bool fNormal)
 		p = pnext;
 	}
 
-	if(fNormal && ts->rwflag == NTS_NOT_READERWRITER)
+	if(ts->pfile)
 	{
-		if(ts->pfile)
-			BufFileClose(ts->pfile);
-		if(ts->plobfile)
-			BufFileClose(ts->plobfile);
+		workfile_mgr_close_file(ts->work_set, ts->pfile);
+		ts->pfile = NULL;
+	}
+	if(ts->plobfile)
+	{
+		workfile_mgr_close_file(ts->work_set, ts->plobfile);
+		ts->plobfile = NULL;
+	}
+
+	if (ts->work_set != NULL)
+	{
+		workfile_mgr_close_set(ts->work_set);
+		ts->work_set = NULL;
 	}
 
 	gp_free2(ts, sizeof(NTupleStore));
@@ -625,6 +666,11 @@ ntuplestore_create(int maxBytes)
 
 	store->plobfile = NULL;
 	store->lobbytes = 0;
+
+	store->work_set = NULL;
+	store->cached_workfiles_found = false;
+	store->cached_workfiles_loaded = false;
+	store->workfiles_created = false;
 
 	Assert(maxBytes >= 0);
 	store->page_max = maxBytes / BLCKSZ;
@@ -655,63 +701,137 @@ ntuplestore_create(int maxBytes)
 	return store;
 }
 
+/*
+ * Initialize a ntuplestore that is shared across slice through a ShareInputScan node
+ *
+ *   filename must be a unique name that identifies the share.
+ *   filename does not include the pgsql_tmp/ prefix
+ */
 NTupleStore *
 ntuplestore_create_readerwriter(const char *filename, int maxBytes, bool isWriter)
 {
 	NTupleStore* store = NULL;
-	bool fOK; 
+	char filenameprefix[MAXPGPATH];
 	char filenamelob[MAXPGPATH];
 
-	snprintf(filenamelob, sizeof(filenamelob), "%s_LOB", filename);
+	snprintf(filenameprefix, sizeof(filenameprefix), "%s/%s", PG_TEMP_FILES_DIR, filename);
+
+	snprintf(filenamelob, sizeof(filenamelob), "%s_LOB", filenameprefix);
 
 	if(isWriter)
 	{
 		store = ntuplestore_create(maxBytes);
-		store->pfile = BufFileCreateTemp_ReaderWriter(filename, isWriter);
+		store->pfile = ExecWorkFile_Create(filenameprefix, BUFFILE,
+				true /*delOnClose */, 0 /* compressType */);
 		store->rwflag = NTS_IS_WRITER;
 
-		store->plobfile = BufFileCreateTemp_ReaderWriter(filenamelob, isWriter);
+		store->plobfile = ExecWorkFile_Create(filenamelob, BUFFILE,
+				true /* delOnClose */, 0 /* compressType */ );
 		store->lobbytes = 0;
 	}
 	else
 	{
 		store = (NTupleStore *) check_malloc(sizeof(NTupleStore));
-		store->pfile = BufFileCreateTemp_ReaderWriter(filename, isWriter);
-		store->first_ondisk_blockn = 0;
-		store->rwflag = NTS_IS_READER;
-	
-		store->plobfile = BufFileCreateTemp_ReaderWriter(filenamelob, isWriter);
-		store->lobbytes = 0;
+		store->work_set = NULL;
+		store->cached_workfiles_found = false;
+		store->cached_workfiles_loaded = false;
+		store->workfiles_created = false;
 
-		Assert(maxBytes >= 0);
-		store->page_max = maxBytes / BLCKSZ;
-		/* give me at least 16 pages */
-		if(store->page_max < 16)
-			store->page_max = 16;
+		store->pfile = ExecWorkFile_Open(filenameprefix, BUFFILE,
+				false /* delOnClose */,
+				0 /* compressType */);
 
-		store->first_page = (NTupleStorePage *) check_malloc(sizeof(NTupleStorePage));
-		init_page(store->first_page);
+		store->plobfile = ExecWorkFile_Open(filenamelob, BUFFILE,
+				false /* delOnClose */,
+				0 /* compressType */);
 
-		fOK = ntsReadBlock(store, 0, store->first_page);
-		if(!fOK)
-		{
-			/* empty file.  We set blockn anyway */
-			nts_page_set_blockn(store->first_page, 0);
-		}
-
-		store->page_cnt = 1;
-		store->pin_cnt = 0;
-
-		nts_pin_page(store, store->first_page);
-		
-		store->last_page = NULL;
-		store->first_free_page = NULL;
-
-		store->accessors = NULL;
-		store->fwacc = false;
-
-		store->instrument = NULL;
+		ntuplestore_init_reader(store, maxBytes);
 		RegisterXactCallbackOnce(XCallBack_NTS, (void *) store);
+	}
+	return store;
+}
+
+/*
+ * Initializes a ntuplestore based on existing files.
+ *
+ * spill_filename and spill_lob_filename are required to have pgsql_tmp/ part of the name
+ */
+static void
+ntuplestore_init_reader(NTupleStore *store, int maxBytes)
+{
+	Assert(NULL != store);
+	Assert(NULL != store->pfile);
+	Assert(NULL != store->plobfile);
+	
+	store->first_ondisk_blockn = 0;
+	store->rwflag = NTS_IS_READER;
+	store->lobbytes = 0;
+
+	Assert(maxBytes >= 0);
+	store->page_max = maxBytes / BLCKSZ;
+	/* give me at least 16 pages */
+	if(store->page_max < 16)
+		store->page_max = 16;
+
+	store->first_page = (NTupleStorePage *) check_malloc(sizeof(NTupleStorePage));
+	init_page(store->first_page);
+
+	bool fOK = ntsReadBlock(store, 0, store->first_page);
+	if(!fOK)
+	{
+		/* empty file.  We set blockn anyway */
+		nts_page_set_blockn(store->first_page, 0);
+	}
+
+	store->page_cnt = 1;
+	store->pin_cnt = 0;
+
+	nts_pin_page(store, store->first_page);
+
+	store->last_page = NULL;
+	store->first_free_page = NULL;
+
+	store->accessors = NULL;
+	store->fwacc = false;
+
+	store->instrument = NULL;
+
+}
+
+/*
+ * Create tuple store using the workfile manager to create spill files if needed.
+ * The workSet needs to be initialized by the caller.
+ */
+NTupleStore *
+ntuplestore_create_workset(workfile_set *workSet, bool cachedWorkfilesFound, int maxBytes)
+{
+
+	elog(gp_workfile_caching_loglevel, "Creating tuplestore with workset in directory %s", workSet->path);
+
+	NTupleStore *store = ntuplestore_create(maxBytes);
+	store->work_set = workSet;
+	store->cached_workfiles_found = cachedWorkfilesFound;
+
+	if (store->cached_workfiles_found)
+	{
+		Assert(store->work_set != NULL);
+
+		/* Reusing existing files. Load data from spill files here */
+		MemoryContext   oldcxt;
+		oldcxt = MemoryContextSwitchTo(TopMemoryContext);
+
+		store->pfile = workfile_mgr_open_fileno(store->work_set, WORKFILE_NUM_TUPLESTORE_DATA);
+		store->plobfile = workfile_mgr_open_fileno(store->work_set, WORKFILE_NUM_TUPLESTORE_LOB);
+
+		MemoryContextSwitchTo(oldcxt);
+
+		ntuplestore_init_reader(store, maxBytes);
+		store->cached_workfiles_loaded = true;
+	}
+	else
+	{
+		/* Creating new workset */
+		store->rwflag = NTS_IS_WRITER;
 	}
 	return store;
 }
@@ -751,7 +871,7 @@ ntuplestore_reset(NTupleStore *ts)
 #ifdef USE_ASSERT_CHECKING
 		int errorcode = 
 #endif /* USE_ASSERT_CHECKING */
-			BufFileSeekBlock(ts->plobfile, 0);
+		    ExecWorkFile_Seek(ts->plobfile, 0 /* offset */, SEEK_SET);
 		Assert(errorcode == 0);
 	}
 
@@ -763,25 +883,26 @@ ntuplestore_flush(NTupleStore *ts)
 {
 	NTupleStorePage *p = ts->first_page;
 
-	Assert(ts->rwflag == NTS_IS_WRITER || !"Flush NYI for Non ReaderWriter or Reader");
+	Assert(ts->rwflag != NTS_IS_READER || !"Flush attempted for Reader");
 	Assert(ts->pfile);
 
 	while(p)
 	{
 		if(nts_page_is_dirty(p) && nts_page_slot_cnt(p) > 0)
 		{
-#ifdef USE_ASSERT_CHECKING
-			bool ok = 
-#endif
-				ntsWriteBlock(ts, p);
-			Assert(ok);
+			if (!ntsWriteBlock(ts, p))
+			{
+				workfile_mgr_report_error();
+			}
 		}
 		p = nts_page_next(p);
 	}
 	
-	BufFileFlush(ts->pfile);
-	if(ts->plobfile)
-		BufFileFlush(ts->plobfile);
+	ExecWorkFile_Flush(ts->pfile);
+	if (ts->plobfile != NULL)
+	{
+		ExecWorkFile_Flush(ts->plobfile);
+	}
 }
 
 void 
@@ -845,39 +966,46 @@ void ntuplestore_destroy_accessor(NTupleStoreAccessor *acc)
 
 static long ntuplestore_put_lob(NTupleStore *nts, char* data, NTupleStoreLobRef *lobref)
 {
-	long wlen; 
 
 	if(!nts->plobfile)
 	{
-		char tmpprefix[50];
-		Assert(nts->rwflag == NTS_NOT_READERWRITER);
-		Assert(nts->lobbytes == 0);
+		if (nts->work_set != NULL)
+		{
+			/* We have a usable workfile_set. Use that to generate temp files */
+			ntuplestore_create_spill_files(nts);
+		}
+		else
+		{
+			char tmpprefix[MAXPGPATH];
+			Assert(nts->rwflag == NTS_NOT_READERWRITER);
+			Assert(nts->work_set == NULL);
+			Assert(nts->lobbytes == 0);
 
-		snprintf(tmpprefix, 50, "slice%d_ntuplestorelob", currentSliceId);
-		nts->plobfile = BufFileCreateTemp(tmpprefix, false);
+			snprintf(tmpprefix, sizeof(tmpprefix), "%s/slice%d_ntuplestorelob", PG_TEMP_FILES_DIR, currentSliceId);
+			nts->plobfile = ExecWorkFile_CreateUnique(tmpprefix, BUFFILE,
+					true /*delOnClose */, 0 /* compressType */);
+		}
 	}
 
 	lobref->start = nts->lobbytes;
-	wlen = BufFileWrite(nts->plobfile, data, lobref->size); 
+#if USE_ASSERT_CHECKING
+	bool res =
+#endif
+			ExecWorkFile_Write(nts->plobfile, data, lobref->size);
 
-	Assert(wlen == lobref->size);
+	Assert(res);
 	nts->lobbytes += lobref->size;
 
-	return wlen;
+	return lobref->size;
 }
 
 static long ntuplestore_get_lob(NTupleStore *nts, void *data, NTupleStoreLobRef *lobref)
 {
-	long fileno = lobref->start / (RELSEG_SIZE * BLCKSZ);
-	long offset = lobref->start % (RELSEG_SIZE * BLCKSZ);
-	long ret;
-	
-	Assert(fileno >= 0);
-	Assert(offset >= 0 && offset < (RELSEG_SIZE * BLCKSZ));
-	ret = BufFileSeek(nts->plobfile, fileno, offset, SEEK_SET);
+	Assert(lobref->start >= 0);
+	long ret = ExecWorkFile_Seek(nts->plobfile, lobref->start, SEEK_SET);
 	Assert(ret == 0);
 
-	ret = BufFileRead(nts->plobfile, data, lobref->size);
+	ret = ExecWorkFile_Read(nts->plobfile, data, lobref->size);
 	Assert(ret == lobref->size);
 
 	return ret;
@@ -1047,7 +1175,13 @@ void ntuplestore_trim(NTupleStore *ts, NTupleStorePos *pos)
 		if(nts_page_is_dirty(ts->first_page))
 		{
 			if(ts->pfile)
-				ntsWriteBlock(ts, ts->first_page);
+			{
+				if (!ntsWriteBlock(ts, ts->first_page))
+				{
+					workfile_mgr_report_error();
+				}
+			}
+
 		}
 
 		ts->first_free_page = NTS_PREPEND_1(ts->first_free_page, ts->first_page); 
@@ -1437,3 +1571,51 @@ bool ntuplestore_acc_is_before(NTupleStoreAccessor *tsa1, NTupleStoreAccessor *t
 	else
 		return false;
 }
+
+/*
+ * Use the associated workfile set to create spill files for this tuplestore.
+ */
+static void
+ntuplestore_create_spill_files(NTupleStore *nts)
+{
+	Assert(nts->work_set != NULL);
+	Assert(!nts->cached_workfiles_found);
+
+	MemoryContext   oldcxt;
+	oldcxt = MemoryContextSwitchTo(TopMemoryContext);
+
+	nts->pfile = workfile_mgr_create_fileno(nts->work_set, WORKFILE_NUM_TUPLESTORE_DATA);
+	nts->plobfile = workfile_mgr_create_fileno(nts->work_set, WORKFILE_NUM_TUPLESTORE_LOB);
+
+	MemoryContextSwitchTo(oldcxt);
+}
+
+/*
+ * Returns true if this tuplestore created workfiles that can potentially be
+ * reused by other queries.
+ */
+bool
+ntuplestore_created_reusable_workfiles(NTupleStore *nts)
+{
+	Assert(nts);
+	return gp_workfile_caching && nts->workfiles_created && nts->work_set && nts->work_set->can_be_reused;
+}
+/*
+ * Mark the associated workfile set as complete, allowing it to be cached for reuse.
+ */
+void
+ntuplestore_mark_workset_complete(NTupleStore *nts)
+{
+	Assert(nts != NULL);
+	if (nts->work_set == NULL)
+	{
+		return;
+	}
+	if (nts->workfiles_created)
+	{
+		elog(gp_workfile_caching_loglevel, "Tuplestore: Marking workset as complete");
+		workfile_mgr_mark_complete(nts->work_set);
+	}
+}
+
+/* EOF */

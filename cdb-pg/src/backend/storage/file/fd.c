@@ -57,8 +57,8 @@
 #include "storage/ipc.h"
 #include "libpq/auth.h"
 #include "libpq/pqformat.h"
+#include "utils/workfile_mgr.h"
 
-#include "utils/debugbreak.h"
 /* Debug_filerep_print guc temporaly added for troubleshooting */
 #include "utils/guc.h"
 #include "utils/faultinjector.h"
@@ -944,7 +944,6 @@ LocalPathNameOpenFile(FileName fileName, int fileFlags, int fileMode)
 
 	DO_DB(elog(LOG, "PathNameOpenFile: %s %x %o",
 			   fileName, fileFlags, fileMode));
-
 	/*
 	 * We need a malloc'd copy of the file name; fail cleanly if no room.
 	 */
@@ -1053,21 +1052,12 @@ OpenTemporaryFile(const char   *fileName,
                   bool          delOnClose,
                   bool          closeAtEOXact)
 {
-	File    file;
-    int     fileFlags;
+
 	char	tempfilepath[MAXPGPATH];
-	char	*temp_dir;
 
 	Assert(fileName);
     AssertImply(makenameunique, create && delOnClose);
 
-	/*
-	 * File flags when open the file.  Note: we don't use O_EXCL, in case there is an orphaned
-	 * temp file that can be reused.
-	 */
-	fileFlags = O_RDWR | PG_BINARY;
-    if (create)
-        fileFlags |= O_TRUNC | O_CREAT;
 
     char tempfileprefix[MAXPGPATH];
 
@@ -1095,9 +1085,37 @@ OpenTemporaryFile(const char   *fileName,
                  extentseqnum);
 	}
 
-	temp_dir = getCurrentTempFilePath;
+    return OpenNamedFile(tempfilepath, create, delOnClose, closeAtEOXact);
+}    /* OpenTemporaryFile */
+
+/*
+ * Open an arbitrary file that will (optionally) disappear when we close it.
+ * This is similar to OpenTemporaryFile, except the exact name specified in
+ * fileName is used.
+ */
+File
+OpenNamedFile(const char   *fileName,
+                  bool          create,
+                  bool          delOnClose,
+                  bool          closeAtEOXact)
+{
+	char	tempfilepath[MAXPGPATH];
+	strncpy(tempfilepath, fileName, sizeof(tempfilepath));
+
+	/*
+	 * File flags when open the file.  Note: we don't use O_EXCL, in case there is an orphaned
+	 * temp file that can be reused.
+	 */
+	int fileFlags = O_RDWR | PG_BINARY;
+	if (create)
+	{
+		fileFlags |= O_TRUNC | O_CREAT;
+	}
+
+	char *temp_dir = getCurrentTempFilePath;
 	elog(DEBUG1, "temporary direcotry is: \"%s\"", temp_dir);
-	file = FileNameOpenFile(tempfilepath, temp_dir, fileFlags, 0600);
+	File file = FileNameOpenFile(tempfilepath, temp_dir, fileFlags, 0600);
+
 
 	if (file <= 0)
 	{
@@ -1137,7 +1155,7 @@ OpenTemporaryFile(const char   *fileName,
 	}
 
 	return file;
-}                               /* OpenTemporaryFile */
+}                             /* OpenNamedFile */
 
 /*
  * close a file when done with it
@@ -1440,6 +1458,28 @@ LocalFileSync(File file)
 		}
 	}
 	return returnCode;
+}
+
+/*
+ * Get the size of a physical file by using fstat()
+ *
+ * Returns size in bytes if successful, < 0 otherwise
+ */
+int64
+FileDiskSize(File file)
+{
+	int returnCode = 0;
+
+	returnCode = FileAccess(file);
+	if (returnCode < 0)
+		return returnCode;
+
+	struct stat buf;
+	returnCode = fstat(VfdCache[file].fd, &buf);
+	if (returnCode < 0)
+		return returnCode;
+
+	return (int64) buf.st_size;
 }
 
 int64
@@ -2120,6 +2160,8 @@ CleanupTempFiles(bool isProcExit)
 		}
 	}
 
+	workfile_mgr_cleanup();
+
 	while (numAllocatedDescs > 0)
 		FreeDesc(&allocatedDescs[0]);
 }
@@ -2130,11 +2172,8 @@ CleanupTempFiles(bool isProcExit)
  * This should be called during postmaster startup.  It will forcibly
  * remove any leftover files created by OpenTemporaryFile.
  *
- * NOTE: we could, but don't, call this during a post-backend-crash restart
- * cycle.  The argument for not doing it is that someone might want to examine
- * the temp files for debugging purposes.  This does however mean that
- * OpenTemporaryFile had better allow for collision with an existing temp
- * file name.
+ * We also call this during the post-backend-crash restart cycle
+ * (postmaster reset).
  */
 void
 RemovePgTempFiles(void)
@@ -2142,6 +2181,9 @@ RemovePgTempFiles(void)
 	char		temp_path[MAXPGPATH];
 	DIR		   *db_dir;
 	struct dirent *db_de;
+
+	ereport(LOG,
+			(errmsg("removing all temporary files")));
 
 	/*
 	 * Cycle through pgsql_tmp directories for all databases and remove old
@@ -2201,14 +2243,19 @@ RemovePgTempFilesInDir(const char *tmpdirname)
 
 		if (HasTempFilePrefix(temp_de->d_name))
 		{
-			unlink(rm_path);	/* note we ignore any error */
+			/*
+			 * It can be a file or a directory, so try to delete both ways
+			 * We ignore errors.
+			 */
+			unlink(rm_path);
+			rmtree(rm_path,true);
 		}
 		else
 		{
 			elog(LOG,
 				 "unexpected file found in temporary-files directory: \"%s\"",
 				 rm_path);
-	}
+		}
 	}
 
 	FreeDir(temp_dir);
@@ -2224,14 +2271,28 @@ RemovePgTempFilesInDir(const char *tmpdirname)
 size_t
 GetTempFilePrefix(char * buf, size_t buflen, const char * fileName)
 {
+	Assert(buf);
+	/*
+	 * If the file name was generated using the workfile
+	 * manager, it already contains the temp directory prefix.
+	 * Leave the filename alone in this case.
+	 */
+	if (strstr(fileName, WORKFILE_SET_PREFIX))
+	{
+		memcpy(buf, fileName, buflen);
+		return strlen(fileName);
+	}
+
 	size_t needlen = strlen(PG_TEMP_FILES_DIR)
 			+ strlen(PG_TEMP_FILE_PREFIX)
 			+ strlen(fileName)
 			+ 2; /* enough for a slash and a _ */
 
-	if(buflen < needlen)
+	if (buflen < needlen)
+	{
 		return needlen;
-
+	}
+	
 	snprintf(buf, buflen, "%s/%s_%s",
 			PG_TEMP_FILES_DIR,
 			PG_TEMP_FILE_PREFIX,
@@ -2241,15 +2302,26 @@ GetTempFilePrefix(char * buf, size_t buflen, const char * fileName)
 }
 
 /*
- * Check if a temporary file matches the expected prefix. This
- * is done before deleting it as a sanity check.
+ * Check if a temporary file or directory matches the expected prefix. This
+ * is done before deleting it, as a sanity check.
  */
 static bool
 HasTempFilePrefix(char * fileName)
 {
-	return (strncmp(fileName,
+
+	bool matching_file = (strncmp(fileName,
 						PG_TEMP_FILE_PREFIX,
 						strlen(PG_TEMP_FILE_PREFIX)) == 0);
+	if (matching_file)
+	{
+		return true;
+	}
+
+	bool matching_dir = (strncmp(fileName,
+						WORKFILE_SET_PREFIX,
+						strlen(WORKFILE_SET_PREFIX)) == 0);
+
+	return matching_dir;
 }
 
 /*

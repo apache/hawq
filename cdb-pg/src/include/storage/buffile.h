@@ -35,6 +35,8 @@ typedef struct BufFile BufFile;
  * prototypes for functions in buffile.c
  */
 
+extern BufFile *BufFileCreateFile(const char * filePrefix, bool delOnClose, bool interXact);
+extern BufFile *BufFileOpenFile(const char * fileName, bool create, bool delOnClose, bool interXact);
 extern BufFile *BufFileCreateTemp(const char * filePrefix, bool interXact);
 extern BufFile *BufFileCreateTemp_ReaderWriter(const char* fileName, bool isWriter);
 extern void BufFileClose(BufFile *file);
@@ -43,17 +45,11 @@ extern void *BufFileSetBuf(BufFile *file, void *buf, Size bufsize);
 extern Size BufFileRead(BufFile *file, void *ptr, Size size);
 extern Size BufFileWrite(BufFile *file, const void *ptr, Size size);
 
-extern int	BufFileSeek(BufFile *file, int fileno, long offset, int whence);
-extern void BufFileTell(BufFile *file, int *fileno, long *offset);
-extern int  BufFileSeek64(BufFile *file, uint64 offset);
-extern uint64 BufFileTell64(BufFile *file);
-extern int	BufFileSeekBlock(BufFile *file, long blknum);
+extern int BufFileSeek(BufFile *file, int64 offset, int whence);
+extern void BufFileTell(BufFile *file, int64 *offset);
+extern int	BufFileSeekBlock(BufFile *file, int64 blknum);
 extern void BufFileFlush(BufFile *file);
+extern int64 BufFileGetSize(BufFile *buffile);
+extern void BufFileSetWorkfile(BufFile *buffile);
 
-extern char* BufFilePeek(BufFile *file, int size);
-
-
-extern size_t sizeBufFile(BufFile * file); /* MPP */
-
-extern int BufFileNumFiles(BufFile *file); 
 #endif   /* BUFFILE_H */

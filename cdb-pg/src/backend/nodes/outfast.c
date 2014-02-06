@@ -37,6 +37,9 @@
 #include "nodes/relation.h"
 #include "utils/datum.h"
 #include "cdb/cdbgang.h"
+#include "utils/workfile_mgr.h"
+#include "parser/parsetree.h"
+
 
 /*
  * Macros to simplify output of different kinds of fields.	Use these
@@ -205,6 +208,12 @@ _outTupleDesc(StringInfo str, TupleDesc node)
 	/* tdrefcount is not effective */
 }
 
+/* When serializing a plan for workfile caching, we want to leave out
+ * all variable fields by setting this to false */
+static bool print_variable_fields = true;
+/* rtable needed when serializing for workfile caching */
+static List *range_table = NULL;
+
 static void
 _outList(StringInfo str, List *node)
 {
@@ -303,13 +312,17 @@ _outDatum(StringInfo str, Datum value, int typlen, bool typbyval)
 static void
 _outPlanInfo(StringInfo str, Plan *node)
 {
-	WRITE_INT_FIELD(plan_node_id);
-	WRITE_INT_FIELD(plan_parent_node_id);
 
-	WRITE_FLOAT_FIELD(startup_cost, "%.2f");
-	WRITE_FLOAT_FIELD(total_cost, "%.2f");
-	WRITE_FLOAT_FIELD(plan_rows, "%.0f");
-	WRITE_INT_FIELD(plan_width);
+	if (print_variable_fields)
+	{
+		WRITE_INT_FIELD(plan_node_id);
+		WRITE_INT_FIELD(plan_parent_node_id);
+
+		WRITE_FLOAT_FIELD(startup_cost, "%.2f");
+		WRITE_FLOAT_FIELD(total_cost, "%.2f");
+		WRITE_FLOAT_FIELD(plan_rows, "%.0f");
+		WRITE_INT_FIELD(plan_width);
+	}
 
 	WRITE_NODE_FIELD(targetlist);
 	WRITE_NODE_FIELD(qual);
@@ -319,21 +332,27 @@ _outPlanInfo(StringInfo str, Plan *node)
 
 	WRITE_INT_FIELD(nParamExec);
 	
-	WRITE_NODE_FIELD(flow);
-	WRITE_INT_FIELD(dispatch);
-	WRITE_BOOL_FIELD(directDispatch.isDirectDispatch);
-	WRITE_NODE_FIELD(directDispatch.contentIds);
-	
-	WRITE_INT_FIELD(nMotionNodes);
-	WRITE_INT_FIELD(nInitPlans);
+	if (print_variable_fields)
+	{
+		WRITE_NODE_FIELD(flow);
+		WRITE_INT_FIELD(dispatch);
+		WRITE_BOOL_FIELD(directDispatch.isDirectDispatch);
+		WRITE_NODE_FIELD(directDispatch.contentIds);
 
-	WRITE_NODE_FIELD(sliceTable);
+		WRITE_INT_FIELD(nMotionNodes);
+		WRITE_INT_FIELD(nInitPlans);
+
+		WRITE_NODE_FIELD(sliceTable);
+	}
 
     WRITE_NODE_FIELD(lefttree);
     WRITE_NODE_FIELD(righttree);
     WRITE_NODE_FIELD(initPlan);
 
-    WRITE_UINT64_FIELD(operatorMemKB);
+	if (print_variable_fields)
+	{
+		WRITE_UINT64_FIELD(operatorMemKB);
+	}
 }
 
 /*
@@ -344,7 +363,30 @@ _outScanInfo(StringInfo str, Scan *node)
 {
 	_outPlanInfo(str, (Plan *) node);
 
-	WRITE_UINT_FIELD(scanrelid);
+	if (print_variable_fields)
+	{
+		WRITE_UINT_FIELD(scanrelid);
+	}
+	else
+	{
+		/*
+		 * Serializing for workfile caching.
+		 * Instead of outputing rtable indices, serialize the actual rtable entry
+		 */
+		Assert(range_table != NULL);
+
+		RangeTblEntry *rte = rt_fetch(node->scanrelid, range_table);
+		/*
+		 * Serialize all rtable entries except for subquery type.
+		 * For subquery scan, the rtable entry contains the entire plan of the
+		 * subquery, but this is serialized elsewhere in outSubqueryScan, no
+		 * need to duplicate it here
+		 */
+		if (rte->type != RTE_SUBQUERY)
+		{
+			_outNode(str,rte);
+		}
+	}
 }
 
 /*
@@ -715,8 +757,11 @@ _outAgg(StringInfo str, Agg *node)
 
 	WRITE_INT_ARRAY(grpColIdx, numCols, AttrNumber);
 
-	WRITE_LONG_FIELD(numGroups);
-	WRITE_INT_FIELD(transSpace);
+	if (print_variable_fields)
+	{
+		WRITE_LONG_FIELD(numGroups);
+		WRITE_INT_FIELD(transSpace);
+	}
 	WRITE_INT_FIELD(numNullCols);
 	WRITE_UINT64_FIELD(inputGrouping);
 	WRITE_UINT64_FIELD(grouping);
@@ -1015,12 +1060,18 @@ _outVar(StringInfo str, Var *node)
 {
 	WRITE_NODE_TYPE("VAR");
 
-	WRITE_UINT_FIELD(varno);
+	if (print_variable_fields)
+	{
+		WRITE_UINT_FIELD(varno);
+	}
 	WRITE_INT_FIELD(varattno);
 	WRITE_OID_FIELD(vartype);
 	WRITE_INT_FIELD(vartypmod);
 	WRITE_UINT_FIELD(varlevelsup);
-	WRITE_UINT_FIELD(varnoold);
+	if (print_variable_fields)
+	{
+		WRITE_UINT_FIELD(varnoold);
+	}
 	WRITE_INT_FIELD(varoattno);
 }
 
@@ -4504,6 +4555,35 @@ _outNode(StringInfo str, void *obj)
 
 	}
 }
+
+/*
+ * Initialize global variables for serializing a plan for the workfile manager.
+ * The serialized form of a plan for workfile manager does not include some
+ * variable fields such as costs and node ids.
+ * In addition, range table pointers are replaced with Oids where applicable.
+ */
+void
+outfast_workfile_mgr_init(List *rtable)
+{
+	Assert(NULL == range_table);
+	Assert(print_variable_fields);
+	range_table = rtable;
+	print_variable_fields = false;
+}
+
+/*
+ * Reset global variables to their default values at the end of serializing
+ * a plan for the workfile manager.
+ */
+void
+outfast_workfile_mgr_end()
+{
+	Assert(!print_variable_fields);
+
+	print_variable_fields = true;
+	range_table = NULL;
+}
+
 
 /*
  * nodeToBinaryStringFast -

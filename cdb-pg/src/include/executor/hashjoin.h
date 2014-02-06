@@ -18,6 +18,7 @@
 #include "fmgr.h"
 #include "executor/execWorkfile.h"
 #include "cdb/cdbpublic.h"                 /* CdbExplain_Agg */
+#include "utils/workfile_mgr.h"
 
 struct StringInfoData;                  /* #include "lib/stringinfo.h" */
 
@@ -121,6 +122,7 @@ typedef struct HashJoinBatchSide
 	 * out any tuples of batch zero.
 	 */
 	ExecWorkFile *workfile;
+	int total_tuples;
 } HashJoinBatchSide;
 
 
@@ -162,6 +164,11 @@ typedef struct HashJoinTableData
 
 	HashJoinBatchData **batches;    /* array [0..nbatch-1] of ptr to HJBD */
 
+	/* Representation of all spill file names, for spill file reuse */
+	workfile_set * work_set;
+
+	ExecWorkFile * state_file;
+
 	/*
 	 * Info about the datatype-specific hash functions for the datatypes being
 	 * hashed.	We assume that the inner and outer sides of each hashclause
@@ -180,6 +187,9 @@ typedef struct HashJoinTableData
 
     HashJoinTableStats *stats;  /* statistics workarea for EXPLAIN ANALYZE */
     bool		eagerlyReleased; /* Has this hash-table been eagerly released? */
+
+    HashJoinState * hjstate; /* reference to the enclosing HashJoinState */
+
 } HashJoinTableData;
 
 #endif   /* HASHJOIN_H */

@@ -110,6 +110,7 @@ init_tuplestore_state(ShareInputScanState *node)
 		if(gp_enable_mk_sort)
 		{
 			node->ts_state = tuplesort_begin_heap_file_readerwriter_mk(
+				& node->ss,
 				rwfile_prefix, false,
 				NULL, 0, NULL, NULL, PlanStateOperatorMemKB((PlanState *) node), true);
 

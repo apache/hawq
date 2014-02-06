@@ -32,10 +32,12 @@ typedef struct Instrumentation
 	double		total;			/* Total total time (in seconds) */
 	double		ntuples;		/* Total tuples produced */
 	double		nloops;			/* # of run cycles for this node */
-    double      execmemused;    /* CDB: executor memory used (bytes) */
-    double      workmemused;    /* CDB: work_mem actually used (bytes) */
-    double      workmemwanted;  /* CDB: work_mem to avoid scratch i/o (bytes) */
+    double		execmemused;    /* CDB: executor memory used (bytes) */
+    double		workmemused;    /* CDB: work_mem actually used (bytes) */
+    double		workmemwanted;  /* CDB: work_mem to avoid scratch i/o (bytes) */
 	instr_time	firststart;		/* CDB: Start time of first iteration of node */
+	bool		workfileReused; /* TRUE if cached workfiles reused in this node */
+	bool		workfileCreated; /* TRUE if workfiles are created in this node */
     struct CdbExplain_NodeSummary  *cdbNodeSummary; /* stats from all qExecs */
 } Instrumentation;
 

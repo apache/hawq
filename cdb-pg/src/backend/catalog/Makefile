@@ -43,6 +43,7 @@ JETPACK_SCHEMA = hawq_$(JETPACK_NAME)
 JETPACK_OBJECT_PREFIX = hawq_
 JETPACK_PREFIX = $(JETPACK_SCHEMA).$(JETPACK_OBJECT_PREFIX)
 JETPACK_PREFIX_AUX = $(JETPACK_SCHEMA).__$(JETPACK_OBJECT_PREFIX)
+WORKFILE_PATHNAME = $$libdir\/gp_workfile_mgr
 
 gp_toolkit.sql: gp_toolkit.sql.in
 	sed \
@@ -50,6 +51,7 @@ gp_toolkit.sql: gp_toolkit.sql.in
 	-e 's/%%JETPACK_SCHEMA%%/$(JETPACK_SCHEMA)/g' \
 	-e 's/%%JETPACK_PREFIX%%/$(JETPACK_PREFIX)/g' \
 	-e 's/%%JETPACK_PREFIX_AUX%%/$(JETPACK_PREFIX_AUX)/g' \
+	-e 's/%%WORKFILE_MODULE%%/$(WORKFILE_PATHNAME)/g' \
 	-e 's/	/    /g' \
 	$< > $@
 

@@ -1825,6 +1825,229 @@ GRANT SELECT ON TABLE %%JETPACK_PREFIX%%size_of_database TO public;
 
 --GRANT SELECT ON %%JETPACK_PREFIX%%resqueue_status TO public;
 
+-- Workfile views
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- @function: 
+--		%%JETPACK_PREFIX_AUX%%workfile_entries_f
+--
+-- @in:
+--
+-- @out:
+--		int - segment id
+--		text - path to workfile set, 
+--		int - hash value of the spilling operator, 
+--		bigint - size in bytes, 
+--		int - utility, 
+--		int - state, 
+--		int - workmem in kilobytes,
+--		int - type of the spilling operator, 
+--		int - containing slice,
+--		int - sessionid, 
+--		int - command_cnt,
+--		timestamptz - time of query start,
+--		int - number of files
+--
+-- @doc:
+--		UDF to retrieve workfile sets currently present on disk on one segment
+--		
+--------------------------------------------------------------------------------
+
+CREATE FUNCTION %%JETPACK_PREFIX_AUX%%workfile_entries_f()
+RETURNS SETOF record
+AS '%%WORKFILE_MODULE%%', 'gp_workfile_mgr_cache_entries'
+LANGUAGE C IMMUTABLE;
+
+GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX_AUX%%workfile_entries_f() TO public;
+
+
+--------------------------------------------------------------------------------
+-- @view: 
+--		 %%JETPACK_PREFIX_AUX%%workfile_data
+--
+-- @doc:
+--		Auxiliary view with workfile entries used to construct the full entries view
+--		
+--------------------------------------------------------------------------------
+
+CREATE VIEW  %%JETPACK_PREFIX_AUX%%workfile_data AS
+   SELECT C.*
+          FROM gp_dist_random('gp_id'), %%JETPACK_PREFIX_AUX%%workfile_entries_f() AS C (
+            segid int, 
+            path text, 
+            hash int, 
+            size bigint, 
+            utility int, 
+            state int, 
+            workmem int,
+            optype text, 
+            slice int,
+            sessionid int, 
+            commandid int,
+            query_start timestamptz, 
+            numfiles int
+          )
+    UNION ALL
+    SELECT C.*
+          FROM gp_id, %%JETPACK_PREFIX_AUX%%workfile_entries_f() AS C (
+            segid int, 
+            path text, 
+            hash int, 
+            size bigint, 
+            utility int, 
+            state int, 
+            workmem int,
+            optype text, 
+            slice int,
+            sessionid int, 
+            commandid int,
+            query_start timestamptz, 
+            numfiles int
+          );
+
+GRANT SELECT ON %%JETPACK_PREFIX_AUX%%workfile_data TO public;
+
+--------------------------------------------------------------------------------
+-- @view: 
+--		%%JETPACK_PREFIX%%workfile_entries
+--
+-- @doc:
+--		List of all the workfile sets currently present on disk
+--		
+--------------------------------------------------------------------------------
+
+CREATE VIEW %%JETPACK_PREFIX%%workfile_entries AS
+SELECT S.datname, 
+       (CASE WHEN (C.state = 1) THEN S.procpid ELSE NULL END) AS procpid, 
+       C.sessionid as sess_id, 
+       C.commandid as command_cnt,
+       S.usename, 
+       (CASE WHEN (C.state = 1) THEN S.current_query ELSE NULL END) as current_query, 
+       C.segid, 
+       C.slice, 
+       C.optype, 
+       C.workmem, 
+       C.size, 
+       C.numfiles,
+       C.path as directory, 
+       (CASE WHEN (C.state = 1) THEN 'RUNNING' WHEN (C.state = 2) THEN 'CACHED' WHEN (C.state = 3) THEN 'DELETING' ELSE 'UNKNOWN' END) as state, 
+       C.utility
+FROM  %%JETPACK_PREFIX_AUX%%workfile_data C LEFT OUTER JOIN 
+   pg_stat_activity as S
+ON C.sessionid = S.sess_id;
+
+GRANT SELECT ON %%JETPACK_PREFIX%%workfile_entries TO public;
+
+--------------------------------------------------------------------------------
+-- @view: 
+--		%%JETPACK_PREFIX%%workfile_usage_per_segment
+--
+-- @doc:
+--		Amount of disk space used for workfiles at each segment
+--		
+--------------------------------------------------------------------------------
+
+CREATE VIEW %%JETPACK_PREFIX%%workfile_usage_per_segment AS
+SELECT gpseg.content AS segid, COALESCE(SUM(wfe.size),0) AS size, 
+	SUM(wfe.numfiles) AS numfiles
+FROM (
+	SELECT content 
+	FROM gp_segment_configuration 
+	WHERE role = 'p') gpseg 
+LEFT JOIN %%JETPACK_PREFIX%%workfile_entries wfe 
+ON (gpseg.content = wfe.segid) 
+GROUP BY gpseg.content;
+
+GRANT SELECT ON %%JETPACK_PREFIX%%workfile_usage_per_segment TO public;
+
+--------------------------------------------------------------------------------
+-- @view: 
+--		%%JETPACK_PREFIX%%workfile_usage_per_query
+--
+-- @doc:
+--		Amount of disk space used for workfiles by each query
+--		
+--------------------------------------------------------------------------------
+
+CREATE VIEW %%JETPACK_PREFIX%%workfile_usage_per_query AS
+SELECT datname, procpid, sess_id, command_cnt, usename, current_query, segid, state, 
+	SUM(size) AS size, SUM(numfiles) AS numfiles 
+FROM %%JETPACK_PREFIX%%workfile_entries
+GROUP BY (datname, procpid, sess_id, command_cnt, usename, current_query, segid, state);
+
+GRANT SELECT ON %%JETPACK_PREFIX%%workfile_usage_per_query TO public;
+
+--------------------------------------------------------------------------------
+-- @function: 
+--		%%JETPACK_PREFIX_AUX%%workfile_cache_clear_f(content int)
+--
+-- @in:
+--		int - segment id
+-- @out:
+--		int - number of workfile sets deleted
+--
+-- @doc:
+--		UDF to clear the workfile cache on one segment
+--		
+--------------------------------------------------------------------------------
+
+CREATE FUNCTION %%JETPACK_PREFIX_AUX%%workfile_cache_clear_f(content int)
+    RETURNS SETOF int
+AS '%%WORKFILE_MODULE%%', 'gp_workfile_mgr_clear_cache' LANGUAGE C IMMUTABLE;
+
+REVOKE ALL ON FUNCTION %%JETPACK_PREFIX_AUX%%workfile_cache_clear_f(int) FROM public;
+
+--------------------------------------------------------------------------------
+-- @function: 
+--		%%JETPACK_PREFIX%%workfile_cache_clear_segment(content int)
+--
+-- @in:
+--		int - segment id
+-- @out:
+--		int - number of workfile sets deleted
+--
+-- @doc:
+--		Clear the workfile cache on one segment
+--		
+--------------------------------------------------------------------------------
+
+CREATE FUNCTION %%JETPACK_PREFIX%%workfile_cache_clear_segment(content int)
+RETURNS SETOF int
+AS
+$$
+ SELECT C.* FROM gp_dist_random('gp_id'), %%JETPACK_PREFIX_AUX%%workfile_cache_clear_f($1) as C
+ UNION ALL
+ SELECT C.* FROM gp_id, %%JETPACK_PREFIX_AUX%%workfile_cache_clear_f($1) as C;
+$$
+LANGUAGE SQL;
+
+REVOKE ALL ON FUNCTION %%JETPACK_PREFIX%%workfile_cache_clear_segment(int) FROM public;
+
+--------------------------------------------------------------------------------
+-- @function: 
+--		%%JETPACK_PREFIX%%workfile_cache_clear()
+--
+-- @in:
+--
+-- @out:
+--		int - number of workfile sets deleted
+--
+-- @doc:
+--		Clear the workfile caches on all segments
+--		
+--------------------------------------------------------------------------------
+
+CREATE FUNCTION %%JETPACK_PREFIX%%workfile_cache_clear()
+RETURNS SETOF int
+AS
+$$
+  SELECT * from %%JETPACK_PREFIX%%workfile_cache_clear_segment(-2)
+$$
+LANGUAGE SQL; 
+
+REVOKE ALL ON FUNCTION %%JETPACK_PREFIX%%workfile_cache_clear() FROM public;
+
 -- Finalize install
 COMMIT;
 

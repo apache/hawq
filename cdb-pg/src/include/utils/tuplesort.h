@@ -23,6 +23,8 @@
 
 #include "access/itup.h"
 #include "executor/tuptable.h"
+#include "nodes/execnodes.h"
+#include "utils/workfile_mgr.h"
 
 #include "gpmon/gpmon.h"
 
@@ -58,7 +60,8 @@ extern Tuplesortstate *tuplesort_begin_heap(TupleDesc tupDesc,
 					 int nkeys,
 					 Oid *sortOperators, AttrNumber *attNums,
 					 int workMem, bool randomAccess);
-extern Tuplesortstate_mk *tuplesort_begin_heap_mk(TupleDesc tupDesc,
+extern Tuplesortstate_mk *tuplesort_begin_heap_mk(ScanState * ss,
+					 TupleDesc tupDesc,
 					 int nkeys,
 					 Oid *sortOperators, AttrNumber *attNums,
 					 int workMem, bool randomAccess);
@@ -71,6 +74,7 @@ extern Tuplesortstate *tuplesort_begin_heap_file_readerwriter(
 		Oid *sortOperators, AttrNumber *attNums,
 		int workMem, bool randomAccess);
 extern Tuplesortstate_mk *tuplesort_begin_heap_file_readerwriter_mk(
+		ScanState * ss,
 		const char* rwfile_prefix, bool isWriter,
 		TupleDesc tupDesc, 
 		int nkeys,
@@ -87,7 +91,8 @@ extern Tuplesortstate_mk *tuplesort_begin_index_mk(Relation indexRel,
 extern Tuplesortstate *tuplesort_begin_datum(Oid datumType,
 					  Oid sortOperator,
 					  int workMem, bool randomAccess);
-extern Tuplesortstate_mk *tuplesort_begin_datum_mk(Oid datumType,
+extern Tuplesortstate_mk *tuplesort_begin_datum_mk(ScanState * ss,
+					  Oid datumType,
 					  Oid sortOperator,
 					  int workMem, bool randomAccess);
 
@@ -134,6 +139,10 @@ extern void tuplesort_finalize_stats_mk(Tuplesortstate_mk *state);
 
 extern int	tuplesort_merge_order(long allowedMem);
 
+extern void tuplesort_write_spill_metadata_mk(Tuplesortstate_mk *state);
+extern void tuplesort_read_spill_metadata_mk(Tuplesortstate_mk *state);
+
+extern void tuplesort_set_spillfile_set_mk(Tuplesortstate_mk * state, workfile_set * sfs);
 /*
  * These routines may only be called if randomAccess was specified 'true'.
  * Likewise, backwards scan in gettuple/getdatum is only allowed if

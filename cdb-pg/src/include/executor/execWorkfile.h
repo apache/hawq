@@ -10,6 +10,8 @@
 #ifndef EXECWORKFILE_H
 #define EXECWORKFILE_H
 
+#include "utils/guc.h"
+
 typedef enum ExecWorkFileType
 {
 	BUFFILE = 0,
@@ -22,6 +24,23 @@ typedef enum ExecWorkFileType
  */ 
 #define WORKFILE_SAFEWRITE_SIZE 512
 
+/* Flags that describe capabilities of a workfile */
+
+/* File supports random-access (seek) capabilities */
+#define EXEC_WORKFILE_RANDOM_ACCESS 0x1
+
+/* File supports suspend/restart capabilities */
+#define EXEC_WORKFILE_SUSPENDABLE 0x2
+
+/* File is marked for automatic deletion upon close */
+#define EXEC_WORKFILE_DEL_ON_CLOSE 0x4
+
+/* File was created by us */
+#define EXEC_WORKFILE_CREATED 0x8
+
+/* This file's size should be checked against the set limits during writes */
+#define EXEC_WORKFILE_LIMIT_SIZE 0x10
+
 /* 
  * ExecWorkFile structure.
  */
@@ -29,8 +48,15 @@ typedef struct ExecWorkFile
 {
 	ExecWorkFileType fileType;
 	int compressType;
+	int64 size;
 	
+	int flags;
+
 	void *file;
+	char *fileName;
+
+	struct workfile_set *work_set;
+
 } ExecWorkFile;
 
 /*
@@ -43,6 +69,21 @@ typedef struct ExecWorkFile
 ExecWorkFile *
 ExecWorkFile_Create(const char *fileName,
 					ExecWorkFileType fileType,
+					bool delOnClose,
+					int compressType);
+ExecWorkFile *
+ExecWorkFile_CreateUnique(const char *filename,
+		ExecWorkFileType fileType,
+		bool delOnClose,
+		int compressType);
+
+StringInfo
+ExecWorkFile_AddUniqueSuffix(const char *filename);
+
+ExecWorkFile *
+ExecWorkFile_Open(const char *fileName,
+					ExecWorkFileType fileType,
+					bool delOnClose,
 					int compressType);
 
 /*
@@ -71,6 +112,10 @@ ExecWorkFile_Read(ExecWorkFile *workfile,
 				  void *data,
 				  uint64 size);
 
+void *
+ExecWorkFile_ReadFromBuffer(ExecWorkFile *workfile,
+				  uint64 size);
+
 /*
  * ExecWorkFile_Rewind
  *    rewind the pointer position to the beginning of the file.
@@ -91,7 +136,15 @@ ExecWorkFile_Tell64(ExecWorkFile *workfile);
  * ExecWorkFile_Close
  *    close the work file, and release the space.
  */
-void
+int64
 ExecWorkFile_Close(ExecWorkFile *workfile);
+
+int ExecWorkFile_Seek(ExecWorkFile *workfile, uint64 offset, int whence);
+void ExecWorkFile_Flush(ExecWorkFile *workfile);
+int64 ExecWorkFile_GetSize(ExecWorkFile *workfile);
+int64 ExecWorkFile_Suspend(ExecWorkFile *workfile);
+void ExecWorkFile_Restart(ExecWorkFile *workfile);
+char * ExecWorkFile_GetFileName(ExecWorkFile *workfile);
+void ExecWorkfile_SetWorkset(ExecWorkFile *workfile, struct workfile_set *work_set);
 
 #endif /* EXECWORKFILE_H */

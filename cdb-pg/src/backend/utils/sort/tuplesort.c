@@ -109,7 +109,7 @@
 #include "lib/stringinfo.h"             /* StringInfo */
 #include "miscadmin.h"
 #include "utils/datum.h"
-#include "storage/buffile.h"
+#include "executor/execWorkfile.h"
 #include "utils/logtape.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
@@ -386,10 +386,10 @@ struct Tuplesortstate
 	PGRUsage	ru_start;
 
 	/* 
-	 * File fo dump/load logical tape set state.  Used by sharing sort across slice 
+	 * File for dump/load logical tape set state.  Used by sharing sort across slice
 	 */
 	char       *pfile_rwfile_prefix;
-	BufFile *pfile_rwfile_state;
+	ExecWorkFile *pfile_rwfile_state;
 
 	/* gpmon */
 	gpmon_packet_t *gpmon_pkt;
@@ -723,10 +723,17 @@ tuplesort_begin_heap_file_readerwriter(
 {
 	Tuplesortstate *state;
 	char statedump[MAXPGPATH];
+	char full_prefix[MAXPGPATH];
 
 	Assert(randomAccess);
 
-	snprintf(statedump, sizeof(statedump), "%s_sortstate", rwfile_prefix);
+	int len = snprintf(statedump, sizeof(statedump), "%s/%s_sortstate", PG_TEMP_FILES_DIR, rwfile_prefix);
+	insist_log(len <= MAXPGPATH - 1, "could not generate temporary file name");
+
+	len = snprintf(full_prefix, sizeof(full_prefix), "%s/%s",
+			PG_TEMP_FILES_DIR,
+			rwfile_prefix);
+	insist_log(len <= MAXPGPATH - 1, "could not generate temporary file name");
 
 	if(isWriter)
 	{
@@ -736,8 +743,13 @@ tuplesort_begin_heap_file_readerwriter(
 		 */
 		state = tuplesort_begin_heap(tupDesc, nkeys, sortOperators, attNums, workMem, randomAccess);
 
-		state->pfile_rwfile_prefix = MemoryContextStrdup(state->sortcontext, rwfile_prefix);
-		state->pfile_rwfile_state = BufFileCreateTemp_ReaderWriter(statedump, true);
+		state->pfile_rwfile_prefix = MemoryContextStrdup(state->sortcontext, full_prefix);
+		state->pfile_rwfile_state = ExecWorkFile_Create(statedump,
+				BUFFILE,
+				true /* delOnClose */ ,
+				0 /* compressType */ );
+		Assert(state->pfile_rwfile_state != NULL);
+
 		return state;
 	}
 	else
@@ -755,10 +767,18 @@ tuplesort_begin_heap_file_readerwriter(
 
 		state->readtup = readtup_heap;
 
-		state->pfile_rwfile_prefix = MemoryContextStrdup(state->sortcontext, rwfile_prefix);
-		state->pfile_rwfile_state = BufFileCreateTemp_ReaderWriter(statedump, false);
+		state->pfile_rwfile_prefix = MemoryContextStrdup(state->sortcontext, full_prefix);
+		state->pfile_rwfile_state = ExecWorkFile_Open(statedump,
+				BUFFILE,
+				false /* delOnClose */,
+				0 /* compressType */);
 
-		state->tapeset = LoadLogicalTapeSetState(state->pfile_rwfile_state, rwfile_prefix);
+		ExecWorkFile *tapefile = ExecWorkFile_Open(full_prefix,
+				BUFFILE,
+				false /* delOnClose */,
+				0 /* compressType */);
+
+		state->tapeset = LoadLogicalTapeSetState(state->pfile_rwfile_state, tapefile);
 		state->currentRun = 0;
 		state->result_tape = LogicalTapeSetGetTape(state->tapeset, 0);
 
@@ -875,7 +895,14 @@ tuplesort_end(Tuplesortstate *state)
 	 * for two #ifdef TRACE_SORT sections.
 	 */
 	if (state->tapeset)
-		LogicalTapeSetClose(state->tapeset);
+	{
+		LogicalTapeSetClose(state->tapeset, NULL /* workset */);
+
+		if (state->pfile_rwfile_state)
+        {
+			workfile_mgr_close_file(NULL /* workset */, state->pfile_rwfile_state);
+        }
+	}
 
 	tuplesort_finalize_stats(state);
 
@@ -1295,7 +1322,7 @@ void tuplesort_flush(Tuplesortstate *state)
 	Assert(state->tapeset && state->pfile_rwfile_state);
 	Assert(state->pos.cur_work_tape == NULL);
 	LogicalTapeFlush(state->tapeset, state->result_tape, state->pfile_rwfile_state);
-	BufFileFlush(state->pfile_rwfile_state);
+	ExecWorkFile_Flush(state->pfile_rwfile_state);
 }
 
 /*
@@ -1634,10 +1661,19 @@ inittapes(Tuplesortstate *state, const char* rwfile_prefix)
 	/*
 	 * Create the tape set and allocate the per-tape data arrays.
 	 */
-	if(!rwfile_prefix)
-		state->tapeset = LogicalTapeSetCreate(maxTapes);
+	if(!rwfile_prefix){
+		state->tapeset = LogicalTapeSetCreate(maxTapes, true /* del_on_close */);
+	}
 	else
-		state->tapeset = LogicalTapeSetCreate_ReaderWriter(rwfile_prefix, maxTapes);
+	{
+		/* We are shared XSLICE, use given prefix to create files so that consumers can find them */
+    	ExecWorkFile *tape_file = ExecWorkFile_Create(rwfile_prefix,
+    			BUFFILE,
+    			true /* delOnClose */,
+    			0 /* compressType */);
+
+		state->tapeset = LogicalTapeSetCreate_File(tape_file, maxTapes);
+	}
 
 	state->mergeactive = (bool *) palloc0(maxTapes * sizeof(bool));
 	state->mergenext = (int *) palloc0(maxTapes * sizeof(int));

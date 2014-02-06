@@ -1205,4 +1205,7 @@ extern Datum enable_xform(PG_FUNCTION_ARGS);
 /* Optimizer's version */
 extern Datum gp_opt_version(PG_FUNCTION_ARGS);
 
+/* utils/workfile_manager/workfile_mgr_test.c */
+extern Datum gp_workfile_mgr_test_harness(PG_FUNCTION_ARGS);
+
 #endif   /* BUILTINS_H */

@@ -390,6 +390,7 @@ execMotionSender(MotionState * node)
 
 			if (node->stopRequested)
 			{
+				elog(gp_workfile_caching_loglevel, "Motion initiating Squelch walker");
 				/* propagate stop notification to our children */
 				ExecSquelchNode(outerNode);
 				done = true;
