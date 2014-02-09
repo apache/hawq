@@ -57,17 +57,12 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
      * If partition filter is set and the file currently opened by the accessor does not belong
      * to the partition we return false and stop processing for this file
      */
+    @Override
     public boolean openForRead() throws Exception {
-        if (!isOurDataInsideFilteredPartition()) {
-            return false;
-        }
-
-        return super.openForRead();
+        return isOurDataInsideFilteredPartition() && super.openForRead();
     }
 
-    /*
-     * Override virtual method to create specialized record reader
-     */
+    @Override
     protected Object getReader(JobConf jobConf, InputSplit split) throws IOException {
         return fformat.getRecordReader(split, jobConf, Reporter.NULL);
     }

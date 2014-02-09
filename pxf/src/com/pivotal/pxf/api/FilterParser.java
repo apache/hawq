@@ -4,9 +4,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Stack;
 
-/*
- * The parser code which goes over a filter string and pushes operands onto a stack
- * Once an operation is read, the evaluate function is called for the IFilterBuilder
+/**
+ * The parser code which goes over a filter string and pushes operands onto a stack.
+ * Once an operation is read, the evaluate function is called for the {@link FilterBuilder}
  * interface with two pop-ed operands.
  *
  * A string of filters looks like this:
@@ -18,14 +18,10 @@ import java.util.Stack;
  * c means a constant (either string or numeric)
  * o means operator
  *
- * Assuming all operators are binary, RPN representation allows it to be read
- * left to right easily.
+ * Assuming all operators are binary, RPN representation allows it to be read left to right easily.
  *
- * FilterParser only knows about columns and constants. The rest is up to the implementor 
- * of IFilterBuilder.
- *
- * FilterParser makes sure a column objects are always on the left of the 
- * expression (when relevant)
+ * FilterParser only knows about columns and constants. The rest is up to the {@link FilterBuilder} implementer.  *
+ * FilterParser makes sure column objects are always on the left of the expression (when relevant).
  */
 public class FilterParser {
     private int index;
@@ -35,9 +31,7 @@ public class FilterParser {
 
     private static Map<Integer, Operation> operatorTranslationMap = initOperatorTransMap();
 
-    /*
-     * Operations supported by the parser
-     */
+    /** Supported operations by the parser. */
     public enum Operation {
         HDOP_LT,
         HDOP_GT,
@@ -48,22 +42,25 @@ public class FilterParser {
         HDOP_AND
     }
 
-    /*
-     * Interface a user of FilterParser should implement
-     * This is used to let the user build filter expressions in the manner she
-     * sees fit
-     *
-     * When an operator is parsed, this function is called to let the user decide
-     * what to do with it operands.
+    /**
+     * Interface a user of FilterParser should implement.
+     * This is used to let the user build filter expressions in the manner she sees fit.
+     * When an operator is parsed, this function is called to let the user decide what to do with its operands.
      */
     public interface FilterBuilder {
+        /**
+         * Builds the filter.
+         *
+         * @param operation the parse operation to perform
+         * @param left the left operand
+         * @param right the right operand
+         * @return the built filter
+         * @throws Exception
+         */
         public Object build(Operation operation, Object left, Object right) throws Exception;
     }
 
-    /*
-     * The class represents a column index
-     * It used to know the type of an operand in the stack
-     */
+    /** Represents a column index. */
     public class ColumnIndex {
         private int index;
 
@@ -76,10 +73,7 @@ public class FilterParser {
         }
     }
 
-    /*
-     * The class represents a constant object (String, Long, ...)
-     * It used to know the type of an operand in the stack
-     */
+    /** Represents a constant object (String, Long, ...). */
     public class Constant {
         private Object constant;
 
@@ -92,8 +86,8 @@ public class FilterParser {
         }
     }
 
-    /*
-     * Basic filter provided for cases where the target storage system does not provide it's own filter
+    /**
+     * Basic filter provided for cases where the target storage system does not provide it own filter
      * For example: Hbase storage provides its own filter but for a Writable based record in a
      * SequenceFile there is no filter provided and so we need to have a default
      */
@@ -102,39 +96,34 @@ public class FilterParser {
         private ColumnIndex column;
         private Constant constant;
 
-        /*
-         * C'tor
+        /**
+         * Constructs a BasicFilter.
+         *
+         * @param oper the parse operation to perform
+         * @param column the column index
+         * @param constant the constant object
          */
-        public BasicFilter(Operation inOper, ColumnIndex inColumn, Constant inConstant) {
-            oper = inOper;
-            column = inColumn;
-            constant = inConstant;
+        public BasicFilter(Operation oper, ColumnIndex column, Constant constant) {
+            this.oper = oper;
+            this.column = column;
+            this.constant = constant;
         }
 
-        /*
-         * returns oper field
-         */
         public Operation getOperation() {
             return oper;
         }
 
-        /*
-         * returns column field
-         */
         public ColumnIndex getColumn() {
             return column;
         }
 
-        /*
-         * returns constant field
-         */
         public Constant getConstant() {
             return constant;
         }
     }
 
-    /*
-     * Exception that can occur while parsing the string
+    /**
+     * Thrown when a filter's parsing exception occurs.
      */
     class FilterStringSyntaxException extends Exception {
         FilterStringSyntaxException(String desc) {
@@ -142,11 +131,23 @@ public class FilterParser {
         }
     }
 
+    /**
+     * Constructs a FilterParser.
+     *
+     * @param eval the filter builder
+     */
     public FilterParser(FilterBuilder eval) {
         operandsStack = new Stack<Object>();
         filterBuilder = eval;
     }
 
+    /**
+     * Parses the string filter.
+     *
+     * @param filter the filter to parse
+     * @return the parsed filter
+     * @throws Exception
+     */
     public Object parse(String filter) throws Exception {
         index = 0;
         filterString = filter;
@@ -219,6 +220,13 @@ public class FilterParser {
         return result;
     }
 
+    /**
+     * Safely converts a long value to an int.
+     *
+     * @param value the long value to convert
+     * @return the converted int value
+     * @throws FilterStringSyntaxException if the long value is not inside an int scope
+     */
     int safeToInt(Long value) throws FilterStringSyntaxException {
         if (value > Integer.MAX_VALUE || value < Integer.MIN_VALUE) {
             throw new FilterStringSyntaxException("value " + value + " larger than intmax ending at " + index);
@@ -227,19 +235,17 @@ public class FilterParser {
         return value.intValue();
     }
 
-    /*
-     * Parses either a number or a string
+    /**
+     * Parses either a number or a string.
      */
     private Object parseParameter() throws Exception {
         if (index == filterString.length()) {
             throw new FilterStringSyntaxException("argument should follow at " + index);
         }
 
-        if (senseString()) {
-            return parseString();
-        }
-
-        return parseNumber();
+        return senseString()
+                ? parseString()
+                : parseNumber();
     }
 
     private boolean senseString() {
@@ -348,11 +354,11 @@ public class FilterParser {
         return operation;
     }
 
-    /*
-     * Create a translation table of opcodes to their enum meaning
+    /**
+     * Create a translation table of opcodes to their enum meaning.
      *
      * These codes correspond to the codes in GPDB C code
-     * see gphdfilters.h in pxf protocol
+     * see gphdfilters.h in pxf protocol.
      */
     static private Map<Integer, Operation> initOperatorTransMap() {
         Map<Integer, Operation> operatorTranslationMap = new HashMap<Integer, Operation>();

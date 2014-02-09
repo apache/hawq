@@ -63,7 +63,7 @@ public class HiveResolver extends Plugin implements ReadResolver {
         String[] toks = userData.split(HiveDataFragmenter.HIVE_UD_DELIM);
 
         if (toks.length != EXPECTED_NUM_OF_TOKS) {
-            throw new FragmenterUserDataException("HiveResolver expected " + EXPECTED_NUM_OF_TOKS + " tokens, but got " + toks.length);
+            throw new UserDataException("HiveResolver expected " + EXPECTED_NUM_OF_TOKS + " tokens, but got " + toks.length);
         }
 
         serdeName = toks[1];
@@ -119,24 +119,33 @@ public class HiveResolver extends Plugin implements ReadResolver {
             String type = levelKey[1];
             String val = levelKey[2];
 
-            if (type.compareTo(serdeConstants.STRING_TYPE_NAME) == 0) {
-                addOneFieldToRecord(partitionFields, TEXT, val);
-            } else if (type.compareTo(serdeConstants.SMALLINT_TYPE_NAME) == 0) {
-                addOneFieldToRecord(partitionFields, SMALLINT, Short.parseShort(val));
-            } else if (type.compareTo(serdeConstants.INT_TYPE_NAME) == 0) {
-                addOneFieldToRecord(partitionFields, INTEGER, Integer.parseInt(val));
-            } else if (type.compareTo(serdeConstants.BIGINT_TYPE_NAME) == 0) {
-                addOneFieldToRecord(partitionFields, BIGINT, Long.parseLong(val));
-            } else if (type.compareTo(serdeConstants.FLOAT_TYPE_NAME) == 0) {
-                addOneFieldToRecord(partitionFields, REAL, Float.parseFloat(val));
-            } else if (type.compareTo(serdeConstants.DOUBLE_TYPE_NAME) == 0) {
-                addOneFieldToRecord(partitionFields, FLOAT8, Double.parseDouble(val));
-            } else if (type.compareTo(serdeConstants.TIMESTAMP_TYPE_NAME) == 0) {
-                addOneFieldToRecord(partitionFields, TIMESTAMP, Timestamp.valueOf(val));
-            } else if (type.compareTo(serdeConstants.DECIMAL_TYPE_NAME) == 0) {
-                addOneFieldToRecord(partitionFields, NUMERIC, new HiveDecimal(val).bigDecimalValue().toString());
-            } else {
-                throw new UnsupportedTypeException("Unknown type: " + type);
+            switch (type) {
+                case serdeConstants.STRING_TYPE_NAME:
+                    addOneFieldToRecord(partitionFields, TEXT, val);
+                    break;
+                case serdeConstants.SMALLINT_TYPE_NAME:
+                    addOneFieldToRecord(partitionFields, SMALLINT, Short.parseShort(val));
+                    break;
+                case serdeConstants.INT_TYPE_NAME:
+                    addOneFieldToRecord(partitionFields, INTEGER, Integer.parseInt(val));
+                    break;
+                case serdeConstants.BIGINT_TYPE_NAME:
+                    addOneFieldToRecord(partitionFields, BIGINT, Long.parseLong(val));
+                    break;
+                case serdeConstants.FLOAT_TYPE_NAME:
+                    addOneFieldToRecord(partitionFields, REAL, Float.parseFloat(val));
+                    break;
+                case serdeConstants.DOUBLE_TYPE_NAME:
+                    addOneFieldToRecord(partitionFields, FLOAT8, Double.parseDouble(val));
+                    break;
+                case serdeConstants.TIMESTAMP_TYPE_NAME:
+                    addOneFieldToRecord(partitionFields, TIMESTAMP, Timestamp.valueOf(val));
+                    break;
+                case serdeConstants.DECIMAL_TYPE_NAME:
+                    addOneFieldToRecord(partitionFields, NUMERIC, new HiveDecimal(val).bigDecimalValue().toString());
+                    break;
+                default:
+                    throw new UnsupportedTypeException("Unknown type: " + type);
             }
         }
     }
@@ -153,18 +162,15 @@ public class HiveResolver extends Plugin implements ReadResolver {
      * the field in the record in the query result.
      */
     public void traverseTuple(Object obj, ObjectInspector objInspector, List<OneField> record) throws IOException, BadRecordException {
-
         ObjectInspector.Category category = objInspector.getCategory();
-
         if ((obj == null) && (category != ObjectInspector.Category.PRIMITIVE)) {
             throw new BadRecordException("NULL Hive composite object");
         }
-
         List<?> list;
         switch (category) {
             case PRIMITIVE:
                 resolvePrimitive(obj, (PrimitiveObjectInspector) objInspector, record);
-                return;
+                break;
             case LIST:
                 ListObjectInspector loi = (ListObjectInspector) objInspector;
                 list = loi.getList(obj);
@@ -172,11 +178,10 @@ public class HiveResolver extends Plugin implements ReadResolver {
                 if (list == null) {
                     throw new BadRecordException("Illegal value NULL for Hive data type List");
                 }
-
-                for (int i = 0; i < list.size(); i++) {
-                    traverseTuple(list.get(i), eoi, record);
+                for (Object object : list) {
+                    traverseTuple(object, eoi, record);
                 }
-                return;
+                break;
             case MAP:
                 MapObjectInspector moi = (MapObjectInspector) objInspector;
                 ObjectInspector koi = moi.getMapKeyObjectInspector();
@@ -185,12 +190,11 @@ public class HiveResolver extends Plugin implements ReadResolver {
                 if (map == null) {
                     throw new BadRecordException("Illegal value NULL for Hive data type Map");
                 }
-
                 for (Map.Entry<?, ?> entry : map.entrySet()) {
                     traverseTuple(entry.getKey(), koi, record);
                     traverseTuple(entry.getValue(), voi, record);
                 }
-                return;
+                break;
             case STRUCT:
                 StructObjectInspector soi = (StructObjectInspector) objInspector;
                 List<? extends StructField> fields = soi.getAllStructFieldRefs();
@@ -198,58 +202,53 @@ public class HiveResolver extends Plugin implements ReadResolver {
                 if (list == null) {
                     throw new BadRecordException("Illegal value NULL for Hive data type Struct");
                 }
-
                 for (int i = 0; i < list.size(); i++) {
                     traverseTuple(list.get(i), fields.get(i).getFieldObjectInspector(), record);
                 }
-                return;
+                break;
             case UNION:
                 UnionObjectInspector uoi = (UnionObjectInspector) objInspector;
                 List<? extends ObjectInspector> ois = uoi.getObjectInspectors();
                 if (ois == null) {
                     throw new BadRecordException("Illegal value NULL for Hive data type Union");
                 }
-
                 traverseTuple(uoi.getField(obj), ois.get(uoi.getTag(obj)), record);
-                return;
-            default:
                 break;
+            default:
+                throw new UnsupportedTypeException("Unknown category type: " + objInspector.getCategory());
         }
-
-        throw new UnsupportedTypeException("Unknown category type: "
-                + objInspector.getCategory());
     }
 
     public void resolvePrimitive(Object o, PrimitiveObjectInspector oi, List<OneField> record) throws IOException {
         Object val;
         switch (oi.getPrimitiveCategory()) {
             case BOOLEAN: {
-                val = (o != null) ? ((BooleanObjectInspector) oi).get(o) : o;
+                val = (o != null) ? ((BooleanObjectInspector) oi).get(o) : null;
                 addOneFieldToRecord(record, BOOLEAN, val);
                 break;
             }
             case SHORT: {
-                val = (o != null) ? ((ShortObjectInspector) oi).get(o) : o;
+                val = (o != null) ? ((ShortObjectInspector) oi).get(o) : null;
                 addOneFieldToRecord(record, SMALLINT, val);
                 break;
             }
             case INT: {
-                val = (o != null) ? ((IntObjectInspector) oi).get(o) : o;
+                val = (o != null) ? ((IntObjectInspector) oi).get(o) : null;
                 addOneFieldToRecord(record, INTEGER, val);
                 break;
             }
             case LONG: {
-                val = (o != null) ? ((LongObjectInspector) oi).get(o) : o;
+                val = (o != null) ? ((LongObjectInspector) oi).get(o) : null;
                 addOneFieldToRecord(record, BIGINT, val);
                 break;
             }
             case FLOAT: {
-                val = (o != null) ? ((FloatObjectInspector) oi).get(o) : o;
+                val = (o != null) ? ((FloatObjectInspector) oi).get(o) : null;
                 addOneFieldToRecord(record, REAL, val);
                 break;
             }
             case DOUBLE: {
-                val = (o != null) ? ((DoubleObjectInspector) oi).get(o) : o;
+                val = (o != null) ? ((DoubleObjectInspector) oi).get(o) : null;
                 addOneFieldToRecord(record, FLOAT8, val);
                 break;
             }
@@ -263,7 +262,7 @@ public class HiveResolver extends Plugin implements ReadResolver {
                 break;
             }
             case STRING: {
-                val = (o != null) ? ((StringObjectInspector) oi).getPrimitiveJavaObject(o) : o;
+                val = (o != null) ? ((StringObjectInspector) oi).getPrimitiveJavaObject(o) : null;
                 addOneFieldToRecord(record, TEXT, val);
                 break;
             }
@@ -278,7 +277,7 @@ public class HiveResolver extends Plugin implements ReadResolver {
                 break;
             }
             case TIMESTAMP: {
-                val = (o != null) ? ((TimestampObjectInspector) oi).getPrimitiveJavaObject(o) : o;
+                val = (o != null) ? ((TimestampObjectInspector) oi).getPrimitiveJavaObject(o) : null;
                 addOneFieldToRecord(record, TIMESTAMP, val);
                 break;
             }
@@ -290,7 +289,6 @@ public class HiveResolver extends Plugin implements ReadResolver {
 
     void addOneFieldToRecord(List<OneField> record, DataType gpdbWritableType, Object val) {
         OneField oneField = new OneField();
-
         oneField.type = gpdbWritableType.getOID();
         oneField.val = val;
         record.add(oneField);

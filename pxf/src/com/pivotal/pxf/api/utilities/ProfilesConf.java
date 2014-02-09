@@ -14,7 +14,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.pivotal.pxf.api.utilities.ProfileConfException.*;
+import static com.pivotal.pxf.api.utilities.ProfileConfException.MessageFormat.*;
+import static com.pivotal.pxf.api.utilities.ProfileConfException.MessageFormat;
+
 
 /**
  * This enum holds the profiles files: pxf-profiles.xml and pxf-profiles-default.xml.
@@ -35,10 +37,9 @@ public enum ProfilesConf {
 
     private static ClassLoader getClassLoader() {
         ClassLoader cL = Thread.currentThread().getContextClassLoader();
-        if (cL == null) {
-            cL = ProfilesConf.class.getClassLoader();
-        }
-        return cL;
+        return (cL != null)
+                ? cL
+                : ProfilesConf.class.getClassLoader();
     }
 
     /**
@@ -61,8 +62,8 @@ public enum ProfilesConf {
         }
     }
 
-    private static boolean useProfilesDefaults(String msgFormat) {
-        return msgFormat.equals(PROFILES_FILE_NOT_FOUND) || msgFormat.equals(NO_PROFILE_DEF);
+    private static boolean useProfilesDefaults(MessageFormat msg) {
+        return msg == PROFILES_FILE_NOT_FOUND || msg == NO_PROFILE_DEF;
     }
 
     private XMLConfiguration getConf() {

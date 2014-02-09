@@ -1,17 +1,42 @@
 package com.pivotal.pxf.api;
 
-/*
+/**
  * Fragment holds a data fragment' information.
- * Fragmenter.getFragments() returns a list of fragments.
+ * {@link Fragmenter#getFragments} returns a list of fragments.
  */
 public class Fragment {
-    private String sourceName;    // File path+name, table name, etc.
-    private int index;        // Fragment index (incremented per sourceName)
-    private String[] replicas;    // Fragment replicas (1 or more)
-    private byte[] metadata;    // Fragment metadata information (starting point + length, region location, etc.)
+    /**
+     * File path+name, table name, etc.
+     */
+    private String sourceName;
 
-    private byte[] userData;    // ThirdParty data added to a fragment. Ignored if null
+    /**
+     * Fragment index (incremented per sourceName).
+     */
+    private int index;
 
+    /**
+     * Fragment replicas (1 or more).
+     */
+    private String[] replicas;
+
+    /**
+     * Fragment metadata information (starting point + length, region location, etc.).
+     */
+    private byte[] metadata;
+
+    /**
+     * ThirdParty data added to a fragment. Ignored if null.
+     */
+    private byte[] userData;
+
+    /**
+     * Constructs a Fragment.
+     *
+     * @param sourceName the resource uri (File path+name, table name, etc.)
+     * @param hosts the replicas
+     * @param metadata the meta data (Starting point + length, region location, etc.).
+     */
     public Fragment(String sourceName,
                     String[] hosts,
                     byte[] metadata) {
@@ -20,6 +45,14 @@ public class Fragment {
         this.metadata = metadata;
     }
 
+    /**
+     * Constructs a Fragment.
+     *
+     * @param sourceName the resource uri (File path+name, table name, etc.)
+     * @param hosts the replicas
+     * @param metadata the meta data (Starting point + length, region location, etc.).
+     * @param userData third party data added to a fragment.
+     */
     public Fragment(String sourceName,
                     String[] hosts,
                     byte[] metadata,

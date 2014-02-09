@@ -82,12 +82,12 @@ public class RecordkeyAdapter {
         return 1;
     }
 
-	/*
+    /*
      * Extracts a java primitive type value from the recordkey.
-	 * If the key is a Writable implementation we extract the value as a Java primitive.
-	 * If the key is already a Java primitive we returned it as is
-	 * If it is an unknown type we throw an exception
-	 */
+     * If the key is a Writable implementation we extract the value as a Java primitive.
+     * If the key is already a Java primitive we returned it as is
+     * If it is an unknown type we throw an exception
+     */
     private Object extractVal(Object key) throws IOException {
         if (extractor == null) {
             extractor = InitializeExtractor(key);
@@ -102,54 +102,63 @@ public class RecordkeyAdapter {
     private ValExtractor InitializeExtractor(Object key) {
         if (key instanceof IntWritable) {
             return new ValExtractor() {
+                @Override
                 public Object get(Object key) {
                     return ((IntWritable) key).get();
                 }
             };
         } else if (key instanceof ByteWritable) {
             return new ValExtractor() {
+                @Override
                 public Object get(Object key) {
                     return ((ByteWritable) key).get();
                 }
             };
         } else if (key instanceof BooleanWritable) {
             return new ValExtractor() {
+                @Override
                 public Object get(Object key) {
                     return ((BooleanWritable) key).get();
                 }
             };
         } else if (key instanceof DoubleWritable) {
             return new ValExtractor() {
+                @Override
                 public Object get(Object key) {
                     return ((DoubleWritable) key).get();
                 }
             };
         } else if (key instanceof FloatWritable) {
             return new ValExtractor() {
+                @Override
                 public Object get(Object key) {
                     return ((FloatWritable) key).get();
                 }
             };
         } else if (key instanceof LongWritable) {
             return new ValExtractor() {
+                @Override
                 public Object get(Object key) {
                     return ((LongWritable) key).get();
                 }
             };
         } else if (key instanceof Text) {
             return new ValExtractor() {
+                @Override
                 public Object get(Object key) {
                     return (key).toString();
                 }
             };
         } else if (key instanceof VIntWritable) {
             return new ValExtractor() {
+                @Override
                 public Object get(Object key) {
                     return ((VIntWritable) key).get();
                 }
             };
         } else {
             return new ValExtractor() {
+                @Override
                 public Object get(Object key) {
                     throw new UnsupportedOperationException("Unsupported recordkey data type " + key.getClass().getName());
                 }
@@ -180,48 +189,56 @@ public class RecordkeyAdapter {
 
         if (key instanceof Integer) {
             return new ValConverter() {
+                @Override
                 public Writable get(Object key) {
                     return (new IntWritable((Integer) key));
                 }
             };
         } else if (key instanceof Byte) {
             return new ValConverter() {
+                @Override
                 public Writable get(Object key) {
                     return (new ByteWritable((Byte) key));
                 }
             };
         } else if (key instanceof Boolean) {
             return new ValConverter() {
+                @Override
                 public Writable get(Object key) {
                     return (new BooleanWritable((Boolean) key));
                 }
             };
         } else if (key instanceof Double) {
             return new ValConverter() {
+                @Override
                 public Writable get(Object key) {
                     return (new DoubleWritable((Double) key));
                 }
             };
         } else if (key instanceof Float) {
             return new ValConverter() {
+                @Override
                 public Writable get(Object key) {
                     return (new FloatWritable((Float) key));
                 }
             };
         } else if (key instanceof Long) {
             return new ValConverter() {
+                @Override
                 public Writable get(Object key) {
                     return (new LongWritable((Long) key));
                 }
             };
         } else if (key instanceof String) {
             return new ValConverter() {
+                @Override
                 public Writable get(Object key) {
                     return (new Text((String) key));
                 }
             };
         } else {
             return new ValConverter() {
+                @Override
                 public Writable get(Object key) {
                     throw new UnsupportedOperationException("Unsupported recordkey data type " + key.getClass().getName());
                 }

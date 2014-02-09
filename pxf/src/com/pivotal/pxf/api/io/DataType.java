@@ -4,6 +4,10 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Supported Data Types and OIDs (HAWQ Data Type identifiers).
+ * There's a one-to-one match between a Data Type and it's corresponding OID.
+ */
 public enum DataType {
     BOOLEAN(16),
     BYTEA(17),
@@ -20,10 +24,9 @@ public enum DataType {
     TIME(1083),
     TIMESTAMP(1114),
     NUMERIC(1700),
-    UN_SUPPORTED_TYPE(-1);
+    UNSUPPORTED_TYPE(-1);
 
-
-    private static final Map<Integer, DataType> lookup = new HashMap<Integer, DataType>();
+    private static final Map<Integer, DataType> lookup = new HashMap<>();
 
     static {
         for (DataType dt : EnumSet.allOf(DataType.class)) {
@@ -37,10 +40,16 @@ public enum DataType {
         this.OID = OID;
     }
 
+    /**
+     * Utility method for converting an {@link #OID} to a {@link #DataType}.
+     *
+     * @param OID the oid to be converted
+     * @return the corresponding DataType if exists, else returns {@link #UNSUPPORTED_TYPE}
+     */
     public static DataType get(int OID) {
         DataType type = lookup.get(OID);
         return type == null
-                ? UN_SUPPORTED_TYPE
+                ? UNSUPPORTED_TYPE
                 : type;
     }
 

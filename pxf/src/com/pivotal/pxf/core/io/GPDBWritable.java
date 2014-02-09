@@ -215,7 +215,7 @@ public class GPDBWritable implements Writable {
                 throw new IOException("Unknown GPDBWritable.DBType ordinal value");
             }
         }
-		
+
 		/* Extract null bit array */
         byte[] nullbytes = new byte[getNullByteArraySize(colCnt)];
         in.readFully(nullbytes);
@@ -226,7 +226,7 @@ public class GPDBWritable implements Writable {
         colValue = new Object[colCnt];
         for (int i = 0; i < colCnt; i++) {
             if (!colIsNull[i]) {
-				/* Skip the alignment padding */
+                /* Skip the alignment padding */
                 int skipbytes = roundUpAlignment(curOffset, coldbtype[i].getAlignment()) - curOffset;
                 for (int j = 0; j < skipbytes; j++) {
                     in.readByte();
@@ -277,8 +277,8 @@ public class GPDBWritable implements Writable {
                         in.readFully((byte[]) colValue[i]);
                         break;
                     }
-					/* For text formatted column, it has a 4 byte var length header
-					 * and it's always null terminated string.
+                    /* For text formatted column, it has a 4 byte var length header
+                     * and it's always null terminated string.
 					 * So, we can remove the last "\0" when constructing the string.
 					 */
                     case TEXT: {
@@ -293,7 +293,7 @@ public class GPDBWritable implements Writable {
                 }
             }
         }
-		
+
 		/* Skip the ending alignment padding */
         int skipbytes = roundUpAlignment(curOffset, 8) - curOffset;
         for (int j = 0; j < skipbytes; j++) {
@@ -361,9 +361,9 @@ public class GPDBWritable implements Writable {
                 colLength[i] = 0;
             } else {
                 nullBits[i] = false;
-								
+
 				/* 
-				 * For fixed length type, we get the fixed length.
+                 * For fixed length type, we get the fixed length.
 				 * For var len binary format, the length is in the col value.
 				 * For text format, we must convert encoding first.
 				 */
@@ -732,20 +732,17 @@ public class GPDBWritable implements Writable {
         if (colType == null) {
             return null;
         }
-
-        String result = "";
+        StringBuilder result = new StringBuilder();
         for (int i = 0; i < colType.length; i++) {
-            result += "Column " + i + ":";
+            result.append("Column ").append(i).append(":");
             if (colValue[i] != null) {
-                if (colType[i] == BYTEA.getOID()) {
-                    result += byteArrayInString((byte[]) colValue[i]);
-                } else {
-                    result += colValue[i].toString();
-                }
+                result.append(colType[i] == BYTEA.getOID()
+                        ? byteArrayInString((byte[]) colValue[i])
+                        : colValue[i]);
             }
-            result += "\n";
+            result.append("\n");
         }
-        return result;
+        return result.toString();
     }
 
     /**
@@ -768,8 +765,7 @@ public class GPDBWritable implements Writable {
     private void checkType(DataType inTyp, int idx, boolean isSet)
             throws TypeMismatchException {
         if (idx < 0 || idx >= colType.length) {
-            throw new TypeMismatchException(
-                    "Column index is out of range");
+            throw new TypeMismatchException("Column index is out of range");
         }
 
         int exTyp = colType[idx];
@@ -852,7 +848,7 @@ public class GPDBWritable implements Writable {
         alignmentOfEightBytes = Integer.parseInt(alignment);
     }
 
-    /*
+    /**
      * Returns if the writable object is empty,
      * based on the pkt len as read from stream.
      * -1 means nothing was read (eof).

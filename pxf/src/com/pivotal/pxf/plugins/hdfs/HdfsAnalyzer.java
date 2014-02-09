@@ -42,10 +42,14 @@ public class HdfsAnalyzer extends Analyzer {
         fs = FileSystem.get(jobConf);
     }
 
-    /*
+    /**
      * path is a data source URI that can appear as a file
      * name, a directory name  or a wildcard returns the data
      * fragments in json format
+     *
+     * @param datapath
+     * @return
+     * @throws Exception
      */
     @Override
     public AnalyzerStats getEstimatedStats(String datapath) throws Exception {

@@ -11,11 +11,10 @@ import org.apache.commons.logging.LogFactory;
 import java.io.FileNotFoundException;
 import java.util.*;
 
-/*
- * Common configuration of all MetaData classes
- * Provides read-only access to common parameters supplied using system properties
+/**
+ * Common configuration of all MetaData classes.
+ * Provides read-only access to common parameters supplied using system properties.
  */
-
 public class InputData {
     public static final int INVALID_SPLIT_IDX = -1;
     private static final String TRUE_LCASE = "true";
@@ -46,24 +45,24 @@ public class InputData {
     protected String remoteLogin;
     protected String remoteSecret;
 
-    /*
+    /**
      * When false the bridge has to run in synchronized mode.
      * default value - true.
      */
     protected boolean threadSafe;
 
 
-    /*
+    /**
      * The name of the recordkey column. It can appear in any location in the columns list.
      * By specifying the recordkey column, the user declares that he is interested to receive for every record
      * retrieved also the the recordkey in the database. The recordkey is present in HBase table (it is called rowkey),
      * and in sequence files. When the HDFS storage element queried will not have a recordkey and
      * the user will still specify it in the "create external table" statement, then the values for this field will be null.
-     * This field will always be the first field in the tuple returned
+     * This field will always be the first field in the tuple returned.
      */
     protected ColumnDescriptor recordkeyColumn;
 
-    /*
+    /**
      * this schema object variable is special -  it is not filled from getProperty like all
      * the others. Instead it is used by the AvroFileAccessor to pass the avro
      * schema to the AvroResolver. In this case only the AvroFileAccessor can
@@ -73,7 +72,7 @@ public class InputData {
      */
     protected Object schema = null;
 
-    /*
+    /**
      * When a property is not found we throw an exception from getProperty method(). The exception message
      * has a generic form containing the HTTP option name. For example:
      * --  Property "X-GP-ACCESSOR" has no value in current request  --
@@ -81,14 +80,13 @@ public class InputData {
      * With propertyErrorMap we make possible to attach a specific explanatory message to a property
      * that will be used instead of the generic one.
      */
-    protected Map<String, String> propertyErrorMap = new HashMap<String, String>();
+    protected Map<String, String> propertyErrorMap = new HashMap<>();
 
-    /* 
-     * Constructor of InputData
-     * Parses X-GP-* configuration variables
+    /**
+     * Constructs an InputData.
+     * Parses X-GP-* configuration variables.
 	 *
 	 * @param paramsMap contains all query-specific parameters from Hawq
-	 * @param servletContext Servlet context contains attributes required by SecuredHDFS
      */
     public InputData(Map<String, String> paramsMap) {
         requestParametersMap = paramsMap;
@@ -118,7 +116,7 @@ public class InputData {
         dataFragment = INVALID_SPLIT_IDX;
         parseDataFragment(getOptionalProperty("X-GP-DATA-FRAGMENT"));
 
-		/*
+		/**
          * We don't want to fail if schema was not supplied. There are HDFS resources which do not require schema.
 		 * If on the other hand the schema is required we will fail when the Resolver or Accessor will request the schema
 		 * by calling function srlzSchemaName(). 
@@ -158,7 +156,7 @@ public class InputData {
     }
 
     /**
-     * Sets the requested profile plugins from profile file into requestParametersMap
+     * Sets the requested profile plugins from profile file into {@link #requestParametersMap}.
      */
     private void setProfilePlugins() {
         Map<String, String> pluginsMap = ProfilesConf.getProfilePluginsMap(profile);
@@ -174,15 +172,15 @@ public class InputData {
         }
     }
 
-    /*
-     * Expose the parameters map
-     */
     public Map<String, String> getParametersMap() {
         return requestParametersMap;
     }
 
-    /* Copy constructor of InputData
-     * Used to create from an extending class
+    /**
+     * Constructs an InputData from a copy.
+     * Used to create from an extending class.
+     *
+     * @param copy the input data to copy
      */
     public InputData(InputData copy) {
         this.requestParametersMap = copy.requestParametersMap;
@@ -212,23 +210,14 @@ public class InputData {
         this.remoteSecret = copy.remoteSecret;
     }
 
-    /*
-     * Set fragment serialized metadata
-     */
     public void setFragmentMetadata(byte[] location) {
         this.fragmentMetadata = location;
     }
 
-    /*
-     * Returns fragment serialized metadata
-     */
     public byte[] getFragmentMetadata() {
         return fragmentMetadata;
     }
 
-    /*
-     * Returns fragment user data
-     */
     public byte[] getFragmentUserData() {
         return userData;
     }
@@ -237,8 +226,11 @@ public class InputData {
         this.userData = userData;
     }
 
-    /*
-     * Returns a property as a string type
+    /**
+     * Returns the value to which the specified property is mapped in {@link #requestParametersMap}.
+     *
+     * @param property the lookup property key
+     * @throws IllegalArgumentException if property key is missing
      */
     public String getProperty(String property) {
         String result = requestParametersMap.get(property);
@@ -252,156 +244,124 @@ public class InputData {
         return result;
     }
 
-    /*
-     * Unlike getProperty(), it will not fail if the property is not found. It will just return null instead
+    /**
+     * Returns the optional property value.
+     * Unlike {@link #getProperty}, it will not fail if the property is not found. It will just return null instead.
+     *
+     * @param property the lookup optional property
+     * @return property value as a String
      */
     protected String getOptionalProperty(String property) {
         return requestParametersMap.get(property);
     }
 
-    /*
-     * It's meant for the plugin implementor, that in his aceessor, resolver,.. is looking for a propietary property
-     * that he introduced in the "create external table ..." statement. He is not aware that if he added
-     * property=value
-     * by the time it got here, it became
-     * X-GP-PROPERTY=value
-     * So in his plugin accessor the user will want to look for 'property', only that there is no such key
-     * in the inputData map. For this purpose we offer method
-     * getUserProperty()
+    /**
+     * Returns a user defined property.
      *
+     * @param userProp the lookup user property (without "X-GP" prefix)
+     * @return property value as a String
      */
     protected String getUserProperty(String userProp) {
         String prop = "X-GP-" + userProp.toUpperCase();
         return getProperty(prop);
     }
 
-    /*
-     * Returns a property as an int type
+    /**
+     * Returns a property value as an int type.
+     *
+     * @param property the lookup property
+     * @return property value as an int type
      */
     protected int getIntProperty(String property) {
         return Integer.parseInt(getProperty(property));
     }
 
-    /*
-     * Returns a property as boolean type
+    /**
+     * Returns a property value as boolean type.
+     * A boolean property is defined as an int where 0 means false, and anything else true (like C).
      *
-     * A boolean property is defined as an int where 0 means false
-     * and anything else true (like C)
+     * @param property the lookup property
+     * @return property value as boolean
      */
     protected boolean getBoolProperty(String property) {
         return getIntProperty(property) != 0;
     }
 
-    /*
-     * Returns the number of segments in GP
-     */
+    /** Returns the number of segments in GP. */
     public int totalSegments() {
         return totalSegments;
     }
 
-    /*
-     * Returns the current segment ID
-     */
+    /** Returns the current segment ID. */
     public int segmentId() {
         return segmentId;
     }
 
-    /*
-     * Returns the current outputFormat
-     * currently either text or gpdbwritable
-     */
+    /** Returns the current outputFormat, either {@link OutputFormat#TEXT} or {@link OutputFormat#BINARY}. */
     public OutputFormat outputFormat() {
         return outputFormat;
     }
 
-    /*
-     * Returns the server name providing the service
-     */
+    /** Returns the server name providing the service. */
     public String serverName() {
         return host;
     }
 
-    /*
-     * Returns the server port providing the service
-     */
+    /** Returns the server port providing the service. */
     public int serverPort() {
         return port;
     }
 
-    /*
-     * Returns true if there is a filter string to parse
-     */
+    /** Returns true if there is a filter string to parse. */
     public boolean hasFilter() {
         return filterStringValid;
     }
 
-    /*
-     * The filter string
-     */
+    /** Returns the filter string, <tt>null</tt> if #hasFilter is <tt>false</tt> */
     public String filterString() {
         return filterString;
     }
 
-    /*
-     * Returns the number of columns in Tuple Description
-     */
+    /** Returns the number of columns in tuple description. */
     public int columns() {
         return tupleDescription.size();
     }
 
-    /*
-     * Returns column index from Tuple Description
-     */
+    /** Returns column index from tuple description. */
     public ColumnDescriptor getColumn(int index) {
         return tupleDescription.get(index);
     }
 
-    /*
-     * Returns a data fragment index
-     */
+    /** Returns a data fragment index. */
     public int getDataFragment() {
         return dataFragment;
     }
 
-    /*
+    /**
      * Returns the column descriptor of the recordkey column.
-     * If the recordkey column was not specified by the user in the create table statement,
-     * then getRecordkeyColumn will return null.
+     * If the recordkey column was not specified by the user in the create table statement will return null.
      */
     public ColumnDescriptor getRecordkeyColumn() {
         return recordkeyColumn;
     }
 
-    /*
-     * Returns the path to the resource required
-     * (might be a file path or a table name)
-     */
+    /** Returns the path of the required resource (i.e a file path or a table name). */
     public String path() {
         return path;
     }
 
-    /*
-     * Sets path into given path.
-     */
     public void setPath(String path) {
         this.path = path;
     }
 
-    /*
-     * Returns the path of the schema used for various deserializers
-     * e.g, Avro file name, Java object file name.
-     */
+    /** Returns the path of the schema used for various deserializers e.g, Avro file name, Java object file name. */
     public String srlzSchemaName() throws FileNotFoundException, IllegalArgumentException {
-        /*
-         * Testing that the schema name was supplied by the user - schema is an optional properly.
-		 */
+        /** Testing that the schema name was supplied by the user - schema is an optional properly. */
         if (srlzSchemaName == null) {
             throw new IllegalArgumentException("Schema was not supplied in the CREATE EXTERNAL TABLE statement." +
                     " Please supply the schema using option schema ");
         }
-        /*
-         * Testing that the schema resource exists
-		 */
+        /** Testing that the schema resource exists. */
         if (!isSchemaResourceOnClasspath(srlzSchemaName)) {
             throw new FileNotFoundException(
                     "schema resource \"" + srlzSchemaName + "\" is not located on the classpath ");
@@ -410,39 +370,30 @@ public class InputData {
         return srlzSchemaName;
     }
 
-    /*
-     * Returns the ClassName for the java class that handles the file access
-     */
+    /** Returns the ClassName for the java class that was defined as Accessor */
     public String accessor() {
         return accessor;
     }
 
-    /*
-     * Returns the ClassName for the java class that handles the record deserialization
-     */
+    /** Returns the ClassName for the java class that was defined as Resolver */
     public String resolver() {
         return resolver;
     }
 
-    /*
-     * The avroSchema fetched by the AvroResolver and used in case of Avro File
-     * In case of avro records inside a sequence file this variable will be null
+    /**
+     * The avroSchema fetched by the AvroResolver and used in case of Avro File.
+     * In case of avro records inside a sequence file this variable will be null,
      * and the AvroResolver will not use it.
      */
     public Object getSchema() {
         return schema;
     }
 
-    /*
-     * Returns table name
-     */
+    /** Returns the data table name */
     public String tableName() {
         return tableName;
     }
 
-    /*
-     * The avroSchema is set from the outside by the AvroFileAccessor
-     */
     public void setSchema(Object schema) {
         this.schema = schema;
     }
@@ -451,9 +402,7 @@ public class InputData {
         compressCodec = getOptionalProperty("X-GP-COMPRESSION_CODEC");
     }
 
-    /*
-     * Returns the compression codec (can be null - means no compression)
-     */
+    /** Returns the compression codec name (<tt>null</tt> means no compression) */
     public String compressCodec() {
         return compressCodec;
     }
@@ -487,39 +436,38 @@ public class InputData {
         compressType = compressType.toUpperCase();
     }
 
-    /*
+    /**
      * Returns the compression type (can be null)
+     * Allowed values: RECORD, BLOCK.
      */
     public String compressType() {
         return compressType;
     }
 
-    /*
-     * The function will return the contents of pxf_remote_service_login
-     * set in Hawq. Should the user set it to an empty string this
-     * function will return null.
+    /**
+     * Returns the contents of pxf_remote_service_login set in Hawq.
+     * Should the user set it to an empty string this function will return null.
      *
-     * @returns	remote login details if set, null otherwise
+     * @return remote login details if set, null otherwise
      */
     public String getLogin() {
         return remoteLogin;
     }
 
-    /*
-     * The function will return the contents of pxf_remote_service_secret
-     * set in Hawq. Should the user set it to an empty string this
-     * function will return null.
+    /**
+     * Returns the contents of pxf_remote_service_secret set in Hawq.
+     * Should the user set it to an empty string this function will return null.
      *
-     * @returns	remote password if set, null otherwise
+     * @return remote password if set, null otherwise
      */
     public String getSecret() {
         return remoteSecret;
     }
 
-    /*
-    * Sets the thread safe parameter.
-    * Default value - true.
-    */
+    /**
+     * Sets the thread safe parameter.
+     * Default value - true.
+     */
     private void parseThreadSafe() {
 
         threadSafe = true;
@@ -545,21 +493,27 @@ public class InputData {
         return threadSafe;
     }
 
-    /*
-     * Sets the format type based on input string
+    /**
+     * Sets the format type based on the input string.
+     * Allowed values are: {@link OutputFormat#TEXT}, {@link OutputFormat#BINARY}.
      */
     protected void parseFormat(String formatString) {
-        if (formatString.equals("TEXT")) {
-            outputFormat = OutputFormat.TEXT;
-        } else if (formatString.equals("GPDBWritable")) {
-            outputFormat = OutputFormat.BINARY;
-        } else {
-            throw new IllegalArgumentException("Wrong value for greenplum.format " + formatString);
+        switch (formatString) {
+            case "TEXT":
+                outputFormat = OutputFormat.TEXT;
+                break;
+            case "GPDBWritable":
+                outputFormat = OutputFormat.BINARY;
+                break;
+            default:
+                throw new IllegalArgumentException("Wrong value for greenplum.format " + formatString);
         }
     }
 
-    /*
-     * Fills the index of allocated data fragments
+    /**
+     * Sets the index of the allocated data fragment
+     *
+     * @param fragment the allocated data fragment
      */
     protected void parseDataFragment(String fragment) {
 
@@ -572,7 +526,7 @@ public class InputData {
         }
 
 		/* 
-		 * 2. Convert to int 
+         * 2. Convert to int
 		 * */
         dataFragment = Integer.parseInt(fragment);
     }

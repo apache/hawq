@@ -2,12 +2,18 @@ package com.pivotal.pxf.api;
 
 import java.util.List;
 
-/*
+/**
  * Interface that defines the serialization of data read from the DB
  * into a OneRow object.
- * Every implementation of a serialization method 
- * (e.g, Writable, Avro, ...) must implement this interface.
+ * This interface is implemented by all serialization methods (e.g, Writable, Avro, ...).
  */
 public interface WriteResolver {
+    /**
+     * Constructs and sets the fields of a {@link OneRow}.
+     *
+     * @param record list of {@link OneField}
+     * @return the constructed {@link OneRow}
+     * @throws Exception
+     */
     OneRow setFields(List<OneField> record) throws Exception;
 }

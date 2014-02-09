@@ -14,7 +14,7 @@ import javax.servlet.ServletContext;
 import java.util.HashMap;
 import java.util.Map;
 
-import static com.pivotal.pxf.api.utilities.ProfileConfException.NO_PROFILE_DEF;
+import static com.pivotal.pxf.api.utilities.ProfileConfException.MessageFormat.NO_PROFILE_DEF;
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;

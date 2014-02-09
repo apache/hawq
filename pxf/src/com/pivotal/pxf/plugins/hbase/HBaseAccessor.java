@@ -21,17 +21,17 @@ import java.io.ObjectInputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-/*
+/**
  * The Bridge API accessor for HBase.
  * This class is responsible for opening the HBase table requested and
  * for iterating over its relevant fragments(regions) to return the relevant table's rows.
  *
  * The table is divided into several splits. Each HAWQ segment is responsible for
- * several splits according to the split function selectTableSplits().
+ * several splits according to the split function {@link #selectTableSplits}.
  * For each region, a Scan object is used to describe the requested rows.
  *
- * The class now supports filters using the HBaseFilterBuilder.
- * Regions can be filtered out according to input from HBaseFilterBuilder.
+ * The class now supports filters using the {@link HBaseFilterBuilder}.
+ * Regions can be filtered out according to input from {@link HBaseFilterBuilder}.
  */
 public class HBaseAccessor extends Plugin implements ReadAccessor {
     private HBaseTupleDescription tupleDescription;
@@ -75,6 +75,7 @@ public class HBaseAccessor extends Plugin implements ReadAccessor {
         scanEndKey = HConstants.EMPTY_END_ROW;
     }
 
+    @Override
     public boolean openForRead() throws Exception {
         openTable();
         createScanner();
@@ -86,10 +87,12 @@ public class HBaseAccessor extends Plugin implements ReadAccessor {
     /*
      * Close the table
      */
+    @Override
     public void closeForRead() throws Exception {
         table.close();
     }
 
+    @Override
     public OneRow readNextObject() throws IOException {
         Result result;
 

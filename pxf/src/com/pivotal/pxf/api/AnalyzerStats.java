@@ -4,9 +4,8 @@ import org.codehaus.jackson.map.ObjectMapper;
 
 import java.io.IOException;
 
-/*
- * AnalyzerStats is a public class that represents the size
- * information of given path.
+/**
+ * AnalyzerStats holds size statistics for a given path.
  */
 public class AnalyzerStats {
 
@@ -18,6 +17,13 @@ public class AnalyzerStats {
     private long numberOfBlocks;    // number of blocks
     private long numberOfTuples; // number of tuples
 
+    /**
+     * Constructs an AnalyzerStats.
+     *
+     * @param blockSize block size (in bytes)
+     * @param numberOfBlocks number of blocks
+     * @param numberOfTuples number of tuples
+     */
     public AnalyzerStats(long blockSize,
                          long numberOfBlocks,
                          long numberOfTuples) {
@@ -26,18 +32,19 @@ public class AnalyzerStats {
         this.setNumberOfTuples(numberOfTuples);
     }
 
-    /*
-     * Default values
-     */
+    /** Constructs an AnalyzerStats with the default values */
     public AnalyzerStats() {
         this(DEFAULT_BLOCK_SIZE, DEFAULT_NUMBER_OF_BLOCKS, DEFAULT_NUMBER_OF_TUPLES);
     }
 
-    /*
-     * Given a AnalyzerStats, serialize it in JSON to be used as
+    /**
+     * Given an AnalyzerStats, serialize it in JSON to be used as
      * the result string for HAWQ. An example result is as follows:
-     *
      * {"PXFDataSourceStats":{"blockSize":67108864,"numberOfBlocks":1,"numberOfTuples":5}}
+     *
+     * @param stats the data to be serialized
+     * @return the result in json format
+     * @throws IOException
      */
     public static String dataToJSON(AnalyzerStats stats) throws IOException {
         ObjectMapper mapper = new ObjectMapper();
@@ -45,10 +52,13 @@ public class AnalyzerStats {
         return "{\"PXFDataSourceStats\":" + mapper.writeValueAsString(stats) + "}";
     }
 
-    /*
+    /**
      * Given a stats structure, convert it to be readable. Intended
-     * for debugging purposes only. 'datapath' is the data path part of
-     * the original URI (e.g., table name, *.csv, etc).
+     * for debugging purposes only.
+     *
+     * @param stats the data to be stringify
+     * @param datapath the data path part of the original URI (e.g., table name, *.csv, etc.)
+     * @return the stringify data
      */
     public static String dataToString(AnalyzerStats stats, String datapath) {
         return "Statistics information for \"" + datapath + "\" " +

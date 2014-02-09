@@ -5,8 +5,6 @@ import com.pivotal.pxf.api.ReadAccessor;
 import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.api.utilities.Plugin;
 import com.pivotal.pxf.plugins.hdfs.utilities.HdfsUtilities;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.*;
 

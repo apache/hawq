@@ -97,10 +97,10 @@ public class HdfsUtilities {
             return false;
         }
         String writeCodec = inputData.compressCodec();
-        Class<? extends CompressionCodec> codecClass =  (writeCodec != null)
+        Class<? extends CompressionCodec> codecClass = (writeCodec != null)
                 ? HdfsUtilities.getCodecClass(conf, writeCodec)
                 : HdfsUtilities.getCodecClassByPath(dataDir);
-		/* bzip2 codec is not thread safe */
+        /* bzip2 codec is not thread safe */
         return (codecClass == null || !BZip2Codec.class.isAssignableFrom(codecClass));
     }
 

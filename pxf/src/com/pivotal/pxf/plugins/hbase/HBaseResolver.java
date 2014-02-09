@@ -31,6 +31,7 @@ public class HBaseResolver extends Plugin implements ReadResolver {
         tupleDescription = new HBaseTupleDescription(input);
     }
 
+    @Override
     public List<OneField> getFields(OneRow onerow) throws Exception {
         Result result = (Result) onerow.getData();
         LinkedList<OneField> fields = new LinkedList<OneField>();

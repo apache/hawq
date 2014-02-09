@@ -89,7 +89,7 @@
         <delete dir="${pkg.buildroot}"/>
     </target>
 
-    <target name="javadoc">
+    <target name="javadoc" unless="skipJavadoc">
         <delete dir="docs/api"/>
         <mkdir dir="docs/api"/>
         <javadoc packagenames="com.pivotal.pxf.api.*"
@@ -135,7 +135,7 @@
     </target>
 
     <!-- Create JAR -->
-    <target name="jar" depends="run-tests" description="create the main jar files">
+    <target name="jar" depends="run-tests,javadoc" description="create the main jar files">
         <jar destfile="${build.dir}/${comp.core}.jar">
             <manifest>
                 <attribute name="Built-By" value="${user.name}"/>

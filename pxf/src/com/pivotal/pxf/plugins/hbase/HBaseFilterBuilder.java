@@ -14,8 +14,8 @@ import java.util.Map;
 
 import static com.pivotal.pxf.api.io.DataType.TEXT;
 
-/*
- * This is the implementation of IFilterBuilder for HBase.
+/**
+ * This is the implementation of FilterBuilder for HBase.
  *
  * The class uses the filter parser code to build a filter object,
  * either simple (single Filter class) or a compound (FilterList)
@@ -45,7 +45,7 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
         this.tupleDescription = tupleDescription;
     }
 
-    /*
+    /**
      * Translates a filterString into a HBase Filter object
      */
     public Filter getFilterObject(String filterString) throws Exception {
@@ -59,7 +59,7 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
         return (Filter) result;
     }
 
-    /*
+    /**
      * Returns the startKey defined by the user
      * if the user specified a > / >= operation
      * on a textual row key column
@@ -69,7 +69,7 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
         return startKey;
     }
 
-    /*
+    /**
      * Returns the endKey defined by the user
      * if the user specified a < / <= operation
      * on a textual row key column
@@ -79,11 +79,12 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
         return endKey;
     }
 
-    /*
-     * Implemented for IFilterBuilder interface
+    /**
+     * Implemented for FilterBuilder interface
      *
      * Called each time the parser comes across an operator.
      */
+    @Override
     public Object build(FilterParser.Operation opId,
                         Object leftOperand,
                         Object rightOperand) throws Exception {
