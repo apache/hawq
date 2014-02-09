@@ -6,3 +6,5 @@ build
 /.testdir.tmp
 /bin
 .ant_targets
+/jsystem*.log.*
+/junitvmwatcher*.properties

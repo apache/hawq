@@ -147,39 +147,30 @@
 
 	<target name="run-tests" depends="compile" description="Run regression-tests">
 		<echo message="Run Regression Batch: com/pxf/tests/basic/${testClass}.class" />
-		<taskdef resource="net/sf/antcontrib/antcontrib.properties" />
 		<mkdir dir="${testreports.dir}" />
-		<junit printsummary="yes" fork="yes" haltonfailure="yes" showoutput="yes">
-
+		<junit printsummary="no" fork="yes" haltonfailure="yes" showoutput="no" outputtoformatters="yes">
 			<classpath>
-
 				<pathelement location="${build.dir}/regression/classes" />
 				<pathelement location="${src.dir}" />
 				<pathelement location="${src.dir}/resources" />
 
-				<fileset dir="${lib.dir}">
-					<include name="**/*.jar" />
-				</fileset>
-				<fileset dir="${basedir}/lib">
-					<include name="**/*.jar" />
-				</fileset>
+				<fileset dir="${lib.dir}" includes="**/*.jar" />
+				<fileset dir="${basedir}/lib" includes="**/*.jar" />
 				<fileset dir="${env.GPHD_ROOT}/pxf" includes="**/*.jar" />
 				<fileset dir="${env.GPHD_ROOT}/hbase/lib" includes="**/*.jar" />
 				<fileset dir="${env.GPHD_ROOT}/hive/lib" includes="**/*.jar" />
-				<fileset dir="${env.GPHD_ROOT}/hadoop/share/hadoop/yarn" includes="**/*.jar" />			
-				<fileset dir="${env.GPHD_ROOT}/hadoop/share/hadoop/mapreduce" includes="**/*.jar" />		
+				<fileset dir="${env.GPHD_ROOT}/hadoop/share/hadoop/yarn" includes="**/*.jar" />
+				<fileset dir="${env.GPHD_ROOT}/hadoop/share/hadoop/mapreduce" includes="**/*.jar" />
 			</classpath>
 
-			<formatter type="plain" usefile="false" />
+			<formatter classname="com.pivotal.pxfauto.infra.utils.junit.OneLinerFormatter" usefile="false" />
 			<formatter type="xml" />
 
 			<batchtest todir="${testreports.dir}">
 				<fileset dir="${build.dir}/regression/classes">
 					<include name="com/pxf/tests/basic/${testClass}.class" />
-
 				</fileset>
 			</batchtest>
-
 		</junit>
 	</target>
 </project>
