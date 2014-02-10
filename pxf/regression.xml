@@ -74,7 +74,6 @@
 
 		<path refid="ivy-classpath" />
 
-		<fileset dir="${basedir}/lib" includes="**/*.jar" />
 		<fileset dir="${env.GPHD_ROOT}/pxf" includes="**/*.jar" />
 		<fileset dir="${env.GPHD_ROOT}/hbase/lib" includes="**/*.jar" />
 		<fileset dir="${env.GPHD_ROOT}/hive/lib" includes="**/*.jar" />
@@ -155,7 +154,6 @@
 				<pathelement location="${src.dir}/resources" />
 
 				<fileset dir="${lib.dir}" includes="**/*.jar" />
-				<fileset dir="${basedir}/lib" includes="**/*.jar" />
 				<fileset dir="${env.GPHD_ROOT}/pxf" includes="**/*.jar" />
 				<fileset dir="${env.GPHD_ROOT}/hbase/lib" includes="**/*.jar" />
 				<fileset dir="${env.GPHD_ROOT}/hive/lib" includes="**/*.jar" />

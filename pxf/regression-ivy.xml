@@ -70,5 +70,18 @@
 		<dependency org="org.springframework" name="spring" rev="2.5.6" conf="compile->master"/>
 		<dependency org="xerces" name="xercesImpl" rev="2.11.0" conf="compile->master"/>
 		<dependency org="xml-apis" name="xml-apis" rev="1.4.01" conf="compile->master"/>
+		
+		<!-- regression dependencies -->
+		
+		<dependency org="com.pivotal" name="jsystem-infra" rev="1.0.0" conf="compile->master"/>
+		<dependency org="jsystemtest" name="jsystemCore" rev="6.0.01" conf="*"/>
+		<dependency org="jsystemtest" name="jsystem-launcher" rev="6.0.01" conf="*"/>
+		<dependency org="jsystemtest" name="jsystemAgent" rev="6.0.01" conf="*"/>
+		<dependency org="jsystemtest" name="jsystemAnt" rev="6.0.01" conf="*"/>
+		<dependency org="jsystemtest" name="jsystemApp" rev="6.0.01" conf="*"/>
+		<dependency org="jsystemtest" name="jsystemCommon" rev="6.0.01" conf="*"/>
+		<dependency org="jsystemtest.systemobjects" name="cli" rev="6.0.01" conf="*"/>
+		<dependency org="postgresql" name="postgresql" rev="8.4-701.jdbc4" conf="compile->master"/>
+		
 	</dependencies>
 </ivy-module>
