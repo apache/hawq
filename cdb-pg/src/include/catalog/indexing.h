@@ -398,14 +398,16 @@ DECLARE_UNIQUE_INDEX(pg_compression_oid_index, 3058, on pg_compression using btr
 /* relation id: 3056 - pg_compression 20110901 */
 DECLARE_UNIQUE_INDEX(pg_compression_compname_index, 3059, on pg_compression using btree(compname name_ops));
 #define CompressionCompnameIndexId	3059
-
 /* relation id: 6112 - pg_filesystem 20130123 */
 DECLARE_UNIQUE_INDEX(pg_filesystem_oid_index, 7183, on pg_filesystem using btree(oid oid_ops));
 #define FileSystemOidIndexId	7183
-
 /* relation id: 6112 - pg_filesystem 20130123 */
 DECLARE_UNIQUE_INDEX(pg_filesystem_fsysname_index, 7184, on pg_filesystem using btree(fsysname name_ops));
 #define FileSystemFsysnameIndexId	7184
+
+/* relation id: 7076 - pg_remote_credentials 20140205 */
+DECLARE_UNIQUE_INDEX(pg_remote_credentials_owner_service_index, 7081, on pg_remote_credentials using btree(rcowner oid_ops, rcservice text_ops));
+#define RemoteCredentialsOwnerServiceIndexId	7081
 
 /* TIDYCAT_END_CODEGEN */
 

@@ -1142,6 +1142,12 @@ SET pxf_enable_stat_collection = true; --reset to default
 DROP EXTERNAL TABLE avfav_analyze_good;
 DROP EXTERNAL TABLE avfav_analyze_bad_port;
 DROP EXTERNAL TABLE avfav_analyze_bad_class;
+-- verify pg_remote_credentials exist with the expected structure
+SELECT * FROM pg_remote_credentials;
+ rcowner | rcservice | rcremoteuser | rcremotepassword 
+---------+-----------+--------------+------------------
+(0 rows)
+
 --
 -- Cleanup: delete all data that was copied into hdfs
 --

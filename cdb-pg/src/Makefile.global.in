@@ -34,6 +34,9 @@ MAJORVERSION = @PG_MAJORVERSION@
 # GPDB version number
 GP_MAJORVERSION = @GP_MAJORVERSION@
 
+# HAWQ version number
+HQ_MAJORVERSION = @HQ_MAJORVERSION@
+
 # Support for VPATH builds
 vpath_build = @vpath_build@
 abs_top_srcdir = @abs_top_srcdir@
@@ -371,7 +374,7 @@ DEF_PGPORT = @default_port@
 WANTED_LANGUAGES = @WANTED_LANGUAGES@
 
 # catdump json
-catdump_json = $(abs_top_srcdir)/../gpMgmt/bin/gppylib/data/$(GP_MAJORVERSION).json
+catdump_json = $(abs_top_srcdir)/../gpMgmt/bin/gppylib/data/$(HQ_MAJORVERSION).json
 
 
 ##########################################################################

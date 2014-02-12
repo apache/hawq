@@ -148,15 +148,19 @@ BootstrapToastTable(char *relName, Oid toastOid, Oid toastIndexOid)
 		case PgTypeEncodingToastTable:
 			typid = PG_TYPE_ENCODING_TOAST_RELTYPE_OID;
 			break;
-
 /* relation id: 9903 - pg_partition_encoding 20110814 */
 		case PgPartitionEncodingToastTable:
 			typid = PG_PARTITION_ENCODING_TOAST_RELTYPE_OID;
 			break;
-
 /* relation id: 5080 - pg_filesystem 20120903 */
 		case PgFileSystemToastTable:
 			typid = PG_FILESYSTEM_TOAST_RELTYPE_OID;
+			break;
+
+
+/* relation id: 7076 - pg_remote_credentials 20140205 */
+		case PgRemoteCredentialsToastTable:
+			typid = PG_REMOTE_CREDENTIALS_TOAST_RELTYPE_OID;
 			break;
 
 /* TIDYCAT_END_CODEGEN */

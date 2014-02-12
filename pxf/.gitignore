@@ -8,3 +8,4 @@ build
 .ant_targets
 /jsystem*.log.*
 /junitvmwatcher*.properties
+docs

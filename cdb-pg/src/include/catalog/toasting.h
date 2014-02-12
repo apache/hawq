@@ -92,11 +92,15 @@ DECLARE_TOAST(pg_type_encoding, 3222, 3223);
 DECLARE_TOAST(pg_partition_encoding, 9905, 9906);
 #define PgPartitionEncodingToastTable	9905
 #define PgPartitionEncodingToastIndex	9906
-
 /* relation id: 6112 - pg_filesystem 20130123 */
 DECLARE_TOAST(pg_filesystem, 6114, 6115);
 #define PgFileSystemToastTable	6114
 #define PgFileSystemToastIndex	6115
+
+/* relation id: 7076 - pg_remote_credentials 20140205 */
+DECLARE_TOAST(pg_remote_credentials, 7078, 7079);
+#define PgRemoteCredentialsToastTable	7078
+#define PgRemoteCredentialsToastIndex	7079
 
 /* TIDYCAT_END_CODEGEN */
 

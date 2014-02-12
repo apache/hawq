@@ -710,3 +710,14 @@ CREATE OR REPLACE FUNCTION svec_return_array(svec) RETURNS double precision[]
     AS '$libdir/gp_svec.so', 'svec_return_array'
     LANGUAGE c IMMUTABLE;
 
+CREATE TABLE @gpupgradeschemaname@.pg_remote_credentials
+(
+	rcowner				oid not null,
+	rcservice			text,
+	rcremoteuser		text,
+	rcremotepassword	text
+)
+WITH (relid=7076, reltype_oid=7077, toast_oid=7078, toast_index=7079, toast_reltype=7080, 
+	  camelcase=RemoteCredentials, oid=false, shared=false);
+
+CREATE UNIQUE INDEX pg_remote_credentials_owner_service_index ON @gpupgradeschemaname@.pg_remote_credentials(rcowner, rcservice) WITH (indexid=7081, CamelCase=RemoteCredentialsOwnerService);

@@ -787,14 +787,20 @@ DATA(insert OID = 2915 ( pg_auth_time_constraint        PGNSP PGUID -1 f c t \05
 /* relation id: 3056 - pg_compression 20110830 */
 DATA(insert OID = 3057 ( pg_compression	    PGNSP PGUID -1 f c t \054 3056 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_ ));	
 #define PG_COMPRESSION_RELTYPE_OID 3057
-
 /* relation id: 6112 - pg_filesystem 20130123 */
 DATA(insert OID = 6113 ( pg_filesystem	    PGNSP PGUID -1 f c t \054 6112 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_ ));	
 #define PG_FILESYSTEM_RELTYPE_OID 6113
-
 /* relation id: 6112 - pg_filesystem 20130123 */
 DATA(insert OID = 6116 (pg_toast_6112 TOASTNSP PGUID -1 f c t \054 6114 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_));
 #define PG_FILESYSTEM_TOAST_RELTYPE_OID 6116
+
+/* relation id: 7076 - pg_remote_credentials 20140205 */
+DATA(insert OID = 7077 ( pg_remote_credentials	    PGNSP PGUID -1 f c t \054 7076 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_ ));	
+#define PG_REMOTE_CREDENTIALS_RELTYPE_OID 7077
+
+/* relation id: 7076 - pg_remote_credentials 20140205 */
+DATA(insert OID = 7080 (pg_toast_7076 TOASTNSP PGUID -1 f c t \054 7078 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_));
+#define PG_REMOTE_CREDENTIALS_TOAST_RELTYPE_OID 7080
 
 /* TIDYCAT_END_CODEGEN */
 

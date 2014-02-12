@@ -365,10 +365,15 @@ Boot_CreateStmt:
 								typid = PG_COMPRESSION_RELTYPE_OID;
 								break;
 
-
 /* relation id: 6112 - pg_filesystem 20130123 */
 							case FileSystemRelationId:
 								typid = PG_FILESYSTEM_RELTYPE_OID;
+								break;
+
+
+/* relation id: 7076 - pg_remote_credentials 20140205 */
+							case RemoteCredentialsRelationId:
+								typid = PG_REMOTE_CREDENTIALS_RELTYPE_OID;
 								break;
 
 /* TIDYCAT_END_CODEGEN */
