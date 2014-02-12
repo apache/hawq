@@ -1518,13 +1518,22 @@ explain_outNode(StringInfo str,
 							"inner", innerPlan(plan),
 							str, indent, es);
 			break;
-		case T_HashJoin:
-			show_upper_qual(((HashJoin *) plan)->hashclauses,
+		case T_HashJoin: {
+			HashJoin *hash_join = (HashJoin *) plan;
+			/*
+			 * In the case of an "IS NOT DISTINCT" condition, we display
+			 * hashqualclauses instead of hashclauses.
+			 */
+			List *cond_to_show = hash_join->hashclauses;
+			if (list_length(hash_join->hashqualclauses) > 0) {
+				cond_to_show = hash_join->hashqualclauses;
+			}
+			show_upper_qual(cond_to_show,
 							"Hash Cond",
 							"outer", outerPlan(plan),
 							"inner", innerPlan(plan),
 							str, indent, es);
-			show_upper_qual(((HashJoin *) plan)->join.joinqual,
+			show_upper_qual(hash_join->join.joinqual,
 							"Join Filter",
 							"outer", outerPlan(plan),
 							"inner", innerPlan(plan),
@@ -1535,6 +1544,7 @@ explain_outNode(StringInfo str,
 							"inner", innerPlan(plan),
 							str, indent, es);
 			break;
+		}
 		case T_Agg:
 			show_upper_qual(plan->qual,
 							"Filter",

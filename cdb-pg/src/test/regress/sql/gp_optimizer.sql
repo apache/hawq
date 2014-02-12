@@ -178,6 +178,14 @@ select 1 from orca.m, orca.m1 where m.a = m1.a and m.b!=m1.b;
 select * from orca.r left outer join orca.s on (r.a=s.c and r.b<s.d) where s.d is null;
 -- select * from orca.r m full outer join orca.r m1 on (m.a=m1.a) where m.a is null;
 
+-- explain Hash Join with 'IS NOT DISTINCT FROM' join condition
+-- force_explain
+explain  select * from orca.r, orca.s where r.a is not distinct from s.c;
+
+-- explain Hash Join with equality join condition
+-- force_explain
+explain select * from orca.r, orca.s where r.a = s.c;
+
 -- sort
 select * from orca.r join orca.s on(r.a=s.c) order by r.a, s.d;
 select * from orca.r join orca.s on(r.a=s.c) order by r.a, s.d limit 10;
