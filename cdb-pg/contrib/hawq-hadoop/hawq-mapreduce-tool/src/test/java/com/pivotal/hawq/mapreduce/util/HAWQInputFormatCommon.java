@@ -71,6 +71,22 @@ public class HAWQInputFormatCommon extends Configured {
 		}
 	}
 
+	public static class HAWQMapper_Boolean extends
+			Mapper<Void, HAWQRecord, Text, Text> {
+		public void map(Void key, HAWQRecord value, Context context)
+				throws IOException, InterruptedException {
+			try {
+				int columnCount = value.getSchema().getFieldCount();
+				for (int j = 1; j <= columnCount; j++) {
+					boolean record = value.getBoolean(j);
+				}
+			} catch (HAWQException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+	}
+
 	public static class HAWQReducer extends Reducer<Text, Text, Text, Text> {
 		public void reduce(Text key, Iterable<Text> values, Context context)
 				throws IOException, InterruptedException {
@@ -160,6 +176,7 @@ public class HAWQInputFormatCommon extends Configured {
                 process.waitFor();   
                 
                 //Delete the file in hdfs for next run
+                fileSystem = FileSystem.get(conf);
                 fileSystem.delete(new Path(tempHdfsPath));                
                 fileSystem.close();
 
@@ -169,6 +186,7 @@ public class HAWQInputFormatCommon extends Configured {
 
         public void extractMetadata(String dbname, String port, String tablename, String output_path)  throws Exception {
                String cmd = String.format("gpextract -p %s -d %s -o %s %s", port, dbname, output_path, tablename);
+               System.out.println(cmd);
                Process process = Runtime.getRuntime().exec(cmd);
                process.waitFor();
                System.out.println("statement execute success :gpextract completed !");
@@ -221,6 +239,77 @@ public class HAWQInputFormatCommon extends Configured {
 		System.out.println("Time elapsed:" + (endTime - beginTime));
 		return res;
               }
+
+	/**
+	 * The common method for map/reduce program. Invoke this method to submit the
+	 * map/reduce job.
+	 * 
+	 * @throws IOException
+	 *             When there is communication problems with the job tracker.
+	 */
+	public int runMapReduce_typeCheck(String job_name, String db_url, String table_name, String output_path, String type) throws Exception {
+                
+                Configuration conf = new Configuration();
+		conf.addResource(new Path(HADOOP_HOME + "/etc/hadoop/hdfs-site.xml"));
+                conf.addResource(new Path(HADOOP_HOME + "/etc/hadoop/core-site.xml"));
+		conf.reloadConfiguration();
+		Job job = new Job(conf, job_name);
+
+                job.setJarByClass(HAWQInputFormatCommon.class);
+
+ 		//For performance test, set the specific Mapper.                
+                if(type.equals("boolean"))
+			job.setMapperClass(HAWQMapper_Boolean.class);
+                else job.setMapperClass(HAWQMapper.class);
+
+		job.setReducerClass(HAWQReducer.class);
+
+		job.setMapOutputKeyClass(Text.class);
+		job.setMapOutputValueClass(Text.class);
+		job.setOutputKeyClass(Text.class);
+		job.setOutputValueClass(Text.class);
+
+		job.setInputFormatClass(HAWQInputFormat.class);
+
+		String user_name = null;
+		String password = null;
+
+		HAWQInputFormat.setInput(job.getConfiguration(), db_url, user_name,
+				password, table_name);
+               
+                String tempHdfsPath = new String("/temp/result");
+                
+                //remove the file in hdfs if it exists.
+                FileSystem fileSystem = FileSystem.get(conf);
+                if(fileSystem.exists(new Path(tempHdfsPath)))
+                    fileSystem.delete(new Path(tempHdfsPath));                
+
+		FileOutputFormat.setOutputPath(job, new Path(tempHdfsPath));
+
+		job.setNumReduceTasks(0);
+		long beginTime = System.currentTimeMillis();
+		int res = job.waitForCompletion(true) ? 0 : 1;
+		long endTime = System.currentTimeMillis();
+                
+                //Dump the file to a local file
+                Process process = Runtime.getRuntime().exec("hadoop fs -cat " + tempHdfsPath + "/*");
+                BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                OutputStreamWriter out = new OutputStreamWriter(new FileOutputStream(output_path),"UTF-8");
+                String s;
+           	while( (s = br.readLine())!=null)
+                    out.write(s+"\n");
+                out.flush();
+                out.close();
+                process.waitFor();   
+                
+                //Delete the file in hdfs for next run
+                fileSystem = FileSystem.get(conf);
+                fileSystem.delete(new Path(tempHdfsPath));                
+                fileSystem.close();
+
+		System.out.println("Time elapsed:" + (endTime - beginTime));
+		return res;
+	}
 
    	public String getHadoopHome()
     	{
