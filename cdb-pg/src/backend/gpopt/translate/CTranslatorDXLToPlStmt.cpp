@@ -1462,10 +1462,7 @@ CTranslatorDXLToPlStmt::TranslateIndexConditions
 			SContextIndexVarAttno ctxtidxvarattno(pmdrel, pmdindex);
 			FSetIndexVarAttno((Node *) pexprIndexCond, &ctxtidxvarattno);
 		}
-
-		// get the index strategy
-		StrategyNumber sn = CTranslatorUtils::Strategynumber(m_pmp, m_pmda, pexprIndexCond);
-
+		
 		// find index key's attno
 		List *plistArgs = ((OpExpr *) pexprIndexCond)->args;
 		Node *pnodeFst = (Node *) lfirst(gpdb::PlcListHead(plistArgs));
@@ -1484,9 +1481,20 @@ CTranslatorDXLToPlStmt::TranslateIndexConditions
 			GPOS_ASSERT(((Var *) pnodeSnd)->varno != OUTER && "unexpected outer reference in index qual");
 			iAttno = ((Var *) pnodeSnd)->varattno;
 		}
+		
+		// retrieve index strategy and subtype
+		INT iSN = 0;
+		OID oidIndexSubtype = InvalidOid;
+		BOOL fRecheck = false;
+		
+		OID oidCmpOperator = CTranslatorUtils::OidCmpOperator(pexprIndexCond);
+		OID oidOpclass = CTranslatorUtils::OidIndexQualOpclass(iAttno, CMDIdGPDB::PmdidConvert(pmdindex->Pmdid())->OidObjectId());
+		gpdb::IndexOpProperties(oidCmpOperator, oidOpclass, &iSN, &oidIndexSubtype, &fRecheck);
 
+		GPOS_ASSERT(!fRecheck);
+		
 		// create index qual
-		pdrgpindexqualinfo->Append(New(m_pmp) CIndexQualInfo(iAttno, (OpExpr *)pexprIndexCond, (OpExpr *)pexprOrigIndexCond, sn));
+		pdrgpindexqualinfo->Append(New(m_pmp) CIndexQualInfo(iAttno, (OpExpr *)pexprIndexCond, (OpExpr *)pexprOrigIndexCond, (StrategyNumber) iSN, oidIndexSubtype));
 	}
 
 	// the index quals much be ordered by attribute number
@@ -1499,7 +1507,7 @@ CTranslatorDXLToPlStmt::TranslateIndexConditions
 		*pplIndexConditions = gpdb::PlAppendElement(*pplIndexConditions, pindexqualinfo->m_popExpr);
 		*pplIndexOrigConditions = gpdb::PlAppendElement(*pplIndexOrigConditions, pindexqualinfo->m_popOriginalExpr);
 		*pplIndexStratgey = gpdb::PlAppendInt(*pplIndexStratgey, pindexqualinfo->m_sn);
-		*pplIndexSubtype = gpdb::PlAppendOid(*pplIndexSubtype, InvalidOid);
+		*pplIndexSubtype = gpdb::PlAppendOid(*pplIndexSubtype, pindexqualinfo->m_oidIndexSubtype);
 	}
 
 	// clean up

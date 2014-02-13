@@ -637,5 +637,14 @@ LEFT JOIN pg_tablespace sp3 ON cl2.reltablespace = sp3.oid, pg_partition pp, pg_
 WHERE pp.paristemplate = false AND pp.parrelid = cl.oid AND pr1.paroid = pp.oid AND cl2.oid = pr1.parchildrelid
 AND cl.relnamespace = n.oid AND cl2.relnamespace = n2.oid and cl.relname ='test_part';
 
+-- MPP-22453: wrong result in indexscan when the indexqual compares different data types
+create table mpp22453(a int, d date);
+insert into mpp22453 values (1, '2012-01-01'), (2, '2012-01-02'), (3, '2012-12-31');
+create index mpp22453_idx on mpp22453(d);
+select disable_xform('CXformGet2TableScan');
+select * from mpp22453 where d > date '2012-01-31' + interval '1 day' ;
+select * from mpp22453 where d > '2012-02-01';
+select enable_xform('CXformGet2TableScan');
+
 -- clean up
 drop schema orca cascade;

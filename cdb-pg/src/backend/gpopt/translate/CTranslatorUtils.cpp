@@ -24,6 +24,7 @@
 #include "access/sysattr.h"
 #include "catalog/pg_type.h"
 #include "optimizer/walkers.h"
+#include "utils/rel.h"
 
 #define GPDB_NEXTVAL 1574
 #define GPDB_CURRVAL 1575
@@ -1118,77 +1119,65 @@ CTranslatorUtils::Scandirection
 
 //---------------------------------------------------------------------------
 //	@function:
-//		CTranslatorUtils::Strategynumber
+//		CTranslatorUtils::OidCmpOperator
 //
 //	@doc:
-//		Return the index strategy number for a given expression
+//		Extract comparison operator from an OpExpr, ScalarArrayOpExpr or RowCompareExpr
 //
 //---------------------------------------------------------------------------
-StrategyNumber
-CTranslatorUtils::Strategynumber
+OID
+CTranslatorUtils::OidCmpOperator
 	(
-	IMemoryPool *pmp,
-	CMDAccessor *pmda,
 	Expr* pexpr
 	)
 {
-	OID oidOpNo = InvalidOid;
-
 	GPOS_ASSERT(IsA(pexpr, OpExpr) || IsA(pexpr, ScalarArrayOpExpr) || IsA(pexpr, RowCompareExpr));
 
 	switch (pexpr->type)
 	{
 		case T_OpExpr:
-				oidOpNo = ((OpExpr *) pexpr)->opno;
-				break;
-
+			return ((OpExpr *) pexpr)->opno;
+			
 		case T_ScalarArrayOpExpr:
-				oidOpNo = ((ScalarArrayOpExpr*) pexpr)->opno;
-				break;
+			return ((ScalarArrayOpExpr*) pexpr)->opno;
 
 		case T_RowCompareExpr:
-				oidOpNo = LInitialOID(((RowCompareExpr *) pexpr)->opnos);
-				break;
-
+			return LInitialOID(((RowCompareExpr *) pexpr)->opnos);
+			
 		default:
 			GPOS_RAISE
 				(
 				gpdxl::ExmaDXL,
 				gpdxl::ExmiPlStmt2DXLConversion,
-				GPOS_WSZ_LIT("No index strategy number found for operator")
+				GPOS_WSZ_LIT("Unsupported comparison")
 				);
-			return InvalidStrategy;
+			return InvalidOid;
 	}
+}
 
-	SCmptypeStrategy rgcmpsnMap[] =
-	{
-		{IMDType::EcmptEq, BTEqualStrategyNumber},
-		{IMDType::EcmptL, BTLessStrategyNumber},
-		{IMDType::EcmptLEq, BTLessEqualStrategyNumber},
-		{IMDType::EcmptG, BTGreaterStrategyNumber},
-		{IMDType::EcmptGEq, BTGreaterEqualStrategyNumber}
-	};
-
- 	const ULONG ulLength = GPOS_ARRAY_SIZE(rgcmpsnMap);
-
-	CMDIdGPDB *pmdid = New(pmp) CMDIdGPDB(oidOpNo);
-	IMDType::ECmpType ecomptype = CUtils::Ecmpt(pmda, pmdid);
-	pmdid->Release();
-
-	StrategyNumber sn = InvalidStrategy;
-
-	for (ULONG ul = 0; ul < ulLength; ul++)
-	{
-	 	SCmptypeStrategy elem = rgcmpsnMap[ul];
-	 	if (ecomptype == elem.ecomptype)
-	 	{
-	 		sn = elem.sn;
-	 	}
-	}
-
-	GPOS_ASSERT(InvalidStrategy != sn);
-
-	return sn;
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorUtils::OidCmpOperator
+//
+//	@doc:
+//		Extract comparison operator from an OpExpr, ScalarArrayOpExpr or RowCompareExpr
+//
+//---------------------------------------------------------------------------
+OID
+CTranslatorUtils::OidIndexQualOpclass
+	(
+	INT iAttno,
+	OID oidIndex
+	)
+{
+	Relation relIndex = gpdb::RelGetRelation(oidIndex);
+	GPOS_ASSERT(NULL != relIndex);
+	GPOS_ASSERT(iAttno <= relIndex->rd_index->indnatts);
+	
+	OID oidOpclass = relIndex->rd_indclass->values[iAttno - 1];
+	gpdb::CloseRelation(relIndex);
+	
+	return oidOpclass;
 }
 
 //---------------------------------------------------------------------------

@@ -542,6 +542,9 @@ namespace gpdb {
 	
 	// check permissions on range table 
 	void CheckRTPermissions(List *plRangeTable);
+	
+	// get index operator properties
+	void IndexOpProperties(Oid opno, Oid opclass, int *strategy, Oid *subtype, bool *recheck);
 
 } //namespace gpdb
 

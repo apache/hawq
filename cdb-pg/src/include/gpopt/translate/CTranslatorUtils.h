@@ -145,11 +145,14 @@ namespace gpdxl
 			static
 			ScanDirection Scandirection(EdxlIndexScanDirection edxlisd);
 
-			// get the index strategy number for a given expression
+			// get the oid of comparison operator
 			static
-			StrategyNumber Strategynumber(IMemoryPool *pmp, CMDAccessor *pmda, Expr* pexpr);
+			OID OidCmpOperator(Expr* pexpr);
 
-
+			// get the opclass for index key
+			static
+			OID OidIndexQualOpclass(INT iAttno, OID oidIndex);
+			
 			// return the type for the system column with the given number
 			static
 			CMDIdGPDB *PmdidSystemColType(IMemoryPool *pmp, AttrNumber attno);

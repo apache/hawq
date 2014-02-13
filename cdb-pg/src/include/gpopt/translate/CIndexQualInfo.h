@@ -53,19 +53,24 @@ namespace gpdxl
 			// index strategy information
 			StrategyNumber m_sn;
 
+			// index subtype
+			OID m_oidIndexSubtype;
+			
 			// ctor
 			CIndexQualInfo
 				(
 				AttrNumber attno,
 				OpExpr *popExpr,
 				OpExpr *popOriginalExpr,
-				StrategyNumber sn
+				StrategyNumber sn,
+				OID oidIndexSubtype
 				)
 				:
 				m_attno(attno),
 				m_popExpr(popExpr),
 				m_popOriginalExpr(popOriginalExpr),
-				m_sn(sn)
+				m_sn(sn),
+				m_oidIndexSubtype(oidIndexSubtype)
 				{}
 
 				// dtor
