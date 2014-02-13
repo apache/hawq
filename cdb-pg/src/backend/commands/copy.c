@@ -1568,12 +1568,13 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 		}
 		else
 		{
+			if (cstate->cdbsreh)
+				cstate->cdbsreh->err_aosegno = stmt->err_aosegno;
+			
 			if (stmt->ao_segnos)
 			{
 				/* We must be a QE if we received the aosegnos config */
 				Assert(Gp_role == GP_ROLE_EXECUTE);
-				if (cstate->cdbsreh)
-					cstate->cdbsreh->err_aosegno = stmt->err_aosegno;
 				cstate->ao_segnos = stmt->ao_segnos;
 			}
 			else
