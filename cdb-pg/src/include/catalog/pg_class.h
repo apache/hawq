@@ -235,6 +235,7 @@ DATA(insert OID = 3250    ( nb_classification PGNSP 3251 PGUID 0 3250 0 0 0 0 0 
  * RELSTORAGE_HEAP    - stored on disk using heap storage.
  * RELSTORAGE_AOROWS  - stored on disk using append only storage.
  * RELSTORAGE_AOCOLS  - stored on dist using append only column storage.
+ * RELSTORAGE_PARQUET - stored on dist using append only parquet.
  * RELSTORAGE_VIRTUAL - has virtual storage, meaning, relation has no
  *						data directly stored forit  (right now this
  *						relates to views and comp types).
@@ -244,6 +245,7 @@ DATA(insert OID = 3250    ( nb_classification PGNSP 3251 PGUID 0 3250 0 0 0 0 0 
 #define		  RELSTORAGE_HEAP	'h'
 #define		  RELSTORAGE_AOROWS	'a'
 #define 	  RELSTORAGE_AOCOLS	'c'
+#define 	  RELSTORAGE_PARQUET	'p'
 #define		  RELSTORAGE_VIRTUAL	'v'
 #define		  RELSTORAGE_EXTERNAL 'x'
 #define		  RELSTORAGE_FOREIGN 'f'
@@ -255,7 +257,12 @@ static inline bool relstorage_is_buffer_pool(char c)
 
 static inline bool relstorage_is_ao(char c)
 {
-	return (c == RELSTORAGE_AOROWS || c == RELSTORAGE_AOCOLS);
+	return (c == RELSTORAGE_AOROWS || c == RELSTORAGE_AOCOLS || c == RELSTORAGE_PARQUET);
+}
+
+static inline bool relstorage_is_aoparquet(char c)
+{
+	return (c == RELSTORAGE_PARQUET);
 }
 
 static inline bool relstorage_is_external(char c)

@@ -465,6 +465,7 @@ set_plan_refs(PlannerGlobal *glob, Plan *plan, const int rtoffset)
 		case T_SeqScan: /* Rely on structure equivalence */
 		case T_AppendOnlyScan: /* Rely on structure equivalence */
 		case T_AOCSScan: /* Rely on structure equivalence */
+		case T_ParquetScan: /* Rely on structure equivalence */
 		case T_ExternalScan: /* Rely on structure equivalence */
 		{
 			Scan    *splan = (Scan *) plan;
@@ -500,7 +501,8 @@ set_plan_refs(PlannerGlobal *glob, Plan *plan, const int rtoffset)
 			RangeTblEntry *rte = rt_fetch(splan->scan.scanrelid, glob->finalrtable);
 			char relstorage = get_rel_relstorage(rte->relid);
 			Assert(relstorage != RELSTORAGE_AOROWS &&
-				   relstorage != RELSTORAGE_AOCOLS);
+				   relstorage != RELSTORAGE_AOCOLS &&
+				   relstorage != RELSTORAGE_PARQUET);
 #endif
 
 			splan->scan.plan.targetlist =
@@ -540,7 +542,8 @@ set_plan_refs(PlannerGlobal *glob, Plan *plan, const int rtoffset)
 			RangeTblEntry *rte = rt_fetch(splan->scan.scanrelid, glob->finalrtable);
 			char relstorage = get_rel_relstorage(rte->relid);
 			Assert(relstorage != RELSTORAGE_AOROWS &&
-				   relstorage != RELSTORAGE_AOCOLS);
+				   relstorage != RELSTORAGE_AOCOLS &&
+				   relstorage != RELSTORAGE_PARQUET);
 #endif
 			splan->scan.plan.targetlist =
 			fix_scan_list(glob, splan->scan.plan.targetlist, rtoffset);
@@ -563,7 +566,8 @@ set_plan_refs(PlannerGlobal *glob, Plan *plan, const int rtoffset)
 			RangeTblEntry *rte = rt_fetch(splan->scan.scanrelid, glob->finalrtable);
 			char relstorage = get_rel_relstorage(rte->relid);
 			Assert(relstorage == RELSTORAGE_AOROWS ||
-				   relstorage == RELSTORAGE_AOCOLS);
+				   relstorage == RELSTORAGE_AOCOLS ||
+				   relstorage == RELSTORAGE_PARQUET);
 #endif
 
 			splan->scan.plan.targetlist =

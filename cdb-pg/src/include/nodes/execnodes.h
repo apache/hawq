@@ -281,6 +281,7 @@ typedef struct ResultRelInfo
 	struct AppendOnlyInsertDescData *ri_aoInsertDesc;
 	struct AOCSInsertDescData       *ri_aocsInsertDesc;
 	struct ExternalInsertDescData	*ri_extInsertDesc;   
+	struct ParquetInsertDescData		*ri_parquetInsertDesc;
 	int                     ri_aosegno;
 	uint64                  ri_aoprocessed; /* tuples processed for AO */
 	struct AttrMap			*ri_partInsertMap;
@@ -407,7 +408,7 @@ typedef struct EState
 
 	/* AO fileseg info for target relation */
 	List                *es_result_aosegnos;
-        
+
 	struct TupleTableSlot *es_trig_tuple_slot; /* for trigger output tuples */
 
 	/* Stuff used for SELECT INTO: */
@@ -1312,19 +1313,21 @@ typedef enum
 	TableTypeHeap,
 	TableTypeAppendOnly,
 	TableTypeAOCS,
+	TableTypeParquet,
 	TableTypeInvalid,
 } TableType;
 
 typedef struct ScanState
 {
-	PlanState        ps;                                /* its first field is NodeTag */
-	Relation        ss_currentRelation;
-	struct TupleTableSlot *ss_ScanTupleSlot;
-	
-	int scan_state;
-	
-	/* The type of the table that is being scanned */
-	TableType tableType;
+        PlanState        ps;                                /* its first field is NodeTag */
+        Relation        ss_currentRelation;
+        struct HeapScanDescData * ss_currentScanDesc;
+        struct TupleTableSlot *ss_ScanTupleSlot;
+
+        int scan_state;
+
+		/* The type of the table that is being scanned */
+		TableType tableType;
 
 } ScanState;
 
@@ -1462,18 +1465,18 @@ typedef struct DynamicIndexScanState
  */
 typedef struct BitmapIndexScanState
 {
-	ScanState        ss;                                /* its first field is NodeTag */
-	Node            *bitmap;                        /* output bitmap */
-	ScanKey                biss_ScanKeys;
-	int                        biss_NumScanKeys;
-	IndexRuntimeKeyInfo *biss_RuntimeKeys;
-	int                        biss_NumRuntimeKeys;
-	IndexArrayKeyInfo *biss_ArrayKeys;
-	int                        biss_NumArrayKeys;
-	bool                biss_RuntimeKeysReady;
-	ExprContext *biss_RuntimeContext;
-	Relation        biss_RelationDesc;
-	struct IndexScanDescData *biss_ScanDesc;
+        ScanState        ss;                                /* its first field is NodeTag */
+        Node            *bitmap;                        /* output bitmap */
+        ScanKey                biss_ScanKeys;
+        int                        biss_NumScanKeys;
+        IndexRuntimeKeyInfo *biss_RuntimeKeys;
+        int                        biss_NumRuntimeKeys;
+        IndexArrayKeyInfo *biss_ArrayKeys;
+        int                        biss_NumArrayKeys;
+        bool                biss_RuntimeKeysReady;
+        ExprContext *biss_RuntimeContext;
+        Relation        biss_RelationDesc;
+        struct IndexScanDescData *biss_ScanDesc;
 } BitmapIndexScanState;
 
 /* ----------------
@@ -1688,6 +1691,31 @@ typedef struct AOCSScanState
 	ScanState ss;
 	AOCSScanOpaqueData *opaque;
 } AOCSScanState;
+
+/*
+ * ParquetScanOpaqueData
+ *    Additional data (in addition to ScanState) for scanning parquet
+ * table.
+ */
+typedef struct ParquetScanOpaqueData
+{
+	/*
+	 * The array to indicate columns that are involved in the scan.
+	 */
+	bool *proj;
+	int  ncol;
+	struct ParquetScanDescData *scandesc;
+} ParquetScanOpaqueData;
+
+/* -----------------------------------------------
+ *      ParquetScanState, need modify for parquet special
+ * -----------------------------------------------
+ */
+typedef struct ParquetScanState
+{
+	ScanState ss;
+	ParquetScanOpaqueData *opaque;
+} ParquetScanState;
 
 /*
  * TableScanState
@@ -2074,7 +2102,7 @@ typedef struct AggState
         Datum *replValues;
         bool *replIsnull;
         bool *doReplace;
-	List	   *percs;			/* all PercentileExpr nodes in targetlist & quals */
+		List	   *percs;			/* all PercentileExpr nodes in targetlist & quals */
 
 	/* true if found matching and usable cached workfiles */
 	bool cached_workfiles_found;

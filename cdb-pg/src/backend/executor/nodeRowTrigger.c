@@ -369,9 +369,10 @@ AssignTuplesForTriggers(void **newTuple, void **oldTuple,  RowTrigger *plannode,
 	bool rel_is_heap = RelationIsHeap(relation);
 	bool rel_is_aorows = RelationIsAoCols(relation);
 	bool rel_is_aocols = RelationIsAoRows(relation);
+	bool rel_is_parquet = RelationIsParquet(relation);
 	bool rel_is_external = RelationIsExternal(relation);
 
-	if (rel_is_aocols || rel_is_external)
+	if (rel_is_aocols || rel_is_external || rel_is_parquet)
 	{
 		elog(ERROR, "Triggers are not supported on column-oriented or external tables");
 	}

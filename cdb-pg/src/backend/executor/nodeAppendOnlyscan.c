@@ -36,6 +36,9 @@ static TupleTableSlot *AppendOnlyNext(AppendOnlyScanState *node);
 static void OpenAOScanRelation(AppendOnlyScanState *node);
 static void CloseAOScanRelation(AppendOnlyScanState *node);
 
+static void
+initGpmonPktForAppendOnlyScan(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estate);
+
 /* ----------------------------------------------------------------
  *						Scan Support
  * ----------------------------------------------------------------
@@ -290,7 +293,7 @@ ExecAppendOnlyReScan(AppendOnlyScanState *node, ExprContext *exprCtxt)
 	CheckSendPlanStateGpmonPkt(&node->ss.ps);
 }
 
-void
+static void
 initGpmonPktForAppendOnlyScan(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estate)
 {
 	Assert(planNode != NULL && gpmon_pkt != NULL && IsA(planNode, AppendOnlyScan));

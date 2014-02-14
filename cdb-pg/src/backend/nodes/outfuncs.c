@@ -529,6 +529,14 @@ _outDynamicTableScan(StringInfo str, DynamicTableScan *node)
 }
 
 static void
+_outParquetScan(StringInfo str, ParquetScan *node)
+{
+	WRITE_NODE_TYPE("ParquetSCAN");
+
+	_outScanInfo(str, (Scan *) node);
+}
+
+static void
 _outExternalScan(StringInfo str, ExternalScan *node)
 {
 	WRITE_NODE_TYPE("EXTERNALSCAN");
@@ -920,7 +928,6 @@ _outMotion(StringInfo str, Motion *node)
 	appendStringInfoLiteral(str, " :outputSegIdx");
 	for (i = 0; i < node->numOutputSegs; i++)
 		appendStringInfo(str, " %d", node->outputSegIdx[i]);
-
 	WRITE_INT_FIELD(numSortCols);
 	appendStringInfoLiteral(str, " :sortColIdx");
 	for (i = 0; i < node->numSortCols; i++)
@@ -4004,6 +4011,9 @@ _outNode(StringInfo str, void *obj)
 				break;
 			case T_TableScan:
 				_outTableScan(str, obj);
+				break;
+			case T_ParquetScan:
+				_outParquetScan(str, obj);
 				break;
 			case T_DynamicTableScan:
 				_outDynamicTableScan(str, obj);

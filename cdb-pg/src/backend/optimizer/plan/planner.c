@@ -110,6 +110,7 @@ static List *make_subplanTargetList(PlannerInfo *root, List *tlist,
 					   AttrNumber **groupColIdx, bool *need_tlist_eval);
 static List *register_ordered_aggs(List *tlist, Node *havingqual, List *sub_tlist);
 
+
 // GP optimizer entry point
 extern PlannedStmt *PplstmtOptimize(Query *parse, bool *pfUnexpectedFailure);
 
@@ -267,7 +268,9 @@ planner(Query *parse, int cursorOptions,
 	 * then fall back to the planner.
 	 * TODO: caragg 11/08/2013: Enable ORCA when running in utility mode (MPP-21841)
 	 */
-	if (optimizer && (-1 == Gp_segment) && (GP_ROLE_UTILITY != Gp_role))
+	if (optimizer &&
+		(-1 == Gp_segment) &&
+		(GP_ROLE_UTILITY != Gp_role))
 	{
 		if (gp_log_optimization_time)
 		{
@@ -3599,9 +3602,3 @@ pushdown_preliminary_limit(Plan *plan, Node *limitCount, int64 count_est, Node *
 
 	return result_plan;
 }
-
-
-
-
-
-

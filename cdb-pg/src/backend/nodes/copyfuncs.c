@@ -397,7 +397,7 @@ _copyAppendOnlyScan(AppendOnlyScan *from)
 }
 
 /*
- * _copyAppendOnlyScan
+ * _copyAOCSScan
  */
 static AOCSScan *
 _copyAOCSScan(AOCSScan *from)
@@ -427,6 +427,22 @@ _copyDynamicTableScan(DynamicTableScan *from)
 	DynamicTableScan *newnode = makeNode(DynamicTableScan);
 	CopyScanFields((Scan *) from, (Scan *) newnode);
 	COPY_SCALAR_FIELD(partIndex);
+
+	return newnode;
+}
+
+/*
+ * _copyParquetScan
+ */
+static ParquetScan *
+_copyParquetScan(ParquetScan *from)
+{
+	ParquetScan    *newnode = makeNode(ParquetScan);
+
+	/*
+	 * copy node superclass fields
+	 */
+	CopyScanFields((Scan *) from, (Scan *) newnode);
 
 	return newnode;
 }
@@ -4262,6 +4278,9 @@ copyObject(void *from)
 			break;
 		case T_DynamicTableScan:
 			retval = _copyDynamicTableScan(from);
+			break;
+		case T_ParquetScan:
+			retval = _copyParquetScan(from);
 			break;
 		case T_ExternalScan:
 			retval = _copyExternalScan(from);

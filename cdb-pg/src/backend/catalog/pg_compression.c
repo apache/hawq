@@ -633,6 +633,12 @@ compresstype_is_valid(char *comptype)
 						 " WHERE compname = :1 ",
 						 NameGetDatum(&compname))));
 		
+	if(!found)
+	{
+		if((strcmp(comptype, "snappy") == 0) || strcmp(comptype, "gzip") == 0)
+			found = true;
+	}
+
 	return found;
 }
 

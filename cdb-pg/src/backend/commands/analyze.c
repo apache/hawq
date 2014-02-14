@@ -34,6 +34,7 @@
 #include "access/tuptoaster.h"
 #include "access/aosegfiles.h"
 #include "access/aocssegfiles.h"
+#include "access/parquetsegfiles.h"
 #include "catalog/index.h"
 #include "catalog/indexing.h"
 #include "catalog/namespace.h"
@@ -123,6 +124,7 @@ static List	*buildExplicitAttributeNames(Oid relationOid, VacuumStmt *stmt);
 static void gp_statistics_estimate_reltuples_relpages_heap(Relation rel, float4 *reltuples, float4 *relpages);
 static void gp_statistics_estimate_reltuples_relpages_ao_rows(Relation rel, float4 *reltuples, float4 *relpages);
 static void gp_statistics_estimate_reltuples_relpages_ao_cs(Relation rel, float4 *reltuples, float4 *relpages);
+static void gp_statistics_estimate_reltuples_relpages_parquet(Relation rel, float4 *reltuples, float4 *relpages);
 static void analyzeEstimateReltuplesRelpages(Oid relationOid, float4 *relTuples, float4 *relPages);
 static void analyzeEstimateIndexpages(Oid relationOid, Oid indexOid, float4 *indexPages);
 
@@ -1377,6 +1379,10 @@ static void analyzeEstimateReltuplesRelpages(Oid relationOid, float4 *relTuples,
 			else if (RelationIsAoCols(rel))
 			{
 				gp_statistics_estimate_reltuples_relpages_ao_cs(rel, &partRelTuples,
+						&partRelPages);
+			}
+			else if (RelationIsParquet(rel)){
+				gp_statistics_estimate_reltuples_relpages_parquet(rel, &partRelTuples,
 						&partRelPages);
 			}
 
@@ -2665,6 +2671,55 @@ static void gp_statistics_estimate_reltuples_relpages_ao_rows(Relation rel, floa
 		pfree(fstotal);
 	}
 	
+	return;
+}
+
+/**
+ * This method estimates the number of tuples and pages in a parquet relation. Parquet tables maintain accurate
+ * tuple counts in the catalog. Therefore, we will only require access to segment catalogs to determine reltuples.
+ * Relpages is obtained by fudging AO block sizes.
+ *
+ * Input:
+ * 	rel - Relation. Must be a parquet table.
+ *
+ * Output:
+ * 	reltuples - estimated number of tuples in relation.
+ * 	relpages  - exact number of pages.
+ */
+
+static void gp_statistics_estimate_reltuples_relpages_parquet(Relation rel, float4 *reltuples, float4 *relpages)
+{
+	int i;
+	ParquetFileSegTotals	*fstotal;
+
+	/**
+	 * Ensure that the right kind of relation with the right type of storage is passed to us.
+	 */
+	Assert(rel->rd_rel->relkind == RELKIND_RELATION);
+	Assert(RelationIsParquet(rel));
+
+	Assert(Gp_role == GP_ROLE_DISPATCH);
+
+	*relpages = 0.0;
+	*reltuples = 0.0;
+
+	for (i = 0 ; i < GetTotalSegmentsNumber() ; ++i)
+	{
+		fstotal = GetParquetSegFilesTotals(rel, SnapshotNow, i);
+		Assert(fstotal);
+		/**
+		 * The planner doesn't understand AO's blocks, so need this method to try to fudge up a number for
+		 * the planner.
+		 */
+		*relpages += RelationGuessNumberOfBlocks((double) fstotal->totalbytes);
+		/**
+		 * The number of tuples in AO table is known accurately. Therefore, we just utilize this value.
+		 */
+		*reltuples += (double) fstotal->totaltuples;
+
+		pfree(fstotal);
+	}
+
 	return;
 }
 

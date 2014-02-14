@@ -18,6 +18,7 @@
 #include "access/reloptions.h"
 #include "catalog/pg_type.h"
 #include "cdb/cdbappendonlyam.h"
+#include "cdb/cdbparquetstoragewrite.h"
 #include "cdb/cdbvars.h"
 #include "commands/defrem.h"
 #include "nodes/makefuncs.h"
@@ -296,6 +297,8 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 		"fillfactor",
 		"appendonly",
 		"blocksize",
+		"pagesize",
+		"rowgroupsize",
 		"compresstype",
 		"compresslevel",
 		"checksum",
@@ -306,12 +309,15 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 	char	   *values[ARRAY_SIZE(default_keywords)];
 	int32		fillfactor = defaultFillfactor;
 	int32		blocksize = DEFAULT_APPENDONLY_BLOCK_SIZE;
+	int32		pagesize = DEFAULT_PARQUET_PAGE_SIZE;
+	int32		rowgroupsize = DEFAULT_PARQUET_ROWGROUP_SIZE;
 	bool		appendonly = false;
 	bool		checksum = false;
 	char*		compresstype = NULL;
 	int32		compresslevel;  /* Not set yet.  Need to derive from compresstype */
 	char*		defaultCompressor = "zlib"; /* don't precede with 'const' */
-	bool 		columnstore = false;
+	char*		defaultParquetCompressor = "gzip"; /* don't precede with 'const' */
+	char 		columnstore = RELSTORAGE_AOROWS;
 	bool		forceHeap = false;
 	bool		errorTable = false;
 	int			j = 0;
@@ -319,24 +325,6 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 	StdRdOptions *result;
 
 	parseRelOptions(reloptions, ARRAY_SIZE(default_keywords), default_keywords, values, validate);
-
-	/* fillfactor */
-	if (values[0] != NULL)
-	{
-		fillfactor = pg_atoi(values[0], sizeof(int32), 0);
-		if (fillfactor < minFillfactor || fillfactor > 100)
-		{
-			if (validate)
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-						 errmsg("fillfactor=%d is out of range (should "
-								"be between %d and 100)",
-								fillfactor, minFillfactor),
-										   errOmitLocation(true)));
-
-			fillfactor = defaultFillfactor;
-		}
-	}
 
 	/* appendonly */
 	if (values[1] != NULL)
@@ -360,6 +348,80 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 		forceHeap = !appendonly;
 	}
 
+	/* columnstore, judge whether parquet/column store */
+	if (values[8] != NULL)
+	{
+		if (relkind != RELKIND_RELATION && validate)
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("usage of parameter \"orientation\" in a non relation object is not supported"),
+					 errOmitLocation(false)));
+
+		if (!appendonly && validate)
+			ereport(ERROR,
+					(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
+					 errmsg("invalid option \"orientation\" for base relation. "
+							"Only valid for Append Only relations"),
+									   errOmitLocation(true)));
+
+		if (!(pg_strcasecmp(values[8], "column") == 0 ||
+			  pg_strcasecmp(values[8], "row") == 0 ||
+			  pg_strcasecmp(values[8], "parquet") == 0) &&
+			validate)
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("invalid parameter value for \"orientation\": \"%s\"",
+							values[8]),
+									   errOmitLocation(true)));
+		}
+
+		/*should add special operation for parquet*/
+		if (pg_strcasecmp(values[8], "row") == 0)
+			columnstore = RELSTORAGE_AOROWS;
+		else if (pg_strcasecmp(values[8], "column") == 0)
+			columnstore = RELSTORAGE_AOCOLS;
+		else if (pg_strcasecmp(values[8], "parquet") == 0)
+			columnstore = RELSTORAGE_PARQUET;
+
+		if (compresstype &&
+			(pg_strcasecmp(compresstype, "rle_type") == 0) &&
+			(columnstore == RELSTORAGE_AOROWS))
+		{
+			if (validate)
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("%s cannot be used with Append Only relations row orientation",
+								compresstype),
+						 errOmitLocation(true)));
+		}
+	}
+
+	/* fillfactor */
+	if (values[0] != NULL)
+	{
+		if((columnstore == RELSTORAGE_PARQUET) && validate)
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("invalid option \'fillfactor\' for parquet table"),
+					 errOmitLocation(true)));
+		}
+		fillfactor = pg_atoi(values[0], sizeof(int32), 0);
+		if (fillfactor < minFillfactor || fillfactor > 100)
+		{
+			if (validate)
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("fillfactor=%d is out of range (should "
+								"be between %d and 100)",
+								fillfactor, minFillfactor),
+										   errOmitLocation(true)));
+
+			fillfactor = defaultFillfactor;
+		}
+	}
+
 	/* blocksize */
 	if (values[2] != NULL)
 	{
@@ -376,6 +438,14 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 							"Only valid for Append Only relations"),
 									   errOmitLocation(true)));
 
+		if((columnstore == RELSTORAGE_PARQUET) && validate)
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("invalid option \'blocksize\' for parquet table"),
+					 errOmitLocation(true)));
+		}
+
 		blocksize = pg_atoi(values[2], sizeof(int32), 0);
 
 		if (blocksize < MIN_APPENDONLY_BLOCK_SIZE || blocksize > MAX_APPENDONLY_BLOCK_SIZE ||
@@ -390,11 +460,10 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 
 			blocksize = DEFAULT_APPENDONLY_BLOCK_SIZE;
 		}
-
 	}
 
 	/* compression type */
-	if (values[3] != NULL)
+	if (values[5] != NULL)
 	{
 		if (relkind != RELKIND_RELATION && validate)
 			ereport(ERROR,
@@ -409,17 +478,36 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 							"Only valid for Append Only relations"),
 									   errOmitLocation(true)));
 
-		compresstype = values[3];
+		compresstype = values[5];
 
 		if (!compresstype_is_valid(compresstype))
 			ereport(ERROR,
 					(errcode(ERRCODE_UNDEFINED_OBJECT),
 					 errmsg("unknown compresstype \"%s\"", compresstype),
 					 errOmitLocation(true)));
+
+		if ((columnstore == RELSTORAGE_PARQUET) && (strcmp(compresstype, "snappy") != 0)
+				&& (strcmp(compresstype, "gzip") != 0)
+				&& (strcmp(compresstype, "none") != 0))
+		{
+			ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("parquet table doesn't support compress type: \'%s\'", compresstype),
+						 errOmitLocation(true)));
+		}
+
+		if (!(columnstore == RELSTORAGE_PARQUET) && ((strcmp(compresstype, "snappy") == 0)
+				|| (strcmp(compresstype, "gzip") == 0)))
+		{
+			ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("non-parquet table doesn't support compress type: \'%s\'", compresstype),
+						 errOmitLocation(true)));
+		}
 	}
 
 	/* compression level */
-	if (values[4] != NULL)
+	if (values[6] != NULL)
 	{
 		if (relkind != RELKIND_RELATION && validate)
 			ereport(ERROR,
@@ -434,14 +522,24 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 							"Only valid for Append Only relations"),
 									   errOmitLocation(true)));
 
-		compresslevel = pg_atoi(values[4], sizeof(int32), 0);
+		/*compress type snappy should not have compress level setting*/
+		if(compresstype && strcmp(compresstype, "snappy") == 0){
+			ereport(ERROR,
+					(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
+					 errmsg("invalid option \'compresslevel\' for compresstype \'snappy\'."),
+					 errOmitLocation(true)));
+		}
 
-		if (compresstype && strcmp(compresstype, "none") != 0
-					&& compresslevel == 0 && validate)
+		compresslevel = pg_atoi(values[6], sizeof(int32), 0);
+
+		if (compresstype && (strcmp(compresstype, "none") != 0 &&
+							 strcmp(compresstype, "snappy") != 0) 
+						 && compresslevel == 0 && validate)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("compresstype can\'t be used with compresslevel 0"),
 							   errOmitLocation(true)));
+
 		if (compresslevel < 0 || compresslevel > 9)
 		{
 			if (validate)
@@ -461,7 +559,12 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 		 * crash.
 		 */
 		if (compresslevel > 0 && !compresstype)
-			compresstype = pstrdup(defaultCompressor);
+		{
+			if (!(columnstore == RELSTORAGE_PARQUET))
+				compresstype = pstrdup(defaultCompressor);
+			else
+				compresstype = pstrdup(defaultParquetCompressor);
+		}
 
 		if (compresstype && (pg_strcasecmp(compresstype, "quicklz") == 0) &&
 			(compresslevel != 1))
@@ -499,7 +602,7 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 	}
 
 	/* checksum */
-	if (values[5] != NULL)
+	if (values[7] != NULL)
 	{
 		if (relkind != RELKIND_RELATION && validate)
 			ereport(ERROR,
@@ -514,63 +617,28 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 							"Only valid for Append Only relations"),
 									   errOmitLocation(true)));
 
-		if (!(pg_strcasecmp(values[5], "true") == 0 ||
-			  pg_strcasecmp(values[5], "false") == 0) &&
+		if ((columnstore == RELSTORAGE_PARQUET) && validate)
+			ereport(ERROR,
+					(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
+					 errmsg("invalid option \'checksum\' for parquet table. "
+							"Default value is false"),
+					errOmitLocation(true)));
+
+		if (!(pg_strcasecmp(values[7], "true") == 0 ||
+			  pg_strcasecmp(values[7], "false") == 0) &&
 			validate)
 		{
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("invalid parameter value for \"checksum\": \"%s\"",
-							values[5]),
+							values[7]),
 									   errOmitLocation(true)));
 		}
-		checksum = (pg_strcasecmp(values[5], "true") == 0 ? true : false);
-	}
-
-	/* columnstore */
-	if (values[6] != NULL)
-	{
-		if (relkind != RELKIND_RELATION && validate)
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("usage of parameter \"orientation\" in a non relation object is not supported"),
-					 errOmitLocation(false)));
-
-		if (!appendonly && validate)
-			ereport(ERROR,
-					(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
-					 errmsg("invalid option \"orientation\" for base relation. "
-							"Only valid for Append Only relations"),
-									   errOmitLocation(true)));
-
-		if (!(pg_strcasecmp(values[6], "column") == 0 ||
-			  pg_strcasecmp(values[6], "row") == 0) &&
-			validate)
-		{
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("invalid parameter value for \"orientation\": \"%s\"",
-							values[6]),
-									   errOmitLocation(true)));
-		}
-
-		columnstore = (pg_strcasecmp(values[6], "column") == 0 ? true : false);
-		
-		if (compresstype && 
-			(pg_strcasecmp(compresstype, "rle_type") == 0) &&
-			! columnstore)
-		{
-			if (validate)
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-						 errmsg("%s cannot be used with Append Only relations row orientation",
-								compresstype),
-						 errOmitLocation(true)));
-		}
+		checksum = (pg_strcasecmp(values[7], "true") == 0 ? true : false);
 	}
 
 	/* errortable */
-	if (values[7] != NULL)
+	if (values[9] != NULL)
 	{
 		if (relkind != RELKIND_RELATION)
 			ereport(ERROR,
@@ -582,20 +650,97 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 			ereport(ERROR,
 					(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
 					 errmsg("invalid option \"errortable\" for base relation. "
-							"Only valid for appendonly relations"),
-									   errOmitLocation(true)));
+							 "Only valid for appendonly relations"),
+							 errOmitLocation(true)));
 
-		if (!(pg_strcasecmp(values[7], "true") == 0 ||
-			  pg_strcasecmp(values[7], "false") == 0))
+		if (!(pg_strcasecmp(values[9], "true") == 0 ||
+			  pg_strcasecmp(values[9], "false") == 0))
 		{
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("invalid parameter value for \"errortable\": \"%s\"",
-							values[7]),
+							values[9]),
 									   errOmitLocation(true)));
 		}
 
-		errorTable = (pg_strcasecmp(values[7], "true") == 0 ? true : false);
+		errorTable = (pg_strcasecmp(values[9], "true") == 0 ? true : false);
+	}
+
+	/* pagesize */
+	if (values[3] != NULL)
+	{
+		if(!(columnstore == RELSTORAGE_PARQUET)){
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("invalid option \'pagesize\' for non-parquet table"),
+					 errOmitLocation(true)));
+		}
+
+		if (relkind != RELKIND_RELATION && validate)
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("usage of parameter \"pagesize\" in a non relation object is not supported"),
+					 errOmitLocation(false)));
+
+		pagesize = pg_atoi(values[3], sizeof(int32), 0);
+
+		if ((pagesize < MIN_PARQUET_PAGE_SIZE) || (pagesize >= MAX_PARQUET_PAGE_SIZE))
+		{
+			if (validate)
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("page size for parquet table should between 1KB and 1GB. Got %d",
+								 pagesize),
+								 errOmitLocation(true)));
+
+			pagesize = DEFAULT_PARQUET_PAGE_SIZE;
+		}
+
+	}
+
+	/* rowgroupsize */
+	if (values[4] != NULL)
+	{
+		if(!(columnstore == RELSTORAGE_PARQUET)){
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("invalid option \'rowgroupsize\' for non-parquet table"),
+					 errOmitLocation(true)));
+		}
+
+		if (!appendonly)
+			ereport(ERROR,
+					(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
+					 errmsg("invalid option \"errortable\" for base relation. "
+							"Only valid for appendonly relations"),
+									   errOmitLocation(true)));
+		if (relkind != RELKIND_RELATION && validate)
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("usage of parameter \"rowgroupsize\" in a non relation object is not supported"),
+					 errOmitLocation(false)));
+
+		rowgroupsize = pg_atoi(values[4], sizeof(int32), 0);
+
+		if ((rowgroupsize < MIN_PARQUET_ROWGROUP_SIZE) || (rowgroupsize >= MAX_PARQUET_ROWGROUP_SIZE))
+		{
+			if (validate)
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("row group size for parquet table should between 1KB and 1GB. "
+								 "Got %d", rowgroupsize), errOmitLocation(true)));
+
+			rowgroupsize = DEFAULT_PARQUET_ROWGROUP_SIZE;
+		}
+
+	}
+
+	if((columnstore == RELSTORAGE_PARQUET) && (pagesize >= rowgroupsize)){
+		ereport(ERROR,
+			(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+			 errmsg("row group size for parquet table must be larger than pagesize. Got rowgroupsize: %d"
+					", pagesize %d", rowgroupsize, pagesize),
+					 errOmitLocation(true)));
 	}
 
 	result = (StdRdOptions *) palloc(sizeof(StdRdOptions));
@@ -604,6 +749,8 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 	result->fillfactor = fillfactor;
 	result->appendonly = appendonly;
 	result->blocksize = blocksize;
+	result->pagesize = pagesize;
+	result->rowgroupsize = rowgroupsize;
 	result->compresslevel = compresslevel;
 	if (compresstype != NULL)
 		for (j = 0;j < strlen(compresstype); j++)
@@ -719,7 +866,7 @@ heap_test_override_reloptions(char relkind, StdRdOptions *stdRdOptions, int *saf
      */
     if (gp_test_orientation_override)
     {
-        stdRdOptions->columnstore = true;
+        stdRdOptions->columnstore = RELSTORAGE_AOCOLS;
     }
 }
 
@@ -781,12 +928,14 @@ index_reloptions(RegProcedure amoptions, Datum reloptions, bool validate)
  */
 void validateAppendOnlyRelOptions(bool ao,
 								  int blocksize,
+								  int pagesize,
+								  int rowgroupsize,
 								  int safewrite,
 								  int complevel,
 								  char* comptype,
 								  bool checksum,
 								  char relkind,
-								  bool co)
+								  char colstore)
 {
 	if (relkind != RELKIND_RELATION)
 	{
@@ -812,7 +961,7 @@ void validateAppendOnlyRelOptions(bool ao,
 		 pg_strcasecmp(comptype, "rle_type") == 0))
 	{
 		
-		if (! co &&
+		if ((colstore != RELSTORAGE_AOCOLS) &&
 			pg_strcasecmp(comptype, "rle_type") == 0)
 		{
 			ereport(ERROR,
@@ -821,7 +970,16 @@ void validateAppendOnlyRelOptions(bool ao,
 							comptype)));			
 		}
 		
-		if (comptype && complevel == 0)
+		if ((colstore != RELSTORAGE_PARQUET) &&
+			pg_strcasecmp(comptype, "snappy") == 0)
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("%s can only be used with parquet relations",
+							comptype)));
+		}
+
+		if (comptype && (pg_strcasecmp(comptype, "snappy") != 0)&& complevel == 0)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("compresstype cannot be used with compresslevel 0")));
@@ -861,6 +1019,13 @@ void validateAppendOnlyRelOptions(bool ao,
 				 errmsg("block size must be between 8KB and 2MB and "
 						"be an 8KB multiple, Got %d", blocksize)));
 
+	if ((colstore == RELSTORAGE_PARQUET) && (pagesize >= rowgroupsize)){
+		ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("row group size must be large than pagesize. rowgroupsize: %d"
+							"pagesize %d", rowgroupsize, pagesize)));
+	}
+
 	if (safewrite > MAX_APPENDONLY_BLOCK_SIZE || safewrite % 8 != 0)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -883,7 +1048,8 @@ void validateAppendOnlyRelOptions(bool ao,
  */
 static int setDefaultCompressionLevel(char* compresstype)
 {
-	if(!compresstype || pg_strcasecmp(compresstype, "none") == 0)
+	if(!compresstype || pg_strcasecmp(compresstype, "none") == 0
+			|| pg_strcasecmp(compresstype, "snappy") == 0)
 		return 0;
 	else
 		return 1;

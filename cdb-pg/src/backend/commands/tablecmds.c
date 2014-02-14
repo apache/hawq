@@ -59,6 +59,7 @@
 #include "catalog/toasting.h"
 #include "cdb/cdbappendonlyam.h"
 #include "cdb/cdbaocsam.h"
+#include "cdb/cdbparquetam.h"
 #include "cdb/cdbpartition.h"
 #include "cdb/cdbsharedstorageop.h"
 #include "commands/cluster.h"
@@ -209,6 +210,8 @@ static void truncate_check_rel(Relation rel);
 static void MergeConstraintsIntoExisting(Relation child_rel, Relation parent_rel);
 static void MergeAttributesIntoExisting(Relation child_rel, Relation parent_rel, List *inhAttrNameList,
 										bool is_partition);
+
+static Datum AddDefaultPageRowGroupSize(Datum relOptions, List *options);
 static bool add_nonduplicate_cooked_constraint(Constraint *cdef, List *stmtConstraints);
 static bool change_varattnos_varno_walker(Node *node, const AttrMapContext *attrMapCxt);
 
@@ -595,6 +598,14 @@ DefineRelation_int(CreateStmt *stmt,
 							 &inheritOids, &old_constraints, &parentOidCount, stmt->policy);
 
 	/*
+	 * If a partition table, and user not specify pagesize and rowgroupsize, specify the default
+	 * pagesize to 1MB, rowgroupsize to 8MB.
+	 */
+	if((stmt->partitionBy) || (stmt->is_part_child)){
+		reloptions = AddDefaultPageRowGroupSize(reloptions, stmt->options);
+	}
+
+	/*
 	 * Create a relation descriptor from the relation schema and create the
 	 * relation.  Note that in this stage only inherited (pre-cooked) defaults
 	 * and constraints will be included into the new relation.
@@ -627,15 +638,13 @@ DefineRelation_int(CreateStmt *stmt,
 		}
 	}
 
-
-
-	stmt->oidInfo.toastOid = InvalidOid;
-	stmt->oidInfo.toastIndexOid = InvalidOid;
-	stmt->oidInfo.aosegOid = InvalidOid;
-	stmt->oidInfo.aosegIndexOid = InvalidOid;
-	stmt->oidInfo.aoblkdirOid = InvalidOid;
-	stmt->oidInfo.aoblkdirIndexOid = InvalidOid;
-	stmt->ownerid = GetUserId();
+     stmt->oidInfo.toastOid = InvalidOid;
+     stmt->oidInfo.toastIndexOid = InvalidOid;
+     stmt->oidInfo.aosegOid = InvalidOid;
+     stmt->oidInfo.aosegIndexOid = InvalidOid;
+     stmt->oidInfo.aoblkdirOid = InvalidOid;
+     stmt->oidInfo.aoblkdirIndexOid = InvalidOid;
+     stmt->ownerid = GetUserId();
 
     if(gp_upgrade_mode && tidycatOptions && (tidycatOptions->relid != InvalidOid))
     {
@@ -766,6 +775,117 @@ DefineRelation_int(CreateStmt *stmt,
 	relation_close(rel, NoLock);
 
 	return relationId;
+}
+
+
+/*
+ * Add Default page size and rowgroup size to relation options
+ */
+static Datum AddDefaultPageRowGroupSize(Datum relOptions, List *defList){
+	Datum result;
+	ListCell   *cell = NULL;
+	bool pageSizeSet = false;
+	bool rowgroupSizeSet = false;
+	bool parquetTable = false;
+
+	if(defList == NIL)
+		return relOptions;
+
+	foreach(cell, defList)
+	{
+		DefElem    *def = lfirst(cell);
+
+		if(pg_strcasecmp("pagesize", def->defname) == 0)
+		{
+			pageSizeSet = true;
+		}
+		if(pg_strcasecmp("rowgroupsize", def->defname) == 0)
+		{
+			rowgroupSizeSet = true;
+		}
+		if(pg_strcasecmp("orientation", def->defname) == 0)
+		{
+			if(def->arg == NULL)
+			{
+				insist_log(false, "syntax not correct, orientation should has corresponding value");
+			}
+
+			if(pg_strcasecmp("parquet", defGetString(def)) == 0)
+			{
+				parquetTable = true;
+			}
+		}
+	}
+
+	if (!parquetTable)
+		return relOptions;
+
+	if ((pageSizeSet == true) && (rowgroupSizeSet == true)){
+		return relOptions;
+	}
+	else
+	{
+		/*set default page size*/
+		ArrayBuildState *astate = NULL;
+		if(DatumGetPointer(relOptions) != 0){
+			ArrayType  *array = DatumGetArrayTypeP(relOptions);
+			Datum	   *options;
+			int			noptions;
+			int			i;
+
+			Assert(ARR_ELEMTYPE(array) == TEXTOID);
+			deconstruct_array(array, TEXTOID, -1, false, 'i',
+							   &options, NULL, &noptions);
+
+			/* copy the existing rel options*/
+			for (i = 0; i < noptions; i++)
+			{
+				astate = accumArrayResult(astate, options[i],
+										  false, TEXTOID,
+										  CurrentMemoryContext);
+			}
+		}
+
+		/* append page size*/
+		if (pageSizeSet == false){
+			text *t;
+			const char *name = "pagesize";
+			Size len;
+			char value[20];
+			pg_ltoa(DEFAULT_PARQUET_PAGE_SIZE_PARTITION, value);
+
+			len = VARHDRSZ + strlen(name) + 1 + strlen(value);
+			t = (text *) palloc(len + 1);
+			SET_VARSIZE(t, len);
+			sprintf(VARDATA(t), "%s=%s", name, value);
+
+			astate = accumArrayResult(astate, PointerGetDatum(t),
+									  false, TEXTOID,
+									  CurrentMemoryContext);
+		}
+
+		if(rowgroupSizeSet == false){
+			text *t;
+			const char *name = "rowgroupsize";
+			char value[20];
+			Size len;
+
+			pg_ltoa(DEFAULT_PARQUET_ROWGROUP_SIZE_PARTITION, value);
+			len = VARHDRSZ + strlen(name) + 1 + strlen(value);
+			t = (text *) palloc(len + 1);
+			SET_VARSIZE(t, len);
+			sprintf(VARDATA(t), "%s=%s", name, value);
+
+			astate = accumArrayResult(astate, PointerGetDatum(t),
+									  false, TEXTOID,
+									  CurrentMemoryContext);
+		}
+
+		if (astate)
+			result = makeArrayResult(astate, CurrentMemoryContext);
+
+		return result;
+	}
 }
 
 /* ----------------------------------------------------------------
@@ -1729,16 +1849,16 @@ ExecuteTruncate(TruncateStmt *stmt)
 		toast_relid = rel->rd_rel->reltoastrelid;
 		heap_close(rel, NoLock);
 
-		if (!RelationIsAoRows(rel) && !RelationIsAoCols(rel))
-		{
-			ereport(ERROR,
-					( errcode(ERRCODE_GP_COMMAND_ERROR),
-							errmsg("TRUNCATE on heap table is not supported.")));
+		if (RelationIsAoRows(rel) || RelationIsAoCols(rel) || RelationIsParquet(rel)){
+			GetAppendOnlyEntryAuxOids(heap_relid, SnapshotNow,
+											  &aoseg_relid, NULL,
+											  &aoblkdir_relid, NULL);
 		}
-
-		GetAppendOnlyEntryAuxOids(heap_relid, SnapshotNow,
-								  &aoseg_relid, NULL,
-								  &aoblkdir_relid, NULL);
+		else{
+			ereport(ERROR,
+								( errcode(ERRCODE_GP_COMMAND_ERROR),
+										errmsg("TRUNCATE on heap table is not supported.")));
+		}
 
 		/*
 		 * The same for the toast table, if any.
@@ -3657,6 +3777,14 @@ rebuildAlteredTableInfo(AlterRewriteTableInfo *ar_tab)
 void
 AlterTable(AlterTableStmt *stmt)
 {
+	GpRoleValue oldrole = GP_ROLE_UNDEFINED;
+
+    if(gp_upgrade_mode)
+    {
+    	oldrole = Gp_role;
+    	Gp_role = GP_ROLE_UTILITY;
+    }
+
 	if (stmt->relkind == OBJECT_INDEX)
 	{
 		if (!gp_called_by_pgdump)
@@ -3713,6 +3841,14 @@ AlterTable(AlterTableStmt *stmt)
 				 &stmt->oidInfoCount,
 				 &stmt->oidInfo,
 				 &stmt->oidmap);
+
+    if(gp_upgrade_mode)
+    	Gp_role = oldrole;
+
+    if(gp_upgrade_mode && Gp_role == GP_ROLE_DISPATCH)
+    {
+        CdbDispatchUtilityStatement((Node *)stmt, "AlterTable");
+    }
 }
 
 /*
@@ -3779,7 +3915,7 @@ ATController(Relation rel, List *cmds, bool recurse,
 	/* Phase 2: update system catalogs */
 	ATRewriteCatalogs(&wqueue);
 
-	if (Gp_role == GP_ROLE_DISPATCH && oidInfoCount != NULL)
+	if (gp_upgrade_mode || (Gp_role == GP_ROLE_DISPATCH && oidInfoCount != NULL))
 	{
 		*oidInfoCount = list_length(wqueue);
 		*oidInfo = palloc0(sizeof(TableOidInfo)*(*oidInfoCount));
@@ -6016,8 +6152,8 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 				idesc = aocs_insert_init(newrel, segno);
 
 			sdesc = aocs_beginscan(oldrel, SnapshotNow, oldTupDesc, proj);
-
 			aocs_getnext(sdesc, ForwardScanDirection, oldslot);
+
 
 			while(!TupIsNull(oldslot))
 			{
@@ -6143,6 +6279,143 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 
 			pfree(proj);
 		}
+		else if(relstorage == RELSTORAGE_PARQUET && Gp_role != GP_ROLE_DISPATCH)
+		{
+			int segno = RESERVED_SEGNO;
+			ParquetInsertDesc idesc = NULL;
+			ParquetScanDesc sdesc = NULL;
+			int nvp = oldrel->rd_att->natts;
+			bool *proj = palloc0(sizeof(bool) * nvp);
+
+			/*
+			 * We use the old tuple descriptor instead of oldrel's tuple descriptor,
+			 * which may already contain altered column.
+			 */
+			if (oldTupDesc)
+			{
+				Assert(oldTupDesc->natts <= nvp);
+				memset(proj, true, oldTupDesc->natts);
+			}
+			else
+				memset(proj, true, nvp);
+
+			if(newrel)
+				idesc = parquet_insert_init(newrel, segno);
+
+			sdesc = parquet_beginscan(oldrel, SnapshotNow, oldTupDesc, proj);
+			parquet_getnext(sdesc, ForwardScanDirection, oldslot);
+
+
+			while(!TupIsNull(oldslot))
+			{
+				oldCxt = MemoryContextSwitchTo(GetPerTupleMemoryContext(estate));
+				econtext->ecxt_scantuple = oldslot;
+
+				if(newrel)
+				{
+					Datum *slotvalues = slot_get_values(oldslot);
+					bool  *slotnulls = slot_get_isnull(oldslot);
+					Datum *newslotvalues = slot_get_values(newslot);
+					bool *newslotnulls = slot_get_isnull(newslot);
+
+					int nv = Min(oldslot->tts_tupleDescriptor->natts, newslot->tts_tupleDescriptor->natts);
+
+					/* aocs does not do oid yet */
+					Assert(!oldTupDesc->tdhasoid);
+					Assert(!newTupDesc->tdhasoid);
+
+					/* Dropped att should be set correctly by aocs_getnext */
+					/* transfer values from old to new slot */
+
+					memcpy(newslotvalues, slotvalues, sizeof(Datum) * nv);
+					memcpy(newslotnulls, slotnulls, sizeof(bool) * nv);
+					TupSetVirtualTupleNValid(newslot, nv);
+
+					/* Process supplied expressions */
+					foreach(l, tab->newvals)
+					{
+						NewColumnValue *ex = lfirst(l);
+
+						newslotvalues[ex->attnum-1] =
+							ExecEvalExpr(ex->exprstate,
+										 econtext,
+										 &newslotnulls[ex->attnum-1],
+										 NULL
+								);
+
+						if (ex->attnum > nv)
+							TupSetVirtualTupleNValid(newslot, ex->attnum);
+					}
+
+					/* Use the modified tuple to check constraints below */
+					econtext->ecxt_scantuple = newslot;
+				}
+
+				/* Check constraints */
+				foreach (l, tab->constraints)
+				{
+					NewConstraint *con = lfirst(l);
+					switch(con->contype)
+					{
+						case CONSTR_CHECK:
+							if(!ExecQual(con->qualstate, econtext, true))
+								ereport(ERROR,
+										(errcode(ERRCODE_CHECK_VIOLATION),
+										 errmsg("check constraint \"%s\" is violated",
+												con->name
+											 ),
+										 errOmitLocation(true)));
+							break;
+						case CONSTR_FOREIGN:
+							/* Nothing to do */
+							break;
+						default:
+							elog(ERROR, "Unrecognized constraint type: %d",
+								 (int) con->contype);
+					}
+				}
+
+				if(newrel)
+				{
+					MemoryContextSwitchTo(oldCxt);
+					parquet_insert(idesc, newslot);
+				}
+
+				ResetExprContext(econtext);
+				CHECK_FOR_INTERRUPTS();
+
+				MemoryContextSwitchTo(oldCxt);
+				parquet_getnext(sdesc, ForwardScanDirection, oldslot);
+			}
+
+			parquet_endscan(sdesc);
+
+			if(newrel)
+			{
+				StringInfo buf = NULL;
+				QueryContextDispatchingSendBack sendback = NULL;
+
+				if (Gp_role == GP_ROLE_EXECUTE)
+					buf = PreSendbackChangedCatalog(1);
+
+				sendback = CreateQueryContextDispatchingSendBack(
+						idesc->parquet_rel->rd_att->natts);
+
+				idesc->sendback = sendback;
+				sendback->relid = RelationGetRelid(idesc->parquet_rel);
+
+				parquet_insert_finish(idesc);
+
+				if (Gp_role == GP_ROLE_EXECUTE)
+					AddSendbackChangedCatalogContent(buf, sendback);
+
+				DropQueryContextDispatchingSendBack(sendback);
+
+				if (Gp_role == GP_ROLE_EXECUTE)
+					FinishSendbackChangedCatalog(buf);
+			}
+			pfree(proj);
+		}
 		else if(relstorage_is_ao(relstorage) && Gp_role == GP_ROLE_DISPATCH)
 		{
 			/*
@@ -6193,7 +6466,7 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 		 */
 		if (newrel)
 		{
-			CreateAppendOnlySegFileForRelationOnMaster(newrel, RESERVED_SEGNO);
+			CreateAppendOnlyParquetSegFileForRelationOnMaster(newrel, RESERVED_SEGNO);
 			/*
 			 * lock segment files on master
 			 */
@@ -6692,7 +6965,7 @@ ATExecAddColumn(AlteredTableInfo *tab, Relation rel,
 	 * specified. 
  	*/
 	 
-	if ((RelationIsAoRows(rel) || RelationIsAoCols(rel)) && 
+	if ((RelationIsAoRows(rel) || RelationIsAoCols(rel)  || RelationIsParquet(rel)) &&
 		(!colDef->default_is_null && !colDef->raw_default))
 	{
 		ereport(ERROR,
@@ -9974,12 +10247,12 @@ ATExecChangeOwner(Oid relationOid, Oid newOwnerId, bool recursing)
 				ATExecChangeOwner(tuple_class->reltoastrelid, newOwnerId,
 								  true);
 
-			if(RelationIsAoRows(target_rel) || RelationIsAoCols(target_rel))
+			if(RelationIsAoRows(target_rel) || RelationIsAoCols(target_rel) || RelationIsParquet(target_rel))
 			{
 				Oid segrelid, blkdirrelid;
 				GetAppendOnlyEntryAuxOids(relationOid, SnapshotNow,
-										  &segrelid, NULL,
-										  &blkdirrelid, NULL);
+									  &segrelid, NULL,
+									  &blkdirrelid, NULL);
 				
 				/* If it has an AO segment table, recurse to change its
 				 * ownership */
@@ -10302,7 +10575,7 @@ ATExecSetRelOptions(Relation rel, List *defList, bool isReset)
 		case RELKIND_TOASTVALUE:
 		case RELKIND_AOSEGMENTS:
 		case RELKIND_AOBLOCKDIR:
-			if(RelationIsAoRows(rel) || RelationIsAoCols(rel))
+			if(RelationIsAoRows(rel) || RelationIsAoCols(rel) || RelationIsParquet(rel))
 				ereport(ERROR,
 						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 						 errmsg("altering reloptions for append only tables"
@@ -12118,7 +12391,8 @@ build_ctas_with_dist(Relation rel, List *dist_clause,
 	pre_built = prebuild_temp_table(rel, tmprel, dist_clause,
 									storage_opts, hidden_types,
 									(RelationIsAoRows(rel) ||
-									 RelationIsAoCols(rel)));
+									 RelationIsAoCols(rel) ||
+									 RelationIsParquet(rel)));
 	if (pre_built)
 	{
 		InsertStmt *i = makeNode(InsertStmt);
@@ -12923,6 +13197,11 @@ ATExecSetDistributedBy(Relation rel, Node *node, AlterTableCmd *cmd)
                         {
                             is_aocs = true;
                             relstorage = RELSTORAGE_AOCOLS;
+                        }
+						else if (IsA(def->arg, String) && pg_strcasecmp(strVal(def->arg), "parquet") == 0)
+                        {
+                            is_aocs = true;
+                            relstorage = RELSTORAGE_PARQUET;
                         }
                         else
                         {
@@ -15218,12 +15497,15 @@ split_rows(Relation intoa, Relation intob, Relation temprel)
 	HeapScanDesc heapscan = NULL;
 	AppendOnlyScanDesc aoscan = NULL;
     AOCSScanDesc aocsscan = NULL;
+    ParquetScanDesc parquetscan = NULL;
     bool *aocsproj = NULL;
 	MemoryContext oldCxt;
 	AppendOnlyInsertDesc aoinsertdesc_a = NULL;
 	AppendOnlyInsertDesc aoinsertdesc_b = NULL;
     AOCSInsertDesc aocsinsertdesc_a = NULL;
     AOCSInsertDesc aocsinsertdesc_b = NULL;
+    ParquetInsertDesc parquetinsertdesc_a = NULL;
+    ParquetInsertDesc parquetinsertdesc_b = NULL;
 	ExprState *achk = NULL;
 	ExprState *bchk = NULL;
 
@@ -15261,7 +15543,7 @@ split_rows(Relation intoa, Relation intob, Relation temprel)
 		heapscan = heap_beginscan(temprel, SnapshotNow, 0, NULL);
 	else if (RelationIsAoRows(temprel))
 		aoscan = appendonly_beginscan(temprel, SnapshotNow, 0, NULL);
-	else if (RelationIsAoCols(temprel))
+	else if (RelationIsAoCols(temprel) || RelationIsParquet(temprel))
 	{
 		int nvp = temprel->rd_att->natts;
 		int i;
@@ -15270,7 +15552,12 @@ split_rows(Relation intoa, Relation intob, Relation temprel)
 		for(i=0; i<nvp; ++i)
 			aocsproj[i] = true;
 
-		aocsscan = aocs_beginscan(temprel, SnapshotNow, NULL /* relationTupleDesc */, aocsproj);
+		if(RelationIsAoCols(temprel)){
+			aocsscan = aocs_beginscan(temprel, SnapshotNow, NULL /* relationTupleDesc */, aocsproj);
+		}
+		else{
+			parquetscan = parquet_beginscan(temprel, SnapshotNow, NULL /* relationTupleDesc */, aocsproj);
+		}
 	}
 	else
 	{
@@ -15286,6 +15573,7 @@ split_rows(Relation intoa, Relation intob, Relation temprel)
 		Relation targetRelation;
 		AppendOnlyInsertDesc *targetAODescPtr;
 		AOCSInsertDesc *targetAOCSDescPtr;
+		ParquetInsertDesc *targetParquetDescPtr;
 		TupleTableSlot	   *targetSlot;
 		ItemPointer			tid;
 		ResultRelInfo	   *targetRelInfo = NULL;
@@ -15319,6 +15607,11 @@ split_rows(Relation intoa, Relation intob, Relation temprel)
 			if (TupIsNull(slotT))
 				break;
 		}
+		else if (RelationIsParquet(temprel)){
+			parquet_getnext(parquetscan, ForwardScanDirection, slotT);
+			if (TupIsNull(slotT))
+				break;
+		}
 
 		/* prepare for ExecQual */
 		econtext->ecxt_scantuple = slotT;
@@ -15341,6 +15634,7 @@ split_rows(Relation intoa, Relation intob, Relation temprel)
 			targetRelation = intoa;
 			targetAODescPtr = &aoinsertdesc_a;
 			targetAOCSDescPtr = &aocsinsertdesc_a;
+			targetParquetDescPtr = &parquetinsertdesc_a;
 			targetRelInfo = rria;
 		}
 		else
@@ -15348,6 +15642,7 @@ split_rows(Relation intoa, Relation intob, Relation temprel)
 			targetRelation = intob;
 			targetAODescPtr = &aoinsertdesc_b;
 			targetAOCSDescPtr = &aocsinsertdesc_b;
+			targetParquetDescPtr = &parquetinsertdesc_b;
 			targetRelInfo = rrib;
 		}
 
@@ -15402,6 +15697,20 @@ split_rows(Relation intoa, Relation intob, Relation temprel)
 			/* cache TID for later updating of indexes */
 			tid = slot_get_ctid(targetSlot);
 		}
+		else if (RelationIsParquet(targetRelation)){
+			if (!*targetParquetDescPtr)
+			{
+				MemoryContextSwitchTo(oldCxt);
+				*targetParquetDescPtr = parquet_insert_init(targetRelation,
+													  RESERVED_SEGNO);
+				MemoryContextSwitchTo(GetPerTupleMemoryContext(estate));
+			}
+
+			parquet_insert(*targetParquetDescPtr, targetSlot);
+
+			/* cache TID for later updating of indexes */
+			tid = slot_get_ctid(targetSlot);
+		}
 		else
 		{
 			Assert(false);
@@ -15433,6 +15742,10 @@ split_rows(Relation intoa, Relation intob, Relation temprel)
 	if (aocsinsertdesc_a)
 		++aocount;
 	if (aocsinsertdesc_b)
+		++aocount;
+	if (parquetinsertdesc_a)
+		++aocount;
+	if (parquetinsertdesc_b)
 		++aocount;
 
 	if (Gp_role == GP_ROLE_EXECUTE && aocount > 0)
@@ -15492,6 +15805,32 @@ split_rows(Relation intoa, Relation intob, Relation temprel)
 
 		DropQueryContextDispatchingSendBack(sendback);
 	}
+	if (parquetinsertdesc_a)
+	{
+		sendback = CreateQueryContextDispatchingSendBack(1);
+		parquetinsertdesc_a->sendback = sendback;
+		sendback->relid = RelationGetRelid(parquetinsertdesc_a->parquet_rel);
+
+		parquet_insert_finish(parquetinsertdesc_a);
+
+		if (Gp_role == GP_ROLE_EXECUTE)
+			AddSendbackChangedCatalogContent(buf, sendback);
+
+		DropQueryContextDispatchingSendBack(sendback);
+	}
+	if (parquetinsertdesc_b)
+	{
+		sendback = CreateQueryContextDispatchingSendBack(1);
+		parquetinsertdesc_b->sendback = sendback;
+		sendback->relid = RelationGetRelid(parquetinsertdesc_b->parquet_rel);
+
+		parquet_insert_finish(parquetinsertdesc_b);
+
+		if (Gp_role == GP_ROLE_EXECUTE)
+			AddSendbackChangedCatalogContent(buf, sendback);
+
+		DropQueryContextDispatchingSendBack(sendback);
+	}
 
 	if (Gp_role == GP_ROLE_EXECUTE && aocount > 0)
 		FinishSendbackChangedCatalog(buf);
@@ -15514,6 +15853,10 @@ split_rows(Relation intoa, Relation intob, Relation temprel)
 	{
 		pfree(aocsproj);
 		aocs_endscan(aocsscan);
+	}
+	else if(RelationIsParquet(temprel)){
+		pfree(aocsproj);
+		parquet_endscan(parquetscan);
 	}
 
 	destroy_split_resultrel(rria);
@@ -15648,7 +15991,8 @@ make_orientation_options(Relation rel)
 	List *l = NIL;
 
 	if (RelationIsAoRows(rel) ||
-		RelationIsAoCols(rel))
+		RelationIsAoCols(rel) ||
+		RelationIsParquet(rel) )
 	{
 		l = lappend(l, makeDefElem("appendonly", (Node *)makeString("true")));
 
@@ -15656,6 +16000,11 @@ make_orientation_options(Relation rel)
 		{
 			l = lappend(l, makeDefElem("orientation",
 									   (Node *)makeString("column")));
+		}
+		else if (RelationIsParquet(rel))
+		{
+			l = lappend(l, makeDefElem("orientation",
+									   (Node *)makeString("parquet")));
 		}
 	}
 	return l;
@@ -16543,9 +16892,9 @@ ATPExecPartSplit(Relation rel,
 		QueryContextInfo *contextdisp;
 
 		/* create the segfiles for the new relations here */
-		CreateAppendOnlySegFileForRelationOnMaster(intoa, RESERVED_SEGNO);
-	
-		CreateAppendOnlySegFileForRelationOnMaster(intob, RESERVED_SEGNO);
+		CreateAppendOnlyParquetSegFileForRelationOnMaster(intoa, RESERVED_SEGNO);
+
+		CreateAppendOnlyParquetSegFileForRelationOnMaster(intob, RESERVED_SEGNO);
 
 		/*
 		 * lock segment files on master

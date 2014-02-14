@@ -720,6 +720,16 @@ typedef struct AOCSPath
 } AOCSPath;
 
 
+/*
+ * ParquetPath is used for parquet table scans.
+ */
+typedef struct ParquetPath
+{
+	Path		path;
+
+	/* for now it's pretty plain.. */
+} ParquetPath;
+
 /* 
  * ExternalPath is used for external table scans. 
  */

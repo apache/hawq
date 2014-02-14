@@ -1210,7 +1210,8 @@ vacuum_rel(Relation onerel, VacuumStmt *vacstmt, LOCKMODE lmode, List *updated_s
 	 */
 	toast_relid = onerel->rd_rel->reltoastrelid;
 	if (RelationIsAoRows(onerel) ||
-		RelationIsAoCols(onerel))
+		RelationIsAoCols(onerel) ||
+		RelationIsParquet(onerel))
 		GetAppendOnlyEntryAuxOids(RelationGetRelid(onerel), SnapshotNow,
 								  &aoseg_relid, NULL,
 								  &aoblkdir_relid, NULL);
@@ -1347,6 +1348,10 @@ full_vacuum_rel(Relation onerel, VacuumStmt *vacstmt, List *updated_stats)
 	else if (RelationIsAoCols(onerel))
 	{
         vacuum_aocs_rel(onerel, vacrelstats, true);
+	}
+	else if (RelationIsParquet(onerel))
+	{
+		vacuum_parquet_rel(onerel, vacrelstats, true);
 	}
 	else
 	{

@@ -15,6 +15,7 @@
 #include "access/appendonlywriter.h"
 #include "access/appendonlytid.h"	  /* AOTupleId_MaxRowNum  */
 #include "access/aocssegfiles.h"                  /* AOCS */
+#include "access/parquetsegfiles.h"
 #include "access/heapam.h"			  /* heap_open            */
 #include "access/transam.h"			  /* InvalidTransactionId */
 #include "utils/lsyscache.h"
@@ -156,11 +157,13 @@ AORelCreateHashEntry(Oid relid)
 {
 	bool			exists = false;
 	FileSegInfo		**allfsinfo;
+	ParquetFileSegInfo **allfsinfoParquet;
 	int				i;
 	int				total_segfiles = 0;
 	AORelHashEntry	aoHashEntry = NULL;
 	Relation		aorel;
 	AppendOnlyEntry *aoEntry;
+	bool			isParquet = false;
 
 	Insist(Gp_role == GP_ROLE_DISPATCH);
 
@@ -182,7 +185,17 @@ AORelCreateHashEntry(Oid relid)
 	 */
 	aoEntry = GetAppendOnlyEntry(relid, SnapshotNow);
 
-	allfsinfo = GetAllFileSegInfo(aorel, aoEntry, SnapshotNow, &total_segfiles);
+	if(RelationIsParquet(aorel))
+	{
+		isParquet = true;
+		allfsinfo = NULL;
+		allfsinfoParquet = GetAllParquetFileSegInfo(aorel, aoEntry, SnapshotNow, &total_segfiles);
+	}
+	else
+	{
+		allfsinfo = GetAllFileSegInfo(aorel, aoEntry, SnapshotNow, &total_segfiles);
+		allfsinfoParquet = NULL;
+	}
 	pfree(aoEntry);
 	heap_close(aorel, RowExclusiveLock);
 
@@ -200,6 +213,8 @@ AORelCreateHashEntry(Oid relid)
 	{
 		if(allfsinfo)
 			pfree(allfsinfo);
+		if(allfsinfoParquet)
+			pfree(allfsinfoParquet);
 		return true;
 	}
 
@@ -247,9 +262,19 @@ AORelCreateHashEntry(Oid relid)
 	 * update the tupcount of each 'segment' file in the append
 	 * only hash according to tupcounts in the pg_aoseg table.
 	 */
-	for (i = 0 ; i < total_segfiles; i++)
+	if (isParquet)
 	{
-		aoHashEntry->relsegfiles[allfsinfo[i]->segno].tupcount = allfsinfo[i]->tupcount;
+		for (i = 0 ; i < total_segfiles; i++)
+		{
+			aoHashEntry->relsegfiles[allfsinfoParquet[i]->segno].tupcount = allfsinfoParquet[i]->tupcount;
+		}
+	}
+	else
+	{
+		for (i = 0 ; i < total_segfiles; i++)
+		{
+			aoHashEntry->relsegfiles[allfsinfo[i]->segno].tupcount = allfsinfo[i]->tupcount;
+		}
 	}
 
 	/* record the fact that another hash entry is now taken */
@@ -257,6 +282,8 @@ AORelCreateHashEntry(Oid relid)
 
 	if(allfsinfo)
 		pfree(allfsinfo);
+	if(allfsinfoParquet)
+		pfree(allfsinfoParquet);
 
 	if (Debug_appendonly_print_segfile_choice)
 	{
@@ -785,12 +812,13 @@ List *assignPerRelSegno(List *all_relids)
 		Oid cur_relid = lfirst_oid(cell);
 		Relation rel = heap_open(cur_relid, NoLock);
 
-		if (RelationIsAoCols(rel) || RelationIsAoRows(rel))
+		if (RelationIsAoCols(rel) || RelationIsAoRows(rel) || RelationIsParquet(rel))
 		{
 			SegfileMapNode *n;
 
 			n = makeNode(SegfileMapNode);
 			n->relid = cur_relid;
+
 			n->segno = SetSegnoForWrite(InvalidFileSegNumber, cur_relid);
 
 			Assert(n->relid != InvalidOid);
@@ -878,7 +906,7 @@ void UpdateMasterAosegTotals(Relation parentrel, int segno, uint64 tupcount)
 		 */
         UpdateFileSegInfo(parentrel, aoEntry, segno, 0, 0, tupcount, 0, GpIdentity.segindex);
 	}
-    else
+    else if (RelationIsAoCols(parentrel))
     {
 		AOCSFileSegInfo *seginfo;
 
@@ -900,6 +928,32 @@ void UpdateMasterAosegTotals(Relation parentrel, int segno, uint64 tupcount)
 			pfree(seginfo);
 		}
 		AOCSFileSegInfoAddCount(parentrel, aoEntry, segno, tupcount, 0);
+    }
+    else
+    {
+    	Assert(RelationIsParquet(parentrel));
+
+    	ParquetFileSegInfo		*fsinfo;
+
+		/* get the information for the file segment we inserted into */
+
+		/*
+		 * Since we have an exclusive lock on the segment-file entry, we can use SnapshotNow.
+		 */
+		fsinfo = GetParquetFileSegInfo(parentrel, aoEntry, SnapshotNow, segno, GpIdentity.segindex);
+		if (fsinfo == NULL)
+		{
+			InsertInitialParquetSegnoEntry(aoEntry, segno, GpIdentity.segindex);
+		}
+		else
+		{
+			pfree(fsinfo);
+		}
+
+		/*
+		 * Update the master Parquet segment info table with correct tuple count total
+		 */
+		UpdateParquetFileSegInfo(parentrel, aoEntry, segno, 0, 0, tupcount, GpIdentity.segindex);
     }
 
 	/*

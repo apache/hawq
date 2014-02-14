@@ -16,7 +16,7 @@ OBJS = catalog.o dependency.o heap.o index.o indexing.o namespace.o aclchk.o \
        pg_exttable.o pg_extprotocol.o pg_filesystem.o pg_largeobject.o pg_namespace.o \
        pg_operator.o pg_proc.o pg_proc_callback.o pg_shdepend.o \
        pg_type.o toasting.o aoseg.o aoblkdir.o gp_fastsequence.o \
-	   pg_attribute_encoding.o pg_compression.o 
+	   pg_attribute_encoding.o pg_compression.o
 SUBDIRS = caql core
 
 BKIFILES = postgres.bki postgres.description postgres.shdescription

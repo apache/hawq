@@ -2826,7 +2826,7 @@ reindex_relation(Oid relid, bool toast_too, bool aoseg_too, bool aoblkdir_too,
 	 */
 	rel = heap_open(relid, ShareLock);
 
-	relIsAO = (RelationIsAoRows(rel) || RelationIsAoCols(rel));
+	relIsAO = (RelationIsAoRows(rel) || RelationIsAoCols(rel) || RelationIsParquet(rel));
 
 	toast_relid = rel->rd_rel->reltoastrelid;
 

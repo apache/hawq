@@ -17,6 +17,7 @@
 #include "access/heapam.h"
 #include "access/xact.h"
 #include "access/aosegfiles.h"
+#include "access/parquetsegfiles.h"
 #include "catalog/dependency.h"
 #include "catalog/heap.h"
 #include "catalog/index.h"
@@ -159,7 +160,7 @@ create_aoseg_table(Relation rel, Oid aosegOid, Oid aosegIndexOid, Oid * comptype
 		TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aoseg_content,
 				"content", INT4OID, -1, 0);
 	}
-	else
+	else if (RelationIsAoCols(rel))
 	{
 		Assert(RelationIsAoCols(rel));
 		/* Create AOCS seg table */
@@ -211,6 +212,32 @@ create_aoseg_table(Relation rel, Oid aosegOid, Oid aosegIndexOid, Oid * comptype
 		TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aocs_content,
 				"content", INT4OID, -1, 0);
     }
+	else
+	{
+
+		/*
+		 * Create the parquetseg table and its index
+		 */
+		snprintf(aoseg_relname, sizeof(aoseg_relname),
+				"pg_paqseg_%u", relOid);
+		snprintf(aoseg_idxname, sizeof(aoseg_idxname),
+				"pg_paqseg_%u_index", relOid);
+
+		/* this is pretty painful...  need a tuple descriptor */
+		tupdesc = CreateTemplateTupleDesc(Natts_pg_parquetseg, false );
+
+		TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_parquetseg_segno,
+				"segno", INT4OID, -1, 0);
+		TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_parquetseg_eof, "eof",
+				FLOAT8OID, -1, 0);
+		TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_parquetseg_tupcount,
+				"tupcount", FLOAT8OID, -1, 0);
+		TupleDescInitEntry(tupdesc,
+				(AttrNumber) Anum_pg_parquetseg_eofuncompressed,
+				"eofuncompressed", FLOAT8OID, -1, 0);
+		TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_parquetseg_content,
+				"content", INT4OID, -1, 0);
+	}
 
 	/*
 	 * Note: the aoseg relation is placed in the regular pg_aoseg namespace
@@ -281,7 +308,7 @@ create_aoseg_table(Relation rel, Oid aosegOid, Oid aosegIndexOid, Oid * comptype
 	 * Store the aoseg table's OID in the parent relation's pg_appendonly row
 	 */
 	UpdateAppendOnlyEntryAuxOids(relOid, aoseg_relid, aoseg_idxid,
-								 InvalidOid, InvalidOid);
+							 InvalidOid, InvalidOid);
 
 	/*
 	 * Register dependency from the aoseg table to the master, so that the
@@ -311,7 +338,7 @@ create_aoseg_table(Relation rel, Oid aosegOid, Oid aosegIndexOid, Oid * comptype
 static bool
 needs_aoseg_table(Relation rel)
 {
-	return (RelationIsAoRows(rel) || RelationIsAoCols(rel));
+	return (RelationIsAoRows(rel) || RelationIsAoCols(rel) || RelationIsParquet(rel));
 }
 
 

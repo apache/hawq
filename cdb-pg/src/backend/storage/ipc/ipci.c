@@ -300,8 +300,9 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
 	 * Set up append only writer
 	 */
 	if (Gp_role == GP_ROLE_DISPATCH)
+	{
 		InitAppendOnlyWriter();
-
+	}
 	PersistentFileSysObj_ShmemInit();
 	PersistentFilespace_ShmemInit();
 	PersistentTablespace_ShmemInit();

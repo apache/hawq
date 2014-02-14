@@ -51,6 +51,8 @@
       <dependency org="xmlsoft"         name="libxml2"         rev="2.7.8"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
       <dependency org="zlib"            name="zlib"            rev="1.2.3"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
       <dependency org="gnu"             name="libgsasl"        rev="1.8.0"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64" />
-      <dependency org="R-Project" name="R"         rev="2.13.0-1"   conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64" />
+      <dependency org="R-Project"       name="R"               rev="2.13.0-1"       conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64" />
+      <dependency org="Apache"          name="thrift"          rev="0.9.1-1"        conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64" />
+      <dependency org="google"          name="snappy"          rev="1.1.1-1"        conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64" />
     </dependencies>
 </ivy-module>

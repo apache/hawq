@@ -1278,7 +1278,6 @@ ProcessUtility(Node *parsetree,
 					ereport(ERROR,
 									(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create index statement yet") ));
 				}
-
 				IndexStmt  *stmt = (IndexStmt *) parsetree;
 
 				if (stmt->concurrent)

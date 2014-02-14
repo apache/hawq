@@ -22,6 +22,7 @@
 #include "access/catquery.h"
 #include "access/heapam.h"
 #include "access/aocssegfiles.h"
+#include "access/parquetsegfiles.h"
 #include "access/pxfuriparser.h"
 #include "catalog/gp_policy.h"
 #include "catalog/pg_inherits.h"
@@ -587,6 +588,17 @@ estimate_rel_size(Relation rel, int32 *attr_widths,
 			    }
 			    curpages = RelationGuessNumberOfBlocks(totalBytes);
 			    pfree(aoEntry);
+			}
+			else if(RelationIsParquet(rel))
+			{
+				/* MPP-7629 */
+				/*
+				 * relation should not be distributed table
+				 */
+				ParquetFileSegTotals *fstotal = GetParquetSegFilesTotals(rel, SnapshotNow, GpIdentity.segindex);
+				Assert(fstotal);
+				curpages = RelationGuessNumberOfBlocks((double)fstotal->totalbytes);
+				pfree(fstotal);
 			}
 			else
 			{

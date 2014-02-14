@@ -157,6 +157,8 @@ DirectOpenDefineExtern(DirectOpen_GpRelationNode);
 
 DirectOpenDefineExtern(DirectOpen_PgAppendOnly);
 
+DirectOpenDefineExtern(DirectOpen_PgParquet);
+
 DirectOpenDefineExtern(DirectOpen_PgAoSeg);
 
 DirectOpenDefineExtern(DirectOpen_PgAoCsSeg);

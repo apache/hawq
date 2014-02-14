@@ -509,7 +509,7 @@ CloseWritableFileSeg(AppendOnlyInsertDesc aoInsertDesc)
 	aoInsertDesc->sendback->insertCount = aoInsertDesc->insertCount;
 
 	aoInsertDesc->sendback->eof = palloc(sizeof(int64));
-	aoInsertDesc->sendback->uncompressed_eof = palloc( sizeof(int64));
+	aoInsertDesc->sendback->uncompressed_eof = palloc(sizeof(int64));
 
 	aoInsertDesc->sendback->numfiles = 1;
 	aoInsertDesc->sendback->eof[0] = fileLen;

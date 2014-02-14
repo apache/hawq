@@ -3931,7 +3931,8 @@ load_relcache_init_file(void)
 
 		if (rel->rd_rel->relkind == RELKIND_INDEX
 				|| (rel->rd_rel->relstorage != RELSTORAGE_AOROWS
-						&& rel->rd_rel->relstorage != RELSTORAGE_AOCOLS)
+						&& rel->rd_rel->relstorage != RELSTORAGE_AOCOLS
+						&& rel->rd_rel->relstorage != RELSTORAGE_PARQUET)
 				|| IsBootstrapProcessingMode() || Gp_role != GP_ROLE_DISPATCH) {
 			rel->rd_segfile0_count = 1;
 		}

@@ -22,6 +22,7 @@
 #include "access/catquery.h"
 #include "access/appendonlywriter.h"
 #include "access/aocssegfiles.h"
+#include "access/parquetsegfiles.h"
 #include "catalog/catalog.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_tablespace.h"
@@ -472,6 +473,8 @@ calculate_relation_size(Relation rel)
 		totalsize = GetAOTotalBytes(rel, SnapshotNow);
 	else if (RelationIsAoCols(rel))
 		totalsize = GetAOCSTotalBytes(rel, SnapshotNow);
+	else if (RelationIsParquet(rel))
+		totalsize = GetParquetTotalBytes(rel, SnapshotNow);
            
     /* RELSTORAGE_VIRTUAL has no space usage */
     return totalsize;
@@ -567,7 +570,7 @@ calculate_total_relation_size(Oid Relid)
 	heapRel = relation_open(Relid, AccessShareLock);
 	toastOid = heapRel->rd_rel->reltoastrelid;
 
-	if (RelationIsAoRows(heapRel) || RelationIsAoCols(heapRel))
+	if (RelationIsAoRows(heapRel) || RelationIsAoCols(heapRel) || RelationIsParquet(heapRel))
 		aoEntry = GetAppendOnlyEntry(Relid, SnapshotNow);
 	
 	/* Get the heap size */

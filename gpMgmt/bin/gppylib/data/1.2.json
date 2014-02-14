@@ -2424,6 +2424,7 @@
          "compresstype" : "text",
          "majorversion" : "int2",
          "minorversion" : "int2",
+         "pagesize" : "int4",
          "relid" : "Oid",
          "safefswritesize" : "int4",
          "segidxid" : "Oid",
@@ -2439,6 +2440,11 @@
          },
          {
             "colname" : "blocksize",
+            "ctype" : "int4",
+            "sqltype" : "integer"
+         },
+         {
+            "colname" : "pagesize",
             "ctype" : "int4",
             "sqltype" : "integer"
          },
@@ -2545,8 +2551,8 @@
          }
       ],
       "relid_comment_tag" : "/* relation id: 6105 - pg_appendonly */\n",
-      "tabdef_text" : "\n   CREATE TABLE pg_appendonly\n   with (camelcase=AppendOnly, oid=false, relid=6105)\n   (\n   relid            oid, \n   blocksize        integer, \n   safefswritesize  integer, \n   compresslevel    smallint, \n   majorversion     smallint, \n   minorversion     smallint, \n   checksum         boolean, \n   compresstype     text, \n   columnstore      boolean, \n   segrelid         oid, \n   segidxid         oid, \n   blkdirrelid      oid, \n   blkdiridxid      oid, \n   version          integer\n   )",
-      "with" : {
+      "tabdef_text" : "\n   CREATE TABLE pg_appendonly\n   with (camelcase=AppendOnly, oid=false, relid=6105)\n   (\n   relid            oid, \n   blocksize        integer, \n   safefswritesize  integer, \n   compresslevel    smallint, \n   majorversion     smallint, \n   minorversion     smallint, \n   checksum         boolean, \n   compresstype     text, \n   columnstore      boolean, \n   segrelid         oid, \n   segidxid         oid, \n   blkdirrelid      oid, \n   blkdiridxid      oid, \n   version          integer, \n   pagesize          integer\n   )",
+	  "with" : {
          "bootstrap" : 0,
          "camelcase" : "AppendOnly",
          "oid" : "",

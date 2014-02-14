@@ -13,6 +13,7 @@
 #include "access/fileam.h"
 #include "cdb/cdbaocsam.h"
 #include "cdb/cdbappendonlyam.h"
+#include "cdb/cdbparquetam.h"
 #include "cdb/cdbpartition.h"
 #include "commands/trigger.h"
 #include "executor/execdebug.h"
@@ -158,7 +159,7 @@ ExecInsert(TupleTableSlot *slot,
 	bool 		rel_is_aorows = false;
 	bool		rel_is_aocols = false;
 	bool		rel_is_external = false;
-
+    bool		rel_is_parquet = false;
 
 	/*
 	 * get information on the (current) result relation
@@ -181,9 +182,10 @@ ExecInsert(TupleTableSlot *slot,
 	rel_is_aocols = RelationIsAoCols(resultRelationDesc);
 	rel_is_aorows = RelationIsAoRows(resultRelationDesc);
 	rel_is_external = RelationIsExternal(resultRelationDesc);
+    rel_is_parquet = RelationIsParquet(resultRelationDesc);
 
 	/* Validate that insert is not part of an non-allowed update operation. */
-	if (isUpdate && (rel_is_aocols || rel_is_aorows))
+	if (isUpdate && (rel_is_aocols || rel_is_aorows || rel_is_parquet))
 	{
 		ereport(ERROR,
 			(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
@@ -200,13 +202,18 @@ ExecInsert(TupleTableSlot *slot,
 	{
 		tuple = ExecFetchSlotMemTuple(partslot, false);
 	}
+	else if (rel_is_parquet)
+	{
+		tuple = NULL;
+	}
 	else
 	{
 		Assert(rel_is_aocols);
 		tuple = ExecFetchSlotMemTuple(partslot, true);
 	}
 
-	Assert(partslot != NULL && tuple != NULL);
+	Assert( partslot != NULL );
+	Assert( rel_is_parquet || (tuple != NULL));
 
 	/* Execute triggers in Planner-generated plans */
 	if (planGen == PLANGEN_PLANNER)
@@ -218,7 +225,7 @@ ExecInsert(TupleTableSlot *slot,
 			HeapTuple	newtuple;
 
 			/* NYI */
-			if(rel_is_aocols)
+			if(rel_is_aocols || rel_is_parquet)
 				elog(ERROR, "triggers are not supported on tables that use column-oriented storage");
 
 			newtuple = ExecBRInsertTriggers(estate, resultRelInfo, tuple);
@@ -298,6 +305,17 @@ ExecInsert(TupleTableSlot *slot,
 
 		newId = external_insert(resultRelInfo->ri_extInsertDesc, tuple);
 	}
+    else if(rel_is_parquet)
+	{
+		/* If there is no parquet insert descriptor, create it now. */
+		if (resultRelInfo->ri_parquetInsertDesc == NULL)
+		{
+			ResultRelInfoSetSegno(resultRelInfo, estate->es_result_aosegnos);
+			resultRelInfo->ri_parquetInsertDesc = parquet_insert_init(resultRelationDesc, resultRelInfo->ri_aosegno);
+		}
+
+		newId = parquet_insert(resultRelInfo->ri_parquetInsertDesc, partslot);
+	}
 	else
 	{
 		Insist(rel_is_heap);
@@ -315,12 +333,14 @@ ExecInsert(TupleTableSlot *slot,
 
 	partslot->tts_tableOid = RelationGetRelid(resultRelationDesc);
 
-	if (rel_is_aorows || rel_is_aocols)
+	if (rel_is_aorows || rel_is_aocols || rel_is_parquet)
 	{
+
+		/* NOTE: Current version does not support index upon parquet table. */
 		/*
 		 * insert index entries for AO Row-Store tuple
 		 */
-		if (resultRelInfo->ri_NumIndices > 0)
+		if (resultRelInfo->ri_NumIndices > 0 && !rel_is_parquet)
 			ExecInsertIndexTuples(partslot, (ItemPointer)&aoTupleId, estate, false);
 	}
 	else

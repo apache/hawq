@@ -762,6 +762,7 @@ AdjustVarnoWalker(Node *node, AdjustVarnoContext *ctx)
 		case T_SeqScan:
 		case T_AppendOnlyScan:
 		case T_AOCSScan:
+		case T_ParquetScan:
 		case T_ExternalScan:
 		case T_IndexScan:
 		case T_BitmapIndexScan:

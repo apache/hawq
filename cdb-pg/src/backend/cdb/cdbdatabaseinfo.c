@@ -1031,11 +1031,12 @@ DatabaseInfo_HandleAppendOnly(
 			if (Debug_persistent_print)
 				elog(Persistent_DebugPrintLevel(), 
 					 "DatabaseInfo_AddPgClassStoredRelation: Append-Only entry for relation id %u, relation name %s, "
-				     "blocksize %d, safefswritesize %d, compresslevel %d, major version %d, minor version %d, "
+				     "blocksize %d, pagesize %d, safefswritesize %d, compresslevel %d, major version %d, minor version %d, "
 				     " checksum %s, compresstype %s, columnstore %s, segrelid %u, segidxid %u, blkdirrelid %u, blkdiridxid %u",
 				     dbInfoRel->relationOid,
 				     dbInfoRel->relname,
 					 aoEntry->blocksize,
+					 aoEntry->pagesize,
 					 aoEntry->safefswritesize,
 					 aoEntry->compresslevel,
 					 aoEntry->majorversion,
@@ -1176,10 +1177,11 @@ DatabaseInfo_CollectPgAppendOnly(
 		if (Debug_persistent_print)
 			elog(Persistent_DebugPrintLevel(), 
 				 "DatabaseInfo_Collect: Append-Only entry for relation id %u, "
-				 "blocksize %d, safefswritesize %d, compresslevel %d, major version %d, minor version %d, "
+				 "blocksize %d, pagesize %d, safefswritesize %d, compresslevel %d, major version %d, minor version %d, "
 				 " checksum %s, compresstype %s, columnstore %s, segrelid %u, segidxid %u, blkdirrelid %u, blkdiridxid %u",
 				 relationId,
 				 aoEntry->blocksize,
+				 aoEntry->pagesize,
 				 aoEntry->safefswritesize,
 				 aoEntry->compresslevel,
 				 aoEntry->majorversion,

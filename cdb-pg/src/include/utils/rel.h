@@ -261,10 +261,12 @@ typedef struct StdRdOptions
 	AutoVacOpts autovacuum;		/* autovacuum-related options */
 	bool		appendonly;		/* is this an appendonly relation? */
 	int			blocksize;		/* max varblock size (AO rels only) */
+	int			pagesize;		/* page size(Parquet rels only) */
+	int			rowgroupsize;	/* row group size (Parquet rels only)*/
 	int			compresslevel;  /* compression level (AO rels only) */
 	char*		compresstype;   /* compression type (AO rels only) */
 	bool		checksum;		/* checksum (AO rels only) */
-	bool 		columnstore;	/* columnstore (AO only) */
+	char 		columnstore;	/* columnstore (AO only, 'a' for ao, 'c' for co, 'p' for parquet) */
 	bool		forceHeap;		/* specified appendonly=false */
 	bool		errorTable;		/* skip GOH tablespace checking. */
 } StdRdOptions;
@@ -344,6 +346,14 @@ typedef struct TidycatOptions
  */
 #define RelationIsAoCols(relation) \
 	((bool)(((relation)->rd_rel->relstorage == RELSTORAGE_AOCOLS)))
+
+/*
+ * RelationIsParquet
+ * 		True iff relation has append only storage with parquet orientation
+ */
+#define RelationIsParquet(relation) \
+	((bool)(((relation)->rd_rel->relstorage == RELSTORAGE_PARQUET)))
+
 
 /*
  * RelationIsForeign

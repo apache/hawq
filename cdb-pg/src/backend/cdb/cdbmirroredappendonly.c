@@ -282,6 +282,8 @@ void MirroredAppendOnly_Flush(
 	Assert(open != NULL);
 	Assert(open->isActive);
 	
+	*primaryError = 0;
+
 	int		ret;
 
 	errno = 0;

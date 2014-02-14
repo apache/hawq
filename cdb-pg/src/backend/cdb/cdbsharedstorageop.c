@@ -303,6 +303,9 @@ void PerformSharedStorageOp(SharedStorageOpStmt * stat)
 		{
 			if (GpIdentity.segindex == stat->contentid[i])
 			{
+				/*we need add here whether choose create an appendonly table file or a
+				 * parquet table file. Maybe can do this by adding a variable to
+				 * SharedStorageOpStmt*/
 				MirroredAppendOnly_Create(&stat->relFileNode[i], stat->segmentFileNum[i],
 						GpIdentity.segindex, stat->relationName[i], &error);
 
@@ -334,7 +337,7 @@ static void LockSegfilesOnMasterForSingleRel(Relation rel, int32 segno)
 	 */
 	for (i = 1; i < rel->rd_segfile0_count; ++i)
 	{
-		if (RelationIsAoRows(rel))
+		if (RelationIsAoRows(rel) || RelationIsParquet(rel))
 		{
 			LockRelationAppendOnlySegmentFile(&rel->rd_node, segno,
 					AccessExclusiveLock, false, i - 1);

@@ -1252,6 +1252,8 @@ describeOneTableDetails(const char *schemaname,
 		char	   *compressionType;
 		char	   *compressionLevel;
 		char	   *blockSize;
+		char	   *pageSize;
+		char	   *rowgroupSize;
 		char	   *checksum;
 	}			tableinfo;
 	bool		show_modifiers = false;
@@ -1260,6 +1262,8 @@ describeOneTableDetails(const char *schemaname,
 	tableinfo.compressionType  = NULL;
 	tableinfo.compressionLevel = NULL;
 	tableinfo.blockSize        = NULL;
+	tableinfo.pageSize		   = NULL;
+	tableinfo.rowgroupSize	   = NULL;
 	tableinfo.checksum         = NULL;
 
 	retval = false;
@@ -1419,6 +1423,35 @@ describeOneTableDetails(const char *schemaname,
 		res = NULL;
 	}
 
+	if (tableinfo.relstorage == 'p')
+	{
+		PGresult *result = NULL;
+		/* Get Append Only information
+		 * always have 4 bits of info: blocksize, compresstype, compresslevel and checksum
+		 */
+		printfPQExpBuffer(&buf,
+				"SELECT p.compresstype, p.compresslevel, p.pagesize, p.blocksize, p.checksum\n"
+					"FROM pg_catalog.pg_appendonly p, pg_catalog.pg_class c\n"
+					"WHERE c.oid = p.relid AND c.oid = '%s'", oid);
+
+		result = PSQLexec(buf.data, false);
+		if (!result)
+			goto error_return;
+
+		if (PQgetisnull(result, 0, 0))
+		{
+			tableinfo.compressionType = pg_malloc(sizeof("None") + 1);
+			strcpy(tableinfo.compressionType, "None");
+		} else
+			tableinfo.compressionType = pg_strdup(PQgetvalue(result, 0, 0));
+		tableinfo.compressionLevel = pg_strdup(PQgetvalue(result, 0, 1));
+		tableinfo.pageSize = pg_strdup(PQgetvalue(result, 0, 2));
+		tableinfo.rowgroupSize = pg_strdup(PQgetvalue(result, 0, 3));
+		tableinfo.checksum = pg_strdup(PQgetvalue(result, 0, 4));
+		PQclear(res);
+		res = NULL;
+	}
+
 	/* Get column info */
 	printfPQExpBuffer(&buf, "SELECT a.attname,");
 	appendPQExpBuffer(&buf, "\n  pg_catalog.format_type(a.atttypid, a.atttypmod),"
@@ -1460,6 +1493,9 @@ describeOneTableDetails(const char *schemaname,
 			else if(tableinfo.relstorage == 'c')
 				printfPQExpBuffer(&title, _("Append-Only Columnar Table \"%s.%s\""),
 								  schemaname, relationname);
+			else if(tableinfo.relstorage == 'p')
+				printfPQExpBuffer(&title, _("Parquet Table \"%s.%s\""),
+								schemaname, relationname);
 			else if(tableinfo.relstorage == 'x')
 				printfPQExpBuffer(&title, _("External table \"%s.%s\""),
 								  schemaname, relationname);
@@ -1947,16 +1983,27 @@ describeOneTableDetails(const char *schemaname,
 		int			tuples = 0;
 
 		/* print append only table information */
-		if (tableinfo.relstorage == 'a' || tableinfo.relstorage == 'c')
+		if (tableinfo.relstorage == 'a' || tableinfo.relstorage == 'c' || tableinfo.relstorage == 'p')
 		{
-		  if (tableinfo.relstorage == 'a')
+		  if (tableinfo.relstorage != 'c')
 			{
 				printfPQExpBuffer(&buf, _("Compression Type: %s"), tableinfo.compressionType);
 				printTableAddFooter(&cont, buf.data);
 				printfPQExpBuffer(&buf, _("Compression Level: %s"), tableinfo.compressionLevel);
 				printTableAddFooter(&cont, buf.data);
-				printfPQExpBuffer(&buf, _("Block Size: %s"), tableinfo.blockSize);
-				printTableAddFooter(&cont, buf.data);
+				if(tableinfo.relstorage == 'a')
+				{
+					printfPQExpBuffer(&buf, _("Block Size: %s"), tableinfo.blockSize);
+					printTableAddFooter(&cont, buf.data);
+				}
+				else
+				{
+					printfPQExpBuffer(&buf, _("Page Size: %s"), tableinfo.pageSize);
+					printTableAddFooter(&cont, buf.data);
+					printfPQExpBuffer(&buf, _("RowGroup Size: %s"), tableinfo.rowgroupSize);
+					printTableAddFooter(&cont, buf.data);
+				}
+
 			}
 			printfPQExpBuffer(&buf, _("Checksum: %s"), tableinfo.checksum);
 			printTableAddFooter(&cont, buf.data);
@@ -2524,6 +2571,10 @@ error_return:
 		free(tableinfo.compressionLevel);
 	if (tableinfo.blockSize)
 		free(tableinfo.blockSize);
+	if (tableinfo.pageSize)
+		free(tableinfo.pageSize);
+	if (tableinfo.rowgroupSize)
+		free(tableinfo.rowgroupSize);
 	if (tableinfo.checksum)
 		free(tableinfo.checksum);
 
@@ -2949,8 +3000,8 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 	if (isGPDB())   /* GPDB? */
 		appendPQExpBuffer(&buf,
 				  ", CASE c.relstorage WHEN 'h' THEN '%s' WHEN 'x' THEN '%s' WHEN 'a' "
-				  "THEN '%s' WHEN 'v' THEN '%s' WHEN 'c' THEN '%s' WHEN 'f' THEN '%s' END as \"%s\"\n",
-				  gettext_noop("heap"), gettext_noop("external"), gettext_noop("append only"), gettext_noop("none"), gettext_noop("append only columnar"), gettext_noop("foreign"), gettext_noop("Storage"));
+				  "THEN '%s' WHEN 'v' THEN '%s' WHEN 'c' THEN '%s' WHEN 'p' THEN '%s' WHEN 'f' THEN '%s' END as \"%s\"\n",
+				  gettext_noop("heap"), gettext_noop("external"), gettext_noop("append only"), gettext_noop("none"), gettext_noop("append only columnar"), gettext_noop("parquet"), gettext_noop("foreign"), gettext_noop("Storage"));
 
 	if (showIndexes)
 		appendPQExpBuffer(&buf,
@@ -2997,7 +3048,7 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
     {
 	appendPQExpBuffer(&buf, "AND c.relstorage IN (");
 	if (showTables || showIndexes || showSeq || (showSystem && showTables))
-		appendPQExpBuffer(&buf, "'h', 'a', 'c',");
+		appendPQExpBuffer(&buf, "'h', 'a', 'c', 'p',");
 	if (showExternal)
 		appendPQExpBuffer(&buf, "'x',");
 	if (showForeign)

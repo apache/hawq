@@ -311,7 +311,7 @@ cluster_rel(RelToCluster *rvtc, bool recheck, ClusterStmt *stmt, bool printError
 	 * We don't support cluster on an AO table. We print out
 	 * a warning/error to the user, and simply return.
 	 */
-	if (RelationIsAoRows(OldHeap) || RelationIsAoCols(OldHeap))
+	if (RelationIsAoRows(OldHeap) || RelationIsAoCols(OldHeap) || RelationIsParquet(OldHeap))
 	{
 		int elevel = WARNING;
 		
@@ -1069,9 +1069,11 @@ swap_relation_files(Oid r1, Oid r2, bool swap_stats)
 	relform2 = (Form_pg_class) GETSTRUCT(reltup2);
 	
 	isAO1 = (relform1->relstorage == RELSTORAGE_AOROWS ||
-			 relform1->relstorage == RELSTORAGE_AOCOLS);
+			 relform1->relstorage == RELSTORAGE_AOCOLS ||
+			 relform1->relstorage == RELSTORAGE_PARQUET);
 	isAO2 = (relform2->relstorage == RELSTORAGE_AOROWS ||
-			 relform2->relstorage == RELSTORAGE_AOCOLS);
+			 relform2->relstorage == RELSTORAGE_AOCOLS ||
+			 relform2->relstorage == RELSTORAGE_PARQUET);
 
 	if (Debug_persistent_print)
 		elog(Persistent_DebugPrintLevel(), 
@@ -1124,7 +1126,6 @@ swap_relation_files(Oid r1, Oid r2, bool swap_stats)
 		TransferAppendonlyEntry(r2, r1);
 	}
 	
-
 	/* swap size statistics too, since new rel has freshly-updated stats */
 	if (swap_stats)
 	{

@@ -36,6 +36,7 @@
 
 #include "access/heapam.h"
 #include "access/aosegfiles.h"
+#include "access/parquetsegfiles.h"
 #include "access/appendonlywriter.h"
 #include "access/fileam.h"
 #include "access/reloptions.h"
@@ -83,6 +84,7 @@
 
 #include "cdb/cdbappendonlyam.h"
 #include "cdb/cdbaocsam.h"
+#include "cdb/cdbparquetam.h"
 #include "cdb/cdbcat.h"
 #include "cdb/cdbdisp.h"
 #include "cdb/cdbdispatchresult.h"
@@ -105,7 +107,6 @@
 #include "cdb/cdbtargeteddispatch.h"
 #include "cdb/cdbquerycontextdispatching.h"
 #include "optimizer/prep.h"
-
 
 typedef struct evalPlanQual
 {
@@ -275,7 +276,7 @@ SetupSegnoForErrorTable(Node *node, QueryCxtWalkerCxt *cxt)
 		info->errTblOid = lcons_oid(scan->fmterrtbl, info->errTblOid);
 
 		Relation errRel = heap_open(scan->fmterrtbl, RowExclusiveLock);
-		CreateAppendOnlySegFileForRelationOnMaster(errRel, errSegno);
+		CreateAppendOnlyParquetSegFileForRelationOnMaster(errRel, errSegno);
 		prepareDispatchedCatalogSingleRelation(info, scan->fmterrtbl, TRUE, errSegno);
 		heap_close(errRel, RowExclusiveLock);
 
@@ -1587,7 +1588,7 @@ InitializeResultRelations(PlannedStmt *plannedstmt, EState *estate, CmdType oper
 		foreach(cell, all_relids)
 		{
 			Oid relid =  lfirst_oid(cell);
-			CreateAppendOnlySegFileOnMaster(relid, estate->es_result_aosegnos);
+			CreateAppendOnlyParquetSegFileOnMaster(relid, estate->es_result_aosegnos);
 		}
 
 	}
@@ -2231,7 +2232,7 @@ initResultRelInfo(ResultRelInfo *resultRelInfo,
 }
 
 void
-CreateAppendOnlySegFileOnMaster(Oid relid, List *mapping)
+CreateAppendOnlyParquetSegFileOnMaster(Oid relid, List *mapping)
 {
    	ListCell *relid_to_segno;
    	bool	  found = false;
@@ -2239,7 +2240,7 @@ CreateAppendOnlySegFileOnMaster(Oid relid, List *mapping)
    	Relation rel = heap_open(relid, AccessShareLock);
 
 	/* only relevant for AO relations */
-	if(!RelationIsAoCols(rel) && !RelationIsAoRows(rel))
+	if(!RelationIsAoCols(rel) && !RelationIsAoRows(rel)  && !RelationIsParquet(rel))
 	{
 		heap_close(rel, AccessShareLock);
 		return;
@@ -2261,7 +2262,7 @@ CreateAppendOnlySegFileOnMaster(Oid relid, List *mapping)
 			 * in hawq, master create all segfile for segments
 			 */
 			if (Gp_role == GP_ROLE_DISPATCH)
-				CreateAppendOnlySegFileForRelationOnMaster(rel, n->segno);
+				CreateAppendOnlyParquetSegFileForRelationOnMaster(rel, n->segno);
 
 			found = true;
 			break;
@@ -2413,21 +2414,92 @@ CreateAoCsSegFileForRelationOnMaster(Relation rel,
 	heap_close(gp_relation_node, AccessShareLock);
 }
 
+static void
+CreateParquetSegFileForRelationOnMaster(Relation rel,
+		AppendOnlyEntry *aoEntry, int segno, SharedStorageOpTasks *tasks)
+{
+	int i;
+	ParquetFileSegInfo * fsinfo;
+
+	Relation gp_relation_node;
+	HeapTuple tuple;
+
+	ItemPointerData persistentTid;
+	int64 persistentSerialNum;
+
+	Assert(RelationIsParquet(rel));
+
+	char * relname = RelationGetRelationName(rel);
+
+	gp_relation_node = heap_open(GpRelationNodeRelationId, AccessShareLock);
+
+	for (i = 0; i < rel->rd_segfile0_count; ++i)
+	{
+		fsinfo = GetParquetFileSegInfo(rel, aoEntry, SnapshotNow, segno,
+				i - 1);
+
+		if (NULL == fsinfo)
+		{
+			InsertInitialParquetSegnoEntry(aoEntry, segno, i - 1);
+		}
+		else if (fsinfo->eof != 0)
+		{
+			pfree(fsinfo);
+			continue;
+		}
+
+		if (fsinfo)
+			pfree(fsinfo);
+
+		tuple = FetchGpRelationNodeTuple(
+					gp_relation_node,
+					rel->rd_node.relNode,
+					segno,
+					i - 1,
+					&persistentTid,
+					&persistentSerialNum);
+
+		if (HeapTupleIsValid(tuple))
+		{
+			heap_freetuple(tuple);
+			continue;
+		}
+
+		SharedStorageOpPreAddTask(&rel->rd_node, segno, i - 1, relname,
+				&rel->rd_segfile0_relationnodeinfos[i].persistentTid,
+				&rel->rd_segfile0_relationnodeinfos[i].persistentSerialNum);
+
+		rel->rd_segfile0_relationnodeinfos[i].isPresent = TRUE;
+
+		SharedStorageOpAddTask(relname, &rel->rd_node, segno, i - 1,
+				&rel->rd_segfile0_relationnodeinfos[i].persistentTid,
+				rel->rd_segfile0_relationnodeinfos[i].persistentSerialNum,
+				tasks);
+	}
+
+	heap_close(gp_relation_node, AccessShareLock);
+}
+
 void
-CreateAppendOnlySegFileForRelationOnMaster(Relation rel, int segno)
+CreateAppendOnlyParquetSegFileForRelationOnMaster(Relation rel, int segno)
 {
 	Assert(NULL != rel->rd_segfile0_relationnodeinfos);
 
 	SharedStorageOpTasks *tasks = CreateSharedStorageOpTasks();
 
-	AppendOnlyEntry *aoEntry = GetAppendOnlyEntry(rel->rd_id, SnapshotNow);
+	if(RelationIsAoRows(rel) || RelationIsAoCols(rel) || RelationIsParquet(rel))
+	{
+		AppendOnlyEntry *aoEntry = GetAppendOnlyEntry(rel->rd_id, SnapshotNow);
 
-	if(RelationIsAoRows(rel))
-		CreaateAoRowSegFileForRelationOnMaster(rel, aoEntry, segno, tasks);
-	else
-		CreateAoCsSegFileForRelationOnMaster(rel, aoEntry, segno, tasks);
+		if(RelationIsAoRows(rel))
+			CreaateAoRowSegFileForRelationOnMaster(rel, aoEntry, segno, tasks);
+		else if (RelationIsAoCols(rel))
+			CreateAoCsSegFileForRelationOnMaster(rel, aoEntry, segno, tasks);
+		else
+			CreateParquetSegFileForRelationOnMaster(rel, aoEntry, segno, tasks);
 
-	pfree(aoEntry);
+		pfree(aoEntry);
+	}
 
 	PerformSharedStorageOpTasks(tasks);
 	PostPerformSharedStorageOpTasks(tasks);
@@ -2641,6 +2713,8 @@ ExecEndPlan(PlanState *planstate, EState *estate)
 			++aocount;
 		if (resultRelInfo->ri_aocsInsertDesc)
 			++aocount;
+		if (resultRelInfo->ri_parquetInsertDesc)
+			++aocount;
         resultRelInfo++;
 	}
 
@@ -2673,6 +2747,14 @@ ExecEndPlan(PlanState *planstate, EState *estate)
 
 			aocs_insert_finish(resultRelInfo->ri_aocsInsertDesc);
         }
+        /*need add processing for parquet insert desc*/
+        if (resultRelInfo->ri_parquetInsertDesc){
+        	sendback = CreateQueryContextDispatchingSendBack(1);
+        	resultRelInfo->ri_parquetInsertDesc->sendback = sendback;
+        	sendback->relid = RelationGetRelid(resultRelInfo->ri_RelationDesc);
+
+        	parquet_insert_finish(resultRelInfo->ri_parquetInsertDesc);
+        }
         if (resultRelInfo->ri_extInsertDesc)
         	external_insert_finish(resultRelInfo->ri_extInsertDesc);
 
@@ -2683,7 +2765,7 @@ ExecEndPlan(PlanState *planstate, EState *estate)
 			ExecClearTuple(resultRelInfo->ri_resultSlot);
 		}
 
-		if (sendback && relstorage_is_ao(RelinfoGetStorage(resultRelInfo))
+		if (sendback && (relstorage_is_ao(RelinfoGetStorage(resultRelInfo)))
 				&& Gp_role == GP_ROLE_EXECUTE)
 			AddSendbackChangedCatalogContent(buf, sendback);
 
@@ -2853,6 +2935,24 @@ ExecutePlan(EState *estate,
 			default:
 				/* do nothing */
 				break;
+		}
+	}
+
+	/* Error out for unsupported updates */
+	if (operation == CMD_UPDATE)
+	{
+		Assert(estate->es_result_relation_info->ri_RelationDesc);
+		Relation rel = estate->es_result_relation_info->ri_RelationDesc;
+		bool rel_is_aocols = RelationIsAoCols(rel);
+		bool rel_is_aorows = RelationIsAoRows(rel);
+		bool rel_is_parquet = RelationIsParquet(rel);
+		
+		if (rel_is_aocols || rel_is_aorows || rel_is_parquet)
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+							errmsg("Append-only/Parquet tables are not updatable. Operation not permitted."),
+							errOmitLocation(true)));
 		}
 	}
 
@@ -3876,7 +3976,8 @@ typedef struct
 	DestReceiver pub;			/* publicly-known function pointers */
 	EState	   *estate;			/* EState we are working with */
 	AppendOnlyInsertDescData *ao_insertDesc; /* descriptor to AO tables */
-        AOCSInsertDescData *aocs_ins;           /* descriptor for aocs */
+	AOCSInsertDescData *aocs_ins;           /* descriptor for aocs */
+	ParquetInsertDescData *parquet_insertDesc; /* descriptor to parquet tables */
 } DR_intorel;
 
 static Relation
@@ -3901,7 +4002,6 @@ CreateIntoRel(QueryDesc *queryDesc)
 	Oid         intoComptypeOid;
 	GpPolicy   *targetPolicy;
 	int			safefswritesize = gp_safefswritesize;
-	
 	ItemPointerData persistentTid;
 	int64			persistentSerialNum;
 
@@ -4016,7 +4116,11 @@ CreateIntoRel(QueryDesc *queryDesc)
 	heap_test_override_reloptions(relkind, stdRdOptions, &safefswritesize);
 	if(stdRdOptions->appendonly)
 	{
+/*
 		relstorage = stdRdOptions->columnstore ? RELSTORAGE_AOCOLS : RELSTORAGE_AOROWS;
+		relstorage = stdRdOptions->parquetstore ? RELSTORAGE_PARQUET : RELSTORAGE_AOROWS;
+*/
+		relstorage = stdRdOptions->columnstore;
 	}
 	else
 	{
@@ -4105,7 +4209,7 @@ CreateIntoRel(QueryDesc *queryDesc)
 	/*
 	 * create segment 1 for insert.
 	 */
-	CreateAppendOnlySegFileForRelationOnMaster(intoRelationDesc, 1);
+	CreateAppendOnlyParquetSegFileForRelationOnMaster(intoRelationDesc, 1);
 
 	/**
 	 * lock segment files
@@ -4184,7 +4288,7 @@ CloseIntoRel(QueryDesc *queryDesc)
 	if (rel)
 	{
 		/* APPEND_ONLY is closed in the intorel_shutdown */
-		if (!(RelationIsAoRows(rel) || RelationIsAoCols(rel)))
+		if (!(RelationIsAoRows(rel) || RelationIsAoCols(rel)  || RelationIsParquet(rel)))
 		{
 			Insist(!"gpsql does not support heap table, use append only table instead");
 			/*
@@ -4200,7 +4304,7 @@ CloseIntoRel(QueryDesc *queryDesc)
 				!rel->rd_istemp)
 			{
 				FlushRelationBuffers(rel);
-				 FlushRelationBuffers will have opened rd_smgr
+				 FlushRelationBuffers will have opened rd_smgr 
 				smgrimmedsync(rel->rd_smgr);
 			}
 
@@ -4293,7 +4397,8 @@ CreateIntoRelDestReceiver(void)
 
 	self->estate = NULL;
 	self->ao_insertDesc = NULL;
-        self->aocs_ins = NULL;
+    self->aocs_ins = NULL;
+    self->parquet_insertDesc = NULL;
 
 	return (DestReceiver *) self;
 }
@@ -4343,6 +4448,14 @@ intorel_receive(TupleTableSlot *slot, DestReceiver *self)
 
 		aocs_insert(myState->aocs_ins, slot);
 	}
+	else if(RelationIsParquet(into_rel)){
+
+		if(myState->parquet_insertDesc == NULL){
+			myState->parquet_insertDesc = parquet_insert_init(into_rel,1);
+		}
+
+		parquet_insert(myState->parquet_insertDesc, slot);
+	}
 	else
 	{
 
@@ -4377,6 +4490,8 @@ intorel_shutdown(DestReceiver *self)
 		++aocount;
 	else if (RelationIsAoCols(into_rel) && myState->aocs_ins)
 		++aocount;
+	else if(RelationIsParquet(into_rel) && myState->parquet_insertDesc)
+		++aocount;
 
 	if (Gp_role == GP_ROLE_EXECUTE && aocount > 0)
 		buf = PreSendbackChangedCatalog(aocount);
@@ -4399,6 +4514,15 @@ intorel_shutdown(DestReceiver *self)
 		sendback->relid = RelationGetRelid(myState->aocs_ins->aoi_rel);
 
         aocs_insert_finish(myState->aocs_ins);
+	}
+	else if (RelationIsParquet(into_rel) && myState->parquet_insertDesc)
+	{
+		sendback = CreateQueryContextDispatchingSendBack(1);
+		myState->parquet_insertDesc->sendback = sendback;
+
+		sendback->relid = RelationGetRelid(myState->parquet_insertDesc->parquet_rel);
+
+		parquet_insert_finish(myState->parquet_insertDesc);
 	}
 
 	if (sendback && Gp_role == GP_ROLE_EXECUTE)
@@ -5056,6 +5180,7 @@ map_part_attrs_from_targetdesc(TupleDesc target, TupleDesc part, AttrMap **map_p
 	*map_ptr = makeAttrMap(ntarget, mapper);
 	pfree(mapper);
 }
+
 
 
 /*

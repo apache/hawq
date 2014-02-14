@@ -960,7 +960,7 @@ AllocSetFree(MemoryContext context, void *pointer)
 			prevblock->next = block->next;
 
 		freesz = block->endptr - (char *) block;
-                MemoryContextNoteFree(&set->header, freesz); 
+        MemoryContextNoteFree(&set->header, freesz); 
 		gp_free2(block, freesz);
 	}
 	else

@@ -339,6 +339,10 @@ set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
 			seqpath = (Path *) create_aocs_path(root, rel);
 			break;
 
+		case RELSTORAGE_PARQUET:
+			seqpath = (Path *) create_parquet_path(root, rel);
+			break;
+
 		case RELSTORAGE_HEAP:
 			seqpath = create_seqscan_path(root, rel);
 			break;
@@ -368,7 +372,8 @@ set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
 	 * calls.
 	 */
 	if (relstorage == RELSTORAGE_AOROWS ||
-		relstorage == RELSTORAGE_AOCOLS)
+		relstorage == RELSTORAGE_AOCOLS ||
+		relstorage == RELSTORAGE_PARQUET)
 		indexpathlist = NIL;
 
     if (indexpathlist && root->config->enable_indexscan)
@@ -381,7 +386,8 @@ set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
     
     /* AO and CO tables do not currently support TidScans. Disable TidScan path for such tables */
 	if (relstorage == RELSTORAGE_AOROWS ||
-		relstorage == RELSTORAGE_AOCOLS)
+		relstorage == RELSTORAGE_AOCOLS ||
+		relstorage == RELSTORAGE_PARQUET)
 		tidpathlist = NIL;
     
     if (tidpathlist && root->config->enable_tidscan)

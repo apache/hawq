@@ -101,20 +101,20 @@ extern FileSegInfo *NewFileSegInfo(int segno);
 
 extern void 
 InsertInitialSegnoEntry(AppendOnlyEntry *aoEntry, int segno, int contentid);
- 
- /*
-  * GetFileSegInfo
-  *
-  * Get the catalog entry for an appendonly (row-oriented) relation from the
-  * pg_aoseg_* relation that belongs to the currently used
-  * AppendOnly table.
-  *
-  * If a caller intends to append to this file segment entry they must
-  * already hold a relation Append-Only segment file (transaction-scope) lock (tag 
-  * LOCKTAG_RELATION_APPENDONLY_SEGMENT_FILE) in order to guarantee
-  * stability of the pg_aoseg information on this segment file and exclusive right
-  * to append data to the segment file.
-  */
+
+/*
+* GetFileSegInfo
+*
+* Get the catalog entry for an appendonly (row-oriented) relation from the
+* pg_aoseg_* relation that belongs to the currently used
+* AppendOnly table.
+*
+* If a caller intends to append to this file segment entry they must
+* already hold a relation Append-Only segment file (transaction-scope) lock (tag
+* LOCKTAG_RELATION_APPENDONLY_SEGMENT_FILE) in order to guarantee
+* stability of the pg_aoseg information on this segment file and exclusive right
+* to append data to the segment file.
+*/
 extern FileSegInfo *
 GetFileSegInfo(Relation parentrel, AppendOnlyEntry *aoEntry, Snapshot appendOnlyMetaDataSnapshot, int segno, int contentid);
 

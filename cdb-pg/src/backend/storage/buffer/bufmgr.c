@@ -51,6 +51,7 @@
 
 #include "access/aosegfiles.h"
 #include "access/aocssegfiles.h"
+#include "access/parquetsegfiles.h"
 #include "cdb/cdbappendonlyam.h"
 #include "cdb/cdbvars.h"
 			
@@ -2443,6 +2444,12 @@ RelationGetNumberOfBlocks(Relation relation)
 		return ((BlockNumber)RelationGuessNumberOfBlocks(totalBytes));
   	}
 	
+	if (RelationIsParquet(relation))
+	{
+		ParquetFileSegTotals *fstotal = GetParquetSegFilesTotals(relation, SnapshotNow, GpIdentity.segindex);
+		return ((BlockNumber)RelationGuessNumberOfBlocks(fstotal->totalbytes));
+	}
+
 	/* For non-AO tables, open it at the smgr level if not already done */
 	RelationOpenSmgr(relation);
 	

@@ -80,6 +80,7 @@ typedef enum LWLockId
 	TemporarySerializePreparesLock,
 	SeqServerControlLock,
 	AOSegFileLock,
+	ParquetSegFileLock,
 	PersistentObjLock,
 	FileRepShmemLock,
 	FileRepAckShmemLock,	

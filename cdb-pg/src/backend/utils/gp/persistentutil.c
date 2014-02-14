@@ -26,8 +26,6 @@
 #include "executor/executor.h"
 #include "utils/builtins.h"
 
-
-
 #include <dirent.h>
 
 
@@ -696,4 +694,3 @@ strToRelfilenode(char *str, Oid *relfilenode, int32 *segmentnum)
 	/* All done, return success */
 	return true;
 }
-

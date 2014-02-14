@@ -43,8 +43,10 @@ extern bytea *index_reloptions(RegProcedure amoptions, Datum reloptions,
 
 extern TidycatOptions *tidycat_reloptions(Datum reloptions);
 
-extern void validateAppendOnlyRelOptions(bool ao, int blocksize, int writesize,
+extern void validateAppendOnlyRelOptions(bool ao, int blocksize,
+										 int pagesize, int rowgroupsize,
+										 int writesize,
 										 int complevel, char* comptype, 
-										 bool checksum, char relkind, bool co);
+										 bool checksum, char relkind, char colstore);
 
 #endif   /* RELOPTIONS_H */

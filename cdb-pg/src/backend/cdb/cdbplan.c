@@ -283,6 +283,18 @@ plan_tree_mutator(Node *node,
 				return (Node *) newaocs;
 			}
 			break;
+
+		case T_ParquetScan:
+			{
+				ParquetScan    *parquet = (ParquetScan *) node;
+				ParquetScan    *newparquet;
+
+				FLATCOPY(newparquet, parquet, ParquetScan);
+				SCANMUTATE(newparquet, parquet);
+				/* (for now) A ParquetScan is really just a Scan, so we're done. */
+				return (Node *) newparquet;
+			}
+			break;
 				
 		case T_TableScan:
 			{

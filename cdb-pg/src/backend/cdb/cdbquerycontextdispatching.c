@@ -15,6 +15,7 @@
 #include "access/genam.h"
 #include "access/heapam.h"
 #include "access/pxfuriparser.h"
+#include "access/parquetsegfiles.h"
 #include "catalog/aoseg.h"
 #include "catalog/catalog.h"
 #include "catalog/gp_fastsequence.h"
@@ -30,6 +31,7 @@
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_tablespace.h"
+#include "catalog/gp_fastsequence.h"
 #include "cdb/cdbdispatchedtablespaceinfo.h"
 #include "cdb/cdbfilesystemcredential.h"
 #include "cdb/cdbpartition.h"
@@ -124,7 +126,7 @@ static void
 prepareDispatchedCatalogFunctionExpr(QueryContextInfo *cxt, Expr *expr);
 
 static void
-prepareDispatchedCatalogForAoCo(QueryContextInfo *cxt, Oid relid,
+prepareDispatchedCatalogForAoCoParquet(QueryContextInfo *cxt, Oid relid,
         bool forInsert, int32 segno);
 
 static void
@@ -1339,7 +1341,8 @@ prepareDispatchedCatalogSingleRelation(QueryContextInfo *cxt, Oid relid,
 	{
 	case RELSTORAGE_AOROWS:
 	case RELSTORAGE_AOCOLS:
-		prepareDispatchedCatalogForAoCo(cxt, relid, forInsert, segno);
+	case RELSTORAGE_PARQUET:
+		prepareDispatchedCatalogForAoCoParquet(cxt, relid, forInsert, segno);
 		break;
 	case RELSTORAGE_EXTERNAL:
 	    prepareDispatchedCatalogExternalTable(cxt, relid);
@@ -1467,13 +1470,17 @@ prepareDispatchedCatalogAoSegfile(QueryContextInfo *cxt,
             contentid = heap_getattr(pg_aoseg_tuple, Anum_pg_aoseg_content,
                     RelationGetDescr(ao_seg_rel), NULL );
         }
-        else
+        else if (RelationIsAoCols(rel))
         {
-            Assert(RelationIsAoCols(rel));
-
             contentid = heap_getattr(pg_aoseg_tuple,
                     Anum_pg_aocs_content, RelationGetDescr(ao_seg_rel),
                     NULL );
+        }
+        else
+        {
+        	Assert (RelationIsParquet(rel));
+        	contentid = heap_getattr(pg_aoseg_tuple, Anum_pg_parquetseg_content,
+        				RelationGetDescr(ao_seg_rel), NULL );
         }
 
         AddTupleToContextInfo(cxt, segrelid,
@@ -1494,7 +1501,7 @@ prepareDispatchedCatalogAoSegfile(QueryContextInfo *cxt,
  * add them to in-memory heap table for dispatcher.
  */
 static void
-prepareDispatchedCatalogForAoCo(QueryContextInfo *cxt, Oid relid,
+prepareDispatchedCatalogForAoCoParquet(QueryContextInfo *cxt, Oid relid,
         bool forInsert, int32 segno)
 {
 
@@ -1506,7 +1513,7 @@ prepareDispatchedCatalogForAoCo(QueryContextInfo *cxt, Oid relid,
 
     rel = heap_open(relid, AccessShareLock);
 
-    Assert((RelationIsAoRows(rel) || RelationIsAoCols(rel)));
+    Assert((RelationIsAoRows(rel) || RelationIsAoCols(rel) || RelationIsParquet(rel)));
 
     /*
      * add tuple in pg_appendonly
@@ -1531,12 +1538,12 @@ prepareDispatchedCatalogForAoCo(QueryContextInfo *cxt, Oid relid,
     hentry->aoseg_relid = segrelid;
 
     /*
-     * add pg_aoseg_XXX's metadata
+     * add pg_aoseg_XXX/pg_paqseg_XXX's metadata
      */
     prepareDispatchedCatalogSingleRelation(cxt, segrelid, FALSE, 0);
 
     /*
-     * add gp_aoseg_xxx's content
+     * add gp_aoseg_xxx/gp_paqseg_xxx's content
      */
     prepareDispatchedCatalogAoSegfile(cxt, rel, segrelid, forInsert, segno);
 
@@ -2188,36 +2195,52 @@ void
 UpdateCatalogModifiedOnSegments(QueryContextDispatchingSendBack sendback)
 {
 	Assert(NULL != sendback);
+	bool is_ao = false;
 
-	AppendOnlyEntry *aoEntry = GetAppendOnlyEntry(sendback->relid, SnapshotNow);
-	Assert(aoEntry != NULL);
-
+	/*NEED JUDGE WHETHER AO TABLE OR PARQUET TABLE. may should change here*/
 	Relation rel = heap_open(sendback->relid, AccessShareLock);
-	if (RelationIsAoCols(rel))
+	if(RelationIsAoCols(rel) || RelationIsAoRows(rel) || RelationIsParquet(rel))
 	{
-		Insist(sendback->numfiles == rel->rd_att->natts);
-		UpdateAOCSFileSegInfo(rel, aoEntry, sendback->segno,
-				sendback->insertCount, sendback->varblock, sendback->eof,
-				sendback->uncompressed_eof, sendback->contentid);
-	}
-	else if (RelationIsAoRows(rel))
-	{
-		Insist(sendback->numfiles == 1);
-		UpdateFileSegInfo(rel, aoEntry, sendback->segno,
-				sendback->eof[0], sendback->uncompressed_eof[0], sendback->insertCount,
-				sendback->varblock, sendback->contentid);
+		is_ao = true;
 	}
 	else
 	{
 		Insist(!"bug, should no get here.");
 	}
-
-	ItemPointerData tid;
-
-	InsertFastSequenceEntry(aoEntry->segrelid, sendback->segno,
-			sendback->nextFastSequence, sendback->contentid, &tid);
-
 	heap_close(rel, AccessShareLock);
+
+	if(is_ao)
+	{
+		AppendOnlyEntry *aoEntry = GetAppendOnlyEntry(sendback->relid, SnapshotNow);
+		Assert(aoEntry != NULL);
+
+		Relation rel = heap_open(sendback->relid, AccessShareLock);
+		if (RelationIsAoCols(rel))
+		{
+			Insist(sendback->numfiles == rel->rd_att->natts);
+			UpdateAOCSFileSegInfo(rel, aoEntry, sendback->segno,
+					sendback->insertCount, sendback->varblock, sendback->eof,
+					sendback->uncompressed_eof, sendback->contentid);
+		}
+		else if (RelationIsAoRows(rel))
+		{
+			Insist(sendback->numfiles == 1);
+			UpdateFileSegInfo(rel, aoEntry, sendback->segno,
+					sendback->eof[0], sendback->uncompressed_eof[0], sendback->insertCount,
+					sendback->varblock, sendback->contentid);
+		}
+		else if (RelationIsParquet(rel))
+		{
+			Insist(sendback->numfiles == 1);
+			UpdateParquetFileSegInfo(rel, aoEntry, sendback->segno,
+					sendback->eof[0], sendback->uncompressed_eof[0], sendback->insertCount,
+					sendback->contentid);
+		}
+		ItemPointerData tid;
+		InsertFastSequenceEntry(aoEntry->segrelid, sendback->segno,
+				sendback->nextFastSequence, sendback->contentid, &tid);
+		heap_close(rel, AccessShareLock);
+	}
 
 	/*
 	 * make the change available

@@ -655,7 +655,8 @@ CTranslatorRelcacheToDXL::Pdrgpmdcol
 	if (FHasSystemColumns(rel->rd_rel->relkind))
 	{
 		BOOL fAOTable = IMDRelation::ErelstorageAppendOnlyRows == erelstorage ||
-				IMDRelation::ErelstorageAppendOnlyCols == erelstorage;
+				IMDRelation::ErelstorageAppendOnlyCols == erelstorage ||
+				IMDRelation::ErelstorageAppendOnlyParquet == erelstorage;
 		AddSystemColumns(pmp, pdrgpmdcol, rel->rd_att->tdhasoid, fAOTable);
 	}
 
@@ -2670,6 +2671,9 @@ CTranslatorRelcacheToDXL::Erelstorage
 			break;
 		case RELSTORAGE_AOROWS:
 			erelstorage = IMDRelation::ErelstorageAppendOnlyRows;
+			break;
+		case RELSTORAGE_PARQUET:
+			erelstorage = IMDRelation::ErelstorageAppendOnlyParquet;
 			break;
 		case RELSTORAGE_VIRTUAL:
 			erelstorage = IMDRelation::ErelstorageVirtual;

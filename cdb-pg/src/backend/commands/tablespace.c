@@ -1433,6 +1433,7 @@ GetSuitableTablespace(char relkind, char relstorage, Oid reltablespace, bool *ov
 	/* Appendonly relation has no restriction. */
 	if (relstorage == RELSTORAGE_AOROWS ||
 		relstorage == RELSTORAGE_AOCOLS ||
+		relstorage == RELSTORAGE_PARQUET ||
 		relstorage == RELSTORAGE_EXTERNAL ||
 		relstorage == RELSTORAGE_FOREIGN)
 		return reltablespace;

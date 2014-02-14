@@ -3232,6 +3232,7 @@ relation_oids()
 			case RELSTORAGE_HEAP:
 			case RELSTORAGE_AOCOLS:
 			case RELSTORAGE_AOROWS:
+			case RELSTORAGE_PARQUET:
 			case RELSTORAGE_EXTERNAL:
 			{
 				Oid relOid = HeapTupleGetOid(tuple);

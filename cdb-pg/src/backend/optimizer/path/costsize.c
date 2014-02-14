@@ -213,6 +213,36 @@ cost_aocsscan(AOCSPath *path, PlannerInfo *root,
 }
 
 /*
+ * cost_parquetscan
+ *	  Determines and returns the cost of scanning a relation sequentially.
+ */
+void
+cost_parquetscan(ParquetPath *path, PlannerInfo *root,
+					RelOptInfo *baserel)
+{
+	Cost		startup_cost = 0;
+	Cost		run_cost = 0;
+	Cost		cpu_per_tuple;
+
+	/* Should only be applied to base relations */
+	Assert(baserel->relid > 0);
+	Assert(baserel->rtekind == RTE_RELATION);
+
+	/*
+	 * disk costs
+	 */
+	run_cost += seq_page_cost * baserel->pages;
+
+	/* CPU costs */
+	startup_cost += baserel->baserestrictcost.startup;
+	cpu_per_tuple = cpu_tuple_cost + baserel->baserestrictcost.per_tuple;
+	run_cost += cpu_per_tuple * baserel->tuples;
+
+	path->path.startup_cost = startup_cost;
+	path->path.total_cost = startup_cost + run_cost;
+}
+
+/*
  * cost_externalscan
  *	  Determines and returns the cost of scanning an external relation.
  *

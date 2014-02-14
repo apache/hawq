@@ -565,6 +565,14 @@ _outDynamicTableScan(StringInfo str, DynamicTableScan *node)
 }
 
 static void
+_outParquetScan(StringInfo str, ParquetScan *node)
+{
+	WRITE_NODE_TYPE("ParquetSCAN");
+
+	_outScanInfo(str, (Scan *) node);
+}
+
+static void
 _outExternalScan(StringInfo str, ExternalScan *node)
 {
 	WRITE_NODE_TYPE("EXTERNALSCAN");
@@ -3811,6 +3819,9 @@ _outNode(StringInfo str, void *obj)
 				break;
 			case T_DynamicTableScan:
 				_outDynamicTableScan(str, obj);
+				break;
+			case T_ParquetScan:
+				_outParquetScan(str, obj);
 				break;
 			case T_ExternalScan:
 				_outExternalScan(str, obj);

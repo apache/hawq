@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header$
+# $Header: //gpsql/feature/hd2.0/private-lili/cdb-pg/src/include/catalog/tidycat.pl#2 $
 #
 # copyright (c) 2009, 2010, 2011
 # Author: Jeffrey I Cohen

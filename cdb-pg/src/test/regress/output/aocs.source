@@ -29,7 +29,7 @@ CREATE TABLE tenk_aocs4 (like tenk_heap_for_aocs) with (appendonly=true, orienta
 CREATE TABLE tenk_aocs5 (like tenk_heap_for_aocs) with (appendonly=true, orientation=column, compresslevel=6, compresstype=zlib, blocksize=1048576, checksum=true) distributed by(unique1);
 -- invalid
 CREATE TABLE tenk_aocs6 (like tenk_heap_for_aocs) with (appendonly=false, orientation=column, compresslevel=6, checksum=true) distributed by(unique1);
-ERROR:  invalid option 'compresslevel' for base relation. Only valid for Append Only relations
+ERROR:  invalid option "orientation" for base relation. Only valid for Append Only relations
 CREATE TABLE tenk_aocs7 (like tenk_heap_for_aocs) with (appendonly=true, orientation=column, compresslevel=6, compresstype=zlib) distributed by(unique1);
 CREATE TABLE tenk_aocs8 (like tenk_heap_for_aocs) with (appendonly=true, orientation=column, blocksize=100) distributed by(unique1);
 ERROR:  block size must be between 8KB and 2MB and be an 8KB multiple. Got 100

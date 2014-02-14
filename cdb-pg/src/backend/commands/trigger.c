@@ -1447,8 +1447,8 @@ ExecARInsertTriggers(EState *estate, ResultRelInfo *relinfo,
 
 	if (trigdesc && trigdesc->n_after_row[TRIGGER_EVENT_INSERT] > 0)
 	{
-		if(RelationIsAoCols(relinfo->ri_RelationDesc))
-			elog(ERROR, "Trigger is not supported on AOCS yet");
+		if(RelationIsAoCols(relinfo->ri_RelationDesc) || RelationIsParquet(relinfo->ri_RelationDesc))
+			elog(ERROR, "Trigger is not supported on AOCS/Parquet yet");
 
 		AfterTriggerSaveEvent(relinfo, TRIGGER_EVENT_INSERT,
 								true, NULL, trigtuple);

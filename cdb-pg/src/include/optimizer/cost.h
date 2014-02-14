@@ -70,6 +70,7 @@ extern void cost_seqscan(Path *path, PlannerInfo *root, RelOptInfo *baserel);
 extern void cost_externalscan(ExternalPath *path, PlannerInfo *root, RelOptInfo *baserel);
 extern void cost_appendonlyscan(AppendOnlyPath *path, PlannerInfo *root, RelOptInfo *baserel);
 extern void cost_aocsscan(AOCSPath *path, PlannerInfo *root, RelOptInfo *baserel);
+extern void cost_parquetscan(ParquetPath *path, PlannerInfo *root, RelOptInfo *baserel);
 extern void cost_index(IndexPath *path, PlannerInfo *root, IndexOptInfo *index,
 		   List *indexQuals, RelOptInfo *outer_rel);
 extern void cost_bitmap_heap_scan(Path *path, PlannerInfo *root, RelOptInfo *baserel,

@@ -1143,7 +1143,8 @@ createdb_int(CreatedbStmt *stmt, CdbDispatcherState *ds)
 			
 			relStorageMgr = (
 					 (dbInfoRel->relstorage == RELSTORAGE_AOROWS ||
-					  dbInfoRel->relstorage == RELSTORAGE_AOCOLS	) ?
+					  dbInfoRel->relstorage == RELSTORAGE_AOCOLS ||
+					  dbInfoRel->relstorage == RELSTORAGE_PARQUET ) ?
 									PersistentFileSysRelStorageMgr_AppendOnly :
 									PersistentFileSysRelStorageMgr_BufferPool);
 
@@ -1535,7 +1536,8 @@ dropdb(const char *dbname, bool missing_ok)
 			 */
 			relStorageMgr = (
 					 (dbInfoRel->relstorage == RELSTORAGE_AOROWS ||
-					  dbInfoRel->relstorage == RELSTORAGE_AOCOLS    ) ?
+					  dbInfoRel->relstorage == RELSTORAGE_AOCOLS ||
+					  dbInfoRel->relstorage == RELSTORAGE_PARQUET  ) ?
 									PersistentFileSysRelStorageMgr_AppendOnly :
 									PersistentFileSysRelStorageMgr_BufferPool);
 

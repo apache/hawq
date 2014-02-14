@@ -74,6 +74,10 @@ getScanMethod(int tableType)
 		{
 			&AOCSScanNext, &BeginScanAOCSRelation, &EndScanAOCSRelation,
 			&ReScanAOCSRelation, &MarkRestrNotAllowed, &MarkRestrNotAllowed
+		},
+		{
+			&ParquetScanNext, &BeginScanParquetRelation, &EndScanParquetRelation,
+			&ReScanParquetRelation, &MarkRestrNotAllowed, &MarkRestrNotAllowed
 		}
 	};
 	
@@ -310,6 +314,7 @@ InitScanStateInternal(ScanState *scanState, Plan *plan, EState *estate, int efla
 	Assert(IsA(plan, SeqScan) ||
 		   IsA(plan, AppendOnlyScan) ||
 		   IsA(plan, AOCSScan) ||
+		   IsA(plan, ParquetScan) ||
 		   IsA(plan, TableScan) ||
 		   IsA(plan, DynamicTableScan));
 
@@ -420,6 +425,11 @@ getTableType(Relation rel)
 		return TableTypeAOCS;
 	}
 	
+	if (RelationIsParquet(rel))
+	{
+		return TableTypeParquet;
+	}
+
 	elog(ERROR, "undefined table type for storage format: %c", rel->rd_rel->relstorage);
 	return TableTypeInvalid;
 }
@@ -529,6 +539,7 @@ MarkRestrNotAllowed(ScanState *scanState)
 {
 	Assert(scanState->tableType == TableTypeAppendOnly ||
 		   scanState->tableType == TableTypeAOCS ||
+		   scanState->tableType == TableTypeParquet ||
 		   IsA(scanState, DynamicTableScanState));
 	
 	const char *scan = NULL;
@@ -542,6 +553,11 @@ MarkRestrNotAllowed(ScanState *scanState)
 		scan = "AppendOnlyColumnarScan";
 	}
 	
+	else if (scanState->tableType == TableTypeParquet)
+	{
+		scan = "ParquetScan";
+	}
+
 	else
 	{
 		Assert(IsA(scanState, DynamicTableScanState));

@@ -62,6 +62,7 @@
 #include "catalog/gp_fastsequence.h"
 #include "cdb/cdbpartition.h"
 #include "cdb/cdbanalyze.h"
+#include "cdb/cdbparquetfooterprocessor.h"
 #include "commands/dbcommands.h"
 #include "commands/tablecmds.h"
 #include "commands/tablespace.h"
@@ -365,7 +366,8 @@ heap_create(const char *relname,
 		 * For non-shared table, we should always need to create a file.
 		 */
 		// WARNING: Do not use the rel structure -- it doesn't have relstorage set...
-		isAppendOnly = (relstorage == RELSTORAGE_AOROWS || relstorage == RELSTORAGE_AOCOLS);
+		isAppendOnly = (relstorage == RELSTORAGE_AOROWS || relstorage == RELSTORAGE_AOCOLS
+				|| relstorage == RELSTORAGE_PARQUET);
 
 		if (shared_relation && gp_upgrade_mode)
 		{
@@ -564,6 +566,7 @@ CheckAttributeNamesTypes(TupleDesc tupdesc, char relkind)
 	}
 }
 
+
 /* --------------------------------
  *		CheckAttributeType
  *
@@ -603,6 +606,31 @@ CheckAttributeType(const char *attname, Oid atttypid)
 		}
 	}
 }
+
+
+/* --------------------------------
+ *		CheckAttributeArray
+ *
+ *		Verify that whether the attribute is of type array,
+ *		parquet table doesn't support array type
+ * --------------------------------
+ */
+void CheckAttributeArray(TupleDesc tupdesc, char relstorage){
+
+	if(relstorage != RELSTORAGE_PARQUET){
+		return;
+	}
+	int	natts = tupdesc->natts;
+	for(int i = 0; i < natts; i++){
+		if(tupdesc->attrs[i]->attndims != 0){
+			ereport(ERROR,
+				(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
+				 errmsg("array type of column \"%s\" is not supported for parquet table yet",
+						 NameStr(tupdesc->attrs[i]->attname))));
+		}
+	}
+}
+
 
 /* MPP-6929: metadata tracking */
 /* --------------------------------
@@ -1418,14 +1446,10 @@ heap_create_with_catalog(const char *relname,
 	appendOnlyRel = stdRdOptions->appendonly;
 	if(appendOnlyRel)
 	{
-		if(stdRdOptions->columnstore)
-		{
-            relstorage = RELSTORAGE_AOCOLS;
+		if(stdRdOptions->columnstore == RELSTORAGE_PARQUET){
+			DetectHostEndian();
 		}
-		else
-        {
-			relstorage = RELSTORAGE_AOROWS;
-        }
+		relstorage = stdRdOptions->columnstore;
 	}
 	
 	reltablespace = GetSuitableTablespace(relkind, relstorage,
@@ -1439,10 +1463,7 @@ heap_create_with_catalog(const char *relname,
 							get_tablespace_name(reltablespace)),
 					 errOmitLocation(true)));
 		appendOnlyRel = stdRdOptions->appendonly = true;
-		if(stdRdOptions->columnstore)
-            relstorage = RELSTORAGE_AOCOLS;
-		else
-			relstorage = RELSTORAGE_AOROWS;
+		relstorage = stdRdOptions->columnstore;
 
 		reloptions = transformRelOptions(reloptions,
 										list_make1(makeDefElem("appendonly", (Node *) makeString("true"))),
@@ -1452,6 +1473,8 @@ heap_create_with_catalog(const char *relname,
 
 	validateAppendOnlyRelOptions(appendOnlyRel,
 								 stdRdOptions->blocksize,
+								 stdRdOptions->pagesize,
+								 stdRdOptions->rowgroupsize,
 								 safefswritesize,
 								 stdRdOptions->compresslevel,
 								 stdRdOptions->compresstype,
@@ -1464,7 +1487,7 @@ heap_create_with_catalog(const char *relname,
 		IsNormalProcessingMode() &&
         (Gp_role == GP_ROLE_DISPATCH))
 	{
-		if (relstorage == RELSTORAGE_AOCOLS)
+		if ((relstorage == RELSTORAGE_AOCOLS) || (relstorage == RELSTORAGE_PARQUET))
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg(
@@ -1484,6 +1507,8 @@ heap_create_with_catalog(const char *relname,
 
 	CheckAttributeNamesTypes(tupdesc, relkind);
 
+	CheckAttributeArray(tupdesc, relstorage);
+
 	if (get_relname_relid(relname, relnamespace))
 		ereport(ERROR,
 				(errcode(ERRCODE_DUPLICATE_TABLE),
@@ -1498,12 +1523,14 @@ heap_create_with_catalog(const char *relname,
 	 */
 	if (!OidIsValid(relid))
 		relid = GetNewRelFileNode(reltablespace, shared_relation,
-								  pg_class_desc, relstorage_is_ao(pg_class_desc->rd_rel->relstorage));
+								  pg_class_desc,
+								  relstorage_is_ao(pg_class_desc->rd_rel->relstorage));
 	else
 		if (IsUnderPostmaster)
 		{
 			CheckNewRelFileNodeIsOk(relid, reltablespace, shared_relation,
-									pg_class_desc, relstorage_is_ao(pg_class_desc->rd_rel->relstorage));
+									pg_class_desc,
+									relstorage_is_ao(pg_class_desc->rd_rel->relstorage));
 		}
 
 	/*
@@ -1619,22 +1646,39 @@ heap_create_with_catalog(const char *relname,
 		heap_close(gp_relation_node_desc, RowExclusiveLock);
 	}
 
-	/*
-	 * if this is an append-only relation, add an entry in pg_appendonly.
-	 */
+	/* Add an entry in pg_appendonly. */
 	if(appendOnlyRel)
 	{
-		InsertAppendOnlyEntry(relid,
-							  stdRdOptions->blocksize,
+		if(relstorage == RELSTORAGE_PARQUET)
+		{
+			InsertAppendOnlyEntry(relid,
+							  stdRdOptions->rowgroupsize,
+							  stdRdOptions->pagesize,
 							  safefswritesize,
 							  stdRdOptions->compresslevel,
 							  stdRdOptions->checksum,
-                              stdRdOptions->columnstore,
+							  (stdRdOptions->columnstore == RELSTORAGE_AOROWS) ? false : true,
 							  stdRdOptions->compresstype,
 							  InvalidOid,
 							  InvalidOid,
 							  InvalidOid,
 							  InvalidOid);
+		}
+		else
+		{
+			InsertAppendOnlyEntry(relid,
+								  stdRdOptions->blocksize,
+								  InvalidOid,
+								  safefswritesize,
+								  stdRdOptions->compresslevel,
+								  stdRdOptions->checksum,
+								  (stdRdOptions->columnstore == RELSTORAGE_AOROWS) ? false : true,
+								  stdRdOptions->compresstype,
+								  InvalidOid,
+								  InvalidOid,
+								  InvalidOid,
+								  InvalidOid);
+		}
 	}
 
 
@@ -2182,7 +2226,7 @@ remove_gp_relation_node_and_schedule_drop(
 			 relpath(rel->rd_node),
 			 rel->rd_rel->relfilenode);
 
-	relStorageMgr = ((RelationIsAoRows(rel) || RelationIsAoCols(rel)) ?
+	relStorageMgr = ((RelationIsAoRows(rel) || RelationIsAoCols(rel) || RelationIsParquet(rel)) ?
 													PersistentFileSysRelStorageMgr_AppendOnly:
 													PersistentFileSysRelStorageMgr_BufferPool);
 
@@ -2287,7 +2331,7 @@ heap_drop_with_catalog(Oid relid)
 
 	relkind = rel->rd_rel->relkind;
 
-	is_appendonly_rel = (RelationIsAoRows(rel) || RelationIsAoCols(rel));
+	is_appendonly_rel = (RelationIsAoRows(rel) || RelationIsAoCols(rel) || RelationIsParquet(rel));
 	is_external_rel = RelationIsExternal(rel);
 	is_foreign_rel = RelationIsForeign(rel);
 
@@ -3230,7 +3274,7 @@ heap_truncate(List *relids)
 		/*
 		 * CONCERN: Not clear this EVER makes sense for Append-Only.
 		 */
-		if (RelationIsAoRows(rel) || RelationIsAoCols(rel))
+		if (RelationIsAoRows(rel) || RelationIsAoCols(rel) || RelationIsParquet(rel))
 		{
 			aoEntry = GetAppendOnlyEntry(rid, SnapshotNow);
 
@@ -3517,7 +3561,8 @@ setNewRelfilenodeCommon(Relation relation, Oid newrelfilenode)
 	newrnode.relNode = newrelfilenode;
 
 	isAppendOnly = (relation->rd_rel->relstorage == RELSTORAGE_AOROWS || 
-					relation->rd_rel->relstorage == RELSTORAGE_AOCOLS);
+					relation->rd_rel->relstorage == RELSTORAGE_AOCOLS ||
+					relation->rd_rel->relstorage == RELSTORAGE_PARQUET);
 	
 	relname = RelationGetRelationName(relation);
 
@@ -3632,6 +3677,7 @@ setNewRelfilenodeCommon(Relation relation, Oid newrelfilenode)
 								&relation->rd_segfile0_relationnodeinfos[0].persistentTid,
 								relation->rd_segfile0_relationnodeinfos[0].persistentSerialNum);
 	}
+
 
 	caql_update_current(pcqCtx, tuple);
 	/* and Update indexes (implicit) */

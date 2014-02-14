@@ -32,6 +32,7 @@
 #include "catalog/pg_type.h"
 #include "catalog/catalog.h"
 #include "cdb/cdbappendonlyam.h"
+#include "cdb/cdbparquetam.h"
 #include "cdb/cdbaocsam.h"
 #include "cdb/cdbpartition.h"
 #include "cdb/cdbdisp.h"
@@ -1551,7 +1552,7 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 			foreach(cell, all_relids)
 			{
 				Oid relid =  lfirst_oid(cell);
-				CreateAppendOnlySegFileOnMaster(relid, cstate->ao_segnos);
+				CreateAppendOnlyParquetSegFileOnMaster(relid, cstate->ao_segnos);
 			}
 
 			/* allocate segno for error table */
@@ -1561,7 +1562,7 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 				Assert(!rel_is_partitioned(relid));
 				cstate->cdbsreh->err_aosegno = SetSegnoForWrite(InvalidFileSegNumber, relid);
 				if (Gp_role == GP_ROLE_DISPATCH)
-					CreateAppendOnlySegFileForRelationOnMaster(
+					CreateAppendOnlyParquetSegFileForRelationOnMaster(
 							cstate->cdbsreh->errtbl,
 							cstate->cdbsreh->err_aosegno);
 			}
@@ -1583,7 +1584,8 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 				 * utility mode (or dispatch mode for no policy table).
 				 * create a one entry map for our one and only relation
 				 */
-				if(RelationIsAoRows(cstate->rel) || RelationIsAoCols(cstate->rel))
+				if(RelationIsAoRows(cstate->rel) || RelationIsAoCols(cstate->rel)
+						 || RelationIsParquet(cstate->rel))
 				{
 					SegfileMapNode *n = makeNode(SegfileMapNode);
 					n->relid = RelationGetRelid(cstate->rel);
@@ -2233,6 +2235,46 @@ CopyTo(CopyState cstate)
 
                 pfree(proj);
             }
+			else if(RelationIsParquet(rel))
+			{
+				ParquetScanDesc scan = NULL;
+				TupleTableSlot	*slot = MakeSingleTupleTableSlot(tupDesc);
+
+				bool *proj = NULL;
+
+				int nvp = tupDesc->natts;
+				int i;
+
+				if (tupDesc->tdhasoid)
+				{
+					elog(ERROR, "OIDS=TRUE is not allowed on tables that use column-oriented storage. Use OIDS=FALSE");
+				}
+
+				proj = palloc(sizeof(bool) * nvp);
+				for(i=0; i<nvp; ++i)
+					proj[i] = true;
+
+				scan = parquet_beginscan(rel, ActiveSnapshot, 0, proj);
+
+				for(;;)
+				{
+					parquet_getnext(scan, ForwardScanDirection, slot);
+					if (TupIsNull(slot))
+					    break;
+
+					/* Extract all the values of the  tuple */
+					slot_getallattrs(slot);
+					values = slot_get_values(slot);
+					nulls = slot_get_isnull(slot);
+
+					/* Format and send the data */
+					CopyOneRowTo(cstate, InvalidOid, values, nulls);
+				}
+
+				ExecDropSingleTupleTableSlot(slot);
+
+				parquet_endscan(scan);
+			}
 			else
 			{
 				/* should never get here */
@@ -3603,17 +3645,17 @@ CopyFromDispatch(CopyState cstate)
    	 				/* find out which segnos the result rels in the QE's used */
     			    ResultRelInfoSetSegno(resultRelInfo, cstate->ao_segnos);
 
-    				UpdateMasterAosegTotals(resultRelInfo->ri_RelationDesc,
-											resultRelInfo->ri_aosegno,
-											ao->tupcount);
+					UpdateMasterAosegTotals(resultRelInfo->ri_RelationDesc,
+										resultRelInfo->ri_aosegno,
+										ao->tupcount);
 				}
 			}
 			else
 			{
 				ResultRelInfoSetSegno(resultRelInfo, cstate->ao_segnos);
 				UpdateMasterAosegTotals(resultRelInfo->ri_RelationDesc,
-										resultRelInfo->ri_aosegno,
-										cstate->processed);
+									resultRelInfo->ri_aosegno,
+									cstate->processed);
 			}
 		}
 
@@ -4066,6 +4108,14 @@ CopyFrom(CopyState cstate)
                         aocs_insert_init(resultRelInfo->ri_RelationDesc,
                         				 resultRelInfo->ri_aosegno);
 				}
+				else if (relstorage == RELSTORAGE_PARQUET &&
+						resultRelInfo->ri_parquetInsertDesc == NULL)
+				{
+					ResultRelInfoSetSegno(resultRelInfo, cstate->ao_segnos);
+					resultRelInfo->ri_parquetInsertDesc =
+						parquet_insert_init(resultRelInfo->ri_RelationDesc,
+										 resultRelInfo->ri_aosegno);
+				}
 				else if (relstorage == RELSTORAGE_EXTERNAL &&
 						 resultRelInfo->ri_extInsertDesc == NULL)
 				{
@@ -4089,7 +4139,7 @@ CopyFrom(CopyState cstate)
 					if (cstate->oids && file_has_oids)
 						MemTupleSetOid(tuple, resultRelInfo->ri_aoInsertDesc->mt_bind, loaded_oid);
 				}
-				else if (relstorage == RELSTORAGE_AOCOLS)
+				else if ((relstorage == RELSTORAGE_AOCOLS) || (relstorage == RELSTORAGE_PARQUET))
 				{
                     tuple = NULL;
 				}
@@ -4120,7 +4170,7 @@ CopyFrom(CopyState cstate)
 				{
 					HeapTuple	newtuple;
 
-					if(relstorage == RELSTORAGE_AOCOLS)
+					if((relstorage == RELSTORAGE_AOCOLS) || (relstorage == RELSTORAGE_PARQUET))
 					{
 						Assert(!tuple);
 						elog(ERROR, "triggers are not supported on tables that use column-oriented storage");
@@ -4142,7 +4192,7 @@ CopyFrom(CopyState cstate)
 				{
 					char relstorage = RelinfoGetStorage(resultRelInfo);
 					
-					if (relstorage != RELSTORAGE_AOCOLS)
+					if ((relstorage != RELSTORAGE_AOCOLS) && (relstorage != RELSTORAGE_PARQUET))
 					{
 						/* Place tuple in tuple slot */
 						ExecStoreGenericTuple(tuple, slot, false);
@@ -4181,6 +4231,15 @@ CopyFrom(CopyState cstate)
 						AOTupleId aoTupleId;
 						
                         aocs_insert_values(resultRelInfo->ri_aocsInsertDesc, values, nulls, &aoTupleId);
+						if (resultRelInfo->ri_NumIndices > 0)
+							ExecInsertIndexTuples(slot, (ItemPointer)&aoTupleId, estate, false);
+					}
+					else if (relstorage == RELSTORAGE_PARQUET)
+					{
+						AOTupleId aoTupleId;
+
+						parquet_insert_values(resultRelInfo->ri_parquetInsertDesc, values, nulls, &aoTupleId);
+
 						if (resultRelInfo->ri_NumIndices > 0)
 							ExecInsertIndexTuples(slot, (ItemPointer)&aoTupleId, estate, false);
 					}
@@ -4275,6 +4334,8 @@ CopyFrom(CopyState cstate)
 			++aocount;
 		if (resultRelInfo->ri_aocsInsertDesc)
 			++aocount;
+		if (resultRelInfo->ri_parquetInsertDesc)
+			++aocount;
 		resultRelInfo++;
 	}
 
@@ -4307,6 +4368,16 @@ CopyFrom(CopyState cstate)
 			sendback->relid = RelationGetRelid(resultRelInfo->ri_RelationDesc);
 
 			aocs_insert_finish(resultRelInfo->ri_aocsInsertDesc);
+		}
+
+		if (resultRelInfo->ri_parquetInsertDesc)
+		{
+			sendback = CreateQueryContextDispatchingSendBack(
+					resultRelInfo->ri_parquetInsertDesc->parquet_rel->rd_att->natts);
+			resultRelInfo->ri_parquetInsertDesc->sendback = sendback;
+			sendback->relid = RelationGetRelid(resultRelInfo->ri_RelationDesc);
+
+			parquet_insert_finish(resultRelInfo->ri_parquetInsertDesc);
 		}
 
 		if (resultRelInfo->ri_extInsertDesc)

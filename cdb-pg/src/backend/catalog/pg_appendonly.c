@@ -32,6 +32,7 @@ HeapTuple
 CreateAppendOnlyEntry(TupleDesc desp,
 					  Oid relid,
 		  	  	  	  int blocksize,
+		  	  	  	  int pagesize,
 		  	  	  	  int safefswritesize,
 		  	  	  	  int compresslevel,
 		  	  	  	  bool checksum,
@@ -59,6 +60,7 @@ CreateAppendOnlyEntry(TupleDesc desp,
 
 	values[Anum_pg_appendonly_relid - 1] = ObjectIdGetDatum(relid);
 	values[Anum_pg_appendonly_blocksize - 1] = Int32GetDatum(blocksize);
+	values[Anum_pg_appendonly_pagesize- 1] = Int32GetDatum(pagesize);
 	values[Anum_pg_appendonly_safefswritesize - 1] = Int32GetDatum(
 			safefswritesize);
 	values[Anum_pg_appendonly_compresslevel - 1] = Int32GetDatum(compresslevel);
@@ -116,6 +118,7 @@ CreateAppendOnlyEntry(TupleDesc desp,
 void
 InsertAppendOnlyEntry(Oid relid, 
 					  int blocksize, 
+					  int pagesize,
 					  int safefswritesize, 
 					  int compresslevel,
 					  bool checksum,
@@ -143,6 +146,7 @@ InsertAppendOnlyEntry(Oid relid,
 	pg_appendonly_tuple = CreateAppendOnlyEntry(RelationGetDescr(pg_appendonly_rel),
 												relid,
 												blocksize,
+												pagesize,
 												safefswritesize,
 												compresslevel,
 												checksum,
@@ -334,6 +338,7 @@ GetAppendOnlyEntryFromTuple(
 {
 	Datum		relid,
 				blocksize,
+				pagesize,
 				safefswritesize,
 				compresslevel,
 				compresstype,
@@ -375,6 +380,16 @@ GetAppendOnlyEntryFromTuple(
 				(errcode(ERRCODE_UNDEFINED_OBJECT),
 				 errmsg("got invalid blocksize value: NULL")));	
 	
+	/* get the pagesize */
+	pagesize = heap_getattr(tuple,
+							 Anum_pg_appendonly_pagesize,
+							 pg_appendonly_dsc,
+							 &isNull);
+	if(isNull)
+			ereport(ERROR,
+					(errcode(ERRCODE_UNDEFINED_OBJECT),
+					 errmsg("got invalid pagesize value: NULL")));
+
 	/* get the safefswritesize */
 	safefswritesize = heap_getattr(tuple, 
 								   Anum_pg_appendonly_safefswritesize, 
@@ -505,6 +520,7 @@ GetAppendOnlyEntryFromTuple(
 				 errmsg("got invalid version value: NULL")));
 
 	aoentry->blocksize = DatumGetInt32(blocksize);
+	aoentry->pagesize = DatumGetInt32(pagesize);
 	aoentry->safefswritesize = DatumGetInt32(safefswritesize);
 	aoentry->compresslevel = DatumGetInt16(compresslevel);
 	aoentry->majorversion = DatumGetInt16(majorversion);

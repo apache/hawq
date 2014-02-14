@@ -13,7 +13,19 @@ override CPPFLAGS+= -I$(top_srcdir)/src/backend/libpq \
 
 # TODO: add ldl for quick hack; we need to figure out why
 # postgres in src/backend/Makefile doesn't need this and -pthread.
-MOCK_LIBS := -ldl $(filter-out -lpgport -lesmtp -ledit, $(LIBS)) 
+
+THRIFTLIB = -lthrift
+LIBS := $(LIBS) $(THRIFTLIB)
+
+CPLUSPLUSLIB = -lstdc++
+LIBS := $(LIBS) $(CPLUSPLUSLIB)
+
+#GLIBLIB = -lgobject-2.0 -lglib-2.0
+#LIBS := $(LIBS) $(GLIBLIB)
+
+
+MOCK_LIBS := -ldl $(filter-out -lpgport -lesmtp -ledit, $(LIBS))
+ 
 
 # We are unable to mock them up at the moment.  Real objects should contain them.
 EXCL_OBJS=src/backend/bootstrap/bootparse.o \
@@ -23,6 +35,11 @@ EXCL_OBJS=src/backend/bootstrap/bootparse.o \
 			src/backend/regex/regexec.o \
 			src/backend/utils/adt/like.o \
 			src/backend/utils/misc/guc.o \
+			src/backend/access/parquet/metadatautil_c++/Metadatainterface.o \
+			src/backend/access/parquet/metadatautil_c++/MetadataUtil.o \
+			src/backend/access/parquet/metadatautil_c++/parquet_constants.o \
+			src/backend/access/parquet/metadatautil_c++/parquet_types.o \
+			src/backend/access/parquet/metadatautil_c++/thrift-util.o \
 			src/timezone/%.o \
             src/backend/main/%.o \
 			src/backend/gpopt/%.o \

@@ -39,6 +39,7 @@
 #include "catalog/pg_type.h"
 #include "catalog/pg_type_encoding.h"
 #include "cdb/cdbpartition.h"
+#include "cdb/cdbparquetstoragewrite.h"
 #include "commands/defrem.h"
 #include "commands/prepare.h"
 #include "commands/tablecmds.h"
@@ -1516,10 +1517,10 @@ List *
 transformStorageEncodingClause(List *options)
 {
 	Datum d;
-	List *extra = list_make2(makeDefElem("appendonly",
-										 (Node *)makeString("true")),
-							 makeDefElem("orientation",
-										 (Node *)makeString("column")));
+	List *extra = list_make1(makeDefElem("appendonly",
+										 (Node *)makeString("true")));
+//							 makeDefElem("orientation",
+//										 (Node *)makeString("column")));
 
 	/* add defaults for missing values */
 	options = fillin_encoding(options);
@@ -1530,7 +1531,7 @@ transformStorageEncodingClause(List *options)
 	 */
 	d = transformRelOptions(PointerGetDatum(NULL),
 									  list_concat(extra, options),
-									  true, false);
+									  false, false);
 	(void)heap_reloptions(0, d, true);
 
 	return options;
@@ -1722,6 +1723,9 @@ form_default_storage_directive(List *enc)
 {
 	List *out = NIL;
 	ListCell *lc;
+	bool	parquetTable = false;
+	bool	pagesizeSet = false;
+	bool	rowgroupsizeSet = false;
 
 	foreach(lc, enc)
 	{
@@ -1732,8 +1736,6 @@ form_default_storage_directive(List *enc)
 
 		if (pg_strcasecmp("appendonly", el->defname) == 0)
 			continue;
-		if (pg_strcasecmp("orientation", el->defname) == 0)
-			continue;
 		if (pg_strcasecmp("oids", el->defname) == 0)
 			continue;
 		if (pg_strcasecmp("errortable", el->defname) == 0)
@@ -1742,8 +1744,37 @@ form_default_storage_directive(List *enc)
 			continue;
 		if (pg_strcasecmp("tablename", el->defname) == 0)
 			continue;
+		if (pg_strcasecmp("orientation", el->defname) == 0)
+		{
+			if(el->arg == NULL)
+				insist_log(false, "syntax not correct, orientation should has corresponding value");
+			if (pg_strcasecmp("parquet", defGetString(el)) == 0)
+				parquetTable = true;
+		}
+		if (pg_strcasecmp("pagesize", el->defname) == 0)
+			pagesizeSet = true;
+		if (pg_strcasecmp("rowgroupsize", el->defname) == 0)
+			rowgroupsizeSet = true;
+
 		out = lappend(out, copyObject(el));
 	}
+
+	/* If parquet table, but pagesize/rowgroupsize not set, should set them to default value*/
+	if (parquetTable){
+		if (!pagesizeSet){
+			DefElem    *f = makeNode(DefElem);
+			f->defname = "pagesize";
+			f->arg = (Node *) makeInteger(DEFAULT_PARQUET_PAGE_SIZE_PARTITION);
+			out = lappend(out, f);
+		}
+		if (!rowgroupsizeSet){
+			DefElem    *f = makeNode(DefElem);
+			f->defname = "rowgroupsize";
+			f->arg = (Node *) makeInteger(DEFAULT_PARQUET_ROWGROUP_SIZE_PARTITION);
+			out = lappend(out, f);
+		}
+	}
+
 	return out;
 }
 
@@ -3371,9 +3402,12 @@ fillin_encoding(List *list)
 {
 	bool foundCompressType = false;
 	bool foundCompressTypeNone = false;
+	bool snappyCompressType = false;
 	char *cmplevel = NULL;
 	bool foundBlockSize = false;
 	char *arg;
+	bool parquetTable = false;
+
 	DefElem *e1 = makeDefElem("compresstype", (Node *) makeString("none"));
 	DefElem *e2 = makeDefElem("compresslevel",
 							  (Node *) makeInteger(0));  /* compress level 0 */
@@ -3383,6 +3417,9 @@ fillin_encoding(List *list)
 						(Node *)makeInteger(DEFAULT_APPENDONLY_BLOCK_SIZE));
 	DefElem *zlibComp = makeDefElem("compresstype",
 									(Node *)makeString("zlib"));
+	DefElem *gzipComp = makeDefElem("compresstype",
+										(Node *)makeString("gzip"));
+
 	List *retList = list;
 	ListCell *lc;
 
@@ -3396,13 +3433,23 @@ fillin_encoding(List *list)
 			arg = defGetString(el);
 			if (pg_strcasecmp("none", arg) == 0)
 				foundCompressTypeNone = true;
+			if (pg_strcasecmp("snappy", arg) == 0)
+				snappyCompressType = true;
 		}
 		else if (pg_strcasecmp("compresslevel", el->defname) == 0)
 		{
 			cmplevel = defGetString(el);
 		}
 		else if (pg_strcasecmp("blocksize", el->defname) == 0)
+		{
 			foundBlockSize = true;
+		}
+		else if (pg_strcasecmp("orientation", el->defname) == 0)
+		{
+			arg = defGetString(el);
+			if (pg_strcasecmp("parquet", arg) == 0)
+				parquetTable = true;
+		}
 	}
 
 	if (foundCompressType == false)
@@ -3414,7 +3461,12 @@ fillin_encoding(List *list)
 		 * N in compresslevel=N (we check if N is meaningful to zlib later).
 		*/
 		if (cmplevel && strcmp(cmplevel, "0") != 0)
-			retList = lappend(retList, zlibComp);
+		{
+			if(!parquetTable)
+				retList = lappend(retList, zlibComp);
+			else
+				retList = lappend(retList, gzipComp);
+		}
 		else
 			retList = lappend(retList, e1);
 	}
@@ -3422,12 +3474,12 @@ fillin_encoding(List *list)
 	if (!cmplevel)
 	{
 		if (foundCompressType == false || foundCompressTypeNone == true)
-			retList = lappend(retList, e2);   /* no compress type => compresslevel = 0 */
-		else
+			retList = lappend(retList, e2);   /* no compress type or snappy compress type => compresslevel = 0 */
+		else if (snappyCompressType == false)
 			retList = lappend(retList, e2b);  /* compress type, but no compress level => compress level = 1 */
 	}
 
-	if (foundBlockSize == false)
+	if ((foundBlockSize == false) && (parquetTable == false))
 		retList = lappend(retList, e3);
 
 	return retList;

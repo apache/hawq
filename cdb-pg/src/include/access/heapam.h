@@ -143,7 +143,8 @@ inline static void RelationFetchGpRelationNodeForXLog(
 		}
 
 		if (relation->rd_rel->relstorage != RELSTORAGE_AOROWS
-			&& relation->rd_rel->relstorage != RELSTORAGE_AOCOLS)
+			&& relation->rd_rel->relstorage != RELSTORAGE_AOCOLS
+			&& relation->rd_rel->relstorage != RELSTORAGE_PARQUET)
 			RelationFetchSegFile0GpRelationNode(relation, MASTER_CONTENT_ID);
 		else
 		{

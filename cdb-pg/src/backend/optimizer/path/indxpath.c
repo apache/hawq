@@ -1758,7 +1758,8 @@ best_inner_indexscan(PlannerInfo *root, RelOptInfo *rel,
 
 	/* Exclude plain index paths if the relation is an append-only relation. */
 	if (relstorage == RELSTORAGE_AOROWS ||
-		relstorage == RELSTORAGE_AOCOLS)
+		relstorage == RELSTORAGE_AOCOLS ||
+		relstorage == RELSTORAGE_PARQUET)
 		indexpaths = NIL;
 
 	/*

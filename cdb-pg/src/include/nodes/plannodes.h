@@ -734,6 +734,12 @@ typedef struct AOCSScan
 	/* nothing for now... */
 } AOCSScan; 
 
+typedef struct ParquetScan
+{
+	Scan		scan;
+	/* nothing for now... */
+} ParquetScan;
+
 /*
  * ==========
  * Join nodes

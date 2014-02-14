@@ -533,7 +533,8 @@ remove_persistent_relations(int16 contentid, Oid databaseOid, Oid dbTablespaceOi
 		 */
 		relStorageMgr = (
 				 (dbInfoRel->relstorage == RELSTORAGE_AOROWS ||
-				  dbInfoRel->relstorage == RELSTORAGE_AOCOLS    ) ?
+				  dbInfoRel->relstorage == RELSTORAGE_AOCOLS ||
+				  dbInfoRel->relstorage == RELSTORAGE_PARQUET  ) ?
 								PersistentFileSysRelStorageMgr_AppendOnly :
 								PersistentFileSysRelStorageMgr_BufferPool);
 

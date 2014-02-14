@@ -1715,13 +1715,13 @@ ao_compression_ratio_internal(Oid relid)
 	/* open the parent (main) relation */
 	parentrel = heap_open(relid, AccessShareLock);
 
-	if(!RelationIsAoRows(parentrel) && !RelationIsAoCols(parentrel))
+	if(!RelationIsAoRows(parentrel) && !RelationIsAoCols(parentrel) && !RelationIsParquet(parentrel))
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				errmsg("'%s' is not an append-only relation",
 						RelationGetRelationName(parentrel))));
 
-	if (RelationIsAoRows(parentrel))
+	if (RelationIsAoRows(parentrel) || RelationIsParquet(parentrel))
 	{
 		returnDatum = aorow_compression_ratio_internal(parentrel);
 	}

@@ -68,6 +68,12 @@ LIBS := $(LIBS) -L$(OPTIMIZER)/libgpopt/$(OBJDIR_DEFAULT) -lgpopt -lpthread
 LIBS := $(LIBS) -L$(top_builddir)/src/backend/gpopt -ldxltranslators
 JSONLIB = -ljson
 LIBS := $(LIBS) $(JSONLIB)
+
+THRIFTLIB = -lthrift
+LIBS := $(LIBS) $(THRIFTLIB)
+
+SNAPPYLIB = -lsnappy
+LIBS := $(LIBS) $(SNAPPYLIB)
 ##########################################################################
 
 all: submake-libpgport submake-libdxltranslators submake-libbsafe_wrapper submake-libgpla postgres $(POSTGRES_IMP)

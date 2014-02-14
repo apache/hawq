@@ -1657,7 +1657,8 @@ RewriteQuery(Query *parsetree, List *rewrite_events)
 		 */
 		if (event == CMD_UPDATE)
 		{
-			if(RelationIsAoRows(rt_entry_relation)||(RelationIsAoCols(rt_entry_relation)))
+			if(RelationIsAoRows(rt_entry_relation)|| RelationIsAoCols(rt_entry_relation)
+					|| RelationIsParquet(rt_entry_relation))
 			{
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
@@ -1667,7 +1668,8 @@ RewriteQuery(Query *parsetree, List *rewrite_events)
 		}
 		else if (event == CMD_DELETE)
 		{
-			if(RelationIsAoRows(rt_entry_relation)||(RelationIsAoCols(rt_entry_relation)))
+			if(RelationIsAoRows(rt_entry_relation) || RelationIsAoCols(rt_entry_relation)
+					|| RelationIsParquet(rt_entry_relation))
 						{
 							ereport(ERROR,
 									(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),

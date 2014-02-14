@@ -429,7 +429,7 @@ RelationNeedsToastTable(Relation rel)
 	/*
 	 * in hawq, we cannot use toast table for dispatched table.
 	 */
-	if (RelationIsAoRows(rel) || RelationIsAoCols(rel))
+	if (RelationIsAoRows(rel) || RelationIsAoCols(rel) || RelationIsParquet(rel))
 		return false ;
 
 	if (!IsBootstrapProcessingMode() && !gp_upgrade_mode && Gp_role == GP_ROLE_DISPATCH)

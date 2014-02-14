@@ -53,6 +53,7 @@
 #include "access/transam.h"
 #include "access/aosegfiles.h"
 #include "access/aocssegfiles.h"
+#include "access/parquetsegfiles.h"
 #include "access/aomd.h"
 #include "commands/vacuum.h"
 #include "catalog/catalog.h"
@@ -187,6 +188,10 @@ lazy_vacuum_rel(Relation onerel, VacuumStmt *vacstmt, List *updated_stats)
 	else if (RelationIsAoCols(onerel))
 	{
         vacuum_aocs_rel(onerel, vacrelstats, /* FULL */ false);
+	}
+	else if (RelationIsParquet(onerel))
+	{
+		vacuum_parquet_rel(onerel, vacrelstats, /* FULL */ false);
 	}
 	else
 	{
@@ -1404,6 +1409,99 @@ vacuum_aocs_rel(Relation aorel, void *vacrelstats, bool isVacFull)
 		FreeAllAOCSSegFileInfo(allseg, totalseg);
 		pfree(allseg);
 	}
+}
+
+/*
+ *	vacuum_parquet_rel() -- vaccum a parquet relation
+ *
+ *		This prodecure will be what gets executed both for VACUUM
+ *		and VACUUM FULL (and also ANALYZE or any other thing that
+ *		needs the pg_class stats updated).
+ *
+ *		In here we don't really vacuum nor scan anything per-se. We
+ *		already have the information that we need in pg_paqseg_<oid>
+ *		relation on each segment. We are interested in reltuples and
+ *		relpages. reltuples is the same as "pg_paqseg_<oid>:tupcount"
+ *		column and we simulate relpages by subdividing the eof value
+ *		("pg_aoseg_<oid>:eof") over the defined page size.
+ *
+ */
+void
+vacuum_parquet_rel(Relation parquetrel, void *vacrelstats, bool isVacFull)
+{
+	ParquetFileSegTotals *fstotal;
+	BlockNumber nblocks;
+	char	   *relname;
+	double		num_tuples;
+	double		totalbytes;
+	double		eof;
+	PGRUsage	ru0;
+
+	pg_rusage_init(&ru0);
+
+	relname = RelationGetRelationName(parquetrel);
+	ereport(elevel,
+			(errmsg("vacuuming \"%s.%s\"",
+					get_namespace_name(RelationGetNamespace(parquetrel)),
+					relname)));
+
+	/* get statistics from the pg_aoseg table */
+	fstotal = GetParquetSegFilesTotals(parquetrel, SnapshotNow, GpIdentity.segindex);
+
+	/* calculate the values we care about */
+	eof = (double)fstotal->totalbytes;
+	num_tuples = (double)fstotal->totaltuples;
+	totalbytes = eof;
+	nblocks = (uint32)RelationGuessNumberOfBlocks(totalbytes);
+
+	if(isVacFull)
+	{
+		/* FULL */
+
+		/* fill in remaining VRelStats values */
+		((VRelStats *)vacrelstats)->rel_pages = nblocks;
+		((VRelStats *)vacrelstats)->rel_tuples = num_tuples;
+		((VRelStats *)vacrelstats)->hasindex = parquetrel->rd_rel->relhasindex;
+		((VRelStats *)vacrelstats)->min_tlen = 0;
+		((VRelStats *)vacrelstats)->max_tlen = 0;
+		((VRelStats *)vacrelstats)->num_vtlinks = 0;
+		((VRelStats *)vacrelstats)->vtlinks = NULL;
+	}
+	else
+	{
+		/* LAZY */
+
+		/* fill in remaining LVRelStats values */
+		((LVRelStats *)vacrelstats)->rel_pages = nblocks;
+		((LVRelStats *)vacrelstats)->rel_tuples = num_tuples;
+		((LVRelStats *)vacrelstats)->hasindex = parquetrel->rd_rel->relhasindex;
+		((LVRelStats *)vacrelstats)->nonempty_pages = 0;
+		((LVRelStats *)vacrelstats)->num_dead_tuples = 0;
+		((LVRelStats *)vacrelstats)->max_dead_tuples = 0;
+		((LVRelStats *)vacrelstats)->tuples_deleted = 0;
+		((LVRelStats *)vacrelstats)->tot_free_pages = 0;
+		((LVRelStats *)vacrelstats)->fs_is_heap = false;
+		((LVRelStats *)vacrelstats)->num_free_pages = 0;
+		((LVRelStats *)vacrelstats)->max_free_pages = 0;
+		((LVRelStats *)vacrelstats)->pages_removed = 0;
+	}
+
+	/*
+	 * in both VACUUM and VACUUM FULL we want to also truncate the relation
+	 * after eof. This must only be done when the relation is exclusively locked
+	 * (as in VACUUM FULL) or the aoseg tuple for the segfile being truncated
+	 * is exclusively locked.
+	 *
+	 * If we don't guarantee the locking conditions we can truncate concurrent
+	 * user's data while he's in the process of writing it!
+	 */
+
+	/*
+	 * for lock reason, in hawq, we currently do not truncate the relation
+	 */
+	pfree(fstotal);
+
+	return;
 }
 
 /*

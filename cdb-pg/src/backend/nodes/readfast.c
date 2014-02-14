@@ -2956,6 +2956,18 @@ _readTableScan(const char **str)
 	readScanInfo(str, (Scan *)local_node);
 	READ_DONE();
 }
+/*
+ * _readParquetScan
+ */
+static ParquetScan *
+_readParquetScan(const char ** str)
+{
+	READ_LOCALS(ParquetScan);
+
+	readScanInfo(str, (Scan *)local_node);
+
+	READ_DONE();
+}
 
 static DynamicTableScan *
 _readDynamicTableScan(const char **str)
@@ -4065,6 +4077,9 @@ readNodeBinary(const char ** str)
 			case T_DynamicTableScan:
 				return_value = _readDynamicTableScan(str);
 				break;
+			case T_ParquetScan:
+				return_value = _readParquetScan(str);
+				break;
 			case T_ExternalScan:
 				return_value = _readExternalScan(str);
 				break;
@@ -4698,10 +4713,10 @@ readNodeBinary(const char ** str)
 			return_value = _readSharedStorageOpStmt(str);
 			break;
 
-			default:
-				return_value = NULL; /* keep the compiler silent */
-				elog(ERROR, "could not deserialize unrecognized node type: %d",
-						 (int) nt);
+		default:
+			return_value = NULL; /* keep the compiler silent */
+			elog(ERROR, "could not deserialize unrecognized node type: %d",
+					 (int) nt);
 
 			break;
 	}

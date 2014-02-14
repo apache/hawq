@@ -2,6 +2,7 @@
 #define FSTREAM_H
 
 #include <sys/types.h>
+#include "pg_config_manual.h"
 /*#include "c.h"*/
 #ifdef WIN32
 typedef __int64 int64_t;

@@ -45,6 +45,9 @@ OBJS = cdbanalyze.o \
 	   cdbmirroredappendonly.o \
 	   cdbmutate.o \
 	   cdboidsync.o \
+	   cdbparquetstorageread.o cdbparquetstoragewrite.o cdbparquetrleencoder.o \
+	   cdbparquetbytepacker.o cdbparquetbitstreamutil.o cdbparquetrowgroup.o\
+	   cdbparquetfooterprocessor.o cdbparquetcolumn.o\
 	   cdbpartindex.o \
 	   cdbpartition.o \
 	   cdbpath.o cdbpathlocus.o cdbpathtoplan.o \

@@ -2399,7 +2399,7 @@ heap_delete(Relation relation, ItemPointer tid,
 
 	Assert(ItemPointerIsValid(tid));
 
-	if (RelationIsAoRows(relation) || RelationIsAoCols(relation))
+	if (RelationIsAoRows(relation) || RelationIsAoCols(relation) || RelationIsParquet(relation))
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("Append-only tables are not updatable. Operation not permitted."),
@@ -2731,7 +2731,7 @@ heap_update_internal(Relation relation, ItemPointer otid, HeapTuple newtup,
 
 	Assert(ItemPointerIsValid(otid));
 
-	if (RelationIsAoRows(relation) || RelationIsAoCols(relation))
+	if (RelationIsAoRows(relation) || RelationIsAoCols(relation) || RelationIsParquet(relation))
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("Append-only tables are not updatable. Operation not permitted."),

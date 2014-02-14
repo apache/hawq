@@ -263,11 +263,13 @@ PGFunction *
 RelationGetRelationCompressionFuncs(Relation rel)
 {
 	AppendOnlyEntry *aoentry;
-	char *comptype;
+	char *comptype = NULL;
 	PGFunction *compFuncs;
 
-	aoentry = GetAppendOnlyEntry(RelationGetRelid(rel), SnapshotNow);
-	comptype = aoentry->compresstype;
+	if(RelationIsAoRows(rel) || RelationIsAoCols(rel) || RelationIsParquet(rel)){
+		aoentry = GetAppendOnlyEntry(RelationGetRelid(rel), SnapshotNow);
+		comptype = aoentry->compresstype;
+	}
 
 	compFuncs =	get_funcs_for_compression(comptype);
 

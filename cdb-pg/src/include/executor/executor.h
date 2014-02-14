@@ -207,7 +207,7 @@ extern void map_part_attrs_from_targetdesc(TupleDesc target, TupleDesc part, Att
 extern PartitionState *createPartitionState(PartitionNode *partsAndRules, int resultPartSize);
 extern TupleTableSlot *reconstructMatchingTupleSlot(TupleTableSlot *slot,
 													ResultRelInfo *resultRelInfo);
-extern void CreateAppendOnlySegFileForRelationOnMaster(Relation rel, int segno);
+extern void CreateAppendOnlyParquetSegFileForRelationOnMaster(Relation rel, int segno);
 
 /*
  * prototypes from functions in execProcnode.c
@@ -310,6 +310,14 @@ extern TupleTableSlot *AOCSScanNext(ScanState *scanState);
 extern void BeginScanAOCSRelation(ScanState *scanState);
 extern void EndScanAOCSRelation(ScanState *scanState);
 extern void ReScanAOCSRelation(ScanState *scanState);
+
+/*
+ * prototypes from functions in execParquetScan.c
+ */
+extern TupleTableSlot *ParquetScanNext(ScanState *scanState);
+extern void BeginScanParquetRelation(ScanState *scanState);
+extern void EndScanParquetRelation(ScanState *scanState);
+extern void ReScanParquetRelation(ScanState *scanState);
 
 /*
  * prototypes from functions in execTuples.c
@@ -423,7 +431,7 @@ extern ShareNodeEntry * ExecGetShareNodeEntry(EState *estate, int shareid, bool 
 /* ResultRelInfo and Append Only segment assignment */
 extern void ResultRelInfoSetSegno(ResultRelInfo *resultRelInfo, List *mapping);
 
-extern void CreateAppendOnlySegFileOnMaster(Oid relid, List *mapping);
+extern void CreateAppendOnlyParquetSegFileOnMaster(Oid relid, List *mapping);
 
 /* Additions for MPP Slice table utilities defined in execUtils.c */
 extern GpExecIdentity getGpExecIdentity(QueryDesc *queryDesc,
@@ -431,7 +439,6 @@ extern GpExecIdentity getGpExecIdentity(QueryDesc *queryDesc,
 										  EState	   *estate);
 extern void mppExecutorFinishup(QueryDesc *queryDesc);
 extern void mppExecutorCleanup(QueryDesc *queryDesc);
-
 /* prototypes defined in nodeAgg.c for rollup-aware Agg/Group nodes. */
 extern int64 tuple_grouping(TupleTableSlot *outerslot,
 			    int input_grouping,

@@ -1355,14 +1355,15 @@ ExecUpdateAOtupCount(ResultRelInfo *result_rels,
 
 	for (i = num_result_rels; i > 0; i--)
 	{
-		if(RelationIsAoRows(result_rels->ri_RelationDesc) || RelationIsAoCols(result_rels->ri_RelationDesc))
+		if(RelationIsAoRows(result_rels->ri_RelationDesc)
+				|| RelationIsAoCols(result_rels->ri_RelationDesc)
+				|| RelationIsParquet(result_rels->ri_RelationDesc))
 		{
 			Assert(result_rels->ri_aosegno != InvalidFileSegNumber);
 			UpdateMasterAosegTotals(result_rels->ri_RelationDesc,
 									result_rels->ri_aosegno,
 									processed);
-		}
-
+			}
 		result_rels++;
 	}
 }
@@ -2180,7 +2181,10 @@ void mppExecutorFinishup(QueryDesc *queryDesc)
 				if (found)
 				{
 					Relation r = heap_open(map->relid, AccessShareLock);
-					UpdateMasterAosegTotals(r, map->segno, entry->tupcount);
+					if(RelationIsAoRows(r) || RelationIsAoCols(r) || RelationIsParquet(r))
+					{
+						UpdateMasterAosegTotals(r, map->segno, entry->tupcount);
+					}
 					heap_close(r, NoLock);
 				}
 			}
@@ -2315,6 +2319,7 @@ initGpmonPktForDefunctOperators(Plan *planNode, gpmon_packet_t *gpmon_pkt, EStat
 {
 	Assert(IsA(planNode, SeqScan) ||
 		   IsA(planNode, AppendOnlyScan) ||
+		   IsA(planNode, ParquetScan) ||
 		   IsA(planNode, AOCSScan));
 	insist_log(false, "SeqScan/AppendOnlyScan/AOCSScan are defunct");
 }
@@ -2465,6 +2470,7 @@ sendInitGpmonPkts(Plan *node, EState *estate)
 		case T_AppendOnlyScan:
 		case T_AOCSScan:
 		case T_DynamicTableScan:
+		case T_ParquetScan:
 		case T_ExternalScan:
 		case T_IndexScan:
 		case T_BitmapIndexScan:

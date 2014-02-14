@@ -513,6 +513,8 @@ char * plannode_type(Plan *p)
 			return "APPENDONLYSCAN";
 		case T_AOCSScan:
 			return "AOCSSCAN";
+		case T_ParquetScan:
+			return "PARQUETSCAN";
 		case T_ExternalScan:
 			return "EXTERNALSCAN";
 		case T_IndexScan:

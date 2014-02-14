@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Header$
+# $Header: //gpsql/feature/hd2.0/private-lili/cdb-pg/src/include/catalog/calico.pl#2 $
 #
 # copyright (c) 2011, 2012, 2013
 # Author: Jeffrey I Cohen

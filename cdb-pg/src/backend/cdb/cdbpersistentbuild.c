@@ -249,7 +249,8 @@ static void PersistentBuild_PopulateGpRelationNode(
 
 		relStorageMgr = (
 				 (dbInfoRel->relstorage == RELSTORAGE_AOROWS ||
-				  dbInfoRel->relstorage == RELSTORAGE_AOCOLS	) ?
+				  dbInfoRel->relstorage == RELSTORAGE_AOCOLS ||
+				  dbInfoRel->relstorage == RELSTORAGE_PARQUET) ?
 								PersistentFileSysRelStorageMgr_AppendOnly :
 								PersistentFileSysRelStorageMgr_BufferPool);
 

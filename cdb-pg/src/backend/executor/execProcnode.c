@@ -255,6 +255,7 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 		case T_SeqScan:
 		case T_AppendOnlyScan:
 		case T_AOCSScan:
+		case T_ParquetScan:
 		case T_TableScan:
 			result = (PlanState *) ExecInitTableScan((TableScan *) node,
 													 estate, eflags);
@@ -537,6 +538,7 @@ ExecProcNode(PlanState *node)
 		&&Exec_Jmp_TableScan,
 		&&Exec_Jmp_TableScan,
 		&&Exec_Jmp_TableScan,
+		&&Exec_Jmp_TableScan,
 		&&Exec_Jmp_DynamicTableScan,
 		&&Exec_Jmp_ExternalScan,
 		&&Exec_Jmp_IndexScan,
@@ -775,7 +777,8 @@ Exec_Jmp_Done:
 		case T_SeqScanState:
 		case T_AppendOnlyScanState:
 		case T_AOCSScanState:
-			insist_log(false, "SeqScan/AppendOnlyScan/AOCSScan are defunct");
+		case T_ParquetScanState:
+			insist_log(false, "SeqScan/AppendOnlyScan/AOCSScan/Parquet are defunct");
 			break;
 
 		case T_IndexScanState:
@@ -1021,6 +1024,7 @@ ExecCountSlotsNode(Plan *node)
 		case T_SeqScan:
 		case T_AppendOnlyScan:
 		case T_AOCSScan:
+		case T_ParquetScan:
 		case T_TableScan:
 			return ExecCountSlotsTableScan((TableScan *) node);
 
@@ -1284,7 +1288,8 @@ ExecEndNode(PlanState *node)
 		case T_SeqScanState:
 		case T_AppendOnlyScanState:
 		case T_AOCSScanState:
-			insist_log(false, "SeqScan/AppendOnlyScan/AOCSScan are defunct");
+		case T_ParquetScanState:
+			insist_log(false, "SeqScan/AppendOnlyScan/AOCSScan/ParquetScan are defunct");
 			break;
 			
 		case T_TableScanState:

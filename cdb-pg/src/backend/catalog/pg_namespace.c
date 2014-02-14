@@ -24,6 +24,7 @@
 #include "utils/syscache.h"
 
 
+
 /* ----------------
  * NamespaceCreate
  * ---------------
@@ -94,3 +95,4 @@ NamespaceCreate(const char *nspName, Oid ownerId, Oid forceOid)
 
 	return nspoid;
 }
+

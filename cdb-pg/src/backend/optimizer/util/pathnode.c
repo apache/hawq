@@ -225,6 +225,7 @@ pathnode_walk_kids(Path            *path,
             case T_ExternalScan:
             case T_AppendOnlyScan:
             case T_AOCSScan:
+            case T_ParquetScan:
             case T_IndexScan:
             case T_TidScan:
             case T_SubqueryScan:
@@ -1161,6 +1162,27 @@ create_aocs_path(PlannerInfo *root, RelOptInfo *rel)
 	cost_aocsscan(pathnode, root, rel);
 	return pathnode;
 }
+
+/*
+ * Create a path for scanning a parquet table
+ */
+ParquetPath *
+create_parquet_path(PlannerInfo *root, RelOptInfo *rel)
+{
+	ParquetPath	   *pathnode = makeNode(ParquetPath);
+
+	pathnode->path.pathtype = T_ParquetScan;
+	pathnode->path.parent = rel;
+	pathnode->path.pathkeys = NIL;	/* seqscan has unordered result */
+
+    pathnode->path.locus = cdbpathlocus_from_baserel(root, rel);
+    pathnode->path.motionHazard = false;
+	pathnode->path.rescannable = true;
+
+	cost_parquetscan(pathnode, root, rel);
+	return pathnode;
+}
+
 /* 
 * Create a path for scanning an external table
  */

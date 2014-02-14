@@ -440,6 +440,7 @@ static Node* ParallelizeCorrelatedSubPlanMutator(Node *node, ParallelizeCorrelat
 	if (IsA(node, SeqScan)
 		|| IsA(node, AppendOnlyScan)
 		|| IsA(node, AOCSScan)
+		|| IsA(node, ParquetScan)
 		|| IsA(node, ShareInputScan))
 	{
 		Plan *scanPlan = (Plan *) node;
@@ -754,7 +755,7 @@ prescan_walker(Node *node, PlanProfile * context)
 			 * may occur in an expression or an initplan list.
 			 */
 
- 		{
+		{
 			/*
 			 * SubPlans establish a local state for the contained plan,
 			 * notably the range table.
@@ -1306,6 +1307,7 @@ motion_sanity_walker(Node *node, sanity_result_t *result)
 		case T_ExternalScan:
 		case T_AppendOnlyScan:
 		case T_AOCSScan:
+		case T_ParquetScan:
 		case T_IndexScan:
 		case T_BitmapIndexScan:
 		case T_BitmapHeapScan:

@@ -2,6 +2,10 @@
 -- Catalog Upgrade Script (from 1.1 to 1.2)
 --
 
+ALTER TABLE @gpupgradeschemaname@.pg_appendonly ADD COLUMN pagesize int4;
+SELECT catDML('UPDATE @gpupgradeschemaname@.pg_appendonly set pagesize = 0;');
+
+
 -- update definitions of built-in functions
 
 CREATE OR REPLACE FUNCTION @gpupgradeschemaname@.pg_get_constraintdef(oid) RETURNS text LANGUAGE internal STABLE STRICT READS SQL DATA AS 'pg_get_constraintdef' WITH (OID=1387);

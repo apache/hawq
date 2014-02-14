@@ -364,7 +364,6 @@ Boot_CreateStmt:
 							case CompressionRelationId:
 								typid = PG_COMPRESSION_RELTYPE_OID;
 								break;
-
 /* relation id: 6112 - pg_filesystem 20130123 */
 							case FileSystemRelationId:
 								typid = PG_FILESYSTEM_RELTYPE_OID;

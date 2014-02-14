@@ -1063,6 +1063,9 @@ explain_outNode(StringInfo str,
 		case T_DynamicTableScan:
 			pname = "Dynamic Table Scan";
 			break;
+		case T_ParquetScan:
+			pname = "Parquet table Scan";
+			break;
 		case T_ExternalScan:
 			pname = "External Scan";
 			break;
@@ -1251,6 +1254,7 @@ explain_outNode(StringInfo str,
 		case T_ExternalScan:
 		case T_AppendOnlyScan:
 		case T_AOCSScan:
+		case T_ParquetScan:
 		case T_TableScan:
 		case T_DynamicTableScan:
 		case T_DynamicIndexScan:
@@ -1445,6 +1449,7 @@ explain_outNode(StringInfo str,
 		case T_ExternalScan:
 		case T_AppendOnlyScan:
 		case T_AOCSScan:
+		case T_ParquetScan:
 		case T_TableScan:
 		case T_DynamicTableScan:
 		case T_FunctionScan:
