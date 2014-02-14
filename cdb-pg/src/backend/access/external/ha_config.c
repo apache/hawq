@@ -1,4 +1,5 @@
 #include "access/ha_config.h"
+#include "access/pxfcomutils.h"
 #include "hdfs/hdfs.h"
 
 #define ALLOC_STRINGS_ARR(sz) ((char**)palloc0(sizeof(char*) * sz))
@@ -11,6 +12,7 @@ static void set_one_namenode(NNHAConf *conf, int idx, Namenode *source);
 static void validate_result(NNHAConf *conf);
 static void validate_port(char *port,  const char *m1, int num);
 static void validate_string(char *s,  const char *m1, int num);
+static void traceNamenodeArr(Namenode* nns, int len);
 
 /*
  * load_nn_ha_config
@@ -112,9 +114,29 @@ load_hdfs_client_config(const char *nameservice)
 	for (i = 0; i < conf->numn; i++)
 		set_one_namenode(conf, i, &nns[i]);
 	
+	/* 
+	 * If we succeeded to create NNHAConf from the input Namenode array in set_one_namenode(), 
+	 * we can at least say that the Namenode array has no NULL or empty strings inside.
+	 * Then we can safely trace it to the log so we can record what was received from 
+	 * the configuration.
+	 */
+	traceNamenodeArr(nns, len);
+	
 	hdfsFreeNamenodeInformation(nns, len);
 	
 	return conf;
+}
+
+/*
+ * Trace the Namenode array to the log
+ */
+static void 
+traceNamenodeArr(Namenode* nns, int len)
+{
+	int i;
+	for (i = 0; i < len; i++)
+		elog(DEBUG2, "PXF received from configuration HA Namenode-%d having rpc-address <%s> and rest-address <%s>", 
+			 i + 1, nns[i].rpc_addr, nns[i].http_addr);
 }
 
 /*
@@ -161,13 +183,17 @@ static void find_active_namenode(NNHAConf *conf, const char *nameservice)
 	conf->active = AC_NOT_SET;
 	for (i = 0; i < conf->numn; i++)
 	{
-		hdfsFS fs = hdfsConnect(conf->nodes[i], atoi(conf->rpcports[i]));
-		if (fs)
-		{
+		elog(DEBUG2, "Connecting to HA Namenode-%d at host <%s> port <%s>.",
+			 i + 1, conf->nodes[i], conf->rpcports[i]);
+		if (ping(conf->nodes[i], conf->rpcports[i]))
+		{ 
 			conf->active = i;
-			hdfsDisconnect(fs);
 			break;
 		}
+		else 
+		  elog(LOG, "Failed to connect to HA Namenode-%d at host <%s> port <%s>. %s",
+			   i + 1, conf->nodes[i], conf->rpcports[i],
+			   i == (conf->numn - 1) ? "No more HA Namenodes to connect to." : "Will attempt to connect to next Namenode.");
 	}
 	
 	if (conf->active == AC_NOT_SET)

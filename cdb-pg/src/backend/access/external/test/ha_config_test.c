@@ -19,15 +19,13 @@ static void handle_pg_excp(char *msg, int errcode);
  * Unitest for load_nn_ha_config() in ../access/external/ha_config.c
  * load_nn_ha_config() discovers the active Namnode from an HA Namenodes pair.
  * It does this by interacting with the API exposed by hdfs.h, from which it uses 
- * 4 functions:
+ * 2 functions:
  * a. Namenode * hdfsGetHANamenodes(const char * nameservice, int * size);
  * b. void hdfsFreeNamenodeInformation(Namenode * namenodes, int size);
- * c. hdfsFS hdfsConnect(const char * host, uint16_t port);
- * d. int hdfsDisconnect(hdfsFS fileSystem);
  * This unitest verifies the correct interaction between load_nn_ha_config() implementation
- * and this 4 hdfs.h APIs. It looks at the standard flows with expected input configuration
+ * and the 2 hdfs.h APIs. It looks at the standard flows with expected input configuration
  * and also at limit cases with corrupted input configuration.
- * The mock functions for the four(4) hdfs.h APIs are in ha_config_mock.c.
+ * The mock functions for the two(2) hdfs.h APIs are in ha_config_mock.c.
  */
 
 /*
@@ -98,28 +96,30 @@ test__load_nn_ha_config__OneNN(void **state)
 /*
  * SUT function: NNHAConf* load_nn_ha_config(const char *nameservice);
  * Mock functions: 
- *         Namenode * hdfsGetHANamenodes(const char * nameservice, int * size)
- *         hdfsFS hdfsConnect(const char * host, uint16_t port);
- *         int hdfsDisconnect(hdfsFS fileSystem);
- * hdfsGetHANamenodes() returns a valid Array of Namenodes and hdfsConnect discovers
+ *         Namenode * hdfsGetHANamenodes(const char * nameservice, int * size);
+ *         void hdfsFreeNamenodeInformation(Namenode * namenodes, int size);
+ *         bool ping(char* host, char *port);
+ * hdfsGetHANamenodes() returns a valid Array of Namenodes and ping() discovers
  * that the second namenode is active
  */
 void 
 test__load_nn_ha_config__SecondNNFound(void **state)
 {
-	const unsigned int DUMMY_INT = 5; /* just a positive int, value itself has no meaning*/
 	unsigned int numn = 2;
 	Namenode nns[] = { {"mdw:2080", "mdw:50070"}, {"smdw:2080", "smdw:50070"}};
 	
 	will_return(hdfsGetHANamenodes, nns);
 	will_assign_value(hdfsGetHANamenodes, size, numn);
 	will_be_called(hdfsFreeNamenodeInformation);
-	will_return(hdfsConnect, NULL);
-	will_return(hdfsConnect, DUMMY_INT/* dummy */); /* just return a number that will be interpreted as an hdfsFS*/
-	will_be_called(hdfsDisconnect);
-	
+	expect_string(ping, host, "mdw");
+	expect_string(ping, port, "2080");
+	will_return(ping, false);
+	expect_string(ping, host, "smdw");
+	expect_string(ping, port, "2080");
+	will_return(ping, true);
+
 	NNHAConf *hac = load_nn_ha_config("NAMESERVICE");
-	
+
 	assert_int_equal(hac->active, 1);
 	assert_int_equal(hac->numn, 2);
 	assert_string_equal(hac->rpcports[0], "2080");
@@ -133,27 +133,27 @@ test__load_nn_ha_config__SecondNNFound(void **state)
 /*
  * SUT function: NNHAConf* load_nn_ha_config(const char *nameservice);
  * Mock functions: 
- *         Namenode * hdfsGetHANamenodes(const char * nameservice, int * size)
- *         hdfsFS hdfsConnect(const char * host, uint16_t port);
- *         int hdfsDisconnect(hdfsFS fileSystem);
- * hdfsGetHANamenodes() returns a valid Array of Namenodes and hdfsConnect discovers
+ *         Namenode * hdfsGetHANamenodes(const char * nameservice, int * size);
+ *         void hdfsFreeNamenodeInformation(Namenode * namenodes, int size);
+ *         bool ping(char* host, char *port);
+ * hdfsGetHANamenodes() returns a valid Array of Namenodes and ping() discovers
  * that the first namenode is active
  */
 void 
 test__load_nn_ha_config__FirstNNFound(void **state)
 {
-	const unsigned int DUMMY_INT = 5; /* just a positive int, value itself has no meaning*/
 	unsigned int numn = 2;
 	Namenode nns[] = { {"mdw:2080", "mdw:50070"}, {"smdw:2080", "smdw:50070"}};
 	
 	will_return(hdfsGetHANamenodes, nns);
 	will_assign_value(hdfsGetHANamenodes, size, numn);
 	will_be_called(hdfsFreeNamenodeInformation);
-	will_return(hdfsConnect, DUMMY_INT/* dummy */); /* just return a number that will be interpreted as an hdfsFS*/
-	will_be_called(hdfsDisconnect);
-	
+	expect_string(ping, host, "mdw");
+	expect_string(ping, port, "2080");	
+	will_return(ping, true); 
+
 	NNHAConf *hac = load_nn_ha_config("NAMESERVICE");
-	
+
 	assert_int_equal(hac->active, 0);
 	assert_int_equal(hac->numn, 2);
 	assert_string_equal(hac->rpcports[0], "2080");
@@ -161,32 +161,36 @@ test__load_nn_ha_config__FirstNNFound(void **state)
 	assert_string_equal(hac->nodes[0], "mdw");
 	assert_string_equal(hac->rpcports[1], "2080");
 	assert_string_equal(hac->restports[1], "50070");
-	assert_string_equal(hac->nodes[1], "smdw");	
+	assert_string_equal(hac->nodes[1], "smdw");     
 }
 
 /*
  * SUT function: NNHAConf* load_nn_ha_config(const char *nameservice);
  * Mock functions: 
- *         Namenode * hdfsGetHANamenodes(const char * nameservice, int * size)
- *         hdfsFS hdfsConnect(const char * host, uint16_t port);
- *         int hdfsDisconnect(hdfsFS fileSystem);
- * hdfsGetHANamenodes() returns a valid Array of 3 Namenodes and hdfsConnect discovers
+ *         Namenode * hdfsGetHANamenodes(const char * nameservice, int * size);
+ *         void hdfsFreeNamenodeInformation(Namenode * namenodes, int size);
+ *         bool ping(char* host, char *port);
+ * hdfsGetHANamenodes() returns a valid Array of 3 Namenodes and ping() discovers
  * that the third namenode is active
  */
 void 
 test__load_nn_ha_config__ThirdNNFound(void **state)
 {
-	const unsigned int DUMMY_INT = 5; /* just a positive int, value itself has no meaning*/
 	unsigned int numn = 3;
-	Namenode nns[] = { {"mdw:2080", "mdw:50070"}, {"smdw:2080", "smdw:50070"}, {"tmdw:2080", "tmdw:50070"}};
-	
+	Namenode nns[] = { {"mdw:2080", "mdw:50070"}, {"smdw:2080", "smdw:50070"}, {"tmdw:2080", "tmdw:50070"} };
+        
 	will_return(hdfsGetHANamenodes, nns);
 	will_assign_value(hdfsGetHANamenodes, size, numn);
 	will_be_called(hdfsFreeNamenodeInformation);
-	will_return(hdfsConnect, NULL);
-	will_return(hdfsConnect, NULL);
-	will_return(hdfsConnect, DUMMY_INT/* dummy */); /* just return a number that will be interpreted as an hdfsFS*/
-	will_be_called(hdfsDisconnect);
+	expect_string(ping, host, "mdw");
+	expect_string(ping, port, "2080");
+	will_return(ping, false);
+	expect_string(ping, host, "smdw");
+	expect_string(ping, port, "2080");	
+	will_return(ping, false);
+	expect_string(ping, host, "tmdw");
+	expect_string(ping, port, "2080");	
+	will_return(ping, true); 
 	
 	NNHAConf *hac = load_nn_ha_config("NAMESERVICE");
 	
@@ -200,17 +204,17 @@ test__load_nn_ha_config__ThirdNNFound(void **state)
 	assert_string_equal(hac->nodes[1], "smdw");
 	assert_string_equal(hac->rpcports[2], "2080");
 	assert_string_equal(hac->restports[2], "50070");
-	assert_string_equal(hac->nodes[2], "tmdw");	
+	assert_string_equal(hac->nodes[2], "tmdw");
 }
-
 
 /*
  * SUT function: NNHAConf* load_nn_ha_config(const char *nameservice)
  * Mock functions: 
- *         Namenode * hdfsGetHANamenodes(const char * nameservice, int * size)
- *         hdfsFS hdfsConnect(const char * host, uint16_t port);
+ *         Namenode * hdfsGetHANamenodes(const char * nameservice, int * size);
+ *         void hdfsFreeNamenodeInformation(Namenode * namenodes, int size);
+ *         bool ping(char* host, char *port);
  * Negative test: hdfsGetHANamenodes() returns a valid Array of namenodes and 
- * hdfsConnect does not discover an active namenode
+ * ping() does not discover an active namenode
  */
 void 
 test__load_nn_ha_config__NoneFound(void **state)
@@ -221,8 +225,12 @@ test__load_nn_ha_config__NoneFound(void **state)
 	will_return(hdfsGetHANamenodes, nns);
 	will_assign_value(hdfsGetHANamenodes, size, numn);
 	will_be_called(hdfsFreeNamenodeInformation);
-	will_return(hdfsConnect, NULL);
-	will_return(hdfsConnect, NULL);
+	expect_string(ping, host, "mdw");
+	expect_string(ping, port, "2080");	
+	will_return(ping, false);
+	expect_string(ping, host, "smdw");
+	expect_string(ping, port, "2080");	
+	will_return(ping, false);
 	
 	PG_TRY();
 	{
@@ -230,16 +238,16 @@ test__load_nn_ha_config__NoneFound(void **state)
 	
 	PG_CATCH();
 	{
-		char *msg = format_string_create("No HA active namenode found for nameservice %s", "NAMESERVICE");				
-		handle_pg_excp(msg, ERRCODE_CONNECTION_FAILURE);		
-		format_string_release(msg); /* if we trip on assert_string_equal we don't free but it doesen't matter because process stops*/
+		char *msg = format_string_create("No HA active namenode found for nameservice %s", "NAMESERVICE");
+		handle_pg_excp(msg, ERRCODE_CONNECTION_FAILURE);                
+		format_string_release(msg); 
 		return;
 	}
 	PG_END_TRY();
-	
+
 	assert_true(false);
 }
-
+										 																							
 /*
  * SUT function: NNHAConf* load_nn_ha_config(const char *nameservice);
  * Mock function: Namenode * hdfsGetHANamenodes(const char * nameservice, int * size) 

@@ -18,13 +18,3 @@ void hdfsFreeNamenodeInformation(Namenode *namenodes, int size)
 {
 	mock();
 }
-
-hdfsFS hdfsConnect(const char *host, uint16_t port)
-{
-	return (hdfsFS)mock();
-}
-
-int hdfsDisconnect(hdfsFS fileSystem)
-{
-	mock();
-}
