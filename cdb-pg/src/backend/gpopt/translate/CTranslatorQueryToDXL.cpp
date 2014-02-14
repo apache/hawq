@@ -307,19 +307,45 @@ CTranslatorQueryToDXL::CheckSirvFuncsWithoutFromClause
 	}
 
 	// see if we have SIRV functions in the target list
-	List *plFunctions =	gpdb::PlExtractNodesExpression((Node *)pquery->targetList, T_FuncExpr, true /*descendIntoSubqueries*/);
+	if (FHasSirvFunctions((Node *) pquery->targetList))
+	{
+		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("SIRV functions"));
+	}
+}
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorQueryToDXL::FHasSirvFunctions
+//
+//	@doc:
+//		Check for SIRV functions in the tree rooted at the given node
+//
+//---------------------------------------------------------------------------
+BOOL
+CTranslatorQueryToDXL::FHasSirvFunctions
+	(
+	Node *pnode
+	)
+	const
+{
+	GPOS_ASSERT(NULL != pnode);
+
+	List *plFunctions =	gpdb::PlExtractNodesExpression(pnode, T_FuncExpr, true /*descendIntoSubqueries*/);
 	ListCell *plc = NULL;
 
+	BOOL fHasSirv = false;
 	ForEach (plc, plFunctions)
 	{
 		FuncExpr *pfuncexpr = (FuncExpr *) lfirst(plc);
 		if (CTranslatorUtils::FSirvFunc(m_pmp, m_pmda, pfuncexpr->funcid))
 		{
-			GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("SIRV functions"));
+			fHasSirv = true;
+			break;
 		}
 	}
-
 	gpdb::FreeList(plFunctions);
+
+	return fHasSirv;
 }
 
 //---------------------------------------------------------------------------
@@ -2909,6 +2935,12 @@ CTranslatorQueryToDXL::PdxlnFromTVF
 
 	FuncExpr *pfuncexpr = (FuncExpr *) prte->funcexpr;
 	BOOL fSubqueryInArgs = false;
+
+	// check if arguments contain SIRV functions
+	if (NIL != pfuncexpr->args && FHasSirvFunctions((Node *) pfuncexpr->args))
+	{
+		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("SIRV functions"));
+	}
 
 	ListCell *plc = NULL;
 	ForEach (plc, pfuncexpr->args)

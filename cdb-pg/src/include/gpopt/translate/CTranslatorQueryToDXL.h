@@ -152,6 +152,9 @@ namespace gpdxl
 			// throw an exception when found
 			void CheckSirvFuncsWithoutFromClause(Query *pquery);
 
+			// check for SIRV functions in the tree rooted at the given node
+			BOOL FHasSirvFunctions (Node *pnode) const;
+
 			// translate FromExpr (in the GPDB query) into a CDXLLogicalJoin or CDXLLogicalGet
 			CDXLNode *PdxlnFromGPDBFromExpr(FromExpr *pfromexpr) const;
 
