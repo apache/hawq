@@ -26,6 +26,7 @@ if sys.version_info < (2, 5, 0) or sys.version_info >= (3, 0, 0):
 try:
     from gppylib.operations.gpMigratorUtil import *
     from gppylib.operations.madlib_depcheck.depcheck import depcheck_for_madlib
+    from gppylib.commands.base import Command
 except ImportError, e:
     sys.exit('Error: unable to import module: ' + str(e))
 
@@ -1785,6 +1786,28 @@ class GPUpgrade(GPUpgradeBase):
                         os.remove(newfile)
                     # logger.debug('Linking file %s => %s ' % (oldfile, newfile))
                     os.link(oldfile, newfile)
+
+        # FIXME: the following hack is version specific, only
+        # applicable when upgrading from HAWQ 1.1.x to HAWQ 1.2.x.
+        # This part of the code must be revisited for upgrades v 1.2
+        # onwards.  Given the time constraints, it was collectively
+        # discussed to incorporate this hack.
+        if style == 'REVERT' and \
+           self.oldversion.getVersionRelease() == "1.1" and \
+           self.newversion.getVersionRelease() == "1.2":
+            # OIDs created during upgrade by v1.2.x upgrade SQL
+            # script need to be removed in the event of failure.
+            # These OIDs may already be present in destination data
+            # dir (see GPSQL-1752).
+            newOidsIn_v12 = ['7076', '7077', '7078', '7079', '7080', '7081']
+            cmdstr = ("find %s/base" % destination +
+                      " -name %s -type f -exec rm -f {} \;")
+            for oid in newOidsIn_v12:
+                cmd = Command("Remove OID", cmdstr % oid)
+                logger.debug("Removing relfile %s from %s" % (oid, destination))
+                cmd.run(validateAfter=True)
+                logger.debug(cmd.get_results().printResult())
+
 
     #------------------------------------------------------------
     def FixConfig(self):
