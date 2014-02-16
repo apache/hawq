@@ -9,6 +9,7 @@
 */
 
 #include "postgres.h"
+#include "access/pxfuriparser.h"
 #include "utils/uri.h"
 
 #include <ctype.h>
@@ -223,4 +224,18 @@ void FreeExternalTableUri(Uri *uri)
 		pfree(uri->customprotocol);
 	
 	pfree(uri);
+}
+
+/*
+ * Clean up an external table URI before displaying it in
+ * messages, such as data formatting errors, error tables, etc.
+ *
+ * currently only used for PXF protocol, but not restricted to it.
+ */
+char *CleanseUriString(char *uri)
+{
+	if (IS_PXF_URI(uri))
+		return GPHDUri_dup_without_segwork(uri);
+
+	return uri;
 }

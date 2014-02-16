@@ -18,7 +18,6 @@ static void  GPHDUri_free_options(GPHDUri *uri);
 static void  GPHDUri_parse_segwork(GPHDUri *uri, const char *uri_str);
 static List* GPHDUri_parse_fragment(char* fragment, List* fragments);
 static void  GPHDUri_free_fragments(GPHDUri *uri);
-static char* GPHDUri_dup_without_segwork(const char* uri);
 static void  GPHDUri_debug_print_options(GPHDUri *uri);
 static void  GPHDUri_debug_print_segwork(GPHDUri *uri);
 static void  GPHDUri_fetch_authority_from_ha_nn(GPHDUri *uri, char *nameservice);
@@ -686,7 +685,7 @@ GPHDUri_free_fragments(GPHDUri *uri)
  * segwork section removed so users won't get it 
  * when an error occurs and the uri is printed
  */
-static char* 
+char*
 GPHDUri_dup_without_segwork(const char* uri)
 {
 	char	*segwork;

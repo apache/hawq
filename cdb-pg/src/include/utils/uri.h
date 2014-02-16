@@ -49,5 +49,6 @@ typedef struct Uri
 
 extern Uri *ParseExternalTableUri(const char *uri);
 extern void FreeExternalTableUri(Uri *uri);
+extern char *CleanseUriString(char *uri);
 
 #endif   /* URI_H */

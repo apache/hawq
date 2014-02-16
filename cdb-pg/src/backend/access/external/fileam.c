@@ -1827,6 +1827,10 @@ external_scan_error_callback(void *arg)
 		return;
 	}
 
+	/* make ext table uri suitable for displaying */
+	if(cstate->filename)
+		cstate->filename = CleanseUriString(cstate->filename);
+
 	initStringInfo(&copy_of_line_buf);
 	appendStringInfoString(&copy_of_line_buf, cstate->line_buf.data);
 

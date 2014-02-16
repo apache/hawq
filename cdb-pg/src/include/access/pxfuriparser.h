@@ -55,6 +55,7 @@ typedef struct GPHDUri
 
 GPHDUri	*parseGPHDUri(const char *uri_str);
 void 	 freeGPHDUri(GPHDUri *uri);
+char	*GPHDUri_dup_without_segwork(const char* uri);
 void	 GPHDUri_debug_print(GPHDUri *uri);
 int		 GPHDUri_get_value_for_opt(GPHDUri *uri, char *key, char **val, bool emit_error);
 bool 	 RelationIsExternalPxfReadOnly(Relation rel, StringInfo location);

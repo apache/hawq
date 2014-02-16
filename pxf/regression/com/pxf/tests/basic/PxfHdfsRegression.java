@@ -1228,7 +1228,9 @@ public class PxfHdfsRegression extends PxfTestCase {
 	 * in an error table until the limit of allowed errors is reached. 
 	 * 
 	 * The test covers a case when the number of errors is lower than limit
-	 * and a case when the errors breach the limit.
+	 * and a case when the errors breach the limit. It also tests the cleanup
+	 * of segwork and metadata information in the filename parameter 
+	 * (the pxf URI) in the error table (GPSQL-1708).
 	 * 
 	 * @throws Exception
 	 */
@@ -1301,17 +1303,19 @@ public class PxfHdfsRegression extends PxfTestCase {
 		ComparisonUtils.compareTables(exTable, dataTable, report);
 
 		hawq.queryResults(errorTable, 
-				"SELECT relname, linenum, errmsg, rawdata FROM " + 
+				"SELECT relname, filename, linenum, errmsg, rawdata FROM " + 
 						errorTable.getName() + " ORDER BY cmdtime ASC");
 		
+		//Temporary workaround for lack of public getLocationUri() method
+		//Opened GPSQL-1798 under PXF Test Automation to clean this up.
+		String createStmt = exTable.constructCreateStmt();
+		String locationUri = createStmt.substring(createStmt.indexOf("pxf://"), createStmt.indexOf("')"));
+			
 		Table errData = new Table("errData", null);
-		errData.addRow(new String[] {
-				exTable.getName(), "1", 
-				"invalid input syntax for integer: \"All Together Now\", column num", 
-				"All Together Now,The Beatles"});
-		errData.addRow(new String[] {exTable.getName(), "6", "invalid input syntax for integer: \"can\", column num", "can,I"});
-		errData.addRow(new String[] {exTable.getName(), "7", "invalid input syntax for integer: \"have\", column num", "have,a"});
-		errData.addRow(new String[] {exTable.getName(), "8", "invalid input syntax for integer: \"little\", column num", "little,more"});
+		errData.addRow(new String[] {exTable.getName(), locationUri, "1", "invalid input syntax for integer: \"All Together Now\", column num", "All Together Now,The Beatles"});
+		errData.addRow(new String[] {exTable.getName(), locationUri, "6", "invalid input syntax for integer: \"can\", column num", "can,I"});
+		errData.addRow(new String[] {exTable.getName(), locationUri, "7", "invalid input syntax for integer: \"have\", column num", "have,a"});
+		errData.addRow(new String[] {exTable.getName(), locationUri, "8", "invalid input syntax for integer: \"little\", column num", "little,more"});
 		
 		ComparisonUtils.compareTables(errorTable, errData, report);
 		

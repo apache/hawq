@@ -19,6 +19,7 @@
 #include "utils/builtins.h"
 #include "utils/lsyscache.h"
 #include "utils/syscache.h"
+#include "utils/uri.h"
 #include "nodes/makefuncs.h"
 #include "access/transam.h"
 
@@ -75,8 +76,7 @@ makeCdbSreh(bool is_keep, bool reusing_existing_errtable,
 	h->lastsegid = 0;
 	h->consec_csv_err = 0;
 	
-	snprintf(h->filename,sizeof h->filename,"%s",filename?filename:"<stdin>");
-	
+	snprintf(h->filename, sizeof(h->filename), "%s", filename ? CleanseUriString(filename) : "<stdin>");
 	
 	/* error table was specified open it (and create it first if necessary) */
 	if(errortable)
