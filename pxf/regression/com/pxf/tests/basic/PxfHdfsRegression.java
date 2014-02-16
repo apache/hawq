@@ -3,6 +3,7 @@ package com.pxf.tests.basic;
 import java.io.File;
 import java.util.List;
 import java.util.ListIterator;
+import java.sql.Types;
 
 import org.apache.commons.lang.StringUtils;
 import org.junit.Assert;
@@ -1332,6 +1333,32 @@ public class PxfHdfsRegression extends PxfTestCase {
 		}
 		
 		ReportUtils.stopLevel(report);
+	}
+
+	/**
+	 * Verify pg_remote_credentials exists and created with the expected
+	 * structure
+	 *
+	 * @throws Exception
+	 */
+	@Test
+	public void remoteCredentialsCatalogTable() throws Exception {
+		Table results = new Table("results", null);
+		hawq.queryResults(results, "SELECT * FROM pg_remote_credentials");
+
+		Table expected = new Table("expected", null);
+		expected.addColumnHeader("rcowner");
+		expected.addColumnHeader("rcservice");
+		expected.addColumnHeader("rcremoteuser");
+		expected.addColumnHeader("rcremotepassword");
+
+		expected.addColDataType(Types.BIGINT);
+		expected.addColDataType(Types.VARCHAR);
+		expected.addColDataType(Types.VARCHAR);
+		expected.addColDataType(Types.VARCHAR);
+
+		ComparisonUtils.compareTablesMetadata(expected, results);
+		ComparisonUtils.compareTables(results, expected, report);
 	}
 	
 	private Table prepareRecursiveDirsData(String baseDir, String delim) throws Exception {
