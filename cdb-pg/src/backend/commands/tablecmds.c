@@ -3915,7 +3915,7 @@ ATController(Relation rel, List *cmds, bool recurse,
 	/* Phase 2: update system catalogs */
 	ATRewriteCatalogs(&wqueue);
 
-	if (gp_upgrade_mode || (Gp_role == GP_ROLE_DISPATCH && oidInfoCount != NULL))
+	if (Gp_role == GP_ROLE_DISPATCH && oidInfoCount != NULL)
 	{
 		*oidInfoCount = list_length(wqueue);
 		*oidInfo = palloc0(sizeof(TableOidInfo)*(*oidInfoCount));
