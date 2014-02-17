@@ -32,7 +32,7 @@ untar_singlecluster: $(SINGLECLUSTER_ROOT)/singlecluster.tar.gz
 	mkdir -p $(SINGLECLUSTER_BUILDROOT)
 	tar -xzf $< --strip-components 1 -C $(SINGLECLUSTER_BUILDROOT)
 
-copy_files: $(ROOT)/README.txt $(ROOT)/init-cluster.sh
+copy_files: $(ROOT)/README.md $(ROOT)/init-cluster.sh
 	cp $^ $(BUILDROOT)
 
 $(BUILDROOT): untar_hawq hawq_version hawq_conf untar_singlecluster copy_files
