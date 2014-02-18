@@ -45,10 +45,11 @@ dfs.mem.namenode.heap = 40960
 dfs.mem.datanode.heap = 6144
 # in hdfs-site.xml
 dfs.support.append = true
-dfs.client.read.shortcircuit = true
+dfs.client.enable.read.from.local = true
 dfs.block.local-path-access.user = gpadmin
 dfs.datanode.max.transfer.threads = 40960
 dfs.client.socket-timeout = 300000000
+dfs.datanode.socket.write.timeout = 7200000
 dfs.namenode.handler.count = 60
 ipc.server.handler.queue.size = 3300
 dfs.datanode.handler.count = 60
