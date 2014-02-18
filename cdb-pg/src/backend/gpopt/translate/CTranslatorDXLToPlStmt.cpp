@@ -515,8 +515,8 @@ CTranslatorDXLToPlStmt::MapLocationsFdist
 	IMDId *pmdidRel
 	)
 {
-	ULONG ulParticipatingSegments = ulTotalPrimaries;
-	ULONG ulMaxParticipants = ulParticipatingSegments;
+	ULONG ulParticipatingSegments = ulTotalPrimaries; 
+	ULONG ulMaxParticipants = ulTotalPrimaries;
 	const ULONG ulLocations = pmdrelext->UlLocations();
 
 	BOOL fPxfProtocol = gpdb::FPxfProtocol(pUri);
@@ -528,6 +528,9 @@ CTranslatorDXLToPlStmt::MapLocationsFdist
 	else if (fPxfProtocol)
 	{
 		ulMaxParticipants = gpdb::IMaxParticipantsPxf(ulTotalPrimaries);
+		if(ulParticipatingSegments > ulMaxParticipants)
+			elog(NOTICE, "External scan using PXF protocol will utilize %d out "
+				 "of %d segment databases", ulMaxParticipants, ulParticipatingSegments);
 		ulParticipatingSegments = ulMaxParticipants;
 	}
 
@@ -535,6 +538,9 @@ CTranslatorDXLToPlStmt::MapLocationsFdist
 	BOOL fSkipRandomly = false;
 	if (ulParticipatingSegments > ulMaxParticipants)
 	{
+		elog(NOTICE, "External scan using GPFDIST protocol will utilize %d out "
+			 "of %d segment databases", ulMaxParticipants, ulParticipatingSegments);
+		
 		ulSkip = ulParticipatingSegments - ulMaxParticipants;
 		ulParticipatingSegments = ulMaxParticipants;
 		fSkipRandomly = true;
