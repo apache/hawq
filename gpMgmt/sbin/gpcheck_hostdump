@@ -404,6 +404,7 @@ def collectHDFS():
     hadoop_env_file = os.path.join(options.hadoop, "etc/hadoop/hadoop-env.sh")
     hdfs_site_file = os.path.join(options.hadoop, "etc/hadoop/hdfs-site.xml")
     core_site_file = os.path.join(options.hadoop, "etc/hadoop/core-site.xml")
+    libhdfs3_site_file = os.environ.get("LIBHDFS3_CONF")
 
     # collect java heap size config
     p = subprocess.Popen("source %s; echo $JAVA_HEAP_MAX" % hadoop_config_file, shell = True,
@@ -439,7 +440,7 @@ def collectHDFS():
     # collect HDFS site config
     getPropName =  lambda node: node.getElementsByTagName('name')[0].childNodes[0].data
     getPropValue = lambda node: node.getElementsByTagName('value')[0].childNodes[0].data
-    for filename in (hdfs_site_file, core_site_file):
+    for filename in (hdfs_site_file, core_site_file, libhdfs3_site_file):
         try:
             with open(filename) as f:
                 xmldoc = minidom.parse(f)
