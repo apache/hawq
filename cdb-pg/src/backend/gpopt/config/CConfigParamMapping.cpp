@@ -126,6 +126,12 @@ CConfigParamMapping::SConfigMappingElem CConfigParamMapping::m_elem[] =
 		},
 
 		{
+                EopttraceDeriveStatsForDPE,
+		&optimizer_dpe_stats,
+                GPOS_WSZ_LIT("Enable stats derivation of partitioned tables with dynamic partition elimination.")
+                },
+
+		{
 		EopttraceEnumeratePlans,
 		&optimizer_enumerate_plans,
 		GPOS_WSZ_LIT("Enable plan enumeration.")

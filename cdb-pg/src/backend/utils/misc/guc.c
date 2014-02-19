@@ -687,6 +687,7 @@ char 		*optimizer_search_strategy_path = NULL;
 char	   *gp_idf_deduplicate_str;
 bool		optimizer_extract_dxl_stats;
 bool		optimizer_extract_dxl_stats_all_nodes;
+bool            optimizer_dpe_stats;
 bool		optimizer_enumerate_plans;
 bool		optimizer_sample_plans;
 int			optimizer_plan_id;
@@ -3642,7 +3643,15 @@ static struct config_bool ConfigureNamesBool[] =
 		&optimizer_extract_dxl_stats_all_nodes,
 		false, NULL, NULL
 	},
-
+        {
+                {"optimizer_dpe_stats", PGC_USERSET, LOGGING_WHAT,
+                        gettext_noop("Enable statistics derivation for partitioned tables with dynamic partition elimination."),
+                        NULL,
+                        GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+                },
+                &optimizer_dpe_stats,
+                false, NULL, NULL
+        },
 	{
 		{"optimizer_enumerate_plans", PGC_USERSET, LOGGING_WHAT,
 			gettext_noop("Enable plan enumeration"),
