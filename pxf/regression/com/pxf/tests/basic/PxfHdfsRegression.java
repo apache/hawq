@@ -34,7 +34,7 @@ import com.pxf.tests.testcases.PxfTestCase;
 public class PxfHdfsRegression extends PxfTestCase {
 
 	ReadableExternalTable exTable;
-
+	
 	/**
 	 * General Table creation Validations with Fragmenter, Accessor and Resolver
 	 * 
@@ -1360,6 +1360,49 @@ public class PxfHdfsRegression extends PxfTestCase {
 		ComparisonUtils.compareTablesMetadata(expected, results);
 		ComparisonUtils.compareTables(results, expected, report);
 	}
+	
+	/**
+	 * Namenode Highavailibility test - creating table with non-existent nameservice
+	 * 
+	 * @throws Exception
+	 */
+	@Test
+	public void negativeHaNameserviceNotExist() throws Exception {
+		String unknownNameservicePath = "text_data.csv";
+		
+		exTable = TableFactory.getPxfReadableTextTable("hatable", new String[] {
+			"s1 text",
+			"s2 text",
+			"s3 text",
+			"d1 timestamp",
+			"n1 int",
+			"n2 int",
+			"n3 int",
+			"n4 int",
+			"n5 int",
+			"n6 int",
+			"n7 int",
+			"s11 text",
+			"s12 text",
+			"s13 text",
+			"d11 timestamp",
+			"n11 int",
+			"n12 int",
+			"n13 int",
+			"n14 int",
+			"n15 int",
+			"n16 int",
+			"n17 int" }, (unknownNameservicePath), ",");
+		
+		exTable.setHostname("phdcluster");
+		exTable.setPort(null);
+				
+		try {
+			hawq.createTableAndVerify(exTable);
+		} catch (Exception e) {
+			ExceptionUtils.validate(report, e, new PSQLException("ERROR: nameservice phdcluster not found in client configuration. No HA namenodes provided", null), false);
+		}
+	}		
 	
 	private Table prepareRecursiveDirsData(String baseDir, String delim) throws Exception {
 		
