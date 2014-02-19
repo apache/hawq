@@ -133,9 +133,10 @@ CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString)
 		SetUserIdAndContext(owner_uid, true);
 
 	/*
-	 * in hawq, should be only called on master
+	 * in hawq, should be only called on master except
+	 * UPGRADE model.
 	 */
-	Assert(Gp_role != GP_ROLE_EXECUTE);
+	Assert(gp_upgrade_mode || (Gp_role != GP_ROLE_EXECUTE));
 	/* Create the schema's namespace */
     namespaceId = NamespaceCreate(schemaName, owner_uid, 0);
 
@@ -204,6 +205,12 @@ CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString)
 
 	/* Reset current user */
 	SetUserIdAndContext(saved_uid, saved_secdefcxt);
+
+	if(gp_upgrade_mode && Gp_role == GP_ROLE_DISPATCH)
+	{
+		CdbDispatchUtilityStatement((Node *)stmt, "DefineSchema");
+	}
+
 }
 
 
