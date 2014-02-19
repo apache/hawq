@@ -25,6 +25,10 @@
 #include "catalog/pg_type.h"
 #include "optimizer/walkers.h"
 
+#define GPDB_NEXTVAL 1574
+#define GPDB_CURRVAL 1575
+#define GPDB_SETVAL 1576
+
 #include "gpos/base.h"
 #include "gpos/common/CAutoTimer.h"
 #include "gpos/common/CBitSetIter.h"
@@ -352,28 +356,6 @@ CTranslatorUtils::Pdxltabdesc
 
 //---------------------------------------------------------------------------
 //	@function:
-//		CTranslatorUtils::FReadsOrModifiesData
-//
-//	@doc:
-//		Check if the given function reads or modifies SQL data
-//
-//---------------------------------------------------------------------------
-BOOL
-CTranslatorUtils::FReadsOrModifiesData
-	(
-	CMDAccessor *pmda,
-	IMDId *pmdidFunc
-	)
-{
-	const IMDFunction *pmdfunc = pmda->Pmdfunc(pmdidFunc);
-	IMDFunction::EFuncDataAcc efda = pmdfunc->EfdaDataAccess();
-
-	return (IMDFunction::EfdaReadsSQLData == efda ||
-			IMDFunction::EfdaModifiesSQLData == efda);
-}
-
-//---------------------------------------------------------------------------
-//	@function:
 //		CTranslatorUtils::FSirvFunc
 //
 //	@doc:
@@ -384,14 +366,29 @@ CTranslatorUtils::FReadsOrModifiesData
 BOOL
 CTranslatorUtils::FSirvFunc
 	(
+	IMemoryPool *pmp,
 	CMDAccessor *pmda,
-	IMDId *pmdidFunc
+	OID oidFunc
 	)
 {
-	const IMDFunction *pmdfunc = pmda->Pmdfunc(pmdidFunc);
-	IMDFunction::EFuncDataAcc efda = pmdfunc->EfdaDataAccess();
+	// we exempt the following 3 functions to avoid falling back to the planner
+	// for DML on tables with sequences. The same exemption is also in the planner
+	if (GPDB_NEXTVAL == oidFunc ||
+		GPDB_CURRVAL == oidFunc ||
+		GPDB_SETVAL == oidFunc)
+	{
+		return false;
+	}
 
-	return !pmdfunc->FReturnsSet() && FReadsOrModifiesData(pmda, pmdidFunc);
+	CMDIdGPDB *pmdidFunc = New(pmp) CMDIdGPDB(oidFunc);
+	const IMDFunction *pmdfunc = pmda->Pmdfunc(pmdidFunc);
+
+	BOOL fSirv = (!pmdfunc->FReturnsSet() &&
+				  IMDFunction::EfsVolatile == pmdfunc->EfsStability());
+
+	pmdidFunc->Release();
+
+	return fSirv;
 }
 
 //---------------------------------------------------------------------------
@@ -442,7 +439,7 @@ CTranslatorUtils::Pdxltvf
 
 	// In the planner, scalar functions that are volatile (SIRV) or read or modify SQL
 	// data get patched into an InitPlan. This is not supported in the optimizer
-	if (FSirvFunc(pmda, pmdidFunc))
+	if (FSirvFunc(pmp, pmda, pfuncexpr->funcid))
 	{
 		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("SIRV functions"));
 	}

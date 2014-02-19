@@ -1303,14 +1303,14 @@ extract_nodes_walker(Node *node, extract_context *context)
  * Same as above, but starts off a scalar expression node rather than a PlannedStmt
  *
  */
-List *extract_nodes_expression(Node *node, int nodeTag)
+List *extract_nodes_expression(Node *node, int nodeTag, bool descendIntoSubqueries)
 {
 	extract_context context;
 	Assert(node);
 	context.base.node = NULL;
 	context.nodes = NULL;
 	context.nodeTag = nodeTag;
-	context.descendIntoSubqueries = false;
+	context.descendIntoSubqueries = descendIntoSubqueries;
 	extract_nodes_expression_walker(node, &context);
 	
 	return context.nodes;
@@ -1329,6 +1329,23 @@ extract_nodes_expression_walker(Node *node, extract_context *context)
 		context->nodes = lappend(context->nodes, node);
 	}
 	
+	if (nodeTag(node) == T_Query && context->descendIntoSubqueries)
+	{
+		Query *query = (Query *) node;
+		if (expression_tree_walker((Node *)query->targetList, extract_nodes_expression_walker, (void *) context))
+		{
+			return true;
+		}
+
+		if (query->jointree != NULL &&
+		   expression_tree_walker(query->jointree->quals, extract_nodes_expression_walker, (void *) context))
+		{
+			return true;
+		}
+
+		return expression_tree_walker(query->havingQual, extract_nodes_expression_walker, (void *) context);
+	}
+
 	return expression_tree_walker(node, extract_nodes_expression_walker, (void *) context);
 }
 

@@ -143,7 +143,7 @@ namespace gpdb {
 	List *PlExtractNodesPlan(Plan *pl, int nodeTag, bool descendIntoSubqueries);
 
 	// extract nodes with specific tag from an expression tree
-	List *PlExtractNodesExpression(Node *node, int nodeTag);
+	List *PlExtractNodesExpression(Node *node, int nodeTag, bool descendIntoSubqueries);
 	
 	// intermediate result type of given aggregate
 	Oid OidAggIntermediateResultType(Oid aggid);

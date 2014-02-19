@@ -398,14 +398,10 @@ namespace gpdxl
 			static
 			BOOL FHasSubquery(Node *pnode);
 
-			// check if the given function reads or modifies SQL data
-			static
-			BOOL FReadsOrModifiesData(CMDAccessor *pmda, IMDId *pmdidFunc);
-
 			// check if the given function is a SIRV (single row volatile) that reads
 			// or modifies SQL data
 			static
-			BOOL FSirvFunc(CMDAccessor *pmda, IMDId *pmdidFunc);
+			BOOL FSirvFunc(IMemoryPool *pmp, CMDAccessor *pmda, OID oidFunc);
 			
 			// is this a motion sensitive to duplicates
 			static

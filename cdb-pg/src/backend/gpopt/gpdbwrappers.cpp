@@ -684,12 +684,13 @@ List *
 gpdb::PlExtractNodesExpression
 	(
 	Node *node,
-	int iNodeTag
+	int iNodeTag,
+	bool descendIntoSubqueries
 	)
 {
 	GP_WRAP_START;
 	{
-		return extract_nodes_expression(node, iNodeTag);
+		return extract_nodes_expression(node, iNodeTag, descendIntoSubqueries);
 	}
 	GP_WRAP_END;
 	return NIL;

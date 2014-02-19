@@ -148,6 +148,10 @@ namespace gpdxl
 			// node is found
 			void CheckUnsupportedNodeTypes(Query *pquery);
 
+			// check for SIRV functions in the targetlist without a FROM clause and
+			// throw an exception when found
+			void CheckSirvFuncsWithoutFromClause(Query *pquery);
+
 			// translate FromExpr (in the GPDB query) into a CDXLLogicalJoin or CDXLLogicalGet
 			CDXLNode *PdxlnFromGPDBFromExpr(FromExpr *pfromexpr) const;
 

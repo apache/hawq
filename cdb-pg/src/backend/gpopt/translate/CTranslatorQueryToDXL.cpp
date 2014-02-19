@@ -196,6 +196,9 @@ CTranslatorQueryToDXL::CTranslatorQueryToDXL
 	// check if the query has any unsupported node types
 	CheckUnsupportedNodeTypes(pquery);
 
+	// check if the query has SIRV functions in the targetlist without a FROM clause
+	CheckSirvFuncsWithoutFromClause(pquery);
+
 	// first normalize the query
 	m_pquery = CQueryMutators::PqueryNormalize(m_pmp, m_pmda, pquery, ulQueryLevel);
 
@@ -279,6 +282,44 @@ CTranslatorQueryToDXL::CheckUnsupportedNodeTypes
 	{
 		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, rgUnsupported[iUnsupported].m_wsz);
 	}
+}
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorQueryToDXL::CheckSirvFuncsWithoutFromClause
+//
+//	@doc:
+//		Check for SIRV functions in the target list without a FROM clause, and
+//		throw an exception when found
+//
+//---------------------------------------------------------------------------
+void
+CTranslatorQueryToDXL::CheckSirvFuncsWithoutFromClause
+	(
+	Query *pquery
+	)
+{
+	// if there is a FROM clause or if target list is empty, look no further
+	if ((NULL != pquery->jointree && 0 < gpdb::UlListLength(pquery->jointree->fromlist))
+		|| NIL == pquery->targetList)
+	{
+		return;
+	}
+
+	// see if we have SIRV functions in the target list
+	List *plFunctions =	gpdb::PlExtractNodesExpression((Node *)pquery->targetList, T_FuncExpr, true /*descendIntoSubqueries*/);
+	ListCell *plc = NULL;
+
+	ForEach (plc, plFunctions)
+	{
+		FuncExpr *pfuncexpr = (FuncExpr *) lfirst(plc);
+		if (CTranslatorUtils::FSirvFunc(m_pmp, m_pmda, pfuncexpr->funcid))
+		{
+			GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("SIRV functions"));
+		}
+	}
+
+	gpdb::FreeList(plFunctions);
 }
 
 //---------------------------------------------------------------------------
@@ -2881,9 +2922,10 @@ CTranslatorQueryToDXL::PdxlnFromTVF
 	}
 
 	CMDIdGPDB *pmdidFunc = New(m_pmp) CMDIdGPDB(pfuncexpr->funcid);
-	if (fSubqueryInArgs && CTranslatorUtils::FReadsOrModifiesData(m_pmda, pmdidFunc))
+	const IMDFunction *pmdfunc = m_pmda->Pmdfunc(pmdidFunc);
+	if (fSubqueryInArgs && IMDFunction::EfsVolatile == pmdfunc->EfsStability())
 	{
-		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("Functions which read or modify data with subqueries in arguments"));
+		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("Volatile functions with subqueries in arguments"));
 	}
 	pmdidFunc->Release();
 
@@ -3157,7 +3199,7 @@ CTranslatorQueryToDXL::PdxlnLgProjectFromGPDBTL
 		}
 		else if (fExpandAggrefExpr && IsA(pte->expr, Aggref))
 		{
-			plVars = gpdb::PlConcat(plVars, gpdb::PlExtractNodesExpression((Node *) pte->expr, T_Var));
+			plVars = gpdb::PlConcat(plVars, gpdb::PlExtractNodesExpression((Node *) pte->expr, T_Var, false /*descendIntoSubqueries*/));
 		}
 		else if (!IsA(pte->expr, Aggref))
 		{

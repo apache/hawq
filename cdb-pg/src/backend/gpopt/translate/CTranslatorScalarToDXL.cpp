@@ -1195,13 +1195,6 @@ CTranslatorScalarToDXL::PdxlnScFuncExprFromFuncExpr
 
 	CMDIdGPDB *pmdidFunc = New(m_pmp) CMDIdGPDB(pfuncexpr->funcid);
 
-	// In the planner, scalar functions that are volatile (SIRV) or read or modify SQL
-	// data get patched into an InitPlan. This is not supported in the optimizer
-	if (CTranslatorUtils::FSirvFunc(m_pmda, pmdidFunc))
-	{
-		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("SIRV functions"));
-	}
-
 	// create the DXL node holding the scalar funcexpr
 	CDXLNode *pdxln = New(m_pmp) CDXLNode
 									(
@@ -1215,7 +1208,8 @@ CTranslatorScalarToDXL::PdxlnScFuncExprFromFuncExpr
 												)
 									);
 
-	if (CTranslatorUtils::FReadsOrModifiesData(m_pmda, pmdidFunc))
+	const IMDFunction *pmdfunc = m_pmda->Pmdfunc(pmdidFunc);
+	if (IMDFunction::EfsVolatile == pmdfunc->EfsStability())
 	{
 		ListCell *plc = NULL;
 		ForEach (plc, pfuncexpr->args)
@@ -1224,7 +1218,7 @@ CTranslatorScalarToDXL::PdxlnScFuncExprFromFuncExpr
 			if (CTranslatorUtils::FHasSubquery(pnodeArg))
 			{
 				GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature,
-						GPOS_WSZ_LIT("Functions which read or modify data with subqueries in arguments"));
+						GPOS_WSZ_LIT("Volatile functions with subqueries in arguments"));
 			}
 		}
 	}
