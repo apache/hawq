@@ -804,23 +804,22 @@ select * from csq_m1 where x not in (select x from csq_d1) or x < -100; -- (3)
 explain select * from csq_d1 where x not in (select x from csq_m1) or x < -100; -- broadcast motion
                                                                                                      QUERY PLAN                                                                                                     
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- Gather Motion 2:1  (slice2; segments: 2)  (cost=0.00..1448.54 rows=1 width=4)
-   ->  Result  (cost=0.00..1447.53 rows=1 width=4)
+ Gather Motion 2:1  (slice2; segments: 2)  (cost=0.00..1448.49 rows=1 width=4)
+   ->  Result  (cost=0.00..1447.48 rows=1 width=4)
          Filter: CASE WHEN NOT csq_d1.x IS NULL THEN CASE WHEN "ColRef_0018" = "ColRef_0017" THEN NULL::boolean WHEN NOT "ColRef_0018" IS NULL THEN false ELSE true END ELSE NULL::boolean END OR csq_d1.x < (-100)
-         ->  GroupAggregate  (cost=0.00..1446.52 rows=3 width=20)
+         ->  GroupAggregate  (cost=0.00..1446.48 rows=3 width=20)
                Group By: csq_d1.x, csq_d1.ctid, csq_d1.gp_segment_id
-               ->  Nested Loop Left Join  (cost=0.00..1445.24 rows=3 width=28)
+               ->  Nested Loop Left Join  (cost=0.00..1445.20 rows=3 width=28)
                      Join Filter: csq_d1.x = csq_m1.x OR csq_m1.x IS NULL
                      ->  Sort  (cost=0.00..1.02 rows=1 width=20)
                            Sort Key: csq_d1.x, csq_d1.ctid, csq_d1.gp_segment_id
                            ->  Table Scan on csq_d1  (cost=0.00..0.02 rows=1 width=20)
-                     ->  Materialize  (cost=0.00..3.22 rows=3 width=12)
-                           ->  Broadcast Motion 1:2  (slice1)  (cost=0.00..2.15 rows=6 width=12)
-                                 ->  Result  (cost=0.00..1.08 rows=2 width=12)
-                                       ->  Result  (cost=0.00..1.08 rows=2 width=12)
-                                             ->  Table Scan on csq_m1  (cost=0.00..0.01 rows=2 width=4)
+                     ->  Materialize  (cost=0.00..3.18 rows=3 width=12)
+                           ->  Result  (cost=0.00..2.11 rows=3 width=12)
+                                 ->  Broadcast Motion 1:2  (slice1)  (cost=0.00..1.04 rows=6 width=4)
+                                       ->  Table Scan on csq_m1  (cost=0.00..0.01 rows=2 width=4)
  Settings:  optimizer=on
-(16 rows)
+(15 rows)
 
 select * from csq_d1 where x not in (select x from csq_m1) or x < -100; -- (4)
  x 
