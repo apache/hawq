@@ -52,7 +52,7 @@ crc32c.c: $(top_srcdir)/src/backend/utils/hash/crc32c.c
 upgradesql:
 	@for i in $(UPGRADEFILES); \
 	do \
-        sed -e 's/\@gpupgradeschemaname\@/pg_catalog/g' -e 's/\@gpupgradetoolkitschema\@/gp_toolkit/g' $$i.in > $$i; \
+        sed -e 's/\@gpupgradeschemaname\@/pg_catalog/g' -e 's/\@gpupgradetoolkitschema\@/hawq_toolkit/g' $$i.in > $$i; \
 	done
 	
 gpmodcat_clean:

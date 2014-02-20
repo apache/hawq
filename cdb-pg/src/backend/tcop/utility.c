@@ -646,6 +646,10 @@ ProcessDropStatement(DropStmt *stmt)
 				 */
 				RemoveSchema(names, stmt->behavior,
 							 stmt->missing_ok);
+				if(gp_upgrade_mode && Gp_role == GP_ROLE_DISPATCH)
+				{
+					CdbDispatchUtilityStatement((Node *)stmt, "RemoveSchema");
+				}
 				break;
 
 			case OBJECT_FILESPACE:
@@ -903,6 +907,10 @@ ProcessUtility(Node *parsetree,
 			 */
 		case T_CreateSchemaStmt:
 			CreateSchemaCommand((CreateSchemaStmt *) parsetree, queryString);
+			if (gp_upgrade_mode && Gp_role == GP_ROLE_DISPATCH)
+			{
+				CdbDispatchUtilityStatement((Node *) parsetree, "CreateSchemaCommand");
+			}
 			break;
 
 		case T_CreateStmt:

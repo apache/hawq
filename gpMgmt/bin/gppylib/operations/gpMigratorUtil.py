@@ -829,6 +829,38 @@ class GPUpgradeBase(object):
             raise e
 
     #------------------------------------------------------------
+    def PerformPostUpgrade(self):
+        '''
+        Handles various post upgrade tasks including:
+          - Populates the hawq_toolkit schema
+          - Performs updates for the gpperfmon database
+        '''
+        try:
+
+            # Get the admin role and all the databases
+            logger.info("Installing hawq_toolkit")
+            rolname = self.Select("select rolname from pg_authid where oid=10")[0]
+
+            # Read the toolkit sql file into memory
+            fname = '%s/share/postgresql/gp_toolkit.sql' % self.newhome
+            sql = open(fname, 'r').read()
+
+            # Set our role to the admin role then execute the sql script
+            sql = "SET SESSION AUTHORIZATION %s;\n%s" % (rolname, sql)
+            oids = sorted(self.dbs.keys())
+            for dboid in oids:
+                db = self.dbs[dboid]
+
+                if db == 'template0':
+                    continue
+                self.Update(sql, db=db)
+
+        except BaseException, e:
+            sys.stderr.write(traceback.format_exc())
+            sys.stderr.write(str(e))
+            raise e
+
+    #------------------------------------------------------------
     def getversion(self, home,env):
         binary = os.path.join(home, 'bin', 'pg_ctl')
         if not os.path.exists(binary):

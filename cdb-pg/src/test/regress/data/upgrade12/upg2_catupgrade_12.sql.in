@@ -2,12 +2,16 @@
 -- Catalog Upgrade Script (from 1.1 to 1.2)
 --
 
+-- drop and recreate hawq_toolkit schema first
+-- if upgrade is successfull gpmigrator will recreate hawq_toolkit objects
+DROP SCHEMA IF EXISTS @gpupgradetoolkitschema@ CASCADE;
+CREATE SCHEMA @gpupgradetoolkitschema@;
+
 ALTER TABLE @gpupgradeschemaname@.pg_appendonly ADD COLUMN pagesize int4;
 SELECT catDML('UPDATE @gpupgradeschemaname@.pg_appendonly set pagesize = 0;');
-UPDATE pg_database SET dat2tablespace = (SELECT oid FROM pg_tablespace WHERE spcname = 'dfs_default') WHERE datname = 'template0' AND dat2tablespace = 1663;
 
--- hawq_toolkit
-SELECT @gpupgradeschemaname@.enableHAWQToolkit();
+-- The line below is for gpsql-1812 as per BJ 
+UPDATE pg_database SET dat2tablespace = (SELECT oid FROM pg_tablespace WHERE spcname = 'dfs_default') WHERE datname = 'template0' AND dat2tablespace = 1663;
 
 -- update definitions of built-in functions
 

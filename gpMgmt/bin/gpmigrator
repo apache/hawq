@@ -3031,6 +3031,7 @@ class GPUpgrade(GPUpgradeBase):
             # + Requires a fully running 4.0 system including dispatch
             #   and thus must occur after remirroring.
             if 'POSTUPGRADE' not in current_state:
+                self.PerformPostUpgrade()
                 self.SetState('POSTUPGRADE')
 
             # VACUUM FREEZE template1, since we haven't already

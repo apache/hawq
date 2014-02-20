@@ -205,12 +205,6 @@ CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString)
 
 	/* Reset current user */
 	SetUserIdAndContext(saved_uid, saved_secdefcxt);
-
-	if(gp_upgrade_mode && Gp_role == GP_ROLE_DISPATCH)
-	{
-		CdbDispatchUtilityStatement((Node *)stmt, "DefineSchema");
-	}
-
 }
 
 
@@ -223,7 +217,7 @@ RemoveSchema(List *names, DropBehavior behavior, bool missing_ok)
 {
 	char	   *schemaName;
 
-	Assert(Gp_role != GP_ROLE_EXECUTE);
+	Assert(gp_upgrade_mode || Gp_role != GP_ROLE_EXECUTE);
 
 	if (list_length(names) != 1)
 		ereport(ERROR,
