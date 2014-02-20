@@ -68,9 +68,13 @@ TARGET_OBJS=$(shell echo $(1)_test.o $(CMOCKERY_OBJS) $($(1)_REAL_OBJS) \
 
 $(abs_top_srcdir)/src/%.c:
 
+# In order to avoid symlink issue, we should explicitly specify
+# absolute path for both --out-dir and --src-dir.
 $(MOCK_DIR)/%_mock.c: $(abs_top_srcdir)/src/%.c
 	@echo mocking $<
-	@(cd $(MOCK_DIR) && PYTHONPATH=$(python_libdir) $(PYTHON) mocker.py $<)
+	@(cd $(MOCK_DIR) && PYTHONPATH=$(python_libdir) $(PYTHON) mocker.py \
+		--out-dir=$(abs_top_srcdir)/src/test/unit/mock \
+		--src-dir=$(abs_top_srcdir)/src $<)
 
 # For some reason, mock.o files are intermediate files sometimes.
 # Mark them as secondary in order not to be deleted automatically.
