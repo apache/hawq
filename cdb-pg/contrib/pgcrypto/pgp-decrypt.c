@@ -871,8 +871,8 @@ static int
 process_data_packets(PGP_Context *ctx, MBuf *dst, PullFilter *src,
 					 int allow_compr, int need_mdc)
 {
-	uint8		tag;
-	int			len,
+	uint8		tag = 0;
+	int			len = 0,
 				res;
 	int			got_data = 0;
 	int			got_mdc = 0;
@@ -1098,8 +1098,8 @@ pgp_decrypt(PGP_Context *ctx, MBuf *msrc, MBuf *mdst)
 	int			res;
 	PullFilter *src = NULL;
 	PullFilter *pkt = NULL;
-	uint8		tag;
-	int			len;
+	uint8		tag = 0;
+	int			len = 0;
 	int			got_key = 0;
 	int			got_data = 0;
 
