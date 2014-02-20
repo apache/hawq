@@ -1268,6 +1268,10 @@ ProcessUtility(Node *parsetree,
 				ViewStmt   *stmt = (ViewStmt *) parsetree;
 
 				DefineView(stmt);
+				if (gp_upgrade_mode && Gp_role == GP_ROLE_DISPATCH)
+				{
+				    CdbDispatchUtilityStatement(parsetree, "DefineView");
+				}
 			}
 			break;
 

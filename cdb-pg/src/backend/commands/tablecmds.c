@@ -423,7 +423,12 @@ DefineRelation(CreateStmt *stmt, char relkind, char relstorage)
 
     reloid = DefineRelation_int(stmt, relkind, relstorage, NULL);
 
-    if(gp_upgrade_mode && Gp_role == GP_ROLE_DISPATCH)
+	/*
+	 * Note about stmt->relKind check: if we reach here from
+	 * DefineView(), there should be no dispatch.  ViewStmt case in
+	 * ProcessUtility() will dispatch the view statement separately.
+	 */
+    if(gp_upgrade_mode && Gp_role == GP_ROLE_DISPATCH && stmt->relKind != RELKIND_VIEW)
     {
         CdbDispatchUtilityStatement((Node *)stmt, "DefineRelation");
     }

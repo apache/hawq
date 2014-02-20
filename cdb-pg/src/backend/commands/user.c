@@ -1730,10 +1730,11 @@ GrantRole(GrantRoleStmt *stmt)
 	 */
 	auth_file_update_needed();
 
-    /* GPSQL: Don't dispatch to segments
-    if (Gp_role == GP_ROLE_DISPATCH)
+    // GPSQL: Don't dispatch to segments unless we are in upgrade mode
+    if (gp_upgrade_mode && Gp_role == GP_ROLE_DISPATCH)
+    {
         CdbDispatchUtilityStatement((Node *) stmt, "GrantRole");
-    */
+    }
 
 }
 
