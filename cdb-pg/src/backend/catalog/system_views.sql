@@ -842,3 +842,14 @@ pg_resqueuecapability rc WHERE
 rq.oid=rc.resqueueid AND rc.restypid = rt.restypid
 ORDER BY rsqname, restypid
 ;
+
+CREATE VIEW pg_remote_logins AS
+	SELECT
+		A.rolname			AS rolname,
+		C.rcservice			AS rcservice,
+		C.rcremoteuser		AS rcremoteuser,
+        '********'::text	AS rcremotepassword
+	FROM pg_remote_credentials C
+		 LEFT JOIN pg_authid A ON (A.oid = C.rcowner);
+
+REVOKE ALL ON pg_remote_credentials FROM public;
