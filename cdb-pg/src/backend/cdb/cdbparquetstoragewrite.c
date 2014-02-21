@@ -739,6 +739,9 @@ flushRowGroup(ParquetRowGroup rowgroup,
 {
 	int bytes_added = 0;
 
+	if (rowgroup == NULL)
+		return;
+
 	/*
 	 * Write out column chunks one by one. For each chunk, we do the following:
 	 * 1. encode the last page.

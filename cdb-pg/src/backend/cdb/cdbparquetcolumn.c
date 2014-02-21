@@ -53,7 +53,7 @@ void ParquetExecutorReadColumn(ParquetColumnReader *columnReader, File file, Mem
 	/*reuse the column reader data buffer to avoid memory re-allocation*/
 	if(columnReader->dataLen == 0)
 	{
-		columnReader->dataLen = columnReader->dataLen < BUFFER_SIZE_LIMIT_BEFORE_SCALED ?
+		columnReader->dataLen = columnChunkSize < BUFFER_SIZE_LIMIT_BEFORE_SCALED ?
 								columnChunkSize * BUFFER_SCALE_FACTOR :
 								MaxAllocSize-1;
 
@@ -61,7 +61,7 @@ void ParquetExecutorReadColumn(ParquetColumnReader *columnReader, File file, Mem
 	}
 	else if(columnReader->dataLen < columnChunkSize)
 	{
-        columnReader->dataLen = columnReader->dataLen < BUFFER_SIZE_LIMIT_BEFORE_SCALED ?
+        columnReader->dataLen = columnChunkSize < BUFFER_SIZE_LIMIT_BEFORE_SCALED ?
                                 columnChunkSize * BUFFER_SCALE_FACTOR :
                                 MaxAllocSize-1;
 

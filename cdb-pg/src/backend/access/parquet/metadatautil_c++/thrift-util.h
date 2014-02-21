@@ -61,9 +61,7 @@ public:
 		try {
 			mem_buffer_->resetBuffer();
 			obj->write(protocol_.get());
-		} catch (std::exception& e) {
-			std::stringstream msg;
-			msg << "Couldn't serialize thrift object:\n" << e.what();
+		} catch (...) {
 			return -1;
 		}
 		mem_buffer_->getBuffer(buffer, len);
@@ -119,12 +117,7 @@ public:
 				compact);
 		try {
 			deserialized_msg->read(tproto.get());
-		} catch (std::exception& e) {
-			std::stringstream msg;
-			std::cout << "couldn't deserialize thrift msg:\n" << e.what();
-			return -1;
 		} catch (...) {
-			std::cout<<"Unknown exception"<<std::endl;
 			return -1;
 		}
 		uint32_t bytes_left = tmem_transport->available_read();

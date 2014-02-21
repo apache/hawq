@@ -39,7 +39,7 @@ int writeParquetFooter(File dataFile,
 	{
 		return -1;
 	}
-	elog(LOG, "footerlen:%d", footerLen);
+	elog(DEBUG5, "footerlen:%d", footerLen);
 
 	/* write out buffer to file*/
 	writeRet = FileWrite(dataFile, bufferFooter, footerLen);
@@ -114,7 +114,7 @@ bool readParquetFooter(File fileHandler, ParquetMetadata *parquetMetadata,
 				 errmsg("Parquet Storage Read error on segment file '%s': seek failure when fetching "
 						 "footer length" , filePathName)));
 	}
-	elog(LOG, "Parquet metadata file footer length index: %lld\n", (long long)footLengthIndex);
+	elog(DEBUG5, "Parquet metadata file footer length index: %lld\n", (long long)footLengthIndex);
 
 	char buffer[4];
 	while(actualReadSize < 4)
@@ -134,17 +134,17 @@ bool readParquetFooter(File fileHandler, ParquetMetadata *parquetMetadata,
 	uint32_t ch3 = buffer[2];
 	uint32_t ch4 = buffer[3];
 	uint64_t footerLen = (ch4 << 24) + (ch3 << 16) + (ch2 << 8) + (ch1 << 0);
-	elog(LOG, "Parquet metadata file footer length: %llu\n",footerLen);*/
+	elog(DEBUG5, "Parquet metadata file footer length: %llu\n",footerLen);*/
 
 	/** get footerlen through little-endian decoding */
 	uint32_t footerLen = *(uint32*) buffer;
-	elog(LOG, "Parquet metadata file footer length: %u\n",footerLen);
+	elog(DEBUG5, "Parquet metadata file footer length: %u\n",footerLen);
 
 
 	/** Part 2: read footer itself*/
 	int64 footerIndex = footLengthIndex - (int64) footerLen;
 	elog(
-	LOG, "Parquet metadata file footer Index: %lld",(long long)footerIndex);
+	DEBUG5, "Parquet metadata file footer Index: %lld",(long long)footerIndex);
 
 	if (FileSeek(fileHandler, footerIndex, SEEK_SET) != footerIndex)
 	{
@@ -175,10 +175,6 @@ bool readParquetFooter(File fileHandler, ParquetMetadata *parquetMetadata,
 			(errcode(ERRCODE_IO_ERROR),
 			 errmsg("Parquet Storage Read error on segment file '%s': read footer" , filePathName)));
 	}
-
-	elog(LOG, "pfileMedatada.size:%ld", (*parquetMetadata)->num_rows);
-	elog(LOG, "fieldCount:%d \t blockCount: %d",
-	(*parquetMetadata)->fieldCount, (*parquetMetadata)->blockCount);
 
 	return true;
 }

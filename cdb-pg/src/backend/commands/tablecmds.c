@@ -2834,6 +2834,12 @@ renameatt(Oid myrelid,
 				 errmsg("permission denied: \"%s\" is a system catalog",
 						RelationGetRelationName(targetrelation))));
 
+	if (RelationIsParquet(targetrelation))
+		ereport(ERROR,
+				(errcode(ERRCODE_CDB_FEATURE_NOT_SUPPORTED),
+				 errmsg("Unsupported Rename column command for table type parquet"),
+				 errOmitLocation(true)));
+
 	/*
 	 * if the 'recurse' flag is set then we are supposed to rename this
 	 * attribute in all classes that inherit from 'relname' (as well as in
@@ -3635,6 +3641,52 @@ void ATVerifyObject(AlterTableStmt *stmt, Relation rel)
 								 errOmitLocation(true)));
 					break;
 					
+				default:
+					/* ALTER type supported */
+					break;
+			}
+		}
+	}
+
+	/*
+	 * Check the ALTER command type is supported for this object
+	 */
+	if (RelationIsParquet(rel))
+	{
+		ListCell *lcmd;
+
+		foreach(lcmd, stmt->cmds)
+		{
+			AlterTableCmd *cmd = (AlterTableCmd *) lfirst(lcmd);
+
+			switch(cmd->subtype)
+			{
+				/* FOREIGN and EXTERNAL tables doesn't support the following AT */
+				case AT_AddColumn:
+				case AT_AddColumnRecurse:
+				case AT_ColumnDefault:
+				case AT_DropNotNull:
+				case AT_SetNotNull:
+				case AT_SetStorage:
+				case AT_DropColumn:
+				case AT_DropColumnRecurse:
+				case AT_AddIndex:
+				case AT_ReAddIndex:
+				case AT_AlterColumnType:
+				case AT_ClusterOn:
+				case AT_DropCluster:
+				case AT_DropOids:
+				case AT_EnableTrig:
+				case AT_DisableTrig:
+				case AT_EnableTrigAll:
+				case AT_DisableTrigAll:
+				case AT_EnableTrigUser:
+				case AT_DisableTrigUser:
+					ereport(ERROR,
+							(errcode(ERRCODE_INVALID_COLUMN_DEFINITION),
+							 errmsg("Unsupported ALTER command for table type parquet"),
+							 errOmitLocation(true)));
+					break;
 				default:
 					/* ALTER type supported */
 					break;

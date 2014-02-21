@@ -87,6 +87,7 @@
 #include "cdb/cdbsharedstorageop.h"
 #include "cdb/cdbmirroredfilesysobj.h"
 #include "cdb/cdbpersistentfilesysobj.h"
+#include "cdb/cdbparquetstoragewrite.h"
 #include "catalog/gp_persistent.h"
 
 #include "utils/guc.h"
@@ -615,13 +616,55 @@ CheckAttributeType(const char *attname, Oid atttypid)
  *		parquet table doesn't support array type
  * --------------------------------
  */
-void CheckAttributeArray(TupleDesc tupdesc, char relstorage){
+void CheckAttributeForParquet(TupleDesc tupdesc, char relstorage){
 
 	if(relstorage != RELSTORAGE_PARQUET){
 		return;
 	}
 	int	natts = tupdesc->natts;
 	for(int i = 0; i < natts; i++){
+		switch(tupdesc->attrs[i]->atttypid){
+			case HAWQ_TYPE_BOOL:
+			case HAWQ_TYPE_CHAR:
+			case HAWQ_TYPE_NAME:
+			case HAWQ_TYPE_INT8:
+			case HAWQ_TYPE_INT2:
+			case HAWQ_TYPE_INT4:
+			case HAWQ_TYPE_FLOAT4:
+			case HAWQ_TYPE_FLOAT8:
+			case HAWQ_TYPE_MONEY:
+			case HAWQ_TYPE_NUMERIC:
+			case HAWQ_TYPE_BYTE:
+			case HAWQ_TYPE_TEXT:
+			case HAWQ_TYPE_XML:
+			case HAWQ_TYPE_MACADDR:
+			case HAWQ_TYPE_INET:
+			case HAWQ_TYPE_CIDR:
+			case HAWQ_TYPE_BPCHAR:
+			case HAWQ_TYPE_VARCHAR:
+			case HAWQ_TYPE_DATE:
+			case HAWQ_TYPE_TIME:
+			case HAWQ_TYPE_TIMESTAMP:
+			case HAWQ_TYPE_TIMETZ:
+			case HAWQ_TYPE_TIMESTAMPTZ:
+			case HAWQ_TYPE_INTERVAL:
+			case HAWQ_TYPE_BIT:
+			case HAWQ_TYPE_VARBIT:
+			case HAWQ_TYPE_POINT:
+			case HAWQ_TYPE_LSEG:
+			case HAWQ_TYPE_PATH:
+			case HAWQ_TYPE_BOX:
+			case HAWQ_TYPE_POLYGON:
+			case HAWQ_TYPE_CIRCLE:
+				break;
+			default:
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_COLUMN_DEFINITION),
+						 errmsg("data type for column %s is not supported for parquet table yet",
+								 NameStr(tupdesc->attrs[i]->attname)),
+						 errOmitLocation(true)));
+		}
+
 		if(tupdesc->attrs[i]->attndims != 0){
 			ereport(ERROR,
 				(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
@@ -1507,7 +1550,7 @@ heap_create_with_catalog(const char *relname,
 
 	CheckAttributeNamesTypes(tupdesc, relkind);
 
-	CheckAttributeArray(tupdesc, relstorage);
+	CheckAttributeForParquet(tupdesc, relstorage);
 
 	if (get_relname_relid(relname, relnamespace))
 		ereport(ERROR,
