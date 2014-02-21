@@ -156,8 +156,6 @@ class ConfExpSegCmd(Command):
                     logger.info("Validate data directories for new segment")
                     try:
                         self.validatePath(self.datadir, True)
-                        #for path in self.filespaceDirs:
-                        #    self.validatePath(path, False)
                     except ValidationException, e:
                         msg = "for segment with port %s: %s" %  (self.port, e.getMessage())
                         self.set_results(CommandResult(1, '', msg, True, False))
@@ -173,10 +171,6 @@ class ConfExpSegCmd(Command):
                     logger.info("Create or update data directories for new segment")
                     try:
                         self.makeOrUpdatePathAsNeeded(self.datadir)
-                        #if self.isPrimary:
-                            # only on primary do we create it -- otherwise, mirroring code creates it on replay
-                            #for path in self.filespaceDirs:
-                            #    self.makeOrUpdatePathAsNeeded(path)
                     except Exception, e:
                         self.set_results(CommandResult(1,'',e,True,False))
                         raise
@@ -191,15 +185,11 @@ class ConfExpSegCmd(Command):
                         logger.error(extractTarCmd.get_results())
                         raise
 
-                    #if self.isPrimary:
-                        # only on primary do we create it -- otherwise, mirroring code creates it on replay
-                        #self.fixupFilespaces()
-
                     logger.info("create gp_dbid file for segment")
                     writeGpDbidFile(self.datadir, self.dbid, logger=gplog.get_logger_if_verbose())
 
                     logger.info('create temporary direcotries')
-                    #update_temporary_directories(self.datadir, self.content)
+                    update_temporary_directories(self.datadir, self.content)
 
                     logger.info("Updating %s/postgresql.conf" % self.datadir)
                     modifyPostgresqlConfCmd = ModifyPostgresqlConfSetting('Updating %s/postgresql.conf' % self.datadir,
