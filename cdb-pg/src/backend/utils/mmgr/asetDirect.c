@@ -54,7 +54,8 @@ static void AsetDirectInit(MemoryContext context);
 static void AsetDirectReset(MemoryContext context);
 static void AsetDirectDelete(MemoryContext context);
 static bool AsetDirectIsEmpty(MemoryContext context);
-static void AsetDirectStats(MemoryContext context, const char* contextName);
+static void AsetDirectStats(MemoryContext context, uint64 *nBlocks, uint64 *nChunks,
+		uint64 *currentAvailable, uint64 *allAllocated, uint64 *allFreed, uint64 *maxHeld);
 
 #ifdef MEMORY_CONTEXT_CHECKING
 static void AsetDirectCheck(MemoryContext context);
@@ -272,58 +273,40 @@ AsetDirectIsEmpty(MemoryContext context)
     return set->narea_total == 0;
 }                               /* AsetDirectIsEmpty */
 
-
 /*
  * AsetDirectStats
- *      Displays stats about memory consumption of an allocset.
+ *		Returns stats about memory consumption of an AsetDirectContext.
+ *
+ *	Input parameters:
+ *		context: the context of interest
+ *
+ *	Output parameters:
+ *		nBlocks: number of blocks in the context
+ *		nChunks: number of chunks in the context
+ *
+ *		currentAvailable: free space across all blocks
+ *
+ *		allAllocated: total bytes allocated during lifetime (including
+ *		blocks that was dropped later on, e.g., freeing a large chunk
+ *		in an exclusive block would drop the block)
+ *
+ *		allFreed: total bytes that was freed during lifetime
+ *		maxHeld: maximum bytes held during lifetime
  */
-
-/* Helper to portably right-justify an int64 in a field of specified width. */
-static char *
-aset_rjfmt_int64(int64 v, int width, char **inout_bufpos, char *bufend)
-{
-    char       *bp = *inout_bufpos;
-    char        fmtbuf[32];
-    int         len;
-    int         pad;
-
-    snprintf(fmtbuf, sizeof(fmtbuf), INT64_FORMAT, v);
-    len = strlen(fmtbuf);
-    pad = Max(width - len, 0);
-    if (pad + len >= bufend - bp)
-        return "***";
-    memset(bp, ' ', pad);
-    memcpy(bp+pad, fmtbuf, len);
-    bp[pad+len] = '\0';
-   *inout_bufpos += pad+len+1;
-    return bp;
-}                               /* aset_rjfmt_int64 */
-
-
 static void
-AsetDirectStats(MemoryContext context, const char* contextName)
+AsetDirectStats(MemoryContext context, uint64 *nBlocks, uint64 *nChunks,
+		uint64 *currentAvailable, uint64 *allAllocated, uint64 *allFreed, uint64 *maxHeld)
 {
     AsetDirectContext  *set = (AsetDirectContext *)context;
-    int64       held;
-    char       *cfp;
-    char       *efp;
-    char        fmtbuf[200];
 
     Assert(set && IsA(set, AsetDirectContext));
 
-    /* Display the totals. */
-    efp = fmtbuf + sizeof(fmtbuf);
-    cfp = fmtbuf;
-    held = set->header.allBytesAlloc - set->header.allBytesFreed;
-    write_stderr("  Subtree: %s KB held; %s KB peak; %s KB lifetime sum."
-                 "   Node: %s KB held in %3u blocks."
-                 "  %s\n",
-                 aset_rjfmt_int64((held + 1023) / 1024, 8, &cfp, efp),
-                 aset_rjfmt_int64((set->header.maxBytesHeld + 1023) / 1024, 8, &cfp, efp),
-                 aset_rjfmt_int64((set->header.allBytesAlloc + 1023) / 1024, 9, &cfp, efp),
-                 aset_rjfmt_int64((set->size_total + 1023) / 1024, 8, &cfp, efp),
-                 set->narea_total,
-                 contextName);
+    *nBlocks = 0;
+    *nChunks = set->narea_total;
+    *currentAvailable = 0;
+    *allAllocated = set->header.allBytesAlloc;
+    *allFreed = set->header.allBytesFreed;
+    *maxHeld = set->header.maxBytesHeld;
 }
 
 

@@ -191,7 +191,8 @@ static void AllocSetReset(MemoryContext context);
 static void AllocSetDelete(MemoryContext context);
 static Size AllocSetGetChunkSpace(MemoryContext context, void *pointer);
 static bool AllocSetIsEmpty(MemoryContext context);
-static void AllocSetStats(MemoryContext context, const char* contextName);
+static void AllocSet_GetStats(MemoryContext context, uint64 *nBlocks, uint64 *nChunks,
+		uint64 *currentAvailable, uint64 *allAllocated, uint64 *allFreed, uint64 *maxHeld);
 static void AllocSetReleaseAccountingForAllAllocatedChunks(MemoryContext context);
 static void AllocSetUpdateGenerationForAllAllocatedChunks(MemoryContext context);
 
@@ -211,7 +212,7 @@ static MemoryContextMethods AllocSetMethods = {
 	AllocSetDelete,
 	AllocSetGetChunkSpace,
 	AllocSetIsEmpty,
-	AllocSetStats,
+	AllocSet_GetStats,
 	AllocSetReleaseAccountingForAllAllocatedChunks,
 	AllocSetUpdateGenerationForAllAllocatedChunks
 #ifdef MEMORY_CONTEXT_CHECKING
@@ -1636,76 +1637,55 @@ AllocSetIsEmpty(MemoryContext context)
 	return false;
 }
 
-/* Helpers to portably right-justify a uint64 in a field of specified width. */
-static char *
-aset_rjfmt_uint64(uint64 v, int width, char **inout_bufpos, char *bufend)
-{
-    char       *bp = *inout_bufpos;
-    char        fmtbuf[32];
-    int         len;
-    int         pad;
-
-    snprintf(fmtbuf, sizeof(fmtbuf), UINT64_FORMAT, v);
-    len = strlen(fmtbuf);
-    pad = Max(width - len, 0);
-    if (pad + len >= bufend - bp)
-        return "***";
-    memset(bp, ' ', pad);
-    memcpy(bp+pad, fmtbuf, len);
-    bp[pad+len] = '\0';
-   *inout_bufpos += pad+len+1;
-    return bp;
-}                               /* aset_rjfmt_int64 */
-
-static char *
-aset_rjfmt_mem64(uint64 v, int width, char **inout_bufpos, char *bufend)
-{
-    char   *bp;
-    char   *ip = *inout_bufpos;
-    char   *suffix = "kB";
-
-    v = (v + 1023) >> 10;
-    bp = aset_rjfmt_uint64(v, width, inout_bufpos, bufend - strlen(suffix));
-    if (bp == ip)
-    {
-        strcat(bp, suffix);
-        *inout_bufpos += strlen(suffix);
-    }
-    return bp;
-}                               /* aset_rjfmt_mem64 */
-
 /*
- * AllocSetStats
- *		Displays stats about memory consumption of an allocset.
+ * AllocSet_GetStats
+ *		Returns stats about memory consumption of an AllocSet.
+ *
+ *	Input parameters:
+ *		context: the context of interest
+ *
+ *	Output parameters:
+ *		nBlocks: number of blocks in the context
+ *		nChunks: number of chunks in the context
+ *
+ *		currentAvailable: free space across all blocks
+ *
+ *		allAllocated: total bytes allocated during lifetime (including
+ *		blocks that was dropped later on, e.g., freeing a large chunk
+ *		in an exclusive block would drop the block)
+ *
+ *		allFreed: total bytes that was freed during lifetime
+ *		maxHeld: maximum bytes held during lifetime
  */
 static void
-AllocSetStats(MemoryContext context, const char* contextName)
+AllocSet_GetStats(MemoryContext context, uint64 *nBlocks, uint64 *nChunks,
+		uint64 *currentAvailable, uint64 *allAllocated, uint64 *allFreed, uint64 *maxHeld)
 {
 	AllocSet	set = (AllocSet) context;
-	long		nblocks = 0;
-	long		nchunks = 0;
-	Size        totalspace = 0;
-	Size        freespace = 0;
-    Size        held;
     AllocBlock	block;
 	AllocChunk	chunk;
 	int			fidx;
-    char       *cfp;
-    char       *efp;
-    char        fmtbuf[400];
+	uint64 currentAllocated = 0;
+
+    *nBlocks = 0;
+    *nChunks = 0;
+    *currentAvailable = 0;
+    *allAllocated = set->header.allBytesAlloc;
+    *allFreed = set->header.allBytesFreed;
+    *maxHeld = set->header.maxBytesHeld;
 
     /* Total space obtained from host's memory manager */
     for (block = set->blocks; block != NULL; block = block->next)
-	{
-		nblocks++;
-		totalspace += block->endptr - ((char *) block);
+    {
+    	*nBlocks = *nBlocks + 1;
+    	currentAllocated += block->endptr - ((char *) block);
 	}
 
     /* Space at end of first block is available for use. */
     if (set->blocks)
     {
-        nchunks++;
-        freespace += set->blocks->endptr - set->blocks->freeptr;
+    	*nChunks = *nChunks + 1;
+    	*currentAvailable += set->blocks->endptr - set->blocks->freeptr;
     }
 
     /* Freelists.  Count usable space only, not chunk headers. */
@@ -1714,27 +1694,10 @@ AllocSetStats(MemoryContext context, const char* contextName)
 		for (chunk = set->freelist[fidx]; chunk != NULL;
 			 chunk = (AllocChunk) chunk->sharedHeader)
 		{
-			nchunks++;
-			freespace += chunk->size;
+			*nChunks = *nChunks + 1;
+			*currentAvailable += chunk->size;
 		}
 	}
-
-    efp = fmtbuf + sizeof(fmtbuf);
-    cfp = fmtbuf;
-    held = set->header.allBytesAlloc - set->header.allBytesFreed;
-    write_stderr("  (Tree: %s held; %s peak; %s/%s cumulative taken/returned)"
-                 "  (Node: %s held in %3ld blocks; %s in use; "
-                 "  %s free in %3ld chunks)  %s\n",
-                 aset_rjfmt_mem64(held, 8, &cfp, efp),
-                 aset_rjfmt_mem64(set->header.maxBytesHeld, 8, &cfp, efp),
-                 aset_rjfmt_mem64(set->header.allBytesAlloc, 9, &cfp, efp),
-                 aset_rjfmt_mem64(set->header.allBytesFreed, 9, &cfp, efp),
-                 aset_rjfmt_mem64(totalspace, 8, &cfp, efp),
-                 nblocks,
-                 aset_rjfmt_mem64(totalspace - freespace, 8, &cfp, efp),
-                 aset_rjfmt_mem64(freespace, 8, &cfp, efp),
-                 nchunks,
-                 contextName);
 }
 
 #ifdef MEMORY_CONTEXT_CHECKING

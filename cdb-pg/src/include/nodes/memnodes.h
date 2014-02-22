@@ -45,7 +45,7 @@ typedef struct MemoryContextMethods
 	void		(*delete_context) (MemoryContext context);
 	Size		(*get_chunk_space) (MemoryContext context, void *pointer);
 	bool		(*is_empty) (MemoryContext context);
-	void		(*stats) (MemoryContext context, const char* contextName);
+	void		(*stats) (MemoryContext context, uint64 *nBlocks, uint64 *nChunks, uint64 *currentAvailable, uint64 *allAllocated, uint64 *allFreed, uint64 *maxHeld);
 	void		(*release_accounting)(MemoryContext context);
 	void		(*update_generation)(MemoryContext context);
 #ifdef MEMORY_CONTEXT_CHECKING
