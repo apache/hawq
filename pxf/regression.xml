@@ -147,7 +147,7 @@
 	<target name="run-tests" depends="compile" description="Run regression-tests">
 		<echo message="Run Regression Batch: com/pxf/tests/basic/${testClass}.class" />
 		<mkdir dir="${testreports.dir}" />
-		<junit printsummary="no" fork="yes" haltonfailure="yes" showoutput="no" outputtoformatters="yes">
+		<junit printsummary="no" fork="yes" haltonfailure="no" showoutput="no" outputtoformatters="yes">
 			<classpath>
 				<pathelement location="${build.dir}/regression/classes" />
 				<pathelement location="${src.dir}" />
