@@ -26,11 +26,13 @@ import com.pivotal.pxfauto.infra.utils.exception.ExceptionUtils;
 import com.pivotal.pxfauto.infra.utils.jsystem.report.ReportUtils;
 import com.pivotal.pxfauto.infra.utils.tables.ComparisonUtils;
 import com.pxf.tests.dataprepares.hbase.HBaseDataPreparer;
-import com.pxf.tests.fixtures.PxfHbaseFixture;
+import com.pxf.tests.fixtures.PxfHBaseFixture;
 import com.pxf.tests.testcases.PxfTestCase;
 
 public class PxfHBaseRegression extends PxfTestCase {
 
+	final String NO_FILTER = "No filter";
+	
 	HBase hbase;
 	int numberOfSplits = 2;
 
@@ -40,6 +42,8 @@ public class PxfHBaseRegression extends PxfTestCase {
 	HBaseTable lookUpTable;
 
 	ExternalTable externalTableHbase;
+	ExternalTable externalTableHBaseWithFilter;
+	ReadableExternalTable externalTableFilterPrinter;
 
 	String[] habseTableQualifiers = new String[] {
 			"cf1:q1",
@@ -72,7 +76,7 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 	String[] exTableFieldsFullName = new String[] {
 			"recordkey TEXT",
-			"\"cf1:q1\" TEXT",
+			"\"cf1:q1\" VARCHAR",
 			"\"cf1:q2\" TEXT",
 			"\"cf1:q3\" INT",
 			"\"cf1:q4\" BYTEA",
@@ -86,7 +90,7 @@ public class PxfHBaseRegression extends PxfTestCase {
 			"\"cf1:q12\" TIMESTAMP" };
 
 	public PxfHBaseRegression() {
-		setFixture(PxfHbaseFixture.class);
+		setFixture(PxfHBaseFixture.class);
 	}
 
 	@Before
@@ -152,7 +156,8 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		lookUpTable.setQualifiers(new String[] { "mapping:q4" });
 
-		externalTableHbase = TableFactory.getPxfHbaseReadableTable("hbase_pxf_external_table", exTableFields, hTable);
+		externalTableHbase = 
+				TableFactory.getPxfHbaseReadableTable("hbase_pxf_external_table", exTableFields, hTable);
 
 		/**
 		 * Create external table if not exists
@@ -173,7 +178,8 @@ public class PxfHBaseRegression extends PxfTestCase {
 	@Test
 	public void syntaxValidation() throws Exception {
 
-		ReportUtils.reportBold(report, getClass(), "Fail to create external table directed to HBase table with no PXF paramters");
+		ReportUtils.reportBold(report, getClass(), 
+				"Fail to create external table directed to HBase table with no PXF paramters");
 
 		initAndPopulateHBaseTable(hTable, false);
 
@@ -185,7 +191,9 @@ public class PxfHBaseRegression extends PxfTestCase {
 		try {
 			hawq.createTable(exTable);
 		} catch (Exception e) {
-			ExceptionUtils.validate(report, e, new PSQLException("ERROR: Invalid URI pxf://" + exTable.getHostname() + ":" + exTable.getPort() + "/" + exTable.getPath() + "?: invalid option after '?'", null), false);
+			ExceptionUtils.validate(report, e, 
+					new PSQLException("ERROR: Invalid URI pxf://" + exTable.getHostname() + ":" + exTable.getPort() + 
+							"/" + exTable.getPath() + "?: invalid option after '?'", null), false);
 		}
 
 		ReportUtils.reportBold(report, getClass(), "Create Writable external table directed to HBase table");
@@ -205,9 +213,13 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		initAndPopulateHBaseTable(hTable, false);
 
-		hawq.runQueryWithExpectedWarning("ANALYZE " + externalTableHbase.getName(), "PXF 'Analyzer' class was not found. Please supply it in the LOCATION clause or use it in a PXF profile in order to run ANALYZE on this table", true);
+		hawq.runQueryWithExpectedWarning("ANALYZE " + externalTableHbase.getName(), 
+				"PXF 'Analyzer' class was not found. Please supply it in the LOCATION clause" +
+				" or use it in a PXF profile in order to run ANALYZE on this table", true);
 
-		hawq.queryResults(externalTableHbase, "SELECT relpages, reltuples FROM pg_class WHERE relname = '" + externalTableHbase.getName() + "'");
+		hawq.queryResults(externalTableHbase, 
+				"SELECT relpages, reltuples FROM pg_class" +
+				" WHERE relname = '" + externalTableHbase.getName() + "'");
 
 		Table expectedTable = new Table("expected", null);
 
@@ -223,9 +235,14 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		hbase.queryResults(hTable, null);
 
-		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " ORDER BY recordkey ASC");
+		hawq.queryResults(externalTableHbase, 
+				"SELECT * FROM " + externalTableHbase.getName() + " ORDER BY recordkey ASC");
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
+		
+		createAndQueryPxfHBaseFilterTable(null);
+		
+		createAndQueryPxfHawqFilterTable(hTable, exTableFields, "", NO_FILTER);
 	}
 
 	@Test
@@ -233,7 +250,9 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		initAndPopulateHBaseTable(hTable, false);
 
-		hawq.queryResults(externalTableHbase, "SELECT cnt < 300 AS check FROM (SELECT COUNT(*) AS cnt FROM " + externalTableHbase.getName() + " WHERE gp_segment_id = 0) AS a");
+		hawq.queryResults(externalTableHbase, 
+				"SELECT cnt < 300 AS check FROM (SELECT COUNT(*) AS cnt FROM " + externalTableHbase.getName() + 
+				" WHERE gp_segment_id = 0) AS a");
 
 		Table expectedTable = new Table("expected", null);
 
@@ -247,13 +266,25 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		initAndPopulateHBaseTable(hTable, false);
 
-		hTable.addFilter(new RowFilter(CompareFilter.CompareOp.GREATER, new BinaryComparator(Bytes.toBytes("row00000090"))));
-		hTable.addFilter(new RowFilter(CompareFilter.CompareOp.LESS_OR_EQUAL, new BinaryComparator(Bytes.toBytes("row00000103"))));
+		String whereClause = " WHERE recordkey > 'row00000090' AND recordkey <= 'row00000103'";
+		String filterString = "a0c\"row00000090\"o2a0c\"row00000103\"o3o7";
+		
+		hTable.addFilter(new RowFilter(CompareFilter.CompareOp.GREATER, 
+				new BinaryComparator(Bytes.toBytes("row00000090"))));
+		hTable.addFilter(new RowFilter(CompareFilter.CompareOp.LESS_OR_EQUAL, 
+				new BinaryComparator(Bytes.toBytes("row00000103"))));
 
 		hbase.queryResults(hTable, null);
-		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE recordkey > 'row00000090' AND recordkey <= 'row00000103' ORDER BY recordkey ASC");
+		hawq.queryResults(externalTableHbase, 
+				"SELECT * FROM " + externalTableHbase.getName() + 
+				whereClause + " ORDER BY recordkey ASC");
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
+		
+		createAndQueryPxfHBaseFilterTable(filterString);
+		
+		createAndQueryPxfHawqFilterTable(hTable, exTableFields, whereClause, filterString);
+
 	}
 
 	@Test
@@ -261,12 +292,22 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		initAndPopulateHBaseTable(hTable, false);
 
-		hTable.addFilter(new RowFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(Bytes.toBytes("row00000100"))));
+		String whereClause = " WHERE recordkey = 'row00000100'";
+		String filterString = "a0c\"row00000100\"o5";
+		
+		hTable.addFilter(new RowFilter(CompareFilter.CompareOp.EQUAL, 
+				new BinaryComparator(Bytes.toBytes("row00000100"))));
 
 		hbase.queryResults(hTable, null);
-		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE recordkey = 'row00000100'");
+		hawq.queryResults(externalTableHbase, 
+				"SELECT * FROM " + externalTableHbase.getName() + 
+				whereClause);
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
+		
+		createAndQueryPxfHBaseFilterTable(filterString);
+	
+		createAndQueryPxfHawqFilterTable(hTable, exTableFields, whereClause, filterString);
 	}
 
 	@Test
@@ -274,14 +315,25 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		initAndPopulateHBaseTable(hTable, false);
 
-		hTable.addFilter(new RowFilter(CompareFilter.CompareOp.NOT_EQUAL, new BinaryComparator(Bytes.toBytes("row00000090"))));
-		hTable.addFilter(new RowFilter(CompareFilter.CompareOp.LESS_OR_EQUAL, new BinaryComparator(Bytes.toBytes("row00000103"))));
+		String whereClause = " WHERE recordkey != 'row00000090' AND recordkey <= 'row00000103'";
+		String filterString = "a0c\"row00000090\"o6a0c\"row00000103\"o3o7";
+		
+		hTable.addFilter(new RowFilter(CompareFilter.CompareOp.NOT_EQUAL, 
+				new BinaryComparator(Bytes.toBytes("row00000090"))));
+		hTable.addFilter(new RowFilter(CompareFilter.CompareOp.LESS_OR_EQUAL, 
+				new BinaryComparator(Bytes.toBytes("row00000103"))));
 
 		hbase.queryResults(hTable, null);
 
-		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE recordkey != 'row00000090' AND recordkey <= 'row00000103' ORDER BY recordkey ASC");
+		hawq.queryResults(externalTableHbase, 
+				"SELECT * FROM " + externalTableHbase.getName() + 
+				whereClause + " ORDER BY recordkey ASC");
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
+		
+		createAndQueryPxfHBaseFilterTable(filterString);
+		
+		createAndQueryPxfHawqFilterTable(hTable, exTableFields, whereClause, filterString);
 	}
 
 	@Test
@@ -289,30 +341,60 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		initAndPopulateHBaseTable(hTable, false);
 
-		hTable.addFilter(new RowFilter(CompareFilter.CompareOp.NOT_EQUAL, new BinaryComparator(Bytes.toBytes("row00000090"))));
-		hTable.addFilter(new RowFilter(CompareFilter.CompareOp.LESS_OR_EQUAL, new BinaryComparator(Bytes.toBytes("row00000095"))));
-		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q7".getBytes(), CompareOp.GREATER, "o".getBytes()));
+		String whereClause = " WHERE recordkey != 'row00000090' AND recordkey <= 'row00000095' AND \"cf1:q7\" > 'o'";
+		// TODO: pending adding BYTEA support to HBase filter (cf1:q7)
+		//String filterString = "a0c\"row00000090\"o6a0c\"row00000095\"o3o7a7c\"o\"o2o7";
+		String filterString = "a0c\"row00000090\"o6a0c\"row00000095\"o3o7";
+		
+		hTable.addFilter(new RowFilter(CompareFilter.CompareOp.NOT_EQUAL, 
+				new BinaryComparator(Bytes.toBytes("row00000090"))));
+		hTable.addFilter(new RowFilter(CompareFilter.CompareOp.LESS_OR_EQUAL, 
+				new BinaryComparator(Bytes.toBytes("row00000095"))));
+		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q7".getBytes(), 
+				CompareOp.GREATER, "o".getBytes()));
 
 		hbase.queryResults(hTable, null);
 
-		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE recordkey != 'row00000090' AND recordkey <= 'row00000095' AND \"cf1:q7\" > 'o' ORDER BY recordkey ASC");
+		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + 
+				whereClause + " ORDER BY recordkey ASC");
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
+		
+		// TODO: pending adding BYTEA support to HBase filter
+		//createAndQueryPxfHBaseFilterTable(filterString);
+		
+		createAndQueryPxfHawqFilterTable(hTable, exTableFields, whereClause, filterString);
 	}
 
 	@Test
-	public void filterSeverlQualifiers() throws Exception {
+	public void filterSeveralQualifiers() throws Exception {
 
 		initAndPopulateHBaseTable(hTable, false);
 
-		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q1".getBytes(), CompareOp.GREATER, "ASCII00000090".getBytes()));
-		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q4".getBytes(), CompareOp.LESS_OR_EQUAL, "lookup00000198".getBytes()));
+		String whereClause = " WHERE \"cf1:q1\" > 'ASCII00000090' AND q4 <= 'lookup00000198'";
+		String filterString = "a1c\"ASCII00000090\"o2a4c\"lookup00000198\"o3o7";
+		
+		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q1".getBytes(), 
+				CompareOp.GREATER, "ASCII00000090".getBytes()));
+		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q4".getBytes(), 
+				CompareOp.LESS_OR_EQUAL, "lookup00000198".getBytes()));
 
 		hbase.queryResults(hTable, null);
 
-		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE \"cf1:q1\" > 'ASCII00000090' AND q4 <= 'lookup00000198' ORDER BY recordkey ASC");
+		hawq.queryResults(externalTableHbase, 
+				"SELECT * FROM " + externalTableHbase.getName() + 
+				whereClause + " ORDER BY recordkey ASC");
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
+		
+		// TODO: pending adding BYTEA support to HBase filter
+		//createAndQueryPxfHBaseFilterTable(filterString);
+		
+		/** TODO: pending adding: 
+		 * BYTEA support to filter pushdown (q4)
+		 * cast between text and varchar (cf1:q1) 
+		 */
+		createAndQueryPxfHawqFilterTable(hTable, exTableFields, whereClause, NO_FILTER);
 	}
 
 	@Test
@@ -320,14 +402,28 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		initAndPopulateHBaseTable(hTable, false);
 
-		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q2".getBytes(), CompareOp.GREATER, "UTF8_計算機用語_00000090".getBytes("UTF-8")));
-		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q3".getBytes(), CompareOp.LESS_OR_EQUAL, new HBaseIntegerComparator(990000L)));
+		String whereClause = " WHERE \"cf1:q2\" > 'UTF8_計算機用語_00000090' AND \"cf1:q3\" <= 990000";
+		String filterString = "a2c\"UTF8_計算機用語_00000090\"o2a3c990000o3o7";
+		
+		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q2".getBytes(), 
+				CompareOp.GREATER, "UTF8_計算機用語_00000090".getBytes("UTF-8")));
+		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q3".getBytes(), 
+				CompareOp.LESS_OR_EQUAL, new HBaseIntegerComparator(990000L)));
 
 		hbase.queryResults(hTable, null);
 
-		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE \"cf1:q2\" > 'UTF8_計算機用語_00000090' AND \"cf1:q3\" <= 990000 ORDER BY recordkey ASC");
+		hawq.queryResults(externalTableHbase, 
+				"SELECT * FROM " + externalTableHbase.getName() + 
+				whereClause + " ORDER BY recordkey ASC");
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
+		
+		/** 
+		 * TODO: failing test - UTF-8 encoding isn't passed correctly to PXF.
+		 * see GPSQL-1739.
+		 */
+		//createAndQueryPxfHBaseFilterTable(filterString);
+		//createAndQueryPxfHawqFilterTable(hTable, exTableFields, whereClause, filterString);
 	}
 
 	@Test
@@ -335,14 +431,23 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		initAndPopulateHBaseTable(hTable, false);
 
-		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q5".getBytes(), CompareOp.GREATER, "91.92".getBytes()));
-		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q6".getBytes(), CompareOp.LESS_OR_EQUAL, "99999999.99".getBytes()));
+		String whereClause = " WHERE \"cf1:q5\" > 91.92 AND \"cf1:q6\" <= 99999999.99";
+		String filterString = NO_FILTER;
+		
+		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q5".getBytes(), 
+				CompareOp.GREATER, "91.92".getBytes()));
+		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q6".getBytes(), 
+				CompareOp.LESS_OR_EQUAL, "99999999.99".getBytes()));
 
 		hbase.queryResults(hTable, null);
 
-		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE \"cf1:q5\" > 91.92 AND \"cf1:q6\" <= 99999999.99 ORDER BY recordkey ASC");
+		hawq.queryResults(externalTableHbase, 
+				"SELECT * FROM " + externalTableHbase.getName() + 
+				whereClause + " ORDER BY recordkey ASC");
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
+		
+		createAndQueryPxfHawqFilterTable(hTable, exTableFields, whereClause, filterString);
 	}
 
 	@Test
@@ -350,14 +455,26 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		initAndPopulateHBaseTable(hTable, false);
 
-		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q8".getBytes(), CompareOp.GREATER, new HBaseIntegerComparator(97L)));
-		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q9".getBytes(), CompareOp.LESS_OR_EQUAL, new HBaseIntegerComparator(9702990000000099L)));
+		String whereClause = " WHERE \"cf1:q8\" > 97 AND \"cf1:q9\" <= 9702990000000099";
+		String filterString = "a8c97o2a9c9702990000000099o3o7";
+		
+		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q8".getBytes(), CompareOp.GREATER, 
+				new HBaseIntegerComparator(97L)));
+		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q9".getBytes(), CompareOp.LESS_OR_EQUAL, 
+				new HBaseIntegerComparator(9702990000000099L)));
 
 		hbase.queryResults(hTable, null);
 
-		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE \"cf1:q8\" > 97 AND \"cf1:q9\" <= 9702990000000099 ORDER BY recordkey ASC");
+		hawq.queryResults(externalTableHbase, 
+				"SELECT * FROM " + externalTableHbase.getName() + 
+				whereClause + " ORDER BY recordkey ASC");
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
+		
+		createAndQueryPxfHBaseFilterTable(filterString);
+		
+		// TODO: pending adding support of cast between smallint and int (cf1:q8)
+		createAndQueryPxfHawqFilterTable(hTable, exTableFields, whereClause, "a9c9702990000000099o3");
 	}
 
 	@Test
@@ -365,13 +482,23 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		initAndPopulateHBaseTable(hTable, false);
 
-		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q9".getBytes(), CompareOp.LESS, new HBaseIntegerComparator(-7000000000000000L)));
+		String whereClause = " WHERE \"cf1:q9\" < -7000000000000000";
+		String filterString = "a9c-7000000000000000o1";
+		
+		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q9".getBytes(), CompareOp.LESS,
+				new HBaseIntegerComparator(-7000000000000000L)));
 
 		hbase.queryResults(hTable, null);
 
-		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE \"cf1:q9\" < -7000000000000000 ORDER BY recordkey ASC");
+		hawq.queryResults(externalTableHbase, 
+				"SELECT * FROM " + externalTableHbase.getName() + 
+				whereClause + " ORDER BY recordkey ASC");
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
+		
+		createAndQueryPxfHBaseFilterTable(filterString);
+
+		createAndQueryPxfHawqFilterTable(hTable, exTableFields, whereClause, filterString);
 	}
 
 	@Test
@@ -379,48 +506,86 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		initAndPopulateHBaseTable(hTable, false);
 
+		String whereClause = 
+				" WHERE (((recordkey > 'row00000090') AND (recordkey <= 'row00000103'))" +
+				" OR (recordkey = 'row00000105'))";
+		String filterString = NO_FILTER;
+		
 		FilterList andFilterList = new FilterList(Operator.MUST_PASS_ALL);
-		andFilterList.addFilter(new RowFilter(CompareFilter.CompareOp.GREATER, new BinaryComparator(Bytes.toBytes("row00000090"))));
-		andFilterList.addFilter(new RowFilter(CompareFilter.CompareOp.LESS_OR_EQUAL, new BinaryComparator(Bytes.toBytes("row00000103"))));
+		andFilterList.addFilter(new RowFilter(CompareFilter.CompareOp.GREATER, 
+				new BinaryComparator(Bytes.toBytes("row00000090"))));
+		andFilterList.addFilter(new RowFilter(CompareFilter.CompareOp.LESS_OR_EQUAL, 
+				new BinaryComparator(Bytes.toBytes("row00000103"))));
 
 		FilterList allFilterList = new FilterList(Operator.MUST_PASS_ONE);
 
 		allFilterList.addFilter(andFilterList);
-		allFilterList.addFilter(new RowFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(Bytes.toBytes("row00000105"))));
+		allFilterList.addFilter(new RowFilter(CompareFilter.CompareOp.EQUAL, 
+				new BinaryComparator(Bytes.toBytes("row00000105"))));
 
 		hTable.setFilters(allFilterList);
 
 		hbase.queryResults(hTable, null);
 
-		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE (((recordkey > 'row00000090') AND (recordkey <= 'row00000103')) OR (recordkey = 'row00000105')) ORDER BY recordkey ASC");
+		hawq.queryResults(externalTableHbase, 
+				"SELECT * FROM " + externalTableHbase.getName() + 
+				whereClause + " ORDER BY recordkey ASC");
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
+
+		createAndQueryPxfHawqFilterTable(hTable, exTableFields, whereClause, filterString);
 	}
 
 	@Test
 	public void filterAndNotEquals() throws Exception {
 
 		initAndPopulateHBaseTable(hTable, false);
-
-		hTable.addFilter(new RowFilter(CompareFilter.CompareOp.NOT_EQUAL, new BinaryComparator(Bytes.toBytes("row00000099"))));
-		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q8".getBytes(), CompareOp.GREATER, "97".getBytes()));
-		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q9".getBytes(), CompareOp.LESS_OR_EQUAL, "9702990000000099".getBytes()));
+		
+		hTable.addFilter(new RowFilter(CompareFilter.CompareOp.NOT_EQUAL, 
+				new BinaryComparator(Bytes.toBytes("row00000099"))));
+		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q8".getBytes(), 
+				CompareOp.GREATER, "97".getBytes()));
+		hTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q9".getBytes(), 
+				CompareOp.LESS_OR_EQUAL, "9702990000000099".getBytes()));
 
 		hbase.queryResults(hTable, null);
 
-		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE recordkey != 'row00000099' AND \"cf1:q8\" > 97 AND \"cf1:q9\" <= 9702990000000099 ORDER BY recordkey ASC");
+		String whereClause = 
+				" WHERE recordkey != 'row00000099' AND \"cf1:q8\" > 97 AND \"cf1:q9\" <= 9702990000000099";
+		String filterString = "a0c\"row00000099\"o6a8c97o2o7a9c9702990000000099o3o7";
+		
+		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + 
+				whereClause + " ORDER BY recordkey ASC");
+
+		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
+		createAndQueryPxfHBaseFilterTable(filterString);
+		// TODO: add support of cast between smallint and int (\"cf1:q8\" > 97 is ignored)
+		filterString = "a0c\"row00000099\"o6a9c9702990000000099o3o7";
+		createAndQueryPxfHawqFilterTable(hTable, exTableFields, whereClause, filterString);
+		
+		whereClause = " WHERE \"cf1:q9\" <= 9702990000000099 AND recordkey != 'row00000099' AND \"cf1:q8\" > 97";
+		filterString = "a9c9702990000000099o3a0c\"row00000099\"o6o7a8c97o2o7";
+		
+		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + 
+				whereClause + " ORDER BY recordkey ASC");
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
 
-		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE \"cf1:q9\" <= 9702990000000099 AND recordkey != 'row00000099' AND \"cf1:q8\" > 97 ORDER BY recordkey ASC");
-
-		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
-
+		createAndQueryPxfHBaseFilterTable(filterString);
+		// TODO: add support of cast between smallint and int (\"cf1:q8\" > 97" is ignored)
+		filterString = "a9c9702990000000099o3a0c\"row00000099\"o6o7";
+		createAndQueryPxfHawqFilterTable(hTable, exTableFields, whereClause, filterString);
+		
 		hawq.runQuery("SET pxf_enable_filter_pushdown = off");
 
-		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + " WHERE \"cf1:q9\" <= 9702990000000099 AND recordkey != 'row00000099' AND \"cf1:q8\" > 97 ORDER BY recordkey ASC");
+		filterString = NO_FILTER;
+		
+		hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + 
+				whereClause + " ORDER BY recordkey ASC");
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
+
+		createAndQueryPxfHawqFilterTable(hTable, exTableFields, whereClause, filterString);
 	}
 
 	@Test
@@ -428,22 +593,33 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		initAndPopulateHBaseTable(hNullTable, true);
 
-		ExternalTable exTable = TableFactory.getPxfHbaseReadableTable("habse_with_nulls_pxf_external_table", exTableFields, hNullTable);
+		String whereClause = " WHERE \"cf1:q1\" is null";
+		String filterString = NO_FILTER;
+		
+		ExternalTable exTable = 
+				TableFactory.getPxfHbaseReadableTable("habse_with_nulls_pxf_external_table", 
+						exTableFields, hNullTable);
 
-		hNullTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q1".getBytes(), CompareOp.EQUAL, "null".getBytes()));
+		hNullTable.addFilter(
+				new SingleColumnValueFilter("cf1".getBytes(), "q1".getBytes(), CompareOp.EQUAL, "null".getBytes()));
 		hbase.queryResults(hNullTable, null);
 
 		hawq.createTableAndVerify(exTable);
 
-		hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " WHERE \"cf1:q1\" is null ORDER BY recordkey ASC");
+		hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + 
+				whereClause + " ORDER BY recordkey ASC");
 
 		ComparisonUtils.compareTables(exTable, hNullTable, report);
+		
+		createAndQueryPxfHawqFilterTable(hNullTable, exTableFields, whereClause, filterString);
 	}
 
 	@Test
 	public void lookupTableUpperCase() throws Exception {
 
-		ReportUtils.reportBold(report, getClass(), "Remove lower case q4 from lookup table for " + hNullTable.getName() + " table and add Q4 upper case mapping");
+		ReportUtils.reportBold(report, getClass(), 
+				"Remove lower case q4 from lookup table for " + hNullTable.getName() + 
+				" table and add Q4 upper case mapping");
 
 		hbase.removeRow(lookUpTable, new String[] { hNullTable.getName() });
 
@@ -462,7 +638,9 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		initAndPopulateHBaseTable(hNullTable, true);
 
-		ExternalTable exTable = TableFactory.getPxfHbaseReadableTable("habse_with_nulls_pxf_external_table", exTableFields, hNullTable);
+		ExternalTable exTable = 
+				TableFactory.getPxfHbaseReadableTable("habse_with_nulls_pxf_external_table", 
+						exTableFields, hNullTable);
 
 		hbase.queryResults(hNullTable, null);
 
@@ -476,7 +654,8 @@ public class PxfHBaseRegression extends PxfTestCase {
 	@Test
 	public void noLookupTable() throws Exception {
 
-		ReportUtils.reportBold(report, getClass(), "Drop lookup table, fail to query external tablebecause of q4 field resolve");
+		ReportUtils.reportBold(report, getClass(), 
+				"Drop lookup table, fail to query external table because of q4 field resolve");
 
 		initAndPopulateHBaseTable(hTable, false);
 		initAndPopulateHBaseTable(hNullTable, true);
@@ -484,37 +663,52 @@ public class PxfHBaseRegression extends PxfTestCase {
 		hbase.dropTable(lookUpTable, false);
 
 		try {
-			hawq.queryResults(externalTableHbase, "SELECT * FROM " + externalTableHbase.getName() + "  WHERE \"cf1:q1\" is null ORDER BY recordkey ASC");
+			hawq.queryResults(externalTableHbase, 
+					"SELECT * FROM " + externalTableHbase.getName() + 
+					" WHERE \"cf1:q1\" is null ORDER BY recordkey ASC");
 		} catch (Exception e) {
-			ExceptionUtils.validate(report, e, new PSQLException("Illegal HBase column name q4, missing", null), true);
+			ExceptionUtils.validate(report, e, 
+					new PSQLException("Illegal HBase column name q4, missing", null), true);
 		}
 
-		ReportUtils.reportBold(report, getClass(), "Succeed to quiery from external table with full name for q4 field (family and qualifier)");
+		ReportUtils.reportBold(report, getClass(), 
+				"Succeed to query from external table with full name for q4 field (family and qualifier)");
 
-		ExternalTable exTableUsingFullPathQ4 = TableFactory.getPxfHbaseReadableTable("habse_with_nulls_pxf_external_table", exTableFieldsFullName, hNullTable);
+		ExternalTable exTableUsingFullPathQ4 = 
+				TableFactory.getPxfHbaseReadableTable("habse_with_nulls_pxf_external_table", 
+						exTableFieldsFullName, hNullTable);
 
-		hNullTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q1".getBytes(), CompareOp.EQUAL, "null".getBytes()));
+		hNullTable.addFilter(
+				new SingleColumnValueFilter("cf1".getBytes(), "q1".getBytes(), CompareOp.EQUAL, "null".getBytes()));
 		hbase.queryResults(hNullTable, null);
 
 		hawq.createTableAndVerify(exTableUsingFullPathQ4);
 
-		hawq.queryResults(exTableUsingFullPathQ4, "SELECT * FROM " + exTableUsingFullPathQ4.getName() + "  WHERE \"cf1:q1\" is null ORDER BY recordkey ASC");
+		hawq.queryResults(exTableUsingFullPathQ4, 
+				"SELECT * FROM " + exTableUsingFullPathQ4.getName() + 
+				" WHERE \"cf1:q1\" is null ORDER BY recordkey ASC");
 
 		ComparisonUtils.compareTables(exTableUsingFullPathQ4, hNullTable, report);
 
-		ReportUtils.reportBold(report, getClass(), "Recreate lookup table and fail to query from external table because lookup table is empty");
+		ReportUtils.reportBold(report, getClass(), 
+				"Recreate lookup table and fail to query from external table because lookup table is empty");
 
 		hbase.createTableAndVerify(lookUpTable);
 
 		try {
-			hawq.queryResults(externalTableHbase, "SELECT recordkey, \"cf1:q1\" FROM " + externalTableHbase.getName() + " ORDER BY recordkey LIMIT 5;");
+			hawq.queryResults(externalTableHbase, 
+					"SELECT recordkey, \"cf1:q1\" FROM " + externalTableHbase.getName() + 
+					" ORDER BY recordkey LIMIT 5;");
 		} catch (Exception e) {
-			ExceptionUtils.validate(report, e, new PSQLException("Illegal HBase column name q4, missing", null), true);
+			ExceptionUtils.validate(report, e, 
+					new PSQLException("Illegal HBase column name q4, missing", null), true);
 		}
 
 		ReportUtils.reportBold(report, getClass(), "Succeed to query external table with full q4 field name");
 
-		hawq.queryResults(exTableUsingFullPathQ4, "SELECT * FROM " + exTableUsingFullPathQ4.getName() + "  WHERE \"cf1:q1\" is null ORDER BY recordkey ASC");
+		hawq.queryResults(exTableUsingFullPathQ4, 
+				"SELECT * FROM " + exTableUsingFullPathQ4.getName() + 
+				" WHERE \"cf1:q1\" is null ORDER BY recordkey ASC");
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
 	}
@@ -522,13 +716,15 @@ public class PxfHBaseRegression extends PxfTestCase {
 	@Test
 	public void disableLookupTable() throws Exception {
 
-		ReportUtils.reportBold(report, getClass(), "Disable lookup table and succeed to query external table with full column name");
+		ReportUtils.reportBold(report, getClass(), 
+				"Disable lookup table and succeed to query external table with full column name");
 
 		initAndPopulateHBaseTable(hTable, false);
 
 		hbase.disableTable(lookUpTable);
 
-		ExternalTable exTableUsingFullPathQ4 = TableFactory.getPxfHbaseReadableTable("habse_lookup_external_table", exTableFieldsFullName, hTable);
+		ExternalTable exTableUsingFullPathQ4 = 
+				TableFactory.getPxfHbaseReadableTable("habse_lookup_external_table", exTableFieldsFullName, hTable);
 
 		hTable.setQualifiers(new String[] { "cf1:q1" });
 
@@ -536,7 +732,9 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		hawq.createTableAndVerify(exTableUsingFullPathQ4);
 
-		hawq.queryResults(exTableUsingFullPathQ4, "SELECT recordkey, \"cf1:q1\" FROM " + exTableUsingFullPathQ4.getName() + " ORDER BY recordkey;");
+		hawq.queryResults(exTableUsingFullPathQ4, 
+				"SELECT recordkey, \"cf1:q1\" FROM " + exTableUsingFullPathQ4.getName() + 
+				" ORDER BY recordkey;");
 
 		ComparisonUtils.compareTables(exTableUsingFullPathQ4, hTable, report);
 
@@ -546,13 +744,16 @@ public class PxfHBaseRegression extends PxfTestCase {
 	@Test
 	public void removeColumnFromLookupTable() throws Exception {
 
-		ReportUtils.reportBold(report, getClass(), "Remove lookup table 'Mapping' column family and succeed to query external table with full column name");
+		ReportUtils.reportBold(report, getClass(), 
+				"Remove lookup table 'Mapping' column family" +
+				" and succeed to query external table with full column name");
 
 		hbase.removeColumn(lookUpTable, new String[] { "mapping" });
 
 		initAndPopulateHBaseTable(hTable, false);
 
-		ExternalTable exTableUsingFullPathQ4 = TableFactory.getPxfHbaseReadableTable("habse_lookup_external_table", exTableFieldsFullName, hTable);
+		ExternalTable exTableUsingFullPathQ4 = 
+				TableFactory.getPxfHbaseReadableTable("habse_lookup_external_table", exTableFieldsFullName, hTable);
 
 		hTable.setQualifiers(new String[] { "cf1:q1" });
 
@@ -560,7 +761,9 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		hawq.createTableAndVerify(exTableUsingFullPathQ4);
 
-		hawq.queryResults(exTableUsingFullPathQ4, "SELECT recordkey, \"cf1:q1\" FROM " + exTableUsingFullPathQ4.getName() + " ORDER BY recordkey;");
+		hawq.queryResults(exTableUsingFullPathQ4, 
+				"SELECT recordkey, \"cf1:q1\" FROM " + exTableUsingFullPathQ4.getName() + 
+				" ORDER BY recordkey;");
 
 		ComparisonUtils.compareTables(exTableUsingFullPathQ4, hTable, report);
 
@@ -570,12 +773,7 @@ public class PxfHBaseRegression extends PxfTestCase {
 	@Test
 	public void recordKeyAsInteger() throws Exception {
 
-		initAndPopulateHBaseTable(hIntegerRowKey, false);
-
-		hIntegerRowKey.addFilter(new RowFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(Bytes.toBytes("00000050"))));
-		hbase.queryResults(hIntegerRowKey, null);
-
-		ExternalTable exTableIntegerRowKey = TableFactory.getPxfHbaseReadableTable("habse_integer_row_key_external_table", new String[] {
+		String[] recordkeyIntegerFields = new String[] {
 				"recordkey INTEGER",
 				"\"cf1:q1\" TEXT",
 				"\"cf1:q2\" TEXT",
@@ -588,37 +786,66 @@ public class PxfHBaseRegression extends PxfTestCase {
 				"\"cf1:q9\" BIGINT",
 				"\"cf1:q10\" BOOLEAN",
 				"\"cf1:q11\" NUMERIC",
-				"\"cf1:q12\" TIMESTAMP" }, hIntegerRowKey);
+				"\"cf1:q12\" TIMESTAMP"	
+		};
+		
+		initAndPopulateHBaseTable(hIntegerRowKey, false);
+
+		String whereClause = " WHERE recordkey = 50";
+		String filterString = "a0c50o5";
+		hIntegerRowKey.addFilter(new RowFilter(CompareFilter.CompareOp.EQUAL, 
+				new BinaryComparator(Bytes.toBytes("00000050"))));
+		hbase.queryResults(hIntegerRowKey, null);
+
+		ExternalTable exTableIntegerRowKey = 
+				TableFactory.getPxfHbaseReadableTable("habse_integer_row_key_external_table", 
+						recordkeyIntegerFields, hIntegerRowKey);
 
 		hawq.createTableAndVerify(exTableIntegerRowKey);
-
-		hawq.queryResults(exTableIntegerRowKey, "SELECT * FROM " + exTableIntegerRowKey.getName() + " WHERE recordkey = 50");
+		
+		hawq.queryResults(exTableIntegerRowKey, 
+				"SELECT * FROM " + exTableIntegerRowKey.getName() + whereClause);
 
 		ComparisonUtils.compareTables(exTableIntegerRowKey, hIntegerRowKey, report);
 
+		createAndQueryPxfHBaseFilterTable(filterString, hIntegerRowKey, recordkeyIntegerFields);
+		
+		createAndQueryPxfHawqFilterTable(hIntegerRowKey, recordkeyIntegerFields, whereClause, filterString);
+		
+		whereClause = " WHERE recordkey <= 30 OR recordkey > 145";
+		filterString = NO_FILTER;
 		FilterList orFilter = new FilterList(Operator.MUST_PASS_ONE);
-		orFilter.addFilter(new RowFilter(CompareFilter.CompareOp.LESS_OR_EQUAL, new BinaryComparator(Bytes.toBytes("00000030"))));
-		orFilter.addFilter(new RowFilter(CompareFilter.CompareOp.GREATER, new BinaryComparator(Bytes.toBytes("00000145"))));
+		orFilter.addFilter(new RowFilter(CompareFilter.CompareOp.LESS_OR_EQUAL, 
+				new BinaryComparator(Bytes.toBytes("00000030"))));
+		orFilter.addFilter(new RowFilter(CompareFilter.CompareOp.GREATER, 
+				new BinaryComparator(Bytes.toBytes("00000145"))));
 
 		hIntegerRowKey.addFilter(orFilter);
 		hbase.queryResults(hIntegerRowKey, null);
 
-		hawq.queryResults(exTableIntegerRowKey, "SELECT * FROM " + exTableIntegerRowKey.getName() + " WHERE recordkey <= 30 OR recordkey > 145 ORDER BY recordkey;");
+		hawq.queryResults(exTableIntegerRowKey, 
+				"SELECT * FROM " + exTableIntegerRowKey.getName() + 
+				whereClause + " ORDER BY recordkey;");
 
 		ComparisonUtils.compareTables(exTableIntegerRowKey, hIntegerRowKey, report);
+		
+		createAndQueryPxfHawqFilterTable(hIntegerRowKey, recordkeyIntegerFields, whereClause, filterString);
 	}
 
 	@Test
 	public void notExistsHBaseTable() throws Exception {
 
-		ReadableExternalTable notExistsTable = TableFactory.getPxfHbaseReadableTable("not_exists_hbase_table", exTableFields, new HBaseTable("not_exists_hbase_table", null));
+		ReadableExternalTable notExistsTable = 
+				TableFactory.getPxfHbaseReadableTable("not_exists_hbase_table", exTableFields, 
+						new HBaseTable("not_exists_hbase_table", null));
 
 		hawq.createTableAndVerify(notExistsTable);
 
 		try {
 			hawq.queryResults(notExistsTable, "SELECT * FROM " + notExistsTable.getName() + " WHERE recordkey = 50");
 		} catch (Exception e) {
-			ExceptionUtils.validate(report, e, new PSQLException("org.apache.hadoop.hbase.TableNotFoundException: not_exists_hbase_table", null), true);
+			ExceptionUtils.validate(report, e, 
+					new PSQLException("org.apache.hadoop.hbase.TableNotFoundException: not_exists_hbase_table", null), true);
 		}
 	}
 
@@ -629,7 +856,8 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		hbase.createTableAndVerify(emptyTable);
 
-		ReadableExternalTable exTable = TableFactory.getPxfHbaseReadableTable("empty_hbase_table", exTableFieldsFullName, emptyTable);
+		ReadableExternalTable exTable = 
+				TableFactory.getPxfHbaseReadableTable("empty_hbase_table", exTableFieldsFullName, emptyTable);
 
 		hawq.createTableAndVerify(exTable);
 		hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName());
@@ -665,5 +893,81 @@ public class PxfHBaseRegression extends PxfTestCase {
 		}
 
 		ReportUtils.stopLevel(report);
+	}
+
+	/**
+	 * Creates and queries table using HBaseAccessorWithAccessor.
+	 * Table fields are {@link exTableFields}, 
+	 * HBase table in the path is {@link hTable}, and is also used for comparing query results.
+	 * 
+	 * @param filter serialized filter string to be used in table created.
+	 * @throws Exception
+	 */
+	private void createAndQueryPxfHBaseFilterTable(String filter) throws Exception {
+		createAndQueryPxfHBaseFilterTable(filter, hTable, exTableFields);
+	}
+	
+	/**
+	 * Creates and queries table using HBaseAccessorWithAccessor.
+	 * 
+	 * @param filter serialized filter string to be used in table created.
+	 * @param hbaseTable HBase table used in the table's path and for comparing query results.
+	 * @param fields table's fields.
+	 * @throws Exception
+	 */
+	private void createAndQueryPxfHBaseFilterTable(String filter, 
+			HBaseTable hbaseTable, String[] fields) throws Exception {
+		
+		ReportUtils.report(report, getClass(), "running query on HBaseAccessorWithFilter, filter: " + filter);
+		
+		createPxfHBaseFilterTable(filter, hbaseTable, fields);
+		
+		hawq.queryResults(externalTableHBaseWithFilter, "SELECT * FROM " + externalTableHBaseWithFilter.getName() + " ORDER BY recordkey ASC");
+
+		ComparisonUtils.compareTables(externalTableHBaseWithFilter, hbaseTable, report);
+	}
+	
+	/**
+	 * Creates PXF HBase table using HBaseAccessorWithFilter.
+	 * 
+	 * @param filter serialized filter string to be used in table created.
+	 * @param hbaseTable HBase table to be used in the table's path.
+	 * @param fields table's fields.
+	 * @throws Exception
+	 */
+	private void createPxfHBaseFilterTable(String filter, HBaseTable hbaseTable, String[] fields) throws Exception {
+		
+		externalTableHBaseWithFilter = new ReadableExternalTable("hbase_pxf_with_filter", fields, hbaseTable.getName(), "CUSTOM"); 
+		externalTableHBaseWithFilter.setFragmenter("com.pivotal.pxf.plugins.hbase.HBaseDataFragmenter");
+		externalTableHBaseWithFilter.setAccessor("HBaseAccessorWithFilter");
+		externalTableHBaseWithFilter.setResolver("com.pivotal.pxf.plugins.hbase.HBaseResolver");
+		externalTableHBaseWithFilter.setFormatter("pxfwritable_import");
+
+		externalTableHBaseWithFilter.setUserParameters(new String[] { "TEST-HBASE-FILTER=" + filter});
+			
+		hawq.createTableAndVerify(externalTableHBaseWithFilter);
+	}
+	
+	private void createAndQueryPxfHawqFilterTable(HBaseTable hbaseTable, String[] fields, 
+			String whereClause, String expectedFilter) throws Exception {
+		
+		ReportUtils.report(report, getClass(), "running query on FilterPrinterAccessor " +
+				"with WHERE: clause " + whereClause + ", expected filter: " + expectedFilter);
+		
+		externalTableFilterPrinter = new ReadableExternalTable("hbase_pxf_print_filter", fields, hbaseTable.getName(), "CUSTOM"); 
+		externalTableFilterPrinter.setFragmenter("com.pivotal.pxf.plugins.hbase.HBaseDataFragmenter");
+		externalTableFilterPrinter.setAccessor("FilterPrinterAccessor");
+		externalTableFilterPrinter.setResolver("com.pivotal.pxf.plugins.hbase.HBaseResolver");
+		externalTableFilterPrinter.setFormatter("pxfwritable_import");
+			
+		hawq.createTableAndVerify(externalTableFilterPrinter);
+		
+		try {
+			hawq.queryResults(externalTableFilterPrinter, 
+					"SELECT * FROM " + externalTableFilterPrinter.getName() + 
+					" " + whereClause + " ORDER BY recordkey ASC");
+		} catch (Exception e) {
+			ExceptionUtils.validate(report, e, new Exception("ERROR.*Filter string: '" + expectedFilter + "'.*"), true, true);
+		}
 	}
 }
