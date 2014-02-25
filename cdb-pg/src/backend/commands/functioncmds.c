@@ -1812,7 +1812,7 @@ CreateCast(CreateCastStmt *stmt)
 	caql_endscan(pcqCtx);
 	heap_close(relation, RowExclusiveLock);
 
-	if (Gp_role == GP_ROLE_DISPATCH)
+	if (gp_upgrade_mode && Gp_role == GP_ROLE_DISPATCH)
 	{
 		CdbDispatchUtilityStatement((Node *) stmt, "CreateCast");
 	}
@@ -1882,7 +1882,7 @@ DropCast(DropCastStmt *stmt)
 
 	performDeletion(&object, stmt->behavior);
 
-	if (Gp_role == GP_ROLE_DISPATCH)
+	if (gp_upgrade_mode && Gp_role == GP_ROLE_DISPATCH)
 	{
 		CdbDispatchUtilityStatement((Node *) stmt, "DropCast");
 	}

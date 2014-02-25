@@ -446,7 +446,7 @@ DefineOpClass(CreateOpClassStmt *stmt)
 	caql_endscan(pcqCtx);
 	heap_close(rel, RowExclusiveLock);
 	
-	if (Gp_role == GP_ROLE_DISPATCH)
+	if (gp_upgrade_mode && Gp_role == GP_ROLE_DISPATCH)
 	{
 		CdbDispatchUtilityStatement((Node *) stmt, "DefineOpClass");
 	}
@@ -814,7 +814,7 @@ RemoveOpClass(RemoveOpClassStmt *stmt)
 
 	performDeletion(&object, stmt->behavior);
 	
-	if (Gp_role == GP_ROLE_DISPATCH)
+	if (gp_upgrade_mode && Gp_role == GP_ROLE_DISPATCH)
 	{
 		CdbDispatchUtilityStatement((Node *) stmt, "RemoveOpClass");
 	}

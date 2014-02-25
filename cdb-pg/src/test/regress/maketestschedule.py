@@ -362,7 +362,6 @@ class TestScheduler:
         addEdges("create_function_2", "create_table")
         addEdges("copy", "create_function_2")
         addEdges("create_misc", "copy")
-        addEdges("create_operator", "create_function_2")
         addEdges("create_index", "create_misc", "polygon", "circle")
         addEdges("alter_table","create_index")
         addEdges("create_view", "create_misc", "create_operator")

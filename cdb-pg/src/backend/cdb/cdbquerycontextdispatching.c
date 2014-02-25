@@ -20,6 +20,8 @@
 #include "catalog/catalog.h"
 #include "catalog/gp_fastsequence.h"
 #include "catalog/gp_fastsequence.h"
+#include "catalog/pg_amop.h"
+#include "catalog/pg_amproc.h"
 #include "catalog/pg_aggregate.h"
 #include "catalog/pg_language.h"
 #include "catalog/pg_type.h"
@@ -29,6 +31,8 @@
 #include "catalog/pg_exttable.h"
 #include "catalog/pg_magic_oid.h"
 #include "catalog/pg_namespace.h"
+#include "catalog/pg_opclass.h"
+#include "catalog/pg_operator.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/gp_fastsequence.h"
@@ -91,7 +95,15 @@ typedef enum QueryContextDispatchingItemType QueryContextDispatchingItemType;
 
 enum QueryContextDispatchingObjType
 {
-  RelationType, TablespaceType, NamespaceType, ProcType, AggType, LangType, TypeType
+	RelationType,
+	TablespaceType,
+	NamespaceType,
+	ProcType,
+	AggType,
+	LangType,
+	TypeType,
+	OpType,
+	OpClassType
 };
 typedef enum QueryContextDispatchingObjType QueryContextDispatchingObjType;
 
@@ -118,6 +130,12 @@ prepareDispatchedCatalogLanguage(QueryContextInfo *ctx, Oid langOid);
 
 static void
 prepareDispatchedCatalogType(QueryContextInfo *ctx, Oid typeOid);
+
+static void
+prepareDispatchedCatalogOperator(QueryContextInfo *ctx, Oid opOid);
+
+static void
+prepareDispatchedCatalogOpClass(QueryContextInfo *ctx, Oid opclass);
 
 static void
 prepareDispatchedCatalogAggregate(QueryContextInfo *ctx, Oid aggfuncoid);
@@ -1721,7 +1739,19 @@ static bool collect_func_walker(Node *node, QueryContextInfo *context)
 	}
 	if (IsA(node, Aggref))
 	{
-		Aggref * aggnode = (Aggref *) node;
+		Aggref *aggnode = (Aggref *) node;
+
+		if (aggnode->aggorder != NULL)
+		{
+			ListCell	   *lc;
+
+			foreach (lc, aggnode->aggorder->sortClause)
+			{
+				SortClause	   *sc = (SortClause *) lfirst(lc);
+
+				prepareDispatchedCatalogOperator(context, sc->sortop);
+			}
+		}
 		/*
 		 * An aggregate has two catalog entries, one in pg_aggregate
 		 * and the other in pg_proc.  Both need to be dispatched to
@@ -1749,6 +1779,50 @@ static bool collect_func_walker(Node *node, QueryContextInfo *context)
 		return expression_tree_walker((Node *)wnode->args,
 									  collect_func_walker, context);
 	}
+	if (IsA(node, OpExpr))
+	{
+		OpExpr	   *op = (OpExpr *) node;
+
+		if (OidIsValid(op->opfuncid))
+			prepareDispatchedCatalogFunction(context, op->opfuncid);
+		if (OidIsValid(op->opno))
+			prepareDispatchedCatalogOperator(context, op->opno);
+	}
+	else if (IsA(node, RelabelType))
+	{
+		RelabelType	   *relable = (RelabelType *) node;
+
+		prepareDispatchedCatalogType(context, relable->resulttype);
+	}
+	else if (IsA(node, ConvertRowtypeExpr))
+	{
+		ConvertRowtypeExpr	   *expr = (ConvertRowtypeExpr *) node;
+
+		prepareDispatchedCatalogType(context, expr->resulttype);
+	}
+	else if (IsA(node, Sort))
+	{
+		Sort	   *sort = (Sort *) node;
+		int			i;
+
+		for (i = 0; i < sort->numCols; i++)
+		{
+			prepareDispatchedCatalogOperator(context, sort->sortOperators[i]);
+		}
+	}
+	else if (IsA(node, SortClause))
+	{
+		SortClause	   *sc = (SortClause *) node;
+
+		prepareDispatchedCatalogOperator(context, sc->sortop);
+	}
+	else if (IsA(node, GroupClause))
+	{
+		GroupClause	   *gc = (GroupClause *) node;
+
+		prepareDispatchedCatalogOperator(context, gc->sortop);
+	}
+
 	return plan_tree_walker(node, collect_func_walker, context);
 }
 
@@ -1899,6 +1973,163 @@ prepareDispatchedCatalogType(QueryContextInfo *ctx, Oid typeOid)
 	{
 		prepareDispatchedCatalogSingleRelation(ctx, DatumGetObjectId(typeDatum),
 											   FALSE, 0);
+	}
+
+	caql_endscan(pcqCtx);
+}
+
+/*
+ * Send pg_operator and pg_amop tuples.
+ */
+static void
+prepareDispatchedCatalogOperator(QueryContextInfo *ctx, Oid opOid)
+{
+	cqContext	   *pcqCtx;
+	HeapTuple		tuple;
+	Datum			value;
+	bool			isnull;
+
+	/*
+	 * builtin object, dispatch nothing.
+	 */
+	if (opOid < FirstNormalObjectId)
+		return;
+
+	if (alreadyAddedForDispatching(ctx->htab, opOid, OpType))
+		return;
+
+	pcqCtx = caql_beginscan(NULL,
+							cql("SELECT * FROM pg_operator"
+								" WHERE oid = :1",
+								ObjectIdGetDatum(opOid)));
+	tuple = caql_getnext(pcqCtx);
+	if (!HeapTupleIsValid(tuple))
+		elog(ERROR, "cache lookup failed for operator %u", opOid);
+
+	AddTupleToContextInfo(ctx, OperatorRelationId, "pg_operator", tuple,
+						  MASTER_CONTENT_ID);
+
+	value = caql_getattr(pcqCtx, Anum_pg_operator_oprcode, &isnull);
+	if (!isnull && OidIsValid(DatumGetObjectId(value)))
+		prepareDispatchedCatalogFunction(ctx, DatumGetObjectId(value));
+
+	/* sort operators */
+	value = caql_getattr(pcqCtx, Anum_pg_operator_oprlsortop, &isnull);
+	if (!isnull && OidIsValid(DatumGetObjectId(value)))
+		prepareDispatchedCatalogOperator(ctx, DatumGetObjectId(value));
+
+	value = caql_getattr(pcqCtx, Anum_pg_operator_oprrsortop, &isnull);
+	if (!isnull && OidIsValid(DatumGetObjectId(value)))
+		prepareDispatchedCatalogOperator(ctx, DatumGetObjectId(value));
+
+	/* merge join LT compare operator */
+	value = caql_getattr(pcqCtx, Anum_pg_operator_oprltcmpop, &isnull);
+	if (!isnull && OidIsValid(DatumGetObjectId(value)))
+	{
+		Oid		ltproc;
+
+		ltproc = get_opcode(DatumGetObjectId(value));
+		if (OidIsValid(ltproc))
+			prepareDispatchedCatalogFunction(ctx, ltproc);
+	}
+
+	/* merge join GT compare operator */
+	value = caql_getattr(pcqCtx, Anum_pg_operator_oprgtcmpop, &isnull);
+	if (!isnull && OidIsValid(DatumGetObjectId(value)))
+	{
+		Oid		gtproc;
+
+		gtproc = get_opcode(DatumGetObjectId(value));
+		if (OidIsValid(gtproc))
+			prepareDispatchedCatalogFunction(ctx, gtproc);
+	}
+
+	caql_endscan(pcqCtx);
+
+	/*
+	 * Ordinary operator expression does not need anything than underlying
+	 * function, but in case of HJ, we need hash function information too.
+	 * Since it's almost impossible to know if this operator is used for HJ
+	 * or others, we just send everything that might be needed.
+	 */
+	pcqCtx = caql_beginscan(NULL,
+							cql("SELECT * FROM pg_amop"
+								" WHERE amopopr = :1",
+								ObjectIdGetDatum(opOid)));
+
+	while (HeapTupleIsValid(tuple = caql_getnext(pcqCtx)))
+	{
+		Oid		opclass;
+
+		/*
+		 * We check duplicates for opclass id in prepareDispatchedCatalogOpClass.
+		 * The unique key of pg_amop is (amopopr, amopclaid), so sending
+		 * pg_amop tuples by operator id should not create duplicate
+		 * tuples for pg_amop.
+		 */
+		AddTupleToContextInfo(ctx, AccessMethodOperatorRelationId, "pg_amop",
+							  tuple, MASTER_CONTENT_ID);
+
+		opclass = DatumGetObjectId(
+				caql_getattr(pcqCtx, Anum_pg_amop_amopclaid, &isnull));
+
+		prepareDispatchedCatalogOpClass(ctx, opclass);
+	}
+	caql_endscan(pcqCtx);
+}
+
+/*
+ * For opclass, we dispatch pg_opclass and pg_amproc.  pg_amop should be
+ * handled by operator, so we don't touch it here.
+ */
+static void
+prepareDispatchedCatalogOpClass(QueryContextInfo *ctx, Oid opclass)
+{
+	cqContext	   *pcqCtx;
+	HeapTuple		tuple;
+	Datum			value;
+	bool			isnull;
+
+	/*
+	 * builtin object, dispatch nothing.
+	 */
+	if (!OidIsValid(opclass))
+		return;
+
+	if (opclass < FirstNormalObjectId)
+		return;
+
+	if (alreadyAddedForDispatching(ctx->htab, opclass, OpClassType))
+		return;
+
+	/* pg_opclass */
+	pcqCtx = caql_beginscan(NULL,
+							cql("SELECT * FROM pg_opclass"
+								" WHERE oid = :1",
+								ObjectIdGetDatum(opclass)));
+	tuple = caql_getnext(pcqCtx);
+	if (!HeapTupleIsValid(tuple))
+		elog(ERROR, "cache lookup failed for operator class %u", opclass);
+
+	AddTupleToContextInfo(ctx, OperatorClassRelationId, "pg_opclass",
+						  tuple, MASTER_CONTENT_ID);
+
+	caql_endscan(pcqCtx);
+
+	/* pg_amproc */
+	pcqCtx = caql_beginscan(NULL,
+							cql("SELECT * FROM pg_amproc"
+								" WHERE amopclaid = :1",
+								ObjectIdGetDatum(opclass)));
+
+	while (HeapTupleIsValid(tuple = caql_getnext(pcqCtx)))
+	{
+		AddTupleToContextInfo(ctx, AccessMethodProcedureRelationId,
+							  "pg_amproc", tuple, MASTER_CONTENT_ID);
+
+		value = caql_getattr(pcqCtx, Anum_pg_amproc_amproc, &isnull);
+		if (!isnull && OidIsValid(DatumGetObjectId(value)))
+			prepareDispatchedCatalogFunction(ctx, DatumGetObjectId(value));
 	}
 
 	caql_endscan(pcqCtx);

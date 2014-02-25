@@ -3121,7 +3121,7 @@ sort_op_can_sort(Oid opid, bool mergejoin)
 		HeapTuple tuple = &catlist->members[i]->tuple;
 		Form_pg_amop amop = (Form_pg_amop)GETSTRUCT(tuple);
 		
-		if (opclass_is_btree(amop->amopclaid))
+		if (!opclass_is_btree(amop->amopclaid))
 			continue;
 
 		if (amop->amopsubtype != InvalidOid)

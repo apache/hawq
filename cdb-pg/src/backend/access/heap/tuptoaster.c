@@ -1127,8 +1127,6 @@ toast_flatten_tuple_attribute(Datum value,
 	 * Break down the tuple into fields.
 	 */
 	olddata = DatumGetHeapTupleHeader(value);
-	Assert(typeId == HeapTupleHeaderGetTypeId(olddata));
-	Assert(typeMod == HeapTupleHeaderGetTypMod(olddata));
 	/* Build a temporary HeapTuple control structure */
 	tmptup.t_len = HeapTupleHeaderGetDatumLength(olddata);
 	ItemPointerSetInvalid(&(tmptup.t_self));

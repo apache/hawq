@@ -289,9 +289,6 @@ ExecAlterOwnerStmt(AlterOwnerStmt *stmt)
 			break;
 
 		case OBJECT_OPERATOR:
-			if (!gp_called_by_pgdump)
-				ereport(ERROR,
-						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter operator owner statement yet") ));
 			Assert(list_length(stmt->objarg) == 2);
 			AlterOperatorOwner(stmt->object,
 							   (TypeName *) linitial(stmt->objarg),

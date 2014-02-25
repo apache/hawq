@@ -1221,10 +1221,6 @@ ProcessUtility(Node *parsetree,
 																stmt->newOid, stmt->ordered);
 						break;
 					case OBJECT_OPERATOR:
-						if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
-							ereport(ERROR,
-								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create operator statement yet") ));
-						}
 						Assert(stmt->args == NIL);
 						DefineOperator(stmt->defnames, stmt->definition, stmt->newOid);
 						break;
@@ -1778,32 +1774,18 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_CreateCastStmt:
-            if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
-		    	ereport(ERROR,
-							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create cast statement yet") ));
-            }
 			CreateCast((CreateCastStmt *) parsetree);
 			break;
 
 		case T_DropCastStmt:
-			ereport(ERROR,
-							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support drop cast statement yet") ));
-
 			DropCast((DropCastStmt *) parsetree);
 			break;
 
 		case T_CreateOpClassStmt:
-			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY) )) {
-			    ereport(ERROR,
-							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create opclass statement yet") ));
-            }
 			DefineOpClass((CreateOpClassStmt *) parsetree);
 			break;
 
 		case T_RemoveOpClassStmt:
-			ereport(ERROR,
-							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support remove opclass statement yet") ));
-
 			RemoveOpClass((RemoveOpClassStmt *) parsetree);
 			break;
 
