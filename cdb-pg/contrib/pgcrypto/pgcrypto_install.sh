@@ -2,7 +2,7 @@
 #
 # Copyright (c) Greenplum Inc 2013. All Rights Reserved.
 #
-USAGE="$0 -f <hosts file> [-x]"
+USAGE="$0 -f <hosts file> -d <database> [-x]"
 
 function install_master() {
   echo "Copying artifacts to master"
@@ -31,6 +31,7 @@ function install_segments() {
       # Clean up.
       output=$(gpssh -f $hosts rm -f $GPHOME/lib/postgresql/pgcrypto.so)
       exit 1
+
   fi
   if [[ $output == *ERROR* ]]; then
       echo "Error running gpscp."
@@ -40,8 +41,8 @@ function install_segments() {
 }
 
 function create_functions() {
-  echo "Creating pgcrypto functions."
-  psql -d template1 -f share/postgresql/contrib/pgcrypto.sql
+  echo "Creating pgcrypto functions in database $targetdb"
+  psql -d "$targetdb" -f share/postgresql/contrib/pgcrypto.sql
   if [ 0 -ne $? ]; then
       echo "Failed to create pgcrypto functions."
       exit 1
@@ -70,8 +71,12 @@ fi
 
 expand=false
 hosts=""
-while getopts f:x opt; do
+targetdb="template1"
+while getopts f:d:x opt; do
   case $opt in
+  d)
+      targetdb=$OPTARG
+      ;;
   f)
       hosts=$OPTARG
       ;;
@@ -82,6 +87,11 @@ while getopts f:x opt; do
   esac
 done
 
+if [[ "$targetdb" = "" && "$expand" = false ]]; then
+    echo "target database not specified."
+    echo $USAGE
+    exit 1
+fi
 if [ "$hosts" = "" ]; then
     echo "<hosts file> not specified."
     echo $USAGE
