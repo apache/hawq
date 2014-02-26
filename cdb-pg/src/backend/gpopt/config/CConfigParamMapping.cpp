@@ -200,6 +200,12 @@ CConfigParamMapping::PbsPack
 		}
 	}
 
+	// disable index-join if the corresponding GUC is turned off
+	if (!optimizer_indexjoin)
+	{
+		(void) pbs->FExchangeSet(GPOPT_DISABLE_XFORM_TF(CXform::ExfInnerJoin2IndexApply));
+	}
+
 	return pbs;
 }
 

@@ -23,6 +23,7 @@ insert into orca.s select i, i/2 from generate_series(1,30) i;
 
 set optimizer_log=on;
 set optimizer=on;
+set optimizer_indexjoin=on;
 ----------------------------------------------------------------------
 -- expected fall back to the planner
 select sum(distinct a), count(distinct b) from orca.r;

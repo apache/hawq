@@ -690,6 +690,7 @@ char	   *gp_idf_deduplicate_str;
 bool		optimizer_extract_dxl_stats;
 bool		optimizer_extract_dxl_stats_all_nodes;
 bool            optimizer_dpe_stats;
+bool		optimizer_indexjoin;
 bool		optimizer_enumerate_plans;
 bool		optimizer_sample_plans;
 int			optimizer_plan_id;
@@ -3652,6 +3653,15 @@ static struct config_bool ConfigureNamesBool[] =
                         GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
                 },
                 &optimizer_dpe_stats,
+                false, NULL, NULL
+        },
+        {
+                {"optimizer_indexjoin", PGC_USERSET, DEVELOPER_OPTIONS,
+                        gettext_noop("Enable index nested loops join plans in the optimizer."),
+                        NULL,
+                        GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+                },
+                &optimizer_indexjoin,
                 false, NULL, NULL
         },
 	{
