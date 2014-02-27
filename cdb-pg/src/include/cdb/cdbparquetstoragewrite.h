@@ -23,8 +23,8 @@ typedef struct ColumnChunkMetadata_4C* ColumnChunkMetadata;
 typedef struct BlockMetadata_4C* RowGroupMetadata;
 typedef struct FileField_4C* ParquetFileField;
 
-#define DEFAULT_PARQUET_ROWGROUP_SIZE 			64*1024*1024
-#define DEFAULT_PARQUET_PAGE_SIZE 				4*1024*1024
+#define DEFAULT_PARQUET_ROWGROUP_SIZE 			8*1024*1024
+#define DEFAULT_PARQUET_PAGE_SIZE 				1*1024*1024
 #define DEFAULT_PARQUET_ROWGROUP_SIZE_PARTITION 8*1024*1024
 #define DEFAULT_PARQUET_PAGE_SIZE_PARTITION 	1*1024*1024
 
