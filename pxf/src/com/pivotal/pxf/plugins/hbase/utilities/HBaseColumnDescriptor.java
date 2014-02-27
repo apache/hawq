@@ -5,20 +5,34 @@ import org.apache.hadoop.hbase.util.Bytes;
 
 import java.util.Arrays;
 
-/*
- * ColumnDescriptor for HBase columns. In the case of HBase columns,
- * the column name must be in either of the following forms:
- * 1) columnfamily:qualifier - standard HBase column
- * 2) hbaserowkey - Row key column (case insensitive)
+/**
+ * {@link ColumnDescriptor} for HBase columns.
  */
 public class HBaseColumnDescriptor extends ColumnDescriptor {
     byte[] columnFamily;
     byte[] qualifier;
 
+    /**
+     * Constructs a column descriptor using the given copy's column name.
+     */
     public HBaseColumnDescriptor(ColumnDescriptor copy) {
         this(copy, copy.columnName().getBytes());
     }
 
+    /**
+     * Constructs an HBase column descriptor from a generic column descriptor and an HBase column name.
+     * <p>
+     * The column name must be in either of the following forms:
+     * <ol>
+     * <li>columnfamily:qualifier - standard HBase column.</li>
+     * <li>recordkey - Row key column (case insensitive).</li>
+     * </ol>
+     * <p>
+     * For recordkey, no HBase name is created. 
+     * 
+     * @param copy column descriptor 
+     * @param newColumnName HBase column name - can be different than the given column descriptor name.
+     */
     public HBaseColumnDescriptor(ColumnDescriptor copy, byte[] newColumnName) {
         super(copy);
 
@@ -32,10 +46,18 @@ public class HBaseColumnDescriptor extends ColumnDescriptor {
         qualifier = Arrays.copyOfRange(newColumnName, seperatorIndex + 1, newColumnName.length);
     }
 
+    /**
+     * Returns the family column name.
+     * (E.g. "cf1:q2" will return "cf1")
+     */
     public byte[] columnFamilyBytes() {
         return columnFamily;
     }
 
+    /**
+     * Returns the qualifier column name.
+     * (E.g. "cf1:q2" will return "q2")
+     */
     public byte[] qualifierBytes() {
         return qualifier;
     }

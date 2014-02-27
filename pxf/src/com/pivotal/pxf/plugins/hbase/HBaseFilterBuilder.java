@@ -15,22 +15,20 @@ import java.util.Map;
 import static com.pivotal.pxf.api.io.DataType.TEXT;
 
 /**
- * This is the implementation of FilterBuilder for HBase.
- *
+ * This is the implementation of {@code FilterParser.FilterBuilder} for HBase.
+ * <p>
  * The class uses the filter parser code to build a filter object,
- * either simple (single Filter class) or a compound (FilterList)
- * for HBaseAccessor to use for its scan
- *
- * This is done before the scan starts
- * It is not a scan time operation
- *
- * HBase row key column is a special case
- * If the user defined row key column as TEXT and used <,>,<=,>=,= operators
- * the startkey (>/>=) and the endkey (</<=) are stored in addition to
+ * either simple (single {@link Filter} class) or a compound ({@link FilterList})
+ * for {@link HBaseAccessor} to use for its scan.
+ * <p>
+ * This is done before the scan starts. It is not a scan time operation.
+ * <p>
+ * HBase row key column is a special case.
+ * If the user defined row key column as TEXT and used {@code <,>,<=,>=,=} operators
+ * the startkey ({@code >/>=}) and the endkey ({@code </<=}) are stored in addition to
  * the created filter.
- *
  * This is an addition on top of regular filters and does not replace
- * any logic in HBase filter objects
+ * any logic in HBase filter objects.
  */
 public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
     private Map<FilterParser.Operation, CompareFilter.CompareOp> operatorsMap;
@@ -46,7 +44,7 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
     }
 
     /**
-     * Translates a filterString into a HBase Filter object
+     * Translates a filterString into a HBase {@link Filter} object.
      */
     public Filter getFilterObject(String filterString) throws Exception {
         FilterParser parser = new FilterParser(this);
@@ -60,29 +58,37 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
     }
 
     /**
-     * Returns the startKey defined by the user
-     * if the user specified a > / >= operation
-     * on a textual row key column
-     * o/w, start of table
+     * Returns the startKey for scanning the HBase table.
+     * If the user specified a {@code > / >=} operation 
+     * on a textual row key column, this value will be returned.
+     * Otherwise, the start of table.
      */
     public byte[] startKey() {
         return startKey;
     }
 
     /**
-     * Returns the endKey defined by the user
-     * if the user specified a < / <= operation
-     * on a textual row key column
-     * o/w, end of table
+     * Returns the endKey for scanning the HBase table.
+     * If the user specified a {@code < / <=} operation
+     * on a textual row key column, this value will be returned.
+     * Otherwise, the end of table.
      */
     public byte[] endKey() {
         return endKey;
     }
 
     /**
-     * Implemented for FilterBuilder interface
-     *
-     * Called each time the parser comes across an operator.
+     * Builds a filter from the input operands and operation.
+     * Two kinds of operations are handled:
+     * <ol>
+     * <li>Simple operation between {@code FilterParser.Constant} and {@code FilterParser.ColumnIndex}.
+     *    Supported operations are {@code <, >, <=, <=, >=, =, !=}. </li>
+     * <li>Compound operations between {@link Filter} objects.
+     *    The only supported operation is {@code AND}. </li>
+     * </ol>
+     * <p>
+     * This function is called by {@link FilterParser}, 
+     * each time the parser comes across an operator.
      */
     @Override
     public Object build(FilterParser.Operation opId,
@@ -107,8 +113,8 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
                 (FilterParser.Constant) rightOperand);
     }
 
-    /*
-     * Initialize the operatorsMap with appropriate values
+    /**
+     * Initializes the {@link #operatorsMap} with appropriate values.
      */
     private void initOperatorsMap() {
         operatorsMap = new HashMap<FilterParser.Operation, CompareFilter.CompareOp>();
@@ -120,9 +126,9 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
         operatorsMap.put(FilterParser.Operation.HDOP_NE, CompareFilter.CompareOp.NOT_EQUAL); // "!="
     }
 
-    /*
-     * Handles simple column-operator-constant expressions
-     * Creates a special filter in the case the column is the row key column
+    /**
+     * Handles simple column-operator-constant expressions.
+     * Creates a special filter in the case the column is the row key column.
      */
     private Filter handleSimpleOperations(FilterParser.Operation opId,
                                           FilterParser.ColumnIndex column,
@@ -131,8 +137,10 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
         ByteArrayComparable comparator = getComparator(hbaseColumn.columnTypeCode(),
                 constant.constant());
 
-        // If row key is of type TEXT, allow filter in start/stop row key API in
-        // HBaseAccessor/Scan object
+        /**
+         * If row key is of type TEXT, allow filter in start/stop row key API in 
+         * HBaseAccessor/Scan object.
+         */
         if (textualRowKey(hbaseColumn)) {
             storeStartEndKeys(opId, constant.constant());
         }
@@ -147,9 +155,9 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
                 comparator);
     }
 
-    /*
-     * Resolve the column's type to a comparator class to be used
-     * Currently, we use an Int and a Text
+    /**
+     * Resolves the column's type to a comparator class to be used.
+     * Currently, supported types are TEXT and INTEGER types.
      */
     private ByteArrayComparable getComparator(int type, Object data) throws Exception {
         ByteArrayComparable result;
@@ -169,17 +177,19 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
         return result;
     }
 
-    /*
-     * Handle AND of already calculated expressions
-     * Currently only AND, in the future OR can be added
-     *
+    /**
+     * Handles operation between already calculated expressions.
+     * Currently only {@code AND}, in the future {@code OR} can be added.
+     * <p>
      * Four cases here:
-     * 1) both are simple filters
-     * 2) left is a FilterList and right is a filter
-     * 3) left is a filter and right is a FilterList
-     * 4) both are FilterLists
-     *
-     * Currently, 1, 2 can occur, since no parenthesis are used
+     * <ol>
+     * <li>Both are simple filters.</li>
+     * <li>Left is a FilterList and right is a filter.</li>
+     * <li>Left is a filter and right is a FilterList.</li>
+     * <li>Both are FilterLists.</li>
+     * </ol>
+     * <p>
+     * Currently, 1, 2 can occur, since no parenthesis are used.
      */
     private Filter handleCompoundOperations(Filter left, Filter right) {
         FilterList result;
@@ -191,30 +201,26 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
             return result;
         }
 
-        result = new FilterList(FilterList.Operator.MUST_PASS_ALL);
-        // Adding one by one as the documented c'tor taking var args
-        // doesn't exist(!!)
-        result.addFilter(left);
-        result.addFilter(right);
+        result = new FilterList(FilterList.Operator.MUST_PASS_ALL, new Filter[] {left, right});
 
         return result;
     }
 
-    /*
-     * True, if column is of type TEXT and is a row key column
+    /**
+     * Returns true if column is of type TEXT and is a row key column.
      */
     private boolean textualRowKey(HBaseColumnDescriptor column) {
         return column.isKeyColumn() &&
                 column.columnTypeCode() == TEXT.getOID();
     }
 
-    /*
+    /**
      * Sets startKey/endKey and their inclusiveness
-     * according to the operation op
-     *
-     * TODO allow only one assignment to start/end key
-     * currently, multiple calls to this function might change
-     * previous assignments
+     * according to the operation op.
+     * <p>
+     * TODO allow only one assignment to start/end key.
+     * Currently, multiple calls to this function might change
+     * previous assignments.
      */
     private void storeStartEndKeys(FilterParser.Operation op, Object data) {
         String key = (String) data;

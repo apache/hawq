@@ -9,6 +9,10 @@ public class ColumnDescriptor {
     String gpdbColumnName;
     String gpdbColumnTypeName;
     int gpdbColumnIndex;
+    /**
+     * Reserved word for a table record key. 
+     * A field with this name will be treated as record key.
+     */
     public static final String RECORD_KEY_NAME = "recordkey";
 
     /**

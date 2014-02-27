@@ -14,23 +14,33 @@ import java.sql.Timestamp;
 import java.util.LinkedList;
 import java.util.List;
 
-/*
+/**
  * Record resolver for HBase.
  * 
- * The class is responsible to convert rows from HBase scans (returned as Result objects)
- * into a List of OneField objects which later translates into GPDBWritable objects.
- * That also includes the conversion process of each HBase column's value into its GP assigned type.
+ * The class is responsible to convert rows from HBase scans (returned as {@link Result} objects)
+ * into a List of {@link OneField} objects.
+ * That also includes the conversion process of each HBase column's value into its HAWQ assigned type.
  *
- * Currently, the class assumes all HBase values are stored as String object Bytes encoded
+ * Currently, the class assumes all HBase values are stored as String object Bytes encoded.
  */
 public class HBaseResolver extends Plugin implements ReadResolver {
     private HBaseTupleDescription tupleDescription;
-
-    public HBaseResolver(InputData input) throws Exception {
+    
+    /**
+     * Constructs a resolver and initializes the table's tuple description.
+     */
+    public HBaseResolver(InputData input) {
         super(input);
         tupleDescription = new HBaseTupleDescription(input);
     }
 
+    /**
+     * Splits an HBase {@link Result} object into a list of {@link OneField},
+     * based on the table's tuple description. 
+     * Each field is converted from HBase bytes into its column description type.
+     * 
+     * @return list of fields
+     */
     @Override
     public List<OneField> getFields(OneRow onerow) throws Exception {
         Result result = (Result) onerow.getData();
@@ -56,8 +66,15 @@ public class HBaseResolver extends Plugin implements ReadResolver {
         return fields;
     }
 
-    /*
-     * Call the conversion function for type
+    /**
+     * Converts given byte array value to the matching java object, according to
+     * the given type code.
+     * 
+     * @param typeCode ColumnDescriptor type id
+     * @param typeName type name. Used for error messages
+     * @param val value to be converted
+     * @return value converted to matching object type
+     * @throws Exception when conversion fails or type code is not supported
      */
     Object convertToJavaObject(int typeCode, String typeName, byte[] val) throws Exception {
         if (val == null) {
@@ -107,6 +124,13 @@ public class HBaseResolver extends Plugin implements ReadResolver {
         }
     }
 
+    /**
+     * Returns the value of a column from a Result object.
+     * 
+     * @param result HBase table row
+     * @param column HBase column to be retrieved
+     * @return HBase column value
+     */
     byte[] getColumnValue(Result result, HBaseColumnDescriptor column) {
         // if column does not contain a value, return null
         if (!result.containsColumn(column.columnFamilyBytes(),

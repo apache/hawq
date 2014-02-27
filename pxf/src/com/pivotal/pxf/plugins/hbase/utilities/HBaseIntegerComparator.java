@@ -10,46 +10,49 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 
 /**
- * This is a Filter comparator for HBase It is external to PXF HBase code
- * 
- * To use with HBase it must reside in the classpath of every region server
- * 
- * It converts a value into Long before comparing The filter is good for any
- * integer numeric comparison i.e. integer, bigint, smallint
- * 
- * according to HBase 0.96 requirements, this must serialized using pb
- * (toByteArray and parseFrom methods)
- * 
- * A reference can be found in {@link SubstringComparator}
+ * This is a Filter comparator for HBase It is external to PXF HBase code.
+ * <p>
+ * To use with HBase it must reside in the classpath of every region server.
+ * <p>
+ * It converts a value into {@link Long} before comparing. 
+ * The filter is good for any integer numeric comparison i.e. integer, bigint, smallint.
+ * <p>
+ * according to HBase 0.96 requirements, this must serialized using Protocol Buffers
+ * ({@link #toByteArray()} and {@link #parseFrom(byte[])} methods).
+ * <p>
+ * A reference can be found in {@link SubstringComparator}.
  */
 public class HBaseIntegerComparator extends ByteArrayComparable {
 	private Long val;
 
+	
 	public HBaseIntegerComparator(Long inVal) {
 		super(Bytes.toBytes(inVal));
 		this.val = inVal;
 	}
 
 	/**
-	 * The comparison function currently is using Long.parseLong
+	 * The comparison function. Currently uses {@link Long#parseLong(String)}.
 	 */
 	@Override
 	public int compareTo(byte[] value, int offset, int length) {
-		/*
+		/**
 		 * Fix for HD-2610: query fails when recordkey is integer.
 		 */
 		if (length == 0)
 			return 1; // empty line, can't compare.
 
-		// TODO optimize by parsing the bytes directly.
-		// Maybe we can even determine if it is an int or a string encoded
+		/** 
+		 * TODO optimize by parsing the bytes directly.
+		 * Maybe we can even determine if it is an int or a string encoded.
+		 */
 		String valueAsString = new String(value, offset, length);
 		Long valueAsLong = Long.parseLong(valueAsString);
 		return val.compareTo(valueAsLong);
 	}
 
 	/**
-	 * @return The comparator serialized using pb
+	 * Returns the comparator serialized using Protocol Buffers.
 	 */
 	@Override
 	public byte[] toByteArray() {
@@ -59,8 +62,8 @@ public class HBaseIntegerComparator extends ByteArrayComparable {
 	}
 
 	/**
-	 * "Override" a static method in ByteArrayComparable. In the Deserialization
-	 * this method will be call.
+	 * Hides ("overrides") a static method in {@link ByteArrayComparable}.
+	 * This method will be called in deserialization.
 	 * 
 	 * @param pbBytes
 	 *            A pb serialized instance

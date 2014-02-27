@@ -18,32 +18,28 @@ import org.apache.hadoop.hbase.util.Bytes;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
- * The Bridge API accessor for HBase.
+ * Accessor for HBase.
  * This class is responsible for opening the HBase table requested and
- * for iterating over its relevant fragments(regions) to return the relevant table's rows.
- *
- * The table is divided into several splits. Each HAWQ segment is responsible for
- * several splits according to the split function {@link #selectTableSplits}.
+ * for iterating over its relevant fragments (regions) to return the relevant table's rows.
+ * <p>
+ * The table is divided into several splits. Each accessor instance is assigned a single split.
  * For each region, a Scan object is used to describe the requested rows.
- *
- * The class now supports filters using the {@link HBaseFilterBuilder}.
+ * <p>
+ * The class supports filters using the {@link HBaseFilterBuilder}.
  * Regions can be filtered out according to input from {@link HBaseFilterBuilder}.
  */
 public class HBaseAccessor extends Plugin implements ReadAccessor {
     private HBaseTupleDescription tupleDescription;
     private HTable table;
-    private List<SplitBoundary> splits;
+    private SplitBoundary split;
     private Scan scanDetails;
     private ResultScanner currentScanner;
-    private int currentRegionIndex;
     private byte[] scanStartKey;
     private byte[] scanEndKey;
 
-    /*
+    /**
      * The class represents a single split of a table
      * i.e. a start key and an end key
      */
@@ -65,45 +61,55 @@ public class HBaseAccessor extends Plugin implements ReadAccessor {
         }
     }
 
+    /**
+     * Constructs {@link HBaseTupleDescription} based on HAWQ table description and 
+     * initializes the scan start and end keys of the HBase table to default values.
+     *  
+     * @param input query information, contains HBase table name and filter
+     */
     public HBaseAccessor(InputData input) {
         super(input);
 
         tupleDescription = new HBaseTupleDescription(input);
-        splits = new ArrayList<SplitBoundary>();
-        currentRegionIndex = 0;
+        split = null;
         scanStartKey = HConstants.EMPTY_START_ROW;
         scanEndKey = HConstants.EMPTY_END_ROW;
     }
 
+    /**
+     * Opens the HBase table.
+     * 
+     * @return true if the current fragment (split) is 
+     * available for reading and includes in the filter
+     */
     @Override
     public boolean openForRead() throws Exception {
         openTable();
         createScanner();
-        selectTableSplits();
+        addTableSplit();
 
         return openCurrentRegion();
     }
 
-    /*
-     * Close the table
+    /**
+     * Closes the HBase table.
      */
     @Override
     public void closeForRead() throws Exception {
         table.close();
     }
 
+    /**
+     * Returns the next row in the HBase table, null if end of fragment.
+     */
     @Override
     public OneRow readNextObject() throws IOException {
         Result result;
 
-        while ((result = currentScanner.next()) == null) // while currentScanner can't return a new result
-        {
+        // while currentScanner can't return a new result
+        while ((result = currentScanner.next()) == null) {
             currentScanner.close(); // close it
-            ++currentRegionIndex; // open next region
-
-            if (!openCurrentRegion()) {
-                return null; // no more splits on the list
-            }
+            return null; // no more rows on the split
         }
 
         return new OneRow(null, result);
@@ -113,17 +119,18 @@ public class HBaseAccessor extends Plugin implements ReadAccessor {
         table = new HTable(HBaseConfiguration.create(), inputData.tableName().getBytes());
     }
 
-    /*
-     * The function creates an array of start,end keys pairs for each
-     * table split this Accessor instance is assigned to scan.
-     *
-     * The function verifies splits are within user supplied range
-     *
+    /**
+     * Creates a {@link SplitBoundary} of the table split 
+     * this accessor instance is assigned to scan. 
+     * The table split is constructed from the fragment metadata 
+     * passed in {@link InputData#getFragmentMetadata()}. 
+     * <p>
+     * The function verifies the split is within user supplied range.
+     * <p>
      * It is assumed, |startKeys| == |endKeys|
-     * This assumption is made through HBase's code as well
+     * This assumption is made through HBase's code as well.
      */
-    private void selectTableSplits() {
-
+    private void addTableSplit() {
 
         byte[] serializedMetadata = inputData.getFragmentMetadata();
         if (serializedMetadata == null) {
@@ -137,38 +144,39 @@ public class HBaseAccessor extends Plugin implements ReadAccessor {
             byte[] endKey = (byte[]) objectStream.readObject();
 
             if (withinScanRange(startKey, endKey)) {
-                splits.add(new SplitBoundary(startKey, endKey));
+            	split = new SplitBoundary(startKey, endKey);
             }
-
         } catch (Exception e) {
             throw new RuntimeException("Exception while reading expected fragment metadata", e);
         }
     }
 
-    /*
-     * returns true if given start/end key pair is within the scan range
+    /**
+     * Returns true if given start/end key pair is within the scan range.
      */
     private boolean withinScanRange(byte[] startKey, byte[] endKey) {
-        if (Bytes.compareTo(startKey, scanStartKey) <= 0) // startKey <= scanStartKey
-        {
-            if (Bytes.equals(endKey, HConstants.EMPTY_END_ROW) || // endKey == table's end
-                    Bytes.compareTo(endKey, scanStartKey) >= 0) // endKey >= scanStartKey
-            {
+    	
+    	// startKey <= scanStartKey
+        if (Bytes.compareTo(startKey, scanStartKey) <= 0) {
+        	// endKey == table's end or endKey >= scanStartKey
+            if (Bytes.equals(endKey, HConstants.EMPTY_END_ROW) || 
+                    Bytes.compareTo(endKey, scanStartKey) >= 0) {
                 return true;
             }
-        } else // startKey > scanStartKey
-            if (Bytes.equals(scanEndKey, HConstants.EMPTY_END_ROW) || //  scanEndKey == table's end
-                    Bytes.compareTo(startKey, scanEndKey) <= 0) // startKey <= scanEndKey
-            {
+        } else { // startKey > scanStartKey
+        	// scanEndKey == table's end or startKey <= scanEndKey
+            if (Bytes.equals(scanEndKey, HConstants.EMPTY_END_ROW) || 
+                    Bytes.compareTo(startKey, scanEndKey) <= 0) {
                 return true;
             }
+        }
         return false;
     }
 
-    /*
-     * The function creates the Scan object used to describe the query
+    /**
+     * Creates the Scan object used to describe the query
      * requested from HBase.
-     * As the row key column always gets returned, no need to ask for it
+     * As the row key column always gets returned, no need to ask for it.
      */
     private void createScanner() throws Exception {
         scanDetails = new Scan();
@@ -179,23 +187,26 @@ public class HBaseAccessor extends Plugin implements ReadAccessor {
         addFilters();
     }
 
-    /*
-     * Open the region of index currentRegionIndex from splits list.
-     * Update the Scan object to retrieve only rows from that region.
+    /**
+     * Opens the region of the fragment to be scanned.
+     * Updates the Scan object to retrieve only rows from that region.
      */
     private boolean openCurrentRegion() throws IOException {
-        if (currentRegionIndex == splits.size()) {
+        if (split == null) {
             return false;
         }
 
-        SplitBoundary region = splits.get(currentRegionIndex);
-        scanDetails.setStartRow(region.startKey());
-        scanDetails.setStopRow(region.endKey());
+        scanDetails.setStartRow(split.startKey());
+        scanDetails.setStopRow(split.endKey());
 
         currentScanner = table.getScanner(scanDetails);
         return true;
     }
 
+    /**
+     * Adds the table tuple description to {@link #scanDetails},
+     * so only these fields will be returned.
+     */
     private void addColumns() {
         for (int i = 0; i < tupleDescription.columns(); ++i) {
             HBaseColumnDescriptor column = tupleDescription.getColumn(i);
@@ -206,12 +217,12 @@ public class HBaseAccessor extends Plugin implements ReadAccessor {
         }
     }
 
-    /*
-     * Uses HBaseFilterBuilder to translate a filter string into a
-     * HBase Filter object. The result is added as a filter to the
-     * Scan object
-     *
-     * use row key ranges to limit split count
+    /**
+     * Uses {@link HBaseFilterBuilder} to translate a filter string into a
+     * HBase {@link Filter} object. The result is added as a filter to the
+     * Scan object.
+     * <p>
+     * Uses row key ranges to limit split count.
      */
     private void addFilters() throws Exception {
         if (!inputData.hasFilter()) {

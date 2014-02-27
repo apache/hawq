@@ -16,15 +16,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 
-/*
+/**
  * Fragmenter class for HBase data resources.
  *
- * Extends the Fragmenter abstract class, with the purpose of transforming
+ * Extends the {@link Fragmenter} abstract class, with the purpose of transforming
  * an input data path (an HBase table name in this case) into a list of regions
  * that belong to this table.
  *
- * Fragmenter also puts HBase lookup table information for the given
- * table (if exists) in fragments' user data field.
+ * This class also puts HBase lookup table information for the given
+ * table (if exists) in each fragment's user data field.
  */
 public class HBaseDataFragmenter extends Fragmenter {
 
@@ -32,6 +32,15 @@ public class HBaseDataFragmenter extends Fragmenter {
         super(inConf);
     }
 
+    /**
+     * Returns list of fragments containing all of the 
+     * HBase's table data.
+     * Lookup table information with mapping between 
+     * field names in HAWQ table and HBase table will be 
+     * returned as user data.
+     * 
+     * @return a list of fragments
+     */
     @Override
     public List<Fragment> getFragments() throws Exception {
         byte[] userData = prepareUserData();
@@ -40,6 +49,13 @@ public class HBaseDataFragmenter extends Fragmenter {
         return fragments;
     }
 
+    /**
+     * Serializes lookup table mapping into byte array.
+     * 
+     * @return serialized lookup table mapping
+     * @throws IOException when connection to lookup table fails 
+     * or serialization fails
+     */
     private byte[] prepareUserData() throws IOException {
         HBaseLookupTable lookupTable = new HBaseLookupTable();
         Map<String, byte[]> mappings = lookupTable.getMappings(inputData.tableName());
@@ -52,6 +68,14 @@ public class HBaseDataFragmenter extends Fragmenter {
         return null;
     }
 
+    /**
+     * Serializes fragment metadata information 
+     * (region start and end keys) into byte array.
+     * 
+     * @param region region to be serialized
+     * @return serialized metadata information
+     * @throws IOException when serialization fails
+     */
     private byte[] prepareFragmentMetadata(HRegionInfo region) throws IOException {
 
         ByteArrayOutputStream byteArrayStream = new ByteArrayOutputStream();
@@ -76,7 +100,7 @@ public class HBaseDataFragmenter extends Fragmenter {
     private void addFragment(Map.Entry<HRegionInfo, ServerName> entry,
                              byte[] userData) throws IOException {
         ServerName serverInfo = entry.getValue();
-        String[] hosts = new String[]{serverInfo.getHostname()};
+        String[] hosts = new String[] {serverInfo.getHostname()};
         HRegionInfo region = entry.getKey();
         byte[] fragmentMetadata = prepareFragmentMetadata(region);
         Fragment fragment = new Fragment(inputData.tableName(), hosts, fragmentMetadata, userData);
