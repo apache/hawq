@@ -150,7 +150,6 @@ static int appendParquetColumn_Circle(
 		int d);
 
 static char *generateHAWQSchemaStr(
-		char *relName,
 		ParquetFileField pfields,
 		int fieldCount);
 
@@ -189,12 +188,11 @@ static bool exceedsPageSizeLimit(ParquetDataPage current_page,
  What about Array?
  */
 static char *
-generateHAWQSchemaStr(char *relName,
-					  ParquetFileField pfields,
+generateHAWQSchemaStr(ParquetFileField pfields,
 					  int fieldCount)
 {
 	StringInfo schemaBuf = makeStringInfo();
-	appendStringInfo(schemaBuf, "message %s {", relName);
+	appendStringInfo(schemaBuf, "message hawqschema {");
 
 	for (ParquetFileField field = pfields; field < pfields + fieldCount; field++)
 	{
@@ -225,7 +223,6 @@ generateHAWQSchemaStr(char *relName,
  */
 int
 initparquetMetadata(ParquetMetadata parquetmd,
-					char *relName,
 					TupleDesc tableAttrs,
 					File parquetFile)
 {
@@ -323,8 +320,7 @@ initparquetMetadata(ParquetMetadata parquetmd,
 	parquetmd->colCount = colCount;
 	parquetmd->schemaTreeNodeCount = schemaTreeNodeCount;
 
-	parquetmd->hawqschemastr = generateHAWQSchemaStr(relName,
-													 parquetmd->pfield,
+	parquetmd->hawqschemastr = generateHAWQSchemaStr(parquetmd->pfield,
 													 parquetmd->fieldCount);
 	parquetmd->maxBlockCount = DEFAULT_ROWGROUP_COUNT;
 	parquetmd->pBlockMD = palloc0(parquetmd->maxBlockCount * sizeof(RowGroupMetadata));
@@ -762,11 +758,9 @@ flushRowGroup(ParquetRowGroup rowgroup,
 		if (chunkmd->firstDataPage < 0)
 		{
 			ereport(ERROR,
-					(errcode(ERRCODE_IO_ERROR),
-					 errmsg("failed to tell position of parquet segment file."
-							 " Error code = %d (%s)",
-							 (int) (chunkmd->firstDataPage),
-							 strerror((int) (chunkmd->firstDataPage)))));
+					(errcode_for_file_access(),
+					 errmsg("file tell position error for segment file: %s",
+							 strerror(errno))));
 		}
 		for (int pageno = 0; pageno < chunk->pageNumber; ++pageno)
 		{
@@ -780,11 +774,9 @@ flushRowGroup(ParquetRowGroup rowgroup,
 		if (chunkmd->file_offset < 0)
 		{
 			ereport(ERROR,
-					(errcode(ERRCODE_IO_ERROR),
-					 errmsg("failed to tell position of parquet segment file."
-							 " Error code = %d (%s)",
-							 (int) (chunkmd->file_offset),
-							 strerror((int) (chunkmd->file_offset)))));
+					(errcode_for_file_access(),
+					 errmsg("file tell position error for segment file: %s",
+							 strerror(errno))));
 		}
 
 		uint8_t *Thrift_ColumnMetaData_Buf;
@@ -794,8 +786,8 @@ flushRowGroup(ParquetRowGroup rowgroup,
 									 chunkmd) != 0)
 		{
 			ereport(ERROR,
-					(errcode(ERRCODE_IO_ERROR),
-					 errmsg("failed to serialize ColumnMetaData using thrift")));
+					(errcode(ERRCODE_GP_INTERNAL_ERROR),
+					 errmsg("failed to serialize column metadata using thrift")));
 		}
 
 		bytes_added += Thrift_ColumnMetaData_Len;
@@ -805,8 +797,9 @@ flushRowGroup(ParquetRowGroup rowgroup,
 					  Thrift_ColumnMetaData_Len) != Thrift_ColumnMetaData_Len)
 		{
 			ereport(ERROR,
-					(errcode(ERRCODE_IO_ERROR),
-					 errmsg("failed to write out ColumnMetaData")));
+					(errcode_for_file_access(),
+					 errmsg("file write error when writing out column metadata: %s",
+							 strerror(errno))));
 		}
 
 		/* Add chunk compressedsize and uncompressedsize to parquet fileLen and fileLen_uncompressed*/
@@ -818,8 +811,9 @@ flushRowGroup(ParquetRowGroup rowgroup,
 	MirroredAppendOnly_Flush(mirroredOpen, &fileSync);
 	if(fileSync < 0){
 		ereport(ERROR,
-					(errcode(ERRCODE_IO_ERROR),
-					 errmsg("failed to write data out to file system")));
+					(errcode_for_file_access(),
+					 errmsg("file sync error: %s",
+							 strerror(fileSync))));
 	}
 
 	rowgroup->rowGroupMetadata->totalByteSize += bytes_added;
@@ -968,8 +962,9 @@ flushDataPage(ParquetColumnChunk chunk, int page_number)
 				  page->header_len) != page->header_len)
 	{
 		ereport(ERROR,
-				(errcode(ERRCODE_IO_ERROR),
-				errmsg("failed to write out page header")));
+				(errcode_for_file_access(),
+				errmsg("file write error when writing out page header: %s",
+						strerror(errno))));
 	}
 	pfree(page->header_buffer);
 
@@ -981,8 +976,9 @@ flushDataPage(ParquetColumnChunk chunk, int page_number)
 				  page->header->compressed_page_size) != page->header->compressed_page_size)
 	{
 		ereport(ERROR,
-				(errcode(ERRCODE_IO_ERROR),
-				errmsg("failed to write out page data")));
+				(errcode_for_file_access(),
+				errmsg("file write error when writing out page data: %s",
+						strerror(errno))));
 	}
 
 	pfree(page->header);
@@ -1609,7 +1605,7 @@ encodeCurrentPage(ParquetColumnChunk chunk)
 			if (ret != Z_OK)
 			{
 				ereport(ERROR,
-						(errcode(ERRCODE_IO_ERROR),
+						(errcode(ERRCODE_GP_INTERNAL_ERROR),
 						 errmsg("zlib deflateInit2 failed: %s", stream.msg)));
 			}
 
@@ -1636,7 +1632,7 @@ encodeCurrentPage(ParquetColumnChunk chunk)
 				{
 					deflateEnd(&stream);
 					ereport(ERROR,
-							(errcode(ERRCODE_IO_ERROR),
+							(errcode(ERRCODE_GP_INTERNAL_ERROR),
 							 errmsg("zlib deflate failed: %s", stream.msg)));
 				}
 
@@ -1672,8 +1668,8 @@ encodeCurrentPage(ParquetColumnChunk chunk)
 					  current_page->header) < 0)
 	{
 		ereport(ERROR,
-				(errcode(ERRCODE_IO_ERROR),
-				 errmsg("write page metadata failed for column: %s", chunkmd->colName)));
+				(errcode(ERRCODE_GP_INTERNAL_ERROR),
+				 errmsg("failed to serialize page metadata using thrift for column: %s", chunkmd->colName)));
 	}
 
 	current_page->header_buffer = (uint8_t *) palloc0(current_page->header_len);

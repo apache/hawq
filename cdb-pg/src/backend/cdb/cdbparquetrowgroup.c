@@ -77,7 +77,7 @@ bool ParquetExecutorReadRowGroup_GetRowGroupInfo(
 		executorReadRowGroup->columnReaderCount = colReaderNum;
 	}
 	else if(executorReadRowGroup->columnReaderCount != colReaderNum){
-		ereport(ERROR, (errcode_for_file_access(),
+		ereport(ERROR, (errcode(ERRCODE_GP_INTERNAL_ERROR),
 				errmsg("row group column information not compatible with previous"
 						"row groups in file %s for relation %s",
 						storageRead->segmentFileName, storageRead->relationName)));

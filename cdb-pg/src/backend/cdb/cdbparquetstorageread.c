@@ -40,7 +40,7 @@ void ParquetStorageRead_OpenFile(ParquetStorageRead *storageRead,
 	if (logicalEof == 0)
 		ereport(ERROR,
 				(errcode(ERRCODE_GP_INTERNAL_ERROR),
-				 errmsg("Parquet Storage Read segment file '%s' EOF must be > 0 for relation '%s'",
+				 errmsg("parquet storage read segment file '%s' eof must be > 0 for relation '%s'",
 						filePathName,
 						storageRead->relationName)));
 
@@ -51,9 +51,10 @@ void ParquetStorageRead_OpenFile(ParquetStorageRead *storageRead,
 	{
 		ereport(ERROR,
 				(errcode_for_file_access(),
-				 errmsg("Parquet Storage Read could not open segment file '%s' for relation '%s'",
+				 errmsg("file open error in file '%s' for relation '%s': %s",
 						filePathName,
-						storageRead->relationName)));
+						storageRead->relationName,
+						strerror(errno))));
 	}
 
 	ParquetStorageRead_FinishOpenFile(

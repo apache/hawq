@@ -147,7 +147,10 @@ GetParquetFileSegInfo(Relation parentrel, AppendOnlyEntry *aoEntry,
 
 	if (fsinfo->eof < 0)
 		ereport(ERROR,
-				(errcode(ERRCODE_GP_INTERNAL_ERROR), errmsg("Invalid eof " INT64_FORMAT " for relation %s", fsinfo->eof, RelationGetRelationName(parentrel))));
+				(errcode(ERRCODE_GP_INTERNAL_ERROR),
+						errmsg("invalid eof " INT64_FORMAT " for relation %s",
+								fsinfo->eof,
+								RelationGetRelationName(parentrel))));
 
 	/* Finish up scan and close appendonly catalog. */
 	heap_close(pg_parquetseg_rel, AccessShareLock);

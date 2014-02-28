@@ -9,20 +9,25 @@
 #include "cdb/cdbparquetstoragewrite.h"
 
 
-int writeParquetHeader(File dataFile, int64 *fileLen, int64 *fileLen_uncompressed) {
+void writeParquetHeader(File dataFile, char *filePathName, int64 *fileLen, int64 *fileLen_uncompressed) {
 	/* write out magic 'PAR1'*/
 	DetectHostEndian();
 
 	char PARQUET_VERSION_NUMBER[4] = { 'P', 'A', 'R', '1' };
 	if (FileWrite(dataFile, PARQUET_VERSION_NUMBER, 4) != 4)
-		return -1;
+	{
+		ereport(ERROR,
+			(errcode_for_file_access(),
+			 errmsg("file write error in file '%s': %s",
+					 filePathName, strerror(errno))));
+	}
 
 	*fileLen += 4;
 	*fileLen_uncompressed += 4;
-	return 0;
 }
 
-int writeParquetFooter(File dataFile,
+void writeParquetFooter(File dataFile,
+		char *filePathName,
 		/*ParquetMetadataUtil metaUtil,*/
 		ParquetMetadata parquetMetadata,
 		int64 *fileLen,
@@ -37,7 +42,10 @@ int writeParquetFooter(File dataFile,
 			parquetMetadata/*, metaUtil*/);
 	if(writeRet < 0)
 	{
-		return -1;
+		ereport(ERROR,
+			(errcode(ERRCODE_GP_INTERNAL_ERROR),
+			 errmsg("parquet convert file metadata error in file '%s': serialize thrift object error",
+					 filePathName)));
 	}
 	elog(DEBUG5, "footerlen:%d", footerLen);
 
@@ -45,7 +53,10 @@ int writeParquetFooter(File dataFile,
 	writeRet = FileWrite(dataFile, bufferFooter, footerLen);
 
 	if (writeRet != footerLen) {
-		return -1;
+		ereport(ERROR,
+				(errcode_for_file_access(),
+				 errmsg("file write error in file '%s': %s",
+						 filePathName, strerror(errno))));
 	}
 
 	*fileLen += footerLen;
@@ -58,17 +69,26 @@ int writeParquetFooter(File dataFile,
 	bufferFooterLen[3] = (footerLen >> 24) & 0xFF;
 	writeRet = FileWrite(dataFile, bufferFooterLen, 4);
 	if (writeRet != 4)
-		return -1;
+	{
+		ereport(ERROR,
+			(errcode_for_file_access(),
+			 errmsg("file write error in file '%s': %s",
+					 filePathName, strerror(errno))));
+	}
 
 	/* write out magic 'PAR1'*/
 	char PARQUET_VERSION_NUMBER[4] = { 'P', 'A', 'R', '1' };
 	writeRet = FileWrite(dataFile, PARQUET_VERSION_NUMBER, 4);
 	if (writeRet != 4)
-		return -1;
+	{
+		ereport(ERROR,
+				(errcode_for_file_access(),
+				 errmsg("file write error in file '%s': %s",
+						 filePathName, strerror(errno))));
+	}
 
 	*fileLen += 8;
 	*fileLen_uncompressed += 8;
-	return 0;
 }
 
 /*
@@ -89,8 +109,6 @@ bool readParquetFooter(File fileHandler, ParquetMetadata *parquetMetadata,
 
 	DetectHostEndian();
 
-	DetectHostEndian();
-
 	/* if file size is 0, means there's no data in file, return -1*/
 	if (eof == 0)
 		return false;
@@ -100,9 +118,9 @@ bool readParquetFooter(File fileHandler, ParquetMetadata *parquetMetadata,
 	if (eof < 12)
 	{
 		ereport(ERROR,
-				(errcode(ERRCODE_IO_ERROR),
-				 errmsg("Parquet Storage Read error on segment file '%s': eof information not correct "
-						 "at least eof should be 12, but got '%lld'", filePathName, (long long)eof)));
+				(errcode(ERRCODE_GP_INTERNAL_ERROR),
+				 errmsg("catalog information for '%s' not correct, eof should be more than 12, but got" INT64_FORMAT,
+						 filePathName, eof)));
 	}
 
 	/* get footer length*/
@@ -110,11 +128,11 @@ bool readParquetFooter(File fileHandler, ParquetMetadata *parquetMetadata,
 	if (footLengthIndex != (eof - 8))
 	{
 		ereport(ERROR,
-				(errcode(ERRCODE_IO_ERROR),
-				 errmsg("Parquet Storage Read error on segment file '%s': seek failure when fetching "
-						 "footer length" , filePathName)));
+				(errcode_for_file_access(),
+				 errmsg("file seek error in file '%s' when seeking \'" INT64_FORMAT "\': '%s'",
+						 filePathName, footLengthIndex, strerror(errno))));
 	}
-	elog(DEBUG5, "Parquet metadata file footer length index: %lld\n", (long long)footLengthIndex);
+	elog(DEBUG5, "Parquet metadata file footer length index: " INT64_FORMAT "\n", footLengthIndex);
 
 	char buffer[4];
 	while(actualReadSize < 4)
@@ -122,9 +140,9 @@ bool readParquetFooter(File fileHandler, ParquetMetadata *parquetMetadata,
 		/*read out all the buffer of the column chunk*/
 		int readFooterLen = FileRead(fileHandler, buffer + actualReadSize, 4 - actualReadSize);
 		if (readFooterLen < 0) {
-			/*ereport error*/
-			ereport(ERROR, (errcode(ERRCODE_IO_ERROR),
-			errmsg("Parquet Storage Read error on segment file '%s': reading footer failure", filePathName)));
+			ereport(ERROR, (errcode_for_file_access(),
+			errmsg("file read error in file '%s': %s",
+					filePathName, strerror(errno))));
 		}
 		actualReadSize += readFooterLen;
 	}
@@ -144,13 +162,14 @@ bool readParquetFooter(File fileHandler, ParquetMetadata *parquetMetadata,
 	/** Part 2: read footer itself*/
 	int64 footerIndex = footLengthIndex - (int64) footerLen;
 	elog(
-	DEBUG5, "Parquet metadata file footer Index: %lld",(long long)footerIndex);
+	DEBUG5, "Parquet metadata file footer Index: " INT64_FORMAT, footerIndex);
 
 	if (FileSeek(fileHandler, footerIndex, SEEK_SET) != footerIndex)
 	{
 		ereport(ERROR,
-				(errcode(ERRCODE_IO_ERROR),
-				 errmsg("Parquet Storage Read error on segment file '%s': seek failure when fetching footer" , filePathName)));
+				(errcode_for_file_access(),
+				 errmsg("file seek error in file '%s' when seeking \'" INT64_FORMAT "\': %s",
+						 filePathName, footerIndex, strerror(errno))));
 	}
 
 	char bufferFooter[footerLen];
@@ -161,8 +180,9 @@ bool readParquetFooter(File fileHandler, ParquetMetadata *parquetMetadata,
 		int readLen = FileRead(fileHandler, bufferFooter + actualReadSize, footerLen - actualReadSize);
 		if (readLen < 0) {
 			/*ereport error*/
-			ereport(ERROR, (errcode(ERRCODE_IO_ERROR),
-			errmsg("Parquet Storage Read error on segment file '%s': reading footer failure", filePathName)));
+			ereport(ERROR, (errcode_for_file_access(),
+			errmsg("file read error in file '%s': %s",
+					filePathName, strerror(errno))));
 		}
 		actualReadSize += readLen;
 	}
@@ -172,8 +192,9 @@ bool readParquetFooter(File fileHandler, ParquetMetadata *parquetMetadata,
 	if (readFileMetadata((uint8_t*) bufferFooter, footerLen, compact,
 			parquetMetadata) < 0){
 		ereport(ERROR,
-			(errcode(ERRCODE_IO_ERROR),
-			 errmsg("Parquet Storage Read error on segment file '%s': read footer" , filePathName)));
+			(errcode(ERRCODE_GP_INTERNAL_ERROR),
+			 errmsg("failed to deserialize parquetMetadata using thrift in segment file '%s'",
+					 filePathName)));
 	}
 
 	return true;
@@ -270,6 +291,7 @@ DetectHostEndian(void)
 
 	if (O32_BIG_ENDIAN == o32_host_order.value)
 		ereport(ERROR,
-				(errmsg("Parquet format is not supported on Big Endian.")));
+				(errcode(ERRCODE_GP_INTERNAL_ERROR),
+						errmsg("parquet format is not supported on big endian.")));
 }
 

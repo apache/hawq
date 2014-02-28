@@ -41,9 +41,9 @@ void ParquetExecutorReadColumn(ParquetColumnReader *columnReader, File file, Mem
 	if ( columnChunkSize > MaxAllocSize ) 
 	{
         ereport(ERROR,
-                (errcode(ERRCODE_IO_ERROR),
-                 errmsg("Parquet Storage Read error on reading column %s due to too large column chunk size: %lld",
-                         columnChunkMetadata->colName, (long long)columnChunkSize)));
+                (errcode(ERRCODE_GP_INTERNAL_ERROR),
+                 errmsg("parquet storage read error on reading column %s due to too large column chunk size: " INT64_FORMAT,
+                         columnChunkMetadata->colName, columnChunkSize)));
     }
 
 	int64 actualReadSize = 0;
@@ -81,9 +81,9 @@ void ParquetExecutorReadColumn(ParquetColumnReader *columnReader, File file, Mem
 	if (seekResult != firstPageOffset)
 	{
 		ereport(ERROR,
-				(errcode(ERRCODE_IO_ERROR),
-				 errmsg("Parquet Storage Read error on reading column %s at first data pages: %ld",
-						 columnChunkMetadata->colName, (long)columnChunkMetadata->firstDataPage)));
+				(errcode_for_file_access(),
+				 errmsg("file seek error to position " INT64_FORMAT ": %s",
+						 firstPageOffset, strerror(errno))));
 	}
 
 	/*recursively read, until get the total column chunk data out*/
@@ -92,9 +92,10 @@ void ParquetExecutorReadColumn(ParquetColumnReader *columnReader, File file, Mem
 		/*read out all the buffer of the column chunk*/
 		int columnChunkLen = FileRead(file, buffer + actualReadSize, columnChunkSize - actualReadSize);
 		if (columnChunkLen < 0) {
-			/*ereport error*/
-			ereport(ERROR, (errcode(ERRCODE_IO_ERROR),
-			errmsg("Parquet Storage Read error on reading column %s ", columnChunkMetadata->colName)));
+			ereport(ERROR,
+					(errcode_for_file_access(),
+							errmsg("parquet storage read error on reading column %s ",
+									columnChunkMetadata->colName)));
 		}
 		actualReadSize += columnChunkLen;
 	}
@@ -119,8 +120,8 @@ void ParquetExecutorReadColumn(ParquetColumnReader *columnReader, File file, Mem
 		uint32_t header_size = (char *) columnReader->dataBuffer + columnChunkSize - buffer;
 		if (readPageMetadata((uint8_t*) buffer, &header_size, /*compact*/1, &pageHeader) < 0)
 		{
-			ereport(ERROR, (errcode(ERRCODE_IO_ERROR),
-				errmsg("Parquet Storage Read error on reading page header of column %s ",
+			ereport(ERROR, (errcode(ERRCODE_GP_INTERNAL_ERROR),
+				errmsg("thrift deserialize failure on reading page header of column %s ",
 						columnChunkMetadata->colName)));
 		}
 
@@ -275,7 +276,7 @@ decodeCurrentPage(ParquetColumnReader *columnReader)
 											   &uncompressedLen) != SNAPPY_OK)
 				{
 					ereport(ERROR,
-							(errcode(ERRCODE_IO_ERROR),
+							(errcode(ERRCODE_GP_INTERNAL_ERROR),
 							 errmsg("invalid snappy compressed data for column %s, page number %d",
 									chunkmd->colName, columnReader->dataPageProcessed)));
 				}
@@ -286,7 +287,7 @@ decodeCurrentPage(ParquetColumnReader *columnReader)
 									  (char *) buf,				&uncompressedLen) != SNAPPY_OK)
 				{
 					ereport(ERROR,
-							(errcode(ERRCODE_IO_ERROR),
+							(errcode(ERRCODE_GP_INTERNAL_ERROR),
 							 errmsg("failed to decompress snappy data for column %s, page number %d, "
 									"uncompressed size %d, compressed size %d",
 									chunkmd->colName, columnReader->dataPageProcessed,
@@ -313,7 +314,7 @@ decodeCurrentPage(ParquetColumnReader *columnReader)
 				if (ret != Z_OK)
 				{
 					ereport(ERROR,
-							(errcode(ERRCODE_IO_ERROR),
+							(errcode(ERRCODE_GP_INTERNAL_ERROR),
 							 errmsg("zlib inflateInit2 failed: %s", stream.msg)));
 				}
 
@@ -325,7 +326,7 @@ decodeCurrentPage(ParquetColumnReader *columnReader)
 				if (ret != Z_STREAM_END)
 				{
 					ereport(ERROR,
-							(errcode(ERRCODE_IO_ERROR),
+							(errcode(ERRCODE_GP_INTERNAL_ERROR),
 							 errmsg("zlib inflate failed: %s", stream.msg)));
 				
 				}

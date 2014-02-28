@@ -19,10 +19,11 @@ typedef struct ParquetMetadata_4C *ParquetMetadata;
 
 void DetectHostEndian(void);
 
-int writeParquetHeader(File dataFile, int64 *fileLen, int64 *fileLen_uncompressed);
+void writeParquetHeader(File dataFile, char *filePathName, int64 *fileLen, int64 *fileLen_uncompressed);
 
-int writeParquetFooter(File dataFile/*,
-		ParquetMetadataUtil metaUtil*/,
+void writeParquetFooter(File dataFile,
+		char *filePathName,
+		/*ParquetMetadataUtil metaUtil*/
 		ParquetMetadata parquetMetadata,
 		int64 *fileLen,
 		int64 *fileLen_uncompressed);

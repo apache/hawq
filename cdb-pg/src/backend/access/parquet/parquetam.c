@@ -635,18 +635,10 @@ void parquet_insert_finish(ParquetInsertDesc parquetInsertDesc) {
 				  &parquetInsertDesc->fileLen_uncompressed);
 
 	/*should add row group row number*/
-	int writeFooter = writeParquetFooter(parquetInsertDesc->parquet_file,
+	writeParquetFooter(parquetInsertDesc->parquet_file,
+			parquetInsertDesc->parquetFilePathName,
 			parquetInsertDesc->parquetMetadata, &parquetInsertDesc->fileLen,
 			&parquetInsertDesc->fileLen_uncompressed);
-
-	if (writeFooter < 0)
-	{
-		ereport(ERROR,
-				(errcode_for_file_access(),
-				errmsg("Parquet File write footer error in segment file '%s' for relation "
-						"'%s'", parquetInsertDesc->parquetFilePathName,
-						parquetInsertDesc->relname)));
-	}
 
 	CloseWritableFileSeg(parquetInsertDesc);
 
@@ -754,12 +746,10 @@ static void TransactionFlushAndCloseFile(
 	if (*newLogicalEof < 0){
 		ereport(ERROR,
 				(errcode_for_file_access(),
-					errmsg("Parquet File get postition error in segment file '%s' for relation '%s'."
-							" Error code = %d (%s)",
+					errmsg("file tell position error in file '%s' for relation '%s': %s",
 							parquetInsertDesc->parquetFilePathName,
 							parquetInsertDesc->relname,
-							(int)(*newLogicalEof),
-							strerror((int)(*newLogicalEof)))));
+							strerror(errno))));
 	}
 
 	Assert(parquetInsertDesc->fileLen == *newLogicalEof);
@@ -772,7 +762,7 @@ static void TransactionFlushAndCloseFile(
 	if (primaryError != 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
-						errmsg("Could not flush (fsync) Parquet segment file '%s' to "
+						errmsg("file flush error when flushing (fsync) segment file '%s' to "
 								"disk for relation '%s': %s",
 								parquetInsertDesc->parquetFilePathName,
 								parquetInsertDesc->relname,
@@ -885,7 +875,7 @@ static void OpenSegmentFile(
 	if (primaryError != 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
-						errmsg("Parquet Storage Write could not open segment file "
+						errmsg("file open error when opening file "
 								"'%s' for relation '%s': %s", filePathName, relname,
 								strerror(primaryError))));
 
@@ -895,15 +885,15 @@ static void OpenSegmentFile(
 	if (fileSize < 0){
 		ereport(ERROR,
 				(errcode_for_file_access(),
-						errmsg("Parquet File seek error in segment file '%s' for relation "
+						errmsg("file seek error in file '%s' for relation "
 								"'%s'", filePathName, relname)));
 	}
 	if (logicalEof > fileSize) {
 		ereport(ERROR,
-				(errcode_for_file_access(),
-						errmsg("Parquet Storage Write segment file not correct: logical eof "
-								"exceeds file size '%s' for relation '%s': %s", filePathName,
-								relname, strerror(primaryError))));
+				(errcode(ERRCODE_GP_INTERNAL_ERROR),
+						errmsg("logical eof exceeds file size in file '%s' for relation '%s'",
+								filePathName,
+								relname)));
 	}
 
 	metadataExist = readParquetFooter(file, parquetMetadata, logicalEof, filePathName);
@@ -918,7 +908,7 @@ static void OpenSegmentFile(
 	if (primaryError != 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
-						errmsg("Parquet Storage Write could not open segment file '%s' "
+						errmsg("file open error when opening file '%s' "
 								"for relation '%s': %s", filePathName, relname,
 								strerror(primaryError))));
 
@@ -931,11 +921,11 @@ static void OpenSegmentFile(
 
 			MirroredAppendOnly_Close(mirroredOpen);
 			ereport(ERROR,
-					(errcode(ERRCODE_IO_ERROR),
-						errmsg("Parquet Storage Write error on segment file '%s' for relation "
-								"'%s'.  FileSeek offset = " INT64_FORMAT ".  Error code = %d (%s)",
-								filePathName, relname, logicalEof, (int)seekResult,
-								strerror((int)seekResult))));
+					(errcode_for_file_access(),
+						errmsg("file truncate error in file '%s' for relation "
+								"'%s' to position " INT64_FORMAT ": %s",
+								filePathName, relname, logicalEof,
+								strerror(errno))));
 		}
 	}
 
@@ -945,24 +935,17 @@ static void OpenSegmentFile(
 	if (metadataExist == false) {
 		/* init parquet metadata information, init schema information using table attributes,
 		 * and may get existing information from data file*/
-		initparquetMetadata(*parquetMetadata, relname, tableAttrs, *parquet_file);
+		initparquetMetadata(*parquetMetadata, tableAttrs, *parquet_file);
 
 		/*should judge whether file already exists, if a new file, should write header out*/
-		int ret = writeParquetHeader(*parquet_file, fileLen, fileLen_uncompressed);
-		if (ret < 0){
-			ereport(ERROR,
-					(errcode_for_file_access(),
-							errmsg("Parquet File write header error in segment file "
-							"'%s' for relation '%s'",
-							filePathName, relname)));
-		}
+		writeParquetHeader(*parquet_file, filePathName, fileLen, fileLen_uncompressed);
 	}
 	else {
 		if (!checkAndSyncMetadata(*parquetMetadata, tableAttrs))
 		{
 			ereport(ERROR,
 					(errcode(ERRCODE_GP_INTERNAL_ERROR),
-						errmsg("Parquet Storage Write file's metadata incompatible "
+						errmsg("parquet storage write file's metadata incompatible "
 								"with table's schema for relation '%s'.",
 						relname)));
 		}

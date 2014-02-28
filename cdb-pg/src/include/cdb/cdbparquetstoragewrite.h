@@ -200,7 +200,7 @@ void freeRowGroup(ParquetRowGroup rowgroup);
  */
 void appendRowValue(ParquetRowGroup rowgroup, ParquetMetadata parquetmd, Datum* values, bool* nulls);
 
-int initparquetMetadata(ParquetMetadata parquetMetadata, char *relName, TupleDesc tableAttrs, File parquetFile);
+int initparquetMetadata(ParquetMetadata parquetMetadata, TupleDesc tableAttrs, File parquetFile);
 
 int mappingHAWQType(int hawqTypeID);
 
