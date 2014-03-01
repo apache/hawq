@@ -1193,6 +1193,12 @@ CTranslatorScalarToDXL::PdxlnScFuncExprFromFuncExpr
 	GPOS_ASSERT(IsA(pexpr, FuncExpr));
 	const FuncExpr *pfuncexpr = (FuncExpr *) pexpr;
 
+	// check if this is a catalog function
+	if (CTranslatorUtils::FCatalogFunc(pfuncexpr->funcid))
+	{
+		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("Catalog functions"));
+	}
+
 	CMDIdGPDB *pmdidFunc = New(m_pmp) CMDIdGPDB(pfuncexpr->funcid);
 
 	// create the DXL node holding the scalar funcexpr
