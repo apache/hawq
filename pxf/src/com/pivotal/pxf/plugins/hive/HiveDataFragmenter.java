@@ -127,14 +127,13 @@ public class HiveDataFragmenter extends Fragmenter {
      */
     @Override
     public List<Fragment> getFragments() throws Exception {
-    	
     	if (client == null) {
     		initHiveClient();
     	}
     	
-        TblDesc tblDesc = parseTableQualifiedName(inputData.tableName());
+        TblDesc tblDesc = parseTableQualifiedName(inputData.dataSource());
         if (tblDesc == null) {
-            throw new IllegalArgumentException(inputData.tableName() + " is not a valid Hive table name. Should be either <table_name> or <db_name.table_name>");
+            throw new IllegalArgumentException(inputData.dataSource() + " is not a valid Hive table name. Should be either <table_name> or <db_name.table_name>");
         }
 
         fetchTableMetaData(tblDesc);
@@ -302,7 +301,6 @@ public class HiveDataFragmenter extends Fragmenter {
             FileSplit fsp = (FileSplit) split;
             String[] hosts = fsp.getLocations();
             String filepath = fsp.getPath().toUri().getPath();
-            filepath = filepath.substring(1); // TODO - remove the '/' from the beginning - will deal with this next
 
             byte[] locationInfo = HdfsUtilities.prepareFragmentMetadata(fsp);
             Fragment fragment = new Fragment(filepath, hosts, locationInfo, makeUserData(tablePartition));

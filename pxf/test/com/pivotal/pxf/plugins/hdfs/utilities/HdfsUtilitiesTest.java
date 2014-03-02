@@ -144,7 +144,7 @@ public class HdfsUtilitiesTest {
             String codecStr, CompressionCodec codec) {
 
         inputData = mock(InputData.class);
-        when(inputData.path()).thenReturn("/" + path);
+        when(inputData.dataSource()).thenReturn("/" + path);
         when(inputData.threadSafe()).thenReturn(threadSafe);
         when(inputData.compressCodec()).thenReturn(codecStr);
 

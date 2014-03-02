@@ -54,8 +54,8 @@ public abstract class HdfsAtomicDataAccessor extends Plugin implements ReadAcces
         }
 
         // 1. input data stream
-        FileSystem fs = FileSystem.get(URI.create(inputData.path()), conf); // FileSystem.get actually returns an FSDataInputStream
-        inp = fs.open(new Path(inputData.path()));
+        FileSystem fs = FileSystem.get(URI.create(inputData.dataSource()), conf); // FileSystem.get actually returns an FSDataInputStream
+        inp = fs.open(new Path(inputData.dataSource()));
         return (inp != null);
     }
 

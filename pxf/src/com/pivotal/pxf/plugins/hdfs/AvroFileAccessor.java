@@ -35,7 +35,7 @@ public class AvroFileAccessor extends HdfsSplittableDataAccessor {
         // 2. Accessing the avro file through the "unsplittable" API just to get the schema.
         //    The splittable API (AvroInputFormat) which is the one we will be using to fetch
         //    the records, does not support getting the avro schema yet.
-        Path p = new Path(inputData.path());
+        Path p = new Path(inputData.dataSource());
         FsInput inStream = new FsInput(p, conf);
         DatumReader<GenericRecord> dummyReader = new GenericDatumReader<GenericRecord>();
         DataFileReader<GenericRecord> dummyFileReader = new DataFileReader<GenericRecord>(inStream, dummyReader);

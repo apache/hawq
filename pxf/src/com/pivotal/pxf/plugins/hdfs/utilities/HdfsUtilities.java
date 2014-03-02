@@ -22,6 +22,18 @@ public class HdfsUtilities {
     private static Log Log = LogFactory.getLog(HdfsUtilities.class);
     private static CompressionCodecFactory factory =
             new CompressionCodecFactory(new Configuration());
+	
+	/**
+	 * Hdfs data sources are absolute data paths. Method ensures 
+	 * that dataSource begins with '/'
+	 * @param dataSource The HDFS path to a file or directory of interest. 
+         *  Retrieved from the client request.
+	 * @return an absolute data path
+	 */
+	public static String absoluteDataPath(String dataSource)
+	{
+		return (dataSource.charAt(0) == '/') ? dataSource : "/" + dataSource;
+	}
 
     /*
      * Helper routine to get a compression codec class
@@ -92,7 +104,7 @@ public class HdfsUtilities {
      */
     public static boolean isThreadSafe(InputData inputData) {
         Configuration conf = new Configuration();
-        String dataDir = inputData.path();
+        String dataDir = inputData.dataSource();
         if (!inputData.threadSafe()) {
             return false;
         }
@@ -143,12 +155,12 @@ public class HdfsUtilities {
 
             String[] hosts = (String[]) objectStream.readObject();
 
-            FileSplit fileSplit = new FileSplit(new Path(inputData.path()),
+            FileSplit fileSplit = new FileSplit(new Path(inputData.dataSource()),
                     start,
                     end,
                     hosts);
 
-            Log.debug("parsed file split: path " + inputData.path() +
+            Log.debug("parsed file split: path " + inputData.dataSource() +
                     ", start " + start + ", end " + end +
                     ", hosts " + ArrayUtils.toString(hosts));
 

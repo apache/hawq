@@ -55,7 +55,7 @@ public class HdfsAnalyzer extends Analyzer {
     public AnalyzerStats getEstimatedStats(String datapath) throws Exception {
         long blockSize = 0;
         long numberOfBlocks;
-        Path path = new Path("/" + datapath); //yikes! any better way?
+        Path path = new Path(HdfsUtilities.absoluteDataPath(datapath));
 
         InputSplit[] splits = getSplits(path);
 
@@ -105,7 +105,7 @@ public class HdfsAnalyzer extends Analyzer {
         FileSplit firstSplit = (FileSplit) splits[0];
         byte[] fragmentMetadata = HdfsUtilities.prepareFragmentMetadata(firstSplit);
         inputData.setFragmentMetadata(fragmentMetadata);
-        inputData.setPath(firstSplit.getPath().toUri().getPath());
+        inputData.setDataSource(firstSplit.getPath().toUri().getPath());
         accessor = ReadBridge.getFileAccessor(inputData);
 
         if (accessor.openForRead()) {

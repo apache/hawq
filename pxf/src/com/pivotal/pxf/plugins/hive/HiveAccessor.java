@@ -105,7 +105,7 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
         boolean returnData = isFiltered(partitions, filter);
 
         if (Log.isDebugEnabled()) {
-            Log.debug("segmentId: " + inputData.segmentId() + " " + inputData.path() + "--" + filterStr + "returnData: " + returnData);
+            Log.debug("segmentId: " + inputData.segmentId() + " " + inputData.dataSource() + "--" + filterStr + "returnData: " + returnData);
             if (filter instanceof List) {
                 for (Object f : (List) filter) {
                     printOneBasicFilter(f);

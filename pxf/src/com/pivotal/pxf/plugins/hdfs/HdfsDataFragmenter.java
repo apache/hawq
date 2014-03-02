@@ -40,7 +40,8 @@ public class HdfsDataFragmenter extends Fragmenter {
      */
     @Override
     public List<Fragment> getFragments() throws Exception {
-        InputSplit[] splits = getSplits(new Path(inputData.path()));
+		String absoluteDataPath = HdfsUtilities.absoluteDataPath(inputData.dataSource());
+        InputSplit[] splits = getSplits(new Path(absoluteDataPath));
 
         for (InputSplit split : splits) {
             FileSplit fsp = (FileSplit) split;
@@ -61,8 +62,6 @@ public class HdfsDataFragmenter extends Fragmenter {
 			 * start, length and hosts (locations).
 			 */
             byte[] fragmentMetadata = HdfsUtilities.prepareFragmentMetadata(fsp);
-
-            filepath = filepath.substring(1); // hack - remove the '/' from the beginning - we'll deal with this next
             Fragment fragment = new Fragment(filepath, hosts, fragmentMetadata);
             fragments.add(fragment);
         }

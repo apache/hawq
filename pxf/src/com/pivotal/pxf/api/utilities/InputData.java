@@ -35,11 +35,10 @@ public class InputData {
     protected String filterString;
     protected String host;
     protected String srlzSchemaName;
-    protected String path;
+    protected String dataSource;
     protected String accessor;
     protected String resolver;
     protected String profile;
-    protected String tableName;
     protected String compressCodec;
     protected String compressType;
     protected String remoteLogin;
@@ -136,11 +135,7 @@ public class InputData {
         accessor = getProperty("X-GP-ACCESSOR");
         resolver = getProperty("X-GP-RESOLVER");
 
-		/* TODO: leading '/' is expected. gpdb ignores it. deal more gracefully... */
-        path = "/" + getProperty("X-GP-DATA-DIR");
-
-		/* TODO: once leading '/' is removed from the path variable, remove tableName and use path in HBase classes */
-        tableName = getProperty("X-GP-DATA-DIR"); /* for HBase and Hive */
+        dataSource = getProperty("X-GP-DATA-DIR");
 
         parseFragmentMetadata();
         parseUserData();
@@ -154,7 +149,7 @@ public class InputData {
         parseThreadSafe();
         parseRemoteCredentials();
     }
-
+	
     /**
      * Sets the requested profile plugins from profile file into {@link #requestParametersMap}.
      */
@@ -199,10 +194,9 @@ public class InputData {
         this.filterStringValid = copy.filterStringValid;
         this.filterString = copy.filterString;
         this.srlzSchemaName = copy.srlzSchemaName;
-        this.path = copy.path;
+        this.dataSource = copy.dataSource;
         this.accessor = copy.accessor;
         this.resolver = copy.resolver;
-        this.tableName = copy.tableName;
         this.compressCodec = copy.compressCodec;
         this.compressType = copy.compressType;
         this.threadSafe = copy.threadSafe;
@@ -345,13 +339,13 @@ public class InputData {
         return recordkeyColumn;
     }
 
-    /** Returns the path of the required resource (i.e a file path or a table name). */
-    public String path() {
-        return path;
+    /** Returns the dataSource of the required resource (i.e a file path or a table name). */
+    public String dataSource() {
+        return dataSource;
     }
 
-    public void setPath(String path) {
-        this.path = path;
+    public void setDataSource(String dataSource) {
+        this.dataSource = dataSource;
     }
 
     /** Returns the path of the schema used for various deserializers e.g, Avro file name, Java object file name. */
@@ -387,11 +381,6 @@ public class InputData {
      */
     public Object getSchema() {
         return schema;
-    }
-
-    /** Returns the data table name */
-    public String tableName() {
-        return tableName;
     }
 
     public void setSchema(Object schema) {

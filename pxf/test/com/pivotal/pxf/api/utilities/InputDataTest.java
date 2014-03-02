@@ -44,8 +44,7 @@ public class InputDataTest {
         assertEquals(input.accessor(), "are");
         assertEquals(input.resolver(), "packed");
         assertNull(input.getSchema());
-        assertEquals(input.tableName(), "i'm/ready/to/go");
-        assertEquals(input.path(), "/i'm/ready/to/go");
+        assertEquals(input.dataSource(), "i'm/ready/to/go");
         assertEquals(input.getUserProperty("i'm-standing-here"), "outside-your-door");
         assertEquals(input.getParametersMap(), parameters);
         assertNull(input.getLogin());

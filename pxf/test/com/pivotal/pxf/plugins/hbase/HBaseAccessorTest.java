@@ -104,7 +104,7 @@ public class HBaseAccessorTest {
      */
     private void prepareTableOpen() throws Exception {
         // Set table name
-        when(inputData.tableName()).thenReturn(tableName);
+        when(inputData.dataSource()).thenReturn(tableName);
 
         // Make sure we mock static functions in HBaseConfiguration
         PowerMockito.mockStatic(HBaseConfiguration.class);

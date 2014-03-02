@@ -116,7 +116,7 @@ public class HBaseAccessor extends Plugin implements ReadAccessor {
     }
 
     private void openTable() throws IOException {
-        table = new HTable(HBaseConfiguration.create(), inputData.tableName().getBytes());
+        table = new HTable(HBaseConfiguration.create(), inputData.dataSource().getBytes());
     }
 
     /**

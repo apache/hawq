@@ -67,7 +67,7 @@ public class BridgeResource {
         InputData inputData = new InputData(params);
         SecuredHDFS.verifyToken(inputData, servletContext);
         Bridge bridge = new ReadBridge(inputData);
-        String dataDir = inputData.path();
+        String dataDir = inputData.dataSource();
         // THREAD-SAFE parameter has precedence
         boolean isThreadSafe = inputData.threadSafe() && bridge.isThreadSafe();
         Log.debug("Request for " + dataDir + " will be handled " +
@@ -78,7 +78,7 @@ public class BridgeResource {
 
     Response readResponse(final Bridge bridge, InputData inputData, final boolean threadSafe) throws Exception {
         final int fragment = inputData.getDataFragment();
-        final String dataDir = inputData.getProperty("X-GP-DATA-DIR");
+        final String dataDir = inputData.dataSource();
 
         // Creating an internal streaming class
         // which will iterate the records and put them on the
