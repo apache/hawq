@@ -647,5 +647,11 @@ select * from mpp22453 where d > date '2012-01-31' + interval '1 day' ;
 select * from mpp22453 where d > '2012-02-01';
 select enable_xform('CXformGet2TableScan');
 
+-- MPP-22791: SIGSEGV when querying a table with default partition only
+create table mpp22791(a int, b int) partition by range(b) (default partition d);
+insert into mpp22791 values (1, 1), (2, 2), (3, 3);
+select * from mpp22791 where b > 1; 
+select * from mpp22791 where b <= 3;
+
 -- clean up
 drop schema orca cascade;

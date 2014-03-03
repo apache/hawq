@@ -880,6 +880,11 @@ get_relation_part_constraints(Oid rootOid, bool *fDefaultPartition)
 			allCons = (Node *) mergeIntervals(allCons, partCons);
 		}
 	}
+	
+	if (NULL == allCons)
+	{
+		allCons = makeBoolConst(false /*value*/, false /*isnull*/);
+	}
 
 	return allCons;
 }
