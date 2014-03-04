@@ -231,3 +231,6 @@ select madlib.svec_cast_positions_float8arr('{1,2,4,6,2,5}'::INT8[], '{.2,.3,.4,
 (1 row)
 
 DROP SCHEMA madlib_install_check_gpsql_svec_test CASCADE;
+-- sanity check; don't delete madlib schema and its objects.
+DROP SCHEMA madlib CASCADE;
+ERROR:  cannot drop schema madlib because it is required by the database system

@@ -111,7 +111,8 @@ CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString)
 		check_is_member_of_role(saved_uid, owner_uid);
 
 		/* Additional check to protect reserved schema names */
-		if (!allowSystemTableModsDDL && IsReservedName(schemaName))
+		if (!allowSystemTableModsDDL &&
+			(IsReservedName(schemaName) || strcmp(schemaName, "madlib") == 0))
 		{
 			ereport(ERROR,
 					(errcode(ERRCODE_RESERVED_NAME),
@@ -266,8 +267,9 @@ RemoveSchema_internal(const char *schemaName, DropBehavior behavior,
 					   schemaName);
 
 	/* Additional check to protect reserved schema names, exclude temp schema */
-	if (!is_internal && !allowSystemTableModsDDL && IsReservedName(schemaName) &&
-        (strlen(schemaName)>=7 && strncmp(schemaName, "pg_temp", 7)!=0))
+	if (!is_internal && !allowSystemTableModsDDL &&
+		((IsReservedName(schemaName) && strncmp(schemaName, "pg_temp", 7) != 0) ||
+		 strcmp(schemaName, "madlib") == 0))
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_RESERVED_NAME),
@@ -364,7 +366,8 @@ RenameSchema(const char *oldname, const char *newname)
 		aclcheck_error(aclresult, ACL_KIND_DATABASE,
 					   get_database_name(MyDatabaseId));
 
-	if (!allowSystemTableModsDDL && IsReservedName(oldname))
+	if (!allowSystemTableModsDDL &&
+		(IsReservedName(oldname) || strcmp(oldname, "madlib") == 0))
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
@@ -372,7 +375,8 @@ RenameSchema(const char *oldname, const char *newname)
 				 errdetail("Schema %s is reserved for system use.", oldname)));
 	}
 
-	if (!allowSystemTableModsDDL && IsReservedName(newname))
+	if (!allowSystemTableModsDDL &&
+		(IsReservedName(newname) || strcmp(newname, "madlib") == 0))
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_RESERVED_NAME),
@@ -458,7 +462,8 @@ AlterSchemaOwner(const char *name, Oid newOwnerId)
 				(errcode(ERRCODE_UNDEFINED_SCHEMA),
 				 errmsg("schema \"%s\" does not exist", name)));
 
-	if (!allowSystemTableModsDDL && IsReservedName(name))
+	if (!allowSystemTableModsDDL &&
+		(IsReservedName(name) || strcmp(name, "madlib") == 0))
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),

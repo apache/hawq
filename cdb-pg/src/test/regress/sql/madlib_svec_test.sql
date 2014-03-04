@@ -51,3 +51,6 @@ select id, madlib.svec_concat_replicate(3, b), b from test_pairs order by id;
 select madlib.svec_cast_positions_float8arr('{1,2,4,6,2,5}'::INT8[], '{.2,.3,.4,.5,.3,.1}'::FLOAT8[], 10000, 0.0);
 
 DROP SCHEMA madlib_install_check_gpsql_svec_test CASCADE;
+
+-- sanity check; don't delete madlib schema and its objects.
+DROP SCHEMA madlib CASCADE;
