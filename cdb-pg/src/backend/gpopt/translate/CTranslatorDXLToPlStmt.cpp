@@ -588,7 +588,7 @@ CTranslatorDXLToPlStmt::MapLocationsFdist
 	{
 		Relation rel = gpdb::RelGetRelation(CMDIdGPDB::PmdidConvert(pmdidRel)->OidObjectId());
 		CHAR *szUri = CTranslatorUtils::SzFromWsz(pmdrelext->PstrLocation(0)->Wsz());
-		rgszSegWorkMap = gpdb::RgszMapHdDataToSegments(szUri, ulTotalPrimaries, ulMaxParticipants, rel);
+		rgszSegWorkMap = gpdb::RgszMapHdDataToSegments(szUri, ulTotalPrimaries, ulMaxParticipants, rel, NULL);
 
 		GPOS_ASSERT(NULL != rgszSegWorkMap);
 		gpdb::CloseRelation(rel);

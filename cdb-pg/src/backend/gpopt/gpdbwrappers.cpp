@@ -2408,12 +2408,13 @@ gpdb::RgszMapHdDataToSegments
 	char *uri,
 	int total_segs,
 	int working_segs,
-	Relation relation
+	Relation relation,
+	List *quals
 	)
 {
 	GP_WRAP_START;
 	{
-		return map_hddata_2gp_segments(uri, total_segs, working_segs, relation);
+		return map_hddata_2gp_segments(uri, total_segs, working_segs, relation, quals);
 	}
 	GP_WRAP_END;
 	return NULL;

@@ -1,5 +1,5 @@
 #include "common.h"
-#include "gphdfilters.h"
+#include "access/pxffilters.h"
 #include "access/libchurl.h"
 #include "access/pxfuriparser.h"
 #include "access/pxfheaders.h"
@@ -161,7 +161,7 @@ void add_querydata_to_http_header(gphadoop_context* context, PG_FUNCTION_ARGS)
 	inputData.headers = context->churl_headers;
 	inputData.gphduri = context->gphd_uri;
 	inputData.rel = EXTPROTOCOL_GET_RELATION(fcinfo);
-	inputData.filterstr = serializeGPHDFilterQuals(EXTPROTOCOL_GET_SCANQUALS(fcinfo));
+	inputData.filterstr = serializePxfFilterQuals(EXTPROTOCOL_GET_SCANQUALS(fcinfo));
 	add_delegation_token(&inputData);
 	
 	build_http_header(&inputData);

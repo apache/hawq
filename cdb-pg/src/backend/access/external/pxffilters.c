@@ -1,12 +1,11 @@
 /*
- * gphdfilters.c
+ * pxffilters.c
  *
- * Functions for handling push down of supported scan level filters to GPBridge.
+ * Functions for handling push down of supported scan level filters to PXF.
  * 
  * Copyright (c) 2012, Greenplum inc
  */
-
-#include "gphdfilters.h"
+#include "access/pxffilters.h"
 #include "catalog/pg_operator.h"
 #include "optimizer/clauses.h"
 #include "parser/parse_expr.h"
@@ -14,52 +13,52 @@
 #include "utils/guc.h"
 #include "utils/lsyscache.h"
 
-static bool opexpr_to_gphdfilter(OpExpr *expr, GPHDFilterDesc *filter);
+static bool opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter);
 static void const_to_str(Const *constval, StringInfo buf);
 static bool supported_filter_type(Oid type);
 
 /*
- * All supported GPDB operators, and their respective HFDS operator code.
+ * All supported HAWQ operators, and their respective HFDS operator code.
  * Note that it is OK to use hardcoded OIDs, since these are all pinned
  * down system catalog operators.
  * see pg_operator.h
  */
-gpop_hdop_map gphd_supported_opr[] =
+dbop_pxfop_map pxf_supported_opr[] =
 {
 	/* int2 */
-	{Int2EqualOperator  /* int2eq */, HDOP_EQ},
-	{95  /* int2lt */, HDOP_LT},
-	{520 /* int2gt */, HDOP_GT},
-	{524 /* int2ge */, HDOP_GE},
-	{522 /* int2le */, HDOP_LE},
-	{519 /* int2ne */, HDOP_NE},
+	{Int2EqualOperator  /* int2eq */, PXFOP_EQ},
+	{95  /* int2lt */, PXFOP_LT},
+	{520 /* int2gt */, PXFOP_GT},
+	{524 /* int2ge */, PXFOP_GE},
+	{522 /* int2le */, PXFOP_LE},
+	{519 /* int2ne */, PXFOP_NE},
 
 	/* int4 */
-	{Int4EqualOperator  /* int4eq */, HDOP_EQ},
-	{97  /* int4lt */, HDOP_LT},
-	{521 /* int4gt */, HDOP_GT},
-	{525 /* int4ge */, HDOP_GE},
-	{523 /* int4le */, HDOP_LE},
-	{518 /* int4lt */, HDOP_NE},
+	{Int4EqualOperator  /* int4eq */, PXFOP_EQ},
+	{97  /* int4lt */, PXFOP_LT},
+	{521 /* int4gt */, PXFOP_GT},
+	{525 /* int4ge */, PXFOP_GE},
+	{523 /* int4le */, PXFOP_LE},
+	{518 /* int4lt */, PXFOP_NE},
 
 	/* int8 */
-	{Int8EqualOperator /* int8eq */, HDOP_EQ},
-	{412 /* int8lt */, HDOP_LT},
-	{413 /* int8gt */, HDOP_GT},
-	{415 /* int8ge */, HDOP_GE},
-	{414 /* int8le */, HDOP_LE},
-	{411 /* int8lt */, HDOP_NE},
+	{Int8EqualOperator /* int8eq */, PXFOP_EQ},
+	{412 /* int8lt */, PXFOP_LT},
+	{413 /* int8gt */, PXFOP_GT},
+	{415 /* int8ge */, PXFOP_GE},
+	{414 /* int8le */, PXFOP_LE},
+	{411 /* int8lt */, PXFOP_NE},
 
 	/* text */
-	{TextEqualOperator  /* texteq  */, HDOP_EQ},
-	{664 /* text_lt */, HDOP_LT},
-	{666 /* text_gt */, HDOP_GT},
-	{667 /* text_ge */, HDOP_GE},
-	{665 /* text_le */, HDOP_LE},
-	{531 /* textlt  */, HDOP_NE},
+	{TextEqualOperator  /* texteq  */, PXFOP_EQ},
+	{664 /* text_lt */, PXFOP_LT},
+	{666 /* text_gt */, PXFOP_GT},
+	{667 /* text_ge */, PXFOP_GE},
+	{665 /* text_le */, PXFOP_LE},
+	{531 /* textlt  */, PXFOP_NE},
 };
 
-Oid gphd_supported_types[] =
+Oid pxf_supported_types[] =
 {
 	INT2OID,
 	INT4OID,
@@ -76,16 +75,16 @@ Oid gphd_supported_types[] =
 };
 
 /*
- * gphd_make_filter_list
+ * pxf_make_filter_list
  *
- * Given a scan node qual list, find the filters that are eligible to be used in
- * the GPBridge, construct a GPHDFilter that describes the filter information,
+ * Given a scan node qual list, find the filters that are eligible to be used
+ * by PXF, construct a PxfFilterDesc list that describes the filter information,
  * and return it to the caller.
  *
- * Caller is responsible for pfreeing the returned GPHDFilter List.
+ * Caller is responsible for pfreeing the returned PxfFilterDesc List.
  */
 static List *
-gphd_make_filter_list(List *quals)
+pxf_make_filter_list(List *quals)
 {
 	List			*result = NIL;
 	ListCell		*lc = NULL;
@@ -101,17 +100,17 @@ gphd_make_filter_list(List *quals)
 	{
 		Node *node = (Node *) lfirst(lc);
 		NodeTag tag = nodeTag(node);
-		elog(DEBUG5, "gphd_make_filter_list: node tag %d. %s", tag, tag==T_OpExpr? "(T_OpExpr)": "");
+		elog(DEBUG5, "pxf_make_filter_list: node tag %d. %s", tag, tag==T_OpExpr? "(T_OpExpr)": "");
 		switch (tag)
 		{
 			case T_OpExpr:
 			{
 				OpExpr			*expr 	= (OpExpr *) node;
-				GPHDFilterDesc	*filter;
+				PxfFilterDesc	*filter;
 
-				filter = (GPHDFilterDesc *) palloc0(sizeof(GPHDFilterDesc));
+				filter = (PxfFilterDesc *) palloc0(sizeof(PxfFilterDesc));
 
-				if (opexpr_to_gphdfilter(expr, filter))
+				if (opexpr_to_pxffilter(expr, filter))
 					result = lappend(result, filter);
 				else
 					pfree(filter);
@@ -128,7 +127,7 @@ gphd_make_filter_list(List *quals)
 }
 
 static void
-gphd_free_filter(GPHDFilterDesc* filter)
+pxf_free_filter(PxfFilterDesc* filter)
 {
 	if (!filter)
 		return;
@@ -150,7 +149,7 @@ gphd_free_filter(GPHDFilterDesc* filter)
 }
 
 /*
- * gphd_free_filter_list
+ * pxf_free_filter_list
  *
  * free all memory associated with the filters once no longer needed.
  * alternatively we could have allocated them in a shorter lifespan
@@ -158,25 +157,25 @@ gphd_free_filter(GPHDFilterDesc* filter)
  * more sense.
  */
 static void
-gphd_free_filter_list(List *filters)
+pxf_free_filter_list(List *filters)
 {
 	ListCell		*lc 	= NULL;
-	GPHDFilterDesc 	*filter = NULL;
+	PxfFilterDesc 	*filter = NULL;
 
 	if (list_length(filters) == 0)
 		return;
 
 	foreach (lc, filters)
 	{
-		filter	= (GPHDFilterDesc *) lfirst(lc);
-		gphd_free_filter(filter);
+		filter	= (PxfFilterDesc *) lfirst(lc);
+		pxf_free_filter(filter);
 	}
 }
 
 /*
- * gphd_serialize_filter_list
+ * pxf_serialize_filter_list
  *
- * Given a list of implicitly ANDed GPHDFilterDesc objects, produce a
+ * Given a list of implicitly ANDed PxfFilterDesc objects, produce a
  * serialized string representation in order to communicate this list
  * over the wire.
  *
@@ -198,7 +197,7 @@ gphd_free_filter_list(List *filters)
  *
  */
 static char *
-gphd_serialize_filter_list(List *filters)
+pxf_serialize_filter_list(List *filters)
 {
 	StringInfo	 resbuf;
 	StringInfo	 curbuf;
@@ -220,38 +219,38 @@ gphd_serialize_filter_list(List *filters)
 	 */
 	foreach (lc, filters)
 	{
-		GPHDFilterDesc		*filter	= (GPHDFilterDesc *) lfirst(lc);
-		GPHDOperand			 l		= filter->l;
-		GPHDOperand			 r 		= filter->r;
-		GPHDOperatorCode	 o 		= filter->op;
+		PxfFilterDesc		*filter	= (PxfFilterDesc *) lfirst(lc);
+		PxfOperand			 l		= filter->l;
+		PxfOperand			 r 		= filter->r;
+		PxfOperatorCode	 o 		= filter->op;
 
 		/* last result is stored in 'oldbuf'. start 'curbuf' clean */
 		resetStringInfo(curbuf);
 
 		/* format the operands */
-		if (gphdoperand_is_attr(l) && gphdoperand_is_const(r))
+		if (pxfoperand_is_attr(l) && pxfoperand_is_const(r))
 		{
 			appendStringInfo(curbuf, "%c%d%c%s",
-									 GPHD_ATTR_CODE, l.attnum - 1, /* Java attrs are 0-based */
-									 GPHD_CONST_CODE, (r.conststr)->data);
+									 PXF_ATTR_CODE, l.attnum - 1, /* Java attrs are 0-based */
+									 PXF_CONST_CODE, (r.conststr)->data);
 		}
-		else if (gphdoperand_is_const(l) && gphdoperand_is_attr(r))
+		else if (pxfoperand_is_const(l) && pxfoperand_is_attr(r))
 		{
 			appendStringInfo(curbuf, "%c%s%c%d",
-									 GPHD_CONST_CODE, (l.conststr)->data,
-									 GPHD_ATTR_CODE, r.attnum - 1); /* Java attrs are 0-based */
+									 PXF_CONST_CODE, (l.conststr)->data,
+									 PXF_ATTR_CODE, r.attnum - 1); /* Java attrs are 0-based */
 		}
 		else
 		{
-			/* GphdFilterMakeList() should have never let this happen */
+			/* pxf_make_filter_list() should have never let this happen */
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
-					 errmsg("internal error in gphdfilters.c:SerializeGphd"
-							"FilterList. Found a non const+attr filter")));
+					 errmsg("internal error in pxffilters.c:pxf_serialize_"
+							 "filter_list. Found a non const+attr filter")));
 		}
 
 		/* format the operator */
-		appendStringInfo(curbuf, "%c%d", GPHD_OPERATOR_CODE, o);
+		appendStringInfo(curbuf, "%c%d", PXF_OPERATOR_CODE, o);
 
 		/* append this result to the previous result */
 		appendBinaryStringInfo(resbuf, curbuf->data, curbuf->len);
@@ -259,7 +258,7 @@ gphd_serialize_filter_list(List *filters)
 		/* if there was a previous result, append a trailing AND operator */
 		if(resbuf->len > curbuf->len)
 		{
-			appendStringInfo(resbuf, "%c%d", GPHD_OPERATOR_CODE, HDOP_AND);
+			appendStringInfo(resbuf, "%c%d", PXF_OPERATOR_CODE, PXFOP_AND);
 		}
 	}
 
@@ -270,16 +269,16 @@ gphd_serialize_filter_list(List *filters)
 
 
 /*
- * opexpr_to_gphdfilter
+ * opexpr_to_pxffilter
  *
  * check if an OpExpr qualifies to be pushed-down to PXF.
  * if it is - create it and return a success code.
  */
 static bool
-opexpr_to_gphdfilter(OpExpr *expr, GPHDFilterDesc *filter)
+opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter)
 {
 	int		 i;
-	int		 nargs 		= sizeof(gphd_supported_opr) / sizeof(gpop_hdop_map);
+	int		 nargs 		= sizeof(pxf_supported_opr) / sizeof(dbop_pxfop_map);
 	Node	*leftop 	= NULL;
 	Node	*rightop	= NULL;
 	Oid		 rightop_type = 0;
@@ -294,12 +293,12 @@ opexpr_to_gphdfilter(OpExpr *expr, GPHDFilterDesc *filter)
 	/* only binary oprs supported currently */
 	if (!rightop)
 	{
-		elog(DEBUG5, "opexpr_to_gphdfilter: unary op! leftop_type: %d, op: %d",
+		elog(DEBUG5, "opexpr_to_pxffilter: unary op! leftop_type: %d, op: %d",
 				 	 exprType(leftop), expr->opno);
 		return false;
 	}
 
-	elog(DEBUG5, "opexpr_to_gphdfilter: leftop_type: %d, rightop_type: %d, op: %d",
+	elog(DEBUG5, "opexpr_to_pxffilter: leftop_type: %d, rightop_type: %d, op: %d",
 		 exprType(leftop), rightop_type, expr->opno);
 	/* both side data types must be identical (for now) */
 	if (rightop_type != exprType(leftop))
@@ -315,12 +314,12 @@ opexpr_to_gphdfilter(OpExpr *expr, GPHDFilterDesc *filter)
 	/* arguments must be VAR and CONST */
 	if (IsA(leftop,  Var) && IsA(rightop, Const))
 	{
-		filter->l.opcode = GPHD_ATTR_CODE;
+		filter->l.opcode = PXF_ATTR_CODE;
 		filter->l.attnum = ((Var *) leftop)->varattno;
 		if (filter->l.attnum <= InvalidAttrNumber)
 			return false; /* system attr not supported */
 
-		filter->r.opcode = GPHD_CONST_CODE;
+		filter->r.opcode = PXF_CONST_CODE;
 		filter->r.attnum = InvalidAttrNumber;
 		filter->r.conststr = makeStringInfo();
 		initStringInfo(filter->r.conststr);
@@ -328,13 +327,13 @@ opexpr_to_gphdfilter(OpExpr *expr, GPHDFilterDesc *filter)
 	}
 	else if (IsA(leftop, Const) && IsA(rightop, Var))
 	{
-		filter->l.opcode = GPHD_CONST_CODE;
+		filter->l.opcode = PXF_CONST_CODE;
 		filter->l.attnum = InvalidAttrNumber;
 		filter->l.conststr = makeStringInfo();
 		initStringInfo(filter->l.conststr);
 		const_to_str((Const *)leftop, filter->l.conststr);
 
-		filter->r.opcode = GPHD_ATTR_CODE;
+		filter->r.opcode = PXF_ATTR_CODE;
 		filter->r.attnum = ((Var *) rightop)->varattno;
 		if (filter->r.attnum <= InvalidAttrNumber)
 			return false; /* system attr not supported */
@@ -344,14 +343,14 @@ opexpr_to_gphdfilter(OpExpr *expr, GPHDFilterDesc *filter)
 		return false;
 	}
 
-	/* is operator supported? if so, set the corresponding HDOP */
+	/* is operator supported? if so, set the corresponding PXFOP */
 	for (i = 0; i < nargs; i++)
 	{
 		/* NOTE: switch to hash table lookup if   */
 		/* array grows. for now it's cheap enough */
-		if(expr->opno == gphd_supported_opr[i].gpop)
+		if(expr->opno == pxf_supported_opr[i].dbop)
 		{
-			filter->op = gphd_supported_opr[i].hdop;
+			filter->op = pxf_supported_opr[i].pxfop;
 			return true; /* filter qualifies! */
 		}
 	}
@@ -365,19 +364,19 @@ opexpr_to_gphdfilter(OpExpr *expr, GPHDFilterDesc *filter)
 /*
  * supported_filter_type
  *
- * Return true if the type is supported by gphdfilters.
- * Supported defines are defined in gphd_supported_types.
+ * Return true if the type is supported by pxffilters.
+ * Supported defines are defined in pxf_supported_types.
  */
 static bool
 supported_filter_type(Oid type)
 {
-	int		 nargs 		= sizeof(gphd_supported_types) / sizeof(Oid);
+	int		 nargs 		= sizeof(pxf_supported_types) / sizeof(Oid);
 	int 	 i;
 
 	/* is type supported? */
 	for (i = 0; i < nargs; i++)
 	{
-		if (type == gphd_supported_types[i])
+		if (type == pxf_supported_types[i])
 			return true;
 	}
 	return false;
@@ -438,7 +437,7 @@ const_to_str(Const *constval, StringInfo buf)
 			/* should never happen. we filter on types earlier */
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
-					 errmsg("internal error in gphdfilters.c:const_to_str. "
+					 errmsg("internal error in pxffilters.c:const_to_str. "
 							"Using unsupported data type (%d) (value %s)",
 							constval->consttype, extval)));
 
@@ -448,26 +447,26 @@ const_to_str(Const *constval, StringInfo buf)
 }
 
 /*
- * GphdFilterSerializeQuals
+ * serializePxfFilterQuals
  *
- * Wrapper around GphdFilterMakeList -> GphdFilterSerializeList.
+ * Wrapper around pxf_make_filter_list -> pxf_serialize_filter_list.
  * Currently the only function exposed to the outside, however
- * if we could expose the others in the future if needed.
+ * we could expose the others in the future if needed.
  *
  * The function accepts the scan qual list and produces a serialized
  * string that represents the push down filters (See called functions
  * headers for more information).
  */
-char *serializeGPHDFilterQuals(List *quals)
+char *serializePxfFilterQuals(List *quals)
 {
 	char	*result = NULL;
 
 	if (pxf_enable_filter_pushdown)
 	{
-		List *filters = gphd_make_filter_list(quals);
+		List *filters = pxf_make_filter_list(quals);
 
-		result  = gphd_serialize_filter_list(filters);
-		gphd_free_filter_list(filters);
+		result  = pxf_serialize_filter_list(filters);
+		pxf_free_filter_list(filters);
 	}
 
 	return result;

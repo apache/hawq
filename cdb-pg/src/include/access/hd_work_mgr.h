@@ -16,7 +16,7 @@
 #include "nodes/pg_list.h"
 #include "lib/stringinfo.h"
 
-extern char** map_hddata_2gp_segments(char *uri, int total_segs, int working_segs, Relation relation);
+extern char** map_hddata_2gp_segments(char *uri, int total_segs, int working_segs, Relation relation, List* quals);
 extern void free_hddata_2gp_segments(char **segs_work_map, int total_segs);
 
 /*

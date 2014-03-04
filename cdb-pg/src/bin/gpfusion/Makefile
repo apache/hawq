@@ -2,7 +2,7 @@ top_builddir = ../../..
 include $(top_builddir)/src/Makefile.global
 
 MODULE_big = pxf
-OBJS       = gpdbwritableformatter.o gpbridgeapi.o gphdfilters.o pxf.o 
+OBJS       = gpdbwritableformatter.o gpbridgeapi.o pxf.o 
 
 CFLAGS += -lcurl
 

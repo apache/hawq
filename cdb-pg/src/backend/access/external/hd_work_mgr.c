@@ -15,6 +15,7 @@
 #include "access/hd_work_mgr.h"
 #include "access/libchurl.h"
 #include "access/pxfheaders.h"
+#include "access/pxffilters.h"
 #include "cdb/cdbfilesystemcredential.h"
 #include "cdb/cdbutil.h"
 #include "cdb/cdbvars.h"
@@ -115,7 +116,7 @@ static void cancel_delegation_token(PxfInputData *inputData);
  * The function will generate a delegation token when secure filesystem mode 
  * is on and cancel it right after. PXF segment code will get a new token.
  */
-char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs, Relation relation)
+char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs, Relation relation, List* quals)
 {
 	char **segs_work_map = NULL;
 	List **segs_data = NULL;
@@ -140,7 +141,7 @@ char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs, Rela
 	inputData.headers = client_context.http_headers;
 	inputData.gphduri = hadoop_uri;
 	inputData.rel = relation;
-	inputData.filterstr = NULL; /* We do not supply filter data to the HTTP header TODO? */
+	inputData.filterstr = NULL; /* We do not supply filter data to the HTTP header TODO serializePxfFilterQuals(quals); */
     generate_delegation_token(&inputData);
 	build_http_header(&inputData);
 	

@@ -499,7 +499,7 @@ namespace gpdb {
 	int IMaxParticipantsPxf(int total_segments);
 
 	// generate the mapping of the Hadoop data fragments to the segments
-	char** RgszMapHdDataToSegments(char *uri, int total_segs, int working_segs, Relation relation);
+	char** RgszMapHdDataToSegments(char *uri, int total_segs, int working_segs, Relation relation, List* quals);
 
 	// release the memory allocated for the mapping of the Hadoop data fragments to the segments
 	void FreeHdDataToSegmentsMapping(char **segs_work_map, int total_segs);

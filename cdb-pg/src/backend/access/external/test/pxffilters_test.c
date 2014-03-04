@@ -4,7 +4,7 @@
 #include "cmockery.h"
 
 #include "c.h"
-#include "../gphdfilters.c"
+#include "../pxffilters.c"
 
 void
 test__supported_filter_type(void **state)
@@ -50,7 +50,6 @@ mock__const_to_str(Oid const_type, char* const_value)
 	expect_value(getTypeOutputInfo, type, const_type);
 	expect_any(getTypeOutputInfo, typOutput);
 	expect_any(getTypeOutputInfo, typIsVarlena);
-	//will_assign_value(getTypeOutputInfo, typOutput, input->consttype);
 	will_return(getTypeOutputInfo, NULL);
 
 	expect_any(OidOutputFunctionCall, functionId);
@@ -105,7 +104,7 @@ void run__const_to_str__negative(Const* input, StringInfo result, char* value)
 
 	StringInfo err_msg = makeStringInfo();
 	appendStringInfo(err_msg,
-			"internal error in gphdfilters.c:const_to_str. "
+			"internal error in pxffilters.c:const_to_str. "
 			"Using unsupported data type (%d) (value %s)", input->consttype, value);
 
 	/* Setting the test -- code omitted -- */
@@ -176,37 +175,37 @@ test__const_to_str__NegativeCircle(void **state)
 }
 
 void
-test__opexpr_to_gphdfilter__null(void **state)
+test__opexpr_to_pxffilter__null(void **state)
 {
-	GPHDFilterDesc *filter = (GPHDFilterDesc*) palloc0(sizeof(GPHDFilterDesc));
+	PxfFilterDesc *filter = (PxfFilterDesc*) palloc0(sizeof(PxfFilterDesc));
 	OpExpr *expr = (OpExpr*) palloc0(sizeof(OpExpr));
 
-	assert_false(opexpr_to_gphdfilter(NULL, NULL));
-	assert_false(opexpr_to_gphdfilter(NULL, filter));
-	assert_false(opexpr_to_gphdfilter(expr, NULL));
+	assert_false(opexpr_to_pxffilter(NULL, NULL));
+	assert_false(opexpr_to_pxffilter(NULL, filter));
+	assert_false(opexpr_to_pxffilter(expr, NULL));
 
 	expr->args = NIL;
-	assert_false(opexpr_to_gphdfilter(expr, filter));
+	assert_false(opexpr_to_pxffilter(expr, filter));
 
 	pfree(filter);
 	pfree(expr);
 }
 
 void
-test__opexpr_to_gphdfilter__unary_expr(void **state)
+test__opexpr_to_pxffilter__unary_expr(void **state)
 {
-	GPHDFilterDesc *filter = (GPHDFilterDesc*) palloc0(sizeof(GPHDFilterDesc));
+	PxfFilterDesc *filter = (PxfFilterDesc*) palloc0(sizeof(PxfFilterDesc));
 	OpExpr *expr = (OpExpr*) palloc0(sizeof(OpExpr));
 	Var *arg = (Var*) palloc0(sizeof(Var));
 	arg->xpr.type = T_Var;
 
-	assert_false(opexpr_to_gphdfilter(NULL, NULL));
-	assert_false(opexpr_to_gphdfilter(NULL, filter));
-	assert_false(opexpr_to_gphdfilter(expr, NULL));
+	assert_false(opexpr_to_pxffilter(NULL, NULL));
+	assert_false(opexpr_to_pxffilter(NULL, filter));
+	assert_false(opexpr_to_pxffilter(expr, NULL));
 
 	expr->args = NIL;
 	expr->args = lappend(expr->args, arg);
-	assert_false(opexpr_to_gphdfilter(expr, filter));
+	assert_false(opexpr_to_pxffilter(expr, filter));
 
 	pfree(arg);
 	pfree(filter);
@@ -219,9 +218,9 @@ test__opexpr_to_gphdfilter__unary_expr(void **state)
  * f1 is of type smallint (INT2OID), 9 is of type int (INT4OID).
  */
 void
-test__opexpr_to_gphdfilter__different_types(void **state)
+test__opexpr_to_pxffilter__different_types(void **state)
 {
-	GPHDFilterDesc *filter = (GPHDFilterDesc*) palloc0(sizeof(GPHDFilterDesc));
+	PxfFilterDesc *filter = (PxfFilterDesc*) palloc0(sizeof(PxfFilterDesc));
 	OpExpr *expr = (OpExpr*) palloc0(sizeof(OpExpr));
 	Var *arg_var = (Var*) palloc0(sizeof(Var));
 	Const* arg_const = (Const*) palloc0(sizeof(Const));
@@ -241,7 +240,7 @@ test__opexpr_to_gphdfilter__different_types(void **state)
 	expr->opno = 92;
 	expr->xpr.type = T_OpExpr;
 
-	assert_false(opexpr_to_gphdfilter(expr, filter));
+	assert_false(opexpr_to_pxffilter(expr, filter));
 
 	pfree(filter);
 	pfree(expr);
@@ -250,7 +249,7 @@ test__opexpr_to_gphdfilter__different_types(void **state)
 }
 
 void
-compare_filters(GPHDFilterDesc* result, GPHDFilterDesc* expected)
+compare_filters(PxfFilterDesc* result, PxfFilterDesc* expected)
 {
 	assert_true(result->l.opcode == expected->l.opcode);
 	assert_int_equal(result->l.attnum, expected->l.attnum);
@@ -269,11 +268,11 @@ compare_filters(GPHDFilterDesc* result, GPHDFilterDesc* expected)
 	assert_int_equal(result->op, expected->op);
 }
 
-GPHDFilterDesc* build_filter(char lopcode, int lattnum, char* lconststr,
+PxfFilterDesc* build_filter(char lopcode, int lattnum, char* lconststr,
 							 char ropcode, int rattnum, char* rconststr,
-							 GPHDOperatorCode op)
+							 PxfOperatorCode op)
 {
-	GPHDFilterDesc *filter = (GPHDFilterDesc*) palloc0(sizeof(GPHDFilterDesc));
+	PxfFilterDesc *filter = (PxfFilterDesc*) palloc0(sizeof(PxfFilterDesc));
 
 	filter->l.opcode = lopcode;
 	filter->l.attnum = lattnum;
@@ -330,27 +329,27 @@ build_op_expr(void* left, void* right, int op)
 }
 
 void
-test__opexpr_to_gphdfilter__intGT(void **state)
+test__opexpr_to_pxffilter__intGT(void **state)
 {
-	GPHDFilterDesc *filter = (GPHDFilterDesc*) palloc0(sizeof(GPHDFilterDesc));
+	PxfFilterDesc *filter = (PxfFilterDesc*) palloc0(sizeof(PxfFilterDesc));
 	Var *arg_var = build_var(INT2OID, 1);
 	StringInfo const_value = makeStringInfo();
 	appendStringInfo(const_value, "%d", 1984);
 	Const* arg_const = build_const(INT2OID, const_value);
 
 	OpExpr *expr = build_op_expr(arg_var, arg_const, 520 /* int2gt */);
-	GPHDFilterDesc* expected = build_filter(
-			GPHD_ATTR_CODE, 1, NULL,
-			GPHD_CONST_CODE, 0, "1984",
-			HDOP_GT);
+	PxfFilterDesc* expected = build_filter(
+			PXF_ATTR_CODE, 1, NULL,
+			PXF_CONST_CODE, 0, "1984",
+			PXFOP_GT);
 
 	/* run test */
-	assert_true(opexpr_to_gphdfilter(expr, filter));
+	assert_true(opexpr_to_pxffilter(expr, filter));
 
 	compare_filters(filter, expected);
 
-	gphd_free_filter(expected);
-	gphd_free_filter(filter);
+	pxf_free_filter(expected);
+	pxf_free_filter(filter);
 
 	pfree(const_value); /* data is freed by const_to_str */
 	list_free_deep(expr->args); /* free all args */
@@ -361,84 +360,84 @@ test__opexpr_to_gphdfilter__intGT(void **state)
 /* NOTE: this test is not  a use case - when the query includes
  * 'is null' or 'is not null' the qualifier code is T_NullTest and not T_OpExpr */
 void
-test__opexpr_to_gphdfilter__attributeIsNull(void **state)
+test__opexpr_to_pxffilter__attributeIsNull(void **state)
 {
-	GPHDFilterDesc *filter = (GPHDFilterDesc*) palloc0(sizeof(GPHDFilterDesc));
+	PxfFilterDesc *filter = (PxfFilterDesc*) palloc0(sizeof(PxfFilterDesc));
 	Var *arg_var = build_var(INT2OID, 1);
 	Const* arg_const = build_const(INT2OID, NULL);
 	OpExpr *expr = build_op_expr(arg_var, arg_const, 94 /* int2eq */);
 
-	GPHDFilterDesc* expected = build_filter(
-				GPHD_ATTR_CODE, 1, NULL,
-				GPHD_CONST_CODE, 0, "\"NULL\"",
-				HDOP_EQ);
+	PxfFilterDesc* expected = build_filter(
+				PXF_ATTR_CODE, 1, NULL,
+				PXF_CONST_CODE, 0, "\"NULL\"",
+				PXFOP_EQ);
 
 	/* run test */
-	assert_true(opexpr_to_gphdfilter(expr, filter));
+	assert_true(opexpr_to_pxffilter(expr, filter));
 	compare_filters(filter, expected);
 
-	gphd_free_filter(filter);
-	gphd_free_filter(expected);
+	pxf_free_filter(filter);
+	pxf_free_filter(expected);
 
 	list_free_deep(expr->args); /* free all args */
 	pfree(expr);
 }
 
 void
-test__opexpr_to_gphdfilter__differentTypes(void **state)
+test__opexpr_to_pxffilter__differentTypes(void **state)
 {
-	GPHDFilterDesc *filter = (GPHDFilterDesc*) palloc0(sizeof(GPHDFilterDesc));
+	PxfFilterDesc *filter = (PxfFilterDesc*) palloc0(sizeof(PxfFilterDesc));
 	Var *arg_var = build_var(INT2OID, 3);
 	Const *arg_const = build_const(CHAROID, NULL);
 	OpExpr *expr = build_op_expr(arg_const, arg_var, 1877 /* int2not */);
 
 	/* run test */
-	assert_false(opexpr_to_gphdfilter(expr, filter));
+	assert_false(opexpr_to_pxffilter(expr, filter));
 
-	gphd_free_filter(filter);
+	pxf_free_filter(filter);
 
 	list_free_deep(expr->args); /* free all args */
 	pfree(expr);
 }
 
 void
-test__opexpr_to_gphdfilter__unsupportedTypeCircle(void **state)
+test__opexpr_to_pxffilter__unsupportedTypeCircle(void **state)
 {
-	GPHDFilterDesc *filter = (GPHDFilterDesc*) palloc0(sizeof(GPHDFilterDesc));
+	PxfFilterDesc *filter = (PxfFilterDesc*) palloc0(sizeof(PxfFilterDesc));
 	Var *arg_var = build_var(CIRCLEOID, 8);
 	Const *arg_const = build_const(CIRCLEOID, NULL);
 	OpExpr *expr = build_op_expr(arg_const, arg_var, 0 /* whatever */);
 
 	/* run test */
-	assert_false(opexpr_to_gphdfilter(expr, filter));
+	assert_false(opexpr_to_pxffilter(expr, filter));
 
-	gphd_free_filter(filter);
+	pxf_free_filter(filter);
 
 	list_free_deep(expr->args); /* free all args */
 	pfree(expr);
 }
 
 void
-test__opexpr_to_gphdfilter__twoVars(void **state)
+test__opexpr_to_pxffilter__twoVars(void **state)
 {
-	GPHDFilterDesc *filter = (GPHDFilterDesc*) palloc0(sizeof(GPHDFilterDesc));
+	PxfFilterDesc *filter = (PxfFilterDesc*) palloc0(sizeof(PxfFilterDesc));
 	Var *arg_var_left = build_var(INT4OID, 8);
 	Var *arg_var_right = build_var(INT4OID, 9);
 	OpExpr *expr = build_op_expr(arg_var_left, arg_var_right, 0 /* whatever */);
 
 	/* run test */
-	assert_false(opexpr_to_gphdfilter(expr, filter));
+	assert_false(opexpr_to_pxffilter(expr, filter));
 
-	gphd_free_filter(filter);
+	pxf_free_filter(filter);
 
 	list_free_deep(expr->args); /* free all args */
 	pfree(expr);
 }
 
 void
-test__opexpr_to_gphdfilter__unsupportedOpNot(void **state)
+test__opexpr_to_pxffilter__unsupportedOpNot(void **state)
 {
-	GPHDFilterDesc *filter = (GPHDFilterDesc*) palloc0(sizeof(GPHDFilterDesc));
+	PxfFilterDesc *filter = (PxfFilterDesc*) palloc0(sizeof(PxfFilterDesc));
 	Var *arg_var = build_var(INT2OID, 3);
 	StringInfo const_value = makeStringInfo();
 	appendStringInfo(const_value, "%s", "not");
@@ -446,9 +445,9 @@ test__opexpr_to_gphdfilter__unsupportedOpNot(void **state)
 	OpExpr *expr = build_op_expr(arg_const, arg_var, 1877 /* int2not */);
 
 	/* run test */
-	assert_false(opexpr_to_gphdfilter(expr, filter));
+	assert_false(opexpr_to_pxffilter(expr, filter));
 
-	gphd_free_filter(filter);
+	pxf_free_filter(filter);
 
 	pfree(const_value); /* data is freed by const_to_str */
 	list_free_deep(expr->args); /* free all args */
@@ -456,79 +455,79 @@ test__opexpr_to_gphdfilter__unsupportedOpNot(void **state)
 }
 
 void
-test__gphd_serialize_filter_list__oneFilter(void **state)
+test__pxf_serialize_filter_list__oneFilter(void **state)
 {
 	List* filter_list = NIL;
 
-	GPHDFilterDesc* filter = build_filter(
-			GPHD_ATTR_CODE, 1, NULL,
-			GPHD_CONST_CODE, 0, "1984",
-			HDOP_GT);
+	PxfFilterDesc* filter = build_filter(
+			PXF_ATTR_CODE, 1, NULL,
+			PXF_CONST_CODE, 0, "1984",
+			PXFOP_GT);
 	filter_list = lappend(filter_list, filter);
 
-	char* result = gphd_serialize_filter_list(filter_list);
+	char* result = pxf_serialize_filter_list(filter_list);
 	assert_string_equal(result, "a0c1984o2");
 
-	gphd_free_filter_list(filter_list);
+	pxf_free_filter_list(filter_list);
 	filter_list = NIL;
 	pfree(result);
 
 	filter = build_filter(
-			GPHD_ATTR_CODE, 8, NULL,
-			GPHD_CONST_CODE, 0, "\"George Orwell\"",
-			HDOP_EQ);
+			PXF_ATTR_CODE, 8, NULL,
+			PXF_CONST_CODE, 0, "\"George Orwell\"",
+			PXFOP_EQ);
 	filter_list = lappend(filter_list, filter);
 
-	result = gphd_serialize_filter_list(filter_list);
+	result = pxf_serialize_filter_list(filter_list);
 	assert_string_equal(result, "a7c\"George Orwell\"o5");
 
-	gphd_free_filter_list(filter_list);
+	pxf_free_filter_list(filter_list);
 	pfree(result);
 }
 
 void
-test__gphd_serialize_filter_list__manyFilters(void **state)
+test__pxf_serialize_filter_list__manyFilters(void **state)
 {
 	char* result = NULL;
 	List* filter_list = NIL;
 
-	GPHDFilterDesc* filter1 = build_filter(
-			GPHD_ATTR_CODE, 2, NULL,
-			GPHD_CONST_CODE, 0, "1983",
-			HDOP_GT);
-	GPHDFilterDesc* filter2 = build_filter(
-			GPHD_ATTR_CODE, 3, NULL,
-			GPHD_CONST_CODE, 0, "1985",
-			HDOP_LT);
-	GPHDFilterDesc* filter3 = build_filter(
-			GPHD_ATTR_CODE, 4, NULL,
-			GPHD_CONST_CODE, 0, "\"George Orwell\"",
-			HDOP_EQ);
-	GPHDFilterDesc* filter4 = build_filter(
-			GPHD_ATTR_CODE, 5, NULL,
-			GPHD_CONST_CODE, 0, "\"Winston\"",
-			HDOP_GE);
+	PxfFilterDesc* filter1 = build_filter(
+			PXF_ATTR_CODE, 2, NULL,
+			PXF_CONST_CODE, 0, "1983",
+			PXFOP_GT);
+	PxfFilterDesc* filter2 = build_filter(
+			PXF_ATTR_CODE, 3, NULL,
+			PXF_CONST_CODE, 0, "1985",
+			PXFOP_LT);
+	PxfFilterDesc* filter3 = build_filter(
+			PXF_ATTR_CODE, 4, NULL,
+			PXF_CONST_CODE, 0, "\"George Orwell\"",
+			PXFOP_EQ);
+	PxfFilterDesc* filter4 = build_filter(
+			PXF_ATTR_CODE, 5, NULL,
+			PXF_CONST_CODE, 0, "\"Winston\"",
+			PXFOP_GE);
 
 	filter_list = lappend(filter_list, filter1);
 	filter_list = lappend(filter_list, filter2);
 
-	result = gphd_serialize_filter_list(filter_list);
+	result = pxf_serialize_filter_list(filter_list);
 	assert_string_equal(result, "a1c1983o2a2c1985o1o7");
 	pfree(result);
 
 	filter_list = lappend(filter_list, filter3);
 
-	result = gphd_serialize_filter_list(filter_list);
+	result = pxf_serialize_filter_list(filter_list);
 	assert_string_equal(result, "a1c1983o2a2c1985o1o7a3c\"George Orwell\"o5o7");
 	pfree(result);
 
 	filter_list = lappend(filter_list, filter4);
 
-	result = gphd_serialize_filter_list(filter_list);
+	result = pxf_serialize_filter_list(filter_list);
 	assert_string_equal(result, "a1c1983o2a2c1985o1o7a3c\"George Orwell\"o5o7a4c\"Winston\"o4o7");
 	pfree(result);
 
-	gphd_free_filter_list(filter_list);
+	pxf_free_filter_list(filter_list);
 	filter_list = NIL;
 }
 
@@ -544,17 +543,17 @@ main(int argc, char* argv[])
 			unit_test(test__const_to_str__text),
 			unit_test(test__const_to_str__boolean),
 			unit_test(test__const_to_str__NegativeCircle),
-			unit_test(test__opexpr_to_gphdfilter__null),
-			unit_test(test__opexpr_to_gphdfilter__unary_expr),
-			unit_test(test__opexpr_to_gphdfilter__different_types),
-			unit_test(test__opexpr_to_gphdfilter__intGT),
-			unit_test(test__opexpr_to_gphdfilter__attributeIsNull),
-			unit_test(test__opexpr_to_gphdfilter__differentTypes),
-			unit_test(test__opexpr_to_gphdfilter__unsupportedTypeCircle),
-			unit_test(test__opexpr_to_gphdfilter__twoVars),
-			unit_test(test__opexpr_to_gphdfilter__unsupportedOpNot),
-			unit_test(test__gphd_serialize_filter_list__oneFilter),
-			unit_test(test__gphd_serialize_filter_list__manyFilters)
+			unit_test(test__opexpr_to_pxffilter__null),
+			unit_test(test__opexpr_to_pxffilter__unary_expr),
+			unit_test(test__opexpr_to_pxffilter__different_types),
+			unit_test(test__opexpr_to_pxffilter__intGT),
+			unit_test(test__opexpr_to_pxffilter__attributeIsNull),
+			unit_test(test__opexpr_to_pxffilter__differentTypes),
+			unit_test(test__opexpr_to_pxffilter__unsupportedTypeCircle),
+			unit_test(test__opexpr_to_pxffilter__twoVars),
+			unit_test(test__opexpr_to_pxffilter__unsupportedOpNot),
+			unit_test(test__pxf_serialize_filter_list__oneFilter),
+			unit_test(test__pxf_serialize_filter_list__manyFilters)
 	};
 	return run_tests(tests);
 }
