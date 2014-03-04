@@ -2,22 +2,16 @@
 -- CREATE_TYPE
 --
 --
--- Note: widget_in/out were created in create_function_1, without any
+-- Note: widget_in/out were CREATEd in CREATE_function_1, without any
 -- prior shell-type creation.  These commands therefore complete a test
 -- of the "old style" approach of making the functions first.
 --
-CREATE TYPE widget (
-   internallength = 24, 
-   input = widget_in,
-   output = widget_out,
-   alignment = double
-);
-CREATE TYPE city_budget ( 
-   internallength = 16, 
-   input = int44in, 
-   output = int44out, 
-   element = int4
-);
+-- start_ignore
+DROP SCHEMA IF EXISTS create_type_icg cascade;
+NOTICE:  schema "create_type_icg" does not exist, skipping
+CREATE schema create_type_icg;
+SET search_path=create_type_icg;
+-- end_ignore
 -- Test creation and destruction of shell types
 CREATE TYPE shell;
 CREATE TYPE shell;   -- fail, type already present
@@ -26,7 +20,7 @@ DROP TYPE shell;
 DROP TYPE shell;     -- fail, type not exist
 ERROR:  type "shell" does not exist
 --
--- Test type-related default values (broken in releases before PG 7.2)
+-- Test type-related default VALUES (broken in releases before PG 7.2)
 --
 -- This part of the test also exercises the "new style" approach of making
 -- a shell type and then filling it in.
@@ -70,6 +64,7 @@ CREATE TYPE text_w_default (
    default = 'zippo'
 );
 CREATE TABLE default_test (f1 text_w_default, f2 int42);
+NOTICE:  Table doesn't have 'distributed by' clause, and no column type is suitable for a distribution key. Creating a NULL policy entry.
 INSERT INTO default_test DEFAULT VALUES;
 SELECT * FROM default_test;
   f1   | f2 
@@ -93,7 +88,7 @@ COMMENT ON TYPE bad IS 'bad comment';
 ERROR:  type "bad" does not exist
 COMMENT ON TYPE default_test_row IS 'good comment';
 COMMENT ON TYPE default_test_row IS NULL;
--- Check shell type create for existing types
+-- Check shell type CREATE for existing types
 CREATE TYPE text_w_default;		-- should fail
 ERROR:  type "text_w_default" already exists
 DROP TYPE default_test_row CASCADE;
@@ -101,10 +96,91 @@ NOTICE:  drop cascades to function get_default_test()
 DROP TABLE default_test;
 -- Create & Drop type as non-superuser
 CREATE USER user_bob;
+NOTICE:  resource queue required -- using default resource queue "pg_default"
 SET SESSION AUTHORIZATION user_bob;
 CREATE TYPE shell;
+ERROR:  no schema has been selected to create in
 DROP TYPE shell;
+ERROR:  type "shell" does not exist
 CREATE TYPE compfoo as (f1 int, f2 text);
+ERROR:  no schema has been selected to create in
 DROP TYPE compfoo;
+ERROR:  type "compfoo" does not exist
 RESET SESSION AUTHORIZATION;
 DROP USER user_bob;
+--udt arrays
+CREATE TABLE aTABLE(k int, a int42[]);
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'k' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+INSERT INTO aTABLE VALUES(1, '{1, 3}');
+INSERT INTO aTABLE VALUES(2, '{2, 3}');
+INSERT INTO aTABLE VALUES(3, '{3, 3}');
+INSERT INTO aTABLE VALUES(4, '{4, 3}');
+SELECT a FROM aTABLE WHERE k=1;   
+   a   
+-------
+ {1,3}
+(1 row)
+
+SELECT a FROM aTABLE WHERE k=4;   
+   a   
+-------
+ {4,3}
+(1 row)
+
+--functions
+CREATE FUNCTION echo_aTABLE(int) returns int42[]
+as 'select a from aTABLE where k = $1;'
+LANGUAGE SQL;
+SELECT echo_aTABLE(1);
+ echo_atable 
+-------------
+ {1,3}
+(1 row)
+
+SELECT echo_aTABLE(2);
+ echo_atable 
+-------------
+ {2,3}
+(1 row)
+
+CREATE TABLE sensors(f1 text, f2 int42);
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'f1' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+INSERT INTO sensors VALUES ('sensor1', '21');
+INSERT INTO sensors VALUES ('sensor2', '22');
+INSERT INTO sensors VALUES ('sensor3', '23');
+INSERT INTO sensors VALUES ('sensor4', '24');
+CREATE FUNCTION get_sensor_point(text) returns int42
+as 'select f2 from sensors where f1=$1;'
+language sql;
+SELECT get_sensor_point('sensor2');
+ get_sensor_point 
+------------------
+ 22
+(1 row)
+
+CREATE FUNCTION get_sensor_points() returns setof int42
+as 'select f2 from sensors;'
+language sql;
+SELECT get_sensor_pointis();
+ERROR:  function get_sensor_pointis() does not exist
+LINE 1: SELECT get_sensor_pointis();
+               ^
+HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
+-- start_ignore
+DROP SCHEMA create_type_icg cascade;
+NOTICE:  drop cascades to function get_sensor_points()
+NOTICE:  drop cascades to function get_sensor_point(text)
+NOTICE:  drop cascades to append only table sensors
+NOTICE:  drop cascades to function echo_atable(integer)
+NOTICE:  drop cascades to append only table atable
+NOTICE:  drop cascades to type text_w_default[]
+NOTICE:  drop cascades to type text_w_default
+NOTICE:  drop cascades to function text_w_default_out(text_w_default)
+NOTICE:  drop cascades to function text_w_default_in(cstring)
+NOTICE:  drop cascades to type int42[]
+NOTICE:  drop cascades to type int42
+NOTICE:  drop cascades to function int42_out(int42)
+NOTICE:  drop cascades to function int42_in(cstring)
+-- end_ignore

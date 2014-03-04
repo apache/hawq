@@ -129,6 +129,9 @@ static void
 prepareDispatchedCatalogLanguage(QueryContextInfo *ctx, Oid langOid);
 
 static void
+prepareDispatchedCatalogOpClassForType(QueryContextInfo *ctx, Oid typeOid);
+
+static void
 prepareDispatchedCatalogType(QueryContextInfo *ctx, Oid typeOid);
 
 static void
@@ -145,16 +148,19 @@ prepareDispatchedCatalogFunctionExpr(QueryContextInfo *cxt, Expr *expr);
 
 static void
 prepareDispatchedCatalogForAoCoParquet(QueryContextInfo *cxt, Oid relid,
-        bool forInsert, int32 segno);
+									   bool forInsert, int32 segno);
+
+static void
+prepareAllDispatchedCatalogTablespace(QueryContextInfo *ctx);
 
 static void
 prepareDispatchedCatalogExternalTable(QueryContextInfo *cxt, Oid relid);
 
 static void
-WriteData(QueryContextInfo *cxt, const char *buffer, int size);
+addOperatorToDispatchContext(QueryContextInfo *ctx, Oid opOid);
 
 static void
-prepareAllDispatchedCatalogTablespace(QueryContextInfo *ctx);
+WriteData(QueryContextInfo *cxt, const char *buffer, int size);
 
 static void GetExtTableLocationsArray(HeapTuple tuple, TupleDesc exttab_desc, 
 									  Datum **array, int *array_size);
@@ -1641,6 +1647,18 @@ static bool collect_func_walker(Node *node, QueryContextInfo *context)
 {
 	if (node == NULL)
 		return false;
+
+	if (IsA(node, Var))
+	{
+		/*
+		 * This handler is for user defined types.
+		 * prepareDispatchedCatalogType() checks if the oid of this type
+		 * is greater than FirstNormalObjectId so we do not need to test
+		 * that here.
+		 */
+		Var *var = (Var *) node;
+		prepareDispatchedCatalogType(context, var->vartype);
+	}
 	if (IsA(node, RowExpr))
 	{
 		/*
@@ -1961,7 +1979,58 @@ prepareDispatchedCatalogType(QueryContextInfo *ctx, Oid typeOid)
 	if (!HeapTupleIsValid(typetuple))
 		elog(ERROR, "cache lookup failed for type %u", typeOid);
 
-	AddTupleToContextInfo(ctx, TypeRelationId, "pg_type", typetuple, MASTER_CONTENT_ID);
+	/*
+	 * In case of arrays of user defined types we should also
+	 * dispatch the underlying type defined by typelem attribute
+	 * if it is also a user defined type.
+	 */
+	typeDatum = caql_getattr(pcqCtx, Anum_pg_type_typelem, &isNull);
+	if (!isNull && OidIsValid(DatumGetObjectId(typeDatum)))
+	{
+		prepareDispatchedCatalogType(ctx, DatumGetObjectId(typeDatum));
+	}
+
+	/*
+	 * We need to dispatch all the accompanying functions for user defined types.
+	 */
+	typeDatum = caql_getattr(pcqCtx, Anum_pg_type_typinput, &isNull);
+	if (!isNull && OidIsValid(DatumGetObjectId(typeDatum)))
+	{
+		prepareDispatchedCatalogFunction(ctx, DatumGetObjectId(typeDatum));
+	}
+
+	typeDatum = caql_getattr(pcqCtx, Anum_pg_type_typoutput, &isNull);
+	if (!isNull && OidIsValid(DatumGetObjectId(typeDatum)))
+	{
+		prepareDispatchedCatalogFunction(ctx, DatumGetObjectId(typeDatum));
+	}
+
+	typeDatum = caql_getattr(pcqCtx, Anum_pg_type_typreceive, &isNull);
+	if (!isNull && OidIsValid(DatumGetObjectId(typeDatum)))
+	{
+		prepareDispatchedCatalogFunction(ctx, DatumGetObjectId(typeDatum));
+	}
+
+	typeDatum = caql_getattr(pcqCtx, Anum_pg_type_typsend, &isNull);
+	if (!isNull && OidIsValid(DatumGetObjectId(typeDatum)))
+	{
+		prepareDispatchedCatalogFunction(ctx, DatumGetObjectId(typeDatum));
+	}
+
+	typeDatum = caql_getattr(pcqCtx, Anum_pg_type_typreceive, &isNull);
+	if (!isNull && typeDatum)
+	{
+		prepareDispatchedCatalogFunction(ctx, DatumGetObjectId(typeDatum));
+	}
+
+	typeDatum = caql_getattr(pcqCtx, Anum_pg_type_typsend, &isNull);
+	if (!isNull && typeDatum)
+	{
+		prepareDispatchedCatalogFunction(ctx, DatumGetObjectId(typeDatum));
+	}
+
+	AddTupleToContextInfo(ctx, TypeRelationId, "pg_type", typetuple,
+						  MASTER_CONTENT_ID);
 
 	/*
 	 * ROW(f1, f2, ...) expression may not have corresponding pg_type
@@ -1969,20 +2038,112 @@ prepareDispatchedCatalogType(QueryContextInfo *ctx, Oid typeOid)
 	 * already included, the following is a no-op.
 	 */
 	typeDatum = caql_getattr(pcqCtx, Anum_pg_type_typrelid, &isNull);
-	if (!isNull && typeDatum)
+    if (!isNull && OidIsValid(DatumGetObjectId(typeDatum)))
 	{
 		prepareDispatchedCatalogSingleRelation(ctx, DatumGetObjectId(typeDatum),
 											   FALSE, 0);
 	}
 
 	caql_endscan(pcqCtx);
+
+	/*
+	 * For user defined types we also dispatch associated operator classes.
+	 * This is to safe guard against certain cases like Sort Operator and
+	 * Hash Aggregates where the plan tree does not explicitly contain all the
+	 * operators that might be needed by the executor on the segments.
+	 */
+	prepareDispatchedCatalogOpClassForType(ctx, typeOid);
+}
+
+/* For user defined type dispatch the operator class. */
+static void
+prepareDispatchedCatalogOpClassForType(QueryContextInfo *ctx, Oid typeOid)
+{
+	cqContext      *pcqCtx;
+	HeapTuple       tuple;
+	Datum           value;
+
+	if (!OidIsValid(typeOid))
+		return;
+
+	/*
+	 * builtin object, dispatch nothing.
+	 */
+	if (typeOid < FirstNormalObjectId)
+		return;
+
+	pcqCtx = caql_beginscan(NULL,
+							cql("SELECT oid FROM pg_opclass"
+								" WHERE opcintype = :1",
+								ObjectIdGetDatum(typeOid)));
+
+	while (HeapTupleIsValid(tuple = caql_getnext(pcqCtx)))
+	{
+		value = HeapTupleGetOid(tuple);
+		if (OidIsValid(DatumGetObjectId(value)))
+			prepareDispatchedCatalogOpClass(ctx, DatumGetObjectId(value));
+	}
+
+	caql_endscan(pcqCtx);
 }
 
 /*
- * Send pg_operator and pg_amop tuples.
+ * This function does not do the actual work. It checks if
+ * there is an operator class associated with this operator and
+ * if found delegates the work to prepareDispatchedOpClass else
+ * delegates work to addOperatorToDispatchContext.
  */
 static void
 prepareDispatchedCatalogOperator(QueryContextInfo *ctx, Oid opOid)
+{
+	cqContext	   *pcqCtx;
+	HeapTuple		tuple;
+	bool			isnull;
+	bool			foundOperatorClass = false;
+
+	/*
+	 * builtin object, dispatch nothing.
+	 */
+	if (opOid < FirstNormalObjectId)
+		return;
+
+	if (alreadyAddedForDispatching(ctx->htab, opOid, OpType))
+		return;
+
+	/*
+	 * Check if we have an operator class associated with this operator.
+	 * If yes, the prepareDispatchedOpClass will handle adding this operator
+	 * to the context.
+	 */
+	pcqCtx = caql_beginscan(NULL,
+							cql("SELECT * FROM pg_amop"
+								" WHERE amopopr = :1",
+								ObjectIdGetDatum(opOid)));
+	while (HeapTupleIsValid(tuple = caql_getnext(pcqCtx)))
+	{
+		foundOperatorClass = true;
+		Oid		opclass;
+		opclass = DatumGetObjectId(
+				caql_getattr(pcqCtx, Anum_pg_amop_amopclaid, &isnull));
+
+		prepareDispatchedCatalogOpClass(ctx, opclass);
+	}
+
+	caql_endscan(pcqCtx);
+
+	/*
+	 * Otherwise, call addOperatorToDispatchContext to add this operator from
+	 * here and bail out.
+	 */
+	if (!foundOperatorClass)
+	{
+		addOperatorToDispatchContext(ctx, opOid);
+	}
+}
+
+/* just add the pg_operator tuple and associated operator functions */
+static void
+addOperatorToDispatchContext(QueryContextInfo *ctx, Oid opOid)
 {
 	cqContext	   *pcqCtx;
 	HeapTuple		tuple;
@@ -2016,11 +2177,11 @@ prepareDispatchedCatalogOperator(QueryContextInfo *ctx, Oid opOid)
 	/* sort operators */
 	value = caql_getattr(pcqCtx, Anum_pg_operator_oprlsortop, &isnull);
 	if (!isnull && OidIsValid(DatumGetObjectId(value)))
-		prepareDispatchedCatalogOperator(ctx, DatumGetObjectId(value));
+		addOperatorToDispatchContext(ctx, DatumGetObjectId(value));
 
 	value = caql_getattr(pcqCtx, Anum_pg_operator_oprrsortop, &isnull);
 	if (!isnull && OidIsValid(DatumGetObjectId(value)))
-		prepareDispatchedCatalogOperator(ctx, DatumGetObjectId(value));
+		addOperatorToDispatchContext(ctx, DatumGetObjectId(value));
 
 	/* merge join LT compare operator */
 	value = caql_getattr(pcqCtx, Anum_pg_operator_oprltcmpop, &isnull);
@@ -2045,42 +2206,11 @@ prepareDispatchedCatalogOperator(QueryContextInfo *ctx, Oid opOid)
 	}
 
 	caql_endscan(pcqCtx);
-
-	/*
-	 * Ordinary operator expression does not need anything than underlying
-	 * function, but in case of HJ, we need hash function information too.
-	 * Since it's almost impossible to know if this operator is used for HJ
-	 * or others, we just send everything that might be needed.
-	 */
-	pcqCtx = caql_beginscan(NULL,
-							cql("SELECT * FROM pg_amop"
-								" WHERE amopopr = :1",
-								ObjectIdGetDatum(opOid)));
-
-	while (HeapTupleIsValid(tuple = caql_getnext(pcqCtx)))
-	{
-		Oid		opclass;
-
-		/*
-		 * We check duplicates for opclass id in prepareDispatchedCatalogOpClass.
-		 * The unique key of pg_amop is (amopopr, amopclaid), so sending
-		 * pg_amop tuples by operator id should not create duplicate
-		 * tuples for pg_amop.
-		 */
-		AddTupleToContextInfo(ctx, AccessMethodOperatorRelationId, "pg_amop",
-							  tuple, MASTER_CONTENT_ID);
-
-		opclass = DatumGetObjectId(
-				caql_getattr(pcqCtx, Anum_pg_amop_amopclaid, &isnull));
-
-		prepareDispatchedCatalogOpClass(ctx, opclass);
-	}
-	caql_endscan(pcqCtx);
 }
 
 /*
- * For opclass, we dispatch pg_opclass and pg_amproc.  pg_amop should be
- * handled by operator, so we don't touch it here.
+ * For opclass, we dispatch pg_opclass, pg_amproc, and pg_amop tuples.
+ * Loop through all the underlying operators and dispatch them too.
  */
 static void
 prepareDispatchedCatalogOpClass(QueryContextInfo *ctx, Oid opclass)
@@ -2130,6 +2260,31 @@ prepareDispatchedCatalogOpClass(QueryContextInfo *ctx, Oid opclass)
 		value = caql_getattr(pcqCtx, Anum_pg_amproc_amproc, &isnull);
 		if (!isnull && OidIsValid(DatumGetObjectId(value)))
 			prepareDispatchedCatalogFunction(ctx, DatumGetObjectId(value));
+	}
+
+	caql_endscan(pcqCtx);
+
+	/* pg_amop and dispatch all underlying operators */
+	/*
+	 * Ordinary operator expression does not need anything than underlying
+	 * function, but in case of HJ, we need hash function information too.
+	 * Since it's almost impossible to know if this operator is used for HJ
+	 * or others, we just send everything that might be needed.
+	 */
+	pcqCtx = caql_beginscan(NULL,
+							cql("SELECT * FROM pg_amop"
+								" WHERE amopclaid = :1",
+								ObjectIdGetDatum(opclass)));
+
+	while (HeapTupleIsValid(tuple = caql_getnext(pcqCtx)))
+	{
+		AddTupleToContextInfo(ctx, AccessMethodOperatorRelationId, "pg_amop",
+							  tuple, MASTER_CONTENT_ID);
+		value = caql_getattr(pcqCtx, Anum_pg_amop_amopopr, &isnull);
+		if (!isnull && OidIsValid(DatumGetObjectId(value)))
+		{
+			addOperatorToDispatchContext(ctx, DatumGetObjectId(value));
+		}
 	}
 
 	caql_endscan(pcqCtx);

@@ -189,7 +189,7 @@ DefineType(List *names, List *parameters, Oid newOid, Oid shadowOid)
 		if (createShellOnly)
 		{
 			/* Must dispatch shell type creation */
-			if (Gp_role == GP_ROLE_DISPATCH)
+			if (gp_upgrade_mode && Gp_role == GP_ROLE_DISPATCH)
 			{
 				DefineStmt * stmt = makeNode(DefineStmt);
 				stmt->kind = OBJECT_TYPE;
@@ -526,7 +526,7 @@ DefineType(List *names, List *parameters, Oid newOid, Oid shadowOid)
 		pfree(shadow_type);
 	}
 
-	if (Gp_role == GP_ROLE_DISPATCH)
+	if (gp_upgrade_mode &&  Gp_role == GP_ROLE_DISPATCH)
 	{
 		DefineStmt * stmt = makeNode(DefineStmt);
 		stmt->kind = OBJECT_TYPE;
@@ -2742,7 +2742,7 @@ AlterType(AlterTypeStmt *stmt)
 		add_type_encoding(typid, typoptions);
 	}	
 
-	if (Gp_role == GP_ROLE_DISPATCH)
+	if (gp_upgrade_mode && Gp_role == GP_ROLE_DISPATCH)
 		CdbDispatchUtilityStatement((Node *)stmt, NULL);
 
 	heap_close(pgtypeenc, NoLock);

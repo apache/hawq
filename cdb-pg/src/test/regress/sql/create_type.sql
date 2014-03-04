@@ -3,23 +3,16 @@
 --
 
 --
--- Note: widget_in/out were created in create_function_1, without any
+-- Note: widget_in/out were CREATEd in CREATE_function_1, without any
 -- prior shell-type creation.  These commands therefore complete a test
 -- of the "old style" approach of making the functions first.
 --
-CREATE TYPE widget (
-   internallength = 24, 
-   input = widget_in,
-   output = widget_out,
-   alignment = double
-);
 
-CREATE TYPE city_budget ( 
-   internallength = 16, 
-   input = int44in, 
-   output = int44out, 
-   element = int4
-);
+-- start_ignore
+DROP SCHEMA IF EXISTS create_type_icg cascade;
+CREATE schema create_type_icg;
+SET search_path=create_type_icg;
+-- end_ignore
 
 -- Test creation and destruction of shell types
 CREATE TYPE shell;
@@ -28,7 +21,7 @@ DROP TYPE shell;
 DROP TYPE shell;     -- fail, type not exist
 
 --
--- Test type-related default values (broken in releases before PG 7.2)
+-- Test type-related default VALUES (broken in releases before PG 7.2)
 --
 -- This part of the test also exercises the "new style" approach of making
 -- a shell type and then filling it in.
@@ -92,7 +85,7 @@ COMMENT ON TYPE bad IS 'bad comment';
 COMMENT ON TYPE default_test_row IS 'good comment';
 COMMENT ON TYPE default_test_row IS NULL;
 
--- Check shell type create for existing types
+-- Check shell type CREATE for existing types
 CREATE TYPE text_w_default;		-- should fail
 
 DROP TYPE default_test_row CASCADE;
@@ -109,3 +102,39 @@ DROP TYPE compfoo;
 RESET SESSION AUTHORIZATION;
 DROP USER user_bob;
 
+--udt arrays
+CREATE TABLE aTABLE(k int, a int42[]);
+INSERT INTO aTABLE VALUES(1, '{1, 3}');
+INSERT INTO aTABLE VALUES(2, '{2, 3}');
+INSERT INTO aTABLE VALUES(3, '{3, 3}');
+INSERT INTO aTABLE VALUES(4, '{4, 3}');
+SELECT a FROM aTABLE WHERE k=1;   
+SELECT a FROM aTABLE WHERE k=4;   
+
+--functions
+CREATE FUNCTION echo_aTABLE(int) returns int42[]
+as 'select a from aTABLE where k = $1;'
+LANGUAGE SQL;
+SELECT echo_aTABLE(1);
+SELECT echo_aTABLE(2);
+
+
+CREATE TABLE sensors(f1 text, f2 int42);
+INSERT INTO sensors VALUES ('sensor1', '21');
+INSERT INTO sensors VALUES ('sensor2', '22');
+INSERT INTO sensors VALUES ('sensor3', '23');
+INSERT INTO sensors VALUES ('sensor4', '24');
+
+CREATE FUNCTION get_sensor_point(text) returns int42
+as 'select f2 from sensors where f1=$1;'
+language sql;
+SELECT get_sensor_point('sensor2');
+
+CREATE FUNCTION get_sensor_points() returns setof int42
+as 'select f2 from sensors;'
+language sql;
+SELECT get_sensor_pointis();
+
+-- start_ignore
+DROP SCHEMA create_type_icg cascade;
+-- end_ignore

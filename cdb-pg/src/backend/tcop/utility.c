@@ -618,6 +618,10 @@ ProcessDropStatement(DropStmt *stmt)
 				/* RemoveType does its own permissions checks */
 				RemoveType(names, stmt->behavior,
 						   stmt->missing_ok);
+				if(gp_upgrade_mode && Gp_role == GP_ROLE_DISPATCH)
+				{
+					CdbDispatchUtilityStatement((Node *)stmt, "RemoveType");
+				}
 				break;
 
 			case OBJECT_DOMAIN:
@@ -1225,10 +1229,6 @@ ProcessUtility(Node *parsetree,
 						DefineOperator(stmt->defnames, stmt->definition, stmt->newOid);
 						break;
 					case OBJECT_TYPE:
-						if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
-							ereport(ERROR,
-								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create type statement yet") ));
-						}
 						Assert(stmt->args == NIL);
 						DefineType(stmt->defnames, stmt->definition, stmt->newOid, stmt->shadowOid);
 						break;
