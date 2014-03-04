@@ -2432,6 +2432,7 @@ CTranslatorRelcacheToDXL::PdrgpdxlbucketTransformStats
 	GPOS_ASSERT(phistGPDBMCV->FValid());
 
 	CHistogram *phistGPDBHist = NULL;
+	ULONG ulHist = 0;
 	CDouble dHistFreq = CDouble(1.0) - phistGPDBMCV->DFrequency();
 
 	// TODO: shene - Jul 23, 2013; The semantics is not very clear here - if there are
@@ -2450,17 +2451,18 @@ CTranslatorRelcacheToDXL::PdrgpdxlbucketTransformStats
 						dDistinct,
 						dHistFreq
 						);
+		ulHist = phistGPDBHist->UlBuckets();
 	}
 
 	DrgPdxlbucket *pdrgpdxlbucket = NULL;
 
-	if (1 - CStatistics::DEpsilon < dHistFreq && 0 < ulNumHistValues)
+	if (1 - CStatistics::DEpsilon < dHistFreq && 0 < ulHist)
 	{
 		// if histogram exists and dominates, use histogram only
 		pdrgpdxlbucket = Pdrgpdxlbucket(pmp, pmdtype, phistGPDBHist);
 	}
 
-	else if (1 >= ulNumHistValues || CStatistics::DEpsilon > dHistFreq)
+	else if (1 >= ulHist || CStatistics::DEpsilon > dHistFreq)
 	{
 		// if MCV dominates, use MCV only
 		pdrgpdxlbucket = Pdrgpdxlbucket(pmp, pmdtype, phistGPDBMCV);
@@ -2599,10 +2601,15 @@ CTranslatorRelcacheToDXL::PhistTransformGPDBHist
 									);
 		pdrgppbucket->Append(pbucket);
 
-		if (!pdatumMin->FHasStatsLessThan(pdatumMin))
+		if (!pdatumMin->FHasStatsLessThan(pdatumMin) || !pdatumMin->FStatsLessThan(pdatumMax))
 		{
-			// if less than operation is not supported on this datum, then no point
-			// building a histogram. return an empty histogram
+			// if less than operation is not supported on this datum,
+			// or the translated histogram does not conform to GPDB sort order (e.g. text column in Linux platform),
+			// then no point building a histogram. return an empty histogram
+
+			// TODO: shene 03/01/2014 translate histogram into Orca even if sort
+			// order is different in GPDB, and use const expression eval to compare
+			// datums in Orca (MPP-22780)
 			pdrgppbucket->Release();
 			return New(pmp) CHistogram(New(pmp) DrgPbucket(pmp));
 		}
