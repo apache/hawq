@@ -1347,20 +1347,73 @@ public class PxfHdfsRegression extends PxfTestCase {
 		hawq.queryResults(results, "SELECT * FROM pg_remote_credentials");
 
 		Table expected = new Table("expected", null);
-		expected.addColumnHeader("rcowner");
-		expected.addColumnHeader("rcservice");
-		expected.addColumnHeader("rcremoteuser");
-		expected.addColumnHeader("rcremotepassword");
-
-		expected.addColDataType(Types.BIGINT);
-		expected.addColDataType(Types.VARCHAR);
-		expected.addColDataType(Types.VARCHAR);
-		expected.addColDataType(Types.VARCHAR);
+		expected.addColumn("rcowner", Types.BIGINT);
+		expected.addColumn("rcservice", Types.VARCHAR);
+		expected.addColumn("rcremoteuser", Types.VARCHAR);
+		expected.addColumn("rcremotepassword", Types.VARCHAR);
 
 		ComparisonUtils.compareTablesMetadata(expected, results);
 		ComparisonUtils.compareTables(results, expected, report);
 	}
 	
+	/**
+	 * Verify pg_remote_logins exists, created with the expected
+	 * structure and does not print any passwords
+	 *
+	 * pg_remote_logins is a view ontop pg_remote_credentials.
+	 *
+	 * @throws Exception
+	 */
+	@Test
+	public void remoteLoginsView() throws Exception {
+
+		// SETUP
+		hawq.runQuery("SET allow_system_table_mods = 'DML';");
+		hawq.runQuery("INSERT INTO pg_remote_credentials VALUES (10, 'a', 'b', 'c');");
+
+		// TEST
+		Table results = new Table("results", null);
+		hawq.queryResults(results, "SELECT * FROM pg_remote_logins");
+
+		// COMPARISON
+		Table expected = new Table("expected", null);
+		expected.addColumn("rolname", Types.VARCHAR);
+		expected.addColumn("rcservice", Types.VARCHAR);
+		expected.addColumn("rcremoteuser", Types.VARCHAR);
+		expected.addColumn("rcremotepassword", Types.VARCHAR);
+		expected.addRow(new String[] { System.getProperty("user.name"), "a", "b", "********" });
+
+		ComparisonUtils.compareTablesMetadata(expected, results);
+		ComparisonUtils.compareTables(results, expected, report);
+
+		// CLEANUP
+		hawq.runQuery("DELETE FROM pg_remote_credentials WHERE rcowner = 10;");
+		hawq.runQuery("SET allow_system_table_mods = 'NONE';");
+	}
+	
+	/**
+	 * Verify pg_remote_credentials has the correct ACLs
+	 *
+	 * @throws Exception
+	 */
+	@Test
+	public void remoteCredentialsACL() throws Exception {
+
+		// TEST
+		Table results = new Table("results", null);
+		hawq.queryResults(results, "SELECT relacl FROM pg_class WHERE relname = 'pg_remote_credentials'");
+
+		// COMPARISON
+		Table expected = new Table("expected", null);
+		expected.addColumnHeader("relacl");
+		expected.addColDataType(Types.ARRAY);
+		expected.addRow(new String[] {"{" + System.getProperty("user.name") + 
+									  "=arwdxt/" + System.getProperty("user.name") + "}"});
+
+		ComparisonUtils.compareTablesMetadata(expected, results);
+		ComparisonUtils.compareTables(results, expected, report);
+	}
+
 	/**
 	 * Namenode Highavailibility test - creating table with non-existent nameservice
 	 * 
