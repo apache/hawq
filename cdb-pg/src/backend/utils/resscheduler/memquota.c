@@ -21,6 +21,17 @@
 #include "utils/guc_tables.h"
 #include "cdb/cdbvars.h"
 #include "optimizer/clauses.h"
+#include "parser/parsetree.h"
+
+/*
+ * OIDs of partition functions that we mark as non-memory intensive.
+ * TODO caragg 03/04/2014: Revert these changes when ORCA has the new partition
+ * operator (MPP-22799)
+ */
+#define GP_PARTITION_PROPAGATION_OID 6083
+#define GP_PARTITION_SELECTION_OID 6084
+#define GP_PARTITION_EXPANSION_OID 6085
+#define GP_PARTITION_INVERSE_OID 6086
 
 /**
  * Policy Auto. This contains information that will be used by Policy AUTO 
@@ -31,6 +42,7 @@ typedef struct PolicyAutoContext
 	uint64 numNonMemIntensiveOperators; /* number of non-blocking operators */
 	uint64 numMemIntensiveOperators; /* number of blocking operators */
 	uint64 queryMemKB;
+	PlannedStmt *plannedStmt; /* pointer to the planned statement */
 } PolicyAutoContext;
 
 /**
@@ -39,7 +51,7 @@ typedef struct PolicyAutoContext
 static bool PolicyAutoPrelimWalker(Node *node, PolicyAutoContext *context);
 static bool	PolicyAutoAssignWalker(Node *node, PolicyAutoContext *context);
 static bool IsAggMemoryIntensive(Agg *agg);
-static bool IsMemoryIntensiveOperator(Node *node);
+static bool IsMemoryIntensiveOperator(Node *node, PlannedStmt *stmt);
 static double minDouble(double a, double b);
 
 struct OperatorGroupNode;
@@ -90,6 +102,7 @@ typedef struct PolicyEagerFreeContext
 	OperatorGroupNode *groupNode; /* the current group node in the group tree */
 	uint32 nextGroupId; /* the group id for a new group node */
 	uint64 queryMemKB; /* the query memory limit */
+	PlannedStmt *plannedStmt; /* pointer to the planned statement */
 } PolicyEagerFreeContext;
 
 /**
@@ -211,17 +224,100 @@ IsBlockingOperator(Node *node)
 }
 
 /**
- * Is a result node memory intensive? It is if it contains function calls.
+ * Special-case certain functions which we know are not memory intensive.
+ * TODO caragg 03/04/2014: Revert these changes when ORCA has the new partition
+ * operator (MPP-22799)
+ *
  */
-bool IsResultMemoryIntesive(Result *res)
+static bool
+isMemoryIntensiveFunction(Oid funcid)
 {
-	return contains_node_type(NULL, (Node *) ((Plan *) res)->targetlist, T_FuncExpr);
+
+	if ((GP_PARTITION_PROPAGATION_OID == funcid) ||
+			(GP_PARTITION_SELECTION_OID == funcid) ||
+			(GP_PARTITION_EXPANSION_OID == funcid) ||
+			(GP_PARTITION_INVERSE_OID == funcid))
+
+	{
+		return false;
+	}
+
+	return true;
 }
+
+/**
+ * Is a result node memory intensive? It is if it contains function calls.
+ * We special-case certain functions used by ORCA which we know that are not
+ * memory intensive
+ * TODO caragg 03/04/2014: Revert these changes when ORCA has the new partition
+ * operator (MPP-22799)
+ */
+bool
+IsResultMemoryIntesive(Result *res)
+{
+
+	List *funcNodes = extract_nodes(NULL /* glob */,
+			(Node *) ((Plan *) res)->targetlist, T_FuncExpr);
+
+	int nFuncExpr = list_length(funcNodes);
+	if (nFuncExpr == 0)
+	{
+		/* No function expressions, not memory intensive */
+		return false;
+	}
+
+	bool isMemoryIntensive = false;
+	ListCell *lc = NULL;
+	foreach(lc, funcNodes)
+	{
+		FuncExpr *funcExpr = lfirst(lc);
+		Assert(IsA(funcExpr, FuncExpr));
+		if ( isMemoryIntensiveFunction(funcExpr->funcid))
+		{
+			/* Found a function that we don't know of. Mark as memory intensive */
+			isMemoryIntensive = true;
+			break;
+		}
+	}
+
+	/* Shallow free of the funcNodes list */
+	list_free(funcNodes);
+	funcNodes = NIL;
+
+	return isMemoryIntensive;
+}
+
+/**
+ * Is a function scan memory intensive? Special case some known functions
+ * that are not memory intensive.
+ */
+static bool
+IsFunctionScanMemoryIntensive(FunctionScan *funcScan, PlannedStmt *stmt)
+{
+	Assert(NULL != stmt);
+	Assert(NULL != funcScan);
+
+	Index rteIndex = funcScan->scan.scanrelid;
+	RangeTblEntry *rte = rt_fetch(rteIndex, stmt->rtable);
+
+	Assert(RTE_FUNCTION == rte->rtekind);
+
+	if (IsA(rte->funcexpr, FuncExpr))
+	{
+		FuncExpr *funcExpr = (FuncExpr *) rte->funcexpr;
+		return isMemoryIntensiveFunction(funcExpr->funcid);
+	}
+
+	/* Didn't find any of our special cases, default is memory intensive */
+	return true;
+}
+
 
 /**
  * Is an operator memory intensive?
  */
-static bool IsMemoryIntensiveOperator(Node *node)
+static bool
+IsMemoryIntensiveOperator(Node *node, PlannedStmt *stmt)
 {
 	Assert(is_plan_node(node));
 	switch(nodeTag(node))
@@ -231,7 +327,6 @@ static bool IsMemoryIntensiveOperator(Node *node)
 		case T_ShareInputScan:
 		case T_Hash:
 		case T_BitmapIndexScan:
-		case T_FunctionScan:
 		case T_Window:
 		case T_TableFunctionScan:
 			return true;
@@ -244,6 +339,11 @@ static bool IsMemoryIntensiveOperator(Node *node)
 			{
 				Result *res = (Result *) node;
 				return IsResultMemoryIntesive(res);
+			}
+		case T_FunctionScan:
+			{
+				FunctionScan *funcScan = (FunctionScan *) node;
+				return IsFunctionScanMemoryIntensive(funcScan, stmt);
 			}
 		default:
 			return false;
@@ -282,7 +382,7 @@ static bool PolicyAutoPrelimWalker(Node *node, PolicyAutoContext *context)
 	Assert(context);	
 	if (is_plan_node(node))
 	{
-		if (IsMemoryIntensiveOperator(node))
+		if (IsMemoryIntensiveOperator(node, context->plannedStmt))
 		{
 			context->numMemIntensiveOperators++;
 		}
@@ -318,7 +418,7 @@ static bool PolicyAutoAssignWalker(Node *node, PolicyAutoContext *context)
 		/**
 		 * If the operator is not a memory intensive operator, give it fixed amount of memory.
 		 */
-		if (!IsMemoryIntensiveOperator(node))
+		if (!IsMemoryIntensiveOperator(node, context->plannedStmt))
 		{
 			planNode->operatorMemKB = nonMemIntenseOpMemKB;
 		}
@@ -351,6 +451,7 @@ static bool PolicyAutoAssignWalker(Node *node, PolicyAutoContext *context)
 	 ctx.queryMemKB = (uint64) (memAvailableBytes / 1024);
 	 ctx.numMemIntensiveOperators = 0;
 	 ctx.numNonMemIntensiveOperators = 0;
+	 ctx.plannedStmt = stmt;
 	 
 #ifdef USE_ASSERT_CHECKING
 	 bool result = 
@@ -428,12 +529,12 @@ CreateOperatorGroupNode(uint32 groupId, OperatorGroupNode *parentGroup)
  * on the type of the operator.
  */
 static void
-IncrementOperatorCount(Node *node, OperatorGroupNode *groupNode)
+IncrementOperatorCount(Node *node, OperatorGroupNode *groupNode, PlannedStmt *stmt)
 {
 	Assert(node != NULL);
 	Assert(groupNode != NULL);
 	
-	if (IsMemoryIntensiveOperator(node))
+	if (IsMemoryIntensiveOperator(node, stmt))
 	{
 		groupNode->numMemIntenseOps++;
 	}
@@ -761,7 +862,7 @@ PolicyEagerFreePrelimWalker(Node *node, PolicyEagerFreeContext *context)
 		context->groupNode = CreateOperatorGroupForOperator(node, context);
 		Assert(context->groupNode != NULL);
 
-		IncrementOperatorCount(node, context->groupNode);
+		IncrementOperatorCount(node, context->groupNode, context->plannedStmt);
 		
 		/*
 		 * We also increment the parent group's counter if this node
@@ -770,7 +871,7 @@ PolicyEagerFreePrelimWalker(Node *node, PolicyEagerFreeContext *context)
 		parentGroupNode = GetParentOperatorGroup(context->groupNode);
 		if (IsRootOperatorInGroup(node) && parentGroupNode != NULL)
 		{
-			IncrementOperatorCount(node, parentGroupNode);
+			IncrementOperatorCount(node, parentGroupNode, context->plannedStmt);
 		}
 	}
 
@@ -846,7 +947,7 @@ PolicyEagerFreeAssignWalker(Node *node, PolicyEagerFreeContext *context)
 			ComputeMemLimitForChildGroups(GetParentOperatorGroup(context->groupNode));
 		}
 
-		if (!IsMemoryIntensiveOperator(node))
+		if (!IsMemoryIntensiveOperator(node, context->plannedStmt))
 		{
 			planNode->operatorMemKB = nonMemIntenseOpMemKB;
 		}
@@ -914,6 +1015,7 @@ PolicyEagerFreeAssignOperatorMemoryKB(PlannedStmt *stmt, uint64 memAvailableByte
 	ctx.groupNode = NULL;
 	ctx.nextGroupId = 0;
 	ctx.queryMemKB = memAvailableBytes / 1024;
+	ctx.plannedStmt = stmt;
 
 #ifdef USE_ASSERT_CHECKING
 	bool result = 
