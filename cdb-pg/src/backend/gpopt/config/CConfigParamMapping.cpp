@@ -112,6 +112,12 @@ CConfigParamMapping::SConfigMappingElem CConfigParamMapping::m_elem[] =
 		&optimizer_minidump,
 		GPOS_WSZ_LIT("Generate optimizer minidump.")
 		},
+             	
+		{
+                EopttraceDisableMotions,
+                &optimizer_disable_motions,
+                GPOS_WSZ_LIT("Disable motion nodes in optimizer.")
+                },
 
 		{
 		EopttraceExtractDXLStats,

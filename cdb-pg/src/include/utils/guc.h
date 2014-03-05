@@ -351,6 +351,7 @@ extern bool optimizer_extract_dxl_stats;
 extern bool optimizer_extract_dxl_stats_all_nodes;
 extern bool optimizer_dpe_stats;
 extern bool optimizer_indexjoin;
+extern bool optimizer_disable_motions;
 extern bool optimizer_enumerate_plans;
 extern bool optimizer_sample_plans;
 extern int	optimizer_plan_id;

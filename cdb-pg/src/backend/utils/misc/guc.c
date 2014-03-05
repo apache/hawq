@@ -691,6 +691,7 @@ bool		optimizer_extract_dxl_stats;
 bool		optimizer_extract_dxl_stats_all_nodes;
 bool            optimizer_dpe_stats;
 bool		optimizer_indexjoin;
+bool		optimizer_disable_motions;
 bool		optimizer_enumerate_plans;
 bool		optimizer_sample_plans;
 int			optimizer_plan_id;
@@ -3662,6 +3663,15 @@ static struct config_bool ConfigureNamesBool[] =
                         GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
                 },
                 &optimizer_indexjoin,
+                false, NULL, NULL
+        },
+        {
+                {"optimizer_disable_motions", PGC_USERSET, DEVELOPER_OPTIONS,
+                        gettext_noop("Disallow plans with Motion operators in the optimizer."),
+                        NULL,
+                        GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+                },
+                &optimizer_disable_motions,
                 false, NULL, NULL
         },
 	{

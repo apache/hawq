@@ -812,6 +812,7 @@ COptTasks::PvOptimizeTask
 			{
 				// install opt context in TLS
 				pcm->AddRef();
+				pocconf->AddRef();
 				CAutoOptCtxt aoc(pmp, &mda, pcm, pocconf);
 				CTranslatorUtils::PreloadMD(pmp, &mda, sysidDefault, (Query*) poctx->m_pquery);
 			}
