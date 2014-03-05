@@ -10,7 +10,6 @@ ignore: goh_subselect
 ignore: goh_array
 ignore: goh_gphdfs
 test: goh_partition
-test: gpsql_872
 ignore: goh_dpe
 ignore: goh_gpic
 ignore: goh_eagerfree
