@@ -56,6 +56,9 @@ namespace gpdxl
 				// config param address
 				BOOL *m_pfParam;
 
+				// if true, we negate the config param value before setting traceflag value
+				BOOL m_fNegate;
+
 				// description
 				const WCHAR *wszDescription;
 			};

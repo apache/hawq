@@ -690,8 +690,14 @@ char	   *gp_idf_deduplicate_str;
 bool		optimizer_extract_dxl_stats;
 bool		optimizer_extract_dxl_stats_all_nodes;
 bool            optimizer_dpe_stats;
-bool		optimizer_indexjoin;
-bool		optimizer_disable_motions;
+bool		optimizer_enable_indexjoin;
+bool		optimizer_enable_motions;
+bool		optimizer_enable_motion_broadcast;
+bool		optimizer_enable_motion_gather;
+bool		optimizer_enable_motion_redistribute;
+bool		optimizer_enable_sort;
+bool		optimizer_enable_materialize;
+bool		optimizer_enable_part_propagation;
 bool		optimizer_enumerate_plans;
 bool		optimizer_sample_plans;
 int			optimizer_plan_id;
@@ -3657,22 +3663,76 @@ static struct config_bool ConfigureNamesBool[] =
                 false, NULL, NULL
         },
         {
-                {"optimizer_indexjoin", PGC_USERSET, DEVELOPER_OPTIONS,
+                {"optimizer_enable_indexjoin", PGC_USERSET, DEVELOPER_OPTIONS,
                         gettext_noop("Enable index nested loops join plans in the optimizer."),
                         NULL,
                         GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
                 },
-                &optimizer_indexjoin,
+                &optimizer_enable_indexjoin,
                 false, NULL, NULL
         },
         {
-                {"optimizer_disable_motions", PGC_USERSET, DEVELOPER_OPTIONS,
-                        gettext_noop("Disallow plans with Motion operators in the optimizer."),
+                {"optimizer_enable_motions", PGC_USERSET, DEVELOPER_OPTIONS,
+                        gettext_noop("Enable plans with Motion operators in the optimizer."),
                         NULL,
                         GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
                 },
-                &optimizer_disable_motions,
-                false, NULL, NULL
+                &optimizer_enable_motions,
+                true, NULL, NULL
+        },
+        {
+                {"optimizer_enable_motion_broadcast", PGC_USERSET, DEVELOPER_OPTIONS,
+                        gettext_noop("Enable plans with Motion Broadcast operators in the optimizer."),
+                        NULL,
+                        GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+                },
+                &optimizer_enable_motion_broadcast,
+                true, NULL, NULL
+        },
+        {
+                {"optimizer_enable_motion_gather", PGC_USERSET, DEVELOPER_OPTIONS,
+                        gettext_noop("Enable plans with Motion Gather operators in the optimizer."),
+                        NULL,
+                        GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+                },
+                &optimizer_enable_motion_gather,
+                true, NULL, NULL
+        },
+        {
+                {"optimizer_enable_motion_redistribute", PGC_USERSET, DEVELOPER_OPTIONS,
+                        gettext_noop("Enable plans with Motion Redistribute operators in the optimizer."),
+                        NULL,
+                        GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+                },
+                &optimizer_enable_motion_redistribute,
+                true, NULL, NULL
+        },
+        {
+                {"optimizer_enable_sort", PGC_USERSET, DEVELOPER_OPTIONS,
+                        gettext_noop("Enable plans with Sort operators in the optimizer."),
+                        NULL,
+                        GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+                },
+                &optimizer_enable_sort,
+                true, NULL, NULL
+        },
+        {
+                {"optimizer_enable_materialize", PGC_USERSET, DEVELOPER_OPTIONS,
+                        gettext_noop("Enable plans with Materialize operators in the optimizer."),
+                        NULL,
+                        GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+                },
+                &optimizer_enable_materialize,
+                true, NULL, NULL
+        },
+        {
+                {"optimizer_enable_part_propagation", PGC_USERSET, DEVELOPER_OPTIONS,
+                        gettext_noop("Enable plans with Partition Propagation operators in the optimizer."),
+                        NULL,
+                        GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+                },
+                &optimizer_enable_part_propagation,
+                true, NULL, NULL
         },
 	{
 		{"optimizer_enumerate_plans", PGC_USERSET, LOGGING_WHAT,

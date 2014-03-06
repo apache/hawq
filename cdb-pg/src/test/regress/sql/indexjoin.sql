@@ -2476,7 +2476,7 @@ CREATE INDEX my_tq_agg_small_ets_end_ts_ix ON my_tq_agg_small USING btree (ets, 
 
 analyze my_tq_agg_small;
 analyze my_tt_agg_small;
-set optimizer_indexjoin=on;
+set optimizer_enable_indexjoin=on;
 -- force_explain
 EXPLAIN 
 SELECT (tt.event_ts / 100000) / 5 * 5 as fivemin, COUNT(*)
