@@ -113,11 +113,11 @@ public class HiveDataFragmenter extends Fragmenter {
     /*
      * C'tor
      */
-    public HiveDataFragmenter(InputData md) throws TTransportException {
+    public HiveDataFragmenter(InputData md) {
         super(md);
 
         jobConf = new JobConf(new Configuration(), HiveDataFragmenter.class);
-        client = InitHiveClient();
+        client = null;
     }
 
     /*
@@ -127,6 +127,11 @@ public class HiveDataFragmenter extends Fragmenter {
      */
     @Override
     public List<Fragment> getFragments() throws Exception {
+    	
+    	if (client == null) {
+    		initHiveClient();
+    	}
+    	
         TblDesc tblDesc = parseTableQualifiedName(inputData.tableName());
         if (tblDesc == null) {
             throw new IllegalArgumentException(inputData.tableName() + " is not a valid Hive table name. Should be either <table_name> or <db_name.table_name>");
@@ -138,13 +143,17 @@ public class HiveDataFragmenter extends Fragmenter {
     }
 
     /* Initialize the Hive client */
-    private HiveClient InitHiveClient() throws TTransportException {
+    private void initHiveClient() {
         loadHostAndPort();
         TSocket transport = new TSocket(metastore.host, metastore.port);
+       
+        try {
+        	transport.open();
+        } catch (TTransportException e) {
+        	throw new RuntimeException("Failed to connect to Hive metastore: " + e.getMessage());
+        }
         TBinaryProtocol protocol = new TBinaryProtocol(transport);
-        HiveClient client = new org.apache.hadoop.hive.service.HiveClient(protocol);
-        transport.open();
-        return client;
+        client = new HiveClient(protocol);
     }
 
     /*

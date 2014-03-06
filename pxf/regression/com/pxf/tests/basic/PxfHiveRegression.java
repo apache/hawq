@@ -59,6 +59,35 @@ public class PxfHiveRegression extends PxfTestCase {
 	}
 
 	/**
+	 * Try to query a table that doesn't exist.
+	 * 
+	 * @throws Exception
+	 */
+	@Test
+	public void negativeNoTable() throws Exception {
+		
+		hiveTable = new HiveTable("no_such_hive_table", null);
+		
+		hawqExternalTable = TableFactory.getPxfHiveReadableTable("no_such_table", new String[] {
+				"t1    text",
+				"num1  integer"}, hiveTable);
+
+		hawq.createTableAndVerify(hawqExternalTable);
+
+		try {
+
+			hawq.queryResults(hawqExternalTable, "SELECT * FROM " + hawqExternalTable.getName() + " ORDER BY t1");
+
+		} catch (Exception e) {
+			
+			ExceptionUtils.validate(report, e, 
+					new PSQLException("NoSuchObjectException\\(message:default." + hiveTable.getName() + 
+							" table not found\\)", null), true);
+		}
+
+	}
+	
+	/**
 	 * Create Hive table with primitive types and PXF it.
 	 * 
 	 * @throws Exception

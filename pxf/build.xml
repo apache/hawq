@@ -85,7 +85,14 @@
 
     <!-- Cleanup -->
     <target name="clean">
-        <delete dir="${build.dir}"/>
+        <delete dir="${build.dir}/classes"/>
+    	<delete dir="${build.dir}/lib"/>
+        <delete dir="${build.dir}/test"/>
+    	<delete>
+    		<fileset dir="${build.dir}">
+    			<include name="*.jar" />
+    		</fileset>
+    	</delete>
         <delete dir="${pkg.buildroot}"/>
     </target>
 
