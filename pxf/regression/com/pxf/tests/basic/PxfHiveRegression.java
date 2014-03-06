@@ -2,6 +2,10 @@ package com.pxf.tests.basic;
 
 import java.io.File;
 
+import jsystem.framework.fixture.FixtureManager;
+import jsystem.framework.fixture.RootFixture;
+
+import org.junit.AfterClass;
 import org.junit.Test;
 import org.postgresql.util.PSQLException;
 
@@ -27,6 +31,10 @@ public class PxfHiveRegression extends PxfTestCase {
 
 	ReadableExternalTable hawqExternalTable;
 
+	/**
+	 * Connects PxfHiveRegression to PxfHiveFixture. The Fixture will run once and than the system
+	 * will be in that "Fixture state".
+	 */
 	public PxfHiveRegression() {
 		setFixture(PxfHiveFixture.class);
 	}
@@ -40,7 +48,7 @@ public class PxfHiveRegression extends PxfTestCase {
 		super.defaultBefore();
 
 		hawq.runQuery("SET optimizer = off");
-		
+
 		hive = (Hive) system.getSystemObject("hive");
 
 		hiveTable = TableFactory.getHivebyRowCommaTable("reg_txt", new String[] {
@@ -65,12 +73,12 @@ public class PxfHiveRegression extends PxfTestCase {
 	 */
 	@Test
 	public void negativeNoTable() throws Exception {
-		
+
 		hiveTable = new HiveTable("no_such_hive_table", null);
-		
+
 		hawqExternalTable = TableFactory.getPxfHiveReadableTable("no_such_table", new String[] {
 				"t1    text",
-				"num1  integer"}, hiveTable);
+				"num1  integer" }, hiveTable);
 
 		hawq.createTableAndVerify(hawqExternalTable);
 
@@ -79,14 +87,12 @@ public class PxfHiveRegression extends PxfTestCase {
 			hawq.queryResults(hawqExternalTable, "SELECT * FROM " + hawqExternalTable.getName() + " ORDER BY t1");
 
 		} catch (Exception e) {
-			
-			ExceptionUtils.validate(report, e, 
-					new PSQLException("NoSuchObjectException\\(message:default." + hiveTable.getName() + 
-							" table not found\\)", null), true);
+
+			ExceptionUtils.validate(report, e, new PSQLException("NoSuchObjectException\\(message:default." + hiveTable.getName() + " table not found\\)", null), true);
 		}
 
 	}
-	
+
 	/**
 	 * Create Hive table with primitive types and PXF it.
 	 * 
@@ -216,8 +222,8 @@ public class PxfHiveRegression extends PxfTestCase {
 	}
 
 	/**
-	 * Create Hive table separated to different partitions and PXF it. Also
-	 * check pg_class table after ANALYZE.
+	 * Create Hive table separated to different partitions and PXF it. Also check pg_class table
+	 * after ANALYZE.
 	 * 
 	 * @throws Exception
 	 */
@@ -289,8 +295,7 @@ public class PxfHiveRegression extends PxfTestCase {
 		ComparisonUtils.compareTables(hiveTable, extTableNoProfile, report);
 
 		/**
-		 * Perform Analyze on two kind of external tables and check suitable
-		 * Warnings.
+		 * Perform Analyze on two kind of external tables and check suitable Warnings.
 		 */
 		hawq.runQueryWithExpectedWarning("ANALYZE " + extTableUsingProfile.getName(), "PXF 'Analyzer' class was not found. Please supply it in the LOCATION clause or use it in a PXF profile in order to run ANALYZE on this table", true);
 		hawq.runQueryWithExpectedWarning("ANALYZE " + extTableNoProfile.getName(), "no ANALYZER or PROFILE option in table definition", true);
@@ -457,5 +462,17 @@ public class PxfHiveRegression extends PxfTestCase {
 		hive.dropTable(hiveTable, false);
 
 		hive.createTable(hiveTable);
+	}
+
+	/**
+	 * Will run after all tests in the class ran. Will call to PxfHiveFixture tear down.
+	 * 
+	 * @throws Throwable
+	 */
+	@AfterClass
+	public static void afterClass() throws Throwable {
+
+		// go to RootFixture - it means perform PxfHiveFixture teardown
+		FixtureManager.getInstance().goTo(RootFixture.getInstance().getName());
 	}
 }
