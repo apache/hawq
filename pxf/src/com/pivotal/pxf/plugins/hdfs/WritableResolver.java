@@ -17,14 +17,12 @@ import java.util.List;
 
 import static com.pivotal.pxf.api.io.DataType.*;
 
-/*
- * Class WritableResolver handles serialization and deserialization of records that were 
- * serialized using Hadoop's Writable serialization framework.
+/**
+ * WritableResolver handles serialization and deserialization of records 
+ * that were serialized using Hadoop's Writable serialization framework.
  * 
  * A field named 'recordkey' is treated as a key of the given row, and not as 
  * part of the data schema. @See RecordkeyAdapter.
- * 
- * WritableResolver implements IReadResolver and IWriteResolver interfaces.
  */
 public class WritableResolver extends Plugin implements ReadResolver, WriteResolver {
     private static final int RECORDKEY_UNDEFINED = -1;
@@ -35,6 +33,13 @@ public class WritableResolver extends Plugin implements ReadResolver, WriteResol
     private Object userObject = null;
     private Field[] fields = null;
 
+    
+    /**
+     * Constructs a WritableResolver
+     * 
+     * @param input all input parameters coming from the client
+     * @throws Exception
+     */
     public WritableResolver(InputData input) throws Exception {
         super(input);
         userObject = Class.forName(inputData.srlzSchemaName()).newInstance();
@@ -99,7 +104,12 @@ public class WritableResolver extends Plugin implements ReadResolver, WriteResol
         return length;
     }
 
-    public static DataType convertJavaToGPDBType(String type) {
+    
+    /*
+     * Given a java Object type, convert it to the corresponding output field
+     * type.
+     */
+    private DataType convertJavaToGPDBType(String type) {
         if ("boolean".equals(type) || "[Z".equals(type)) {
             return BOOLEAN;
         }

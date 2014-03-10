@@ -25,11 +25,9 @@ import java.util.List;
 
 import static com.pivotal.pxf.api.io.DataType.*;
 
-
-/*
+/**
  * Class AvroResolver handles deserialization of records that were serialized 
- * using the AVRO serialization framework. AvroResolver implements
- * IReadResolver interface.
+ * using the AVRO serialization framework.
  */
 public class AvroResolver extends Plugin implements ReadResolver {
     private GenericRecord avroRecord = null;
@@ -38,12 +36,15 @@ public class AvroResolver extends Plugin implements ReadResolver {
     private List<Schema.Field> fields = null;
     private RecordkeyAdapter recordkeyAdapter = new RecordkeyAdapter();
 
-    /*
-     * C'tor
-     * Initializes Avro data structure: the avro record - fields information and the avro record reader
-     * All Avro data is build from the Avro schema, which is based on the *.avsc file that was passed
-     * by the user
-     */
+	/**
+	 * Constructs an AvroResolver. Initializes Avro data structure: the avro
+	 * record - fields information and the avro record reader. All Avro data is
+	 * build from the Avro schema, which is based on the *.avsc file that was
+	 * passed by the user
+	 * 
+	 * @param input all input parameters coming from the client
+	 * @throws IOException
+	 */
     public AvroResolver(InputData input) throws IOException {
         super(input);
 
@@ -56,11 +57,12 @@ public class AvroResolver extends Plugin implements ReadResolver {
     }
 
     /*
-     * getFields returns a list of the fields of one record.
-     * Each record field is represented by a OneField item.
-     * OneField item contains two fields: an integer representing the field type and a Java
-     * Object representing the field value.
+     * getFields returns a list of the fields of one record. Each record field 
+     * is represented by a OneField item. OneField item contains two fields: 
+     * an integer representing the field type and a Java Object representing 
+     * the field value.
      */
+    @Override
     public List<OneField> getFields(OneRow row) throws Exception {
         avroRecord = makeAvroRecord(row.getData(), avroRecord);
         List<OneField> record = new LinkedList<OneField>();
@@ -93,14 +95,15 @@ public class AvroResolver extends Plugin implements ReadResolver {
     }
 
     /*
-     * The record can arrive from one out of two different sources: a sequence file or an AVRO file.
-     * If it comes from an AVRO file, then it was already obtained as a GenericRecord when
-     * when it was fetched from the file with the AvroRecorReader so in this case a cast is enough.
-     * On the other hand, if the source is a sequence file, then the input parameter
-     * obj hides a bytes [] buffer which is in fact one Avro record serialized.
-     * Here, we build the Avro record from the flat buffer, using the AVRO API.
-     * Then (for both cases) in the remaining functions we build a List<OneField> record from
-     * the Avro record
+     * The record can arrive from one out of two different sources: a sequence
+     * file or an AVRO file. If it comes from an AVRO file, then it was already 
+     * obtained as a GenericRecord when when it was fetched from the file with 
+     * the AvroRecorReader so in this case a cast is enough. On the other hand, 
+     * if the source is a sequence file, then the input parameter obj hides a 
+     * bytes [] buffer which is in fact one Avro record serialized. Here, we 
+     * build the Avro record from the flat buffer, using the AVRO API. Then 
+     * (for both cases) in the remaining functions we build a List<OneField> 
+     * record from the Avro record
      */
     GenericRecord makeAvroRecord(Object obj, GenericRecord reuseRecord) throws IOException {
         if (isAvroFile()) {
@@ -113,8 +116,9 @@ public class AvroResolver extends Plugin implements ReadResolver {
     }
 
     /*
-     * For a given field in the Avro record we extract its value and insert it into the output
-     * List<OneField> record. An Avro field can be a primitive type or an array type.
+     * For a given field in the Avro record we extract its value and insert it 
+     * into the output List<OneField> record. An Avro field can be a primitive
+     * type or an array type.
      */
     int populateRecord(List<OneField> record, Schema.Field field) throws IllegalAccessException {
         String fieldName = field.name();
@@ -154,9 +158,9 @@ public class AvroResolver extends Plugin implements ReadResolver {
     }
 
     /*
-     * When an Avro field is actually an array, we resolve the type of the array element, and for
-     * each element in the Avro array, we create an object of type OneField and insert it into the
-     * output List<OneField> record
+     * When an Avro field is actually an array, we resolve the type of the array
+     * element, and for each element in the Avro array, we create an object of 
+     * type OneField and insert it into the output List<OneField> record
      */
     int SetArrayField(List<OneField> record, String fieldName, Schema arraySchema) throws IllegalAccessException {
         Schema typeSchema = arraySchema.getElementType();
@@ -192,8 +196,9 @@ public class AvroResolver extends Plugin implements ReadResolver {
     }
 
     /*
-     * Iterate the Avro array (that comes from an Avro field) and for each array element create  a OneField
-     * object and add it to the output List<OneField> record.
+     * Iterate the Avro array (that comes from an Avro field) and for each array
+     * element create  a OneField object and add it to the output List<OneField> 
+     * record.
      */
     int iterateArray(List<OneField> record, DataType gpdbWritableType, GenericData.Array<?> array) {
         int length = array.size();

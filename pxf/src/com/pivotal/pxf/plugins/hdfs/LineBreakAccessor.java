@@ -17,8 +17,8 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 
-/*
- * Specialization of HdfsSplittableDataAccessor for \n delimited files
+/**
+ * A PXF Accessor for reading delimited plain text records
  */
 public class LineBreakAccessor extends HdfsSplittableDataAccessor implements WriteAccessor {
     private DataOutputStream dos;
@@ -26,12 +26,13 @@ public class LineBreakAccessor extends HdfsSplittableDataAccessor implements Wri
     private Configuration conf;
     private FileSystem fs;
     private Path file;
-
     private Log Log;
 
-    /*
-     * C'tor
-     * Creates the LineReaderAccessor and the LineRecordReader object
+    /**
+     * Constructs a LineReaderAccessor
+     * 
+     * @param input all input parameters coming from the client request
+     * @throws Exception
      */
     public LineBreakAccessor(InputData input) throws Exception {
         super(input, new TextInputFormat());
@@ -45,7 +46,9 @@ public class LineBreakAccessor extends HdfsSplittableDataAccessor implements Wri
         return new LineRecordReader(jobConf, (FileSplit) split);
     }
 
-    // opens file for write
+    /* 
+     * opens file for write
+     */
     public boolean openForWrite() throws Exception {
 
         String fileName = inputData.getProperty("X-GP-DATA-PATH");
@@ -93,21 +96,27 @@ public class LineBreakAccessor extends HdfsSplittableDataAccessor implements Wri
 
     }
 
-    // write row into stream
+    /*
+     * write row into stream
+     */
     public boolean writeNextObject(OneRow onerow) throws Exception {
         dos.write((byte[]) onerow.getData());
         return true;
     }
-
+    
+    /* 
+     * close the output stream after done writing
+     */
     public void closeForWrite() throws Exception {
         if ((dos != null) && (fsdos != null)) {
             Log.debug("Closing writing stream for path " + file);
             dos.flush();
             /*
              * From release 0.21.0 sync() is deprecated in favor of hflush(),
-			 * which only guarantees that new readers will see all data written to that point, 
-			 * and hsync(), which makes a stronger guarantee that the operating system has flushed 
-			 * the data to disk (like POSIX fsync), although data may still be in the disk cache.
+			 * which only guarantees that new readers will see all data written 
+			 * to that point, and hsync(), which makes a stronger guarantee that
+			 * the operating system has flushed the data to disk (like POSIX 
+			 * fsync), although data may still be in the disk cache.
 			 */
             fsdos.hsync();
             dos.close();

@@ -16,17 +16,18 @@ import org.apache.hadoop.mapred.JobConf;
 
 import java.io.IOException;
 
-/*
- * Specialization of SplittableFileAccessor for AVRO files
+/**
+ * A PXF Accessor for reading Avro File records
  */
 public class AvroFileAccessor extends HdfsSplittableDataAccessor {
     private Schema schema = null;
     private AvroWrapper<GenericRecord> avroWrapper = null;
 
-    /*
-     * C'tor
-     * Creates the job configuration object JobConf, and accesses the avro file to fetch
-     * the avro schema
+    /**
+     * Constructs a AvroFileAccessor that creates the job configuration and 
+     * accesses the avro file to fetch the avro schema
+     * 
+     * @param input all input parameters coming from the client
      */
     public AvroFileAccessor(InputData input) throws Exception {
         // 1. Call the base class
@@ -56,11 +57,13 @@ public class AvroFileAccessor extends HdfsSplittableDataAccessor {
         return new AvroRecordReader(jobConf, (FileSplit) split);
     }
 
-    /*
+    /**
      * readNextObject
-     * The AVRO accessor is currently the only specialized accessor that overrides this method
-     * This happens, because the special AvroRecordReader.next() semantics (use of the AvroWrapper), so it
-     * cannot use the RecordReader's default implementation in SplittableFileAccessor
+     * The AVRO accessor is currently the only specialized accessor that 
+     * overrides this method. This happens, because the special 
+     * AvroRecordReader.next() semantics (use of the AvroWrapper), so it
+     * cannot use the RecordReader's default implementation in 
+     * SplittableFileAccessor
      */
     @Override
     public OneRow readNextObject() throws IOException {

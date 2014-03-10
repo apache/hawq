@@ -12,10 +12,12 @@ import java.io.IOException;
 import java.util.LinkedList;
 import java.util.ListIterator;
 
-/*
- * Implementation of Accessor for accessing a splittable data source
- * - it means that HDFS will divide the file into splits based on an internal algorithm (by default, the 
- * the block size 64 MB is also the split size).  
+/**
+ * Accessor for accessing a splittable HDFS data sources. HDFS will divide the
+ * file into splits based on an internal decision (by default, the block size is
+ * also the split size).
+ * 
+ * Accessors that require such base functionality should extend this class.
  */
 public abstract class HdfsSplittableDataAccessor extends Plugin implements ReadAccessor {
     protected Configuration conf = null;
@@ -25,8 +27,12 @@ public abstract class HdfsSplittableDataAccessor extends Plugin implements ReadA
     protected JobConf jobConf = null;
     protected Object key, data;
 
-    /*
-     * C'tor
+    /**
+     * Constructs an HdfsSplittableDataAccessor
+     * 
+     * @param input all input parameters coming from the client request
+     * @param inFormat the HDFS {@link InputFormat} the caller wants to use
+     * @throws Exception
      */
     public HdfsSplittableDataAccessor(InputData input, FileInputFormat<?, ?> inFormat) throws Exception {
         super(input);
@@ -39,24 +45,31 @@ public abstract class HdfsSplittableDataAccessor extends Plugin implements ReadA
         jobConf = new JobConf(conf, HdfsSplittableDataAccessor.class);
     }
 
-    /*
-     * openForRead
-     * Fetches the first split (relevant to this segment) in the file, using
-     * the splittable API - InputFormat
+    /**
+     * Fetches the requested fragment (file split) for the current client 
+     * request, and sets a record reader for the job.
+     * 
+     * @return true if succeeded, false if no more splits to be read
      */
     public boolean openForRead() throws Exception {
-        LinkedList<InputSplit> segSplits = new LinkedList<InputSplit>();
-        // add split from inputData.getFragmentMetadata
+        LinkedList<InputSplit> requestSplits = new LinkedList<InputSplit>();
         FileSplit fileSplit = HdfsUtilities.parseFragmentMetadata(inputData);
-        segSplits.add(fileSplit);
+        requestSplits.add(fileSplit);
 
         // Initialize record reader based on current split
-        iter = segSplits.listIterator(0);
+        iter = requestSplits.listIterator(0);
         return getNextSplit();
     }
 
-    /*
-     * Specialized accessors will override this method and implement their own recordReader
+    /**
+     * Specialized accessors will override this method and implement their own 
+     * recordReader. For example, a plain delimited text accessor may want to
+     * return a LineRecordReader. 
+     * 
+     * @param jobConf the hadoop jobconf to use for the selected InputFormat
+     * @param split the input split to be read by the accessor
+     * @return a recordreader to be used for reading the data records of the split
+     * @throws IOException
      */
     abstract protected Object getReader(JobConf jobConf, InputSplit split) throws IOException;
 
@@ -97,10 +110,11 @@ public abstract class HdfsSplittableDataAccessor extends Plugin implements ReadA
         }
 
 		/*
-         * if neither condition was met, it means we already read all the records in all the splits, and
-		 * in this call record variable was not set, so we return null and thus we are signaling end of 
-		 * records sequence
-		*/
+		 * if neither condition was met, it means we already read all the
+		 * records in all the splits, and in this call record variable was not
+		 * set, so we return null and thus we are signaling end of records
+		 * sequence
+		 */
         return new OneRow(key, data);
     }
 

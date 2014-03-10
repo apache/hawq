@@ -11,7 +11,7 @@ import org.apache.hadoop.io.*;
 import java.io.IOException;
 import java.util.List;
 
-/*
+/**
  * Adapter used for adding a recordkey field to the records output List<OneField>
  */
 public class RecordkeyAdapter {
@@ -35,40 +35,59 @@ public class RecordkeyAdapter {
 
     private ValConverter converter = null;
 
+    /**
+     * Constructs a RecordkeyAdapter
+     */
     public RecordkeyAdapter() {
         Log = LogFactory.getLog(RecordkeyAdapter.class);
     }
 
-    /*
+    /**
      *  Adds the recordkey to the end of the passed in recFields list.
-     *  If onerow.getKey() returns null, it means that keys are not supported by the underlying source, and the user
-     *  shouldn't have asked for the recordkey field in the "CREATE EXTERNAL TABLE" statement.
-     *  If a given source type supports keys then for this source type, onerow.getKey() will never return null.
-     *  For example if the source is a SequenceFile, onerow.getKey() will never return null and if the source type
-     *  is an AvroFile then onerow.getKey() will always return null.
+     *  <p>
+     *  This method also verifies cases in which record keys are not supported 
+     *  by the underlying source type, and therefore "illegally" requested. 
+     *  
+     * @param recFields existing list of record (non-key) fields and their values.
+     * @param input all input parameters coming from the client request
+     * @param onerow a row object which is used here in order to find out if
+     *        the given type supports recordkeys or not.
+     * @return 0 if record key not needed, or 1 if record key was appended
+     * @throws NoSuchFieldException when the given record type does not support
+     *         recordkeys
+     * @throws IOException
      */
     public int appendRecordkeyField(List<OneField> recFields,
                                     InputData input,
                                     OneRow onerow) throws NoSuchFieldException, IOException {
-        /* user did not request the recordkey field in the "create external table" statement */
+        
+		/*
+		 * user did not request the recordkey field in the
+		 * "create external table" statement
+		 */
         ColumnDescriptor recordkeyColumn = input.getRecordkeyColumn();
         if (recordkeyColumn == null) {
             return 0;
         }
 
 		/*
-         * The recordkey was filled in the fileAccessor during execution of method readNextObject
-		 * Our current accessor implementations are SequenceFileAccessor, TextFileAccessor and AvroFileAccessor
-		 * from SplittableFileAccessor and ProtobufFileAccessor from OddFileAccessor. 
-		 * For SequenceFileAccessor, TextFileAccesor and ProtobufFileAccessor the recordkey is set, since
-		 * it is returned by the SequenceFileRecordReader or LineRecordReader(for text file) or ProtobufFileAccessor.DynamicMessage. 
-		 * But Avro files do not have keys, so the AvroRecordReader will not return a key and in this case
-		 * recordkey will be null. If the user required a recordkey in the "create external table" statement
-		 * and he reads from an AvroFile, we will throw an exception since the Avro file does not have keys
-		 * In the future, additional implementations of FileAccessors will have to set recordkey
-		 * during readNextObject(). Otherwise it is null by default and we will throw an exception here, that is
-		 * if we get here... a careful user will not specify recordkey in the "create external.." statement and
-		 * then we will leave this function one line above.
+		 * The recordkey was filled in the fileAccessor during execution of
+		 * method readNextObject. The current accessor implementations are
+		 * SequenceFileAccessor, LineBreakAccessor and AvroFileAccessor from
+		 * HdfsSplittableDataAccessor and QuotedLineBreakAccessor from
+		 * HdfsAtomicDataAccessor. For SequenceFileAccessor, LineBreakAccessor
+		 * the recordkey is set, since it is returned by the
+		 * SequenceFileRecordReader or LineRecordReader(for text file). But Avro
+		 * files do not have keys, so the AvroRecordReader will not return a key
+		 * and in this case recordkey will be null. If the user specified a
+		 * recordkey attribute in the CREATE EXTERNAL TABLE statement and he
+		 * reads from an AvroFile, we will throw an exception since the Avro
+		 * file does not have keys In the future, additional implementations of
+		 * FileAccessors will have to set recordkey during readNextObject().
+		 * Otherwise it is null by default and we will throw an exception here,
+		 * that is if we get here... a careful user will not specify recordkey
+		 * in the CREATE EXTERNAL statement and then we will leave this function
+		 * one line above.
 		 */
         Object recordkey = onerow.getKey();
         if (recordkey == null) {
@@ -83,11 +102,11 @@ public class RecordkeyAdapter {
     }
 
     /*
-     * Extracts a java primitive type value from the recordkey.
-     * If the key is a Writable implementation we extract the value as a Java primitive.
-     * If the key is already a Java primitive we returned it as is
-     * If it is an unknown type we throw an exception
-     */
+	 * Extracts a java primitive type value from the recordkey. If the key is a
+	 * Writable implementation we extract the value as a Java primitive. If the
+	 * key is already a Java primitive we returned it as is If it is an unknown
+	 * type we throw an exception
+	 */
     private Object extractVal(Object key) throws IOException {
         if (extractor == null) {
             extractor = InitializeExtractor(key);

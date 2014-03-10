@@ -12,17 +12,20 @@ import java.util.List;
 
 import static com.pivotal.pxf.api.io.DataType.VARCHAR;
 
-/*
- * Class StringPassResolver handles "deserialization" and serialization of String records 
- * StringPassResolver implements IReadResolver and IWriteResolver interfaces.
- * Returns strings as-is.
+/**
+ * StringPassResolver handles "deserialization" and serialization of 
+ * String records. StringPassResolver implements IReadResolver and 
+ * IWriteResolver interfaces. Returns strings as-is.
  */
 public class StringPassResolver extends Plugin implements ReadResolver, WriteResolver {
     // for write
     private OneRow oneRow;
 
-    /*
-     * C'tor
+    /**
+     * Constructs a StringPassResolver
+     * 
+     * @param inputData input all input parameters coming from the client request
+     * @throws Exception
      */
     public StringPassResolver(InputData inputData) throws Exception {
         super(inputData);

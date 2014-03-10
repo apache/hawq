@@ -6,11 +6,12 @@ import org.apache.hadoop.mapred.*;
 
 import java.io.IOException;
 
-/*
- * Class is not intended to read a specific format, hence it implements a dummy getRecordReader
- * Instead, its purpose is to apply FileInputFormat.getSplits from one point in PXF and get the splits
- * which are valid for the actual InputFormats, since all of them we use inherit FileInputFormat but do not 
- * override getSplits.
+/**
+ * PxfInputFormat is not intended to read a specific format, hence it implements
+ * a dummy getRecordReader Instead, its purpose is to apply
+ * FileInputFormat.getSplits from one point in PXF and get the splits which are
+ * valid for the actual InputFormats, since all of them we use inherit
+ * FileInputFormat but do not override getSplits.
  */
 public class PxfInputFormat extends FileInputFormat {
 
@@ -22,7 +23,7 @@ public class PxfInputFormat extends FileInputFormat {
     }
 
     /*
-     *  Return if this file can be split (HD-6863)
+     * Return true if this file can be split.
      */
     @Override
     protected boolean isSplitable(FileSystem fs, Path filename) {

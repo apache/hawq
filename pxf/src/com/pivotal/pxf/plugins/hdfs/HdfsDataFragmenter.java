@@ -14,7 +14,7 @@ import org.apache.hadoop.mapred.JobConf;
 import java.io.IOException;
 import java.util.List;
 
-/*
+/**
  * Fragmenter class for HDFS data resources
  *
  * Given an HDFS data source (a file, directory, or wild card pattern)
@@ -24,8 +24,10 @@ import java.util.List;
 public class HdfsDataFragmenter extends Fragmenter {
     private JobConf jobConf;
 
-    /*
-     * C'tor
+    /**
+     * Constructs an HdfsDataFragmenter object
+     * @param md all input parameters coming from the client
+     * @throws IOException
      */
     public HdfsDataFragmenter(InputData md) throws IOException {
         super(md);

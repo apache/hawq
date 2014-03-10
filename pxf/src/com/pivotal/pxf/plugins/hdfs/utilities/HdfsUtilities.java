@@ -15,7 +15,7 @@ import org.apache.hadoop.util.ReflectionUtils;
 
 import java.io.*;
 
-/*
+/**
  * HdfsUtilities class exposes helper methods for PXF classes
  */
 public class HdfsUtilities {

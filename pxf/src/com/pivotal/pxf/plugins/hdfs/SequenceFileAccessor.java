@@ -21,8 +21,8 @@ import org.apache.hadoop.mapred.*;
 import java.io.IOException;
 import java.util.EnumSet;
 
-/*
- * Specialization of HdfsSplittableDataAccessor for sequence files, and sequence files writer
+/**
+ * A PXF Accessor for reading and writing Sequence File records
  */
 public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements WriteAccessor {
 
@@ -36,9 +36,11 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements 
 
     private Log Log;
 
-    /*
-     * C'tor
-     * Creates the InputFormat and the RecordReader object
+    /**
+     * Constructs a SequenceFileAccessor
+     * 
+     * @param input all input parameters coming from the client request
+     * @throws Exception
      */
     public SequenceFileAccessor(InputData input) throws Exception {
 
@@ -55,7 +57,7 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements 
         return new SequenceFileRecordReader(jobConf, (FileSplit) split);
     }
 
-    // opens file for write
+    @Override
     public boolean openForWrite() throws Exception {
         FileSystem fs;
         Path parent;
@@ -116,12 +118,8 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements 
         }
     }
 
-    /**
-     * Returns fileName with the codec's file extension
-     *
-     * @param fileName
-     * @param codec
-     * @return fileName with the codec's file extension appended
+    /*
+     * Returns fileName with the codec's file extension appended
      */
     private String updateFileExtension(String fileName, CompressionCodec codec) {
 
@@ -132,6 +130,7 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements 
         return fileName;
     }
 
+    @Override
     public boolean writeNextObject(OneRow onerow) throws IOException {
         Writable value = (Writable) onerow.getData();
         Writable key = (Writable) onerow.getKey();
@@ -156,6 +155,7 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements 
         return true;
     }
 
+    @Override
     public void closeForWrite() throws Exception {
         if (writer != null) {
             writer.sync();

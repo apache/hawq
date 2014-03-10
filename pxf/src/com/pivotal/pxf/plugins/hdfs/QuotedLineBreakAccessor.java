@@ -8,20 +8,25 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
-/*
- * Specialization of HdfsAtomicDataAccessor for \n delimited files with quoted \n
+/**
+ * A (atomic) PXF Accessor for reading \n delimited files with quoted
+ * field delimiter, line delimiter, and quotes. This accessor supports
+ * multi-line records, that are read from a single source (non-parallel).
  */
 public class QuotedLineBreakAccessor extends HdfsAtomicDataAccessor {
     private BufferedReader reader;
 
-    /*
-     * C'tor
-     * Creates the QuotedLineBreakAccessor
+    /**
+     * Constructs a QuotedLineBreakAccessor
+     * 
+     * @param input all input parameters coming from the client request
+     * @throws Exception
      */
     public QuotedLineBreakAccessor(InputData input) throws Exception {
         super(input);
     }
 
+    @Override
     public boolean openForRead() throws Exception {
         if (!super.openForRead()) {
             return false;
@@ -34,6 +39,7 @@ public class QuotedLineBreakAccessor extends HdfsAtomicDataAccessor {
      * readNextObject
      * Fetches one record (maybe partial) from the  file. The record is returned as a Java object.
      */
+    @Override
     public OneRow readNextObject() throws IOException {
         if (super.readNextObject() == null) /* check if working segment */ {
             return null;

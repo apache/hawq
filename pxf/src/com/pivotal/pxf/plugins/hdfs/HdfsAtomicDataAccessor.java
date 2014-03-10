@@ -14,24 +14,30 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 
-/*
- * Base class for enforcing the complete access of a file in one accessor. Since we are not accessing the
- * file using the splittable API, but instead are using the "simple" stream API, it means that
- * we cannot fetch different parts (splits) of the file in different segments. Instead each file access
- * brings the complete file. And, if several segments would access the same file, then each one will return the whole
- * file and we will observe in the query result, each record appearing number_of_segments times. To avoid this
- * we will only have one segment (segment 0) working for this case - enforced with isWorkingSegment() method.
- * Naturally this is the less recommended working mode since we are not making use of segment parallelism.
- * HDFS accessors for a specific file type should inherit from this class only if the file they are reading does 
- * not support splitting: a protocol-buffer file, regular file, ...
-*/
+/**
+ * Base class for enforcing the complete access of a file in one accessor. 
+ * Since we are not accessing the file using the splittable API, but instead are
+ * using the "simple" stream API, it means that we cannot fetch different parts
+ * (splits) of the file in different segments. Instead each file access brings
+ * the complete file. And, if several segments would access the same file, then 
+ * each one will return the whole file and we will observe in the query result,
+ * each record appearing number_of_segments times. To avoid this we will only 
+ * have one segment (segment 0) working for this case - enforced with 
+ * isWorkingSegment() method. Naturally this is the less recommended working 
+ * mode since we are not making use of segment parallelism. HDFS accessors for
+ * a specific file type should inherit from this class only if the file they are
+ * reading does not support splitting: a protocol-buffer file, regular file, ...
+ * 
+ */
 public abstract class HdfsAtomicDataAccessor extends Plugin implements ReadAccessor {
     private Configuration conf = null;
     protected InputStream inp = null;
     private FileSplit fileSplit = null;
 
-    /*
-     * C'tor
+    /**
+     * Constructs a HdfsAtomicDataAccessor object.
+     * @param input all input parameters coming from the client
+     * @throws Exception
      */
     public HdfsAtomicDataAccessor(InputData input) throws Exception {
         // 0. Hold the configuration data
@@ -43,25 +49,28 @@ public abstract class HdfsAtomicDataAccessor extends Plugin implements ReadAcces
         fileSplit = HdfsUtilities.parseFragmentMetadata(inputData);
     }
 
-    /*
-     * openForRead
-     * Opens the file the file, using the non-splittable API for HADOOP HDFS file access
-     * This means that instead of using a FileInputFormat for access, we use a Java stream
+    /**
+     * Opens the file using the non-splittable API for HADOOP HDFS file access
+     * This means that instead of using a FileInputFormat for access, we use a
+     * Java stream
+     * 
+     * @return true for successful file open, false otherwise
      */
     public boolean openForRead() throws Exception {
         if (!isWorkingSegment()) {
             return false;
         }
 
-        // 1. input data stream
+        // input data stream
         FileSystem fs = FileSystem.get(URI.create(inputData.dataSource()), conf); // FileSystem.get actually returns an FSDataInputStream
         inp = fs.open(new Path(inputData.dataSource()));
+
         return (inp != null);
     }
 
-    /*
-     * readNextObject
-     * Fetches one record from the  file. The record is returned as a Java object.
+    /**
+     * Fetches one record from the file.
+     * @return a {@link OneRow} record as a Java object. returns null if none.
      */
     public OneRow readNextObject() throws IOException {
         if (!isWorkingSegment()) {
@@ -71,9 +80,8 @@ public abstract class HdfsAtomicDataAccessor extends Plugin implements ReadAcces
         return new OneRow(null, new Object());
     }
 
-    /*
-     * closeForRead
-     * When user finished reading the file, it closes the access stream
+    /**
+     * Closes the access stream when finished reading the file
      */
     public void closeForRead() throws Exception {
         if (!isWorkingSegment()) {

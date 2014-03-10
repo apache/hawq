@@ -20,7 +20,7 @@ import org.apache.hadoop.mapred.JobConf;
 import java.io.IOException;
 
 
-/*
+/**
  * Analyzer class for HDFS data resources
  *
  * Given an HDFS data source (a file, directory, or wild card pattern)
@@ -31,8 +31,11 @@ public class HdfsAnalyzer extends Analyzer {
     private FileSystem fs;
     private Log Log;
 
-    /*
-     * C'tor
+    /**
+     * Constructs an HdfsAnalyzer object
+     * 
+     * @param inputData all input parameters coming from the client
+     * @throws IOException
      */
     public HdfsAnalyzer(InputData inputData) throws IOException {
         super(inputData);
@@ -43,12 +46,12 @@ public class HdfsAnalyzer extends Analyzer {
     }
 
     /**
-     * path is a data source URI that can appear as a file
-     * name, a directory name  or a wildcard returns the data
-     * fragments in json format
-     *
-     * @param datapath
-     * @return
+     * Collects a number of basic statistics based on an estimate. Statistics
+     * are: number of records, number of hdfs blocks and hdfs block size.
+     * 
+     * @param datapath path is a data source URI that can appear as a file 
+     *        name, a directory name or a wildcard pattern
+     * @return statistics in json format
      * @throws Exception
      */
     @Override
@@ -98,10 +101,10 @@ public class HdfsAnalyzer extends Analyzer {
             return tuples;
         }
 
-		/*
+        /*
          * metadata information includes: file split's
-		 * start, length and hosts (locations).
-		 */
+         * start, length and hosts (locations).
+         */
         FileSplit firstSplit = (FileSplit) splits[0];
         byte[] fragmentMetadata = HdfsUtilities.prepareFragmentMetadata(firstSplit);
         inputData.setFragmentMetadata(fragmentMetadata);
