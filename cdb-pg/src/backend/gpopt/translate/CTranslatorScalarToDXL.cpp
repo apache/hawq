@@ -672,19 +672,39 @@ CTranslatorScalarToDXL::PdxlnScConstFromExpr
 CDXLDatum *
 CTranslatorScalarToDXL::Pdxldatum
 	(
+	IMemoryPool *pmp,
+	CMDAccessor *mda,
+	const Const *pconst
+	)
+{
+	CMDIdGPDB *pmdid = New(pmp) CMDIdGPDB(pconst->consttype);
+	const IMDType *pmdtype= mda->Pmdtype(pmdid);
+	pmdid->Release();
+
+ 	// translate gpdb datum into a DXL datum
+	CDXLDatum *pdxldatum = CTranslatorScalarToDXL::Pdxldatum(pmp, pmdtype, pconst->constisnull, pconst->constlen, pconst->constvalue);
+
+	return pdxldatum;
+}
+
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorScalarToDXL::Pdxldatum
+//
+//	@doc:
+//		Create a DXL datum from a GPDB Const
+//---------------------------------------------------------------------------
+CDXLDatum *
+CTranslatorScalarToDXL::Pdxldatum
+	(
 	const Const *pconst
 	)
 	const
 {
-	CMDIdGPDB *pmdid = New(m_pmp) CMDIdGPDB(pconst->consttype);
-	const IMDType *pmdtype= m_pmda->Pmdtype(pmdid);
-	pmdid->Release();
-
- 	// translate gpdb datum into a DXL datum and create the scalar constant operator holding the datum
-	CDXLDatum *pdxldatum = CTranslatorScalarToDXL::Pdxldatum(m_pmp, pmdtype, pconst->constisnull, pconst->constlen, pconst->constvalue);
-
-	return pdxldatum;
+	return Pdxldatum(m_pmp, m_pmda, pconst);
 }
+
 
 //---------------------------------------------------------------------------
 //	@function:

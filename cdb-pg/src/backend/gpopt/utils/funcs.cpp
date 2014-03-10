@@ -77,6 +77,8 @@ PG_FUNCTION_INFO_V1(LibraryVersion);
 
 PG_FUNCTION_INFO_V1(Optimize);
 
+PG_FUNCTION_INFO_V1(EvalExprFromDXLFile);
+
 } // end extern C
 
 
@@ -509,6 +511,50 @@ RestoreQueryFromDXLFile(PG_FUNCTION_ARGS)
 	PG_RETURN_TEXT_P(ptResult);
 }
 }
+
+
+//---------------------------------------------------------------------------
+//	@function:
+//		EvalExprFromDXLFile
+//
+//	@doc:
+//		Reads a serialized XML representation of a DXL constant scalar expression
+//		from the file path given by its argument. The expression is then evaluated
+//		by the executor and the result is transformed back to DXL and serialized
+//		as a string.
+//		It doesn't check that the expression is actually constant.
+//
+//---------------------------------------------------------------------------
+extern "C" {
+Datum
+EvalExprFromDXLFile(PG_FUNCTION_ARGS)
+{
+	char *szFileName = textToString(PG_GETARG_TEXT_P(0));
+	CFileReader fr;
+	fr.Open(szFileName);
+	ULLONG ullSize = fr.UllSize();
+	char *pcBuf = (char*) gpdb::GPDBAlloc(ullSize + 1);
+	fr.UlpRead((BYTE*)pcBuf, ullSize);
+	fr.Close();
+	pcBuf[ullSize] = '\0';
+
+	char *szResultDXL = COptTasks::SzEvalExprFromXML(pcBuf);
+	gpdb::GPDBFree(pcBuf);
+
+	if (szResultDXL != NULL)
+	{
+		text *ptResult = stringToText(szResultDXL);
+		gpdb::GPDBFree(szResultDXL);
+		PG_RETURN_TEXT_P(ptResult);
+	}
+	else
+	{
+		// Return a dummy value so the tests can continue
+		PG_RETURN_NULL();
+	}
+}
+}
+
 
 //---------------------------------------------------------------------------
 //	@function:
@@ -952,6 +998,7 @@ RestoreQueryFromFile(PG_FUNCTION_ARGS)
 	PG_RETURN_TEXT_P(ptResult);
 }
 }
+
 
 //---------------------------------------------------------------------------
 //	@function:

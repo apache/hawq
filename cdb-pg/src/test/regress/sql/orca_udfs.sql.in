@@ -1,0 +1,29 @@
+drop schema if exists %%GPOPTUTILS_NAMESPACE%% cascade;
+
+create schema %%GPOPTUTILS_NAMESPACE%%;
+
+\set Udflib `echo "$GPHOME/lib/libgpoptudf.%%EXT%%"`
+
+create function %%GPOPTUTILS_NAMESPACE%%.EvalExprFromDXLFile(text) returns text as :'Udflib', 'EvalExprFromDXLFile' language c strict;
+
+\set Mypath `pwd`'/udf_input/s01_const_int.xml'
+select %%GPOPTUTILS_NAMESPACE%%.EvalExprFromDXLFile(:'Mypath');
+
+\set Mypath `pwd`'/udf_input/s02_const_string.xml'
+select %%GPOPTUTILS_NAMESPACE%%.EvalExprFromDXLFile(:'Mypath');
+
+\set Mypath `pwd`'/udf_input/s03_add.xml'
+select %%GPOPTUTILS_NAMESPACE%%.EvalExprFromDXLFile(:'Mypath');
+
+\set Mypath `pwd`'/udf_input/s04_length.xml'
+select %%GPOPTUTILS_NAMESPACE%%.EvalExprFromDXLFile(:'Mypath');
+
+\set Mypath `pwd`'/udf_input/s05_position.xml'
+select %%GPOPTUTILS_NAMESPACE%%.EvalExprFromDXLFile(:'Mypath');
+
+\set Mypath `pwd`'/udf_input/s06_nested_string_funcs.xml'
+select %%GPOPTUTILS_NAMESPACE%%.EvalExprFromDXLFile(:'Mypath');
+
+\set Mypath `pwd`'/udf_input/s07_non_const_expr.xml'
+-- set client_min_messages= 'log';
+select %%GPOPTUTILS_NAMESPACE%%.EvalExprFromDXLFile(:'Mypath');

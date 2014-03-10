@@ -203,6 +203,7 @@ ignore: co_nestloop_idxscan
 ignore: madlib_array_ops
 test: madlib_svec_test
 test: agg_derived_win
+test: orca_udfs
 #
 # the following test needs some special filespace/tablespace.
 #

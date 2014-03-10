@@ -1,0 +1,92 @@
+drop schema if exists orcaudftest cascade;
+NOTICE:  schema "orcaudftest" does not exist, skipping
+create schema orcaudftest;
+\set Udflib `echo "$GPHOME/lib/libgpoptudf.so"`
+create function orcaudftest.EvalExprFromDXLFile(text) returns text as :'Udflib', 'EvalExprFromDXLFile' language c strict;
+\set Mypath `pwd`'/udf_input/s01_const_int.xml'
+select orcaudftest.EvalExprFromDXLFile(:'Mypath');
+                                  evalexprfromdxlfile                                  
+---------------------------------------------------------------------------------------
+ <?xml version="1.0" encoding="UTF-8"?>                                                
+ <dxl:DXLMessage xmlns:dxl="http://greenplum.com/dxl/2010/12/">                        
+   <dxl:ScalarExpr>                                                                    
+     <dxl:ConstValue TypeMdid="0.23.1.0" IsNull="false" IsByValue="true" Value="111"/> 
+   </dxl:ScalarExpr>                                                                   
+ </dxl:DXLMessage>                                                                     
+ 
+(1 row)
+
+\set Mypath `pwd`'/udf_input/s02_const_string.xml'
+select orcaudftest.EvalExprFromDXLFile(:'Mypath');
+                                                    evalexprfromdxlfile                                                    
+---------------------------------------------------------------------------------------------------------------------------
+ <?xml version="1.0" encoding="UTF-8"?>                                                                                    
+ <dxl:DXLMessage xmlns:dxl="http://greenplum.com/dxl/2010/12/">                                                            
+   <dxl:ScalarExpr>                                                                                                        
+     <dxl:ConstValue TypeMdid="0.25.1.0" IsNull="false" IsByValue="false" Value="AAAAClRob21hcw==" LintValue="278553470"/> 
+   </dxl:ScalarExpr>                                                                                                       
+ </dxl:DXLMessage>                                                                                                         
+ 
+(1 row)
+
+\set Mypath `pwd`'/udf_input/s03_add.xml'
+select orcaudftest.EvalExprFromDXLFile(:'Mypath');
+                                 evalexprfromdxlfile                                 
+-------------------------------------------------------------------------------------
+ <?xml version="1.0" encoding="UTF-8"?>                                              
+ <dxl:DXLMessage xmlns:dxl="http://greenplum.com/dxl/2010/12/">                      
+   <dxl:ScalarExpr>                                                                  
+     <dxl:ConstValue TypeMdid="0.23.1.0" IsNull="false" IsByValue="true" Value="8"/> 
+   </dxl:ScalarExpr>                                                                 
+ </dxl:DXLMessage>                                                                   
+ 
+(1 row)
+
+\set Mypath `pwd`'/udf_input/s04_length.xml'
+select orcaudftest.EvalExprFromDXLFile(:'Mypath');
+                                 evalexprfromdxlfile                                 
+-------------------------------------------------------------------------------------
+ <?xml version="1.0" encoding="UTF-8"?>                                              
+ <dxl:DXLMessage xmlns:dxl="http://greenplum.com/dxl/2010/12/">                      
+   <dxl:ScalarExpr>                                                                  
+     <dxl:ConstValue TypeMdid="0.23.1.0" IsNull="false" IsByValue="true" Value="6"/> 
+   </dxl:ScalarExpr>                                                                 
+ </dxl:DXLMessage>                                                                   
+ 
+(1 row)
+
+\set Mypath `pwd`'/udf_input/s05_position.xml'
+select orcaudftest.EvalExprFromDXLFile(:'Mypath');
+                                 evalexprfromdxlfile                                 
+-------------------------------------------------------------------------------------
+ <?xml version="1.0" encoding="UTF-8"?>                                              
+ <dxl:DXLMessage xmlns:dxl="http://greenplum.com/dxl/2010/12/">                      
+   <dxl:ScalarExpr>                                                                  
+     <dxl:ConstValue TypeMdid="0.23.1.0" IsNull="false" IsByValue="true" Value="3"/> 
+   </dxl:ScalarExpr>                                                                 
+ </dxl:DXLMessage>                                                                   
+ 
+(1 row)
+
+\set Mypath `pwd`'/udf_input/s06_nested_string_funcs.xml'
+select orcaudftest.EvalExprFromDXLFile(:'Mypath');
+                                                evalexprfromdxlfile                                                
+-------------------------------------------------------------------------------------------------------------------
+ <?xml version="1.0" encoding="UTF-8"?>                                                                            
+ <dxl:DXLMessage xmlns:dxl="http://greenplum.com/dxl/2010/12/">                                                    
+   <dxl:ScalarExpr>                                                                                                
+     <dxl:ConstValue TypeMdid="0.25.1.0" IsNull="false" IsByValue="false" Value="AAAABm9t" LintValue="588882732"/> 
+   </dxl:ScalarExpr>                                                                                               
+ </dxl:DXLMessage>                                                                                                 
+ 
+(1 row)
+
+\set Mypath `pwd`'/udf_input/s07_non_const_expr.xml'
+-- set client_min_messages= 'log';
+select orcaudftest.EvalExprFromDXLFile(:'Mypath');
+NOTICE:  Found non const expression. Please check log for more information.
+ evalexprfromdxlfile 
+---------------------
+ 
+(1 row)
+

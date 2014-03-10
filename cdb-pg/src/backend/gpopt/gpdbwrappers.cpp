@@ -174,6 +174,7 @@
 #define ALLOW_pxf_calc_participating_segments
 #define ALLOW_map_hddata_2gp_segments
 #define ALLOW_free_hddata_2gp_segments
+#define ALLOW_evaluate_expr
 
 #include "gpopt/utils/gpdbdefs.h"
 
@@ -2650,6 +2651,23 @@ gpdb::IndexOpProperties
 		return;
 	}
 	GP_WRAP_END;
+}
+
+// Evaluates 'pexpr' and returns the result as an Expr.
+// Caller keeps ownership of 'pexpr' and takes ownership of the result
+Expr *
+gpdb::PexprEvaluate
+	(
+	Expr *pexpr,
+	Oid oidResultType
+	)
+{
+	GP_WRAP_START;
+	{
+		return evaluate_expr(pexpr, oidResultType);
+	}
+	GP_WRAP_END;
+	return NULL;
 }
 
 // EOF

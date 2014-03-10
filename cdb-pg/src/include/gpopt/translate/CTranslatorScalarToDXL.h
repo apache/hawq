@@ -418,6 +418,15 @@ namespace gpdxl
 				)
 				const;
 
+			// translate GPDB Const to CDXLDatum
+			static
+			CDXLDatum *Pdxldatum
+				(
+				IMemoryPool *pmp,
+				CMDAccessor *mda,
+				const Const *pconst
+				);
+
 			// translate GPDB datum to CDXLDatum
 			static
 			CDXLDatum *Pdxldatum

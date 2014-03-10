@@ -133,6 +133,20 @@ class COptTasks
 			SContextRelcacheToDXL *PctxrelcacheConvert(void *pv);
 		};
 
+		// Structure containing the input and output string for a task that evaluates expressions.
+		struct SEvalExprContext
+		{
+			// Serialized DXL of the expression to be evaluated
+			char *m_szDXL;
+
+			// The result of evaluating the expression
+			char *m_szResult;
+
+			// casting function
+			static
+			SEvalExprContext *PevalctxtConvert(void *pv);
+		};
+
 		// execute a task given the argument
 		static
 		void Execute ( void *(*pfunc) (void *), void *pfuncArg);
@@ -168,6 +182,10 @@ class COptTasks
 		// dump relstats info for an object into DXL
 		static
 		void* PvDXLFromRelStatsTask(void *pv);
+
+		// evaluates an expression given as a serialized DXL string and returns the serialized DXL result
+		static
+		void* PvEvalExprFromDXLTask(void *pv);
 
 		// create optimizer configuration object
 		static
@@ -258,6 +276,10 @@ class COptTasks
 		// return comparison type code
 		static
 		ULONG UlCmpt(char *szCmpType);
+
+		// converts XML string to DXL and evaluates the expression
+		static
+		char *SzEvalExprFromXML(char *szXmlString);
 
 };
 

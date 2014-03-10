@@ -546,6 +546,10 @@ namespace gpdb {
 	// get index operator properties
 	void IndexOpProperties(Oid opno, Oid opclass, int *strategy, Oid *subtype, bool *recheck);
 
+	// returns the result of evaluating 'pexpr' as an Expr. Caller keeps ownership of 'pexpr'
+	// and takes ownership of the result 
+	Expr *PexprEvaluate(Expr *pexpr, Oid oidResultType);
+
 } //namespace gpdb
 
 #define ForEach(cell, l)	\

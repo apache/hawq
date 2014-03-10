@@ -19,6 +19,7 @@
 #define ALLOW_strcasecmp
 
 #include "gpopt/utils/gpdbdefs.h"
+#include "gpopt/utils/CConstExprEvaluatorProxy.h"
 #include "gpopt/utils/COptTasks.h"
 #include "gpopt/relcache/CMDProviderRelcache.h"
 #include "gpopt/config/CConfigParamMapping.h"
@@ -85,8 +86,10 @@
 #include "md/CSystemId.h"
 #include "md/IMDRelStats.h"
 #include "md/IMDColStats.h"
+#include "md/IMDTypeInt8.h"
 #include "md/CMDIdCast.h"
 #include "md/CMDIdScCmp.h"
+#include "md/CMDTypeInt8GPDB.h"
 
 #include "dxl/operators/CDXLNode.h"
 #include "dxl/parser/CParseHandlerDXL.h"
@@ -262,6 +265,26 @@ COptTasks::SContextRelcacheToDXL::PctxrelcacheConvert
 	GPOS_ASSERT(NULL != pv);
 
 	return reinterpret_cast<SContextRelcacheToDXL*>(pv);
+}
+
+
+//---------------------------------------------------------------------------
+//	@function:
+//		COptTasks::SEvalExprContext::PevalctxtConvert
+//
+//	@doc:
+//		Casting function
+//
+//---------------------------------------------------------------------------
+COptTasks::SEvalExprContext *
+COptTasks::SEvalExprContext::PevalctxtConvert
+	(
+	void *pv
+	)
+{
+	GPOS_ASSERT(NULL != pv);
+
+	return reinterpret_cast<SEvalExprContext*>(pv);
 }
 
 
@@ -1248,6 +1271,103 @@ COptTasks::PvDXLFromRelStatsTask
 
 //---------------------------------------------------------------------------
 //	@function:
+//		COptTasks::PvEvalExprFromDXLTask
+//
+//	@doc:
+//		Task that parses an XML representation of a DXL constant expression,
+//		evaluates it and returns the result as a serialized DXL document.
+//
+//---------------------------------------------------------------------------
+void*
+COptTasks::PvEvalExprFromDXLTask
+	(
+	void *pv
+	)
+{
+	GPOS_ASSERT(NULL != pv);
+	SEvalExprContext *pevalctxt = SEvalExprContext::PevalctxtConvert(pv);
+
+	GPOS_ASSERT(NULL != pevalctxt->m_szDXL);
+	GPOS_ASSERT(NULL == pevalctxt->m_szResult);
+
+	AUTO_MEM_POOL(amp);
+	IMemoryPool *pmp = amp.Pmp();
+
+	CDXLNode *pdxlnInput = CDXLUtils::PdxlnParseScalarExpr(pmp, pevalctxt->m_szDXL, NULL /*szXSDPath*/);
+	GPOS_ASSERT(NULL != pdxlnInput);
+
+	CDXLNode *pdxlnResult = NULL;
+	BOOL fReleaseCache = false;
+	// initialize metadata cache
+	if (!CMDCache::FInitialized())
+	{
+		CMDCache::Init();
+		fReleaseCache = true;
+	}
+
+	CMDProviderRelcache *pmdpRelcache = New(pmp) CMDProviderRelcache(pmp);
+	GPOS_TRY
+	{
+		// set up relcache MD provider
+		CMDProviderRelcache *pmdpRelcache = New(pmp) CMDProviderRelcache(pmp);
+		{
+			// scope for MD accessor
+			CMDAccessor mda(pmp, CMDCache::Pcache(), sysidDefault, pmdpRelcache);
+
+			CConstExprEvaluatorProxy ceeval(pmp, &mda);
+			pdxlnResult = ceeval.PdxlnEvaluateExpr(pdxlnInput);
+		}
+	}
+	GPOS_CATCH_EX(ex)
+	{
+		CRefCount::SafeRelease(pdxlnResult);
+		CRefCount::SafeRelease(pdxlnInput);
+		if (fReleaseCache)
+		{
+			CMDCache::Shutdown();
+		}
+		// Catch GPDB exceptions
+		if (GPOS_MATCH_EX(ex, gpdxl::ExmaGPDB, gpdxl::ExmiGPDBError))
+		{
+			elog(NOTICE, "Found non const expression. Please check log for more information.");
+			GPOS_RESET_EX;
+			return NULL;
+		}
+		if (FErrorOut(ex))
+		{
+			IErrorContext *perrctxt = CTask::PtskSelf()->Perrctxt();
+			char *szErrorMsg = SzFromWsz(perrctxt->WszMsg());
+			elog(DEBUG1, "%s", szErrorMsg);
+			gpdb::GPDBFree(szErrorMsg);
+		}
+		GPOS_RETHROW(ex);
+	}
+	GPOS_CATCH_END;
+
+	CWStringDynamic *pstrDXL =
+			CDXLUtils::PstrSerializeScalarExpr
+						(
+						pmp,
+						pdxlnResult,
+						true, // fSerializeHeaderFooter
+						true // fIndent
+						);
+	pevalctxt->m_szResult = SzFromWsz(pstrDXL->Wsz());
+	delete pstrDXL;
+	CRefCount::SafeRelease(pdxlnResult);
+	pdxlnInput->Release();
+
+	if (fReleaseCache)
+	{
+		CMDCache::Shutdown();
+	}
+
+	return NULL;
+}
+
+
+//---------------------------------------------------------------------------
+//	@function:
 //		COptTasks::SzOptimize
 //
 //	@doc:
@@ -1576,5 +1696,30 @@ COptTasks::UlCmpt
 	return CmptOther;
 }
 
+
+//---------------------------------------------------------------------------
+//	@function:
+//		COptTasks::SzEvalExprFromXML
+//
+//	@doc:
+//		Converts XML string to DXL and evaluates the expression. Caller keeps
+//		ownership of 'szXmlString' and takes ownership of the returned result.
+//
+//---------------------------------------------------------------------------
+char *
+COptTasks::SzEvalExprFromXML
+	(
+	char *szXmlString
+	)
+{
+	GPOS_ASSERT(NULL != szXmlString);
+
+	SEvalExprContext evalctxt;
+	evalctxt.m_szDXL = szXmlString;
+	evalctxt.m_szResult = NULL;
+
+	Execute(&PvEvalExprFromDXLTask, &evalctxt);
+	return evalctxt.m_szResult;
+}
 
 // EOF
