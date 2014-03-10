@@ -18,7 +18,6 @@ static void pxf_free_filter(PxfFilterDesc* filter);
 static void pxf_free_filter_list(List *filters);
 static char* pxf_serialize_filter_list(List *filters);
 static bool opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter);
-static void const_to_str(Const *constval, StringInfo buf);
 static bool supported_filter_type(Oid type);
 static void const_to_str(Const *constval, StringInfo buf);
 
@@ -34,33 +33,82 @@ dbop_pxfop_map pxf_supported_opr[] =
 	{Int2EqualOperator  /* int2eq */, PXFOP_EQ},
 	{95  /* int2lt */, PXFOP_LT},
 	{520 /* int2gt */, PXFOP_GT},
-	{524 /* int2ge */, PXFOP_GE},
 	{522 /* int2le */, PXFOP_LE},
+	{524 /* int2ge */, PXFOP_GE},
 	{519 /* int2ne */, PXFOP_NE},
 
 	/* int4 */
 	{Int4EqualOperator  /* int4eq */, PXFOP_EQ},
 	{97  /* int4lt */, PXFOP_LT},
 	{521 /* int4gt */, PXFOP_GT},
-	{525 /* int4ge */, PXFOP_GE},
 	{523 /* int4le */, PXFOP_LE},
+	{525 /* int4ge */, PXFOP_GE},
 	{518 /* int4lt */, PXFOP_NE},
 
 	/* int8 */
 	{Int8EqualOperator /* int8eq */, PXFOP_EQ},
 	{412 /* int8lt */, PXFOP_LT},
 	{413 /* int8gt */, PXFOP_GT},
-	{415 /* int8ge */, PXFOP_GE},
 	{414 /* int8le */, PXFOP_LE},
+	{415 /* int8ge */, PXFOP_GE},
 	{411 /* int8lt */, PXFOP_NE},
 
 	/* text */
 	{TextEqualOperator  /* texteq  */, PXFOP_EQ},
 	{664 /* text_lt */, PXFOP_LT},
 	{666 /* text_gt */, PXFOP_GT},
-	{667 /* text_ge */, PXFOP_GE},
 	{665 /* text_le */, PXFOP_LE},
+	{667 /* text_ge */, PXFOP_GE},
 	{531 /* textlt  */, PXFOP_NE},
+
+	/* int2 to int4 */
+	{Int24EqualOperator /* int24eq */, PXFOP_EQ},
+	{534  /* int24lt */, PXFOP_LT},
+	{536 /* int24gt */, PXFOP_GT},
+	{540 /* int24le */, PXFOP_LE},
+	{542 /* int24ge */, PXFOP_GE},
+	{538 /* int24ne */, PXFOP_NE},
+
+	/* int4 to int2 */
+	{Int42EqualOperator /* int42eq */, PXFOP_EQ},
+	{535  /* int42lt */, PXFOP_LT},
+	{537 /* int42gt */, PXFOP_GT},
+	{541 /* int42le */, PXFOP_LE},
+	{543 /* int42ge */, PXFOP_GE},
+	{539 /* int42ne */, PXFOP_NE},
+
+	/* int8 to int4 */
+	{Int84EqualOperator /* int84eq */, PXFOP_EQ},
+	{418  /* int84lt */, PXFOP_LT},
+	{419 /* int84gt */, PXFOP_GT},
+	{420 /* int84le */, PXFOP_LE},
+	{430 /* int84ge */, PXFOP_GE},
+	{417 /* int84ne */, PXFOP_NE},
+
+	/* int4 to int8 */
+	{Int48EqualOperator /* int48eq */, PXFOP_EQ},
+	{37  /* int48lt */, PXFOP_LT},
+	{76 /* int48gt */, PXFOP_GT},
+	{80 /* int48le */, PXFOP_LE},
+	{82 /* int48ge */, PXFOP_GE},
+	{36 /* int48ne */, PXFOP_NE},
+
+	/* int2 to int8 */
+	{Int28EqualOperator /* int28eq */, PXFOP_EQ},
+	{1864  /* int28lt */, PXFOP_LT},
+	{1865 /* int28gt */, PXFOP_GT},
+	{1866 /* int28le */, PXFOP_LE},
+	{1867 /* int28ge */, PXFOP_GE},
+	{1863 /* int28ne */, PXFOP_NE},
+
+	/* int8 to int2 */
+	{Int82EqualOperator /* int82eq */, PXFOP_EQ},
+	{1870  /* int82lt */, PXFOP_LT},
+	{1871 /* int82gt */, PXFOP_GT},
+	{1872 /* int82le */, PXFOP_LE},
+	{1873 /* int82ge */, PXFOP_GE},
+	{1869 /* int82ne */, PXFOP_NE}
+
 };
 
 Oid pxf_supported_types[] =
@@ -304,34 +352,35 @@ opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter)
 	int		 nargs 		= sizeof(pxf_supported_opr) / sizeof(dbop_pxfop_map);
 	Node	*leftop 	= NULL;
 	Node	*rightop	= NULL;
-	Oid		 rightop_type = 0;
+	Oid		 rightop_type = InvalidOid;
+	Oid		 leftop_type = InvalidOid;
 
 	if ((!expr) || (!filter))
 		return false;
 
 	leftop = get_leftop((Expr*)expr);
 	rightop	= get_rightop((Expr*)expr);
+	leftop_type = exprType(leftop);
 	rightop_type = exprType(rightop);
 
 	/* only binary oprs supported currently */
 	if (!rightop)
 	{
 		elog(DEBUG5, "opexpr_to_pxffilter: unary op! leftop_type: %d, op: %d",
-				 	 exprType(leftop), expr->opno);
+			 leftop_type, expr->opno);
 		return false;
 	}
 
-	elog(DEBUG5, "opexpr_to_pxffilter: leftop_type: %d, rightop_type: %d, op: %d",
-		 exprType(leftop), rightop_type, expr->opno);
-	/* both side data types must be identical (for now) */
-	if (rightop_type != exprType(leftop))
-		return false;
+	elog(DEBUG5, "opexpr_to_gphdfilter: leftop (expr type: %d, arg type: %d), "
+			"rightop_type (expr type: %d, arg type %d), op: %d",
+			leftop_type, nodeTag(leftop),
+			rightop_type, nodeTag(rightop),
+			expr->opno);
 
 	/*
 	 * check if supported type -
-	 * enough to check only one side because of above condition
 	 */
-	if (!supported_filter_type(rightop_type))
+	if (!supported_filter_type(rightop_type) || !supported_filter_type(leftop_type))
 		return false;
 
 	/* arguments must be VAR and CONST */
@@ -491,6 +540,7 @@ char *serializePxfFilterQuals(List *quals)
 		result  = pxf_serialize_filter_list(filters);
 		pxf_free_filter_list(filters);
 	}
+	elog(DEBUG2, "serializePxfFilterQuals: filter result: %s", (result == NULL) ? "null" : result);
 
 	return result;
 }

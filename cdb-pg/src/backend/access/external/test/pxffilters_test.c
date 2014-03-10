@@ -39,6 +39,15 @@ test__supported_filter_type(void **state)
 	/* unsupported type */
 	result = supported_filter_type(oids[i]);
 	assert_false(result);
+
+	/* go over pxf_supported_types array */
+	int nargs = sizeof(pxf_supported_types) / sizeof(Oid);
+	assert_int_equal(nargs, 12);
+	for (i = 0; i < nargs; ++i)
+	{
+		assert_true(supported_filter_type(pxf_supported_types[i]));
+	}
+
 }
 
 /*
@@ -61,7 +70,7 @@ void
 verify__const_to_str(bool is_null, char* const_value, Oid const_type, char* expected)
 {
 	StringInfo result = makeStringInfo();
-	StringInfo value = NULL;
+	char* value = NULL;
 	Const* input = (Const*) palloc0(sizeof(Const));
 	input->constisnull = is_null;
 	input->consttype = const_type;
@@ -69,10 +78,9 @@ verify__const_to_str(bool is_null, char* const_value, Oid const_type, char* expe
 	/* need to prepare inner functions */
 	if (!is_null)
 	{
-		value = makeStringInfo();
-		appendStringInfo(value, "%s", const_value);
+		value = strdup(const_value); /* will be free'd by const_to_str */
 
-		mock__const_to_str(const_type, value->data);
+		mock__const_to_str(const_type, value);
 	}
 
 	/* no expected value means it's a negative test */
@@ -82,14 +90,12 @@ verify__const_to_str(bool is_null, char* const_value, Oid const_type, char* expe
 	}
 	else
 	{
-		run__const_to_str__negative(input, result, value->data);
-		pfree(value->data); /* data was not freed by const_to_str b/c of failure */
+		run__const_to_str__negative(input, result, value);
+		pfree(value); /* value was not freed by const_to_str b/c of failure */
 	}
 
 	pfree(result->data);
 	pfree(result);
-	if (value)
-		pfree(value); /* data is freed by const_to_str */
 	pfree(input);
 }
 
@@ -118,7 +124,7 @@ void run__const_to_str__negative(Const* input, StringInfo result, char* value)
 		CurrentMemoryContext = 1;
 		ErrorData *edata = CopyErrorData();
 
-		/*Validate the type of expected error */
+		/* Validate the type of expected error */
 		assert_true(edata->sqlerrcode == ERRCODE_INTERNAL_ERROR);
 		assert_true(edata->elevel == ERROR);
 		assert_string_equal(edata->message, err_msg->data);
@@ -212,46 +218,10 @@ test__opexpr_to_pxffilter__unary_expr(void **state)
 	pfree(expr);
 }
 
-/*
- * test for a query with different types for the field (attribute) and the value (const)
- * e.g.: field f1 with type smallint (INT2OID), and a query 'f1 = 9',
- * f1 is of type smallint (INT2OID), 9 is of type int (INT4OID).
- */
-void
-test__opexpr_to_pxffilter__different_types(void **state)
-{
-	PxfFilterDesc *filter = (PxfFilterDesc*) palloc0(sizeof(PxfFilterDesc));
-	OpExpr *expr = (OpExpr*) palloc0(sizeof(OpExpr));
-	Var *arg_var = (Var*) palloc0(sizeof(Var));
-	Const* arg_const = (Const*) palloc0(sizeof(Const));
-
-	arg_var->xpr.type = T_Var;
-	arg_var->vartype = INT2OID;
-	arg_var->varattno = 1;
-
-	arg_const->xpr.type = T_Const;
-	arg_const->constisnull = false;
-	arg_const->consttype = INT4OID;
-
-	expr->args = NIL;
-	expr->args = lappend(expr->args, arg_var);
-	expr->args = lappend(expr->args, arg_const);
-
-	expr->opno = 92;
-	expr->xpr.type = T_OpExpr;
-
-	assert_false(opexpr_to_pxffilter(expr, filter));
-
-	pfree(filter);
-	pfree(expr);
-	pfree(arg_var);
-	pfree(arg_const);
-}
-
 void
 compare_filters(PxfFilterDesc* result, PxfFilterDesc* expected)
 {
-	assert_true(result->l.opcode == expected->l.opcode);
+	assert_int_equal(result->l.opcode, expected->l.opcode);
 	assert_int_equal(result->l.attnum, expected->l.attnum);
 	if (expected->l.conststr)
 		assert_string_equal(result->l.conststr->data, expected->l.conststr->data);
@@ -303,7 +273,7 @@ Var* build_var(Oid oid, int attno) {
 	return arg_var;
 }
 
-Const* build_const(Oid oid, StringInfo value)
+Const* build_const(Oid oid, char* value)
 {
 	Const* arg_const = (Const*) palloc0(sizeof(Const));
 	arg_const->xpr.type = T_Const;
@@ -311,13 +281,13 @@ Const* build_const(Oid oid, StringInfo value)
 	arg_const->consttype = oid;
 	if (value != NULL)
 	{
-		mock__const_to_str(oid, value->data);
+		mock__const_to_str(oid, value);
 	}
 
 	return arg_const;
 }
 
-build_op_expr(void* left, void* right, int op)
+OpExpr* build_op_expr(void* left, void* right, int op)
 {
 	OpExpr *expr = (OpExpr*) palloc0(sizeof(OpExpr));
 	expr->args = NIL;
@@ -326,22 +296,21 @@ build_op_expr(void* left, void* right, int op)
 
 	expr->opno = op;
 	expr->xpr.type = T_OpExpr;
+	return expr;
 }
 
-void
-test__opexpr_to_pxffilter__intGT(void **state)
+void run__opexpr_to_pxffilter__positive(Oid dbop, PxfOperatorCode expectedPxfOp)
 {
 	PxfFilterDesc *filter = (PxfFilterDesc*) palloc0(sizeof(PxfFilterDesc));
 	Var *arg_var = build_var(INT2OID, 1);
-	StringInfo const_value = makeStringInfo();
-	appendStringInfo(const_value, "%d", 1984);
+	char* const_value = strdup("1984"); /* will be free'd by const_to_str */
 	Const* arg_const = build_const(INT2OID, const_value);
 
-	OpExpr *expr = build_op_expr(arg_var, arg_const, 520 /* int2gt */);
+	OpExpr *expr = build_op_expr(arg_var, arg_const, dbop);
 	PxfFilterDesc* expected = build_filter(
 			PXF_ATTR_CODE, 1, NULL,
 			PXF_CONST_CODE, 0, "1984",
-			PXFOP_GT);
+			expectedPxfOp);
 
 	/* run test */
 	assert_true(opexpr_to_pxffilter(expr, filter));
@@ -351,10 +320,29 @@ test__opexpr_to_pxffilter__intGT(void **state)
 	pxf_free_filter(expected);
 	pxf_free_filter(filter);
 
-	pfree(const_value); /* data is freed by const_to_str */
 	list_free_deep(expr->args); /* free all args */
 	pfree(expr);
+}
 
+void
+test__opexpr_to_pxffilter__intGT(void **state)
+{
+	run__opexpr_to_pxffilter__positive(520 /* int2gt */, PXFOP_GT);
+}
+
+void
+test__opexpr_to_pxffilter__allSupportedTypes(void **state)
+{
+	int nargs = sizeof(pxf_supported_opr) / sizeof(dbop_pxfop_map);
+	PxfOperatorCode pxfop = 0;
+	Oid dbop = InvalidOid;
+
+	for (int i = 0; i < nargs; ++i)
+	{
+		dbop = pxf_supported_opr[i].dbop;
+		pxfop = pxf_supported_opr[i].pxfop;
+		run__opexpr_to_pxffilter__positive(dbop, pxfop);
+	}
 }
 
 /* NOTE: this test is not  a use case - when the query includes
@@ -383,19 +371,30 @@ test__opexpr_to_pxffilter__attributeIsNull(void **state)
 	pfree(expr);
 }
 
+/*
+ * Test for a query with different types.
+ * Types pairing are not checked, it is covered by the
+ * supported operations which are type specific.
+ */
 void
 test__opexpr_to_pxffilter__differentTypes(void **state)
 {
 	PxfFilterDesc *filter = (PxfFilterDesc*) palloc0(sizeof(PxfFilterDesc));
 	Var *arg_var = build_var(INT2OID, 3);
-	Const *arg_const = build_const(CHAROID, NULL);
-	OpExpr *expr = build_op_expr(arg_const, arg_var, 1877 /* int2not */);
+	char* const_value = strdup("13"); /* will be free'd by const_to_str */
+	Const *arg_const = build_const(INT8OID, const_value);
+	OpExpr *expr = build_op_expr(arg_const, arg_var, 1864 /* int28lt */);
+
 
 	/* run test */
-	assert_false(opexpr_to_pxffilter(expr, filter));
+	assert_true(opexpr_to_pxffilter(expr, filter));
+	PxfFilterDesc *expected = build_filter(
+			PXF_CONST_CODE, 0, "13",
+			PXF_ATTR_CODE, 3, NULL,
+			PXFOP_LT);
+	compare_filters(filter, expected);
 
 	pxf_free_filter(filter);
-
 	list_free_deep(expr->args); /* free all args */
 	pfree(expr);
 }
@@ -439,8 +438,7 @@ test__opexpr_to_pxffilter__unsupportedOpNot(void **state)
 {
 	PxfFilterDesc *filter = (PxfFilterDesc*) palloc0(sizeof(PxfFilterDesc));
 	Var *arg_var = build_var(INT2OID, 3);
-	StringInfo const_value = makeStringInfo();
-	appendStringInfo(const_value, "%s", "not");
+	char* const_value = strdup("not"); /* will be free'd by const_to_str */
 	Const *arg_const = build_const(INT2OID, const_value);
 	OpExpr *expr = build_op_expr(arg_const, arg_var, 1877 /* int2not */);
 
@@ -449,7 +447,6 @@ test__opexpr_to_pxffilter__unsupportedOpNot(void **state)
 
 	pxf_free_filter(filter);
 
-	pfree(const_value); /* data is freed by const_to_str */
 	list_free_deep(expr->args); /* free all args */
 	pfree(expr);
 }
@@ -545,8 +542,8 @@ main(int argc, char* argv[])
 			unit_test(test__const_to_str__NegativeCircle),
 			unit_test(test__opexpr_to_pxffilter__null),
 			unit_test(test__opexpr_to_pxffilter__unary_expr),
-			unit_test(test__opexpr_to_pxffilter__different_types),
 			unit_test(test__opexpr_to_pxffilter__intGT),
+			unit_test(test__opexpr_to_pxffilter__allSupportedTypes),
 			unit_test(test__opexpr_to_pxffilter__attributeIsNull),
 			unit_test(test__opexpr_to_pxffilter__differentTypes),
 			unit_test(test__opexpr_to_pxffilter__unsupportedTypeCircle),

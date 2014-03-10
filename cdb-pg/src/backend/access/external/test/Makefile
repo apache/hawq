@@ -1,7 +1,7 @@
 subdir=src/backend/access/external
 top_builddir=../../../../..
 
-TARGETS=pxfuriparser hd_work_mgr pxfheaders ha_config 
+TARGETS=pxfuriparser hd_work_mgr pxfheaders ha_config pxffilters 
 
 # Objects from backend, which don't need to be mocked but need to be linked.
 COMMON_REAL_OBJS=\
@@ -50,7 +50,10 @@ hd_work_mgr_REAL_OBJS=$(COMMON_REAL_OBJS) \
 pxfheaders_REAL_OBJS=$(COMMON_REAL_OBJS) \
 	$(top_srcdir)/src/backend/utils/adt/numutils.o
 ha_config_REAL_OBJS=$(COMMON_REAL_OBJS) \
-    $(top_srcdir)/src/backend/utils/fmgrtab.o
+	$(top_srcdir)/src/backend/utils/fmgrtab.o
+pxffilters_REAL_OBJS=$(COMMON_REAL_OBJS) \
+	$(top_srcdir)/src/backend/optimizer/util/clauses.o \
+	$(top_srcdir)/src/backend/parser/parse_expr.o    
 
 include ../../../../Makefile.mock
 

@@ -472,8 +472,7 @@ public class PxfHBaseRegression extends PxfTestCase {
 		
 		createAndQueryPxfHBaseFilterTable(filterString);
 		
-		// TODO: pending adding support of cast between smallint and int (cf1:q8)
-		createAndQueryPxfHawqFilterTable(hTable, exTableFields, whereClause, "a9c9702990000000099o3");
+		createAndQueryPxfHawqFilterTable(hTable, exTableFields, whereClause, filterString);
 	}
 
 	@Test
@@ -553,6 +552,8 @@ public class PxfHBaseRegression extends PxfTestCase {
 				"((recordkey <= 'row00000103') AND (recordkey = 'row00000105') OR recordkey = '0')";
 		filterString = "a0c\"row00000090\"o2";
 		createAndQueryPxfHawqFilterTable(hTable, exTableFields, whereClause, filterString);
+		
+		ReportUtils.stopLevel(report);
 	}
 
 	@Test
@@ -578,8 +579,6 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
 		createAndQueryPxfHBaseFilterTable(filterString);
-		// TODO: add support of cast between smallint and int (\"cf1:q8\" > 97 is ignored)
-		filterString = "a0c\"row00000099\"o6a9c9702990000000099o3o7";
 		createAndQueryPxfHawqFilterTable(hTable, exTableFields, whereClause, filterString);
 		
 		whereClause = " WHERE \"cf1:q9\" <= 9702990000000099 AND recordkey != 'row00000099' AND \"cf1:q8\" > 97";
@@ -591,8 +590,6 @@ public class PxfHBaseRegression extends PxfTestCase {
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
 
 		createAndQueryPxfHBaseFilterTable(filterString);
-		// TODO: add support of cast between smallint and int (\"cf1:q8\" > 97" is ignored)
-		filterString = "a9c9702990000000099o3a0c\"row00000099\"o6o7";
 		createAndQueryPxfHawqFilterTable(hTable, exTableFields, whereClause, filterString);
 		
 		hawq.runQuery("SET pxf_enable_filter_pushdown = off");
