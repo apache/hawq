@@ -16,8 +16,16 @@ import java.util.LinkedList;
 import java.util.List;
 
 
-/*
- * Specialization of HdfsSplittableDataAccessor for sequence files
+/**
+ * Accessor for Hive tables.
+ * The accessor will open and read a split belonging to a Hive table.
+ * Opening a split means creating the coresponding InputFormat and RecordReader required to access the 
+ * split's data. The actual record reading is done in the base class - 
+ * {@link com.pivotal.pxf.plugins.hdfs.HdfsSplittableDataAccessor}.
+ * <p>
+ * HiveAccessor will also enforce Hive partition filtering by filtering-out a split which does not
+ * belong to a partition filter. Naturally, the partition filtering will be done only for Hive tables 
+ * that are partitioned.
  */
 public class HiveAccessor extends HdfsSplittableDataAccessor {
     private Log Log;
@@ -36,9 +44,10 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
 
     private List<Partition> partitions;
 
-    /*
-     * C'tor
-     * Creates the InputFormat and the RecordReader object
+    /**
+     * Constructs the InputFormat (derived  from {@link org.apache.hadoop.mapred.FileInputFormat})
+	 * and the Hive partition fields 
+	 * @param input contains the InputFormat class name and the partition fields
      */
     public HiveAccessor(InputData input) throws Exception {
         /*
@@ -51,22 +60,32 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
         Log = LogFactory.getLog(HiveAccessor.class);
     }
 
-    /*
+    /**
      * openForRead
-     * Overriding openForRead to enable partition filtering
-     * If partition filter is set and the file currently opened by the accessor does not belong
-     * to the partition we return false and stop processing for this file
+     * Enables Hive partition filtering
+     * @return true if there are no partitions or there is no partition filter or 
+	 *         partition filter is set and the file currently opened by the accessor belongs
+     *         to the partition.
      */
     @Override
     public boolean openForRead() throws Exception {
         return isOurDataInsideFilteredPartition() && super.openForRead();
     }
 
+	/**
+	 * Creates the RecordReader suitable for this given split.
+	 * @param jobConf configuraton data for the Hadoop framework
+	 * @param split the split that was allocated for reading to this accessor
+	 */
     @Override
     protected Object getReader(JobConf jobConf, InputSplit split) throws IOException {
         return fformat.getRecordReader(split, jobConf, Reporter.NULL);
     }
 
+	/*
+	 * Parse the user-data supplied by the HiveFragmenter from InputData. Based on the 
+	 * user-data construct the partition foelds and the InputFormat for current split
+	 */
     private FileInputFormat<?, ?> createInputFormat(InputData input) throws Exception {
         String userData = new String(input.getFragmentUserData());
         String[] toks = userData.split(HiveDataFragmenter.HIVE_UD_DELIM);

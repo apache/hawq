@@ -25,11 +25,11 @@ import java.util.Properties;
 
 import static com.pivotal.pxf.api.io.DataType.*;
 
-/*
+/**
  * Class HiveResolver handles deserialization of records that were serialized 
- * using Hadoop's Hive serialization framework. HiveResolver implements
- * IReadResolver interface.
+ * using Hadoop's Hive serialization framework.  
  */
+
 /*
 TODO - remove SupressWarning once Hive resolves the problem described below
 This line and the change of the deserialiazer member to Object instead of the original Deserializer...., All this changes stem from the same issue. 
@@ -44,7 +44,14 @@ public class HiveResolver extends Plugin implements ReadResolver {
     private String serdeName;
     private String propsString;
     private String partitionKeys;
-
+	
+	/**
+	 * Constructs the HiveResolver by parsing the userdata in the input 
+	 * and obtaining the serde class name, the serde properties string 
+	 * and the partition keys.
+	 * @param input contains the Serde class name, the serde properties 
+	 *        string and the partition keys
+	 */
     public HiveResolver(InputData input) throws Exception {
         super(input);
 
@@ -52,6 +59,19 @@ public class HiveResolver extends Plugin implements ReadResolver {
         InitSerde();
         InitPartitionFields();
     }
+	
+	public List<OneField> getFields(OneRow onerow) throws Exception {
+        List<OneField> record = new LinkedList<OneField>();
+		
+        Object tuple = (deserializer).deserialize((Writable) onerow.getData());
+        ObjectInspector oi = (deserializer).getObjectInspector();
+		
+        traverseTuple(tuple, oi, record);
+        /* We follow Hive convention. Partition fields are always added at the end of the record */
+        addPartitionKeyValues(record);
+		
+        return record;
+    }	
 
     /*
      * parse user data string (arrived from fragmenter)
@@ -69,25 +89,6 @@ public class HiveResolver extends Plugin implements ReadResolver {
         serdeName = toks[1];
         propsString = toks[2];
         partitionKeys = toks[3];
-    }
-
-    /*
-     * getFields returns a list of the fields of one record.
-     * Each record field is represented by a OneField item.
-     * OneField item contains two fields: an integer representing the field type and a Java
-     * Object representing the field value.
-     */
-    public List<OneField> getFields(OneRow onerow) throws Exception {
-        List<OneField> record = new LinkedList<OneField>();
-
-        Object tuple = (deserializer).deserialize((Writable) onerow.getData());
-        ObjectInspector oi = (deserializer).getObjectInspector();
-
-        traverseTuple(tuple, oi, record);
-        /* We follow Hive convention. Partition fields are always added at the end of the record */
-        addPartitionKeyValues(record);
-
-        return record;
     }
 
     /*
@@ -161,7 +162,7 @@ public class HiveResolver extends Plugin implements ReadResolver {
      * is null - then BadRecordException will be thrown. If a primitive field value is null, then a null will appear for
      * the field in the record in the query result.
      */
-    public void traverseTuple(Object obj, ObjectInspector objInspector, List<OneField> record) throws IOException, BadRecordException {
+    private void traverseTuple(Object obj, ObjectInspector objInspector, List<OneField> record) throws IOException, BadRecordException {
         ObjectInspector.Category category = objInspector.getCategory();
         if ((obj == null) && (category != ObjectInspector.Category.PRIMITIVE)) {
             throw new BadRecordException("NULL Hive composite object");
@@ -219,7 +220,7 @@ public class HiveResolver extends Plugin implements ReadResolver {
         }
     }
 
-    public void resolvePrimitive(Object o, PrimitiveObjectInspector oi, List<OneField> record) throws IOException {
+    private void resolvePrimitive(Object o, PrimitiveObjectInspector oi, List<OneField> record) throws IOException {
         Object val;
         switch (oi.getPrimitiveCategory()) {
             case BOOLEAN: {

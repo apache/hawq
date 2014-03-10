@@ -28,15 +28,17 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Properties;
 
-/*
- * Fragmenter class for a HIVE table
- *
+/**
+ * Fragmenter class for HIVE tables
+ * <p>
  * Given a Hive table and its partitions
  * divide the data into fragments (here a data fragment is actually a HDFS file block) and return a list of them.
  * Each data fragment will contain the following information:
- * a. sourceName: full HDFS path to the data file that this data fragment is part of
- * b. hosts: a list of the datanode machines that hold a replica of this block
- * c. userData: file_input_format_name_DELIM_serde_name_DELIM_serialization_properties
+ * <ol>
+ * <li>sourceName: full HDFS path to the data file that this data fragment is part of</li>
+ * <li>hosts: a list of the datanode machines that hold a replica of this block</li>
+ * <li>userData: file_input_format_name_DELIM_serde_name_DELIM_serialization_properties</li>
+ * </ol>
  */
 public class HiveDataFragmenter extends Fragmenter {
     private JobConf jobConf;
@@ -63,14 +65,13 @@ public class HiveDataFragmenter extends Fragmenter {
 
     private Metastore metastore;
 
-    public static final String HIVE_DEFAULT_DBNAME = "default";
-    public static final String HIVE_UD_DELIM = "!HUDD!";
-    public static final String HIVE_1_PART_DELIM = "!H1PD!";
-    public static final String HIVE_PARTITIONS_DELIM = "!HPAD!";
-    public static final String HIVE_NO_PART_TBL = "!HNPT!";
+	private static final String HIVE_DEFAULT_DBNAME = "default";
+    static final String HIVE_UD_DELIM = "!HUDD!";
+    static final String HIVE_1_PART_DELIM = "!H1PD!";
+    static final String HIVE_PARTITIONS_DELIM = "!HPAD!";
+    static final String HIVE_NO_PART_TBL = "!HNPT!";
 
-    /* TODO: get rid of these */
-    public static final int HIVE_MAX_PARTS = 1000;
+    private static final int HIVE_MAX_PARTS = 1000;
     static final int METASTORE_DEFAULT_PORT = 9083; /* default metastore port */
     static final String METASTORE_DEFAULT_HOST = "localhost";
 
@@ -110,8 +111,9 @@ public class HiveDataFragmenter extends Fragmenter {
         }
     }
 
-    /*
-     * C'tor
+    /**
+     * Constructs a HiveDataFragmenter object
+	 * @param md all input parameters comming from the client
      */
     public HiveDataFragmenter(InputData md) {
         super(md);
@@ -120,12 +122,7 @@ public class HiveDataFragmenter extends Fragmenter {
         client = null;
     }
 
-    /*
-     * path is a data source URI that can appear as a file
-     * name, a directory name  or a wildcard returns the data
-     * fragments in json format
-     */
-    @Override
+	@Override
     public List<Fragment> getFragments() throws Exception {
     	if (client == null) {
     		initHiveClient();
@@ -140,6 +137,23 @@ public class HiveDataFragmenter extends Fragmenter {
 
         return fragments;
     }
+	
+	/**
+	 * Creates the partition InputFormat 
+	 * @param inputFormatName input format class name
+	 * @param jobConf configuraton data for the Hadoop framework
+	 * @return a {@link org.apache.hadoop.mapred.FileInputFormat} derived object
+	 */
+    static public FileInputFormat<?, ?> makeInputFormat(String inputFormatName, JobConf jobConf) throws Exception {
+        Class<?> c = Class.forName(inputFormatName, true, JavaUtils.getClassLoader());
+        FileInputFormat<?, ?> fformat = (FileInputFormat<?, ?>) c.newInstance();
+		
+        if ("org.apache.hadoop.mapred.TextInputFormat".equals(inputFormatName)) {
+            ((TextInputFormat) fformat).configure(jobConf); // TextInputFormat needs a special configuration
+        }
+		
+        return fformat;
+    }	
 
     /* Initialize the Hive client */
     private void initHiveClient() {
@@ -306,18 +320,6 @@ public class HiveDataFragmenter extends Fragmenter {
             Fragment fragment = new Fragment(filepath, hosts, locationInfo, makeUserData(tablePartition));
             fragments.add(fragment);
         }
-    }
-
-    /* Create the partition InputFormat  */
-    static public FileInputFormat<?, ?> makeInputFormat(String inputFormatName, JobConf jobConf) throws Exception {
-        Class<?> c = Class.forName(inputFormatName, true, JavaUtils.getClassLoader());
-        FileInputFormat<?, ?> fformat = (FileInputFormat<?, ?>) c.newInstance();
-
-        if ("org.apache.hadoop.mapred.TextInputFormat".equals(inputFormatName)) {
-            ((TextInputFormat) fformat).configure(jobConf); // TextInputFormat needs a special configuration
-        }
-
-        return fformat;
     }
 
     /*

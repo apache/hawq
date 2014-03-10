@@ -166,6 +166,29 @@
                 </fileset>
             </classpath>
         </javadoc>   	
+       <delete dir="docs/plugins/hive"/>
+        <mkdir dir="docs/plugins/hive"/>
+        <javadoc packagenames="com.pivotal.pxf.plugins.hive.*"
+                 sourcepath="src"
+                 defaultexcludes="yes"
+                 destdir="docs/plugins/hive"
+                 author="true"
+                 version="true"
+                 use="true"
+                 windowtitle="PXF Hive Plugin">
+            <doctitle><![CDATA[<h1>Pivotal Extension Framework</h1>]]></doctitle>
+            <bottom><![CDATA[<i>Copyright &#169; 2014 Pivotal All Rights Reserved.</i>]]></bottom>
+            <link offline="true" href="http://docs.oracle.com/javase/7/docs/api/" packagelistLoc="/tmp"/>
+            <link href="http://docs.oracle.com/javase/7/docs/api/"/>
+            <classpath>
+                <pathelement location="${build.dir}/test/classes"/>
+                <pathelement location="${build.dir}/classes"/>
+                <pathelement location="${src.dir}"/>
+                <fileset dir="${lib.dir}">
+                    <include name="**/*.jar"/>
+                </fileset>
+            </classpath>
+        </javadoc>
     </target>
 
     <!-- Compilation -->

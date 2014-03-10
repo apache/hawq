@@ -6,22 +6,30 @@ import com.pivotal.pxf.api.utilities.InputData;
 import java.util.LinkedList;
 import java.util.List;
 
-/*
- * This is the implementation of FilterBuilder for Hive.
- *
- * The class uses the filter parser code to build a filter object,
- * either simple (single BasicFilter class) or a compound (List<BasicFilter>)
- * for HiveAccessor to use for partition filtering
+/**
+ * Uses the filter parser code to build a filter object,
+ * either simple - a single {@link com.pivotal.pxf.api.FilterParser.BasicFilter} 
+ * object or a compound - a {@link java.util.List} of
+ * {@link com.pivotal.pxf.api.FilterParser.BasicFilter} objects.
+ * {@link com.pivotal.pxf.plugins.hive.HiveAccessor} will use the filter 
+ *        for partition filtering
  */
 public class HiveFilterBuilder implements FilterParser.FilterBuilder {
     private InputData inputData;
 
+	/**
+	 * Constructs a HiveFilterBuilder object
+	 * @param input
+	 */
     public HiveFilterBuilder(InputData input) {
         inputData = input;
     }
 
-    /*
+    /**
      * Translates a filterString into a FilterParser.BasicFilter or a list of such filters
+	 * @param filterString the string representation of the filter
+	 * @return a single {@link com.pivotal.pxf.api.FilterParser.BasicFilter} object or
+	 * a {@link java.util.List} of {@link com.pivotal.pxf.api.FilterParser.BasicFilter} objects.
      */
     public Object getFilterObject(String filterString) throws Exception {
         FilterParser parser = new FilterParser(this);
@@ -34,12 +42,7 @@ public class HiveFilterBuilder implements FilterParser.FilterBuilder {
         return result;
     }
 
-    /*
-     * Implemented for IFilterBuilder interface
-     *
-     * Called each time the parser comes across an operator.
-     */
-    @SuppressWarnings("unchecked")
+	@SuppressWarnings("unchecked")
     public Object build(FilterParser.Operation opId,
                         Object leftOperand,
                         Object rightOperand) throws Exception {
