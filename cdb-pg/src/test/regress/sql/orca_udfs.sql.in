@@ -2,7 +2,9 @@ drop schema if exists %%GPOPTUTILS_NAMESPACE%% cascade;
 
 create schema %%GPOPTUTILS_NAMESPACE%%;
 
+-- start_ignore
 \set Udflib `echo "$GPHOME/lib/libgpoptudf.%%EXT%%"`
+-- end_ignore
 
 create function %%GPOPTUTILS_NAMESPACE%%.EvalExprFromDXLFile(text) returns text as :'Udflib', 'EvalExprFromDXLFile' language c strict;
 

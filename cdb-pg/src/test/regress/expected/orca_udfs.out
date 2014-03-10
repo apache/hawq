@@ -1,7 +1,9 @@
 drop schema if exists orcaudftest cascade;
 NOTICE:  schema "orcaudftest" does not exist, skipping
 create schema orcaudftest;
+-- start_ignore
 \set Udflib `echo "$GPHOME/lib/libgpoptudf.so"`
+-- end_ignore
 create function orcaudftest.EvalExprFromDXLFile(text) returns text as :'Udflib', 'EvalExprFromDXLFile' language c strict;
 \set Mypath `pwd`'/udf_input/s01_const_int.xml'
 select orcaudftest.EvalExprFromDXLFile(:'Mypath');
