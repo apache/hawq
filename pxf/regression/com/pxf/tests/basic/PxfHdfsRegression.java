@@ -1157,10 +1157,6 @@ public class PxfHdfsRegression extends PxfTestCase {
 		ShellSystemObject sso = hawq.openPsql();
 		try {
 
-			// TODO: SET optimizer = false should be removed once GPSQL-1465 is
-			// resolved.
-			ReportUtils.report(report, getClass(), "set optimizer to false until ORCA fix pushdown to external scan");
-			hawq.runSqlCmd(sso, "SET optimizer = false;", true);
 			hawq.runSqlCmd(sso, "SET client_min_messages = debug2;", true);
 
 			ReportUtils.report(report, getClass(), "filter with one condition");

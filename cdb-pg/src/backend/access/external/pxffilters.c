@@ -13,9 +13,14 @@
 #include "utils/guc.h"
 #include "utils/lsyscache.h"
 
+static List* pxf_make_filter_list(List* quals);
+static void pxf_free_filter(PxfFilterDesc* filter);
+static void pxf_free_filter_list(List *filters);
+static char* pxf_serialize_filter_list(List *filters);
 static bool opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter);
 static void const_to_str(Const *constval, StringInfo buf);
 static bool supported_filter_type(Oid type);
+static void const_to_str(Const *constval, StringInfo buf);
 
 /*
  * All supported HAWQ operators, and their respective HFDS operator code.
@@ -100,7 +105,7 @@ pxf_make_filter_list(List *quals)
 	{
 		Node *node = (Node *) lfirst(lc);
 		NodeTag tag = nodeTag(node);
-		elog(DEBUG5, "pxf_make_filter_list: node tag %d. %s", tag, tag==T_OpExpr? "(T_OpExpr)": "");
+
 		switch (tag)
 		{
 			case T_OpExpr:
@@ -109,6 +114,7 @@ pxf_make_filter_list(List *quals)
 				PxfFilterDesc	*filter;
 
 				filter = (PxfFilterDesc *) palloc0(sizeof(PxfFilterDesc));
+				elog(DEBUG5, "pxf_make_filter_list: node tag %d (T_OpExpr)", tag);
 
 				if (opexpr_to_pxffilter(expr, filter))
 					result = lappend(result, filter);
@@ -117,8 +123,25 @@ pxf_make_filter_list(List *quals)
 
 				break;
 			}
+			case T_BoolExpr:
+			{
+				BoolExpr	*expr = (BoolExpr *) node;
+				BoolExprType boolType = expr->boolop;
+				elog(DEBUG5, "pxf_make_filter_list: node tag %d (T_BoolExpr), bool node type %d %s",
+						tag, boolType, boolType==AND_EXPR ? "(AND_EXPR)" : "");
+
+				/* only AND_EXPR is supported */
+				if (expr->boolop == AND_EXPR)
+				{
+					List *inner_result = pxf_make_filter_list(expr->args);
+					elog(DEBUG5, "pxf_make_filter_list: inner result size %d", list_length(inner_result));
+					result = list_concat(result, inner_result);
+				}
+				break;
+			}
 			default:
 				/* expression not supported. ignore */
+				elog(DEBUG5, "pxf_make_filter_list: unsupported node tag %d", tag);
 				break;
 		}
 	}

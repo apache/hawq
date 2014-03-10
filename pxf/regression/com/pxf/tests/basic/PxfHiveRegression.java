@@ -47,8 +47,6 @@ public class PxfHiveRegression extends PxfTestCase {
 
 		super.defaultBefore();
 
-		hawq.runQuery("SET optimizer = off");
-
 		hive = (Hive) system.getSystemObject("hive");
 
 		hiveTable = TableFactory.getHivebyRowCommaTable("reg_txt", new String[] {

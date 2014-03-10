@@ -103,7 +103,6 @@ public class PxfHBaseRegression extends PxfTestCase {
 		hbase = (HBase) system.getSystemObject("hbase");
 
 		hawq.runQuery("SET pxf_enable_filter_pushdown = on");
-		hawq.runQuery("SET optimizer = off");
 
 		hTable = new HBaseTable("hbase_table", new String[] { "cf1" });
 
@@ -533,6 +532,26 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		ComparisonUtils.compareTables(externalTableHbase, hTable, report);
 
+		ReportUtils.startLevel(report, getClass(), "OR tests");
+		
+		ReportUtils.report(report, getClass(), "Query: ((x AND y) OR z). Expected filter: null");
+		createAndQueryPxfHawqFilterTable(hTable, exTableFields, whereClause, filterString);
+		
+		ReportUtils.report(report, getClass(), "Query: (x OR (y AND z)). Expected filter: null");
+		whereClause = " WHERE (recordkey = 'row00000105') OR " +
+				"((recordkey > 'row00000090') AND (recordkey <= 'row00000103'))";
+		createAndQueryPxfHawqFilterTable(hTable, exTableFields, whereClause, filterString);
+		
+		ReportUtils.report(report, getClass(), "Query: (x AND (y OR z)). Expected filter: x");
+		whereClause = " WHERE (recordkey > 'row00000090') AND " +
+				"((recordkey <= 'row00000103') OR (recordkey = 'row00000105'))";
+		filterString = "a0c\"row00000090\"o2";
+		createAndQueryPxfHawqFilterTable(hTable, exTableFields, whereClause, filterString);
+		
+		ReportUtils.report(report, getClass(), "Query: (x AND (y AND z OR a)). Expected filter: x");
+		whereClause = " WHERE (recordkey > 'row00000090') AND " +
+				"((recordkey <= 'row00000103') AND (recordkey = 'row00000105') OR recordkey = '0')";
+		filterString = "a0c\"row00000090\"o2";
 		createAndQueryPxfHawqFilterTable(hTable, exTableFields, whereClause, filterString);
 	}
 
