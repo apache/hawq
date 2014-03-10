@@ -42,6 +42,8 @@
 #define ALLOW_UInt64GetDatum
 #define ALLOW_DatumGetObjectId
 #define ALLOW_DatumGetPointer
+#define ALLOW_DatumGetFloat4
+#define ALLOW_DatumGetFloat8
 #define ALLOW_PointerGetDatum
 #define ALLOW_aggregate_exists
 #define ALLOW_bms_add_member
@@ -126,6 +128,8 @@
 #define ALLOW_MemoryContextStrdup
 #define ALLOW_nodeToString
 #define ALLOW_numeric_to_double_no_overflow
+#define ALLOW_convert_timevalue_to_scalar
+#define ALLOW_convert_network_to_scalar
 #define ALLOW_op_hashjoinable
 #define ALLOW_op_mergejoinable
 #define ALLOW_op_input_types
@@ -509,6 +513,34 @@ gpdb::PvPointerFromDatum
 	}
 	GP_WRAP_END;
 	return NULL;
+}
+
+float4
+gpdb::FpFloat4FromDatum
+	(
+	Datum d
+	)
+{
+	GP_WRAP_START;
+	{
+		return DatumGetFloat4(d);
+	}
+	GP_WRAP_END;
+	return 0;
+}
+
+float8
+gpdb::DFloat8FromDatum
+	(
+	Datum d
+	)
+{
+	GP_WRAP_START;
+	{
+		return DatumGetFloat8(d);
+	}
+	GP_WRAP_END;
+	return 0;
 }
 
 Datum
@@ -1904,6 +1936,36 @@ gpdb::DNumericToDoubleNoOverflow
 	GP_WRAP_START;
 	{
 		return numeric_to_double_no_overflow(num);
+	}
+	GP_WRAP_END;
+	return 0.0;
+}
+
+double
+gpdb::DConvertTimeValueToScalar
+	(
+	Datum datum,
+	Oid typid
+	)
+{
+	GP_WRAP_START;
+	{
+		return convert_timevalue_to_scalar(datum, typid);
+	}
+	GP_WRAP_END;
+	return 0.0;
+}
+
+double
+gpdb::DConvertNetworkToScalar
+	(
+	Datum datum,
+	Oid typid
+	)
+{
+	GP_WRAP_START;
+	{
+		return convert_network_to_scalar(datum, typid);
 	}
 	GP_WRAP_END;
 	return 0.0;

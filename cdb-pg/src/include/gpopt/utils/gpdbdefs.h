@@ -33,6 +33,7 @@ extern "C" {
 #include "utils/lsyscache.h"
 #include "utils/datum.h"
 #include "utils/array.h"
+#include "utils/builtins.h"
 #include "optimizer/walkers.h"
 #include "optimizer/planmain.h"
 #include "parser/parse_expr.h"
@@ -60,6 +61,7 @@ extern "C" {
 #include "tcop/dest.h"
 #include "commands/trigger.h"
 #include "parser/parse_coerce.h"
+#include "utils/selfuncs.h"
 
 extern
 Query *preprocess_query_optimizer(Query *pquery, ParamListInfo boundParams);

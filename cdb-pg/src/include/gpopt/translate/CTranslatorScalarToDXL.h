@@ -462,8 +462,10 @@ namespace gpdxl
 			static
 			CDouble DValue
 				(
+				IMDId *pmdid,
+				BOOL fNull,
 				BYTE *pba,
-				BOOL fNull
+				Datum datum
 				);
 
 			// extract the long int value of a datum

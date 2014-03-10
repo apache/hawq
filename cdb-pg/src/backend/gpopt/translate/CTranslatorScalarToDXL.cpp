@@ -2072,13 +2072,13 @@ CTranslatorScalarToDXL::PdxldatumGeneric
 	}
 
 	CDouble dValue(0);
-	if (pmdid->FEquals(&CMDIdGPDB::m_mdidNumeric))
+	if (CMDTypeGenericGPDB::FHasByteDoubleMapping(pmdid))
 	{
-		dValue = DValue(pba, fNull);
+		dValue = DValue(pmdid, fNull, pba, datum);
 	}
 
 	LINT lValue = 0;
-	if (CMDTypeGenericGPDB::FNeedsByteaLintMapping(pmdid))
+	if (CMDTypeGenericGPDB::FHasByteLintMapping(pmdid))
 	{
 		lValue = LValue(pmdid, fNull, pba, ulLength);
 	}
@@ -2222,12 +2222,22 @@ CTranslatorScalarToDXL::PdxldatumInt8
 CDouble
 CTranslatorScalarToDXL::DValue
 	(
+	IMDId *pmdid,
+	BOOL fNull,
 	BYTE *pba,
-	BOOL fNull
+	Datum datum
 	)
 {
-	CDouble dValue = 0;
-	if (!fNull)
+	GPOS_ASSERT(CMDTypeGenericGPDB::FHasByteDoubleMapping(pmdid));
+
+	double d = 0;
+
+	if (fNull)
+	{
+		return CDouble(d);
+	}
+
+	if (pmdid->FEquals(&CMDIdGPDB::m_mdidNumeric))
 	{
 		Numeric num = (Numeric) (pba);
 		if (NUMERIC_IS_NAN(num))
@@ -2236,11 +2246,26 @@ CTranslatorScalarToDXL::DValue
 			return CDouble(GPOS_FP_ABS_MAX);
 		}
 
-		double d = gpdb::DNumericToDoubleNoOverflow(num);
-		dValue = CDouble(d);
+		d = gpdb::DNumericToDoubleNoOverflow(num);
+	}
+	else if (pmdid->FEquals(&CMDIdGPDB::m_mdidFloat4))
+	{
+		d = (double) gpdb::FpFloat4FromDatum(datum);
+	}
+	else if (pmdid->FEquals(&CMDIdGPDB::m_mdidFloat8))
+	{
+		d = gpdb::DFloat8FromDatum(datum);
+	}
+	else if (CMDTypeGenericGPDB::FTimeRelatedType(pmdid))
+	{
+		d = gpdb::DConvertTimeValueToScalar(datum, CMDIdGPDB::PmdidConvert(pmdid)->OidObjectId());
+	}
+	else if (CMDTypeGenericGPDB::FNetworkRelatedType(pmdid))
+	{
+		d = gpdb::DConvertNetworkToScalar(datum, CMDIdGPDB::PmdidConvert(pmdid)->OidObjectId());
 	}
 
-	return dValue;
+	return CDouble(d);
 }
 
 
@@ -2304,28 +2329,22 @@ CTranslatorScalarToDXL::LValue
 	ULONG ulLength
 	)
 {
+	GPOS_ASSERT(CMDTypeGenericGPDB::FHasByteLintMapping(pmdid));
+
 	LINT lValue = 0;
 	if (fNull)
 	{
 		return lValue;
 	}
 
-	if (pmdid->FEquals(&CMDIdGPDB::m_mdidDate))
+	if (pmdid->FEquals(&CMDIdGPDB::m_mdidCash))
 	{
+		// cash is a pass-by-ref type
 		Datum datumConstVal = (Datum) 0;
-		// the value is stored in the datum.
 		clib::PvMemCpy(&datumConstVal, pba, ulLength);
 		// Date is internally represented as an int32
 		lValue = (LINT) (gpdb::IInt32FromDatum(datumConstVal));
-		lValue = lValue * LINT(86400000000LL); // microseconds per day
-	}
-	else if (pmdid->FEquals(&CMDIdGPDB::m_mdidTimestamp))
-	{
-		Datum datumConstVal = (Datum) 0;
-		// the value is stored in the datum.
-		clib::PvMemCpy(&datumConstVal, pba, ulLength);
-		// Timestamp is internally an int64
-		lValue = (LINT) (gpdb::LlInt64FromDatum(datumConstVal));
+
 	}
 	else
 	{

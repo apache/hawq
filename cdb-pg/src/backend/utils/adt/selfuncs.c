@@ -121,7 +121,6 @@ static void convert_bytea_to_scalar(Datum value,
 						double *scaledhibound);
 static double convert_one_bytea_to_scalar(unsigned char *value, int valuelen,
 							int rangelo, int rangehi);
-static double convert_timevalue_to_scalar(Datum value, Oid typid);
 static bool get_variable_maximum(PlannerInfo *root, VariableStatData *vardata,
 					 Oid sortop, Datum *max);
 static Selectivity prefix_selectivity(VariableStatData *vardata,
@@ -3080,7 +3079,7 @@ convert_one_bytea_to_scalar(unsigned char *value, int valuelen,
 /*
  * Do convert_to_scalar()'s work for any timevalue data type.
  */
-static double
+double
 convert_timevalue_to_scalar(Datum value, Oid typid)
 {
 	switch (typid)

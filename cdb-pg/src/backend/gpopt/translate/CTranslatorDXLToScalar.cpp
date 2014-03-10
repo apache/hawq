@@ -1358,12 +1358,8 @@ CTranslatorDXLToScalar::PconstFromDXLDatum
 			{CDXLDatum::EdxldatumBool , &CTranslatorDXLToScalar::PconstBool},
 			{CDXLDatum::EdxldatumOid , &CTranslatorDXLToScalar::PconstOid},
 			{CDXLDatum::EdxldatumGeneric, &CTranslatorDXLToScalar::PconstGeneric},
-			{CDXLDatum::EdxldatumDate, &CTranslatorDXLToScalar::PconstGeneric},
-			{CDXLDatum::EdxldatumTimeStamp, &CTranslatorDXLToScalar::PconstGeneric},
-			{CDXLDatum::EdxldatumBpchar, &CTranslatorDXLToScalar::PconstGeneric},
-			{CDXLDatum::EdxldatumVarchar, &CTranslatorDXLToScalar::PconstGeneric},
-			{CDXLDatum::EdxldatumText, &CTranslatorDXLToScalar::PconstGeneric},
-			{CDXLDatum::EdxldatumDouble, &CTranslatorDXLToScalar::PconstGeneric}
+			{CDXLDatum::EdxldatumStatsDoubleMappable, &CTranslatorDXLToScalar::PconstGeneric},
+			{CDXLDatum::EdxldatumStatsLintMappable, &CTranslatorDXLToScalar::PconstGeneric}
 		};
 
 	const ULONG ulTranslators = GPOS_ARRAY_SIZE(rgTranslators);

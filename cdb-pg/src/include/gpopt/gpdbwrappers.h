@@ -118,6 +118,12 @@ namespace gpdb {
 	// convert datum to generic object with pointer handle
 	void *PvPointerFromDatum(Datum d);
 
+	// convert datum to float4
+	float4 FpFloat4FromDatum(Datum d);
+
+	// convert datum to float8
+	float8 DFloat8FromDatum(Datum d);
+
 	// convert pointer to datum
 	Datum DDatumFromPointer(const void *p);
 
@@ -393,6 +399,12 @@ namespace gpdb {
 
 	// convert numeric to double; if out of range, return +/- HUGE_VAL
 	double DNumericToDoubleNoOverflow(Numeric num);
+
+	// convert time-related datums to double for stats purpose
+	double DConvertTimeValueToScalar(Datum datum, Oid typid);
+
+	// convert network-related datums to double for stats purpose
+	double DConvertNetworkToScalar(Datum datum, Oid typid);
 
 	// is the given operator hash-joinable
 	bool FOpHashJoinable(Oid opno);
