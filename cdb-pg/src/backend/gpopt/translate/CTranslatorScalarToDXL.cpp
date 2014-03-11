@@ -447,18 +447,6 @@ CTranslatorScalarToDXL::PdxlnScCmpFromOpExpr
 	GPOS_ASSERT(IsA(pexpr, OpExpr));
 	const OpExpr *popexpr = (OpExpr *) pexpr;
 
-	if(0 == popexpr->opfuncid)
-	{
-		// In a GPDB query object, the Funcid is set to 0. Therefore, we set the
-		// funcoid from the meta data (CMetadataContext)
-
-		CMDIdGPDB *pmdidOp = New(m_pmp) CMDIdGPDB(popexpr->opno);
-		const IMDScalarOp *pmdscop = m_pmda->Pmdscop(pmdidOp);
-		pmdidOp->Release();
-
-		const_cast<OpExpr*>(popexpr)->opfuncid = CMDIdGPDB::PmdidConvert(pmdscop->PmdidFunc())->OidObjectId();
-	}
-
 	// process arguments of op expr
 	GPOS_ASSERT(2 == gpdb::UlListLength(popexpr->args));
 
@@ -509,33 +497,22 @@ CTranslatorScalarToDXL::PdxlnScOpExprFromExpr
 {
 	GPOS_ASSERT(IsA(pexpr, OpExpr));
 
+	const OpExpr *popexpr = (OpExpr *) pexpr;
+
 	// check if this is a scalar comparison
 	CMDIdGPDB *pmdidReturnType = New(m_pmp) CMDIdGPDB(((OpExpr *) pexpr)->opresulttype);
 	const IMDType *pmdtype= m_pmda->Pmdtype(pmdidReturnType);
 
-	if (IMDType::EtiBool ==  pmdtype->Eti())
+	const ULONG ulArgs = gpdb::UlListLength(popexpr->args);
+
+	if (IMDType::EtiBool ==  pmdtype->Eti() && 2 == ulArgs)
 	{
 		pmdidReturnType->Release();
 		return PdxlnScCmpFromOpExpr(pexpr, pmapvarcolid);
 	}
 
-	const OpExpr *popexpr = (OpExpr *) pexpr;
-
-	if(0 == popexpr->opfuncid)
-	{
-		CMDIdGPDB *pmdidOp = New(m_pmp) CMDIdGPDB(popexpr->opno);
-		const IMDScalarOp *pmdscop = m_pmda->Pmdscop(pmdidOp);
-		pmdidOp->Release();
-
-		// In a GPDB query object, the Funcid is set to 0;
-		const_cast<OpExpr*>(popexpr)->opfuncid = CMDIdGPDB::PmdidConvert(pmdscop->PmdidFunc())->OidObjectId();
-	}
-
-	GPOS_ASSERT(1 == gpdb::UlListLength(popexpr->args) || 2 == gpdb::UlListLength(popexpr->args));
-
 	// get operator name and id
 	IMDId *pmdid = New(m_pmp) CMDIdGPDB(popexpr->opno);
-	
 	const CWStringConst *pstr = PstrOpName(pmdid);
 
 	CDXLScalarOpExpr *pdxlop = New(m_pmp) CDXLScalarOpExpr(m_pmp, pmdid, pmdidReturnType, New(m_pmp) CWStringConst(pstr->Wsz()));
@@ -543,19 +520,8 @@ CTranslatorScalarToDXL::PdxlnScOpExprFromExpr
 	// create the DXL node holding the scalar opexpr
 	CDXLNode *pdxln = New(m_pmp) CDXLNode(m_pmp, pdxlop);
 
-	// process arguments of op expr
-	CDXLNode *pdxlnLeft = PdxlnScOpFromExpr((Expr*) gpdb::PvListNth(popexpr->args, 0), pmapvarcolid);
-	GPOS_ASSERT(NULL != pdxlnLeft);
-
-	// add children in the right order
-	pdxln->AddChild(pdxlnLeft);
-
-	if (2 == gpdb::UlListLength(popexpr->args))
-	{
-		CDXLNode *pdxlnRight = PdxlnScOpFromExpr((Expr *) gpdb::PvListNth(popexpr->args, 1), pmapvarcolid);
-		GPOS_ASSERT(NULL != pdxlnRight);
-		pdxln->AddChild(pdxlnRight);
-	}
+	// process arguments
+	TranslateScalarChildren(pdxln, popexpr->args, pmapvarcolid);
 
 	return pdxln;
 }
