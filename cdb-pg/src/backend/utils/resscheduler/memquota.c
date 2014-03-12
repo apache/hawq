@@ -490,6 +490,7 @@ static bool PolicyAutoAssignWalker(Node *node, PolicyAutoContext *context)
 	 ctx.queryMemKB = (uint64) (stmt->query_mem / 1024);
 	 ctx.numMemIntensiveOperators = 0;
 	 ctx.numNonMemIntensiveOperators = 0;
+	 ctx.plannedStmt = stmt;
 	 
 #ifdef USE_ASSERT_CHECKING
 	 bool result = 
