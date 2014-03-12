@@ -847,11 +847,6 @@ CreateFunction(CreateFunctionStmt *stmt)
 				   &as_clause, &languageOid, &languageName, &volatility,
 				   &isStrict, &security, &dataAccess);
 
-	if (security)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("SECURITY DEFINER not supported")));
-
 	languageTuple = caql_getfirst(NULL,
 			cql("SELECT * FROM pg_language "
 				"WHERE oid = :1",
@@ -1435,11 +1430,6 @@ AlterFunction(AlterFunctionStmt *stmt)
 		procForm->proisstrict = intVal(strict_item->arg);
 	if (security_def_item)
 		procForm->prosecdef = intVal(security_def_item->arg);
-
-	if (procForm->prosecdef)
-        ereport(ERROR,
-                (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-                 errmsg("SECURITY DEFINER not supported")));
 
 	if (data_access_item)
 	{
