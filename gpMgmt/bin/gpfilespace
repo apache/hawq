@@ -323,9 +323,10 @@ def getdir(prompt, hosts=[], primary=None, shared=False):
 
         # shared filespace
         if shared:
-            if not pingurl(value):
-                print "Must specify a filespace path, such as: 'host:port/dir'"
-                continue
+            # TODO: check dfs uri 
+            #if not pingurl(value):
+            #    print "Must specify a filespace path, such as: 'host:port/dir'"
+            #    continue
             return value
 
         if not os.path.isabs(value):
