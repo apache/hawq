@@ -265,7 +265,7 @@ static GPHDUri* init(char* uri, ClientContext* cl_context)
 	/*
 	 * 1. Cherrypick the data relevant for HADOOP from the input uri
 	 */
-	GPHDUri* hadoop_uri = parseGPHDUri(uri);
+	GPHDUri* hadoop_uri = parseGPHDUri(uri, GPHDURI_DONT_WARN);
 	
 	/*
 	 * 2. Communication with the Hadoop back-end

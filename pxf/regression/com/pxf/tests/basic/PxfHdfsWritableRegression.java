@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.List;
+import java.sql.SQLWarning;
 
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
@@ -876,5 +877,79 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 		hawq.createTableAndVerify(reTable);
 		hawq.queryResults(reTable, "SELECT * FROM " + reTable.getName() + " ORDER BY num1");
 		ComparisonUtils.compareTables(reTable, dataTable, report);
+	}
+
+	@Test
+	public void textInsertDeprecatedClasses() throws Exception {
+
+		String hdfsDir = hdfsWorkingFolder + "/writable/wrtext";
+
+		WritableExternalTable writableTable = new WritableExternalTable("wrtext", new String[] {
+				"s1 text",
+				"n1 int",
+				"n2 int" }, hdfsDir, "TEXT");
+		writableTable.setDelimiter(",");
+
+		writableTable.setAccessor("LineBreakAccessor");
+		writableTable.setResolver("StringPassResolver");
+
+		try {
+			hawq.createTableAndVerify(writableTable);
+			Assert.fail("A SQLWarning should have been thrown");
+		} catch (SQLWarning warnings)
+		{
+			SQLWarning warning = warnings;
+			assertUseIsDeprecated("LineBreakAccessor", warning);
+			warning = warning.getNextWarning();
+			assertUseIsDeprecated("StringPassResolver", warning);
+			warning = warning.getNextWarning();
+			Assert.assertNull(warning);
+		}
+
+		Table sudoTable = new Table("sudoTable", null);
+		Table smallTable = new Table("smallTable", null);
+
+		ReportUtils.report(report, getClass(), "insert data with multiple insert commands");
+		for (int i = 0; i < 14; i = i + 2) {
+			smallTable.addRow(textData[i]);
+			smallTable.addRow(textData[i + 1]);
+			if (i == 12) {
+				smallTable.addRow(textData[i + 2]);
+			}
+			sudoTable.appendRows(smallTable);
+
+			try {
+				hawq.insertData(smallTable, writableTable);
+				Assert.fail("A SQLWarning should have been thrown");
+			} catch (SQLWarning warnings) {
+				SQLWarning warning = warnings;
+				assertUseIsDeprecated("LineBreakAccessor", warning);
+				warning = warning.getNextWarning();
+				assertUseIsDeprecated("StringPassResolver", warning);
+				warning = warning.getNextWarning();
+				Assert.assertNull(warning);
+			}
+
+			smallTable.setData(null);
+		}
+
+		Assert.assertNotEquals(hdfs.listSize(hdfsDir), 0);
+
+		ReadableExternalTable readableTable = TableFactory.getPxfReadableTextTable("retext", new String[] {
+				"s1 text",
+				"n1 int",
+				"n2 int" }, hdfsDir, ",");
+
+		hawq.createTableAndVerify(readableTable);
+		hawq.queryResults(readableTable, "SELECT * FROM " + readableTable.getName() + " ORDER BY n1");
+
+		ComparisonUtils.compareTables(readableTable, sudoTable, report);
+	}
+
+	private void assertUseIsDeprecated(String classname, SQLWarning warning)
+	{
+		String message = "Use of " + classname + 
+						 " is deprecated and it will be removed on the next major version";
+		Assert.assertTrue(warning.getMessage().contains(message));
 	}
 }

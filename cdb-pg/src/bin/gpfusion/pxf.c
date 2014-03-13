@@ -29,7 +29,7 @@ pxfprotocol_validate_urls(PG_FUNCTION_ARGS)
 {
 	GPHDUri	*uri;
 	char *option;
-	bool	is_writable = EXTPROTOCOL_VALIDATOR_GET_DIRECTION(fcinfo) == EXT_VALIDATE_WRITE;
+	bool is_writable = EXTPROTOCOL_VALIDATOR_GET_DIRECTION(fcinfo) == EXT_VALIDATE_WRITE;
 
 	/* Must be called via the external table format manager */
 	if (!CALLED_AS_EXTPROTOCOL_VALIDATOR(fcinfo))
@@ -46,7 +46,7 @@ pxfprotocol_validate_urls(PG_FUNCTION_ARGS)
 	/*
 	 * Condition 2: url formatting of extra options.
 	 */
-	uri = parseGPHDUri(EXTPROTOCOL_VALIDATOR_GET_NTH_URL(fcinfo, 1));
+	uri = parseGPHDUri(EXTPROTOCOL_VALIDATOR_GET_NTH_URL(fcinfo, 1), GPHDURI_WARN);
 
 	/*
 	 * Condition 3: No duplicate options.

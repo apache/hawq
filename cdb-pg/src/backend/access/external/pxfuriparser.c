@@ -9,6 +9,47 @@ static const char* segwork_substring = "segwork=";
 static const char segwork_separator = '@';
 static const int EMPTY_VALUE_LEN = 2;
 
+/* Number of columns in deprecation table */
+#define DEPRECATED_TABLE_TUPLE_SIZE 3
+/* Index for deprecated class name */
+static const int DEPRECATED_CLASS_INDEX = 0;
+/* Index for class name to use instead of deprecated name */
+static const int CLASS_INDEX = 1;
+/* Index for recommended profile */
+static const int PROFILE_INDEX = 2;
+
+/* The array holds deprecated fragmenter names */
+static const char *FRAGMENTERS[][DEPRECATED_TABLE_TUPLE_SIZE] = 
+{ 
+	{ "HdfsDataFragmenter", "com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter", "HdfsTextSimple" },
+	{ "HiveDataFragmenter", "com.pivotal.pxf.plugins.hive.HiveDataFragmenter", "Hive" },
+	{ "HBaseDataFragmenter", "com.pivotal.pxf.plugins.hbase.HBaseDataFragmenter", "HBase" }
+};
+
+/* The array holds deprecated accessor names */
+static const char *ACCESSORS[][DEPRECATED_TABLE_TUPLE_SIZE] = 
+{ 
+	{ "TextFileAccessor", "com.pivotal.pxf.plugins.hdfs.LineBreakAccessor", "HdfsTextSimple" },
+	{ "LineBreakAccessor", "com.pivotal.pxf.plugins.hdfs.LineBreakAccessor", "HdfsTextSimple" },
+	{ "LineReaderAccessor", "com.pivotal.pxf.plugins.hdfs.LineBreakAccessor", "HdfsTextSimple" },
+	{ "QuotedLineBreakAccessor", "com.pivotal.pxf.plugins.hdfs.QuotedLineBreakAccessor", "HdfsTextMulti" },
+	{ "HiveAccessor", "com.pivotal.pxf.plugins.hive.HiveAccessor", "Hive" },
+	{ "HBaseAccessor", "com.pivotal.pxf.plugins.hbase.HBaseAccessor", "HBase" },
+	{ "AvroFileAccessor", "com.pivotal.pxf.plugins.hdfs.AvroFileAccessor", "Avro" },
+	{ "SequenceFileAccessor", "com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor", "SequenceWritable" }
+};
+
+/* The array holds deprecated resolver names */
+static const char *RESOLVERS[][DEPRECATED_TABLE_TUPLE_SIZE] = 
+{ 
+	{ "TextResolver", "com.pivotal.pxf.plugins.hdfs.StringPassResolver", "HdfsTextSimple" },
+	{ "StringPassResolver", "com.pivotal.pxf.plugins.hdfs.StringPassResolver", "HdfsTextSimple" },
+	{ "HiveResolver", "com.pivotal.pxf.plugins.hive.HiveResolver", "Hive" },
+	{ "HBaseResolver", "com.pivotal.pxf.plugins.hbase.HBaseResolver", "HBase" },
+	{ "AvroResolver", "com.pivotal.pxf.plugins.hdfs.AvroResolver", "Avro" },
+	{ "WritableResolver", "com.pivotal.pxf.plugins.hdfs.WritableResolver", "SequenceWritable" }
+};
+
 static void  GPHDUri_parse_protocol(GPHDUri *uri, char **cursor);
 static void  GPHDUri_parse_authority(GPHDUri *uri, char **cursor);
 static void  GPHDUri_parse_data(GPHDUri *uri, char **cursor);
@@ -21,6 +62,11 @@ static void  GPHDUri_free_fragments(GPHDUri *uri);
 static void  GPHDUri_debug_print_options(GPHDUri *uri);
 static void  GPHDUri_debug_print_segwork(GPHDUri *uri);
 static void  GPHDUri_fetch_authority_from_ha_nn(GPHDUri *uri, char *nameservice);
+static void GPHDUri_replace_deprecated_options(GPHDUri *uri, bool warn_on_deprecation);
+static void GPHDUri_replace_deprecated_option(OptionData *option, 
+											  const unsigned int array_size, 
+											  const char *array[array_size][DEPRECATED_TABLE_TUPLE_SIZE],
+											  bool warn_on_deprecation);
 
 /* parseGPHDUri
  *
@@ -47,7 +93,7 @@ static void  GPHDUri_fetch_authority_from_ha_nn(GPHDUri *uri, char *nameservice)
  * 		a parsed uri as a GPHDUri structure, or reports a format error.
  */
 GPHDUri*
-parseGPHDUri(const char *uri_str)
+parseGPHDUri(const char *uri_str, bool warn_on_deprecation)
 {
 	GPHDUri	*uri = (GPHDUri *)palloc0(sizeof(GPHDUri));
 	char	*cursor;
@@ -60,6 +106,7 @@ parseGPHDUri(const char *uri_str)
 	GPHDUri_parse_authority(uri, &cursor);
 	GPHDUri_parse_data(uri, &cursor);
 	GPHDUri_parse_options(uri, &cursor);
+	GPHDUri_replace_deprecated_options(uri, warn_on_deprecation);
 
 	return uri;
 }
@@ -754,3 +801,53 @@ bool RelationIsExternalPxfReadOnly(Relation rel, StringInfo location)
 	return false;
 }
 
+static void
+GPHDUri_replace_deprecated_options(GPHDUri *uri, bool warn_on_deprecation)
+{
+	ListCell *item;
+
+	foreach(item, uri->options)
+	{
+		OptionData *item_data = (OptionData*)lfirst(item);
+
+		if (pg_strcasecmp(item_data->key, "accessor") == 0)
+			GPHDUri_replace_deprecated_option(item_data, 
+											  sizeof(ACCESSORS)/sizeof(ACCESSORS[0]),
+											  ACCESSORS,
+											  warn_on_deprecation);
+
+		else if (pg_strcasecmp(item_data->key, "fragmenter") == 0)
+			GPHDUri_replace_deprecated_option(item_data, 
+											  sizeof(FRAGMENTERS)/sizeof(FRAGMENTERS[0]),
+											  FRAGMENTERS,
+											  warn_on_deprecation);
+
+		else if (pg_strcasecmp(item_data->key, "resolver") == 0)
+			GPHDUri_replace_deprecated_option(item_data, 
+											  sizeof(RESOLVERS)/sizeof(RESOLVERS[0]),
+											  RESOLVERS,
+											  warn_on_deprecation);
+	}
+}
+
+static void
+GPHDUri_replace_deprecated_option(OptionData *option, 
+								  const unsigned int array_size, 
+								  const char *array[array_size][DEPRECATED_TABLE_TUPLE_SIZE],
+								  bool warn_on_deprecation)
+{
+	for (unsigned int i = 0; i < array_size; ++i)
+	{
+		if (strcmp(option->value, array[i][DEPRECATED_CLASS_INDEX]) != 0)
+			continue;
+
+		pfree(option->value);
+		option->value = pstrdup(array[i][CLASS_INDEX]);
+
+		if (warn_on_deprecation)
+			elog(WARNING, "Use of %s is deprecated and it will be removed on the next major version\n"
+				 "Please use the appropriate PXF profile for forward compatibility (e.g. profile=%s)",
+				 array[i][DEPRECATED_CLASS_INDEX], array[i][PROFILE_INDEX]);
+
+	}
+}

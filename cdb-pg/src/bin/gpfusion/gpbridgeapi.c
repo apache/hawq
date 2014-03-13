@@ -373,7 +373,7 @@ size_t gpbridge_write(PG_FUNCTION_ARGS)
 
 void parse_gphd_uri(gphadoop_context* context, bool is_import, PG_FUNCTION_ARGS)
 {
-	context->gphd_uri = parseGPHDUri(EXTPROTOCOL_GET_URL(fcinfo));
+	context->gphd_uri = parseGPHDUri(EXTPROTOCOL_GET_URL(fcinfo), GPHDURI_WARN);
 	if (is_import)
 		Assert(context->gphd_uri->fragments != NULL);
 }

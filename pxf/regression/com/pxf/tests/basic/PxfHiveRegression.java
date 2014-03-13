@@ -1,11 +1,13 @@
 package com.pxf.tests.basic;
 
 import java.io.File;
+import java.sql.SQLWarning;
 
 import jsystem.framework.fixture.FixtureManager;
 import jsystem.framework.fixture.RootFixture;
 
 import org.junit.AfterClass;
+import org.junit.Assert;
 import org.junit.Test;
 import org.postgresql.util.PSQLException;
 
@@ -472,5 +474,71 @@ public class PxfHiveRegression extends PxfTestCase {
 
 		// go to RootFixture - it means perform PxfHiveFixture teardown
 		FixtureManager.getInstance().goTo(RootFixture.getInstance().getName());
+	}
+
+	@Test
+	public void primitiveTypesDeprecatedClasses() throws Exception {
+
+		hiveTable = TableFactory.getHivebyRowCommaTable("hive_types", new String[] {
+				"s1 string",
+				"s2 string",
+				"n1 int",
+				"d1 double",
+				"dc1 decimal",
+				"tm timestamp",
+				"f float",
+				"bg bigint",
+				"b boolean" });
+
+		hive.dropTable(hiveTable, false);
+
+		hive.createTable(hiveTable);
+
+		File resource = new File("regression/resources/hive_types.txt");
+
+		hive.loadData(hiveTable, resource.getAbsolutePath());
+
+		hive.queryResults(hiveTable, "SELECT * FROM " + hiveTable.getName() + " ORDER BY s1");
+
+		hawqExternalTable = new ReadableExternalTable("hawq_types", new String[] {
+				"t1    text",
+				"t2    text",
+				"num1  integer",
+				"dub1  double precision",
+				"dec1  numeric",
+				"tm timestamp",
+				"r real",
+				"bg bigint",
+				"b boolean" }, hiveTable.getName(), "CUSTOM");
+
+		hawqExternalTable.setFragmenter("HiveDataFragmenter");
+		hawqExternalTable.setAccessor("HiveAccessor");
+		hawqExternalTable.setResolver("HiveResolver");
+		hawqExternalTable.setFormatter("pxfwritable_import");
+
+		try {
+			hawq.createTableAndVerify(hawqExternalTable);
+			Assert.fail("A SQLWarning should have been thrown");
+		} catch (SQLWarning warnings) {
+			SQLWarning warning = warnings;
+			assertUseIsDeprecated("HiveDataFragmenter", warning);
+			warning = warning.getNextWarning();
+			assertUseIsDeprecated("HiveAccessor", warning);
+			warning = warning.getNextWarning();
+			assertUseIsDeprecated("HiveResolver", warning);
+			warning = warning.getNextWarning();
+			Assert.assertNull(warning);
+		}
+
+		hawq.queryResults(hawqExternalTable, "SELECT * FROM " + hawqExternalTable.getName() + " ORDER BY t1");
+
+		ComparisonUtils.compareTables(hiveTable, hawqExternalTable, report);
+	}
+
+	private void assertUseIsDeprecated(String classname, SQLWarning warning)
+	{
+		Assert.assertEquals("Use of " + classname + 
+							" is deprecated and it will be removed on the next major version",
+							warning.getMessage());
 	}
 }

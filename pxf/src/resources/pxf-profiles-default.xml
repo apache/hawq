@@ -66,6 +66,19 @@
         </plugins>
     </profile>
     <profile>
+        <name>SequenceWritable</name>
+		<description>
+			Profile for accessing Sequence files serialized with a custom Writable class
+			usage: pxf://nn:50070/path/to/file?profile=SequenceWritable&amp;data-schema=CustomClass
+		</description>
+        <plugins>
+            <fragmenter>com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter</fragmenter>
+            <accessor>com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor</accessor>
+            <resolver>com.pivotal.pxf.plugins.hdfs.CustomWritable</resolver>
+            <analyzer>com.pivotal.pxf.plugins.hdfs.HdfsAnalyzer</analyzer>
+        </plugins>
+    </profile>
+    <profile>
         <name>GemFireXD</name>
         <description>This profile is suitable for using when connecting to GemFireXD</description>
         <plugins>

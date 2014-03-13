@@ -4,6 +4,7 @@ import java.io.File;
 import java.util.List;
 import java.util.ListIterator;
 import java.sql.Types;
+import java.sql.SQLWarning;
 
 import org.apache.commons.lang.StringUtils;
 import org.junit.Assert;
@@ -1572,5 +1573,71 @@ public class PxfHdfsRegression extends PxfTestCase {
 		ComparisonUtils.compareTables(analyzeResults, sudoResults, report);
 
 		ReportUtils.stopLevel(report);
+	}
+
+	@Test
+	public void textFormatDeprecatedClasses() throws Exception {
+
+		String csvPath = hdfsWorkingFolder + "/text_data.csv";
+
+		Table dataTable = new Table("dataTable", null);
+
+		FileFormatsUtils.prepareData(new CustomTextPreparer(), 1000, dataTable);
+
+		hdfs.writeTextFile(csvPath, dataTable.getData(), ",");
+
+		exTable = new ReadableExternalTable("bigtext", new String[] {
+				"s1 text",
+				"s2 text",
+				"s3 text",
+				"d1 timestamp",
+				"n1 int",
+				"n2 int",
+				"n3 int",
+				"n4 int",
+				"n5 int",
+				"n6 int",
+				"n7 int",
+				"s11 text",
+				"s12 text",
+				"s13 text",
+				"d11 timestamp",
+				"n11 int",
+				"n12 int",
+				"n13 int",
+				"n14 int",
+				"n15 int",
+				"n16 int",
+				"n17 int" }, csvPath, "TEXT");
+
+		exTable.setFragmenter("HdfsDataFragmenter");
+		exTable.setAccessor("TextFileAccessor");
+		exTable.setResolver("TextResolver");
+		exTable.setDelimiter(",");
+
+		try {
+			hawq.createTableAndVerify(exTable);
+			Assert.fail("A SQLWarning should have been thrown");
+		} catch (SQLWarning warnings) {
+			SQLWarning warning = warnings;
+			assertUseIsDeprecated("HdfsDataFragmenter", warning);
+			warning = warning.getNextWarning();
+			assertUseIsDeprecated("TextFileAccessor", warning);
+			warning = warning.getNextWarning();
+			assertUseIsDeprecated("TextResolver", warning);
+			warning = warning.getNextWarning();
+			Assert.assertNull(warning);
+		}
+
+		hawq.queryResults(exTable, "SELECT * FROM bigtext ORDER BY n1");
+
+		ComparisonUtils.compareTables(exTable, dataTable, report);
+	}
+
+	private void assertUseIsDeprecated(String classname, SQLWarning warning)
+	{
+		Assert.assertEquals("Use of " + classname + 
+							" is deprecated and it will be removed on the next major version",
+							warning.getMessage());
 	}
 }

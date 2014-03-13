@@ -2359,7 +2359,7 @@ static void AddFileSystemCredentialForPxfTable(char *uri)
 	StringInfoData hdfs_uri;
 
 	initStringInfo(&hdfs_uri);
-	GPHDUri *gphd_uri = parseGPHDUri(uri);
+	GPHDUri *gphd_uri = parseGPHDUri(uri, GPHDURI_DONT_WARN);
 	appendStringInfo(&hdfs_uri, "hdfs://%s:8020/", gphd_uri->host);
 
 	prepareDispatchedCatalogFileSystemCredential(hdfs_uri.data);

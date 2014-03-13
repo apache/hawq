@@ -13,12 +13,12 @@
 void 
 test__parseGPHDUri__ValidURI(void **state)
 {
-	char* uri = "pxf://1.2.3.4:5678/some/path/and/table.tbl?FRAGMENTER=HdfsDataFragmenter&ACCESSOR=AvroFileAccessor&RESOLVER=AvroResolver&ANALYZER=HdfsAnalyzer";
+	char* uri = "pxf://1.2.3.4:5678/some/path/and/table.tbl?FRAGMENTER=SomeFragmenter&ACCESSOR=SomeAccessor&RESOLVER=SomeResolver&ANALYZER=SomeAnalyzer";
 	List* options = NIL;
 	ListCell* cell = NULL;
 	OptionData* option = NULL;
 
-	GPHDUri* parsed = parseGPHDUri(uri);
+	GPHDUri* parsed = parseGPHDUri(uri, GPHDURI_DONT_WARN);
 
 	assert_true(parsed != NULL);
 	assert_string_equal(parsed->uri, uri);
@@ -34,22 +34,22 @@ test__parseGPHDUri__ValidURI(void **state)
 	cell = list_nth_cell(options, 0);
 	option = lfirst(cell);
 	assert_string_equal(option->key, "FRAGMENTER");
-	assert_string_equal(option->value, "HdfsDataFragmenter");
+	assert_string_equal(option->value, "SomeFragmenter");
 
 	cell = list_nth_cell(options, 1);
 	option = lfirst(cell);
 	assert_string_equal(option->key, "ACCESSOR");
-	assert_string_equal(option->value, "AvroFileAccessor");
+	assert_string_equal(option->value, "SomeAccessor");
 
 	cell = list_nth_cell(options, 2);
 	option = lfirst(cell);
 	assert_string_equal(option->key, "RESOLVER");
-	assert_string_equal(option->value, "AvroResolver");
+	assert_string_equal(option->value, "SomeResolver");
 
 	cell = list_nth_cell(options, 3);
 	option = lfirst(cell);
 	assert_string_equal(option->key, "ANALYZER");
-	assert_string_equal(option->value, "HdfsAnalyzer");
+	assert_string_equal(option->value, "SomeAnalyzer");
 
 	assert_true(parsed->fragments == NULL);
 
@@ -68,7 +68,7 @@ test__parseGPHDUri__NegativeTestNoProtocol(void **state)
 	PG_TRY();
 	{
 		/* This will throw a ereport(ERROR).*/
-		GPHDUri* parsed = parseGPHDUri(uri_no_protocol);
+		GPHDUri* parsed = parseGPHDUri(uri_no_protocol, GPHDURI_DONT_WARN);
 	}
 	PG_CATCH();
 	{
@@ -98,7 +98,7 @@ test__parseGPHDUri__NegativeTestNoOptions(void **state)
 	PG_TRY();
 	{
 		/* This will throw a ereport(ERROR).*/
-		GPHDUri* parsed = parseGPHDUri(uri_no_options);
+		GPHDUri* parsed = parseGPHDUri(uri_no_options, GPHDURI_DONT_WARN);
 	}
 	PG_CATCH();
 	{
@@ -128,7 +128,7 @@ test__parseGPHDUri__NegativeTestMissingEqual(void **state)
 	PG_TRY();
 	{
 		/* This will throw a ereport(ERROR).*/
-		GPHDUri* parsed = parseGPHDUri(uri_missing_equal);
+		GPHDUri* parsed = parseGPHDUri(uri_missing_equal, GPHDURI_DONT_WARN);
 	}
 	PG_CATCH();
 	{
@@ -158,7 +158,7 @@ test__parseGPHDUri__NegativeTestDuplicateEquals(void **state)
 	PG_TRY();
 	{
 		/* This will throw a ereport(ERROR).*/
-		GPHDUri* parsed = parseGPHDUri(uri_duplicate_equals);
+		GPHDUri* parsed = parseGPHDUri(uri_duplicate_equals, GPHDURI_DONT_WARN);
 	}
 	PG_CATCH();
 	{
@@ -188,7 +188,7 @@ test__parseGPHDUri__NegativeTestMissingKey(void **state)
 	PG_TRY();
 	{
 		/* This will throw a ereport(ERROR).*/
-		GPHDUri* parsed = parseGPHDUri(uri_missing_key);
+		GPHDUri* parsed = parseGPHDUri(uri_missing_key, GPHDURI_DONT_WARN);
 	}
 	PG_CATCH();
 	{
@@ -218,7 +218,7 @@ test__parseGPHDUri__NegativeTestMissingValue(void **state)
 	PG_TRY();
 	{
 		/* This will throw a ereport(ERROR).*/
-		GPHDUri* parsed = parseGPHDUri(uri_missing_value);
+		GPHDUri* parsed = parseGPHDUri(uri_missing_value, GPHDURI_DONT_WARN);
 	}
 	PG_CATCH();
 	{
@@ -245,7 +245,7 @@ test__GPHDUri_verify_no_duplicate_options__ValidURI(void **state)
 	char* valid_uri = "pxf://1.2.3.4:5678/some/path/and/table.tbl?Profile=a&Analyzer=b";
 
 	/* Setting the test -- code omitted -- */
-	GPHDUri* parsed = parseGPHDUri(valid_uri);
+	GPHDUri* parsed = parseGPHDUri(valid_uri, GPHDURI_DONT_WARN);
 	GPHDUri_verify_no_duplicate_options(parsed);
 	freeGPHDUri(parsed);
 }
@@ -261,7 +261,7 @@ test__GPHDUri_verify_no_duplicate_options__NegativeTestDuplicateOpts(void **stat
 	/* Setting the test -- code omitted -- */
 	PG_TRY();
 	{
-		GPHDUri* parsed = parseGPHDUri(uri_duplicate_opts);
+		GPHDUri* parsed = parseGPHDUri(uri_duplicate_opts, GPHDURI_DONT_WARN);
 		/* This will throw a ereport(ERROR).*/
 		GPHDUri_verify_no_duplicate_options(parsed);
 	}
@@ -290,7 +290,7 @@ test__GPHDUri_verify_core_options_exist__ValidURI(void **state)
 	char* valid_uri = "pxf://1.2.3.4:5678/some/path/and/table.tbl?Fragmenter=1&Accessor=2&Resolver=3";
 
 	/* Setting the test -- code omitted -- */
-	GPHDUri* parsed = parseGPHDUri(valid_uri);
+	GPHDUri* parsed = parseGPHDUri(valid_uri, GPHDURI_DONT_WARN);
 	List *coreOptions = list_make3("FRAGMENTER", "ACCESSOR", "RESOLVER");
 	GPHDUri_verify_core_options_exist(parsed, coreOptions);
 	freeGPHDUri(parsed);
@@ -308,7 +308,7 @@ test__GPHDUri_verify_core_options_exist__NegativeTestMissingCoreOpts(void **stat
 	/* Setting the test -- code omitted -- */
 	PG_TRY();
 	{
-		GPHDUri* parsed = parseGPHDUri(missing_core_opts);
+		GPHDUri* parsed = parseGPHDUri(missing_core_opts, GPHDURI_DONT_WARN);
 		coreOptions = list_make3("FRAGMENTER", "ACCESSOR", "RESOLVER");
 		/* This will throw a ereport(ERROR).*/
 		GPHDUri_verify_core_options_exist(parsed, coreOptions);
@@ -330,6 +330,96 @@ test__GPHDUri_verify_core_options_exist__NegativeTestMissingCoreOpts(void **stat
 	assert_true(false);
 }
 
+void run_parseGPHDUri_and_verify_key_value(char* uri, char* key, char* value)
+{
+	List* options = NIL;
+	ListCell* cell = NULL;
+	OptionData* option = NULL;
+
+	GPHDUri* parsed = parseGPHDUri(uri, GPHDURI_DONT_WARN);
+
+	assert_true(parsed != NULL);
+	assert_string_equal(parsed->uri, uri);
+
+	assert_string_equal(parsed->protocol, "pxf");
+	assert_string_equal(parsed->host, "1.2.3.4");
+	assert_string_equal(parsed->port, "5678");
+	assert_string_equal(parsed->data, "some/path");
+
+	options = parsed->options;
+	assert_int_equal(list_length(options), 1);
+
+	cell = list_nth_cell(options, 0);
+	option = lfirst(cell);
+	assert_string_equal(option->key, key);
+	assert_string_equal(option->value, value);
+
+	assert_true(parsed->fragments == NULL);
+
+	freeGPHDUri(parsed);
+}
+
+void
+test__parseGPHDUri__DeprecatedFragmenter(void **state)
+{
+	static const char *url_pattern = "pxf://1.2.3.4:5678/some/path?FRAGMENTER=%s";
+	const char *cases[][2] = 
+	{
+		{ "HdfsDataFragmenter", "com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter" },
+		{ "HiveDataFragmenter", "com.pivotal.pxf.plugins.hive.HiveDataFragmenter" },
+		{ "HBaseDataFragmenter", "com.pivotal.pxf.plugins.hbase.HBaseDataFragmenter" },
+		{ "UntouchedFragmenter", "UntouchedFragmenter" }
+	};
+
+	for (int i = 0; i < sizeof(cases)/sizeof(cases[0]); ++i)
+	{
+		char buf[1024];
+		snprintf(buf, sizeof(buf), url_pattern, cases[i][0]);
+		run_parseGPHDUri_and_verify_key_value(buf, "FRAGMENTER", cases[i][1]);
+	}
+}
+
+void
+test__parseGPHDUri__DeprecatedAccessor(void **state)
+{
+	static const char *url_pattern = "pxf://1.2.3.4:5678/some/path?ACCESSOR=%s";
+	const char *cases[][2] = 
+	{
+		{ "TextFileAccessor", "com.pivotal.pxf.plugins.hdfs.LineBreakAccessor" },
+		{ "LineBreakAccessor", "com.pivotal.pxf.plugins.hdfs.LineBreakAccessor" },
+		{ "HiveAccessor", "com.pivotal.pxf.plugins.hive.HiveAccessor" },
+		{ "AvroFileAccessor", "com.pivotal.pxf.plugins.hdfs.AvroFileAccessor" },
+		{ "UntouchedAccessor", "UntouchedAccessor" }
+	};
+
+	for (int i = 0; i < sizeof(cases)/sizeof(cases[0]); ++i)
+	{
+		char buf[1024];
+		snprintf(buf, sizeof(buf), url_pattern, cases[i][0]);
+		run_parseGPHDUri_and_verify_key_value(buf, "ACCESSOR", cases[i][1]);
+	}
+}
+
+void
+test__parseGPHDUri__DeprecatedResolver(void **state)
+{
+	static const char *url_pattern = "pxf://1.2.3.4:5678/some/path?RESOLVER=%s";
+	const char *cases[][2] = 
+	{
+		{ "TextResolver", "com.pivotal.pxf.plugins.hdfs.StringPassResolver" },
+		{ "StringPassResolver", "com.pivotal.pxf.plugins.hdfs.StringPassResolver" },
+		{ "HiveResolver", "com.pivotal.pxf.plugins.hive.HiveResolver" },
+		{ "UntouchedResolver", "UntouchedResolver" }
+	};
+
+	for (int i = 0; i < sizeof(cases)/sizeof(cases[0]); ++i)
+	{
+		char buf[1024];
+		snprintf(buf, sizeof(buf), url_pattern, cases[i][0]);
+		run_parseGPHDUri_and_verify_key_value(buf, "RESOLVER", cases[i][1]);
+	}
+}
+
 int 
 main(int argc, char* argv[]) 
 {
@@ -337,6 +427,9 @@ main(int argc, char* argv[])
 
 	const UnitTest tests[] = {
 			unit_test(test__parseGPHDUri__ValidURI),
+			unit_test(test__parseGPHDUri__DeprecatedFragmenter),
+			unit_test(test__parseGPHDUri__DeprecatedAccessor),
+			unit_test(test__parseGPHDUri__DeprecatedResolver),
 			unit_test(test__parseGPHDUri__NegativeTestNoProtocol),
 			unit_test(test__parseGPHDUri__NegativeTestNoOptions),
 			unit_test(test__parseGPHDUri__NegativeTestMissingEqual),

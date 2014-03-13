@@ -1,6 +1,7 @@
 package com.pxf.tests.basic;
 
 import java.util.ArrayList;
+import java.sql.SQLWarning;
 
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.filter.BinaryComparator;
@@ -13,6 +14,7 @@ import org.apache.hadoop.hbase.filter.SingleColumnValueFilter;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.Assert;
 import org.postgresql.util.PSQLException;
 
 import com.pivotal.pxf.plugins.hbase.utilities.HBaseIntegerComparator;
@@ -985,5 +987,47 @@ public class PxfHBaseRegression extends PxfTestCase {
 		} catch (Exception e) {
 			ExceptionUtils.validate(report, e, new Exception("ERROR.*Filter string: '" + expectedFilter + "'.*"), true, true);
 		}
+	}
+
+	@Test
+	public void selectAllDeprecatedClasses() throws Exception {
+
+		initAndPopulateHBaseTable(hTable, false);
+
+		hbase.queryResults(hTable, null);
+
+		ExternalTable table = new ReadableExternalTable("hbase_pxf_with_deprecated", 
+														exTableFields, hTable.getName(), 
+														"CUSTOM");
+		table.setFragmenter("HBaseDataFragmenter");
+		table.setAccessor("HBaseAccessor");
+		table.setResolver("HBaseResolver");
+		table.setFormatter("pxfwritable_import");
+
+		try {
+			hawq.createTableAndVerify(table);
+			Assert.fail("A SQLWarning should have been thrown");
+		} catch (SQLWarning warnings) {
+			SQLWarning warning = warnings;
+			assertUseIsDeprecated("HBaseDataFragmenter", warning);
+			warning = warning.getNextWarning();
+			assertUseIsDeprecated("HBaseAccessor", warning);
+			warning = warning.getNextWarning();
+			assertUseIsDeprecated("HBaseResolver", warning);
+			warning = warning.getNextWarning();
+			Assert.assertNull(warning);
+		}
+
+		hawq.queryResults(table, 
+				"SELECT * FROM " + table.getName() + " ORDER BY recordkey ASC");
+
+		ComparisonUtils.compareTables(table, hTable, report);
+	}
+
+	private void assertUseIsDeprecated(String classname, SQLWarning warning)
+	{
+		Assert.assertEquals("Use of " + classname + 
+							" is deprecated and it will be removed on the next major version",
+							warning.getMessage());
 	}
 }
