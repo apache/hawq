@@ -78,7 +78,8 @@ PG_FUNCTION_INFO_V1(LibraryVersion);
 PG_FUNCTION_INFO_V1(Optimize);
 
 PG_FUNCTION_INFO_V1(EvalExprFromDXLFile);
-
+PG_FUNCTION_INFO_V1(OptimizeMinidumpFromFile);
+PG_FUNCTION_INFO_V1(ExecuteMinidumpFromFile);
 } // end extern C
 
 
@@ -541,7 +542,7 @@ EvalExprFromDXLFile(PG_FUNCTION_ARGS)
 	char *szResultDXL = COptTasks::SzEvalExprFromXML(pcBuf);
 	gpdb::GPDBFree(pcBuf);
 
-	if (szResultDXL != NULL)
+	if (NULL != szResultDXL)
 	{
 		text *ptResult = stringToText(szResultDXL);
 		gpdb::GPDBFree(szResultDXL);
@@ -552,6 +553,74 @@ EvalExprFromDXLFile(PG_FUNCTION_ARGS)
 		// Return a dummy value so the tests can continue
 		PG_RETURN_NULL();
 	}
+}
+}
+
+
+//---------------------------------------------------------------------------
+//	@function:
+//		OptimizeMinidumpFromFile
+//
+//	@doc:
+//		Loads a minidump from the given file path, optimizes it and returns
+//		the string serialized representation of the result as DXL
+//
+//---------------------------------------------------------------------------
+
+extern "C" {
+Datum
+OptimizeMinidumpFromFile(PG_FUNCTION_ARGS)
+{
+	char *szFileName = textToString(PG_GETARG_TEXT_P(0));
+	char *szResultDXL = COptTasks::SzOptimizeMinidumpFromFile(szFileName);
+	if (NULL != szResultDXL)
+	{
+		text *ptResult = stringToText(szResultDXL);
+		gpdb::GPDBFree(szResultDXL);
+		PG_RETURN_TEXT_P(ptResult);
+	}
+	else
+	{
+		elog(NOTICE, "Execution of UDF 'OptimizeMinidumpFromFile' failed. Consult the LOG for more information.");
+
+		// return a dummy value
+		PG_RETURN_NULL();
+	}
+}
+}
+
+
+//---------------------------------------------------------------------------
+//	@function:
+//		ExecuteMinidumpFromFile
+//
+//	@doc:
+//		Loads a minidump from the given file path, executes it and returns
+//		the number of rows in the result.
+//
+//---------------------------------------------------------------------------
+
+extern "C" {
+Datum
+ExecuteMinidumpFromFile(PG_FUNCTION_ARGS)
+{
+	char *szFileName = textToString(PG_GETARG_TEXT_P(0));
+	char *szResultDXL = COptTasks::SzOptimizeMinidumpFromFile(szFileName);
+	if (NULL == szResultDXL)
+	{
+		elog(NOTICE, "Execution of UDF 'ExecuteMinidumpFromFile' failed. Consult the LOG for more information.");
+
+		// return a dummy value
+		PG_RETURN_NULL();
+	}
+	int iProcessed = executeXMLPlan(szResultDXL);
+	gpdb::GPDBFree(szResultDXL);
+	StringInfoData str;
+	initStringInfo(&str);
+	appendStringInfo(&str, "processed %d rows", iProcessed);
+	text *ptResult = stringToText(str.data);
+
+	PG_RETURN_TEXT_P(ptResult);
 }
 }
 

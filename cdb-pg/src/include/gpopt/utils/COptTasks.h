@@ -147,6 +147,20 @@ class COptTasks
 			SEvalExprContext *PevalctxtConvert(void *pv);
 		};
 
+		// context of minidump load and execution
+		struct SOptimizeMinidumpContext
+		{
+			// the name of the file containing the minidump
+			char *m_szFileName;
+
+			// the result of optimizing the minidump
+			char *m_szDXLResult;
+
+			// casting function
+			static
+			SOptimizeMinidumpContext *PoptmdpConvert(void *pv);
+		};
+
 		// execute a task given the argument
 		static
 		void Execute ( void *(*pfunc) (void *), void *pfuncArg);
@@ -194,6 +208,10 @@ class COptTasks
 		// optimize a query to a physical DXL
 		static
 		void* PvOptimizeTask(void *pv);
+
+		// optimize the query in a minidump and return resulting plan in DXL format
+		static
+		void* PvOptimizeMinidumpTask(void *pv);
 
 		// translate a DXL tree into a planned statement
 		static
@@ -281,6 +299,10 @@ class COptTasks
 		static
 		char *SzEvalExprFromXML(char *szXmlString);
 
+		// loads a minidump from the given file path, executes it and returns
+		// the serialized representation of the result as DXL
+		static
+		char *SzOptimizeMinidumpFromFile(char *szFileName);
 };
 
 #endif // COptTasks_H

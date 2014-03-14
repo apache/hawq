@@ -290,6 +290,26 @@ COptTasks::SEvalExprContext::PevalctxtConvert
 
 //---------------------------------------------------------------------------
 //	@function:
+//		COptTasks::SOptimizeMinidumpContext::PexecmdpConvert
+//
+//	@doc:
+//		Casting function
+//
+//---------------------------------------------------------------------------
+COptTasks::SOptimizeMinidumpContext *
+COptTasks::SOptimizeMinidumpContext::PoptmdpConvert
+	(
+	void *pv
+	)
+{
+	GPOS_ASSERT(NULL != pv);
+
+	return reinterpret_cast<SOptimizeMinidumpContext*>(pv);
+}
+
+
+//---------------------------------------------------------------------------
+//	@function:
 //		SzFromWsz
 //
 //	@doc:
@@ -918,6 +938,70 @@ COptTasks::PvOptimizeTask
 	return NULL;
 }
 
+//---------------------------------------------------------------------------
+//	@function:
+//		COptTasks::PvOptimizeMinidumpTask
+//
+//	@doc:
+//		Task that loads and optimizes a minidump and returns the result as string-serialized DXL
+//
+//---------------------------------------------------------------------------
+void*
+COptTasks::PvOptimizeMinidumpTask
+	(
+	void *pv
+	)
+{
+	GPOS_ASSERT(NULL != pv);
+
+	SOptimizeMinidumpContext *poptmdpctxt = SOptimizeMinidumpContext::PoptmdpConvert(pv);
+	GPOS_ASSERT(NULL != poptmdpctxt->m_szFileName);
+	GPOS_ASSERT(NULL == poptmdpctxt->m_szDXLResult);
+
+	AUTO_MEM_POOL(amp);
+	IMemoryPool *pmp = amp.Pmp();
+
+	ULONG ulSegments = gpdb::UlSegmentCountGP();
+	ULONG ulSegmentsForCosting = optimizer_segments;
+	if (0 == ulSegmentsForCosting)
+	{
+		ulSegmentsForCosting = ulSegments;
+	}
+	COptimizerConfig *pocconf = PoconfCreate(pmp);
+	ICostModel *pcm = New(pmp) CCostModelGPDB(pmp, ulSegmentsForCosting);
+	CDXLNode *pdxlnResult = NULL;
+
+	GPOS_TRY
+	{
+		pdxlnResult = CMinidumperUtils::PdxlnExecuteMinidump(pmp, poptmdpctxt->m_szFileName, pcm, ulSegments, gp_session_id, gp_command_count, pocconf);
+	}
+	GPOS_CATCH_EX(ex)
+	{
+		CRefCount::SafeRelease(pdxlnResult);
+		CRefCount::SafeRelease(pcm);
+		CRefCount::SafeRelease(pocconf);
+		GPOS_RETHROW(ex);
+	}
+	GPOS_CATCH_END;
+	CWStringDynamic *pstrDXL =
+			CDXLUtils::PstrSerializePlan
+						(
+						pmp,
+						pdxlnResult,
+						0,  // ullPlanId
+						0,  // ullPlanSpaceSize
+						true, // fSerializeHeaderFooter
+						true // fIndent
+						);
+	poptmdpctxt->m_szDXLResult = SzFromWsz(pstrDXL->Wsz());
+	delete pstrDXL;
+	CRefCount::SafeRelease(pdxlnResult);
+	pcm->Release();
+	pocconf->Release();
+
+	return NULL;
+}
+
 
 //---------------------------------------------------------------------------
 //	@function:
@@ -1288,7 +1372,7 @@ COptTasks::PvEvalExprFromDXLTask
 	SEvalExprContext *pevalctxt = SEvalExprContext::PevalctxtConvert(pv);
 
 	GPOS_ASSERT(NULL != pevalctxt->m_szDXL);
-	GPOS_ASSERT(NULL == pevalctxt->m_szResult);
+	GPOS_ASSERT(NULL == pevalctxt->m_szDXLResult);
 
 	AUTO_MEM_POOL(amp);
 	IMemoryPool *pmp = amp.Pmp();
@@ -1720,6 +1804,31 @@ COptTasks::SzEvalExprFromXML
 
 	Execute(&PvEvalExprFromDXLTask, &evalctxt);
 	return evalctxt.m_szResult;
+}
+
+
+//---------------------------------------------------------------------------
+//	@function:
+//		COptTasks::SzOptimizeMinidumpFromFile
+//
+//	@doc:
+//		Loads a minidump from the given file path, optimizes it and returns
+//		the serialized representation of the result as DXL.
+//
+//---------------------------------------------------------------------------
+char *
+COptTasks::SzOptimizeMinidumpFromFile
+	(
+	char *szFileName
+	)
+{
+	GPOS_ASSERT(NULL != szFileName);
+	SOptimizeMinidumpContext optmdpctxt;
+	optmdpctxt.m_szFileName = szFileName;
+	optmdpctxt.m_szDXLResult = NULL;
+
+	Execute(&PvOptimizeMinidumpTask, &optmdpctxt);
+	return optmdpctxt.m_szDXLResult;
 }
 
 // EOF
