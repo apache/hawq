@@ -18,14 +18,12 @@
 #ifndef GPDXL_CConstExprEvaluator_H
 #define GPDXL_CConstExprEvaluator_H
 
+#include "gpos/base.h"
+
+#include "gpopt/eval/IConstDXLNodeEvaluator.h"
 #include "gpopt/mdcache/CMDAccessor.h"
 #include "gpopt/translate/CMappingColIdVar.h"
 #include "gpopt/translate/CTranslatorDXLToScalar.h"
-
-namespace gpos
-{
-	class IMemoryPool;
-}
 
 namespace gpdxl
 {
@@ -44,7 +42,7 @@ namespace gpdxl
 	//		the destructor of this class.
 	//
 	//---------------------------------------------------------------------------
-	class CConstExprEvaluatorProxy
+	class CConstExprEvaluatorProxy : public gpopt::IConstDXLNodeEvaluator
 	{
 		private:
 			//---------------------------------------------------------------------------
@@ -107,6 +105,7 @@ namespace gpdxl
 			}
 
 			// dtor
+			virtual
 			~CConstExprEvaluatorProxy()
 			{
 			}
@@ -114,7 +113,15 @@ namespace gpdxl
 			// evaluate given constant expressionand return the DXL representation of the result.
 			// if the expression has variables, an error is thrown.
 			// caller keeps ownership of 'pdxlnExpr' and takes ownership of the returned pointer
+			virtual
 			CDXLNode *PdxlnEvaluateExpr(const CDXLNode *pdxlnExpr);
+
+			// returns true iff the evaluator can evaluate constant expressions without subqueries
+			virtual
+			BOOL FCanEvalExpressions()
+			{
+				return true;
+			}
 	};
 }
 
