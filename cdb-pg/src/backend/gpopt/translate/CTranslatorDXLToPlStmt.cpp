@@ -512,7 +512,8 @@ CTranslatorDXLToPlStmt::MapLocationsFdist
 	CdbComponentDatabases *pcdbCompDB,
 	Uri *pUri,
 	const ULONG ulTotalPrimaries,
-	IMDId *pmdidRel
+	IMDId *pmdidRel,
+	List *plQuals
 	)
 {
 	ULONG ulParticipatingSegments = ulTotalPrimaries; 
@@ -588,7 +589,7 @@ CTranslatorDXLToPlStmt::MapLocationsFdist
 	{
 		Relation rel = gpdb::RelGetRelation(CMDIdGPDB::PmdidConvert(pmdidRel)->OidObjectId());
 		CHAR *szUri = CTranslatorUtils::SzFromWsz(pmdrelext->PstrLocation(0)->Wsz());
-		rgszSegWorkMap = gpdb::RgszMapHdDataToSegments(szUri, ulTotalPrimaries, ulMaxParticipants, rel, NULL);
+		rgszSegWorkMap = gpdb::RgszMapHdDataToSegments(szUri, ulTotalPrimaries, ulMaxParticipants, rel, plQuals);
 
 		GPOS_ASSERT(NULL != rgszSegWorkMap);
 		gpdb::CloseRelation(rel);
@@ -942,7 +943,8 @@ List*
 CTranslatorDXLToPlStmt::PlExternalScanUriList
 	(
 	const IMDRelationExternal *pmdrelext,
-	IMDId *pmdidRel
+	IMDId *pmdidRel,
+	List *plQuals
 	)
 {
 	if (pmdrelext->FWritable())
@@ -1002,7 +1004,7 @@ CTranslatorDXLToPlStmt::PlExternalScanUriList
 	}
 	else if (fUsingLocation && (URI_GPFDIST == pUri->protocol || URI_GPFDISTS == pUri->protocol || URI_CUSTOM == pUri->protocol))
 	{
-		MapLocationsFdist(pmdrelext, rgszSegFileMap, pcdbCompDB, pUri, ulTotalPrimaries, pmdidRel);
+		MapLocationsFdist(pmdrelext, rgszSegFileMap, pcdbCompDB, pUri, ulTotalPrimaries, pmdidRel, plQuals);
 	}
 	else if (fUsingExecute)
 	{
@@ -1105,8 +1107,13 @@ CTranslatorDXLToPlStmt::PtsFromDXLTblScan
 
 		// create external scan node
 		ExternalScan *pes = MakeNode(ExternalScan);
+		pplan = &(pes->scan.plan);
+		// translate filter
+		CDXLNode *pdxlnFilter = (*pdxlnTblScan)[EdxltsIndexFilter];
+		pplan->qual = PlQualFromFilter(pdxlnFilter, &dxltrctxbt, NULL /*pdrgpdxltrctx*/, pdxltrctxOut, pplan);
+
 		pes->scan.scanrelid = iRel;
-		pes->uriList = PlExternalScanUriList(pmdrelext, pmdidRel);
+		pes->uriList = PlExternalScanUriList(pmdrelext, pmdidRel, pplan->qual);
 		Value *pval = gpdb::PvalMakeString(CTranslatorUtils::SzFromWsz(pmdrelext->PstrFormatOptions()->Wsz()));
 		pes->fmtOpts = ListMake1(pval);
 		pes->fmtType = CExternalScanFormatType(pmdrelext->Erelextformat());
@@ -1127,7 +1134,6 @@ CTranslatorDXLToPlStmt::PtsFromDXLTblScan
 		pes->encoding = pmdrelext->UlEncoding();
 		pes->scancounter = m_ulExternalScanCounter++;
 
-		pplan = &(pes->scan.plan);
 		pplanReturn = (Plan *) pes;
 	}
 	else
@@ -1137,6 +1143,9 @@ CTranslatorDXLToPlStmt::PtsFromDXLTblScan
 		pts->scanrelid = iRel;
 		pplan = &(pts->plan);
 		pplanReturn = (Plan *) pts;
+		// translate filter
+		CDXLNode *pdxlnFilter = (*pdxlnTblScan)[EdxltsIndexFilter];
+		pplan->qual = PlQualFromFilter(pdxlnFilter, &dxltrctxbt, NULL /*pdrgpdxltrctx*/, pdxltrctxOut, pplan);
 	}
 
 	pplan->plan_node_id = m_pctxdxltoplstmt->UlNextPlanId();
@@ -1156,21 +1165,9 @@ CTranslatorDXLToPlStmt::PtsFromDXLTblScan
 	// a table scan node must have 2 children: projection list and filter
 	GPOS_ASSERT(2 == pdxlnTblScan->UlArity());
 
-	// translate proj list and filter
+	// translate proj list
 	CDXLNode *pdxlnPrL = (*pdxlnTblScan)[EdxltsIndexProjList];
-	CDXLNode *pdxlnFilter = (*pdxlnTblScan)[EdxltsIndexFilter];
-
-	TranslateProjListAndFilter
-		(
-		pdxlnPrL,
-		pdxlnFilter,
-		&dxltrctxbt,	// translate context for the base table
-		NULL,			// pdxltrctxLeft and pdxltrctxRight,
-		&pplan->targetlist,
-		&pplan->qual,
-		pdxltrctxOut,
-		pplan
-		);
+	pplan->targetlist = PlTargetListFromProjList(pdxlnPrL, &dxltrctxbt, NULL /*pdrgpdxltrctx*/, pdxltrctxOut, pplan);
 
 	SetParamIds(pplan);
 
