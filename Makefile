@@ -1344,7 +1344,6 @@ ifneq "$(BLD_GPDB_BUILDSET)" "partial"
 	# Copy DXL translators library
 	echo "Copy DXL translators library";	
 	cp $(BLD_TOP)/cdb-pg/src/backend/gpopt/libdxltranslators.$(LDSFX) $(INSTLOC)/lib;
-	rm -f $(BLD_TOP)/cdb-pg/src/backend/gpopt/libdxltranslators.$(LDSFX);
 
 	cd $(LIBSTDC++_LIBDIR); tar cvf - * | (cd $(INSTLOC)/lib; tar xfp -)
 
