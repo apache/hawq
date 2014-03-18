@@ -1,14 +1,16 @@
 # Line too long - pylint: disable=C0301
 # Copyright (c) Greenplum Inc 2011. All Rights Reserved.
 
+import sys
 import os
 import errno
 import shutil
 import hashlib
 import signal
+import urlparse
 
 from gppylib.db import dbconn, catalog
-from gppylib.db.dbconn import UnexpectedRowsError
+from gppylib.db.dbconn import UnexpectedRowsError, executeUpdateOrInsert
 from gppylib import gplog
 from gppylib.commands.gp import GpStop, GpStart, get_local_db_mode
 from gppylib.commands.unix import Ping, RemoveDirectory, RemoveFiles, MakeDirectory
@@ -909,6 +911,225 @@ class GetMoveOperationList(Operation):
                                                                     ),
                                                   seg.getSegmentHostName()))
         return operations
+
+class MoveFileSpaceLocation(Operation):
+    """
+        Move filespace location to a new location on dfs
+    """
+    
+    def __init__(self, fsname, location, user, pswd):
+        self.user = user
+        self.pswd = pswd
+        self.fsname = fsname
+        self.location = location
+        self.dburl = dbconn.DbURL(username=self.user, password=self.pswd)
+    
+    def start_master_only(self):
+        logger.info('Starting Database in master only mode')
+        cmd = GpStart('Start Database in master only mode', masterOnly=True, upgrade=True)
+        cmd.run()
+        if cmd.get_results().rc != 0:
+            logger.error('Failed to start Greenplum Database in master only mode.')
+            cmd.validate()
+
+    def stop_master_only(self):
+        logger.info('Stopping Database in master only mode')
+        cmd = GpStop('Stop Database in master only mode', masterOnly=True)
+        cmd.run()
+        if cmd.get_results().rc != 0:
+            logger.error('Failed to stop Greenplum Database in master only mode.')
+            cmd.validate()
+
+    def stop_database(self):
+        logger.info('Stopping Greenplum Database')
+        cmd = GpStop('Stop Greenplum Databse')
+        cmd.run()
+        if cmd.get_results().rc != 0:
+            logger.error('Failed to stop Greenplum Database.')
+            cmd.validate()
+
+    def check_database_stopped(self):
+        try:
+            mode = get_local_db_mode(MASTER_DATA_DIR)
+            logger.info('Database was started in %s mode' % mode)
+        except Exception, e:
+            logger.info('Database might already be stopped.')
+            return True
+
+        return False
+    
+    def prepare_tasks(self):
+        conn = dbconn.connect(dbconn.DbURL(username=self.user, password=self.pswd), utility=True)
+        
+        try:
+            # Check if the filespace exist and can be changed, get its oid
+            filespaceRow = dbconn.execSQL(conn, '''
+                            SELECT oid, fsfsys
+                            FROM pg_filespace
+                            WHERE fsname = '%s';
+                        ''' % self.fsname)
+                
+            if filespaceRow.rowcount != 1:
+                logger.error('Filespace %s does not exist' % self.fsname)
+                return None
+            
+            filespace =  filespaceRow.fetchall()[0]
+            
+            if filespace[1] == 0:
+                logger.error('Filespace "%s" is not created on distributed file system' % self.fsname)
+                return None
+            
+            self.fsoid =  filespace[0]
+            filespaceRow.close()
+            
+            #get segments dbid
+            segmentsDbidRows = dbconn.execSQL(conn, '''
+                            SELECT dbid, content
+                            FROM gp_segment_configuration
+                            WHERE content != -1
+                            ''' )
+            
+            if segmentsDbidRows.rowcount == 0:
+                logger.error('No segment is configured')
+                return None
+            
+            segconf = {}
+            for row in segmentsDbidRows:
+                segconf[row[0]] = row[1]
+                
+            segdbids = segconf.keys()
+                        
+            #get segments prefix and verify consistency of filespace entries
+            entryRows = dbconn.execSQL(conn, '''
+                            SELECT fselocation, fsedbid
+                            FROM pg_filespace_entry 
+                            WHERE fsefsoid = %d and fsedbid in (%s);
+                        ''' % (self.fsoid, ','.join(str(x) for x in segdbids)))
+
+            segmentLocation = []
+            
+            if entryRows.rowcount == 0:
+                logger.error('Cannot get filespace entry for filespace "%s"' % self.fsname)
+                return None
+            
+            targetDbids = []
+            for row in entryRows:
+                segmentLocation.append(row[0]);
+                targetDbids.append(row[1])
+            
+            entryRows.close()
+
+            prefixs = [os.path.split(loc)[1] for loc in segmentLocation]
+            self.prefix = os.path.commonprefix(prefixs)
+            
+            if len(self.prefix) == 0:
+                logger.error('Cannot get segments prefix for filespace "%s"' % self.fsname)
+                return None
+            
+            schemes = [urlparse.urlparse(loc).scheme for loc in segmentLocation]
+            
+            if len(set(schemes)) != 1:
+                logger.warn('The scheme of segment are not consistent')
+                
+            targetScheme = urlparse.urlparse(self.location).scheme
+            
+            if len(targetScheme) == 0:
+                logger.error('Target location: "%s" is not a valid url' % self.location)
+                return None
+            
+            if targetScheme not in set(schemes):
+                logger.error("Target location's scheme: \"%s\" does not match file system requirement", targetScheme)
+                return None
+            
+            queries = []
+            #generate sql for pg_filespace_entry
+            for dbid in targetDbids:
+                uri = '%s/%s%d' % (self.location, self.prefix, segconf[dbid])
+                queries.append('''
+                        UPDATE pg_filespace_entry 
+                        SET fselocation = '%s' 
+                        WHERE fsefsoid = %d 
+                        AND fsedbid = %d;
+                        ''' %(uri, self.fsoid, dbid))
+            
+            #get gp_persistent_filespace
+            rows = dbconn.execSQL(conn, '''
+                        SELECT contentid, location_1
+                        FROM gp_persistent_filespace_node 
+                        WHERE filespace_oid = %d and contentid <> -1
+                    ''' % self.fsoid)
+            
+            #generate sql for gp_persistent_filespace
+            for row in rows:
+                uri = '%s/%s%d' % (self.location, self.prefix, row[0])
+                queries.append('''
+                        UPDATE gp_persistent_filespace_node 
+                        SET location_1 = '%s' 
+                        WHERE filespace_oid = %d 
+                        AND contentid = %d;
+                        ''' %(uri.ljust(len(row[1])), self.fsoid, row[0]))
+            
+            return queries
+        
+        finally:
+            conn.close()
+
+        
+    def update_filespace_locations(self, queries):
+        conn = dbconn.connect(dbconn.DbURL(username=self.user, password=self.pswd), utility=True, allowSystemTableMods='all')
+        
+        try:
+            logger.info('Updating catalog...')
+            
+            for query in queries:
+                logger.debug('executing ...%s' % query)
+                executeUpdateOrInsert(conn, query, 1)
+            
+            dbconn.execSQL(conn, "COMMIT")
+            logger.info('catalog updated successfully')
+                
+        finally:
+            conn.close()
+
+    def execute(self):
+        try:
+            # Disable Ctrl+C
+            signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+            # StopGPDB - Check for GPDB connections first and fail if connections exist
+            if not self.check_database_stopped():
+                logger.error('stop Database first')
+                sys.exit(1)
+
+            # StartGPDB in Master only mode
+            self.start_master_only()
+
+            try:
+                if not CheckSuperUser(self.dburl).run():
+                    raise MoveFilespaceError('gpfilespace requires database superuser privileges.')
+                    
+                queries = self.prepare_tasks();
+                    
+                if queries is None:
+                    self.stop_master_only()
+                    sys.exit(1)
+                    
+            except Exception, e:
+                self.stop_master_only()
+                raise
+                    
+            try:
+                self.update_filespace_locations(queries);
+            except Exception, e:
+                logger.fatal("Fatal error happened when updating catalog, PLEASE RESTORE MASTER DATA DIRECTORY!")
+                raise
+            finally:
+                # Bring GPDB Offline
+                self.stop_master_only()
+                
+        finally:
+            # Enable Ctrl+C
+            signal.signal(signal.SIGINT, signal.default_int_handler)
 
 class MoveFilespace(Operation):
     """

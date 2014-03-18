@@ -876,7 +876,7 @@ class GpDeleteSystem(Command):
 
 #-----------------------------------------------
 class GpStart(Command):
-    def __init__(self, name, masterOnly=False, restricted=False, verbose=False,ctxt=LOCAL, remoteHost=None):
+    def __init__(self, name, masterOnly=False, restricted=False, verbose=False,ctxt=LOCAL, remoteHost=None, upgrade=False):
         self.cmdStr="$GPHOME/bin/gpstart -a"
         if masterOnly:
             self.cmdStr += " -m"
@@ -885,6 +885,8 @@ class GpStart(Command):
             self.cmdStr += " -R"
         if verbose or logging_is_verbose():
             self.cmdStr += " -v"
+        if upgrade:
+            self.cmdStr += " -Uupgrade"
         Command.__init__(self,name,self.cmdStr,ctxt,remoteHost)
 
     @staticmethod

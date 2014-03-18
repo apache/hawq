@@ -159,7 +159,7 @@ def connect(dburl, utility=False, verbose=False, encoding=None, allowSystemTable
         options = ''
 
     # MPP-13779, et al
-    if allowSystemTableMods in ['dml']:
+    if allowSystemTableMods in ['dml', 'ddl', 'all']:
         options += ' -c allow_system_table_mods=' + allowSystemTableMods
     elif allowSystemTableMods is not None:
         raise Exception('allowSystemTableMods invalid: %s' % allowSystemTableMods)

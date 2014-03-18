@@ -19,6 +19,9 @@ Execution Options:
   -o | --output DIRECTORY    output directory for config file
 
 Move Options:
+  --movefilespace FILESPACE | default move filespace to new location on distributed file system
+  --location <dfslocation>    new location which the filespace will be moved to
+  
   --movetransfilespace FILESPACE | default move filespace used by transaction files to FILESPACE
   --movetempfilespace  FILESPACE | default move filespace used by temporary files to FILESPACE
   --showtransfilespace           show the filespace used by transaction files
@@ -66,7 +69,7 @@ try:
     from getpass import getpass
     from gppylib.parseutils import line_reader, parse_fspacename, parse_fspacesys, parse_fspacereplica, parse_gpfilespace_line, \
         canonicalize_address
-    from gppylib.operations.filespace import MoveFilespace, MoveFilespaceError, GetCurrentFilespaceEntries, FileType, CheckFilespaceConsistency, CheckSuperUser, PG_SYSTEM_FILESPACE
+    from gppylib.operations.filespace import MoveFilespace, MoveFilespaceError, MoveFileSpaceLocation, GetCurrentFilespaceEntries, FileType, CheckFilespaceConsistency, CheckSuperUser, PG_SYSTEM_FILESPACE
     from gppylib.commands.base import WorkerPool, Command
 
 except ImportError, e:
@@ -156,6 +159,8 @@ def ParseOptions():
                       action='store_true', help=optparse.SUPPRESS_HELP)
     parser.add_option('--movetransfilespace', 
                       help=optparse.SUPPRESS_HELP)
+    parser.add_option('--movefilespace')
+    parser.add_option('--location')
     parser.add_option('-f', '--filesystem', default=filesystem,
                       help=optparse.SUPPRESS_HELP)
     parser.add_option('--movetempfilespace',
@@ -1364,7 +1369,26 @@ in a Greenplum system (primary segment, mirror segment and master instances).
 Once a filespace is created, it can be used by one or more tablespaces.
 
 """)
-        if opt.movetransfilespace:
+        if opt.movefilespace:
+            if opt.movefilespace == 'default':
+                opt.movefilespace = "dfs_system"
+                
+            if opt.location is None or len(opt.location) == 0:
+                usage()
+                logger.error("Target location is not set");
+                sys.exit(1)
+
+            logger.warn('PLEASE STOP DATABASE AND BACKUP MASTER DATA DIRECTORY IN CASE OF LOSING DATA!')
+            
+            question = "I understand the risk and already backuped master data directory?  (Y|N)"
+            if not getbool("> ", question, "N"):
+                raise KeyboardInterrupt()
+         
+            MoveFileSpaceLocation(opt.movefilespace, opt.location, opt.username, opt.password).run()
+            
+            logger.info("Move filespace successfully.")
+            logger.info("IF STANDBY MASTER IS CONFIGURED, PLEASE REMOVE IT AND INITIALIZE A NEW ONE!")
+        elif opt.movetransfilespace:
             logger.fatal('movetransfilespace option NOT SUPPORTED YET IN GPSQL')
             sys.exit(1)
             if opt.movetransfilespace == 'default':

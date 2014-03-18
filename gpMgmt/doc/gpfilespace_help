@@ -15,6 +15,8 @@ gpfilespace [<connection_option> ...] [-l <logfile_directory>]
 gpfilespace [<connection_option> ...] [-l <logfile_directory>] 
             -c <fs_config_file>
 
+gpfilespace --movefilespace=<FILESPACE_NAME | default> --location=<TARGET_LOCATION>
+
 gpfilespace -v | -?
 
 
@@ -168,6 +170,24 @@ in GPSQL:
 
  $ gpfilespace -c gpfilespace_config_1
 
+*****************************************************
+MOVE FILESPACE
+*****************************************************
+
+Move the filiespace to a new location on distributed file system
+
+$ filespace --movefilespace=example_filespace_name --location=hdfs://host:port/new/location
+
+This command is to move filespace "example_filespace_name" to new location "hdfs://host:port/new/location"
+
+Note:
+ 1) The value of --location should be a valid URL
+ 2) No data is actually moved, only catalog is updated. User should move data manually.
+ 3) Shutdown the database and then backup the master data directory first
+ 4) Master's data cannot be moved using this command, and should be backuped before this command. 
+		Otherwise the metadata may be in inconsistent state and data may lose if this command fail 
+ 5) If standby master is configured, it should be removed and initialized again after the successfully executing of this command
+ 
 
 *****************************************************
 SEE ALSO
