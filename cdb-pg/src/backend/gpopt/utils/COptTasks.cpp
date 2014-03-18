@@ -1436,7 +1436,7 @@ COptTasks::PvEvalExprFromDXLTask
 						true, // fSerializeHeaderFooter
 						true // fIndent
 						);
-	pevalctxt->m_szResult = SzFromWsz(pstrDXL->Wsz());
+	pevalctxt->m_szDXLResult = SzFromWsz(pstrDXL->Wsz());
 	delete pstrDXL;
 	CRefCount::SafeRelease(pdxlnResult);
 	pdxlnInput->Release();
@@ -1800,10 +1800,10 @@ COptTasks::SzEvalExprFromXML
 
 	SEvalExprContext evalctxt;
 	evalctxt.m_szDXL = szXmlString;
-	evalctxt.m_szResult = NULL;
+	evalctxt.m_szDXLResult = NULL;
 
 	Execute(&PvEvalExprFromDXLTask, &evalctxt);
-	return evalctxt.m_szResult;
+	return evalctxt.m_szDXLResult;
 }
 
 

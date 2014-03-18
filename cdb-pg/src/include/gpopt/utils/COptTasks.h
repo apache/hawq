@@ -140,7 +140,7 @@ class COptTasks
 			char *m_szDXL;
 
 			// The result of evaluating the expression
-			char *m_szResult;
+			char *m_szDXLResult;
 
 			// casting function
 			static
