@@ -50,6 +50,12 @@ static const char *RESOLVERS[][DEPRECATED_TABLE_TUPLE_SIZE] =
 	{ "WritableResolver", "com.pivotal.pxf.plugins.hdfs.WritableResolver", "SequenceWritable" }
 };
 
+/* The array holds deprecated analyzer names */
+static const char *ANALYZERS[][DEPRECATED_TABLE_TUPLE_SIZE] = 
+{ 
+	{ "HdfsAnalyzer", "com.pivotal.pxf.plugins.hdfs.HdfsAnalyzer", "HdfsTextSimple" }
+};
+
 static void  GPHDUri_parse_protocol(GPHDUri *uri, char **cursor);
 static void  GPHDUri_parse_authority(GPHDUri *uri, char **cursor);
 static void  GPHDUri_parse_data(GPHDUri *uri, char **cursor);
@@ -826,6 +832,11 @@ GPHDUri_replace_deprecated_options(GPHDUri *uri, bool warn_on_deprecation)
 			GPHDUri_replace_deprecated_option(item_data, 
 											  sizeof(RESOLVERS)/sizeof(RESOLVERS[0]),
 											  RESOLVERS,
+											  warn_on_deprecation);
+		else if (pg_strcasecmp(item_data->key, "analyzer") == 0)
+			GPHDUri_replace_deprecated_option(item_data, 
+											  sizeof(ANALYZERS)/sizeof(ANALYZERS[0]),
+											  ANALYZERS,
 											  warn_on_deprecation);
 	}
 }

@@ -530,6 +530,8 @@ public class PxfHiveRegression extends PxfTestCase {
 			Assert.assertNull(warning);
 		}
 
+		// TODO once jsystem-infra supports throwing warnings from queryResults
+		// check warnings are also printed here
 		hawq.queryResults(hawqExternalTable, "SELECT * FROM " + hawqExternalTable.getName() + " ORDER BY t1");
 
 		ComparisonUtils.compareTables(hiveTable, hawqExternalTable, report);

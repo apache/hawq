@@ -1613,6 +1613,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 		exTable.setFragmenter("HdfsDataFragmenter");
 		exTable.setAccessor("TextFileAccessor");
 		exTable.setResolver("TextResolver");
+		exTable.setAnalyzer("HdfsAnalyzer");
 		exTable.setDelimiter(",");
 
 		try {
@@ -1626,12 +1627,31 @@ public class PxfHdfsRegression extends PxfTestCase {
 			warning = warning.getNextWarning();
 			assertUseIsDeprecated("TextResolver", warning);
 			warning = warning.getNextWarning();
+			assertUseIsDeprecated("HdfsAnalyzer", warning);
+			warning = warning.getNextWarning();
 			Assert.assertNull(warning);
 		}
 
+		// TODO once jsystem-infra supports throwing warnings from queryResults
+		// check warnings are also printed here
 		hawq.queryResults(exTable, "SELECT * FROM bigtext ORDER BY n1");
 
 		ComparisonUtils.compareTables(exTable, dataTable, report);
+		try {
+			verifyAnalyze(exTable);
+			Assert.fail("A SQLWarning should have been thrown");
+		} catch (SQLWarning warnings) {
+			SQLWarning warning = warnings;
+			assertUseIsDeprecated("HdfsDataFragmenter", warning);
+			warning = warning.getNextWarning();
+			assertUseIsDeprecated("TextFileAccessor", warning);
+			warning = warning.getNextWarning();
+			assertUseIsDeprecated("TextResolver", warning);
+			warning = warning.getNextWarning();
+			assertUseIsDeprecated("HdfsAnalyzer", warning);
+			warning = warning.getNextWarning();
+			Assert.assertNull(warning);
+		}
 	}
 
 	private void assertUseIsDeprecated(String classname, SQLWarning warning)

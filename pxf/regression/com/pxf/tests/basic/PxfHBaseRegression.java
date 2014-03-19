@@ -1018,6 +1018,8 @@ public class PxfHBaseRegression extends PxfTestCase {
 			Assert.assertNull(warning);
 		}
 
+		// TODO once jsystem-infra supports throwing warnings from queryResults
+		// check warnings are also printed here
 		hawq.queryResults(table, 
 				"SELECT * FROM " + table.getName() + " ORDER BY recordkey ASC");
 

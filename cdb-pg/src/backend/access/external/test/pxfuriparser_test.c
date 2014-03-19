@@ -420,6 +420,24 @@ test__parseGPHDUri__DeprecatedResolver(void **state)
 	}
 }
 
+void
+test__parseGPHDUri__DeprecatedAnalyzer(void **state)
+{
+	static const char *url_pattern = "pxf://1.2.3.4:5678/some/path?ANALYZER=%s";
+	const char *cases[][2] = 
+	{
+		{ "HdfsAnalyzer", "com.pivotal.pxf.plugins.hdfs.HdfsAnalyzer" },
+		{ "UntouchedAnalyzer", "UntouchedAnalyzer" }
+	};
+
+	for (int i = 0; i < sizeof(cases)/sizeof(cases[0]); ++i)
+	{
+		char buf[1024];
+		snprintf(buf, sizeof(buf), url_pattern, cases[i][0]);
+		run_parseGPHDUri_and_verify_key_value(buf, "ANALYZER", cases[i][1]);
+	}
+}
+
 int 
 main(int argc, char* argv[]) 
 {
@@ -430,6 +448,7 @@ main(int argc, char* argv[])
 			unit_test(test__parseGPHDUri__DeprecatedFragmenter),
 			unit_test(test__parseGPHDUri__DeprecatedAccessor),
 			unit_test(test__parseGPHDUri__DeprecatedResolver),
+			unit_test(test__parseGPHDUri__DeprecatedAnalyzer),
 			unit_test(test__parseGPHDUri__NegativeTestNoProtocol),
 			unit_test(test__parseGPHDUri__NegativeTestNoOptions),
 			unit_test(test__parseGPHDUri__NegativeTestMissingEqual),
