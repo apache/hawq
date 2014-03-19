@@ -57,7 +57,6 @@ General
 -------
 - No support for -upgrade / -rollback
 - Maximum number of datanodes is 10
-- JDK is required due to usage of jps tool
 
 CentOS
 ------
@@ -66,6 +65,12 @@ CentOS
 
 7. Changes
 ==========
+
+v1.7.7
+------
+
+- JRE can be used instead of JDK
+- GPSQL-1363: start-gphd.sh fails to recognize Zookeeper is up
 
 v1.7.6
 ------

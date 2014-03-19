@@ -61,7 +61,14 @@ function hdfs_running()
 
 function zookeeper_running()
 {
-	sleep 5s
-	$ZOOKEEPER_BIN/zkServer.sh status > /dev/null 2>&1
-	return $?
+	local retval=1
+	for i in {1..10}; do
+		sleep 5s
+		$ZOOKEEPER_BIN/zkServer.sh status > /dev/null 2>&1
+		retval=$?
+		if [ $retval -eq 0 ]; then
+			return 0
+		fi
+	done
+	return $retval
 }
