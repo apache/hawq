@@ -967,7 +967,10 @@ CTranslatorDXLToScalar::PsublinkFromDXLNodeQuantifiedSubquery
 	pparam->paramid = 1;
 
 	const CMappingElementColIdTE *pmappingelement = ptemapCopy->PtLookup(&ulColId);
-	GPOS_ASSERT(NULL != pmappingelement);
+	if (NULL  == pmappingelement)
+	{
+		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiDXL2PlStmtAttributeNotFound, ulColId);
+	}	
 	TargetEntry *pte = const_cast<TargetEntry *>(pmappingelement->Pte());
 
 	pparam->paramtype = gpdb::OidExprType((Node*) pte->expr);
@@ -1600,7 +1603,10 @@ CTranslatorDXLToScalar::PexprFromDXLNodeScId
 		pexprResult = (Expr *) pmapcidvarplstmt->PparamFromDXLNodeScId(pdxlop);	
 	}
 
-	GPOS_ASSERT(NULL != pexprResult);
+	if (NULL  == pexprResult)
+	{
+		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiDXL2PlStmtAttributeNotFound, pdxlop->Pdxlcr()->UlID());
+	}	
 	return pexprResult;
 }
 
