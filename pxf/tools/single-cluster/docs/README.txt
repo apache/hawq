@@ -71,6 +71,7 @@ v1.7.7
 
 - JRE can be used instead of JDK
 - GPSQL-1363: start-gphd.sh fails to recognize Zookeeper is up
+- GPSQL-1987: use US dist server for refresh_tars
 
 v1.7.6
 ------

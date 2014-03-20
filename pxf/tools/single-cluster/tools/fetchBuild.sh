@@ -17,7 +17,7 @@ name=$2
 
 version_file=stackversion.txt
 log_file=fetch.log
-dist_server=http://hdsh129.lss.emc.com/dist/PHD
+dist_server=http://hdp4-mdw1.wbe.dh.greenplum.com/dist/PHD
 tmpfile=/tmp/curldata.${RANDOM}.tmp
 sort_order=?O=A
 url=$dist_server/$jobpath
