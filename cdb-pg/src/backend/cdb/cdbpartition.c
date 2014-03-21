@@ -275,6 +275,73 @@ rel_partition_key_attrs(Oid relid)
 }
 
 /*
+ * Return a list of lists representing the partitioning keys of the partitioned
+ * table identified by the argument or NIL. The keys are in the order of
+ * partitioning levels. Each of the lists inside the main list correspond to one
+ * level, and may have one or more attribute numbers depending on whether the
+ * part key for that level is composite or not.
+ *
+ * Note: Only returns a non-empty list of keys for partitioned table
+ *       as a whole.  Returns empty for non-partitioned tables or for
+ *       parts of partitioned tables.  Key attributes are attribute
+ *       numbers in the partitioned table.
+ */
+List *
+rel_partition_keys_ordered(Oid relid)
+{
+	cqContext *pcqCtx = caql_beginscan(
+							NULL,
+							cql("SELECT * FROM pg_partition "
+								" WHERE parrelid = :1 ",
+								ObjectIdGetDatum(relid)));
+
+	List *levels = NIL;
+	List *keysUnordered = NIL;
+	int nlevels = 0;
+	HeapTuple tuple = NULL;
+	while (HeapTupleIsValid(tuple = caql_getnext(pcqCtx)))
+	{
+		Form_pg_partition p = (Form_pg_partition) GETSTRUCT(tuple);
+
+		if (p->paristemplate)
+		{
+			continue;
+		}
+
+		List *levelkeys = NIL;
+		for (int i = 0; i < p->parnatts; i++ )
+		{
+			levelkeys = lappend_int(levelkeys, (Oid)p->paratts.values[i]);
+		}
+
+		nlevels++;
+		levels = lappend_int(levels, p->parlevel);
+		keysUnordered = lappend(keysUnordered, levelkeys);
+	}
+	caql_endscan(pcqCtx);
+
+	if (1 == nlevels)
+	{
+		list_free(levels);
+		return keysUnordered;
+	}
+
+	// now order the keys by level
+	List *pkeys = NIL;
+	for (int i = 0; i< nlevels; i++)
+	{
+		int pos = list_find_int(levels, i);
+		Assert (0 <= pos);
+
+		pkeys = lappend(pkeys, list_nth(keysUnordered, pos));
+	}
+	list_free(levels);
+	list_free(keysUnordered);
+
+	return pkeys;
+}
+
+/*
  * Is relid a child in a partitioning hierarchy? 
  *
  *    exists (select *

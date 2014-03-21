@@ -1334,7 +1334,7 @@ gpdb::PlPartitionAttrs
 	GP_WRAP_START;
 	{
 		// return unique partition level attributes
-		return rel_partition_key_attrs(oid);
+		return rel_partition_keys_ordered(oid);
 	}
 	GP_WRAP_END;
 	return NIL;

@@ -2751,7 +2751,14 @@ CTranslatorRelcacheToDXL::PdrgpulPartKeys
 	ListCell *plc = NULL;
 	ForEach (plc, plPartKeys)
 	{
-		INT iAttno = lfirst_int(plc);
+		List *plPartKey = (List *) lfirst(plc);
+
+		if (1 < gpdb::UlListLength(plPartKey))
+		{
+			GPOS_RAISE(gpdxl::ExmaMD, gpdxl::ExmiMDObjUnsupported, GPOS_WSZ_LIT("Composite part key"));
+		}
+
+		INT iAttno = linitial_int(plPartKey);
 		GPOS_ASSERT(0 < iAttno);
 		pdrgpulPartKeys->Append(New(pmp) ULONG(iAttno - 1));
 	}
