@@ -185,9 +185,16 @@ CConfigParamMapping::SConfigMappingElem CConfigParamMapping::m_elem[] =
 
                 {
                 EopttraceDisablePartPropagation,
-                &optimizer_enable_part_propagation,
+                &optimizer_enable_partition_propagation,
                 true, // m_fNegate
                 GPOS_WSZ_LIT("Disable partition propagation nodes in optimizer.")
+                },
+                
+                {
+                EopttraceDisablePartSelection,
+                &optimizer_enable_partition_selection,
+                true, // m_fNegate
+                GPOS_WSZ_LIT("Disable partition selection in optimizer.")
                 },
 
 		{

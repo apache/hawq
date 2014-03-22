@@ -697,7 +697,8 @@ bool		optimizer_enable_motion_gather;
 bool		optimizer_enable_motion_redistribute;
 bool		optimizer_enable_sort;
 bool		optimizer_enable_materialize;
-bool		optimizer_enable_part_propagation;
+bool		optimizer_enable_partition_propagation;
+bool		optimizer_enable_partition_selection;
 bool		optimizer_enumerate_plans;
 bool		optimizer_sample_plans;
 int			optimizer_plan_id;
@@ -3726,14 +3727,24 @@ static struct config_bool ConfigureNamesBool[] =
                 true, NULL, NULL
         },
         {
-                {"optimizer_enable_part_propagation", PGC_USERSET, DEVELOPER_OPTIONS,
+                {"optimizer_enable_partition_propagation", PGC_USERSET, DEVELOPER_OPTIONS,
                         gettext_noop("Enable plans with Partition Propagation operators in the optimizer."),
                         NULL,
                         GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
                 },
-                &optimizer_enable_part_propagation,
+                &optimizer_enable_partition_propagation,
                 true, NULL, NULL
         },
+        {
+                {"optimizer_enable_partition_selection", PGC_USERSET, DEVELOPER_OPTIONS,
+                        gettext_noop("Enable plans with Partition Selection operators in the optimizer."),
+                        NULL,
+                        GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+                },
+                &optimizer_enable_partition_selection,
+                true, NULL, NULL
+        },
+        
 	{
 		{"optimizer_enumerate_plans", PGC_USERSET, LOGGING_WHAT,
 			gettext_noop("Enable plan enumeration"),
