@@ -1537,6 +1537,8 @@ CTranslatorRelcacheToDXL::Pmdscop
 		pmdidOpInverse = New(pmp) CMDIdGPDB(oidInverse);
 	}
 
+	BOOL fReturnsNullOnNullInput = gpdb::FOpStrict(oidOp);
+
 	pmdid->AddRef();
 	CMDScalarOpGPDB *pmdscop = New(pmp) CMDScalarOpGPDB
 											(
@@ -1549,7 +1551,8 @@ CTranslatorRelcacheToDXL::Pmdscop
 											pmdidFunc,
 											pmdidOpCommute,
 											pmdidOpInverse,
-											ecmpt
+											ecmpt,
+											fReturnsNullOnNullInput
 											);
 	return pmdscop;
 }

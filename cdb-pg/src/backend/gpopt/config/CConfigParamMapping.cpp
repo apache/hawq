@@ -197,6 +197,13 @@ CConfigParamMapping::SConfigMappingElem CConfigParamMapping::m_elem[] =
                 GPOS_WSZ_LIT("Disable partition selection in optimizer.")
                 },
 
+                {
+                EopttraceDisableOuterJoin2InnerJoinRewrite,
+                &optimizer_enable_outerjoin_rewrite,
+                true, // m_fNegate
+                GPOS_WSZ_LIT("Disable outer join to inner join rewrite in optimizer.")
+                },
+
 		{
 		EopttraceExtractDXLStats,
 		&optimizer_extract_dxl_stats,

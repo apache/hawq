@@ -359,6 +359,7 @@ extern bool optimizer_enable_sort;
 extern bool optimizer_enable_materialize;
 extern bool optimizer_enable_partition_propagation;
 extern bool optimizer_enable_partition_selection;
+extern bool optimizer_enable_outerjoin_rewrite;
 extern bool optimizer_enumerate_plans;
 extern bool optimizer_sample_plans;
 extern int	optimizer_plan_id;

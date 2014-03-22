@@ -412,6 +412,9 @@ namespace gpdb {
 	// is the given operator merge-joinable
 	bool FOpMergeJoinable(Oid opno, Oid *leftOp, Oid *rightOp);
 
+	// is the given operator strict
+	bool FOpStrict(Oid opno);
+
 	// get input types for a given operator
 	void GetOpInputTypes(Oid opno, Oid *lefttype, Oid *righttype);
 

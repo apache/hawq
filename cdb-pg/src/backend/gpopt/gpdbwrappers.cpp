@@ -132,6 +132,7 @@
 #define ALLOW_convert_network_to_scalar
 #define ALLOW_op_hashjoinable
 #define ALLOW_op_mergejoinable
+#define ALLOW_op_strict
 #define ALLOW_op_input_types
 #define ALLOW_operator_exists
 #define ALLOW_palloc
@@ -1996,6 +1997,20 @@ gpdb::FOpMergeJoinable
 	GP_WRAP_START;
 	{
 		return op_mergejoinable(opno, leftOp, rightOp);
+	}
+	GP_WRAP_END;
+	return false;
+}
+
+bool
+gpdb::FOpStrict
+	(
+	Oid opno
+	)
+{
+	GP_WRAP_START;
+	{
+		return op_strict(opno);
 	}
 	GP_WRAP_END;
 	return false;
