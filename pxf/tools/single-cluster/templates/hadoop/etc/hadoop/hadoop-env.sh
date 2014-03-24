@@ -4,6 +4,7 @@
 export HADOOP_CLASSPATH=\
 `echo $PXF_ROOT/pxf-core-*[0-9].jar`:\
 `echo $PXF_ROOT/pxf-api-*[0-9].jar`:\
+`echo $PXF_ROOT/conf`:\
 `echo $HBASE_ROOT/lib/hbase-common-*-gphd-*[0-9].jar`:\
 `echo $HBASE_ROOT/lib/hbase-common-*-gphd-*[0-9]-SNAPSHOT.jar`:\
 `echo $HBASE_ROOT/lib/hbase-protocol*-gphd-*[0-9].jar`:\

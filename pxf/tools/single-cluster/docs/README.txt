@@ -66,6 +66,11 @@ CentOS
 7. Changes
 ==========
 
+v1.7.8
+------
+
+- GPSQL-2000: add pxf conf to Hadoop's classpath
+
 v1.7.7
 ------
 
