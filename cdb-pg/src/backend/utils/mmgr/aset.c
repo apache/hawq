@@ -563,14 +563,14 @@ AllocAllocInfo(AllocSet set, AllocChunk chunk, bool isHeader)
 				 * the nullAccountHeader as a null ActiveMemoryAccount
 				 * automatically implies a null SharedChunkHeadersMemoryAccount
 				 */
-}
+			}
 
 			chunk->sharedHeader = set->nullAccountHeader;
 			set->nullAccountHeader->balance += (chunk->size + ALLOC_CHUNKHDRSZ);
 		}
 	}
 	else
-{
+	{
 		/*
 		 * At this point we still may have NULL SharedChunksHeadersMemoryAccount.
 		 * Note: this is only possible if the ActiveMemoryAccount and

@@ -4445,7 +4445,7 @@ intorel_shutdown(DestReceiver *self)
 		sendback->relid = RelationGetRelid(myState->aocs_ins->aoi_rel);
 
         aocs_insert_finish(myState->aocs_ins);
-}
+	}
 	else if (RelationIsParquet(into_rel) && myState->parquet_insertDesc)
 	{
 		sendback = CreateQueryContextDispatchingSendBack(1);
