@@ -156,7 +156,7 @@ opt_write_test:
 /opt/releng/apache-ant: 
 	${MAKE} opt_write_test
 	echo "Sync Ivy project dependency management framework ..."
-	curl --silent http://releng.sanmateo.greenplum.com/tools/apache-ant.1.8.1.tar.gz -o /tmp/apache-ant.1.8.1.tar.gz
+	curl --silent http://build-prod.dh.greenplum.com/tools/apache-ant.1.8.1.tar.gz -o /tmp/apache-ant.1.8.1.tar.gz
 	( umask 002; [ ! -d /opt/releng ] && mkdir -p /opt/releng; \
 	   cd /opt/releng; \
 	   gunzip -qc /tmp/apache-ant.1.8.1.tar.gz | tar xf -; \
