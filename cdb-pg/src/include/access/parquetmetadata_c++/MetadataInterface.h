@@ -109,13 +109,19 @@ typedef struct ParquetMetadata_4C
 {
 	struct FileField_4C* pfield;	/*The first level of field, the field may have children itself*/
 	int fieldCount;	/*first level field count*/
+
 	long num_rows;	/*number of rows*/
+
 	struct BlockMetadata_4C** pBlockMD;
 	int maxBlockCount; /*indicates the allocated array size for pBlockMD*/
 	int blockCount;		/*count of row groups*/
+
 	char *hawqschemastr;	/*hawq schema str, should output into parquet metadata keyvalue part*/
 	int colCount;	/*The number of columns in each row group, which is the expanded columns of pfield*/
 	int schemaTreeNodeCount;	/*the count of all the nodes in schema tree, including middle nodes and leaf nodes*/
+
+    int *estimateChunkSizes; /* array of estimated sizes for each columnchunk */
+
 	int version; /*the version of parquet file*/
 } ParquetMetadata_4C;
 

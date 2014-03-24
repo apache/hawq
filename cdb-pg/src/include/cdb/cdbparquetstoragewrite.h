@@ -94,10 +94,9 @@ struct ParquetDataPage_S
 	ByteBasedBitPackingEncoder	*bool_values;
 	ByteBasedBitPackingDecoder	*bool_values_reader;
 
-	/* Data for buffered values.  For non-bool columns, this is where the output
-	 is accumulated.  For bool columns, this is a ptr into bool_values (no
-	 memory is allocated for it).*/
+	/* For non-bool columns, this is where the output is accumulated before compression. */
 	uint8_t						*values_buffer;
+    int                         values_buffer_capacity; /* palloced size for values_buffer */
 
     /*
      * For write, this is the page data to write, may be compressed.
@@ -130,18 +129,21 @@ struct ParquetColumnChunk_S
 
 	int 						pageNumber;
     
-	int 						maxPageSize; /*the page size limited by both pagesize and rowgroupsize/columnNum*/
+    /*
+     * Used to estimate size for values_buffer of each data pages.
+     * e.g, if estimateChunkSizeRemained is 1.5 * pageSizeLimit, then
+     * for the first data page, we init values_buffer_capacity to be pageSizeLimit,
+     * for the second data page, we init values_buffer_capacity to be 0.5pageSizeLimit.
+     *
+     * The estimation is based on uncompressed chunk size of last rowgroup. For chunks in
+     * the first rowgroup, the estimation is based on column width.
+     */
+    int                         estimateChunkSizeRemained;
 
-	int							maxPageLimitSize; /*the page size limited by pagesize*/
+	int                         pageSizeLimit;          /* pagesize in pg_appendonly */
 
     char    					*compresstype;
     int     					compresslevel;
-
-    /* 
-     * buffer used for compressing each page
-     */
-    char    					*compressed;
-    size_t  					compressedMaxLen;
 
 	File 						parquetFile;
 };
@@ -172,7 +174,11 @@ struct ParquetRowGroup_S
  *
  * Return the created rowgroup.
  */
-ParquetRowGroup addRowGroup(ParquetMetadata parquetmd, AppendOnlyEntry *aoentry, File file);
+ParquetRowGroup addRowGroup(
+        ParquetMetadata parquetmd,
+        TupleDesc tableAttrs,
+        AppendOnlyEntry *aoentry,
+        File file);
 
 /*
  * Write out all columns of `rowgroup`.

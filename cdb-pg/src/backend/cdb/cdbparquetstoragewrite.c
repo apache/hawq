@@ -78,10 +78,10 @@ static void addSingleColumn(
 		AppendOnlyEntry *catalog,
 		struct ColumnChunkMetadata_4C** columnsMetadata,
 		ParquetColumnChunk columns,
-		int maxChunkLimitSize,
-		struct FileField_4C *field,
-		int *colIndex,
-		File parquetFile);
+		int		*estimateChunkSizes,
+		struct	FileField_4C *field,
+		int		*colIndex,
+		File	parquetFile);
 
 static int appendNullForFields(
 		struct FileField_4C *field,
@@ -153,19 +153,24 @@ static char *generateHAWQSchemaStr(
 		ParquetFileField pfields,
 		int fieldCount);
 
+static void estimateColumnWidths(
+		int *columnWidths,
+		int ncolumns,
+		TupleDesc tableAttrs);
+
 static char *getTypeName(Oid typeOid);
 
 static int encodePlain(
 		Datum data,
 		ParquetDataPage current_page,
 		int hawqTypeId,
-		int maxPageSize,
-		int maxPageLimitSize);
+		int pageSizeLimit);
 
 static int approximatePageSize(ParquetDataPage page);
 
-static bool exceedsPageSizeLimit(ParquetDataPage current_page,
-		int currentPageSize, int maxPageSize, int maxPageLimitSize);
+static bool ensureBufferCapacity(ParquetDataPage page,
+								 int newValueSize,
+								 int pageSizeLimit);
 
 #define ENCODE_INVALID_VALUE	-1
 #define ENCODE_OUTOF_PAGE		-2
@@ -209,18 +214,6 @@ generateHAWQSchemaStr(ParquetFileField pfields,
 	return schemaBuf->data;
 }
 
-/**
- * point(600)			group {required double x; required double y;}
- *
- * lseg(601)			group {required double x1; required double y1; required double x2; required double y2;}
- *
- * box(603)				group {required double x1; required double y1; required double x2; required double y2;}
- *
- * circle(718)			group {required double x; required double y; required double r;}
- *
- * path(602)			group {	repeated group {required double x; required double y;}}
- *
- */
 int
 initparquetMetadata(ParquetMetadata parquetmd,
 					TupleDesc tableAttrs,
@@ -676,8 +669,139 @@ mappingHAWQType(int hawqTypeID)
 	}
 }
 
+static void
+estimateColumnWidths(int *columnWidths,
+					 int ncolumns,
+					 TupleDesc tableAttrs)
+{
+	Form_pg_attribute att;
+	int colidx = 0;
+
+	for (int i = 0; i < tableAttrs->natts; i++)
+	{
+		att = tableAttrs->attrs[i];
+
+		switch (att->atttypid)
+		{
+			/* fixed size type */
+			case HAWQ_TYPE_BOOL:
+			case HAWQ_TYPE_INT2:
+			case HAWQ_TYPE_INT4:
+			case HAWQ_TYPE_INT8:
+			case HAWQ_TYPE_FLOAT4:
+			case HAWQ_TYPE_FLOAT8:
+			case HAWQ_TYPE_DATE:
+			case HAWQ_TYPE_TIME:
+			case HAWQ_TYPE_TIMETZ:
+			case HAWQ_TYPE_TIMESTAMP:
+			case HAWQ_TYPE_TIMESTAMPTZ:
+			case HAWQ_TYPE_INTERVAL:
+			case HAWQ_TYPE_NAME:
+			case HAWQ_TYPE_MONEY:
+			case HAWQ_TYPE_MACADDR:
+				Assert(att->attlen > 0);
+				columnWidths[colidx++] = att->attlen;
+				break;
+
+			/* variable length type */
+			case HAWQ_TYPE_CHAR:
+			case HAWQ_TYPE_BPCHAR:
+				/* for char(n), atttypmod is n + 4 */
+				Assert(att->atttypmod > 4);
+				columnWidths[colidx++] = att->atttypmod;
+				break;
+				break;
+			case HAWQ_TYPE_VARCHAR:
+			case HAWQ_TYPE_TEXT:
+			case HAWQ_TYPE_XML:
+				if (att->atttypmod > 4)
+				{	/* for varchar(n), atttypmod is n + 4 */
+					columnWidths[colidx++] = att->atttypmod;
+				}
+				else
+				{	/* for varchar, text, xml */
+					columnWidths[colidx++] = 30;
+				}
+				break;
+
+			case HAWQ_TYPE_BIT:
+			case HAWQ_TYPE_VARBIT:
+				if (att->atttypmod > 0)
+				{	/* for bit(n) and bit varying (n), atttypmod is n,
+					 * but we also have 4 bytes binary header */
+					columnWidths[colidx++] = 4 + att->atttypmod;
+				}
+				else
+				{
+					columnWidths[colidx++] = 20;
+				}
+				break;
+
+			case HAWQ_TYPE_BYTE:
+			case HAWQ_TYPE_NUMERIC:
+			case HAWQ_TYPE_INET:
+			case HAWQ_TYPE_CIDR:
+				columnWidths[colidx++] = 24;
+				break;
+
+			/* maps to multiple columns */
+			case HAWQ_TYPE_POINT:
+				columnWidths[colidx++] = 8;	/* x */
+				columnWidths[colidx++] = 8;	/* y */
+				break;
+			case HAWQ_TYPE_PATH:
+				columnWidths[colidx++] = 1;	/* is_open */
+				columnWidths[colidx++] = 24;/* repeated points.x */
+				columnWidths[colidx++] = 24;/* repeated points.x */
+				break;
+			case HAWQ_TYPE_LSEG:
+			case HAWQ_TYPE_BOX:
+				columnWidths[colidx++] = 8;	/* x1 */
+				columnWidths[colidx++] = 8;	/* y1 */
+				columnWidths[colidx++] = 8;	/* x2 */
+				columnWidths[colidx++] = 8;	/* y2 */
+				break;
+			case HAWQ_TYPE_POLYGON:
+				columnWidths[colidx++] = 8;	/* boundbox.x1 */
+				columnWidths[colidx++] = 8;	/* boundbox.y1 */
+				columnWidths[colidx++] = 8;	/* boundbox.x2 */
+				columnWidths[colidx++] = 8;	/* boundbox.y2 */
+				columnWidths[colidx++] = 24;/* repeated points.x */
+				columnWidths[colidx++] = 24;/* repeated points.y */
+				break;
+			case HAWQ_TYPE_CIRCLE:
+				columnWidths[colidx++] = 8;	/* x */
+				columnWidths[colidx++] = 8;	/* y */
+				columnWidths[colidx++] = 8;	/* r */
+				break;
+			default:
+				Insist(false);
+				break;
+		}
+	}
+	Assert(colidx == ncolumns);
+
+	const int min_column_width = 1;
+	const int max_column_width = 100;
+
+	/* make sure columnwidth in reasonable range to avoid some column
+	 * got too low or too high weight */
+	for (colidx = 0; colidx < ncolumns; colidx++)
+	{
+		if (columnWidths[colidx] < min_column_width)
+		{
+			columnWidths[colidx] = min_column_width;
+		}
+		if (columnWidths[colidx] > max_column_width)
+		{
+			columnWidths[colidx] = max_column_width;
+		}
+	}
+}
+
 ParquetRowGroup
 addRowGroup(ParquetMetadata parquetmd,
+			TupleDesc tableAttrs,
 			AppendOnlyEntry *aoentry,
 			File file)
 {
@@ -697,6 +821,28 @@ addRowGroup(ParquetMetadata parquetmd,
 	rowgroupmd->rowCount		= 0;
 	rowgroupmd->totalByteSize	= 0;
 
+	if (parquetmd->estimateChunkSizes == NULL)
+	{
+		parquetmd->estimateChunkSizes = palloc(parquetmd->colCount * sizeof(int));
+
+		int *columnWidths = palloc(parquetmd->colCount * sizeof(int));
+		estimateColumnWidths(columnWidths, parquetmd->colCount, tableAttrs);
+
+		double rowWidths = 0.0;
+		for (int i = 0; i < parquetmd->colCount; i++)
+		{
+			rowWidths += columnWidths[i];
+		}
+
+		for (int i = 0; i < parquetmd->colCount; i++)
+		{
+			parquetmd->estimateChunkSizes[i] =
+				(int) ((columnWidths[i] / rowWidths) * rowgroup->catalog->blocksize * 1.05);
+		}
+
+		pfree(columnWidths);
+	}
+
 	/*
 	 * init ParquetColumnChunk (including it's metadata) for each column
 	 */
@@ -706,7 +852,7 @@ addRowGroup(ParquetMetadata parquetmd,
 		addSingleColumn(rowgroup->catalog,
 						&rowgroupmd->columns,	/* for ColumnChunkMetadata */
 						rowgroup->columnChunks,	/* for ParquetColumnChunk */
-						rowgroup->catalog->blocksize / rowgroup->columnChunkNumber,
+						parquetmd->estimateChunkSizes,
 						/*parquet column chunk max size*/
 						&parquetmd->pfield[i],
 						&cIndex,
@@ -750,6 +896,16 @@ flushRowGroup(ParquetRowGroup rowgroup,
 		ColumnChunkMetadata chunkmd	= chunk->columnChunkMetadata;
 
 		bytes_added += encodeCurrentPage(chunk);
+
+		/*----------------------------------------------------------------
+		 * recompute estimate chunk size based on uncompressed size (excludes header)
+		 *----------------------------------------------------------------*/
+		parquetmd->estimateChunkSizes[i] = 0;
+		for (int pageno = 0; pageno < chunk->pageNumber; ++pageno)
+		{
+			parquetmd->estimateChunkSizes[i] += chunk->pages[pageno].header->uncompressed_page_size;
+		}
+		parquetmd->estimateChunkSizes[i] = (int) (parquetmd->estimateChunkSizes[i] * 1.05);
 
 		/*----------------------------------------------------------------
 		 * write out pages one by one
@@ -828,10 +984,6 @@ freeRowGroup(ParquetRowGroup rowgroup)
 	for (int i = 0; i < rowgroup->columnChunkNumber; i++)
 	{
 		pfree(rowgroup->columnChunks[i].pages);
-		if (rowgroup->columnChunks[i].compressed != NULL)
-		{
-			pfree(rowgroup->columnChunks[i].compressed);
-		}
 
 		/* chunk metadata should be kept util parquet_insert_finish */
 		rowgroup->columnChunks[i].columnChunkMetadata = NULL;
@@ -842,102 +994,98 @@ freeRowGroup(ParquetRowGroup rowgroup)
 
 /**
  * add a column information to row group
+ * catalog:				pg_appendonly entry
  * columnsMetadata:		columnMetadata needed to be added
  * columns:				column chunks of row group needed to be initialized
- * maxChunkLimitSize:	the max size of the column chunk in memory, calcualted by rowgroupsize/columnNum
+ * estimateChunkSizes:	array of estimated sizes for each columnchunk
  * field:				the column description in parquet file metadata schema part
  * colIndex:			the index of the column in columnsMetadata and columns
+ * parquetFile:			file to insert into
  */
 void
 addSingleColumn(AppendOnlyEntry *catalog,
 				struct ColumnChunkMetadata_4C** columnsMetadata,
 				ParquetColumnChunk columns,
-				int maxChunkLimitSize,
-				struct FileField_4C *field,
-				int *colIndex,
-				File parquetFile)
+				int		*estimateChunkSizes,
+				struct	FileField_4C *field,
+				int		*colIndex,
+				File	parquetFile)
 {
-	if (field->num_children > 0) {
-		/* for embedded types, should expand it, recursive call the function itself*/
+	if (field->num_children > 0)
+	{	/* for embedded types, should expand it, recursive call the function itself*/
 		for (int i = 0; i < field->num_children; i++) {
-			addSingleColumn(catalog, columnsMetadata, columns, maxChunkLimitSize, &(field->children[i]),
-					colIndex, parquetFile);
+			addSingleColumn(catalog, columnsMetadata, columns, estimateChunkSizes,
+							&(field->children[i]), colIndex, parquetFile);
 		}
-	} else {/* for single column, directly add the column*/
-		struct ColumnChunkMetadata_4C* columnChunkMetadata =
+	}
+	else
+	{	/* for single column, directly add the column*/
+		struct ColumnChunkMetadata_4C* chunkmd =
 				&((*columnsMetadata)[*colIndex]);
-		/*maybe 3?? for definition level, repetition level, and data*/
-		columnChunkMetadata->EncodingCount = 3;
-		columnChunkMetadata->pEncodings =
-				(enum Encoding*) palloc0(columnChunkMetadata->EncodingCount * sizeof(enum Encoding));
-		columnChunkMetadata->pEncodings[0] = RLE; /*set definition level encoding as RLE*/
-		columnChunkMetadata->pEncodings[1] = RLE; /*set repetition level encoding as RLE*/
-		columnChunkMetadata->pEncodings[2] = PLAIN; /*set data encoding as PLAIN*/
-		columnChunkMetadata->file_offset = 0;
-		columnChunkMetadata->firstDataPage = 0;
-		columnChunkMetadata->totalSize = 0;
-		columnChunkMetadata->totalUncompressedSize = 0;
-		columnChunkMetadata->valueCount = 0;
+
+		/*----------------------------------------------------------------
+		 * initialize ColumnChunkMetadata
+		 *----------------------------------------------------------------*/
+		chunkmd->EncodingCount			= 3;
+		chunkmd->pEncodings 			= palloc0(chunkmd->EncodingCount * sizeof(enum Encoding));
+		chunkmd->pEncodings[0] 			= RLE; /*set definition level encoding as RLE*/
+		chunkmd->pEncodings[1] 			= RLE; /*set repetition level encoding as RLE*/
+		chunkmd->pEncodings[2] 			= PLAIN; /*set data encoding as PLAIN*/
+		chunkmd->file_offset 			= 0;
+		chunkmd->firstDataPage 			= 0;
+		chunkmd->totalSize 				= 0;
+		chunkmd->totalUncompressedSize 	= 0;
+		chunkmd->valueCount 			= 0;
 
 		if (catalog->compresstype == NULL)
 		{
-			columnChunkMetadata->codec = UNCOMPRESSED;
+			chunkmd->codec = UNCOMPRESSED;
 		}
 		else
 		{
-			if (0 == strcmp(catalog->compresstype, "snappy")){
-				columnChunkMetadata->codec = SNAPPY;
+			if (0 == strcmp(catalog->compresstype, "snappy"))
+			{
+				chunkmd->codec = SNAPPY;
 			}
-			else if (0 == strcmp(catalog->compresstype, "gzip")){
-				columnChunkMetadata->codec = GZIP;
+			else if (0 == strcmp(catalog->compresstype, "gzip"))
+			{
+				chunkmd->codec = GZIP;
 			}
-			else if (0 == strcmp(catalog->compresstype, "lzo")){
-				columnChunkMetadata->codec = LZO;
+			else if (0 == strcmp(catalog->compresstype, "lzo"))
+			{
+				chunkmd->codec = LZO;
 			}
-			else {
+			else
+			{
 				Assert(0 == strcmp(catalog->compresstype, "none"));
-				columnChunkMetadata->codec = UNCOMPRESSED;	
+				chunkmd->codec = UNCOMPRESSED;	
 			}
 		}
 		
-		/* stores */
-		columnChunkMetadata->type = field->type;
-		columnChunkMetadata->hawqTypeId = field->hawqTypeId;
-		int attNameLen = strlen(field->name);
-		columnChunkMetadata->colName = (char*) palloc0(attNameLen + 1);
-		strcpy(columnChunkMetadata->colName, field->name);
-		int pathInSchemaLen = strlen(field->pathInSchema);
-		columnChunkMetadata->pathInSchema =
-				(char*) palloc0(pathInSchemaLen + 1);
-		strcpy(columnChunkMetadata->pathInSchema, field->pathInSchema);
-		columnChunkMetadata->r = field->r;
-		columnChunkMetadata->d = field->d;
-		columnChunkMetadata->depth = field->depth;
+		chunkmd->type 			= field->type;
+		chunkmd->hawqTypeId 	= field->hawqTypeId;
+		chunkmd->colName 		= palloc0(strlen(field->name) + 1);
+		strcpy(chunkmd->colName, field->name);
+		chunkmd->pathInSchema 	= palloc0(strlen(field->pathInSchema) + 1);
+		strcpy(chunkmd->pathInSchema, field->pathInSchema);
+		chunkmd->r 				= field->r;
+		chunkmd->d 				= field->d;
+		chunkmd->depth 			= field->depth;
 
-		/** actual data for column chunks part*/
-		/* may also need copy data here*/
-		ParquetColumnChunk chunk = columns + (*colIndex);
-		chunk->columnChunkMetadata = columnChunkMetadata;
-		chunk->pageNumber = 0;
-		chunk->maxPageCount = DEFAULT_DATAPAGE_COUNT;
-		chunk->pages = (ParquetDataPage) palloc0(chunk->maxPageCount * sizeof(struct ParquetDataPage_S));
-		chunk->currentPage		= NULL;
-		chunk->parquetFile		= parquetFile;
-		chunk->maxPageLimitSize = catalog->pagesize;
-
-		/* set maxPagesize to min(chunk->maxPageLimitSize, maxChunkLimitSize) */
-		chunk->maxPageSize = (chunk->maxPageLimitSize > maxChunkLimitSize) ?
-				maxChunkLimitSize : chunk->maxPageLimitSize;
-
-		chunk->compresstype		= catalog->compresstype;
-		chunk->compresslevel	= catalog->compresslevel;
-		
-		if (columnChunkMetadata->codec != UNCOMPRESSED)
-		{
-			/* 1.5 shoud be an empirical value to make our buffer big enough for most page */
-			chunk->compressedMaxLen	= chunk->maxPageSize * 1.5;
-			chunk->compressed = (char *) palloc0(chunk->compressedMaxLen);
-		}
+		/*----------------------------------------------------------------
+		 * initialize ParquetColumnChunk
+		 *----------------------------------------------------------------*/
+		ParquetColumnChunk chunk 			= columns + (*colIndex);
+		chunk->columnChunkMetadata			= chunkmd;
+		chunk->maxPageCount 				= DEFAULT_DATAPAGE_COUNT;
+		chunk->pageNumber 					= 0;
+		chunk->pages 						= palloc0(chunk->maxPageCount * sizeof(struct ParquetDataPage_S));
+		chunk->currentPage					= NULL;
+		chunk->estimateChunkSizeRemained 	= estimateChunkSizes[*colIndex];
+		chunk->pageSizeLimit 				= catalog->pagesize;
+		chunk->compresstype					= catalog->compresstype;
+		chunk->compresslevel				= catalog->compresslevel;
+		chunk->parquetFile					= parquetFile;
 
 		*colIndex = *colIndex + 1;
 	}
@@ -994,27 +1142,17 @@ flushDataPage(ParquetColumnChunk chunk, int page_number)
  * Upon successful completion, the number of bytes which were added is returned.
  *
  * Otherwise ENCODE_INVALID_VALUE is returned if encoded length of `data`
- * exceeds `maxPageSize`.
+ * exceeds `pageSizeLimit`.
  *
  * ENCODE_OUTOF_PAGE is returned if `data` is of valid size but appending
- * the data will make the page exceeds `maxPageSize`.
- *
- * @maxPageSize:		min(maxPageLimitSize, rowgoupLimitSize/columnNum)
- * @maxPageLimitSize:	the page size limited by user or default pagesize 1MB/4MB
- *
- * If the encodePlain exceeds maxPageSize but not exceeds maxPageLimitSize, should
- * repalloc dataPage->values_buffer to enable a large single value limitation
- * can satisfy user's expection, which means, user defines the page limit to 3MB, rowgroup
- * limit to 10MB with 5 columns, when one value exceeds 2MB but not 3MB, should enable
- * this value rather than throw exception. [JIRA: GPSQL-1500]
+ * the data will make the page exceeds `pageSizeLimit`.
  *
  */
 static int
 encodePlain(Datum data, 
 			ParquetDataPage current_page,
 			int hawqTypeId,
-			int maxPageSize,
-			int maxPageLimitSize)
+			int pageSizeLimit)
 {
 	int len = 0; /* actual number of bytes added to buffer */
 	uint8_t* dst_ptr = NULL;
@@ -1024,9 +1162,7 @@ encodePlain(Datum data,
 
 	case HAWQ_TYPE_BOOL:
 	{
-		/* If the size exceeds current_page size, should return OUTOF_PAGE*/
-		if (exceedsPageSizeLimit(current_page, approximatePageSize(current_page),
-				maxPageSize, maxPageLimitSize))
+		if (approximatePageSize(current_page) >= pageSizeLimit)
 		{
 			return ENCODE_OUTOF_PAGE;
 		}
@@ -1039,17 +1175,14 @@ encodePlain(Datum data,
 	case HAWQ_TYPE_INT2:
 	{
 		len = 4;
-		if (exceedsPageSizeLimit(current_page, approximatePageSize(current_page) + len,
-				maxPageSize, maxPageLimitSize))
+		if (!ensureBufferCapacity(current_page, len, pageSizeLimit))
 		{
 			return ENCODE_OUTOF_PAGE;
 		}
 		int32 val = (int32) DatumGetInt16(data);
 
-                /* exceedsPageSizeLimit may change the address of 
-                   current_page->values_buffer. */
-                dst_ptr = current_page->values_buffer + 
-                          current_page->header->uncompressed_page_size; 
+		dst_ptr = current_page->values_buffer + 
+				  current_page->header->uncompressed_page_size; 
 
 		memcpy(dst_ptr, &val, len);
 		return len;
@@ -1057,17 +1190,14 @@ encodePlain(Datum data,
 	case HAWQ_TYPE_INT4:
 	{
 		len = 4;
-		if (exceedsPageSizeLimit(current_page, approximatePageSize(current_page) + len,
-				maxPageSize, maxPageLimitSize))
+		if (!ensureBufferCapacity(current_page, len, pageSizeLimit))
 		{
 			return ENCODE_OUTOF_PAGE;
 		}
 		int32 val = DatumGetInt32(data);
 
-                /* exceedsPageSizeLimit may change the address of 
-                   current_page->values_buffer. */
-                dst_ptr = current_page->values_buffer + 
-                          current_page->header->uncompressed_page_size;
+		dst_ptr = current_page->values_buffer + 
+				  current_page->header->uncompressed_page_size;
 
 		memcpy(dst_ptr, &val, len);
 		return len;
@@ -1075,17 +1205,14 @@ encodePlain(Datum data,
 	case HAWQ_TYPE_DATE:
 	{
 		len = 4;
-		if (exceedsPageSizeLimit(current_page, approximatePageSize(current_page) + len,
-				maxPageSize, maxPageLimitSize))
+		if (!ensureBufferCapacity(current_page, len, pageSizeLimit))
 		{
 			return ENCODE_OUTOF_PAGE;
 		}
 		DateADT val = DatumGetDateADT(data);
 
-                /* exceedsPageSizeLimit may change the address of 
-                   current_page->values_buffer. */
-                dst_ptr = current_page->values_buffer + 
-                          current_page->header->uncompressed_page_size;
+		dst_ptr = current_page->values_buffer + 
+				  current_page->header->uncompressed_page_size;
 
 		memcpy(dst_ptr, &val, len);
 		return len;
@@ -1093,17 +1220,14 @@ encodePlain(Datum data,
 	case HAWQ_TYPE_FLOAT4:
 	{
 		len = 4;
-		if (exceedsPageSizeLimit(current_page, approximatePageSize(current_page) + len,
-			maxPageSize, maxPageLimitSize))
+		if (!ensureBufferCapacity(current_page, len, pageSizeLimit))
 		{
 			return ENCODE_OUTOF_PAGE;
 		}
 		float4 val = DatumGetFloat4(data);
 
-                /* exceedsPageSizeLimit may change the address of 
-                   current_page->values_buffer. */
-                dst_ptr = current_page->values_buffer + 
-                          current_page->header->uncompressed_page_size;
+		dst_ptr = current_page->values_buffer + 
+				  current_page->header->uncompressed_page_size;
 
 		memcpy(dst_ptr, &val, len);
 		return len;
@@ -1115,17 +1239,14 @@ encodePlain(Datum data,
 		 * it's passed by reference.
 		 */
 		len = 4;
-		if (exceedsPageSizeLimit(current_page, approximatePageSize(current_page) + len,
-			maxPageSize, maxPageLimitSize))
+		if (!ensureBufferCapacity(current_page, len, pageSizeLimit))
 		{
 			return ENCODE_OUTOF_PAGE;
 		}
 		Cash *cash_p = (Cash *) DatumGetPointer(data);
 
-                /* exceedsPageSizeLimit may change the address of 
-                   current_page->values_buffer. */
-                dst_ptr = current_page->values_buffer + 
-                          current_page->header->uncompressed_page_size;
+		dst_ptr = current_page->values_buffer + 
+				  current_page->header->uncompressed_page_size;
 
 		memcpy(dst_ptr, cash_p, len);
 		return len;
@@ -1138,17 +1259,14 @@ encodePlain(Datum data,
 	case HAWQ_TYPE_INT8:
 	{
 		len = 8;
-		if (exceedsPageSizeLimit(current_page, approximatePageSize(current_page) + len,
-			maxPageSize, maxPageLimitSize))
+		if (!ensureBufferCapacity(current_page, len, pageSizeLimit))
 		{
 			return ENCODE_OUTOF_PAGE;
 		}
 		int64 val = DatumGetInt64(data);
 
-                /* exceedsPageSizeLimit may change the address of 
-                   current_page->values_buffer. */
-                dst_ptr = current_page->values_buffer + 
-                          current_page->header->uncompressed_page_size;
+		dst_ptr = current_page->values_buffer + 
+				  current_page->header->uncompressed_page_size;
 
 		memcpy(dst_ptr, &val, len);
 		return len;
@@ -1156,17 +1274,14 @@ encodePlain(Datum data,
 	case HAWQ_TYPE_TIME:
 	{
 		len = 8;
-		if (exceedsPageSizeLimit(current_page, approximatePageSize(current_page) + len,
-			maxPageSize, maxPageLimitSize))
+		if (!ensureBufferCapacity(current_page, len, pageSizeLimit))
 		{
 			return ENCODE_OUTOF_PAGE;
 		}
 		TimeADT val = DatumGetTimeADT(data);
 
-                /* exceedsPageSizeLimit may change the address of 
-                   current_page->values_buffer. */
-                dst_ptr = current_page->values_buffer + 
-                          current_page->header->uncompressed_page_size;
+		dst_ptr = current_page->values_buffer + 
+				  current_page->header->uncompressed_page_size;
 
 		memcpy(dst_ptr, &val, len);
 		return len;
@@ -1174,17 +1289,14 @@ encodePlain(Datum data,
 	case HAWQ_TYPE_TIMESTAMP:
 	{
 		len = 8;
-		if (exceedsPageSizeLimit(current_page, approximatePageSize(current_page) + len,
-			maxPageSize, maxPageLimitSize))
+		if (!ensureBufferCapacity(current_page, len, pageSizeLimit))
 		{
 			return ENCODE_OUTOF_PAGE;
 		}
 		Timestamp val = DatumGetTimestamp(data);
 
-                /* exceedsPageSizeLimit may change the address of 
-                   current_page->values_buffer. */
-                dst_ptr = current_page->values_buffer + 
-                          current_page->header->uncompressed_page_size;
+		dst_ptr = current_page->values_buffer + 
+				  current_page->header->uncompressed_page_size;
 
 		memcpy(dst_ptr, &val, len);
 		return len;
@@ -1192,17 +1304,14 @@ encodePlain(Datum data,
 	case HAWQ_TYPE_TIMESTAMPTZ:
 	{
 		len = 8;
-		if (exceedsPageSizeLimit(current_page, approximatePageSize(current_page) + len,
-			maxPageSize, maxPageLimitSize))
+		if (!ensureBufferCapacity(current_page, len, pageSizeLimit))
 		{
 			return ENCODE_OUTOF_PAGE;
 		}
 		TimestampTz val = DatumGetTimestampTz(data);
 
-                /* exceedsPageSizeLimit may change the address of 
-                   current_page->values_buffer. */
-                dst_ptr = current_page->values_buffer + 
-                          current_page->header->uncompressed_page_size;
+		dst_ptr = current_page->values_buffer + 
+				  current_page->header->uncompressed_page_size;
 
 		memcpy(dst_ptr, &val, len);
 		return len;
@@ -1210,17 +1319,14 @@ encodePlain(Datum data,
 	case HAWQ_TYPE_FLOAT8:
 	{
 		len = 8;
-		if (exceedsPageSizeLimit(current_page, approximatePageSize(current_page) + len,
-			maxPageSize, maxPageLimitSize))
+		if (!ensureBufferCapacity(current_page, len, pageSizeLimit))
 		{
 			return ENCODE_OUTOF_PAGE;
 		}
 		float8 val = DatumGetFloat8(data);
 
-                /* exceedsPageSizeLimit may change the address of 
-                   current_page->values_buffer. */
-                dst_ptr = current_page->values_buffer + 
-                          current_page->header->uncompressed_page_size;
+		dst_ptr = current_page->values_buffer + 
+				  current_page->header->uncompressed_page_size;
 
 		memcpy(dst_ptr, &val, len);
 		return len;
@@ -1234,16 +1340,13 @@ encodePlain(Datum data,
 		int data_size = NAMEDATALEN;
 		NameData *name = DatumGetName(data);
 		len = 4 + data_size;
-		if (exceedsPageSizeLimit(current_page, approximatePageSize(current_page) + len,
-			maxPageSize, maxPageLimitSize))
+		if (!ensureBufferCapacity(current_page, len, pageSizeLimit))
 		{
 			return ENCODE_OUTOF_PAGE;
 		}
 
-                /* exceedsPageSizeLimit may change the address of 
-                   current_page->values_buffer. */
-                dst_ptr = current_page->values_buffer + 
-                          current_page->header->uncompressed_page_size;
+		dst_ptr = current_page->values_buffer + 
+				  current_page->header->uncompressed_page_size;
 
 		memcpy(dst_ptr, &(/*htole32(*/data_size/*)*/), 4);
 		dst_ptr += 4;
@@ -1259,16 +1362,13 @@ encodePlain(Datum data,
 		int data_size = sizeof(TimeTzADT);
 		TimeTzADT *timetz = DatumGetTimeTzADTP(data);
 		len = 4 + data_size;
-		if (exceedsPageSizeLimit(current_page, approximatePageSize(current_page) + len,
-			maxPageSize, maxPageLimitSize))
+		if (!ensureBufferCapacity(current_page, len, pageSizeLimit))
 		{
 			return ENCODE_OUTOF_PAGE;
 		}
 
-                /* exceedsPageSizeLimit may change the address of 
-                   current_page->values_buffer. */
-                dst_ptr = current_page->values_buffer + 
-                          current_page->header->uncompressed_page_size;
+		dst_ptr = current_page->values_buffer + 
+				  current_page->header->uncompressed_page_size;
 
 		memcpy(dst_ptr, &(/*htole32(*/data_size/*)*/), 4);
 		dst_ptr += 4;
@@ -1280,16 +1380,13 @@ encodePlain(Datum data,
 		int data_size = sizeof(Interval);
 		Interval *interval = DatumGetIntervalP(data);
 		len = 4 + data_size;
-		if (exceedsPageSizeLimit(current_page, approximatePageSize(current_page) + len,
-			maxPageSize, maxPageLimitSize))
+		if (!ensureBufferCapacity(current_page, len, pageSizeLimit))
 		{
 			return ENCODE_OUTOF_PAGE;
 		}
 
-                /* exceedsPageSizeLimit may change the address of 
-                   current_page->values_buffer. */
-                dst_ptr = current_page->values_buffer + 
-                          current_page->header->uncompressed_page_size;
+		dst_ptr = current_page->values_buffer + 
+				  current_page->header->uncompressed_page_size;
 
 		memcpy(dst_ptr, &(/*htole32(*/data_size/*)*/), 4);
 		dst_ptr += 4;
@@ -1301,16 +1398,13 @@ encodePlain(Datum data,
 		int data_size = 6;
 		macaddr *mac = DatumGetMacaddrP(data);
 		len = 4 + data_size;
-		if (exceedsPageSizeLimit(current_page, approximatePageSize(current_page) + len,
-			maxPageSize, maxPageLimitSize))
+		if (!ensureBufferCapacity(current_page, len, pageSizeLimit))
 		{
 			return ENCODE_OUTOF_PAGE;
 		}
 
-                /* exceedsPageSizeLimit may change the address of 
-                   current_page->values_buffer. */
-                dst_ptr = current_page->values_buffer + 
-                          current_page->header->uncompressed_page_size;
+		dst_ptr = current_page->values_buffer + 
+				  current_page->header->uncompressed_page_size;
 
 		memcpy(dst_ptr, &(/*htole32(*/data_size/*)*/), 4);
 		dst_ptr += 4;
@@ -1361,20 +1455,17 @@ encodePlain(Datum data,
 		int puredataSize = VARSIZE_ANY_EXHDR(varlen);
 		len = puredataSize + 4;
 
-		if (len > maxPageLimitSize)
+		if (len > pageSizeLimit)
 		{
 			return ENCODE_INVALID_VALUE;
 		}
-		if (exceedsPageSizeLimit(current_page, approximatePageSize(current_page) + len,
-			maxPageSize, maxPageLimitSize))
+		if (!ensureBufferCapacity(current_page, len, pageSizeLimit))
 		{
 			return ENCODE_OUTOF_PAGE;
 		}
 
-                /* exceedsPageSizeLimit may change the address of 
-                   current_page->values_buffer. */
-                dst_ptr = current_page->values_buffer + 
-                          current_page->header->uncompressed_page_size;
+		dst_ptr = current_page->values_buffer + 
+				  current_page->header->uncompressed_page_size;
 
 		memcpy(dst_ptr, &(/*htole32(*/puredataSize/*)*/), 4);
 		dst_ptr += 4;
@@ -1394,20 +1485,17 @@ encodePlain(Datum data,
 		int dataSize = VARSIZE_ANY(varlen);
 		len = dataSize + sizeof(int32);
 
-		if (len > maxPageLimitSize)
+		if (len > pageSizeLimit)
 		{
 			return ENCODE_INVALID_VALUE;
 		}
-		if (exceedsPageSizeLimit(current_page, approximatePageSize(current_page) + len,
-			maxPageSize, maxPageLimitSize))
+		if (!ensureBufferCapacity(current_page, len, pageSizeLimit))
 		{
 			return ENCODE_OUTOF_PAGE;
 		}
 
-                /* exceedsPageSizeLimit may change the address of 
-                   current_page->values_buffer. */
-                dst_ptr = current_page->values_buffer + 
-                          current_page->header->uncompressed_page_size;
+		dst_ptr = current_page->values_buffer + 
+				  current_page->header->uncompressed_page_size;
 
 		memcpy(dst_ptr, &(/*htole32(*/dataSize/*)*/), sizeof(int32));
 		dst_ptr += sizeof(int32);
@@ -1420,26 +1508,37 @@ encodePlain(Datum data,
 	}
 }
 
-/**
- * Judge whether current_page size exceeds Limitation
+
+/*
+ * Ensure page's values_buffer is large enough to contain the new value.
  *
- * If the current page size doesn't exceed maxPageSize, return false;
- * If exceed maxPageSize but not exceeds maxPageLimitSize, repalloc
- * current_page->values_buffer;
- * Otherwise, return true
+ * Return false if adding the value will make the page exceeds `pageSizeLimit`.
+ * Return true otherwise.
  */
-static bool exceedsPageSizeLimit(ParquetDataPage current_page,
-		int currentPageSize, int maxPageSize, int maxPageLimitSize)
+static bool ensureBufferCapacity(ParquetDataPage page,
+								 int newValueSize, int pageSizeLimit)
 {
-	Assert(maxPageSize <= maxPageLimitSize);
+	if ((approximatePageSize(page) + newValueSize) > pageSizeLimit)
+		return false;
 
-	if (currentPageSize >= maxPageLimitSize)
-		return true;
+	/* the lower bound size for values_buffer to contain the new value */
+	int buffer_lowerbound = page->header->uncompressed_page_size + newValueSize;
 
-	if (currentPageSize > maxPageSize)
-		current_page->values_buffer = repalloc(current_page->values_buffer, maxPageLimitSize);
+	Assert(buffer_lowerbound <= pageSizeLimit);
 
-	return false;
+	/* make sure buffer_lowerbound <= values_buffer_capacity <= pageSizeLimit */
+	if (buffer_lowerbound > page->values_buffer_capacity)
+	{
+		page->values_buffer_capacity = buffer_lowerbound > page->values_buffer_capacity * 2
+											? buffer_lowerbound
+											: page->values_buffer_capacity * 2;
+
+		if (page->values_buffer_capacity > pageSizeLimit)
+			page->values_buffer_capacity = pageSizeLimit;
+
+		page->values_buffer = repalloc(page->values_buffer, page->values_buffer_capacity);
+	}
+	return true;
 }
 
 /**
@@ -1562,22 +1661,12 @@ encodeCurrentPage(ParquetColumnChunk chunk)
 		case SNAPPY:
 		{
 			size_t compressedLen = snappy_max_compressed_length(header->uncompressed_page_size);
-
-			if (compressedLen > chunk->compressedMaxLen)
-			{
-				chunk->compressedMaxLen = compressedLen;
-				chunk->compressed = repalloc(chunk->compressed, chunk->compressedMaxLen);
-			}
+			current_page->data = (uint8_t *) palloc(compressedLen);
 
 			if (snappy_compress(buf.data, header->uncompressed_page_size,
-								chunk->compressed, &compressedLen) == SNAPPY_OK)
+								(char *)current_page->data, &compressedLen) == SNAPPY_OK)
 			{
-				/* we don't need uncompressed data any more, reuse buf.data to store
-				 * final compressed content */
-				buf.data = repalloc(buf.data, compressedLen);
-				memcpy(buf.data, chunk->compressed, compressedLen);
-
-				current_page->data = (uint8_t *) buf.data;
+				pfree(buf.data);
 				header->compressed_page_size = compressedLen;
 			}
 			else
@@ -1609,8 +1698,11 @@ encodeCurrentPage(ParquetColumnChunk chunk)
 						 errmsg("zlib deflateInit2 failed: %s", stream.msg)));
 			}
 
-			Bytef *out = (Bytef *) chunk->compressed;
-			int outlen = chunk->compressedMaxLen;
+			size_t compressedLen = header->uncompressed_page_size;
+			current_page->data = (uint8_t *) palloc(compressedLen);
+
+			Bytef *out = (Bytef *) current_page->data;
+			int outlen = compressedLen;
 			
 			/* process until all inputs have been compressed */
 			do
@@ -1621,12 +1713,13 @@ encodeCurrentPage(ParquetColumnChunk chunk)
 				ret = deflate(&stream, Z_FINISH);
 				if (ret == Z_STREAM_END)
 					break;
-				if (ret == Z_OK)	/* out buffer is not big enough */
+				if (ret == Z_OK)
 				{
-					chunk->compressedMaxLen += 4096;
-					chunk->compressed = repalloc(chunk->compressed, chunk->compressedMaxLen);
-					out += outlen;
+					/* out buffer is not big enough, extend 4096 byte at a time */
 					outlen = 4096;
+					current_page->data = repalloc(current_page->data, compressedLen + outlen);
+					out = current_page->data + compressedLen;
+					compressedLen += outlen;
 				}
 				else
 				{
@@ -1638,16 +1731,11 @@ encodeCurrentPage(ParquetColumnChunk chunk)
 
 			} while (1);
 
-			outlen = stream.total_out;
-
+			compressedLen = stream.total_out;
 			deflateEnd(&stream);
 
-			/* copy the final compressed data */
-			buf.data = repalloc(buf.data, outlen);
-			memcpy(buf.data, chunk->compressed, outlen);
-			
-			current_page->data = (uint8_t *) buf.data;
-			header->compressed_page_size = outlen;
+			pfree(buf.data);
+			header->compressed_page_size = compressedLen;
 			break;
 		}
 		case LZO:
@@ -1726,7 +1814,22 @@ addDataPage(ParquetColumnChunk chunk)
 	}
 	else
 	{
-		chunk->currentPage->values_buffer = palloc0(chunk->maxPageSize);
+		int max_buffer_size = chunk->pageSizeLimit;
+		int min_buffer_size = 512;
+		if (chunk->estimateChunkSizeRemained > max_buffer_size)
+		{
+			chunk->currentPage->values_buffer_capacity = max_buffer_size;
+			chunk->estimateChunkSizeRemained -= max_buffer_size;
+		}
+		else if (chunk->estimateChunkSizeRemained < min_buffer_size)
+		{
+			chunk->currentPage->values_buffer_capacity = min_buffer_size;
+		}
+		else
+		{
+			chunk->currentPage->values_buffer_capacity = chunk->estimateChunkSizeRemained;
+		}
+		chunk->currentPage->values_buffer = palloc0(chunk->currentPage->values_buffer_capacity);
 	}
 
 	chunk->pageNumber++;
@@ -1743,7 +1846,7 @@ appendParquetColumnNull(ParquetColumnChunk columnChunk)
 	}
 
 	/* If page size exceeds limit, finalize current data page and add a new one*/
-	if (approximatePageSize(columnChunk->currentPage) >= columnChunk->maxPageSize)
+	if (approximatePageSize(columnChunk->currentPage) >= columnChunk->pageSizeLimit)
 	{
 		bytes_added += finalizeCurrentAndNewPage(columnChunk);
 	}
@@ -1807,15 +1910,14 @@ appendParquetColumnValue(ParquetColumnChunk chunk,
 	encoded_len = encodePlain(value,
 							  chunk->currentPage,
 							  chunk->columnChunkMetadata->hawqTypeId,
-							  chunk->maxPageSize,
-							  chunk->maxPageLimitSize);
+							  chunk->pageSizeLimit);
 
 	if (encoded_len == ENCODE_INVALID_VALUE)
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
 				 errmsg("value for column \"%s\" exceeds pagesize %d!",
-						chunk->columnChunkMetadata->colName, chunk->maxPageLimitSize)));
+						chunk->columnChunkMetadata->colName, chunk->pageSizeLimit)));
 	}
 
 	if (encoded_len == ENCODE_OUTOF_PAGE)
@@ -1824,8 +1926,7 @@ appendParquetColumnValue(ParquetColumnChunk chunk,
 		encoded_len = encodePlain(value,
 								  chunk->currentPage,
 								  chunk->columnChunkMetadata->hawqTypeId,
-								  chunk->maxPageSize,
-								  chunk->maxPageLimitSize);
+								  chunk->pageSizeLimit);
 
 	}
 

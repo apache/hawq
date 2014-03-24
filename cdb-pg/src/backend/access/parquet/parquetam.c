@@ -584,6 +584,7 @@ Oid parquet_insert_values(ParquetInsertDesc parquetInsertDesc,
 	if (parquetInsertDesc->current_rowGroup == NULL)	/* TODO maybe create in insert_init phase */
 	{
 		parquetInsertDesc->current_rowGroup = addRowGroup(parquetInsertDesc->parquetMetadata,
+														  parquetInsertDesc->parquet_rel->rd_att,
 														  parquetInsertDesc->aoEntry,
 														  parquetInsertDesc->parquet_file);
 	}
@@ -598,6 +599,7 @@ Oid parquet_insert_values(ParquetInsertDesc parquetInsertDesc,
 					  &parquetInsertDesc->fileLen_uncompressed);
 
 		rowgroup = addRowGroup(parquetInsertDesc->parquetMetadata,
+							   parquetInsertDesc->parquet_rel->rd_att,
 							   parquetInsertDesc->aoEntry,
 							   parquetInsertDesc->parquet_file);
 		parquetInsertDesc->current_rowGroup = rowgroup;
@@ -677,6 +679,7 @@ void freeParquetInsertDesc(ParquetInsertDesc parquetInsertDesc) {
 		pfree(parquetInsertDesc->parquetMetadata->pfield[i].name);
 	}
 	pfree(parquetInsertDesc->parquetMetadata->pfield);
+	pfree(parquetInsertDesc->parquetMetadata->estimateChunkSizes);
 	pfree(parquetInsertDesc->parquetMetadata);
 }
 
