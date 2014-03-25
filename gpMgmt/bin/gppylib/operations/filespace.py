@@ -1041,6 +1041,10 @@ class MoveFileSpaceLocation(Operation):
                 logger.error("Target location's scheme: \"%s\" does not match file system requirement", targetScheme)
                 return None
             
+            #remove last slash
+            if self.location[-1] is '/':
+                self.location = self.location[:-1]
+                
             queries = []
             #generate sql for pg_filespace_entry
             for dbid in targetDbids:
@@ -1062,12 +1066,18 @@ class MoveFileSpaceLocation(Operation):
             #generate sql for gp_persistent_filespace
             for row in rows:
                 uri = '%s/%s%d' % (self.location, self.prefix, row[0])
+                
+                paddinglen = len(row[1])
+                if len(uri) > paddinglen:
+                    logger.error('target location "%s" is too long' % self.location)
+                    return None
+                
                 queries.append('''
                         UPDATE gp_persistent_filespace_node 
                         SET location_1 = '%s' 
                         WHERE filespace_oid = %d 
                         AND contentid = %d;
-                        ''' %(uri.ljust(len(row[1])), self.fsoid, row[0]))
+                        ''' %(uri.ljust(paddinglen), self.fsoid, row[0]))
             
             return queries
         
