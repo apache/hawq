@@ -734,7 +734,7 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
 				if (plannedstmt->intoClause != NULL)
 				{
 					prepareDispatchedCatalogSingleRelation(plannedstmt->contextdisp,
-							plannedstmt->intoClause->oidInfo.relOid, TRUE, 1);
+							plannedstmt->intoClause->oidInfo.relOid, TRUE, RESERVED_SEGNO);
 				}
 
 				if (plannedstmt->rtable)
@@ -4207,18 +4207,9 @@ CreateIntoRel(QueryDesc *queryDesc)
 									   intoClause->options);
 
 	/*
-	 * create segment 1 for insert.
+	 * create segment 0 for insert.
 	 */
-	CreateAppendOnlyParquetSegFileForRelationOnMaster(intoRelationDesc, 1);
-
-	/**
-	 * lock segment files
-	 */
-	/*
-	 * currently, we disable vacuum, do not lock since lock table is too small.
-	 */
-	/*if (Gp_role == GP_ROLE_DISPATCH)
-		LockSegfilesOnMaster(intoRelationDesc, 1);*/
+	CreateAppendOnlyParquetSegFileForRelationOnMaster(intoRelationDesc, RESERVED_SEGNO);
 
 	intoClause->oidInfo.relOid = intoRelationId;
 	estate->es_into_relation_descriptor = intoRelationDesc;
@@ -4291,83 +4282,6 @@ CloseIntoRel(QueryDesc *queryDesc)
 		if (!(RelationIsAoRows(rel) || RelationIsAoCols(rel)  || RelationIsParquet(rel)))
 		{
 			Insist(!"gpsql does not support heap table, use append only table instead");
-			/*
-			int32 numOfBlocks;
-
-
-			 * If we skipped using WAL, and it's not a temp relation, we must
-			 * force the relation down to disk before it's safe to commit the
-			 * transaction.  This requires forcing out any dirty buffers and
-			 * then doing a forced fsync.
-
-			if (estate->es_into_relation_is_bulkload &&
-				!rel->rd_istemp)
-			{
-				FlushRelationBuffers(rel);
-				 FlushRelationBuffers will have opened rd_smgr 
-				smgrimmedsync(rel->rd_smgr);
-			}
-
-			if (PersistentStore_IsZeroTid(&estate->es_into_relation_last_heap_tid))
-				numOfBlocks = 0;
-			else
-				numOfBlocks = ItemPointerGetBlockNumber(&estate->es_into_relation_last_heap_tid) + 1;
-
-			if (estate->es_into_relation_is_bulkload)
-			{
-				bool mirrorDataLossOccurred;
-
-
-				 * We may have to catch-up the mirror since bulk loading of data is
-				 * ignored by resynchronize.
-
-				while (true)
-				{
-					bool bulkLoadFinished;
-
-					bulkLoadFinished =
-						MirroredBufferPool_EvaluateBulkLoadFinish(
-									estate->es_into_relation_bulkloadinfo);
-
-					if (bulkLoadFinished)
-					{
-
-						 * The flush was successful to the mirror (or the mirror is
-						 * not configured).
-						 *
-						 * We have done a state-change from 'Bulk Load Create Pending'
-						 * to 'Create Pending'.
-
-						break;
-					}
-
-
-					 * Copy primary data to mirror and flush.
-
-					MirroredBufferPool_CopyToMirror(
-							&estate->es_into_relation_bulkloadinfo->relFileNode,
-							estate->es_into_relation_descriptor->rd_rel->relname.data,
-							&estate->es_into_relation_bulkloadinfo->persistentTid,
-							estate->es_into_relation_bulkloadinfo->persistentSerialNum,
-							estate->es_into_relation_bulkloadinfo->mirrorDataLossTrackingState,
-							estate->es_into_relation_bulkloadinfo->mirrorDataLossTrackingSessionNum,
-							numOfBlocks,
-							&mirrorDataLossOccurred);
-				}
-			}
-			else
-			{
-				if (Debug_persistent_print)
-				{
-					elog(Persistent_DebugPrintLevel(),
-						 "CloseIntoRel %u/%u/%u: did not bypass the WAL -- did not use bulk load, persistent serial num " INT64_FORMAT ", TID %s",
-						 estate->es_into_relation_bulkloadinfo->relFileNode.spcNode,
-						 estate->es_into_relation_bulkloadinfo->relFileNode.dbNode,
-						 estate->es_into_relation_bulkloadinfo->relFileNode.relNode,
-						 estate->es_into_relation_bulkloadinfo->persistentSerialNum,
-						 ItemPointerToString(&estate->es_into_relation_bulkloadinfo->persistentTid));
-				}
-			}*/
 		}
 
 		/* close rel, but keep lock until commit */
@@ -4435,8 +4349,7 @@ intorel_receive(TupleTableSlot *slot, DestReceiver *self)
 		AOTupleId	aoTupleId;
 
 		if (myState->ao_insertDesc == NULL)
-			myState->ao_insertDesc = appendonly_insert_init(into_rel,
-															1);
+			myState->ao_insertDesc = appendonly_insert_init(into_rel, RESERVED_SEGNO);
 
 		appendonly_insert(myState->ao_insertDesc, tuple, &tupleOid, &aoTupleId);
 		pfree(tuple);
@@ -4444,14 +4357,14 @@ intorel_receive(TupleTableSlot *slot, DestReceiver *self)
 	else if (RelationIsAoCols(into_rel))
 	{
 		if(myState->aocs_ins == NULL)
-			myState->aocs_ins = aocs_insert_init(into_rel, 1);
+			myState->aocs_ins = aocs_insert_init(into_rel, RESERVED_SEGNO);
 
 		aocs_insert(myState->aocs_ins, slot);
 	}
 	else if(RelationIsParquet(into_rel)){
 
 		if(myState->parquet_insertDesc == NULL){
-			myState->parquet_insertDesc = parquet_insert_init(into_rel,1);
+			myState->parquet_insertDesc = parquet_insert_init(into_rel,RESERVED_SEGNO);
 		}
 
 		parquet_insert(myState->parquet_insertDesc, slot);

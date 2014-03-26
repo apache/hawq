@@ -6524,13 +6524,6 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 		if (newrel)
 		{
 			CreateAppendOnlyParquetSegFileForRelationOnMaster(newrel, RESERVED_SEGNO);
-			/*
-			 * lock segment files on master
-			 */
-			/*
-			 * currently, we disable vacuum, do not lock since lock table is too small.
-			 */
-			/*LockSegfilesOnMaster(newrel, RESERVED_SEGNO);*/
 		}
 
 		/* prepare for the metadata dispatch */
@@ -16952,15 +16945,6 @@ ATPExecPartSplit(Relation rel,
 		CreateAppendOnlyParquetSegFileForRelationOnMaster(intoa, RESERVED_SEGNO);
 
 		CreateAppendOnlyParquetSegFileForRelationOnMaster(intob, RESERVED_SEGNO);
-
-		/*
-		 * lock segment files on master
-		 */
-		/*
-		 * currently, we disable vacuum, do not lock since lock table is too small.
-		 */
-		/*LockSegfilesOnMaster(intoa, RESERVED_SEGNO);
-		LockSegfilesOnMaster(intob, RESERVED_SEGNO);*/
 
 		/* prepare for the metadata dispatch */	
 		contextdisp = CreateQueryContextInfo();
