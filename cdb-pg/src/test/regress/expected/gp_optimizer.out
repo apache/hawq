@@ -5,7 +5,7 @@
 SELECT gp_opt_version();
                            gp_opt_version
 --------------------------------------------------------------------
- GPOPT version: 1.381, GPOS version: 1.98, Xerces version: 3.1.1-p1
+ GPOPT version: 1.382, GPOS version: 1.98, Xerces version: 3.1.1-p1
 (1 row)
 
 -- master only tables
@@ -8479,6 +8479,28 @@ select count(*) from (select gp_segment_id,ctid,tableoid from orca.p1 group by g
  count 
 -------
     14
+
+-- Arrayref
+drop table if exists orca.arrtest;
+NOTICE:  table "arrtest" does not exist, skipping
+create table orca.arrtest (
+ a int2[],
+ b int4[][][],
+ c name[],
+ d text[][]
+ ) DISTRIBUTED RANDOMLY;
+insert into orca.arrtest (a[1:5], b[1:1][1:2][1:2], c, d)
+values ('{1,2,3,4,5}', '{{{0,0},{1,2}}}', '{}', '{}');
+select a[1:3], b[1][2][1], c[1], d[1][1] FROM orca.arrtest order by 1,2,3,4;
+    a    | b | c | d 
+---------+---+---+---
+ {1,2,3} | 1 |   | 
+(1 row)
+
+select a[b[1][2][2]] from orca.arrtest;
+ a 
+---
+ 2
 (1 row)
 
 -- clean up

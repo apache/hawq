@@ -345,6 +345,7 @@ CTranslatorScalarToDXL::PdxlnScOpFromExpr
 		{T_SubPlan, &CTranslatorScalarToDXL::PdxlnSubPlanFromSubPlan},
 		{T_SubLink, &CTranslatorScalarToDXL::PdxlnFromSublink},
 		{T_ArrayExpr, &CTranslatorScalarToDXL::PdxlnArray},
+		{T_ArrayRef, &CTranslatorScalarToDXL::PdxlnArrayRef},
 	};
 
 	const ULONG ulTranslators = GPOS_ARRAY_SIZE(rgTranslators);
@@ -1860,10 +1861,89 @@ CTranslatorScalarToDXL::PdxlnArray
 
 //---------------------------------------------------------------------------
 //	@function:
+//		CTranslatorScalarToDXL::PdxlnArrayRef
+//
+//	@doc:
+//		Translate arrayref
+//
+//---------------------------------------------------------------------------
+CDXLNode *
+CTranslatorScalarToDXL::PdxlnArrayRef
+	(
+	const Expr *pexpr,
+	const CMappingVarColId* pmapvarcolid
+	)
+	const
+{
+	GPOS_ASSERT(IsA(pexpr, ArrayRef));
+
+	const ArrayRef *parrayref = (ArrayRef *) pexpr;
+
+	CDXLScalarArrayRef *pdxlop =
+			New(m_pmp) CDXLScalarArrayRef
+						(
+						m_pmp,
+						New(m_pmp) CMDIdGPDB(parrayref->refelemtype),
+						New(m_pmp) CMDIdGPDB(parrayref->refarraytype),
+						New(m_pmp) CMDIdGPDB(parrayref->refrestype)
+						);
+
+	CDXLNode *pdxln = New(m_pmp) CDXLNode(m_pmp, pdxlop);
+
+	// add children
+	AddArrayIndexList(pdxln, parrayref->reflowerindexpr, CDXLScalarArrayRefIndexList::EilbLower, pmapvarcolid);
+	AddArrayIndexList(pdxln, parrayref->refupperindexpr, CDXLScalarArrayRefIndexList::EilbUpper, pmapvarcolid);
+
+	pdxln->AddChild(PdxlnScOpFromExpr(parrayref->refexpr, pmapvarcolid));
+
+	if (NULL != parrayref->refassgnexpr)
+	{
+		pdxln->AddChild(PdxlnScOpFromExpr(parrayref->refassgnexpr, pmapvarcolid));
+	}
+
+	return pdxln;
+}
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorScalarToDXL::AddArrayIndexList
+//
+//	@doc:
+//		Add an indexlist to the given DXL arrayref node
+//
+//---------------------------------------------------------------------------
+void
+CTranslatorScalarToDXL::AddArrayIndexList
+	(
+	CDXLNode *pdxln,
+	List *plist,
+	CDXLScalarArrayRefIndexList::EIndexListBound eilb,
+	const CMappingVarColId* pmapvarcolid
+	)
+	const
+{
+	GPOS_ASSERT(NULL != pdxln);
+	GPOS_ASSERT(EdxlopScalarArrayRef == pdxln->Pdxlop()->Edxlop());
+	GPOS_ASSERT(CDXLScalarArrayRefIndexList::EilbSentinel > eilb);
+
+	CDXLNode *pdxlnIndexList =
+			New(m_pmp) CDXLNode
+					(
+					m_pmp,
+					New(m_pmp) CDXLScalarArrayRefIndexList(m_pmp, eilb)
+					);
+
+	TranslateScalarChildren(pdxlnIndexList, plist, pmapvarcolid);
+	pdxln->AddChild(pdxlnIndexList);
+}
+
+//---------------------------------------------------------------------------
+//	@function:
 //		CTranslatorScalarToDXL::PstrOpName
 //
 //	@doc:
 //		Get the operator name
+//
 //---------------------------------------------------------------------------
 const CWStringConst *
 CTranslatorScalarToDXL::PstrOpName

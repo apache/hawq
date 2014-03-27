@@ -345,6 +345,20 @@ namespace gpdxl
 			// translate an array expression
 			CDXLNode *PdxlnArray(const Expr *pexpr, const CMappingVarColId* pmapvarcolid) const;
 
+			// translate an arrayref expression
+			CDXLNode *PdxlnArrayRef(const Expr *pexpr, const CMappingVarColId* pmapvarcolid) const;
+
+			// add an indexlist to the given DXL arrayref node
+			void AddArrayIndexList
+				(
+				CDXLNode *pdxln,
+				List *plist,
+				CDXLScalarArrayRefIndexList::EIndexListBound eilb,
+				const CMappingVarColId* pmapvarcolid
+				)
+				const;
+
+			// get the operator name
 			const CWStringConst *PstrOpName(IMDId *pmdid) const;
 
 			// translate the window frame edge, if the column used in the edge is a

@@ -661,5 +661,21 @@ create table orca.p1(a int) partition by range(a)(partition pp1 start(1) end(10)
 insert into orca.p1 select * from generate_series(2,15);
 select count(*) from (select gp_segment_id,ctid,tableoid from orca.p1 group by gp_segment_id,ctid,tableoid) as foo;
 
+-- Arrayref
+drop table if exists orca.arrtest;
+create table orca.arrtest (
+ a int2[],
+ b int4[][][],
+ c name[],
+ d text[][]
+ ) DISTRIBUTED RANDOMLY;
+
+insert into orca.arrtest (a[1:5], b[1:1][1:2][1:2], c, d)
+values ('{1,2,3,4,5}', '{{{0,0},{1,2}}}', '{}', '{}');
+
+select a[1:3], b[1][2][1], c[1], d[1][1] FROM orca.arrtest order by 1,2,3,4;
+
+select a[b[1][2][2]] from orca.arrtest;
+
 -- clean up
 drop schema orca cascade;

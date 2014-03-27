@@ -28,6 +28,7 @@
 #include "gpos/base.h"
 #include "dxl/operators/CDXLNode.h"
 #include "dxl/operators/CDXLDatum.h"
+#include "dxl/operators/CDXLScalarArrayRefIndexList.h"
 
 // fwd declarations
 namespace gpopt
@@ -266,6 +267,21 @@ namespace gpdxl
 			Expr *PexprArray
 				(
 				const CDXLNode *pdxlnArray,
+				CMappingColIdVar *pmapcidvar
+				);
+
+			// translate an arrayref expression
+			Expr *PexprArrayRef
+				(
+				const CDXLNode *pdxlnArrayref,
+				CMappingColIdVar *pmapcidvar
+				);
+
+			// translate an arrayref index list
+			List *PlTranslateArrayRefIndexList
+				(
+				const CDXLNode *pdxlnIndexlist,
+				CDXLScalarArrayRefIndexList::EIndexListBound eilb,
 				CMappingColIdVar *pmapcidvar
 				);
 

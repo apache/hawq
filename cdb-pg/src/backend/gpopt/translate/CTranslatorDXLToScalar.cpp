@@ -115,6 +115,7 @@ CTranslatorDXLToScalar::PexprFromDXLNodeScalar
 		{EdxlopScalarSubqueryAny, &CTranslatorDXLToScalar::PexprFromDXLNodeSubqueryAnyAll},
 		{EdxlopScalarSubqueryAll, &CTranslatorDXLToScalar::PexprFromDXLNodeSubqueryAnyAll},
 		{EdxlopScalarArray, &CTranslatorDXLToScalar::PexprArray},
+		{EdxlopScalarArrayRef, &CTranslatorDXLToScalar::PexprArrayRef},
 		{EdxlopScalarDMLAction, &CTranslatorDXLToScalar::PexprDMLAction},
 	};
 
@@ -1676,6 +1677,74 @@ CTranslatorDXLToScalar::PexprArray
 	pexpr->elements = PlistTranslateScalarChildren(pexpr->elements, pdxlnArray, pmapcidvar);
 
 	return (Expr *) pexpr;
+}
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorDXLToScalar::PexprArrayRef
+//
+//	@doc:
+//		Translates a DXL scalar arrayref into a GPDB ArrayRef node
+//
+//---------------------------------------------------------------------------
+Expr *
+CTranslatorDXLToScalar::PexprArrayRef
+	(
+	const CDXLNode *pdxlnArrayref,
+	CMappingColIdVar *pmapcidvar
+	)
+{
+	GPOS_ASSERT(NULL != pdxlnArrayref);
+	CDXLScalarArrayRef *pdxlop = CDXLScalarArrayRef::PdxlopConvert(pdxlnArrayref->Pdxlop());
+
+	ArrayRef *parrayref = MakeNode(ArrayRef);
+	parrayref->refarraytype = CMDIdGPDB::PmdidConvert(pdxlop->PmdidArray())->OidObjectId();
+	parrayref->refelemtype = CMDIdGPDB::PmdidConvert(pdxlop->PmdidElem())->OidObjectId();
+	parrayref->refrestype = CMDIdGPDB::PmdidConvert(pdxlop->PmdidReturn())->OidObjectId();
+
+	const ULONG ulArity = pdxlnArrayref->UlArity();
+	GPOS_ASSERT(3 == ulArity || 4 == ulArity);
+
+	parrayref->reflowerindexpr = PlTranslateArrayRefIndexList((*pdxlnArrayref)[0], CDXLScalarArrayRefIndexList::EilbLower, pmapcidvar);
+	parrayref->refupperindexpr = PlTranslateArrayRefIndexList((*pdxlnArrayref)[1], CDXLScalarArrayRefIndexList::EilbUpper, pmapcidvar);
+
+	parrayref->refexpr = PexprFromDXLNodeScalar((*pdxlnArrayref)[2], pmapcidvar);
+	parrayref->refassgnexpr = NULL;
+	if (4 == ulArity)
+	{
+		parrayref->refassgnexpr = PexprFromDXLNodeScalar((*pdxlnArrayref)[3], pmapcidvar);
+	}
+
+	return (Expr *) parrayref;
+}
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTranslatorDXLToScalar::PlTranslateArrayRefIndexList
+//
+//	@doc:
+//		Translates a DXL arrayref index list
+//
+//---------------------------------------------------------------------------
+List *
+CTranslatorDXLToScalar::PlTranslateArrayRefIndexList
+	(
+	const CDXLNode *pdxlnIndexlist,
+	CDXLScalarArrayRefIndexList::EIndexListBound
+#ifdef GPOS_DEBUG
+	eilb
+#endif //GPOS_DEBUG
+	,
+	CMappingColIdVar *pmapcidvar
+	)
+{
+	GPOS_ASSERT(NULL != pdxlnIndexlist);
+	GPOS_ASSERT(eilb == CDXLScalarArrayRefIndexList::PdxlopConvert(pdxlnIndexlist->Pdxlop())->Eilb());
+
+	List *plChildren = NIL;
+	plChildren = PlistTranslateScalarChildren(plChildren, pdxlnIndexlist, pmapcidvar);
+
+	return plChildren;
 }
 
 //---------------------------------------------------------------------------
