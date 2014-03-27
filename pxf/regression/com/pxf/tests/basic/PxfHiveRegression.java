@@ -11,6 +11,7 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.postgresql.util.PSQLException;
 
+import com.pivotal.pxfauto.infra.cluster.Cluster;
 import com.pivotal.pxfauto.infra.hive.Hive;
 import com.pivotal.pxfauto.infra.structures.tables.basic.Table;
 import com.pivotal.pxfauto.infra.structures.tables.hive.HiveExternalTable;
@@ -537,10 +538,7 @@ public class PxfHiveRegression extends PxfTestCase {
 		ComparisonUtils.compareTables(hiveTable, hawqExternalTable, report);
 	}
 
-	private void assertUseIsDeprecated(String classname, SQLWarning warning)
-	{
-		Assert.assertEquals("Use of " + classname + 
-							" is deprecated and it will be removed on the next major version",
-							warning.getMessage());
+	private void assertUseIsDeprecated(String classname, SQLWarning warning) {
+		Assert.assertEquals("Use of " + classname + " is deprecated and it will be removed on the next major version", warning.getMessage());
 	}
 }

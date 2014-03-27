@@ -35,7 +35,7 @@ import com.pxf.tests.testcases.PxfTestCase;
 public class PxfHdfsRegression extends PxfTestCase {
 
 	ReadableExternalTable exTable;
-	
+
 	/**
 	 * General Table creation Validations with Fragmenter, Accessor and Resolver
 	 * 
@@ -75,8 +75,8 @@ public class PxfHdfsRegression extends PxfTestCase {
 	}
 
 	/**
-	 * Create Table with no Fragmenter, Accessor and Resolver. Should fail and
-	 * throw the right message.
+	 * Create Table with no Fragmenter, Accessor and Resolver. Should fail and throw the right
+	 * message.
 	 * 
 	 * @throws Exception
 	 */
@@ -177,9 +177,8 @@ public class PxfHdfsRegression extends PxfTestCase {
 	}
 
 	/**
-	 * Use "com.pivotal.pxf.plugins.hdfs.fragmenters.HdfsDataFragmenter" +
-	 * "LineReaderAccessor" + "StringPassResolver" and TEXT delimiter for
-	 * parsing CSV file.
+	 * Use "com.pivotal.pxf.plugins.hdfs.fragmenters.HdfsDataFragmenter" + "LineReaderAccessor" +
+	 * "StringPassResolver" and TEXT delimiter for parsing CSV file.
 	 * 
 	 * @throws Exception
 	 */
@@ -246,8 +245,8 @@ public class PxfHdfsRegression extends PxfTestCase {
 	}
 
 	/**
-	 * Use "com.pivotal.pxf.plugins.hdfs.fragmenters.HdfsDataFragmenter" +
-	 * "LineReaderAccessor" + "StringPassResolver" along with Format("CSV")
+	 * Use "com.pivotal.pxf.plugins.hdfs.fragmenters.HdfsDataFragmenter" + "LineReaderAccessor" +
+	 * "StringPassResolver" along with Format("CSV")
 	 * 
 	 * @throws Exception
 	 */
@@ -298,8 +297,8 @@ public class PxfHdfsRegression extends PxfTestCase {
 	}
 
 	/**
-	 * Test TEXT format on a file with many fields with deprecated ACCESSOR
-	 * TextFileAccessor and deprecated RESOLVER TextResolver
+	 * Test TEXT format on a file with many fields with deprecated ACCESSOR TextFileAccessor and
+	 * deprecated RESOLVER TextResolver
 	 * 
 	 * @throws Exception
 	 */
@@ -351,8 +350,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 	}
 
 	/**
-	 * Test TEXT format on a file with many fields with deprecated ACCESSOR
-	 * LineReaderAccessor
+	 * Test TEXT format on a file with many fields with deprecated ACCESSOR LineReaderAccessor
 	 * 
 	 * @throws Exception
 	 */
@@ -843,7 +841,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"tmp1  timestamp",
 				"num1  integer", }, (hdfsWorkingFolder + "/multiblock.tbl"), "TEXT");
 
-		exTable.setHostname("badhostname");
+		exTable.setHost("badhostname");
 		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
 		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.LineBreakAccessor");
 		exTable.setResolver("com.pivotal.pxf.plugins.hdfs.StringPassResolver");
@@ -854,7 +852,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 		try {
 			hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY num1");
 		} catch (PSQLException e) {
-			ExceptionUtils.validate(report, e, new PSQLException("Couldn't resolve host '" + exTable.getHostname() + "'", null), true);
+			ExceptionUtils.validate(report, e, new PSQLException("Couldn't resolve host '" + exTable.getHost() + "'", null), true);
 		}
 	}
 
@@ -887,7 +885,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 			 * Different Curel versions can provide different ERROR messages.
 			 */
 			String[] possibleErrMessages = {
-					"Failed connect to " + exTable.getHostname() + ":" + exTable.getPort() + "; Connection refused",
+					"Failed connect to " + exTable.getHost() + ":" + exTable.getPort() + "; Connection refused",
 					"couldn't connect to host" };
 
 			ExceptionUtils.validate(report, e, new PSQLException(possibleErrMessages[0] + "|" + possibleErrMessages[1], null), true);
@@ -1039,7 +1037,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 		 * Different Curl versions can provide different ERROR messages.
 		 */
 		String[] possibleErrMessages = {
-				"Failed connect to " + exTable.getHostname() + ":" + exTable.getPort() + "; Connection refused",
+				"Failed connect to " + exTable.getHost() + ":" + exTable.getPort() + "; Connection refused",
 				"couldn't connect to host" };
 
 		hawq.runQueryWithExpectedWarning("ANALYZE " + exTable.getName(), possibleErrMessages[0] + "|" + possibleErrMessages[1], true);
@@ -1123,9 +1121,9 @@ public class PxfHdfsRegression extends PxfTestCase {
 	}
 
 	/**
-	 * Verify that filter pushdown is working, and we send a filter to PXF In
-	 * this test we check that a query condition (WHERE ...) is serialized and
-	 * passe correctly to PXF, by reading the debug logs of HAWQ.
+	 * Verify that filter pushdown is working, and we send a filter to PXF In this test we check
+	 * that a query condition (WHERE ...) is serialized and passe correctly to PXF, by reading the
+	 * debug logs of HAWQ.
 	 * 
 	 * The filter serialization is done using RPN, see more details in
 	 * {@link com.pivotal.pxf.filtering.FilterParser} header.
@@ -1188,31 +1186,27 @@ public class PxfHdfsRegression extends PxfTestCase {
 			hawq.closePsql(sso);
 		}
 	}
-	
+
 	/**
-	 * Test mapreduce.input.fileinputformat.input.dir.recursive parameter
-	 * is working in PXF when set to true.
-	 * The test runs a query on a table with directory name in its location, 
-	 * and should successfully find all files in the nested directories.
+	 * Test mapreduce.input.fileinputformat.input.dir.recursive parameter is working in PXF when set
+	 * to true. The test runs a query on a table with directory name in its location, and should
+	 * successfully find all files in the nested directories.
 	 * 
 	 * @throws Exception
 	 */
 	@Test
 	public void recursiveDirs() throws Exception {
-		
+
 		final String recursiveParam = "mapreduce.input.fileinputformat.input.dir.recursive";
 		String baseDir = hdfsWorkingFolder + "/recursive";
-		String[] fields = new String[] {
-				"lyrics text",
-				"line text",
-		};
+		String[] fields = new String[] { "lyrics text", "line text", };
 		String delim = ":";
-		
+
 		ReportUtils.report(report, getClass(), recursiveParam + " is TRUE, query should be successful");
-		
+
 		// build environment and prepare data:
 		Table dataTable = prepareRecursiveDirsData(baseDir, delim);
-	
+
 		exTable = TableFactory.getPxfReadableTextTable("recursive_dirs", fields, baseDir, delim);
 		hawq.createTableAndVerify(exTable);
 		String sqlQuery = "SELECT * FROM " + exTable.getName() + " ORDER BY line";
@@ -1221,121 +1215,126 @@ public class PxfHdfsRegression extends PxfTestCase {
 	}
 
 	/**
-	 * Test error table option: LOG ERRORS INTO <err_table> SEGMENT REJECT LIMIT <number_of_errors> 
-	 * When reading data from external table, errors in formatting are stored 
-	 * in an error table until the limit of allowed errors is reached. 
+	 * Test error table option: LOG ERRORS INTO <err_table> SEGMENT REJECT LIMIT <number_of_errors>
+	 * When reading data from external table, errors in formatting are stored in an error table
+	 * until the limit of allowed errors is reached.
 	 * 
-	 * The test covers a case when the number of errors is lower than limit
-	 * and a case when the errors breach the limit. It also tests the cleanup
-	 * of segwork and metadata information in the filename parameter 
-	 * (the pxf URI) in the error table (GPSQL-1708).
+	 * The test covers a case when the number of errors is lower than limit and a case when the
+	 * errors breach the limit. It also tests the cleanup of segwork and metadata information in the
+	 * filename parameter (the pxf URI) in the error table (GPSQL-1708).
 	 * 
 	 * @throws Exception
 	 */
 	@Test
 	public void errorTables() throws Exception {
-		
-		String[] fields = new String[] {
-			"num int",
-			"words text"
-		};
-		
+
+		String[] fields = new String[] { "num int", "words text" };
+
 		String dataPath = hdfsWorkingFolder + "/dataWithErr.txt";
-		
+
 		Table dataTable = new Table("dataTable", null);
-		
-		dataTable.addRow(new String[] {"All Together Now", "The Beatles"});
-		dataTable.addRow(new String[] {"1", "one"});
-		dataTable.addRow(new String[] {"2", "two"});
-		dataTable.addRow(new String[] {"3", "three"});
-		dataTable.addRow(new String[] {"4", "four"});
-		dataTable.addRow(new String[] {"can", "I"});
-		dataTable.addRow(new String[] {"have", "a"});
-		dataTable.addRow(new String[] {"little", "more"});
-		dataTable.addRow(new String[] {"5", "five"});
-		dataTable.addRow(new String[] {"6", "six"});
-		dataTable.addRow(new String[] {"7", "seven"});
-		dataTable.addRow(new String[] {"8", "eight"});
-		dataTable.addRow(new String[] {"9", "nine"});
-		dataTable.addRow(new String[] {"10", "ten - I love you!"});
-		
+
+		dataTable.addRow(new String[] { "All Together Now", "The Beatles" });
+		dataTable.addRow(new String[] { "1", "one" });
+		dataTable.addRow(new String[] { "2", "two" });
+		dataTable.addRow(new String[] { "3", "three" });
+		dataTable.addRow(new String[] { "4", "four" });
+		dataTable.addRow(new String[] { "can", "I" });
+		dataTable.addRow(new String[] { "have", "a" });
+		dataTable.addRow(new String[] { "little", "more" });
+		dataTable.addRow(new String[] { "5", "five" });
+		dataTable.addRow(new String[] { "6", "six" });
+		dataTable.addRow(new String[] { "7", "seven" });
+		dataTable.addRow(new String[] { "8", "eight" });
+		dataTable.addRow(new String[] { "9", "nine" });
+		dataTable.addRow(new String[] { "10", "ten - I love you!" });
+
 		hdfs.writeTextFile(dataPath, dataTable.getData(), ",");
-		
-		ErrorTable errorTable = new ErrorTable("err_table"); 
-		hawq.runQueryWithExpectedWarning(errorTable.constructDropStmt(true), 
-				"(drop cascades to external table err_table_test|" +
-				"table \"" + errorTable.getName() + "\" does not exist, skipping)", 
-				true, true);
-		
+
+		ErrorTable errorTable = new ErrorTable("err_table");
+		hawq.runQueryWithExpectedWarning(errorTable.constructDropStmt(true), "(drop cascades to external table err_table_test|" + "table \"" + errorTable.getName() + "\" does not exist, skipping)", true, true);
+
 		exTable = TableFactory.getPxfReadableTextTable("err_table_test", fields, dataPath, ",");
 		exTable.setErrorTable(errorTable.getName());
 		exTable.setSegmentRejectLimit(10);
-		
+
 		ReportUtils.startLevel(report, getClass(), "Drop and create table, expect error table notice");
 		hawq.dropTable(exTable, false);
-		hawq.runQueryWithExpectedWarning(exTable.constructCreateStmt(), 
-				"Error table \"" + errorTable.getName() + "\" does not exist. " +
-				"Auto generating an error table with the same name", 
-				true, true);
-		
+		hawq.runQueryWithExpectedWarning(exTable.constructCreateStmt(), "Error table \"" + errorTable.getName() + "\" does not exist. " + "Auto generating an error table with the same name", true, true);
+
 		Assert.assertTrue(hawq.checkTableExists(exTable));
 		ReportUtils.stopLevel(report);
-		
+
 		hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY num ASC");
-		
-		hawq.verifyWarning("Found 4 data formatting errors \\(4 or more input rows\\). " +
-				"Rejected related input data.", true, false);
-		
+
+		hawq.verifyWarning("Found 4 data formatting errors \\(4 or more input rows\\). " + "Rejected related input data.", true, false);
+
 		// remove erroneous rows
 		ReportUtils.report(report, getClass(), "Remove erroneous rows from dataTable");
 		List<List<String>> data = dataTable.getData();
 		ListIterator<List<String>> iter = data.listIterator();
-		while(iter.hasNext()){
+		while (iter.hasNext()) {
 			List<String> element = iter.next();
 			if (!StringUtils.isNumeric(element.get(0))) {
-					iter.remove();
+				iter.remove();
 			}
 		}
 		dataTable.setData(data);
-				
+
 		ComparisonUtils.compareTables(exTable, dataTable, report);
 
-		hawq.queryResults(errorTable, 
-				"SELECT relname, filename, linenum, errmsg, rawdata FROM " + 
-						errorTable.getName() + " ORDER BY cmdtime ASC");
-		
-		//Temporary workaround for lack of public getLocationUri() method
-		//Opened GPSQL-1798 under PXF Test Automation to clean this up.
+		hawq.queryResults(errorTable, "SELECT relname, filename, linenum, errmsg, rawdata FROM " + errorTable.getName() + " ORDER BY cmdtime ASC");
+
+		// Temporary workaround for lack of public getLocationUri() method
+		// Opened GPSQL-1798 under PXF Test Automation to clean this up.
 		String createStmt = exTable.constructCreateStmt();
 		String locationUri = createStmt.substring(createStmt.indexOf("pxf://"), createStmt.indexOf("')"));
-			
+
 		Table errData = new Table("errData", null);
-		errData.addRow(new String[] {exTable.getName(), locationUri, "1", "invalid input syntax for integer: \"All Together Now\", column num", "All Together Now,The Beatles"});
-		errData.addRow(new String[] {exTable.getName(), locationUri, "6", "invalid input syntax for integer: \"can\", column num", "can,I"});
-		errData.addRow(new String[] {exTable.getName(), locationUri, "7", "invalid input syntax for integer: \"have\", column num", "have,a"});
-		errData.addRow(new String[] {exTable.getName(), locationUri, "8", "invalid input syntax for integer: \"little\", column num", "little,more"});
-		
+		errData.addRow(new String[] {
+				exTable.getName(),
+				locationUri,
+				"1",
+				"invalid input syntax for integer: \"All Together Now\", column num",
+				"All Together Now,The Beatles" });
+		errData.addRow(new String[] {
+				exTable.getName(),
+				locationUri,
+				"6",
+				"invalid input syntax for integer: \"can\", column num",
+				"can,I" });
+		errData.addRow(new String[] {
+				exTable.getName(),
+				locationUri,
+				"7",
+				"invalid input syntax for integer: \"have\", column num",
+				"have,a" });
+		errData.addRow(new String[] {
+				exTable.getName(),
+				locationUri,
+				"8",
+				"invalid input syntax for integer: \"little\", column num",
+				"little,more" });
+
 		ComparisonUtils.compareTables(errorTable, errData, report);
-		
+
 		ReportUtils.startLevel(report, getClass(), "table with too many errors");
 		exTable.setSegmentRejectLimit(3);
 		hawq.createTableAndVerify(exTable);
-		
+
 		try {
 			hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY num ASC");
 		} catch (PSQLException e) {
-			PSQLException expected = new PSQLException("Segment reject limit reached. Aborting operation. " +
-					"Last error was: invalid input syntax for integer: \"have\", column num", null);
+			PSQLException expected = new PSQLException("Segment reject limit reached. Aborting operation. " + "Last error was: invalid input syntax for integer: \"have\", column num", null);
 			ExceptionUtils.validate(report, e, expected, true);
 		}
-		
+
 		ReportUtils.stopLevel(report);
 	}
 
 	/**
-	 * Verify pg_remote_credentials exists and created with the expected
-	 * structure
-	 *
+	 * Verify pg_remote_credentials exists and created with the expected structure
+	 * 
 	 * @throws Exception
 	 */
 	@Test
@@ -1352,13 +1351,13 @@ public class PxfHdfsRegression extends PxfTestCase {
 		ComparisonUtils.compareTablesMetadata(expected, results);
 		ComparisonUtils.compareTables(results, expected, report);
 	}
-	
+
 	/**
-	 * Verify pg_remote_logins exists, created with the expected
-	 * structure and does not print any passwords
-	 *
+	 * Verify pg_remote_logins exists, created with the expected structure and does not print any
+	 * passwords
+	 * 
 	 * pg_remote_logins is a view ontop pg_remote_credentials.
-	 *
+	 * 
 	 * @throws Exception
 	 */
 	@Test
@@ -1387,10 +1386,10 @@ public class PxfHdfsRegression extends PxfTestCase {
 		hawq.runQuery("DELETE FROM pg_remote_credentials WHERE rcowner = 10;");
 		hawq.runQuery("SET allow_system_table_mods = 'NONE';");
 	}
-	
+
 	/**
 	 * Verify pg_remote_credentials has the correct ACLs
-	 *
+	 * 
 	 * @throws Exception
 	 */
 	@Test
@@ -1404,8 +1403,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 		Table expected = new Table("expected", null);
 		expected.addColumnHeader("relacl");
 		expected.addColDataType(Types.ARRAY);
-		expected.addRow(new String[] {"{" + System.getProperty("user.name") + 
-									  "=arwdxt/" + System.getProperty("user.name") + "}"});
+		expected.addRow(new String[] { "{" + System.getProperty("user.name") + "=arwdxt/" + System.getProperty("user.name") + "}" });
 
 		ComparisonUtils.compareTablesMetadata(expected, results);
 		ComparisonUtils.compareTables(results, expected, report);
@@ -1419,57 +1417,49 @@ public class PxfHdfsRegression extends PxfTestCase {
 	@Test
 	public void negativeHaNameserviceNotExist() throws Exception {
 		String unknownNameservicePath = "text_data.csv";
-		
+
 		exTable = TableFactory.getPxfReadableTextTable("hatable", new String[] {
-			"s1 text",
-			"s2 text",
-			"s3 text",
-			"d1 timestamp",
-			"n1 int",
-			"n2 int",
-			"n3 int",
-			"n4 int",
-			"n5 int",
-			"n6 int",
-			"n7 int",
-			"s11 text",
-			"s12 text",
-			"s13 text",
-			"d11 timestamp",
-			"n11 int",
-			"n12 int",
-			"n13 int",
-			"n14 int",
-			"n15 int",
-			"n16 int",
-			"n17 int" }, (unknownNameservicePath), ",");
-		
-		exTable.setHostname("phdcluster");
+				"s1 text",
+				"s2 text",
+				"s3 text",
+				"d1 timestamp",
+				"n1 int",
+				"n2 int",
+				"n3 int",
+				"n4 int",
+				"n5 int",
+				"n6 int",
+				"n7 int",
+				"s11 text",
+				"s12 text",
+				"s13 text",
+				"d11 timestamp",
+				"n11 int",
+				"n12 int",
+				"n13 int",
+				"n14 int",
+				"n15 int",
+				"n16 int",
+				"n17 int" }, (unknownNameservicePath), ",");
+
+		exTable.setHost("phdcluster");
 		exTable.setPort(null);
-				
+
 		try {
 			hawq.createTableAndVerify(exTable);
 		} catch (Exception e) {
 			ExceptionUtils.validate(report, e, new PSQLException("ERROR: nameservice phdcluster not found in client configuration. No HA namenodes provided", null), false);
 		}
-	}		
-	
+	}
+
 	private Table prepareRecursiveDirsData(String baseDir, String delim) throws Exception {
-		
+
 		Table fileTable = new Table("file", null);
 		Table dataTable = new Table("dataTable", null);
-		
+
 		/*
-		 * - recursive/
-		 *  	 -level1leaf1/
-		 * 					 file1
-		 *  	 -level1leaf2/
-		 *   				 -level2leaf1/
-		 *  							  file2
-		 * 								  file3
-		 *   				  	 		 -level3/
-		 * 						    	   		 file4
-		 *   				 -level2leaf2/
+		 * - recursive/ -level1leaf1/ file1 -level1leaf2/ -level2leaf1/ file2 file3 -level3/ file4
+		 * -level2leaf2/
 		 */
 		hdfs.createDirectory(baseDir);
 		hdfs.createDirectory(baseDir + "/level1leaf1");
@@ -1477,33 +1467,32 @@ public class PxfHdfsRegression extends PxfTestCase {
 		hdfs.createDirectory(baseDir + "/level1leaf2/level2leaf1");
 		hdfs.createDirectory(baseDir + "/level1leaf2/level2leaf1/level3");
 		hdfs.createDirectory(baseDir + "/level1leaf2/level2leaf2");
-		
-		
-		fileTable.addRow(new String[] {"When the truth is found to be lies", "line1" });
-		fileTable.addRow(new String[] {"And all the joy within you dies", "line2" });
+
+		fileTable.addRow(new String[] { "When the truth is found to be lies", "line1" });
+		fileTable.addRow(new String[] { "And all the joy within you dies", "line2" });
 		hdfs.writeTextFile(baseDir + "/level1leaf1/file1", fileTable.getData(), delim);
 		dataTable.appendRows(fileTable);
 		fileTable.setData(null);
 
-		fileTable.addRow(new String[] {"Don't you want somebody to love, don't you", "line3" });
-		fileTable.addRow(new String[] {"Need somebody to love, wouldn't you", "line4" });
+		fileTable.addRow(new String[] { "Don't you want somebody to love, don't you", "line3" });
+		fileTable.addRow(new String[] { "Need somebody to love, wouldn't you", "line4" });
 		hdfs.writeTextFile(baseDir + "/level1leaf2/level2leaf1/file2", fileTable.getData(), delim);
 		dataTable.appendRows(fileTable);
 		fileTable.setData(null);
-		
-		fileTable.addRow(new String[] {"Love somebody to love, you better", "line5" });
+
+		fileTable.addRow(new String[] { "Love somebody to love, you better", "line5" });
 		hdfs.writeTextFile(baseDir + "/level1leaf2/level2leaf1/file3", fileTable.getData(), delim);
 		dataTable.appendRows(fileTable);
 		fileTable.setData(null);
-		
-		fileTable.addRow(new String[] {"Find somebody to love", "line6" });
+
+		fileTable.addRow(new String[] { "Find somebody to love", "line6" });
 		hdfs.writeTextFile(baseDir + "/level1leaf2/level2leaf1/level3/file4", fileTable.getData(), delim);
 		dataTable.appendRows(fileTable);
 		fileTable.setData(null);
-		
+
 		return dataTable;
 	}
-	
+
 	private void verifyFilterPushdown(ShellSystemObject sso, String queryFilter, String serializedFilter, int rows)
 			throws Exception {
 
@@ -1654,10 +1643,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 		}
 	}
 
-	private void assertUseIsDeprecated(String classname, SQLWarning warning)
-	{
-		Assert.assertEquals("Use of " + classname + 
-							" is deprecated and it will be removed on the next major version",
-							warning.getMessage());
+	private void assertUseIsDeprecated(String classname, SQLWarning warning) {
+		Assert.assertEquals("Use of " + classname + " is deprecated and it will be removed on the next major version", warning.getMessage());
 	}
 }

@@ -43,5 +43,6 @@
 		<GPDATA></GPDATA>
 		<MASTER_DATA_DIRECTORY></MASTER_DATA_DIRECTORY>
 		<PGPORT></PGPORT>
+		<PGHOST></PGHOST>
 	</shellsystemobject>
 </sut>

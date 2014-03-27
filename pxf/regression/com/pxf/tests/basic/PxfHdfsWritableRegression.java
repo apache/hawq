@@ -109,8 +109,7 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 	}
 
 	/**
-	 * Create writable table with no accessor and resolver. Should fail and
-	 * throw the right message.
+	 * Create writable table with no accessor and resolver. Should fail and throw the right message.
 	 * 
 	 * @throws Exception
 	 */
@@ -129,8 +128,7 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 	}
 
 	/**
-	 * Create writable table with no parameters. Should fail and throw the right
-	 * message.
+	 * Create writable table with no parameters. Should fail and throw the right message.
 	 * 
 	 * @throws Exception
 	 */
@@ -151,8 +149,8 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 	}
 
 	/**
-	 * Create writable table, insert data to it, check that data is written to
-	 * HDFS, then read it with Readable Table.
+	 * Create writable table, insert data to it, check that data is written to HDFS, then read it
+	 * with Readable Table.
 	 * 
 	 * @throws Exception
 	 */
@@ -257,8 +255,8 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 	}
 
 	/**
-	 * Create writable table with Gzip codec, insert data to it using copy, then
-	 * read it from HDFS using Readable Table.
+	 * Create writable table with Gzip codec, insert data to it using copy, then read it from HDFS
+	 * using Readable Table.
 	 * 
 	 * @throws Exception
 	 */
@@ -288,8 +286,8 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 	}
 
 	/**
-	 * Create writable table with Default codec, insert data to it, then read it
-	 * from HDFS using Readable Table.
+	 * Create writable table with Default codec, insert data to it, then read it from HDFS using
+	 * Readable Table.
 	 * 
 	 * @throws Exception
 	 */
@@ -316,8 +314,8 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 	}
 
 	/**
-	 * Create writable table with BZip2 codec, insert data to it using copy,
-	 * than read it from HDFS using Readable Table.
+	 * Create writable table with BZip2 codec, insert data to it using copy, than read it from HDFS
+	 * using Readable Table.
 	 * 
 	 * @throws Exception
 	 */
@@ -358,15 +356,13 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 	public void sequence() throws Exception {
 
 		String schema = "CustomWritable";
-		String[] codecs = new String[] {
-				null,
-				/**
-				 * Gzip is not supported in Mac and RHEL 5 [JIRA:GPSQL-1179]
-				 * 
-				 * "org.apache.hadoop.io.compress.GzipCodec",
-				 **/
-				"org.apache.hadoop.io.compress.DefaultCodec",
-				"org.apache.hadoop.io.compress.BZip2Codec" };
+		String[] codecs = new String[] { null,
+		/**
+		 * Gzip is not supported in Mac and RHEL 5 [JIRA:GPSQL-1179]
+		 * 
+		 * "org.apache.hadoop.io.compress.GzipCodec",
+		 **/
+		"org.apache.hadoop.io.compress.DefaultCodec", "org.apache.hadoop.io.compress.BZip2Codec" };
 		String[][] userParams = new String[][] {
 				null,
 				{ "COMPRESSION_TYPE=RECORD" },
@@ -409,9 +405,7 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 	 */
 	@Test
 	public void negativeWrongPort() throws Exception {
-		weTable = new WritableExternalTable("wr_wrong_port", new String[] {
-				"t1 text",
-				"a1 integer" }, hdfsWorkingFolder + "/writable/err", "TEXT");
+		weTable = new WritableExternalTable("wr_wrong_port", new String[] { "t1 text", "a1 integer" }, hdfsWorkingFolder + "/writable/err", "TEXT");
 		weTable.setDelimiter(",");
 		weTable.setAccessor("TextFileWAccessor");
 		weTable.setResolver("TextWResolver");
@@ -427,7 +421,7 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 		try {
 			hawq.insertData(dataTable, weTable);
 		} catch (PSQLException e) {
-			ExceptionUtils.validate(report, e, new PSQLException("ERROR: remote component error \\(0\\): " + "(Failed connect to " + weTable.getHostname() + ":12345; Connection refused|couldn't connect to host).*?", null), true);
+			ExceptionUtils.validate(report, e, new PSQLException("ERROR: remote component error \\(0\\): " + "(Failed connect to " + weTable.getHost() + ":12345; Connection refused|couldn't connect to host).*?", null), true);
 		}
 	}
 
@@ -438,13 +432,11 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 	 */
 	@Test
 	public void negativeBadHost() throws Exception {
-		weTable = new WritableExternalTable("wr_host_err", new String[] {
-				"t1 text",
-				"a1 integer" }, hdfsWorkingFolder + "/writable/err", "TEXT");
+		weTable = new WritableExternalTable("wr_host_err", new String[] { "t1 text", "a1 integer" }, hdfsWorkingFolder + "/writable/err", "TEXT");
 		weTable.setDelimiter(",");
 		weTable.setAccessor("TextFileWAccessor");
 		weTable.setResolver("TextWResolver");
-		weTable.setHostname("badhostname");
+		weTable.setHost("badhostname");
 
 		hawq.createTableAndVerify(weTable);
 
@@ -510,9 +502,7 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 	@Test
 	public void negativeCharType() throws Exception {
 
-		weTable = new WritableExternalTable("wr_host_err", new String[] {
-				"a1 integer",
-				"c1 char" }, hdfsWorkingFolder + "/writable/err", "CUSTOM");
+		weTable = new WritableExternalTable("wr_host_err", new String[] { "a1 integer", "c1 char" }, hdfsWorkingFolder + "/writable/err", "CUSTOM");
 		weTable.setAccessor("com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor");
 		weTable.setResolver("com.pivotal.pxf.plugins.hdfs.WritableResolver");
 		weTable.setDataSchema("CustomWritableWithChar");
@@ -601,10 +591,7 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 	@Test
 	public void csv() throws Exception {
 
-		String[] fields = new String[] {
-				"number int",
-				"name text",
-				"position char" };
+		String[] fields = new String[] { "number int", "name text", "position char" };
 		String hdfsDir = hdfsWorkingFolder + "/writable/csv";
 
 		weTable = new WritableExternalTable("writable_csv", fields, hdfsDir, "CSV");
@@ -641,10 +628,7 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 	 */
 	@Test
 	public void threadSafe() throws Exception {
-		String[] fields = new String[] {
-				"number int",
-				"name text",
-				"position char" };
+		String[] fields = new String[] { "number int", "name text", "position char" };
 		String hdfsDir = hdfsWorkingFolder + "/writable/threadsafe";
 
 		weTable = new WritableExternalTable("writable_threadsafe", fields, hdfsDir, "CSV");
@@ -724,8 +708,8 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 	}
 
 	/**
-	 * Test recordkey for sequence file - recordkey of type int One row will
-	 * fail - it has a text value
+	 * Test recordkey for sequence file - recordkey of type int One row will fail - it has a text
+	 * value
 	 * 
 	 * @throws Exception
 	 */
@@ -794,8 +778,7 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 		hawq.runQuery("SET pxf_enable_stat_collection = " + newState + ";");
 	}
 
-	private void analyzeAndVerifyDefaultValues(String tableName)
-			throws Exception {
+	private void analyzeAndVerifyDefaultValues(String tableName) throws Exception {
 		ReportUtils.startLevel(report, getClass(), "verify analyze on " + tableName + " table results in default values");
 
 		hawq.runQuery("ANALYZE " + tableName);
@@ -820,8 +803,7 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 		hdfs.removeDirectory(hdfsDir);
 	}
 
-	private void createReadableAndCompare(String[] fields, Table dataTable)
-			throws Exception {
+	private void createReadableAndCompare(String[] fields, Table dataTable) throws Exception {
 
 		ReadableExternalTable readableTable = TableFactory.getPxfReadableTextTable("readgzip", fields, hdfsDir, ",");
 
@@ -833,13 +815,12 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 	}
 
 	/**
-	 * create data file based on CustomWritable schema. data is written from
-	 * sudoDataTable and to path file.
+	 * create data file based on CustomWritable schema. data is written from sudoDataTable and to
+	 * path file.
 	 * 
 	 * @param sudoDataTable
 	 * @param path
-	 * @param recordkey
-	 *            add recordkey data to the beginning of each row
+	 * @param recordkey add recordkey data to the beginning of each row
 	 * @throws IOException
 	 */
 	private void createCustomWritableDataFile(Table sudoDataTable, File path, boolean recordkey)
@@ -896,8 +877,7 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 		try {
 			hawq.createTableAndVerify(writableTable);
 			Assert.fail("A SQLWarning should have been thrown");
-		} catch (SQLWarning warnings)
-		{
+		} catch (SQLWarning warnings) {
 			SQLWarning warning = warnings;
 			assertUseIsDeprecated("LineBreakAccessor", warning);
 			warning = warning.getNextWarning();
@@ -946,10 +926,8 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 		ComparisonUtils.compareTables(readableTable, sudoTable, report);
 	}
 
-	private void assertUseIsDeprecated(String classname, SQLWarning warning)
-	{
-		String message = "Use of " + classname + 
-						 " is deprecated and it will be removed on the next major version";
+	private void assertUseIsDeprecated(String classname, SQLWarning warning) {
+		String message = "Use of " + classname + " is deprecated and it will be removed on the next major version";
 		Assert.assertTrue(warning.getMessage().contains(message));
 	}
 }

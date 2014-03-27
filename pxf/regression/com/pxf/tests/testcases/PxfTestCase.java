@@ -11,10 +11,11 @@ import org.junit.Before;
 import com.pivotal.pxfauto.infra.hawq.Hawq;
 import com.pivotal.pxfauto.infra.hdfs.Hdfs;
 import com.pivotal.pxfauto.infra.utils.jsystem.report.ReportUtils;
+import com.pxf.tests.fixtures.BasicFixture;
 
 /**
- * All test cases that related to PXF will extends from this Test Case class.
- * Already includes HAWQ and HDFS system objects loaded and ready to use.
+ * All test cases that related to PXF will extends from this Test Case class. Already includes HAWQ
+ * and HDFS system objects loaded and ready to use.
  */
 public class PxfTestCase extends SystemTestCase4 {
 	protected Hawq hawq;
