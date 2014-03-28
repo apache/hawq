@@ -24,6 +24,8 @@
 #include "gpopt/relcache/CMDProviderRelcache.h"
 #include "gpopt/config/CConfigParamMapping.h"
 #include "gpopt/translate/CStateDXLToQuery.h"
+#include "gpopt/translate/CTranslatorDXLToExpr.h"
+#include "gpopt/translate/CTranslatorExprToDXL.h"
 #include "gpopt/translate/CTranslatorUtils.h"
 #include "gpopt/translate/CTranslatorQueryToDXL.h"
 #include "gpopt/translate/CTranslatorPlStmtToDXL.h"
@@ -849,6 +851,9 @@ COptTasks::PvOptimizeTask
 			CTranslatorQueryToDXL trquerytodxl(pmp, &mda, &idgtorColId, &idgtorCTE, pmapvarcolid, (Query*) poctx->m_pquery, 0 /* ulQueryLevel */);
 			COptimizerConfig *pocconf = PoconfCreate(pmp);
 			ICostModel *pcm = New(pmp) CCostModelGPDB(pmp, ulSegmentsForCosting);
+			CConstExprEvaluatorProxy ceevalproxy(pmp, &mda);
+			// the optimizer will use the default evaluator
+			IConstExprEvaluator *pceeval = NULL;
 
 			// preload metadata if optimizer uses multiple threads
 			if (optimizer_parallel)
@@ -856,7 +861,7 @@ COptTasks::PvOptimizeTask
 				// install opt context in TLS
 				pcm->AddRef();
 				pocconf->AddRef();
-				CAutoOptCtxt aoc(pmp, &mda, pcm, pocconf);
+				CAutoOptCtxt aoc(pmp, &mda, pcm, pceeval, pocconf);
 				CTranslatorUtils::PreloadMD(pmp, &mda, sysidDefault, (Query*) poctx->m_pquery);
 			}
 
@@ -873,6 +878,7 @@ COptTasks::PvOptimizeTask
 									pdrgpdxlnQueryOutput,
 									pdrgpdxlnCTE,
 									pcm,
+									pceeval,
 									ulSegments,
 									gp_session_id,
 									gp_command_count,
@@ -1290,7 +1296,7 @@ COptTasks::PvDXLFromRelStatsTask
 	CMDProviderRelcache *pmdpr = New(pmp) CMDProviderRelcache(pmp);
 	CAutoMDAccessor amda(pmp, pmdpr, sysidDefault);
 	ICostModel *pcm = New(pmp) CCostModelGPDB(pmp, gpdb::UlSegmentCountGP());
-	CAutoOptCtxt aoc(pmp, amda.Pmda(), pcm, NULL /* poconf */);
+	CAutoOptCtxt aoc(pmp, amda.Pmda(), pcm, NULL /*pceeval*/, NULL /*poconf*/);
 
 	DrgPimdobj *pdrgpmdobj = New(pmp) DrgPimdobj(pmp);
 

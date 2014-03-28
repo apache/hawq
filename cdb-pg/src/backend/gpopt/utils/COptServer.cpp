@@ -382,7 +382,14 @@ COptServer::PvOptimize
 			CSerializableMDAccessor serMDA(amda.Pmda());
 
 			// install opt context in TLS
-			CAutoOptCtxt aoc(pmp, amda.Pmda(), New(pmp) CCostModelGPDB(pmp, ulSegments), NULL /* COptimizerConfig */);
+			CAutoOptCtxt aoc
+			  (
+			   pmp,
+			   amda.Pmda(),
+			   New(pmp) CCostModelGPDB(pmp, ulSegments),
+			   NULL /*pceeval*/,
+			   NULL /*poconf*/
+			  );
 
 			// build query context from requested query
 			CQueryContext *pqc = PqcRecvQuery(pmp, pcomm, amda.Pmda());

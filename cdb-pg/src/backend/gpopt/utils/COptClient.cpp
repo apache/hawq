@@ -160,7 +160,14 @@ COptClient::PplstmtOptimize()
 				// scope for optimization context
 				{
 					// install opt context in TLS
-					CAutoOptCtxt aoc(m_pmp, amda.Pmda(), NULL /* CCostParams */, NULL /* COptimizerConfig */);
+					CAutoOptCtxt aoc
+					  (
+					   m_pmp,
+					   amda.Pmda(),
+					   NULL, /* CCostParams */
+					   NULL, /* IConstExprEvaluator */
+					   NULL /* COptimizerConfig */
+					  );
 
 					// send request to client
 					SendRequest(amda.Pmda());
