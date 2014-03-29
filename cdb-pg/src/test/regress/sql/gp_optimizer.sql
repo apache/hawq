@@ -677,5 +677,8 @@ select a[1:3], b[1][2][1], c[1], d[1][1] FROM orca.arrtest order by 1,2,3,4;
 
 select a[b[1][2][2]] from orca.arrtest;
 
+-- MPP-20713, MPP-20714, MPP-20738: Const table get with a filter
+select 1 as x where 1 in (2, 3);
+
 -- clean up
 drop schema orca cascade;
