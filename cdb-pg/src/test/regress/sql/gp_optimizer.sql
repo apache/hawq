@@ -653,5 +653,8 @@ insert into mpp22791 values (1, 1), (2, 2), (3, 3);
 select * from mpp22791 where b > 1; 
 select * from mpp22791 where b <= 3;
 
+-- MPP-20713, MPP-20714, MPP-20738: Const table get with a filter
+select 1 as x where 1 in (2, 3);
+
 -- clean up
 drop schema orca cascade;
