@@ -1016,6 +1016,7 @@ primaryMirrorModeShmemInit(void)
 		pmModuleState->tempFilespacePath[i][0] = '\0';
 		pmModuleState->tempFilespacePathHasError[i] = false;
 	}
+	/* Will be changed in primaryMirrorPopulateFilespaceInfo(). */
     pmModuleState->isUsingDefaultFilespaceForTempFiles = 1;
 
     pmModuleState->txnFilespacePath[0] = '\0';
@@ -1024,6 +1025,13 @@ primaryMirrorModeShmemInit(void)
     pmModuleState->isUsingDefaultFilespaceForTxnFiles = 1;
 
     primaryMirrorPopulateFilespaceInfo();
+	/* Set each segment temp dir allocation seed to different values. */
+	if (!pmModuleState->isUsingDefaultFilespaceForTempFiles &&
+		pmModuleState->numOfFilespacePath > 0 &&
+		GpIdentity.segindex != MASTER_CONTENT_ID)
+	{
+		pmModuleState->lastAllocateIdx = GpIdentity.segindex % pmModuleState->numOfFilespacePath;
+	}
 
 	clearTransitionArgs(&pmModuleState->requestedTransition);
 
