@@ -27,7 +27,7 @@
 
 
 	<property name="src.dir" value="${basedir}/regression" />
-	<property name="build.dir" value="${basedir}/build" />
+	<property name="build.dir" value="${basedir}/build-regression" />
 	<property name="lib.dir" value="${build.dir}/regression-lib" />
 	<property name="dist.dir" value="${build.dir}/regression" />
 	<property name="test.dir" value="${basedir}/regression/com/pxf/tests/basic" />
@@ -93,6 +93,8 @@
 	<!-- Compilation -->
 	<target name="compile" depends="ivy-retrieve">
 		<mkdir dir="${build.dir}/regression/classes" />
+        <mkdir dir="${basedir}/log-regression" />
+        <mkdir dir="${testreports.dir}" />
 
 		<!-- display the classpath used for compiling -->
 		<property name="myclasspath" refid="library.commons.classpath" />
@@ -146,7 +148,6 @@
 
 	<target name="run-tests" depends="compile" description="Run regression-tests">
 		<echo message="Run Regression Batch: com/pxf/tests/basic/${testClass}.class" />
-		<mkdir dir="${testreports.dir}" />
 		<junit printsummary="no" fork="yes" haltonfailure="no" showoutput="no" outputtoformatters="yes" failureproperty="test.failure">
 			<classpath>
 				<pathelement location="${build.dir}/regression/classes" />

@@ -9,3 +9,6 @@ build
 /jsystem*.log.*
 /junitvmwatcher*.properties
 docs
+.idea
+*.iml
+.gradle

@@ -2,22 +2,22 @@
 ANT=/opt/releng/apache-ant/bin/ant
 
 all: 
-	$(ANT) all
+	./gradlew clean build
 	
 unittest:
-	$(ANT) run-tests
+	./gradlew test
 	
 jar:
-	$(ANT) jar
+	./gradlew build 
 	
 tar:
-	$(ANT) tar
+	./gradlew distTar
 
 rpm:
-	$(ANT) rpm
+	./gradlew buildRpm
 	
 clean:
-	$(ANT) clean
+	./gradlew clean
 
 regressions:
 	$(ANT) -buildfile regression.xml
