@@ -566,6 +566,16 @@ recordIndexesOnLeafPart(PartitionIndexNode **pNodePtr,
 	{
 		Form_pg_index indForm = (Form_pg_index) GETSTRUCT(tuple);
 
+		Relation indRel = RelationIdGetRelation(indForm->indexrelid);
+		Assert(NULL != indRel);
+		if (BTREE_AM_OID != indRel->rd_rel->relam)
+		{
+			// TODO: antova - Apr 1, 2014; only b-tree indexes on partitioned tables supported
+			RelationClose(indRel);
+			continue;
+		}
+		RelationClose(indRel);
+
 		/* 
 		 * when constructing hash key, we need to map attnums in part indexes
 		 * to root attnums. Get the attMap needed for mapping.

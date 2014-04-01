@@ -982,6 +982,14 @@ CTranslatorRelcacheToDXL::Pmdindex
 		return pmdindex;
 	}
 
+
+	IMDIndex::EmdindexType emdindt = IMDIndex::EmdindBtree;
+	IMDRelation::Erelstoragetype erelstorage = pmdrel->Erelstorage();
+	if (BITMAP_AM_OID == relIndex->rd_rel->relam || IMDRelation::ErelstorageAppendOnlyRows == erelstorage || IMDRelation::ErelstorageAppendOnlyCols == erelstorage)
+	{
+		emdindt = IMDIndex::EmdindBitmap;
+	}
+	
 	// get the index name
 	CHAR *szIndexName = NameStr(relIndex->rd_rel->relname);
 	CWStringDynamic *pstrName = CDXLUtils::PstrFromSz(pmp, szIndexName);
@@ -1014,6 +1022,7 @@ CTranslatorRelcacheToDXL::Pmdindex
 										pmdname,
 										New(pmp) CMDIdGPDB(pgIndex->indrelid),
 										pgIndex->indisclustered,
+										emdindt,
 										false, // fPartial
 										pdrgpulKeyCols,
 										pdrgpulIncludeCols,
@@ -1182,6 +1191,9 @@ CTranslatorRelcacheToDXL::PmdindexPartTable
 	pmdrel->Pmdid()->AddRef();
 	pmdidIndex->AddRef();
 	
+	// TODO: antova - Mar 26, 2014; compute in function (OPT-3971)
+	IMDIndex::EmdindexType emdindt = IMDIndex::EmdindBtree;
+	
 	CMDIndexGPDB *pmdindex = New(pmp) CMDIndexGPDB
 										(
 										pmp,
@@ -1189,6 +1201,7 @@ CTranslatorRelcacheToDXL::PmdindexPartTable
 										pmdname,
 										pmdrel->Pmdid(),
 										pgIndex->indisclustered,
+										emdindt,
 										fPartial,
 										pdrgpulKeyCols,
 										pdrgpulIncludeCols,
@@ -2943,7 +2956,7 @@ CTranslatorRelcacheToDXL::FIndexSupported
 	// index expressions and index constraints not supported
 	return gpdb::FHeapAttIsNull(pht, Anum_pg_index_indexprs) &&
 		gpdb::FHeapAttIsNull(pht, Anum_pg_index_indpred) && 
-		BTREE_AM_OID == relIndex->rd_rel->relam;
+		(BTREE_AM_OID == relIndex->rd_rel->relam || BITMAP_AM_OID == relIndex->rd_rel->relam);
 }
 
 //---------------------------------------------------------------------------
