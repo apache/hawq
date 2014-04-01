@@ -8509,5 +8509,20 @@ select 1 as x where 1 in (2, 3);
 ---
 (0 rows)
 
+-- MPP-22918: join inner child with universal distribution
+SELECT generate_series(1,10) EXCEPT SELECT 1;
+ generate_series 
+-----------------
+               2
+               6
+              10
+               4
+               8
+               9
+               5
+               3
+               7
+(9 rows)
+
 -- clean up
 drop schema orca cascade;

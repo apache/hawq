@@ -680,5 +680,8 @@ select a[b[1][2][2]] from orca.arrtest;
 -- MPP-20713, MPP-20714, MPP-20738: Const table get with a filter
 select 1 as x where 1 in (2, 3);
 
+-- MPP-22918: join inner child with universal distribution
+SELECT generate_series(1,10) EXCEPT SELECT 1;
+
 -- clean up
 drop schema orca cascade;
