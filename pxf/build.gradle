@@ -160,10 +160,7 @@ project('pxf-hbase') {
 }
 
 def buildNumber() {
-    if (System.getenv('BUILD_NUMBER') != null) {
-        return System.getProperty('BUILD_NUMBER')
-    }
-    return System.getProperty('user.name')
+    System.getenv('BUILD_NUMBER') ?: System.getProperty('user.name')
 }
 
 task wrapper(type: Wrapper) {
