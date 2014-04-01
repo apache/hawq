@@ -30,7 +30,9 @@ EXTRA_CLEAN+=$(R_RPM) $(PLR_RPM) $(PLR_GPPKG)
 #
 include $(BLD_TOP)/releng/gppkg.mk
 
+
 gppkg: $(R_DIR)
+	@echo Line 33
 	$(MAKE) $(R_RPM) RPM_FLAGS=$(R_RPM_FLAGS)
 	$(MAKE) $(PLR_RPM) RPM_FLAGS=$(PLR_RPM_FLAGS)
 	$(MAKE) $(PLR_GPPKG) MAIN_RPM=$(PLR_RPM) DEPENDENT_RPMS=$(R_RPM)

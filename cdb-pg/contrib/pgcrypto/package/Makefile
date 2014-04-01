@@ -25,5 +25,6 @@ include $(BLD_TOP)/releng/gppkg.mk
 gppkg: 
 	$(MAKE) $(PGCRYPTO_RPM) RPM_FLAGS=$(PGCRYPTO_RPM_FLAGS)
 	$(MAKE) $(PGCRYPTO_GPPKG) MAIN_RPM=$(PGCRYPTO_RPM)
+	cp pgcrypto*.gppkg pgcrypto.gppkg
 
 .PHONY: gppkg

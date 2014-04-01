@@ -370,7 +370,7 @@ class IsVersionCompatible(Operation):
 
         gppkg = self.gppkg
 
-        gpdb_version = self._get_gpdb_version()
+        gpdb_version = self._get_hawq_version()
         required_gpdb_version = gppkg.gpdbversion
 
         logger.debug('Greenplum Database Version = %s' % gpdb_version)
@@ -379,7 +379,7 @@ class IsVersionCompatible(Operation):
         if gpdb_version is None:
             logger.error('Could not determine Greenplum Database version')
             return False
-        
+        print "Installed GPDB Version: {0}".format(gpdb_version) 
         if not required_gpdb_version.isVersionRelease(gpdb_version):
             logger.error('%s requires Greenplum Database version %s' % (gppkg.pkgname, required_gpdb_version))
             return False
@@ -399,8 +399,13 @@ class IsVersionCompatible(Operation):
         gpdb_version = GpVersion(version.strip()) 
         return gpdb_version
 
-
-
+    def _get_hawq_version(self):
+        binary = os.path.join(GPHOME, 'bin', 'pg_ctl')
+        cmdstr = '{0} --hawq-version'.format(binary)
+        cmd = Command('Get hawq version', cmdstr)
+        cmd.run(validateAfter = True)
+        return cmd.results.stdout.strip()
+        
 class ValidateInstallPackage(Operation):
     """
     Ensure that the given rpms can be installed safely. This is accomplished mainly

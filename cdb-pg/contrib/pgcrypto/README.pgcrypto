@@ -9,51 +9,12 @@ Marko Kreen <markokr@gmail.com>
 -----------------
 
 // Note: These installation instructions assume you have obtained a
-   precompiled build of pgcrypto from Greenplum.
+   pgcrypto package from Greenplum.
 
-1.1.  Automated Installation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Run:
+gppkg --install $GPHOME/share/packages/archive/pgcryptXXX.gppkg   
 
-1. Extract files from the pgcrypto package. For example:
-
-   mkdir pgcrypto
-   mv pgcrypto.tgz pgcrypto
-   tar -xzvf pgcryto/pgcrypto.tgz
-
-2. Run install.sh script with the hosts file as argument.  The hosts
-   file must contain hostname of each segment, one per line.
-
-   cd pgcrypto
-   ./pgcrypto_install.sh -f ~/hosts
-
-1.2.  Manual Installation
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-1. Extract files from the pgcrypto package. For example:
-
-   mkdir pgcrypto
-   mv pgcrypto.tgz pgcrypto
-   tar -xzvf pgcryto/pgcrypto.tgz
-
-2. Copy the pgcrypto.so file to your Greenplum installation's
-   library directory.
-
-   cp pgcrypto/lib/postgresql/pgcrypto.so $GPHOME/lib/postgresql
-
-3. (optional) Edit the pgcrypto.sql file and edit the initial 
-   SET command that specifies the schema where the pgcrypto
-   objects will be created. By default they will be created in
-   the 'public' schema. For example:
-
-    vi pgcrypto/share/postgresql/contrib/pgcrypto.sql
-     
-      SET search_path = YOUR_SCHEMA;
-
-4. Run the commands in the pgcrypto.sql file using psql to 
-   install the pgcrypto objects in your database. For example:
-
-    psql -d template1 -f pgcrypto/share/postgresql/contrib/pgcrypto.sql
-
+psql -d <database> -f $GPHOME/share/postgresql/contrib/pgcrypto.sql
 
 // Note: To uninstall the pgcrypto objects, use uninstall_pgcrypto.sql
 

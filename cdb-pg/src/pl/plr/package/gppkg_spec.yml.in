@@ -1,9 +1,9 @@
 Pkgname: plr 
 Architecture: #arch
 OS: #os
-Version: 1.0
-GPDBVersion: 4.2
-Description: Provides a procedural language implementation of R for the Greenplum Database. 
+Version: 1.2
+GPDBVersion: 1.2.1.0
+Description: Provides a procedural language implementation of R for the Hawq Database. 
 PostInstall:
 - Master: "echo 'Please source your $GPHOME/greenplum_path.sh file and restart the database.';
           echo 'You can enable PL/R by running createlang plr -d mydatabase.';"
