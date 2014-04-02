@@ -495,9 +495,17 @@ CTranslatorRelcacheToDXL::Pmdrel
 	// collect relation triggers
 	DrgPmdid *pdrgpmdidTriggers = PdrgpmdidTriggers(pmp, rel);
 
+	// get partition keys
+	DrgPul *pdrgpulPartKeys = NULL;
+	if (IMDRelation::ErelstorageExternal != erelstorage)
+	{
+		 pdrgpulPartKeys = PdrgpulPartKeys(pmp, rel, oid);
+	}
+	 BOOL fPartitioned = (NULL != pdrgpulPartKeys && 0 < pdrgpulPartKeys->UlLength()); 
+
 	// get key sets
 	BOOL fAddDefaultKeys = FHasSystemColumns(rel->rd_rel->relkind);
-	DrgPdrgPul *pdrgpdrgpulKeys = PdrgpdrgpulKeys(pmp, oid, fAddDefaultKeys, pulAttnoMapping);
+	DrgPdrgPul *pdrgpdrgpulKeys = PdrgpdrgpulKeys(pmp, oid, fAddDefaultKeys, fPartitioned, pulAttnoMapping);
 
 	// collect all check constraints
 	DrgPmdid *pdrgpmdidCheckConstraints = PdrgpmdidCheckConstraints(pmp, oid);
@@ -569,9 +577,6 @@ CTranslatorRelcacheToDXL::Pmdrel
 	}
 	else
 	{
-		// get partition keys
-		DrgPul *pdrgpulPartKeys = PdrgpulPartKeys(pmp, oid);
-
 		// get part constraint
 		CMDPartConstraintGPDB *pmdpartcnstr = PmdpartcnstrRelation(pmp, pmda, oid, pdrgpmdcol);
 
@@ -2715,9 +2720,12 @@ DrgPul *
 CTranslatorRelcacheToDXL::PdrgpulPartKeys
 	(
 	IMemoryPool *pmp,
+	Relation rel,
 	OID oid
 	)
 {
+	GPOS_ASSERT(NULL != rel);
+
 	if (!gpdb::FRelPartIsRoot(oid))
 	{
 		// not a partitioned table
@@ -2734,6 +2742,7 @@ CTranslatorRelcacheToDXL::PdrgpulPartKeys
 	
 	if (gpdb::FHashPartitioned(pn->part->parkind))
 	{
+		gpdb::CloseRelation(rel);
 		GPOS_RAISE(gpdxl::ExmaMD, gpdxl::ExmiMDObjUnsupported, GPOS_WSZ_LIT("Hash partitioning"));
 	}
 	
@@ -2807,6 +2816,7 @@ CTranslatorRelcacheToDXL::PdrgpdrgpulKeys
 	IMemoryPool *pmp,
 	OID oid,
 	BOOL fAddDefaultKeys,
+	BOOL fPartitioned,
 	ULONG *pulMapping
 	)
 {
@@ -2838,6 +2848,12 @@ CTranslatorRelcacheToDXL::PdrgpdrgpulKeys
 	if (fAddDefaultKeys)
 	{
 		DrgPul *pdrgpulKey = New(pmp) DrgPul(pmp);
+		if (fPartitioned)
+		{
+			// TableOid is part of default key for partitioned tables
+			ULONG ulPosTableOid = UlPosition(TableOidAttributeNumber, pulMapping);
+			pdrgpulKey->Append(New(pmp) ULONG(ulPosTableOid));
+		}
 		ULONG ulPosSegid= UlPosition(GpSegmentIdAttributeNumber, pulMapping);
 		ULONG ulPosCtid = UlPosition(SelfItemPointerAttributeNumber, pulMapping);
 		pdrgpulKey->Append(New(pmp) ULONG(ulPosSegid));

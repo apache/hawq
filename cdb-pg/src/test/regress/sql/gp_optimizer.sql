@@ -656,5 +656,10 @@ select * from mpp22791 where b <= 3;
 -- MPP-20713, MPP-20714, MPP-20738: Const table get with a filter
 select 1 as x where 1 in (2, 3);
 
+-- MPP-23081: keys of partitioned tables
+create table orca.p1(a int) partition by range(a)(partition pp1 start(1) end(10), partition pp2 start(10) end(20));
+insert into orca.p1 select * from generate_series(2,15);
+select count(*) from (select gp_segment_id,ctid,tableoid from orca.p1 group by gp_segment_id,ctid,tableoid) as foo;
+
 -- clean up
 drop schema orca cascade;

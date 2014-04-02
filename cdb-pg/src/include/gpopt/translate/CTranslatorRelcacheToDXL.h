@@ -255,11 +255,11 @@ namespace gpdxl
 
 			// get partition keys for a relation
 			static
-			DrgPul *PdrgpulPartKeys(IMemoryPool *pmp, OID oid);
+			DrgPul *PdrgpulPartKeys(IMemoryPool *pmp, Relation rel, OID oid);
 
 			// get keysets for relation
 			static
-			DrgPdrgPul *PdrgpdrgpulKeys(IMemoryPool *pmp, OID oid, BOOL fAddDefaultKeys, ULONG *pulMapping);
+			DrgPdrgPul *PdrgpdrgpulKeys(IMemoryPool *pmp, OID oid, BOOL fAddDefaultKeys, BOOL fPartitioned, ULONG *pulMapping);
 
 			// storage type for a relation
 			static
