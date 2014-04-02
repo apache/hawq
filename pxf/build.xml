@@ -1,0 +1,435 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="${comp.basename}" default="all" xmlns:ivy="antlib:org.apache.ivy.ant">
+
+    <!-- Load product and build parameters from build.properties
+         NOTE: Product name and version defined in build.properties -->
+    <loadproperties srcfile="build.properties"/>
+
+    <!-- Some basic properties -->
+    <property environment="env"/>
+    <property name="comp.core" value="${comp.basename}-core-${comp.version}"/>
+    <property name="comp.api" value="${comp.basename}-api-${comp.version}"/>
+    <property name="comp.hdfs" value="${comp.basename}-hdfs-${comp.version}"/>
+    <property name="comp.hive" value="${comp.basename}-hive-${comp.version}"/>
+    <property name="comp.hbase" value="${comp.basename}-hbase-${comp.version}"/>
+
+    <!-- If BUILD_NUMBER is in environment, use it, o/w use current username -->
+    <condition property="build.number" value="${env.BUILD_NUMBER}" else="${user.name}">
+        <isset property="env.BUILD_NUMBER"/>
+    </condition>
+
+    <!-- If build.trunkbuild is defined (-D) then add _dev
+         Used for trunk builds -->
+    <condition property="build.branch" value="_dev" else="">
+        <isset property="build.trunkbuild"/>
+    </condition>
+
+
+    <property name="src.dir" value="${basedir}/src"/>
+    <property name="build.dir" value="${basedir}/build"/>
+    <property name="lib.dir" value="${build.dir}/lib"/>
+    <property name="dist.dir.core" value="${build.dir}/${comp.core}"/>
+    <property name="dist.dir.api" value="${build.dir}/${comp.api}"/>
+    <property name="dist.dir.hdfs" value="${build.dir}/${comp.hdfs}"/>
+    <property name="dist.dir.hive" value="${build.dir}/${comp.hive}"/>
+    <property name="dist.dir.hbase" value="${build.dir}/${comp.hbase}"/>
+    <property name="test.dir" value="${basedir}/test"/>
+    <property name="testreports.dir" value="${build.dir}/test/reports"/>
+
+    <property name="pkg.buildroot" value="${basedir}/${comp.basename}_package_build_${user.name}"/>
+    <property name="pkg.release" value="${build.number}${build.branch}"/>
+    <property name="pkg.core" value="${comp.core}-${pkg.release}"/>
+    <property name="pkg.api" value="${comp.api}-${pkg.release}"/>
+    <property name="pkg.hdfs" value="${comp.hdfs}-${pkg.release}"/>
+    <property name="pkg.hive" value="${comp.hive}-${pkg.release}"/>
+    <property name="pkg.hbase" value="${comp.hbase}-${pkg.release}"/>
+
+    <!--Apache Ivy(http://ant.apache.org/ivy/history/latest-milestone/install.html) -->
+    <loadproperties srcfile="${basedir}/ivy/libraries.properties"/>
+    <property name="build.ivy.lib.dir" value="${build.dir}/lib"/>
+    <property name="ivy.artifact.retrieve.pattern" value="[artifact]-[revision].[ext]"/>
+    <property name="ivy.install.version" value="2.2.0"/>
+    <condition property="ivy.home" value="${env.IVY_HOME}">
+        <isset property="env.IVY_HOME"/>
+    </condition>
+    <property name="ivy.home" value="${user.home}/.ant"/>
+    <property name="ivy.jar.dir" value="${ivy.home}/lib"/>
+    <property name="ivy.jar.file" value="${ivy.jar.dir}/ivy.jar"/>
+
+    <patternset id="library.patterns">
+        <include name="*.jar"/>
+    </patternset>
+
+
+    <!-- Project Libraries -->
+    <path id="library.commons.classpath">
+        <!-- sort the files in reversed name order. We need to put -->
+        <!-- avro-tools behind hadoop in the class path since it   -->
+        <!-- includes hadoop and breaks the build otherwise...     -->
+        <sort>
+            <fileset dir="${lib.dir}"/>
+            <reverse xmlns="antlib:org.apache.tools.ant.types.resources.comparators">
+                <name/>
+            </reverse>
+        </sort>
+
+        <fileset dir="${lib.dir}">
+            <patternset refid="library.patterns"/>
+        </fileset>
+
+        <path refid="ivy-classpath"/>
+    </path>
+
+    <target name="init" description="Build initialization">
+    </target>
+
+    <!-- Cleanup -->
+    <target name="clean">
+        <delete dir="${build.dir}/classes"/>
+    	<delete dir="${build.dir}/lib"/>
+        <delete dir="${build.dir}/test"/>
+    	<delete>
+    		<fileset dir="${build.dir}">
+    			<include name="*.jar" />
+    		</fileset>
+    	</delete>
+        <delete dir="${pkg.buildroot}"/>
+    </target>
+
+    <target name="javadoc" unless="skipJavadoc">
+        <delete dir="docs/api"/>
+        <mkdir dir="docs/api"/>
+        <javadoc packagenames="com.pivotal.pxf.api.*"
+                 sourcepath="src"
+                 defaultexcludes="yes"
+                 destdir="docs/api"
+                 author="true"
+                 version="true"
+                 use="true"
+                 windowtitle="PXF API">
+            <doctitle><![CDATA[<h1>Pivotal Extension Framework</h1>]]></doctitle>
+            <bottom><![CDATA[<i>Copyright &#169; 2014 Pivotal All Rights Reserved.</i>]]></bottom>
+            <link offline="true" href="http://docs.oracle.com/javase/7/docs/api/" packagelistLoc="/tmp"/>
+            <link href="http://docs.oracle.com/javase/7/docs/api/"/>
+            <classpath>
+                <pathelement location="${build.dir}/test/classes"/>
+                <pathelement location="${build.dir}/classes"/>
+                <pathelement location="${src.dir}"/>
+                <fileset dir="${lib.dir}">
+                    <include name="**/*.jar"/>
+                </fileset>
+            </classpath>
+        </javadoc>
+        <delete dir="docs/plugins/hbase"/>
+        <mkdir dir="docs/plugins/hbase"/>
+        <javadoc packagenames="com.pivotal.pxf.plugins.hbase.*"
+                 sourcepath="src"
+                 defaultexcludes="yes"
+                 destdir="docs/plugins/hbase"
+                 author="true"
+                 version="true"
+                 use="true"
+                 windowtitle="PXF HBase Plugin">
+            <doctitle><![CDATA[<h1>Pivotal Extension Framework</h1>]]></doctitle>
+            <bottom><![CDATA[<i>Copyright &#169; 2014 Pivotal All Rights Reserved.</i>]]></bottom>
+            <link offline="true" href="http://docs.oracle.com/javase/7/docs/api/" packagelistLoc="/tmp"/>
+            <link href="http://docs.oracle.com/javase/7/docs/api/"/>
+            <classpath>
+                <pathelement location="${build.dir}/test/classes"/>
+                <pathelement location="${build.dir}/classes"/>
+                <pathelement location="${src.dir}"/>
+                <fileset dir="${lib.dir}">
+                    <include name="**/*.jar"/>
+                </fileset>
+            </classpath>
+        </javadoc>
+        <delete dir="docs/plugins/hdfs"/>
+        <mkdir dir="docs/plugins/hdfs"/>
+        <javadoc packagenames="com.pivotal.pxf.plugins.hdfs.*"
+                 sourcepath="src"
+                 defaultexcludes="yes"
+                 destdir="docs/plugins/hdfs"
+                 author="true"
+                 version="true"
+                 use="true"
+                 windowtitle="PXF HDFS Plugins">
+            <doctitle><![CDATA[<h1>Pivotal Extension Framework</h1>]]></doctitle>
+            <bottom><![CDATA[<i>Copyright &#169; 2014 Pivotal All Rights Reserved.</i>]]></bottom>
+            <link offline="true" href="http://docs.oracle.com/javase/7/docs/api/" packagelistLoc="/tmp"/>
+            <link href="http://docs.oracle.com/javase/7/docs/api/"/>
+            <classpath>
+                <pathelement location="${build.dir}/test/classes"/>
+                <pathelement location="${build.dir}/classes"/>
+                <pathelement location="${src.dir}"/>
+                <fileset dir="${lib.dir}">
+                    <include name="**/*.jar"/>
+                </fileset>
+            </classpath>
+        </javadoc>   	
+    </target>
+
+    <!-- Compilation -->
+    <target name="compile" depends="ivy-retrieve">
+        <mkdir dir="${build.dir}/classes"/>
+
+        <!-- display the classpath used for compiling -->
+        <property name="myclasspath" refid="library.commons.classpath"/>
+        <!-- enable the following line to echo classpath -->
+        <!-- echo message="classpath used in javac target: ${myclasspath}"/-->
+
+        <!-- compile the core gpdhfs connector source -->
+        <javac classpathref="library.commons.classpath" destdir="${build.dir}/classes"
+               includeantruntime="${compiler.includeantruntime}" debug="${compiler.debug}" fork="yes"
+               verbose="${compiler.verbose}" memoryMaximumSize="${compiler.max.memory}" srcdir="${src.dir}">
+            <compilerarg
+                    line="-Werror -Xlint:unchecked -Xlint:deprecation -Xlint:finally -Xlint:fallthrough -Xlint:path"/>
+        </javac>
+
+    </target>
+
+    <!-- Create JAR -->
+    <target name="jar" depends="run-tests,javadoc" description="create the main jar files">
+        <jar destfile="${build.dir}/${comp.core}.jar">
+            <manifest>
+                <attribute name="Built-By" value="${user.name}"/>
+                <attribute name="Built-Date" value="${TODAY}"/>
+            </manifest>
+            <fileset dir="${build.dir}/classes" includes="com/pivotal/pxf/core/**"/>
+        </jar>
+        <jar destfile="${build.dir}/${comp.api}.jar">
+            <manifest>
+                <attribute name="Built-By" value="${user.name}"/>
+                <attribute name="Built-Date" value="${TODAY}"/>
+            </manifest>
+            <fileset dir="${build.dir}/classes" includes="com/pivotal/pxf/api/**"/>
+            <fileset dir="${src.dir}" includes="resources/*.xml"/>
+        </jar>
+        <jar destfile="${build.dir}/${comp.hdfs}.jar">
+            <manifest>
+                <attribute name="Built-By" value="${user.name}"/>
+                <attribute name="Built-Date" value="${TODAY}"/>
+            </manifest>
+            <fileset dir="${build.dir}/classes" includes="com/pivotal/pxf/plugins/hdfs/**"/>
+        </jar>
+        <jar destfile="${build.dir}/${comp.hbase}.jar">
+            <manifest>
+                <attribute name="Built-By" value="${user.name}"/>
+                <attribute name="Built-Date" value="${TODAY}"/>
+            </manifest>
+            <fileset dir="${build.dir}/classes" includes="com/pivotal/pxf/plugins/hbase/**"/>
+        </jar>
+        <jar destfile="${build.dir}/${comp.hive}.jar">
+            <manifest>
+                <attribute name="Built-By" value="${user.name}"/>
+                <attribute name="Built-Date" value="${TODAY}"/>
+            </manifest>
+            <fileset dir="${build.dir}/classes" includes="com/pivotal/pxf/plugins/hive/**"/>
+        </jar>
+    </target>
+
+    <!-- Default -->
+    <target name="all" depends="clean,jar" description="build all jar files"/>
+
+    <!-- Create package -->
+    <target name="package" depends="jar" description="Creates a package directory">
+        <delete dir="${dist.dir.core}"/>
+        <mkdir dir="${dist.dir.core}"/>
+        <copy todir="${dist.dir.core}">
+            <fileset dir="${build.dir}">
+                <include name="${comp.core}.jar"/>
+            </fileset>
+        </copy>
+
+        <delete dir="${dist.dir.api}"/>
+        <mkdir dir="${dist.dir.api}"/>
+        <mkdir dir="${dist.dir.api}/conf"/>
+        <copy todir="${dist.dir.api}">
+            <fileset dir="${build.dir}">
+                <include name="${comp.api}.jar"/>
+            </fileset>
+        </copy>
+        <copy file="${src.dir}/resources/pxf-profiles-default.xml" tofile="${dist.dir.api}/conf/pxf-profiles.xml"/>
+
+        <delete dir="${dist.dir.hdfs}"/>
+        <mkdir dir="${dist.dir.hdfs}"/>
+        <copy todir="${dist.dir.hdfs}">
+            <fileset dir="${build.dir}">
+                <include name="${comp.hdfs}.jar"/>
+            </fileset>
+        </copy>
+
+        <delete dir="${dist.dir.hbase}"/>
+        <mkdir dir="${dist.dir.hbase}"/>
+        <copy todir="${dist.dir.hbase}">
+            <fileset dir="${build.dir}">
+                <include name="${comp.hbase}.jar"/>
+            </fileset>
+        </copy>
+
+        <delete dir="${dist.dir.hive}"/>
+        <mkdir dir="${dist.dir.hive}"/>
+        <copy todir="${dist.dir.hive}">
+            <fileset dir="${build.dir}">
+                <include name="${comp.hive}.jar"/>
+            </fileset>
+        </copy>
+    </target>
+
+    <!-- Create TAR -->
+    <target name="tar" depends="package" description="Creates a tarball">
+        <tar destfile="${build.dir}/${pkg.core}.tar.gz" compression="gzip" longfile="gnu">
+            <tarfileset dir="${dist.dir.core}" prefix="${comp.core}"/>
+        </tar>
+        <tar destfile="${build.dir}/${pkg.api}.tar.gz" compression="gzip" longfile="gnu">
+            <tarfileset dir="${dist.dir.api}" prefix="${comp.api}"/>
+        </tar>
+        <tar destfile="${build.dir}/${pkg.hdfs}.tar.gz" compression="gzip" longfile="gnu">
+            <tarfileset dir="${dist.dir.hdfs}" prefix="${comp.hdfs}"/>
+        </tar>
+        <tar destfile="${build.dir}/${pkg.hive}.tar.gz" compression="gzip" longfile="gnu">
+            <tarfileset dir="${dist.dir.hive}" prefix="${comp.hive}"/>
+        </tar>
+        <tar destfile="${build.dir}/${pkg.hbase}.tar.gz" compression="gzip" longfile="gnu">
+            <tarfileset dir="${dist.dir.hbase}" prefix="${comp.hbase}"/>
+        </tar>
+    </target>
+
+    <target name="rpm_component" description="Creates an RPM package component">
+        <mkdir dir="${pkg.buildroot}/BUILD"/>
+        <mkdir dir="${pkg.buildroot}/RPMS"/>
+        <mkdir dir="${pkg.buildroot}/SRPMS"/>
+        <mkdir dir="${pkg.buildroot}/SOURCES"/>
+        <mkdir dir="${pkg.buildroot}/SPECS"/>
+        <copy todir="${pkg.buildroot}/SOURCES">
+            <fileset dir="${build.dir}">
+                <include name="${pkg}.tar.gz"/>
+            </fileset>
+        </copy>
+        <copy file="${basedir}/packages/rpm.spec" todir="${pkg.buildroot}/SPECS">
+            <filterchain>
+                <replacetokens>
+                    <token key="comp.basename" value="${comp.basename}"/>
+                    <token key="comp.version" value="${comp.version}"/>
+                    <token key="comp.name" value="${comp}"/>
+                    <token key="comp.deps" value="${deps}"/>
+                    <token key="pkg.release" value="${pkg.release}"/>
+                    <token key="pkg.libprefix" value="${pkg.libprefix}"/>
+                    <token key="pkg.etcprefix" value="${pkg.etcprefix}"/>
+                    <token key="pkg.filename" value="${comp.basename}-${name}"/>
+                    <token key="pkg.name" value="${pkg}"/>
+                    <token key="pkg.dir" value="${comp.basename}-${comp.version}-${pkg.release}"/>
+                    <token key="pkg.publicstage" value="${pkg.publicstage}"/>
+                    <token key="pkg.summary" value="${pkg.summary}"/>
+                    <token key="pkg.vendor" value="${pkg.vendor}"/>
+                    <token key="pkg.description" value="${pkg.description}"/>
+                    <token key="pkg.obsoletes" value="${pkg.obsoletes}"/>
+                </replacetokens>
+            </filterchain>
+        </copy>
+        <rpm specFile="rpm.spec" command="-bb" topDir="${pkg.buildroot}" cleanBuildDir="true"
+             failOnError="true"/>
+        <copy todir="${build.dir}/" flatten="true">
+            <fileset dir="${pkg.buildroot}/RPMS">
+                <include name="**/${comp.basename}*.rpm"/>
+            </fileset>
+        </copy>
+        <delete dir="${pkg.buildroot}" quiet="true" verbose="false"/>
+    </target>
+
+    <target name="rpm" depends="tar" description="Creates an RPM package">
+        <antcall target="rpm_component">
+            <param name="name" value="core"/>
+            <param name="pkg" value="${pkg.core}"/>
+            <param name="comp" value="${comp.core}"/>
+            <param name="deps" value="hadoop >= 2.2.0, hadoop-mapreduce >= 2.2.0"/>
+        </antcall>
+        <antcall target="rpm_component">
+            <param name="name" value="api"/>
+            <param name="pkg" value="${pkg.api}"/>
+            <param name="comp" value="${comp.api}"/>
+            <param name="deps" value="pxf-core >= ${comp.version}"/>
+        </antcall>
+        <antcall target="rpm_component">
+            <param name="name" value="hdfs"/>
+            <param name="pkg" value="${pkg.hdfs}"/>
+            <param name="comp" value="${comp.hdfs}"/>
+            <param name="deps" value="hadoop >= 2.2.0, hadoop-mapreduce >= 2.2.0, pxf-api >= ${comp.version}"/>
+        </antcall>
+        <antcall target="rpm_component">
+            <param name="name" value="hbase"/>
+            <param name="pkg" value="${pkg.hbase}"/>
+            <param name="comp" value="${comp.hbase}"/>
+            <param name="deps" value="hbase, pxf-hdfs >= ${comp.version}"/>
+        </antcall>
+        <antcall target="rpm_component">
+            <param name="name" value="hive"/>
+            <param name="pkg" value="${pkg.hive}"/>
+            <param name="comp" value="${comp.hive}"/>
+            <param name="deps" value="hive, pxf-hdfs >= ${comp.version}"/>
+        </antcall>
+    </target>
+
+    <!-- Ivy -->
+    <target name="ivy-probe-antlib">
+        <condition property="ivy.found">
+            <typefound uri="antlib:org.apache.ivy.ant" name="cleancache"/>
+        </condition>
+    </target>
+
+    <target name="download-ivy" unless="offline">
+        <mkdir dir="${ivy.jar.dir}"/>
+        <get src="http://repo2.maven.org/maven2/org/apache/ivy/ivy/${ivy.install.version}/ivy-${ivy.install.version}.jar"
+             dest="${ivy.jar.file}" usetimestamp="true"/>
+    </target>
+
+    <target name="ivy-init" depends="download-ivy">
+        <path id="ivy.lib.path">
+            <fileset dir="${ivy.jar.dir}" includes="*.jar"/>
+        </path>
+        <taskdef resource="org/apache/ivy/ant/antlib.xml" uri="antlib:org.apache.ivy.ant" classpathref="ivy.lib.path"/>
+    </target>
+
+    <target name="ivy-retrieve" depends="ivy-init"
+            description="--> Retrieve Ivy-managed artifacts for the compile configurations">
+        <ivy:settings id="basic.settings" file="ivysettings.xml"/>
+        <ivy:retrieve settingsRef="basic.settings" pattern="${build.ivy.lib.dir}/${ivy.artifact.retrieve.pattern}"
+                      sync="true" conf="compile"/>
+        <ivy:cachepath pathid="ivy-classpath" conf="compile"/>
+    </target>
+
+    <target name="compile-tests" depends="compile" description="Compiling tests">
+        <mkdir dir="${build.dir}/test/classes"/>
+        <javac classpathref="library.commons.classpath" classpath="${build.dir}/classes"
+               destdir="${build.dir}/test/classes" includeantruntime="${compiler.includeantruntime}"
+               debug="${compiler.debug}" fork="yes" verbose="${compiler.verbose}"
+               memoryMaximumSize="${compiler.max.memory}" srcdir="${test.dir}">
+            <compilerarg
+                    line="-Werror -Xlint:unchecked -Xlint:deprecation -Xlint:finally -Xlint:fallthrough -Xlint:path"/>
+        </javac>
+    </target>
+
+    <target name="run-tests" depends="compile-tests" description="Run unit-tests" unless="skipTests">
+        <mkdir dir="${testreports.dir}"/>
+        <junit printsummary="yes" fork="yes" haltonfailure="yes">
+
+            <classpath>
+                <pathelement location="${build.dir}/test/classes"/>
+                <pathelement location="${build.dir}/classes"/>
+                <pathelement location="${src.dir}"/>
+                <fileset dir="${lib.dir}">
+                    <include name="**/*.jar"/>
+                </fileset>
+            </classpath>
+
+            <formatter type="plain" usefile="false"/>
+            <formatter type="xml"/>
+
+            <batchtest todir="${testreports.dir}">
+                <fileset dir="${build.dir}/test/classes">
+                    <include name="**/*Test.class"/>
+                </fileset>
+            </batchtest>
+
+        </junit>
+    </target>
+</project>

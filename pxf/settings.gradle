@@ -1,7 +1,0 @@
-rootProject.name = 'pxf'
-
-include 'pxf-api'
-include 'pxf-core'
-include 'pxf-hdfs'
-include 'pxf-hive'
-include 'pxf-hbase'
