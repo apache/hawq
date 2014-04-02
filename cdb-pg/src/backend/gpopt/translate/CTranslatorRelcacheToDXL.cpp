@@ -1191,9 +1191,13 @@ CTranslatorRelcacheToDXL::PmdindexPartTable
 	pmdrel->Pmdid()->AddRef();
 	pmdidIndex->AddRef();
 	
-	// TODO: antova - Mar 26, 2014; compute in function (OPT-3971)
-	IMDIndex::EmdindexType emdindt = IMDIndex::EmdindBtree;
+	GPOS_ASSERT(INDTYPE_BITMAP == pidxinfo->indType || INDTYPE_BTREE == pidxinfo->indType);
 	
+	IMDIndex::EmdindexType emdindt = IMDIndex::EmdindBtree;
+	if (INDTYPE_BITMAP == pidxinfo->indType)
+	{
+		emdindt = IMDIndex::EmdindBitmap;
+	}
 	CMDIndexGPDB *pmdindex = New(pmp) CMDIndexGPDB
 										(
 										pmp,

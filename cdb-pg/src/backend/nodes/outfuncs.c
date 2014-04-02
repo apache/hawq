@@ -589,6 +589,7 @@ outLogicalIndexInfo(StringInfo str, LogicalIndexInfo *node)
 	WRITE_NODE_FIELD(indPred);
 	WRITE_NODE_FIELD(indExprs);
 	WRITE_BOOL_FIELD(indIsUnique);
+	WRITE_ENUM_FIELD(indType, LogicalIndexType);
 	WRITE_NODE_FIELD(partCons);
 	WRITE_NODE_FIELD(defaultLevels);
 }

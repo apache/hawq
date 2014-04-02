@@ -484,6 +484,15 @@ typedef struct IndexScan
 	ScanDirection indexorderdir;	/* forward or backward or don't care */
 } IndexScan;
 
+/* ----------------
+ *		index type information
+ */
+typedef enum LogicalIndexType
+{
+	INDTYPE_BTREE = 0, 
+	INDTYPE_BITMAP = 1
+} LogicalIndexType;
+
 typedef struct LogicalIndexInfo
 {
 	Oid	logicalIndexOid;	/* OID of the logical index */
@@ -492,6 +501,7 @@ typedef struct LogicalIndexInfo
 	List	*indPred;		/* predicate if partial index, or NIL */
 	List	*indExprs;		/* index on expressions */
 	bool	indIsUnique;		/* unique index */
+	LogicalIndexType indType;  /* index type: btree or bitmap */
 	Node	*partCons;		/* concatenated list of check constraints 
 					 * of each partition on which this index is defined */
 	List	*defaultLevels;		/* Used to identify a default partition */

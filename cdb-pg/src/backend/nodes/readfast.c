@@ -3037,6 +3037,7 @@ readLogicalIndexInfo(const char ** str, LogicalIndexInfo *local_node)
 	READ_NODE_FIELD(indPred);
 	READ_NODE_FIELD(indExprs);
 	READ_BOOL_FIELD(indIsUnique);
+	READ_ENUM_FIELD(indType, LogicalIndexType);
 	READ_NODE_FIELD(partCons);
 	READ_NODE_FIELD(defaultLevels);
 }

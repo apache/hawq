@@ -61,6 +61,7 @@ typedef struct
 	int 		logicalIndexId;
 	Oid		logicalIndexOid;
 	struct 		IndexInfo *ii;
+	LogicalIndexType indType;
 	List		*partList;
 	List		*defaultPartList;
 } LogicalIndexInfoHashEntry;
@@ -407,7 +408,8 @@ constructIndexHashKey(Oid partOid,
 			Oid rootOid,
 			HeapTuple tup,
 			AttrNumber *attMap,
-			IndexInfo *ii)
+			IndexInfo *ii,
+			LogicalIndexType indType)
 {
 	StringInfoData  buf;
 	Expr 		*predExpr = NULL;
@@ -440,6 +442,7 @@ constructIndexHashKey(Oid partOid,
 	change_varattnos_of_a_node((Node *)exprsExpr, attMap);
 
 	appendStringInfo(&buf, "%s", nodeToString(exprsExpr));
+	appendStringInfo(&buf, "%d", (int) indType);
 
 	/* remember mapped exprsList */
 	ii->ii_Expressions = (List *)exprsExpr;
@@ -546,13 +549,8 @@ recordIndexesOnLeafPart(PartitionIndexNode **pNodePtr,
 	
 	Relation partRel = heap_open(partOid, AccessShareLock);
 
-	if (RELSTORAGE_HEAP != partRel->rd_rel->relstorage)
-	{
-		/* do not cosider indexes on AO and AOCO partitions */
-		/* TODO: antova - Sep 10, 2013; remove this limitation when MPP-19808 is resolved */
-		heap_close(partRel, AccessShareLock);
-		return;
-	}
+	char relstorage = partRel->rd_rel->relstorage;
+
 	heap_close(partRel, AccessShareLock);
 
 	pcqCtx = caql_beginscan(
@@ -566,15 +564,21 @@ recordIndexesOnLeafPart(PartitionIndexNode **pNodePtr,
 	{
 		Form_pg_index indForm = (Form_pg_index) GETSTRUCT(tuple);
 
-		Relation indRel = RelationIdGetRelation(indForm->indexrelid);
-		Assert(NULL != indRel);
-		if (BTREE_AM_OID != indRel->rd_rel->relam)
+		LogicalIndexType indType = INDTYPE_BITMAP;
+		/* for AO and AOCO tables we assume the index is bitmap, for heap partitions
+		 * look up the access method from the catalog
+		 */
+		if (RELSTORAGE_HEAP == relstorage)
 		{
-			// TODO: antova - Apr 1, 2014; only b-tree indexes on partitioned tables supported
+			
+			Relation indRel = RelationIdGetRelation(indForm->indexrelid);
+			Assert(NULL != indRel); 
+			if (BTREE_AM_OID == indRel->rd_rel->relam)
+			{
+				indType = INDTYPE_BTREE;
+			}
 			RelationClose(indRel);
-			continue;
 		}
-		RelationClose(indRel);
 
 		/* 
 		 * when constructing hash key, we need to map attnums in part indexes
@@ -600,7 +604,7 @@ recordIndexesOnLeafPart(PartitionIndexNode **pNodePtr,
 		ii = populateIndexInfo(pcqCtx, tuple, indForm);
 			
 		/* construct hash key for the index */
-		partIndexHashKey = constructIndexHashKey(partOid, rootOid, tuple, attmap, ii);
+		partIndexHashKey = constructIndexHashKey(partOid, rootOid, tuple, attmap, ii, indType);
 
 		/* lookup PartitionIndexHash table */
 		partIndexHashEntry = (PartitionIndexHashEntry *)hash_search(PartitionIndexHash,
@@ -641,6 +645,7 @@ recordIndexesOnLeafPart(PartitionIndexNode **pNodePtr,
 			logicalIndexInfoHashEntry->ii = ii;
 			logicalIndexInfoHashEntry->partList = NIL;
 			logicalIndexInfoHashEntry->defaultPartList = NIL;
+			logicalIndexInfoHashEntry->indType = indType;
 		}
 		else
 		{
@@ -982,6 +987,7 @@ generateLogicalIndexPred(LogicalIndexes *li,
 		li->logicalIndexInfo[*curIdx]->indExprs = (List *)copyObject(entry->ii->ii_Expressions);
 		li->logicalIndexInfo[*curIdx]->indPred = (List *)copyObject(entry->ii->ii_Predicate);
 		li->logicalIndexInfo[*curIdx]->indIsUnique = entry->ii->ii_Unique;
+		li->logicalIndexInfo[*curIdx]->indType = entry->indType;
 
 		/* fetch the partList from the logical index hash entry */
 		foreach(lc, entry->partList)
@@ -1025,6 +1031,7 @@ generateLogicalIndexPred(LogicalIndexes *li,
 		li->logicalIndexInfo[*curIdx]->indExprs = (List *)copyObject(entry->ii->ii_Expressions);
 		li->logicalIndexInfo[*curIdx]->indPred = (List *)copyObject(entry->ii->ii_Predicate);
 		li->logicalIndexInfo[*curIdx]->indIsUnique = entry->ii->ii_Unique;
+		li->logicalIndexInfo[*curIdx]->indType = entry->indType;
 
 		/* 
 		 * Default parts don't have constraints, so they cannot be represented
@@ -1194,6 +1201,8 @@ getPhysicalIndexRelid(LogicalIndexInfo *iInfo,
 			resultOid = indForm->indexrelid;
 			break;
 		}
+		
+		// TODO: antova - Mar 28, 2014; compare if this is a bitmap index
 	}
 
 	caql_endscan(pcqCtx);
@@ -1459,6 +1468,7 @@ LogicalIndexInfo *logicalIndexInfoForIndexOid(Oid rootOid, Oid indexOid)
 	TupleDesc rootTupDesc = rootRel->rd_att;
 	TupleDesc partTupDesc = partRel->rd_att;
 
+	char relstorage = partRel->rd_rel->relstorage;
 	AttrNumber	*attMap = varattnos_map(rootTupDesc, partTupDesc);
 	heap_close(rootRel, AccessShareLock);
 	heap_close(partRel, AccessShareLock);
@@ -1489,6 +1499,19 @@ LogicalIndexInfo *logicalIndexInfoForIndexOid(Oid rootOid, Oid indexOid)
 		}
 		change_varattnos_of_a_node((Node *) plogicalIndexInfo->indExprs, attMap);
 		change_varattnos_of_a_node((Node *) plogicalIndexInfo->indPred, attMap);
+	}
+	
+	plogicalIndexInfo->indType = INDTYPE_BITMAP;
+	if (RELSTORAGE_HEAP == relstorage)
+	{
+		
+		Relation indRel = RelationIdGetRelation(indForm->indexrelid);
+		Assert(NULL != indRel); 
+		if (BTREE_AM_OID == indRel->rd_rel->relam)
+		{
+			plogicalIndexInfo->indType = INDTYPE_BTREE;
+		}
+		RelationClose(indRel);
 	}
 	
 	return plogicalIndexInfo;

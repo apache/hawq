@@ -142,6 +142,7 @@ CopyLogicalIndexInfo(const LogicalIndexInfo *from, LogicalIndexInfo *newnode)
 	COPY_NODE_FIELD(indPred);
 	COPY_NODE_FIELD(indExprs);
 	COPY_SCALAR_FIELD(indIsUnique);
+	COPY_SCALAR_FIELD(indType);
 	COPY_NODE_FIELD(partCons);
 	COPY_NODE_FIELD(defaultLevels);
 }
