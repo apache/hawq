@@ -16,7 +16,7 @@
 
 #include "postgres.h"
 
-#include "access/catquery.h"
+#include "catalog/catquery.h"
 #include "access/heapam.h"
 #include "catalog/heap.h"
 #include "catalog/pg_am.h"

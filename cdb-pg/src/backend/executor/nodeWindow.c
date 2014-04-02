@@ -13,8 +13,8 @@
 #include "miscadmin.h"
 
 /* XXX include list is speculative -- bhagenbuch */
-#include "access/catquery.h"
 #include "access/heapam.h"
+#include "catalog/catquery.h"
 #include "catalog/pg_aggregate.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_operator.h"

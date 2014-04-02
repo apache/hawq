@@ -15,7 +15,7 @@
 
 #include "postgres.h"
 
-#include "access/catquery.h"
+#include "catalog/catquery.h"
 #include "access/tuptoaster.h"
 #include "catalog/pg_language.h"
 #include "catalog/pg_proc.h"

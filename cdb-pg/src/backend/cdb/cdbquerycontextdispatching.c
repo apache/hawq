@@ -11,13 +11,13 @@
 
 #include <sys/fcntl.h>
 
-#include "access/catquery.h"
 #include "access/genam.h"
 #include "access/heapam.h"
 #include "access/pxfuriparser.h"
 #include "access/parquetsegfiles.h"
 #include "catalog/aoseg.h"
 #include "catalog/catalog.h"
+#include "catalog/catquery.h"
 #include "catalog/gp_fastsequence.h"
 #include "catalog/gp_fastsequence.h"
 #include "catalog/pg_amop.h"

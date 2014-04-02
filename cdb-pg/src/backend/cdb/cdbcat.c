@@ -10,7 +10,7 @@
 
 #include "postgres.h"
 #include "miscadmin.h"
-#include "access/catquery.h" 
+#include "catalog/catquery.h" 
 #include "catalog/pg_namespace.h"
 #include "catalog/indexing.h"
 #include "utils/builtins.h"

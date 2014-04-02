@@ -14,8 +14,8 @@
  */
 #include "postgres.h"
 
-#include "access/catquery.h"
 #include "access/xact.h"
+#include "catalog/catquery.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_type.h"
 #include "commands/trigger.h"

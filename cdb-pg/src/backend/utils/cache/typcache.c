@@ -42,7 +42,7 @@
  */
 #include "postgres.h"
 
-#include "access/catquery.h"
+#include "catalog/catquery.h"
 #include "access/hash.h"
 #include "access/heapam.h"
 #include "access/nbtree.h"

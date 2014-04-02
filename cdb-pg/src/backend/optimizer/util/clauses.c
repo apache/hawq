@@ -20,7 +20,7 @@
 
 #include "postgres.h"
 
-#include "access/catquery.h"
+#include "catalog/catquery.h"
 #include "catalog/pg_aggregate.h"
 #include "catalog/pg_language.h"
 #include "catalog/pg_operator.h"

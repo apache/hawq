@@ -92,8 +92,8 @@
  */
 #include "postgres.h"
 
-#include "access/catquery.h"
 #include "access/nbtree.h"
+#include "catalog/catquery.h"
 #include "catalog/pg_amop.h"
 #include "cdb/cdbvars.h"
 #include "executor/execdebug.h"

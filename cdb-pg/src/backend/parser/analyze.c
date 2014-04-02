@@ -26,8 +26,8 @@
 #include "postgres.h"
 
 #include "access/heapam.h"
-#include "access/catquery.h"
 #include "access/reloptions.h"
+#include "catalog/catquery.h"
 #include "catalog/heap.h"
 #include "catalog/index.h"
 #include "catalog/indexing.h"

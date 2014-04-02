@@ -15,7 +15,7 @@
 
 #include "access/genam.h"
 #include "access/heapam.h"
-#include "access/catquery.h"
+#include "catalog/catquery.h"
 #include "catalog/dependency.h"
 #include "catalog/heap.h"
 #include "catalog/indexing.h"

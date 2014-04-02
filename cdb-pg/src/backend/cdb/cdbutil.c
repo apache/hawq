@@ -18,7 +18,7 @@
 #include "postgres.h"
 #include "fmgr.h"
 #include "funcapi.h"
-#include "access/catquery.h"
+#include "catalog/catquery.h"
 #include "catalog/pg_type.h"
 #include "nodes/makefuncs.h"
 #include "parser/parse_oper.h"

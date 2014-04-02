@@ -22,8 +22,8 @@
 #include <ctype.h>
 
 #include "access/genam.h"
-#include "access/catquery.h"
 #include "access/heapam.h"
+#include "catalog/catquery.h"
 #include "catalog/indexing.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_operator.h"

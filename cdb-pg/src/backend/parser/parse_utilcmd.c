@@ -26,10 +26,10 @@
 
 #include "postgres.h"
 
-#include "access/catquery.h"
 #include "access/genam.h"
 #include "access/heapam.h"
 #include "access/reloptions.h"
+#include "catalog/catquery.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/dependency.h"
 #include "catalog/heap.h"

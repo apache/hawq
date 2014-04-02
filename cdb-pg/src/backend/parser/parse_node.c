@@ -14,7 +14,7 @@
  */
 #include "postgres.h"
 
-#include "access/catquery.h"
+#include "catalog/catquery.h"
 #include "catalog/pg_type.h"
 #include "mb/pg_wchar.h"
 #include "nodes/makefuncs.h"

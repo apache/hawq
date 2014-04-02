@@ -31,11 +31,11 @@
 #include "postgres.h"
 
 #include "access/genam.h"
-#include "access/catquery.h" 
 #include "access/heapam.h"
 #include "access/tuptoaster.h"
 #include "access/xact.h"
 #include "catalog/catalog.h"
+#include "catalog/catquery.h" 
 #include "catalog/indexing.h"
 #include "catalog/pg_largeobject.h"
 #include "commands/comment.h"

@@ -14,7 +14,7 @@
 
 #include "access/heapam.h"
 #include "access/genam.h"
-#include "access/catquery.h"
+#include "catalog/catquery.h"
 #include "catalog/dependency.h"
 #include "catalog/indexing.h"
 #include "catalog/pg_extprotocol.h"

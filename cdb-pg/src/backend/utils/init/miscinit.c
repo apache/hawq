@@ -29,7 +29,7 @@
 #include <utime.h>
 #endif
 
-#include "access/catquery.h"
+#include "catalog/catquery.h"
 #include "catalog/pg_authid.h"
 #include "cdb/cdbvars.h"
 #include "mb/pg_wchar.h"

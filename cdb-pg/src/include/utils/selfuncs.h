@@ -16,8 +16,8 @@
 #define SELFUNCS_H
 
 #include "fmgr.h"
-#include "access/catquery.h"
 #include "access/htup.h"
+#include "catalog/catquery.h"
 #include "nodes/relation.h"
 
 

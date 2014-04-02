@@ -15,10 +15,10 @@
 
 #include "access/genam.h"
 #include "access/heapam.h"
-#include "access/catquery.h"
-#include "catalog/heap.h"
 #include "access/xact.h"
+#include "catalog/catquery.h"
 #include "catalog/dependency.h"
+#include "catalog/heap.h"
 #include "catalog/indexing.h"
 #include "catalog/pg_auth_time_constraint.h"
 #include "catalog/pg_auth_members.h"

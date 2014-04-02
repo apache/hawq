@@ -9,7 +9,7 @@
  */
 
 #include "postgres.h"
-#include "access/catquery.h"
+#include "catalog/catquery.h"
 #include "optimizer/planpartition.h"
 #include "optimizer/walkers.h"
 #include "optimizer/clauses.h"

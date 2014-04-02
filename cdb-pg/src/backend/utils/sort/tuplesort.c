@@ -99,9 +99,9 @@
 
 #include "postgres.h"
 
-#include "access/catquery.h"
 #include "access/heapam.h"
 #include "access/nbtree.h"
+#include "catalog/catquery.h"
 #include "catalog/pg_amop.h"
 #include "catalog/pg_operator.h"
 #include "executor/instrument.h"        /* Instrumentation */

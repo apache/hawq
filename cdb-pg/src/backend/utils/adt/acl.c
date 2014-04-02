@@ -16,7 +16,7 @@
 
 #include <ctype.h>
 
-#include "access/catquery.h"
+#include "catalog/catquery.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_authid.h"
 #include "catalog/pg_auth_members.h"

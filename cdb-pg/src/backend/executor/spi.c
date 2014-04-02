@@ -13,10 +13,10 @@
  */
 #include "postgres.h"
 
-#include "access/catquery.h"
 #include "access/printtup.h"
 #include "access/sysattr.h"
 #include "access/xact.h"
+#include "catalog/catquery.h"
 #include "catalog/heap.h"
 #include "commands/trigger.h"
 #include "executor/spi_priv.h"

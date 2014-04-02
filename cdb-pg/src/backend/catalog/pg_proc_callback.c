@@ -13,8 +13,8 @@
 #include "postgres.h"
 
 #include "access/genam.h"
-#include "access/catquery.h"
 #include "access/heapam.h"
+#include "catalog/catquery.h"
 #include "catalog/indexing.h"
 #include "catalog/pg_proc_callback.h"
 #include "utils/fmgroids.h"

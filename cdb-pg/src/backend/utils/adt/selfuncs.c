@@ -77,7 +77,7 @@
 #include <ctype.h>
 #include <math.h>
 
-#include "access/catquery.h"
+#include "catalog/catquery.h"
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_statistic.h"
 #include "catalog/pg_type.h"

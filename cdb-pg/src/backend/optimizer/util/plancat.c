@@ -19,11 +19,11 @@
 #include <math.h>
 
 #include "access/genam.h"
-#include "access/catquery.h"
 #include "access/heapam.h"
 #include "access/aocssegfiles.h"
 #include "access/parquetsegfiles.h"
 #include "access/pxfuriparser.h"
+#include "catalog/catquery.h"
 #include "catalog/gp_policy.h"
 #include "catalog/pg_inherits.h"
 #include "catalog/pg_exttable.h"

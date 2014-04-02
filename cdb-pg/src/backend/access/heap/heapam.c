@@ -38,7 +38,6 @@
  */
 #include "postgres.h"
 
-#include "access/catquery.h"
 #include "access/heapam.h"
 #include "access/hio.h"
 #include "access/multixact.h"
@@ -49,6 +48,7 @@
 #include "access/valid.h"
 #include "access/xact.h"
 #include "catalog/catalog.h"
+#include "catalog/catquery.h"
 #include "catalog/gp_policy.h"
 #include "catalog/gp_fastsequence.h"
 #include "catalog/namespace.h"

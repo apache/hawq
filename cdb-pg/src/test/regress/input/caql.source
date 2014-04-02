@@ -23,10 +23,9 @@
 
 --
 -- caql.md5 contains hash codes for compiled caql modules
--- (see src/backend/access/index/findcaql.sh)
 --
 CREATE EXTERNAL WEB TABLE compiled_caql_x (mod text, hsh text)
-execute E'(cat @abs_srcdir@/../../backend/access/index/caql.md5 | perl -nle \'my @foo=split("/", $_); print $foo[-2]."/".$foo[-1]\' | sed "s/)=/|/" | sort ) ' on MASTER format 'text' (delimiter '|');
+execute E'(cat @abs_srcdir@/../../backend/catalog/caql/caql.md5 | perl -nle \'my @foo=split("/", $_); print $foo[-2]."/".$foo[-1]\' | sed "s/)=/|/" | sort ) ' on MASTER format 'text' (delimiter '|');
 
 --
 -- build hash codes for current set of caql modules

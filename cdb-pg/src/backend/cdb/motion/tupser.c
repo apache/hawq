@@ -10,7 +10,7 @@
  */
 #include "postgres.h"
 
-#include "access/catquery.h"
+#include "catalog/catquery.h"
 #include "catalog/pg_type.h"
 #include "nodes/execnodes.h" //SliceTable
 #include "cdb/cdbmotion.h"

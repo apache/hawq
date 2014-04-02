@@ -103,6 +103,13 @@ typedef struct cqContextData
 
 } cqContext;
 
+/* internal use */
+bool is_builtin_object(cqContext *pCtx, HeapTuple tuple);
+Datum caql_getattr_internal(cqContext *pCtx, HeapTuple tup,
+					  AttrNumber attnum, bool *isnull);
+void caql_heapclose(cqContext *pCtx);
+void disable_catalog_check(cqContext *pCtx, HeapTuple tuple);
+
 /* count (and optionally delete) */
 int			 caql_getcount(cqContext *pCtx, cq_list *pcql);
 
@@ -228,6 +235,11 @@ void caql_logquery(const char *funcname, const char *filename, int lineno,
 
 /* ifdef gnuc ! */
 #define cql(x, ...) cql1(x, __FILE__, __LINE__, __VA_ARGS__)
+
+/* MPP-18975: wrapper to assuage type checker (only CString currently). 
+   See calico.pl/check_datum_type() for details.
+ */
+#define cqlIsDatumForCString(d) (d)
 
 /* caqlanalyze.c */
 struct caql_hash_cookie * cq_lookup(const char *str, unsigned int len, cq_list *pcql);

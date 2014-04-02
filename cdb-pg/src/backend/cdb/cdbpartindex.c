@@ -11,7 +11,7 @@
 #include "postgres.h"
 #include "funcapi.h"
 #include "fmgr.h"
-#include "access/catquery.h"
+#include "catalog/catquery.h"
 #include "access/hash.h"
 #include "catalog/index.h"
 #include "catalog/pg_constraint.h"

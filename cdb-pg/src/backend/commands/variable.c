@@ -18,8 +18,8 @@
 
 #include <ctype.h>
 
-#include "access/catquery.h"
 #include "access/xact.h"
+#include "catalog/catquery.h"
 #include "catalog/pg_authid.h"
 #include "commands/variable.h"
 #include "miscadmin.h"

@@ -25,13 +25,13 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
-#include "access/catquery.h"
 #include "access/genam.h"
 #include "access/heapam.h"
 #include "catalog/heap.h"
 #include "access/xact.h"
 #include "access/transam.h"				/* InvalidTransactionId */
 #include "catalog/catalog.h"
+#include "catalog/catquery.h"
 #include "catalog/dependency.h"
 #include "catalog/indexing.h"
 #include "catalog/pg_attribute.h"

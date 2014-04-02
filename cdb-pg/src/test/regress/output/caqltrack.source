@@ -356,7 +356,7 @@ AS
 drop external web table if exists get_uniqdef;
 NOTICE:  table "get_uniqdef" does not exist, skipping
 CREATE EXTERNAL WEB TABLE get_uniqdef (x text)
-execute E'( perl @abs_srcdir@/../../include/catalog/caqluniqdef.pl  @abs_srcdir@/../../backend/access/index/uniqdef.json > @abs_srcdir@/data/uniqdef.data )'
+execute E'( perl @abs_srcdir@/../../include/catalog/caqluniqdef.pl  @abs_srcdir@/../../backend/catalog/caql/uniqdef.json > @abs_srcdir@/data/uniqdef.data )'
 on SEGMENT 0
 format 'text';
 -- start_ignore
@@ -395,7 +395,7 @@ drop table if exists caller;
 NOTICE:  table "caller" does not exist, skipping
 -- end_ignore
 CREATE EXTERNAL WEB TABLE get_caloc (query text, file text, lineno integer, path text)
-execute E'python @abs_srcdir@/../../backend/access/index/caller.py'
+execute E'python @abs_srcdir@/../../backend/catalog/caql/caller.py'
 on MASTER format 'text';
 create table caloc as select * from get_caloc;
 NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'query' as the Greenplum Database data distribution key for this table.

@@ -4,6 +4,9 @@
  *  Created on: Jul 30, 2013
  *      Author: malili
  */
+#include "postgres.h"
+
+#include "catalog/catquery.h"
 #include "cdb/cdbparquetstoragewrite.h"
 #include "lib/stringinfo.h"
 #include "utils/cash.h"
@@ -12,7 +15,6 @@
 #include "utils/numeric.h"
 #include "utils/xml.h"
 #include "utils/inet.h"
-#include "access/catquery.h"
 
 #include "snappy-c.h"
 #include "zlib.h"

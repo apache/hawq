@@ -9,25 +9,6 @@
 #include "catquery_mock.c"
 
 
-/*
- * Helpers
- */ 
-bool
-attribute_check_helper(Oid attrelid)
-{
-	bool ret = false;
-	PG_TRY();
-	{
-		disable_attribute_check(attrelid);
-	}
-	PG_CATCH();
-	{
-		ret = true;
-	}
-	PG_END_TRY();
-	return ret;
-}
-
 bool
 catalog_check_helper(cqContext *pCtx, HeapTuple tuple)
 {
@@ -105,31 +86,6 @@ test__disable_catalog_check__true(void **state)
 	assert_true(catalog_check_helper(&ctx, ht));
 }
 
-void
-test__disable_attribute_check__false(void **state)
-{
-	Gp_role = GP_ROLE_DISPATCH;
-	assert_false(attribute_check_helper(18000));
-
-	Gp_role = GP_ROLE_EXECUTE;
-	Gp_segment = -1;
-	assert_false(attribute_check_helper(18000));
-
-	Gp_segment = 1;
-	gp_disable_catalog_access_on_segment = false;
-	assert_false(attribute_check_helper(18000));
-}
-
-void
-test__disable_attribute_check__true(void **state)
-{
-	Gp_role = GP_ROLE_EXECUTE;
-	Gp_segment = 1;
-	gp_disable_catalog_access_on_segment = true;
-
-	assert_true(attribute_check_helper(20000));
-}
-
 int
 main(int argc, char* argv[])
 {
@@ -140,8 +96,6 @@ main(int argc, char* argv[])
 		unit_test(test__is_builtin_object__non_oid),
 		unit_test(test__disable_catalog_check__false),
 		unit_test(test__disable_catalog_check__true),
-		unit_test(test__disable_attribute_check__false),
-		unit_test(test__disable_attribute_check__true)
 	};
 	
 	return run_tests(tests);

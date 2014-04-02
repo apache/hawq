@@ -9,7 +9,7 @@
  */
 #include "postgres.h"
 
-#include "access/catquery.h"
+#include "catalog/catquery.h"
 #include "catalog/pg_type.h"            /* INT8OID */
 #include "nodes/makefuncs.h"
 #include "optimizer/clauses.h"

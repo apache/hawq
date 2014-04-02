@@ -1,7 +1,7 @@
 subdir=src/backend/catalog/caql
 top_builddir=../../../../..
 
-TARGETS=caqlanalyze gram
+TARGETS=catquery caqlanalyze gram 
 
 COMMON_REAL_OBJS = \
 	$(top_srcdir)/src/backend/access/hash/hashfunc.o \
@@ -44,11 +44,18 @@ COMMON_REAL_OBJS = \
 caqlanalyze_REAL_OBJS=$(COMMON_REAL_OBJS) \
 	$(top_srcdir)/src/backend/access/common/heaptuple.o \
 	$(top_srcdir)/src/backend/access/common/tupdesc.o \
-	$(top_srcdir)/src/backend/access/index/catquery.o \
+	$(top_srcdir)/src/backend/catalog/caql/caqlaccess.o \
 	$(top_srcdir)/src/backend/catalog/core/catcoretable.o \
 	$(top_srcdir)/src/backend/catalog/core/catcore.o
 gram_REAL_OBJS=$(COMMON_REAL_OBJS)
 
+catquery_REAL_OBJS=$(COMMON_REAL_OBJS) \
+	$(top_srcdir)/src/backend/access/common/heaptuple.o \
+	$(top_srcdir)/src/backend/access/transam/filerepdefs.o \
+	$(top_srcdir)/src/backend/catalog/caql/caqlaccess.o \
+	$(top_srcdir)/src/backend/executor/execUtils.o \
+	$(top_srcdir)/src/port/exec.o 
+	
 include ../../../../Makefile.mock
 
 gram.t: gram_upper

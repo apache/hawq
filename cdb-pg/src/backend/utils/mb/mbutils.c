@@ -8,8 +8,8 @@
  */
 #include "postgres.h"
 
-#include "access/catquery.h"
 #include "access/xact.h"
+#include "catalog/catquery.h"
 #include "catalog/namespace.h"
 #include "mb/pg_wchar.h"
 #include "utils/builtins.h"

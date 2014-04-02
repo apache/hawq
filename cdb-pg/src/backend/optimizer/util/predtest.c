@@ -15,7 +15,7 @@
  */
 #include "postgres.h"
 
-#include "access/catquery.h"
+#include "catalog/catquery.h"
 #include "catalog/pg_amop.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_operator.h"

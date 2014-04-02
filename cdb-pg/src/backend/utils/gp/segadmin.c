@@ -8,7 +8,7 @@
 #include "postgres.h"
 #include "miscadmin.h"
 
-#include "access/catquery.h"
+#include "catalog/catquery.h"
 #include "catalog/gp_segment_config.h"
 #include "catalog/pg_database.h"
 #include "catalog/pg_filespace.h"

@@ -74,10 +74,10 @@ def main():
     # cdb-pg directory
     rootdir = os.path.join(os.path.dirname(__file__), '../../../..')
     # caql.files know which `.c` files should be processed.
-    input_file = os.path.join(rootdir, 'src/backend/access/index/caql.files')
+    input_file = os.path.join(rootdir, 'src/backend/catalog/caql/caql.files')
     for line in open(input_file):
         line = line.strip()
-        abspath = os.path.join(rootdir, 'src/backend/access/index', line)
+        abspath = os.path.join(rootdir, 'src/backend/catalog/caql', line)
         dirname = os.path.dirname(abspath)
         dirname_fromtop = os.path.relpath(abspath, rootdir)
         filename = os.path.basename(abspath)

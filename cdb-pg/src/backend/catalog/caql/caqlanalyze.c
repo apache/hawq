@@ -10,10 +10,10 @@
 
 #include "postgres.h"
 
-#include "access/catquery.h"
 #include "access/hash.h"
 #include "access/heapam.h"
 #include "catalog/catcore.h"
+#include "catalog/catquery.h"
 #include "catalog/caqlparse.h"
 #include "cdb/cdbvars.h"
 #include "cdb/cdbpersistentstore.h"

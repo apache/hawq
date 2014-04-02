@@ -2,4 +2,10 @@ gram.c
 gram.h
 scan.c
 scan.c-e
-
+basedef.json
+caql.files
+caql.md5
+caqlfilemap.json
+catquery.c
+gperf.init
+uniqdef.json

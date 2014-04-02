@@ -28,7 +28,7 @@
 #include "access/pxfuriparser.h"
 #include "access/heapam.h"
 #include "access/hd_work_mgr.h"
-#include "access/catquery.h"
+#include "catalog/catquery.h"
 #include "catalog/heap.h"
 #include "access/transam.h"
 #include "access/tuptoaster.h"

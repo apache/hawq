@@ -10,7 +10,7 @@
 #include "fmgr.h"
 
 #include "access/reloptions.h"
-#include "access/catquery.h"
+#include "catalog/catquery.h"
 #include "catalog/pg_attribute_encoding.h"
 #include "catalog/pg_compression.h"
 #include "catalog/dependency.h"

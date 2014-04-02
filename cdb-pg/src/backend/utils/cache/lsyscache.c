@@ -18,8 +18,8 @@
 
 #include "access/hash.h"
 #include "access/genam.h" 
-#include "access/catquery.h"
 #include "bootstrap/bootstrap.h"
+#include "catalog/catquery.h"
 #include "catalog/heap.h"                   /* SystemAttributeDefinition() */  
 #include "catalog/pg_authid.h"
 #include "catalog/pg_amop.h"

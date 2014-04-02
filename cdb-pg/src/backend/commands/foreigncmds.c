@@ -13,10 +13,10 @@
  */
 #include "postgres.h"
 
-#include "access/catquery.h"
 #include "access/heapam.h"
 #include "access/reloptions.h"
 #include "catalog/catalog.h"
+#include "catalog/catquery.h"
 #include "catalog/dependency.h"
 #include "catalog/indexing.h"
 #include "catalog/pg_foreign_data_wrapper.h"
@@ -39,7 +39,6 @@
 #include "utils/rel.h"
 #include "utils/syscache.h"
 #include "access/genam.h"
-#include "access/catquery.h"
 
 /*
  * Convert a DefElem list to the text array format that is used in

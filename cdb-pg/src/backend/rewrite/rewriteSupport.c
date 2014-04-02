@@ -14,8 +14,8 @@
  */
 #include "postgres.h"
 
-#include "access/catquery.h"
 #include "access/heapam.h"
+#include "catalog/catquery.h"
 #include "catalog/indexing.h"
 #include "rewrite/rewriteSupport.h"
 #include "utils/inval.h"
