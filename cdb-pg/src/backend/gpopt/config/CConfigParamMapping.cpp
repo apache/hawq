@@ -246,6 +246,13 @@ CConfigParamMapping::SConfigMappingElem CConfigParamMapping::m_elem[] =
 		GPOS_WSZ_LIT("Enable CTE inlining.")
 		},
 
+		{
+		EopttraceEnableConstantExpressionEvaluation,
+		&optimizer_enable_constant_expression_evaluation,
+		false,  // m_fNegate
+		GPOS_WSZ_LIT("Enable constant expression evaluation in the optimizer")
+		},
+
 };
 
 //---------------------------------------------------------------------------

@@ -472,6 +472,45 @@ insert into orca.t(user_id, timest, tag2) values(3, '201208','tag2');
 
 select * from orca.t order by 1, 2;
 
+-- test heterogeneous indexes with constant expression evaluation
+drop table if exists orca.t_date;
+
+create table orca.t_date ( timest date, user_id numeric(16,0) not null, tag1 char(5), tag2 char(5))
+distributed by (user_id)
+partition by list (timest) (partition part201203 values('01-03-2012'::date), partition part201204 values('01-04-2012'::date), partition part201205 values('01-05-2012'::date));
+create index user_id_idx on orca.t_date_1_prt_part201203(user_id);
+
+alter table orca.t_date add partition part201206 values('01-06-2012'::date);
+alter table orca.t_date add partition part201207 values('01-07-2012'::date);
+alter table orca.t_date add partition part201208 values('01-08-2012'::date);
+
+insert into orca.t_date values('01-03-2012'::date,0,'tag1','tag2');
+insert into orca.t_date values('01-03-2012'::date,1,'tag1','tag2');
+insert into orca.t_date values('01-04-2012'::date,2,'tag1','tag2');
+insert into orca.t_date values('01-05-2012'::date,1,'tag1','tag2');
+insert into orca.t_date values('01-06-2012'::date,2,'tag1','tag2');
+insert into orca.t_date values('01-07-2012'::date,1,'tag1','tag2');
+insert into orca.t_date values('01-08-2012'::date,2,'tag1','tag2');
+
+insert into orca.t_date values('01-03-2012'::date,2,'tag1','tag2');
+insert into orca.t_date values('01-03-2012'::date,3,'tag1','tag2');
+insert into orca.t_date values('01-03-2012'::date,4,'tag1','tag2');
+insert into orca.t_date values('01-03-2012'::date,5,'tag1','tag2');
+insert into orca.t_date values('01-03-2012'::date,6,'tag1','tag2');
+insert into orca.t_date values('01-03-2012'::date,7,'tag1','tag2');
+insert into orca.t_date values('01-03-2012'::date,8,'tag1','tag2');
+insert into orca.t_date values('01-03-2012'::date,9,'tag1','tag2');
+
+set optimizer_enable_constant_expression_evaluation=on;
+set optimizer_enumerate_plans=on;
+set optimizer_plan_id = 3;
+explain select * from orca.t_date where user_id=9;
+select * from orca.t_date where user_id=9;
+
+set optimizer_enumerate_plans=off;
+set optimizer_enable_constant_expression_evaluation=off;
+set optimizer_print_plan=off;
+
 -- test project elements in TVF
 
 CREATE FUNCTION orca.csq_f(a int) RETURNS int AS $$ select $1 $$ LANGUAGE SQL;

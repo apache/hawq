@@ -373,6 +373,7 @@ extern double optimizer_damping_factor_join;
 extern double optimizer_damping_factor_groupby;
 extern int optimizer_segments;
 extern bool optimizer_analyze_root_partition;
+extern bool optimizer_enable_constant_expression_evaluation;
 /**
  * Enable logging of DPE match in optimizer.
  */

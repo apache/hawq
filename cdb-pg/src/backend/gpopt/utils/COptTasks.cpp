@@ -33,6 +33,7 @@
 #include "gpopt/translate/CTranslatorDXLToQuery.h"
 #include "gpopt/translate/CContextDXLToPlStmt.h"
 #include "gpopt/translate/CTranslatorRelcacheToDXL.h"
+#include "gpopt/eval/CConstExprEvaluatorDXL.h"
 
 #include "cdb/cdbvars.h"
 #include "utils/guc.h"
@@ -852,8 +853,8 @@ COptTasks::PvOptimizeTask
 			COptimizerConfig *pocconf = PoconfCreate(pmp);
 			ICostModel *pcm = New(pmp) CCostModelGPDB(pmp, ulSegmentsForCosting);
 			CConstExprEvaluatorProxy ceevalproxy(pmp, &mda);
-			// the optimizer will use the default evaluator
-			IConstExprEvaluator *pceeval = NULL;
+			IConstExprEvaluator *pceeval =
+					New(pmp) CConstExprEvaluatorDXL(pmp, &mda, &ceevalproxy);
 
 			// preload metadata if optimizer uses multiple threads
 			if (optimizer_parallel)
@@ -861,6 +862,7 @@ COptTasks::PvOptimizeTask
 				// install opt context in TLS
 				pcm->AddRef();
 				pocconf->AddRef();
+				pceeval->AddRef();
 				CAutoOptCtxt aoc(pmp, &mda, pcm, pceeval, pocconf);
 				CTranslatorUtils::PreloadMD(pmp, &mda, sysidDefault, (Query*) poctx->m_pquery);
 			}
@@ -900,6 +902,7 @@ COptTasks::PvOptimizeTask
 				poctx->m_pplstmt = (PlannedStmt *) gpdb::PvCopyObject(Pplstmt(pmp, &mda, pdxlnPlan));
 			}
 
+			pceeval->Release();
 			pdxlnQuery->Release();
 			pocconf->Release();
 			pcm->Release();
