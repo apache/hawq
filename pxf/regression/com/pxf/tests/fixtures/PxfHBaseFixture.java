@@ -4,6 +4,8 @@ import java.io.File;
 
 import jsystem.utils.FileUtils;
 
+import org.junit.Assert;
+
 import com.pivotal.pxfauto.infra.common.ShellSystemObject;
 import com.pivotal.pxfauto.infra.hbase.HBase;
 import com.pivotal.pxfauto.infra.structures.tables.basic.Table;
@@ -19,6 +21,18 @@ public class PxfHBaseFixture extends BasicFixture {
 
 		startFixtureLevel();
 
+		prepareJar(
+				new String[] {
+						"HBaseAccessorWithFilter", 
+						"FilterPrinterAccessor"},
+				new String[] {
+						"HBaseAccessorWithFilter", 
+						"HBaseAccessorWithFilter$SplitBoundary", 
+						"FilterPrinterAccessor",
+						"FilterPrinterAccessor$FilterPrinterException"},
+				"Class-Path: pxf-hbase-2.2.0.jar",
+				"hbase-filter-test.jar");
+		
 		hbase = (HBase) system.getSystemObject("hbase");
 
 		Table[] hbaseTables = new Table[] {
@@ -33,18 +47,6 @@ public class PxfHBaseFixture extends BasicFixture {
 				hbase.dropTable(hbaseTables[i], false);
 			}
 		}
-
-		prepareJar(
-				new String[] {
-						"HBaseAccessorWithFilter", 
-						"FilterPrinterAccessor"},
-				new String[] {
-						"HBaseAccessorWithFilter", 
-						"HBaseAccessorWithFilter$SplitBoundary", 
-						"FilterPrinterAccessor",
-						"FilterPrinterAccessor$FilterPrinterException"},
-				"Class-Path: pxf-hbase-2.2.0.jar",
-				"hbase-filter-test.jar");
 		
 		stopFixtureLevel();
 	}
@@ -85,6 +87,8 @@ public class PxfHBaseFixture extends BasicFixture {
 		sb.append("-d ").append(tmpDir);
 		sso.runCommand(sb.toString());
 		
+		String compliationStatus = sso.getLastCmdResult();
+		
 		ReportUtils.report(report, getClass(), "create " + jarFile.getName());
 		// the $ in inner class files must be prepended by a slash in command line
 		sb = new StringBuilder();
@@ -93,6 +97,9 @@ public class PxfHBaseFixture extends BasicFixture {
 		index = 0;
 		for (String className: classFileNames) {
 			classFiles[index] = new File(tmpDir + className + ".class");
+			Assert.assertTrue("Class name " + classFiles[index].getAbsolutePath() + " is missing," +
+					" check for compilation error: \n" + compliationStatus + "", 
+					classFiles[index].exists());
 			sb.append("-C ").append(tmpDir).append(" ").
 			   append(getEscapedClassName(classFiles[index])).append(" ");
 			++index;
