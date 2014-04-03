@@ -1390,6 +1390,55 @@ prepareDispatchedCatalogSingleRelation(QueryContextInfo *cxt, Oid relid,
     ReleaseSysCache(classtuple);
 }
 
+static Oid
+getActiveSegrelid(Oid relid)
+{
+    Relation pg_appendonly_rel;
+    TupleDesc pg_appendonly_dsc;
+    HeapTuple tuple;
+    ScanKeyData key;
+    SysScanDesc aoscan;
+
+    Oid retval;
+    Datum temp;
+
+
+    Snapshot saveSnapshot = ActiveSnapshot;
+	ActiveSnapshot = CopySnapshot(ActiveSnapshot);
+	ActiveSnapshot->curcid = GetCurrentCommandId();
+
+    pg_appendonly_rel = heap_open(AppendOnlyRelationId, AccessShareLock);
+    pg_appendonly_dsc = RelationGetDescr(pg_appendonly_rel);
+
+    ScanKeyInit(&key, Anum_pg_appendonly_relid, BTEqualStrategyNumber, F_OIDEQ,
+            ObjectIdGetDatum(relid));
+
+    aoscan = systable_beginscan(pg_appendonly_rel, AppendOnlyRelidIndexId, TRUE,
+            ActiveSnapshot, 1, &key);
+
+    tuple = systable_getnext(aoscan);
+
+    if (!HeapTupleIsValid(tuple))
+        ereport(ERROR,
+                (errcode(ERRCODE_UNDEFINED_OBJECT), errmsg("missing pg_appendonly"
+                " entry for relation \"%s\"", get_rel_name(relid))));
+
+    temp = heap_getattr(tuple, Anum_pg_appendonly_segrelid, pg_appendonly_dsc,
+            NULL );
+
+    retval = DatumGetObjectId(temp);
+
+    /* Finish up scan and close pg_appendonly catalog. */
+    systable_endscan(aoscan);
+
+    heap_close(pg_appendonly_rel, AccessShareLock);
+
+    /* Restore the old snapshot */
+	ActiveSnapshot = saveSnapshot;
+
+    return retval;
+}
+
 /*
  * parse pg_appendonly for dispatch
  */
@@ -1404,6 +1453,11 @@ prepareDispatchedCatalogGpAppendOnly(QueryContextInfo *cxt,
     SysScanDesc aoscan;
 
     Datum temp;
+
+    /*
+     * used to check if currently transaction can be serialized
+     */
+    Oid activeSegrelid = getActiveSegrelid(relid);
 
     /*
      * Check the pg_appendonly relation to be certain the ao table
@@ -1432,6 +1486,16 @@ prepareDispatchedCatalogGpAppendOnly(QueryContextInfo *cxt,
             NULL );
 
     *segrelid = DatumGetObjectId(temp);
+
+    if (*segrelid != activeSegrelid)
+    {
+    	/*
+    	 * the pg_aoseg table for this relation is changed in other concurrent transaction,
+    	 * it usually happened with a concurrent alter statement.
+    	 * abort this transaction
+    	 */
+    	elog(ERROR, "could not serialize access due to read/write/alter dependencies among transactions");
+    }
 
     temp = heap_getattr(tuple, Anum_pg_appendonly_segidxid, pg_appendonly_dsc,
             NULL );
