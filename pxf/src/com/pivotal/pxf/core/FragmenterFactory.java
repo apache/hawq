@@ -9,8 +9,9 @@ import com.pivotal.pxf.core.utilities.Utilities;
  * an Fragmenter abstract class which is returned by the FragmenterFactory. 
  */
 public class FragmenterFactory {
-    static public Fragmenter create(InputData conf) throws Exception {
-        String fragmenterName = conf.getProperty("X-GP-FRAGMENTER");
-        return (Fragmenter) Utilities.createAnyInstance(InputData.class, fragmenterName, conf);
+    static public Fragmenter create(InputData inputData) throws Exception {
+    	String fragmenterName = inputData.fragmenter();
+    	
+        return (Fragmenter) Utilities.createAnyInstance(InputData.class, fragmenterName, inputData);
     }
 }

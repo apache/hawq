@@ -100,7 +100,7 @@ public class HdfsUtilities {
      * Checks if requests should be handle in a single thread or not.
      *
      * @param inputData container holding all parameters
-     * @return if the request can be run in multithreaded mode.
+     * @return if the request can be run in multi-threaded mode.
      */
     public static boolean isThreadSafe(InputData inputData) {
         Configuration conf = new Configuration();

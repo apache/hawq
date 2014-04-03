@@ -4,6 +4,7 @@ import com.pivotal.pxf.api.Analyzer;
 import com.pivotal.pxf.api.AnalyzerStats;
 import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.core.AnalyzerFactory;
+import com.pivotal.pxf.core.utilities.ProtocolData;
 import com.pivotal.pxf.core.utilities.SecuredHDFS;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -70,9 +71,25 @@ public class AnalyzerResource {
 		/* Convert headers into a regular map */
         Map<String, String> params = convertToRegularMap(headers.getRequestHeaders());
 
-        final InputData inputData = new InputData(params);
-        SecuredHDFS.verifyToken(inputData, servletContext);
-        final Analyzer analyzer = AnalyzerFactory.create(inputData);
+        /* Store protocol level properties and verify */
+        final ProtocolData protData = new ProtocolData(params);
+        SecuredHDFS.verifyToken(protData, servletContext);
+        
+        /*
+         * Analyzer is a special case in which it is hard to tell if user didn't
+         * specify one, or specified a profile that doesn't include one, or it's
+         * an actual protocol violation. Since we can only test protocol level
+         * logic, we assume (like before) that it's a user error, which is the
+         * case in most likelihood. When analyzer module is removed in the near
+         * future, this assumption will go away with it.
+         */
+        if (protData.analyzer() == null) {
+			throw new IllegalArgumentException(
+					"PXF 'Analyzer' class was not found. Please supply it in the LOCATION clause or use it in a PXF profile in order to run ANALYZE on this table");
+        }
+        
+        /* Create an analyzer instance with API level parameters */
+        final Analyzer analyzer = AnalyzerFactory.create(protData);
 
 		/*
          * Function queries the pxf Analyzer for the data fragments of the resource

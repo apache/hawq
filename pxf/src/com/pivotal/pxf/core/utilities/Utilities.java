@@ -49,13 +49,17 @@ public class Utilities {
         try {
             return con.newInstance(metaData);
         } catch (InvocationTargetException e) {
-            /*
-             * We are creating resolvers, accessors and fragmenters using the reflection framework. If for example, a resolver, during its
-			 * instantiation - in the c'tor, will throw an exception, the Resolver's exception will reach the Reflection
-			 * layer and there it will be wrapped inside an InvocationTargetException. Here we are above the
-			 * Reflection layer and we need to unwrap the Resolver's initial exception and throw it instead of the
-			 * wrapper InvocationTargetException so that our initial Exception text will be displayed
-			 * in psql instead of the message: "Internal Server Error"
+			/*
+			 * We are creating resolvers, accessors and fragmenters using the
+			 * reflection framework. If for example, a resolver, during its
+			 * instantiation - in the c'tor, will throw an exception, the
+			 * Resolver's exception will reach the Reflection layer and there it
+			 * will be wrapped inside an InvocationTargetException. Here we are
+			 * above the Reflection layer and we need to unwrap the Resolver's
+			 * initial exception and throw it instead of the wrapper
+			 * InvocationTargetException so that our initial Exception text will
+			 * be displayed in psql instead of the message:
+			 * "Internal Server Error"
 			 */
             throw (e.getCause() != null) ? new Exception(e.getCause()) : e;
         }

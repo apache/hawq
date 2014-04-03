@@ -4,11 +4,12 @@ import com.pivotal.pxf.api.BadRecordException;
 import com.pivotal.pxf.api.OneField;
 import com.pivotal.pxf.api.OutputFormat;
 import com.pivotal.pxf.api.io.DataType;
-import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.core.io.GPDBWritable;
 import com.pivotal.pxf.core.io.GPDBWritable.TypeMismatchException;
 import com.pivotal.pxf.core.io.Text;
 import com.pivotal.pxf.core.io.Writable;
+import com.pivotal.pxf.core.utilities.ProtocolData;
+
 import org.apache.commons.lang.ObjectUtils;
 
 import java.lang.reflect.Array;
@@ -24,7 +25,7 @@ import static com.pivotal.pxf.api.io.DataType.TEXT;
  * an output record.
  */
 public class BridgeOutputBuilder {
-    private InputData inputData;
+    private ProtocolData inputData;
     private Writable output = null;
     private GPDBWritable errorRecord = null;
     private String delim = ",";
@@ -34,7 +35,7 @@ public class BridgeOutputBuilder {
     /*
      * C'tor
      */
-    public BridgeOutputBuilder(InputData input) {
+    public BridgeOutputBuilder(ProtocolData input) {
         inputData = input;
         makeErrorRecord();
     }

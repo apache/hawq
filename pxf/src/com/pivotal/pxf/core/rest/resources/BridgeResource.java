@@ -1,9 +1,9 @@
 package com.pivotal.pxf.core.rest.resources;
 
-import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.core.Bridge;
 import com.pivotal.pxf.core.ReadBridge;
 import com.pivotal.pxf.core.io.Writable;
+import com.pivotal.pxf.core.utilities.ProtocolData;
 import com.pivotal.pxf.core.utilities.SecuredHDFS;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.logging.Log;
@@ -64,21 +64,21 @@ public class BridgeResource {
 
         Log.debug("started with parameters: " + params);
 
-        InputData inputData = new InputData(params);
-        SecuredHDFS.verifyToken(inputData, servletContext);
-        Bridge bridge = new ReadBridge(inputData);
-        String dataDir = inputData.dataSource();
+        ProtocolData protData = new ProtocolData(params);
+        SecuredHDFS.verifyToken(protData, servletContext);
+        Bridge bridge = new ReadBridge(protData);
+        String dataDir = protData.dataSource();
         // THREAD-SAFE parameter has precedence
-        boolean isThreadSafe = inputData.threadSafe() && bridge.isThreadSafe();
+        boolean isThreadSafe = protData.threadSafe() && bridge.isThreadSafe();
         Log.debug("Request for " + dataDir + " will be handled " +
                 (isThreadSafe ? "without" : "with") + " synchronization");
 
-        return readResponse(bridge, inputData, isThreadSafe);
+        return readResponse(bridge, protData, isThreadSafe);
     }
 
-    Response readResponse(final Bridge bridge, InputData inputData, final boolean threadSafe) throws Exception {
-        final int fragment = inputData.getDataFragment();
-        final String dataDir = inputData.dataSource();
+    Response readResponse(final Bridge bridge, ProtocolData protData, final boolean threadSafe) throws Exception {
+        final int fragment = protData.getDataFragment();
+        final String dataDir = protData.dataSource();
 
         // Creating an internal streaming class
         // which will iterate the records and put them on the

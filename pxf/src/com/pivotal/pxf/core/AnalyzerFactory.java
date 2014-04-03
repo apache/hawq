@@ -9,8 +9,9 @@ import com.pivotal.pxf.core.utilities.Utilities;
  * an Analyzer abstract class which is returned by the AnalyzerFactory. 
  */
 public class AnalyzerFactory {
-    static public Analyzer create(InputData conf) throws Exception {
-        String analyzerName = conf.getProperty("X-GP-ANALYZER");
-        return (Analyzer) Utilities.createAnyInstance(InputData.class, analyzerName, conf);
+    static public Analyzer create(InputData inputData) throws Exception {
+    	String analyzerName = inputData.analyzer();
+    	
+        return (Analyzer) Utilities.createAnyInstance(InputData.class, analyzerName, inputData);
     }
 }

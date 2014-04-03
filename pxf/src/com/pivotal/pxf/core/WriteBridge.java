@@ -4,6 +4,7 @@ import com.pivotal.pxf.api.*;
 import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.api.utilities.Plugin;
 import com.pivotal.pxf.core.io.Writable;
+import com.pivotal.pxf.core.utilities.ProtocolData;
 import com.pivotal.pxf.core.utilities.Utilities;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -25,10 +26,13 @@ public class WriteBridge implements Bridge {
     /*
      * C'tor - set the implementation of the bridge
      */
-    public WriteBridge(InputData input) throws Exception {
-        fileAccessor = getFileAccessor(input);
-        fieldsResolver = getFieldsResolver(input);
-        inputBuilder = new BridgeInputBuilder(input);
+    public WriteBridge(ProtocolData protocolData) throws Exception {
+    	
+        inputBuilder = new BridgeInputBuilder(protocolData);        
+        /* plugins accept InputData paramaters */
+        fileAccessor = getFileAccessor(protocolData);
+        fieldsResolver = getFieldsResolver(protocolData);
+        
     }
 
     /*

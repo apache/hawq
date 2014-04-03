@@ -1,6 +1,5 @@
 package com.pivotal.pxf.core.utilities;
 
-import com.pivotal.pxf.api.utilities.InputData;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
@@ -51,14 +50,16 @@ public class SecuredHDFS {
      * The function will get the token information from parameters
 	 * and call SecuredHDFS to verify the token.
 	 *
-	 * X-GP data will be deserialied from hex string to a byte array
+	 * All token properties will be deserialied from hex string to a byte array
 	 */
-    public static void verifyToken(InputData inputData, ServletContext context) {
+    public static void verifyToken(ProtocolData protData, ServletContext context) {
         if (UserGroupInformation.isSecurityEnabled()) {
-            byte[] identifier = hexStringToByteArray(inputData.getProperty("X-GP-TOKEN-IDNT"));
-            byte[] password = hexStringToByteArray(inputData.getProperty("X-GP-TOKEN-PASS"));
-            byte[] kind = hexStringToByteArray(inputData.getProperty("X-GP-TOKEN-KIND"));
-            byte[] service = hexStringToByteArray(inputData.getProperty("X-GP-TOKEN-SRVC"));
+        	
+            byte[] identifier = hexStringToByteArray(protData.getTokenIdentifier());
+            byte[] password = hexStringToByteArray(protData.getTokenPassword());
+            byte[] kind = hexStringToByteArray(protData.getTokenKind());
+            byte[] service = hexStringToByteArray(protData.getTokenService());
+
             verifyToken(identifier, password, kind, service, context);
         }
     }

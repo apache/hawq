@@ -42,7 +42,8 @@ public class WritableResolver extends Plugin implements ReadResolver, WriteResol
      */
     public WritableResolver(InputData input) throws Exception {
         super(input);
-        userObject = Class.forName(inputData.srlzSchemaName()).newInstance();
+        inputData.verifyDataSchemaAccessible();
+        userObject = Class.forName(inputData.getDataSchemaName()).newInstance();
         fields = userObject.getClass().getDeclaredFields();
         recordkeyIndex = (inputData.getRecordkeyColumn() == null)
                 ? RECORDKEY_UNDEFINED

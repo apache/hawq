@@ -1,7 +1,7 @@
 package com.pivotal.pxf.core;
 
 import com.pivotal.pxf.api.OneField;
-import com.pivotal.pxf.api.utilities.InputData;
+import com.pivotal.pxf.core.utilities.ProtocolData;
 import com.pivotal.pxf.core.io.GPDBWritable;
 import org.junit.Before;
 import org.junit.Test;
@@ -19,12 +19,12 @@ public class BridgeOutputBuilderTest {
 
     private static final int UN_SUPPORTED_TYPE = -1;
     BridgeOutputBuilder builder;
-    InputData input;
+    ProtocolData protocolData;
 
     @Before
     public void setUp() throws Exception {
-        input = mock(InputData.class);
-        builder = new BridgeOutputBuilder(input);
+        protocolData = mock(ProtocolData.class);
+        builder = new BridgeOutputBuilder(protocolData);
     }
 
     @Test

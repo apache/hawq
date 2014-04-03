@@ -3,9 +3,10 @@ package com.pivotal.pxf.core;
 import com.pivotal.pxf.api.OneField;
 import com.pivotal.pxf.api.OutputFormat;
 import com.pivotal.pxf.api.io.DataType;
-import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.core.io.GPDBWritable;
 import com.pivotal.pxf.core.io.Text;
+import com.pivotal.pxf.core.utilities.ProtocolData;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -15,15 +16,15 @@ import java.util.LinkedList;
 import java.util.List;
 
 public class BridgeInputBuilder {
-    private InputData inputData;
+    private ProtocolData protocolData;
     private static final Log LOG = LogFactory.getLog(BridgeInputBuilder.class);
 
-    public BridgeInputBuilder(InputData inputData) throws Exception {
-        this.inputData = inputData;
+    public BridgeInputBuilder(ProtocolData protocolData) throws Exception {
+        this.protocolData = protocolData;
     }
 
     public List<OneField> makeInput(DataInput inputStream) throws Exception {
-        if (inputData.outputFormat() == OutputFormat.TEXT) {
+        if (protocolData.outputFormat() == OutputFormat.TEXT) {
             Text txt = new Text();
             txt.readFields(inputStream);
             return Collections.singletonList(new OneField(DataType.BYTEA.getOID(), txt.getBytes()));

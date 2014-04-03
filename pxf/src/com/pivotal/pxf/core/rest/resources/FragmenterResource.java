@@ -5,6 +5,7 @@ import com.pivotal.pxf.api.Fragmenter;
 import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.core.FragmenterFactory;
 import com.pivotal.pxf.core.FragmentsResponseFormatter;
+import com.pivotal.pxf.core.utilities.ProtocolData;
 import com.pivotal.pxf.core.utilities.SecuredHDFS;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -63,9 +64,16 @@ public class FragmenterResource {
 
 		/* Convert headers into a regular map */
         Map<String, String> params = convertToRegularMap(headers.getRequestHeaders());
-        InputData inputData = new InputData(params);
-        SecuredHDFS.verifyToken(inputData, servletContext);
-        final Fragmenter fragmenter = FragmenterFactory.create(inputData);
+        
+        /* Store protocol level properties and verify */
+        ProtocolData protData = new ProtocolData(params);
+        if (protData.fragmenter() == null)
+        	protData.protocolViolation("fragmenter");
+
+        SecuredHDFS.verifyToken(protData, servletContext);
+
+        /* Create a fragmenter instance with API level parameters */
+        final Fragmenter fragmenter = FragmenterFactory.create(protData);
 
         List<Fragment> fragments = fragmenter.getFragments();
         String jsonOutput = FragmentsResponseFormatter.formatResponseString(fragments, path);

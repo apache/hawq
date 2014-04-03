@@ -1,8 +1,8 @@
 package com.pivotal.pxf.core.rest.resources;
 
-import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.core.Bridge;
 import com.pivotal.pxf.core.WriteBridge;
+import com.pivotal.pxf.core.utilities.ProtocolData;
 import com.pivotal.pxf.core.utilities.SecuredHDFS;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -86,15 +86,17 @@ public class WritableResource {
 
         // Convert headers into a regular map
         Map<String, String> params = convertToRegularMap(headers.getRequestHeaders());
-        params.put("X-GP-DATA-PATH", path);
-        LOG.debug("WritableResource started with parameters: " + params);
+        LOG.debug("WritableResource started with parameters: " + params +
+        		  " and write path: " + path);
 
-        InputData inputData = new InputData(params);
-        SecuredHDFS.verifyToken(inputData, servletContext);
-        Bridge bridge = new WriteBridge(inputData);
+        ProtocolData protData = new ProtocolData(params);
+        protData.setDataSource(path);
+        
+        SecuredHDFS.verifyToken(protData, servletContext);
+        Bridge bridge = new WriteBridge(protData);
 
         // THREAD-SAFE parameter has precedence
-        boolean isThreadSafe = inputData.threadSafe() && bridge.isThreadSafe();
+        boolean isThreadSafe = protData.threadSafe() && bridge.isThreadSafe();
         LOG.debug("Request for " + path + " handled " +
                 (isThreadSafe ? "without" : "with") + " synchronization");
 

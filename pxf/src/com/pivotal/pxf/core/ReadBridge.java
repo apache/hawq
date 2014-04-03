@@ -7,6 +7,7 @@ import com.pivotal.pxf.api.ReadResolver;
 import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.api.utilities.Plugin;
 import com.pivotal.pxf.core.io.Writable;
+import com.pivotal.pxf.core.utilities.ProtocolData;
 import com.pivotal.pxf.core.utilities.Utilities;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -35,11 +36,11 @@ public class ReadBridge implements Bridge {
     /*
      * C'tor - set the implementation of the bridge
      */
-    public ReadBridge(InputData input) throws Exception {
-        fileAccessor = getFileAccessor(input);
-        fieldsResolver = getFieldsResolver(input);
-        outputBuilder = new BridgeOutputBuilder(input);
+    public ReadBridge(ProtocolData protData) throws Exception {
+        outputBuilder = new BridgeOutputBuilder(protData);
         Log = LogFactory.getLog(ReadBridge.class);
+        fileAccessor = getFileAccessor(protData);
+        fieldsResolver = getFieldsResolver(protData);
     }
 
     /*

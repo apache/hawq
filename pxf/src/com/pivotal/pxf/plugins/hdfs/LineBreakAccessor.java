@@ -51,7 +51,7 @@ public class LineBreakAccessor extends HdfsSplittableDataAccessor implements Wri
      */
     public boolean openForWrite() throws Exception {
 
-        String fileName = inputData.getProperty("X-GP-DATA-PATH");
+        String fileName = inputData.dataSource();
         String compressCodec = inputData.compressCodec();
         CompressionCodec codec = null;
 

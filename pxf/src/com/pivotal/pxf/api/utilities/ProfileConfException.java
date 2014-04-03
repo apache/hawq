@@ -7,7 +7,7 @@ package com.pivotal.pxf.api.utilities;
  * {@link ProfileConfException.MessageFormat#NO_PROFILE_DEF} when a profile entry or attribute is missing.
  */
 public class ProfileConfException extends RuntimeException {
-    static enum MessageFormat {
+    public static enum MessageFormat {
         PROFILES_FILE_NOT_FOUND("%s was not found on the CLASSPATH"),
         PROFILES_FILE_LOAD_ERR("Profiles configuration %s could not be loaded: %s"),
         NO_PROFILE_DEF("%s is not defined in %s");

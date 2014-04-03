@@ -234,7 +234,10 @@ public class AvroResolver extends Plugin implements ReadResolver {
     }
 
     InputStream openExternalSchema() throws IOException {
-        String schemaName = inputData.srlzSchemaName();
+    	
+    	inputData.verifyDataSchemaAccessible();
+    	
+        String schemaName = inputData.getDataSchemaName();
         ClassLoader loader = this.getClass().getClassLoader();
         InputStream result = loader.getResourceAsStream(schemaName);
 

@@ -61,7 +61,7 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements 
     public boolean openForWrite() throws Exception {
         FileSystem fs;
         Path parent;
-        String fileName = inputData.getProperty("X-GP-DATA-PATH");
+        String fileName = inputData.dataSource();
         conf = new Configuration();
 
         getCompressionCodec(inputData);

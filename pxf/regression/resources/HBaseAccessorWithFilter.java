@@ -212,7 +212,7 @@ public class HBaseAccessorWithFilter extends Plugin implements ReadAccessor {
 	 */
 	private void addFilters() throws Exception {
 		
-		String filterStr = inputData.getProperty("X-GP-TEST-HBASE-FILTER");
+		String filterStr = inputData.getUserProperty("TEST-HBASE-FILTER");
 		Log.debug("user defined filter: " + filterStr);
 		if ((filterStr == null) || filterStr.isEmpty() || "null".equals(filterStr))
 			return;

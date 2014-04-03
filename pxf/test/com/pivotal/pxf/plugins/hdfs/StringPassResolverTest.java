@@ -3,13 +3,13 @@ package com.pivotal.pxf.plugins.hdfs;
 import com.pivotal.pxf.api.OneField;
 import com.pivotal.pxf.api.OneRow;
 import com.pivotal.pxf.api.OutputFormat;
-import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.core.BridgeInputBuilder;
+import com.pivotal.pxf.core.io.Text;
+import com.pivotal.pxf.core.utilities.ProtocolData;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.Mockito;
 import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
@@ -20,27 +20,27 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.Assert.*;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.*;
 
 @RunWith(PowerMockRunner.class)
-@PrepareForTest({InputData.class, LogFactory.class})
+@PrepareForTest({Text.class, BridgeInputBuilder.class, ProtocolData.class, LogFactory.class})
 public class StringPassResolverTest {
-    InputData inputData;
-    Log Log;
-
+    ProtocolData mockProtocolData;
+    Log mockLog;
+    
     @Test
     /*
      * Test the setFields method: small \n terminated input
 	 */
     public void testSetFields() throws Exception {
-        StringPassResolver resolver = buildResolver(false);
+        StringPassResolver resolver = buildResolver();
 
         byte[] data = new byte[]{(int) 'a', (int) 'b', (int) 'c', (int) 'd', (int) '\n',
                 (int) 'n', (int) 'o', (int) '\n'};
 
         DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(data));
-        BridgeInputBuilder inputBuilder = new BridgeInputBuilder(inputData);
+        BridgeInputBuilder inputBuilder = new BridgeInputBuilder(mockProtocolData);
         List<OneField> record = inputBuilder.makeInput(inputStream);
 
         OneRow oneRow = resolver.setFields(record);
@@ -57,7 +57,7 @@ public class StringPassResolverTest {
 	 */
     public void testSetFieldsBigArray() throws Exception {
 
-        StringPassResolver resolver = buildResolver(false);
+        StringPassResolver resolver = buildResolver();
 
         byte[] bigArray = new byte[2000];
         for (int i = 0; i < 1999; ++i) {
@@ -66,7 +66,7 @@ public class StringPassResolverTest {
         bigArray[1999] = (byte) '\n';
 
         DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(bigArray));
-        BridgeInputBuilder inputBuilder = new BridgeInputBuilder(inputData);
+        BridgeInputBuilder inputBuilder = new BridgeInputBuilder(mockProtocolData);
         List<OneField> record = inputBuilder.makeInput(inputStream);
 
         OneRow oneRow = resolver.setFields(record);
@@ -80,7 +80,11 @@ public class StringPassResolverTest {
 	 */
     public void testSetFieldsBigArrayNoNewLine() throws Exception {
 
-        StringPassResolver resolver = buildResolver(false);
+    	PowerMockito.mockStatic(LogFactory.class);
+        mockLog = mock(Log.class);
+        PowerMockito.when(LogFactory.getLog(any(Class.class))).thenReturn(mockLog);
+
+    	StringPassResolver resolver = buildResolver();
 
         byte[] bigArray = new byte[2000];
         for (int i = 0; i < 2000; ++i) {
@@ -88,14 +92,15 @@ public class StringPassResolverTest {
         }
 
         DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(bigArray));
-        BridgeInputBuilder inputBuilder = new BridgeInputBuilder(inputData);
+        BridgeInputBuilder inputBuilder = new BridgeInputBuilder(mockProtocolData);
         List<OneField> record = inputBuilder.makeInput(inputStream);
-
 
         OneRow oneRow = resolver.setFields(record);
 
         verifyOneRow(oneRow, bigArray);
 
+        //verify(mockLog, atLeastOnce()).info(anyString());
+        //Mockito.verify(mockLog).warn("Stream ended without line breaksdfljsldkj");
         //verifyWarning();
     }
 
@@ -105,12 +110,12 @@ public class StringPassResolverTest {
 	 */
     public void testSetFieldsEmptyStream() throws Exception {
 
-        StringPassResolver resolver = buildResolver(false);
+        StringPassResolver resolver = buildResolver();
 
         byte[] empty = new byte[0];
 
         DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(empty));
-        BridgeInputBuilder inputBuilder = new BridgeInputBuilder(inputData);
+        BridgeInputBuilder inputBuilder = new BridgeInputBuilder(mockProtocolData);
         List<OneField> record = inputBuilder.makeInput(inputStream);
 
         OneRow oneRow = resolver.setFields(record);
@@ -121,20 +126,13 @@ public class StringPassResolverTest {
 	/*
 	 * helpers functions
 	 */
-
-    private StringPassResolver buildResolver(boolean hasWarn)
+    private StringPassResolver buildResolver()
             throws Exception {
-        // prepare log for warning
-        if (hasWarn) {
-            PowerMockito.mockStatic(LogFactory.class);
-            Log = mock(Log.class);
-            when(LogFactory.getLog(StringPassResolver.class)).thenReturn(Log);
-        }
+ 
+        mockProtocolData = mock(ProtocolData.class);
+        PowerMockito.when(mockProtocolData.outputFormat()).thenReturn(OutputFormat.TEXT);
 
-        inputData = mock(InputData.class);
-        PowerMockito.when(inputData.outputFormat()).thenReturn(OutputFormat.TEXT);
-
-        return new StringPassResolver(inputData);
+        return new StringPassResolver(mockProtocolData);
     }
 
     private void verifyOneRow(OneRow oneRow, byte[] expected) {
@@ -145,7 +143,7 @@ public class StringPassResolverTest {
         assertTrue(Arrays.equals(result, expected));
     }
 
-    private void verifyWarning() {
-        Mockito.verify(Log).warn("Stream ended without line break");
-    }
+//    private void verifyWarning() {
+//        Mockito.verify(Log).warn("Stream ended without line break");
+//    }
 }
