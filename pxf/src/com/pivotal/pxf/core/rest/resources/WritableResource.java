@@ -15,7 +15,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.*;
 import java.io.DataInputStream;
 import java.io.InputStream;
-import java.util.HashMap;
 import java.util.Map;
 
 /*
@@ -61,7 +60,7 @@ import java.util.Map;
  * REST component
  */
 @Path("/" + Version.PXF_PROTOCOL_VERSION + "/Writable/")
-public class WritableResource {
+public class WritableResource extends RestResource{
     private static final Log LOG = LogFactory.getLog(WritableResource.class);
 
     public WritableResource() {
@@ -84,10 +83,11 @@ public class WritableResource {
                            @QueryParam("path") String path,
                            InputStream inputStream) throws Exception {
 
-        // Convert headers into a regular map
-        Map<String, String> params = convertToRegularMap(headers.getRequestHeaders());
-        LOG.debug("WritableResource started with parameters: " + params +
-        		  " and write path: " + path);
+        /* Convert headers into a case-insensitive regular map */
+        Map<String, String> params = convertToCaseInsensitiveMap(headers.getRequestHeaders());
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("WritableResource started with parameters: " + params + " and write path: " + path);
+        }
 
         ProtocolData protData = new ProtocolData(params);
         protData.setDataSource(path);
@@ -141,17 +141,5 @@ public class WritableResource {
         LOG.debug(returnMsg);
 
         return Response.ok(returnMsg).build();
-    }
-
-    Map<String, String> convertToRegularMap(MultivaluedMap<String, String> multimap) {
-        Map<String, String> result = new HashMap<String, String>();
-        for (String key : multimap.keySet()) {
-            String newKey = key;
-            if (key.startsWith("X-GP-")) {
-                newKey = key.toUpperCase();
-            }
-            result.put(newKey, multimap.getFirst(key).replace("\\\"", "\""));
-        }
-        return result;
     }
 }

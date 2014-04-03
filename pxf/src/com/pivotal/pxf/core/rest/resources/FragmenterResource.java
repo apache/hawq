@@ -2,7 +2,6 @@ package com.pivotal.pxf.core.rest.resources;
 
 import com.pivotal.pxf.api.Fragment;
 import com.pivotal.pxf.api.Fragmenter;
-import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.core.FragmenterFactory;
 import com.pivotal.pxf.core.FragmentsResponseFormatter;
 import com.pivotal.pxf.core.utilities.ProtocolData;
@@ -15,9 +14,11 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.*;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -30,7 +31,7 @@ import java.util.Map;
  * in NameNode.java in the hadoop package - /hadoop-core-X.X.X.jar
  */
 @Path("/" + Version.PXF_PROTOCOL_VERSION + "/Fragmenter/")
-public class FragmenterResource {
+public class FragmenterResource extends RestResource {
     private Log Log;
 
     public FragmenterResource() throws IOException {
@@ -53,22 +54,21 @@ public class FragmenterResource {
                                  @QueryParam("path") final String path) throws Exception {
 
         if (Log.isDebugEnabled()) {
-            StringBuilder startmsg = new StringBuilder("FRAGMENTER started for path \"" + path + "\"");
-            if (headers != null) {
-                for (String header : headers.getRequestHeaders().keySet()) {
-                    startmsg.append(" Header: ").append(header).append(" Value: ").append(headers.getRequestHeader(header));
-                }
+            StringBuilder startMsg = new StringBuilder("FRAGMENTER started for path \"" + path + "\"");
+            for (String header : headers.getRequestHeaders().keySet()) {
+                startMsg.append(" Header: ").append(header).append(" Value: ").append(headers.getRequestHeader(header));
             }
-            Log.debug(startmsg);
+            Log.debug(startMsg);
         }
 
-		/* Convert headers into a regular map */
-        Map<String, String> params = convertToRegularMap(headers.getRequestHeaders());
+		/* Convert headers into a case-insensitive regular map */
+        Map<String, String> params = convertToCaseInsensitiveMap(headers.getRequestHeaders());
         
         /* Store protocol level properties and verify */
         ProtocolData protData = new ProtocolData(params);
-        if (protData.fragmenter() == null)
-        	protData.protocolViolation("fragmenter");
+        if (protData.fragmenter() == null) {
+            protData.protocolViolation("fragmenter");
+        }
 
         SecuredHDFS.verifyToken(protData, servletContext);
 
@@ -79,17 +79,5 @@ public class FragmenterResource {
         String jsonOutput = FragmentsResponseFormatter.formatResponseString(fragments, path);
 
         return Response.ok(jsonOutput, MediaType.APPLICATION_JSON_TYPE).build();
-    }
-
-    Map<String, String> convertToRegularMap(MultivaluedMap<String, String> multimap) {
-        Map<String, String> result = new HashMap<String, String>();
-        for (String key : multimap.keySet()) {
-            String newKey = key;
-            if (key.startsWith("X-GP-")) {
-                newKey = key.toUpperCase();
-            }
-            result.put(newKey, multimap.getFirst(key).replace("\\\"", "\""));
-        }
-        return result;
     }
 }

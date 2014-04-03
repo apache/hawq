@@ -99,15 +99,15 @@ public class ClusterNodesResource {
         String ip = node.getIpAddr();
 
         if (StringUtils.isEmpty(ip)) {
-            throw new NodeDataException("Invalid IP: " + ip + " (Node " + node.toString() + ")");
+            throw new NodeDataException("Invalid IP: " + ip + " (Node " + node + ")");
         }
 
         if (port <= 0) {
-            throw new NodeDataException("Invalid port: " + port + " (Node " + node.toString() + ")");
+            throw new NodeDataException("Invalid port: " + port + " (Node " + node + ")");
         }
     }
 
     String writeNode(DatanodeInfo node) throws java.io.IOException {
-        return "{\"host\":\"" + node.getIpAddr() + "\",\"port\":" + Integer.toString(node.getInfoPort()) + "}";
+        return "{\"host\":\"" + node.getIpAddr() + "\",\"port\":" + node.getInfoPort() + "}";
     }
 }

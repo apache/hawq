@@ -19,7 +19,6 @@ import javax.ws.rs.core.*;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -28,7 +27,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * REST component
  */
 @Path("/" + Version.PXF_PROTOCOL_VERSION + "/Bridge/")
-public class BridgeResource {
+public class BridgeResource extends RestResource {
 
     private static Log Log = LogFactory.getLog(BridgeResource.class);
     /**
@@ -60,7 +59,7 @@ public class BridgeResource {
     public Response read(@Context final ServletContext servletContext,
                          @Context HttpHeaders headers) throws Exception {
         // Convert headers into a regular map
-        Map<String, String> params = convertToRegularMap(headers.getRequestHeaders());
+        Map<String, String> params = convertToCaseInsensitiveMap(headers.getRequestHeaders());
 
         Log.debug("started with parameters: " + params);
 
@@ -127,29 +126,6 @@ public class BridgeResource {
         };
 
         return Response.ok(streaming, MediaType.APPLICATION_OCTET_STREAM).build();
-    }
-
-    Map<String, String> convertToRegularMap(MultivaluedMap<String, String> multimap) throws Exception {
-        Map<String, String> result = new HashMap<String, String>();
-        for (String key : multimap.keySet()) {
-            String val = multimap.getFirst(key);
-            String newVal = val.replace("\\\"", "\"");
-            String newKey = key;
-            if (key.startsWith("X-GP-")) {
-                newKey = key.toUpperCase();
-            }
-            if (newKey.compareTo("X-GP-FRAGMENT-USER-DATA") == 0) {
-                /* FRAGMENT-USER-DATA must be Base64 encoded */
-                if (!Base64.isArrayByteBase64(newVal.getBytes())) {
-                    throw new IOException("Fragment user data must be Base64 encoded. " +
-                            "(Bad value: " + newVal + ")");
-                }
-                Log.debug("X-GP-FRAGMENT-USER-DATA: " + newVal);
-            }
-            result.put(newKey, newVal);
-        }
-
-        return result;
     }
 
     /**

@@ -14,9 +14,11 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.*;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
 
 /*
@@ -28,7 +30,7 @@ import java.util.Map;
  * in NameNode.java in the hadoop package - /hadoop-core-X.X.X.jar
  */
 @Path("/" + Version.PXF_PROTOCOL_VERSION + "/Analyzer/")
-public class AnalyzerResource {
+public class AnalyzerResource extends RestResource {
     private Log Log;
 
 
@@ -69,7 +71,7 @@ public class AnalyzerResource {
         }
 
 		/* Convert headers into a regular map */
-        Map<String, String> params = convertToRegularMap(headers.getRequestHeaders());
+        Map<String, String> params = convertToCaseInsensitiveMap(headers.getRequestHeaders());
 
         /* Store protocol level properties and verify */
         final ProtocolData protData = new ProtocolData(params);
@@ -98,17 +100,5 @@ public class AnalyzerResource {
         String jsonOutput = AnalyzerStats.dataToJSON(analyzer.getEstimatedStats(path));
 
         return Response.ok(jsonOutput, MediaType.APPLICATION_JSON_TYPE).build();
-    }
-
-    Map<String, String> convertToRegularMap(MultivaluedMap<String, String> multimap) {
-        Map<String, String> result = new HashMap<String, String>();
-        for (String key : multimap.keySet()) {
-            String newKey = key;
-            if (key.startsWith("X-GP-")) {
-                newKey = key.toUpperCase();
-            }
-            result.put(newKey, multimap.getFirst(key).replace("\\\"", "\""));
-        }
-        return result;
     }
 }
