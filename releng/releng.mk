@@ -175,8 +175,8 @@ opt_write_test:
 
 sync_tools: opt_write_test /opt/releng/apache-ant
 	@cd releng/make/dependencies; \
-	 (umask 002; /opt/releng/apache-ant/bin/ant -DBLD_ARCH=$(BLD_ARCH) resolve); \
-	 echo "Resolve finished"
+	 (umask 002; /opt/releng/apache-ant/bin/ant -DBLD_ARCH=$(BLD_ARCH) resolve);
+	@echo "Resolve finished";
 
 clean_tools: opt_write_test
 	@cd releng/make/dependencies; \
