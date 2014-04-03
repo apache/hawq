@@ -784,19 +784,18 @@ def processGenericLinuxServer():
     global output
     output = GenericLinuxOutputData()
 
+    output.hdfs = collectHDFS()
+    output.uname = collectUname()
+    output.machine = collectCPUandMemoryInfo()
+    output.diskusage = collectDiskUsage()
+    output.sysctl = collectSysctl()
+    output.limitsconf = collectLimits()
+    output.mounts = collectMounts()
+    output.ioschedulers = collectIOschedulers()
+    output.ntp = collectNtpd()
     if getpass.getuser() == "root":
         output.blockdev = collectBlockdev()
 
-    else:
-        output.hdfs = collectHDFS()
-        output.uname = collectUname()
-        output.machine = collectCPUandMemoryInfo()
-        output.diskusage = collectDiskUsage()
-        output.sysctl = collectSysctl()
-        output.limitsconf = collectLimits()
-        output.mounts = collectMounts()
-        output.ioschedulers = collectIOschedulers()
-        output.ntp = collectNtpd()
 
 
 def processApplianceServer():

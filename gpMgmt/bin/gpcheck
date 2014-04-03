@@ -192,7 +192,7 @@ def parseargs():
 
     HADOOP_HOME = options.hadoop if options.hadoop else os.environ.get("HADOOP_HOME")
 
-    if not gpcheck_info.is_root and not HADOOP_HOME:
+    if not HADOOP_HOME:
         checkFailed(None, "utility will SKIP HDFS configuration check because HADOOP_HOME is not specified in environment variable or --hadoop")
 
     # params check
@@ -292,7 +292,7 @@ def createHostList():
     if options.verbose:
         logger.info("trying to deduplicate hosts [success]")
 
-    if not gpcheck_info.is_root and HADOOP_HOME:
+    if HADOOP_HOME:
         try:
             namenode_host = getHDFSNamenodeHost()
             gpcheck_info.hosts[namenode_host] = GpCheckHost(namenode_host, is_namenode=True)
@@ -326,10 +326,9 @@ def runCollectionOnServers():
             raise GpCheckError("unsupported host type")
 
         cmd = "%s/sbin/gpcheck_hostdump %s" % (GPHOME, host_type_cl)
-        if not gpcheck_info.is_root:
-            cmd += " --sysctl %s" % ",".join(gpcheck_config.sysctl_expected.keys())
-            if HADOOP_HOME:
-                cmd += " --hadoop %s" % HADOOP_HOME
+        cmd += " --sysctl %s" % ",".join(gpcheck_config.sysctl_expected.keys())
+        if HADOOP_HOME:
+            cmd += " --hadoop %s" % HADOOP_HOME
         return cmd
 
     try:
@@ -823,11 +822,10 @@ def testGenericSolarisCluster():
 
 
 def runTests():
-    if gpcheck_info.host_type == HostType.GPCHECK_HOSTTYPE_GENERIC_LINUX and not gpcheck_info.is_root:
+    if gpcheck_info.host_type == HostType.GPCHECK_HOSTTYPE_GENERIC_LINUX:
         testGenericLinuxCluster()
-
-    elif gpcheck_info.host_type == HostType.GPCHECK_HOSTTYPE_GENERIC_LINUX and gpcheck_info.is_root:
-        testGenericLinuxClusterBlockDev()
+        if gpcheck_info.is_root:
+            testGenericLinuxClusterBlockDev()
 
     elif gpcheck_info.host_type == HostType.GPCHECK_HOSTTYPE_GENERIC_SOLARIS:
         testGenericSolarisCluster()
@@ -988,8 +986,7 @@ if __name__ == '__main__':
             # read collected data into gpcheck_info
             readDataFiles()
             # read HAWQ configuration
-            if not gpcheck_info.is_root:
-                readHAWQConfiguration()
+            readHAWQConfiguration()
 
         # Phase 2: generate output
         if options.stdout:
