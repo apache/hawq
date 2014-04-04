@@ -2775,6 +2775,7 @@ CTranslatorRelcacheToDXL::PdrgpulPartKeys
 
 		if (1 < gpdb::UlListLength(plPartKey))
 		{
+			gpdb::CloseRelation(rel);
 			GPOS_RAISE(gpdxl::ExmaMD, gpdxl::ExmiMDObjUnsupported, GPOS_WSZ_LIT("Composite part key"));
 		}
 
