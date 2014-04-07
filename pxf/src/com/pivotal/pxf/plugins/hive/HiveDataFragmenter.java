@@ -128,9 +128,9 @@ public class HiveDataFragmenter extends Fragmenter {
     		initHiveClient();
     	}
     	
-        TblDesc tblDesc = parseTableQualifiedName(inputData.dataSource());
+        TblDesc tblDesc = parseTableQualifiedName(inputData.getDataSource());
         if (tblDesc == null) {
-            throw new IllegalArgumentException(inputData.dataSource() + " is not a valid Hive table name. Should be either <table_name> or <db_name.table_name>");
+            throw new IllegalArgumentException(inputData.getDataSource() + " is not a valid Hive table name. Should be either <table_name> or <db_name.table_name>");
         }
 
         fetchTableMetaData(tblDesc);

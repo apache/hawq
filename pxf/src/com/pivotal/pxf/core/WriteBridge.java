@@ -76,11 +76,11 @@ public class WriteBridge implements Bridge {
     }
 
     private static WriteAccessor getFileAccessor(InputData inputData) throws Exception {
-        return (WriteAccessor) Utilities.createAnyInstance(InputData.class, inputData.accessor(), inputData);
+        return (WriteAccessor) Utilities.createAnyInstance(InputData.class, inputData.getAccessor(), inputData);
     }
 
     private static WriteResolver getFieldsResolver(InputData inputData) throws Exception {
-        return (WriteResolver) Utilities.createAnyInstance(InputData.class, inputData.resolver(), inputData);
+        return (WriteResolver) Utilities.createAnyInstance(InputData.class, inputData.getResolver(), inputData);
     }
 
     @Override

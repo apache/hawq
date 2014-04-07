@@ -87,11 +87,11 @@ public class ReadBridge implements Bridge {
     }
 
     public static ReadAccessor getFileAccessor(InputData inputData) throws Exception {
-        return (ReadAccessor) Utilities.createAnyInstance(InputData.class, inputData.accessor(), inputData);
+        return (ReadAccessor) Utilities.createAnyInstance(InputData.class, inputData.getAccessor(), inputData);
     }
 
     public static ReadResolver getFieldsResolver(InputData inputData) throws Exception {
-        return (ReadResolver) Utilities.createAnyInstance(InputData.class, inputData.resolver(), inputData);
+        return (ReadResolver) Utilities.createAnyInstance(InputData.class, inputData.getResolver(), inputData);
     }
 
     /*

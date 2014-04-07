@@ -58,7 +58,7 @@ public class HBaseDataFragmenter extends Fragmenter {
      */
     private byte[] prepareUserData() throws IOException {
         HBaseLookupTable lookupTable = new HBaseLookupTable();
-        Map<String, byte[]> mappings = lookupTable.getMappings(inputData.dataSource());
+        Map<String, byte[]> mappings = lookupTable.getMappings(inputData.getDataSource());
         lookupTable.close();
 
         if (mappings != null) {
@@ -87,7 +87,7 @@ public class HBaseDataFragmenter extends Fragmenter {
     }
 
     private void addTableFragments(byte[] userData) throws IOException {
-        HTable table = new HTable(HBaseConfiguration.create(), inputData.dataSource());
+        HTable table = new HTable(HBaseConfiguration.create(), inputData.getDataSource());
         NavigableMap<HRegionInfo, ServerName> locations = table.getRegionLocations();
 
         for (Map.Entry<HRegionInfo, ServerName> entry : locations.entrySet()) {
@@ -103,7 +103,7 @@ public class HBaseDataFragmenter extends Fragmenter {
         String[] hosts = new String[] {serverInfo.getHostname()};
         HRegionInfo region = entry.getKey();
         byte[] fragmentMetadata = prepareFragmentMetadata(region);
-        Fragment fragment = new Fragment(inputData.dataSource(), hosts, fragmentMetadata, userData);
+        Fragment fragment = new Fragment(inputData.getDataSource(), hosts, fragmentMetadata, userData);
         fragments.add(fragment);
     }
 

@@ -96,7 +96,7 @@ public class WritableResource extends RestResource{
         Bridge bridge = new WriteBridge(protData);
 
         // THREAD-SAFE parameter has precedence
-        boolean isThreadSafe = protData.threadSafe() && bridge.isThreadSafe();
+        boolean isThreadSafe = protData.isThreadSafe() && bridge.isThreadSafe();
         LOG.debug("Request for " + path + " handled " +
                 (isThreadSafe ? "without" : "with") + " synchronization");
 

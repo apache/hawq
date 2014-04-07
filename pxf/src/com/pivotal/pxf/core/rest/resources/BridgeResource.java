@@ -66,9 +66,9 @@ public class BridgeResource extends RestResource {
         ProtocolData protData = new ProtocolData(params);
         SecuredHDFS.verifyToken(protData, servletContext);
         Bridge bridge = new ReadBridge(protData);
-        String dataDir = protData.dataSource();
+        String dataDir = protData.getDataSource();
         // THREAD-SAFE parameter has precedence
-        boolean isThreadSafe = protData.threadSafe() && bridge.isThreadSafe();
+        boolean isThreadSafe = protData.isThreadSafe() && bridge.isThreadSafe();
         Log.debug("Request for " + dataDir + " will be handled " +
                 (isThreadSafe ? "without" : "with") + " synchronization");
 
@@ -77,7 +77,7 @@ public class BridgeResource extends RestResource {
 
     Response readResponse(final Bridge bridge, ProtocolData protData, final boolean threadSafe) throws Exception {
         final int fragment = protData.getDataFragment();
-        final String dataDir = protData.dataSource();
+        final String dataDir = protData.getDataSource();
 
         // Creating an internal streaming class
         // which will iterate the records and put them on the

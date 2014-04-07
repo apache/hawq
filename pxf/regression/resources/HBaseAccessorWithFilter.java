@@ -108,7 +108,7 @@ public class HBaseAccessorWithFilter extends Plugin implements ReadAccessor {
 	}
 
 	private void openTable() throws IOException	{
-		table = new HTable(HBaseConfiguration.create(), inputData.dataSource().getBytes());
+		table = new HTable(HBaseConfiguration.create(), inputData.getDataSource().getBytes());
 	}
 
 	/*

@@ -144,9 +144,9 @@ public class HdfsUtilitiesTest {
             String codecStr, CompressionCodec codec) {
 
         inputData = mock(InputData.class);
-        when(inputData.dataSource()).thenReturn("/" + path);
-        when(inputData.threadSafe()).thenReturn(threadSafe);
-        when(inputData.compressCodec()).thenReturn(codecStr);
+        when(inputData.getDataSource()).thenReturn("/" + path);
+        when(inputData.isThreadSafe()).thenReturn(threadSafe);
+        when(inputData.getCompressCodec()).thenReturn(codecStr);
 
         try {
             conf = PowerMockito.mock(Configuration.class);

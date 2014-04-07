@@ -91,7 +91,7 @@ public class AvroResolver extends Plugin implements ReadResolver {
      * they may reside inside a sequence file, regular file, ...
      */
     boolean isAvroFile() {
-        return inputData.accessor().toLowerCase().contains("avro");
+        return inputData.getAccessor().toLowerCase().contains("avro");
     }
 
     /*

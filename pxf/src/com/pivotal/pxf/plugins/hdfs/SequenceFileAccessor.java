@@ -61,7 +61,7 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements 
     public boolean openForWrite() throws Exception {
         FileSystem fs;
         Path parent;
-        String fileName = inputData.dataSource();
+        String fileName = inputData.getDataSource();
         conf = new Configuration();
 
         getCompressionCodec(inputData);
@@ -71,7 +71,7 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements 
         file = new Path(fileName);
         fs = file.getFileSystem(conf);
         fc = FileContext.getFileContext();
-        defaultKey = new LongWritable(inputData.segmentId());
+        defaultKey = new LongWritable(inputData.getSegmentId());
 
         if (fs.exists(file)) {
             throw new IOException("file " + file + " already exists, can't write data");
@@ -94,8 +94,8 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements 
      */
     private void getCompressionCodec(InputData inputData) {
 
-        String compressCodec = inputData.compressCodec();
-        String compressType = inputData.compressType();
+        String compressCodec = inputData.getCompressCodec();
+        String compressType = inputData.getCompressType();
 
         compressionType = SequenceFile.CompressionType.NONE;
         codec = null;

@@ -129,7 +129,6 @@ public class InputData {
         return fragmentMetadata;
     }
 
-    
     /** 
      * Gets any custom user data that may have been passed from the 
      * fragmenter. Will mostly be used by the accessor or resolver. 
@@ -147,12 +146,12 @@ public class InputData {
     }
 
     /** Returns the number of segments in GP. */
-    public int totalSegments() {
+    public int getTotalSegments() {
         return totalSegments;
     }
 
     /** Returns the current segment ID. */
-    public int segmentId() {
+    public int getSegmentId() {
         return segmentId;
     }
 
@@ -162,7 +161,7 @@ public class InputData {
     }
 
     /** Returns the filter string, <tt>null</tt> if #hasFilter is <tt>false</tt> */
-    public String filterString() {
+    public String getFilterString() {
         return filterString;
     }
 
@@ -172,7 +171,7 @@ public class InputData {
     }
 
     /** Returns the number of columns in tuple description. */
-    public int columns() {
+    public int getColumns() {
         return tupleDescription.size();
     }
 
@@ -191,7 +190,7 @@ public class InputData {
     }
 
     /** Returns the data source of the required resource (i.e a file path or a table name). */
-    public String dataSource() {
+    public String getDataSource() {
         return dataSource;
     }
 
@@ -220,12 +219,12 @@ public class InputData {
     }
 
     /** Returns the ClassName for the java class that was defined as Accessor */
-    public String accessor() {
+    public String getAccessor() {
         return accessor;
     }
 
     /** Returns the ClassName for the java class that was defined as Resolver */
-    public String resolver() {
+    public String getResolver() {
         return resolver;
     }
 
@@ -233,7 +232,7 @@ public class InputData {
 	 * Returns the ClassName for the java class that was defined as Fragmenter
 	 * or null if no fragmenter was defined
 	 */
-    public String fragmenter() {
+    public String getFragmenter() {
     	return fragmenter;
     }
 
@@ -241,7 +240,7 @@ public class InputData {
 	 * Returns the ClassName for the java class that was defined as Analyzer or
 	 * null if no analyzer was defined
 	 */
-    public String analyzer() {
+    public String getAnalyzer() {
     	return analyzer;
     }
 
@@ -264,7 +263,7 @@ public class InputData {
     }
 
     /** Returns the compression codec name (<tt>null</tt> means no compression) */
-    public String compressCodec() {
+    public String getCompressCodec() {
         return compressCodec;
     }
 
@@ -273,7 +272,7 @@ public class InputData {
      * Returns the compression type (can be null)
      * Allowed values: RECORD, BLOCK.
      */
-    public String compressType() {
+    public String getCompressType() {
         return compressType;
     }
 
@@ -297,7 +296,7 @@ public class InputData {
         return remoteSecret;
     }
 
-    public boolean threadSafe() {
+    public boolean isThreadSafe() {
         return threadSafe;
     }
 

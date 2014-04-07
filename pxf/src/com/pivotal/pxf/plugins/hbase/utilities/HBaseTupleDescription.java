@@ -78,7 +78,7 @@ public class HBaseTupleDescription {
     }
 
     private void createTupleDescription() {
-        for (int i = 0; i < conf.columns(); ++i) {
+        for (int i = 0; i < conf.getColumns(); ++i) {
             ColumnDescriptor column = conf.getColumn(i);
             tupleDescription.add(getHBaseColumn(column));
         }

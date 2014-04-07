@@ -116,7 +116,7 @@ public class HBaseAccessor extends Plugin implements ReadAccessor {
     }
 
     private void openTable() throws IOException {
-        table = new HTable(HBaseConfiguration.create(), inputData.dataSource().getBytes());
+        table = new HTable(HBaseConfiguration.create(), inputData.getDataSource().getBytes());
     }
 
     /**
@@ -230,7 +230,7 @@ public class HBaseAccessor extends Plugin implements ReadAccessor {
         }
 
         HBaseFilterBuilder eval = new HBaseFilterBuilder(tupleDescription);
-        Filter filter = eval.getFilterObject(inputData.filterString());
+        Filter filter = eval.getFilterObject(inputData.getFilterString());
         scanDetails.setFilter(filter);
 
         scanStartKey = eval.startKey();

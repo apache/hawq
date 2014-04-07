@@ -104,11 +104,11 @@ public class HdfsUtilities {
      */
     public static boolean isThreadSafe(InputData inputData) {
         Configuration conf = new Configuration();
-        String dataDir = inputData.dataSource();
-        if (!inputData.threadSafe()) {
+        String dataDir = inputData.getDataSource();
+        if (!inputData.isThreadSafe()) {
             return false;
         }
-        String writeCodec = inputData.compressCodec();
+        String writeCodec = inputData.getCompressCodec();
         Class<? extends CompressionCodec> codecClass = (writeCodec != null)
                 ? HdfsUtilities.getCodecClass(conf, writeCodec)
                 : HdfsUtilities.getCodecClassByPath(dataDir);
@@ -155,12 +155,12 @@ public class HdfsUtilities {
 
             String[] hosts = (String[]) objectStream.readObject();
 
-            FileSplit fileSplit = new FileSplit(new Path(inputData.dataSource()),
+            FileSplit fileSplit = new FileSplit(new Path(inputData.getDataSource()),
                     start,
                     end,
                     hosts);
 
-            Log.debug("parsed file split: path " + inputData.dataSource() +
+            Log.debug("parsed file split: path " + inputData.getDataSource() +
                     ", start " + start + ", end " + end +
                     ", hosts " + ArrayUtils.toString(hosts));
 

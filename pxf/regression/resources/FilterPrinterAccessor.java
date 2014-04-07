@@ -50,7 +50,7 @@ public class FilterPrinterAccessor extends Plugin implements ReadAccessor
 	public boolean openForRead() throws Exception {
 		
 		String filter = inputData.hasFilter() ?
-				inputData.filterString() : "No filter"; 
+				inputData.getFilterString() : "No filter"; 
 		throw new FilterPrinterException(filter);
 	}
 	

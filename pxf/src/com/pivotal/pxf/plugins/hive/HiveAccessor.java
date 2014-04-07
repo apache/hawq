@@ -117,14 +117,14 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
             return true;
         }
 
-        String filterStr = inputData.filterString();
+        String filterStr = inputData.getFilterString();
         HiveFilterBuilder eval = new HiveFilterBuilder(inputData);
         Object filter = eval.getFilterObject(filterStr);
 
         boolean returnData = isFiltered(partitions, filter);
 
         if (Log.isDebugEnabled()) {
-            Log.debug("segmentId: " + inputData.segmentId() + " " + inputData.dataSource() + "--" + filterStr + "returnData: " + returnData);
+            Log.debug("segmentId: " + inputData.getSegmentId() + " " + inputData.getDataSource() + "--" + filterStr + "returnData: " + returnData);
             if (filter instanceof List) {
                 for (Object f : (List) filter) {
                     printOneBasicFilter(f);

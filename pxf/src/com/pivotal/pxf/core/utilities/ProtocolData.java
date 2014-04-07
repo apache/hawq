@@ -300,7 +300,7 @@ public class ProtocolData extends InputData {
      * Returns the compression type (can be null)
      * Allowed values: RECORD, BLOCK.
      */
-    public String compressType() {
+    public String getCompressType() {
         return compressType;
     }
 

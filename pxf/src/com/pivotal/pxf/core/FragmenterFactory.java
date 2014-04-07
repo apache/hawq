@@ -10,7 +10,7 @@ import com.pivotal.pxf.core.utilities.Utilities;
  */
 public class FragmenterFactory {
     static public Fragmenter create(InputData inputData) throws Exception {
-    	String fragmenterName = inputData.fragmenter();
+    	String fragmenterName = inputData.getFragmenter();
     	
         return (Fragmenter) Utilities.createAnyInstance(InputData.class, fragmenterName, inputData);
     }

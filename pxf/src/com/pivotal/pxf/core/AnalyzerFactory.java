@@ -10,7 +10,7 @@ import com.pivotal.pxf.core.utilities.Utilities;
  */
 public class AnalyzerFactory {
     static public Analyzer create(InputData inputData) throws Exception {
-    	String analyzerName = inputData.analyzer();
+    	String analyzerName = inputData.getAnalyzer();
     	
         return (Analyzer) Utilities.createAnyInstance(InputData.class, analyzerName, inputData);
     }

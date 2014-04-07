@@ -32,20 +32,20 @@ public class ProtocolDataTest {
         ProtocolData protocolData = new ProtocolData(parameters);
 
         assertEquals(System.getProperty("greenplum.alignment"), "all");
-        assertEquals(protocolData.totalSegments(), 2);
-        assertEquals(protocolData.segmentId(), -44);
+        assertEquals(protocolData.getTotalSegments(), 2);
+        assertEquals(protocolData.getSegmentId(), -44);
         assertEquals(protocolData.outputFormat(), OutputFormat.TEXT);
         assertEquals(protocolData.serverName(), "my://bags");
         assertEquals(protocolData.serverPort(), -8020);
         assertFalse(protocolData.hasFilter());
-        assertNull(protocolData.filterString());
-        assertEquals(protocolData.columns(), 0);
+        assertNull(protocolData.getFilterString());
+        assertEquals(protocolData.getColumns(), 0);
         assertEquals(protocolData.getDataFragment(), -1);
         assertNull(protocolData.getRecordkeyColumn());
-        assertEquals(protocolData.accessor(), "are");
-        assertEquals(protocolData.resolver(), "packed");
+        assertEquals(protocolData.getAccessor(), "are");
+        assertEquals(protocolData.getResolver(), "packed");
         assertNull(protocolData.getSchema());
-        assertEquals(protocolData.dataSource(), "i'm/ready/to/go");
+        assertEquals(protocolData.getDataSource(), "i'm/ready/to/go");
         assertEquals(protocolData.getUserProperty("i'm-standing-here"), "outside-your-door");
         assertEquals(protocolData.getParametersMap(), parameters);
         assertNull(protocolData.getLogin());
@@ -77,9 +77,9 @@ public class ProtocolDataTest {
         parameters.remove("X-GP-ACCESSOR");
         parameters.remove("X-GP-RESOLVER");
         ProtocolData protocolData = new ProtocolData(parameters);
-        assertEquals(protocolData.fragmenter(), "com.pivotal.pxf.plugins.hive.HiveDataFragmenter");
-        assertEquals(protocolData.accessor(), "com.pivotal.pxf.plugins.hive.HiveAccessor");
-        assertEquals(protocolData.resolver(), "com.pivotal.pxf.plugins.hive.HiveResolver");
+        assertEquals(protocolData.getFragmenter(), "com.pivotal.pxf.plugins.hive.HiveDataFragmenter");
+        assertEquals(protocolData.getAccessor(), "com.pivotal.pxf.plugins.hive.HiveAccessor");
+        assertEquals(protocolData.getResolver(), "com.pivotal.pxf.plugins.hive.HiveResolver");
     }
 
     @Test
@@ -98,7 +98,7 @@ public class ProtocolDataTest {
         parameters.put("X-GP-COMPRESSION_CODEC",
                 "So I asked, who is he? He goes by the name of Wayne Rooney");
         ProtocolData protocolData = new ProtocolData(parameters);
-        assertEquals(protocolData.compressCodec(),
+        assertEquals(protocolData.getCompressCodec(),
                 "So I asked, who is he? He goes by the name of Wayne Rooney");
     }
 
@@ -107,7 +107,7 @@ public class ProtocolDataTest {
         parameters.put("X-GP-COMPRESSION_CODEC",
                 "org.apache.hadoop.io.compress.BZip2Codec");
         ProtocolData protocolData = new ProtocolData(parameters);
-        assertEquals(protocolData.compressCodec(),
+        assertEquals(protocolData.getCompressCodec(),
                 "org.apache.hadoop.io.compress.BZip2Codec");
     }
 
@@ -115,15 +115,15 @@ public class ProtocolDataTest {
     public void compressType() {
         parameters.put("X-GP-COMPRESSION_TYPE", "BLOCK");
         ProtocolData protocolData = new ProtocolData(parameters);
-        assertEquals(protocolData.compressType(), "BLOCK");
+        assertEquals(protocolData.getCompressType(), "BLOCK");
 
         parameters.put("X-GP-COMPRESSION_TYPE", "ReCoRd");
         protocolData = new ProtocolData(parameters);
-        assertEquals(protocolData.compressType(), "RECORD");
+        assertEquals(protocolData.getCompressType(), "RECORD");
 
         parameters.remove("X-GP-COMPRESSION_TYPE");
         protocolData = new ProtocolData(parameters);
-        assertEquals(protocolData.compressType(), "RECORD");
+        assertEquals(protocolData.getCompressType(), "RECORD");
 
         parameters.put("X-GP-COMPRESSION_TYPE", "Oy");
         try {
@@ -147,22 +147,22 @@ public class ProtocolDataTest {
     public void threadSafeTrue() {
         parameters.put("X-GP-THREAD-SAFE", "TRUE");
         ProtocolData protocolData = new ProtocolData(parameters);
-        assertEquals(protocolData.threadSafe(), true);
+        assertEquals(protocolData.isThreadSafe(), true);
 
         parameters.put("X-GP-THREAD-SAFE", "true");
         protocolData = new ProtocolData(parameters);
-        assertEquals(protocolData.threadSafe(), true);
+        assertEquals(protocolData.isThreadSafe(), true);
     }
 
     @Test
     public void threadSafeFalse() {
         parameters.put("X-GP-THREAD-SAFE", "False");
         ProtocolData protocolData = new ProtocolData(parameters);
-        assertEquals(protocolData.threadSafe(), false);
+        assertEquals(protocolData.isThreadSafe(), false);
 
         parameters.put("X-GP-THREAD-SAFE", "falSE");
         protocolData = new ProtocolData(parameters);
-        assertEquals(protocolData.threadSafe(), false);
+        assertEquals(protocolData.isThreadSafe(), false);
     }
 
     @Test
@@ -181,7 +181,7 @@ public class ProtocolDataTest {
     public void threadSafeDefault() {
         parameters.remove("X-GP-THREAD-SAFE");
         ProtocolData protocolData = new ProtocolData(parameters);
-        assertEquals(protocolData.threadSafe(), true);
+        assertEquals(protocolData.isThreadSafe(), true);
     }
 
     @Test

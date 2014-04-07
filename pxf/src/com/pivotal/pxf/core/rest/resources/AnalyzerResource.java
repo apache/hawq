@@ -85,7 +85,7 @@ public class AnalyzerResource extends RestResource {
          * case in most likelihood. When analyzer module is removed in the near
          * future, this assumption will go away with it.
          */
-        if (protData.analyzer() == null) {
+        if (protData.getAnalyzer() == null) {
 			throw new IllegalArgumentException(
 					"PXF 'Analyzer' class was not found. Please supply it in the LOCATION clause or use it in a PXF profile in order to run ANALYZE on this table");
         }

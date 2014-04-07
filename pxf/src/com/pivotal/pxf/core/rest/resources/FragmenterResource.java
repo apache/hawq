@@ -66,10 +66,9 @@ public class FragmenterResource extends RestResource {
         
         /* Store protocol level properties and verify */
         ProtocolData protData = new ProtocolData(params);
-        if (protData.fragmenter() == null) {
-            protData.protocolViolation("fragmenter");
+        if (protData.getFragmenter() == null) {
+        	protData.protocolViolation("fragmenter");
         }
-
         SecuredHDFS.verifyToken(protData, servletContext);
 
         /* Create a fragmenter instance with API level parameters */

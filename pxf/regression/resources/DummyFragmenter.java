@@ -24,13 +24,13 @@ public class DummyFragmenter extends Fragmenter {
     public List<Fragment> getFragments() throws Exception {
         String localhostname = java.net.InetAddress.getLocalHost().getHostName();
         String[] localHosts = new String[]{localhostname, localhostname};
-        fragments.add(new Fragment(inputData.dataSource() + ".1" /* source name */,
+        fragments.add(new Fragment(inputData.getDataSource() + ".1" /* source name */,
                 localHosts /* available hosts list */,
                 "fragment1".getBytes()));
-        fragments.add(new Fragment(inputData.dataSource() + ".2" /* source name */,
+        fragments.add(new Fragment(inputData.getDataSource() + ".2" /* source name */,
                 localHosts /* available hosts list */,
                 "fragment2".getBytes()));
-        fragments.add(new Fragment(inputData.dataSource() + ".3" /* source name */,
+        fragments.add(new Fragment(inputData.getDataSource() + ".3" /* source name */,
                 localHosts /* available hosts list */,
                 "fragment3".getBytes()));
         return fragments;
