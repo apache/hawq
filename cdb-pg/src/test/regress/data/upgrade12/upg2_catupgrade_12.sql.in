@@ -481,41 +481,41 @@ DROP FUNCTION svec_to_string(svec);
 DROP FUNCTION svec_unnest(svec);
 DROP FUNCTION tanimoto_distance(svec, svec);
 
-SELECT catDML('DROP TYPE assoc_rules_results');
+DROP TYPE assoc_rules_results;
 
-SELECT catDML('DROP TYPE chi2_test_result');
+DROP TYPE chi2_test_result;
 
-SELECT catDML('DROP TYPE closest_column_result');
+DROP TYPE closest_column_result;
 
-SELECT catDML('DROP TYPE closest_columns_result');
+DROP TYPE closest_columns_result;
 
-SELECT catDML('DROP TYPE cox_prop_hazards_result');
+DROP TYPE cox_prop_hazards_result;
 
-SELECT catDML('DROP TYPE f_test_result');
+DROP TYPE f_test_result;
 
-SELECT catDML('DROP TYPE intermediate_cox_prop_hazards_result');
+DROP TYPE intermediate_cox_prop_hazards_result;
 
-SELECT catDML('DROP TYPE kmeans_result');
+DROP TYPE kmeans_result;
 
-SELECT catDML('DROP TYPE kmeans_state');
+DROP TYPE kmeans_state;
 
-SELECT catDML('DROP TYPE ks_test_result');
+DROP TYPE ks_test_result;
 
-SELECT catDML('DROP TYPE linregr_result');
+DROP TYPE linregr_result;
 
-SELECT catDML('DROP TYPE logregr_result');
+DROP TYPE logregr_result;
 
-SELECT catDML('DROP TYPE mlogregr_result');
+DROP TYPE mlogregr_result;
 
-SELECT catDML('DROP TYPE mw_test_result');
+DROP TYPE mw_test_result;
 
-SELECT catDML('DROP TYPE lda_result');
+DROP TYPE lda_result;
 
-SELECT catDML('DROP TYPE one_way_anova_result');
+DROP TYPE one_way_anova_result;
 
-SELECT catDML('DROP TYPE t_test_result');
+DROP TYPE t_test_result;
 
-SELECT catDML('DROP TYPE wsr_test_result');
+DROP TYPE wsr_test_result;
 
 CREATE OR REPLACE FUNCTION svec_in(cstring) RETURNS svec
     AS '$libdir/gp_svec.so', 'svec_in'
