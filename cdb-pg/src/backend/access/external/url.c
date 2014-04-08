@@ -170,7 +170,7 @@ header_callback(void *ptr_, size_t size, size_t nmemb, void *userp)
  * when data arrives from gpfdist server and curl is ready to write it
  * to our application, it calls this routine. In here we will store the
  * data in the application variable (URL_FILE *)file which is the passed 
- * in the forth argument as a part of the callback settings.
+ * in the fourth argument as a part of the callback settings.
  *
  * we return the number of bytes written to the application buffer
  */

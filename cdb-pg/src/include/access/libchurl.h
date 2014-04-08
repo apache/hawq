@@ -110,6 +110,10 @@ size_t churl_write(CHURL_HANDLE handle, const char* buf, size_t bufsize);
  */
 size_t churl_read(CHURL_HANDLE handle, char* buf, size_t max_size);
 /*
+ * Check connectivity by reading some bytes and checking response
+ */
+void churl_read_check_connectivity(CHURL_HANDLE handle);
+/*
  * Cleanup churl resources
  */
 void churl_cleanup(CHURL_HANDLE handle);

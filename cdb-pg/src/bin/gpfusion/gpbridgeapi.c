@@ -219,6 +219,9 @@ void gpbridge_import_start(PG_FUNCTION_ARGS)
 
 	context->churl_handle = churl_init_download(context->uri.data,
 												context->churl_headers);
+
+	/* read some bytes to make sure the connection is established */
+	churl_read_check_connectivity(context->churl_handle);
 }
 
 void gpbridge_export_start(PG_FUNCTION_ARGS)
@@ -319,7 +322,6 @@ DataNodeRestSrv* get_pxf_server(GPHDUri* gphd_uri, const Relation rel)
 	return ret_server;
 }
 
-
 /* read as much as possible until we get a zero.
  * if necessary, move to next uri
  */
@@ -336,6 +338,11 @@ size_t gpbridge_read(PG_FUNCTION_ARGS)
 
 	while ((n = fill_buffer(context, databuf, datalen)) == 0)
 	{
+		/* done processing all data for current fragment -
+		 * check if the connection terminated with an error */
+		churl_read_check_connectivity(context->churl_handle);
+
+		/* start processing next fragment */
 		context->current_fragment = lnext(context->current_fragment);
 
 		if (context->current_fragment == NULL)
@@ -343,6 +350,9 @@ size_t gpbridge_read(PG_FUNCTION_ARGS)
 
 		set_current_fragment_headers(context);
 		churl_download_restart(context->churl_handle, context->uri.data, context->churl_headers);
+
+		/* read some bytes to make sure the connection is established */
+		churl_read_check_connectivity(context->churl_handle);
 	}
 
 	return n;
@@ -431,7 +441,7 @@ size_t fill_buffer(gphadoop_context* context, char* start, size_t size)
  * The function will get the cached delegation token
  * for remote host and add it to inputData
  * 
- * TODO Get "hdfs" and port from somplace else.
+ * TODO Get "hdfs" and port from someplace else.
  */
 void add_delegation_token(PxfInputData *inputData)
 {

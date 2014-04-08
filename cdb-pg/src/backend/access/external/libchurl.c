@@ -376,6 +376,18 @@ size_t churl_write(CHURL_HANDLE handle, const char* buf, size_t bufsize)
 }
 
 /*
+ * check that connection is ok, read a few bytes and check response.
+ */
+void churl_read_check_connectivity(CHURL_HANDLE handle)
+{
+	churl_context* context = (churl_context*)handle;
+	Assert(!context->upload);
+
+	fill_internal_buffer(context, 1);
+	check_response_code(context);
+}
+
+/*
  * download
  */
 size_t churl_read(CHURL_HANDLE handle, char* buf, size_t max_size)
@@ -386,7 +398,6 @@ size_t churl_read(CHURL_HANDLE handle, char* buf, size_t max_size)
 	Assert(!context->upload);
 
 	fill_internal_buffer(context, max_size);
-	check_response_code(context);
 
 	n = context_buffer->top - context_buffer->bot;
 	/* TODO: this means we are done.
@@ -412,6 +423,8 @@ void churl_cleanup(CHURL_HANDLE handle)
 
 	if (context->upload)
 		finish_upload(context);
+	else
+		churl_read_check_connectivity(handle);
 
 	cleanup_curl_handle(context);
 	cleanup_internal_buffer(context->download_buffer);

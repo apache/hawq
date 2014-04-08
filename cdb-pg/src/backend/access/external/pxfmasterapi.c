@@ -27,6 +27,9 @@ void process_request(ClientContext* client_context, char *uri)
 	memset(client_context->chunk_buf, 0, RAW_BUF_SIZE);
 	resetStringInfo(&(client_context->the_rest_buf));
 
+	/* read some bytes to make sure the connection is established */
+	churl_read_check_connectivity(client_context->handle);
+
 	while ((n = churl_read(client_context->handle, client_context->chunk_buf, sizeof(client_context->chunk_buf))) != 0)
 	{
 		appendBinaryStringInfo(&(client_context->the_rest_buf), client_context->chunk_buf, n);

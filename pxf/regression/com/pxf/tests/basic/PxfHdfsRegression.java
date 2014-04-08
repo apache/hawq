@@ -664,7 +664,6 @@ public class PxfHdfsRegression extends PxfTestCase {
 		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
 		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.AvroFileAccessor");
 		exTable.setResolver("com.pivotal.pxf.plugins.hdfs.AvroResolver");
-		exTable.setDataSchema("regressPXFCustomAvro.avsc");
 		exTable.setFormatter("pxfwritable_import");
 
 		hawq.createTableAndVerify(exTable);
@@ -966,7 +965,6 @@ public class PxfHdfsRegression extends PxfTestCase {
 		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
 		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.AvroFileAccessor");
 		exTable.setResolver("com.pivotal.pxf.plugins.hdfs.AvroResolver");
-		exTable.setDataSchema("regressPXFCustomAvro.avsc");
 		exTable.setFormatter("pxfwritable_import");
 		exTable.setAnalyzer("com.pivotal.pxf.plugins.hdfs.HdfsAnalyzer");
 
@@ -1023,7 +1021,6 @@ public class PxfHdfsRegression extends PxfTestCase {
 		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
 		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.AvroFileAccessor");
 		exTable.setResolver("com.pivotal.pxf.plugins.hdfs.AvroResolver");
-		exTable.setDataSchema("regressPXFCustomAvro.avsc");
 		exTable.setFormatter("pxfwritable_import");
 		exTable.setAnalyzer("com.pivotal.pxf.plugins.hdfs.HdfsAnalyzer");
 
@@ -1093,7 +1090,6 @@ public class PxfHdfsRegression extends PxfTestCase {
 		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
 		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.AvroFileAccessor");
 		exTable.setResolver("com.pivotal.pxf.plugins.hdfs.AvroResolver");
-		exTable.setDataSchema("regressPXFCustomAvro.avsc");
 		exTable.setFormatter("pxfwritable_import");
 		exTable.setAnalyzer("NoSuchAnalyzer");
 
