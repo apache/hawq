@@ -16,10 +16,10 @@
  */
 #include "postgres.h"
 
+#include "access/catquery.h"
 #include "access/twophase.h"
 #include "access/xact.h"
 #include "catalog/catalog.h"
-#include "catalog/catquery.h"
 #include "catalog/namespace.h"
 #include "catalog/toasting.h"
 #include "catalog/aoseg.h"
@@ -1520,7 +1520,8 @@ ProcessUtility(Node *parsetree,
 										  /* gp_dispatch */ false);
 					}
 				}
-				else if (strcmp(n->name, "default_tablespace") == 0)
+				else if ((strcmp(n->name, "default_tablespace") == 0)
+						|| (strcmp(n->name, "search_path") == 0))
 				{
 					SetPGVariable(n->name, n->args, n->is_local, /* gp_dispatch */ false);
 				}
