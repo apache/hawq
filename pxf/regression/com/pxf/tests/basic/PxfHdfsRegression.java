@@ -191,7 +191,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		FileFormatsUtils.prepareData(new CustomTextPreparer(), 1000, dataTable);
 
-		hdfs.writeTextFile(csvPath, dataTable.getData(), ",");
+		hdfs.writeTableToFile(csvPath, dataTable, ",");
 
 		exTable = new ReadableExternalTable("bigtext", new String[] {
 				"s1 text",
@@ -259,7 +259,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		FileFormatsUtils.prepareData(new CustomTextPreparer(), 1000, dataTable);
 
-		hdfs.writeTextFile(csvPath, dataTable.getData(), ",");
+		hdfs.writeTableToFile(csvPath, dataTable, ",");
 
 		exTable = new ReadableExternalTable("bigtext", new String[] {
 				"s1 text",
@@ -311,7 +311,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		FileFormatsUtils.prepareData(new CustomTextPreparer(), 1000, dataTable);
 
-		hdfs.writeTextFile(csvPath, dataTable.getData(), ",");
+		hdfs.writeTableToFile(csvPath, dataTable, ",");
 
 		exTable = new ReadableExternalTable("bigtext", new String[] {
 				"s1 text",
@@ -363,7 +363,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		FileFormatsUtils.prepareData(new CustomTextPreparer(), 1000, dataTable);
 
-		hdfs.writeTextFile(csvPath, dataTable.getData(), ",");
+		hdfs.writeTableToFile(csvPath, dataTable, ",");
 
 		exTable = new ReadableExternalTable("bigtext", new String[] {
 				"s1 text",
@@ -688,7 +688,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		FileFormatsUtils.prepareData(new QuotedLineTextPreparer(), 1000, dataTable);
 
-		hdfs.writeTextFile(csvPath, dataTable.getData(), ",");
+		hdfs.writeTableToFile(csvPath, dataTable, ",");
 
 		exTable = new ReadableExternalTable("small_csv", new String[] {
 				"num1 int",
@@ -1147,7 +1147,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 		dataTable.addRow(new String[] { "and", "1" });
 		dataTable.addRow(new String[] { "out", "0" });
 
-		hdfs.writeTextFile(csvPath, dataTable.getData(), ",");
+		hdfs.writeTableToFile(csvPath, dataTable, ",");
 
 		exTable = TableFactory.getPxfReadableTextTable("filter_pushdown", fields, csvPath, ",");
 
@@ -1249,7 +1249,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 		dataTable.addRow(new String[] { "9", "nine" });
 		dataTable.addRow(new String[] { "10", "ten - I love you!" });
 
-		hdfs.writeTextFile(dataPath, dataTable.getData(), ",");
+		hdfs.writeTableToFile(dataPath, dataTable, ",");
 
 		ErrorTable errorTable = new ErrorTable("err_table");
 		hawq.runQueryWithExpectedWarning(errorTable.constructDropStmt(true), "(drop cascades to external table err_table_test|" + "table \"" + errorTable.getName() + "\" does not exist, skipping)", true, true);
@@ -1470,23 +1470,23 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		fileTable.addRow(new String[] { "When the truth is found to be lies", "line1" });
 		fileTable.addRow(new String[] { "And all the joy within you dies", "line2" });
-		hdfs.writeTextFile(baseDir + "/level1leaf1/file1", fileTable.getData(), delim);
+		hdfs.writeTableToFile(baseDir + "/level1leaf1/file1", fileTable, delim);
 		dataTable.appendRows(fileTable);
 		fileTable.setData(null);
 
 		fileTable.addRow(new String[] { "Don't you want somebody to love, don't you", "line3" });
 		fileTable.addRow(new String[] { "Need somebody to love, wouldn't you", "line4" });
-		hdfs.writeTextFile(baseDir + "/level1leaf2/level2leaf1/file2", fileTable.getData(), delim);
+		hdfs.writeTableToFile(baseDir + "/level1leaf2/level2leaf1/file2", fileTable, delim);
 		dataTable.appendRows(fileTable);
 		fileTable.setData(null);
 
 		fileTable.addRow(new String[] { "Love somebody to love, you better", "line5" });
-		hdfs.writeTextFile(baseDir + "/level1leaf2/level2leaf1/file3", fileTable.getData(), delim);
+		hdfs.writeTableToFile(baseDir + "/level1leaf2/level2leaf1/file3", fileTable, delim);
 		dataTable.appendRows(fileTable);
 		fileTable.setData(null);
 
 		fileTable.addRow(new String[] { "Find somebody to love", "line6" });
-		hdfs.writeTextFile(baseDir + "/level1leaf2/level2leaf1/level3/file4", fileTable.getData(), delim);
+		hdfs.writeTableToFile(baseDir + "/level1leaf2/level2leaf1/level3/file4", fileTable, delim);
 		dataTable.appendRows(fileTable);
 		fileTable.setData(null);
 
@@ -1573,7 +1573,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		FileFormatsUtils.prepareData(new CustomTextPreparer(), 1000, dataTable);
 
-		hdfs.writeTextFile(csvPath, dataTable.getData(), ",");
+		hdfs.writeTableToFile(csvPath, dataTable, ",");
 
 		exTable = new ReadableExternalTable("bigtext", new String[] {
 				"s1 text",
