@@ -1,15 +1,33 @@
 #!/bin/sh
 ## ======================================================================
 
+##-----------------------------------------------------------------------
+##                        NOTICE!!
+## Before using this script to run feature tests, you should
+## 0. source greenplum_path.sh
+## 1. start HDFS and HAWQ, and create a "gptest" database
+## 2. if you HAWQ are not running at localhost:5432, specify PG_BASE_ADDRESS and PG_BASE_PORT
+## 3. make sure HADOOP_HOME points to right place and hadoop commands have been added to PATH
+## 4. mvn clean package to generate jar files needed
+##
+## This script must be run in hawq-mapreduce-tool folder!
+##-----------------------------------------------------------------------
+
 ##
 ## List of default test cases to run.  This can be overwritten with
 ## the FEATURE_TEST_LIST environment variable.
 ##
 
-FEATURE_TEST_LIST=${FEATURE_TEST_LIST:=com.pivotal.hawq.mapreduce.HAWQAOInputFormatFeatureTest_SingleType \
-                                       com.pivotal.hawq.mapreduce.HAWQAOInputFormatFeatureTest_MultiType \
-                                       com.pivotal.hawq.mapreduce.HAWQAOInputFormatFeatureTest_Tpch \
-                                       com.pivotal.hawq.mapreduce.HAWQAOInputFormatFeatureTest_Others }
+FEATURE_TEST_LIST=${FEATURE_TEST_LIST:=com.pivotal.hawq.mapreduce.ft.HAWQInputFormatFeatureTest_AO_Compression \
+                                       com.pivotal.hawq.mapreduce.ft.HAWQInputFormatFeatureTest_AO_Misc \
+                                       com.pivotal.hawq.mapreduce.ft.HAWQInputFormatFeatureTest_AO_Options \
+                                       com.pivotal.hawq.mapreduce.ft.HAWQInputFormatFeatureTest_AO_Types \
+                                       com.pivotal.hawq.mapreduce.ft.HAWQInputFormatFeatureTest_Parquet_Compression \
+                                       com.pivotal.hawq.mapreduce.ft.HAWQInputFormatFeatureTest_Parquet_Misc \
+                                       com.pivotal.hawq.mapreduce.ft.HAWQInputFormatFeatureTest_Parquet_Options \
+                                       com.pivotal.hawq.mapreduce.ft.HAWQInputFormatFeatureTest_Parquet_Types \
+                                       com.pivotal.hawq.mapreduce.ft.HAWQInputFormatFeatureTest_TPCH }
+
 ##
 ## Default location for test working tmp directory.
 ##
@@ -19,6 +37,9 @@ HAWQ_MAPREDUCE_TOOL_TMPDIR=${HAWQ_MAPREDUCE_TOOL_TMPDIR:=/tmp/hawq-mapreduce-too
 ##
 ## Bring in hadoop config environment.
 ##
+
+export HADOOP_HOME=${HADOOP_HOME:=/usr/lib/gphd/hadoop/}
+echo "HADOOP_HOME is set to ${HADOOP_HOME}"
 
 source /usr/lib/gphd/hadoop/libexec/hadoop-config.sh
 
@@ -54,12 +75,13 @@ for jar in ls /usr/lib/gphd/hadoop-yarn/*.jar ${HAWQ_MAPREDUCE_TOOL_TMPDIR}/*.ja
     CLASSPATH=$CLASSPATH:${jar}
 done
 
+rm inputformat.logs
 for test in ${FEATURE_TEST_LIST}; do
     command="java -cp $CLASSPATH org.junit.runner.JUnitCore ${test}"
 
     echo ""
     echo "======================================================================"
-    echo "Timestamp ..... : $( date)"
+    echo "Timestamp ..... : $(date)"
     echo "Running test .. : ${test}"
     echo "command ....... : ${command}"
     echo "----------------------------------------------------------------------"
@@ -70,7 +92,16 @@ for test in ${FEATURE_TEST_LIST}; do
     echo ""
 done
 
-## 
-## Generate readable test report
 ##
-python generate_mr_report.py
+## Show results.
+##
+num_fails=$(grep -c FAILURES inputformat.logs)
+echo "======================================================================"
+echo ""
+if [ $num_fails -eq 0 ]; then
+    echo "All InputFormat Feature Tests Passed!!!" | tee -a inputformat.logs
+    exit 0
+else
+    echo "There are ${num_fails} failed cases!!!" | tee -a inputformat.logs
+    exit 1
+fi

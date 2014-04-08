@@ -4,14 +4,11 @@ import com.pivotal.hawq.mapreduce.HAWQException;
 import com.pivotal.hawq.mapreduce.datatype.HAWQArray;
 import com.pivotal.hawq.mapreduce.datatype.HAWQBox;
 import com.pivotal.hawq.mapreduce.datatype.HAWQCidr;
-import com.pivotal.hawq.mapreduce.datatype.HAWQDate;
 import com.pivotal.hawq.mapreduce.datatype.HAWQInet;
 import com.pivotal.hawq.mapreduce.datatype.HAWQInterval;
 import com.pivotal.hawq.mapreduce.datatype.HAWQPath;
 import com.pivotal.hawq.mapreduce.datatype.HAWQPoint;
 import com.pivotal.hawq.mapreduce.datatype.HAWQPolygon;
-import com.pivotal.hawq.mapreduce.datatype.HAWQTime;
-import com.pivotal.hawq.mapreduce.datatype.HAWQTimestamp;
 import com.pivotal.hawq.mapreduce.datatype.HAWQVarbit;
 import com.pivotal.hawq.mapreduce.schema.HAWQPrimitiveField;
 
@@ -21,6 +18,7 @@ import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.TimeZone;
 
@@ -29,115 +27,130 @@ import java.util.TimeZone;
  */
 public abstract class HAWQConvertUtil
 {
-	private static long microsecondsPerDay = 86400000000l;
+	//--------------------------------------------------------------------------------
+	//----- Section: Date/Time/Timestamp/Interval
+	//--------------------------------------------------------------------------------
+	private static Calendar defaultCal = new GregorianCalendar();
+	private static TimeZone defaultTz = defaultCal.getTimeZone();
+
+	// We can't use Long.MAX_VALUE or Long.MIN_VALUE for java.sql.date
+	// because this would break the 'normalization contract' of the
+	// java.sql.Date API.
+	// The follow values are the nearest MAX/MIN values with hour,
+	// minute, second, millisecond set to 0 - this is used for
+	// -infinity / infinity representation in Java
+	private static final long DATE_POSITIVE_INFINITY = 9223372036825200000l;
+	private static final long DATE_NEGATIVE_INFINITY = -9223372036832400000l;
+	private static final long DATE_POSITIVE_SMALLER_INFINITY = 185543533774800000l;
+	private static final long DATE_NEGATIVE_SMALLER_INFINITY = -185543533774800000l;
 
 	/**
-	 * Convert long to timestamp
-	 * 
-	 * @param microseconds
-	 *            microseconds
-	 * @return timestamp converted from micorseconds
+	 * Converts the given postgresql seconds to java seconds.
+	 * Reverse engineered by inserting varying dates to postgresql
+	 * and tuning the formula until the java dates matched.
+	 *
+	 * @param secs Postgresql seconds.
+	 * @return Java seconds.
 	 */
-	public static Timestamp longToTimestamp(long microseconds)
-	{
-		long days = microseconds / microsecondsPerDay;
-		HAWQDate date = (HAWQDate) integerToDate((int) days);
-		return new HAWQTimestamp(date, microseconds % microsecondsPerDay,
-				date.isBC());
-	}
+	private static long toJavaSecs(long secs) {
+		// postgres epoc to java epoc
+		secs += 946684800L;
 
-	/**
-	 * Convert long to timestamp with time zone
-	 * 
-	 * @param microseconds
-	 *            microseconds
-	 * @return timestamp with time zone converted from micorseconds
-	 */
-	public static Timestamp longToTimestampTz(long microseconds)
-	{
-		long days = microseconds / microsecondsPerDay;
-		HAWQDate date = (HAWQDate) integerToDate((int) days);
-		return new HAWQTimestamp(date, microseconds % microsecondsPerDay,
-				date.isBC(), TimeZone.getDefault().getRawOffset());
-	}
-
-	/**
-	 * Convert long to time
-	 * 
-	 * @param microseconds
-	 *            microseconds
-	 * @return time converted from microseconds
-	 */
-	public static Time longToTime(long microseconds)
-	{
-		long milliseconds = microseconds / 1000;
-		int microsecond = (int) (microseconds % 1000);
-		return new HAWQTime(milliseconds, microsecond);
-	}
-
-	/**
-	 * Convert 12 bytes to time with time zone
-	 * 
-	 * @param bytes
-	 *            byte array
-	 * @param offset
-	 *            offset in byte array
-	 * @return time with time zone converted from bytes
-	 * @throws HAWQException
-	 *             when there is no enough bytes in byte array
-	 */
-	public static Time bytesToTimeTz(byte[] bytes, int offset)
-			throws HAWQException
-	{
-		long microseconds = bytesToLong(bytes, offset);
-		int zoneSecondOffset = bytesToInt(bytes, offset + 8);
-		long milliseconds = microseconds / 1000;
-		int microsecond = (int) (microseconds % 1000);
-		return new HAWQTime(milliseconds, microsecond, zoneSecondOffset);
-	}
-
-	/**
-	 * Convert integer to date
-	 * 
-	 * @param days
-	 *            days
-	 * @return date converted from days
-	 */
-	public static Date integerToDate(int days)
-	{
-		int julian;
-		int quad;
-		int extra;
-		int y;
-
-		julian = days + HAWQDate.date2j(2000, 1, 1);
-		julian += 32044;
-		quad = julian / 146097;
-		extra = (julian - quad * 146097) * 4 + 3;
-		julian += 60 + quad * 3 + extra / 146097;
-		quad = julian / 1461;
-		julian -= quad * 1461;
-		y = julian * 4 / 1461;
-		julian = ((y != 0) ? (julian + 305) % 365 : (julian + 306) % 366) + 123;
-		y += quad * 4;
-		int year = y - 4800;
-		quad = julian * 2141 / 65536;
-		int day = julian - 7834 * quad / 256;
-		int month = (quad + 10) % 12 + 1;
-
-		boolean isBC = false;
-		if (year < 0)
-		{
-			year = -year + 1;
-			isBC = true;
+		// Julian/Gregorian calendar cutoff point
+		if (secs < -12219292800L) { // October 4, 1582 -> October 15, 1582
+			secs += 86400 * 10;
+			if (secs < -14825808000L) { // 1500-02-28 -> 1500-03-01
+				int extraLeaps = (int) ((secs + 14825808000L) / 3155760000L);
+				extraLeaps--;
+				extraLeaps -= extraLeaps / 4;
+				secs += extraLeaps * 86400L;
+			}
 		}
-		GregorianCalendar calendar = new GregorianCalendar(year, month - 1, day);
-		return new HAWQDate(calendar.getTimeInMillis(), isBC);
+		return secs;
+	}
+
+	/**
+	 * Convert from int to date. HAWQ stores date as int4 in DB,
+	 * which is the julian day number since 2000/01/01.
+	 * @param days
+	 * @return
+	 */
+	public static Date toDate(int days) {
+		long secs = toJavaSecs(days * 86400L);
+		long millis = secs * 1000L;
+		int offset = defaultTz.getOffset(millis);
+		if (millis <= DATE_NEGATIVE_SMALLER_INFINITY) {
+			millis = DATE_NEGATIVE_INFINITY;
+			offset = 0;
+		} else if (millis >= DATE_POSITIVE_SMALLER_INFINITY) {
+			millis = DATE_POSITIVE_INFINITY;
+			offset = 0;
+		}
+		return new Date(millis - offset);
+	}
+
+	/**
+	 * Convert from long to time. HAWQ stored time as int8, which is the
+	 * microseconds since 2000-01-01 00:00:00 GMT.
+	 * @param time value stored in database
+	 * @return java.sql.Time instance representing the stored value.
+	 */
+	public static Time toTime(long time) {
+		long millis = time / 1000;
+		int timeOffset = defaultTz.getOffset(millis);
+
+		return new Time(millis - timeOffset);
+	}
+
+	/**
+	 * Convert from 12 bytes to timetz. HAWQ stored timetz as 12 bytes, which is
+	 * int8 time and int4 zone offset.
+	 * @param bytes value stored in database
+	 * @param offset offset of the byte array indicating the start of value
+	 * @return java.sql.Time instance representing the stored value.
+	 * @throws HAWQException
+	 */
+	public static Time toTimeTz(byte[] bytes, int offset) throws HAWQException {
+		long time = bytesToLong(bytes, offset);
+		long millis = time / 1000;
+
+		int timeOffset = bytesToInt(bytes, offset + 8);
+		timeOffset *= -1000;
+
+		return new Time(millis - timeOffset);
+	}
+
+	/**
+	 * Convert from long to timestamp/timestamptz. HAWQ stored timestamp/timestamptz as int8,
+	 * which is the microseconds since 2000-01-01 00:00:00 GMT.
+	 * @param time value stored in database
+	 * @param isTimestamptz true if binary is in GMT.
+	 * @return java.sql.Timestamp instance representing the stored value.
+	 */
+	public static Timestamp toTimestamp(long time, boolean isTimestamptz) {
+		long secs = time / 1000000;
+		int nanos = (int) (time - secs * 1000000);
+
+		if (nanos < 0) {
+			secs--;
+			nanos += 1000000;
+		}
+		nanos *= 1000;
+
+		secs = toJavaSecs(secs);
+		long millis = secs * 1000L;
+		if (!isTimestamptz) {
+			millis -= defaultTz.getOffset(millis);
+		}
+
+		Timestamp result =  new Timestamp(millis);
+		result.setNanos(nanos);
+		return result;
 	}
 
 	/**
 	 * Convert 16 bytes to interval
-	 * 
+	 *
 	 * @param bytes
 	 *            byte array
 	 * @param offset
@@ -147,11 +160,10 @@ public abstract class HAWQConvertUtil
 	 *             when there is no 16 bytes from offset to end of bytes
 	 */
 	public static HAWQInterval bytesToInterval(byte[] bytes, int offset)
-			throws HAWQException
-	{
+			throws HAWQException {
 		if (bytes.length - offset < 16)
 			throw new HAWQException("Need at least 16 bytes: offset is "
-					+ offset + " while length of bytes is " + bytes.length);
+											+ offset + " while length of bytes is " + bytes.length);
 
 		long time1 = bytesToLong(bytes, offset);
 		int day = bytesToInt(bytes, offset + 8);
@@ -170,8 +182,11 @@ public abstract class HAWQConvertUtil
 		int year = allmonths / 12;
 
 		return new HAWQInterval(year, month, day, hour, minute, second,
-				millisecond, microsecond);
+								millisecond, microsecond);
 	}
+	//--------------------------------------------------------------------------------
+	//----- Date/Time/Timestamp/Interval END
+	//--------------------------------------------------------------------------------
 
 	/**
 	 * Convert byte to boolean
@@ -560,7 +575,7 @@ public abstract class HAWQConvertUtil
 					datas[i] = byteToBoolean(bytes[posInBytes++]);
 					break;
 				case DATE:
-					datas[i] = integerToDate(bytesToInt(bytes, posInBytes));
+					datas[i] = toDate(bytesToInt(bytes, posInBytes));
 					posInBytes += 4;
 					break;
 				case INTERVAL:
@@ -568,7 +583,7 @@ public abstract class HAWQConvertUtil
 					posInBytes += 16;
 					break;
 				case TIME:
-					datas[i] = longToTime(bytesToLong(bytes, posInBytes));
+					datas[i] = toTime(bytesToLong(bytes, posInBytes));
 					posInBytes += 8;
 					break;
 				default:
@@ -791,7 +806,7 @@ public abstract class HAWQConvertUtil
 	 * @throws HAWQException
 	 *             when there is not enough bytes in byte array for a cidr value
 	 */
-	public static HAWQInet bytesToCidr(byte[] bytes, int offset_cidr)
+	public static HAWQCidr bytesToCidr(byte[] bytes, int offset_cidr)
 			throws HAWQException
 	{
 		byte lead = bytes[offset_cidr];

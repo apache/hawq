@@ -1,0 +1,27 @@
+AO_FileLocations:
+  Blocksize: 2097152
+  Checksum: true
+  CompressionLevel: 0
+  CompressionType: none
+  Files:
+  - path: /hawq-data/gpseg0/16385/119737/119958.1
+    size: 3752
+  - path: /hawq-data/gpseg1/16385/119737/119958.1
+    size: 160
+AO_Schema:
+- name: c0
+  type: bool
+- name: c1
+  type: int4
+- name: c2
+  type: numeric
+- name: c3
+  type: date
+DBVersion: PostgreSQL 8.2.15 (Greenplum Database 4.2.0 build 1) (HAWQ 1.2.0.0 build
+  dev) on i386-apple-darwin11.4.2, compiled by GCC gcc (GCC) 4.4.2 compiled on Feb
+  28 2014 09:52:04 (with assert checking)
+DFS_URL: hdfs://127.0.0.1:9000
+Encoding: UTF8
+FileFormat: AO
+TableName: public.sample_parquet_table
+Version: 1.0.0

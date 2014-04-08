@@ -89,12 +89,17 @@ public class HAWQPoint
 	public String toString()
 	{
 		StringBuffer buffer = new StringBuffer();
-		buffer.append('(').append(x).append(',').append(y).append(')');
 		/*
 		 * GPSQL-936
-		 * 
-		 * Remove useless ".0" for float/double
+		 *
+		 * Remove trailing ".0" for float/double to match DB output
 		 */
-		return buffer.toString().replace(".0", "");
+		buffer.append('(')
+			  .append(((Double) x).toString().replaceAll("\\.0$", ""))
+			  .append(',')
+			  .append(((Double) y).toString().replaceAll("\\.0$", ""))
+			  .append(')');
+
+		return buffer.toString();
 	}
 }

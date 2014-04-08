@@ -1,8 +1,9 @@
 package com.pivotal.hawq.mapreduce;
 
-import java.io.IOException;
-import java.util.List;
-
+import com.pivotal.hawq.mapreduce.ao.HAWQAOInputFormat;
+import com.pivotal.hawq.mapreduce.metadata.HAWQTableFormat;
+import com.pivotal.hawq.mapreduce.metadata.MetadataAccessor;
+import com.pivotal.hawq.mapreduce.parquet.HAWQParquetInputFormat;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.JobContext;
@@ -10,128 +11,105 @@ import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 
-import com.pivotal.hawq.mapreduce.ao.HAWQAOInputFormat;
-import com.pivotal.hawq.mapreduce.ao.db.Database;
-import com.pivotal.hawq.mapreduce.ao.db.Metadata;
-import com.pivotal.hawq.mapreduce.ao.file.HAWQAOSplit;
+import java.io.IOException;
+import java.util.List;
 
 /**
- * An InputFormat that reads input data from HAWQ table.
- * <p/>
- * HAWQInputFormat emits LongWritables containing the record number as key and
- * HAWQRecord as value.
+ * An InputFormat that reads tuple from HAWQ table as {@link com.pivotal.hawq.mapreduce.HAWQRecord}.
+ * Currently AO and Parquet table are supported.
  */
-public class HAWQInputFormat extends FileInputFormat<Void, HAWQRecord>
-{
+public class HAWQInputFormat extends FileInputFormat<Void, HAWQRecord> {
+
+	private static final String TABLE_FORMAT = "mapreduce.hawq.table.format";
 
 	private HAWQAOInputFormat aoInputFormat = new HAWQAOInputFormat();
-	// private HAWQParquetInputFormat parquetInputFormat = new
-	// HAWQParquetInputFormat();
-
-	private static Database.TableType tableType = null;
+	private HAWQParquetInputFormat parquetInputFormat = new HAWQParquetInputFormat();
 
 	@Override
-	public List<InputSplit> getSplits(JobContext job) throws IOException
-	{
-		switch (tableType)
-		{
-		case AO_TABLE:
-			return aoInputFormat.getSplits(job);
-		case PARQUET_TABLE:
-			throw new UnsupportedOperationException(
-					"Only append only(row orientation) table is supported");
-		default:
-			throw new IOException("Please call HAWQInputFormat.setInput first");
+	public List<InputSplit> getSplits(JobContext job) throws IOException {
+		HAWQTableFormat tableFormat = getTableFormat(job.getConfiguration());
+
+		switch (tableFormat) {
+			case AO:
+				return aoInputFormat.getSplits(job);
+			case Parquet:
+				return parquetInputFormat.getSplits(job);
+			default:
+				throw new AssertionError("invalid table format: " + tableFormat);
 		}
 	}
 
 	@Override
-	public RecordReader<Void, HAWQRecord> createRecordReader(InputSplit split,
-			TaskAttemptContext context) throws IOException,
-			InterruptedException
-	{
-		Database.TableType type = null;
-		if (split instanceof HAWQAOSplit)
-			type = Database.TableType.AO_TABLE;
-		else
-			throw new UnsupportedOperationException(
-					"Only append only(row orientation) table is supported");
+	public RecordReader<Void, HAWQRecord> createRecordReader(
+			InputSplit split, TaskAttemptContext context)
+				throws IOException, InterruptedException {
 
-		switch (type)
-		{
-		case AO_TABLE:
-			return aoInputFormat.createRecordReader(split, context);
-		case PARQUET_TABLE:
-			// return parquetInputFormat.createRecordReader(split, context);
-		default:
-			throw new UnsupportedOperationException(
-					"Only append only(row orientation) table is supported");
+		HAWQTableFormat tableFormat = getTableFormat(context.getConfiguration());
+
+		switch (tableFormat) {
+			case AO:
+				return aoInputFormat.createRecordReader(split, context);
+			case Parquet:
+				return parquetInputFormat.createRecordReader(split, context);
+			default:
+				throw new AssertionError("invalid table format: " + tableFormat);
 		}
+	}
+
+	private HAWQTableFormat getTableFormat(Configuration conf) {
+		String formatName = conf.get(TABLE_FORMAT);
+		if (formatName == null) {
+			throw new IllegalStateException("Please call HAWQInputFormat.setInput first");
+		}
+		return HAWQTableFormat.valueOf(formatName);
 	}
 
 	/**
 	 * Initializes the map-part of the job with the appropriate input settings
 	 * through connecting to Database.
-	 * 
-	 * @param conf
-	 *            The map-reduce job configuration
-	 * @param db_url
-	 *            The database URL to connect to
-	 * @param username
-	 *            The username for setting up a connection to the database
-	 * @param password
-	 *            The password for setting up a connection to the database
-	 * @param tableName
-	 *            The name of the table to access to
-	 * @throws Exception
+	 *
+	 * @param conf      The map-reduce job configuration
+	 * @param db_url    The database URL to connect to
+	 * @param username  The username for setting up a connection to the database
+	 * @param password  The password for setting up a connection to the database
+	 * @param tableName The name of the table to access to
 	 */
 	public static void setInput(Configuration conf, String db_url,
-			String username, String password, String tableName)
-			throws Exception
-	{
-		Metadata metadata = new Metadata(db_url, username, password, tableName);
-		setInput(conf, metadata);
+								String username, String password,
+								String tableName) {
+		MetadataAccessor accessor = MetadataAccessor.newInstanceUsingJDBC(
+				db_url, username, password, tableName);
+		setInput(conf, accessor);
 	}
 
 	/**
 	 * Initializes the map-part of the job with the appropriate input settings
 	 * through reading metadata file stored in local filesystem.
-	 * 
+	 * <p/>
 	 * To get metadata file, please use gpextract first
-	 * 
-	 * @param conf
-	 *            The map-reduce job configuration
-	 * @param pathStr
-	 *            The metadata file path in local filesystem. e.g.
-	 *            /home/gpadmin/metadata/postgres_test
-	 * @throws Exception
+	 *
+	 * @param conf     The map-reduce job configuration
+	 * @param metadataFile Path to the metadata file generated by gpextract.
 	 */
-	public static void setInput(Configuration conf, String pathStr)
-			throws Exception
-	{
-		Metadata metadata = new Metadata(pathStr);
-		setInput(conf, metadata);
+	public static void setInput(Configuration conf, String metadataFile) {
+		MetadataAccessor accessor = MetadataAccessor.newInstanceUsingFile(metadataFile);
+		setInput(conf, accessor);
 	}
 
-	private static void setInput(Configuration conf, Metadata metadata)
-			throws HAWQException
-	{
-		/*
-		 * GPSQL-972
-		 * 
-		 * When the input table is not ao table, throw exception
-		 */
-		tableType = metadata.getTableType();
-		switch (tableType)
-		{
-		case AO_TABLE:
-			HAWQAOInputFormat.setInput(conf, metadata);
-			break;
-		case PARQUET_TABLE:
-		default:
-			throw new HAWQException(
-					"Only append only(row orientation) table is supported");
+	private static void setInput(Configuration conf, MetadataAccessor accessor) {
+		HAWQTableFormat tableFormat = accessor.getTableFormat();
 
+		switch (tableFormat) {
+			case AO:
+				HAWQAOInputFormat.setInput(conf, accessor.getAOMetadata());
+				break;
+			case Parquet:
+				HAWQParquetInputFormat.setInput(conf, accessor.getParquetMetadata());
+				break;
+			default:
+				throw new AssertionError("invalid table format: " + tableFormat);
 		}
+
+		conf.set(TABLE_FORMAT, tableFormat.name());
 	}
 }

@@ -1,0 +1,1942 @@
+DBVersion: PostgreSQL 8.2.15 (Greenplum Database 4.2.0 build 1) (HAWQ 1.2.0.0 build
+  dev) on i386-apple-darwin11.4.2, compiled by GCC gcc (GCC) 4.4.2 compiled on Feb
+  28 2014 09:52:04 (with assert checking)
+DFS_URL: hdfs://127.0.0.1:9000
+Encoding: UTF8
+FileFormat: Parquet
+Parquet_FileLocations:
+  Checksum: false
+  CompressionLevel: 0
+  CompressionType: null
+  EnableDictionary: false
+  Files:
+  - path: test-data/hawq-data/gpseg0/16385/179545/187199.1
+    size: 0
+  - path: test-data/hawq-data/gpseg1/16385/179545/187199.1
+    size: 0
+  PageSize: 1048576
+  PartitionBy: PARTITION BY range (l_shipdate)
+  Partitions:
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_1 START ('1992-01-01'::date) END ('1992-01-21'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187204.1
+      size: 2652
+    - path: test-data/hawq-data/gpseg1/16385/179545/187204.1
+      size: 3143
+    Name: lineitem_ao_parquet_1_prt_p1_1
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_2 START ('1992-01-21'::date) END ('1992-02-10'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187210.1
+      size: 2633
+    - path: test-data/hawq-data/gpseg1/16385/179545/187210.1
+      size: 4004
+    Name: lineitem_ao_parquet_1_prt_p1_2
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_3 START ('1992-02-10'::date) END ('1992-03-01'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187216.1
+      size: 4005
+    - path: test-data/hawq-data/gpseg1/16385/179545/187216.1
+      size: 3992
+    Name: lineitem_ao_parquet_1_prt_p1_3
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_4 START ('1992-03-01'::date) END ('1992-03-21'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187222.1
+      size: 3965
+    - path: test-data/hawq-data/gpseg1/16385/179545/187222.1
+      size: 4398
+    Name: lineitem_ao_parquet_1_prt_p1_4
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_5 START ('1992-03-21'::date) END ('1992-04-10'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187228.1
+      size: 5380
+    - path: test-data/hawq-data/gpseg1/16385/179545/187228.1
+      size: 5209
+    Name: lineitem_ao_parquet_1_prt_p1_5
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_6 START ('1992-04-10'::date) END ('1992-04-30'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187234.1
+      size: 6027
+    - path: test-data/hawq-data/gpseg1/16385/179545/187234.1
+      size: 5969
+    Name: lineitem_ao_parquet_1_prt_p1_6
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_7 START ('1992-04-30'::date) END ('1992-05-20'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187240.1
+      size: 5432
+    - path: test-data/hawq-data/gpseg1/16385/179545/187240.1
+      size: 7006
+    Name: lineitem_ao_parquet_1_prt_p1_7
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_8 START ('1992-05-20'::date) END ('1992-06-09'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187246.1
+      size: 7380
+    - path: test-data/hawq-data/gpseg1/16385/179545/187246.1
+      size: 8521
+    Name: lineitem_ao_parquet_1_prt_p1_8
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_9 START ('1992-06-09'::date) END ('1992-06-29'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187252.1
+      size: 7562
+    - path: test-data/hawq-data/gpseg1/16385/179545/187252.1
+      size: 8160
+    Name: lineitem_ao_parquet_1_prt_p1_9
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_10 START ('1992-06-29'::date) END ('1992-07-19'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187258.1
+      size: 7257
+    - path: test-data/hawq-data/gpseg1/16385/179545/187258.1
+      size: 6597
+    Name: lineitem_ao_parquet_1_prt_p1_10
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_11 START ('1992-07-19'::date) END ('1992-08-08'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187264.1
+      size: 5720
+    - path: test-data/hawq-data/gpseg1/16385/179545/187264.1
+      size: 6373
+    Name: lineitem_ao_parquet_1_prt_p1_11
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_12 START ('1992-08-08'::date) END ('1992-08-28'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187270.1
+      size: 5994
+    - path: test-data/hawq-data/gpseg1/16385/179545/187270.1
+      size: 7377
+    Name: lineitem_ao_parquet_1_prt_p1_12
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_13 START ('1992-08-28'::date) END ('1992-09-17'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187276.1
+      size: 6087
+    - path: test-data/hawq-data/gpseg1/16385/179545/187276.1
+      size: 7631
+    Name: lineitem_ao_parquet_1_prt_p1_13
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_14 START ('1992-09-17'::date) END ('1992-10-07'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187282.1
+      size: 6649
+    - path: test-data/hawq-data/gpseg1/16385/179545/187282.1
+      size: 7577
+    Name: lineitem_ao_parquet_1_prt_p1_14
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_15 START ('1992-10-07'::date) END ('1992-10-27'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187288.1
+      size: 6326
+    - path: test-data/hawq-data/gpseg1/16385/179545/187288.1
+      size: 6723
+    Name: lineitem_ao_parquet_1_prt_p1_15
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_16 START ('1992-10-27'::date) END ('1992-11-16'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187294.1
+      size: 5513
+    - path: test-data/hawq-data/gpseg1/16385/179545/187294.1
+      size: 6983
+    Name: lineitem_ao_parquet_1_prt_p1_16
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_17 START ('1992-11-16'::date) END ('1992-12-06'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187300.1
+      size: 6586
+    - path: test-data/hawq-data/gpseg1/16385/179545/187300.1
+      size: 7663
+    Name: lineitem_ao_parquet_1_prt_p1_17
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_18 START ('1992-12-06'::date) END ('1992-12-26'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187306.1
+      size: 6319
+    - path: test-data/hawq-data/gpseg1/16385/179545/187306.1
+      size: 6448
+    Name: lineitem_ao_parquet_1_prt_p1_18
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_19 START ('1992-12-26'::date) END ('1993-01-15'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187312.1
+      size: 5804
+    - path: test-data/hawq-data/gpseg1/16385/179545/187312.1
+      size: 7380
+    Name: lineitem_ao_parquet_1_prt_p1_19
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_20 START ('1993-01-15'::date) END ('1993-02-04'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187318.1
+      size: 5622
+    - path: test-data/hawq-data/gpseg1/16385/179545/187318.1
+      size: 7228
+    Name: lineitem_ao_parquet_1_prt_p1_20
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_21 START ('1993-02-04'::date) END ('1993-02-24'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187324.1
+      size: 5553
+    - path: test-data/hawq-data/gpseg1/16385/179545/187324.1
+      size: 5524
+    Name: lineitem_ao_parquet_1_prt_p1_21
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_22 START ('1993-02-24'::date) END ('1993-03-16'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187330.1
+      size: 6214
+    - path: test-data/hawq-data/gpseg1/16385/179545/187330.1
+      size: 6194
+    Name: lineitem_ao_parquet_1_prt_p1_22
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_23 START ('1993-03-16'::date) END ('1993-04-05'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187336.1
+      size: 5790
+    - path: test-data/hawq-data/gpseg1/16385/179545/187336.1
+      size: 7079
+    Name: lineitem_ao_parquet_1_prt_p1_23
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_24 START ('1993-04-05'::date) END ('1993-04-25'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187342.1
+      size: 6471
+    - path: test-data/hawq-data/gpseg1/16385/179545/187342.1
+      size: 6468
+    Name: lineitem_ao_parquet_1_prt_p1_24
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_25 START ('1993-04-25'::date) END ('1993-05-15'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187348.1
+      size: 6315
+    - path: test-data/hawq-data/gpseg1/16385/179545/187348.1
+      size: 6808
+    Name: lineitem_ao_parquet_1_prt_p1_25
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_26 START ('1993-05-15'::date) END ('1993-06-04'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187354.1
+      size: 7388
+    - path: test-data/hawq-data/gpseg1/16385/179545/187354.1
+      size: 6494
+    Name: lineitem_ao_parquet_1_prt_p1_26
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_27 START ('1993-06-04'::date) END ('1993-06-24'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187360.1
+      size: 5970
+    - path: test-data/hawq-data/gpseg1/16385/179545/187360.1
+      size: 8148
+    Name: lineitem_ao_parquet_1_prt_p1_27
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_28 START ('1993-06-24'::date) END ('1993-07-14'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187366.1
+      size: 5886
+    - path: test-data/hawq-data/gpseg1/16385/179545/187366.1
+      size: 7959
+    Name: lineitem_ao_parquet_1_prt_p1_28
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_29 START ('1993-07-14'::date) END ('1993-08-03'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187372.1
+      size: 3849
+    - path: test-data/hawq-data/gpseg1/16385/179545/187372.1
+      size: 7575
+    Name: lineitem_ao_parquet_1_prt_p1_29
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_30 START ('1993-08-03'::date) END ('1993-08-23'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187378.1
+      size: 6174
+    - path: test-data/hawq-data/gpseg1/16385/179545/187378.1
+      size: 6512
+    Name: lineitem_ao_parquet_1_prt_p1_30
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_31 START ('1993-08-23'::date) END ('1993-09-12'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187384.1
+      size: 5624
+    - path: test-data/hawq-data/gpseg1/16385/179545/187384.1
+      size: 5275
+    Name: lineitem_ao_parquet_1_prt_p1_31
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_32 START ('1993-09-12'::date) END ('1993-10-02'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187390.1
+      size: 5235
+    - path: test-data/hawq-data/gpseg1/16385/179545/187390.1
+      size: 5896
+    Name: lineitem_ao_parquet_1_prt_p1_32
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_33 START ('1993-10-02'::date) END ('1993-10-22'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187396.1
+      size: 5912
+    - path: test-data/hawq-data/gpseg1/16385/179545/187396.1
+      size: 7360
+    Name: lineitem_ao_parquet_1_prt_p1_33
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_34 START ('1993-10-22'::date) END ('1993-11-11'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187402.1
+      size: 5672
+    - path: test-data/hawq-data/gpseg1/16385/179545/187402.1
+      size: 7290
+    Name: lineitem_ao_parquet_1_prt_p1_34
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_35 START ('1993-11-11'::date) END ('1993-12-01'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187408.1
+      size: 5480
+    - path: test-data/hawq-data/gpseg1/16385/179545/187408.1
+      size: 4788
+    Name: lineitem_ao_parquet_1_prt_p1_35
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_36 START ('1993-12-01'::date) END ('1993-12-21'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187414.1
+      size: 6822
+    - path: test-data/hawq-data/gpseg1/16385/179545/187414.1
+      size: 5356
+    Name: lineitem_ao_parquet_1_prt_p1_36
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_37 START ('1993-12-21'::date) END ('1994-01-10'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187420.1
+      size: 6175
+    - path: test-data/hawq-data/gpseg1/16385/179545/187420.1
+      size: 7136
+    Name: lineitem_ao_parquet_1_prt_p1_37
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_38 START ('1994-01-10'::date) END ('1994-01-30'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187426.1
+      size: 7546
+    - path: test-data/hawq-data/gpseg1/16385/179545/187426.1
+      size: 7246
+    Name: lineitem_ao_parquet_1_prt_p1_38
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_39 START ('1994-01-30'::date) END ('1994-02-19'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187432.1
+      size: 7297
+    - path: test-data/hawq-data/gpseg1/16385/179545/187432.1
+      size: 6353
+    Name: lineitem_ao_parquet_1_prt_p1_39
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_40 START ('1994-02-19'::date) END ('1994-03-11'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187438.1
+      size: 6641
+    - path: test-data/hawq-data/gpseg1/16385/179545/187438.1
+      size: 6550
+    Name: lineitem_ao_parquet_1_prt_p1_40
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_41 START ('1994-03-11'::date) END ('1994-03-31'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187444.1
+      size: 8572
+    - path: test-data/hawq-data/gpseg1/16385/179545/187444.1
+      size: 5858
+    Name: lineitem_ao_parquet_1_prt_p1_41
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_42 START ('1994-03-31'::date) END ('1994-04-20'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187450.1
+      size: 6112
+    - path: test-data/hawq-data/gpseg1/16385/179545/187450.1
+      size: 5851
+    Name: lineitem_ao_parquet_1_prt_p1_42
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_43 START ('1994-04-20'::date) END ('1994-05-10'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187456.1
+      size: 7192
+    - path: test-data/hawq-data/gpseg1/16385/179545/187456.1
+      size: 5361
+    Name: lineitem_ao_parquet_1_prt_p1_43
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_44 START ('1994-05-10'::date) END ('1994-05-30'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187462.1
+      size: 5604
+    - path: test-data/hawq-data/gpseg1/16385/179545/187462.1
+      size: 6298
+    Name: lineitem_ao_parquet_1_prt_p1_44
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_45 START ('1994-05-30'::date) END ('1994-06-19'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187468.1
+      size: 6018
+    - path: test-data/hawq-data/gpseg1/16385/179545/187468.1
+      size: 6911
+    Name: lineitem_ao_parquet_1_prt_p1_45
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_46 START ('1994-06-19'::date) END ('1994-07-09'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187474.1
+      size: 6343
+    - path: test-data/hawq-data/gpseg1/16385/179545/187474.1
+      size: 6285
+    Name: lineitem_ao_parquet_1_prt_p1_46
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_47 START ('1994-07-09'::date) END ('1994-07-29'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187480.1
+      size: 5685
+    - path: test-data/hawq-data/gpseg1/16385/179545/187480.1
+      size: 6105
+    Name: lineitem_ao_parquet_1_prt_p1_47
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_48 START ('1994-07-29'::date) END ('1994-08-18'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187486.1
+      size: 5655
+    - path: test-data/hawq-data/gpseg1/16385/179545/187486.1
+      size: 6942
+    Name: lineitem_ao_parquet_1_prt_p1_48
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_49 START ('1994-08-18'::date) END ('1994-09-07'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187492.1
+      size: 6735
+    - path: test-data/hawq-data/gpseg1/16385/179545/187492.1
+      size: 7294
+    Name: lineitem_ao_parquet_1_prt_p1_49
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_50 START ('1994-09-07'::date) END ('1994-09-27'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187498.1
+      size: 7795
+    - path: test-data/hawq-data/gpseg1/16385/179545/187498.1
+      size: 5322
+    Name: lineitem_ao_parquet_1_prt_p1_50
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_51 START ('1994-09-27'::date) END ('1994-10-17'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187504.1
+      size: 5857
+    - path: test-data/hawq-data/gpseg1/16385/179545/187504.1
+      size: 7343
+    Name: lineitem_ao_parquet_1_prt_p1_51
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_52 START ('1994-10-17'::date) END ('1994-11-06'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187510.1
+      size: 5460
+    - path: test-data/hawq-data/gpseg1/16385/179545/187510.1
+      size: 4721
+    Name: lineitem_ao_parquet_1_prt_p1_52
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_53 START ('1994-11-06'::date) END ('1994-11-26'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187516.1
+      size: 5354
+    - path: test-data/hawq-data/gpseg1/16385/179545/187516.1
+      size: 6930
+    Name: lineitem_ao_parquet_1_prt_p1_53
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_54 START ('1994-11-26'::date) END ('1994-12-16'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187522.1
+      size: 8923
+    - path: test-data/hawq-data/gpseg1/16385/179545/187522.1
+      size: 6003
+    Name: lineitem_ao_parquet_1_prt_p1_54
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_55 START ('1994-12-16'::date) END ('1995-01-05'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187528.1
+      size: 7668
+    - path: test-data/hawq-data/gpseg1/16385/179545/187528.1
+      size: 6490
+    Name: lineitem_ao_parquet_1_prt_p1_55
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_56 START ('1995-01-05'::date) END ('1995-01-25'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187534.1
+      size: 5740
+    - path: test-data/hawq-data/gpseg1/16385/179545/187534.1
+      size: 6670
+    Name: lineitem_ao_parquet_1_prt_p1_56
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_57 START ('1995-01-25'::date) END ('1995-02-14'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187540.1
+      size: 5689
+    - path: test-data/hawq-data/gpseg1/16385/179545/187540.1
+      size: 6015
+    Name: lineitem_ao_parquet_1_prt_p1_57
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_58 START ('1995-02-14'::date) END ('1995-03-06'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187546.1
+      size: 5988
+    - path: test-data/hawq-data/gpseg1/16385/179545/187546.1
+      size: 5534
+    Name: lineitem_ao_parquet_1_prt_p1_58
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_59 START ('1995-03-06'::date) END ('1995-03-26'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187552.1
+      size: 8064
+    - path: test-data/hawq-data/gpseg1/16385/179545/187552.1
+      size: 5975
+    Name: lineitem_ao_parquet_1_prt_p1_59
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_60 START ('1995-03-26'::date) END ('1995-04-15'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187558.1
+      size: 6529
+    - path: test-data/hawq-data/gpseg1/16385/179545/187558.1
+      size: 6127
+    Name: lineitem_ao_parquet_1_prt_p1_60
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_61 START ('1995-04-15'::date) END ('1995-05-05'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187564.1
+      size: 6439
+    - path: test-data/hawq-data/gpseg1/16385/179545/187564.1
+      size: 5175
+    Name: lineitem_ao_parquet_1_prt_p1_61
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_62 START ('1995-05-05'::date) END ('1995-05-25'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187570.1
+      size: 6377
+    - path: test-data/hawq-data/gpseg1/16385/179545/187570.1
+      size: 5686
+    Name: lineitem_ao_parquet_1_prt_p1_62
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_63 START ('1995-05-25'::date) END ('1995-06-14'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187576.1
+      size: 6778
+    - path: test-data/hawq-data/gpseg1/16385/179545/187576.1
+      size: 5808
+    Name: lineitem_ao_parquet_1_prt_p1_63
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_64 START ('1995-06-14'::date) END ('1995-07-04'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187582.1
+      size: 5255
+    - path: test-data/hawq-data/gpseg1/16385/179545/187582.1
+      size: 8084
+    Name: lineitem_ao_parquet_1_prt_p1_64
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_65 START ('1995-07-04'::date) END ('1995-07-24'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187588.1
+      size: 5658
+    - path: test-data/hawq-data/gpseg1/16385/179545/187588.1
+      size: 6786
+    Name: lineitem_ao_parquet_1_prt_p1_65
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_66 START ('1995-07-24'::date) END ('1995-08-13'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187594.1
+      size: 5827
+    - path: test-data/hawq-data/gpseg1/16385/179545/187594.1
+      size: 6118
+    Name: lineitem_ao_parquet_1_prt_p1_66
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_67 START ('1995-08-13'::date) END ('1995-09-02'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187600.1
+      size: 6390
+    - path: test-data/hawq-data/gpseg1/16385/179545/187600.1
+      size: 6940
+    Name: lineitem_ao_parquet_1_prt_p1_67
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_68 START ('1995-09-02'::date) END ('1995-09-22'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187606.1
+      size: 7712
+    - path: test-data/hawq-data/gpseg1/16385/179545/187606.1
+      size: 5800
+    Name: lineitem_ao_parquet_1_prt_p1_68
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_69 START ('1995-09-22'::date) END ('1995-10-12'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187612.1
+      size: 6606
+    - path: test-data/hawq-data/gpseg1/16385/179545/187612.1
+      size: 6039
+    Name: lineitem_ao_parquet_1_prt_p1_69
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_70 START ('1995-10-12'::date) END ('1995-11-01'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187618.1
+      size: 6326
+    - path: test-data/hawq-data/gpseg1/16385/179545/187618.1
+      size: 7796
+    Name: lineitem_ao_parquet_1_prt_p1_70
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_71 START ('1995-11-01'::date) END ('1995-11-21'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187624.1
+      size: 6439
+    - path: test-data/hawq-data/gpseg1/16385/179545/187624.1
+      size: 6681
+    Name: lineitem_ao_parquet_1_prt_p1_71
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_72 START ('1995-11-21'::date) END ('1995-12-11'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187630.1
+      size: 7955
+    - path: test-data/hawq-data/gpseg1/16385/179545/187630.1
+      size: 6226
+    Name: lineitem_ao_parquet_1_prt_p1_72
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_73 START ('1995-12-11'::date) END ('1995-12-31'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187636.1
+      size: 6840
+    - path: test-data/hawq-data/gpseg1/16385/179545/187636.1
+      size: 5348
+    Name: lineitem_ao_parquet_1_prt_p1_73
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_74 START ('1995-12-31'::date) END ('1996-01-20'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187642.1
+      size: 6805
+    - path: test-data/hawq-data/gpseg1/16385/179545/187642.1
+      size: 4402
+    Name: lineitem_ao_parquet_1_prt_p1_74
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_75 START ('1996-01-20'::date) END ('1996-02-09'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187648.1
+      size: 7609
+    - path: test-data/hawq-data/gpseg1/16385/179545/187648.1
+      size: 5946
+    Name: lineitem_ao_parquet_1_prt_p1_75
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_76 START ('1996-02-09'::date) END ('1996-02-29'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187654.1
+      size: 5698
+    - path: test-data/hawq-data/gpseg1/16385/179545/187654.1
+      size: 4539
+    Name: lineitem_ao_parquet_1_prt_p1_76
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_77 START ('1996-02-29'::date) END ('1996-03-20'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187660.1
+      size: 7635
+    - path: test-data/hawq-data/gpseg1/16385/179545/187660.1
+      size: 5492
+    Name: lineitem_ao_parquet_1_prt_p1_77
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_78 START ('1996-03-20'::date) END ('1996-04-09'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187666.1
+      size: 5712
+    - path: test-data/hawq-data/gpseg1/16385/179545/187666.1
+      size: 5689
+    Name: lineitem_ao_parquet_1_prt_p1_78
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_79 START ('1996-04-09'::date) END ('1996-04-29'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187672.1
+      size: 6687
+    - path: test-data/hawq-data/gpseg1/16385/179545/187672.1
+      size: 5836
+    Name: lineitem_ao_parquet_1_prt_p1_79
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_80 START ('1996-04-29'::date) END ('1996-05-19'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187678.1
+      size: 6108
+    - path: test-data/hawq-data/gpseg1/16385/179545/187678.1
+      size: 5286
+    Name: lineitem_ao_parquet_1_prt_p1_80
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_81 START ('1996-05-19'::date) END ('1996-06-08'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187684.1
+      size: 6326
+    - path: test-data/hawq-data/gpseg1/16385/179545/187684.1
+      size: 6377
+    Name: lineitem_ao_parquet_1_prt_p1_81
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_82 START ('1996-06-08'::date) END ('1996-06-28'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187690.1
+      size: 5847
+    - path: test-data/hawq-data/gpseg1/16385/179545/187690.1
+      size: 6208
+    Name: lineitem_ao_parquet_1_prt_p1_82
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_83 START ('1996-06-28'::date) END ('1996-07-18'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187696.1
+      size: 5399
+    - path: test-data/hawq-data/gpseg1/16385/179545/187696.1
+      size: 5457
+    Name: lineitem_ao_parquet_1_prt_p1_83
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_84 START ('1996-07-18'::date) END ('1996-08-07'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187702.1
+      size: 5983
+    - path: test-data/hawq-data/gpseg1/16385/179545/187702.1
+      size: 6654
+    Name: lineitem_ao_parquet_1_prt_p1_84
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_85 START ('1996-08-07'::date) END ('1996-08-27'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187708.1
+      size: 8394
+    - path: test-data/hawq-data/gpseg1/16385/179545/187708.1
+      size: 4662
+    Name: lineitem_ao_parquet_1_prt_p1_85
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_86 START ('1996-08-27'::date) END ('1996-09-16'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187714.1
+      size: 8104
+    - path: test-data/hawq-data/gpseg1/16385/179545/187714.1
+      size: 6400
+    Name: lineitem_ao_parquet_1_prt_p1_86
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_87 START ('1996-09-16'::date) END ('1996-10-06'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187720.1
+      size: 8028
+    - path: test-data/hawq-data/gpseg1/16385/179545/187720.1
+      size: 7748
+    Name: lineitem_ao_parquet_1_prt_p1_87
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_88 START ('1996-10-06'::date) END ('1996-10-26'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187726.1
+      size: 7207
+    - path: test-data/hawq-data/gpseg1/16385/179545/187726.1
+      size: 5545
+    Name: lineitem_ao_parquet_1_prt_p1_88
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_89 START ('1996-10-26'::date) END ('1996-11-15'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187732.1
+      size: 8543
+    - path: test-data/hawq-data/gpseg1/16385/179545/187732.1
+      size: 6151
+    Name: lineitem_ao_parquet_1_prt_p1_89
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_90 START ('1996-11-15'::date) END ('1996-12-05'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187738.1
+      size: 7717
+    - path: test-data/hawq-data/gpseg1/16385/179545/187738.1
+      size: 6924
+    Name: lineitem_ao_parquet_1_prt_p1_90
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_91 START ('1996-12-05'::date) END ('1996-12-25'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187744.1
+      size: 8157
+    - path: test-data/hawq-data/gpseg1/16385/179545/187744.1
+      size: 6663
+    Name: lineitem_ao_parquet_1_prt_p1_91
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_92 START ('1996-12-25'::date) END ('1997-01-14'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187750.1
+      size: 7451
+    - path: test-data/hawq-data/gpseg1/16385/179545/187750.1
+      size: 7476
+    Name: lineitem_ao_parquet_1_prt_p1_92
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_93 START ('1997-01-14'::date) END ('1997-02-03'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187756.1
+      size: 6458
+    - path: test-data/hawq-data/gpseg1/16385/179545/187756.1
+      size: 9142
+    Name: lineitem_ao_parquet_1_prt_p1_93
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_94 START ('1997-02-03'::date) END ('1997-02-23'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187762.1
+      size: 5344
+    - path: test-data/hawq-data/gpseg1/16385/179545/187762.1
+      size: 6776
+    Name: lineitem_ao_parquet_1_prt_p1_94
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_95 START ('1997-02-23'::date) END ('1997-03-15'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187768.1
+      size: 7910
+    - path: test-data/hawq-data/gpseg1/16385/179545/187768.1
+      size: 7194
+    Name: lineitem_ao_parquet_1_prt_p1_95
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_96 START ('1997-03-15'::date) END ('1997-04-04'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187774.1
+      size: 7087
+    - path: test-data/hawq-data/gpseg1/16385/179545/187774.1
+      size: 5138
+    Name: lineitem_ao_parquet_1_prt_p1_96
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_97 START ('1997-04-04'::date) END ('1997-04-24'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187780.1
+      size: 7468
+    - path: test-data/hawq-data/gpseg1/16385/179545/187780.1
+      size: 6459
+    Name: lineitem_ao_parquet_1_prt_p1_97
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_98 START ('1997-04-24'::date) END ('1997-05-14'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187786.1
+      size: 7738
+    - path: test-data/hawq-data/gpseg1/16385/179545/187786.1
+      size: 7459
+    Name: lineitem_ao_parquet_1_prt_p1_98
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_99 START ('1997-05-14'::date) END ('1997-06-03'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187792.1
+      size: 5941
+    - path: test-data/hawq-data/gpseg1/16385/179545/187792.1
+      size: 7319
+    Name: lineitem_ao_parquet_1_prt_p1_99
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_100 START ('1997-06-03'::date) END ('1997-06-23'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187798.1
+      size: 7103
+    - path: test-data/hawq-data/gpseg1/16385/179545/187798.1
+      size: 6552
+    Name: lineitem_ao_parquet_1_prt_p1_100
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_101 START ('1997-06-23'::date) END ('1997-07-13'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187804.1
+      size: 6543
+    - path: test-data/hawq-data/gpseg1/16385/179545/187804.1
+      size: 6264
+    Name: lineitem_ao_parquet_1_prt_p1_101
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_102 START ('1997-07-13'::date) END ('1997-08-02'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187810.1
+      size: 5166
+    - path: test-data/hawq-data/gpseg1/16385/179545/187810.1
+      size: 9111
+    Name: lineitem_ao_parquet_1_prt_p1_102
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_103 START ('1997-08-02'::date) END ('1997-08-22'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187816.1
+      size: 7785
+    - path: test-data/hawq-data/gpseg1/16385/179545/187816.1
+      size: 6277
+    Name: lineitem_ao_parquet_1_prt_p1_103
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_104 START ('1997-08-22'::date) END ('1997-09-11'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187822.1
+      size: 6704
+    - path: test-data/hawq-data/gpseg1/16385/179545/187822.1
+      size: 6800
+    Name: lineitem_ao_parquet_1_prt_p1_104
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_105 START ('1997-09-11'::date) END ('1997-10-01'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187828.1
+      size: 5875
+    - path: test-data/hawq-data/gpseg1/16385/179545/187828.1
+      size: 5936
+    Name: lineitem_ao_parquet_1_prt_p1_105
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_106 START ('1997-10-01'::date) END ('1997-10-21'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187834.1
+      size: 6965
+    - path: test-data/hawq-data/gpseg1/16385/179545/187834.1
+      size: 5898
+    Name: lineitem_ao_parquet_1_prt_p1_106
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_107 START ('1997-10-21'::date) END ('1997-11-10'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187840.1
+      size: 4380
+    - path: test-data/hawq-data/gpseg1/16385/179545/187840.1
+      size: 4883
+    Name: lineitem_ao_parquet_1_prt_p1_107
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_108 START ('1997-11-10'::date) END ('1997-11-30'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187846.1
+      size: 6720
+    - path: test-data/hawq-data/gpseg1/16385/179545/187846.1
+      size: 5599
+    Name: lineitem_ao_parquet_1_prt_p1_108
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_109 START ('1997-11-30'::date) END ('1997-12-20'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187852.1
+      size: 6438
+    - path: test-data/hawq-data/gpseg1/16385/179545/187852.1
+      size: 6057
+    Name: lineitem_ao_parquet_1_prt_p1_109
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_110 START ('1997-12-20'::date) END ('1998-01-09'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187858.1
+      size: 5601
+    - path: test-data/hawq-data/gpseg1/16385/179545/187858.1
+      size: 6103
+    Name: lineitem_ao_parquet_1_prt_p1_110
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_111 START ('1998-01-09'::date) END ('1998-01-29'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187864.1
+      size: 5531
+    - path: test-data/hawq-data/gpseg1/16385/179545/187864.1
+      size: 6980
+    Name: lineitem_ao_parquet_1_prt_p1_111
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_112 START ('1998-01-29'::date) END ('1998-02-18'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187870.1
+      size: 6212
+    - path: test-data/hawq-data/gpseg1/16385/179545/187870.1
+      size: 5659
+    Name: lineitem_ao_parquet_1_prt_p1_112
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_113 START ('1998-02-18'::date) END ('1998-03-10'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187876.1
+      size: 5638
+    - path: test-data/hawq-data/gpseg1/16385/179545/187876.1
+      size: 6880
+    Name: lineitem_ao_parquet_1_prt_p1_113
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_114 START ('1998-03-10'::date) END ('1998-03-30'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187882.1
+      size: 6695
+    - path: test-data/hawq-data/gpseg1/16385/179545/187882.1
+      size: 6001
+    Name: lineitem_ao_parquet_1_prt_p1_114
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_115 START ('1998-03-30'::date) END ('1998-04-19'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187888.1
+      size: 7621
+    - path: test-data/hawq-data/gpseg1/16385/179545/187888.1
+      size: 4905
+    Name: lineitem_ao_parquet_1_prt_p1_115
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_116 START ('1998-04-19'::date) END ('1998-05-09'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187894.1
+      size: 7973
+    - path: test-data/hawq-data/gpseg1/16385/179545/187894.1
+      size: 6583
+    Name: lineitem_ao_parquet_1_prt_p1_116
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_117 START ('1998-05-09'::date) END ('1998-05-29'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187900.1
+      size: 7192
+    - path: test-data/hawq-data/gpseg1/16385/179545/187900.1
+      size: 5506
+    Name: lineitem_ao_parquet_1_prt_p1_117
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_118 START ('1998-05-29'::date) END ('1998-06-18'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187906.1
+      size: 8367
+    - path: test-data/hawq-data/gpseg1/16385/179545/187906.1
+      size: 5614
+    Name: lineitem_ao_parquet_1_prt_p1_118
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_119 START ('1998-06-18'::date) END ('1998-07-08'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187912.1
+      size: 5770
+    - path: test-data/hawq-data/gpseg1/16385/179545/187912.1
+      size: 6378
+    Name: lineitem_ao_parquet_1_prt_p1_119
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_120 START ('1998-07-08'::date) END ('1998-07-28'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187918.1
+      size: 7832
+    - path: test-data/hawq-data/gpseg1/16385/179545/187918.1
+      size: 6327
+    Name: lineitem_ao_parquet_1_prt_p1_120
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_121 START ('1998-07-28'::date) END ('1998-08-17'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187924.1
+      size: 6056
+    - path: test-data/hawq-data/gpseg1/16385/179545/187924.1
+      size: 7172
+    Name: lineitem_ao_parquet_1_prt_p1_121
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_122 START ('1998-08-17'::date) END ('1998-09-06'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187930.1
+      size: 5191
+    - path: test-data/hawq-data/gpseg1/16385/179545/187930.1
+      size: 5345
+    Name: lineitem_ao_parquet_1_prt_p1_122
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_123 START ('1998-09-06'::date) END ('1998-09-26'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187936.1
+      size: 4384
+    - path: test-data/hawq-data/gpseg1/16385/179545/187936.1
+      size: 4360
+    Name: lineitem_ao_parquet_1_prt_p1_123
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_124 START ('1998-09-26'::date) END ('1998-10-16'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187942.1
+      size: 5060
+    - path: test-data/hawq-data/gpseg1/16385/179545/187942.1
+      size: 4419
+    Name: lineitem_ao_parquet_1_prt_p1_124
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_125 START ('1998-10-16'::date) END ('1998-11-05'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187948.1
+      size: 3167
+    - path: test-data/hawq-data/gpseg1/16385/179545/187948.1
+      size: 5013
+    Name: lineitem_ao_parquet_1_prt_p1_125
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_126 START ('1998-11-05'::date) END ('1998-11-25'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187954.1
+      size: 2831
+    - path: test-data/hawq-data/gpseg1/16385/179545/187954.1
+      size: 3194
+    Name: lineitem_ao_parquet_1_prt_p1_126
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_127 START ('1998-11-25'::date) END ('1998-12-15'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187960.1
+      size: 0
+    - path: test-data/hawq-data/gpseg1/16385/179545/187960.1
+      size: 2679
+    Name: lineitem_ao_parquet_1_prt_p1_127
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  - Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION p1_128 START ('1998-12-15'::date) END ('1998-12-31'::date)
+      EVERY ('20 days'::interval) WITH (orientation=parquet, appendonly=true, pagesize=1048576,
+      rowgroupsize=8388608)
+    EnableDictionary: false
+    Files:
+    - path: test-data/hawq-data/gpseg0/16385/179545/187966.1
+      size: 0
+    - path: test-data/hawq-data/gpseg1/16385/179545/187966.1
+      size: 0
+    Name: lineitem_ao_parquet_1_prt_p1_128
+    PageSize: 1048576
+    RowGroupSize: 8388608
+  RowGroupSize: 8388608
+TableName: public.lineitem_ao_parquet
+Version: 1.0.0

@@ -1,22 +1,5 @@
 package com.pivotal.hawq.mapreduce.ao.io;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-
-import com.pivotal.hawq.mapreduce.HAWQException;
-import com.pivotal.hawq.mapreduce.ao.db.Database;
-import com.pivotal.hawq.mapreduce.ao.db.Metadata;
-import com.pivotal.hawq.mapreduce.ao.file.HAWQAOFileStatus;
-import com.pivotal.hawq.mapreduce.ao.file.HAWQAOSplit;
-import com.pivotal.hawq.mapreduce.ao.io.HAWQAOFileReader;
-import com.pivotal.hawq.mapreduce.ao.io.HAWQAORecord;
-import com.pivotal.hawq.mapreduce.file.HAWQFileStatus;
-import com.pivotal.hawq.mapreduce.schema.HAWQSchema;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.BlockLocation;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-
 public class HAWQAOFileReaderTest
 {
 
@@ -29,6 +12,7 @@ public class HAWQAOFileReaderTest
 
 	public static void main(String[] args) throws Exception
 	{
+		/*
 		if (args.length != 3)
 		{
 			System.exit(printUsage());
@@ -59,7 +43,7 @@ public class HAWQAOFileReaderTest
 
 		for (int i = 0; i < fileAttributes.length; i++)
 		{
-			String pathStr = fileAttributes[i].getPathStr();
+			String pathStr = fileAttributes[i].getFilePath();
 			long fileLength = fileAttributes[i].getFileLength();
 			HAWQAOFileStatus aofilestatus = (HAWQAOFileStatus) fileAttributes[i];
 			boolean checksum = aofilestatus.getChecksum();
@@ -116,5 +100,6 @@ public class HAWQAOFileReaderTest
 		{
 			bw.close();
 		}
+		*/
 	}
 }

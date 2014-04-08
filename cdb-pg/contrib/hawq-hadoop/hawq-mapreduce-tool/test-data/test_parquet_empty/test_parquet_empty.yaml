@@ -1,0 +1,16 @@
+DBVersion: PostgreSQL 8.2.15 (Greenplum Database 4.2.0 build 1) (HAWQ 1.2.1.0 build
+  dev) on i386-apple-darwin11.4.2, compiled by GCC gcc (GCC) 4.4.2 compiled on Mar
+  28 2014 11:37:25 (with assert checking)
+DFS_URL: hdfs://127.0.0.1:9000
+Encoding: UTF8
+FileFormat: Parquet
+Parquet_FileLocations:
+  Checksum: false
+  CompressionLevel: 0
+  CompressionType: none
+  EnableDictionary: false
+  Files: []
+  PageSize: 1048576
+  RowGroupSize: 8388608
+TableName: public.test_parquet_empty
+Version: 1.0.0

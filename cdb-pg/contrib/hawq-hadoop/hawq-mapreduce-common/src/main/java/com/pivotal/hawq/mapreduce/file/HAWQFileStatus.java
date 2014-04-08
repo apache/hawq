@@ -1,22 +1,26 @@
 package com.pivotal.hawq.mapreduce.file;
 
 /**
- * This class describe file status of database. This is an abstract class and
- * only store base attribute (path and length) of file.
+ * This class describe file status of database.
  */
-public abstract class HAWQFileStatus
+public class HAWQFileStatus
 {
-	protected String pathStr = null;
+	protected String filePath = null;
 	protected long fileLength;
+
+	public HAWQFileStatus(String filePath, long fileLength) {
+		this.filePath = filePath;
+		this.fileLength = fileLength;
+	}
 
 	/**
 	 * Get path string of this file
 	 * 
 	 * @return path
 	 */
-	public String getPathStr()
+	public String getFilePath()
 	{
-		return pathStr;
+		return filePath;
 	}
 
 	/**

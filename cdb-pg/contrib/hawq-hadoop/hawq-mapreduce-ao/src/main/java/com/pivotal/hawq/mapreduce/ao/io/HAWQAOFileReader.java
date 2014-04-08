@@ -402,8 +402,8 @@ public final class HAWQAOFileReader
 		if (effectiveLargeTupleLength != -1)
 		{
 			// large tuple
-			((HAWQAORecord) record).setMemtuples(largeTuple, 0,
-					effectiveLargeTupleLength - 1);
+			record.setMemtuples(largeTuple, 0, effectiveLargeTupleLength - 1);
+			effectiveLargeTupleLength = -1;
 		}
 		else
 		{
@@ -411,18 +411,18 @@ public final class HAWQAOFileReader
 			if (currentPosInOffsets == effectiveOffsetLength - 1
 					|| offsets[currentPosInOffsets + 1] == 0)
 			{
-				((HAWQAORecord) record).setMemtuples(smallTuple_Varblock,
-						offsets[currentPosInOffsets],
-						effectiveSmallTupleLength - 1);
+				record.setMemtuples(smallTuple_Varblock,
+									offsets[currentPosInOffsets],
+									effectiveSmallTupleLength - 1);
 				effectiveSmallTupleLength = -1;
 				effectiveOffsetLength = -1;
 				currentPosInOffsets = -1;
 			}
 			else
 			{
-				((HAWQAORecord) record).setMemtuples(smallTuple_Varblock,
-						offsets[currentPosInOffsets],
-						offsets[currentPosInOffsets + 1] - 1);
+				record.setMemtuples(smallTuple_Varblock,
+									offsets[currentPosInOffsets],
+									offsets[currentPosInOffsets + 1] - 1);
 			}
 			++currentPosInOffsets;
 		}

@@ -1,5 +1,7 @@
 package com.pivotal.hawq.mapreduce.datatype;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -20,4 +22,16 @@ public class HAWQMacaddrTest
 		assertTrue(macaddr3.toString().toUpperCase().equals("22:8C:9F:88:00:00"));
 	}
 
+	@Test
+	public void testMacaddrEquals() throws Exception {
+		HAWQMacaddr m1 = new HAWQMacaddr(new byte[] {0x1, 0x2, 0x3, 0x4, 0x5, 0x6});
+		HAWQMacaddr m2 = new HAWQMacaddr(new byte[] {0x1, 0x2, 0x3, 0x4, 0x5, 0x6});
+		HAWQMacaddr m3 = new HAWQMacaddr(new byte[] {0x1, 0x2, 0x3, 0x4, 0x5, 0x7});
+
+		assertEquals(m1, m2);
+		assertEquals(m2, m1);
+
+		assertFalse(m1.equals(m3));
+		assertFalse(m2.equals(m3));
+	}
 }

@@ -3,7 +3,6 @@ package com.pivotal.hawq.mapreduce.ao.io;
 import com.pivotal.hawq.mapreduce.HAWQException;
 import com.pivotal.hawq.mapreduce.HAWQRecord;
 import com.pivotal.hawq.mapreduce.datatype.HAWQBox;
-import com.pivotal.hawq.mapreduce.datatype.HAWQByteArray;
 import com.pivotal.hawq.mapreduce.datatype.HAWQCidr;
 import com.pivotal.hawq.mapreduce.datatype.HAWQCircle;
 import com.pivotal.hawq.mapreduce.datatype.HAWQInet;
@@ -33,8 +32,6 @@ import java.sql.Timestamp;
  */
 public class HAWQAORecord extends HAWQRecord
 {
-	private Object[] value = null;
-
 	private String encoding;
 	/*
 	 * GPSQL-1047
@@ -87,7 +84,6 @@ public class HAWQAORecord extends HAWQRecord
 		super(schema);
 		columnNum = schema.getFieldCount();
 		schemaType = new HAWQPrimitiveField.PrimitiveType[columnNum];
-		value = new Object[columnNum];
 		offsetOfEachColumn = new int[columnNum];
 		nullmap = new boolean[columnNum];
 		for (int i = 0; i < columnNum; i++)
@@ -97,7 +93,7 @@ public class HAWQAORecord extends HAWQRecord
 				schemaType[i] = field.asPrimitive().getType();
 			else
 				throw new HAWQException("User define type is not supported yet");
-			value[i] = null;
+			values[i] = null;
 			offsetOfEachColumn[i] = -1;
 			nullmap[i] = false;
 		}
@@ -150,578 +146,283 @@ public class HAWQAORecord extends HAWQRecord
 			encoding = "x-windows-874";
 	}
 
-	private void checkFieldIndex(int fieldIndex) throws HAWQException
-	{
-		if (fieldIndex < 1 || fieldIndex > value.length)
-			throw new HAWQException(String.format(
-					"index %d out of range [%d, %d]", fieldIndex, 1,
-					value.length));
-	}
-
 	@Override
 	public boolean getBoolean(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		if (value[fieldIndex - 1] == null)
-		{
-			return false;
-		}
-		
-		return ((Boolean)(value[fieldIndex - 1])).booleanValue();
-	}
-
-	@Override
-	public void setBoolean(int fieldIndex, boolean x) throws HAWQException
-	{
-		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = x;
+		return super.getBoolean(fieldIndex);
 	}
 
 	@Override
 	public byte getByte(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		try
-		{
-			return Byte.parseByte(value[fieldIndex - 1].toString());
-		}
-		catch (NumberFormatException e)
-		{
-			throw new HAWQException("Cannot convert "
-					+ value[fieldIndex - 1].getClass() + " "
-					+ value[fieldIndex - 1].toString() + "to byte");
-		}
-	}
-
-	@Override
-	public void setByte(int fieldIndex, byte x) throws HAWQException
-	{
-		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = x;
+		return super.getByte(fieldIndex);
 	}
 
 	@Override
 	public byte[] getBytes(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		return ((HAWQByteArray) value[fieldIndex - 1]).getBytes();
-	}
-
-	@Override
-	public void setBytes(int fieldIndex, byte[] x) throws HAWQException
-	{
-		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = new HAWQByteArray(x);
+		return super.getBytes(fieldIndex);
 	}
 
 	@Override
 	public double getDouble(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		try
-		{
-			return Double.parseDouble(value[fieldIndex - 1].toString());
-		}
-		catch (NumberFormatException e)
-		{
-			throw new HAWQException("Cannot convert "
-					+ value[fieldIndex - 1].getClass() + " "
-					+ value[fieldIndex - 1].toString() + "to double");
-		}
-	}
-
-	@Override
-	public void setDouble(int fieldIndex, double x) throws HAWQException
-	{
-		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = x;
+		return super.getDouble(fieldIndex);
 	}
 
 	@Override
 	public float getFloat(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		try
-		{
-			return Float.parseFloat(value[fieldIndex - 1].toString());
-		}
-		catch (NumberFormatException e)
-		{
-			throw new HAWQException("Cannot convert "
-					+ value[fieldIndex - 1].getClass() + " "
-					+ value[fieldIndex - 1].toString() + "to float");
-		}
-	}
-
-	@Override
-	public void setFloat(int fieldIndex, float x) throws HAWQException
-	{
-		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = x;
+		return super.getFloat(fieldIndex);
 	}
 
 	@Override
 	public int getInt(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		try
-		{
-			return Integer.parseInt(value[fieldIndex - 1].toString());
-		}
-		catch (NumberFormatException e)
-		{
-			throw new HAWQException("Cannot convert "
-					+ value[fieldIndex - 1].getClass() + " "
-					+ value[fieldIndex - 1].toString() + "to integer");
-		}
-	}
-
-	@Override
-	public void setInt(int fieldIndex, int x) throws HAWQException
-	{
-		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = x;
+		return super.getInt(fieldIndex);
 	}
 
 	@Override
 	public long getLong(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		try
-		{
-			return Long.parseLong(value[fieldIndex - 1].toString());
-		}
-		catch (NumberFormatException e)
-		{
-			throw new HAWQException("Cannot convert "
-					+ value[fieldIndex - 1].getClass() + " "
-					+ value[fieldIndex - 1].toString() + "to long");
-		}
-	}
-
-	@Override
-	public void setLong(int fieldIndex, long x) throws HAWQException
-	{
-		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = x;
+		return super.getLong(fieldIndex);
 	}
 
 	@Override
 	public short getShort(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		try
-		{
-			return Short.parseShort(value[fieldIndex - 1].toString());
-		}
-		catch (NumberFormatException e)
-		{
-			throw new HAWQException("Cannot convert "
-					+ value[fieldIndex - 1].getClass() + " "
-					+ value[fieldIndex - 1].toString() + "to short");
-		}
-	}
-
-	@Override
-	public void setShort(int fieldIndex, short x) throws HAWQException
-	{
-		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = x;
+		return super.getShort(fieldIndex);
 	}
 
 	@Override
 	public String getString(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		if (value[fieldIndex - 1] == null)
-			return "null";
-
-		/*
-		 * GPSQL-936
-		 * 
-		 * Remove useless ".0" for float/double
-		 */
-		String result = value[fieldIndex - 1].toString();
-		if (value[fieldIndex - 1].getClass() == Float.class
-				|| value[fieldIndex - 1].getClass() == Double.class)
-			return result.replace(".0", "");
-		return result;
-	}
-
-	@Override
-	public void setString(int fieldIndex, String x) throws HAWQException
-	{
-		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = x;
+		return super.getString(fieldIndex);
 	}
 
 	@Override
 	public char getChar(int fieldIndex) throws HAWQException
 	{
-		return getString(fieldIndex).charAt(0);
-	}
-
-	@Override
-	public void setChar(int fieldIndex, char newvalue) throws HAWQException
-	{
 		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = newvalue;
+		if (values[fieldIndex - 1] == null)
+			get(fieldIndex);
+
+		return super.getChar(fieldIndex);
 	}
 
 	@Override
 	public boolean isNull(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		return (value[fieldIndex - 1] == null);
-	}
-
-	@Override
-	public void setNull(int fieldIndex) throws HAWQException
-	{
-		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = null;
+		return (values[fieldIndex - 1] == null);
 	}
 
 	@Override
 	public Timestamp getTimestamp(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		return (Timestamp) value[fieldIndex - 1];
-	}
-
-	@Override
-	public void setTimestamp(int fieldIndex, Timestamp x) throws HAWQException
-	{
-		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = x;
+		return super.getTimestamp(fieldIndex);
 	}
 
 	@Override
 	public Time getTime(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		return (Time) value[fieldIndex - 1];
-	}
-
-	@Override
-	public void setTime(int fieldIndex, Time x) throws HAWQException
-	{
-		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = x;
+		return super.getTime(fieldIndex);
 	}
 
 	@Override
 	public Date getDate(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		return (Date) value[fieldIndex - 1];
-	}
-
-	@Override
-	public void setDate(int fieldIndex, Date x) throws HAWQException
-	{
-		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = x;
+		return super.getDate(fieldIndex);
 	}
 
 	@Override
 	public BigDecimal getBigDecimal(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		return (BigDecimal) value[fieldIndex - 1];
-	}
-
-	@Override
-	public void setBigDecimal(int fieldIndex, BigDecimal x)
-			throws HAWQException
-	{
-		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = x;
+		return super.getBigDecimal(fieldIndex);
 	}
 
 	@Override
 	public Array getArray(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		return (Array) value[fieldIndex - 1];
-	}
-
-	@Override
-	public void setArray(int fieldIndex, Array x) throws HAWQException
-	{
-		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = x;
-	}
-
-	@Override
-	public HAWQRecord getField(int fieldIndex) throws HAWQException
-	{
-		throw new UnsupportedOperationException("Not supported yet.");
-	}
-
-	@Override
-	public void setField(int fieldIndex, HAWQRecord x) throws HAWQException
-	{
-		throw new UnsupportedOperationException("Not supported yet.");
+		return super.getArray(fieldIndex);
 	}
 
 	@Override
 	public HAWQBox getBox(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		return (HAWQBox) value[fieldIndex - 1];
-	}
-
-	@Override
-	public void setBox(int fieldIndex, HAWQBox box) throws HAWQException
-	{
-		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = box;
+		return super.getBox(fieldIndex);
 	}
 
 	@Override
 	public HAWQCircle getCircle(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		return (HAWQCircle) value[fieldIndex - 1];
-	}
-
-	@Override
-	public void setCircle(int fieldIndex, HAWQCircle circle)
-			throws HAWQException
-	{
-		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = circle;
+		return super.getCircle(fieldIndex);
 	}
 
 	@Override
 	public HAWQInterval getInterval(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		return (HAWQInterval) value[fieldIndex - 1];
-	}
-
-	@Override
-	public void setInterval(int fieldIndex, HAWQInterval interval)
-			throws HAWQException
-	{
-		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = interval;
+		return super.getInterval(fieldIndex);
 	}
 
 	@Override
 	public HAWQLseg getLseg(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		return (HAWQLseg) value[fieldIndex - 1];
-	}
-
-	@Override
-	public void setLseg(int fieldIndex, HAWQLseg lseg) throws HAWQException
-	{
-		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = lseg;
+		return super.getLseg(fieldIndex);
 	}
 
 	@Override
 	public HAWQPath getPath(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		return (HAWQPath) value[fieldIndex - 1];
-	}
-
-	@Override
-	public void setPath(int fieldIndex, HAWQPath path) throws HAWQException
-	{
-		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = path;
+		return super.getPath(fieldIndex);
 	}
 
 	@Override
 	public HAWQPoint getPoint(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		return (HAWQPoint) value[fieldIndex - 1];
-	}
-
-	@Override
-	public void setPoint(int fieldIndex, HAWQPoint point) throws HAWQException
-	{
-		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = point;
+		return super.getPoint(fieldIndex);
 	}
 
 	@Override
 	public HAWQPolygon getPolygon(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		return (HAWQPolygon) value[fieldIndex - 1];
-	}
-
-	@Override
-	public void setPolygon(int fieldIndex, HAWQPolygon newvalue)
-			throws HAWQException
-	{
-		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = newvalue;
+		return super.getPolygon(fieldIndex);
 	}
 
 	@Override
 	public HAWQMacaddr getMacaddr(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		return (HAWQMacaddr) value[fieldIndex - 1];
-	}
-
-	@Override
-	public void setMacaddr(int fieldIndex, HAWQMacaddr newvalue)
-			throws HAWQException
-	{
-		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = newvalue;
+		return super.getMacaddr(fieldIndex);
 	}
 
 	@Override
 	public HAWQInet getInet(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		return (HAWQInet) value[fieldIndex - 1];
-	}
-
-	@Override
-	public void setInet(int fieldIndex, HAWQInet newvalue) throws HAWQException
-	{
-		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = newvalue;
+		return super.getInet(fieldIndex);
 	}
 
 	@Override
 	public HAWQCidr getCidr(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		return (HAWQCidr) value[fieldIndex - 1];
-	}
-
-	@Override
-	public void setCidr(int fieldIndex, HAWQCidr newvalue) throws HAWQException
-	{
-		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = newvalue;
+		return super.getCidr(fieldIndex);
 	}
 
 	@Override
 	public HAWQVarbit getVarbit(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		return (HAWQVarbit) value[fieldIndex - 1];
-	}
-
-	@Override
-	public void setVarbit(int fieldIndex, HAWQVarbit newvalue)
-			throws HAWQException
-	{
-		checkFieldIndex(fieldIndex);
-		value[fieldIndex - 1] = newvalue;
-	}
-
-	@Override
-	public HAWQVarbit getBit(int fieldIndex) throws HAWQException
-	{
-		return getVarbit(fieldIndex);
-	}
-
-	@Override
-	public void setBit(int fieldIndex, HAWQVarbit newvalue)
-			throws HAWQException
-	{
-		setVarbit(fieldIndex, newvalue);
+		return super.getVarbit(fieldIndex);
 	}
 
 	public Object getObject(int fieldIndex) throws HAWQException
 	{
 		checkFieldIndex(fieldIndex);
-		if (value[fieldIndex - 1] == null)
+		if (values[fieldIndex - 1] == null)
 			get(fieldIndex);
 
-		return value[fieldIndex - 1];
+		return super.getObject(fieldIndex);
 	}
 
 	@Override
@@ -729,7 +430,7 @@ public class HAWQAORecord extends HAWQRecord
 	{
 		for (int i = 0; i < columnNum; ++i)
 		{
-			value[i] = null;
+			values[i] = null;
 			offsetOfEachColumn[i] = -1;
 			nullmap[i] = false;
 		}
@@ -844,11 +545,11 @@ public class HAWQAORecord extends HAWQRecord
 		int offset = offsetOfEachColumn[i];
 		if (offset == 0)
 		{
-			value[i] = null;
+			values[i] = null;
 			return;
 		}
 
-		HAWQField field = super.getSchema().getField(i + 1);
+		HAWQField field = schema.getField(i + 1);
 		if (field.isArray())
 		{
 			int offset_array;
@@ -859,7 +560,7 @@ public class HAWQAORecord extends HAWQRecord
 						offset)) & 0x0000FFFF;
 			offset_array += start;
 			offset_array += nullmapExtraBytes;
-			value[i] = HAWQConvertUtil.bytesToArray(memtuples, schemaType[i],
+			values[i] = HAWQConvertUtil.bytesToArray(memtuples, schemaType[i],
 					offset_array);
 			return;
 		}
@@ -867,22 +568,22 @@ public class HAWQAORecord extends HAWQRecord
 		switch (schemaType[i])
 		{
 		case INT4:
-			value[i] = HAWQConvertUtil.bytesToInt(memtuples, offset);
+			values[i] = HAWQConvertUtil.bytesToInt(memtuples, offset);
 			break;
 		case INT8:
-			value[i] = HAWQConvertUtil.bytesToLong(memtuples, offset);
+			values[i] = HAWQConvertUtil.bytesToLong(memtuples, offset);
 			break;
 		case FLOAT4:
-			value[i] = HAWQConvertUtil.bytesToFloat(memtuples, offset);
+			values[i] = HAWQConvertUtil.bytesToFloat(memtuples, offset);
 			break;
 		case FLOAT8:
-			value[i] = HAWQConvertUtil.bytesToDouble(memtuples, offset);
+			values[i] = HAWQConvertUtil.bytesToDouble(memtuples, offset);
 			break;
 		case BOOL:
-			value[i] = HAWQConvertUtil.byteToBoolean(memtuples[offset]);
+			values[i] = HAWQConvertUtil.byteToBoolean(memtuples[offset]);
 			break;
 		case INT2:
-			value[i] = HAWQConvertUtil.bytesToShort(memtuples, offset);
+			values[i] = HAWQConvertUtil.bytesToShort(memtuples, offset);
 			break;
 		case TEXT:
 		case BPCHAR:
@@ -912,7 +613,7 @@ public class HAWQAORecord extends HAWQRecord
 			}
 			try
 			{
-				value[i] = new String(memtuples, offset_String, length_String,
+				values[i] = new String(memtuples, offset_String, length_String,
 						encoding);
 			}
 			catch (UnsupportedEncodingException e)
@@ -937,7 +638,7 @@ public class HAWQAORecord extends HAWQRecord
 						offset)) & 0x0000FFFF;
 			offset_inet += start;
 			offset_inet += nullmapExtraBytes;
-			value[i] = HAWQConvertUtil.bytesToInet(memtuples, offset_inet);
+			values[i] = HAWQConvertUtil.bytesToInet(memtuples, offset_inet);
 			break;
 		case CIDR:
 			int offset_cidr;
@@ -948,7 +649,7 @@ public class HAWQAORecord extends HAWQRecord
 						offset)) & 0x0000FFFF;
 			offset_cidr += start;
 			offset_cidr += nullmapExtraBytes;
-			value[i] = HAWQConvertUtil.bytesToCidr(memtuples, offset_cidr);
+			values[i] = HAWQConvertUtil.bytesToCidr(memtuples, offset_cidr);
 			break;
 		case NUMERIC:
 			int offset_numeric;
@@ -959,27 +660,27 @@ public class HAWQAORecord extends HAWQRecord
 						offset)) & 0x0000FFFF;
 			offset_numeric += start;
 			offset_numeric += nullmapExtraBytes;
-			value[i] = HAWQConvertUtil
+			values[i] = HAWQConvertUtil
 					.bytesToDecimal(memtuples, offset_numeric);
 			break;
 		case TIME:
-			value[i] = HAWQConvertUtil.longToTime(HAWQConvertUtil.bytesToLong(
-					memtuples, offset));
+			values[i] = HAWQConvertUtil.toTime(
+					HAWQConvertUtil.bytesToLong(memtuples, offset));
 			break;
 		case TIMETZ:
-			value[i] = HAWQConvertUtil.bytesToTimeTz(memtuples, offset);
+			values[i] = HAWQConvertUtil.toTimeTz(memtuples, offset);
 			break;
 		case TIMESTAMP:
-			value[i] = HAWQConvertUtil.longToTimestamp(HAWQConvertUtil
-					.bytesToLong(memtuples, offset));
+			values[i] = HAWQConvertUtil.toTimestamp(
+					HAWQConvertUtil.bytesToLong(memtuples, offset), false);
 			break;
 		case TIMESTAMPTZ:
-			value[i] = HAWQConvertUtil.longToTimestampTz(HAWQConvertUtil
-					.bytesToLong(memtuples, offset));
+			values[i] = HAWQConvertUtil.toTimestamp(
+					HAWQConvertUtil.bytesToLong(memtuples, offset), true);
 			break;
 		case DATE:
-			value[i] = HAWQConvertUtil.integerToDate(HAWQConvertUtil
-					.bytesToInt(memtuples, offset));
+			values[i] = HAWQConvertUtil.toDate(
+					HAWQConvertUtil.bytesToInt(memtuples, offset));
 			break;
 		case BYTEA:
 			int offset_varbinary;
@@ -1004,21 +705,20 @@ public class HAWQAORecord extends HAWQRecord
 				offset_Bytes = offset_varbinary + 4;
 				length_Bytes = Integer.reverseBytes(HAWQConvertUtil.bytesToInt(
 						memtuples, offset_varbinary)) - 4;
-			}/*
-			 * GPSQL-938
-			 * 
-			 * Change byte[] to HAWQByteArray
-			 */
-			value[i] = new HAWQByteArray(memtuples, offset_Bytes, length_Bytes);
+			}
+
+			byte[] bytes = new byte[length_Bytes];
+			System.arraycopy(memtuples, offset_Bytes, bytes, 0, length_Bytes);
+			values[i] = bytes;
 			break;
 		case INTERVAL:
-			value[fieldIndex - 1] = HAWQConvertUtil.bytesToInterval(memtuples,
+			values[fieldIndex - 1] = HAWQConvertUtil.bytesToInterval(memtuples,
 					offset);
 			break;
 		case POINT:
 			double x = HAWQConvertUtil.bytesToDouble(memtuples, offset);
 			double y = HAWQConvertUtil.bytesToDouble(memtuples, offset + 8);
-			value[fieldIndex - 1] = new HAWQPoint(x, y);
+			values[fieldIndex - 1] = new HAWQPoint(x, y);
 			break;
 		case LSEG:
 			double lseg_x_1 = HAWQConvertUtil.bytesToDouble(memtuples, offset);
@@ -1028,7 +728,7 @@ public class HAWQAORecord extends HAWQRecord
 					offset + 16);
 			double lseg_y_2 = HAWQConvertUtil.bytesToDouble(memtuples,
 					offset + 24);
-			value[fieldIndex - 1] = new HAWQLseg(lseg_x_1, lseg_y_1, lseg_x_2,
+			values[fieldIndex - 1] = new HAWQLseg(lseg_x_1, lseg_y_1, lseg_x_2,
 					lseg_y_2);
 			break;
 		case BOX:
@@ -1039,7 +739,7 @@ public class HAWQAORecord extends HAWQRecord
 					offset + 16);
 			double box_y_2 = HAWQConvertUtil.bytesToDouble(memtuples,
 					offset + 24);
-			value[fieldIndex - 1] = new HAWQBox(box_x_1, box_y_1, box_x_2,
+			values[fieldIndex - 1] = new HAWQBox(box_x_1, box_y_1, box_x_2,
 					box_y_2);
 			break;
 		case CIRCLE:
@@ -1047,7 +747,7 @@ public class HAWQAORecord extends HAWQRecord
 			double centerY = HAWQConvertUtil.bytesToDouble(memtuples,
 					offset + 8);
 			double r = HAWQConvertUtil.bytesToDouble(memtuples, offset + 16);
-			value[fieldIndex - 1] = new HAWQCircle(centerX, centerY, r);
+			values[fieldIndex - 1] = new HAWQCircle(centerX, centerY, r);
 			break;
 		case PATH:
 			int offset_path;
@@ -1058,7 +758,7 @@ public class HAWQAORecord extends HAWQRecord
 						offset)) & 0x0000FFFF;
 			offset_path += start;
 			offset_path += nullmapExtraBytes;
-			value[fieldIndex - 1] = HAWQConvertUtil.bytesToPath(memtuples,
+			values[fieldIndex - 1] = HAWQConvertUtil.bytesToPath(memtuples,
 					offset_path);
 			break;
 		case POLYGON:
@@ -1070,7 +770,7 @@ public class HAWQAORecord extends HAWQRecord
 						offset)) & 0x0000FFFF;
 			offset_polygon += start;
 			offset_polygon += nullmapExtraBytes;
-			value[fieldIndex - 1] = HAWQConvertUtil.bytesToPolygon(memtuples,
+			values[fieldIndex - 1] = HAWQConvertUtil.bytesToPolygon(memtuples,
 					offset_polygon);
 			break;
 		case BIT:
@@ -1083,11 +783,11 @@ public class HAWQAORecord extends HAWQRecord
 						offset)) & 0x0000FFFF;
 			offser_varbit += start;
 			offser_varbit += nullmapExtraBytes;
-			value[fieldIndex - 1] = HAWQConvertUtil.bytesToVarbit(memtuples,
+			values[fieldIndex - 1] = HAWQConvertUtil.bytesToVarbit(memtuples,
 					offser_varbit);
 			break;
 		case MACADDR:
-			value[fieldIndex - 1] = new HAWQMacaddr(memtuples, offset);
+			values[fieldIndex - 1] = new HAWQMacaddr(memtuples, offset);
 			break;
 		default:
 			break;

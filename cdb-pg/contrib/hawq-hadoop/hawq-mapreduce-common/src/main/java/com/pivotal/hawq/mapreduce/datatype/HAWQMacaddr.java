@@ -1,5 +1,7 @@
 package com.pivotal.hawq.mapreduce.datatype;
 
+import java.util.Arrays;
+
 /**
  * Store value of macaddr in database
  */
@@ -42,9 +44,10 @@ public class HAWQMacaddr
 	@Override
 	public boolean equals(Object obj)
 	{
+		if (this == obj)
+			return true;
 		if (obj instanceof HAWQMacaddr)
-			return toString().equals(obj.toString());
-
+			return Arrays.equals(this.bytes, ((HAWQMacaddr) obj).bytes);
 		return false;
 	}
 

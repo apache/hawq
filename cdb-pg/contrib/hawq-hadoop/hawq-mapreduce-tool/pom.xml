@@ -5,11 +5,13 @@
     <parent>
         <artifactId>hawq-hadoop</artifactId>
         <groupId>com.pivotal.hawq</groupId>
-        <version>1.0.0</version>
+        <version>1.1.0</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>hawq-mapreduce-tool</artifactId>
+    <packaging>jar</packaging>
 
     <dependencies>
         <dependency>
@@ -22,11 +24,6 @@
             <artifactId>hawq-mapreduce-parquet</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
-            <version>9.2-1003-jdbc4</version>
-        </dependency>
     </dependencies>
 
     <build>
@@ -36,7 +33,16 @@
                 <artifactId>maven-clover2-plugin</artifactId>
                 <configuration>
                     <licenseLocation>../lib/clover.license</licenseLocation>
-                    <historyDir>../clover/history</historyDir>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>2.16</version>
+                <configuration>
+                    <includes>
+                        <include>**/HAWQInputFormatUnitTest*.java</include>
+                    </includes>
                 </configuration>
             </plugin>
         </plugins>

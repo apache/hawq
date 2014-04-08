@@ -1,12 +1,11 @@
 package com.pivotal.hawq.mapreduce.ao;
 
 import com.pivotal.hawq.mapreduce.HAWQRecord;
-import com.pivotal.hawq.mapreduce.ao.db.Metadata;
-import com.pivotal.hawq.mapreduce.ao.file.HAWQAOFileStatus;
+import com.pivotal.hawq.mapreduce.file.HAWQAOFileStatus;
 import com.pivotal.hawq.mapreduce.ao.file.HAWQAOSplit;
 import com.pivotal.hawq.mapreduce.conf.HAWQConfiguration;
-import com.pivotal.hawq.mapreduce.file.HAWQFileStatus;
 
+import com.pivotal.hawq.mapreduce.metadata.HAWQAOTableMetadata;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -25,15 +24,15 @@ import java.util.List;
 
 /**
  * An InputFormat that reads input data from HAWQ append only table.
- * <p/>
- * HAWQAOInputFormat emits LongWritables containing the record number as key and
- * HAWQRecord as value.
+ *<p>
+ * In most cases, you should consider use HAWQInputFormat, which delegates to
+ * this class for AO table, but can handle other non-AO table as well.
  */
 public final class HAWQAOInputFormat extends FileInputFormat<Void, HAWQRecord>
 {
 	private static final Log LOG = LogFactory.getLog(HAWQAOInputFormat.class);
 
-	private static HAWQFileStatus[] filestatus = null;
+	private static HAWQAOFileStatus[] fileStatuses = null;
 
 	/**
 	 * Initializes the map-part of the job with the appropriate input settings
@@ -44,18 +43,17 @@ public final class HAWQAOInputFormat extends FileInputFormat<Void, HAWQRecord>
 	 * @param metadata
 	 *            The metadata of this table get from database or metadataFile
 	 */
-	public static void setInput(Configuration conf, Metadata metadata)
+	public static void setInput(Configuration conf, HAWQAOTableMetadata metadata)
 	{
-		HAWQConfiguration.setInputTableEncoding(conf,
-				metadata.getTableEncoding());
+		HAWQConfiguration.setInputTableEncoding(conf, metadata.getDatabaseEncoding());
 		HAWQConfiguration.setInputTableSchema(conf, metadata.getSchema());
 		/*
 		 * GPSQL-1047
 		 * 
 		 * Set version into configuration to get working environment of database
 		 */
-		HAWQConfiguration.setDatabaseVersion(conf, metadata.getVersion());
-		filestatus = metadata.getFileStatus();
+		HAWQConfiguration.setDatabaseVersion(conf, metadata.getDatabaseVersion());
+		fileStatuses = metadata.getFileStatuses();
 	}
 
 	/**
@@ -92,19 +90,10 @@ public final class HAWQAOInputFormat extends FileInputFormat<Void, HAWQRecord>
 	public List<InputSplit> getSplits(JobContext job) throws IOException
 	{
 		List<InputSplit> splits = new ArrayList<InputSplit>();
-		for (int i = 0; i < filestatus.length; ++i)
+		for (int i = 0; i < fileStatuses.length; ++i)
 		{
-			HAWQAOFileStatus aofilestatus = null;
-			try
-			{
-				aofilestatus = (HAWQAOFileStatus) filestatus[i];
-			}
-			catch (ClassCastException e)
-			{
-				throw new IOException("Failed to get file attribute from "
-						+ filestatus[i].getClass().getName());
-			}
-			String pathStr = aofilestatus.getPathStr();
+			HAWQAOFileStatus aofilestatus = fileStatuses[i];
+			String pathStr = aofilestatus.getFilePath();
 			long fileLength = aofilestatus.getFileLength();
 			if (fileLength == 0)
 				continue;

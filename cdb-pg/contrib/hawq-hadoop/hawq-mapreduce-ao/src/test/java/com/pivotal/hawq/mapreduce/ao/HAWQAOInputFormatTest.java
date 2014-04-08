@@ -1,5 +1,0 @@
-package com.pivotal.hawq.mapreduce.ao;
-
-public class HAWQAOInputFormatTest {
-
-}

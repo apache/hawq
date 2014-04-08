@@ -1,16 +1,17 @@
 package com.pivotal.hawq.mapreduce.parquet.convert;
 
 import com.pivotal.hawq.mapreduce.HAWQRecord;
-import com.pivotal.hawq.mapreduce.parquet.HAWQParquetRecord;
-import com.pivotal.hawq.mapreduce.parquet.convert.HAWQRecordConverter;
 import com.pivotal.hawq.mapreduce.schema.HAWQSchema;
 import parquet.io.api.GroupConverter;
 import parquet.io.api.RecordMaterializer;
 import parquet.schema.MessageType;
 
 /**
- * User: gaod1
- * Date: 8/8/13
+ * HAWQ's implementation of the RecordMaterializer interface.
+ *
+ * <p>This class materialize HAWQRecord objects from a stream of Parquet data,
+ * using a HAWQRecordConverter internally to convert data types between HAWQ and Parquet.
+ *
  */
 public class HAWQRecordMaterializer extends RecordMaterializer<HAWQRecord> {
 
@@ -21,7 +22,7 @@ public class HAWQRecordMaterializer extends RecordMaterializer<HAWQRecord> {
 	}
 
 	@Override
-	public HAWQParquetRecord getCurrentRecord() {
+	public HAWQRecord getCurrentRecord() {
 		return rootConverter.getCurrentRecord();
 	}
 

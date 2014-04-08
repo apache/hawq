@@ -8,10 +8,6 @@ import static com.pivotal.hawq.mapreduce.schema.HAWQSchema.*;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
-/**
- * User: gaod1
- * Date: 8/27/13
- */
 public class HAWQSchemaTest {
 
 	private HAWQSchema personSchema = new HAWQSchema("person",

@@ -249,7 +249,7 @@ def extract_metadata(conn, tbname):
     Return table metadata as a dict for table `tbname`
     '''
     accessor            = GpMetadataAccessor(conn)
-    nspname, relname    = get_qualified_tablename(tbname)
+    nspname, relname    = get_qualified_tablename(tbname.lower())
     rel_pgclass         = accessor.get_pgclass(nspname, relname)
 
     segment_localtions = accessor.get_segment_locations()
@@ -367,7 +367,7 @@ def extract_metadata(conn, tbname):
                         'Checksum':         p_appendonly['checksum'] == 't',
                         'CompressionType':  p_appendonly['compresstype'],
                         'CompressionLevel': p_appendonly['compresslevel'],
-                        'Name':             p['partitionname'],
+                        'Name':             p['partitiontablename'],
                         'Constraint':       p['partitionboundary'],
                         'Files': get_ao_table_files(p_pgclass['oid'], p_pgclass['relfilenode'])
                 }
@@ -407,7 +407,7 @@ def extract_metadata(conn, tbname):
 
                 p_parquet = accessor.get_appendonly_attrs(p_pgclass['oid'])
                 par_info = {
-                        'Name':             p['partitionname'],
+                        'Name':             p['partitiontablename'],
                         'Constraint':       p['partitionboundary'],
                         'RowGroupSize':     p_parquet['blocksize'],
                         'PageSize':         p_parquet['pagesize'],

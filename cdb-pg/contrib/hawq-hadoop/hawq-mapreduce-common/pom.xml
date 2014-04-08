@@ -5,12 +5,32 @@
     <parent>
         <artifactId>hawq-hadoop</artifactId>
         <groupId>com.pivotal.hawq</groupId>
-        <version>1.0.0</version>
+        <version>1.1.0</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>hawq-mapreduce-common</artifactId>
     <packaging>jar</packaging>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.codehaus.modello</groupId>
+            <artifactId>modello-plugin-snakeyaml</artifactId>
+            <version>1.8.1</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.codehaus.plexus</groupId>
+                    <artifactId>plexus-container-default</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>9.2-1003-jdbc4</version>
+        </dependency>
+    </dependencies>
 
     <build>
         <plugins>
@@ -19,7 +39,10 @@
                 <artifactId>maven-clover2-plugin</artifactId>
                 <configuration>
                     <licenseLocation>../lib/clover.license</licenseLocation>
-                    <historyDir>../clover/history</historyDir>
+                    <excludes>
+                        <exclude>**/HAWQJdbcUtils.java</exclude>
+                        <exclude>**/MetadataSQLAccessor.java</exclude>
+                    </excludes>
                 </configuration>
             </plugin>
         </plugins>

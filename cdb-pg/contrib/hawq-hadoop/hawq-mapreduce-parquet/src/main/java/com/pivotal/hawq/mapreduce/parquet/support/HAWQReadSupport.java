@@ -16,15 +16,24 @@ import java.util.Map;
  */
 public class HAWQReadSupport extends ReadSupport<HAWQRecord> {
 
+	private static final String KEY_HAWQ_SCHEMA = "hawq.schema";
+	private static final String HAWQ_REQUESTED_SCHEMA = "hawq.schema.requested";
+
 	@Override
 	public ReadContext init(Configuration configuration,
 							Map<String, String> keyValueMetaData,
 							MessageType fileSchema) {
 
-//		String partialSchemaString = configuration.get(ReadSupport.PARQUET_READ_SCHEMA); // TODO use another key for requested schema?
-//		MessageType requestedSchema = (partialSchemaString == null) ? fileSchema : getSchemaForRead(fileSchema, partialSchemaString);
-//		// TODO client gives requestedHAWQSchema and we construct corresponding requestedMessageType
+//		String requestedProjectionString = configuration.get(HAWQ_REQUESTED_SCHEMA);
+//
+//		if (requestedProjectionString == null) { // read all data
+//			return new ReadContext(fileSchema);
+//		}
+//
+//		HAWQSchema requestedHAWQSchema = HAWQSchema.fromString(requestedProjectionString);
+//		MessageType requestedSchema = HAWQSchemaConverter.convertToParquet(requestedHAWQSchema);
 //		return new ReadContext(requestedSchema);
+
 		return new ReadContext(fileSchema);
 	}
 
@@ -33,8 +42,9 @@ public class HAWQReadSupport extends ReadSupport<HAWQRecord> {
 														 Map<String, String> keyValueMetaData,
 														 MessageType fileSchema, ReadContext readContext) {
 
-		String hawqSchemaStr = configuration.get("hawq.record.schema", "record t1 { int4 user_id }");
-		HAWQSchema hawqSchema = HAWQSchema.fromString(hawqSchemaStr);
-		return new HAWQRecordMaterializer(readContext.getRequestedSchema(), hawqSchema);
+		HAWQSchema hawqSchema = HAWQSchema.fromString(keyValueMetaData.get(KEY_HAWQ_SCHEMA));
+		return new HAWQRecordMaterializer(
+				readContext.getRequestedSchema(), // requested parquet schema
+				hawqSchema); // corresponding requested HAWQSchema
 	}
 }

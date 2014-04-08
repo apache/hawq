@@ -11,9 +11,9 @@ include $(top_srcdir)/contrib/contrib-global.mk
 endif
 
 # Maven subprojects
-SUBPROJECTS = hawq-mapreduce-ao hawq-mapreduce-common hawq-mapreduce-tool
-DEPENDENCIES = postgresql-9.2-1003-jdbc4.jar snakeyaml-1.12.jar
-VERSION = 1.0.0
+SUBPROJECTS = hawq-mapreduce-ao hawq-mapreduce-parquet hawq-mapreduce-common hawq-mapreduce-tool
+DEPENDENCIES = postgresql-9.2-1003-jdbc4.jar snakeyaml-1.12.jar parquet-column-1.1.0.jar parquet-common-1.1.0.jar parquet-encoding-1.1.0.jar parquet-format-1.0.0.jar parquet-hadoop-1.1.0.jar snappy-java-1.1.0.jar
+VERSION = 1.1.0
 DEFAULTTARGET = hawq-mapreduce-tool/target/hawq-mapreduce-tool-$(VERSION).jar
 JARDIR = hawq-mr-io
 

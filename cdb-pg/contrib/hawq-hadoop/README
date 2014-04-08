@@ -1,8 +1,21 @@
-To generate the clover code coverage report:
-    mvn clean clover2:setup test clover2:aggregate clover2:clover
+Run Unit Test
+-------------
+All unit tests can be run without starting HAWQ and HDFS, simply run
+$ mvn clean test
 
 
-To export metadata of one table to hdfs, run:
-    com.pivotal.hawq.mapreduce.ao.tool.WriteMetadataToHDFS <database_url> <table_name> <pathInHdfs> [<username>] [<password>]
-      For example: com.pivotal.hawq.mapreduce.ao.tool.WriteMetadataToHDFS localhost:5432/postgres lineitem hdfs://localhost:9000/metadata/postgres_lineitem
-                   com.pivotal.hawq.mapreduce.ao.tool.WriteMetadataToHDFS localhost:5432/ao_nocomp_1g orders hdfs://localhost:9000/metadata/ao_nocomp_1g_orders wangj77
+Run Feature Test
+----------------
+1. Make sure HAWQ started, and have a database "gptest". We assume
+   master's host and port to be localhost:5432, but you can change it
+   using the following environment variables
+   - PG_BASE_ADDRESS
+   - PG_BASE_PORT
+
+2. Make sure HDFS started.
+   - HADOOP_HOME    defaults to "/usr/local/hadoop"
+
+
+Code Coverage
+-------------
+$ mvn clean clover2:setup test clover2:aggregate clover2:clover

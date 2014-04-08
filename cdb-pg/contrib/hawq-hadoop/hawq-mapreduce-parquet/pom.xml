@@ -5,7 +5,8 @@
     <parent>
         <artifactId>hawq-hadoop</artifactId>
         <groupId>com.pivotal.hawq</groupId>
-        <version>1.0.0</version>
+        <version>1.1.0</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -13,7 +14,8 @@
     <packaging>jar</packaging>
 
     <properties>
-        <parquet.version>1.0.0</parquet.version>
+        <parquet.hadoop.version>1.1.0</parquet.hadoop.version>
+        <parquet.format.version>1.0.0</parquet.format.version>
     </properties>
 
     <repositories>
@@ -28,31 +30,39 @@
             </snapshots>
         </repository>
     </repositories>
+
     <dependencies>
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>hawq-mapreduce-common</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- Parquet artifacts -->
         <dependency>
             <groupId>com.twitter</groupId>
-            <artifactId>parquet-common</artifactId>
-            <version>${parquet.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.twitter</groupId>
-            <artifactId>parquet-encoding</artifactId>
-            <version>${parquet.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.twitter</groupId>
-            <artifactId>parquet-column</artifactId>
-            <version>${parquet.version}</version>
+            <artifactId>parquet-format</artifactId>
+            <version>${parquet.format.version}</version>
         </dependency>
         <dependency>
             <groupId>com.twitter</groupId>
             <artifactId>parquet-hadoop</artifactId>
-            <version>${parquet.version}</version>
+            <version>${parquet.hadoop.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.hadoop</groupId>
+                    <artifactId>hadoop-client</artifactId>
+                </exclusion>
+                <!-- snappy-java-1.0.5 raise UnsatisfiedLinkError on old system -->
+                <exclusion>
+                    <groupId>org.xerial.snappy</groupId>
+                    <artifactId>snappy-java</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.xerial.snappy</groupId>
+            <artifactId>snappy-java</artifactId>
+            <version>1.1.0</version>
         </dependency>
     </dependencies>
 
@@ -63,7 +73,15 @@
                 <artifactId>maven-clover2-plugin</artifactId>
                 <configuration>
                     <licenseLocation>../lib/clover.license</licenseLocation>
-                    <historyDir>../clover/history</historyDir>
+                    <excludes>
+                        <!-- exclude file for outputformat -->
+                        <exclude>**/HAWQParquetOutputFormat.java</exclude>
+                        <exclude>**/HAWQSchemaConverter.java</exclude>
+                        <exclude>**/HAWQWriteSupport.java</exclude>
+                        <exclude>**/HAWQRecordWriter.java</exclude>
+                        <!-- ignore the dummy adapter -->
+                        <exclude>**/ParentValueContainerAdapter.java</exclude>
+                    </excludes>
                 </configuration>
             </plugin>
         </plugins>

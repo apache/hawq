@@ -2,15 +2,15 @@ package com.pivotal.hawq.mapreduce.parquet.convert;
 
 import com.pivotal.hawq.mapreduce.HAWQException;
 import com.pivotal.hawq.mapreduce.HAWQRecord;
-import com.pivotal.hawq.mapreduce.parquet.HAWQParquetRecord;
+import com.pivotal.hawq.mapreduce.datatype.*;
 import com.pivotal.hawq.mapreduce.schema.HAWQField;
 import com.pivotal.hawq.mapreduce.schema.HAWQSchema;
+import com.pivotal.hawq.mapreduce.util.HAWQConvertUtil;
 import parquet.io.api.Binary;
 import parquet.io.api.Converter;
 import parquet.io.api.GroupConverter;
 import parquet.io.api.PrimitiveConverter;
 import parquet.schema.MessageType;
-import parquet.schema.Type;
 
 import java.math.BigDecimal;
 import java.sql.Array;
@@ -19,17 +19,16 @@ import java.sql.Time;
 import java.sql.Timestamp;
 
 /**
- * User: gaod1
- * Date: 8/8/13
+ * HAWQ's implementation of Parquet's GroupConverter.
  */
 public class HAWQRecordConverter extends GroupConverter {
 
 	private final ParentValueContainer parent;
 	private HAWQSchema hawqSchema;
 	private final Converter[] converters;
-	private HAWQParquetRecord currentRecord;
+	private HAWQRecord currentRecord;
 
-	// FIXME Converter deal with requestedHAWQSchema only? (construct from requestedSchema and hawqSchema)
+	// TODO maybe HAWQRecordConverter(HAWQSchema requestedSchema, HAWQSchema hawqSchema) ?
 	public HAWQRecordConverter(MessageType requestedSchema, HAWQSchema hawqSchema) {
 		this(null, requestedSchema, hawqSchema);
 	}
@@ -41,130 +40,196 @@ public class HAWQRecordConverter extends GroupConverter {
 		int fieldsNum = hawqSchema.getFieldCount();
 		this.converters = new Converter[fieldsNum];
 
-		int fieldIndex = 0;
+		int fieldIndex = 0;  // index of converter starts from 0
 		for (HAWQField field : hawqSchema.getFields()) {
 			final int recordFieldIndex = fieldIndex + 1;  // index in HAWQRecord starts from 1
 			Converter fieldConverter = newConverter(field, new ParentValueContainer() {
-
 				@Override
-				void setBoolean(boolean x) throws HAWQException {
+				public void setBoolean(boolean x) throws HAWQException {
 					HAWQRecordConverter.this.currentRecord.setBoolean(recordFieldIndex, x);
 				}
 
 				@Override
-				void setByte(byte x) throws HAWQException {
+				public void setBit(HAWQVarbit x) throws HAWQException {
+					HAWQRecordConverter.this.currentRecord.setBit(recordFieldIndex, x);
+				}
+
+				@Override
+				public void setByte(byte x) throws HAWQException {
 					HAWQRecordConverter.this.currentRecord.setByte(recordFieldIndex, x);
 				}
 
 				@Override
-				void setBytes(byte[] x) throws HAWQException {
+				public void setBytes(byte[] x) throws HAWQException {
 					HAWQRecordConverter.this.currentRecord.setBytes(recordFieldIndex, x);
 				}
 
 				@Override
-				void setDouble(double x) throws HAWQException {
-					HAWQRecordConverter.this.currentRecord.setDouble(recordFieldIndex, x);
-				}
-
-				@Override
-				void setFloat(float x) throws HAWQException {
-					HAWQRecordConverter.this.currentRecord.setFloat(recordFieldIndex, x);
-				}
-
-				@Override
-				void setInt(int x) throws HAWQException {
-					HAWQRecordConverter.this.currentRecord.setInt(recordFieldIndex, x);
-				}
-
-				@Override
-				void setLong(long x) throws HAWQException {
-					HAWQRecordConverter.this.currentRecord.setLong(recordFieldIndex, x);
-				}
-
-				@Override
-				void setShort(short x) throws HAWQException {
+				public void setShort(short x) throws HAWQException {
 					HAWQRecordConverter.this.currentRecord.setShort(recordFieldIndex, x);
 				}
 
 				@Override
-				void setString(String x) throws HAWQException {
-					HAWQRecordConverter.this.currentRecord.setString(recordFieldIndex, x);
+				public void setInt(int x) throws HAWQException {
+					HAWQRecordConverter.this.currentRecord.setInt(recordFieldIndex, x);
 				}
 
 				@Override
-				void setNull() throws HAWQException {
-					HAWQRecordConverter.this.currentRecord.setNull(recordFieldIndex);
+				public void setLong(long x) throws HAWQException {
+					HAWQRecordConverter.this.currentRecord.setLong(recordFieldIndex, x);
 				}
 
 				@Override
-				void setTimestamp(Timestamp x) throws HAWQException {
-					HAWQRecordConverter.this.currentRecord.setTimestamp(recordFieldIndex, x);
+				public void setFloat(float x) throws HAWQException {
+					HAWQRecordConverter.this.currentRecord.setFloat(recordFieldIndex, x);
 				}
 
 				@Override
-				void setTime(Time x) throws HAWQException {
-					HAWQRecordConverter.this.currentRecord.setTime(recordFieldIndex, x);
+				public void setDouble(double x) throws HAWQException {
+					HAWQRecordConverter.this.currentRecord.setDouble(recordFieldIndex, x);
 				}
 
 				@Override
-				void setDate(Date x) throws HAWQException {
-					HAWQRecordConverter.this.currentRecord.setDate(recordFieldIndex, x);
-				}
-
-				@Override
-				void setBigDecimal(BigDecimal x) throws HAWQException {
+				public void setBigDecimal(BigDecimal x) throws HAWQException {
 					HAWQRecordConverter.this.currentRecord.setBigDecimal(recordFieldIndex, x);
 				}
 
 				@Override
-				void setArray(Array x) throws HAWQException {
-					HAWQRecordConverter.this.currentRecord.setArray(recordFieldIndex, x);
+				public void setString(String x) throws HAWQException {
+					HAWQRecordConverter.this.currentRecord.setString(recordFieldIndex, x);
 				}
 
 				@Override
-				void setField(HAWQRecord x) throws HAWQException {
+				public void setDate(Date x) throws HAWQException {
+					HAWQRecordConverter.this.currentRecord.setDate(recordFieldIndex, x);
+				}
+
+				@Override
+				public void setTime(Time x) throws HAWQException {
+					HAWQRecordConverter.this.currentRecord.setTime(recordFieldIndex, x);
+				}
+
+				@Override
+				public void setTimestamp(Timestamp x) throws HAWQException {
+					HAWQRecordConverter.this.currentRecord.setTimestamp(recordFieldIndex, x);
+				}
+
+				@Override
+				public void setInterval(HAWQInterval x) throws HAWQException {
+					HAWQRecordConverter.this.currentRecord.setInterval(recordFieldIndex, x);
+				}
+
+				@Override
+				public void setPoint(HAWQPoint x) throws HAWQException {
+					HAWQRecordConverter.this.currentRecord.setPoint(recordFieldIndex, x);
+				}
+
+				@Override
+				public void setLseg(HAWQLseg x) throws HAWQException {
+					HAWQRecordConverter.this.currentRecord.setLseg(recordFieldIndex, x);
+				}
+
+				@Override
+				public void setBox(HAWQBox x) throws HAWQException {
+					HAWQRecordConverter.this.currentRecord.setBox(recordFieldIndex, x);
+				}
+
+				@Override
+				public void setCircle(HAWQCircle x) throws HAWQException {
+					HAWQRecordConverter.this.currentRecord.setCircle(recordFieldIndex, x);
+				}
+
+				@Override
+				public void setPath(HAWQPath x) throws HAWQException {
+					HAWQRecordConverter.this.currentRecord.setPath(recordFieldIndex, x);
+				}
+
+				@Override
+				public void setPolygon(HAWQPolygon x) throws HAWQException {
+					HAWQRecordConverter.this.currentRecord.setPolygon(recordFieldIndex, x);
+				}
+
+				@Override
+				public void setMacaddr(HAWQMacaddr x) throws HAWQException {
+					HAWQRecordConverter.this.currentRecord.setMacaddr(recordFieldIndex, x);
+				}
+
+				@Override
+				public void setInet(HAWQInet x) throws HAWQException {
+					HAWQRecordConverter.this.currentRecord.setInet(recordFieldIndex, x);
+				}
+
+				@Override
+				public void setCidr(HAWQCidr x) throws HAWQException {
+					HAWQRecordConverter.this.currentRecord.setCidr(recordFieldIndex, x);
+				}
+
+				@Override
+				public void setArray(Array x) throws HAWQException {
+					throw new UnsupportedOperationException();  // TODO
+				}
+
+				@Override
+				public void setField(HAWQRecord x) throws HAWQException {
 					HAWQRecordConverter.this.currentRecord.setField(recordFieldIndex, x);
 				}
 			});
 			this.converters[fieldIndex++] = fieldConverter;
 		}
-
 	}
 
 	private Converter newConverter(HAWQField hawqType, ParentValueContainer parent) {
-		/*
-		 * !!
-		 * 
-		 * Dayue should redesign this function
-		 */
-		if (!hawqType.isPrimitive())
-//			return new HAWQRecordConverter(parent, null, hawqType);
-			return null;
+		if (!hawqType.isPrimitive())  // FIXME
+			throw new RuntimeException("HAWQRecordConverter.newConverter not implement group type converter");
+
 		switch (hawqType.asPrimitive().getType()) {
+			case BIT:case VARBIT:
+				return new HAWQBitsConverter(parent);
+			case BYTEA:
+				return new HAWQByteArrayConverter(parent);
+			/* number related type */
 			case BOOL:case INT4:case INT8:case FLOAT4:case FLOAT8:
 				return new HAWQPrimitiveConverter(parent);
 			case INT2:
 				return new HAWQShortConverter(parent);
 			case NUMERIC:
 				return new HAWQBigDecimalConverter(parent);
-			case BPCHAR:case VARCHAR:case TEXT:
+			/* string related type */
+			case BPCHAR:case VARCHAR:case TEXT:case XML:
 				return new HAWQStringConverter(parent);
-			case BYTEA:
-				return new HAWQByteArrayConverter(parent);
+			/* time related type */
 			case DATE:
 				return new HAWQDateConverter(parent);
 			case TIME:
 				return new HAWQTimeConverter(parent);
+			case TIMETZ:
+				return new HAWQTimeTZConverter(parent);
 			case TIMESTAMP:
 				return new HAWQTimestampConverter(parent);
+			case TIMESTAMPTZ:
+				return new HAWQTimestampTZConverter(parent);
+			case INTERVAL:
+				return new HAWQIntervalConverter(parent);
+			/* geometry related type */
 			case POINT:
 				return new HAWQPointConverter(parent);
 			case LSEG:
 				return new HAWQLineSegmentConverter(parent);
+			case PATH:
+				return new HAWQPathConverter(parent);
 			case BOX:
 				return new HAWQBoxConverter(parent);
+			case POLYGON:
+				return new HAWQPolygonConverter(parent);
 			case CIRCLE:
 				return new HAWQCircleConverter(parent);
+			/* other type */
+			case MACADDR:
+				return new HAWQMacaddrConverter(parent);
+			case INET:
+				return new HAWQInetConverter(parent);
+			case CIDR:
+				return new HAWQCidrConverter(parent);
 			default:
 				throw new UnsupportedOperationException("unsupported type " + hawqType);
 		}
@@ -177,7 +242,7 @@ public class HAWQRecordConverter extends GroupConverter {
 
 	@Override
 	public void start() {
-		currentRecord = new HAWQParquetRecord(hawqSchema);
+		currentRecord = new HAWQRecord(hawqSchema);
 	}
 
 	@Override
@@ -189,43 +254,13 @@ public class HAWQRecordConverter extends GroupConverter {
 		}
 	}
 
-	public HAWQParquetRecord getCurrentRecord() {
+	public HAWQRecord getCurrentRecord() {
 		return currentRecord;
 	}
 
-	static abstract class ParentValueContainer {
-		abstract void setBoolean(boolean x) throws HAWQException;
-
-		abstract void setByte(byte x) throws HAWQException;
-
-		abstract void setBytes(byte[] x) throws HAWQException;
-
-		abstract void setDouble(double x) throws HAWQException;
-
-		abstract void setFloat(float x) throws HAWQException;
-
-		abstract void setInt(int x) throws HAWQException;
-
-		abstract void setLong(long x) throws HAWQException;
-
-		abstract void setShort(short x) throws HAWQException;
-
-		abstract void setString(String x) throws HAWQException;
-
-		abstract void setNull() throws HAWQException; // TODO
-
-		abstract void setTimestamp(Timestamp x) throws HAWQException;
-
-		abstract void setTime(Time x) throws HAWQException;
-
-		abstract void setDate(Date x) throws HAWQException;
-
-		abstract void setBigDecimal(BigDecimal x) throws HAWQException;
-
-		abstract void setArray(Array x) throws HAWQException;
-
-		abstract void setField(HAWQRecord x) throws HAWQException;
-	}
+	//////////////////////////////////////////////////////////////
+	/// converters from parquet data type to HAWQ data type
+	//////////////////////////////////////////////////////////////
 
 	static class HAWQPrimitiveConverter extends PrimitiveConverter {
 		private ParentValueContainer parent;
@@ -285,7 +320,6 @@ public class HAWQRecordConverter extends GroupConverter {
 		}
 	}
 
-	//TODO
 	static class HAWQBigDecimalConverter extends PrimitiveConverter {
 		private ParentValueContainer parent;
 
@@ -295,6 +329,12 @@ public class HAWQRecordConverter extends GroupConverter {
 
 		@Override
 		public void addBinary(Binary value) {
+			try {
+				// FIXME bytesToDecimal return "NAN" case
+				parent.setBigDecimal((BigDecimal) HAWQConvertUtil.bytesToDecimal(value.getBytes(), 0));
+			} catch (HAWQException e) {
+				throw new RuntimeException("error during conversion from Binary to BigDecimal", e);
+			}
 		}
 	}
 
@@ -309,7 +349,26 @@ public class HAWQRecordConverter extends GroupConverter {
 		public void addBinary(Binary value) {
 			try {
 				parent.setString(value.toStringUsingUTF8());
-			} catch (HAWQException e) {}
+			} catch (HAWQException e) {
+				throw new RuntimeException("error during conversion from Binary to String", e);
+			}
+		}
+	}
+
+	static class HAWQBitsConverter extends PrimitiveConverter {
+		private ParentValueContainer parent;
+
+		public HAWQBitsConverter(ParentValueContainer parent) {
+			this.parent = parent;
+		}
+
+		@Override
+		public void addBinary(Binary value) {
+			try {
+				parent.setBit(HAWQConvertUtil.bytesToVarbit(value.getBytes(), 0));
+			} catch (HAWQException e) {
+				throw new RuntimeException("error during conversion from Binary to Varbit");
+			}
 		}
 	}
 
@@ -328,7 +387,7 @@ public class HAWQRecordConverter extends GroupConverter {
 		}
 	}
 
-	//TODO date is stored in 4 bytes binary
+	// date is stored as a 4-bytes int
 	static class HAWQDateConverter extends PrimitiveConverter {
 		private ParentValueContainer parent;
 
@@ -337,12 +396,17 @@ public class HAWQRecordConverter extends GroupConverter {
 		}
 
 		@Override
-		public void addBinary(Binary value) {
+		public void addInt(int value) {
+			try {
+				parent.setDate(HAWQConvertUtil.toDate(value));
 
+			} catch (HAWQException e) {
+				throw new RuntimeException("error during conversion from Integer to Date", e);
+			}
 		}
 	}
 
-	//TODO time (without timezone) is stored in 8 bytes binary
+	// time (without timezone) is stored in 8-bytes long
 	static class HAWQTimeConverter extends PrimitiveConverter {
 		private ParentValueContainer parent;
 
@@ -351,12 +415,34 @@ public class HAWQRecordConverter extends GroupConverter {
 		}
 
 		@Override
-		public void addBinary(Binary value) {
-
+		public void addLong(long value) {
+			try {
+				parent.setTime(HAWQConvertUtil.toTime(value));
+			} catch (HAWQException e) {
+				throw new RuntimeException("error during conversion from Long to Time", e);
+			}
 		}
 	}
 
-	//TODO timestamp (without timezone) is stored in 8 bytes binary
+	// time (with timezone) is stored in 12 bytes binary
+	static class HAWQTimeTZConverter extends PrimitiveConverter {
+		private ParentValueContainer parent;
+
+		public HAWQTimeTZConverter(ParentValueContainer parent) {
+			this.parent = parent;
+		}
+
+		@Override
+		public void addBinary(Binary value) {
+			try {
+				parent.setTime(HAWQConvertUtil.toTimeTz(value.getBytes(), 0));
+			} catch (HAWQException e) {
+				throw new RuntimeException("error during conversion from Binary to Time (with timezone)", e);
+			}
+		}
+	}
+
+	// timestamp (without timezone) is stored in 8-bytes long
 	static class HAWQTimestampConverter extends PrimitiveConverter {
 		private ParentValueContainer parent;
 
@@ -365,59 +451,102 @@ public class HAWQRecordConverter extends GroupConverter {
 		}
 
 		@Override
-		public void addBinary(Binary value) {
+		public void addLong(long value) {
+			try {
+				parent.setTimestamp(HAWQConvertUtil.toTimestamp(value, false));
+			} catch (HAWQException e) {
+				throw new RuntimeException("error during conversion from Long to Timestamp", e);
+			}
 		}
 	}
 
-	//TODO point is stored in 16 bytes binary (x,y)
-	static class HAWQPointConverter extends PrimitiveConverter {
+	// timestamp (with timezone) is stored in 8-bytes long
+	static class HAWQTimestampTZConverter extends PrimitiveConverter {
 		private ParentValueContainer parent;
 
-		public HAWQPointConverter(ParentValueContainer parent) {
+		public HAWQTimestampTZConverter(ParentValueContainer parent) {
+			this.parent = parent;
+		}
+
+		@Override
+		public void addLong(long value) {
+			try {
+				parent.setTimestamp(HAWQConvertUtil.toTimestamp(value, true));
+			} catch (HAWQException e) {
+				throw new RuntimeException("error during conversion from Long to Timestamp (with timezone)", e);
+			}
+		}
+	}
+
+	// interval is stored in 16 bytes binary
+	static class HAWQIntervalConverter extends PrimitiveConverter {
+		private ParentValueContainer parent;
+
+		public HAWQIntervalConverter(ParentValueContainer parent) {
 			this.parent = parent;
 		}
 
 		@Override
 		public void addBinary(Binary value) {
+			try {
+				parent.setInterval(HAWQConvertUtil.bytesToInterval(value.getBytes(), 0));
+			} catch (HAWQException e) {
+				throw new RuntimeException("error during conversion from Binary to Interval", e);
+			}
 		}
 	}
 
-	//TODO line segment is stored in 32 bytes binary (x1,y1,x2,y2)
-	static class HAWQLineSegmentConverter extends PrimitiveConverter {
+	// macaddr is stored as binary
+	static class HAWQMacaddrConverter extends PrimitiveConverter {
 		private ParentValueContainer parent;
 
-		public HAWQLineSegmentConverter(ParentValueContainer parent) {
+		public HAWQMacaddrConverter(ParentValueContainer parent) {
 			this.parent = parent;
 		}
 
 		@Override
 		public void addBinary(Binary value) {
+			try {
+				parent.setMacaddr(new HAWQMacaddr(value.getBytes()));
+			} catch (HAWQException e) {
+				throw new RuntimeException("error during conversion from Binary to HAWQMacaddr");
+			}
 		}
 	}
 
-	//TODO box is stored in 32 bytes binary (x1,y1,x2,y2)
-	static class HAWQBoxConverter extends PrimitiveConverter {
+	// inet is stored as binary
+	static class HAWQInetConverter extends PrimitiveConverter {
 		private ParentValueContainer parent;
 
-		public HAWQBoxConverter(ParentValueContainer parent) {
+		HAWQInetConverter(ParentValueContainer parent) {
 			this.parent = parent;
 		}
 
 		@Override
 		public void addBinary(Binary value) {
+			try {
+				parent.setInet(HAWQConvertUtil.bytesToInet(value.getBytes(), 0));
+			} catch (HAWQException e) {
+				throw new RuntimeException("error during conversion from Binary to HAWQInet");
+			}
 		}
 	}
 
-	//TODO circle is stored in 24 bytes binary (x,y,r)
-	static class HAWQCircleConverter extends PrimitiveConverter {
+	// cidr is stored as binary
+	static class HAWQCidrConverter extends PrimitiveConverter {
 		private ParentValueContainer parent;
 
-		public HAWQCircleConverter(ParentValueContainer parent) {
+		HAWQCidrConverter(ParentValueContainer parent) {
 			this.parent = parent;
 		}
 
 		@Override
 		public void addBinary(Binary value) {
+			try {
+				parent.setCidr(HAWQConvertUtil.bytesToCidr(value.getBytes(), 0));
+			} catch (HAWQException e) {
+				throw new RuntimeException("error during conversion from Binary to HAWQCidr");
+			}
 		}
 	}
 }
