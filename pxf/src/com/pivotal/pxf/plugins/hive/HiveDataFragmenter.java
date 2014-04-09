@@ -4,24 +4,23 @@ import com.pivotal.pxf.api.Fragment;
 import com.pivotal.pxf.api.Fragmenter;
 import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.plugins.hdfs.utilities.HdfsUtilities;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.JavaUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
+import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
-import org.apache.hadoop.hive.service.HiveClient;
 import org.apache.hadoop.mapred.*;
-import org.apache.thrift.protocol.TBinaryProtocol;
-import org.apache.thrift.transport.TSocket;
-import org.apache.thrift.transport.TTransportException;
 
 import java.io.ByteArrayOutputStream;
 import java.util.List;
@@ -42,28 +41,8 @@ import java.util.Properties;
  */
 public class HiveDataFragmenter extends Fragmenter {
     private JobConf jobConf;
-    HiveClient client;
+    HiveMetaStoreClient client;
     Log Log = LogFactory.getLog(HiveDataFragmenter.class);
-
-    /* Encapsulates Metastore host and port*/
-    static class Metastore {
-        String host;
-        int port;
-
-        /* C'tor */
-        Metastore(String host, int port) {
-            this.host = host;
-            this.port = port;
-        }
-
-        /* C'tor */
-        Metastore(Metastore other) {
-            this.host = other.host;
-            this.port = other.port;
-        }
-    }
-
-    private Metastore metastore;
 
 	private static final String HIVE_DEFAULT_DBNAME = "default";
     static final String HIVE_UD_DELIM = "!HUDD!";
@@ -72,8 +51,6 @@ public class HiveDataFragmenter extends Fragmenter {
     static final String HIVE_NO_PART_TBL = "!HNPT!";
 
     private static final int HIVE_MAX_PARTS = 1000;
-    static final int METASTORE_DEFAULT_PORT = 9083; /* default metastore port */
-    static final String METASTORE_DEFAULT_HOST = "localhost";
 
     /* internal class used for parsing the qualified table name received as input to getFragments() */
     class TblDesc {
@@ -119,15 +96,11 @@ public class HiveDataFragmenter extends Fragmenter {
         super(md);
 
         jobConf = new JobConf(new Configuration(), HiveDataFragmenter.class);
-        client = null;
+		initHiveClient();
     }
 
 	@Override
     public List<Fragment> getFragments() throws Exception {
-    	if (client == null) {
-    		initHiveClient();
-    	}
-    	
         TblDesc tblDesc = parseTableQualifiedName(inputData.getDataSource());
         if (tblDesc == null) {
             throw new IllegalArgumentException(inputData.getDataSource() + " is not a valid Hive table name. Should be either <table_name> or <db_name.table_name>");
@@ -137,9 +110,9 @@ public class HiveDataFragmenter extends Fragmenter {
 
         return fragments;
     }
-	
+
 	/**
-	 * Creates the partition InputFormat 
+	 * Creates the partition InputFormat
 	 * @param inputFormatName input format class name
 	 * @param jobConf configuraton data for the Hadoop framework
 	 * @return a {@link org.apache.hadoop.mapred.FileInputFormat} derived object
@@ -147,78 +120,24 @@ public class HiveDataFragmenter extends Fragmenter {
     static public FileInputFormat<?, ?> makeInputFormat(String inputFormatName, JobConf jobConf) throws Exception {
         Class<?> c = Class.forName(inputFormatName, true, JavaUtils.getClassLoader());
         FileInputFormat<?, ?> fformat = (FileInputFormat<?, ?>) c.newInstance();
-		
+
         if ("org.apache.hadoop.mapred.TextInputFormat".equals(inputFormatName)) {
             ((TextInputFormat) fformat).configure(jobConf); // TextInputFormat needs a special configuration
         }
-		
+
         return fformat;
-    }	
+    }
 
-    /* Initialize the Hive client */
+    /* 
+	 * Initialize the HiveMetaStoreClient 
+	 * Uses classpath configuration files to locate the MetaStore
+	 */
     private void initHiveClient() {
-        loadHostAndPort();
-        TSocket transport = new TSocket(metastore.host, metastore.port);
-       
-        try {
-        	transport.open();
-        } catch (TTransportException e) {
-        	throw new RuntimeException("Failed to connect to Hive metastore: " + e.getMessage());
-        }
-        TBinaryProtocol protocol = new TBinaryProtocol(transport);
-        client = new HiveClient(protocol);
-    }
-
-    /*
-     * Load metastore host and port from configuration
-     * In case of corrupted or unset configuration we stay with the hardcoded
-     * METASTORE_DEFAULT_HOST and METASTORE_DEFAULT_PORT
-     */
-    private void loadHostAndPort() {
-        HiveConf hiveConf = new HiveConf();
-        /* example of hive.metastore.uris: thrift://localhost:9084*/
-        metastore = parseMetastoreUri(hiveConf.getVar(ConfVars.METASTOREURIS), Log);
-    }
-
-    /*
-     * Parse the Metastore uri
-     * In case of corrupted or unset configuration we stay with the hardcoded
-     * METASTORE_DEFAULT_HOST and METASTORE_DEFAULT_PORT
-     */
-    static Metastore parseMetastoreUri(String uri, Log log) {
-        Metastore ms = new Metastore(METASTORE_DEFAULT_HOST, METASTORE_DEFAULT_PORT);
-        if (uri == null) /* non existent property hive.metastore.uris */ {
-            log.warn("Property [hive.metastore.uris] is missing from hive-site.xml. will use "
-                    + "default values for metastore service host:port - localhost:9083");
-            return ms;
-        }
-
-        String[] arr = uri.split("\\/\\/");
-        if (arr.length != 2) /* the value of  property hive.metastore.uris is corrupted */ {
-            log.warn("Property [hive.metastore.uris] in hive-site.xml. is invalid. "
-                    + "host:port section is missing."
-                    + "Will use default values for metastore service host:port - localhost:9083");
-            return ms;
-        }
-
-        String hostport = arr[1];
-        arr = hostport.split(":");
-        if (arr.length != 2) /* the value of  property hive.metastore.uris is corrupted */ {
-            log.warn("Property [hive.metastore.uris] in hive-site.xml. is invalid. "
-                    + "There is no [:] between host and port."
-                    + "Will use default values for metastore service host:port - localhost:9083");
-            return ms;
-        }
-
-        String host = arr[0];
-        String sport = arr[1];
-        int nport = (sport != null) ? Integer.parseInt(sport) : 0;
-
-        if (host != null && nport != 0) {
-            ms = new Metastore(host, nport);
-        }
-
-        return ms;
+		try {
+			client = new HiveMetaStoreClient(new HiveConf());
+		} catch (MetaException cause) {
+			throw new RuntimeException("Failed connecting to Hive MetaStore service: " + cause.getMessage(), cause);
+		}
     }
 
     /*
@@ -247,7 +166,7 @@ public class HiveDataFragmenter extends Fragmenter {
      * Goes over the table partitions metadata and extracts the splits and the InputFormat and Serde per split.
      */
     private void fetchTableMetaData(TblDesc tblDesc) throws Exception {
-        Table tbl = client.get_table(tblDesc.dbName, tblDesc.tableName);
+        Table tbl = client.getTable(tblDesc.dbName, tblDesc.tableName);
         String tblType = tbl.getTableType();
 
         if (Log.isDebugEnabled()) {
@@ -259,7 +178,7 @@ public class HiveDataFragmenter extends Fragmenter {
         }
 
         // guessing the max partitions - will have to further research this
-        List<Partition> partitions = client.get_partitions(tblDesc.dbName, tblDesc.tableName, (short) HIVE_MAX_PARTS);
+        List<Partition> partitions = client.listPartitions(tblDesc.dbName, tblDesc.tableName, (short) HIVE_MAX_PARTS);
         StorageDescriptor descTable = tbl.getSd();
         Properties props;
 
@@ -369,7 +288,3 @@ public class HiveDataFragmenter extends Fragmenter {
         return userData.getBytes();
     }
 }
-
-
-
-

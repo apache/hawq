@@ -1,47 +1,84 @@
 package com.pivotal.pxf.plugins.hive;
 
-import junitparams.JUnitParamsRunner;
-import junitparams.Parameters;
-import org.apache.commons.logging.Log;
+import com.pivotal.pxf.api.utilities.InputData;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.mapred.JobConf;
+
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import static org.junit.Assert.assertEquals;
-import static org.mockito.Mockito.mock;
+import static org.junit.Assert.*;
+import static org.mockito.Mockito.*;
 
-/*
- * Test HiveDataFragmenter
- */
-@RunWith(JUnitParamsRunner.class)
+import org.powermock.api.mockito.PowerMockito;
+import org.powermock.core.classloader.annotations.PrepareForTest;
+import org.powermock.core.classloader.annotations.SuppressStaticInitializationFor;
+import org.powermock.modules.junit4.PowerMockRunner;
+
+@RunWith(PowerMockRunner.class)
+@PrepareForTest({HiveDataFragmenter.class}) // Enables mocking 'new' calls
+@SuppressStaticInitializationFor({"org.apache.hadoop.mapred.JobConf", 
+								  "org.apache.hadoop.hive.metastore.api.MetaException"}) // Prevents static inits
 public class HiveDataFragmenterTest {
-    /* parameterized testing for testparseMetastoreUri */
-    private static final Object[] getHostport() {
-        /* input data for the tests - each Object[] is an iteration of testparseMetastoreUri() */
-        return new Object[]{
-                new Object[]{"thrift://isenshackamac.corp.emc.com:9084",
-                        "isenshackamac.corp.emc.com",
-                        9084}, /* valid uri - expect success */
+	InputData inputData;
+	Configuration hadoopConfiguration;
+	JobConf jobConf;
+	HiveConf hiveConfiguration;
+	HiveMetaStoreClient hiveClient;
 
-			/* when parsing fails we expect testparseMetastoreUri() to return default host and port */
-                new Object[]{"thrift:/isenshackamac.corp.emc.com:9084",
-                        HiveDataFragmenter.METASTORE_DEFAULT_HOST,
-                        HiveDataFragmenter.METASTORE_DEFAULT_PORT}, /* invalid uri - expect failure */
-                new Object[]{"thrift://isenshackamac.corp.emc.com9084",
-                        HiveDataFragmenter.METASTORE_DEFAULT_HOST,
-                        HiveDataFragmenter.METASTORE_DEFAULT_PORT}, /* invalid uri - expect failure */
-                new Object[]{null,
-                        HiveDataFragmenter.METASTORE_DEFAULT_HOST,
-                        HiveDataFragmenter.METASTORE_DEFAULT_PORT} /* invalid uri - expect failure */
-        };
-    }
+	@Test
+	public void construction() throws Exception {
+		prepareConstruction();
+		HiveDataFragmenter fragmenter = new HiveDataFragmenter(inputData);
+		PowerMockito.verifyNew(JobConf.class).withArguments(hadoopConfiguration, HiveDataFragmenter.class);
+		PowerMockito.verifyNew(HiveMetaStoreClient.class).withArguments(hiveConfiguration);
+	}
 
-    @Test
-    @Parameters(method = "getHostport")
-    public void testparseMetastoreUri(String uri, String expectedHost, int expectedPort) throws Exception {
-        Log Log = mock(Log.class);
+	@Test
+	public void constructorCantAccessMetaStore() throws Exception {
+		prepareConstruction();
+		PowerMockito.whenNew(HiveMetaStoreClient.class).withArguments(hiveConfiguration).thenThrow(new MetaException("which way to albuquerque"));
 
-        HiveDataFragmenter.Metastore ms = HiveDataFragmenter.parseMetastoreUri(uri, Log);
-        assertEquals(ms.host, expectedHost);
-        assertEquals(ms.port, expectedPort);
-    }
+		try {
+			HiveDataFragmenter fragmenter = new HiveDataFragmenter(inputData);
+			fail("Expected a RuntimeException");
+		} catch (RuntimeException ex) {
+			assertEquals(ex.getMessage(), "Failed connecting to Hive MetaStore service: which way to albuquerque");
+		}
+	}
+
+	@Test
+	public void invalidTableName() throws Exception {
+		prepareConstruction();
+		HiveDataFragmenter fragmenter = new HiveDataFragmenter(inputData);
+
+		when(inputData.getDataSource()).thenReturn("t.r.o.u.b.l.e.m.a.k.e.r");
+
+		try {
+			fragmenter.getFragments();
+			fail("Expected an IllegalArgumentException");
+		} catch (IllegalArgumentException ex) {
+			assertEquals(ex.getMessage(), "t.r.o.u.b.l.e.m.a.k.e.r is not a valid Hive table name. Should be either <table_name> or <db_name.table_name>");
+		}
+	}
+
+	private void prepareConstruction() throws Exception {
+		inputData = mock(InputData.class);
+
+		hadoopConfiguration = mock(Configuration.class);
+		PowerMockito.whenNew(Configuration.class).withNoArguments().thenReturn(hadoopConfiguration);
+
+		jobConf = mock(JobConf.class);
+		PowerMockito.whenNew(JobConf.class).withArguments(hadoopConfiguration, HiveDataFragmenter.class).thenReturn(jobConf);
+
+		hiveConfiguration = mock(HiveConf.class);
+		PowerMockito.whenNew(HiveConf.class).withNoArguments().thenReturn(hiveConfiguration);
+
+		hiveClient = mock(HiveMetaStoreClient.class);
+		PowerMockito.whenNew(HiveMetaStoreClient.class).withArguments(hiveConfiguration).thenReturn(hiveClient);
+	}
 }
