@@ -164,11 +164,14 @@
 			<formatter classname="com.pivotal.pxfauto.infra.utils.junit.OneLinerFormatter" usefile="false" />
 			<formatter type="xml" />
 
-			<batchtest todir="${testreports.dir}">
+			<batchtest todir="${testreports.dir}" unless="testMethods">
 				<fileset dir="${build.dir}/regression/classes">
 					<include name="com/pxf/tests/basic/${testClass}.class" />
 				</fileset>
 			</batchtest>
+			<!-- running specific test methods from test class -->
+			<test name="com.pxf.tests.basic.${testClass}" methods="${testMethods}" todir="${testreports.dir}" if="testMethods"/>
+
 		</junit>
 		<fail message="Regression Failed" if="test.failure" />
 	</target>

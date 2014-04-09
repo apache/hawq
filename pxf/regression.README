@@ -7,7 +7,7 @@ are set before running the ant.
 2. Open the default.xml sut file located in the regression/sut folder and change the required parameters: 
 add your required host, ports.
 The clusterFolder will be taken from GPHD_ROOT variable if exists - if needed you can put the location in the sut.
-Pay attention and replace escape characters in the default.xml file ​​as in the following table:
+Pay attention and replace escape characters in the default.xml file as in the following table:
 
 "	->	&quot;
 '	->	&apos;
@@ -15,8 +15,26 @@ Pay attention and replace escape characters in the default.xml file ​​as in 
 >	->	&gt;
 &	->	&amp;
 
-3. Run from root directory of PXF project: ant -buildfile regression.xml 
-to run all regression tests exists. (Currently will run POC of HDFS, Writable and Hive regression)
+3. Regressions require ant version >= 1.8.2 (ant -version). 
+Running the regressions can be done by running ant directly or make regressions <options>.
+Before running the regressions for the first time please run make sync_tools 
+from HAWQ's root directory to update the ant version used by Makefile.
 
-4. Run from root directory of PXF project: ant -buildfile regression.xml -DtestClass <specific test class>  
-to run specific test class.
+Running:
+# To run all regression tests (Currently will run POC of HDFS, Writable and Hive regression),
+run from root directory of PXF project: 
+make regressions
+OR
+ant -buildfile regression.xml
+
+## To run a specific test class: run from root directory of PXF project: 
+make regressions TEST=<specific test class>
+OR
+ant -buildfile regression.xml -DtestClass <specific test class>  
+
+### To run specific methods within a specific test class: 
+run from root directory of PXF project: 
+make regressions TEST=<specific test class> METHODS=<specific test methods from test class, comma separated>
+OR
+ant -buildfile regression.xml -DtestClass=<specific test class> -DtestMethods=<specific test methods from test class, comma delimited>
+

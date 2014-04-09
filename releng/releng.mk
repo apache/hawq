@@ -120,7 +120,17 @@ MAVEN_DIR = $(BLD_TOP)/ext/$(BLD_ARCH)/apache-maven
 maventmpPATH:=$(MAVEN_DIR)/bin:$(PATH)
 export PATH=$(maventmpPATH)
 endif
-	
+
+## ---------------------------------------
+## Ant support
+## ---------------------------------------
+
+ifneq "$(wildcard $(BLD_TOP)/ext/$(BLD_ARCH)/apache-ant/bin/ant)" ""
+ANT_DIR = $(BLD_TOP)/ext/$(BLD_ARCH)/apache-ant
+anttmpPATH:=$(ANT_DIR)/bin:$(PATH)
+export PATH=$(anttmpPATH)
+endif
+
 display_dependent_vers:
 	@echo ""
 	@echo "======================================================================"
