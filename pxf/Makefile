@@ -1,3 +1,6 @@
+# protect the default target for this file from the targets in Makefile.global
+default: all
+
 BLD_TOP=..
 include $(BLD_TOP)/Makefile.global
 include $(BLD_TOP)/releng/releng.mk
