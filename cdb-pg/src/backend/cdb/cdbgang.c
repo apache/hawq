@@ -72,8 +72,6 @@ static bool cleanupGang(Gang * gp);
 
 extern void resetSessionForPrimaryGangLoss(void);
 
-static char *rmSearchPath(StringInfoData *input);
-
 /*
  * Points to the result of getCdbComponentDatabases()
  */
@@ -1034,46 +1032,10 @@ addOneOption(PQExpBufferData *buffer, struct config_generic * guc)
 }
 
 /*
- *	Remove -c search_path from input.data, MyProcPort->override_options.
- *	Because segments don't have search_path information, it's essential
- *	to remove the configuration away from conn info to segments.
- *
- *	Return the removed search_path part configuration string.
- *	If malloc failed, return NULL
- */
-char *rmSearchPath(StringInfoData *input)
-{
-	char *output = (char*) malloc(input->len + 1);
-	if(output == NULL){
-		return NULL;
-	}
-	char *searchPathInit = strstr(input->data, "-c search_path=");
-	memset(output, '\0', input->len + 1);
-	if(searchPathInit)
-	{
-		int startLen = searchPathInit - input->data;
-		strncpy(output, input->data, startLen);
-
-		char *searchPathEnd = strstr(searchPathInit + 2, "-c");
-		if(searchPathEnd)
-		{
-			int endLen = searchPathEnd - input->data;
-			strcat(output, input->data + endLen);
-		}
-	}
-	else
-	{
-		strncpy(output, input->data, input->len);
-	}
-	return output;
-}
-
-/*
  * Add GUCs to option string.
  *
  * Return 1 (>0) if success.
- * Return 0 if out of memory when malloc.
- * Return -index-1 (<0) into get_guc_variables on failure, so that caller
+ * Return -index (<=0) into get_guc_variables on failure, so that caller
  * will be able to print a nice error message.
  */
 static int
@@ -1146,28 +1108,17 @@ addOptions(PQExpBufferData *buffer, bool iswriter, int segindex, bool i_am_super
 		if ((guc->flags & GUC_GPDB_ADDOPT) &&
 			(guc->context == PGC_USERSET || i_am_superuser))
 		{
-			/* Do not distribute set search_path to segments*/
-			if(strcmp(guc->name, "search_path") == 0)
-			{
-				continue;
-			}
-
 			bool		fOK = addOneOption(buffer, guc);
 
-			if(!fOK)
-				return -i-1;
+			if (!fOK)
+				return -i;
 		}
 	}
 
 	/* GPSQL needs to dispatch the database/user gucs. */
 	if (GpIdentity.segindex == MASTER_CONTENT_ID && MyProcPort->override_options.len)
 	{
-		char *output = rmSearchPath(&(MyProcPort->override_options));
-		if(!output)
-			return 0;
-		appendPQExpBuffer(buffer, " %s", output);
-		free(output);
-		/*appendPQExpBuffer(buffer, " %s", MyProcPort->override_options.data);*/
+		appendPQExpBuffer(buffer, " %s", MyProcPort->override_options.data);
 	}
 
 	appendPQExpBuffer(buffer, "' ");
