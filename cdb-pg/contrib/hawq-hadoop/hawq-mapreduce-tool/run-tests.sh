@@ -67,13 +67,16 @@ for host in smdw sdw1 sdw2; do
 done
 
 ##
-## Clean up any previous tmp working directory and copy contents to
-## remote systems.
+## Setup CLASSPATH
 ##
 
-for jar in ls /usr/lib/gphd/hadoop-yarn/*.jar ${HAWQ_MAPREDUCE_TOOL_TMPDIR}/*.jar; do
-    CLASSPATH=$CLASSPATH:${jar}
-done
+#
+# After source hadoop-config.sh, our CLASSPATH contains an old version of snappy-java
+# which doesn't work on centos 5. To handle this, HAWQ_MAPREDUCE_TOOL_TMPDIR includes
+# an updated version (snappy-java-1.1.0.jar). But we should put in front of the CLASSPATH
+# to make it work.
+# 
+CLASSPATH=${HAWQ_MAPREDUCE_TOOL_TMPDIR}/*:/usr/lib/gphd/hadoop-yarn/*:$CLASSPATH
 
 rm inputformat.logs
 for test in ${FEATURE_TEST_LIST}; do
@@ -93,15 +96,6 @@ for test in ${FEATURE_TEST_LIST}; do
 done
 
 ##
-## Show results.
+## Generate reports parsed by pulse.
 ##
-num_fails=$(grep -c FAILURES inputformat.logs)
-echo "======================================================================"
-echo ""
-if [ $num_fails -eq 0 ]; then
-    echo "All InputFormat Feature Tests Passed!!!" | tee -a inputformat.logs
-    exit 0
-else
-    echo "There are ${num_fails} failed cases!!!" | tee -a inputformat.logs
-    exit 1
-fi
+python generate_mr_report.py 

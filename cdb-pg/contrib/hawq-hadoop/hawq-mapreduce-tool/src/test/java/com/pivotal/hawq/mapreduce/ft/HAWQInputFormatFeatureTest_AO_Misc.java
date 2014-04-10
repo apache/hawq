@@ -5,12 +5,18 @@ import com.pivotal.hawq.mapreduce.DataProvider;
 import com.pivotal.hawq.mapreduce.HAWQTable;
 import com.pivotal.hawq.mapreduce.SimpleTableClusterTester;
 import com.pivotal.hawq.mapreduce.metadata.HAWQTableFormat;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 /**
  * Miscellaneous tests for AO tables.
  */
 public class HAWQInputFormatFeatureTest_AO_Misc extends SimpleTableClusterTester {
+
+	@BeforeClass
+	public static void setUpBeforeClass() {
+		System.out.println("Executing test suite: AO_Misc");
+	}
 
 	@Test
 	public void testAOLargeContent() throws Exception {

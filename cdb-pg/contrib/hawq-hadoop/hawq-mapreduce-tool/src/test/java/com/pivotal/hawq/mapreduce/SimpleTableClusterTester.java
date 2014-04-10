@@ -25,6 +25,8 @@ public class SimpleTableClusterTester extends SimpleTableTester {
 	protected void testSimpleTable(HAWQTable table, Class<? extends Mapper> mapperClass) throws Exception {
 		final String tableName = table.getTableName();
 		// use table name as case name
+		System.out.println("Executing test case: " + tableName);
+
 		final File caseFolder	= new File(FT_TEST_FOLDER, tableName);
 		final File sqlFile		= new File(caseFolder, tableName + ".sql");
 		final File answerFile	= new File(caseFolder, tableName + ".ans");
@@ -66,5 +68,7 @@ public class SimpleTableClusterTester extends SimpleTableTester {
 		// 5. compare result
 		List<String> outputs = Files.readLines(outputFile, Charsets.UTF_8);
 		checkOutput(answers, outputs, table);
+
+		System.out.println("Successfully finish test case: " + tableName);
 	}
 }

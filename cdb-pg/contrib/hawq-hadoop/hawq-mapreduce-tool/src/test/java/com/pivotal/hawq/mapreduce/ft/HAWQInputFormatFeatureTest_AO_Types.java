@@ -4,12 +4,18 @@ import com.google.common.collect.Lists;
 import com.pivotal.hawq.mapreduce.HAWQTable;
 import com.pivotal.hawq.mapreduce.SimpleTableClusterTester;
 import com.pivotal.hawq.mapreduce.metadata.HAWQTableFormat;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 /**
  * Test data type support for AO table.
  */
 public class HAWQInputFormatFeatureTest_AO_Types extends SimpleTableClusterTester {
+
+	@BeforeClass
+	public static void setUpBeforeClass() {
+		System.out.println("Executing test suite: AO_Types");
+	}
 
 	private void doSingleColumnAOTest(String columnType) throws Exception {
 		String tableName = "test_ao_types_" + columnType;

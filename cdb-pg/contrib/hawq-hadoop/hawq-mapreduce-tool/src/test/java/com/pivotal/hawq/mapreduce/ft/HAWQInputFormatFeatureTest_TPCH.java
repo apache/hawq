@@ -2,12 +2,18 @@ package com.pivotal.hawq.mapreduce.ft;
 
 import com.pivotal.hawq.mapreduce.TPCHClusterTester;
 import com.pivotal.hawq.mapreduce.metadata.HAWQTableFormat;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 /**
  * Test reading TPC-H table using HAWQInputFormat
  */
 public class HAWQInputFormatFeatureTest_TPCH extends TPCHClusterTester {
+
+	@BeforeClass
+	public static void setUpBeforeClass() {
+		System.out.println("Executing test suite: TPC-H");
+	}
 
 	@Test
 	public void testTPCH_AO_No_Partition() throws Exception {

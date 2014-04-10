@@ -6,6 +6,7 @@ import com.pivotal.hawq.mapreduce.HAWQTable;
 import com.pivotal.hawq.mapreduce.RandomDataProvider;
 import com.pivotal.hawq.mapreduce.SimpleTableClusterTester;
 import com.pivotal.hawq.mapreduce.metadata.HAWQTableFormat;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.util.List;
@@ -14,6 +15,11 @@ import java.util.List;
  * Test reading Parquet compressed table.
  */
 public class HAWQInputFormatFeatureTest_Parquet_Compression extends SimpleTableClusterTester {
+
+	@BeforeClass
+	public static void setUpBeforeClass() {
+		System.out.println("Executing test suite: Parquet_Compression");
+	}
 
 	private List<String> colTypes = Lists.newArrayList("int4", "text");
 	private DataProvider provider = new RandomDataProvider(500);

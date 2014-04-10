@@ -26,6 +26,8 @@ public class TPCHClusterTester extends TPCHTester {
 			throws Exception {
 
 		String caseName = tpchSpec.toString();
+		System.out.println("Executing test case: " + caseName);
+
 		final File caseFolder	= new File(FT_TEST_FOLDER, caseName);
 		final File answerFile	= new File(caseFolder, tableName + ".ans");
 		final File outputFile	= new File(caseFolder, tableName + ".out");
@@ -70,5 +72,7 @@ public class TPCHClusterTester extends TPCHTester {
 		if (!answers.equals(outputs))
 			Assert.fail(String.format("HAWQInputFormat output for table %s differs with DB output:\n%s\n%s",
 									  tableName, answerFile, outputFile));
+
+		System.out.println("Successfully finish test case: " + caseName);
 	}
 }

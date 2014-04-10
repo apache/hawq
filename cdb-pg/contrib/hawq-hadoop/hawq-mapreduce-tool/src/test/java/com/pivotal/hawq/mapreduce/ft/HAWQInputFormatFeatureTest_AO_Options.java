@@ -5,6 +5,7 @@ import com.pivotal.hawq.mapreduce.HAWQTable;
 import com.pivotal.hawq.mapreduce.SeriesIntDataProvider;
 import com.pivotal.hawq.mapreduce.SimpleTableClusterTester;
 import com.pivotal.hawq.mapreduce.metadata.HAWQTableFormat;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.util.List;
@@ -13,6 +14,11 @@ import java.util.List;
  * Test reading AO tables with different options.
  */
 public class HAWQInputFormatFeatureTest_AO_Options extends SimpleTableClusterTester {
+
+	@BeforeClass
+	public static void setUpBeforeClass() {
+		System.out.println("Executing test suite: AO_Options");
+	}
 
 	@Test
 	public void testBlockSize() throws Exception {

@@ -5,6 +5,7 @@ import com.pivotal.hawq.mapreduce.HAWQTable;
 import com.pivotal.hawq.mapreduce.SeriesIntDataProvider;
 import com.pivotal.hawq.mapreduce.SimpleTableClusterTester;
 import com.pivotal.hawq.mapreduce.metadata.HAWQTableFormat;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.util.List;
@@ -13,6 +14,12 @@ import java.util.List;
  * Test reading Parquet tables with different options.
  */
 public class HAWQInputFormatFeatureTest_Parquet_Options extends SimpleTableClusterTester {
+
+	@BeforeClass
+	public static void setUpBeforeClass() {
+		System.out.println("Executing test suite: Parquet_Options");
+	}
+
 	List<String> colTypes = Lists.newArrayList("int8");
 
 	@Test

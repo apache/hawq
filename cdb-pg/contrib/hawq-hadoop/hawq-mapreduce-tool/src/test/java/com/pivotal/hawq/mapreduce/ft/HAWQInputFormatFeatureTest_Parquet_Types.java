@@ -4,12 +4,18 @@ import com.google.common.collect.Lists;
 import com.pivotal.hawq.mapreduce.HAWQTable;
 import com.pivotal.hawq.mapreduce.SimpleTableClusterTester;
 import com.pivotal.hawq.mapreduce.metadata.HAWQTableFormat;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 /**
  * Test data type support for Parquet table.
  */
 public class HAWQInputFormatFeatureTest_Parquet_Types extends SimpleTableClusterTester {
+
+	@BeforeClass
+	public static void setUpBeforeClass() {
+		System.out.println("Executing test suite: Parquet_Types");
+	}
 
 	private void doSingleColumnParquetTest(String columnType) throws Exception {
 		String tableName = "test_parquet_types_" + columnType;

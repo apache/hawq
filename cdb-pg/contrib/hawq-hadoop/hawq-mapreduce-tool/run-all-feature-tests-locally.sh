@@ -53,8 +53,13 @@ for test in ${FEATURE_TEST_LIST}; do
     echo "command ....... : ${command}"
     echo "----------------------------------------------------------------------"
 
-    ${command}
+    ${command} | tee -a inputformat.logs 2>&1
 
     echo "======================================================================"
     echo ""
 done
+
+##
+## Generate reports parsed by pulse.
+##
+python generate_mr_report.py 
