@@ -34,6 +34,8 @@
 #include "md/CMDIdCast.h"
 #include "md/CMDIdScCmp.h"
 
+#include "dxl/gpdb_types.h"
+
 #include "md/CMDCastGPDB.h"
 #include "md/CMDScCmpGPDB.h"
 
@@ -985,9 +987,11 @@ CTranslatorRelcacheToDXL::Pmdindex
 
 	IMDIndex::EmdindexType emdindt = IMDIndex::EmdindBtree;
 	IMDRelation::Erelstoragetype erelstorage = pmdrel->Erelstorage();
+	IMDId *pmdidItemType = NULL;
 	if (BITMAP_AM_OID == relIndex->rd_rel->relam || IMDRelation::ErelstorageAppendOnlyRows == erelstorage || IMDRelation::ErelstorageAppendOnlyCols == erelstorage)
 	{
 		emdindt = IMDIndex::EmdindBitmap;
+		pmdidItemType = New(pmp) CMDIdGPDB(GPDB_ANY);
 	}
 	
 	// get the index name
@@ -1023,6 +1027,7 @@ CTranslatorRelcacheToDXL::Pmdindex
 										New(pmp) CMDIdGPDB(pgIndex->indrelid),
 										pgIndex->indisclustered,
 										emdindt,
+										pmdidItemType,
 										false, // fPartial
 										pdrgpulKeyCols,
 										pdrgpulIncludeCols,
@@ -1194,9 +1199,11 @@ CTranslatorRelcacheToDXL::PmdindexPartTable
 	GPOS_ASSERT(INDTYPE_BITMAP == pidxinfo->indType || INDTYPE_BTREE == pidxinfo->indType);
 	
 	IMDIndex::EmdindexType emdindt = IMDIndex::EmdindBtree;
+	IMDId *pmdidItemType = NULL;
 	if (INDTYPE_BITMAP == pidxinfo->indType)
 	{
 		emdindt = IMDIndex::EmdindBitmap;
+		pmdidItemType = New(pmp) CMDIdGPDB(GPDB_ANY);
 	}
 	CMDIndexGPDB *pmdindex = New(pmp) CMDIndexGPDB
 										(
@@ -1206,6 +1213,7 @@ CTranslatorRelcacheToDXL::PmdindexPartTable
 										pmdrel->Pmdid(),
 										pgIndex->indisclustered,
 										emdindt,
+										pmdidItemType,
 										fPartial,
 										pdrgpulKeyCols,
 										pdrgpulIncludeCols,
