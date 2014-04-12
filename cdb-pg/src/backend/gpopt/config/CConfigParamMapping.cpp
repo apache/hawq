@@ -318,6 +318,12 @@ CConfigParamMapping::PbsPack
 		(void) pbs->FExchangeSet(GPOPT_DISABLE_XFORM_TF(CXform::ExfInnerJoin2DynamicIndexGetApply));
 	}
 
+	// disable bitmap scan if the corresponding GUC is turned off
+	if (!optimizer_enable_bitmapscan)
+	{
+		(void) pbs->FExchangeSet(GPOPT_DISABLE_XFORM_TF(CXform::ExfSelect2BitmapTableGet));
+	}
+
 	return pbs;
 }
 

@@ -714,6 +714,7 @@ double 		optimizer_damping_factor_groupby;
 int			optimizer_segments;
 bool		optimizer_analyze_root_partition;
 bool		optimizer_enable_constant_expression_evaluation;
+bool		optimizer_enable_bitmapscan;
 
 /* Security */
 bool		gp_reject_internal_tcp_conn = true;
@@ -3802,6 +3803,16 @@ static struct config_bool ConfigureNamesBool[] =
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
 		&optimizer_enable_constant_expression_evaluation,
+		false, NULL, NULL
+	},
+
+	{
+		{"optimizer_enable_bitmapscan", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Enable bitmap plans in the optimizer"),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&optimizer_enable_bitmapscan,
 		false, NULL, NULL
 	},
 
