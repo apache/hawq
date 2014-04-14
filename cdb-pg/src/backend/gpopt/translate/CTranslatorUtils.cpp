@@ -2592,6 +2592,42 @@ CTranslatorUtils::FDuplicateSensitiveMotion
 
 //---------------------------------------------------------------------------
 //	@function:
+//		CTranslatorUtils::FHasProjElem
+//
+//	@doc:
+//		Check whether the given project list has a project element of the given
+//		operator type
+//
+//---------------------------------------------------------------------------
+BOOL
+CTranslatorUtils::FHasProjElem
+	(
+	CDXLNode *pdxlnPrL,
+	Edxlopid edxlopid
+	)
+{
+	GPOS_ASSERT(NULL != pdxlnPrL);
+	GPOS_ASSERT(EdxlopScalarProjectList == pdxlnPrL->Pdxlop()->Edxlop());
+	GPOS_ASSERT(EdxlopSentinel > edxlopid);
+
+	const ULONG ulArity = pdxlnPrL->UlArity();
+	for (ULONG ul = 0; ul < ulArity; ul++)
+	{
+		CDXLNode *pdxlnPrEl = (*pdxlnPrL)[ul];
+		GPOS_ASSERT(EdxlopScalarProjectElem == pdxlnPrEl->Pdxlop()->Edxlop());
+
+		CDXLNode *pdxlnChild = (*pdxlnPrEl)[0];
+		if (edxlopid == pdxlnChild->Pdxlop()->Edxlop())
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+//---------------------------------------------------------------------------
+//	@function:
 //		CTranslatorUtils::PdxlnPrElNull
 //
 //	@doc:

@@ -1358,7 +1358,7 @@ CTranslatorQueryToDXL::PdxlnWindow
 		pdxlnNewChildScPrL->Release();
 	}
 
-	if (0 == pdxlnPrL->UlArity())
+	if (!CTranslatorUtils::FHasProjElem(pdxlnPrL, EdxlopScalarWindowRef))
 	{
 		pdxlnPrL->Release();
 		pdrgpdxlws->Release();

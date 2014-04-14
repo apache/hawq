@@ -389,6 +389,10 @@ namespace gpdxl
 			static
 			INT IFromStr(const CWStringBase *pstr);
 
+			// check whether the given project list has a project element of the given
+			// operator type
+			static
+			BOOL FHasProjElem(CDXLNode *pdxlnPrL, Edxlopid edxlopid);
 
 			// create a multi-byte character string from a wide character string
 			static
