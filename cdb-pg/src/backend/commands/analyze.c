@@ -108,7 +108,7 @@ typedef struct AttributeStatistics
 static int 			elevel = -1;
 
 /* Top level functions */
-static void analyzeRelation(Relation relation, List *lAttributeNames);
+static void analyzeRelation(Relation relation, List *lAttributeNames, bool rootonly);
 static void analyzeComputeAttributeStatistics(Oid relationOid, 
 		const char *attributeName,
 		float4 relTuples, 
@@ -125,7 +125,7 @@ static void gp_statistics_estimate_reltuples_relpages_heap(Relation rel, float4 
 static void gp_statistics_estimate_reltuples_relpages_ao_rows(Relation rel, float4 *reltuples, float4 *relpages);
 static void gp_statistics_estimate_reltuples_relpages_ao_cs(Relation rel, float4 *reltuples, float4 *relpages);
 static void gp_statistics_estimate_reltuples_relpages_parquet(Relation rel, float4 *reltuples, float4 *relpages);
-static void analyzeEstimateReltuplesRelpages(Oid relationOid, float4 *relTuples, float4 *relPages);
+static void analyzeEstimateReltuplesRelpages(Oid relationOid, float4 *relTuples, float4 *relPages, bool rootonly);
 static void analyzeEstimateIndexpages(Oid relationOid, Oid indexOid, float4 *indexPages);
 
 /* Attribute-type related functions */
@@ -528,7 +528,7 @@ void analyzeStmt(VacuumStmt *stmt, List *relids)
 						lAttNames = analyzableAttributes(candidateRelation);
 					}
 
-					analyzeRelation(candidateRelation, lAttNames);
+					analyzeRelation(candidateRelation, lAttNames, stmt->rootonly);
 
 					/* Switch back to statement context and reset relation context */
 					MemoryContextSwitchTo(analyzeStatementContext);
@@ -780,7 +780,7 @@ static List *analyzableAttributes(Relation candidateRelation)
  * Output:
  * 	None
  */
-static void analyzeRelation(Relation relation, List *lAttributeNames)
+static void analyzeRelation(Relation relation, List *lAttributeNames, bool rootonly)
 {
 	Oid			sampleTableOid = InvalidOid;
 	float4		minSampleTableSize = 0;
@@ -803,7 +803,7 @@ static void analyzeRelation(Relation relation, List *lAttributeNames)
 	/* Step 1: estimate reltuples, relpages for the relation */
 	if (!isExternalPxfReadOnly)
 	{
-		analyzeEstimateReltuplesRelpages(relationOid, &estimatedRelTuples, &estimatedRelPages);
+		analyzeEstimateReltuplesRelpages(relationOid, &estimatedRelTuples, &estimatedRelPages, rootonly);
 	}
 	else
 	{
@@ -1349,16 +1349,19 @@ static void analyzeEstimateIndexpages(Oid relationOid, Oid indexOid, float4 *ind
  * 	relTuples - estimated number of tuples
  * 	relPages  - estimated number of pages
  */
-static void analyzeEstimateReltuplesRelpages(Oid relationOid, float4 *relTuples, float4 *relPages)
-{	
+static void analyzeEstimateReltuplesRelpages(Oid relationOid, float4 *relTuples, float4 *relPages, bool rootonly)
+{
 	*relPages = 0.0;		
 	*relTuples = 0.0;			
 
 	List *allRelOids = NIL;
-	/* if GUC optimizer_analyze_root_partition is off, we do not analyze root partitions.
+
+	/* if GUC optimizer_analyze_root_partition is off, we do not analyze root partitions, unless
+	 * using the 'ANALYZE ROOTPARITION tablename' command.
 	 * This is done by estimating the reltuples to be 0 and thus bypass the actual analyze.
 	 * See MPP-21427 */
-	if (rel_is_partitioned(relationOid) && optimizer_analyze_root_partition)
+	if (rel_is_partitioned(relationOid) &&
+			(optimizer_analyze_root_partition || rootonly))
 	{
 		PartitionNode *pn = get_parts(relationOid, 0 /*level*/ ,
 				0 /*parent*/, false /* inctemplate */, CurrentMemoryContext);
