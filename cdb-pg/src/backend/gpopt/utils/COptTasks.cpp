@@ -906,6 +906,7 @@ COptTasks::PvOptimizeTask
 			pdxlnQuery->Release();
 			pocconf->Release();
 			pcm->Release();
+			pdxlnPlan->Release();
 		}
 	}
 	GPOS_CATCH_EX(ex)
@@ -914,6 +915,7 @@ COptTasks::PvOptimizeTask
 		CRefCount::SafeRelease(pbsEnabled);
 		CRefCount::SafeRelease(pbsDisabled);
 		CRefCount::SafeRelease(pbsTraceFlags);
+		CRefCount::SafeRelease(pdxlnPlan);
 		CMDCache::Shutdown();
 
 		if (GPOS_MATCH_EX(ex, gpdxl::ExmaGPDB, gpdxl::ExmiGPDBError))
@@ -938,7 +940,6 @@ COptTasks::PvOptimizeTask
 	CRefCount::SafeRelease(pbsEnabled);
 	CRefCount::SafeRelease(pbsDisabled);
 	CRefCount::SafeRelease(pbsTraceFlags);
-	CRefCount::SafeRelease(pdxlnPlan);
 	if (optimizer_release_mdcache)
 	{
 		CMDCache::Shutdown();
