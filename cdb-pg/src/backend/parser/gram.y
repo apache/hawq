@@ -333,6 +333,7 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 %type <boolean> opt_instead opt_analyze
 %type <boolean> index_opt_unique opt_verbose opt_full
 %type <boolean> opt_freeze opt_default opt_ordered opt_recheck
+%type <boolean> opt_rootonly_all
 %type <boolean> opt_dxl
 %type <defelt>	opt_binary opt_oids copy_delimiter
 
@@ -495,13 +496,13 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 
 	DATA_P DATABASE DAY_P DEALLOCATE DEC DECIMAL_P DECLARE DECODE DEFAULT DEFAULTS
 	DEFERRABLE DEFERRED DEFINER DELETE_P DELIMITER DELIMITERS DENY
-	DESC DISABLE_P DISTINCT DISTRIBUTED DO DOMAIN_P DOUBLE_P DROP
+	DESC DISABLE_P DISTINCT DISTRIBUTED DO DOMAIN_P DOUBLE_P DROP DXL
 
 	EACH ELSE ENABLE_P ENCODING ENCRYPTED END_P ENUM_P ERRORS ESCAPE EVERY EXCEPT 
 	EXCHANGE EXCLUDE EXCLUDING EXCLUSIVE EXECUTE EXISTS EXPLAIN EXTERNAL EXTRACT
 
 	FALSE_P FETCH FIELDS FILESPACE FILESYSTEM FILL FILTER FIRST_P FLOAT_P FOLLOWING FOR 
-    FORCE FOREIGN FORMAT FORMATTER FORWARD FREEZE FROM FULL FUNCTION DXL
+    	FORCE FOREIGN FORMAT FORMATTER FORWARD FREEZE FROM FULL FUNCTION
 
 	GLOBAL GRANT GRANTED GREATEST GROUP_P GROUP_ID GROUPING
 
@@ -542,7 +543,7 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
     REFERENCES REINDEX REJECT_P RELATIVE_P 
 	RELEASE RENAME REPEATABLE REPLACE RESET RESOURCE RESTART RESTRICT 
 	RETURNING RETURNS REVOKE RIGHT
-	ROLE ROLLBACK ROLLUP ROW ROWS RULE
+	ROLE ROLLBACK ROLLUP ROOTPARTITION ROW ROWS RULE
 
 	SAVEPOINT SCATTER SCHEMA SCROLL SEARCH SECOND_P 
     SECURITY SEGMENT SELECT SEQUENCE
@@ -8347,7 +8348,7 @@ VacuumStmt: VACUUM opt_full opt_freeze opt_verbose
 		;
 
 AnalyzeStmt:
-			analyze_keyword opt_verbose
+			analyze_keyword opt_verbose opt_rootonly_all
 				{
 					VacuumStmt *n = makeNode(VacuumStmt);
 					n->vacuum = false;
@@ -8355,6 +8356,7 @@ AnalyzeStmt:
 					n->full = false;
 					n->freeze_min_age = -1;
 					n->verbose = $2;
+					n->rootonly = $3;
 					n->relation = NULL;
 					n->va_cols = NIL;
 					$$ = (Node *)n;
@@ -8367,8 +8369,22 @@ AnalyzeStmt:
 					n->full = false;
 					n->freeze_min_age = -1;
 					n->verbose = $2;
+					n->rootonly = false;
 					n->relation = $3;
 					n->va_cols = $4;
+					$$ = (Node *)n;
+				}
+			| analyze_keyword opt_verbose ROOTPARTITION qualified_name opt_name_list
+				{
+					VacuumStmt *n = makeNode(VacuumStmt);
+					n->vacuum = false;
+					n->analyze = true;
+					n->full = false;
+					n->freeze_min_age = -1;
+					n->verbose = $2;
+					n->rootonly = true;
+					n->relation = $4;
+					n->va_cols = $5;
 					$$ = (Node *)n;
 				}
 		;
@@ -8380,6 +8396,11 @@ analyze_keyword:
 
 opt_verbose:
 			VERBOSE									{ $$ = TRUE; }
+			| /*EMPTY*/								{ $$ = FALSE; }
+		;
+
+opt_rootonly_all:
+			ROOTPARTITION ALL						{ $$ = TRUE; }
 			| /*EMPTY*/								{ $$ = FALSE; }
 		;
 			
@@ -8395,7 +8416,6 @@ opt_name_list:
 			'(' name_list ')'						{ $$ = $2; }
 			| /*EMPTY*/								{ $$ = NIL; }
 		;
-
 
 /*****************************************************************************
  *
@@ -12436,7 +12456,6 @@ unreserved_keyword:
 			| CONTINUE_P
 			| CONVERSION_P
 			| COPY
-			| DXL
 			| COST
 			| CREATEDB
 			| CREATEEXTTABLE
@@ -12462,6 +12481,7 @@ unreserved_keyword:
 			| DOMAIN_P
 			| DOUBLE_P
 			| DROP
+			| DXL
 			| EACH
 			| ENABLE_P
 			| ENCODING
@@ -12606,6 +12626,7 @@ unreserved_keyword:
 			| REVOKE
 			| ROLE
 			| ROLLBACK
+			| ROOTPARTITION
 			| RULE
 			| SAVEPOINT
 			| SEARCH

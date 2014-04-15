@@ -115,7 +115,7 @@ static void analyzeComputeAttributeStatistics(Oid relationOid,
 		Oid sampleTableOid, 
 		float4 sampleTableRelTuples, 
 		AttributeStatistics *stats);
-static List* analyzableRelations(void);
+static List* analyzableRelations(bool rootonly);
 static bool analyzePermitted(Oid relationOid);
 static List *analyzableAttributes(Relation candidateRelation);
 static List	*buildExplicitAttributeNames(Oid relationOid, VacuumStmt *stmt);
@@ -346,7 +346,12 @@ void analyzeStmt(VacuumStmt *stmt, List *relids)
 		/**
 		 * ANALYZE entire DB.
 		 */
-		lRelOids = analyzableRelations();
+		lRelOids = analyzableRelations(stmt->rootonly);
+		if (stmt->rootonly && NIL == lRelOids)
+		{
+			ereport(WARNING,
+					(errmsg("there are no partitioned tables in database to ANALYZE ROOTPARTITION")));
+		}
 	}
 	else if (relids != NIL)
 	{
@@ -364,7 +369,15 @@ void analyzeStmt(VacuumStmt *stmt, List *relids)
 		Assert(relids == NIL);
 		Assert(stmt->relation != NULL);
 		relationOid = RangeVarGetRelid(stmt->relation, false);
-		if (rel_is_partitioned(relationOid))
+
+		if (!rel_is_partitioned(relationOid) && stmt->rootonly)
+		{
+			ereport(WARNING,
+					(errmsg("skipping \"%s\" --- cannot analyze a non-root partition using ANALYZE ROOTPARTITION",
+							get_rel_name(relationOid))));
+		}
+
+		else if (rel_is_partitioned(relationOid) && !stmt->rootonly)
 		{
 			PartitionNode *pn = get_parts(relationOid, 0 /*level*/ ,
 		 	 	            0 /*parent*/, false /* inctemplate */, CurrentMemoryContext);
@@ -679,13 +692,14 @@ static bool analyzePermitted(Oid relationOid)
  * If ANALYZE is requested with no relations specified, this method is called to build
  * the implicit list of relations from pg_class. Only those with relkind == RELKIND_RELATION
  * are considered.
+ * If rootonly is true, we only analyze root partition table.
  * 
  * Input:
  * 	None
  * Output:
  * 	List of relids
  */
-static List* analyzableRelations(void)
+static List* analyzableRelations(bool rootonly)
 {
 	List	   		*lRelOids = NIL;
 	cqContext		*pcqCtx;
@@ -700,6 +714,10 @@ static List* analyzableRelations(void)
 	while (HeapTupleIsValid(tuple = caql_getnext(pcqCtx)))
 	{
 		Oid candidateOid = HeapTupleGetOid(tuple);
+		if (rootonly && !rel_is_partitioned(candidateOid))
+		{
+			continue;
+		}
 		if (analyzePermitted(candidateOid)
 				&& candidateOid != StatisticRelationId)
 		{

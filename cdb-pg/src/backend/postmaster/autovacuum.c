@@ -1023,6 +1023,7 @@ autovacuum_do_vac_analyze(Oid relid, bool dovacuum, bool doanalyze,
 	vacstmt->analyze = doanalyze;
 	vacstmt->freeze_min_age = freeze_min_age;
 	vacstmt->verbose = false;
+	vacstmt->rootonly = false;
 	vacstmt->relation = NULL;	/* not used since we pass relids list */
 	vacstmt->va_cols = NIL;
 
@@ -1251,6 +1252,7 @@ void autostats_issue_analyze(Oid relationOid)
 	analyzeStmt->analyze = true;
 	analyzeStmt->freeze_min_age = -1;
 	analyzeStmt->verbose = false;
+	analyzeStmt->rootonly = false;
 	analyzeStmt->relation = relation;     /* not used since we pass relids list */
 	analyzeStmt->va_cols = NIL;
 	vacuum(analyzeStmt, NIL);

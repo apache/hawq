@@ -3788,6 +3788,7 @@ _outVacuumStmt(StringInfo str, VacuumStmt *node)
 	WRITE_BOOL_FIELD(full);
 	WRITE_BOOL_FIELD(analyze);
 	WRITE_BOOL_FIELD(verbose);
+	WRITE_BOOL_FIELD(rootonly);
 	WRITE_INT_FIELD(freeze_min_age);
 	WRITE_NODE_FIELD(relation);
 	WRITE_NODE_FIELD(va_cols);
