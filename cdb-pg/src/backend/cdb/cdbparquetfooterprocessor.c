@@ -70,11 +70,13 @@ void writeParquetFooter(File dataFile,
 	writeRet = FileWrite(dataFile, bufferFooterLen, 4);
 	if (writeRet != 4)
 	{
+		pfree(bufferFooterLen);
 		ereport(ERROR,
 			(errcode_for_file_access(),
 			 errmsg("file write error in file '%s': %s",
 					 filePathName, strerror(errno))));
 	}
+	pfree(bufferFooterLen);
 
 	/* write out magic 'PAR1'*/
 	char PARQUET_VERSION_NUMBER[4] = { 'P', 'A', 'R', '1' };
@@ -172,7 +174,8 @@ bool readParquetFooter(File fileHandler, ParquetMetadata *parquetMetadata,
 						 filePathName, footerIndex, strerror(errno))));
 	}
 
-	char bufferFooter[footerLen];
+
+	char *bufferFooter = (char*) palloc0(footerLen + 1);
 	actualReadSize = 0;
 	while(actualReadSize < footerLen)
 	{
@@ -180,6 +183,7 @@ bool readParquetFooter(File fileHandler, ParquetMetadata *parquetMetadata,
 		int readLen = FileRead(fileHandler, bufferFooter + actualReadSize, footerLen - actualReadSize);
 		if (readLen < 0) {
 			/*ereport error*/
+			pfree(bufferFooter);
 			ereport(ERROR, (errcode_for_file_access(),
 			errmsg("file read error in file '%s': %s",
 					filePathName, strerror(errno))));
@@ -188,14 +192,16 @@ bool readParquetFooter(File fileHandler, ParquetMetadata *parquetMetadata,
 	}
 
 
-	/** read metadata through thrift protocol*/
+	/* read metadata through thrift protocol*/
 	if (readFileMetadata((uint8_t*) bufferFooter, footerLen, compact,
 			parquetMetadata) < 0){
+		pfree(bufferFooter);
 		ereport(ERROR,
 			(errcode(ERRCODE_GP_INTERNAL_ERROR),
 			 errmsg("failed to deserialize parquetMetadata using thrift in segment file '%s'",
 					 filePathName)));
 	}
+	pfree(bufferFooter);
 
 	return true;
 }
