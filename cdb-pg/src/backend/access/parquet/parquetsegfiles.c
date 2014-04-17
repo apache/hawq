@@ -552,10 +552,13 @@ ParquetFileSegInfo **GetAllParquetFileSegInfo_pg_paqseg_rel(
 		allseginfo[seginfo_no] = (ParquetFileSegInfo *)palloc0(sizeof(ParquetFileSegInfo));
 		oneseginfo = allseginfo[seginfo_no];
 
-		GetTupleVisibilitySummary(
+        if (Gp_role == GP_ROLE_DISPATCH)
+		{
+            GetTupleVisibilitySummary(
 								tuple,
 								&oneseginfo->tupleVisibilitySummary);
-
+        }
+            
 		segno = fastgetattr(tuple, Anum_pg_parquetseg_segno, pg_parquetseg_dsc, &isNull);
 		oneseginfo->segno = DatumGetInt32(segno);
 
