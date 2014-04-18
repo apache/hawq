@@ -322,6 +322,7 @@ CConfigParamMapping::PbsPack
 	if (!optimizer_enable_bitmapscan)
 	{
 		(void) pbs->FExchangeSet(GPOPT_DISABLE_XFORM_TF(CXform::ExfSelect2BitmapTableGet));
+		(void) pbs->FExchangeSet(GPOPT_DISABLE_XFORM_TF(CXform::ExfSelect2DynamicBitmapTableGet));
 	}
 
 	return pbs;
