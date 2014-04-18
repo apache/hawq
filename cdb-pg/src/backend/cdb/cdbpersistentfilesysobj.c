@@ -4030,6 +4030,7 @@ void PersistentFileSysObj_PreparedEndXactAction(
 
 	goto jumpoverinjectfaultexit;
 
+#ifdef FAULT_INJECTOR
 injectfaultexit:
 
 	if (Debug_persistent_print ||
@@ -4053,6 +4054,7 @@ injectfaultexit:
 
 		LWLockRelease(FileRepAppendOnlyCommitCountLock);
 	}
+#endif
 
 jumpoverinjectfaultexit:
 

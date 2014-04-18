@@ -255,7 +255,7 @@
 /*
  * Enable injecting faults.
  */
-#define FAULT_INJECTOR 1
+/*#define FAULT_INJECTOR 1*/
 
 /*
  * Enable tracing of resource consumption during sort operations;
