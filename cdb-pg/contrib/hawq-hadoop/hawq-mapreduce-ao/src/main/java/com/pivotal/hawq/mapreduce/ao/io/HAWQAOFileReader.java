@@ -109,8 +109,6 @@ public final class HAWQAOFileReader
 	{
 		if (dis != null)
 			dis.close();
-		if (fs != null)
-			fs.close();
 	}
 
 	/**
