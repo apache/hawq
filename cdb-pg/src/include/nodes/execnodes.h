@@ -2286,7 +2286,7 @@ typedef struct DMLState
 	
 	PlanState	ps;
 	JunkFilter *junkfilter;			/* filter that removes junk and dropped attributes */
-	struct TupleTableSlot *insertSlot;	/* holds `final' tuple */
+	struct TupleTableSlot *cleanedUpSlot;	/* holds 'final' tuple which matches the target relation schema */
 	
 } DMLState;
 

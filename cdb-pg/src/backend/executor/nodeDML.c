@@ -70,21 +70,23 @@ ExecDML(DMLState *node)
 
 	Assert(action == DML_INSERT || action == DML_DELETE);
 
+
+	/*
+	 * Reset per-tuple memory context to free any expression evaluation
+	 * storage allocated in the previous tuple cycle.
+	 */
+	ExprContext *econtext = node->ps.ps_ExprContext;
+	ResetExprContext(econtext);
+
+	/* Prepare cleaned-up tuple by projecting it and filtering junk columns */
+	econtext->ecxt_outertuple = slot;
+	TupleTableSlot *projectedSlot = ExecProject(node->ps.ps_ProjInfo, NULL);
+
+	/* remove 'junk' columns from tuple */
+	node->cleanedUpSlot = ExecFilterJunk(node->junkfilter, projectedSlot);
+
 	if (DML_INSERT == action)
 	{
-
-		/*
-		 * Reset per-tuple memory context to free any expression evaluation
-		 * storage allocated in the previous tuple cycle.
-		 */
-		ExprContext *econtext = node->ps.ps_ExprContext;
-		ResetExprContext(econtext);
-
-		econtext->ecxt_outertuple = slot;
-		TupleTableSlot *projectedSlot = ExecProject(node->ps.ps_ProjInfo, NULL);
-
-		/* remove `junk' columns from tuple */
-		node->insertSlot = ExecFilterJunk(node->junkfilter, projectedSlot);
 
 		/* Respect any given tuple Oid when updating a tuple. */
 		if(isUpdate &&
@@ -92,18 +94,17 @@ ExecDML(DMLState *node)
 		{
 			isnull = false;
 			oid = slot_getattr(slot, plannode->tupleoidColIdx, &isnull);
-			HeapTuple htuple = ExecFetchSlotHeapTuple(node->insertSlot);
-			Assert(htuple == node->insertSlot->PRIVATE_tts_heaptuple);
+			HeapTuple htuple = ExecFetchSlotHeapTuple(node->cleanedUpSlot);
+			Assert(htuple == node->cleanedUpSlot->PRIVATE_tts_heaptuple);
 			HeapTupleSetOid(htuple, oid);
 		}
 
 		/* The plan origin is required since ExecInsert performs different actions 
 		 * depending on the type of plan (constraint enforcement and triggers.) 
 		 */
-		ExecInsert(node->insertSlot, NULL /* destReceiver */,
+		ExecInsert(node->cleanedUpSlot, NULL /* destReceiver */,
 				node->ps.state, PLANGEN_OPTIMIZER /* Plan origin */, 
 				isUpdate);
-
 	}
 	else /* DML_DELETE */
 	{
@@ -116,9 +117,8 @@ ExecDML(DMLState *node)
 		tupleid = &tuple_ctid;
 
 		/* Correct tuple count by ignoring deletes when splitting tuples. */
-		ExecDelete(tupleid, slot, NULL /* DestReceiver */, node->ps.state,
+		ExecDelete(tupleid, node->cleanedUpSlot, NULL /* DestReceiver */, node->ps.state,
 				PLANGEN_OPTIMIZER /* Plan origin */, isUpdate);
-
 	}
 
 	return slot;
@@ -162,7 +162,7 @@ ExecInitDML(DML *node, EState *estate, int eflags)
 	/*
 	 * Initialize slot to insert/delete using output relation descriptor.
 	 */
-	dmlstate->insertSlot = ExecInitExtraTupleSlot(estate);
+	dmlstate->cleanedUpSlot = ExecInitExtraTupleSlot(estate);
 
 	/*
 	 * Both input and output of the junk filter include dropped attributes, so
@@ -171,7 +171,7 @@ ExecInitDML(DML *node, EState *estate, int eflags)
 	TupleDesc cleanTupType = CreateTupleDescCopy(dmlstate->ps.state->es_result_relation_info->ri_RelationDesc->rd_att); 
 	dmlstate->junkfilter = ExecInitJunkFilter(node->plan.targetlist,
 			cleanTupType,
-			dmlstate->insertSlot);
+			dmlstate->cleanedUpSlot);
 
 	if (estate->es_instrument)
 	{
@@ -195,7 +195,7 @@ ExecEndDML(DMLState *node)
 
 	ExecFreeExprContext(&node->ps);
 	ExecClearTuple(node->ps.ps_ResultTupleSlot);
-	ExecClearTuple(node->insertSlot);
+	ExecClearTuple(node->cleanedUpSlot);
 	ExecEndNode(outerPlanState(node));
 	EndPlanStateGpmonPkt(&node->ps);
 }

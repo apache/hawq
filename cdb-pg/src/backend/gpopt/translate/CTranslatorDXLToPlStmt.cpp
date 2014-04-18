@@ -4203,10 +4203,9 @@ CTranslatorDXLToPlStmt::PplanDML
 		pplan
 		);
 	
-	if (pmdrel->FHasDroppedColumns() && 
-			(Edxldmlupdate == pdxlop->EdxlDmlOpType() || Edxldmlinsert == pdxlop->EdxlDmlOpType()))
+	if (pmdrel->FHasDroppedColumns())
 	{
-		// pad DML target list with NULLs for dropped columns
+		// pad DML target list with NULLs for dropped columns for all DML operator types
 		List *plTargetListWithDroppedCols = PlTargetListWithDroppedCols(plTargetListDML, pmdrel);
 		gpdb::GPDBFree(plTargetListDML);
 		plTargetListDML = plTargetListWithDroppedCols;
