@@ -101,6 +101,7 @@
 #include "exception.h"
 
 #include "CCostModelGPDB.h"
+#include "CCostModelGPDBLegacy.h"
 
 
 #include "gpopt/gpdbwrappers.h"
@@ -782,6 +783,28 @@ COptTasks::FErrorOut
 }
 
 //---------------------------------------------------------------------------
+//      @function:
+//              COptTasks::Pcm
+//
+//      @doc:
+//              Generate an instance of optimizer cost model
+//
+//---------------------------------------------------------------------------
+ICostModel *
+COptTasks::Pcm
+        (
+        IMemoryPool *pmp,
+        ULONG ulSegments
+        )
+{
+        if (OPTIMIZER_GPDB_CALIBRATED == optimizer_cost_model)
+        {
+               return New(pmp) CCostModelGPDB(pmp, ulSegments);
+        }
+        return New(pmp) CCostModelGPDBLegacy(pmp, ulSegments);
+}
+
+//---------------------------------------------------------------------------
 //	@function:
 //		COptTasks::PvOptimizeTask
 //
@@ -851,7 +874,7 @@ COptTasks::PvOptimizeTask
 
 			CTranslatorQueryToDXL trquerytodxl(pmp, &mda, &idgtorColId, &idgtorCTE, pmapvarcolid, (Query*) poctx->m_pquery, 0 /* ulQueryLevel */);
 			COptimizerConfig *pocconf = PoconfCreate(pmp);
-			ICostModel *pcm = New(pmp) CCostModelGPDB(pmp, ulSegmentsForCosting);
+			ICostModel *pcm = Pcm(pmp, ulSegmentsForCosting);
 			CConstExprEvaluatorProxy ceevalproxy(pmp, &mda);
 			IConstExprEvaluator *pceeval =
 					New(pmp) CConstExprEvaluatorDXL(pmp, &mda, &ceevalproxy);
@@ -978,7 +1001,7 @@ COptTasks::PvOptimizeMinidumpTask
 		ulSegmentsForCosting = ulSegments;
 	}
 	COptimizerConfig *pocconf = PoconfCreate(pmp);
-	ICostModel *pcm = New(pmp) CCostModelGPDB(pmp, ulSegmentsForCosting);
+	ICostModel *pcm = Pcm(pmp, ulSegmentsForCosting);
 	CDXLNode *pdxlnResult = NULL;
 
 	GPOS_TRY
@@ -1299,7 +1322,7 @@ COptTasks::PvDXLFromRelStatsTask
 	// relcache MD provider
 	CMDProviderRelcache *pmdpr = New(pmp) CMDProviderRelcache(pmp);
 	CAutoMDAccessor amda(pmp, pmdpr, sysidDefault);
-	ICostModel *pcm = New(pmp) CCostModelGPDB(pmp, gpdb::UlSegmentCountGP());
+	ICostModel *pcm = Pcm(pmp, gpdb::UlSegmentCountGP());
 	CAutoOptCtxt aoc(pmp, amda.Pmda(), pcm, NULL /*pceeval*/, NULL /*poconf*/);
 
 	DrgPimdobj *pdrgpmdobj = New(pmp) DrgPimdobj(pmp);

@@ -327,8 +327,13 @@ extern char  *data_directory;
 #define OPTIMIZER_MINIDUMP_FAIL  	0  /* create optimizer minidump on failure */
 #define OPTIMIZER_MINIDUMP_ALWAYS 	1  /* always create optimizer minidump */
 
+/* optimizer cost model */
+#define OPTIMIZER_GPDB_LEGACY           0       /* GPDB's legacy cost model */
+#define OPTIMIZER_GPDB_CALIBRATED       1       /* GPDB's calibrated cost model */
+
 // ORCA-related gucs
 extern bool optimizer_minidump;
+extern int  optimizer_cost_model;
 extern bool optimizer_print_query;
 extern bool optimizer_print_plan;
 extern bool optimizer_print_xform;

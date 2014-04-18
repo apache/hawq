@@ -43,6 +43,7 @@ namespace gpopt
 	class CMDAccessor;
 	class CQueryContext;
 	class COptimizerConfig;
+	class ICostModel;
 }
 
 struct PlannedStmt;
@@ -236,6 +237,10 @@ class COptTasks
 		// check if given exception should error out
 		static
 		BOOL FErrorOut(gpos::CException &exc);
+
+                // generate an instance of optimizer cost model
+                static
+                ICostModel *Pcm(IMemoryPool *pmp, ULONG ulSegments);
 
 	public:
 
