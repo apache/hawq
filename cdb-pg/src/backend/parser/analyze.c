@@ -1748,6 +1748,9 @@ form_default_storage_directive(List *enc)
 		{
 			if(el->arg == NULL)
 				insist_log(false, "syntax not correct, orientation should has corresponding value");
+			if (pg_strcasecmp("column", defGetString(el)) == 0){
+				continue;
+			}
 			if (pg_strcasecmp("parquet", defGetString(el)) == 0)
 				parquetTable = true;
 		}
@@ -1845,7 +1848,14 @@ transformAttributeEncoding(List *stenc, CreateStmt *stmt, CreateStmtContext cxt)
 	 * If no default has been specified, we might create one out of the
 	 * WITH clause.
 	 */
-	tmpenc = form_default_storage_directive(stmt->options);
+	if (!deflt)
+	{
+		tmpenc = form_default_storage_directive(stmt->options);
+	}
+	else
+	{
+		tmpenc = NIL;
+	}
 
 	if (tmpenc)
 	{
