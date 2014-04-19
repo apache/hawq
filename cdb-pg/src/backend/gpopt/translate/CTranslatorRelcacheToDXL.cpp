@@ -2550,7 +2550,7 @@ CTranslatorRelcacheToDXL::PhistTransformGPDBMCV
 		pdrgpdatum->Append(pdatum);
 		pdrgpdFreq->Append(New(pmp) CDouble(pdrgfMCVFrequencies[ul]));
 
-		if (!pdatum->FHasStatsLessThan(pdatum))
+		if (!pdatum->FStatsComparable(pdatum))
 		{
 			// if less than operation is not supported on this datum, then no point
 			// building a histogram. return an empty histogram
@@ -2634,7 +2634,7 @@ CTranslatorRelcacheToDXL::PhistTransformGPDBHist
 									);
 		pdrgppbucket->Append(pbucket);
 
-		if (!pdatumMin->FHasStatsLessThan(pdatumMin) || !pdatumMin->FStatsLessThan(pdatumMax))
+		if (!pdatumMin->FStatsComparable(pdatumMin) || !pdatumMin->FStatsLessThan(pdatumMax))
 		{
 			// if less than operation is not supported on this datum,
 			// or the translated histogram does not conform to GPDB sort order (e.g. text column in Linux platform),
