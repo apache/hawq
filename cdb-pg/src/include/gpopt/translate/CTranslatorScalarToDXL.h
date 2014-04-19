@@ -65,7 +65,7 @@ namespace gpdxl
 	class CTranslatorScalarToDXL
 	{
 		// shorthand for functions for translating GPDB expressions into DXL nodes
-		typedef CDXLNode * (CTranslatorScalarToDXL::*PfPdxln)(const Expr *pexpr, const CMappingVarColId* pmapvarcolid) const;
+		typedef CDXLNode * (CTranslatorScalarToDXL::*PfPdxln)(const Expr *pexpr, const CMappingVarColId* pmapvarcolid);
 
 		// shorthand for functions for translating DXL nodes to GPDB expressions
 		typedef CDXLDatum * (PfPdxldatumFromDatum)(IMemoryPool *pmp, const IMDType *pmdtype, BOOL fNull, ULONG ulLen, Datum datum);
@@ -94,6 +94,9 @@ namespace gpdxl
 			// absolute level of query whose vars will be translated
 			ULONG m_ulQueryLevel;
 
+			// does the currently translated scalar have distributed tables
+			BOOL m_fHasDistributedTables;
+
 			// is scalar being translated in query mode
 			BOOL m_fQuery;
 
@@ -120,153 +123,136 @@ namespace gpdxl
 				(
 				CDXLNode *pdxln,
 				List *plist,
-				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				const CMappingVarColId* pmapvarcolid,
+				BOOL *pfHasDistributedTables = NULL
+				);
 
 			// create a DXL scalar distinct comparison node from a GPDB DistinctExpr
 			CDXLNode *PdxlnScDistCmpFromDistExpr
 				(
 				const Expr *pexpr,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			// create a DXL scalar boolean expression node from a GPDB qual list
 			CDXLNode *PdxlnScCondFromQual
 				(
 				List *plQual,
-				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				const CMappingVarColId* pmapvarcolid,
+				BOOL *pfHasDistributedTables
+				);
 
 			// create a DXL scalar comparison node from a GPDB op expression
 			CDXLNode *PdxlnScCmpFromOpExpr
 				(
 				const Expr *pexpr,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			// create a DXL scalar opexpr node from a GPDB expression
 			CDXLNode *PdxlnScOpExprFromExpr
 				(
 				const Expr *pexpr,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			// translate an array expression
 			CDXLNode *PdxlnArrayOpExpr
 				(
 				const Expr *pexpr,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			// create a DXL scalar array comparison node from a GPDB expression
 			CDXLNode *PdxlnScArrayCompFromExpr
 				(
 				const Expr *pexpr,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			// create a DXL scalar Const node from a GPDB expression
 			CDXLNode *PdxlnScConstFromExpr
 				(
 				const Expr *pexpr,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			// create a DXL node for a scalar nullif from a GPDB Expr
 			CDXLNode *PdxlnScNullIfFromExpr
 				(
 				const Expr *pexpr,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			// create a DXL scalar boolexpr node from a GPDB expression
 			CDXLNode *PdxlnScBoolExprFromExpr
 				(
 				const Expr *pexpr,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			// create a DXL scalar boolean test node from a GPDB expression
 			CDXLNode *PdxlnScBooleanTestFromExpr
 				(
 				const Expr *pexpr,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			// create a DXL scalar nulltest node from a GPDB expression
 			CDXLNode *PdxlnScNullTestFromNullTest
 				(
 				const Expr *pexpr,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			// create a DXL scalar case statement node from a GPDB expression
 			CDXLNode *PdxlnScCaseStmtFromExpr
 				(
 				const Expr *pexpr,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			// create a DXL scalar if statement node from a GPDB case expression
 			CDXLNode *PdxlnScIfStmtFromCaseExpr
 				(
 				const CaseExpr *pcaseexpr,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			// create a DXL scalar switch node from a GPDB case expression
 			CDXLNode *PdxlnScSwitchFromCaseExpr
 				(
 				const CaseExpr *pcaseexpr,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			// create a DXL node for a case test from a GPDB Expr.
 			CDXLNode *PdxlnScCaseTestFromExpr
 				(
 				const Expr *pexpr,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			// create a DXL scalar coalesce node from a GPDB expression
 			CDXLNode *PdxlnScCoalesceFromExpr
 				(
 				const Expr *pexpr,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			// create a DXL scalar relabeltype node from a GPDB expression
 			CDXLNode *PdxlnScCastFromRelabelType
 				(
 				const Expr *pexpr,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			// create a DXL scalar funcexpr node from a GPDB expression
 			CDXLNode *PdxlnScFuncExprFromFuncExpr
 				(
 				const Expr *pexpr,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			// return the window frame boundary
 			EdxlFrameBoundary Edxlfb(WindowBoundingKind kind, Node *pnode) const;
@@ -276,23 +262,20 @@ namespace gpdxl
 				(
 				const Expr *pexpr,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			// create a DXL scalar Aggref node from a GPDB expression
 			CDXLNode *PdxlnScAggrefFromAggref
 				(
 				const Expr *pexpr,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			CDXLNode *PdxlnScIdFromVar
 				(
 				const Expr *pexpr,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			// Create a DXL colid from a GPDB param
 			CDXLNode *PdxlnScIdFromParam(const Param * pparam) const;
@@ -304,49 +287,43 @@ namespace gpdxl
 				(
 				const Expr *pexpr,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			CDXLNode *PdxlnPlanFromParam
 				(
 				const Expr *pexpr,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			CDXLNode *PdxlnFromSublink
 				(
 				const Expr *pexpr,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			CDXLNode *PdxlnScSubqueryFromSublink
 				(
 				const SubLink *psublink,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			CDXLNode *PdxlnExistSubqueryFromSublink
 				(
 				const SubLink *psublink,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			CDXLNode *PdxlnQuantifiedSubqueryFromSublink
 				(
 				const SubLink *psublink,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			// translate an array expression
-			CDXLNode *PdxlnArray(const Expr *pexpr, const CMappingVarColId* pmapvarcolid) const;
+			CDXLNode *PdxlnArray(const Expr *pexpr, const CMappingVarColId* pmapvarcolid);
 
 			// translate an arrayref expression
-			CDXLNode *PdxlnArrayRef(const Expr *pexpr, const CMappingVarColId* pmapvarcolid) const;
+			CDXLNode *PdxlnArrayRef(const Expr *pexpr, const CMappingVarColId* pmapvarcolid);
 
 			// add an indexlist to the given DXL arrayref node
 			void AddArrayIndexList
@@ -355,8 +332,7 @@ namespace gpdxl
 				List *plist,
 				CDXLScalarArrayRefIndexList::EIndexListBound eilb,
 				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				);
 
 			// get the operator name
 			const CWStringConst *PstrOpName(IMDId *pmdid) const;
@@ -367,9 +343,9 @@ namespace gpdxl
 				(
 				const Node *pnode,
 				const CMappingVarColId* pmapvarcolid,
-				CDXLNode *pdxlnNewChildScPrL
-				)
-				const;
+				CDXLNode *pdxlnNewChildScPrL,
+				BOOL *pfHasDistributedTables
+				);
 
 		public:
 
@@ -410,27 +386,27 @@ namespace gpdxl
 			CDXLNode *PdxlnScOpFromExpr
 				(
 				const Expr *pexpr,
-				const CMappingVarColId* pmapvarcolid
-				)
-				const;
+				const CMappingVarColId* pmapvarcolid,
+				BOOL *pfHasDistributedTables = NULL
+				);
 
 			// create a DXL scalar filter node from a GPDB qual list
 			CDXLNode *PdxlnFilterFromQual
 				(
 				List *plQual,
 				const CMappingVarColId* pmapvarcolid,
-				Edxlopid edxlopFilterType
-				)
-				const;
+				Edxlopid edxlopFilterType,
+				BOOL *pfHasDistributedTables = NULL
+				);
 
 			// create a DXL WindowFrame node from a GPDB expression
 			CDXLWindowFrame *Pdxlwf
 				(
 				const Expr *pexpr,
 				const CMappingVarColId* pmapvarcolid,
-				CDXLNode *pdxlnNewChildScPrL
-				)
-				const;
+				CDXLNode *pdxlnNewChildScPrL,
+				BOOL *pfHasDistributedTables = NULL
+				);
 
 			// translate GPDB Const to CDXLDatum
 			static

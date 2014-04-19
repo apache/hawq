@@ -297,7 +297,8 @@ CTranslatorUtils::Pdxltabdesc
 	IMemoryPool *pmp,
 	CMDAccessor *pmda,
 	CIdGenerator *pidgtor,
-	const RangeTblEntry *prte
+	const RangeTblEntry *prte,
+	BOOL *pfDistributedTable // output
 	)
 {
 	// generate an MDId for the table desc.
@@ -325,6 +326,13 @@ CTranslatorUtils::Pdxltabdesc
 
 	const ULONG ulLen = pmdrel->UlColumns();
 	
+	IMDRelation::Ereldistrpolicy ereldist = pmdrel->Ereldistribution();
+	if (NULL != pfDistributedTable &&
+		(IMDRelation::EreldistrHash == ereldist || IMDRelation::EreldistrRandom == ereldist))
+	{
+		*pfDistributedTable = true;
+	}
+
 	// add columns from md cache relation object to table descriptor
 	for (ULONG ul = 0; ul < ulLen; ul++)
 	{

@@ -184,7 +184,8 @@ namespace gpdxl
 								IMemoryPool *pmp,
 								CMDAccessor *pmda,
 								CIdGenerator *pidgtor,
-								const RangeTblEntry *prte
+								const RangeTblEntry *prte,
+								BOOL *pfDistributedTable = NULL
 								);
 
 			// translate a RangeTableEntry into a CDXLLogicalTVF

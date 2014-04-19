@@ -51,6 +51,7 @@
 #include "gpos/task/CWorkerPoolManager.h"
 #include "gpos/task/CAutoTaskProxy.h"
 #include "gpos/task/CTaskContext.h"
+#include "gpos/task/CAutoTraceFlag.h"
 #include "gpos/common/CAutoP.h"
 
 #include "init.h"
@@ -895,6 +896,12 @@ COptTasks::PvOptimizeTask
 			DrgPdxln *pdrgpdxlnCTE = trquerytodxl.PdrgpdxlnCTE();
 			GPOS_ASSERT(NULL != pdrgpdxlnQueryOutput);
 
+			// TODO: elhela - Apr 18, 2014: enable the following 2 lines after
+			// the distribution requests are fixed in Orca
+			/*
+			BOOL fMasterOnly = !trquerytodxl.FHasDistributedTables();
+			CAutoTraceFlag atf(EopttraceDisableMotions, fMasterOnly);
+			*/
 			pdxlnPlan = COptimizer::PdxlnOptimize
 									(
 									pmp,

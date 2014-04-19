@@ -143,6 +143,7 @@ CTranslatorQueryToDXL::CTranslatorQueryToDXL
 	m_pidgtorCTE(pidgtorCTE),
 	m_pmapvarcolid(pmapvarcolid),
 	m_ulQueryLevel(ulQueryLevel),
+	m_fHasDistributedTables(false),
 	m_phmulCTEEntries(NULL),
 	m_pdrgpdxlnQueryOutput(NULL),
 	m_pdrgpdxlnCTE(NULL),
@@ -627,7 +628,7 @@ CTranslatorQueryToDXL::PdxlnInsert()
 	CDXLNode *pdxlnQuery = PdxlnFromQueryInternal();
 	const RangeTblEntry *prte = (RangeTblEntry *) gpdb::PvListNth(m_pquery->rtable, m_pquery->resultRelation - 1);
 
-	CDXLTableDescr *pdxltabdesc = CTranslatorUtils::Pdxltabdesc(m_pmp, m_pmda, m_pidgtorCol, prte);
+	CDXLTableDescr *pdxltabdesc = CTranslatorUtils::Pdxltabdesc(m_pmp, m_pmda, m_pidgtorCol, prte, &m_fHasDistributedTables);
 	const IMDRelation *pmdrel = m_pmda->Pmdrel(pdxltabdesc->Pmdid());
 
 	const ULONG ulLenTblCols = pmdrel->UlColumns() - pmdrel->UlSystemColumns();
@@ -760,7 +761,7 @@ CTranslatorQueryToDXL::PdxlnDelete()
 	CDXLNode *pdxlnQuery = PdxlnFromQueryInternal();
 	const RangeTblEntry *prte = (RangeTblEntry *) gpdb::PvListNth(m_pquery->rtable, m_pquery->resultRelation - 1);
 
-	CDXLTableDescr *pdxltabdesc = CTranslatorUtils::Pdxltabdesc(m_pmp, m_pmda, m_pidgtorCol, prte);
+	CDXLTableDescr *pdxltabdesc = CTranslatorUtils::Pdxltabdesc(m_pmp, m_pmda, m_pidgtorCol, prte, &m_fHasDistributedTables);
 
 	ULONG ulCtid = 0;
 	ULONG ulSegmentId = 0;
@@ -805,7 +806,7 @@ CTranslatorQueryToDXL::PdxlnUpdate()
 	CDXLNode *pdxlnQuery = PdxlnFromQueryInternal();
 	const RangeTblEntry *prte = (RangeTblEntry *) gpdb::PvListNth(m_pquery->rtable, m_pquery->resultRelation - 1);
 
-	CDXLTableDescr *pdxltabdesc = CTranslatorUtils::Pdxltabdesc(m_pmp, m_pmda, m_pidgtorCol, prte);
+	CDXLTableDescr *pdxltabdesc = CTranslatorUtils::Pdxltabdesc(m_pmp, m_pmda, m_pidgtorCol, prte, &m_fHasDistributedTables);
 
 	ULONG ulCtidColId = 0;
 	ULONG ulSegmentIdColId = 0;
@@ -1133,7 +1134,6 @@ CTranslatorQueryToDXL::Pdrgpdxlws
 	HMIUl *phmiulSortColsColId,
 	CDXLNode *pdxlnScPrL
 	)
-	const
 {
 	GPOS_ASSERT(NULL != plWindowClause);
 	GPOS_ASSERT(NULL != phmiulSortColsColId);
@@ -1177,7 +1177,7 @@ CTranslatorQueryToDXL::Pdrgpdxlws
 
 		if (NULL != pwindowspec->frame)
 		{
-			pdxlwf = m_psctranslator->Pdxlwf((Expr *) pwindowspec->frame, m_pmapvarcolid, pdxlnScPrL);
+			pdxlwf = m_psctranslator->Pdxlwf((Expr *) pwindowspec->frame, m_pmapvarcolid, pdxlnScPrL, &m_fHasDistributedTables);
 		}
 
 		CDXLWindowSpec *pdxlws = New(m_pmp) CDXLWindowSpec(m_pmp, pdrgppulPartCol, pmdname, pdxlnSortColList, pdxlwf);
@@ -1206,7 +1206,6 @@ CTranslatorQueryToDXL::PdxlnWindow
 	HMIUl *phmiulSortColsColId,
 	HMIUl *phmiulOutputCols
 	)
-	const
 {
 	if (0 == gpdb::UlListLength(plWindowClause))
 	{
@@ -1490,7 +1489,6 @@ CTranslatorQueryToDXL::PdxlnLgLimit
 	CDXLNode *pdxlnChild,
 	HMIUl *phmiulGrpColsColId
 	)
-	const
 {
 	if (0 == gpdb::UlListLength(plSortCl) && NULL == pnodeLimitCount && NULL == pnodeLimitOffset)
 	{
@@ -1598,7 +1596,6 @@ CTranslatorQueryToDXL::PdxlnSimpleGroupBy
 	HMIUl *phmiulChild,
 	HMIUl *phmiulOutputCols
 	)
-	const
 {
 	if (NULL == pbsGroupByCols && !fHasAggs)
 	{ 
@@ -2085,7 +2082,6 @@ CTranslatorQueryToDXL::PdxlnFromSetOp
 	List *plTargetList,
 	HMIUl *phmiulOutputCols
 	)
-	const
 {
 	GPOS_ASSERT(IsA(pnodeSetOp, SetOperationStmt));
 	SetOperationStmt *psetopstmt = (SetOperationStmt*) pnodeSetOp;
@@ -2341,7 +2337,6 @@ CTranslatorQueryToDXL::PdxlnSetOpChild
 	DrgPmdid *pdrgpmdid,
 	List *plTargetList
 	)
-	const
 {
 	GPOS_ASSERT(NULL != pdrgpul);
 	GPOS_ASSERT(NULL != pdrgpmdid);
@@ -2366,6 +2361,7 @@ CTranslatorQueryToDXL::PdxlnSetOpChild
 
 			DrgPdxln *pdrgpdxlnCTE = trquerytodxl.PdrgpdxlnCTE();
 			CUtils::AddRefAppend(m_pdrgpdxlnCTE, pdrgpdxlnCTE);
+			m_fHasDistributedTables = m_fHasDistributedTables || trquerytodxl.FHasDistributedTables();
 
 			// get the output columns of the derived table
 			DrgPdxln *pdrgpdxln = trquerytodxl.PdrgpdxlnQueryOutput();
@@ -2434,7 +2430,6 @@ CTranslatorQueryToDXL::PdxlnFromGPDBFromExpr
 	(
 	FromExpr *pfromexpr
 	)
-	const
 {
 	CDXLNode *pdxln = NULL;
 
@@ -2515,7 +2510,6 @@ CTranslatorQueryToDXL::PdxlnFromGPDBFromClauseEntry
 	(
 	Node *pnode
 	)
-	const
 {
 	GPOS_ASSERT(NULL != pnode);
 
@@ -2630,10 +2624,9 @@ CTranslatorQueryToDXL::PdxlnFromRelation
 	ULONG ulRTIndex,
 	ULONG //ulCurrQueryLevel 
 	)
-	const
 {
 	// construct table descriptor for the scan node from the range table entry
-	CDXLTableDescr *pdxltabdesc = CTranslatorUtils::Pdxltabdesc(m_pmp, m_pmda, m_pidgtorCol, prte);
+	CDXLTableDescr *pdxltabdesc = CTranslatorUtils::Pdxltabdesc(m_pmp, m_pmda, m_pidgtorCol, prte, &m_fHasDistributedTables);
 
 	CDXLLogicalGet *pdxlop = NULL;
 	const IMDRelation *pmdrel = m_pmda->Pmdrel(pdxltabdesc->Pmdid());
@@ -2669,7 +2662,6 @@ CTranslatorQueryToDXL::PdxlnFromValues
 	ULONG ulRTIndex,
 	ULONG ulCurrQueryLevel
 	)
-	const
 {
 	List *plTuples = prte->values_lists;
 	GPOS_ASSERT(NULL != plTuples);
@@ -2903,11 +2895,11 @@ CTranslatorQueryToDXL::PdxlnFromTVF
 	ULONG ulRTIndex,
 	ULONG //ulCurrQueryLevel
 	)
-	const
 {
 	GPOS_ASSERT(NULL != prte->funcexpr);
 
-	// check if this is a catalog function
+	// TODO: elhela - Apr 18, 2014; remove the following check once we enable
+	// forcing master-only plans
 	if (CTranslatorUtils::FCatalogFunc(((FuncExpr *)prte->funcexpr)->funcid))
 	{
 		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("Catalog functions"));
@@ -2953,7 +2945,7 @@ CTranslatorQueryToDXL::PdxlnFromTVF
 		Node *pnodeArg = (Node *) lfirst(plc);
 		fSubqueryInArgs = fSubqueryInArgs || CTranslatorUtils::FHasSubquery(pnodeArg);
 		CDXLNode *pdxlnFuncExprArg =
-				m_psctranslator->PdxlnScOpFromExpr((Expr *) pnodeArg, m_pmapvarcolid);
+				m_psctranslator->PdxlnScOpFromExpr((Expr *) pnodeArg, m_pmapvarcolid, &m_fHasDistributedTables);
 		GPOS_ASSERT(NULL != pdxlnFuncExprArg);
 		pdxlnTVF->AddChild(pdxlnFuncExprArg);
 	}
@@ -2983,7 +2975,7 @@ CTranslatorQueryToDXL::PdxlnFromCTE
 	const RangeTblEntry *prte,
 	ULONG ulRTIndex,
 	ULONG ulCurrQueryLevel
-	) const
+	)
 {
 	const ULONG ulCteQueryLevel = ulCurrQueryLevel - prte->ctelevelsup;
 	const CCTEListEntry *pctelistentry = m_phmulCTEEntries->PtLookup(&ulCteQueryLevel);
@@ -3033,7 +3025,7 @@ CTranslatorQueryToDXL::PdxlnFromDerivedTable
 	const RangeTblEntry *prte,
 	ULONG ulRTIndex,
 	ULONG ulCurrQueryLevel
-	) const
+	)
 {
 	Query *pqueryDerTbl = prte->subquery;
 	GPOS_ASSERT(NULL != pqueryDerTbl);
@@ -3051,6 +3043,8 @@ CTranslatorQueryToDXL::PdxlnFromDerivedTable
 
 	CUtils::AddRefAppend(m_pdrgpdxlnCTE, pdrgpdxlnCTE);
 	
+	m_fHasDistributedTables = m_fHasDistributedTables || trquerytodxl.FHasDistributedTables();
+
 	// make note of new columns from derived table
 	m_pmapvarcolid->LoadDerivedTblColumns(ulCurrQueryLevel, ulRTIndex, pdrgpdxlnQueryOutputDerTbl, trquerytodxl.Pquery()->targetList);
 
@@ -3070,9 +3064,8 @@ CTranslatorQueryToDXL::PdxlnScFromGPDBExpr
 	(
 	Expr *pexpr
 	)
-	const
 {
-	CDXLNode *pdxlnScalar = m_psctranslator->PdxlnScOpFromExpr(pexpr, m_pmapvarcolid);
+	CDXLNode *pdxlnScalar = m_psctranslator->PdxlnScOpFromExpr(pexpr, m_pmapvarcolid, &m_fHasDistributedTables);
 	GPOS_ASSERT(NULL != pdxlnScalar);
 
 	return pdxlnScalar;
@@ -3090,7 +3083,7 @@ CDXLNode *
 CTranslatorQueryToDXL::PdxlnLgJoinFromGPDBJoinExpr
 	(
 	JoinExpr *pjoinexpr
-	) const
+	)
 {
 	GPOS_ASSERT(NULL != pjoinexpr);
 
@@ -3190,7 +3183,6 @@ CTranslatorQueryToDXL::PdxlnLgProjectFromGPDBTL
 	List *plgrpcl,
 	BOOL fExpandAggrefExpr
 	)
-	const
 {
 	BOOL fGroupBy = (0 != gpdb::UlListLength(m_pquery->groupClause) || m_pquery->hasAggs);
 
@@ -3570,8 +3562,7 @@ CTranslatorQueryToDXL::PdxlnPrEFromGPDBExpr
 	Expr *pexpr,
 	CHAR *szAliasName,
 	BOOL fInsistNewColIds
-	) 
-	const
+	)
 {
 	GPOS_ASSERT(NULL != pexpr);
 
@@ -3621,7 +3612,7 @@ CTranslatorQueryToDXL::PdxlnPrEFromGPDBExpr
 //		Returns a CDXLNode representing scalar condition "true"
 //---------------------------------------------------------------------------
 CDXLNode *
-CTranslatorQueryToDXL::PdxlnScConstValueTrue() const
+CTranslatorQueryToDXL::PdxlnScConstValueTrue()
 {
 	Const *pconst = (Const*) gpdb::PnodeMakeBoolConst(true /*value*/, false /*isnull*/);
 	CDXLNode *pdxln = PdxlnScFromGPDBExpr((Expr*) pconst);
@@ -3726,7 +3717,8 @@ CTranslatorQueryToDXL::ConstructCTEProducerList
 		// get the output columns of the cte table
 		DrgPdxln *pdrgpdxlnQueryOutputCte = trquerytodxl.PdrgpdxlnQueryOutput();
 		DrgPdxln *pdrgpdxlnCTE = trquerytodxl.PdrgpdxlnCTE();
-		
+		m_fHasDistributedTables = m_fHasDistributedTables || trquerytodxl.FHasDistributedTables();
+
 		GPOS_ASSERT(NULL != pdxlnCteChild && NULL != pdrgpdxlnQueryOutputCte && NULL != pdrgpdxlnCTE);
 		
 		// append any nested CTE
