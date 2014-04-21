@@ -59,16 +59,20 @@ optionListToArray(List *options)
 	foreach(cell, options)
 	{
 		DefElem    *def = lfirst(cell);
-		const char *value;
+		char *value;
 		Size		len;
 		text	   *t;
 
-		value = defGetString(def);
+		bool need_free_value = false;
+		value = defGetString(def, &need_free_value);
 		len = VARHDRSZ + strlen(def->defname) + 1 + strlen(value);
 		t = palloc(len + 1);
 		SET_VARSIZE(t, len);
 		sprintf(VARDATA(t), "%s=%s", def->defname, value);
-
+		if (need_free_value)
+		{
+			pfree(value);
+		}
 		astate = accumArrayResult(astate, PointerGetDatum(t),
 								  false, TEXTOID,
 								  CurrentMemoryContext);

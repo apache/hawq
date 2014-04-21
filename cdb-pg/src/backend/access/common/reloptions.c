@@ -122,7 +122,7 @@ transformRelOptions(Datum oldOptions, List *defList,
 		else
 		{
 			text	   *t;
-			const char *value;
+			char *value;
 			Size		len;
 
 			if (ignoreOids && pg_strcasecmp(def->defname, "oids") == 0)
@@ -132,15 +132,26 @@ transformRelOptions(Datum oldOptions, List *defList,
 			 * Flatten the DefElem into a text string like "name=arg". If we
 			 * have just "name", assume "name=true" is meant.
 			 */
+
+			bool need_free_value = false;
 			if (def->arg != NULL)
-				value = defGetString(def);
+			{
+				value = defGetString(def, &need_free_value);
+			}
 			else
+			{
 				value = "true";
+			}
 			len = VARHDRSZ + strlen(def->defname) + 1 + strlen(value);
 			/* +1 leaves room for sprintf's trailing null */
 			t = (text *) palloc(len + 1);
 			SET_VARSIZE(t, len);
 			sprintf(VARDATA(t), "%s=%s", def->defname, value);
+
+			if (need_free_value)
+			{
+				pfree(value);
+			}
 
 			astate = accumArrayResult(astate, PointerGetDatum(t),
 									  false, TEXTOID,

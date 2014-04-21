@@ -125,6 +125,7 @@ DefineType(List *names, List *parameters, Oid newOid, Oid shadowOid)
 	Oid			resulttype;
 	Datum		typoptions = 0;
 	List	   *encoding = NIL;
+	bool        need_free_value = false;
 
 	/* Convert list of names to a name and namespace */
 	typeNamespace = QualifiedNameGetCreationNamespace(names, &typeName);
@@ -235,7 +236,7 @@ DefineType(List *names, List *parameters, Oid newOid, Oid shadowOid)
 			analyzeName = defGetQualifiedName(defel);
 		else if (pg_strcasecmp(defel->defname, "delimiter") == 0)
 		{
-			char	   *p = defGetString(defel);
+			char	   *p = defGetString(defel, &need_free_value);
 
 			delimiter = p[0];
 		}
@@ -251,12 +252,12 @@ DefineType(List *names, List *parameters, Oid newOid, Oid shadowOid)
 										   errOmitLocation(true)));
 		}
 		else if (pg_strcasecmp(defel->defname, "default") == 0)
-			defaultValue = defGetString(defel);
+			defaultValue = defGetString(defel, &need_free_value);
 		else if (pg_strcasecmp(defel->defname, "passedbyvalue") == 0)
 			byValue = defGetBoolean(defel);
 		else if (pg_strcasecmp(defel->defname, "alignment") == 0)
 		{
-			char	   *a = defGetString(defel);
+			char	   *a = defGetString(defel, &need_free_value);
 
 			/*
 			 * Note: if argument was an unquoted identifier, parser will have
@@ -284,7 +285,7 @@ DefineType(List *names, List *parameters, Oid newOid, Oid shadowOid)
 		}
 		else if (pg_strcasecmp(defel->defname, "storage") == 0)
 		{
-			char	   *a = defGetString(defel);
+			char	   *a = defGetString(defel, &need_free_value);
 
 			if (pg_strcasecmp(a, "plain") == 0)
 				storage = 'p';
@@ -308,7 +309,7 @@ DefineType(List *names, List *parameters, Oid newOid, Oid shadowOid)
 			 * During upgrade, we need to create "build-in" psudue type with 'p'.
 			 *
 			 */
-			typtype = defGetString(defel)[0];
+			typtype = defGetString(defel, &need_free_value)[0];
 		}
 		else if (gp_upgrade_mode && pg_strcasecmp(defel->defname, "shadowoid") == 0)
 		{

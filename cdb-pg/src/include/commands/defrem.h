@@ -108,7 +108,7 @@ extern void RemoveUserMappingById(Oid umId);
 
 extern char *case_translate_language_name(const char *input);
 
-extern char *defGetString(DefElem *def);
+extern char *defGetString(DefElem *def, bool *need_free);
 extern double defGetNumeric(DefElem *def);
 extern bool defGetBoolean(DefElem *def);
 extern int64 defGetInt64(DefElem *def);

@@ -1410,17 +1410,28 @@ co_explicitly_disabled(List *opts)
 
 		/* Arguement will be a Value */
 		if (!el->arg)
+		{
 			continue;
+		}
 
-		arg = defGetString(el);
-
+		bool need_free_arg = false;
+		arg = defGetString(el, &need_free_arg);
+		bool result = false;
 		if (pg_strcasecmp("appendonly", el->defname) == 0 &&
 			pg_strcasecmp("false", arg) == 0)
 		{
-			return true;
+			result = true;
 		}
 		else if (pg_strcasecmp("orientation", el->defname) == 0 &&
 				 pg_strcasecmp("column", arg) != 0)
+		{
+			result = true;
+		}
+		if (need_free_arg)
+		{
+			pfree(arg);
+		}
+		if (result)
 		{
 			return true;
 		}
@@ -1446,9 +1457,12 @@ is_aocs(List *opts)
 
 		/* Arguement will be a Value */
 		if (!el->arg)
+		{
 			continue;
+		}
 
-		arg = defGetString(el);
+		bool need_free_arg = false;
+		arg = defGetString(el, &need_free_arg);
 
 		if (pg_strcasecmp("appendonly", el->defname) == 0 &&
 			pg_strcasecmp("true", arg) == 0)
@@ -1459,6 +1473,10 @@ is_aocs(List *opts)
 				 pg_strcasecmp("column", arg) == 0)
 		{
 			found_cs = true;
+		}
+		if (need_free_arg)
+		{
+			pfree(arg);
 		}
 	}
 	return (found_ao && found_cs);
@@ -1494,9 +1512,24 @@ encodings_overlap(List *a, List *b, bool test_conflicts)
 					}
 					else
 					{
-						if (pg_strcasecmp(defGetString(ela),
-										  defGetString(elb)) != 0)
+						bool need_free_ela = false;
+						bool need_free_elb = false;
+						char *ela_str = defGetString(ela, &need_free_ela);
+						char *elb_str = defGetString(elb, &need_free_elb);
+						int result = pg_strcasecmp(ela_str,elb_str);
+						// free ela_str, elb_str if it is initialized via TypeNameToString
+						if (need_free_ela)
+						{
+							pfree(ela_str);
+						}
+						if (need_free_elb)
+						{
+							pfree(elb_str);
+						}
+						if (result != 0)
+						{
 							return true;
+						}
 					}
 				}
 				else
@@ -3414,6 +3447,7 @@ fillin_encoding(List *list)
 	bool foundCompressTypeNone = false;
 	bool snappyCompressType = false;
 	char *cmplevel = NULL;
+	bool need_free_cmplevel = false;
 	bool foundBlockSize = false;
 	char *arg;
 	bool parquetTable = false;
@@ -3440,15 +3474,20 @@ fillin_encoding(List *list)
 		if (pg_strcasecmp("compresstype", el->defname) == 0)
 		{
 			foundCompressType = true;
-			arg = defGetString(el);
+			bool need_free_arg = false;
+			arg = defGetString(el, &need_free_arg);
 			if (pg_strcasecmp("none", arg) == 0)
 				foundCompressTypeNone = true;
 			if (pg_strcasecmp("snappy", arg) == 0)
 				snappyCompressType = true;
+			if (need_free_arg)
+			{
+				pfree(arg);
+			}
 		}
 		else if (pg_strcasecmp("compresslevel", el->defname) == 0)
 		{
-			cmplevel = defGetString(el);
+			cmplevel = defGetString(el, &need_free_cmplevel);
 		}
 		else if (pg_strcasecmp("blocksize", el->defname) == 0)
 		{
@@ -3456,9 +3495,14 @@ fillin_encoding(List *list)
 		}
 		else if (pg_strcasecmp("orientation", el->defname) == 0)
 		{
-			arg = defGetString(el);
+			bool need_free_arg = false;
+			arg = defGetString(el, &need_free_arg);
 			if (pg_strcasecmp("parquet", arg) == 0)
 				parquetTable = true;
+			if (need_free_arg)
+			{
+				pfree(arg);
+			}
 		}
 	}
 
@@ -7219,7 +7263,13 @@ partition_range_every(ParseState *pstate, PartitionBy *pBy, List *coltypes,
 								 errmsg("invalid tablename specification")));
 
 					bTablename = true;
-					pBSpec->pWithTnameStr = pstrdup(defGetString(pDef));
+					bool need_free_value = false;
+					char * widthname_str = defGetString(pDef, &need_free_value);
+					pBSpec->pWithTnameStr = pstrdup(widthname_str);
+					if (need_free_value)
+					{
+						pfree(widthname_str);
+					}
 					pWithList = list_delete_cell(pWithList, def_lc, prev_lc);
 					((AlterPartitionCmd *)pStoreAttr)->arg1 =
 							(Node *)pWithList;
@@ -8473,7 +8523,13 @@ transformPartitionBy(ParseState *pstate, CreateStmtContext *cxt,
 								(errcode(ERRCODE_SYNTAX_ERROR),
 								 errmsg("invalid tablename specification")));
 
-					relname = pstrdup(defGetString(pDef));
+					bool need_free_value = false;
+					char *relname_str = defGetString(pDef, &need_free_value);
+					relname = pstrdup(relname_str);
+					if (need_free_value)
+					{
+						pfree(relname_str);
+					}
 					prtstr[0] = '\0';
 					pWithList = list_delete_cell(pWithList, def_lc, prev_lc);
 					((AlterPartitionCmd *)pStoreAttr)->arg1 =

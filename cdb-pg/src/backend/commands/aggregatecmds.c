@@ -67,6 +67,7 @@ DefineAggregate(List *name, List *args, bool oldstyle, List *parameters,
 	Oid			transTypeId;
 	ListCell   *pl;
 	Oid			aggOid;
+	bool need_free_value = false;
 
 	/* Convert list of names to a name and namespace */
 	aggNamespace = QualifiedNameGetCreationNamespace(name, &aggName);
@@ -100,9 +101,9 @@ DefineAggregate(List *name, List *args, bool oldstyle, List *parameters,
 		else if (pg_strcasecmp(defel->defname, "stype1") == 0)
 			transType = defGetTypeName(defel);
 		else if (pg_strcasecmp(defel->defname, "initcond") == 0)
-			initval = defGetString(defel);
+			initval = defGetString(defel, &need_free_value);
 		else if (pg_strcasecmp(defel->defname, "initcond1") == 0)
-			initval = defGetString(defel);
+			initval = defGetString(defel, &need_free_value);
 		else if (pg_strcasecmp(defel->defname, "prefunc") == 0) /* MPP */
 			prelimfuncName = defGetQualifiedName(defel);
 		else if (gp_upgrade_mode && pg_strcasecmp(defel->defname, "oid") == 0) /* OID */
