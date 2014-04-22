@@ -130,7 +130,8 @@ public abstract class HdfsSplittableDataAccessor extends Plugin implements ReadA
 
     @Override
     public boolean isThreadSafe() {
-        return HdfsUtilities.isThreadSafe(inputData);
+        return HdfsUtilities.isThreadSafe(inputData.getDataSource(),
+				  inputData.getUserProperty("COMPRESSION_CODEC"));
     }
 
 }

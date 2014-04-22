@@ -567,7 +567,7 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 
 		String[] fields = new String[] { "a1 integer", "c1 char" };
 
-		weTable = TableFactory.getPxfWritableSequenceTable("compress_type_none", fields, hdfsWorkingFolder + "/writable/err", "SomeClass");
+		weTable = TableFactory.getPxfWritableSequenceTable("compress_type_none", fields, hdfsWorkingFolder + "/writable/err", "CustomWritable");
 		weTable.setUserParameters(new String[] { "COMPRESSION_TYPE=NONE" });
 
 		hawq.createTableAndVerify(weTable);

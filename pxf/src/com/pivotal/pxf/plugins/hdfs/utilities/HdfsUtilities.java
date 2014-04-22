@@ -20,8 +20,9 @@ import java.io.*;
  */
 public class HdfsUtilities {
     private static Log Log = LogFactory.getLog(HdfsUtilities.class);
+    private static Configuration config = new Configuration();
     private static CompressionCodecFactory factory =
-            new CompressionCodecFactory(new Configuration());
+            new CompressionCodecFactory(config);
 	
 	/**
 	 * Hdfs data sources are absolute data paths. Method ensures 
@@ -99,18 +100,14 @@ public class HdfsUtilities {
     /**
      * Checks if requests should be handle in a single thread or not.
      *
-     * @param inputData container holding all parameters
+     * @param dataDir hdfs path to the data source
+     * @param compCodec the fully qualified name of the compression codec
      * @return if the request can be run in multi-threaded mode.
      */
-    public static boolean isThreadSafe(InputData inputData) {
-        Configuration conf = new Configuration();
-        String dataDir = inputData.getDataSource();
-        if (!inputData.isThreadSafe()) {
-            return false;
-        }
-        String writeCodec = inputData.getCompressCodec();
-        Class<? extends CompressionCodec> codecClass = (writeCodec != null)
-                ? HdfsUtilities.getCodecClass(conf, writeCodec)
+    public static boolean isThreadSafe(String dataDir, String compCodec) {
+
+        Class<? extends CompressionCodec> codecClass = (compCodec != null)
+                ? HdfsUtilities.getCodecClass(config, compCodec)
                 : HdfsUtilities.getCodecClassByPath(dataDir);
         /* bzip2 codec is not thread safe */
         return (codecClass == null || !BZip2Codec.class.isAssignableFrom(codecClass));

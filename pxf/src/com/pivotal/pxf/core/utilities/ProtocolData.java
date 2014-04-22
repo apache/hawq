@@ -62,14 +62,6 @@ public class ProtocolData extends InputData {
         recordkeyColumn = null;
         parseTupleDescription();
 
-		/**
-		 * We don't want to fail if schema was not supplied. There are HDFS
-		 * resources which do not require schema. If on the other hand the
-		 * schema is required we will fail when the Resolver or Accessor will
-		 * request the schema by calling function srlzSchemaName().
-		 */
-        srlzSchemaName = getOptionalProperty("DATA-SCHEMA");
-
 		/* 
          * accessor - will throw exception from getPropery() if outputFormat is BINARY
 		 * and the user did not supply accessor=... or profile=...
@@ -99,10 +91,6 @@ public class ProtocolData extends InputData {
         parseThreadSafe();
         parseRemoteCredentials();
 
-        /* compression properties (for write) */
-        compressCodec = getOptionalProperty("COMPRESSION_CODEC");
-        parseCompressionType();
-
         dataFragment = INVALID_SPLIT_IDX;
         parseDataFragment(getOptionalProperty("DATA-FRAGMENT"));
         
@@ -129,14 +117,11 @@ public class ProtocolData extends InputData {
         this.recordkeyColumn = copy.recordkeyColumn;
         this.filterStringValid = copy.filterStringValid;
         this.filterString = copy.filterString;
-        this.srlzSchemaName = copy.srlzSchemaName;
         this.dataSource = copy.dataSource;
         this.accessor = copy.accessor;
         this.resolver = copy.resolver;
         this.fragmenter = copy.fragmenter;
         this.analyzer = copy.analyzer;
-        this.compressCodec = copy.compressCodec;
-        this.compressType = copy.compressType;
         this.threadSafe = copy.threadSafe;
         this.remoteLogin = copy.remoteLogin;
         this.remoteSecret = copy.remoteSecret;
@@ -265,43 +250,6 @@ public class ProtocolData extends InputData {
     /** Returns the server port providing the service. */
     public int serverPort() {
         return port;
-    }
-
-    /*
-     * Parse compression type for sequence file. If null, default to RECORD.
-     * Allowed values: RECORD, BLOCK.
-     */
-    private void parseCompressionType() {
-        final String COMPRESSION_TYPE_RECORD = "RECORD";
-        final String COMPRESSION_TYPE_BLOCK = "BLOCK";
-        final String COMPRESSION_TYPE_NONE = "NONE";
-
-        compressType = getOptionalProperty("COMPRESSION_TYPE");
-
-        if (compressType == null) {
-            compressType = COMPRESSION_TYPE_RECORD;
-            return;
-        }
-
-        if (compressType.equalsIgnoreCase(COMPRESSION_TYPE_NONE)) {
-            throw new IllegalArgumentException("Illegal compression type 'NONE'. " +
-                    "For disabling compression remove COMPRESSION_CODEC parameter.");
-        }
-
-        if (!compressType.equalsIgnoreCase(COMPRESSION_TYPE_RECORD) &&
-                !compressType.equalsIgnoreCase(COMPRESSION_TYPE_BLOCK)) {
-            throw new IllegalArgumentException("Illegal compression type '" + compressType + "'");
-        }
-
-        compressType = compressType.toUpperCase();
-    }
-
-    /**
-     * Returns the compression type (can be null)
-     * Allowed values: RECORD, BLOCK.
-     */
-    public String getCompressType() {
-        return compressType;
     }
 
     /**

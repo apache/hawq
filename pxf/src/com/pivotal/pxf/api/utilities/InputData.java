@@ -23,14 +23,11 @@ public class InputData {
     protected byte[] userData = null;
     protected boolean filterStringValid;
     protected String filterString;
-    protected String srlzSchemaName;
     protected String dataSource;
     protected String accessor;
     protected String resolver;
     protected String analyzer;
     protected String fragmenter;
-    protected String compressCodec;
-    protected String compressType;
     protected String remoteLogin;
     protected String remoteSecret;
     protected int dataFragment; /* should be deprecated */
@@ -88,14 +85,11 @@ public class InputData {
         this.recordkeyColumn = copy.recordkeyColumn;
         this.filterStringValid = copy.filterStringValid;
         this.filterString = copy.filterString;
-        this.srlzSchemaName = copy.srlzSchemaName;
         this.dataSource = copy.dataSource;
         this.accessor = copy.accessor;
         this.resolver = copy.resolver;
         this.fragmenter = copy.fragmenter;
         this.analyzer = copy.analyzer;
-        this.compressCodec = copy.compressCodec;
-        this.compressType = copy.compressType;
         this.remoteLogin = copy.remoteLogin;
         this.remoteSecret = copy.remoteSecret;
         this.threadSafe = copy.threadSafe;
@@ -199,25 +193,6 @@ public class InputData {
         this.dataSource = dataSource;
     }
 
-    /** Returns the path of the schema used for various deserializers e.g, Avro file name, Java object file name. */
-    public void verifyDataSchemaAccessible() throws FileNotFoundException, IllegalArgumentException {
-        /** Testing that the schema name was supplied by the user - schema is an optional properly. */
-        if (srlzSchemaName == null) {
-            throw new IllegalArgumentException("Schema was not supplied in the CREATE EXTERNAL TABLE statement." +
-                    " Please supply the schema using option schema ");
-        }
-        /** Testing that the schema resource exists. */
-        if (!isSchemaResourceOnClasspath(srlzSchemaName)) {
-            throw new FileNotFoundException(
-                    "schema resource \"" + srlzSchemaName + "\" is not located on the classpath ");
-        }
-    }
-    
-    /** Returns the path of the schema used for various deserializers e.g, Avro file name, Java object file name. */
-    public String getDataSchemaName() {
-        return srlzSchemaName;
-    }
-
     /** Returns the ClassName for the java class that was defined as Accessor */
     public String getAccessor() {
         return accessor;
@@ -262,20 +237,6 @@ public class InputData {
         this.schema = schema;
     }
 
-    /** Returns the compression codec name (<tt>null</tt> means no compression) */
-    public String getCompressCodec() {
-        return compressCodec;
-    }
-
-
-    /**
-     * Returns the compression type (can be null)
-     * Allowed values: RECORD, BLOCK.
-     */
-    public String getCompressType() {
-        return compressType;
-    }
-
     /**
      * Returns the contents of pxf_remote_service_login set in Hawq.
      * Should the user set it to an empty string this function will return null.
@@ -308,20 +269,4 @@ public class InputData {
 		return dataFragment;
 	}
 
-    /*
-     * Tests for the case schema resource is a file like avro_schema.avsc
-     * or for the case schema resource is a Java class. in which case we try to reflect the class name.
-     */
-    private boolean isSchemaResourceOnClasspath(String resource) {
-        if (this.getClass().getClassLoader().getResource(resource) != null) {
-            return true;
-        }
-
-        try {
-            Class.forName(resource);
-            return true;
-        } catch (ClassNotFoundException e) {
-            return false;
-        }
-    }
 }

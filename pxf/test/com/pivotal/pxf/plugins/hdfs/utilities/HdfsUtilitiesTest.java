@@ -86,67 +86,57 @@ public class HdfsUtilitiesTest {
 
         testIsThreadSafe(
                 "readable compression, no compression - thread safe",
-                "some/path/without.compression", true,
+                "/some/path/without.compression",
                 null, null,
                 true);
 
         testIsThreadSafe(
                 "readable compression, gzip compression - thread safe",
-                "some/compressed/path.gz", true,
+                "/some/compressed/path.gz",
                 null, new GzipCodec(),
                 true);
 
         testIsThreadSafe(
                 "readable compression, bzip2 compression - not thread safe",
-                "some/path/with/bzip2.bz2", true,
+                "/some/path/with/bzip2.bz2",
                 null, new BZip2Codec(),
                 false);
 
         testIsThreadSafe(
-                "readable compression, marked as not thread safe - not thread safe",
-                "some/path", false,
-                null, null,
-                false);
-
-        testIsThreadSafe(
                 "writable compression, no compression codec - thread safe",
-                "some/path", true,
+                "/some/path",
                 null, null,
                 true);
 
         testIsThreadSafe(
                 "writable compression, some compression codec - thread safe",
-                "some/path", true,
+                "/some/path",
                 "I.am.a.nice.codec", new NotSoNiceCodec(),
                 true);
 
         testIsThreadSafe(
                 "writable compression, compression codec bzip2 - not thread safe",
-                "some/path", true,
+                "/some/path",
                 "org.apache.hadoop.io.compress.BZip2Codec", new BZip2Codec(),
                 false);
     }
 
     private void testIsThreadSafe(
             String testDescription,
-            String path, boolean threadSafe,
+            String path,
             String codecStr, CompressionCodec codec,
             boolean expectedResult) {
 
-        prepareDataForIsThreadSafe(path, threadSafe, codecStr, codec);
+    	String dataDir = path;
+    	
+        prepareDataForIsThreadSafe(dataDir, codecStr, codec);
 
-        boolean result = HdfsUtilities.isThreadSafe(inputData);
+        boolean result = HdfsUtilities.isThreadSafe(dataDir, codecStr);
         assertTrue(testDescription, result == expectedResult);
     }
 
     private void prepareDataForIsThreadSafe(
-            String path, boolean threadSafe,
-            String codecStr, CompressionCodec codec) {
-
-        inputData = mock(InputData.class);
-        when(inputData.getDataSource()).thenReturn("/" + path);
-        when(inputData.isThreadSafe()).thenReturn(threadSafe);
-        when(inputData.getCompressCodec()).thenReturn(codecStr);
+            String dataDir, String codecStr, CompressionCodec codec) {
 
         try {
             conf = PowerMockito.mock(Configuration.class);
@@ -156,7 +146,7 @@ public class HdfsUtilitiesTest {
         }
 
         if (codecStr == null) {
-            when(factory.getCodec(new Path("/" + path))).thenReturn(codec);
+            when(factory.getCodec(new Path(dataDir))).thenReturn(codec);
         } else {
             PowerMockito.stub(PowerMockito.method(HdfsUtilities.class, "getCodecClass")).toReturn(codec.getClass());
         }

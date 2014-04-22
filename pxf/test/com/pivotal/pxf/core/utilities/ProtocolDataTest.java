@@ -94,56 +94,6 @@ public class ProtocolDataTest {
     }
 
     @Test
-    public void compressCodec() {
-        parameters.put("X-GP-COMPRESSION_CODEC",
-                "So I asked, who is he? He goes by the name of Wayne Rooney");
-        ProtocolData protocolData = new ProtocolData(parameters);
-        assertEquals(protocolData.getCompressCodec(),
-                "So I asked, who is he? He goes by the name of Wayne Rooney");
-    }
-
-    @Test
-    public void compressCodecBZip2() {
-        parameters.put("X-GP-COMPRESSION_CODEC",
-                "org.apache.hadoop.io.compress.BZip2Codec");
-        ProtocolData protocolData = new ProtocolData(parameters);
-        assertEquals(protocolData.getCompressCodec(),
-                "org.apache.hadoop.io.compress.BZip2Codec");
-    }
-
-    @Test
-    public void compressType() {
-        parameters.put("X-GP-COMPRESSION_TYPE", "BLOCK");
-        ProtocolData protocolData = new ProtocolData(parameters);
-        assertEquals(protocolData.getCompressType(), "BLOCK");
-
-        parameters.put("X-GP-COMPRESSION_TYPE", "ReCoRd");
-        protocolData = new ProtocolData(parameters);
-        assertEquals(protocolData.getCompressType(), "RECORD");
-
-        parameters.remove("X-GP-COMPRESSION_TYPE");
-        protocolData = new ProtocolData(parameters);
-        assertEquals(protocolData.getCompressType(), "RECORD");
-
-        parameters.put("X-GP-COMPRESSION_TYPE", "Oy");
-        try {
-            new ProtocolData(parameters);
-            fail("illegal COMPRESSION_TYPE should throw IllegalArgumentException");
-        } catch (IllegalArgumentException e) {
-            assertEquals(e.getMessage(), "Illegal compression type 'Oy'");
-        }
-
-        parameters.put("X-GP-COMPRESSION_TYPE", "none");
-        try {
-            new ProtocolData(parameters);
-            fail("illegal COMPRESSION_TYPE should throw IllegalArgumentException");
-        } catch (IllegalArgumentException e) {
-            assertEquals(e.getMessage(),
-                    "Illegal compression type 'NONE'. " + "For disabling compression remove COMPRESSION_CODEC parameter.");
-        }
-    }
-
-    @Test
     public void threadSafeTrue() {
         parameters.put("X-GP-THREAD-SAFE", "TRUE");
         ProtocolData protocolData = new ProtocolData(parameters);

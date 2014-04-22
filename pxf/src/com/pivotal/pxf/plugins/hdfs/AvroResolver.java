@@ -6,6 +6,7 @@ import com.pivotal.pxf.api.ReadResolver;
 import com.pivotal.pxf.api.io.DataType;
 import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.api.utilities.Plugin;
+import com.pivotal.pxf.plugins.hdfs.utilities.DataSchemaException;
 import com.pivotal.pxf.plugins.hdfs.utilities.RecordkeyAdapter;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
@@ -17,6 +18,7 @@ import org.apache.avro.io.DecoderFactory;
 import org.apache.avro.util.Utf8;
 import org.apache.hadoop.io.BytesWritable;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -24,6 +26,8 @@ import java.util.LinkedList;
 import java.util.List;
 
 import static com.pivotal.pxf.api.io.DataType.*;
+import static com.pivotal.pxf.plugins.hdfs.utilities.DataSchemaException.MessageFmt.SCHEMA_NOT_INDICATED;
+import static com.pivotal.pxf.plugins.hdfs.utilities.DataSchemaException.MessageFmt.SCHEMA_NOT_ON_CLASSPATH;
 
 /**
  * Class AvroResolver handles deserialization of records that were serialized 
@@ -235,12 +239,23 @@ public class AvroResolver extends Plugin implements ReadResolver {
 
     InputStream openExternalSchema() throws IOException {
     	
-    	inputData.verifyDataSchemaAccessible();
+    	String schemaName = inputData.getUserProperty("DATA-SCHEMA");
+
+        /** Testing that the schema name was supplied by the user - schema is an optional properly. */
+        if (schemaName == null) {
+            throw new DataSchemaException(SCHEMA_NOT_INDICATED, this.getClass().getName());
+        }
+        
+        /** Testing that the schema resource exists. */
+        if (this.getClass().getClassLoader().getResource(schemaName) == null) {
+        	throw new DataSchemaException(SCHEMA_NOT_ON_CLASSPATH, schemaName);
+        }
     	
-        String schemaName = inputData.getDataSchemaName();
         ClassLoader loader = this.getClass().getClassLoader();
         InputStream result = loader.getResourceAsStream(schemaName);
 
         return result;
     }
 }
+
+

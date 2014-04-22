@@ -94,28 +94,55 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements 
      */
     private void getCompressionCodec(InputData inputData) {
 
-        String compressCodec = inputData.getCompressCodec();
-        String compressType = inputData.getCompressType();
+        String userCompressCodec = inputData.getUserProperty("COMPRESSION_CODEC");
+        String userCompressType = inputData.getUserProperty("COMPRESSION_TYPE");
+        String parsedCompressType = parseCompressionType(userCompressType);
 
         compressionType = SequenceFile.CompressionType.NONE;
         codec = null;
-        if (compressCodec != null) {
-            codec = HdfsUtilities.getCodec(conf, compressCodec);
+        if (userCompressCodec != null) {
+            codec = HdfsUtilities.getCodec(conf, userCompressCodec);
 
             try {
-                compressionType = CompressionType.valueOf(compressType);
+                compressionType = CompressionType.valueOf(parsedCompressType);
             } catch (IllegalArgumentException e) {
                 throw new IllegalArgumentException("Illegal value for compression type " +
-                        "'" + compressType + "'");
+                        "'" + parsedCompressType + "'");
             }
             if (compressionType == null) {
                 throw new IllegalArgumentException("Compression type must be defined");
             }
 
             Log.debug("Compression ON: " +
-                    "compression codec: " + compressCodec +
+                    "compression codec: " + userCompressCodec +
                     ", compression type: " + compressionType);
         }
+    }
+
+    /*
+     * Parse compression type for sequence file. If null, default to RECORD.
+     * Allowed values: RECORD, BLOCK.
+     */
+    private String parseCompressionType(String compressType) {
+        final String COMPRESSION_TYPE_RECORD = "RECORD";
+        final String COMPRESSION_TYPE_BLOCK = "BLOCK";
+        final String COMPRESSION_TYPE_NONE = "NONE";
+
+        if (compressType == null) {
+            return COMPRESSION_TYPE_RECORD;
+        }
+
+        if (compressType.equalsIgnoreCase(COMPRESSION_TYPE_NONE)) {
+            throw new IllegalArgumentException("Illegal compression type 'NONE'. " +
+                    "For disabling compression remove COMPRESSION_CODEC parameter.");
+        }
+
+        if (!compressType.equalsIgnoreCase(COMPRESSION_TYPE_RECORD) &&
+        	!compressType.equalsIgnoreCase(COMPRESSION_TYPE_BLOCK)) {
+            throw new IllegalArgumentException("Illegal compression type '" + compressType + "'");
+        }
+
+        return compressType.toUpperCase();
     }
 
     /*
@@ -169,4 +196,12 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements 
             writer.close();
         }
     }
+
+	public CompressionType getCompressionType() {
+		return compressionType;
+	}
+
+	public CompressionCodec getCodec() {
+		return codec;
+	}
 }

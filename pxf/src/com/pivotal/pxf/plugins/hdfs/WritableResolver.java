@@ -5,10 +5,12 @@ import com.pivotal.pxf.api.io.DataType;
 import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.api.utilities.Plugin;
 import com.pivotal.pxf.plugins.hdfs.utilities.RecordkeyAdapter;
+import com.pivotal.pxf.plugins.hdfs.utilities.DataSchemaException;
+import static com.pivotal.pxf.plugins.hdfs.utilities.DataSchemaException.MessageFmt.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.io.Writable;
-
+import java.io.FileNotFoundException;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -42,8 +44,20 @@ public class WritableResolver extends Plugin implements ReadResolver, WriteResol
      */
     public WritableResolver(InputData input) throws Exception {
         super(input);
-        inputData.verifyDataSchemaAccessible();
-        userObject = Class.forName(inputData.getDataSchemaName()).newInstance();
+        
+    	String schemaName = inputData.getUserProperty("DATA-SCHEMA");
+        
+        /** Testing that the schema name was supplied by the user - schema is an optional properly. */
+        if (schemaName == null) {
+            throw new DataSchemaException(SCHEMA_NOT_INDICATED, this.getClass().getName());
+        }
+        
+        /** Testing that the schema resource exists. */
+        if (!isSchemaOnClasspath(schemaName)) {
+        	throw new DataSchemaException(SCHEMA_NOT_ON_CLASSPATH, schemaName);
+        }
+        
+        userObject = Class.forName(schemaName).newInstance();
         fields = userObject.getClass().getDeclaredFields();
         recordkeyIndex = (inputData.getRecordkeyColumn() == null)
                 ? RECORDKEY_UNDEFINED
@@ -189,5 +203,22 @@ public class WritableResolver extends Plugin implements ReadResolver, WriteResol
         }
 
         return new OneRow(key, userObject);
+    }
+    
+    /*
+     * Tests for the case schema resource is a file like avro_schema.avsc
+     * or for the case schema resource is a Java class. in which case we try to reflect the class name.
+     */
+    private boolean isSchemaOnClasspath(String resource) {
+        if (this.getClass().getClassLoader().getResource(resource) != null) {
+            return true;
+        }
+
+        try {
+            Class.forName(resource);
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
     }
 }

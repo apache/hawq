@@ -52,7 +52,7 @@ public class LineBreakAccessor extends HdfsSplittableDataAccessor implements Wri
     public boolean openForWrite() throws Exception {
 
         String fileName = inputData.getDataSource();
-        String compressCodec = inputData.getCompressCodec();
+        String compressCodec = inputData.getUserProperty("COMPRESSION_CODEC");
         CompressionCodec codec = null;
 
         conf = new Configuration();

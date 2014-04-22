@@ -103,6 +103,7 @@ public abstract class HdfsAtomicDataAccessor extends Plugin implements ReadAcces
 
     @Override
     public boolean isThreadSafe() {
-        return HdfsUtilities.isThreadSafe(inputData);
+        return HdfsUtilities.isThreadSafe(inputData.getDataSource(),
+        								  inputData.getUserProperty("COMPRESSION_CODEC"));
     }
 }
