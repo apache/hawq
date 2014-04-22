@@ -16,9 +16,9 @@ import org.apache.avro.io.BinaryDecoder;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.avro.util.Utf8;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.BytesWritable;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -28,6 +28,7 @@ import java.util.List;
 import static com.pivotal.pxf.api.io.DataType.*;
 import static com.pivotal.pxf.plugins.hdfs.utilities.DataSchemaException.MessageFmt.SCHEMA_NOT_INDICATED;
 import static com.pivotal.pxf.plugins.hdfs.utilities.DataSchemaException.MessageFmt.SCHEMA_NOT_ON_CLASSPATH;
+import static com.pivotal.pxf.plugins.hdfs.utilities.HdfsUtilities.getAvroSchema;
 
 /**
  * Class AvroResolver handles deserialization of records that were serialized 
@@ -53,10 +54,10 @@ public class AvroResolver extends Plugin implements ReadResolver {
         super(input);
 
         Schema schema = isAvroFile()
-                ? (Schema) inputData.getSchema()
+                ? getAvroSchema(new Configuration(), input.getDataSource())
                 : (new Schema.Parser()).parse(openExternalSchema());
 
-        reader = new GenericDatumReader<GenericRecord>(schema);
+        reader = new GenericDatumReader<>(schema);
         fields = schema.getFields();
     }
 
@@ -132,7 +133,7 @@ public class AvroResolver extends Plugin implements ReadResolver {
 
         switch (fieldType) {
             case ARRAY:
-                ret = SetArrayField(record, fieldName, fieldSchema);
+                ret = setArrayField(record, fieldName, fieldSchema);
                 break;
             case INT:
                 ret = addOneFieldToRecord(record, INTEGER, avroRecord.get(fieldName));
@@ -166,7 +167,7 @@ public class AvroResolver extends Plugin implements ReadResolver {
      * element, and for each element in the Avro array, we create an object of 
      * type OneField and insert it into the output List<OneField> record
      */
-    int SetArrayField(List<OneField> record, String fieldName, Schema arraySchema) throws IllegalAccessException {
+    int setArrayField(List<OneField> record, String fieldName, Schema arraySchema) throws IllegalAccessException {
         Schema typeSchema = arraySchema.getElementType();
         Schema.Type arrayType = typeSchema.getType();
         int ret = 0;
@@ -245,17 +246,12 @@ public class AvroResolver extends Plugin implements ReadResolver {
         if (schemaName == null) {
             throw new DataSchemaException(SCHEMA_NOT_INDICATED, this.getClass().getName());
         }
-        
+
         /** Testing that the schema resource exists. */
         if (this.getClass().getClassLoader().getResource(schemaName) == null) {
         	throw new DataSchemaException(SCHEMA_NOT_ON_CLASSPATH, schemaName);
         }
-    	
         ClassLoader loader = this.getClass().getClassLoader();
-        InputStream result = loader.getResourceAsStream(schemaName);
-
-        return result;
+        return loader.getResourceAsStream(schemaName);
     }
 }
-
-

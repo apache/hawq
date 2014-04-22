@@ -51,17 +51,6 @@ public class InputData {
 	 */
     protected ColumnDescriptor recordkeyColumn;
 
-	/**
-	 * this schema object variable is special - it is not filled from
-	 * getProperty like all the others. Instead it is used by the
-	 * AvroFileAccessor to pass the avro schema to the AvroResolver. In this
-	 * case only the AvroFileAccessor can fetch the schema because it is the
-	 * only one that can read the Avro file. So the AvroResolver needs to get
-	 * the schema from the AvroFileAccessor, and this schema variable is the way
-	 * it's done.
-	 */
-    protected Object schema = null;
-
     /**
      * Constructs an empty InputData
      */
@@ -217,24 +206,6 @@ public class InputData {
 	 */
     public String getAnalyzer() {
     	return analyzer;
-    }
-
-    /**
-     * Get the generic schema object that can be shared by the Accessor and
-     * Resolver if needed. Returns null if isn't used.
-     */
-    public Object getSchema() {
-        return schema;
-    }
-    
-    /**
-     * Set the generic schema object that can be shared by the Accessor and
-     * Resolver if needed. Returns null if isn't used.
-     *
-     * @param schema the (schema) object used in the current data fragment
-     */
-    public void setSchema(Object schema) {
-        this.schema = schema;
     }
 
     /**

@@ -28,7 +28,7 @@ public class ProtocolDataTest {
     ServletContext mockContext;
 
     @Test
-    public void ProtocolDataCreated() {
+    public void protocolDataCreated() {
         ProtocolData protocolData = new ProtocolData(parameters);
 
         assertEquals(System.getProperty("greenplum.alignment"), "all");
@@ -44,7 +44,6 @@ public class ProtocolDataTest {
         assertNull(protocolData.getRecordkeyColumn());
         assertEquals(protocolData.getAccessor(), "are");
         assertEquals(protocolData.getResolver(), "packed");
-        assertNull(protocolData.getSchema());
         assertEquals(protocolData.getDataSource(), "i'm/ready/to/go");
         assertEquals(protocolData.getUserProperty("i'm-standing-here"), "outside-your-door");
         assertEquals(protocolData.getParametersMap(), parameters);

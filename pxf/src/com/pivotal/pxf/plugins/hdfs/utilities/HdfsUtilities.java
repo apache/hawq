@@ -1,6 +1,12 @@
 package com.pivotal.pxf.plugins.hdfs.utilities;
 
 import com.pivotal.pxf.api.utilities.InputData;
+import org.apache.avro.Schema;
+import org.apache.avro.file.DataFileReader;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.DatumReader;
+import org.apache.avro.mapred.FsInput;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -23,18 +29,18 @@ public class HdfsUtilities {
     private static Configuration config = new Configuration();
     private static CompressionCodecFactory factory =
             new CompressionCodecFactory(config);
-	
-	/**
-	 * Hdfs data sources are absolute data paths. Method ensures 
-	 * that dataSource begins with '/'
-	 * @param dataSource The HDFS path to a file or directory of interest. 
-         *  Retrieved from the client request.
-	 * @return an absolute data path
-	 */
-	public static String absoluteDataPath(String dataSource)
-	{
-		return (dataSource.charAt(0) == '/') ? dataSource : "/" + dataSource;
-	}
+
+    /**
+     * Hdfs data sources are absolute data paths. Method ensures
+     * that dataSource begins with '/'
+     *
+     * @param dataSource The HDFS path to a file or directory of interest.
+     *                   Retrieved from the client request.
+     * @return an absolute data path
+     */
+    public static String absoluteDataPath(String dataSource) {
+        return (dataSource.charAt(0) == '/') ? dataSource : "/" + dataSource;
+    }
 
     /*
      * Helper routine to get a compression codec class
@@ -100,7 +106,7 @@ public class HdfsUtilities {
     /**
      * Checks if requests should be handle in a single thread or not.
      *
-     * @param dataDir hdfs path to the data source
+     * @param dataDir   hdfs path to the data source
      * @param compCodec the fully qualified name of the compression codec
      * @return if the request can be run in multi-threaded mode.
      */
@@ -166,5 +172,22 @@ public class HdfsUtilities {
         } catch (Exception e) {
             throw new RuntimeException("Exception while reading expected fragment metadata", e);
         }
+    }
+
+    /**
+     * Accessing the avro file through the "unsplittable" API just to get the schema.
+     * The splittable API (AvroInputFormat) which is the one we will be using to fetch
+     * the records, does not support getting the avro schema yet.
+     *
+     * @param conf       Hadoop configuration
+     * @param dataSource Avro file (i.e fileName.avro) path
+     * @return the Avro schema
+     * @throws IOException
+     */
+    public static Schema getAvroSchema(Configuration conf, String dataSource) throws IOException {
+        FsInput inStream = new FsInput(new Path(dataSource), conf);
+        DatumReader<GenericRecord> dummyReader = new GenericDatumReader<>();
+        DataFileReader<GenericRecord> dummyFileReader = new DataFileReader<>(inStream, dummyReader);
+        return dummyFileReader.getSchema();
     }
 }

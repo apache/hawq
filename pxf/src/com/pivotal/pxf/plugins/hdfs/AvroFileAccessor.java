@@ -3,12 +3,8 @@ package com.pivotal.pxf.plugins.hdfs;
 import com.pivotal.pxf.api.OneRow;
 import com.pivotal.pxf.api.utilities.InputData;
 import org.apache.avro.Schema;
-import org.apache.avro.file.DataFileReader;
-import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.io.DatumReader;
 import org.apache.avro.mapred.*;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
@@ -16,11 +12,12 @@ import org.apache.hadoop.mapred.JobConf;
 
 import java.io.IOException;
 
+import static com.pivotal.pxf.plugins.hdfs.utilities.HdfsUtilities.getAvroSchema;
+
 /**
  * A PXF Accessor for reading Avro File records
  */
 public class AvroFileAccessor extends HdfsSplittableDataAccessor {
-    private Schema schema = null;
     private AvroWrapper<GenericRecord> avroWrapper = null;
 
     /**
@@ -36,19 +33,12 @@ public class AvroFileAccessor extends HdfsSplittableDataAccessor {
         // 2. Accessing the avro file through the "unsplittable" API just to get the schema.
         //    The splittable API (AvroInputFormat) which is the one we will be using to fetch
         //    the records, does not support getting the avro schema yet.
-        Path p = new Path(inputData.getDataSource());
-        FsInput inStream = new FsInput(p, conf);
-        DatumReader<GenericRecord> dummyReader = new GenericDatumReader<GenericRecord>();
-        DataFileReader<GenericRecord> dummyFileReader = new DataFileReader<GenericRecord>(inStream, dummyReader);
-        schema = dummyFileReader.getSchema();
+        Schema schema = getAvroSchema(conf, inputData.getDataSource());
 
-        // 3. Pass the schema to the inputData for the AvroResolver to fetch
-        inputData.setSchema(schema);
-
-        // 4. Pass the schema to the AvroInputFormat
+        // 3. Pass the schema to the AvroInputFormat
         AvroJob.setInputSchema(jobConf, schema);
 
-        // 5. The avroWrapper required for the iteration
+        // 4. The avroWrapper required for the iteration
         avroWrapper = new AvroWrapper<GenericRecord>();
     }
 
