@@ -1080,6 +1080,8 @@ getSpillFile(workfile_set *work_set, SpillSet *set, int file_no, int *p_alloc_si
 		spill_file->file_info = (BatchFileInfo *)palloc(sizeof(BatchFileInfo));
 		spill_file->file_info->total_bytes = 0;
 		spill_file->file_info->ntuples = 0;
+		/* Initialize to NULL in case the create function below throws an exception */
+		spill_file->file_info->wfile = NULL; 
 		spill_file->file_info->wfile = workfile_mgr_create_file(work_set);
 
 		elog(HHA_MSG_LVL, "HashAgg: create %d level batch file %d with compression %d",
