@@ -356,6 +356,7 @@ extern bool optimizer_extract_dxl_stats;
 extern bool optimizer_extract_dxl_stats_all_nodes;
 extern bool optimizer_dpe_stats;
 extern bool optimizer_enable_indexjoin;
+extern bool optimizer_enable_motions_masteronly_queries;
 extern bool optimizer_enable_motions;
 extern bool optimizer_enable_motion_broadcast;
 extern bool optimizer_enable_motion_gather;
