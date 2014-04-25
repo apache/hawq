@@ -5,7 +5,7 @@
 SELECT gp_opt_version();
                            gp_opt_version
 ---------------------------------------------------------------------
- GPOPT version: 1.405, GPOS version: 1.100, Xerces version: 3.1.1-p1
+ GPOPT version: 1.406, GPOS version: 1.100, Xerces version: 3.1.1-p1
 (1 row)
 
 -- master only tables
@@ -8047,6 +8047,129 @@ select * from orca.t_date where user_id=9;
 set optimizer_enumerate_plans=off;
 set optimizer_enable_constant_expression_evaluation=off;
 set optimizer_print_plan=off;
+drop table if exists orca.t_text;
+NOTICE:  table "t_text" does not exist, skipping
+drop index if exists orca.user_id_idx;
+create table orca.t_text ( timest date, user_id numeric(16,0) not null, tag1 char(5), tag2 char(5))
+distributed by (user_id)
+partition by list(tag1) (partition partgood values('good'::text), partition partbad values('bad'::text), partition partugly values('ugly'::text));
+NOTICE:  CREATE TABLE will create partition "t_text_1_prt_partgood" for table "t_text"
+NOTICE:  CREATE TABLE will create partition "t_text_1_prt_partbad" for table "t_text"
+NOTICE:  CREATE TABLE will create partition "t_text_1_prt_partugly" for table "t_text"
+create index user_id_idx on orca.t_text_1_prt_partgood(user_id);
+insert into orca.t_text values('01-03-2012'::date,0,'good','tag2');
+insert into orca.t_text values('01-03-2012'::date,1,'bad','tag2');
+insert into orca.t_text values('01-04-2012'::date,2,'ugly','tag2');
+insert into orca.t_text values('01-05-2012'::date,1,'good','tag2');
+insert into orca.t_text values('01-06-2012'::date,2,'bad','tag2');
+insert into orca.t_text values('01-07-2012'::date,1,'ugly','tag2');
+insert into orca.t_text values('01-08-2012'::date,2,'good','tag2');
+insert into orca.t_text values('01-03-2012'::date,2,'bad','tag2');
+insert into orca.t_text values('01-03-2012'::date,3,'ugly','tag2');
+insert into orca.t_text values('01-03-2012'::date,4,'good','tag2');
+insert into orca.t_text values('01-03-2012'::date,5,'bad','tag2');
+insert into orca.t_text values('01-03-2012'::date,6,'ugly','tag2');
+insert into orca.t_text values('01-03-2012'::date,7,'good','tag2');
+insert into orca.t_text values('01-03-2012'::date,8,'bad','tag2');
+insert into orca.t_text values('01-03-2012'::date,9,'ugly','tag2');
+set optimizer_enable_constant_expression_evaluation=on;
+set optimizer_enumerate_plans=on;
+set optimizer_plan_id = 3;
+explain select * from orca.t_text where user_id=9;
+                                               QUERY PLAN                                               
+--------------------------------------------------------------------------------------------------------
+ Gather Motion 2:1  (slice1; segments: 2)  (cost=0.00..5.67 rows=1 width=32)
+   ->  Sequence  (cost=0.00..3.63 rows=1 width=32)
+         ->  Result  (cost=0.00..4.66 rows=1 width=32)
+               ->  Function Scan on gp_partition_inverse  (cost=10.00..100.00 rows=50 width=4)
+         ->  Result  (cost=0.00..3.63 rows=1 width=32)
+               ->  Append  (cost=0.00..3.63 rows=1 width=32)
+                     ->  Dynamic Index Scan on t_text  (cost=0.00..1.47 rows=1 width=88)
+                           Index Cond: user_id = 9::numeric
+                     ->  Dynamic Table Scan on t_text (partIndex: 2)  (cost=0.00..1.13 rows=1 width=88)
+                           Filter: user_id = 9::numeric
+ Settings:  optimizer=on
+(11 rows)
+
+select * from orca.t_text where user_id=9;
+   timest   | user_id | tag1  | tag2  
+------------+---------+-------+-------
+ 01-03-2012 |       9 | ugly  | tag2 
+(1 row)
+
+set optimizer_enumerate_plans=off;
+set optimizer_enable_constant_expression_evaluation=off;
+set optimizer_print_plan=off;
+-- create a user defined type and only define equality on it
+-- the type can be used in the partitioning list, but Orca is not able to pick a heterogenous index
+-- because constraint derivation needs all comparison operators
+drop type if exists orca.employee cascade;
+NOTICE:  type "orca.employee" does not exist, skipping
+create type orca.employee as (empid int, empname text);
+create function orca.emp_equal(orca.employee, orca.employee) returns boolean
+  as 'select $1.empid = $2.empid;'
+  language sql
+  immutable
+  returns null on null input;
+create operator pg_catalog.= (
+        leftarg = orca.employee,
+        rightarg = orca.employee,
+        procedure = orca.emp_equal
+);
+create operator class orca.employee_op_class default for type orca.employee
+  using btree as
+  operator 3 =;
+drop table if exists orca.t_employee;
+NOTICE:  table "t_employee" does not exist, skipping
+create table orca.t_employee(timest date, user_id numeric(16,0) not null, tag1 char(5), emp orca.employee)
+  distributed by (user_id)
+  partition by list(emp)
+  (partition part1 values('(1, ''foo'')'::orca.employee), partition part2 values('(2, ''foo'')'::orca.employee));
+NOTICE:  CREATE TABLE will create partition "t_employee_1_prt_part1" for table "t_employee"
+NOTICE:  CREATE TABLE will create partition "t_employee_1_prt_part2" for table "t_employee"
+create index user_id_idx1 on orca.t_employee_1_prt_part1(user_id);
+create index user_id_idx2 on orca.t_employee_1_prt_part2(user_id);
+insert into orca.t_employee values('01-03-2012'::date,0,'tag1','(1, ''foo'')'::orca.employee);
+insert into orca.t_employee values('01-03-2012'::date,1,'tag1','(1, ''foo'')'::orca.employee);
+insert into orca.t_employee values('01-04-2012'::date,2,'tag1','(2, ''foo'')'::orca.employee);
+insert into orca.t_employee values('01-05-2012'::date,1,'tag1','(1, ''foo'')'::orca.employee);
+insert into orca.t_employee values('01-06-2012'::date,2,'tag1','(2, ''foo'')'::orca.employee);
+insert into orca.t_employee values('01-07-2012'::date,1,'tag1','(1, ''foo'')'::orca.employee);
+insert into orca.t_employee values('01-08-2012'::date,2,'tag1','(2, ''foo'')'::orca.employee);
+set optimizer_enable_constant_expression_evaluation=on;
+select disable_xform('CXformDynamicGet2DynamicTableScan');
+                 disable_xform                 
+-----------------------------------------------
+ CXformDynamicGet2DynamicTableScan is disabled
+(1 row)
+
+explain select * from orca.t_employee where user_id = 2;
+                                           QUERY PLAN                                            
+-------------------------------------------------------------------------------------------------
+ Gather Motion 2:1  (slice1; segments: 2)  (cost=0.00..3.61 rows=1 width=32)
+   ->  Sequence  (cost=0.00..0.53 rows=1 width=32)
+         ->  Result  (cost=0.00..1.56 rows=1 width=32)
+               ->  Function Scan on gp_partition_expansion  (cost=10.00..100.00 rows=50 width=4)
+         ->  Dynamic Index Scan on t_employee  (cost=0.00..0.53 rows=1 width=32)
+               Index Cond: user_id = 2::numeric
+ Settings:  optimizer=on
+(7 rows)
+
+select * from orca.t_employee where user_id = 2;
+   timest   | user_id | tag1  |     emp      
+------------+---------+-------+--------------
+ 01-08-2012 |       2 | tag1  | (2," 'foo'")
+ 01-06-2012 |       2 | tag1  | (2," 'foo'")
+ 01-04-2012 |       2 | tag1  | (2," 'foo'")
+(3 rows)
+
+select enable_xform('CXformDynamicGet2DynamicTableScan');
+                 enable_xform                 
+----------------------------------------------
+ CXformDynamicGet2DynamicTableScan is enabled
+(1 row)
+
+reset optimizer_enable_constant_expression_evaluation;
 -- test project elements in TVF
 CREATE FUNCTION orca.csq_f(a int) RETURNS int AS $$ select $1 $$ LANGUAGE SQL;
 CREATE TABLE orca.csq_r(a int);

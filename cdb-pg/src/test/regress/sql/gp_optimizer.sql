@@ -511,6 +511,87 @@ set optimizer_enumerate_plans=off;
 set optimizer_enable_constant_expression_evaluation=off;
 set optimizer_print_plan=off;
 
+drop table if exists orca.t_text;
+drop index if exists orca.user_id_idx;
+create table orca.t_text ( timest date, user_id numeric(16,0) not null, tag1 char(5), tag2 char(5))
+distributed by (user_id)
+partition by list(tag1) (partition partgood values('good'::text), partition partbad values('bad'::text), partition partugly values('ugly'::text));
+
+create index user_id_idx on orca.t_text_1_prt_partgood(user_id);
+
+insert into orca.t_text values('01-03-2012'::date,0,'good','tag2');
+insert into orca.t_text values('01-03-2012'::date,1,'bad','tag2');
+insert into orca.t_text values('01-04-2012'::date,2,'ugly','tag2');
+insert into orca.t_text values('01-05-2012'::date,1,'good','tag2');
+insert into orca.t_text values('01-06-2012'::date,2,'bad','tag2');
+insert into orca.t_text values('01-07-2012'::date,1,'ugly','tag2');
+insert into orca.t_text values('01-08-2012'::date,2,'good','tag2');
+
+insert into orca.t_text values('01-03-2012'::date,2,'bad','tag2');
+insert into orca.t_text values('01-03-2012'::date,3,'ugly','tag2');
+insert into orca.t_text values('01-03-2012'::date,4,'good','tag2');
+insert into orca.t_text values('01-03-2012'::date,5,'bad','tag2');
+insert into orca.t_text values('01-03-2012'::date,6,'ugly','tag2');
+insert into orca.t_text values('01-03-2012'::date,7,'good','tag2');
+insert into orca.t_text values('01-03-2012'::date,8,'bad','tag2');
+insert into orca.t_text values('01-03-2012'::date,9,'ugly','tag2');
+
+set optimizer_enable_constant_expression_evaluation=on;
+set optimizer_enumerate_plans=on;
+set optimizer_plan_id = 3;
+
+explain select * from orca.t_text where user_id=9;
+select * from orca.t_text where user_id=9;
+
+set optimizer_enumerate_plans=off;
+set optimizer_enable_constant_expression_evaluation=off;
+set optimizer_print_plan=off;
+
+-- create a user defined type and only define equality on it
+-- the type can be used in the partitioning list, but Orca is not able to pick a heterogenous index
+-- because constraint derivation needs all comparison operators
+drop type if exists orca.employee cascade;
+create type orca.employee as (empid int, empname text);
+
+create function orca.emp_equal(orca.employee, orca.employee) returns boolean
+  as 'select $1.empid = $2.empid;'
+  language sql
+  immutable
+  returns null on null input;
+create operator pg_catalog.= (
+        leftarg = orca.employee,
+        rightarg = orca.employee,
+        procedure = orca.emp_equal
+);
+create operator class orca.employee_op_class default for type orca.employee
+  using btree as
+  operator 3 =;
+
+drop table if exists orca.t_employee;
+create table orca.t_employee(timest date, user_id numeric(16,0) not null, tag1 char(5), emp orca.employee)
+  distributed by (user_id)
+  partition by list(emp)
+  (partition part1 values('(1, ''foo'')'::orca.employee), partition part2 values('(2, ''foo'')'::orca.employee));
+create index user_id_idx1 on orca.t_employee_1_prt_part1(user_id);
+create index user_id_idx2 on orca.t_employee_1_prt_part2(user_id);
+
+insert into orca.t_employee values('01-03-2012'::date,0,'tag1','(1, ''foo'')'::orca.employee);
+insert into orca.t_employee values('01-03-2012'::date,1,'tag1','(1, ''foo'')'::orca.employee);
+insert into orca.t_employee values('01-04-2012'::date,2,'tag1','(2, ''foo'')'::orca.employee);
+insert into orca.t_employee values('01-05-2012'::date,1,'tag1','(1, ''foo'')'::orca.employee);
+insert into orca.t_employee values('01-06-2012'::date,2,'tag1','(2, ''foo'')'::orca.employee);
+insert into orca.t_employee values('01-07-2012'::date,1,'tag1','(1, ''foo'')'::orca.employee);
+insert into orca.t_employee values('01-08-2012'::date,2,'tag1','(2, ''foo'')'::orca.employee);
+
+set optimizer_enable_constant_expression_evaluation=on;
+
+select disable_xform('CXformDynamicGet2DynamicTableScan');
+explain select * from orca.t_employee where user_id = 2;
+select * from orca.t_employee where user_id = 2;
+select enable_xform('CXformDynamicGet2DynamicTableScan');
+
+reset optimizer_enable_constant_expression_evaluation;
+
 -- test project elements in TVF
 
 CREATE FUNCTION orca.csq_f(a int) RETURNS int AS $$ select $1 $$ LANGUAGE SQL;
