@@ -411,10 +411,6 @@ namespace gpdxl
 			static
 			BOOL FSirvFunc(IMemoryPool *pmp, CMDAccessor *pmda, OID oidFunc);
 			
-			// check if the given function is a catalog function
-			static
-			BOOL FCatalogFunc(OID oidFunc);
-
 			// is this a motion sensitive to duplicates
 			static
 			BOOL FDuplicateSensitiveMotion(CDXLPhysicalMotion *pdxlopMotion);

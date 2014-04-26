@@ -2898,13 +2898,6 @@ CTranslatorQueryToDXL::PdxlnFromTVF
 {
 	GPOS_ASSERT(NULL != prte->funcexpr);
 
-	// TODO: elhela - Apr 18, 2014; remove the following check once we enable
-	// forcing master-only plans
-	if (CTranslatorUtils::FCatalogFunc(((FuncExpr *)prte->funcexpr)->funcid))
-	{
-		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("Catalog functions"));
-	}
-
 	// if this is a folded function expression, generate a project over a CTG
 	if (!IsA(prte->funcexpr, FuncExpr))
 	{

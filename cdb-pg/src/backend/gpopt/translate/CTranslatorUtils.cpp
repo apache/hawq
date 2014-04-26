@@ -402,66 +402,6 @@ CTranslatorUtils::FSirvFunc
 
 //---------------------------------------------------------------------------
 //	@function:
-//		CTranslatorUtils::FCatalogFunc
-//
-//	@doc:
-//		Check if the given function is a catalog function
-//
-//---------------------------------------------------------------------------
-BOOL
-CTranslatorUtils::FCatalogFunc
-	(
-	OID oidFunc
-	)
-{
-	// these functions access catalog tables and/or do their own dispatching.
-	// since this is not currently supported by Orca, we fall back to the planner
-	OID rgoidCatalogFuncs[] =
-	{
-			1269, //pg_column_size
-			1371, //pg_lock_status
-			1387, //pg_get_constraintdef
-			1716, //pg_get_expr
-			2168, //pg_database_size
-			2286, //pg_total_relation_size
-			2287, //pg_total_relation_size
-			2288, //pg_size_pretty
-			2289, //pg_relation_size
-			2322, //pg_tablespace_size
-			2323, //pg_tablespace_size
-			2324, //pg_database_size
-			2325, //pg_relation_size
-			2508, //pg_get_constraintdef
-			2509, //pg_get_expr
-			5024, //pg_get_partition_def
-			5025, //pg_get_partition_def
-			5027, //pg_get_partition_rule_def
-			5028, //pg_get_partition_rule_def
-			5034, //pg_get_partition_def
-			6023, //pg_highest_oid
-			6071, //pg_stat_get_activity
-			7169, //get_ao_distribution
-			7170, //get_ao_distribution
-			7171, //get_ao_compression_ratio
-			7172, //get_ao_compression_ratio
-			7173, //gp_update_ao_master_stats
-			7174, //gp_update_ao_master_stats
-	};
-
-	List *plUnsupported = NIL;
-	for (ULONG ul = 0; ul < GPOS_ARRAY_SIZE(rgoidCatalogFuncs); ul++)
-	{
-		if (oidFunc == rgoidCatalogFuncs[ul])
-		{
-			return true;
-		}
-	}
-
-	return false;
-}
-
-//---------------------------------------------------------------------------
-//	@function:
 //		CTranslatorUtils::FHasSubquery
 //
 //	@doc:
