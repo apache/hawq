@@ -110,14 +110,37 @@
 			<fileset dir="${src.dir}/resources" />
 		</copy>
 
-
 		<copy todir="${build.dir}/regression/classes/sut">
 			<fileset dir="${src.dir}/sut" />
 		</copy>
 	</target>
 
+	<target name="compile-resources" depends="compile" description="compile resources">
+		<mkdir dir="${build.dir}/regression/resources-classes" />
+		
+		<!-- compile the core gpdhfs connector source -->
+		<javac classpathref="library.commons.classpath" destdir="${build.dir}/regression/resources-classes" includeantruntime="${compiler.includeantruntime}" debug="${compiler.debug}" fork="yes" verbose="${compiler.verbose}" memoryMaximumSize="${compiler.max.memory}">
+			<compilerarg line="-Werror -Xlint:unchecked -Xlint:deprecation -Xlint:finally -Xlint:fallthrough -Xlint:-path" />
+			<src path="${src.dir}/resources" />
+			<exclude name="CustomWritable.java" />
+		</javac>
+	</target>
+	
+	<target name="jar-resources" depends="compile-resources" description="create jar files from resource plugins">
+		
+		<jar destfile="${env.GPHD_ROOT}/pxf/regression-test.jar">
+			<manifest>
+				<attribute name="Built-By" value="${user.name}"/>
+				<attribute name="Built-Date" value="${TODAY}"/>
+				<attribute name="Class-Path" value="${env.GPHD_ROOT}/pxf/*"/>
+			</manifest>
+			<fileset dir="${build.dir}/regression/resources-classes"/>
+		</jar>
+		
+	</target>
+	
 	<!-- Default -->
-	<target name="all" depends="clean,compile, run-tests" description="build all jar files" />
+	<target name="all" depends="clean, compile, jar-resources, run-tests" description="build all jar files" />
 
 	<!-- Ivy -->
 	<target name="ivy-probe-antlib">

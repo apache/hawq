@@ -1406,7 +1406,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 	}
 
 	/**
-	 * Namenode Highavailibility test - creating table with non-existent nameservice
+	 * Namenode High-availability test - creating table with non-existent nameservice
 	 * 
 	 * @throws Exception
 	 */

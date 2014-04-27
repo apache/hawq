@@ -155,7 +155,7 @@ char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs, Rela
 	 *   get a list of all REST servers and assign the listening port to
 	 *   each fragment that lives on a matching host. 
 	 * if pxf_local_storage == false (example: ISILON)
-	 *   in this case PXF is installed on a propietery server on the same hosts
+	 *   in this case PXF is installed on a proprietary server on the same hosts
 	 *   as the Hawq segments. The target port for all fragments is the port
 	 *   supplied in the URI.
 	 */
