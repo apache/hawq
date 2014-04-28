@@ -79,28 +79,75 @@ InternalIpcMemoryCreate(IpcMemoryKey memKey, Size size)
 
 	if (shmid < 0)
 	{
+		int			shmget_errno = errno;
+
 		/*
 		 * Fail quietly if error indicates a collision with existing segment.
 		 * One would expect EEXIST, given that we said IPC_EXCL, but perhaps
 		 * we could get a permission violation instead?  Also, EIDRM might
 		 * occur if an old seg is slated for destruction but not gone yet.
 		 */
-		if (errno == EEXIST || errno == EACCES
+		if (shmget_errno == EEXIST || shmget_errno == EACCES
 #ifdef EIDRM
-			|| errno == EIDRM
+			|| shmget_errno == EIDRM
 #endif
 			)
 			return NULL;
 
 		/*
-		 * Else complain and abort
+		 * Some BSD-derived kernels are known to return EINVAL, not EEXIST, if
+		 * there is an existing segment but it's smaller than "size" (this is
+		 * a result of poorly-thought-out ordering of error tests). To
+		 * distinguish between collision and invalid size in such cases, we
+		 * make a second try with size = 0.  These kernels do not test size
+		 * against SHMMIN in the preexisting-segment case, so we will not get
+		 * EINVAL a second time if there is such a segment.
 		 */
+		if (shmget_errno == EINVAL)
+		{
+			shmid = shmget(memKey, 0, IPC_CREAT | IPC_EXCL | IPCProtection);
+
+			if (shmid < 0)
+			{
+				/* As above, fail quietly if we verify a collision */
+				if (errno == EEXIST || errno == EACCES
+#ifdef EIDRM
+					|| errno == EIDRM
+#endif
+					)
+					return NULL;
+				/* Otherwise, fall through to report the original error */
+			}
+			else
+			{
+				/*
+				 * On most platforms we cannot get here because SHMMIN is
+				 * greater than zero.  However, if we do succeed in creating a
+				 * zero-size segment, free it and then fall through to report
+				 * the original error.
+				 */
+				if (shmctl(shmid, IPC_RMID, NULL) < 0)
+					elog(LOG, "shmctl(%d, %d, 0) failed: %m",
+						 (int) shmid, IPC_RMID);
+			}
+		}
+
+		/*
+		 * Else complain and abort.
+		 *
+		 * Note: at this point EINVAL should mean that either SHMMIN or SHMMAX
+		 * is violated.  SHMALL violation might be reported as either ENOMEM
+		 * (BSDen) or ENOSPC (Linux); the Single Unix Spec fails to say which
+		 * it should be.  SHMMNI violation is ENOSPC, per spec.  Just plain
+		 * not-enough-RAM is ENOMEM.
+		 */
+		errno = shmget_errno;
 		ereport(FATAL,
 				(errmsg("could not create shared memory segment: %m"),
 		  errdetail("Failed system call was shmget(key=%lu, size=%lu, 0%o).",
 					(unsigned long) memKey, (unsigned long) size,
 					IPC_CREAT | IPC_EXCL | IPCProtection),
-				 (errno == EINVAL) ?
+				 (shmget_errno == EINVAL) ?
 				 errhint("This error usually means that PostgreSQL's request for a shared memory "
 		  "segment exceeded your kernel's SHMMAX parameter.  You can either "
 						 "reduce the request size or reconfigure the kernel with larger SHMMAX.  "
@@ -113,7 +160,7 @@ InternalIpcMemoryCreate(IpcMemoryKey memKey, Size size)
 		"The PostgreSQL documentation contains more information about shared "
 						 "memory configuration.",
 						 (unsigned long) size, NBuffers, MaxBackends) : 0,
-				 (errno == ENOMEM) ?
+				 (shmget_errno == ENOMEM) ?
 				 errhint("This error usually means that PostgreSQL's request for a shared "
 				   "memory segment exceeded available memory or swap space. "
 				  "To reduce the request size (currently %lu bytes), reduce "
@@ -122,7 +169,7 @@ InternalIpcMemoryCreate(IpcMemoryKey memKey, Size size)
 		"The PostgreSQL documentation contains more information about shared "
 						 "memory configuration.",
 						 (unsigned long) size, NBuffers, MaxBackends) : 0,
-				 (errno == ENOSPC) ?
+				 (shmget_errno == ENOSPC) ?
 				 errhint("This error does *not* mean that you have run out of disk space. "
 						 "It occurs either if all available shared memory IDs have been taken, "
 						 "in which case you need to raise the SHMMNI parameter in your kernel, "
