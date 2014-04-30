@@ -159,6 +159,7 @@ select count(*) from direct_test_range_partition where a =1;
 ----------------------------------------------------------------------------------
 -- MPP-7643: various types
 --
+set optimizer_enable_constant_expression_evaluation=on;
 insert into direct_test_type_real values (8,8,true,8,8,'2008-08-08',8.8);
 insert into direct_test_type_smallint values (8,8,true,8,8,'2008-08-08',8.8);
 insert into direct_test_type_boolean values (8,8,true,8,8,'2008-08-08',8.8);
@@ -166,6 +167,7 @@ insert into direct_test_type_int values (8,8,true,8,8,'2008-08-08',8.8);
 insert into direct_test_type_double values (8,8,true,8,8,'2008-08-08',8.8);
 insert into direct_test_type_date values (8,8,true,8,8,'2008-08-08',8.8);
 insert into direct_test_type_numeric values (8,8,true,8,8,'2008-08-08',8.8);
+reset optimizer_enable_constant_expression_evaluation;
 
 select * from direct_test_type_real where real1 = 8::real;
 select * from direct_test_type_smallint where smallint1 = 8::smallint;

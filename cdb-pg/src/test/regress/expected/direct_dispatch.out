@@ -291,6 +291,7 @@ INFO:  Dispatch command to SINGLE content
 ----------------------------------------------------------------------------------
 -- MPP-7643: various types
 --
+set optimizer_enable_constant_expression_evaluation=on;
 insert into direct_test_type_real values (8,8,true,8,8,'2008-08-08',8.8);
 INFO:  Dispatch command to SINGLE content
 INFO:  Distributed transaction command 'Distributed Prepare' to SINGLE content
@@ -319,6 +320,7 @@ insert into direct_test_type_numeric values (8,8,true,8,8,'2008-08-08',8.8);
 INFO:  Dispatch command to SINGLE content
 INFO:  Distributed transaction command 'Distributed Prepare' to SINGLE content
 INFO:  Distributed transaction command 'Distributed Commit Prepared' to SINGLE content
+reset optimizer_enable_constant_expression_evaluation;
 select * from direct_test_type_real where real1 = 8::real;
 INFO:  Dispatch command to SINGLE content
  real1 | smallint1 | boolean1 | int1 | double1 |   date1    | numeric1 

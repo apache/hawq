@@ -315,13 +315,14 @@ INFO:  Dispatch command to ALL contents
 ----------------------------------------------------------------------------------
 -- MPP-7643: various types
 --
+set optimizer_enable_constant_expression_evaluation=on;
 -- start_ignore
 -- Known_opt_diff: MPP-21347
 -- end_ignore
 insert into direct_test_type_real values (8,8,true,8,8,'2008-08-08',8.8);
-INFO:  Dispatch command to ALL contents
-INFO:  Distributed transaction command 'Distributed Prepare' to ALL contents
-INFO:  Distributed transaction command 'Distributed Commit Prepared' to ALL contents
+INFO:  Dispatch command to SINGLE content
+INFO:  Distributed transaction command 'Distributed Prepare' to SINGLE content
+INFO:  Distributed transaction command 'Distributed Commit Prepared' to SINGLE content
 -- start_ignore
 -- Known_opt_diff: MPP-21347
 -- end_ignore
@@ -333,9 +334,9 @@ INFO:  Distributed transaction command 'Distributed Commit Prepared' to SINGLE c
 -- Known_opt_diff: MPP-21347
 -- end_ignore
 insert into direct_test_type_boolean values (8,8,true,8,8,'2008-08-08',8.8);
-INFO:  Dispatch command to ALL contents
-INFO:  Distributed transaction command 'Distributed Prepare' to ALL contents
-INFO:  Distributed transaction command 'Distributed Commit Prepared' to ALL contents
+INFO:  Dispatch command to SINGLE content
+INFO:  Distributed transaction command 'Distributed Prepare' to SINGLE content
+INFO:  Distributed transaction command 'Distributed Commit Prepared' to SINGLE content
 insert into direct_test_type_int values (8,8,true,8,8,'2008-08-08',8.8);
 INFO:  Dispatch command to SINGLE content
 INFO:  Distributed transaction command 'Distributed Prepare' to SINGLE content
@@ -344,23 +345,24 @@ INFO:  Distributed transaction command 'Distributed Commit Prepared' to SINGLE c
 -- Known_opt_diff: MPP-21347
 -- end_ignore
 insert into direct_test_type_double values (8,8,true,8,8,'2008-08-08',8.8);
-INFO:  Dispatch command to ALL contents
-INFO:  Distributed transaction command 'Distributed Prepare' to ALL contents
-INFO:  Distributed transaction command 'Distributed Commit Prepared' to ALL contents
+INFO:  Dispatch command to SINGLE content
+INFO:  Distributed transaction command 'Distributed Prepare' to SINGLE content
+INFO:  Distributed transaction command 'Distributed Commit Prepared' to SINGLE content
 -- start_ignore
 -- Known_opt_diff: MPP-21347
 -- end_ignore
 insert into direct_test_type_date values (8,8,true,8,8,'2008-08-08',8.8);
-INFO:  Dispatch command to ALL contents
-INFO:  Distributed transaction command 'Distributed Prepare' to ALL contents
-INFO:  Distributed transaction command 'Distributed Commit Prepared' to ALL contents
+INFO:  Dispatch command to SINGLE content
+INFO:  Distributed transaction command 'Distributed Prepare' to SINGLE content
+INFO:  Distributed transaction command 'Distributed Commit Prepared' to SINGLE content
 -- start_ignore
 -- Known_opt_diff: MPP-21347
 -- end_ignore
 insert into direct_test_type_numeric values (8,8,true,8,8,'2008-08-08',8.8);
-INFO:  Dispatch command to ALL contents
-INFO:  Distributed transaction command 'Distributed Prepare' to ALL contents
-INFO:  Distributed transaction command 'Distributed Commit Prepared' to ALL contents
+INFO:  Dispatch command to SINGLE content
+INFO:  Distributed transaction command 'Distributed Prepare' to SINGLE content
+INFO:  Distributed transaction command 'Distributed Commit Prepared' to SINGLE content
+reset optimizer_enable_constant_expression_evaluation;
 -- start_ignore
 -- Known_opt_diff: MPP-21346
 -- end_ignore
