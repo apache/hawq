@@ -1780,7 +1780,7 @@ heap_create_with_catalog(const char *relname,
      * key column list in the gp_distribution_policy catalog and attach a
      * copy to the relcache entry.
      */
-    if (policy &&
+    if (!gp_upgrade_mode && policy &&
         Gp_role == GP_ROLE_DISPATCH)
     {
         Assert(relkind == RELKIND_RELATION);
