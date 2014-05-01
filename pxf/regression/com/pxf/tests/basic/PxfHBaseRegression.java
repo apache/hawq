@@ -1,7 +1,7 @@
 package com.pxf.tests.basic;
 
-import java.util.ArrayList;
 import java.sql.SQLWarning;
+import java.util.ArrayList;
 
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.filter.BinaryComparator;
@@ -12,9 +12,9 @@ import org.apache.hadoop.hbase.filter.FilterList.Operator;
 import org.apache.hadoop.hbase.filter.RowFilter;
 import org.apache.hadoop.hbase.filter.SingleColumnValueFilter;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.Assert;
 import org.postgresql.util.PSQLException;
 
 import com.pivotal.pxf.plugins.hbase.utilities.HBaseIntegerComparator;
@@ -157,7 +157,7 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		lookUpTable.setQualifiers(new String[] { "mapping:q4" });
 
-		externalTableHbase = TableFactory.getPxfHbaseReadableTable("hbase_pxf_external_table", exTableFields, hTable);
+		externalTableHbase = TableFactory.getPxfHBaseReadableTable("hbase_pxf_external_table", exTableFields, hTable);
 
 		/**
 		 * Create external table if not exists
@@ -170,8 +170,6 @@ public class PxfHBaseRegression extends PxfTestCase {
 	/**
 	 * Check Syntax validation, try to create Readable Table without PXF options, expect failure and
 	 * Error message.
-	 * 
-	 * Create Writable Table with all options and expect success.
 	 * 
 	 * @throws Exception
 	 */
@@ -192,15 +190,6 @@ public class PxfHBaseRegression extends PxfTestCase {
 		} catch (Exception e) {
 			ExceptionUtils.validate(report, e, new PSQLException("ERROR: Invalid URI pxf://" + exTable.getHost() + ":" + exTable.getPort() + "/" + exTable.getPath() + "?: invalid option after '?'", null), false);
 		}
-
-		ReportUtils.reportBold(report, getClass(), "Create Writable external table directed to HBase table");
-
-		exTable = TableFactory.getPxfHbaseWritableTable("pxf_writable_extable_validations", new String[] {
-				"a int",
-				"b text",
-				"c bytea" }, hTable);
-
-		hawq.createTableAndVerify(exTable);
 	}
 
 	@Test
@@ -551,7 +540,7 @@ public class PxfHBaseRegression extends PxfTestCase {
 		String whereClause = " WHERE \"cf1:q1\" is null";
 		String filterString = NO_FILTER;
 
-		ExternalTable exTable = TableFactory.getPxfHbaseReadableTable("habse_with_nulls_pxf_external_table", exTableFields, hNullTable);
+		ExternalTable exTable = TableFactory.getPxfHBaseReadableTable("habse_with_nulls_pxf_external_table", exTableFields, hNullTable);
 
 		hNullTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q1".getBytes(), CompareOp.EQUAL, "null".getBytes()));
 		hbase.queryResults(hNullTable, null);
@@ -587,7 +576,7 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		initAndPopulateHBaseTable(hNullTable, true);
 
-		ExternalTable exTable = TableFactory.getPxfHbaseReadableTable("habse_with_nulls_pxf_external_table", exTableFields, hNullTable);
+		ExternalTable exTable = TableFactory.getPxfHBaseReadableTable("habse_with_nulls_pxf_external_table", exTableFields, hNullTable);
 
 		hbase.queryResults(hNullTable, null);
 
@@ -616,7 +605,7 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		ReportUtils.reportBold(report, getClass(), "Succeed to query from external table with full name for q4 field (family and qualifier)");
 
-		ExternalTable exTableUsingFullPathQ4 = TableFactory.getPxfHbaseReadableTable("habse_with_nulls_pxf_external_table", exTableFieldsFullName, hNullTable);
+		ExternalTable exTableUsingFullPathQ4 = TableFactory.getPxfHBaseReadableTable("habse_with_nulls_pxf_external_table", exTableFieldsFullName, hNullTable);
 
 		hNullTable.addFilter(new SingleColumnValueFilter("cf1".getBytes(), "q1".getBytes(), CompareOp.EQUAL, "null".getBytes()));
 		hbase.queryResults(hNullTable, null);
@@ -653,7 +642,7 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		hbase.disableTable(lookUpTable);
 
-		ExternalTable exTableUsingFullPathQ4 = TableFactory.getPxfHbaseReadableTable("habse_lookup_external_table", exTableFieldsFullName, hTable);
+		ExternalTable exTableUsingFullPathQ4 = TableFactory.getPxfHBaseReadableTable("habse_lookup_external_table", exTableFieldsFullName, hTable);
 
 		hTable.setQualifiers(new String[] { "cf1:q1" });
 
@@ -677,7 +666,7 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		initAndPopulateHBaseTable(hTable, false);
 
-		ExternalTable exTableUsingFullPathQ4 = TableFactory.getPxfHbaseReadableTable("habse_lookup_external_table", exTableFieldsFullName, hTable);
+		ExternalTable exTableUsingFullPathQ4 = TableFactory.getPxfHBaseReadableTable("habse_lookup_external_table", exTableFieldsFullName, hTable);
 
 		hTable.setQualifiers(new String[] { "cf1:q1" });
 
@@ -717,7 +706,7 @@ public class PxfHBaseRegression extends PxfTestCase {
 		hIntegerRowKey.addFilter(new RowFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(Bytes.toBytes("00000050"))));
 		hbase.queryResults(hIntegerRowKey, null);
 
-		ExternalTable exTableIntegerRowKey = TableFactory.getPxfHbaseReadableTable("habse_integer_row_key_external_table", recordkeyIntegerFields, hIntegerRowKey);
+		ExternalTable exTableIntegerRowKey = TableFactory.getPxfHBaseReadableTable("habse_integer_row_key_external_table", recordkeyIntegerFields, hIntegerRowKey);
 
 		hawq.createTableAndVerify(exTableIntegerRowKey);
 
@@ -748,7 +737,7 @@ public class PxfHBaseRegression extends PxfTestCase {
 	@Test
 	public void notExistsHBaseTable() throws Exception {
 
-		ReadableExternalTable notExistsTable = TableFactory.getPxfHbaseReadableTable("not_exists_hbase_table", exTableFields, new HBaseTable("not_exists_hbase_table", null));
+		ReadableExternalTable notExistsTable = TableFactory.getPxfHBaseReadableTable("not_exists_hbase_table", exTableFields, new HBaseTable("not_exists_hbase_table", null));
 
 		hawq.createTableAndVerify(notExistsTable);
 
@@ -766,7 +755,7 @@ public class PxfHBaseRegression extends PxfTestCase {
 
 		hbase.createTableAndVerify(emptyTable);
 
-		ReadableExternalTable exTable = TableFactory.getPxfHbaseReadableTable("empty_hbase_table", exTableFieldsFullName, emptyTable);
+		ReadableExternalTable exTable = TableFactory.getPxfHBaseReadableTable("empty_hbase_table", exTableFieldsFullName, emptyTable);
 
 		hawq.createTableAndVerify(exTable);
 		hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName());
