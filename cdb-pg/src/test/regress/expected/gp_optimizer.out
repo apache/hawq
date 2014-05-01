@@ -5,7 +5,7 @@
 SELECT gp_opt_version();
                            gp_opt_version
 ---------------------------------------------------------------------
- GPOPT version: 1.407, GPOS version: 1.100, Xerces version: 3.1.1-p1
+ GPOPT version: 1.408, GPOS version: 1.100, Xerces version: 3.1.1-p1
 (1 row)
 
 -- master only tables
@@ -8046,7 +8046,6 @@ select * from orca.t_date where user_id=9;
 
 set optimizer_enumerate_plans=off;
 set optimizer_enable_constant_expression_evaluation=off;
-set optimizer_print_plan=off;
 drop table if exists orca.t_text;
 NOTICE:  table "t_text" does not exist, skipping
 drop index if exists orca.user_id_idx;
@@ -8099,7 +8098,6 @@ select * from orca.t_text where user_id=9;
 
 set optimizer_enumerate_plans=off;
 set optimizer_enable_constant_expression_evaluation=off;
-set optimizer_print_plan=off;
 -- create a user defined type and only define equality on it
 -- the type can be used in the partitioning list, but Orca is not able to pick a heterogenous index
 -- because constraint derivation needs all comparison operators
@@ -8169,6 +8167,51 @@ select enable_xform('CXformDynamicGet2DynamicTableScan');
  CXformDynamicGet2DynamicTableScan is enabled
 (1 row)
 
+reset optimizer_enable_constant_expression_evaluation;
+-- test that constant expression evaluation works with integers
+drop table if exists orca.t_ceeval_ints;
+NOTICE:  table "t_ceeval_ints" does not exist, skipping
+create table orca.t_ceeval_ints(user_id numeric(16,0), category_id int, tag1 char(5), tag2 char(5))
+distributed by (user_id) 
+partition by list (category_id)
+	(partition part100 values('100') , partition part101 values('101'), partition part103 values('102'));
+NOTICE:  CREATE TABLE will create partition "t_ceeval_ints_1_prt_part100" for table "t_ceeval_ints"
+NOTICE:  CREATE TABLE will create partition "t_ceeval_ints_1_prt_part101" for table "t_ceeval_ints"
+NOTICE:  CREATE TABLE will create partition "t_ceeval_ints_1_prt_part103" for table "t_ceeval_ints"
+create index user_id_ceeval_ints on orca.t_ceeval_ints_1_prt_part101(user_id);
+insert into orca.t_ceeval_ints values(1, 100, 'tag1', 'tag2');
+insert into orca.t_ceeval_ints values(2, 100, 'tag1', 'tag2');	
+insert into orca.t_ceeval_ints values(3, 100, 'tag1', 'tag2');
+insert into orca.t_ceeval_ints values(4, 101, 'tag1', 'tag2');
+insert into orca.t_ceeval_ints values(5, 102, 'tag1', 'tag2');
+set optimizer_enable_constant_expression_evaluation=on;
+set optimizer_use_external_constant_expression_evaluation_for_ints = on;
+set optimizer_enumerate_plans=on;
+set optimizer_plan_id = 4;
+explain select * from orca.t_ceeval_ints where user_id=4;
+                                                  QUERY PLAN                                                   
+---------------------------------------------------------------------------------------------------------------
+ Gather Motion 2:1  (slice1; segments: 2)  (cost=0.00..5.67 rows=1 width=32)
+   ->  Sequence  (cost=0.00..3.63 rows=1 width=32)
+         ->  Result  (cost=0.00..4.66 rows=1 width=32)
+               ->  Function Scan on gp_partition_inverse  (cost=10.00..100.00 rows=50 width=4)
+         ->  Result  (cost=0.00..3.63 rows=1 width=32)
+               ->  Append  (cost=0.00..3.63 rows=1 width=32)
+                     ->  Dynamic Index Scan on t_ceeval_ints  (cost=0.00..1.47 rows=1 width=88)
+                           Index Cond: user_id = 4::numeric
+                     ->  Dynamic Table Scan on t_ceeval_ints (partIndex: 2)  (cost=0.00..1.13 rows=1 width=88)
+                           Filter: user_id = 4::numeric
+ Settings:  optimizer=on
+(11 rows)
+
+select * from orca.t_ceeval_ints where user_id=4;
+ user_id | category_id | tag1  | tag2  
+---------+-------------+-------+-------
+       4 |         101 | tag1  | tag2 
+(1 row)
+
+reset optimizer_enumerate_plans;
+reset optimizer_use_external_constant_expression_evaluation_for_ints;
 reset optimizer_enable_constant_expression_evaluation;
 -- test project elements in TVF
 CREATE FUNCTION orca.csq_f(a int) RETURNS int AS $$ select $1 $$ LANGUAGE SQL;

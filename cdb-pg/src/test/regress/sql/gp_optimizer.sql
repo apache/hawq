@@ -509,7 +509,6 @@ select * from orca.t_date where user_id=9;
 
 set optimizer_enumerate_plans=off;
 set optimizer_enable_constant_expression_evaluation=off;
-set optimizer_print_plan=off;
 
 drop table if exists orca.t_text;
 drop index if exists orca.user_id_idx;
@@ -545,7 +544,6 @@ select * from orca.t_text where user_id=9;
 
 set optimizer_enumerate_plans=off;
 set optimizer_enable_constant_expression_evaluation=off;
-set optimizer_print_plan=off;
 
 -- create a user defined type and only define equality on it
 -- the type can be used in the partitioning list, but Orca is not able to pick a heterogenous index
@@ -590,6 +588,33 @@ explain select * from orca.t_employee where user_id = 2;
 select * from orca.t_employee where user_id = 2;
 select enable_xform('CXformDynamicGet2DynamicTableScan');
 
+reset optimizer_enable_constant_expression_evaluation;
+
+-- test that constant expression evaluation works with integers
+drop table if exists orca.t_ceeval_ints;
+
+create table orca.t_ceeval_ints(user_id numeric(16,0), category_id int, tag1 char(5), tag2 char(5))
+distributed by (user_id) 
+partition by list (category_id)
+	(partition part100 values('100') , partition part101 values('101'), partition part103 values('102'));
+create index user_id_ceeval_ints on orca.t_ceeval_ints_1_prt_part101(user_id);
+
+insert into orca.t_ceeval_ints values(1, 100, 'tag1', 'tag2');
+insert into orca.t_ceeval_ints values(2, 100, 'tag1', 'tag2');	
+insert into orca.t_ceeval_ints values(3, 100, 'tag1', 'tag2');
+insert into orca.t_ceeval_ints values(4, 101, 'tag1', 'tag2');
+insert into orca.t_ceeval_ints values(5, 102, 'tag1', 'tag2');
+
+set optimizer_enable_constant_expression_evaluation=on;
+set optimizer_use_external_constant_expression_evaluation_for_ints = on;
+set optimizer_enumerate_plans=on;
+set optimizer_plan_id = 4;
+
+explain select * from orca.t_ceeval_ints where user_id=4;
+select * from orca.t_ceeval_ints where user_id=4;
+
+reset optimizer_enumerate_plans;
+reset optimizer_use_external_constant_expression_evaluation_for_ints;
 reset optimizer_enable_constant_expression_evaluation;
 
 -- test project elements in TVF

@@ -380,6 +380,7 @@ extern double optimizer_damping_factor_groupby;
 extern int optimizer_segments;
 extern bool optimizer_analyze_root_partition;
 extern bool optimizer_enable_constant_expression_evaluation;
+extern bool optimizer_use_external_constant_expression_evaluation_for_ints;
 extern bool optimizer_enable_bitmapscan;
 /**
  * Enable logging of DPE match in optimizer.

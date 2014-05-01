@@ -719,6 +719,7 @@ double 		optimizer_damping_factor_groupby;
 int			optimizer_segments;
 bool		optimizer_analyze_root_partition;
 bool		optimizer_enable_constant_expression_evaluation;
+bool		optimizer_use_external_constant_expression_evaluation_for_ints;
 bool		optimizer_enable_bitmapscan;
 
 /* Security */
@@ -3817,6 +3818,16 @@ static struct config_bool ConfigureNamesBool[] =
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
 		&optimizer_enable_constant_expression_evaluation,
+		false, NULL, NULL
+	},
+
+	{
+		{"optimizer_use_external_constant_expression_evaluation_for_ints", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Use external constant expression evaluation in the optimizer for all integer types"),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&optimizer_use_external_constant_expression_evaluation_for_ints,
 		false, NULL, NULL
 	},
 
