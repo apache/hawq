@@ -7,15 +7,8 @@ Synopsis
 ******************************************************
 
 gprecoverseg [-p <new_recover_host>[,...]]
-             |-i <recover_config_file> 
-             |-s <filespace_config_file>] 
              [-d <master_data_directory>] [-B <parallel_processes>] 
              [-F] [-a] [-q] [-l <logfile_directory>]
-
-
-gprecoverseg -o <output_recover_config_file> 
-            | -S <output_filespace_config_file> 
-             [-p <new_recover_host>[,...]]
 
 gprecoverseg -? 
 
@@ -25,17 +18,16 @@ gprecoverseg --version
 DESCRIPTION
 ******************************************************
 
-The gprecoverseg utility reactivates a failed segment instance.
-Once gprecoverseg completes this process, the system will be recoveried.
+The gprecoverseg utility reactivates failed segment instances.
+Once gprecoverseg completes this process, the system will be recovered.
 
 A segment instance can fail for several reasons, such as a host failure, 
 network failure, or disk failure. When a segment instance fails, its 
-status is marked as down in the Greenplum Database system catalog, 
+status is marked as down in the HAWQ Database system catalog, 
 and the master will random pickup a segment to process query for a session.
 In order to bring the failed segment instance back into operation again,
 you must first correct the problem that made it fail in the first place, 
-and then recover the segment instance in Greenplum Database 
-using gprecoverseg.
+and then recover the segment instance in HAWQ Database using gprecoverseg.
 
 Segment recovery using gprecoverseg requires that you have at least one
 alive segment to recover from. For systems that do not have alive
@@ -43,43 +35,29 @@ segment do a system restart to bring the segments back online (gpstop -r).
 
 By default, a failed segment is restarted in place, meaning that 
 the system brings the segment back online on the same host and data 
-directory location on which it was originally configured. In 
-this case, use the following format for the recovery configuration file 
-(using -i).
-
-filespaceOrder=[filespace1_fsname[, filespace2_fsname[, ...]]
-<failed_host_address>:<port>:<data_directory> 
+directory location on which it was originally configured. 
 
 If the data directory was removed or damaged, gprecoverseg can
-recovery the data directory (using -F). This reuqires that you have
+recovery the data directory (using -F). This requires that you have
 at least one alive segment to recover from. 
 
 In some cases, the above method may not be possible (for example, if a
 host was physically damaged and cannot be recovered). In this situation, 
 gprecoverseg allows you to recover failed segments to a completely 
-new host (using -p), on an alternative data directory location on 
-your remaining live segment hosts (using -s), or by supplying a 
-recovery configuration file (using -i) in the following format. 
-The word SPACE indicates the location of a required space. Do not 
-add additional spaces.
+new host (using -p). In this senario, to prevent HAWQ getting imbalanced workload,
+all the segments on the failed host should be moved to the new host.
+You must manually kill the other alive segments left on the failed host
+before you try to run gprecoverseg.
 
-filespaceOrder=[filespace1_fsname[, filespace2_fsname[, ...]]
-<failed_host_address>:<port>:<data_directory>SPACE 
-[<recovery_host_address>:<port>:<replication_port>:<data_directory>
-[:<fselocation>:...]]
-
-See the -i option below for details and examples of a recovery
-configuration file.
-
-The new recovery segment host must be pre-installed with the Greenplum 
+The new recovery segment host must be pre-installed with the HAWQ 
 Database software and configured exactly the same as the existing 
 segment hosts. A spare data directory location must exist on all 
 currently configured segment hosts and have enough disk space to 
 accommodate the failed segments.
 
-The recovery process marks the segment as up again in the Greenplum 
+The recovery process marks the segment as up again in the HAWQ 
 Database system catalog. Use the following command to check the
-recover result.
+recovery result.
 
 gpstate
 
@@ -113,85 +91,28 @@ in order to recover the failed segment. The default is to
 only restart the failed segment in-place.
 
 
--i <recover_config_file>
-
-Specifies the name of a file with the details about failed segments to recover. 
-Each line in the file is in the following format. The word SPACE indicates 
-the location of a required space. Do not add additional spaces.
-
-filespaceOrder=<failed_host_address>:<port>:<data_directory>SPACE
-<recovery_host_address>:<port>:<replication_port>:<data_directory>
-
-Comments
-Lines beginning with # are treated as comments and ignored.
-
-Segments to Recover
-Each line after the first specifies a segment to recover. This line can 
-have one of two formats. In the event of in-place recovery, enter one 
-group of colon delimited fields in the line:
-
-failedAddress:failedPort:failedDataDirectory
-
-For recovery to a new location, enter two groups of fields separated by 
-a space in the line. The required space is indicated by SPACE. Do not 
-add additional spaces.
-
-failedAddress:failedPort:failedDataDirectorySPACEnewAddress:newPort:
-newReplicationPort:newDataDirectory
-
-On a system with additional filespaces, the second group of fields 
-is expected to be followed with a list of the corresponding filespace 
-locations separated by additional colons. For example, on a system 
-with two additional filespaces, enter two additional directories 
-in the second group, as follows. The required space is indicated 
-by SPACE. Do not add additional spaces.
-
-failedAddress:failedPort:failedDataDirectory newAddress:newPort:
-newReplicationPort:newDataDirectory:location1:location2
-
-Examples
-
-In-place recovery of a single segment
-
-filespaceOrder=
-sdw1-1:50001:/data1/segment/gpseg16
-
-Recovery of a single segment to a new host
-
-filespaceOrder=
-sdw1-1:50001:/data1/segment/gpseg16SPACE sdw4-1:50001:51001:/data1/recover1/gpseg16
-
-Obtaining a Sample File
-
-You can use the -o option to output a sample recovery configuration file 
-to use as a starting point.
-
 -l <logfile_directory>
 
 The directory to write the log file. Defaults to ~/gpAdminLogs.
-
--o <output_recover_config_file>
-
-Specifies a file name and location to output a sample 
-recovery configuration file. The output file lists the 
-currently invalid segments and their default recovery 
-location in the format that is required by the -i option. 
-Use together with the -p option to output a sample file 
-for recovering to a different host. This file can be 
-edited to supply alternate recovery locations if needed.
 
 
 -p <new_recover_host>[,...]
 
 Specifies a spare host outside of the currently configured 
-Greenplum Database array on which to recover invalid segments. In 
+HAWQ Database array on which to recover invalid segments. In 
 the case of multiple failed segment hosts, you can specify a 
-comma-separated list. The spare host must have the Greenplum Database 
+comma-separated list. The spare host must have the HAWQ Database 
 software installed and configured, and have the same hardware and OS 
 configuration as the current segment hosts (same OS version, locales, 
 gpadmin user account, data directory locations created, ssh keys 
 exchanged, number of network interfaces, network interface naming 
-convention, and so on.).
+convention, and so on.). 
+
+When this option is used, assume the number of
+failed hosts is N, you need to specify N new hosts, and make sure that all the 
+segments on the failed hosts are marked 'down' before run the command.
+If there are still some alive segments on the failed hosts, kill the segments first or
+shutdown the failed hosts.
 
 
 -q (no screen output)
@@ -200,34 +121,15 @@ Run in quiet mode. Command output is not displayed on
 the screen, but is still written to the log file.
 
 
--s <filespace_config_file>
-
-Specifies the name of a configuration file that contains file 
-system locations on the currently configured segment hosts 
-where you can recover failed segment instances. The filespace 
-configuration file is in the format of:
-
-pg_system=default_fselocation 
-
-Note: The -s and -S options are only used when you recover to 
-existing hosts in the cluster. You cannot use these options 
-when you recover to a new host. To recover to a new host, 
-use the -i and -o options.
-
--S <output_filespace_config_file>
-
-Specifies a file name and location to output a sample 
-filespace configuration file in the format that is 
-required by the -s option. This file should be edited 
-to supply the correct alternate filespace locations.
-
 -v (verbose)
 
 Sets logging output to verbose.
 
+
 --version (version)
 
 Displays the version of this utility.
+
 
 -? (help)
 Displays the online help.
@@ -241,17 +143,13 @@ Recover any failed segment instances in place:
 
  $ gprecoverseg
 
+Recreate any failed segment instances in place:
 
-Recover any failed segment instances to a newly configured 
-spare segment host:
+ $ gprecoverseg -F
 
-  $ gprecoverseg -i recover_config_file
+Replace any failed host to a set of new host:
 
-
-Output the default recovery configuration file:
-
-  $ gprecoverseg -o /home/gpadmin/recover_config_file
-
+ $ gprecoverseg -p new1,new2 
 
 ******************************************************
 SEE ALSO
