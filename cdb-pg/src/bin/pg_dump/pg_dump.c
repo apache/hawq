@@ -1062,6 +1062,7 @@ selectDumpableNamespace(NamespaceInfo *nsinfo)
 	else if (strncmp(nsinfo->dobj.name, "pg_", 3) == 0 ||
 			 strcmp(nsinfo->dobj.name, "information_schema") == 0 ||
 			 strcmp(nsinfo->dobj.name, "gp_toolkit") == 0 ||
+			 strcmp(nsinfo->dobj.name, "hawq_toolkit") == 0 ||
 			 strcmp(nsinfo->dobj.name, "madlib") == 0 ||
 			 strcmp(nsinfo->dobj.name, "retail_demo") == 0)
 		nsinfo->dobj.dump = false;
