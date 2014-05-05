@@ -446,9 +446,9 @@ class ValidateInstallPackage(Operation):
         rpm_set = set([self.gppkg.main_rpm] + self.gppkg.dependencies)
         rpm_install_string = ' '.join([os.path.join(TEMP_EXTRACTION_PATH, rpm) for rpm in rpm_set])
         if self.is_update:
-            rpm_install_command = 'rpm --test -U %s --dbpath %s --prefix %s' % (rpm_install_string, RPM_DATABASE, RPM_INSTALLATION_PATH)
+            rpm_install_command = 'rpm --test --nodeps -U %s --dbpath %s --prefix %s' % (rpm_install_string, RPM_DATABASE, RPM_INSTALLATION_PATH)
         else:
-            rpm_install_command = 'rpm --test -i %s --dbpath %s --prefix %s' % (rpm_install_string, RPM_DATABASE, RPM_INSTALLATION_PATH)
+            rpm_install_command = 'rpm --test --nodeps -i %s --dbpath %s --prefix %s' % (rpm_install_string, RPM_DATABASE, RPM_INSTALLATION_PATH)
         cmd = Command('Validating rpm installation', rpm_install_command)
         logger.info(cmd)        # TODO: AK: This should be debug(), but RMI cannot propagate a log level.
 
@@ -685,9 +685,9 @@ class InstallPackageLocally(Operation):
 
         if rpm_set:
             if self.is_update:
-                rpm_install_command = 'rpm -U %s --dbpath %s --prefix=%s'
+                rpm_install_command = 'rpm -U --nodeps %s --dbpath %s --prefix=%s'
             else:
-                rpm_install_command = 'rpm -i %s --dbpath %s --prefix=%s'
+                rpm_install_command = 'rpm -i --nodeps %s --dbpath %s --prefix=%s'
             rpm_install_command = rpm_install_command % \
                                   (" ".join([os.path.join(TEMP_EXTRACTION_PATH, rpm) for rpm in rpm_set]), 
                                    RPM_DATABASE, 

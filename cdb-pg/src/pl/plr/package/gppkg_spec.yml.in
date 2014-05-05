@@ -5,5 +5,6 @@ Version: 1.2
 GPDBVersion: 1.2.1.0
 Description: Provides a procedural language implementation of R for the Hawq Database. 
 PostInstall:
-- Master: "echo 'Please source your $GPHOME/greenplum_path.sh file and restart the database.';
-          echo 'You can enable PL/R by running createlang plr -d mydatabase.';"
+- Master: "echo 'POST INSTALL STEPS:';
+          echo '1. Source $GPHOME/greenplum_path.sh file and restart the cluster.';
+          echo '2. Run: psql $GPHOME/share/postgresql/contrib/plr.plr.sql -d [database].';"

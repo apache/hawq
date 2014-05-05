@@ -1521,8 +1521,8 @@ else
 GPPKG_SOURCES = \
 	cdb-pg/contrib/pgcrypto \
 	cdb-pg/src/pl/pljava \
+	cdb-pg/src/pl/plr \
     $(NULL)
-	#cdb-pg/src/pl/plr \
 	#cdb-pg/contrib/postgis \
 	#cdb-pg/src/pl/plperl \
 	#cdb-pg/src/bin/pg_dump/cdb/ddboost \

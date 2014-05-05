@@ -26,5 +26,6 @@ include $(BLD_TOP)/releng/gppkg.mk
 gppkg:
 	$(MAKE) $(PLJAVA_RPM) RPM_FLAGS=$(PLJAVA_RPM_FLAGS)
 	$(MAKE) $(PLJAVA_GPPKG) MAIN_RPM=$(PLJAVA_RPM)
+	cp pljava*.gppkg pljava.gppkg
 
 .PHONY: gppkg
