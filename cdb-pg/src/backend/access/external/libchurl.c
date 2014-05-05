@@ -745,9 +745,9 @@ void check_response_code(churl_context* context)
 			appendStringInfo(&err, "remote component error (%ld)", response_code);
 
 			/* add dest ip and port, if any, and curl was nice to tell us */
-			if (response_code != 0 &&
-				CURLE_OK == curl_easy_getinfo(context->curl_handle, CURLINFO_PRIMARY_IP, &dest_ip) &&
-				CURLE_OK == curl_easy_getinfo(context->curl_handle, CURLINFO_PRIMARY_PORT, &dest_port))
+			if (CURLE_OK == curl_easy_getinfo(context->curl_handle, CURLINFO_PRIMARY_IP, &dest_ip) &&
+				CURLE_OK == curl_easy_getinfo(context->curl_handle, CURLINFO_PRIMARY_PORT, &dest_port) &&
+				dest_ip && dest_port)
 			{
 				appendStringInfo(&err, " from '%s:%ld'", dest_ip, dest_port);
 			}

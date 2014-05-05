@@ -52,7 +52,7 @@ parse_datanodes_response(List *rest_srvrs, StringInfo rest_buf)
 	/* obtain host/port data for the REST server running on each HDFS data node */
 	for (int i = 0; i < length; i++)
 	{
-		DataNodeRestSrv* srv = (DataNodeRestSrv*)palloc(sizeof(DataNodeRestSrv));
+		PxfServer* srv = (PxfServer*)palloc(sizeof(PxfServer));
 
 		struct json_object *js_node = json_object_array_get_idx(nodes, i);
 		struct json_object *js_host = json_object_object_get(js_node, "host");
@@ -102,13 +102,13 @@ free_datanode_rest_servers(List *srvrs)
 	ListCell *srv_cell = NULL;
 	foreach(srv_cell, srvrs)
 	{
-		DataNodeRestSrv* srv = (DataNodeRestSrv*)lfirst(srv_cell);
+		PxfServer* srv = (PxfServer*)lfirst(srv_cell);
 		free_datanode_rest_server(srv);
 	}
 	list_free(srvrs);
 }
 
-void free_datanode_rest_server(DataNodeRestSrv* srv)
+void free_datanode_rest_server(PxfServer* srv)
 {
 	if (srv->host)
 		pfree(srv->host);

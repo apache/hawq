@@ -607,7 +607,9 @@ show_allow_system_table_mods(void);
 bool   pxf_enable_filter_pushdown = true;
 bool   pxf_enable_stat_collection = true;
 bool   pxf_enable_locality_optimizations = true;
-bool   pxf_local_storage = true;
+bool   pxf_local_storage = true; /* temporary GUC */
+int    pxf_service_port = 51200; /* temporary GUC */
+bool   pxf_service_singlecluster = false;
 char   *pxf_remote_service_login = NULL;
 char   *pxf_remote_service_secret = NULL;
 
@@ -3774,13 +3776,24 @@ static struct config_bool ConfigureNamesBool[] =
 	
 	{
 		{"pxf_local_storage", PGC_POSTMASTER, EXTERNAL_TABLES,
-			gettext_noop("Is PXF target storage system local or remote?"),
-			NULL
+			gettext_noop("Indicates whether PXF target storage system is local or remote."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
 		&pxf_local_storage,
 		true, NULL, NULL
     },
 	
+	{
+		{"pxf_service_singlecluster", PGC_POSTMASTER, EXTERNAL_TABLES,
+			gettext_noop("Indicates whether PXF runs on SingleCluster."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&pxf_service_singlecluster,
+		false, NULL, NULL
+    },
+
 	{
 		{"gp_disable_catalog_access_on_segment", PGC_USERSET, DEVELOPER_OPTIONS,
 		 gettext_noop("Disables non-builtin object access on segments"),
@@ -5755,6 +5768,16 @@ static struct config_int ConfigureNamesInt[] =
 		0, 0, INT_MAX, NULL, NULL
 	},
 	
+	{
+		{"pxf_service_port", PGC_POSTMASTER, EXTERNAL_TABLES,
+			gettext_noop("PXF service port"),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&pxf_service_port,
+		51200, 1, 65535, NULL, NULL
+	},
+
 	/* End-of-list marker */
 	{
 		{NULL, 0, 0, NULL, NULL}, NULL, 0, 0, 0, NULL, NULL

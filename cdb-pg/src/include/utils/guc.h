@@ -394,9 +394,23 @@ extern bool   pxf_enable_locality_optimizations; /* turn locality optimization i
  * Is the target storage system local or remote?
  * local - if hawq segments are collocated with the datanodes (e.g, PHD), 
  * remote - if hawq segments and datanodes are on separate physical servers (e.g Isilon)
+ * NOTE: This is a temporary GUC, until local storage (Jetty) is removed.
  */
 extern bool   pxf_local_storage;
-
+/*
+ * PXF service port, used when the storage system is not local
+ * (pxf_local_storage = false). Default value (for tcserver) 51200.
+ * This GUC can be changed only on startup.
+ * NOTE: This is a temporary GUC, until the port will be read from a conf file.
+ */
+extern int    pxf_service_port;
+/*
+ * A development GUC to use with single cluster.
+ * When true, call several PXF instances residing on the same
+ * host, but assuming that their ports are incremented consecutively
+ * starting from pxf_service_port port.
+ */
+extern bool   pxf_service_singlecluster;
 /*
  * Temporary GUCs to forward login/password information to PXF
  * connector. These can be used to access remote services requiring

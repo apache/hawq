@@ -32,11 +32,11 @@ typedef struct sClientContext
 	StringInfoData the_rest_buf; 	/* contains the complete HTTP response 	*/
 } ClientContext;
 
-typedef struct sDataNodeRestSrv
+typedef struct sPxfServer
 {
 	char *host;
 	int port;
-} DataNodeRestSrv;
+} PxfServer;
 
 /*
  * A DataFragment instance contains the fragment data necessary
@@ -63,7 +63,7 @@ typedef struct sFragmentHost
 extern void process_request(ClientContext* client_context, char *uri);
 extern List* get_datanode_rest_servers(GPHDUri *hadoop_uri, ClientContext* client_context);
 extern void free_datanode_rest_servers(List *srvrs);
-extern void free_datanode_rest_server(DataNodeRestSrv* srv);
+extern void free_datanode_rest_server(PxfServer* srv);
 extern PxfStatsElem *get_data_statistics(GPHDUri* hadoop_uri, ClientContext *cl_context, StringInfo err_msg);
 extern List* get_data_fragment_list(GPHDUri *hadoop_uri,  ClientContext* client_context);
 extern void free_fragment(DataFragment *fragment);

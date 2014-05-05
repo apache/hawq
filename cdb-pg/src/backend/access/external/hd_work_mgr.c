@@ -16,6 +16,7 @@
 #include "access/libchurl.h"
 #include "access/pxfheaders.h"
 #include "access/pxffilters.h"
+#include "access/pxfutils.h"
 #include "cdb/cdbfilesystemcredential.h"
 #include "cdb/cdbutil.h"
 #include "cdb/cdbvars.h"
@@ -96,7 +97,6 @@ static List* do_segment_clustering_by_host(void);
 static ListCell* pick_random_cell_in_list(List* list);
 static void clean_gphosts_list(List *hosts_list);
 static AllocatedDataFragment* create_allocated_fragment(DataFragment *fragment);
-static bool are_ips_equal(char *ip1, char *ip2);
 static char** create_output_strings(List **allocated_fragments, int total_segs);
 static void assign_remote_port_to_fragments(int remote_rest_port, List *fragments);
 static void generate_delegation_token(PxfInputData *inputData);
@@ -135,6 +135,7 @@ char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs, Rela
 	GPHDUri* hadoop_uri = init(uri, &client_context, GPHDURI_DONT_WARN);
 	if (!hadoop_uri)
 		return (char**)NULL;
+
 	/*
 	 * Enrich the curl HTTP header
 	 */
@@ -162,7 +163,7 @@ char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs, Rela
 	if (pxf_local_storage)
 		assign_rest_ports_to_fragments(&client_context, hadoop_uri, data_fragments);
 	else 
-		assign_remote_port_to_fragments(atoi(hadoop_uri->port), data_fragments);
+		assign_remote_port_to_fragments(pxf_service_port, data_fragments);
 
 	/* debug - enable when tracing */
 	print_fragment_list(data_fragments);
@@ -199,11 +200,27 @@ static void assign_remote_port_to_fragments(int remote_rest_port, List *fragment
 	{
 		ListCell 		*host_c 		= NULL;
 		DataFragment 	*fragdata	= (DataFragment*)lfirst(frag_c);
+		char* ip = NULL;
+		int port = remote_rest_port;
 		
 		foreach(host_c, fragdata->replicas)
 		{
 			FragmentHost *fraghost = (FragmentHost*)lfirst(host_c);
-			fraghost->rest_port = remote_rest_port;
+			/* In case there are several fragments on the same host, we assume
+			 * there are multiple DN residing together.
+			 * The port is incremented by one, to match singlecluster convention */
+			if (pxf_service_singlecluster)
+			{
+				if (ip == NULL)
+				{
+					ip = fraghost->ip;
+				}
+				else if (are_ips_equal(ip, fraghost->ip))
+				{
+					port++;
+				}
+			}
+			fraghost->rest_port = port;
 		}
 	}	
 }
@@ -267,6 +284,14 @@ static GPHDUri* init(char* uri, ClientContext* cl_context, bool warn_on_deprecat
 	 */
 	GPHDUri* hadoop_uri = parseGPHDUri(uri, warn_on_deprecation);
 	
+	/* if pxf_local_storage is false, ignore the port in the uri
+	 * and use pxf_service_port instead to access PXF.
+	 */
+	if (!pxf_local_storage)
+	{
+		sprintf(hadoop_uri->port, "%d", pxf_service_port);
+	}
+
 	/*
 	 * 2. Communication with the Hadoop back-end
 	 *    Initialize churl client context and header
@@ -419,10 +444,8 @@ distribute_work_2_gp_segments(List *whole_data_fragments_list, int total_segs, i
 			
 			/* 
 			 * locality logic depends on whether we require optimizations (pxf_enable_locality_optimizations guc)
-			 * and on whether the target storage system is local (pxf_local_storage). ex: plain hdfs is local while 
-			 * hdfs on isilon is remote
 			 */
-			if (pxf_enable_locality_optimizations && pxf_local_storage)
+			if (pxf_enable_locality_optimizations)
 			{
 				foreach(datanode_cell, allDNProcessingLoads) /* an attempt at locality - try and find a datanode sitting on the same host with the segment */
 				{
@@ -443,22 +466,13 @@ distribute_work_2_gp_segments(List *whole_data_fragments_list, int total_segs, i
 						 found_dn->dataNodeIp, host_ip);
 			}
 			
-			if (!found_dn) /* there is No datanode found at the head of allDNProcessingLoads, it means we just finished the blocks*/
+			if (!found_dn) /* there is no datanode found at the head of allDNProcessingLoads, it means we just finished the blocks*/
 				break;
 			
 			/* we have a datanode */
 			while ( (block_cell = list_head(found_dn->datanodeBlocks)) )
 			{
 				AllocatedDataFragment* allocated = (AllocatedDataFragment*)lfirst(block_cell);
-				/* 
-				 * in case of remote storage, the segment host is also where the PXF will be running
-				 * so we set allocated->host accordingly, instead of the remote storage system - datanode ip.
-				 */
-				if (!pxf_local_storage) 
-				{
-					pfree(allocated->host);
-					allocated->host = pstrdup(host_ip);
-				}
 				allocatedBlocksPerSegment = lappend(allocatedBlocksPerSegment, allocated);
 				
 				found_dn->datanodeBlocks = list_delete_first(found_dn->datanodeBlocks);
@@ -722,13 +736,6 @@ static DatanodeProcessingLoad* get_dn_processing_load(List **allDNProcessingLoad
 	return dn_found;
 }
 
-/* checks if two ip strings are equal */
-static bool
-are_ips_equal(char *ip1, char *ip2)
-{
-	return (strcmp(ip1, ip2) == 0);
-}
-
 /*
  * Create the output string from the allocated fragments list
  */
@@ -812,7 +819,7 @@ find_datanode_rest_server_port(List *rest_servers, char *host)
 
 	foreach(lc, rest_servers)
 	{
-		DataNodeRestSrv *rest_srv = (DataNodeRestSrv*)lfirst(lc);
+		PxfServer *rest_srv = (PxfServer*)lfirst(lc);
 		if (are_ips_equal(rest_srv->host, host))
 			return rest_srv->port;
 	}
@@ -870,7 +877,8 @@ print_fragment_list(List *fragments)
 	StringInfoData log_str;
 	initStringInfo(&log_str);
 
-	appendStringInfo(&log_str, "Fragment list: (%d elements)\n", fragments ? fragments->length : 0);
+	appendStringInfo(&log_str, "Fragment list: (%d elements, pxf_local_storage = %s)\n",
+			fragments ? fragments->length : 0, pxf_local_storage ? "true" : "false");
 
 	foreach(fragment_cell, fragments)
 	{

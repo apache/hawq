@@ -421,7 +421,7 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 		try {
 			hawq.insertData(dataTable, weTable);
 		} catch (PSQLException e) {
-			ExceptionUtils.validate(report, e, new PSQLException("ERROR: remote component error \\(0\\): " + "(Failed connect to " + weTable.getHost() + ":12345; Connection refused|couldn't connect to host).*?", null), true);
+			ExceptionUtils.validate(report, e, new PSQLException("ERROR: remote component error \\(0\\) from '.*?:\\d+': " + "(Failed connect to " + weTable.getHost() + ":12345; Connection refused|couldn't connect to host).*?", null), true);
 		}
 	}
 

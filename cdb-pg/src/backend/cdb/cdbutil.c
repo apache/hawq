@@ -64,7 +64,7 @@ struct segment_ip_cache_entry {
  *
  *
  * Storage for the SegmentInstances block and all subsidiary
- * strucures are allocated from the caller's context.
+ * structures are allocated from the caller's context.
  */
 CdbComponentDatabases *
 getCdbComponentInfo(bool DNSLookupAsError)

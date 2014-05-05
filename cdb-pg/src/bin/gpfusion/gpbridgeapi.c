@@ -4,6 +4,7 @@
 #include "access/pxfuriparser.h"
 #include "access/pxfheaders.h"
 #include "access/pxfmasterapi.h"
+#include "access/pxfutils.h"
 #include "cdb/cdbvars.h"
 #include "cdb/cdbtm.h"
 #include "cdb/cdbfilesystemcredential.h"
@@ -33,13 +34,13 @@ void	append_churl_header_if_exists(gphadoop_context* context,
 void    set_current_fragment_headers(gphadoop_context* context);
 void	gpbridge_import_start(PG_FUNCTION_ARGS);
 void	gpbridge_export_start(PG_FUNCTION_ARGS);
-DataNodeRestSrv* get_pxf_server(GPHDUri* gphd_uri, const Relation rel);
+PxfServer* get_pxf_server(GPHDUri* gphd_uri, const Relation rel);
 size_t	gpbridge_read(PG_FUNCTION_ARGS);
 size_t	gpbridge_write(PG_FUNCTION_ARGS);
 void	parse_gphd_uri(gphadoop_context* context, bool is_import, PG_FUNCTION_ARGS);
 void	build_uri_for_read(gphadoop_context* context);
 void 	build_file_name_for_write(gphadoop_context* context);
-void 	build_uri_for_write(gphadoop_context* context, DataNodeRestSrv* rest_server);
+void 	build_uri_for_write(gphadoop_context* context, PxfServer* rest_server);
 size_t	fill_buffer(gphadoop_context* context, char* start, size_t size);
 void	add_delegation_token(PxfInputData *inputData);
 void	free_token_resources(PxfInputData *inputData);
@@ -232,7 +233,7 @@ void gpbridge_export_start(PG_FUNCTION_ARGS)
 
 	/* get rest servers list and choose one */
 	Relation rel = EXTPROTOCOL_GET_RELATION(fcinfo);
-	DataNodeRestSrv* rest_server = get_pxf_server(context->gphd_uri, rel);
+	PxfServer* rest_server = get_pxf_server(context->gphd_uri, rel);
 
 	if (!rest_server)
 		ereport(ERROR,
@@ -267,16 +268,18 @@ static void init_client_context(ClientContext *client_context)
 
 /*
  * get list of data nodes' rest servers,
- * and choose one (based on modulo segment id)
+ * and choose one (based on modulo segment id).
+ * if pxf_local_storage is false, use the pxf_service_port port.
  * TODO: add locality
  */
-DataNodeRestSrv* get_pxf_server(GPHDUri* gphd_uri, const Relation rel)
+PxfServer* get_pxf_server(GPHDUri* gphd_uri, const Relation rel)
 {
-
 	ClientContext client_context; /* holds the communication info */
 	PxfInputData inputData = {0};
 	List	 	*rest_servers = NIL;
-	DataNodeRestSrv *found_server = NULL, *ret_server = NULL;
+	ListCell 	*rest_server_c = NULL;
+	PxfServer *found_server = NULL, *ret_server = NULL;
+	char		*server_ip = NULL;
 	int 		 server_index = 0;
 
 	Assert(gphd_uri);
@@ -289,6 +292,14 @@ DataNodeRestSrv* get_pxf_server(GPHDUri* gphd_uri, const Relation rel)
 	churl_headers_append(client_context.http_headers, REST_HEADER_JSON_RESPONSE, NULL);
 	if (!client_context.http_headers)
 		return NULL;
+
+	/* if pxf_local_storage is false, ignore the port in the uri
+	 * and use pxf_service_port instead to access PXF.
+	 */
+	if (!pxf_local_storage)
+	{
+		sprintf(gphd_uri->port, "%d", pxf_service_port);
+	}
 
 	/*
 	 * Enrich the curl HTTP header
@@ -303,13 +314,39 @@ DataNodeRestSrv* get_pxf_server(GPHDUri* gphd_uri, const Relation rel)
 	/* send request */
 	rest_servers = get_datanode_rest_servers(gphd_uri, &client_context);
 
+	/* for remote service, use pxf_service_port port */
+	if (!pxf_local_storage)
+	{
+		int port = pxf_service_port;
+
+		foreach(rest_server_c, rest_servers)
+		{
+			PxfServer *rest_server = (PxfServer*)lfirst(rest_server_c);
+			/* In case there are several rest servers on the same host, we assume
+			 * there are multiple DN residing together.
+			 * The port is incremented by one, to match singlecluster convention */
+			if (pxf_service_singlecluster)
+			{
+				if (server_ip == NULL)
+				{
+					server_ip = rest_server->host;
+				}
+				else if (are_ips_equal(server_ip, rest_server->host))
+				{
+					port++;
+				}
+			}
+			rest_server->port = port;
+		}
+	}
+
 	/* choose server by segment id */
 	server_index = Gp_segment % list_length(rest_servers);
 	elog(DEBUG3, "get_pxf_server: server index %d, segment id %d, rest servers number %d",
 			server_index, Gp_segment, list_length(rest_servers));
 
-	found_server = (DataNodeRestSrv*)list_nth(rest_servers, server_index);
-	ret_server = (DataNodeRestSrv*)palloc(sizeof(DataNodeRestSrv));
+	found_server = (PxfServer*)list_nth(rest_servers, server_index);
+	ret_server = (PxfServer*)palloc(sizeof(PxfServer));
 	ret_server->host = pstrdup(found_server->host);
 	ret_server->port = found_server->port;
 
@@ -410,7 +447,7 @@ void build_file_name_for_write(gphadoop_context* context)
 	elog(DEBUG2, "pxf: file name for write: %s", context->write_file_name.data);
 }
 
-void build_uri_for_write(gphadoop_context* context, DataNodeRestSrv* rest_server )
+void build_uri_for_write(gphadoop_context* context, PxfServer* rest_server )
 {
 	appendStringInfo(&context->uri, "http://%s:%d/%s/%s/Writable/stream?path=%s",
 					 rest_server->host, rest_server->port,

@@ -44,7 +44,8 @@ pxfuriparser_REAL_OBJS=$(COMMON_REAL_OBJS) \
     $(top_srcdir)/src/backend/nodes/value.o
 hd_work_mgr_REAL_OBJS=$(COMMON_REAL_OBJS) \
 	$(top_srcdir)/src/backend/cdb/cdbutil.o \
-	$(top_srcdir)/src/backend/access/external/pxfuriparser.o
+	$(top_srcdir)/src/backend/access/external/pxfuriparser.o \
+	$(top_srcdir)/src/backend/access/external/pxfutils.o
 
 # numutils for pg_ltoa
 pxfheaders_REAL_OBJS=$(COMMON_REAL_OBJS) \
