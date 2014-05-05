@@ -792,7 +792,7 @@ static Datum AddDefaultPageRowGroupSize(Datum relOptions, List *defList){
 	bool pageSizeSet = false;
 	bool rowgroupSizeSet = false;
 	bool parquetTable = false;
-
+	bool need_free_arg = false;
 	if(defList == NIL)
 		return relOptions;
 
@@ -815,7 +815,7 @@ static Datum AddDefaultPageRowGroupSize(Datum relOptions, List *defList){
 				insist_log(false, "syntax not correct, orientation should has corresponding value");
 			}
 
-			if(pg_strcasecmp("parquet", defGetString(def)) == 0)
+			if(pg_strcasecmp("parquet", defGetString(def, &need_free_arg)) == 0)
 			{
 				parquetTable = true;
 			}

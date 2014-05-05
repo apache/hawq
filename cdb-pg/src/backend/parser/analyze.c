@@ -1759,7 +1759,7 @@ form_default_storage_directive(List *enc)
 	bool	parquetTable = false;
 	bool	pagesizeSet = false;
 	bool	rowgroupsizeSet = false;
-
+	bool	need_free_arg = false;
 	foreach(lc, enc)
 	{
 		DefElem *el = lfirst(lc);
@@ -1781,10 +1781,10 @@ form_default_storage_directive(List *enc)
 		{
 			if(el->arg == NULL)
 				insist_log(false, "syntax not correct, orientation should has corresponding value");
-			if (pg_strcasecmp("column", defGetString(el)) == 0){
+			if (pg_strcasecmp("column", defGetString(el, &need_free_arg)) == 0){
 				continue;
 			}
-			if (pg_strcasecmp("parquet", defGetString(el)) == 0)
+			if (pg_strcasecmp("parquet", defGetString(el, &need_free_arg)) == 0)
 				parquetTable = true;
 		}
 		if (pg_strcasecmp("pagesize", el->defname) == 0)
