@@ -11,8 +11,5 @@ bin=$root/bin
 
 for (( i=0; i < $SLAVES; i++ ))
 do
-	$bin/hadoop-datanode.sh stop $i | sed "s/^/node $i: /"
+	$bin/pxf-instance.sh stop $i | sed "s/^/node $i: /"
 done
-
-# Stop NameNode
-$HADOOP_SBIN/hadoop-daemon.sh --config $HADOOP_CONF stop namenode | sed "s/^/master: /"

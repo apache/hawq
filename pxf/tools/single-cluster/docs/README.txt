@@ -66,6 +66,11 @@ CentOS
 7. Changes
 ==========
 
+v1.8
+----
+
+- GPSQL-2072: Add tcServer for future PXF integration
+
 v1.7.8
 ------
 

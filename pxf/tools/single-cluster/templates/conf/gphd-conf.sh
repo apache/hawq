@@ -5,6 +5,7 @@ export HADOOP_STORAGE_ROOT=$STORAGE_ROOT/hadoop
 export ZOOKEEPER_STORAGE_ROOT=$STORAGE_ROOT/zookeeper
 export HBASE_STORAGE_ROOT=$STORAGE_ROOT/hbase
 export HIVE_STORAGE_ROOT=$STORAGE_ROOT/hive
+export PXF_STORAGE_ROOT=$STORAGE_ROOT/pxf
 
 # settings
 export SLAVES=3
@@ -26,6 +27,9 @@ export START_YARN_HISTORY_SERVER=false
 
 # Automatically start Hive Metastore server
 export START_HIVEMETASTORE=true
+
+# Automatically start PXF service
+export START_PXF=false
 
 # These settings go into all HBase's, Hadoop's JVMs
 export COMMON_JAVA_OPTS=${COMMON_JAVA_OPTS}

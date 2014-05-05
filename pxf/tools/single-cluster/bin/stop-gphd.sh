@@ -16,6 +16,11 @@ if [ "$START_HBASE" == "true" ]; then
 	$bin/stop-zookeeper.sh
 fi
 
+if [ "$START_PXF" == "true" ]; then
+	echo Stopping PXF...
+	$bin/stop-pxf.sh
+fi
+
 if [ "$START_YARN" == "true" ]; then
 	echo Stopping YARN...
 	$bin/stop-yarn.sh

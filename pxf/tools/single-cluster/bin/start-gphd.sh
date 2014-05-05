@@ -22,6 +22,10 @@ if [ "$START_HIVEMETASTORE" == "true" ]; then
 	$bin/start-hive.sh || exit 1
 fi
 
+if [ "$START_PXF" == "true" ]; then
+	$bin/start-pxf.sh || exit 1
+fi
+
 if [ "$START_HBASE" != "true" ]; then
 	echo HBase wont be started
 	exit 0

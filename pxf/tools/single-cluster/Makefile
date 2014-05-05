@@ -67,8 +67,12 @@ merge_pxf:
 		rmdir $$X; \
 	done;
 
+.PHONY: rename_tcserver
+rename_tcserver:
+	mv `echo $(BUILDROOT)/vfabric-tc-server-*` $(BUILDROOT)/tcserver
+
 .PHONY: extract_products
-extract_products: $(EXTRACTEDTARS) extract_stack merge_pxf
+extract_products: $(EXTRACTEDTARS) extract_stack merge_pxf rename_tcserver
 	for X in $(BUILDROOT)/*-[0-9]*; do \
 		mv $$X `echo $$X | sed -e 's/^\($(BUILDROOT)\/[A-Za-z0-9]*\).*$$/\1/'`; \
 	done;

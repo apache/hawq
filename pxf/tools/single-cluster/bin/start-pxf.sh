@@ -16,13 +16,8 @@ if [ $? -ne 0 ]; then
 	exit 1
 fi
 
-# Hadoop
-# Start NameNode
-echo Starting HDFS...
-$HADOOP_SBIN/hadoop-daemon.sh --config $HADOOP_CONF start namenode | sed "s/^/master: /"
-
-# Start DataNodes
+# Start PXF
 for (( i=0; i < $SLAVES; i++ ))
 do
-	$bin/hadoop-datanode.sh start $i | sed "s/^/node $i: /"
+	$bin/pxf-instance.sh start $i | sed "s/^/node $i: /"
 done

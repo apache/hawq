@@ -29,6 +29,7 @@ export HBASE_ROOT=$GPHD_ROOT/hbase
 export ZOOKEEPER_ROOT=$GPHD_ROOT/zookeeper
 export PXF_ROOT=$GPHD_ROOT/pxf
 export HIVE_ROOT=$GPHD_ROOT/hive
+export TCSERVER_ROOT=$GPHD_ROOT/tcserver
 
 export LOGS_ROOT=$STORAGE_ROOT/logs
 export PIDS_ROOT=$STORAGE_ROOT/pids
