@@ -36,3 +36,5 @@ Linux GCC
 Linux\ GCC
 pgcrypto.tgz
 *.class
+
+cdb-pg/src/test/regress/data/upgrade12/upg2_catupgrade_121.sql

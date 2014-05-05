@@ -39,7 +39,6 @@ __version__ = '$Revision$'
 # ============================================================================
 import sys, os
 EXECNAME = os.path.split(__file__)[-1]
-
 # ============================================================================
 # Python version 2.6.2 is expected, must be between 2.5-3.0
 # ============================================================================
@@ -55,6 +54,7 @@ import optparse                          # Option Parsing
 import subprocess                        # Calling external processes
 import traceback                         # exception logging
 import re
+import commands
 from time import strftime
 try:
     from gppylib import gphostcache
@@ -309,7 +309,7 @@ def pingurl(url):
         return False
 
 # ============================================================================
-def getdir(prompt, hosts=[], primary=None, shared=False):
+def getdir(prompt, hosts=[], primary=None, shared=False, fsysn=None, db=None):
     '''
     getdir(prompt, hosts)
 
@@ -325,15 +325,57 @@ def getdir(prompt, hosts=[], primary=None, shared=False):
         value = getstring(prompt)
         if len(value) == 0:
             continue
-
-        # shared filespace
         if shared:
-            # TODO: check dfs uri 
-            #if not pingurl(value):
-            #    print "Must specify a filespace path, such as: 'host:port/dir'"
-            #    continue
-            return value
+            # TODO: check dfs uri
+            try:
+                cursor = dbconn.execSQL(db, "show enable_secure_filesystem")
+                db.commit()  # Should move into execSQL ?
+                rows = cursor.fetchall()
+                krbstatus = rows[0][0]
+                
+                cursor = dbconn.execSQL(db, "show krb_server_keyfile")
+                db.commit()
+                rows = cursor.fetchall();
+                krb_keyfile = rows[0][0]
 
+            except Exception, e:
+                raise GPDatabaseError(str(e))
+
+            dfs_name = fsysn
+            dfs_url = value
+            
+            command = "gpcheckhdfs %s %s %s %s" % (dfs_name, dfs_url, krbstatus, krb_keyfile)
+            (status,returnCode) = commands.getstatusoutput(command)
+            if status != 0:
+                print command
+            if 1 == status:
+                print "gpcheckhdfs run error,Please check: %s" % (command)
+                continue
+            elif 100 == status:
+                print "Failed to Connect to %s://%s" % (dfs_name, dfs_url)
+                continue
+            elif 101 == status:
+                print "Failed to Open or Write a File in HDFS"
+                continue
+            elif 102 == status:
+                print "Failed to Write File to HDFS"
+                continue
+            elif 103 == status:
+                print "Failed to Flush,Check your Datanode"
+                continue
+            elif 104 == status:
+                print "Failed to Delete a File."
+                continue
+            elif 105 == status:
+                print "DFS Directory Error"
+                continue
+            elif 106 == status:
+                print "Get Delegation Token Error"
+                continue
+            elif 107 == status:
+                print "Failed to Login to Kerberos Server"
+                continue
+            return value
         if not os.path.isabs(value):
             print "Must specify a full path"
             continue
@@ -743,8 +785,7 @@ class GPFilespace:
 
         self.dburl = dburl
         self.db    = conn
-
-
+	
     # --------------------------------------------------------------------
     def close_conn(self):
         if self.db:
@@ -1049,7 +1090,7 @@ class GPFilespace:
             if (nprimary > 0):
                 print "\nPlease specify the DFS location for the segments (for example: localhost:9000/fs)"
                 prompt = "location> "
-                dir = getdir(prompt, config.hosts, primary=True, shared=shared_filespace)
+                dir = getdir(prompt, config.hosts, primary=True, shared=shared_filespace, fsysn=fsysname, db=self.db) 
                 for i in range(nprimary):
                     prompt = "primary location %d> " % (i+1)
                     config.set_primary(dir)
@@ -1061,7 +1102,7 @@ class GPFilespace:
                     "segments, one per line:" % nmirror
                 for i in range(nmirror):
                     prompt = "mirror location %d> " % (i+1)
-                    dir = getdir(prompt, config.hosts, primary=False, shared=shared_filespace)
+                    dir = getdir(prompt, config.hosts, primary=False, shared=shared_filespace, fsysn=fsysname, db=self.db)
                     config.set_mirror(dir)
                     logger.debug("%s %s" % (prompt, dir))
 
@@ -1097,7 +1138,7 @@ class GPFilespace:
         else:
             print "\nEnter a file system location for the master"
             prompt = "master location> "
-            masterdir = getdir(prompt, [masterhost])
+            masterdir = getdir(prompt, [masterhost], fsysn=fsysname, db=self.db)
         logger.debug("%s %s" % (prompt, masterdir))
 
         # Write out the information to a configuration file

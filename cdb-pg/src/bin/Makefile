@@ -17,7 +17,7 @@ DIRS = initdb ipcclean pg_ctl pg_dump \
 	psql scripts pg_config pg_controldata pg_resetxlog \
 	gpfilesystem/hdfs \
 	gpmirrortransition gpupgrade \
-    gpfusion gp_workfile_mgr
+    gpfusion gp_workfile_mgr gpcheckhdfs
 #gpmapreduce 
 
 #ifeq ($(enable_snmp),yes)

@@ -546,6 +546,54 @@ CHK_PARAMS () {
 		LOG_MSG "[INFO]:-End Function $FUNCNAME"
 }
 
+#*****************************************************
+# Hdfs Check Error Code
+#*****************************************************
+
+GPCHKHDFS_ERR=1
+CONNECT_ERR=100
+OPENFILE_ERR=101
+WRITEFILE_ERR=102
+FLUSH_ERR=103
+DELETE_ERR=104
+DFSDIR_ERR=105
+GETTOKEN_ERR=106
+KRBLOGIN_ERR=107
+CHK_HDFS() {
+	LOG_MSG "[INFO]:-Start Function $FUNCNAME" 
+ 	LOG_MSG "[INFO]:-Checking Hdfs is avaiable,please wait..." 1
+	$GP_CHECK_HDFS $DFS_NAME $DFS_URL $ENABLE_SECURE_FILESYSTEM $KERBEROS_KEYFILE
+	RESULT=$?
+	if [ $RESULT -ne 0 ] ;then
+		LOG_MSG "[FATAL]:-gpcheckhdfs Command: 'gpcheckhdfs $DFS_NAME $DFS_URL $ENABLE_SECURE_FILESYSTEM $KERBEROS_KEYFILE'" 1
+		LOG_MSG "[FATAL]:-There may be some problems in Hdfs Or Krb Authorized..Please Check Error($RESULT).." 1
+	else
+		LOG_MSG "[INFO]:-Checking Hdfs Successfully" 1
+	fi
+
+	if [ $RESULT -eq $GPCHKHDFS_ERR ] ;then
+		LOG_MSG "[FATAL]:-Command: $GP_CHECK_HDFS $DFS_NAME $DFS_URL $ENABLE_SECURE_FILESYSTEM $KERBEROS_KEYFILE" 1
+		ERROR_EXIT "[FATAL]:Unable to check hdfs" 2
+	elif [ $RESULT -eq $CONNECT_ERR ] ;then
+		LOG_MSG "[FATAL]:-Failed to Connected to $DFS_NAME://$DFS_URL" 1
+		ERROR_EXIT "[FATAL]:Please Check your hostname or port" 2
+	elif [ $RESULT -eq $OPENFILE_ERR ] ;then
+		ERROR_EXIT "[FATAL]:-Failed to Open or Write a File" 2
+	elif [ $RESULT -eq $WRITEFILE_ERR ] ;then
+		ERROR_EXIT "[FATAL]:-Failed to Write File to Hdfs" 2
+	elif [ $RESULT -eq $FLUSH_ERR ] ;then
+		ERROR_EXIT "[FATAL]:-Failed to Flush,Please check your Datanode" 2
+	elif [ $RESULT -eq $DELETE_ERR ] ;then
+		ERROR_EXIT "[FATAL]:-Failed to Delete a File..." 2
+	elif [ $RESULT -eq $DFSDIR_ERR ] ;then
+		ERROR_EXIT "[FATAL]:-DFS Directory Error" 2
+	elif [ $RESULT -eq $GETTOKEN_ERR ] ;then
+		ERROR_EXIT "[FATAL]:-Get Delegation Token Error" 2
+	elif [ $RESULT -eq $KRBLOGIN_ERR ] ;then
+		ERROR_EXIT "[FATAL]:-Failed to login to Kerberos,Please check your keytab file or kdc" 2
+	fi
+}
+
 CHK_MULTI_HOME () {
 	LOG_MSG "[INFO]:-Start Function $FUNCNAME"
 	LOG_MSG "[INFO]:-Commencing multi-home checks, please wait..." 1
@@ -766,8 +814,8 @@ CHK_DFS_URL () {
 	#PING_HOST "$dfs_host"
 
 	# We must create the filespace in a relative path
-	DFS_URL="$DFS_URL"/hawq_data
-	export DFS_URL
+	#DFS_URL="$DFS_URL"/hawq_data
+	#export DFS_URL
 
 	LOG_MSG "[INFO]:-End Function $FUNCNAME"
 }
@@ -2249,6 +2297,7 @@ if [ x"$INPUT_CONFIG" != x"" ] ; then
     CHK_QES_FROM_INPUTFILE
     CHK_DFS_NAME
     CHK_DFS_URL
+    CHK_HDFS
     CHK_TEMP_DIR
 
     if [ x"" != x"$OUTPUT_CONFIG" ] ; then
@@ -2265,6 +2314,7 @@ else
     CREATE_QE_ARRAY
     CHK_DFS_NAME
     CHK_DFS_URL
+    CHK_HDFS
     CHK_QE_ARRAY_PORT_RANGES
     CHK_QES
     CHK_TEMP_DIR

@@ -205,7 +205,7 @@ PSQL=$PSQLBIN/psql
 GP_DUMP=$PSQLBIN/gp_dump
 GP_RESTORE=$PSQLBIN/gp_restore
 GPSYNCMASTER=$PSQLBIN/gpsyncmaster
-
+GP_CHECK_HDFS=$PSQLBIN/gpcheckhdfs
 
 GPLISTDATABASEQTY="SELECT d.datname as \"Name\",
        r.rolname as \"Owner\",
