@@ -42,28 +42,29 @@ public class TPCHLocalTester extends TPCHTester {
 
 			Connection conn = null;
 			try {
-				conn = getTestDBConnection();
+				conn = MRFormatTestUtils.getTestDBConnection();
 
 				// load TPCH data
 				Map<String, String> rs = HAWQJdbcUtils.executeSafeQueryForSingleRow(
 						conn, "SELECT COUNT(*) segnum FROM gp_segment_configuration WHERE content>=0;");
 				int segnum = Integer.parseInt(rs.get("segnum"));
-				runShellCommand(tpchSpec.getLoadCmd(segnum));
+				MRFormatTestUtils.runShellCommand(tpchSpec.getLoadCmd(segnum));
 
 				// generate answer
-				answers = dumpTable(conn, tableName);
+				answers = MRFormatTestUtils.dumpTable(conn, tableName);
 				Collections.sort(answers);
 				Files.write(Joiner.on('\n').join(answers).getBytes(), answerFile);
 
 				// extract metadata
-				runShellCommand(String.format("gpextract -d %s -o %s %s",
-											  TEST_DB_NAME, metadataFile.getPath(), tableName));
+				MRFormatTestUtils.runShellCommand(
+						String.format("gpextract -d %s -o %s %s",
+									  TEST_DB_NAME, metadataFile.getPath(), tableName));
 
 				// copy data files to local
-				copyDataFilesToLocal(metadataFile);
+				MRFormatTestUtils.copyDataFilesToLocal(metadataFile);
 
 				// transform metadata file to use local file locations
-				transformMetadata(metadataFile);
+				MRFormatTestUtils.transformMetadata(metadataFile);
 
 			} catch (Exception e) {
 				// clean up if any error happens
@@ -76,8 +77,9 @@ public class TPCHLocalTester extends TPCHTester {
 		}
 
 		// run input format driver
-		int exitCode = runMapReduceLocally(new Path(metadataFile.getPath()),
-										   new Path(outputFile.getParent()), null);
+		int exitCode = MRFormatTestUtils.runMapReduceLocally(
+				new Path(metadataFile.getPath()),
+				new Path(outputFile.getParent()), null);
 		Assert.assertEquals(0, exitCode);
 
 		// compare result

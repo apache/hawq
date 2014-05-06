@@ -6,7 +6,7 @@ import org.apache.hadoop.mapreduce.Mapper;
 import java.util.Iterator;
 import java.util.List;
 
-abstract class SimpleTableTester extends MRFormatTester {
+abstract class SimpleTableTester {
 
 	abstract protected void testSimpleTable(
 			HAWQTable table, Class<? extends Mapper> mapperClass) throws Exception;

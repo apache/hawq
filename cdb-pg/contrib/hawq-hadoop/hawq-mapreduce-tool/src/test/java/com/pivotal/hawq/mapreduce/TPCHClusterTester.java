@@ -40,16 +40,16 @@ public class TPCHClusterTester extends TPCHTester {
 		Connection conn = null;
 		List<String> answers;
 		try {
-			conn = getTestDBConnection();
+			conn = MRFormatTestUtils.getTestDBConnection();
 
 			// 1. load TPCH data
 			Map<String, String> rs = HAWQJdbcUtils.executeSafeQueryForSingleRow(
 					conn, "SELECT COUNT(*) segnum FROM gp_segment_configuration WHERE content>=0;");
 			int segnum = Integer.parseInt(rs.get("segnum"));
-			runShellCommand(tpchSpec.getLoadCmd(segnum));
+			MRFormatTestUtils.runShellCommand(tpchSpec.getLoadCmd(segnum));
 
 			// 2. generate answer
-			answers = dumpTable(conn, tableName);
+			answers = MRFormatTestUtils.dumpTable(conn, tableName);
 			Collections.sort(answers);
 			Files.write(Joiner.on('\n').join(answers).getBytes(), answerFile);
 
@@ -59,12 +59,13 @@ public class TPCHClusterTester extends TPCHTester {
 
 		// 3. run input format driver
 		final Path hdfsOutput	= new Path("/temp/hawqinputformat/part-r-00000");
-		int exitCode = runMapReduceOnCluster(tableName, hdfsOutput.getParent(), null);
+		int exitCode = MRFormatTestUtils.runMapReduceOnCluster(tableName, hdfsOutput.getParent(), null);
 		Assert.assertEquals(0, exitCode);
 
 		// 4. copy hdfs output to local
-		runShellCommand(String.format("hadoop fs -copyToLocal %s %s",
-									  hdfsOutput.toString(), outputFile.getPath()));
+		MRFormatTestUtils.runShellCommand(
+				String.format("hadoop fs -copyToLocal %s %s",
+							  hdfsOutput.toString(), outputFile.getPath()));
 
 		// 5. compare result
 		List<String> outputs = Files.readLines(outputFile, Charsets.UTF_8);

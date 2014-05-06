@@ -20,17 +20,18 @@ import static com.pivotal.hawq.mapreduce.MRFormatConfiguration.FT_TEST_FOLDER;
  * Test a simple table using cluster job runner, suitable for Integration Test.
  */
 public class SimpleTableClusterTester extends SimpleTableTester {
+	protected static final Path HDFS_OUTPUT_PATH = new Path("/temp/hawqinputformat");
 
 	@Override
 	protected void testSimpleTable(HAWQTable table, Class<? extends Mapper> mapperClass) throws Exception {
 		final String tableName = table.getTableName();
-		// use table name as case name
-		System.out.println("Executing test case: " + tableName);
+		final String caseName = tableName.replaceAll("\\.", "_");
+		System.out.println("Executing test case: " + caseName);
 
-		final File caseFolder	= new File(FT_TEST_FOLDER, tableName);
-		final File sqlFile		= new File(caseFolder, tableName + ".sql");
-		final File answerFile	= new File(caseFolder, tableName + ".ans");
-		final File outputFile	= new File(caseFolder, tableName + ".out");
+		final File caseFolder	= new File(FT_TEST_FOLDER, caseName);
+		final File sqlFile		= new File(caseFolder, caseName + ".sql");
+		final File answerFile	= new File(caseFolder, caseName + ".ans");
+		final File outputFile	= new File(caseFolder, caseName + ".out");
 
 		if (caseFolder.exists()) {
 			FileUtils.deleteDirectory(caseFolder);
@@ -40,15 +41,15 @@ public class SimpleTableClusterTester extends SimpleTableTester {
 		Connection conn = null;
 		List<String> answers;
 		try {
-			conn = getTestDBConnection();
+			conn = MRFormatTestUtils.getTestDBConnection();
 
 			// 1. prepare test data
 			String setupSQLs = table.generateDDL() + table.generateData();
 			Files.write(setupSQLs.getBytes(), sqlFile);
-			runSQLs(conn, setupSQLs);
+			MRFormatTestUtils.runSQLs(conn, setupSQLs);
 
 			// 2. generate answer
-			answers = dumpTable(conn, tableName);
+			answers = MRFormatTestUtils.dumpTable(conn, tableName);
 			Collections.sort(answers);
 			Files.write(Joiner.on('\n').join(answers).getBytes(), answerFile);
 
@@ -57,18 +58,19 @@ public class SimpleTableClusterTester extends SimpleTableTester {
 		}
 
 		// 3. run input format driver
-		final Path hdfsOutput = new Path("/temp/hawqinputformat/part-r-00000");
-		int exitCode = runMapReduceOnCluster(tableName, hdfsOutput.getParent(), mapperClass);
+		int exitCode = MRFormatTestUtils.runMapReduceOnCluster(tableName, HDFS_OUTPUT_PATH, mapperClass);
 		Assert.assertEquals(0, exitCode);
 
 		// 4. copy hdfs output to local
-		runShellCommand(String.format("hadoop fs -copyToLocal %s %s",
-									  hdfsOutput.toString(), outputFile.getPath()));
+		final Path hdfsOutputFile = new Path(HDFS_OUTPUT_PATH, "part-r-00000");
+		MRFormatTestUtils.runShellCommand(
+				String.format("hadoop fs -copyToLocal %s %s",
+							  hdfsOutputFile.toString(), outputFile.getPath()));
 
 		// 5. compare result
 		List<String> outputs = Files.readLines(outputFile, Charsets.UTF_8);
 		checkOutput(answers, outputs, table);
 
-		System.out.println("Successfully finish test case: " + tableName);
+		System.out.println("Successfully finish test case: " + caseName);
 	}
 }

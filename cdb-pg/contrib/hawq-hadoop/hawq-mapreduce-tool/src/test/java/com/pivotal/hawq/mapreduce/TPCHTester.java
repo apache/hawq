@@ -5,7 +5,7 @@ import com.pivotal.hawq.mapreduce.metadata.HAWQTableFormat;
 import static com.pivotal.hawq.mapreduce.MRFormatConfiguration.TEST_DB_NAME;
 import static com.pivotal.hawq.mapreduce.MRFormatConfiguration.TEST_DB_PORT;
 
-abstract class TPCHTester extends MRFormatTester {
+public abstract class TPCHTester {
 
 	public static class HAWQTPCHSpec {
 		private final String scale;

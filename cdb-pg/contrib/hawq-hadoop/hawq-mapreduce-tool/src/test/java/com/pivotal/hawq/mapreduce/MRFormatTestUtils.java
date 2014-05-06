@@ -20,11 +20,11 @@ import static com.pivotal.hawq.mapreduce.MRFormatConfiguration.TEST_DB_URL;
 import static com.pivotal.hawq.mapreduce.MRFormatConfiguration.TEST_FOLDER;
 
 /**
- * Base class for all HAWQInputFormat tests.
+ * A collection of utility functions for all HAWQInputFormat tests.
  */
-public abstract class MRFormatTester {
+public final class MRFormatTestUtils {
 
-	protected void runSQLs(Connection conn, String sqls) throws SQLException {
+	public static void runSQLs(Connection conn, String sqls) throws SQLException {
 		Statement stmt = null;
 		try {
 			conn.setAutoCommit(false);
@@ -39,7 +39,7 @@ public abstract class MRFormatTester {
 		}
 	}
 
-	protected void runShellCommand(String command)
+	public static void runShellCommand(String command)
 			throws IOException, InterruptedException {
 
 		System.out.println("execute: " + command);
@@ -55,8 +55,8 @@ public abstract class MRFormatTester {
 	 * @return exit code. 0 on success.
 	 * @throws Exception
 	 */
-	protected int runMapReduceLocally(Path metadataFile, Path outputFolder,
-									  Class<? extends Mapper> mapperClass) throws Exception {
+	public static int runMapReduceLocally(Path metadataFile, Path outputFolder,
+										  Class<? extends Mapper> mapperClass) throws Exception {
 
 		MapReduceLocalDriver driver = new MapReduceLocalDriver();
 
@@ -77,8 +77,8 @@ public abstract class MRFormatTester {
 	 * @return exit code. 0 on success.
 	 * @throws Exception
 	 */
-	protected int runMapReduceOnCluster(String tableName, Path outputFolder,
-										Class<? extends Mapper> mapperClass) throws Exception {
+	public static int runMapReduceOnCluster(String tableName, Path outputFolder,
+											Class<? extends Mapper> mapperClass) throws Exception {
 
 		MapReduceClusterDriver driver = new MapReduceClusterDriver();
 
@@ -98,7 +98,7 @@ public abstract class MRFormatTester {
 	// while Java uses 'true' and 'false'. This will lead to problems when comparing
 	// results from DB and InputFormat, therefore we use Java's toString representation
 	// below for types like bool, date, etc.
-	private String getColumnValue(ResultSet rs, ResultSetMetaData rsmd, int colIndex)
+	private static String getColumnValue(ResultSet rs, ResultSetMetaData rsmd, int colIndex)
 			throws SQLException {
 
 		String s = rs.getString(colIndex);
@@ -131,7 +131,7 @@ public abstract class MRFormatTester {
 	 * @return all rows of specified table
 	 * @throws SQLException
 	 */
-	protected List<String> dumpTable(Connection conn, String tableName) throws SQLException {
+	public static List<String> dumpTable(Connection conn, String tableName) throws SQLException {
 		List<String> rows = Lists.newArrayList();
 		Statement stmt = null;
 		ResultSet rs = null;
@@ -157,7 +157,7 @@ public abstract class MRFormatTester {
 		return rows;
 	}
 
-	protected void copyDataFilesToLocal(File metadataFile)
+	public static void copyDataFilesToLocal(File metadataFile)
 			throws IOException, InterruptedException {
 
 		MetadataAccessor accessor = MetadataAccessor.newInstanceUsingFile(metadataFile.getPath());
@@ -197,7 +197,7 @@ public abstract class MRFormatTester {
 	 * @param metadataFile the file to transform
 	 * @throws IOException
 	 */
-	protected void transformMetadata(File metadataFile) throws IOException {
+	public static void transformMetadata(File metadataFile) throws IOException {
 		String content = Files.toString(metadataFile, Charsets.UTF_8);
 		// replace all lines like
 		// - path: /hawq-data/gpseg0/16385/119737/134935.1
@@ -208,7 +208,7 @@ public abstract class MRFormatTester {
 	}
 
 	// Get a connection to the test database.
-	protected static Connection getTestDBConnection() throws SQLException {
+	public static Connection getTestDBConnection() throws SQLException {
 		return HAWQJdbcUtils.getConnection("jdbc:postgresql://" + TEST_DB_URL, null, null);
 	}
 }

@@ -26,7 +26,8 @@ FEATURE_TEST_LIST=${FEATURE_TEST_LIST:=com.pivotal.hawq.mapreduce.ft.HAWQInputFo
                                        com.pivotal.hawq.mapreduce.ft.HAWQInputFormatFeatureTest_Parquet_Misc \
                                        com.pivotal.hawq.mapreduce.ft.HAWQInputFormatFeatureTest_Parquet_Options \
                                        com.pivotal.hawq.mapreduce.ft.HAWQInputFormatFeatureTest_Parquet_Types \
-                                       com.pivotal.hawq.mapreduce.ft.HAWQInputFormatFeatureTest_TPCH }
+                                       com.pivotal.hawq.mapreduce.ft.HAWQInputFormatFeatureTest_TPCH \
+                                       com.pivotal.hawq.mapreduce.ft.HAWQInputFormatFeatureTest_Misc }
 
 ##
 ## Bring in hadoop config environment.
