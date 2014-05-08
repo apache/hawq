@@ -5,8 +5,8 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Calendar;
 
-import com.pivotal.pxfauto.infra.fileformats.IDataPreparer;
-import com.pivotal.pxfauto.infra.structures.tables.basic.Table;
+import com.pivotal.parot.fileformats.IDataPreparer;
+import com.pivotal.parot.structures.tables.basic.Table;
 
 public class CustomSequencePreparer implements IDataPreparer {
 
@@ -21,9 +21,7 @@ public class CustomSequencePreparer implements IDataPreparer {
 
 			int num1 = i;
 
-			Timestamp tms = new Timestamp(Calendar.getInstance()
-					.getTime()
-					.getTime());
+			Timestamp tms = new Timestamp(Calendar.getInstance().getTime().getTime());
 
 			Class<?> c = Class.forName("CustomWritable");// full package name
 			Constructor<?> constructor = c.getConstructor(Timestamp.class, int.class, int.class, int.class);
@@ -39,23 +37,17 @@ public class CustomSequencePreparer implements IDataPreparer {
 				 * Read fields and store in sudo table
 				 */
 
-				int[] num = ((int[]) cwArr[i].getClass()
-						.getField("num")
-						.get(cwArr[i]));
+				int[] num = ((int[]) cwArr[i].getClass().getField("num").get(cwArr[i]));
 
 				for (int j = 0; j < num.length; j++) {
 					row.add(String.valueOf(num[j]));
 				}
 
-				int int1 = ((Integer) cwArr[i].getClass()
-						.getField("int1")
-						.get(cwArr[i]));
+				int int1 = ((Integer) cwArr[i].getClass().getField("int1").get(cwArr[i]));
 
 				row.add(String.valueOf(int1));
 
-				int int2 = ((Integer) cwArr[i].getClass()
-						.getField("int2")
-						.get(cwArr[i]));
+				int int2 = ((Integer) cwArr[i].getClass().getField("int2").get(cwArr[i]));
 
 				row.add(String.valueOf(int2));
 
@@ -67,9 +59,7 @@ public class CustomSequencePreparer implements IDataPreparer {
 					row.add(strings[j]);
 				}
 
-				String st1 = ((String) cwArr[i].getClass()
-						.getField("st1")
-						.get(cwArr[i]));
+				String st1 = ((String) cwArr[i].getClass().getField("st1").get(cwArr[i]));
 
 				row.add(st1);
 
@@ -81,9 +71,7 @@ public class CustomSequencePreparer implements IDataPreparer {
 					row.add(String.valueOf(dubs[j]));
 				}
 
-				double db = ((Double) cwArr[i].getClass()
-						.getField("db")
-						.get(cwArr[i]));
+				double db = ((Double) cwArr[i].getClass().getField("db").get(cwArr[i]));
 
 				row.add(String.valueOf(db));
 
@@ -95,9 +83,7 @@ public class CustomSequencePreparer implements IDataPreparer {
 					row.add(String.valueOf(fts[j]));
 				}
 
-				float ft = ((Float) cwArr[i].getClass()
-						.getField("ft")
-						.get(cwArr[i]));
+				float ft = ((Float) cwArr[i].getClass().getField("ft").get(cwArr[i]));
 
 				row.add(String.valueOf(ft));
 
@@ -109,15 +95,11 @@ public class CustomSequencePreparer implements IDataPreparer {
 					row.add(String.valueOf(lngs[j]));
 				}
 
-				long lng = ((Long) cwArr[i].getClass()
-						.getField("lng")
-						.get(cwArr[i]));
+				long lng = ((Long) cwArr[i].getClass().getField("lng").get(cwArr[i]));
 
 				row.add(String.valueOf(lng));
 
-				byte[] bts = ((byte[]) cwArr[i].getClass()
-						.getField("bts")
-						.get(cwArr[i]));
+				byte[] bts = ((byte[]) cwArr[i].getClass().getField("bts").get(cwArr[i]));
 
 				row.add(new String(bts));
 
@@ -127,26 +109,24 @@ public class CustomSequencePreparer implements IDataPreparer {
 				for (int j = 0; j < bools.length; j++) {
 					row.add(String.valueOf(bools[j]));
 				}
-				
+
 				boolean bool = ((Boolean) cwArr[i].getClass()
-								.getField("bool")
-								.get(cwArr[i]));
+						.getField("bool")
+						.get(cwArr[i]));
 				row.add(String.valueOf(bool));
 
 				short[] shrts = ((short[]) cwArr[i].getClass()
 						.getField("shrts")
 						.get(cwArr[i]));
-				
+
 				for (int j = 0; j < shrts.length; j++) {
 					row.add(String.valueOf(shrts[j]));
 				}
-				
-				long shrt = ((Short) cwArr[i].getClass()
-						.getField("shrt")
-						.get(cwArr[i]));
+
+				long shrt = ((Short) cwArr[i].getClass().getField("shrt").get(cwArr[i]));
 
 				row.add(String.valueOf(shrt));
-				
+
 				dataTable.addRow(row);
 			}
 		}

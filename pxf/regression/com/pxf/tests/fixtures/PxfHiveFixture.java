@@ -2,11 +2,11 @@ package com.pxf.tests.fixtures;
 
 import java.io.File;
 
-import com.pivotal.pxfauto.infra.cluster.Cluster;
-import com.pivotal.pxfauto.infra.hive.Hive;
-import com.pivotal.pxfauto.infra.structures.tables.hive.HiveTable;
-import com.pivotal.pxfauto.infra.structures.tables.utils.TableFactory;
-import com.pivotal.pxfauto.infra.utils.jsystem.report.ReportUtils;
+import com.pivotal.parot.components.cluster.Cluster;
+import com.pivotal.parot.components.hive.Hive;
+import com.pivotal.parot.structures.tables.hive.HiveTable;
+import com.pivotal.parot.structures.tables.utils.TableFactory;
+import com.pivotal.parot.utils.jsystem.report.ReportUtils;
 import com.pxf.tests.basic.PxfHiveRegression;
 
 /**

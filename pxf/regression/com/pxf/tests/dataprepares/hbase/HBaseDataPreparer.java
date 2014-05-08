@@ -7,15 +7,14 @@ import java.util.TimeZone;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.util.Bytes;
 
-import com.pivotal.pxfauto.infra.fileformats.IDataPreparer;
-import com.pivotal.pxfauto.infra.structures.tables.basic.Table;
-import com.pivotal.pxfauto.infra.structures.tables.hbase.HBaseTable;
+import com.pivotal.parot.fileformats.IDataPreparer;
+import com.pivotal.parot.structures.tables.basic.Table;
+import com.pivotal.parot.structures.tables.hbase.HBaseTable;
 
 /**
- * HBaseDataPreparer creates given rows for every numberOfSplits. (rows *
- * numberOfSplits). The data tries to include the various data types:
- * String,UTF8 string, Integer, ASCII, real, float, char, small integer, big
- * integer and Time stamp.
+ * HBaseDataPreparer creates given rows for every numberOfSplits. (rows * numberOfSplits). The data
+ * tries to include the various data types: String,UTF8 string, Integer, ASCII, real, float, char,
+ * small integer, big integer and Time stamp.
  */
 public class HBaseDataPreparer implements IDataPreparer {
 

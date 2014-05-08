@@ -4,8 +4,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.pivotal.pxfauto.infra.fileformats.IDataPreparer;
-import com.pivotal.pxfauto.infra.structures.tables.basic.Table;
+import com.pivotal.parot.fileformats.IDataPreparer;
+import com.pivotal.parot.structures.tables.basic.Table;
 import com.pxf.tests.dataprepares.protobuf.schema.PbGpProtos.People;
 import com.pxf.tests.dataprepares.protobuf.schema.PbGpProtos.Person;
 

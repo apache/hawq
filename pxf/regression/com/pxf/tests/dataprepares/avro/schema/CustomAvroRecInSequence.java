@@ -21,7 +21,7 @@ import org.apache.avro.io.Encoder;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
 
-import com.pivotal.pxfauto.infra.fileformats.IAvroSchema;
+import com.pivotal.parot.fileformats.IAvroSchema;
 
 public class CustomAvroRecInSequence implements IAvroSchema {
 	public String tms;

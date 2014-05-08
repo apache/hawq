@@ -1,15 +1,14 @@
 package com.pxf.tests.basic;
 
-import org.junit.Test;
 import org.junit.After;
-
+import org.junit.Test;
 import org.postgresql.util.PSQLException;
 
-import com.pivotal.pxfauto.infra.structures.tables.basic.Table;
-import com.pivotal.pxfauto.infra.structures.tables.pxf.ReadableExternalTable;
-import com.pivotal.pxfauto.infra.structures.tables.pxf.WritableExternalTable;
-import com.pivotal.pxfauto.infra.utils.exception.ExceptionUtils;
-import com.pivotal.pxfauto.infra.utils.tables.ComparisonUtils;
+import com.pivotal.parot.structures.tables.basic.Table;
+import com.pivotal.parot.structures.tables.pxf.ReadableExternalTable;
+import com.pivotal.parot.structures.tables.pxf.WritableExternalTable;
+import com.pivotal.parot.utils.exception.ExceptionUtils;
+import com.pivotal.parot.utils.tables.ComparisonUtils;
 import com.pxf.tests.testcases.PxfTestCase;
 
 /**

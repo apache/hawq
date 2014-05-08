@@ -4,8 +4,8 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.List;
 import java.sql.SQLWarning;
+import java.util.List;
 
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
@@ -13,14 +13,14 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.postgresql.util.PSQLException;
 
-import com.pivotal.pxfauto.infra.structures.tables.basic.Table;
-import com.pivotal.pxfauto.infra.structures.tables.pxf.ReadableExternalTable;
-import com.pivotal.pxfauto.infra.structures.tables.pxf.WritableExternalTable;
-import com.pivotal.pxfauto.infra.structures.tables.utils.TableFactory;
-import com.pivotal.pxfauto.infra.utils.exception.ExceptionUtils;
-import com.pivotal.pxfauto.infra.utils.fileformats.FileFormatsUtils;
-import com.pivotal.pxfauto.infra.utils.jsystem.report.ReportUtils;
-import com.pivotal.pxfauto.infra.utils.tables.ComparisonUtils;
+import com.pivotal.parot.structures.tables.basic.Table;
+import com.pivotal.parot.structures.tables.pxf.ReadableExternalTable;
+import com.pivotal.parot.structures.tables.pxf.WritableExternalTable;
+import com.pivotal.parot.structures.tables.utils.TableFactory;
+import com.pivotal.parot.utils.exception.ExceptionUtils;
+import com.pivotal.parot.utils.fileformats.FileFormatsUtils;
+import com.pivotal.parot.utils.jsystem.report.ReportUtils;
+import com.pivotal.parot.utils.tables.ComparisonUtils;
 import com.pxf.tests.dataprepares.sequence.CustomSequencePreparer;
 import com.pxf.tests.dataprepares.writable.WritableTextPreparer;
 import com.pxf.tests.testcases.PxfTestCase;
@@ -356,13 +356,15 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 	public void sequence() throws Exception {
 
 		String schema = "CustomWritable";
-		String[] codecs = new String[] { null,
-		/**
-		 * Gzip is not supported in Mac and RHEL 5 [JIRA:GPSQL-1179]
-		 * 
-		 * "org.apache.hadoop.io.compress.GzipCodec",
-		 **/
-		"org.apache.hadoop.io.compress.DefaultCodec", "org.apache.hadoop.io.compress.BZip2Codec" };
+		String[] codecs = new String[] {
+				null,
+				/**
+				 * Gzip is not supported in Mac and RHEL 5 [JIRA:GPSQL-1179]
+				 * 
+				 * "org.apache.hadoop.io.compress.GzipCodec",
+				 **/
+				"org.apache.hadoop.io.compress.DefaultCodec",
+				"org.apache.hadoop.io.compress.BZip2Codec" };
 		String[][] userParams = new String[][] {
 				null,
 				{ "COMPRESSION_TYPE=RECORD" },
@@ -405,7 +407,9 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 	 */
 	@Test
 	public void negativeWrongPort() throws Exception {
-		weTable = new WritableExternalTable("wr_wrong_port", new String[] { "t1 text", "a1 integer" }, hdfsWorkingFolder + "/writable/err", "TEXT");
+		weTable = new WritableExternalTable("wr_wrong_port", new String[] {
+				"t1 text",
+				"a1 integer" }, hdfsWorkingFolder + "/writable/err", "TEXT");
 		weTable.setDelimiter(",");
 		weTable.setAccessor("TextFileWAccessor");
 		weTable.setResolver("TextWResolver");
@@ -432,7 +436,9 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 	 */
 	@Test
 	public void negativeBadHost() throws Exception {
-		weTable = new WritableExternalTable("wr_host_err", new String[] { "t1 text", "a1 integer" }, hdfsWorkingFolder + "/writable/err", "TEXT");
+		weTable = new WritableExternalTable("wr_host_err", new String[] {
+				"t1 text",
+				"a1 integer" }, hdfsWorkingFolder + "/writable/err", "TEXT");
 		weTable.setDelimiter(",");
 		weTable.setAccessor("TextFileWAccessor");
 		weTable.setResolver("TextWResolver");
@@ -502,7 +508,9 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 	@Test
 	public void negativeCharType() throws Exception {
 
-		weTable = new WritableExternalTable("wr_host_err", new String[] { "a1 integer", "c1 char" }, hdfsWorkingFolder + "/writable/err", "CUSTOM");
+		weTable = new WritableExternalTable("wr_host_err", new String[] {
+				"a1 integer",
+				"c1 char" }, hdfsWorkingFolder + "/writable/err", "CUSTOM");
 		weTable.setAccessor("com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor");
 		weTable.setResolver("com.pivotal.pxf.plugins.hdfs.WritableResolver");
 		weTable.setDataSchema("CustomWritableWithChar");
@@ -803,7 +811,8 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 		hdfs.removeDirectory(hdfsDir);
 	}
 
-	private void createReadableAndCompare(String[] fields, Table dataTable) throws Exception {
+	private void createReadableAndCompare(String[] fields, Table dataTable)
+			throws Exception {
 
 		ReadableExternalTable readableTable = TableFactory.getPxfReadableTextTable("readgzip", fields, hdfsDir, ",");
 

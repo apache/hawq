@@ -4,8 +4,8 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Calendar;
 
-import com.pivotal.pxfauto.infra.fileformats.IDataPreparer;
-import com.pivotal.pxfauto.infra.structures.tables.basic.Table;
+import com.pivotal.parot.fileformats.IDataPreparer;
+import com.pivotal.parot.structures.tables.basic.Table;
 import com.pxf.tests.dataprepares.avro.schema.CustomAvroRecInFile;
 
 public class CustomAvroPreparer implements IDataPreparer {

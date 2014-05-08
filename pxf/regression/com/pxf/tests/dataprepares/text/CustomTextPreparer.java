@@ -4,14 +4,13 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Calendar;
 
-import com.pivotal.pxfauto.infra.fileformats.IDataPreparer;
-import com.pivotal.pxfauto.infra.structures.tables.basic.Table;
+import com.pivotal.parot.fileformats.IDataPreparer;
+import com.pivotal.parot.structures.tables.basic.Table;
 
 public class CustomTextPreparer implements IDataPreparer {
 
 	@Override
-	public Object[] prepareData(int rows, Table dataTable)
-			throws Exception {
+	public Object[] prepareData(int rows, Table dataTable) throws Exception {
 
 		Object[] data = new Object[rows];
 
@@ -23,9 +22,7 @@ public class CustomTextPreparer implements IDataPreparer {
 			row.add("s_" + num1 * 10);
 			row.add("s_" + num1 * 100);
 
-			Timestamp tms = new Timestamp(Calendar.getInstance()
-					.getTime()
-					.getTime());
+			Timestamp tms = new Timestamp(Calendar.getInstance().getTime().getTime());
 
 			row.add(tms.toString());
 

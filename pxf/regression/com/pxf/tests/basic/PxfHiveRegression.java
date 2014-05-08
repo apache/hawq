@@ -12,15 +12,15 @@ import org.junit.Before;
 import org.junit.Test;
 import org.postgresql.util.PSQLException;
 
-import com.pivotal.pxfauto.infra.hive.Hive;
-import com.pivotal.pxfauto.infra.structures.tables.basic.Table;
-import com.pivotal.pxfauto.infra.structures.tables.hive.HiveExternalTable;
-import com.pivotal.pxfauto.infra.structures.tables.hive.HiveTable;
-import com.pivotal.pxfauto.infra.structures.tables.pxf.ReadableExternalTable;
-import com.pivotal.pxfauto.infra.structures.tables.utils.TableFactory;
-import com.pivotal.pxfauto.infra.utils.exception.ExceptionUtils;
-import com.pivotal.pxfauto.infra.utils.jsystem.report.ReportUtils;
-import com.pivotal.pxfauto.infra.utils.tables.ComparisonUtils;
+import com.pivotal.parot.components.hive.Hive;
+import com.pivotal.parot.structures.tables.basic.Table;
+import com.pivotal.parot.structures.tables.hive.HiveExternalTable;
+import com.pivotal.parot.structures.tables.hive.HiveTable;
+import com.pivotal.parot.structures.tables.pxf.ReadableExternalTable;
+import com.pivotal.parot.structures.tables.utils.TableFactory;
+import com.pivotal.parot.utils.exception.ExceptionUtils;
+import com.pivotal.parot.utils.jsystem.report.ReportUtils;
+import com.pivotal.parot.utils.tables.ComparisonUtils;
 import com.pxf.tests.fixtures.PxfHiveFixture;
 import com.pxf.tests.testcases.PxfTestCase;
 

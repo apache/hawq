@@ -1,35 +1,35 @@
 <sut>
 	<cluster>
-		<class>com.pivotal.pxfauto.infra.cluster.SingleCluster</class>
+		<class>com.pivotal.parot.components.cluster.SingleCluster</class>
 		<host>localhost</host>
 	</cluster>
 
 	<hawq>
-		<class>com.pivotal.pxfauto.infra.hawq.Hawq</class>
+		<class>com.pivotal.parot.components.hawq.Hawq</class>
 		<host>localhost</host>
 		<db>pxf_regression</db>
 	</hawq>
 
 	<hdfs>
-		<class>com.pivotal.pxfauto.infra.hdfs.Hdfs</class>
+		<class>com.pivotal.parot.components.hdfs.Hdfs</class>
 		<host>localhost</host>
 		<port>8020</port>
 		<workingDirectory>pxf_regression_data</workingDirectory>
 	</hdfs>
 
 	<hbase>
-		<class>com.pivotal.pxfauto.infra.hbase.HBase</class>
+		<class>com.pivotal.parot.components.hbase.HBase</class>
 		<host>localhost</host>
 	</hbase>
 
 	<hive>
-		<class>com.pivotal.pxfauto.infra.hive.Hive</class>
+		<class>com.pivotal.parot.components.hive.Hive</class>
 		<host>localhost</host>
 		<port>10004</port>
 	</hive>
 
 	<tinc>
-		<class>com.pivotal.pxfauto.infra.tinc.Tinc</class>
+		<class>com.pivotal.parot.components.tinc.Tinc</class>
 		<host>localhost</host>
 		<gphome>$GPHOME</gphome>
 		<tincFolder>/Users/koazu/work/workspace/tinc/main</tincFolder>

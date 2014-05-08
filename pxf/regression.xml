@@ -184,7 +184,7 @@
 				<fileset dir="${env.GPHD_ROOT}/hadoop/share/hadoop/mapreduce" includes="**/*.jar" />
 			</classpath>
 
-			<formatter classname="com.pivotal.pxfauto.infra.utils.junit.OneLinerFormatter" usefile="false" />
+			<formatter classname="com.pivotal.parot.utils.junit.OneLinerFormatter" usefile="false" />
 			<formatter type="xml" />
 
 			<batchtest todir="${testreports.dir}" unless="testMethods">

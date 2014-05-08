@@ -1,7 +1,7 @@
 package com.pxf.tests.fixtures;
 
-import com.pivotal.pxfauto.infra.hbase.HBase;
-import com.pivotal.pxfauto.infra.structures.tables.basic.Table;
+import com.pivotal.parot.components.hbase.HBase;
+import com.pivotal.parot.structures.tables.basic.Table;
 
 public class PxfHBaseFixture extends BasicFixture {
 

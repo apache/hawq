@@ -73,7 +73,7 @@
 		
 		<!-- regression dependencies -->
 		
-		<dependency org="com.pivotal" name="jsystem-infra" rev="latest.release" conf="compile->master"/>
+		<dependency org="com.pivotal" name="parot" rev="latest.release" conf="compile->master"/>
 		<dependency org="jsystemtest" name="jsystemCore" rev="6.0.01" conf="*"/>
 		<dependency org="jsystemtest" name="jsystem-launcher" rev="6.0.01" conf="*"/>
 		<dependency org="jsystemtest" name="jsystemAgent" rev="6.0.01" conf="*"/>

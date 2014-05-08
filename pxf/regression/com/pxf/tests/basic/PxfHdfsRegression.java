@@ -1,27 +1,27 @@
 package com.pxf.tests.basic;
 
 import java.io.File;
+import java.sql.SQLWarning;
+import java.sql.Types;
 import java.util.List;
 import java.util.ListIterator;
-import java.sql.Types;
-import java.sql.SQLWarning;
 
 import org.apache.commons.lang.StringUtils;
 import org.junit.Assert;
 import org.junit.Test;
 import org.postgresql.util.PSQLException;
 
-import com.pivotal.pxfauto.infra.common.ShellSystemObject;
-import com.pivotal.pxfauto.infra.fileformats.IAvroSchema;
-import com.pivotal.pxfauto.infra.structures.tables.basic.Table;
-import com.pivotal.pxfauto.infra.structures.tables.pxf.ErrorTable;
-import com.pivotal.pxfauto.infra.structures.tables.pxf.ReadableExternalTable;
-import com.pivotal.pxfauto.infra.structures.tables.utils.TableFactory;
-import com.pivotal.pxfauto.infra.utils.exception.ExceptionUtils;
-import com.pivotal.pxfauto.infra.utils.fileformats.FileFormatsUtils;
-import com.pivotal.pxfauto.infra.utils.jsystem.report.ReportUtils;
-import com.pivotal.pxfauto.infra.utils.regex.RegexUtils;
-import com.pivotal.pxfauto.infra.utils.tables.ComparisonUtils;
+import com.pivotal.parot.components.common.ShellSystemObject;
+import com.pivotal.parot.fileformats.IAvroSchema;
+import com.pivotal.parot.structures.tables.basic.Table;
+import com.pivotal.parot.structures.tables.pxf.ErrorTable;
+import com.pivotal.parot.structures.tables.pxf.ReadableExternalTable;
+import com.pivotal.parot.structures.tables.utils.TableFactory;
+import com.pivotal.parot.utils.exception.ExceptionUtils;
+import com.pivotal.parot.utils.fileformats.FileFormatsUtils;
+import com.pivotal.parot.utils.jsystem.report.ReportUtils;
+import com.pivotal.parot.utils.regex.RegexUtils;
+import com.pivotal.parot.utils.tables.ComparisonUtils;
 import com.pxf.tests.dataprepares.avro.CustomAvroPreparer;
 import com.pxf.tests.dataprepares.sequence.CustomAvroInSequencePreparer;
 import com.pxf.tests.dataprepares.sequence.CustomSequencePreparer;
@@ -1373,7 +1373,11 @@ public class PxfHdfsRegression extends PxfTestCase {
 		expected.addColumn("rcservice", Types.VARCHAR);
 		expected.addColumn("rcremoteuser", Types.VARCHAR);
 		expected.addColumn("rcremotepassword", Types.VARCHAR);
-		expected.addRow(new String[] { System.getProperty("user.name"), "a", "b", "********" });
+		expected.addRow(new String[] {
+				System.getProperty("user.name"),
+				"a",
+				"b",
+				"********" });
 
 		ComparisonUtils.compareTablesMetadata(expected, results);
 		ComparisonUtils.compareTables(results, expected, report);
@@ -1470,7 +1474,9 @@ public class PxfHdfsRegression extends PxfTestCase {
 		dataTable.appendRows(fileTable);
 		fileTable.setData(null);
 
-		fileTable.addRow(new String[] { "Don't you want somebody to love, don't you", "line3" });
+		fileTable.addRow(new String[] {
+				"Don't you want somebody to love, don't you",
+				"line3" });
 		fileTable.addRow(new String[] { "Need somebody to love, wouldn't you", "line4" });
 		hdfs.writeTableToFile(baseDir + "/level1leaf2/level2leaf1/file2", fileTable, delim);
 		dataTable.appendRows(fileTable);

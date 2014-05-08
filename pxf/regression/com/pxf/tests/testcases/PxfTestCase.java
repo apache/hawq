@@ -8,10 +8,9 @@ import junit.framework.SystemTestCase4;
 import org.junit.After;
 import org.junit.Before;
 
-import com.pivotal.pxfauto.infra.hawq.Hawq;
-import com.pivotal.pxfauto.infra.hdfs.Hdfs;
-import com.pivotal.pxfauto.infra.utils.jsystem.report.ReportUtils;
-import com.pxf.tests.fixtures.BasicFixture;
+import com.pivotal.parot.components.hawq.Hawq;
+import com.pivotal.parot.components.hdfs.Hdfs;
+import com.pivotal.parot.utils.jsystem.report.ReportUtils;
 
 /**
  * All test cases that related to PXF will extends from this Test Case class. Already includes HAWQ

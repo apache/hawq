@@ -12,7 +12,7 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
 
-import com.pivotal.pxfauto.infra.fileformats.IAvroSchema;
+import com.pivotal.parot.fileformats.IAvroSchema;
 
 public class CustomAvroRecInFile implements IAvroSchema {
 	public String tms;

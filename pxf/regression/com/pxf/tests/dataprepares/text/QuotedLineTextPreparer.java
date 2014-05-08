@@ -2,8 +2,8 @@ package com.pxf.tests.dataprepares.text;
 
 import java.util.ArrayList;
 
-import com.pivotal.pxfauto.infra.fileformats.IDataPreparer;
-import com.pivotal.pxfauto.infra.structures.tables.basic.Table;
+import com.pivotal.parot.fileformats.IDataPreparer;
+import com.pivotal.parot.structures.tables.basic.Table;
 
 public class QuotedLineTextPreparer implements IDataPreparer {
 

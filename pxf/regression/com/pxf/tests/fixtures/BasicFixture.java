@@ -4,7 +4,7 @@ import java.io.IOException;
 
 import jsystem.framework.fixture.Fixture;
 
-import com.pivotal.pxfauto.infra.utils.jsystem.report.ReportUtils;
+import com.pivotal.parot.utils.jsystem.report.ReportUtils;
 
 /**
  * Fixture is a system state. Each Test will verify that the system is in the fixture it required,

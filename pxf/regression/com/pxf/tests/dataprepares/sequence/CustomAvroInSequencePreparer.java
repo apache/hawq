@@ -4,10 +4,9 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Calendar;
 
-import com.pivotal.pxfauto.infra.fileformats.IDataPreparer;
-import com.pivotal.pxfauto.infra.structures.tables.basic.Table;
+import com.pivotal.parot.fileformats.IDataPreparer;
+import com.pivotal.parot.structures.tables.basic.Table;
 import com.pxf.tests.dataprepares.avro.schema.CustomAvroRecInSequence;
-
 
 public class CustomAvroInSequencePreparer implements IDataPreparer {
 
@@ -26,9 +25,7 @@ public class CustomAvroInSequencePreparer implements IDataPreparer {
 
 			int num1 = i + 1;
 
-			Timestamp tms = new Timestamp(Calendar.getInstance()
-					.getTime()
-					.getTime());
+			Timestamp tms = new Timestamp(Calendar.getInstance().getTime().getTime());
 
 			data[i] = new CustomAvroRecInSequence(schemaName, tms, num1, 10 * num1, 20 * num1);
 
