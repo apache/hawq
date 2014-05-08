@@ -129,6 +129,9 @@ ifneq "$(wildcard $(BLD_TOP)/ext/$(BLD_ARCH)/apache-ant/bin/ant)" ""
 ANT_DIR = $(BLD_TOP)/ext/$(BLD_ARCH)/apache-ant
 anttmpPATH:=$(ANT_DIR)/bin:$(PATH)
 export PATH=$(anttmpPATH)
+# Exporting ANT_HOME to make sure ANT_DIR ant libraries are being used 
+# and not taken from /usr
+export ANT_HOME=$(ANT_DIR)
 endif
 
 display_dependent_vers:
