@@ -309,11 +309,7 @@ HdfsConnect(FsysName protocol, char * host, uint16_t port, char *ccname, void *t
 							 /* Call Context */ (Node *) (&fsysUdf),
 							 /* ResultSetInfo */ NULL);
 
-	Datum d = FunctionCallInvoke(&fcinfo);
-
-	/* We do not expect a null result */
-	if (fcinfo.isnull || DatumGetInt32(d))
-		elog(WARNING, "function %u returned error: %d", fcinfo.flinfo->fn_oid, DatumGetInt32(d));
+	FunctionCallInvoke(&fcinfo);
 
 	return FSYS_UDF_GET_HDFS(&fcinfo);
 }
@@ -339,10 +335,6 @@ int HdfsDisconnect(FsysName protocol, hdfsFS fileSystem)
 							 /* ResultSetInfo */ NULL);
 
 	Datum d = FunctionCallInvoke(&fcinfo);
-
-	/* We do not expect a null result */
-	if (fcinfo.isnull)
-		elog(WARNING, "function %u returned error: %d", fcinfo.flinfo->fn_oid, DatumGetInt32(d));
 
 	return DatumGetInt32(d);
 }
@@ -374,11 +366,7 @@ hdfsFile HdfsOpenFile(FsysName protocol, hdfsFS fileSystem, char * path, int fla
 							 /* Call Context */ (Node *) (&fsysUdf),
 							 /* ResultSetInfo */ NULL);
 
-	Datum d = FunctionCallInvoke(&fcinfo);
-
-	/* We do not expect a null result */
-	if (fcinfo.isnull || DatumGetInt32(d))
-		elog(WARNING, "function %u returned error: %d", fcinfo.flinfo->fn_oid, DatumGetInt32(d));
+	FunctionCallInvoke(&fcinfo);
 
 	return FSYS_UDF_GET_HFILE(&fcinfo);
 }
@@ -407,10 +395,6 @@ HdfsSync(FsysName protocol, hdfsFS fileSystem, hdfsFile file)
 
 	Datum d = FunctionCallInvoke(&fcinfo);
 
-	/* We do not expect a null result */
-	if (fcinfo.isnull)
-		elog(WARNING, "function %u returned error", fcinfo.flinfo->fn_oid);
-
 	return DatumGetInt32(d);
 }
 
@@ -437,10 +421,6 @@ int HdfsCloseFile(FsysName protocol, hdfsFS fileSystem, hdfsFile file)
 
 	Datum d = FunctionCallInvoke(&fcinfo);
 
-	/* We do not expect a null result */
-	if (fcinfo.isnull)
-		elog(WARNING, "function %u returned error", fcinfo.flinfo->fn_oid);
-
 	return DatumGetInt32(d);
 }
 
@@ -466,10 +446,6 @@ int HdfsCreateDirectory(FsysName protocol, hdfsFS fileSystem, char * path)
 							 /* ResultSetInfo */ NULL);
 
 	Datum d = FunctionCallInvoke(&fcinfo);
-
-	/* We do not expect a null result */
-	if (fcinfo.isnull)
-		elog(WARNING, "function %u returned error", fcinfo.flinfo->fn_oid);
 
 	return DatumGetInt32(d);
 }
@@ -499,10 +475,6 @@ HdfsDelete(FsysName protocol, hdfsFS fileSystem, char * path, int recursive)
 
 	Datum d = FunctionCallInvoke(&fcinfo);
 
-	/* We do not expect a null result */
-	if (fcinfo.isnull)
-		elog(WARNING, "function %u returned error", fcinfo.flinfo->fn_oid);
-
 	return DatumGetInt32(d);
 }
 
@@ -530,10 +502,6 @@ HdfsChmod(FsysName protocol, hdfsFS fileSystem, char * path, short mode)
 							 /* ResultSetInfo */ NULL);
 
 	Datum d = FunctionCallInvoke(&fcinfo);
-
-	/* We do not expect a null result */
-	if (fcinfo.isnull)
-		elog(WARNING, "function %u returned error", fcinfo.flinfo->fn_oid);
 
 	return DatumGetInt32(d);
 }
@@ -564,10 +532,6 @@ HdfsRead(FsysName protocol, hdfsFS fileSystem, hdfsFile file, void * buffer, int
 
 	Datum d = FunctionCallInvoke(&fcinfo);
 
-	/* We do not expect a null result */
-	if (fcinfo.isnull)
-		elog(WARNING, "function %u returned error", fcinfo.flinfo->fn_oid);
-
 	return DatumGetInt32(d);
 }
 
@@ -597,10 +561,6 @@ HdfsWrite(FsysName protocol, hdfsFS fileSystem, hdfsFile file, const void * buff
 
 	Datum d = FunctionCallInvoke(&fcinfo);
 
-	/* We do not expect a null result */
-	if (fcinfo.isnull)
-		elog(WARNING, "function %u returned error", fcinfo.flinfo->fn_oid);
-
 	return DatumGetInt32(d);
 }
 
@@ -629,10 +589,6 @@ HdfsSeek(FsysName protocol, hdfsFS fileSystem, hdfsFile file, int64_t desiredPos
 
 	Datum d = FunctionCallInvoke(&fcinfo);
 
-	/* We do not expect a null result */
-	if (fcinfo.isnull)
-		elog(WARNING, "function %u returned error", fcinfo.flinfo->fn_oid);
-
 	return DatumGetInt32(d);
 }
 
@@ -658,10 +614,6 @@ int64_t HdfsTell(FsysName protocol, hdfsFS fileSystem, hdfsFile file)
 							 /* ResultSetInfo */ NULL);
 
 	Datum d = FunctionCallInvoke(&fcinfo);
-
-	/* We do not expect a null result */
-	if (fcinfo.isnull)
-		elog(WARNING, "function %u returned error", fcinfo.flinfo->fn_oid);
 
 	return DatumGetInt64(d);
 }
@@ -690,14 +642,10 @@ int HdfsTruncate(FsysName protocol, hdfsFS fileSystem, char * path, int64_t size
 
 	Datum d = FunctionCallInvoke(&fcinfo);
 
-	/* We do not expect a null result */
-	if (fcinfo.isnull)
-		elog(WARNING, "function %u returned error", fcinfo.flinfo->fn_oid);
-
 	return DatumGetInt32(d);
 }
 
-HdfsFileInfo * HdfsGetPathInfo(FsysName protocol, hdfsFS fileSystem, char * path)
+hdfsFileInfo * HdfsGetPathInfo(FsysName protocol, hdfsFS fileSystem, char * path)
 {
 	FunctionCallInfoData fcinfo;
 	FileSystemUdfData fsysUdf;
@@ -716,21 +664,17 @@ HdfsFileInfo * HdfsGetPathInfo(FsysName protocol, hdfsFS fileSystem, char * path
 
 	(void) FunctionCallInvoke(&fcinfo);
 
-	/* We do not expect a null result */
-	if (fcinfo.isnull)
-		elog(WARNING, "function %u returned error", fcinfo.flinfo->fn_oid);
-
 	return FSYS_UDF_GET_FILEINFO(&fcinfo);
 }
 
-int HdfsFreeFileInfo(FsysName protocol, HdfsFileInfo * hdfsFileInfo, int numEntries)
+int HdfsFreeFileInfo(FsysName protocol, hdfsFileInfo * info, int numEntries)
 {
 	FunctionCallInfoData fcinfo;
 	FileSystemUdfData fsysUdf;
 	FmgrInfo *fsysFunc = FsysInterfaceGetFunc(protocol, FSYS_FUNC_FREEFILEINFO);
 
 	fsysUdf.type = T_FileSystemFunctionData;
-	fsysUdf.fsys_fileinfo = hdfsFileInfo;
+	fsysUdf.fsys_fileinfo = info;
 	fsysUdf.fsys_fileinfonum = numEntries;
 
 	InitFunctionCallInfoData(/* FunctionCallInfoData */ fcinfo,
@@ -740,10 +684,6 @@ int HdfsFreeFileInfo(FsysName protocol, HdfsFileInfo * hdfsFileInfo, int numEntr
 							 /* ResultSetInfo */ NULL);
 
 	Datum d = FunctionCallInvoke(&fcinfo);
-
-	/* We do not expect a null result */
-	if (fcinfo.isnull)
-		elog(WARNING, "function %u returned error", fcinfo.flinfo->fn_oid);
 
 	return DatumGetInt32(d);
 }

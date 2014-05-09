@@ -148,19 +148,16 @@ static void BufferedAppendWrite(
 
 		currentWritePosition = FileNonVirtualTell(bufferedAppend->file);
 		if (currentWritePosition < 0)
-			ereport(ERROR, (errcode_for_file_access(),
-							errmsg("unable to get current position in table \"%s\" for file \"%s\" (errcode %d)",
-								   bufferedAppend->relationName,
-							       bufferedAppend->filePathName,
-								   errno)));
+			ereport(ERROR,
+					(errcode_for_file_access(), errmsg("unable to get current position in table \"%s\" for file \"%s\" (errcode %d)",
+							bufferedAppend->relationName, bufferedAppend->filePathName, errno),
+							errdetail("%s", HdfsGetLastError())));
 
 		if (currentWritePosition != bufferedAppend->largeWritePosition)
 			ereport(ERROR, (errcode_for_file_access(),
-							errmsg("Current position mismatch actual "
-								   INT64_FORMAT ", expected " INT64_FORMAT " in table \"%s\" for file \"%s\"",
-								   currentWritePosition, bufferedAppend->largeWritePosition,
-								   bufferedAppend->relationName,
-								   bufferedAppend->filePathName)));
+							errmsg("Current position mismatch actual " INT64_FORMAT ", expected " INT64_FORMAT " in table \"%s\" for file \"%s\"",
+									currentWritePosition, bufferedAppend->largeWritePosition, bufferedAppend->relationName, bufferedAppend->filePathName),
+							errdetail("%s", HdfsGetLastError())));
 	}
 #endif	
 
@@ -178,9 +175,9 @@ static void BufferedAppendWrite(
 		if (primaryError != 0)
 			ereport(ERROR,
 					(errcode_for_file_access(),
-					 errmsg("Could not write in table \"%s\" to segment file '%s': %m", 
-					 		bufferedAppend->relationName,
-							bufferedAppend->filePathName)));
+					 errmsg("Could not write in table \"%s\" to segment file '%s': %m",
+							 bufferedAppend->relationName, bufferedAppend->filePathName),
+					 errdetail("%s", HdfsGetLastError())));
 	   
 	   if (Debug_appendonly_print_append_block)
 	   {

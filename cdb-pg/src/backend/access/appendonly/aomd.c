@@ -171,9 +171,8 @@ OpenAOSegmentFile(
 	if (primaryError != 0)
 		ereport(ERROR,
 			   (errcode_for_file_access(),
-			    errmsg("Could not open Append-Only segment file '%s': %s",
-					   filepathname,
-					   strerror(primaryError))));
+			    errmsg("Could not open Append-Only segment file '%s': %s", filepathname, strerror(primaryError)),
+			    errdetail("%s", HdfsGetLastError())));
 
 	return true;
 }

@@ -392,32 +392,40 @@ void AppendOnlyStorageWrite_OpenFile(
 	if (primaryError != 0)
 		ereport(ERROR,
 			   (errcode_for_file_access(),
-			    errmsg("Append-only Storage Write could not open segment file '%s' for relation '%s': %s",
-					   filePathName,
-					   storageWrite->relationName,
-					   strerror(primaryError))));
+			    errmsg("Append-only Storage Write could not open segment file '%s' for relation '%s': %s"
+			    		, filePathName, storageWrite->relationName, strerror(primaryError)),
+			    errdetail("%s", HdfsGetLastError())));
 
 	file = storageWrite->bufferedAppend.mirroredOpen.primaryFile;
 
 	seekResult = FileNonVirtualTell(file);
 	if (seekResult != logicalEof)
 	{
+		if (seekResult < 0)
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_IO_ERROR),
+							errmsg("Append-only Storage Tell error on segment file '%s' for relation '%s'.  FileSeek offset = " INT64_FORMAT ".  Error code = %d (%s)",
+									filePathName, storageWrite->relationName, logicalEof, (int)errno, strerror(errno)),
+									errdetail("%s", HdfsGetLastError())));
+		}
+
 		/*
 		 * previous transaction is aborted
 		 * truncate file
 		 */
 		if (FileTruncate(file, logicalEof))
 		{
+			char * msg = pstrdup(HdfsGetLastError());
 
 			MirroredAppendOnly_Close(&storageWrite->bufferedAppend.mirroredOpen);
 		
 			ereport(ERROR,
-					(errcode(ERRCODE_IO_ERROR),
-							errmsg("Append-only Storage Write error on segment file '%s' for relation '%s'.  FileSeek offset = "
-									INT64_FORMAT ".  Error code = %d (%s)",
-									filePathName, storageWrite->relationName,
-									logicalEof, (int)seekResult,
-									strerror((int)seekResult))));
+				(errcode(ERRCODE_IO_ERROR),
+						errmsg("Append-only Storage truncate error on segment file '%s' for relation '%s'",
+								filePathName, storageWrite->relationName),
+								errdetail("%s", msg)));
+
 		}
 	}
 
@@ -585,10 +593,9 @@ void AppendOnlyStorageWrite_FlushAndCloseFile(
 	if (primaryError != 0)
 		ereport(ERROR,
 			   (errcode_for_file_access(),
-			    errmsg("Could not flush (fsync) Append-Only segment file '%s' to disk for relation '%s': %s",
-					   storageWrite->segmentFileName,
-					   storageWrite->relationName,
-					   strerror(primaryError))));
+			    errmsg("Could not flush (fsync) Append-Only segment file '%s' to disk for relation '%s': %s"
+			    		, storageWrite->segmentFileName, storageWrite->relationName, strerror(primaryError)),
+			    errdetail("%s", HdfsGetLastError())));
 
 	storageWrite->file = -1;
 

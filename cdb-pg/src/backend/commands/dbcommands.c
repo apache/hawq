@@ -490,7 +490,8 @@ static void copy_append_only_segment_file(
 	if (srcFile < 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
-				 errmsg("could not open file \"%s\": %m", srcFileName)));
+				 errmsg("could not open file \"%s\": %m", srcFileName),
+				 errdetail("%s", HdfsGetLastError())));
 
 	CopyRelPath(dstFileName, MAXPGPATH, contentid, *dstRelFileNode);
 	if (segmentFileNum > 0)
@@ -510,9 +511,8 @@ static void copy_append_only_segment_file(
 	if (primaryError != 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
-				 errmsg("could not open file \"%s\": %s",
-				 		dstFileName,
-				 		strerror(primaryError))));
+				 errmsg("could not open file \"%s\": %s", dstFileName, strerror(primaryError)),
+				 errdetail("%s", HdfsGetLastError())));
 
 	/*
 	 * Do the data copying.
@@ -529,9 +529,8 @@ static void copy_append_only_segment_file(
 		{
 			ereport(ERROR,
 					(errcode_for_file_access(),
-					 errmsg("could not read from position: " INT64_FORMAT " in file '%s' : %m",
-							readOffset, 
-							srcFileName)));
+					 errmsg("could not read from position: " INT64_FORMAT " in file '%s' : %m", readOffset, srcFileName),
+					 errdetail("%s", HdfsGetLastError())));
 			
 			break;
 		}						
@@ -545,9 +544,8 @@ static void copy_append_only_segment_file(
 		if (primaryError != 0)
 			ereport(ERROR,
 					(errcode_for_file_access(),
-					 errmsg("could not write file \"%s\": %s",
-							dstFileName,
-							strerror(primaryError))));
+					 errmsg("could not write file \"%s\": %s", dstFileName, strerror(primaryError)),
+					 errdetail("%s", HdfsGetLastError())));
 		
 		readOffset += bufferLen;
 		
@@ -566,9 +564,8 @@ static void copy_append_only_segment_file(
 	if (primaryError != 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
-				 errmsg("could not flush (fsync) file \"%s\": %s",
-						dstFileName,
-						strerror(primaryError))));
+				 errmsg("could not flush (fsync) file \"%s\": %s", dstFileName, strerror(primaryError)),
+				 errdetail("%s", HdfsGetLastError())));
 
 	FileClose(srcFile);
 	

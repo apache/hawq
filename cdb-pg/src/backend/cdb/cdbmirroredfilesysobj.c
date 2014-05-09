@@ -356,10 +356,10 @@ void MirroredFileSysObj_TransactionCreateFilespaceDir(
 		LWLockRelease(MirroredLock);
 		// UNDONE: Need equiv. of GetDatabasePath here for filespace.
 		ereport(ERROR,
-			(errcode_for_file_access(),
-			 errmsg("could not create filespace directory %s: %s",
-					primaryFilespaceLocation,
-					strerror(primaryError))));
+				(errcode_for_file_access(),
+						errmsg("could not create filespace directory %s: %s"
+								, primaryFilespaceLocation, strerror(primaryError)),
+						errdetail("%s", HdfsGetLastError())));
 	}
 	
 	MirroredFileSysObj_FinishMirroredCreate(
@@ -565,9 +565,8 @@ void MirroredFileSysObj_TransactionCreateTablespaceDir(
 		// UNDONE: Need equiv. of GetDatabasePath here for tablespace.
 		ereport(ERROR,
 			(errcode_for_file_access(),
-			 errmsg("could not create tablespace directory %u: %s",
-					tablespaceDirNode->tablespace,
-					strerror(primaryError))));
+			 errmsg("could not create tablespace directory %u: %s"
+					 , tablespaceDirNode->tablespace, strerror(primaryError))));
 	}
 
 	MirroredFileSysObj_FinishMirroredCreate(
@@ -1160,11 +1159,9 @@ void MirroredFileSysObj_TransactionCreateAppendOnlyFile(
 	{
 		ereport(ERROR,
 			(errcode_for_file_access(),
-			 errmsg("could not create relation file '%s', relation name '%s', contentid: %d: %s",
-					relpath(*relFileNode),
-					relationName,
-					contentid,
-					strerror(primaryError))));
+			 errmsg("could not create relation file '%s', relation name '%s', contentid: %d: %s"
+					 , relpath(*relFileNode), relationName, contentid, strerror(primaryError)),
+			 errdetail("%s", HdfsGetLastError())));
 	}
 }
 

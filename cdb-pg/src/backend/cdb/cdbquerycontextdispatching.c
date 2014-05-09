@@ -234,7 +234,12 @@ InitQueryContextInfoFromFile(QueryContextInfo *cxt)
     cxt->file = PathNameOpenFile(cxt->sharedPath, O_RDONLY, 0);
 
     if (cxt->file < 0)
-		elog(ERROR, "cannot open file %s %m", cxt->sharedPath);
+	{
+    	ereport(ERROR,
+					(errcode_for_file_access(),
+					 errmsg("cannot open file %s %m", cxt->sharedPath),
+					 errdetail("%s", HdfsGetLastError())));
+	}
 
 }
 
@@ -250,7 +255,17 @@ CloseQueryContextInfo(QueryContextInfo *cxt)
     {
         int size = cxt->cursor;
         if (cxt->useFile)
+        {
             size = FileNonVirtualTell(cxt->file);
+
+            if (size < 0)
+            {
+            	ereport(ERROR,
+						(errcode_for_file_access(),
+								errmsg("failed to get file point position"),
+										errdetail("%s", HdfsGetLastError())));
+            }
+        }
 
         elog(LOG, "query context size: %d bytes, passed by %s",
                 size, (cxt->useFile? "shared storage" : "dispatching"));
@@ -370,8 +385,8 @@ ReadFully(File file, const char *path, char *buffer, int size,
         if (0 == done && errorOnEof)
         {
             ereport(ERROR,
-                    (errcode(ERRCODE_IO_ERROR), errmsg( "rebuild query context failed:"
-                    " can not read data since unexpected eof")));
+					(errcode(ERRCODE_IO_ERROR),
+							errmsg( "rebuild query context failed:" " can not read data since unexpected eof")));
         }
         else if (0 == done)
         {
@@ -380,8 +395,9 @@ ReadFully(File file, const char *path, char *buffer, int size,
         else if (done < 0)
         {
             ereport(ERROR,
-                    (errcode(ERRCODE_IO_ERROR), errmsg( "rebuild query context failed:"
-                    " can not read data from %s", path)));
+					(errcode(ERRCODE_IO_ERROR),
+							errmsg( "rebuild query context failed:" " can not read data from %s", path),
+							errdetail("%s", HdfsGetLastError())));
         }
 
         todo -= done;
@@ -456,8 +472,9 @@ WriteData(QueryContextInfo *cxt, const char *buffer, int size)
         if (size != FileWrite(cxt->file, buffer, size))
         {
             ereport(ERROR,
-                    (errcode(ERRCODE_IO_ERROR), errmsg( "prepare query context failed: "
-                    "can not write data into file: %s", cxt->sharedPath)));
+					(errcode(ERRCODE_IO_ERROR),
+							errmsg( "prepare query context failed: " "can not write data into file: %s", cxt->sharedPath),
+							errdetail("%s", HdfsGetLastError())));
         }
 
         return;
@@ -491,7 +508,12 @@ WriteData(QueryContextInfo *cxt, const char *buffer, int size)
         cxt->file = PathNameOpenFile(cxt->sharedPath, O_CREAT | O_WRONLY, 0500);
 
         if (cxt->file < 0)
-        	elog(ERROR, "cannot create file %s %m", cxt->sharedPath);
+        {
+        	ereport(ERROR,
+					(errcode_for_file_access(),
+					 errmsg("cannot create file %s %m", cxt->sharedPath),
+					 errdetail("%s", HdfsGetLastError())));
+        }
 
         AddToDropList(cxt->sharedPath);
 
@@ -500,8 +522,9 @@ WriteData(QueryContextInfo *cxt, const char *buffer, int size)
             if (cxt->cursor != FileWrite(cxt->file, cxt->buffer, cxt->cursor))
             {
                 ereport(ERROR,
-                        (errcode(ERRCODE_IO_ERROR), errmsg( "prepare query context failed: "
-                        "can not write data into file: %s", cxt->sharedPath)));
+						(errcode(ERRCODE_IO_ERROR),
+								errmsg( "prepare query context failed: " "can not write data into file: %s", cxt->sharedPath),
+								errdetail("%s", HdfsGetLastError())));
             }
         }
         if (cxt->buffer)

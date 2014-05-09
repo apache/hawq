@@ -623,7 +623,12 @@ LruDelete(File file)
 	{
 		if (HdfsCloseFile(VfdCache[file].hProtocol, VfdCache[file].hFS,
 				VfdCache[file].hFile))
-			elog(ERROR, "could not close file \"%s\": %m", vfdP->fileName);
+		{
+			ereport(WARNING,
+				(errcode(ERRCODE_IO_ERROR),
+						errmsg("could not close file \"%s\": %m", vfdP->fileName),
+						errdetail("%s", HdfsGetLastError())));
+		}
 	}
 
 	--nfile;
@@ -749,8 +754,10 @@ LruInsert(File file)
 					 */
 					if (vfdP->seekPos != len)
 					{
-						elog(FATAL, "reopen hdfs file %s length "INT64_FORMAT" is not equal to logic file length "INT64_FORMAT,
-								vfdP->fileName, len, vfdP->seekPos);
+						ereport(FATAL,
+								(errcode(ERRCODE_IO_ERROR),
+										errmsg("reopen hdfs file %s length "INT64_FORMAT" is not equal to logic file length "INT64_FORMAT, vfdP->fileName, len, vfdP->seekPos),
+										errdetail("%s", HdfsGetLastError())));
 						return -1;
 					}
 				}
@@ -1699,7 +1706,7 @@ FreeDesc(AllocateDesc *desc)
 			result = closedir(desc->desc.dir);
 			break;
 		case AllocateDescRemoteDir:
-			HdfsFreeFileInfo(desc->protocol, (HdfsFileInfo *) desc->filelist, desc->num);
+			HdfsFreeFileInfo(desc->protocol, (hdfsFileInfo *) desc->filelist, desc->num);
 			free(desc->desc.dir);
 			result = true;
 			break;
@@ -1774,7 +1781,7 @@ AllocateDir(const char *dirname)
 	if (!IsLocalPath(dirname))
 	{
 		int				num;
-		HdfsFileInfo	*info;
+		hdfsFileInfo	*info;
 		char			*protocol;
 		char			unixpath[MAXPGPATH];
 		hdfsFS			fs;
@@ -1907,7 +1914,7 @@ ReadDir(DIR *dir, const char *dirname)
 		if (desc->cur >= desc->num)
 			return NULL;
 
-		fullname = ((HdfsFileInfo *) desc->filelist)[(desc->cur)++].mName;
+		fullname = ((hdfsFileInfo *) desc->filelist)[(desc->cur)++].mName;
 		/* Get the file name instead of the absolute path. */
 		filename = fullname + strlen(fullname);
 		while (filename > fullname &&
@@ -2400,7 +2407,11 @@ HdfsGetConnection(const char * path)
 					credential = find_filesystem_credential(protocol, host, port, &credentialSize);
 					if (credential == token)
 					{
-						elog(WARNING, "failed to get filesystem credential.");
+						ereport(WARNING,
+								(errcode(ERRCODE_IO_ERROR),
+										errmsg("failed to get filesystem credential."),
+										errdetail("%s", HdfsGetLastError())));
+
 						hash_search(HdfsFsTable, location, HASH_REMOVE, &found);
 						errno = EACCES;
 						break;
@@ -2429,8 +2440,10 @@ HdfsGetConnection(const char * path)
 			if (NULL == entry->fs)
 			{
 				hash_search(HdfsFsTable, location, HASH_REMOVE, &found);
-				elog(WARNING, "fail to connect hdfs at %s, errno = %d", location,
-						errno);
+				ereport(WARNING,
+						(errcode(ERRCODE_IO_ERROR),
+								errmsg("fail to connect hdfs at %s, errno = %d", location, errno),
+								errdetail("%s", HdfsGetLastError())));
 				break;
 			}
 		}
@@ -2728,7 +2741,12 @@ HdfsFileClose(File file, bool canReportError)
 	{
 		/* do not disconnect. */
 		if (canReportError)
-			elog(ERROR, "could not close file %d : (%s) errno %d", file, fileName, errno);
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_IO_ERROR),
+							errmsg("could not close file %d : (%s) errno %d", file, fileName, errno),
+							errdetail("%s", HdfsGetLastError())));
+		}
 	}
 }
 
@@ -2751,11 +2769,7 @@ HdfsFileRead(File file, char *buffer, int amount)
 
 	returnCode = FileAccess(file);
 	if (returnCode < 0)
-	{
-		elog(WARNING, "cannot reopen file %s for read, errno %d",
-				vfdP->fileName, errno);
 		return returnCode;
-	}
 
 	DO_DB(elog(LOG, "HdfsFileRead  para %p %p %p %d", VfdCache[file].hFS,
 					VfdCache[file].hFile, buffer, amount));
@@ -2765,12 +2779,8 @@ HdfsFileRead(File file, char *buffer, int amount)
 	if (returnCode >= 0)
 		VfdCache[file].seekPos += returnCode;
 	else
-	{
 		/* Trouble, so assume we don't know the file position anymore */
 		VfdCache[file].seekPos = FileUnknownPos;
-		elog(WARNING, "cannot read from file %s, errno %d",
-		        VfdCache[file].fileName, errno);
-	}
 
 	return returnCode;
 }
@@ -2824,8 +2834,10 @@ HdfsFileTell(File file)
 	returnCode = FileAccess(file);
 	if (returnCode < 0)
 	{
-		elog(WARNING, "cannot reopen file %s for file tell, errno %d",
-				VfdCache[file].fileName, errno);
+		ereport(WARNING,
+				(errcode(ERRCODE_IO_ERROR),
+						errmsg("cannot reopen file %s for file tell, errno %d", VfdCache[file].fileName, errno),
+						errdetail("%s", HdfsGetLastError())));
 		return returnCode;
 	}
 	return (int64) HdfsTell(VfdCache[file].hProtocol, VfdCache[file].hFS,
@@ -2861,7 +2873,7 @@ HdfsFileSeek(File file, int64 offset, int whence)
 			break;
 		case SEEK_END:
 		{
-			HdfsFileInfo	*info;
+			hdfsFileInfo	*info;
 			char path[MAXPGPATH + 1];
 
 			ConvertToUnixPath(VfdCache[file].fileName, path, sizeof(path));
@@ -3104,7 +3116,10 @@ HdfsGetDelegationToken(const char *uri, int *size, void **fs)
 	token = hdfsGetDelegationToken(*fs, pg_krb_srvnam);
 	if (NULL == token)
 	{
-		elog(LOG, "cannot get HDFS delegation token for renewer: %s", pg_krb_srvnam);
+		ereport(WARNING,
+				(errcode(ERRCODE_IO_ERROR),
+						errmsg("cannot get HDFS delegation token for renewer: %s", pg_krb_srvnam),
+						errdetail("%s", HdfsGetLastError())));
 		return NULL;
 	}
 
@@ -3123,7 +3138,12 @@ HdfsRenewDelegationToken(void *fs, void *credential, int credentialSize)
 	hdfsToken * token = DeserializeDelegationToken(credential, credentialSize);
 
 	if (0 < hdfsRenewDelegationToken(fs, token))
-		elog(WARNING, "failed to renew hdfs delegation token.");
+	{
+		ereport(WARNING,
+				(errcode(ERRCODE_IO_ERROR),
+						errmsg("failed to renew hdfs delegation token."),
+						errdetail("%s", HdfsGetLastError())));
+	}
 
 	pfree(token);
 }
@@ -3135,11 +3155,20 @@ void HdfsCancelDelegationToken(void *fs, void *credential, int credentialSize)
 	hdfsToken * token = DeserializeDelegationToken(credential, credentialSize);
 
 	if (hdfsCancelDelegationToken(fs, token))
-		elog(WARNING, "failed to cancel hdfs delegation token.");
+	{
+		ereport(WARNING,
+						(errcode(ERRCODE_IO_ERROR),
+								errmsg("failed to cancel hdfs delegation token."),
+								errdetail("%s", HdfsGetLastError())));
+	}
 
 	pfree(token);
 }
 
+const char * HdfsGetLastError(void)
+{
+	return hdfsGetLastError();
+}
 
 File
 PathNameOpenFile(FileName fileName, int fileFlags, int fileMode) {
@@ -3245,7 +3274,7 @@ HdfsPathExist(char *path)
 	char	relative_path[MAXPGPATH + 1];
 	char	*protocol;
 	hdfsFS	fs = NULL;
-	HdfsFileInfo	*info;
+	hdfsFileInfo	*info;
 
 	DO_DB(elog(LOG, "HdfsPathExist, path: %s", path));
 
@@ -3301,7 +3330,7 @@ HdfsPathSize(DIR *dirdesc)
 
 	for (idx = 0; idx < desc->num; idx++)
 	{
-		total_size += ((HdfsFileInfo *) desc->filelist)[idx].mSize;
+		total_size += ((hdfsFileInfo *) desc->filelist)[idx].mSize;
 	}
 
 	return total_size;

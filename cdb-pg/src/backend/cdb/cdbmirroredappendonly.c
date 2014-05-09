@@ -111,11 +111,11 @@ static void MirroredAppendOnly_DoOpen(
 
 
 	if (create)
-		fileFlags = (O_CREAT | O_EXCL);
+		fileFlags = O_CREAT | O_SYNC;
 	else if (readOnly)
 		fileFlags = O_RDONLY;
 	else
-		fileFlags = (O_WRONLY | O_APPEND);
+		fileFlags = (O_WRONLY | O_APPEND | O_SYNC);
 
 	open->primaryFile = PathNameOpenFile(path, fileFlags, fileMode);
 

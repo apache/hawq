@@ -63,7 +63,7 @@ typedef struct FileSystemUdfData
 	int				fsys_recursive;
 	short			fsys_mode;
 	int64_t			fsys_pos;
-	HdfsFileInfo*   fsys_fileinfo;
+	hdfsFileInfo*   fsys_fileinfo;
 	int             fsys_fileinfonum;
 	void*			fsys_user_ctx;
 } FileSystemUdfData;
@@ -116,8 +116,8 @@ int64_t HdfsTell(FsysName protocol, hdfsFS fileSystem, hdfsFile file);
 
 int HdfsTruncate(FsysName protocol, hdfsFS fileSystem, char * path, int64_t size);
 
-HdfsFileInfo * HdfsGetPathInfo(FsysName protocol, hdfsFS fileSystem, char * path);
-int HdfsFreeFileInfo(FsysName protocol, HdfsFileInfo * hdfsFileInfo, int numEntries);
+hdfsFileInfo * HdfsGetPathInfo(FsysName protocol, hdfsFS fileSystem, char * path);
+int HdfsFreeFileInfo(FsysName protocol, hdfsFileInfo * hdfsFileInfo, int numEntries);
 
 /*
 void HdfsLogLevel(LogLevel level);

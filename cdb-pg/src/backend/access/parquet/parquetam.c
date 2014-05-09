@@ -746,13 +746,13 @@ static void TransactionFlushAndCloseFile(
 
 	/* Get Logical Eof and uncompressed length*/
 	*newLogicalEof = FileNonVirtualTell(parquetInsertDesc->parquet_file);
-	if (*newLogicalEof < 0){
+	if (*newLogicalEof < 0)
+	{
 		ereport(ERROR,
 				(errcode_for_file_access(),
-					errmsg("file tell position error in file '%s' for relation '%s': %s",
-							parquetInsertDesc->parquetFilePathName,
-							parquetInsertDesc->relname,
-							strerror(errno))));
+					errmsg("file tell position error in file '%s' for relation '%s': %s"
+							, parquetInsertDesc->parquetFilePathName, parquetInsertDesc->relname, strerror(errno)),
+					errdetail("%s", HdfsGetLastError())));
 	}
 
 	Assert(parquetInsertDesc->fileLen == *newLogicalEof);
@@ -765,11 +765,9 @@ static void TransactionFlushAndCloseFile(
 	if (primaryError != 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
-						errmsg("file flush error when flushing (fsync) segment file '%s' to "
-								"disk for relation '%s': %s",
-								parquetInsertDesc->parquetFilePathName,
-								parquetInsertDesc->relname,
-								strerror(primaryError))));
+						errmsg("file flush error when flushing (fsync) segment file '%s' to " "disk for relation '%s': %s"
+								, parquetInsertDesc->parquetFilePathName, parquetInsertDesc->relname, strerror(primaryError)),
+						errdetail("%s", HdfsGetLastError())));
 
 	parquetInsertDesc->parquet_file = -1;
 
@@ -877,19 +875,19 @@ static void OpenSegmentFile(
 			contentid, relname, logicalEof, true, &primaryError);
 	if (primaryError != 0)
 		ereport(ERROR,
-				(errcode_for_file_access(),
-						errmsg("file open error when opening file "
-								"'%s' for relation '%s': %s", filePathName, relname,
-								strerror(primaryError))));
+				(errcode_for_file_access(), errmsg("file open error when opening file " "'%s' for relation '%s': %s"
+						, filePathName, relname, strerror(primaryError)),
+				errdetail("%s", HdfsGetLastError())));
 
 	file = mirroredOpen->primaryFile;
 
 	int64 fileSize = FileSeek(file, 0, SEEK_END);
-	if (fileSize < 0){
+	if (fileSize < 0)
+	{
 		ereport(ERROR,
 				(errcode_for_file_access(),
-						errmsg("file seek error in file '%s' for relation "
-								"'%s'", filePathName, relname)));
+						errmsg("file seek error in file '%s' for relation " "'%s'", filePathName, relname),
+						errdetail("%s", HdfsGetLastError())));
 	}
 	if (logicalEof > fileSize) {
 		ereport(ERROR,
@@ -911,24 +909,31 @@ static void OpenSegmentFile(
 	if (primaryError != 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
-						errmsg("file open error when opening file '%s' "
-								"for relation '%s': %s", filePathName, relname,
-								strerror(primaryError))));
+						errmsg("file open error when opening file '%s' " "for relation '%s': %s"
+								, filePathName, relname, strerror(primaryError)),
+						errdetail("%s", HdfsGetLastError())));
 
 	file = mirroredOpen->primaryFile;
 
 	seekResult = FileNonVirtualTell(file);
 	if (seekResult != logicalEof) {
+		if (seekResult < 0)
+		{
+			ereport(ERROR,
+					(errcode_for_file_access(),
+						errmsg("file tell error in file '%s' for relation " "'%s' to position " INT64_FORMAT ": %s", filePathName, relname, logicalEof, strerror(errno)),
+						errdetail("%s", HdfsGetLastError())));
+		}
+
 		/* previous transaction is aborted truncate file*/
 		if (FileTruncate(file, logicalEof)) {
 
+			char * msg = pstrdup(HdfsGetLastError());
+
 			MirroredAppendOnly_Close(mirroredOpen);
 			ereport(ERROR,
-					(errcode_for_file_access(),
-						errmsg("file truncate error in file '%s' for relation "
-								"'%s' to position " INT64_FORMAT ": %s",
-								filePathName, relname, logicalEof,
-								strerror(errno))));
+					(errcode_for_file_access(), errmsg("file truncate error in file '%s' for relation " "'%s' to position " INT64_FORMAT ": %s", filePathName, relname, logicalEof, strerror(errno)),
+							errdetail("%s", msg)));
 		}
 	}
 

@@ -131,6 +131,8 @@ gpfs_hdfs_connect(PG_FUNCTION_ARGS)
 		hdfsBuilderSetKerbTicketCachePath(builder, ccname);
 	}
 
+	hdfsBuilderSetForceNewInstance(builder);
+
 	hdfs = hdfsBuilderConnect(builder);
 	hdfsFreeBuilder(builder);
 
@@ -239,8 +241,8 @@ Datum
 gpfs_hdfs_sync(PG_FUNCTION_ARGS)
 {
 	int retval = 0;
-	hdfsFS *hdfs = NULL;
-	hdfsFile *hFile = NULL;
+	hdfsFS hdfs = NULL;
+	hdfsFile hFile = NULL;
 
 	/* Must be called via the filesystem manager */
 	if (!CALLED_AS_GPFILESYSTEM(fcinfo)) {
@@ -265,7 +267,7 @@ gpfs_hdfs_sync(PG_FUNCTION_ARGS)
 		PG_RETURN_INT32(retval);
 	}
 
-	retval = hdfsHFlush(hdfs, hFile);
+	retval = hdfsSync(hdfs, hFile);
 
 	PG_RETURN_INT32(retval);
 }
@@ -277,8 +279,8 @@ Datum
 gpfs_hdfs_closefile(PG_FUNCTION_ARGS)
 {
 	int retval = 0;
-	hdfsFS *hdfs = NULL;
-	hdfsFile *hFile = NULL;
+	hdfsFS hdfs = NULL;
+	hdfsFile hFile = NULL;
 
 	/* Must be called via the filesystem manager */
 	if (!CALLED_AS_GPFILESYSTEM(fcinfo)) {
@@ -315,7 +317,7 @@ Datum
 gpfs_hdfs_createdirectory(PG_FUNCTION_ARGS)
 {
 	int retval = 0;
-	hdfsFS *hdfs = NULL;
+	hdfsFS hdfs = NULL;
 	char *path = NULL;
 
 	/* Must be called via the filesystem manager */
@@ -353,7 +355,7 @@ Datum
 gpfs_hdfs_delete(PG_FUNCTION_ARGS)
 {
 	int retval = 0;
-	hdfsFS *hdfs = NULL;
+	hdfsFS hdfs = NULL;
 	char *path = NULL;
 	int recursive = 0;
 
@@ -393,7 +395,7 @@ Datum
 gpfs_hdfs_chmod(PG_FUNCTION_ARGS)
 {
 	int retval = 0;
-	hdfsFS *hdfs = NULL;
+	hdfsFS hdfs = NULL;
 	char *path = NULL;
 	short mod = 0;
 
@@ -433,8 +435,8 @@ Datum
 gpfs_hdfs_read(PG_FUNCTION_ARGS)
 {
 	int retval = 0;
-	hdfsFS *hdfs = NULL;
-	hdfsFile *hFile = NULL;
+	hdfsFS hdfs = NULL;
+	hdfsFile hFile = NULL;
 	char *buf = NULL;
 	int length = 0;
 
@@ -487,8 +489,8 @@ Datum
 gpfs_hdfs_write(PG_FUNCTION_ARGS)
 {
 	int retval = 0;
-	hdfsFS *hdfs = NULL;
-	hdfsFile *hFile = NULL;
+	hdfsFS hdfs = NULL;
+	hdfsFile hFile = NULL;
 	char *buf = NULL;
 	int length = 0;
 
@@ -541,8 +543,8 @@ Datum
 gpfs_hdfs_seek(PG_FUNCTION_ARGS)
 {
 	int retval = 0;
-	hdfsFS *hdfs = NULL;
-	hdfsFile *hFile = NULL;
+	hdfsFS hdfs = NULL;
+	hdfsFile hFile = NULL;
 	int64_t pos = 0;
 
 	/* Must be called via the filesystem manager */
@@ -587,8 +589,8 @@ Datum
 gpfs_hdfs_tell(PG_FUNCTION_ARGS)
 {
 	int64_t retval = 0;
-	hdfsFS *hdfs = NULL;
-	hdfsFile *hFile = NULL;
+	hdfsFS hdfs = NULL;
+	hdfsFile hFile = NULL;
 
 	/* Must be called via the filesystem manager */
 	if (!CALLED_AS_GPFILESYSTEM(fcinfo)) {
@@ -625,7 +627,7 @@ Datum
 gpfs_hdfs_truncate(PG_FUNCTION_ARGS)
 {
 	int retval = 0;
-	hdfsFS *hdfs = NULL;
+	hdfsFS hdfs = NULL;
 	char *path = NULL;
 	int64_t pos = 0;
 
@@ -674,15 +676,15 @@ gpfs_hdfs_truncate(PG_FUNCTION_ARGS)
  */
 
 /*
- * HdfsFileInfo * hdfsGetPathInfo(hdfsFS fileSystem, const char * path);
+ * hdfsFileInfo * hdfsGetPathInfo(hdfsFS fileSystem, const char * path);
  */
 Datum
 gpfs_hdfs_getpathinfo(PG_FUNCTION_ARGS)
 {
 	int64_t retval = 0;
-	hdfsFS *hdfs = NULL;
+	hdfsFS hdfs = NULL;
 	char *path = NULL;
-	HdfsFileInfo *fileinfo = NULL;
+	hdfsFileInfo *fileinfo = NULL;
 
 	/* Must be called via the filesystem manager */
 	if (!CALLED_AS_GPFILESYSTEM(fcinfo)) {
@@ -721,7 +723,7 @@ Datum
 gpfs_hdfs_freefileinfo(PG_FUNCTION_ARGS)
 {
 	int64_t retval = 0;
-	HdfsFileInfo *fileinfo = NULL;
+	hdfsFileInfo *fileinfo = NULL;
 	int numEntries = 0;
 
 	/* Must be called via the filesystem manager */
@@ -735,13 +737,13 @@ gpfs_hdfs_freefileinfo(PG_FUNCTION_ARGS)
 	fileinfo = FSYS_UDF_GET_FILEINFO(fcinfo);
 	numEntries = FSYS_UDF_GET_FILEINFONUM(fcinfo);
 	if (NULL == fileinfo) {
-		elog(WARNING, "get HdfsFileInfo invalid in gpfs_hdfs_freefileinfo");
+		elog(WARNING, "get hdfsFileInfo invalid in gpfs_hdfs_freefileinfo");
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT64(retval);
 	}
 	if (numEntries <= 0) {
-		elog(WARNING, "get HdfsFileInfo numEntries invalid in gpfs_hdfs_freefileinfo");
+		elog(WARNING, "get hdfsFileInfo numEntries invalid in gpfs_hdfs_freefileinfo");
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT64(retval);

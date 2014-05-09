@@ -917,8 +917,8 @@ flushRowGroup(ParquetRowGroup rowgroup,
 		{
 			ereport(ERROR,
 					(errcode_for_file_access(),
-					 errmsg("file tell position error for segment file: %s",
-							 strerror(errno))));
+					 errmsg("file tell position error for segment file: %s", strerror(errno)),
+					 errdetail("%s", HdfsGetLastError())));
 		}
 		for (int pageno = 0; pageno < chunk->pageNumber; ++pageno)
 		{
@@ -933,8 +933,8 @@ flushRowGroup(ParquetRowGroup rowgroup,
 		{
 			ereport(ERROR,
 					(errcode_for_file_access(),
-					 errmsg("file tell position error for segment file: %s",
-							 strerror(errno))));
+					 errmsg("file tell position error for segment file: %s", strerror(errno)),
+					 errdetail("%s", HdfsGetLastError())));
 		}
 
 		uint8_t *Thrift_ColumnMetaData_Buf;
@@ -956,8 +956,8 @@ flushRowGroup(ParquetRowGroup rowgroup,
 		{
 			ereport(ERROR,
 					(errcode_for_file_access(),
-					 errmsg("file write error when writing out column metadata: %s",
-							 strerror(errno))));
+					 errmsg("file write error when writing out column metadata: %s", strerror(errno)),
+					 errdetail("%s", HdfsGetLastError())));
 		}
 
 		/* Add chunk compressedsize and uncompressedsize to parquet fileLen and fileLen_uncompressed*/
@@ -969,9 +969,9 @@ flushRowGroup(ParquetRowGroup rowgroup,
 	MirroredAppendOnly_Flush(mirroredOpen, &fileSync);
 	if(fileSync < 0){
 		ereport(ERROR,
-					(errcode_for_file_access(),
-					 errmsg("file sync error: %s",
-							 strerror(fileSync))));
+				(errcode_for_file_access(),
+						errmsg("file sync error: %s", strerror(fileSync)),
+						errdetail("%s", HdfsGetLastError())));
 	}
 
 	rowgroup->rowGroupMetadata->totalByteSize += bytes_added;
@@ -1113,8 +1113,8 @@ flushDataPage(ParquetColumnChunk chunk, int page_number)
 	{
 		ereport(ERROR,
 				(errcode_for_file_access(),
-				errmsg("file write error when writing out page header: %s",
-						strerror(errno))));
+						errmsg("file write error when writing out page header: %s", strerror(errno)),
+						errdetail("%s", HdfsGetLastError())));
 	}
 	pfree(page->header_buffer);
 
@@ -1127,8 +1127,8 @@ flushDataPage(ParquetColumnChunk chunk, int page_number)
 	{
 		ereport(ERROR,
 				(errcode_for_file_access(),
-				errmsg("file write error when writing out page data: %s",
-						strerror(errno))));
+						errmsg("file write error when writing out page data: %s", strerror(errno)),
+						errdetail("%s", HdfsGetLastError())));
 	}
 
 	pfree(page->header);

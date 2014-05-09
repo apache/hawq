@@ -170,7 +170,8 @@ static void BufferedReadIo(
 							errmsg("unable to get current position for table \"%s\" in file \"%s\" (errcode %d)",
 								   bufferedRead->relationName,
 							       bufferedRead->filePathName,
-								   errno)));
+								   errno),
+						    errdetail("%s", HdfsGetLastError())));
 			
 		if (currentReadPosition != bufferedRead->largeReadPosition)
 		{
@@ -179,7 +180,8 @@ static void BufferedReadIo(
 								   INT64_FORMAT ", expected " INT64_FORMAT " for table \"%s\" in file \"%s\"",
 								   currentReadPosition, bufferedRead->largeReadPosition,
 								   bufferedRead->relationName,
-								   bufferedRead->filePathName)));
+								   bufferedRead->filePathName),
+						    errdetail("%s", HdfsGetLastError())));
 		}
 	}
 #endif
@@ -202,7 +204,8 @@ static void BufferedReadIo(
 							errmsg("unable to read table \"%s\" file \"%s\" (errcode %d)", 
 								   bufferedRead->relationName,
 								   bufferedRead->filePathName,
-								   errno)));
+								   errno),
+						    errdetail("%s", HdfsGetLastError())));
 		
 		if (Debug_appendonly_print_read_block)
 		{
@@ -409,7 +412,8 @@ void BufferedReadSetTemporaryRange(
 							errmsg("unable to seek to position for table \"%s\" in file \"%s\" (errcode %d):%m",
 									   bufferedRead->relationName,
 									   bufferedRead->filePathName,
-									   errno)));
+									   errno),
+						    errdetail("%s", HdfsGetLastError())));
 
 		bufferedRead->bufferOffset = 0;
 

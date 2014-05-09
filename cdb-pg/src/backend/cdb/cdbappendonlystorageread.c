@@ -31,7 +31,7 @@
  * Initialize AppendOnlyStorageRead.
  *
  * The AppendOnlyStorageRead data structure is initialized
- * once for a read �session� and can be used to read
+ * once for a read session and can be used to read
  * Append-Only Storage Blocks from 1 or more segment files.
  *
  * The current file to read to is opened with the
@@ -290,11 +290,9 @@ static void AppendOnlyStorageRead_FinishOpenFile(
 		FileClose(file);
         ereport(ERROR,
 				(errcode(ERRCODE_IO_ERROR),
-			     errmsg("Append-only Storage Read error on segment file '%s' for relation '%s'.  FileSeek offset = 0.  Error code = %d (%s)",
-        	 		    filePathName,
-        	 		    storageRead->relationName,
-             		    (int)seekResult,
-             			strerror((int)seekResult))));
+			     errmsg("Append-only Storage Read error on segment file '%s' for relation '%s'.  FileSeek offset = 0.  Error code = %d (%s)"
+			    		 , filePathName, storageRead->relationName, errno, strerror(errno)),
+			     errdetail("%s", HdfsGetLastError())));
 	}
 
 	storageRead->file = file;
@@ -367,9 +365,8 @@ void AppendOnlyStorageRead_OpenFile(
 	{
 		ereport(ERROR,
 				(errcode_for_file_access(),
-				 errmsg("Append-Only Storage Read could not open segment file '%s' for relation '%s'",
-						filePathName,
-						storageRead->relationName)));
+				 errmsg("Append-Only Storage Read could not open segment file '%s' for relation '%s'", filePathName, storageRead->relationName),
+				 errdetail("%s", HdfsGetLastError())));
 	}
 
 	AppendOnlyStorageRead_FinishOpenFile(
@@ -841,9 +838,11 @@ static bool AppendOnlyStorageRead_InternalGetBlockInfo(
 													&storedChecksum,
 													&computedChecksum))
 			ereport(ERROR,
-			        (errmsg("Header checksum does not match.  Expected 0x%X and found 0x%X ",
+			        (errmsg("Header checksum does not match.  Expected 0x%X and found 0x%X headerOffsetInFile is" INT64_FORMAT " overallBlockLen is %d",
 			     		    storedChecksum,
-			        		computedChecksum),
+			        		computedChecksum,
+			        		storageRead->current.headerOffsetInFile,
+			        		storageRead->current.overallBlockLen),
 			         errdetail_appendonly_read_storage_content_header(storageRead),
 			         errcontext_appendonly_read_storage_block(storageRead)));
 	}
@@ -1206,7 +1205,7 @@ static void AppendOnlyStorageRead_InternalGetBuffer(
 }
 
 /*
- * Get a pointer to the �small� non-compressed content.
+ * Get a pointer to the small non-compressed content.
  *
  * This interface provides a pointer directly into the
  * read buffer for efficient data use.

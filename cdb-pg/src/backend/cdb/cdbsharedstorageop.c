@@ -200,10 +200,9 @@ void PerformSharedStorageOpTasks(SharedStorageOpTasks *tasks)
 			{
 				ereport(ERROR,
 					(errcode_for_file_access(),
-						errmsg("could not create relation file '%s', relation name '%s', contentid: %d: %s",
-							relpath(stat->relFileNode[i]),
-							stat->relationName[i], GpIdentity.segindex,
-							strerror(error))));
+						errmsg("could not create relation file '%s', relation name '%s', contentid: %d: %s"
+								, relpath(stat->relFileNode[i]), stat->relationName[i], GpIdentity.segindex, strerror(error)),
+						errdetail("%s", HdfsGetLastError())));
 			}
 		}
 
@@ -313,10 +312,9 @@ void PerformSharedStorageOp(SharedStorageOpStmt * stat)
 				{
 					ereport(ERROR,
 						(errcode_for_file_access(),
-							errmsg("could not create relation file '%s', relation name '%s', contentid: %d: %s",
-								relpath(stat->relFileNode[i]),
-								stat->relationName[i], GpIdentity.segindex,
-								strerror(error))));
+							errmsg("could not create relation file '%s', relation name '%s', contentid: %d: %s"
+									, relpath(stat->relFileNode[i]), stat->relationName[i], GpIdentity.segindex, strerror(error)),
+							errdetail("%s", HdfsGetLastError())));
 				}
 			}
 		}

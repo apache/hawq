@@ -82,8 +82,8 @@ void ParquetExecutorReadColumn(ParquetColumnReader *columnReader, File file, Mem
 	{
 		ereport(ERROR,
 				(errcode_for_file_access(),
-				 errmsg("file seek error to position " INT64_FORMAT ": %s",
-						 firstPageOffset, strerror(errno))));
+				 errmsg("file seek error to position " INT64_FORMAT ": %s", firstPageOffset, strerror(errno)),
+				 errdetail("%s", HdfsGetLastError())));
 	}
 
 	/*recursively read, until get the total column chunk data out*/
@@ -94,8 +94,8 @@ void ParquetExecutorReadColumn(ParquetColumnReader *columnReader, File file, Mem
 		if (columnChunkLen < 0) {
 			ereport(ERROR,
 					(errcode_for_file_access(),
-							errmsg("parquet storage read error on reading column %s ",
-									columnChunkMetadata->colName)));
+							errmsg("parquet storage read error on reading column %s ", columnChunkMetadata->colName),
+							errdetail("%s", HdfsGetLastError())));
 		}
 		actualReadSize += columnChunkLen;
 	}

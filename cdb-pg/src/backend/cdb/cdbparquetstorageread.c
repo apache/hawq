@@ -51,10 +51,9 @@ void ParquetStorageRead_OpenFile(ParquetStorageRead *storageRead,
 	{
 		ereport(ERROR,
 				(errcode_for_file_access(),
-				 errmsg("file open error in file '%s' for relation '%s': %s",
-						filePathName,
-						storageRead->relationName,
-						strerror(errno))));
+				 errmsg("file open error in file '%s' for relation '%s': %s"
+						 , filePathName, storageRead->relationName, strerror(errno)),
+				 errdetail("%s", HdfsGetLastError())));
 	}
 
 	ParquetStorageRead_FinishOpenFile(

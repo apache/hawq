@@ -17,9 +17,9 @@ void writeParquetHeader(File dataFile, char *filePathName, int64 *fileLen, int64
 	if (FileWrite(dataFile, PARQUET_VERSION_NUMBER, 4) != 4)
 	{
 		ereport(ERROR,
-			(errcode_for_file_access(),
-			 errmsg("file write error in file '%s': %s",
-					 filePathName, strerror(errno))));
+				(errcode_for_file_access(),
+						errmsg("file write error in file '%s': %s", filePathName, strerror(errno)),
+						errdetail("%s", HdfsGetLastError())));
 	}
 
 	*fileLen += 4;
@@ -55,8 +55,8 @@ void writeParquetFooter(File dataFile,
 	if (writeRet != footerLen) {
 		ereport(ERROR,
 				(errcode_for_file_access(),
-				 errmsg("file write error in file '%s': %s",
-						 filePathName, strerror(errno))));
+				 errmsg("file write error in file '%s': %s", filePathName, strerror(errno)),
+				 errdetail("%s", HdfsGetLastError())));
 	}
 
 	*fileLen += footerLen;
@@ -73,8 +73,8 @@ void writeParquetFooter(File dataFile,
 		pfree(bufferFooterLen);
 		ereport(ERROR,
 			(errcode_for_file_access(),
-			 errmsg("file write error in file '%s': %s",
-					 filePathName, strerror(errno))));
+			 errmsg("file write error in file '%s': %s", filePathName, strerror(errno)),
+			 errdetail("%s", HdfsGetLastError())));
 	}
 	pfree(bufferFooterLen);
 
@@ -85,8 +85,8 @@ void writeParquetFooter(File dataFile,
 	{
 		ereport(ERROR,
 				(errcode_for_file_access(),
-				 errmsg("file write error in file '%s': %s",
-						 filePathName, strerror(errno))));
+						errmsg("file write error in file '%s': %s", filePathName, strerror(errno)),
+						errdetail("%s", HdfsGetLastError())));
 	}
 
 	*fileLen += 8;
@@ -131,8 +131,9 @@ bool readParquetFooter(File fileHandler, ParquetMetadata *parquetMetadata,
 	{
 		ereport(ERROR,
 				(errcode_for_file_access(),
-				 errmsg("file seek error in file '%s' when seeking \'" INT64_FORMAT "\': '%s'",
-						 filePathName, footLengthIndex, strerror(errno))));
+				 errmsg("file seek error in file '%s' when seeking \'" INT64_FORMAT "\': '%s'"
+						 , filePathName, footLengthIndex, strerror(errno)),
+				 errdetail("%s", HdfsGetLastError())));
 	}
 	elog(DEBUG5, "Parquet metadata file footer length index: " INT64_FORMAT "\n", footLengthIndex);
 
@@ -142,9 +143,10 @@ bool readParquetFooter(File fileHandler, ParquetMetadata *parquetMetadata,
 		/*read out all the buffer of the column chunk*/
 		int readFooterLen = FileRead(fileHandler, buffer + actualReadSize, 4 - actualReadSize);
 		if (readFooterLen < 0) {
-			ereport(ERROR, (errcode_for_file_access(),
-			errmsg("file read error in file '%s': %s",
-					filePathName, strerror(errno))));
+			ereport(ERROR,
+					(errcode_for_file_access(),
+							errmsg("file read error in file '%s': %s", filePathName, strerror(errno)),
+							errdetail("%s", HdfsGetLastError())));
 		}
 		actualReadSize += readFooterLen;
 	}
@@ -170,8 +172,9 @@ bool readParquetFooter(File fileHandler, ParquetMetadata *parquetMetadata,
 	{
 		ereport(ERROR,
 				(errcode_for_file_access(),
-				 errmsg("file seek error in file '%s' when seeking \'" INT64_FORMAT "\': %s",
-						 filePathName, footerIndex, strerror(errno))));
+				 errmsg("file seek error in file '%s' when seeking \'" INT64_FORMAT "\': %s"
+						 , filePathName, footerIndex, strerror(errno)),
+				 errdetail("%s", HdfsGetLastError())));
 	}
 
 
@@ -186,7 +189,8 @@ bool readParquetFooter(File fileHandler, ParquetMetadata *parquetMetadata,
 			pfree(bufferFooter);
 			ereport(ERROR, (errcode_for_file_access(),
 			errmsg("file read error in file '%s': %s",
-					filePathName, strerror(errno))));
+					filePathName, strerror(errno)),
+			errdetail("%s", HdfsGetLastError())));
 		}
 		actualReadSize += readLen;
 	}

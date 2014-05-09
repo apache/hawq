@@ -114,7 +114,7 @@ int main(int argc, char * argv[]) {
 }
 
 int testHdfsOperateFile(hdfsFS fs, const char * filepath, const char * dfscompleteurl) {
-    hdfsFile testFile = hdfsOpenFile(fs, filepath, O_CREAT | O_EXCL, 0, 0, 0);
+    hdfsFile testFile = hdfsOpenFile(fs, filepath, O_CREAT, 0, 0, 0);
 
     if (NULL == testFile) {
         fprintf(stderr, "ERROR:'hdfsOpenFile' execute failed\n"

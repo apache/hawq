@@ -86,6 +86,7 @@ extern int HdfsFileTruncate(File file, int64 offset);
 extern int HdfsMakeDirectory(const char *path, mode_t mode);
 extern void *HdfsGetDelegationToken(const char *uri, int *size, void **fs);
 extern void HdfsRenewDelegationToken(void *fs, void *credential, int credentialSize);
+extern const char * HdfsGetLastError(void);
 extern void HdfsCancelDelegationToken(void *fs, void *credential, int credentialSize);
 extern hdfsToken *DeserializeDelegationToken(void *binary, int size);
 
