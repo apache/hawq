@@ -45,17 +45,17 @@ else
         exit 2
     fi
 
-    ls pxf/build/pxf*.rpm > /dev/null
+    ls pxf/build/distributions/pxf*.rpm > /dev/null
     if [ $? = 0 ]; then
-        PXF_RPM=$( ls pxf/build/pxf*.rpm )
+        PXF_RPM=$( ls pxf/build/distributions/pxf*.rpm )
     else
         echo "PXF rpm artifact does not exist."
         exit 2
     fi
 
-    ls pxf/build/pxf*.tar.gz > /dev/null
+    ls pxf/build/distributions/pxf*.tar.gz > /dev/null
     if [ $? = 0 ]; then
-        PXF_TARBALL=$( ls pxf/build/pxf*.tar.gz )
+        PXF_TARBALL=$( ls pxf/build/distributions/pxf*.tar.gz )
     else
         echo "PXF tarball artifact does not exist."
         exit 2

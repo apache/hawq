@@ -1,0 +1,190 @@
+buildscript {
+    repositories {
+        mavenCentral()
+        mavenLocal()
+        jcenter()
+        maven {
+            url 'http://repository.jboss.org/nexus/content/groups/public'
+        }
+    }
+    dependencies {
+        classpath 'org.hibernate.build.gradle:gradle-maven-publish-auth:2.0.1'
+        classpath 'com.netflix.nebula:gradle-ospackage-plugin:1.9.4'
+    }
+}
+subprojects { subProject ->
+    group = 'com.pivotal.pxf'
+    apply plugin: 'java'
+    apply plugin: 'idea'
+    apply plugin: 'eclipse'
+    apply plugin: 'os-package'
+    apply plugin: 'maven-publish'
+    apply plugin: 'maven-publish-auth'
+    compileJava.options*.compilerArgs = [
+            "-Xlint:varargs", "-Xlint:cast", "-Xlint:classfile", "-Xlint:dep-ann", "-Xlint:divzero", "-Xlint:empty",
+            "-Xlint:finally", "-Xlint:overrides", "-Xlint:path", "-Xlint:processing", "-Xlint:static", "-Xlint:try",
+            "-Xlint:fallthrough", "-Xlint:deprecation", "-Xlint:unchecked", "-Xlint:-options", "-Werror"
+    ]
+    compileTestJava.options*.compilerArgs = [
+            "-Xlint:varargs", "-Xlint:cast", "-Xlint:classfile", "-Xlint:dep-ann", "-Xlint:divzero", "-Xlint:empty",
+            "-Xlint:finally", "-Xlint:overrides", "-Xlint:path", "-Xlint:processing", "-Xlint:static", "-Xlint:try",
+            "-Xlint:-fallthrough", "-Xlint:-deprecation", "-Xlint:-unchecked", "-Xlint:-options"
+    ]
+    repositories {
+        mavenCentral()
+        mavenLocal()
+        maven { url 'http://hdsh128.lss.emc.com:8081/artifactory/libs-release-local' }
+    }
+    dependencies {
+        compile 'commons-logging:commons-logging:1.1.1'
+        compile 'commons-collections:commons-collections:3.2.1'
+        compile 'commons-codec:commons-codec:1.4'
+        compile 'commons-configuration:commons-configuration:1.6'
+        compile 'org.codehaus.jackson:jackson-mapper-asl:1.9.3'
+        testCompile 'junit:junit:4.11'
+        testCompile 'org.powermock:powermock-core:1.5.1'
+        testCompile 'org.powermock:powermock-module-junit4:1.5.1'
+        testCompile 'org.powermock:powermock-api-mockito:1.5.1'
+        testCompile 'org.mockito:mockito-core:1.9.5'
+    }
+    task distTar(type: Tar) {
+        classifier = buildNumber()
+        compression = Compression.GZIP
+        extension = 'tar.gz'
+        from jar.outputs.files
+        into "${project.name}-${project.version}"
+    }
+    //buildRpm
+    ospackage {
+        summary = 'The PXF extensions library for HAWQ'
+        vendor = 'Pivotal'
+        release = buildNumber()
+        os = LINUX
+        license = "Copyright © ${new Date().format("yyyy")} Pivotal Software, Inc. All Rights reserved."
+        obsoletes('gpxf')
+        user = 'root'
+        permissionGroup = 'root'
+        from(jar.outputs.files) {
+            into "/usr/lib/gphd/pxf-${project.version}"
+        }
+        from(jar.outputs.files) {
+            into '/usr/lib/gphd/publicstage'
+            rename { '.workaround' }
+        }
+        link('/usr/lib/gphd/pxf', "pxf-${project.version}")
+        link("/usr/lib/gphd/pxf-${project.version}/${project.name}.jar", "${project.name}-${project.version}.jar")
+    }
+    //publish
+    publishing {
+        publications {
+            mavenJava(MavenPublication) {
+                from components.java
+            }
+        }
+        repositories {
+            maven {
+                if (subProject.version.endsWith('SNAPSHOT')) {
+                    name 'hdsh128.lss.emc.com'
+                    url 'http://hdsh128.lss.emc.com:8081/artifactory/libs-snapshot-local'
+                } else {
+                    name 'hdsh128.lss.emc.com'
+                    url 'http://hdsh128.lss.emc.com:8081/artifactory/libs-release-local'
+                }
+            }
+        }
+    }
+}
+project('pxf-api') {
+    dependencies {
+        testCompile "org.eclipse.jetty.orbit:javax.servlet:$servletVersion"
+    }
+    ospackage {
+        from('src/main/resources/pxf-profiles-default.xml') {
+            fileType = CONFIG | NOREPLACE
+            into "/etc/gphd/pxf-${project.version}/conf"
+            rename { 'pxf-profiles.xml' }
+        }
+        link('/etc/gphd/pxf', "pxf-${project.version}")
+    }
+    project.distTar {
+        from('src/main/resources/pxf-profiles-default.xml') { into 'conf' rename { 'pxf-profiles.xml' } }
+    }
+}
+project('pxf-core') {
+    dependencies {
+        compile(project(':pxf-api'))
+        compile "org.eclipse.jetty.orbit:javax.servlet:$servletVersion"
+        compile "org.eclipse.jetty:jetty-io:$jettyVersion"
+        compile "com.sun.jersey:jersey-core:$jerseyVersion"
+        compile "org.apache.hadoop:hadoop-common:$hadoopVersion"
+        compile "org.apache.hadoop:hadoop-hdfs:$hadoopVersion"
+        compile "org.apache.hadoop:hadoop-auth:$hadoopVersion"
+        compile "org.apache.hadoop:hadoop-annotations:$hadoopVersion"
+    }
+    ospackage {
+        requires('pxf-api', project.version, GREATER | EQUAL)
+    }
+}
+project('pxf-hdfs') {
+    dependencies {
+        compile(project(':pxf-core')) //Yikes, HdfsAnalyzer is directly accessing the bridge
+        compile "org.eclipse.jetty.orbit:javax.servlet:$servletVersion"
+        compile "org.eclipse.jetty:jetty-io:$jettyVersion"
+        compile "com.sun.jersey:jersey-core:$jerseyVersion"
+        compile "org.apache.avro:avro-mapred:$avroVersion"
+        compile "org.apache.hadoop:hadoop-mapreduce-client-core:$hadoopVersion"
+    }
+    ospackage {
+        requires('pxf-core', project.version, GREATER | EQUAL)
+    }
+}
+project('pxf-hive') {
+    dependencies {
+        compile(project(':pxf-hdfs'))
+        compile "org.eclipse.jetty.orbit:javax.servlet:$servletVersion"
+        compile "org.eclipse.jetty:jetty-io:$jettyVersion"
+        compile "com.sun.jersey:jersey-core:$jerseyVersion"
+        compile "org.apache.hive:hive-service:$hiveVersion"
+        compile "org.apache.hive:hive-metastore:$hiveVersion"
+        compile "org.apache.hive:hive-common:$hiveVersion"
+        compile "org.apache.hive:hive-serde:$hiveVersion"
+        compile "org.apache.avro:avro:$avroVersion"
+        testCompile 'pl.pragmatists:JUnitParams:1.0.2'
+    }
+
+    ospackage {
+        requires('pxf-hdfs', project.version, GREATER | EQUAL)
+    }
+}
+project('pxf-hbase') {
+    dependencies {
+        compile(project(':pxf-api'))
+        compile "org.apache.hadoop:hadoop-common:$hadoopVersion"
+        compile "org.eclipse.jetty.orbit:javax.servlet:$servletVersion"
+        compile "org.eclipse.jetty:jetty-io:$jettyVersion"
+        compile "com.sun.jersey:jersey-core:$jerseyVersion"
+        compile "org.apache.hbase:hbase-client:$hbaseVersion"
+        compile "org.apache.avro:avro:$avroVersion"
+    }
+    ospackage {
+        requires('pxf-api', project.version, GREATER | EQUAL)
+    }
+}
+
+def buildNumber() {
+    System.getenv('BUILD_NUMBER') ?: System.getProperty('user.name')
+}
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '1.11'
+}
+
+task release(type: Copy, dependsOn: [subprojects.build, subprojects.javadoc, subprojects.buildRpm, subprojects.distTar]) {
+    delete 'build'
+    into 'build'
+    subprojects { subProject ->
+        from("${project.name}/build/libs") { into 'libs' }
+        from("${project.name}/build/distributions") { into 'distributions' }
+        from("${project.name}/build/test-results") { into 'test-results' }
+    }
+}
