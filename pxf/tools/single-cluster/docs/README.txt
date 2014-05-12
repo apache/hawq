@@ -66,6 +66,11 @@ CentOS
 7. Changes
 ==========
 
+v1.8.1
+------
+
+- GPSQL-2142: Grab tcServer from build-prod
+
 v1.8
 ----
 
