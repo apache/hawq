@@ -727,7 +727,7 @@ void check_response_code(churl_context* context)
 	{
 		if (!handle_special_error(response_code))
 		{
-			char	*dest_ip;
+			char	*dest_ip = NULL;
 			long	 dest_port = 0;
 			StringInfoData err;
 			char    *http_error_msg;

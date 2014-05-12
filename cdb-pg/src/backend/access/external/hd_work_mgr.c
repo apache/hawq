@@ -289,7 +289,7 @@ static GPHDUri* init(char* uri, ClientContext* cl_context, bool warn_on_deprecat
 	 */
 	if (!pxf_local_storage)
 	{
-		sprintf(hadoop_uri->port, "%d", pxf_service_port);
+		port_to_str(hadoop_uri->port, pxf_service_port);
 	}
 
 	/*

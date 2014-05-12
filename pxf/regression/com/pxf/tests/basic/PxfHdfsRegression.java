@@ -881,7 +881,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 		} catch (PSQLException e) {
 
 			/**
-			 * Different Curel versions can provide different ERROR messages.
+			 * Different Curl versions can provide different ERROR messages.
 			 */
 			String[] possibleErrMessages = {
 					"Failed connect to " + exTable.getHost() + ":" + exTable.getPort() + "; Connection refused",
