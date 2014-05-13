@@ -639,3 +639,69 @@ parquetFileSegInfoCmp(const void *left, const void *right)
 
 	return 0;
 }
+
+Datum
+parquet_compression_ration_internal(Relation parentrel)
+{
+	Relation pg_parquetseg_rel;
+	TupleDesc pg_parquetseg_dsc;
+	HeapTuple tuple;
+	HeapScanDesc parquetscan;
+	Datum eof;
+	Datum eof_uncompressed;
+	float8 total_eof = 0;
+	float8 total_eof_uncompressed = 0;
+	bool isNull;
+	AppendOnlyEntry *aoEntry = NULL;
+	float8			compress_ratio = -1; /* the default, meaning "not available" */
+
+	Assert(GpIdentity.segindex == -1); /* Make sure this function is called in master */
+
+	aoEntry = GetAppendOnlyEntry(RelationGetRelid(parentrel), SnapshotNow);
+
+	Assert(aoEntry != NULL);
+
+	pg_parquetseg_rel = heap_open(aoEntry->segrelid, AccessShareLock);
+	pg_parquetseg_dsc = RelationGetDescr(pg_parquetseg_rel);
+
+	parquetscan = heap_beginscan(pg_parquetseg_rel, SnapshotNow, 0, NULL);
+
+	while (HeapTupleIsValid(tuple = heap_getnext(parquetscan, ForwardScanDirection)))
+	{
+		eof = fastgetattr(tuple, Anum_pg_parquetseg_eof, pg_parquetseg_dsc, &isNull);
+		Assert(!isNull);
+
+		eof_uncompressed = fastgetattr(tuple, Anum_pg_parquetseg_eofuncompressed, pg_parquetseg_dsc, &isNull);
+		Assert(!isNull);
+
+		total_eof += DatumGetFloat8(eof);
+		total_eof_uncompressed += DatumGetFloat8(eof_uncompressed);
+
+		CHECK_FOR_INTERRUPTS();
+	}
+
+	heap_endscan(parquetscan);
+	heap_close(pg_parquetseg_rel, AccessShareLock);
+
+	pfree(aoEntry);
+
+	if (total_eof > 0)
+	{
+		char  buf[8];
+
+		/* calculate the compression ratio */
+		float8 compress_ratio_raw = DatumGetFloat8(DirectFunctionCall2(float8div,
+																	Float8GetDatum(total_eof_uncompressed),
+																	Float8GetDatum(total_eof)));
+
+		/* format to 2 digits past the decimal point */
+		snprintf(buf, 8, "%.2f", compress_ratio_raw);
+
+		/* format to 2 digit decimal precision */
+		compress_ratio = DatumGetFloat8(DirectFunctionCall1(float8in,
+										CStringGetDatum(buf)));
+
+	}
+
+	PG_RETURN_FLOAT8(compress_ratio);
+}

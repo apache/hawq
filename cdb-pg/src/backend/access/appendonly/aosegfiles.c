@@ -34,6 +34,7 @@
 #include "utils/fmgroids.h"
 #include "utils/numeric.h"
 #include "access/aocssegfiles.h"
+#include "access/parquetsegfiles.h"
 
 static Datum ao_compression_ratio_internal(Oid relid);
 
@@ -1553,7 +1554,7 @@ get_ao_compression_ratio_name(PG_FUNCTION_ARGS)
 	text	   		*relname = PG_GETARG_TEXT_P(0);
 	Oid				relid;
 
-	Assert(Gp_role != GP_ROLE_EXECUTE);
+	/* Assert(Gp_role != GP_ROLE_EXECUTE); */
 
 	parentrv = makeRangeVarFromNameList(textToQualifiedNameList(relname));
 	relid = RangeVarGetRelid(parentrv, false);
@@ -1572,7 +1573,7 @@ get_ao_compression_ratio_oid(PG_FUNCTION_ARGS)
 {
 	Oid			relid = PG_GETARG_OID(0);
 
-	Assert(Gp_role != GP_ROLE_EXECUTE);
+	/* Assert(Gp_role != GP_ROLE_EXECUTE); */
 
 	return ao_compression_ratio_internal(relid);
 }
@@ -1580,128 +1581,65 @@ get_ao_compression_ratio_oid(PG_FUNCTION_ARGS)
 static Datum
 aorow_compression_ratio_internal(Relation parentrel)
 {
-	StringInfoData 	sqlstmt;
-	bool 			connected = false;
-	char		   *aoseg_relname;
-	int 			proc;
-	int 			ret;
+	Relation pg_aoseg_rel;
+	TupleDesc pg_aoseg_dsc;
+	HeapTuple tuple;
+	HeapScanDesc aoscan;
+	Datum eof;
+	Datum eof_uncompressed;
+	float8 total_eof = 0;
+	float8 total_eof_uncompressed = 0;
+	bool isNull;
+	AppendOnlyEntry *aoEntry = NULL;
 	float8			compress_ratio = -1; /* the default, meaning "not available" */
 
-	MemoryContext 	oldcontext = CurrentMemoryContext;
-	Oid segrelid = InvalidOid;
+	Assert(GpIdentity.segindex == -1); /* Make sure this function is called in master */
 
-	GetAppendOnlyEntryAuxOids(RelationGetRelid(parentrel), SnapshotNow,
-							  &segrelid,
-							  NULL, NULL, NULL);
-	Assert(OidIsValid(segrelid));
+	aoEntry = GetAppendOnlyEntry(RelationGetRelid(parentrel), SnapshotNow);
 
-	/*
-	 * get the name of the aoseg relation
-	 */
-	aoseg_relname = get_rel_name(segrelid);
-	if (NULL == aoseg_relname)
-		elog(ERROR, "failed to get relname for AO file segment");
+	Assert(aoEntry != NULL);
 
-	/*
-	 * assemble our query string
-	 */
-	initStringInfo(&sqlstmt);
-	if (Gp_role != GP_ROLE_EXECUTE)
-		appendStringInfo(&sqlstmt, "select sum(eof), sum(eofuncompressed) "
-								"from pg_aoseg.%s",
-									aoseg_relname);
-	else
-		appendStringInfo(&sqlstmt, "select eof, eofuncompressed "
-								"from pg_aoseg.%s",
-									aoseg_relname);
+	pg_aoseg_rel = heap_open(aoEntry->segrelid, AccessShareLock);
+	pg_aoseg_dsc = RelationGetDescr(pg_aoseg_rel);
 
-	PG_TRY();
+	aoscan = heap_beginscan(pg_aoseg_rel, SnapshotNow, 0, NULL);
+
+	while (HeapTupleIsValid(tuple = heap_getnext(aoscan, ForwardScanDirection)))
 	{
+		eof = fastgetattr(tuple, Anum_pg_aoseg_eof, pg_aoseg_dsc, &isNull);
+		Assert(!isNull);
 
-		if (SPI_OK_CONNECT != SPI_connect())
-		{
-			ereport(ERROR, (errcode(ERRCODE_CDB_INTERNAL_ERROR),
-							errmsg("Unable to obtain AO relation information from segment databases."),
-							errdetail("SPI_connect failed in get_ao_compression_ratio")));
-		}
-		connected = true;
+		eof_uncompressed = fastgetattr(tuple, Anum_pg_aoseg_eofuncompressed, pg_aoseg_dsc, &isNull);
+		Assert(!isNull);
 
-		/* Do the query. */
-		ret = SPI_execute(sqlstmt.data, false, 0);
-		proc = SPI_processed;
+		total_eof += DatumGetFloat8(eof);
+		total_eof_uncompressed += DatumGetFloat8(eof_uncompressed);
 
-
-		if (ret > 0 && SPI_tuptable != NULL)
-		{
-			TupleDesc 		tupdesc = SPI_tuptable->tupdesc;
-			SPITupleTable*	tuptable = SPI_tuptable;
-			HeapTuple 		tuple = tuptable->vals[0];
-			char*			val_eof;
-			char*			val_eof_uncomp;
-			MemoryContext 	cxt_save;
-
-			/* we expect only 1 tuple */
-			Assert(proc == 1);
-
-			/* Get totals from QE's */
-			val_eof = SPI_getvalue(tuple, tupdesc, 1);
-			val_eof_uncomp = SPI_getvalue(tuple, tupdesc, 2);
-
-			/* use our own context so that SPI won't free our stuff later */
-			cxt_save = MemoryContextSwitchTo(oldcontext);
-
-			/*
-			 * Calculate the compression ratio. but do it only if the uncomp
-			 * value is not NULL. In older tables, that were created before
-			 * GPDB 3.3 the upgrade process will leave a NULL in new aoseg
-			 * table eofuncompressed column, and in that case we return -1
-			 * to indicate "ratio N/A" (set by default at declare time).
-			 */
-			if(val_eof_uncomp != NULL && val_eof != NULL)
-			{
-				Datum eof = DirectFunctionCall1(float8in, CStringGetDatum(val_eof));
-				Datum eof_uncomp = DirectFunctionCall1(float8in, CStringGetDatum(val_eof_uncomp));
-
-				/* guard against division by zero */
-				if(DatumGetFloat8(eof) > 0)
-				{
-					char  buf[8];
-
-					/* calculate the compression ratio */
-					float8 compress_ratio_raw = DatumGetFloat8(DirectFunctionCall2(float8div,
-																				eof_uncomp,
-																				eof));
-
-					/* format to 2 digits past the decimal point */
-					snprintf(buf, 8, "%.2f", compress_ratio_raw);
-
-					/* format to 2 digit decimal precision */
-					compress_ratio = DatumGetFloat8(DirectFunctionCall1(float8in,
-													CStringGetDatum(buf)));
-				}
-			}
-
-			MemoryContextSwitchTo(cxt_save);
-
-		}
-
-		connected = false;
-		SPI_finish();
+		CHECK_FOR_INTERRUPTS();
 	}
 
-	/* Clean up in case of error. */
-	PG_CATCH();
+	heap_endscan(aoscan);
+	heap_close(pg_aoseg_rel, AccessShareLock);
+
+	pfree(aoEntry);
+
+	if (total_eof > 0)
 	{
-		if (connected)
-			SPI_finish();
+		char  buf[8];
 
-		/* Carry on with error handling. */
-		PG_RE_THROW();
+		/* calculate the compression ratio */
+		float8 compress_ratio_raw = DatumGetFloat8(DirectFunctionCall2(float8div,
+																	Float8GetDatum(total_eof_uncompressed),
+																	Float8GetDatum(total_eof)));
+
+		/* format to 2 digits past the decimal point */
+		snprintf(buf, 8, "%.2f", compress_ratio_raw);
+
+		/* format to 2 digit decimal precision */
+		compress_ratio = DatumGetFloat8(DirectFunctionCall1(float8in,
+										CStringGetDatum(buf)));
+
 	}
-	PG_END_TRY();
-
-
-	pfree(sqlstmt.data);
 
 	PG_RETURN_FLOAT8(compress_ratio);
 }
@@ -1721,13 +1659,17 @@ ao_compression_ratio_internal(Oid relid)
 				errmsg("'%s' is not an append-only relation",
 						RelationGetRelationName(parentrel))));
 
-	if (RelationIsAoRows(parentrel) || RelationIsParquet(parentrel))
+	if (RelationIsAoRows(parentrel))
 	{
 		returnDatum = aorow_compression_ratio_internal(parentrel);
 	}
-	else
+	else if (RelationIsAoCols(parentrel))
 	{
 		returnDatum = aocol_compression_ratio_internal(parentrel);
+	}
+	else
+	{
+		returnDatum = parquet_compression_ration_internal(parentrel);
 	}
 	
 	heap_close(parentrel, AccessShareLock);

@@ -1299,137 +1299,73 @@ gp_update_aocol_master_stats_internal(Relation parentrel, Snapshot appendOnlyMet
 Datum
 aocol_compression_ratio_internal(Relation parentrel)
 {
-	StringInfoData	sqlstmt;
-	bool			connected = false;
-	char		   *aocsseg_relname;
-	int				proc;
-	int				ret;
-	int64			eof = 0;
-	int64			eof_uncompressed = 0;
-	float8			compress_ratio = -1; /* the default, meaning "not available" */
+	Relation pg_aocsseg_rel;
+	TupleDesc pg_aocsseg_dsc;
+	HeapTuple tuple;
+	HeapScanDesc aocsscan;
+	Datum vpinfo;
+	float8 total_eof = 0;
+	float8 total_eof_uncompressed = 0;
+	bool isNull;
+	AppendOnlyEntry *aoEntry = NULL;
+	float8 compress_ratio = -1; /* the default, meaning "not available" */
 
-	MemoryContext 	oldcontext = CurrentMemoryContext;
-	Oid segrelid = InvalidOid;
+	Assert(GpIdentity.segindex == -1); /* Make sure this function is called in master */
 
-	GetAppendOnlyEntryAuxOids(RelationGetRelid(parentrel), SnapshotNow,
-							  &segrelid, NULL, NULL, NULL);
-	Assert(OidIsValid(segrelid));
+	aoEntry = GetAppendOnlyEntry(RelationGetRelid(parentrel), SnapshotNow);
 
-	/*
-	 * get the name of the aoseg relation
-	 */
-	aocsseg_relname = get_rel_name(segrelid);
-	if (NULL == aocsseg_relname)
-		elog(ERROR, "failed to get relname for AO file segment");
+	Assert(aoEntry != NULL);
 
-	/*
-	 * assemble our query string.
-	 *
-	 * NOTE: The aocsseg (per table) system catalog lives in the gp_aoseg namespace, too.
-	 */
-	initStringInfo(&sqlstmt);
-	if (Gp_role == GP_ROLE_DISPATCH)
-		appendStringInfo(&sqlstmt, "select vpinfo "
-								"from pg_aoseg.%s",
-									aocsseg_relname);
-	else
-		appendStringInfo(&sqlstmt, "select vpinfo "
-								"from pg_aoseg.%s",
-									aocsseg_relname);
+	pg_aocsseg_rel = heap_open(aoEntry->segrelid, AccessShareLock);
+	pg_aocsseg_dsc = RelationGetDescr(pg_aocsseg_rel);
 
-	PG_TRY();
+	aocsscan = heap_beginscan(pg_aocsseg_rel, SnapshotNow, 0, NULL);
+
+	while (HeapTupleIsValid(tuple = heap_getnext(aocsscan, ForwardScanDirection)))
 	{
+		vpinfo = fastgetattr(tuple, Anum_pg_aocs_vpinfo, pg_aocsseg_dsc, &isNull);
+		Assert(!isNull);
 
-		if (SPI_OK_CONNECT != SPI_connect())
 		{
-			ereport(ERROR, (errcode(ERRCODE_CDB_INTERNAL_ERROR),
-							errmsg("Unable to obtain AO relation information from segment databases."),
-							errdetail("SPI_connect failed in get_ao_compression_ratio")));
-		}
-		connected = true;
-
-		/* Do the query. */
-		ret = SPI_execute(sqlstmt.data, false, 0);
-		proc = SPI_processed;
-
-
-		if (ret > 0 && SPI_tuptable != NULL)
-		{
-			TupleDesc 		tupdesc = SPI_tuptable->tupdesc;
-			SPITupleTable*	tuptable = SPI_tuptable;
-			int				i;
-			HeapTuple 		tuple;
-			bool			isnull;
-			Datum			vpinfoDatum;
-			AOCSVPInfo 		*vpinfo;
-			int				j;
-			MemoryContext 	cxt_save;
-
-			for (i = 0; i < proc; i++)
+			struct varlena *v = (struct varlena *)DatumGetPointer(vpinfo);
+			struct varlena *dv = pg_detoast_datum(v);
+			AOCSVPInfo *vpinfo = (AOCSVPInfo *)dv;
+			int i;
+			for (i = 0; i < vpinfo->nEntry; i++)
 			{
-				/*
-				 * Each row is a binary struct vpinfo with a variable number of entries
-				 * on the end.
-				 */
-				tuple = tuptable->vals[i];
-				
-				vpinfoDatum = heap_getattr(tuple, 1, tupdesc, &isnull);
-				if (isnull)
-					break;
-
-				vpinfo = (AOCSVPInfo*)DatumGetByteaP(vpinfoDatum);
-				
-				// CONSIDER: Better verification of vpinfo.
-				Assert(vpinfo->version == 0);
-				for (j = 0; j < vpinfo->nEntry; j++)
-				{
-					eof += vpinfo->entry[j].eof;
-					eof_uncompressed += vpinfo->entry[j].eof_uncompressed;
-				}
+				total_eof += vpinfo->entry[i].eof;
+				total_eof_uncompressed += vpinfo->entry[i].eof_uncompressed;
 			}
-
-			/* use our own context so that SPI won't free our stuff later */
-			cxt_save = MemoryContextSwitchTo(oldcontext);
-
-			/* guard against division by zero */
-			if (eof > 0)
+			if(dv != v)
 			{
-				char  buf[8];
-
-				/* calculate the compression ratio */
-				float8 compress_ratio_raw = 
-						((float8)eof_uncompressed) /
-												((float8)eof);
-
-				/* format to 2 digits past the decimal point */
-				sprintf(buf, "%.2f", compress_ratio_raw);
-
-				/* format to 2 digit decimal precision */
-				compress_ratio = DatumGetFloat8(DirectFunctionCall1(float8in,
-												CStringGetDatum(buf)));
+				pfree(dv);
 			}
-
-			MemoryContextSwitchTo(cxt_save);
-
 		}
 
-		connected = false;
-		SPI_finish();
+		CHECK_FOR_INTERRUPTS();
 	}
 
-	/* Clean up in case of error. */
-	PG_CATCH();
+	heap_endscan(aocsscan);
+	heap_close(pg_aocsseg_rel, AccessShareLock);
+	pfree(aoEntry);
+
+	if (total_eof > 0)
 	{
-		if (connected)
-			SPI_finish();
+		char  buf[8];
 
-		/* Carry on with error handling. */
-		PG_RE_THROW();
+		/* calculate the compression ratio */
+		float8 compress_ratio_raw = DatumGetFloat8(DirectFunctionCall2(float8div,
+																	Float8GetDatum(total_eof_uncompressed),
+																	Float8GetDatum(total_eof)));
+
+		/* format to 2 digits past the decimal point */
+		snprintf(buf, 8, "%.2f", compress_ratio_raw);
+
+		/* format to 2 digit decimal precision */
+		compress_ratio = DatumGetFloat8(DirectFunctionCall1(float8in,
+										CStringGetDatum(buf)));
+
 	}
-	PG_END_TRY();
-
-
-	pfree(sqlstmt.data);
 
 	PG_RETURN_FLOAT8(compress_ratio);
 }

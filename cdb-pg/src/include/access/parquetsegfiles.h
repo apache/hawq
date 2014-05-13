@@ -103,4 +103,6 @@ extern ParquetFileSegTotals *GetParquetSegFilesTotals(Relation parentrel,
 
 extern int64 GetParquetTotalBytes(Relation parentrel, Snapshot parquetMetaDataSnapshot);
 
+extern Datum parquet_compression_ration_internal(Relation parentrel);
+
 #endif   /* PARQUETSEGFILES_H */
