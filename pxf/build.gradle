@@ -33,7 +33,7 @@ subprojects { subProject ->
     repositories {
         mavenCentral()
         mavenLocal()
-        maven { url 'http://hdsh128.lss.emc.com:8081/artifactory/libs-release-local' }
+        maven { url 'http://hdp4-mdw1.wbe.dh.greenplum.com:8081/artifactory/libs-release-local' }
     }
     dependencies {
         compile 'commons-logging:commons-logging:1.1.1'
