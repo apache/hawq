@@ -62,8 +62,8 @@ int main(int argc, char * argv[]) {
     *  argv[4]:krb keytab file
     */
     if (argc < 3 || (argc == 4 && strcasecmp(argv[3],"off")) ) {
-    	fprintf(stderr, "ERROR: gpcheckhdfs run error,Please check your config file\n"
-			"       DFS_NAME and DFS_URL are must, KERBEROS_KEYFILE and ENABLE_SECURE_FILESYSTEM are optional\n");
+    	fprintf(stderr, "ERROR: gpcheckhdfs parameter error, Please check your config file\n"
+			"\tDFS_NAME and DFS_URL are required, KERBEROS_KEYFILE and ENABLE_SECURE_FILESYSTEM are optional\n");
         return GPCHKHDFS_ERR;
     } 
 
@@ -77,7 +77,7 @@ int main(int argc, char * argv[]) {
     int iPort = atoi(port);
 
     if (iPort < 0) {
-        fprintf(stderr, "ERROR:Invalid NameNode Port,Please Check\n");
+        fprintf(stderr, "ERROR: Invalid NameNode Port, Please Check\n");
         return CONNECT_ERR;
     }
 
@@ -117,41 +117,35 @@ int testHdfsOperateFile(hdfsFS fs, const char * filepath, const char * dfscomple
     hdfsFile testFile = hdfsOpenFile(fs, filepath, O_CREAT, 0, 0, 0);
 
     if (NULL == testFile) {
-        fprintf(stderr, "ERROR:'hdfsOpenFile' execute failed\n"
-                "Can not Open or Create file %s\n", dfscompleteurl);
+		fprintf(stderr, "ERROR:'hdfsOpenFile' failed to create file %s\n", dfscompleteurl);
         return OPENFILE_ERR;
     }
 
     char * testbuff = "Test file....";
-    int ts = hdfsWrite(fs, testFile, testbuff, strlen(testbuff) + 1);
+    int ts = hdfsWrite(fs, testFile, testbuff, strlen(testbuff));
 
     if (ts < 0) {
-        fprintf(stderr, "ERROR:'hdfsWrite' execute failed\n"
-                "Can not Write to file %s\n", dfscompleteurl);
+        fprintf(stderr, "ERROR:'hdfsWrite' failed to write to file %s\n", dfscompleteurl);
         return WRITEFILE_ERR;
     }
 
     int rv = hdfsHFlush(fs, testFile);
 
     if (rv < 0) {
-        fprintf(stderr, "ERROR:'hdfsHFlush' execute failed\n"
-                "Can not Flush\n");
-        rv = hdfsDelete(fs, filepath, 0);
-
-        if (rv < 0) {
-            fprintf(stderr, "ERROR:'hdfsDelete' execute failed\n"
-                    "Can not Delete %s\n", dfscompleteurl);
-            return DELETE_ERR;
-        }
-
+        fprintf(stderr, "ERROR:'hdfsHFlush' failed to flush file\n");
         return FLUSH_ERR;
     }
+
+    rv = hdfsCloseFile(fs, testFile);
+	if (rv < 0) {
+		fprintf(stderr, "ERROR:'hdfsClose' failed to close file\n");
+		return FLUSH_ERR;
+	}
 
     rv = hdfsDelete(fs, filepath, 0);
 
     if (rv < 0) {
-        fprintf(stderr, "ERROR:'hdfsDelete' execute failed\n"
-                "Can not Delete %s\n", dfscompleteurl);
+        fprintf(stderr, "ERROR:'hdfsDelete' failed to delete %s\n", dfscompleteurl);
         return DELETE_ERR;
     }
 
@@ -186,7 +180,7 @@ int testHdfsConnect(hdfsFS * fsptr, const char * host, int iPort, const char * k
             else
                 fprintf(stderr, "ERROR: (HA) Can not connect to 'hdfs://%s'\n", host);
 
-            fprintf(stderr, "Please Check your Hdfs or Config file\n");
+            fprintf(stderr, "Please check your HDFS or hdfs-client.xml in ${GPHOME}/etc\n");
             return CONNECT_ERR;
         }
 
@@ -194,7 +188,7 @@ int testHdfsConnect(hdfsFS * fsptr, const char * host, int iPort, const char * k
         struct hdfsToken * token = hdfsGetDelegationToken((*fsptr), krb_srvname);
 
         if (NULL == token) {
-            fprintf(stderr, "ERROR:Get Delegation Token Error\n");
+            fprintf(stderr, "ERROR: Get Delegation Token Error\n");
             return GETTOKEN_ERR;
         }
 
@@ -222,18 +216,19 @@ int testHdfsExisted(hdfsFS fs, const char * filepath, const char * dfscompleteur
     int notExisted = hdfsExists(fs, filepath);
 
     if (notExisted) {
-        fprintf(stderr, "WARNING:'%s' does not existed,It will start to create\n", dfscompleteurl);
-	int rv = hdfsCreateDirectory(fs, filepath);
-	if (rv < 0) {
-  	    fprintf(stderr, "ERROR: Create dir %s failed,please check\n", dfscompleteurl);
-	    return DFSDIR_ERR;
-	}
+        fprintf(stderr, "WARNING:'%s' does not exist, create it ...\n", dfscompleteurl);
+        int rv = hdfsCreateDirectory(fs, filepath);
+
+        if (rv < 0) {
+            fprintf(stderr, "ERROR: failed to create directory %s\n", dfscompleteurl);
+            return DFSDIR_ERR;
+        }
     } else {
         int num;
         hdfsFileInfo * fi = hdfsListDirectory(fs, filepath, &num);
 
-        if (NULL != fi) {
-            fprintf(stderr, "ERROR:%s is not empty\n"
+        if (NULL == fi || num != 0) {
+            fprintf(stderr, "ERROR: failed to list directory %s or it is not empty\n"
                     "Please Check your filepath before run gpinitsystem\n", dfscompleteurl);
             return DFSDIR_ERR;
         }
