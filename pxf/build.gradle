@@ -67,10 +67,6 @@ subprojects { subProject ->
         from(jar.outputs.files) {
             into "/usr/lib/gphd/pxf-${project.version}"
         }
-        from(jar.outputs.files) {
-            into '/usr/lib/gphd/publicstage'
-            rename { '.workaround' }
-        }
         link('/usr/lib/gphd/pxf', "pxf-${project.version}")
         link("/usr/lib/gphd/pxf-${project.version}/${project.name}.jar", "${project.name}-${project.version}.jar")
     }
@@ -103,6 +99,10 @@ project('pxf-api') {
             fileType = CONFIG | NOREPLACE
             into "/etc/gphd/pxf-${project.version}/conf"
             rename { 'pxf-profiles.xml' }
+        }
+        from('src/main/resources/pxf-profiles-default.xml') {
+            into '/usr/lib/gphd/publicstage'
+            rename { '.workaround' }
         }
         link('/etc/gphd/pxf', "pxf-${project.version}")
     }
