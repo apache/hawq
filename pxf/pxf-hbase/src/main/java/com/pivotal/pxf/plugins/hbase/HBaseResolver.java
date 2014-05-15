@@ -7,6 +7,7 @@ import com.pivotal.pxf.api.utilities.Plugin;
 import com.pivotal.pxf.plugins.hbase.utilities.HBaseColumnDescriptor;
 import com.pivotal.pxf.plugins.hbase.utilities.HBaseTupleDescription;
 import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.util.Bytes;
 
@@ -140,9 +141,6 @@ public class HBaseResolver extends Plugin implements ReadResolver {
 
         // else, get the latest version of the requested column
         Cell cell = result.getColumnLatestCell(column.columnFamilyBytes(), column.qualifierBytes());
-        int len = cell.getValueLength();
-        byte[] res = new byte[len];
-        System.arraycopy(cell.getValueArray(), cell.getValueOffset(), res, 0, len);
-        return res;
+        return CellUtil.cloneValue(cell);
     }
 }
