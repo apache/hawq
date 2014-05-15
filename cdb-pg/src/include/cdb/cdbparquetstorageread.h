@@ -11,7 +11,7 @@
 #include "cdb/cdbbufferedread.h"
 #include "catalog/pg_compression.h"
 #include "cdb/cdbparquetfooterprocessor.h"
-#include "cdb/cdbparquetstoragelayer.h"
+#include "cdb/cdbappendonlystoragelayer.h"
 
 /*
  * This structure contains read session information.  Consider the fields
@@ -33,7 +33,7 @@ typedef struct ParquetStorageRead {
 	char 			*title;
 
 	/* The Parquet Storage Attributes from relation creation.*/
-	ParquetStorageAttributes storageAttributes;
+	AppendOnlyStorageAttributes storageAttributes;
 
 	/* The handle to the current open segment file.*/
 	File 			file;
@@ -74,6 +74,9 @@ extern void ParquetStorageRead_Init(
 		MemoryContext memoryContext,
 		char *relationName,
 		char *title,
-		ParquetStorageAttributes *storageAttributes);
+		AppendOnlyStorageAttributes *storageAttributes);
+
+void
+ParquetStorageRead_FinishSession(ParquetStorageRead *storageRead);
 
 #endif /* CDBPARQUETSTORAGEREAD_H_ */

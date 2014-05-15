@@ -95,7 +95,7 @@ ParquetScanDesc parquet_beginscan(Relation relation,
 	ParquetScanDesc 	scan;
 	AppendOnlyEntry		*aoEntry;
 
-	ParquetStorageAttributes *attr;
+	AppendOnlyStorageAttributes *attr;
 
 	StringInfoData		titleBuf;
 	/*
@@ -174,7 +174,10 @@ ParquetScanDesc parquet_beginscan(Relation relation,
 }
 
 void parquet_rescan(ParquetScanDesc scan) {
-	insist_log(false, "SeqScan/AppendOnlyScan/AOCSScan/ParquetScan are defunct");
+    CloseScannedFileSeg(scan);
+	scan->initedStorageRoutines = false;
+	ParquetStorageRead_FinishSession(&(scan->storageRead));
+	initscan(scan);
 }
 
 void parquet_endscan(ParquetScanDesc scan) {
@@ -205,6 +208,10 @@ void parquet_endscan(ParquetScanDesc scan) {
 		}
 		pfree(readRowGroup.columnReaders);
 	}
+    
+    CloseScannedFileSeg(scan);
+	ParquetStorageRead_FinishSession(&(scan->storageRead));
+	scan->initedStorageRoutines = false;
 
 	if(scan->hawqAttrToParquetColChunks != NULL){
 		pfree(scan->hawqAttrToParquetColChunks);
@@ -213,9 +220,6 @@ void parquet_endscan(ParquetScanDesc scan) {
 	if(scan->aoEntry != NULL){
 		pfree(scan->aoEntry);
 	}
-
-	CloseScannedFileSeg(scan);
-
 }
 
 void parquet_getnext(ParquetScanDesc scan, ScanDirection direction,

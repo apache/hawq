@@ -184,7 +184,7 @@ void ParquetStorageRead_Init(
 		MemoryContext memoryContext,
 		char *relationName,
 		char *title,
-		ParquetStorageAttributes *storageAttributes)
+		AppendOnlyStorageAttributes *storageAttributes)
 {
 	int		relationNameLen;
 	uint8	*memory;
@@ -208,7 +208,7 @@ void ParquetStorageRead_Init(
 	memcpy(
 		&storageRead->storageAttributes,
 		storageAttributes,
-		sizeof(ParquetStorageAttributes));
+		sizeof(AppendOnlyStorageAttributes));
 
 	relationNameLen = strlen(relationName);
 	storageRead->relationName = (char *) palloc(relationNameLen + 1);
@@ -231,5 +231,34 @@ void ParquetStorageRead_Init(
 	MemoryContextSwitchTo(oldMemoryContext);
 
 	storageRead->isActive = true;
+}
+
+void
+ParquetStorageRead_FinishSession(ParquetStorageRead *storageRead)
+{
+	MemoryContext	oldMemoryContext;
+    
+	if(!storageRead->isActive)
+		return;
+    
+	oldMemoryContext = MemoryContextSwitchTo(storageRead->memoryContext);
+    
+	if (storageRead->relationName != NULL)
+	{
+		pfree(storageRead->relationName);
+		storageRead->relationName = NULL;
+	}
+    
+	if (storageRead->segmentFileName != NULL)
+	{
+		pfree(storageRead->segmentFileName);
+		storageRead->segmentFileName = NULL;
+	}
+    
+	/* Deallocation is done. Go back to caller memory-context. */
+	MemoryContextSwitchTo(oldMemoryContext);
+    
+	storageRead->isActive = false;
+    
 }
 

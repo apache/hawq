@@ -10,7 +10,7 @@
 
 #include "access/parquetsegfiles.h"
 #include "access/parquetmetadata_c++/MetadataInterface.h"
-#include "cdb/cdbparquetstoragelayer.h"
+#include "cdb/cdbappendonlystoragelayer.h"
 #include "cdb/cdbparquetstorageread.h"
 #include "cdb/cdbparquetstoragewrite.h"
 #include "cdb/cdbmirroredappendonly.h"
@@ -58,7 +58,7 @@ typedef struct ParquetScanDescData {
 
 	bool 				initedStorageRoutines;
 
-	ParquetStorageAttributes storageAttributes;
+	AppendOnlyStorageAttributes storageAttributes;
 	ParquetStorageRead 	storageRead;
 
 	char 				*title;
