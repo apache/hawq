@@ -262,5 +262,12 @@ HA -->
 		the timeout interval in millisecond when the output stream is trying to write to datanode. default is 3600000.
 		</description>
 	</property>
-	
+
+	<property>
+		<name>output.packetpool.size</name>
+		<value>1024</value>
+		<description>
+		the max number of packets in a file's packet pool. default is 1024.
+		</description>
+	</property>
 </configuration>

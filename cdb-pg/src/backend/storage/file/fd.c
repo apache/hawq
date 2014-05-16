@@ -2861,11 +2861,21 @@ HdfsFileSeek(File file, int64 offset, int whence)
 
 	int64 desiredPos = 0;
 	if (VfdCache[file].seekPos != FileUnknownPos )
+	{
 		desiredPos = VfdCache[file].seekPos;
+	}
+	else if (whence == SEEK_CUR)
+	{
+		ereport(WARNING,
+			(errcode(ERRCODE_IO_ERROR),
+					errmsg("cannot seek file %s since current position is unknown", VfdCache[file].fileName)));
+		errno = EINVAL;
+		return -1;
+	}
 
 	switch (whence) {
 		case SEEK_SET:
-			Assert(offset >= INT64CONST(0));
+			Insist(offset >= INT64CONST(0));
 			desiredPos = offset;
 			break;
 		case SEEK_CUR:
@@ -2873,6 +2883,7 @@ HdfsFileSeek(File file, int64 offset, int whence)
 			break;
 		case SEEK_END:
 		{
+			Insist(offset <= INT64CONST(0));
 			hdfsFileInfo	*info;
 			char path[MAXPGPATH + 1];
 
@@ -2880,9 +2891,15 @@ HdfsFileSeek(File file, int64 offset, int whence)
 
 			info = HdfsGetPathInfo(VfdCache[file].hProtocol, VfdCache[file].hFS, path);
 			if (!info)
+			{
+				ereport(WARNING,
+						(errcode(ERRCODE_IO_ERROR),
+								errmsg("cannot seek file %s since cannot get file information", VfdCache[file].fileName),
+								errdetail("%s", HdfsGetLastError())));
 				return -1;
+			}
 
-			desiredPos = info->mSize;
+			desiredPos = info->mSize + offset;
 			HdfsFreeFileInfo(VfdCache[file].hProtocol, info, 1);
 			break;
 		}
@@ -3019,7 +3036,13 @@ HdfsFileTruncate(File file, int64 offset)
 	Insist((vfdP->fileFlags & O_WRONLY) && (vfdP->fileFlags & O_APPEND));
 	if (FALSE == HdfsBasicOpenFile(vfdP->fileName, vfdP->fileFlags, vfdP->fileMode,
 	        &protocol, &vfdP->hFS, &vfdP->hFile))
-	    return -1;
+	{
+		ereport(WARNING,
+			(errcode(ERRCODE_IO_ERROR),
+					errmsg("cannot reopen file %s after truncate, errno %d", VfdCache[file].fileName, errno),
+					errdetail("%s", HdfsGetLastError())));
+		return -1;
+	}
 
 	vfdP->hProtocol = strdup(protocol);
 	pfree(protocol);
@@ -3036,8 +3059,22 @@ HdfsFileTruncate(File file, int64 offset)
 	 * we assume that there is no concurrent appending and truncating.
 	 */
 	vfdP->seekPos = (int64) HdfsTell(vfdP->hProtocol, vfdP->hFS, vfdP->hFile);
+
+	if (vfdP->seekPos < 0)
+	{
+		ereport(WARNING,
+			(errcode(ERRCODE_IO_ERROR),
+					errmsg("cannot get file length for file %s after truncate, errno %d", VfdCache[file].fileName, errno),
+					errdetail("%s", HdfsGetLastError())));
+		return -1;
+	}
+
 	if (offset != vfdP->seekPos)
 	{
+		ereport(WARNING,
+				(errcode(ERRCODE_IO_ERROR),
+						errmsg("failed to check logic position after truncate file %s, logic position " INT64_FORMAT ", current file length is " INT64_FORMAT
+								, VfdCache[file].fileName, offset, vfdP->seekPos)));
 		errno = EIO;
 		return -1;
 	}

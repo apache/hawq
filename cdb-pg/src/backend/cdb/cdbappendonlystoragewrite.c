@@ -36,7 +36,7 @@
  * Initialize AppendOnlyStorageWrite.
  *
  * The AppendOnlyStorageWrite data structure is initialized
- * once for a append �session� and can be used to add
+ * once for a append session and can be used to add
  * Append-Only Storage Blocks to 1 or more segment files.
  *
  * The current file to write to is opened with the
@@ -399,17 +399,20 @@ void AppendOnlyStorageWrite_OpenFile(
 	file = storageWrite->bufferedAppend.mirroredOpen.primaryFile;
 
 	seekResult = FileNonVirtualTell(file);
-	if (seekResult != logicalEof)
-	{
-		if (seekResult < 0)
-		{
-			ereport(ERROR,
-					(errcode(ERRCODE_IO_ERROR),
-							errmsg("Append-only Storage Tell error on segment file '%s' for relation '%s'.  FileSeek offset = " INT64_FORMAT ".  Error code = %d (%s)",
-									filePathName, storageWrite->relationName, logicalEof, (int)errno, strerror(errno)),
-									errdetail("%s", HdfsGetLastError())));
-		}
 
+	if (seekResult < 0)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_IO_ERROR),
+						errmsg("Append-only Storage Tell error on segment file '%s' for relation '%s'.  FileSeek offset = " INT64_FORMAT ".  Error code = %d (%s)",
+								filePathName, storageWrite->relationName, logicalEof, (int)errno, strerror(errno)),
+								errdetail("%s", HdfsGetLastError())));
+	}
+
+	if (seekResult > logicalEof)
+	{
+		elog(LOG, "Truncate file %s for table %s to length " INT64_FORMAT,
+				filePathName, storageWrite->relationName, logicalEof);
 		/*
 		 * previous transaction is aborted
 		 * truncate file
@@ -417,16 +420,27 @@ void AppendOnlyStorageWrite_OpenFile(
 		if (FileTruncate(file, logicalEof))
 		{
 			char * msg = pstrdup(HdfsGetLastError());
+			int errorno = errno;
 
 			MirroredAppendOnly_Close(&storageWrite->bufferedAppend.mirroredOpen);
 		
 			ereport(ERROR,
 				(errcode(ERRCODE_IO_ERROR),
-						errmsg("Append-only Storage truncate error on segment file '%s' for relation '%s'",
-								filePathName, storageWrite->relationName),
+						errmsg("Append-only Storage truncate error on segment file '%s' to position " INT64_FORMAT " for relation '%s' Error code = %d (%s)",
+								filePathName, logicalEof, storageWrite->relationName, (int)errorno, strerror(errorno)),
 								errdetail("%s", msg)));
 
 		}
+	}
+	/*
+	 * file length is less then the logic eof, we lost some data
+	 */
+	else if (seekResult < logicalEof)
+	{
+		ereport(ERROR,
+			(errcode(ERRCODE_IO_ERROR),
+					errmsg("Table %s, file %s length " INT64_FORMAT " is less then logic EOF recorded in metadata " INT64_FORMAT,
+							storageWrite->relationName, filePathName, seekResult, logicalEof)));
 	}
 
 	storageWrite->file = file;
