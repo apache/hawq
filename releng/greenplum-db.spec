@@ -32,10 +32,10 @@ Summary:        HAWQ, the power behind Pivotal Advanced Database Services (ADS)
 Name:           %{name}
 Version:        %{version}
 Release:        %{release}
-License:        Copyright (c) 2013, EMC Greenplum
-Vendor:         EMC Greenplum
+License:        Copyright (c) 2014 Pivotal Software, Inc. All Rights reserved.
+Vendor:         Pivotal
 Group:          Applications/Databases
-URL:            http://www.greenplum.com/products/pivotal-hd
+URL:            http://www.gopivotal.com/big-data/pivotal-hd
 BuildArch:      %{arch}
 # This prevents rpmbuild from generating automatic dependecies on
 # libraries and binaries. Some of these dependencies cause problems
