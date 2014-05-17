@@ -20,8 +20,9 @@ subprojects { subProject ->
     apply plugin: 'os-package'
     apply plugin: 'maven-publish'
     apply plugin: 'maven-publish-auth'
+    compileJava.options.debug = true 
     compileJava.options*.compilerArgs = [
-            "-Xlint:varargs", "-Xlint:cast", "-Xlint:classfile", "-Xlint:dep-ann", "-Xlint:divzero", "-Xlint:empty",
+            "-g", "-Xlint:varargs", "-Xlint:cast", "-Xlint:classfile", "-Xlint:dep-ann", "-Xlint:divzero", "-Xlint:empty",
             "-Xlint:finally", "-Xlint:overrides", "-Xlint:path", "-Xlint:processing", "-Xlint:static", "-Xlint:try",
             "-Xlint:fallthrough", "-Xlint:deprecation", "-Xlint:unchecked", "-Xlint:-options", "-Werror"
     ]

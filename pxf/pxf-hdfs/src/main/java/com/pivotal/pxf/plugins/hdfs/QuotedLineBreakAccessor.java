@@ -2,7 +2,6 @@ package com.pivotal.pxf.plugins.hdfs;
 
 import com.pivotal.pxf.api.OneRow;
 import com.pivotal.pxf.api.utilities.InputData;
-import org.apache.hadoop.io.Text;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -50,6 +49,6 @@ public class QuotedLineBreakAccessor extends HdfsAtomicDataAccessor {
             return null;
         }
 
-        return new OneRow(null, new Text(next_line));
+        return new OneRow(null, next_line);
     }
 }

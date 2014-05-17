@@ -1,11 +1,13 @@
 package com.pivotal.pxf.plugins.hdfs;
 
+import com.pivotal.pxf.api.io.DataType;
 import com.pivotal.pxf.api.OneField;
 import com.pivotal.pxf.api.OneRow;
 import com.pivotal.pxf.api.ReadResolver;
 import com.pivotal.pxf.api.WriteResolver;
 import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.api.utilities.Plugin;
+import com.pivotal.pxf.plugins.hdfs.ChunkWritable;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -48,9 +50,14 @@ public class StringPassResolver extends Plugin implements ReadResolver, WriteRes
 		 * 1. performance
 		 * 2. desire to not replicate text parsing logic from the backend into java
 		 */
-        String line = (onerow.getData()).toString();
         List<OneField> record = new LinkedList<OneField>();
-        record.add(new OneField(VARCHAR.getOID(), line));
+		Object data = onerow.getData();
+		if (data instanceof ChunkWritable) {
+			record.add(new OneField(DataType.BYTEA.getOID(), ((ChunkWritable)data).box));
+		}
+		else {
+			record.add(new OneField(VARCHAR.getOID(), data));
+		}
         return record;
     }
 

@@ -4,12 +4,12 @@ import com.pivotal.pxf.api.BadRecordException;
 import com.pivotal.pxf.api.OneField;
 import com.pivotal.pxf.api.OutputFormat;
 import com.pivotal.pxf.api.io.DataType;
+import com.pivotal.pxf.core.io.BufferWritable;
 import com.pivotal.pxf.core.io.GPDBWritable;
 import com.pivotal.pxf.core.io.GPDBWritable.TypeMismatchException;
-import com.pivotal.pxf.core.io.Text;
 import com.pivotal.pxf.core.io.Writable;
+import com.pivotal.pxf.core.io.Text;
 import com.pivotal.pxf.core.utilities.ProtocolData;
-
 import org.apache.commons.lang.ObjectUtils;
 
 import java.lang.reflect.Array;
@@ -76,24 +76,13 @@ public class BridgeOutputBuilder {
      * Translates recFields (obtained from the Resolver) into an output record.
 	 */
     public Writable makeOutput(List<OneField> recFields) throws BadRecordException {
-        if (output == null) {
-            createOutputRecord(recFields);
+        if (output == null && inputData.outputFormat() == OutputFormat.BINARY) {
+            makeGPDBWritableOutput(recFields);
         }
 
         fillOutputRecord(recFields);
 
         return output;
-    }
-
-    /*
-     * Creates the output record based on the configuration output type
-     */
-    void createOutputRecord(List<OneField> recFields) {
-        if (inputData.outputFormat() == OutputFormat.BINARY) {
-            makeGPDBWritableOutput(recFields);
-        } else /* output is text*/ {
-            output = new Text();
-        }
     }
 
     /*
@@ -141,17 +130,25 @@ public class BridgeOutputBuilder {
     /*
      * Fills a Text object based on recFields
      */
-    void fillText(List<OneField> recFields) {
-        int size = recFields.size();
-        StringBuilder strLine = new StringBuilder();
-
-        for (int i = 0; i < size; i++) {
-            strLine.append(recFields.get(i).val.toString())
-                    .append(i < (size - 1) ? delim : endl);
-        }
-
-        ((Text) output).set(strLine.toString());
-    }
+    void fillText(List<OneField> recFields)  throws BadRecordException {
+		/*
+		 * For thre TEXT case there must be only one record in the list
+		 */
+		if (recFields.size() != 1) {
+			throw new BadRecordException("BridgeOutputBuilder must receive one field when handling the TEXT format");
+		}
+		
+		OneField fld = recFields.get(0);
+		int type = fld.type;
+		Object val = fld.val;
+		if (DataType.get(type) == DataType.BYTEA) {// from LineBreakAccessor
+			output = new BufferWritable((byte [])val);
+		}
+		else  {// from QuotedLineBreakAccessor 
+			String textRec = (String)val;
+			output = new Text(textRec + endl);
+		}
+	}
 
     /*
      * Fills one GPDBWritable field

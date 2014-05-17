@@ -100,10 +100,11 @@ public class BridgeResource extends RestResource {
                     DataOutputStream dos = new DataOutputStream(out);
                     Log.debug("Starting streaming fragment " + fragment + " of resource " + dataDir);
                     while ((record = bridge.getNext()) != null) {
-                        record.write(dos);
+						record.write(dos);
                         ++recordCount;
                     }
-                    Log.debug("Finished streaming fragment " + fragment + " of resource " + dataDir + ", " + recordCount + " records.");
+                    
+					Log.debug("Finished streaming fragment " + fragment + " of resource " + dataDir + ", " + recordCount + " records.");
                 } catch (org.eclipse.jetty.io.EofException e) {
                     // Occurs whenever GPDB decides the end the connection
                     Log.error("Remote connection closed by GPDB", e);

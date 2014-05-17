@@ -96,12 +96,10 @@ public abstract class HdfsSplittableDataAccessor extends Plugin implements ReadA
      */
     @Override
     public OneRow readNextObject() throws IOException {
-        if (!reader.next(key, data)) // if there is one more record in the current split
-        {
-            if (getNextSplit()) // the current split is exhausted. try to move to the next split.
-            {
-                if (!reader.next(key, data)) // read the first record of the new split
-                {
+		
+        if (!reader.next(key, data)) { // if there is one more record in the current split
+            if (getNextSplit()) {// the current split is exhausted. try to move to the next split.
+                if (!reader.next(key, data)) {// read the first record of the new split
                     return null; // make sure we return nulls
                 }
             } else {
