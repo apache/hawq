@@ -1546,6 +1546,9 @@ else
 		$(MAKE) -C $${source}/package INSTLOC=$(INSTLOC); \
 		cp $${source}/package/*.gppkg $(GPPKGINSTLOC); \
 	done
+	# Delete pljava.so file from lib/postgresql if pljava gppkg is emabled
+	rm $(INSTLOC)/lib/postgresql/pljava.so
+	rm $(INSTLOC)/lib/postgresql/pljava.jar
 endif
 endif
 
