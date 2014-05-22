@@ -2988,6 +2988,12 @@ HdfsMakeDirectory(const char * path, mode_t mode)
 	if (NULL == ConvertToUnixPath(path, p, sizeof(p)))
 		return -1;
 
+	if (HdfsPathExist((char *) path))
+	{
+		errno = EEXIST;
+		return -1;
+	}
+
 	if (HdfsCreateDirectory(protocol, fs, p))
 		return -1;
 
