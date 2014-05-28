@@ -3,7 +3,7 @@
 		<license name="Pivotal" />
 		<ivyauthor name="PXF Hadoop Team" url="http://gopivotal.com" />
 		<description>
-			PFX Hadoop Integration
+			PXF Hadoop Integration
 		</description>
 	</info>
 
