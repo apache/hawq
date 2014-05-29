@@ -20,6 +20,8 @@ DISTSVR_stack = $(DISTSVR_VIEW)
 
 TARGET = $(COMPONENTS:%=%.fetched)
 
+PHD_VERSION = undefined
+
 .PHONY: all
 all: $(TARGET)
 
@@ -29,7 +31,11 @@ clean:
 	-rm -f *~
 
 stack.fetched:
-	$(DISTSVR_FETCH) $(DISTSVR_stack) "PHD-[\.0-9]*-bin-[0-9]*"
+	echo Downloading PHD of version $(PHD_VERSION)
+ifeq ($(PHD_VERSION),undefined)
+	$(error PHD_VERSION undefined)
+endif
+	$(DISTSVR_FETCH) $(DISTSVR_stack) "PHD-$(PHD_VERSION)[\.0-9]*-bin-[0-9]*"
 	touch $@
 
 tcserver.fetched:

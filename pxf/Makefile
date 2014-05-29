@@ -15,7 +15,7 @@ endif
 
 
 all: 
-	./gradlew clean build
+	./gradlew clean release
 	
 unittest:
 	./gradlew test

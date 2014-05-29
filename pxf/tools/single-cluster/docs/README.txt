@@ -66,6 +66,11 @@ CentOS
 7. Changes
 ==========
 
+v1.8.2
+------
+
+- GPSQL-2274 Add PHD_VERSION paramter for compilation
+
 v1.8.1
 ------
 

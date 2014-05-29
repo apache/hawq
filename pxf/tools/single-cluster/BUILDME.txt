@@ -18,6 +18,7 @@ Each has a script to update its components from Jenkins jobs
 2. Build
 ========
 
-make RELEASE=<release name> clean all
+make clean all RELEASE=<release name> ARTIFACTS=<path to PXF tarballs>
+PHD_VERSION=<PHD version to use>
 
 Note: You have to do clean
