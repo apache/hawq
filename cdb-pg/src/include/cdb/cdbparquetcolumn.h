@@ -29,7 +29,7 @@
 
 typedef struct ParquetColumnReader
 {
-//	char *colName;
+	MemoryContext					memoryContext;
 	struct ColumnChunkMetadata_4C	*columnMetadata;
 	ParquetDataPage					dataPages;
 	ParquetDataPage 				currentPage;
@@ -62,14 +62,14 @@ typedef struct ParquetColumnReader
     char                            *pageBuffer;
     int32                           pageBufferLen;
 
+	/*buffer reused for embedded type, avoid palloc each time for each tuple*/
     void                            *geoval;
 } ParquetColumnReader;
 
 
 extern void ParquetExecutorReadColumn(
 		ParquetColumnReader *columnReaders,
-		File file,
-		MemoryContext 	memoryContext);
+		File file);
 
 extern void ParquetColumnReader_readValue(ParquetColumnReader *columnReader,
 		Datum *value, bool *null, int hawqTypeID);
@@ -81,6 +81,6 @@ extern void ParquetColumnReader_readBOX(ParquetColumnReader readers[], Datum *va
 extern void ParquetColumnReader_readPOLYGON(ParquetColumnReader readers[], Datum *value, bool *null);
 extern void ParquetColumnReader_readCIRCLE(ParquetColumnReader readers[], Datum *value, bool *null);
 
-extern void ParquetExecutionReadColumn_FinishedScanColumn(ParquetColumnReader *columnReader);
+extern void ParquetColumnReader_FinishedScanColumn(ParquetColumnReader *columnReader);
 
 #endif /* CDBPARQUETCOLUM_H_ */

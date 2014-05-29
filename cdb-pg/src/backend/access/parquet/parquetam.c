@@ -18,7 +18,12 @@
 #include "cdb/cdbparquetam.h"
 #include "cdb/cdbparquetstoragewrite.h"
 #include "catalog/pg_attribute_encoding.h"
-
+#include "catalog/catquery.h"
+#include "utils/lsyscache.h"
+#include "utils/builtins.h"
+#include "catalog/pg_statistic.h"
+#include "cdb/cdbparquetfooterbuffer.h"
+#include "cdb/cdbparquetfooterserializer.h"
 
 /**For read*/
 static void initscan(ParquetScanDesc scan);
@@ -53,10 +58,13 @@ static void OpenSegmentFile(
 		char *relname,
 		int32 contentid,
 		File *parquet_file,
+		File *parquet_file_previous,
+		CompactProtocol **protocol_read,
 		TupleDesc tableAttrs,
 		ParquetMetadata *parquetMetadata,
 		int64 *fileLen,
-		int64 *fileLen_uncompressed);
+		int64 *fileLen_uncompressed,
+		int *previous_rowgroupcnt);
 
 static void CloseWritableFileSeg(ParquetInsertDesc parquetInsertDesc);
 
@@ -89,15 +97,18 @@ static void initscan(ParquetScanDesc scan)
 /**
  *begin scanning of a parquet relation
  */
-ParquetScanDesc parquet_beginscan(Relation relation,
-		Snapshot parquetMetaDataSnapshot, TupleDesc relationTupleDesc,
-		bool *proj) {
-	ParquetScanDesc 	scan;
-	AppendOnlyEntry		*aoEntry;
+ParquetScanDesc
+parquet_beginscan(
+		Relation relation,
+		Snapshot parquetMetaDataSnapshot,
+		TupleDesc relationTupleDesc,
+		bool *proj)
+{
+	ParquetScanDesc 			scan;
+	AppendOnlyEntry				*aoEntry;
 
-	AppendOnlyStorageAttributes *attr;
+	AppendOnlyStorageAttributes	*attr;
 
-	StringInfoData		titleBuf;
 	/*
 	 * increment relation ref count while scanning relation
 	 *
@@ -107,9 +118,7 @@ ParquetScanDesc parquet_beginscan(Relation relation,
 	 */
 	RelationIncrementReferenceCount(relation);
 
-	/*
-	 * allocate scan descriptor
-	 */
+	/* allocate scan descriptor */
 	scan = (ParquetScanDescData *)palloc0(sizeof(ParquetScanDescData));
 
 	/*
@@ -123,14 +132,9 @@ ParquetScanDesc parquet_beginscan(Relation relation,
 	 * initialize the scan descriptor
 	 */
 	scan->pqs_filenamepath_maxlen = AOSegmentFilePathNameLen(relation) + 1;
-	scan->pqs_filenamepath = (char*)palloc(scan->pqs_filenamepath_maxlen);
-	scan->pqs_filenamepath[0] = '\0';
+	scan->pqs_filenamepath = (char*)palloc0(scan->pqs_filenamepath_maxlen);
 	scan->pqs_rd = relation;
 	scan->parquetScanInitContext = CurrentMemoryContext;
-	initStringInfo(&titleBuf);
-	appendStringInfo(&titleBuf, "Scan of Parquet relation '%s'",
-					 RelationGetRelationName(relation));
-	scan->title = titleBuf.data;
 
 	/*
 	 * Fill in Parquet Storage layer attributes.
@@ -174,22 +178,26 @@ ParquetScanDesc parquet_beginscan(Relation relation,
 }
 
 void parquet_rescan(ParquetScanDesc scan) {
-    CloseScannedFileSeg(scan);
+	CloseScannedFileSeg(scan);
 	scan->initedStorageRoutines = false;
 	ParquetStorageRead_FinishSession(&(scan->storageRead));
+
 	initscan(scan);
 }
 
 void parquet_endscan(ParquetScanDesc scan) {
-	ParquetExecutorReadRowGroup readRowGroup = scan->executorReadRowGroup;
+	ParquetRowGroupReader rowGroupReader = scan->rowGroupReader;
 
 	RelationDecrementReferenceCount(scan->pqs_rd);
 
-	if(readRowGroup.columnReaders != NULL)
+	MemoryContext oldContext = MemoryContextSwitchTo(scan->parquetScanInitContext);
+
+	/* Free the column readers information*/
+	if(rowGroupReader.columnReaders != NULL)
 	{
-		for (int i = 0; i < readRowGroup.columnReaderCount; ++i)
+		for (int i = 0; i < rowGroupReader.columnReaderCount; ++i)
 		{
-			ParquetColumnReader *reader = &readRowGroup.columnReaders[i];
+			ParquetColumnReader *reader = &rowGroupReader.columnReaders[i];
 
 			if (reader->dataBuffer != NULL)
 			{
@@ -206,12 +214,8 @@ void parquet_endscan(ParquetScanDesc scan) {
 				pfree(reader->geoval);
 			}
 		}
-		pfree(readRowGroup.columnReaders);
+		pfree(rowGroupReader.columnReaders);
 	}
-    
-    CloseScannedFileSeg(scan);
-	ParquetStorageRead_FinishSession(&(scan->storageRead));
-	scan->initedStorageRoutines = false;
 
 	if(scan->hawqAttrToParquetColChunks != NULL){
 		pfree(scan->hawqAttrToParquetColChunks);
@@ -220,6 +224,21 @@ void parquet_endscan(ParquetScanDesc scan) {
 	if(scan->aoEntry != NULL){
 		pfree(scan->aoEntry);
 	}
+
+	ParquetStorageRead_FinishSession(&(scan->storageRead));
+
+	/* free the segment file array*/
+	if (scan->pqs_segfile_arr != NULL)
+	{
+		for (int seginfo_no = 0; seginfo_no < scan->pqs_total_segfiles; seginfo_no++)
+		{
+			pfree(scan->pqs_segfile_arr[seginfo_no]);
+		}
+		pfree(scan->pqs_segfile_arr);
+	}
+
+	MemoryContextSwitchTo(oldContext);
+	CloseScannedFileSeg(scan);
 }
 
 void parquet_getnext(ParquetScanDesc scan, ScanDirection direction,
@@ -252,9 +271,9 @@ void parquet_getnext(ParquetScanDesc scan, ScanDirection direction,
 			scan->bufferDone = false;
 		}
 
-		bool tupleExist = ParquetExecutorReadRowGroup_ScanNextTuple(
+		bool tupleExist = ParquetRowGroupReader_ScanNextTuple(
 												scan->pqs_tupDesc,
-												&scan->executorReadRowGroup,
+												&scan->rowGroupReader,
 												scan->hawqAttrToParquetColChunks,
 												scan->proj,
 												slot);
@@ -302,9 +321,9 @@ static bool getNextRowGroup(ParquetScanDesc scan)
 		scan->cur_seg_row = 0;
 	}
 
-	if (!ParquetExecutorReadRowGroup_GetRowGroupInfo(
+	if (!ParquetRowGroupReader_GetRowGroupInfo(
 									&scan->storageRead,
-									&scan->executorReadRowGroup,
+									&scan->rowGroupReader,
 									scan->proj,
 									scan->pqs_tupDesc,
 									scan->hawqAttrToParquetColChunks))
@@ -315,9 +334,7 @@ static bool getNextRowGroup(ParquetScanDesc scan)
 		return false;
 	}
 
-	ParquetExecutorReadRowGroup_GetContents(
-									&scan->executorReadRowGroup,
-									scan->storageRead.memoryContext);
+	ParquetRowGroupReader_GetContents(&scan->rowGroupReader);
 
 	return true;
 }
@@ -360,22 +377,11 @@ SetNextFileSegForRead(ParquetScanDesc scan)
 							&scan->storageRead,
 							scan->parquetScanInitContext,
 							NameStr(scan->pqs_rd->rd_rel->relname),
-							scan->title,
 							&scan->storageAttributes);
 
-		/*
-		 * There is no guarantee that the current memory context will be preserved between calls,
-		 * so switch to a safe memory context for retrieving compression information.
-		 */
-		MemoryContext oldMemoryContext = MemoryContextSwitchTo(scan->parquetScanInitContext);
-
-		/* Switch back to caller's memory context. */
-		MemoryContextSwitchTo(oldMemoryContext);
-
-		ParquetExecutorReadRowGroup_Init(
-							&scan->executorReadRowGroup,
+		ParquetRowGroupReader_Init(
+							&scan->rowGroupReader,
 							scan->pqs_rd,
-							scan->parquetScanInitContext,
 							&scan->storageRead);
 
 		scan->bufferDone = true; /* so we read a new buffer right away */
@@ -532,6 +538,7 @@ ParquetInsertDesc parquet_insert_init(Relation rel, int segno) {
 	parquetInsertDesc->parquetFilePathName =
 			(char*) palloc0(parquetInsertDesc->parquetFilePathNameMaxLen);
 	parquetInsertDesc->parquetFilePathName[0] = '\0';
+	parquetInsertDesc->footerProtocol = NULL;
 
 	Assert(segno >= 0);
 	parquetInsertDesc->cur_segno = segno;
@@ -552,6 +559,7 @@ ParquetInsertDesc parquet_insert_init(Relation rel, int segno) {
 	parquetInsertDesc->mirroredOpen->isActive = FALSE;
 	parquetInsertDesc->mirroredOpen->segmentFileNum = 0;
 	parquetInsertDesc->mirroredOpen->primaryFile = -1;
+	parquetInsertDesc->previous_rowgroupcnt = 0;
 
 	/* open our current relation file segment for write */
 	SetCurrentFileSegForWrite(parquetInsertDesc);
@@ -599,6 +607,7 @@ Oid parquet_insert_values(ParquetInsertDesc parquetInsertDesc,
 		flushRowGroup(rowgroup,
 					  parquetInsertDesc->parquetMetadata,
 					  parquetInsertDesc->mirroredOpen,
+					  parquetInsertDesc->footerProtocol,
 					  &parquetInsertDesc->fileLen,
 					  &parquetInsertDesc->fileLen_uncompressed);
 
@@ -606,6 +615,7 @@ Oid parquet_insert_values(ParquetInsertDesc parquetInsertDesc,
 							   parquetInsertDesc->parquet_rel->rd_att,
 							   parquetInsertDesc->aoEntry,
 							   parquetInsertDesc->parquet_file);
+
 		parquetInsertDesc->current_rowGroup = rowgroup;
 	}
 
@@ -626,7 +636,6 @@ Oid parquet_insert_values(ParquetInsertDesc parquetInsertDesc,
 	AOTupleIdInit_rowNum(aoTupleId, parquetInsertDesc->rowCount);
 
 	return InvalidOid;
-
 }
 
 void parquet_insert_finish(ParquetInsertDesc parquetInsertDesc) {
@@ -637,6 +646,7 @@ void parquet_insert_finish(ParquetInsertDesc parquetInsertDesc) {
 	flushRowGroup(parquetInsertDesc->current_rowGroup,
 				  parquetInsertDesc->parquetMetadata,
 				  parquetInsertDesc->mirroredOpen,
+				  parquetInsertDesc->footerProtocol,
 				  &parquetInsertDesc->fileLen,
 				  &parquetInsertDesc->fileLen_uncompressed);
 
@@ -644,7 +654,10 @@ void parquet_insert_finish(ParquetInsertDesc parquetInsertDesc) {
 	writeParquetFooter(parquetInsertDesc->parquet_file,
 			parquetInsertDesc->parquetFilePathName,
 			parquetInsertDesc->parquetMetadata, &parquetInsertDesc->fileLen,
-			&parquetInsertDesc->fileLen_uncompressed);
+			&parquetInsertDesc->fileLen_uncompressed,
+			&(parquetInsertDesc->protocol_read),
+			&(parquetInsertDesc->footerProtocol),
+			parquetInsertDesc->previous_rowgroupcnt);
 
 	CloseWritableFileSeg(parquetInsertDesc);
 
@@ -657,34 +670,39 @@ void parquet_insert_finish(ParquetInsertDesc parquetInsertDesc) {
 	pfree(parquetInsertDesc);
 }
 
-void freeParquetInsertDesc(ParquetInsertDesc parquetInsertDesc) {
-	pfree(parquetInsertDesc->aoEntry);
-	pfree(parquetInsertDesc->title);
-	pfree(parquetInsertDesc->relname);
-	pfree(parquetInsertDesc->parquetFilePathName);
-	pfree(parquetInsertDesc->mirroredOpen);
-
-	pfree(parquetInsertDesc->parquetMetadata->hawqschemastr);
-	for (int i = 0; i < parquetInsertDesc->parquetMetadata->blockCount; i++) {
-		struct BlockMetadata_4C* block =
-				parquetInsertDesc->parquetMetadata->pBlockMD[i];
-		for (int j = 0; j < block->ColChunkCount; j++) {
-			pfree(block->columns[j].colName);
-			if(block->columns[j].pathInSchema != NULL){
-				pfree(block->columns[j].pathInSchema);
-			}
-			pfree(block->columns[j].pEncodings);
-		}
-		pfree(block->columns);
+void
+freeParquetInsertDesc(ParquetInsertDesc parquetInsertDesc)
+{
+	if(parquetInsertDesc->aoEntry != NULL)
+	{
+		pfree(parquetInsertDesc->aoEntry);
+		parquetInsertDesc->aoEntry = NULL;
 	}
-	pfree(parquetInsertDesc->parquetMetadata->pBlockMD);
-
-	for (int i = 0; i < parquetInsertDesc->parquetMetadata->fieldCount; i++) {
-		pfree(parquetInsertDesc->parquetMetadata->pfield[i].name);
+	if(parquetInsertDesc->title != NULL)
+	{
+		pfree(parquetInsertDesc->title);
+		parquetInsertDesc->title = NULL;
 	}
-	pfree(parquetInsertDesc->parquetMetadata->pfield);
-	pfree(parquetInsertDesc->parquetMetadata->estimateChunkSizes);
-	pfree(parquetInsertDesc->parquetMetadata);
+	if(parquetInsertDesc->relname != NULL)
+	{
+		pfree(parquetInsertDesc->relname);
+		parquetInsertDesc->relname = NULL;
+	}
+	if(parquetInsertDesc->parquetFilePathName != NULL)
+	{
+		pfree(parquetInsertDesc->parquetFilePathName);
+		parquetInsertDesc->parquetFilePathName = NULL;
+	}
+	if(parquetInsertDesc->mirroredOpen != NULL)
+	{
+		pfree(parquetInsertDesc->mirroredOpen);
+		parquetInsertDesc->mirroredOpen = NULL;
+	}
+	if(parquetInsertDesc->parquetMetadata != NULL)
+	{
+		freeParquetMetadata(parquetInsertDesc->parquetMetadata);
+		parquetInsertDesc->parquetMetadata = NULL;
+	}
 }
 
 /*
@@ -750,13 +768,13 @@ static void TransactionFlushAndCloseFile(
 
 	/* Get Logical Eof and uncompressed length*/
 	*newLogicalEof = FileNonVirtualTell(parquetInsertDesc->parquet_file);
-	if (*newLogicalEof < 0)
-	{
+	if (*newLogicalEof < 0){
 		ereport(ERROR,
 				(errcode_for_file_access(),
-					errmsg("file tell position error in file '%s' for relation '%s': %s"
-							, parquetInsertDesc->parquetFilePathName, parquetInsertDesc->relname, strerror(errno)),
-					errdetail("%s", HdfsGetLastError())));
+					errmsg("file tell position error in file '%s' for relation '%s': %s",
+							parquetInsertDesc->parquetFilePathName,
+							parquetInsertDesc->relname,
+							strerror(errno))));
 	}
 
 	Assert(parquetInsertDesc->fileLen == *newLogicalEof);
@@ -769,11 +787,19 @@ static void TransactionFlushAndCloseFile(
 	if (primaryError != 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
-						errmsg("file flush error when flushing (fsync) segment file '%s' to " "disk for relation '%s': %s"
-								, parquetInsertDesc->parquetFilePathName, parquetInsertDesc->relname, strerror(primaryError)),
-						errdetail("%s", HdfsGetLastError())));
+						errmsg("file flush error when flushing (fsync) segment file '%s' to "
+								"disk for relation '%s': %s",
+								parquetInsertDesc->parquetFilePathName,
+								parquetInsertDesc->relname,
+								strerror(primaryError))));
 
 	parquetInsertDesc->parquet_file = -1;
+
+	if(parquetInsertDesc->file_previousmetadata == -1)
+		return;
+
+	FileClose(parquetInsertDesc->file_previousmetadata);
+	parquetInsertDesc->file_previousmetadata = -1;
 
 	/*assign newLogicalEof and fileLen_uncompressed*/
 
@@ -833,10 +859,16 @@ static void SetCurrentFileSegForWrite(ParquetInsertDesc parquetInsertDesc) {
 			parquetInsertDesc->cur_segno, parquetInsertDesc->relname,
 			GpIdentity.segindex,
 			&parquetInsertDesc->parquet_file,
+			&parquetInsertDesc->file_previousmetadata,
+			&parquetInsertDesc->protocol_read,
 			parquetInsertDesc->parquet_rel->rd_att,
 			&parquetInsertDesc->parquetMetadata,
 			&parquetInsertDesc->fileLen,
-			&parquetInsertDesc->fileLen_uncompressed);
+			&parquetInsertDesc->fileLen_uncompressed,
+			&parquetInsertDesc->previous_rowgroupcnt);
+
+	initSerializeFooter(&(parquetInsertDesc->footerProtocol), parquetInsertDesc->parquetFilePathName);
+
 }
 
 /*
@@ -858,10 +890,13 @@ static void OpenSegmentFile(
 		char *relname,
 		int32 contentid,
 		File *parquet_file,
+		File *parquet_file_previous,
+		CompactProtocol **protocol_read,
 		TupleDesc tableAttrs,
 		ParquetMetadata *parquetMetadata,
 		int64 *fileLen,
-		int64 *fileLen_uncompressed) {
+		int64 *fileLen_uncompressed,
+		int *previous_rowgroupcnt) {
 	int primaryError;
 
 	File file;
@@ -873,25 +908,25 @@ static void OpenSegmentFile(
 	bool metadataExist = false;
 
 	/*
-	 * Open or create the file for metadata reading.
+	 * Open the file for metadata reading.
 	 */
 	MirroredAppendOnly_OpenReadWrite(mirroredOpen, relFileNode, segmentFileNum,
 			contentid, relname, logicalEof, true, &primaryError);
 	if (primaryError != 0)
 		ereport(ERROR,
-				(errcode_for_file_access(), errmsg("file open error when opening file " "'%s' for relation '%s': %s"
-						, filePathName, relname, strerror(primaryError)),
-				errdetail("%s", HdfsGetLastError())));
+				(errcode_for_file_access(),
+						errmsg("file open error when opening file "
+								"'%s' for relation '%s': %s", filePathName, relname,
+								strerror(primaryError))));
 
-	file = mirroredOpen->primaryFile;
+	*parquet_file_previous = mirroredOpen->primaryFile;
 
-	int64 fileSize = FileSeek(file, 0, SEEK_END);
-	if (fileSize < 0)
-	{
+	int64 fileSize = FileSeek(*parquet_file_previous, 0, SEEK_END);
+	if (fileSize < 0){
 		ereport(ERROR,
 				(errcode_for_file_access(),
-						errmsg("file seek error in file '%s' for relation " "'%s'", filePathName, relname),
-						errdetail("%s", HdfsGetLastError())));
+						errmsg("file seek error in file '%s' for relation "
+								"'%s'", filePathName, relname)));
 	}
 	if (logicalEof > fileSize) {
 		ereport(ERROR,
@@ -901,43 +936,38 @@ static void OpenSegmentFile(
 								relname)));
 	}
 
-	metadataExist = readParquetFooter(file, parquetMetadata, logicalEof, filePathName);
+	/*read parquet footer, get metadata information before rowgroup metadata*/
+	metadataExist = readParquetFooter(*parquet_file_previous, parquetMetadata, protocol_read,
+			logicalEof, filePathName);
 
-	MirroredAppendOnly_Close(mirroredOpen);
+	*previous_rowgroupcnt = (*parquetMetadata)->blockCount;
 
 	/*
-	 * Open or create the file for write.
+	 * Open the file for writing.
 	 */
 	MirroredAppendOnly_OpenReadWrite(mirroredOpen, relFileNode, segmentFileNum,
 			contentid, relname, logicalEof, false, &primaryError);
 	if (primaryError != 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
-						errmsg("file open error when opening file '%s' " "for relation '%s': %s"
-								, filePathName, relname, strerror(primaryError)),
-						errdetail("%s", HdfsGetLastError())));
+						errmsg("file open error when opening file '%s' "
+								"for relation '%s': %s", filePathName, relname,
+								strerror(primaryError))));
 
 	file = mirroredOpen->primaryFile;
 
 	seekResult = FileNonVirtualTell(file);
 	if (seekResult != logicalEof) {
-		if (seekResult < 0)
-		{
-			ereport(ERROR,
-					(errcode_for_file_access(),
-						errmsg("file tell error in file '%s' for relation " "'%s' to position " INT64_FORMAT ": %s", filePathName, relname, logicalEof, strerror(errno)),
-						errdetail("%s", HdfsGetLastError())));
-		}
-
 		/* previous transaction is aborted truncate file*/
 		if (FileTruncate(file, logicalEof)) {
 
-			char * msg = pstrdup(HdfsGetLastError());
-
 			MirroredAppendOnly_Close(mirroredOpen);
 			ereport(ERROR,
-					(errcode_for_file_access(), errmsg("file truncate error in file '%s' for relation " "'%s' to position " INT64_FORMAT ": %s", filePathName, relname, logicalEof, strerror(errno)),
-							errdetail("%s", msg)));
+					(errcode_for_file_access(),
+						errmsg("file truncate error in file '%s' for relation "
+								"'%s' to position " INT64_FORMAT ": %s",
+								filePathName, relname, logicalEof,
+								strerror(errno))));
 		}
 	}
 
@@ -963,3 +993,135 @@ static void OpenSegmentFile(
 		}
 	}
 }
+
+#ifdef NOT_USED
+/**
+ * Given parquet table oid, return the memory reserved for parquet table insert operator.
+ * For uncompressed table, the whole rowgroup is stored in memory before written to disk,
+ * so we can keep a memory quota of rowgroup size for it.
+ * For compressed table, besides the compressed rowgroup, there's a page buffer for each column
+ * storing the original uncompressed data, so the max memory consumption under worst case is
+ * 2 times of rowgroup size.
+ * @rel_oid		The oid of relation to be inserted
+ * @return		The memory allocated for this table insert
+ */
+uint64 memReservedForParquetInsert(Oid rel_oid) {
+	uint64 memReserved = 0;
+	char *compresstype = NULL;
+
+	AppendOnlyEntry *aoEntry = GetAppendOnlyEntry(rel_oid, NULL);
+	memReserved = aoEntry->blocksize;
+	compresstype = aoEntry->compresstype;
+
+	if (compresstype && (strcmp(compresstype, "none") != 0)){
+		pfree(compresstype);
+		memReserved *= 2;
+	}
+	return memReserved;
+}
+
+/**
+ * Given parquet table oid, return the memory reserved for parquet table scan operator.
+ *
+ * 1) For Un-compressed parquet table. When scanning parquet table, just the required columns
+ * are loaded into memory instead of the entire row group, so we can use
+ * sum(columnwidth)/recordwidth * rowgroupsize to estimate memory occupation.
+ *
+ * 2) For compressed parquet table. When scanning the parquet table, besides loading required
+ * columns(compressed data) into memory, each column chunk has a page buffer storing uncompressed
+ * data for this page. Usually one column chunk has multiple column pages, and the worst case is
+ * that one column chunk just has one column page, under which there are two copies of data for
+ * each required column: compressed and uncompressed. Because the rowgroupsize is the uncompressed
+ * rowgroup limit, we can estimate the worst case of memory consuming to be
+ * (columnwidth)/recordwidth * rowgroupsize * 2.
+ *
+ * @rel_oid		The oid of relation to be inserted
+ * @attr_list	The list of attributes to be scanned
+ * @return		The memory allocated for this table insert
+ */
+
+uint64 memReservedForParquetScan(Oid rel_oid, List* attr_list) {
+	uint64		rowgroupsize = 0;
+	char		*compresstype = NULL;
+	uint64		memReserved = 0;
+
+	int 		attrNum = get_relnatts(rel_oid); /*Get the total attribute number of the relation*/
+	uint64		attsWidth = 0;		/*the sum width of attributes to be scanned*/
+	uint64		recordWidth = 0;	/*the average width of one record in the relation*/
+	/* The width array for all the attributes in the relation*/
+	int32		*attWidth = (int32*)palloc0(attrNum * sizeof(int32));
+
+	/** The variables for traversing through attribute list*/
+	ListCell	*cell;
+	TargetEntry	*tle;
+
+	/* Get rowgroup size and compress type */
+	AppendOnlyEntry *aoEntry = GetAppendOnlyEntry(rel_oid, NULL);
+	rowgroupsize = aoEntry->blocksize;
+	compresstype = aoEntry->compresstype;
+
+
+	/** For each column in the relation, get the column width
+	 * 1) Get the column width from pg_attribute, estimate column width for to-be-scanned columns:
+	 * If fixed column width, the attlen is the column width; if not fixed, refer to typmod
+	 * 2) Get the average column width for variable length type column from table pg_statistic, if the
+	 * stawidth not equals 0, set it as the column width.
+	 */
+	for(int i = 0; i < attrNum; i++){
+		int att_id = i + 1;
+		HeapTuple attTuple = caql_getfirst(NULL, cql("SELECT * FROM pg_attribute"
+				" WHERE attrelid = :1 "
+				" AND attnum = :2 ",
+				ObjectIdGetDatum(rel_oid),
+				Int16GetDatum(att_id)));
+
+		if (HeapTupleIsValid(attTuple)) {
+			/*Step1: estimate attwidth according to pg_attributes*/
+			Form_pg_attribute att = (Form_pg_attribute) GETSTRUCT(attTuple);
+			estimateColumnWidth(attWidth, &i, att, false);
+			i--;
+
+			int32 stawidth = 0;
+			/*Step2: adjust addwidth according to pg_statistic*/
+			switch (att->atttypid)
+			{
+				case HAWQ_TYPE_VARCHAR:
+				case HAWQ_TYPE_TEXT:
+				case HAWQ_TYPE_XML:
+				case HAWQ_TYPE_PATH:
+				case HAWQ_TYPE_POLYGON:
+					stawidth = get_attavgwidth(rel_oid, att_id);
+					if(stawidth != 0)
+						attWidth[i] = stawidth;
+					break;
+				case HAWQ_TYPE_BIT:
+				case HAWQ_TYPE_VARBIT:
+					stawidth = get_attavgwidth(rel_oid, att_id);
+					if(stawidth != 0)
+						attWidth[i] = stawidth + 4;
+					break;
+				default:
+					break;
+			}
+		}
+		recordWidth += attWidth[i];
+	}
+
+	/** Reverse through the to-be-scanned attribute list, sum up the width */
+	foreach(cell, attr_list)
+	{
+		tle = (TargetEntry *) lfirst(cell);
+		AttrNumber att_id = tle->resno;
+		attsWidth += attWidth[att_id - 1];	/*sum up the attribute width in the to-be-scanned list*/
+	}
+	pfree(attWidth);
+
+	memReserved = (attsWidth * rowgroupsize) / recordWidth;
+	if(compresstype != NULL && (strcmp(compresstype, "none") != 0))
+	{
+		pfree(compresstype);
+		memReserved *= 2;
+	}
+	return memReserved;
+}
+#endif

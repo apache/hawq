@@ -6,26 +6,26 @@
  */
 
 #include "cdb/cdbparquetrowgroup.h"
-
+#include "cdb/cdbparquetfooterserializer.h"
 
 /*
  * Initialize the ExecutorReadGroup once.  Assumed to be zeroed out before the call.
  */
-void ParquetExecutorReadRowGroup_Init(
-	ParquetExecutorReadRowGroup		*executorReadRowGroup,
-	Relation						relation,
-	MemoryContext					memoryContext,
-	ParquetStorageRead				*storageRead)
+void
+ParquetRowGroupReader_Init(
+	ParquetRowGroupReader	*rowGroupReader,
+	Relation				relation,
+	ParquetStorageRead		*storageRead)
 {
 	MemoryContext	oldcontext;
 
-	oldcontext = MemoryContextSwitchTo(memoryContext);
+	oldcontext = MemoryContextSwitchTo(storageRead->memoryContext);
 
-	ItemPointerSet(&executorReadRowGroup->cdb_fake_ctid, 0, 0);
+	ItemPointerSet(&rowGroupReader->cdb_fake_ctid, 0, 0);
 
-	executorReadRowGroup->storageRead = storageRead;
+	rowGroupReader->storageRead = storageRead;
 
-	executorReadRowGroup->memoryContext = memoryContext;
+	rowGroupReader->memoryContext = storageRead->memoryContext;
 
 	MemoryContextSwitchTo(oldcontext);
 
@@ -34,12 +34,13 @@ void ParquetExecutorReadRowGroup_Init(
 /**
  * Get the information of row group, including column chunk information
  */
-bool ParquetExecutorReadRowGroup_GetRowGroupInfo(
-	ParquetStorageRead			*storageRead,
-	ParquetExecutorReadRowGroup		*executorReadRowGroup,
-	bool *projs,
-	TupleDesc hawqTupleDesc,
-	int *hawqAttrToParquetColChunks)
+bool
+ParquetRowGroupReader_GetRowGroupInfo(
+	ParquetStorageRead		*storageRead,
+	ParquetRowGroupReader	*rowGroupReader,
+	bool 					*projs,
+	TupleDesc 				hawqTupleDesc,
+	int 					*hawqAttrToParquetColChunks)
 {
 	ParquetMetadata parquetMetadata;
 	int rowGroupIndex;
@@ -51,14 +52,21 @@ bool ParquetExecutorReadRowGroup_GetRowGroupInfo(
 	parquetMetadata = storageRead->parquetMetadata;
 	rowGroupIndex = storageRead->rowGroupProcessedCount;
 
+	oldcontext = MemoryContextSwitchTo(storageRead->memoryContext);
+
 	/*if row group processed exceeds the number of total row groups,
 	 *there're no row groups available*/
 	if(rowGroupIndex >= storageRead->rowGroupCount){
+		/*end of serialize footer*/
+		endDeserializerFooter(parquetMetadata, &(storageRead->footerProtocol));
 		return false;
 	}
 
+	/*get next rowgroup metadata*/
+	readNextRowGroupInfo(parquetMetadata, storageRead->footerProtocol);
+
 	/*assign the row group metadata information to executorReadRowGroup*/
-	rowGroupMetadata = parquetMetadata->pBlockMD[rowGroupIndex];
+	rowGroupMetadata = parquetMetadata->currentBlockMD;
 
 	/*initialize parquet column reader: get column reader numbers*/
 	for(int i = 0; i < hawqTableAttNum; i++){
@@ -68,15 +76,14 @@ bool ParquetExecutorReadRowGroup_GetRowGroupInfo(
 		colReaderNum += hawqAttrToParquetColChunks[i];
 	}
 
-	oldcontext = MemoryContextSwitchTo(storageRead->memoryContext);
 	/*if not first row group, but column reader count not equals to previous row group,
 	 *report error*/
-	if(executorReadRowGroup->columnReaderCount == 0){
-		executorReadRowGroup->columnReaders = (ParquetColumnReader *)palloc0
+	if(rowGroupReader->columnReaderCount == 0){
+		rowGroupReader->columnReaders = (ParquetColumnReader *)palloc0
 				(colReaderNum * sizeof(ParquetColumnReader));
-		executorReadRowGroup->columnReaderCount = colReaderNum;
+		rowGroupReader->columnReaderCount = colReaderNum;
 	}
-	else if(executorReadRowGroup->columnReaderCount != colReaderNum){
+	else if(rowGroupReader->columnReaderCount != colReaderNum){
 		ereport(ERROR, (errcode(ERRCODE_GP_INTERNAL_ERROR),
 				errmsg("row group column information not compatible with previous"
 						"row groups in file %s for relation %s",
@@ -85,8 +92,8 @@ bool ParquetExecutorReadRowGroup_GetRowGroupInfo(
 	MemoryContextSwitchTo(oldcontext);
 
 	/*initialize parquet column readers*/
-	executorReadRowGroup->rowCount = rowGroupMetadata->rowCount;
-	executorReadRowGroup->rowRead = 0;
+	rowGroupReader->rowCount = rowGroupMetadata->rowCount;
+	rowGroupReader->rowRead = 0;
 
 	/*initialize individual column reader, by passing by parquet column chunk information*/
 	int hawqColIndex = 0;
@@ -103,8 +110,10 @@ bool ParquetExecutorReadRowGroup_GetRowGroupInfo(
 
 		for(int j = 0; j < parquetColChunkNum; j++){
 			/*get the column chunk metadata information*/
-			executorReadRowGroup->columnReaders[hawqColIndex + j].columnMetadata =
+			rowGroupReader->columnReaders[hawqColIndex + j].columnMetadata =
 					&(rowGroupMetadata->columns[parquetColIndex + j]);
+			rowGroupReader->columnReaders[hawqColIndex + j].memoryContext =
+					rowGroupReader->memoryContext;
 		}
 		hawqColIndex += parquetColChunkNum;
 		parquetColIndex += parquetColChunkNum;
@@ -113,17 +122,17 @@ bool ParquetExecutorReadRowGroup_GetRowGroupInfo(
 	return true;
 }
 
-void ParquetExecutorReadRowGroup_GetContents(
-	ParquetExecutorReadRowGroup *executorReadRowGroup,
-	MemoryContext 	memoryContext)
+void
+ParquetRowGroupReader_GetContents(
+	ParquetRowGroupReader *rowGroupReader)
 {
 	/*scan the file to get next row group data*/
-	ParquetColumnReader *columnReaders = executorReadRowGroup->columnReaders;
-	File file = executorReadRowGroup->storageRead->file;
-	for(int i = 0; i < executorReadRowGroup->columnReaderCount; i++){
-		ParquetExecutorReadColumn(&(columnReaders[i]), file, memoryContext);
+	ParquetColumnReader *columnReaders = rowGroupReader->columnReaders;
+	File file = rowGroupReader->storageRead->file;
+	for(int i = 0; i < rowGroupReader->columnReaderCount; i++){
+		ParquetExecutorReadColumn(&(columnReaders[i]), file);
 	}
-	executorReadRowGroup->storageRead->rowGroupProcessedCount++;
+	rowGroupReader->storageRead->rowGroupProcessedCount++;
 
 }
 
@@ -132,25 +141,26 @@ void ParquetExecutorReadRowGroup_GetContents(
  *
  * Return false if current row group has no tuple left, true otherwise.
  */
-bool ParquetExecutorReadRowGroup_ScanNextTuple(
-	TupleDesc 			tupDesc,
-	ParquetExecutorReadRowGroup		*executorReadRowGroup,
-	int					*hawqAttrToParquetColNum,
-	bool 				*projs,
-	TupleTableSlot 		*slot)
+bool
+ParquetRowGroupReader_ScanNextTuple(
+	TupleDesc 				tupDesc,
+	ParquetRowGroupReader	*rowGroupReader,
+	int						*hawqAttrToParquetColNum,
+	bool 					*projs,
+	TupleTableSlot 			*slot)
 {
 	Assert(slot);
 
-	if (executorReadRowGroup->rowRead >= executorReadRowGroup->rowCount)
+	if (rowGroupReader->rowRead >= rowGroupReader->rowCount)
 	{
-		ParquetExecutionReadRowGroup_FinishedScanRowGroup(executorReadRowGroup);
+		ParquetRowGroupReader_FinishedScanRowGroup(rowGroupReader);
 		return false;
 	}
 
 	/*
 	 * get the next item (tuple) from the row group
 	 */
-	executorReadRowGroup->rowRead++;
+	rowGroupReader->rowRead++;
 
 	int natts = slot->tts_tupleDescriptor->natts;
 	Assert(natts <=	tupDesc->natts);
@@ -168,7 +178,7 @@ bool ParquetExecutorReadRowGroup_ScanNextTuple(
 		}
 
 		ParquetColumnReader *nextReader =
-			&executorReadRowGroup->columnReaders[colReaderIndex];
+			&rowGroupReader->columnReaders[colReaderIndex];
 		int hawqTypeID = tupDesc->attrs[i]->atttypid;
 
 		if(hawqAttrToParquetColNum[i] == 1)
@@ -177,6 +187,12 @@ bool ParquetExecutorReadRowGroup_ScanNextTuple(
 		}
 		else
 		{
+			/*
+			 * Because there are some memory reused inside the whole column reader, so need
+			 * to switch the context from PerTupleContext to rowgroup->context
+			 */
+			MemoryContext oldContext = MemoryContextSwitchTo(rowGroupReader->memoryContext);
+
 			switch(hawqTypeID)
 			{
 				case HAWQ_TYPE_POINT:
@@ -203,6 +219,8 @@ bool ParquetExecutorReadRowGroup_ScanNextTuple(
 					Insist(false);
 					break;
 			}
+
+			MemoryContextSwitchTo(oldContext);
 		}
 
 		colReaderIndex += hawqAttrToParquetColNum[i];
@@ -216,15 +234,16 @@ bool ParquetExecutorReadRowGroup_ScanNextTuple(
 /**
  * finish scanning row group, but keeping the structure palloced
  */
-void ParquetExecutionReadRowGroup_FinishedScanRowGroup(
-	ParquetExecutorReadRowGroup		*rowGroup)
+void
+ParquetRowGroupReader_FinishedScanRowGroup(
+	ParquetRowGroupReader		*rowGroupReader)
 {
 	/*reset rowCount and rowRead*/
-	rowGroup->rowCount = 0;
-	rowGroup->rowRead = 0;
+	rowGroupReader->rowCount = 0;
+	rowGroupReader->rowRead = 0;
 
 	/*memset columnreader content to zero for later use*/
-	for(int i = 0; i < rowGroup->columnReaderCount; i++){
-		ParquetExecutionReadColumn_FinishedScanColumn(&(rowGroup->columnReaders[i]));
+	for(int i = 0; i < rowGroupReader->columnReaderCount; i++){
+		ParquetColumnReader_FinishedScanColumn(&(rowGroupReader->columnReaders[i]));
 	}
 }

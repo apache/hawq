@@ -7,6 +7,7 @@
 
 #include "cdb/cdbparquetfooterprocessor.h"
 #include "cdb/cdbparquetstoragewrite.h"
+#include "cdb/cdbparquetfooterserializer.h"
 
 
 void writeParquetHeader(File dataFile, char *filePathName, int64 *fileLen, int64 *fileLen_uncompressed) {
@@ -28,36 +29,18 @@ void writeParquetHeader(File dataFile, char *filePathName, int64 *fileLen, int64
 
 void writeParquetFooter(File dataFile,
 		char *filePathName,
-		/*ParquetMetadataUtil metaUtil,*/
 		ParquetMetadata parquetMetadata,
 		int64 *fileLen,
-		int64 *fileLen_uncompressed) {
-	char *bufferFooter;
+		int64 *fileLen_uncompressed,
+		CompactProtocol **footer_read_protocol,
+		CompactProtocol **footer_write_protocol,
+		int	previous_rowgroup_count) {
 	uint32_t footerLen;
-	char *bufferFooterLen = (char*) palloc0(4);
+	char bufferFooterLen[4];
 	int writeRet = 0;
 
-	/* write out metadata through thrift protocol to buffer*/
-	writeRet = writeFileMetadata((uint8_t **) &bufferFooter, &footerLen,
-			parquetMetadata/*, metaUtil*/);
-	if(writeRet < 0)
-	{
-		ereport(ERROR,
-			(errcode(ERRCODE_GP_INTERNAL_ERROR),
-			 errmsg("parquet convert file metadata error in file '%s': serialize thrift object error",
-					 filePathName)));
-	}
-	elog(DEBUG5, "footerlen:%d", footerLen);
-
-	/* write out buffer to file*/
-	writeRet = FileWrite(dataFile, bufferFooter, footerLen);
-
-	if (writeRet != footerLen) {
-		ereport(ERROR,
-				(errcode_for_file_access(),
-				 errmsg("file write error in file '%s': %s", filePathName, strerror(errno)),
-				 errdetail("%s", HdfsGetLastError())));
-	}
+	footerLen = (uint32_t)endSerializeFooter(footer_read_protocol, footer_write_protocol,
+			filePathName, dataFile, parquetMetadata, previous_rowgroup_count);
 
 	*fileLen += footerLen;
 	*fileLen_uncompressed += footerLen;
@@ -70,13 +53,11 @@ void writeParquetFooter(File dataFile,
 	writeRet = FileWrite(dataFile, bufferFooterLen, 4);
 	if (writeRet != 4)
 	{
-		pfree(bufferFooterLen);
 		ereport(ERROR,
 			(errcode_for_file_access(),
 			 errmsg("file write error in file '%s': %s", filePathName, strerror(errno)),
 			 errdetail("%s", HdfsGetLastError())));
 	}
-	pfree(bufferFooterLen);
 
 	/* write out magic 'PAR1'*/
 	char PARQUET_VERSION_NUMBER[4] = { 'P', 'A', 'R', '1' };
@@ -105,13 +86,13 @@ void writeParquetFooter(File dataFile,
  *
  * */
 bool readParquetFooter(File fileHandler, ParquetMetadata *parquetMetadata,
-		int64 eof, char *filePathName) {
-	int compact = 1;
+		CompactProtocol **footerProtocol, int64 eof, char *filePathName) {
+	/*int compact = 1;*/
 	int actualReadSize = 0;
 
 	DetectHostEndian();
 
-	/* if file size is 0, means there's no data in file, return -1*/
+	/* if file size is 0, means there's no data in file, return false*/
 	if (eof == 0)
 		return false;
 
@@ -151,13 +132,6 @@ bool readParquetFooter(File fileHandler, ParquetMetadata *parquetMetadata,
 		actualReadSize += readFooterLen;
 	}
 
-/*	uint32_t ch1 = buffer[0];
-	uint32_t ch2 = buffer[1];
-	uint32_t ch3 = buffer[2];
-	uint32_t ch4 = buffer[3];
-	uint64_t footerLen = (ch4 << 24) + (ch3 << 16) + (ch2 << 8) + (ch1 << 0);
-	elog(DEBUG5, "Parquet metadata file footer length: %llu\n",footerLen);*/
-
 	/** get footerlen through little-endian decoding */
 	uint32_t footerLen = *(uint32*) buffer;
 	elog(DEBUG5, "Parquet metadata file footer length: %u\n",footerLen);
@@ -177,38 +151,11 @@ bool readParquetFooter(File fileHandler, ParquetMetadata *parquetMetadata,
 				 errdetail("%s", HdfsGetLastError())));
 	}
 
-
-	char *bufferFooter = (char*) palloc0(footerLen + 1);
-	actualReadSize = 0;
-	while(actualReadSize < footerLen)
-	{
-		/*read out all the buffer of the column chunk*/
-		int readLen = FileRead(fileHandler, bufferFooter + actualReadSize, footerLen - actualReadSize);
-		if (readLen < 0) {
-			/*ereport error*/
-			pfree(bufferFooter);
-			ereport(ERROR, (errcode_for_file_access(),
-			errmsg("file read error in file '%s': %s",
-					filePathName, strerror(errno)),
-			errdetail("%s", HdfsGetLastError())));
-		}
-		actualReadSize += readLen;
-	}
-
-
-	/* read metadata through thrift protocol*/
-	if (readFileMetadata((uint8_t*) bufferFooter, footerLen, compact,
-			parquetMetadata) < 0){
-		pfree(bufferFooter);
-		ereport(ERROR,
-			(errcode(ERRCODE_GP_INTERNAL_ERROR),
-			 errmsg("failed to deserialize parquetMetadata using thrift in segment file '%s'",
-					 filePathName)));
-	}
-	pfree(bufferFooter);
+	initDeserializeFooter(fileHandler, footerLen, filePathName, parquetMetadata, footerProtocol);
 
 	return true;
 }
+
 
 /**
  * This procedure does two things:

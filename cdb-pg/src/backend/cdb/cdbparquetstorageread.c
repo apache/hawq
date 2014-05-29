@@ -5,6 +5,7 @@
  *      Author: malili
  */
 #include "cdb/cdbparquetstorageread.h"
+#include "cdb/cdbparquetfooterserializer.h"
 #include "sys/fcntl.h"
 #include "utils/guc.h"
 
@@ -12,7 +13,8 @@ static File ParquetStorageRead_DoOpenFile(ParquetStorageRead *storageRead,
 		char *filePathName);
 
 static void ParquetStorageRead_FinishOpenFile(ParquetStorageRead *storageRead,
-	File file, char *filePathName, int64 logicalEof, TupleDesc tableAttrs);
+		File fileHandlerfordata, File fileHandlerforfooter, char *filePathName,
+		int64 logicalEof, TupleDesc tableAttrs);
 
 /*
  * Open the next segment file to read.
@@ -25,9 +27,9 @@ static void ParquetStorageRead_FinishOpenFile(ParquetStorageRead *storageRead,
  * 						end of the segment file.
  */
 void ParquetStorageRead_OpenFile(ParquetStorageRead *storageRead,
-		char *filePathName, int64 logicalEof, TupleDesc tableAttrs)
-{
-	File	file;
+		char *filePathName, int64 logicalEof, TupleDesc tableAttrs) {
+	File fileHandlerfordata;
+	File fileHandlerforfooter;
 
 	Assert(storageRead != NULL);
 	Assert(storageRead->isActive);
@@ -39,16 +41,11 @@ void ParquetStorageRead_OpenFile(ParquetStorageRead *storageRead,
 	 */
 	if (logicalEof == 0)
 		ereport(ERROR,
-				(errcode(ERRCODE_GP_INTERNAL_ERROR),
-				 errmsg("parquet storage read segment file '%s' eof must be > 0 for relation '%s'",
-						filePathName,
-						storageRead->relationName)));
+				(errcode(ERRCODE_GP_INTERNAL_ERROR), errmsg("parquet storage read segment file '%s' eof must be > 0 for relation '%s'", filePathName, storageRead->relationName)));
 
-	file = ParquetStorageRead_DoOpenFile(
-									storageRead,
-									filePathName);
-	if(file < 0)
-	{
+	fileHandlerfordata = ParquetStorageRead_DoOpenFile(storageRead,
+			filePathName);
+	if (fileHandlerfordata < 0) {
 		ereport(ERROR,
 				(errcode_for_file_access(),
 				 errmsg("file open error in file '%s' for relation '%s': %s"
@@ -56,40 +53,36 @@ void ParquetStorageRead_OpenFile(ParquetStorageRead *storageRead,
 				 errdetail("%s", HdfsGetLastError())));
 	}
 
-	ParquetStorageRead_FinishOpenFile(
-									storageRead,
-									file,
-									filePathName,
-									logicalEof,
-									tableAttrs);
-}
+	fileHandlerforfooter = ParquetStorageRead_DoOpenFile(storageRead,
+			filePathName);
 
+	ParquetStorageRead_FinishOpenFile(storageRead, fileHandlerfordata,
+			fileHandlerforfooter, filePathName, logicalEof, tableAttrs);
+}
 
 /*
  * Do open the next segment file to read, but don't do error processing.
  *
  */
-static File ParquetStorageRead_DoOpenFile(
-		ParquetStorageRead *storageRead,
-		char *filePathName)
-{
-	int		fileFlags = O_RDONLY | PG_BINARY;
-	int		fileMode = 0400; /* File mode is S_IRUSR 00400 user has read permission */
+static File ParquetStorageRead_DoOpenFile(ParquetStorageRead *storageRead,
+		char *filePathName) {
+	int fileFlags = O_RDONLY | PG_BINARY;
+	int fileMode = 0400; /* File mode is S_IRUSR 00400 user has read permission */
 
-	File	file;
+	File file;
 
 	Assert(storageRead != NULL);
 	Assert(storageRead->isActive);
 	Assert(filePathName != NULL);
 
-	if (Debug_appendonly_print_read_block)
-	{
-		elog(LOG,
-			 "Parquet storage read: opening table '%s', segment file '%s', fileFlags 0x%x, fileMode 0x%x",
-			 storageRead->relationName,
-			 storageRead->segmentFileName,
-			 fileFlags,
-			 fileMode);
+	if (Debug_appendonly_print_read_block) {
+		elog(
+				LOG,
+				"Parquet storage read: opening table '%s', segment file '%s', fileFlags 0x%x, fileMode 0x%x",
+				storageRead->relationName,
+				storageRead->segmentFileName,
+				fileFlags,
+				fileMode);
 	}
 	/*
 	 * Open the file for read.
@@ -105,39 +98,37 @@ static File ParquetStorageRead_DoOpenFile(
  * @logicalEof		The snapshot version of the EOF value to use as the read end of
  * 					the segment file
  */
-static void ParquetStorageRead_FinishOpenFile(
-	ParquetStorageRead		*storageRead,
-	File					file,
-	char					*filePathName,
-	int64					logicalEof,
-	TupleDesc 				tableAttrs)
-{
-	MemoryContext	oldMemoryContext;
-	int				segmentFileNameLen;
+static void ParquetStorageRead_FinishOpenFile(ParquetStorageRead *storageRead,
+		File fileHandlerfordata, File fileHandlerforfooter, char *filePathName,
+		int64 logicalEof, TupleDesc tableAttrs) {
+	MemoryContext oldMemoryContext;
+	int segmentFileNameLen;
 
-	readParquetFooter(file, &(storageRead->parquetMetadata), logicalEof, filePathName);
+	oldMemoryContext = MemoryContextSwitchTo(storageRead->memoryContext);
 
-	if(checkAndSyncMetadata(storageRead->parquetMetadata, tableAttrs) == false){
+	readParquetFooter(fileHandlerforfooter, &(storageRead->parquetMetadata),
+			&(storageRead->footerProtocol), logicalEof, filePathName);
+
+	if (checkAndSyncMetadata(storageRead->parquetMetadata, tableAttrs) == false) {
 		ereport(ERROR,
 				(errcode(ERRCODE_GP_INTERNAL_ERROR),
-					errmsg("parquet file error: metadata not correct for relation '%s'",
-					storageRead->relationName)));
+						errmsg("parquet file error: metadata not correct for relation '%s'",
+						storageRead->relationName)));
 	}
 
-	storageRead->file = file;
+	storageRead->file = fileHandlerfordata;
+	storageRead->fileHandlerForFooter = fileHandlerforfooter;
 	storageRead->rowGroupCount = storageRead->parquetMetadata->blockCount;
 	storageRead->rowGroupProcessedCount = 0;
 
 	/*
 	 * When reading multiple segment files, we throw away the old segment file name strings.
 	 */
-	oldMemoryContext = MemoryContextSwitchTo(storageRead->memoryContext);
-
 	if (storageRead->segmentFileName != NULL)
 		pfree(storageRead->segmentFileName);
 
 	segmentFileNameLen = strlen(filePathName);
-	storageRead->segmentFileName = (char *) palloc(segmentFileNameLen + 1);
+	storageRead->segmentFileName = (char *) palloc0(segmentFileNameLen + 1);
 	memcpy(storageRead->segmentFileName, filePathName, segmentFileNameLen + 1);
 
 	/* Allocation is done.	Go back to caller memory-context. */
@@ -149,9 +140,9 @@ static void ParquetStorageRead_FinishOpenFile(
  *
  * No error if the current is already closed.
  */
-void ParquetStorageRead_CloseFile(ParquetStorageRead *storageRead)
-{
-	if(!storageRead->isActive)
+void ParquetStorageRead_CloseFile(ParquetStorageRead *storageRead) {
+	MemoryContext oldMemoryContext;
+	if (!storageRead->isActive)
 		return;
 
 	if (storageRead->file == -1)
@@ -161,8 +152,18 @@ void ParquetStorageRead_CloseFile(ParquetStorageRead *storageRead)
 
 	storageRead->file = -1;
 
-}
+	Assert(storageRead->fileHandlerForFooter != -1);
+	FileClose(storageRead->fileHandlerForFooter);
+	storageRead->fileHandlerForFooter = -1;
 
+	oldMemoryContext = MemoryContextSwitchTo(storageRead->memoryContext);
+
+	/*free storageRead->parquetMetadata*/
+	freeParquetMetadata(storageRead->parquetMetadata);
+	storageRead->parquetMetadata = NULL;
+
+	MemoryContextSwitchTo(oldMemoryContext);
+}
 
 /*
  * Initialize ParquetStorageRead.
@@ -179,17 +180,15 @@ void ParquetStorageRead_CloseFile(ParquetStorageRead *storageRead)
  * 						manages the storage for this.
  * @storageAttributes	The Parquet Storage Attributes from relation creation.
  */
-void ParquetStorageRead_Init(
+void
+ParquetStorageRead_Init(
 		ParquetStorageRead *storageRead,
 		MemoryContext memoryContext,
 		char *relationName,
-		char *title,
 		AppendOnlyStorageAttributes *storageAttributes)
 {
-	int		relationNameLen;
-	uint8	*memory;
-	int32	memoryLen = 1024;
-	MemoryContext	oldMemoryContext;
+	int relationNameLen;
+	MemoryContext oldMemoryContext;
 
 	Assert(storageRead != NULL);
 
@@ -211,54 +210,52 @@ void ParquetStorageRead_Init(
 		sizeof(AppendOnlyStorageAttributes));
 
 	relationNameLen = strlen(relationName);
-	storageRead->relationName = (char *) palloc(relationNameLen + 1);
-	memcpy(storageRead->relationName, relationName, relationNameLen + 1);
-
-	storageRead->title = title;
+	storageRead->relationName = (char *) palloc0(relationNameLen + 1);
+	strcpy(storageRead->relationName, relationName);
 
 	Assert(CurrentMemoryContext == storageRead->memoryContext);
-	memory = (uint8*)palloc(memoryLen);
 
 	if (Debug_appendonly_print_scan || Debug_appendonly_print_read_block)
 		elog(LOG,"Parquet Storage Read initialize for table '%s' "
-		     "(compression = %s, compression level %d)",
-		     storageRead->relationName,
-		     (storageRead->storageAttributes.compress ? "true" : "false"),
-		     storageRead->storageAttributes.compressLevel);
+		"(compression = %s, compression level %d)",
+		storageRead->relationName,
+		(storageRead->storageAttributes.compress ? "true" : "false"),
+		storageRead->storageAttributes.compressLevel);
 
 	storageRead->file = -1;
+	storageRead->fileHandlerForFooter = -1;
 
 	MemoryContextSwitchTo(oldMemoryContext);
 
 	storageRead->isActive = true;
 }
 
+/**
+ * Free the contents in storage read
+ */
 void
 ParquetStorageRead_FinishSession(ParquetStorageRead *storageRead)
 {
-	MemoryContext	oldMemoryContext;
-    
+	MemoryContext oldContext;
+
 	if(!storageRead->isActive)
 		return;
-    
-	oldMemoryContext = MemoryContextSwitchTo(storageRead->memoryContext);
-    
-	if (storageRead->relationName != NULL)
+
+	oldContext = MemoryContextSwitchTo(storageRead->memoryContext);
+
+	if(storageRead->relationName != NULL)
 	{
 		pfree(storageRead->relationName);
 		storageRead->relationName = NULL;
 	}
-    
+
 	if (storageRead->segmentFileName != NULL)
 	{
 		pfree(storageRead->segmentFileName);
 		storageRead->segmentFileName = NULL;
 	}
-    
-	/* Deallocation is done. Go back to caller memory-context. */
-	MemoryContextSwitchTo(oldMemoryContext);
-    
-	storageRead->isActive = false;
-    
-}
 
+	MemoryContextSwitchTo(oldContext);
+
+	storageRead->isActive = false;
+}

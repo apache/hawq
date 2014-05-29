@@ -187,6 +187,7 @@ void flushRowGroup(
 		ParquetRowGroup rowgroup,
 		ParquetMetadata parquetmd,
 		MirroredAppendOnlyOpen *mirroredOpen,
+		CompactProtocol	*footerProtocol,
 		int64 *fileLen,
 		int64 *fileLen_uncompressed);
 
@@ -209,5 +210,10 @@ void appendRowValue(ParquetRowGroup rowgroup, ParquetMetadata parquetmd, Datum* 
 int initparquetMetadata(ParquetMetadata parquetMetadata, TupleDesc tableAttrs, File parquetFile);
 
 int mappingHAWQType(int hawqTypeID);
+
+void estimateColumnWidth(int *columnWidths,
+					int *colidx,
+					Form_pg_attribute att,
+					bool expandEmbeddingType);
 
 #endif /* CDBPARQUETSTORAGEWRITE_H_ */

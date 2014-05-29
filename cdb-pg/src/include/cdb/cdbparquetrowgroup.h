@@ -14,54 +14,52 @@
 #include "access/htup.h"
 #include "executor/tuptable.h"
 
-typedef struct ParquetExecutorReadRowGroup
+typedef struct ParquetRowGroupReader
 {
-	MemoryContext	memoryContext;
-
+	MemoryContext		memoryContext;
 	ParquetStorageRead	*storageRead;
-
-	int 			rowCount;
-	int				rowRead;
-
+	int 				rowCount;
+	int					rowRead;
 	ParquetColumnReader	*columnReaders;
-	int				columnReaderCount;
-
+	int					columnReaderCount;
 	/* synthetic system attributes */
-	ItemPointerData cdb_fake_ctid;
-} ParquetExecutorReadRowGroup;
-
+	ItemPointerData 	cdb_fake_ctid;
+} ParquetRowGroupReader;
 
 /* read row group initialization*/
-void ParquetExecutorReadRowGroup_Init(
-		ParquetExecutorReadRowGroup *executorReadRowGroup,
-		Relation relation,
-		MemoryContext memoryContext,
-		ParquetStorageRead *storageRead);
+void
+ParquetRowGroupReader_Init(
+	ParquetRowGroupReader	*rowGroupReader,
+	Relation 				relation,
+	ParquetStorageRead		*storageRead);
 
 /* Get row group metadata*/
-bool ParquetExecutorReadRowGroup_GetRowGroupInfo(
-	ParquetStorageRead			*storageRead,
-	ParquetExecutorReadRowGroup		*executorReadRowGroup,
-	bool *projs,
-	TupleDesc hawqTupleDesc,
-	int *hawqAttrToParquetColChunks);
+bool
+ParquetRowGroupReader_GetRowGroupInfo(
+	ParquetStorageRead		*storageRead,
+	ParquetRowGroupReader	*rowGroupReader,
+	bool 					*projs,
+	TupleDesc 				hawqTupleDesc,
+	int 					*hawqAttrToParquetColChunks);
 
 /* Get contents of row group*/
-void ParquetExecutorReadRowGroup_GetContents(
-		ParquetExecutorReadRowGroup *executorReadRowGroup,
-		MemoryContext 	memoryContext);
+void
+ParquetRowGroupReader_GetContents(
+	ParquetRowGroupReader	*rowGroupReader);
 
 /* Get next tuple of current row group*/
-bool ParquetExecutorReadRowGroup_ScanNextTuple(
-	TupleDesc 			pqs_tupDesc,
-	ParquetExecutorReadRowGroup *executorReadRowGroup,
-	int					*hawqAttrToParquetColNum,
-	bool *projs,
-	TupleTableSlot *slot);
+bool
+ParquetRowGroupReader_ScanNextTuple(
+	TupleDesc 				pqs_tupDesc,
+	ParquetRowGroupReader 	*rowGroupReader,
+	int						*hawqAttrToParquetColNum,
+	bool 					*projs,
+	TupleTableSlot 			*slot);
 
 /* Finish scanning current row group*/
-void ParquetExecutionReadRowGroup_FinishedScanRowGroup(ParquetExecutorReadRowGroup *executorReadRowGroup);
-
+void
+ParquetRowGroupReader_FinishedScanRowGroup(
+	ParquetRowGroupReader	*rowGroupReader);
 
 
 #endif /* CDBPARQUETROWGROUP_H_ */

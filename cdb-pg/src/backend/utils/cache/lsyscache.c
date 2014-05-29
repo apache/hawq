@@ -1639,7 +1639,6 @@ get_relname_relid(const char *relname, Oid relnamespace)
 	return result;
 }
 
-#ifdef NOT_USED
 /*
  * get_relnatts
  *
@@ -1670,7 +1669,6 @@ get_relnatts(Oid relid)
 	caql_endscan(pcqCtx);
 	return result;
 }
-#endif
 
 /*
  * get_rel_name

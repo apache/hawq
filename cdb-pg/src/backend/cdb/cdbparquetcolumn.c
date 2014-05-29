@@ -30,7 +30,8 @@ static inline int get_path_size(int npts) { return offsetof(PATH, p[0]) + sizeof
 /* return size of POLYGON struct given number of points in it */
 static inline int get_polygon_size(int npts) { return offsetof(POLYGON, p[0]) + sizeof(Point) * npts; }
 
-void ParquetExecutorReadColumn(ParquetColumnReader *columnReader, File file, MemoryContext memoryContext)
+void
+ParquetExecutorReadColumn(ParquetColumnReader *columnReader, File file)
 {
 	struct ColumnChunkMetadata_4C* columnChunkMetadata = columnReader->columnMetadata;
 
@@ -48,7 +49,7 @@ void ParquetExecutorReadColumn(ParquetColumnReader *columnReader, File file, Mem
 
 	int64 actualReadSize = 0;
 
-	MemoryContext oldContext = MemoryContextSwitchTo(memoryContext);
+	MemoryContext oldContext = MemoryContextSwitchTo(columnReader->memoryContext);
 
 	/*reuse the column reader data buffer to avoid memory re-allocation*/
 	if(columnReader->dataLen == 0)
@@ -68,7 +69,6 @@ void ParquetExecutorReadColumn(ParquetColumnReader *columnReader, File file, Mem
 		columnReader->dataBuffer = (char*) repalloc(columnReader->dataBuffer, columnReader->dataLen);
 		memset(columnReader->dataBuffer, 0, columnReader->dataLen);
 	}
-	MemoryContextSwitchTo(memoryContext);
 
 	char *buffer = columnReader->dataBuffer;
 
@@ -99,8 +99,6 @@ void ParquetExecutorReadColumn(ParquetColumnReader *columnReader, File file, Mem
 		}
 		actualReadSize += columnChunkLen;
 	}
-
-	oldContext = MemoryContextSwitchTo(memoryContext);
 
 	/*only if first column reader set, just need palloc the data pages*/
 	if(columnReader->dataPageCapacity == 0)
@@ -223,10 +221,13 @@ decodeCurrentPage(ParquetColumnReader *columnReader)
 	ParquetDataPage page;
 	ParquetPageHeader header;
 	uint8_t			*buf;	/* store uncompressed or decompressed page data */
+	MemoryContext	oldContext;
 
 	chunkmd	= columnReader->columnMetadata;
 	page	= columnReader->currentPage;
 	header	= page->header;
+
+	oldContext = MemoryContextSwitchTo(columnReader->memoryContext);
 
 	/*----------------------------------------------------------------
 	 * Decompress raw data. After this, buf & page->data points to
@@ -245,7 +246,7 @@ decodeCurrentPage(ParquetColumnReader *columnReader)
 		if (chunkmd->r > 0)
 		{
 			/* repeatable column creates decompression buffer for each page */
-			buf = palloc(header->uncompressed_page_size);
+			buf = palloc0(header->uncompressed_page_size);
 		}
 		else
 		{	
@@ -253,7 +254,7 @@ decodeCurrentPage(ParquetColumnReader *columnReader)
 			if (columnReader->pageBuffer == NULL)
 			{
 				columnReader->pageBufferLen = header->uncompressed_page_size * BUFFER_SCALE_FACTOR;
-				columnReader->pageBuffer = palloc(columnReader->pageBufferLen);
+				columnReader->pageBuffer = palloc0(columnReader->pageBufferLen);
 			}
 			else if (columnReader->pageBufferLen < header->uncompressed_page_size)
 			{
@@ -390,6 +391,7 @@ decodeCurrentPage(ParquetColumnReader *columnReader)
 		page->values_buffer = buf;
 	}
 
+	MemoryContextSwitchTo(oldContext);
 }
 
 /**
@@ -400,10 +402,11 @@ decodeCurrentPage(ParquetColumnReader *columnReader)
  * @null				used to record whether the value is null
  */
 void
-ParquetColumnReader_readValue(ParquetColumnReader *columnReader,
-							  Datum *value,
-							  bool *null,
-							  int hawqTypeID)
+ParquetColumnReader_readValue(
+		ParquetColumnReader *columnReader,
+		Datum *value,
+		bool *null,
+		int hawqTypeID)
 {
 	/*
 	 * for non-repeatable column, because of using shared `pageBuffer`,
@@ -578,8 +581,12 @@ decodePlain(Datum *value, uint8_t **buffer, int hawqTypeID)
 /**
  * finish scan current column, free and reset column reader part
  */
-void ParquetExecutionReadColumn_FinishedScanColumn(ParquetColumnReader *columnReader)
+void
+ParquetColumnReader_FinishedScanColumn(
+		ParquetColumnReader *columnReader)
 {
+	MemoryContext oldContext = MemoryContextSwitchTo(columnReader->memoryContext);
+
 	for(int i = 0; i < columnReader->dataPageNum; i++)
 	{
 		ParquetDataPage page = columnReader->dataPages + i;
@@ -625,6 +632,14 @@ void ParquetExecutionReadColumn_FinishedScanColumn(ParquetColumnReader *columnRe
 		columnReader->dataPageNum = 0;
 	}
 
+	if (columnReader->geoval != NULL)
+	{
+		pfree(columnReader->geoval);
+		columnReader->geoval = NULL;
+	}
+
+	MemoryContextSwitchTo(oldContext);
+
 	columnReader->dataPageProcessed = 0;
 	columnReader->currentPageValueRemained = 0;
 }
@@ -634,9 +649,10 @@ void ParquetExecutionReadColumn_FinishedScanColumn(ParquetColumnReader *columnRe
  *----------------------------------------------------------------*/
 
 void
-ParquetColumnReader_readPoint(ParquetColumnReader readers[],
-							  Datum *value,
-							  bool *null)
+ParquetColumnReader_readPoint(
+		ParquetColumnReader readers[],
+		Datum *value,
+		bool *null)
 {
 	Point *point;
 	Datum child_values[2] = {0};
@@ -667,9 +683,10 @@ ParquetColumnReader_readPoint(ParquetColumnReader readers[],
 }
 
 void
-ParquetColumnReader_readLSEG(ParquetColumnReader readers[],
-							 Datum *value,
-							 bool *null)
+ParquetColumnReader_readLSEG(
+		ParquetColumnReader readers[],
+		Datum *value,
+		bool *null)
 {
 	LSEG *lseg;
 	Datum child_values[4] = {0};
@@ -706,9 +723,10 @@ ParquetColumnReader_readLSEG(ParquetColumnReader readers[],
 }
 
 void
-ParquetColumnReader_readPATH(ParquetColumnReader readers[],
-							 Datum *value,
-							 bool *null)
+ParquetColumnReader_readPATH(
+		ParquetColumnReader readers[],
+		Datum *value,
+		bool *null)
 {
 	PATH *path;
 	Datum child_values[3] = {0};	/* is_open, points.x, points.y */
@@ -730,7 +748,7 @@ ParquetColumnReader_readPATH(ParquetColumnReader readers[],
 	if (path == NULL)
 	{
 		maxnpts = 10;
-		path = palloc(get_path_size(maxnpts));
+		path = (PATH *)palloc0(get_path_size(maxnpts));
 	}
 	else
 	{
@@ -743,7 +761,7 @@ ParquetColumnReader_readPATH(ParquetColumnReader readers[],
 		if (npts >= maxnpts)
 		{
 			maxnpts *= 2;
-			path = repalloc(path, get_path_size(maxnpts));
+			path = (PATH *)repalloc(path, get_path_size(maxnpts));
 		}
 		
 		ParquetColumnReader_readValue(&readers[1], &child_values[1], &child_nulls[1], HAWQ_TYPE_FLOAT8);
@@ -757,7 +775,7 @@ ParquetColumnReader_readPATH(ParquetColumnReader readers[],
 			break;	/* no more points in this path */
 	}
 
-	path = repalloc(path, get_path_size(npts));
+	path = (PATH *)repalloc(path, get_path_size(npts));
 	SET_VARSIZE(path, get_path_size(npts));
 	path->npts = npts;
 
@@ -768,9 +786,10 @@ ParquetColumnReader_readPATH(ParquetColumnReader readers[],
 }
 
 void
-ParquetColumnReader_readBOX(ParquetColumnReader readers[],
-							Datum *value,
-							bool *null)
+ParquetColumnReader_readBOX(
+		ParquetColumnReader readers[],
+		Datum *value,
+		bool *null)
 {
 	BOX *box;
 	Datum child_values[4] = {0};
@@ -807,9 +826,10 @@ ParquetColumnReader_readBOX(ParquetColumnReader readers[],
 }
 
 void
-ParquetColumnReader_readPOLYGON(ParquetColumnReader readers[],
-								Datum *value,
-								bool *null)
+ParquetColumnReader_readPOLYGON(
+		ParquetColumnReader readers[],
+		Datum *value,
+		bool *null)
 {
 	POLYGON *polygon;
 	Datum child_values[6] = {0};	/* boundbox:{x1,y1,x2,y2}, points:{x,y} */
@@ -887,9 +907,10 @@ ParquetColumnReader_readPOLYGON(ParquetColumnReader readers[],
 }
 
 void
-ParquetColumnReader_readCIRCLE(ParquetColumnReader readers[],
-							   Datum *value,
-							   bool *null)
+ParquetColumnReader_readCIRCLE(
+		ParquetColumnReader readers[],
+		Datum *value,
+		bool *null)
 {
 	CIRCLE *circle;
 	Datum child_values[3] = {0};

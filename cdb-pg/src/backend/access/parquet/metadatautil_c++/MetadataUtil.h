@@ -1,5 +1,5 @@
 /*
- * getMetadata.h
+ * MetadataUtil.h
  *
  *  Created on: Jun 25, 2013
  *      Author: malili
@@ -34,32 +34,15 @@ const parquet::Type::type HAWQ_TO_PARQUET_TYPES[] = {
 class MetadataUtil {
 private:
 
-	ThriftDeserializer *thriftDeserializer;
-
 	static ThriftSerializer *thriftSerializer;
 
 public:
-	MetadataUtil() {
-	}
-	;
-	virtual ~MetadataUtil() {
-	}
-	;
-
-	void readMetadataInit();
-
-	static int writeFileMetadata(uint8_t **buf, uint32_t *len,
-			ParquetMetadata_4C* fileMetadata);
 
 	static int writeColumnChunkMetadata(uint8_t **buf, uint32_t *len,
 			ColumnChunkMetadata_4C* hawqColumnChunkMetadata);
 
 	static int writePageMetadata(uint8_t **buf, uint32_t *len,
 			PageMetadata_4C* pageMetadata);
-
-	static int convertToParquetMetadata(
-			parquet::FileMetaData *parquetFileMetadata,
-			ParquetMetadata_4C* hawqFileMetadata);
 
 	static int convertToColumnMetadata(parquet::ColumnMetaData *columnchunk_metadata,
 			ColumnChunkMetadata_4C* hawqColumnMetadata);
@@ -68,22 +51,12 @@ public:
 			parquet::PageHeader *parquetHeader,
 			PageMetadata_4C* hawqPageMetadata);
 
-
-	int readFileMetadata(uint8_t *buf, uint32_t len, bool compact,
-			ParquetMetadata_4C* pfileMedata);
-
-	int readPageMetadata(uint8_t *buf, uint32_t *len, bool compact,
+	static int readPageMetadata(uint8_t *buf, uint32_t *len, bool compact,
 			PageMetadata_4C* pPageMetadata);
 
-	void convertFileMetadata(parquet::FileMetaData& parquetFileMetadata,
-			ParquetMetadata_4C* hawqFileMetadata);
-
-	void convertPageMetadata(parquet::PageHeader& parquetHeader,
+	static void convertPageMetadata(parquet::PageHeader& parquetHeader,
 			PageMetadata_4C* hawqPageMetadata);
 
-
-	int fromParquetKeyValue(std::vector<parquet::KeyValue> keyValue,
-			char **hawqschemastr);
 };
 }
 #endif /* GETMETADATA_H_ */

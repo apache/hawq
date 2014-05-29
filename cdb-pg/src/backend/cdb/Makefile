@@ -46,8 +46,9 @@ OBJS = cdbanalyze.o \
 	   cdbmutate.o \
 	   cdboidsync.o \
 	   cdbparquetstorageread.o cdbparquetstoragewrite.o cdbparquetrleencoder.o \
-	   cdbparquetbytepacker.o cdbparquetbitstreamutil.o cdbparquetrowgroup.o\
-	   cdbparquetfooterprocessor.o cdbparquetcolumn.o\
+	   cdbparquetbytepacker.o cdbparquetbitstreamutil.o cdbparquetrowgroup.o \
+	   cdbparquetcolumn.o cdbparquetfooterprocessor.o cdbparquetfooterbuffer.o	\
+	   cdbparquetfooterserializer.o cdbparquetfooterserializer_protocol.o \
 	   cdbpartindex.o \
 	   cdbpartition.o \
 	   cdbpath.o cdbpathlocus.o cdbpathtoplan.o \

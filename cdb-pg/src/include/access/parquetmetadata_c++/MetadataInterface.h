@@ -112,8 +112,7 @@ typedef struct ParquetMetadata_4C
 
 	long num_rows;	/*number of rows*/
 
-	struct BlockMetadata_4C** pBlockMD;
-	int maxBlockCount; /*indicates the allocated array size for pBlockMD*/
+	struct BlockMetadata_4C *currentBlockMD;	/*the metadata of current row group*/
 	int blockCount;		/*count of row groups*/
 
 	char *hawqschemastr;	/*hawq schema str, should output into parquet metadata keyvalue part*/
@@ -139,36 +138,22 @@ typedef struct PageMetadata_4C
 	int32_t crc;
 } PageMetadata_4C;
 
-//typedef struct ParquetMetadataUtil{
-////	MetadataUtil util;	/*metadata utility for thrift serializer/deserializer*/
-//	bool compactBool;	/*whether compact*/
-//}ParquetMetadataUtil_4C;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-int readFileMetadata(/*IN*/uint8_t *buf,
-		/*IN*/uint32_t len,
-		/*IN*/int compact,
-		struct ParquetMetadata_4C** ppfileMetdata);
-
-int writeFileMetadata(/*IN*/uint8_t **buf,
-		/*IN*/uint32_t *len,
-		struct ParquetMetadata_4C* ppfileMetadata);
-
-int readPageMetadata(/*IN*/uint8_t *buf,
-		/*IN*/uint32_t *len,
-		/*IN*/int compact,
+int readPageMetadata(uint8_t *buf,
+		uint32_t *len,
+		int compact,
 		struct PageMetadata_4C** ppageMetdata);
 
-int writePageMetadata(/*IN*/uint8_t **buf,
-		/*IN*/uint32_t *len,
-//		/*IN*/int compact,
+int writePageMetadata(uint8_t **buf,
+		uint32_t *len,
 		struct PageMetadata_4C* ppageMetadata);
 
-int writeColumnChunkMetadata(/*IN*/uint8_t **buf,
-		/*IN*/uint32_t *len,
+int writeColumnChunkMetadata(uint8_t **buf,
+		uint32_t *len,
 		struct ColumnChunkMetadata_4C* columnChunkMetadata);
 
 

@@ -93,6 +93,7 @@ extern Oid get_agg_transtype(Oid aggid);
 extern bool is_agg_ordered(Oid aggid);
 extern bool has_agg_prelimfunc(Oid aggid);
 extern Oid	get_relname_relid(const char *relname, Oid relnamespace);
+extern int get_relnatts(Oid relid);
 extern char *get_rel_name(Oid relid);
 extern char *get_rel_name_partition(Oid relid);
 extern Oid	get_rel_namespace(Oid relid);

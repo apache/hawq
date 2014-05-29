@@ -1,13 +1,16 @@
 /*
  * cdbparquetstoragewrite.c
+
  *
  *  Created on: Jul 30, 2013
  *      Author: malili
  */
+
 #include "postgres.h"
 
 #include "catalog/catquery.h"
 #include "cdb/cdbparquetstoragewrite.h"
+#include "cdb/cdbparquetfooterserializer.h"
 #include "lib/stringinfo.h"
 #include "utils/cash.h"
 #include "utils/geo_decls.h"
@@ -203,7 +206,7 @@ generateHAWQSchemaStr(ParquetFileField pfields,
 
 	for (ParquetFileField field = pfields; field < pfields + fieldCount; field++)
 	{
-		/* FIXME add ARRAY and UDF type support */
+		/* TODO add ARRAY and UDF type support */
 		char *typeName = getTypeName(field->hawqTypeId);
 		appendStringInfo(schemaBuf, "%s %s %s;",
 						 (field->repetitionType == REQUIRED) ? "required" : "optional",
@@ -317,8 +320,6 @@ initparquetMetadata(ParquetMetadata parquetmd,
 
 	parquetmd->hawqschemastr = generateHAWQSchemaStr(parquetmd->pfield,
 													 parquetmd->fieldCount);
-	parquetmd->maxBlockCount = DEFAULT_ROWGROUP_COUNT;
-	parquetmd->pBlockMD = palloc0(parquetmd->maxBlockCount * sizeof(RowGroupMetadata));
 	return 0;
 }
 
@@ -380,7 +381,7 @@ void initGroupType(struct FileField_4C *field,
 	int nameLen = strlen(name);
 	int pathInSchemaLen;
 	/*initialize name*/
-	field->name = (char*) palloc0(nameLen + 1);
+	field->name = (char *) palloc0 (nameLen + 1);
 	strcpy(field->name, name);
 
 	/*initialize pathInSchema, should be parentPathInSchema:Name*/
@@ -671,115 +672,141 @@ mappingHAWQType(int hawqTypeID)
 	}
 }
 
+void estimateColumnWidth(int *columnWidths,
+					int *colidx,
+					Form_pg_attribute att,
+					bool expandEmbeddingType){
+	switch (att->atttypid)
+	{
+		/* fixed size type */
+		case HAWQ_TYPE_BOOL:
+		case HAWQ_TYPE_INT2:
+		case HAWQ_TYPE_INT4:
+		case HAWQ_TYPE_INT8:
+		case HAWQ_TYPE_FLOAT4:
+		case HAWQ_TYPE_FLOAT8:
+		case HAWQ_TYPE_DATE:
+		case HAWQ_TYPE_TIME:
+		case HAWQ_TYPE_TIMETZ:
+		case HAWQ_TYPE_TIMESTAMP:
+		case HAWQ_TYPE_TIMESTAMPTZ:
+		case HAWQ_TYPE_INTERVAL:
+		case HAWQ_TYPE_NAME:
+		case HAWQ_TYPE_MONEY:
+		case HAWQ_TYPE_MACADDR:
+			Assert(att->attlen > 0);
+			columnWidths[(*colidx)++] = att->attlen;
+			break;
+
+		/* variable length type */
+		case HAWQ_TYPE_CHAR:
+		case HAWQ_TYPE_BPCHAR:
+			/* for char(n), atttypmod is n + 4 */
+			Assert(att->atttypmod > 4);
+			columnWidths[(*colidx)++] = att->atttypmod;
+			break;
+			break;
+		case HAWQ_TYPE_VARCHAR:
+		case HAWQ_TYPE_TEXT:
+		case HAWQ_TYPE_XML:
+			if (att->atttypmod > 4)
+			{	/* for varchar(n), atttypmod is n + 4 */
+				columnWidths[(*colidx)++] = att->atttypmod;
+			}
+			else
+			{	/* for varchar, text, xml */
+				columnWidths[(*colidx)++] = 30;
+			}
+			break;
+
+		case HAWQ_TYPE_BIT:
+		case HAWQ_TYPE_VARBIT:
+			if (att->atttypmod > 0)
+			{	/* for bit(n) and bit varying (n), atttypmod is n,
+				 * but we also have 4 bytes binary header */
+				columnWidths[(*colidx)++] = 4 + att->atttypmod;
+			}
+			else
+			{
+				columnWidths[(*colidx)++] = 20;
+			}
+			break;
+
+		case HAWQ_TYPE_BYTE:
+		case HAWQ_TYPE_NUMERIC:
+		case HAWQ_TYPE_INET:
+		case HAWQ_TYPE_CIDR:
+			columnWidths[(*colidx)++] = 24;
+			break;
+
+		/* maps to multiple columns */
+		case HAWQ_TYPE_POINT:
+			if (expandEmbeddingType) {
+				columnWidths[(*colidx)++] = 8; /* x */
+				columnWidths[(*colidx)++] = 8; /* y */
+			} else {
+				columnWidths[(*colidx)++] = 16;
+			}
+			break;
+		case HAWQ_TYPE_PATH:
+			if (expandEmbeddingType) {
+				columnWidths[(*colidx)++] = 1; /* is_open */
+				columnWidths[(*colidx)++] = 24;/* repeated points.x */
+				columnWidths[(*colidx)++] = 24;/* repeated points.y */
+			} else {
+				columnWidths[(*colidx)++] = 49;
+			}
+			break;
+		case HAWQ_TYPE_LSEG:
+		case HAWQ_TYPE_BOX:
+			if (expandEmbeddingType) {
+				columnWidths[(*colidx)++] = 8; /* x1 */
+				columnWidths[(*colidx)++] = 8; /* y1 */
+				columnWidths[(*colidx)++] = 8; /* x2 */
+				columnWidths[(*colidx)++] = 8; /* y2 */
+			} else {
+				columnWidths[(*colidx)++] = 32;
+			}
+
+			break;
+		case HAWQ_TYPE_POLYGON:
+			if (expandEmbeddingType) {
+				columnWidths[(*colidx)++] = 8; /* boundbox.x1 */
+				columnWidths[(*colidx)++] = 8; /* boundbox.y1 */
+				columnWidths[(*colidx)++] = 8; /* boundbox.x2 */
+				columnWidths[(*colidx)++] = 8; /* boundbox.y2 */
+				columnWidths[(*colidx)++] = 24;/* repeated points.x */
+				columnWidths[(*colidx)++] = 24;/* repeated points.y */
+			} else {
+				columnWidths[(*colidx)++] = 80;
+			}
+			break;
+		case HAWQ_TYPE_CIRCLE:
+			if (expandEmbeddingType) {
+				columnWidths[(*colidx)++] = 8; /* x */
+				columnWidths[(*colidx)++] = 8; /* y */
+				columnWidths[(*colidx)++] = 8; /* r */
+			} else {
+				columnWidths[(*colidx)++] = 24;
+			}
+			break;
+		default:
+			Insist(false);
+			break;
+	}
+}
+
+
 static void
 estimateColumnWidths(int *columnWidths,
 					 int ncolumns,
 					 TupleDesc tableAttrs)
 {
-	Form_pg_attribute att;
 	int colidx = 0;
-
 	for (int i = 0; i < tableAttrs->natts; i++)
 	{
-		att = tableAttrs->attrs[i];
-
-		switch (att->atttypid)
-		{
-			/* fixed size type */
-			case HAWQ_TYPE_BOOL:
-			case HAWQ_TYPE_INT2:
-			case HAWQ_TYPE_INT4:
-			case HAWQ_TYPE_INT8:
-			case HAWQ_TYPE_FLOAT4:
-			case HAWQ_TYPE_FLOAT8:
-			case HAWQ_TYPE_DATE:
-			case HAWQ_TYPE_TIME:
-			case HAWQ_TYPE_TIMETZ:
-			case HAWQ_TYPE_TIMESTAMP:
-			case HAWQ_TYPE_TIMESTAMPTZ:
-			case HAWQ_TYPE_INTERVAL:
-			case HAWQ_TYPE_NAME:
-			case HAWQ_TYPE_MONEY:
-			case HAWQ_TYPE_MACADDR:
-				Assert(att->attlen > 0);
-				columnWidths[colidx++] = att->attlen;
-				break;
-
-			/* variable length type */
-			case HAWQ_TYPE_CHAR:
-			case HAWQ_TYPE_BPCHAR:
-				/* for char(n), atttypmod is n + 4 */
-				Assert(att->atttypmod > 4);
-				columnWidths[colidx++] = att->atttypmod;
-				break;
-				break;
-			case HAWQ_TYPE_VARCHAR:
-			case HAWQ_TYPE_TEXT:
-			case HAWQ_TYPE_XML:
-				if (att->atttypmod > 4)
-				{	/* for varchar(n), atttypmod is n + 4 */
-					columnWidths[colidx++] = att->atttypmod;
-				}
-				else
-				{	/* for varchar, text, xml */
-					columnWidths[colidx++] = 30;
-				}
-				break;
-
-			case HAWQ_TYPE_BIT:
-			case HAWQ_TYPE_VARBIT:
-				if (att->atttypmod > 0)
-				{	/* for bit(n) and bit varying (n), atttypmod is n,
-					 * but we also have 4 bytes binary header */
-					columnWidths[colidx++] = 4 + att->atttypmod;
-				}
-				else
-				{
-					columnWidths[colidx++] = 20;
-				}
-				break;
-
-			case HAWQ_TYPE_BYTE:
-			case HAWQ_TYPE_NUMERIC:
-			case HAWQ_TYPE_INET:
-			case HAWQ_TYPE_CIDR:
-				columnWidths[colidx++] = 24;
-				break;
-
-			/* maps to multiple columns */
-			case HAWQ_TYPE_POINT:
-				columnWidths[colidx++] = 8;	/* x */
-				columnWidths[colidx++] = 8;	/* y */
-				break;
-			case HAWQ_TYPE_PATH:
-				columnWidths[colidx++] = 1;	/* is_open */
-				columnWidths[colidx++] = 24;/* repeated points.x */
-				columnWidths[colidx++] = 24;/* repeated points.x */
-				break;
-			case HAWQ_TYPE_LSEG:
-			case HAWQ_TYPE_BOX:
-				columnWidths[colidx++] = 8;	/* x1 */
-				columnWidths[colidx++] = 8;	/* y1 */
-				columnWidths[colidx++] = 8;	/* x2 */
-				columnWidths[colidx++] = 8;	/* y2 */
-				break;
-			case HAWQ_TYPE_POLYGON:
-				columnWidths[colidx++] = 8;	/* boundbox.x1 */
-				columnWidths[colidx++] = 8;	/* boundbox.y1 */
-				columnWidths[colidx++] = 8;	/* boundbox.x2 */
-				columnWidths[colidx++] = 8;	/* boundbox.y2 */
-				columnWidths[colidx++] = 24;/* repeated points.x */
-				columnWidths[colidx++] = 24;/* repeated points.y */
-				break;
-			case HAWQ_TYPE_CIRCLE:
-				columnWidths[colidx++] = 8;	/* x */
-				columnWidths[colidx++] = 8;	/* y */
-				columnWidths[colidx++] = 8;	/* r */
-				break;
-			default:
-				Insist(false);
-				break;
-		}
+		estimateColumnWidth(columnWidths, &colidx, tableAttrs->attrs[i],
+				/*expandEmbeddingType*/ true);
 	}
 	Assert(colidx == ncolumns);
 
@@ -825,9 +852,9 @@ addRowGroup(ParquetMetadata parquetmd,
 
 	if (parquetmd->estimateChunkSizes == NULL)
 	{
-		parquetmd->estimateChunkSizes = palloc(parquetmd->colCount * sizeof(int));
+		parquetmd->estimateChunkSizes = (int *)palloc0(parquetmd->colCount * sizeof(int));
 
-		int *columnWidths = palloc(parquetmd->colCount * sizeof(int));
+		int *columnWidths = (int *)palloc0(parquetmd->colCount * sizeof(int));
 		estimateColumnWidths(columnWidths, parquetmd->colCount, tableAttrs);
 
 		double rowWidths = 0.0;
@@ -839,7 +866,7 @@ addRowGroup(ParquetMetadata parquetmd,
 		for (int i = 0; i < parquetmd->colCount; i++)
 		{
 			parquetmd->estimateChunkSizes[i] =
-				(int) ((columnWidths[i] / rowWidths) * rowgroup->catalog->blocksize * 1.05);
+				(int) ((columnWidths[i] * rowgroup->catalog->blocksize * 1.05)/rowWidths);
 		}
 
 		pfree(columnWidths);
@@ -862,15 +889,8 @@ addRowGroup(ParquetMetadata parquetmd,
 	}
 	Assert(cIndex == parquetmd->colCount);
 
-	/* ParquetMetadata should keep track of all rowgroups' metadata */
-	if (parquetmd->blockCount >= parquetmd->maxBlockCount)
-	{
-		parquetmd->maxBlockCount *= 2;
-		parquetmd->pBlockMD = repalloc(parquetmd->pBlockMD,
-									   parquetmd->maxBlockCount * sizeof(RowGroupMetadata));
-	}
-	parquetmd->pBlockMD[parquetmd->blockCount++] = rowgroupmd;
-
+	/* should increment the row group count of parquet metadata*/
+	parquetmd->blockCount++;
 	return rowgroup;
 }
 
@@ -878,6 +898,7 @@ void
 flushRowGroup(ParquetRowGroup rowgroup,
 			  ParquetMetadata parquetmd,
 			  MirroredAppendOnlyOpen *mirroredOpen,
+			  CompactProtocol *footerProtocol,
 			  int64 *fileLen,
 			  int64 *fileLen_uncompressed)
 {
@@ -977,6 +998,7 @@ flushRowGroup(ParquetRowGroup rowgroup,
 	rowgroup->rowGroupMetadata->totalByteSize += bytes_added;
 	parquetmd->num_rows += rowgroup->rowGroupMetadata->rowCount;
 
+	writeRowGroupInfo(rowgroup->rowGroupMetadata, footerProtocol);
 	freeRowGroup(rowgroup);
 }
 
@@ -991,6 +1013,8 @@ freeRowGroup(ParquetRowGroup rowgroup)
 		rowgroup->columnChunks[i].columnChunkMetadata = NULL;
 	}
 	pfree(rowgroup->columnChunks);
+
+	freeRowGroupInfo(rowgroup->rowGroupMetadata);
 	pfree(rowgroup);
 }
 
@@ -1066,9 +1090,9 @@ addSingleColumn(AppendOnlyEntry *catalog,
 		
 		chunkmd->type 			= field->type;
 		chunkmd->hawqTypeId 	= field->hawqTypeId;
-		chunkmd->colName 		= palloc0(strlen(field->name) + 1);
+		chunkmd->colName 		= (char *)palloc0(strlen(field->name) + 1);
 		strcpy(chunkmd->colName, field->name);
-		chunkmd->pathInSchema 	= palloc0(strlen(field->pathInSchema) + 1);
+		chunkmd->pathInSchema 	= (char *)palloc0(strlen(field->pathInSchema) + 1);
 		strcpy(chunkmd->pathInSchema, field->pathInSchema);
 		chunkmd->r 				= field->r;
 		chunkmd->d 				= field->d;

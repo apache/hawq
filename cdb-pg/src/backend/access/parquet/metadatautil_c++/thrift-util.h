@@ -45,6 +45,7 @@ public:
 	}
 
 	~ThriftSerializer(){
+		mem_buffer_.reset();
 	}
 
 	/**
@@ -75,17 +76,11 @@ private:
 
 class ThriftDeserializer {
 public:
-	ThriftDeserializer(bool compact) {
-	}
-	;
-	ThriftDeserializer() {
-	}
-	;
 
 	/**
 	 * create a protocol according to the memory transport.
 	 */
-	shared_ptr<TProtocol> CreateDeserializeProtocol(
+	static shared_ptr<TProtocol> CreateDeserializeProtocol(
 			shared_ptr<TMemoryBuffer> mem, bool compact) {
 		if (compact) {
 			TCompactProtocolFactoryT<TMemoryBuffer> tproto_factory;
@@ -106,7 +101,7 @@ public:
 	 * @return			return deserialization result
 	 */
 	template<class T>
-	int DeserializeThriftMsg(const uint8_t* buf,
+	static int DeserializeThriftMsg(const uint8_t* buf,
 			uint32_t* len, bool compact, T* deserialized_msg) {
 
 		/* TMemoryBuffer is not const-safe, although we use it in a const-safe way,
@@ -124,10 +119,6 @@ public:
 		*len = *len - bytes_left;
 		return 0;
 	}
-
-private:
-	shared_ptr<TProtocolFactory> factory_;
-	shared_ptr<TProtocol> tproto_;
 }
 ;
 

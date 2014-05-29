@@ -51,7 +51,7 @@ typedef struct ParquetScanDescData {
 
 	MemoryContext 		parquetScanInitContext; /* mem context at init time */
 
-	ParquetExecutorReadRowGroup	executorReadRowGroup;    // may need change to row group reader of parquet
+	ParquetRowGroupReader	rowGroupReader;
 
 	/* current scan state */
 	bool 				bufferDone;
@@ -61,13 +61,9 @@ typedef struct ParquetScanDescData {
 	AppendOnlyStorageAttributes storageAttributes;
 	ParquetStorageRead 	storageRead;
 
-	char 				*title;
-
 	QueryContextDispatchingSendBack sendback;
 
 	AppendOnlyEntry 		*aoEntry;
-
-	ParquetMetadata 	parquetMetadata;
 } ParquetScanDescData;
 
 typedef ParquetScanDescData *ParquetScanDesc;
@@ -81,6 +77,8 @@ typedef struct ParquetInsertDescData {
 	Relation 			parquet_rel;
 	Snapshot 			parquetMetaDataSnapshot;
 	File 				parquet_file; /*file handler*/
+	File				file_previousmetadata;		/*the read file descriptor for previous metadata*/
+	CompactProtocol 	*protocol_read;		/*the footer protocol for reading previous metadata*/
 	int 				parquetFilePathNameMaxLen;
 	char 				*parquetFilePathName; /*stores the filePathname, in hdfs path*/
 	char 				*relname;
@@ -89,9 +87,9 @@ typedef struct ParquetInsertDescData {
 	AppendOnlyEntry 	*aoEntry;
 	ParquetFileSegInfo 	*fsInfo;
 
-	bool 				metadataExists; /*whether metadata exists*/
 	int64 				rowCount;
 	int64				insertCount;	/*the records inserted.*/
+	int					previous_rowgroupcnt;		/*the origin row group count*/
 
 	int64				fileLen_uncompressed;	/*uncompressed length of the data file*/
 	int64				fileLen;	/*file length of the data file*/
@@ -100,6 +98,8 @@ typedef struct ParquetInsertDescData {
 
 	ParquetMetadata 	parquetMetadata;
 	ParquetRowGroup 	current_rowGroup;
+
+	CompactProtocol		*footerProtocol;	/*footer protocol for processing */
 
 	MirroredAppendOnlyOpen 				*mirroredOpen; /*used for opening segment file*/
 	QueryContextDispatchingSendBack 	sendback;
