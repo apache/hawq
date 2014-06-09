@@ -270,4 +270,12 @@ HA -->
 		the max number of packets in a file's packet pool. default is 1024.
 		</description>
 	</property>
+	
+	<property>
+		<name>output.close.timeout</name>
+		<value>900000</value>
+		<description>
+		the timeout interval in millisecond when close an output stream. default is 900000.
+		</description>
+	</property>
 </configuration>
