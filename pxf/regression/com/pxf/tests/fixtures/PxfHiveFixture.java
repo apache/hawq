@@ -2,7 +2,7 @@ package com.pxf.tests.fixtures;
 
 import java.io.File;
 
-import com.pivotal.parot.components.cluster.Cluster;
+import com.pivotal.parot.components.cluster.PhdCluster;
 import com.pivotal.parot.components.hive.Hive;
 import com.pivotal.parot.structures.tables.hive.HiveTable;
 import com.pivotal.parot.structures.tables.utils.TableFactory;
@@ -17,7 +17,7 @@ import com.pxf.tests.basic.PxfHiveRegression;
  */
 public class PxfHiveFixture extends BasicFixture {
 
-	private Cluster sc;
+	private PhdCluster sc;
 	private Hive hive;
 
 	// paths to data resources
@@ -40,7 +40,7 @@ public class PxfHiveFixture extends BasicFixture {
 		startFixtureLevel();
 
 		// get cluster object from sut
-		sc = (Cluster) system.getSystemObject("cluster");
+		sc = (PhdCluster) system.getSystemObject("cluster");
 
 		// start Hive server for Hive JDBC requests
 		sc.startHiveServer();
