@@ -103,7 +103,13 @@ ParquetFooterBuffer *createParquetFooterBuffer( File  datafile,
  */
 void freeParquetFooterBuffer( ParquetFooterBuffer *buffer ) 
 {
-    /* Free allocated spaces */
+    elog(DEBUG5, "Free parquet footer buffer."
+                 "INSTADDR=%p, "
+                 "MODE=%s",
+                 buffer,
+                 ModeStringConstant[buffer->Mode] );
+
+	/* Free allocated spaces */
 	pfree(buffer->Head);
 	pfree(buffer->FileName);
     
@@ -114,13 +120,6 @@ void freeParquetFooterBuffer( ParquetFooterBuffer *buffer )
     
     /* Free whole buffer instance. */
 	pfree(buffer);
-    
-    elog(DEBUG5, "Free parquet footer buffer."
-                 "INSTADDR=%p, "
-                 "MODE=%s",
-                 buffer,
-                 ModeStringConstant[buffer->Mode] );
-    
 }
 
 /*
