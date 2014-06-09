@@ -1,7 +1,9 @@
 package com.pxf.tests.basic;
 
 import java.io.IOException;
+import java.sql.SQLException;
 import java.sql.SQLWarning;
+import java.util.List;
 
 import jsystem.framework.fixture.FixtureManager;
 import jsystem.framework.fixture.RootFixture;
@@ -21,6 +23,7 @@ import com.pivotal.parot.structures.tables.utils.TableFactory;
 import com.pivotal.parot.utils.exception.ExceptionUtils;
 import com.pivotal.parot.utils.jsystem.report.ReportUtils;
 import com.pivotal.parot.utils.tables.ComparisonUtils;
+import com.pivotal.pxf.service.io.GPDBWritable.TypeMismatchException;
 import com.pxf.tests.fixtures.PxfHiveFixture;
 import com.pxf.tests.testcases.PxfTestCase;
 
@@ -332,6 +335,115 @@ public class PxfHiveRegression extends PxfTestCase {
 		hawq.queryResults(hawqExternalTable, "SELECT * FROM " + hawqExternalTable.getName() + " ORDER BY t1");
 
 		ComparisonUtils.compareTables(hiveCollectionTable, hawqExternalTable, report);
+	}
+	
+	/**
+	 * Test demonstrates how missing items in a hive array can be discovered.
+	 * In this case we have an <int> Hive array which is mapped to three integer fields in Hawq
+	 * When one of the records in the Hive table has only two integers in the array we issue
+	 * an exception from Hawq. This is fine, only that it happens due to the fact that the next
+	 * field after the <int> array is a string. If the next field were of the same type - an int,
+	 * then an exception would not be thrown and we would have got a null on the last field - 
+	 * This is a weakness of the current implementation  - demonstrated in the next test
+	 * 
+	 * @throws Exception
+	 */
+	@Test
+	public void arrayTypeIncompleteDiscovered() throws Exception {
+		HiveTable hiveCollectionTable = new HiveTable("hive_array", new String[] {
+				"s1 STRING",
+				"a1 ARRAY<INT>",
+				"s2 STRING" });
+		
+		hiveCollectionTable.setFormat("row");
+		hiveCollectionTable.setDelimiterFieldsBy(",");
+		hiveCollectionTable.setDelimiterCollectionItemsBy("|");
+		hiveCollectionTable.setDelimiterLinesBy("\\n");
+		hiveCollectionTable.setStoredAs("TEXTFILE");
+		
+		hive.createTableAndVerify(hiveCollectionTable);
+		hive.loadData(hiveCollectionTable, PxfHiveFixture.HIVE_NULLS1_DATA_FILE_PATH);
+		hive.queryResults(hiveCollectionTable, "SELECT * FROM " + hiveCollectionTable.getName() + " ORDER BY s1");
+		
+		hawqExternalTable = TableFactory.getPxfHiveReadableTable("hawq_array_tbl", new String[] {
+				"t1    text",
+				"num1  integer",
+				"num2  integer",
+				"num3  integer",
+				"t2    text",
+				}, hiveCollectionTable);
+		hawq.createTableAndVerify(hawqExternalTable);
+		
+		/* Data file:
+		 * one,11|12|13,one
+         * two,1|23,two
+         * 
+         * The second record has the fourth field missing ( the third field in the array)
+         * We can discover this only because the next Hive field is text and not int
+		 */
+		try
+		{
+			hawq.queryResults(hawqExternalTable, "SELECT * FROM " + hawqExternalTable.getName() + " ORDER BY t1");
+		} catch (org.postgresql.util.PSQLException e) {
+			String cur = e.getMessage();
+ 			boolean has = cur.contains("For field num3 schema requires type INTEGER but input record has type TEXT");
+			Assert.assertTrue(has);
+			return;
+		}
+		Assert.assertTrue("queryResults() in arrayTypeIncompleteDiscovered should have raised an exception",false);
+	}
+	
+	/**
+	 * Test demonstrates a case where missing items in a hive array ARE NOT discovered.
+	 * In this case we have an <int> Hive array which is mapped to three integer fields in Hawq
+	 * When one of the records in the Hive table has only two integers in the array, we DO NOT issue
+	 * an exception from Hawq. It happens due to the fact that the next field after the <int> array 
+	 * is of the same type - an int. Instead of  an exception we get a null on the last field - 
+	 * This is a weakness of the current implementation.
+	 * 
+	 * @throws Exception
+	 */
+	@Test
+	public void arrayTypeIncompleteNotFound() throws Exception {
+		HiveTable hiveCollectionTable = new HiveTable("hive_array", new String[] {
+				"s1 STRING",
+				"a1 ARRAY<INT>",
+				"a2 INT" });
+		
+		hiveCollectionTable.setFormat("row");
+		hiveCollectionTable.setDelimiterFieldsBy(",");
+		hiveCollectionTable.setDelimiterCollectionItemsBy("|");
+		hiveCollectionTable.setDelimiterLinesBy("\\n");
+		hiveCollectionTable.setStoredAs("TEXTFILE");
+		
+		hive.createTableAndVerify(hiveCollectionTable);
+		hive.loadData(hiveCollectionTable, PxfHiveFixture.HIVE_NULLS2_DATA_FILE_PATH);
+		hive.queryResults(hiveCollectionTable, "SELECT * FROM " + hiveCollectionTable.getName() + " ORDER BY s1");
+		
+		hawqExternalTable = TableFactory.getPxfHiveReadableTable("hawq_array_tbl", new String[] {
+				"t1    text",
+				"num1  integer",
+				"num2  integer",
+				"num3  integer",
+				"num4  integer",
+				}, hiveCollectionTable);
+		hawq.createTableAndVerify(hawqExternalTable);
+		hawq.queryResults(hawqExternalTable, "SELECT * FROM " + hawqExternalTable.getName() + " ORDER BY t1");
+		
+		/* Data file:
+		 * one,11|12|13,14
+         * two,1|23,24
+         * 
+         * The second record has a NULL in the fifth field instead of the fourth field
+         * This is the weakness in the current implementation that this test exposes
+		 */
+		
+		List<List<String>> data = hawqExternalTable.getData();
+		List<String> faulty = data.get(1);
+		int size = faulty.size();
+		Assert.assertEquals(size, 5);
+		Assert.assertEquals(faulty.get(3), "24");
+		Assert.assertNull(faulty.get(4));
 	}
 
 	/**

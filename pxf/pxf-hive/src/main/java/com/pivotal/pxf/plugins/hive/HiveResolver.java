@@ -191,9 +191,15 @@ public class HiveResolver extends Plugin implements ReadResolver {
                 if (map == null) {
                     throw new BadRecordException("Illegal value NULL for Hive data type Map");
                 }
-                for (Map.Entry<?, ?> entry : map.entrySet()) {
-                    traverseTuple(entry.getKey(), koi, record);
-                    traverseTuple(entry.getValue(), voi, record);
+                else if (map.isEmpty()) {
+                    traverseTuple(null, koi, record);
+                    traverseTuple(null, voi, record);               	
+                }
+                else {
+                	for (Map.Entry<?, ?> entry : map.entrySet()) {
+                		traverseTuple(entry.getKey(), koi, record);
+                		traverseTuple(entry.getValue(), voi, record);
+                	}
                 }
                 break;
             case STRUCT:
@@ -281,6 +287,11 @@ public class HiveResolver extends Plugin implements ReadResolver {
                 val = (o != null) ? ((TimestampObjectInspector) oi).getPrimitiveJavaObject(o) : null;
                 addOneFieldToRecord(record, TIMESTAMP, val);
                 break;
+            }
+            case BYTE: { /* TINYINT */
+            	val = (o != null) ? ((ByteObjectInspector) oi).get(o) : null;
+            	addOneFieldToRecord(record, SMALLINT, new Short((byte)val));
+            	break;
             }
             default: {
                 throw new UnsupportedTypeException(oi.getTypeName() + " conversion is not supported by " + getClass().getSimpleName());

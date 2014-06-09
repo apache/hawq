@@ -1,5 +1,6 @@
 package com.pivotal.pxf.service;
 
+import com.pivotal.pxf.api.BadRecordException;
 import com.pivotal.pxf.api.OneField;
 import com.pivotal.pxf.service.utilities.ProtocolData;
 import com.pivotal.pxf.service.io.GPDBWritable;
@@ -10,38 +11,50 @@ import java.sql.Date;
 import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
-import static com.pivotal.pxf.api.io.DataType.*;
+import com.pivotal.pxf.api.io.DataType;
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.mock;
 
 public class BridgeOutputBuilderTest {
 
     private static final int UN_SUPPORTED_TYPE = -1;
-    BridgeOutputBuilder builder;
-    ProtocolData protocolData;
-
-    @Before
-    public void setUp() throws Exception {
-        protocolData = mock(ProtocolData.class);
-        builder = new BridgeOutputBuilder(protocolData);
-    }
-
+    
     @Test
     public void testFillGPDBWritable() throws Exception {
-        List<OneField> recFields = Arrays.asList(new OneField(INTEGER.getOID(), 0),
-                new OneField(FLOAT8.getOID(), (double) 0),
-                new OneField(REAL.getOID(), (float) 0),
-                new OneField(BIGINT.getOID(), (long) 0),
-                new OneField(SMALLINT.getOID(), (short) 0),
-                new OneField(BOOLEAN.getOID(), true),
-                new OneField(BYTEA.getOID(), new byte[]{0}),
-                new OneField(VARCHAR.getOID(), "value"),
-                new OneField(BPCHAR.getOID(), "value"),
-                new OneField(TEXT.getOID(), "value"),
-                new OneField(NUMERIC.getOID(), "0"),
-                new OneField(TIMESTAMP.getOID(), new Timestamp(0)));
-        GPDBWritable output = builder.makeGPDBWritableOutput(recFields);
+    	Map<String, String> parameters = new HashMap<String, String>();
+    	parameters.put("X-GP-ATTRS", "12");
+    	
+    	addColumn(parameters, 0, DataType.INTEGER,   "col0");
+    	addColumn(parameters, 1, DataType.FLOAT8,    "col1");
+    	addColumn(parameters, 2, DataType.REAL,      "col2");
+    	addColumn(parameters, 3, DataType.BIGINT,    "col3");
+    	addColumn(parameters, 4, DataType.SMALLINT,  "col4");
+    	addColumn(parameters, 5, DataType.BOOLEAN,   "col5");
+    	addColumn(parameters, 6, DataType.BYTEA,     "col6");
+    	addColumn(parameters, 7, DataType.VARCHAR,   "col7");
+    	addColumn(parameters, 8, DataType.BPCHAR,    "col9");
+    	addColumn(parameters, 9,  DataType.TEXT,     "col9");
+    	addColumn(parameters, 10, DataType.NUMERIC,  "col10");
+    	addColumn(parameters, 11, DataType.TIMESTAMP,"col11");
+    	
+    	BridgeOutputBuilder builder = makeBuilder(parameters);
+    	GPDBWritable output = builder.makeGPDBWritableOutput();
+    	
+        List<OneField> recFields = Arrays.asList(new OneField(DataType.INTEGER.getOID(), 0),
+                new OneField(DataType.FLOAT8.getOID(), (double) 0),
+                new OneField(DataType.REAL.getOID(), (float) 0),
+                new OneField(DataType.BIGINT.getOID(), (long) 0),
+                new OneField(DataType.SMALLINT.getOID(), (short) 0),
+                new OneField(DataType.BOOLEAN.getOID(), true),
+                new OneField(DataType.BYTEA.getOID(), new byte[]{0}),
+                new OneField(DataType.VARCHAR.getOID(), "value"),
+                new OneField(DataType.BPCHAR.getOID(), "value"),
+                new OneField(DataType.TEXT.getOID(), "value"),
+                new OneField(DataType.NUMERIC.getOID(), "0"),
+                new OneField(DataType.VARCHAR.getOID(), new Timestamp(0)));
         builder.fillGPDBWritable(recFields);
 
         assertEquals(output.getInt(0), Integer.valueOf(0));
@@ -60,6 +73,12 @@ public class BridgeOutputBuilderTest {
 
     @Test
     public void testFillOneGPDBWritableField() throws Exception {
+    	Map<String, String> parameters = new HashMap<String, String>();
+    	parameters.put("X-GP-ATTRS", "1");    	
+    	addColumn(parameters, 0, DataType.INTEGER, "col0");    	
+    	BridgeOutputBuilder builder = makeBuilder(parameters);
+    	GPDBWritable output = builder.makeGPDBWritableOutput();
+    	   	
         OneField unSupportedField = new OneField(UN_SUPPORTED_TYPE, new Date(0));
         try {
             builder.fillOneGPDBWritableField(unSupportedField, 0);
@@ -68,4 +87,124 @@ public class BridgeOutputBuilderTest {
             assertEquals(e.getMessage(), "Date is not supported for gpdb conversion");
         }
     }
+    
+    @Test
+    public void testRecordSmallerThanSchema() throws Exception {
+    	Map<String, String> parameters = new HashMap<String, String>();
+    	parameters.put("X-GP-ATTRS", "4");
+    	
+    	addColumn(parameters, 0, DataType.INTEGER, "col0");
+    	addColumn(parameters, 1, DataType.INTEGER, "col1");
+    	addColumn(parameters, 2, DataType.INTEGER, "col2");
+    	addColumn(parameters, 3, DataType.INTEGER, "col3");
+    	   	
+    	BridgeOutputBuilder builder = makeBuilder(parameters);
+    	GPDBWritable output = builder.makeGPDBWritableOutput();
+    	
+    	/* all four fields */
+    	List<OneField> complete = Arrays.asList(
+    			new OneField(DataType.INTEGER.getOID(), 10),
+    			new OneField(DataType.INTEGER.getOID(), 20),
+                new OneField(DataType.INTEGER.getOID(), 30),
+                new OneField(DataType.INTEGER.getOID(), 40));
+    	builder.fillGPDBWritable(complete);
+    	assertEquals(output.getColType().length, 4);
+        assertEquals(output.getInt(0), Integer.valueOf(10));
+        assertEquals(output.getInt(1), Integer.valueOf(20));
+        assertEquals(output.getInt(2), Integer.valueOf(30));
+        assertEquals(output.getInt(3), Integer.valueOf(40));
+        
+        /* two fields instead of four */
+        List<OneField> incomplete = Arrays.asList(
+        		new OneField(DataType.INTEGER.getOID(), 10),
+    			new OneField(DataType.INTEGER.getOID(), 20));
+        builder.fillGPDBWritable(incomplete);
+        assertEquals(output.getColType().length, 4); /* size of the output does not change */
+        assertEquals(output.getInt(0), Integer.valueOf(10));
+        assertEquals(output.getInt(1), Integer.valueOf(20));
+        assertNull(output.getInt(2));
+        assertNull(output.getInt(3));
+        
+    }
+    
+    @Test
+    public void testRecordBiggerThanSchema() throws Exception {
+    	Map<String, String> parameters = new HashMap<String, String>();
+    	parameters.put("X-GP-ATTRS", "4");
+    	
+    	addColumn(parameters, 0, DataType.INTEGER, "col0");
+    	addColumn(parameters, 1, DataType.INTEGER, "col1");
+    	addColumn(parameters, 2, DataType.INTEGER, "col2");
+    	addColumn(parameters, 3, DataType.INTEGER, "col3");
+    	   	
+    	BridgeOutputBuilder builder = makeBuilder(parameters);
+    	GPDBWritable output = builder.makeGPDBWritableOutput();
+    	
+    	/* five fields instead of four */
+    	List<OneField> complete = Arrays.asList(
+    			new OneField(DataType.INTEGER.getOID(), 10),
+    			new OneField(DataType.INTEGER.getOID(), 20),
+                new OneField(DataType.INTEGER.getOID(), 30),
+                new OneField(DataType.INTEGER.getOID(), 40),
+                new OneField(DataType.INTEGER.getOID(), 50));
+    	try {
+    		builder.fillGPDBWritable(complete);
+    		fail("testRecordBiggerThanSchema should have failed on - Record has 5 fields but the schema size is 4");
+    	} catch (BadRecordException e) {
+    		assertEquals(e.getMessage(), "Record has 5 fields but the schema size is 4");
+    	}
+    }
+    
+    @Test
+    public void testFieldTypeMismatch() throws Exception {
+    	Map<String, String> parameters = new HashMap<String, String>();
+    	parameters.put("X-GP-ATTRS", "4");
+    	
+    	addColumn(parameters, 0, DataType.INTEGER, "col0");
+    	addColumn(parameters, 1, DataType.INTEGER, "col1");
+    	addColumn(parameters, 2, DataType.INTEGER, "col2");
+    	addColumn(parameters, 3, DataType.INTEGER, "col3");
+    	   	
+    	BridgeOutputBuilder builder = makeBuilder(parameters);
+    	GPDBWritable output = builder.makeGPDBWritableOutput();
+    	
+    	/* last field is REAL while schema requires INT */
+    	List<OneField> complete = Arrays.asList(
+    			new OneField(DataType.INTEGER.getOID(), 10),
+    			new OneField(DataType.INTEGER.getOID(), 20),
+                new OneField(DataType.INTEGER.getOID(), 30),
+                new OneField(DataType.REAL.getOID(), 40.0));
+    	try {
+    		builder.fillGPDBWritable(complete);
+    		fail("testFieldTypeMismatch should have failed on - For field 3 schema requires type INTEGER but input record has type REAL");
+    	} catch (BadRecordException e) {
+    		assertEquals(e.getMessage(), "For field col3 schema requires type INTEGER but input record has type REAL");
+    	}
+    }   
+    
+    private void addColumn(Map<String, String> parameters, int idx, DataType dataType, String name) {
+    	parameters.put("X-GP-ATTR-NAME" + idx, name);
+    	parameters.put("X-GP-ATTR-TYPECODE" + idx, Integer.toString(dataType.getOID()));
+    	parameters.put("X-GP-ATTR-TYPENAME" + idx, dataType.toString());
+    }
+    
+    private BridgeOutputBuilder makeBuilder(Map<String, String> parameters) throws Exception {
+
+        parameters.put("X-GP-ALIGNMENT", "8");
+        parameters.put("X-GP-SEGMENT-ID", "-44");
+        parameters.put("X-GP-SEGMENT-COUNT", "2");
+        parameters.put("X-GP-HAS-FILTER", "0");
+        parameters.put("X-GP-FORMAT", "TEXT");
+        parameters.put("X-GP-URL-HOST", "my://bags");
+        parameters.put("X-GP-URL-PORT", "-8020");
+        parameters.put("X-GP-ACCESSOR", "are");
+        parameters.put("X-GP-RESOLVER", "packed");
+        parameters.put("X-GP-DATA-DIR", "i'm/ready/to/go");
+        parameters.put("X-GP-FRAGMENT-METADATA", "U29tZXRoaW5nIGluIHRoZSB3YXk=");
+        parameters.put("X-GP-I'M-STANDING-HERE", "outside-your-door");
+
+        ProtocolData protocolData = new ProtocolData(parameters);
+        BridgeOutputBuilder builder = new BridgeOutputBuilder(protocolData);
+        return builder;
+    }    
 }

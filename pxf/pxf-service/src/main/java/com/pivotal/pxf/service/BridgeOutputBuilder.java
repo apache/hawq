@@ -31,6 +31,8 @@ public class BridgeOutputBuilder {
     private GPDBWritable errorRecord = null;
     private String delim = ",";
     private String endl = "\n";
+    private int[] schema;
+    private String[] colNames;
 
 
     /*
@@ -78,7 +80,7 @@ public class BridgeOutputBuilder {
 	 */
     public Writable makeOutput(List<OneField> recFields) throws BadRecordException {
         if (output == null && inputData.outputFormat() == OutputFormat.BINARY) {
-            makeGPDBWritableOutput(recFields);
+            makeGPDBWritableOutput();
         }
 
         fillOutputRecord(recFields);
@@ -90,12 +92,14 @@ public class BridgeOutputBuilder {
      * Creates the GPDBWritable object. The object is created one time
      * and is refilled from recFields for each record sent
      */
-    GPDBWritable makeGPDBWritableOutput(List<OneField> recFields) {
-        int num_actual_fields = recFields.size();
-        int[] schema = new int[num_actual_fields];
+    GPDBWritable makeGPDBWritableOutput() {
+        int num_actual_fields = inputData.getColumns();
+        schema = new int[num_actual_fields];
+        colNames = new String[num_actual_fields];
 
         for (int i = 0; i < num_actual_fields; i++) {
-            schema[i] = recFields.get(i).type;
+            schema[i] = inputData.getColumn(i).columnTypeCode();
+            colNames[i] = inputData.getColumn(i).columnName();
         }
 
         output = new GPDBWritable(schema);
@@ -116,16 +120,79 @@ public class BridgeOutputBuilder {
 
     /*
      * Fills a GPDBWritable object based on recFields
+     * The input record recFields must correspond to schema.
+     * If the record has more fields than the schema we throw an exception.
+     * We require that the type of field[i] in recFields corresponds to the type 
+     * of field[i] in the schema.
+     * But we do support the case where recFields has less fields than the schema. 
+     * Since recFields is a list of OneField objects, and OneField has no designation of
+     * a field's index, we must assume that the first item in recFields is the first field in the 
+     * schema. So if recFields will have only three items and the schema holds five items, we will
+     * assume the recFields holds the first three fields in the record. We will then test that 
+     * their types correspond with the schema types. If they do, we will fill the other two fields 
+     * at the tail of the schema with nulls and return the record.
      */
     void fillGPDBWritable(List<OneField> recFields) throws BadRecordException {
         int size = recFields.size();
         if (size == 0) /* size 0 means the resolver couldn't deserialize any of the record fields*/ {
             throw new BadRecordException("No fields in record");
         }
-
-        for (int i = 0; i < size; i++) {
-            fillOneGPDBWritableField(recFields.get(i), i);
+        else if (size > schema.length) {
+        	throw new BadRecordException("Record has " + size + " fields but the schema size is " + schema.length);
         }
+        
+        for (int i = 0; i < size; i++) {
+        	OneField current = recFields.get(i);
+        	if (!isTypeInSchema(current.type, schema[i])) {
+        		throw new BadRecordException("For field " + colNames[i] + " schema requires type "+ DataType.get(schema[i]).toString() + 
+        				" but input record has type " + DataType.get(current.type).toString());
+        	}
+        		
+            fillOneGPDBWritableField(current, i);
+        }
+        
+        /* this record was not full. complete with nulls. GPSQL-1141 */
+        if (size < schema.length){
+        	for (int i = size; i < schema.length; i++) {
+        		OneField fld = new OneField(schema[i], null);
+        		fillOneGPDBWritableField(fld, i);
+        	}
+        }    
+        
+    }
+    
+    /*
+     * Test if this is a string type
+     */
+    boolean isStringType(DataType type)
+    {
+    	DataType [] types = {DataType.VARCHAR, DataType.BPCHAR, DataType.TEXT,DataType.NUMERIC, DataType.TIMESTAMP};
+    	
+    	for (DataType cur : types) {
+    		if (type == cur) {
+    			return true;
+    		}
+    	}
+    	return false;
+    }
+        
+    /*
+     * Tests that record field type and schema type correspond
+     */
+    boolean isTypeInSchema(int recType, int schemaType)
+    {
+    	DataType dtRec = DataType.get(recType);
+    	DataType dtSchem = DataType.get(schemaType);
+    	
+    	if (dtSchem == DataType.UNSUPPORTED_TYPE) {
+    		return true;
+    	} else if (dtRec == dtSchem) {
+    		return true;
+    	} else if (isStringType(dtRec) && isStringType(dtSchem)) {
+    		return true;
+      	} 
+    		
+    	return false;
     }
 
     /*
