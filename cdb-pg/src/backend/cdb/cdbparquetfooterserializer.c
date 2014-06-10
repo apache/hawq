@@ -679,7 +679,10 @@ readColumnMetadata(
 					}
 					xfer += readString(prot, &path_in_schema);
 					appendStringInfo(colNameBuf, "%s", path_in_schema);
-					colChunk->pathInSchema = colNameBuf->data;
+					colChunk->pathInSchema = (char *)palloc0(colNameBuf->len + 1);
+					strcpy(colChunk->pathInSchema, colNameBuf->data);
+					pfree(colNameBuf->data);
+					pfree(colNameBuf);
 					colChunk->colName = path_in_schema;
 				}
 				isset_path_in_schema = true;
