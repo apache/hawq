@@ -63,7 +63,7 @@ HA -->
 		<name>rpc.client.ping.interval</name>
 		<value>10000</value>
 		<description>
-		the interval which the RPC client send a heart beat to server when the connection is idle. default is 10000.
+		the interval which the RPC client send a heart beat to server. 0 means disable, default is 10000.
 		</description>
 	</property>
 	
