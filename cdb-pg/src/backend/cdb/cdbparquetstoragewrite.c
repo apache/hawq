@@ -201,22 +201,23 @@ static char *
 generateHAWQSchemaStr(ParquetFileField pfields,
 					  int fieldCount)
 {
-	StringInfo schemaBuf = makeStringInfo();
-	appendStringInfo(schemaBuf, "message hawqschema {");
+	StringInfoData schemaBuf;
+	initStringInfo(&schemaBuf);
+	appendStringInfo(&schemaBuf, "message hawqschema {");
 
 	for (ParquetFileField field = pfields; field < pfields + fieldCount; field++)
 	{
 		/* TODO add ARRAY and UDF type support */
 		char *typeName = getTypeName(field->hawqTypeId);
-		appendStringInfo(schemaBuf, "%s %s %s;",
+		appendStringInfo(&schemaBuf, "%s %s %s;",
 						 (field->repetitionType == REQUIRED) ? "required" : "optional",
 						 typeName,
 						 field->name);
 		pfree(typeName);
 	}
 
-	appendStringInfo(schemaBuf, "}");
-	return schemaBuf->data;
+	appendStringInfo(&schemaBuf, "}");
+	return schemaBuf.data;
 }
 
 int

@@ -86,18 +86,24 @@ toParquetEncoding(std::vector<parquet::Encoding::type> &encodings,
  *	Convert from hawq path to parquet path_in_schema in parquet. The path is splited with ":"
  */
 int
-toParquetPathInSchema(std::vector<std::string> &path_in_schema, int depth, char* path){
-	char *newPath = (char*)palloc0(strlen(path) + 1);
-	strcpy(newPath, path);
-	path_in_schema.resize(depth);
+toParquetPathInSchema(std::vector<std::string> &path_in_schema, int depth, const char* path){
+	Assert(NULL != path);
+
+	char *p;
 	const char *delim = ":";
-	path_in_schema[0] = strtok(newPath, delim);
-	for(int i = 1; i < depth; i++){
-		path_in_schema[i] = strtok(NULL, delim);
-		if(path_in_schema[i].c_str() == NULL){
+	std::string newPath = path;
+	path_in_schema.resize(depth);
+	path_in_schema[0] = strtok(&newPath[0], delim);
+
+	for (int i = 1; i < depth; i++) {
+		p = strtok(NULL, delim);
+		if (p == NULL) {
 			return -1;
+		} else {
+			path_in_schema[i] = p;
 		}
 	}
+
 	return 0;
 }
 
@@ -128,6 +134,8 @@ MetadataUtil::convertPageMetadata(parquet::PageHeader& parquetHeader,
 int
 MetadataUtil::convertToPageMetadata(parquet::PageHeader *parquetHeader,
 		PageMetadata_4C* hawqPageMetadata) {
+	parquet::DataPageHeader dataPageHeader;
+
 	parquetHeader->__set_type(
 			(enum parquet::PageType::type) hawqPageMetadata->page_type);
 	parquetHeader->__set_compressed_page_size(
@@ -136,7 +144,7 @@ MetadataUtil::convertToPageMetadata(parquet::PageHeader *parquetHeader,
 	parquetHeader->__set_uncompressed_page_size(
 			hawqPageMetadata->uncompressed_page_size);
 
-	parquet::DataPageHeader dataPageHeader;
+
 	dataPageHeader.__set_definition_level_encoding(
 			(enum parquet::Encoding::type) hawqPageMetadata->definition_level_encoding);
 	dataPageHeader.__set_encoding(
@@ -156,26 +164,37 @@ int
 MetadataUtil::convertToColumnMetadata(
 		parquet::ColumnMetaData *columnchunk_metadata,
 		ColumnChunkMetadata_4C* hawqColumnMetadata) {
+	std::vector<parquet::Encoding::type> encodings;
+	std::vector < std::string > pathschema;
+	int subcall = 0;
+
 	columnchunk_metadata->__set_codec(
 			(parquet::CompressionCodec::type) hawqColumnMetadata->codec);
 	columnchunk_metadata->__set_data_page_offset(
 			hawqColumnMetadata->firstDataPage);
 	columnchunk_metadata->__set_dictionary_page_offset(-1);
-	std::vector<parquet::Encoding::type> encodings;
-	toParquetEncoding(encodings, hawqColumnMetadata->pEncodings,
-			hawqColumnMetadata->EncodingCount);
-	columnchunk_metadata->__set_encodings(encodings);
 	columnchunk_metadata->__set_index_page_offset(-1);
 	columnchunk_metadata->__set_num_values(hawqColumnMetadata->valueCount);
-	/*set path in schema, should be a vector with one column: colName*/
-	std::vector < std::string > pathschema;
-	toParquetPathInSchema(pathschema, hawqColumnMetadata->depth, hawqColumnMetadata->pathInSchema);
-	columnchunk_metadata->__set_path_in_schema(pathschema);
 	columnchunk_metadata->__set_total_compressed_size(
 			hawqColumnMetadata->totalSize);
 	columnchunk_metadata->__set_total_uncompressed_size(
 			hawqColumnMetadata->totalUncompressedSize);
 	columnchunk_metadata->__set_type(
 			(parquet::Type::type) hawqColumnMetadata->type);
+
+	subcall = toParquetEncoding(encodings, hawqColumnMetadata->pEncodings,
+			hawqColumnMetadata->EncodingCount);
+	if (subcall < 0) {
+		return subcall;
+	}
+	columnchunk_metadata->__set_encodings(encodings);
+
+	subcall = toParquetPathInSchema(pathschema, hawqColumnMetadata->depth,
+			hawqColumnMetadata->pathInSchema);
+	if (subcall < 0) {
+		return subcall;
+	}
+	columnchunk_metadata->__set_path_in_schema(pathschema);
+
 	return 0;
 }

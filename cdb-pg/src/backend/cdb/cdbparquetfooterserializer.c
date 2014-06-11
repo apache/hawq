@@ -668,21 +668,21 @@ readColumnMetadata(
 					/*process path in schema, setting colchunk->depth and colchunk->pathInSchema*/
 					TType etype;
 					uint32_t lsize;
+					StringInfoData colNameBuf;
+
 					xfer += readListBegin(prot, &etype, &lsize);
 					colChunk->depth = lsize;
-					StringInfo colNameBuf = makeStringInfo();
+					initStringInfo(&colNameBuf);
 					char *path_in_schema;
 					for (int i = 0; i < lsize - 1; i++) {
 						xfer += readString(prot, &path_in_schema);
-						appendStringInfo(colNameBuf, "%s:", path_in_schema);
+						appendStringInfo(&colNameBuf, "%s:", path_in_schema);
 						pfree(path_in_schema);
 					}
 					xfer += readString(prot, &path_in_schema);
-					appendStringInfo(colNameBuf, "%s", path_in_schema);
-					colChunk->pathInSchema = (char *)palloc0(colNameBuf->len + 1);
-					strcpy(colChunk->pathInSchema, colNameBuf->data);
-					pfree(colNameBuf->data);
-					pfree(colNameBuf);
+					appendStringInfo(&colNameBuf, "%s", path_in_schema);
+
+					colChunk->pathInSchema = colNameBuf.data;
 					colChunk->colName = path_in_schema;
 				}
 				isset_path_in_schema = true;
@@ -925,6 +925,10 @@ writeColumnMetadata(
 		CompactProtocol *prot)
 {
 	uint32_t xfer = 0;
+	char *elemPath = NULL;
+	const char *delim = ":";
+	Assert(NULL != columnInfo->pathInSchema);
+	char path[strlen(columnInfo->pathInSchema) + 1];
 
 	xfer += writeStructBegin(prot);
 
@@ -935,22 +939,29 @@ writeColumnMetadata(
 	/*write out encoding*/
 	xfer += writeFieldBegin(prot, T_LIST, 2);
 	xfer += writeListBegin(prot, T_I32, columnInfo->EncodingCount);
-	for(int i = 0; i < columnInfo->EncodingCount; i++){
+	for (int i = 0; i < columnInfo->EncodingCount; i++) {
 		xfer += writeI32(prot, (int32_t)(columnInfo->pEncodings[i]));
 	}
 
 	/*write out path_in_schema*/
 	xfer += writeFieldBegin(prot, T_LIST, 3);
 	xfer += writeListBegin(prot, T_STRING, columnInfo->depth);
-	char path[strlen(columnInfo->pathInSchema) + 1];
 	strcpy(path, columnInfo->pathInSchema);
-	const char *delim = ":";
-	char *elemPath = NULL;
+
 	elemPath = strtok(path, delim);
+	if (elemPath == NULL) {
+		ereport(ERROR,
+				(errcode(ERRCODE_GP_INTERNAL_ERROR),
+						errmsg("file metadata column metadata(path_in_schema) not correct")));
+	}
 	xfer += writeString(prot, elemPath, strlen(elemPath));
-	for(int i = 1; i < columnInfo->depth; i++)
-	{
+	for (int i = 1; i < columnInfo->depth; i++) {
 		elemPath = strtok(NULL, delim);
+		if (elemPath == NULL) {
+			ereport(ERROR,
+					(errcode(ERRCODE_GP_INTERNAL_ERROR),
+							errmsg("file metadata column metadata(path_in_schema) not correct")));
+		}
 		xfer += writeString(prot, elemPath, strlen(elemPath));
 	}
 
