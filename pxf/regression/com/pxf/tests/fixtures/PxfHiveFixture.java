@@ -21,9 +21,9 @@ public class PxfHiveFixture extends BasicFixture {
 	private Hive hive;
 
 	// paths to data resources
-	public final static String HIVE_SMALL_DATA_FILE_PATH = new File("regression/resources/hive_small_data.txt").getAbsolutePath();
-	public final static String HIVE_TYPES_DATA_FILE_PATH = new File("regression/resources/hive_types.txt").getAbsolutePath();
-	public final static String HIVE_COLLECTIONS_DATA_FILE_PATH = new File("regression/resources/hive_collections.txt").getAbsolutePath();
+	public final static String HIVE_SMALL_DATA_FILE_PATH = new File("resources/hive_small_data.txt").getAbsolutePath();
+	public final static String HIVE_TYPES_DATA_FILE_PATH = new File("resources/hive_types.txt").getAbsolutePath();
+	public final static String HIVE_COLLECTIONS_DATA_FILE_PATH = new File("resources/hive_collections.txt").getAbsolutePath();
 
 	public static HiveTable hiveSmallDataTable = null;
 	public static HiveTable hiveTypesTable = null;

@@ -6,6 +6,8 @@ include $(BLD_TOP)/Makefile.global
 include $(BLD_TOP)/releng/releng.mk
 ANT=$(ANT_DIR)/bin/ant
 
+REGRESSION_DIR=regression
+
 ifneq "$(TEST)" ""
 REGRESSION_TEST= -DtestClass=$(TEST) 
 endif
@@ -33,4 +35,4 @@ clean:
 	./gradlew clean
 
 regressions:
-	$(ANT) -buildfile regression.xml $(REGRESSION_TEST) $(REGRESSION_METHODS)
+	cd $(REGRESSION_DIR) && ../$(ANT) -buildfile regression.xml $(REGRESSION_TEST) $(REGRESSION_METHODS)

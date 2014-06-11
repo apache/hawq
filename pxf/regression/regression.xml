@@ -24,13 +24,11 @@
 		<isset property="build.trunkbuild" />
 	</condition>
 
-
-
-	<property name="src.dir" value="${basedir}/regression" />
+	<property name="src.dir" value="${basedir}" />
 	<property name="build.dir" value="${basedir}/build-regression" />
 	<property name="lib.dir" value="${build.dir}/regression-lib" />
 	<property name="dist.dir" value="${build.dir}/regression" />
-	<property name="test.dir" value="${basedir}/regression/com/pxf/tests/basic" />
+	<property name="test.dir" value="${basedir}/com/pxf/tests/basic" />
 	<property name="testreports.dir" value="${build.dir}/regression/reports" />
 
 	<property name="package.buildroot" value="${basedir}/${component.basename}_package_build_${user.name}" />

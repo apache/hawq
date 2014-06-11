@@ -470,7 +470,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		Table dataTable = new Table("dataTable", null);
 
-		String schemaName = "regression/resources/regressPXFCustomAvro.avsc";
+		String schemaName = "resources/regressPXFCustomAvro.avsc";
 
 		Object[] data = FileFormatsUtils.prepareData(new CustomAvroInSequencePreparer(schemaName), 100, dataTable);
 
@@ -523,7 +523,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		Table dataTable = new Table("dataTable", null);
 
-		String schemaName = "regression/resources/regressPXFCustomAvro.avsc";
+		String schemaName = "resources/regressPXFCustomAvro.avsc";
 
 		Object[] data = FileFormatsUtils.prepareData(new CustomAvroInSequencePreparer(schemaName), 1000, dataTable);
 
@@ -576,7 +576,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		Table dataTable = new Table("dataTable", null);
 
-		String schemaName = "regression/resources/regressPXFCustomAvro.avsc";
+		String schemaName = "resources/regressPXFCustomAvro.avsc";
 
 		Object[] data = FileFormatsUtils.prepareData(new CustomAvroInSequencePreparer(schemaName), 1000, dataTable);
 
@@ -631,7 +631,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		Table dataTable = new Table("dataTable", null);
 
-		String avroSchemName = "regression/resources/regressPXFCustomAvro.avsc";
+		String avroSchemName = "resources/regressPXFCustomAvro.avsc";
 
 		IAvroSchema[] avroData = (IAvroSchema[]) FileFormatsUtils.prepareData(new CustomAvroPreparer(avroSchemName), 100, dataTable);
 
@@ -906,7 +906,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 	@Test
 	public void emptyFile() throws Exception {
 
-		File regResourcesFolder = new File("regression/resources/");
+		File regResourcesFolder = new File("resources/");
 
 		hdfs.copyFromLocal(regResourcesFolder.getAbsolutePath() + "/empty.tbl", (hdfsWorkingFolder + "/empty.tbl"));
 
@@ -935,7 +935,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 	@Test
 	public void analyzeHdfsFile() throws Exception {
 
-		File regResourcesFolder = new File("regression/resources/");
+		File regResourcesFolder = new File("resources/");
 
 		hdfs.copyFromLocal(regResourcesFolder.getAbsolutePath() + "/avroformat_inside_avrofile.avro", (hdfsWorkingFolder + "/avroformat_inside_avrofile.avro"));
 
@@ -990,7 +990,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 	@Test
 	public void negativeAnalyzeHdfsFileBadPort() throws Exception {
 
-		File regResourcesFolder = new File("regression/resources/");
+		File regResourcesFolder = new File("resources/");
 
 		hdfs.copyFromLocal(regResourcesFolder.getAbsolutePath() + "/avroformat_inside_avrofile.avro", (hdfsWorkingFolder + "/avroformat_inside_avrofile.avro"));
 
@@ -1060,7 +1060,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 	@Test
 	public void negativeAnalyzeHdfsFileBadClass() throws Exception {
 
-		File regResourcesFolder = new File("regression/resources/");
+		File regResourcesFolder = new File("resources/");
 
 		hdfs.copyFromLocal(regResourcesFolder.getAbsolutePath() + "/avroformat_inside_avrofile.avro", (hdfsWorkingFolder + "/avroformat_inside_avrofile.avro"));
 
