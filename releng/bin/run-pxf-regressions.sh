@@ -97,7 +97,7 @@ echo "----------------------------------------------------------------------"
 ##
 
 pushd ${BLDWRAP_TOP}/src/pxf
-make regressions
+make regressions || exit 1
 popd
 
 ##
