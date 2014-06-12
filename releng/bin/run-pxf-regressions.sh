@@ -97,7 +97,8 @@ echo "----------------------------------------------------------------------"
 ##
 
 pushd ${BLDWRAP_TOP}/src/pxf
-make regressions || exit 1
+make regressions
+PXF_REGRESSION_STATUS=$?
 popd
 
 ##
@@ -113,5 +114,5 @@ if [ $? = 0 ]; then
     exit 1
 else
     echo "All postgres processes are stopped."
-    exit 0
+    exit $PXF_REGRESSION_STATUS
 fi
