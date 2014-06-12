@@ -29,7 +29,7 @@ export START_YARN_HISTORY_SERVER=false
 export START_HIVEMETASTORE=true
 
 # Automatically start PXF service
-export START_PXF=false
+export START_PXF=true
 
 # These settings go into all HBase's, Hadoop's JVMs
 export COMMON_JAVA_OPTS=${COMMON_JAVA_OPTS}

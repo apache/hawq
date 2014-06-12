@@ -41,8 +41,10 @@ fi
 # Initialize PXF instances
 for (( i=0; i < $SLAVES; i++ ))
 do
-	$bin/pxf-instance.sh init $i | sed "s/^/node $i: /"
+	echo initializing PXF instance $i
+	$bin/pxf-instance.sh init $i
 	if [ $? -ne 0 ]; then
+		echo
 		echo tcServer instance \#${i} initialization failed
 		echo check console output
 		exit 1

@@ -607,7 +607,7 @@ show_allow_system_table_mods(void);
 bool   pxf_enable_filter_pushdown = true;
 bool   pxf_enable_stat_collection = true;
 bool   pxf_enable_locality_optimizations = true;
-bool   pxf_local_storage = true; /* temporary GUC */
+bool   pxf_local_storage = false; /* temporary GUC */
 int    pxf_service_port = 51200; /* temporary GUC */
 bool   pxf_service_singlecluster = false;
 char   *pxf_remote_service_login = NULL;
@@ -3781,7 +3781,7 @@ static struct config_bool ConfigureNamesBool[] =
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
 		&pxf_local_storage,
-		true, NULL, NULL
+		false, NULL, NULL
     },
 	
 	{

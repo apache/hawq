@@ -12,4 +12,3 @@ docs
 .idea
 *.iml
 .gradle
-/build-regression
