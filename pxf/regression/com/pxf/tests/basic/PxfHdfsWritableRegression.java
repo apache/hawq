@@ -401,6 +401,35 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 	}
 
 	/**
+	 * insert into writable table with wrong port
+	 * 
+	 * @throws Exception
+	 */
+	@Test
+	public void negativeWrongPort() throws Exception {
+		weTable = new WritableExternalTable("wr_wrong_port", new String[] {
+				"t1 text",
+				"a1 integer" }, hdfsWorkingFolder + "/writable/err", "TEXT");
+		weTable.setDelimiter(",");
+		weTable.setAccessor("TextFileWAccessor");
+		weTable.setResolver("TextWResolver");
+		weTable.setPort("12345");
+
+		hawq.createTableAndVerify(weTable);
+
+		Table dataTable = new Table("data", null);
+		dataTable.addRow(new String[] { "first", "1" });
+		dataTable.addRow(new String[] { "second", "2" });
+		dataTable.addRow(new String[] { "third", "3" });
+
+		try {
+			hawq.insertData(dataTable, weTable);
+		} catch (PSQLException e) {
+			ExceptionUtils.validate(report, e, new PSQLException("ERROR: remote component error \\(0\\) from '.*?:\\d+': " + "(Failed connect to " + weTable.getHost() + ":12345; Connection refused|couldn't connect to host).*?", null), true);
+		}
+	}
+
+	/**
 	 * insert into table with bad host name
 	 * 
 	 * @throws Exception
@@ -497,7 +526,7 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 			hawq.insertData(dataTable, weTable);
 		} catch (PSQLException e) {
 
-			ExceptionUtils.validate(report, e, new PSQLException("ERROR.*Type char is not supported by GPDBWritable.*?", null), true);
+			ExceptionUtils.validate(report, e, new PSQLException("ERROR: remote component error \\(500\\) from " + "'.*?': " + "Problem accessing /gpdb/v(\\d+)/Writable/stream. Reason:(\\s+)" + "Server Error(\\s+)Caused by:(\\s+)com.pivotal.pxf.api.UnsupportedTypeException: Type char is not supported by GPDBWritable.*?", null), true);
 		}
 	}
 
@@ -558,7 +587,7 @@ public class PxfHdfsWritableRegression extends PxfTestCase {
 		try {
 			hawq.insertData(dataTable, weTable);
 		} catch (PSQLException e) {
-			ExceptionUtils.validate(report, e, new PSQLException("ERROR.*Illegal compression type 'NONE'\\. For disabling compression remove COMPRESSION_CODEC parameter\\..*?", null), true);
+			ExceptionUtils.validate(report, e, new PSQLException("ERROR: remote component error \\(500\\) from " + "'.*?': " + "Problem accessing /gpdb/v(\\d+)/Writable/stream. Reason:(\\s+)" + "Server Error(\\s+)Caused by:(\\s+)java.lang.IllegalArgumentException: " + "Illegal compression type 'NONE'\\. For disabling compression remove COMPRESSION_CODEC parameter\\..*?", null), true);
 		}
 	}
 

@@ -855,6 +855,42 @@ public class PxfHdfsRegression extends PxfTestCase {
 		}
 	}
 
+	/**
+	 * 
+	 * set bad port
+	 * 
+	 * @throws Exception
+	 */
+	@Test
+	public void negativeErrorInPort() throws Exception {
+
+		ReadableExternalTable exTable = new ReadableExternalTable("port_err", new String[] {
+				"tmp1  timestamp",
+				"num1  integer", }, (hdfsWorkingFolder + "/multiblock.tbl"), "TEXT");
+
+		exTable.setPort("12345");
+		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
+		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.LineBreakAccessor");
+		exTable.setResolver("com.pivotal.pxf.plugins.hdfs.StringPassResolver");
+		exTable.setDelimiter(",");
+
+		hawq.createTableAndVerify(exTable);
+
+		try {
+			hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY num1");
+		} catch (PSQLException e) {
+
+			/**
+			 * Different Curl versions can provide different ERROR messages.
+			 */
+			String[] possibleErrMessages = {
+					"Failed connect to " + exTable.getHost() + ":" + exTable.getPort() + "; Connection refused",
+					"couldn't connect to host" };
+
+			ExceptionUtils.validate(report, e, new PSQLException(possibleErrMessages[0] + "|" + possibleErrMessages[1], null), true);
+		}
+	}
+
 	public static void main(String[] args) {
 		boolean b = RegexUtils.match("[couldn't connect to host | Failed connect to]", "Failed connect to");
 
@@ -952,13 +988,13 @@ public class PxfHdfsRegression extends PxfTestCase {
 	 * @throws Exception
 	 */
 	@Test
-	public void negativeAnalyzeHdfsFileBadHost() throws Exception {
+	public void negativeAnalyzeHdfsFileBadPort() throws Exception {
 
 		File regResourcesFolder = new File("resources/");
 
 		hdfs.copyFromLocal(regResourcesFolder.getAbsolutePath() + "/avroformat_inside_avrofile.avro", (hdfsWorkingFolder + "/avroformat_inside_avrofile.avro"));
 
-		ReadableExternalTable exTable = new ReadableExternalTable("avfav_analyze_bad_host", new String[] {
+		ReadableExternalTable exTable = new ReadableExternalTable("avfav_analyze_bad_port", new String[] {
 				"tmp1  timestamp",
 				"num1  integer",
 				"num2  integer",
@@ -981,7 +1017,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 				"ln3   bigint",
 				"bt    bytea" }, (hdfsWorkingFolder + "/avroformat_inside_avrofile.avro"), "custom");
 
-		exTable.setHost("host_err");
+		exTable.setPort("12345");
 		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
 		exTable.setAccessor("com.pivotal.pxf.plugins.hdfs.AvroFileAccessor");
 		exTable.setResolver("com.pivotal.pxf.plugins.hdfs.AvroResolver");
@@ -994,7 +1030,14 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		hawq.runQuery("SET pxf_enable_stat_collection = true;");
 
-		hawq.runQueryWithExpectedWarning("ANALYZE " + exTable.getName(), "remote component error \\(0\\): Couldn't resolve host 'host_err'", true);
+		/**
+		 * Different Curl versions can provide different ERROR messages.
+		 */
+		String[] possibleErrMessages = {
+				"Failed connect to " + exTable.getHost() + ":" + exTable.getPort() + "; Connection refused",
+				"couldn't connect to host" };
+
+		hawq.runQueryWithExpectedWarning("ANALYZE " + exTable.getName(), possibleErrMessages[0] + "|" + possibleErrMessages[1], true);
 
 		Table analyzeResults = new Table("results", null);
 
@@ -1409,64 +1452,6 @@ public class PxfHdfsRegression extends PxfTestCase {
 		}
 	}
 
-	@Test
-	public void queryLimit() throws Exception {
-		
-		String filePath = hdfsWorkingFolder + "/text_limit.txt";
-		
-		Table dataTable = new Table("dataTable", null);
-		Table limitTable = new Table("limitTable", null);
-		String[] line = new String[] {"Same shirt", "different day"};
-		for (int i = 0; i < 1000; i++) {
-			limitTable.addRow(line);
-		}
-		for (int i = 0; i < 10; i++) {
-			dataTable.appendRows(limitTable);
-		}
-		
-		hdfs.writeTableToFile(filePath, dataTable, ",");
-
-		String[] fields = new String[] {
-				"s1 text",
-				"s2 text"};
-		exTable = TableFactory.getPxfReadableTextTable("text_limit", fields, filePath, ",");
-
-		hawq.createTableAndVerify(exTable);
-
-		hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " LIMIT 1000");
-
-		ComparisonUtils.compareTables(exTable, limitTable, report);
-	}
-	
-	@Test 
-	public void negativeBadTextData() throws Exception {
-		
-		String filePath = hdfsWorkingFolder + "/bad_text.txt";
-		
-		Table dataTable = new Table("dataTable", null);
-		for (int i = 0; i < 50; i++) {
-			dataTable.addRow(new String[] {"" + i, Integer.toHexString(i)});
-		}
-		dataTable.addRow(new String[] {"joker", "ha"});
-		
-		hdfs.writeTableToFile(filePath, dataTable, ",");
-
-		String[] fields = new String[] {
-				"num int",
-				"string text"};
-		exTable = TableFactory.getPxfReadableTextTable("bad_text", fields, filePath, ",");
-
-		hawq.createTableAndVerify(exTable);
-		
-		try {
-			hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY num");
-		} catch (PSQLException e) {
-			String err = "ERROR: invalid input syntax for integer: \"joker\"";
-			ExceptionUtils.validate(report, e, new PSQLException(err, null), true);
-		}
-		
-	}
-	
 	private Table prepareRecursiveDirsData(String baseDir, String delim) throws Exception {
 
 		Table fileTable = new Table("file", null);

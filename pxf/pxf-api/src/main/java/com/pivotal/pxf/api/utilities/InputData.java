@@ -3,6 +3,7 @@ package com.pivotal.pxf.api.utilities;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import java.io.FileNotFoundException;
 import java.util.*;
 
 /**

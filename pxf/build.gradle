@@ -7,13 +7,11 @@ buildscript {
             url 'http://repository.jboss.org/nexus/content/groups/public'
         }
     }
-
     dependencies {
         classpath 'org.hibernate.build.gradle:gradle-maven-publish-auth:2.0.1'
         classpath 'com.netflix.nebula:gradle-ospackage-plugin:1.9.4'
     }
 }
-
 subprojects { subProject ->
     group = 'com.pivotal.pxf'
     apply plugin: 'java'
@@ -22,25 +20,22 @@ subprojects { subProject ->
     apply plugin: 'os-package'
     apply plugin: 'maven-publish'
     apply plugin: 'maven-publish-auth'
-
+    compileJava.options.debug = true 
     compileJava.options*.compilerArgs = [
             "-g", "-Xlint:varargs", "-Xlint:cast", "-Xlint:classfile", "-Xlint:dep-ann", "-Xlint:divzero", "-Xlint:empty",
             "-Xlint:finally", "-Xlint:overrides", "-Xlint:path", "-Xlint:processing", "-Xlint:static", "-Xlint:try",
             "-Xlint:fallthrough", "-Xlint:deprecation", "-Xlint:unchecked", "-Xlint:-options", "-Werror"
     ]
-
     compileTestJava.options*.compilerArgs = [
             "-Xlint:varargs", "-Xlint:cast", "-Xlint:classfile", "-Xlint:dep-ann", "-Xlint:divzero", "-Xlint:empty",
             "-Xlint:finally", "-Xlint:overrides", "-Xlint:path", "-Xlint:processing", "-Xlint:static", "-Xlint:try",
             "-Xlint:-fallthrough", "-Xlint:-deprecation", "-Xlint:-unchecked", "-Xlint:-options"
     ]
-
     repositories {
         mavenCentral()
         mavenLocal()
         maven { url 'http://hdp4-mdw1.wbe.dh.greenplum.com:8081/artifactory/libs-release-local' }
     }
-
     dependencies {
         compile 'commons-logging:commons-logging:1.1.1'
         compile 'commons-collections:commons-collections:3.2.1'
@@ -53,7 +48,6 @@ subprojects { subProject ->
         testCompile 'org.powermock:powermock-api-mockito:1.5.1'
         testCompile 'org.mockito:mockito-core:1.9.5'
     }
-
     task distTar(type: Tar) {
         classifier = buildNumber()
         compression = Compression.GZIP
@@ -61,22 +55,22 @@ subprojects { subProject ->
         from jar.outputs.files
         into "${project.name}-${project.version}"
     }
-
     //buildRpm
     ospackage {
         summary = 'The PXF extensions library for HAWQ'
         vendor = 'Pivotal'
         release = buildNumber()
-        version = subProject.version.split('-')[0];
         os = LINUX
         license = "Copyright © ${new Date().format("yyyy")} Pivotal Software, Inc. All Rights reserved."
         obsoletes('gpxf')
         user = 'root'
         permissionGroup = 'root'
-
+        from(jar.outputs.files) {
+            into "/usr/lib/gphd/pxf-${project.version}"
+        }
         link('/usr/lib/gphd/pxf', "pxf-${project.version}")
+        link("/usr/lib/gphd/pxf-${project.version}/${project.name}.jar", "${project.name}-${project.version}.jar")
     }
-
     //publish
     publishing {
         publications {
@@ -84,7 +78,6 @@ subprojects { subProject ->
                 from components.java
             }
         }
-
         repositories {
             maven {
                 if (subProject.version.endsWith('SNAPSHOT')) {
@@ -98,132 +91,84 @@ subprojects { subProject ->
         }
     }
 }
-
-project('pxf-service') {
-    apply plugin: 'war'
-    tasks.war {
-        archiveName = 'pxf.war'
-    }
-
+project('pxf-api') {
     dependencies {
-        compile(project(':pxf-api'))
-        compile 'com.sun.jersey:jersey-core:1.9'
-        providedCompile "org.apache.hadoop:hadoop-common:$hadoopVersion"
-        providedCompile "org.apache.hadoop:hadoop-hdfs:$hadoopVersion"
-        providedCompile "org.apache.hadoop:hadoop-auth:$hadoopVersion"
-        providedCompile "org.apache.hadoop:hadoop-annotations:$hadoopVersion"
-        providedCompile "org.apache.tomcat:tomcat-catalina:7.0.50"
+        testCompile "org.eclipse.jetty.orbit:javax.servlet:$servletVersion"
     }
-
     ospackage {
-
-        requires('vfabric-tc-server-standard', '2.9.5', GREATER | EQUAL)
-
-        obsoletes('pxf-core')
-        obsoletes('pxf-api')
-
-		preInstall file('src/scripts/pre-install.sh')
-		postInstall file('src/scripts/post-install.sh')
-
         from('src/main/resources/pxf-profiles-default.xml') {
-            fileType CONFIG | NOREPLACE
+            fileType = CONFIG | NOREPLACE
             into "/etc/gphd/pxf-${project.version}/conf"
             rename { 'pxf-profiles.xml' }
         }
-
-        from('src/main/resources/pxf-classpath') {
-            fileType CONFIG | NOREPLACE
-            into "/etc/gphd/pxf-${project.version}/conf"
-        }
-
-        from('src/main/resources/custom-classpath') {
-            fileType CONFIG | NOREPLACE
+        from('src/main/resources/pxf-profiles-default.xml') {
             into '/usr/lib/gphd/publicstage'
+            rename { '.workaround' }
         }
-
-        from('src/scripts/pxf-instance') {
-            fileMode 0755
-            addParentDirs false
-            into '/etc/init.d'
-        }
-
-		from(war.outputs.files) {
-            into "/usr/lib/gphd/pxf-${project.version}"
-		}
-
-        from(jar.outputs.files) {
-            into "/usr/lib/gphd/pxf-${project.version}"
-        }
-
-        link("/usr/lib/gphd/pxf-${project.version}/${project.name}.jar", "${project.name}-${project.version}.jar")
         link('/etc/gphd/pxf', "pxf-${project.version}")
     }
-
     project.distTar {
         from('src/main/resources/pxf-profiles-default.xml') { into 'conf' rename { 'pxf-profiles.xml' } }
-        from('src/main/resources/pxf-classpath') { into 'conf' }
-        from(war.outputs.files)
     }
 }
-
+project('pxf-core') {
+    dependencies {
+        compile(project(':pxf-api'))
+        compile "org.eclipse.jetty.orbit:javax.servlet:$servletVersion"
+        compile "org.eclipse.jetty:jetty-io:$jettyVersion"
+        compile "com.sun.jersey:jersey-core:$jerseyVersion"
+        compile "org.apache.hadoop:hadoop-common:$hadoopVersion"
+        compile "org.apache.hadoop:hadoop-hdfs:$hadoopVersion"
+        compile "org.apache.hadoop:hadoop-auth:$hadoopVersion"
+        compile "org.apache.hadoop:hadoop-annotations:$hadoopVersion"
+    }
+    ospackage {
+        requires('pxf-api', project.version, GREATER | EQUAL)
+    }
+}
 project('pxf-hdfs') {
     dependencies {
-        compile(project(':pxf-service')) //Yikes, HdfsAnalyzer is directly accessing the bridge
-        compile 'org.apache.avro:avro-mapred:1.7.4'
+        compile(project(':pxf-core')) //Yikes, HdfsAnalyzer is directly accessing the bridge
+        compile "org.eclipse.jetty.orbit:javax.servlet:$servletVersion"
+        compile "org.eclipse.jetty:jetty-io:$jettyVersion"
+        compile "com.sun.jersey:jersey-core:$jerseyVersion"
+        compile "org.apache.avro:avro-mapred:$avroVersion"
         compile "org.apache.hadoop:hadoop-mapreduce-client-core:$hadoopVersion"
     }
-
     ospackage {
-        requires('pxf-service', project.version, GREATER | EQUAL)
-        requires('hadoop', "$hadoopVersion", GREATER | EQUAL)
-        requires('hadoop-mapreduce', "$hadoopVersion", GREATER | EQUAL)
-
-        from(jar.outputs.files) {
-            into "/usr/lib/gphd/pxf-${project.version}"
-        }
-
-        link("/usr/lib/gphd/pxf-${project.version}/${project.name}.jar", "${project.name}-${project.version}.jar")
+        requires('pxf-core', project.version, GREATER | EQUAL)
     }
 }
-
 project('pxf-hive') {
     dependencies {
         compile(project(':pxf-hdfs'))
+        compile "org.eclipse.jetty.orbit:javax.servlet:$servletVersion"
+        compile "org.eclipse.jetty:jetty-io:$jettyVersion"
+        compile "com.sun.jersey:jersey-core:$jerseyVersion"
         compile "org.apache.hive:hive-service:$hiveVersion"
         compile "org.apache.hive:hive-metastore:$hiveVersion"
         compile "org.apache.hive:hive-common:$hiveVersion"
         compile "org.apache.hive:hive-serde:$hiveVersion"
+        compile "org.apache.avro:avro:$avroVersion"
         testCompile 'pl.pragmatists:JUnitParams:1.0.2'
     }
 
     ospackage {
         requires('pxf-hdfs', project.version, GREATER | EQUAL)
-        requires('hive', "$hiveVersion", GREATER | EQUAL)
-
-        from(jar.outputs.files) {
-            into "/usr/lib/gphd/pxf-${project.version}"
-        }
-
-        link("/usr/lib/gphd/pxf-${project.version}/${project.name}.jar", "${project.name}-${project.version}.jar")
     }
 }
-
 project('pxf-hbase') {
     dependencies {
         compile(project(':pxf-api'))
         compile "org.apache.hadoop:hadoop-common:$hadoopVersion"
-        compile "org.apache.hbase:hbase-client:$hbaseVersionJar"
+        compile "org.eclipse.jetty.orbit:javax.servlet:$servletVersion"
+        compile "org.eclipse.jetty:jetty-io:$jettyVersion"
+        compile "com.sun.jersey:jersey-core:$jerseyVersion"
+        compile "org.apache.hbase:hbase-client:$hbaseVersion"
+        compile "org.apache.avro:avro:$avroVersion"
     }
-
     ospackage {
-        requires('pxf-service', project.version, GREATER | EQUAL)
-        requires('hbase', "$hbaseVersionRPM", GREATER | EQUAL)
-
-        from(jar.outputs.files) {
-            into "/usr/lib/gphd/pxf-${project.version}"
-        }
-
-        link("/usr/lib/gphd/pxf-${project.version}/${project.name}.jar", "${project.name}-${project.version}.jar")
+        requires('pxf-api', project.version, GREATER | EQUAL)
     }
 }
 
@@ -235,33 +180,12 @@ task wrapper(type: Wrapper) {
     gradleVersion = '1.11'
 }
 
-task release(type: Copy, dependsOn: [subprojects.build, subprojects.javadoc, (subprojects - project(':pxf-api')).buildRpm, subprojects.distTar]) {
+task release(type: Copy, dependsOn: [subprojects.build, subprojects.javadoc, subprojects.buildRpm, subprojects.distTar]) {
     delete 'build'
     into 'build'
     subprojects { subProject ->
         from("${project.name}/build/libs") { into 'libs' }
         from("${project.name}/build/distributions") { into 'distributions' }
         from("${project.name}/build/test-results") { into 'test-results' }
-    }
-}
-
-task tar(type: Copy, dependsOn: [subprojects.build, subprojects.distTar]) {
-    into 'build'
-    subprojects { subProject ->
-        from("${project.name}/build/distributions") { into 'distributions' }
-    }
-}
-
-task jar(type: Copy, dependsOn: [subprojects.build]) {
-    into 'build'
-    subprojects { subProject ->
-        from("${project.name}/build/libs") { into 'libs' }
-    }
-}
-
-task rpm(type: Copy, dependsOn: [subprojects.build, subprojects.buildRpm]) {
-    into 'build'
-    subprojects { subProject ->
-        from("${project.name}/build/distributions") { into 'distributions' }
     }
 }

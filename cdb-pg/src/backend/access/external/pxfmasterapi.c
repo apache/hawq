@@ -81,7 +81,7 @@ get_datanode_rest_servers(GPHDUri *hadoop_uri, ClientContext* client_context)
 	appendStringInfo(&get_srvrs_uri, "http://%s:%s/%s/%s/HadoopCluster/getNodesInfo",
 											hadoop_uri->host,
 											hadoop_uri->port,
-											PXF_SERVICE_PREFIX,
+											GPDB_REST_PREFIX,
 											PXF_VERSION);
 
 	process_request(client_context, get_srvrs_uri.data);
@@ -129,7 +129,7 @@ PxfStatsElem *get_data_statistics(GPHDUri* hadoop_uri,
 	appendStringInfo(&request, "http://%s:%s/%s/%s/Analyzer/getEstimatedStats?path=%s",
 					 hadoop_uri->host,
 					 hadoop_uri->port,
-					 PXF_SERVICE_PREFIX,
+					 GPDB_REST_PREFIX,
 					 PXF_VERSION,
 					 hadoop_uri->data);
 
@@ -213,7 +213,7 @@ get_data_fragment_list(GPHDUri *hadoop_uri,
 	appendStringInfo(&request, "http://%s:%s/%s/%s/Fragmenter/getFragments?path=%s",
 								hadoop_uri->host,
 								hadoop_uri->port,
-								PXF_SERVICE_PREFIX,
+								GPDB_REST_PREFIX,
 								PXF_VERSION,
 								hadoop_uri->data);
 
@@ -230,7 +230,7 @@ get_data_fragment_list(GPHDUri *hadoop_uri,
  * parse the response of the PXF Fragments call. An example:
  *
  * Request:
- * 		curl --header "X-GP-FRAGMENTER: HdfsDataFragmenter" "http://goldsa1mac.local:50070/pxf/v2/Fragmenter/getFragments?path=demo" (demo is a directory)
+ * 		curl --header "X-GP-FRAGMENTER: HdfsDataFragmenter" "http://goldsa1mac.local:50070/gpdb/v2/Fragmenter/getFragments?path=demo" (demo is a directory)
  *
  * Response (left as a single line purposefully):
  * {"PXFFragments":[{"index":0,"userData":null,"sourceName":"demo/text2.csv","metadata":"rO0ABXcQAAAAAAAAAAAAAAAAAAAABXVyABNbTGphdmEubGFuZy5TdHJpbmc7rdJW5+kde0cCAAB4cAAAAAN0ABxhZXZjZWZlcm5hczdtYnAuY29ycC5lbWMuY29tdAAcYWV2Y2VmZXJuYXM3bWJwLmNvcnAuZW1jLmNvbXQAHGFldmNlZmVybmFzN21icC5jb3JwLmVtYy5jb20=","replicas":["10.207.4.23","10.207.4.23","10.207.4.23"]},{"index":0,"userData":null,"sourceName":"demo/text_csv.csv","metadata":"rO0ABXcQAAAAAAAAAAAAAAAAAAAABnVyABNbTGphdmEubGFuZy5TdHJpbmc7rdJW5+kde0cCAAB4cAAAAAN0ABxhZXZjZWZlcm5hczdtYnAuY29ycC5lbWMuY29tdAAcYWV2Y2VmZXJuYXM3bWJwLmNvcnAuZW1jLmNvbXQAHGFldmNlZmVybmFzN21icC5jb3JwLmVtYy5jb20=","replicas":["10.207.4.23","10.207.4.23","10.207.4.23"]}]}

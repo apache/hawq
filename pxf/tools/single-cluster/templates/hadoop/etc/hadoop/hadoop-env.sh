@@ -2,6 +2,32 @@
 . $bin/../../bin/gphd-env.sh
 
 export HADOOP_CLASSPATH=\
+`echo $PXF_ROOT/pxf-core-*[0-9].jar`:\
+`echo $PXF_ROOT/pxf-api-*[0-9].jar`:\
+`echo $PXF_ROOT/conf`:\
+`echo $HBASE_ROOT/lib/hbase-common-*-gphd-*[0-9].jar`:\
+`echo $HBASE_ROOT/lib/hbase-common-*-gphd-*[0-9]-SNAPSHOT.jar`:\
+`echo $HBASE_ROOT/lib/hbase-protocol*-gphd-*[0-9].jar`:\
+`echo $HBASE_ROOT/lib/hbase-protocol*-gphd-*[0-9]-SNAPSHOT.jar`:\
+`echo $HBASE_ROOT/lib/hbase-client-*-gphd-*[0-9].jar`:\
+`echo $HBASE_ROOT/lib/hbase-client-*-gphd-*[0-9]-SNAPSHOT.jar`:\
+`echo $HBASE_ROOT/lib/hbase-thrift-*-gphd-*[0-9].jar`:\
+`echo $HBASE_ROOT/lib/hbase-thrift-*-gphd-*[0-9]-SNAPSHOT.jar`:\
+`echo $HBASE_ROOT/lib/htrace-core-2.01.jar`:\
+`echo $ZOOKEEPER_ROOT/zookeeper-*-gphd-*[0-9].jar`:\
+`echo $ZOOKEEPER_ROOT/zookeeper-*-gphd-*[0-9]-SNAPSHOT.jar`:\
+`echo $HIVE_ROOT/lib/hive-service-*-gphd-*[0-9].jar`:\
+`echo $HIVE_ROOT/lib/hive-service-*-gphd-*[0-9]-SNAPSHOT.jar`:\
+`echo $HIVE_ROOT/lib/libthrift.jar`:\
+`echo $HIVE_ROOT/lib/hive-metastore-*-gphd-*[0-9].jar`:\
+`echo $HIVE_ROOT/lib/hive-metastore-*-gphd-*[0-9]-SNAPSHOT.jar`:\
+`echo $HIVE_ROOT/lib/libfb303-*.jar`:\
+`echo $HIVE_ROOT/lib/hive-common-*-gphd-*[0-9].jar`:\
+`echo $HIVE_ROOT/lib/hive-common-*-gphd-*[0-9]-SNAPSHOT.jar`:\
+`echo $HIVE_ROOT/lib/hive-exec-*-gphd-*[0-9].jar`:\
+`echo $HIVE_ROOT/lib/hive-exec-*-gphd-*[0-9]-SNAPSHOT.jar`:\
+$HBASE_CONF:\
+$HIVE_CONF:\
 $HADOOP_CLASSPATH:\
 $COMMON_CLASSPATH:\
 

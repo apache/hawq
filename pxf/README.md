@@ -1,7 +1,7 @@
 The PXF extensions library for HAWQ
 ===================================
 
-Copyright © 2014 Pivotal Software, Inc. All Rights reserved.
+(c) Copyright 2014 Pivotal Software, Inc
 
 Table of Contents
 =================
@@ -25,7 +25,8 @@ PXF is distributed as a set of RPMs -
 
     pxf/
         └── rpm
-            ├── pxf-service-$version.noarch.rpm
+            ├── pxf-api-$version.noarch.rpm
+            ├── pxf-core-$version.noarch.rpm
             ├── pxf-hdfs-$version.noarch.rpm
             ├── pxf-hive-$version.noarch.rpm
             └── pxf-hbase-$version.noarch.rpm

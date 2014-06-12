@@ -271,13 +271,15 @@ public class FilterParserTest {
     }
 
     private void runParseOneOperation(String description, String filter, Operation op) throws Exception {
+        Object obj = new String(description);
+
         when(filterBuilder.build(eq(op),
                 any(),
-                any())).thenReturn(description);
+                any())).thenReturn(obj);
 
         Object result = filterParser.parse(filter);
 
-        assertEquals(description, result);
+        assertEquals(obj, result);
     }
 
     private String filterStringMsg(String filter) {

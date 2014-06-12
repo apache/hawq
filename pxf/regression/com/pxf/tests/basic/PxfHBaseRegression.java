@@ -3,7 +3,6 @@ package com.pxf.tests.basic;
 import java.sql.SQLWarning;
 import java.util.ArrayList;
 
-import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.filter.BinaryComparator;
 import org.apache.hadoop.hbase.filter.CompareFilter;
@@ -863,9 +862,6 @@ public class PxfHBaseRegression extends PxfTestCase {
 		try {
 			hawq.queryResults(externalTableFilterPrinter, "SELECT * FROM " + externalTableFilterPrinter.getName() + " " + whereClause + " ORDER BY recordkey ASC");
 		} catch (Exception e) {
-			// tcServer displays special character in their HTML representation, 
-			// need to convert our string as well.
-			expectedFilter = StringEscapeUtils.escapeHtml(expectedFilter);
 			ExceptionUtils.validate(report, e, new Exception("ERROR.*Filter string: '" + expectedFilter + "'.*"), true, true);
 		}
 	}

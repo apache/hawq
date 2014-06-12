@@ -430,7 +430,7 @@ void build_uri_for_read(gphadoop_context* context)
 	FragmentData* data = (FragmentData*)lfirst(context->current_fragment);
 	resetStringInfo(&context->uri);
 	appendStringInfo(&context->uri, "http://%s/%s/%s/Bridge/",
-					 data->authority, PXF_SERVICE_PREFIX, PXF_VERSION);
+					 data->authority, GPDB_REST_PREFIX, PXF_VERSION);
 	elog(DEBUG2, "pxf: uri %s for read", context->uri.data);
 }
 
@@ -451,7 +451,7 @@ void build_uri_for_write(gphadoop_context* context, PxfServer* rest_server )
 {
 	appendStringInfo(&context->uri, "http://%s:%d/%s/%s/Writable/stream?path=%s",
 					 rest_server->host, rest_server->port,
-					 PXF_SERVICE_PREFIX, PXF_VERSION, context->write_file_name.data);
+					 GPDB_REST_PREFIX, PXF_VERSION, context->write_file_name.data);
 	elog(DEBUG2, "pxf: uri %s with file name for write: %s", context->uri.data, context->write_file_name.data);
 
 }

@@ -4,7 +4,7 @@ import com.pivotal.pxf.api.Analyzer;
 import com.pivotal.pxf.api.AnalyzerStats;
 import com.pivotal.pxf.api.ReadAccessor;
 import com.pivotal.pxf.api.utilities.InputData;
-import com.pivotal.pxf.service.ReadBridge;
+import com.pivotal.pxf.core.ReadBridge;
 import com.pivotal.pxf.plugins.hdfs.utilities.HdfsUtilities;
 import com.pivotal.pxf.plugins.hdfs.utilities.PxfInputFormat;
 import org.apache.commons.logging.Log;

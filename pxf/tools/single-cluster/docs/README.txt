@@ -16,7 +16,6 @@ will be started:
 3 Data Nodes
 3 Region Servers
 3 Node Managers
-3 PXF Servers
 1 Hive Thrift server
 
 Uses an unmodified version of relevant PHD services
@@ -67,25 +66,9 @@ CentOS
 7. Changes
 ==========
 
-v1.8.4
-------
-
-- SingleCluster now has its own pxf-classpath and context.xml
-
-v1.8.3
-------
-
-- GPSQL-2127: change webapp name to pxf
-- include mapred-site.xml in pxf webapp WEB-INF/classes
-- PXF on by default
-- Remove PXF from Hadoop classpath
-- Fix error message in PXF initialization
-
 v1.8.2
 ------
 
-- GPSQL-2238: Temporary webapp for PXF
-- pxf-only target for tar fetch will fetch just PXF tars
 - GPSQL-2274 Add PHD_VERSION paramter for compilation
 
 v1.8.1
