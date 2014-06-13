@@ -797,7 +797,6 @@ void estimateColumnWidth(int *columnWidths,
 	}
 }
 
-
 static void
 estimateColumnWidths(int *columnWidths,
 					 int ncolumns,

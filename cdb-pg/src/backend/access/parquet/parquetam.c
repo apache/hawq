@@ -985,7 +985,6 @@ static void OpenSegmentFile(
 	}
 }
 
-#ifdef NOT_USED
 /**
  * Given parquet table oid, return the memory reserved for parquet table insert operator.
  * For uncompressed table, the whole rowgroup is stored in memory before written to disk,
@@ -1000,14 +999,14 @@ uint64 memReservedForParquetInsert(Oid rel_oid) {
 	uint64 memReserved = 0;
 	char *compresstype = NULL;
 
-	AppendOnlyEntry *aoEntry = GetAppendOnlyEntry(rel_oid, NULL);
+	AppendOnlyEntry *aoEntry = GetAppendOnlyEntry(rel_oid, SnapshotNow);
 	memReserved = aoEntry->blocksize;
 	compresstype = aoEntry->compresstype;
 
 	if (compresstype && (strcmp(compresstype, "none") != 0)){
-		pfree(compresstype);
 		memReserved *= 2;
 	}
+	pfree(aoEntry);
 	return memReserved;
 }
 
@@ -1027,7 +1026,7 @@ uint64 memReservedForParquetInsert(Oid rel_oid) {
  * (columnwidth)/recordwidth * rowgroupsize * 2.
  *
  * @rel_oid		The oid of relation to be inserted
- * @attr_list	The list of attributes to be scanned
+ * @attr_list		The list of attributes to be scanned
  * @return		The memory allocated for this table insert
  */
 
@@ -1044,10 +1043,9 @@ uint64 memReservedForParquetScan(Oid rel_oid, List* attr_list) {
 
 	/** The variables for traversing through attribute list*/
 	ListCell	*cell;
-	TargetEntry	*tle;
 
 	/* Get rowgroup size and compress type */
-	AppendOnlyEntry *aoEntry = GetAppendOnlyEntry(rel_oid, NULL);
+	AppendOnlyEntry *aoEntry = GetAppendOnlyEntry(rel_oid, SnapshotNow);
 	rowgroupsize = aoEntry->blocksize;
 	compresstype = aoEntry->compresstype;
 
@@ -1085,7 +1083,6 @@ uint64 memReservedForParquetScan(Oid rel_oid, List* attr_list) {
 					if(stawidth != 0)
 						attWidth[i] = stawidth;
 					break;
-				case HAWQ_TYPE_BIT:
 				case HAWQ_TYPE_VARBIT:
 					stawidth = get_attavgwidth(rel_oid, att_id);
 					if(stawidth != 0)
@@ -1098,21 +1095,34 @@ uint64 memReservedForParquetScan(Oid rel_oid, List* attr_list) {
 		recordWidth += attWidth[i];
 	}
 
-	/** Reverse through the to-be-scanned attribute list, sum up the width */
+	/* Reverse through the to-be-scanned attribute list, sum up the width */
+	Assert (1 <= list_length(attr_list));
 	foreach(cell, attr_list)
 	{
-		tle = (TargetEntry *) lfirst(cell);
-		AttrNumber att_id = tle->resno;
+		AttrNumber att_id = lfirst_int(cell);
+		Assert(1 <= att_id);
+		Assert(att_id <= attrNum);
 		attsWidth += attWidth[att_id - 1];	/*sum up the attribute width in the to-be-scanned list*/
 	}
+
 	pfree(attWidth);
 
 	memReserved = (attsWidth * rowgroupsize) / recordWidth;
 	if(compresstype != NULL && (strcmp(compresstype, "none") != 0))
 	{
-		pfree(compresstype);
 		memReserved *= 2;
 	}
+	pfree(aoEntry);
+	/* Since memory allocated to parquet scan depends on the columns get scanned, it is possible
+	 * to allocate very small chunk of memory if the scanned columns are very small in terms of the
+	 * average table width. Therefore, we set minimum threshold of memory allocated as 100 KB to
+	 * be consistent with the non-memory intensive operators.
+	 *
+	 */
+	if (100 * 1024 > memReserved)
+	{
+		memReserved = 100 * 1024;
+	}
+
 	return memReserved;
 }
-#endif

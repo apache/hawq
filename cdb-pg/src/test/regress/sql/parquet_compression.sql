@@ -17,6 +17,8 @@ drop table parquet_snappy_uncompr;
 drop table parquet_snappy_part;
 drop table parquet_snappy_part_unc;
 drop table parquet_gzip_2;
+
+set statement_mem='1999MB';
 --end_ignore
 
 --Datatypes covered: text,bytea,varchar,bit varying

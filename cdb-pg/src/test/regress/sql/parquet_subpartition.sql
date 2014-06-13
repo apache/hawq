@@ -6,6 +6,8 @@
 DROP TABLE if exists parquet_wt_subpartgzip7 cascade;
 
 DROP TABLE if exists parquet_wt_subpartgzip7_uncompr cascade;
+
+SET statement_mem='1999MB';
 --end_ignore
 --
 -- Create table

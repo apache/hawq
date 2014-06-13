@@ -7,21 +7,28 @@
  * Copyright (c) 2010, Greenplum inc
  * 
  *-------------------------------------------------------------------------*/
- 
+
 #include "cdb/memquota.h"
-#include "cdb/cdbllize.h"
-#include "storage/lwlock.h"
-#include "commands/queue.h"
-#include "catalog/pg_resqueue.h"
-#include "utils/relcache.h"
-#include "executor/execdesc.h"
-#include "utils/resscheduler.h"
 #include "access/heapam.h"
-#include "miscadmin.h"
-#include "utils/guc_tables.h"
+#include "catalog/pg_attribute_encoding.h"
+#include "catalog/pg_class.h"
+#include "catalog/pg_resqueue.h"
+#include "cdb/cdbllize.h"
+#include "cdb/cdbparquetam.h"
+#include "cdb/cdbpartition.h"
 #include "cdb/cdbvars.h"
+#include "commands/queue.h"
+#include "commands/tablecmds.h"
+#include "executor/executor.h"
+#include "executor/execdesc.h"
+#include "miscadmin.h"
 #include "optimizer/clauses.h"
 #include "parser/parsetree.h"
+#include "storage/lwlock.h"
+#include "utils/guc_tables.h"
+#include "utils/lsyscache.h"
+#include "utils/relcache.h"
+#include "utils/resscheduler.h"
 
 /*
  * OIDs of partition functions that we mark as non-memory intensive.
@@ -43,6 +50,7 @@ typedef struct PolicyAutoContext
 	uint64 numMemIntensiveOperators; /* number of blocking operators */
 	uint64 queryMemKB;
 	PlannedStmt *plannedStmt; /* pointer to the planned statement */
+	uint64 parquetOpReservedMemKB; /* memory reserved for parquet related operators */
 } PolicyAutoContext;
 
 /**
@@ -52,6 +60,14 @@ static bool PolicyAutoPrelimWalker(Node *node, PolicyAutoContext *context);
 static bool	PolicyAutoAssignWalker(Node *node, PolicyAutoContext *context);
 static bool IsAggMemoryIntensive(Agg *agg);
 static bool IsMemoryIntensiveOperator(Node *node, PlannedStmt *stmt);
+static bool IsParquetScanOperator(Node *node, PlannedStmt *stmt);
+static bool IsParquetInsertOperator(Node *node, PlannedStmt *stmt);
+static uint64 MemoryReservedForParquetInsertForPlannerPlan(PlannedStmt *stmt);
+static List* GetScannedColumnsForTable(Node *node, Oid rel_oid);
+static uint64 MemoryReservedForParquetScan(Node *node, PlannedStmt *stmt);
+static uint64 MemoryReservedForParquetInsert(Oid rel_oid);
+static Oid GetPartOidForParquetScan(Node *node, Oid root_oid, uint64 *maxMemRequired);
+static Oid GetPartOidForParquetInsert(Oid root_oid, uint64 *maxMemRequired);
 static double minDouble(double a, double b);
 
 struct OperatorGroupNode;
@@ -88,11 +104,15 @@ typedef struct OperatorGroupNode
 
 	/* The memory limit for this group and its child groups */
 	uint64 groupMemKB;
+
+	/* memory reserved for parquet related operators in this group */
+	uint64 parquetOpReservedMemKB;
+
 } OperatorGroupNode;
 
 /*
  * PolicyEagerFreeContext
- *   Store the intemediate states during the tree walking for the optimize
+ *   Store the intermediate states during the tree walking for the optimize
  * memory distribution policy.
  */
 typedef struct PolicyEagerFreeContext
@@ -350,6 +370,343 @@ IsMemoryIntensiveOperator(Node *node, PlannedStmt *stmt)
 	}
 }
 
+/**
+ * Calculate memory required for a parquet table scan
+ *
+ * node:   Plan node
+ * stmt:   Plan statement
+ * return: memory in byte that is reserved for parquet table scan
+ */
+static uint64
+MemoryReservedForParquetScan(Node *node, PlannedStmt *stmt)
+{
+	Assert(NULL != node);
+	Assert(NULL != stmt);
+
+	Oid rel_oid = getrelid(((Scan *) node)->scanrelid, stmt->rtable);
+	uint64 memoryReservedForParquetScan = 0;
+
+	/* For dynamic table scan, we need to iterate through all the part tables and find out the
+	 * parquet part table that has the maximum memory requirement. */
+	if (IsA(node, DynamicTableScan))
+	{
+#if USE_ASSERT_CHECKING
+                Oid part_oid =
+#endif
+		GetPartOidForParquetScan(node, rel_oid, &memoryReservedForParquetScan);
+		Assert(InvalidOid != part_oid);
+	}
+	else
+	{
+		List *scanned_columns_list = GetScannedColumnsForTable(node, rel_oid);
+		memoryReservedForParquetScan = memReservedForParquetScan(rel_oid, scanned_columns_list);
+		list_free(scanned_columns_list);
+	}
+	return memoryReservedForParquetScan;
+}
+
+/**
+ * Calculate memory required for parquet table insert
+ *
+ * rel_oid: target table's Oid, it can be a root table of a partitioned table
+ * return:  memory in byte that is reserved for parquet table insert
+ *          It will return 0 if the target table is not a parquet table or
+ *          no parquet part table exists
+ */
+static uint64
+MemoryReservedForParquetInsert(Oid rel_oid)
+{
+	Assert(InvalidOid != rel_oid);
+	uint64 memoryReserved = 0;
+	/* partitioned case */
+	if (rel_is_partitioned(rel_oid))
+	{
+		GetPartOidForParquetInsert(rel_oid, &memoryReserved);
+	}
+	/* non-partition case, parquet table */
+	else if(relstorage_is_aoparquet(get_rel_relstorage(rel_oid)))
+	{
+		memoryReserved = memReservedForParquetInsert(rel_oid);
+	}
+
+	return memoryReserved;
+}
+
+/**
+ * Is an operator parquet scan?
+ */
+static bool
+IsParquetScanOperator(Node *node, PlannedStmt *stmt)
+{
+	Assert(NULL != node);
+	Assert(NULL != stmt);
+	Assert(is_plan_node(node));
+	switch(nodeTag(node))
+	{
+		case T_ParquetScan:
+			return true;
+		case T_TableScan:
+			{
+				Oid rel_oid = getrelid(((Scan *) node)->scanrelid, stmt->rtable);
+				if (relstorage_is_aoparquet(get_rel_relstorage(rel_oid)))
+				{
+					return true;
+				}
+				else
+				{
+					return false;
+				}
+			}
+		case T_DynamicTableScan:
+			{
+				uint64 memRequired = 0;
+				Oid rel_oid = getrelid(((Scan *) node)->scanrelid, stmt->rtable);
+				if (InvalidOid == GetPartOidForParquetScan(node, rel_oid, &memRequired))
+				{
+					return false;
+				}
+				else
+				{
+					return true;
+				}
+			}
+		default:
+			return false;
+	}
+}
+
+/**
+ * Is an operator parquet Insert?
+ */
+static bool
+IsParquetInsertOperator(Node *node, PlannedStmt *stmt)
+{
+	Assert(NULL != node);
+	Assert(NULL != stmt);
+	Assert(is_plan_node(node));
+	if (IsA(node, DML))
+	{
+		if (CMD_INSERT == stmt->commandType)
+		{
+			Oid rel_oid = getrelid(((Scan *) node)->scanrelid, stmt->rtable);
+			/* partitioned case */
+			if (rel_is_partitioned(rel_oid))
+			{
+				uint64 memRequired = 0;
+				if (InvalidOid == GetPartOidForParquetInsert(rel_oid, &memRequired))
+				{
+					return false;
+				}
+				else
+				{
+					return true;
+				}
+			}
+			/* non-partition case, parquet table */
+			else if (relstorage_is_aoparquet(get_rel_relstorage(rel_oid)))
+			{
+				return true;
+			}
+			else
+			{
+				return false;
+			}
+		}
+		else
+		{
+			return false;
+		}
+	}
+	else
+	{
+		return false;
+	}
+}
+
+/**
+ * Compute memory required for Parquet table insert if the plan
+ * is produced by Planner. Because unlike ORCA, Planner does not put
+ * insert in its plan nodes. We collect memory by traversing
+ * the resultRelations and sum up the memory needed for each relation.
+ *
+ * stmt:   Plan statement
+ * return: memory in byte that is reserved for parquet table insert
+ *         It will return 0 if no parquet table exists.
+ */
+static uint64
+MemoryReservedForParquetInsertForPlannerPlan(PlannedStmt *stmt)
+{
+	Assert(PLANGEN_PLANNER == stmt->planGen);
+	Assert(CMD_INSERT == stmt->commandType);
+	uint64 memRequired = 0;
+	ListCell *lc = NULL;
+	foreach(lc, stmt->resultRelations)
+	{
+		Oid rel_oid = getrelid(lfirst_int(lc), stmt->rtable);
+		memRequired += MemoryReservedForParquetInsert(rel_oid);
+	}
+	return memRequired;
+}
+
+/*
+ * Get list of columns need to be scanned for a parquet table
+ *
+ * The return list is palloc-ed in the current memory context, and the caller
+ * is required to free it.
+ *
+ * node:    Plan node
+ * rel_oid: target table's Oid
+ * return:  List of columns that need to be scanned
+ */
+static List* 
+GetScannedColumnsForTable(Node *node, Oid rel_oid)
+{
+	Plan *plan = (Plan *) &((Scan *) node)->plan;
+	int num_col = get_relnatts(rel_oid);
+	bool *proj = (bool *)palloc0(sizeof(bool) * num_col);
+	GetNeededColumnsForScan((Node *)plan->targetlist, proj, num_col);
+	GetNeededColumnsForScan((Node *)plan->qual, proj, num_col);
+	List *result = NIL;
+	for(int col_no = 0; col_no < num_col; col_no++)
+	{
+		if(proj[col_no])
+		{
+			result = lappend_int(result, col_no + 1);
+		}
+	}
+	pfree(proj);
+	
+	/* In some cases (e.g.: count(*)), no column is specified.
+	 * We always scan the first column. 	 
+	 */
+	if (0 == list_length(result))
+	{
+		result = lappend_int(result, 1);
+	}
+	return result;
+}
+
+/*
+ * Iterate through all part tables and try to find the parquet part table that
+ * has the maximum memory requirement.
+ *
+ * Return InvalidOid if no parquet part table exists.
+ *
+ * node:           Plan node
+ * root_oid:       Oid of root table
+ * maxMemRequired: Output argument for memory in byte that is reserved for the part table scan
+ *
+ */
+static Oid GetPartOidForParquetScan(Node *node, Oid root_oid, uint64 *maxMemRequired)
+{
+	Assert(NULL != maxMemRequired);
+	Assert(rel_is_partitioned(root_oid));
+	Oid maxRowgroupsizePartTableOid = InvalidOid;
+	*maxMemRequired = 0;
+
+	PartitionNode *pn = get_parts(root_oid, 0 /* level */, 0 /* parent */, false /* inctemplate */,
+	                              CurrentMemoryContext);
+	Assert(pn);
+
+	List *scanned_columns_list = GetScannedColumnsForTable(node, root_oid);
+	
+	/*
+	 * If we have dropped columns in root table, we need to remap
+	 * the attribute numbers for part tables to get accurate columns
+	 * to be scanned.
+	 */ 
+	Relation rootRel = heap_open(root_oid, AccessShareLock);
+	TupleDesc rootTupDesc = rootRel->rd_att;
+
+	List *lRelOids = all_partition_relids(pn);
+	ListCell *lc_part_oid = NULL;
+	foreach (lc_part_oid, lRelOids)
+	{
+		Oid part_oid = lfirst_oid(lc_part_oid);
+		if (relstorage_is_aoparquet(get_rel_relstorage(part_oid)))
+		{
+			/* remap scanned columns for part table if needed */
+			Relation partRel = heap_open(part_oid, AccessShareLock);
+			TupleDesc partTupDesc = partRel->rd_att;
+			AttrNumber *attMap = varattnos_map(rootTupDesc, partTupDesc);
+			List *remap_scanned_columns_list = NIL;
+			if (attMap)
+			{
+				ListCell *cell = NULL;
+				foreach(cell, scanned_columns_list)
+				{
+					AttrNumber remap_att_num = attMap[lfirst_int(cell)-1];
+					remap_scanned_columns_list = lappend_int(remap_scanned_columns_list, remap_att_num);
+				}
+			}
+			/* no mapping needed */
+			else
+			{
+				remap_scanned_columns_list = scanned_columns_list;
+			}
+			heap_close(partRel, AccessShareLock);
+				
+			uint64 memRequired = memReservedForParquetScan(part_oid, remap_scanned_columns_list);
+			if (memRequired > *maxMemRequired)
+			{
+				*maxMemRequired = memRequired;
+				maxRowgroupsizePartTableOid = part_oid;
+			}
+
+			/* clean up */
+			if (attMap)
+			{
+				list_free(remap_scanned_columns_list);
+				pfree(attMap);
+			}
+		}
+	}
+	heap_close(rootRel, AccessShareLock);
+	list_free(scanned_columns_list);
+	
+	return maxRowgroupsizePartTableOid;
+}
+
+/*
+ * Iterate through all part tables and try to find the parquet part table that
+ * has the maximum memory requirement for insert.
+ *
+ * Return InvalidOid if no parquet part table exists.
+ *
+ * root_oid:       Oid of root table
+ * maxMemRequired: Output argument for memory in byte that is reserved for the part table insert
+ *
+ */
+static Oid
+GetPartOidForParquetInsert(Oid root_oid, uint64 *maxMemRequired)
+{
+	Assert(NULL != maxMemRequired);
+	Assert(rel_is_partitioned(root_oid));
+	Oid maxRowgroupsizePartTableOid = InvalidOid;
+	*maxMemRequired = 0;
+
+	PartitionNode *pn = get_parts(root_oid, 0 /* level */, 0 /* parent */, false /* inctemplate */,
+	                              CurrentMemoryContext);
+	Assert(pn);
+
+	List *lRelOids = all_partition_relids(pn);
+	ListCell *lc_part_oid = NULL;
+	foreach (lc_part_oid, lRelOids)
+	{
+		Oid part_oid = lfirst_oid(lc_part_oid);
+		if (relstorage_is_aoparquet(get_rel_relstorage(part_oid)))
+		{
+			uint64 memRequired = memReservedForParquetInsert(part_oid);
+			if (memRequired > *maxMemRequired)
+			{
+				*maxMemRequired = memRequired;
+				maxRowgroupsizePartTableOid = part_oid;
+			}
+		}
+	}
+	return maxRowgroupsizePartTableOid;
+}
+
 /*
  * IsRootOperatorInGroup
  *    Return true if the given node is the root operator in an operator group.
@@ -382,7 +739,27 @@ static bool PolicyAutoPrelimWalker(Node *node, PolicyAutoContext *context)
 	Assert(context);	
 	if (is_plan_node(node))
 	{
-		if (IsMemoryIntensiveOperator(node, context->plannedStmt))
+		if (IsParquetScanOperator(node, context->plannedStmt))
+		{
+			uint64 memResevedForParquetScan = MemoryReservedForParquetScan(node, context->plannedStmt);
+			uint64 memResevedForParquetScanKB = (uint64) ( (double) memResevedForParquetScan / 1024);
+			context->parquetOpReservedMemKB += memResevedForParquetScanKB;
+			/* Assign the memory required to the operator so we do not need to compute it again */
+			Plan *planNode = (Plan *) node;
+			planNode->operatorMemKB = memResevedForParquetScanKB;
+		}
+		else if (IsParquetInsertOperator(node, context->plannedStmt))
+		{
+			/* get memory required for parquet table insert */
+			Oid rel_oid = getrelid(((Scan *) node)->scanrelid, context->plannedStmt->rtable);
+			uint64 memResevedForParquetInsert = MemoryReservedForParquetInsert(rel_oid);
+			uint64 memResevedForParquetInsertKB = (uint64) ( (double) memResevedForParquetInsert / 1024);
+			context->parquetOpReservedMemKB += memResevedForParquetInsertKB;
+			/* Assign the memory required to the operator so we do not need to compute it again */
+			Plan *planNode = (Plan *) node;
+			planNode->operatorMemKB = memResevedForParquetInsertKB;
+		}
+		else if (IsMemoryIntensiveOperator(node, context->plannedStmt))
 		{
 			context->numMemIntensiveOperators++;
 		}
@@ -418,14 +795,19 @@ static bool PolicyAutoAssignWalker(Node *node, PolicyAutoContext *context)
 		/**
 		 * If the operator is not a memory intensive operator, give it fixed amount of memory.
 		 */
-		if (!IsMemoryIntensiveOperator(node, context->plannedStmt))
+		if (IsParquetScanOperator(node, context->plannedStmt) || IsParquetInsertOperator(node, context->plannedStmt))
+		{
+			/* do nothing as we already assigned the memory to the operator */
+		}
+		else if (!IsMemoryIntensiveOperator(node, context->plannedStmt))
 		{
 			planNode->operatorMemKB = nonMemIntenseOpMemKB;
 		}
 		else
 		{
 			planNode->operatorMemKB = (uint64) ( (double) context->queryMemKB 
-					- (double) context->numNonMemIntensiveOperators * nonMemIntenseOpMemKB) 
+					- (double) context->numNonMemIntensiveOperators * nonMemIntenseOpMemKB
+					- (double) context->parquetOpReservedMemKB)
 					/ context->numMemIntensiveOperators;
 		}
 
@@ -451,17 +833,34 @@ static bool PolicyAutoAssignWalker(Node *node, PolicyAutoContext *context)
 	 ctx.queryMemKB = (uint64) (memAvailableBytes / 1024);
 	 ctx.numMemIntensiveOperators = 0;
 	 ctx.numNonMemIntensiveOperators = 0;
+	 ctx.parquetOpReservedMemKB = 0;
 	 ctx.plannedStmt = stmt;
 	 
+	 /* If it is a planner's plan for parquet insert, we need to reserve
+	  * the memory before traversing the plan nodes. Because unlike ORCA,
+	  * insert is not in the plan nodes. So we compute the memory required
+	  * for parquet table insert and subtract it from the available query memory.
+	  */
+	 if (PLANGEN_PLANNER == stmt->planGen && CMD_INSERT == stmt->commandType)
+	 {
+		 uint64 memRequiredForParquetInsert = MemoryReservedForParquetInsertForPlannerPlan(stmt);
+		 uint64 memRequiredForParquetInsertKB = (uint64) ( (double) memRequiredForParquetInsert / 1024);
+		 if (ctx.queryMemKB <= memRequiredForParquetInsertKB)
+		 {
+			 elog(ERROR, ERRMSG_GP_INSUFFICIENT_STATEMENT_MEMORY);
+		 }
+		 ctx.queryMemKB -= memRequiredForParquetInsertKB;
+	 }
+
+
 #ifdef USE_ASSERT_CHECKING
 	 bool result = 
 #endif
 			 PolicyAutoPrelimWalker((Node *) stmt->planTree, &ctx);
 	 
 	 Assert(!result);
-	 Assert(ctx.numMemIntensiveOperators + ctx.numNonMemIntensiveOperators > 0);
 	 
-	 if (ctx.queryMemKB <= ctx.numNonMemIntensiveOperators * gp_resqueue_memory_policy_auto_fixed_mem)
+	 if (ctx.queryMemKB <= ctx.numNonMemIntensiveOperators * gp_resqueue_memory_policy_auto_fixed_mem + ctx.parquetOpReservedMemKB)
 	 {
 		 elog(ERROR, ERRMSG_GP_INSUFFICIENT_STATEMENT_MEMORY);
 	 }
@@ -490,6 +889,7 @@ static bool PolicyAutoAssignWalker(Node *node, PolicyAutoContext *context)
 	 ctx.queryMemKB = (uint64) (stmt->query_mem / 1024);
 	 ctx.numMemIntensiveOperators = 0;
 	 ctx.numNonMemIntensiveOperators = 0;
+	 ctx.parquetOpReservedMemKB = 0;
 	 ctx.plannedStmt = stmt;
 	 
 #ifdef USE_ASSERT_CHECKING
@@ -505,7 +905,8 @@ static bool PolicyAutoAssignWalker(Node *node, PolicyAutoContext *context)
 	  * TODO: Siva - employ binary search to find the right value.
 	  */
 	 uint64 requiredStatementMemKB = ctx.numNonMemIntensiveOperators * nonMemIntenseOpMemKB 
-			 + ctx.numMemIntensiveOperators * minOperatorMemKB;
+			 + ctx.numMemIntensiveOperators * minOperatorMemKB
+			 + ctx.parquetOpReservedMemKB;
 
 	 return requiredStatementMemKB;
  }
@@ -520,6 +921,7 @@ CreateOperatorGroupNode(uint32 groupId, OperatorGroupNode *parentGroup)
 	OperatorGroupNode *node = palloc0(sizeof(OperatorGroupNode));
 	node->groupId = groupId;
 	node->parentGroup = parentGroup;
+	node->parquetOpReservedMemKB = 0;
 
 	return node;
 }
@@ -535,7 +937,28 @@ IncrementOperatorCount(Node *node, OperatorGroupNode *groupNode, PlannedStmt *st
 	Assert(node != NULL);
 	Assert(groupNode != NULL);
 	
-	if (IsMemoryIntensiveOperator(node, stmt))
+	if (IsParquetScanOperator(node, stmt))
+	{
+		uint64 memResevedForParquetScan = MemoryReservedForParquetScan(node, stmt);
+		uint64 memResevedForParquetScanKB = (uint64) ((double) memResevedForParquetScan / 1024);
+		groupNode->parquetOpReservedMemKB += memResevedForParquetScanKB;
+		/* Assign the memory required to the operator so we do not need to compute it again */
+		Plan *planNode = (Plan *) node;
+		planNode->operatorMemKB = memResevedForParquetScanKB;
+
+	}
+	else if (IsParquetInsertOperator(node, stmt))
+	{
+		/* get memory required for parquet table insert */
+		Oid rel_oid = getrelid(((Scan *) node)->scanrelid, stmt->rtable);
+		uint64 memResevedForParquetInsert = MemoryReservedForParquetInsert(rel_oid);
+		uint64 memResevedForParquetInsertKB = (uint64) ( (double) memResevedForParquetInsert / 1024);
+		groupNode->parquetOpReservedMemKB += memResevedForParquetInsertKB;
+		/* Assign the memory required to the operator so we do not need to compute it again */
+		Plan *planNode = (Plan *) node;
+		planNode->operatorMemKB = memResevedForParquetInsertKB;
+	}
+	else if (IsMemoryIntensiveOperator(node, stmt))
 	{
 		groupNode->numMemIntenseOps++;
 	}
@@ -583,7 +1006,6 @@ CreateOperatorGroupForOperator(Node *node,
 		context->groupTree->groupMemKB = context->queryMemKB;
 		context->nextGroupId++;
 	}
-
 	/*
 	 * If this node is a potential root of an operator group, this means that
 	 * the current group ends, and a new group starts. we create a new operator
@@ -758,8 +1180,9 @@ ComputeAvgMemKBForMemIntenseOp(OperatorGroupNode *groupNode)
 	
 	const uint64 nonMemIntenseOpMemKB = (uint64)gp_resqueue_memory_policy_auto_fixed_mem;
 
-	return (((double)groupNode->groupMemKB -
-			 (double)groupNode->numNonMemIntenseOps * nonMemIntenseOpMemKB) /
+	return (((double)groupNode->groupMemKB
+			 - (double)groupNode->numNonMemIntenseOps * nonMemIntenseOpMemKB
+			 - (double) groupNode->parquetOpReservedMemKB ) /
 			groupNode->numMemIntenseOps);
 }
 
@@ -803,7 +1226,8 @@ ComputeMemLimitForChildGroups(OperatorGroupNode *parentGroupNode)
 		
 		Assert(childGroup->groupMemKB == 0);
 		
-		if (parentGroupNode->groupMemKB < totalNumNonMemIntenseOps * nonMemIntenseOpMemKB)
+		if (parentGroupNode->groupMemKB < totalNumNonMemIntenseOps * nonMemIntenseOpMemKB
+											+ parentGroupNode->parquetOpReservedMemKB)
 		{
 			ereport(ERROR,
 					(errcode(ERRCODE_INSUFFICIENT_RESOURCES),
@@ -814,21 +1238,32 @@ ComputeMemLimitForChildGroups(OperatorGroupNode *parentGroupNode)
 		if (totalNumMemIntenseOps > 0)
 		{
 			memIntenseOpMemKB =
-				((double)(parentGroupNode->groupMemKB -
-						  totalNumNonMemIntenseOps * nonMemIntenseOpMemKB)) /
+				((double)(parentGroupNode->groupMemKB
+						  - totalNumNonMemIntenseOps * nonMemIntenseOpMemKB
+						  - parentGroupNode->parquetOpReservedMemKB)) /
 				((double)totalNumMemIntenseOps);
 		}
 
 		Assert(parentGroupNode->groupMemKB > 0);
-		
-		double scaleFactor =
-			((double)(memIntenseOpMemKB * 
-					  Max(childGroup->maxNumConcMemIntenseOps, childGroup->numMemIntenseOps) +
-					  nonMemIntenseOpMemKB * 
-					  Max(childGroup->maxNumConcNonMemIntenseOps, childGroup->numNonMemIntenseOps))) /
-			((double)parentGroupNode->groupMemKB);
-		
-		childGroup->groupMemKB = (uint64) (parentGroupNode->groupMemKB * scaleFactor);
+
+		/* 
+		 * MPP-23130
+		 * In memory policy eager free, scaleFactor is used to balance memory allocated to
+		 * each child group based on the number of memory-intensive and non-memory-intensive
+		 * operators they have. The calculation of scaleFactor is as follows:
+		 * scaleFactor = (memIntensiveOpMem *
+		 *               Max(childGroup->maxNumConcMemIntenseOps, childGroup->numMemIntenseOps)
+		 *              + nonMemIntenseOpMemKB *
+		 *               Max(childGroup->maxNumConcNonMemIntenseOps, childGroup->numNonMemIntenseOps))
+		 *               / parentGroupNode->groupMemKB
+		 * Child group's memory: childGroup->groupMemKB = scaleFactor * parentGroupNode->groupMemKB,
+		 * which is the denominator of the scaleFactor formula.
+		 */ 	
+		childGroup->groupMemKB  = (uint64) (memIntenseOpMemKB *
+					           Max(childGroup->maxNumConcMemIntenseOps, childGroup->numMemIntenseOps) +
+					           nonMemIntenseOpMemKB * 
+					           Max(childGroup->maxNumConcNonMemIntenseOps, childGroup->numNonMemIntenseOps) +
+					           childGroup->parquetOpReservedMemKB);
 	}
 }
 
@@ -891,7 +1326,7 @@ PolicyEagerFreePrelimWalker(Node *node, PolicyEagerFreeContext *context)
 			
 		uint64 maxNumConcNonMemIntenseOps = 0;
 		uint64 maxNumConcMemIntenseOps = 0;
-			
+		uint64 childrenParquetOpReservedMem = 0;	
 		ListCell *lc;
 		foreach(lc, context->groupNode->childGroups)
 		{
@@ -900,13 +1335,14 @@ PolicyEagerFreePrelimWalker(Node *node, PolicyEagerFreeContext *context)
 				Max(childGroup->maxNumConcNonMemIntenseOps, childGroup->numNonMemIntenseOps);
 			maxNumConcMemIntenseOps +=
 				Max(childGroup->maxNumConcMemIntenseOps, childGroup->numMemIntenseOps);
+			childrenParquetOpReservedMem += childGroup->parquetOpReservedMemKB;
 		}
 		
 		Assert(context->groupNode->maxNumConcNonMemIntenseOps == 0 &&
 			   context->groupNode->maxNumConcMemIntenseOps == 0);
 		context->groupNode->maxNumConcNonMemIntenseOps = maxNumConcNonMemIntenseOps;
 		context->groupNode->maxNumConcMemIntenseOps = maxNumConcMemIntenseOps;
-		
+		context->groupNode->parquetOpReservedMemKB += childrenParquetOpReservedMem;
 		/* Reset the groupNode to point to its parentGroupNode */
 		context->groupNode = GetParentOperatorGroup(context->groupNode);
 	}
@@ -948,7 +1384,11 @@ PolicyEagerFreeAssignWalker(Node *node, PolicyEagerFreeContext *context)
 			ComputeMemLimitForChildGroups(GetParentOperatorGroup(context->groupNode));
 		}
 
-		if (!IsMemoryIntensiveOperator(node, context->plannedStmt))
+		if (IsParquetScanOperator(node, context->plannedStmt) || IsParquetInsertOperator(node, context->plannedStmt))
+		{
+			/* do nothing as we already assigned the memory to the operator */
+		}
+		else if (!IsMemoryIntensiveOperator(node, context->plannedStmt))
 		{
 			planNode->operatorMemKB = nonMemIntenseOpMemKB;
 		}
@@ -1018,6 +1458,22 @@ PolicyEagerFreeAssignOperatorMemoryKB(PlannedStmt *stmt, uint64 memAvailableByte
 	ctx.queryMemKB = memAvailableBytes / 1024;
 	ctx.plannedStmt = stmt;
 
+	/* If it is a planner's plan for parquet insert, we need to reserve
+	 * the memory before traverse the plan nodes. Because unlike ORCA,
+	 * insert is not in the plan nodes. So we compute the memory required
+	 * for parquet table insert and subtract it from the available query memory.
+	*/
+	if (PLANGEN_PLANNER == stmt->planGen && CMD_INSERT == stmt->commandType)
+	{
+		uint64 memRequiredForParquetInsert = MemoryReservedForParquetInsertForPlannerPlan(stmt);
+		uint64 memRequiredForParquetInsertKB = (uint64) ( (double) memRequiredForParquetInsert / 1024);
+		 if (ctx.queryMemKB <= memRequiredForParquetInsertKB)
+		 {
+			 elog(ERROR, ERRMSG_GP_INSUFFICIENT_STATEMENT_MEMORY);
+		 }
+		 ctx.queryMemKB -= memRequiredForParquetInsertKB;
+	}
+
 #ifdef USE_ASSERT_CHECKING
 	bool result = 
 #endif
@@ -1031,6 +1487,18 @@ PolicyEagerFreeAssignOperatorMemoryKB(PlannedStmt *stmt, uint64 memAvailableByte
 	 */
 	ctx.groupNode = NULL;
 	ctx.nextGroupId = 0;
+
+	/*
+	 * Check if memory exceeds the limit in the root group
+	 */
+	const uint64 nonMemIntenseOpMemKB = (uint64)gp_resqueue_memory_policy_auto_fixed_mem;
+	if (ctx.groupTree->groupMemKB < ctx.groupTree->numNonMemIntenseOps * nonMemIntenseOpMemKB
+									+ ctx.groupTree->parquetOpReservedMemKB)
+	{
+		ereport(ERROR,
+			(errcode(ERRCODE_INSUFFICIENT_RESOURCES),
+			errmsg("insufficient memory reserved for statement")));
+	}
 
 #ifdef USE_ASSERT_CHECKING
 	result = 

@@ -147,4 +147,11 @@ extern Oid parquet_insert_values(
 extern void parquet_insert_finish(
 		ParquetInsertDesc parquetInsertDesc);
 
+extern uint64 memReservedForParquetInsert(
+		Oid rel_oid);
+
+extern uint64 memReservedForParquetScan(
+		Oid rel_oid,
+		List* attr_list);
+
 #endif /* CDBPARQUETAM_H_ */
