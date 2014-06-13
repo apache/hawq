@@ -3656,16 +3656,29 @@ void ATVerifyObject(AlterTableStmt *stmt, Relation rel)
 	/*
 	 * Check the ALTER command type is supported for this object
 	 */
-	if (RelationIsParquet(rel))
+	/*
+	 * Check whether the relation or its sub partition table is parquet table, if yes,
+	 * check whether the command is supported
+	 */
+	List *children = find_all_inheritors(RelationGetRelid(rel));
+	ListCell *lc;
+	foreach(lc, children)
 	{
-		ListCell *lcmd;
+		Oid relid = lfirst_oid(lc);
+		Relation crel;
+		if (relid == RelationGetRelid(rel))
+			crel = rel;
+		else
+			crel = heap_open(relid, AccessShareLock);
 
-		foreach(lcmd, stmt->cmds)
-		{
-			AlterTableCmd *cmd = (AlterTableCmd *) lfirst(lcmd);
+		if (RelationIsParquet(crel)) {
+			ListCell *lcmd;
 
-			switch(cmd->subtype)
+			foreach(lcmd, stmt->cmds)
 			{
+				AlterTableCmd *cmd = (AlterTableCmd *) lfirst(lcmd);
+
+				switch (cmd->subtype) {
 				/* FOREIGN and EXTERNAL tables doesn't support the following AT */
 				case AT_AddColumn:
 				case AT_AddColumnRecurse:
@@ -3689,15 +3702,22 @@ void ATVerifyObject(AlterTableStmt *stmt, Relation rel)
 				case AT_DisableTrigUser:
 					ereport(ERROR,
 							(errcode(ERRCODE_INVALID_COLUMN_DEFINITION),
-							 errmsg("Unsupported ALTER command for table type parquet"),
-							 errOmitLocation(true)));
+									errmsg("Unsupported ALTER command for parquet table \"%s\"",
+									NameStr(crel->rd_rel->relname)),
+									errOmitLocation(true)));
 					break;
 				default:
 					/* ALTER type supported */
 					break;
+				}
 			}
 		}
+
+		/*close sub partition table*/
+		if (relid != RelationGetRelid(rel))
+			heap_close(crel, AccessShareLock);
 	}
+	list_free(children);
 }
 
 /*
