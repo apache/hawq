@@ -44,6 +44,13 @@ HA -->
 
 	<!-- RPC client configuration -->
 	<property>
+		<name>rpc.client.timeout</name>
+		<value>3600000</value>
+		<description>
+		timeout interval of a RPC invocation in millisecond. default is 3600000.
+		</description>
+	</property>
+	<property>
 		<name>rpc.client.connect.tcpnodelay</name>
 		<value>true</value>
 		<description>
@@ -235,7 +242,7 @@ HA -->
 		<name>output.default.write.retry</name>
 		<value>10</value>
 		<description>
-		the max retry times when the client fail to setup the pipeline.
+		the max retry times when the client fail to setup the pipeline. default is 10.
 		</description>
 	</property>
 	

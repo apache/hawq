@@ -26,7 +26,7 @@
       <dependency org="OpenLDAP"        name="openldap"        rev="2.3.38"         conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
       <dependency org="OpenSSL"         name="openssl"         rev="0.9.8u"         conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
       <dependency org="PROJ.4"          name="proj"            rev="4.7.0"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
-      <dependency org="Pivotal"         name="libhdfs3"        rev="2.2.18"         conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
+      <dependency org="Pivotal"         name="libhdfs3"        rev="2.2.19"         conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
       <dependency org="Pivotal"         name="libbm"           rev="1.0.1"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
       <dependency org="PyYAML"          name="yaml"            rev="0.1.1"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
       <dependency org="Python"          name="python"          rev="2.6.2"          conf="osx106_x86->osx106_x86;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64;sol10_x86_64->sol10_x86_64" />
