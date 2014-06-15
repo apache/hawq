@@ -68,7 +68,6 @@ cat <<-EOF
 	PADS_VERSION ..... : ${PADS_VERSION}
 	PADS_TAR ......... : ${PADS_TAR}
 	PADS_BIN_TAR ..... : ${PADS_BIN_TAR}
-EOF
 
 ----------------------------------------------------------------------
 Creating tarball: ${PADS_TAR}
