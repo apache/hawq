@@ -2,14 +2,14 @@ ROOT = ../..
 
 COMPONENTS = \
 			 pxf-api \
-			 pxf-core \
+			 pxf-service \
 			 pxf-hbase \
 			 pxf-hdfs \
 			 pxf-hive \
 			 stack \
 			 tcserver \
 
-ARTIFACTS = $(ROOT)/artifacts
+ARTIFACTS = ../../../../build/distributions
 DISTSVR_FETCH = $(ROOT)/tools/fetchBuild.sh
 
 TCSERVER_VERSION=2.9.5/vfabric-tc-server-standard-2.9.5.SR1.tar.gz
@@ -24,6 +24,9 @@ PHD_VERSION = undefined
 
 .PHONY: all
 all: $(TARGET)
+
+.PHONY: pxf-only
+pxf-only: $(patsubst %, %.fetched, $(filter pxf-%, $(COMPONENTS)))
 
 .PHONY: clean
 clean:

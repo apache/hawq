@@ -6,10 +6,10 @@
 #include "utils/builtins.h"
 
 /*
- * Path constants for accessing GPFX.
- * All PXF's resources are under /GPDB_REST_PREFIX/PXF_VERSION/...
+ * Path constants for accessing PXF.
+ * All PXF's resources are under /PXF_SERVICE_PREFIX/PXF_VERSION/...
  */
-#define GPDB_REST_PREFIX "gpdb"
+#define PXF_SERVICE_PREFIX "pxf"
 #define PXF_VERSION "v10" /* PXF version */
 
 /* Issue a deprecation warning when parsing a

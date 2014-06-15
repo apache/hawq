@@ -115,10 +115,10 @@
 		</copy>
 	</target>
 
-	<target name="compile-resources" depends="compile" description="compile resources">
+	<target name="compile-resources" depends="ivy-retrieve" description="compile resources">
 		<mkdir dir="${build.dir}/regression/resources-classes" />
 		
-		<!-- compile the core gpdhfs connector source -->
+		<!-- compile the regression resources -->
 		<javac classpathref="library.commons.classpath" destdir="${build.dir}/regression/resources-classes" includeantruntime="${compiler.includeantruntime}" debug="${compiler.debug}" fork="yes" verbose="${compiler.verbose}" memoryMaximumSize="${compiler.max.memory}">
 			<compilerarg line="-Werror -Xlint:unchecked -Xlint:deprecation -Xlint:finally -Xlint:fallthrough -Xlint:-path" />
 			<src path="${src.dir}/resources" />
@@ -135,6 +135,8 @@
 				<attribute name="Class-Path" value="${env.GPHD_ROOT}/pxf/*"/>
 			</manifest>
 			<fileset dir="${build.dir}/regression/resources-classes"/>
+			<fileset dir="${src.dir}/resources" includes="**/*.class"/>
+			<fileset dir="${src.dir}/resources" includes="**/*.avsc"/>
 		</jar>
 		
 	</target>

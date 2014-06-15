@@ -97,8 +97,22 @@ echo "----------------------------------------------------------------------"
 ##
 
 pushd ${BLDWRAP_TOP}/src/pxf
+
+## Compile and copy regression resources to $GPHD_ROOT/pxf
+make regression-resources
+$GPHD_ROOT/bin/stop-pxf.sh
+sleep 2s
+$GPHD_ROOT/bin/start-pxf.sh
+
+if [ ! -f $GPHD_ROOT/pxf/regression-test.jar ]; then
+	echo WARNING: GPHD_ROOT/pxf/regression-test.jar doesnt exist
+	echo GPHD_ROOT := $GPHD_ROOT
+fi
+
+## run the regressions
 make regressions
 PXF_REGRESSION_STATUS=$?
+
 popd
 
 ##

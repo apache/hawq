@@ -26,7 +26,7 @@ instance_template=bio
 instance_root=$PXF_STORAGE_ROOT/pxf$nodeid
 instance_name=pxf-service-$nodeid
 
-function doinit()
+function createInstance()
 {
 	instance_port=5120${nodeid}
 	create_options="\
@@ -35,7 +35,49 @@ function doinit()
 	--instance-directory $instance_root"
 
 	mkdir -p $instance_root
-	$TCSERVER_ROOT/tcruntime-instance.sh create $create_options $instance_name
+	$TCSERVER_ROOT/tcruntime-instance.sh create $create_options $instance_name > /dev/null
+
+	if [ $? -gt 0 ]; then
+		echo instance creation failed
+		return 1
+	fi
+}
+
+function configureInstance()
+{
+	serverXml=$instance_root/$instance_name/conf/server.xml
+	cat $serverXml | \
+	sed "/^[[:blank:]]*maxKeepAliveRequests=.*$/ a\\
+	maxHeaderCount=\"10000\"\\
+	maxHttpHeaderSize=\"65536\"
+	" > ${serverXml}.tmp
+
+	rm $serverXml
+	mv ${serverXml}.tmp $serverXml
+}
+
+function deployWebapp()
+{
+    cp $GPHD_ROOT/pxf/pxf.war $instance_root/$instance_name/webapps/
+    cp $GPHD_ROOT/pxf/pxf-service-*[0-9].jar $instance_root/$instance_name/lib/
+
+	pushd $instance_root/$instance_name/webapps
+	mkdir pxf
+	cd pxf
+	unzip ../pxf.war
+	popd
+
+	context_file=$instance_root/$instance_name/webapps/pxf/META-INF/context.xml
+	cat $context_file | \
+	sed "s/classpathFiles=\"[a-zA-Z0-9\/\;-]*\"/classpathFiles=\"pxf\/conf\/pxf-classpath\"/" > context.xml.tmp
+	mv context.xml.tmp $context_file
+}
+
+function doinit()
+{
+	createInstance || return 1
+	configureInstance || return 1
+	deployWebapp || return 1
 }
 
 function docommand()
@@ -53,6 +95,10 @@ case "$command" in
 		;;
 	"stop" )
 		docommand $command
+		;;
+	"restart" )
+		docommand stop
+		docommand start
 		;;
 	* )
 		;;

@@ -39,6 +39,24 @@ else
 	exit 2
 fi
 
+wget -nv http://build-prod.dh.greenplum.com/releases/tcServer/2.9.5/vfabric-tc-server-standard-2.9.5.SR1.tar.gz
+ls vfabric-tc-server-standard*.tar.gz > /dev/null
+if [ $? = 0 ]; then
+	TCSERVER_TARBALL=$( ls vfabric-tc-server-standard*.tar.gz )
+else
+	echo "Failed downloading tcServer tarball."
+	exit 2
+fi
+
+wget -nv http://build-prod.dh.greenplum.com/releases/tcServer/2.9.5/vfabric-tc-server-standard-2.9.5-SR1.noarch.rpm
+ls vfabric-tc-server-standard*.rpm > /dev/null
+if [ $? = 0 ]; then
+	TCSERVER_RPM=$( ls vfabric-tc-server-standard*.rpm )
+else
+	echo "Failed downloading tcServer rpm."
+	exit 2
+fi
+
 PADS_VERSION=$( echo ${HAWQ_RPM} | sed -e 's/hawq-\([0-9]\.[0-9]\.[0-9]\.[0-9]\).*/\1/' )
 
 PADS_TAR=PADS-${PADS_VERSION}-${BUILD_NUMBER}.tar.gz
@@ -62,7 +80,7 @@ rm -rf PADS-${PADS_VERSION}-${BUILD_NUMBER}
 
 mkdir PADS-${PADS_VERSION}-${BUILD_NUMBER}
 
-cp ${HAWQ_RPM} ${PXF_RPM} PADS-${PADS_VERSION}-${BUILD_NUMBER}
+cp ${HAWQ_RPM} ${PXF_RPM} ${TCSERVER_RPM} PADS-${PADS_VERSION}-${BUILD_NUMBER}
 
 tar zcvf ../${PADS_TAR} PADS-${PADS_VERSION}-${BUILD_NUMBER}
 if [ $? != 0 ]; then
@@ -80,7 +98,7 @@ Creating tarball: ${PADS_BIN_TAR}
 
 EOF
 
-cp ${HAWQ_TARBALL} ${PXF_TARBALL} PADS-${PADS_VERSION}-${BUILD_NUMBER}
+cp ${HAWQ_TARBALL} ${PXF_TARBALL} ${TCSERVER_TARBALL} PADS-${PADS_VERSION}-${BUILD_NUMBER}
 
 tar zcvf ../${PADS_BIN_TAR} PADS-${PADS_VERSION}-${BUILD_NUMBER}
 if [ $? != 0 ]; then

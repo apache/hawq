@@ -10,7 +10,6 @@ import static com.pivotal.pxf.plugins.hdfs.utilities.DataSchemaException.Message
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.io.Writable;
-import java.io.FileNotFoundException;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -210,7 +209,7 @@ public class WritableResolver extends Plugin implements ReadResolver, WriteResol
      * or for the case schema resource is a Java class. in which case we try to reflect the class name.
      */
     private boolean isSchemaOnClasspath(String resource) {
-        if (this.getClass().getClassLoader().getResource(resource) != null) {
+        if (this.getClass().getClassLoader().getResource("/" + resource) != null) {
             return true;
         }
 
