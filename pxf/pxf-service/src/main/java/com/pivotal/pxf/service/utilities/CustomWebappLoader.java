@@ -1,22 +1,19 @@
 package com.pivotal.pxf.service.utilities;
 
-import org.apache.catalina.LifecycleException;
-import org.apache.catalina.loader.WebappLoader;
-import org.apache.juli.logging.Log;
-import org.apache.juli.logging.LogFactory;
-
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 
-import static java.nio.file.Files.newDirectoryStream;
-import static java.nio.file.Files.readAllBytes;
-import static java.nio.file.Paths.get;
+import org.apache.catalina.LifecycleException;
+import org.apache.catalina.loader.WebappLoader;
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
 
 /**
  * A WebappLoader that allows a customized classpath to be added through configuration in context xml.
@@ -30,18 +27,29 @@ import static java.nio.file.Paths.get;
  * </pre>
  */
 public class CustomWebappLoader extends WebappLoader {
+	
+	/**
+	 * Because this class belongs in tcServer itself, logs go into tcServer's log facility that is separate 
+	 * from the web app's log facility.
+	 * 
+	 * Logs are directed to catalina.log file. By default only INFO or higher messages are logged.
+	 * To change log level, add the following line to {catalina.base}/conf/logging.properties  
+	 * <code>com.pivotal.pxf.level = FINE/INFO/WARNING</code> (FINE = debug).
+	 */
 	private static final Log LOG = LogFactory.getLog(CustomWebappLoader.class);
 
 	/**
 	 * Classpath files containing path entries, separated by new line.
+	 * Globbing is supported for the file name.
 	 * e.g:
 	 * somedir
 	 * anotherdir/somejar.jar
 	 * anotherone/hadoop*.jar
 	 * anotherone/pxf*[0-9].jar
 	 * Unix wildcard convention can be used to match a number of files 
-	 * (e.g. <code>*</code>, <code>[0-9]</code>). 
-	 * These files must exist - if they can't be read an exception will be thrown.
+	 * (e.g. <code>*</code>, <code>[0-9]</code>, <code>?</code>), but not a number of directories.
+	 * 
+	 * The files specified under classpathFiles must exist - if they can't be read an exception will be thrown.
 	 */
 	private String classpathFiles;
 	/**
@@ -103,7 +111,7 @@ public class CustomWebappLoader extends WebappLoader {
 			
 			String classpath = readClasspathFile(classpathFile, throwException);
 			if (classpath == null) {
-				continue;
+				continue;	
 			}
 			
 			ArrayList<String> classpathEntries = trimEntries(classpath.split("[\\r\\n]+"));
@@ -112,25 +120,26 @@ public class CustomWebappLoader extends WebappLoader {
 			for (String entry : classpathEntries) {
 				LOG.debug("Trying to load entry " + entry);
 				int repositoriesCount = 0;
-				// TODO: change to general globbing, not just '*'.
-				if (entry.contains("*")) {
-					try (DirectoryStream<Path> repositories = newDirectoryStream(Paths.get(entry).getParent(),
-							Paths.get(entry).getFileName().toString())) { 
-						for (Path repository : repositories) {
-							if (addPathToRepository(repository, entry)) {
-								repositoriesCount++;
-							}
+				Path pathEntry = Paths.get(entry);
+				/*
+				 * For each entry, we look at the parent directory and try to match each of the files 
+				 * inside it to the file name or pattern in the file name (the last part of the path).
+				 * E.g., for path '/some/path/with/pattern*', the parent directory will be '/some/path/with/'
+				 * and the file name will be 'pattern*'. Each file under that directory matching 
+				 * this pattern will be added to the class loader repository. 
+				 */
+				try (DirectoryStream<Path> repositories = Files.newDirectoryStream(pathEntry.getParent(),
+						pathEntry.getFileName().toString())) { 
+					for (Path repository : repositories) {
+						if (addPathToRepository(repository, entry)) {
+							repositoriesCount++;
 						}
-					} catch (IOException e) {
-						LOG.warn("Failed to load entry " + entry + ": " + e);
-					} 
-					if (repositoriesCount == 0) {
-						LOG.warn("Entry " + entry + " doesn't match any files");
 					}
-				} else {
-					if (addPathToRepository(Paths.get(entry), entry)) {
-						repositoriesCount++;
-					}
+				} catch (IOException e) {
+					LOG.warn("Failed to load entry " + entry + ": " + e);
+				} 
+				if (repositoriesCount == 0) {
+					LOG.warn("Entry " + entry + " doesn't match any files");
 				}
 				LOG.debug("Loaded " + repositoriesCount + " repositories from entry " + entry);
 			}
@@ -141,7 +150,7 @@ public class CustomWebappLoader extends WebappLoader {
 		String classpath = null;
 		try {
 			LOG.info("Trying to read classpath file " + classpathFile);
-			classpath = new String(readAllBytes(get(classpathFile)));
+			classpath = new String(Files.readAllBytes(Paths.get(classpathFile)));
 		} catch (IOException ioe) {
 			LOG.warn("Failed to read classpath file: " + ioe);
 			if (throwException) {
@@ -179,7 +188,6 @@ public class CustomWebappLoader extends WebappLoader {
 	}
 	
 	private boolean addPathToRepository(Path path, String entry) {
-		boolean status = false;
 		
 		try {
 			URI pathUri = path.toUri();
@@ -190,12 +198,12 @@ public class CustomWebappLoader extends WebappLoader {
 			}
 			addRepository(pathUriStr);
 			LOG.debug("Repository " + pathUriStr + " added from entry " + entry);
-			status = true;
+			return true;
 		} catch (Exception e) {
 			LOG.warn("Failed to load path " + path + " to repository: " + e);
 		}
-		
-		return status;
+
+		return false;
 	}
 	
 }

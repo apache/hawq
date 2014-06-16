@@ -4,3 +4,5 @@
 /jsystem.properties.bu
 /runnerState.properties
 /.testdir.tmp
+/jsystem*.log.*
+/junit*.properties

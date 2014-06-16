@@ -7,9 +7,10 @@ import com.pivotal.pxf.api.io.DataType;
 import com.pivotal.pxf.service.io.BufferWritable;
 import com.pivotal.pxf.service.io.GPDBWritable;
 import com.pivotal.pxf.service.io.GPDBWritable.TypeMismatchException;
-import com.pivotal.pxf.service.io.Writable;
 import com.pivotal.pxf.service.io.Text;
+import com.pivotal.pxf.service.io.Writable;
 import com.pivotal.pxf.service.utilities.ProtocolData;
+
 import org.apache.commons.lang.ObjectUtils;
 
 import java.lang.reflect.Array;
