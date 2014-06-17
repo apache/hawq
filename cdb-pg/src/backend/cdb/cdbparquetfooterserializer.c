@@ -1363,7 +1363,10 @@ freeField(struct FileField_4C *field) {
 		pfree(field->name);
 	if (field->pathInSchema != NULL)
 		pfree(field->pathInSchema);
-	for (int i = 0; i < field->num_children; i++) {
-		freeField(&(field->children[i]));
+	if (field->num_children > 0){
+		for (int i = 0; i < field->num_children; i++) {
+			freeField(&(field->children[i]));
+		}
+		pfree(field->children);
 	}
 }

@@ -1662,6 +1662,7 @@ encodeCurrentPage(ParquetColumnChunk chunk)
 							   BitPack_Data(current_page->bool_values),
 							   BitPack_Size(current_page->bool_values));
 
+		pfree(current_page->bool_values->buffer);
 		pfree(current_page->bool_values);
 	}
 	else
@@ -2050,11 +2051,14 @@ appendValueForFields(struct FileField_4C *field,
 													0, field->d);
 			break;
 		case HAWQ_TYPE_PATH:
-			bytes_added += appendParquetColumn_Path(columnChunks,
-													colIndex,
-													DatumGetPathP(value),
-													0, field->d);
+		{
+			PATH *path = DatumGetPathP(value);
+			bytes_added += appendParquetColumn_Path(columnChunks, colIndex,
+					path, 0, field->d);
+			if(VARATT_IS_EXTENDED((struct varlena *) DatumGetPointer(value)))
+				pfree(path);
 			break;
+		}
 		case HAWQ_TYPE_BOX:
 			bytes_added += appendParquetColumn_Box(columnChunks,
 												   colIndex,
@@ -2062,11 +2066,16 @@ appendValueForFields(struct FileField_4C *field,
 												   0, field->d);
 			break;
 		case HAWQ_TYPE_POLYGON:
+		{
+			POLYGON *polygon = DatumGetPolygonP(value);
 			bytes_added += appendParquetColumn_Polygon(columnChunks,
 													   colIndex,
-													   DatumGetPolygonP(value),
+													   polygon,
 													   0, field->d);
+			if(VARATT_IS_EXTENDED((struct varlena *) DatumGetPointer(value)))
+				pfree(polygon);
 			break;
+		}
 		case HAWQ_TYPE_CIRCLE:
 			bytes_added += appendParquetColumn_Circle(columnChunks,
 													  colIndex,
