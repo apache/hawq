@@ -6084,7 +6084,7 @@ CopyGetAttnums(TupleDesc tupDesc, Relation rel, List *attnamelist)
 }
 
 #define COPY_FIND_MD_DELIM \
-md_delim = memchr(line_start, COPY_METADATA_DELIM, 32); \
+md_delim = memchr(line_start, COPY_METADATA_DELIM, Min(32, cstate->line_buf.len)); \
 if(md_delim && (md_delim != line_start)) \
 { \
 	value_len = md_delim - line_start + 1; \
