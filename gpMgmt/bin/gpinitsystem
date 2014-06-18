@@ -2399,7 +2399,6 @@ LOG_MSG "[INFO]:-   to access the Greenplum scripts for this instance:" 1
 LOG_MSG "[INFO]:-   or, use -d ${MASTER_DIRECTORY}/${SEG_PREFIX}-1 option for the Greenplum scripts" 1
 LOG_MSG "[INFO]:-   Example gpstate -d ${MASTER_DIRECTORY}/${SEG_PREFIX}-1" 1
 LOG_MSG "[INFO]:-Script log file = $LOG_FILE" 1
-LOG_MSG "[INFO]:-To remove instance, run gpdeletesystem utility" 1
 if [ x"" != x"$STANDBY_HOSTNAME" ];then
 LOG_MSG "[INFO]:-Standby Master $STANDBY_HOSTNAME has been configured" 1
 LOG_MSG "[INFO]:-To activate the Standby Master Segment in the event of Master" 1
