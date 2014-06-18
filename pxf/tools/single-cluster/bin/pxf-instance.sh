@@ -19,16 +19,16 @@ root=`cd \`dirname $0\`/..;pwd`
 bin=$root/bin
 . $bin/gphd-env.sh
 
-# template used for PXF instaces
+# template used for PXF instances
 # TODO consider making this one public
 instance_template=bio
 
 instance_root=$PXF_STORAGE_ROOT/pxf$nodeid
 instance_name=pxf-service-$nodeid
+instance_port=5120$nodeid
 
 function createInstance()
 {
-	instance_port=5120${nodeid}
 	create_options="\
 	--template $instance_template \
 	--property ${instance_template}.http.port=$instance_port \
@@ -73,6 +73,41 @@ function deployWebapp()
 	mv context.xml.tmp $context_file
 }
 
+function checkWebapp()
+{
+	curl=`which curl`
+	attempts=0
+	max_attempts=300 # try to connect for 5 minutes
+	sleep_time=1 # sleep 1 second between attempts
+	
+	# wait until tomcat is up:
+	echo Waiting for tcServer to start...
+	until [[ "`curl --silent --connect-timeout 1 -I http://localhost:${instance_port} | grep 'Coyote'`" != "" 
+	   || "$attempts" -eq "$max_attempts" ]];
+	do
+        let attempts=attempts+1
+        echo "tcServer not responding, re-trying after ${sleep_time} second (attempt number ${attempts})"
+        sleep $sleep_time
+    done
+	if [[ "$attempts" -eq "$max_attempts" ]]; then
+		echo ERROR: cannot connect to tcServer after 5 minutes
+		return 1
+	fi
+	
+	# check if PXF webapp is up:
+	echo Checking if PXF webapp is up and running...
+	curlResponse=$($curl --silent "http://localhost:${instance_port}/pxf/v0")
+	expectedResponse="Wrong version v0, supported version is v[0-9]+"
+	
+	if [[ $curlResponse =~ $expectedResponse ]]; then
+		echo PXF webapp is up
+		return 0
+	fi
+	
+	echo ERROR: PXF webapp is inaccessible, check logs for more information
+	return 1
+}
+
 function doinit()
 {
 	createInstance || return 1
@@ -84,6 +119,13 @@ function docommand()
 {
 	command=$1
 	$TCSERVER_ROOT/tcruntime-ctl.sh $instance_name $command -n $instance_root -d $TCSERVER_ROOT
+	if [ $? -ne 0 ]; then
+		return 1
+	fi 
+	
+	if [ "$command" = "start" ]; then
+		checkWebapp || return 1
+	fi
 }
 
 case "$command" in
@@ -103,3 +145,5 @@ case "$command" in
 	* )
 		;;
 esac
+
+exit $?

@@ -19,8 +19,11 @@ class Version {
     final static String PXF_PROTOCOL_VERSION = "v11";
 }
 
-/*
+/**
  * Class for catching paths that are not defined by other resources.
+ * NOTE: This resource must be accessible without any security checks 
+ * as it is used to verify proper load of the PXF webapp.
+ *  
  * For each path, the version is compared to the current version PXF_VERSION.
  * The expected format of a path is "http://<host>:<port>/pxf/<version>/<rest of path>
  *
