@@ -2362,6 +2362,13 @@ primaryMirrorGetTempFilespacePath(void)
 	{
 		int	idx = (lastAllocateIdx + i) % numOfDirectories;
 
+		/*
+		 * Allocate an error temporary will cause segment startup failed, we
+		 * check it here to reduce the race condition.
+		 */
+		if (!TemporaryDirectoryIsOk((const char *) pmModuleState->tempFilespacePath[i]))
+			pmModuleState->tempFilespacePathHasError[idx] = true;
+
 		if (pmModuleState->tempFilespacePathHasError[idx])
 			continue;
 
