@@ -3,6 +3,13 @@
 # pxf-instance	start/stop/initialize the PXF instance
 #
 
+source /etc/gphd/pxf/conf/pxf-env.sh
+
+if [ ! -x $JAVA_HOME/bin/java ]; then
+    echo \$JAVA_HOME is invalid
+    exit 1
+fi
+
 pxf_user=pxf
 pxf_root=/usr/lib/gphd/pxf
 
@@ -10,7 +17,7 @@ instance_root=/var/gphd/pxf
 instance_name=pxf-service
 instance_template=bio
 instance_port=51200
-instance_owner=pxf:pxf
+instance_owner=pxf:hadoop
 
 tcserver_root=/opt/vmware/vfabric-tc-server-standard
 
@@ -88,7 +95,7 @@ function checkWebapp()
 
 function doInit()
 {
-	if [ -d $instance_root ]; then 
+	if [ -d $instance_root ]; then
 		echo instance already exists in $instance_root, existing...
 		return 1
 	fi

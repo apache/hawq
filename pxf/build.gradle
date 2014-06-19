@@ -122,7 +122,6 @@ project('pxf-service') {
         obsoletes('pxf-core')
         obsoletes('pxf-api')
 
-		preInstall file('src/scripts/pre-install.sh')
 		postInstall file('src/scripts/post-install.sh')
 
         from('src/main/resources/pxf-profiles-default.xml') {
@@ -139,6 +138,12 @@ project('pxf-service') {
         from('src/main/resources/custom-classpath') {
             fileType CONFIG | NOREPLACE
             into '/usr/lib/gphd/publicstage'
+        }
+
+        from('src/scripts/pxf-env.sh') {
+            fileMode 0755
+            fileType NOREPLACE
+            into "/etc/gphd/pxf-${project.version}/conf"
         }
 
         from('src/scripts/pxf-instance') {

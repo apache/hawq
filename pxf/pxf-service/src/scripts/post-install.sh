@@ -20,6 +20,3 @@ getent passwd $user > /dev/null || $useradd --comment "PXF service user" -M -r -
 
 # Add pxf user to vfabric group so it can control the instance
 getent group vfabric > /dev/null && $usermod -a -G vfabric $user
-
-# Generate the instance
-/etc/init.d/pxf-instance init
