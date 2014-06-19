@@ -146,7 +146,7 @@ project('pxf-service') {
             into "/etc/gphd/pxf-${project.version}/conf"
         }
 
-        from('src/scripts/pxf-instance') {
+        from('src/scripts/pxf-service') {
             fileMode 0755
             addParentDirs false
             into '/etc/init.d'

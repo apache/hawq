@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# pxf-instance	start/stop/initialize the PXF instance
+# pxf-service	start/stop/initialize the PXF instance
 #
 
 source /etc/gphd/pxf/conf/pxf-env.sh
