@@ -11,13 +11,16 @@
 
 static void writeIntLittleEndianOnOneByte	(CapacityByteWriter *out, uint32_t value);
 static void writeIntLittleEndianOnTwoBytes	(CapacityByteWriter *out, uint32_t value);
-static void writeIntLittleEndianOnThreeBytes(CapacityByteWriter *out, uint32_t value);
-static void writeIntLittleEndianOnFourBytes	(CapacityByteWriter *out, uint32_t value);
 
 static int readIntLittleEndianOnOneByte(uint8_t *in);
 static int readIntLittleEndianOnTwoBytes(uint8_t *in);
+
+#ifdef NOT_USED
+static void writeIntLittleEndianOnThreeBytes(CapacityByteWriter *out, uint32_t value);
+static void writeIntLittleEndianOnFourBytes	(CapacityByteWriter *out, uint32_t value);
 static int readIntLittleEndianOnThreeBytes(uint8_t *in);
 static int readIntLittleEndianOnFourBytes(uint8_t *in);
+#endif
 
 static int paddedByteCountFromBits(int bitLength);
 
@@ -117,12 +120,14 @@ writeIntLittleEndianPaddedOnBitWidth(CapacityByteWriter *writer, int value, int 
 	case 2:
 		writeIntLittleEndianOnTwoBytes(writer, value);
 		break;
+#ifdef NOT_USED
 	case 3:
 		writeIntLittleEndianOnThreeBytes(writer, value);
 		break;
 	case 4:
 		writeIntLittleEndianOnFourBytes(writer, value);
 		break;
+#endif
 	default:
 		/*ereport error*/
 		break;
@@ -141,12 +146,14 @@ readIntLittleEndianPaddedOnBitWidth(int bitWidth, uint8_t *in, int *val)
 	case 2:
 		*val = readIntLittleEndianOnTwoBytes(in);
 		break;
+#ifdef NOT_USED
 	case 3:
 		*val = readIntLittleEndianOnThreeBytes(in);
 		break;
 	case 4:
 		*val = readIntLittleEndianOnFourBytes(in);
 		break;
+#endif
 	default:
 		/* TODO raise error */
 		return -1;
@@ -167,6 +174,22 @@ writeIntLittleEndianOnTwoBytes(CapacityByteWriter *out, uint32_t value)
 	CapacityByteWriter_WriteSingle(out, (value >> 8) & 0xFF);
 }
 
+int
+readIntLittleEndianOnOneByte(uint8_t *in)
+{
+	int ch1 = (int) in[0];
+	return ch1;
+}
+
+int
+readIntLittleEndianOnTwoBytes(uint8_t *in)
+{
+	int ch1 = (int) in[0];
+	int ch2 = (int) in[1];
+	return ((ch2 << 8) + (ch1 << 0));
+}
+
+#ifdef NOT_USED
 void
 writeIntLittleEndianOnThreeBytes(CapacityByteWriter *out, uint32_t value)
 {
@@ -182,21 +205,6 @@ writeIntLittleEndianOnFourBytes(CapacityByteWriter *out, uint32_t value)
 	CapacityByteWriter_WriteSingle(out, (value >> 8) & 0xFF);
 	CapacityByteWriter_WriteSingle(out, (value >> 16) & 0xFF);
 	CapacityByteWriter_WriteSingle(out, (value >> 24) & 0xFF);
-}
-
-int
-readIntLittleEndianOnOneByte(uint8_t *in)
-{
-	int ch1 = (int) in[0];
-	return ch1;
-}
-
-int
-readIntLittleEndianOnTwoBytes(uint8_t *in)
-{
-	int ch1 = (int) in[0];
-	int ch2 = (int) in[1];
-	return ((ch2 << 8) + (ch1 << 0));
 }
 
 int 
@@ -217,3 +225,4 @@ readIntLittleEndianOnFourBytes(uint8_t *in)
 	int ch4 = (int) in[3];
 	return ((ch4 << 24) + (ch3 << 16) + (ch2 << 8) + (ch1 << 0));
 }
+#endif

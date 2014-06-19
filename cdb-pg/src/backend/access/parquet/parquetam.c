@@ -245,8 +245,6 @@ void parquet_getnext(ParquetScanDesc scan, ScanDirection direction,
 		TupleTableSlot *slot) {
 
 	AOTupleId aoTupleId;
-	int64 rowNum = INT64CONST(-1);
-
 	Assert(ScanDirectionIsForward(direction));
 
 	for(;;)
@@ -285,14 +283,7 @@ void parquet_getnext(ParquetScanDesc scan, ScanDirection direction,
 										 scan->pqs_segfile_arr[scan->pqs_segfiles_processed - 1]->segno);
 
 			scan->cur_seg_row++;
-			if (rowNum == INT64CONST(-1))
-			{
-				AOTupleIdInit_rowNum(&aoTupleId, scan->cur_seg_row);
-			}
-			else
-			{
-				AOTupleIdInit_rowNum(&aoTupleId, rowNum);
-			}
+			AOTupleIdInit_rowNum(&aoTupleId, scan->cur_seg_row);
 
 			scan->cdb_fake_ctid = *((ItemPointer)&aoTupleId);
 

@@ -12,21 +12,23 @@
  * it packs and unpacks from the Least Significant Bit first */
 static void pack8Values1Bits(int32_t *in, int inPos, uint8_t* out, int outPos);
 static void pack8Values2Bits(int32_t *in, int inPos, uint8_t* out, int outPos);
+static void unpack8Values1Bits(uint8_t *in, int inPos, int32_t *out, int outPos);
+static void unpack8Values2Bits(uint8_t *in, int inPos, int32_t *out, int outPos);
+
+#ifdef NOT_USED
 static void pack8Values3Bits(int32_t *in, int inPos, uint8_t* out, int outPos);
 static void pack8Values4Bits(int32_t *in, int inPos, uint8_t* out, int outPos);
 static void pack8Values5Bits(int32_t *in, int inPos, uint8_t* out, int outPos);
 static void pack8Values6Bits(int32_t *in, int inPos, uint8_t* out, int outPos);
 static void pack8Values7Bits(int32_t *in, int inPos, uint8_t* out, int outPos);
 static void pack8Values8Bits(int32_t *in, int inPos, uint8_t* out, int outPos);
-
-static void unpack8Values1Bits(uint8_t *in, int inPos, int32_t *out, int outPos);
-static void unpack8Values2Bits(uint8_t *in, int inPos, int32_t *out, int outPos);
 static void unpack8Values3Bits(uint8_t *in, int inPos, int32_t *out, int outPos);
 static void unpack8Values4Bits(uint8_t *in, int inPos, int32_t *out, int outPos);
 static void unpack8Values5Bits(uint8_t *in, int inPos, int32_t *out, int outPos);
 static void unpack8Values6Bits(uint8_t *in, int inPos, int32_t *out, int outPos);
 static void unpack8Values7Bits(uint8_t *in, int inPos, int32_t *out, int outPos);
 static void unpack8Values8Bits(uint8_t *in, int inPos, int32_t *out, int outPos);
+#endif
 
 static int paddedByteCountFromBits(int numBits);
 static void pack(ByteBasedBitPackingEncoder *encoder);
@@ -144,14 +146,13 @@ void
 pack8Values(int bitWidth, int32_t *in, int inPos, uint8_t* out, int outPos)
 {
 	switch(bitWidth){
-	case 0:
-		break;
 	case 1:
 		pack8Values1Bits(in, inPos, out, outPos);
 		break;
 	case 2:
 		pack8Values2Bits(in, inPos, out, outPos);
 		break;
+#ifdef NOT_USED
 	case 3:
 		pack8Values3Bits(in, inPos, out, outPos);
 		break;
@@ -218,6 +219,7 @@ pack8Values(int bitWidth, int32_t *in, int inPos, uint8_t* out, int outPos)
 		break;
 	case 32:
 		break;
+#endif
 	default:
 		/*ereport error*/
 		break;
@@ -228,14 +230,13 @@ void
 unpack8Values(int bitWidth, uint8_t *in, int inPos, int32_t *out, int outPos)
 {
 	switch(bitWidth){
-	case 0:
-		break;
 	case 1:
 		unpack8Values1Bits(in, inPos, out, outPos);
 		break;
 	case 2:
 		unpack8Values2Bits(in, inPos, out, outPos);
 		break;
+#ifdef NOT_USED
 	case 3:
 		unpack8Values3Bits(in, inPos, out, outPos);
 		break;
@@ -302,6 +303,7 @@ unpack8Values(int bitWidth, uint8_t *in, int inPos, int32_t *out, int outPos)
 		break;
 	case 32:
 		break;
+#endif
 	default:
 		/*ereport error*/
 		break;
@@ -373,6 +375,7 @@ pack8Values2Bits(int32_t *in, int inPos, uint8_t* out, int outPos)
 	) & 255);
 }
 
+#ifdef NOT_USED
 void
 pack8Values3Bits(int32_t *in, int inPos, uint8_t* out, int outPos)
 {
@@ -412,27 +415,7 @@ pack8Values3Bits(int32_t *in, int inPos, uint8_t* out, int outPos)
 			//            [210]
 		|	((in[7 + inPos] & 7) <<  5)) & 255);
 }
-
-void pack8Values4Bits(int32_t *in, int inPos, uint8_t* out, int outPos){
-
-}
-
-void pack8Values5Bits(int32_t *in, int inPos, uint8_t* out, int outPos){
-
-}
-
-void pack8Values6Bits(int32_t *in, int inPos, uint8_t* out, int outPos){
-
-}
-
-void pack8Values7Bits(int32_t *in, int inPos, uint8_t* out, int outPos){
-
-}
-
-void pack8Values8Bits(int32_t *in, int inPos, uint8_t* out, int outPos){
-
-}
-
+#endif
 
 void
 unpack8Values1Bits(uint8_t *in, int inPos, int32_t *out, int outPos)
@@ -501,6 +484,7 @@ unpack8Values2Bits(uint8_t *in, int inPos, int32_t *out, int outPos)
 		(((((int)in[ 1 + inPos]) & 255) >> 6) & 3);
 }
 
+#ifdef NOT_USED
 void
 unpack8Values3Bits(uint8_t *in, int inPos, int32_t *out, int outPos)
 {
@@ -543,24 +527,4 @@ unpack8Values3Bits(uint8_t *in, int inPos, int32_t *out, int outPos)
         //             [210]
         (((((int)in[ 2 + inPos]) & 255) >> 5) & 7);
 }
-
-void unpack8Values4Bits(uint8_t *in, int inPos, int32_t *out, int outPos) {
-
-}
-
-void unpack8Values5Bits(uint8_t *in, int inPos, int32_t *out, int outPos) {
-
-}
-
-void unpack8Values6Bits(uint8_t *in, int inPos, int32_t *out, int outPos) {
-
-}
-
-void unpack8Values7Bits(uint8_t *in, int inPos, int32_t *out, int outPos) {
-
-}
-
-void unpack8Values8Bits(uint8_t *in, int inPos, int32_t *out, int outPos) {
-
-}
-
+#endif

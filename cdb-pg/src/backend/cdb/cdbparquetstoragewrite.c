@@ -818,10 +818,7 @@ estimateColumnWidths(int *columnWidths,
 	 * got too low or too high weight */
 	for (colidx = 0; colidx < ncolumns; colidx++)
 	{
-		if (columnWidths[colidx] < min_column_width)
-		{
-			columnWidths[colidx] = min_column_width;
-		}
+		Insist(columnWidths[colidx] >= min_column_width);
 		if (columnWidths[colidx] > max_column_width)
 		{
 			columnWidths[colidx] = max_column_width;
@@ -904,9 +901,7 @@ flushRowGroup(ParquetRowGroup rowgroup,
 			  int64 *fileLen_uncompressed)
 {
 	int bytes_added = 0;
-
-	if (rowgroup == NULL)
-		return;
+	Assert(rowgroup != NULL);
 
 	/*
 	 * Write out column chunks one by one. For each chunk, we do the following:
@@ -1078,10 +1073,12 @@ addSingleColumn(AppendOnlyEntry *catalog,
 			{
 				chunkmd->codec = GZIP;
 			}
+#ifdef NOT_USED
 			else if (0 == strcmp(catalog->compresstype, "lzo"))
 			{
 				chunkmd->codec = LZO;
 			}
+#endif
 			else
 			{
 				Assert(0 == strcmp(catalog->compresstype, "none"));
@@ -1698,8 +1695,10 @@ encodeCurrentPage(ParquetColumnChunk chunk)
 				header->compressed_page_size = compressedLen;
 			}
 			else
-			{	/* shouldn't get here */
-				Insist(false);
+			{
+				ereport(ERROR,
+					(errcode(ERRCODE_GP_INTERNAL_ERROR),
+					 errmsg("snappy compression failed: %s", (char *)current_page->data)));
 			}
 
 			break;
@@ -1766,10 +1765,12 @@ encodeCurrentPage(ParquetColumnChunk chunk)
 			header->compressed_page_size = compressedLen;
 			break;
 		}
+#ifdef NOT_USED
 		case LZO:
 			/* TODO*/
 			Insist(false);
 			break;
+#endif
 		default:
 			Insist(false);	/* shouldn't get here */
 			break;
