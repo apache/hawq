@@ -1556,19 +1556,11 @@ InitializeResultRelations(PlannedStmt *plannedstmt, EState *estate, CmdType oper
 		List 	*all_relids = NIL;
 		Oid		 relid = getrelid(linitial_int(plannedstmt->resultRelations), rangeTable);
 
-		if (rel_is_child_partition(relid))
-		{
-			relid = rel_partition_get_master(relid);
-		}
-
-		estate->es_result_partitions = BuildPartitionNodeFromRoot(relid);
-		
-		/*
-		 * list all the relids that may take part in this insert operation
-		 */
 		all_relids = lappend_oid(all_relids, relid);
-		all_relids = list_concat(all_relids,
-								 all_partition_relids(estate->es_result_partitions));
+		estate->es_result_partitions = BuildPartitionNodeFromRoot(relid);
+
+		if (rel_is_partitioned(relid))
+		    all_relids = list_concat(all_relids, all_partition_relids(estate->es_result_partitions));
 		
 		estate->es_result_aosegnos = assignPerRelSegno(all_relids);
 		
