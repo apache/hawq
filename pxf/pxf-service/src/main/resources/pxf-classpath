@@ -1,3 +1,4 @@
+/etc/gphd/pxf/conf
 /etc/gphd/hadoop/conf
 /etc/gphd/hbase/conf
 /etc/gphd/hive/conf

@@ -22,4 +22,7 @@
     	<servlet-name>PXF REST Service</servlet-name>
     	<url-pattern>/*</url-pattern>
 	</servlet-mapping>
+	<listener>
+		<listener-class>com.pivotal.pxf.service.rest.ServletLifecycleListener</listener-class>
+	</listener>
 </web-app>
