@@ -167,6 +167,7 @@ project('pxf-service') {
     project.distTar {
         from('src/main/resources/pxf-profiles-default.xml') { into 'conf' rename { 'pxf-profiles.xml' } }
         from('src/main/resources/pxf-classpath') { into 'conf' }
+        from(project(':pxf-api').jar.outputs.files)
         from(war.outputs.files)
     }
 }
@@ -240,7 +241,9 @@ task wrapper(type: Wrapper) {
     gradleVersion = '1.11'
 }
 
-task release(type: Copy, dependsOn: [subprojects.build, subprojects.javadoc, (subprojects - project(':pxf-api')).buildRpm, subprojects.distTar]) {
+def distSubprojects = subprojects - project(':pxf-api')
+
+task release(type: Copy, dependsOn: [subprojects.build, subprojects.javadoc, distSubprojects.buildRpm, distSubprojects.distTar]) {
     delete 'build'
     into 'build'
     subprojects { subProject ->
@@ -250,9 +253,9 @@ task release(type: Copy, dependsOn: [subprojects.build, subprojects.javadoc, (su
     }
 }
 
-task tar(type: Copy, dependsOn: [subprojects.build, subprojects.distTar]) {
+task tar(type: Copy, dependsOn: [subprojects.build, distSubprojects.distTar]) {
     into 'build'
-    subprojects { subProject ->
+    distSubprojects.any() { subProject ->
         from("${project.name}/build/distributions") { into 'distributions' }
     }
 }
@@ -264,9 +267,9 @@ task jar(type: Copy, dependsOn: [subprojects.build]) {
     }
 }
 
-task rpm(type: Copy, dependsOn: [subprojects.build, subprojects.buildRpm]) {
+task rpm(type: Copy, dependsOn: [subprojects.build, distSubprojects.buildRpm]) {
     into 'build'
-    subprojects { subProject ->
+    distSubprojects.any() { subProject ->
         from("${project.name}/build/distributions") { into 'distributions' }
     }
 }

@@ -1,7 +1,6 @@
 ROOT = ../..
 
 COMPONENTS = \
-			 pxf-api \
 			 pxf-service \
 			 pxf-hbase \
 			 pxf-hdfs \
