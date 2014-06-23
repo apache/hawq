@@ -8,6 +8,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -54,14 +55,17 @@ public class ClusterNodesResource {
             FileSystem fs = FileSystem.get(conf);
             DistributedFileSystem dfs = (DistributedFileSystem) fs;
 
-			/* 2. Query the namenode for the datanodes info */
-            DatanodeInfo[] nodes = dfs.getDataNodeStats();
+			/* 2. Query the namenode for the datanodes info.  
+			 *    Only live nodes are returned  - in accordance with the results returned by 
+			 *    org.apache.hadoop.hdfs.tools.DFSAdmin#report().
+			 */
+            DatanodeInfo[] liveNodes = dfs.getDataNodeStats(DatanodeReportType.LIVE);
 
 			/* 3. Pack the datanodes info in a JSON text format and write it 
              *    to the HTTP output stream.
 			 */
             String prefix = "";
-            for (DatanodeInfo node : nodes) {
+            for (DatanodeInfo node : liveNodes) {
                 verifyNode(node);
                 jsonOutput.append(prefix).append(writeNode(node)); // write one node to the HTTP stream
                 prefix = ",";

@@ -3,7 +3,6 @@ package com.pivotal.pxf.plugins.hdfs;
 import com.pivotal.pxf.api.OneRow;
 import com.pivotal.pxf.api.WriteAccessor;
 import com.pivotal.pxf.api.utilities.InputData;
-import com.pivotal.pxf.plugins.hdfs.ChunkWritable;
 import com.pivotal.pxf.plugins.hdfs.utilities.HdfsUtilities;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;

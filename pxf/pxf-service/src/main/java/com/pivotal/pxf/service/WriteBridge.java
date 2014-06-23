@@ -67,11 +67,12 @@ public class WriteBridge implements Bridge {
         return true;
     }
 
-    private void close() {
+    private void close() throws Exception {
         try {
             fileAccessor.closeForWrite();
         } catch (Exception e) {
-            LOG.warn("Failed to close bridge resources: " + e.getMessage());
+            LOG.error("Failed to close bridge resources: " + e.getMessage());
+            throw e;
         }
     }
 

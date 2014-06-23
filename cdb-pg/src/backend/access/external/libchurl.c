@@ -78,6 +78,7 @@ void setup_multi_handle(churl_context* context);
 void multi_perform(churl_context* context);
 bool internal_buffer_large_enough(churl_buffer* buffer, size_t required);
 void flush_internal_buffer(churl_context* context);
+void error_with_address(char* msg, CURL* curl_handle);
 void enlarge_internal_buffer(churl_buffer* buffer, size_t required);
 void finish_upload(churl_context* context);
 void cleanup_curl_handle(churl_context* context);
@@ -542,12 +543,31 @@ void flush_internal_buffer(churl_context* context)
 	}
 
 	if ((context->curl_still_running == 0) &&
-		((context_buffer->top - context_buffer->bot) > 0))
-		elog(ERROR, "failed sending to remote component");
+		((context_buffer->top - context_buffer->bot) > 0)) {
+		error_with_address("failed sending to remote component", context->curl_handle);
+	}
+
 	check_response_code(context);
 
 	context_buffer->top = 0;
 	context_buffer->bot = 0;
+}
+
+void error_with_address(char* msg, CURL* curl_handle) {
+	char	*dest_ip = NULL;
+	long	 dest_port = 0;
+	StringInfoData err;
+	initStringInfo(&err);
+
+	appendStringInfo(&err, "failed sending to remote component");
+	/* add dest ip and port, if any, and curl was nice to tell us */
+	if (CURLE_OK == curl_easy_getinfo(curl_handle, CURLINFO_PRIMARY_IP, &dest_ip) &&
+			CURLE_OK == curl_easy_getinfo(curl_handle, CURLINFO_PRIMARY_PORT, &dest_port) &&
+			dest_ip && dest_port)
+	{
+		appendStringInfo(&err, " '%s:%ld'", dest_ip, dest_port);
+	}
+	elog(ERROR, "%s", err.data);
 }
 
 void enlarge_internal_buffer(churl_buffer* buffer, size_t required)

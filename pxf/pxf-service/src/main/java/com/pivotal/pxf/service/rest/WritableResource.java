@@ -129,21 +129,21 @@ public class WritableResource extends RestResource{
 
         DataInputStream dataStream = new DataInputStream(inputStream);
 
-        long totalRead = 0;
+        long totalWritten = 0;
 
         try {
             while (bridge.setNext(dataStream)) {
-                ++totalRead;
+                ++totalWritten;
             }
         } catch (ClientAbortException e) {
             LOG.debug("Remote connection closed by HAWQ", e);
         } catch (Exception ex) {
-            LOG.debug("totalRead so far " + totalRead + " to " + path);
+            LOG.debug("totalWritten so far " + totalWritten + " to " + path);
             throw ex;
         } finally {
             inputStream.close();
         }
-        returnMsg = "wrote " + totalRead + " bulks to " + path;
+        returnMsg = "wrote " + totalWritten + " bulks to " + path;
         LOG.debug(returnMsg);
 
         return Response.ok(returnMsg).build();
