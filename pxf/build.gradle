@@ -118,11 +118,14 @@ project('pxf-service') {
     ospackage {
 
         requires('vfabric-tc-server-standard', '2.9.5', GREATER | EQUAL)
+        requires('hadoop', "$hadoopVersion", GREATER | EQUAL)
+        requires('hadoop-hdfs', "$hadoopVersion", GREATER | EQUAL)
 
+        // Upgrades pxf-core, pxf-api to pxf-service
         obsoletes('pxf-core')
         obsoletes('pxf-api')
 
-		postInstall file('src/scripts/post-install.sh')
+        postInstall file('src/scripts/post-install.sh')
 
         from('src/main/resources/pxf-profiles-default.xml') {
             fileType CONFIG | NOREPLACE
@@ -130,10 +133,10 @@ project('pxf-service') {
             rename { 'pxf-profiles.xml' }
         }
 
-		from('src/configs/pxf-site.xml') {
-			fileType CONFIG | NOREPLACE
-			into "/etc/gphd/pxf-${project.version}/conf"
-		}
+        from('src/configs/pxf-site.xml') {
+            fileType CONFIG | NOREPLACE
+            into "/etc/gphd/pxf-${project.version}/conf"
+        }
 
         from('src/main/resources/pxf-classpath') {
             fileType CONFIG | NOREPLACE
@@ -157,9 +160,9 @@ project('pxf-service') {
             into '/etc/init.d'
         }
 
-		from(war.outputs.files) {
+        from(war.outputs.files) {
             into "/usr/lib/gphd/pxf-${project.version}"
-		}
+        }
 
         from(jar.outputs.files) {
             into "/usr/lib/gphd/pxf-${project.version}"
