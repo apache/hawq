@@ -39,5 +39,3 @@
 /usr/lib/gphd/pxf/pxf-hbase-*[0-9].jar
 /usr/lib/gphd/pxf/pxf-hdfs-*[0-9].jar
 /usr/lib/gphd/pxf/pxf-hive-*[0-9].jar
-#TODO: Temporary jar for regressions. To be removed
-/usr/lib/gphd/pxf/regression-test.jar
