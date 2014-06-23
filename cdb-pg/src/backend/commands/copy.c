@@ -6203,7 +6203,7 @@ copy_in_error_callback(void *arg)
 		/* the following is a compacted mod of CopyExtractRowMetaData */
 		int value_len = 0;
 		char *line_start = copy_of_line_buf.data;
-		char *lineno_delim = memchr(line_start, COPY_METADATA_DELIM, 32);
+		char *lineno_delim = memchr(line_start, COPY_METADATA_DELIM, Min(32, cstate->line_buf.len));
 
 		if (lineno_delim && (lineno_delim != line_start))
 		{
@@ -6219,7 +6219,7 @@ copy_in_error_callback(void *arg)
 			copy_of_line_buf.len -= value_len;
 
 			line_start = copy_of_line_buf.data;
-			lineno_delim = memchr(line_start, COPY_METADATA_DELIM, 32);
+			lineno_delim = memchr(line_start, COPY_METADATA_DELIM, Min(32, cstate->line_buf.len));
 
 			value_len = lineno_delim - line_start + 1;
 			copy_of_line_buf.data += value_len; /* advance beyond line_buf_converted */
