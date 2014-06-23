@@ -67,6 +67,11 @@ CentOS
 7. Changes
 ==========
 
+v1.8.5
+------
+
+- GPSQL-2392 - add restart-pxf.sh
+
 v1.8.4
 ------
 
