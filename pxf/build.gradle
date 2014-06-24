@@ -263,7 +263,7 @@ task release(type: Copy, dependsOn: [subprojects.build, subprojects.javadoc, dis
 
 task tar(type: Copy, dependsOn: [subprojects.build, distSubprojects.distTar]) {
     into 'build'
-    distSubprojects.any() { subProject ->
+    distSubprojects.each { project ->
         from("${project.name}/build/distributions") { into 'distributions' }
     }
 }
@@ -277,7 +277,7 @@ task jar(type: Copy, dependsOn: [subprojects.build]) {
 
 task rpm(type: Copy, dependsOn: [subprojects.build, distSubprojects.buildRpm]) {
     into 'build'
-    distSubprojects.any() { subProject ->
+    distSubprojects.each { project ->
         from("${project.name}/build/distributions") { into 'distributions' }
     }
 }
