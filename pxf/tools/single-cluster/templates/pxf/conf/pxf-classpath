@@ -1,3 +1,4 @@
+pxf/conf
 hadoop/etc/hadoop
 hbase/conf
 hive/conf
