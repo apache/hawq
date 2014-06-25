@@ -847,7 +847,10 @@ static bool PolicyAutoAssignWalker(Node *node, PolicyAutoContext *context)
 		 uint64 memRequiredForParquetInsertKB = (uint64) ( (double) memRequiredForParquetInsert / 1024);
 		 if (ctx.queryMemKB <= memRequiredForParquetInsertKB)
 		 {
-			 elog(ERROR, ERRMSG_GP_INSUFFICIENT_STATEMENT_MEMORY);
+			 ereport(ERROR,
+			         (errcode(ERRCODE_INSUFFICIENT_RESOURCES),
+			          errmsg("insufficient memory reserved for statement"),
+			          errhint("Increase statement memory for parquet table insert.")));
 		 }
 		 ctx.queryMemKB -= memRequiredForParquetInsertKB;
 	 }
@@ -862,7 +865,19 @@ static bool PolicyAutoAssignWalker(Node *node, PolicyAutoContext *context)
 	 
 	 if (ctx.queryMemKB <= ctx.numNonMemIntensiveOperators * gp_resqueue_memory_policy_auto_fixed_mem + ctx.parquetOpReservedMemKB)
 	 {
-		 elog(ERROR, ERRMSG_GP_INSUFFICIENT_STATEMENT_MEMORY);
+		 if (ctx.parquetOpReservedMemKB > 0)
+		 {
+			 ereport(ERROR,
+			         (errcode(ERRCODE_INSUFFICIENT_RESOURCES),
+			          errmsg("insufficient memory reserved for statement"),
+			          errhint("Increase statement memory or reduce the number of Parquet tables to be scanned.")));
+		 }
+		 else
+		 {
+			 ereport(ERROR,
+					 (errcode(ERRCODE_INSUFFICIENT_RESOURCES),
+					  errmsg("insufficient memory reserved for statement")));
+		 }
 	 }
 	 
 #ifdef USE_ASSERT_CHECKING
@@ -1229,9 +1244,20 @@ ComputeMemLimitForChildGroups(OperatorGroupNode *parentGroupNode)
 		if (parentGroupNode->groupMemKB < totalNumNonMemIntenseOps * nonMemIntenseOpMemKB
 											+ parentGroupNode->parquetOpReservedMemKB)
 		{
-			ereport(ERROR,
-					(errcode(ERRCODE_INSUFFICIENT_RESOURCES),
-					 errmsg("insufficient memory reserved for statement")));
+			if (parentGroupNode->parquetOpReservedMemKB > 0)
+			{
+				ereport(ERROR,
+				        (errcode(ERRCODE_INSUFFICIENT_RESOURCES),
+				         errmsg("insufficient memory reserved for statement"),
+				         errhint("Increase statement memory or reduce the number of Parquet tables to be scanned.")));
+			}
+			else
+			{
+				ereport(ERROR,
+				        (errcode(ERRCODE_INSUFFICIENT_RESOURCES),
+				         errmsg("insufficient memory reserved for statement")));
+			}
+
 		}
 
 		double memIntenseOpMemKB = 0;
@@ -1469,7 +1495,10 @@ PolicyEagerFreeAssignOperatorMemoryKB(PlannedStmt *stmt, uint64 memAvailableByte
 		uint64 memRequiredForParquetInsertKB = (uint64) ( (double) memRequiredForParquetInsert / 1024);
 		 if (ctx.queryMemKB <= memRequiredForParquetInsertKB)
 		 {
-			 elog(ERROR, ERRMSG_GP_INSUFFICIENT_STATEMENT_MEMORY);
+			 ereport(ERROR,
+			         (errcode(ERRCODE_INSUFFICIENT_RESOURCES),
+			          errmsg("insufficient memory reserved for statement"),
+			          errhint("Increase statement memory for parquet table insert.")));
 		 }
 		 ctx.queryMemKB -= memRequiredForParquetInsertKB;
 	}
@@ -1495,9 +1524,19 @@ PolicyEagerFreeAssignOperatorMemoryKB(PlannedStmt *stmt, uint64 memAvailableByte
 	if (ctx.groupTree->groupMemKB < ctx.groupTree->numNonMemIntenseOps * nonMemIntenseOpMemKB
 									+ ctx.groupTree->parquetOpReservedMemKB)
 	{
-		ereport(ERROR,
-			(errcode(ERRCODE_INSUFFICIENT_RESOURCES),
-			errmsg("insufficient memory reserved for statement")));
+		if(ctx.groupTree->parquetOpReservedMemKB > 0)
+		{
+			ereport(ERROR,
+			        (errcode(ERRCODE_INSUFFICIENT_RESOURCES),
+			         errmsg("insufficient memory reserved for statement"),
+			         errhint("Increase statement memory or reduce the number of Parquet tables to be scanned.")));
+		}
+		else
+		{
+			ereport(ERROR,
+			        (errcode(ERRCODE_INSUFFICIENT_RESOURCES),
+			         errmsg("insufficient memory reserved for statement")));
+		}
 	}
 
 #ifdef USE_ASSERT_CHECKING
