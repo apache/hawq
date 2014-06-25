@@ -303,6 +303,9 @@ int 		gp_ltrace_flag = 0;
 /* Internal Features */
 bool		gp_enable_alter_table_inherit_cols = false;
 
+/* During insertion in a table with parquet partitions, require tuples to be sorted by partition key */
+bool		gp_parquet_insert_sort = true;
+
 /* Greenplum Database Experimental Feature GUCs */
 int         gp_distinct_grouping_sets_threshold = 32;
 bool		gp_enable_explain_allstat = FALSE;

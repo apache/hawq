@@ -15,6 +15,7 @@
 #include "cdb/cdbappendonlyam.h"
 #include "cdb/cdbparquetam.h"
 #include "cdb/cdbpartition.h"
+#include "cdb/cdbvars.h"
 #include "commands/trigger.h"
 #include "executor/execdebug.h"
 #include "executor/execDML.h"
@@ -168,6 +169,78 @@ ExecInsert(TupleTableSlot *slot,
 	{
 		resultRelInfo = slot_get_partition(slot, estate);
 		estate->es_result_relation_info = resultRelInfo;
+
+		if (NULL != resultRelInfo->ri_parquetSendBack)
+		{
+			/*
+			 * The Parquet part we are about to insert into
+			 * has sendBack information. This means we're inserting into the
+			 * part twice, which is not supported. Error out (GPSQL-2291)
+			 */
+			Assert(gp_parquet_insert_sort);
+			ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+					errmsg("Cannot insert out-of-order tuples in parquet partitions"),
+					errhint("Sort the data on the partitioning key(s) before inserting"),
+					errOmitLocation(true)));
+		}
+
+		/*
+		 * Check if we need to close the last parquet partition we
+		 * inserted into (GPSQL-2291).
+		 */
+		Oid new_part_oid = resultRelInfo->ri_RelationDesc->rd_id;
+		if (gp_parquet_insert_sort &&
+				PLANGEN_OPTIMIZER == planGen &&
+				InvalidOid != estate->es_last_parq_part &&
+				new_part_oid != estate->es_last_parq_part)
+		{
+
+			Assert(NULL != estate->es_partition_state->result_partition_hash);
+
+			ResultPartHashEntry *entry = hash_search(estate->es_partition_state->result_partition_hash,
+									&estate->es_last_parq_part,
+									HASH_FIND,
+									NULL /* found */);
+
+			Assert(NULL != entry);
+			Assert(entry->offset < estate->es_num_result_relations);
+
+			ResultRelInfo *oldResultRelInfo = & estate->es_result_relations[entry->offset];
+
+			elog(DEBUG1, "Switching from old part oid=%d name=[%s] to new part oid=%d name=[%s]",
+					estate->es_last_parq_part,
+					oldResultRelInfo->ri_RelationDesc->rd_rel->relname.data,
+					new_part_oid,
+					resultRelInfo->ri_RelationDesc->rd_rel->relname.data);
+
+			/*
+			 * We are opening a new partition, and the last partition we
+			 * inserted into was a Parquet part. Let's close the old
+			 * parquet insert descriptor to free the memory before
+			 * opening the new one.
+			 */
+			ParquetInsertDescData *oldInsertDesc = oldResultRelInfo->ri_parquetInsertDesc;
+
+			/*
+			 * We need to preserve the "sendback" information that needs to be
+			 * sent back to the QD process from this part.
+			 * Compute it here, and store it for later use.
+			 */
+			QueryContextDispatchingSendBack sendback =
+					CreateQueryContextDispatchingSendBack(1);
+			sendback->relid = RelationGetRelid(oldResultRelInfo->ri_RelationDesc);
+			oldInsertDesc->sendback = sendback;
+			parquet_insert_finish(oldInsertDesc);
+
+			/* Store the sendback information in the resultRelInfo for this part */
+			oldResultRelInfo->ri_parquetSendBack = sendback;
+
+			/* Record in the resultRelInfo that we closed the parquet insert descriptor */
+			oldResultRelInfo->ri_parquetInsertDesc = NULL;
+
+			/* Reset the last parquet part Oid, it's now closed */
+			estate->es_last_parq_part = InvalidOid;
+		}
 	}
 	else
 	{
@@ -312,6 +385,14 @@ ExecInsert(TupleTableSlot *slot,
 		{
 			ResultRelInfoSetSegno(resultRelInfo, estate->es_result_aosegnos);
 			resultRelInfo->ri_parquetInsertDesc = parquet_insert_init(resultRelationDesc, resultRelInfo->ri_aosegno);
+
+			/*
+			 * Just opened a new parquet partition for insert. Save the Oid
+			 * in estate, so that we can close it when switching to a
+			 * new partition (GPSQL-2291)
+			 */
+			elog(DEBUG1, "Saving es_last_parq_part. Old=%d, new=%d", estate->es_last_parq_part, resultRelationDesc->rd_id);
+			estate->es_last_parq_part = resultRelationDesc->rd_id;
 		}
 
 		newId = parquet_insert(resultRelInfo->ri_parquetInsertDesc, partslot);

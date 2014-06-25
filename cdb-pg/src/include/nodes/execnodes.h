@@ -240,55 +240,59 @@ typedef struct JunkFilter
  * The ResultRelInfo class is used to hold all the information needed
  * about a result relation, including indices.. -cim 10/15/89
  *
- *  RangeTableIndex		result relation's range table index
- *  RelationDesc		relation descriptor for result relation
- *  NumIndices			# of indices existing on result relation
- *  IndexRelationDescs	array of relation descriptors for indices
- *  IndexRelationInfo	array of key/attr info for indices
- *  TrigDesc			triggers to be fired, if any
- *  TrigFunctions		cached lookup info for trigger functions
- *  TrigInstrument		optional runtime measurements for triggers
- *  ConstraintExprs		array of constraint-checking expr states
- *  junkFilter			for removing junk attributes from tuples
- *  projectReturning	for computing a RETURNING list
- *  tupdesc_match		???
- *  mt_bind				???
- *  aoInsertDesc		context for appendonly relation buffered INSERT.
- *  ao_segno			the AO segfile we inserted into.
- *  extinsertDesc		???
- *  aosegno				???
- *  aoprocessed			???
- *  partInsertMap		map input attrno to target attrno
- *  partSlot			TupleTableSlot for the target part relation
+ *  RangeTableIndex     result relation's range table index
+ *  RelationDesc        relation descriptor for result relation
+ *  NumIndices          # of indices existing on result relation
+ *  IndexRelationDescs  array of relation descriptors for indices
+ *  IndexRelationInfo   array of key/attr info for indices
+ *  TrigDesc            triggers to be fired, if any
+ *  TrigFunctions       cached lookup info for trigger functions
+ *  TrigInstrument      optional runtime measurements for triggers
+ *  ConstraintExprs     array of constraint-checking expr states
+ *  junkFilter          for removing junk attributes from tuples
+ *  projectReturning    for computing a RETURNING list
+ *  tupdesc_match       ???
+ *  mt_bind             ???
+ *  aoInsertDesc        context for appendonly relation buffered INSERT
+ *  aocsInsertDesc      context for appendonly column oriented relation buffered INSERT
+ *  extInsertDesc       context for external table INSERT
+ *  parquetInsertDesc   context for parquet table INSERT
+ *  parquetSendBack     information to be sent back to dispatch after INSERT in a parquet table
+ *  aosegno             the AO segfile we inserted into.
+ *  aoprocessed         tuples processed for AO
+ *  partInsertMap       map input attrno to target attrno
+ *  partSlot            TupleTableSlot for the target part relation
  *  resultSlot          TupleTableSlot for the target relation
  * ----------------
  */
 typedef struct ResultRelInfo
 {
-	NodeTag                 type;
-	Index                   ri_RangeTableIndex;
-	Relation                ri_RelationDesc;
-	int                     ri_NumIndices;
-	RelationPtr             ri_IndexRelationDescs;
-	struct IndexInfo        **ri_IndexRelationInfo;
-	struct TriggerDesc             *ri_TrigDesc;
-	FmgrInfo                *ri_TrigFunctions;
-	struct Instrumentation  *ri_TrigInstrument;
-	List                    **ri_ConstraintExprs;
-	JunkFilter              *ri_junkFilter;
-	ProjectionInfo          *ri_projectReturning;
-	int                     tupdesc_match;
-	struct MemTupleBinding         *mt_bind;
+	NodeTag                         type;
+	Index                           ri_RangeTableIndex;
+	Relation                        ri_RelationDesc;
+	int                             ri_NumIndices;
+	RelationPtr                     ri_IndexRelationDescs;
+	struct IndexInfo                **ri_IndexRelationInfo;
+	struct TriggerDesc              *ri_TrigDesc;
+	FmgrInfo                        *ri_TrigFunctions;
+	struct Instrumentation          *ri_TrigInstrument;
+	List                            **ri_ConstraintExprs;
+	JunkFilter                      *ri_junkFilter;
+	ProjectionInfo                  *ri_projectReturning;
+	int                             tupdesc_match;
+	struct MemTupleBinding          *mt_bind;
 
 	struct AppendOnlyInsertDescData *ri_aoInsertDesc;
 	struct AOCSInsertDescData       *ri_aocsInsertDesc;
-	struct ExternalInsertDescData	*ri_extInsertDesc;   
-	struct ParquetInsertDescData		*ri_parquetInsertDesc;
-	int                     ri_aosegno;
-	uint64                  ri_aoprocessed; /* tuples processed for AO */
-	struct AttrMap			*ri_partInsertMap;
-	struct TupleTableSlot			*ri_partSlot;
-	struct TupleTableSlot *ri_resultSlot;
+	struct ExternalInsertDescData   *ri_extInsertDesc;
+	struct ParquetInsertDescData    *ri_parquetInsertDesc;
+	struct QueryContextDispatchingSendBackData *ri_parquetSendBack;
+
+	int                             ri_aosegno;
+	uint64                          ri_aoprocessed;
+	struct AttrMap                  *ri_partInsertMap;
+	struct TupleTableSlot           *ri_partSlot;
+	struct TupleTableSlot           *ri_resultSlot;
 } ResultRelInfo;
 
 typedef struct ShareNodeEntry
@@ -404,6 +408,8 @@ typedef struct EState
 	int                        es_num_result_relations;                /* length of array */
 	ResultRelInfo *es_result_relation_info;                /* currently active array elt */
 	JunkFilter *es_junkFilter;        /* currently active junk filter */
+
+	Oid es_last_parq_part; /* The Oid of the last parquet partition we opened for insertion */
 
 	/* partitioning info for target relation */
 	PartitionNode *es_result_partitions;

@@ -457,6 +457,9 @@ namespace gpdb {
 	// check whether a relation is inherited
 	bool FHasSubclass(Oid oidRel);
 
+        // check whether a relation has parquet children
+        bool FHasParquetChildren(Oid oidRel);
+        
 	// does a relation exist with the given oid
 	bool FRelationExists(Oid oid);
 

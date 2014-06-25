@@ -148,20 +148,6 @@ static void intorel_shutdown(DestReceiver *self);
 static void intorel_destroy(DestReceiver *self);
 static void ClearPartitionState(EState *estate);
 
-/*
- * For a partitioned insert target only:  
- * This type represents an entry in the per-part hash table stored at
- * estate->es_partition_state->result_partition_hash.   The table maps 
- * part OID -> ResultRelInfo and avoids repeated calculation of the
- * result information.
- */
-typedef struct ResultPartHashEntry 
-{
-	Oid targetid; /* OID of part relation */
-	int offset; /* Index ResultRelInfo in es_result_partitions */
-} ResultPartHashEntry;
-
-
 typedef struct CopyDirectDispatchToSliceContext
 {
 	plan_tree_base_prefix	base; /* Required prefix for plan_tree_walker/mutator */
@@ -2731,7 +2717,7 @@ ExecEndPlan(PlanState *planstate, EState *estate)
 			++aocount;
 		if (resultRelInfo->ri_aocsInsertDesc)
 			++aocount;
-		if (resultRelInfo->ri_parquetInsertDesc)
+		if (resultRelInfo->ri_parquetInsertDesc || resultRelInfo->ri_parquetSendBack)
 			++aocount;
         resultRelInfo++;
 	}
@@ -2767,16 +2753,45 @@ ExecEndPlan(PlanState *planstate, EState *estate)
         }
         /*need add processing for parquet insert desc*/
         if (resultRelInfo->ri_parquetInsertDesc){
+
+        	AssertImply(resultRelInfo->ri_parquetSendBack, gp_parquet_insert_sort);
+
+        	if (NULL != resultRelInfo->ri_parquetSendBack)
+        	{
+			/*
+			 * The Parquet part we just finished inserting into already
+			 * has sendBack information. This means we're inserting into the
+			 * part twice, which is not supported. Error out (GPSQL-2291)
+			 */
+			ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+					errmsg("Cannot insert out-of-order tuples in parquet partitions"),
+					errhint("Sort the data on the partitioning key(s) before inserting"),
+					errOmitLocation(true)));
+        	}
+
         	sendback = CreateQueryContextDispatchingSendBack(1);
         	resultRelInfo->ri_parquetInsertDesc->sendback = sendback;
         	sendback->relid = RelationGetRelid(resultRelInfo->ri_RelationDesc);
 
         	parquet_insert_finish(resultRelInfo->ri_parquetInsertDesc);
         }
-		if (resultRelInfo->ri_extInsertDesc)
-			external_insert_finish(resultRelInfo->ri_extInsertDesc);
 
-		if (resultRelInfo->ri_resultSlot)
+        /*
+         * This can happen if we inserted into this parquet part then
+         * closed it during insertion. SendBack information is saved
+         * in the resultRelInfo, since the ri_parquetInsertDesc is freed
+         * (GPSQL-2291)
+         */
+        if (NULL != resultRelInfo->ri_parquetSendBack)
+        {
+        	Assert(NULL == sendback);
+        	sendback = resultRelInfo->ri_parquetSendBack;
+        }
+
+        if (resultRelInfo->ri_extInsertDesc)
+        	external_insert_finish(resultRelInfo->ri_extInsertDesc);
+
+        if (resultRelInfo->ri_resultSlot)
 		{
 			Assert(resultRelInfo->ri_resultSlot->tts_tupleDescriptor);
 			ReleaseTupleDesc(resultRelInfo->ri_resultSlot->tts_tupleDescriptor);

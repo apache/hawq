@@ -180,6 +180,7 @@
 #define ALLOW_map_hddata_2gp_segments
 #define ALLOW_free_hddata_2gp_segments
 #define ALLOW_evaluate_expr
+#define ALLOW_has_parquet_children
 
 #include "gpopt/utils/gpdbdefs.h"
 
@@ -2224,6 +2225,21 @@ gpdb::FHasSubclass
 	}
 	GP_WRAP_END;
 	return false;
+}
+
+
+bool
+gpdb::FHasParquetChildren
+        (
+        Oid oidRel
+        )
+{
+        GP_WRAP_START;
+        {
+                return has_parquet_children(oidRel);
+        }
+        GP_WRAP_END;
+        return false;
 }
 
 bool

@@ -504,7 +504,15 @@ CTranslatorRelcacheToDXL::Pmdrel
 		 pdrgpulPartKeys = PdrgpulPartKeys(pmp, rel, oid);
 	}
 	 BOOL fPartitioned = (NULL != pdrgpulPartKeys && 0 < pdrgpulPartKeys->UlLength()); 
-
+	
+	if (fPartitioned && IMDRelation::ErelstorageAppendOnlyParquet != erelstorage && IMDRelation::ErelstorageExternal != erelstorage)
+	{
+		// mark relation as Parquet if one of its children is parquet
+		if (gpdb::FHasParquetChildren(oid))
+		{
+			erelstorage = IMDRelation::ErelstorageAppendOnlyParquet;
+		}
+	}
 	// get key sets
 	BOOL fAddDefaultKeys = FHasSystemColumns(rel->rd_rel->relkind);
 	DrgPdrgPul *pdrgpdrgpulKeys = PdrgpdrgpulKeys(pmp, oid, fAddDefaultKeys, fPartitioned, pulAttnoMapping);
