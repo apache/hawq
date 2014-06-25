@@ -1195,7 +1195,7 @@ vacuum_aocs_rel(Relation aorel, void *vacrelstats, bool isVacFull)
 
 	aoEntry = GetAppendOnlyEntry(RelationGetRelid(aorel), SnapshotNow);
 
-	allseg = GetAllAOCSFileSegInfo(aorel, aoEntry, SnapshotNow, &totalseg);
+	allseg = GetAllAOCSFileSegInfo(aorel, aoEntry, SnapshotNow, true, &totalseg);
 	if (Debug_persistent_print)
 		elog(Persistent_DebugPrintLevel(),
 			 "vacuum_aocs_rel: AO COL relation \"%s.%s\", relation id %u, relfilenode %u has %d logical segments, %d atributes (columns)",

@@ -2598,7 +2598,7 @@ static void gp_statistics_estimate_reltuples_relpages_ao_cs(Relation rel, float4
 	
     /* get table level statistics from the pg_aoseg table */
 	aoEntry = GetAppendOnlyEntry(RelationGetRelid(rel), SnapshotNow);
-    aocsInfo = GetAllAOCSFileSegInfo(rel, aoEntry, SnapshotNow, &nsegs);
+    aocsInfo = GetAllAOCSFileSegInfo(rel, aoEntry, SnapshotNow, true, &nsegs);
     if (aocsInfo)
     {
         int i = 0;

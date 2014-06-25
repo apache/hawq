@@ -428,7 +428,7 @@ aocs_beginscan(Relation relation, Snapshot appendOnlyMetaDataSnapshot, TupleDesc
     scan->compType = aoentry->compresstype;
     scan->blocksz = aoentry->blocksize;
 
-    scan->seginfo = GetAllAOCSFileSegInfo(relation, aoentry, appendOnlyMetaDataSnapshot, &scan->total_seg);
+    scan->seginfo = GetAllAOCSFileSegInfo(relation, aoentry, appendOnlyMetaDataSnapshot, false, &scan->total_seg);
 
     scan->relationTupleDesc = relationTupleDesc;
 
@@ -1141,7 +1141,7 @@ aocs_fetch_init(Relation relation,
 	aocsFetchDesc->aoEntry = aoentry;
 
 	aocsFetchDesc->segmentFileInfo =
-		GetAllAOCSFileSegInfo(relation, aoentry, appendOnlyMetaDataSnapshot, &aocsFetchDesc->totalSegfiles);
+		GetAllAOCSFileSegInfo(relation, aoentry, appendOnlyMetaDataSnapshot, false, &aocsFetchDesc->totalSegfiles);
 
 	Assert(tupleDesc != NULL);
 

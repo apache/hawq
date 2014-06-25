@@ -218,31 +218,23 @@ GetAOCSFileSegInfo(
 AOCSFileSegInfo **GetAllAOCSFileSegInfo(Relation prel,
 										AppendOnlyEntry *aoEntry,
 										Snapshot appendOnlyMetaDataSnapshot,
+										bool returnAllSegfiles,
 										int32 *totalseg)
 {
     Relation 			pg_aocsseg_rel;
-    bool returnAllSegmentsFiles;
 
 	AOCSFileSegInfo		**results;
 	TupleDesc	tupdesc = RelationGetDescr(prel);
 	
 	pg_aocsseg_rel = relation_open(aoEntry->segrelid, AccessShareLock);
 
-	if (GP_ROLE_EXECUTE != Gp_role)
-	{
-		returnAllSegmentsFiles = TRUE;
-	}
-	else
-	{
-		returnAllSegmentsFiles = FALSE;
-	}
 	results = GetAllAOCSFileSegInfo_pg_aocsseg_rel(
 											tupdesc->natts,
 											RelationGetRelationName(prel),
 											aoEntry,
 											pg_aocsseg_rel,
 											appendOnlyMetaDataSnapshot,
-											returnAllSegmentsFiles,
+											returnAllSegfiles,
 											totalseg);
 
     heap_close(pg_aocsseg_rel, AccessShareLock);
@@ -430,7 +422,7 @@ int64 GetAOCSTotalBytes(Relation parentrel, Snapshot appendOnlyMetaDataSnapshot)
 	Assert(GP_ROLE_EXECUTE != Gp_role);
 
 	result = 0;
-	allseg = GetAllAOCSFileSegInfo(parentrel, aoEntry, appendOnlyMetaDataSnapshot, &totalseg);
+	allseg = GetAllAOCSFileSegInfo(parentrel, aoEntry, appendOnlyMetaDataSnapshot, true, &totalseg);
 	for (s = 0; s < totalseg; s++)
 	{
 		int32 nEntry;

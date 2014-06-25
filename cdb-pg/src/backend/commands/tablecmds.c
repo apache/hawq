@@ -15812,7 +15812,7 @@ split_rows(Relation intoa, Relation intob, Relation temprel)
 	if (aocsinsertdesc_a)
 	{
 		sendback = CreateQueryContextDispatchingSendBack(
-				aocsinsertdesc_b->aoi_rel->rd_att->natts);
+				aocsinsertdesc_a->aoi_rel->rd_att->natts);
 		aocsinsertdesc_a->sendback = sendback;
 		sendback->relid = RelationGetRelid(aocsinsertdesc_a->aoi_rel);
 

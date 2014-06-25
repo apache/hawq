@@ -132,7 +132,8 @@ extern AOCSFileSegInfo **
 GetAllAOCSFileSegInfo(
 	Relation 			prel, 
 	AppendOnlyEntry 	*aoEntry, 
-	Snapshot 			appendOnlyMetaDataSnapshot, 
+	Snapshot 			appendOnlyMetaDataSnapshot,
+	bool returnAllSegfiles,
 	int 				*totalseg);
 
 extern AOCSFileSegInfo **
