@@ -150,8 +150,8 @@ function doInit()
 {
 	instanceExists
 	if [ $? -eq 0 ]; then
-		echo ERROR: instance already exists in $instance_root, existing...
-		return 1
+		echo WARNING: instance already exists in $instance_root, nothing to do...
+		return 0
 	fi
 
 	createInstance || return 1
