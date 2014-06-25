@@ -3,24 +3,36 @@
 # pxf-service	start/stop/initialize the PXF instance
 #
 
-source /etc/gphd/pxf/conf/pxf-env.sh
-
-if [ ! -x $JAVA_HOME/bin/java ]; then
-    echo \$JAVA_HOME is invalid
-    exit 1
-fi
+pxf_root=/usr/lib/gphd/pxf
+env_script=/etc/gphd/pxf/conf/pxf-env.sh
+tcserver_root=/opt/vmware/vfabric-tc-server-standard
+instance_root=/var/gphd/pxf
 
 pxf_user=pxf
-pxf_root=/usr/lib/gphd/pxf
-
-instance_root=/var/gphd/pxf
 instance_name=pxf-service
 instance_template=bio
 instance_port=51200
 instance_owner=pxf:hadoop
 
-tcserver_root=/opt/vmware/vfabric-tc-server-standard
+curl=`which curl`
 
+# load pxf-env.sh script
+if [ ! -f $env_script ]; then
+	echo WARNING: failed to find $env_script
+else
+	source $env_script
+fi
+
+# validate JAVA_HOME
+if [ ! -x $JAVA_HOME/bin/java ]; then
+    echo ERROR: \$JAVA_HOME is invalid
+    exit 1
+fi
+
+#
+# createInstance creates a tcServer instance with specified
+# port, template, target directory and ownership.
+#
 function createInstance()
 {
 	create_options="\
@@ -32,13 +44,22 @@ function createInstance()
 	$tcserver_root/tcruntime-instance.sh create $create_options $instance_name
 
 	if [ $? -gt 0 ]; then
-		echo instance creation failed
+		echo ERROR: instance creation failed
 		return 1
 	fi
 
 	chown $instance_owner -R $instance_root
+
+	return 0
 }
 
+#
+# configureInstance configures the tcServer instance
+#
+# specifically:
+#	support up to 10,000 header fields
+#	support up to up to 64k size header
+#
 function configureInstance()
 {
 	serverXml=$instance_root/$instance_name/conf/server.xml
@@ -46,28 +67,39 @@ function configureInstance()
 	sed "/^[[:blank:]]*maxKeepAliveRequests=.*$/ a\\
 	maxHeaderCount=\"10000\"\\
 	maxHttpHeaderSize=\"65536\"
-	" > ${serverXml}.tmp
+	" > ${serverXml}.tmp || return 1
 
-	rm $serverXml
-	mv ${serverXml}.tmp $serverXml
+	rm $serverXml || return 1
+	mv ${serverXml}.tmp $serverXml || return 1
+
+	return 0
 }
 
+#
+# deployWebapp adds the pxf-webapp to the new instance's webapps folder
+# and the custom loader to the instance's lib directory
+#
 function deployWebapp()
 {
-    cp $pxf_root/pxf.war $instance_root/$instance_name/webapps/
-    cp $pxf_root/pxf-service-*[0-9].jar $instance_root/$instance_name/lib/
+    cp $pxf_root/pxf.war $instance_root/$instance_name/webapps/ || return 1
+    cp $pxf_root/pxf-service-*[0-9].jar $instance_root/$instance_name/lib/ || return 1
+
+	return 0
 }
 
-function checkWebapp()
+#
+# waitForTomcat waits for tcServer to finish loading
+# currently up to 5 minutes
+#
+function waitForTomcat()
 {
-	curl=`which curl`
 	attempts=0
 	max_attempts=300 # try to connect for 5 minutes
 	sleep_time=1 # sleep 1 second between attempts
 	
 	# wait until tomcat is up:
 	echo Waiting for tcServer to start...
-	until [[ "`curl --silent --connect-timeout 1 -I http://localhost:${instance_port} | grep 'Coyote'`" != "" 
+	until [[ "`$curl --silent --connect-timeout 1 -I http://localhost:${instance_port} | grep 'Coyote'`" != "" 
 	   || "$attempts" -eq "$max_attempts" ]];
     do
         let attempts=attempts+1
@@ -78,8 +110,18 @@ function checkWebapp()
 		echo ERROR: cannot connect to tcServer after 5 minutes
 		return 1
 	fi
+
+	return 0
+}
+
+#
+# checkWebapp waits for tcServer to finish loading and then
+# verifies PXF webapp is functional
+#
+function checkWebapp()
+{
+	waitForTomcat || return 1
 	
-	# check if PXF webapp is up:
 	echo Checking if PXF webapp is up and running...
 	curlResponse=$($curl -s "http://localhost:${instance_port}/pxf/v0")
 	expectedResponse="Wrong version v0, supported version is v[0-9]+"
@@ -93,10 +135,22 @@ function checkWebapp()
 	return 1
 }
 
+function instanceExists()
+{
+	if [ ! -d $instance_root ]; then
+		return 0
+	fi
+
+	$tcserver_root/tcruntime-ctl.sh $instance_name status -i $instance_root | grep -qi "runtime version:\s*[0-9]"
+	return $?
+}
+
+# doInit handles the init command
 function doInit()
 {
-	if [ -d $instance_root ]; then
-		echo instance already exists in $instance_root, existing...
+	instanceExists
+	if [ $? -eq 0 ]; then
+		echo ERROR: instance already exists in $instance_root, existing...
 		return 1
 	fi
 
@@ -105,9 +159,23 @@ function doInit()
 	deployWebapp || return 1
 }
 
+# 
+# doStartStop handles start/stop commands
+# commands are executed as the user $pxf_user
+#
+# after start, uses checkWebapp to verify the PXF webapp was loaded
+# successfully
+#
 function doStartStop()
 {
 	command=$1
+
+	instanceExists
+	if [ $? -ne 0 ]; then
+		echo ERROR: cant find PXF instance, maybe call init?
+		return 1
+	fi
+
 	pushd $instance_root
 	runuser $pxf_user -c "$tcserver_root/tcruntime-ctl.sh $instance_name $command -n $instance_root -d $tcserver_root"
 	if [ $? -ne 0 ]; then

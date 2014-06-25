@@ -1409,6 +1409,13 @@ public class PxfHdfsRegression extends PxfTestCase {
 		}
 	}
 
+	/*
+	 * Verify use of LIMIT
+	 *
+	 * TODO The test doesn't verify whether Hawq got all tuples 
+	 * or just the LIMIT. We should test LIMIT cancels the query once 
+	 * it gets LIMIT tuples.
+	 */
 	@Test
 	public void queryLimit() throws Exception {
 		
@@ -1438,6 +1445,10 @@ public class PxfHdfsRegression extends PxfTestCase {
 		ComparisonUtils.compareTables(exTable, limitTable, report);
 	}
 	
+	/*
+	 * Verify query fails when conversion to int (for example) fails 
+	 * (without an error table) and a proper error message is printed
+	 */
 	@Test 
 	public void negativeBadTextData() throws Exception {
 		
