@@ -646,11 +646,13 @@ class LocalCopy(Command):
    
 #-------------create tar------------------
 class CreateTar(Command):
-    def __init__(self,name,srcDirectory,dstTarFile,ctxt=LOCAL,remoteHost=None):
+    def __init__(self,name,srcDirectory,dstTarFile,ctxt=LOCAL,remoteHost=None,exclude=""):
         self.srcDirectory=srcDirectory
         self.dstTarFile=dstTarFile
         tarCmd = SYSTEM.getTarCmd()
-        cmdStr="%s cvPf %s -C %s  ." % (tarCmd, self.dstTarFile,srcDirectory)
+        if exclude:
+            exclude = ' --exclude=' + exclude
+        cmdStr="%s cvPf %s %s -C %s  ." % (tarCmd, self.dstTarFile, exclude,srcDirectory)
         Command.__init__(self,name,cmdStr,ctxt,remoteHost)
 
     

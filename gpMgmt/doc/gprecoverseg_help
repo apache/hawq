@@ -59,8 +59,7 @@ The recovery process marks the segment as up again in the HAWQ
 Database system catalog. Use the following command to check the
 recovery result.
 
-gpstate
-
+ $ gpstate
 
 ******************************************************
 OPTIONS

@@ -443,9 +443,22 @@ class GpDB:
 
         logger.info("Starting copy of segment dbid %d to location %s" % (int(self.getSegmentDbId()), dstDir))
 
-        cpCmd = Scp("Copy system data directory", self.getSegmentDataDirectory() + '/*', dstDir, self.address, None, True)
+        # scp does not support fifo files, so tar it first, then copy it, and finally untar it.
+        templateTarFileDir = '/tmp'
+        templateTarFileName = 'hawq_template' + time.strftime("%Y%m%d_%H%M%S")
+        dstTarFile = templateTarFileDir + '/' + templateTarFileName
+        tarCmd = CreateTar("Tar data direcotry", self.getSegmentDataDirectory(), dstTarFile, REMOTE, self.address, 'pgsql_tmp')
+        tarCmd.run(validateAfter = True)
+        res = tarCmd.get_results()
+        cpCmd = Scp("Copy system data directory tar", dstTarFile, dstDir, self.address, None, True)
         cpCmd.run(validateAfter = True)
         res = cpCmd.get_results()
+        untarCmd = ExtractTar("Untar data directory", dstTarFile, dstDir)
+        untarCmd.run(validateAfter = True)
+        res = untarCmd.get_results()
+        rmCmd = RemoveFiles('Remove data directory tar', dstDir + '/' + templateTarFileName)
+        rmCmd.run(validateAfter = True)
+        res = rmCmd.get_results()
 
         # Remove the gp_dbid file from the data dir
         RemoveFiles.local('Remove gp_dbid file', os.path.normpath(dstDir + '/gp_dbid'))
