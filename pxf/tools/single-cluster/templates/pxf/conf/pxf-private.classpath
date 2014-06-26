@@ -1,3 +1,9 @@
+##################################################################
+# This file contains the internal classpaths required to run PXF.
+# WARNING: DO NOT EDIT!
+# Any change in this file can result in PXF failing to run.
+# Adding resources should be done using pxf-public.classpath file. 
+##################################################################
 pxf/conf
 hadoop/etc/hadoop
 hbase/conf

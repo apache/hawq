@@ -67,6 +67,11 @@ CentOS
 7. Changes
 ==========
 
+v1.8.6
+------
+
+- GPSQL-2302 - classpath files are pxf-private.classpath and pxf-public.classpath.
+
 v1.8.5
 ------
 

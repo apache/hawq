@@ -1,0 +1,8 @@
+##############################################################
+# This is PXF service's classpath file
+# Any connector should be added here, one resource per line.
+# e.g. /usr/lib/myconnector/myconnector.jar
+# Wildcard characters (*,[],?) are supported for the file names
+# e.g. /usr/lib/myconnector/*.jar
+#      /usr/lib/myconnector/myconnector*[0-9].jar
+##############################################################

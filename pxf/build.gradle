@@ -138,14 +138,14 @@ project('pxf-service') {
             into "/etc/gphd/pxf-${project.version}/conf"
         }
 
-        from('src/main/resources/pxf-classpath') {
+        from('src/main/resources/pxf-private.classpath') {
             fileType CONFIG | NOREPLACE
             into "/etc/gphd/pxf-${project.version}/conf"
         }
 
-        from('src/main/resources/custom-classpath') {
+        from('src/main/resources/pxf-public.classpath') {
             fileType CONFIG | NOREPLACE
-            into '/usr/lib/gphd/publicstage'
+            into "/etc/gphd/pxf-${project.version}/conf"
         }
 
         from('src/scripts/pxf-env.sh') {
@@ -174,7 +174,8 @@ project('pxf-service') {
 
     project.distTar {
         from('src/main/resources/pxf-profiles-default.xml') { into 'conf' rename { 'pxf-profiles.xml' } }
-        from('src/main/resources/pxf-classpath') { into 'conf' }
+        from('src/main/resources/pxf-private.classpath') { into 'conf' }
+        from('src/main/resources/pxf-public.classpath') { into 'conf' }
         from(project(':pxf-api').jar.outputs.files)
         from(war.outputs.files)
     }

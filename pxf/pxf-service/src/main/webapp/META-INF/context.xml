@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Context>
      <Loader className="com.pivotal.pxf.service.utilities.CustomWebappLoader" 
-             classpathFiles="/etc/gphd/pxf/conf/pxf-classpath" 
-             secondaryClasspathFiles="/usr/lib/gphd/publicstage/custom-classpath"/>
+             classpathFiles="/etc/gphd/pxf/conf/pxf-private.classpath"
+             secondaryClasspathFiles="/etc/gphd/pxf/conf/pxf-public.classpath"/>
 </Context>
