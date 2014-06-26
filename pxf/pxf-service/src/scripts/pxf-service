@@ -135,10 +135,12 @@ function checkWebapp()
 	return 1
 }
 
+# instanceExists returns 0 when the instance exists
+# non zero otherwise
 function instanceExists()
 {
 	if [ ! -d $instance_root ]; then
-		return 0
+		return 1
 	fi
 
 	$tcserver_root/tcruntime-ctl.sh $instance_name status -i $instance_root | grep -qi "runtime version:\s*[0-9]"
