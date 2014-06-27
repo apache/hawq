@@ -2,7 +2,7 @@
 ## ======================================================================
 
 ARTIFACTS=artifacts
-PADS_PUBLISH_LOCATION="build@hdsh129.lss.emc.com:/data/downloads/PHD/testing/"
+PADS_PUBLISH_LOCATION="build@dist.dh.greenplum.com:/data/dist/PHD/testing/"
 
 NUMPADS=`find $ARTIFACTS -regex '.*\/PADS-[0-9\.]*-[0-9]*\.tar\.gz' | wc -l | grep -o '[0-9]*'`
 if [ "x$NUMPADS" != "x1" ]; then
