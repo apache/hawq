@@ -12,7 +12,7 @@ pxf_user=pxf
 instance_name=pxf-service
 instance_template=bio
 instance_port=51200
-instance_owner=pxf:hadoop
+instance_owner=pxf:pxf
 
 curl=`which curl`
 
