@@ -6,12 +6,12 @@ import java.sql.Types;
 import java.util.List;
 import java.util.ListIterator;
 
+import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
 import org.junit.Assert;
 import org.junit.Test;
 import org.postgresql.util.PSQLException;
 
-import com.pivotal.parot.components.common.ShellSystemObject;
 import com.pivotal.parot.fileformats.IAvroSchema;
 import com.pivotal.parot.structures.tables.basic.Table;
 import com.pivotal.parot.structures.tables.pxf.ErrorTable;
@@ -1074,9 +1074,9 @@ public class PxfHdfsRegression extends PxfTestCase {
 	}
 
 	/**
-	 * Verify that filter pushdown is working, and we send a filter to PXF In this test we check
-	 * that a query condition (WHERE ...) is serialized and passe correctly to PXF, by reading the
-	 * debug logs of HAWQ.
+	 * Verify that filter pushdown is working, and we send a filter to PXF. In this test we check
+	 * that a query condition (WHERE ...) is serialized and passed correctly to PXF, 
+	 * by using FilterPrinterAccessor that prints the received filter from HAWQ.
 	 * 
 	 * The filter serialization is done using RPN, see more details in
 	 * {@link com.pivotal.pxf.filtering.FilterParser} header.
@@ -1101,43 +1101,52 @@ public class PxfHdfsRegression extends PxfTestCase {
 		dataTable.addRow(new String[] { "out", "0" });
 
 		hdfs.writeTableToFile(csvPath, dataTable, ",");
+		
+		ReadableExternalTable printFilterTable = 
+				new ReadableExternalTable("filter_printer", fields, csvPath, "TEXT"); 
+		printFilterTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
+		printFilterTable.setAccessor("FilterPrinterAccessor");
+		printFilterTable.setResolver("com.pivotal.pxf.plugins.hdfs.StringPassResolver");
+		printFilterTable.setDelimiter(",");
+		hawq.createTableAndVerify(printFilterTable);
 
 		exTable = TableFactory.getPxfReadableTextTable("filter_pushdown", fields, csvPath, ",");
-
 		hawq.createTableAndVerify(exTable);
 
-		ShellSystemObject sso = hawq.openPsql();
-		try {
+		ReportUtils.report(report, getClass(), "set pxf_enable_filter_pushdown to true");
+		hawq.runQuery("SET pxf_enable_filter_pushdown = true;");
+		
+		ReportUtils.report(report, getClass(), "filter with one condition");
+		String queryFilter = "WHERE s1 = 'you'";
+		String serializedFilter = "a0c\\\"you\\\"o5";
+		verifyFilterPushdown(printFilterTable, queryFilter, serializedFilter, 1);
 
-			hawq.runSqlCmd(sso, "SET client_min_messages = debug2;", true);
+		ReportUtils.report(report, getClass(), "filter with AND condition");
+		queryFilter = "WHERE s1 != 'nobody' AND n1 <= 5";
+		serializedFilter = "a0c\\\"nobody\\\"o6a1c5o3o7";
+		verifyFilterPushdown(printFilterTable, queryFilter, serializedFilter, 4);
 
-			ReportUtils.report(report, getClass(), "filter with one condition");
-			String queryFilter = "WHERE s1 = 'you'";
-			String serializedFilter = "a0c\\\"you\\\"o5";
-			verifyFilterPushdown(sso, queryFilter, serializedFilter, 1);
+		ReportUtils.report(report, getClass(), "no pushdown: filter with OR condition");
+		queryFilter = "WHERE s1 = 'nobody' OR n1 <= 5";
+		serializedFilter = null;
+		verifyFilterPushdown(printFilterTable, queryFilter, serializedFilter, 5);
 
-			ReportUtils.report(report, getClass(), "filter with AND condition");
-			queryFilter = "WHERE s1 != 'nobody' AND n1 <= 5";
-			serializedFilter = "a0c\\\"nobody\\\"o6a1c5o3o7";
-			verifyFilterPushdown(sso, queryFilter, serializedFilter, 4);
+		ReportUtils.report(report, getClass(), "no pushdown: run no filter");
+		queryFilter = "";
+		serializedFilter = null;
+		verifyFilterPushdown(printFilterTable, queryFilter, serializedFilter, 8);
 
-			ReportUtils.report(report, getClass(), "no pushdown: filter with OR condition");
-			queryFilter = "WHERE s1 = 'nobody' OR n1 <= 5";
-			serializedFilter = null;
-			verifyFilterPushdown(sso, queryFilter, serializedFilter, 5);
+		ReportUtils.report(report, getClass(), "set pxf_enable_filter_pushdown to false");
+		hawq.runQuery("SET pxf_enable_filter_pushdown = false;");
 
-			ReportUtils.report(report, getClass(), "no pushdown: run no filter");
-			queryFilter = "";
-			serializedFilter = null;
-			verifyFilterPushdown(sso, queryFilter, serializedFilter, 8);
+		ReportUtils.report(report, getClass(), "filter with one condition - filter pushdown disabled");
+		queryFilter = "WHERE s1 = 'you'";
+		serializedFilter = null;
+		verifyFilterPushdown(printFilterTable, queryFilter, serializedFilter, 1);
 
-			ReportUtils.report(report, getClass(), "set optimizer to true again");
-			hawq.runSqlCmd(sso, "SET optimizer = true;", true);
+		ReportUtils.report(report, getClass(), "set pxf_enable_filter_pushdown to true again");
+		hawq.runQuery("SET pxf_enable_filter_pushdown = true;");
 
-			hawq.runSqlCmd(sso, "set client_min_messages = notice;", true);
-		} finally {
-			hawq.closePsql(sso);
-		}
 	}
 
 	/**
@@ -1521,27 +1530,29 @@ public class PxfHdfsRegression extends PxfTestCase {
 		return dataTable;
 	}
 
-	private void verifyFilterPushdown(ShellSystemObject sso, String queryFilter, String serializedFilter, int rows)
+	private void verifyFilterPushdown(ReadableExternalTable printFilterTable, 
+			String queryFilter, String serializedFilter, int rows)
 			throws Exception {
+		
+		final String NO_FILTER = "No filter";
 
 		ReportUtils.startLevel(report, getClass(), "run query with filter '" + queryFilter + "'");
-		String result = hawq.runSqlCmd(sso, "SELECT s1 FROM " + exTable.getName() + " " + queryFilter + ";", true);
-
-		ReportUtils.report(report, getClass(), "verify query returned " + rows + " rows");
-		if (rows == 1) {
-			Assert.assertTrue("expecting 1 row", result.contains("1 row"));
-		} else {
-			Assert.assertTrue("expecting " + rows + " row", result.contains(rows + " row"));
+		try {
+			hawq.queryResults(printFilterTable, "SELECT s1 FROM " + printFilterTable.getName() + " " + queryFilter + ";");
+			Assert.fail("Query should throw a filter printer exception");
+		} catch (Exception e) {
+			// tcServer displays special character in their HTML representation, 
+			// need to convert our string as well.
+			if (serializedFilter == null) {
+				serializedFilter = NO_FILTER;
+			}
+			serializedFilter = StringEscapeUtils.escapeHtml(serializedFilter);
+			ExceptionUtils.validate(report, e, new Exception("ERROR.*Filter string: '" + serializedFilter + "'.*"), true, true);
 		}
-		if (serializedFilter == null) {
-			ReportUtils.report(report, getClass(), "verify filter no was pushed");
-			Assert.assertTrue("expecting to have no filter", result.contains("X-GP-HAS-FILTER: 0"));
-		} else {
-			ReportUtils.report(report, getClass(), "verify filter was pushed");
-			Assert.assertTrue("expecting to have filter", result.contains("X-GP-HAS-FILTER: 1"));
-			ReportUtils.report(report, getClass(), "verify filter is '" + serializedFilter + "'");
-			Assert.assertTrue("expecting filter to be '" + serializedFilter + "'", result.contains("X-GP-FILTER: " + serializedFilter));
-		}
+		
+		ReportUtils.report(report, getClass(), "expecting query to return " + rows + " rows");
+		hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " " + queryFilter + ";");
+		Assert.assertEquals(exTable.getData().size(), rows);
 		ReportUtils.stopLevel(report);
 	}
 
