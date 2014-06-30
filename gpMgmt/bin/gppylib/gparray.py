@@ -447,13 +447,15 @@ class GpDB:
         templateTarFileDir = '/tmp'
         templateTarFileName = 'hawq_template' + time.strftime("%Y%m%d_%H%M%S")
         dstTarFile = templateTarFileDir + '/' + templateTarFileName
+        # tar runs on the remote template segment.
         tarCmd = CreateTar("Tar data direcotry", self.getSegmentDataDirectory(), dstTarFile, REMOTE, self.address, 'pgsql_tmp')
         tarCmd.run(validateAfter = True)
         res = tarCmd.get_results()
+        # scp tar file to the master
         cpCmd = Scp("Copy system data directory tar", dstTarFile, dstDir, self.address, None, True)
         cpCmd.run(validateAfter = True)
         res = cpCmd.get_results()
-        untarCmd = ExtractTar("Untar data directory", dstTarFile, dstDir)
+        untarCmd = ExtractTar("Untar data directory", dstDir + '/' + templateTarFileName, dstDir)
         untarCmd.run(validateAfter = True)
         res = untarCmd.get_results()
         rmCmd = RemoveFiles('Remove data directory tar', dstDir + '/' + templateTarFileName)
