@@ -104,7 +104,7 @@ EOF
 ## Publish artifacts?
 ##
 
-if [ "${BLDWRAP_PUBLISH_ARTIFACTS}" = "true" ]; then 
+if [ "${PUBLISH_HAWQ_ARTIFACTS}" = "true" ]; then 
 
     GPPKGS=$( ls src/*${BUILD_NUMBER}*.gppkg )
 
