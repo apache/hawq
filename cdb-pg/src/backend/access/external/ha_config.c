@@ -6,7 +6,6 @@
 
 static NNHAConf *init_config(unsigned int numnodes);
 static NNHAConf *load_hdfs_client_config(const char *nameservice);
-static void find_active_namenode(NNHAConf *conf, const char *nameservice);
 static void free_string_array(char **arr, int size);
 static void set_one_namenode(NNHAConf *conf, int idx, Namenode *source);
 static void validate_result(NNHAConf *conf);
@@ -15,7 +14,7 @@ static void validate_string(char *s,  const char *m1, int num);
 static void traceNamenodeArr(Namenode* nns, int len);
 
 /*
- * load_nn_ha_config
+ * GPHD_HA_load_nodes
  *
  * Load the Namenode High-Availability properties set for a given 
  * HA nameservice from the HDFS client configuration files
@@ -25,21 +24,20 @@ static void traceNamenodeArr(Namenode* nns, int len);
  * server and will move to an independent stand-alone application server 
  */
 NNHAConf*
-load_nn_ha_config(const char *nameservice)
+GPHD_HA_load_nodes(const char *nameservice)
 {
 	NNHAConf *conf = load_hdfs_client_config(nameservice);
 	validate_result(conf);
-	find_active_namenode(conf, nameservice);	
 	return conf;
 }
 
 /*
- * release_nn_ha_config
+ * GPHD_HA_release_nodes
  *
  * Free the memory allocated for the data structure holding the HA configuration
  */
 void
-release_nn_ha_config(NNHAConf *conf)
+GPHD_HA_release_nodes(NNHAConf *conf)
 {
 	if (!conf)
 		return;
@@ -80,9 +78,7 @@ init_config(unsigned int numnodes)
 	conf->nodes     = ALLOC_STRINGS_ARR(numnodes);
 	conf->rpcports  = ALLOC_STRINGS_ARR(numnodes);
 	conf->restports = ALLOC_STRINGS_ARR(numnodes);
-	
 	conf->numn  = numnodes;
-	conf->active = AC_NOT_SET;
 	
 	return conf;
 }
@@ -103,7 +99,7 @@ load_hdfs_client_config(const char *nameservice)
 				 errmsg("nameservice %s not found in client configuration. No HA namenodes provided",
 						nameservice)));
 	
-	if (len == AC_ONE_NODE)
+	if (len == HA_ONE_NODE)
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("High availability for nameservice %s was configured with only one node. A high availability scheme requires at least two nodes ",
@@ -175,34 +171,6 @@ set_one_namenode(NNHAConf *conf, int idx, Namenode *source)
 }
 
 /*
- * Discover in runtime which is the HA active namenode
- */
-static void find_active_namenode(NNHAConf *conf, const char *nameservice)
-{	
-	int i;
-	conf->active = AC_NOT_SET;
-	for (i = 0; i < conf->numn; i++)
-	{
-		elog(DEBUG2, "Connecting to HA Namenode-%d at host <%s> port <%s>.",
-			 i + 1, conf->nodes[i], conf->rpcports[i]);
-		if (ping(conf->nodes[i], conf->rpcports[i]))
-		{ 
-			conf->active = i;
-			break;
-		}
-		else 
-		  elog(LOG, "Failed to connect to HA Namenode-%d at host <%s> port <%s>. %s",
-			   i + 1, conf->nodes[i], conf->rpcports[i],
-			   i == (conf->numn - 1) ? "No more HA Namenodes to connect to." : "Will attempt to connect to next Namenode.");
-	}
-	
-	if (conf->active == AC_NOT_SET)
-			ereport(ERROR,
-				(errcode(ERRCODE_CONNECTION_FAILURE),
-				 errmsg("No HA active namenode found for nameservice %s", nameservice)));
-}
-
-/*
  * Validate the obtained NN host and ports
  */
 static void 
@@ -245,6 +213,5 @@ validate_port(char *port,  const char *m1, int num)
 	if (numport == 0 || (tail && strlen(tail) > 0) /* port had a non-numeric part*/ || numport > max_port_number)
 			ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("Invalid port <%s> detected in nameservice configuration", port)));	
-	
+				 errmsg("Invalid port <%s> detected in nameservice configuration", port)));
 }

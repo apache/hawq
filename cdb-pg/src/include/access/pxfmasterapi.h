@@ -15,6 +15,7 @@
 #include "commands/copy.h"
 #include "access/pxfuriparser.h"
 #include "access/hd_work_mgr.h"
+#include "access/pxfutils.h"
 
 /*
  * One debug level for all log messages from the data allocation algorithm
@@ -22,15 +23,6 @@
 #define FRAGDEBUG DEBUG2
 
 #define REST_HEADER_JSON_RESPONSE "Accept: application/json"
-
-typedef struct sClientContext
-{
-	CHURL_HEADERS http_headers;
-	CHURL_HANDLE handle;
-	char chunk_buf[RAW_BUF_SIZE];	/* part of the HTTP response - received	*/
-									/* from one call to churl_read 			*/
-	StringInfoData the_rest_buf; 	/* contains the complete HTTP response 	*/
-} ClientContext;
 
 typedef struct sPxfServer
 {
@@ -60,7 +52,6 @@ typedef struct sFragmentHost
 	int   rest_port;
 } FragmentHost;
 
-extern void process_request(ClientContext* client_context, char *uri);
 extern List* get_datanode_rest_servers(GPHDUri *hadoop_uri, ClientContext* client_context);
 extern void free_datanode_rest_servers(List *srvrs);
 extern void free_datanode_rest_server(PxfServer* srv);

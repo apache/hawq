@@ -1,6 +1,5 @@
 
 #include "access/pxfuriparser.h"
-#include "access/ha_config.h"
 #include "catalog/pg_exttable.h"
 #include "utils/formatting.h"
 #include "utils/uri.h"
@@ -129,6 +128,8 @@ freeGPHDUri(GPHDUri *uri)
 	pfree(uri->data);
 
 	GPHDUri_free_options(uri);
+	if (uri->ha_nodes)
+		GPHD_HA_release_nodes(uri->ha_nodes);
 
 	pfree(uri);
 }
@@ -344,6 +345,7 @@ GPHDUri_parse_authority(GPHDUri *uri, char **cursor)
 		uri->port = pstrdup(portstart + 1);
 		hostlen = portstart - hostport;
 		uri->host = pnstrdup(hostport, hostlen);
+		uri->ha_nodes = NULL; /* signal that we are not in the HA case */
 	}
 	else /* the authority is a nameservice string - we are going to find the HighAvailibility NN */
 		GPHDUri_fetch_authority_from_ha_nn(uri, hostport);
@@ -377,10 +379,14 @@ GPHDUri_parse_authority(GPHDUri *uri, char **cursor)
 static void
 GPHDUri_fetch_authority_from_ha_nn(GPHDUri *uri, char *nameservice)
 {
-	NNHAConf* hac = load_nn_ha_config(nameservice);
-	uri->host = pstrdup(hac->nodes[hac->active]);
-	uri->port = pstrdup(hac->restports[hac->active]);
-	release_nn_ha_config(hac);
+	uri->ha_nodes = GPHD_HA_load_nodes(nameservice);
+	/*
+	 * Let's try our luck with the first node. In case the first one is not active
+	 * the failover code around call_rest() - pxfmasterapi.c, will try the second
+	 * node
+	 */
+	uri->host = pstrdup(uri->ha_nodes->nodes[0]);
+	uri->port = pstrdup(uri->ha_nodes->restports[0]);
 }	
 
 /*

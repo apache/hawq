@@ -14,30 +14,10 @@
 static List* parse_datanodes_response(List *rest_srvrs, StringInfo rest_buf);
 static PxfStatsElem* parse_get_stats_response(StringInfo rest_buf);
 static List* parse_get_fragments_response(List* fragments, StringInfo rest_buf);
-
-/*
- * Wrapper for libchurl
- */
-void process_request(ClientContext* client_context, char *uri)
-{
-	size_t n = 0;
-
-	print_http_headers(client_context->http_headers);
-	client_context->handle = churl_init_download(uri, client_context->http_headers);
-	memset(client_context->chunk_buf, 0, RAW_BUF_SIZE);
-	resetStringInfo(&(client_context->the_rest_buf));
-
-	/* read some bytes to make sure the connection is established */
-	churl_read_check_connectivity(client_context->handle);
-
-	while ((n = churl_read(client_context->handle, client_context->chunk_buf, sizeof(client_context->chunk_buf))) != 0)
-	{
-		appendBinaryStringInfo(&(client_context->the_rest_buf), client_context->chunk_buf, n);
-		memset(client_context->chunk_buf, 0, RAW_BUF_SIZE);
-	}
-
-	churl_cleanup(client_context->handle);
-}
+static void ha_failover(GPHDUri *hadoop_uri, ClientContext *client_context, char* rest_msg);
+static void rest_request(GPHDUri *hadoop_uri, ClientContext* client_context, char *
+);
+static char* concat(char *body, char *tail);
 
 /*
  * Obtain the datanode REST servers host/port data
@@ -67,32 +47,44 @@ parse_datanodes_response(List *rest_srvrs, StringInfo rest_buf)
 }
 
 /*
+ * Wrap the REST call with a retry for the HA HDFS scenario
+ */
+static void
+rest_request(GPHDUri *hadoop_uri, ClientContext* client_context, char *restMsg)
+{
+	Assert(hadoop_uri->host != NULL && hadoop_uri->port != NULL);
+
+	/* construct the request */
+	PG_TRY();
+	{
+		call_rest(hadoop_uri, client_context, restMsg);
+	}
+	PG_CATCH();
+	{
+		if (hadoop_uri->ha_nodes) /* if we are in the HA scenario will try to access the second Namenode machine */
+			ha_failover(hadoop_uri, client_context, restMsg);
+		else /*This is not HA - so let's re-throw */
+			PG_RE_THROW();
+	}
+	PG_END_TRY();
+}
+
+/*
  * Get host/port data for the REST servers running on each datanode
  */
 List*
 get_datanode_rest_servers(GPHDUri *hadoop_uri, ClientContext* client_context)
 {
 	List* rest_srvrs_list = NIL;
-	StringInfoData get_srvrs_uri;
-	initStringInfo(&get_srvrs_uri);
+	char *restMsg = "http://%s:%s/%s/%s/HadoopCluster/getNodesInfo";
 
-	Assert(hadoop_uri->host != NULL && hadoop_uri->port != NULL);
-
-	appendStringInfo(&get_srvrs_uri, "http://%s:%s/%s/%s/HadoopCluster/getNodesInfo",
-											hadoop_uri->host,
-											hadoop_uri->port,
-											PXF_SERVICE_PREFIX,
-											PXF_VERSION);
-
-	process_request(client_context, get_srvrs_uri.data);
+	rest_request(hadoop_uri, client_context, restMsg);
 
 	/*
 	 * the curl client finished the communication. The response from
 	 * the backend lies at rest_buf->data
 	 */
 	rest_srvrs_list = parse_datanodes_response(rest_srvrs_list, &(client_context->the_rest_buf));
-	pfree(get_srvrs_uri.data);
-
 	return rest_srvrs_list;
 }
 
@@ -119,24 +111,15 @@ void free_datanode_rest_server(PxfServer* srv)
  * Fetch the statistics from the PXF service
  */
 PxfStatsElem *get_data_statistics(GPHDUri* hadoop_uri,
-										 ClientContext *cl_context,
+										 ClientContext *client_context,
 										 StringInfo err_msg)
 {
-	StringInfoData request;
-	initStringInfo(&request);
-
-	/* construct the request */
-	appendStringInfo(&request, "http://%s:%s/%s/%s/Analyzer/getEstimatedStats?path=%s",
-					 hadoop_uri->host,
-					 hadoop_uri->port,
-					 PXF_SERVICE_PREFIX,
-					 PXF_VERSION,
-					 hadoop_uri->data);
+	char *restMsg = concat("http://%s:%s/%s/%s/Analyzer/getEstimatedStats?path=", hadoop_uri->data);
 
 	/* send the request. The response will exist in rest_buf.data */
 	PG_TRY();
 	{
-		process_request(cl_context, request.data);
+		rest_request(hadoop_uri, client_context, restMsg);
 	}
 	PG_CATCH();
 	{
@@ -165,7 +148,7 @@ PxfStatsElem *get_data_statistics(GPHDUri* hadoop_uri,
 	PG_END_TRY();
 
 	/* parse the JSON response and form a fragments list to return */
-	return parse_get_stats_response(&(cl_context->the_rest_buf));
+	return parse_get_stats_response(&(client_context->the_rest_buf));
 }
 
 /*
@@ -193,6 +176,49 @@ static PxfStatsElem *parse_get_stats_response(StringInfo rest_buf)
 }
 
 /*
+ * ha_failover
+ *
+ * Handle the HA failover logic for the REST call.
+ * Change the active NN located in <hadoop_uri->host>:<hadoop_uri->port>
+ * and issue the REST call again
+ */
+static void
+ha_failover(GPHDUri *hadoop_uri,
+		    ClientContext *client_context,
+		    char* rest_msg)
+{
+	int i;
+	NNHAConf *conf = hadoop_uri->ha_nodes;
+
+	for (i = 0; i < conf->numn; i++)
+	{
+		/* There are two HA Namenodes inside NNHAConf. We tried one. Let's try the next one */
+		if (strcmp(conf->nodes[i], hadoop_uri->host) != 0)
+		{
+			if (hadoop_uri->host)
+				pfree(hadoop_uri->host);
+			if (hadoop_uri->port)
+				pfree(hadoop_uri->port);
+			hadoop_uri->host = pstrdup(conf->nodes[i]);
+			hadoop_uri->port = pstrdup(conf->restports[i]);
+			call_rest(hadoop_uri, client_context, rest_msg);
+			break;
+		}
+	}
+}
+
+/* Concatanate two literal strings using stringinfo */
+char* concat(char *body, char *tail)
+{
+	StringInfoData str;
+	initStringInfo(&str);
+
+	appendStringInfoString(&str, body);
+	appendStringInfoString(&str, tail);
+	return str.data;
+}
+
+/*
  * get_data_fragment_list
  *
  * 1. Request a list of fragments from the PXF Fragmenter class
@@ -205,20 +231,9 @@ get_data_fragment_list(GPHDUri *hadoop_uri,
 					   ClientContext *client_context)
 {
 	List *data_fragments = NIL;
-	StringInfoData request;
+	char *restMsg = concat("http://%s:%s/%s/%s/Fragmenter/getFragments?path=",hadoop_uri->data);
 
-	initStringInfo(&request);
-
-	/* construct the request */
-	appendStringInfo(&request, "http://%s:%s/%s/%s/Fragmenter/getFragments?path=%s",
-								hadoop_uri->host,
-								hadoop_uri->port,
-								PXF_SERVICE_PREFIX,
-								PXF_VERSION,
-								hadoop_uri->data);
-
-	/* send the request. The response will exist in rest_buf.data */
-	process_request(client_context, request.data);
+	rest_request(hadoop_uri, client_context, restMsg);
 
 	/* parse the JSON response and form a fragments list to return */
 	data_fragments = parse_get_fragments_response(data_fragments, &(client_context->the_rest_buf));

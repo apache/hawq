@@ -3,6 +3,8 @@
 
 #include "postgres.h"
 #include "fmgr.h"
+
+#include "access/ha_config.h"
 #include "utils/builtins.h"
 
 /*
@@ -57,6 +59,11 @@ typedef struct GPHDUri
 	/* options */
 	List			*options;   /* list of OptionData 		*/
 
+	/* HA
+	 * list of nodes for the HDFS HA case - the active host and port from
+	 * NNHAConf  will also occupy <host> and <port> members
+	 */
+	NNHAConf        *ha_nodes;
 } GPHDUri;
 
 GPHDUri	*parseGPHDUri(const char *uri_str, bool warn_on_deprecation);

@@ -16,37 +16,37 @@ static char *format_string_create(char *f,...);
 static void handle_pg_excp(char *msg, int errcode);
 
 /*
- * Unitest for load_nn_ha_config() in ../access/external/ha_config.c
- * load_nn_ha_config() discovers the active Namnode from an HA Namenodes pair.
+ * Unitest for GPHD_HA_load_nodes() in ../access/external/ha_config.c
+ * GPHD_HA_load_nodes() discovers the active Namnode from an HA Namenodes pair.
  * It does this by interacting with the API exposed by hdfs.h, from which it uses 
  * 2 functions:
  * a. Namenode * hdfsGetHANamenodes(const char * nameservice, int * size);
  * b. void hdfsFreeNamenodeInformation(Namenode * namenodes, int size);
- * This unitest verifies the correct interaction between load_nn_ha_config() implementation
+ * This unitest verifies the correct interaction between GPHD_HA_load_nodes() implementation
  * and the 2 hdfs.h APIs. It looks at the standard flows with expected input configuration
  * and also at limit cases with corrupted input configuration.
  * The mock functions for the two(2) hdfs.h APIs are in ha_config_mock.c.
  */
 
 /*
- * SUT function: NNHAConf* load_nn_ha_config(const char *nameservice);
+ * SUT function: NNHAConf* GPHD_HA_load_nodes(const char *nameservice);
  * Mock function: Namenode * hdfsGetHANamenodes(const char * nameservice, int * size) 
- * Negative test: load_nn_ha_config() receives an unexistent namesrvice
+ * Negative test: GPHD_HA_load_nodes() receives an unexistent namesrvice
  */
 void 
-test__load_nn_ha_config__UnknownNameservice(void **state)
+test__GPHD_HA_load_nodes__UnknownNameservice(void **state)
 {
 	/* 
 	 * In case it receives an unknown nameservice string, the real function hdfsGetHANamenodes()
 	 * will return NULL. We instruct our mock function to return NULL. In this way we simulate
-	 * an unknown_service scenario and verify that our SUT function load_nn_ha_config() handles
+	 * an unknown_service scenario and verify that our SUT function GPHD_HA_load_nodes() handles
 	 * correctly the NULL returned by hdfsGetHANamenodes.
 	 */
 	will_return(hdfsGetHANamenodes, NULL);
 	
 	PG_TRY();
 	{
-		NNHAConf *hac = load_nn_ha_config("UNKNOWN_SERVICE");
+		NNHAConf *hac = GPHD_HA_load_nodes("UNKNOWN_SERVICE");
 	}
 	PG_CATCH();
 	{
@@ -60,13 +60,13 @@ test__load_nn_ha_config__UnknownNameservice(void **state)
 }
 
 /*
- * SUT function: NNHAConf* load_nn_ha_config(const char *nameservice);
+ * SUT function: NNHAConf* GPHD_HA_load_nodes(const char *nameservice);
  * Mock function: Namenode * hdfsGetHANamenodes(const char * nameservice, int * size) 
  * Negative test: hdfsGetHANamenodes() returns just one namenode. 
  * This is not an HA sustainable.
  */
 void 
-test__load_nn_ha_config__OneNN(void **state)
+test__GPHD_HA_load_nodes__OneNN(void **state)
 {
 	unsigned int numn = 1;
 	Namenode nns[1];
@@ -77,7 +77,7 @@ test__load_nn_ha_config__OneNN(void **state)
 
 	PG_TRY();
 	{
-		NNHAConf *hac = load_nn_ha_config("NAMESERVICE");
+		NNHAConf *hac = GPHD_HA_load_nodes("NAMESERVICE");
 	}
 	PG_CATCH();
 	{
@@ -92,170 +92,15 @@ test__load_nn_ha_config__OneNN(void **state)
 	assert_true(false);
 	
 }
-
-/*
- * SUT function: NNHAConf* load_nn_ha_config(const char *nameservice);
- * Mock functions: 
- *         Namenode * hdfsGetHANamenodes(const char * nameservice, int * size);
- *         void hdfsFreeNamenodeInformation(Namenode * namenodes, int size);
- *         bool ping(char* host, char *port);
- * hdfsGetHANamenodes() returns a valid Array of Namenodes and ping() discovers
- * that the second namenode is active
- */
-void 
-test__load_nn_ha_config__SecondNNFound(void **state)
-{
-	unsigned int numn = 2;
-	Namenode nns[] = { {"mdw:2080", "mdw:50070"}, {"smdw:2080", "smdw:50070"}};
-	
-	will_return(hdfsGetHANamenodes, nns);
-	will_assign_value(hdfsGetHANamenodes, size, numn);
-	will_be_called(hdfsFreeNamenodeInformation);
-	expect_string(ping, host, "mdw");
-	expect_string(ping, port, "2080");
-	will_return(ping, false);
-	expect_string(ping, host, "smdw");
-	expect_string(ping, port, "2080");
-	will_return(ping, true);
-
-	NNHAConf *hac = load_nn_ha_config("NAMESERVICE");
-
-	assert_int_equal(hac->active, 1);
-	assert_int_equal(hac->numn, 2);
-	assert_string_equal(hac->rpcports[0], "2080");
-	assert_string_equal(hac->restports[0], "50070");
-	assert_string_equal(hac->nodes[0], "mdw");
-	assert_string_equal(hac->rpcports[1], "2080");
-	assert_string_equal(hac->restports[1], "50070");
-	assert_string_equal(hac->nodes[1], "smdw");
-}
-
-/*
- * SUT function: NNHAConf* load_nn_ha_config(const char *nameservice);
- * Mock functions: 
- *         Namenode * hdfsGetHANamenodes(const char * nameservice, int * size);
- *         void hdfsFreeNamenodeInformation(Namenode * namenodes, int size);
- *         bool ping(char* host, char *port);
- * hdfsGetHANamenodes() returns a valid Array of Namenodes and ping() discovers
- * that the first namenode is active
- */
-void 
-test__load_nn_ha_config__FirstNNFound(void **state)
-{
-	unsigned int numn = 2;
-	Namenode nns[] = { {"mdw:2080", "mdw:50070"}, {"smdw:2080", "smdw:50070"}};
-	
-	will_return(hdfsGetHANamenodes, nns);
-	will_assign_value(hdfsGetHANamenodes, size, numn);
-	will_be_called(hdfsFreeNamenodeInformation);
-	expect_string(ping, host, "mdw");
-	expect_string(ping, port, "2080");	
-	will_return(ping, true); 
-
-	NNHAConf *hac = load_nn_ha_config("NAMESERVICE");
-
-	assert_int_equal(hac->active, 0);
-	assert_int_equal(hac->numn, 2);
-	assert_string_equal(hac->rpcports[0], "2080");
-	assert_string_equal(hac->restports[0], "50070");
-	assert_string_equal(hac->nodes[0], "mdw");
-	assert_string_equal(hac->rpcports[1], "2080");
-	assert_string_equal(hac->restports[1], "50070");
-	assert_string_equal(hac->nodes[1], "smdw");     
-}
-
-/*
- * SUT function: NNHAConf* load_nn_ha_config(const char *nameservice);
- * Mock functions: 
- *         Namenode * hdfsGetHANamenodes(const char * nameservice, int * size);
- *         void hdfsFreeNamenodeInformation(Namenode * namenodes, int size);
- *         bool ping(char* host, char *port);
- * hdfsGetHANamenodes() returns a valid Array of 3 Namenodes and ping() discovers
- * that the third namenode is active
- */
-void 
-test__load_nn_ha_config__ThirdNNFound(void **state)
-{
-	unsigned int numn = 3;
-	Namenode nns[] = { {"mdw:2080", "mdw:50070"}, {"smdw:2080", "smdw:50070"}, {"tmdw:2080", "tmdw:50070"} };
-        
-	will_return(hdfsGetHANamenodes, nns);
-	will_assign_value(hdfsGetHANamenodes, size, numn);
-	will_be_called(hdfsFreeNamenodeInformation);
-	expect_string(ping, host, "mdw");
-	expect_string(ping, port, "2080");
-	will_return(ping, false);
-	expect_string(ping, host, "smdw");
-	expect_string(ping, port, "2080");	
-	will_return(ping, false);
-	expect_string(ping, host, "tmdw");
-	expect_string(ping, port, "2080");	
-	will_return(ping, true); 
-	
-	NNHAConf *hac = load_nn_ha_config("NAMESERVICE");
-	
-	assert_int_equal(hac->active, 2);
-	assert_int_equal(hac->numn, 3);
-	assert_string_equal(hac->rpcports[0], "2080");
-	assert_string_equal(hac->restports[0], "50070");
-	assert_string_equal(hac->nodes[0], "mdw");
-	assert_string_equal(hac->rpcports[1], "2080");
-	assert_string_equal(hac->restports[1], "50070");
-	assert_string_equal(hac->nodes[1], "smdw");
-	assert_string_equal(hac->rpcports[2], "2080");
-	assert_string_equal(hac->restports[2], "50070");
-	assert_string_equal(hac->nodes[2], "tmdw");
-}
-
-/*
- * SUT function: NNHAConf* load_nn_ha_config(const char *nameservice)
- * Mock functions: 
- *         Namenode * hdfsGetHANamenodes(const char * nameservice, int * size);
- *         void hdfsFreeNamenodeInformation(Namenode * namenodes, int size);
- *         bool ping(char* host, char *port);
- * Negative test: hdfsGetHANamenodes() returns a valid Array of namenodes and 
- * ping() does not discover an active namenode
- */
-void 
-test__load_nn_ha_config__NoneFound(void **state)
-{
-	unsigned int numn = 2;
-	Namenode nns[] = { {"mdw:2080", "mdw:50070"}, {"smdw:2080", "smdw:50070"}};
-	
-	will_return(hdfsGetHANamenodes, nns);
-	will_assign_value(hdfsGetHANamenodes, size, numn);
-	will_be_called(hdfsFreeNamenodeInformation);
-	expect_string(ping, host, "mdw");
-	expect_string(ping, port, "2080");	
-	will_return(ping, false);
-	expect_string(ping, host, "smdw");
-	expect_string(ping, port, "2080");	
-	will_return(ping, false);
-	
-	PG_TRY();
-	{
-		NNHAConf *hac = load_nn_ha_config("NAMESERVICE");}
-	
-	PG_CATCH();
-	{
-		char *msg = format_string_create("No HA active namenode found for nameservice %s", "NAMESERVICE");
-		handle_pg_excp(msg, ERRCODE_CONNECTION_FAILURE);                
-		format_string_release(msg); 
-		return;
-	}
-	PG_END_TRY();
-
-	assert_true(false);
-}
 										 																							
 /*
- * SUT function: NNHAConf* load_nn_ha_config(const char *nameservice);
+ * SUT function: NNHAConf* GPHD_HA_load_nodes(const char *nameservice);
  * Mock function: Namenode * hdfsGetHANamenodes(const char * nameservice, int * size) 
  * Negative test: hdfsGetHANamenodes() returns a Namenode.rpc_address field without ":"
  * the host:port delimiter.
  */
 void 
-test__load_nn_ha_config__RpcDelimMissing(void **state)
+test__GPHD_HA_load_nodes__RpcDelimMissing(void **state)
 {
 	unsigned int numn = 2;
 	Namenode nns[] = { {"mdw2080", "mdw:50070"}, {"smdw:2080", "smdw:50070"}};	
@@ -265,7 +110,7 @@ test__load_nn_ha_config__RpcDelimMissing(void **state)
 		
 	PG_TRY();
 	{
-		NNHAConf *hac = load_nn_ha_config("NAMESERVICE");
+		NNHAConf *hac = GPHD_HA_load_nodes("NAMESERVICE");
 	}
 	PG_CATCH();
 	{
@@ -280,13 +125,13 @@ test__load_nn_ha_config__RpcDelimMissing(void **state)
 }
 
 /*
- * SUT function: NNHAConf* load_nn_ha_config(const char *nameservice)
+ * SUT function: NNHAConf* GPHD_HA_load_nodes(const char *nameservice)
  * Mock function: Namenode * hdfsGetHANamenodes(const char * nameservice, int * size) 
  * Negative test: hdfsGetHANamenodes() returns a Namenode.http_address field without ":"
  * the host:port delimiter.
  */
 void 
-test__load_nn_ha_config__HttpDelimMissing(void **state)
+test__GPHD_HA_load_nodes__HttpDelimMissing(void **state)
 {
 	unsigned int numn = 2;
 	Namenode nns[] = { {"mdw:2080", "mdw:50070"}, {"smdw:2080", "smdw50070"}};	
@@ -296,7 +141,7 @@ test__load_nn_ha_config__HttpDelimMissing(void **state)
 		
 	PG_TRY();
 	{
-		NNHAConf *hac = load_nn_ha_config("NAMESERVICE");
+		NNHAConf *hac = GPHD_HA_load_nodes("NAMESERVICE");
 	}
 	PG_CATCH();
 	{
@@ -311,13 +156,13 @@ test__load_nn_ha_config__HttpDelimMissing(void **state)
 }
 
 /*
- * SUT function: NNHAConf* load_nn_ha_config(const char *nameservice)
+ * SUT function: NNHAConf* GPHD_HA_load_nodes(const char *nameservice)
  * Mock function: Namenode * hdfsGetHANamenodes(const char * nameservice, int * size) 
  * Negative test: hdfsGetHANamenodes() returns a Namenode.http_address field without 
  * the host - ":port".
  */
 void 
-test__load_nn_ha_config__HostMissing(void **state)
+test__GPHD_HA_load_nodes__HostMissing(void **state)
 {
 	unsigned int numn = 2;
 	Namenode nns[] = { {":2080", "mdw:50070"}, {"smdw:2080", "smdw:50070"}};	
@@ -328,7 +173,7 @@ test__load_nn_ha_config__HostMissing(void **state)
 	
 	PG_TRY();
 	{
-		NNHAConf *hac = load_nn_ha_config("NAMESERVICE");
+		NNHAConf *hac = GPHD_HA_load_nodes("NAMESERVICE");
 	}
 	PG_CATCH();
 	{
@@ -340,13 +185,13 @@ test__load_nn_ha_config__HostMissing(void **state)
 }
 
 /*
- * SUT function: NNHAConf* load_nn_ha_config(const char *nameservice)
+ * SUT function: NNHAConf* GPHD_HA_load_nodes(const char *nameservice)
  * Mock function: Namenode * hdfsGetHANamenodes(const char * nameservice, int * size) 
  * Negative test: hdfsGetHANamenodes() returns a Namenode.http_address field without 
  * the port - "host:".
  */
 void 
-test__load_nn_ha_config__PortMissing(void **state)
+test__GPHD_HA_load_nodes__PortMissing(void **state)
 {
 	unsigned int numn = 2;
 	Namenode nns[] = { {"mdw:", "mdw:50070"}, {"smdw:2080", "smdw:50070"}};	
@@ -357,7 +202,7 @@ test__load_nn_ha_config__PortMissing(void **state)
 	
 	PG_TRY();
 	{
-		NNHAConf *hac = load_nn_ha_config("NAMESERVICE");
+		NNHAConf *hac = GPHD_HA_load_nodes("NAMESERVICE");
 	}
 	PG_CATCH();
 	{
@@ -369,12 +214,12 @@ test__load_nn_ha_config__PortMissing(void **state)
 }
 
 /*
- * SUT function: NNHAConf* load_nn_ha_config(const char *nameservice)
+ * SUT function: NNHAConf* GPHD_HA_load_nodes(const char *nameservice)
  * Mock function: Namenode * hdfsGetHANamenodes(const char * nameservice, int * size) 
  * Negative test: hdfsGetHANamenodes() returns an empty Namenode address string.
  */
 void 
-test__load_nn_ha_config__EmptyAddress(void **state)
+test__GPHD_HA_load_nodes__EmptyAddress(void **state)
 {
 	unsigned int numn = 2;
 	Namenode nns[] = { {"", "mdw:50070"}, {"smdw:2080", "smdw:50070"}};	
@@ -384,7 +229,7 @@ test__load_nn_ha_config__EmptyAddress(void **state)
 	
 	PG_TRY();
 	{
-		NNHAConf *hac = load_nn_ha_config("NAMESERVICE");
+		NNHAConf *hac = GPHD_HA_load_nodes("NAMESERVICE");
 	}
 	PG_CATCH();
 	{
@@ -396,13 +241,13 @@ test__load_nn_ha_config__EmptyAddress(void **state)
 }
 
 /*
- * SUT function: NNHAConf* load_nn_ha_config(const char *nameservice)
+ * SUT function: NNHAConf* GPHD_HA_load_nodes(const char *nameservice)
  * Mock function: Namenode * hdfsGetHANamenodes(const char * nameservice, int * size) 
  * Negative test: hdfsGetHANamenodes() returns a port outside the valid range
  *  - a number higher than 65535
  */
 void 
-test__load_nn_ha_config__PortIsInvalidNumber(void **state)
+test__GPHD_HA_load_nodes__PortIsInvalidNumber(void **state)
 {
 	unsigned int numn = 2;
 	Namenode nns[] = { {"mdw:2080", "mdw:65550"}, {"smdw:2080", "smdw:50070"}};	
@@ -413,7 +258,7 @@ test__load_nn_ha_config__PortIsInvalidNumber(void **state)
 	
 	PG_TRY();
 	{
-		NNHAConf *hac = load_nn_ha_config("NAMESERVICE");
+		NNHAConf *hac = GPHD_HA_load_nodes("NAMESERVICE");
 	}
 	PG_CATCH();
 	{
@@ -425,12 +270,12 @@ test__load_nn_ha_config__PortIsInvalidNumber(void **state)
 }
 
 /*
- * SUT function: NNHAConf* load_nn_ha_config(const char *nameservice)
+ * SUT function: NNHAConf* GPHD_HA_load_nodes(const char *nameservice)
  * Mock function: Namenode * hdfsGetHANamenodes(const char * nameservice, int * size) 
  * Negative test: hdfsGetHANamenodes() returns a port that is not a numeric string
  */
 void 
-test__load_nn_ha_config__PortIsNotNumber_TakeOne(void **state)
+test__GPHD_HA_load_nodes__PortIsNotNumber_TakeOne(void **state)
 {
 	NNHAConf *hac;
 	unsigned int numn = 2;
@@ -442,7 +287,7 @@ test__load_nn_ha_config__PortIsNotNumber_TakeOne(void **state)
 	
 	PG_TRY();
 	{
-		hac = load_nn_ha_config("NAMESERVICE");
+		hac = GPHD_HA_load_nodes("NAMESERVICE");
 	}
 	PG_CATCH();
 	{
@@ -454,12 +299,12 @@ test__load_nn_ha_config__PortIsNotNumber_TakeOne(void **state)
 }
 
 /*
- * SUT function: NNHAConf* load_nn_ha_config(const char *nameservice)
+ * SUT function: NNHAConf* GPHD_HA_load_nodes(const char *nameservice)
  * Mock function: Namenode * hdfsGetHANamenodes(const char * nameservice, int * size) 
  * Negative test: hdfsGetHANamenodes() returns a port that is not a numeric string
  */
 void 
-test__load_nn_ha_config__PortIsNotNumber_TakeTwo(void **state)
+test__GPHD_HA_load_nodes__PortIsNotNumber_TakeTwo(void **state)
 {
 	NNHAConf *hac;
 	unsigned int numn = 2;
@@ -471,7 +316,7 @@ test__load_nn_ha_config__PortIsNotNumber_TakeTwo(void **state)
 	
 	PG_TRY();
 	{
-		hac = load_nn_ha_config("NAMESERVICE");
+		hac = GPHD_HA_load_nodes("NAMESERVICE");
 	}
 	PG_CATCH();
 	{
@@ -488,20 +333,16 @@ main(int argc, char *argv[])
 	cmockery_parse_arguments(argc, argv);
 
 	const UnitTest tests[] = {
-		    unit_test(test__load_nn_ha_config__UnknownNameservice),
-            unit_test(test__load_nn_ha_config__OneNN), 
-		    unit_test(test__load_nn_ha_config__SecondNNFound),
-		    unit_test(test__load_nn_ha_config__FirstNNFound),
-		    unit_test(test__load_nn_ha_config__ThirdNNFound),
-		    unit_test(test__load_nn_ha_config__NoneFound),
-		    unit_test(test__load_nn_ha_config__RpcDelimMissing),
-		    unit_test(test__load_nn_ha_config__HttpDelimMissing),
-		    unit_test(test__load_nn_ha_config__HostMissing), 
-		    unit_test(test__load_nn_ha_config__PortMissing),
-		    unit_test(test__load_nn_ha_config__EmptyAddress),
-		    unit_test(test__load_nn_ha_config__PortIsInvalidNumber),		
-		    unit_test(test__load_nn_ha_config__PortIsNotNumber_TakeOne),
-		    unit_test(test__load_nn_ha_config__PortIsNotNumber_TakeTwo)
+		    unit_test(test__GPHD_HA_load_nodes__UnknownNameservice),
+            unit_test(test__GPHD_HA_load_nodes__OneNN), 
+		    unit_test(test__GPHD_HA_load_nodes__RpcDelimMissing),
+		    unit_test(test__GPHD_HA_load_nodes__HttpDelimMissing),
+		    unit_test(test__GPHD_HA_load_nodes__HostMissing), 
+		    unit_test(test__GPHD_HA_load_nodes__PortMissing),
+		    unit_test(test__GPHD_HA_load_nodes__EmptyAddress),
+		    unit_test(test__GPHD_HA_load_nodes__PortIsInvalidNumber),		
+		    unit_test(test__GPHD_HA_load_nodes__PortIsNotNumber_TakeOne),
+		    unit_test(test__GPHD_HA_load_nodes__PortIsNotNumber_TakeTwo)
 	};
 	return run_tests(tests);
 }
