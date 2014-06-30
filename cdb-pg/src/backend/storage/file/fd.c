@@ -2440,7 +2440,7 @@ HdfsGetConnection(const char * path)
 			if (NULL == entry->fs)
 			{
 				hash_search(HdfsFsTable, location, HASH_REMOVE, &found);
-				ereport(WARNING,
+				ereport(LOG,
 						(errcode(ERRCODE_IO_ERROR),
 								errmsg("fail to connect hdfs at %s, errno = %d", location, errno),
 								errdetail("%s", HdfsGetLastError())));
