@@ -2,6 +2,7 @@
 ## ======================================================================
 
 PULSE_BUILD_NUMBER=${PULSE_BUILD_NUMBER:=9999}
+PADS_PUBLISH_LOCATION="build@dist.dh.greenplum.com:/data/dist/PHD/testing/"
 
 pushd src
 
@@ -60,14 +61,12 @@ fi
 PADS_VERSION=$( echo ${HAWQ_RPM} | sed -e 's/hawq-\([0-9]\.[0-9]\.[0-9]\.[0-9]\).*/\1/' )
 
 PADS_TAR=PADS-${PADS_VERSION}-${BUILD_NUMBER}.tar.gz
-PADS_BIN_TAR=PADS-${PADS_VERSION}-bin-${BUILD_NUMBER}.tar.gz
 
 cat <<-EOF
 	======================================================================
 	TIMESTAMP ........ : $( date )
 	PADS_VERSION ..... : ${PADS_VERSION}
 	PADS_TAR ......... : ${PADS_TAR}
-	PADS_BIN_TAR ..... : ${PADS_BIN_TAR}
 
 ----------------------------------------------------------------------
 Creating tarball: ${PADS_TAR}
@@ -87,28 +86,9 @@ if [ $? != 0 ]; then
     exit 1
 fi
 
-rm -f PADS-${PADS_VERSION}-${BUILD_NUMBER}/*
-
-cat <<-EOF
-
-----------------------------------------------------------------------
-Creating tarball: ${PADS_BIN_TAR}
-----------------------------------------------------------------------
-
-EOF
-
-cp ${HAWQ_TARBALL} ${PXF_TARBALL} ${TCSERVER_TARBALL} PADS-${PADS_VERSION}-${BUILD_NUMBER}
-
-tar zcvf ../${PADS_BIN_TAR} PADS-${PADS_VERSION}-${BUILD_NUMBER}
-if [ $? != 0 ]; then
-    echo "FATAL: bin tar failed"
-    exit 1
-fi
-
 popd
 
 PADS_TAR_MD5=$( openssl dgst -md5 ${PADS_TAR} )
-PADS_BIN_TAR_MD5=$( openssl dgst -md5 ${PADS_BIN_TAR} )
 
 cat <<-EOF
 	
@@ -117,8 +97,41 @@ cat <<-EOF
 	$( ls -al ${PADS_TAR} ${PADS_BIN_TAR} )
 
 	PADS_TAR_MD5 ....... : ${PADS_TAR_MD5}
-	PADS_BIN_TAR_MD5 ... : ${PADS_BIN_TAR_MD5}
 	======================================================================
 EOF
+
+##
+## Publish artifacts?
+##
+
+if [ "${BLDWRAP_PUBLISH_ARTIFACTS}" = "true" ]; then 
+
+    GPPKGS=$( ls src/*${BUILD_NUMBER}*.gppkg )
+
+	cat <<-EOF
+		======================================================================
+		TIMESTAMP ........ : $( date )
+		PADS_TAR ......... : ${PADS_TAR}
+		GPPKGS ........... : ${GPPKGS}
+	
+		Destination(s):
+		  ${PADS_PUBLISH_LOCATION}
+		======================================================================
+	
+		----------------------------------------------------------------------
+		Shipping out files:
+		  scp -o StrictHostKeyChecking=no ${PADS_TAR} ${GPPKGS} ${PADS_PUBLISH_LOCATION}
+		----------------------------------------------------------------------
+	
+	EOF
+	
+	scp -o StrictHostKeyChecking=no ${PADS_TAR} ${GPPKGS} ${PADS_PUBLISH_LOCATION}
+	if [ $? != 0 ]; then
+	    echo "FATAL: scp failed (${PADS_PUBLISH_LOCATION})"
+	    exit 1
+	fi
+else
+    echo "Publishing is disabled ({BLDWRAP_PUBLISH_ARTIFACTS})"
+fi
 
 exit 0
