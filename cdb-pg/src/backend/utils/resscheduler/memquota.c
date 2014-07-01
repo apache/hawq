@@ -30,16 +30,6 @@
 #include "utils/relcache.h"
 #include "utils/resscheduler.h"
 
-/*
- * OIDs of partition functions that we mark as non-memory intensive.
- * TODO caragg 03/04/2014: Revert these changes when ORCA has the new partition
- * operator (MPP-22799)
- */
-#define GP_PARTITION_PROPAGATION_OID 6083
-#define GP_PARTITION_SELECTION_OID 6084
-#define GP_PARTITION_EXPANSION_OID 6085
-#define GP_PARTITION_INVERSE_OID 6086
-
 /**
  * Policy Auto. This contains information that will be used by Policy AUTO 
  */
@@ -244,94 +234,13 @@ IsBlockingOperator(Node *node)
 }
 
 /**
- * Special-case certain functions which we know are not memory intensive.
- * TODO caragg 03/04/2014: Revert these changes when ORCA has the new partition
- * operator (MPP-22799)
- *
- */
-static bool
-isMemoryIntensiveFunction(Oid funcid)
-{
-
-	if ((GP_PARTITION_PROPAGATION_OID == funcid) ||
-			(GP_PARTITION_SELECTION_OID == funcid) ||
-			(GP_PARTITION_EXPANSION_OID == funcid) ||
-			(GP_PARTITION_INVERSE_OID == funcid))
-
-	{
-		return false;
-	}
-
-	return true;
-}
-
-/**
  * Is a result node memory intensive? It is if it contains function calls.
- * We special-case certain functions used by ORCA which we know that are not
- * memory intensive
- * TODO caragg 03/04/2014: Revert these changes when ORCA has the new partition
- * operator (MPP-22799)
  */
 bool
 IsResultMemoryIntesive(Result *res)
 {
-
-	List *funcNodes = extract_nodes(NULL /* glob */,
-			(Node *) ((Plan *) res)->targetlist, T_FuncExpr);
-
-	int nFuncExpr = list_length(funcNodes);
-	if (nFuncExpr == 0)
-	{
-		/* No function expressions, not memory intensive */
-		return false;
-	}
-
-	bool isMemoryIntensive = false;
-	ListCell *lc = NULL;
-	foreach(lc, funcNodes)
-	{
-		FuncExpr *funcExpr = lfirst(lc);
-		Assert(IsA(funcExpr, FuncExpr));
-		if ( isMemoryIntensiveFunction(funcExpr->funcid))
-		{
-			/* Found a function that we don't know of. Mark as memory intensive */
-			isMemoryIntensive = true;
-			break;
-		}
-	}
-
-	/* Shallow free of the funcNodes list */
-	list_free(funcNodes);
-	funcNodes = NIL;
-
-	return isMemoryIntensive;
+	return contains_node_type(NULL, (Node *) ((Plan *) res)->targetlist, T_FuncExpr);
 }
-
-/**
- * Is a function scan memory intensive? Special case some known functions
- * that are not memory intensive.
- */
-static bool
-IsFunctionScanMemoryIntensive(FunctionScan *funcScan, PlannedStmt *stmt)
-{
-	Assert(NULL != stmt);
-	Assert(NULL != funcScan);
-
-	Index rteIndex = funcScan->scan.scanrelid;
-	RangeTblEntry *rte = rt_fetch(rteIndex, stmt->rtable);
-
-	Assert(RTE_FUNCTION == rte->rtekind);
-
-	if (IsA(rte->funcexpr, FuncExpr))
-	{
-		FuncExpr *funcExpr = (FuncExpr *) rte->funcexpr;
-		return isMemoryIntensiveFunction(funcExpr->funcid);
-	}
-
-	/* Didn't find any of our special cases, default is memory intensive */
-	return true;
-}
-
 
 /**
  * Is an operator memory intensive?
@@ -347,6 +256,7 @@ IsMemoryIntensiveOperator(Node *node, PlannedStmt *stmt)
 		case T_ShareInputScan:
 		case T_Hash:
 		case T_BitmapIndexScan:
+		case T_FunctionScan:
 		case T_Window:
 		case T_TableFunctionScan:
 			return true;
@@ -359,11 +269,6 @@ IsMemoryIntensiveOperator(Node *node, PlannedStmt *stmt)
 			{
 				Result *res = (Result *) node;
 				return IsResultMemoryIntesive(res);
-			}
-		case T_FunctionScan:
-			{
-				FunctionScan *funcScan = (FunctionScan *) node;
-				return IsFunctionScanMemoryIntensive(funcScan, stmt);
 			}
 		default:
 			return false;
