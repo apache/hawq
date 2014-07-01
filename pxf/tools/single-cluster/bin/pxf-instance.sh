@@ -71,7 +71,13 @@ function deployWebapp()
 	cat $context_file | \
 	sed  -e "s/classpathFiles=\"[a-zA-Z0-9\/\;.-]*\"/classpathFiles=\"pxf\/conf\/pxf-private.classpath\"/" \
     -e "s/secondaryClasspathFiles=\"[a-zA-Z0-9\/\;.-]*\"/secondaryClasspathFiles=\"pxf\/conf\/pxf-public.classpath\"/" > context.xml.tmp
-    mv context.xml.tmp $context_file
+	mv context.xml.tmp $context_file
+
+	web_file=$instance_root/$instance_name/webapps/pxf/WEB-INF/web.xml
+	cat $web_file | \
+	sed "s/<param-value>.*pxf-log4j.properties<\/param-value>/<param-value>..\/..\/..\/..\/..\/..\/pxf\/conf\/pxf-log4j.properties<\/param-value>/" > web.xml.tmp
+	mv web.xml.tmp $web_file
+
 }
 
 function checkWebapp()

@@ -153,6 +153,11 @@ project('pxf-service') {
             fileType NOREPLACE
             into "/etc/gphd/pxf-${project.version}/conf"
         }
+        
+        from('src/main/resources/pxf-log4j.properties') {
+            fileType CONFIG | NOREPLACE
+            into "/etc/gphd/pxf-${project.version}/conf"
+        }
 
         from('src/scripts/pxf-service') {
             fileMode 0755
