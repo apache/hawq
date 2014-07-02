@@ -50,7 +50,7 @@ public class HiveDataFragmenter extends Fragmenter {
     static final String HIVE_PARTITIONS_DELIM = "!HPAD!";
     static final String HIVE_NO_PART_TBL = "!HNPT!";
 
-    private static final int HIVE_MAX_PARTS = 1000;
+    private static final short ALL_PARTS = -1;
 
     /* internal class used for parsing the qualified table name received as input to getFragments() */
     class TblDesc {
@@ -177,8 +177,7 @@ public class HiveDataFragmenter extends Fragmenter {
             throw new UnsupportedOperationException("PXF doesn't support HIVE views");
         }
 
-        // guessing the max partitions - will have to further research this
-        List<Partition> partitions = client.listPartitions(tblDesc.dbName, tblDesc.tableName, (short) HIVE_MAX_PARTS);
+        List<Partition> partitions = client.listPartitions(tblDesc.dbName, tblDesc.tableName, ALL_PARTS);
         StorageDescriptor descTable = tbl.getSd();
         Properties props;
 
