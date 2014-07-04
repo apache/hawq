@@ -186,7 +186,12 @@ GetQueryContextDipsatchingFileLocation(char **buffer)
     Assert(GpIdentity.numsegments >= 1);
     GetFilespacePathForTablespace(tablespace, content, &path);
 
-    Assert(NULL != path);
+    if (NULL == path)
+    {
+        elog(ERROR, "cannot get distributed table space location for current database,"
+                " table space oid is %u",
+                tablespace);
+    }
 
     pos = path + strlen(path) - 1;
     Assert('0' == *pos);
