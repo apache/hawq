@@ -190,7 +190,7 @@ HA -->
 	
 	<property>
 		<name>input.localread.default.buffersize</name>
-		<value>1048576</value>
+		<value>2097152</value>
 		<description>
 		number of bytes of the buffer which is used to hold the data from block file and verify checksum.
 		it is only used when "dfs.client.read.shortcircuit" is set to true. default is 1048576.
