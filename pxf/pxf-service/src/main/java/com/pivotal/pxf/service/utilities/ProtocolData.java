@@ -78,7 +78,7 @@ public class ProtocolData extends InputData {
         fragmenter = getOptionalProperty("FRAGMENTER");
         dataSource = getProperty("DATA-DIR");
 
-        /* kerboros token information */
+        /* Kerberos token information */
         if (UserGroupInformation.isSecurityEnabled()) {
         	tokenIdentifier = getProperty("TOKEN-IDNT");
         	tokenPassword = getProperty("TOKEN-PASS");
@@ -152,13 +152,24 @@ public class ProtocolData extends InputData {
      */
     private void setProfilePlugins() {
         Map<String, String> pluginsMap = ProfilesConf.getProfilePluginsMap(profile);
-        checkForDuplicates(pluginsMap.keySet(), requestParametersMap.keySet());
+        checkForDuplicates(pluginsMap, requestParametersMap);
         requestParametersMap.putAll(pluginsMap);
     }
 
-    private void checkForDuplicates(Set<String> plugins, Set<String> params) {
-        @SuppressWarnings("unchecked")  //CollectionUtils doesn't yet support generics.
-                Collection<String> duplicates = CollectionUtils.intersection(plugins, params);
+	/** 
+	 * Verifies there are no duplicates between parameters declared in the table definition 
+	 * and parameters defined in a profile. 
+	 *
+	 * The parameters' names are case insensitive.
+	 */
+    private void checkForDuplicates(Map<String, String> plugins, Map<String, String> params) {
+		List<String> duplicates = new ArrayList<>();
+		for (String key : plugins.keySet()) {
+			if (params.containsKey(key)) {
+				duplicates.add(key);
+			}
+		}
+
         if (!duplicates.isEmpty()) {
             throw new IllegalArgumentException("Profile '" + profile + "' already defines: " + String.valueOf(duplicates).replace("X-GP-", ""));
         }

@@ -4,6 +4,7 @@ import com.pivotal.pxf.api.OutputFormat;
 import com.pivotal.pxf.service.utilities.ProtocolData;
 import com.pivotal.pxf.api.utilities.ProfileConfException;
 import static com.pivotal.pxf.api.utilities.ProfileConfException.MessageFormat.NO_PROFILE_DEF;
+import com.pivotal.pxf.api.utilities.ProfilesConf;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -12,9 +13,9 @@ import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
 
-import javax.servlet.ServletContext;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.TreeMap;
 
 import org.apache.hadoop.security.UserGroupInformation;
 import static org.junit.Assert.*;
@@ -22,10 +23,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @RunWith(PowerMockRunner.class)
-@PrepareForTest({UserGroupInformation.class})
+@PrepareForTest({UserGroupInformation.class, ProfilesConf.class})
 public class ProtocolDataTest {
     Map<String, String> parameters;
-    ServletContext mockContext;
 
     @Test
     public void protocolDataCreated() {
@@ -60,12 +60,24 @@ public class ProtocolDataTest {
 
     @Test
     public void profileWithDuplicateProperty() {
-        parameters.put("X-GP-PROFILE", "HIVE");
+		PowerMockito.mockStatic(ProfilesConf.class);
+
+		Map<String, String> mockedProfiles = new HashMap<>();
+		mockedProfiles.put("wHEn you trY yOUR bESt", "but you dont succeed");
+		mockedProfiles.put("when YOU get WHAT you WANT", "but not what you need");
+		mockedProfiles.put("when you feel so tired", "but you cant sleep");
+
+		when(ProfilesConf.getProfilePluginsMap("a profile")).thenReturn(mockedProfiles);
+
+		parameters.put("x-gp-profile", "a profile");
+		parameters.put("when you try your best", "and you do succeed");
+		parameters.put("WHEN you GET what YOU want", "and what you need");
+
         try {
             new ProtocolData(parameters);
             fail("Duplicate property should throw IllegalArgumentException");
         } catch (IllegalArgumentException iae) {
-            assertEquals("Profile 'HIVE' already defines: [ACCESSOR, RESOLVER]",
+            assertEquals("Profile 'a profile' already defines: [when YOU get WHAT you WANT, wHEn you trY yOUR bESt]",
                     iae.getMessage());
         }
     }
@@ -223,7 +235,7 @@ public class ProtocolDataTest {
 	 */
     @Before
     public void setUp() {
-        parameters = new HashMap<String, String>();
+        parameters = new TreeMap<String, String>(String.CASE_INSENSITIVE_ORDER);
 
         parameters.put("X-GP-ALIGNMENT", "all");
         parameters.put("X-GP-SEGMENT-ID", "-44");
@@ -238,8 +250,6 @@ public class ProtocolDataTest {
         parameters.put("X-GP-DATA-DIR", "i'm/ready/to/go");
         parameters.put("X-GP-FRAGMENT-METADATA", "U29tZXRoaW5nIGluIHRoZSB3YXk=");
         parameters.put("X-GP-I'M-STANDING-HERE", "outside-your-door");
-
-        mockContext = mock(ServletContext.class);
 
         PowerMockito.mockStatic(UserGroupInformation.class);
     }
