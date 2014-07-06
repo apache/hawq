@@ -231,12 +231,11 @@ public class FilterParserTest {
 
     @Test
     public void parseFilterWith2Operations() throws Exception {
-
         filter = "a1c\"first\"o5a2c2o2o7";
 
-        Object firstOp = new String("first operation HDOP_EQ");
-        Object secondOp = new String("second operation HDOP_GT");
-        Object lastOp = new String("filter with 2 operations connected by AND");
+        Object firstOp = "first operation HDOP_EQ";
+        Object secondOp = "second operation HDOP_GT";
+        Object lastOp = "filter with 2 operations connected by AND";
 
         when(filterBuilder.build(eq(Operation.HDOP_EQ),
                 any(),
@@ -258,7 +257,6 @@ public class FilterParserTest {
 	/*
      * Helper functions
 	 */
-
     private void runParseNegative(String description, String filter, String exception) {
         try {
             filterParser.parse(filter);

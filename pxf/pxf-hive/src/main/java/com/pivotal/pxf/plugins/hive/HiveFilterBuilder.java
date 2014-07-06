@@ -46,7 +46,7 @@ public class HiveFilterBuilder implements FilterParser.FilterBuilder {
     public Object build(FilterParser.Operation opId,
                         Object leftOperand,
                         Object rightOperand) throws Exception {
-        if (leftOperand instanceof FilterParser.BasicFilter) {
+        if (leftOperand instanceof FilterParser.BasicFilter || leftOperand instanceof List) {
             if (opId != FilterParser.Operation.HDOP_AND ||
                     !(rightOperand instanceof FilterParser.BasicFilter)) {
                 throw new Exception("Only AND is allowed between compound expressions");
