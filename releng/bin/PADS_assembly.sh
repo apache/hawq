@@ -104,7 +104,7 @@ EOF
 ## Publish artifacts?
 ##
 
-if [ "${PUBLISH_HAWQ_ARTIFACTS}" = "true" ]; then 
+if [ "${PUBLISH_HAWQ_ARTIFACTS}" = "true" ] && ( [[ "${PULSE_PROJECT}"  =~ ^HAWQ-[0-9]+\.[0-9]+\.X-opt$ ]] || [[ "${PULSE_PROJECT}"  =~ ^HAWQ-main-opt$ ]] ); then 
 
     GPPKGS=$( ls src/*${BUILD_NUMBER}*.gppkg )
 
