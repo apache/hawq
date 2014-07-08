@@ -48,8 +48,8 @@ function configureInstance()
 	serverXml=$instance_root/$instance_name/conf/server.xml
 	cat $serverXml | \
 	sed "/^[[:blank:]]*maxKeepAliveRequests=.*$/ a\\
-	maxHeaderCount=\"10000\"\\
-	maxHttpHeaderSize=\"65536\"
+	maxHeaderCount=\"30000\"\\
+	maxHttpHeaderSize=\"1048576\"
 	" > ${serverXml}.tmp
 
 	rm $serverXml

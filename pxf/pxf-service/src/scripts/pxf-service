@@ -57,16 +57,16 @@ function createInstance()
 # configureInstance configures the tcServer instance
 #
 # specifically:
-#	support up to 10,000 header fields
-#	support up to up to 64k size header
+#	support up to 30,000 header fields
+#	support up to 1MB size header
 #
 function configureInstance()
 {
 	serverXml=$instance_root/$instance_name/conf/server.xml
 	cat $serverXml | \
 	sed "/^[[:blank:]]*maxKeepAliveRequests=.*$/ a\\
-	maxHeaderCount=\"10000\"\\
-	maxHttpHeaderSize=\"65536\"
+	maxHeaderCount=\"30000\"\\
+	maxHttpHeaderSize=\"1048576\"
 	" > ${serverXml}.tmp || return 1
 
 	rm $serverXml || return 1
