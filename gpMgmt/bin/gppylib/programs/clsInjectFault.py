@@ -384,7 +384,7 @@ class GpInjectFaultProgram:
 			      "multi_exec_hash_large_vmem (allocate large vmem using palloc inside MultiExecHash to attempt to exceed vmem limit), " \
 			      "execsort_before_sorting (inject fault in nodeSort after receiving all tuples and before sorting), " \
 			      "execsort_mksort_mergeruns (inject fault in MKSort during the mergeruns phase), " \
-			      "fault_during_exec_dynamic_table_scan (inject fault during scanning of a partition), " \
+			      "fault_in_background_writer_main (inject fault in BackgroundWriterMain), " \
 			      "all (affects all faults injected, used for 'status' and 'reset'), ") 
         addTo.add_option("-c", "--ddl_statement", dest="ddlStatement", type="string",
                          metavar="ddlStatement",
