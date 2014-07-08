@@ -78,16 +78,19 @@ void setup_multi_handle(churl_context* context);
 void multi_perform(churl_context* context);
 bool internal_buffer_large_enough(churl_buffer* buffer, size_t required);
 void flush_internal_buffer(churl_context* context);
-void error_with_address(char* msg, CURL* curl_handle);
+char* get_dest_address(CURL* curl_handle);
 void enlarge_internal_buffer(churl_buffer* buffer, size_t required);
 void finish_upload(churl_context* context);
 void cleanup_curl_handle(churl_context* context);
+void multi_remove_handle(churl_context* context);
 void cleanup_internal_buffer(churl_buffer* buffer);
 void churl_cleanup_context(churl_context* context);
 size_t write_callback(char *buffer, size_t size, size_t nitems, void *userp);
 int fill_internal_buffer(churl_context* context, int want);
 void churl_headers_set(churl_context* context, CHURL_HEADERS settings);
+void check_response_status(churl_context* context);
 void check_response_code(churl_context* context);
+void check_response(churl_context* context);
 void clear_error_buffer(churl_context* context);
 size_t header_callback(char *buffer, size_t size, size_t nitems, void *userp);
 void free_http_response(churl_context* context);
@@ -342,7 +345,8 @@ void churl_download_restart(CHURL_HANDLE handle, const char* url, CHURL_HEADERS 
 	Assert(!context->upload);
 
 	/* halt current transfer */
-	curl_multi_remove_handle(context->multi_handle, context->curl_handle);
+	multi_remove_handle(context);
+
 	/* set a new url */
 	set_curl_option(context, CURLOPT_URL, url);
 
@@ -385,7 +389,7 @@ void churl_read_check_connectivity(CHURL_HANDLE handle)
 	Assert(!context->upload);
 
 	fill_internal_buffer(context, 1);
-	check_response_code(context);
+	check_response(context);
 }
 
 /*
@@ -543,31 +547,34 @@ void flush_internal_buffer(churl_context* context)
 	}
 
 	if ((context->curl_still_running == 0) &&
-		((context_buffer->top - context_buffer->bot) > 0)) {
-		error_with_address("failed sending to remote component", context->curl_handle);
-	}
+		((context_buffer->top - context_buffer->bot) > 0))
+		elog(ERROR, "failed sending to remote component %s", get_dest_address(context->curl_handle));
 
-	check_response_code(context);
+	check_response(context);
 
 	context_buffer->top = 0;
 	context_buffer->bot = 0;
 }
 
-void error_with_address(char* msg, CURL* curl_handle) {
+/*
+ * Returns the remote ip and port of the curl response.
+ * If it's not available, returns an empty string.
+ * The returned value should be free'd.
+ */
+char* get_dest_address(CURL* curl_handle) {
 	char	*dest_ip = NULL;
 	long	 dest_port = 0;
-	StringInfoData err;
-	initStringInfo(&err);
+	StringInfoData addr;
+	initStringInfo(&addr);
 
-	appendStringInfo(&err, "failed sending to remote component");
 	/* add dest ip and port, if any, and curl was nice to tell us */
 	if (CURLE_OK == curl_easy_getinfo(curl_handle, CURLINFO_PRIMARY_IP, &dest_ip) &&
-			CURLE_OK == curl_easy_getinfo(curl_handle, CURLINFO_PRIMARY_PORT, &dest_port) &&
-			dest_ip && dest_port)
+		CURLE_OK == curl_easy_getinfo(curl_handle, CURLINFO_PRIMARY_PORT, &dest_port) &&
+		dest_ip && dest_port)
 	{
-		appendStringInfo(&err, " '%s:%ld'", dest_ip, dest_port);
+		appendStringInfo(&addr, "'%s:%ld'", dest_ip, dest_port);
 	}
-	elog(ERROR, "%s", err.data);
+	return addr.data;
 }
 
 void enlarge_internal_buffer(churl_buffer* buffer, size_t required)
@@ -596,7 +603,7 @@ void finish_upload(churl_context* context)
 	while(context->curl_still_running != 0)
 		multi_perform(context);
 
-	check_response_code(context);
+	check_response(context);
 }
 
 void cleanup_curl_handle(churl_context* context)
@@ -604,11 +611,23 @@ void cleanup_curl_handle(churl_context* context)
 	if (!context->curl_handle)
 		return;
 	if (context->multi_handle)
-		curl_multi_remove_handle(context->multi_handle, context->curl_handle);
+		multi_remove_handle(context);
 	curl_easy_cleanup(context->curl_handle);
 	context->curl_handle = NULL;
 	curl_multi_cleanup(context->multi_handle);
 	context->multi_handle = NULL;
+}
+
+void multi_remove_handle(churl_context* context)
+{
+	int curl_error;
+
+	Assert(context->curl_handle && context->multi_handle);
+
+	if (CURLM_OK !=
+			(curl_error = curl_multi_remove_handle(context->multi_handle, context->curl_handle)))
+		elog(ERROR, "internal error: curl_multi_remove_handle failed (%d - %s)",
+			 curl_error, curl_easy_strerror(curl_error));
 }
 
 void cleanup_internal_buffer(churl_buffer* buffer)
@@ -725,6 +744,53 @@ void churl_headers_set(churl_context* context,
 }
 
 /*
+ * Checks that the response finished successfully
+ * with a valid response status and code.
+ */
+void check_response(churl_context* context)
+{
+	check_response_code(context);
+	check_response_status(context);
+}
+
+/*
+ * Checks that libcurl transfers completed successfully.
+ * This is different than the response code (HTTP code) -
+ * a message can have a response code 200 (OK), but end prematurely
+ * and so have an error status.
+ */
+void check_response_status(churl_context* context)
+{
+	CURLMsg *msg; /* for picking up messages with the transfer status */
+	int msgs_left; /* how many messages are left */
+	long status;
+
+	while ((msg = curl_multi_info_read(context->multi_handle, &msgs_left)))
+	{
+		int i = 0;
+
+		/* CURLMSG_DONE is the only possible status. */
+		if (msg->msg != CURLMSG_DONE)
+			continue;
+		if (CURLE_OK != (status = msg->data.result))
+		{
+			char* addr = get_dest_address(msg->easy_handle);
+			StringInfoData err;
+			initStringInfo(&err);
+
+			appendStringInfo(&err, "transfer error (%ld): %s",
+					status, curl_easy_strerror(status));
+
+			if (strlen(addr) != 0)
+				appendStringInfo(&err, " from %s", addr);
+			pfree(addr);
+			elog(ERROR, "%s", err.data);
+		}
+		elog(DEBUG2, "check_response_status: msg %d done with status OK", i++);
+	}
+}
+
+/*
  * Parses return code from libcurl operation and
  * reports if different than 200 and 100
  */
@@ -747,10 +813,9 @@ void check_response_code(churl_context* context)
 	{
 		if (!handle_special_error(response_code))
 		{
-			char	*dest_ip = NULL;
-			long	 dest_port = 0;
 			StringInfoData err;
 			char    *http_error_msg;
+			char    *addr;
 
 			initStringInfo(&err);
 
@@ -764,13 +829,10 @@ void check_response_code(churl_context* context)
 			/* add remote http error code */
 			appendStringInfo(&err, "remote component error (%ld)", response_code);
 
-			/* add dest ip and port, if any, and curl was nice to tell us */
-			if (CURLE_OK == curl_easy_getinfo(context->curl_handle, CURLINFO_PRIMARY_IP, &dest_ip) &&
-				CURLE_OK == curl_easy_getinfo(context->curl_handle, CURLINFO_PRIMARY_PORT, &dest_port) &&
-				dest_ip && dest_port)
-			{
-				appendStringInfo(&err, " from '%s:%ld'", dest_ip, dest_port);
-			}
+			addr = get_dest_address(context->curl_handle);
+			if (strlen(addr) != 0)
+				appendStringInfo(&err, " from %s", addr);
+			pfree(addr);
 
 			/*
 			 * add detailed error message from the http response. response_text

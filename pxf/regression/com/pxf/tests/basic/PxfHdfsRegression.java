@@ -91,9 +91,8 @@ public class PxfHdfsRegression extends PxfTestCase {
 		exTable.setFormatter("pxfwritable_import");
 
 		try {
-
 			hawq.createTableAndVerify(exTable);
-
+			Assert.fail("Table creation should fail with invalid URI error");
 		} catch (PSQLException e) {
 			ExceptionUtils.validate(report, e, new PSQLException("ERROR: Invalid URI pxf://" + hawq.getHost() + ":50070/" + exTable.getPath() + "?: invalid option after '?'", null), false);
 		}
@@ -119,8 +118,8 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		try {
 			hawq.createTableAndVerify(exTable);
+			Assert.fail("Table creation should fail with invalid URI error");
 		} catch (PSQLException e) {
-
 			ExceptionUtils.validate(report, e, new PSQLException("ERROR: Invalid URI pxf://" + hawq.getHost() + ":50070/" + exTable.getPath() + "?ACCESSOR=xacc&RESOLVER=xres&someuseropt=someuserval: PROFILE or FRAGMENTER option(s) missing", null), false);
 		}
 	}
@@ -145,6 +144,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		try {
 			hawq.createTableAndVerify(exTable);
+			Assert.fail("Table creation should fail with invalid URI error");
 		} catch (PSQLException e) {
 			ExceptionUtils.validate(report, e, new PSQLException("ERROR: Invalid URI pxf://" + hawq.getHost() + ":50070/" + exTable.getPath() + "?FRAGMENTER=xfrag&RESOLVER=xres&someuseropt=someuserval: PROFILE or ACCESSOR option(s) missing", null), false);
 		}
@@ -168,9 +168,8 @@ public class PxfHdfsRegression extends PxfTestCase {
 		exTable.setFormatter("pxfwritable_import");
 
 		try {
-
 			hawq.createTableAndVerify(exTable);
-
+			Assert.fail("Table creation should fail with invalid URI error");
 		} catch (PSQLException e) {
 			ExceptionUtils.validate(report, e, new PSQLException("ERROR: Invalid URI pxf://" + hawq.getHost() + ":50070/" + exTable.getPath() + "?FRAGMENTER=xfrag&ACCESSOR=xacc: PROFILE or RESOLVER option(s) missing", null), false);
 		}
@@ -1286,6 +1285,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		try {
 			hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY num ASC");
+			Assert.fail("Query should fail with segment reject limit reached error");
 		} catch (PSQLException e) {
 			PSQLException expected = new PSQLException("Segment reject limit reached. Aborting operation. " + "Last error was: invalid input syntax for integer: \"have\", column num", null);
 			ExceptionUtils.validate(report, e, expected, true);
@@ -1413,6 +1413,7 @@ public class PxfHdfsRegression extends PxfTestCase {
 
 		try {
 			hawq.createTableAndVerify(exTable);
+			Assert.fail("Table creation should fail with bad nameservice error");
 		} catch (Exception e) {
 			ExceptionUtils.validate(report, e, new PSQLException("ERROR: nameservice phdcluster not found in client configuration. No HA namenodes provided", null), false);
 		}
@@ -1480,11 +1481,56 @@ public class PxfHdfsRegression extends PxfTestCase {
 		
 		try {
 			hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY num");
+			Assert.fail("Query should fail with invalid input syntax error");
 		} catch (PSQLException e) {
 			String err = "ERROR: invalid input syntax for integer: \"joker\"";
 			ExceptionUtils.validate(report, e, new PSQLException(err, null), true);
 		}
+	}
+	
+	/*
+	 * Verify we detect errors in the read bridge if they occur
+	 * after the first HTTP packet was sent.
+	 * TcServer (2.9.7) detects error and doesn't add the end chunk.
+	 * PXF on the client side should detect and throw an error. 
+	 * 
+	 *  The test is done by running a query over a file with >10000 records,
+	 *  using ThrowOn10000Accessor which throw an exception on the 10000th record.
+	 *  
+	 *  TODO: Test deactivated at the moment, pending an upgrade to a newer version 
+	 *  of tcServer. See GPSQL-2272.
+	 */
+	//@Test 
+	public void errorInTheMiddleOfStream() throws Exception {
 		
+		String filePath = hdfsWorkingFolder + "/error_on_10000.txt";
+		
+		Table dataTable = new Table("dataTable", null);
+		for (int i = 0; i < 10005; i++) {
+			dataTable.addRow(new String[] {"" + i, Integer.toHexString(i)});
+		}
+		
+		hdfs.writeTableToFile(filePath, dataTable, ",");
+
+		String[] fields = new String[] {
+				"num int",
+				"string text"};
+		
+		exTable = new ReadableExternalTable("error_on_10000", fields, filePath, "TEXT");
+		exTable.setFragmenter("com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter");
+		exTable.setAccessor("ThrowOn10000Accessor");
+		exTable.setResolver("com.pivotal.pxf.plugins.hdfs.StringPassResolver");
+		exTable.setDelimiter(",");
+		
+		hawq.createTableAndVerify(exTable);
+		
+		try {
+			hawq.queryResults(exTable, "SELECT * FROM " + exTable.getName() + " ORDER BY num");
+			Assert.fail("Query should fail after reading 10000 records.");
+		} catch (PSQLException e) {
+			String err = "ERROR: transfer error \\(18\\): Transferred a partial file from '.*'";
+			ExceptionUtils.validate(report, e, new PSQLException(err, null), true);
+		}
 	}
 	
 	private Table prepareRecursiveDirsData(String baseDir, String delim) throws Exception {

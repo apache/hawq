@@ -114,15 +114,6 @@ public class BridgeResource extends RestResource {
                     Log.error("Remote connection closed by HAWQ", e);
                 } catch (Exception e) {
                     Log.error("Exception thrown when streaming", e);
-                    /* TODO: Throwing RuntimeException at the moment, 
-                     * but it's ignored if the response is committed, (i.e. recordCount > 0). 
-                     * Former solution under Jetty regime:
-                     * Jetty ignores most exceptions while streaming (i.e recordCount > 0), so we need to throw a RuntimeIOException
-                     * (see org.eclipse.jetty.servlet.ServletHandler)
-                     */
-                    if (recordCount > 0) {
-                    	throw new RuntimeException(e.getMessage());
-                    }
                     throw new IOException(e.getMessage());
                 } finally {
                     Log.debug("Stopped streaming fragment " + fragment + " of resource " + dataDir + ", " + recordCount + " records.");
