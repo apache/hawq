@@ -4,7 +4,6 @@ import org.apache.commons.collections.IteratorUtils;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.XMLConfiguration;
-import org.apache.commons.configuration.reloading.FileChangedReloadingStrategy;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -13,33 +12,34 @@ import java.net.URL;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 import static com.pivotal.pxf.api.utilities.ProfileConfException.MessageFormat.*;
-import static com.pivotal.pxf.api.utilities.ProfileConfException.MessageFormat;
-
 
 /**
  * This enum holds the profiles files: pxf-profiles.xml and pxf-profiles-default.xml.
  * It exposes a public static method getProfilePluginsMap(String plugin) which returns the requested profile plugins
  */
 public enum ProfilesConf {
-    PROFILES_CONF("pxf-profiles.xml"),
-    PROFILES_CONF_DEFAULT("pxf-profiles-default.xml");
-    private static final Log LOG = LogFactory.getLog(ProfilesConf.class);
-    private String fileName;
-    private URL url;
-    private XMLConfiguration conf;
+    INSTANCE;
+    private Log log = LogFactory.getLog(ProfilesConf.class);
+    private Map<String, Map<String, String>> profilesMap;
+    private final static String EXTERNAL_PROFILES = "pxf-profiles.xml";
+    private final static String INTERNAL_PROFILES = "pxf-profiles-default.xml";
 
-    ProfilesConf(String fileName) {
-        this.fileName = fileName;
-        url = getClassLoader().getResource(fileName);
-    }
-
-    private static ClassLoader getClassLoader() {
-        ClassLoader cL = Thread.currentThread().getContextClassLoader();
-        return (cL != null)
-                ? cL
-                : ProfilesConf.class.getClassLoader();
+    /**
+     * Constructs the ProfilesConf enum singleton instance.
+     * <p/>
+     * External profiles take precedence over the internal ones and override them.
+     */
+    private ProfilesConf() {
+        profilesMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        loadConf(INTERNAL_PROFILES, true);
+        loadConf(EXTERNAL_PROFILES, false);
+        if (profilesMap.isEmpty()) {
+            throw new ProfileConfException(PROFILES_FILE_NOT_FOUND, EXTERNAL_PROFILES);
+        }
+        log.info("PXF profiles loaded: " + profilesMap.keySet());
     }
 
     /**
@@ -51,47 +51,60 @@ public enum ProfilesConf {
      * @return Plugins map of the requested profile
      */
     public static Map<String, String> getProfilePluginsMap(String profile) {
-        try {
-            return PROFILES_CONF.getPluginsMap(profile);
-        } catch (ProfileConfException pce) {
-            if (!useProfilesDefaults(pce.getMsgFormat())) {
-                throw pce;
-            }
-            LOG.debug(pce.getMessage() + ". Using profiles defaults");
-            return PROFILES_CONF_DEFAULT.getPluginsMap(profile);
+        Map<String, String> pluginsMap = INSTANCE.profilesMap.get(profile);
+        if (pluginsMap == null) {
+            throw new ProfileConfException(NO_PROFILE_DEF, profile, EXTERNAL_PROFILES);
         }
+        return pluginsMap;
     }
 
-    private static boolean useProfilesDefaults(MessageFormat msg) {
-        return msg == PROFILES_FILE_NOT_FOUND || msg == NO_PROFILE_DEF;
+    private ClassLoader getClassLoader() {
+        ClassLoader cL = Thread.currentThread().getContextClassLoader();
+        return (cL != null)
+                ? cL
+                : ProfilesConf.class.getClassLoader();
     }
 
-    private XMLConfiguration getConf() {
+    private void loadConf(String fileName, boolean isMandatory) {
+        URL url = getClassLoader().getResource(fileName);
         if (url == null) {
-            throw new ProfileConfException(PROFILES_FILE_NOT_FOUND, fileName);
+            log.warn(fileName + " not found in the classpath");
+            if (isMandatory) {
+                throw new ProfileConfException(PROFILES_FILE_NOT_FOUND, fileName);
+            }
+            return;
         }
-        if (conf == null || conf.isEmpty()) {
-            conf = loadConf();
-        }
-        return conf;
-    }
-
-    private XMLConfiguration loadConf() {
-        XMLConfiguration conf;
         try {
-            conf = new XMLConfiguration(url);
-            conf.setReloadingStrategy(new FileChangedReloadingStrategy());
+            XMLConfiguration conf = new XMLConfiguration(url);
+            loadMap(conf);
         } catch (ConfigurationException e) {
-            throw new ProfileConfException(PROFILES_FILE_LOAD_ERR, fileName, String.valueOf(e.getCause()));
+            throw new ProfileConfException(PROFILES_FILE_LOAD_ERR, url.getFile(), String.valueOf(e.getCause()));
         }
-        return conf;
     }
 
-    private Map<String, String> getPluginsMap(String profile) {
-        Configuration profileSubset = getProfileSubset(profile);
+    private void loadMap(XMLConfiguration conf) {
+        String[] profileNames = conf.getStringArray("profile.name");
+        if (profileNames.length == 0) {
+            log.warn("Profile file: " + conf.getFileName() + " is empty");
+            return;
+        }
+        Map<String, Map<String, String>> profileMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        for (int profileIdx = 0; profileIdx < profileNames.length; profileIdx++) {
+            String profileName = profileNames[profileIdx];
+            if (profileMap.containsKey(profileName)) {
+                log.warn("Duplicate profile definition found in " + conf.getFileName() + " for: " + profileName);
+                continue;
+            }
+            Configuration profileSubset = conf.subset("profile(" + profileIdx + ").plugins");
+            profileMap.put(profileName, getProfilePluginMap(profileSubset));
+        }
+        profilesMap.putAll(profileMap);
+    }
+
+    private Map<String, String> getProfilePluginMap(Configuration profileSubset) {
         @SuppressWarnings("unchecked") //IteratorUtils doesn't yet support generics.
         List<String> plugins = IteratorUtils.toList(profileSubset.getKeys());
-        Map<String, String> pluginsMap = new HashMap<String, String>();
+        Map<String, String> pluginsMap = new HashMap<>();
         for (String plugin : plugins) {
             String pluginValue = profileSubset.getString(plugin);
             if (!StringUtils.isEmpty(StringUtils.trim(pluginValue))) {
@@ -99,15 +112,5 @@ public enum ProfilesConf {
             }
         }
         return pluginsMap;
-    }
-
-    private Configuration getProfileSubset(String profile) {
-        String[] profileNames = getConf().getStringArray("profile.name");
-        for (int profileIdx = 0; profileIdx < profileNames.length; profileIdx++) {
-            if (profileNames[profileIdx].equalsIgnoreCase(profile)) {
-                return getConf().subset("profile(" + profileIdx + ").plugins");
-            }
-        }
-        throw new ProfileConfException(NO_PROFILE_DEF, profile, PROFILES_CONF.fileName);
     }
 }
