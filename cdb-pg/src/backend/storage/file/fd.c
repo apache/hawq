@@ -2875,7 +2875,7 @@ HdfsFileSeek(File file, int64 offset, int whence)
 
 	switch (whence) {
 		case SEEK_SET:
-			Insist(offset >= INT64CONST(0));
+			Assert(offset >= INT64CONST(0));
 			desiredPos = offset;
 			break;
 		case SEEK_CUR:
@@ -2883,7 +2883,7 @@ HdfsFileSeek(File file, int64 offset, int whence)
 			break;
 		case SEEK_END:
 		{
-			Insist(offset <= INT64CONST(0));
+			Assert(offset <= INT64CONST(0));
 			hdfsFileInfo	*info;
 			char path[MAXPGPATH + 1];
 
