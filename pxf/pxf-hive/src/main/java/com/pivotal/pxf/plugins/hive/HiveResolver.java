@@ -289,8 +289,8 @@ public class HiveResolver extends Plugin implements ReadResolver {
                 break;
             }
             case BYTE: { /* TINYINT */
-            	val = (o != null) ? ((ByteObjectInspector) oi).get(o) : null;
-            	addOneFieldToRecord(record, SMALLINT, new Short((byte)val));
+            	val = (o != null) ? new Short(((ByteObjectInspector) oi).get(o)) : null;
+            	addOneFieldToRecord(record, SMALLINT, val);
             	break;
             }
             default: {
