@@ -2,6 +2,7 @@
 #define _PXF_UTILS_H_
 
 #include "postgres.h"
+#include "access/libchurl.h"
 #include "access/pxfuriparser.h"
 #include "commands/copy.h"
 
@@ -18,7 +19,7 @@ typedef struct sClientContext
 bool are_ips_equal(char *ip1, char *ip2);
 
 /* override port str with given new port int */
-void port_to_str(char* port, int new_port);
+void port_to_str(char** port, int new_port);
 
 /* Parse the REST message and issue the libchurl call */
 void call_rest(GPHDUri *hadoop_uri, ClientContext *client_context, char* rest_msg);

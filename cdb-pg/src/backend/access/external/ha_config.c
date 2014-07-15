@@ -1,6 +1,8 @@
 #include "access/ha_config.h"
 #include "access/pxfcomutils.h"
+#include "access/pxfutils.h"
 #include "hdfs/hdfs.h"
+#include "utils/guc.h"
 
 #define ALLOC_STRINGS_ARR(sz) ((char**)palloc0(sizeof(char*) * sz))
 
@@ -160,14 +162,10 @@ set_one_namenode(NNHAConf *conf, int idx, Namenode *source)
 	conf->nodes[idx] = pnstrdup(source->rpc_addr, hostlen);
 	conf->rpcports[idx] = pstrdup(portstart);
 	
-	validate_string(source->http_addr, "In configuration Namenode.http_address number %d is null or empty", idx + 1);
-	portstart =  strchr(source->http_addr, ':');
-	if (!portstart)
-		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("dfs.namenode.http-address was set incorrectly in the configuration. ':' missing")));
-	portstart++;
-	conf->restports[idx] = pstrdup(portstart);	
+/*
+ * we override the ha rest post from hdfs-site.xml, with pxf_service_port
+ */
+	port_to_str(&(conf->restports[idx]), pxf_service_port);
 }
 
 /*

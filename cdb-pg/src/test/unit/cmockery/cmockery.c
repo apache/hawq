@@ -211,6 +211,8 @@ static void initialize_testing(const char *test_name);
 static void teardown_testing(const char *test_name);
 static const char* get_color(int color_code);
 static void check_color_env(void);
+static int _assign_memory_for_outbuffer(const LargestIntegralType value,
+		const LargestIntegralType assign_value_data);
 
 // Keeps track of the calling context returned by setenv() so that the fail()
 // method can jump out of a test.
@@ -1290,11 +1292,48 @@ void _will_assign_memory(
 			assign_data_pointer.value, &assign_data->event, count);
 }
 
+/*
+ *  A callback used for the case where the mock function needs to set
+ *  an output function parameter which is a pointer to a buffer -
+ *  for example: char**
+ *  compare it to assign_memory() to see the difference.
+ *  For assign_memory(), the function output parameter is just a buffer
+ */
+static int _assign_memory_for_outbuffer(const LargestIntegralType value,
+		const LargestIntegralType assign_value_data) {
+	AssignMemoryData* memory_value = (AssignMemoryData*)assign_value_data;
+
+	void* v = (void*)value;
+	void *buf = malloc(memory_value->value_size);
+	memcpy(buf, memory_value->memory, memory_value->value_size);
+	*((char**)v) = buf;
+
+	return 1;
+}
+
+void _will_assign_memory_for_outbuffer(
+		const char* const function, const char* const parameter,
+		const char* const file, const int line,
+		const void* const memory, const size_t size, const int count)
+{
+	struct AssignMemoryData * assign_data = malloc(sizeof(*assign_data) + size);
+	void * const mem = (void*)(assign_data + 1);
+	declare_initialize_value_pointer_pointer(assign_data_pointer, assign_data);
+	assert_true(memory);
+	assert_true(size);
+	memcpy(mem, memory, size);
+	assign_data->memory = mem;
+	assign_data->value_size = size;
+
+	_will_assign(function, parameter, file, line, _assign_memory_for_outbuffer,
+			assign_data_pointer.value, &assign_data->event, count);
+}
+
 void _will_assign_string(
 		const char* const function, const char* const parameter,
 		const char* const file, const int line,
 		const char* const str, const int count) {
-	_will_assign_memory(function, parameter, file, line, str, strlen(str)+1, count);
+	_will_assign_memory_for_outbuffer(function, parameter, file, line, str, strlen(str)+1, count);
 }
 
 void _will_assign_value(

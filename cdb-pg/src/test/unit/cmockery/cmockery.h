@@ -488,6 +488,10 @@ void _will_assign_memory(
 	    const char* const function, const char* const parameter,
 	    const char* const file, const int line,
 	    const void* const memory, const size_t value_size, const int count);
+void _will_assign_memory_for_outbuffer(
+		const char* const function, const char* const parameter,
+		const char* const file, const int line,
+		const void* const memory, const size_t size, const int count);
 void _will_not_assign(
 	    const char* const function, const char* const parameter,
 	    const char* const file, const int line, int count);

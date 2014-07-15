@@ -1,4 +1,3 @@
-#include "access/libchurl.h"
 #include "access/pxfutils.h"
 #include "utils/builtins.h"
 
@@ -14,15 +13,18 @@ bool are_ips_equal(char *ip1, char *ip2)
 }
 
 /* override port str with given new port int */
-void port_to_str(char* port, int new_port)
+void port_to_str(char **port, int new_port)
 {
 	char tmp[10];
-	if (port)
-		pfree(port);
+
+	if (!port)
+		elog(ERROR, "unexpected internal error in pxfutils.c");
+	if (*port)
+		pfree(*port);
 
 	Assert((new_port <= 65535) && (new_port >= 1)); /* legal port range */
 	pg_ltoa(new_port, tmp);
-	port = pstrdup(tmp);
+	*port = pstrdup(tmp);
 }
 
 /*

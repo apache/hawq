@@ -51,7 +51,8 @@ hd_work_mgr_REAL_OBJS=$(COMMON_REAL_OBJS) \
 pxfheaders_REAL_OBJS=$(COMMON_REAL_OBJS) \
 	$(top_srcdir)/src/backend/utils/adt/numutils.o
 ha_config_REAL_OBJS=$(COMMON_REAL_OBJS) \
-	$(top_srcdir)/src/backend/utils/fmgrtab.o
+	$(top_srcdir)/src/backend/utils/fmgrtab.o \
+	$(top_srcdir)/src/backend/utils/adt/numutils.o
 pxfmasterapi_REAL_OBJS=$(COMMON_REAL_OBJS) \
 	$(top_srcdir)/src/backend/utils/fmgrtab.o	
 pxffilters_REAL_OBJS=$(COMMON_REAL_OBJS) \

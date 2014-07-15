@@ -298,7 +298,7 @@ PxfServer* get_pxf_server(GPHDUri* gphd_uri, const Relation rel)
 	 */
 	if (!pxf_local_storage)
 	{
-		port_to_str(gphd_uri->port, pxf_service_port);
+		port_to_str(&(gphd_uri->port), pxf_service_port);
 	}
 
 	/*
