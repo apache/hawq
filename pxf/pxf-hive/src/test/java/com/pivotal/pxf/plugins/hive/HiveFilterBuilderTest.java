@@ -10,7 +10,6 @@ import static com.pivotal.pxf.api.FilterParser.Operation.*;
 import static org.junit.Assert.assertEquals;
 
 public class HiveFilterBuilderTest {
-
     @Test
     public void parseFilterWithThreeOperations() throws Exception {
         HiveFilterBuilder builder = new HiveFilterBuilder(null);

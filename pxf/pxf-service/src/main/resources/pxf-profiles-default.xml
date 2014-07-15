@@ -67,10 +67,10 @@
     </profile>
     <profile>
         <name>SequenceWritable</name>
-		<description>
-			Profile for accessing Sequence files serialized with a custom Writable class
-			usage: pxf://nn:50070/path/to/file?profile=SequenceWritable&amp;data-schema=CustomClass
-		</description>
+        <description>
+            Profile for accessing Sequence files serialized with a custom Writable class
+            usage: pxf://nn:50070/path/to/file?profile=SequenceWritable&amp;data-schema=CustomClass
+        </description>
         <plugins>
             <fragmenter>com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter</fragmenter>
             <accessor>com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor</accessor>
@@ -85,6 +85,19 @@
             <fragmenter>com.pivotal.pxf.plugins.gemfirexd.GemFireXDFragmenter</fragmenter>
             <accessor>com.pivotal.pxf.plugins.gemfirexd.GemFireXDAccessor</accessor>
             <resolver>com.pivotal.pxf.plugins.gemfirexd.GemFireXDResolver</resolver>
+        </plugins>
+    </profile>
+    <profile>
+        <name>HiveRC</name>
+        <description>This profile is suitable only for Hive tables stored in RC files
+            and serialized with either the ColumnarSerDe or the LazyBinaryColumnarSerDe. 
+            It is much faster than the general purpose Hive profile.
+            DELIMITER parameter is mandatory.
+        </description>
+        <plugins>
+            <fragmenter>com.pivotal.pxf.plugins.hive.HiveInputFormatFragmenter</fragmenter>
+            <accessor>com.pivotal.pxf.plugins.hive.HiveRCFileAccessor</accessor>
+            <resolver>com.pivotal.pxf.plugins.hive.HiveColumnarSerdeResolver</resolver>
         </plugins>
     </profile>
 </profiles>

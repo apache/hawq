@@ -10,10 +10,10 @@ import com.pivotal.pxf.service.io.GPDBWritable.TypeMismatchException;
 import com.pivotal.pxf.service.io.Text;
 import com.pivotal.pxf.service.io.Writable;
 import com.pivotal.pxf.service.utilities.ProtocolData;
-
 import org.apache.commons.lang.ObjectUtils;
 
 import java.lang.reflect.Array;
+import java.util.Arrays;
 import java.util.List;
 
 import static com.pivotal.pxf.api.io.DataType.TEXT;
@@ -29,14 +29,11 @@ public class BridgeOutputBuilder {
     private ProtocolData inputData;
     private Writable output = null;
     private GPDBWritable errorRecord = null;
-    private String delim = ",";
-    private String endl = "\n";
     private int[] schema;
     private String[] colNames;
 
-
-    /*
-     * C'tor
+    /**
+     * Constructs a BridgeOutputBuilder
      */
     public BridgeOutputBuilder(ProtocolData input) {
         inputData = input;
@@ -134,89 +131,68 @@ public class BridgeOutputBuilder {
      */
     void fillGPDBWritable(List<OneField> recFields) throws BadRecordException {
         int size = recFields.size();
-        if (size == 0) /* size 0 means the resolver couldn't deserialize any of the record fields*/ {
+        if (size == 0) { // size 0 means the resolver couldn't deserialize any of the record fields
             throw new BadRecordException("No fields in record");
+        } else if (size > schema.length) {
+            throw new BadRecordException("Record has " + size + " fields but the schema size is " + schema.length);
         }
-        else if (size > schema.length) {
-        	throw new BadRecordException("Record has " + size + " fields but the schema size is " + schema.length);
-        }
-        
+
         for (int i = 0; i < size; i++) {
-        	OneField current = recFields.get(i);
-        	if (!isTypeInSchema(current.type, schema[i])) {
-        		throw new BadRecordException("For field " + colNames[i] + " schema requires type "+ DataType.get(schema[i]).toString() + 
-        				" but input record has type " + DataType.get(current.type).toString());
-        	}
-        		
+            OneField current = recFields.get(i);
+            if (!isTypeInSchema(current.type, schema[i])) {
+                throw new BadRecordException("For field " + colNames[i] + " schema requires type " + DataType.get(schema[i]).toString() +
+                        " but input record has type " + DataType.get(current.type).toString());
+            }
+
             fillOneGPDBWritableField(current, i);
         }
         
         /* this record was not full. complete with nulls. GPSQL-1141 */
-        if (size < schema.length){
-        	for (int i = size; i < schema.length; i++) {
-        		OneField fld = new OneField(schema[i], null);
-        		fillOneGPDBWritableField(fld, i);
-        	}
-        }    
-        
+        if (size < schema.length) {
+            for (int i = size; i < schema.length; i++) {
+                OneField fld = new OneField(schema[i], null);
+                fillOneGPDBWritableField(fld, i);
+            }
+        }
+
     }
-    
-    /*
-     * Test if this is a string type
-     */
-    boolean isStringType(DataType type)
-    {
-    	DataType [] types = {DataType.VARCHAR, DataType.BPCHAR, DataType.TEXT,DataType.NUMERIC, DataType.TIMESTAMP};
-    	
-    	for (DataType cur : types) {
-    		if (type == cur) {
-    			return true;
-    		}
-    	}
-    	return false;
+
+    /* Tests if data type is a string type */
+    boolean isStringType(DataType type) {
+        return Arrays.asList(DataType.VARCHAR, DataType.BPCHAR, DataType.TEXT, DataType.NUMERIC, DataType.TIMESTAMP)
+                .contains(type);
     }
-        
-    /*
-     * Tests that record field type and schema type correspond
-     */
-    boolean isTypeInSchema(int recType, int schemaType)
-    {
-    	DataType dtRec = DataType.get(recType);
-    	DataType dtSchem = DataType.get(schemaType);
-    	
-    	if (dtSchem == DataType.UNSUPPORTED_TYPE) {
-    		return true;
-    	} else if (dtRec == dtSchem) {
-    		return true;
-    	} else if (isStringType(dtRec) && isStringType(dtSchem)) {
-    		return true;
-      	} 
-    		
-    	return false;
+
+    /* Tests if record field type and schema type correspond */
+    boolean isTypeInSchema(int recType, int schemaType) {
+        DataType dtRec = DataType.get(recType);
+        DataType dtSchema = DataType.get(schemaType);
+
+        return (dtSchema == DataType.UNSUPPORTED_TYPE || dtRec == dtSchema ||
+                (isStringType(dtRec) && isStringType(dtSchema)));
     }
 
     /*
      * Fills a Text object based on recFields
      */
-    void fillText(List<OneField> recFields)  throws BadRecordException {
-		/*
-		 * For thre TEXT case there must be only one record in the list
+    void fillText(List<OneField> recFields) throws BadRecordException {
+        /*
+         * For the TEXT case there must be only one record in the list
 		 */
-		if (recFields.size() != 1) {
-			throw new BadRecordException("BridgeOutputBuilder must receive one field when handling the TEXT format");
-		}
-		
-		OneField fld = recFields.get(0);
-		int type = fld.type;
-		Object val = fld.val;
-		if (DataType.get(type) == DataType.BYTEA) {// from LineBreakAccessor
-			output = new BufferWritable((byte [])val);
-		}
-		else  {// from QuotedLineBreakAccessor 
-			String textRec = (String)val;
-			output = new Text(textRec + endl);
-		}
-	}
+        if (recFields.size() != 1) {
+            throw new BadRecordException("BridgeOutputBuilder must receive one field when handling the TEXT format");
+        }
+
+        OneField fld = recFields.get(0);
+        int type = fld.type;
+        Object val = fld.val;
+        if (DataType.get(type) == DataType.BYTEA) {// from LineBreakAccessor
+            output = new BufferWritable((byte[]) val);
+        } else { // from QuotedLineBreakAccessor
+            String textRec = (String) val;
+            output = new Text(textRec + "\n");
+        }
+    }
 
     /*
      * Fills one GPDBWritable field

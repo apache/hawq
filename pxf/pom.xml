@@ -69,6 +69,11 @@
             <version>${gphd.hive.version}-gphd-${gphd.stack.version}</version>
         </dependency>
         <dependency>
+            <groupId>org.apache.hive</groupId>
+            <artifactId>hive-exec</artifactId>
+            <version>${gphd.hive.version}-gphd-${gphd.stack.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.apache.hbase</groupId>
             <artifactId>hbase-common</artifactId>
             <version>${gphd.hbase.version}-gphd-${gphd.stack.version}</version>
