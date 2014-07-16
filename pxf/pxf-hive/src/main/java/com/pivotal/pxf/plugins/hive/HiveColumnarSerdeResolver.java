@@ -231,13 +231,8 @@ public class HiveColumnarSerdeResolver extends Plugin implements ReadResolver {
                     builder.append(((StringObjectInspector) oi).getPrimitiveJavaObject(o));
                     break;
                 case BINARY:
-                    /* convert a byte array to a string of octals in the form of \yyy */
                     byte[] bytes = ((BinaryObjectInspector) oi).getPrimitiveJavaObject(o);
-                    StringBuilder sb = new StringBuilder(bytes.length * 4 /* bytes per byte */);
-                    for (byte b : bytes) {
-                        sb.append('\\').append(Integer.toString(b, 8 /* octal */));
-                    }
-                    builder.append(sb);
+                    byteArrayToOctalString(bytes, builder);
                     break;
                 case TIMESTAMP:
                     builder.append(((TimestampObjectInspector) oi).getPrimitiveJavaObject(o));
@@ -285,5 +280,22 @@ public class HiveColumnarSerdeResolver extends Plugin implements ReadResolver {
         }
 
         delimiter = userDelim.charAt(0);
+    }
+
+    /*
+     * transform a byte array into a string of octal codes in the form \\xyz\\xyz
+     *
+     * We double escape each char because it is required in postgres bytea for some bytes.
+     * In the minimum all non-printables, backslash, null and single quote.
+     * Easier to just escape everything
+     * see http://www.postgresql.org/docs/9.0/static/datatype-binary.html
+     *
+     * Octal codes must be padded to 3 characters (001, 012)
+     */
+    private void byteArrayToOctalString(byte [] bytes, StringBuilder sb) {
+        sb.ensureCapacity(sb.length() + (bytes.length * 5 /* characters per byte */));
+        for (int b : bytes) {
+            sb.append(String.format("\\\\%03o", b & 0xff));
+        }
     }
 }
