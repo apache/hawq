@@ -55,6 +55,14 @@ void ParquetStorageRead_OpenFile(ParquetStorageRead *storageRead,
 
 	fileHandlerforfooter = ParquetStorageRead_DoOpenFile(storageRead,
 			filePathName);
+	if (fileHandlerforfooter < 0) {
+		ereport(ERROR,
+				(errcode_for_file_access(),
+				 errmsg("file open error for footer processing "
+						 "in file '%s' for relation '%s': %s"
+						 , filePathName, storageRead->relationName, strerror(errno)),
+				 errdetail("%s", HdfsGetLastError())));
+	}
 
 	ParquetStorageRead_FinishOpenFile(storageRead, fileHandlerfordata,
 			fileHandlerforfooter, filePathName, logicalEof, tableAttrs);
