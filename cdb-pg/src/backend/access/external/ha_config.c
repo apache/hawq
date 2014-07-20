@@ -6,7 +6,7 @@
 
 #define ALLOC_STRINGS_ARR(sz) ((char**)palloc0(sizeof(char*) * sz))
 
-static NNHAConf *init_config(unsigned int numnodes);
+static NNHAConf *init_config(unsigned int numnodes, const char *nameservice);
 static NNHAConf *load_hdfs_client_config(const char *nameservice);
 static void free_string_array(char **arr, int size);
 static void set_one_namenode(NNHAConf *conf, int idx, Namenode *source);
@@ -44,6 +44,7 @@ GPHD_HA_release_nodes(NNHAConf *conf)
 	if (!conf)
 		return;
 	
+	pfree(conf->nameservice);
 	free_string_array(conf->nodes, conf->numn);
 	free_string_array(conf->rpcports, conf->numn);
 	free_string_array(conf->restports, conf->numn);
@@ -73,14 +74,15 @@ free_string_array(char **arr, int size)
  * Initialize NNHAConf structure
  */
 static NNHAConf* 
-init_config(unsigned int numnodes)
+init_config(unsigned int numnodes, const char *nameservice)
 {
 	NNHAConf	*conf = (NNHAConf *)palloc0(sizeof(NNHAConf));
 	
-	conf->nodes     = ALLOC_STRINGS_ARR(numnodes);
-	conf->rpcports  = ALLOC_STRINGS_ARR(numnodes);
-	conf->restports = ALLOC_STRINGS_ARR(numnodes);
-	conf->numn  = numnodes;
+	conf->nameservice   = pstrdup(nameservice);
+	conf->nodes         = ALLOC_STRINGS_ARR(numnodes);
+	conf->rpcports      = ALLOC_STRINGS_ARR(numnodes);
+	conf->restports     = ALLOC_STRINGS_ARR(numnodes);
+	conf->numn          = numnodes;
 	
 	return conf;
 }
@@ -107,7 +109,7 @@ load_hdfs_client_config(const char *nameservice)
 				 errmsg("High availability for nameservice %s was configured with only one node. A high availability scheme requires at least two nodes ",
 						nameservice)));
 		
-	conf = init_config(len);
+	conf = init_config(len, nameservice);
 	
 	for (i = 0; i < conf->numn; i++)
 		set_one_namenode(conf, i, &nns[i]);

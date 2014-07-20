@@ -942,6 +942,10 @@ static void init_client_context(ClientContext *client_context)
  * is created. We cannot use that token because hd_work_mgr.c code gets 
  * executed before a portal is created.
  *
+ * The function uses a hdfs uri in the form of hdfs://host:port/
+ * where port is 8020. In the case of HA the function uses the form
+ * hdfs://nameservice/
+ *
  * TODO 8020 is hard-coded. Must find the NameNode port somehow.
  */
 static void generate_delegation_token(PxfInputData *inputData)
@@ -952,7 +956,12 @@ static void generate_delegation_token(PxfInputData *inputData)
 		return;
 
 	initStringInfo(&hdfs_uri);
-	appendStringInfo(&hdfs_uri, "hdfs://%s:8020/", inputData->gphduri->host);
+    if (inputData->gphduri->ha_nodes)
+        appendStringInfo(&hdfs_uri, "hdfs://%s/", inputData->gphduri->ha_nodes->nameservice);
+    else
+        appendStringInfo(&hdfs_uri, "hdfs://%s:8020/", inputData->gphduri->host);
+
+    elog(DEBUG2, "about to acquire delegation token for %s", hdfs_uri.data);
 
 	inputData->token = palloc0(sizeof(PxfHdfsTokenData));
 

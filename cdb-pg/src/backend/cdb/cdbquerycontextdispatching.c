@@ -2823,6 +2823,12 @@ static char* GetExtTableFirstLocation(Datum *array)
  * Using host from uri, dispatch HDFS credentials to 
  * segments.
  *
+ * The function uses a hdfs uri in the form hdfs://host:port/ where
+ * port is hard-coded 8020. For HA the function uses hdfs://nameservice/
+ *
+ * prepareDispatchedCatalogFileSystemCredential will store the token
+ * using port == 0 in HA case (otherwise the supplied port)
+ *
  * TODO Get HDFS port from someplace else, currently hard coded
  */
 static void AddFileSystemCredentialForPxfTable(char *uri)
@@ -2831,7 +2837,12 @@ static void AddFileSystemCredentialForPxfTable(char *uri)
 
 	initStringInfo(&hdfs_uri);
 	GPHDUri *gphd_uri = parseGPHDUri(uri, GPHDURI_DONT_WARN);
-	appendStringInfo(&hdfs_uri, "hdfs://%s:8020/", gphd_uri->host);
+    if (gphd_uri->ha_nodes)
+        appendStringInfo(&hdfs_uri, "hdfs://%s/", gphd_uri->ha_nodes->nameservice);
+    else
+        appendStringInfo(&hdfs_uri, "hdfs://%s:8020/", gphd_uri->host);
+
+    elog(DEBUG2, "about to acquire delegation token for %s", hdfs_uri.data);
 
 	prepareDispatchedCatalogFileSystemCredential(hdfs_uri.data);
 

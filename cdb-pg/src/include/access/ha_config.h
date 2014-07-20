@@ -19,6 +19,7 @@ typedef enum HANodes
  */
 typedef struct NNHAConf
 {
+    char            *nameservice;   /* the HA nameservice */
     char 			**nodes;		/* the  HA Namenode nodes	*/
 	char			**rpcports;	    /* rpcports[0] belongs to nodes[0] */
 	char			**restports;	/* restports[0] belongs to nodes[0]	*/

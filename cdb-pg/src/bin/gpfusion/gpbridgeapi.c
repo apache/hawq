@@ -477,21 +477,41 @@ size_t fill_buffer(gphadoop_context* context, char* start, size_t size)
 /*
  * The function will get the cached delegation token
  * for remote host and add it to inputData
+ *
+ * In HA case, where only a nameservice is used, port has to 
+ * be zero (stored that way by prepareDispatchedCatalogFileSystemCredential)
+ * see HdfsGetConnection()@fd.c
  * 
  * TODO Get "hdfs" and port from someplace else.
  */
 void add_delegation_token(PxfInputData *inputData)
 {
+	PxfHdfsTokenData *token = NULL;
+    int port;
+    char *host = NULL;
+
 	if (!enable_secure_filesystem)
 		return;
 
-	PxfHdfsTokenData *token = NULL;
 	token = palloc0(sizeof(PxfHdfsTokenData));
 
+    if (inputData->gphduri->ha_nodes)
+    {
+        host = inputData->gphduri->ha_nodes->nameservice;
+        port = 0 /* port used when using a nameservice */;
+    } else
+    {
+        host = inputData->gphduri->host;
+        port = 8020;
+    }
+
+    elog(DEBUG2, "locating token for %s:%d", host, port);
+
 	token->hdfs_token = find_filesystem_credential("hdfs", 
-												   inputData->gphduri->host, 
-												   8020,
+												   host,
+												   port,
 												   &token->hdfs_token_size);
+
 	if (token->hdfs_token == NULL)
 		elog(ERROR, "failed to find delegation token for %s", inputData->gphduri->host);
 	elog(DEBUG2, "Delegation token for %s found", inputData->gphduri->host);
