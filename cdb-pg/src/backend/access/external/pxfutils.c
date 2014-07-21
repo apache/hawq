@@ -64,16 +64,46 @@ static void process_request(ClientContext* client_context, char *uri)
 	memset(client_context->chunk_buf, 0, RAW_BUF_SIZE);
 	resetStringInfo(&(client_context->the_rest_buf));
 
-	/* read some bytes to make sure the connection is established */
-	churl_read_check_connectivity(client_context->handle);
-
-	while ((n = churl_read(client_context->handle, client_context->chunk_buf, sizeof(client_context->chunk_buf))) != 0)
+	/*
+	 * This try-catch ensures that in case of an exception during the "communication with PXF and the accumulation of
+	 * PXF data in client_context->the_rest_buf", we still get to terminate the libcurl connection nicely and avoid
+	 * leaving the PXF server connection hung.
+	 */
+	PG_TRY();
 	{
-		appendBinaryStringInfo(&(client_context->the_rest_buf), client_context->chunk_buf, n);
-		memset(client_context->chunk_buf, 0, RAW_BUF_SIZE);
+		/* read some bytes to make sure the connection is established */
+		churl_read_check_connectivity(client_context->handle);
+		while ((n = churl_read(client_context->handle, client_context->chunk_buf, sizeof(client_context->chunk_buf))) != 0)
+		{
+			appendBinaryStringInfo(&(client_context->the_rest_buf), client_context->chunk_buf, n);
+			memset(client_context->chunk_buf, 0, RAW_BUF_SIZE);
+		}
 	}
+	PG_CATCH();
+	{
+		if (client_context->handle)
+			churl_cleanup(client_context->handle);
+		PG_RE_THROW();
+	}
+	PG_END_TRY();
 
 	churl_cleanup(client_context->handle);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
