@@ -41,6 +41,9 @@ typedef struct PolicyAutoContext
 	uint64 queryMemKB;
 	PlannedStmt *plannedStmt; /* pointer to the planned statement */
 	uint64 parquetOpReservedMemKB; /* memory reserved for parquet related operators */
+
+	/* hash table of root Oids of parquet tables for Planner's plan */
+	HTAB * parquetRootOids;
 } PolicyAutoContext;
 
 /**
@@ -54,11 +57,12 @@ static bool IsParquetScanOperator(Node *node, PlannedStmt *stmt);
 static bool IsParquetInsertOperator(Node *node, PlannedStmt *stmt);
 static uint64 MemoryReservedForParquetInsertForPlannerPlan(PlannedStmt *stmt);
 static List* GetScannedColumnsForTable(Node *node, Oid rel_oid);
-static uint64 MemoryReservedForParquetScan(Node *node, PlannedStmt *stmt);
+static uint64 MemoryReservedForParquetScan(Node *node, PlannedStmt *stmt, HTAB *parquetRootOids);
 static uint64 MemoryReservedForParquetInsert(Oid rel_oid);
-static Oid GetPartOidForParquetScan(Node *node, Oid root_oid, uint64 *maxMemRequired);
+static Oid GetPartOidForParquetScan(Node *node, Oid rootOid, uint64 *maxMemRequired, bool needRemap);
 static Oid GetPartOidForParquetInsert(Oid root_oid, uint64 *maxMemRequired);
 static double minDouble(double a, double b);
+static HTAB* createOidHTAB();
 
 struct OperatorGroupNode;
 
@@ -98,6 +102,9 @@ typedef struct OperatorGroupNode
 	/* memory reserved for parquet related operators in this group */
 	uint64 parquetOpReservedMemKB;
 
+	/* hash table of root Oids of parquet tables for Planner's plan */
+	HTAB * parquetRootOids;
+
 } OperatorGroupNode;
 
 /*
@@ -124,6 +131,25 @@ bool						gp_log_resqueue_memory = false;
 int							gp_resqueue_memory_policy_auto_fixed_mem;
 const int					gp_resqueue_memory_log_level=NOTICE;
 bool						gp_resqueue_print_operator_memory_limits = false;
+
+/**
+ * create a HTAB for Oids
+ */
+static HTAB*
+createOidHTAB()
+{
+	HASHCTL hashCtl;
+	MemSet(&hashCtl, 0, sizeof(HASHCTL));
+	hashCtl.keysize = sizeof(Oid);
+	hashCtl.entrysize = sizeof(Oid);
+	hashCtl.hash = oid_hash;
+	hashCtl.hcxt = CurrentMemoryContext;
+
+	return hash_create("Parquet Table Root Oids",
+	                   INITIAL_NUM_PIDS,
+	                   &hashCtl,
+	                   HASH_ELEM | HASH_CONTEXT | HASH_FUNCTION);
+}
 
 /**
  * Minimum of two doubles 
@@ -283,10 +309,11 @@ IsMemoryIntensiveOperator(Node *node, PlannedStmt *stmt)
  * return: memory in byte that is reserved for parquet table scan
  */
 static uint64
-MemoryReservedForParquetScan(Node *node, PlannedStmt *stmt)
+MemoryReservedForParquetScan(Node *node, PlannedStmt *stmt, HTAB *parquetRootOids)
 {
 	Assert(NULL != node);
 	Assert(NULL != stmt);
+	Assert(NULL != parquetRootOids);
 
 	Oid rel_oid = getrelid(((Scan *) node)->scanrelid, stmt->rtable);
 	uint64 memoryReservedForParquetScan = 0;
@@ -296,10 +323,54 @@ MemoryReservedForParquetScan(Node *node, PlannedStmt *stmt)
 	if (IsA(node, DynamicTableScan))
 	{
 #if USE_ASSERT_CHECKING
-                Oid part_oid =
+		Oid part_oid =
 #endif
-		GetPartOidForParquetScan(node, rel_oid, &memoryReservedForParquetScan);
+		GetPartOidForParquetScan(node, rel_oid, &memoryReservedForParquetScan, true /* need remap */);
 		Assert(InvalidOid != part_oid);
+	}
+	/* Planner's plan for parquet table scan */
+	else if(IsA(node, ParquetScan))
+	{
+		Oid root_oid = rel_partition_get_master(rel_oid);
+		if (InvalidOid == root_oid)
+		{
+			/* it is not a partitioned table */
+			List *scanned_columns_list = GetScannedColumnsForTable(node, rel_oid);
+			memoryReservedForParquetScan = memReservedForParquetScan(rel_oid, scanned_columns_list);
+			list_free(scanned_columns_list);
+		}
+		/* it is a partitioned table */
+		else
+		{
+			/**
+			 * GPSQL-2477: we should assign parquet required memory to one
+			 * partitioned table scan for Planner's plan.
+			 */
+			bool foundPtr = false;
+			hash_search(parquetRootOids, &root_oid, HASH_ENTER, &foundPtr);
+
+			if (foundPtr)
+			{
+				/*
+				 * the root_oid is already in the hash table which means the
+				 * parquet required memory has been assigned to some other ParquetScan.
+				 * Assign 100K to this operator.
+				 */
+				memoryReservedForParquetScan = (uint64) gp_resqueue_memory_policy_auto_fixed_mem * 1024;
+			}
+			else
+			{
+				/*
+				 * this is the first time we encounter ParquetScan for a partitioned parquet table.
+				 * Assign the maximum memory required for this table to this operator.
+				 */
+#if USE_ASSERT_CHECKING
+				Oid part_oid =
+#endif
+				GetPartOidForParquetScan(node, root_oid, &memoryReservedForParquetScan, false /* no need remap */);
+				Assert(InvalidOid != part_oid);
+			}
+		}
 	}
 	else
 	{
@@ -366,7 +437,7 @@ IsParquetScanOperator(Node *node, PlannedStmt *stmt)
 			{
 				uint64 memRequired = 0;
 				Oid rel_oid = getrelid(((Scan *) node)->scanrelid, stmt->rtable);
-				if (InvalidOid == GetPartOidForParquetScan(node, rel_oid, &memRequired))
+				if (InvalidOid == GetPartOidForParquetScan(node, rel_oid, &memRequired, true /* need remap */))
 				{
 					return false;
 				}
@@ -502,25 +573,25 @@ GetScannedColumnsForTable(Node *node, Oid rel_oid)
  * maxMemRequired: Output argument for memory in byte that is reserved for the part table scan
  *
  */
-static Oid GetPartOidForParquetScan(Node *node, Oid root_oid, uint64 *maxMemRequired)
+static Oid GetPartOidForParquetScan(Node *node, Oid rootOid, uint64 *maxMemRequired, bool needRemap)
 {
 	Assert(NULL != maxMemRequired);
-	Assert(rel_is_partitioned(root_oid));
+	Assert(rel_is_partitioned(rootOid));
 	Oid maxRowgroupsizePartTableOid = InvalidOid;
 	*maxMemRequired = 0;
 
-	PartitionNode *pn = get_parts(root_oid, 0 /* level */, 0 /* parent */, false /* inctemplate */,
+	PartitionNode *pn = get_parts(rootOid, 0 /* level */, 0 /* parent */, false /* inctemplate */,
 	                              CurrentMemoryContext);
 	Assert(pn);
 
-	List *scanned_columns_list = GetScannedColumnsForTable(node, root_oid);
+	List *scanned_columns_list = GetScannedColumnsForTable(node, rootOid);
 	
 	/*
 	 * If we have dropped columns in root table, we need to remap
 	 * the attribute numbers for part tables to get accurate columns
 	 * to be scanned.
 	 */ 
-	Relation rootRel = heap_open(root_oid, AccessShareLock);
+	Relation rootRel = heap_open(rootOid, AccessShareLock);
 	TupleDesc rootTupDesc = rootRel->rd_att;
 
 	List *lRelOids = all_partition_relids(pn);
@@ -535,7 +606,7 @@ static Oid GetPartOidForParquetScan(Node *node, Oid root_oid, uint64 *maxMemRequ
 			TupleDesc partTupDesc = partRel->rd_att;
 			AttrNumber *attMap = varattnos_map(rootTupDesc, partTupDesc);
 			List *remap_scanned_columns_list = NIL;
-			if (attMap)
+			if (attMap && needRemap)
 			{
 				ListCell *cell = NULL;
 				foreach(cell, scanned_columns_list)
@@ -559,7 +630,7 @@ static Oid GetPartOidForParquetScan(Node *node, Oid root_oid, uint64 *maxMemRequ
 			}
 
 			/* clean up */
-			if (attMap)
+			if (attMap && needRemap)
 			{
 				list_free(remap_scanned_columns_list);
 				pfree(attMap);
@@ -646,7 +717,11 @@ static bool PolicyAutoPrelimWalker(Node *node, PolicyAutoContext *context)
 	{
 		if (IsParquetScanOperator(node, context->plannedStmt))
 		{
-			uint64 memResevedForParquetScan = MemoryReservedForParquetScan(node, context->plannedStmt);
+			if (NULL == context->parquetRootOids)
+			{
+				context->parquetRootOids = createOidHTAB();
+			}
+			uint64 memResevedForParquetScan = MemoryReservedForParquetScan(node, context->plannedStmt, context->parquetRootOids);
 			uint64 memResevedForParquetScanKB = (uint64) ( (double) memResevedForParquetScan / 1024);
 			context->parquetOpReservedMemKB += memResevedForParquetScanKB;
 			/* Assign the memory required to the operator so we do not need to compute it again */
@@ -740,6 +815,7 @@ static bool PolicyAutoAssignWalker(Node *node, PolicyAutoContext *context)
 	 ctx.numNonMemIntensiveOperators = 0;
 	 ctx.parquetOpReservedMemKB = 0;
 	 ctx.plannedStmt = stmt;
+	 ctx.parquetRootOids = NULL;
 	 
 	 /* If it is a planner's plan for parquet insert, we need to reserve
 	  * the memory before traversing the plan nodes. Because unlike ORCA,
@@ -811,6 +887,7 @@ static bool PolicyAutoAssignWalker(Node *node, PolicyAutoContext *context)
 	 ctx.numNonMemIntensiveOperators = 0;
 	 ctx.parquetOpReservedMemKB = 0;
 	 ctx.plannedStmt = stmt;
+	 ctx.parquetRootOids = NULL;
 	 
 #ifdef USE_ASSERT_CHECKING
 	 bool result = 
@@ -842,6 +919,7 @@ CreateOperatorGroupNode(uint32 groupId, OperatorGroupNode *parentGroup)
 	node->groupId = groupId;
 	node->parentGroup = parentGroup;
 	node->parquetOpReservedMemKB = 0;
+	node->parquetRootOids = NULL;
 
 	return node;
 }
@@ -859,7 +937,11 @@ IncrementOperatorCount(Node *node, OperatorGroupNode *groupNode, PlannedStmt *st
 	
 	if (IsParquetScanOperator(node, stmt))
 	{
-		uint64 memResevedForParquetScan = MemoryReservedForParquetScan(node, stmt);
+		if (NULL == groupNode->parquetRootOids)
+		{
+			groupNode->parquetRootOids = createOidHTAB();
+		}
+		uint64 memResevedForParquetScan = MemoryReservedForParquetScan(node, stmt, groupNode->parquetRootOids);
 		uint64 memResevedForParquetScanKB = (uint64) ((double) memResevedForParquetScan / 1024);
 		groupNode->parquetOpReservedMemKB += memResevedForParquetScanKB;
 		/* Assign the memory required to the operator so we do not need to compute it again */
@@ -1609,5 +1691,6 @@ uint64 ResourceQueueGetSuperuserQueryMemoryLimit(void)
 	Assert(superuser());
 	return (uint64) statement_mem * 1024L;
 }
+
 
 
