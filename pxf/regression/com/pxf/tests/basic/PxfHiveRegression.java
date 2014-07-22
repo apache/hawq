@@ -1,8 +1,6 @@
 package com.pxf.tests.basic;
 
 import java.io.IOException;
-import java.sql.SQLException;
-import java.sql.SQLWarning;
 import java.util.List;
 
 import jsystem.framework.fixture.FixtureManager;
@@ -23,7 +21,6 @@ import com.pivotal.parot.structures.tables.utils.TableFactory;
 import com.pivotal.parot.utils.exception.ExceptionUtils;
 import com.pivotal.parot.utils.jsystem.report.ReportUtils;
 import com.pivotal.parot.utils.tables.ComparisonUtils;
-import com.pivotal.pxf.service.io.GPDBWritable.TypeMismatchException;
 import com.pxf.tests.fixtures.PxfHiveFixture;
 import com.pxf.tests.testcases.PxfTestCase;
 
@@ -69,13 +66,6 @@ public class PxfHiveRegression extends PxfTestCase {
 		hiveTypesTable = PxfHiveFixture.hiveTypesTable;;
 		hiveSequenceTable = PxfHiveFixture.hiveSequenceTable;;
 		hiveRcTable = PxfHiveFixture.hiveRcTable;;
-	}
-
-	@AfterClass
-	public static void afterClass() throws Throwable {
-
-		// go to RootFixture - this will cause activation of PxfHiveFixture tearDown()
-		FixtureManager.getInstance().goTo(RootFixture.getInstance().getName());
 	}
 
 	/**
@@ -448,53 +438,13 @@ public class PxfHiveRegression extends PxfTestCase {
 
 	/**
 	 * Will run after all tests in the class ran. Will call to PxfHiveFixture tear down.
-	 * 
+	 *
 	 * @throws Throwable
 	 */
+	@AfterClass
+	public static void afterClass() throws Throwable {
 
-	@Test
-	public void primitiveTypesDeprecatedClasses() throws Exception {
-
-		comparisonDataTable.loadDataFromFile(PxfHiveFixture.HIVE_TYPES_DATA_FILE_PATH, ",", 0);
-
-		hawqExternalTable = new ReadableExternalTable("hive_types", new String[] {
-				"t1    text",
-				"t2    text",
-				"num1  integer",
-				"dub1  double precision",
-				"dec1  numeric",
-				"tm timestamp",
-				"r real",
-				"bg bigint",
-				"b boolean" }, hiveTypesTable.getName(), "CUSTOM");
-
-		hawqExternalTable.setFragmenter("HiveDataFragmenter");
-		hawqExternalTable.setAccessor("HiveAccessor");
-		hawqExternalTable.setResolver("HiveResolver");
-		hawqExternalTable.setFormatter("pxfwritable_import");
-
-		try {
-			hawq.createTableAndVerify(hawqExternalTable);
-			Assert.fail("A SQLWarning should have been thrown");
-		} catch (SQLWarning warnings) {
-			SQLWarning warning = warnings;
-			assertUseIsDeprecated("HiveDataFragmenter", warning);
-			warning = warning.getNextWarning();
-			assertUseIsDeprecated("HiveAccessor", warning);
-			warning = warning.getNextWarning();
-			assertUseIsDeprecated("HiveResolver", warning);
-			warning = warning.getNextWarning();
-			Assert.assertNull(warning);
-		}
-
-		// TODO once jsystem-infra supports throwing warnings from queryResults check warnings are
-		// also printed here
-		hawq.queryResults(hawqExternalTable, "SELECT * FROM " + hawqExternalTable.getName() + " ORDER BY t1");
-
-		ComparisonUtils.compareTables(hawqExternalTable, comparisonDataTable, report);
-	}
-
-	private void assertUseIsDeprecated(String classname, SQLWarning warning) {
-		Assert.assertEquals("Use of " + classname + " is deprecated and it will be removed on the next major version", warning.getMessage());
+		// go to RootFixture - it means perform PxfHiveFixture teardown
+		FixtureManager.getInstance().goTo(RootFixture.getInstance().getName());
 	}
 }

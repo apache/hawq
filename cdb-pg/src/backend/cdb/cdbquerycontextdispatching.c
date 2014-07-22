@@ -2836,7 +2836,7 @@ static void AddFileSystemCredentialForPxfTable(char *uri)
 	StringInfoData hdfs_uri;
 
 	initStringInfo(&hdfs_uri);
-	GPHDUri *gphd_uri = parseGPHDUri(uri, GPHDURI_DONT_WARN);
+	GPHDUri *gphd_uri = parseGPHDUri(uri);
     if (gphd_uri->ha_nodes)
         appendStringInfo(&hdfs_uri, "hdfs://%s/", gphd_uri->ha_nodes->nameservice);
     else

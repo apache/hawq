@@ -89,7 +89,7 @@ static char* make_allocation_output_string(List *segment_fragments);
 static List* free_allocated_frags(List *segment_fragments);
 static void assign_rest_ports_to_fragments(ClientContext *client_context, GPHDUri *hadoop_uri, List *fragments);
 static void init_client_context(ClientContext *client_context);
-static GPHDUri* init(char* uri, ClientContext* cl_context, bool warn_on_deprecation);
+static GPHDUri* init(char* uri, ClientContext* cl_context);
 static List* allocate_fragments_to_datanodes(List *whole_data_fragments_list);
 static DatanodeProcessingLoad* get_dn_processing_load(List **allDNProcessingLoads, FragmentHost *fragment_host);
 static void print_data_nodes_allocation(List *allDNProcessingLoads, int total_data_frags);
@@ -132,7 +132,7 @@ char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs, Rela
 	/*
 	 * 1. Cherrypick the data relevant for HADOOP from the input uri and init curl headers
 	 */
-	GPHDUri* hadoop_uri = init(uri, &client_context, GPHDURI_DONT_WARN);
+	GPHDUri* hadoop_uri = init(uri, &client_context);
 	if (!hadoop_uri)
 		return (char**)NULL;
 
@@ -239,7 +239,7 @@ PxfStatsElem *get_pxf_statistics(char *uri, Relation rel, StringInfo err_msg)
 	PxfInputData inputData = {0};
 	PxfStatsElem *result = NULL;
 	
-	GPHDUri* hadoop_uri = init(uri, &client_context, GPHDURI_WARN);
+	GPHDUri* hadoop_uri = init(uri, &client_context);
 	if (!hadoop_uri)
 		return NULL;
 
@@ -274,7 +274,7 @@ PxfStatsElem *get_pxf_statistics(char *uri, Relation rel, StringInfo err_msg)
 /*
  * Preliminary uri parsing and curl initializations for the REST communication
  */
-static GPHDUri* init(char* uri, ClientContext* cl_context, bool warn_on_deprecation)
+static GPHDUri* init(char* uri, ClientContext* cl_context)
 {	
 	char *fragmenter = NULL;
 	char *profile = NULL;
@@ -282,7 +282,7 @@ static GPHDUri* init(char* uri, ClientContext* cl_context, bool warn_on_deprecat
 	/*
 	 * 1. Cherrypick the data relevant for HADOOP from the input uri
 	 */
-	GPHDUri* hadoop_uri = parseGPHDUri(uri, warn_on_deprecation);
+	GPHDUri* hadoop_uri = parseGPHDUri(uri);
 	
 	/* if pxf_local_storage is false, ignore the port in the uri
 	 * and use pxf_service_port instead to access PXF.

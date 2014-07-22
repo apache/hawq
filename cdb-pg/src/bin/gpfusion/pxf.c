@@ -46,7 +46,7 @@ pxfprotocol_validate_urls(PG_FUNCTION_ARGS)
 	/*
 	 * Condition 2: url formatting of extra options.
 	 */
-	uri = parseGPHDUri(EXTPROTOCOL_VALIDATOR_GET_NTH_URL(fcinfo, 1), GPHDURI_WARN);
+	uri = parseGPHDUri(EXTPROTOCOL_VALIDATOR_GET_NTH_URL(fcinfo, 1));
 
 	/*
 	 * Condition 3: No duplicate options.

@@ -14,12 +14,6 @@
 #define PXF_SERVICE_PREFIX "pxf"
 #define PXF_VERSION "v11" /* PXF version */
 
-/* Issue a deprecation warning when parsing a
- * deprecated class
- */
-#define GPHDURI_WARN true
-#define GPHDURI_DONT_WARN false
-
 /*
  * FragmentData - describes a single Hadoop file split / HBase table region
  * in means of location (ip, port), the source name of the specific file/table that is being accessed,
@@ -66,7 +60,7 @@ typedef struct GPHDUri
 	NNHAConf        *ha_nodes;
 } GPHDUri;
 
-GPHDUri	*parseGPHDUri(const char *uri_str, bool warn_on_deprecation);
+GPHDUri	*parseGPHDUri(const char *uri_str);
 void 	 freeGPHDUri(GPHDUri *uri);
 char	*GPHDUri_dup_without_segwork(const char* uri);
 void	 GPHDUri_debug_print(GPHDUri *uri);
