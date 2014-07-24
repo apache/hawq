@@ -209,11 +209,15 @@ project('pxf-hdfs') {
 project('pxf-hive') {
     dependencies {
         compile(project(':pxf-hdfs'))
-        compile "org.apache.hive:hive-service:$hiveVersion"
+        compile "org.apache.hive:hive-exec:$hiveVersion"
         compile "org.apache.hive:hive-metastore:$hiveVersion"
         compile "org.apache.hive:hive-common:$hiveVersion"
         compile "org.apache.hive:hive-serde:$hiveVersion"
         testCompile 'pl.pragmatists:JUnitParams:1.0.2'
+		configurations {
+			// Remove hive-exec from unit tests as it causes VerifyError
+			testRuntime.exclude module: 'hive-exec'
+		}
     }
 
     ospackage {

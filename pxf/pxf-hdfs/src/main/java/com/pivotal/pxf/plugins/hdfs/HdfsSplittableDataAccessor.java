@@ -22,7 +22,7 @@ import java.util.ListIterator;
 public abstract class HdfsSplittableDataAccessor extends Plugin implements ReadAccessor {
     protected Configuration conf = null;
     protected RecordReader<Object, Object> reader = null;
-    protected FileInputFormat<?, ?> fformat = null;
+    protected InputFormat<?, ?> fformat = null;
     protected ListIterator<InputSplit> iter = null;
     protected JobConf jobConf = null;
     protected Object key, data;
@@ -34,7 +34,7 @@ public abstract class HdfsSplittableDataAccessor extends Plugin implements ReadA
      * @param inFormat the HDFS {@link InputFormat} the caller wants to use
      * @throws Exception
      */
-    public HdfsSplittableDataAccessor(InputData input, FileInputFormat<?, ?> inFormat) throws Exception {
+    public HdfsSplittableDataAccessor(InputData input, InputFormat<?, ?> inFormat) throws Exception {
         super(input);
         fformat = inFormat;
 

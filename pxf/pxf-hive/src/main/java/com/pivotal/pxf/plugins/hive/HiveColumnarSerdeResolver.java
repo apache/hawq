@@ -155,7 +155,7 @@ public class HiveColumnarSerdeResolver extends Plugin implements ReadResolver {
                     parts.append(Timestamp.valueOf(val));
                     break;
                 case serdeConstants.DECIMAL_TYPE_NAME:
-                    parts.append(new HiveDecimal(val).bigDecimalValue());
+                    parts.append(HiveDecimal.create(val).bigDecimalValue());
                     break;
                 default:
                     throw new UnsupportedTypeException("Unsupported partition type: " + type);

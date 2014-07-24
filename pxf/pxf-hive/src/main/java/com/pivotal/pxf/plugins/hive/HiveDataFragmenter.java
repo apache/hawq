@@ -90,7 +90,7 @@ public class HiveDataFragmenter extends Fragmenter {
 
     /**
      * Constructs a HiveDataFragmenter object
-	 * @param md all input parameters comming from the client
+	 * @param md all input parameters coming from the client
      */
     public HiveDataFragmenter(InputData md) {
         super(md);
@@ -114,14 +114,14 @@ public class HiveDataFragmenter extends Fragmenter {
 	/**
 	 * Creates the partition InputFormat
 	 * @param inputFormatName input format class name
-	 * @param jobConf configuraton data for the Hadoop framework
-	 * @return a {@link org.apache.hadoop.mapred.FileInputFormat} derived object
+	 * @param jobConf configuration data for the Hadoop framework
+	 * @return a {@link org.apache.hadoop.mapred.InputFormat} derived object
 	 */
-    static public FileInputFormat<?, ?> makeInputFormat(String inputFormatName, JobConf jobConf) throws Exception {
-        Class<?> c = Class.forName(inputFormatName, true, JavaUtils.getClassLoader());
-        FileInputFormat<?, ?> fformat = (FileInputFormat<?, ?>) c.newInstance();
+	public static InputFormat<?, ?> makeInputFormat(String inputFormatName, JobConf jobConf) throws Exception {
+		Class<?> c = Class.forName(inputFormatName, true, JavaUtils.getClassLoader());
+		InputFormat<?, ?> fformat = (InputFormat<?, ?>) c.newInstance();
 
-        if ("org.apache.hadoop.mapred.TextInputFormat".equals(inputFormatName)) {
+		if ("org.apache.hadoop.mapred.TextInputFormat".equals(inputFormatName)) {
             ((TextInputFormat) fformat).configure(jobConf); // TextInputFormat needs a special configuration
         }
 
@@ -225,7 +225,7 @@ public class HiveDataFragmenter extends Fragmenter {
      * Fill a table partition
      */
     private void fetchMetaData(HiveTablePartition tablePartition) throws Exception {
-        FileInputFormat<?, ?> fformat = makeInputFormat(tablePartition.storageDesc.getInputFormat(), jobConf);
+        InputFormat<?, ?> fformat = makeInputFormat(tablePartition.storageDesc.getInputFormat(), jobConf);
         FileInputFormat.setInputPaths(jobConf, new Path(tablePartition.storageDesc.getLocation()));
         InputSplit[] splits = fformat.getSplits(jobConf, 1);
 

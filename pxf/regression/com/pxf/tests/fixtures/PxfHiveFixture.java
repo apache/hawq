@@ -103,7 +103,7 @@ public class PxfHiveFixture extends BasicFixture {
 				"s2 string",
 				"n1 int",
 				"d1 double",
-				"dc1 decimal",
+				"dc1 decimal(38,18)",
 				"tm timestamp",
 				"f float",
 				"bg bigint",

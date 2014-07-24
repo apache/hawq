@@ -143,7 +143,7 @@ public class HiveResolver extends Plugin implements ReadResolver {
                     addOneFieldToRecord(partitionFields, TIMESTAMP, Timestamp.valueOf(val));
                     break;
                 case serdeConstants.DECIMAL_TYPE_NAME:
-                    addOneFieldToRecord(partitionFields, NUMERIC, new HiveDecimal(val).bigDecimalValue().toString());
+                    addOneFieldToRecord(partitionFields, NUMERIC, HiveDecimal.create(val).bigDecimalValue().toString());
                     break;
                 default:
                     throw new UnsupportedTypeException("Unknown type: " + type);
@@ -262,8 +262,11 @@ public class HiveResolver extends Plugin implements ReadResolver {
             case DECIMAL: {
                 String sVal = null;
                 if (o != null) {
-                    BigDecimal bd = ((HiveDecimalObjectInspector) oi).getPrimitiveJavaObject(o).bigDecimalValue();
-                    sVal = bd.toString();
+					HiveDecimal hd = ((HiveDecimalObjectInspector) oi).getPrimitiveJavaObject(o);
+					if (hd != null) {
+						BigDecimal bd = hd.bigDecimalValue();
+						sVal = bd.toString();
+					}
                 }
                 addOneFieldToRecord(record, NUMERIC, sVal);
                 break;

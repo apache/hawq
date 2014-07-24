@@ -6,7 +6,7 @@ import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.plugins.hdfs.HdfsSplittableDataAccessor;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.mapred.FileInputFormat;
+import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.Reporter;
@@ -19,7 +19,7 @@ import java.util.List;
 /**
  * Accessor for Hive tables.
  * The accessor will open and read a split belonging to a Hive table.
- * Opening a split means creating the coresponding InputFormat and RecordReader required to access the 
+ * Opening a split means creating the corresponding InputFormat and RecordReader required to access the 
  * split's data. The actual record reading is done in the base class - 
  * {@link com.pivotal.pxf.plugins.hdfs.HdfsSplittableDataAccessor}.
  * <p>
@@ -45,7 +45,7 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
     private List<Partition> partitions;
 
     /**
-     * Constructs the InputFormat (derived  from {@link org.apache.hadoop.mapred.FileInputFormat})
+     * Constructs the InputFormat (derived from {@link org.apache.hadoop.mapred.InputFormat})
 	 * and the Hive partition fields 
 	 * @param input contains the InputFormat class name and the partition fields
      */
@@ -84,9 +84,9 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
 
 	/*
 	 * Parse the user-data supplied by the HiveFragmenter from InputData. Based on the 
-	 * user-data construct the partition foelds and the InputFormat for current split
+	 * user-data construct the partition fields and the InputFormat for current split
 	 */
-    private FileInputFormat<?, ?> createInputFormat(InputData input) throws Exception {
+    private InputFormat<?, ?> createInputFormat(InputData input) throws Exception {
         String userData = new String(input.getFragmentUserData());
         String[] toks = userData.split(HiveDataFragmenter.HIVE_UD_DELIM);
         initPartitionFields(toks[3]);
