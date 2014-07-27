@@ -14,7 +14,7 @@ DISTSVR_FETCH = $(ROOT)/tools/fetchBuild.sh
 TCSERVER_VERSION=2.9.5/vfabric-tc-server-standard-2.9.5.SR1.tar.gz
 TCSERVER_URL_BASE=http://build-prod.dh.greenplum.com/releases/tcServer
 
-DISTSVR_VIEW = latest
+DISTSVR_VIEW = testing
 DISTSVR_stack = $(DISTSVR_VIEW)
 
 TARGET = $(COMPONENTS:%=%.fetched)
