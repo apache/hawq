@@ -1496,11 +1496,10 @@ public class PxfHdfsRegression extends PxfTestCase {
 	 * 
 	 *  The test is done by running a query over a file with >10000 records,
 	 *  using ThrowOn10000Accessor which throw an exception on the 10000th record.
-	 *  
-	 *  TODO: Test deactivated at the moment, pending an upgrade to a newer version 
-	 *  of tcServer. See GPSQL-2272.
+	 *
+	 *  see GPSQL-2272
 	 */
-	//@Test 
+	@Test 
 	public void errorInTheMiddleOfStream() throws Exception {
 		
 		String filePath = hdfsWorkingFolder + "/error_on_10000.txt";

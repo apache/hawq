@@ -40,7 +40,7 @@ else
 	exit 2
 fi
 
-wget -nv http://build-prod.dh.greenplum.com/releases/tcServer/2.9.5/vfabric-tc-server-standard-2.9.5.SR1.tar.gz
+wget -nv http://build-prod.dh.greenplum.com/releases/tcServer/2.9.7/vfabric-tc-server-standard-2.9.7.RELEASE.tar.gz
 ls vfabric-tc-server-standard*.tar.gz > /dev/null
 if [ $? = 0 ]; then
 	TCSERVER_TARBALL=$( ls vfabric-tc-server-standard*.tar.gz )
@@ -49,7 +49,7 @@ else
 	exit 2
 fi
 
-wget -nv http://build-prod.dh.greenplum.com/releases/tcServer/2.9.5/vfabric-tc-server-standard-2.9.5-SR1.noarch.rpm
+wget -nv http://build-prod.dh.greenplum.com/releases/tcServer/2.9.7/vfabric-tc-server-standard-2.9.7-RELEASE.noarch.rpm
 ls vfabric-tc-server-standard*.rpm > /dev/null
 if [ $? = 0 ]; then
 	TCSERVER_RPM=$( ls vfabric-tc-server-standard*.rpm )

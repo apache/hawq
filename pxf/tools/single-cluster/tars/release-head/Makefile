@@ -11,7 +11,7 @@ COMPONENTS = \
 ARTIFACTS = ../../../../build/distributions
 DISTSVR_FETCH = $(ROOT)/tools/fetchBuild.sh
 
-TCSERVER_VERSION=2.9.5/vfabric-tc-server-standard-2.9.5.SR1.tar.gz
+TCSERVER_VERSION=2.9.7/vfabric-tc-server-standard-2.9.7.RELEASE.tar.gz
 TCSERVER_URL_BASE=http://build-prod.dh.greenplum.com/releases/tcServer
 
 DISTSVR_VIEW = testing

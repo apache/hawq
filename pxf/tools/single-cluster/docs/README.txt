@@ -67,6 +67,11 @@ CentOS
 7. Changes
 ==========
 
+v1.8.7
+------
+
+- GPSQL-2272 - Use tcServer v2.9.7
+
 v1.8.6
 ------
 

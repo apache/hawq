@@ -117,7 +117,7 @@ project('pxf-service') {
 
     ospackage {
 
-        requires('vfabric-tc-server-standard', '2.9.5', GREATER | EQUAL)
+        requires('vfabric-tc-server-standard', '2.9.7', GREATER | EQUAL)
         requires('hadoop', "$hadoopVersion", GREATER | EQUAL)
         requires('hadoop-hdfs', "$hadoopVersion", GREATER | EQUAL)
 
