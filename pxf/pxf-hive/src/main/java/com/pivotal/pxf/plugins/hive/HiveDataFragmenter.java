@@ -4,10 +4,8 @@ import com.pivotal.pxf.api.Fragment;
 import com.pivotal.pxf.api.Fragmenter;
 import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.plugins.hdfs.utilities.HdfsUtilities;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.JavaUtils;
@@ -15,11 +13,7 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.TableType;
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.MetaException;
-import org.apache.hadoop.hive.metastore.api.Partition;
-import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
-import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.metastore.api.*;
 import org.apache.hadoop.mapred.*;
 
 import java.io.ByteArrayOutputStream;
@@ -29,7 +23,7 @@ import java.util.Properties;
 
 /**
  * Fragmenter class for HIVE tables
- * <p>
+ * <p/>
  * Given a Hive table and its partitions
  * divide the data into fragments (here a data fragment is actually a HDFS file block) and return a list of them.
  * Each data fragment will contain the following information:
@@ -40,22 +34,22 @@ import java.util.Properties;
  * </ol>
  */
 public class HiveDataFragmenter extends Fragmenter {
-    private JobConf jobConf;
-    HiveMetaStoreClient client;
-    Log Log = LogFactory.getLog(HiveDataFragmenter.class);
+    private static final Log LOG = LogFactory.getLog(HiveDataFragmenter.class);
+    private static final String HIVE_DEFAULT_DBNAME = "default";
+    private static final short ALL_PARTS = -1;
 
-	private static final String HIVE_DEFAULT_DBNAME = "default";
     static final String HIVE_UD_DELIM = "!HUDD!";
     static final String HIVE_1_PART_DELIM = "!H1PD!";
     static final String HIVE_PARTITIONS_DELIM = "!HPAD!";
     static final String HIVE_NO_PART_TBL = "!HNPT!";
 
-    private static final short ALL_PARTS = -1;
+    private JobConf jobConf;
+    private HiveMetaStoreClient client;
 
     /* internal class used for parsing the qualified table name received as input to getFragments() */
-    class TblDesc {
-        public String dbName;
-        public String tableName;
+    private class TblDesc {
+        String dbName;
+        String tableName;
     }
 
     /*
@@ -65,41 +59,56 @@ public class HiveDataFragmenter extends Fragmenter {
      * HiveTableUnit will be the whole table
      */
     class HiveTablePartition {
-        public StorageDescriptor storageDesc;
-        public Properties properties;
-        public Partition partition;
-        public List<FieldSchema> partitionKeys;
+        StorageDescriptor storageDesc;
+        Properties properties;
+        Partition partition;
+        List<FieldSchema> partitionKeys;
+        String tableName;
 
-        public HiveTablePartition(StorageDescriptor inStorageDesc, Properties inProperties) {
-            storageDesc = inStorageDesc;
-            properties = inProperties;
-            partition = null;
-            partitionKeys = null;
+        HiveTablePartition(StorageDescriptor storageDesc,
+                           Properties properties,
+                           Partition partition,
+                           List<FieldSchema> partitionKeys,
+                           String tableName) {
+            this.storageDesc = storageDesc;
+            this.properties = properties;
+            this.partition = partition;
+            this.partitionKeys = partitionKeys;
+            this.tableName = tableName;
         }
 
-        public HiveTablePartition(StorageDescriptor inStorageDesc,
-                                  Properties inProperties,
-                                  Partition inPartition,
-                                  List<FieldSchema> inPartitionKeys) {
-            storageDesc = inStorageDesc;
-            properties = inProperties;
-            partition = inPartition;
-            partitionKeys = inPartitionKeys;
+
+        @Override
+        public String toString() {
+            return "table - " + tableName +
+                    ((partition == null)
+                            ? ""
+                            : ", partition - " + partition);
         }
     }
 
     /**
      * Constructs a HiveDataFragmenter object
-	 * @param md all input parameters coming from the client
+     *
+     * @param inputData all input parameters coming from the client
      */
-    public HiveDataFragmenter(InputData md) {
-        super(md);
-
-        jobConf = new JobConf(new Configuration(), HiveDataFragmenter.class);
-		initHiveClient();
+    public HiveDataFragmenter(InputData inputData) {
+        this(inputData, HiveDataFragmenter.class);
     }
 
-	@Override
+    /**
+     * Constructs a HiveDataFragmenter object
+     *
+     * @param inputData all input parameters coming from the client
+     * @param clazz     Class for JobConf
+     */
+    public HiveDataFragmenter(InputData inputData, Class<?> clazz) {
+        super(inputData);
+        jobConf = new JobConf(new Configuration(), clazz);
+        initHiveClient();
+    }
+
+    @Override
     public List<Fragment> getFragments() throws Exception {
         TblDesc tblDesc = parseTableQualifiedName(inputData.getDataSource());
         if (tblDesc == null) {
@@ -111,33 +120,34 @@ public class HiveDataFragmenter extends Fragmenter {
         return fragments;
     }
 
-	/**
-	 * Creates the partition InputFormat
-	 * @param inputFormatName input format class name
-	 * @param jobConf configuration data for the Hadoop framework
-	 * @return a {@link org.apache.hadoop.mapred.InputFormat} derived object
-	 */
-	public static InputFormat<?, ?> makeInputFormat(String inputFormatName, JobConf jobConf) throws Exception {
-		Class<?> c = Class.forName(inputFormatName, true, JavaUtils.getClassLoader());
-		InputFormat<?, ?> fformat = (InputFormat<?, ?>) c.newInstance();
+    /**
+     * Creates the partition InputFormat
+     *
+     * @param inputFormatName input format class name
+     * @param jobConf         configuration data for the Hadoop framework
+     * @return a {@link org.apache.hadoop.mapred.InputFormat} derived object
+     */
+    public static InputFormat<?, ?> makeInputFormat(String inputFormatName, JobConf jobConf) throws Exception {
+        Class<?> c = Class.forName(inputFormatName, true, JavaUtils.getClassLoader());
+        InputFormat<?, ?> inputFormat = (InputFormat<?, ?>) c.newInstance();
 
-		if ("org.apache.hadoop.mapred.TextInputFormat".equals(inputFormatName)) {
-            ((TextInputFormat) fformat).configure(jobConf); // TextInputFormat needs a special configuration
+        if ("org.apache.hadoop.mapred.TextInputFormat".equals(inputFormatName)) {
+            ((TextInputFormat) inputFormat).configure(jobConf); // TextInputFormat needs a special configuration
         }
 
-        return fformat;
+        return inputFormat;
     }
 
     /* 
-	 * Initialize the HiveMetaStoreClient 
+     * Initialize the HiveMetaStoreClient
 	 * Uses classpath configuration files to locate the MetaStore
 	 */
     private void initHiveClient() {
-		try {
-			client = new HiveMetaStoreClient(new HiveConf());
-		} catch (MetaException cause) {
-			throw new RuntimeException("Failed connecting to Hive MetaStore service: " + cause.getMessage(), cause);
-		}
+        try {
+            client = new HiveMetaStoreClient(new HiveConf());
+        } catch (MetaException cause) {
+            throw new RuntimeException("Failed connecting to Hive MetaStore service: " + cause.getMessage(), cause);
+        }
     }
 
     /*
@@ -162,20 +172,20 @@ public class HiveDataFragmenter extends Fragmenter {
         return tblDesc;
     }
 
-    /*
-     * Goes over the table partitions metadata and extracts the splits and the InputFormat and Serde per split.
-     */
+    /* Goes over the table partitions metadata and extracts the splits and the InputFormat and Serde per split. */
     private void fetchTableMetaData(TblDesc tblDesc) throws Exception {
         Table tbl = client.getTable(tblDesc.dbName, tblDesc.tableName);
         String tblType = tbl.getTableType();
 
-        if (Log.isDebugEnabled()) {
-            Log.debug("Table: " + tblDesc.dbName + "." + tblDesc.tableName + ", type: " + tblType);
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Table: " + tblDesc.dbName + "." + tblDesc.tableName + ", type: " + tblType);
         }
 
         if (TableType.valueOf(tblType) == TableType.VIRTUAL_VIEW) {
             throw new UnsupportedOperationException("PXF doesn't support HIVE views");
         }
+
+        verifySchema(tbl);
 
         List<Partition> partitions = client.listPartitions(tblDesc.dbName, tblDesc.tableName, ALL_PARTS);
         StorageDescriptor descTable = tbl.getSd();
@@ -194,9 +204,13 @@ public class HiveDataFragmenter extends Fragmenter {
                         null, // Map<string, string> parameters - can be empty
                         tblDesc.dbName, tblDesc.tableName, // table name
                         partitionKeys);
-                fetchMetaDataForPrtitionedTable(descPartition, props, partition, partitionKeys);
+                fetchMetaDataForPartitionedTable(descPartition, props, partition, partitionKeys, tblDesc.tableName);
             }
         }
+    }
+
+    void verifySchema(Table tbl) throws Exception {
+        /* nothing to verify here */
     }
 
     private static Properties getSchema(Table table) {
@@ -209,21 +223,22 @@ public class HiveDataFragmenter extends Fragmenter {
     }
 
     private void fetchMetaDataForSimpleTable(StorageDescriptor stdsc, Properties props) throws Exception {
-        HiveTablePartition tablePartition = new HiveTablePartition(stdsc, props);
-        fetchMetaData(tablePartition);
+        fetchMetaDataForSimpleTable(stdsc, props, null);
     }
 
-    private void fetchMetaDataForPrtitionedTable(StorageDescriptor stdsc,
-                                                 Properties props,
-                                                 Partition partition,
-                                                 List<FieldSchema> partitionKeys) throws Exception {
-        HiveTablePartition tablePartition = new HiveTablePartition(stdsc, props, partition, partitionKeys);
-        fetchMetaData(tablePartition);
+    private void fetchMetaDataForSimpleTable(StorageDescriptor stdsc, Properties props, String tableName) throws Exception {
+        fetchMetaData(new HiveTablePartition(stdsc, props, null, null, tableName));
     }
 
-    /*
-     * Fill a table partition
-     */
+    private void fetchMetaDataForPartitionedTable(StorageDescriptor stdsc,
+                                                  Properties props,
+                                                  Partition partition,
+                                                  List<FieldSchema> partitionKeys,
+                                                  String tableName) throws Exception {
+        fetchMetaData(new HiveTablePartition(stdsc, props, partition, partitionKeys, tableName));
+    }
+
+    /* Fills a table partition */
     private void fetchMetaData(HiveTablePartition tablePartition) throws Exception {
         InputFormat<?, ?> fformat = makeInputFormat(tablePartition.storageDesc.getInputFormat(), jobConf);
         FileInputFormat.setInputPaths(jobConf, new Path(tablePartition.storageDesc.getLocation()));
@@ -240,19 +255,15 @@ public class HiveDataFragmenter extends Fragmenter {
         }
     }
 
-    /*
-     * Turn a Properties class into a string
-     */
+    /* Turns a Properties class into a string */
     private String serializeProperties(Properties props) throws Exception {
         ByteArrayOutputStream outStream = new ByteArrayOutputStream();
         props.store(outStream, ""/* comments */);
         return outStream.toString();
     }
 
-    /*
-     * Turn the partition keys into a string
-     */
-    private String serializePartitionKeys(HiveTablePartition partData) throws Exception {
+    /* Turns the partition keys into a string */
+    String serializePartitionKeys(HiveTablePartition partData) throws Exception {
         if (partData.partition == null) /* this is a simple hive table - there are no partitions */ {
             return HIVE_NO_PART_TBL;
         }
@@ -274,15 +285,15 @@ public class HiveDataFragmenter extends Fragmenter {
         return partitionKeys.toString();
     }
 
-    private byte[] makeUserData(HiveTablePartition partData) throws Exception {
+    byte[] makeUserData(HiveTablePartition partData) throws Exception {
         String inputFormatName = partData.storageDesc.getInputFormat();
         String serdeName = partData.storageDesc.getSerdeInfo().getSerializationLib();
         String propertiesString = serializeProperties(partData.properties);
-        String partionKeys = serializePartitionKeys(partData);
+        String partitionKeys = serializePartitionKeys(partData);
         String userData = inputFormatName + HIVE_UD_DELIM +
                 serdeName + HIVE_UD_DELIM +
                 propertiesString + HIVE_UD_DELIM +
-                partionKeys;
+                partitionKeys;
 
         return userData.getBytes();
     }

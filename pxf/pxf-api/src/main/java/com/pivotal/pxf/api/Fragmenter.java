@@ -19,7 +19,7 @@ public abstract class Fragmenter extends Plugin {
      */
     public Fragmenter(InputData metaData) {
         super(metaData);
-        fragments = new LinkedList<Fragment>();
+        fragments = new LinkedList<>();
     }
 
     /**

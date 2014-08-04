@@ -22,7 +22,7 @@ import java.util.ListIterator;
 public abstract class HdfsSplittableDataAccessor extends Plugin implements ReadAccessor {
     protected Configuration conf = null;
     protected RecordReader<Object, Object> reader = null;
-    protected InputFormat<?, ?> fformat = null;
+    protected InputFormat<?, ?> inputFormat = null;
     protected ListIterator<InputSplit> iter = null;
     protected JobConf jobConf = null;
     protected Object key, data;
@@ -36,7 +36,7 @@ public abstract class HdfsSplittableDataAccessor extends Plugin implements ReadA
      */
     public HdfsSplittableDataAccessor(InputData input, InputFormat<?, ?> inFormat) throws Exception {
         super(input);
-        fformat = inFormat;
+        inputFormat = inFormat;
 
         // 1. Load Hadoop configuration defined in $HADOOP_HOME/conf/*.xml files
         conf = new Configuration();

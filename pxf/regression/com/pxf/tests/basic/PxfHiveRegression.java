@@ -38,9 +38,9 @@ public class PxfHiveRegression extends PxfTestCase {
 	 * Required Hive Tables for regression tests
 	 */
 	public HiveTable hiveSmallDataTable = PxfHiveFixture.hiveSmallDataTable;
-	public HiveTable hiveTypesTable = PxfHiveFixture.hiveTypesTable;;
-	public HiveTable hiveSequenceTable = PxfHiveFixture.hiveSequenceTable;;
-	public HiveTable hiveRcTable = PxfHiveFixture.hiveRcTable;;
+	public HiveTable hiveTypesTable = PxfHiveFixture.hiveTypesTable;
+	public HiveTable hiveSequenceTable = PxfHiveFixture.hiveSequenceTable;
+	public HiveTable hiveRcTable = PxfHiveFixture.hiveRcTable;
 
 	/**
 	 * Connects PxfHiveRegression to PxfHiveFixture. The Fixture will run once and than the system
@@ -64,9 +64,9 @@ public class PxfHiveRegression extends PxfTestCase {
 		comparisonDataTable.loadDataFromFile(PxfHiveFixture.HIVE_SMALL_DATA_FILE_PATH, ",", 0);
 
 		hiveSmallDataTable = PxfHiveFixture.hiveSmallDataTable;
-		hiveTypesTable = PxfHiveFixture.hiveTypesTable;;
-		hiveSequenceTable = PxfHiveFixture.hiveSequenceTable;;
-		hiveRcTable = PxfHiveFixture.hiveRcTable;;
+		hiveTypesTable = PxfHiveFixture.hiveTypesTable;
+		hiveSequenceTable = PxfHiveFixture.hiveSequenceTable;
+		hiveRcTable = PxfHiveFixture.hiveRcTable;
 	}
 
 	/**

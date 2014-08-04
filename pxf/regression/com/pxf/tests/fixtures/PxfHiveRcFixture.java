@@ -12,11 +12,11 @@ import com.pivotal.parot.utils.jsystem.report.ReportUtils;
 import com.pxf.tests.basic.PxfHiveRegression;
 
 /**
- * Preparing the system for hive Walmart Regression
+ * Preparing the system for Hive RC Regression
  * 
  * @see PxfHiveRegression
  */
-public class PxfHiveWalmartFixture extends BasicFixture {
+public class PxfHiveRcFixture extends BasicFixture {
 
 	private PhdCluster sc;
 	private Hive hive;
@@ -24,7 +24,6 @@ public class PxfHiveWalmartFixture extends BasicFixture {
 	// paths to data resources
 	public final static String HIVE_SMALL_DATA_FILE_PATH = new File("resources/hive_small_data.txt").getAbsolutePath();
 	public final static String HIVE_TYPES_DATA_FILE_PATH = new File("resources/hive_types_walmart.txt").getAbsolutePath();
-	public final static String HIVE_COLLECTIONS_DATA_FILE_PATH = new File("resources/hive_collections.txt").getAbsolutePath();
 
 	public static HiveTable hiveSmallDataTable = null;
 	public static HiveTable hiveTypesTable = null;

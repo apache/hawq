@@ -19,73 +19,83 @@ import java.util.List;
 /**
  * Accessor for Hive tables.
  * The accessor will open and read a split belonging to a Hive table.
- * Opening a split means creating the corresponding InputFormat and RecordReader required to access the 
- * split's data. The actual record reading is done in the base class - 
+ * Opening a split means creating the corresponding InputFormat and RecordReader required to access the
+ * split's data. The actual record reading is done in the base class -
  * {@link com.pivotal.pxf.plugins.hdfs.HdfsSplittableDataAccessor}.
- * <p>
+ * <p/>
  * HiveAccessor will also enforce Hive partition filtering by filtering-out a split which does not
- * belong to a partition filter. Naturally, the partition filtering will be done only for Hive tables 
+ * belong to a partition filter. Naturally, the partition filtering will be done only for Hive tables
  * that are partitioned.
  */
 public class HiveAccessor extends HdfsSplittableDataAccessor {
-    private Log Log;
+    private static final Log LOG = LogFactory.getLog(HiveAccessor.class);
+    List<HivePartition> partitions;
 
-    public class Partition {
+    class HivePartition {
         public String name;
         public String type;
         public String val;
 
-        Partition(String inName, String inType, String inVal) {
-            name = inName;
-            type = inType;
-            val = inVal;
+        HivePartition(String name, String type, String val) {
+            this.name = name;
+            this.type = type;
+            this.val = val;
         }
     }
 
-    private List<Partition> partitions;
-
     /**
-     * Constructs the InputFormat (derived from {@link org.apache.hadoop.mapred.InputFormat})
-	 * and the Hive partition fields 
-	 * @param input contains the InputFormat class name and the partition fields
+     * Constructs a HiveAccessor and creates an InputFormat (derived from {@link org.apache.hadoop.mapred.InputFormat})
+     * and the Hive partition fields
+     *
+     * @param input contains the InputFormat class name and the partition fields
      */
     public HiveAccessor(InputData input) throws Exception {
         /*
          * Unfortunately, Java does not allow us to call a function before calling the base constructor,
-		 * otherwise it would have been:  super(input, createInputFormat(input))
+		 * otherwise it would have been: super(input, createInputFormat(input))
 		 */
         super(input, null);
-        fformat = createInputFormat(input);
+        inputFormat = createInputFormat(input);
+    }
 
-        Log = LogFactory.getLog(HiveAccessor.class);
+    /**
+     * Constructs a HiveAccessor
+     *
+     * @param input       contains the InputFormat class name and the partition fields
+     * @param inputFormat Hive InputFormat
+     */
+    public HiveAccessor(InputData input, InputFormat<?, ?> inputFormat) throws Exception {
+        super(input, inputFormat);
     }
 
     /**
      * openForRead
      * Enables Hive partition filtering
-     * @return true if there are no partitions or there is no partition filter or 
-	 *         partition filter is set and the file currently opened by the accessor belongs
-     *         to the partition.
+     *
+     * @return true if there are no partitions or there is no partition filter or
+     * partition filter is set and the file currently opened by the accessor belongs
+     * to the partition.
      */
     @Override
     public boolean openForRead() throws Exception {
         return isOurDataInsideFilteredPartition() && super.openForRead();
     }
 
-	/**
-	 * Creates the RecordReader suitable for this given split.
-	 * @param jobConf configuraton data for the Hadoop framework
-	 * @param split the split that was allocated for reading to this accessor
-	 */
+    /**
+     * Creates the RecordReader suitable for this given split.
+     *
+     * @param jobConf configuraton data for the Hadoop framework
+     * @param split   the split that was allocated for reading to this accessor
+     */
     @Override
     protected Object getReader(JobConf jobConf, InputSplit split) throws IOException {
-        return fformat.getRecordReader(split, jobConf, Reporter.NULL);
+        return inputFormat.getRecordReader(split, jobConf, Reporter.NULL);
     }
 
-	/*
-	 * Parse the user-data supplied by the HiveFragmenter from InputData. Based on the 
-	 * user-data construct the partition fields and the InputFormat for current split
-	 */
+    /*
+     * Parse the user-data supplied by the HiveFragmenter from InputData. Based on the
+     * user-data construct the partition fields and the InputFormat for current split
+     */
     private InputFormat<?, ?> createInputFormat(InputData input) throws Exception {
         String userData = new String(input.getFragmentUserData());
         String[] toks = userData.split(HiveDataFragmenter.HIVE_UD_DELIM);
@@ -93,12 +103,10 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
         return HiveDataFragmenter.makeInputFormat(toks[0]/* inputFormat name */, jobConf);
     }
 
-    /*
-     * The partition fields are initialized  one time  base on userData provided by the fragmenter
-     */
-    private void initPartitionFields(String partitionKeys) {
-        partitions = new LinkedList<Partition>();
-        if (partitionKeys.compareTo(HiveDataFragmenter.HIVE_NO_PART_TBL) == 0) {
+    /* The partition fields are initialized one time base on userData provided by the fragmenter */
+    void initPartitionFields(String partitionKeys) {
+        partitions = new LinkedList<HivePartition>();
+        if (partitionKeys.equals(HiveDataFragmenter.HIVE_NO_PART_TBL)) {
             return;
         }
 
@@ -108,7 +116,7 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
             String name = levelKey[0];
             String type = levelKey[1];
             String val = levelKey[2];
-            partitions.add(new Partition(name, type, val));
+            partitions.add(new HivePartition(name, type, val));
         }
     }
 
@@ -123,8 +131,8 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
 
         boolean returnData = isFiltered(partitions, filter);
 
-        if (Log.isDebugEnabled()) {
-            Log.debug("segmentId: " + inputData.getSegmentId() + " " + inputData.getDataSource() + "--" + filterStr + "returnData: " + returnData);
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("segmentId: " + inputData.getSegmentId() + " " + inputData.getDataSource() + "--" + filterStr + "returnData: " + returnData);
             if (filter instanceof List) {
                 for (Object f : (List) filter) {
                     printOneBasicFilter(f);
@@ -137,7 +145,7 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
         return returnData;
     }
 
-    private boolean isFiltered(List<Partition> partitionFields, Object filter) {
+    private boolean isFiltered(List<HivePartition> partitionFields, Object filter) {
         if (filter instanceof List) {
             /*
              * We are going over each filter in the filters list and test it against all the partition fields
@@ -145,7 +153,7 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
 			 * deny this data.
 			 */
             for (Object f : (List) filter) {
-                if (testOneFilter(partitionFields, f, inputData) == false) {
+                if (!testOneFilter(partitionFields, f, inputData)) {
                     return false;
                 }
             }
@@ -156,7 +164,7 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
     }
 
     /*
-     * We are testing  one filter against all the partition fields.
+     * We are testing one filter against all the partition fields.
      * The filter has the form "fieldA = valueA".
      * The partitions have the form partitionOne=valueOne/partitionTwo=ValueTwo/partitionThree=valueThree
      * 1. For a filter to match one of the partitions, lets say partitionA for example, we need:
@@ -165,12 +173,12 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
      * because it is not on a partition field.
      * 3. If fieldA = partittionOne and valueA != valueOne, then we return false.
      */
-    private boolean testOneFilter(List<Partition> partitionFields, Object filter, InputData input) {
+    private boolean testOneFilter(List<HivePartition> partitionFields, Object filter, InputData input) {
         // Let's look first at the filter
         FilterParser.BasicFilter bFilter = (FilterParser.BasicFilter) filter;
 
         boolean isFilterOperationEqual = (bFilter.getOperation() == FilterParser.Operation.HDOP_EQ);
-        if (isFilterOperationEqual == false) /* in case this is not an "equality filter" we ignore it here - in partition filtering */ {
+        if (!isFilterOperationEqual) /* in case this is not an "equality filter" we ignore it here - in partition filtering */ {
             return true;
         }
 
@@ -179,13 +187,10 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
         ColumnDescriptor filterColumn = input.getColumn(filterColumnIndex);
         String filterColumnName = filterColumn.columnName();
 
-        for (Partition partition : partitionFields) {
-            if (filterColumnName.compareTo(partition.name) == 0) {
-                if (filterValue.compareTo(partition.val) == 0) {
-                    return true;
-                } else {
-                    return false; /* the filter field matches a partition field, but the values do not match */
-                }
+        for (HivePartition partition : partitionFields) {
+            if (filterColumnName.equals(partition.name)) {
+                /* the filter field matches a partition field, but the values do not match */
+                return filterValue.equals(partition.val);
             }
         }
 
@@ -198,7 +203,6 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
         boolean isOperationEqual = (bFilter.getOperation() == FilterParser.Operation.HDOP_EQ);
         int columnIndex = bFilter.getColumn().index();
         String value = bFilter.getConstant().constant().toString();
-        Log.debug("isOperationEqual:  " + isOperationEqual + " columnIndex:  " + columnIndex + " value:  " + value);
+        LOG.debug("isOperationEqual: " + isOperationEqual + " columnIndex: " + columnIndex + " value: " + value);
     }
-
 }

@@ -36,7 +36,7 @@ public class LineBreakAccessor extends HdfsSplittableDataAccessor implements Wri
      */
     public LineBreakAccessor(InputData input) throws Exception {
         super(input, new TextInputFormat());
-        ((TextInputFormat) fformat).configure(jobConf);
+        ((TextInputFormat) inputFormat).configure(jobConf);
 
         Log = LogFactory.getLog(LineBreakAccessor.class);
     }

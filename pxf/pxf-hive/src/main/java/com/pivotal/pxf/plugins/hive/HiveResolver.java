@@ -4,10 +4,12 @@ import com.pivotal.pxf.api.*;
 import com.pivotal.pxf.api.io.DataType;
 import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.api.utilities.Plugin;
+import org.apache.commons.lang.CharUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.common.JavaUtils;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.serde.serdeConstants;
+import org.apache.hadoop.hive.serde2.AbstractSerDe;
 import org.apache.hadoop.hive.serde2.objectinspector.*;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.*;
 import org.apache.hadoop.io.BytesWritable;
@@ -26,57 +28,50 @@ import java.util.Properties;
 import static com.pivotal.pxf.api.io.DataType.*;
 
 /**
- * Class HiveResolver handles deserialization of records that were serialized 
- * using Hadoop's Hive serialization framework.  
+ * Class HiveResolver handles deserialization of records that were serialized
+ * using Hadoop's Hive serialization framework.
  */
 
-/*
-TODO - remove SupressWarning once Hive resolves the problem described below
-This line and the change of the deserialiazer member to Object instead of the original Deserializer...., All this changes stem from the same issue. 
-In 0.11.0 The API changed and all Serde types extend a new interface - AbstractSerde. 
-But this change was not adopted by the OrcSerde (which was also introduced in Hive 0.11.0). 
-In order to cope with this inconsistency... this bit of juggling has been necessary.
-*/
-@SuppressWarnings("deprecation")
 public class HiveResolver extends Plugin implements ReadResolver {
-    private org.apache.hadoop.hive.serde2.SerDe deserializer;
+    private AbstractSerDe deserializer;
     private List<OneField> partitionFields;
     private String serdeName;
     private String propsString;
-    private String partitionKeys;
-	
-	/**
-	 * Constructs the HiveResolver by parsing the userdata in the input 
-	 * and obtaining the serde class name, the serde properties string 
-	 * and the partition keys.
-	 * @param input contains the Serde class name, the serde properties 
-	 *        string and the partition keys
-	 */
+    String partitionKeys;
+    char delimiter;
+
+    /**
+     * Constructs the HiveResolver by parsing the userdata in the input
+     * and obtaining the serde class name, the serde properties string
+     * and the partition keys.
+     *
+     * @param input contains the Serde class name, the serde properties
+     *              string and the partition keys
+     */
     public HiveResolver(InputData input) throws Exception {
         super(input);
 
-        ParseUserData(input);
-        InitSerde();
-        InitPartitionFields();
+        parseUserData(input);
+        initPartitionFields();
+        initSerde(input);
     }
-	
-	public List<OneField> getFields(OneRow onerow) throws Exception {
-        List<OneField> record = new LinkedList<OneField>();
-		
+
+    @Override
+    public List<OneField> getFields(OneRow onerow) throws Exception {
+        List<OneField> record = new LinkedList<>();
+
         Object tuple = (deserializer).deserialize((Writable) onerow.getData());
         ObjectInspector oi = (deserializer).getObjectInspector();
-		
+
         traverseTuple(tuple, oi, record);
         /* We follow Hive convention. Partition fields are always added at the end of the record */
-        addPartitionKeyValues(record);
-		
-        return record;
-    }	
+        record.addAll(partitionFields);
 
-    /*
-     * parse user data string (arrived from fragmenter)
-     */
-    private void ParseUserData(InputData input) throws Exception {
+        return record;
+    }
+
+    /* parse user data string (arrived from fragmenter) */
+    void parseUserData(InputData input) throws Exception {
         final int EXPECTED_NUM_OF_TOKS = 4;
 
         String userData = new String(input.getFragmentUserData());
@@ -91,26 +86,22 @@ public class HiveResolver extends Plugin implements ReadResolver {
         partitionKeys = toks[3];
     }
 
-    /*
-     * Get and init the deserializer for the records of this Hive data fragment
-     */
-    private void InitSerde() throws Exception {
+    /* Get and init the deserializer for the records of this Hive data fragment */
+    void initSerde(InputData inputData) throws Exception {
         Properties serdeProperties;
 
         Class<?> c = Class.forName(serdeName, true, JavaUtils.getClassLoader());
-        deserializer = (org.apache.hadoop.hive.serde2.SerDe) c.newInstance();
+        deserializer = (AbstractSerDe) c.newInstance();
         serdeProperties = new Properties();
         ByteArrayInputStream inStream = new ByteArrayInputStream(propsString.getBytes());
         serdeProperties.load(inStream);
         deserializer.initialize(new JobConf(new Configuration(), HiveResolver.class), serdeProperties);
     }
 
-    /*
-     * The partition fields are initialized  one time  base on userData provided by the fragmenter
-     */
-    private void InitPartitionFields() {
-        partitionFields = new LinkedList<OneField>();
-        if (partitionKeys.compareTo(HiveDataFragmenter.HIVE_NO_PART_TBL) == 0) {
+    /* The partition fields are initialized one time base on userData provided by the fragmenter */
+    void initPartitionFields() {
+        partitionFields = new LinkedList<>();
+        if (partitionKeys.equals(HiveDataFragmenter.HIVE_NO_PART_TBL)) {
             return;
         }
 
@@ -146,15 +137,52 @@ public class HiveResolver extends Plugin implements ReadResolver {
                     addOneFieldToRecord(partitionFields, NUMERIC, HiveDecimal.create(val).bigDecimalValue().toString());
                     break;
                 default:
-                    throw new UnsupportedTypeException("Unknown type: " + type);
+                    throw new UnsupportedTypeException("Unsupported partition type: " + type);
             }
         }
     }
 
-    private void addPartitionKeyValues(List<OneField> record) {
-        for (OneField field : partitionFields) {
-            record.add(field);
+    /* The partition fields are initialized one time base on userData provided by the fragmenter */
+    int initPartitionFields(StringBuilder parts) {
+        if (partitionKeys.equals(HiveDataFragmenter.HIVE_NO_PART_TBL)) {
+            return 0;
         }
+        String[] partitionLevels = partitionKeys.split(HiveDataFragmenter.HIVE_PARTITIONS_DELIM);
+        for (String partLevel : partitionLevels) {
+            String[] levelKey = partLevel.split(HiveDataFragmenter.HIVE_1_PART_DELIM);
+            String type = levelKey[1];
+            String val = levelKey[2];
+            parts.append(delimiter);
+            switch (type) {
+                case serdeConstants.STRING_TYPE_NAME:
+                    parts.append(val);
+                    break;
+                case serdeConstants.SMALLINT_TYPE_NAME:
+                    parts.append(Short.parseShort(val));
+                    break;
+                case serdeConstants.INT_TYPE_NAME:
+                    parts.append(Integer.parseInt(val));
+                    break;
+                case serdeConstants.BIGINT_TYPE_NAME:
+                    parts.append(Long.parseLong(val));
+                    break;
+                case serdeConstants.FLOAT_TYPE_NAME:
+                    parts.append(Float.parseFloat(val));
+                    break;
+                case serdeConstants.DOUBLE_TYPE_NAME:
+                    parts.append(Double.parseDouble(val));
+                    break;
+                case serdeConstants.TIMESTAMP_TYPE_NAME:
+                    parts.append(Timestamp.valueOf(val));
+                    break;
+                case serdeConstants.DECIMAL_TYPE_NAME:
+                    parts.append(HiveDecimal.create(val).bigDecimalValue());
+                    break;
+                default:
+                    throw new UnsupportedTypeException("Unsupported partition type: " + type);
+            }
+        }
+        return partitionLevels.length;
     }
 
     /*
@@ -190,16 +218,14 @@ public class HiveResolver extends Plugin implements ReadResolver {
                 Map<?, ?> map = moi.getMap(obj);
                 if (map == null) {
                     throw new BadRecordException("Illegal value NULL for Hive data type Map");
-                }
-                else if (map.isEmpty()) {
+                } else if (map.isEmpty()) {
                     traverseTuple(null, koi, record);
-                    traverseTuple(null, voi, record);               	
-                }
-                else {
-                	for (Map.Entry<?, ?> entry : map.entrySet()) {
-                		traverseTuple(entry.getKey(), koi, record);
-                		traverseTuple(entry.getValue(), voi, record);
-                	}
+                    traverseTuple(null, voi, record);
+                } else {
+                    for (Map.Entry<?, ?> entry : map.entrySet()) {
+                        traverseTuple(entry.getKey(), koi, record);
+                        traverseTuple(entry.getValue(), voi, record);
+                    }
                 }
                 break;
             case STRUCT:
@@ -262,11 +288,11 @@ public class HiveResolver extends Plugin implements ReadResolver {
             case DECIMAL: {
                 String sVal = null;
                 if (o != null) {
-					HiveDecimal hd = ((HiveDecimalObjectInspector) oi).getPrimitiveJavaObject(o);
-					if (hd != null) {
-						BigDecimal bd = hd.bigDecimalValue();
-						sVal = bd.toString();
-					}
+                    HiveDecimal hd = ((HiveDecimalObjectInspector) oi).getPrimitiveJavaObject(o);
+                    if (hd != null) {
+                        BigDecimal bd = hd.bigDecimalValue();
+                        sVal = bd.toString();
+                    }
                 }
                 addOneFieldToRecord(record, NUMERIC, sVal);
                 break;
@@ -292,9 +318,9 @@ public class HiveResolver extends Plugin implements ReadResolver {
                 break;
             }
             case BYTE: { /* TINYINT */
-            	val = (o != null) ? new Short(((ByteObjectInspector) oi).get(o)) : null;
-            	addOneFieldToRecord(record, SMALLINT, val);
-            	break;
+                val = (o != null) ? new Short(((ByteObjectInspector) oi).get(o)) : null;
+                addOneFieldToRecord(record, SMALLINT, val);
+                break;
             }
             default: {
                 throw new UnsupportedTypeException(oi.getTypeName() + " conversion is not supported by " + getClass().getSimpleName());
@@ -302,10 +328,45 @@ public class HiveResolver extends Plugin implements ReadResolver {
         }
     }
 
-    void addOneFieldToRecord(List<OneField> record, DataType gpdbWritableType, Object val) {
-        OneField oneField = new OneField();
-        oneField.type = gpdbWritableType.getOID();
-        oneField.val = val;
-        record.add(oneField);
+    private void addOneFieldToRecord(List<OneField> record, DataType gpdbWritableType, Object val) {
+        record.add(new OneField(gpdbWritableType.getOID(), val));
+    }
+
+    /*
+     * Get the delimiter character from the URL, verify and store it.
+     * Must be a single ascii character (same restriction as Hawq's)
+     * If a hex representation was passed, convert it to its char.
+     */
+    void parseDelimiterChar(InputData input) {
+
+        String userDelim = input.getUserProperty("DELIMITER");
+
+        final int VALID_LENGTH = 1;
+        final int VALID_LENGTH_HEX = 4;
+
+        if (userDelim.startsWith("\\x")) {  // hexadecimal sequence
+
+            if (userDelim.length() != VALID_LENGTH_HEX) {
+                throw new IllegalArgumentException("Invalid hexdecimal value for delimiter (got" + userDelim + ")");
+            }
+
+            delimiter = (char) Integer.parseInt(userDelim.substring(2, VALID_LENGTH_HEX), 16);
+
+            if (!CharUtils.isAscii(delimiter)) {
+                throw new IllegalArgumentException("Invalid delimiter value. Must be a single ASCII character, or a hexadecimal sequence (got non ASCII " + delimiter + ")");
+            }
+
+            return;
+        }
+
+        if (userDelim.length() != VALID_LENGTH) {
+            throw new IllegalArgumentException("Invalid delimiter value. Must be a single ASCII character, or a hexadecimal sequence (got " + userDelim + ")");
+        }
+
+        if (!CharUtils.isAscii(userDelim.charAt(0))) {
+            throw new IllegalArgumentException("Invalid delimiter value. Must be a single ASCII character, or a hexadecimal sequence (got non ASCII " + userDelim + ")");
+        }
+
+        delimiter = userDelim.charAt(0);
     }
 }

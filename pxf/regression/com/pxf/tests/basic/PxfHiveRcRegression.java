@@ -1,15 +1,5 @@
 package com.pxf.tests.basic;
 
-import java.io.IOException;
-
-import jsystem.framework.fixture.FixtureManager;
-import jsystem.framework.fixture.RootFixture;
-
-import org.apache.commons.lang.StringEscapeUtils;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.Test;
-
 import com.pivotal.parot.components.hive.Hive;
 import com.pivotal.parot.structures.tables.basic.Table;
 import com.pivotal.parot.structures.tables.hive.HiveExternalTable;
@@ -19,11 +9,19 @@ import com.pivotal.parot.structures.tables.utils.TableFactory;
 import com.pivotal.parot.utils.exception.ExceptionUtils;
 import com.pivotal.parot.utils.jsystem.report.ReportUtils;
 import com.pivotal.parot.utils.tables.ComparisonUtils;
-import com.pxf.tests.fixtures.PxfHiveWalmartFixture;
+import com.pxf.tests.fixtures.PxfHiveRcFixture;
 import com.pxf.tests.testcases.PxfTestCase;
+import jsystem.framework.fixture.FixtureManager;
+import jsystem.framework.fixture.RootFixture;
+import org.apache.commons.lang.StringEscapeUtils;
+import org.junit.AfterClass;
+import org.junit.Assert;
+import org.junit.Test;
+
+import java.io.IOException;
 
 /**
- * Hive Walmart Hive RC connector regression
+ * Hive RC connector regression
  */
 public class PxfHiveRcRegression extends PxfTestCase {
 
@@ -35,18 +33,18 @@ public class PxfHiveRcRegression extends PxfTestCase {
 	/**
 	 * Required Hive Tables for regression tests
 	 */
-	public HiveTable hiveSmallDataTable = PxfHiveWalmartFixture.hiveSmallDataTable;
-	public HiveTable hiveTypesTable = PxfHiveWalmartFixture.hiveTypesTable;;
-	public HiveTable hiveRcTable1 = PxfHiveWalmartFixture.hiveRcTable1;
-	public HiveTable hiveRcTableNoSerde = PxfHiveWalmartFixture.hiveRcTableNoSerde;
-	public HiveTable hiveRcTypes = PxfHiveWalmartFixture.hiveRcTypes;
+	public HiveTable hiveSmallDataTable = PxfHiveRcFixture.hiveSmallDataTable;
+	public HiveTable hiveTypesTable = PxfHiveRcFixture.hiveTypesTable;
+	public HiveTable hiveRcTable1 = PxfHiveRcFixture.hiveRcTable1;
+	public HiveTable hiveRcTableNoSerde = PxfHiveRcFixture.hiveRcTableNoSerde;
+	public HiveTable hiveRcTypes = PxfHiveRcFixture.hiveRcTypes;
 
 	/**
-	 * Connects PxfHiveRegression to PxfHiveFixture. The Fixture will run once and than the system
+	 * Connects PxfHiveRcRegression to PxfHiveRcFixture. The Fixture will run once and than the system
 	 * will be in that "Fixture state".
 	 */
 	public PxfHiveRcRegression() {
-		setFixture(PxfHiveWalmartFixture.class);
+		setFixture(PxfHiveRcFixture.class);
 	}
 
 	/**
@@ -59,13 +57,13 @@ public class PxfHiveRcRegression extends PxfTestCase {
 
 		hive = (Hive) system.getSystemObject("hive");
 
-		comparisonDataTable.loadDataFromFile(PxfHiveWalmartFixture.HIVE_SMALL_DATA_FILE_PATH, ",", 0);
+		comparisonDataTable.loadDataFromFile(PxfHiveRcFixture.HIVE_SMALL_DATA_FILE_PATH, ",", 0);
 
-		hiveSmallDataTable = PxfHiveWalmartFixture.hiveSmallDataTable;
-		hiveTypesTable = PxfHiveWalmartFixture.hiveTypesTable;;
-		hiveRcTable1 = PxfHiveWalmartFixture.hiveRcTable1;
-		hiveRcTableNoSerde = PxfHiveWalmartFixture.hiveRcTableNoSerde;
-		hiveRcTypes = PxfHiveWalmartFixture.hiveRcTypes;
+		hiveSmallDataTable = PxfHiveRcFixture.hiveSmallDataTable;
+		hiveTypesTable = PxfHiveRcFixture.hiveTypesTable;
+		hiveRcTable1 = PxfHiveRcFixture.hiveRcTable1;
+		hiveRcTableNoSerde = PxfHiveRcFixture.hiveRcTableNoSerde;
+		hiveRcTypes = PxfHiveRcFixture.hiveRcTypes;
 	}
 
 	@AfterClass
@@ -76,7 +74,7 @@ public class PxfHiveRcRegression extends PxfTestCase {
 
 	/**
 	 * Create Hive table with all supported types:
-	 * 
+	 *
 	 * TEXT -> string <br>
 	 * INTEGER -> int<br>
 	 * FLOAT8 -> double<br>
@@ -87,7 +85,7 @@ public class PxfHiveRcRegression extends PxfTestCase {
 	 * BOOLEAN -> boolean<br>
 	 * SMALLINT -> smallint (tinyint is converted to smallint)<br>
 	 * BYTEA -> binary <br>
-	 * 
+	 *
 	 * @throws Exception
 	 */
 	@Test
@@ -113,14 +111,14 @@ public class PxfHiveRcRegression extends PxfTestCase {
 
 		hawq.queryResults(hawqExternalTable, "SELECT * FROM " + hawqExternalTable.getName() + " ORDER BY key");
 
-		comparisonDataTable.loadDataFromFile(PxfHiveWalmartFixture.HIVE_TYPES_DATA_FILE_PATH, ",", 0);
+		comparisonDataTable.loadDataFromFile(PxfHiveRcFixture.HIVE_TYPES_DATA_FILE_PATH, ",", 0);
 
 		ComparisonUtils.compareTables(hawqExternalTable, comparisonDataTable, report);
 	}
 
 	/**
-	 * use unsupported types for walmart RC connector and check for error
-	 * 
+	 * use unsupported types for RC connector and check for error
+	 *
 	 * @throws Exception
 	 */
 	@Test
@@ -148,41 +146,42 @@ public class PxfHiveRcRegression extends PxfTestCase {
 			hawq.queryResults(hawqExternalTable, "SELECT * FROM " + hawqExternalTable.getName() + " ORDER BY key");
 			Assert.fail();
 		} catch (Exception e) {
-			ExceptionUtils.validate(report, e, new Exception("com.pivotal.pxf.api.UnsupportedTypeException: Schema mismatch definition: Field si \\(Hive type smallint, HAWQ type INTEGER\\)"), true, true);
+			ExceptionUtils.validate(report, e,
+                    new Exception("com.pivotal.pxf.api.UnsupportedTypeException: Schema mismatch definition: Field si \\(Hive type smallint, HAWQ type INTEGER\\)"), true, true);
 		}
 	}
 
-	/**
-	 * use RC connectors on hive text table and expect error
-	 * 
-	 * @throws Exception
-	 */
-	@Test
-	public void hiveTextUsingRcConnectors() throws Exception {
+    /**
+     * use RC connectors on hive text table and expect error
+     *
+     * @throws Exception
+     */
+    @Test
+    public void hiveTextUsingRcConnectors() throws Exception {
 
-		hawqExternalTable = TableFactory.getPxfHiveRcReadableTable("hv_text", new String[] {
-				"t1    text",
-				"t2    text",
-				"num1  integer",
-				"dub1  double precision" }, hiveSmallDataTable, false);
+        hawqExternalTable = TableFactory.getPxfHiveRcReadableTable("hv_text", new String[] {
+                "t1    text",
+                "t2    text",
+                "num1  integer",
+                "dub1  double precision" }, hiveSmallDataTable, false);
 
-		try {
-			hawq.createTableAndVerify(hawqExternalTable);
-		} catch (Exception e) {
-			ExceptionUtils.validate(report, e, new Exception("nonstandard use of escape in a string literal"), true, true);
-		}
+        try {
+            hawq.createTableAndVerify(hawqExternalTable);
+        } catch (Exception e) {
+            ExceptionUtils.validate(report, e, new Exception("nonstandard use of escape in a string literal"), true, true);
+        }
 
-		try {
-			hawq.queryResults(hawqExternalTable, "SELECT * FROM " + hawqExternalTable.getName() + " ORDER BY t1");
-			Assert.fail();
-		} catch (Exception e) {
-			ExceptionUtils.validate(report, e, new Exception("HiveInputFormatFragmenter does not yet support org.apache.hadoop.mapred.TextInputFormat for table - reg_txt. Supported InputFormat is org.apache.hadoop.hive.ql.io.RCFileInputFormat"), true, true);
-		}
-	}
+        try {
+            hawq.queryResults(hawqExternalTable, "SELECT * FROM " + hawqExternalTable.getName() + " ORDER BY t1");
+            Assert.fail();
+        } catch (Exception e) {
+            ExceptionUtils.validate(report, e, new Exception("LAZY_SIMPLE_SERDE serializer isn't supported by com.pivotal.pxf.plugins.hive.HiveRCFileAccessor"), true, true);
+        }
+    }
 
 	/**
 	 * use PXF RC connectors to get data from Hive RC table with mentioned ColumnarSerDe serde.
-	 * 
+	 *
 	 * @throws Exception
 	 */
 	@Test
@@ -207,7 +206,7 @@ public class PxfHiveRcRegression extends PxfTestCase {
 
 	/**
 	 * use PXF RC connectors to get data from Hive RC table without mentioned serde.
-	 * 
+	 *
 	 * @throws Exception
 	 */
 	@Test
@@ -233,7 +232,7 @@ public class PxfHiveRcRegression extends PxfTestCase {
 	/**
 	 * use PXF RC connectors to get data from Hive partitioned table using specific ColumnarSerDe
 	 * serde.
-	 * 
+	 *
 	 * @throws Exception
 	 */
 	@Test
@@ -256,7 +255,7 @@ public class PxfHiveRcRegression extends PxfTestCase {
 		hive.runQuery("ALTER TABLE " + hiveExternalTable.getName() + " ADD PARTITION (fmt = 'rc2') LOCATION 'hdfs:/hive/warehouse/" + hiveRcTable1.getName() + "'");
 		hive.runQuery("ALTER TABLE " + hiveExternalTable.getName() + " ADD PARTITION (fmt = 'rc3') LOCATION 'hdfs:/hive/warehouse/" + hiveRcTable1.getName() + "'");
 
-		// Create PXF Table for Hive portioned table
+		// Create PXF Table for Hive partitioned table
 		ReadableExternalTable extTableNoProfile = TableFactory.getPxfHiveRcReadableTable("hv_heterogen", new String[] {
 				"t1    text",
 				"t2    text",
@@ -273,7 +272,7 @@ public class PxfHiveRcRegression extends PxfTestCase {
 		hawq.queryResults(extTableNoProfile, "SELECT * FROM " + extTableNoProfile.getName() + " ORDER BY t3, t1");
 
 		// pump up the small data to fit the unified data
-		comparisonDataTable.loadDataFromFile(PxfHiveWalmartFixture.HIVE_SMALL_DATA_FILE_PATH, ",", 0);
+		comparisonDataTable.loadDataFromFile(PxfHiveRcFixture.HIVE_SMALL_DATA_FILE_PATH, ",", 0);
 		pumpUpComparisonTableData(3, false);
 
 		ComparisonUtils.compareTables(extTableNoProfile, comparisonDataTable, report);
@@ -281,7 +280,7 @@ public class PxfHiveRcRegression extends PxfTestCase {
 
 	/**
 	 * use PXF RC connectors to get data from Hive partitioned table using default serde.
-	 * 
+	 *
 	 * @throws Exception
 	 */
 	@Test
@@ -302,7 +301,7 @@ public class PxfHiveRcRegression extends PxfTestCase {
 		hive.runQuery("ALTER TABLE " + hiveExternalTable.getName() + " ADD PARTITION (fmt = 'rc2') LOCATION 'hdfs:/hive/warehouse/" + hiveRcTableNoSerde.getName() + "'");
 		hive.runQuery("ALTER TABLE " + hiveExternalTable.getName() + " ADD PARTITION (fmt = 'rc3') LOCATION 'hdfs:/hive/warehouse/" + hiveRcTableNoSerde.getName() + "'");
 
-		// Create PXF Table for Hive portioned table
+		// Create PXF Table for Hive partitioned table
 		ReadableExternalTable extTableNoProfile = TableFactory.getPxfHiveRcReadableTable("hv_heterogen_using_profile", new String[] {
 				"t1    text",
 				"t2    text",
@@ -319,7 +318,7 @@ public class PxfHiveRcRegression extends PxfTestCase {
 		hawq.queryResults(extTableNoProfile, "SELECT * FROM " + extTableNoProfile.getName() + " ORDER BY t3, t1");
 
 		// pump up the small data to fit the unified data
-		comparisonDataTable.loadDataFromFile(PxfHiveWalmartFixture.HIVE_SMALL_DATA_FILE_PATH, ",", 0);
+		comparisonDataTable.loadDataFromFile(PxfHiveRcFixture.HIVE_SMALL_DATA_FILE_PATH, ",", 0);
 		pumpUpComparisonTableData(3, false);
 
 		ComparisonUtils.compareTables(extTableNoProfile, comparisonDataTable, report);
@@ -327,7 +326,7 @@ public class PxfHiveRcRegression extends PxfTestCase {
 
 	/**
 	 * Create HAWQ external table without the partition column. check error.
-	 * 
+	 *
 	 * @throws Exception
 	 */
 	@Test
@@ -375,7 +374,7 @@ public class PxfHiveRcRegression extends PxfTestCase {
 
 	/**
 	 * Filter partitions columns on external table directed to hive partitioned table
-	 * 
+	 *
 	 * @throws Exception
 	 */
 	@Test
@@ -399,7 +398,7 @@ public class PxfHiveRcRegression extends PxfTestCase {
 		hive.runQuery("ALTER TABLE " + hiveExternalTable.getName() + " ADD PARTITION (fmt = 'rc3', part = 'c') LOCATION 'hdfs:/hive/warehouse/" + hiveRcTable1.getName() + "'");
 
 		/**
-		 * Create PXF Table using Hive profile
+		 * Create PXF Table using Hive RC profile
 		 */
 		ReadableExternalTable extTableNoProfile = TableFactory.getPxfHiveRcReadableTable("hv_heterogen_using_filter", new String[] {
 				"t1    text",
@@ -418,7 +417,7 @@ public class PxfHiveRcRegression extends PxfTestCase {
 		hawq.queryResults(extTableNoProfile, "SELECT * FROM " + extTableNoProfile.getName() + " WHERE t3 = 'rc1' AND prt = 'a' ORDER BY t3, t1");
 
 		// pump up the small data to fit the unified data
-		comparisonDataTable.loadDataFromFile(PxfHiveWalmartFixture.HIVE_SMALL_DATA_FILE_PATH, ",", 0);
+		comparisonDataTable.loadDataFromFile(PxfHiveRcFixture.HIVE_SMALL_DATA_FILE_PATH, ",", 0);
 		pumpUpComparisonTableData(1, true);
 
 		ComparisonUtils.compareTables(extTableNoProfile, comparisonDataTable, report);
@@ -426,7 +425,7 @@ public class PxfHiveRcRegression extends PxfTestCase {
 
 	/**
 	 * Filter none partitions columns on external table directed to hive partitioned table
-	 * 
+	 *
 	 * @throws Exception
 	 */
 	@Test
@@ -480,7 +479,7 @@ public class PxfHiveRcRegression extends PxfTestCase {
 
 	/**
 	 * check none supported Hive types error
-	 * 
+	 *
 	 * @throws Exception
 	 */
 	@Test
@@ -522,7 +521,7 @@ public class PxfHiveRcRegression extends PxfTestCase {
 
 	/**
 	 * Pump up the comparison table data for partitions test case
-	 * 
+	 *
 	 * @throws IOException
 	 */
 	private void pumpUpComparisonTableData(int pumpAmount, boolean useSecondPartition)

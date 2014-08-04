@@ -32,6 +32,31 @@
         </plugins>
     </profile>
     <profile>
+        <name>HiveRC</name>
+        <description>This profile is suitable only for Hive tables stored in RC files
+            and serialized with either the ColumnarSerDe or the LazyBinaryColumnarSerDe.
+            It is much faster than the general purpose Hive profile.
+            DELIMITER parameter is mandatory.
+        </description>
+        <plugins>
+            <fragmenter>com.pivotal.pxf.plugins.hive.HiveInputFormatFragmenter</fragmenter>
+            <accessor>com.pivotal.pxf.plugins.hive.HiveRCFileAccessor</accessor>
+            <resolver>com.pivotal.pxf.plugins.hive.HiveColumnarSerdeResolver</resolver>
+        </plugins>
+    </profile>
+    <profile>
+        <name>HiveText</name>
+        <description>This profile is suitable only for Hive tables stored as Text files.
+            It is much faster than the general purpose Hive profile.
+            DELIMITER parameter is mandatory.
+        </description>
+        <plugins>
+            <fragmenter>com.pivotal.pxf.plugins.hive.HiveInputFormatFragmenter</fragmenter>
+            <accessor>com.pivotal.pxf.plugins.hive.HiveLineBreakAccessor</accessor>
+            <resolver>com.pivotal.pxf.plugins.hive.HiveStringPassResolver</resolver>
+        </plugins>
+    </profile>
+    <profile>
         <name>HdfsTextSimple</name>
         <description>This profile is suitable for using when reading delimited single line records from plain text files
             on HDFS
@@ -85,19 +110,6 @@
             <fragmenter>com.pivotal.pxf.plugins.gemfirexd.GemFireXDFragmenter</fragmenter>
             <accessor>com.pivotal.pxf.plugins.gemfirexd.GemFireXDAccessor</accessor>
             <resolver>com.pivotal.pxf.plugins.gemfirexd.GemFireXDResolver</resolver>
-        </plugins>
-    </profile>
-    <profile>
-        <name>HiveRC</name>
-        <description>This profile is suitable only for Hive tables stored in RC files
-            and serialized with either the ColumnarSerDe or the LazyBinaryColumnarSerDe. 
-            It is much faster than the general purpose Hive profile.
-            DELIMITER parameter is mandatory.
-        </description>
-        <plugins>
-            <fragmenter>com.pivotal.pxf.plugins.hive.HiveInputFormatFragmenter</fragmenter>
-            <accessor>com.pivotal.pxf.plugins.hive.HiveRCFileAccessor</accessor>
-            <resolver>com.pivotal.pxf.plugins.hive.HiveColumnarSerdeResolver</resolver>
         </plugins>
     </profile>
 </profiles>
