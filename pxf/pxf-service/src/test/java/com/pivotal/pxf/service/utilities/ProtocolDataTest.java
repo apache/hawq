@@ -7,6 +7,7 @@ import static com.pivotal.pxf.api.utilities.ProfileConfException.MessageFormat.N
 import com.pivotal.pxf.api.utilities.ProfilesConf;
 
 import org.junit.Before;
+import org.junit.After;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.powermock.api.mockito.PowerMockito;
@@ -253,4 +254,13 @@ public class ProtocolDataTest {
 
         PowerMockito.mockStatic(UserGroupInformation.class);
     }
+
+	/*
+	 * tearDown function called after each test
+	 */
+	@After
+	public void tearDown() {
+		// Cleanup the system property ProtocolData sets
+		System.clearProperty("greenplum.alignment");
+	}
 }
