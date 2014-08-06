@@ -9,7 +9,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.common.JavaUtils;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.serde.serdeConstants;
-import org.apache.hadoop.hive.serde2.AbstractSerDe;
+import org.apache.hadoop.hive.serde2.*;
 import org.apache.hadoop.hive.serde2.objectinspector.*;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.*;
 import org.apache.hadoop.io.BytesWritable;
@@ -31,9 +31,16 @@ import static com.pivotal.pxf.api.io.DataType.*;
  * Class HiveResolver handles deserialization of records that were serialized
  * using Hadoop's Hive serialization framework.
  */
-
+/*
+TODO - remove SupressWarning once Hive resolves the problem described below
+This line and the change of the deserialiazer member to Object instead of the original Deserializer...., All this changes stem from the same issue.
+In 0.11.0 The API changed and all Serde types extend a new interface - AbstractSerde.
+But this change was not adopted by the OrcSerde (which was also introduced in Hive 0.11.0).
+In order to cope with this inconsistency... this bit of juggling has been necessary.
+*/
+@SuppressWarnings("deprecation")
 public class HiveResolver extends Plugin implements ReadResolver {
-    private AbstractSerDe deserializer;
+    private SerDe deserializer;
     private List<OneField> partitionFields;
     private String serdeName;
     private String propsString;
@@ -91,7 +98,7 @@ public class HiveResolver extends Plugin implements ReadResolver {
         Properties serdeProperties;
 
         Class<?> c = Class.forName(serdeName, true, JavaUtils.getClassLoader());
-        deserializer = (AbstractSerDe) c.newInstance();
+        deserializer = (SerDe) c.newInstance();
         serdeProperties = new Properties();
         ByteArrayInputStream inStream = new ByteArrayInputStream(propsString.getBytes());
         serdeProperties.load(inStream);
