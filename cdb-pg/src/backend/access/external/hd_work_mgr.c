@@ -966,7 +966,6 @@ static void generate_delegation_token(PxfInputData *inputData)
 	inputData->token = palloc0(sizeof(PxfHdfsTokenData));
 
 	inputData->token->hdfs_token = HdfsGetDelegationToken(hdfs_uri.data, 
-														  &inputData->token->hdfs_token_size, 
 														  &inputData->token->hdfs_handle);
 
 	if (inputData->token->hdfs_token == NULL)
@@ -990,8 +989,7 @@ static void cancel_delegation_token(PxfInputData *inputData)
 	Insist(inputData->token->hdfs_token != NULL);
 
 	HdfsCancelDelegationToken(inputData->token->hdfs_handle, 
-							  inputData->token->hdfs_token, 
-							  inputData->token->hdfs_token_size);
+							  inputData->token->hdfs_token);
 
 	pfree(inputData->token);
 	inputData->token = NULL;

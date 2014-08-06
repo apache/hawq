@@ -14,8 +14,6 @@ static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel);
 static void add_location_options_httpheader(CHURL_HEADERS headers, GPHDUri *gphduri);
 static char* prepend_x_gp(const char* key);
 static void add_delegation_token_headers(CHURL_HEADERS headers, PxfInputData *inputData);
-static hdfsToken* deserialize_token(PxfHdfsToken serializedToken);
-static void serialize_buffer_to_hex_string(char* buf, int size, StringInfo string);
 static void add_remote_credentials(CHURL_HEADERS headers);
 
 /* 
@@ -177,66 +175,10 @@ static char* prepend_x_gp(const char* key)
  */
 static void add_delegation_token_headers(CHURL_HEADERS headers, PxfInputData *inputData)
 {
-	hdfsToken* token = NULL;
-	StringInfoData formatter;
-
 	if (inputData->token == NULL)
 		return;
 
-	token = deserialize_token(inputData->token);
-
-	initStringInfo(&formatter);
-	serialize_buffer_to_hex_string(token->identifier,
-								   token->identifierLength,
-								   &formatter);
-	churl_headers_append(headers, "X-GP-TOKEN-IDNT", formatter.data);
-
-	resetStringInfo(&formatter);
-	serialize_buffer_to_hex_string(token->password,
-								   token->passwordLength,
-								   &formatter);
-	churl_headers_append(headers, "X-GP-TOKEN-PASS", formatter.data);
-
-	resetStringInfo(&formatter);
-	serialize_buffer_to_hex_string(token->kind,
-								   token->kindLength,
-								   &formatter);
-	churl_headers_append(headers, "X-GP-TOKEN-KIND", formatter.data);
-
-	resetStringInfo(&formatter);
-	serialize_buffer_to_hex_string(token->service,
-								   token->serviceLength,
-								   &formatter);
-	churl_headers_append(headers, "X-GP-TOKEN-SRVC", formatter.data);
-
-	pfree(formatter.data);
-	pfree(token);
-}
-
-/*
- * deserialize_token will deserialize the token given in inputData
- * into a hdfsToken pointer.
- */
-static hdfsToken* deserialize_token(PxfHdfsToken serializedToken)
-{
-	hdfsToken* token = NULL;
-
-	Insist(serializedToken->hdfs_token != NULL && 
-		   serializedToken->hdfs_token_size > 0);
-	token = DeserializeDelegationToken(serializedToken->hdfs_token, 
-									   serializedToken->hdfs_token_size);
-	Insist(token != NULL);
-
-	return token;
-}
-
-/*
- * Convert a sequence of bytes into a hex StringInfo
- */
-static void serialize_buffer_to_hex_string(char* buf, int size, StringInfo string)
-{
-	for (int i = 0; i < size; ++i)
-		appendStringInfo(string, "%02X", (unsigned char)buf[i]);
+	churl_headers_append(headers, "X-GP-TOKEN", inputData->token->hdfs_token);
 }
 
 /*

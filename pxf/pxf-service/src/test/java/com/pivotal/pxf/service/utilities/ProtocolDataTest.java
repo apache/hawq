@@ -174,63 +174,18 @@ public class ProtocolDataTest {
     }
 
     @Test
-    public void nullIdentifierThrows() {
+    public void nullTokenThrows() {
         when(UserGroupInformation.isSecurityEnabled()).thenReturn(true);
 
         try {
             new ProtocolData(parameters);
-            fail("null X-GP-TOKEN-IDNT should throw");
+            fail("null X-GP-TOKEN should throw");
         } catch (IllegalArgumentException e) {
             assertEquals(e.getMessage(),
-                    "Internal server error. Property \"TOKEN-IDNT\" has no value in current request");
+                    "Internal server error. Property \"TOKEN\" has no value in current request");
         }
     }
     
-    @Test
-    public void nullPasswordThrows() {
-        when(UserGroupInformation.isSecurityEnabled()).thenReturn(true);
-        parameters.put("X-GP-TOKEN-IDNT", "DEAD");
-
-        try {
-            new ProtocolData(parameters);
-            fail("null X-GP-TOKEN-PASS should throw");
-        } catch (IllegalArgumentException e) {
-            assertEquals(e.getMessage(),
-                    "Internal server error. Property \"TOKEN-PASS\" has no value in current request");
-        }
-    }
-
-    @Test
-    public void nullKindThrows() {
-        when(UserGroupInformation.isSecurityEnabled()).thenReturn(true);
-        parameters.put("X-GP-TOKEN-IDNT", "DEAD");
-        parameters.put("X-GP-TOKEN-PASS", "DEAD");
-
-        try {
-            new ProtocolData(parameters);
-            fail("null X-GP-TOKEN-KIND should throw");
-        } catch (IllegalArgumentException e) {
-            assertEquals(e.getMessage(),
-                    "Internal server error. Property \"TOKEN-KIND\" has no value in current request");
-        }
-    }
-
-    @Test
-    public void nullServiceThrows() {
-        when(UserGroupInformation.isSecurityEnabled()).thenReturn(true);
-        parameters.put("X-GP-TOKEN-IDNT", "DEAD");
-        parameters.put("X-GP-TOKEN-PASS", "DEAD");
-        parameters.put("X-GP-TOKEN-KIND", "DEAD");
-
-        try {
-            new ProtocolData(parameters);
-            fail("null X-GP-TOKEN-SRVC should throw");
-        } catch (IllegalArgumentException e) {
-            assertEquals(e.getMessage(),
-                    "Internal server error. Property \"TOKEN-SRVC\" has no value in current request");
-        }
-    }
-
     /*
      * setUp function called before each test
 	 */

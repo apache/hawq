@@ -26,9 +26,11 @@ void create_filesystem_credentials(Portal portal);
 void cleanup_filesystem_credentials(Portal portal);
 void set_filesystem_credentials(Portal portal);
 void add_filesystem_credential(const char * uri);
+void add_filesystem_credential_to_cache(const char * uri, char *token);
 char *serialize_filesystem_credentials(int *size);
 void deserialize_filesystem_credentials(char *binary, int len);
-void *find_filesystem_credential(const char *protocol, const char *host, int port, int *credentialSize);
+char *find_filesystem_credential_with_uri(const char *uri);
+char *find_filesystem_credential(const char *protocol, const char *host, int port);
 void renew_filesystem_credentials(void);
 
 #endif /* _CDB_CDBFILESYSTEMCREDENTIAL_H_ */

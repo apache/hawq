@@ -66,6 +66,7 @@
 #include "utils/memutils.h"
 
 bool	enable_secure_filesystem = 0;
+extern bool		filesystem_support_truncate;
 
 // Provide some indirection here in case we have problems with lseek and
 // 64 bits on some platforms
@@ -2348,9 +2349,7 @@ HdfsGetConnection(const char * path)
 	int port;
 
 	char *ccname = NULL;
-	void *credential = NULL;
-	int credentialSize;
-	hdfsToken *token = NULL;
+	char *token = NULL;
 
 	hdfsFS retval = NULL;
 
@@ -2404,8 +2403,8 @@ HdfsGetConnection(const char * path)
 			{
 				if (Gp_role == GP_ROLE_EXECUTE)
 				{
-					credential = find_filesystem_credential(protocol, host, port, &credentialSize);
-					if (credential == token)
+					token = find_filesystem_credential(protocol, host, port);
+					if (token == NULL)
 					{
 						ereport(WARNING,
 								(errcode(ERRCODE_IO_ERROR),
@@ -2416,8 +2415,6 @@ HdfsGetConnection(const char * path)
 						errno = EACCES;
 						break;
 					}
-
-					token = DeserializeDelegationToken(credential, credentialSize);
 				}
 				else
 				{
@@ -3023,6 +3020,14 @@ HdfsFileTruncate(File file, int64 offset)
 	DO_DB(elog(LOG, "HdfsFileTruncate %d (%s)",
 					file, VfdCache[file].fileName));
 
+	if (!filesystem_support_truncate) {
+		ereport(WARNING,
+				(errcode(ERRCODE_IO_ERROR), errmsg("cannot truncate file %s, file system does not support truncate, errno %d",
+						VfdCache[file].fileName, ENOTSUP)));
+		errno = ENOTSUP;
+		return -1;
+	}
+
 	fs = vfdP->hFS;
 	protocol = pstrdup(vfdP->hProtocol);
 
@@ -3088,63 +3093,11 @@ HdfsFileTruncate(File file, int64 offset)
 	return 0;
 }
 
-static void *
-SerializeDelegationToken(hdfsToken *token, int *size)
+char *
+HdfsGetDelegationToken(const char *uri, void **fs)
 {
-	Assert(NULL != token && NULL != size);
-
-	StringInfoData buffer;
-	initStringInfo(&buffer);
-
-	pq_sendint(&buffer, token->identifierLength, sizeof(token->identifierLength));
-	pq_sendint(&buffer, token->passwordLength, sizeof(token->passwordLength));
-	pq_sendint(&buffer, token->kindLength, sizeof(token->kindLength));
-	pq_sendint(&buffer, token->serviceLength, sizeof(token->serviceLength));
-
-	pq_sendbytes(&buffer, token->identifier, token->identifierLength);
-	pq_sendbytes(&buffer, token->password, token->passwordLength);
-	pq_sendbytes(&buffer, token->kind, token->kindLength);
-	pq_sendbytes(&buffer, token->service, token->serviceLength);
-
-	*size = buffer.len;
-
-	return buffer.data;
-}
-
-
-hdfsToken *
-DeserializeDelegationToken(void *binary, int size)
-{
-	hdfsToken *token;
-
-	StringInfoData buffer;
-	initStringInfoOfString(&buffer, binary, size);
-
-	token = palloc(sizeof(hdfsToken));
-
-	token->identifierLength = pq_getmsgint(&buffer, sizeof(token->identifierLength));
-	token->passwordLength = pq_getmsgint(&buffer, sizeof(token->passwordLength));
-	token->kindLength = pq_getmsgint(&buffer, sizeof(token->kindLength));
-	token->serviceLength = pq_getmsgint(&buffer, sizeof(token->serviceLength));
-
-	token->identifier = palloc(token->identifierLength);
-	token->password = palloc(token->passwordLength);
-	token->kind = palloc(token->kindLength);
-	token->service = palloc(token->serviceLength);
-
-	memcpy(token->identifier, pq_getmsgbytes(&buffer, token->identifierLength), token->identifierLength);
-	memcpy(token->password, pq_getmsgbytes(&buffer, token->passwordLength), token->passwordLength);
-	memcpy(token->kind, pq_getmsgbytes(&buffer, token->kindLength), token->kindLength);
-	memcpy(token->service, pq_getmsgbytes(&buffer, token->serviceLength), token->serviceLength);
-
-	return token;
-}
-
-void *
-HdfsGetDelegationToken(const char *uri, int *size, void **fs)
-{
-	hdfsToken *token;
-	void *retval;
+	char *token;
+	char *retval;
 
 	*fs = HdfsGetConnection(uri);
 	if (*fs == NULL)
@@ -3166,38 +3119,31 @@ HdfsGetDelegationToken(const char *uri, int *size, void **fs)
 		return NULL;
 	}
 
-	retval = SerializeDelegationToken(token, size);
-
+	retval = pstrdup(token);
 	hdfsFreeDelegationToken(token);
 
-	return (void *)retval;
+	return retval;
 }
 
 void
-HdfsRenewDelegationToken(void *fs, void *credential, int credentialSize)
+HdfsRenewDelegationToken(void *fs, char *credential)
 {
 	Assert(NULL != fs && NULL != credential);
 
-	hdfsToken * token = DeserializeDelegationToken(credential, credentialSize);
-
-	if (0 < hdfsRenewDelegationToken(fs, token))
+	if (0 < hdfsRenewDelegationToken(fs, credential))
 	{
 		ereport(WARNING,
 				(errcode(ERRCODE_IO_ERROR),
 						errmsg("failed to renew hdfs delegation token."),
 						errdetail("%s", HdfsGetLastError())));
 	}
-
-	pfree(token);
 }
 
-void HdfsCancelDelegationToken(void *fs, void *credential, int credentialSize)
+void HdfsCancelDelegationToken(void *fs, char *credential)
 {
 	Assert(NULL != fs && NULL != credential);
 
-	hdfsToken * token = DeserializeDelegationToken(credential, credentialSize);
-
-	if (hdfsCancelDelegationToken(fs, token))
+	if (hdfsCancelDelegationToken(fs, credential))
 	{
 		ereport(WARNING,
 						(errcode(ERRCODE_IO_ERROR),
@@ -3205,7 +3151,6 @@ void HdfsCancelDelegationToken(void *fs, void *credential, int credentialSize)
 								errdetail("%s", HdfsGetLastError())));
 	}
 
-	pfree(token);
 }
 
 const char * HdfsGetLastError(void)
@@ -3292,6 +3237,47 @@ FileTruncate(File file, int64 offset) {
 		return HdfsFileTruncate(file, offset);
 }
 
+static int
+HdfsPathFileTruncate(FileName fileName) {
+	char *protocol;
+	hdfsFS fs;
+	char path[MAXPGPATH + 1];
+
+	if (!filesystem_support_truncate) {
+		ereport(WARNING,
+				(errcode(ERRCODE_IO_ERROR), errmsg("cannot truncate file %s, file system does not support truncate, errno %d", fileName, ENOTSUP)));
+		errno = ENOTSUP;
+		return -1;
+	}
+
+	if (HdfsParsePath(fileName, &protocol, NULL, NULL, NULL)
+			|| NULL == protocol) {
+		elog(WARNING, "cannot get parse path: %s", fileName);
+		return -1;
+	}
+
+	fs = HdfsGetConnection(fileName);
+	if (fs == NULL)
+		return -1;
+
+	if (NULL == ConvertToUnixPath(fileName, path, sizeof(path)))
+		return -1;
+
+	if (0 != HdfsTruncate(protocol, fs, path, 0))
+		return -1;
+
+	pfree(protocol);
+
+	return 0;
+}
+
+int
+PathFileTruncate(FileName fileName) {
+	Insist(!IsLocalPath(fileName) && "path must a dfs uri");
+	return HdfsPathFileTruncate(fileName);
+}
+
+
 /*
  * make a directory on given file system
  *
@@ -3315,9 +3301,8 @@ bool
 HdfsPathExist(char *path)
 {
 	char	relative_path[MAXPGPATH + 1];
-	char	*protocol;
+	char   *protocol;
 	hdfsFS	fs = NULL;
-	hdfsFileInfo	*info;
 
 	DO_DB(elog(LOG, "HdfsPathExist, path: %s", path));
 
@@ -3332,14 +3317,7 @@ HdfsPathExist(char *path)
 	if (NULL == ConvertToUnixPath(path, relative_path, sizeof(relative_path)))
 		elog(ERROR, "cannot convert to unix path for path: %s", path);
 
-	info = HdfsGetPathInfo(protocol, fs, relative_path);
-	if (info == NULL)
-		return false;
-
-	HdfsFreeFileInfo(protocol, info, 1);
-
-	pfree(protocol);
-	return true;
+	return 0 == hdfsExists(fs, relative_path);
 }
 
 FileName
@@ -3377,5 +3355,38 @@ HdfsPathSize(DIR *dirdesc)
 	}
 
 	return total_size;
+}
+
+int64
+HdfsGetFileLength(char * path)
+{
+	char	relative_path[MAXPGPATH + 1];
+	char	*protocol;
+	int64	retval;
+	hdfsFS	fs = NULL;
+	hdfsFileInfo	*info;
+
+	DO_DB(elog(LOG, "HdfsPathExist, path: %s", path));
+
+	if (HdfsParsePath(path, &protocol, NULL, NULL, NULL) || NULL == protocol)
+		elog(ERROR, "cannot get protocol for path: %s", path);
+
+	fs = HdfsGetConnection(path);
+
+	if (fs == NULL)
+		return -1;
+
+	if (NULL == ConvertToUnixPath(path, relative_path, sizeof(relative_path)))
+		elog(ERROR, "cannot convert to unix path for path: %s", path);
+
+	info = HdfsGetPathInfo(protocol, fs, relative_path);
+	if (info == NULL)
+		return -1;
+
+	retval = info->mSize;
+	HdfsFreeFileInfo(protocol, info, 1);
+
+	pfree(protocol);
+	return retval;
 }
 

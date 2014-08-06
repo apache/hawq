@@ -39,3 +39,5 @@ pgcrypto.tgz
 cdb-pg/src/test/regress/data/upgrade12/upg2_catupgrade_121.sql
 cdb-pg/src/test/regress/data/upgrade12/upg2_catupgrade_12.sql
 cdb-pg/src/bin/gpcheckhdfs/gpcheckhdfs
+
+cdb-pg/src/test/regress/sql/orca_udfs.sql

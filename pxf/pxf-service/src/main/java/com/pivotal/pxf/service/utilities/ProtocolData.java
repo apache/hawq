@@ -31,10 +31,7 @@ public class ProtocolData extends InputData {
     protected int port;
     protected String host;
     protected String profile;
-	protected String tokenIdentifier;
-    protected String tokenPassword;
-    protected String tokenKind;
-    protected String tokenService;
+	protected String token;
 
     /**
      * Constructs a ProtocolData.
@@ -80,10 +77,7 @@ public class ProtocolData extends InputData {
 
         /* Kerberos token information */
         if (UserGroupInformation.isSecurityEnabled()) {
-        	tokenIdentifier = getProperty("TOKEN-IDNT");
-        	tokenPassword = getProperty("TOKEN-PASS");
-        	tokenKind = getProperty("TOKEN-KIND");
-        	tokenService = getProperty("TOKEN-SRVC");
+        	token = getProperty("TOKEN");
         }
 
         parseFragmentMetadata();
@@ -125,26 +119,11 @@ public class ProtocolData extends InputData {
         this.threadSafe = copy.threadSafe;
         this.remoteLogin = copy.remoteLogin;
         this.remoteSecret = copy.remoteSecret;
-    	this.tokenIdentifier = copy.tokenIdentifier;
-    	this.tokenPassword = copy.tokenPassword;
-    	this.tokenKind = copy.tokenKind;
-    	this.tokenService = copy.tokenService;
+    	this.token = copy.token;
     }
 
-    public String getTokenIdentifier() {
-		return tokenIdentifier;
-	}
-
-	public String getTokenPassword() {
-		return tokenPassword;
-	}
-
-	public String getTokenKind() {
-		return tokenKind;
-	}
-
-	public String getTokenService() {
-		return tokenService;
+    public String getToken() {
+		return token;
 	}
 
     /**

@@ -12,8 +12,7 @@
  */
 typedef struct sPxfHdfsTokenInfo
 {
-	void	*hdfs_token;
-	int		hdfs_token_size;
+	char	*hdfs_token;
 	void	*hdfs_handle;
 } *PxfHdfsToken, PxfHdfsTokenData;
 

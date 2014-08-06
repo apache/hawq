@@ -22,46 +22,27 @@ public class SecuredHDFS {
     private static final Log LOG = LogFactory.getLog(SecuredHDFS.class);
 
     /*
-     * Convert a hex string to a byte array.
-	 *
-	 * @throws IllegalArgumentException when data is not even
-	 *
-	 * @param hex HEX string to deserialize
-	 */
-    private static byte[] hexStringToByteArray(String hex) {
-        final int HEX_RADIX = 16;
-        final int NIBBLE_SIZE_IN_BITS = 4;
-
-        if (hex.length() % 2 != 0) {
-            throw new IllegalArgumentException("Internal server error. String " +
-                    hex + " isn't a valid hex string");
-        }
-
-        byte[] result = new byte[hex.length() / 2];
-        for (int i = 0; i < hex.length(); i = i + 2) {
-            result[i / 2] = (byte) ((Character.digit(hex.charAt(i), HEX_RADIX) << NIBBLE_SIZE_IN_BITS) +
-                    Character.digit(hex.charAt(i + 1), HEX_RADIX));
-        }
-
-        return result;
-    }
-
-    /*
      * The function will get the token information from parameters
 	 * and call SecuredHDFS to verify the token.
 	 *
-	 * All token properties will be deserialied from hex string to a byte array
+	 * All token properties will be deserialied from string to a Token object
+	 * 
+	 * @throws SecurityException Thrown when authentication fails
 	 */
     public static void verifyToken(ProtocolData protData, ServletContext context) {
-        if (UserGroupInformation.isSecurityEnabled()) {
-        	
-            byte[] identifier = hexStringToByteArray(protData.getTokenIdentifier());
-            byte[] password = hexStringToByteArray(protData.getTokenPassword());
-            byte[] kind = hexStringToByteArray(protData.getTokenKind());
-            byte[] service = hexStringToByteArray(protData.getTokenService());
+		try {
+			if (UserGroupInformation.isSecurityEnabled()) {
+				Token<DelegationTokenIdentifier> token = new Token<DelegationTokenIdentifier>();
+				String tokenString = protData.getToken();
+				token.decodeFromUrlString(tokenString);
 
-            verifyToken(identifier, password, kind, service, context);
-        }
+				verifyToken(token.getIdentifier(), token.getPassword(),
+						token.getKind(), token.getService(), context);
+			}
+		} catch (IOException e) {
+			throw new SecurityException("Failed to verify delegation token "
+					+ e, e);
+		}
     }
 
     /*
@@ -76,15 +57,15 @@ public class SecuredHDFS {
      *
      * @throws SecurityException Thrown when authentication fails
      */
-    private static void verifyToken(byte[] identifier, byte[] password,
-                                    byte[] kind, byte[] service,
-                                    ServletContext servletContext) {
+	private static void verifyToken(byte[] identifier, byte[] password,
+									Text kind, Text service, 
+									ServletContext servletContext) {
         try {
             Token<DelegationTokenIdentifier> token = new Token<DelegationTokenIdentifier>(
                     identifier,
                     password,
-                    new Text(kind),
-                    new Text(service));
+                    kind,
+                    service);
 
             ByteArrayInputStream buf =
                     new ByteArrayInputStream(token.getIdentifier());

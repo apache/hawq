@@ -25,61 +25,18 @@ public class SecuredHDFSTest {
     ServletContext mockContext;
 
     @Test
-    public void invalidIdentifierThrows() {
+    public void invalidTokenThrows() {
         when(UserGroupInformation.isSecurityEnabled()).thenReturn(true);
-        when(mockProtocolData.getTokenIdentifier()).thenReturn("This is odd");
+        when(mockProtocolData.getToken()).thenReturn("This is odd");
 
         try {
             SecuredHDFS.verifyToken(mockProtocolData, mockContext);
-            fail("invalid X-GP-TOKEN-IDNT should throw");
-        } catch (IllegalArgumentException e) {
-            assertEquals(e.getMessage(), "Internal server error. String This is odd isn't a valid hex string");
+            fail("invalid X-GP-TOKEN should throw");
+        } catch (SecurityException e) {
+            assertEquals("Failed to verify delegation token java.io.EOFException", e.getMessage());
         }
     }
 
-    @Test
-    public void invalidPasswordThrows() {
-        when(UserGroupInformation.isSecurityEnabled()).thenReturn(true);
-        when(mockProtocolData.getTokenIdentifier()).thenReturn("DEAD");
-        when(mockProtocolData.getTokenPassword()).thenReturn("This is odd");
-        
-        try {
-            SecuredHDFS.verifyToken(mockProtocolData, mockContext);
-            fail("invalid X-GP-TOKEN-PASS should throw");
-        } catch (IllegalArgumentException e) {
-            assertEquals(e.getMessage(), "Internal server error. String This is odd isn't a valid hex string");
-        }
-    }
-
-    public void invalidKindThrows() {
-        when(UserGroupInformation.isSecurityEnabled()).thenReturn(true);
-        when(mockProtocolData.getTokenIdentifier()).thenReturn("DEAD");
-        when(mockProtocolData.getTokenPassword()).thenReturn("DEAD");
-        when(mockProtocolData.getTokenKind()).thenReturn("This is odd");
-
-        try {
-            SecuredHDFS.verifyToken(mockProtocolData, mockContext);
-            fail("invalid X-GP-TOKEN-KIND should throw");
-        } catch (IllegalArgumentException e) {
-            assertEquals(e.getMessage(), "Internal server error. String This is odd isn't a valid hex string");
-        }
-    }
-
-    @Test
-    public void invalidServiceThrows() {
-        when(UserGroupInformation.isSecurityEnabled()).thenReturn(true);
-        when(mockProtocolData.getTokenIdentifier()).thenReturn("DEAD");
-        when(mockProtocolData.getTokenPassword()).thenReturn("DEAD");
-        when(mockProtocolData.getTokenKind()).thenReturn("DEAD");
-        when(mockProtocolData.getTokenService()).thenReturn("This is odd");
-
-        try {
-            SecuredHDFS.verifyToken(mockProtocolData, mockContext);
-            fail("invalid X-GP-TOKEN-SRVC should throw");
-        } catch (IllegalArgumentException e) {
-            assertEquals(e.getMessage(), "Internal server error. String This is odd isn't a valid hex string");
-        }
-    }
     /*
      * setUp function called before each test
 	 */

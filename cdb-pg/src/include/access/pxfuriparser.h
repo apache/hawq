@@ -12,7 +12,7 @@
  * All PXF's resources are under /PXF_SERVICE_PREFIX/PXF_VERSION/...
  */
 #define PXF_SERVICE_PREFIX "pxf"
-#define PXF_VERSION "v11" /* PXF version */
+#define PXF_VERSION "v12" /* PXF version */
 
 /*
  * FragmentData - describes a single Hadoop file split / HBase table region

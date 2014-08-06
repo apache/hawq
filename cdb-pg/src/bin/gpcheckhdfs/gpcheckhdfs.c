@@ -185,7 +185,7 @@ int testHdfsConnect(hdfsFS * fsptr, const char * host, int iPort, const char * k
         }
 
         hdfsFreeBuilder(builder);
-        struct hdfsToken * token = hdfsGetDelegationToken((*fsptr), krb_srvname);
+        char * token = hdfsGetDelegationToken((*fsptr), krb_srvname);
 
         if (NULL == token) {
             fprintf(stderr, "ERROR: Get Delegation Token Error\n");

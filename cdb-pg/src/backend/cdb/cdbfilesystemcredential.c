@@ -40,9 +40,8 @@ struct FileSystemCredentialKey
 struct FileSystemCredential
 {
 	struct FileSystemCredentialKey key;
-	void *credential;
+	char *credential;
 	void *fs;
-	int credentialSize;
 };
 
 bool
@@ -104,7 +103,7 @@ get_filesystem_crential(struct FileSystemCredential *entry)
 	char uri[1024];
 	snprintf(uri, sizeof(uri), "%s://%s:%d", key->protocol, key->host,
 			key->port);
-	entry->credential = HdfsGetDelegationToken(uri, &entry->credentialSize, &entry->fs);
+	entry->credential = HdfsGetDelegationToken(uri, &entry->fs);
 
 	return entry->credential ? true : false;
 
@@ -148,6 +147,42 @@ create_filesystem_credentials(Portal portal)
 {
 	create_filesystem_credentials_internal(&portal->filesystem_credentials,
 			&portal->filesystem_credentials_memory);
+}
+
+void
+add_filesystem_credential_to_cache(const char * uri, char *token)
+{
+	char *protocol;
+	char *host;
+
+	bool found = false;
+	struct FileSystemCredential *entry;
+	struct FileSystemCredentialKey key;
+
+	Assert(NULL != token);
+	Assert(NULL != CurrentFilesystemCredentials);
+	Assert(NULL != CurrentFilesystemCredentialsMemoryContext);
+
+	MemoryContext old = MemoryContextSwitchTo(
+			CurrentFilesystemCredentialsMemoryContext);
+
+	memset(&key, 0, sizeof(key));
+
+	if (HdfsParsePath(uri, &protocol, &host, &key.port, NULL)
+			|| NULL == protocol || NULL == host)
+		elog(ERROR, "fail to parse uri: %s", uri);
+
+	strncpy(key.protocol, protocol, sizeof(key.protocol));
+	strncpy(key.host, host, sizeof(key.host));
+
+	entry = (struct FileSystemCredential *) hash_search(
+			CurrentFilesystemCredentials, &key, HASH_ENTER, &found);
+
+	if (!found) {
+		entry->credential = pstrdup(token);
+	}
+
+	MemoryContextSwitchTo(old);
 }
 
 void
@@ -211,8 +246,7 @@ cancel_filesystem_credential(struct FileSystemCredential *entry)
 			(struct FileSystemCredentialKey*) entry;
 	Insist(strcasecmp(key->protocol, "hdfs") == 0);
 
-	HdfsCancelDelegationToken(entry->fs, entry->credential,
-			entry->credentialSize);
+	HdfsCancelDelegationToken(entry->fs, entry->credential);
 }
 
 static void
@@ -275,8 +309,7 @@ serialize_filesystem_credential(StringInfo buffer,
 	pq_sendstring(buffer, entry->key.host);
 	pq_sendstring(buffer, entry->key.protocol);
 	pq_sendint(buffer, entry->key.port, sizeof(int));
-	pq_sendint(buffer, entry->credentialSize, sizeof(int));
-	pq_sendbytes(buffer, entry->credential, entry->credentialSize);
+	pq_sendstring(buffer, entry->credential);
 }
 
 char *
@@ -341,11 +374,7 @@ deserialize_filesystem_credentials(char *binary, int len)
 		if (found)
 			elog(ERROR, "dispatched duplicate file system credential");
 
-		entry->credentialSize = pq_getmsgint(&buffer, sizeof(int));
-		entry->credential = palloc(entry->credentialSize);
-		memcpy(entry->credential,
-				pq_getmsgbytes(&buffer, entry->credentialSize),
-				entry->credentialSize);
+		entry->credential = pstrdup(pq_getmsgstring(&buffer));
 	}
 
 	if (buffer.cursor != buffer.len)
@@ -354,9 +383,23 @@ deserialize_filesystem_credentials(char *binary, int len)
 	MemoryContextSwitchTo(old);
 }
 
-void*
+char*
+find_filesystem_credential_with_uri(const char *uri)
+{
+	char   *protocol;
+	char   *host;
+	int 	port;
+
+	if (HdfsParsePath(uri, &protocol, &host, &port, NULL)
+			|| NULL == protocol || NULL == host)
+		elog(ERROR, "fail to parse uri: %s", uri);
+
+	return find_filesystem_credential(protocol, host, port);
+}
+
+char*
 find_filesystem_credential(const char *protocol, const char *host,
-		int port, int *credentialSize)
+		int port)
 {
 	bool found = false;
 	struct FileSystemCredentialKey key;
@@ -380,7 +423,6 @@ find_filesystem_credential(const char *protocol, const char *host,
 	if (!found)
 		return NULL;
 
-	*credentialSize = entry->credentialSize;
 	return entry->credential;
 }
 
@@ -393,7 +435,7 @@ renew_filesystem_credential(struct FileSystemCredential *entry)
 	Insist(strcasecmp(key->protocol, "hdfs") == 0);
 
 	Assert(NULL != entry->credential);
-	HdfsRenewDelegationToken(entry->fs, entry->credential, entry->credentialSize);
+	HdfsRenewDelegationToken(entry->fs, entry->credential);
 }
 
 void

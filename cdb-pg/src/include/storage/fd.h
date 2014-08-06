@@ -84,11 +84,11 @@ extern int HdfsFileSync(File file);
 extern int HdfsRemovePath(FileName fileName, int recursive);
 extern int HdfsFileTruncate(File file, int64 offset);
 extern int HdfsMakeDirectory(const char *path, mode_t mode);
-extern void *HdfsGetDelegationToken(const char *uri, int *size, void **fs);
-extern void HdfsRenewDelegationToken(void *fs, void *credential, int credentialSize);
+extern char *HdfsGetDelegationToken(const char *uri, void **fs);
+extern void HdfsRenewDelegationToken(void *fs, char *credential);
 extern const char * HdfsGetLastError(void);
-extern void HdfsCancelDelegationToken(void *fs, void *credential, int credentialSize);
-extern hdfsToken *DeserializeDelegationToken(void *binary, int size);
+extern void HdfsCancelDelegationToken(void *fs, char *credential);
+extern char *DeserializeDelegationToken(void *binary, int size);
 
 extern void cleanup_lru_opened_files(void);
 extern void cleanup_filesystem_handler(void);
@@ -120,6 +120,7 @@ extern int	FileSync(File file);
 extern int64 FileSeek(File file, int64 offset, int whence);
 extern int64 FileNonVirtualTell(File file);
 extern int	FileTruncate(File file, int64 offset);
+extern int  PathFileTruncate(FileName fileName);
 extern int64 FileDiskSize(File file);
 
 /* Operations that allow use of regular stdio --- USE WITH CAUTION */
@@ -162,6 +163,8 @@ extern bool TestFileValid(File file);
 extern bool HdfsPathExist(char *path);
 
 extern int64 HdfsPathSize(DIR *dirdesc);
+
+extern int64 HdfsGetFileLength(char * path);
 
 extern FileName FileGetName(File file);
 

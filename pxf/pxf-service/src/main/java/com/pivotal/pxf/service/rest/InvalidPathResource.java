@@ -16,7 +16,7 @@ import java.io.IOException;
 
 
 class Version {
-    final static String PXF_PROTOCOL_VERSION = "v11";
+    final static String PXF_PROTOCOL_VERSION = "v12";
 }
 
 /**

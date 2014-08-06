@@ -340,6 +340,7 @@ bool		Debug_datumstream_block_write_check_integrity = false;
 bool		Debug_datumstream_read_print_varlena_info = false;
 bool		Debug_datumstream_write_use_small_initial_buffers = false;
 bool		gp_temporary_files_filespace_repair = false;
+bool		filesystem_support_truncate = true;
 
 int			explain_memory_verbosity = 0;
 char* 		memory_profiler_run_id = "none";
@@ -4009,6 +4010,16 @@ static struct config_bool ConfigureNamesBool[] =
 		},
 		&enable_secure_filesystem,
 		false, NULL, NULL
+	},
+
+	{
+		{"filesystem_support_truncate", PGC_USERSET, APPENDONLY_TABLES,
+		 gettext_noop("the file system support truncate feature."),
+		 NULL,
+		 GUC_GPDB_ADDOPT | GUC_SUPERUSER_ONLY
+		},
+		&filesystem_support_truncate,
+		true, NULL, NULL
 	},
 
 	/* End-of-list marker */
