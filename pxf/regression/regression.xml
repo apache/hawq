@@ -115,7 +115,11 @@
 		</copy>
 	</target>
 
-	<target name="compile-resources" depends="ivy-retrieve" description="compile resources">
+    <target name="clean-resources">
+        <delete dir="${build.dir}/regression/resources-classes" />
+    </target>
+    
+    <target name="compile-resources" depends="clean-resources, ivy-retrieve" description="compile resources">
 		<mkdir dir="${build.dir}/regression/resources-classes" />
 		
 		<!-- compile the regression resources -->
