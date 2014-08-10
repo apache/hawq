@@ -11,5 +11,5 @@ bin=$root/bin
 
 for (( i=0; i < $SLAVES; i++ ))
 do
-	$bin/pxf-instance.sh stop $i | sed "s/^/node $i: /"
+	$bin/pxf-service.sh stop $i | sed "s/^/node $i: /"
 done

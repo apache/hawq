@@ -42,7 +42,7 @@ fi
 for (( i=0; i < $SLAVES; i++ ))
 do
 	echo initializing PXF instance $i
-	$bin/pxf-instance.sh init $i
+	$bin/pxf-service.sh init $i
 	if [ $? -ne 0 ]; then
 		echo
 		echo tcServer instance \#${i} initialization failed

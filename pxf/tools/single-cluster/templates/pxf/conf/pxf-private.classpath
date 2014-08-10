@@ -42,7 +42,7 @@ hive/lib/hive-exec-*[0-9].jar
 hive/lib/hive-metastore-*[0-9].jar
 hive/lib/jdo-api-*[0-9].jar
 hive/lib/libfb303-*[0-9].jar
-pxf/pxf-hbase-*[0-9].jar
-pxf/pxf-hdfs-*[0-9].jar
-pxf/pxf-hive-*[0-9].jar
+pxf/pxf-hbase.jar
+pxf/pxf-hdfs.jar
+pxf/pxf-hive.jar
 pxf/regression-test.jar

@@ -1,9 +1,5 @@
 ROOT = .
 
-ifndef $(RELEASE)
-  RELEASE = dev-head
-endif
-
 BUILDVER=$(shell cat product.version)
 
 BUILDNUM = $(BUILD_NUMBER)
@@ -15,7 +11,7 @@ TARGET = singlecluster.tar.gz
 
 BUILDROOT = $(TARGET:%.tar.gz=%)
 BINROOT = $(ROOT)/bin
-TARSROOT = $(ROOT)/tars/$(RELEASE)
+TARSROOT = $(ROOT)/tars
 TEMPLATESROOT = $(ROOT)/templates
 DOCSROOT = $(ROOT)/docs
 
@@ -50,7 +46,6 @@ copy_binfiles: $(BINFILES)
 .PHONY: create_versions_file
 create_versions_file:
 	echo build number: $(BUILDNUM) > $(VERSIONSFILE)
-	echo release: $(RELEASE) >> $(VERSIONSFILE)
 	echo single_cluster-$(BUILDVER) >> $(VERSIONSFILE)
 
 .PHONY: extract_stack
@@ -67,12 +62,19 @@ merge_pxf:
 		rmdir $$X; \
 	done;
 
+.PHONY: softlink_pxf
+softlink_pxf:
+	cd $(BUILDROOT)/pxf && \
+	for X in pxf-*-[0-9]*.jar; do \
+		ln -s $$X `echo $$X | sed -e 's/-[a-zA-Z0-9.]*.jar/.jar/'`; \
+	done;
+
 .PHONY: rename_tcserver
 rename_tcserver:
 	mv `echo $(BUILDROOT)/vfabric-tc-server-*` $(BUILDROOT)/tcserver
 
 .PHONY: extract_products
-extract_products: $(EXTRACTEDTARS) extract_stack merge_pxf rename_tcserver
+extract_products: $(EXTRACTEDTARS) extract_stack merge_pxf softlink_pxf rename_tcserver
 	for X in $(BUILDROOT)/*-[0-9]*; do \
 		mv $$X `echo $$X | sed -e 's/^\($(BUILDROOT)\/[A-Za-z0-9]*\).*$$/\1/'`; \
 	done;

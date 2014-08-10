@@ -20,6 +20,6 @@ fi
 pushd $GPHD_ROOT
 for (( i=0; i < $SLAVES; i++ ))
 do
-	$bin/pxf-instance.sh start $i | sed "s/^/node $i: /"
+	$bin/pxf-service.sh start $i | sed "s/^/node $i: /"
 done
 popd

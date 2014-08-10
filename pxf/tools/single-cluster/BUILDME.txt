@@ -1,24 +1,14 @@
-1. Preparation
-==============
+Build
+=====
 
-In order to build a single-cluster you'll need to add stack binaries in the
-form of tarballs (no need to extract, just keep the .tar.gz):
+parameters
+PXF_ARTIFACTS -		directory for PXF tarballs relative to tars subdirectory
+					default ../../../build/distributions
+					optional
+PHD_VERSION		-	PHD stack version to use (e.g. 2.2)
+					mandatory
 
-1) hadoop
-2) hbase
-3) zookeeper
-4) hive
-5) pxf
-
-put these in a subdirectory under tars/ which includes the name of the release
-
-Currently, we have release-head and dev-head
-Each has a script to update its components from Jenkins jobs
-
-2. Build
-========
-
-make clean all RELEASE=<release name> ARTIFACTS=<path to PXF tarballs>
-PHD_VERSION=<PHD version to use>
+make refresh_tars PHD_VERSION=x PXF_ARTIFACTS=y
+make clean all
 
 Note: You have to do clean

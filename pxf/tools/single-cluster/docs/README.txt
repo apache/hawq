@@ -67,6 +67,17 @@ CentOS
 7. Changes
 ==========
 
+v1.9.0
+------
+
+- Cleanup fetch tool
+- Cleanup refresh_tars
+- Remove release (dev-head/release-head), now theres only one
+- Update BUILDME.txt
+- Create version-less softlinks for PXF binaries
+- Refresh PXF instance war/pxf-service files after PXF start
+- pxf-instance.sh now called pxf-service.sh
+
 v1.8.7
 ------
 

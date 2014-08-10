@@ -4,11 +4,11 @@
 # dov.dorin at gopivotal.com
 ############################
 
-usage="Usage: `basename $0` <start|stop|init> <node_id>"
+usage="Usage: `basename $0` <start|stop|restart|init> <node_id>"
 
 if [ $# -ne 2 ]; then
-    echo $usage
-    exit 1
+	echo $usage
+	exit 1
 fi
 
 command=$1
@@ -58,10 +58,25 @@ function configureInstance()
 
 function deployWebapp()
 {
-    cp $GPHD_ROOT/pxf/pxf.war $instance_root/$instance_name/webapps/
-    cp $GPHD_ROOT/pxf/pxf-service-*[0-9].jar $instance_root/$instance_name/lib/
+	pushd $instance_root/$instance_name/lib
+	ln -s $PXF_ROOT/pxf-service.jar .
 
-	pushd $instance_root/$instance_name/webapps
+	cd ../webapps
+	ln -s $PXF_ROOT/pxf.war .
+	popd
+}
+
+function doinit()
+{
+	createInstance || return 1
+	configureInstance || return 1
+	deployWebapp || return 1
+}
+
+function patchWebapp()
+{
+	pushd $instance_root/$instance_name/webapps || return 1
+	rm -rf pxf
 	mkdir pxf
 	cd pxf
 	unzip ../pxf.war
@@ -70,14 +85,13 @@ function deployWebapp()
 	context_file=$instance_root/$instance_name/webapps/pxf/META-INF/context.xml
 	cat $context_file | \
 	sed  -e "s/classpathFiles=\"[a-zA-Z0-9\/\;.-]*\"/classpathFiles=\"pxf\/conf\/pxf-private.classpath\"/" \
-    -e "s/secondaryClasspathFiles=\"[a-zA-Z0-9\/\;.-]*\"/secondaryClasspathFiles=\"pxf\/conf\/pxf-public.classpath\"/" > context.xml.tmp
+	-e "s/secondaryClasspathFiles=\"[a-zA-Z0-9\/\;.-]*\"/secondaryClasspathFiles=\"pxf\/conf\/pxf-public.classpath\"/" > context.xml.tmp
 	mv context.xml.tmp $context_file
 
 	web_file=$instance_root/$instance_name/webapps/pxf/WEB-INF/web.xml
 	cat $web_file | \
 	sed "s/<param-value>.*pxf-log4j.properties<\/param-value>/<param-value>..\/..\/..\/..\/..\/..\/pxf\/conf\/pxf-log4j.properties<\/param-value>/" > web.xml.tmp
 	mv web.xml.tmp $web_file
-
 }
 
 function checkWebapp()
@@ -90,12 +104,12 @@ function checkWebapp()
 	# wait until tomcat is up:
 	echo Waiting for tcServer to start...
 	until [[ "`curl --silent --connect-timeout 1 -I http://localhost:${instance_port} | grep 'Coyote'`" != "" 
-	   || "$attempts" -eq "$max_attempts" ]];
+		|| "$attempts" -eq "$max_attempts" ]];
 	do
-        let attempts=attempts+1
-        echo "tcServer not responding, re-trying after ${sleep_time} second (attempt number ${attempts})"
-        sleep $sleep_time
-    done
+		let attempts=attempts+1
+		echo "tcServer not responding, re-trying after ${sleep_time} second (attempt number ${attempts})"
+		sleep $sleep_time
+	done
 	if [[ "$attempts" -eq "$max_attempts" ]]; then
 		echo ERROR: cannot connect to tcServer after 5 minutes
 		return 1
@@ -115,24 +129,25 @@ function checkWebapp()
 	return 1
 }
 
-function doinit()
-{
-	createInstance || return 1
-	configureInstance || return 1
-	deployWebapp || return 1
-}
-
-function docommand()
+function commandWebapp()
 {
 	command=$1
 	$TCSERVER_ROOT/tcruntime-ctl.sh $instance_name $command -n $instance_root -d $TCSERVER_ROOT
 	if [ $? -ne 0 ]; then
 		return 1
 	fi 
-	
-	if [ "$command" = "start" ]; then
-		checkWebapp || return 1
-	fi
+}
+
+function dostart()
+{
+	patchWebapp || return 1
+	commandWebapp start || return 1
+	checkWebapp || return 1
+}
+
+function dostop()
+{
+	commandWebapp stop || return 1
 }
 
 case "$command" in
@@ -140,14 +155,14 @@ case "$command" in
 		doinit
 		;;
 	"start" )
-		docommand $command
+		dostart
 		;;
 	"stop" )
-		docommand $command
+		dostop
 		;;
 	"restart" )
-		docommand stop
-		docommand start
+		dostop
+		dostart
 		;;
 	* )
 		;;
