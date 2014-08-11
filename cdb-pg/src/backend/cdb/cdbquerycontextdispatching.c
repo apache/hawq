@@ -2618,10 +2618,14 @@ prepareDispatchedCatalog(QueryContextInfo *cxt, List *rtable)
             break;
 
         case RTE_SPECIAL:              /*special rule relation (NEW or OLD) */
-        case RTE_CTE:                  /*CommonTableExpr in FROM */
+            elog(ERROR, "dispatch metedata for RTE_SPECIAL node is not implemented");
+            break;
+        case RTE_CTE:                   /*CommonTableExpr in FROM */
+            /* nothing to do for cte */
+            break;
         case RTE_TABLEFUNCTION:        /*CDB: Functions over multiset input */
             /*TODO */
-            elog(ERROR, "not implemented");
+            elog(ERROR, "dispatch metedata for RTE_TABLEFUNCTION node is not implemented");
             break;
         default:
             Insist(!"never get here");
