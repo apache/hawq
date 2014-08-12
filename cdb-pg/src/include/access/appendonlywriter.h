@@ -81,6 +81,7 @@ typedef struct AOSegfileStatus
 									 * use another 							  */
 	bool			isfull;	   		/* if true - never insert into this segno *
 									 * anymore 								  */
+	bool			needCheck;		/* need to check if the segfile contain unexpected garbage data */
 } AOSegfileStatus;
 
 /*
@@ -96,7 +97,9 @@ typedef struct AOSegfileStatus
 typedef struct AORelHashEntryData
 {
 	Oid				relid;
+	Oid				segrelid;
 	int				txns_using_rel;
+	char			tspPathPrefix[MAXPGPATH + 1];
 	AOSegfileStatus relsegfiles[MAX_AOREL_CONCURRENCY];
 	
 } AORelHashEntryData;
@@ -115,6 +118,7 @@ extern AppendOnlyWriterData	*AppendOnlyWriter;
 extern Size AppendOnlyWriterShmemSize(void);
 extern void InitAppendOnlyWriter(void);
 extern Size AppendOnlyWriterShmemSize(void);
+extern bool TestCurrentTspSupportTruncate(Oid tsp);
 extern int  SetSegnoForWrite(int existingsegno, Oid relid);
 extern List *assignPerRelSegno(List *all_rels);
 extern void UpdateMasterAosegTotals(Relation parentrel,
@@ -122,7 +126,7 @@ extern void UpdateMasterAosegTotals(Relation parentrel,
 									uint64 tupcount);
 extern bool AORelRemoveHashEntry(Oid relid);
 extern void AtCommit_AppendOnly(void);
-extern void AtAbort_AppendOnly(void);
+extern void AtAbort_AppendOnly(bool isSubTransaction);
 extern void AtEOXact_AppendOnly(void);
 
 extern void ValidateAppendOnlyMetaDataSnapshot(

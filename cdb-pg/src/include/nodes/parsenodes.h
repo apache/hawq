@@ -1415,7 +1415,7 @@ typedef struct CreateStmt
 
 typedef enum SharedStorageOp
 {
-	Op_CreateSegFile, Op_DropSegFile, Op_CreateDir
+	Op_CreateSegFile, Op_DropSegFile, Op_CreateDir, Op_OverWriteSegFile
 } SharedStorageOp;
 
 typedef struct SharedStorageOpStmt

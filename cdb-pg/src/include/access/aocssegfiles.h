@@ -137,6 +137,14 @@ GetAllAOCSFileSegInfo(
 	int 				*totalseg);
 
 extern AOCSFileSegInfo **
+GetAOCSFileSegInfoWithSegno(
+	Relation 			prel,
+	AppendOnlyEntry 	*aoEntry,
+	Snapshot 			appendOnlyMetaDataSnapshot,
+	int					segno,
+	int 				*totalseg);
+
+extern AOCSFileSegInfo **
 GetAllAOCSFileSegInfo_pg_aocsseg_rel(
 	int 				numOfColumsn, 
 	char 				*relationName, 
@@ -144,6 +152,7 @@ GetAllAOCSFileSegInfo_pg_aocsseg_rel(
 	Relation 			pg_aocsseg_rel, 
 	Snapshot 			appendOnlyMetaDataSnapshot,
 	bool returnAllSegmentsFiles,
+	int32				segno,
 	int32 				*totalseg);
 
 extern void FreeAllAOCSSegFileInfo(AOCSFileSegInfo **allAOCSSegInfo, int totalSegFiles);

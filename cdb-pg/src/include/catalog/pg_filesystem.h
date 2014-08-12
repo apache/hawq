@@ -140,7 +140,7 @@ typedef FormData_pg_filesystem *Form_pg_filesystem;
 /*
  * HDFS default options.
  */
-#define FS_DEFAULT_REPLICA_NUM (3)
+#define FS_DEFAULT_REPLICA_NUM (0)
 #define FS_MAX_REPLICA_NUM (10)
 
 /*

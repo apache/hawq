@@ -10425,6 +10425,14 @@ DESCR("enables transformations in the optimizer");
 DATA(insert OID = 6089 ( gp_opt_version  PGNSP PGUID 12 f f t f i 0 25 f "" _null_ _null_ _null_ gp_opt_version - _null_ n ));
 DESCR("Returns the optimizer and gpos library versions");
 
+/* dfs_get_file_length(text) => record */
+DATA(insert OID = 6117 ( dfs_get_file_length  PGNSP PGUID 12 f f t f v 2 2249 f "25 25" "{25,25,20,23}" "{i,i,o,o}" "{patten,token,eof,content}" dfs_get_file_length - _null_ n ));
+DESCR("Returns file length and contentid");
+
+/* tablespace_support_truncate(oid) => bool */
+DATA(insert OID = 6118 ( tablespace_support_truncate  PGNSP PGUID 12 f f t f i 1 16 f "26" _null_ _null_ _null_ tablespace_support_truncate - _null_ n ));
+DESCR("Test if table space support truncate feature");
+
 
 /* TIDYCAT_END_PG_PROC_GEN */
 

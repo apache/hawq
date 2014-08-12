@@ -17,6 +17,8 @@
 #include "utils/relcache.h"
 #include "utils/rel.h"
 
+extern void CheckFilespacePathPattern(const char * path);
+extern void GetFilespacePathPrefix(Oid tablespaceOid, char **pathPattern);
 extern void GetFilespacePathForTablespace(Oid tablespaceOid, int32 contentid, char **filespacePath);
 extern char *relpath(RelFileNode rnode);
 extern void CopyRelPath(char *target, int targetMaxLen, int4 contentid, RelFileNode rnode);

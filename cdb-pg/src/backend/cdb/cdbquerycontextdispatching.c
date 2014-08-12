@@ -176,37 +176,22 @@ AddFileSystemCredentialForPxfTable(char *uri);
 static void
 GetQueryContextDipsatchingFileLocation(char **buffer)
 {
-    int len, content = 0;
-
     static int count = 0;
 
-    char *path = NULL, *pos;
+    int len;
+    char *prefix = NULL;
     Oid tablespace = get_database_dts(MyDatabaseId);
 
     Assert(GpIdentity.numsegments >= 1);
-    GetFilespacePathForTablespace(tablespace, content, &path);
+    GetFilespacePathPrefix(tablespace, &prefix);
 
-    if (NULL == path)
-    {
-        elog(ERROR, "cannot get distributed table space location for current database,"
-                " table space oid is %u",
-                tablespace);
-    }
-
-    pos = path + strlen(path) - 1;
-    Assert('0' == *pos);
-
-    *pos = '\0';
-
-    len = strlen(path);
+    len = strlen(prefix);
     len += 64;
 
     *buffer = palloc(len);
+    snprintf(*buffer, len, "%s-1/session_%d_id_%d_query_context", prefix, gp_session_id, ++count);
 
-    snprintf(*buffer, len, "%s-1/session_%d_id_%d_query_context", path, gp_session_id, ++count);
-
-    pfree(path);
-
+    pfree(prefix);
 }
 /*
  * create a QueryContextInfo and fill the location of file on shared storage.
@@ -649,6 +634,7 @@ RebuildTablespaceLocation(QueryContextInfo *cxt)
 
     loc = buffer + sizeof(Oid);
 
+    CheckFilespacePathPattern(buffer + sizeof(Oid));
     snprintf(location, FilespaceLocationBlankPaddedWithNullTermLen,
             buffer + sizeof(Oid), GpIdentity.segindex);
 
@@ -948,7 +934,7 @@ void
 prepareDispatchedCatalogTablespace(QueryContextInfo *cxt, Oid tablespace)
 {
 
-    char *path = NULL, *pos;
+    char *prfix = NULL;
     char location[FilespaceLocationBlankPaddedWithNullTermLen];
 
     if (IsBuiltinTablespace(tablespace) || tablespace == InvalidOid )
@@ -962,21 +948,15 @@ prepareDispatchedCatalogTablespace(QueryContextInfo *cxt, Oid tablespace)
      * master's tablespace location is special in hawq.
      */
     Assert(GpIdentity.numsegments >=1);
-    GetFilespacePathForTablespace(tablespace, 0, &path);
+    GetFilespacePathPrefix(tablespace, &prfix);
 
-    Assert(NULL != path);
-    Assert(strlen(path) < FilespaceLocationBlankPaddedWithNullTermLen);
+    Assert(NULL != prfix);
+    prepareDispatchedCatalogFileSystemCredential(prfix);
 
-    prepareDispatchedCatalogFileSystemCredential(path);
-
-    pos = path + strlen(path) - 1;
-    Assert('0' == *pos);
-
-    *pos = '\0';
     snprintf(location, FilespaceLocationBlankPaddedWithNullTermLen,
-            "%s%s", path, "%d");
+            "%s%s", prfix, "%d");
 
-    pfree(path);
+    pfree(prfix);
 
     AddTablespaceLocationToContextInfo(cxt, tablespace, location);
 }

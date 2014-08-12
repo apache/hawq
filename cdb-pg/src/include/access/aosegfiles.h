@@ -121,8 +121,16 @@ GetFileSegInfo(Relation parentrel, AppendOnlyEntry *aoEntry, Snapshot appendOnly
 extern FileSegInfo **
 GetAllFileSegInfo(Relation parentrel, AppendOnlyEntry *aoEntry, Snapshot appendOnlyMetaDataSnapshot, int *totalsegs);
 
+extern FileSegInfo **GetFileSegInfoWithSegno(Relation parentrel,
+		AppendOnlyEntry *aoEntry,
+		Snapshot appendOnlyMetaDataSnapshot,
+		int segno,
+		int *totalsegs);
+
 extern FileSegInfo **
-GetAllFileSegInfo_pg_aoseg_rel(char *relationName, AppendOnlyEntry *aoEntry, Relation pg_aoseg_rel, Snapshot appendOnlyMetaDataSnapshot, bool regurnAllSegmentsFiles, int *totalsegs);
+GetAllFileSegInfo_pg_aoseg_rel(char *relationName, AppendOnlyEntry *aoEntry,
+		Relation pg_aoseg_rel, Snapshot appendOnlyMetaDataSnapshot,
+		bool regurnAllSegmentsFiles, int32 segno, int *totalsegs);
 
 extern void
 UpdateFileSegInfo(Relation parentrel,

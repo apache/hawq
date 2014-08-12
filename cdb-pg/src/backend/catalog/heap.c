@@ -436,7 +436,7 @@ heap_create(const char *relname,
 							tasks);
 				}
 
-				PerformSharedStorageOpTasks(tasks);
+				PerformSharedStorageOpTasks(tasks, Op_CreateSegFile);
 				PostPerformSharedStorageOpTasks(tasks);
 				DropSharedStorageOpTasks(tasks);
 			}
@@ -3660,7 +3660,7 @@ setNewRelfilenodeCommon(Relation relation, Oid newrelfilenode)
 					tasks);
 		}
 
-		PerformSharedStorageOpTasks(tasks);
+		PerformSharedStorageOpTasks(tasks, Op_CreateSegFile);
 		PostPerformSharedStorageOpTasks(tasks);
 		DropSharedStorageOpTasks(tasks);
 	}

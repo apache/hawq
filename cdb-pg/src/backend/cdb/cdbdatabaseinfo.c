@@ -1079,6 +1079,7 @@ DatabaseInfo_HandleAppendOnly(
 												pg_aoseg_rel,
 												SnapshotNow, 
 												true,
+												-1,
 												&totalAoSegFiles);
 				for (i = 0; i < totalAoSegFiles; i++)
 				{
@@ -1112,6 +1113,7 @@ DatabaseInfo_HandleAppendOnly(
 																pg_aocsseg_rel,
 																SnapshotNow, 
 																true,
+																-1,
 																&totalAocsSegFiles);
 				for (i = 0; i < totalAocsSegFiles; i++)
 				{

@@ -487,7 +487,25 @@ ParquetFileSegInfo **GetAllParquetFileSegInfo(Relation parentrel,
 
 	result = GetAllParquetFileSegInfo_pg_paqseg_rel(RelationGetRelationName(parentrel),
 			aoEntry, pg_parquetseg_rel, parquetMetaDataSnapshot,
-			/* Accessing the files belong to this segment */false, totalsegs);
+			/* Accessing the files belong to this segment */false, -1, totalsegs);
+
+	heap_close(pg_parquetseg_rel, AccessShareLock);
+
+	return result;
+}
+
+ParquetFileSegInfo **GetParquetFileSegInfoWithSegno(Relation parentrel,
+		AppendOnlyEntry *aoEntry, Snapshot parquetMetaDataSnapshot,
+		int segno, int *totalsegs) {
+	Relation pg_parquetseg_rel;
+
+	ParquetFileSegInfo **result;
+
+	pg_parquetseg_rel = heap_open(aoEntry->segrelid, AccessShareLock);
+
+	result = GetAllParquetFileSegInfo_pg_paqseg_rel(RelationGetRelationName(parentrel),
+			aoEntry, pg_parquetseg_rel, parquetMetaDataSnapshot,
+			/* Accessing the files belong to this segment */true, segno, totalsegs);
 
 	heap_close(pg_parquetseg_rel, AccessShareLock);
 
@@ -500,13 +518,15 @@ ParquetFileSegInfo **GetAllParquetFileSegInfo_pg_paqseg_rel(
 								Relation pg_parquetseg_rel,
 								Snapshot parquetMetaDataSnapshot,
 								bool returnAllSegmentsFiles,
+								int expectedSegno,
 								int *totalsegs)
 {
 	TupleDesc		pg_parquetseg_dsc;
 	HeapTuple		tuple;
 	SysScanDesc		parquetscan;
-	ScanKeyData		key[1];
+	ScanKeyData		key[2];
 	ParquetFileSegInfo		**allseginfo;
+	int				numOfKey = 0;
 	int				seginfo_no;
 	int				seginfo_slot_no = AO_FILESEGINFO_ARRAY_SIZE;
 	Datum			segno,
@@ -525,18 +545,25 @@ ParquetFileSegInfo **GetAllParquetFileSegInfo_pg_paqseg_rel(
 	allseginfo = (ParquetFileSegInfo **) palloc0(sizeof(ParquetFileSegInfo*) * seginfo_slot_no);
 	seginfo_no = 0;
 
-	ScanKeyInit(&key[0], (AttrNumber) Anum_pg_parquetseg_content,
+	if (!returnAllSegmentsFiles)
+	{
+		ScanKeyInit(&key[0], (AttrNumber) Anum_pg_parquetseg_content,
 			BTEqualStrategyNumber, F_INT4EQ, Int32GetDatum(GpIdentity.segindex));
+		numOfKey ++;
+	}
+
+	if (expectedSegno >= 0)
+	{
+		ScanKeyInit(&key[numOfKey], (AttrNumber) Anum_pg_parquetseg_segno,
+			BTEqualStrategyNumber, F_INT4EQ, Int32GetDatum(expectedSegno));
+		numOfKey ++;
+	}
 
 	/*
 	 * Now get the actual segfile information
 	 */
-	if (returnAllSegmentsFiles)
-		parquetscan = systable_beginscan(pg_parquetseg_rel, InvalidOid, FALSE,
-				parquetMetaDataSnapshot, 0, NULL);
-	else
-		parquetscan = systable_beginscan(pg_parquetseg_rel, InvalidOid, FALSE,
-				parquetMetaDataSnapshot, 1, &key[0]);
+	parquetscan = systable_beginscan(pg_parquetseg_rel, InvalidOid, FALSE,
+			parquetMetaDataSnapshot, numOfKey, key);
 
 	while (HeapTupleIsValid(tuple = systable_getnext(parquetscan)))
 	{

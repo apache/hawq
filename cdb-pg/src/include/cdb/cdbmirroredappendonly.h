@@ -46,6 +46,10 @@ typedef struct MirroredAppendOnlyOpen
 // Open, Flush, and Close 
 // -----------------------------------------------------------------------------
 
+extern void AppendOnly_Overwrite(RelFileNode *relFileNode, int32 segmentFileNum,
+		int32 contentid, int *primaryError);
+
+
 /*
  * We call MirroredAppendOnly_Create with the MirroredLock already held.
  */

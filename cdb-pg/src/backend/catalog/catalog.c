@@ -67,6 +67,54 @@
 
 #define OIDCHARS	10			/* max chars printed by %u */
 
+void CheckFilespacePathPattern(const char * path)
+{
+	int i, c;
+
+	if (NULL == path)
+		elog(ERROR, "invalid file space path");
+
+	if (NULL == strstr(path, "%d"))
+		elog(ERROR, "invalid file space path %s", path);
+
+
+	for (i = 0, c = 0; i < strlen(path); ++i)
+	{
+		if (path[i] == '%')
+			++c;
+	}
+
+	if (c != 1)
+		elog(ERROR, "invalid file space path %s", path);
+}
+
+void GetFilespacePathPrefix(Oid tablespaceOid, char **pathPrefix)
+{
+	char *path = NULL;
+	GetFilespacePathForTablespace(tablespaceOid, 0, &path);
+
+	if (path == NULL)
+		elog(ERROR, "cannot get table space location for content 0 table space %u", tablespaceOid);
+
+	int len = strlen(path);
+
+	if (len < 1 || path[len - 1] == '/')
+	{
+		path[len - 1] = 0;
+		len -= 1;
+	}
+
+	if (len < 1 || path[len - 1] != '0')
+		elog(ERROR, "Invalid table space location for content 0 table space %u. %s", tablespaceOid, path);
+	else
+	{
+		path[len - 1] = 0;
+		len -= 1;
+	}
+
+	*pathPrefix = path;
+}
+
 void GetFilespacePathForTablespace(
 	Oid tablespaceOid,
 

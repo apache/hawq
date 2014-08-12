@@ -4038,7 +4038,7 @@ AbortTransaction(void)
 		AtAbort_ResScheduler();
 		
 	/* Perform any AO table abort processing */
-	AtAbort_AppendOnly();
+	AtAbort_AppendOnly(false);
 
 	AtEOXact_LargeObject(false);	/* 'false' means it's abort */
 	AtAbort_Notify();
@@ -6197,6 +6197,8 @@ AbortSubTransaction(void)
 	/* Make sure we have a valid memory context and resource owner */
 	AtSubAbort_Memory();
 	AtSubAbort_ResourceOwner();
+
+	AtAbort_AppendOnly(true);
 
 	/*
 	 * Release any LW locks we might be holding as quickly as possible.

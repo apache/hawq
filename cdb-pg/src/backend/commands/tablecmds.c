@@ -1858,6 +1858,9 @@ ExecuteTruncate(TruncateStmt *stmt)
 			GetAppendOnlyEntryAuxOids(heap_relid, SnapshotNow,
 											  &aoseg_relid, NULL,
 											  &aoblkdir_relid, NULL);
+			LWLockAcquire(AOSegFileLock, LW_EXCLUSIVE);
+			AORelRemoveHashEntry(RelationGetRelid(rel));
+			LWLockRelease(AOSegFileLock);
 		}
 		else{
 			ereport(ERROR,
@@ -13726,6 +13729,10 @@ ATExecSetDistributedBy(Relation rel, Node *node, AlterTableCmd *cmd)
 			}
 		}
 	}
+
+    LWLockAcquire(AOSegFileLock, LW_EXCLUSIVE);
+    AORelRemoveHashEntry(RelationGetRelid(rel));
+    LWLockRelease(AOSegFileLock);
 
 l_distro_fini:
 

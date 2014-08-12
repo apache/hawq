@@ -118,7 +118,7 @@ void SharedStorageOpAddTask(const char * relname,
 /*
  * Do the tasks on all segments.
  */
-void PerformSharedStorageOpTasks(SharedStorageOpTasks *tasks)
+void PerformSharedStorageOpTasks(SharedStorageOpTasks *tasks, enum SharedStorageOp op)
 {
 	int i, j, masterWorkCount = 0, masterWorkSize = 1;
 
@@ -139,7 +139,7 @@ void PerformSharedStorageOpTasks(SharedStorageOpTasks *tasks)
 	q->querySource = QSRC_ORIGINAL;
 	q->canSetTag = true;
 
-	stat->op = Op_CreateSegFile;
+	stat->op = op;
 
 	stat->relFileNode = palloc(sizeof(RelFileNode) * tasks->numTasks);
 	stat->segmentFileNum = palloc(sizeof(int) * tasks->numTasks);
@@ -302,11 +302,27 @@ void PerformSharedStorageOp(SharedStorageOpStmt * stat)
 		{
 			if (GpIdentity.segindex == stat->contentid[i])
 			{
-				/*we need add here whether choose create an appendonly table file or a
-				 * parquet table file. Maybe can do this by adding a variable to
-				 * SharedStorageOpStmt*/
 				MirroredAppendOnly_Create(&stat->relFileNode[i], stat->segmentFileNum[i],
 						GpIdentity.segindex, stat->relationName[i], &error);
+
+				if (error != 0)
+				{
+					ereport(ERROR,
+						(errcode_for_file_access(),
+							errmsg("could not create relation file '%s', relation name '%s', contentid: %d: %s"
+									, relpath(stat->relFileNode[i]), stat->relationName[i], GpIdentity.segindex, strerror(error)),
+							errdetail("%s", HdfsGetLastError())));
+				}
+			}
+		}
+		break;
+	case Op_OverWriteSegFile:
+		for (i = 0; i < stat->numTasks; ++i)
+		{
+			if (GpIdentity.segindex == stat->contentid[i])
+			{
+				AppendOnly_Overwrite(&stat->relFileNode[i], stat->segmentFileNum[i],
+						GpIdentity.segindex, &error);
 
 				if (error != 0)
 				{

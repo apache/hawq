@@ -108,6 +108,8 @@
 #include "cdb/cdbquerycontextdispatching.h"
 #include "optimizer/prep.h"
 
+extern bool		filesystem_support_truncate;
+
 typedef struct evalPlanQual
 {
 	Index		rti;
@@ -2280,7 +2282,7 @@ CreateAppendOnlyParquetSegFileOnMaster(Oid relid, List *mapping)
 
 static void
 CreaateAoRowSegFileForRelationOnMaster(Relation rel,
-		AppendOnlyEntry * aoEntry, int segno, SharedStorageOpTasks *tasks)
+		AppendOnlyEntry * aoEntry, int segno, SharedStorageOpTasks *addTask, SharedStorageOpTasks *overwriteTask)
 {
 	int i;
 	FileSegInfo * fsinfo;
@@ -2325,7 +2327,24 @@ CreaateAoRowSegFileForRelationOnMaster(Relation rel,
 
 		if (HeapTupleIsValid(tuple))
 		{
+			bool currentTspSupportTruncate = false;
+
+			if (filesystem_support_truncate)
+				currentTspSupportTruncate = TestCurrentTspSupportTruncate(rel->rd_node.spcNode);
+
 			heap_freetuple(tuple);
+
+			/*
+			 * here is a record in persistent table, we assume the file exist on filesystem.
+			 * but there is no record in pg_aoseg_xxx catalog.
+			 * We should overwrite that file in case that the file system do not support truncate.
+			 */
+			if (!currentTspSupportTruncate)
+				SharedStorageOpAddTask(relname, &rel->rd_node, segno, i - 1,
+						&rel->rd_segfile0_relationnodeinfos[i].persistentTid,
+						rel->rd_segfile0_relationnodeinfos[i].persistentSerialNum,
+						overwriteTask);
+
 			continue;
 		}
 
@@ -2338,7 +2357,7 @@ CreaateAoRowSegFileForRelationOnMaster(Relation rel,
 		SharedStorageOpAddTask(relname, &rel->rd_node, segno, i - 1,
 				&rel->rd_segfile0_relationnodeinfos[i].persistentTid,
 				rel->rd_segfile0_relationnodeinfos[i].persistentSerialNum,
-				tasks);
+				addTask);
 	}
 
 	heap_close(gp_relation_node, AccessShareLock);
@@ -2346,7 +2365,7 @@ CreaateAoRowSegFileForRelationOnMaster(Relation rel,
 
 static void
 CreateAoCsSegFileForRelationOnMaster(Relation rel,
-		AppendOnlyEntry * aoEntry, int segno, SharedStorageOpTasks *tasks)
+		AppendOnlyEntry * aoEntry, int segno, SharedStorageOpTasks *addTasks, SharedStorageOpTasks *overwriteTask)
 {
 	int i, j;
 	AOCSFileSegInfo *aocsFileSegInfo;
@@ -2392,7 +2411,24 @@ CreateAoCsSegFileForRelationOnMaster(Relation rel,
 
 			if (HeapTupleIsValid(tuple))
 			{
+				bool currentTspSupportTruncate = false;
+
+				if (filesystem_support_truncate)
+					currentTspSupportTruncate = TestCurrentTspSupportTruncate(rel->rd_node.spcNode);
+
 				heap_freetuple(tuple);
+
+				/*
+				 * here is a record in persistent table, we assume the file exist on filesystem.
+				 * but there is no record in pg_aoseg_xxx catalog.
+				 * We should overwrite that file in case that the file system do not support truncate.
+				 */
+				if (!currentTspSupportTruncate)
+					SharedStorageOpAddTask(relname, &rel->rd_node,
+								segmentFileNum,
+								i - 1, &rel->rd_segfile0_relationnodeinfos[i].persistentTid,
+								rel->rd_segfile0_relationnodeinfos[i].persistentSerialNum,
+								overwriteTask);
 				continue;
 			}
 
@@ -2408,7 +2444,7 @@ CreateAoCsSegFileForRelationOnMaster(Relation rel,
 					segmentFileNum,
 					i - 1, &rel->rd_segfile0_relationnodeinfos[i].persistentTid,
 					rel->rd_segfile0_relationnodeinfos[i].persistentSerialNum,
-					tasks);
+					addTasks);
 		}
 		rel->rd_segfile0_relationnodeinfos[i].isPresent = TRUE;
 
@@ -2420,7 +2456,7 @@ CreateAoCsSegFileForRelationOnMaster(Relation rel,
 
 static void
 CreateParquetSegFileForRelationOnMaster(Relation rel,
-		AppendOnlyEntry *aoEntry, int segno, SharedStorageOpTasks *tasks)
+		AppendOnlyEntry *aoEntry, int segno, SharedStorageOpTasks *addTasks, SharedStorageOpTasks *overwriteTask)
 {
 	int i;
 	ParquetFileSegInfo * fsinfo;
@@ -2465,7 +2501,23 @@ CreateParquetSegFileForRelationOnMaster(Relation rel,
 
 		if (HeapTupleIsValid(tuple))
 		{
+			bool currentTspSupportTruncate = false;
+
+			if (filesystem_support_truncate)
+				currentTspSupportTruncate = TestCurrentTspSupportTruncate(rel->rd_node.spcNode);
+
 			heap_freetuple(tuple);
+
+			/*
+			 * here is a record in persistent table, we assume the file exist on filesystem.
+			 * but there is no record in pg_aoseg_xxx catalog.
+			 * We should overwrite that file in case that the file system do not support truncate.
+			 */
+			if (!currentTspSupportTruncate)
+				SharedStorageOpAddTask(relname, &rel->rd_node, segno, i - 1,
+							&rel->rd_segfile0_relationnodeinfos[i].persistentTid,
+							rel->rd_segfile0_relationnodeinfos[i].persistentSerialNum,
+							overwriteTask);
 			continue;
 		}
 
@@ -2478,7 +2530,7 @@ CreateParquetSegFileForRelationOnMaster(Relation rel,
 		SharedStorageOpAddTask(relname, &rel->rd_node, segno, i - 1,
 				&rel->rd_segfile0_relationnodeinfos[i].persistentTid,
 				rel->rd_segfile0_relationnodeinfos[i].persistentSerialNum,
-				tasks);
+				addTasks);
 	}
 
 	heap_close(gp_relation_node, AccessShareLock);
@@ -2489,25 +2541,28 @@ CreateAppendOnlyParquetSegFileForRelationOnMaster(Relation rel, int segno)
 {
 	Assert(NULL != rel->rd_segfile0_relationnodeinfos);
 
-	SharedStorageOpTasks *tasks = CreateSharedStorageOpTasks();
+	SharedStorageOpTasks *addTasks = CreateSharedStorageOpTasks();
+	SharedStorageOpTasks *overwriteTasks = CreateSharedStorageOpTasks();
 
 	if(RelationIsAoRows(rel) || RelationIsAoCols(rel) || RelationIsParquet(rel))
 	{
 		AppendOnlyEntry *aoEntry = GetAppendOnlyEntry(rel->rd_id, SnapshotNow);
 
 		if(RelationIsAoRows(rel))
-			CreaateAoRowSegFileForRelationOnMaster(rel, aoEntry, segno, tasks);
+			CreaateAoRowSegFileForRelationOnMaster(rel, aoEntry, segno, addTasks, overwriteTasks);
 		else if (RelationIsAoCols(rel))
-			CreateAoCsSegFileForRelationOnMaster(rel, aoEntry, segno, tasks);
+			CreateAoCsSegFileForRelationOnMaster(rel, aoEntry, segno, addTasks, overwriteTasks);
 		else
-			CreateParquetSegFileForRelationOnMaster(rel, aoEntry, segno, tasks);
+			CreateParquetSegFileForRelationOnMaster(rel, aoEntry, segno, addTasks, overwriteTasks);
 
 		pfree(aoEntry);
 	}
 
-	PerformSharedStorageOpTasks(tasks);
-	PostPerformSharedStorageOpTasks(tasks);
-	DropSharedStorageOpTasks(tasks);
+	PerformSharedStorageOpTasks(addTasks, Op_CreateSegFile);
+	PostPerformSharedStorageOpTasks(addTasks);
+	PerformSharedStorageOpTasks(overwriteTasks, Op_OverWriteSegFile);
+	DropSharedStorageOpTasks(addTasks);
+	DropSharedStorageOpTasks(overwriteTasks);
 }
 
 /*

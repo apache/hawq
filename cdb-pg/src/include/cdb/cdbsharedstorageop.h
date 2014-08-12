@@ -45,7 +45,7 @@ extern void SharedStorageOpAddTask(const char * relname, RelFileNode *node,
 
 extern void TransactionCreateDatabaseDir(Oid dbid, Oid tsp);
 
-extern void PerformSharedStorageOpTasks(SharedStorageOpTasks *tasks);
+extern void PerformSharedStorageOpTasks(SharedStorageOpTasks *tasks, enum SharedStorageOp op);
 
 extern void PostPerformSharedStorageOpTasks(SharedStorageOpTasks *tasks);
 

@@ -18,16 +18,27 @@
 #include "access/parquetsegfiles.h"
 #include "access/heapam.h"			  /* heap_open            */
 #include "access/transam.h"			  /* InvalidTransactionId */
+#include "catalog/catalog.h"
+#include "catalog/pg_tablespace.h"
+#include "commands/dbcommands.h"
 #include "utils/lsyscache.h"
-
-#include "cdb/cdbvars.h"			  /* Gp_role              */
+#include "cdb/cdbdisp.h"
+#include "cdb/cdbfilesystemcredential.h"
 #include "cdb/cdbtm.h"
+#include "cdb/cdbvars.h"			  /* Gp_role              */
+#include "utils/builtins.h"
 #include "utils/tqual.h"
+#include "funcapi.h"
+#include "gp-libpq-fe.h"
+#include "lib/stringinfo.h"
+#include "miscadmin.h"
+
 
 /*
  * GUC variables
  */
 int		MaxAppendOnlyTables;		/* Max # of tables */
+extern bool		filesystem_support_truncate;
 
 /*
  * Global Variables
@@ -43,6 +54,9 @@ static AORelHashEntry AppendOnlyRelHashNew(Oid relid, bool *exists);
 static AORelHashEntry AORelGetHashEntry(Oid relid);
 static AORelHashEntry AORelLookupHashEntry(Oid relid);
 static bool AORelCreateHashEntry(Oid relid);
+
+extern Datum dfs_get_file_length(PG_FUNCTION_ARGS);
+extern Datum tablespace_support_truncate(PG_FUNCTION_ARGS);
 
 /*
  * AppendOnlyWriterShmemSize -- estimate size the append only writer structures
@@ -155,6 +169,7 @@ AOHashTableInit(void)
 static bool
 AORelCreateHashEntry(Oid relid)
 {
+	Oid				segrelid;
 	bool			exists = false;
 	FileSegInfo		**allfsinfo;
 	ParquetFileSegInfo **allfsinfoParquet;
@@ -164,6 +179,7 @@ AORelCreateHashEntry(Oid relid)
 	Relation		aorel;
 	AppendOnlyEntry *aoEntry;
 	bool			isParquet = false;
+    char			*prefix = NULL;
 
 	Insist(Gp_role == GP_ROLE_DISPATCH);
 
@@ -179,11 +195,13 @@ AORelCreateHashEntry(Oid relid)
 	 * in this hash entry.
 	 */
 	aorel = heap_open(relid, RowExclusiveLock);
+	GetFilespacePathPrefix(get_database_dts(aorel->rd_node.dbNode), &prefix);
 
 	/*
 	 * Use SnapshotNow since we have an exclusive lock on the relation.
 	 */
 	aoEntry = GetAppendOnlyEntry(relid, SnapshotNow);
+	segrelid = aoEntry->segrelid;
 
 	if(RelationIsParquet(aorel))
 	{
@@ -232,6 +250,9 @@ AORelCreateHashEntry(Oid relid)
 
 	Insist(aoHashEntry->relid == relid);
 	aoHashEntry->txns_using_rel = 0;
+	strncpy(aoHashEntry->tspPathPrefix, prefix, sizeof(aoHashEntry->tspPathPrefix));
+	aoHashEntry->segrelid = segrelid;
+	pfree(prefix);
 	
 	/*
 	 * Initialize all segfile array to zero
@@ -242,6 +263,7 @@ AORelCreateHashEntry(Oid relid)
 		aoHashEntry->relsegfiles[i].xid = InvalidTransactionId;
 		aoHashEntry->relsegfiles[i].latestWriteXid = InvalidTransactionId;
 		aoHashEntry->relsegfiles[i].isfull = false;
+		aoHashEntry->relsegfiles[i].needCheck = true;
 		aoHashEntry->relsegfiles[i].tupcount = 0;
 		aoHashEntry->relsegfiles[i].tupsadded = 0;
 
@@ -254,6 +276,7 @@ AORelCreateHashEntry(Oid relid)
 	aoHashEntry->relsegfiles[RESERVED_SEGNO].xid = InvalidTransactionId;
 	aoHashEntry->relsegfiles[RESERVED_SEGNO].latestWriteXid = InvalidTransactionId;
 	aoHashEntry->relsegfiles[RESERVED_SEGNO].isfull = true;
+	aoHashEntry->relsegfiles[RESERVED_SEGNO].needCheck = true;
 	aoHashEntry->relsegfiles[RESERVED_SEGNO].tupcount = 0;
 	aoHashEntry->relsegfiles[RESERVED_SEGNO].tupsadded = 0;
 
@@ -602,6 +625,507 @@ usedByConcurrentTransaction(AOSegfileStatus *segfilestat, int segno)
 	return false;
 }
 
+Datum
+dfs_get_file_length(PG_FUNCTION_ARGS)
+{
+	char 	   *path;
+	char	   *token;
+	Datum		values[12];
+	bool		nulls[12];
+	HeapTuple	tuple;
+	int64		len;
+	TupleDesc tupdesc, btupdesc;
+
+	char *filePattern = text_to_cstring(PG_GETARG_TEXT_P(0));
+	token = text_to_cstring(PG_GETARG_TEXT_P(1));
+	path = palloc(strlen(filePattern) + 64);
+	CheckFilespacePathPattern(filePattern);
+	snprintf(path, strlen(filePattern) + 63, filePattern, GpIdentity.segindex);
+
+	if (Gp_role != GP_ROLE_EXECUTE)
+		elog(ERROR, "dfs_get_file_length cannot be called on master");
+
+	if (token != NULL && strlen(token) > 0)
+		add_filesystem_credential_to_cache(path, token);
+
+	len = HdfsGetFileLength(path);
+	if (len < 0)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_IO_ERROR),
+						errmsg( "failed to get file length %s", path),
+						errdetail("%s", HdfsGetLastError())));
+	}
+
+	get_call_result_type(fcinfo, NULL, &tupdesc);
+	btupdesc = BlessTupleDesc(tupdesc);
+
+	MemSet(nulls, 0, sizeof(nulls));
+	values[0] = len;
+	values[1] = GpIdentity.segindex;
+
+	tuple = heap_form_tuple(btupdesc, values, nulls);
+
+	return HeapTupleGetDatum(tuple);
+}
+
+struct SegFileMap
+{
+	int32	contentid;
+	int64	eof;
+	bool	ok;
+};
+
+static struct SegFileMap *
+GetSegmentFileLengthMapping(Relation rel, Oid segrelid, int segno, int *totalsegs)
+{
+	AppendOnlyEntry		aoEntry;
+	struct SegFileMap	*retval;
+	int					i;
+
+	memset(&aoEntry, 0, sizeof(aoEntry));
+	aoEntry.segrelid = segrelid;
+
+	if (RelationIsAoRows(rel)) {
+		FileSegInfo **fsinfo;
+
+		fsinfo = GetFileSegInfoWithSegno(rel, &aoEntry, SnapshotNow, segno, totalsegs);
+		if (fsinfo == NULL)
+		{
+			return NULL;
+		}
+		else
+		{
+			retval = palloc0(sizeof(struct SegFileMap) * *totalsegs);
+
+			for (i = 0; i < *totalsegs; ++i)
+			{
+				retval[i].contentid = fsinfo[i]->content;
+				retval[i].eof = fsinfo[i]->eof;
+				retval[i].ok = false;
+			}
+
+			pfree(fsinfo);
+		}
+	}
+	else if (RelationIsAoCols(rel))
+	{
+		AOCSFileSegInfo **seginfo;
+
+		seginfo = GetAOCSFileSegInfoWithSegno(rel, &aoEntry, SnapshotNow, segno, totalsegs);
+		if (seginfo == NULL)
+		{
+			return NULL;
+		}
+		else
+		{
+			retval = palloc0(sizeof(struct SegFileMap) * *totalsegs);
+
+			for (i = 0; i < *totalsegs; ++i)
+			{
+				retval[i].contentid = seginfo[i]->content;
+				retval[i].eof = seginfo[i]->vpinfo.entry[0].eof;
+				retval[i].ok = false;
+			}
+
+			pfree(seginfo);
+		}
+	}
+	else
+	{
+		Assert(RelationIsParquet(rel));
+		ParquetFileSegInfo **fsinfo;
+
+		fsinfo = GetParquetFileSegInfoWithSegno(rel, &aoEntry, SnapshotNow, segno, totalsegs);
+
+		if (fsinfo == NULL)
+		{
+			return NULL;
+		}
+		else
+		{
+			retval = palloc0(sizeof(struct SegFileMap) * *totalsegs);
+
+			for (i = 0; i < *totalsegs; ++i)
+			{
+				retval[i].contentid = fsinfo[i]->content;
+				retval[i].eof = fsinfo[i]->eof;
+				retval[i].ok = false;
+			}
+
+			pfree(fsinfo);
+		}
+	}
+
+	for (i = 0; i < *totalsegs; ++i)
+	{
+		if (retval[i].eof != 0)
+			return retval;
+	}
+
+	pfree(retval);
+	return NULL;
+}
+
+static bool
+CheckSegnoForWrite(Relation rel, AORelHashEntryData *aoentry, int segno)
+{
+	int				i, j, sqlSize, totalsegs;
+	int				numresults;
+	StringInfoData 	errbuf;
+	struct pg_result ** results;
+	const char 		*sqlFormat, *token = "";
+	char			pathPattern[MAXPGPATH + 1];
+	RelFileNode		*node = &rel->rd_node;
+
+	struct SegFileMap * mapping = GetSegmentFileLengthMapping(rel,
+			aoentry->segrelid, segno, &totalsegs);
+
+	if (!mapping)
+		return true;
+
+	if (segno == 0)
+		sqlFormat = "select * from dfs_get_file_length('%s', '%s')";
+	else
+		sqlFormat = "select * from dfs_get_file_length('%s.%d', '%s')";
+
+	if (enable_secure_filesystem)
+	{
+		add_filesystem_credential(aoentry->tspPathPrefix);
+		token = find_filesystem_credential_with_uri(aoentry->tspPathPrefix);
+	}
+
+	snprintf(pathPattern, MAXPGPATH,
+				"%s%s/%u/%u/%u", aoentry->tspPathPrefix, "%d", node->spcNode, node->dbNode,
+				node->relNode);
+
+	sqlSize = strlen(sqlFormat) + strlen(pathPattern) + strlen(token) + 64;
+	char * sql = palloc(sqlSize);
+
+	if (segno == 0)
+		snprintf(sql, sqlSize, sqlFormat, pathPattern, token);
+	else
+		snprintf(sql, sqlSize, sqlFormat, pathPattern, segno, token);
+
+	initStringInfo(&errbuf);
+
+	results = cdbdisp_dispatchRMCommand(sql, false, &errbuf, &numresults);
+
+	if (errbuf.len > 0)
+		ereport(ERROR,
+				( errmsg("failed to check segment file for segno %d", segno),
+						errdetail("%s", errbuf.data)));
+
+	pfree(errbuf.data);
+
+	for (i = 0; i < numresults; i++)
+	{
+		if (PQresultStatus(results[i]) != PGRES_TUPLES_OK)
+		{
+			elog(ERROR, "CheckSegnoForWrite: resultStatus not tuples_Ok");
+		}
+		else
+		{
+			int64 eof = strtoll(PQgetvalue(results[i], 0, 0), NULL, 0);
+			int32 content = strtol(PQgetvalue(results[i], 0, 1), NULL, 0);
+
+			if ( 0 == PQntuples(results[i]))
+				elog(ERROR, "CheckSegnoForWrite: segment did not return tuple");
+			else if (PQntuples(results[i]) > 1)
+				elog(ERROR, "CheckSegnoForWrite: segment return more than one tuple");
+
+			if (2 != PQnfields(results[i]))
+				elog(ERROR, "CheckSegnoForWrite segment return invalid tuple");
+
+			for (j = 0; j < totalsegs; ++j)
+			{
+				if(mapping[j].contentid == content && mapping[j].eof == eof)
+				{
+					mapping[j].ok = true;
+					break;
+				}
+			}
+		}
+	}
+
+	for (i = 0; i < numresults; i++)
+		PQclear(results[i]);
+
+	free(results);
+
+	for (i = 0; i < totalsegs; ++i)
+	{
+		if (mapping[i].ok == false && mapping[i].contentid != MASTER_CONTENT_ID)
+			return false;
+	}
+
+	pfree(mapping);
+
+	return true;
+}
+
+struct TspSupportTruncate
+{
+	Oid		*tsps;
+	bool	*values;
+	int		size;
+	int		capacity;
+};
+
+static struct TspSupportTruncate TspSupportTruncateMap = {NULL, NULL, 0, 0};
+
+static bool
+TestCurrentTspSupportTruncateInternal(Oid tsp, const char *tspPathPrefix)
+{
+	int 			rc, i;
+	MemoryContext 	old;
+	char			path[MAXPGPATH + 1];
+
+	for (i = 0; i < TspSupportTruncateMap.size; ++i)
+	{
+		if (TspSupportTruncateMap.tsps[i] == tsp)
+			return TspSupportTruncateMap.values[i];
+	}
+
+	if (TspSupportTruncateMap.size >= TspSupportTruncateMap.capacity)
+	{
+		old = MemoryContextSwitchTo(TopMemoryContext);
+
+		if (TspSupportTruncateMap.capacity == 0)
+		{
+			TspSupportTruncateMap.tsps = palloc(sizeof(Oid));
+			TspSupportTruncateMap.values = palloc(sizeof(Oid));
+			TspSupportTruncateMap.size = 0;
+			TspSupportTruncateMap.capacity = 1;
+		}
+		else
+		{
+			TspSupportTruncateMap.tsps = repalloc(TspSupportTruncateMap.tsps,
+					sizeof(Oid) * TspSupportTruncateMap.capacity * 2);
+			TspSupportTruncateMap.values = repalloc(
+					TspSupportTruncateMap.values,
+					sizeof(Oid) * TspSupportTruncateMap.capacity * 2);
+			TspSupportTruncateMap.capacity *= 2;
+		}
+
+		MemoryContextSwitchTo(old);
+	}
+
+	snprintf(path, sizeof(path), "%s0/__NOTEXIST__", tspPathPrefix);
+
+	errno = 0;
+	rc = PathFileTruncate(path);
+	Insist(rc < 0 && "Truncate a non exist file shuld always fail");
+
+	TspSupportTruncateMap.tsps[TspSupportTruncateMap.size] = tsp;
+	TspSupportTruncateMap.values[TspSupportTruncateMap.size] = !(errno == ENOTSUP);
+	TspSupportTruncateMap.size += 1;
+
+	return !(errno == ENOTSUP);
+}
+
+bool
+TestCurrentTspSupportTruncate(Oid tsp)
+{
+	char 	*prefix = NULL;
+	bool	retval;
+	GetFilespacePathPrefix(tsp, &prefix);
+	retval = TestCurrentTspSupportTruncateInternal(tsp, prefix);
+	pfree(prefix);
+	return retval;
+}
+
+Datum
+tablespace_support_truncate(PG_FUNCTION_ARGS)
+{
+	Oid tsp = PG_GETARG_OID(0);
+
+	if (Gp_role == GP_ROLE_EXECUTE)
+		elog(ERROR, "tablespace_support_truncate cannot be called on segment");
+
+	if (tsp == DEFAULTTABLESPACE_OID || tsp == GLOBALTABLESPACE_OID)
+		elog(ERROR, "tablespace %u does not on distributed file system", tsp);
+
+	PG_RETURN_BOOL(TestCurrentTspSupportTruncate(tsp));
+}
+
+
+static bool
+ChooseSegnoForWriteOnMaster(int *result, AORelHashEntryData	*aoentry, Oid relid)
+{
+	int					i, usesegno = -1;
+	bool				segno_chosen = false;
+	bool				currentTspSupportTruncate = false;
+	TransactionId 		CurrentXid = GetTopTransactionId();
+	Relation rel = 		heap_open(relid, RowExclusiveLock);
+
+again:
+	/*
+	 * Now pick a segment that is not in use and is not over the
+	 * allowed size threshold (90% full).
+	 *
+	 * However, if we already picked a segno for a previous statement
+	 * in this very same transaction we are still in (explicit txn) we
+	 * pick the same one to insert into it again.
+	 */
+	for (i = 0 ; i < MAX_AOREL_CONCURRENCY ; i++)
+	{
+		AOSegfileStatus *segfilestat = &aoentry->relsegfiles[i];
+
+		if(!segfilestat->isfull)
+		{
+			if(!segfilestat->inuse && !segno_chosen &&
+			   !usedByConcurrentTransaction(segfilestat, i))
+			{
+				/*
+				 * this segno is avaiable and not full. use it.
+				 *
+				 * Notice that we don't break out of the loop quite yet.
+				 * We still need to check the rest of the segnos, if our
+				 * txn is already using one of them. see below.
+				 */
+				usesegno = i;
+				segno_chosen = true;
+			}
+
+			if(segfilestat->xid == CurrentXid)
+			{
+				/* we already used this segno in our txn. use it again */
+				Assert(segfilestat->inuse);
+				usesegno = i;
+				segno_chosen = true;
+				aoentry->txns_using_rel--; /* same txn. re-adjust */
+
+				if (Debug_appendonly_print_segfile_choice)
+				{
+					ereport(LOG, (errmsg("SetSegnoForWrite: reusing segno %d for append-"
+							 "only relation "
+							 "%d. there are " INT64_FORMAT " tuples "
+							 "added to it from previous operations "
+							 "in this not yet committed txn. decrementing"
+							 "txns_using_rel back to %d",
+							 usesegno, relid,
+							 (int64) segfilestat->tupsadded,
+							 aoentry->txns_using_rel)));
+				}
+
+				break;
+			}
+		}
+	}
+
+	if (filesystem_support_truncate && segno_chosen && aoentry->relsegfiles[usesegno].needCheck)
+		currentTspSupportTruncate = TestCurrentTspSupportTruncateInternal(rel->rd_node.spcNode, aoentry->tspPathPrefix);
+
+	if (!currentTspSupportTruncate
+			&& segno_chosen && aoentry->relsegfiles[usesegno].needCheck)
+	{
+		if (!CheckSegnoForWrite(rel, aoentry, usesegno))
+		{
+			//elog(INFO, "segfile %d is invalid and became read only for relation %s.", usesegno, RelationGetRelationName(rel));
+			segno_chosen = false;
+			aoentry->relsegfiles[usesegno].inuse = true;
+			aoentry->relsegfiles[usesegno].xid = InvalidTransactionId;
+			aoentry->relsegfiles[usesegno].needCheck = false;
+			usesegno = -1;
+			goto again;
+		}
+
+		aoentry->relsegfiles[usesegno].needCheck = false;
+	}
+
+	if (segno_chosen)
+	{
+		Assert(usesegno >= 0);
+		Assert(usesegno != RESERVED_SEGNO);
+
+		/* mark this segno as in use */
+		aoentry->relsegfiles[usesegno].inuse = true;
+		aoentry->relsegfiles[usesegno].xid = CurrentXid;
+	}
+
+	heap_close(rel, RowExclusiveLock);
+
+	*result = usesegno;
+	return segno_chosen;
+}
+
+static int
+SetSegnoForWriteOnMaster(int existingsegno, Oid relid)
+{
+	int					usesegno = -1;
+	bool				segno_chosen = false;
+	AORelHashEntryData	*aoentry = NULL;
+
+	Assert(existingsegno == InvalidFileSegNumber);
+
+	if (Debug_appendonly_print_segfile_choice)
+	{
+		ereport(LOG, (errmsg("SetSegnoForWrite: Choosing a segno for append-only "
+							 "relation \"%s\" (%d) ",
+							 get_rel_name(relid), relid)));
+	}
+
+	LWLockAcquire(AOSegFileLock, LW_EXCLUSIVE);
+
+	/*
+	 * The most common case is likely the entry exists already.
+	 */
+	aoentry = AORelLookupHashEntry(relid);
+	if (aoentry == NULL)
+	{
+		/*
+		 * We need to create a hash entry for this relation.
+		 *
+		 * However, we need to access the pg_appendonly system catalog
+		 * table, so AORelCreateHashEntry will carefully release the AOSegFileLock,
+		 * gather the information, and then re-acquire AOSegFileLock.
+		 */
+		if(!AORelCreateHashEntry(relid))
+		{
+			LWLockRelease(AOSegFileLock);
+			ereport(ERROR, (errmsg("can't have more than %d different append-only "
+					    "tables open for writing data at the same time. "
+					    "if tables are heavily partitioned or if your "
+					    "workload requires, increase the value of "
+					    "max_appendonly_tables and retry",
+					    MaxAppendOnlyTables)));
+		}
+
+		/* get the hash entry for this relation (must exist) */
+		aoentry = AORelGetHashEntry(relid);
+	}
+	aoentry->txns_using_rel++;
+
+	if (Debug_appendonly_print_segfile_choice)
+	{
+		ereport(LOG, (errmsg("SetSegnoForWrite: got the hash entry for relation \"%s\" (%d). "
+							 "setting txns_using_rel to %d",
+							 get_rel_name(relid), relid,
+							 aoentry->txns_using_rel)));
+	}
+
+	segno_chosen = ChooseSegnoForWriteOnMaster(&usesegno, aoentry, relid);
+
+	if(!segno_chosen)
+	{
+		LWLockRelease(AOSegFileLock);
+		ereport(ERROR, (errmsg("could not find segment file to use for "
+							   "inserting into relation %s (%d).",
+							   get_rel_name(relid), relid)));
+	}
+
+	LWLockRelease(AOSegFileLock);
+
+	if (Debug_appendonly_print_segfile_choice)
+	{
+		ereport(LOG, (errmsg("Segno chosen for append-only relation \"%s\" (%d)"
+							 "is %d", get_rel_name(relid), relid, usesegno)));
+	}
+
+	return usesegno;
+}
+
 /*
  * SetSegnoForWrite
  *
@@ -631,13 +1155,6 @@ usedByConcurrentTransaction(AOSegfileStatus *segfilestat, int segno)
  */
 int SetSegnoForWrite(int existingsegno, Oid relid)
 {
-	/* these vars are used in GP_ROLE_DISPATCH only */
-	int					i, usesegno = -1;
-	bool				segno_chosen = false;
-	AORelHashEntryData	*aoentry = NULL;
-	TransactionId 		CurrentXid = GetTopTransactionId();
-
-
 	switch(Gp_role)
 	{
 		case GP_ROLE_EXECUTE:
@@ -652,135 +1169,7 @@ int SetSegnoForWrite(int existingsegno, Oid relid)
 			return RESERVED_SEGNO;
 
 		case GP_ROLE_DISPATCH:
-
-			Assert(existingsegno == InvalidFileSegNumber);
-
-			if (Debug_appendonly_print_segfile_choice)
-			{
-				ereport(LOG, (errmsg("SetSegnoForWrite: Choosing a segno for append-only "
-									 "relation \"%s\" (%d) ", 
-									 get_rel_name(relid), relid)));
-			}
-
-			LWLockAcquire(AOSegFileLock, LW_EXCLUSIVE);
-
-			/*
-			 * The most common case is likely the entry exists already.
-			 */
-			aoentry = AORelLookupHashEntry(relid);
-			if (aoentry == NULL)
-			{
-				/* 
-				 * We need to create a hash entry for this relation.
-				 *
-				 * However, we need to access the pg_appendonly system catalog
-				 * table, so AORelCreateHashEntry will carefully release the AOSegFileLock, 
-				 * gather the information, and then re-acquire AOSegFileLock.
-				 */
-				if(!AORelCreateHashEntry(relid))
-				{
-					LWLockRelease(AOSegFileLock);
-					ereport(ERROR, (errmsg("can't have more than %d different append-only "
-							    "tables open for writing data at the same time. "
-							    "if tables are heavily partitioned or if your "
-							    "workload requires, increase the value of "
-							    "max_appendonly_tables and retry",
-							    MaxAppendOnlyTables)));
-				}
-
-				/* get the hash entry for this relation (must exist) */
-				aoentry = AORelGetHashEntry(relid);
-			}
-			aoentry->txns_using_rel++;
-
-			if (Debug_appendonly_print_segfile_choice)
-			{
-				ereport(LOG, (errmsg("SetSegnoForWrite: got the hash entry for relation \"%s\" (%d). "
-									 "setting txns_using_rel to %d",
-									 get_rel_name(relid), relid, 
-									 aoentry->txns_using_rel)));
-			}
-
-			/*
-			 * Now pick a segment that is not in use and is not over the
-			 * allowed size threshold (90% full).
-			 *
-			 * However, if we already picked a segno for a previous statement
-			 * in this very same transaction we are still in (explicit txn) we
-			 * pick the same one to insert into it again.
-			 */
-			for (i = 0 ; i < MAX_AOREL_CONCURRENCY ; i++)
-			{
-				AOSegfileStatus *segfilestat = &aoentry->relsegfiles[i];
-
-				if(!segfilestat->isfull)
-				{
-					if(!segfilestat->inuse && !segno_chosen &&
-					   !usedByConcurrentTransaction(segfilestat, i))
-					{
-						/*
-						 * this segno is avaiable and not full. use it.
-						 *
-						 * Notice that we don't break out of the loop quite yet.
-						 * We still need to check the rest of the segnos, if our
-						 * txn is already using one of them. see below.
-						 */
-						usesegno = i;
-						segno_chosen = true;
-					}
-
-					if(segfilestat->xid == CurrentXid)
-					{
-						/* we already used this segno in our txn. use it again */
-						Assert(segfilestat->inuse);
-						usesegno = i;
-						segno_chosen = true;
-						aoentry->txns_using_rel--; /* same txn. re-adjust */
-						
-						if (Debug_appendonly_print_segfile_choice)
-						{
-							ereport(LOG, (errmsg("SetSegnoForWrite: reusing segno %d for append-"
-									 "only relation "
-									 "%d. there are " INT64_FORMAT " tuples "
-									 "added to it from previous operations "
-									 "in this not yet committed txn. decrementing"
-									 "txns_using_rel back to %d",
-									 usesegno, relid,
-									 (int64) segfilestat->tupsadded,
-									 aoentry->txns_using_rel)));
-						}
-
-						break;
-					}
-				}
-			}
-
-			if(!segno_chosen)
-			{
-				LWLockRelease(AOSegFileLock);
-				ereport(ERROR, (errmsg("could not find segment file to use for "
-									   "inserting into relation %s (%d).", 
-									   get_rel_name(relid), relid)));
-			}
-				
-			Insist(usesegno != RESERVED_SEGNO);
-
-			/* mark this segno as in use */
-			aoentry->relsegfiles[usesegno].inuse = true;
-			aoentry->relsegfiles[usesegno].xid = CurrentXid;
-
-			LWLockRelease(AOSegFileLock);
-
-			Assert(usesegno >= 0);
-			Assert(usesegno != RESERVED_SEGNO);
-
-			if (Debug_appendonly_print_segfile_choice)
-			{
-				ereport(LOG, (errmsg("Segno chosen for append-only relation \"%s\" (%d)"
-									 "is %d", get_rel_name(relid), relid, usesegno)));
-			}
-
-			return usesegno;
+			return SetSegnoForWriteOnMaster(existingsegno, relid);
 
 		/* fix this for dispatch agent. for now it's broken anyway. */
 		default:
@@ -1066,13 +1455,13 @@ AtCommit_AppendOnly(void)
  * AtEOXact_AppendOnly as well.
  */
 void
-AtAbort_AppendOnly(void)
+AtAbort_AppendOnly(bool isSubTransaction)
 {
 	HASH_SEQ_STATUS status;
 	AORelHashEntry	aoentry = NULL;
-	TransactionId 	CurrentXid = GetCurrentTransactionIdIfAny();
+	TransactionId 	CurrentXid = GetTopTransactionId();
 
-	if (Gp_role != GP_ROLE_DISPATCH)
+	if (Gp_role != GP_ROLE_DISPATCH || CurrentXid == InvalidTransactionId)
 		return;
 
 	hash_seq_init(&status, AppendOnlyHash);
@@ -1118,7 +1507,9 @@ AtAbort_AppendOnly(void)
 					}
 
 					/* now do the in memory cleanup. tupcount not touched */
-					segfilestat->tupsadded = 0;
+					if (!isSubTransaction)
+						segfilestat->tupsadded = 0;
+					segfilestat->needCheck = true;
 				}
 			}
 		}
@@ -1144,7 +1535,7 @@ AtEOXact_AppendOnly(void)
 {
 	HASH_SEQ_STATUS status;
 	AORelHashEntry	aoentry = NULL;
-	TransactionId 	CurrentXid = GetCurrentTransactionIdIfAny();
+	TransactionId 	CurrentXid = GetTopTransactionId();
 	bool			entry_updated = false;
 
 	if (Gp_role != GP_ROLE_DISPATCH)

@@ -235,6 +235,35 @@ AOCSFileSegInfo **GetAllAOCSFileSegInfo(Relation prel,
 											pg_aocsseg_rel,
 											appendOnlyMetaDataSnapshot,
 											returnAllSegfiles,
+											-1,
+											totalseg);
+
+    heap_close(pg_aocsseg_rel, AccessShareLock);
+
+	return results;
+}
+
+AOCSFileSegInfo **GetAOCSFileSegInfoWithSegno(Relation prel,
+										AppendOnlyEntry *aoEntry,
+										Snapshot appendOnlyMetaDataSnapshot,
+										int segno,
+										int32 *totalseg)
+{
+    Relation 			pg_aocsseg_rel;
+
+	AOCSFileSegInfo		**results;
+	TupleDesc	tupdesc = RelationGetDescr(prel);
+
+	pg_aocsseg_rel = relation_open(aoEntry->segrelid, AccessShareLock);
+
+	results = GetAllAOCSFileSegInfo_pg_aocsseg_rel(
+											tupdesc->natts,
+											RelationGetRelationName(prel),
+											aoEntry,
+											pg_aocsseg_rel,
+											appendOnlyMetaDataSnapshot,
+											true,
+											segno,
 											totalseg);
 
     heap_close(pg_aocsseg_rel, AccessShareLock);
@@ -282,6 +311,7 @@ AOCSFileSegInfo **GetAllAOCSFileSegInfo_pg_aocsseg_rel(
 									    Relation pg_aocsseg_rel,
 										Snapshot snapshot,
 										bool returnAllSegmentsFiles,
+										int32 segno,
 										int32 *totalseg)
 {
 
@@ -289,10 +319,10 @@ AOCSFileSegInfo **GetAllAOCSFileSegInfo_pg_aocsseg_rel(
 
     SysScanDesc scan;
     HeapTuple tup;
-    ScanKeyData key[1];
+    ScanKeyData key[2];
     AOCSFileSegInfo **allseg;
     AOCSFileSegInfo *seginfo;
-    int cur_seg;
+    int cur_seg, numOfKey = 0;
     Datum *d;
     bool *null;
 	int seginfo_slot_no = AO_FILESEGINFO_ARRAY_SIZE;
@@ -309,18 +339,23 @@ AOCSFileSegInfo **GetAllAOCSFileSegInfo_pg_aocsseg_rel(
 
     cur_seg = 0;
 
-    ScanKeyInit(&key[0], (AttrNumber)Anum_pg_aocs_content,
-    		BTEqualStrategyNumber, F_INT4EQ, Int32GetDatum(GpIdentity.segindex));
+	if (!returnAllSegmentsFiles)
+	{
+		ScanKeyInit(&key[0], (AttrNumber) Anum_pg_aocs_content,
+				BTEqualStrategyNumber, F_INT4EQ, Int32GetDatum(GpIdentity.segindex));
+		numOfKey ++;
+	}
 
-    if (returnAllSegmentsFiles)
-    {
-        scan = systable_beginscan(pg_aocsseg_rel, InvalidOid, FALSE, snapshot, 0, NULL);
-    }
-    else
-    {
-        scan = systable_beginscan(pg_aocsseg_rel, InvalidOid, FALSE, snapshot, 1, &key[0]);
-    }
-	while (HeapTupleIsValid(tup = systable_getnext(scan)))
+	if (segno >= 0)
+	{
+		ScanKeyInit(&key[numOfKey], (AttrNumber) Anum_pg_aocs_segno,
+				BTEqualStrategyNumber, F_INT4EQ, Int32GetDatum(segno));
+		numOfKey ++;
+	}
+
+    scan = systable_beginscan(pg_aocsseg_rel, InvalidOid, FALSE, snapshot, numOfKey, &key[0]);
+
+    while (HeapTupleIsValid(tup = systable_getnext(scan)))
     {
 		/* dynamically expand space for AOCSFileSegInfo* array */
 		if (cur_seg >= seginfo_slot_no)
@@ -823,6 +858,7 @@ gp_aocsseg(PG_FUNCTION_ARGS)
 														pg_aocsseg_rel,
 														SnapshotNow,
 														true,
+														-1,
 														&context->totalAocsSegFiles);
 
 		heap_close(pg_aocsseg_rel, NoLock);
@@ -1025,6 +1061,7 @@ gp_aocsseg_history(PG_FUNCTION_ARGS)
 														pg_aocsseg_rel,
 														SnapshotAny,	// Get ALL tuples from pg_aocsseg_% including aborted and in-progress ones. 
 														true,
+														-1,
 														&context->totalAocsSegFiles);
 
 		heap_close(pg_aocsseg_rel, NoLock);

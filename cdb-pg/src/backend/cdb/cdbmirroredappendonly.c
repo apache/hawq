@@ -143,6 +143,67 @@ static void MirroredAppendOnly_DoOpen(
 
 }
 
+
+void AppendOnly_Overwrite(RelFileNode *relFileNode, int32 segmentFileNum,
+		int32 contentid, int *primaryError)
+{
+	int		fileFlags, file;
+	int		fileMode = 0600;
+	char *primaryFilespaceLocation = NULL;
+	char *mirrorFilespaceLocation = NULL;
+
+	Assert(open != NULL);
+
+	*primaryError = 0;
+
+	PersistentTablespace_GetPrimaryAndMirrorFilespaces(
+										contentid,
+										relFileNode->spcNode,
+										TRUE,
+										&primaryFilespaceLocation,
+										&mirrorFilespaceLocation);
+
+	char *dbPath;
+	char *path;
+
+	dbPath = (char*)palloc(MAXPGPATH + 1);
+	path = (char*)palloc(MAXPGPATH + 1);
+
+	/*
+	 * Do the primary work first so we don't leave files on the mirror or have an
+	 * open to clean up.
+	 */
+	FormDatabasePath(
+				dbPath,
+				primaryFilespaceLocation,
+				relFileNode->spcNode,
+				relFileNode->dbNode);
+
+	if (segmentFileNum == 0)
+		sprintf(path, "%s/%u", dbPath, relFileNode->relNode);
+	else
+		sprintf(path, "%s/%u.%u", dbPath, relFileNode->relNode, segmentFileNum);
+
+	errno = 0;
+
+	fileFlags = O_WRONLY | O_SYNC;
+
+	file = PathNameOpenFile(path, fileFlags, fileMode);
+
+	if (file < 0)
+		*primaryError = errno;
+
+	pfree(dbPath);
+	pfree(path);
+
+	if (primaryFilespaceLocation != NULL)
+		pfree(primaryFilespaceLocation);
+	if (mirrorFilespaceLocation != NULL)
+		pfree(mirrorFilespaceLocation);
+
+	FileClose(file);
+}
+
 /*
  * Call MirroredAppendOnly_Create with the MirroredLock already held.
  */

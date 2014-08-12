@@ -88,10 +88,14 @@ extern ParquetFileSegInfo **GetAllParquetFileSegInfo(Relation parentrel,
 		AppendOnlyEntry *aoEntry, Snapshot parquetMetaDataSnapshot,
 		int *totalsegs);
 
+extern ParquetFileSegInfo **GetParquetFileSegInfoWithSegno(Relation parentrel,
+		AppendOnlyEntry *aoEntry, Snapshot parquetMetaDataSnapshot,
+		int segno, int *totalsegs);
+
 extern ParquetFileSegInfo **GetAllParquetFileSegInfo_pg_paqseg_rel(
 		char *relationName, AppendOnlyEntry *aoEntry,
 		Relation pg_parquetseg_rel, Snapshot parquetMetaDataSnapshot,
-		bool returnAllSegmentsFiles, int *totalsegs);
+		bool returnAllSegmentsFiles, int segno, int *totalsegs);
 
 extern void
 UpdateParquetFileSegInfo(Relation parentrel, AppendOnlyEntry *aoEntry,
