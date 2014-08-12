@@ -9,6 +9,7 @@ export GPHD_CONF=$GPHD_ROOT/conf
 settings_file=$GPHD_CONF/gphd-conf.sh
 if [ ! -f $settings_file ]; then
 	echo cannot find settings file at $settings_file
+	exit 1
 fi
 . $settings_file
 

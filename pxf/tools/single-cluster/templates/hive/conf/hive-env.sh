@@ -1,5 +1,7 @@
 # load singlecluster environment
-if [ -f $bin/../../bin/gphd-env.sh ]; then
+if [ -f $bin/../bin/gphd-env.sh ]; then
+	. $bin/../bin/gphd-env.sh
+elif [ -f $bin/../../bin/gphd-env.sh ]; then
 	. $bin/../../bin/gphd-env.sh
 fi
 
