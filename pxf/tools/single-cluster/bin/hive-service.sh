@@ -78,7 +78,11 @@ start()
 
 	hive_rotate_log $log
 	echo starting $service, logging to $log
-	nohup nice -n $HIVE_NICENESS $HIVE_BIN/hive --config $HIVE_ROOT/conf --service $service $HIVE_OPTS > $log 2>&1 < /dev/null &
+	ACTUAL_HIVE_OPTS=$HIVE_OPTS
+        if [ $service =  "hiveserver" ]; then
+                ACTUAL_HIVE_OPTS=$HIVE_SERVER_OPTS
+        fi
+        nohup nice -n $HIVE_NICENESS $HIVE_BIN/hive --config $HIVE_ROOT/conf --service $service $ACTUAL_HIVE_OPTS > $log 2>&1 < /dev/null &
 	echo $! > $pid
 }
 
