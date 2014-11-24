@@ -329,6 +329,7 @@ typedef struct ParallelizeCorrelatedPlanWalkerContext
 	Movement movement; /* What is the final movement necessary? Is it gather or broadcast */
 	List *rtable; /* rtable from the global context */
 	bool subPlanDistributed; /* is original subplan distributed */
+	bool subPlanHasMotion;/* is original subplan has motion already  */
 } ParallelizeCorrelatedPlanWalkerContext;
 
 /**
@@ -462,6 +463,20 @@ static Node* ParallelizeCorrelatedSubPlanMutator(Node *node, ParallelizeCorrelat
 		|| IsA(node, ShareInputScan))
 	{
 		Plan *scanPlan = (Plan *) node;
+		/**
+		 * If original subplan has no motion, we double check whether the scan
+		 * node is on catalog table or not. If catalog, no need to apply
+		 * parallelization.
+		 * This is for case like:
+		 * SELECT array(select case when p.oid in (select
+		 * unnest(array[typoutput, typsend]) from pg_type) then 'upg_catalog.'
+		 * else 'pg_catalog.' end) FROM pg_proc p;
+		 **/
+		if(!ctx->subPlanHasMotion)
+		{
+			if(!scanPlan->flow || scanPlan->flow->flotype == FLOW_REPLICATED)
+				return (Node *)node;
+		}
 
 		/**
 		 * Steps:
@@ -595,6 +610,19 @@ static Node* ParallelizeCorrelatedSubPlanMutator(Node *node, ParallelizeCorrelat
 		{
 			return node;
 		}
+
+		/**
+		 * Pull up the parallelization of subplan to here, because we want to
+		 * set the is_parallelized flag. We don't want to apply double
+		 * parallelization for nested subplan.
+		 * This is for case like:
+		 * select A.i, A.j, (select sum(C.j) from C where C.j = A.j and C.i =
+		 * (select A.i from A where A.i = C.i)) from A;
+		 **/
+		SubPlan* new_sp = (SubPlan *)plan_tree_mutator(node, ParallelizeCorrelatedSubPlanMutator, ctx);
+		Assert(new_sp);
+		new_sp->is_parallelized = true;
+		return (Node *)new_sp;
 	}
 
 	/**
@@ -603,6 +631,7 @@ static Node* ParallelizeCorrelatedSubPlanMutator(Node *node, ParallelizeCorrelat
 	 */
 	if (IsA(node, Motion))
 	{
+		ctx->subPlanHasMotion = true;
 		Plan *plan = (Plan *) node;
 		node = (Node *) plan->lefttree;
 		Assert(node);
@@ -621,6 +650,7 @@ Plan* ParallelizeCorrelatedSubPlan(PlannerInfo *root, SubPlan *spExpr, Plan *pla
 	ctx.base.node = (Node *) root;
 	ctx.movement = m;
 	ctx.subPlanDistributed = subPlanDistributed;
+	ctx.subPlanHasMotion = false;
 	ctx.sp = spExpr;
 	ctx.rtable = root->glob->finalrtable;
 	return (Plan *) ParallelizeCorrelatedSubPlanMutator((Node *) plan, &ctx);
@@ -655,6 +685,7 @@ void ParallelizeSubplan(SubPlan *spExpr, PlanProfile *context)
 
 	bool containingPlanDistributed = (context->currentPlanFlow && context->currentPlanFlow->flotype == FLOW_PARTITIONED);
 	bool subPlanDistributed = (origPlan->flow && origPlan->flow->flotype == FLOW_PARTITIONED);
+	bool hasParParam = (list_length(spExpr->parParam) > 0);
 
 	/**
 	 * If containing plan is distributed then we must know the flow of the subplan.
@@ -693,7 +724,11 @@ void ParallelizeSubplan(SubPlan *spExpr, PlanProfile *context)
 
 		newPlan = materialize_subplan(context->root, newPlan);
 	}
-	else if (containingPlanDistributed || subPlanDistributed)
+	/* *
+	 * [JIRA: MPP-24563] Adding hasParParam check here, for the kind of cases in
+	 * JIRA, which has both focused parent plan and subplan.
+	 * */
+	else if(containingPlanDistributed || subPlanDistributed || hasParParam)
 	{
 		Movement reqMove = containingPlanDistributed ? MOVEMENT_BROADCAST : MOVEMENT_FOCUS;
 
