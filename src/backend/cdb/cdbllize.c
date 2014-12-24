@@ -350,6 +350,7 @@ static void ParallelizeSubplan(SubPlan *spExpr, PlanProfile *context);
 static Plan* ParallelizeCorrelatedSubPlan(PlannerInfo *root, SubPlan *spExpr, Plan *plan, Movement m, bool subPlanDistributed);
 static Node* MapVarsMutator(Node *expr, MapVarsMutatorContext *ctx);
 static Node* ParallelizeCorrelatedSubPlanMutator(Node *node, ParallelizeCorrelatedPlanWalkerContext *ctx);
+static Node *ParallelizeCorrelatedSubPlanUpdateFlowMutator(Node *node);
 
 /**
  * Does an expression contain a parameter?
@@ -415,6 +416,34 @@ Plan *materialize_subplan(PlannerInfo *root, Plan *subplan)
 	return mat;
 }
 
+static Node *ParallelizeCorrelatedSubPlanUpdateFlowMutator(Node *node)
+{
+	Assert(is_plan_node(node));
+	switch (nodeTag(node))
+	{
+		case T_Agg:
+		case T_Result:
+		{
+			if(((Plan *)node)->lefttree && ((Plan *)node)->lefttree->flow)
+				((Plan *)node)->flow = pull_up_Flow((Plan *)node, ((Plan *)node)->lefttree, true);
+			break;
+		}
+		case T_Append:
+		{
+			List *append_list = (List *) ((Append *)node)->appendplans;
+			if(append_list == NULL)
+				break;
+			Plan *first_append = (Plan *) (lfirst(list_head(append_list)));
+			Assert(first_append && first_append->flow);
+			bool with_sort = list_length(append_list) == 1 ? true : false;
+			((Plan *)node)->flow = pull_up_Flow((Plan *)node, first_append, with_sort);
+			break;
+		}
+		default:
+			break;
+	}
+	return node;
+}
 
 /**
  * This is the workhorse method that transforms a plan containing correlated references
@@ -587,6 +616,9 @@ static Node* ParallelizeCorrelatedSubPlanMutator(Node *node, ParallelizeCorrelat
 		((Plan *) res)->allParam = saveAllParam;
 		((Plan *) res)->extParam = saveExtParam;
 
+		Assert(((Plan *) res)->lefttree && ((Plan *) res)->lefttree->flow);
+		((Plan *) res)->flow = pull_up_Flow((Plan *) res, ((Plan *)res)->lefttree, true);
+
 		/**
 		 * It is possible that there is an additional level of correlation in the result node.
 		 * we will need to recurse in these structures again.
@@ -638,7 +670,10 @@ static Node* ParallelizeCorrelatedSubPlanMutator(Node *node, ParallelizeCorrelat
 		return ParallelizeCorrelatedSubPlanMutator(node, ctx);
 	}
 
-	return plan_tree_mutator(node, ParallelizeCorrelatedSubPlanMutator, ctx);
+	Node * result = plan_tree_mutator(node, ParallelizeCorrelatedSubPlanMutator, ctx);
+	if(is_plan_node(node))
+		return ParallelizeCorrelatedSubPlanUpdateFlowMutator(result);
+	return result;
 }
 
 /**
