@@ -24,6 +24,7 @@
 #include "catalog/catalog.h"
 #include "catalog/catquery.h"
 #include "catalog/namespace.h"
+#include "catalog/pg_database.h"
 #include "catalog/pg_tablespace.h"
 #include "commands/dbcommands.h"
 #include "commands/tablespace.h"
@@ -177,6 +178,11 @@ calculate_database_size(Oid dbOid)
 	AclResult	 aclresult;
 
 	Assert(Gp_role != GP_ROLE_EXECUTE);
+
+	if (dbOid == HcatalogDbOid)
+		ereport(ERROR,
+			(ERRCODE_UNDEFINED_DATABASE,
+			errmsg("database hcatalog (OID 6120) is reserved")));
 
 	/* User must have connect privilege for target database */
 	aclresult = pg_database_aclcheck(dbOid, GetUserId(), ACL_CONNECT);

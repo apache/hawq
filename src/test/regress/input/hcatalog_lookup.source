@@ -134,7 +134,9 @@ select r1.*, r2.* from hcatalog.test_schema.r r1, test_schema.r r2;
 -- negative test: partitioned tables and hcatalog
 alter table test_schema.p exchange partition p1 with table hcatalog.test_schema.r;
 
-
+-- negative test: cannot run pg_database_size on hcatalog
+select pg_catalog.pg_database_size('hcatalog');
+select pg_catalog.pg_database_size(6120);
 
 -- cleanup
 DROP schema test_schema cascade;
