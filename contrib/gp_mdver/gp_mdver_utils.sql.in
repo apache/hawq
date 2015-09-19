@@ -1,0 +1,41 @@
+CREATE SCHEMA mdver_utils;
+SET search_path = mdver_utils;
+
+BEGIN;
+
+-- Register the functions and views.
+ 
+--------------------------------------------------------------------------------
+-- @function: 
+--        mdver_utils.__gp_mdver_cache_entries_f()
+--
+-- @in:
+--
+-- @out:
+--        oid - Oid of versioned object
+--        bigint - ddl version
+--        bigint - dml version 
+--------------------------------------------------------------------------------
+   
+CREATE FUNCTION mdver_utils.__gp_mdver_cache_entries_f()
+       RETURNS RECORD 
+       AS 'MODULE_PATHNAME', 'gp_mdver_cache_entries' LANGUAGE C;
+
+--------------------------------------------------------------------------------
+-- @view: 
+--        mdver_utils.gp_mdver_cache_entries
+--
+-- @doc:
+--        List of all the objects in the Global MDVSN cache and their version
+--        
+--------------------------------------------------------------------------------
+
+CREATE VIEW mdver_utils.gp_mdver_cache_entries AS
+SELECT C.*
+		FROM mdver_utils.__gp_mdver_cache_entries_f() AS C (
+		oid oid,
+		ddlversion bigint,
+		dmlversion bigint
+        );
+
+COMMIT;

@@ -1,0 +1,18 @@
+<configuration>
+
+	<property>
+		<name>dfs.default.uri</name>
+		<value>hdfs://localhost:9000</value>
+	</property>
+	
+	<property>
+		<name>rpc.socekt.linger.timeout</name>
+		<value>20</value>
+	</property>
+	
+	<property>
+		<name>rpc.max.idle</name>
+		<value>100</value>
+	</property>
+
+</configuration>

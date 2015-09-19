@@ -1,0 +1,12 @@
+gram.c
+gram.h
+scan.c
+scan.c-e
+basedef.json
+caql.files
+caql.md5
+caqlfilemap.json
+catquery.c
+catquery.c.perl
+gperf.init
+uniqdef.json

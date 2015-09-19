@@ -1,0 +1,113 @@
+-- --------------------------------------
+-- tidycat2
+-- --------------------------------------
+
+-- *********************************************************************
+-- *********************************************************************
+-- This script will produce diffs if you add or change function
+-- definitions in src/include/pg_proc.sql. If you want to change the results, 
+-- you must make the changes in regress/output/tidycat2.source, not
+-- regress/expected, and use gpsourcify.pl to generate a ".out" file.
+--
+-- From the regress directory invoke the command:
+--
+--    gpsourcify.pl results/tidycat2.out  > output/tidycat2.source
+--
+-- *********************************************************************
+-- *********************************************************************
+-- *********************************************************************
+-- *********************************************************************
+
+create schema tidycat;
+
+set search_path to tidycat, "$user", public;
+
+-- pg_proc testing
+
+--
+-- replace the anyarray, anyelement, and internal return types with
+-- FAKE types to avoid problems.
+-- Also fix the PGNSP reference.
+--
+CREATE EXTERNAL WEB TABLE get_pgproc (x text)
+execute E'(cat @abs_srcdir@/../../include/catalog/pg_proc.sql | perl -ple \' s/\\s*with\\s*\\(.*\\)\\s*//gmi\' | perl -ple \' s/RETURNS\\s+anyarray\\s+/RETURNS fake_anyarray /gmi \' | perl -ple \' s/RETURNS\\s+anyelement\\s+/RETURNS fake_anyelement /gmi \' | perl -ple \' s/RETURNS\\s+internal\\s+/RETURNS fake_internal /gmi \' | perl -ple \' s/relnamespace\\s+=\\s+PGNSP/relnamespace = 11 /gmi \' > @abs_srcdir@/data/tidyproc.sql ; sleep 20)' 
+ON MASTER
+FORMAT 'text' (delimiter '|');
+
+select * from get_pgproc order by 1;
+
+drop external table get_pgproc;
+
+-- start_ignore
+\i @abs_srcdir@/data/tidyproc.sql
+
+-- how many tidycat procs?
+select pc1.proname
+from 
+	 pg_proc pc1
+where 
+ pc1.pronamespace = 
+	(select oid from pg_namespace 
+	where nspname = 'tidycat')	  
+order by proname;
+
+-- end_ignore
+
+-- how many non-tidycat procs? (should be ZERO)
+
+select proname from pg_proc pp
+where
+pp.pronamespace =
+(select oid from pg_namespace where nspname = 'pg_catalog')
+and
+oid < 10000
+and
+pp.proname not in
+(select proname from pg_proc pp2
+where pp2.pronamespace =
+(select oid from pg_namespace where nspname = 'tidycat'))
+order by proname;
+
+select proname from pg_proc pp
+where
+pp.pronamespace =
+(select oid from pg_namespace where nspname = 'tidycat')
+and
+pp.proname not in
+(select proname from pg_proc pp2
+where pp2.pronamespace =
+(select oid from pg_namespace where nspname = 'pg_catalog'))
+order by proname;
+
+-- start_matchsubs
+--
+-- # remove tidycat prefix - use "checkthisproname" to avoid further
+-- # mangling of other tidycat usages
+--
+-- m/checkthisproname\s+\|\s+tidycat\./
+-- s/tidycat\.//
+--
+-- m/checkthisproname\s+\|.*\|\s+fake\_/
+-- s/fake\_//
+--
+-- end_matchsubs
+
+-- start_equiv
+
+select 'checkthisproname', oid::regprocedure, prorettype::regtype 
+from pg_proc pp
+where
+pp.pronamespace =
+(select oid from pg_namespace where nspname = 'pg_catalog')
+and oid < 10000;
+
+select 'checkthisproname', oid::regprocedure, prorettype::regtype 
+from pg_proc pp
+where
+pp.pronamespace =
+(select oid from pg_namespace where nspname = 'tidycat');
+
+-- end_equiv
+
+drop schema tidycat CASCADE;
+

@@ -1,0 +1,438 @@
+--
+-- PXF HIVE regression suite 
+--
+-- Prerequisites:
+--
+--   Must have a running hdfs with REST service on port 50070
+--   Must have a running YARN services (to load data into Hive).
+--   Must have HADOOP_ROOT, HBASE_ROOT, HIVE_ROOT and ZOOKEEPER_ROOT set.
+--   PATH=${PATH}:${HADOOP_ROOT}/bin/
+--
+-- TODO: test gpdbwritable write/read when it is enabled.
+-- TODO: test PB, AVRO, THRIFT when it is enabled (read only, with pre formatted files).
+-- TODO: test protocol validator for pxf once written.
+-- TODO: test parameter passing, filter passing
+-- start_matchsubs
+--                                                                                               
+-- # create a match/subs expression to handle ip addresses that change
+--
+-- m/(ERROR|WARNING):.*remote component error.*\(\d+\).*from.*'\d+\.\d+\.\d+\.\d+:\d+'.*/
+-- s/'\d+\.\d+\.\d+\.\d+:\d+'/'SOME_IP:SOME_PORT'/
+--
+-- end_matchsubs
+--------------------------------------------------------------------------------
+-- HIVE
+--------------------------------------------------------------------------------
+--
+-- 1. Testing Hive support for the primitive data types
+\! ${HIVE_ROOT}/bin/hive -e "create table hive_types (s1 string,s2 string,n1 int, d1 double, dc1 decimal, tm timestamp, f float, bg bigint, b boolean)row format delimited fields terminated by ','" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "load data local inpath '@abs_srcdir@/data/pxf/hive_types.txt' into table hive_types" 2>/dev/null
+CREATE EXTERNAL TABLE hawq_types(
+t1    text,
+t2    text,  
+num1  integer, 
+dub1  double precision,
+dec1  numeric,
+tm timestamp,
+r real,
+bg bigint,
+b boolean)
+LOCATION ('pxf://@hostname@:50070/hive_types?PROFILE=Hive')
+format 'custom' (formatter='pxfwritable_import');
+select * from hawq_types order by t1;
+          t1          |  t2  | num1 | dub1 |                  dec1                   |            tm            |  r   |    bg    | b 
+----------------------+------+------+------+-----------------------------------------+--------------------------+------+----------+---
+ row1                 | s_6  |    1 |    6 |                                 1.23456 | Sat Jul 13 21:00:05 2013 |  7.7 | 23456789 | f
+ row10                | s_15 |   10 |   15 |                       45678.00002340089 | Mon Jul 22 21:00:05 2013 |  7.7 | 23456789 | t
+ row11                | s_16 |   11 |   37 | 0.1234567890123456789012345678901234567 | Tue Jul 23 21:00:05 2013 |  7.7 | 23456789 | f
+ row12_text_null      |      |   11 |   37 | 0.1234567890123456789012345678901234567 | Tue Jul 23 21:00:05 2013 |  7.7 | 23456789 | f
+ row13_int_null       | s_16 |      |   37 | 0.1234567890123456789012345678901234567 | Tue Jul 23 21:00:05 2013 |  7.7 | 23456789 | f
+ row14_double_null    | s_16 |   11 |      | 0.1234567890123456789012345678901234567 | Tue Jul 23 21:00:05 2013 |  7.7 | 23456789 | f
+ row15_decimal_null   | s_17 |   12 |   38 |                                         | Wed Jul 24 21:00:05 2013 |  7.7 | 23456789 | f
+ row16_timestamp_null | s_16 |   11 |   37 | 0.1234567890123456789012345678901234567 |                          |  7.7 | 23456789 | f
+ row17_real_null      | s_16 |   11 |   37 | 0.1234567890123456789012345678901234567 | Tue Jul 23 21:00:05 2013 |      | 23456789 | f
+ row18_bigint_null    | s_16 |   11 |   37 | 0.1234567890123456789012345678901234567 | Tue Jul 23 21:00:05 2013 |  7.7 |          | f
+ row19_bool_null      | s_16 |   11 |   37 | 0.1234567890123456789012345678901234567 | Tue Jul 23 21:00:05 2013 |  7.7 | 23456789 | 
+ row2                 | s_7  |    2 |    7 |                                 1.23456 | Sat Jul 13 21:00:05 2013 |  8.7 | 23456789 | t
+ row3                 | s_8  |    3 |    8 |                                -1.23456 | Mon Jul 15 21:00:05 2013 |  9.7 | 23456789 | f
+ row4                 | s_9  |    4 |    9 |                     123456789.123456789 | Tue Jul 16 21:00:05 2013 | 10.7 | 23456789 | t
+ row5                 | s_10 |    5 |   10 |                          0.000000000001 | Wed Jul 17 21:00:05 2013 | 11.7 | 23456789 | f
+ row6                 | s_11 |    6 |   11 |                         1234.8889999111 | Thu Jul 18 21:00:05 2013 | 12.7 | 23456789 | t
+ row7                 | s_12 |    7 |   12 |                                  0.0001 | Fri Jul 19 21:00:05 2013 |  7.7 | 23456789 | f
+ row8                 | s_13 |    8 |   13 |                       45678.00002340089 | Sat Jul 20 21:00:05 2013 |  7.7 | 23456789 | t
+ row9                 | s_14 |    9 |   14 |                                 23457.1 | Sun Jul 21 21:00:05 2013 |  7.7 | 23456789 | f
+(19 rows)
+
+-- 2. Hive table stored as text
+\! ${HIVE_ROOT}/bin/hive -e "create table reg_txt (s1 string,s2 string,n1 int, d1 double)row format delimited fields terminated by ','" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "load data local inpath '@abs_srcdir@/data/pxf/hive_small_data.txt' into table reg_txt" 2>/dev/null
+CREATE EXTERNAL TABLE hv_txt(
+t1    text,
+t2    text,  
+num1  integer, 
+dub1  double precision)
+LOCATION ('pxf://@hostname@:50070/reg_txt?PROFILE=Hive')
+format 'custom' (formatter='pxfwritable_import');
+select * from hv_txt order by t1;
+  t1   |  t2  | num1 | dub1 
+-------+------+------+------
+ row1  | s_6  |    1 |    6
+ row10 | s_15 |   10 |   15
+ row2  | s_7  |    2 |    7
+ row3  | s_8  |    3 |    8
+ row4  | s_9  |    4 |    9
+ row5  | s_10 |    5 |   10
+ row6  | s_11 |    6 |   11
+ row7  | s_12 |    7 |   12
+ row8  | s_13 |    8 |   13
+ row9  | s_14 |    9 |   14
+(10 rows)
+
+-- 3. Hive table stored as sequence
+\! ${HIVE_ROOT}/bin/hive -e "create table reg_seq (t0 string, t1 string, num1 int, d1 double) row format delimited fields terminated by ',' STORED AS SEQUENCEFILE" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "insert into table reg_seq select * from reg_txt" 2>/dev/null
+CREATE EXTERNAL TABLE hv_seq(
+t1    text,
+t2    text,  
+num1  integer, 
+dub1  double precision)
+LOCATION ('pxf://@hostname@:50070/reg_seq?PROFILE=Hive')
+format 'custom' (formatter='pxfwritable_import');
+select * from hv_seq order by t1;
+  t1   |  t2  | num1 | dub1 
+-------+------+------+------
+ row1  | s_6  |    1 |    6
+ row10 | s_15 |   10 |   15
+ row2  | s_7  |    2 |    7
+ row3  | s_8  |    3 |    8
+ row4  | s_9  |    4 |    9
+ row5  | s_10 |    5 |   10
+ row6  | s_11 |    6 |   11
+ row7  | s_12 |    7 |   12
+ row8  | s_13 |    8 |   13
+ row9  | s_14 |    9 |   14
+(10 rows)
+
+-- 4. Hive table stored as rcfile
+\! ${HIVE_ROOT}/bin/hive -e "create table reg_rc (t0 string, t1 string, num1 int, d1 double) STORED AS RCFILE" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "insert into table reg_rc select * from reg_txt" 2>/dev/null
+CREATE EXTERNAL TABLE hv_rc(
+t1    text,
+t2    text,  
+num1  integer, 
+dub1  double precision)
+LOCATION ('pxf://@hostname@:50070/reg_rc?PROFILE=Hive')
+format 'custom' (formatter='pxfwritable_import');
+select * from hv_rc order by t1;
+  t1   |  t2  | num1 | dub1 
+-------+------+------+------
+ row1  | s_6  |    1 |    6
+ row10 | s_15 |   10 |   15
+ row2  | s_7  |    2 |    7
+ row3  | s_8  |    3 |    8
+ row4  | s_9  |    4 |    9
+ row5  | s_10 |    5 |   10
+ row6  | s_11 |    6 |   11
+ row7  | s_12 |    7 |   12
+ row8  | s_13 |    8 |   13
+ row9  | s_14 |    9 |   14
+(10 rows)
+
+-- 5. Hive table stored as orc
+\! ${HIVE_ROOT}/bin/hive -e "create table reg_orc (t0 string, t1 string, num1 int, d1 double) STORED AS ORC" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "insert into table reg_orc select * from reg_txt" 2>/dev/null
+CREATE EXTERNAL TABLE hv_orc(
+t1    text,
+t2    text,  
+num1  integer, 
+dub1  double precision)
+LOCATION ('pxf://@hostname@:50070/reg_orc?PROFILE=Hive')
+format 'custom' (formatter='pxfwritable_import');
+select * from hv_orc order by t1;
+  t1   |  t2  | num1 | dub1 
+-------+------+------+------
+ row1  | s_6  |    1 |    6
+ row10 | s_15 |   10 |   15
+ row2  | s_7  |    2 |    7
+ row3  | s_8  |    3 |    8
+ row4  | s_9  |    4 |    9
+ row5  | s_10 |    5 |   10
+ row6  | s_11 |    6 |   11
+ row7  | s_12 |    7 |   12
+ row8  | s_13 |    8 |   13
+ row9  | s_14 |    9 |   14
+(10 rows)
+
+-- 6. Hive table stored in several partitions where each partition is stored in a diferrent format
+\! ${HIVE_ROOT}/bin/hive -e "create external table reg_heterogen (s1 string,s2 string,n1 int, d1 double) partitioned by (fmt string)  row format delimited fields terminated by ','" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "alter table reg_heterogen add partition (fmt = 'txt') location 'hdfs:/hive/warehouse/reg_txt'" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "alter table reg_heterogen add partition (fmt = 'rc') location 'hdfs:/hive/warehouse/reg_rc'" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "alter table reg_heterogen add partition (fmt = 'seq') location 'hdfs:/hive/warehouse/reg_seq'" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "alter table reg_heterogen add partition (fmt = 'orc') location 'hdfs:/hive/warehouse/reg_orc'" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "alter table reg_heterogen partition (fmt='rc') set fileformat RCFILE" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "alter table reg_heterogen partition (fmt='seq') set fileformat SEQUENCEFILE" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "alter table reg_heterogen partition (fmt='orc') set fileformat ORC" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "show partitions reg_heterogen" 2>/dev/null
+fmt=orc
+fmt=rc
+fmt=seq
+fmt=txt
+CREATE EXTERNAL TABLE hv_heterogen(
+t1    text,
+t2    text,  
+num1  integer, 
+dub1  double precision,
+t3 text)
+LOCATION ('pxf://@hostname@:50070/reg_heterogen?PROFILE=Hive')
+format 'custom' (formatter='pxfwritable_import');
+select * from hv_heterogen order by t3, t1;
+  t1   |  t2  | num1 | dub1 | t3  
+-------+------+------+------+-----
+ row1  | s_6  |    1 |    6 | orc
+ row10 | s_15 |   10 |   15 | orc
+ row2  | s_7  |    2 |    7 | orc
+ row3  | s_8  |    3 |    8 | orc
+ row4  | s_9  |    4 |    9 | orc
+ row5  | s_10 |    5 |   10 | orc
+ row6  | s_11 |    6 |   11 | orc
+ row7  | s_12 |    7 |   12 | orc
+ row8  | s_13 |    8 |   13 | orc
+ row9  | s_14 |    9 |   14 | orc
+ row1  | s_6  |    1 |    6 | rc
+ row10 | s_15 |   10 |   15 | rc
+ row2  | s_7  |    2 |    7 | rc
+ row3  | s_8  |    3 |    8 | rc
+ row4  | s_9  |    4 |    9 | rc
+ row5  | s_10 |    5 |   10 | rc
+ row6  | s_11 |    6 |   11 | rc
+ row7  | s_12 |    7 |   12 | rc
+ row8  | s_13 |    8 |   13 | rc
+ row9  | s_14 |    9 |   14 | rc
+ row1  | s_6  |    1 |    6 | seq
+ row10 | s_15 |   10 |   15 | seq
+ row2  | s_7  |    2 |    7 | seq
+ row3  | s_8  |    3 |    8 | seq
+ row4  | s_9  |    4 |    9 | seq
+ row5  | s_10 |    5 |   10 | seq
+ row6  | s_11 |    6 |   11 | seq
+ row7  | s_12 |    7 |   12 | seq
+ row8  | s_13 |    8 |   13 | seq
+ row9  | s_14 |    9 |   14 | seq
+ row1  | s_6  |    1 |    6 | txt
+ row10 | s_15 |   10 |   15 | txt
+ row2  | s_7  |    2 |    7 | txt
+ row3  | s_8  |    3 |    8 | txt
+ row4  | s_9  |    4 |    9 | txt
+ row5  | s_10 |    5 |   10 | txt
+ row6  | s_11 |    6 |   11 | txt
+ row7  | s_12 |    7 |   12 | txt
+ row8  | s_13 |    8 |   13 | txt
+ row9  | s_14 |    9 |   14 | txt
+(40 rows)
+
+-- Test analyze for Hive table.
+ANALYZE hv_heterogen;
+WARNING:  skipping "hv_heterogen" --- error returned: remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v10/Analyzer/getEstimatedStats. Reason:     Server Error   Caused by:  java.lang.IllegalArgumentException: PXF 'Analyzer' class was not found. Please supply it in the LOCATION clause or use it in a PXF profile in order to run ANALYZE on this table
+select relpages, reltuples from pg_class where relname = 'hv_heterogen';
+ relpages | reltuples 
+----------+-----------
+     1000 |     1e+06
+(1 row)
+
+-- 7. Hive table with collection types (non primitive types)
+\! ${HIVE_ROOT}/bin/hive -e "CREATE TABLE reg_collections ( s1 STRING, f1 FLOAT, a1 ARRAY<STRING> , m1 MAP<STRING,  FLOAT > , sr1 STRUCT<street:STRING,  city:STRING,  state:STRING,  zip:INT > )  ROW FORMAT DELIMITED  FIELDS TERMINATED BY '\001' COLLECTION ITEMS TERMINATED BY '\002' MAP KEYS TERMINATED BY '\003'  LINES TERMINATED BY '\n'  STORED AS TEXTFILE" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "load data local inpath '@abs_srcdir@/data/pxf/hive_collections.txt' into table reg_collections" 2>/dev/null
+CREATE EXTERNAL TABLE hv_collections(
+t1    text,   
+f1    real,
+t2    text, 
+t3    text, 
+t4    text,
+t5    text, 
+f2    real,
+t6    text,
+f3    real,
+t7    text,
+t8    text,
+t9    text,
+num1  integer)
+LOCATION ('pxf://@hostname@:50070/reg_collections?PROFILE=Hive')
+format 'custom' (formatter='pxfwritable_import');
+select * from hv_collections order by t1;
+   t1    | f1 |    t2    |  t3   |  t4   |   t5   | f2 |   t6    | f3  |    t7    |  t8  |   t9   | num1  
+---------+----+----------+-------+-------+--------+----+---------+-----+----------+------+--------+-------
+ giraffe |  2 | Nige     | Kenya | Congo | height |  4 | wheight | 100 | agripas  | aviv | israel | 56303
+ lion    |  2 | Zanzibar | Kenya | Congo | height |  2 | wheight |  90 | horcanus | aviv | israel | 56303
+ panther |  2 | Somalia  | Kenya | Congo | height |  1 | wheight |  40 | herzog   | aviv | israel | 56303
+ zebra   |  2 | Tanzania | Kenya | Congo | height |  2 | wheight |  50 | zohar    | aviv | israel | 56303
+(4 rows)
+
+-- 8. View - negative test
+\! ${HIVE_ROOT}/bin/hive -e "create view reg_txt_view as select s1 from reg_txt" 2>/dev/null
+CREATE EXTERNAL TABLE hv_view(
+t1    text)
+LOCATION ('pxf://@hostname@:50070/reg_txt_view?PROFILE=Hive')
+format 'custom' (formatter='pxfwritable_import');
+select * from hv_view order by t1;
+ERROR:  remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v10/Fragmenter/getFragments. Reason:     Server Error   Caused by:  java.lang.UnsupportedOperationException: PXF doesn't support HIVE views (SOMEFILE:SOMEFUNC)
+-- 9.  Decimal is a partition in the Hive Table
+\! ${HIVE_ROOT}/bin/hive -e "create table part_dec (s1 string,s2 string,n1 int, d1 double) partitioned by (dec decimal)  row format delimited fields terminated by ','" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "load data local inpath '@abs_srcdir@/data/pxf/hive_small_data.txt' into table part_dec partition (dec = 10.1111111111111)" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "load data local inpath '@abs_srcdir@/data/pxf/hive_small_data.txt' into table part_dec partition (dec = 10.2222222222222)" 2>/dev/null
+CREATE EXTERNAL TABLE hv_part_dec(
+t1    text,
+t2    text,  
+num1  integer, 
+dub1  double precision,
+dec1  numeric)
+LOCATION ('pxf://@hostname@:50070/part_dec?PROFILE=Hive')
+format 'custom' (formatter='pxfwritable_import');
+select * from hv_part_dec order by dec1, t1;
+  t1   |  t2  | num1 | dub1 |       dec1       
+-------+------+------+------+------------------
+ row1  | s_6  |    1 |    6 | 10.1111111111111
+ row10 | s_15 |   10 |   15 | 10.1111111111111
+ row2  | s_7  |    2 |    7 | 10.1111111111111
+ row3  | s_8  |    3 |    8 | 10.1111111111111
+ row4  | s_9  |    4 |    9 | 10.1111111111111
+ row5  | s_10 |    5 |   10 | 10.1111111111111
+ row6  | s_11 |    6 |   11 | 10.1111111111111
+ row7  | s_12 |    7 |   12 | 10.1111111111111
+ row8  | s_13 |    8 |   13 | 10.1111111111111
+ row9  | s_14 |    9 |   14 | 10.1111111111111
+ row1  | s_6  |    1 |    6 | 10.2222222222222
+ row10 | s_15 |   10 |   15 | 10.2222222222222
+ row2  | s_7  |    2 |    7 | 10.2222222222222
+ row3  | s_8  |    3 |    8 | 10.2222222222222
+ row4  | s_9  |    4 |    9 | 10.2222222222222
+ row5  | s_10 |    5 |   10 | 10.2222222222222
+ row6  | s_11 |    6 |   11 | 10.2222222222222
+ row7  | s_12 |    7 |   12 | 10.2222222222222
+ row8  | s_13 |    8 |   13 | 10.2222222222222
+ row9  | s_14 |    9 |   14 | 10.2222222222222
+(20 rows)
+
+select * from hv_part_dec where dec1 = 10.2222222222222 order by t1;
+  t1   |  t2  | num1 | dub1 |       dec1       
+-------+------+------+------+------------------
+ row1  | s_6  |    1 |    6 | 10.2222222222222
+ row10 | s_15 |   10 |   15 | 10.2222222222222
+ row2  | s_7  |    2 |    7 | 10.2222222222222
+ row3  | s_8  |    3 |    8 | 10.2222222222222
+ row4  | s_9  |    4 |    9 | 10.2222222222222
+ row5  | s_10 |    5 |   10 | 10.2222222222222
+ row6  | s_11 |    6 |   11 | 10.2222222222222
+ row7  | s_12 |    7 |   12 | 10.2222222222222
+ row8  | s_13 |    8 |   13 | 10.2222222222222
+ row9  | s_14 |    9 |   14 | 10.2222222222222
+(10 rows)
+
+-- 10.  Unknown Type - negative test
+\! ${HIVE_ROOT}/bin/hive -e "create table un_supported_tbl (s1 string,s2 string,n1 tinyint, n2 int)row format delimited fields terminated by ','" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "load data local inpath '@abs_srcdir@/data/pxf/hive_small_data.txt' into table un_supported_tbl" 2>/dev/null
+CREATE EXTERNAL TABLE hv_un_supported_tbl(
+t1    text,
+t2    text,  
+num1  integer, 
+num2  integer)
+LOCATION ('pxf://@hostname@:50070/un_supported_tbl?PROFILE=Hive')
+format 'custom' (formatter='pxfwritable_import');
+select * from hv_un_supported_tbl;
+ERROR:  remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v10/Bridge/. Reason:     Server Error   Caused by:  java.io.IOException: tinyint conversion is not supported by HiveResolver (SOMEFILE:SOMEFUNC)
+DETAIL:  External table hv_un_supported_tbl
+-- 11.  Create external table with Profile option
+CREATE EXTERNAL TABLE tbl_with_profile(
+t1    text,
+t2    text,  
+num1  integer, 
+dub1  double precision)
+LOCATION ('pxf://@hostname@:50070/reg_seq?PROFILE=HIVE')
+format 'custom' (formatter='pxfwritable_import');
+select * from tbl_with_profile order by t1;
+  t1   |  t2  | num1 | dub1 
+-------+------+------+------
+ row1  | s_6  |    1 |    6
+ row10 | s_15 |   10 |   15
+ row2  | s_7  |    2 |    7
+ row3  | s_8  |    3 |    8
+ row4  | s_9  |    4 |    9
+ row5  | s_10 |    5 |   10
+ row6  | s_11 |    6 |   11
+ row7  | s_12 |    7 |   12
+ row8  | s_13 |    8 |   13
+ row9  | s_14 |    9 |   14
+(10 rows)
+
+-- 12. Test analyze for Hive table with profile without analyzer - negative test
+CREATE EXTERNAL TABLE hv_heterogen_profile_wo_analyzer(
+t1    text,
+t2    text,
+num1  integer,
+dub1  double precision,
+t3 text)
+LOCATION ('pxf://@hostname@:50070/reg_heterogen?PROFILE=Hive')
+format 'custom' (formatter='pxfwritable_import');
+ANALYZE hv_heterogen_profile_wo_analyzer;
+WARNING:  skipping "hv_heterogen_profile_wo_analyzer" --- error returned: remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v10/Analyzer/getEstimatedStats. Reason:     Server Error   Caused by:  java.lang.IllegalArgumentException: PXF 'Analyzer' class was not found. Please supply it in the LOCATION clause or use it in a PXF profile in order to run ANALYZE on this table
+-- 13. Index table
+\! ${HIVE_ROOT}/bin/hive -e "create index reg_txt_index on table reg_txt (s1) as 'COMPACT' with deferred rebuild" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "alter index reg_txt_index on reg_txt rebuild" 2>/dev/null
+CREATE EXTERNAL TABLE hv_index(
+t1    text,
+t2    text,
+n1 bigint)
+LOCATION ('pxf://@hostname@:50070/default__reg_txt_reg_txt_index__?PROFILE=Hive')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import');
+SELECT t1, n1 FROM hv_index ORDER BY t1;
+  t1   | n1  
+-------+-----
+ row1  |   0
+ row10 | 127
+ row2  |  13
+ row3  |  26
+ row4  |  39
+ row5  |  52
+ row6  |  67
+ row7  |  82
+ row8  |  97
+ row9  | 112
+(10 rows)
+
+-- 14. Create external table with wrong column definitions - negative test
+CREATE EXTERNAL TABLE tbl_with_wrong_col_def(
+t1    text,
+t2    text,
+wrong1  double precision,
+wrong2  smallint)
+LOCATION ('pxf://@hostname@:50070/reg_seq?PROFILE=HIVE')
+format 'custom' (formatter='pxfwritable_import');
+select * from tbl_with_wrong_col_def order by t1;
+ERROR:  External table definition did not match input data: column "wrong1" (type "double precision", input data type "integer"), column "wrong2" (type "smallint", input data type "double precision")
+DETAIL:  External table tbl_with_wrong_col_def
+-- 15. Clean after Hive
+drop external table hv_index;
+drop external table hv_view;
+drop external table hv_collections;
+drop external table hv_heterogen;
+drop external table hv_orc;
+drop external table hv_rc;
+drop external table hv_seq;
+drop external table hv_txt;
+drop external table hawq_types;
+drop external table hv_part_dec;
+drop external table hv_un_supported_tbl;
+drop external table tbl_with_profile;
+drop external table hv_heterogen_profile_wo_analyzer;
+drop external table tbl_with_wrong_col_def;
+\! ${HIVE_ROOT}/bin/hive -e "drop index reg_index on reg_txt" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "drop table default__reg_txt_reg_txt_index__" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "drop view reg_txt_view" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "drop table reg_collections" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "drop table reg_heterogen" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "drop table reg_orc" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "drop table reg_rc" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "drop table reg_seq" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "drop table reg_txt" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "drop table hive_types" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "drop table part_dec" 2>/dev/null
+\! ${HIVE_ROOT}/bin/hive -e "drop table un_supported_tbl" 2>/dev/null

@@ -1,0 +1,393 @@
+buildscript {
+    repositories {
+        // mavenCentral without https:
+        maven {
+            url 'http://repo1.maven.org/maven2'
+        }
+        mavenLocal()
+        jcenter {
+            url 'http://jcenter.bintray.com/'
+        }
+        maven {
+            url 'http://repository.jboss.org/nexus/content/groups/public'
+        }
+    }
+    
+    dependencies {
+        classpath "com.netflix.nebula:gradle-ospackage-plugin:2.2.6"
+        classpath "de.undercouch:gradle-download-task:1.2"
+    }   
+}
+
+// Hadoop distribution (can be phd or hdp) - needed to set correct classpaths
+// can be set with -Dhd=<value>
+def hddist = System.properties['hd'] ?: 'phd';
+if (hddist != 'phd' && hddist != 'hdp') {
+    throw new GradleException("hadoop distribution parameter (hd) set to invalid value: $hddist")
+}
+
+subprojects { subProject ->
+    group = 'com.pivotal.pxf'
+    apply plugin: 'java'
+    apply plugin: 'idea'
+    apply plugin: 'eclipse'
+    apply plugin: 'os-package'
+    apply plugin: 'maven-publish'
+
+    compileJava.options*.compilerArgs = [
+            "-g", "-Xlint:varargs", "-Xlint:cast", "-Xlint:classfile", "-Xlint:dep-ann", "-Xlint:divzero", "-Xlint:empty",
+            "-Xlint:finally", "-Xlint:overrides", "-Xlint:path", "-Xlint:processing", "-Xlint:static", "-Xlint:try",
+            "-Xlint:fallthrough", "-Xlint:deprecation", "-Xlint:unchecked", "-Xlint:-options", "-Werror"
+    ]
+
+    compileTestJava.options*.compilerArgs = [
+            "-Xlint:varargs", "-Xlint:cast", "-Xlint:classfile", "-Xlint:dep-ann", "-Xlint:divzero", "-Xlint:empty",
+            "-Xlint:finally", "-Xlint:overrides", "-Xlint:path", "-Xlint:processing", "-Xlint:static", "-Xlint:try",
+            "-Xlint:-fallthrough", "-Xlint:-deprecation", "-Xlint:-unchecked", "-Xlint:-options"
+    ]
+
+    repositories {
+        // mavenCentral without https:
+        maven { url 'http://repo1.maven.org/maven2' }
+        mavenLocal()
+        maven { url 'http://repo.hortonworks.com/content/repositories/releases/'}
+    }
+
+    dependencies {
+        compile 'commons-logging:commons-logging:1.1.3'
+        compile 'commons-collections:commons-collections:3.2.1'
+        compile 'commons-codec:commons-codec:1.4'
+        compile 'commons-configuration:commons-configuration:1.6'
+        compile 'org.codehaus.jackson:jackson-mapper-asl:1.9.3'
+        testCompile 'junit:junit:4.11'
+        testCompile 'org.powermock:powermock-core:1.5.1'
+        testCompile 'org.powermock:powermock-module-junit4:1.5.1'
+        testCompile 'org.powermock:powermock-api-mockito:1.5.1'
+        testCompile 'org.mockito:mockito-core:1.9.5'
+    }
+    
+    configurations.all {
+    	resolutionStrategy {
+    		// force versions that were specified in dependencies:
+    	 	// hbase/hive has a different versions than other hadoop components
+        	force 'commons-codec:commons-codec:1.4'
+        	force 'commons-collections:commons-collections:3.2.1'
+        	force 'commons-logging:commons-logging:1.1.3'
+        	force 'org.apache.avro:avro:1.7.4'
+        	force 'org.apache.zookeeper:zookeeper:3.4.5'
+        	force 'org.codehaus.jackson:jackson-mapper-asl:1.9.13'
+        	force 'junit:junit:4.11'
+   		}
+	}
+
+    task distTar(type: Tar) {
+        classifier = buildNumber()
+        compression = Compression.GZIP
+        extension = 'tar.gz'
+        from jar.outputs.files
+        into "${project.name}-${project.version}"
+    }
+
+    //buildRpm
+    ospackage {
+        summary = 'The PXF extensions library for HAWQ'
+        vendor = 'Pivotal'
+        release = buildNumber()
+        version = subProject.version.split('-')[0];
+        os = LINUX
+        license = "Copyright (c) ${new Date().format("yyyy")} Pivotal Software, Inc. All Rights reserved."
+        obsoletes('gpxf')
+        user = 'root'
+        permissionGroup = 'root'
+    }
+}
+
+project('pxf-service') {
+    apply plugin: 'war'
+    tasks.war {
+        archiveName = 'pxf.war'
+        processResources {
+            filesMatching('**/pxf-private*.classpath') {
+                details ->
+                if (details.name == "pxf-private${hddist}.classpath") {
+                    details.name = "pxf-private.classpath"
+                } else { 
+                    // exclude classpath file for a different distribution
+                    details.exclude()
+                }
+            }
+        }
+    }
+
+    dependencies {
+        compile(project(':pxf-api'))
+        compile 'com.sun.jersey:jersey-core:1.9'
+        providedCompile "org.apache.hadoop:hadoop-common:$hadoopVersion"
+        providedCompile "org.apache.hadoop:hadoop-hdfs:$hadoopVersion"
+        providedCompile "org.apache.hadoop:hadoop-auth:$hadoopVersion"
+        providedCompile "org.apache.hadoop:hadoop-annotations:$hadoopVersion"
+        providedCompile "org.apache.tomcat:tomcat-catalina:$tomcatVersion"
+    }
+
+    ospackage {
+
+        requires('apache-tomcat', "$tomcatVersion", GREATER | EQUAL)
+        requires('hadoop', "$hadoopVersion", GREATER | EQUAL)
+        requires('hadoop-hdfs', "$hadoopVersion", GREATER | EQUAL)
+
+        // Upgrades pxf-core, pxf-api to pxf-service
+        obsoletes('pxf-core')
+        obsoletes('pxf-api')
+
+        preInstall file('src/scripts/pre-install.sh')
+        postInstall file('src/scripts/post-install.sh')
+
+        from('src/main/resources/pxf-profiles-default.xml') {
+            fileType CONFIG | NOREPLACE
+            into "/etc/pxf-${project.version}/conf"
+            rename { 'pxf-profiles.xml' }
+        }
+
+        from('src/configs/pxf-site.xml') {
+            fileType CONFIG | NOREPLACE
+            into "/etc/pxf-${project.version}/conf"
+        }
+
+        from("src/main/resources") {
+            into("/etc/gphd/pxf-${project.version}/conf")
+            include("**/pxf-private*.classpath")
+        }
+
+        from("src/main/resources/pxf-private${hddist}.classpath") {
+            into("/etc/pxf-${project.version}/conf")
+            rename("pxf-private${hddist}.classpath", "pxf-private.classpath") 
+        }
+
+        from('src/main/resources/pxf-public.classpath') {
+            fileType CONFIG | NOREPLACE
+            into "/etc/pxf-${project.version}/conf"
+        }
+
+        from('src/scripts/pxf-env.sh') {
+            fileMode 0755
+            fileType NOREPLACE
+            into "/etc/pxf-${project.version}/conf"
+        }
+        
+        from('src/main/resources/pxf-log4j.properties') {
+            fileType CONFIG | NOREPLACE
+            into "/etc/pxf-${project.version}/conf"
+        }
+
+        from('src/scripts/pxf-service') {
+            fileMode 0755
+            addParentDirs false
+            into '/etc/init.d'
+        }
+
+        from(war.outputs.files) {
+            into "/usr/lib/pxf-${project.version}"
+        }
+
+        from(jar.outputs.files) {
+            into "/usr/lib/pxf-${project.version}"
+        }
+        
+        //tomcat configuration files
+        from('src/configs/tomcat') {
+            fileType CONFIG | NOREPLACE
+            into '/opt/pivotal/pxf/tomcat-templates'
+        }
+
+        link('/usr/lib/pxf', "/usr/lib/pxf-${project.version}")
+
+        link("/usr/lib/pxf-${project.version}/${project.name}.jar", "${project.name}-${project.version}.jar")
+        link('/etc/pxf', "pxf-${project.version}")
+
+    }
+
+    project.distTar {
+        from('src/main/resources/pxf-profiles-default.xml') { into 'conf' rename { 'pxf-profiles.xml' } }
+        from("src/main/resources") { into 'conf' include '**/pxf-private*.classpath'}
+        from("src/main/resources/pxf-private${hddist}.classpath") { into 'conf' rename {'pxf-private.classpath'} }
+        from('src/main/resources/pxf-public.classpath') { into 'conf' }
+        from(project(':pxf-api').jar.outputs.files)
+        from(war.outputs.files)
+    }
+}
+
+project('pxf-hdfs') {
+    dependencies {
+        compile(project(':pxf-service')) //Yikes, HdfsAnalyzer is directly accessing the bridge
+        compile 'org.apache.avro:avro-mapred:1.7.4'
+        compile "org.apache.hadoop:hadoop-mapreduce-client-core:$hadoopVersion"
+    }
+
+    ospackage {
+        requires('pxf-service', project.version, GREATER | EQUAL)
+        requires('hadoop', "$hadoopVersion", GREATER | EQUAL)
+        requires('hadoop-mapreduce', "$hadoopVersion", GREATER | EQUAL)
+
+        from(jar.outputs.files) {
+            into "/usr/lib/pxf-${project.version}"
+        }
+
+        link("/usr/lib/pxf-${project.version}/${project.name}.jar", "${project.name}-${project.version}.jar")
+    }
+}
+
+project('pxf-hive') {
+    dependencies {
+        compile(project(':pxf-hdfs'))
+        compile("org.apache.hive:hive-exec:$hiveVersion") {
+            exclude module: 'calcite-core'
+            exclude module: 'calcite-avatica'
+        }
+        compile "org.apache.hive:hive-metastore:$hiveVersion"
+        compile "org.apache.hive:hive-common:$hiveVersion"
+        compile "org.apache.hive:hive-serde:$hiveVersion"
+        testCompile 'pl.pragmatists:JUnitParams:1.0.2'
+        configurations {
+            // Remove hive-exec from unit tests as it causes VerifyError
+            testRuntime.exclude module: 'hive-exec'
+        }
+    }
+
+    ospackage {
+        requires('pxf-hdfs', project.version, GREATER | EQUAL)
+        requires('hive', "$hiveVersion", GREATER | EQUAL)
+
+        from(jar.outputs.files) {
+            into "/usr/lib/pxf-${project.version}"
+        }
+
+        link("/usr/lib/pxf-${project.version}/${project.name}.jar", "${project.name}-${project.version}.jar")
+    }
+}
+
+project('pxf-hbase') {
+    dependencies {
+        compile(project(':pxf-api'))
+        compile "org.apache.hadoop:hadoop-common:$hadoopVersion"
+        compile "org.apache.hbase:hbase-client:$hbaseVersionJar"
+    }
+
+    ospackage {
+        requires('pxf-service', project.version, GREATER | EQUAL)
+        requires('hbase', "$hbaseVersionRPM", GREATER | EQUAL)
+
+        from(jar.outputs.files) {
+            into "/usr/lib/pxf-${project.version}"
+        }
+
+        link("/usr/lib/pxf-${project.version}/${project.name}.jar", "${project.name}-${project.version}.jar")
+    }
+}
+
+def buildNumber() {
+    System.getenv('BUILD_NUMBER') ?: System.getProperty('user.name')
+}
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '2.5'
+}
+
+def distSubprojects = subprojects - project(':pxf-api')
+
+task release(type: Copy, dependsOn: [subprojects.build, subprojects.javadoc, distSubprojects.buildRpm, distSubprojects.distTar]) {
+    delete 'build'
+    into 'build'
+    subprojects { subProject ->
+        from("${project.name}/build/libs") { into 'libs' }
+        from("${project.name}/build/distributions") { into 'distributions' }
+        from("${project.name}/build/test-results") { into 'test-results' }
+    }
+}
+
+task tar(type: Copy, dependsOn: [subprojects.build, distSubprojects.distTar]) {
+    into 'build'
+    distSubprojects.each { project ->
+        from("${project.name}/build/distributions") { into 'distributions' }
+    }
+}
+
+task jar(type: Copy, dependsOn: [subprojects.build]) {
+    into 'build'
+    subprojects { subProject ->
+        from("${project.name}/build/libs") { into 'libs' }
+    }
+}
+
+task rpm(type: Copy, dependsOn: [subprojects.build, distSubprojects.buildRpm]) {
+    into 'build'
+    distSubprojects.each { project ->
+        from("${project.name}/build/distributions") { into 'distributions' }
+    }
+}
+
+// tomcat 
+def tomcatName = "apache-tomcat-${tomcatVersion}"
+def tomcatTargetDir = "tomcat/build/"
+    
+task tomcatGet << {
+    
+    apply plugin: 'de.undercouch.download'
+    
+    def TarGzSuffix = ".tar.gz"
+    def tomcatTar = "${tomcatName}${TarGzSuffix}"
+    def tomcatUrl = "http://archive.apache.org/dist/tomcat/tomcat-7/v${tomcatVersion}/bin/${tomcatTar}"
+	    
+    if (file("${tomcatTargetDir}/${tomcatName}").exists()) {
+        println "${tomcatName} already exists, nothing to do"
+        return 0
+    }
+
+    println "About to download from ${tomcatUrl}..."
+    // download tar ball
+    download {
+        src tomcatUrl
+        dest "${tomcatTargetDir}/${tomcatTar}"
+    }
+    // extract tar ball
+    println "Extracting..."
+    copy {
+        from tarTree(resources.gzip("${tomcatTargetDir}/${tomcatTar}"))
+        into tomcatTargetDir
+    }
+}
+
+apply plugin: 'os-package'
+
+task tomcatRpm(type: Rpm) {
+    buildDir = 'tomcat/build/'
+     
+    // clean should not delete the downloaded tarball
+    // and RPM, so this is a bogus directory to delete instead.
+    clean {
+        delete = 'tomcat/build/something'
+    }
+     
+    ospackage {
+        packageName 'apache-tomcat'
+        summary = 'Apache Tomcat RPM'
+        vendor = 'Pivotal'
+        release = buildNumber()
+        version = tomcatVersion
+        os = LINUX
+        license = "Copyright (c) ${new Date().format("yyyy")} Pivotal Software, Inc. All Rights reserved."
+        user = 'root'
+        permissionGroup = 'root'
+
+        preInstall file('tomcat/src/scripts/pre-install.sh')
+
+        from("${tomcatTargetDir}/${tomcatName}") {
+            user 'tomcat'
+            permissionGroup 'tomcat'
+            into "/opt/pivotal/${tomcatName}"
+        }
+    
+        link("/opt/pivotal/${packageName}", "${tomcatName}")
+    }
+}
+
+tomcatRpm.dependsOn tomcatGet

@@ -1,0 +1,21 @@
+{
+	"type": "record",
+	"name": "CustomAvro",
+	"doc": "CustomAvro record",
+	"fields": [
+				{"name": "tms", "type": "string"},
+				{"name": "num", "type": {"type": "array", "items": "int"}},
+				{"name": "int1", "type": "int"},
+				{"name": "int2", "type": "int"},
+				{"name": "strings", "type": {"type": "array", "items": "string"}},		
+				{"name": "st1", "type": "string"},
+				{"name": "dubs", "type": {"type": "array", "items": "double"}},
+				{"name": "db", "type": "double"},
+				{"name": "fts", "type": {"type": "array", "items": "float"}},		
+				{"name": "ft", "type": "float"},
+				{"name": "lngs", "type": {"type": "array", "items": "long"}},		
+				{"name": "lng", "type": "long"},
+				{"name": "bts", "type": "bytes"},
+				{"name": "bl", "type": "boolean"}
+	]
+}

@@ -1,0 +1,330 @@
+---
+--- Test for CREATE TABLE distribution policy
+---
+CREATE TABLE t1(c1 int);
+CREATE TABLE t1_1(c2 int) INHERITS(t1);
+NOTICE:  Table has parent, setting distribution columns to match parent table
+CREATE TABLE t1_1_w(c2 int) INHERITS(t1) WITH (bucketnum = 3);
+NOTICE:  Table has parent, setting distribution columns to match parent table
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1');
+ bucketnum | attrnums 
+-----------+----------
+         8 | 
+(1 row)
+
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_1');
+ bucketnum | attrnums 
+-----------+----------
+         8 | 
+(1 row)
+
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_1_w');
+ bucketnum | attrnums 
+-----------+----------
+         3 | 
+(1 row)
+
+CREATE TABLE t1_1_1(c2 int) INHERITS (t1) DISTRIBUTED BY(c1);
+CREATE TABLE t1_1_2(c2 int) INHERITS (t1) DISTRIBUTED BY(c2);
+CREATE TABLE t1_1_3(c2 int) INHERITS (t1) DISTRIBUTED RANDOMLY;
+CREATE TABLE t1_1_4(c2 int) INHERITS (t1) WITH (bucketnum = 3) DISTRIBUTED BY(c1) ;
+CREATE TABLE t1_1_5(c2 int) INHERITS (t1) WITH (bucketnum = 5) DISTRIBUTED BY(c2);
+CREATE TABLE t1_1_6(c2 int) INHERITS (t1) WITH (bucketnum = 7) DISTRIBUTED RANDOMLY;
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_1_1');
+ bucketnum | attrnums 
+-----------+----------
+         8 | {1}
+(1 row)
+
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_1_2');
+ bucketnum | attrnums 
+-----------+----------
+         8 | {2}
+(1 row)
+
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_1_3');
+ bucketnum | attrnums 
+-----------+----------
+         8 | 
+(1 row)
+
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_1_4');
+ bucketnum | attrnums 
+-----------+----------
+         3 | {1}
+(1 row)
+
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_1_5');
+ bucketnum | attrnums 
+-----------+----------
+         5 | {2}
+(1 row)
+
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_1_6');
+ bucketnum | attrnums 
+-----------+----------
+         7 | 
+(1 row)
+
+CREATE TABLE t1_2(LIKE t1);        
+NOTICE:  Table doesn't have 'distributed by' clause, defaulting to distribution columns from LIKE table
+CREATE TABLE t1_2_w(LIKE t1) WITH (bucketnum = 4);   
+NOTICE:  Table doesn't have 'distributed by' clause, defaulting to distribution columns from LIKE table
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_2');
+ bucketnum | attrnums 
+-----------+----------
+         8 | 
+(1 row)
+
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_2_w');
+ bucketnum | attrnums 
+-----------+----------
+         4 | 
+(1 row)
+
+CREATE TABLE t1_2_1(LIKE t1) DISTRIBUTED BY (c1);
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_2_1');
+ bucketnum | attrnums 
+-----------+----------
+         8 | {1}
+(1 row)
+
+CREATE TABLE t1_2_2(LIKE t1) DISTRIBUTED RANDOMLY;
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_2_2');
+ bucketnum | attrnums 
+-----------+----------
+         8 | 
+(1 row)
+
+CREATE TABLE t1_2_3(LIKE t1) WITH (bucketnum = 4) DISTRIBUTED BY (c1);
+CREATE TABLE t1_2_4(LIKE t1) WITH (bucketnum = 4) DISTRIBUTED RANDOMLY;
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_2_3');
+ bucketnum | attrnums 
+-----------+----------
+         4 | {1}
+(1 row)
+
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_2_4');
+ bucketnum | attrnums 
+-----------+----------
+         4 | 
+(1 row)
+
+CREATE TABLE t1_3 AS (SELECT * FROM t1);
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_3');
+ bucketnum | attrnums 
+-----------+----------
+         8 | 
+(1 row)
+
+CREATE TABLE t1_3_w WITH (bucketnum = 4) AS (SELECT * FROM t1);
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_3_w');
+ bucketnum | attrnums 
+-----------+----------
+         4 | 
+(1 row)
+
+CREATE TABLE t1_3_1 AS (SELECT * FROM  t1) DISTRIBUTED BY (c1);                   
+CREATE TABLE t1_3_2 AS (SELECT * FROM  t1) DISTRIBUTED RANDOMLY;
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_3_1');
+ bucketnum | attrnums 
+-----------+----------
+         8 | {1}
+(1 row)
+
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_3_2');
+ bucketnum | attrnums 
+-----------+----------
+         8 | 
+(1 row)
+
+CREATE TABLE t1_3_3 WITH (bucketnum = 6) AS (SELECT * FROM  t1) DISTRIBUTED BY (c1);                   
+CREATE TABLE t1_3_4 WITH (bucketnum = 7) AS (SELECT * FROM  t1) DISTRIBUTED RANDOMLY;
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_3_3');
+ bucketnum | attrnums 
+-----------+----------
+         6 | {1}
+(1 row)
+
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_3_4');
+ bucketnum | attrnums 
+-----------+----------
+         7 | 
+(1 row)
+
+DROP TABLE t1_3_4, t1_3_3, t1_3_2, t1_3_1, t1_3_w, t1_3, t1_2_4, t1_2_3, t1_2_2, t1_2_1, t1_2_w, t1_2, t1_1_1, t1_1_2, t1_1_3, t1_1_4, t1_1_5, t1_1_6, t1_1_w, t1_1, t1;
+CREATE TABLE t2(c1 int) DISTRIBUTED BY (c1);
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2');
+ bucketnum | attrnums 
+-----------+----------
+         8 | {1}
+(1 row)
+
+CREATE TABLE t2_1(c2 int) INHERITS (t2);
+NOTICE:  Table has parent, setting distribution columns to match parent table
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_1');
+ bucketnum | attrnums 
+-----------+----------
+         8 | {1}
+(1 row)
+
+CREATE TABLE t2_1_w(c2 int) INHERITS (t2) WITH (bucketnum = 3);
+NOTICE:  Table has parent, setting distribution columns to match parent table
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_1_w');
+ bucketnum | attrnums 
+-----------+----------
+         3 | {1}
+(1 row)
+
+CREATE TABLE t2_1_1(c2 int) INHERITS (t2) DISTRIBUTED BY (c1);
+CREATE TABLE t2_1_2(c2 int) INHERITS (t2) DISTRIBUTED BY (c2);
+CREATE TABLE t2_1_3(c2 int) INHERITS (t2) DISTRIBUTED RANDOMLY;
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_1_1');
+ bucketnum | attrnums 
+-----------+----------
+         8 | {1}
+(1 row)
+
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_1_2');
+ bucketnum | attrnums 
+-----------+----------
+         8 | {2}
+(1 row)
+
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_1_3');
+ bucketnum | attrnums 
+-----------+----------
+         8 | 
+(1 row)
+
+CREATE TABLE t2_1_4(c2 int) INHERITS (t2) WITH (bucketnum = 3) DISTRIBUTED BY (c1);
+CREATE TABLE t2_1_5(c2 int) INHERITS (t2) WITH (bucketnum = 5) DISTRIBUTED BY (c2);
+CREATE TABLE t2_1_6(c2 int) INHERITS (t2) WITH (bucketnum = 7) DISTRIBUTED RANDOMLY;
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_1_4');
+ bucketnum | attrnums 
+-----------+----------
+         3 | {1}
+(1 row)
+
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_1_5');
+ bucketnum | attrnums 
+-----------+----------
+         5 | {2}
+(1 row)
+
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_1_6');
+ bucketnum | attrnums 
+-----------+----------
+         7 | 
+(1 row)
+
+CREATE TABLE t2_2(LIKE t2);
+NOTICE:  Table doesn't have 'distributed by' clause, defaulting to distribution columns from LIKE table
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_2');
+ bucketnum | attrnums 
+-----------+----------
+         8 | {1}
+(1 row)
+
+CREATE TABLE t2_2_w(LIKE t2) WITH (bucketnum = 4);
+NOTICE:  Table doesn't have 'distributed by' clause, defaulting to distribution columns from LIKE table
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_2_w');
+ bucketnum | attrnums 
+-----------+----------
+         4 | {1}
+(1 row)
+
+CREATE TABLE t2_2_1(LIKE t2) DISTRIBUTED BY (c1);
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_2_1');
+ bucketnum | attrnums 
+-----------+----------
+         8 | {1}
+(1 row)
+
+CREATE TABLE t2_2_2(LIKE t2) DISTRIBUTED RANDOMLY;
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_2_2');
+ bucketnum | attrnums 
+-----------+----------
+         8 | 
+(1 row)
+
+CREATE TABLE t2_2_3(LIKE t2) WITH (bucketnum = 5) DISTRIBUTED BY (c1);
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_2_3');
+ bucketnum | attrnums 
+-----------+----------
+         5 | {1}
+(1 row)
+
+CREATE TABLE t2_2_4(LIKE t2) WITH (bucketnum = 6) DISTRIBUTED RANDOMLY;
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_2_4');
+ bucketnum | attrnums 
+-----------+----------
+         6 | 
+(1 row)
+
+CREATE TABLE t2_3 AS (SELECT * FROM  t2);
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_3');
+ bucketnum | attrnums 
+-----------+----------
+         8 | 
+(1 row)
+
+CREATE TABLE t2_3_w WITH (bucketnum = 4) AS (SELECT * FROM  t2);
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_3_w');
+ bucketnum | attrnums 
+-----------+----------
+         4 | 
+(1 row)
+
+                                                                                                                                    ;
+CREATE TABLE t2_3_1 AS (SELECT * FROM  t2) DISTRIBUTED BY (c1);
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_3_1');
+ bucketnum | attrnums 
+-----------+----------
+         8 | {1}
+(1 row)
+
+CREATE TABLE t2_3_2 AS (SELECT * FROM  t2) DISTRIBUTED RANDOMLY;
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_3_2');
+ bucketnum | attrnums 
+-----------+----------
+         8 | 
+(1 row)
+
+CREATE TABLE t2_3_3 WITH (bucketnum = 5) AS (SELECT * FROM  t2) DISTRIBUTED BY (c1);
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_3_3');
+ bucketnum | attrnums 
+-----------+----------
+         5 | {1}
+(1 row)
+
+CREATE TABLE t2_3_4 WITH (bucketnum = 6) AS (SELECT * FROM  t2) DISTRIBUTED RANDOMLY;
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_3_4');
+ bucketnum | attrnums 
+-----------+----------
+         6 | 
+(1 row)
+
+DROP TABLE t2_3_4, t2_3_3, t2_3_2, t2_3_1, t2_3_w, t2_3, t2_2_4, t2_2_3, t2_2_2, t2_2_1, t2_2_w, t2_2, t2_1_1, t2_1_2, t2_1_3, t2_1_4, t2_1_5, t2_1_6, t2_1_w, t2_1, t2;
+CREATE TABLE t3 (c1 int) WITH (bucketnum = 4);
+CREATE TABLE t3_1 (c1 int) WITH (bucketnum = 5) DISTRIBUTED BY(c1);
+CREATE TABLE t3_2 (c1 int) WITH (bucketnum = 6) DISTRIBUTED RANDOMLY;
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't3');
+ bucketnum | attrnums 
+-----------+----------
+         4 | 
+(1 row)
+
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't3_1');
+ bucketnum | attrnums 
+-----------+----------
+         5 | {1}
+(1 row)
+
+SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't3_2');
+ bucketnum | attrnums 
+-----------+----------
+         6 | 
+(1 row)
+
+DROP TABLE t3_2, t3_1, t3;

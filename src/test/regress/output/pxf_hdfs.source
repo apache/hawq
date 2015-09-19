@@ -1,0 +1,1157 @@
+--
+-- PXF HDFS regression suite 
+--
+-- Prerequisites:
+--
+--   Must have a running hdfs with REST service on port 50070
+--   Must have HADOOP_ROOT, HBASE_ROOT, HIVE_ROOT and ZOOKEEPER_ROOT set.
+--
+-- TODO: test gpdbwritable write/read when it is enabled.
+-- TODO: test PB, AVRO, THRIFT when it is enabled (read only, with pre formatted files).
+-- TODO: test protocol validator for pxf once written.
+-- TODO: test parameter passing, filter passing
+-- start_matchsubs
+--                                                                                               
+-- # create a match/subs expression to handle ip addresses that change
+--
+-- m/(ERROR|WARNING):.*remote component error.*\(\d+\).*from.*'\d+\.\d+\.\d+\.\d+:\d+'.*/
+-- s/'\d+\.\d+\.\d+\.\d+:\d+'/'SOME_IP:SOME_PORT'/
+--
+-- m/(remote component error \(0\): Failed connect to @hostname@:12345; Connection refused|remote component error \(0\): couldn't connect to host).*/
+-- s/(Failed connect to @hostname@:12345; Connection refused|couldn't connect to host)/CURL_CON_ERROR/
+--
+-- end_matchsubs
+-- start_matchignore
+--
+-- m/.*Unable to load native-hadoop library for your platform.*/
+--
+-- end_matchignore
+--
+-- syntax validations
+--
+CREATE READABLE EXTERNAL TABLE gphdfs_in(a int, b text, c bytea)
+LOCATION ('pxf://@hostname@:50070/somepath/gpdb_regression_data?FRAGMENTER=xfrag&ACCESSOR=xacc&RESOLVER=xres&someuseropt=someuserval')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- positive
+CREATE READABLE EXTERNAL TABLE gphdfs_in1(a int, b text, c bytea)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data?FRAGMENTER=xfrag&ACCESSOR=com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.AvroResolver&DATA-SCHEMA=MySchema')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- positive
+CREATE READABLE EXTERNAL TABLE gphdfs_in2(a int, b text, c bytea)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/*')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- negative
+ERROR:  Invalid URI pxf://@hostname@:50070/gpdb_regression_data/*: missing options section
+CREATE READABLE EXTERNAL TABLE gphdfs_in2(a int, b text, c bytea)
+LOCATION ('pxf://@hostname@:50070/somepath/gpdb_regression_data?ACCESSOR=xacc&RESOLVER=xres&someuseropt=someuserval')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- negative, missing fragmenter
+ERROR:  Invalid URI pxf://@hostname@:50070/somepath/gpdb_regression_data?ACCESSOR=xacc&RESOLVER=xres&someuseropt=someuserval: PROFILE or FRAGMENTER option(s) missing
+CREATE READABLE EXTERNAL TABLE gphdfs_in2(a int, b text, c bytea)
+LOCATION ('pxf://@hostname@:50070/somepath/gpdb_regression_data?FRAGMENTER=xfrag&RESOLVER=xres&someuseropt=someuserval')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- negative, missing accessor
+ERROR:  Invalid URI pxf://@hostname@:50070/somepath/gpdb_regression_data?FRAGMENTER=xfrag&RESOLVER=xres&someuseropt=someuserval: PROFILE or ACCESSOR option(s) missing
+CREATE READABLE EXTERNAL TABLE gphdfs_in2(a int, b text, c bytea)
+LOCATION ('pxf://@hostname@:50070/somepath/gpdb_regression_data?FRAGMENTER=xfrag&ACCESSOR=xacc')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- negative, missing resolver
+ERROR:  Invalid URI pxf://@hostname@:50070/somepath/gpdb_regression_data?FRAGMENTER=xfrag&ACCESSOR=xacc: PROFILE or RESOLVER option(s) missing
+DROP EXTERNAL TABLE gphdfs_in;
+DROP EXTERNAL TABLE gphdfs_in1;
+--
+-- Load HDFS with test data
+--
+\! ${HADOOP_ROOT}/bin/hadoop fs -mkdir /gpdb_regression_data
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/writable_inside_sequence1.tbl /gpdb_regression_data/writable_inside_sequence.tbl
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/avro_inside_sequence.tbl /gpdb_regression_data/avro_inside_sequence.tbl; 
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/avroformat_inside_avrofile.avro /gpdb_regression_data/avroformat_inside_avrofile.avro
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/text_data.csv /gpdb_regression_data/text_data.csv
+\! ${HADOOP_ROOT}/bin/hadoop fs -mkdir /gpdb_regression_data/wild
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/writable_inside_sequence1.tbl /gpdb_regression_data/wild/writable_inside_sequence1.tbl
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/writable_inside_sequence2.tbl /gpdb_regression_data/wild/writable_inside_sequence2.tbl
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/empty.tbl /gpdb_regression_data/empty.tbl
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/small.csv /gpdb_regression_data/small.csv
+--
+-- Test TEXT format on a file with many fields
+--
+CREATE EXTERNAL TABLE bigtext (s1 text, 
+                               s2 text, 
+							   s3 text, 
+							   d1 timestamp, 
+							   n1 int, 
+							   n2 int, 
+							   n3 int, 
+							   n4 int, 
+							   n5 int, 
+							   n6 int, 
+							   n7 int,
+                               s11 text, 
+							   s12 text, 
+							   s13 text, 
+							   d11 timestamp, 
+							   n11 int, 
+							   n12 int, 
+							   n13 int, 
+							   n14 int, 
+							   n15 int, 
+							   n16 int, 
+							   n17 int)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/text_data.csv?PROFILE=HdfsTextSimple')
+FORMAT 'TEXT' (DELIMITER ',');
+SELECT n1, n2, n3, n4, n5, s1, s2, s3, d1 FROM bigtext ORDER BY n1;
+ n1 | n2  |  n3  |  n4  |  n5  |  s1  |  s2   |   s3   |            d1            
+----+-----+------+------+------+------+-------+--------+--------------------------
+  1 |  10 |  100 |  100 |  100 | s_1  | s_10  | s_100  | Wed Jun 01 12:30:30 2011
+  2 |  20 |  200 |  200 |  200 | s_2  | s_20  | s_200  | Wed Jun 01 12:30:30 2011
+  3 |  30 |  300 |  300 |  300 | s_3  | s_30  | s_300  | Wed Jun 01 12:30:30 2011
+  4 |  40 |  400 |  400 |  400 | s_4  | s_40  | s_400  | Wed Jun 01 12:30:30 2011
+  5 |  50 |  500 |  500 |  500 | s_5  | s_50  | s_500  | Wed Jun 01 12:30:30 2011
+  6 |  60 |  600 |  600 |  600 | s_6  | s_60  | s_600  | Wed Jun 01 12:30:30 2011
+  7 |  70 |  700 |  700 |  700 | s_7  | s_70  | s_700  | Wed Jun 01 12:30:30 2011
+  8 |  80 |  800 |  800 |  800 | s_8  | s_80  | s_800  | Wed Jun 01 12:30:30 2011
+  9 |  90 |  900 |  900 |  900 | s_9  | s_90  | s_900  | Wed Jun 01 12:30:30 2011
+ 10 | 100 | 1000 | 1000 | 1000 | s_10 | s_100 | s_1000 | Wed Jun 01 12:30:30 2011
+ 11 | 110 | 1100 | 1100 | 1100 | s_11 | s_110 | s_1100 | Wed Jun 01 12:30:30 2011
+ 12 | 120 | 1200 | 1200 | 1200 | s_12 | s_120 | s_1200 | Wed Jun 01 12:30:30 2011
+ 13 | 130 | 1300 | 1300 | 1300 | s_13 | s_130 | s_1300 | Wed Jun 01 12:30:30 2011
+ 14 | 140 | 1400 | 1400 | 1400 | s_14 | s_140 | s_1400 | Wed Jun 01 12:30:30 2011
+ 15 | 150 | 1500 | 1500 | 1500 | s_15 | s_150 | s_1500 | Wed Jun 01 12:30:30 2011
+ 16 | 160 | 1600 | 1600 | 1600 | s_16 | s_160 | s_1600 | Wed Jun 01 12:30:30 2011
+ 17 | 170 | 1700 | 1700 | 1700 | s_17 | s_170 | s_1700 | Wed Jun 01 12:30:30 2011
+ 18 | 180 | 1800 | 1800 | 1800 | s_18 | s_180 | s_1800 | Wed Jun 01 12:30:30 2011
+ 19 | 190 | 1900 | 1900 | 1900 | s_19 | s_190 | s_1900 | Wed Jun 01 12:30:30 2011
+ 20 | 200 | 2000 | 2000 | 2000 | s_20 | s_200 | s_2000 | Wed Jun 01 12:30:30 2011
+ 21 | 210 | 2100 | 2100 | 2100 | s_21 | s_210 | s_2100 | Wed Jun 01 12:30:30 2011
+ 22 | 220 | 2200 | 2200 | 2200 | s_22 | s_220 | s_2200 | Wed Jun 01 12:30:30 2011
+ 23 | 230 | 2300 | 2300 | 2300 | s_23 | s_230 | s_2300 | Wed Jun 01 12:30:30 2011
+ 24 | 240 | 2400 | 2400 | 2400 | s_24 | s_240 | s_2400 | Wed Jun 01 12:30:30 2011
+ 25 | 250 | 2500 | 2500 | 2500 | s_25 | s_250 | s_2500 | Wed Jun 01 12:30:30 2011
+ 26 | 260 | 2600 | 2600 | 2600 | s_26 | s_260 | s_2600 | Wed Jun 01 12:30:30 2011
+ 27 | 270 | 2700 | 2700 | 2700 | s_27 | s_270 | s_2700 | Wed Jun 01 12:30:30 2011
+ 28 | 280 | 2800 | 2800 | 2800 | s_28 | s_280 | s_2800 | Wed Jun 01 12:30:30 2011
+ 29 | 290 | 2900 | 2900 | 2900 | s_29 | s_290 | s_2900 | Wed Jun 01 12:30:30 2011
+ 30 | 300 | 3000 | 3000 | 3000 | s_30 | s_300 | s_3000 | Wed Jun 01 12:30:30 2011
+(30 rows)
+
+SELECT n11, n12, n13, n14, n15, s11, s12, s13, d11 FROM bigtext ORDER BY n11;
+ n11 | n12 | n13  | n14  | n15  | s11  |  s12  |  s13   |           d11            
+-----+-----+------+------+------+------+-------+--------+--------------------------
+   1 |  10 |  100 |  100 |  100 | s_1  | s_10  | s_100  | Wed Jun 01 12:30:30 2011
+   2 |  20 |  200 |  200 |  200 | s_2  | s_20  | s_200  | Wed Jun 01 12:30:30 2011
+   3 |  30 |  300 |  300 |  300 | s_3  | s_30  | s_300  | Wed Jun 01 12:30:30 2011
+   4 |  40 |  400 |  400 |  400 | s_4  | s_40  | s_400  | Wed Jun 01 12:30:30 2011
+   5 |  50 |  500 |  500 |  500 | s_5  | s_50  | s_500  | Wed Jun 01 12:30:30 2011
+   6 |  60 |  600 |  600 |  600 | s_6  | s_60  | s_600  | Wed Jun 01 12:30:30 2011
+   7 |  70 |  700 |  700 |  700 | s_7  | s_70  | s_700  | Wed Jun 01 12:30:30 2011
+   8 |  80 |  800 |  800 |  800 | s_8  | s_80  | s_800  | Wed Jun 01 12:30:30 2011
+   9 |  90 |  900 |  900 |  900 | s_9  | s_90  | s_900  | Wed Jun 01 12:30:30 2011
+  10 | 100 | 1000 | 1000 | 1000 | s_10 | s_100 | s_1000 | Wed Jun 01 12:30:30 2011
+  11 | 110 | 1100 | 1100 | 1100 | s_11 | s_110 | s_1100 | Wed Jun 01 12:30:30 2011
+  12 | 120 | 1200 | 1200 | 1200 | s_12 | s_120 | s_1200 | Wed Jun 01 12:30:30 2011
+  13 | 130 | 1300 | 1300 | 1300 | s_13 | s_130 | s_1300 | Wed Jun 01 12:30:30 2011
+  14 | 140 | 1400 | 1400 | 1400 | s_14 | s_140 | s_1400 | Wed Jun 01 12:30:30 2011
+  15 | 150 | 1500 | 1500 | 1500 | s_15 | s_150 | s_1500 | Wed Jun 01 12:30:30 2011
+  16 | 160 | 1600 | 1600 | 1600 | s_16 | s_160 | s_1600 | Wed Jun 01 12:30:30 2011
+  17 | 170 | 1700 | 1700 | 1700 | s_17 | s_170 | s_1700 | Wed Jun 01 12:30:30 2011
+  18 | 180 | 1800 | 1800 | 1800 | s_18 | s_180 | s_1800 | Wed Jun 01 12:30:30 2011
+  19 | 190 | 1900 | 1900 | 1900 | s_19 | s_190 | s_1900 | Wed Jun 01 12:30:30 2011
+  20 | 200 | 2000 | 2000 | 2000 | s_20 | s_200 | s_2000 | Wed Jun 01 12:30:30 2011
+  21 | 210 | 2100 | 2100 | 2100 | s_21 | s_210 | s_2100 | Wed Jun 01 12:30:30 2011
+  22 | 220 | 2200 | 2200 | 2200 | s_22 | s_220 | s_2200 | Wed Jun 01 12:30:30 2011
+  23 | 230 | 2300 | 2300 | 2300 | s_23 | s_230 | s_2300 | Wed Jun 01 12:30:30 2011
+  24 | 240 | 2400 | 2400 | 2400 | s_24 | s_240 | s_2400 | Wed Jun 01 12:30:30 2011
+  25 | 250 | 2500 | 2500 | 2500 | s_25 | s_250 | s_2500 | Wed Jun 01 12:30:30 2011
+  26 | 260 | 2600 | 2600 | 2600 | s_26 | s_260 | s_2600 | Wed Jun 01 12:30:30 2011
+  27 | 270 | 2700 | 2700 | 2700 | s_27 | s_270 | s_2700 | Wed Jun 01 12:30:30 2011
+  28 | 280 | 2800 | 2800 | 2800 | s_28 | s_280 | s_2800 | Wed Jun 01 12:30:30 2011
+  29 | 290 | 2900 | 2900 | 2900 | s_29 | s_290 | s_2900 | Wed Jun 01 12:30:30 2011
+  30 | 300 | 3000 | 3000 | 3000 | s_30 | s_300 | s_3000 | Wed Jun 01 12:30:30 2011
+(30 rows)
+
+DROP EXTERNAL TABLE bigtext;
+--
+-- Test CSV format on a file with many fields
+--
+CREATE EXTERNAL TABLE bigcsv (s1 text, 
+                               s2 text, 
+							   s3 text, 
+							   d1 timestamp, 
+							   n1 int, 
+							   n2 int, 
+							   n3 int, 
+							   n4 int, 
+							   n5 int, 
+							   n6 int, 
+							   n7 int,
+                               s11 text, 
+							   s12 text, 
+							   s13 text, 
+							   d11 timestamp, 
+							   n11 int, 
+							   n12 int, 
+							   n13 int, 
+							   n14 int, 
+							   n15 int, 
+							   n16 int, 
+							   n17 int)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/text_data.csv?PROFILE=HdfsTextSimple')
+FORMAT 'CSV';
+SELECT n1, n2, n3, n4, n5, s1, s2, s3, d1 FROM bigcsv ORDER BY n1;
+ n1 | n2  |  n3  |  n4  |  n5  |  s1  |  s2   |   s3   |            d1            
+----+-----+------+------+------+------+-------+--------+--------------------------
+  1 |  10 |  100 |  100 |  100 | s_1  | s_10  | s_100  | Wed Jun 01 12:30:30 2011
+  2 |  20 |  200 |  200 |  200 | s_2  | s_20  | s_200  | Wed Jun 01 12:30:30 2011
+  3 |  30 |  300 |  300 |  300 | s_3  | s_30  | s_300  | Wed Jun 01 12:30:30 2011
+  4 |  40 |  400 |  400 |  400 | s_4  | s_40  | s_400  | Wed Jun 01 12:30:30 2011
+  5 |  50 |  500 |  500 |  500 | s_5  | s_50  | s_500  | Wed Jun 01 12:30:30 2011
+  6 |  60 |  600 |  600 |  600 | s_6  | s_60  | s_600  | Wed Jun 01 12:30:30 2011
+  7 |  70 |  700 |  700 |  700 | s_7  | s_70  | s_700  | Wed Jun 01 12:30:30 2011
+  8 |  80 |  800 |  800 |  800 | s_8  | s_80  | s_800  | Wed Jun 01 12:30:30 2011
+  9 |  90 |  900 |  900 |  900 | s_9  | s_90  | s_900  | Wed Jun 01 12:30:30 2011
+ 10 | 100 | 1000 | 1000 | 1000 | s_10 | s_100 | s_1000 | Wed Jun 01 12:30:30 2011
+ 11 | 110 | 1100 | 1100 | 1100 | s_11 | s_110 | s_1100 | Wed Jun 01 12:30:30 2011
+ 12 | 120 | 1200 | 1200 | 1200 | s_12 | s_120 | s_1200 | Wed Jun 01 12:30:30 2011
+ 13 | 130 | 1300 | 1300 | 1300 | s_13 | s_130 | s_1300 | Wed Jun 01 12:30:30 2011
+ 14 | 140 | 1400 | 1400 | 1400 | s_14 | s_140 | s_1400 | Wed Jun 01 12:30:30 2011
+ 15 | 150 | 1500 | 1500 | 1500 | s_15 | s_150 | s_1500 | Wed Jun 01 12:30:30 2011
+ 16 | 160 | 1600 | 1600 | 1600 | s_16 | s_160 | s_1600 | Wed Jun 01 12:30:30 2011
+ 17 | 170 | 1700 | 1700 | 1700 | s_17 | s_170 | s_1700 | Wed Jun 01 12:30:30 2011
+ 18 | 180 | 1800 | 1800 | 1800 | s_18 | s_180 | s_1800 | Wed Jun 01 12:30:30 2011
+ 19 | 190 | 1900 | 1900 | 1900 | s_19 | s_190 | s_1900 | Wed Jun 01 12:30:30 2011
+ 20 | 200 | 2000 | 2000 | 2000 | s_20 | s_200 | s_2000 | Wed Jun 01 12:30:30 2011
+ 21 | 210 | 2100 | 2100 | 2100 | s_21 | s_210 | s_2100 | Wed Jun 01 12:30:30 2011
+ 22 | 220 | 2200 | 2200 | 2200 | s_22 | s_220 | s_2200 | Wed Jun 01 12:30:30 2011
+ 23 | 230 | 2300 | 2300 | 2300 | s_23 | s_230 | s_2300 | Wed Jun 01 12:30:30 2011
+ 24 | 240 | 2400 | 2400 | 2400 | s_24 | s_240 | s_2400 | Wed Jun 01 12:30:30 2011
+ 25 | 250 | 2500 | 2500 | 2500 | s_25 | s_250 | s_2500 | Wed Jun 01 12:30:30 2011
+ 26 | 260 | 2600 | 2600 | 2600 | s_26 | s_260 | s_2600 | Wed Jun 01 12:30:30 2011
+ 27 | 270 | 2700 | 2700 | 2700 | s_27 | s_270 | s_2700 | Wed Jun 01 12:30:30 2011
+ 28 | 280 | 2800 | 2800 | 2800 | s_28 | s_280 | s_2800 | Wed Jun 01 12:30:30 2011
+ 29 | 290 | 2900 | 2900 | 2900 | s_29 | s_290 | s_2900 | Wed Jun 01 12:30:30 2011
+ 30 | 300 | 3000 | 3000 | 3000 | s_30 | s_300 | s_3000 | Wed Jun 01 12:30:30 2011
+(30 rows)
+
+SELECT n11, n12, n13, n14, n15, s11, s12, s13, d11 FROM bigcsv ORDER BY n11;
+ n11 | n12 | n13  | n14  | n15  | s11  |  s12  |  s13   |           d11            
+-----+-----+------+------+------+------+-------+--------+--------------------------
+   1 |  10 |  100 |  100 |  100 | s_1  | s_10  | s_100  | Wed Jun 01 12:30:30 2011
+   2 |  20 |  200 |  200 |  200 | s_2  | s_20  | s_200  | Wed Jun 01 12:30:30 2011
+   3 |  30 |  300 |  300 |  300 | s_3  | s_30  | s_300  | Wed Jun 01 12:30:30 2011
+   4 |  40 |  400 |  400 |  400 | s_4  | s_40  | s_400  | Wed Jun 01 12:30:30 2011
+   5 |  50 |  500 |  500 |  500 | s_5  | s_50  | s_500  | Wed Jun 01 12:30:30 2011
+   6 |  60 |  600 |  600 |  600 | s_6  | s_60  | s_600  | Wed Jun 01 12:30:30 2011
+   7 |  70 |  700 |  700 |  700 | s_7  | s_70  | s_700  | Wed Jun 01 12:30:30 2011
+   8 |  80 |  800 |  800 |  800 | s_8  | s_80  | s_800  | Wed Jun 01 12:30:30 2011
+   9 |  90 |  900 |  900 |  900 | s_9  | s_90  | s_900  | Wed Jun 01 12:30:30 2011
+  10 | 100 | 1000 | 1000 | 1000 | s_10 | s_100 | s_1000 | Wed Jun 01 12:30:30 2011
+  11 | 110 | 1100 | 1100 | 1100 | s_11 | s_110 | s_1100 | Wed Jun 01 12:30:30 2011
+  12 | 120 | 1200 | 1200 | 1200 | s_12 | s_120 | s_1200 | Wed Jun 01 12:30:30 2011
+  13 | 130 | 1300 | 1300 | 1300 | s_13 | s_130 | s_1300 | Wed Jun 01 12:30:30 2011
+  14 | 140 | 1400 | 1400 | 1400 | s_14 | s_140 | s_1400 | Wed Jun 01 12:30:30 2011
+  15 | 150 | 1500 | 1500 | 1500 | s_15 | s_150 | s_1500 | Wed Jun 01 12:30:30 2011
+  16 | 160 | 1600 | 1600 | 1600 | s_16 | s_160 | s_1600 | Wed Jun 01 12:30:30 2011
+  17 | 170 | 1700 | 1700 | 1700 | s_17 | s_170 | s_1700 | Wed Jun 01 12:30:30 2011
+  18 | 180 | 1800 | 1800 | 1800 | s_18 | s_180 | s_1800 | Wed Jun 01 12:30:30 2011
+  19 | 190 | 1900 | 1900 | 1900 | s_19 | s_190 | s_1900 | Wed Jun 01 12:30:30 2011
+  20 | 200 | 2000 | 2000 | 2000 | s_20 | s_200 | s_2000 | Wed Jun 01 12:30:30 2011
+  21 | 210 | 2100 | 2100 | 2100 | s_21 | s_210 | s_2100 | Wed Jun 01 12:30:30 2011
+  22 | 220 | 2200 | 2200 | 2200 | s_22 | s_220 | s_2200 | Wed Jun 01 12:30:30 2011
+  23 | 230 | 2300 | 2300 | 2300 | s_23 | s_230 | s_2300 | Wed Jun 01 12:30:30 2011
+  24 | 240 | 2400 | 2400 | 2400 | s_24 | s_240 | s_2400 | Wed Jun 01 12:30:30 2011
+  25 | 250 | 2500 | 2500 | 2500 | s_25 | s_250 | s_2500 | Wed Jun 01 12:30:30 2011
+  26 | 260 | 2600 | 2600 | 2600 | s_26 | s_260 | s_2600 | Wed Jun 01 12:30:30 2011
+  27 | 270 | 2700 | 2700 | 2700 | s_27 | s_270 | s_2700 | Wed Jun 01 12:30:30 2011
+  28 | 280 | 2800 | 2800 | 2800 | s_28 | s_280 | s_2800 | Wed Jun 01 12:30:30 2011
+  29 | 290 | 2900 | 2900 | 2900 | s_29 | s_290 | s_2900 | Wed Jun 01 12:30:30 2011
+  30 | 300 | 3000 | 3000 | 3000 | s_30 | s_300 | s_3000 | Wed Jun 01 12:30:30 2011
+(30 rows)
+
+DROP EXTERNAL TABLE bigcsv;
+--
+-- Test TEXT format on a file with many fields with deprecated ACCESSOR TextFileAccessor and deprecated RESOLVER TextResolver
+--
+CREATE EXTERNAL TABLE bigtext (s1 text, 
+                               s2 text, 
+							   s3 text, 
+							   d1 timestamp, 
+							   n1 int, 
+							   n2 int, 
+							   n3 int, 
+							   n4 int, 
+							   n5 int, 
+							   n6 int, 
+							   n7 int,
+                               s11 text, 
+							   s12 text, 
+							   s13 text, 
+							   d11 timestamp, 
+							   n11 int, 
+							   n12 int, 
+							   n13 int, 
+							   n14 int, 
+							   n15 int, 
+							   n16 int, 
+							   n17 int)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/text_data.csv?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.TextFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.TextResolver')
+FORMAT 'TEXT' (DELIMITER ',');
+SELECT n1, n2, n3, n4, n5, s1, s2, s3, d1 FROM bigtext ORDER BY n1;
+ n1 | n2  |  n3  |  n4  |  n5  |  s1  |  s2   |   s3   |            d1            
+----+-----+------+------+------+------+-------+--------+--------------------------
+  1 |  10 |  100 |  100 |  100 | s_1  | s_10  | s_100  | Wed Jun 01 12:30:30 2011
+  2 |  20 |  200 |  200 |  200 | s_2  | s_20  | s_200  | Wed Jun 01 12:30:30 2011
+  3 |  30 |  300 |  300 |  300 | s_3  | s_30  | s_300  | Wed Jun 01 12:30:30 2011
+  4 |  40 |  400 |  400 |  400 | s_4  | s_40  | s_400  | Wed Jun 01 12:30:30 2011
+  5 |  50 |  500 |  500 |  500 | s_5  | s_50  | s_500  | Wed Jun 01 12:30:30 2011
+  6 |  60 |  600 |  600 |  600 | s_6  | s_60  | s_600  | Wed Jun 01 12:30:30 2011
+  7 |  70 |  700 |  700 |  700 | s_7  | s_70  | s_700  | Wed Jun 01 12:30:30 2011
+  8 |  80 |  800 |  800 |  800 | s_8  | s_80  | s_800  | Wed Jun 01 12:30:30 2011
+  9 |  90 |  900 |  900 |  900 | s_9  | s_90  | s_900  | Wed Jun 01 12:30:30 2011
+ 10 | 100 | 1000 | 1000 | 1000 | s_10 | s_100 | s_1000 | Wed Jun 01 12:30:30 2011
+ 11 | 110 | 1100 | 1100 | 1100 | s_11 | s_110 | s_1100 | Wed Jun 01 12:30:30 2011
+ 12 | 120 | 1200 | 1200 | 1200 | s_12 | s_120 | s_1200 | Wed Jun 01 12:30:30 2011
+ 13 | 130 | 1300 | 1300 | 1300 | s_13 | s_130 | s_1300 | Wed Jun 01 12:30:30 2011
+ 14 | 140 | 1400 | 1400 | 1400 | s_14 | s_140 | s_1400 | Wed Jun 01 12:30:30 2011
+ 15 | 150 | 1500 | 1500 | 1500 | s_15 | s_150 | s_1500 | Wed Jun 01 12:30:30 2011
+ 16 | 160 | 1600 | 1600 | 1600 | s_16 | s_160 | s_1600 | Wed Jun 01 12:30:30 2011
+ 17 | 170 | 1700 | 1700 | 1700 | s_17 | s_170 | s_1700 | Wed Jun 01 12:30:30 2011
+ 18 | 180 | 1800 | 1800 | 1800 | s_18 | s_180 | s_1800 | Wed Jun 01 12:30:30 2011
+ 19 | 190 | 1900 | 1900 | 1900 | s_19 | s_190 | s_1900 | Wed Jun 01 12:30:30 2011
+ 20 | 200 | 2000 | 2000 | 2000 | s_20 | s_200 | s_2000 | Wed Jun 01 12:30:30 2011
+ 21 | 210 | 2100 | 2100 | 2100 | s_21 | s_210 | s_2100 | Wed Jun 01 12:30:30 2011
+ 22 | 220 | 2200 | 2200 | 2200 | s_22 | s_220 | s_2200 | Wed Jun 01 12:30:30 2011
+ 23 | 230 | 2300 | 2300 | 2300 | s_23 | s_230 | s_2300 | Wed Jun 01 12:30:30 2011
+ 24 | 240 | 2400 | 2400 | 2400 | s_24 | s_240 | s_2400 | Wed Jun 01 12:30:30 2011
+ 25 | 250 | 2500 | 2500 | 2500 | s_25 | s_250 | s_2500 | Wed Jun 01 12:30:30 2011
+ 26 | 260 | 2600 | 2600 | 2600 | s_26 | s_260 | s_2600 | Wed Jun 01 12:30:30 2011
+ 27 | 270 | 2700 | 2700 | 2700 | s_27 | s_270 | s_2700 | Wed Jun 01 12:30:30 2011
+ 28 | 280 | 2800 | 2800 | 2800 | s_28 | s_280 | s_2800 | Wed Jun 01 12:30:30 2011
+ 29 | 290 | 2900 | 2900 | 2900 | s_29 | s_290 | s_2900 | Wed Jun 01 12:30:30 2011
+ 30 | 300 | 3000 | 3000 | 3000 | s_30 | s_300 | s_3000 | Wed Jun 01 12:30:30 2011
+(30 rows)
+
+SELECT n11, n12, n13, n14, n15, s11, s12, s13, d11 FROM bigtext ORDER BY n11;
+ n11 | n12 | n13  | n14  | n15  | s11  |  s12  |  s13   |           d11            
+-----+-----+------+------+------+------+-------+--------+--------------------------
+   1 |  10 |  100 |  100 |  100 | s_1  | s_10  | s_100  | Wed Jun 01 12:30:30 2011
+   2 |  20 |  200 |  200 |  200 | s_2  | s_20  | s_200  | Wed Jun 01 12:30:30 2011
+   3 |  30 |  300 |  300 |  300 | s_3  | s_30  | s_300  | Wed Jun 01 12:30:30 2011
+   4 |  40 |  400 |  400 |  400 | s_4  | s_40  | s_400  | Wed Jun 01 12:30:30 2011
+   5 |  50 |  500 |  500 |  500 | s_5  | s_50  | s_500  | Wed Jun 01 12:30:30 2011
+   6 |  60 |  600 |  600 |  600 | s_6  | s_60  | s_600  | Wed Jun 01 12:30:30 2011
+   7 |  70 |  700 |  700 |  700 | s_7  | s_70  | s_700  | Wed Jun 01 12:30:30 2011
+   8 |  80 |  800 |  800 |  800 | s_8  | s_80  | s_800  | Wed Jun 01 12:30:30 2011
+   9 |  90 |  900 |  900 |  900 | s_9  | s_90  | s_900  | Wed Jun 01 12:30:30 2011
+  10 | 100 | 1000 | 1000 | 1000 | s_10 | s_100 | s_1000 | Wed Jun 01 12:30:30 2011
+  11 | 110 | 1100 | 1100 | 1100 | s_11 | s_110 | s_1100 | Wed Jun 01 12:30:30 2011
+  12 | 120 | 1200 | 1200 | 1200 | s_12 | s_120 | s_1200 | Wed Jun 01 12:30:30 2011
+  13 | 130 | 1300 | 1300 | 1300 | s_13 | s_130 | s_1300 | Wed Jun 01 12:30:30 2011
+  14 | 140 | 1400 | 1400 | 1400 | s_14 | s_140 | s_1400 | Wed Jun 01 12:30:30 2011
+  15 | 150 | 1500 | 1500 | 1500 | s_15 | s_150 | s_1500 | Wed Jun 01 12:30:30 2011
+  16 | 160 | 1600 | 1600 | 1600 | s_16 | s_160 | s_1600 | Wed Jun 01 12:30:30 2011
+  17 | 170 | 1700 | 1700 | 1700 | s_17 | s_170 | s_1700 | Wed Jun 01 12:30:30 2011
+  18 | 180 | 1800 | 1800 | 1800 | s_18 | s_180 | s_1800 | Wed Jun 01 12:30:30 2011
+  19 | 190 | 1900 | 1900 | 1900 | s_19 | s_190 | s_1900 | Wed Jun 01 12:30:30 2011
+  20 | 200 | 2000 | 2000 | 2000 | s_20 | s_200 | s_2000 | Wed Jun 01 12:30:30 2011
+  21 | 210 | 2100 | 2100 | 2100 | s_21 | s_210 | s_2100 | Wed Jun 01 12:30:30 2011
+  22 | 220 | 2200 | 2200 | 2200 | s_22 | s_220 | s_2200 | Wed Jun 01 12:30:30 2011
+  23 | 230 | 2300 | 2300 | 2300 | s_23 | s_230 | s_2300 | Wed Jun 01 12:30:30 2011
+  24 | 240 | 2400 | 2400 | 2400 | s_24 | s_240 | s_2400 | Wed Jun 01 12:30:30 2011
+  25 | 250 | 2500 | 2500 | 2500 | s_25 | s_250 | s_2500 | Wed Jun 01 12:30:30 2011
+  26 | 260 | 2600 | 2600 | 2600 | s_26 | s_260 | s_2600 | Wed Jun 01 12:30:30 2011
+  27 | 270 | 2700 | 2700 | 2700 | s_27 | s_270 | s_2700 | Wed Jun 01 12:30:30 2011
+  28 | 280 | 2800 | 2800 | 2800 | s_28 | s_280 | s_2800 | Wed Jun 01 12:30:30 2011
+  29 | 290 | 2900 | 2900 | 2900 | s_29 | s_290 | s_2900 | Wed Jun 01 12:30:30 2011
+  30 | 300 | 3000 | 3000 | 3000 | s_30 | s_300 | s_3000 | Wed Jun 01 12:30:30 2011
+(30 rows)
+
+DROP EXTERNAL TABLE bigtext;
+--
+-- Test TEXT format on a file with many fields with deprecated ACCESSOR LineReaderAccessor
+--
+CREATE EXTERNAL TABLE linereader (s1 text, 
+                                  s2 text, 
+							      s3 text, 
+							      d1 timestamp, 
+							      n1 int, 
+							      n2 int, 
+							      n3 int, 
+							      n4 int, 
+							      n5 int, 
+							      n6 int, 
+							      n7 int,
+                                  s11 text, 
+							      s12 text, 
+							      s13 text, 
+							      d11 timestamp, 
+							      n11 int, 
+							      n12 int, 
+							      n13 int, 
+							      n14 int, 
+							      n15 int, 
+							      n16 int, 
+							      n17 int)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/text_data.csv?PROFILE=HdfsTextSimple')
+FORMAT 'TEXT' (DELIMITER ',');
+SELECT n1, n2, n3, n4, n5, s1, s2, s3, d1 FROM linereader ORDER BY n1;
+ n1 | n2  |  n3  |  n4  |  n5  |  s1  |  s2   |   s3   |            d1            
+----+-----+------+------+------+------+-------+--------+--------------------------
+  1 |  10 |  100 |  100 |  100 | s_1  | s_10  | s_100  | Wed Jun 01 12:30:30 2011
+  2 |  20 |  200 |  200 |  200 | s_2  | s_20  | s_200  | Wed Jun 01 12:30:30 2011
+  3 |  30 |  300 |  300 |  300 | s_3  | s_30  | s_300  | Wed Jun 01 12:30:30 2011
+  4 |  40 |  400 |  400 |  400 | s_4  | s_40  | s_400  | Wed Jun 01 12:30:30 2011
+  5 |  50 |  500 |  500 |  500 | s_5  | s_50  | s_500  | Wed Jun 01 12:30:30 2011
+  6 |  60 |  600 |  600 |  600 | s_6  | s_60  | s_600  | Wed Jun 01 12:30:30 2011
+  7 |  70 |  700 |  700 |  700 | s_7  | s_70  | s_700  | Wed Jun 01 12:30:30 2011
+  8 |  80 |  800 |  800 |  800 | s_8  | s_80  | s_800  | Wed Jun 01 12:30:30 2011
+  9 |  90 |  900 |  900 |  900 | s_9  | s_90  | s_900  | Wed Jun 01 12:30:30 2011
+ 10 | 100 | 1000 | 1000 | 1000 | s_10 | s_100 | s_1000 | Wed Jun 01 12:30:30 2011
+ 11 | 110 | 1100 | 1100 | 1100 | s_11 | s_110 | s_1100 | Wed Jun 01 12:30:30 2011
+ 12 | 120 | 1200 | 1200 | 1200 | s_12 | s_120 | s_1200 | Wed Jun 01 12:30:30 2011
+ 13 | 130 | 1300 | 1300 | 1300 | s_13 | s_130 | s_1300 | Wed Jun 01 12:30:30 2011
+ 14 | 140 | 1400 | 1400 | 1400 | s_14 | s_140 | s_1400 | Wed Jun 01 12:30:30 2011
+ 15 | 150 | 1500 | 1500 | 1500 | s_15 | s_150 | s_1500 | Wed Jun 01 12:30:30 2011
+ 16 | 160 | 1600 | 1600 | 1600 | s_16 | s_160 | s_1600 | Wed Jun 01 12:30:30 2011
+ 17 | 170 | 1700 | 1700 | 1700 | s_17 | s_170 | s_1700 | Wed Jun 01 12:30:30 2011
+ 18 | 180 | 1800 | 1800 | 1800 | s_18 | s_180 | s_1800 | Wed Jun 01 12:30:30 2011
+ 19 | 190 | 1900 | 1900 | 1900 | s_19 | s_190 | s_1900 | Wed Jun 01 12:30:30 2011
+ 20 | 200 | 2000 | 2000 | 2000 | s_20 | s_200 | s_2000 | Wed Jun 01 12:30:30 2011
+ 21 | 210 | 2100 | 2100 | 2100 | s_21 | s_210 | s_2100 | Wed Jun 01 12:30:30 2011
+ 22 | 220 | 2200 | 2200 | 2200 | s_22 | s_220 | s_2200 | Wed Jun 01 12:30:30 2011
+ 23 | 230 | 2300 | 2300 | 2300 | s_23 | s_230 | s_2300 | Wed Jun 01 12:30:30 2011
+ 24 | 240 | 2400 | 2400 | 2400 | s_24 | s_240 | s_2400 | Wed Jun 01 12:30:30 2011
+ 25 | 250 | 2500 | 2500 | 2500 | s_25 | s_250 | s_2500 | Wed Jun 01 12:30:30 2011
+ 26 | 260 | 2600 | 2600 | 2600 | s_26 | s_260 | s_2600 | Wed Jun 01 12:30:30 2011
+ 27 | 270 | 2700 | 2700 | 2700 | s_27 | s_270 | s_2700 | Wed Jun 01 12:30:30 2011
+ 28 | 280 | 2800 | 2800 | 2800 | s_28 | s_280 | s_2800 | Wed Jun 01 12:30:30 2011
+ 29 | 290 | 2900 | 2900 | 2900 | s_29 | s_290 | s_2900 | Wed Jun 01 12:30:30 2011
+ 30 | 300 | 3000 | 3000 | 3000 | s_30 | s_300 | s_3000 | Wed Jun 01 12:30:30 2011
+(30 rows)
+
+SELECT n11, n12, n13, n14, n15, s11, s12, s13, d11 FROM linereader ORDER BY n11;
+ n11 | n12 | n13  | n14  | n15  | s11  |  s12  |  s13   |           d11            
+-----+-----+------+------+------+------+-------+--------+--------------------------
+   1 |  10 |  100 |  100 |  100 | s_1  | s_10  | s_100  | Wed Jun 01 12:30:30 2011
+   2 |  20 |  200 |  200 |  200 | s_2  | s_20  | s_200  | Wed Jun 01 12:30:30 2011
+   3 |  30 |  300 |  300 |  300 | s_3  | s_30  | s_300  | Wed Jun 01 12:30:30 2011
+   4 |  40 |  400 |  400 |  400 | s_4  | s_40  | s_400  | Wed Jun 01 12:30:30 2011
+   5 |  50 |  500 |  500 |  500 | s_5  | s_50  | s_500  | Wed Jun 01 12:30:30 2011
+   6 |  60 |  600 |  600 |  600 | s_6  | s_60  | s_600  | Wed Jun 01 12:30:30 2011
+   7 |  70 |  700 |  700 |  700 | s_7  | s_70  | s_700  | Wed Jun 01 12:30:30 2011
+   8 |  80 |  800 |  800 |  800 | s_8  | s_80  | s_800  | Wed Jun 01 12:30:30 2011
+   9 |  90 |  900 |  900 |  900 | s_9  | s_90  | s_900  | Wed Jun 01 12:30:30 2011
+  10 | 100 | 1000 | 1000 | 1000 | s_10 | s_100 | s_1000 | Wed Jun 01 12:30:30 2011
+  11 | 110 | 1100 | 1100 | 1100 | s_11 | s_110 | s_1100 | Wed Jun 01 12:30:30 2011
+  12 | 120 | 1200 | 1200 | 1200 | s_12 | s_120 | s_1200 | Wed Jun 01 12:30:30 2011
+  13 | 130 | 1300 | 1300 | 1300 | s_13 | s_130 | s_1300 | Wed Jun 01 12:30:30 2011
+  14 | 140 | 1400 | 1400 | 1400 | s_14 | s_140 | s_1400 | Wed Jun 01 12:30:30 2011
+  15 | 150 | 1500 | 1500 | 1500 | s_15 | s_150 | s_1500 | Wed Jun 01 12:30:30 2011
+  16 | 160 | 1600 | 1600 | 1600 | s_16 | s_160 | s_1600 | Wed Jun 01 12:30:30 2011
+  17 | 170 | 1700 | 1700 | 1700 | s_17 | s_170 | s_1700 | Wed Jun 01 12:30:30 2011
+  18 | 180 | 1800 | 1800 | 1800 | s_18 | s_180 | s_1800 | Wed Jun 01 12:30:30 2011
+  19 | 190 | 1900 | 1900 | 1900 | s_19 | s_190 | s_1900 | Wed Jun 01 12:30:30 2011
+  20 | 200 | 2000 | 2000 | 2000 | s_20 | s_200 | s_2000 | Wed Jun 01 12:30:30 2011
+  21 | 210 | 2100 | 2100 | 2100 | s_21 | s_210 | s_2100 | Wed Jun 01 12:30:30 2011
+  22 | 220 | 2200 | 2200 | 2200 | s_22 | s_220 | s_2200 | Wed Jun 01 12:30:30 2011
+  23 | 230 | 2300 | 2300 | 2300 | s_23 | s_230 | s_2300 | Wed Jun 01 12:30:30 2011
+  24 | 240 | 2400 | 2400 | 2400 | s_24 | s_240 | s_2400 | Wed Jun 01 12:30:30 2011
+  25 | 250 | 2500 | 2500 | 2500 | s_25 | s_250 | s_2500 | Wed Jun 01 12:30:30 2011
+  26 | 260 | 2600 | 2600 | 2600 | s_26 | s_260 | s_2600 | Wed Jun 01 12:30:30 2011
+  27 | 270 | 2700 | 2700 | 2700 | s_27 | s_270 | s_2700 | Wed Jun 01 12:30:30 2011
+  28 | 280 | 2800 | 2800 | 2800 | s_28 | s_280 | s_2800 | Wed Jun 01 12:30:30 2011
+  29 | 290 | 2900 | 2900 | 2900 | s_29 | s_290 | s_2900 | Wed Jun 01 12:30:30 2011
+  30 | 300 | 3000 | 3000 | 3000 | s_30 | s_300 | s_3000 | Wed Jun 01 12:30:30 2011
+(30 rows)
+
+DROP EXTERNAL TABLE linereader;
+--
+-- Test Writable data inside a SequenceFile (read only).
+--
+CREATE EXTERNAL TABLE seqwr(tmp1  timestamp, 
+                            num1  integer, 
+                            num2  integer, 
+                            num3  integer, 
+                            num4  integer,
+                            t1    text, 
+                            t2    text, 
+                            t3    text, 
+                            t4    text, 
+                            t5    text, 
+                            t6    text, 
+                            dub1  double precision, 
+                            dub2  double precision, 
+                            dub3  double precision, 
+                            ft1   real, 
+                            ft2   real, 
+                            ft3   real, 
+                            ln1   bigint, 
+                            ln2   bigint, 
+                            ln3   bigint, 
+                            bt    bytea,
+							bool1 boolean,
+							bool2 boolean,
+							bool3 boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable_inside_sequence.tbl?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt, bool1, bool2, bool3 FROM seqwr ORDER BY num1;
+             tmp1             | num1 | num2 | num3 | num4 | ln1 | ln2 | ln3 |    bt    | bool1 | bool2 | bool3 
+------------------------------+------+------+------+------+-----+-----+-----+----------+-------+-------+-------
+ Mon Jun 17 14:35:40.975 2013 |   10 |   20 |   10 |   20 |  30 |  40 |  15 | Writable | f     | f     | t
+ Mon Jun 17 14:35:40.979 2013 |   20 |   40 |   20 |   40 |  60 |  80 |  25 | Writable | f     | f     | t
+ Mon Jun 17 14:35:40.979 2013 |   30 |   60 |   30 |   60 |  90 | 120 |  35 | Writable | f     | f     | t
+ Mon Jun 17 14:35:40.983 2013 |   40 |   80 |   40 |   80 | 120 | 160 |  45 | Writable | f     | f     | t
+ Mon Jun 17 14:35:40.984 2013 |   50 |  100 |   50 |  100 | 150 | 200 |  55 | Writable | f     | f     | t
+ Mon Jun 17 14:35:40.984 2013 |   60 |  120 |   60 |  120 | 180 | 240 |  65 | Writable | f     | f     | t
+ Mon Jun 17 14:35:40.984 2013 |   70 |  140 |   70 |  140 | 210 | 280 |  75 | Writable | f     | f     | t
+ Mon Jun 17 14:35:40.984 2013 |   80 |  160 |   80 |  160 | 240 | 320 |  85 | Writable | f     | f     | t
+ Mon Jun 17 14:35:40.984 2013 |   90 |  180 |   90 |  180 | 270 | 360 |  95 | Writable | f     | f     | t
+(9 rows)
+
+SELECT num1, t1, t2, t3 FROM seqwr ORDER BY num1;
+ num1 |               t1                |               t2                |               t3                
+------+---------------------------------+---------------------------------+---------------------------------
+   10 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   20 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   30 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   40 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   50 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   60 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   70 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   80 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   90 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+(9 rows)
+
+DROP EXTERNAL TABLE seqwr;
+--
+-- Test Avro data inside a SequenceFile (read only).
+--
+CREATE EXTERNAL TABLE seqav(tmp1 timestamp, 
+                            num1  integer, 
+                            num2  integer, 
+                            num3  integer, 
+                            num4  integer,
+                            t1    text,
+                            t2    text,
+                            t3    text,
+                            t4    text,
+                            t5    text,
+                            t6    text,
+                            dub1  double precision,
+                            dub2  double precision, 
+                            dub3  double precision, 
+                            ft1   real, 
+                            ft2   real, 
+                            ft3   real, 
+                            ln1   bigint, 
+                            ln2   bigint, 
+                            ln3   bigint, 
+                            bt    bytea,
+							bl    boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/avro_inside_sequence.tbl?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.AvroResolver&DATA-SCHEMA=regressPXFCustomAvro.avsc')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt, bl FROM seqav ORDER BY num1;
+             tmp1             | num1 | num2 | num3 | num4 | ln1  | ln2  | ln3 |    bt    | bl 
+------------------------------+------+------+------+------+------+------+-----+----------+----
+ Wed Jul 24 17:41:56.685 2013 |  200 |  400 |  200 |  400 |  600 |  800 | 205 | AvroDude | t
+ Wed Jul 24 17:41:56.892 2013 |  210 |  420 |  210 |  420 |  630 |  840 | 215 | AvroDude | t
+ Wed Jul 24 17:41:56.893 2013 |  220 |  440 |  220 |  440 |  660 |  880 | 225 | AvroDude | t
+ Wed Jul 24 17:41:56.895 2013 |  230 |  460 |  230 |  460 |  690 |  920 | 235 | AvroDude | t
+ Wed Jul 24 17:41:56.896 2013 |  240 |  480 |  240 |  480 |  720 |  960 | 245 | AvroDude | t
+ Wed Jul 24 17:41:56.898 2013 |  250 |  500 |  250 |  500 |  750 | 1000 | 255 | AvroDude | t
+ Wed Jul 24 17:41:56.899 2013 |  260 |  520 |  260 |  520 |  780 | 1040 | 265 | AvroDude | t
+ Wed Jul 24 17:41:56.9 2013   |  270 |  540 |  270 |  540 |  810 | 1080 | 275 | AvroDude | t
+ Wed Jul 24 17:41:56.902 2013 |  280 |  560 |  280 |  560 |  840 | 1120 | 285 | AvroDude | t
+ Wed Jul 24 17:41:56.904 2013 |  290 |  580 |  290 |  580 |  870 | 1160 | 295 | AvroDude | t
+ Wed Jul 24 17:41:56.905 2013 |  300 |  600 |  300 |  600 |  900 | 1200 | 305 | AvroDude | t
+ Wed Jul 24 17:41:56.906 2013 |  310 |  620 |  310 |  620 |  930 | 1240 | 315 | AvroDude | t
+ Wed Jul 24 17:41:56.908 2013 |  320 |  640 |  320 |  640 |  960 | 1280 | 325 | AvroDude | t
+ Wed Jul 24 17:41:56.909 2013 |  330 |  660 |  330 |  660 |  990 | 1320 | 335 | AvroDude | t
+ Wed Jul 24 17:41:56.911 2013 |  340 |  680 |  340 |  680 | 1020 | 1360 | 345 | AvroDude | t
+ Wed Jul 24 17:41:56.912 2013 |  350 |  700 |  350 |  700 | 1050 | 1400 | 355 | AvroDude | t
+ Wed Jul 24 17:41:56.913 2013 |  360 |  720 |  360 |  720 | 1080 | 1440 | 365 | AvroDude | t
+ Wed Jul 24 17:41:56.915 2013 |  370 |  740 |  370 |  740 | 1110 | 1480 | 375 | AvroDude | t
+ Wed Jul 24 17:41:56.916 2013 |  380 |  760 |  380 |  760 | 1140 | 1520 | 385 | AvroDude | t
+ Wed Jul 24 17:41:56.918 2013 |  390 |  780 |  390 |  780 | 1170 | 1560 | 395 | AvroDude | t
+ Wed Jul 24 17:41:56.919 2013 |  400 |  800 |  400 |  800 | 1200 | 1600 | 405 | AvroDude | t
+ Wed Jul 24 17:41:56.92 2013  |  410 |  820 |  410 |  820 | 1230 | 1640 | 415 | AvroDude | t
+ Wed Jul 24 17:41:56.922 2013 |  420 |  840 |  420 |  840 | 1260 | 1680 | 425 | AvroDude | t
+ Wed Jul 24 17:41:56.923 2013 |  430 |  860 |  430 |  860 | 1290 | 1720 | 435 | AvroDude | t
+ Wed Jul 24 17:41:56.925 2013 |  440 |  880 |  440 |  880 | 1320 | 1760 | 445 | AvroDude | t
+ Wed Jul 24 17:41:56.926 2013 |  450 |  900 |  450 |  900 | 1350 | 1800 | 455 | AvroDude | t
+ Wed Jul 24 17:41:56.927 2013 |  460 |  920 |  460 |  920 | 1380 | 1840 | 465 | AvroDude | t
+ Wed Jul 24 17:41:56.929 2013 |  470 |  940 |  470 |  940 | 1410 | 1880 | 475 | AvroDude | t
+ Wed Jul 24 17:41:56.93 2013  |  480 |  960 |  480 |  960 | 1440 | 1920 | 485 | AvroDude | t
+ Wed Jul 24 17:41:56.932 2013 |  490 |  980 |  490 |  980 | 1470 | 1960 | 495 | AvroDude | t
+(30 rows)
+
+SELECT num1, t1, t2, t3 FROM seqav ORDER BY num1;
+ num1 |               t1                |               t2                |               t3                
+------+---------------------------------+---------------------------------+---------------------------------
+  200 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  210 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  220 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  230 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  240 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  250 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  260 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  270 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  280 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  290 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  300 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  310 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  320 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  330 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  340 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  350 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  360 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  370 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  380 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  390 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  400 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  410 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  420 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  430 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  440 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  450 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  460 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  470 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  480 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  490 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+(30 rows)
+
+DROP EXTERNAL TABLE seqav;
+--
+-- Test file name with spaces.
+--
+CREATE EXTERNAL TABLE seqav_space(tmp1 timestamp, 
+                            num1  integer, 
+                            num2  integer, 
+                            num3  integer, 
+                            num4  integer,
+                            t1    text,
+                            t2    text,
+                            t3    text,
+                            t4    text,
+                            t5    text,
+                            t6    text,
+                            dub1  double precision,
+                            dub2  double precision, 
+                            dub3  double precision, 
+                            ft1   real, 
+                            ft2   real, 
+                            ft3   real, 
+                            ln1   bigint, 
+                            ln2   bigint, 
+                            ln3   bigint, 
+                            bt    bytea,
+							bl    boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/avro_inside_sequence.tbl?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.AvroResolver&DATA-SCHEMA=regress PXF Custom Avro1.avsc')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt, bl FROM seqav_space ORDER BY num1;
+             tmp1             | num1 | num2 | num3 | num4 | ln1  | ln2  | ln3 |    bt    | bl 
+------------------------------+------+------+------+------+------+------+-----+----------+----
+ Wed Jul 24 17:41:56.685 2013 |  200 |  400 |  200 |  400 |  600 |  800 | 205 | AvroDude | t
+ Wed Jul 24 17:41:56.892 2013 |  210 |  420 |  210 |  420 |  630 |  840 | 215 | AvroDude | t
+ Wed Jul 24 17:41:56.893 2013 |  220 |  440 |  220 |  440 |  660 |  880 | 225 | AvroDude | t
+ Wed Jul 24 17:41:56.895 2013 |  230 |  460 |  230 |  460 |  690 |  920 | 235 | AvroDude | t
+ Wed Jul 24 17:41:56.896 2013 |  240 |  480 |  240 |  480 |  720 |  960 | 245 | AvroDude | t
+ Wed Jul 24 17:41:56.898 2013 |  250 |  500 |  250 |  500 |  750 | 1000 | 255 | AvroDude | t
+ Wed Jul 24 17:41:56.899 2013 |  260 |  520 |  260 |  520 |  780 | 1040 | 265 | AvroDude | t
+ Wed Jul 24 17:41:56.9 2013   |  270 |  540 |  270 |  540 |  810 | 1080 | 275 | AvroDude | t
+ Wed Jul 24 17:41:56.902 2013 |  280 |  560 |  280 |  560 |  840 | 1120 | 285 | AvroDude | t
+ Wed Jul 24 17:41:56.904 2013 |  290 |  580 |  290 |  580 |  870 | 1160 | 295 | AvroDude | t
+ Wed Jul 24 17:41:56.905 2013 |  300 |  600 |  300 |  600 |  900 | 1200 | 305 | AvroDude | t
+ Wed Jul 24 17:41:56.906 2013 |  310 |  620 |  310 |  620 |  930 | 1240 | 315 | AvroDude | t
+ Wed Jul 24 17:41:56.908 2013 |  320 |  640 |  320 |  640 |  960 | 1280 | 325 | AvroDude | t
+ Wed Jul 24 17:41:56.909 2013 |  330 |  660 |  330 |  660 |  990 | 1320 | 335 | AvroDude | t
+ Wed Jul 24 17:41:56.911 2013 |  340 |  680 |  340 |  680 | 1020 | 1360 | 345 | AvroDude | t
+ Wed Jul 24 17:41:56.912 2013 |  350 |  700 |  350 |  700 | 1050 | 1400 | 355 | AvroDude | t
+ Wed Jul 24 17:41:56.913 2013 |  360 |  720 |  360 |  720 | 1080 | 1440 | 365 | AvroDude | t
+ Wed Jul 24 17:41:56.915 2013 |  370 |  740 |  370 |  740 | 1110 | 1480 | 375 | AvroDude | t
+ Wed Jul 24 17:41:56.916 2013 |  380 |  760 |  380 |  760 | 1140 | 1520 | 385 | AvroDude | t
+ Wed Jul 24 17:41:56.918 2013 |  390 |  780 |  390 |  780 | 1170 | 1560 | 395 | AvroDude | t
+ Wed Jul 24 17:41:56.919 2013 |  400 |  800 |  400 |  800 | 1200 | 1600 | 405 | AvroDude | t
+ Wed Jul 24 17:41:56.92 2013  |  410 |  820 |  410 |  820 | 1230 | 1640 | 415 | AvroDude | t
+ Wed Jul 24 17:41:56.922 2013 |  420 |  840 |  420 |  840 | 1260 | 1680 | 425 | AvroDude | t
+ Wed Jul 24 17:41:56.923 2013 |  430 |  860 |  430 |  860 | 1290 | 1720 | 435 | AvroDude | t
+ Wed Jul 24 17:41:56.925 2013 |  440 |  880 |  440 |  880 | 1320 | 1760 | 445 | AvroDude | t
+ Wed Jul 24 17:41:56.926 2013 |  450 |  900 |  450 |  900 | 1350 | 1800 | 455 | AvroDude | t
+ Wed Jul 24 17:41:56.927 2013 |  460 |  920 |  460 |  920 | 1380 | 1840 | 465 | AvroDude | t
+ Wed Jul 24 17:41:56.929 2013 |  470 |  940 |  470 |  940 | 1410 | 1880 | 475 | AvroDude | t
+ Wed Jul 24 17:41:56.93 2013  |  480 |  960 |  480 |  960 | 1440 | 1920 | 485 | AvroDude | t
+ Wed Jul 24 17:41:56.932 2013 |  490 |  980 |  490 |  980 | 1470 | 1960 | 495 | AvroDude | t
+(30 rows)
+
+DROP EXTERNAL TABLE seqav_space;
+--
+-- Test options are case insensitive
+--
+CREATE EXTERNAL TABLE seqav_case(tmp1 timestamp, 
+                            num1  integer, 
+                            num2  integer, 
+                            num3  integer, 
+                            num4  integer,
+                            t1    text,
+                            t2    text,
+                            t3    text,
+                            t4    text,
+                            t5    text,
+                            t6    text,
+                            dub1  double precision,
+                            dub2  double precision, 
+                            dub3  double precision, 
+                            ft1   real, 
+                            ft2   real, 
+                            ft3   real, 
+                            ln1   bigint, 
+                            ln2   bigint, 
+                            ln3   bigint, 
+                            bt    bytea,
+							bl    boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/avro_inside_sequence.tbl?fragmenter=com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter&Accessor=com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor&ReSoLvEr=com.pivotal.pxf.plugins.hdfs.AvroResolver&Data-Schema=regressPXFCustomAvro.avsc')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt, bl FROM seqav_case ORDER BY num1;
+             tmp1             | num1 | num2 | num3 | num4 | ln1  | ln2  | ln3 |    bt    | bl 
+------------------------------+------+------+------+------+------+------+-----+----------+----
+ Wed Jul 24 17:41:56.685 2013 |  200 |  400 |  200 |  400 |  600 |  800 | 205 | AvroDude | t
+ Wed Jul 24 17:41:56.892 2013 |  210 |  420 |  210 |  420 |  630 |  840 | 215 | AvroDude | t
+ Wed Jul 24 17:41:56.893 2013 |  220 |  440 |  220 |  440 |  660 |  880 | 225 | AvroDude | t
+ Wed Jul 24 17:41:56.895 2013 |  230 |  460 |  230 |  460 |  690 |  920 | 235 | AvroDude | t
+ Wed Jul 24 17:41:56.896 2013 |  240 |  480 |  240 |  480 |  720 |  960 | 245 | AvroDude | t
+ Wed Jul 24 17:41:56.898 2013 |  250 |  500 |  250 |  500 |  750 | 1000 | 255 | AvroDude | t
+ Wed Jul 24 17:41:56.899 2013 |  260 |  520 |  260 |  520 |  780 | 1040 | 265 | AvroDude | t
+ Wed Jul 24 17:41:56.9 2013   |  270 |  540 |  270 |  540 |  810 | 1080 | 275 | AvroDude | t
+ Wed Jul 24 17:41:56.902 2013 |  280 |  560 |  280 |  560 |  840 | 1120 | 285 | AvroDude | t
+ Wed Jul 24 17:41:56.904 2013 |  290 |  580 |  290 |  580 |  870 | 1160 | 295 | AvroDude | t
+ Wed Jul 24 17:41:56.905 2013 |  300 |  600 |  300 |  600 |  900 | 1200 | 305 | AvroDude | t
+ Wed Jul 24 17:41:56.906 2013 |  310 |  620 |  310 |  620 |  930 | 1240 | 315 | AvroDude | t
+ Wed Jul 24 17:41:56.908 2013 |  320 |  640 |  320 |  640 |  960 | 1280 | 325 | AvroDude | t
+ Wed Jul 24 17:41:56.909 2013 |  330 |  660 |  330 |  660 |  990 | 1320 | 335 | AvroDude | t
+ Wed Jul 24 17:41:56.911 2013 |  340 |  680 |  340 |  680 | 1020 | 1360 | 345 | AvroDude | t
+ Wed Jul 24 17:41:56.912 2013 |  350 |  700 |  350 |  700 | 1050 | 1400 | 355 | AvroDude | t
+ Wed Jul 24 17:41:56.913 2013 |  360 |  720 |  360 |  720 | 1080 | 1440 | 365 | AvroDude | t
+ Wed Jul 24 17:41:56.915 2013 |  370 |  740 |  370 |  740 | 1110 | 1480 | 375 | AvroDude | t
+ Wed Jul 24 17:41:56.916 2013 |  380 |  760 |  380 |  760 | 1140 | 1520 | 385 | AvroDude | t
+ Wed Jul 24 17:41:56.918 2013 |  390 |  780 |  390 |  780 | 1170 | 1560 | 395 | AvroDude | t
+ Wed Jul 24 17:41:56.919 2013 |  400 |  800 |  400 |  800 | 1200 | 1600 | 405 | AvroDude | t
+ Wed Jul 24 17:41:56.92 2013  |  410 |  820 |  410 |  820 | 1230 | 1640 | 415 | AvroDude | t
+ Wed Jul 24 17:41:56.922 2013 |  420 |  840 |  420 |  840 | 1260 | 1680 | 425 | AvroDude | t
+ Wed Jul 24 17:41:56.923 2013 |  430 |  860 |  430 |  860 | 1290 | 1720 | 435 | AvroDude | t
+ Wed Jul 24 17:41:56.925 2013 |  440 |  880 |  440 |  880 | 1320 | 1760 | 445 | AvroDude | t
+ Wed Jul 24 17:41:56.926 2013 |  450 |  900 |  450 |  900 | 1350 | 1800 | 455 | AvroDude | t
+ Wed Jul 24 17:41:56.927 2013 |  460 |  920 |  460 |  920 | 1380 | 1840 | 465 | AvroDude | t
+ Wed Jul 24 17:41:56.929 2013 |  470 |  940 |  470 |  940 | 1410 | 1880 | 475 | AvroDude | t
+ Wed Jul 24 17:41:56.93 2013  |  480 |  960 |  480 |  960 | 1440 | 1920 | 485 | AvroDude | t
+ Wed Jul 24 17:41:56.932 2013 |  490 |  980 |  490 |  980 | 1470 | 1960 | 495 | AvroDude | t
+(30 rows)
+
+DROP EXTERNAL TABLE seqav_case;
+--
+-- Test Avro data inside an AvroFile (read only).
+--
+CREATE EXTERNAL TABLE avfav(tmp1 timestamp, 
+                            num1  integer, 
+                            num2  integer, 
+                            num3  integer, 
+                            num4  integer,
+                            t1    text,
+                            t2    text,
+                            t3    text,
+                            t4    text,
+                            t5    text,
+                            t6    text,
+                            dub1  double precision,
+                            dub2  double precision, 
+                            dub3  double precision, 
+                            ft1   real, 
+                            ft2   real, 
+                            ft3   real, 
+                            ln1   bigint, 
+                            ln2   bigint, 
+                            ln3   bigint, 
+                            bt    bytea,
+							bl    boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/avroformat_inside_avrofile.avro?PROFILE=Avro')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt, bl FROM avfav ORDER BY num1;
+             tmp1             | num1 | num2 | num3 | num4 | ln1  | ln2  | ln3 |    bt    | bl 
+------------------------------+------+------+------+------+------+------+-----+----------+----
+ Wed Jul 24 18:16:38.43 2013  |  200 |  400 |  200 |  400 |  600 |  800 | 205 | AvroDude | t
+ Wed Jul 24 18:16:38.435 2013 |  210 |  420 |  210 |  420 |  630 |  840 | 215 | AvroDude | f
+ Wed Jul 24 18:16:38.436 2013 |  220 |  440 |  220 |  440 |  660 |  880 | 225 | AvroDude | t
+ Wed Jul 24 18:16:38.437 2013 |  230 |  460 |  230 |  460 |  690 |  920 | 235 | AvroDude | f
+ Wed Jul 24 18:16:38.439 2013 |  240 |  480 |  240 |  480 |  720 |  960 | 245 | AvroDude | t
+ Wed Jul 24 18:16:38.44 2013  |  250 |  500 |  250 |  500 |  750 | 1000 | 255 | AvroDude | f
+ Wed Jul 24 18:16:38.441 2013 |  260 |  520 |  260 |  520 |  780 | 1040 | 265 | AvroDude | t
+ Wed Jul 24 18:16:38.442 2013 |  270 |  540 |  270 |  540 |  810 | 1080 | 275 | AvroDude | f
+ Wed Jul 24 18:16:38.443 2013 |  280 |  560 |  280 |  560 |  840 | 1120 | 285 | AvroDude | t
+ Wed Jul 24 18:16:38.444 2013 |  290 |  580 |  290 |  580 |  870 | 1160 | 295 | AvroDude | f
+ Wed Jul 24 18:16:38.445 2013 |  300 |  600 |  300 |  600 |  900 | 1200 | 305 | AvroDude | t
+ Wed Jul 24 18:16:38.447 2013 |  310 |  620 |  310 |  620 |  930 | 1240 | 315 | AvroDude | f
+ Wed Jul 24 18:16:38.448 2013 |  320 |  640 |  320 |  640 |  960 | 1280 | 325 | AvroDude | t
+ Wed Jul 24 18:16:38.449 2013 |  330 |  660 |  330 |  660 |  990 | 1320 | 335 | AvroDude | f
+ Wed Jul 24 18:16:38.45 2013  |  340 |  680 |  340 |  680 | 1020 | 1360 | 345 | AvroDude | t
+ Wed Jul 24 18:16:38.451 2013 |  350 |  700 |  350 |  700 | 1050 | 1400 | 355 | AvroDude | f
+ Wed Jul 24 18:16:38.452 2013 |  360 |  720 |  360 |  720 | 1080 | 1440 | 365 | AvroDude | t
+ Wed Jul 24 18:16:38.453 2013 |  370 |  740 |  370 |  740 | 1110 | 1480 | 375 | AvroDude | f
+ Wed Jul 24 18:16:38.455 2013 |  380 |  760 |  380 |  760 | 1140 | 1520 | 385 | AvroDude | t
+ Wed Jul 24 18:16:38.456 2013 |  390 |  780 |  390 |  780 | 1170 | 1560 | 395 | AvroDude | f
+ Wed Jul 24 18:16:38.457 2013 |  400 |  800 |  400 |  800 | 1200 | 1600 | 405 | AvroDude | t
+ Wed Jul 24 18:16:38.458 2013 |  410 |  820 |  410 |  820 | 1230 | 1640 | 415 | AvroDude | f
+ Wed Jul 24 18:16:38.459 2013 |  420 |  840 |  420 |  840 | 1260 | 1680 | 425 | AvroDude | t
+ Wed Jul 24 18:16:38.46 2013  |  430 |  860 |  430 |  860 | 1290 | 1720 | 435 | AvroDude | f
+ Wed Jul 24 18:16:38.461 2013 |  440 |  880 |  440 |  880 | 1320 | 1760 | 445 | AvroDude | t
+ Wed Jul 24 18:16:38.463 2013 |  450 |  900 |  450 |  900 | 1350 | 1800 | 455 | AvroDude | f
+ Wed Jul 24 18:16:38.464 2013 |  460 |  920 |  460 |  920 | 1380 | 1840 | 465 | AvroDude | t
+ Wed Jul 24 18:16:38.465 2013 |  470 |  940 |  470 |  940 | 1410 | 1880 | 475 | AvroDude | f
+ Wed Jul 24 18:16:38.466 2013 |  480 |  960 |  480 |  960 | 1440 | 1920 | 485 | AvroDude | t
+ Wed Jul 24 18:16:38.467 2013 |  490 |  980 |  490 |  980 | 1470 | 1960 | 495 | AvroDude | f
+(30 rows)
+
+SELECT num1, t1, t2, t3 FROM avfav ORDER BY num1;
+ num1 |               t1                |               t2                |               t3                
+------+---------------------------------+---------------------------------+---------------------------------
+  200 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  210 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  220 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  230 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  240 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  250 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  260 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  270 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  280 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  290 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  300 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  310 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  320 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  330 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  340 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  350 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  360 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  370 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  380 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  390 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  400 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  410 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  420 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  430 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  440 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  450 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  460 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  470 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  480 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  490 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+(30 rows)
+
+DROP EXTERNAL TABLE avfav;
+--
+-- Test quoted line break
+--
+CREATE EXTERNAL TABLE small_csv(num1 int, 
+                                word text, 
+                                num2 int)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/small.csv?PROFILE=HdfsTextMulti')
+FORMAT 'CSV';
+SELECT * FROM small_csv ORDER BY num1;
+ num1 | word | num2 
+------+------+------
+    1 | aaa  |    2
+    2 | ab   |    4
+      : c      
+(2 rows)
+
+DROP EXTERNAL TABLE small_csv;
+--
+-- Test wildcards in file name
+--
+CREATE EXTERNAL TABLE seqwild(tmp1  timestamp, 
+                              num1  integer, 
+                              num2  integer, 
+                              num3  integer, 
+                              num4  integer,
+                              t1    text, 
+                              t2    text, 
+                              t3    text, 
+                              t4    text, 
+                              t5    text, 
+                              t6    text, 
+                              dub1  double precision, 
+                              dub2  double precision, 
+                              dub3  double precision, 
+                              ft1   real, 
+                              ft2   real, 
+                              ft3   real, 
+                              ln1   bigint, 
+                              ln2   bigint, 
+                              ln3   bigint, 
+                              bt    bytea,
+							  bool1 boolean,
+							  bool2 boolean,
+							  bool3 boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/wild/*.tbl?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT num1, t1, t2, t3 FROM seqwild ORDER BY num1;
+ num1 |               t1                |               t2                |               t3                
+------+---------------------------------+---------------------------------+---------------------------------
+   10 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   10 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   20 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   20 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   30 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   30 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   40 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   40 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   50 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   50 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   60 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   60 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   70 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   70 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   80 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   80 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   90 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   90 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  100 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  110 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  120 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  130 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  140 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  150 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  160 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  170 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  180 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  190 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+(28 rows)
+
+DROP EXTERNAL TABLE seqwild;
+CREATE EXTERNAL TABLE seqquestion(tmp1  timestamp, 
+                              num1  integer, 
+                              num2  integer, 
+                              num3  integer, 
+                              num4  integer,
+                              t1    text, 
+                              t2    text, 
+                              t3    text, 
+                              t4    text, 
+                              t5    text, 
+                              t6    text, 
+                              dub1  double precision, 
+                              dub2  double precision, 
+                              dub3  double precision, 
+                              ft1   real, 
+                              ft2   real, 
+                              ft3   real, 
+                              ln1   bigint, 
+                              ln2   bigint, 
+                              ln3   bigint, 
+                              bt    bytea,
+							  bool1 boolean,
+							  bool2 boolean,
+							  bool3 boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/wild/writable_inside_sequence?.tbl?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT num1, t1, t2, t3 FROM seqquestion ORDER BY num1;
+ num1 |               t1                |               t2                |               t3                
+------+---------------------------------+---------------------------------+---------------------------------
+   10 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   10 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   20 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   20 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   30 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   30 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   40 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   40 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   50 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   50 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   60 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   60 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   70 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   70 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   80 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   80 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   90 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+   90 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  100 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  110 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  120 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  130 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  140 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  150 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  160 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  170 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  180 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+  190 | strings_array_member_number___1 | strings_array_member_number___2 | strings_array_member_number___3
+(28 rows)
+
+DROP EXTERNAL TABLE seqquestion;
+--
+-- Test error in host name -- negative
+--
+CREATE EXTERNAL TABLE host_err(t1 text,
+                               a1 integer)
+LOCATION ('pxf://badhostname:50070/gpdb_regression_data/multiblock.tbl?PROFILE=HdfsTextSimple')
+FORMAT 'TEXT' (DELIMITER ',');
+SELECT t1, a1 FROM host_err ORDER BY t1 LIMIT 10; -- negative
+ERROR:  remote component error (0): Couldn't resolve host 'badhostname' (SOMEFILE:SOMEFUNC)
+DROP EXTERNAL TABLE host_err;
+--
+-- Test error in port -- negative
+--
+CREATE EXTERNAL TABLE port_err(t1 text,
+                               a1 integer)
+LOCATION ('pxf://@hostname@:12345/gpdb_regression_data/multiblock.tbl?PROFILE=HdfsTextSimple')
+FORMAT 'TEXT' (DELIMITER ',');
+SELECT t1, a1 FROM port_err ORDER BY t1 LIMIT 10; -- negative
+ERROR:  remote component error (0): CURL_CON_ERROR (SOMEFILE:SOMEFUNC)
+DROP EXTERNAL TABLE port_err;
+--
+-- Test empty file
+--
+CREATE EXTERNAL TABLE empty(t1 text,
+                            a1 integer)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/empty.tbl?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT * FROM empty ORDER BY t1;
+ t1 | a1 
+----+----
+(0 rows)
+
+DROP EXTERNAL TABLE empty;
+--
+-- Test analyze for HDFS file(read only).
+--
+CREATE EXTERNAL TABLE avfav_analyze_good(tmp1 timestamp, 
+                            num1  integer, 
+                            num2  integer, 
+                            num3  integer, 
+                            num4  integer,
+                            t1    text,
+                            t2    text,
+                            t3    text,
+                            t4    text,
+                            t5    text,
+                            t6    text,
+                            dub1  double precision,
+                            dub2  double precision, 
+                            dub3  double precision, 
+                            ft1   real, 
+                            ft2   real, 
+                            ft3   real, 
+                            ln1   bigint, 
+                            ln2   bigint, 
+                            ln3   bigint, 
+                            bt    bytea)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/avroformat_inside_avrofile.avro?PROFILE=Avro')
+FORMAT 'custom' (formatter='pxfwritable_import');
+-- Table that points to a wrong port.
+CREATE EXTERNAL TABLE avfav_analyze_bad_port(tmp1 timestamp, 
+                            num1  integer, 
+                            num2  integer, 
+                            num3  integer, 
+                            num4  integer,
+                            t1    text,
+                            t2    text,
+                            t3    text,
+                            t4    text,
+                            t5    text,
+                            t6    text,
+                            dub1  double precision,
+                            dub2  double precision, 
+                            dub3  double precision, 
+                            ft1   real, 
+                            ft2   real, 
+                            ft3   real, 
+                            ln1   bigint, 
+                            ln2   bigint, 
+                            ln3   bigint, 
+                            bt    bytea)
+LOCATION ('pxf://@hostname@:12345/gpdb_regression_data/avroformat_inside_avrofile.avro?PROFILE=Avro')
+FORMAT 'custom' (formatter='pxfwritable_import');
+-- Table that points to a wrong analyzer class.
+CREATE EXTERNAL TABLE avfav_analyze_bad_class(tmp1 timestamp, 
+                            num1  integer, 
+                            num2  integer, 
+                            num3  integer, 
+                            num4  integer,
+                            t1    text,
+                            t2    text,
+                            t3    text,
+                            t4    text,
+                            t5    text,
+                            t6    text,
+                            dub1  double precision,
+                            dub2  double precision, 
+                            dub3  double precision, 
+                            ft1   real, 
+                            ft2   real, 
+                            ft3   real, 
+                            ln1   bigint, 
+                            ln2   bigint, 
+                            ln3   bigint, 
+                            bt    bytea)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/avroformat_inside_avrofile.avro?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.AvroFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.AvroResolver&ANALYZER=NoSuchAnalyzer')
+FORMAT 'custom' (formatter='pxfwritable_import');
+-- verify that default stats remain after ANALYZE with GUC off
+SET pxf_enable_stat_collection = false;
+ANALYZE avfav_analyze_good;
+WARNING:  skipping "avfav_analyze_good" --- analyze for PXF tables is turned off by 'pxf_enable_stat_collection'
+SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_good' AND relpages = 1000 AND reltuples = 1000000;
+ count 
+-------
+     1
+(1 row)
+
+-- verify that stats get updated after ANALYZE with GUC on
+-- NOTE: we can't guarantee the same results on each machine. We just check that defaults were changed
+SET pxf_enable_stat_collection = true;
+ANALYZE avfav_analyze_good;
+SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_good' 
+                              AND relpages != 1000 AND relpages > 0
+                              AND reltuples != 1000000 AND reltuples > 0;
+ count 
+-------
+     1
+(1 row)
+
+-- verify that stats stay updated to most recent value after ANALYZE with GUC off
+SET pxf_enable_stat_collection = false;
+ANALYZE avfav_analyze_good;
+WARNING:  skipping "avfav_analyze_good" --- analyze for PXF tables is turned off by 'pxf_enable_stat_collection'
+SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_good' 
+                              AND relpages != 1000 AND relpages > 0
+                              AND reltuples != 1000000 AND reltuples > 0;
+ count 
+-------
+     1
+(1 row)
+
+-- verify that ANALYZE doesn't break while checking out a table that can't connect to the analyzer module
+-- TODO: find a way to verify that previous stat values remain.
+SET pxf_enable_stat_collection = true;
+ANALYZE avfav_analyze_bad_port;
+WARNING:  skipping "avfav_analyze_bad_port" --- error returned: remote component error (0): CURL_CON_ERROR
+SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_bad_port' AND relpages = 1000 AND reltuples = 1000000;
+ count 
+-------
+     1
+(1 row)
+
+ANALYZE avfav_analyze_bad_class;
+WARNING:  skipping "avfav_analyze_bad_class" --- error returned: remote component error (500) from 'SOME_IP:SOME_PORT': Problem accessing /gpdb/v10/Analyzer/getEstimatedStats. Reason:     Server Error   Caused by:  java.lang.ClassNotFoundException: NoSuchAnalyzer
+SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_bad_class' AND relpages = 1000 AND reltuples = 1000000;
+ count 
+-------
+     1
+(1 row)
+
+SET pxf_enable_stat_collection = true; --reset to default
+DROP EXTERNAL TABLE avfav_analyze_good;
+DROP EXTERNAL TABLE avfav_analyze_bad_port;
+DROP EXTERNAL TABLE avfav_analyze_bad_class;
+-- verify pg_remote_credentials exist with the expected structure
+SELECT * FROM pg_remote_credentials;
+ rcowner | rcservice | rcremoteuser | rcremotepassword 
+---------+-----------+--------------+------------------
+(0 rows)
+
+--
+-- Cleanup: delete all data that was copied into hdfs
+--
+-- start_ignore
+\! ${HADOOP_ROOT}/bin/hadoop fs -rm -r /gpdb_regression_data
+Deleted /gpdb_regression_data
+-- end_ignore

@@ -1,0 +1,109 @@
+{
+	"functions": {
+		"errcode_for_file_access": {
+			"filename": "src/backend/utils/error/elog.c" 
+		},
+		"ExceptionalCondition": {
+			"filename": "src/backend/utils/error/elog.c" 
+		},
+		"errstart": {
+			"filename": "src/backend/utils/error/elog.c" 
+		},
+		"errfinish": {
+			"filename": "src/backend/utils/error/elog.c" 
+		},
+		"elog_start": {
+			"filename": "src/backend/utils/error/elog.c" 
+		},
+		"elog_finish": {
+			"filename": "src/backend/utils/error/elog.c" 
+		},
+		"errmsg": {
+			"filename": "src/backend/utils/error/elog.c" 
+		},
+		"errdetail": {
+			"filename": "src/backend/utils/error/elog.c" 
+		},
+		"errhint": {
+			"filename": "src/backend/utils/error/elog.c" 
+		},
+		"errcode": {
+			"filename": "src/backend/utils/error/elog.c" 
+		},
+		"elog_internalerror": {
+			"filename": "src/backend/utils/error/elog.c" 
+		},
+		"errcontext": {
+			"filename": "src/backend/utils/error/elog.c" 
+		},
+		"gp_backtrace": {
+			"filename": "src/backend/utils/error/elog.c" 
+		},
+		"gp_stacktrace": {
+			"filename": "src/backend/utils/error/elog.c" 
+		},
+		"errOmitLocation": {
+			"filename": "src/backend/utils/error/elog.c" 
+		},
+		"errSentAlert": {
+			"filename": "src/backend/utils/error/elog.c" 
+		},
+		"BackoffBackendTick": {
+			"filename": "src/backend/postmaster/backoff.c" 	
+		},
+		"pgstat_initstats": {
+			"filename": "src/backend/postmaster/pgstat.c" 	
+		},
+		"pgstat_count_heap_update": {
+			"filename": "src/backend/postmaster/pgstat.c" 	
+		},
+		"pgstat_count_heap_insert": {
+			"filename": "src/backend/postmaster/pgstat.c" 	
+		},
+		"pgstat_reset_all": {
+			"filename": "src/backend/postmaster/pgstat.c" 	
+		},
+		"pgstat_count_heap_delete": {
+			"filename": "src/backend/postmaster/pgstat.c" 	
+		},
+		"PageInit": {
+			"filename": "src/backend/storage/page/bufpage.c" 	
+		},
+		"PageHeaderIsValid": {
+			"filename": "src/backend/storage/page/bufpage.c" 	
+		},
+		"BufferGetPage": {
+			"filename": "src/backend/storage/page/bufpage.c" 	
+		},
+		"PageAddItem": {
+			"filename": "src/backend/storage/page/bufpage.c" 	
+		},
+		"PageGetTempPage": {
+			"filename": "src/backend/storage/page/bufpage.c" 	
+		},
+		"PageRestoreTempPage": {
+			"filename": "src/backend/storage/page/bufpage.c" 	
+		},
+		"PageRepairFragmentation": {
+			"filename": "src/backend/storage/page/bufpage.c" 	
+		},
+		"PageGetFreeSpace": {
+			"filename": "src/backend/storage/page/bufpage.c" 	
+		},
+		"PageIndexTupleDelete": {
+			"filename": "src/backend/storage/page/bufpage.c" 	
+		},
+		"PageIndexMultiDelete": {
+			"filename": "src/backend/storage/page/bufpage.c" 	
+		}
+	},
+	"globals": {
+		"error_context_stack": {
+			"filename": "src/backend/utils/error/elog.c" 
+		},
+		"pgstat_track_counts": {
+			"filename": "src/backend/postmaster/pgstat.c" 	
+		}
+		
+	}
+}

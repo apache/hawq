@@ -1,0 +1,19 @@
+<configuration>
+	<!-- Security configuration for PXF service
+
+	<property>
+		<name>pxf.service.kerberos.keytab</name>
+		<value>/etc/security/keytab/pxf.service.keytab</value>
+		<description>path to keytab file owned by pxf service 
+		with permissions 0400</description>
+	</property>
+	<property>
+		<name>pxf.service.kerberos.principal</name>
+		<value>pxf/_HOST@EXAMPLE.COM</value>
+		<description>Kerberos principal pxf service should use.
+		_HOST is replaced automatically with hostnames 
+		FQDN</description>
+	</property>
+
+	-->
+</configuration>

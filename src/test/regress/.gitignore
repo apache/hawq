@@ -1,0 +1,13 @@
+optimizer_status.out
+pg_regress
+results
+yml
+current_good_schedule
+libregress.so
+libregress.so.0
+libregress.so.0.0
+regress.so
+regression.diffs
+regression.out
+/TempStatsStore
+/testtablespace

@@ -1,0 +1,560 @@
+--
+-- PXF HDFS regression suite 
+--
+-- Prerequisites:
+--
+--   Must have a running hdfs with REST service on port 50070
+--   Must have HADOOP_ROOT, HBASE_ROOT, HIVE_ROOT and ZOOKEEPER_ROOT set.
+--
+-- TODO: test gpdbwritable write/read when it is enabled.
+-- TODO: test PB, AVRO, THRIFT when it is enabled (read only, with pre formatted files).
+-- TODO: test protocol validator for pxf once written.
+-- TODO: test parameter passing, filter passing
+
+-- start_matchsubs
+--                                                                                               
+-- # create a match/subs expression to handle ip addresses that change
+--
+-- m/(ERROR|WARNING):.*remote component error.*\(\d+\).*from.*'\d+\.\d+\.\d+\.\d+:\d+'.*/
+-- s/'\d+\.\d+\.\d+\.\d+:\d+'/'SOME_IP:SOME_PORT'/
+--
+-- m/(remote component error \(0\): Failed connect to @hostname@:12345; Connection refused|remote component error \(0\): couldn't connect to host).*/
+-- s/(Failed connect to @hostname@:12345; Connection refused|couldn't connect to host)/CURL_CON_ERROR/
+--
+-- end_matchsubs
+-- start_matchignore
+--
+-- m/.*Unable to load native-hadoop library for your platform.*/
+--
+-- end_matchignore
+
+--
+-- syntax validations
+--
+CREATE READABLE EXTERNAL TABLE gphdfs_in(a int, b text, c bytea)
+LOCATION ('pxf://@hostname@:50070/somepath/gpdb_regression_data?FRAGMENTER=xfrag&ACCESSOR=xacc&RESOLVER=xres&someuseropt=someuserval')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- positive
+
+CREATE READABLE EXTERNAL TABLE gphdfs_in1(a int, b text, c bytea)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data?FRAGMENTER=xfrag&ACCESSOR=com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.AvroResolver&DATA-SCHEMA=MySchema')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- positive
+
+CREATE READABLE EXTERNAL TABLE gphdfs_in2(a int, b text, c bytea)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/*')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- negative
+
+CREATE READABLE EXTERNAL TABLE gphdfs_in2(a int, b text, c bytea)
+LOCATION ('pxf://@hostname@:50070/somepath/gpdb_regression_data?ACCESSOR=xacc&RESOLVER=xres&someuseropt=someuserval')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- negative, missing fragmenter
+
+CREATE READABLE EXTERNAL TABLE gphdfs_in2(a int, b text, c bytea)
+LOCATION ('pxf://@hostname@:50070/somepath/gpdb_regression_data?FRAGMENTER=xfrag&RESOLVER=xres&someuseropt=someuserval')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- negative, missing accessor
+
+CREATE READABLE EXTERNAL TABLE gphdfs_in2(a int, b text, c bytea)
+LOCATION ('pxf://@hostname@:50070/somepath/gpdb_regression_data?FRAGMENTER=xfrag&ACCESSOR=xacc')
+FORMAT 'CUSTOM' (formatter='pxfwritable_import'); -- negative, missing resolver
+
+DROP EXTERNAL TABLE gphdfs_in;
+DROP EXTERNAL TABLE gphdfs_in1;
+
+--
+-- Load HDFS with test data
+--
+\! ${HADOOP_ROOT}/bin/hadoop fs -mkdir /gpdb_regression_data
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/writable_inside_sequence1.tbl /gpdb_regression_data/writable_inside_sequence.tbl
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/avro_inside_sequence.tbl /gpdb_regression_data/avro_inside_sequence.tbl; 
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/avroformat_inside_avrofile.avro /gpdb_regression_data/avroformat_inside_avrofile.avro
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/text_data.csv /gpdb_regression_data/text_data.csv
+\! ${HADOOP_ROOT}/bin/hadoop fs -mkdir /gpdb_regression_data/wild
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/writable_inside_sequence1.tbl /gpdb_regression_data/wild/writable_inside_sequence1.tbl
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/writable_inside_sequence2.tbl /gpdb_regression_data/wild/writable_inside_sequence2.tbl
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/empty.tbl /gpdb_regression_data/empty.tbl
+\! ${HADOOP_ROOT}/bin/hadoop fs -copyFromLocal @abs_srcdir@/data/pxf/small.csv /gpdb_regression_data/small.csv
+--
+-- Test TEXT format on a file with many fields
+--
+CREATE EXTERNAL TABLE bigtext (s1 text, 
+                               s2 text, 
+							   s3 text, 
+							   d1 timestamp, 
+							   n1 int, 
+							   n2 int, 
+							   n3 int, 
+							   n4 int, 
+							   n5 int, 
+							   n6 int, 
+							   n7 int,
+                               s11 text, 
+							   s12 text, 
+							   s13 text, 
+							   d11 timestamp, 
+							   n11 int, 
+							   n12 int, 
+							   n13 int, 
+							   n14 int, 
+							   n15 int, 
+							   n16 int, 
+							   n17 int)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/text_data.csv?PROFILE=HdfsTextSimple')
+FORMAT 'TEXT' (DELIMITER ',');
+SELECT n1, n2, n3, n4, n5, s1, s2, s3, d1 FROM bigtext ORDER BY n1;
+SELECT n11, n12, n13, n14, n15, s11, s12, s13, d11 FROM bigtext ORDER BY n11;
+DROP EXTERNAL TABLE bigtext;
+--
+-- Test CSV format on a file with many fields
+--
+CREATE EXTERNAL TABLE bigcsv (s1 text, 
+                               s2 text, 
+							   s3 text, 
+							   d1 timestamp, 
+							   n1 int, 
+							   n2 int, 
+							   n3 int, 
+							   n4 int, 
+							   n5 int, 
+							   n6 int, 
+							   n7 int,
+                               s11 text, 
+							   s12 text, 
+							   s13 text, 
+							   d11 timestamp, 
+							   n11 int, 
+							   n12 int, 
+							   n13 int, 
+							   n14 int, 
+							   n15 int, 
+							   n16 int, 
+							   n17 int)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/text_data.csv?PROFILE=HdfsTextSimple')
+FORMAT 'CSV';
+SELECT n1, n2, n3, n4, n5, s1, s2, s3, d1 FROM bigcsv ORDER BY n1;
+SELECT n11, n12, n13, n14, n15, s11, s12, s13, d11 FROM bigcsv ORDER BY n11;
+DROP EXTERNAL TABLE bigcsv;
+--
+-- Test TEXT format on a file with many fields with deprecated ACCESSOR TextFileAccessor and deprecated RESOLVER TextResolver
+--
+CREATE EXTERNAL TABLE bigtext (s1 text, 
+                               s2 text, 
+							   s3 text, 
+							   d1 timestamp, 
+							   n1 int, 
+							   n2 int, 
+							   n3 int, 
+							   n4 int, 
+							   n5 int, 
+							   n6 int, 
+							   n7 int,
+                               s11 text, 
+							   s12 text, 
+							   s13 text, 
+							   d11 timestamp, 
+							   n11 int, 
+							   n12 int, 
+							   n13 int, 
+							   n14 int, 
+							   n15 int, 
+							   n16 int, 
+							   n17 int)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/text_data.csv?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.TextFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.TextResolver')
+FORMAT 'TEXT' (DELIMITER ',');
+SELECT n1, n2, n3, n4, n5, s1, s2, s3, d1 FROM bigtext ORDER BY n1;
+SELECT n11, n12, n13, n14, n15, s11, s12, s13, d11 FROM bigtext ORDER BY n11;
+DROP EXTERNAL TABLE bigtext;
+--
+-- Test TEXT format on a file with many fields with deprecated ACCESSOR LineReaderAccessor
+--
+CREATE EXTERNAL TABLE linereader (s1 text, 
+                                  s2 text, 
+							      s3 text, 
+							      d1 timestamp, 
+							      n1 int, 
+							      n2 int, 
+							      n3 int, 
+							      n4 int, 
+							      n5 int, 
+							      n6 int, 
+							      n7 int,
+                                  s11 text, 
+							      s12 text, 
+							      s13 text, 
+							      d11 timestamp, 
+							      n11 int, 
+							      n12 int, 
+							      n13 int, 
+							      n14 int, 
+							      n15 int, 
+							      n16 int, 
+							      n17 int)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/text_data.csv?PROFILE=HdfsTextSimple')
+FORMAT 'TEXT' (DELIMITER ',');
+SELECT n1, n2, n3, n4, n5, s1, s2, s3, d1 FROM linereader ORDER BY n1;
+SELECT n11, n12, n13, n14, n15, s11, s12, s13, d11 FROM linereader ORDER BY n11;
+DROP EXTERNAL TABLE linereader;
+--
+-- Test Writable data inside a SequenceFile (read only).
+--
+
+CREATE EXTERNAL TABLE seqwr(tmp1  timestamp, 
+                            num1  integer, 
+                            num2  integer, 
+                            num3  integer, 
+                            num4  integer,
+                            t1    text, 
+                            t2    text, 
+                            t3    text, 
+                            t4    text, 
+                            t5    text, 
+                            t6    text, 
+                            dub1  double precision, 
+                            dub2  double precision, 
+                            dub3  double precision, 
+                            ft1   real, 
+                            ft2   real, 
+                            ft3   real, 
+                            ln1   bigint, 
+                            ln2   bigint, 
+                            ln3   bigint, 
+                            bt    bytea,
+							bool1 boolean,
+							bool2 boolean,
+							bool3 boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/writable_inside_sequence.tbl?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt, bool1, bool2, bool3 FROM seqwr ORDER BY num1;
+SELECT num1, t1, t2, t3 FROM seqwr ORDER BY num1;
+DROP EXTERNAL TABLE seqwr;
+--
+-- Test Avro data inside a SequenceFile (read only).
+--
+CREATE EXTERNAL TABLE seqav(tmp1 timestamp, 
+                            num1  integer, 
+                            num2  integer, 
+                            num3  integer, 
+                            num4  integer,
+                            t1    text,
+                            t2    text,
+                            t3    text,
+                            t4    text,
+                            t5    text,
+                            t6    text,
+                            dub1  double precision,
+                            dub2  double precision, 
+                            dub3  double precision, 
+                            ft1   real, 
+                            ft2   real, 
+                            ft3   real, 
+                            ln1   bigint, 
+                            ln2   bigint, 
+                            ln3   bigint, 
+                            bt    bytea,
+							bl    boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/avro_inside_sequence.tbl?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.AvroResolver&DATA-SCHEMA=regressPXFCustomAvro.avsc')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt, bl FROM seqav ORDER BY num1;
+SELECT num1, t1, t2, t3 FROM seqav ORDER BY num1;
+DROP EXTERNAL TABLE seqav;
+--
+-- Test file name with spaces.
+--
+CREATE EXTERNAL TABLE seqav_space(tmp1 timestamp, 
+                            num1  integer, 
+                            num2  integer, 
+                            num3  integer, 
+                            num4  integer,
+                            t1    text,
+                            t2    text,
+                            t3    text,
+                            t4    text,
+                            t5    text,
+                            t6    text,
+                            dub1  double precision,
+                            dub2  double precision, 
+                            dub3  double precision, 
+                            ft1   real, 
+                            ft2   real, 
+                            ft3   real, 
+                            ln1   bigint, 
+                            ln2   bigint, 
+                            ln3   bigint, 
+                            bt    bytea,
+							bl    boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/avro_inside_sequence.tbl?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.AvroResolver&DATA-SCHEMA=regress PXF Custom Avro1.avsc')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt, bl FROM seqav_space ORDER BY num1;
+DROP EXTERNAL TABLE seqav_space;
+--
+-- Test options are case insensitive
+--
+CREATE EXTERNAL TABLE seqav_case(tmp1 timestamp, 
+                            num1  integer, 
+                            num2  integer, 
+                            num3  integer, 
+                            num4  integer,
+                            t1    text,
+                            t2    text,
+                            t3    text,
+                            t4    text,
+                            t5    text,
+                            t6    text,
+                            dub1  double precision,
+                            dub2  double precision, 
+                            dub3  double precision, 
+                            ft1   real, 
+                            ft2   real, 
+                            ft3   real, 
+                            ln1   bigint, 
+                            ln2   bigint, 
+                            ln3   bigint, 
+                            bt    bytea,
+							bl    boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/avro_inside_sequence.tbl?fragmenter=com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter&Accessor=com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor&ReSoLvEr=com.pivotal.pxf.plugins.hdfs.AvroResolver&Data-Schema=regressPXFCustomAvro.avsc')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt, bl FROM seqav_case ORDER BY num1;
+DROP EXTERNAL TABLE seqav_case;
+--
+-- Test Avro data inside an AvroFile (read only).
+--
+CREATE EXTERNAL TABLE avfav(tmp1 timestamp, 
+                            num1  integer, 
+                            num2  integer, 
+                            num3  integer, 
+                            num4  integer,
+                            t1    text,
+                            t2    text,
+                            t3    text,
+                            t4    text,
+                            t5    text,
+                            t6    text,
+                            dub1  double precision,
+                            dub2  double precision, 
+                            dub3  double precision, 
+                            ft1   real, 
+                            ft2   real, 
+                            ft3   real, 
+                            ln1   bigint, 
+                            ln2   bigint, 
+                            ln3   bigint, 
+                            bt    bytea,
+							bl    boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/avroformat_inside_avrofile.avro?PROFILE=Avro')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT tmp1, num1, num2, num3, num4, ln1, ln2, ln3, bt, bl FROM avfav ORDER BY num1;
+SELECT num1, t1, t2, t3 FROM avfav ORDER BY num1;
+DROP EXTERNAL TABLE avfav;
+--
+-- Test quoted line break
+--
+CREATE EXTERNAL TABLE small_csv(num1 int, 
+                                word text, 
+                                num2 int)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/small.csv?PROFILE=HdfsTextMulti')
+FORMAT 'CSV';
+SELECT * FROM small_csv ORDER BY num1;
+DROP EXTERNAL TABLE small_csv;
+--
+-- Test wildcards in file name
+--
+CREATE EXTERNAL TABLE seqwild(tmp1  timestamp, 
+                              num1  integer, 
+                              num2  integer, 
+                              num3  integer, 
+                              num4  integer,
+                              t1    text, 
+                              t2    text, 
+                              t3    text, 
+                              t4    text, 
+                              t5    text, 
+                              t6    text, 
+                              dub1  double precision, 
+                              dub2  double precision, 
+                              dub3  double precision, 
+                              ft1   real, 
+                              ft2   real, 
+                              ft3   real, 
+                              ln1   bigint, 
+                              ln2   bigint, 
+                              ln3   bigint, 
+                              bt    bytea,
+							  bool1 boolean,
+							  bool2 boolean,
+							  bool3 boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/wild/*.tbl?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT num1, t1, t2, t3 FROM seqwild ORDER BY num1;
+DROP EXTERNAL TABLE seqwild;
+CREATE EXTERNAL TABLE seqquestion(tmp1  timestamp, 
+                              num1  integer, 
+                              num2  integer, 
+                              num3  integer, 
+                              num4  integer,
+                              t1    text, 
+                              t2    text, 
+                              t3    text, 
+                              t4    text, 
+                              t5    text, 
+                              t6    text, 
+                              dub1  double precision, 
+                              dub2  double precision, 
+                              dub3  double precision, 
+                              ft1   real, 
+                              ft2   real, 
+                              ft3   real, 
+                              ln1   bigint, 
+                              ln2   bigint, 
+                              ln3   bigint, 
+                              bt    bytea,
+							  bool1 boolean,
+							  bool2 boolean,
+							  bool3 boolean)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/wild/writable_inside_sequence?.tbl?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT num1, t1, t2, t3 FROM seqquestion ORDER BY num1;
+DROP EXTERNAL TABLE seqquestion;
+--
+-- Test error in host name -- negative
+--
+CREATE EXTERNAL TABLE host_err(t1 text,
+                               a1 integer)
+LOCATION ('pxf://badhostname:50070/gpdb_regression_data/multiblock.tbl?PROFILE=HdfsTextSimple')
+FORMAT 'TEXT' (DELIMITER ',');
+SELECT t1, a1 FROM host_err ORDER BY t1 LIMIT 10; -- negative
+DROP EXTERNAL TABLE host_err;
+--
+-- Test error in port -- negative
+--
+CREATE EXTERNAL TABLE port_err(t1 text,
+                               a1 integer)
+LOCATION ('pxf://@hostname@:12345/gpdb_regression_data/multiblock.tbl?PROFILE=HdfsTextSimple')
+FORMAT 'TEXT' (DELIMITER ',');
+SELECT t1, a1 FROM port_err ORDER BY t1 LIMIT 10; -- negative
+DROP EXTERNAL TABLE port_err;
+--
+-- Test empty file
+--
+CREATE EXTERNAL TABLE empty(t1 text,
+                            a1 integer)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/empty.tbl?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.WritableResolver&DATA-SCHEMA=CustomWritable')
+FORMAT 'custom' (formatter='pxfwritable_import');
+SELECT * FROM empty ORDER BY t1;
+DROP EXTERNAL TABLE empty;
+--
+-- Test analyze for HDFS file(read only).
+--
+CREATE EXTERNAL TABLE avfav_analyze_good(tmp1 timestamp, 
+                            num1  integer, 
+                            num2  integer, 
+                            num3  integer, 
+                            num4  integer,
+                            t1    text,
+                            t2    text,
+                            t3    text,
+                            t4    text,
+                            t5    text,
+                            t6    text,
+                            dub1  double precision,
+                            dub2  double precision, 
+                            dub3  double precision, 
+                            ft1   real, 
+                            ft2   real, 
+                            ft3   real, 
+                            ln1   bigint, 
+                            ln2   bigint, 
+                            ln3   bigint, 
+                            bt    bytea)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/avroformat_inside_avrofile.avro?PROFILE=Avro')
+FORMAT 'custom' (formatter='pxfwritable_import');
+
+-- Table that points to a wrong port.
+CREATE EXTERNAL TABLE avfav_analyze_bad_port(tmp1 timestamp, 
+                            num1  integer, 
+                            num2  integer, 
+                            num3  integer, 
+                            num4  integer,
+                            t1    text,
+                            t2    text,
+                            t3    text,
+                            t4    text,
+                            t5    text,
+                            t6    text,
+                            dub1  double precision,
+                            dub2  double precision, 
+                            dub3  double precision, 
+                            ft1   real, 
+                            ft2   real, 
+                            ft3   real, 
+                            ln1   bigint, 
+                            ln2   bigint, 
+                            ln3   bigint, 
+                            bt    bytea)
+LOCATION ('pxf://@hostname@:12345/gpdb_regression_data/avroformat_inside_avrofile.avro?PROFILE=Avro')
+FORMAT 'custom' (formatter='pxfwritable_import');
+
+-- Table that points to a wrong analyzer class.
+CREATE EXTERNAL TABLE avfav_analyze_bad_class(tmp1 timestamp, 
+                            num1  integer, 
+                            num2  integer, 
+                            num3  integer, 
+                            num4  integer,
+                            t1    text,
+                            t2    text,
+                            t3    text,
+                            t4    text,
+                            t5    text,
+                            t6    text,
+                            dub1  double precision,
+                            dub2  double precision, 
+                            dub3  double precision, 
+                            ft1   real, 
+                            ft2   real, 
+                            ft3   real, 
+                            ln1   bigint, 
+                            ln2   bigint, 
+                            ln3   bigint, 
+                            bt    bytea)
+LOCATION ('pxf://@hostname@:50070/gpdb_regression_data/avroformat_inside_avrofile.avro?FRAGMENTER=com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter&ACCESSOR=com.pivotal.pxf.plugins.hdfs.AvroFileAccessor&RESOLVER=com.pivotal.pxf.plugins.hdfs.AvroResolver&ANALYZER=NoSuchAnalyzer')
+FORMAT 'custom' (formatter='pxfwritable_import');
+
+-- verify that default stats remain after ANALYZE with GUC off
+SET pxf_enable_stat_collection = false;
+ANALYZE avfav_analyze_good;
+SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_good' AND relpages = 1000 AND reltuples = 1000000;
+
+-- verify that stats get updated after ANALYZE with GUC on
+-- NOTE: we can't guarantee the same results on each machine. We just check that defaults were changed
+SET pxf_enable_stat_collection = true;
+ANALYZE avfav_analyze_good;
+SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_good' 
+                              AND relpages != 1000 AND relpages > 0
+                              AND reltuples != 1000000 AND reltuples > 0;
+
+-- verify that stats stay updated to most recent value after ANALYZE with GUC off
+SET pxf_enable_stat_collection = false;
+ANALYZE avfav_analyze_good;
+SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_good' 
+                              AND relpages != 1000 AND relpages > 0
+                              AND reltuples != 1000000 AND reltuples > 0;
+
+-- verify that ANALYZE doesn't break while checking out a table that can't connect to the analyzer module
+-- TODO: find a way to verify that previous stat values remain.
+SET pxf_enable_stat_collection = true;
+ANALYZE avfav_analyze_bad_port;
+SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_bad_port' AND relpages = 1000 AND reltuples = 1000000;
+ANALYZE avfav_analyze_bad_class;
+SELECT COUNT(*) FROM pg_class WHERE relname = 'avfav_analyze_bad_class' AND relpages = 1000 AND reltuples = 1000000;
+
+SET pxf_enable_stat_collection = true; --reset to default
+
+DROP EXTERNAL TABLE avfav_analyze_good;
+DROP EXTERNAL TABLE avfav_analyze_bad_port;
+DROP EXTERNAL TABLE avfav_analyze_bad_class;
+
+-- verify pg_remote_credentials exist with the expected structure
+SELECT * FROM pg_remote_credentials;
+
+--
+-- Cleanup: delete all data that was copied into hdfs
+--
+-- start_ignore
+\! ${HADOOP_ROOT}/bin/hadoop fs -rm -r /gpdb_regression_data
+-- end_ignore

@@ -1,0 +1,9 @@
+5046,gp_add_master_standby,11,10,12,f,f,f,f,v,3,21,f,"25 25 25",,,,gp_add_master_standby,-,,n
+6435,pg_explain_resource_distribution,11,10,12,f,f,t,t,v,6,2249,f,"25 23 23 23 23 25",,,,pg_explain_resource_distribution,-,,n
+6450,dump_resource_manager_status,11,10,12,f,f,t,f,s,1,25,f,"23",,,,dump_resource_manager_status,-,,n
+6460,pg_play_resource_action,11,10,12,f,f,t,t,v,2,2249,f,"25 25",,,,pg_play_resource_action,-,,n
+8080,gp_metadata_cache_clear,11,10,12,f,f,t,f,s,0,25,f,"",,,,gp_metadata_cache_clear,-,,n
+8081,gp_metadata_cache_current_num,11,10,12,f,f,t,f,s,0,20,f,"",,,,gp_metadata_cache_current_num,-,,n
+8082,gp_metadata_cache_exists,11,10,12,f,f,t,f,s,4,16,f,"26 26 26 23",,,,gp_metadata_cache_exists,-,,n
+8083,gp_metadata_cache_info,11,10,12,f,f,t,f,s,4,25,f,"26 26 26 23",,,,gp_metadata_cache_info,-,,n
+8084,gp_metadata_cache_current_block_num,11,10,12,f,f,t,f,s,0,20,f,"",,,,gp_metadata_cache_current_block_num,-,,n

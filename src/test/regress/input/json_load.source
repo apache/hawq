@@ -1,0 +1,103 @@
+-- --------------------------------------
+-- test parsing and loading metadata from json
+-- --------------------------------------
+
+
+-- Create function to insert and scan in-memory data to pg_class
+CREATE OR REPLACE FUNCTION load_json_data(filename text) RETURNS text
+  AS '@abs_builddir@/regress@DLSUFFIX@', 'load_json_data'
+  LANGUAGE C;
+
+CREATE OR REPLACE FUNCTION search_namespace(namespaceName text) 
+  RETURNS table(nspname text, nspdboid "oid", oid "oid")
+  AS '@abs_builddir@/regress@DLSUFFIX@', 'caql_scan_in_memory_pg_namespace'
+  LANGUAGE C;
+
+CREATE OR REPLACE FUNCTION search_table(tblname text) 
+  RETURNS table(relname text, relkind "char", oid "oid")
+  LANGUAGE C volatile NO SQL
+  AS '@abs_builddir@/regress@DLSUFFIX@', 'caql_scan_in_memory_pg_class';
+
+CREATE OR REPLACE FUNCTION search_type(tblname text) 
+  RETURNS table(oid "oid", relname text, namespace "oid")
+  LANGUAGE C volatile NO SQL
+  AS '@abs_builddir@/regress@DLSUFFIX@', 'caql_scan_in_memory_pg_type';
+
+CREATE OR REPLACE FUNCTION search_policy(tblname text) 
+  RETURNS table(oid "oid", relname text, policy_atts text)
+  LANGUAGE C volatile NO SQL
+  AS '@abs_builddir@/regress@DLSUFFIX@', 'caql_scan_in_memory_gp_distribution_policy';
+
+CREATE OR REPLACE FUNCTION search_exttable(tblname text) 
+  RETURNS table(oid "oid", relname text, location text)
+  LANGUAGE C volatile NO SQL
+  AS '@abs_builddir@/regress@DLSUFFIX@', 'caql_scan_in_memory_pg_exttable';
+
+CREATE OR REPLACE FUNCTION search_attribute(tblname text) 
+  RETURNS table(attname text, atttype "oid", attypmod int)
+  LANGUAGE C volatile NO SQL
+  AS '@abs_builddir@/regress@DLSUFFIX@', 'caql_scan_in_memory_pg_attribute';
+
+CREATE OR REPLACE FUNCTION min_external_oid() RETURNS oid
+  AS '@abs_builddir@/regress@DLSUFFIX@', 'min_external_oid'
+  LANGUAGE C;
+
+create table mytable_internal(c1 char(3),vc2 varchar(3), ts3 timestamp, d4 date, n5 numeric(30,10), n6 numeric(10), n7 numeric, c8 char, vc9 varchar);
+select attname, atttypid, atttypmod  from pg_attribute where attrelid = 'mytable_internal'::regclass;
+
+-- make sure pg_class and pg_namespace don't use oids from the reserved range for external metadata
+select count(*) from
+(select oid from pg_class
+union all
+select oid from pg_class) t
+where oid >= min_external_oid();
+
+-- positive test case with a single table
+BEGIN TRANSACTION;
+SELECT load_json_data('@abs_builddir@/data/hcatalog/single_table.json');
+SELECT nspname, nspdboid, count(distinct oid) from search_namespace('default') group by nspname, nspdboid;
+SELECT relname, relkind from search_table('mytable');
+SELECT relname from search_type('mytable');
+SELECT relname, policy_atts from search_policy('mytable');
+SELECT relname, location from search_exttable('mytable');
+SELECT relname, relkind from search_table('mytable') where oid >= min_external_oid();
+SELECT * from search_attribute('mytable');
+END TRANSACTION;
+
+-- positive test case with multiple tables
+BEGIN TRANSACTION;
+SELECT load_json_data('@abs_builddir@/data/hcatalog/multi_table.json');
+SELECT nspname, nspdboid, count(distinct oid) from search_namespace('db1') where oid >= min_external_oid() group by nspname, nspdboid;
+SELECT nspname, nspdboid, count(distinct oid) from search_namespace('db2') where oid >= min_external_oid() group by nspname, nspdboid;
+
+SELECT relname, relkind from search_table('ht1') where oid >= min_external_oid();
+SELECT relname, count(oid) from search_type('ht1') group by relname, namespace;
+SELECT relname, policy_atts from search_policy('ht1');
+SELECT relname, location from search_exttable('ht1');
+END TRANSACTION;
+
+-- negative test: duplicated tables
+BEGIN TRANSACTION;
+SELECT load_json_data('@abs_builddir@/data/hcatalog/multi_table_duplicates.json');
+END TRANSACTION;
+
+-- negative test case: invalid numeric typemod
+BEGIN TRANSACTION;
+SELECT load_json_data('@abs_builddir@/data/hcatalog/invalid_numeric_range.json');
+END TRANSACTION;
+
+-- negative test case: invalid typemod for timestamp type
+BEGIN TRANSACTION;
+SELECT load_json_data('@abs_builddir@/data/hcatalog/invalid_typemod_timestamp.json');
+END TRANSACTION;
+
+-- cleanup
+drop table mytable_internal;
+DROP FUNCTION load_json_data(filename text);
+DROP FUNCTION search_namespace(namespaceName text);
+DROP FUNCTION search_table(tblname text);
+DROP FUNCTION search_type(tblname text);
+DROP FUNCTION search_policy(tblname text);
+DROP FUNCTION search_exttable(tblname text);
+DROP FUNCTION search_attribute(tblname text);
+DROP FUNCTION min_external_oid();

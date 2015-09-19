@@ -1,0 +1,1578 @@
+/*
+ * Greenplum Restriction:
+ *	Appendonly does not support unique index.
+ * GOH Restirction:
+ *	Database stored on shared storage does not support heap table.
+ *	Database stored on local storage can only access local tablespace.
+ *	Database stored on shared storage can only access shared tablespace.
+ */
+/*
+ * Prepare the tablespace, assume that there are local and hdfs filespaces.
+ */
+SET client_min_messages = warning;
+DROP DATABASE IF EXISTS goh_tablespace_local;
+DROP DATABASE IF EXISTS goh_tablespace_shared;
+RESET client_min_messages;
+CREATE DATABASE goh_tablespace_local TABLESPACE local;
+CREATE DATABASE goh_tablespace_shared TABLESPACE hdfs;
+/*
+ * Test create objects in a local storaged database.
+ * We will test database object, table object, and index object.
+ */
+\c goh_tablespace_local
+-- remove the databases before we create them
+SET client_min_messages = warning;
+DROP DATABASE IF EXISTS in_local_default;
+DROP DATABASE IF EXISTS in_local_ts_local;
+DROP DATABASE IF EXISTS in_local_ts_hdfs;
+RESET client_min_messages;
+-- database
+CREATE DATABASE in_local_default;
+-- FIXME: extend the psql...
+DROP DATABASE in_local_default;
+CREATE DATABASE in_local_ts_local TABLESPACE local;
+-- FIXME: extend the psql...
+DROP DATABASE in_local_ts_local;
+CREATE DATABASE in_local_ts_hdfs TABLESPACE hdfs;
+-- FIXME: extend the psql...
+DROP DATABASE in_local_ts_hdfs;
+-- Table stores on the default tablesapce, local in this case.
+CREATE TABLE in_local_default(c1 INT PRIMARY KEY USING INDEX TABLESPACE hdfs, c2 INT, c3 TEXT) DISTRIBUTED BY (c1); -- ERROR: GOH restriction
+ERROR:  cannot access a shared tablespace from a local stored database
+CREATE TABLE in_local_default(c1 INT PRIMARY KEY USING INDEX TABLESPACE local, c2 INT, c3 TEXT) DISTRIBUTED BY (c1);
+NOTICE:  CREATE TABLE / PRIMARY KEY will create implicit index "in_local_default_pkey" for table "in_local_default"
+\d+ in_local_default
+            Table "public.in_local_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer | not null  | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Indexes:
+    "in_local_default_pkey" PRIMARY KEY, btree (c1)
+Has OIDs: no
+Distributed by: (c1)
+
+DROP TABLE in_local_default;
+CREATE TABLE in_local_default(c1 INT PRIMARY KEY, c2 INT, c3 TEXT) DISTRIBUTED BY (c1);
+NOTICE:  CREATE TABLE / PRIMARY KEY will create implicit index "in_local_default_pkey" for table "in_local_default"
+\d+ in_local_default
+            Table "public.in_local_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer | not null  | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Indexes:
+    "in_local_default_pkey" PRIMARY KEY, btree (c1)
+Has OIDs: no
+Distributed by: (c1)
+
+ALTER TABLE in_local_default SET TABLESPACE local2;
+\d+ in_local_default
+            Table "public.in_local_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer | not null  | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Indexes:
+    "in_local_default_pkey" PRIMARY KEY, btree (c1)
+Has OIDs: no
+Distributed by: (c1)
+Tablespace: "local2"
+
+ALTER TABLE in_local_default SET TABLESPACE local;
+\d+ in_local_default
+            Table "public.in_local_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer | not null  | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Indexes:
+    "in_local_default_pkey" PRIMARY KEY, btree (c1)
+Has OIDs: no
+Distributed by: (c1)
+
+ALTER TABLE in_local_default SET TABLESPACE hdfs; -- ERROR: GOH restriction
+ERROR:  cannot move to shared tablespace hdfs
+\d+ in_local_default
+            Table "public.in_local_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer | not null  | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Indexes:
+    "in_local_default_pkey" PRIMARY KEY, btree (c1)
+Has OIDs: no
+Distributed by: (c1)
+
+CREATE INDEX i_local_default ON in_local_default(c1);
+\d+ in_local_default
+            Table "public.in_local_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer | not null  | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Indexes:
+    "in_local_default_pkey" PRIMARY KEY, btree (c1)
+    "i_local_default" btree (c1)
+Has OIDs: no
+Distributed by: (c1)
+
+CREATE INDEX i_local_ts_local ON in_local_default(c1) TABLESPACE local;
+\d+ in_local_default
+            Table "public.in_local_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer | not null  | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Indexes:
+    "in_local_default_pkey" PRIMARY KEY, btree (c1)
+    "i_local_default" btree (c1)
+    "i_local_ts_local" btree (c1)
+Has OIDs: no
+Distributed by: (c1)
+
+CREATE INDEX i_local_ts_hdfs ON in_local_default(c1) TABLESPACE hdfs; -- ERROR: GOH restriction
+ERROR:  cannot access a shared tablespace from a local stored database
+\d+ in_local_default
+            Table "public.in_local_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer | not null  | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Indexes:
+    "in_local_default_pkey" PRIMARY KEY, btree (c1)
+    "i_local_default" btree (c1)
+    "i_local_ts_local" btree (c1)
+Has OIDs: no
+Distributed by: (c1)
+
+ALTER INDEX i_local_ts_local SET TABLESPACE local2;
+\d+ in_local_default
+            Table "public.in_local_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer | not null  | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Indexes:
+    "in_local_default_pkey" PRIMARY KEY, btree (c1)
+    "i_local_default" btree (c1)
+    "i_local_ts_local" btree (c1), tablespace "local2"
+Has OIDs: no
+Distributed by: (c1)
+
+ALTER INDEX i_local_ts_local SET TABLESPACE local;
+\d+ in_local_default
+            Table "public.in_local_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer | not null  | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Indexes:
+    "in_local_default_pkey" PRIMARY KEY, btree (c1)
+    "i_local_default" btree (c1)
+    "i_local_ts_local" btree (c1)
+Has OIDs: no
+Distributed by: (c1)
+
+ALTER INDEX i_local_ts_local SET TABLESPACE hdfs; -- ERROR: GOH restriction
+ERROR:  cannot move to shared tablespace hdfs
+\d+ in_local_default
+            Table "public.in_local_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer | not null  | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Indexes:
+    "in_local_default_pkey" PRIMARY KEY, btree (c1)
+    "i_local_default" btree (c1)
+    "i_local_ts_local" btree (c1)
+Has OIDs: no
+Distributed by: (c1)
+
+DROP TABLE in_local_default;
+-- Table stores on the default tablesapce, local in this case, explictly specify a heap table.
+CREATE TABLE in_local_heap_default(c1 INT PRIMARY KEY USING INDEX TABLESPACE hdfs, c2 INT, c3 TEXT) WITH (appendonly=false) DISTRIBUTED BY (c1); -- ERROR: GOH restriction
+ERROR:  cannot access a shared tablespace from a local stored database
+CREATE TABLE in_local_heap_default(c1 INT PRIMARY KEY USING INDEX TABLESPACE local, c2 INT, c3 TEXT) WITH (appendonly=false) DISTRIBUTED BY (c1);
+NOTICE:  CREATE TABLE / PRIMARY KEY will create implicit index "in_local_heap_default_pkey" for table "in_local_heap_default"
+\d+ in_local_heap_default
+         Table "public.in_local_heap_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer | not null  | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Indexes:
+    "in_local_heap_default_pkey" PRIMARY KEY, btree (c1)
+Has OIDs: no
+Options: appendonly=false
+Distributed by: (c1)
+
+DROP TABLE in_local_heap_default;
+CREATE TABLE in_local_heap_default(c1 INT PRIMARY KEY, c2 INT, c3 TEXT) WITH (appendonly=false) DISTRIBUTED BY (c1);
+NOTICE:  CREATE TABLE / PRIMARY KEY will create implicit index "in_local_heap_default_pkey" for table "in_local_heap_default"
+\d+ in_local_heap_default
+         Table "public.in_local_heap_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer | not null  | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Indexes:
+    "in_local_heap_default_pkey" PRIMARY KEY, btree (c1)
+Has OIDs: no
+Options: appendonly=false
+Distributed by: (c1)
+
+ALTER TABLE in_local_heap_default SET TABLESPACE local2;
+\d+ in_local_heap_default
+         Table "public.in_local_heap_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer | not null  | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Indexes:
+    "in_local_heap_default_pkey" PRIMARY KEY, btree (c1)
+Has OIDs: no
+Options: appendonly=false
+Distributed by: (c1)
+Tablespace: "local2"
+
+ALTER TABLE in_local_heap_default SET TABLESPACE local;
+\d+ in_local_heap_default
+         Table "public.in_local_heap_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer | not null  | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Indexes:
+    "in_local_heap_default_pkey" PRIMARY KEY, btree (c1)
+Has OIDs: no
+Options: appendonly=false
+Distributed by: (c1)
+
+ALTER TABLE in_local_heap_default SET TABLESPACE hdfs; -- ERROR: GOH restriction
+ERROR:  cannot move to shared tablespace hdfs
+\d+ in_local_heap_default
+         Table "public.in_local_heap_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer | not null  | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Indexes:
+    "in_local_heap_default_pkey" PRIMARY KEY, btree (c1)
+Has OIDs: no
+Options: appendonly=false
+Distributed by: (c1)
+
+CREATE INDEX i_local_heap_default ON in_local_heap_default(c1);
+\d+ in_local_heap_default
+         Table "public.in_local_heap_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer | not null  | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Indexes:
+    "in_local_heap_default_pkey" PRIMARY KEY, btree (c1)
+    "i_local_heap_default" btree (c1)
+Has OIDs: no
+Options: appendonly=false
+Distributed by: (c1)
+
+CREATE INDEX i_local_heap_ts_local ON in_local_heap_default(c1) TABLESPACE local;
+\d+ in_local_heap_default
+         Table "public.in_local_heap_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer | not null  | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Indexes:
+    "in_local_heap_default_pkey" PRIMARY KEY, btree (c1)
+    "i_local_heap_default" btree (c1)
+    "i_local_heap_ts_local" btree (c1)
+Has OIDs: no
+Options: appendonly=false
+Distributed by: (c1)
+
+CREATE INDEX i_local_heap_ts_hdfs ON in_local_heap_default(c1) TABLESPACE hdfs; -- ERROR: GOH restriction
+ERROR:  cannot access a shared tablespace from a local stored database
+\d+ in_local_heap_default
+         Table "public.in_local_heap_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer | not null  | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Indexes:
+    "in_local_heap_default_pkey" PRIMARY KEY, btree (c1)
+    "i_local_heap_default" btree (c1)
+    "i_local_heap_ts_local" btree (c1)
+Has OIDs: no
+Options: appendonly=false
+Distributed by: (c1)
+
+ALTER INDEX i_local_heap_ts_local SET TABLESPACE local2;
+\d+ in_local_heap_default
+         Table "public.in_local_heap_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer | not null  | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Indexes:
+    "in_local_heap_default_pkey" PRIMARY KEY, btree (c1)
+    "i_local_heap_default" btree (c1)
+    "i_local_heap_ts_local" btree (c1), tablespace "local2"
+Has OIDs: no
+Options: appendonly=false
+Distributed by: (c1)
+
+ALTER INDEX i_local_heap_ts_local SET TABLESPACE local;
+\d+ in_local_heap_default
+         Table "public.in_local_heap_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer | not null  | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Indexes:
+    "in_local_heap_default_pkey" PRIMARY KEY, btree (c1)
+    "i_local_heap_default" btree (c1)
+    "i_local_heap_ts_local" btree (c1)
+Has OIDs: no
+Options: appendonly=false
+Distributed by: (c1)
+
+ALTER INDEX i_local_heap_ts_local SET TABLESPACE hdfs; -- ERROR: GOH restriction
+ERROR:  cannot move to shared tablespace hdfs
+\d+ i_local_heap_ts_local
+         Index "public.i_local_heap_ts_local"
+ Column |  Type   | Definition | Storage | Description 
+--------+---------+------------+---------+-------------
+ c1     | integer | c1         | plain   | 
+btree, for table "public.in_local_heap_default"
+
+DROP TABLE in_local_heap_default;
+-- Table stores on the default tablesapce, local in this case, explictly specify a appendonly table.
+CREATE TABLE in_local_ao_default(c1 INT, c2 INT, c3 TEXT) WITH (appendonly=true) DISTRIBUTED BY (c1);
+\d+ in_local_ao_default
+    Append-Only Table "public.in_local_ao_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+
+ALTER TABLE in_local_ao_default SET TABLESPACE local2;
+\d+ in_local_ao_default
+    Append-Only Table "public.in_local_ao_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+Tablespace: "local2"
+
+ALTER TABLE in_local_ao_default SET TABLESPACE local;
+\d+ in_local_ao_default
+    Append-Only Table "public.in_local_ao_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+
+ALTER TABLE in_local_ao_default SET TABLESPACE hdfs; -- ERROR: GOH restriction
+ERROR:  cannot move to shared tablespace hdfs
+\d+ in_local_ao_default
+    Append-Only Table "public.in_local_ao_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+
+CREATE INDEX i_local_ao_default ON in_local_ao_default(c1);
+\d+ in_local_ao_default
+    Append-Only Table "public.in_local_ao_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Indexes:
+    "i_local_ao_default" btree (c1)
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+
+CREATE INDEX i_local_ao_ts_local ON in_local_ao_default(c1) TABLESPACE local;
+\d+ in_local_ao_default
+    Append-Only Table "public.in_local_ao_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Indexes:
+    "i_local_ao_default" btree (c1)
+    "i_local_ao_ts_local" btree (c1)
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+
+CREATE INDEX i_local_ao_ts_hdfs ON in_local_ao_default(c1) TABLESPACE hdfs; -- ERROR: GOH restriction
+ERROR:  cannot access a shared tablespace from a local stored database
+\d+ in_local_ao_default
+    Append-Only Table "public.in_local_ao_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Indexes:
+    "i_local_ao_default" btree (c1)
+    "i_local_ao_ts_local" btree (c1)
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+
+ALTER INDEX i_local_ao_ts_local SET TABLESPACE local2;
+\d+ in_local_ao_default
+    Append-Only Table "public.in_local_ao_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Indexes:
+    "i_local_ao_default" btree (c1)
+    "i_local_ao_ts_local" btree (c1), tablespace "local2"
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+
+ALTER INDEX i_local_ao_ts_local SET TABLESPACE local;
+\d+ in_local_ao_default
+    Append-Only Table "public.in_local_ao_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Indexes:
+    "i_local_ao_default" btree (c1)
+    "i_local_ao_ts_local" btree (c1)
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+
+ALTER INDEX i_local_ao_ts_local SET TABLESPACE hdfs; -- ERROR: GOH restriction
+ERROR:  cannot move to shared tablespace hdfs
+\d+ in_local_ao_default
+    Append-Only Table "public.in_local_ao_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Indexes:
+    "i_local_ao_default" btree (c1)
+    "i_local_ao_ts_local" btree (c1)
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+
+DROP TABLE in_local_ao_default;
+-- Table stores on the default tablesapce, local in this case, explictly specify a column store table.
+CREATE TABLE in_local_co_default(c1 INT, c2 INT, c3 TEXT) WITH (appendonly=true, orientation=column) DISTRIBUTED BY (c1);
+\d+ in_local_co_default
+                          Append-Only Columnar Table "public.in_local_co_default"
+ Column |  Type   | Modifiers | Storage  | Compression Type | Compression Level | Block Size | Description 
+--------+---------+-----------+----------+------------------+-------------------+------------+-------------
+ c1     | integer |           | plain    | none             | 0                 | 32768      | 
+ c2     | integer |           | plain    | none             | 0                 | 32768      | 
+ c3     | text    |           | extended | none             | 0                 | 32768      | 
+Checksum: f
+Has OIDs: no
+Options: appendonly=true, orientation=column
+Distributed by: (c1)
+
+ALTER TABLE in_local_co_default SET TABLESPACE local2;
+\d+ in_local_co_default
+                          Append-Only Columnar Table "public.in_local_co_default"
+ Column |  Type   | Modifiers | Storage  | Compression Type | Compression Level | Block Size | Description 
+--------+---------+-----------+----------+------------------+-------------------+------------+-------------
+ c1     | integer |           | plain    | none             | 0                 | 32768      | 
+ c2     | integer |           | plain    | none             | 0                 | 32768      | 
+ c3     | text    |           | extended | none             | 0                 | 32768      | 
+Checksum: f
+Has OIDs: no
+Options: appendonly=true, orientation=column
+Distributed by: (c1)
+Tablespace: "local2"
+
+ALTER TABLE in_local_co_default SET TABLESPACE local;
+\d+ in_local_co_default
+                          Append-Only Columnar Table "public.in_local_co_default"
+ Column |  Type   | Modifiers | Storage  | Compression Type | Compression Level | Block Size | Description 
+--------+---------+-----------+----------+------------------+-------------------+------------+-------------
+ c1     | integer |           | plain    | none             | 0                 | 32768      | 
+ c2     | integer |           | plain    | none             | 0                 | 32768      | 
+ c3     | text    |           | extended | none             | 0                 | 32768      | 
+Checksum: f
+Has OIDs: no
+Options: appendonly=true, orientation=column
+Distributed by: (c1)
+
+ALTER TABLE in_local_co_default SET TABLESPACE hdfs; -- ERROR: GOH restriction
+ERROR:  cannot move to shared tablespace hdfs
+\d+ in_local_co_default
+                          Append-Only Columnar Table "public.in_local_co_default"
+ Column |  Type   | Modifiers | Storage  | Compression Type | Compression Level | Block Size | Description 
+--------+---------+-----------+----------+------------------+-------------------+------------+-------------
+ c1     | integer |           | plain    | none             | 0                 | 32768      | 
+ c2     | integer |           | plain    | none             | 0                 | 32768      | 
+ c3     | text    |           | extended | none             | 0                 | 32768      | 
+Checksum: f
+Has OIDs: no
+Options: appendonly=true, orientation=column
+Distributed by: (c1)
+
+CREATE INDEX i_local_co_default ON in_local_co_default(c1);
+\d+ in_local_co_default
+                          Append-Only Columnar Table "public.in_local_co_default"
+ Column |  Type   | Modifiers | Storage  | Compression Type | Compression Level | Block Size | Description 
+--------+---------+-----------+----------+------------------+-------------------+------------+-------------
+ c1     | integer |           | plain    | none             | 0                 | 32768      | 
+ c2     | integer |           | plain    | none             | 0                 | 32768      | 
+ c3     | text    |           | extended | none             | 0                 | 32768      | 
+Checksum: f
+Indexes:
+    "i_local_co_default" btree (c1)
+Has OIDs: no
+Options: appendonly=true, orientation=column
+Distributed by: (c1)
+
+CREATE INDEX i_local_co_ts_local ON in_local_co_default(c1) TABLESPACE local;
+\d+ in_local_co_default
+                          Append-Only Columnar Table "public.in_local_co_default"
+ Column |  Type   | Modifiers | Storage  | Compression Type | Compression Level | Block Size | Description 
+--------+---------+-----------+----------+------------------+-------------------+------------+-------------
+ c1     | integer |           | plain    | none             | 0                 | 32768      | 
+ c2     | integer |           | plain    | none             | 0                 | 32768      | 
+ c3     | text    |           | extended | none             | 0                 | 32768      | 
+Checksum: f
+Indexes:
+    "i_local_co_default" btree (c1)
+    "i_local_co_ts_local" btree (c1)
+Has OIDs: no
+Options: appendonly=true, orientation=column
+Distributed by: (c1)
+
+CREATE INDEX i_local_co_ts_hdfs ON in_local_co_default(c1) TABLESPACE hdfs; -- ERROR: GOH restriction
+ERROR:  cannot access a shared tablespace from a local stored database
+\d+ in_local_co_default
+                          Append-Only Columnar Table "public.in_local_co_default"
+ Column |  Type   | Modifiers | Storage  | Compression Type | Compression Level | Block Size | Description 
+--------+---------+-----------+----------+------------------+-------------------+------------+-------------
+ c1     | integer |           | plain    | none             | 0                 | 32768      | 
+ c2     | integer |           | plain    | none             | 0                 | 32768      | 
+ c3     | text    |           | extended | none             | 0                 | 32768      | 
+Checksum: f
+Indexes:
+    "i_local_co_default" btree (c1)
+    "i_local_co_ts_local" btree (c1)
+Has OIDs: no
+Options: appendonly=true, orientation=column
+Distributed by: (c1)
+
+ALTER INDEX i_local_co_ts_local SET TABLESPACE local2;
+\d+ in_local_co_default
+                          Append-Only Columnar Table "public.in_local_co_default"
+ Column |  Type   | Modifiers | Storage  | Compression Type | Compression Level | Block Size | Description 
+--------+---------+-----------+----------+------------------+-------------------+------------+-------------
+ c1     | integer |           | plain    | none             | 0                 | 32768      | 
+ c2     | integer |           | plain    | none             | 0                 | 32768      | 
+ c3     | text    |           | extended | none             | 0                 | 32768      | 
+Checksum: f
+Indexes:
+    "i_local_co_default" btree (c1)
+    "i_local_co_ts_local" btree (c1), tablespace "local2"
+Has OIDs: no
+Options: appendonly=true, orientation=column
+Distributed by: (c1)
+
+ALTER INDEX i_local_co_ts_local SET TABLESPACE local;
+\d+ in_local_co_default
+                          Append-Only Columnar Table "public.in_local_co_default"
+ Column |  Type   | Modifiers | Storage  | Compression Type | Compression Level | Block Size | Description 
+--------+---------+-----------+----------+------------------+-------------------+------------+-------------
+ c1     | integer |           | plain    | none             | 0                 | 32768      | 
+ c2     | integer |           | plain    | none             | 0                 | 32768      | 
+ c3     | text    |           | extended | none             | 0                 | 32768      | 
+Checksum: f
+Indexes:
+    "i_local_co_default" btree (c1)
+    "i_local_co_ts_local" btree (c1)
+Has OIDs: no
+Options: appendonly=true, orientation=column
+Distributed by: (c1)
+
+ALTER INDEX i_local_co_ts_local SET TABLESPACE hdfs; -- ERROR: GOH restriction
+ERROR:  cannot move to shared tablespace hdfs
+\d+ in_local_co_default
+                          Append-Only Columnar Table "public.in_local_co_default"
+ Column |  Type   | Modifiers | Storage  | Compression Type | Compression Level | Block Size | Description 
+--------+---------+-----------+----------+------------------+-------------------+------------+-------------
+ c1     | integer |           | plain    | none             | 0                 | 32768      | 
+ c2     | integer |           | plain    | none             | 0                 | 32768      | 
+ c3     | text    |           | extended | none             | 0                 | 32768      | 
+Checksum: f
+Indexes:
+    "i_local_co_default" btree (c1)
+    "i_local_co_ts_local" btree (c1)
+Has OIDs: no
+Options: appendonly=true, orientation=column
+Distributed by: (c1)
+
+DROP TABLE in_local_co_default;
+-- Table stores on the local tablesapce.
+CREATE TABLE in_local_ts_local(c1 INT, c2 INT, c3 TEXT) TABLESPACE local DISTRIBUTED BY (c1);
+\d+ in_local_ts_local
+           Table "public.in_local_ts_local"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Has OIDs: no
+Distributed by: (c1)
+
+-- no need to test all of this
+DROP TABLE in_local_ts_local;
+-- Table stores on the local tablesapce, explictly specify a heap table.
+CREATE TABLE in_local_heap_ts_local(c1 INT, c2 INT, c3 TEXT) WITH (appendonly=false) TABLESPACE local DISTRIBUTED BY (c1);
+\d+ in_local_heap_ts_local
+         Table "public.in_local_heap_ts_local"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Has OIDs: no
+Options: appendonly=false
+Distributed by: (c1)
+
+-- no need to test all of this
+DROP TABLE in_local_heap_ts_local;
+-- Table stores on the local tablesapce, explictly specify a appendonly table.
+CREATE TABLE in_local_ao_ts_local(c1 INT, c2 INT, c3 TEXT) WITH (appendonly=true) TABLESPACE local DISTRIBUTED BY (c1);
+\d+ in_local_ao_ts_local
+    Append-Only Table "public.in_local_ao_ts_local"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+
+-- no need to test all of this
+DROP TABLE in_local_ao_ts_local;
+-- Table stores on the local tablesapce, explictly specify a column store table.
+CREATE TABLE in_local_co_ts_local(c1 INT, c2 INT, c3 TEXT) WITH (appendonly=true, orientation=column) TABLESPACE local DISTRIBUTED BY (c1);
+\d+ in_local_co_ts_local
+                         Append-Only Columnar Table "public.in_local_co_ts_local"
+ Column |  Type   | Modifiers | Storage  | Compression Type | Compression Level | Block Size | Description 
+--------+---------+-----------+----------+------------------+-------------------+------------+-------------
+ c1     | integer |           | plain    | none             | 0                 | 32768      | 
+ c2     | integer |           | plain    | none             | 0                 | 32768      | 
+ c3     | text    |           | extended | none             | 0                 | 32768      | 
+Checksum: f
+Has OIDs: no
+Options: appendonly=true, orientation=column
+Distributed by: (c1)
+
+-- no need to test all of this
+DROP TABLE in_local_co_ts_local;
+-- Table stores on the shared tablesapce.
+CREATE TABLE in_local_ts_hdfs(c1 INT, c2 INT, c3 TEXT) TABLESPACE hdfs DISTRIBUTED BY (c1); -- ERROR: GOH restriction
+ERROR:  cannot access a shared tablespace from a local stored database
+-- Table stores on the shared tablesapce, explictly specify a heap table.
+CREATE TABLE in_local_heap_ts_hdfs(c1 INT, c2 INT, c3 TEXT) WITH (appendonly=false) TABLESPACE hdfs DISTRIBUTED BY (c1); -- ERROR: GOH restriction
+ERROR:  cannot access a shared tablespace from a local stored database
+-- Table stores on the shared tablesapce, explictly specify a appendonly table.
+CREATE TABLE in_local_ao_ts_hdfs(c1 INT, c2 INT, c3 TEXT) WITH (appendonly=true) TABLESPACE hdfs DISTRIBUTED BY (c1); -- ERROR: GOH restriction
+ERROR:  cannot access a shared tablespace from a local stored database
+-- Table stores on the shared tablesapce, explictly specify a column store table.
+CREATE TABLE in_local_co_ts_hdfs(c1 INT, c2 INT, c3 TEXT) WITH (appendonly=true, orientation=column) TABLESPACE hdfs DISTRIBUTED BY (c1); -- ERROR: GOH restriction
+ERROR:  cannot access a shared tablespace from a local stored database
+-- external/copy
+CREATE EXTERNAL WEB TABLE in_local_ext(c INT) EXECUTE 'echo "no_such_number"' ON ALL FORMAT 'TEXT' LOG ERRORS INTO in_local_ext_error SEGMENT REJECT LIMIT 2;
+NOTICE:  Error table "in_local_ext_error" does not exist. Auto generating an error table with the same name
+\d+ in_local_ext_error
+                    Table "public.in_local_ext_error"
+  Column  |           Type           | Modifiers | Storage  | Description 
+----------+--------------------------+-----------+----------+-------------
+ cmdtime  | timestamp with time zone |           | plain    | 
+ relname  | text                     |           | extended | 
+ filename | text                     |           | extended | 
+ linenum  | integer                  |           | plain    | 
+ bytenum  | integer                  |           | plain    | 
+ errmsg   | text                     |           | extended | 
+ rawdata  | text                     |           | extended | 
+ rawbytes | bytea                    |           | extended | 
+Has OIDs: no
+Options: errortable=true
+Distributed randomly
+
+SELECT * FROM in_local_ext;
+ERROR:  Segment reject limit reached. Aborting operation. Last error was: invalid input syntax for integer: "", column c  (seg0 slice1 mat3-mbp.local:40000 pid=60502)
+DETAIL:  External table in_local_ext, line 2 of execute:echo "no_such_number", column c
+SELECT relname, filename, errmsg FROM in_local_ext_error;
+   relname    |           filename            |                            errmsg                            
+--------------+-------------------------------+--------------------------------------------------------------
+ in_local_ext | execute:echo "no_such_number" | invalid input syntax for integer: "no_such_number", column c
+ in_local_ext | execute:echo "no_such_number" | invalid input syntax for integer: "no_such_number", column c
+(2 rows)
+
+DROP EXTERNAL WEB TABLE in_local_ext;
+DROP TABLE in_local_ext_error;
+CREATE TABLE copied_table(c INT);
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'c' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+COPY copied_table FROM stdin LOG ERRORS INTO in_local_ext_error SEGMENT REJECT LIMIT 2;
+NOTICE:  Error table "in_local_ext_error" does not exist. Auto generating an error table with the same name
+WARNING:  The error table was created in the same transaction as this operation. It will get dropped if transaction rolls back even if bad rows are present
+HINT:  To avoid this create the error table ahead of time using: CREATE TABLE <name> (cmdtime timestamp with time zone, relname text, filename text, linenum integer, bytenum integer, errmsg text, rawdata text, rawbytes bytea)
+NOTICE:  Found 1 data formatting errors (1 or more input rows). Errors logged into error table "in_local_ext_error"
+\d+ in_local_ext_error
+                    Table "public.in_local_ext_error"
+  Column  |           Type           | Modifiers | Storage  | Description 
+----------+--------------------------+-----------+----------+-------------
+ cmdtime  | timestamp with time zone |           | plain    | 
+ relname  | text                     |           | extended | 
+ filename | text                     |           | extended | 
+ linenum  | integer                  |           | plain    | 
+ bytenum  | integer                  |           | plain    | 
+ errmsg   | text                     |           | extended | 
+ rawdata  | text                     |           | extended | 
+ rawbytes | bytea                    |           | extended | 
+Has OIDs: no
+Options: errortable=true
+Distributed randomly
+
+DROP TABLE copied_table;
+DROP TABLE in_local_ext_error;
+-- select into
+SELECT RANDOM() AS r INTO in_local_random;
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column(s) named 'r' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+\d+ in_local_random
+                Table "public.in_local_random"
+ Column |       Type       | Modifiers | Storage | Description 
+--------+------------------+-----------+---------+-------------
+ r      | double precision |           | plain   | 
+Has OIDs: no
+Distributed by: (r)
+
+DROP TABLE in_local_random;
+/*
+ * Test create objects in a shared storaged database.
+ * We will test database object, table object, and index object.
+ */
+\c goh_tablespace_shared
+-- remove the databases before we create them
+SET client_min_messages = warning;
+DROP DATABASE IF EXISTS in_shared_default;
+DROP DATABASE IF EXISTS in_shared_ts_local;
+DROP DATABASE IF EXISTS in_shared_ts_hdfs;
+RESET client_min_messages;
+-- database
+CREATE DATABASE in_shared_default;
+-- FIXME: extend the psql...
+DROP DATABASE in_shared_default;
+CREATE DATABASE in_shared_ts_local TABLESPACE local;
+-- FIXME: extend the psql...
+DROP DATABASE in_shared_ts_local;
+CREATE DATABASE in_shared_ts_hdfs TABLESPACE hdfs;
+-- FIXME: extend the psql...
+DROP DATABASE in_shared_ts_hdfs;
+-- Table stores on the default tablesapce, shared in this case.
+CREATE TABLE in_shared_default(c1 INT PRIMARY KEY USING INDEX TABLESPACE hdfs, c2 INT, c3 TEXT) DISTRIBUTED BY (c1); -- ERROR: Feature not supported || GPDB restriction
+ERROR:  cannot create index on tablespace hdfs
+CREATE TABLE in_shared_default(c1 INT PRIMARY KEY USING INDEX TABLESPACE local, c2 INT, c3 TEXT) DISTRIBUTED BY (c1); -- ERROR: GOH restriction || GPDB restriction
+ERROR:  cannot access a local tablespace from a shared stored database
+CREATE TABLE in_shared_default(c1 INT, c2 INT, c3 TEXT) DISTRIBUTED BY (c1);
+\d+ in_shared_default
+     Append-Only Table "public.in_shared_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+ALTER TABLE in_shared_default SET TABLESPACE local2; -- ERROR: GOH restriction
+ERROR:  cannot move from shared tablespace hdfs
+\d+ in_shared_default
+     Append-Only Table "public.in_shared_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+ALTER TABLE in_shared_default SET TABLESPACE local; -- ERROR: GOH restriction
+ERROR:  cannot move from shared tablespace hdfs
+\d+ in_shared_default
+     Append-Only Table "public.in_shared_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+ALTER TABLE in_shared_default SET TABLESPACE hdfs2;
+ERROR:  cannot move from shared tablespace hdfs
+\d+ in_shared_default
+     Append-Only Table "public.in_shared_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+CREATE INDEX i_shared_default ON in_shared_default(c1);
+\d+ in_shared_default
+     Append-Only Table "public.in_shared_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Indexes:
+    "i_shared_default" btree (c1)
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+CREATE INDEX i_shared_default ON in_shared_default(c1) TABLESPACE local; -- ERROR: GOH restriction
+ERROR:  cannot access a local tablespace from a shared stored database
+\d+ in_shared_default
+     Append-Only Table "public.in_shared_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Indexes:
+    "i_shared_default" btree (c1)
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+CREATE INDEX i_shared_default ON in_shared_default(c1) TABLESPACE hdfs; -- ERROR: Feature not supported
+ERROR:  cannot create index on tablespace hdfs
+\d+ in_shared_default
+     Append-Only Table "public.in_shared_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Indexes:
+    "i_shared_default" btree (c1)
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+ALTER INDEX i_shared_default SET TABLESPACE local2; -- ERROR: GOH restriction
+ERROR:  cannot change tablespace on shared storage
+\d+ in_shared_default
+     Append-Only Table "public.in_shared_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Indexes:
+    "i_shared_default" btree (c1)
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+ALTER INDEX i_shared_default SET TABLESPACE local; -- ERROR: GOH restriction
+ERROR:  cannot change tablespace on shared storage
+\d+ in_shared_default
+     Append-Only Table "public.in_shared_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Indexes:
+    "i_shared_default" btree (c1)
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+ALTER INDEX i_shared_default SET TABLESPACE hdfs; -- ERROR: Feature not supported
+ERROR:  cannot move to shared tablespace hdfs
+\d+ in_shared_default
+     Append-Only Table "public.in_shared_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Indexes:
+    "i_shared_default" btree (c1)
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+DROP TABLE in_shared_default;
+-- Table stores on the default tablesapce, shared in this case, explictly specify a heap table.
+CREATE TABLE in_shared_heap_default(c1 INT PRIMARY KEY USING INDEX TABLESPACE hdfs, c2 INT, c3 TEXT) WITH (appendonly=false) DISTRIBUTED BY (c1); -- ERROR: GOH restriction
+ERROR:  tablespace "hdfs" does not support heap relation
+CREATE TABLE in_shared_heap_default(c1 INT PRIMARY KEY USING INDEX TABLESPACE local, c2 INT, c3 TEXT) WITH (appendonly=false) DISTRIBUTED BY (c1); -- ERROR: GOH restriction
+ERROR:  tablespace "hdfs" does not support heap relation
+CREATE TABLE in_shared_heap_default(c1 INT PRIMARY KEY, c2 INT, c3 TEXT) WITH (appendonly=false) DISTRIBUTED BY (c1); -- ERROR: GOH restriction
+ERROR:  tablespace "hdfs" does not support heap relation
+-- Table stores on the default tablesapce, local in this case, explictly specify a appendonly table.
+CREATE TABLE in_shared_ao_default(c1 INT, c2 INT, c3 TEXT) WITH (appendonly=true) DISTRIBUTED BY (c1);
+\d+ in_shared_ao_default
+    Append-Only Table "public.in_shared_ao_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+ALTER TABLE in_shared_ao_default SET TABLESPACE local2; -- ERROR: GOH restriction
+ERROR:  cannot move from shared tablespace hdfs
+\d+ in_shared_ao_default
+    Append-Only Table "public.in_shared_ao_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+ALTER TABLE in_shared_ao_default SET TABLESPACE local; -- ERROR: GOH restriction
+ERROR:  cannot move from shared tablespace hdfs
+\d+ in_shared_ao_default
+    Append-Only Table "public.in_shared_ao_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+ALTER TABLE in_shared_ao_default SET TABLESPACE hdfs2;
+ERROR:  cannot move from shared tablespace hdfs
+\d+ in_shared_ao_default
+    Append-Only Table "public.in_shared_ao_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+CREATE INDEX i_shared_ao_default ON in_shared_ao_default(c1);
+\d+ in_shared_ao_default
+    Append-Only Table "public.in_shared_ao_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Indexes:
+    "i_shared_ao_default" btree (c1)
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+CREATE INDEX i_shared_ao_ts_local ON in_shared_ao_default(c1) TABLESPACE local; -- ERROR: GOH restriction
+ERROR:  cannot access a local tablespace from a shared stored database
+\d+ in_shared_ao_default
+    Append-Only Table "public.in_shared_ao_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Indexes:
+    "i_shared_ao_default" btree (c1)
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+CREATE INDEX i_shared_ao_ts_hdfs ON in_shared_ao_default(c1) TABLESPACE hdfs; -- ERROR: Feature not supported
+ERROR:  cannot create index on tablespace hdfs
+\d+ in_shared_ao_default
+    Append-Only Table "public.in_shared_ao_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Indexes:
+    "i_shared_ao_default" btree (c1)
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+ALTER INDEX i_shared_ao_default SET TABLESPACE local2; -- ERROR: GOH restriction
+ERROR:  cannot change tablespace on shared storage
+\d+ in_shared_ao_default
+    Append-Only Table "public.in_shared_ao_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Indexes:
+    "i_shared_ao_default" btree (c1)
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+ALTER INDEX i_shared_ao_default SET TABLESPACE local; -- ERROR: GOH restriction
+ERROR:  cannot change tablespace on shared storage
+\d+ in_shared_ao_default
+    Append-Only Table "public.in_shared_ao_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Indexes:
+    "i_shared_ao_default" btree (c1)
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+ALTER INDEX i_shared_ao_default SET TABLESPACE hdfs; -- ERROR: Feature not supported
+ERROR:  cannot move to shared tablespace hdfs
+\d+ in_shared_ao_default
+    Append-Only Table "public.in_shared_ao_default"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Indexes:
+    "i_shared_ao_default" btree (c1)
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+DROP TABLE in_shared_ao_default;
+-- Table stores on the default tablesapce, local in this case, explictly specify a column store table.
+CREATE TABLE in_shared_co_default(c1 INT, c2 INT, c3 TEXT) WITH (appendonly=true, orientation=column) DISTRIBUTED BY (c1);
+\d+ in_shared_co_default
+                         Append-Only Columnar Table "public.in_shared_co_default"
+ Column |  Type   | Modifiers | Storage  | Compression Type | Compression Level | Block Size | Description 
+--------+---------+-----------+----------+------------------+-------------------+------------+-------------
+ c1     | integer |           | plain    | none             | 0                 | 32768      | 
+ c2     | integer |           | plain    | none             | 0                 | 32768      | 
+ c3     | text    |           | extended | none             | 0                 | 32768      | 
+Checksum: f
+Has OIDs: no
+Options: appendonly=true, orientation=column
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+ALTER TABLE in_shared_co_default SET TABLESPACE local2; -- ERROR: GOH restriction
+ERROR:  cannot move from shared tablespace hdfs
+\d+ in_shared_co_default
+                         Append-Only Columnar Table "public.in_shared_co_default"
+ Column |  Type   | Modifiers | Storage  | Compression Type | Compression Level | Block Size | Description 
+--------+---------+-----------+----------+------------------+-------------------+------------+-------------
+ c1     | integer |           | plain    | none             | 0                 | 32768      | 
+ c2     | integer |           | plain    | none             | 0                 | 32768      | 
+ c3     | text    |           | extended | none             | 0                 | 32768      | 
+Checksum: f
+Has OIDs: no
+Options: appendonly=true, orientation=column
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+ALTER TABLE in_shared_co_default SET TABLESPACE local; -- ERROR: GOH restriction
+ERROR:  cannot move from shared tablespace hdfs
+\d+ in_shared_co_default
+                         Append-Only Columnar Table "public.in_shared_co_default"
+ Column |  Type   | Modifiers | Storage  | Compression Type | Compression Level | Block Size | Description 
+--------+---------+-----------+----------+------------------+-------------------+------------+-------------
+ c1     | integer |           | plain    | none             | 0                 | 32768      | 
+ c2     | integer |           | plain    | none             | 0                 | 32768      | 
+ c3     | text    |           | extended | none             | 0                 | 32768      | 
+Checksum: f
+Has OIDs: no
+Options: appendonly=true, orientation=column
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+ALTER TABLE in_shared_co_default SET TABLESPACE hdfs2;
+ERROR:  cannot move from shared tablespace hdfs
+\d+ in_shared_co_default
+                         Append-Only Columnar Table "public.in_shared_co_default"
+ Column |  Type   | Modifiers | Storage  | Compression Type | Compression Level | Block Size | Description 
+--------+---------+-----------+----------+------------------+-------------------+------------+-------------
+ c1     | integer |           | plain    | none             | 0                 | 32768      | 
+ c2     | integer |           | plain    | none             | 0                 | 32768      | 
+ c3     | text    |           | extended | none             | 0                 | 32768      | 
+Checksum: f
+Has OIDs: no
+Options: appendonly=true, orientation=column
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+CREATE INDEX i_shared_co_default ON in_shared_co_default(c1);
+\d+ in_shared_co_default
+                         Append-Only Columnar Table "public.in_shared_co_default"
+ Column |  Type   | Modifiers | Storage  | Compression Type | Compression Level | Block Size | Description 
+--------+---------+-----------+----------+------------------+-------------------+------------+-------------
+ c1     | integer |           | plain    | none             | 0                 | 32768      | 
+ c2     | integer |           | plain    | none             | 0                 | 32768      | 
+ c3     | text    |           | extended | none             | 0                 | 32768      | 
+Checksum: f
+Indexes:
+    "i_shared_co_default" btree (c1)
+Has OIDs: no
+Options: appendonly=true, orientation=column
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+CREATE INDEX i_shared_co_ts_local ON in_shared_co_default(c1) TABLESPACE local; -- ERROR: GOH restriction
+ERROR:  cannot access a local tablespace from a shared stored database
+\d+ in_shared_co_default
+                         Append-Only Columnar Table "public.in_shared_co_default"
+ Column |  Type   | Modifiers | Storage  | Compression Type | Compression Level | Block Size | Description 
+--------+---------+-----------+----------+------------------+-------------------+------------+-------------
+ c1     | integer |           | plain    | none             | 0                 | 32768      | 
+ c2     | integer |           | plain    | none             | 0                 | 32768      | 
+ c3     | text    |           | extended | none             | 0                 | 32768      | 
+Checksum: f
+Indexes:
+    "i_shared_co_default" btree (c1)
+Has OIDs: no
+Options: appendonly=true, orientation=column
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+CREATE INDEX i_shared_co_ts_hdfs ON in_shared_co_default(c1) TABLESPACE hdfs; -- ERROR: Feature not supported
+ERROR:  cannot create index on tablespace hdfs
+\d+ in_shared_co_default
+                         Append-Only Columnar Table "public.in_shared_co_default"
+ Column |  Type   | Modifiers | Storage  | Compression Type | Compression Level | Block Size | Description 
+--------+---------+-----------+----------+------------------+-------------------+------------+-------------
+ c1     | integer |           | plain    | none             | 0                 | 32768      | 
+ c2     | integer |           | plain    | none             | 0                 | 32768      | 
+ c3     | text    |           | extended | none             | 0                 | 32768      | 
+Checksum: f
+Indexes:
+    "i_shared_co_default" btree (c1)
+Has OIDs: no
+Options: appendonly=true, orientation=column
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+ALTER INDEX i_shared_co_default SET TABLESPACE local2; -- ERROR: GOH restriction
+ERROR:  cannot change tablespace on shared storage
+\d+ in_shared_co_default
+                         Append-Only Columnar Table "public.in_shared_co_default"
+ Column |  Type   | Modifiers | Storage  | Compression Type | Compression Level | Block Size | Description 
+--------+---------+-----------+----------+------------------+-------------------+------------+-------------
+ c1     | integer |           | plain    | none             | 0                 | 32768      | 
+ c2     | integer |           | plain    | none             | 0                 | 32768      | 
+ c3     | text    |           | extended | none             | 0                 | 32768      | 
+Checksum: f
+Indexes:
+    "i_shared_co_default" btree (c1)
+Has OIDs: no
+Options: appendonly=true, orientation=column
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+ALTER INDEX i_shared_co_default SET TABLESPACE local; -- ERROR: GOH restriction
+ERROR:  cannot change tablespace on shared storage
+\d+ in_shared_co_default
+                         Append-Only Columnar Table "public.in_shared_co_default"
+ Column |  Type   | Modifiers | Storage  | Compression Type | Compression Level | Block Size | Description 
+--------+---------+-----------+----------+------------------+-------------------+------------+-------------
+ c1     | integer |           | plain    | none             | 0                 | 32768      | 
+ c2     | integer |           | plain    | none             | 0                 | 32768      | 
+ c3     | text    |           | extended | none             | 0                 | 32768      | 
+Checksum: f
+Indexes:
+    "i_shared_co_default" btree (c1)
+Has OIDs: no
+Options: appendonly=true, orientation=column
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+ALTER INDEX i_shared_co_default SET TABLESPACE hdfs; -- ERROR: Feature not supported
+ERROR:  cannot move to shared tablespace hdfs
+\d+ in_shared_co_default
+                         Append-Only Columnar Table "public.in_shared_co_default"
+ Column |  Type   | Modifiers | Storage  | Compression Type | Compression Level | Block Size | Description 
+--------+---------+-----------+----------+------------------+-------------------+------------+-------------
+ c1     | integer |           | plain    | none             | 0                 | 32768      | 
+ c2     | integer |           | plain    | none             | 0                 | 32768      | 
+ c3     | text    |           | extended | none             | 0                 | 32768      | 
+Checksum: f
+Indexes:
+    "i_shared_co_default" btree (c1)
+Has OIDs: no
+Options: appendonly=true, orientation=column
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+DROP TABLE in_shared_co_default;
+-- Table stores on the local tablesapce.
+CREATE TABLE in_shared_ts_local(c1 INT, c2 INT, c3 TEXT) TABLESPACE local DISTRIBUTED BY (c1); -- ERROR: GOH restriction
+ERROR:  cannot access a local tablespace from a shared stored database
+-- Table stores on the local tablesapce, explictly specify a heap table.
+CREATE TABLE in_shared_heap_ts_local(c1 INT, c2 INT, c3 TEXT) WITH (appendonly=false) TABLESPACE local DISTRIBUTED BY (c1); -- ERROR: GOH restriction
+ERROR:  cannot access a local tablespace from a shared stored database
+-- Table stores on the local tablesapce, explictly specify a appendonly table.
+CREATE TABLE in_shared_ao_ts_local(c1 INT, c2 INT, c3 TEXT) WITH (appendonly=true) TABLESPACE local DISTRIBUTED BY (c1); -- ERROR: GOH restriction
+ERROR:  cannot access a local tablespace from a shared stored database
+-- Table stores on the local tablesapce, explictly specify a column store table.
+CREATE TABLE in_shared_co_ts_local(c1 INT, c2 INT, c3 TEXT) WITH (appendonly=true, orientation=column) TABLESPACE local DISTRIBUTED BY (c1); -- ERROR: GOH restriction
+ERROR:  cannot access a local tablespace from a shared stored database
+-- Table stores on the shared tablesapce.
+CREATE TABLE in_shared_ts_hdfs(c1 INT, c2 INT, c3 TEXT) TABLESPACE hdfs DISTRIBUTED BY (c1);
+\d+ in_shared_ts_hdfs
+     Append-Only Table "public.in_shared_ts_hdfs"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+-- no need to test all of this
+DROP TABLE in_shared_ts_hdfs;
+-- Table stores on the shared tablesapce, explictly specify a heap table.
+CREATE TABLE in_shared_heap_ts_hdfs(c1 INT, c2 INT, c3 TEXT) WITH (appendonly=false) TABLESPACE hdfs DISTRIBUTED BY (c1); -- ERROR: GOH restriction
+ERROR:  tablespace "hdfs" does not support heap relation
+-- Table stores on the shared tablesapce, explictly specify a appendonly table.
+CREATE TABLE in_shared_ao_ts_hdfs(c1 INT, c2 INT, c3 TEXT) WITH (appendonly=true) TABLESPACE hdfs DISTRIBUTED BY (c1);
+\d+ in_shared_ao_ts_hdfs
+    Append-Only Table "public.in_shared_ao_ts_hdfs"
+ Column |  Type   | Modifiers | Storage  | Description 
+--------+---------+-----------+----------+-------------
+ c1     | integer |           | plain    | 
+ c2     | integer |           | plain    | 
+ c3     | text    |           | extended | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+-- no need to test all of this
+DROP TABLE in_shared_ao_ts_hdfs;
+-- Table stores on the shared tablesapce, explictly specify a column store table.
+CREATE TABLE in_shared_co_ts_hdfs(c1 INT, c2 INT, c3 TEXT) WITH (appendonly=true, orientation=column) TABLESPACE hdfs DISTRIBUTED BY (c1);
+\d+ in_shared_co_ts_hdfs
+                         Append-Only Columnar Table "public.in_shared_co_ts_hdfs"
+ Column |  Type   | Modifiers | Storage  | Compression Type | Compression Level | Block Size | Description 
+--------+---------+-----------+----------+------------------+-------------------+------------+-------------
+ c1     | integer |           | plain    | none             | 0                 | 32768      | 
+ c2     | integer |           | plain    | none             | 0                 | 32768      | 
+ c3     | text    |           | extended | none             | 0                 | 32768      | 
+Checksum: f
+Has OIDs: no
+Options: appendonly=true, orientation=column
+Distributed by: (c1)
+Tablespace: "hdfs"
+
+-- no need to test all of this
+DROP TABLE in_shared_co_ts_hdfs;
+-- external/copy
+CREATE EXTERNAL WEB TABLE in_shared_ext(c INT) EXECUTE 'echo "no_such_number"' ON ALL FORMAT 'TEXT' LOG ERRORS INTO in_shared_ext_error SEGMENT REJECT LIMIT 2;
+NOTICE:  Error table "in_shared_ext_error" does not exist. Auto generating an error table with the same name
+\d+ in_shared_ext_error
+                    Table "public.in_shared_ext_error"
+  Column  |           Type           | Modifiers | Storage  | Description 
+----------+--------------------------+-----------+----------+-------------
+ cmdtime  | timestamp with time zone |           | plain    | 
+ relname  | text                     |           | extended | 
+ filename | text                     |           | extended | 
+ linenum  | integer                  |           | plain    | 
+ bytenum  | integer                  |           | plain    | 
+ errmsg   | text                     |           | extended | 
+ rawdata  | text                     |           | extended | 
+ rawbytes | bytea                    |           | extended | 
+Has OIDs: no
+Options: errortable=true
+Distributed randomly
+
+SELECT * FROM in_shared_ext;
+ERROR:  Segment reject limit reached. Aborting operation. Last error was: invalid input syntax for integer: "", column c  (seg0 slice1 mat3-mbp.local:40000 pid=60513)
+DETAIL:  External table in_shared_ext, line 2 of execute:echo "no_such_number", column c
+SELECT relname, filename, errmsg FROM in_shared_ext_error;
+    relname    |           filename            |                            errmsg                            
+---------------+-------------------------------+--------------------------------------------------------------
+ in_shared_ext | execute:echo "no_such_number" | invalid input syntax for integer: "no_such_number", column c
+ in_shared_ext | execute:echo "no_such_number" | invalid input syntax for integer: "no_such_number", column c
+(2 rows)
+
+DROP EXTERNAL WEB TABLE in_shared_ext;
+DROP TABLE in_shared_ext_error;
+CREATE TABLE copied_table(c INT);
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'c' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+COPY copied_table FROM stdin LOG ERRORS INTO in_shared_ext_error SEGMENT REJECT LIMIT 2;
+NOTICE:  Error table "in_shared_ext_error" does not exist. Auto generating an error table with the same name
+WARNING:  The error table was created in the same transaction as this operation. It will get dropped if transaction rolls back even if bad rows are present
+HINT:  To avoid this create the error table ahead of time using: CREATE TABLE <name> (cmdtime timestamp with time zone, relname text, filename text, linenum integer, bytenum integer, errmsg text, rawdata text, rawbytes bytea)
+NOTICE:  Found 1 data formatting errors (1 or more input rows). Errors logged into error table "in_shared_ext_error"
+\d+ in_shared_ext_error
+                    Table "public.in_shared_ext_error"
+  Column  |           Type           | Modifiers | Storage  | Description 
+----------+--------------------------+-----------+----------+-------------
+ cmdtime  | timestamp with time zone |           | plain    | 
+ relname  | text                     |           | extended | 
+ filename | text                     |           | extended | 
+ linenum  | integer                  |           | plain    | 
+ bytenum  | integer                  |           | plain    | 
+ errmsg   | text                     |           | extended | 
+ rawdata  | text                     |           | extended | 
+ rawbytes | bytea                    |           | extended | 
+Has OIDs: no
+Options: errortable=true
+Distributed randomly
+
+DROP TABLE copied_table;
+DROP TABLE in_shared_ext_error;
+-- select into
+SELECT RANDOM() AS r INTO in_shared_random;
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column(s) named 'r' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+\d+ in_shared_random
+          Append-Only Table "public.in_shared_random"
+ Column |       Type       | Modifiers | Storage | Description 
+--------+------------------+-----------+---------+-------------
+ r      | double precision |           | plain   | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Has OIDs: no
+Options: appendonly=true
+Distributed by: (r)
+
+DROP TABLE in_shared_random;

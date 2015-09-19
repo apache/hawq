@@ -1,0 +1,64 @@
+# FILE NAME: gpinitsystem_config
+
+# Configuration file needed by the gpinitsystem
+
+################################################
+#### REQUIRED PARAMETERS
+################################################
+
+#### Name of this Greenplum system enclosed in quotes.
+ARRAY_NAME="EMC Greenplum DW"
+
+#### Naming convention for utility-generated data directories.
+SEG_PREFIX=gpseg
+
+#### Base number by which primary segment port numbers 
+#### are calculated.
+PORT_BASE=40000
+
+#### File system location(s) where primary segment data directories 
+#### will be created. The number of locations in the list dictate
+#### the number of primary segments that will get created per
+#### physical host (if multiple addresses for a host are listed in 
+#### the hostfile, the number of segments will be spread evenly across
+#### the specified interface addresses).
+declare -a DATA_DIRECTORY=(/data1/primary /data1/primary /data1/primary /data2/primary /data2/primary /data2/primary)
+
+#### OS-configured hostname or IP address of the master host.
+MASTER_HOSTNAME=mdw
+
+#### File system location where the master data directory 
+#### will be created.
+MASTER_DIRECTORY=/data/master
+
+#### Port number for the master instance. 
+MASTER_PORT=5432
+
+#### Shell utility used to connect to remote hosts.
+TRUSTED_SHELL=ssh
+
+#### Maximum log file segments between automatic WAL checkpoints.
+CHECK_POINT_SEGMENTS=8
+
+#### Default server-side character set encoding.
+ENCODING=UNICODE
+
+################################################
+#### Distributed File System Informaiton
+################################################
+
+DFS_NAME=hdfs
+DFS_URL=localhost:9000/gpsql
+KERBEROS_KEYFILE=/etc/krb5.keytab
+ENABLE_SECURE_FILESYSTEM=off
+
+################################################
+#### OTHER OPTIONAL PARAMETERS
+################################################
+
+#### Create a database of this name after initialization.
+#DATABASE_NAME=name_of_database
+
+#### Specify the location of the host address file here instead of
+#### with the the -h option of gpinitsystem.
+#MACHINE_LIST_FILE=/home/gpadmin/gpconfigs/hostfile_gpinitsystem

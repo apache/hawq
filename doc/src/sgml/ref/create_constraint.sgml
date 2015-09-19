@@ -1,0 +1,129 @@
+<!--
+$PostgreSQL: pgsql/doc/src/sgml/ref/create_constraint.sgml,v 1.17 2006/10/17 12:53:03 momjian Exp $
+PostgreSQL documentation
+-->
+
+<refentry id="SQL-CREATECONSTRAINT">
+ <refmeta>
+  <refentrytitle id="sql-createconstraint-title">CREATE CONSTRAINT TRIGGER</refentrytitle>
+  <refmiscinfo>SQL - Language Statements</refmiscinfo>
+ </refmeta>
+
+ <refnamediv>
+  <refname>CREATE CONSTRAINT TRIGGER</refname>
+  <refpurpose>define a new constraint trigger</refpurpose>
+ </refnamediv>
+
+ <indexterm zone="sql-createconstraint">
+  <primary>CREATE CONSTRAINT</primary>
+ </indexterm>
+
+ <refsynopsisdiv>
+<synopsis>
+CREATE CONSTRAINT TRIGGER <replaceable class="parameter">name</replaceable>
+    AFTER <replaceable class="parameter">event [ OR ... ]</replaceable>
+    ON <replaceable class="parameter">table_name</replaceable>
+    [ FROM <replaceable class="parameter">referenced_table_name</replaceable> ]
+    { NOT DEFERRABLE | [ DEFERRABLE ] { INITIALLY IMMEDIATE | INITIALLY DEFERRED } }
+    FOR EACH ROW
+    EXECUTE PROCEDURE <replaceable class="parameter">funcname</replaceable> ( <replaceable class="parameter">arguments</replaceable> )
+</synopsis>
+ </refsynopsisdiv>
+
+ <refsect1>
+  <title>Description</title>
+
+  <para>
+   <command>CREATE CONSTRAINT TRIGGER</command> is used within
+   <command>CREATE TABLE</command>/<command>ALTER TABLE</command> and by
+   <application>pg_dump</application> to create the special triggers for
+   referential integrity.
+    It is not intended for general use.
+   </para>
+  </refsect1>
+
+  <refsect1>
+  <title>Parameters</title>
+
+  <variablelist>
+   <varlistentry>
+    <term><replaceable class="PARAMETER">name</replaceable></term>
+    <listitem>
+     <para>
+      The name of the constraint trigger. The actual name of the
+      created trigger will be of the form
+      <literal>RI_ConstraintTrigger_0000</literal> (where 0000 is some number
+      assigned by the server).
+      Use this assigned name when dropping the trigger.
+     </para>
+    </listitem>
+   </varlistentry>
+
+   <varlistentry>
+    <term><replaceable class="PARAMETER">event</replaceable></term>
+    <listitem>
+     <para>
+      One of <literal>INSERT</literal>, <literal>UPDATE</literal>, or
+      <literal>DELETE</literal>; this specifies the event that will fire the
+      trigger. Multiple events can be specified using <literal>OR</literal>.
+     </para>
+    </listitem>
+   </varlistentry>
+
+   <varlistentry>
+    <term><replaceable class="PARAMETER">table_name</replaceable></term>
+    <listitem>
+     <para>
+      The (possibly schema-qualified) name of the table in which
+      the triggering events occur.
+     </para>
+    </listitem>
+   </varlistentry>
+
+   <varlistentry>
+    <term><replaceable class="PARAMETER">referenced_table_name</replaceable></term>
+    <listitem>
+     <para>
+      The (possibly schema-qualified) name of the table referenced by the
+      constraint. Used by foreign key constraints triggers.
+     </para>
+    </listitem>
+   </varlistentry>
+
+   <varlistentry>
+    <term><literal>DEFERRABLE</literal></term>
+    <term><literal>NOT DEFERRABLE</literal></term>
+    <term><literal>INITIALLY IMMEDIATE</literal></term>
+    <term><literal>INITIALLY DEFERRED</literal></term>
+    <listitem>
+     <para>
+      See the <xref linkend="SQL-CREATETABLE" endterm="SQL-CREATETABLE-TITLE">
+      documentation for details of these constraint options.
+     </para>
+    </listitem>
+   </varlistentry>
+
+   <varlistentry>
+    <term><replaceable class="PARAMETER">funcname</replaceable>(<replaceable class="PARAMETER">args</replaceable>)</term>
+    <listitem>
+     <para>
+      The function to call as part of the trigger processing. See <xref
+      linkend="SQL-CREATETRIGGER" endterm="SQL-CREATETRIGGER-TITLE"> for
+      details.
+     </para>
+    </listitem>
+   </varlistentry>
+  </variablelist>
+  </refsect1>
+
+ <refsect1>
+  <title>Compatibility</title>
+  <para>
+   <command>CREATE CONTRAINT TRIGGER</command> is a
+   <productname>PostgreSQL</productname> extension of the <acronym>SQL</>
+   standard.
+  </para>
+ </refsect1>
+
+ </refentry>
+

@@ -1,0 +1,151 @@
+-- --------------------------------------
+-- test hcatalog lookup
+-- --------------------------------------
+
+-- Negative test with GUC disabled
+SET hcatalog_enable = false;
+SELECT * from hcatalog.db.t;
+
+-- enable GUC
+SET hcatalog_enable = true;
+
+-- Create function to insert and scan in-memory data to pg_class
+CREATE OR REPLACE FUNCTION convert_to_hcatalog_schema(schemaName text) RETURNS text
+  AS '@abs_builddir@/regress@DLSUFFIX@', 'convert_to_hcatalog_schema'
+  LANGUAGE C;
+
+CREATE OR REPLACE FUNCTION convert_to_internal_schema(schemaName text) RETURNS text
+  AS '@abs_builddir@/regress@DLSUFFIX@', 'convert_to_internal_schema'
+  LANGUAGE C;
+
+-- create an hcatalog schema and tables  
+create schema test_schema;
+create table test_schema.r(a int, b int);
+create table test_schema.t(a int, b int);
+create table test_schema.tt(a int, b int);
+SELECT convert_to_hcatalog_schema('test_schema');
+select nspname,nspdboid from pg_namespace where nspname='test_schema';
+
+create schema test_schema2;
+
+CREATE FUNCTION trigger_func() RETURNS trigger LANGUAGE plpgsql AS '
+BEGIN
+	RAISE NOTICE ''trigger_func() called'';
+	RETURN NULL;
+END;';
+
+create user newuser;
+
+---------------------------------------------------
+-- negative tests: DDL on hcatalog
+---------------------------------------------------
+
+-- create
+create schema hcatalog.test_schema2;
+create table hcatalog.test_schema.tbl(a int);
+create index r_idx on hcatalog.test_schema.r(a);
+create table t(a int, b int) inherits (hcatalog.test_schema.r);
+create type hcatalog.test_schema.a as (a int);
+CREATE TRIGGER before_ins_stmt_trig BEFORE INSERT ON hcatalog.test_schema.r
+FOR EACH STATEMENT EXECUTE PROCEDURE trigger_func();
+
+-- drop
+drop schema test_schema;
+drop schema hcatalog.test_schema;
+drop table test_schema.r;
+drop table hcatalog.test_schema.t;
+drop type hcatalog.test_schema.r;
+
+-- alter
+alter table hcatalog.test_schema.r add column foo text default 'a';
+alter schema test_schema rename to test_schema2;
+alter table hcatalog.test_schema.tt set schema test_schema2;
+alter type hcatalog.test_schema.r owner to newuser;
+
+-- vacuum/analyze
+vacuum hcatalog.test_schema.r;
+analyze hcatalog.test_schema.r;
+
+-- misc
+comment on table hcatalog.test_schema.r is 'my awesome hcatalog table'; 
+lock hcatalog.test_schema.r; 
+reindex database hcatalog; 
+cluster hcatalog.test_schema.r;
+
+-- positive test: CREATE TABLE ... LIKE
+create table t (like hcatalog.test_schema.r);
+select * from t;
+
+---------------------------------------------------
+-- simple tests over tables from the same catalog
+---------------------------------------------------
+-- fail as no table r exists in current schema
+select * from r;
+
+-- positive test cases
+select * from hcatalog.test_schema.r;
+select * from Hcatalog.test_schema.r;
+select * from HCATALOG.test_schema.r; 
+select * from "hcatalog".test_schema.r;
+
+-- negative test case: case-sensitive name resolution
+select * from "HCATALOG".test_schema.r;
+
+select a from hcatalog.test_schema.r;
+select r.a from hcatalog.test_schema.r;
+select  test_schema.r.a from hcatalog.test_schema.r;
+select  test_schema.r.* from hcatalog.test_schema.r;
+select hcatalog.test_schema.r.b from hcatalog.test_schema.r;
+
+-- hcatalog and internal schemas
+create schema test_schema;
+select nspname,nspdboid from pg_namespace where nspname='test_schema';
+
+create table test_schema.s(a int, c int);
+create table test_schema.p(a int, b int) partition by list(b)(partition p1 values (1), partition p2 values (2));
+
+-- negative test: column reference is ambiguous
+select a from hcatalog.test_schema.r, test_schema.s;
+
+-- positive test cases
+select * from test_schema.s, hcatalog.test_schema.r;
+select b,c from test_schema.s, hcatalog.test_schema.r;
+select s.a, r.a from test_schema.s, hcatalog.test_schema.r;
+
+-- hcatalog and internal table with identical names
+create table test_schema.r(a int, d int);
+
+-- negative tests: ambigous column reference
+select a from hcatalog.test_schema.r, test_schema.r;
+select r.a from hcatalog.test_schema.r, test_schema.r;
+select r.* from hcatalog.test_schema.r, test_schema.r;
+
+-- negative tests: ambiguous table references
+select test_schema.r.a from hcatalog.test_schema.r, test_schema.r;
+select test_schema.r.d from hcatalog.test_schema.r, test_schema.r;
+select hcatalog.test_schema.r.a, test_schema.r.a from hcatalog.test_schema.r, test_schema.r;
+
+-- positive tests:
+select * from hcatalog.test_schema.r, test_schema.r;
+select hcatalog.test_schema.r.a, regression.test_schema.r.a from hcatalog.test_schema.r, test_schema.r;
+select b,d from hcatalog.test_schema.r, test_schema.r;
+select r1.*, r2.* from hcatalog.test_schema.r r1, test_schema.r r2;
+
+-- negative test: partitioned tables and hcatalog
+alter table test_schema.p exchange partition p1 with table hcatalog.test_schema.r;
+
+
+
+-- cleanup
+DROP schema test_schema cascade;
+SELECT convert_to_internal_schema('test_schema');
+DROP schema test_schema cascade;
+DROP schema test_schema2 cascade;
+select nspname,nspdboid from pg_namespace where nspname='test_schema';
+
+DROP FUNCTION convert_to_hcatalog_schema(text);
+DROP FUNCTION convert_to_internal_schema(text);
+DROP FUNCTION trigger_func();
+DROP USER newuser;
+-- disable GUC
+SET hcatalog_enable = false;

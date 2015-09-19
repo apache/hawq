@@ -1,0 +1,18 @@
+<ivy-module version="2.0">
+  <info organisation="Pivotal" module="libyarn" revision="<version>" status="release" publication="<time>">
+    <license name="Pivotal"/>
+  </info>
+
+    <configurations>
+      <conf name="osx106_x86" description="osx106_x86" visibility="public"/>
+      <conf name="rhel5_x86_64" description="rhel5_x86_64" visibility="public"/>
+      <conf name="suse10_x86_64" description="suse10_x86_64" visibility="public"/>
+    </configurations>
+
+    <publications> 
+      <artifact name="libyarn-osx106_x86" type="targz" ext="targz" conf="osx106_x86"/>
+      <artifact name="libyarn-rhel5_x86_64" type="targz" ext="targz" conf="rhel5_x86_64"/>
+      <artifact name="libyarn-suse10_x86_64" type="targz" ext="targz" conf="suse10_x86_64"/>
+    </publications>   
+
+</ivy-module>

@@ -1,0 +1,10 @@
+# Architecture Dependent Configuration
+#
+# Format:
+#	target_name: regexp
+#
+# where <regexp> is applied to the output of "file $GPHOME/bin/postgres"
+#
+
+32bit_tpch: 'Mach-O executable i386'
+64bit_tpch: 'Mach-O 64.* executable x86_64'

@@ -1,0 +1,215 @@
+COMMAND NAME: hawq extract
+
+Extract table's metadata into a YAML file.
+
+*****************************************************
+SYNOPSIS
+*****************************************************
+
+hawq extract [-h hostname] [-p port] [-U username] [-d database] [-o output_file] [-W] <tablename>
+
+hawq extract help 
+hawq extract -? 
+
+hawq extract --version
+
+*****************************************************
+DESCRIPTION
+*****************************************************
+
+Hawq extract is a utility to extract table's metadata into
+a YAML formatted file. The file then can be consumed by
+HAWQ's InputFormat to make HAWQ's data file on HDFS be
+read directly in MapReduce program.
+
+To use hawq extract, HAWQ must have been already started.
+
+Currently hawq extract supports AO table only. Partition
+table is supported, however multi-level partitions is
+not supported.
+
+*****************************************************
+Arguments
+*****************************************************
+
+<tablename>
+
+Name of the table to extract metadata. It can be 'namespace_name.table_name'
+or just 'table_name' if the namespace name is 'public'.
+
+*****************************************************
+OPTIONS
+*****************************************************
+
+-o output_file
+
+Specifies the name of a file that hawq extract will write the table's metadata to. If not specified, hawq extract will write to stdout.
+
+-v (verbose mode)
+
+Optional. Show verbose output of the extract steps as they are executed.
+
+-? (help)
+
+Displays the online help.
+
+--version
+
+Displays the version of this utility.
+
+*****************************************************
+CONNECTION OPTIONS
+*****************************************************
+
+-d database
+
+  The database to connect to. If not specified, reads from the
+  environment variable $PGDATABASE or defaults to 'template1'. 
+
+-h hostname
+  
+  Specifies the host name of the machine on which the HAWQ master
+  database server is running. If not specified, reads from the
+  environment variable $PGHOST or defaults to localhost.
+
+-p port
+  
+  Specifies the TCP port on which the HAWQ master database server 
+  is listening for connections. If not specified, reads from the
+  environment variable $PGPORT or defaults to 5432.
+
+-U username
+
+  The database role name to connect as. If not specified, reads
+  from the environment variable $PGUSER or defaults to the current
+  system user name.
+
+-W (force password prompt)
+
+  Force a password prompt. If not specified, reads the password 
+  from the environment variable $PGPASSWORD or from a password file  
+  specified by $PGPASSFILE or in ~/.pgpass. 
+
+*****************************************************
+METADATA FILE FORMAT
+*****************************************************
+
+The hawq extract will export table's metadata into a file using YAML 1.1
+document format. The file contains various key information of the table,
+such as table's schema, data file's locations and sizes, partition
+constraints and so on.
+
+The basic structure of the metadata file is:
+---
+
+Version: string (1.0.0)
+DBVersion: string
+FileFormat: string (AO/Parquet)
+TableName: string (schemaname.tablename)
+DFS_URL: string (hdfs://127.0.0.1:9000)
+Encoding: UTF8
+AO_Schema: 
+- name: string
+  type: string
+
+AO_FileLocations:
+  Blocksize: int
+  Checksum: boolean
+  CompressionType: string
+  CompressionLevel: int
+  PartitionBy: string ('PARTITION BY ...')
+  Files:
+  - path: string (/gpseg0/16385/35469/35470.1)
+    size: long
+  
+  Partitions:
+  - Blocksize: int
+    Checksum: boolean
+    CompressionType: string
+    CompressionLevel: int
+    Name: string
+    Constraint: string (PARTITION Jan08 START (date '2008-01-01') INCLUSIVE)
+    Files:
+    - path: string
+      size: long
+
+*****************************************************
+EXAMPLES
+*****************************************************
+
+Run hawq extract to extract 'rank' table's metadata into
+a file 'rank_table.yaml'.
+
+$ hawq extract -o rank_table.yaml rank
+
+Output content in rank_table.yaml
+---------------------------------
+AO_FileLocations:
+  Blocksize: 32768
+  Checksum: false
+  CompressionLevel: 0
+  CompressionType: null
+  Files:
+  - path: /gpseg0/16385/35469/35692.1
+    size: 0
+  - path: /gpseg1/16385/35469/35692.1
+    size: 0
+  PartitionBy: PARTITION BY list (gender)
+  Partitions:
+  - Blocksize: 32768
+    Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION girls VALUES('F') WITH (appendonly=true)
+    Files:
+    - path: /gpseg0/16385/35469/35697.1
+      size: 0
+    - path: /gpseg1/16385/35469/35697.1
+      size: 0
+    Name: girls
+  - Blocksize: 32768
+    Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION boys VALUES('M') WITH (appendonly=true)
+    Files:
+    - path: /gpseg0/16385/35469/35703.1
+      size: 0
+    - path: /gpseg1/16385/35469/35703.1
+      size: 0
+    Name: boys
+  - Blocksize: 32768
+    Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: DEFAULT PARTITION other  WITH (appendonly=true)
+    Files:
+    - path: /gpseg0/16385/35469/35709.1
+      size: 90071728
+    - path: /gpseg1/16385/35469/35709.1
+      size: 90071512
+    Name: other
+AO_Schema:
+- name: id
+  type: int4
+- name: rank
+  type: int4
+- name: year
+  type: int4
+- name: gender
+  type: bpchar
+- name: count
+  type: int4
+DBVersion: PostgreSQL 8.2.15 (Greenplum Database 4.2.0 build 1) (HAWQ 1.0.0.3 build) on i386-apple-darwin11.4.2, compiled by GCC gcc (GCC) 4.4.2
+DFS_URL: hdfs://127.0.0.1:9000
+Encoding: UTF8
+FileFormat: AO
+TableName: public.rank
+Version: 1.0.0
+
+*****************************************************
+SEE ALSO
+*****************************************************
+
+hawq load
+

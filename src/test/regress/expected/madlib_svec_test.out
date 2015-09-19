@@ -1,0 +1,236 @@
+SET client_min_messages TO ERROR;
+DROP SCHEMA IF EXISTS madlib_install_check_gpsql_svec_test CASCADE;
+CREATE SCHEMA madlib_install_check_gpsql_svec_test;
+SET search_path = madlib_install_check_gpsql_svec_test, madlib;
+create table test_pairs( id int, a madlib.svec, b madlib.svec );
+insert into test_pairs values 
+       (0, '{1,100,1}:{5,0,5}', '{50,50,2}:{1,2,10}'),
+       (1, '{1,100,1}:{-5,0,-5}', '{50,50,2}:{-1,-2,-10}');
+insert into test_pairs values 
+       (11, '{1}:{0}', '{1}:{1}'),
+       (12, '{1}:{5}', '{3}:{-8}'),
+       (13, '{1}:{0}', '{1}:{NULL}'),
+       (14, '{1,2,1}:{2,4,2}', '{2,1,1}:{0,3,5}'),
+       (15, '{1,2,1}:{2,4,2}', '{2,1,1}:{NULL,3,5}');
+select id, madlib.svec_plus(a,b) from test_pairs order by id;
+ id |            svec_plus             
+----+----------------------------------
+  0 | {1,49,50,1,1}:{6,1,2,10,15}
+  1 | {1,49,50,1,1}:{-6,-1,-2,-10,-15}
+ 11 | {1}:{1}
+ 12 | {3}:{-3}
+ 13 | {1}:{NVP}
+ 14 | {1,1,2}:{2,4,7}
+ 15 | {2,2}:{NVP,7}
+(7 rows)
+
+select id, madlib.svec_plus(a,b) = madlib.svec_plus(b,a) from test_pairs order by id;
+ id | ?column? 
+----+----------
+  0 | t
+  1 | t
+ 11 | t
+ 12 | t
+ 13 | t
+ 14 | t
+ 15 | t
+(7 rows)
+
+select id, madlib.svec_mult(a,b) from test_pairs order by id;
+ id |      svec_mult      
+----+---------------------
+  0 | {1,100,1}:{5,0,50}
+  1 | {1,100,1}:{5,-0,50}
+ 11 | {1}:{0}
+ 12 | {3}:{-40}
+ 13 | {1}:{NVP}
+ 14 | {2,1,1}:{0,12,10}
+ 15 | {2,1,1}:{NVP,12,10}
+(7 rows)
+
+select id, madlib.svec_mult(a,b) = madlib.svec_mult(b,a) from test_pairs order by id;
+ id | ?column? 
+----+----------
+  0 | t
+  1 | t
+ 11 | t
+ 12 | t
+ 13 | t
+ 14 | t
+ 15 | t
+(7 rows)
+
+select id, madlib.svec_minus(a, b) = madlib.svec_plus(madlib.svec_mult((-1)::svec,b), a) from test_pairs order by id;
+ id | ?column? 
+----+----------
+  0 | t
+  1 | t
+ 11 | t
+ 12 | t
+ 13 | t
+ 14 | t
+ 15 | t
+(7 rows)
+
+select id, madlib.svec_pow(a,2::svec) = madlib.svec_mult(a,a) from test_pairs order by id;
+ id | ?column? 
+----+----------
+  0 | t
+  1 | t
+ 11 | t
+ 12 | t
+ 13 | t
+ 14 | t
+ 15 | t
+(7 rows)
+
+select madlib.svec_plus('{1,2,3}:{4,5,6}', 5::madlib.svec);
+     svec_plus     
+-------------------
+ {1,2,3}:{9,10,11}
+(1 row)
+
+select madlib.svec_plus(5::madlib.svec, '{1,2,3}:{4,5,6}');
+     svec_plus     
+-------------------
+ {1,2,3}:{9,10,11}
+(1 row)
+
+select madlib.svec_plus(500::madlib.svec, '{1,2,3}:{4,null,6}');
+       svec_plus       
+-----------------------
+ {1,2,3}:{504,NVP,506}
+(1 row)
+
+select madlib.svec_div(500::madlib.svec, '{1,2,3}:{4,null,6}');
+              svec_div              
+------------------------------------
+ {1,2,3}:{125,NVP,83.3333333333333}
+(1 row)
+
+select madlib.svec_div('{1,2,3}:{4,null,6}', 500::madlib.svec);
+         svec_div          
+---------------------------
+ {1,2,3}:{0.008,NVP,0.012}
+(1 row)
+
+-- Test operators between svec and float8[]
+select ('{1,2,3,4}:{3,4,5,6}'::madlib.svec)           %*% ('{1,2,3,4}:{3,4,5,6}'::madlib.svec)::float8[];
+ ?column? 
+----------
+      260
+(1 row)
+
+select ('{1,2,3,4}:{3,4,5,6}'::madlib.svec)::float8[] %*% ('{1,2,3,4}:{3,4,5,6}'::madlib.svec);
+ ?column? 
+----------
+      260
+(1 row)
+
+select ('{1,2,3,4}:{3,4,5,6}'::madlib.svec)            /  ('{1,2,3,4}:{3,4,5,6}'::madlib.svec)::float8[];
+ ?column? 
+----------
+ {10}:{1}
+(1 row)
+
+select ('{1,2,3,4}:{3,4,5,6}'::madlib.svec)::float8[]  /  ('{1,2,3,4}:{3,4,5,6}'::madlib.svec);
+ ?column? 
+----------
+ {10}:{1}
+(1 row)
+
+select ('{1,2,3,4}:{3,4,5,6}'::madlib.svec)            *  ('{1,2,3,4}:{3,4,5,6}'::madlib.svec)::float8[];
+        ?column?        
+------------------------
+ {1,2,3,4}:{9,16,25,36}
+(1 row)
+
+select ('{1,2,3,4}:{3,4,5,6}'::madlib.svec)::float8[]  *  ('{1,2,3,4}:{3,4,5,6}'::madlib.svec);
+        ?column?        
+------------------------
+ {1,2,3,4}:{9,16,25,36}
+(1 row)
+
+select ('{1,2,3,4}:{3,4,5,6}'::madlib.svec)            +  ('{1,2,3,4}:{3,4,5,6}'::madlib.svec)::float8[];
+       ?column?        
+-----------------------
+ {1,2,3,4}:{6,8,10,12}
+(1 row)
+
+select ('{1,2,3,4}:{3,4,5,6}'::madlib.svec)::float8[]  +  ('{1,2,3,4}:{3,4,5,6}'::madlib.svec);
+       ?column?        
+-----------------------
+ {1,2,3,4}:{6,8,10,12}
+(1 row)
+
+select ('{1,2,3,4}:{3,4,5,6}'::madlib.svec)            -  ('{1,2,3,4}:{3,4,5,6}'::madlib.svec)::float8[];
+ ?column? 
+----------
+ {10}:{0}
+(1 row)
+
+select ('{1,2,3,4}:{3,4,5,6}'::madlib.svec)::float8[]  -  ('{1,2,3,4}:{3,4,5,6}'::madlib.svec);
+ ?column? 
+----------
+ {10}:{0}
+(1 row)
+
+select id, a, b, madlib.svec_concat(a,b), a, b from test_pairs order by id;
+ id |          a          |           b           |              svec_concat              |          a          |           b           
+----+---------------------+-----------------------+---------------------------------------+---------------------+-----------------------
+  0 | {1,100,1}:{5,0,5}   | {50,50,2}:{1,2,10}    | {1,100,1,50,50,2}:{5,0,5,1,2,10}      | {1,100,1}:{5,0,5}   | {50,50,2}:{1,2,10}
+  1 | {1,100,1}:{-5,0,-5} | {50,50,2}:{-1,-2,-10} | {1,100,1,50,50,2}:{-5,0,-5,-1,-2,-10} | {1,100,1}:{-5,0,-5} | {50,50,2}:{-1,-2,-10}
+ 11 | {1}:{0}             | {1}:{1}               | {1,1}:{0,1}                           | {1}:{0}             | {1}:{1}
+ 12 | {1}:{5}             | {3}:{-8}              | {1,3}:{5,-8}                          | {1}:{5}             | {3}:{-8}
+ 13 | {1}:{0}             | {1}:{NVP}             | {1,1}:{0,NVP}                         | {1}:{0}             | {1}:{NVP}
+ 14 | {1,2,1}:{2,4,2}     | {2,1,1}:{0,3,5}       | {1,2,1,2,1,1}:{2,4,2,0,3,5}           | {1,2,1}:{2,4,2}     | {2,1,1}:{0,3,5}
+ 15 | {1,2,1}:{2,4,2}     | {2,1,1}:{NVP,3,5}     | {1,2,1,2,1,1}:{2,4,2,NVP,3,5}         | {1,2,1}:{2,4,2}     | {2,1,1}:{NVP,3,5}
+(7 rows)
+
+select id, madlib.svec_concat_replicate(0, b), b from test_pairs order by id;
+ id | svec_concat_replicate |           b           
+----+-----------------------+-----------------------
+  0 | {}:{}                 | {50,50,2}:{1,2,10}
+  1 | {}:{}                 | {50,50,2}:{-1,-2,-10}
+ 11 | {}:{}                 | {1}:{1}
+ 12 | {}:{}                 | {3}:{-8}
+ 13 | {}:{}                 | {1}:{NVP}
+ 14 | {}:{}                 | {2,1,1}:{0,3,5}
+ 15 | {}:{}                 | {2,1,1}:{NVP,3,5}
+(7 rows)
+
+select id, madlib.svec_concat_replicate(1, b) = b from test_pairs order by id;
+ id | ?column? 
+----+----------
+  0 | t
+  1 | t
+ 11 | t
+ 12 | t
+ 13 | t
+ 14 | t
+ 15 | t
+(7 rows)
+
+select id, madlib.svec_concat_replicate(3, b), b from test_pairs order by id;
+ id |                   svec_concat_replicate                   |           b           
+----+-----------------------------------------------------------+-----------------------
+  0 | {50,50,2,50,50,2,50,50,2}:{1,2,10,1,2,10,1,2,10}          | {50,50,2}:{1,2,10}
+  1 | {50,50,2,50,50,2,50,50,2}:{-1,-2,-10,-1,-2,-10,-1,-2,-10} | {50,50,2}:{-1,-2,-10}
+ 11 | {1,1,1}:{1,1,1}                                           | {1}:{1}
+ 12 | {3,3,3}:{-8,-8,-8}                                        | {3}:{-8}
+ 13 | {1,1,1}:{NVP,NVP,NVP}                                     | {1}:{NVP}
+ 14 | {2,1,1,2,1,1,2,1,1}:{0,3,5,0,3,5,0,3,5}                   | {2,1,1}:{0,3,5}
+ 15 | {2,1,1,2,1,1,2,1,1}:{NVP,3,5,NVP,3,5,NVP,3,5}             | {2,1,1}:{NVP,3,5}
+(7 rows)
+
+-- This vfunction test svec creation from position array
+select madlib.svec_cast_positions_float8arr('{1,2,4,6,2,5}'::INT8[], '{.2,.3,.4,.5,.3,.1}'::FLOAT8[], 10000, 0.0);
+        svec_cast_positions_float8arr         
+----------------------------------------------
+ {1,1,1,1,1,1,9994}:{0.2,0.3,0,0.4,0.1,0.5,0}
+(1 row)
+
+DROP SCHEMA madlib_install_check_gpsql_svec_test CASCADE;
+-- sanity check; don't delete madlib schema and its objects.
+DROP SCHEMA madlib CASCADE;
+ERROR:  cannot drop schema madlib because it is required by the database system

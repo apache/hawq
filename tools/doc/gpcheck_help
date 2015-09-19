@@ -1,0 +1,141 @@
+COMMAND NAME: hawq check
+
+Verifies and validates HAWQ platform settings.
+
+*****************************************************
+SYNOPSIS
+*****************************************************
+
+hawq check -f <hostfile_hawq_check> [--hadoop <hadoop_home>]
+        [--stdout | --zipout] [--config <config_file>]
+
+hawq check --zipin <hawq_check_zipfile>
+
+hawq check -?
+
+hawq check --version
+
+
+*****************************************************
+DESCRIPTION
+*****************************************************
+
+The hawq check utility determines the platform on which 
+you are running HAWQ and validates various platform-specific 
+configuration settings as well as HAWQ and HDFS specific 
+configuration settings. In order to perform HAWQ configuration 
+checks, make sure HAWQ has been already started and gpconfig 
+works. For HDFS checks, you should either set the HADOOP_HOME 
+environment variable or give the hadoop installation location 
+using --hadoop option.
+
+hawq check can use a host file or a file previously created with
+the --zipout option to validate platform settings. If
+GPCHECK_ERROR displays, one or more validation checks failed.
+You can also use hawq check to gather and view platform settings 
+on hosts without running validation checks.
+
+When running checks, hawq check compares your actual configuration
+setting with expected value listed in a config file (which is
+$GPHOME/etc/hawq check.cnf by default). You are supposed to modify
+values for "mount.points" and "diskusage.monitor.mounts" to
+the actual mount points you want to check separated by comma,
+otherwise it only checks the root directory which may not be 
+helpful, here is an example:
+
+    [linux.mount]
+    mount.points = /,/data1,/data2
+
+    [linux.diskusage]
+    diskusage.monitor.mounts = /,/data1,/data2
+
+*****************************************************
+OPTIONS
+*****************************************************
+
+--config config_file
+
+ The name of a configuration file to use instead of the default 
+ file $GPHOME/etc/hawq_check.cnf (or ~/gpconfigs/hawq_check_dca_config 
+ on the EMC Greenplum Data Computing Appliance). This file specifies 
+ the OS-specific checks and HDFS-specific checks to run.
+
+
+-f hostfile_hawq_check
+
+ The name of a file that contains a list of hosts that hawq check 
+ uses to validate platform-specific settings. This file should 
+ contain a single host name for all hosts in your HAWQ system 
+ (master, standby master, and segments).
+
+--hadoop hadoop_home
+
+ Use this option to specify your hadoop installation location so that
+ hawq check can validate HDFS settings. This option is not needed when
+ HADOOP_HOME environment variable is set.
+
+
+--stdout
+
+ Display collected host information from hawq check. No checks or 
+ validations are performed.
+
+
+--zipout
+
+ Save all collected data to a .zip file in the current working 
+ directory. hawq check automatically creates the .zip file and names 
+ it hawq_check_timestamp.tar.gz. No checks or validations are performed.
+
+
+--zipin file
+
+ Use this option to decompress and check a .zip file created with 
+ the --zipout option. hawq check performs validation tasks against 
+ the file you specify in this option.
+
+
+-? (help)
+
+ Displays the online help.
+
+
+--version
+
+ Displays the version of this utility.
+
+
+*****************************************************
+EXAMPLES
+*****************************************************
+
+Verify and validate the HAWQ platform settings by 
+entering a host file and specifying the hadoop location:
+
+ # hawq check -f hostfile_hawq_check --hadoop ~/hadoop-2.0.0/
+
+
+Save HAWQ platform settings to a zip file, when HADOOP_HOME
+environment variable is set:
+
+ # hawq check -f hostfile_hawq_check --zipout
+
+
+Verify and validate the HAWQ platform settings 
+using a zip file created with the --zipout option:
+
+ # hawq check --zipin hawq_check_timestamp.tar.gz
+
+
+View collected HAWQ platform settings:
+
+ # hawq check -f hostfile_hawq_check --hadoop ~/hadoop-2.0.0/ --stdout
+
+
+*****************************************************
+SEE ALSO
+*****************************************************
+
+gpcheckperf
+
+

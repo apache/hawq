@@ -1,0 +1,208 @@
+-- --------------------------------------
+-- test parsing and loading metadata from json
+-- --------------------------------------
+-- Create function to insert and scan in-memory data to pg_class
+CREATE OR REPLACE FUNCTION load_json_data(filename text) RETURNS text
+  AS '@abs_builddir@/regress@DLSUFFIX@', 'load_json_data'
+  LANGUAGE C;
+CREATE OR REPLACE FUNCTION search_namespace(namespaceName text) 
+  RETURNS table(nspname text, nspdboid "oid", oid "oid")
+  AS '@abs_builddir@/regress@DLSUFFIX@', 'caql_scan_in_memory_pg_namespace'
+  LANGUAGE C;
+CREATE OR REPLACE FUNCTION search_table(tblname text) 
+  RETURNS table(relname text, relkind "char", oid "oid")
+  LANGUAGE C volatile NO SQL
+  AS '@abs_builddir@/regress@DLSUFFIX@', 'caql_scan_in_memory_pg_class';
+CREATE OR REPLACE FUNCTION search_type(tblname text) 
+  RETURNS table(oid "oid", relname text, namespace "oid")
+  LANGUAGE C volatile NO SQL
+  AS '@abs_builddir@/regress@DLSUFFIX@', 'caql_scan_in_memory_pg_type';
+CREATE OR REPLACE FUNCTION search_policy(tblname text) 
+  RETURNS table(oid "oid", relname text, policy_atts text)
+  LANGUAGE C volatile NO SQL
+  AS '@abs_builddir@/regress@DLSUFFIX@', 'caql_scan_in_memory_gp_distribution_policy';
+CREATE OR REPLACE FUNCTION search_exttable(tblname text) 
+  RETURNS table(oid "oid", relname text, location text)
+  LANGUAGE C volatile NO SQL
+  AS '@abs_builddir@/regress@DLSUFFIX@', 'caql_scan_in_memory_pg_exttable';
+CREATE OR REPLACE FUNCTION search_attribute(tblname text) 
+  RETURNS table(attname text, atttype "oid", attypmod int)
+  LANGUAGE C volatile NO SQL
+  AS '@abs_builddir@/regress@DLSUFFIX@', 'caql_scan_in_memory_pg_attribute';
+CREATE OR REPLACE FUNCTION min_external_oid() RETURNS oid
+  AS '@abs_builddir@/regress@DLSUFFIX@', 'min_external_oid'
+  LANGUAGE C;
+create table mytable_internal(c1 char(3),vc2 varchar(3), ts3 timestamp, d4 date, n5 numeric(30,10), n6 numeric(10), n7 numeric, c8 char, vc9 varchar);
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'c1' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+select attname, atttypid, atttypmod  from pg_attribute where attrelid = 'mytable_internal'::regclass;
+    attname    | atttypid | atttypmod 
+---------------+----------+-----------
+ gp_segment_id |       23 |        -1
+ tableoid      |       26 |        -1
+ cmax          |       29 |        -1
+ xmax          |       28 |        -1
+ cmin          |       29 |        -1
+ xmin          |       28 |        -1
+ ctid          |       27 |        -1
+ vc9           |     1043 |        -1
+ c8            |     1042 |         5
+ n7            |     1700 |        -1
+ n6            |     1700 |    655364
+ n5            |     1700 |   1966094
+ d4            |     1082 |        -1
+ ts3           |     1114 |        -1
+ vc2           |     1043 |         7
+ c1            |     1042 |         7
+(16 rows)
+
+-- make sure pg_class and pg_namespace don't use oids from the reserved range for external metadata
+select count(*) from
+(select oid from pg_class
+union all
+select oid from pg_class) t
+where oid >= min_external_oid();
+ count 
+-------
+     0
+(1 row)
+
+-- positive test case with a single table
+BEGIN TRANSACTION;
+SELECT load_json_data('@abs_builddir@/data/hcatalog/single_table.json');
+  load_json_data  
+------------------
+ default.mytable 
+(1 row)
+
+SELECT nspname, nspdboid, count(distinct oid) from search_namespace('default') group by nspname, nspdboid;
+ nspname | nspdboid | count 
+---------+----------+-------
+ default |     6120 |     1
+(1 row)
+
+SELECT relname, relkind from search_table('mytable');
+ relname | relkind 
+---------+---------
+ mytable | r
+(1 row)
+
+SELECT relname from search_type('mytable');
+ relname 
+---------
+ mytable
+(1 row)
+
+SELECT relname, policy_atts from search_policy('mytable');
+ relname | policy_atts 
+---------+-------------
+ mytable | null
+(1 row)
+
+SELECT relname, location from search_exttable('mytable');
+ relname |                      location                      
+---------+----------------------------------------------------
+ mytable | pxf://localhost:51200/default.mytable?Profile=Hive
+(1 row)
+
+SELECT relname, relkind from search_table('mytable') where oid >= min_external_oid();
+ relname | relkind 
+---------+---------
+ mytable | r
+(1 row)
+
+SELECT * from search_attribute('mytable');
+ attname | atttype | attypmod 
+---------+---------+----------
+ s1      |      25 |       -1
+ s2      |      25 |       -1
+ n1      |      23 |       -1
+ d1      |     701 |       -1
+ dc1     |    1700 |  2490390
+ tm      |    1114 |       -1
+ f       |     700 |       -1
+ bg      |      20 |       -1
+ b       |      16 |       -1
+ tn      |      21 |       -1
+ sml     |      21 |       -1
+ dt      |    1082 |       -1
+ vc1     |    1043 |        9
+ c1      |    1042 |        7
+ bin     |      17 |       -1
+(15 rows)
+
+END TRANSACTION;
+-- positive test case with multiple tables
+BEGIN TRANSACTION;
+SELECT load_json_data('@abs_builddir@/data/hcatalog/multi_table.json');
+      load_json_data      
+--------------------------
+ db1.ht1 db2.ht1 db2.ht2 
+(1 row)
+
+SELECT nspname, nspdboid, count(distinct oid) from search_namespace('db1') where oid >= min_external_oid() group by nspname, nspdboid;
+ nspname | nspdboid | count 
+---------+----------+-------
+ db1     |     6120 |     1
+(1 row)
+
+SELECT nspname, nspdboid, count(distinct oid) from search_namespace('db2') where oid >= min_external_oid() group by nspname, nspdboid;
+ nspname | nspdboid | count 
+---------+----------+-------
+ db2     |     6120 |     1
+(1 row)
+
+SELECT relname, relkind from search_table('ht1') where oid >= min_external_oid();
+ relname | relkind 
+---------+---------
+ ht1     | r
+ ht1     | r
+(2 rows)
+
+SELECT relname, count(oid) from search_type('ht1') group by relname, namespace;
+ relname | count 
+---------+-------
+ ht1     |     1
+ ht1     |     1
+(2 rows)
+
+SELECT relname, policy_atts from search_policy('ht1');
+ relname | policy_atts 
+---------+-------------
+ ht1     | null
+ ht1     | null
+(2 rows)
+
+SELECT relname, location from search_exttable('ht1');
+ relname |                  location                  
+---------+--------------------------------------------
+ ht1     | pxf://localhost:51200/db1.ht1?Profile=Hive
+ ht1     | pxf://localhost:51200/db2.ht1?Profile=Hive
+(2 rows)
+
+END TRANSACTION;
+-- negative test: duplicated tables
+BEGIN TRANSACTION;
+SELECT load_json_data('@abs_builddir@/data/hcatalog/multi_table_duplicates.json');
+ERROR:  relation "hcatalog.db.t" already exists
+END TRANSACTION;
+-- negative test case: invalid numeric typemod
+BEGIN TRANSACTION;
+SELECT load_json_data('@abs_builddir@/data/hcatalog/invalid_numeric_range.json');
+ERROR:  Invalid typemod for imported column n5. NUMERIC scale 40 must be between 0 and precision 30
+END TRANSACTION;
+-- negative test case: invalid typemod for timestamp type
+BEGIN TRANSACTION;
+SELECT load_json_data('@abs_builddir@/data/hcatalog/invalid_typemod_timestamp.json');
+ERROR:  Invalid typemod for imported column n5
+END TRANSACTION;
+-- cleanup
+drop table mytable_internal;
+DROP FUNCTION load_json_data(filename text);
+DROP FUNCTION search_namespace(namespaceName text);
+DROP FUNCTION search_table(tblname text);
+DROP FUNCTION search_type(tblname text);
+DROP FUNCTION search_policy(tblname text);
+DROP FUNCTION search_exttable(tblname text);
+DROP FUNCTION search_attribute(tblname text);
+DROP FUNCTION min_external_oid();

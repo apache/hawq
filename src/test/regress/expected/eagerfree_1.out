@@ -1,0 +1,2295 @@
+drop table if exists smallt;
+NOTICE:  table "smallt" does not exist, skipping
+create table smallt (i int, t text, d date);
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'i' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+insert into smallt select i%10, 'text ' || (i%15), '2011-01-01'::date + ((i%20) || ' days')::interval
+from generate_series(0, 99) i;
+drop table if exists bigt;
+NOTICE:  table "bigt" does not exist, skipping
+create table bigt (i int, t text, d date);
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'i' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+insert into bigt select i/10, 'text ' || (i/15), '2011-01-01'::date + ((i/20) || ' days')::interval
+from generate_series(0, 999999) i;
+drop table if exists smallt2;
+NOTICE:  table "smallt2" does not exist, skipping
+create table smallt2 (i int, t text, d date);
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'i' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+insert into smallt2 select i%5, 'text ' || (i%10), '2011-01-01'::date + ((i%15) || ' days')::interval
+from generate_series(0, 49) i;
+-- HashAgg, Agg
+select d, count(*) from smallt group by d;
+     d      | count 
+------------+-------
+ 01-13-2011 |     5
+ 01-11-2011 |     5
+ 01-12-2011 |     5
+ 01-08-2011 |     5
+ 01-03-2011 |     5
+ 01-09-2011 |     5
+ 01-10-2011 |     5
+ 01-14-2011 |     5
+ 01-20-2011 |     5
+ 01-18-2011 |     5
+ 01-04-2011 |     5
+ 01-15-2011 |     5
+ 01-02-2011 |     5
+ 01-07-2011 |     5
+ 01-01-2011 |     5
+ 01-05-2011 |     5
+ 01-19-2011 |     5
+ 01-17-2011 |     5
+ 01-16-2011 |     5
+ 01-06-2011 |     5
+(20 rows)
+
+explain analyze select d, count(*) from smallt group by d;
+                                                       QUERY PLAN                                                       
+------------------------------------------------------------------------------------------------------------------------
+ Gather Motion 1:1  (slice2; segments: 1)  (cost=3.20..3.45 rows=20 width=12)
+   Rows out:  20 rows at destination with 7.546 ms to first row, 7.550 ms to end, start offset by 0.666 ms.
+   ->  HashAggregate  (cost=3.20..3.45 rows=20 width=12)
+         Group By: smallt.d
+         Rows out:  20 rows with 5.467 ms to first row, 7.390 ms to end, start offset by 0.705 ms.
+         Executor memory:  6225K bytes.
+         ->  Redistribute Motion 1:1  (slice1; segments: 1)  (cost=2.50..2.90 rows=20 width=12)
+               Hash Key: smallt.d
+               Rows out:  20 rows at destination with 2.613 ms to first row, 2.617 ms to end, start offset by 2.974 ms.
+               ->  HashAggregate  (cost=2.50..2.50 rows=20 width=12)
+                     Group By: smallt.d
+                     Rows out:  20 rows with 3.116 ms to first row, 4.529 ms to end, start offset by 0.917 ms.
+                     Executor memory:  6225K bytes.
+                     ->  Seq Scan on smallt  (cost=0.00..2.00 rows=100 width=4)
+                           Rows out:  100 rows with 0.058 ms to first row, 0.077 ms to end, start offset by 3.423 ms.
+ Slice statistics:
+   (slice0)    Executor memory: 184K bytes.
+   (slice1)    Executor memory: 6392K bytes (seg0).
+   (slice2)    Executor memory: 6408K bytes (seg0).
+ Statement statistics:
+   Memory used: 128000K bytes
+ Total runtime: 8.395 ms
+(22 rows)
+
+set statement_mem=2560;
+select count(*) from (select i, t, d, count(*) from bigt group by i, t, d) tmp;
+ count  
+--------
+ 133333
+(1 row)
+
+explain analyze select count(*) from (select i, t, d, count(*) from bigt group by i, t, d) tmp;
+                                                          QUERY PLAN                                                          
+------------------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=22727.56..22727.57 rows=1 width=8)
+   Rows out:  1 rows with 1041 ms to end, start offset by 0.607 ms.
+   ->  Gather Motion 1:1  (slice1; segments: 1)  (cost=22727.52..22727.55 rows=1 width=8)
+         Rows out:  1 rows at destination with 1041 ms to end, start offset by 0.608 ms.
+         ->  Aggregate  (cost=22727.52..22727.53 rows=1 width=8)
+               Rows out:  1 rows with 1041 ms to end, start offset by 0.657 ms.
+               ->  Subquery Scan tmp  (cost=21476.88..22727.51 rows=1 width=0)
+                     Rows out:  133333 rows with 906 ms to first row, 1023 ms to end, start offset by 0.658 ms.
+                     ->  HashAggregate  (cost=21476.88..22727.51 rows=100050 width=48)
+                           Group By: bigt.i, bigt.t, bigt.d
+                           Rows out:  133333 rows with 906 ms to first row, 998 ms to end, start offset by 0.658 ms.
+                           Executor memory:  2785K bytes.
+                           Work_mem used:  2361K bytes.
+                           Work_mem wanted: 8837K bytes to lessen workfile I/O.
+                           133333 groups total in 32 batches; 1 overflows; 133333 spill groups.
+                           Hash chain length 1.5 avg, 15 max, using 112683 of 270336 buckets.
+                           ->  Seq Scan on bigt  (cost=0.00..11471.94 rows=1000494 width=18)
+                                 Rows out:  1000000 rows with 0.025 ms to first row, 110 ms to end, start offset by 0.672 ms.
+ Slice statistics:
+   (slice0)    Executor memory: 201K bytes.
+   (slice1)  * Executor memory: 2970K bytes (seg0).  Work_mem: 2361K bytes max, 8837K bytes wanted.
+ Statement statistics:
+   Memory used: 2560K bytes
+   Memory wanted: 9336K bytes
+ Total runtime: 1041.689 ms
+(25 rows)
+
+set statement_mem=128000;
+-- DQA
+set gp_enable_agg_distinct=off;
+set gp_eager_one_phase_agg=on;
+select count(distinct d) from smallt;
+ count 
+-------
+    20
+(1 row)
+
+explain analyze select count(distinct d) from smallt;
+                                                    QUERY PLAN                                                     
+-------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=4.25..4.26 rows=1 width=8)
+   Rows out:  1 rows with 0.195 ms to end, start offset by 0.376 ms.
+   Executor memory:  29K bytes.
+   Work_mem used:  29K bytes.
+   ->  Gather Motion 1:1  (slice1; segments: 1)  (cost=0.00..4.00 rows=100 width=4)
+         Rows out:  100 rows at destination with 0.126 ms to first row, 0.143 ms to end, start offset by 0.376 ms.
+         ->  Seq Scan on smallt  (cost=0.00..2.00 rows=100 width=4)
+               Rows out:  100 rows with 0.010 ms to first row, 0.030 ms to end, start offset by 0.384 ms.
+ Slice statistics:
+   (slice0)    Executor memory: 208K bytes.  Work_mem: 29K bytes max.
+   (slice1)    Executor memory: 160K bytes (seg0).
+ Statement statistics:
+   Memory used: 128000K bytes
+ Settings:  gp_enable_agg_distinct=off
+ Total runtime: 0.584 ms
+(15 rows)
+
+set statement_mem=2560;
+select count(distinct d) from bigt;
+ count 
+-------
+ 50000
+(1 row)
+
+explain analyze select count(distinct d) from bigt;
+                                                     QUERY PLAN                                                      
+---------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=33983.06..33983.07 rows=1 width=8)
+   Rows out:  1 rows with 2170 ms to end, start offset by 0.490 ms.
+   Executor memory:  2585K bytes.
+   Work_mem used:  2585K bytes.
+   Work_mem wanted: 19596K bytes to lessen workfile I/O.
+   ->  Gather Motion 1:1  (slice1; segments: 1)  (cost=0.00..31481.82 rows=1000494 width=4)
+         Rows out:  1000000 rows at destination with 0.544 ms to first row, 368 ms to end, start offset by 0.491 ms.
+         ->  Seq Scan on bigt  (cost=0.00..11471.94 rows=1000494 width=4)
+               Rows out:  1000000 rows with 0.032 ms to first row, 222 ms to end, start offset by 0.537 ms.
+ Slice statistics:
+   (slice0)  * Executor memory: 2804K bytes.  Work_mem: 2585K bytes max, 19596K bytes wanted.
+   (slice1)    Executor memory: 168K bytes (seg0).
+ Statement statistics:
+   Memory used: 2560K bytes
+   Memory wanted: 19795K bytes
+ Settings:  gp_enable_agg_distinct=off
+ Total runtime: 2170.516 ms
+(17 rows)
+
+set statement_mem=128000;
+set gp_enable_agg_distinct=on;
+set gp_eager_one_phase_agg=off;
+-- Rescan on Agg (with Material in the inner side of nestloop)
+set enable_nestloop=on;
+set enable_hashjoin=off;
+select t1.*, t2.* from
+(select d, count(*) from smallt group by d) as t1, (select d, sum(i) from smallt group by d) as t2
+where t1.d = t2.d;
+     d      | count |     d      | sum 
+------------+-------+------------+-----
+ 01-13-2011 |     5 | 01-13-2011 |  10
+ 01-11-2011 |     5 | 01-11-2011 |   0
+ 01-18-2011 |     5 | 01-18-2011 |  35
+ 01-12-2011 |     5 | 01-12-2011 |   5
+ 01-04-2011 |     5 | 01-04-2011 |  15
+ 01-08-2011 |     5 | 01-08-2011 |  35
+ 01-15-2011 |     5 | 01-15-2011 |  20
+ 01-02-2011 |     5 | 01-02-2011 |   5
+ 01-07-2011 |     5 | 01-07-2011 |  30
+ 01-01-2011 |     5 | 01-01-2011 |   0
+ 01-03-2011 |     5 | 01-03-2011 |  10
+ 01-05-2011 |     5 | 01-05-2011 |  20
+ 01-09-2011 |     5 | 01-09-2011 |  40
+ 01-10-2011 |     5 | 01-10-2011 |  45
+ 01-14-2011 |     5 | 01-14-2011 |  15
+ 01-19-2011 |     5 | 01-19-2011 |  40
+ 01-17-2011 |     5 | 01-17-2011 |  30
+ 01-16-2011 |     5 | 01-16-2011 |  25
+ 01-20-2011 |     5 | 01-20-2011 |  45
+ 01-06-2011 |     5 | 01-06-2011 |  25
+(20 rows)
+
+explain analyze select t1.*, t2.* from
+(select d, count(*) from smallt group by d) as t1, (select d, sum(i) from smallt group by d) as t2
+where t1.d = t2.d;
+                                                             QUERY PLAN                                                             
+------------------------------------------------------------------------------------------------------------------------------------
+ Gather Motion 1:1  (slice3; segments: 1)  (cost=6.87..16.32 rows=20 width=24)
+   Rows out:  20 rows at destination with 6.619 ms to first row, 6.623 ms to end, start offset by 4.497 ms.
+   ->  Nested Loop  (cost=6.87..16.32 rows=20 width=24)
+         Join Filter: t1.d = t2.d
+         Rows out:  20 rows with 4.428 ms to first row, 5.032 ms to end, start offset by 6.008 ms.
+         ->  HashAggregate  (cost=3.20..3.45 rows=20 width=12)
+               Group By: public.smallt.d
+               Rows out:  20 rows with 2.729 ms to first row, 3.233 ms to end, start offset by 7.703 ms.
+               Executor memory:  3153K bytes.
+               ->  Redistribute Motion 1:1  (slice1; segments: 1)  (cost=2.50..2.90 rows=20 width=12)
+                     Hash Key: public.smallt.d
+                     Rows out:  20 rows at destination with 2.186 ms to first row, 2.189 ms to end, start offset by 7.956 ms.
+                     ->  HashAggregate  (cost=2.50..2.50 rows=20 width=12)
+                           Group By: public.smallt.d
+                           Rows out:  20 rows with 2.292 ms to first row, 2.700 ms to end, start offset by 7.354 ms.
+                           Executor memory:  3153K bytes.
+                           ->  Seq Scan on smallt  (cost=0.00..2.00 rows=100 width=4)
+                                 Rows out:  100 rows with 0.182 ms to first row, 0.206 ms to end, start offset by 9.122 ms.
+         ->  Materialize for deadlock safety  (cost=3.67..3.87 rows=20 width=12)
+               Rows out:  401 rows with 1.693 ms to first row, 1.729 ms to end of 21 scans, start offset by 11 ms.
+               ->  HashAggregate  (cost=3.20..3.45 rows=20 width=12)
+                     Group By: public.smallt.d
+                     Rows out:  20 rows with 1.183 ms to first row, 1.682 ms to end, start offset by 6.011 ms.
+                     Executor memory:  3153K bytes.
+                     ->  Redistribute Motion 1:1  (slice2; segments: 1)  (cost=2.50..2.90 rows=20 width=12)
+                           Hash Key: public.smallt.d
+                           Rows out:  20 rows at destination with 0.498 ms to first row, 0.503 ms to end, start offset by 6.429 ms.
+                           ->  HashAggregate  (cost=2.50..2.50 rows=20 width=12)
+                                 Group By: public.smallt.d
+                                 Rows out:  20 rows with 0.909 ms to first row, 1.448 ms to end, start offset by 5.383 ms.
+                                 Executor memory:  3153K bytes.
+                                 ->  Seq Scan on smallt  (cost=0.00..2.00 rows=100 width=8)
+                                       Rows out:  100 rows with 0.063 ms to first row, 0.099 ms to end, start offset by 5.764 ms.
+ Slice statistics:
+   (slice0)    Executor memory: 287K bytes.
+   (slice1)    Executor memory: 3355K bytes (seg0).
+   (slice2)    Executor memory: 3355K bytes (seg0).
+   (slice3)    Executor memory: 3455K bytes (seg0).
+ Statement statistics:
+   Memory used: 128000K bytes
+ Settings:  enable_hashjoin=off; enable_nestloop=on; gp_enable_agg_distinct=on
+ Total runtime: 11.259 ms
+(42 rows)
+
+set enable_nestloop=off;
+set enable_hashjoin=on;
+-- Rescan on Agg (with Material in the inner side of nestloop)
+set enable_nestloop=on;
+set enable_hashjoin=off;
+select t1.*, t2.* from
+(select i, count(*) from smallt group by i) as t1, (select i, sum(i) from smallt group by i) as t2
+where t1.i = t2.i;
+ i | count | i | sum 
+---+-------+---+-----
+ 3 |    10 | 3 |  30
+ 2 |    10 | 2 |  20
+ 6 |    10 | 6 |  60
+ 9 |    10 | 9 |  90
+ 1 |    10 | 1 |  10
+ 7 |    10 | 7 |  70
+ 5 |    10 | 5 |  50
+ 0 |    10 | 0 |   0
+ 8 |    10 | 8 |  80
+ 4 |    10 | 4 |  40
+(10 rows)
+
+explain analyze select t1.*, t2.* from
+(select i, count(*) from smallt group by i) as t1, (select i, sum(i) from smallt group by i) as t2
+where t1.i = t2.i;
+                                                      QUERY PLAN                                                      
+----------------------------------------------------------------------------------------------------------------------
+ Gather Motion 1:1  (slice1; segments: 1)  (cost=5.23..7.71 rows=10 width=24)
+   Rows out:  10 rows at destination with 2.077 ms to first row, 2.079 ms to end, start offset by 0.624 ms.
+   ->  Nested Loop  (cost=5.23..7.71 rows=10 width=24)
+         Join Filter: t1.i = t2.i
+         Rows out:  10 rows with 1.484 ms to first row, 1.922 ms to end, start offset by 0.644 ms.
+         ->  HashAggregate  (cost=2.50..2.62 rows=10 width=12)
+               Group By: public.smallt.i
+               Rows out:  10 rows with 0.505 ms to first row, 0.909 ms to end, start offset by 1.620 ms.
+               Executor memory:  3153K bytes.
+               ->  Seq Scan on smallt  (cost=0.00..2.00 rows=100 width=4)
+                     Rows out:  100 rows with 0.013 ms to first row, 0.029 ms to end, start offset by 1.831 ms.
+         ->  Materialize for deadlock safety  (cost=2.73..2.83 rows=10 width=12)
+               Rows out:  101 rows with 0.975 ms to first row, 0.989 ms to end of 11 scans, start offset by 2.360 ms.
+               ->  HashAggregate  (cost=2.50..2.62 rows=10 width=12)
+                     Group By: public.smallt.i
+                     Rows out:  10 rows with 0.579 ms to first row, 0.968 ms to end, start offset by 0.647 ms.
+                     Executor memory:  3153K bytes.
+                     ->  Seq Scan on smallt  (cost=0.00..2.00 rows=100 width=4)
+                           Rows out:  100 rows with 0.019 ms to first row, 0.042 ms to end, start offset by 0.909 ms.
+ Slice statistics:
+   (slice0)    Executor memory: 201K bytes.
+   (slice1)    Executor memory: 3353K bytes (seg0).
+ Statement statistics:
+   Memory used: 128000K bytes
+ Settings:  enable_hashjoin=off; enable_nestloop=on; gp_enable_agg_distinct=on
+ Total runtime: 2.728 ms
+(26 rows)
+
+set enable_nestloop=off;
+set enable_hashjoin=on;
+-- Limit on Agg
+select d, count(*) from smallt group by d limit 5; --ignore
+     d      | count 
+------------+-------
+ 01-13-2011 |     5
+ 01-11-2011 |     5
+ 01-12-2011 |     5
+ 01-08-2011 |     5
+ 01-03-2011 |     5
+(5 rows)
+
+explain analyze select d, count(*) from smallt group by d limit 5;
+                                                             QUERY PLAN                                                             
+------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=3.20..3.36 rows=5 width=12)
+   Rows out:  5 rows with 5.669 ms to first row, 5.672 ms to end, start offset by 0.619 ms.
+   ->  Gather Motion 1:1  (slice2; segments: 1)  (cost=3.20..3.36 rows=5 width=12)
+         Rows out:  5 rows at destination with 5.667 ms to first row, 5.668 ms to end, start offset by 0.620 ms.
+         ->  Limit  (cost=3.20..3.26 rows=5 width=12)
+               Rows out:  5 rows with 5.401 ms to first row, 5.505 ms to end, start offset by 0.727 ms.
+               ->  HashAggregate  (cost=3.20..3.45 rows=20 width=12)
+                     Group By: smallt.d
+                     Rows out:  5 rows with 5.400 ms to first row, 5.499 ms to end, start offset by 0.727 ms.
+                     Executor memory:  6225K bytes.
+                     ->  Redistribute Motion 1:1  (slice1; segments: 1)  (cost=2.50..2.90 rows=20 width=12)
+                           Hash Key: smallt.d
+                           Rows out:  20 rows at destination with 2.519 ms to first row, 2.521 ms to end, start offset by 3.096 ms.
+                           ->  HashAggregate  (cost=2.50..2.50 rows=20 width=12)
+                                 Group By: smallt.d
+                                 Rows out:  20 rows with 3.173 ms to first row, 4.670 ms to end, start offset by 0.845 ms.
+                                 Executor memory:  6225K bytes.
+                                 ->  Seq Scan on smallt  (cost=0.00..2.00 rows=100 width=4)
+                                       Rows out:  100 rows with 0.063 ms to first row, 0.085 ms to end, start offset by 3.392 ms.
+ Slice statistics:
+   (slice0)    Executor memory: 184K bytes.
+   (slice1)    Executor memory: 6392K bytes (seg0).
+   (slice2)    Executor memory: 6408K bytes (seg0).
+ Statement statistics:
+   Memory used: 128000K bytes
+ Settings:  enable_hashjoin=on; enable_nestloop=off; gp_enable_agg_distinct=on
+ Total runtime: 7.477 ms
+(27 rows)
+
+-- HashJoin
+select t1.* from smallt as t1, smallt as t2 where t1.i = t2.i;
+ i |    t    |     d      
+---+---------+------------
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 5 | text 5  | 01-06-2011
+ 5 | text 5  | 01-06-2011
+ 5 | text 5  | 01-06-2011
+ 5 | text 5  | 01-06-2011
+ 5 | text 5  | 01-06-2011
+ 5 | text 5  | 01-06-2011
+ 5 | text 5  | 01-06-2011
+ 5 | text 5  | 01-06-2011
+ 5 | text 5  | 01-06-2011
+ 5 | text 5  | 01-06-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 7 | text 7  | 01-08-2011
+ 7 | text 7  | 01-08-2011
+ 7 | text 7  | 01-08-2011
+ 7 | text 7  | 01-08-2011
+ 7 | text 7  | 01-08-2011
+ 7 | text 7  | 01-08-2011
+ 7 | text 7  | 01-08-2011
+ 7 | text 7  | 01-08-2011
+ 7 | text 7  | 01-08-2011
+ 7 | text 7  | 01-08-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 9 | text 9  | 01-10-2011
+ 9 | text 9  | 01-10-2011
+ 9 | text 9  | 01-10-2011
+ 9 | text 9  | 01-10-2011
+ 9 | text 9  | 01-10-2011
+ 9 | text 9  | 01-10-2011
+ 9 | text 9  | 01-10-2011
+ 9 | text 9  | 01-10-2011
+ 9 | text 9  | 01-10-2011
+ 9 | text 9  | 01-10-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 3 | text 13 | 01-14-2011
+ 3 | text 13 | 01-14-2011
+ 3 | text 13 | 01-14-2011
+ 3 | text 13 | 01-14-2011
+ 3 | text 13 | 01-14-2011
+ 3 | text 13 | 01-14-2011
+ 3 | text 13 | 01-14-2011
+ 3 | text 13 | 01-14-2011
+ 3 | text 13 | 01-14-2011
+ 3 | text 13 | 01-14-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 5 | text 0  | 01-16-2011
+ 5 | text 0  | 01-16-2011
+ 5 | text 0  | 01-16-2011
+ 5 | text 0  | 01-16-2011
+ 5 | text 0  | 01-16-2011
+ 5 | text 0  | 01-16-2011
+ 5 | text 0  | 01-16-2011
+ 5 | text 0  | 01-16-2011
+ 5 | text 0  | 01-16-2011
+ 5 | text 0  | 01-16-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 7 | text 2  | 01-18-2011
+ 7 | text 2  | 01-18-2011
+ 7 | text 2  | 01-18-2011
+ 7 | text 2  | 01-18-2011
+ 7 | text 2  | 01-18-2011
+ 7 | text 2  | 01-18-2011
+ 7 | text 2  | 01-18-2011
+ 7 | text 2  | 01-18-2011
+ 7 | text 2  | 01-18-2011
+ 7 | text 2  | 01-18-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 9 | text 4  | 01-20-2011
+ 9 | text 4  | 01-20-2011
+ 9 | text 4  | 01-20-2011
+ 9 | text 4  | 01-20-2011
+ 9 | text 4  | 01-20-2011
+ 9 | text 4  | 01-20-2011
+ 9 | text 4  | 01-20-2011
+ 9 | text 4  | 01-20-2011
+ 9 | text 4  | 01-20-2011
+ 9 | text 4  | 01-20-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 5 | text 10 | 01-06-2011
+ 5 | text 10 | 01-06-2011
+ 5 | text 10 | 01-06-2011
+ 5 | text 10 | 01-06-2011
+ 5 | text 10 | 01-06-2011
+ 5 | text 10 | 01-06-2011
+ 5 | text 10 | 01-06-2011
+ 5 | text 10 | 01-06-2011
+ 5 | text 10 | 01-06-2011
+ 5 | text 10 | 01-06-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 7 | text 12 | 01-08-2011
+ 7 | text 12 | 01-08-2011
+ 7 | text 12 | 01-08-2011
+ 7 | text 12 | 01-08-2011
+ 7 | text 12 | 01-08-2011
+ 7 | text 12 | 01-08-2011
+ 7 | text 12 | 01-08-2011
+ 7 | text 12 | 01-08-2011
+ 7 | text 12 | 01-08-2011
+ 7 | text 12 | 01-08-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 9 | text 14 | 01-10-2011
+ 9 | text 14 | 01-10-2011
+ 9 | text 14 | 01-10-2011
+ 9 | text 14 | 01-10-2011
+ 9 | text 14 | 01-10-2011
+ 9 | text 14 | 01-10-2011
+ 9 | text 14 | 01-10-2011
+ 9 | text 14 | 01-10-2011
+ 9 | text 14 | 01-10-2011
+ 9 | text 14 | 01-10-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 3 | text 3  | 01-14-2011
+ 3 | text 3  | 01-14-2011
+ 3 | text 3  | 01-14-2011
+ 3 | text 3  | 01-14-2011
+ 3 | text 3  | 01-14-2011
+ 3 | text 3  | 01-14-2011
+ 3 | text 3  | 01-14-2011
+ 3 | text 3  | 01-14-2011
+ 3 | text 3  | 01-14-2011
+ 3 | text 3  | 01-14-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 5 | text 5  | 01-16-2011
+ 5 | text 5  | 01-16-2011
+ 5 | text 5  | 01-16-2011
+ 5 | text 5  | 01-16-2011
+ 5 | text 5  | 01-16-2011
+ 5 | text 5  | 01-16-2011
+ 5 | text 5  | 01-16-2011
+ 5 | text 5  | 01-16-2011
+ 5 | text 5  | 01-16-2011
+ 5 | text 5  | 01-16-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 7 | text 7  | 01-18-2011
+ 7 | text 7  | 01-18-2011
+ 7 | text 7  | 01-18-2011
+ 7 | text 7  | 01-18-2011
+ 7 | text 7  | 01-18-2011
+ 7 | text 7  | 01-18-2011
+ 7 | text 7  | 01-18-2011
+ 7 | text 7  | 01-18-2011
+ 7 | text 7  | 01-18-2011
+ 7 | text 7  | 01-18-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
+ 9 | text 9  | 01-20-2011
+ 9 | text 9  | 01-20-2011
+ 9 | text 9  | 01-20-2011
+ 9 | text 9  | 01-20-2011
+ 9 | text 9  | 01-20-2011
+ 9 | text 9  | 01-20-2011
+ 9 | text 9  | 01-20-2011
+ 9 | text 9  | 01-20-2011
+ 9 | text 9  | 01-20-2011
+ 9 | text 9  | 01-20-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 2 | text 12 | 01-03-2011
+ 2 | text 12 | 01-03-2011
+ 2 | text 12 | 01-03-2011
+ 2 | text 12 | 01-03-2011
+ 2 | text 12 | 01-03-2011
+ 2 | text 12 | 01-03-2011
+ 2 | text 12 | 01-03-2011
+ 2 | text 12 | 01-03-2011
+ 2 | text 12 | 01-03-2011
+ 2 | text 12 | 01-03-2011
+ 3 | text 13 | 01-04-2011
+ 3 | text 13 | 01-04-2011
+ 3 | text 13 | 01-04-2011
+ 3 | text 13 | 01-04-2011
+ 3 | text 13 | 01-04-2011
+ 3 | text 13 | 01-04-2011
+ 3 | text 13 | 01-04-2011
+ 3 | text 13 | 01-04-2011
+ 3 | text 13 | 01-04-2011
+ 3 | text 13 | 01-04-2011
+ 4 | text 14 | 01-05-2011
+ 4 | text 14 | 01-05-2011
+ 4 | text 14 | 01-05-2011
+ 4 | text 14 | 01-05-2011
+ 4 | text 14 | 01-05-2011
+ 4 | text 14 | 01-05-2011
+ 4 | text 14 | 01-05-2011
+ 4 | text 14 | 01-05-2011
+ 4 | text 14 | 01-05-2011
+ 4 | text 14 | 01-05-2011
+ 5 | text 0  | 01-06-2011
+ 5 | text 0  | 01-06-2011
+ 5 | text 0  | 01-06-2011
+ 5 | text 0  | 01-06-2011
+ 5 | text 0  | 01-06-2011
+ 5 | text 0  | 01-06-2011
+ 5 | text 0  | 01-06-2011
+ 5 | text 0  | 01-06-2011
+ 5 | text 0  | 01-06-2011
+ 5 | text 0  | 01-06-2011
+ 6 | text 1  | 01-07-2011
+ 6 | text 1  | 01-07-2011
+ 6 | text 1  | 01-07-2011
+ 6 | text 1  | 01-07-2011
+ 6 | text 1  | 01-07-2011
+ 6 | text 1  | 01-07-2011
+ 6 | text 1  | 01-07-2011
+ 6 | text 1  | 01-07-2011
+ 6 | text 1  | 01-07-2011
+ 6 | text 1  | 01-07-2011
+ 7 | text 2  | 01-08-2011
+ 7 | text 2  | 01-08-2011
+ 7 | text 2  | 01-08-2011
+ 7 | text 2  | 01-08-2011
+ 7 | text 2  | 01-08-2011
+ 7 | text 2  | 01-08-2011
+ 7 | text 2  | 01-08-2011
+ 7 | text 2  | 01-08-2011
+ 7 | text 2  | 01-08-2011
+ 7 | text 2  | 01-08-2011
+ 8 | text 3  | 01-09-2011
+ 8 | text 3  | 01-09-2011
+ 8 | text 3  | 01-09-2011
+ 8 | text 3  | 01-09-2011
+ 8 | text 3  | 01-09-2011
+ 8 | text 3  | 01-09-2011
+ 8 | text 3  | 01-09-2011
+ 8 | text 3  | 01-09-2011
+ 8 | text 3  | 01-09-2011
+ 8 | text 3  | 01-09-2011
+ 9 | text 4  | 01-10-2011
+ 9 | text 4  | 01-10-2011
+ 9 | text 4  | 01-10-2011
+ 9 | text 4  | 01-10-2011
+ 9 | text 4  | 01-10-2011
+ 9 | text 4  | 01-10-2011
+ 9 | text 4  | 01-10-2011
+ 9 | text 4  | 01-10-2011
+ 9 | text 4  | 01-10-2011
+ 9 | text 4  | 01-10-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 2 | text 7  | 01-13-2011
+ 2 | text 7  | 01-13-2011
+ 2 | text 7  | 01-13-2011
+ 2 | text 7  | 01-13-2011
+ 2 | text 7  | 01-13-2011
+ 2 | text 7  | 01-13-2011
+ 2 | text 7  | 01-13-2011
+ 2 | text 7  | 01-13-2011
+ 2 | text 7  | 01-13-2011
+ 2 | text 7  | 01-13-2011
+ 3 | text 8  | 01-14-2011
+ 3 | text 8  | 01-14-2011
+ 3 | text 8  | 01-14-2011
+ 3 | text 8  | 01-14-2011
+ 3 | text 8  | 01-14-2011
+ 3 | text 8  | 01-14-2011
+ 3 | text 8  | 01-14-2011
+ 3 | text 8  | 01-14-2011
+ 3 | text 8  | 01-14-2011
+ 3 | text 8  | 01-14-2011
+ 4 | text 9  | 01-15-2011
+ 4 | text 9  | 01-15-2011
+ 4 | text 9  | 01-15-2011
+ 4 | text 9  | 01-15-2011
+ 4 | text 9  | 01-15-2011
+ 4 | text 9  | 01-15-2011
+ 4 | text 9  | 01-15-2011
+ 4 | text 9  | 01-15-2011
+ 4 | text 9  | 01-15-2011
+ 4 | text 9  | 01-15-2011
+ 5 | text 10 | 01-16-2011
+ 5 | text 10 | 01-16-2011
+ 5 | text 10 | 01-16-2011
+ 5 | text 10 | 01-16-2011
+ 5 | text 10 | 01-16-2011
+ 5 | text 10 | 01-16-2011
+ 5 | text 10 | 01-16-2011
+ 5 | text 10 | 01-16-2011
+ 5 | text 10 | 01-16-2011
+ 5 | text 10 | 01-16-2011
+ 6 | text 11 | 01-17-2011
+ 6 | text 11 | 01-17-2011
+ 6 | text 11 | 01-17-2011
+ 6 | text 11 | 01-17-2011
+ 6 | text 11 | 01-17-2011
+ 6 | text 11 | 01-17-2011
+ 6 | text 11 | 01-17-2011
+ 6 | text 11 | 01-17-2011
+ 6 | text 11 | 01-17-2011
+ 6 | text 11 | 01-17-2011
+ 7 | text 12 | 01-18-2011
+ 7 | text 12 | 01-18-2011
+ 7 | text 12 | 01-18-2011
+ 7 | text 12 | 01-18-2011
+ 7 | text 12 | 01-18-2011
+ 7 | text 12 | 01-18-2011
+ 7 | text 12 | 01-18-2011
+ 7 | text 12 | 01-18-2011
+ 7 | text 12 | 01-18-2011
+ 7 | text 12 | 01-18-2011
+ 8 | text 13 | 01-19-2011
+ 8 | text 13 | 01-19-2011
+ 8 | text 13 | 01-19-2011
+ 8 | text 13 | 01-19-2011
+ 8 | text 13 | 01-19-2011
+ 8 | text 13 | 01-19-2011
+ 8 | text 13 | 01-19-2011
+ 8 | text 13 | 01-19-2011
+ 8 | text 13 | 01-19-2011
+ 8 | text 13 | 01-19-2011
+ 9 | text 14 | 01-20-2011
+ 9 | text 14 | 01-20-2011
+ 9 | text 14 | 01-20-2011
+ 9 | text 14 | 01-20-2011
+ 9 | text 14 | 01-20-2011
+ 9 | text 14 | 01-20-2011
+ 9 | text 14 | 01-20-2011
+ 9 | text 14 | 01-20-2011
+ 9 | text 14 | 01-20-2011
+ 9 | text 14 | 01-20-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 2 | text 2  | 01-03-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 4 | text 4  | 01-05-2011
+ 5 | text 5  | 01-06-2011
+ 5 | text 5  | 01-06-2011
+ 5 | text 5  | 01-06-2011
+ 5 | text 5  | 01-06-2011
+ 5 | text 5  | 01-06-2011
+ 5 | text 5  | 01-06-2011
+ 5 | text 5  | 01-06-2011
+ 5 | text 5  | 01-06-2011
+ 5 | text 5  | 01-06-2011
+ 5 | text 5  | 01-06-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 6 | text 6  | 01-07-2011
+ 7 | text 7  | 01-08-2011
+ 7 | text 7  | 01-08-2011
+ 7 | text 7  | 01-08-2011
+ 7 | text 7  | 01-08-2011
+ 7 | text 7  | 01-08-2011
+ 7 | text 7  | 01-08-2011
+ 7 | text 7  | 01-08-2011
+ 7 | text 7  | 01-08-2011
+ 7 | text 7  | 01-08-2011
+ 7 | text 7  | 01-08-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 8 | text 8  | 01-09-2011
+ 9 | text 9  | 01-10-2011
+ 9 | text 9  | 01-10-2011
+ 9 | text 9  | 01-10-2011
+ 9 | text 9  | 01-10-2011
+ 9 | text 9  | 01-10-2011
+ 9 | text 9  | 01-10-2011
+ 9 | text 9  | 01-10-2011
+ 9 | text 9  | 01-10-2011
+ 9 | text 9  | 01-10-2011
+ 9 | text 9  | 01-10-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 2 | text 12 | 01-13-2011
+ 3 | text 13 | 01-14-2011
+ 3 | text 13 | 01-14-2011
+ 3 | text 13 | 01-14-2011
+ 3 | text 13 | 01-14-2011
+ 3 | text 13 | 01-14-2011
+ 3 | text 13 | 01-14-2011
+ 3 | text 13 | 01-14-2011
+ 3 | text 13 | 01-14-2011
+ 3 | text 13 | 01-14-2011
+ 3 | text 13 | 01-14-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 4 | text 14 | 01-15-2011
+ 5 | text 0  | 01-16-2011
+ 5 | text 0  | 01-16-2011
+ 5 | text 0  | 01-16-2011
+ 5 | text 0  | 01-16-2011
+ 5 | text 0  | 01-16-2011
+ 5 | text 0  | 01-16-2011
+ 5 | text 0  | 01-16-2011
+ 5 | text 0  | 01-16-2011
+ 5 | text 0  | 01-16-2011
+ 5 | text 0  | 01-16-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 6 | text 1  | 01-17-2011
+ 7 | text 2  | 01-18-2011
+ 7 | text 2  | 01-18-2011
+ 7 | text 2  | 01-18-2011
+ 7 | text 2  | 01-18-2011
+ 7 | text 2  | 01-18-2011
+ 7 | text 2  | 01-18-2011
+ 7 | text 2  | 01-18-2011
+ 7 | text 2  | 01-18-2011
+ 7 | text 2  | 01-18-2011
+ 7 | text 2  | 01-18-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 8 | text 3  | 01-19-2011
+ 9 | text 4  | 01-20-2011
+ 9 | text 4  | 01-20-2011
+ 9 | text 4  | 01-20-2011
+ 9 | text 4  | 01-20-2011
+ 9 | text 4  | 01-20-2011
+ 9 | text 4  | 01-20-2011
+ 9 | text 4  | 01-20-2011
+ 9 | text 4  | 01-20-2011
+ 9 | text 4  | 01-20-2011
+ 9 | text 4  | 01-20-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 2 | text 7  | 01-03-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 4 | text 9  | 01-05-2011
+ 5 | text 10 | 01-06-2011
+ 5 | text 10 | 01-06-2011
+ 5 | text 10 | 01-06-2011
+ 5 | text 10 | 01-06-2011
+ 5 | text 10 | 01-06-2011
+ 5 | text 10 | 01-06-2011
+ 5 | text 10 | 01-06-2011
+ 5 | text 10 | 01-06-2011
+ 5 | text 10 | 01-06-2011
+ 5 | text 10 | 01-06-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 6 | text 11 | 01-07-2011
+ 7 | text 12 | 01-08-2011
+ 7 | text 12 | 01-08-2011
+ 7 | text 12 | 01-08-2011
+ 7 | text 12 | 01-08-2011
+ 7 | text 12 | 01-08-2011
+ 7 | text 12 | 01-08-2011
+ 7 | text 12 | 01-08-2011
+ 7 | text 12 | 01-08-2011
+ 7 | text 12 | 01-08-2011
+ 7 | text 12 | 01-08-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 8 | text 13 | 01-09-2011
+ 9 | text 14 | 01-10-2011
+ 9 | text 14 | 01-10-2011
+ 9 | text 14 | 01-10-2011
+ 9 | text 14 | 01-10-2011
+ 9 | text 14 | 01-10-2011
+ 9 | text 14 | 01-10-2011
+ 9 | text 14 | 01-10-2011
+ 9 | text 14 | 01-10-2011
+ 9 | text 14 | 01-10-2011
+ 9 | text 14 | 01-10-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 2 | text 2  | 01-13-2011
+ 3 | text 3  | 01-14-2011
+ 3 | text 3  | 01-14-2011
+ 3 | text 3  | 01-14-2011
+ 3 | text 3  | 01-14-2011
+ 3 | text 3  | 01-14-2011
+ 3 | text 3  | 01-14-2011
+ 3 | text 3  | 01-14-2011
+ 3 | text 3  | 01-14-2011
+ 3 | text 3  | 01-14-2011
+ 3 | text 3  | 01-14-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 4 | text 4  | 01-15-2011
+ 5 | text 5  | 01-16-2011
+ 5 | text 5  | 01-16-2011
+ 5 | text 5  | 01-16-2011
+ 5 | text 5  | 01-16-2011
+ 5 | text 5  | 01-16-2011
+ 5 | text 5  | 01-16-2011
+ 5 | text 5  | 01-16-2011
+ 5 | text 5  | 01-16-2011
+ 5 | text 5  | 01-16-2011
+ 5 | text 5  | 01-16-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 6 | text 6  | 01-17-2011
+ 7 | text 7  | 01-18-2011
+ 7 | text 7  | 01-18-2011
+ 7 | text 7  | 01-18-2011
+ 7 | text 7  | 01-18-2011
+ 7 | text 7  | 01-18-2011
+ 7 | text 7  | 01-18-2011
+ 7 | text 7  | 01-18-2011
+ 7 | text 7  | 01-18-2011
+ 7 | text 7  | 01-18-2011
+ 7 | text 7  | 01-18-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
+ 8 | text 8  | 01-19-2011
+ 9 | text 9  | 01-20-2011
+ 9 | text 9  | 01-20-2011
+ 9 | text 9  | 01-20-2011
+ 9 | text 9  | 01-20-2011
+ 9 | text 9  | 01-20-2011
+ 9 | text 9  | 01-20-2011
+ 9 | text 9  | 01-20-2011
+ 9 | text 9  | 01-20-2011
+ 9 | text 9  | 01-20-2011
+ 9 | text 9  | 01-20-2011
+(1000 rows)
+
+explain analyze select t1.* from smallt as t1, smallt as t2 where t1.i = t2.i;
+                                                   QUERY PLAN                                                   
+----------------------------------------------------------------------------------------------------------------
+ Gather Motion 1:1  (slice1; segments: 1)  (cost=3.25..18.00 rows=1001 width=15)
+   Rows out:  1000 rows at destination with 6.245 ms to first row, 8.763 ms to end, start offset by 0.547 ms.
+   ->  Hash Join  (cost=3.25..18.00 rows=1001 width=15)
+         Hash Cond: t1.i = t2.i
+         Rows out:  1000 rows with 5.953 ms to first row, 8.326 ms to end, start offset by 0.557 ms.
+         Executor memory:  2K bytes.
+         Work_mem used:  2K bytes.
+         Hash chain length 10.0 avg, 10 max, using 10 of 1048589 buckets.
+         ->  Seq Scan on smallt t1  (cost=0.00..2.00 rows=100 width=15)
+               Rows out:  100 rows with 0.013 ms to first row, 0.028 ms to end, start offset by 0.558 ms.
+         ->  Hash  (cost=2.00..2.00 rows=100 width=4)
+               Rows in:  100 rows with 0.066 ms to end, start offset by 6.439 ms.
+               ->  Seq Scan on smallt t2  (cost=0.00..2.00 rows=100 width=4)
+                     Rows out:  100 rows with 0.022 ms to first row, 0.043 ms to end, start offset by 6.439 ms.
+ Slice statistics:
+   (slice0)    Executor memory: 220K bytes.
+   (slice1)    Executor memory: 12472K bytes (seg0).  Work_mem: 2K bytes max.
+ Statement statistics:
+   Memory used: 128000K bytes
+ Settings:  enable_hashjoin=on; enable_nestloop=off; gp_enable_agg_distinct=on
+ Total runtime: 9.489 ms
+(21 rows)
+
+-- Rescan on HashJoin
+--select t1.* from (select t11.* from smallt as t11, smallt as t22 where t11.i = t22.i and t11.i < 2) as t1,
+--   (select t11.* from smallt as t11, smallt as t22 where t11.d = t22.d and t11.i < 5) as t2;
+-- Material in SubPlan
+select smallt2.* from smallt2
+where i < (select count(*) from smallt where smallt.i = smallt2.i);
+ i |   t    |     d      
+---+--------+------------
+ 0 | text 0 | 01-01-2011
+ 1 | text 1 | 01-02-2011
+ 2 | text 2 | 01-03-2011
+ 3 | text 3 | 01-04-2011
+ 4 | text 4 | 01-05-2011
+ 0 | text 5 | 01-06-2011
+ 1 | text 6 | 01-07-2011
+ 2 | text 7 | 01-08-2011
+ 3 | text 8 | 01-09-2011
+ 4 | text 9 | 01-10-2011
+ 0 | text 0 | 01-11-2011
+ 1 | text 1 | 01-12-2011
+ 2 | text 2 | 01-13-2011
+ 3 | text 3 | 01-14-2011
+ 4 | text 4 | 01-15-2011
+ 0 | text 5 | 01-01-2011
+ 1 | text 6 | 01-02-2011
+ 2 | text 7 | 01-03-2011
+ 3 | text 8 | 01-04-2011
+ 4 | text 9 | 01-05-2011
+ 0 | text 0 | 01-06-2011
+ 1 | text 1 | 01-07-2011
+ 2 | text 2 | 01-08-2011
+ 3 | text 3 | 01-09-2011
+ 4 | text 4 | 01-10-2011
+ 0 | text 5 | 01-11-2011
+ 1 | text 6 | 01-12-2011
+ 2 | text 7 | 01-13-2011
+ 3 | text 8 | 01-14-2011
+ 4 | text 9 | 01-15-2011
+ 0 | text 0 | 01-01-2011
+ 1 | text 1 | 01-02-2011
+ 2 | text 2 | 01-03-2011
+ 3 | text 3 | 01-04-2011
+ 4 | text 4 | 01-05-2011
+ 0 | text 5 | 01-06-2011
+ 1 | text 6 | 01-07-2011
+ 2 | text 7 | 01-08-2011
+ 3 | text 8 | 01-09-2011
+ 4 | text 9 | 01-10-2011
+ 0 | text 0 | 01-11-2011
+ 1 | text 1 | 01-12-2011
+ 2 | text 2 | 01-13-2011
+ 3 | text 3 | 01-14-2011
+ 4 | text 4 | 01-15-2011
+ 0 | text 5 | 01-01-2011
+ 1 | text 6 | 01-02-2011
+ 2 | text 7 | 01-03-2011
+ 3 | text 8 | 01-04-2011
+ 4 | text 9 | 01-05-2011
+(50 rows)
+
+explain select smallt2.* from smallt2
+where i < (select count(*) from smallt where smallt.i = smallt2.i);
+                                   QUERY PLAN                                   
+--------------------------------------------------------------------------------
+ Gather Motion 1:1  (slice1; segments: 1)  (cost=2.85..4.89 rows=17 width=15)
+   ->  Hash Join  (cost=2.85..4.89 rows=17 width=15)
+         Hash Cond: smallt2.i = "Expr_SUBQUERY".csq_c0
+         Join Filter: smallt2.i < "Expr_SUBQUERY".csq_c1
+         ->  Seq Scan on smallt2  (cost=0.00..1.50 rows=50 width=15)
+         ->  Hash  (cost=2.73..2.73 rows=10 width=12)
+               ->  HashAggregate  (cost=2.50..2.62 rows=10 width=12)
+                     Group By: smallt.i
+                     ->  Seq Scan on smallt  (cost=0.00..2.00 rows=100 width=4)
+ Settings:  enable_hashjoin=on; enable_nestloop=off; gp_enable_agg_distinct=on
+(10 rows)
+
+-- Append + Material in SubPlan
+drop table if exists smallt_part;
+NOTICE:  table "smallt_part" does not exist, skipping
+drop table if exists smallt2_part;
+NOTICE:  table "smallt2_part" does not exist, skipping
+create table smallt_part (i int, t text, d date)
+partition by range (d) (start ('2011-01-01'::date) end ('2011-01-21'::date) every ('5 days'::interval));
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'i' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+NOTICE:  CREATE TABLE will create partition "smallt_part_1_prt_1" for table "smallt_part"
+NOTICE:  CREATE TABLE will create partition "smallt_part_1_prt_2" for table "smallt_part"
+NOTICE:  CREATE TABLE will create partition "smallt_part_1_prt_3" for table "smallt_part"
+NOTICE:  CREATE TABLE will create partition "smallt_part_1_prt_4" for table "smallt_part"
+create table smallt2_part (i int, t text, d date)
+partition by range (d) (start ('2011-01-01'::date) end ('2011-01-16'::date) every ('4 days'::interval));
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'i' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+NOTICE:  CREATE TABLE will create partition "smallt2_part_1_prt_1" for table "smallt2_part"
+NOTICE:  CREATE TABLE will create partition "smallt2_part_1_prt_2" for table "smallt2_part"
+NOTICE:  CREATE TABLE will create partition "smallt2_part_1_prt_3" for table "smallt2_part"
+NOTICE:  CREATE TABLE will create partition "smallt2_part_1_prt_4" for table "smallt2_part"
+insert into smallt_part select i%10, 'text ' || (i%15), '2011-01-01'::date + ((i%20) || ' days')::interval
+from generate_series(0, 99) i;
+insert into smallt2_part select i%5, 'text ' || (i%10), '2011-01-01'::date + ((i%15) || ' days')::interval
+from generate_series(0, 49) i;
+select * from smallt_part where i < any (select count(*) from smallt2_part where smallt_part.i = smallt2_part.i group by d);
+ i |    t    |     d      
+---+---------+------------
+ 0 | text 0  | 01-01-2011
+ 1 | text 1  | 01-02-2011
+ 2 | text 2  | 01-03-2011
+ 3 | text 3  | 01-04-2011
+ 0 | text 5  | 01-01-2011
+ 1 | text 6  | 01-02-2011
+ 2 | text 7  | 01-03-2011
+ 3 | text 8  | 01-04-2011
+ 0 | text 10 | 01-01-2011
+ 1 | text 11 | 01-02-2011
+ 2 | text 12 | 01-03-2011
+ 3 | text 13 | 01-04-2011
+ 0 | text 0  | 01-01-2011
+ 1 | text 1  | 01-02-2011
+ 2 | text 2  | 01-03-2011
+ 3 | text 3  | 01-04-2011
+ 0 | text 5  | 01-01-2011
+ 1 | text 6  | 01-02-2011
+ 2 | text 7  | 01-03-2011
+ 3 | text 8  | 01-04-2011
+ 0 | text 10 | 01-11-2011
+ 1 | text 11 | 01-12-2011
+ 2 | text 12 | 01-13-2011
+ 3 | text 13 | 01-14-2011
+ 0 | text 0  | 01-11-2011
+ 1 | text 1  | 01-12-2011
+ 2 | text 2  | 01-13-2011
+ 3 | text 3  | 01-14-2011
+ 0 | text 5  | 01-11-2011
+ 1 | text 6  | 01-12-2011
+ 2 | text 7  | 01-13-2011
+ 3 | text 8  | 01-14-2011
+ 0 | text 10 | 01-11-2011
+ 1 | text 11 | 01-12-2011
+ 2 | text 12 | 01-13-2011
+ 3 | text 13 | 01-14-2011
+ 0 | text 0  | 01-11-2011
+ 1 | text 1  | 01-12-2011
+ 2 | text 2  | 01-13-2011
+ 3 | text 3  | 01-14-2011
+(40 rows)
+
+explain analyze select * from smallt_part where i < any (select count(*) from smallt2_part where smallt_part.i = smallt2_part.i group by d);
+                                                                        QUERY PLAN                                                                         
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+ Gather Motion 1:1  (slice17; segments: 1)  (cost=0.00..51345.98 rows=934 width=40)
+   Rows out:  40 rows at destination with 28 ms to end, start offset by 52 ms.
+   ->  Append  (cost=0.00..51345.98 rows=934 width=40)
+         Rows out:  40 rows with 0.341 ms to first row, 13 ms to end, start offset by 66 ms.
+         ->  Seq Scan on smallt_part_1_prt_1 smallt_part  (cost=0.00..12836.50 rows=234 width=40)
+               Filter: (subplan)
+               Rows out:  20 rows with 0.341 ms to first row, 3.879 ms to end, start offset by 66 ms.
+               SubPlan 1
+                 ->  HashAggregate  (cost=27.45..27.49 rows=3 width=12)
+                       Group By: public.smallt2_part.d
+                       Rows out:  35 rows with 0.317 ms to first row, 3.144 ms to end of 25 scans, start offset by 70 ms.
+                       Executor memory:  465K bytes.
+                       ->  Result  (cost=0.00..27.35 rows=4 width=4)
+                             Rows out:  250 rows with 0.052 ms to first row, 0.873 ms to end of 25 scans, start offset by 70 ms.
+                             ->  Append  (cost=0.00..27.35 rows=4 width=4)
+                                   Rows out:  250 rows with 0.050 ms to first row, 0.784 ms to end of 25 scans, start offset by 70 ms.
+                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  80 rows with 0.049 ms to first row, 0.221 ms to end of 25 scans, start offset by 70 ms.
+                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
+                                               Rows out:  400 rows with 0.046 ms to first row, 0.109 ms to end of 25 scans, start offset by 70 ms.
+                                               ->  Broadcast Motion 1:1  (slice1; segments: 1)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  16 rows at destination with 0.035 ms to first row, 0.038 ms to end, start offset by 66 ms.
+                                                     ->  Seq Scan on smallt2_part_1_prt_1 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  16 rows with 0.164 ms to first row, 0.174 ms to end, start offset by 64 ms.
+                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  65 rows with 0.038 ms to first row, 0.161 ms to end of 25 scans, start offset by 70 ms.
+                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
+                                               Rows out:  325 rows with 0.035 ms to first row, 0.083 ms to end of 25 scans, start offset by 70 ms.
+                                               ->  Broadcast Motion 1:1  (slice2; segments: 1)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  13 rows at destination with 0.027 ms to first row, 0.030 ms to end, start offset by 67 ms.
+                                                     ->  Seq Scan on smallt2_part_1_prt_2 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  13 rows with 0.125 ms to first row, 0.140 ms to end, start offset by 57 ms.
+                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  60 rows with 0.035 ms to first row, 0.180 ms to end of 25 scans, start offset by 70 ms.
+                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
+                                               Rows out:  300 rows with 0.033 ms to first row, 0.107 ms to end of 25 scans, start offset by 70 ms.
+                                               ->  Broadcast Motion 1:1  (slice3; segments: 1)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  12 rows at destination with 0.025 ms to first row, 0.027 ms to end, start offset by 67 ms.
+                                                     ->  Seq Scan on smallt2_part_1_prt_3 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  12 rows with 0.140 ms to first row, 0.150 ms to end, start offset by 58 ms.
+                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  45 rows with 0.034 ms to first row, 0.120 ms to end of 25 scans, start offset by 70 ms.
+                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
+                                               Rows out:  225 rows with 0.030 ms to first row, 0.067 ms to end of 25 scans, start offset by 70 ms.
+                                               ->  Broadcast Motion 1:1  (slice4; segments: 1)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  9 rows at destination with 0.023 ms to first row, 0.026 ms to end, start offset by 67 ms.
+                                                     ->  Seq Scan on smallt2_part_1_prt_4 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  9 rows with 0.132 ms to first row, 0.140 ms to end, start offset by 60 ms.
+         ->  Seq Scan on smallt_part_1_prt_2 smallt_part  (cost=0.00..12836.50 rows=234 width=40)
+               Filter: (subplan)
+               Rows out:  0 rows with 0 ms to end.
+               SubPlan 1
+                 ->  HashAggregate  (cost=27.45..27.49 rows=3 width=12)
+                       Group By: public.smallt2_part.d
+                       Rows out:  0 rows with 0 ms to end.
+                       Executor memory:  401K bytes.
+                       ->  Result  (cost=0.00..27.35 rows=4 width=4)
+                             Rows out:  0 rows with 0 ms to end.
+                             ->  Append  (cost=0.00..27.35 rows=4 width=4)
+                                   Rows out:  0 rows with 0 ms to end.
+                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  0 rows with 0 ms to end.
+                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
+                                               Rows out:  400 rows with 0.035 ms to first row, 0.082 ms to end of 25 scans, start offset by 73 ms.
+                                               ->  Broadcast Motion 1:1  (slice5; segments: 1)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  16 rows at destination with 0.027 ms to first row, 0.028 ms to end, start offset by 70 ms.
+                                                     ->  Seq Scan on smallt2_part_1_prt_1 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  16 rows with 0.114 ms to first row, 0.124 ms to end, start offset by 61 ms.
+                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  0 rows with 0 ms to end.
+                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
+                                               Rows out:  325 rows with 0.021 ms to first row, 0.054 ms to end of 25 scans, start offset by 73 ms.
+                                               ->  Broadcast Motion 1:1  (slice6; segments: 1)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  13 rows at destination with 0.016 ms to first row, 0.019 ms to end, start offset by 70 ms.
+                                                     ->  Seq Scan on smallt2_part_1_prt_2 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  13 rows with 0.125 ms to first row, 0.134 ms to end, start offset by 61 ms.
+                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  0 rows with 0 ms to end.
+                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
+                                               Rows out:  300 rows with 0.019 ms to first row, 0.042 ms to end of 25 scans, start offset by 73 ms.
+                                               ->  Broadcast Motion 1:1  (slice7; segments: 1)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  12 rows at destination with 0.014 ms to first row, 0.016 ms to end, start offset by 70 ms.
+                                                     ->  Seq Scan on smallt2_part_1_prt_3 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  12 rows with 0.111 ms to first row, 0.122 ms to end, start offset by 63 ms.
+                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  0 rows with 0 ms to end.
+                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
+                                               Rows out:  225 rows with 0.018 ms to first row, 0.047 ms to end of 25 scans, start offset by 73 ms.
+                                               ->  Broadcast Motion 1:1  (slice8; segments: 1)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  9 rows at destination with 0.013 ms to first row, 0.015 ms to end, start offset by 70 ms.
+                                                     ->  Seq Scan on smallt2_part_1_prt_4 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  9 rows with 0.113 ms to first row, 0.121 ms to end, start offset by 66 ms.
+         ->  Seq Scan on smallt_part_1_prt_3 smallt_part  (cost=0.00..12836.50 rows=234 width=40)
+               Filter: (subplan)
+               Rows out:  20 rows with 0.195 ms to first row, 2.841 ms to end, start offset by 73 ms.
+               SubPlan 1
+                 ->  HashAggregate  (cost=27.45..27.49 rows=3 width=12)
+                       Group By: public.smallt2_part.d
+                       Rows out:  35 rows with 0.181 ms to first row, 2.289 ms to end of 25 scans, start offset by 76 ms.
+                       Executor memory:  465K bytes.
+                       ->  Result  (cost=0.00..27.35 rows=4 width=4)
+                             Rows out:  250 rows with 0.031 ms to first row, 0.579 ms to end of 25 scans, start offset by 76 ms.
+                             ->  Append  (cost=0.00..27.35 rows=4 width=4)
+                                   Rows out:  250 rows with 0.030 ms to first row, 0.511 ms to end of 25 scans, start offset by 76 ms.
+                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  80 rows with 0.028 ms to first row, 0.150 ms to end of 25 scans, start offset by 76 ms.
+                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
+                                               Rows out:  400 rows with 0.027 ms to first row, 0.065 ms to end of 25 scans, start offset by 76 ms.
+                                               ->  Broadcast Motion 1:1  (slice9; segments: 1)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  16 rows at destination with 0.021 ms to first row, 0.023 ms to end, start offset by 73 ms.
+                                                     ->  Seq Scan on smallt2_part_1_prt_1 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  16 rows with 0.085 ms to first row, 0.094 ms to end, start offset by 69 ms.
+                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  65 rows with 0.024 ms to first row, 0.117 ms to end of 25 scans, start offset by 76 ms.
+                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
+                                               Rows out:  325 rows with 0.022 ms to first row, 0.055 ms to end of 25 scans, start offset by 76 ms.
+                                               ->  Broadcast Motion 1:1  (slice10; segments: 1)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  13 rows at destination with 0.018 ms to end, start offset by 73 ms.
+                                                     ->  Seq Scan on smallt2_part_1_prt_2 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  13 rows with 0.108 ms to first row, 0.119 ms to end, start offset by 63 ms.
+                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  60 rows with 0.020 ms to first row, 0.101 ms to end of 25 scans, start offset by 76 ms.
+                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
+                                               Rows out:  300 rows with 0.018 ms to first row, 0.050 ms to end of 25 scans, start offset by 76 ms.
+                                               ->  Broadcast Motion 1:1  (slice11; segments: 1)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  12 rows at destination with 0.014 ms to first row, 0.016 ms to end, start offset by 73 ms.
+                                                     ->  Seq Scan on smallt2_part_1_prt_3 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  12 rows with 0.109 ms to first row, 0.119 ms to end, start offset by 66 ms.
+                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  45 rows with 0.022 ms to first row, 0.081 ms to end of 25 scans, start offset by 76 ms.
+                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
+                                               Rows out:  225 rows with 0.020 ms to first row, 0.042 ms to end of 25 scans, start offset by 76 ms.
+                                               ->  Broadcast Motion 1:1  (slice12; segments: 1)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  9 rows at destination with 0.015 ms to first row, 0.017 ms to end, start offset by 73 ms.
+                                                     ->  Seq Scan on smallt2_part_1_prt_4 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  9 rows with 0.092 ms to first row, 0.100 ms to end, start offset by 68 ms.
+         ->  Seq Scan on smallt_part_1_prt_4 smallt_part  (cost=0.00..12836.50 rows=234 width=40)
+               Filter: (subplan)
+               Rows out:  0 rows with 0 ms to end.
+               SubPlan 1
+                 ->  HashAggregate  (cost=27.45..27.49 rows=3 width=12)
+                       Group By: public.smallt2_part.d
+                       Rows out:  0 rows with 0 ms to end.
+                       Executor memory:  401K bytes.
+                       ->  Result  (cost=0.00..27.35 rows=4 width=4)
+                             Rows out:  0 rows with 0 ms to end.
+                             ->  Append  (cost=0.00..27.35 rows=4 width=4)
+                                   Rows out:  0 rows with 0 ms to end.
+                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  0 rows with 0 ms to end.
+                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
+                                               Rows out:  400 rows with 0.036 ms to first row, 0.075 ms to end of 25 scans, start offset by 79 ms.
+                                               ->  Broadcast Motion 1:1  (slice13; segments: 1)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  16 rows at destination with 0.030 ms to first row, 0.033 ms to end, start offset by 76 ms.
+                                                     ->  Seq Scan on smallt2_part_1_prt_1 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  16 rows with 0.093 ms to first row, 0.108 ms to end, start offset by 69 ms.
+                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  0 rows with 0 ms to end.
+                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
+                                               Rows out:  325 rows with 0.018 ms to first row, 0.059 ms to end of 25 scans, start offset by 79 ms.
+                                               ->  Broadcast Motion 1:1  (slice14; segments: 1)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  13 rows at destination with 0.014 ms to end, start offset by 76 ms.
+                                                     ->  Seq Scan on smallt2_part_1_prt_2 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  13 rows with 0.149 ms to first row, 0.159 ms to end, start offset by 68 ms.
+                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  0 rows with 0 ms to end.
+                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
+                                               Rows out:  300 rows with 0.018 ms to first row, 0.049 ms to end of 25 scans, start offset by 79 ms.
+                                               ->  Broadcast Motion 1:1  (slice15; segments: 1)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  12 rows at destination with 0.013 ms to first row, 0.016 ms to end, start offset by 76 ms.
+                                                     ->  Seq Scan on smallt2_part_1_prt_3 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  12 rows with 0.117 ms to first row, 0.127 ms to end, start offset by 68 ms.
+                                   ->  Result  (cost=6.84..6.85 rows=1 width=4)
+                                         Filter: $0 = public.smallt2_part.i
+                                         Rows out:  0 rows with 0 ms to end.
+                                         ->  Materialize for deadlock safety  (cost=6.84..6.85 rows=1 width=4)
+                                               Rows out:  225 rows with 0.016 ms to first row, 0.037 ms to end of 25 scans, start offset by 79 ms.
+                                               ->  Broadcast Motion 1:1  (slice16; segments: 1)  (cost=0.00..6.84 rows=1 width=4)
+                                                     Rows out:  9 rows at destination with 0.012 ms to end, start offset by 76 ms.
+                                                     ->  Seq Scan on smallt2_part_1_prt_4 smallt2_part  (cost=0.00..6.84 rows=1 width=4)
+                                                           Rows out:  9 rows with 0.096 ms to first row, 0.105 ms to end, start offset by 69 ms.
+ Slice statistics:
+   (slice0)    Executor memory: 784K bytes.
+   (slice1)    Executor memory: 700K bytes (seg0).
+   (slice2)    Executor memory: 700K bytes (seg0).
+   (slice3)    Executor memory: 700K bytes (seg0).
+   (slice4)    Executor memory: 700K bytes (seg0).
+   (slice5)    Executor memory: 700K bytes (seg0).
+   (slice6)    Executor memory: 700K bytes (seg0).
+   (slice7)    Executor memory: 700K bytes (seg0).
+   (slice8)    Executor memory: 700K bytes (seg0).
+   (slice9)    Executor memory: 700K bytes (seg0).
+   (slice10)   Executor memory: 700K bytes (seg0).
+   (slice11)   Executor memory: 708K bytes (seg0).
+   (slice12)   Executor memory: 716K bytes (seg0).
+   (slice13)   Executor memory: 724K bytes (seg0).
+   (slice14)   Executor memory: 732K bytes (seg0).
+   (slice15)   Executor memory: 740K bytes (seg0).
+   (slice16)   Executor memory: 748K bytes (seg0).
+   (slice17)   Executor memory: 1517K bytes (seg0).
+ Statement statistics:
+   Memory used: 128000K bytes
+ Settings:  enable_hashjoin=on; enable_nestloop=off; gp_enable_agg_distinct=on
+ Total runtime: 79.646 ms
+(219 rows)
+
+-- Sort in MergeJoin
+set enable_hashjoin=off;
+set enable_mergejoin=on;
+select t1.* from smallt as t1, smallt as t2 where t1.i = t2.i and t1.i < 2;
+ i |    t    |     d      
+---+---------+------------
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+(200 rows)
+
+explain analyze select t1.* from smallt as t1, smallt as t2 where t1.i = t2.i and t1.i < 2;
+                                                  QUERY PLAN                                                   
+---------------------------------------------------------------------------------------------------------------
+ Gather Motion 1:1  (slice1; segments: 1)  (cost=5.36..6.06 rows=41 width=15)
+   Rows out:  200 rows at destination with 0.350 ms to first row, 0.380 ms to end, start offset by 0.531 ms.
+   ->  Merge Join  (cost=5.36..6.06 rows=41 width=15)
+         Merge Cond: t1.i = t2.i
+         Rows out:  200 rows with 0.080 ms to first row, 0.184 ms to end, start offset by 0.512 ms.
+         ->  Sort  (cost=2.68..2.73 rows=20 width=15)
+               Sort Key: t1.i
+               Rows out:  20 rows with 0.045 ms to first row, 0.049 ms to end, start offset by 0.512 ms.
+               Executor memory:  29K bytes.
+               Work_mem used:  29K bytes.
+               ->  Seq Scan on smallt t1  (cost=0.00..2.25 rows=20 width=15)
+                     Filter: i < 2
+                     Rows out:  20 rows with 0.013 ms to first row, 0.027 ms to end, start offset by 0.519 ms.
+         ->  Sort  (cost=2.68..2.73 rows=20 width=4)
+               Sort Key: t2.i
+               Rows out:  191 rows with 0.034 ms to first row, 0.056 ms to end, start offset by 0.557 ms.
+               Executor memory:  29K bytes.
+               Work_mem used:  29K bytes.
+               ->  Seq Scan on smallt t2  (cost=0.00..2.25 rows=20 width=4)
+                     Filter: i < 2
+                     Rows out:  20 rows with 0.007 ms to first row, 0.020 ms to end, start offset by 0.565 ms.
+ Slice statistics:
+   (slice0)    Executor memory: 213K bytes.
+   (slice1)    Executor memory: 233K bytes (seg0).  Work_mem: 29K bytes max.
+ Statement statistics:
+   Memory used: 128000K bytes
+ Settings:  enable_hashjoin=off; enable_mergejoin=on; enable_nestloop=off; gp_enable_agg_distinct=on
+ Total runtime: 0.943 ms
+(28 rows)
+
+select t1.* from smallt as t1, smallt as t2 where t1.d = t2.d and t1.i < 2;
+ i |    t    |     d      
+---+---------+------------
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 10 | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 5  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 0 | text 0  | 01-01-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 11 | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 6  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 1 | text 1  | 01-02-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 5  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 0  | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 0 | text 10 | 01-11-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 11 | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 1  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+ 1 | text 6  | 01-12-2011
+(100 rows)
+
+--start_ignore
+explain analyze select t1.* from smallt as t1, smallt as t2 where t1.d = t2.d and t1.i < 2;
+                                                          QUERY PLAN                                                          
+------------------------------------------------------------------------------------------------------------------------------
+ Gather Motion 1:1  (slice2; segments: 1)  (cost=8.40..10.00 rows=101 width=15)
+   Rows out:  100 rows at destination with 0.493 ms to first row, 0.510 ms to end, start offset by 0.554 ms.
+   ->  Merge Join  (cost=8.40..10.00 rows=101 width=15)
+         Merge Cond: t1.d = t2.d
+         Rows out:  100 rows with 0.239 ms to first row, 0.299 ms to end, start offset by 0.656 ms.
+         ->  Sort  (cost=3.08..3.13 rows=20 width=15)
+               Sort Key: t1.d
+               Rows out:  20 rows with 0.155 ms to first row, 0.157 ms to end, start offset by 0.656 ms.
+               Executor memory:  29K bytes.
+               Work_mem used:  29K bytes.
+               ->  Broadcast Motion 1:1  (slice1; segments: 1)  (cost=0.00..2.65 rows=20 width=15)
+                     Rows out:  20 rows at destination with 0.130 ms to first row, 0.133 ms to end, start offset by 0.664 ms.
+                     ->  Seq Scan on smallt t1  (cost=0.00..2.25 rows=20 width=15)
+                           Filter: i < 2
+                           Rows out:  20 rows with 0.021 ms to first row, 0.036 ms to end, start offset by 0.710 ms.
+         ->  Sort  (cost=5.32..5.57 rows=100 width=4)
+               Sort Key: t2.d
+               Rows out:  141 rows with 0.081 ms to first row, 0.094 ms to end, start offset by 0.812 ms.
+               Executor memory:  29K bytes.
+               Work_mem used:  29K bytes.
+               ->  Seq Scan on smallt t2  (cost=0.00..2.00 rows=100 width=4)
+                     Rows out:  100 rows with 0.012 ms to first row, 0.035 ms to end, start offset by 0.820 ms.
+ Slice statistics:
+   (slice0)    Executor memory: 197K bytes.
+   (slice1)    Executor memory: 192K bytes (seg0).
+   (slice2)    Executor memory: 249K bytes (seg0).  Work_mem: 29K bytes max.
+ Statement statistics:
+   Memory used: 128000K bytes
+ Settings:  enable_hashjoin=off; enable_mergejoin=on; enable_nestloop=off; gp_enable_agg_distinct=on
+ Total runtime: 1.118 ms
+(30 rows)
+
+--end_ignore
+set enable_hashjoin=on;
+set enable_mergejoin=off;
+-- ShareInputScan
+--with my_group_max(i, maximum) as (select i, max(d) from smallt group by i)
+--select smallt2.* from my_group_max, smallt2 where my_group_max.i = smallt2.i
+--and smallt2.i < any (select maximum from my_group_max);
+--explain analyze with my_group_max(i, maximum) as (select i, max(d) from smallt group by i)
+--select smallt2.* from my_group_max, smallt2 where my_group_max.i = smallt2.i
+--and smallt2.i < any (select maximum from my_group_max);
+-- IndexScan
+create index smallt_d_idx on smallt (d);
+create index smallt2_d_idx on smallt2 (d);
+set enable_hashjoin=off;
+set enable_nestloop=on;
+set enable_seqscan=off;
+set enable_bitmapscan=off;
+select smallt.* from smallt, smallt2 where smallt.i = smallt2.i and smallt2.d = '2011-01-04'::date
+and smallt.d = '2011-01-04'::date;
+ i |    t    |     d      
+---+---------+------------
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 13 | 01-04-2011
+ 3 | text 13 | 01-04-2011
+ 3 | text 13 | 01-04-2011
+ 3 | text 13 | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+(20 rows)
+
+explain analyze select smallt.* from smallt, smallt2 where smallt.i = smallt2.i and smallt2.d = '2011-01-04'::date
+and smallt.d = '2011-01-04'::date;
+                                                                   QUERY PLAN                                                                   
+------------------------------------------------------------------------------------------------------------------------------------------------
+ Gather Motion 1:1  (slice1; segments: 1)  (cost=200.33..401.12 rows=4 width=15)
+   Rows out:  20 rows at destination with 0.199 ms to first row, 0.219 ms to end, start offset by 0.465 ms.
+   ->  Nested Loop  (cost=200.33..401.12 rows=4 width=15)
+         Join Filter: smallt.i = smallt2.i
+         Rows out:  20 rows with 0.026 ms to first row, 0.105 ms to end, start offset by 0.493 ms.
+         ->  Index Scan using smallt_d_idx on smallt  (cost=0.00..200.34 rows=6 width=15)
+               Index Cond: d = '01-04-2011'::date
+               Rows out:  5 rows with 0.010 ms to first row, 0.016 ms to end, start offset by 0.494 ms.
+         ->  Materialize  (cost=200.33..200.37 rows=4 width=4)
+               Rows out:  20 rows with 0.011 ms to first row, 0.041 ms to end of 5 scans, start offset by 0.601 ms.
+               ->  Index Scan using smallt2_d_idx on smallt2  (cost=0.00..200.32 rows=4 width=4)
+                     Index Cond: d = '01-04-2011'::date
+                     Rows out:  4 rows with 0.006 ms to first row, 0.013 ms to end, start offset by 0.508 ms.
+ Slice statistics:
+   (slice0)    Executor memory: 184K bytes.
+   (slice1)    Executor memory: 232K bytes (seg0).
+ Statement statistics:
+   Memory used: 128000K bytes
+ Settings:  enable_bitmapscan=off; enable_hashjoin=off; enable_mergejoin=off; enable_nestloop=on; enable_seqscan=off; gp_enable_agg_distinct=on
+ Total runtime: 0.742 ms
+(20 rows)
+
+-- BitmapScan
+set enable_indexscan=off;
+set enable_bitmapscan=on;
+select smallt.* from smallt, smallt2 where smallt.i = smallt2.i and smallt2.d = '2011-01-04'::date
+and smallt.d = '2011-01-04'::date;
+ i |    t    |     d      
+---+---------+------------
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 13 | 01-04-2011
+ 3 | text 13 | 01-04-2011
+ 3 | text 13 | 01-04-2011
+ 3 | text 13 | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 3  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+ 3 | text 8  | 01-04-2011
+(20 rows)
+
+explain analyze select smallt.* from smallt, smallt2 where smallt.i = smallt2.i and smallt2.d = '2011-01-04'::date
+and smallt.d = '2011-01-04'::date;
+                                                                             QUERY PLAN                                                                              
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Gather Motion 1:1  (slice1; segments: 1)  (cost=300.63..401.14 rows=4 width=15)
+   Rows out:  20 rows at destination with 0.169 ms to first row, 0.172 ms to end, start offset by 0.619 ms.
+   ->  Nested Loop  (cost=300.63..401.14 rows=4 width=15)
+         Join Filter: smallt.i = smallt2.i
+         Rows out:  20 rows with 0.059 ms to first row, 0.088 ms to end, start offset by 0.606 ms.
+         ->  Bitmap Heap Scan on smallt  (cost=100.29..200.35 rows=6 width=15)
+               Recheck Cond: d = '01-04-2011'::date
+               Rows out:  5 rows with 0.030 ms to first row, 0.034 ms to end, start offset by 0.606 ms.
+               ->  Bitmap Index Scan on smallt_d_idx  (cost=0.00..100.29 rows=6 width=0)
+                     Index Cond: d = '01-04-2011'::date
+                     Bitmaps out:  1 with 0.009 ms to end, start offset by 0.619 ms.
+                     Work_mem used:  9K bytes.
+         ->  Materialize  (cost=200.34..200.38 rows=4 width=4)
+               Rows out:  20 rows with 0.026 ms to first row, 0.040 ms to end of 5 scans, start offset by 0.693 ms.
+               ->  Bitmap Heap Scan on smallt2  (cost=100.28..200.33 rows=4 width=4)
+                     Recheck Cond: d = '01-04-2011'::date
+                     Rows out:  4 rows with 0.023 ms to first row, 0.035 ms to end, start offset by 0.639 ms.
+                     ->  Bitmap Index Scan on smallt2_d_idx  (cost=0.00..100.28 rows=4 width=0)
+                           Index Cond: d = '01-04-2011'::date
+                           Bitmaps out:  1 with 0.005 ms to end, start offset by 0.651 ms.
+                           Work_mem used:  9K bytes.
+ Slice statistics:
+   (slice0)    Executor memory: 265K bytes.
+   (slice1)    Executor memory: 522K bytes (seg0).  Work_mem: 9K bytes max.
+ Statement statistics:
+   Memory used: 128000K bytes
+ Settings:  enable_bitmapscan=on; enable_hashjoin=off; enable_indexscan=off; enable_mergejoin=off; enable_nestloop=on; enable_seqscan=off; gp_enable_agg_distinct=on
+ Total runtime: 0.829 ms
+(28 rows)
+
+set enable_hashjoin=on;
+set enable_nestloop=off;
+set enable_seqscan=on;
+set enable_indexscan=on;
+-- SubPlan
+with my_group_sum(d, total) as (select d, sum(i) from smallt group by d)
+select smallt2.* from smallt2
+where i < all (select total from my_group_sum, smallt, smallt2 as tmp where my_group_sum.d = smallt.d and smallt.d = tmp.d and my_group_sum.d = smallt2.d)
+and i = 0 order by 1,2,3; --order 1,2,3
+ i |   t    |     d      
+---+--------+------------
+ 0 | text 0 | 01-06-2011
+ 0 | text 5 | 01-06-2011
+ 0 | text 5 | 01-06-2011
+(3 rows)
+
+select smallt2.* from smallt2
+where i < all (select total from (select d, sum(i) as total from smallt group by d) as my_group_sum, smallt, smallt2 as tmp
+    where my_group_sum.d = smallt.d and smallt.d = tmp.d and my_group_sum.d = smallt2.d)
+and i = 0 order by 1,2,3; --order 1,2,3
+ i |   t    |     d      
+---+--------+------------
+ 0 | text 0 | 01-06-2011
+ 0 | text 5 | 01-06-2011
+ 0 | text 5 | 01-06-2011
+(3 rows)
+

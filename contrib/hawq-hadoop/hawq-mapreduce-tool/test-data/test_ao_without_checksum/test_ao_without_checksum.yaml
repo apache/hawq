@@ -1,0 +1,23 @@
+AO_FileLocations:
+  Blocksize: 32768
+  Checksum: false
+  CompressionLevel: 0
+  CompressionType: none
+  Files:
+  - path: test-data/hawq-data/gpseg0/16385/179545/179631.1
+    size: 192
+  - path: test-data/hawq-data/gpseg1/16385/179545/179631.1
+    size: 552
+AO_Schema:
+- name: c0
+  type: int4
+- name: c1
+  type: varchar
+DBVersion: PostgreSQL 8.2.15 (Greenplum Database 4.2.0 build 1) (HAWQ 1.2.0.0 build
+  dev) on i386-apple-darwin11.4.2, compiled by GCC gcc (GCC) 4.4.2 compiled on Feb
+  28 2014 09:52:04 (with assert checking)
+DFS_URL: hdfs://127.0.0.1:9000
+Encoding: UTF8
+FileFormat: AO
+TableName: public.test_ao_without_checksum
+Version: 1.0.0

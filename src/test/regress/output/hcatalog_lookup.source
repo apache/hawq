@@ -1,0 +1,294 @@
+-- --------------------------------------
+-- test hcatalog lookup
+-- --------------------------------------
+-- Negative test with GUC disabled
+SET hcatalog_enable = false;
+SELECT * from hcatalog.db.t;
+ERROR:  HCatalog querying is not enabled, query for "hcatalog.db.t" is not allowed in this context
+LINE 1: SELECT * from hcatalog.db.t;
+                      ^
+-- enable GUC
+SET hcatalog_enable = true;
+-- Create function to insert and scan in-memory data to pg_class
+CREATE OR REPLACE FUNCTION convert_to_hcatalog_schema(schemaName text) RETURNS text
+  AS '@abs_builddir@/regress@DLSUFFIX@', 'convert_to_hcatalog_schema'
+  LANGUAGE C;
+CREATE OR REPLACE FUNCTION convert_to_internal_schema(schemaName text) RETURNS text
+  AS '@abs_builddir@/regress@DLSUFFIX@', 'convert_to_internal_schema'
+  LANGUAGE C;
+-- create an hcatalog schema and tables  
+create schema test_schema;
+create table test_schema.r(a int, b int);
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'a' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+create table test_schema.t(a int, b int);
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'a' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+create table test_schema.tt(a int, b int);
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'a' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+SELECT convert_to_hcatalog_schema('test_schema');
+        convert_to_hcatalog_schema        
+------------------------------------------
+ Converted test_schema to hcatalog schema
+(1 row)
+
+select nspname,nspdboid from pg_namespace where nspname='test_schema';
+   nspname   | nspdboid 
+-------------+----------
+ test_schema |     6120
+(1 row)
+
+create schema test_schema2;
+CREATE FUNCTION trigger_func() RETURNS trigger LANGUAGE plpgsql AS '
+BEGIN
+	RAISE NOTICE ''trigger_func() called'';
+	RETURN NULL;
+END;';
+create user newuser;
+NOTICE:  resource queue required -- using default resource queue "pg_default"
+---------------------------------------------------
+-- negative tests: DDL on hcatalog
+---------------------------------------------------
+-- create
+create schema hcatalog.test_schema2;
+ERROR:  syntax error at or near "."
+LINE 1: create schema hcatalog.test_schema2;
+                              ^
+create table hcatalog.test_schema.tbl(a int);
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'a' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+ERROR:  creating hcatalog tables is not supported: "hcatalog.test_schema.tbl"
+create index r_idx on hcatalog.test_schema.r(a);
+ERROR:  reference to hcatalog table "hcatalog.test_schema.r" is not allowed in this context
+create table t(a int, b int) inherits (hcatalog.test_schema.r);
+ERROR:  reference to hcatalog table "hcatalog.test_schema.r" is not allowed in this context
+create type hcatalog.test_schema.a as (a int);
+ERROR:  creating hcatalog tables is not supported: "hcatalog.test_schema.a"
+CREATE TRIGGER before_ins_stmt_trig BEFORE INSERT ON hcatalog.test_schema.r
+FOR EACH STATEMENT EXECUTE PROCEDURE trigger_func();
+ERROR:  Cannot support create trigger statement yet
+-- drop
+drop schema test_schema;
+ERROR:  schema "test_schema" does not exist
+drop schema hcatalog.test_schema;
+ERROR:  schema name may not be qualified
+drop table test_schema.r;
+ERROR:  schema "test_schema" does not exist
+drop table hcatalog.test_schema.t;
+ERROR:  reference to hcatalog table "hcatalog.test_schema.t" is not allowed in this context
+drop type hcatalog.test_schema.r;
+ERROR:  cross-database references are not implemented: hcatalog.test_schema.r
+-- alter
+alter table hcatalog.test_schema.r add column foo text default 'a';
+ERROR:  reference to hcatalog table "hcatalog.test_schema.r" is not allowed in this context
+alter schema test_schema rename to test_schema2;
+ERROR:  Cannot support rename schema statement yet
+alter table hcatalog.test_schema.tt set schema test_schema2;
+ERROR:  reference to hcatalog table "hcatalog.test_schema.tt" is not allowed in this context
+alter type hcatalog.test_schema.r owner to newuser;
+ERROR:  Cannot support alter type owner statement yet
+-- vacuum/analyze
+vacuum hcatalog.test_schema.r;
+ERROR:  reference to hcatalog table "hcatalog.test_schema.r" is not allowed in this context
+analyze hcatalog.test_schema.r;
+ERROR:  reference to hcatalog table "hcatalog.test_schema.r" is not allowed in this context
+-- misc
+comment on table hcatalog.test_schema.r is 'my awesome hcatalog table'; 
+ERROR:  reference to hcatalog table "hcatalog.test_schema.r" is not allowed in this context
+lock hcatalog.test_schema.r; 
+ERROR:  Cannot support lock statement yet
+reindex database hcatalog; 
+ERROR:  can only reindex the currently open database
+cluster hcatalog.test_schema.r;
+ERROR:  Cannot support cluster statement yet
+-- positive test: CREATE TABLE ... LIKE
+create table t (like hcatalog.test_schema.r);
+NOTICE:  Table doesn't have 'distributed by' clause, defaulting to distribution columns from LIKE table
+select * from t;
+ a | b
+---+---
+(0 rows)
+
+---------------------------------------------------
+-- simple tests over tables from the same catalog
+---------------------------------------------------
+-- fail as no table r exists in current schema
+select * from r;
+ERROR:  relation "r" does not exist
+LINE 1: select * from r;
+                      ^
+-- positive test cases
+select * from hcatalog.test_schema.r;
+ a | b 
+---+---
+(0 rows)
+
+select * from Hcatalog.test_schema.r;
+ a | b 
+---+---
+(0 rows)
+
+select * from HCATALOG.test_schema.r; 
+ a | b 
+---+---
+(0 rows)
+
+select * from "hcatalog".test_schema.r;
+ a | b 
+---+---
+(0 rows)
+
+-- negative test case: case-sensitive name resolution
+select * from "HCATALOG".test_schema.r;
+ERROR:  cross-database references are not implemented: "HCATALOG"
+LINE 1: select * from "HCATALOG".test_schema.r;
+                      ^
+select a from hcatalog.test_schema.r;
+ a 
+---
+(0 rows)
+
+select r.a from hcatalog.test_schema.r;
+ a 
+---
+(0 rows)
+
+select  test_schema.r.a from hcatalog.test_schema.r;
+ a 
+---
+(0 rows)
+
+select  test_schema.r.* from hcatalog.test_schema.r;
+ a | b 
+---+---
+(0 rows)
+
+select hcatalog.test_schema.r.b from hcatalog.test_schema.r;
+ b 
+---
+(0 rows)
+
+-- hcatalog and internal schemas
+create schema test_schema;
+select nspname,nspdboid from pg_namespace where nspname='test_schema';
+   nspname   | nspdboid 
+-------------+----------
+ test_schema |        0
+ test_schema |     6120
+(2 rows)
+
+create table test_schema.s(a int, c int);
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'a' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+create table test_schema.p(a int, b int) partition by list(b)(partition p1 values (1), partition p2 values (2));
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'a' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+NOTICE:  CREATE TABLE will create partition "p_1_prt_p1" for table "p"
+NOTICE:  CREATE TABLE will create partition "p_1_prt_p2" for table "p"
+-- negative test: column reference is ambiguous
+select a from hcatalog.test_schema.r, test_schema.s;
+ERROR:  column reference "a" is ambiguous
+LINE 1: select a from hcatalog.test_schema.r, test_schema.s;
+               ^
+-- positive test cases
+select * from test_schema.s, hcatalog.test_schema.r;
+ a | c | a | b 
+---+---+---+---
+(0 rows)
+
+select b,c from test_schema.s, hcatalog.test_schema.r;
+ b | c 
+---+---
+(0 rows)
+
+select s.a, r.a from test_schema.s, hcatalog.test_schema.r;
+ a | a 
+---+---
+(0 rows)
+
+-- hcatalog and internal table with identical names
+create table test_schema.r(a int, d int);
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'a' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+-- negative tests: ambigous column reference
+select a from hcatalog.test_schema.r, test_schema.r;
+ERROR:  column reference "a" is ambiguous
+LINE 1: select a from hcatalog.test_schema.r, test_schema.r;
+               ^
+select r.a from hcatalog.test_schema.r, test_schema.r;
+ERROR:  table reference "r" is ambiguous
+LINE 1: select r.a from hcatalog.test_schema.r, test_schema.r;
+               ^
+select r.* from hcatalog.test_schema.r, test_schema.r;
+ERROR:  table reference "r" is ambiguous
+LINE 1: select r.* from hcatalog.test_schema.r, test_schema.r;
+               ^
+-- negative tests: ambiguous table references
+select test_schema.r.a from hcatalog.test_schema.r, test_schema.r;
+ERROR:  table reference "test_schema.r" is ambiguous
+LINE 1: select test_schema.r.a from hcatalog.test_schema.r, test_sch...
+               ^
+select test_schema.r.d from hcatalog.test_schema.r, test_schema.r;
+ERROR:  table reference "test_schema.r" is ambiguous
+LINE 1: select test_schema.r.d from hcatalog.test_schema.r, test_sch...
+               ^
+select hcatalog.test_schema.r.a, test_schema.r.a from hcatalog.test_schema.r, test_schema.r;
+ERROR:  table reference "test_schema.r" is ambiguous
+LINE 1: select hcatalog.test_schema.r.a, test_schema.r.a from hcatal...
+                                         ^
+-- positive tests:
+select * from hcatalog.test_schema.r, test_schema.r;
+ a | b | a | d 
+---+---+---+---
+(0 rows)
+
+select hcatalog.test_schema.r.a, regression.test_schema.r.a from hcatalog.test_schema.r, test_schema.r;
+ a | a 
+---+---
+(0 rows)
+
+select b,d from hcatalog.test_schema.r, test_schema.r;
+ b | d 
+---+---
+(0 rows)
+
+select r1.*, r2.* from hcatalog.test_schema.r r1, test_schema.r r2;
+ a | b | a | d 
+---+---+---+---
+(0 rows)
+
+-- negative test: partitioned tables and hcatalog
+alter table test_schema.p exchange partition p1 with table hcatalog.test_schema.r;
+ERROR:  reference to hcatalog table "hcatalog.test_schema.r" is not allowed in this context
+-- cleanup
+DROP schema test_schema cascade;
+NOTICE:  drop cascades to append only table test_schema.r
+NOTICE:  drop cascades to append only table test_schema.p_1_prt_p2
+NOTICE:  drop cascades to constraint p_1_prt_p2_check on append only table test_schema.p_1_prt_p2
+NOTICE:  drop cascades to append only table test_schema.p_1_prt_p1
+NOTICE:  drop cascades to constraint p_1_prt_p1_check on append only table test_schema.p_1_prt_p1
+NOTICE:  drop cascades to append only table test_schema.p
+NOTICE:  drop cascades to append only table test_schema.s
+SELECT convert_to_internal_schema('test_schema');
+        convert_to_internal_schema        
+------------------------------------------
+ Converted test_schema to internal schema
+(1 row)
+
+DROP schema test_schema cascade;
+NOTICE:  drop cascades to append only table test_schema.tt
+NOTICE:  drop cascades to append only table test_schema.t
+NOTICE:  drop cascades to append only table test_schema.r
+DROP schema test_schema2 cascade;
+select nspname,nspdboid from pg_namespace where nspname='test_schema';
+ nspname | nspdboid 
+---------+----------
+(0 rows)
+
+DROP FUNCTION convert_to_hcatalog_schema(text);
+DROP FUNCTION convert_to_internal_schema(text);
+DROP FUNCTION trigger_func();
+DROP USER newuser;
+-- disable GUC
+SET hcatalog_enable = false;

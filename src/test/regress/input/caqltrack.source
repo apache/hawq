@@ -1,0 +1,707 @@
+-- --------------------------------------
+-- caqltrack
+-- --------------------------------------
+
+-- *********************************************************************
+-- *********************************************************************
+-- This script tests if we add coverage for caql callers.
+-- It has many ignore blocks containing caql usage information.
+--
+-- If you want to change the results, you must
+-- make the changes in regress/output/caqltrack.source, not
+-- regress/expected, and use gpsourcify.pl to generate a ".source"
+-- file.
+--
+-- From the regress directory invoke the command:
+--
+--    gpsourcify.pl results/caqltrack.out  > output/caqltrack.source
+--
+-- To run this test, CaQL should be built with logquery option.
+-- Set environment variable with caql_logquery_FLAGS='-logquery'
+-- *********************************************************************
+-- *********************************************************************
+-- *********************************************************************
+-- *********************************************************************
+
+-- start_ignore
+drop database if exists caqltrack_db;
+drop role caql_super_luser;
+-- end_ignore
+
+-- create a table, insert some rows, do a query, drop it.
+-- after we build the caql log tables, we can profile the catalog usage
+-- for each statement
+CREATE TABLE CQTxxx_1 (a int, b int);
+INSERT INTO CQTxxx_1 SELECT ii, ii*2 from generate_series(1,1000) as ii;
+SELECT avg(a), avg(b) FROM CQTxxx_1;
+DROP TABLE CQTxxx_1;
+
+
+-- need a superuser and a new database that has the toolkit views
+-- (which are *not* in regression)
+
+create user caql_super_luser SUPERUSER;
+set role caql_super_luser;
+create database caqltrack_db;
+
+\c caqltrack_db
+set role caql_super_luser;
+set gp_enable_caql_logging=false;
+
+-- start_ignore
+-- GPSQL-512 enable caqlcov 
+-- create my_gp_toolkit because the real gp_toolkit is empty in GPSQL
+create schema my_gp_toolkit;
+CREATE EXTERNAL WEB TABLE my_gp_toolkit.__gp_log_master_ext
+(
+    logtime timestamp with time zone,
+    loguser text,
+    logdatabase text,
+    logpid text,
+    logthread text,
+    loghost text,
+    logport text,
+    logsessiontime timestamp with time zone,
+    logtransaction int,
+    logsession text,
+    logcmdcount text,
+    logsegment text,
+    logslice text,
+    logdistxact text,
+    loglocalxact text,
+    logsubxact text,
+    logseverity text,
+    logstate text,
+    logmessage text,
+    logdetail text,
+    loghint text,
+    logquery text,
+    logquerypos int,
+    logcontext text,
+    logdebug text,
+    logcursorpos int,
+    logfunction text,
+    logfile text,
+    logline int,
+    logstack text
+)
+EXECUTE E'cat $GP_SEG_DATADIR/pg_log/*.csv' ON MASTER
+FORMAT 'CSV' (DELIMITER AS ',' NULL AS '' QUOTE AS '"');
+
+CREATE EXTERNAL WEB TABLE my_gp_toolkit.__gp_log_segment_ext
+(
+    logtime timestamp with time zone,
+    loguser text,
+    logdatabase text,
+    logpid text,
+    logthread text,
+    loghost text,
+    logport text,
+    logsessiontime timestamp with time zone,
+    logtransaction int,
+    logsession text,
+    logcmdcount text,
+    logsegment text,
+    logslice text,
+    logdistxact text,
+    loglocalxact text,
+    logsubxact text,
+    logseverity text,
+    logstate text,
+    logmessage text,
+    logdetail text,
+    loghint text,
+    logquery text,
+    logquerypos int,
+    logcontext text,
+    logdebug text,
+    logcursorpos int,
+    logfunction text,
+    logfile text,
+    logline int,
+    logstack text
+)
+EXECUTE E'cat $GP_SEG_DATADIR/pg_log/*.csv'
+FORMAT 'CSV' (DELIMITER AS ',' NULL AS '' QUOTE AS '"');
+-- end_ignore
+
+-- \d my_gp_toolkit.__gp_log_master_ext;
+
+-- start_ignore
+DROP TABLE caql_master_t1;
+DROP TABLE caql_segment_t1;
+
+drop view caql_log_system;
+drop view caql_master_m1;
+drop view caql_master_v1;
+-- end_ignore
+
+-- *********************************************************************
+-- *********************************************************************
+-- This load process is convoluted to avoid a weird problem where
+-- SELECTing from the csv log file (using an external table and
+-- regex_split_to_array() ) resulted in a catalog operation per row
+-- ("SELECT * FROM pg_type WHERE oid = :1" , from
+-- lsyscache.c/get_typlenbyvalalign() ), such that the log file would
+-- grow without bound as we read from it, and the query would never
+-- end.  The caqltrack load process was restructured to disable query
+-- logging (which only works partially) and then copy the contents of
+-- the log to heap tables using simple queries, and then the complex
+-- processing is performed in-database.
+-- *********************************************************************
+-- *********************************************************************
+
+CREATE view caql_master_m1
+as select
+    'master'::varchar as caql_masterseg,
+    logtime,
+    loguser,
+    logdatabase,
+    logpid,
+    logthread,
+    loghost,
+    logport,
+    logsessiontime,
+    logtransaction,
+    logsession,
+    logcmdcount,
+    logsegment,
+    logslice,
+    logdistxact,
+    loglocalxact,
+    logsubxact,
+    logseverity,
+    logstate,
+    logmessage,
+    logdetail,
+    loghint,
+    logquery,
+    logquerypos,
+    logcontext,
+    logdebug,
+    logcursorpos,
+    logfunction,
+    logfile,
+    logline,
+    logstack
+from
+my_gp_toolkit.__gp_log_master_ext
+where logmessage like ('catquery:%');
+
+CREATE TABLE caql_master_t1
+as select * from caql_master_m1 distributed by (logtime);
+
+CREATE VIEW caql_master_v1
+as SELECT
+    caql_masterseg,
+    logtime,
+    loguser,
+    logdatabase,
+    logpid,
+    logthread,
+    loghost,
+    logport,
+    logsessiontime,
+    logtransaction,
+    logsession,
+    logcmdcount,
+    logsegment,
+    logslice,
+    logdistxact,
+    loglocalxact,
+    logsubxact,
+    logseverity,
+    logstate,
+regexp_split_to_array(
+regexp_replace(
+regexp_replace(logmessage,
+'catquery: caql_basic_fn_', ''), 'caller: ', ''), ' ') as caql_mess_arr,
+    logmessage,
+    logdetail,
+    loghint,
+    logquery,
+    logquerypos,
+    logcontext,
+    logdebug,
+    logcursorpos,
+    logfunction,
+    logfile,
+    logline,
+    logstack
+from
+caql_master_t1;
+
+-- start_ignore
+drop view caql_segment_m1;
+drop view caql_segment_v1;
+-- end_ignore
+
+CREATE view caql_segment_m1
+as select
+    'segment'::varchar as caql_masterseg,
+    logtime,
+    loguser,
+    logdatabase,
+    logpid,
+    logthread,
+    loghost,
+    logport,
+    logsessiontime,
+    logtransaction,
+    logsession,
+    logcmdcount,
+    logsegment,
+    logslice,
+    logdistxact,
+    loglocalxact,
+    logsubxact,
+    logseverity,
+    logstate,
+    logmessage,
+    logdetail,
+    loghint,
+    logquery,
+    logquerypos,
+    logcontext,
+    logdebug,
+    logcursorpos,
+    logfunction,
+    logfile,
+    logline,
+    logstack
+from
+my_gp_toolkit.__gp_log_segment_ext
+where logmessage like ('catquery:%');
+
+CREATE TABLE caql_segment_t1
+as select * from caql_segment_m1 distributed by (logtime);
+
+CREATE VIEW caql_segment_v1
+AS SELECT
+    caql_masterseg,
+    logtime,
+    loguser,
+    logdatabase,
+    logpid,
+    logthread,
+    loghost,
+    logport,
+    logsessiontime,
+    logtransaction,
+    logsession,
+    logcmdcount,
+    logsegment,
+    logslice,
+    logdistxact,
+    loglocalxact,
+    logsubxact,
+    logseverity,
+    logstate,
+regexp_split_to_array(
+regexp_replace(
+regexp_replace(logmessage,
+'catquery: caql_basic_fn_', ''), 'caller: ', ''), ' ') as caql_mess_arr,
+    logmessage,
+    logdetail,
+    loghint,
+    logquery,
+    logquerypos,
+    logcontext,
+    logdebug,
+    logcursorpos,
+    logfunction,
+    logfile,
+    logline,
+    logstack
+FROM
+caql_segment_t1;
+
+CREATE VIEW caql_log_system
+AS
+    select
+    caql_masterseg,
+    logtime,
+    loguser,
+    logdatabase,
+    logpid,
+    logthread,
+    loghost,
+    logport,
+    logsessiontime,
+    logtransaction,
+    logsession,
+    logcmdcount,
+    logsegment,
+    logslice,
+    logdistxact,
+    loglocalxact,
+    logsubxact,
+    logseverity,
+    logstate,
+    caql_mess_arr[1] as caql_basequery_code,
+    caql_mess_arr[2] as caql_module,
+    caql_mess_arr[3] as caql_lineno,
+    caql_mess_arr[4] as caql_uniqquery_code,
+    caql_mess_arr[5] as caql_firstarg,
+    logmessage,
+    logdetail,
+    loghint,
+    logquery,
+    logquerypos,
+    logcontext,
+    logdebug,
+    logcursorpos,
+    logfunction,
+    logfile,
+    logline,
+    logstack
+    from
+(
+    SELECT * FROM caql_segment_v1
+    UNION ALL
+    SELECT * FROM caql_master_v1
+) as foo
+;
+
+
+-- --------------------------------------
+-- get "unique" caql queries from calico
+-- --------------------------------------
+drop external web table if exists get_uniqdef;
+
+CREATE EXTERNAL WEB TABLE get_uniqdef (x text)
+execute E'( perl @abs_srcdir@/../../include/catalog/caqluniqdef.pl  @abs_srcdir@/../../backend/catalog/caql/uniqdef.json > @abs_srcdir@/data/uniqdef.data )'
+on SEGMENT 0
+format 'text';
+
+-- start_ignore
+select * from get_uniqdef;
+-- end_ignore
+
+drop external table if exists EXT_uniqdef;
+CREATE EXTERNAL TABLE EXT_uniqdef (
+      uniq_qry text,
+      bcount integer,
+      bdelete integer,
+      binsert integer,
+      bupdate integer,
+      basequery_code integer,
+      base_qry text,
+      colnum char(64),
+      cql char(6),
+      tablename char(64),
+      uniqquery_code integer)
+location ('file://@hostname@@abs_srcdir@/data/uniqdef.data' )
+   FORMAT 'text' (delimiter '|');
+
+create table udef as select * from EXT_uniqdef;
+create table cq_logall as select * from caql_log_system
+distributed by (logtime);
+
+-- --------------------------------------
+-- get caql caller location
+-- --------------------------------------
+-- start_ignore
+drop external web table if exists get_caloc;
+drop table if exists caloc;
+drop table if exists caller;
+-- end_ignore
+
+CREATE EXTERNAL WEB TABLE get_caloc (query text, file text, lineno integer, path text)
+execute E'python @abs_srcdir@/../../backend/catalog/caql/caller.py'
+on MASTER format 'text';
+
+create table caloc as select * from get_caloc;
+-- start_ignore
+select count(*) from caloc;
+-- end_ignore
+
+-- --------------------------------------
+-- get caql caller from the log
+-- --------------------------------------
+create table caller (fn text, file text, lineno int);
+insert into caller
+    select distinct substring(logmessage from 'caql_basic_fn_[0-9]*'),
+                    substring(logmessage from '.*: .*: (.*.c)'),
+                    substring(logmessage from '.* ([0-9]*) [0-9]* [0-9]*')::int from caql_master_t1
+    union
+    select distinct substring(logmessage from 'caql_basic_fn_[0-9]*'),
+                    substring(logmessage from '.*: .*: (.*.c)'),
+                    substring(logmessage from '.* ([0-9]*) [0-9]* [0-9]*')::int from caql_segment_t1
+;
+
+-- start_ignore
+-- --------------------------------------
+-- caql callers that are not yet tested
+-- --------------------------------------
+select count(*)
+  from caloc left join caller using(file, lineno)
+ where caller.fn is null;
+
+select path, file, lineno
+  from caloc left join caller using(file, lineno)
+ where caller.fn is null
+ order by 1, 3;
+
+select caql_masterseg, count(*) from cq_logall group by caql_masterseg;
+
+select count(distinct caql_basequery_code) from cq_logall;
+select count(distinct basequery_code) from udef;
+
+select caql_masterseg, count(distinct caql_basequery_code)
+from cq_logall group by caql_masterseg;
+
+select count(distinct caql_uniqquery_code) from cq_logall;
+select count(distinct uniqquery_code) from udef;
+
+select caql_masterseg, count(distinct caql_uniqquery_code)
+from cq_logall group by caql_masterseg;
+
+
+-- base query counts
+select tablename, base_qry, count(base_qry) as qcount
+from udef u, cq_logall la
+where
+u.basequery_code = la.caql_basequery_code
+group by tablename, base_qry
+order by qcount desc;
+
+-- uniq query counts
+select tablename, base_qry, uniq_qry, count(uniq_qry) as qcount
+from udef u, cq_logall la
+where
+u.uniqquery_code = la.caql_uniqquery_code
+group by tablename, base_qry, uniq_qry
+order by qcount desc;
+
+-- missing base query
+select tablename, base_qry
+from udef u
+where
+u.basequery_code not in
+(select caql_basequery_code from cq_logall)
+order by 1,2;
+
+-- missing uniq query
+select tablename, uniq_qry
+from udef u
+where
+u.uniqquery_code not in
+(select caql_uniqquery_code from cq_logall)
+order by 1,2;
+
+-- tables without insert/update/delete (overall)
+select tablename from udef group by tablename having sum(bdelete)=0
+and sum(binsert)=0 and sum(bupdate)=0;
+
+-- tables without insert/update/delete (as logged)
+select tablename
+from udef u
+where
+u.uniqquery_code in
+(select caql_uniqquery_code from cq_logall)
+group by tablename
+having
+sum(bdelete)=0 and
+sum(binsert)=0 and
+sum(bupdate)=0
+order by 1;
+
+/*
+-- total number of caql callers
+select count(distinct substring(logmessage from '.* *.c [0-9]* [0-9]*')) from caql_segment_t1;
+select count(distinct substring(logmessage from '.* *.c [0-9]* [0-9]*')) from caql_master_t1;
+
+select count(distinct substring(logmessage from '.* *.c [0-9]* [0-9]*'))
+  from (select * from caql_segment_t1 union all select * from caql_master_t1) as total;
+
+-- caql callers
+select distinct (substring(logmessage from '.* *.c [0-9]* [0-9]*')) from caql_segment_t1;
+select distinct (substring(logmessage from '.* *.c [0-9]* [0-9]*')) from caql_master_t1;
+
+select distinct (substring(logmessage from '.* *.c [0-9]* [0-9]*'))
+  from (select * from caql_segment_t1 union all select * from caql_master_t1) as total;
+
+
+-- track caql usage for particular statements on master
+select logdebug, tablename, base_qry, uniq_qry, caql_firstarg
+from udef u, cq_logall la
+where
+u.uniqquery_code = la.caql_uniqquery_code
+and
+caql_masterseg = 'master'
+and
+logdebug like ('%CQTxxx_1%')
+order by logtime, logdebug;
+
+-- track caql usage for particular statements on seg0
+select logdebug, tablename, base_qry, uniq_qry, caql_firstarg
+from udef u, cq_logall la
+where
+u.uniqquery_code = la.caql_uniqquery_code
+and
+caql_masterseg = 'segment'
+and
+logsegment = 'seg0'
+and
+logdebug like ('%CQTxxx_1%')
+order by logtime, logdebug;
+
+-- print the names of the oid arguments
+select logtime, logdebug, uniq_qry, '' as argname
+from udef u, cq_logall la
+where
+u.uniqquery_code = la.caql_uniqquery_code
+and
+caql_masterseg = 'master'
+and
+logdebug like ('%CQTxxx_1%')
+and
+base_qry not like ('%where oid = :1%')
+UNION ALL
+select logtime, logdebug, uniq_qry, cc.rolname as argname
+from udef u, cq_logall la,
+pg_authid cc
+where
+u.uniqquery_code = la.caql_uniqquery_code
+and
+caql_masterseg = 'master'
+and
+logdebug like ('%CQTxxx_1%')
+and
+tablename like ('pg_authid%')
+and  cc.oid = caql_firstarg
+and
+base_qry like ('%where oid = :1%')
+UNION ALL
+select logtime, logdebug, uniq_qry, cc.relname as argname
+from udef u, cq_logall la,
+pg_class cc
+where
+u.uniqquery_code = la.caql_uniqquery_code
+and
+caql_masterseg = 'master'
+and
+logdebug like ('%CQTxxx_1%')
+and
+tablename like ('pg_class%')
+and  cc.oid = caql_firstarg
+and
+base_qry like ('%where oid = :1%')
+UNION ALL
+select logtime, logdebug, uniq_qry, cc.nspname as argname
+from udef u, cq_logall la,
+pg_namespace cc
+where
+u.uniqquery_code = la.caql_uniqquery_code
+and
+caql_masterseg = 'master'
+and
+logdebug like ('%CQTxxx_1%')
+and
+tablename like ('pg_namespace%')
+and  cc.oid = caql_firstarg
+and
+base_qry like ('%where oid = :1%')
+UNION ALL
+select logtime, logdebug, uniq_qry, cc.opcname as argname
+from udef u, cq_logall la,
+pg_opclass cc
+where
+u.uniqquery_code = la.caql_uniqquery_code
+and
+caql_masterseg = 'master'
+and
+logdebug like ('%CQTxxx_1%')
+and
+tablename like ('pg_opclass%')
+and  cc.oid = caql_firstarg
+and
+base_qry like ('%where oid = :1%')
+UNION ALL
+select logtime, logdebug, uniq_qry, cc.oprname as argname
+from udef u, cq_logall la,
+pg_operator cc
+where
+u.uniqquery_code = la.caql_uniqquery_code
+and
+caql_masterseg = 'master'
+and
+logdebug like ('%CQTxxx_1%')
+and
+tablename like ('pg_operator%')
+and  cc.oid = caql_firstarg
+and
+base_qry like ('%where oid = :1%')
+UNION ALL
+select logtime, logdebug, uniq_qry, cc.proname as argname
+from udef u, cq_logall la,
+pg_proc cc
+where
+u.uniqquery_code = la.caql_uniqquery_code
+and
+caql_masterseg = 'master'
+and
+logdebug like ('%CQTxxx_1%')
+and
+tablename like ('pg_proc%')
+and  cc.oid = caql_firstarg
+and
+base_qry like ('%where oid = :1%')
+UNION ALL
+select logtime, logdebug, uniq_qry, cc.spcname as argname
+from udef u, cq_logall la,
+pg_tablespace cc
+where
+u.uniqquery_code = la.caql_uniqquery_code
+and
+caql_masterseg = 'master'
+and
+logdebug like ('%CQTxxx_1%')
+and
+tablename like ('pg_tablespace%')
+and  cc.oid = caql_firstarg
+and
+base_qry like ('%where oid = :1%')
+UNION ALL
+select logtime, logdebug, uniq_qry, cc.typname as argname
+from udef u, cq_logall la,
+pg_type cc
+where
+u.uniqquery_code = la.caql_uniqquery_code
+and
+caql_masterseg = 'master'
+and
+logdebug like ('%CQTxxx_1%')
+and
+tablename like ('pg_type%')
+and  cc.oid = caql_firstarg
+and
+base_qry like ('%where oid = :1%')
+order by logtime, logdebug;
+
+
+-- cleanup
+
+drop view caql_log_system;
+drop view caql_master_v1;
+drop view caql_segment_v1;
+drop view caql_master_m1;
+drop view caql_segment_m1;
+drop table caql_master_t1;
+drop table caql_segment_t1;
+
+drop external web table if exists get_uniqdef;
+drop external table if exists EXT_uniqdef;
+
+drop table udef;
+drop table if exists cq_logall;
+*/
+
+-- back to normal
+
+\c regression
+reset role;
+drop role caql_super_luser ;
+drop database caqltrack_db;
+-- end_ignore

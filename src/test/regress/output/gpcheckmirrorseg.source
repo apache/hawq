@@ -1,0 +1,17 @@
+-- run gpcheckmirrorseg and look at the output
+--
+-- I'd prefer to use an external web table, but the permissions don't
+-- seem to work out
+\! @gpwhich_gpcheckmirrorseg.pl@ -connect "@gp_glob_connect@" 2>&1 -ignore pg_xlog | sed 's/|/^/g' | awk '{print NR"|"$0;}'  > @abs_srcdir@/data/gpcheckmirrorseg.data
+CREATE EXTERNAL TABLE gpcheckmirrorseg (lineno int, lineval text)
+location ('file://@hostname@@abs_srcdir@/data/gpcheckmirrorseg.data')
+FORMAT 'text' (delimiter '|');
+select lineval from gpcheckmirrorseg 
+where 
+lineno = (select max(lineno) from gpcheckmirrorseg);
+       lineval        
+----------------------
+ no differences found
+(1 row)
+
+drop external table gpcheckmirrorseg;

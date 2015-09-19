@@ -1,0 +1,30 @@
+AROPT = cr
+
+ifdef ELF_SYSTEM
+export_dynamic = -Wl,-export-dynamic
+rpath = -Wl,-R'$(rpathdir)'
+endif
+
+DLSUFFIX = .so
+
+CFLAGS_SL = -fPIC -DPIC
+
+ifeq ($(findstring i386,$(host_cpu)), i386)
+allow_nonpic_in_shlib = yes
+endif
+
+
+%.so: %.o
+ifdef ELF_SYSTEM
+	$(LD) -x -shared -o $@ $<
+else
+	$(LD) $(LDREL) $(LDOUT) $<.obj -x $<
+	@echo building shared object $@
+	@rm -f $@.pic
+	@${AR} cq $@.pic $<.obj
+	${RANLIB} $@.pic
+	@rm -f $@
+	$(LD) -x -Bshareable -Bforcearchive -o $@ $@.pic
+endif
+
+sqlmansect = 7

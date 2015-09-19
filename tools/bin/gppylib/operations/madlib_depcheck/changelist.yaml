@@ -1,0 +1,989 @@
+new module:
+
+udt:
+    - assoc_rules_results:
+    - chi2_test_result:
+    - closest_column_result:
+    - closest_columns_result:
+    - cox_prop_hazards_result:
+    - f_test_result:
+    - intermediate_cox_prop_hazards_result:
+    - kmeans_result:
+    - kmeans_state:
+    - ks_test_result:
+    - linregr_result:
+    - logregr_result:
+    - mlogregr_result:
+    - mw_test_result:
+    - lda_result:
+    - one_way_anova_result:
+    - t_test_result:
+    - wsr_test_result:
+
+udf:
+    - __assoc_rules_array_eq:
+        rettype: boolean
+        argument: text[], text[]
+
+    - __filter_input_relation:
+        rettype: character varying
+        argument: character varying, character varying
+
+    - __lda_count_topic_prefunc:
+        rettype: integer[]
+        argument: integer[], integer[]
+
+    - __lda_count_topic_sfunc:
+        rettype: integer[]
+        argument: integer[], integer[], integer[], integer[], integer, integer
+
+    - __lda_gibbs_sample:
+        rettype: integer[]
+        argument: integer[], integer[], integer[], integer[], double precision, double precision, integer, integer, integer
+
+    - __lda_random_assign:
+        rettype: integer[]
+        argument: integer, integer
+
+    - __lda_util_conorm_data:
+        rettype: SETOF schema_madlib.lda_result
+        argument: text, text, text, text
+
+    - __lda_util_index_sort:
+        rettype: integer[]
+        argument: double precision[]
+
+    - __lda_util_norm_dataset:
+        rettype: SETOF schema_madlib.lda_result
+        argument: text, text, text
+
+    - __lda_util_norm_vocab:
+        rettype: SETOF schema_madlib.lda_result
+        argument: text, text
+
+    - __lda_util_norm_with_smoothing:
+        rettype: double precision[]
+        argument: double precision[], double precision
+
+    - __lda_util_transpose:
+        rettype: integer[]
+        argument: integer[]
+
+    - __lda_util_unnest:
+        rettype: SETOF integer[]
+        argument: integer[]
+
+    - array_add:
+        rettype: anyarray
+        argument: anyarray, anyarray
+
+    - array_contains:
+        rettype: boolean
+        argument: anyarray, anyarray
+
+    - array_div:
+        rettype: anyarray
+        argument: anyarray, anyarray
+
+    - array_dot:
+        rettype: double precision
+        argument: anyarray, anyarray
+
+    - array_fill:
+        rettype: anyarray
+        argument: anyarray, anyelement
+
+    - array_max:
+        rettype: anyelement
+        argument: anyarray
+
+    - array_mean:
+        rettype: double precision
+        argument: anyarray
+
+    - array_min:
+        rettype: anyelement
+        argument: anyarray
+
+    - array_mult:
+        rettype: anyarray
+        argument: anyarray, anyarray
+
+    - array_of_bigint:
+        rettype: bigint[]
+        argument: integer
+
+    - array_of_float:
+        rettype: double precision[]
+        argument: integer
+
+    - array_scalar_mult:
+        rettype: anyarray
+        argument: anyarray, anyelement
+
+    - array_sqrt:
+        rettype: anyarray
+        argument: anyarray
+
+    - array_stddev:
+        rettype: double precision
+        argument: anyarray
+
+    - array_sub:
+        rettype: anyarray
+        argument: anyarray, anyarray
+
+    - array_sum:
+        rettype: anyelement
+        argument: anyarray
+
+    - array_sum_big:
+        rettype: double precision
+        argument: anyarray
+
+    - assert:
+        rettype: void
+        argument: boolean, character varying
+
+    - assoc_rules:
+        rettype: schema_madlib.assoc_rules_results
+        argument: double precision, double precision, text, text, text, text, boolean
+
+    - assoc_rules:
+        rettype: schema_madlib.assoc_rules_results
+        argument: double precision, double precision, text, text, text, text
+
+    - avg_vector_final:
+        rettype: double precision[]
+        argument: double precision[]
+
+    - avg_vector_merge:
+        rettype: double precision[]
+        argument: double precision[], double precision[]
+
+    - avg_vector_transition:
+        rettype: double precision[]
+        argument: double precision[], double precision[]
+
+    - check_if_raises_error:
+        rettype: boolean
+        argument: text
+
+    - chi2_gof_test_final:
+        rettype: schema_madlib.chi2_test_result
+        argument: double precision[]
+
+    - chi2_gof_test_merge_states:
+        rettype: double precision[]
+        argument: double precision[], double precision[]
+
+    - chi2_gof_test_transition:
+        rettype: double precision[]
+        argument: double precision[], bigint, double precision, bigint
+
+    - chi2_gof_test_transition:
+        rettype: double precision[]
+        argument: double precision[], bigint, double precision
+
+    - chi2_gof_test_transition:
+        rettype: double precision[]
+        argument: double precision[], bigint
+
+    - closest_column:
+        rettype: schema_madlib.closest_column_result
+        argument: double precision[], double precision[], regproc
+
+    - closest_column:
+        rettype: schema_madlib.closest_column_result
+        argument: double precision[], double precision[]
+
+    - closest_columns:
+        rettype: schema_madlib.closest_columns_result
+        argument: double precision[], double precision[], integer, regproc
+
+    - closest_columns:
+        rettype: schema_madlib.closest_columns_result
+        argument: double precision[], double precision[], integer
+
+    - compute_cox_prop_hazards:
+        rettype: integer
+        argument: character varying, character varying, character varying, integer, character varying, double precision
+
+    - compute_logregr:
+        rettype: integer
+        argument: character varying, character varying, character varying, integer, character varying, double precision
+
+    - compute_mlogregr:
+        rettype: integer
+        argument: character varying, character varying, integer, character varying, integer, character varying, double precision
+
+    - cox_prop_hazards:
+        rettype: schema_madlib.cox_prop_hazards_result
+        argument: character varying, character varying, character varying, integer, character varying, double precision
+
+    - cox_prop_hazards:
+        rettype: schema_madlib.cox_prop_hazards_result
+        argument: character varying, character varying, character varying
+
+    - cox_prop_hazards:
+        rettype: schema_madlib.cox_prop_hazards_result
+        argument: character varying, character varying, character varying, integer
+
+    - cox_prop_hazards:
+        rettype: schema_madlib.cox_prop_hazards_result
+        argument: character varying, character varying, character varying, integer, character varying
+
+    - cox_prop_hazards_step_final:
+        rettype: double precision[]
+        argument: double precision[]
+
+    - cox_prop_hazards_step_transition:
+        rettype: double precision[]
+        argument: precision[], precision[], precision, precision, precision[], precision[], precision[]
+
+    - create_schema_pg_temp:
+        rettype: void
+        argument:
+
+    - dist_angle:
+        rettype: double precision
+        argument: double precision[], double precision[]
+
+    - dist_norm1:
+        rettype: double precision
+        argument: double precision[], double precision[]
+
+    - dist_norm2:
+        rettype: double precision
+        argument: double precision[], double precision[]
+
+    - dist_tanimoto:
+        rettype: double precision
+        argument: double precision[], double precision[]
+
+    - f_test_final:
+        rettype: schema_madlib.f_test_result
+        argument: double precision[]
+
+    - gen_rules_from_cfp:
+        rettype: SETOF text[]
+        argument:
+
+    - intermediate_cox_prop_hazards:
+        rettype: schema_madlib.intermediate_cox_prop_hazards_result
+        argument: precision[], precision[]
+
+    - internal_compute_kmeans:
+        rettype: integer
+        argument: character varying, character varying, character varying, character varying, character varying
+
+    - internal_compute_kmeans_random_seeding:
+        rettype: integer
+        argument: character varying, character varying, character varying, character varying
+
+    - internal_compute_kmeanspp_seeding:
+        rettype: integer
+        argument: character varying, character varying, character varying, character varying
+
+    - internal_cox_prop_hazards_result:
+        rettype: schema_madlib.cox_prop_hazards_result
+        argument: precision[]
+
+    - internal_cox_prop_hazards_step_distance:
+        rettype: double precision
+        argument: precision[], precision[]
+
+    - internal_execute_using_kmeans_args:
+        rettype: void
+        argument: character varying, precision[], precision
+
+    - internal_execute_using_kmeans_args:
+        rettype: schema_madlib.kmeans_result
+        argument: character varying, character varying, character varying, character varying, character varying, integer, double precision
+
+    - internal_execute_using_kmeans_random_seeding_args:
+        rettype: void
+        argument: character varying, precision[]
+
+    - internal_execute_using_kmeanspp_seeding_args:
+        rettype: void
+        argument: character varying, precision[]
+
+    - internal_execute_using_silhouette_args:
+        rettype: double precision
+        argument: character varying, double precision[], regproc
+
+    - internal_logregr_cg_result:
+        rettype: schema_madlib.logregr_result
+        argument: precision[]
+
+    - internal_logregr_cg_step_distance:
+        rettype: double precision
+        argument: precision[], precision[]
+
+    - internal_logregr_igd_result:
+        rettype: schema_madlib.logregr_result
+        argument: precision[]
+
+    - internal_logregr_igd_step_distance:
+        rettype: double precision
+        argument: precision[], precision[]
+
+    - internal_logregr_irls_result:
+        rettype: schema_madlib.logregr_result
+        argument: precision[]
+
+    - internal_logregr_irls_step_distance:
+        rettype: double precision
+        argument: precision[], precision[]
+
+    - internal_mlogregr_irls_result:
+        rettype: schema_madlib.mlogregr_result
+        argument: precision[]
+
+    - internal_mlogregr_irls_step_distance:
+        rettype: double precision
+        argument: precision[], precision[]
+
+    - isnan:
+        rettype: boolean
+        argument: double precision
+
+    - kmeans:
+        rettype: schema_madlib.kmeans_result
+        argument: character varying, character varying, double precision[], character varying, character varying, integer, double precision
+
+    - kmeans:
+        rettype: schema_madlib.kmeans_result
+        argument: character varying, character varying, double precision[], character varying, character varying, integer
+
+    - kmeans:
+        rettype: schema_madlib.kmeans_result
+        argument: character varying, character varying, double precision[], character varying, character varying
+
+    - kmeans:
+        rettype: schema_madlib.kmeans_result
+        argument: character varying, character varying, double precision[], character varying
+
+    - kmeans:
+        rettype: schema_madlib.kmeans_result
+        argument: character varying, character varying, double precision[]
+
+    - kmeans:
+        rettype: schema_madlib.kmeans_result
+        argument: character varying, character varying, character varying, character varying, character varying, character varying, integer, double precision
+
+    - kmeans:
+        rettype: schema_madlib.kmeans_result
+        argument: character varying, character varying, character varying, character varying, character varying, character varying, integer
+
+    - kmeans:
+        rettype: schema_madlib.kmeans_result
+        argument: character varying, character varying, character varying, character varying, character varying, character varying
+
+    - kmeans:
+        rettype: schema_madlib.kmeans_result
+        argument: character varying, character varying, character varying, character varying, character varying
+
+    - kmeans:
+        rettype: schema_madlib.kmeans_result
+        argument: character varying, character varying, character varying, character varying
+
+    - kmeans_random:
+        rettype: schema_madlib.kmeans_result
+        argument: character varying, character varying, integer, character varying, character varying, integer, double precision
+
+    - kmeans_random:
+        rettype: schema_madlib.kmeans_result
+        argument: character varying, character varying, integer, character varying, character varying, integer
+
+    - kmeans_random:
+        rettype: schema_madlib.kmeans_result
+        argument: character varying, character varying, integer, character varying, character varying
+
+    - kmeans_random:
+        rettype: schema_madlib.kmeans_result
+        argument: character varying, character varying, integer, character varying
+
+    - kmeans_random:
+        rettype: schema_madlib.kmeans_result
+        argument: character varying, character varying, integer
+
+    - kmeans_random_seeding:
+        rettype: double precision[]
+        argument: character varying, character varying, integer, double precision[]
+
+    - kmeans_random_seeding:
+        rettype: double precision[]
+        argument: character varying, character varying, integer
+
+    - kmeanspp:
+        rettype: schema_madlib.kmeans_result
+        argument: character varying, character varying, integer, character varying, character varying, integer, double precision
+
+    - kmeanspp:
+        rettype: schema_madlib.kmeans_result
+        argument: character varying, character varying, integer, character varying, character varying, integer
+
+    - kmeanspp:
+        rettype: schema_madlib.kmeans_result
+        argument: character varying, character varying, integer, character varying, character varying
+
+    - kmeanspp:
+        rettype: schema_madlib.kmeans_result
+        argument: character varying, character varying, integer, character varying
+
+    - kmeanspp:
+        rettype: schema_madlib.kmeans_result
+        argument: character varying, character varying, integer
+
+    - kmeanspp_seeding:
+        rettype: double precision[]
+        argument: character varying, character varying, integer, character varying, double precision[]
+
+    - kmeanspp_seeding:
+        rettype: double precision[]
+        argument: character varying, character varying, integer, character varying
+
+    - kmeanspp_seeding:
+        rettype: double precision[]
+        argument: character varying, character varying, integer
+
+    - ks_test_final:
+        rettype: schema_madlib.ks_test_result
+        argument: double precision[]
+
+    - ks_test_transition:
+        rettype: double precision[]
+        argument: double precision[], boolean, double precision, bigint, bigint
+
+    - linregr_final:
+        rettype: schema_madlib.linregr_result
+        argument: schema_madlib.bytea8
+
+    - linregr_merge_states:
+        rettype: schema_madlib.bytea8
+        argument: schema_madlib.bytea8, schema_madlib.bytea8
+
+    - linregr_transition:
+        rettype: schema_madlib.bytea8
+        argument: schema_madlib.bytea8, double precision, double precision[]
+
+    - logistic:
+        rettype: double precision
+        argument: double precision
+
+    - logregr:
+        rettype: schema_madlib.logregr_result
+        argument: character varying, character varying, character varying, integer, character varying, double precision
+
+    - logregr:
+        rettype: schema_madlib.logregr_result
+        argument: character varying, character varying, character varying
+
+    - logregr:
+        rettype: schema_madlib.logregr_result
+        argument: character varying, character varying, character varying, integer
+
+    - logregr:
+        rettype: schema_madlib.logregr_result
+        argument: character varying, character varying, character varying, integer, character varying
+
+    - logregr_cg_step_final:
+        rettype: double precision[]
+        argument: double precision[]
+
+    - logregr_cg_step_merge_states:
+        rettype: double precision[]
+        argument: double precision[], double precision[]
+
+    - logregr_cg_step_transition:
+        rettype: double precision[]
+        argument: precision[], precision[], precision[]
+
+    - logregr_igd_step_final:
+        rettype: double precision[]
+        argument: double precision[]
+
+    - logregr_igd_step_merge_states:
+        rettype: double precision[]
+        argument: double precision[], double precision[]
+
+    - logregr_igd_step_transition:
+        rettype: double precision[]
+        argument: precision[], precision[], precision[]
+
+    - logregr_irls_step_final:
+        rettype: double precision[]
+        argument: double precision[]
+
+    - logregr_irls_step_merge_states:
+        rettype: double precision[]
+        argument: double precision[], double precision[]
+
+    - logregr_irls_step_transition:
+        rettype: double precision[]
+        argument: precision[], precision[], precision[]
+
+    - matrix_agg_final:
+        rettype: double precision[]
+        argument: double precision[]
+
+    - matrix_agg_transition:
+        rettype: double precision[]
+        argument: double precision[], double precision[]
+
+    - matrix_column:
+        rettype: double precision[]
+        argument: double precision[], integer
+
+    - mlogregr:
+        rettype: schema_madlib.mlogregr_result
+        argument: character varying, character varying, integer, character varying, integer, character varying, double precision
+
+    - mlogregr:
+        rettype: schema_madlib.mlogregr_result
+        argument: character varying, character varying, integer, character varying
+
+    - mlogregr:
+        rettype: schema_madlib.mlogregr_result
+        argument: character varying, character varying, integer, character varying, integer
+
+    - mlogregr:
+        rettype: schema_madlib.mlogregr_result
+        argument: character varying, character varying, integer, character varying, integer, character varying
+
+    - mlogregr_irls_step_final:
+        rettype: double precision[]
+        argument: double precision[]
+
+    - mlogregr_irls_step_merge_states:
+        rettype: double precision[]
+        argument: double precision[], double precision[]
+
+    - mlogregr_irls_step_transition:
+        rettype: double precision[]
+        argument: precision[], precision[], precision[]
+
+    - mw_test_final:
+        rettype: schema_madlib.mw_test_result
+        argument: double precision[]
+
+    - mw_test_transition:
+        rettype: double precision[]
+        argument: double precision[], boolean, double precision
+
+    - lda_get_topic_desc:
+        rettype: SETOF schema_madlib.lda_result
+        argument: text, text, text, integer
+
+    - lda_get_topic_word_count:
+        rettype: SETOF schema_madlib.lda_result
+        argument: text, text
+
+    - lda_get_word_topic_count:
+        rettype: SETOF schema_madlib.lda_result
+        argument: text, text
+
+    - lda_predict:
+        rettype: SETOF schema_madlib.lda_result
+        argument: text, text, text
+
+    - lda_train:
+        rettype: SETOF schema_madlib.lda_result
+        argument: text, text, text, integer, integer, integer, double precision, double precision
+
+    - noop:
+        rettype: void
+        argument:
+
+    - norm1:
+        rettype: double precision
+        argument: double precision[]
+
+    - norm2:
+        rettype: double precision
+        argument: double precision[]
+
+    - normalize:
+        rettype: double precision[]
+        argument: double precision[]
+
+    - normalized_avg_vector_final:
+        rettype: double precision[]
+        argument: double precision[]
+
+    - normalized_avg_vector_transition:
+        rettype: double precision[]
+        argument: double precision[], double precision[]
+
+    - one_way_anova_final:
+        rettype: schema_madlib.one_way_anova_result
+        argument: double precision[]
+
+    - one_way_anova_merge_states:
+        rettype: double precision[]
+        argument: double precision[], double precision[]
+
+    - one_way_anova_transition:
+        rettype: double precision[]
+        argument: double precision[], integer, double precision
+
+    - relative_error:
+        rettype: double precision
+        argument: double precision, double precision
+
+    - relative_error:
+        rettype: double precision
+        argument: double precision[], double precision[]
+
+    - simple_silhouette:
+        rettype: double precision
+        argument: character varying, character varying, double precision[], character varying
+
+    - simple_silhouette:
+        rettype: double precision
+        argument: character varying, character varying, double precision[]
+
+    - squared_dist_norm2:
+        rettype: double precision
+        argument: double precision[], double precision[]
+
+    - t_test_merge_states:
+        rettype: double precision[]
+        argument: double precision[], double precision[]
+
+    - t_test_one_final:
+        rettype: schema_madlib.t_test_result
+        argument: double precision[]
+
+    - t_test_one_transition:
+        rettype: double precision[]
+        argument: double precision[], double precision
+
+    - t_test_two_pooled_final:
+        rettype: schema_madlib.t_test_result
+        argument: double precision[]
+
+    - t_test_two_transition:
+        rettype: double precision[]
+        argument: double precision[], boolean, double precision
+
+    - t_test_two_unpooled_final:
+        rettype: schema_madlib.t_test_result
+        argument: double precision[]
+
+    - version:
+        rettype: text
+        argument:
+
+    - weighted_sample_final_int64:
+        rettype: bigint
+        argument: schema_madlib.bytea8
+
+    - weighted_sample_final_vector:
+        rettype: double precision[]
+        argument: schema_madlib.bytea8
+
+    - weighted_sample_merge_int64:
+        rettype: schema_madlib.bytea8
+        argument: schema_madlib.bytea8, schema_madlib.bytea8
+
+    - weighted_sample_merge_vector:
+        rettype: schema_madlib.bytea8
+        argument: schema_madlib.bytea8, schema_madlib.bytea8
+
+    - weighted_sample_transition_int64:
+        rettype: schema_madlib.bytea8
+        argument: schema_madlib.bytea8, bigint, double precision
+
+    - weighted_sample_transition_vector:
+        rettype: schema_madlib.bytea8
+        argument: schema_madlib.bytea8, double precision[], double precision
+
+    - wsr_test_final:
+        rettype: schema_madlib.wsr_test_result
+        argument: double precision[]
+
+    - wsr_test_transition:
+        rettype: double precision[]
+        argument: double precision[], double precision, double precision
+
+    - wsr_test_transition:
+        rettype: double precision[]
+        argument: double precision[], double precision
+
+    - angle:
+        rettype: double precision
+        argument: schema_madlib.svec, schema_madlib.svec
+
+    - l1norm:
+        rettype: double precision
+        argument: schema_madlib.svec, schema_madlib.svec
+
+    - l2norm:
+        rettype: double precision
+        argument: schema_madlib.svec, schema_madlib.svec
+
+    - normalize:
+        rettype: schema_madlib.svec 
+        argument: schema_madlib.svec
+
+    - svec_append:
+        rettype: schema_madlib.svec 
+        argument: schema_madlib.svec, double precision, bigint
+
+    - svec_change:
+        rettype: schema_madlib.svec 
+        argument: schema_madlib.svec, integer, schema_madlib.svec
+
+    - svec_contains:
+        rettype: boolean
+        argument: schema_madlib.svec, schema_madlib.svec
+
+    - svec_count:
+        rettype: schema_madlib.svec 
+        argument: schema_madlib.svec, schema_madlib.svec
+
+    - svec_dimension:
+        rettype: integer 
+        argument: schema_madlib.svec
+
+    - svec_dmax:
+        rettype: double precision
+        argument: double precision, double precision
+
+    - svec_dmin:
+        rettype: double precision
+        argument: double precision, double precision
+
+    - svec_elsum:
+        rettype: double precision
+        argument: schema_madlib.svec
+
+    - svec_elsum:
+        rettype: double precision
+        argument: double precision[]
+
+    - svec_eq_non_zero:
+        rettype: boolean
+        argument: schema_madlib.svec, schema_madlib.svec
+
+    - svec_from_string:
+        rettype: schema_madlib.svec
+        argument: text
+
+    - svec_hash:
+        rettype: integer 
+        argument: schema_madlib.svec
+
+    - svec_l1norm:
+        rettype: double precision
+        argument: schema_madlib.svec
+
+    - svec_l1norm:
+        rettype: double precision
+        argument: double precision[]
+
+    - svec_l2norm:
+        rettype: double precision
+        argument: schema_madlib.svec
+
+    - svec_l2norm:
+        rettype: double precision
+        argument: double precision[]
+
+    - svec_lapply:
+        rettype: schema_madlib.svec
+        argument: text, schema_madlib.svec
+
+    - svec_log:
+        rettype: schema_madlib.svec
+        argument: schema_madlib.svec
+
+    - svec_mean_final:
+        rettype: schema_madlib.svec
+        argument: double precision[]
+
+    - svec_mean_prefunc:
+        rettype: double precision[], double precision[]
+        argument: double precision[]
+
+    - svec_mean_transition:
+        rettype: double precision[], schema_madlib.svec
+        argument: double precision[]
+
+    - svec_median:
+        rettype: double precision
+        argument: double precision[]
+
+    - svec_median:
+        rettype: double precision
+        argument: schema_madlib.svec
+
+    - svec_nonbase_positions:
+        rettype: bigint[] 
+        argument: schema_madlib.svec, double precision
+
+    - svec_nonbase_values:
+        rettype: double precision[] 
+        argument: schema_madlib.svec, double precision
+
+    - svec_pivot:
+        rettype: schema_madlib.svec 
+        argument: schema_madlib.svec, double precision
+
+    - svec_proj:
+        rettype: double precision[
+        argument: schema_madlib.svec, integer 
+
+    - svec_reverse:
+        rettype: schema_madlib.svec 
+        argument: schema_madlib.svec
+
+    - svec_sfv:
+        rettype: schema_madlib.svec 
+        argument: text[], text[]
+
+    - svec_sort:
+        rettype: text[] 
+        argument: text[]
+
+    - svec_subvec:
+        rettype: schema_madlib.svec 
+        argument: schema_madlib.svec, integer, integer
+
+    - svec_to_string:
+        rettype: text
+        argument: schema_madlib.svec
+
+    - svec_unnest:
+        rettype: SETOF double precision
+        argument: schema_madlib.svec
+
+    - tanimoto_distance:
+        rettype: double precision
+        argument: schema_madlib.svec, schema_madlib.svec
+
+uda:
+    - __lda_count_topic_agg:
+        rettype: integer[]
+        argument: integer[], integer[], integer[], integer, integer
+
+    - array_agg:
+        rettype: anyarray
+        argument: anyelement
+
+    - avg:
+        rettype: double precision
+        argument: double precision[]
+
+    - chi2_gof_test:
+        rettype: schema_madlib.chi2_test_result
+        argument: bigint, double precision, bigint
+
+    - chi2_gof_test:
+        rettype: schema_madlib.chi2_test_result
+        argument: bigint, double precision
+
+    - chi2_gof_test:
+        rettype: schema_madlib.chi2_test_result
+        argument: bigint
+
+    - cox_prop_hazards_step:
+        rettype: double precision[]
+        argument: double precision[], double precision, double precision, double precision[], double precision[], double precision[]
+
+    - f_test:
+        rettype: schema_madlib.f_test_result
+        argument: boolean, double precision
+
+    - ks_test:
+        rettype: schema_madlib.ks_test_result
+        argument: boolean, double precision, bigint, bigint
+
+    - linregr:
+        rettype: schema_madlib.linregr_result
+        argument: double precision, double precision[]
+
+    - logregr_cg_step:
+        rettype: double precision[]
+        argument: boolean, double precision[], double precision[]
+
+    - logregr_igd_step:
+        rettype: double precision[]
+        argument: boolean, double precision[], double precision[]
+
+    - logregr_irls_step:
+        rettype: double precision[]
+        argument: boolean, double precision[], double precision[]
+
+    - matrix_agg:
+        rettype: double precision[]
+        argument: double precision[]
+
+    - mlogregr_irls_step:
+        rettype: double precision[]
+        argument: integer, integer, double precision[], double precision[]
+
+    - mw_test:
+        rettype: schema_madlib.mw_test_result
+        argument: boolean, double precision
+
+    - normalized_avg:
+        rettype: double precision[]
+        argument: double precision[]
+
+    - one_way_anova:
+        rettype: schema_madlib.one_way_anova_result
+        argument: integer, double precision
+
+    - t_test_one:
+        rettype: schema_madlib.t_test_result
+        argument: double precision
+
+    - t_test_two_pooled:
+        rettype: schema_madlib.t_test_result
+        argument: boolean, double precision
+
+    - t_test_two_unpooled:
+        rettype: schema_madlib.t_test_result
+        argument: boolean, double precision
+
+    - weighted_sample:
+        rettype: bigint
+        argument: bigint, double precision
+
+    - weighted_sample:
+        rettype: double precision[]
+        argument: double precision[], double precision
+
+    - wsr_test:
+        rettype: schema_madlib.wsr_test_result
+        argument: double precision, double precision
+
+    - wsr_test:
+        rettype: schema_madlib.wsr_test_result
+        argument: double precision
+
+    - mean:
+        rettype: schema_madlib.svec
+        argument: schema_madlib.svec
+        
+    - svec_agg:
+        rettype: schema_madlib.svec
+        argument: double precision
+        
+    - svec_count_nonzero:
+        rettype: schema_madlib.svec
+        argument: schema_madlib.svec
+
+    - svec_median_inmemory:
+        rettype: double precision
+        argument: double precision
+
+    - svec_sum:
+        rettype: schema_madlib.svec
+        argument: schema_madlib.svec
+
+udc:

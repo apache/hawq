@@ -1,0 +1,1485 @@
+--
+-- Catalog Upgrade Script (from 1.0 to 1.1)
+--
+ 
+-- make fundamental changes to pg_proc ...
+SELECT catDML('UPDATE pg_class SET relnatts = 20 WHERE relname = ''pg_proc''');
+SELECT catDML('INSERT INTO pg_attribute VALUES
+  (1255, ''prodataaccess'',  18, -1, 1, 20, 0, -1, -1, true, ''p'', ''c'', true, false, false, true, 0)'
+);
+\c
+
+-- Following code populates the prodataaccess field for functions
+-- oid >= 1644 and oid <= 1655 - RI_FKey* functions are set to MODIFIES SQL
+-- oid >= 2322 and oid <= 2325 - pg_tablespace size, pg_database_size, pg_relation_size set to READS SQL
+-- oid = 1371 - pg_lock_status  - set to READS SQL
+-- oid = 2168 - pg_database_size  set to READS SQL
+-- oid = 6023 - pg_highest_oid  set to READS SQL
+-- oid >= 2286 and oid <= 2289 - pg_relation_size, pg_total_relation_size, pg_size_pretty set to READS SQL
+-- oid >= 7169 and oid <= 7172 - get_ao_distribution, get_ao_compression_ratio  set to READS SQL
+-- oid >= 7173 and oid <= 7174 - gp_update_ao_master_stats set to MODIFIES SQL
+-- rest of the functions - if SQL language are set to CONTAINS SQL or are set to NO SQL
+SELECT catDML(
+'UPDATE pg_proc SET prodataaccess =
+           case
+               when oid >= 1644 and oid <= 1655 then ''m''
+               when oid >= 2322 and oid <= 2325 then ''r''
+               when oid = 1371 or oid = 2168 or oid = 6023 then ''r''
+               when oid >= 2286 and oid <= 2289 then ''r''
+               when oid >= 7169 and oid <= 7172 then ''r''
+               when oid >= 7173 and oid <= 7174 then ''m''
+               when prolang = 14 then ''c''
+               else ''n''
+           end'
+);
+
+-- Update external protocol from gpxf to pxf
+SELECT catDML(
+'UPDATE pg_proc SET proname = ''pxf_write'', prosrc = ''pxfprotocol_export'', probin = ''$libdir/pxf.so'' WHERE proname = ''gpxf_write''
+');
+SELECT catDML(
+'UPDATE pg_proc SET proname = ''pxf_read'', prosrc = ''pxfprotocol_import'', probin = ''$libdir/pxf.so'' WHERE proname = ''gpxf_read''
+');
+SELECT catDML(
+'UPDATE pg_proc SET proname = ''pxf_validate'', prosrc = ''pxfprotocol_validate_urls'', probin = ''$libdir/pxf.so'' WHERE proname = ''gpxf_validate''
+');
+SELECT catDML(
+'UPDATE pg_proc SET proname = ''pxfwritable_export'', prosrc = ''gpdbwritableformatter_export'', probin = ''$libdir/pxf.so'' WHERE proname = ''gpxfwritable_export''
+');
+SELECT catDML(
+'UPDATE pg_proc SET proname = ''pxfwritable_import'', prosrc = ''gpdbwritableformatter_import'', probin = ''$libdir/pxf.so'' WHERE proname = ''gpxfwritable_import''
+');
+SELECT catDML(
+'UPDATE pg_extprotocol SET ptcname = ''pxf'' WHERE ptcname = ''gpxf''
+');
+
+
+VACUUM FREEZE pg_proc;
+-- ... and the rest
+
+--
+-- Partition management functions for the optimizer
+--
+CREATE FUNCTION @gpupgradeschemaname@.gp_partition_propagation(int4, oid) RETURNS void  LANGUAGE internal VOLATILE STRICT AS 'gp_partition_propagation' WITH (OID=6083);
+SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.gp_partition_propagation(int4, oid) IS  ''inserts a partition oid into specified pid-index''');
+
+CREATE FUNCTION @gpupgradeschemaname@.gp_partition_selection(oid, anyelement) RETURNS oid LANGUAGE internal STABLE STRICT AS 'gp_partition_selection' WITH (OID=6084);
+SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.gp_partition_selection(oid, anyelement)  IS ''selects the child partition oid which satisfies a given partition key value''');
+
+CREATE FUNCTION @gpupgradeschemaname@.gp_partition_expansion(oid) RETURNS setof oid LANGUAGE internal STABLE STRICT AS 'gp_partition_expansion' WITH (OID=6085);
+SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.gp_partition_expansion(oid) IS ''finds all child partition oids for the given parent oid''');
+
+CREATE FUNCTION @gpupgradeschemaname@.gp_partition_inverse(oid) RETURNS setof record LANGUAGE internal STABLE STRICT AS 'gp_partition_inverse' WITH (OID=6086);
+SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.gp_partition_inverse(oid) IS ''returns all child partitition oids with their constraints for a given parent oid''');
+
+--
+-- Functions for enabling and disabling transformations
+--
+CREATE FUNCTION @gpupgradeschemaname@.disable_xform(text) RETURNS text LANGUAGE internal IMMUTABLE STRICT AS 'disable_xform' WITH (OID=6087);
+SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.disable_xform(text) IS ''disables transformations in the optimizer''');
+
+CREATE FUNCTION @gpupgradeschemaname@.enable_xform(text) RETURNS text LANGUAGE internal IMMUTABLE STRICT AS 'enable_xform' WITH (OID=6088);
+SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.enable_xform(text) IS ''enables transformations in the optimizer''');
+
+--
+-- Show Optimizer's version
+--
+CREATE FUNCTION @gpupgradeschemaname@.gp_opt_version() RETURNS text LANGUAGE internal IMMUTABLE STRICT AS 'gp_opt_version' WITH (OID=6089);
+SELECT catDML('COMMENT ON FUNCTION @gpupgradeschemaname@.gp_opt_version() IS ''Returns the optimizer and gpos library versions''');
+
+--
+-- Add access properties to MADLib functions
+--
+SET search_path = madlib, pg_catalog;
+
+CREATE OR REPLACE FUNCTION __filter_input_relation(rel_source character varying, expr_point character varying) RETURNS character varying
+    AS $$
+DECLARE
+    oldClientMinMessages VARCHAR;
+    rel_source_filtered VARCHAR;
+BEGIN
+    IF (SELECT position('.' in rel_source)) > 0 THEN
+    	rel_source_filtered := '_madlib_' || split_part(rel_source, '.', 2) || '_filtered';
+    ELSE
+	rel_source_filtered := '_madlib_' || rel_source || '_filtered';
+    END IF;
+
+    oldClientMinMessages :=
+        (SELECT setting FROM pg_settings WHERE name = 'client_min_messages');
+    EXECUTE 'SET client_min_messages TO warning';
+    EXECUTE 'DROP VIEW IF EXISTS _madlib_'||rel_source_filtered||'_filtered';
+    EXECUTE 'DROP VIEW IF EXISTS '||rel_source_filtered;
+    EXECUTE 'CREATE TEMP VIEW '||rel_source_filtered||'
+             AS SELECT * FROM '||rel_source||'
+                    WHERE abs(
+                              coalesce(
+                                 madlib.svec_elsum('||expr_point||'),
+                                 ''Infinity''::FLOAT8
+                              )
+                             ) < ''Infinity''::FLOAT8';
+    EXECUTE 'SET client_min_messages TO ' || oldClientMinMessages;
+    RETURN rel_source_filtered;
+    EXCEPTION
+        WHEN undefined_function THEN
+	    RAISE EXCEPTION 'Point coordinates (%) are not a valid type
+                        (SVEC, FLOAT[], or INTEGER[]).', expr_point;
+END
+$$
+    LANGUAGE plpgsql STRICT MODIFIES SQL DATA;
+
+CREATE OR REPLACE FUNCTION __lda_util_conorm_data(data_table text, vocab_table text, output_data_table text, output_vocab_table text) RETURNS SETOF lda_result
+
+    AS $$
+    
+    import sys
+    from inspect import getframeinfo, currentframe
+    try:
+        from lda import lda
+    except:
+        sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
+        from lda import lda
+    
+    # Retrieve the schema name of the current function
+    # Make it available as variable: schema_madlib
+    fname = getframeinfo(currentframe()).function
+    foid  = fname.rsplit('_',1)[1]
+
+    # plpython names its functions "__plpython_procedure_<function name>_<oid>",
+    # of which we want the oid
+    rv = plpy.execute('SELECT nspname, proname FROM pg_proc p ' \
+         'JOIN pg_namespace n ON (p.pronamespace = n.oid) ' \
+         'WHERE p.oid = %s' % foid, 1)
+
+    global schema_madlib
+    schema_madlib = rv[0]['nspname']    
+
+    lda.conorm_data(
+        data_table, vocab_table, output_data_table, output_vocab_table)
+    return [[output_data_table,'normalized data table'],
+        [output_vocab_table,'normalized vocab table']]
+$$
+    LANGUAGE plpythonu STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION __lda_util_index_sort(arr double precision[]) RETURNS integer[]
+    AS $$
+    
+    import sys
+    from inspect import getframeinfo, currentframe
+    try:
+        from lda import lda
+    except:
+        sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
+        from lda import lda
+    
+    # Retrieve the schema name of the current function
+    # Make it available as variable: schema_madlib
+    fname = getframeinfo(currentframe()).function
+    foid  = fname.rsplit('_',1)[1]
+
+    # plpython names its functions "__plpython_procedure_<function name>_<oid>",
+    # of which we want the oid
+    rv = plpy.execute('SELECT nspname, proname FROM pg_proc p ' \
+         'JOIN pg_namespace n ON (p.pronamespace = n.oid) ' \
+         'WHERE p.oid = %s' % foid, 1)
+
+    global schema_madlib
+    schema_madlib = rv[0]['nspname']    
+
+    return lda.index_sort(arr)
+$$
+    LANGUAGE plpythonu STRICT READS SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION __lda_util_norm_dataset(data_table text, norm_vocab_table text, output_data_table text) RETURNS SETOF lda_result
+    AS $$
+    
+    import sys
+    from inspect import getframeinfo, currentframe
+    try:
+        from lda import lda
+    except:
+        sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
+        from lda import lda
+    
+    # Retrieve the schema name of the current function
+    # Make it available as variable: schema_madlib
+    fname = getframeinfo(currentframe()).function
+    foid  = fname.rsplit('_',1)[1]
+
+    # plpython names its functions "__plpython_procedure_<function name>_<oid>",
+    # of which we want the oid
+    rv = plpy.execute('SELECT nspname, proname FROM pg_proc p ' \
+         'JOIN pg_namespace n ON (p.pronamespace = n.oid) ' \
+         'WHERE p.oid = %s' % foid, 1)
+
+    global schema_madlib
+    schema_madlib = rv[0]['nspname']    
+
+    lda.norm_dataset(data_table, norm_vocab_table, output_data_table)
+    return [[output_data_table,'normalized data table']]
+$$
+    LANGUAGE plpythonu STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION __lda_util_norm_vocab(vocab_table text, output_vocab_table text) RETURNS SETOF lda_result
+    AS $$
+    
+    import sys
+    from inspect import getframeinfo, currentframe
+    try:
+        from lda import lda
+    except:
+        sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
+        from lda import lda
+    
+    # Retrieve the schema name of the current function
+    # Make it available as variable: schema_madlib
+    fname = getframeinfo(currentframe()).function
+    foid  = fname.rsplit('_',1)[1]
+
+    # plpython names its functions "__plpython_procedure_<function name>_<oid>",
+    # of which we want the oid
+    rv = plpy.execute('SELECT nspname, proname FROM pg_proc p ' \
+         'JOIN pg_namespace n ON (p.pronamespace = n.oid) ' \
+         'WHERE p.oid = %s' % foid, 1)
+
+    global schema_madlib
+    schema_madlib = rv[0]['nspname']    
+
+    lda.norm_vocab(vocab_table, output_vocab_table)
+    return [[output_vocab_table,'normalized vocbulary table']]
+$$
+    LANGUAGE plpythonu STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION __lda_util_norm_with_smoothing(arr double precision[], smooth double precision) RETURNS double precision[]
+    AS $$
+    
+    import sys
+    from inspect import getframeinfo, currentframe
+    try:
+        from lda import lda
+    except:
+        sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
+        from lda import lda
+    
+    # Retrieve the schema name of the current function
+    # Make it available as variable: schema_madlib
+    fname = getframeinfo(currentframe()).function
+    foid  = fname.rsplit('_',1)[1]
+
+    # plpython names its functions "__plpython_procedure_<function name>_<oid>",
+    # of which we want the oid
+    rv = plpy.execute('SELECT nspname, proname FROM pg_proc p ' \
+         'JOIN pg_namespace n ON (p.pronamespace = n.oid) ' \
+         'WHERE p.oid = %s' % foid, 1)
+
+    global schema_madlib
+    schema_madlib = rv[0]['nspname']    
+
+    return lda.l1_norm_with_smoothing(arr, smooth)
+$$
+    LANGUAGE plpythonu STRICT READS SQL DATA;
+
+
+CREATE OR REPLACE FUNCTION assoc_rules(support double precision, confidence double precision, tid_col text, item_col text, input_table text, output_schema text, "verbose" boolean) RETURNS assoc_rules_results
+    AS $$
+
+    
+    import sys
+    from inspect import getframeinfo, currentframe
+    try:
+        from assoc_rules import assoc_rules
+    except:
+        sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
+        from assoc_rules import assoc_rules
+    
+    # Retrieve the schema name of the current function
+    # Make it available as variable: schema_madlib
+    fname = getframeinfo(currentframe()).function
+    foid  = fname.rsplit('_',1)[1]
+
+    # plpython names its functions "__plpython_procedure_<function name>_<oid>",
+    # of which we want the oid
+    rv = plpy.execute('SELECT nspname, proname FROM pg_proc p ' \
+         'JOIN pg_namespace n ON (p.pronamespace = n.oid) ' \
+         'WHERE p.oid = %s' % foid, 1)
+
+    global schema_madlib
+    schema_madlib = rv[0]['nspname']    
+
+
+    plpy.execute("SET client_min_messages = error;")
+
+    # schema_madlib comes from PythonFunctionBodyOnly
+    return assoc_rules.assoc_rules(
+        schema_madlib,
+        support,
+        confidence,
+        tid_col,
+        item_col,
+        input_table,
+        output_schema,
+        verbose
+        );
+
+$$
+    LANGUAGE plpythonu MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION assoc_rules(support double precision, confidence double precision, tid_col text, item_col text, input_table text, output_schema text) RETURNS assoc_rules_results
+    AS $$
+
+    
+    import sys
+    from inspect import getframeinfo, currentframe
+    try:
+        from assoc_rules import assoc_rules
+    except:
+        sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
+        from assoc_rules import assoc_rules
+    
+    # Retrieve the schema name of the current function
+    # Make it available as variable: schema_madlib
+    fname = getframeinfo(currentframe()).function
+    foid  = fname.rsplit('_',1)[1]
+
+    # plpython names its functions "__plpython_procedure_<function name>_<oid>",
+    # of which we want the oid
+    rv = plpy.execute('SELECT nspname, proname FROM pg_proc p ' \
+         'JOIN pg_namespace n ON (p.pronamespace = n.oid) ' \
+         'WHERE p.oid = %s' % foid, 1)
+
+    global schema_madlib
+    schema_madlib = rv[0]['nspname']    
+
+
+    plpy.execute("SET client_min_messages = error;")
+
+    # schema_madlib comes from PythonFunctionBodyOnly
+    return assoc_rules.assoc_rules(
+        schema_madlib,
+        support,
+        confidence,
+        tid_col,
+        item_col,
+        input_table,
+        output_schema,
+        False
+        );
+
+$$
+    LANGUAGE plpythonu MODIFIES SQL DATA;
+
+
+CREATE OR REPLACE FUNCTION compute_cox_prop_hazards(source character varying, "indepColumn" character varying, "depColumn" character varying, "maxNumIterations" integer, optimizer character varying, "precision" double precision) RETURNS integer
+    AS $$
+    import sys
+    from inspect import getframeinfo, currentframe
+    try:
+        from stats import cox_prop_hazards
+    except:
+        sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
+        from stats import cox_prop_hazards
+    
+    # Retrieve the schema name of the current function
+    # Make it available as variable: schema_madlib
+    fname = getframeinfo(currentframe()).function
+    foid  = fname.rsplit('_',1)[1]
+
+    # plpython names its functions "__plpython_procedure_<function name>_<oid>",
+    # of which we want the oid
+    rv = plpy.execute('SELECT nspname, proname FROM pg_proc p ' \
+         'JOIN pg_namespace n ON (p.pronamespace = n.oid) ' \
+         'WHERE p.oid = %s' % foid, 1)
+
+    global schema_madlib
+    schema_madlib = rv[0]['nspname']
+
+    return cox_prop_hazards.compute_cox_prop_hazards(**globals())
+$$
+    LANGUAGE plpythonu MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION compute_logregr(source character varying, "depColumn" character varying, "indepColumn" character varying, "maxNumIterations" integer, optimizer character varying, "precision" double precision) RETURNS integer
+    AS $$
+    import sys
+    from inspect import getframeinfo, currentframe
+    try:
+        from regress import logistic
+    except:
+        sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
+        from regress import logistic
+    
+    # Retrieve the schema name of the current function
+    # Make it available as variable: schema_madlib
+    fname = getframeinfo(currentframe()).function
+    foid  = fname.rsplit('_',1)[1]
+
+    # plpython names its functions "__plpython_procedure_<function name>_<oid>",
+    # of which we want the oid
+    rv = plpy.execute('SELECT nspname, proname FROM pg_proc p ' \
+         'JOIN pg_namespace n ON (p.pronamespace = n.oid) ' \
+         'WHERE p.oid = %s' % foid, 1)
+
+    global schema_madlib
+    schema_madlib = rv[0]['nspname']
+
+    return logistic.compute_logregr(**globals())
+$$
+    LANGUAGE plpythonu MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION compute_mlogregr(source character varying, depvar character varying, numcategories integer, indepvar character varying, maxnumiterations integer, optimizer character varying, "precision" double precision) RETURNS integer
+    AS $$
+    import sys
+    from inspect import getframeinfo, currentframe
+    try:
+        from regress import multilogistic
+    except:
+        sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
+        from regress import multilogistic
+    
+    # Retrieve the schema name of the current function
+    # Make it available as variable: schema_madlib
+    fname = getframeinfo(currentframe()).function
+    foid  = fname.rsplit('_',1)[1]
+
+    # plpython names its functions "__plpython_procedure_<function name>_<oid>",
+    # of which we want the oid
+    rv = plpy.execute('SELECT nspname, proname FROM pg_proc p ' \
+         'JOIN pg_namespace n ON (p.pronamespace = n.oid) ' \
+         'WHERE p.oid = %s' % foid, 1)
+
+    global schema_madlib
+    schema_madlib = rv[0]['nspname']
+
+    return multilogistic.compute_mlogregr(**globals())
+$$
+    LANGUAGE plpythonu MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION cox_prop_hazards(source character varying, "indepColumn" character varying, "depColumn" character varying, "maxNumIterations" integer, optimizer character varying, "precision" double precision) RETURNS cox_prop_hazards_result
+    AS $_$
+DECLARE
+    theIteration INTEGER;
+    fnName VARCHAR;
+    theResult madlib.cox_prop_hazards_result;
+BEGIN
+    theIteration := (
+        SELECT madlib.compute_cox_prop_hazards($1, $2, $3, $4, $5, $6)
+    );
+    IF optimizer = 'newton' THEN
+        fnName := 'internal_cox_prop_hazards_result';
+    ELSE
+        RAISE EXCEPTION 'Unknown optimizer (''%'')', optimizer;
+    END IF;
+    EXECUTE
+        $sql$
+        SELECT (result).*
+        FROM (
+            SELECT
+                madlib.$sql$ || fnName || $sql$(_madlib_state) AS result
+                FROM _madlib_iterative_alg
+                WHERE _madlib_iteration = $sql$ || theIteration || $sql$
+            ) subq
+        $sql$
+        INTO theResult;
+				
+    IF NOT (theResult IS NULL) THEN
+        theResult.num_iterations = theIteration;
+    END IF;
+    RETURN theResult;
+END;
+$_$
+    LANGUAGE plpgsql MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION cox_prop_hazards(source character varying, "indepColumn" character varying, "depColumn" character varying) RETURNS cox_prop_hazards_result
+    AS $_$SELECT madlib.cox_prop_hazards($1, $2, $3, 20, 'newton', 0.0001);$_$
+    LANGUAGE sql MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION cox_prop_hazards(source character varying, "indepColumn" character varying, "depColumn" character varying, "maxNumIterations" integer) RETURNS cox_prop_hazards_result
+    AS $_$SELECT madlib.cox_prop_hazards($1, $2, $3, $4, 'newton', 0.0001);$_$
+    LANGUAGE sql MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION cox_prop_hazards(source character varying, "indepColumn" character varying, "depColumn" character varying, "maxNumIterations" integer, optimizer character varying) RETURNS cox_prop_hazards_result
+    AS $_$SELECT madlib.cox_prop_hazards($1, $2, $3, $4, $5, 0.0001);$_$
+    LANGUAGE sql MODIFIES SQL DATA;
+
+
+CREATE OR REPLACE FUNCTION create_schema_pg_temp() RETURNS void
+    AS $$
+BEGIN
+    IF pg_my_temp_schema() = 0 THEN
+        EXECUTE 'CREATE TEMPORARY TABLE _madlib_temp_table AS SELECT 1;
+            DROP TABLE pg_temp._madlib_temp_table CASCADE;';
+    END IF;
+END;
+$$
+    LANGUAGE plpgsql MODIFIES SQL DATA;
+
+
+CREATE OR REPLACE FUNCTION internal_compute_kmeans(rel_args character varying, rel_state character varying, rel_source character varying, expr_point character varying, agg_centroid character varying) RETURNS integer
+    AS $$
+    import sys
+    from inspect import getframeinfo, currentframe
+    try:
+        from kmeans import kmeans
+    except:
+        sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
+        from kmeans import kmeans
+    
+    # Retrieve the schema name of the current function
+    # Make it available as variable: schema_madlib
+    fname = getframeinfo(currentframe()).function
+    foid  = fname.rsplit('_',1)[1]
+
+    # plpython names its functions "__plpython_procedure_<function name>_<oid>",
+    # of which we want the oid
+    rv = plpy.execute('SELECT nspname, proname FROM pg_proc p ' \
+         'JOIN pg_namespace n ON (p.pronamespace = n.oid) ' \
+         'WHERE p.oid = %s' % foid, 1)
+
+    global schema_madlib
+    schema_madlib = rv[0]['nspname']
+
+    return kmeans.compute_kmeans(**globals())
+$$
+    LANGUAGE plpythonu MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION internal_compute_kmeans_random_seeding(rel_args character varying, rel_state character varying, rel_source character varying, expr_point character varying) RETURNS integer
+    AS $$
+    import sys
+    from inspect import getframeinfo, currentframe
+    try:
+        from kmeans import kmeans
+    except:
+        sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
+        from kmeans import kmeans
+    
+    # Retrieve the schema name of the current function
+    # Make it available as variable: schema_madlib
+    fname = getframeinfo(currentframe()).function
+    foid  = fname.rsplit('_',1)[1]
+
+    # plpython names its functions "__plpython_procedure_<function name>_<oid>",
+    # of which we want the oid
+    rv = plpy.execute('SELECT nspname, proname FROM pg_proc p ' \
+         'JOIN pg_namespace n ON (p.pronamespace = n.oid) ' \
+         'WHERE p.oid = %s' % foid, 1)
+
+    global schema_madlib
+    schema_madlib = rv[0]['nspname']
+
+    return kmeans.compute_kmeans_random_seeding(**globals())
+$$
+    LANGUAGE plpythonu MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION internal_compute_kmeanspp_seeding(rel_args character varying, rel_state character varying, rel_source character varying, expr_point character varying) RETURNS integer
+    AS $$
+    import sys
+    from inspect import getframeinfo, currentframe
+    try:
+        from kmeans import kmeans
+    except:
+        sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
+        from kmeans import kmeans
+    
+    # Retrieve the schema name of the current function
+    # Make it available as variable: schema_madlib
+    fname = getframeinfo(currentframe()).function
+    foid  = fname.rsplit('_',1)[1]
+
+    # plpython names its functions "__plpython_procedure_<function name>_<oid>",
+    # of which we want the oid
+    rv = plpy.execute('SELECT nspname, proname FROM pg_proc p ' \
+         'JOIN pg_namespace n ON (p.pronamespace = n.oid) ' \
+         'WHERE p.oid = %s' % foid, 1)
+
+    global schema_madlib
+    schema_madlib = rv[0]['nspname']
+
+    return kmeans.compute_kmeanspp_seeding(**globals())
+$$
+    LANGUAGE plpythonu MODIFIES SQL DATA;
+
+CREATE OR REPLACE FUNCTION kmeans(rel_source character varying, expr_point character varying, initial_centroids double precision[], fn_dist character varying, agg_centroid character varying, max_num_iterations integer, min_frac_reassigned double precision) RETURNS kmeans_result
+    AS $_$
+DECLARE
+    theIteration INTEGER;
+    theResult madlib.kmeans_result;
+    oldClientMinMessages VARCHAR;
+    class_rel_source REGCLASS;
+    proc_fn_dist REGPROCEDURE;
+    proc_agg_centroid REGPROCEDURE;
+    rel_filtered VARCHAR;
+    num_points INTEGER;
+    k INTEGER;
+    centroids FLOAT8[];
+BEGIN
+    IF (array_upper(initial_centroids,1) IS NULL) THEN
+	RAISE EXCEPTION 'No valid initial centroids given.';
+    END IF;
+
+    centroids := ARRAY(SELECT unnest(initial_centroids));
+    IF (SELECT madlib.svec_elsum(centroids)) >= 'Infinity'::float THEN
+        RAISE EXCEPTION 'At least one initial centroid has non-finite values.';
+    END IF;
+
+    rel_filtered = madlib.__filter_input_relation(rel_source, expr_point);
+    class_rel_source := rel_filtered;
+    proc_fn_dist := fn_dist
+        || '(DOUBLE PRECISION[], DOUBLE PRECISION[])';
+    IF (SELECT prorettype != 'DOUBLE PRECISION'::regtype OR proisagg = TRUE
+        FROM pg_proc WHERE oid = proc_fn_dist) THEN
+        RAISE EXCEPTION 'Distance function has wrong signature or is not a simple function.';
+    END IF;
+    proc_agg_centroid := agg_centroid || '(DOUBLE PRECISION[])';
+    IF (SELECT prorettype != 'DOUBLE PRECISION[]'::regtype OR proisagg = FALSE
+        FROM pg_proc WHERE oid = proc_agg_centroid) THEN
+        RAISE EXCEPTION 'Mean aggregate has wrong signature or is not an aggregate.';
+    END IF;
+    IF (min_frac_reassigned < 0) OR (min_frac_reassigned > 1) THEN
+        RAISE EXCEPTION 'Convergence threshold is not a valid value (must be a fraction between 0 and 1).';
+    END IF;
+    IF (max_num_iterations < 0) THEN
+        RAISE EXCEPTION 'Number of iterations must be a non-negative integer.';
+    END IF;
+
+    k := array_upper(initial_centroids,1);
+    IF (k <= 0) THEN
+        RAISE EXCEPTION 'Number of clusters k must be a positive integer.';
+    END IF;
+    IF (k > 32767) THEN
+	RAISE EXCEPTION 'Number of clusters k must be <= 32767 (for results to be returned in a reasonable amount of time).';
+    END IF;
+    EXECUTE $sql$ SELECT count(*) FROM $sql$ || textin(regclassout(class_rel_source)) INTO num_points ;
+    IF (num_points < k) THEN
+	RAISE EXCEPTION 'Number of centroids is greater than number of points.';
+    END IF;
+
+    PERFORM madlib.create_schema_pg_temp();
+    oldClientMinMessages :=
+        (SELECT setting FROM pg_settings WHERE name = 'client_min_messages');
+    EXECUTE 'SET client_min_messages TO warning';
+
+    PERFORM madlib.internal_execute_using_kmeans_args($sql$
+        DROP TABLE IF EXISTS pg_temp._madlib_kmeans_args;
+        CREATE TABLE pg_temp._madlib_kmeans_args AS
+        SELECT
+            $1 AS initial_centroids, array_upper($1, 1) AS k,
+            $2 AS fn_dist, $3 AS max_num_iterations,
+            $4 AS min_frac_reassigned;
+        $sql$,
+        initial_centroids, proc_fn_dist, max_num_iterations,
+        min_frac_reassigned);
+    EXECUTE 'SET client_min_messages TO ' || oldClientMinMessages;
+
+    theIteration := madlib.internal_compute_kmeans('_madlib_kmeans_args',
+            '_madlib_kmeans_state',
+            textin(regclassout(class_rel_source)), expr_point,
+            textin(regprocout(proc_agg_centroid)));
+
+    EXECUTE
+        $sql$
+        SELECT (_state).centroids, (_state).objective_fn,
+            (_state).frac_reassigned, NULL
+        FROM _madlib_kmeans_state
+        WHERE _iteration = $sql$ || theIteration || $sql$
+        $sql$
+        INTO theResult;
+    IF NOT (theResult IS NULL) THEN
+        theResult.num_iterations = theIteration;
+    END IF;
+    RETURN theResult;
+END;
+$_$
+    LANGUAGE plpgsql MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION kmeans(rel_source character varying, expr_point character varying, initial_centroids double precision[], fn_dist character varying, agg_centroid character varying, max_num_iterations integer) RETURNS kmeans_result
+    AS $_$
+    SELECT madlib.kmeans($1, $2, $3, $4, $5, $6, 0.001)
+$_$
+    LANGUAGE sql STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION kmeans(rel_source character varying, expr_point character varying, initial_centroids double precision[], fn_dist character varying, agg_centroid character varying) RETURNS kmeans_result
+    AS $_$
+    SELECT madlib.kmeans($1, $2, $3, $4, $5, 20, 0.001)
+$_$
+    LANGUAGE sql STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION kmeans(rel_source character varying, expr_point character varying, initial_centroids double precision[], fn_dist character varying) RETURNS kmeans_result
+    AS $_$
+    SELECT madlib.kmeans($1, $2, $3, $4, 'madlib.avg', 20,
+        0.001)
+$_$
+    LANGUAGE sql STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION kmeans(rel_source character varying, expr_point character varying, initial_centroids double precision[]) RETURNS kmeans_result
+    AS $_$
+    SELECT madlib.kmeans($1, $2, $3,
+        'madlib.squared_dist_norm2', 'madlib.avg', 20, 0.001)
+$_$
+    LANGUAGE sql STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION kmeans(rel_source character varying, expr_point character varying, rel_initial_centroids character varying, expr_centroid character varying, fn_dist character varying, agg_centroid character varying, max_num_iterations integer, min_frac_reassigned double precision) RETURNS kmeans_result
+    AS $_$
+DECLARE
+    class_rel_initial_centroids REGCLASS;
+    theResult madlib.kmeans_result;
+BEGIN
+    class_rel_initial_centroids := rel_initial_centroids;
+    SELECT * FROM madlib.internal_execute_using_kmeans_args($sql$
+        SELECT madlib.kmeans(
+            $1, $2,
+            (
+                SELECT madlib.matrix_agg(($sql$ || expr_centroid || $sql$)::FLOAT8[])
+                FROM $sql$ || textin(regclassout(class_rel_initial_centroids))
+                    || $sql$
+            ),
+            $3, $4, $5, $6)
+            $sql$,
+        rel_source, expr_point,
+        fn_dist, agg_centroid, max_num_iterations, min_frac_reassigned)
+        INTO theResult;
+    RETURN theResult;
+END;
+$_$
+    LANGUAGE plpgsql STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION kmeans(rel_source character varying, expr_point character varying, rel_initial_centroids character varying, expr_centroid character varying, fn_dist character varying, agg_centroid character varying, max_num_iterations integer) RETURNS kmeans_result
+    AS $_$
+    SELECT madlib.kmeans(
+        $1, $2,
+        $3, $4, $5, $6, $7, 0.001)
+$_$
+    LANGUAGE sql STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION kmeans(rel_source character varying, expr_point character varying, rel_initial_centroids character varying, expr_centroid character varying, fn_dist character varying, agg_centroid character varying) RETURNS kmeans_result
+    AS $_$
+    SELECT madlib.kmeans(
+        $1, $2,
+        $3, $4, $5, $6, 20, 0.001)
+$_$
+    LANGUAGE sql STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION kmeans(rel_source character varying, expr_point character varying, rel_initial_centroids character varying, expr_centroid character varying, fn_dist character varying) RETURNS kmeans_result
+    AS $_$
+    SELECT madlib.kmeans(
+        $1, $2,
+        $3, $4, $5, 'madlib.avg', 20, 0.001)
+$_$
+    LANGUAGE sql STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION kmeans(rel_source character varying, expr_point character varying, rel_initial_centroids character varying, expr_centroid character varying) RETURNS kmeans_result
+    AS $_$
+    SELECT madlib.kmeans(
+        $1, $2,
+        $3, $4,
+        'madlib.squared_dist_norm2', 'madlib.avg', 20, 0.001)
+$_$
+    LANGUAGE sql STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION kmeans_random(rel_source character varying, expr_point character varying, k integer, fn_dist character varying, agg_centroid character varying, max_num_iterations integer, min_frac_reassigned double precision) RETURNS kmeans_result
+    AS $_$
+DECLARE
+    ret madlib.kmeans_result;
+BEGIN
+    ret = madlib.kmeans(
+        $1, $2, madlib.kmeans_random_seeding($1, $2, $3),
+        $4, $5, $6, $7);
+    RETURN ret;
+END
+$_$
+    LANGUAGE plpgsql STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION kmeans_random(rel_source character varying, expr_point character varying, k integer, fn_dist character varying, agg_centroid character varying, max_num_iterations integer) RETURNS kmeans_result
+    AS $_$
+DECLARE
+    ret madlib.kmeans_result;
+BEGIN
+    ret = madlib.kmeans(
+        $1, $2, madlib.kmeans_random_seeding($1, $2, $3),
+        $4, $5, $6, 0.001);
+    RETURN ret;
+END
+$_$
+    LANGUAGE plpgsql STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION kmeans_random(rel_source character varying, expr_point character varying, k integer, fn_dist character varying, agg_centroid character varying) RETURNS kmeans_result
+    AS $_$
+DECLARE
+    ret madlib.kmeans_result;
+BEGIN
+    ret = madlib.kmeans(
+        $1, $2, madlib.kmeans_random_seeding($1, $2, $3),
+        $4, $5, 20, 0.001);
+    RETURN ret;
+END
+$_$
+    LANGUAGE plpgsql STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION kmeans_random(rel_source character varying, expr_point character varying, k integer, fn_dist character varying) RETURNS kmeans_result
+    AS $_$
+DECLARE
+    ret madlib.kmeans_result;
+BEGIN
+    ret = madlib.kmeans(
+        $1, $2,
+        madlib.kmeans_random_seeding($1, $2, $3),
+        $4, 'madlib.avg', 20, 0.001);
+    RETURN ret;
+END
+$_$
+    LANGUAGE plpgsql STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION kmeans_random(rel_source character varying, expr_point character varying, k integer) RETURNS kmeans_result
+    AS $_$
+DECLARE
+    ret madlib.kmeans_result;
+BEGIN
+    ret = madlib.kmeans(
+        $1, $2,
+        madlib.kmeans_random_seeding($1, $2, $3),
+        'madlib.squared_dist_norm2', 'madlib.avg', 20, 0.001);
+    RETURN ret;
+END
+$_$
+    LANGUAGE plpgsql STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION kmeans_random_seeding(rel_source character varying, expr_point character varying, k integer, initial_centroids double precision[]) RETURNS double precision[]
+    AS $_$
+DECLARE
+    theIteration INTEGER;
+    theResult DOUBLE PRECISION[][];
+    oldClientMinMessages VARCHAR;
+    class_rel_source REGCLASS;
+    proc_fn_dist REGPROCEDURE;
+    num_points INTEGER;
+    num_centroids INTEGER;
+    rel_filtered VARCHAR;
+BEGIN
+    rel_filtered = madlib.__filter_input_relation(rel_source, expr_point);
+    class_rel_source := rel_filtered;
+
+    IF (initial_centroids IS NOT NULL) THEN
+	num_centroids := array_upper(initial_centroids,1);
+    ELSE
+	num_centroids := k;
+    END IF;
+
+    IF (k <= 0) THEN
+        RAISE EXCEPTION 'Number of clusters k must be a positive integer.';
+    END IF;
+    IF (k > 32767) THEN
+	RAISE EXCEPTION 'Number of clusters k must be <= 32767 (for results to be returned in a reasonable amount of time).';
+    END IF;
+    EXECUTE $sql$ SELECT count(*) FROM $sql$ || textin(regclassout(class_rel_source)) INTO num_points;
+    IF (num_points < k  OR num_points < num_centroids) THEN
+	RAISE EXCEPTION 'Number of centroids is greater than number of points.';
+    END IF;
+    IF (k < num_centroids) THEN
+	RAISE WARNING 'Number of clusters k is less than number of supplied initial centroids. Number of final clusters will equal number of supplied initial centroids.';
+    END IF;
+
+    oldClientMinMessages :=
+        (SELECT setting FROM pg_settings WHERE name = 'client_min_messages');
+    EXECUTE 'SET client_min_messages TO warning';
+    PERFORM madlib.create_schema_pg_temp();
+    PERFORM madlib.internal_execute_using_kmeans_random_seeding_args($sql$
+        DROP TABLE IF EXISTS pg_temp._madlib_kmeans_random_args;
+        CREATE TEMPORARY TABLE _madlib_kmeans_random_args AS
+        SELECT $1 AS k, $2 AS initial_centroids;
+        $sql$,
+        k, initial_centroids);
+    EXECUTE 'SET client_min_messages TO ' || oldClientMinMessages;
+
+    theIteration := (
+        SELECT madlib.internal_compute_kmeans_random_seeding(
+            '_madlib_kmeans_random_args', '_madlib_kmeans_random_state',
+            textin(regclassout(class_rel_source)), expr_point)
+    );
+
+    EXECUTE
+        $sql$
+        SELECT _state FROM _madlib_kmeans_random_state
+        WHERE _iteration = $sql$ || theIteration || $sql$
+        $sql$
+        INTO theResult;
+    RETURN theResult;
+END;
+$_$
+    LANGUAGE plpgsql MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION kmeans_random_seeding(rel_source character varying, expr_point character varying, k integer) RETURNS double precision[]
+    AS $_$
+    SELECT madlib.kmeans_random_seeding($1, $2, $3, NULL)
+$_$
+    LANGUAGE sql MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION kmeanspp(rel_source character varying, expr_point character varying, k integer, fn_dist character varying, agg_centroid character varying, max_num_iterations integer, min_frac_reassigned double precision) RETURNS kmeans_result
+    AS $_$
+DECLARE
+    ret madlib.kmeans_result;
+BEGIN
+    ret = madlib.kmeans(
+        $1, $2, madlib.kmeanspp_seeding($1, $2, $3, $4),
+        $4, $5, $6, $7);
+    RETURN ret;
+END
+$_$
+    LANGUAGE plpgsql STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION kmeanspp(rel_source character varying, expr_point character varying, k integer, fn_dist character varying, agg_centroid character varying, max_num_iterations integer) RETURNS kmeans_result
+    AS $_$
+DECLARE
+    ret madlib.kmeans_result;
+BEGIN
+    ret = madlib.kmeans(
+        $1, $2, madlib.kmeanspp_seeding($1, $2, $3, $4),
+        $4, $5, $6, 0.001);
+    RETURN ret;
+END
+$_$
+    LANGUAGE plpgsql STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION kmeanspp(rel_source character varying, expr_point character varying, k integer, fn_dist character varying, agg_centroid character varying) RETURNS kmeans_result
+    AS $_$
+DECLARE
+    ret madlib.kmeans_result;
+BEGIN
+    ret = madlib.kmeans(
+        $1, $2, madlib.kmeanspp_seeding($1, $2, $3, $4),
+        $4, $5, 20, 0.001);
+    RETURN ret;
+END
+$_$
+    LANGUAGE plpgsql STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION kmeanspp(rel_source character varying, expr_point character varying, k integer, fn_dist character varying) RETURNS kmeans_result
+    AS $_$
+DECLARE
+    ret madlib.kmeans_result;
+BEGIN
+    ret = madlib.kmeans(
+        $1, $2, madlib.kmeanspp_seeding($1, $2, $3, $4),
+        $4, 'madlib.avg', 20, 0.001);
+    RETURN ret;
+END
+$_$
+    LANGUAGE plpgsql STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION kmeanspp(rel_source character varying, expr_point character varying, k integer) RETURNS kmeans_result
+    AS $_$
+DECLARE
+    ret madlib.kmeans_result;
+BEGIN
+    ret = madlib.kmeans(
+        $1, $2,
+        madlib.kmeanspp_seeding($1, $2, $3,
+            'madlib.squared_dist_norm2'),
+        'madlib.squared_dist_norm2', 'madlib.avg', 20, 0.001);
+    RETURN ret;
+END
+$_$
+    LANGUAGE plpgsql STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION kmeanspp_seeding(rel_source character varying, expr_point character varying, k integer, fn_dist character varying, initial_centroids double precision[]) RETURNS double precision[]
+    AS $_$
+DECLARE
+    theIteration INTEGER;
+    theResult DOUBLE PRECISION[][];
+    oldClientMinMessages VARCHAR;
+    class_rel_source REGCLASS;
+    proc_fn_dist REGPROCEDURE;
+    num_points INTEGER;
+    num_centroids INTEGER;
+    rel_filtered VARCHAR;
+BEGIN
+    rel_filtered = madlib.__filter_input_relation(rel_source, expr_point);
+    class_rel_source := rel_filtered;
+
+    IF (initial_centroids IS NOT NULL) THEN
+	num_centroids := array_upper(initial_centroids,1);
+    ELSE
+	num_centroids := k;
+    END IF;
+
+    proc_fn_dist := fn_dist
+        || '(DOUBLE PRECISION[], DOUBLE PRECISION[])';
+    IF (SELECT prorettype != 'DOUBLE PRECISION'::regtype OR proisagg = TRUE
+        FROM pg_proc WHERE oid = proc_fn_dist) THEN
+        RAISE EXCEPTION 'Distance function has wrong signature or is not a simple function.';
+    END IF;
+    IF (k <= 0) THEN
+        RAISE EXCEPTION 'Number of clusters k must be a positive integer.';
+    END IF;
+    IF (k > 32767) THEN
+	RAISE EXCEPTION 'Number of clusters k must be <= 32767 (for results to be returned in a reasonable amount of time).';
+    END IF;
+    EXECUTE $sql$ SELECT count(*) FROM $sql$ || textin(regclassout(class_rel_source)) INTO num_points ;
+    IF (num_points < k OR num_points < num_centroids) THEN
+	RAISE EXCEPTION 'Number of centroids is greater than number of points.';
+    END IF;
+    IF (k < num_centroids) THEN
+	RAISE WARNING 'Number of clusters k is less than number of supplied initial centroids. Number of final clusters will equal number of supplied initial centroids.';
+    END IF;
+
+    oldClientMinMessages :=
+        (SELECT setting FROM pg_settings WHERE name = 'client_min_messages');
+    EXECUTE 'SET client_min_messages TO warning';
+    PERFORM madlib.create_schema_pg_temp();
+    PERFORM madlib.internal_execute_using_kmeanspp_seeding_args($sql$
+        DROP TABLE IF EXISTS pg_temp._madlib_kmeanspp_args;
+        CREATE TEMPORARY TABLE _madlib_kmeanspp_args AS
+        SELECT $1 AS k, $2 AS fn_dist, $3 AS initial_centroids;
+        $sql$,
+        k, proc_fn_dist, initial_centroids);
+    EXECUTE 'SET client_min_messages TO ' || oldClientMinMessages;
+
+    theIteration := (
+        SELECT madlib.internal_compute_kmeanspp_seeding(
+            '_madlib_kmeanspp_args', '_madlib_kmeanspp_state',
+            textin(regclassout(class_rel_source)), expr_point)
+    );
+
+    EXECUTE
+        $sql$
+        SELECT _state FROM _madlib_kmeanspp_state
+        WHERE _iteration = $sql$ || theIteration || $sql$
+        $sql$
+        INTO theResult;
+    RETURN theResult;
+END;
+$_$
+    LANGUAGE plpgsql MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION kmeanspp_seeding(rel_source character varying, expr_point character varying, k integer, fn_dist character varying) RETURNS double precision[]
+    AS $_$
+    SELECT madlib.kmeanspp_seeding($1, $2, $3, $4, NULL)
+$_$
+    LANGUAGE sql MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION kmeanspp_seeding(rel_source character varying, expr_point character varying, k integer) RETURNS double precision[]
+    AS $_$
+    SELECT madlib.kmeanspp_seeding($1, $2, $3,
+        'madlib.squared_dist_norm2', NULL)
+$_$
+    LANGUAGE sql MODIFIES SQL DATA;
+
+CREATE OR REPLACE FUNCTION logregr(source character varying, "depColumn" character varying, "indepColumn" character varying, "maxNumIterations" integer, optimizer character varying, "precision" double precision) RETURNS logregr_result
+    AS $_$
+DECLARE
+    theIteration INTEGER;
+    fnName VARCHAR;
+    theResult madlib.logregr_result;
+BEGIN
+    theIteration := (
+        SELECT madlib.compute_logregr($1, $2, $3, $4, $5, $6)
+    );
+    IF optimizer = 'irls' OR optimizer = 'newton' THEN
+        fnName := 'internal_logregr_irls_result';
+    ELSIF optimizer = 'cg' THEN
+        fnName := 'internal_logregr_cg_result';
+    ELSEIF optimizer = 'igd' THEN
+        fnName := 'internal_logregr_igd_result';
+    ELSE
+        RAISE EXCEPTION 'Unknown optimizer (''%'')', optimizer;
+    END IF;
+    EXECUTE
+        $sql$
+        SELECT (result).*
+        FROM (
+            SELECT
+                madlib.$sql$ || fnName || $sql$(_madlib_state) AS result
+                FROM _madlib_iterative_alg
+                WHERE _madlib_iteration = $sql$ || theIteration || $sql$
+            ) subq
+        $sql$
+        INTO theResult;
+    IF NOT (theResult IS NULL) THEN
+        theResult.num_iterations = theIteration;
+    END IF;
+    RETURN theResult;
+END;
+$_$
+    LANGUAGE plpgsql MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION logregr(source character varying, "depColumn" character varying, "indepColumn" character varying) RETURNS logregr_result
+    AS $_$SELECT madlib.logregr($1, $2, $3, 20, 'irls', 0.0001);$_$
+    LANGUAGE sql MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION logregr(source character varying, "depColumn" character varying, "indepColumn" character varying, "maxNumIterations" integer) RETURNS logregr_result
+    AS $_$SELECT madlib.logregr($1, $2, $3, $4, 'irls', 0.0001);$_$
+    LANGUAGE sql MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION logregr(source character varying, "depColumn" character varying, "indepColumn" character varying, "maxNumIterations" integer, optimizer character varying) RETURNS logregr_result
+    AS $_$SELECT madlib.logregr($1, $2, $3, $4, $5, 0.0001);$_$
+    LANGUAGE sql MODIFIES SQL DATA;
+
+
+CREATE OR REPLACE FUNCTION mlogregr(source character varying, depvar character varying, numcategories integer, indepvar character varying, maxnumiterations integer, optimizer character varying, "precision" double precision) RETURNS mlogregr_result
+    AS $_$
+DECLARE
+    observed_count INTEGER;
+    theIteration INTEGER;
+    fnName VARCHAR;
+    theResult madlib.mlogregr_result;
+BEGIN
+    IF (SELECT atttypid::regtype <> 'INTEGER'::regtype
+        FROM pg_attribute
+        WHERE attrelid = source::regclass AND attname = depvar) THEN
+        RAISE EXCEPTION 'The dependent variable column should be of type INTEGER';
+    END IF;
+
+    EXECUTE $sql$ SELECT count(DISTINCT $sql$ || depvar || $sql$ )
+                    FROM $sql$ || textin(regclassout(source))
+            INTO observed_count;
+    IF observed_count <> numcategories
+    THEN
+        RAISE WARNING 'Results will be undefined, if ''numcategories'' is not
+         same as the number of distinct categories observed in the training data.';
+    END IF;
+
+    IF optimizer = 'irls' OR optimizer = 'newton' THEN
+        fnName := 'internal_mlogregr_irls_result';
+    ELSE
+        RAISE EXCEPTION 'Unknown optimizer (''%'')', optimizer;
+    END IF;
+
+    theIteration := (
+        SELECT madlib.compute_mlogregr($1, $2, $3, $4, $5, $6, $7)
+    );
+    EXECUTE
+        $sql$
+        SELECT (result).*
+        FROM (
+            SELECT
+                madlib.$sql$ || fnName || $sql$(_madlib_state) AS result
+                FROM _madlib_iterative_alg
+                WHERE _madlib_iteration = $sql$ || theIteration || $sql$
+            ) subq
+        $sql$
+        INTO theResult;
+    IF NOT (theResult IS NULL) THEN
+        theResult.num_iterations = theIteration;
+    END IF;
+    RETURN theResult;
+END;
+$_$
+    LANGUAGE plpgsql MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION mlogregr(source character varying, depvar character varying, numcategories integer, indepvar character varying) RETURNS mlogregr_result
+    AS $_$SELECT madlib.mlogregr($1, $2, $3, $4, 20, 'irls', 0.0001);$_$
+    LANGUAGE sql MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION mlogregr(source character varying, depvar character varying, numcategories integer, indepvar character varying, maxnumiterations integer) RETURNS mlogregr_result
+    AS $_$SELECT madlib.mlogregr($1, $2, $3, $4, $5, 'irls', 0.0001);$_$
+    LANGUAGE sql MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION mlogregr(source character varying, depvar character varying, numcategories integer, indepvar character varying, maxbumiterations integer, optimizer character varying) RETURNS mlogregr_result
+    AS $_$SELECT madlib.mlogregr($1, $2, $3, $4, $5, $6, 0.0001);$_$
+    LANGUAGE sql MODIFIES SQL DATA;
+
+
+CREATE OR REPLACE FUNCTION lda_get_topic_desc(model_table text, vocab_table text, desc_table text, top_k integer) RETURNS SETOF lda_result
+    AS $$
+    
+    import sys
+    from inspect import getframeinfo, currentframe
+    try:
+        from lda import lda
+    except:
+        sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
+        from lda import lda
+    
+    # Retrieve the schema name of the current function
+    # Make it available as variable: schema_madlib
+    fname = getframeinfo(currentframe()).function
+    foid  = fname.rsplit('_',1)[1]
+
+    # plpython names its functions "__plpython_procedure_<function name>_<oid>",
+    # of which we want the oid
+    rv = plpy.execute('SELECT nspname, proname FROM pg_proc p ' \
+         'JOIN pg_namespace n ON (p.pronamespace = n.oid) ' \
+         'WHERE p.oid = %s' % foid, 1)
+
+    global schema_madlib
+    schema_madlib = rv[0]['nspname']    
+
+    lda.get_topic_desc(
+        schema_madlib, model_table, vocab_table, desc_table, top_k)
+    return [[
+        desc_table, 
+        """topic description, use "ORDER BY topicid, prob DESC" to check the
+        results"""]]
+$$
+    LANGUAGE plpythonu STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION lda_get_topic_word_count(model_table text, output_table text) RETURNS SETOF lda_result
+    AS $$
+    
+    import sys
+    from inspect import getframeinfo, currentframe
+    try:
+        from lda import lda
+    except:
+        sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
+        from lda import lda
+    
+    # Retrieve the schema name of the current function
+    # Make it available as variable: schema_madlib
+    fname = getframeinfo(currentframe()).function
+    foid  = fname.rsplit('_',1)[1]
+
+    # plpython names its functions "__plpython_procedure_<function name>_<oid>",
+    # of which we want the oid
+    rv = plpy.execute('SELECT nspname, proname FROM pg_proc p ' \
+         'JOIN pg_namespace n ON (p.pronamespace = n.oid) ' \
+         'WHERE p.oid = %s' % foid, 1)
+
+    global schema_madlib
+    schema_madlib = rv[0]['nspname']    
+
+    lda.get_topic_word_count(schema_madlib, model_table, output_table)
+    return [[output_table, 'per-topic word counts']]
+$$
+    LANGUAGE plpythonu STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION lda_get_word_topic_count(model_table text, output_table text) RETURNS SETOF lda_result
+    AS $$
+    
+    import sys
+    from inspect import getframeinfo, currentframe
+    try:
+        from lda import lda
+    except:
+        sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
+        from lda import lda
+    
+    # Retrieve the schema name of the current function
+    # Make it available as variable: schema_madlib
+    fname = getframeinfo(currentframe()).function
+    foid  = fname.rsplit('_',1)[1]
+
+    # plpython names its functions "__plpython_procedure_<function name>_<oid>",
+    # of which we want the oid
+    rv = plpy.execute('SELECT nspname, proname FROM pg_proc p ' \
+         'JOIN pg_namespace n ON (p.pronamespace = n.oid) ' \
+         'WHERE p.oid = %s' % foid, 1)
+
+    global schema_madlib
+    schema_madlib = rv[0]['nspname']    
+
+    lda.get_word_topic_count(schema_madlib, model_table, output_table)
+    return [[output_table, 'per-word topic counts']]
+$$
+    LANGUAGE plpythonu STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION lda_predict(data_table text, model_table text, output_table text) RETURNS SETOF lda_result
+    AS $$
+    
+    import sys
+    from inspect import getframeinfo, currentframe
+    try:
+        from lda import lda
+    except:
+        sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
+        from lda import lda
+    
+    # Retrieve the schema name of the current function
+    # Make it available as variable: schema_madlib
+    fname = getframeinfo(currentframe()).function
+    foid  = fname.rsplit('_',1)[1]
+
+    # plpython names its functions "__plpython_procedure_<function name>_<oid>",
+    # of which we want the oid
+    rv = plpy.execute('SELECT nspname, proname FROM pg_proc p ' \
+         'JOIN pg_namespace n ON (p.pronamespace = n.oid) ' \
+         'WHERE p.oid = %s' % foid, 1)
+
+    global schema_madlib
+    schema_madlib = rv[0]['nspname']    
+
+    lda.lda_predict(schema_madlib, data_table, model_table, output_table)
+    return [[
+        output_table, 
+        'per-doc topic distribution and per-word topic assignments']]
+$$
+    LANGUAGE plpythonu STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION lda_train(data_table text, model_table text, output_data_table text, voc_size integer, topic_num integer, iter_num integer, alpha double precision, beta double precision) RETURNS SETOF lda_result
+    AS $$
+    
+    import sys
+    from inspect import getframeinfo, currentframe
+    try:
+        from lda import lda
+    except:
+        sys.path.append("/usr/local/madlib/ports/greenplum/4.2/modules")
+        from lda import lda
+    
+    # Retrieve the schema name of the current function
+    # Make it available as variable: schema_madlib
+    fname = getframeinfo(currentframe()).function
+    foid  = fname.rsplit('_',1)[1]
+
+    # plpython names its functions "__plpython_procedure_<function name>_<oid>",
+    # of which we want the oid
+    rv = plpy.execute('SELECT nspname, proname FROM pg_proc p ' \
+         'JOIN pg_namespace n ON (p.pronamespace = n.oid) ' \
+         'WHERE p.oid = %s' % foid, 1)
+
+    global schema_madlib
+    schema_madlib = rv[0]['nspname']    
+
+    lda.lda_train(
+        schema_madlib, data_table, model_table, output_data_table, voc_size,
+        topic_num, iter_num, alpha, beta
+    )
+    return [[model_table, 'model table'], 
+        [output_data_table, 'output data table']]
+$$
+    LANGUAGE plpythonu STRICT MODIFIES SQL DATA;
+
+
+CREATE OR REPLACE FUNCTION simple_silhouette(rel_source character varying, expr_point character varying, centroids double precision[], fn_dist character varying) RETURNS double precision
+    AS $_$
+DECLARE
+    class_rel_source REGCLASS;
+    proc_fn_dist REGPROCEDURE;
+    rel_filtered VARCHAR;
+BEGIN
+    IF (array_upper(centroids,1) IS NULL) THEN
+	RAISE EXCEPTION 'No valid centroids given.';
+    END IF;
+
+    rel_filtered = madlib.__filter_input_relation(rel_source, expr_point);
+    class_rel_source := rel_filtered;
+    proc_fn_dist := fn_dist
+        || '(DOUBLE PRECISION[], DOUBLE PRECISION[])';
+    IF (SELECT prorettype != 'DOUBLE PRECISION'::regtype OR proisagg = TRUE
+        FROM pg_proc WHERE oid = proc_fn_dist) THEN
+        RAISE EXCEPTION 'Distance function has wrong signature or is not a simple function.';
+    END IF;
+
+    RETURN madlib.internal_execute_using_silhouette_args($sql$
+        SELECT
+            avg(CASE
+                    WHEN distances[2] = 0 THEN 0
+                    ELSE (distances[2] - distances[1]) / distances[2]
+                END)
+        FROM (
+            SELECT
+                (madlib.closest_columns(
+                    $1,
+                    ($sql$ || expr_point || $sql$)::FLOAT8[],
+                    2::INTEGER,
+                    $2
+                )).distances
+            FROM
+                $sql$ || textin(regclassout(class_rel_source)) || $sql$
+        ) AS two_shortest_distances
+        $sql$,
+        centroids, proc_fn_dist);
+END;
+$_$
+    LANGUAGE plpgsql STABLE STRICT MODIFIES SQL DATA;
+
+
+
+CREATE OR REPLACE FUNCTION simple_silhouette(rel_source character varying, expr_point character varying, centroids double precision[]) RETURNS double precision
+    AS $_$
+    SELECT madlib.simple_silhouette($1, $2, $3,
+        'madlib.dist_norm2')
+$_$
+    LANGUAGE sql STABLE STRICT MODIFIES SQL DATA;
+
+SET search_path = pg_catalog;

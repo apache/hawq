@@ -1,0 +1,10 @@
+#!/usr/bin/env perl
+$foo = `cat VERSION | tr '-' ' '`;
+chop $foo;
+$foo = quotemeta $foo;
+$files = join(" ", @ARGV);
+$rev = '\\$Revision\\$';
+$bar = "perl -pi -e \'s/$rev/$foo/\' $files";
+system($bar);
+
+

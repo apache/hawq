@@ -1,0 +1,51 @@
+##################################################################
+# This file contains the internal classpaths required to run PXF.
+# WARNING: DO NOT EDIT!
+# Any change in this file can result in PXF failing to run.
+# Adding resources should be done using pxf-public.classpath file. 
+##################################################################
+/etc/pxf/conf
+/etc/hadoop/conf
+/etc/hbase/conf
+/etc/hive/conf
+/usr/hdp/current/hadoop-hdfs-client/hadoop-hdfs.jar
+/usr/hdp/current/hadoop-mapreduce-client/hadoop-mapreduce-client-core.jar
+/usr/hdp/current/hadoop-client/hadoop-auth.jar
+/usr/hdp/current/hadoop-client/hadoop-common.jar
+/usr/hdp/current/hadoop-client/lib/asm-*[0-9].jar
+/usr/hdp/current/hadoop-client/lib/avro-*[0-9].jar
+/usr/hdp/current/hadoop-client/lib/commons-cli-*[0-9].jar
+/usr/hdp/current/hadoop-client/lib/commons-codec-*[0-9].jar
+/usr/hdp/current/hadoop-client/lib/commons-collections-*[0-9].jar
+/usr/hdp/current/hadoop-client/lib/commons-configuration-*[0-9].jar
+/usr/hdp/current/hadoop-client/lib/commons-io-*[0-9].jar
+/usr/hdp/current/hadoop-client/lib/commons-lang-*[0-9].jar
+/usr/hdp/current/hadoop-client/lib/commons-logging-*[0-9].jar
+/usr/hdp/current/hadoop-client/lib/guava-*[0-9].jar
+/usr/hdp/current/hadoop-client/lib/htrace-core-*[0-9].jar
+/usr/hdp/current/hadoop-client/lib/hadoop-lzo-*[0-9].jar
+/usr/hdp/current/hadoop-client/lib/jackson-core-asl-*[0-9].jar
+/usr/hdp/current/hadoop-client/lib/jackson-mapper-asl-*[0-9].jar
+/usr/hdp/current/hadoop-client/lib/jetty-*.jar
+/usr/hdp/current/hadoop-client/lib/jersey-core-*[0-9].jar
+/usr/hdp/current/hadoop-client/lib/jersey-server-*[0-9].jar
+/usr/hdp/current/hadoop-client/lib/log4j-*[0-9].jar
+/usr/hdp/current/hadoop-client/lib/protobuf-java-*[0-9].jar
+/usr/hdp/current/hadoop-client/lib/slf4j-api-*[0-9].jar
+/usr/hdp/current/hadoop-client/lib/snappy-java-*[0-9].jar
+/usr/hdp/current/hbase-client/lib/hbase-client.jar
+/usr/hdp/current/hbase-client/lib/hbase-common.jar
+/usr/hdp/current/hbase-client/lib/hbase-protocol.jar
+/usr/hdp/current/hbase-client/lib/htrace-core-*[0-9].jar
+/usr/hdp/current/hbase-client/lib/netty-*[0-9].Final.jar
+/usr/hdp/current/zookeeper-client/zookeeper.jar
+/usr/hdp/current/hive-client/lib/antlr-runtime-*[0-9].jar
+/usr/hdp/current/hive-client/lib/datanucleus-api-jdo-*[0-9].jar
+/usr/hdp/current/hive-client/lib/datanucleus-core-*[0-9].jar
+/usr/hdp/current/hive-client/lib/hive-exec.jar
+/usr/hdp/current/hive-client/lib/hive-metastore.jar
+/usr/hdp/current/hive-client/lib/jdo-api-*[0-9].jar
+/usr/hdp/current/hive-client/lib/libfb303-*[0-9].jar
+/usr/lib/pxf/pxf-hbase-*[0-9].jar
+/usr/lib/pxf/pxf-hdfs-*[0-9].jar
+/usr/lib/pxf/pxf-hive-*[0-9].jar

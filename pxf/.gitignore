@@ -1,0 +1,15 @@
+build
+/log
+/runnerState.properties
+/jsystem.properties.bu
+.classpath
+/.testdir.tmp
+/bin
+.ant_targets
+/jsystem*.log.*
+/junitvmwatcher*.properties
+docs
+.idea
+*.iml
+.gradle
+/log-regression

@@ -1,0 +1,69 @@
+AO_FileLocations:
+  Blocksize: 32768
+  Checksum: false
+  CompressionLevel: 0
+  CompressionType: none
+  Files:
+  - path: test-data/hawq-data/gpseg0/16385/24576/40961.1
+    size: 32096
+  - path: test-data/hawq-data/gpseg1/16385/24576/40961.1
+    size: 16592
+AO_Schema:
+- name: c0
+  type: bool
+- name: c1
+  type: bit
+- name: c2
+  type: varbit
+- name: c3
+  type: bytea
+- name: c4
+  type: int2
+- name: c5
+  type: int4
+- name: c6
+  type: int8
+- name: c7
+  type: numeric
+- name: c8
+  type: bpchar
+- name: c9
+  type: varchar
+- name: c10
+  type: text
+- name: c11
+  type: date
+- name: c12
+  type: time
+- name: c13
+  type: timestamp
+- name: c14
+  type: interval
+- name: c15
+  type: point
+- name: c16
+  type: lseg
+- name: c17
+  type: box
+- name: c18
+  type: circle
+- name: c19
+  type: path
+- name: c20
+  type: polygon
+- name: c21
+  type: macaddr
+- name: c22
+  type: inet
+- name: c23
+  type: cidr
+- name: c24
+  type: xml
+DBVersion: PostgreSQL 8.2.15 (Greenplum Database 4.2.0 build 1) (HAWQ 1.2.1.0 build
+  dev) on i386-apple-darwin11.4.2, compiled by GCC gcc (GCC) 4.4.2 compiled on Mar
+  28 2014 13:16:47 (with assert checking)
+DFS_URL: hdfs://127.0.0.1:9000
+Encoding: UTF8
+FileFormat: AO
+TableName: public.test_ao_alltypes
+Version: 1.0.0

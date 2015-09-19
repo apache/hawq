@@ -1,0 +1,123 @@
+-- --------------------------------------
+-- caql in memory
+-- --------------------------------------
+
+-- caql in memory testing
+
+-- Create table in order to insert data to pg_class
+CREATE TABLE caql_in_mem1 (a text, b int);
+CREATE TABLE caql_in_mem2 (a text, b int);
+
+-- Create function to insert and scan in-memory data to pg_class
+CREATE OR REPLACE FUNCTION caql_copy_to_in_memory_pg_class(tblname text, kind "char") 
+  RETURNS text
+  LANGUAGE C volatile NO SQL
+  AS '@abs_builddir@/regress@DLSUFFIX@', 'caql_copy_to_in_memory_pg_class';
+CREATE OR REPLACE FUNCTION caql_scan_in_memory_pg_class(tblname text) 
+  RETURNS table(relname text, relkind "char", oid "oid")
+  LANGUAGE C volatile NO SQL
+  AS '@abs_builddir@/regress@DLSUFFIX@', 'caql_scan_in_memory_pg_class';
+CREATE OR REPLACE FUNCTION caql_scan_backward_in_memory_pg_class(tblname text) 
+  RETURNS table(relname text, relkind "char", oid "oid")
+  LANGUAGE C volatile NO SQL
+  AS '@abs_builddir@/regress@DLSUFFIX@', 'caql_scan_backward_in_memory_pg_class';
+
+CREATE OR REPLACE FUNCTION caql_insert_to_in_memory_pg_class(relid oid, tblname text, nspid oid) 
+  RETURNS text
+  LANGUAGE C volatile NO SQL
+  AS '@abs_builddir@/regress@DLSUFFIX@', 'caql_insert_to_in_memory_pg_class';
+  
+CREATE OR REPLACE FUNCTION caql_insert_to_in_memory_pg_namespace(nspid oid, nspname text, nspdboid oid) 
+  RETURNS text
+  LANGUAGE C volatile NO SQL
+  AS '@abs_builddir@/regress@DLSUFFIX@', 'caql_insert_to_in_memory_pg_namespace';
+
+CREATE OR REPLACE FUNCTION caql_insert_to_in_memory_pg_attribute(attrelid oid, attname text, attno smallint) 
+  RETURNS text
+  LANGUAGE C volatile NO SQL
+  AS '@abs_builddir@/regress@DLSUFFIX@', 'caql_insert_to_in_memory_pg_attribute';
+    
+-- 1. Test insert and scan in a transaction
+BEGIN;
+-- Insert lines in memory
+SELECT caql_copy_to_in_memory_pg_class('caql_in_mem1', 'h');
+SELECT caql_copy_to_in_memory_pg_class('caql_in_mem2', 'w');
+-- Scan pg_class using caql
+SELECT relname, relkind FROM caql_scan_in_memory_pg_class('caql_in_mem1');
+END;
+
+-- 2. Test insert and scan outside of a transaction - expected no in memory data
+-- Insert line in memory
+SELECT caql_copy_to_in_memory_pg_class('caql_in_mem1', 'p');
+-- Scan pg_class using caql - expect only one table
+SELECT relname, relkind FROM caql_scan_in_memory_pg_class('caql_in_mem1');
+
+-- 3. Test insert in a transaction, abort and scan - expected no in memory data
+BEGIN;
+-- Insert line in memory
+SELECT caql_copy_to_in_memory_pg_class('caql_in_mem1', 'd');
+ROLLBACK;
+-- Scan pg_class using caql - expect only one table
+SELECT relname, relkind FROM caql_scan_in_memory_pg_class('caql_in_mem1');
+
+-- 4. Test insert and backward scan in a transaction
+BEGIN;
+-- Insert line in memory
+SELECT caql_copy_to_in_memory_pg_class('caql_in_mem1', 'l');
+SELECT caql_copy_to_in_memory_pg_class('caql_in_mem2', 's');
+-- Drop heap table
+DROP TABLE caql_in_mem1;
+-- Scan pg_class using caql with backward scan
+SELECT relname, relkind FROM caql_scan_backward_in_memory_pg_class('caql_in_mem1');
+END;
+
+-- 5. Test inserting duplicate values to pg_class
+BEGIN;
+-- insert duplicate oid values to pg_class
+SELECT caql_insert_to_in_memory_pg_class(1234, 'R', 789);
+SELECT caql_insert_to_in_memory_pg_class(1234, 'S', 791);
+END;
+
+BEGIN;
+-- insert duplicate relname, relnamespace values
+SELECT caql_insert_to_in_memory_pg_class(1234, 'R', 789);
+SELECT caql_insert_to_in_memory_pg_class(1235, 'R', 791);
+SELECT caql_insert_to_in_memory_pg_class(1236, 'R', 791);
+END;
+
+-- 6. Test inserting duplicate values to pg_namespace
+BEGIN;
+-- insert duplicate oid values to pg_namespace
+SELECT caql_insert_to_in_memory_pg_namespace(1234, 'nsp1', 789);
+SELECT caql_insert_to_in_memory_pg_namespace(1234, 'nsp2', 791);
+END;
+
+BEGIN;
+-- insert duplicate relname, relnamespace values
+SELECT caql_insert_to_in_memory_pg_namespace(1234, 'nsp1', 789);
+SELECT caql_insert_to_in_memory_pg_namespace(1235, 'nsp1', 791);
+SELECT caql_insert_to_in_memory_pg_namespace(1236, 'nsp1', 791);
+END;
+
+-- 7. Test inserting duplicate values to pg_attribute
+BEGIN;
+-- insert duplicate attrelid, attname values to pg_attribute
+SELECT caql_insert_to_in_memory_pg_attribute(1234, 'nsp1', 1::smallint);
+SELECT caql_insert_to_in_memory_pg_attribute(1234, 'nsp2', 2::smallint);
+SELECT caql_insert_to_in_memory_pg_attribute(1234, 'nsp2', 3::smallint);
+
+END;
+
+BEGIN;
+-- insert duplicate attrelid, attnum values to pg_attribute
+SELECT caql_insert_to_in_memory_pg_attribute(1234, 'nsp1', 1::smallint);
+SELECT caql_insert_to_in_memory_pg_attribute(1234, 'nsp2', 1::smallint);
+END;
+
+-- cleanup
+DROP FUNCTION caql_copy_to_in_memory_pg_class(text, "char");
+DROP FUNCTION caql_scan_in_memory_pg_class(text);
+DROP FUNCTION caql_scan_backward_in_memory_pg_class(text);
+DROP FUNCTION caql_insert_to_in_memory_pg_class(oid, text, oid);
+DROP FUNCTION caql_insert_to_in_memory_pg_namespace(oid, text, oid);
+DROP FUNCTION caql_insert_to_in_memory_pg_attribute(oid, text, smallint);

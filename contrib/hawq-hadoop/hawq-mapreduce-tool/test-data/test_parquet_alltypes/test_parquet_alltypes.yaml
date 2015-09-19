@@ -1,0 +1,20 @@
+DBVersion: PostgreSQL 8.2.15 (Greenplum Database 4.2.0 build 1) (HAWQ 1.2.1.0 build
+  dev) on i386-apple-darwin11.4.2, compiled by GCC gcc (GCC) 4.4.2 compiled on Mar
+  28 2014 13:16:47 (with assert checking)
+DFS_URL: hdfs://127.0.0.1:9000
+Encoding: UTF8
+FileFormat: Parquet
+Parquet_FileLocations:
+  Checksum: false
+  CompressionLevel: 0
+  CompressionType: none
+  EnableDictionary: false
+  Files:
+  - path: test-data/hawq-data/gpseg0/16385/24576/40966.1
+    size: 33762
+  - path: test-data/hawq-data/gpseg1/16385/24576/40966.1
+    size: 24097
+  PageSize: 1048576
+  RowGroupSize: 8388608
+TableName: public.test_parquet_alltypes
+Version: 1.0.0

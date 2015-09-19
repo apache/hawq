@@ -1,0 +1,480 @@
+#!/usr/bin/env perl
+#
+# Copyright (C) 2007 - 2011  Greenplum Inc.
+# Florian Waas (flw@greenplum.com)
+#
+use Getopt::Long;
+use Pod::Usage;
+use strict;
+use warnings;
+
+=head1 NAME
+
+B<gpsd> - Greenplum Statistics Dumper
+
+=head1 SYNOPSIS
+
+B<gpsd> [-?] [-h hostname] [-p port] [-U username] dbname
+
+=head1 DESCRIPTION
+
+gpsd creates a schema and statistics dump of a given Greenplum database instance which can be used to create a database environment in which all optimizer issues can be reproduced without having to copy any user data. This facilitates troubleshooting as well as verification of changes to the optimizer logic without costly data transfer.
+
+The unit of a dump is a complete database instance. The resulting output is an SQL script.
+
+=head1 OPTIONS
+
+gpsd supports the same connection options as pg_dump and psql:
+
+=over 6
+
+=item -?
+
+Print usage information.
+
+=item -h hostname
+
+Hostname of target server. Default: localhost.
+
+
+=item -p port
+
+
+Port of target server. Default: 5432.
+
+=item -U username
+
+Database user name. Default: current userid.
+
+=back
+
+=head1 USAGE
+
+The dump file contains all information necessary to re-create the database
+schema and populate the statistics contained in pg_statistic and pg_class.
+
+Since gpsd writes to STDOUT the standard usage pattern is like this
+
+ gpsd -h myserver mydb > mydb.clone.sql
+ createdb mydb.clone
+ psql -h myserver -f mydb.clone.sql
+
+=head1 LIMITATIONS
+
+gpsd uses the standard utilities pg_dump and psql. Consequently it inherits their limitations. Currently known issues include:
+
+=over 6
+
+=item MPP-1890
+
+pg_dump does not script constraints on inherited tables correctly, in particular, constraints on the parent table which have been explicitly removed from the children. The removal of the constraint on the children is ignored which can result in contradicting constraints on the children. For example, range partitioning implemented with inherited tables may place a contradiction as constraint on the parent table to exclude it from DML and query operations.
+
+=back
+
+=head1 AUTHORS
+ 
+Copyright (C) 2007 - 2011 Greenplum.  All rights reserved.
+
+=cut
+
+my $glob_id = "";
+
+my $GPSD = "gpsd";
+my $copyright = "Copyright (C) 2007 - 2011  Greenplum";
+my $psqlClient = "psql";
+my $pgdump = "pg_dump";
+my $pgdumpall = "pg_dumpall";
+my $commentPrefix = "-- ";
+
+my $sysnslist ="('pg_toast', 'pg_bitmapindex', 'pg_temp_1', ".
+    "'pg_catalog', 'information_schema')";
+
+# connection variables set from options
+my $user = "";
+my $port = "";
+my $host = "";
+
+
+# format text as SQL comment
+#
+sub comment
+{
+    my $text = shift;
+    my @lines = split '\n', $text."\<";
+    my $comment = join "\n".$commentPrefix, @lines;
+    
+    $comment =~ s/\<$//g;
+    return $commentPrefix.$comment. "\n";
+}
+
+
+sub getGlobals
+{
+    my $pid = open (PGDUMPALL, "$pgdumpall $host $port $user -g --gp-syntax |");
+    die unless defined($pid);
+    my @globals = <PGDUMPALL>;
+    close PGDUMPALL;
+
+    die "$GPSD: reading from $pgdumpall ($pid) failed. \n" unless @globals;
+
+    return @globals;
+}
+
+# extract all schemas from a given database using $pgdump
+#
+sub getSchema
+{
+    my $db = shift;
+    my $pid = open(PGDUMP, "$pgdump $host $port $user -s -x --gp-syntax -O $db|");
+    die unless defined($pid);
+    my @schema = <PGDUMP>;
+    close PGDUMP;
+
+    die "$GPSD: reading from $pgdump ($pid) failed.\n" unless @schema;
+
+    return @schema;
+}
+
+# simple SQL executor using psql
+# not using DBI as it doesn't come with the standard distribution
+#
+sub executeSQL
+{
+    my $db = shift;
+    my $stmt = shift;
+
+    # print "EXECUTING: $host $port $user $db -c \"$stmt\"\n";
+
+    my $pid = open(PSQL, "$psqlClient $host $port $user $db -c \"$stmt\" |");
+    die unless defined($pid);
+    my @result = <PSQL>;
+    close PSQL;
+
+    my $len = $#result;
+    @result = splice(@result, 0, $len - 1); 
+
+    die "$GPSD: reading from $psqlClient ($pid) failed.\n" unless @result;
+
+    return @result;
+}
+
+# get server-side date,time,version
+#
+sub getDateTimeVersion
+{
+    my $db = shift;
+    return 
+	(&executeSQL($db, "select current_date, current_time, version()"))[2]; 
+}
+
+# strip off leading and trailing blanks
+#
+sub mstrip
+{
+    $_ = shift @_;
+    s|^\s*||;
+    s|\s*$||;
+    return $_;
+}
+
+# basic escaping of special chars
+#
+sub escValue
+{
+    $_ = shift;
+    s|'|''|g;
+    s|\\"|\\\\"|g;
+    return $_;
+}
+
+# break up a row as it is returned from psql
+# use the +'s in the formatting to decide on the width of the fields
+#
+sub splituprow
+{
+    my $line = shift;
+    my $data = shift;
+    
+    #print "$line$data";
+
+    my @parts = split '\+', $line;
+
+    my $pos = 0;
+    my @res = ();
+    foreach my $part (@parts)
+    {
+	my $len = length($part);
+	push @res, &mstrip(substr($data, $pos, $len));
+	$pos += $len + 1;
+    }
+    return @res;
+}
+
+# construct SET part of UPDATE statement
+#
+sub setStmt
+{
+    my($names, $values, $types, $incl) = @_;
+    my $first = 1;
+
+    my @res = ();
+
+    foreach my $rec (@$incl)
+    {
+	my $type = @$types[$rec];
+	my $name = @$names[$rec];
+	my $value = @$values[$rec];
+
+	$value = mkValue($value, $type);
+
+#	print "r = $rec, t = $type, n = $name, v = '$value'\n";
+	push @res , "$name = $value"."::$type";
+    }   
+    return "\t".join (",\n\t", @res);
+}
+
+# determine page and tuple counts
+# build UPDATE statement
+#
+sub setPagesTuples
+{
+    my $db = shift;
+
+    my $stmt = 
+	"SELECT pgc.relname, pgn.nspname, pgc.relpages, pgc.reltuples ".
+	"FROM pg_class pgc, pg_namespace pgn ".
+	"WHERE pgc.relnamespace = pgn.oid ".
+	"and pgn.nspname NOT IN $sysnslist";
+
+    my ($header, $line, @pgc) = &executeSQL($db, $stmt);
+    my $res = "-- set pages and tuple counts\n\n";
+
+    my @names = &splituprow($line, $header);
+    # print "names = '$header', '@names'\n";
+
+    my @types = ("ignore","ignore","int","real");
+    my @incls = (2..3);
+    
+    foreach my $row (@pgc)
+    {
+	my @values = &splituprow($line, $row);
+	my ($table, $namespace) = @values;
+
+	$res .= 
+	    &comment("\nTable: $table\n").
+	    "UPDATE pg_class\nSET\n".
+	    &setStmt(\@names, \@values, \@types, \@incls).
+	    "\nWHERE relname = '$table' ".
+	    "AND relnamespace = ".
+	    "(SELECT oid FROM pg_namespace WHERE nspname = '$namespace');\n\n";
+    }
+    return $res."\n\n";
+}
+
+# extract all data from pg_statistic
+#
+sub getStats
+{
+    my $db = shift;
+ 
+    my $stmt =
+	"SELECT pgc.relname, pgn.nspname, pga.attname, pgt.typname, pgs.* ".
+	"FROM pg_class pgc, pg_statistic pgs, ".
+	"pg_namespace pgn, ".
+	"pg_attribute pga, pg_type pgt ".
+	"WHERE ".
+	"pgc.relnamespace = pgn.oid ".
+	"and pgn.nspname NOT IN $sysnslist ".
+	"and pgc.oid = pgs.starelid ".
+	"and pga.attrelid = pgc.oid ".
+	"and pga.attnum = pgs.staattnum ".
+	"and pga.atttypid = pgt.oid ".
+	"ORDER BY pgc.relname, pgs.staattnum";
+    
+    return &executeSQL($db, $stmt);
+}
+
+# quote a value based on its original value and its type
+#
+sub mkValue
+{
+    my $value = shift;
+    my $type = shift;
+    my $lquote = "";
+
+    # quoting of array types
+    my $isArray = $type =~ /^\_|\]$/;
+    $lquote= "'" if ($isArray);
+
+    # escape value
+    $value = &escValue($value);
+
+    if ($value eq "NaN")
+    {
+	# patch up NaN's for real/float
+	if ($type eq "real" || $type eq "float")
+	{
+	    $value = "'NaN'"
+	}
+    }
+
+    # empty columns are NULL values
+    $value = "NULL" if $value eq "";
+
+    # BUG: this shouldn't happen -- scanner problem!
+    $value = "NULL" if ($isArray && not $value =~/^\{/);
+
+    # do not quote a NULL in an array
+    $lquote= "" if ($isArray && $value eq "NULL");
+    return $lquote.$value.$lquote;
+}
+
+
+# format value and type, quote accordingly
+#
+sub combineValuesTypes
+{
+    my $values = shift;
+    my $types = shift;
+
+    my @res = ();
+
+    foreach my $v (@$values)
+    {
+	my $type = shift @$types;
+
+	$v = mkValue($v, $type);
+	push @res, $v."::".$type;
+    }
+    return @res;
+}
+
+
+sub setStats
+{
+    my ($header, $line, @qry) = @_;
+    my $res = "";
+
+    my @names = &splituprow($line, $header);
+   # print "names = '$header', '@names'\n";
+
+    my @types = (
+
+	"ignore",    # relname
+	"ignore",    # ns name
+	"ignore",    # attname
+	"ignore",    # typname
+	
+	#columms of pg_statistic
+	"oid",       # starelid
+	"smallint",  # staattnum
+	"real",
+	"integer",
+	"real",
+	"smallint",
+	"smallint",
+	"smallint",
+	"smallint",
+	"oid",
+	"oid",
+	"oid",
+	"oid",
+	"real[]",
+	"real[]",
+	"real[]",
+	"real[]"
+
+	# incomplete -- types for stavalues1-4 are added 
+	# on a per row basis
+    );
+
+    foreach my $row (@qry)
+    {
+	my @values = &splituprow($line, $row);	
+	my ($table, $namespace, $attname, $specType, $relid, $column)
+	    = @values;
+
+	$specType .= "[]" unless $specType =~ /^_/;
+
+	# add row specific types to the type array
+	my @typesTmp = @types;
+	push @typesTmp, ($specType, $specType, $specType, $specType);
+
+	my @combvals = &combineValuesTypes(\@values, \@typesTmp);
+	my @newvals = ("'$namespace.$table'::regclass", splice(@combvals, 5, $#combvals - 4));
+	
+	$res .= 
+	    &comment ("\nTable: $table, Attribute: $attname\n").
+	    "INSERT INTO pg_statistic VALUES (\n".
+	    "\t". join(",\n\t", @newvals). 
+	    ");\n\n";
+    }    
+    return $res;    
+}
+
+
+# dumper routine
+#
+sub dumper
+{
+    my $db = shift;
+
+    my $dateTimeVersion =
+	"SELECT current_date, current_time, version()";
+    my ($header, $line, $row, @rem) = &executeSQL($db, $dateTimeVersion);
+    my ($date, $time, $version) = &splituprow($line, $row);
+    
+    my @output = ();
+    push @output, 
+    &comment(
+	"\nGreenplum Database Statistics Dump\n".
+	$copyright."\n\n".
+
+	"Database: $db\n".
+	"Date:     $date\n".
+	"Time:     $time\n".
+	"CmdLine:  $host $port $user\n".
+	"Version:  $version\n");
+
+    push @output, &getGlobals;
+
+    push @output, &comment("\nConnecting to target database\n");
+    push @output, "\\connect $db\n";
+    push @output, &getSchema($db);
+
+    push @output, &comment("\nAllow system table modifications\n");
+    push @output, "set allow_system_table_mods=\"DML\";\n";
+
+    push @output, &setPagesTuples($db);
+    push @output, &setStats(&getStats($db));
+    
+    push @output, &comment("\nGreenplum Database Statistics Dump complete\n");
+
+    return @output;
+}
+
+
+# parse options
+my $man =0;
+
+GetOptions
+    (
+     'help|?' => \$man,
+     "h:s" => \$host,
+     "p:i" => \$port,
+     "U:s" => \$user
+    )
+    || 
+    pod2usage(-msg => $glob_id, -verbose => 2);
+
+
+# display man page
+pod2usage(-msg => $glob_id, -verbose => 2) if ($man || $#ARGV == -1);
+
+$host = "-h $host" if $host;
+$port = "-p $port" if $port;
+$user = "-U $user" if $user;
+
+
+# call actual dumper
+print &dumper($ARGV[0]);

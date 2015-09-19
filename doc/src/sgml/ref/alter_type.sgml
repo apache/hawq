@@ -1,0 +1,144 @@
+<!--
+$PostgreSQL: pgsql/doc/src/sgml/ref/alter_type.sgml,v 1.4 2006/09/16 00:30:16 momjian Exp $
+PostgreSQL documentation
+-->
+
+<refentry id="SQL-ALTERTYPE">
+ <refmeta>
+  <refentrytitle id="sql-altertype-title">ALTER TYPE</refentrytitle>
+  <refmiscinfo>SQL - Language Statements</refmiscinfo>
+ </refmeta>
+
+ <refnamediv>
+  <refname>
+   ALTER TYPE
+  </refname>
+  <refpurpose>
+   change the definition of a type
+  </refpurpose>
+ </refnamediv>
+
+ <indexterm zone="sql-altertype">
+  <primary>ALTER TYPE</primary>
+ </indexterm>
+
+ <refsynopsisdiv>
+  <synopsis>
+ALTER TYPE <replaceable class="PARAMETER">name</replaceable> 
+   SET DEFAULT ENCODING ( storage_directive )
+     OWNER TO <replaceable class="PARAMETER">new_owner</replaceable> 
+   | SET SCHEMA <replaceable class="PARAMETER">new_schema</replaceable>
+  </synopsis>
+ </refsynopsisdiv>
+
+ <refsect1>
+  <title>Description</title>
+
+  <para>
+   <command>ALTER TYPE</command> changes the definition of an existing type.
+   The only currently available capabilities are changing the owner and schema
+   of a type.
+  </para>
+
+  <para>
+   You must own the type to use <command>ALTER TYPE</>.
+   To change the schema of a type, you must also have
+   <literal>CREATE</literal> privilege on the new schema.
+   To alter the owner, you must also be a direct or indirect member of the new
+   owning role, and that role must have <literal>CREATE</literal> privilege on
+   the type's schema.  (These restrictions enforce that altering the owner
+   doesn't do anything you couldn't do by dropping and recreating the type.
+   However, a superuser can alter ownership of any type anyway.)
+  </para>
+ </refsect1>
+
+ <refsect1>
+  <title>Parameters</title>
+
+   <para>
+    <variablelist>
+     <varlistentry>
+      <term><replaceable class="PARAMETER">name</replaceable></term>
+      <listitem>
+       <para>
+        The name (possibly schema-qualified) of an existing type to
+        alter.
+       </para>
+      </listitem>
+     </varlistentry>
+
+     <varlistentry>
+      <term><replaceable class="PARAMETER">new_owner</replaceable></term>
+      <listitem>
+       <para>
+        The user name of the new owner of the type.
+       </para>
+      </listitem>
+     </varlistentry>
+
+     <varlistentry>
+      <term><replaceable class="PARAMETER">new_schema</replaceable></term>
+      <listitem>
+       <para>
+        The new schema for the type.
+       </para>
+      </listitem>
+     </varlistentry>
+
+     <varlistentry>
+      <term><replaceable class="PARAMETER">storage_directive</replaceable></term>
+      <listitem>
+       <para>
+        Sets any or all of the following: compression type, compression level, 
+        and blocksize, using the following format:
+        COMPRESSTYPE={ZLIB | QUICKLZ | RLE_TYPE | NONE} | 
+        COMPRESSLEVEL={0-9} | BLOCKSIZE={8192-2097152}
+       </para>
+       <para>
+       For more information on the compression and blocksize parameters, see the
+       "Storage Directives for Column-level Compression" in the Greenplum
+       Database Administrator Guide.
+       </para>
+      </listitem>
+     </varlistentry>
+
+    </variablelist>
+   </para>
+  </refsect1>
+
+ <refsect1>
+  <title>Examples</title>
+
+  <para> 
+   To change the owner of the user-defined type <literal>email</literal>
+   to <literal>joe</literal>:
+   <programlisting>
+ALTER TYPE email OWNER TO joe;
+   </programlisting>
+  </para>
+
+  <para>
+   To change the schema of the user-defined type <literal>email</literal>
+   to <literal>customers</literal>:
+   <programlisting>
+ALTER TYPE email SET SCHEMA customers;
+   </programlisting>
+  </para>
+
+  <para>
+   To change the type int to have ZLIB column compression:
+   <programlisting>
+ALTER TYPE int SET DEFAULT ENCODING (COMPRESSTYPE=ZLIB);
+   </programlisting>
+  </para>
+ </refsect1>
+
+ <refsect1>
+  <title>Compatibility</title>
+    
+  <para>
+   There is no <command>ALTER TYPE</command> statement in the SQL
+   standard.
+  </para>
+ </refsect1>
+</refentry>

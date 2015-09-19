@@ -1,0 +1,263 @@
+/*
+ * TestLibYarnClientC.cpp
+ *
+ *  Created on: Mar 17, 2015
+ *      Author: weikui
+ */
+
+#include "gtest/gtest.h"
+#include "gmock/gmock.h"
+
+#include "libyarnclient/LibYarnClientC.h"
+#include "MockLibYarnClient.h"
+
+using namespace std;
+using namespace libyarn;
+using namespace testing;
+using namespace Mock;
+
+
+extern "C" LibYarnClient_t* getLibYarnClinetT(LibYarnClient *libyarnClient);
+
+class TestLibYarnClientC: public ::testing::Test {
+public:
+	TestLibYarnClientC(){
+		string rmHost("localhost");
+		string rmPort("8032");
+		string schedHost("localhost");
+		string schedPort("8030");
+		string amHost("localhost");
+		int32_t amPort = 0;
+		string am_tracking_url("url");
+		int heartbeatInterval = 1000;
+		libyarnClient = new MockLibYarnClient(rmHost, rmPort, schedHost, schedPort, amHost, amPort, am_tracking_url,heartbeatInterval);
+	}
+	~TestLibYarnClientC(){
+		delete libyarnClient;
+	}
+protected:
+	MockLibYarnClient *libyarnClient;
+};
+
+static char* StringToChar(string str){
+	char *cstr = new char[str.length()+1];
+	strcpy(cstr,str.c_str());
+	return cstr;
+}
+
+TEST_F(TestLibYarnClientC,TestNewLibYarnClient){
+	char *rmHost = StringToChar("localhost");
+	char *rmPort = StringToChar("8032");
+	char *schedHost = StringToChar("localhost");
+	char *schedPort = StringToChar("8030");
+	char *amHost = StringToChar("localhost");
+	int32_t amPort = 10;
+	char *am_tracking_url = StringToChar("url");
+	int heartbeatInterval = 1000;
+	LibYarnClient_t *client = NULL;
+	int result = newLibYarnClient(rmHost, rmPort, schedHost, schedPort,
+				amHost, amPort, am_tracking_url,&client,heartbeatInterval);
+	EXPECT_EQ(result,FUNCTION_SUCCEEDED);
+}
+
+TEST_F(TestLibYarnClientC,TestCreateJob){
+	EXPECT_CALL((*libyarnClient),createJob(_,_,_)).Times(AnyNumber())
+		.WillOnce(Return(FUNCTION_FAILED))
+		.WillOnce(Return(FUNCTION_SUCCEEDED));
+	LibYarnClient_t *client = getLibYarnClinetT(libyarnClient);
+	char *jobName = StringToChar("libyarn");
+	char *queue = StringToChar("default");
+	char *jobId = NULL;
+	int result = createJob(client, jobName, queue,&jobId);
+	EXPECT_STREQ("",(const char *)(jobId));
+	EXPECT_EQ(result,FUNCTION_FAILED);
+
+	result = createJob(client, jobName, queue,&jobId);
+	EXPECT_STREQ("",(const char *)(jobId));
+	EXPECT_EQ(result,FUNCTION_SUCCEEDED);
+}
+
+TEST_F(TestLibYarnClientC,TestAllocateResources){
+	EXPECT_CALL((*libyarnClient),allocateResources(_,_,_,_,_,_)).Times(AnyNumber())
+			.WillOnce(Return(FUNCTION_FAILED))
+			.WillOnce(Return(FUNCTION_SUCCEEDED));
+	LibYarnClient_t *client = getLibYarnClinetT(libyarnClient);
+	char *jobId = StringToChar("");
+	LibYarnResourceRequest_t resRequest;
+	resRequest.priority = 1;
+	resRequest.host = StringToChar("*");
+	resRequest.vCores = 1;
+	resRequest.memory = 1024;
+	resRequest.num_containers = 2;
+	resRequest.relax_locality = 1;
+
+	int blacklistAddsSize = 3;
+	char *blackListAdditions[blacklistAddsSize];
+	for (int i = 0;i<blacklistAddsSize;i++){
+		blackListAdditions[i] = StringToChar("");
+	}
+	int blackListRemovalsSize = 3;
+	char *blackListRemovals[blackListRemovalsSize];
+	for (int i = 0;i<blackListRemovalsSize;i++){
+		blackListRemovals[i] = StringToChar("");
+	}
+
+	//1. allocate resource
+	LibYarnResource_t *allocatedResourcesArray;
+	int allocatedResourceArraySize;
+	/*
+	int result = allocateResources(client, jobId, &resRequest, blackListAdditions,
+			blacklistAddsSize, blackListRemovals, blackListRemovalsSize, &allocatedResourcesArray, &allocatedResourceArraySize,5);
+	EXPECT_EQ(result,FUNCTION_FAILED);
+
+	result = allocateResources(client, jobId, &resRequest, blackListAdditions,
+			blacklistAddsSize, blackListRemovals, blackListRemovalsSize, &allocatedResourcesArray, &allocatedResourceArraySize,5);
+	EXPECT_EQ(result,FUNCTION_SUCCEEDED);
+	EXPECT_EQ(0,allocatedResourceArraySize);*/
+}
+
+TEST_F(TestLibYarnClientC,TestActiveResources){
+	EXPECT_CALL((*libyarnClient),activeResources(_,_,_)).Times(AnyNumber())
+		.WillOnce(Return(FUNCTION_FAILED))
+		.WillOnce(Return(FUNCTION_SUCCEEDED));
+	LibYarnClient_t *client = getLibYarnClinetT(libyarnClient);
+
+	int activeContainerSize = 0;
+	int32_t activeContainerIds[activeContainerSize];
+	char *jobId = StringToChar("");
+	int result = activeResources(client, jobId, activeContainerIds,activeContainerSize);
+	EXPECT_EQ(result,FUNCTION_FAILED);
+	result = activeResources(client, jobId, activeContainerIds,activeContainerSize);
+	EXPECT_EQ(result,FUNCTION_SUCCEEDED);
+}
+
+TEST_F(TestLibYarnClientC,TestReleaseResources){
+	EXPECT_CALL((*libyarnClient),releaseResources(_,_,_)).Times(AnyNumber())
+		.WillOnce(Return(FUNCTION_FAILED))
+		.WillOnce(Return(FUNCTION_SUCCEEDED));
+	LibYarnClient_t *client = getLibYarnClinetT(libyarnClient);
+
+	int releaseContainerSize = 0;
+	int32_t releaseContainerIds[releaseContainerSize];
+	char *jobId = StringToChar("");
+	int result = releaseResources(client, jobId, releaseContainerIds,releaseContainerSize);
+	EXPECT_EQ(result,FUNCTION_FAILED);
+	result = releaseResources(client, jobId, releaseContainerIds,releaseContainerSize);
+	EXPECT_EQ(result,FUNCTION_SUCCEEDED);
+}
+
+TEST_F(TestLibYarnClientC,TestFinishJob){
+	EXPECT_CALL((*libyarnClient),finishJob(_,_)).Times(AnyNumber())
+		.WillOnce(Return(FUNCTION_FAILED))
+		.WillOnce(Return(FUNCTION_SUCCEEDED));
+	LibYarnClient_t *client = getLibYarnClinetT(libyarnClient);
+
+	char *jobId = StringToChar("");
+	int result = finishJob(client, jobId, APPLICATION_SUCCEEDED);
+	EXPECT_EQ(result,FUNCTION_FAILED);
+	result = finishJob(client, jobId, APPLICATION_SUCCEEDED);
+	EXPECT_EQ(result,FUNCTION_SUCCEEDED);
+}
+
+TEST_F(TestLibYarnClientC,TestGetActiveFailContainerIds){
+	EXPECT_CALL((*libyarnClient),getActiveFailContainerIds(_)).Times(AnyNumber())
+		.WillOnce(Return(FUNCTION_FAILED))
+		.WillOnce(Return(FUNCTION_SUCCEEDED));
+	LibYarnClient_t *client = getLibYarnClinetT(libyarnClient);
+
+	int *activeFailIds;
+	int activeFailSize;
+	int result = getActiveFailContainerIds(client,&activeFailIds,&activeFailSize);
+	EXPECT_EQ(result,FUNCTION_FAILED);
+
+	result = getActiveFailContainerIds(client,&activeFailIds,&activeFailSize);
+	EXPECT_EQ(result,FUNCTION_SUCCEEDED);
+	EXPECT_EQ(0,activeFailSize);
+}
+
+TEST_F(TestLibYarnClientC,TestGetApplicationReport){
+	EXPECT_CALL((*libyarnClient),getApplicationReport(_,_)).Times(AnyNumber())
+		.WillOnce(Return(FUNCTION_FAILED))
+		.WillOnce(Return(FUNCTION_SUCCEEDED));
+	LibYarnClient_t *client = getLibYarnClinetT(libyarnClient);
+
+	LibYarnApplicationReport_t *applicationReport = NULL;
+	char *jobId = StringToChar("");
+	int result = getApplicationReport(client, jobId, &applicationReport);
+	EXPECT_EQ(result,FUNCTION_FAILED);
+	result = getApplicationReport(client, jobId, &applicationReport);
+	EXPECT_EQ(result,FUNCTION_SUCCEEDED);
+	EXPECT_EQ(0,applicationReport->appId);
+}
+
+TEST_F(TestLibYarnClientC,TestGetContainerReports){
+	EXPECT_CALL((*libyarnClient),getContainerReports(_,_)).Times(AnyNumber())
+		.WillOnce(Return(FUNCTION_FAILED))
+		.WillOnce(Return(FUNCTION_SUCCEEDED));
+	LibYarnClient_t *client = getLibYarnClinetT(libyarnClient);
+
+	char *jobId = StringToChar("");
+	LibYarnContainerReport_t *containerReportArray;
+	int containerReportArraySize;
+	int result = getContainerReports(client, jobId, &containerReportArray,
+									&containerReportArraySize);
+	EXPECT_EQ(result,FUNCTION_FAILED);
+	result = getContainerReports(client, jobId, &containerReportArray,
+									&containerReportArraySize);
+	EXPECT_EQ(result,FUNCTION_SUCCEEDED);
+	EXPECT_EQ(0,containerReportArraySize);
+}
+
+TEST_F(TestLibYarnClientC,TestGetContainerStatuses){
+	EXPECT_CALL((*libyarnClient),getContainerStatuses(_,_,_,_)).Times(AnyNumber())
+		.WillOnce(Return(FUNCTION_FAILED))
+		.WillOnce(Return(FUNCTION_SUCCEEDED));
+	LibYarnClient_t *client = getLibYarnClinetT(libyarnClient);
+
+	char *jobId = StringToChar("");
+
+	int statusContainerSize = 0;
+	int statusContainerIds[statusContainerSize];
+	LibYarnContainerStatus_t *containerStatusArray;
+	int containerStatusArraySize;
+	int result = getContainerStatuses(client, jobId, statusContainerIds,
+			statusContainerSize, &containerStatusArray,&containerStatusArraySize);
+	EXPECT_EQ(result,FUNCTION_FAILED);
+	result = getContainerStatuses(client, jobId, statusContainerIds,
+				statusContainerSize, &containerStatusArray,&containerStatusArraySize);
+	EXPECT_EQ(result,FUNCTION_SUCCEEDED);
+	EXPECT_EQ(0,containerStatusArraySize);
+}
+
+TEST_F(TestLibYarnClientC,TestGetQueueInfo){
+	EXPECT_CALL((*libyarnClient),getQueueInfo(_,_,_,_,_)).Times(AnyNumber())
+		.WillOnce(Return(FUNCTION_FAILED))
+		.WillOnce(Return(FUNCTION_SUCCEEDED));
+	LibYarnClient_t *client = getLibYarnClinetT(libyarnClient);
+
+	char *queue = StringToChar("queue");
+
+	LibYarnQueueInfo_t *queueInfo = NULL;
+	int result = getQueueInfo(client, queue, true, true, true, &queueInfo);
+
+	EXPECT_EQ(result,FUNCTION_FAILED);
+	result = getQueueInfo(client, queue, true, true, true, &queueInfo);
+	EXPECT_EQ(result,FUNCTION_SUCCEEDED);
+}
+
+TEST_F(TestLibYarnClientC,TestGetClusterNodes){
+	EXPECT_CALL((*libyarnClient),getClusterNodes(_,_)).Times(AnyNumber())
+		.WillOnce(Return(FUNCTION_FAILED))
+		.WillOnce(Return(FUNCTION_SUCCEEDED));
+	LibYarnClient_t *client = getLibYarnClinetT(libyarnClient);
+
+	LibYarnNodeReport_t *nodeReportArray;
+	int nodeReportArraySize;
+	int result = getClusterNodes(client, NODE_STATE_RUNNING, &nodeReportArray, &nodeReportArraySize);
+	EXPECT_EQ(result,FUNCTION_FAILED);
+	result = getClusterNodes(client, NODE_STATE_RUNNING, &nodeReportArray, &nodeReportArraySize);
+	EXPECT_EQ(result,FUNCTION_SUCCEEDED);
+}
+
+
+

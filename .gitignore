@@ -1,5 +1,51 @@
-# This file should contain patterns all developers want to ignore
-# If you have workspace specific files, add them 
-# to .git/info/exclude.
-#
-# see git help gitignore for more details
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+.deps
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+# Debug files
+*.dSYM/
+*.o
+*.ko
+*.obj
+*.elf
+objfiles.txt
+
+# Eclipse Project
+.project
+.pydevproject
+
+# Generated files
+GNUmakefile
+config.log
+config.status
+VERSION
+env.sh
+ext/
+plr.tgz
+autom4te.cache/

@@ -1,0 +1,6 @@
+Pkgname: libgppc
+Architecture: #arch
+Version: #gppcver
+OS: #os
+GPDBVersion: #gpver
+Description: The Greenplum Partner Connector (libgppc) provides a convenient abstraction of the Greenplum Database (GPDB) backend API which will remain constant from one version to the next. For the most part it is targeted at partners and power users trying to write stable user defined functions against GPDB.

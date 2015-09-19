@@ -1,0 +1,219 @@
+-- --------------------------------------
+-- tidycat
+-- --------------------------------------
+-- start_matchsubs
+--
+-- # pg_statistic stavalues -- can't define a column of type anyarray
+--
+-- m/pg\_statistic\s*\|\s*stavalues/
+-- s/text/anyarray/
+--
+-- end_matchsubs
+-- *********************************************************************
+-- *********************************************************************
+-- This script will produce diffs if you add or change catalog table
+-- definitions in src/include/catalog. If you want to change the results, 
+-- you must make the changes in regress/output/tidycat.source, not
+-- regress/expected, and use gpsourcify.pl to generate a ".out" file.
+--
+-- From the regress directory invoke the command:
+--
+--    gpsourcify.pl results/tidycat.out > output/tidycat.source
+--
+-- *********************************************************************
+-- *********************************************************************
+-- *********************************************************************
+-- *********************************************************************
+CREATE EXTERNAL WEB TABLE get_tc (x text)
+execute E'(find @abs_srcdir@/../../include/catalog \\\( -name \'pg_*.h\' -o -name \'gp_*.h\' \\\)  | xargs perl @abs_srcdir@/../../include/catalog/tidycat.pl -sql - 2>&1 | perl -ple \' s/^\\s*with\\s*\\(.*\\)\\s*//gm \' > @abs_srcdir@/data/tidyddl.sql ; sleep 20)' 
+ON MASTER
+FORMAT 'text' (delimiter '|');
+select * from get_tc order by 1;
+ x 
+---
+(0 rows)
+
+drop external table get_tc;
+create schema tidycat;
+set search_path to tidycat, "$user", public;
+-- start_ignore
+\i @abs_srcdir@/data/tidyddl.sql
+table pg_filesystem has a dynamic reltype oid -- cannot redefine to static!! at @abs_srcdir@/../../include/catalog/tidycat.pl line 1092.
+psql:@abs_srcdir@/data/tidyddl.sql:1: ERROR:  syntax error at or near "table"
+LINE 1: table pg_filesystem has a dynamic reltype oid 
+        ^
+-- how many tidycat defs?
+select pc1.relname
+from 
+	 pg_class pc1
+where 
+ pc1.relnamespace = 
+	(select oid from pg_namespace 
+	where nspname = 'tidycat')	  
+order by relname;
+ relname 
+---------
+(0 rows)
+
+-- end_ignore
+-- how many non-tidycat defs? (should be ZERO)
+select pc2.relname
+from 
+	 pg_class pc2
+where 
+ pc2.relnamespace = 
+	(select oid from pg_namespace 
+	where nspname = 'pg_catalog')	  
+and pc2.relkind = 'r'
+and
+ pc2.relname not in 
+ 			 (select pc1.relname
+			 from 
+			 	 pg_class pc1
+				 where 
+				  pc1.relnamespace = 
+				  	(select oid from pg_namespace 
+						where nspname = 'tidycat'))	  
+order by relname;
+            relname            
+-------------------------------
+ gp_configuration
+ gp_configuration_history
+ gp_db_interfaces
+ gp_distribution_policy
+ gp_fastsequence
+ gp_fault_strategy
+ gp_global_sequence
+ gp_id
+ gp_interfaces
+ gp_master_mirroring
+ gp_persistent_database_node
+ gp_persistent_filespace_node
+ gp_persistent_relation_node
+ gp_persistent_tablespace_node
+ gp_relation_node
+ gp_san_configuration
+ gp_segment_configuration
+ gp_verification_history
+ gp_version_at_initdb
+ pg_aggregate
+ pg_am
+ pg_amop
+ pg_amproc
+ pg_appendonly
+ pg_appendonly_alter_column
+ pg_attrdef
+ pg_attribute
+ pg_attribute_encoding
+ pg_auth_members
+ pg_auth_time_constraint
+ pg_authid
+ pg_autovacuum
+ pg_cast
+ pg_class
+ pg_compression
+ pg_constraint
+ pg_conversion
+ pg_database
+ pg_depend
+ pg_description
+ pg_extprotocol
+ pg_exttable
+ pg_filespace
+ pg_filespace_entry
+ pg_filesystem
+ pg_foreign_data_wrapper
+ pg_foreign_server
+ pg_foreign_table
+ pg_index
+ pg_inherits
+ pg_language
+ pg_largeobject
+ pg_listener
+ pg_namespace
+ pg_opclass
+ pg_operator
+ pg_partition
+ pg_partition_encoding
+ pg_partition_rule
+ pg_pltemplate
+ pg_proc
+ pg_proc_callback
+ pg_resourcetype
+ pg_resqueue
+ pg_resqueuecapability
+ pg_rewrite
+ pg_shdepend
+ pg_shdescription
+ pg_stat_last_operation
+ pg_stat_last_shoperation
+ pg_statistic
+ pg_tablespace
+ pg_trigger
+ pg_type
+ pg_type_encoding
+ pg_user_mapping
+ pg_window
+(77 rows)
+
+select pc2.relname
+from 
+	 pg_class pc2
+where 
+ pc2.relnamespace = 
+	(select oid from pg_namespace 
+	where nspname = 'tidycat')	  
+and pc2.relkind = 'r'
+and
+ pc2.relname not in 
+ 			 (select pc1.relname
+			 from 
+			 	 pg_class pc1
+				 where 
+				  pc1.relnamespace = 
+				  	(select oid from pg_namespace 
+						where nspname = 'pg_catalog'))	  
+order by relname;
+ relname 
+---------
+(0 rows)
+
+-- start_equiv
+select pc1.relname, pa1.attname, pt1.typname 
+from 
+	 pg_attribute pa1,
+	 pg_class pc1, 
+	 pg_type pt1 
+where pt1.oid = pa1.atttypid
+and pa1.attnum > 0
+and pa1.attisdropped is false
+and pc1.oid = pa1.attrelid 
+and pc1.relnamespace = 
+	(select oid from pg_namespace 
+	where nspname = 'tidycat')	  
+order by relname, pa1.attnum;
+ relname | attname | typname 
+---------+---------+---------
+(0 rows)
+
+select pc1.relname, pa1.attname, pt1.typname 
+from 
+	 pg_attribute pa1,
+	 pg_class pc1, 
+	 pg_type pt1 
+where pt1.oid = pa1.atttypid
+and pa1.attnum > 0
+and pa1.attisdropped is false
+and pc1.oid = pa1.attrelid 
+and pc1.relnamespace = 
+	(select oid from pg_namespace where nspname = 'pg_catalog')
+and pc1.relname	in 
+	(select relname from pg_class where relnamespace =
+			(select	oid from pg_namespace where nspname = 'tidycat'))
+order by relname, pa1.attnum;
+ relname | attname | typname 
+---------+---------+---------
+(0 rows)
+
+-- end_equiv
+drop schema tidycat CASCADE;

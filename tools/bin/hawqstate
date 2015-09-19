@@ -1,0 +1,129 @@
+#!/usr/bin/env python
+#
+
+import os
+import sys
+from optparse import Option, OptionParser
+from hawqpylib.hawqlib import HawqXMLParser, parse_hosts_file, check_file_exist
+from gppylib.db import dbconn
+from pygresql.pg import DatabaseError
+from gppylib.gplog import get_default_logger, setup_hawq_tool_logging, quiet_stdout_logging, enable_verbose_logging
+from gppylib.commands.unix import getLocalHostname, getUserName
+
+
+def parseargs():
+    parser = OptionParser(usage="HAWQ config options.")
+    parser.add_option('-b', default=False, action='store_true', dest='show_brief_status',
+                      help="Show brief status of cluster.")
+    parser.add_option('-q', '--quiet', action='store_true', default=False)
+    parser.add_option('-v', '--verbose', action='store_true', default=False)
+    parser.add_option("-a", "--prompt", action="store_false",
+                      dest="prompt", default=True,
+                      help="Execute without prompt.")
+    parser.add_option("-d", "--datadir", dest="master_dir",
+                      help="HAWQ Master data directory.")
+    parser.add_option("--hawqhome", dest="hawq_home",
+                      help="HAWQ Master data directory.")
+    parser.add_option("-l", "--logdir", dest="logDir",
+                      help="Sets the directory for log files")
+    (options, args) = parser.parse_args()
+    return (options, args)
+
+
+def check_status(status_value):
+    if status_value == 'u':
+        status_tag = 'Active'
+    elif status_value == 'd':
+        status_tag = 'Down'
+    else:
+        status_tag = 'Unknown'
+    return status_tag
+
+
+def show_brief_status(hawq_site, segment_list, standby_host):
+    try:
+        dburl = dbconn.DbURL(port=hawq_site.hawq_dict['hawq_master_address_port'], dbname='template1')
+        conn = dbconn.connect(dburl, True)
+        query = "select role, status, port, hostname, address from gp_segment_configuration;"
+        rows = dbconn.execSQL(conn, query)
+        conn.close()
+    except DatabaseError, ex:
+        print "Failed to connect to database, this script can only be run when the database is up."
+        sys.exit(1)
+    seg_host_list = {}
+    valid_seg_host_list = {}
+    master_status = ''
+    standby_status = ''
+    for row in rows:
+        if row[0] == 'm':
+            master_host = row[3]
+            master_status = check_status(row[1])
+        elif row[0] == 's':
+            standby_host = row[3]
+            if row[1] == "u":
+                standby_status = "Standby host passive"
+            else:
+                standby_status = "Unknown"
+        elif row[0] == 'p':
+            seg_host_list[row[3]] = row[1]
+            if row[1] == 'u':
+                valid_seg_host_list[row[3]] = row[1]
+
+    total_seg_num = len(segment_list)
+    total_seg_num_from_catalog = len(seg_host_list)
+    total_seg_num_valid = len(valid_seg_host_list)
+    total_seg_num_failure = total_seg_num - total_seg_num_valid
+    seg_pid_file_path = hawq_site.hawq_dict['hawq_segment_directory'] + "/postmaster.pid"
+    total_seg_pid_file_found = len(check_file_exist(seg_pid_file_path, segment_list, '' ))
+    total_seg_pid_file_miss = total_seg_num - total_seg_pid_file_found
+    logger.info("-HAWQ instance status summary")
+    logger.info("-----------------------------------------------------")
+    logger.info("-   Master instance                                = %s" % master_status)
+    if 'hawq_standby_address_host' in hawq_site.hawq_dict:
+        logger.info("-   Master standby                                 = %s" % standby_host)
+        logger.info("-   Standby master state                           = %s" % standby_status)
+    else:
+        logger.info("-   No Standby master defined                           ")
+    logger.info("-   Total segment instance count from config file  = %s"% total_seg_num)
+    logger.info("----------------------------------------------------- ")
+    logger.info("-   Segment Status                                    ")
+    logger.info("----------------------------------------------------- ")
+    logger.info("-   Total segments count from catalog      = %s" % total_seg_num_from_catalog)
+    logger.info("-   Total segment valid (at master)        = %s" % total_seg_num_valid)
+    logger.info("-   Total segment failures (at master)     = %s" % total_seg_num_failure)
+    logger.info("-   Total number of postmaster.pid files missing   = %s" % total_seg_pid_file_miss)
+    logger.info("-   Total number of postmaster.pid files found     = %s" % total_seg_pid_file_found)
+    #logger.info("-   Total number of postmaster.pid PIDs missing    = %s" % total_seg_pid_miss)
+    #logger.info("-   Total number of postmaster.pid PIDs found      = %s" % total_seg_pid_found)
+    #logger.info("-   Total number of /tmp lock files missing        = %s" % total_seg_lock_file_miss)
+    #logger.info("-   Total number of /tmp lock files found          = %s" % total_seg_lock_file_found)
+    #logger.info("-   Total number postmaster processes missing      = %s" % total_seg_process_miss)
+    #logger.info("-   Total number postmaster processes found        = %s" % total_seg_process_found)
+    #logger.info("----------------------------------------------------- ")
+
+if __name__ == '__main__':
+    options, args = parseargs()
+    if options.verbose:
+        enable_verbose_logging()
+    if options.quiet:
+        quiet_stdout_logging()
+
+    logger, log_filename = setup_hawq_tool_logging('hawq_state',getLocalHostname(),getUserName(), options.logDir) 
+    if options.hawq_home is None:
+        GPHOME = os.getenv('GPHOME')
+    else:
+        GPHOME = options.hawq_home
+    hawq_site = HawqXMLParser(GPHOME)
+    hawq_site.get_all_values()
+    segment_list = parse_hosts_file(GPHOME)
+    master_host = hawq_site.hawq_dict['hawq_master_address_host']
+    host_list = segment_list + [master_host]
+    if 'hawq_standby_address_host' in hawq_site.hawq_dict:
+        standby_host = hawq_site.hawq_dict['hawq_standby_address_host']
+        if standby_host not in ('None', 'none', ''):
+            host_list = host_list + [standby_host]
+
+    if options.show_brief_status:
+        show_brief_status(hawq_site, segment_list, standby_host="None") 
+    else:
+        show_brief_status(hawq_site, segment_list, standby_host="None")

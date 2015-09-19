@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    PXF profiles definition file.
+    New profiles can be added in the form:
+        <profile>
+            <name>...</name>
+            <description>...</description>
+            <plugins>
+                <plugin_A>...</plugin_A>
+                <plugin_B>...</plugin_B>
+                ...
+            </plugins>
+         </profile>
+-->
+<profiles>
+    <profile>
+        <name>HBase</name>
+        <description>This profile is suitable for using when connecting to an HBase data store engine</description>
+        <plugins>
+            <fragmenter>com.pivotal.pxf.plugins.hbase.HBaseDataFragmenter</fragmenter>
+            <accessor>com.pivotal.pxf.plugins.hbase.HBaseAccessor</accessor>
+            <resolver>com.pivotal.pxf.plugins.hbase.HBaseResolver</resolver>
+        </plugins>
+    </profile>
+    <profile>
+        <name>Hive</name>
+        <description>This profile is suitable for using when connecting to Hive</description>
+        <plugins>
+            <fragmenter>com.pivotal.pxf.plugins.hive.HiveDataFragmenter</fragmenter>
+            <accessor>com.pivotal.pxf.plugins.hive.HiveAccessor</accessor>
+            <resolver>com.pivotal.pxf.plugins.hive.HiveResolver</resolver>
+        </plugins>
+    </profile>
+    <profile>
+        <name>HiveRC</name>
+        <description>This profile is suitable only for Hive tables stored in RC files
+            and serialized with either the ColumnarSerDe or the LazyBinaryColumnarSerDe.
+            It is much faster than the general purpose Hive profile.
+            DELIMITER parameter is mandatory.
+        </description>
+        <plugins>
+            <fragmenter>com.pivotal.pxf.plugins.hive.HiveInputFormatFragmenter</fragmenter>
+            <accessor>com.pivotal.pxf.plugins.hive.HiveRCFileAccessor</accessor>
+            <resolver>com.pivotal.pxf.plugins.hive.HiveColumnarSerdeResolver</resolver>
+        </plugins>
+    </profile>
+    <profile>
+        <name>HiveText</name>
+        <description>This profile is suitable only for Hive tables stored as Text files.
+            It is much faster than the general purpose Hive profile.
+            DELIMITER parameter is mandatory.
+        </description>
+        <plugins>
+            <fragmenter>com.pivotal.pxf.plugins.hive.HiveInputFormatFragmenter</fragmenter>
+            <accessor>com.pivotal.pxf.plugins.hive.HiveLineBreakAccessor</accessor>
+            <resolver>com.pivotal.pxf.plugins.hive.HiveStringPassResolver</resolver>
+        </plugins>
+    </profile>
+    <profile>
+        <name>HdfsTextSimple</name>
+        <description>This profile is suitable for using when reading delimited single line records from plain text files
+            on HDFS
+        </description>
+        <plugins>
+            <fragmenter>com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter</fragmenter>
+            <accessor>com.pivotal.pxf.plugins.hdfs.LineBreakAccessor</accessor>
+            <resolver>com.pivotal.pxf.plugins.hdfs.StringPassResolver</resolver>
+            <analyzer>com.pivotal.pxf.plugins.hdfs.HdfsAnalyzer</analyzer>
+        </plugins>
+    </profile>
+    <profile>
+        <name>HdfsTextMulti</name>
+        <description>This profile is suitable for using when reading delimited single or multi line records (with quoted
+            linefeeds) from plain text files on HDFS. It is not splittable (non parallel) and slower than HdfsTextSimple.
+        </description>
+        <plugins>
+            <fragmenter>com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter</fragmenter>
+            <accessor>com.pivotal.pxf.plugins.hdfs.QuotedLineBreakAccessor</accessor>
+            <resolver>com.pivotal.pxf.plugins.hdfs.StringPassResolver</resolver>
+            <analyzer>com.pivotal.pxf.plugins.hdfs.HdfsAnalyzer</analyzer>
+        </plugins>
+    </profile>
+    <profile>
+        <name>Avro</name>
+        <description>This profile is suitable for using when reading Avro files (i.e fileName.avro)</description>
+        <plugins>
+            <fragmenter>com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter</fragmenter>
+            <accessor>com.pivotal.pxf.plugins.hdfs.AvroFileAccessor</accessor>
+            <resolver>com.pivotal.pxf.plugins.hdfs.AvroResolver</resolver>
+            <analyzer>com.pivotal.pxf.plugins.hdfs.HdfsAnalyzer</analyzer>
+        </plugins>
+    </profile>
+    <profile>
+        <name>SequenceWritable</name>
+        <description>
+            Profile for accessing Sequence files serialized with a custom Writable class
+            usage: pxf://nn:50070/path/to/file?profile=SequenceWritable&amp;data-schema=CustomClass
+        </description>
+        <plugins>
+            <fragmenter>com.pivotal.pxf.plugins.hdfs.HdfsDataFragmenter</fragmenter>
+            <accessor>com.pivotal.pxf.plugins.hdfs.SequenceFileAccessor</accessor>
+            <resolver>com.pivotal.pxf.plugins.hdfs.WritableResolver</resolver>
+            <analyzer>com.pivotal.pxf.plugins.hdfs.HdfsAnalyzer</analyzer>
+        </plugins>
+    </profile>
+    <profile>
+        <name>GemFireXD</name>
+        <description>This profile is suitable for using when connecting to GemFireXD</description>
+        <plugins>
+            <fragmenter>com.pivotal.pxf.plugins.gemfirexd.GemFireXDFragmenter</fragmenter>
+            <accessor>com.pivotal.pxf.plugins.gemfirexd.GemFireXDAccessor</accessor>
+            <resolver>com.pivotal.pxf.plugins.gemfirexd.GemFireXDResolver</resolver>
+        </plugins>
+    </profile>
+</profiles>

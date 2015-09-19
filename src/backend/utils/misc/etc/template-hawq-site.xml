@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <property>
+        <name>hawq_master_address_host</name>
+        <value>%master.host%</value>
+    </property>
+
+    <property>
+        <name>hawq_master_address_port</name>
+        <value>%master.port%</value>
+    </property>
+
+    <property>
+        <name>hawq_standby_address_host</name>
+        <value>%standby.host%</value>
+    </property>
+
+    <property>
+        <name>hawq_segment_address_port</name>
+        <value>%segment.port%</value>
+    </property>
+
+    <property>
+        <name>hawq_dfs_url</name>
+        <value>%namenode.host%:%namenode.port%/%hawq.file.space%</value>
+    </property>
+
+    <property>
+        <name>hawq_master_directory</name>
+        <value>%master.directory%</value>
+    </property>
+
+    <property>
+        <name>hawq_segment_directory</name>
+        <value>%segment.directory%</value>
+    </property> 
+
+    <property>
+        <name>hawq_master_temp_directory</name>
+        <value>%master.temp.directory%</value>
+    </property>
+
+    <property>
+        <name>hawq_segment_temp_directory</name>
+        <value>%segment.temp.directory%</value>
+    </property>
+     
+    <!-- HAWQ resource manager parameters -->
+    <property>
+        <name>hawq_resourcemanager_yarn_resourcemanager_address</name>
+        <value>%master.host%:9980</value>
+    </property>
+
+    <property>
+        <name>hawq_resourcemanager_yarn_resourcemanager_scheduler_address</name>
+        <value>%master.host%:9981</value>
+    </property>
+
+    <property>
+        <name>hawq_resourcemanager_server_type</name>
+        <value>%enable_yarn%</value>
+    </property>
+
+    <property>
+        <name>hawq_resourcemanager_master_address_domainsocket_port</name>
+        <value>5436</value>
+    </property>
+    
+    <property>
+        <name>hawq_resourcemanager_master_address_port</name>
+        <value>5437</value>
+    </property>
+    
+    <property>
+        <name>hawq_resourcemanager_segment_address_port</name>
+        <value>5438</value>
+    </property>
+    
+    <property>
+        <name>hawq_resourcemanager_segment_limit_memory_use</name>
+        <value>64GB</value>
+    </property>
+
+    <property>
+        <name>hawq_resourcemanager_segment_limit_core_use</name>
+        <value>16</value>
+    </property>
+    
+    <property>
+        <name>hawq_resourcemanager_yarn_queue</name>
+        <value>default</value>
+    </property>
+
+    <property>
+        <name>hawq_resourcemanager_yarn_application_name</name>
+        <value>hawq</value>
+    </property>
+
+    <property>
+        <name>hawq_resourcemanager_log_level</name>
+        <value>10</value>
+    </property>
+
+    <!-- HAWQ resource enforcement parameters -->
+    <property>
+        <name>hawq_resourceenforcer_cpu_enable</name>
+        <value>false</value>
+    </property>
+
+    <property>
+        <name>hawq_resourceenforcer_cgroup_mount_point</name>
+        <value>/sys/fs/cgroup</value>
+    </property>
+    
+    <property>
+        <name>hawq_resourceenforcer_cgroup_hierarchy_name</name>
+        <value>hadoop-yarn</value>
+    </property>
+
+    <property>
+        <name>hawq_resourceenforcer_cleanup_period</name>
+        <value>180</value>
+    </property>
+    
+    <property>
+        <name>hawq_resourceenforcer_cpu_weight</name>
+        <value>1024.0</value>
+    </property>
+    
+    <property>
+        <name>hawq_resourceenforcer_vcore_pcore_ratio</name>
+        <value>1.0</value>
+    </property>
+    <!-- HAWQ resource enforcement parameters ends here. -->
+</configuration>

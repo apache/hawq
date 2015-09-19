@@ -1,0 +1,46 @@
+CC = g++
+OPTS = -g -std=gnu++0x -lc -lpthread 
+INCYARN = -I libyarn/include
+LIBYARN = -L libyarn/lib -lyarn
+#INCBOOST = -I /opt/boost/include
+#LIBBOOST = -L /opt/boost/lib -lboost
+INCRPOTOBUFC = -I protobuf/include
+LIBPROTOBUFC = -L protobuf/lib -lprotobuf-c
+
+INCLUDES = $(INCYARN) $(INCPROTOBUFC) -I ./include
+LIBS = $(LIBYARN) $(LIBPROTOBUFC)
+
+MAINOBJS = main.o dynrm.o envswitch.o nodemanager.o resqueuemanager.o
+UTILOBJS = balancedbst.o linkedlist.o
+TESTOBJS = yarnsimulator.o
+
+all:hawqdrm
+
+hawqdrm:$(MAINOBJS) $(UTILOBJS) $(TESTOBJS)
+	$(CC) $(OPTS) $(LIBYARN) $(LIBPROTOBUFC) $(MAINOBJS) $(UTILOBJS) $(TESTOBJS) -o hawqdrm 
+main.o:main.c
+	$(CC) $(OPTS) $(INCLUDES) -c main.c
+dynrm.o:dynrm.c include/dynrm.h
+	$(CC) $(OPTS) $(INCLUDES) -c dynrm.c
+
+envswitch.o:envswitch.c include/envswitch.h
+	$(CC) $(OPTS) $(INCLUDES) -c envswitch.c -o envswitch.o
+
+nodemanager.o:nodemanager.c include/dynrm.h
+	$(CC) $(OPTS) $(INCLUDES) -c nodemanager.c -o nodemanager.o
+
+resqueuemanager.o:resqueuemanager.c include/dynrm.h
+	$(CC) $(OPTS) $(INCLUDES) -c resqueuemanager.c -o resqueuemanager.o
+
+linkedlist.o:utils/linkedlist.c include/utils/linkedlist.h
+	$(CC) $(OPTS) $(INCLUDES) -c utils/linkedlist.c -o linkedlist.o
+
+balancedbst.o:utils/balancedbst.c include/utils/balancedbst.h
+	$(CC) $(OPTS) $(INCLUDES) -c utils/balancedbst.c -o balancedbst.o
+
+yarnsimulator.o:test/yarnsimulator/yarnsimulator.c include/test/yarnsimulator.h
+	$(CC) $(OPTS) $(INCLUDES) -c test/yarnsimulator/yarnsimulator.c -o yarnsimulator.o
+
+clean:
+	rm *.o
+	rm hawqdrm

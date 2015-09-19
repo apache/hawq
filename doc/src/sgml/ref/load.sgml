@@ -1,0 +1,80 @@
+<!--
+$PostgreSQL: pgsql/doc/src/sgml/ref/load.sgml,v 1.25 2008/11/14 10:22:47 petere Exp $
+-->
+
+<refentry id="SQL-LOAD">
+ <refmeta>
+  <refentrytitle id="SQL-LOAD-TITLE">LOAD</refentrytitle>
+  <manvolnum>7</manvolnum>
+  <refmiscinfo>SQL - Language Statements</refmiscinfo>
+ </refmeta>
+
+ <refnamediv>
+  <refname>LOAD</refname>
+  <refpurpose>load or reload a shared library file</refpurpose>
+ </refnamediv>
+
+ <indexterm zone="sql-load">
+  <primary>LOAD</primary>
+ </indexterm>
+
+ <refsynopsisdiv>
+<synopsis>
+LOAD '<replaceable class="PARAMETER">filename</replaceable>'
+</synopsis>
+ </refsynopsisdiv>
+
+ <refsect1 id="sql-load-description">
+  <title>Description</title>
+
+  <para>
+   This command loads a shared library file into the <productname>PostgreSQL</>
+   server's address space.  If the file had been loaded previously,
+   it is first unloaded.  This command is primarily useful to unload
+   and reload a shared library file that has been changed since the
+   server first loaded it.  To make use of the shared library,
+   function(s) in it need to be declared using the <xref
+   linkend="sql-createfunction" endterm="sql-createfunction-title">
+   command.
+  </para>
+
+  <para>
+   The file name is specified in the same way as for shared library
+   names in <xref linkend="sql-createfunction" endterm="sql-createfunction-title">; in particular, one
+   can rely on a search path and automatic addition of the system's standard
+   shared library file name extension.  See <xref linkend="xfunc-c"> for
+   more information on this topic.
+  </para>
+
+  <indexterm>
+   <primary><filename>$libdir/plugins</></primary>
+  </indexterm>
+
+  <para>
+   Non-superusers can only apply <command>LOAD</> to library files
+   located in <filename>$libdir/plugins/</> &mdash; the specified
+   <replaceable class="PARAMETER">filename</replaceable> must begin
+   with exactly that string.  (It is the database administrator's
+   responsibility to ensure that only <quote>safe</> libraries
+   are installed there.)
+  </para>
+ </refsect1>
+
+ <refsect1 id="sql-load-compat">
+  <title>Compatibility</title>
+
+  <para>
+   <command>LOAD</command> is a <productname>PostgreSQL</productname>
+   extension.
+  </para>
+ </refsect1>
+
+
+ <refsect1>
+  <title>See Also</title>
+
+  <para>
+   <xref linkend="sql-createfunction" endterm="sql-createfunction-title">
+  </para>
+ </refsect1>
+</refentry>

@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<Server port="${base.shutdown.port}"
+        shutdown="SHUTDOWN">
+    <Listener className="org.apache.catalina.core.JasperListener"/>
+    <Listener className="org.apache.catalina.core.JreMemoryLeakPreventionListener"/>
+    <Listener className="org.apache.catalina.mbeans.GlobalResourcesLifecycleListener"/>
+    <GlobalNamingResources>
+        <Resource auth="Container"
+                  description="User database that can be updated and saved"
+                  factory="org.apache.catalina.users.MemoryUserDatabaseFactory"
+                  name="UserDatabase"
+                  pathname="conf/tomcat-users.xml"
+                  type="org.apache.catalina.UserDatabase"/>
+    </GlobalNamingResources>
+    <Service name="Catalina">
+        <Executor maxThreads="300"
+                  minSpareThreads="50"
+                  name="tomcatThreadPool"
+                  namePrefix="tomcat-http--"/>
+        <Engine defaultHost="localhost"
+                name="Catalina">
+            <Realm className="org.apache.catalina.realm.LockOutRealm">
+                <Realm className="org.apache.catalina.realm.UserDatabaseRealm"
+                       resourceName="UserDatabase"/>
+            </Realm>
+            <Host appBase="webapps"
+                  autoDeploy="true"
+                  deployOnStartup="true"
+                  deployXML="true"
+                  name="localhost"
+                  unpackWARs="true">
+                <Valve className="org.apache.catalina.valves.AccessLogValve"
+                       directory="/tmp/logs"
+                       pattern="%h %l %u %t &quot;%r&quot; %s %b"
+                       prefix="localhost_access_log."
+                       suffix=".txt"/>
+            </Host>
+        </Engine>
+        <Connector acceptCount="100"
+                   connectionTimeout="20000"
+                   executor="tomcatThreadPool"
+                   maxKeepAliveRequests="15"
+                   maxHeaderCount="30000"
+                   maxHttpHeaderSize="1048576"
+                   port="${connector.http.port}"
+                   protocol="org.apache.coyote.http11.Http11Protocol"
+                   redirectPort="${connector.https.port}"/>
+    </Service>
+    <Listener className="org.apache.catalina.core.ThreadLocalLeakPreventionListener"/>
+</Server>

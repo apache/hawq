@@ -1,0 +1,141 @@
+COMMAND NAME: hawq ssh
+
+Provides ssh access to multiple hosts at once.
+
+
+*****************************************************
+SYNOPSIS
+*****************************************************
+
+hawq ssh { -f <hostfile_hawq ssh> | -h <hostname> [-h <hostname> ...] } 
+[-u userid] [-v] [-e] [<bash_command>]
+
+hawq ssh -? 
+
+hawq ssh --version
+
+
+*****************************************************
+DESCRIPTION
+*****************************************************
+
+The hawq ssh utility allows you to run bash shell commands on 
+multiple hosts at once using SSH (secure shell). You can execute 
+a single command by specifying it on the command-line, or omit 
+the command to enter into an interactive command-line session. 
+
+To specify the hosts involved in the SSH session, use the -f 
+option to specify a file containing a list of host names, or use 
+the -h option to name single host names on the command-line. At 
+least one host name (-h) or a host file (-f) is required. Note that 
+the current host is not included in the session by default  to 
+include the local host, you must explicitly declare it in the 
+list of hosts involved in the session.
+
+Before using hawq ssh, you must have a trusted host setup between 
+the hosts involved in the SSH session. You can use the utility 
+hawq ssh-exkeys to update the known host files and exchange public 
+keys between hosts if you have not done so already.
+
+If you do not specify a command on the command-line, hawq ssh will 
+go into interactive mode. At the hawq ssh command prompt (=>), you 
+can enter a command as you would in a regular bash terminal command-line, 
+and the command will be executed on all hosts involved in the session. 
+To end an interactive session, press CTRL+D on the keyboard or type 
+exit or quit.
+
+If a user name is not specified in the host list file, hawq ssh will 
+execute commands as the currently logged in user. To determine the 
+currently logged in user, do a whoami command. By default, hawq ssh goes 
+to $HOME of the session user on the remote hosts after login. To ensure 
+commands are executed correctly on all remote hosts, you should always 
+enter absolute paths.
+
+
+*****************************************************
+OPTIONS
+*****************************************************
+
+<bash_command>
+
+ A bash shell command to execute on all hosts involved in this 
+ session (optionally enclosed in quotes). If not specified, hawq ssh 
+ will start an interactive session.
+
+
+-e (echo)
+
+ Optional. Echoes the commands passed to each host and their 
+ resulting output while running in non-interactive mode.
+
+
+-f <hostfile_hawqssh>
+
+ Specifies the name of a file that contains a list of hosts that 
+ will participate in this SSH session. The host name is required, 
+ and you can optionally specify an alternate user name and/or SSH 
+ port number per host. The syntax of the host file is one host  
+ per line as follows::
+  
+  [username@]hostname[:ssh_port]
+
+-h <hostname>
+
+ Specifies a single host name that will participate in this SSH session. 
+ You can use the -h option multiple times to specify multiple host names.
+
+
+-u <userid>
+
+ Specifies the userid for this SSH session. 
+
+
+-v (verbose mode)
+
+ Optional. Reports additional messages in addition to the command 
+ output when running in non-interactive mode.
+
+
+--version
+
+ Displays the version of this utility.
+
+
+-? (help)
+
+ Displays the online help.
+
+
+
+
+*****************************************************
+EXAMPLES
+*****************************************************
+
+Start an interactive group SSH session with all hosts listed 
+in the file hostfile_hawqssh:
+
+  $ hawq ssh -f hostfile_hawqssh
+
+
+At the hawq ssh interactive command prompt, run a shell command 
+on all the hosts involved in this session.
+
+  => ls -a /data/primary/*
+
+Exit an interactive session:
+
+  => exit
+
+Start a non-interactive group SSH session with the hosts 
+named dw1 and dw2 and pass a file containing several commands
+named command_file to hawq ssh:
+ 
+  $ hawq ssh -h sdw1 -h sdw2 -v -e < command_file
+
+Execute single commands in non-interactive mode on hosts sdw2
+and localhost:
+
+  $ hawq ssh -h sdw2 -h localhost -v -e 'ls -a /data/primary/*'
+  $ hawq ssh -h sdw2 -h localhost -v -e 'echo $GPHOME'
+  $ hawq ssh -h sdw2 -h localhost -v -e 'ls -1 | wc -l'

@@ -1,0 +1,131 @@
+--
+-- Catalog Upgrade Script (from 1.3 to 2.0)
+--
+
+
+-- Catalog changes
+
+-- set this guc to enable executing blow queries on master only mode
+SET optimizer_enable_master_only_queries=true;
+-- make fundamental changes to pg_namespace...
+INSERT INTO pg_attribute VALUES (2615, 'nspdboid',  26, -1, 4, 4, 0, -1, -1, true, 'p', 'i', false, false, false, true, 0);
+UPDATE @gpupgradeschemaname@.pg_class SET relnatts = relnatts+1 WHERE relnamespace = 11 and relname = 'pg_namespace';
+-- need to update date before updating index meta info, because the value changed is in the new index
+\c
+SET optimizer_enable_master_only_queries=true;
+VACUUM FREEZE pg_namespace;
+UPDATE @gpupgradeschemaname@.pg_namespace set nspdboid = 0;
+-- change it's index
+INSERT INTO pg_attribute VALUES (2684, 'nspdboid',  26, -1, 4, 2, 0, -1, -1, true, 'p', 'i', false, false, false, true, 0);
+UPDATE @gpupgradeschemaname@.pg_class SET relnatts = relnatts+1 WHERE relnamespace = 11 and relname = 'pg_namespace_nspname_index';
+UPDATE pg_index SET indnatts=2, indkey='1 4', indclass='1986 1989' WHERE indexrelid=2684;
+\c
+SET optimizer_enable_master_only_queries=true;
+VACUUM FREEZE pg_namespace;
+select * from pg_class  WHERE relnamespace = 11 and relname = 'pg_namespace';
+select * FROM pg_attribute WHERE attrelid=2615 ;
+-- make fundamental changes to gp_distribution_policy...
+UPDATE @gpupgradeschemaname@.pg_class SET relnatts = relnatts+1 WHERE relnamespace = 11 and relname = 'gp_distribution_policy';
+UPDATE pg_attribute SET attnum = attnum+1 WHERE attrelid=5002 AND attname='attrnums';
+INSERT INTO pg_attribute VALUES (5002, 'bucketnum',  23, -1, 4, 2, 0, -1, -1, true, 'p', 'i', false, false, false, true, 0);
+\c
+SET optimizer_enable_master_only_queries=true;
+UPDATE gp_distribution_policy SET bucketnum= 0; --preset 0, and we be set after transform hdfs in aoseg_%s_rewrite.sql
+UPDATE pg_attribute SET attnotnull=TRUE WHERE attrelid=5002 AND attname='bucketnum';
+VACUUM FREEZE gp_distribution_policy;
+
+-- make fundamental changes to gp_segment_configuration
+select * from pg_class  WHERE relnamespace = 11 and relname = 'gp_segment_configuration';
+UPDATE @gpupgradeschemaname@.pg_class SET relnatts = relnatts-5 WHERE relnamespace = 11 and relname = 'gp_segment_configuration';
+select * FROM pg_attribute WHERE attrelid=5036 ;
+DELETE FROM pg_attribute WHERE attrelid=5036 AND (attnum=1 OR attnum=4 OR attnum=5 OR attnum=10 OR attnum=11);
+UPDATE pg_attribute SET attname = 'registration_order', attnum = 1, atttypid=23, attlen=4, attalign='i' WHERE attrelid=5036 AND attname='content';
+UPDATE pg_attribute SET attnum = 2 WHERE attrelid=5036 AND attname='role';
+UPDATE pg_attribute SET attnum = attnum - 3 WHERE attrelid=5036 AND attnum>5;
+select * FROM pg_attribute WHERE attrelid=5036 ;
+-- change it's index
+UPDATE @gpupgradeschemaname@.pg_class SET relnatts = relnatts-1, relname='gp_segment_config_registration_order_index' WHERE relnamespace = 11 and relname = 'gp_segment_config_content_preferred_role_index';
+DELETE FROM pg_attribute WHERE attrelid=6106 AND attnum=2;
+UPDATE pg_attribute SET attname = 'registration_order', attnum = 1, atttypid=23, attlen=4, attalign='i' WHERE attrelid=6106 AND attname='content';
+UPDATE pg_index SET indnatts=1, indkey='1', indclass='1978' WHERE indexrelid=6106;
+UPDATE @gpupgradeschemaname@.pg_class SET relname='gp_segment_config_role_index' WHERE relnamespace = 11 and relname='gp_segment_config_dbid_index';
+UPDATE pg_attribute SET attname='role', atttypid=18, attlen=1, attalign='c' WHERE attrelid=6107 AND attnum=1;
+UPDATE pg_index SET indnatts=1, indkey='2', indclass='429' WHERE indexrelid=6107;
+\c
+SET optimizer_enable_master_only_queries=true;
+DELETE FROM gp_segment_configuration;
+VACUUM FREEZE gp_segment_configuration;
+select * from pg_class  WHERE relnamespace = 11 and relname = 'gp_segment_configuration';
+select * FROM pg_attribute WHERE attrelid=5036 ;
+
+-- make fundamental changes to pg_appendonly...
+UPDATE @gpupgradeschemaname@.pg_class SET relnatts = relnatts+1 WHERE relnamespace = 11 and relname = 'pg_appendonly';
+INSERT INTO pg_attribute VALUES (6105, 'splitsize',  23, -1, 4, 16, 0, -1, -1, true, 'p', 'i', false, false, false, true, 0);
+\c
+SET optimizer_enable_master_only_queries=true;
+UPDATE pg_appendonly SET splitsize = 67108864;
+VACUUM FREEZE pg_appendonly;
+
+-- make fundamental changes to pg_resqueue...
+DELETE FROM pg_resqueue;
+DELETE FROM pg_class WHERE relnamespace = 11 and relname = 'pg_resqueue';
+DELETE FROM pg_attribute WHERE attrelid=6026;
+DELETE FROM pg_type where typname='pg_resqueue';
+set gp_before_persistence_work to false;
+CREATE TABLE pg_resqueue
+(
+    rsqname name not null, -- name of resource queue
+    rsq_parent oid not null, -- oid of resource queue
+    rsq_active_stats_cluster integer not null, -- active statement count limit
+    rsq_memory_limit_cluster text, -- memory limit in cluster
+    rsq_core_limit_cluster text, -- core limit in cluster
+    rsq_resource_upper_factor real, -- resource upper limit in cluster
+    rsq_allocation_policy text, -- query resource allocation policy
+    rsq_vseg_resource_quota text, -- vsegment resource quota
+    rsq_vseg_upper_limit integer, -- vsegment size upper limit
+    rsq_creation_time timestamp with time zone, -- when the queue is created
+    rsq_update_time timestamp with time zone, -- when the queue is updated ( create or alter )
+    rsq_status text -- the status of resource queue.
+)
+with (camelcase=ResQueue, shared=true, oids=true, relid=6026, reltype_oid=9830, toast_oid=9820, toast_index=9821, toast_reltype=9822)
+TABLESPACE pg_global;
+\c
+SET optimizer_enable_master_only_queries=true;
+VACUUM FREEZE  pg_resqueue;
+select * from pg_class  WHERE relnamespace = 11 and relname = 'pg_resqueue';
+select * FROM pg_attribute WHERE attrelid=6026;
+-- Then we can insert pg_type rows including OID.  Note only COPY allows us
+-- to insert OID as of today.  Use CSV as data contains comma data.
+-- psql expands this for us
+\set pg_resqueue_datafile `echo "'$GPHOME/share/postgresql/upgrade/pg_resqueue.data'"`
+-- Add entries to the master
+COPY @gpupgradeschemaname@.pg_resqueue FROM :pg_resqueue_datafile WITH OIDS CSV;
+
+-- change data in table pg_resourcetype
+UPDATE pg_resourcetype SET resname='active_statements', resrequired=false, reshasdefault=true, reshasdisable=false, resdefaultsetting=-1, resdisabledsetting=-1 WHERE restypid=1;
+UPDATE pg_resourcetype SET resname='parent', resrequired=true, reshasdefault=false, reshasdisable=false, resdefaultsetting=-1, resdisabledsetting=-1 WHERE restypid=2;
+UPDATE pg_resourcetype SET resname='memory_limit_cluster', resrequired=true, reshasdefault=false, reshasdisable=false, resdefaultsetting=-1, resdisabledsetting=-1 WHERE restypid=3;
+UPDATE pg_resourcetype SET resname='core_limit_cluster', resrequired=true, reshasdefault=false, reshasdisable=false, resdefaultsetting=-1, resdisabledsetting=-1 WHERE restypid=4;
+UPDATE pg_resourcetype SET resname='segment_resource_quota', resrequired=false, reshasdefault=true, reshasdisable=false, resdefaultsetting=-1, resdisabledsetting=-1 WHERE restypid=5;
+UPDATE pg_resourcetype SET resname='resource_upper_factor', resrequired=false, reshasdefault=true, reshasdisable=false, resdefaultsetting=-1, resdisabledsetting=-1 WHERE restypid=6;
+
+-- change proc pg_stat_get_activity
+UPDATE pg_proc SET proallargtypes='{23,26,23,26,25,25,16,1184,1184,1184,869,23,23,16}',proargmodes='{i,o,o,o,o,o,o,o,o,o,o,o,o,o}',
+    proargnames='{pid,datid,procpid,usesysid,application_name,current_query, waiting,xact_start,query_start,backend_start,client_addr,client_port,sess_id,waiting_resource}'
+    WHERE oid=6071;
+
+-- change pg_proc data
+DELETE FROM @gpupgradeschemaname@.pg_proc WHERE oid IN (5040, 5041, 5042, 5046, 6117, 6435, 9900);
+\set pg_proc_datafile `echo "'$GPHOME/share/postgresql/upgrade/pg_proc.data'"`
+COPY @gpupgradeschemaname@.pg_proc FROM :pg_proc_datafile WITH OIDS CSV;
+
+-- change pg_description data
+DELETE FROM @gpupgradeschemaname@.pg_description WHERE objoid IN (5040, 5041, 5042, 6117, 6435);
+\set pg_description_datafile `echo "'$GPHOME/share/postgresql/upgrade/pg_description.data'"`
+COPY @gpupgradeschemaname@.pg_description FROM :pg_description_datafile CSV;
+
+-- drop and recreate hawq_toolkit schema first
+-- if upgrade is successfull gpmigrator will recreate hawq_toolkit objects
+DROP SCHEMA IF EXISTS @gpupgradetoolkitschema@ CASCADE;
+CREATE SCHEMA @gpupgradetoolkitschema@;
+

@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+
+<configuration>
+    <property>
+        <name>fs.default.name</name>
+        <value>hdfs://127.0.0.1:9000</value>
+    </property>
+    <property>
+        <name>mapred.job.tracker</name>
+        <value>local</value>
+    </property>
+</configuration>

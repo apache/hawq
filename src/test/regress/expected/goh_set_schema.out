@@ -1,0 +1,48 @@
+--
+-- alter object set schema
+--
+create schema alter1;
+create schema alter2;
+create table alter1.t1(f1 serial, f2 int check (f2 > 0));
+NOTICE:  CREATE TABLE will create implicit sequence "t1_f1_seq" for serial column "t1.f1"
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'f1' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+create view alter1.v1 as select * from alter1.t1;
+insert into alter1.t1(f2) values(11);
+insert into alter1.t1(f2) values(12);
+alter table alter1.t1 set schema alter2;
+alter table alter1.v1 set schema alter2;
+select * from alter2.t1;
+ f1 | f2 
+----+----
+  2 | 12
+  1 | 11
+(2 rows)
+
+select * from alter2.v1;
+ f1 | f2 
+----+----
+  2 | 12
+  1 | 11
+(2 rows)
+
+create function alter1.plus1(int) returns int as 'select $1+1' language sql;
+alter function alter1.plus1(int) set schema alter2;
+ERROR:  Cannot support alter function schema statement yet
+create domain alter1.posint integer check (value > 0);
+ERROR:  Cannot support create domain statement yet
+alter domain alter1.posint set schema alter2;
+ERROR:  Cannot support alter domain schema statement yet
+create type alter1.ctype as (f1 int, f2 text);
+ERROR:  Cannot support create type yet
+alter type alter1.ctype set schema alter2;
+ERROR:  Cannot support alter type schema statement yet
+drop schema alter1 cascade;
+NOTICE:  drop cascades to type alter1.ctype
+drop schema alter2 cascade;
+NOTICE:  drop cascades to view alter2.v1
+NOTICE:  drop cascades to rule _RETURN on view alter2.v1
+NOTICE:  drop cascades to sequence alter2.t1_f1_seq
+NOTICE:  drop cascades to default for append only table alter2.t1 column f1
+NOTICE:  drop cascades to append only table alter2.t1
+NOTICE:  drop cascades to constraint t1_f2_check on append only table alter2.t1

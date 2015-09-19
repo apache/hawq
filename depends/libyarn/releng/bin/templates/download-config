@@ -1,0 +1,5 @@
+hawq-1.1.0=http://hdp4-mdw1.wbe.dh.greenplum.com/dist/PHD/stable/PHD1.0.1/PHD-1.0.1.0-19.tar.gz
+hawq-1.1.1=http://hdp4-mdw1.wbe.dh.greenplum.com/dist/PHD/stable/PHD1.0.2/PHD-1.0.2.0-7.tar.gz
+hawq-1.1.2=http://hdp4-mdw1.wbe.dh.greenplum.com/dist/PHD/stable/PHD1.0.3/PHD-1.0.3.0-66.tar.gz
+hawq-1.1.3=http://hdp4-mdw1.wbe.dh.greenplum.com/dist/PHD/stable/PHD1.1.0/PHD-1.1.0.0-76.tar.gz
+hawq-1.1.4=http://hdp4-mdw1.wbe.dh.greenplum.com/dist/PHD/testing/PHD-1.1.1.0-82.tar.gz

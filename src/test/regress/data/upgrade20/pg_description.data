@@ -1,0 +1,8 @@
+6435,1255,0,"Return resource distribution among segments for given workload"
+6450,1255,0,"Dump resource manager status for testing"
+6460,1255,0,"Play resource actions based on specified action file, and output the result to output file"
+8080,1255,0,"Clear all metadata cache content"
+8081,1255,0,"Get metadata cache current entry number"
+8082,1255,0,"Check whether metadata cache key exists"
+8083,1255,0,"Get metadata cache info for specific key"
+8084,1255,0,"Get metadata cache current block number"

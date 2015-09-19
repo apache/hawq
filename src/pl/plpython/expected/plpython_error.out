@@ -1,0 +1,51 @@
+-- test error handling, i forgot to restore Warn_restart in
+-- the trigger handler once. the errors and subsequent core dump were
+-- interesting.
+SELECT invalid_type_uncaught('rick');
+ERROR:  plpy.SPIError: type "test" does not exist (plpython.c:4703)
+CONTEXT:  Traceback (most recent call last):
+  PL/Python function "invalid_type_uncaught", line 3, in <module>
+    SD["plan"] = plpy.prepare(q, [ "test" ])
+PL/Python function "invalid_type_uncaught"
+SELECT invalid_type_caught('rick');
+NOTICE:  type "test" does not exist
+CONTEXT:  PL/Python function "invalid_type_caught"
+ invalid_type_caught 
+---------------------
+ 
+(1 row)
+
+SELECT invalid_type_reraised('rick');
+ERROR:  plpy.Error: type "test" does not exist (plpython.c:4703)
+CONTEXT:  Traceback (most recent call last):
+  PL/Python function "invalid_type_reraised", line 6, in <module>
+    plpy.error(str(ex))
+PL/Python function "invalid_type_reraised"
+SELECT valid_type('rick');
+ valid_type 
+------------
+ 
+(1 row)
+
+--
+-- Test Unicode error handling.
+--
+SELECT unicode_return_error();
+ unicode_return_error 
+----------------------
+ \u0080
+(1 row)
+
+INSERT INTO unicode_test (testvalue) VALUES ('test');
+SELECT unicode_plan_error1();
+ unicode_plan_error1 
+---------------------
+ \u0080
+(1 row)
+
+SELECT unicode_plan_error2();
+ERROR:  TypeError: plpy.execute takes a sequence as its second argument (plpython.c:4703)
+CONTEXT:  Traceback (most recent call last):
+  PL/Python function "unicode_plan_error2", line 3, in <module>
+    rv = plpy.execute(plan, u"\x80", 1)
+PL/Python function "unicode_plan_error2"

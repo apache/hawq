@@ -1,0 +1,21 @@
+Run Unit Test
+-------------
+All unit tests can be run without starting HAWQ and HDFS, simply run
+$ mvn clean test
+
+
+Run Feature Test
+----------------
+1. Make sure HAWQ started, and have a database "gptest". We assume
+   master's host and port to be localhost:5432, but you can change it
+   using the following environment variables
+   - PG_BASE_ADDRESS
+   - PG_BASE_PORT
+
+2. Make sure HDFS started.
+   - HADOOP_HOME    defaults to "/usr/local/hadoop"
+
+
+Code Coverage
+-------------
+$ mvn clean clover2:setup test clover2:aggregate clover2:clover

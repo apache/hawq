@@ -1,0 +1,80 @@
+/*-------------------------------------------------------------------------
+ *
+ * executormgr.h
+ *
+ * Copyright (c) 2014-2014, Pivotal inc
+ *
+ *-------------------------------------------------------------------------
+ */
+
+#ifndef EXECUTORMGR_H
+#define EXECUTORMGR_H
+
+#include "portability/instr_time.h"	/* Monitor the dispatcher performance */
+
+struct DispatchData;
+struct DispatchTask;
+struct DispatchSlice;
+struct QueryExecutor;
+struct Segment;
+struct SegmentDatabaseDescriptor;
+
+/* Executor state. */
+extern struct QueryExecutor *executormgr_create_executor(void);
+extern bool	executormgr_bind_executor_task(struct DispatchData *data,
+							struct QueryExecutor *executor,
+							struct SegmentDatabaseDescriptor *desc,
+							struct DispatchTask *task,
+							struct DispatchSlice *slice);
+extern void executormgr_serialize_executor_state(struct DispatchData *data,
+							struct QueryExecutor *executor,
+							struct DispatchTask *task,
+							struct DispatchSlice *slice);
+extern void	executormgr_unbind_executor_task(struct DispatchData *data,
+							struct QueryExecutor *executor,
+							struct DispatchTask *task,
+							struct DispatchSlice *slice);
+extern void executormgr_get_statistics(struct QueryExecutor *executor,
+								instr_time *time_connect_begin,
+								instr_time *time_connect_end,
+								instr_time *time_dispatch_begin,
+								instr_time *time_dispatch_end,
+			          instr_time *time_consume_begin,
+			          instr_time *time_consume_end,
+			          instr_time *time_free_begin,
+			          instr_time *time_free_end);
+extern struct SegmentDatabaseDescriptor *executormgr_allocate_executor(
+							struct Segment *segment, bool is_writer, bool is_entrydb);
+extern struct SegmentDatabaseDescriptor *executormgr_takeover_segment_conns(struct QueryExecutor *executor);
+extern void executormgr_free_takeovered_segment_conn(struct SegmentDatabaseDescriptor *desc);
+extern void executormgr_get_executor_connection_info(struct QueryExecutor *executor,
+							char **address, int *port, int *pid);
+extern bool	executormgr_is_stop(struct QueryExecutor *executor);
+extern bool	executormgr_has_error(struct QueryExecutor *executor);
+extern int	executormgr_get_executor_slice_id(struct QueryExecutor *executor);
+extern int	executormgr_get_fd(struct QueryExecutor *executor);
+extern bool	executormgr_cancel(struct QueryExecutor * executor);
+extern bool	executormgr_dispatch_and_run(struct DispatchData *data, struct QueryExecutor *executor);
+extern bool	executormgr_consume(struct QueryExecutor *executor);
+extern bool	executormgr_discard(struct QueryExecutor *executor);
+extern void	executormgr_merge_error(struct QueryExecutor *exeutor);
+extern void executormgr_merge_error_for_dispatcher(
+    struct QueryExecutor *executor, int *errHostSize,
+    int *errNum, char ***errHostInfo);
+extern bool executormgr_is_executor_error(struct QueryExecutor *executor);
+extern void executormgr_setup_env(MemoryContext ctx);
+extern void executormgr_cleanup_env(void);
+extern int executormgr_get_cached_executor_num(void);
+extern int executormgr_get_cached_executor_num_onentrydb(void);
+
+/* API used to connect executor concurrently. */
+extern struct SegmentDatabaseDescriptor *executormgr_prepare_connect(
+							struct Segment *segment,
+							bool is_writer);
+extern bool executormgr_connect(struct SegmentDatabaseDescriptor *desc,
+							struct QueryExecutor *executor,
+							bool is_writer, bool is_superuser);
+extern void executormgr_free_executor(struct SegmentDatabaseDescriptor *desc);
+
+#endif	/* EXECUTORMGR_H */
+

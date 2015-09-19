@@ -1,0 +1,1062 @@
+#!/usr/bin/env python
+#
+# Copyright (c) Pivotal Inc 2015. All Rights Reserved.
+#
+
+import os
+import sys
+import re
+import logging, time
+from optparse import OptionParser
+import subprocess
+import threading
+import Queue
+import signal
+
+try:
+    from gppylib.gplog import setup_hawq_tool_logging, quiet_stdout_logging, enable_verbose_logging
+    from gppylib.commands.unix import getLocalHostname, getUserName
+    from gppylib.commands import gp
+    from gppylib import userinput
+    from hawqpylib.hawqlib import local_ssh, HawqCommands, HawqXMLParser, parse_hosts_file,\
+        remove_property_xml, sync_hawq_site
+    from hawqpylib.HAWQ_HELP import *
+    from gppylib.db import dbconn
+    from pygresql.pg import DatabaseError
+except ImportError, e:
+    sys.exit('ERROR: Cannot import modules.  Please check that you '
+             'have sourced greenplum_path.sh.  Detail: ' + str(e))
+
+
+class HawqInit:
+    def __init__(self, opts, hawq_dict):
+        self.node_type = opts.node_type
+        self.hawq_command = opts.hawq_command
+        self.user= opts.user
+        self.GPHOME = opts.GPHOME
+        self.stop_mode = opts.stop_mode
+        self.log_dir = opts.log_dir
+        self.timeout = opts.timeout_seconds
+        self.no_update = opts.no_update
+        self.remove_standby = opts.remove_standby
+        self.hawq_dict = hawq_dict
+        self.locale = opts.hawq_locale
+        self.quiet  = opts.quiet_run
+        self.hawq_lc_collate= opts.hawq_lc_collate
+        self.hawq_lc_ctype = opts.hawq_lc_ctype
+        self.hawq_lc_messages = opts.hawq_lc_messages
+        self.hawq_lc_monetary = opts.hawq_lc_monetary
+        self.hawq_lc_numeric = opts.hawq_lc_numeric
+        self.hawq_lc_time = opts.hawq_lc_time
+        self.vseg_num_per_node = opts.virtual_seg_num
+        self.max_connections = opts.max_connections
+        self.shared_buffers = opts.shared_buffers
+        self.lock = threading.Lock()
+        self._get_config()
+        self._write_config()
+
+    def _get_config(self):
+        check_items = ('hawq_master_address_host', 'hawq_master_address_port',
+        'hawq_master_directory', 'hawq_segment_directory',
+        'hawq_segment_address_port', 'hawq_dfs_url',
+        'hawq_master_temp_directory', 'hawq_segment_temp_directory')
+
+        if self.node_type in ['master', 'segment', 'standby']:
+            for item in check_items:
+                if item in self.hawq_dict:
+                    logger.info("Check: %s is set" % item)
+                else:
+                    sys.exit("Check: %s not configured in hawq-site.xml." % item)
+
+        self.master_host_name = self.hawq_dict['hawq_master_address_host']
+        self.master_port = self.hawq_dict['hawq_master_address_port']
+        self.master_data_directory = self.hawq_dict['hawq_master_directory']
+        self.master_address = self.master_host_name + ":" + self.master_port
+        self.segment_data_directory = self.hawq_dict['hawq_segment_directory']
+        self.segment_port = self.hawq_dict['hawq_segment_address_port']
+        self.hawq_master_temp_directory = self.hawq_dict['hawq_master_temp_directory']
+        self.hawq_segment_temp_directory = self.hawq_dict['hawq_segment_temp_directory']
+        self.dfs_url = self.hawq_dict['hawq_dfs_url']
+        self.dfs_namenode, self.dfs_namenode_port, self.dfs_space = re.split('[:/]', self.dfs_url, maxsplit=2)
+        self.host_list = parse_hosts_file(self.GPHOME)
+        self.hosts_count_number = len(self.host_list)
+        if self.hosts_count_number == 0:
+            self.total_vseg_num = self.vseg_num_per_node
+        else:
+            self.total_vseg_num = self.hosts_count_number * self.vseg_num_per_node
+
+        if 'hawq_standby_address_host' in self.hawq_dict:
+            self.standby_host_name = self.hawq_dict['hawq_standby_address_host']
+            self.standby_port = self.master_port
+            self.standby_address = self.standby_host_name + ":" + self.standby_port
+        else:
+            logger.info("No standby host configured, skip it")
+            self.standby_host_name = ''
+        if 'enable_secure_filesystem' in self.hawq_dict:
+            self.enable_secure_filesystem=self.hawq_dict['enable_secure_filesystem']
+            self.krb_server_keyfile =self.hawq_dict['krb_server_keyfile']
+        else:
+            self.enable_secure_filesystem = 'off'
+            self.krb_server_keyfile = ''
+
+    def _write_config(self):
+        configFile = "%s/etc/_mgmt_config" % self.GPHOME
+        # Clean configFile while the first write in.
+        with open(configFile, 'w') as f: 
+            f.write("GPHOME=%s\n" % self.GPHOME)
+        with open(configFile, 'a') as f: 
+            f.write("hawqUser=%s\n" % self.user)
+            f.write("master_host_name=%s\n" % self.master_host_name)
+            f.write("master_port=%s\n" % self.master_port)
+            f.write("master_data_directory=%s\n" % self.master_data_directory)
+            f.write("segment_data_directory=%s\n" % self.segment_data_directory)
+            f.write("segment_port=%s\n" % self.segment_port)
+            f.write("hawq_master_temp_directory=%s\n" % self.hawq_master_temp_directory)
+            f.write("hawq_segment_temp_directory=%s\n" % self.hawq_segment_temp_directory)
+            f.write("locale=%s\n" % self.locale)
+            f.write("hawq_lc_collate=%s\n" % self.hawq_lc_collate)
+            f.write("hawq_lc_ctype=%s\n" % self.hawq_lc_ctype)
+            f.write("hawq_lc_messages=%s\n" % self.hawq_lc_messages)
+            f.write("hawq_lc_monetary=%s\n" % self.hawq_lc_monetary)
+            f.write("hawq_lc_numeric=%s\n" % self.hawq_lc_numeric)
+            f.write("hawq_lc_time=%s\n" % self.hawq_lc_time)
+            f.write("max_connections=%s\n" % self.max_connections)
+            f.write("shared_buffers=%s\n" % self.shared_buffers)
+            f.write("dfs_url=%s\n" % self.dfs_url)
+            f.write("log_filename=%s\n" % log_filename)
+            f.write("log_dir=%s\n" % self.log_dir)
+        if 'hawq_standby_address_host' in self.hawq_dict:
+            with open(configFile, 'a') as f: 
+                f.write("standby_host_name=%s\n" % self.standby_host_name)
+
+    def check_hdfs_path(self):
+        cmd = "%s/bin/gpcheckhdfs hdfs %s %s %s" % \
+              (self.GPHOME, self.dfs_url, self.enable_secure_filesystem, self.krb_server_keyfile)
+        logger.info("Check if hdfs path is available.")
+        logger.debug("Check hdfs: %s" % cmd)
+        result = local_ssh(cmd)
+        if result != 0:
+            logger.error("Check hdfs failed, please verify your hdfs settings.")
+            sys.exit(1)
+        return result
+
+    def set_total_vsegment_num(self):
+        cmd = "%s; hawq config -c default_segment_num -v %s --skipvalidation -q > /dev/null" % \
+               (source_hawq_env, self.total_vseg_num)
+        result = local_ssh(cmd)
+        if result != 0:
+            logger.warn("Set default_segment_num failed.")
+        return result
+
+    def set_vsegment_num_per_node(self):
+        cmd = "%s; hawq config -c hawq_resourcemanager_query_vsegment_number_per_segment_limit  \
+              -v %s --skipvalidation -q > /dev/null" % \
+              (source_hawq_env, self.vseg_num_per_node)
+        result = local_ssh(cmd)
+        if result != 0:
+            logger.warn("Set hawq_resourcemanager_query_vsegment_number_per_segment_limit failed.")
+        return result
+
+    def _get_master_init_cmd(self):
+        cmd = "%s/bin/lib/hawqinit.sh master '%s'" % \
+                (self.GPHOME, self.GPHOME)
+        return cmd
+
+    def _get_standby_init_cmd(self):
+        cmd = "%s/bin/lib/hawqinit.sh standby '%s'" % \
+                (self.GPHOME, self.GPHOME)
+        return cmd
+
+    def hawq_remove_standby(self):
+        """Removes the standby master."""
+        running_standby_host = ''
+
+        try:
+            dburl = dbconn.DbURL(port=self.master_port, dbname='template1')
+            conn = dbconn.connect(dburl, True)
+            query = "select role, hostname from gp_segment_configuration where role = 's';"
+            rows = dbconn.execSQL(conn, query)
+            conn.close()
+        except DatabaseError, ex:
+            logger.error("Failed to connect to database, this script can only be run when the database is up.")
+            sys.exit(1)
+
+        for row in rows:
+            if row[0] == 's':
+                running_standby_host = row[1]
+
+        if running_standby_host:
+            logger.info("running standby host is %s" % running_standby_host)
+            signal.signal(signal.SIGINT,signal.SIG_IGN)
+            cmd = "%s; hawq stop cluster -a -q" % source_hawq_env
+            logger.info("Stop HAWQ cluster.")
+            result = local_ssh(cmd)
+            if result != 0:
+                logger.error("Stop HAWQ cluster failed, exit.")
+                sys.exit(1)
+            logger.info("Start HAWQ master.")
+            cmd = "%s; hawq start master -m -q" % source_hawq_env
+            result = local_ssh(cmd)
+            if result != 0:
+                logger.error("Start HAWQ master failed, exit.")
+                sys.exit(1)
+
+            try:
+                logger.info('Remove standby from Database catalog.')
+                #dburl = dbconn.DbURL(port=self.master_port, dbname='template1')
+                #conn = dbconn.connect(dburl, utility=True, verbose=True)
+                #query = "select gp_remove_master_standby();"
+                #rows = dbconn.execSQL(conn, query)
+                #for row in rows:
+                #    print row
+                #conn.close()
+                cmd = 'env PGOPTIONS="-c gp_session_role=utility" %s/bin/psql -p %s -d template1 -c \
+                    "select gp_remove_master_standby();"' % (self.GPHOME, self.master_port)
+                local_ssh(cmd)
+                logger.info('Database catalog updated successfully.')
+                logger.info("Stop HAWQ master.")
+                cmd = "%s; hawq stop master -a" % source_hawq_env
+                result = local_ssh(cmd)
+                if result != 0:
+                    logger.error("Stop hawq master failed, exit.")
+                    sys.exit(1)
+            except DatabaseError, ex:
+                logger.error("Failed to connect to database, this script can only be run when the database is up.")
+                cmd = "%s; hawq stop master -a" % source_hawq_env
+                result = local_ssh(cmd)
+                if result != 0:
+                    logger.error("Stop hawq master failed, exit.")
+                sys.exit(1)
+            remove_property_xml("hawq_standby_address_host", "%s/etc/hawq-site.xml" % self.GPHOME)
+            host_list = parse_hosts_file(self.GPHOME)
+            sync_hawq_site(self.GPHOME, host_list)
+            gpsyncmaster_pid = gp.getSyncmasterPID(running_standby_host, self.master_data_directory)
+            if gpsyncmaster_pid > 0:
+                # stop it
+                logger.info('Stopping gpsyncmaster on %s' % running_standby_host)
+                gp.SegmentStop.remote('stop gpsyncmaster',
+                                    running_standby_host,
+                                    self.master_data_directory)
+
+            tmp_dir_list = self.hawq_master_temp_directory.replace(',', ' ')
+
+            logger.debug("rm -rf %s %s" % (self.master_data_directory, tmp_dir_list))
+            cmd = "rm -rf %s %s" % (self.master_data_directory, tmp_dir_list)
+            result = remote_ssh(cmd, self.standby_host_name, self.user)
+            if result != 0:
+                logger.error("Delete standby master's directories failed, exit.")
+                sys.exit(1)
+            signal.signal(signal.SIGINT,signal.default_int_handler)
+            logger.info('Remove standby master finished.')
+        else:
+            logger.info("Do not find a running standby master.")
+
+    def _resync_standby(self):
+        logger.info("Re-sync standby.")
+        cmd = "%s; hawq stop cluster -a" % source_hawq_env
+        result = local_ssh(cmd)
+        if result != 0:
+            logger.error("Stop hawq cluster failed, exit.")
+            sys.exit(1)
+        cmd = "cd %s; %s; %s/bin/lib/pysync.py -x gpperfmon/data -x pg_log -x db_dumps %s %s:%s" % \
+                 (self.master_data_directory, source_hawq_env,  self.GPHOME, self.master_data_directory,
+                  self.standby_host_name, self.master_data_directory)
+        result = local_ssh(cmd)
+        if result != 0:
+            logger.error("Re-sync standby master failed, exit.")
+            sys.exit(1)
+        else:
+            cmd = "%s; hawq start cluster -a" % source_hawq_env
+            local_ssh(cmd)
+
+        return result
+        
+    def _get_segment_init_cmd(self):
+        cmd = "%s/bin/lib/hawqinit.sh segment '%s'" % \
+                (self.GPHOME, self.GPHOME)
+        return cmd
+
+    def _init_cluster(self):
+        logger.info("%s segment hosts defined" % self.hosts_count_number)
+        logger.info("Set default_segment_num as: %s" % self.total_vseg_num)
+        result = self.set_total_vsegment_num()
+        if result != 0:
+            sys.exit(1)
+        result = self.set_vsegment_num_per_node()
+        if result != 0:
+            sys.exit(1)
+        master_cmd = self._get_master_init_cmd()
+        logger.info("Start to init master node: '%s'" % self.master_host_name)
+        result = local_ssh(master_cmd)
+        if result != 0:
+            logger.error("Master init failed, exit")
+            sys.exit(1)
+        else:
+            logger.info("Master init successfully")
+
+        segment_cmd_str = self._get_segment_init_cmd()
+        # Execute segment init command on each segment nodes.
+        logger.info("Init segments in list: %s" % self.host_list)
+        work_list = []
+        q = Queue.Queue()
+        for host in self.host_list:
+            logger.debug("Start to init segment on node '%s'" % host)
+            scpcmd = "scp %s/etc/_mgmt_config %s:%s/etc/_mgmt_config > /dev/null" % (self.GPHOME, host, self.GPHOME)
+            local_ssh(scpcmd)
+            work_list.append({"func":remote_ssh,"args":(segment_cmd_str, host, self.user, q)})
+        work_list.append({"func":check_progress,"args":(q, self.hosts_count_number, 'init', self.quiet)})
+        node_init = HawqCommands(name='HAWQ-SEG-INIT')
+        node_init.get_function_list(work_list)
+        node_init.start()
+        if node_init.return_flag != 0:
+            logger.info("Segments init failed, exit")
+            sys.exit(1)
+        else:
+            logger.info("Segments init successfully on nodes '%s'" % self.host_list)
+
+        if self.standby_host_name not in ('', 'None', 'none', 'NONE'):
+            logger.info("Start to init standby master: '%s'" % self.standby_host_name)
+            logger.info("This might take a couple of minutes, please wait...")
+            standby_init_cmd = self._get_standby_init_cmd()
+            scpcmd = "scp %s/etc/_mgmt_config %s:%s/etc/_mgmt_config > /dev/null" % \
+                     (self.GPHOME, self.standby_host_name, self.GPHOME)
+            local_ssh(scpcmd)
+            scpcmd = "scp %s/etc/slaves %s:%s/etc/slaves > /dev/null" % \
+                     (self.GPHOME, self.standby_host_name, self.GPHOME)
+            local_ssh(scpcmd)
+            result = remote_ssh(standby_init_cmd, self.master_host_name, self.user)
+            if result != 0:
+                logger.error("Standby master init failed, exit")
+                sys.exit(1)
+            else:
+                logger.info("Standby master init successfully")
+                logger.info("HAWQ cluster init successfully")
+        return None
+
+    def run(self):
+        if self.node_type == "master":
+            self.check_hdfs_path()
+            logger.info("%s segment hosts defined" % self.hosts_count_number)
+            logger.info("Set default_segment_num as: %s" % self.total_vseg_num)
+            result = self.set_total_vsegment_num()
+            if result != 0:
+                sys.exit(1)
+            result = self.set_vsegment_num_per_node()
+            if result != 0:
+                sys.exit(1)
+            logger.info("Start to init master")
+            cmd = self._get_master_init_cmd()
+            result = local_ssh(cmd)
+            if result != 0:
+                logger.error("Master init failed, exit")
+                sys.exit(1)
+            else:
+                logger.info("Master init successfully")
+        elif self.node_type == "standby" and self.remove_standby is True:
+            logger.info("Try to remove standby master")
+            self.hawq_remove_standby()
+        elif self.node_type == "standby":
+            logger.info("Start to init standby master")
+            logger.info("This might take couple minutes, please wait...")
+            if self.no_update:
+                result = self._resync_standby()
+                if result != 0:
+                    logger.error("Standby master re-sync failed, exit")
+                    sys.exit(1)
+                else:
+                    logger.info("Standby master re-sync successfully")
+            else:
+                cmd = self._get_standby_init_cmd()
+                result = local_ssh(cmd)
+                if result != 0:
+                    logger.error("Standby master init failed, exit")
+                    sys.exit(1)
+                else:
+                    logger.info("Standby master init successfully")
+
+        elif self.node_type == "segment":
+            cmd = self._get_segment_init_cmd()
+            result = local_ssh(cmd)
+            if result != 0:
+                logger.error("Segment init failed, exit")
+                sys.exit(1)
+            else:
+                logger.info("Segment init successfully")
+
+        elif self.node_type == "cluster":
+            self.check_hdfs_path()
+            self._init_cluster()
+        else:
+            sys.exit('node_type should be in master/standby/segment/cluster')
+        return None
+
+class HawqStart:
+    def __init__(self, opts, hawq_dict):
+        self.node_type = opts.node_type
+        self.hawq_command = opts.hawq_command
+        self.user= opts.user
+        self.GPHOME = opts.GPHOME
+        self.quiet  = opts.quiet_run
+        self.stop_mode = opts.stop_mode
+        self.log_dir = opts.log_dir
+        self.timeout = opts.timeout_seconds
+        self.hawq_dict = hawq_dict
+        self.lock = threading.Lock()
+        self.max_connections = opts.max_connections
+        self.masteronly = opts.masteronly 
+        self.special_mode = opts.special_mode
+        self.restrict =  opts.restrict
+
+        self._get_config()
+
+    def _get_config(self):
+        logger.info("Gathering information and validating the environment...")
+        check_items = ('hawq_master_address_host', 'hawq_master_address_port',
+        'hawq_master_directory', 'hawq_segment_directory',
+        'hawq_segment_address_port', 'hawq_dfs_url',
+        'hawq_master_temp_directory', 'hawq_segment_temp_directory')
+
+        for item in check_items:
+            if item not in self.hawq_dict:
+                logger.error("Check: %s not configured in hawq-site.xml." % item)
+                sys.exit()
+
+        self.master_host_name = self.hawq_dict['hawq_master_address_host']
+        self.master_port = self.hawq_dict['hawq_master_address_port']
+        self.master_data_directory = self.hawq_dict['hawq_master_directory']
+        self.master_address = self.master_host_name + ":" + self.master_port
+        self.segment_data_directory = self.hawq_dict['hawq_segment_directory']
+        self.segment_port = self.hawq_dict['hawq_segment_address_port']
+        self.dfs_url = self.hawq_dict['hawq_dfs_url']
+        self.dfs_namenode, self.dfs_namenode_port, self.dfs_space = re.split('[:/]', self.dfs_url, maxsplit=2)
+        self.host_list = parse_hosts_file(self.GPHOME)
+        self.hosts_count_number = len(self.host_list)
+
+        if 'hawq_standby_address_host' in self.hawq_dict:
+            self.standby_host_name = self.hawq_dict['hawq_standby_address_host']
+            self.standby_port = self.master_port
+            self.standby_address = self.standby_host_name + ":" + self.standby_port
+        else:
+            logger.info("No standby host configured")
+            self.standby_host_name = ''
+
+    def _start_master_cmd(self):
+        logger.info("Start master service")
+        if self.masteronly:
+            start_options = "-i -M master -p %s --silent-mode=true -c gp_role=utility" % self.master_port
+        elif self.special_mode == 'upgrade':
+            start_options = "-i -M master -p %s --silent-mode=true -U" % self.master_port
+        elif self.special_mode == 'maintenance':
+            start_options = "-i -M master -p %s --silent-mode=true -m" % self.master_port
+        elif self.restrict:
+            start_options = "-i -M master -p %s --silent-mode=true -c superuser_reserved_connections=%s" % (self.master_port, self.max_connections)
+        else:
+            start_options = "-i -M master -p %s --silent-mode=true" % self.master_port
+
+        cmd_str = "%s; %s/bin/pg_ctl start -w -t %s -D %s -l %s/pg_log/startup.log -o \\\"%s\\\" >> %s" \
+                 % (source_hawq_env, self.GPHOME, self.timeout, self.master_data_directory, self.master_data_directory, start_options, log_filename)
+        return cmd_str
+
+    def start_master(self):
+        cmd = self._start_master_cmd()
+        result = remote_ssh(cmd, self.master_host_name, self.user)
+        return result
+
+    def _start_standby_cmd(self):
+        logger.info("Start standby master service")
+        cmd_str = "%s; %s/bin/gpsyncmaster -D %s -i -p %s >> %s 2>&1 &" \
+                 % (source_hawq_env, self.GPHOME, self.master_data_directory, self.standby_port, log_filename)
+        return cmd_str
+
+    def start_standby(self):
+        cmd = self._start_standby_cmd()
+        result = remote_ssh(cmd, self.standby_host_name, self.user)
+        return result
+
+    def _start_segment_cmd(self):
+        logger.info("Start segment service")
+        cmd_str = "%s; %s/bin/pg_ctl start -w -t %s -D %s -l %s/pg_log/startup.log -o \\\" -i -M %s -p %s --silent-mode=true\\\" >> %s" \
+             % (source_hawq_env, self.GPHOME, self.timeout, self.segment_data_directory, self.segment_data_directory,
+                "segment", self.segment_port, log_filename)
+
+        return cmd_str
+
+    def start_segment(self):
+        cmd = self._start_segment_cmd()
+        result = remote_ssh(cmd, 'localhost', self.user)
+        return result
+
+    def _start_all_nodes(self):
+        logger.info("Start all the nodes in hawq cluster")
+        logger.info("Starting master node '%s'" % self.master_host_name)
+        result = self.start_master()
+        if result != 0:
+            logger.error("Master start failed, exit")
+            sys.exit(1)
+        else:
+            logger.info("Master started successfully")
+
+        if self.standby_host_name not in ('', 'None', 'none', 'NONE'):
+            logger.info("Starting standby master '%s'" % self.standby_host_name)
+            result = self.start_standby()
+            if result != 0:
+                logger.error("Standby master start failed, exit")
+                sys.exit(1)
+            else:
+                logger.info("Standby master started successfully")
+        segment_cmd_str = self._start_segment_cmd()
+        logger.info("Start segments in list: %s" % self.host_list)
+        work_list = []
+        q = Queue.Queue()
+        for host in self.host_list:
+            work_list.append({"func":remote_ssh,"args":(segment_cmd_str, host, self.user, q)})
+        work_list.append({"func":check_progress,"args":(q, self.hosts_count_number, 'start', self.quiet)})
+        node_init = HawqCommands()
+        node_init.get_function_list(work_list)
+        node_init.start()
+        if node_init.return_flag != 0:
+            logger.error("Segments start failed")
+        else:
+            logger.info("Segments started successfully")
+        return node_init.return_flag
+
+    def _start_all_segments(self):
+        logger.info("Start all the segments in hawq cluster")
+        segment_cmd_str = self._start_segment_cmd()
+        logger.info("Start segments in list: %s" % self.host_list)
+        work_list = []
+        q = Queue.Queue()
+        for host in self.host_list:
+            work_list.append({"func":remote_ssh,"args":(segment_cmd_str, host, self.user, q)})
+        work_list.append({"func":check_progress,"args":(q, self.hosts_count_number, 'start', self.quiet)})
+        node_init = HawqCommands(name='HAWQ-SEG-START')
+        node_init.get_function_list(work_list)
+        node_init.start()
+        logger.info("Total threads return value is : %d" % node_init.return_flag)
+        if node_init.return_flag != 0:
+            logger.error("Segments start failed")
+        else:
+            logger.info("Segments started successfully")
+        return node_init.return_flag
+
+    def _check_master_running(self):
+        logger.info("Check if master is running")
+    def _check_standby_running(self):
+        logger.info("Check if standby master is running")
+    def _check_version(self):
+        logger.info("Check hawq version")
+    def _recovery_startup(self):
+        logger.info("Do recovery master start")
+    def _remove_postmaster_tmpfile(self, port):
+        logger.info("Delete postmaster temporary file")
+
+    def run(self):
+        if self.node_type == "master":
+            result = self.start_master()
+            if result != 0:
+                logger.error("Master start failed, exit")
+                sys.exit(1)
+            else:
+                logger.info("Master started successfully")
+        elif self.node_type == "standby":
+            if self.standby_host_name == '':
+                sys.exit(1)
+            result = self.start_standby()
+            if result != 0:
+                logger.error("Standby master start failed, exit")
+                sys.exit(1)
+            else:
+                logger.info("Standby master started successfully")
+        elif self.node_type == "segment":
+            result = self.start_segment()
+            if result != 0:
+                logger.error("Segment start failed, exit")
+                sys.exit(1)
+            else:
+                logger.info("Segment started successfully")
+        elif self.node_type == "cluster":
+            self._start_all_nodes()
+        elif self.node_type == "allsegments":
+            self._start_all_segments()
+        else:
+            sys.exit('Node object should be in master/standby/segment/allsegments/cluster')
+        return None
+
+
+class HawqStop:
+    def __init__(self, opts, hawq_dict):
+        self.node_type = opts.node_type
+        self.hawq_command = opts.hawq_command
+        self.user= opts.user
+        self.GPHOME = opts.GPHOME
+        self.stop_mode = opts.stop_mode
+        self.quiet  = opts.quiet_run
+        self.log_dir = opts.log_dir
+        self.timeout = opts.timeout_seconds
+        self.hawq_dict = hawq_dict
+        self.hawq_reload = opts.hawq_reload
+        self.lock = threading.Lock()
+        self._get_config()
+
+    def _get_config(self):
+        check_items = ('hawq_master_address_host', 'hawq_master_address_port',
+                       'hawq_master_directory', 'hawq_segment_directory',
+                       'hawq_segment_address_port', 'hawq_dfs_url',
+                       'hawq_master_temp_directory', 'hawq_segment_temp_directory')
+
+        for item in check_items:
+            if item not in self.hawq_dict:
+                sys.exit("Check: %s not configured in hawq-site.xml." % item)
+
+        self.master_host_name = self.hawq_dict['hawq_master_address_host']
+        self.master_port = self.hawq_dict['hawq_master_address_port']
+        self.master_data_directory = self.hawq_dict['hawq_master_directory']
+        self.master_address = self.master_host_name + ":" + self.master_port
+        self.segment_data_directory = self.hawq_dict['hawq_segment_directory']
+        self.segment_port = self.hawq_dict['hawq_segment_address_port']
+        self.dfs_url = self.hawq_dict['hawq_dfs_url']
+        self.dfs_namenode, self.dfs_namenode_port, self.dfs_space = re.split('[:/]', self.dfs_url, maxsplit=2)
+        self.host_list = parse_hosts_file(self.GPHOME)
+        self.hosts_count_number = len(self.host_list)
+
+        if 'hawq_standby_address_host' in self.hawq_dict:
+            self.standby_host_name = self.hawq_dict['hawq_standby_address_host']
+            self.standby_port = self.master_port
+            self.standby_address = self.standby_host_name + ":" + self.standby_port
+        else:
+            logger.info("No standby host configured")
+            self.standby_host_name = ''
+
+    def _stop_master_cmd(self):
+        logger.info("Stop hawq master")
+        if self.hawq_reload:
+            cmd_str = "%s; %s/bin/pg_ctl reload -D %s >> %s" % \
+                      (source_hawq_env, self.GPHOME, self.master_data_directory, log_filename)
+            return cmd_str
+        else:
+            cmd_str = "%s; %s/bin/pg_ctl stop -w -t %s -D %s -l %s/pg_log/startup.log -m %s >> %s" % \
+                      (source_hawq_env, self.GPHOME, self.timeout, self.master_data_directory,
+                       self.master_data_directory, self.stop_mode, log_filename)
+            return cmd_str
+
+    def _stop_master(self):
+        cmd = self._stop_master_cmd()
+        result = remote_ssh(cmd, self.master_host_name, self.user)
+        return result
+
+    def _stop_segment_cmd(self):
+        logger.info("Stop hawq segment")
+        if self.hawq_reload:
+            cmd_str = "%s; %s/bin/pg_ctl reload -D %s >> %s" % \
+                      (source_hawq_env, self.GPHOME, self.segment_data_directory, log_filename)
+            return cmd_str
+        else:
+            cmd_str = "%s; %s/bin/pg_ctl stop -w -t %s -D %s -l %s/pg_log/startup.log -m %s >> %s" % \
+                      (source_hawq_env, self.GPHOME, self.timeout, self.segment_data_directory,
+                       self.segment_data_directory, self.stop_mode, log_filename)
+            return cmd_str
+
+    def _stop_segment(self):
+        cmd = self._stop_segment_cmd()
+        result = remote_ssh(cmd, 'localhost', self.user)
+        return result
+
+    def _stop_standby_cmd(self):
+        logger.info("Stop hawq standby master")
+        if self.hawq_reload:
+            cmd_str = "%s; %s/bin/pg_ctl reload -D %s >> %s" % \
+                      (source_hawq_env, self.GPHOME, self.master_data_directory, log_filename)
+            return cmd_str
+        else:
+            cmd_str = "%s; %s/bin/pg_ctl stop -w -t %s -D %s -l %s/pg_log/startup.log -m %s >> %s" % \
+                      (source_hawq_env, self.GPHOME, self.timeout, self.master_data_directory,
+                       self.master_data_directory, self.stop_mode, log_filename)
+            return cmd_str
+
+    def _stop_standby(self):
+        cmd = self._stop_standby_cmd()
+        result = remote_ssh(cmd, self.standby_host_name, self.user)
+        return result
+
+    def _stopAll(self):
+        logger.info("Stop hawq cluster")
+        result = self._stop_master()
+        if result != 0:
+            logger.error("Master stop failed")
+        else:
+            logger.info("Master stopped successfully")
+        if self.standby_host_name not in ('', 'None', 'none', 'NONE'):
+            result = self._stop_standby()
+            if result != 0:
+                logger.error("Standby master stop failed")
+            else:
+                logger.info("Standby master stopped successfully")
+
+        segment_cmd_str = self._stop_segment_cmd()
+        # Execute segment start command on each segment nodes.
+        logger.info("Stop segments in list: %s" % self.host_list)
+        work_list = []
+        q = Queue.Queue()
+        for host in self.host_list:
+            work_list.append({"func":remote_ssh,"args":(segment_cmd_str, host, self.user, q)})
+        work_list.append({"func":check_progress,"args":(q, self.hosts_count_number, 'stop', self.quiet)})
+        node_init = HawqCommands()
+        node_init.get_function_list(work_list)
+        node_init.start()
+        if node_init.return_flag != 0:
+            logger.error("Segments stop failed")
+        else:
+            logger.info("Segments stopped successfully")
+        return node_init.return_flag
+
+    def _stopAllSegments(self):
+        logger.info("Stop hawq cluster")
+
+        segment_cmd_str = self._stop_segment_cmd()
+        # Execute segment start command on each segment nodes.
+        logger.info("Stop segments in list: %s" % self.host_list)
+        work_list = []
+        q = Queue.Queue()
+        for host in self.host_list:
+            work_list.append({"func":remote_ssh,"args":(segment_cmd_str, host, self.user, q)})
+        work_list.append({"func":check_progress,"args":(q, self.hosts_count_number, 'stop', self.quiet)})
+        node_init = HawqCommands()
+        node_init.get_function_list(work_list)
+        node_init.start()
+        if node_init.return_flag != 0:
+            logger.error("Segments stop failed")
+        else:
+            logger.info("Segments stopped successfully")
+        return node_init.return_flag
+
+    def run(self):
+        if self.node_type == "master":
+            result = self._stop_master()
+            if result != 0:
+                logger.error("Master stop failed, exit")
+                sys.exit(1)
+            else:
+                logger.info("Master stopped successfully")
+        elif self.node_type == "standby":
+            result = self._stop_standby()
+            if result != 0:
+                logger.error("Standby master stop failed, exit")
+                sys.exit(1)
+            else:
+                logger.info("Standby master stopped successfully")
+        elif self.node_type == "segment":
+            result = self._stop_segment()
+            if result != 0:
+                logger.error("Segment stop failed, exit")
+                sys.exit(1)
+            else:
+                logger.info("Segment stopped successfully")
+        elif self.node_type == "cluster":
+            self._stopAll()
+        elif self.node_type == "allsegments":
+            self._stopAllSegments()
+        else:
+            sys.exit('node_type should be in master/standby/segment/allsegments/cluster')
+        return None
+
+
+def create_logger(logname='hawq logger', outputFile='/tmp/hawq_mgmt.log'):
+    logger = logging.getLogger(logname)
+    logger.setLevel(logging.DEBUG) 
+    fh = logging.FileHandler(outputFile)
+    fh.setLevel(logging.DEBUG)  
+    ch = logging.StreamHandler() 
+    ch.setLevel(logging.DEBUG) 
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s') 
+    fh.setFormatter(formatter) 
+    ch.setFormatter(formatter) 
+    logger.addHandler(fh)
+    #logger.addHandler(ch) 
+    return logger
+
+
+def get_args():
+    (opts, ARGS) = create_parser()
+    if ARGS[0]:
+        opts.hawq_command = ARGS[0]
+    if ARGS[1]:
+        opts.node_type = ARGS[1]
+
+    if opts.node_type in ['master', 'standby', 'segment', 'cluster', 'allsegments'] and opts.hawq_command in ['start', 'stop', 'restart', 'init', 'activate']:
+        global logger, log_filename
+        if opts.verbose:
+            enable_verbose_logging()
+        if opts.quiet_run:
+            quiet_stdout_logging()
+        logger, log_filename = setup_hawq_tool_logging('hawq_%s' % opts.hawq_command,getLocalHostname(),getUserName(), opts.log_dir)
+        logger.info("Prepare to do 'hawq %s'" % opts.hawq_command)
+        logger.info("You can check log in %s" % log_filename)
+    else:
+        print COMMON_HELP
+        sys.exit(1)
+
+    args_lens = len(ARGS)
+    
+    if args_lens != 2:
+        sys.exit('Only support two arguements.')
+    
+    opts.GPHOME = os.getenv('GPHOME')
+    if not opts.GPHOME:
+        logger.error("Didn't get GPHOME value, exit")
+        sys.exit()
+    logger.debug("GPHOME is %s" % opts.GPHOME)
+    global source_hawq_env
+    source_hawq_env = "source %s/greenplum_path.sh" % opts.GPHOME 
+
+    if opts.user == "":
+        opts.user = os.getenv('USER')
+    if opts.user == "root":
+        logger.error("'root' user is not allowed")
+        sys.exit()
+    logger.debug("Current user is '%s'" % opts.user)
+    hawqsite = HawqXMLParser(opts.GPHOME)
+    hawqsite.get_all_values()
+    hawq_dict = hawqsite.hawq_dict
+
+    Capital_Action = opts.hawq_command.title()
+    logger.info("%s hawq with args: %s" % (Capital_Action, ARGS))
+    return opts, hawq_dict
+
+
+def remote_ssh(cmd_str, host, user, q=None):
+    if user == "":
+        remote_cmd_str = "ssh -o 'StrictHostKeyChecking no' %s \"%s\"" % (host, cmd_str)
+    else:
+        remote_cmd_str = "ssh -o 'StrictHostKeyChecking no' %s@%s \"%s\"" % (user, host, cmd_str)
+    result = subprocess.Popen(remote_cmd_str, shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+    stdout,stderr = result.communicate()
+    if stdout and stdout != '':
+        logger.info(stdout)
+    if stderr and stdout != '':
+        logger.info(stderr)
+    if q:
+        q.put(("done", host, result.returncode))
+    return result.returncode
+
+
+def check_progress(q, total_num, action, quiet=False):
+    working_num = total_num
+    success_num = 0
+    pnum = 0
+    sys.stdout.write("\r")
+    while working_num > 0:
+        if not q.empty():
+            msg = q.get()
+            if msg[0] == "done":
+                working_num = working_num - 1
+            if msg[2] == 0:
+                success_num = success_num + 1
+            if not quiet:
+                sys.stdout.write(".")
+                sys.stdout.flush()
+        else:
+            if not quiet:
+                sys.stdout.write(".")
+                sys.stdout.flush()
+        time.sleep(1)
+    if not quiet:
+        sys.stdout.write("\n")
+    logger.info("%d of %d segments %s successfully" % (success_num, total_num, action))
+    return 0
+
+
+def start_hawq(opts, hawq_dict):
+    instance = HawqStart(opts, hawq_dict)
+    instance.run()
+    return None
+
+
+def stop_hawq(opts, hawq_dict):
+    instance = HawqStop(opts, hawq_dict)
+    instance.run()
+    return None
+
+
+def hawq_init(opts, hawq_dict):
+    instance = HawqInit(opts, hawq_dict)
+    instance.run()
+    return None
+
+
+def hawq_activate_standby(opts, hawq_dict):
+    cmd = "%s; hawq stop cluster -a -M fast;" % source_hawq_env
+    result = local_ssh(cmd)
+    if result != 0:
+        logger.debug("Stop cluster failed, try to stop it immediately.")
+        cmd = "%s; hawq stop cluster -a -M immediate;" % source_hawq_env
+        local_ssh(cmd)
+    cmd = "%s; hawq config -c hawq_master_address_host -v %s --skipvalidation -q" % (source_hawq_env, hawq_dict['hawq_standby_address_host'])
+    local_ssh(cmd)
+    cmd = "%s; hawq config -c hawq_standby_address_host -v %s --skipvalidation -q" % (source_hawq_env, 'none')
+    local_ssh(cmd)
+    cmd = '''echo "gp_persistent_repair_global_sequence = true" >> %s/%s''' % (hawq_dict['hawq_master_directory'], 'postgresql.conf')
+    local_ssh(cmd)
+    cmd = "%s; hawq start master" % source_hawq_env
+    local_ssh(cmd)
+    cmd = "%s; env PGOPTIONS=\"-c gp_session_role=utility\" psql -p %s -d template1 -c \"select gp_remove_master_standby()\
+            where (select count(*) from gp_segment_configuration where role='s') = 1;\"" % (source_hawq_env, hawq_dict['hawq_master_address_port'])
+    local_ssh(cmd)
+    cmd = "%s; hawq stop master -a" % source_hawq_env
+    local_ssh(cmd)
+    cmd = "%s; hawq start cluster" % source_hawq_env
+    local_ssh(cmd)
+    cmd = '''sed -i "/gp_persistent_repair_global_sequence/d" %s/%s''' % (hawq_dict['hawq_master_directory'], 'postgresql.conf')
+    local_ssh(cmd)
+    return None
+
+
+def restart_hawq(opts, hawq_dict):
+    logger.info("Restarting hawq:")
+    stop_hawq(opts, hawq_dict)
+    start_hawq(opts, hawq_dict)
+    return None
+
+
+def create_parser():
+    parser = OptionParser(usage="HAWQ management scripts options")
+    parser.add_option("-a", "--prompt",
+                      action="store_false",
+                      dest="prompt",
+                      default=True,
+                      help="Execute automatically")
+    parser.add_option("-M", "--mode",
+                      choices=['smart', 'immediate', 'fast'],
+                      dest="stop_mode",
+                      default="smart",
+                      help="HAWQ stop mode: smart/fast/immediatly")
+    parser.add_option("-v", "--verbose",
+                      action="store_true",
+                      dest="verbose",
+                      help="Execute with verbose output")
+    parser.add_option("-q", "--quiet",
+                      action="store_true",
+                      dest="quiet_run",
+                      help="Execute in quiet mode")
+    parser.add_option("-y", "--nostandby",
+                      action="store_false",
+                      dest="nostandby",
+                      help="Exclude standby master")
+    parser.add_option("-l", "--logdir",
+                      dest="log_dir",
+                      help="Sets the directory for log files")
+    parser.add_option("-t", "--timeout",
+                      dest="timeout_seconds",
+                      default="60",
+                      help="Set the timeout seconds, default is 60")
+    parser.add_option("-B", "--parallel",
+                      dest="parallel_processses",
+                      default="60",
+                      help="Sets the max parallel processes")
+    parser.add_option("-V", "--version",
+                      dest="hawq_version",
+                      default="dev",
+                      help="Show HAWQ version")
+    parser.add_option("--user",
+                      dest="user",
+                      default="",
+                      help="Sets hawq user")
+    parser.add_option("-u", "--reload",
+                      dest="hawq_reload",
+                      action="store_true",
+                      default=False,
+                      help="Reload hawq configuration")
+    parser.add_option("-m", "--masteronly",
+                      dest="masteronly",
+                      action="store_true",
+                      default=False,
+                      help="Start hawq in utility mode.")
+    parser.add_option("-U", "--special-mode",
+                      choices=['upgrade', 'maintenance'],
+                      dest="special_mode",
+                      help="Start hawq in upgrade/maintenance mode.")
+    parser.add_option("-R", "--restrict",
+                      dest="restrict",
+                      action="store_true",
+                      default=False,
+                      help="Start hawq in restrict mode.")
+    parser.add_option('-r', '--remove-standby', action='store_true',
+                      dest='remove_standby', default=False,
+                      help='Delete hawq standby master node.')
+    parser.add_option('-n', '--no-update', action='store_true',
+                      dest='no_update', default=False,
+                      help='Do not update system catalog tables.')
+    parser.add_option("--vsegNumber",
+                      type="int",
+                      dest="virtual_seg_num",
+                      default=8,
+                      help="Sets maximum number of virtual segments per node.")
+    parser.add_option("--vsegment-number",
+                      type="int",
+                      dest="virtual_seg_num",
+                      default=8,
+                      help="Sets maximum number of virtual segments per node.")
+    parser.add_option("--locale",
+                      dest="hawq_locale",
+                      default="en_US.utf8",
+                      help="Sets the locale name")
+    parser.add_option("--lc-collate",
+                      dest="hawq_lc_collate",
+                      default="en_US.utf8",
+                      help="Sets the string sort order")
+    parser.add_option("--lc-ctype",
+                      dest="hawq_lc_ctype",
+                      default="en_US.utf8",
+                      help="Sets character classification")
+    parser.add_option("--lc-messages",
+                      dest="hawq_lc_messages",
+                      default="en_US.utf8",
+                      help="Sets the language in which messages are displayed")
+    parser.add_option("--lc-monetary",
+                      dest="hawq_lc_monetary",
+                      default="en_US.utf8",
+                      help="Sets the locale to use for formatting monetary amounts")
+    parser.add_option("--lc-numeric",
+                      dest="hawq_lc_numeric",
+                      default="en_US.utf8",
+                      help="Sets the locale to use for formatting numbers")
+    parser.add_option("--lc-time",
+                      dest="hawq_lc_time",
+                      default="en_US.utf8",
+                      help="Sets the locale to use for formatting dates and times")
+    parser.add_option("--max_connections",
+                      dest="max_connections",
+                      default="1280",
+                      help="Sets the max_connections for formatting hawq database")
+    parser.add_option("--shared_buffers",
+                      dest="shared_buffers",
+                      default="128000kB",
+                      help="Sets the shared_buffers for formatting hawq database")
+    (options, args) = parser.parse_args()
+    if len(args) == 0:
+        parser.print_help()
+        sys.exit(1)
+    return (options, args)
+
+if __name__ == '__main__':
+    (opts, hawq_dict) = get_args()
+    if opts.hawq_command == 'start':
+        start_hawq(opts, hawq_dict)
+    elif opts.hawq_command == 'stop':
+        if opts.prompt:
+            if not userinput.ask_yesno(None, "\nContinue with HAWQ service stop", 'N'):
+                sys.exit(1)
+        stop_hawq(opts, hawq_dict)
+    elif opts.hawq_command == 'restart':
+        restart_hawq(opts, hawq_dict)
+    elif opts.hawq_command == 'init':
+        if opts.prompt:
+            if not userinput.ask_yesno(None, "\nContinue with HAWQ init", 'N'):
+                sys.exit(1)
+        hawq_init(opts, hawq_dict)
+    elif opts.hawq_command == 'activate':
+        if opts.prompt:
+            if not userinput.ask_yesno(None, "\nContinue with HAWQ standby master activate", 'N'):
+                sys.exit(1)
+        hawq_activate_standby(opts, hawq_dict)
+    else:
+        print COMMON_HELP

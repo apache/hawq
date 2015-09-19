@@ -1,0 +1,843 @@
+/*-------------------------------------------------------------------------
+ *
+ * path.c
+ *	  portable path handling routines
+ *
+ * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1994, Regents of the University of California
+ *
+ *
+ * IDENTIFICATION
+ *	  $PostgreSQL: pgsql/src/port/path.c,v 1.79 2009/06/11 14:49:15 momjian Exp $
+ *
+ *-------------------------------------------------------------------------
+ */
+
+#include "postgres.h"
+
+#include <ctype.h>
+#include <sys/stat.h>
+#ifdef WIN32
+#ifdef _WIN32_IE
+#undef _WIN32_IE
+#endif
+#define _WIN32_IE 0x0500
+#ifdef near
+#undef near
+#endif
+#define near
+#include <shlobj.h>
+#else
+#include <unistd.h>
+#endif
+
+#include "pg_config_paths.h"
+
+#ifndef WIN32
+#define IS_DIR_SEP(ch)	((ch) == '/')
+#else
+#define IS_DIR_SEP(ch)	((ch) == '/' || (ch) == '\\')
+#endif
+
+#ifndef WIN32
+#define IS_PATH_SEP(ch) ((ch) == ':')
+#else
+#define IS_PATH_SEP(ch) ((ch) == ';')
+#endif
+
+/*
+ * These declarations are for gp_mkdtemp on Solaris
+ *
+ * On Solaris there is no mkdtemp function, so we added our
+ * own implementation.
+ */
+#if defined pg_on_solaris
+
+/*
+ * A lower bound on the number of temporary files to attempt to
+ * generate.  The maximum total number of temporary file names that
+ * can exist for a given template is 62**6.  It should never be
+ * necessary to try all these combinations.  Instead if a reasonable
+ * number of names is tried (we define reasonable as 62**3) fail to
+ * give the system administrator the chance to remove the problems.
+ */
+#define MKDTEMP_ATTEMPTS_MIN (62 * 62 * 62)
+
+#ifndef __set_errno
+# define __set_errno(Val) errno = (Val)
+#endif
+
+	/* These are the characters used in temporary file names.  */
+static const char letters[] =
+	"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+#endif
+
+static void make_relative_path(char *ret_path, const char *target_path,
+				   const char *bin_path, const char *my_exec_path);
+static void trim_directory(char *path);
+static void trim_trailing_separator(char *path);
+
+
+/*
+ * skip_drive
+ *
+ * On Windows, a path may begin with "C:" or "//network/".	Advance over
+ * this and point to the effective start of the path.
+ */
+#ifdef WIN32
+
+static char *
+skip_drive(const char *path)
+{
+	if (IS_DIR_SEP(path[0]) && IS_DIR_SEP(path[1]))
+	{
+		path += 2;
+		while (*path && !IS_DIR_SEP(*path))
+			path++;
+	}
+	else if (isalpha((unsigned char) path[0]) && path[1] == ':')
+	{
+		path += 2;
+	}
+	return (char *) path;
+}
+#else
+
+#define skip_drive(path)	(path)
+#endif
+
+/*
+ *	first_dir_separator
+ *
+ * Find the location of the first directory separator, return
+ * NULL if not found.
+ */
+char *
+first_dir_separator(const char *filename)
+{
+	const char *p;
+
+	for (p = skip_drive(filename); *p; p++)
+		if (IS_DIR_SEP(*p))
+			return (char *) p;
+	return NULL;
+}
+
+/*
+ *	first_path_separator
+ *
+ * Find the location of the first path separator (i.e. ':' on
+ * Unix, ';' on Windows), return NULL if not found.
+ */
+char *
+first_path_separator(const char *pathlist)
+{
+	const char *p;
+
+	/* skip_drive is not needed */
+	for (p = pathlist; *p; p++)
+		if (IS_PATH_SEP(*p))
+			return (char *) p;
+	return NULL;
+}
+
+/*
+ *	last_dir_separator
+ *
+ * Find the location of the last directory separator, return
+ * NULL if not found.
+ */
+char *
+last_dir_separator(const char *filename)
+{
+	const char *p,
+			   *ret = NULL;
+
+	for (p = skip_drive(filename); *p; p++)
+		if (IS_DIR_SEP(*p))
+			ret = p;
+	return (char *) ret;
+}
+
+
+/*
+ *	make_native_path - on WIN32, change / to \ in the path
+ *
+ *	This effectively undoes canonicalize_path.
+ *
+ *	This is required because WIN32 COPY is an internal CMD.EXE
+ *	command and doesn't process forward slashes in the same way
+ *	as external commands.  Quoting the first argument to COPY
+ *	does not convert forward to backward slashes, but COPY does
+ *	properly process quoted forward slashes in the second argument.
+ *
+ *	COPY works with quoted forward slashes in the first argument
+ *	only if the current directory is the same as the directory
+ *	of the first argument.
+ */
+void
+make_native_path(char *filename)
+{
+#ifdef WIN32
+	char	   *p;
+
+	for (p = filename; *p; p++)
+		if (*p == '/')
+			*p = '\\';
+#else
+	UnusedArg(filename);
+#endif
+}
+
+
+/*
+ * join_path_components - join two path components, inserting a slash
+ *
+ * ret_path is the output area (must be of size MAXPGPATH)
+ *
+ * ret_path can be the same as head, but not the same as tail.
+ */
+void
+join_path_components(char *ret_path,
+					 const char *head, const char *tail)
+{
+	if (ret_path != head)
+		strlcpy(ret_path, head, MAXPGPATH);
+
+	/*
+	 * Remove any leading "." and ".." in the tail component, adjusting head
+	 * as needed.
+	 */
+	for (;;)
+	{
+		if (tail[0] == '.' && IS_DIR_SEP(tail[1]))
+		{
+			tail += 2;
+		}
+		else if (tail[0] == '.' && tail[1] == '\0')
+		{
+			tail += 1;
+			break;
+		}
+		else if (tail[0] == '.' && tail[1] == '.' && IS_DIR_SEP(tail[2]))
+		{
+			trim_directory(ret_path);
+			tail += 3;
+		}
+		else if (tail[0] == '.' && tail[1] == '.' && tail[2] == '\0')
+		{
+			trim_directory(ret_path);
+			tail += 2;
+			break;
+		}
+		else
+			break;
+	}
+	if (*tail)
+		snprintf(ret_path + strlen(ret_path), MAXPGPATH - strlen(ret_path),
+				 "/%s", tail);
+}
+
+
+/*
+ *	Clean up path by:
+ *		o  make Win32 path use Unix slashes
+ *		o  remove trailing quote on Win32
+ *		o  remove trailing slash
+ *		o  remove duplicate adjacent separators
+ *		o  remove trailing '.'
+ *		o  process trailing '..' ourselves
+ */
+void
+canonicalize_path(char *path)
+{
+	char	   *p,
+			   *to_p;
+	char	   *spath;
+	bool		was_sep = false;
+	int			pending_strips;
+
+#ifdef WIN32
+
+	/*
+	 * The Windows command processor will accept suitably quoted paths with
+	 * forward slashes, but barfs badly with mixed forward and back slashes.
+	 */
+	for (p = path; *p; p++)
+	{
+		if (*p == '\\')
+			*p = '/';
+	}
+
+	/*
+	 * In Win32, if you do: prog.exe "a b" "\c\d\" the system will pass \c\d"
+	 * as argv[2], so trim off trailing quote.
+	 */
+	if (p > path && *(p - 1) == '"')
+		*(p - 1) = '/';
+#endif
+
+	/*
+	 * Removing the trailing slash on a path means we never get ugly double
+	 * trailing slashes. Also, Win32 can't stat() a directory with a trailing
+	 * slash. Don't remove a leading slash, though.
+	 */
+	trim_trailing_separator(path);
+
+	/*
+	 * Remove duplicate adjacent separators
+	 */
+	p = path;
+#ifdef WIN32
+	/* Don't remove leading double-slash on Win32 */
+	if (*p)
+		p++;
+#endif
+	to_p = p;
+	for (; *p; p++, to_p++)
+	{
+		/* Handle many adjacent slashes, like "/a///b" */
+		while (*p == '/' && was_sep)
+			p++;
+		if (to_p != p)
+			*to_p = *p;
+		was_sep = (*p == '/');
+	}
+	*to_p = '\0';
+
+	/*
+	 * Remove any trailing uses of "." and process ".." ourselves
+	 *
+	 * Note that "/../.." should reduce to just "/", while "../.." has to be
+	 * kept as-is.	In the latter case we put back mistakenly trimmed ".."
+	 * components below.  Also note that we want a Windows drive spec to be
+	 * visible to trim_directory(), but it's not part of the logic that's
+	 * looking at the name components; hence distinction between path and
+	 * spath.
+	 */
+	spath = skip_drive(path);
+	pending_strips = 0;
+	for (;;)
+	{
+		int			len = strlen(spath);
+
+		if (len >= 2 && strcmp(spath + len - 2, "/.") == 0)
+			trim_directory(path);
+		else if (strcmp(spath, ".") == 0)
+		{
+			/* Want to leave "." alone, but "./.." has to become ".." */
+			if (pending_strips > 0)
+				*spath = '\0';
+			break;
+		}
+		else if ((len >= 3 && strcmp(spath + len - 3, "/..") == 0) ||
+				 strcmp(spath, "..") == 0)
+		{
+			trim_directory(path);
+			pending_strips++;
+		}
+		else if (pending_strips > 0 && *spath != '\0')
+		{
+			/* trim a regular directory name cancelled by ".." */
+			trim_directory(path);
+			pending_strips--;
+			/* foo/.. should become ".", not empty */
+			if (*spath == '\0')
+				strcpy(spath, ".");
+		}
+		else
+			break;
+	}
+
+	if (pending_strips > 0)
+	{
+		/*
+		 * We could only get here if path is now totally empty (other than a
+		 * possible drive specifier on Windows). We have to put back one or
+		 * more ".."'s that we took off.
+		 */
+		while (--pending_strips > 0)
+			strcat(path, "../");
+		strcat(path, "..");
+	}
+}
+
+/*
+ * Detect whether a path contains any parent-directory references ("..")
+ *
+ * The input *must* have been put through canonicalize_path previously.
+ *
+ * This is a bit tricky because we mustn't be fooled by "..a.." (legal)
+ * nor "C:.." (legal on Unix but not Windows).
+ */
+bool
+path_contains_parent_reference(const char *path)
+{
+	int			path_len;
+
+	path = skip_drive(path);	/* C: shouldn't affect our conclusion */
+
+	path_len = strlen(path);
+
+	/*
+	 * ".." could be the whole path; otherwise, if it's present it must be at
+	 * the beginning, in the middle, or at the end.
+	 */
+	if (strcmp(path, "..") == 0 ||
+		strncmp(path, "../", 3) == 0 ||
+		strstr(path, "/../") != NULL ||
+		(path_len >= 3 && strcmp(path + path_len - 3, "/..") == 0))
+		return true;
+
+	return false;
+}
+
+/*
+ * Detect whether path1 is a prefix of path2 (including equality).
+ *
+ * This is pretty trivial, but it seems better to export a function than
+ * to export IS_DIR_SEP.
+ */
+bool
+path_is_prefix_of_path(const char *path1, const char *path2)
+{
+	int			path1_len = strlen(path1);
+
+	if (strncmp(path1, path2, path1_len) == 0 &&
+		(IS_DIR_SEP(path2[path1_len]) || path2[path1_len] == '\0'))
+		return true;
+	return false;
+}
+
+/*
+ * Extracts the actual name of the program as called -
+ * stripped of .exe suffix if any
+ */
+const char *
+get_progname(const char *argv0)
+{
+	const char *nodir_name;
+	char	   *progname;
+
+	nodir_name = last_dir_separator(argv0);
+	if (nodir_name)
+		nodir_name++;
+	else
+		nodir_name = skip_drive(argv0);
+
+	/*
+	 * Make a copy in case argv[0] is modified by ps_status. Leaks memory, but
+	 * called only once.
+	 */
+	progname = strdup(nodir_name);
+	if (progname == NULL)
+	{
+		fprintf(stderr, "%s: out of memory\n", nodir_name);
+		exit(1);				/* This could exit the postmaster */
+	}
+
+#if defined(__CYGWIN__) || defined(WIN32)
+	/* strip ".exe" suffix, regardless of case */
+	if (strlen(progname) > sizeof(EXE) - 1 &&
+	pg_strcasecmp(progname + strlen(progname) - (sizeof(EXE) - 1), EXE) == 0)
+		progname[strlen(progname) - (sizeof(EXE) - 1)] = '\0';
+#endif
+
+	return progname;
+}
+
+
+/*
+ * dir_strcmp: strcmp except any two DIR_SEP characters are considered equal,
+ * and we honor filesystem case insensitivity if known
+ */
+static int
+dir_strcmp(const char *s1, const char *s2)
+{
+	while (*s1 && *s2)
+	{
+		if (
+#ifndef WIN32
+			*s1 != *s2
+#else
+			/* On windows, paths are case-insensitive */
+			pg_tolower((unsigned char) *s1) != pg_tolower((unsigned char) *s2)
+#endif
+			&& !(IS_DIR_SEP(*s1) && IS_DIR_SEP(*s2)))
+			return (int) *s1 - (int) *s2;
+		s1++, s2++;
+	}
+	if (*s1)
+		return 1;				/* s1 longer */
+	if (*s2)
+		return -1;				/* s2 longer */
+	return 0;
+}
+
+
+/*
+ * make_relative_path - make a path relative to the actual binary location
+ *
+ * This function exists to support relocation of installation trees.
+ *
+ *	ret_path is the output area (must be of size MAXPGPATH)
+ *	target_path is the compiled-in path to the directory we want to find
+ *	bin_path is the compiled-in path to the directory of executables
+ *	my_exec_path is the actual location of my executable
+ *
+ * We determine the common prefix of target_path and bin_path, then compare
+ * the remainder of bin_path to the last directory component(s) of
+ * my_exec_path.  If they match, build the result as the part of my_exec_path
+ * preceding the match, joined to the remainder of target_path.  If no match,
+ * return target_path as-is.
+ *
+ * For example:
+ *		target_path  = '/usr/local/share/postgresql'
+ *		bin_path	 = '/usr/local/bin'
+ *		my_exec_path = '/opt/pgsql/bin/postmaster'
+ * Given these inputs, the common prefix is '/usr/local/', the tail of
+ * bin_path is 'bin' which does match the last directory component of
+ * my_exec_path, so we would return '/opt/pgsql/share/postgresql'
+ */
+static void
+make_relative_path(char *ret_path, const char *target_path,
+				   const char *bin_path, const char *my_exec_path)
+{
+	int			prefix_len;
+	int			tail_start;
+	int			tail_len;
+	int			i;
+
+	/*
+	 * Determine the common prefix --- note we require it to end on a
+	 * directory separator, consider eg '/usr/lib' and '/usr/libexec'.
+	 */
+	prefix_len = 0;
+	for (i = 0; target_path[i] && bin_path[i]; i++)
+	{
+		if (IS_DIR_SEP(target_path[i]) && IS_DIR_SEP(bin_path[i]))
+			prefix_len = i + 1;
+		else if (target_path[i] != bin_path[i])
+			break;
+	}
+	if (prefix_len == 0)
+		goto no_match;			/* no common prefix? */
+	tail_len = strlen(bin_path) - prefix_len;
+
+	/*
+	 * Set up my_exec_path without the actual executable name, and
+	 * canonicalize to simplify comparison to bin_path.
+	 */
+	strlcpy(ret_path, my_exec_path, MAXPGPATH);
+	trim_directory(ret_path);	/* remove my executable name */
+	canonicalize_path(ret_path);
+
+	/*
+	 * Tail match?
+	 */
+	tail_start = (int) strlen(ret_path) - tail_len;
+	if (tail_start > 0 &&
+		IS_DIR_SEP(ret_path[tail_start - 1]) &&
+		dir_strcmp(ret_path + tail_start, bin_path + prefix_len) == 0)
+	{
+		ret_path[tail_start] = '\0';
+		trim_trailing_separator(ret_path);
+		join_path_components(ret_path, ret_path, target_path + prefix_len);
+		canonicalize_path(ret_path);
+		return;
+	}
+
+no_match:
+	strlcpy(ret_path, target_path, MAXPGPATH);
+	canonicalize_path(ret_path);
+}
+
+
+/*
+ *	get_share_path
+ */
+void
+get_share_path(const char *my_exec_path, char *ret_path)
+{
+	make_relative_path(ret_path, PGSHAREDIR, PGBINDIR, my_exec_path);
+}
+
+/*
+ *	get_etc_path
+ */
+void
+get_etc_path(const char *my_exec_path, char *ret_path)
+{
+	make_relative_path(ret_path, SYSCONFDIR, PGBINDIR, my_exec_path);
+}
+
+/*
+ *	get_include_path
+ */
+void
+get_include_path(const char *my_exec_path, char *ret_path)
+{
+	make_relative_path(ret_path, INCLUDEDIR, PGBINDIR, my_exec_path);
+}
+
+/*
+ *	get_pkginclude_path
+ */
+void
+get_pkginclude_path(const char *my_exec_path, char *ret_path)
+{
+	make_relative_path(ret_path, PKGINCLUDEDIR, PGBINDIR, my_exec_path);
+}
+
+/*
+ *	get_includeserver_path
+ */
+void
+get_includeserver_path(const char *my_exec_path, char *ret_path)
+{
+	make_relative_path(ret_path, INCLUDEDIRSERVER, PGBINDIR, my_exec_path);
+}
+
+/*
+ *	get_lib_path
+ */
+void
+get_lib_path(const char *my_exec_path, char *ret_path)
+{
+	make_relative_path(ret_path, LIBDIR, PGBINDIR, my_exec_path);
+}
+
+/*
+ *	get_pkglib_path
+ */
+void
+get_pkglib_path(const char *my_exec_path, char *ret_path)
+{
+	make_relative_path(ret_path, PKGLIBDIR, PGBINDIR, my_exec_path);
+}
+
+/*
+ *	get_locale_path
+ */
+void
+get_locale_path(const char *my_exec_path, char *ret_path)
+{
+	make_relative_path(ret_path, LOCALEDIR, PGBINDIR, my_exec_path);
+}
+
+/*
+ *	get_doc_path
+ */
+void
+get_doc_path(const char *my_exec_path, char *ret_path)
+{
+	make_relative_path(ret_path, DOCDIR, PGBINDIR, my_exec_path);
+}
+
+/*
+ *	get_html_path
+ */
+void
+get_html_path(const char *my_exec_path, char *ret_path)
+{
+	make_relative_path(ret_path, HTMLDIR, PGBINDIR, my_exec_path);
+}
+
+/*
+ *	get_man_path
+ */
+void
+get_man_path(const char *my_exec_path, char *ret_path)
+{
+	make_relative_path(ret_path, MANDIR, PGBINDIR, my_exec_path);
+}
+
+
+/*
+ *	get_home_path
+ *
+ * On Unix, this actually returns the user's home directory.  On Windows
+ * it returns the PostgreSQL-specific application data folder.
+ */
+bool
+get_home_path(char *ret_path)
+{
+#ifndef WIN32
+	char		pwdbuf[BUFSIZ];
+	struct passwd pwdstr;
+	struct passwd *pwd = NULL;
+
+	if (pqGetpwuid(geteuid(), &pwdstr, pwdbuf, sizeof(pwdbuf), &pwd) != 0)
+		return false;
+	strlcpy(ret_path, pwd->pw_dir, MAXPGPATH);
+	return true;
+#else
+	char	   *tmppath;
+
+	/*
+	 * Note: We use getenv here because the more modern
+	 * SHGetSpecialFolderPath() will force us to link with shell32.lib which
+	 * eats valuable desktop heap.
+	 */
+	tmppath = getenv("APPDATA");
+	if (!tmppath)
+		return false;
+	snprintf(ret_path, MAXPGPATH, "%s/postgresql", tmppath);
+	return true;
+#endif
+}
+
+
+/*
+ * get_parent_directory
+ *
+ * Modify the given string in-place to name the parent directory of the
+ * named file.
+ */
+void
+get_parent_directory(char *path)
+{
+	trim_directory(path);
+}
+
+
+/*
+ *	trim_directory
+ *
+ *	Trim trailing directory from path, that is, remove any trailing slashes,
+ *	the last pathname component, and the slash just ahead of it --- but never
+ *	remove a leading slash.
+ */
+static void
+trim_directory(char *path)
+{
+	char	   *p;
+
+	path = skip_drive(path);
+
+	if (path[0] == '\0')
+		return;
+
+	/* back up over trailing slash(es) */
+	for (p = path + strlen(path) - 1; IS_DIR_SEP(*p) && p > path; p--)
+		;
+	/* back up over directory name */
+	for (; !IS_DIR_SEP(*p) && p > path; p--)
+		;
+	/* if multiple slashes before directory name, remove 'em all */
+	for (; p > path && IS_DIR_SEP(*(p - 1)); p--)
+		;
+	/* don't erase a leading slash */
+	if (p == path && IS_DIR_SEP(*p))
+		p++;
+	*p = '\0';
+}
+
+
+/*
+ *	trim_trailing_separator
+ *
+ * trim off trailing slashes, but not a leading slash
+ */
+static void
+trim_trailing_separator(char *path)
+{
+	char	   *p;
+
+	path = skip_drive(path);
+	p = path + strlen(path);
+	if (p > path)
+		for (p--; p > path && IS_DIR_SEP(*p); p--)
+			*p = '\0';
+}
+
+/*
+ * Generate a unique temporary directory name from TEMPLATE_PATH.
+ * The last six characters of TEMPLATE_PATH must be "XXXXXX";
+ * they are replaced with a string that makes the directory name unique.
+ * Then create the directory and return the template or NULL.
+ */
+char *
+gp_mkdtemp(char *template_path)
+{
+#if defined (pg_on_solaris)
+	int len;
+	char *suffix;
+	static int64 value;
+	int64 random_time_bits;
+	unsigned int count;
+	int save_errno = errno;
+	struct timeval tv;
+
+	/*
+	 * The number of times to attempt to generate a temporary file.  To
+	 * conform to POSIX, this must be no smaller than TMP_MAX.
+	 */
+#if defined TMP_MAX
+		unsigned int mkdir_attempts = MKDTEMP_ATTEMPTS_MIN < TMP_MAX ? TMP_MAX : MKDTEMP_ATTEMPTS_MIN;
+#else
+		unsigned int mkdir_attempts = MKDTEMP_ATTEMPTS_MIN;
+#endif
+
+	len = strlen (template_path);
+	if (len < 6 || strcmp (&template_path[len - 6], "XXXXXX"))
+	{
+		__set_errno (EINVAL);
+		return NULL;
+	}
+
+	/* This is where the Xs start.  */
+	suffix = &template_path[len - 6];
+
+	/* Get some more or less random data.  */
+	gettimeofday (&tv, NULL);
+	random_time_bits = ((int64) tv.tv_usec << 16) ^ tv.tv_sec;
+	value += random_time_bits ^ getpid();
+
+	for (count = 0; count < mkdir_attempts; value += 7777, ++count)
+	{
+		int64 v = value;
+
+		/* Fill in the random bits.  */
+		suffix[0] = letters[v % 62];
+		v /= 62;
+		suffix[1] = letters[v % 62];
+		v /= 62;
+		suffix[2] = letters[v % 62];
+		v /= 62;
+		suffix[3] = letters[v % 62];
+		v /= 62;
+		suffix[4] = letters[v % 62];
+		v /= 62;
+		suffix[5] = letters[v % 62];
+
+		if (mkdir(template_path, 0700) == 0)
+		{
+			__set_errno (save_errno);
+			return template_path;
+		}
+		else
+		{
+			if (errno != EEXIST)
+			{
+				return NULL;
+			}
+		}
+	}
+
+	/* We got out of the loop because we ran out of combinations to try.  */
+	__set_errno (EEXIST);
+	return NULL;
+
+#elif defined (__linux__) || defined(linux) || defined(__darwin__)
+
+	return mkdtemp(template_path);
+
+#else
+
+	fprintf(stderr, "mkdtemp not supported on this platform");
+	exit(1);				/* This could exit the postmaster */
+
+#endif
+}

@@ -1,0 +1,223 @@
+<!--
+$PostgreSQL: pgsql/doc/src/sgml/ref/cluster.sgml,v 1.38.2.1 2007/05/13 16:04:40 mha Exp $
+PostgreSQL documentation
+-->
+
+<refentry id="SQL-CLUSTER">
+ <refmeta>
+  <refentrytitle id="sql-cluster-title">CLUSTER</refentrytitle>
+  <refmiscinfo>SQL - Language Statements</refmiscinfo>
+ </refmeta>
+
+ <refnamediv>
+  <refname>CLUSTER</refname>
+  <refpurpose>cluster a heap storage table according to an index</refpurpose>
+ </refnamediv>
+
+ <indexterm zone="sql-cluster">
+  <primary>CLUSTER</primary>
+ </indexterm>
+
+ <refsynopsisdiv>
+<synopsis>
+CLUSTER <replaceable class="PARAMETER">indexname</replaceable> ON <replaceable class="PARAMETER">tablename</replaceable>
+CLUSTER <replaceable class="PARAMETER">tablename</replaceable>
+CLUSTER
+</synopsis>
+ </refsynopsisdiv>
+
+ <refsect1>
+  <title>Description</title>
+
+  <para>
+   <command>CLUSTER</command> instructs <productname>PostgreSQL</productname> 
+   to cluster the table specified
+   by <replaceable class="parameter">tablename</replaceable>
+   based on the index specified by
+   <replaceable class="parameter">indexname</replaceable>. The index must
+   already have been defined on 
+   <replaceable class="parameter">tablename</replaceable>.
+  </para>
+
+  <para>
+   When a table is clustered, it is physically reordered
+   based on the index information. Clustering is a one-time operation:
+   when the table is subsequently updated, the changes are
+   not clustered.  That is, no attempt is made to store new or
+   updated rows according to their index order.  If one wishes, one can
+   periodically recluster by issuing the command again.
+  </para>
+
+  <para>
+   When a table is clustered, <productname>PostgreSQL</productname>
+   remembers on which index it was clustered.  The form
+   <command>CLUSTER <replaceable class="parameter">tablename</replaceable></command>
+   reclusters the table on the same index that it was clustered before.
+  </para>
+
+  <para>
+   <command>CLUSTER</command> without any parameter reclusters all the tables
+   in the
+   current database that the calling user owns, or all tables if called
+   by a superuser.  (Never-clustered tables are not included.)  This
+   form of <command>CLUSTER</command> cannot be executed inside a transaction
+   block.
+  </para>
+
+  <para>
+   When a table is being clustered, an <literal>ACCESS
+   EXCLUSIVE</literal> lock is acquired on it. This prevents any other
+   database operations (both reads and writes) from operating on the
+   table until the <command>CLUSTER</command> is finished.
+  </para>
+ </refsect1>
+
+ <refsect1>
+  <title>Parameters</title>
+
+  <variablelist>
+   <varlistentry>
+    <term><replaceable class="PARAMETER">indexname</replaceable></term>
+    <listitem>
+     <para>
+      The name of an index.
+     </para>
+    </listitem>
+   </varlistentry>
+
+   <varlistentry>
+    <term><replaceable class="PARAMETER">tablename</replaceable></term>
+    <listitem>
+     <para>
+      The name (possibly schema-qualified) of a table.
+     </para>
+    </listitem>
+   </varlistentry>
+  </variablelist>
+ </refsect1>
+
+ <refsect1>
+  <title>Notes</title>
+
+   <para>
+    <command>CLUSTER</command> loses all visibility information of tuples,
+    which makes the table look empty to any snapshot that was taken
+    before the <command>CLUSTER</command> command finished. That makes
+    <command>CLUSTER</command> unsuitable for applications where
+    transactions that access the table being clustered are run concurrently
+    with <command>CLUSTER</command>. This is most visible with serializable
+    transactions, because they take only one snapshot at the beginning of the
+    transaction, but read-committed transactions are also affected.
+   </para>
+
+   <para>
+    In cases where you are accessing single rows randomly
+    within a table, the actual order of the data in the
+    table is unimportant. However, if you tend to access some
+    data more than others, and there is an index that groups
+    them together, you will benefit from using <command>CLUSTER</command>.
+    If you are requesting a range of indexed values from a table, or a
+    single indexed value that has multiple rows that match,
+    <command>CLUSTER</command> will help because once the index identifies the
+    table page for the first row that matches, all other rows
+    that match are probably already on the same table page,
+    and so you save disk accesses and speed up the query.
+   </para>
+
+   <para>
+    During the cluster operation, a temporary copy of the table is created
+    that contains the table data in the index order.  Temporary copies of
+    each index on the table are created as well.  Therefore, you need free
+    space on disk at least equal to the sum of the table size and the index
+    sizes.
+   </para>
+
+   <para>
+    Because <command>CLUSTER</command> remembers the clustering information,
+    one can cluster the tables one wants clustered manually the first time, and
+    setup a timed event similar to <command>VACUUM</command> so that the tables
+    are periodically reclustered.
+   </para>
+
+   <para>
+    Because the planner records statistics about the ordering of
+    tables, it is advisable to run <xref linkend="sql-analyze"
+    endterm="sql-analyze-title"> on the newly clustered table.
+    Otherwise, the planner may make poor choices of query plans.
+   </para>
+
+   <para>
+    There is another way to cluster data. The
+    <command>CLUSTER</command> command reorders the original table by
+    scanning it using the index you specify. This can be slow
+    on large tables because the rows are fetched from the table
+    in index order, and if the table is disordered, the
+    entries are on random pages, so there is one disk page
+    retrieved for every row moved. (<productname>PostgreSQL</productname> has
+    a cache, but the majority of a big table will not fit in the cache.)
+    The other way to cluster a table is to use
+
+<programlisting>
+CREATE TABLE <replaceable class="parameter">newtable</replaceable> AS
+    SELECT * FROM <replaceable class="parameter">table</replaceable> ORDER BY <replaceable class="parameter">columnlist</replaceable>;
+</programlisting>
+
+    which uses the <productname>PostgreSQL</productname> sorting code
+    to produce the desired order;
+    this is usually much faster than an index scan for disordered data.
+    Then you drop the old table, use
+    <command>ALTER TABLE ... RENAME</command>
+    to rename <replaceable class="parameter">newtable</replaceable> to the
+    old name, and recreate the table's indexes.
+    The big disadvantage of this approach is that it does not preserve
+    OIDs, constraints, foreign key relationships, granted privileges, and
+    other ancillary properties of the table &mdash; all such items must be
+    manually recreated.  Another disadvantage is that this way requires a sort
+    temporary file about the same size as the table itself, so peak disk usage
+    is about three times the table size instead of twice the table size.
+   </para>
+ </refsect1>
+
+ <refsect1>
+  <title>Examples</title>
+
+  <para>
+   Cluster the table <literal>employees</literal> on the basis of
+   its index <literal>emp_ind</literal>:
+<programlisting>
+CLUSTER emp_ind ON emp;
+</programlisting>
+  </para>
+
+  <para>
+   Cluster the <literal>employees</literal> table using the same
+   index that was used before:
+<programlisting>
+CLUSTER emp;
+</programlisting>
+  </para>
+
+  <para>
+   Cluster all tables in the database that have previously been clustered:
+<programlisting>
+CLUSTER;
+</programlisting>
+  </para>
+ </refsect1>
+
+ <refsect1>
+  <title>Compatibility</title>
+
+  <para>
+   There is no <command>CLUSTER</command> statement in the SQL standard.
+  </para>
+ </refsect1>
+
+ <refsect1>
+  <title>See Also</title>
+
+  <simplelist type="inline">
+   <member><xref linkend="app-clusterdb" endterm="app-clusterdb-title"></member>
+  </simplelist>
+ </refsect1>
+</refentry>

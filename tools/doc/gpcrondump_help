@@ -1,0 +1,330 @@
+COMMAND NAME: gpcrondump
+
+A wrapper utility for gp_dump, which can be called directly or 
+from a crontab entry.
+
+*****************************************************
+SYNOPSIS
+*****************************************************
+
+gpcrondump -x <database_name> 
+     [-s <schema> | -t <schema>.<table> | -T <schema>.<table>] 
+     [--table-file="<filename>" | --exclude-table-file="<filename>"] 
+     [-u <backup_directory>] [-R <post_dump_script>] 
+     [-c] [-z] [-r] [-f <free_space_percent>] [-b] [-h] [-j | -k] 
+     [-g] [-G] [-C] [-d <master_data_directory>] [-B <parallel_processes>] 
+     [-a] [-q] [-y <reportfile>] [-l <logfile_directory>] [-v]
+     { [-E <encoding>] [--inserts | --column-inserts] [--oids] 
+       [--no-owner | --use-set-session-authorization] 
+       [--no-privileges] [--rsyncable]
+     
+gpcrondump -o
+
+gpcrondump -? 
+
+gpcrondump --version
+
+
+*****************************************************
+DESCRIPTION
+*****************************************************
+
+gpcrondump is a wrapper utility for gp_dump. By default, dump files are 
+created in their respective master and segment data directories in a 
+directory named db_dumps/YYYYMMDD. The data dump files are compressed 
+by default using gzip.
+
+gpcrondump allows you to schedule routine backups of a Greenplum database 
+using cron (a scheduling utility for UNIX operating systems). Cron jobs 
+that call gpcrondump should be scheduled on the master host.
+
+gpcrondump is used to schedule Data Domain Boost backup and restore 
+operations. gpcrondump is also used to set or remove one-time 
+credentials for Data Domain Boost.
+
+**********************
+Return Codes
+**********************
+
+The following is a list of the codes that gpcrondump returns.
+   0 - Dump completed with no problems
+   1 - Dump completed, but one or more warnings were generated
+   2 - Dump failed with a fatal error
+
+**********************
+EMAIL NOTIFICATIONS
+**********************
+To have gpcrondump send out status email notifications, you must place 
+a file named mail_contacts in the home directory of the Greenplum 
+superuser (gpadmin) or in the same directory as the gpcrondump utility 
+($GPHOME/bin). This file should contain one email address per line. 
+gpcrondump will issue a warning if it cannot locate a mail_contacts file 
+in either location. If both locations have a mail_contacts file, then 
+the one in $HOME takes precedence.
+
+
+*****************************************************
+OPTIONS
+*****************************************************
+
+-a (do not prompt)
+
+ Do not prompt the user for confirmation.
+
+
+-b (bypass disk space check)
+
+ Bypass disk space check. The default is to check for available disk space.
+
+ Note: Bypassing the disk space check generates a warning message. 
+ With a warning message, the return code for gpcrondump is 1 if the 
+ dump is successful. (If the dump fails, the return code is 2, in all cases.)
+
+
+-B <parallel_processes>
+
+ The number of segments to check in parallel for pre/post-dump validation. 
+ If not specified, the utility will start up to 60 parallel processes 
+ depending on how many segment instances it needs to dump.
+
+
+-c (clear old dump files first)
+
+ Clear out old dump files before doing the dump. The default is not to 
+ clear out old dump files. This will remove all old dump directories in 
+ the db_dumps directory, except for the dump directory of the current date.
+
+
+-C (clean old catalog dumps)
+
+ Clean out old catalog schema dump files prior to create.
+
+
+--column-inserts
+ 
+ Dump data as INSERT commands with column names.
+
+
+-d <master_data_directory>
+
+ The master host data directory. If not specified, the value 
+ set for $MASTER_DATA_DIRECTORY will be used.
+
+-E encoding
+
+ Character set encoding of dumped data. Defaults to the encoding of 
+ the database being dumped.
+
+
+-f <free_space_percent>
+
+ When doing the check to ensure that there is enough free disk space to 
+ create the dump files, specifies a percentage of free disk space that 
+ should remain after the dump completes. The default is 10 percent.
+
+-g (copy config files)
+
+ Secure a copy of the master and segment configuration files 
+ postgresql.conf, pg_ident.conf, and pg_hba.conf. These 
+ configuration files are dumped in the master or segment data 
+ directory to db_dumps/YYYYMMDD/config_files_<timestamp>.tar
+
+-G (dump global objects)
+
+ Use pg_dumpall to dump global objects such as roles and tablespaces. 
+ Global objects are dumped in the master data directory to 
+ db_dumps/YYYYMMDD/gp_global_1_1_<timestamp>.
+
+-h (record dump details)
+
+  Record details of database dump in database table
+  public.gpcrondump_history in database supplied via 
+  -x option. Utility will create table if it does not
+  currently exist.
+
+
+--inserts
+
+ Dump data as INSERT, rather than COPY commands.
+
+
+-j (vacuum before dump)
+
+ Run VACUUM before the dump starts.
+
+
+-k (vacuum after dump)
+
+ Run VACUUM after the dump has completed successfully.
+
+
+-l <logfile_directory>
+
+ The directory to write the log file. Defaults to ~/gpAdminLogs.
+
+
+--no-owner
+
+ Do not output commands to set object ownership.
+
+
+--no-privileges
+
+ Do not output commands to set object privileges (GRANT/REVOKE commands).
+
+
+-o (clear old dump files only)
+
+ Clear out old dump files only, but do not run a dump. This will remove 
+ the oldest dump directory except the current date's dump directory. 
+ All dump sets within that directory will be removed.
+
+
+--oids
+
+ Include object identifiers (oid) in dump data.
+
+
+-q (no screen output)
+
+ Run in quiet mode. Command output is not displayed on the screen, 
+ but is still written to the log file.
+
+
+-r (rollback on failure)
+
+ Rollback the dump files (delete a partial dump) if a failure 
+ is detected. The default is to not rollback.
+
+
+-R <post_dump_script>
+
+ The absolute path of a script to run after a successful dump operation. 
+ For example, you might want a script that moves completed dump files 
+ to a backup host. This script must reside in the same location on 
+ the master and all segment hosts.
+
+
+--rsyncable
+
+ Passes the --rsyncable flag to the gpzip utility to synchronize
+ the output occasionally, based on the input during compression.
+ This synchronization increases the file size by less than 1% in
+ most cases. When this flag is passed, the rsync(1) program can
+ synchronize compressed files much more efficiently. The gunzip
+ utility cannot differentiate between a compressed file created
+ with this option, and one created without it.  
+
+ 
+-s <schema_name>
+
+ Dump only the named schema in the named database.
+
+
+-t <schema>.<table_name>
+
+ Dump only the named table in this database.
+ The -t option can be specified multiple times.
+
+
+-T <schema>.<table_name>
+
+ A table name to exclude from the database dump. 
+ The -T option can be specified multiple times.
+
+--exclude-table-file="<filename>"
+
+  Exclude all tables listed in <filename> from the 
+  database dump. The file <filename> contains any 
+  number of tables, listed one per line.
+
+--table-file="<filename>"
+
+  Dump only the tables listed in <filename>.
+  The file <filename> contains any 
+  number of tables, listed one per line.
+
+-u <backup_directory>
+
+ Specifies the absolute path where the backup files will be 
+ placed on each host. If the path does not exist, it will be 
+ created, if possible. If not specified, defaults to the data 
+ directory of each instance to be backed up. Using this option 
+ may be desirable if each segment host has multiple segment 
+ instances as it will create the dump files in a centralized 
+ location rather than the segment data directories.
+
+
+--use-set-session-authorization
+
+ Use SET SESSION AUTHORIZATION commands instead of ALTER OWNER 
+ commands to set object ownership.
+
+
+-v | --verbose
+
+ Specifies verbose mode.
+
+
+--version (show utility version)
+
+ Displays the version of this utility.
+
+
+-x <database_name>
+
+ Required. The name of the Greenplum database to dump.
+ Multiple databases can be specified in a comma-separated list.
+
+
+-y <reportfile>
+
+ Specifies the full path name where the backup job log file will 
+ be placed on the master host. If not specified, defaults to the 
+ master data directory or if running remotely, the current working 
+ directory.
+
+
+-z (no compression)
+
+ Do not use compression. Default is to compress the dump files 
+ using gzip.
+
+ We recommend using this option for NFS and Data Dommain 
+ Boost backups.
+
+
+-? (help)
+
+ Displays the online help.
+
+
+*****************************************************
+EXAMPLES
+*****************************************************
+
+Call gpcrondump directly and dump mydatabase (and global objects):
+
+  gpcrondump -x mydatabase -c -g -G
+
+A crontab entry that runs a backup of the sales database 
+(and global objects) nightly at one past midnight:
+
+  01 0 * * * /home/gpadmin/gpdump.sh >> gpdump.log
+
+The content of dump script gpdump.sh is:
+
+  #!/bin/bash
+  export GPHOME=/usr/local/greenplum-db
+  export MASTER_DATA_DIRECTORY=/data/gpdb_p1/gp-1
+  . $GPHOME/greenplum_path.sh  
+  gpcrondump -x sales -c -g -G -a -q 
+
+
+*****************************************************
+SEE ALSO
+*****************************************************
+
+gp_dump, gpdbrestore
+
+

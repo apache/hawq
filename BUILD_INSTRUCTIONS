@@ -1,0 +1,43 @@
+Instruction for Building the Apache HAWQ
+
+September 2015
+
+Dependencies:
+
+Tested on Centos 6 with the following version.
+
+autoconf		2.63
+binutils		2.20.51
+bison			2.4.1
+flex			2.5.35
+gperf			3.0.4
+gcc				4.4.7
+g++				4.4.7
+make			3.81 
+perl			5.10.1
+python-devel	2.6.2
+zlib-devel		1.2.3
+bzip2-devel		1.0.5
+readline-devel	6.0
+libevent-devel	1.4.6
+LibYAML			0.1.1
+boost			1.55
+snappy			1.1.1
+thrift			0.9.1
+json-c			0.9
+libcurl			7.21.7
+libhdfs3		2.2.30
+libyarn			code shipped with HAWQ 
+
+
+Build
+
+./configure --prefix=/somewhere/you/want/to/install
+make -j8
+make install
+
+Test
+
+After setup a HAWQ cluster.
+
+make installcheck-good

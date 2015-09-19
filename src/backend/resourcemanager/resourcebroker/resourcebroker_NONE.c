@@ -1,0 +1,242 @@
+#include "envswitch.h"
+
+#include "resourcebroker/resourcebroker_NONE.h"
+#include "resourcemanager.h"
+#include "utils/kvproperties.h"
+/*******************************************************************************
+ * NONE mode does not need resource broker process to help negotiating with
+ * global resource manager which does not exist at all.
+ ******************************************************************************/
+
+#define RB_NONE_INBUILDHOST 											   \
+		SMBUFF_HEAD(SegmentTrackInformation, &machineidbuff)
+
+/*
+ *------------------------------------------------------------------------------
+ * Global variables.
+ *------------------------------------------------------------------------------
+ */
+int32_t			RoundRobinIndex		= 0;
+uint32_t		ContainerIDCounter	= 0;
+
+/*
+ *------------------------------------------------------------------------------
+ * RB NONE implementation.
+ *------------------------------------------------------------------------------
+ */
+void RB_NONE_createEntries(RB_FunctionEntries entries)
+{
+	entries->acquireResource 	= RB_NONE_acquireResource;
+	entries->returnResource		= RB_NONE_returnResource;
+	entries->handleError		= RB_NONE_handleError;
+}
+
+/**
+ * Acquire resource from hosts in NONE mode.
+ *
+ * This function use round-robin sequence to select available hosts in HAWQ RM
+ * resource pool and choose suitable host to allocate containers.
+ */
+int RB_NONE_acquireResource(uint32_t memorymb, uint32_t core, List *preferred)
+{
+
+	int					contmemorymb  	= memorymb/core;
+	int					contcount 		= core;
+	int					contactcount	= 0;
+
+	bool				hasallocated 	= false;
+	GRMContainer 		newcontainer	= NULL;
+	int					hostcount		= PRESPOOL->SegmentIDCounter;
+	ListCell		   *cell			= NULL;
+	int					res				= FUNC_RETURN_OK;
+
+	elog(DEBUG3, "NONE mode resource broker received resource allocation request "
+				 "(%d MB, %d CORE)",
+				 memorymb,
+				 core);
+
+	/*
+	 * If a list of hosts are preferred for new allocated resource, they are
+	 * considered in first priority.
+	 */
+	foreach(cell, preferred)
+	{
+		PAIR pair = (PAIR)lfirst(cell);
+		SegResource segres = (SegResource)(pair->Key);
+		ResourceBundle resource = (ResourceBundle)(pair->Value);
+
+		elog(DEBUG3, "Resource manager expects (%d MB, %lf CORE) resource on "
+					 "segment %s",
+					 resource->MemoryMB,
+					 resource->Core,
+					 GET_SEGRESOURCE_HOSTNAME(segres));
+
+		if (!IS_SEGRESOURCE_USABLE(segres))
+		{
+			elog(DEBUG3, "Resource manager considers segment %s down. No GRM "
+						 "containers to be allocated in this host.",
+						 GET_SEGRESOURCE_HOSTNAME(segres));
+			continue;
+		}
+
+		/* Check how many containers can be allocated in this segment. */
+		int availctn = segres->Stat->FTSTotalCore -
+					   segres->Allocated.Core -
+					   segres->IncPending.Core;
+		int availctn2 = (segres->Stat->FTSTotalMemoryMB -
+						 segres->Allocated.MemoryMB -
+						 segres->IncPending.MemoryMB) / contmemorymb;
+		availctn = availctn < availctn2 ? availctn : availctn2;
+		availctn = availctn < resource->Core ? availctn : resource->Core;
+
+		elog(DEBUG3, "NONE mode resource broker allocates resource "
+					 "(%d MB, %d CORE) x %d on segment %s",
+					 contmemorymb,
+					 1,
+					 availctn,
+					 GET_SEGRESOURCE_HOSTNAME(segres));
+
+		for ( int i = 0 ; i < availctn ; ++i )
+		{
+			newcontainer = createGRMContainer(ContainerIDCounter,
+											  contmemorymb,
+											  1,
+											  GET_SEGRESOURCE_HOSTNAME(segres),
+										      segres);
+			contactcount++;
+			ContainerIDCounter++;
+			addGRMContainerToToBeAccepted(newcontainer);
+
+			if ( contactcount >= contcount )
+			{
+				break;
+			}
+		}
+
+		if ( contactcount >= contcount )
+		{
+			break;
+		}
+	}
+
+	/*
+	 * Then if we need more containers, round-robin strategy is implemented.
+	 */
+	while( contactcount < contcount )
+	{
+
+		hasallocated = false;
+		for (int i = 0 ; i < hostcount ; ++i)
+		{
+
+		     RoundRobinIndex = RoundRobinIndex >= hostcount-1 ?
+		    		 	       0 :
+							   RoundRobinIndex + 1;
+
+			/* Get the host currently indexed. */
+			SegResource segres = getSegResource(RoundRobinIndex);
+			if ( segres == NULL )
+			{
+				continue;
+			}
+
+			char *hostname = GET_SEGRESOURCE_HOSTNAME(segres);
+
+			elog(DEBUG5, "NONE mode resource broker tries host %s.", hostname);
+
+			/* The host must be HAWQ available and not RUAlive pending. */
+			if ( !IS_SEGRESOURCE_USABLE(segres))
+			{
+				continue;
+			}
+
+			/* Check the pending resource quota to avoid allocating too much. */
+			if ( segres->Stat->FTSTotalMemoryMB -
+				 segres->Allocated.MemoryMB -
+				 segres->IncPending.MemoryMB >= contmemorymb &&
+				 segres->Stat->FTSTotalCore -
+				 segres->Allocated.Core -
+				 segres->IncPending.Core >= 1 )
+			{
+				hasallocated = true;
+
+				elog(DEBUG3, "NONE mode resource broker chooses host %s to allocate "
+							 "resource (%d MB, 1 CORE).",
+							 hostname,
+							 contmemorymb);
+
+				newcontainer = createGRMContainer(ContainerIDCounter,
+												  contmemorymb,
+												  1,
+												  hostname,
+											      segres);
+				contactcount++;
+				ContainerIDCounter++;
+				break;
+			}
+		}
+
+		if ( !hasallocated ) {
+			break; /* May be not fully satisfied. */
+		}
+
+		/*
+		 * Add the new container into resource pool. In NONE mode, we expect
+		 * HAWQ RM always can successfully add the container into its resource
+		 * pool.
+		 */
+		Assert(newcontainer != NULL);
+		addGRMContainerToToBeAccepted(newcontainer);
+	}
+
+	elog(LOG, "NONE mode resource broker allocated containers "
+			  "(%d MB, %d CORE) x %d. Expected %d containers.",
+				contmemorymb,
+				1,
+				contactcount,
+				contcount);
+
+	if ( contactcount <= 0 ) {
+		res = RESBROK_TEMP_NO_RESOURCE;
+	}
+
+	/* Clean up pending resource quantity. */
+	removePendingResourceRequestInRootQueue( contmemorymb * (contcount - contactcount),
+											 1            * (contcount - contactcount));
+
+	return FUNC_RETURN_OK;
+}
+
+int RB_NONE_returnResource(List **ctnl)
+{
+	while( (*ctnl) != NULL )
+	{
+		GRMContainer ctn = (GRMContainer)lfirst(list_head(*ctnl));
+		MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
+		(*ctnl) = list_delete_first(*ctnl);
+		MEMORY_CONTEXT_SWITCH_BACK
+
+		if ( ctn->CalcDecPending ) {
+			minusResourceBundleData(&(ctn->Resource->DecPending), ctn->MemoryMB, ctn->Core);
+			Assert( ctn->Resource->DecPending.MemoryMB >= 0 );
+			Assert( ctn->Resource->DecPending.Core >= 0 );
+		}
+
+		elog(LOG, "NONE mode resource broker returned resource container "
+				  "(%d MB, %d CORE) to host %s",
+				  ctn->MemoryMB,
+				  ctn->Core,
+				  ctn->HostName == NULL ? "NULL" : ctn->HostName);
+
+		/* Destroy resource container. */
+		freeGRMContainer(ctn);
+		PRESPOOL->RetPendingContainerCount--;
+	}
+
+	return FUNC_RETURN_OK;
+}
+
+void RB_NONE_handleError(int errorcode)
+{
+	/* Do nothing temporarily. */
+}

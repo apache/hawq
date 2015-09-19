@@ -1,0 +1,245 @@
+#!/bin/sh
+#
+# pxf-service	start/stop/initialize/status the PXF instance
+#
+
+pxf_root=/usr/lib/pxf
+env_script=/etc/pxf/conf/pxf-env.sh
+tomcat_root=/opt/pivotal/apache-tomcat
+tomcat_templates=/opt/pivotal/pxf/tomcat-templates
+instance_root=/var/pxf
+
+pxf_user=pxf
+instance_name=pxf-service
+instance_port=51200
+instance_owner=pxf:pxf
+
+curl=`which curl`
+
+# load pxf-env.sh script
+if [ ! -f $env_script ]; then
+	echo WARNING: failed to find $env_script
+else
+	source $env_script
+fi
+
+# validate JAVA_HOME
+if [ ! -x $JAVA_HOME/bin/java ]; then
+	echo ERROR: \$JAVA_HOME is invalid
+	exit 1
+fi
+
+#
+# createInstance creates a tomcat instance 
+# configuration files 
+#
+function createInstance()
+{
+	mkdir -p $instance_root 
+	mkdir -p $instance_root/$instance_name 
+	cp -r $tomcat_root/* $instance_root/$instance_name/.
+
+	if [ $? -gt 0 ]; then
+		echo ERROR: instance creation failed
+		return 1
+	fi
+
+	chown $instance_owner -R $instance_root
+	chmod 700 $instance_root/$instance_name
+
+	return 0
+}
+
+#
+# configureInstance configures the tomcat instance
+# based on pre-configured template files.
+#
+# specifically:
+#	support up to 30,000 header fields
+#	support up to 1MB size header
+#	change connection timeout to 60 seconds
+#	set port to 51200
+#
+function configureInstance()
+{
+	# copy configuration files into instance
+	cp $tomcat_templates/bin/setenv.sh $instance_root/$instance_name/bin/setenv.sh
+	cp $tomcat_templates/conf/catalina.properties $instance_root/$instance_name/conf/.
+	cp $tomcat_templates/conf/server.xml $instance_root/$instance_name/conf/.
+	cp $tomcat_templates/conf/web.xml $instance_root/$instance_name/conf/.
+	
+	# set port
+	catalinaProperties=$instance_root/$instance_name/conf/catalina.properties
+	cat $catalinaProperties | \
+	sed "s|^[[:blank:]]*connector.http.port=.*$|connector.http.port=$instance_port|g" \
+	> ${catalinaProperties}.tmp
+
+	rm $catalinaProperties
+	mv ${catalinaProperties}.tmp $catalinaProperties
+
+	# set pid
+	catalinaEnv=$instance_root/$instance_name/bin/setenv.sh
+	cat $catalinaEnv | \
+	sed "s|^[[:blank:]]*CATALINA_PID=.*$|CATALINA_PID=$PXF_RUNDIR/catalina.pid|g" \
+	> ${catalinaEnv}.tmp
+	rm $catalinaEnv
+	mv ${catalinaEnv}.tmp $catalinaEnv
+
+	# set log directories
+	catalinaLog=$instance_root/$instance_name/conf/logging.properties
+	cat $catalinaLog | \
+	sed "s|juli.FileHandler.directory\s*=.*$|juli.FileHandler.directory = $PXF_LOGDIR|g" \
+	> ${catalinaLog}.tmp
+	rm $catalinaLog
+	mv ${catalinaLog}.tmp $catalinaLog
+
+	return 0
+}
+
+#
+# deployWebapp adds the pxf-webapp to the new instance's webapps folder
+# and the custom loader to the instance's lib directory
+#
+function deployWebapp()
+{
+	cp $pxf_root/pxf.war $instance_root/$instance_name/webapps/ || return 1
+	cp $pxf_root/pxf-service-*[0-9].jar $instance_root/$instance_name/lib/ || return 1
+
+	return 0
+}
+
+#
+# waitForTomcat waits for tomcat to finish loading
+# for given attempts number.
+#
+function waitForTomcat()
+{
+	attempts=0
+	max_attempts=$1 # number of attempts to connect 
+	sleep_time=1 # sleep 1 second between attempts
+	
+	# wait until tomcat is up:
+	echo Checking if tomcat is up and running...
+	until [[ "`curl --silent --connect-timeout 1 -I http://localhost:${instance_port} | grep 'Coyote'`" != "" ]];
+	do
+		let attempts=attempts+1
+		if [[ "$attempts" -eq "$max_attempts" ]]; then
+			echo ERROR: PXF is down - tomcat is not running
+			return 1
+		fi
+		echo "tomcat not responding, re-trying after ${sleep_time} second (attempt number ${attempts})"
+		sleep $sleep_time
+	done
+
+	return 0
+}
+
+#
+# checkWebapp checks if tomcat is up for $1 attempts and then
+# verifies PXF webapp is functional
+#
+function checkWebapp()
+{
+	waitForTomcat $1 || return 1
+	
+	echo Checking if PXF webapp is up and running...
+	curlResponse=$($curl -s "http://localhost:${instance_port}/pxf/v0")
+	expectedResponse="Wrong version v0, supported version is v[0-9]+"
+	
+	if [[ $curlResponse =~ $expectedResponse ]]; then
+		echo PXF webapp is up
+		return 0
+	fi
+	
+	echo ERROR: PXF webapp is inaccessible but tomcat is up. Check logs for more information
+	return 1
+}
+
+# instanceExists returns 0 when the instance exists
+# non zero otherwise
+function instanceExists()
+{
+	if [ ! -d $instance_root ]; then
+		return 1
+	fi
+
+	$instance_root/$instance_name/bin/catalina.sh version > /dev/null 2>&1
+	return $?
+}
+
+# doInit handles the init command
+function doInit()
+{
+	instanceExists
+	if [ $? -eq 0 ]; then
+		echo WARNING: instance already exists in $instance_root, nothing to do...
+		return 0
+	fi
+
+	createInstance || return 1
+	configureInstance || return 1
+	deployWebapp || return 1
+}
+
+# 
+# doStartStop handles start/stop commands
+# commands are executed as the user $pxf_user
+#
+# after start, uses checkWebapp to verify the PXF webapp was loaded
+# successfully
+#
+function doStartStop()
+{
+	command=$1
+
+	instanceExists
+	if [ $? -ne 0 ]; then
+		echo ERROR: cant find PXF instance, maybe call init?
+		return 1
+	fi
+
+	pushd $instance_root
+	su $pxf_user -c "$instance_root/$instance_name/bin/catalina.sh $command"
+	if [ $? -ne 0 ]; then
+		return 1
+	fi 
+	popd
+	
+	if [ "$command" = "start" ]; then
+		# try to connect for 5 minutes
+		checkWebapp 300 || return 1
+	fi
+}
+
+function doStatus()
+{
+	checkWebapp 1 || return 1
+}
+
+command=$1
+
+case "$command" in
+	"init" )
+		doInit
+		;;
+	"start" )
+		doStartStop $command
+		;;
+	"stop" )
+		doStartStop $command
+		;;
+	"restart" )
+		doStartStop stop
+		sleep 1s
+		doStartStop start
+		;;
+	"status" )
+		doStatus
+		;;
+	* )
+		echo $"Usage: $0 {start|stop|restart|init|status}"
+		exit 2
+		;;
+esac
+
+exit $?
