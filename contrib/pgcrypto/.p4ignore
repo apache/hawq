@@ -1,8 +1,0 @@
-libpgcrypto.a
-libpgcrypto.so
-libpgcrypto.so.0
-libpgcrypto.so.0.0
-pgcrypto.sql
-log
-results
-tmp_check
