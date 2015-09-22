@@ -892,6 +892,9 @@ PersistentBuild_TruncateAllGpRelationNode(void)
 		dbOid = HeapTupleGetOid(tuple);
 		dattablespace = form_pg_database->dattablespace;
 
+		if (dbOid == HcatalogDbOid)
+			continue;
+
 		if (Debug_persistent_print)
 			elog(Persistent_DebugPrintLevel(), 
 				 "PersistentBuild_TruncateAllGpRelationNode: dbOid %u, '%s'",
