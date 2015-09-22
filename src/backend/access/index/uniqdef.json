@@ -1,0 +1,5755 @@
+{
+   "DELETE FROM gp_distribution_policy  WHERE localoid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from gp_distribution_policy where localoid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbcat.c" : 1
+      },
+      "tablename" : "gp_distribution_policy"
+   },
+   "DELETE FROM gp_fastsequence  WHERE objid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from gp_fastsequence where objid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/gp_fastsequence.c" : 1
+      },
+      "tablename" : "gp_fastsequence"
+   },
+   "DELETE FROM gp_segment_configuration  WHERE registration_order = :1" : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from gp_segment_configuration where registration_order = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/gp/segadmin.c" : 1
+      },
+      "tablename" : "gp_segment_configuration"
+   },
+   "DELETE FROM gp_segment_configuration  WHERE role = :1" : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from gp_segment_configuration where role = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/gp/segadmin.c" : 2
+      },
+      "tablename" : "gp_segment_configuration"
+   },
+   "DELETE FROM pg_aggregate  WHERE aggfnoid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_aggregate where aggfnoid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/functioncmds.c" : 1
+      },
+      "tablename" : "pg_aggregate"
+   },
+   "DELETE FROM pg_amop  WHERE amopclaid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_amop where amopclaid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/opclasscmds.c" : 1
+      },
+      "tablename" : "pg_amop"
+   },
+   "DELETE FROM pg_amproc  WHERE amopclaid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_amproc where amopclaid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/opclasscmds.c" : 1
+      },
+      "tablename" : "pg_amproc"
+   },
+   "DELETE FROM pg_attribute  WHERE attrelid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_attribute where attrelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/heap.c" : 1
+      },
+      "tablename" : "pg_attribute"
+   },
+   "DELETE FROM pg_attribute_encoding  WHERE attrelid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_attribute_encoding where attrelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_attribute_encoding.c" : 1
+      },
+      "tablename" : "pg_attribute_encoding"
+   },
+   "DELETE FROM pg_auth_members  WHERE member = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_auth_members where member = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/user.c" : 1
+      },
+      "tablename" : "pg_auth_members"
+   },
+   "DELETE FROM pg_auth_members  WHERE roleid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_auth_members where roleid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/user.c" : 1
+      },
+      "tablename" : "pg_auth_members"
+   },
+   "DELETE FROM pg_cast  WHERE oid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_cast where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/functioncmds.c" : 1
+      },
+      "tablename" : "pg_cast"
+   },
+   "DELETE FROM pg_conversion  WHERE oid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_conversion where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_conversion.c" : 1
+      },
+      "tablename" : "pg_conversion"
+   },
+   "DELETE FROM pg_database  WHERE oid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_database where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/dbcommands.c" : 1
+      },
+      "tablename" : "pg_database"
+   },
+   "DELETE FROM pg_depend  WHERE classid = :1  AND objid = :2 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_depend where classid = :1 and objid = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_depend.c" : 1
+      },
+      "tablename" : "pg_depend"
+   },
+   "DELETE FROM pg_description where objoid = :1 AND  classoid = :2" : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_description where objoid = :1 and classoid = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/comment.c" : 1
+      },
+      "tablename" : "pg_description"
+   },
+   "DELETE FROM pg_description where objoid = :1 AND  classoid = :2 AND  objsubid = :3" : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_description where objoid = :1 and classoid = :2 and objsubid = :3",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/comment.c" : 1
+      },
+      "tablename" : "pg_description"
+   },
+   "DELETE FROM pg_extprotocol  WHERE oid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_extprotocol where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_extprotocol.c" : 1
+      },
+      "tablename" : "pg_extprotocol"
+   },
+   "DELETE FROM pg_exttable  WHERE reloid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_exttable where reloid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_exttable.c" : 1
+      },
+      "tablename" : "pg_exttable"
+   },
+   "DELETE FROM pg_filespace  WHERE oid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_filespace where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/filespace.c" : 1
+      },
+      "tablename" : "pg_filespace"
+   },
+   "DELETE FROM pg_filespace_entry  WHERE fsedbid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_filespace_entry where fsedbid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/filespace.c" : 1
+      },
+      "tablename" : "pg_filespace_entry"
+   },
+   "DELETE FROM pg_filespace_entry  WHERE fsefsoid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_filespace_entry where fsefsoid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/filespace.c" : 1
+      },
+      "tablename" : "pg_filespace_entry"
+   },
+   "DELETE FROM pg_foreign_data_wrapper  WHERE oid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_foreign_data_wrapper where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/foreigncmds.c" : 1
+      },
+      "tablename" : "pg_foreign_data_wrapper"
+   },
+   "DELETE FROM pg_foreign_server  WHERE oid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_foreign_server where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/foreigncmds.c" : 1
+      },
+      "tablename" : "pg_foreign_server"
+   },
+   "DELETE FROM pg_foreign_table  WHERE reloid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_foreign_table where reloid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/foreigncmds.c" : 1
+      },
+      "tablename" : "pg_foreign_table"
+   },
+   "DELETE FROM pg_inherits  WHERE inhrelid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_inherits where inhrelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/heap.c" : 1
+      },
+      "tablename" : "pg_inherits"
+   },
+   "DELETE FROM pg_language  WHERE oid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_language where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/proclang.c" : 1
+      },
+      "tablename" : "pg_language"
+   },
+   "DELETE FROM pg_namespace  WHERE oid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_namespace where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/schemacmds.c" : 1
+      },
+      "tablename" : "pg_namespace"
+   },
+   "DELETE FROM pg_opclass  WHERE oid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_opclass where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/opclasscmds.c" : 1
+      },
+      "tablename" : "pg_opclass"
+   },
+   "DELETE FROM pg_operator  WHERE oid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_operator where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/operatorcmds.c" : 1
+      },
+      "tablename" : "pg_operator"
+   },
+   "DELETE FROM pg_partition  WHERE parrelid = :1  AND parlevel = :2  AND paristemplate = :3 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_partition where parrelid = :1 and parlevel = :2 and paristemplate = :3",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartition.c" : 1
+      },
+      "tablename" : "pg_partition"
+   },
+   "DELETE FROM pg_partition_rule  WHERE parchildrelid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_partition_rule where parchildrelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/heap.c" : 1
+      },
+      "tablename" : "pg_partition_rule"
+   },
+   "DELETE FROM pg_partition_rule  WHERE paroid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_partition_rule where paroid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/heap.c" : 1
+      },
+      "tablename" : "pg_partition_rule"
+   },
+   "DELETE FROM pg_partition_rule  WHERE paroid = :1  AND parparentrule = :2 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_partition_rule where paroid = :1 and parparentrule = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartition.c" : 1
+      },
+      "tablename" : "pg_partition_rule"
+   },
+   "DELETE FROM pg_proc_callback  WHERE profnoid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_proc_callback where profnoid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_proc_callback.c" : 1
+      },
+      "tablename" : "pg_proc_callback"
+   },
+   "DELETE FROM pg_shdepend  WHERE dbid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_shdepend where dbid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_shdepend.c" : 1
+      },
+      "tablename" : "pg_shdepend"
+   },
+   "DELETE FROM pg_shdescription where objoid  = :1 AND  classoid = :2" : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_shdescription where objoid = :1 and classoid = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/comment.c" : 1
+      },
+      "tablename" : "pg_shdescription"
+   },
+   "DELETE FROM pg_stat_last_operation  WHERE classid = :1  AND objid = :2 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_stat_last_operation where classid = :1 and objid = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/heap.c" : 1
+      },
+      "tablename" : "pg_stat_last_operation"
+   },
+   "DELETE FROM pg_stat_last_shoperation  WHERE classid = :1  AND objid = :2 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_stat_last_shoperation where classid = :1 and objid = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/heap.c" : 1
+      },
+      "tablename" : "pg_stat_last_shoperation"
+   },
+   "DELETE FROM pg_statistic  WHERE starelid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_statistic where starelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/heap.c" : 1
+      },
+      "tablename" : "pg_statistic"
+   },
+   "DELETE FROM pg_statistic  WHERE starelid = :1  AND staattnum = :2 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_statistic where starelid = :1 and staattnum = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/heap.c" : 1
+      },
+      "tablename" : "pg_statistic"
+   },
+   "DELETE FROM pg_type  WHERE oid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_type where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/typecmds.c" : 1
+      },
+      "tablename" : "pg_type"
+   },
+   "DELETE FROM pg_type_encoding  WHERE typid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_type_encoding where typid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/typecmds.c" : 1
+      },
+      "tablename" : "pg_type_encoding"
+   },
+   "DELETE FROM pg_user_mapping  WHERE oid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 1,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_user_mapping where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/foreigncmds.c" : 1
+      },
+      "tablename" : "pg_user_mapping"
+   },
+   "INSERT INTO gp_distribution_policy " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into gp_distribution_policy",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbcat.c" : 1
+      },
+      "tablename" : "gp_distribution_policy"
+   },
+   "INSERT INTO gp_segment_configuration " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into gp_segment_configuration",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/gp/segadmin.c" : 1
+      },
+      "tablename" : "gp_segment_configuration"
+   },
+   "INSERT INTO pg_aggregate" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_aggregate",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_aggregate.c" : 1
+      },
+      "tablename" : "pg_aggregate"
+   },
+   "INSERT INTO pg_amop" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_amop",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/opclasscmds.c" : 1
+      },
+      "tablename" : "pg_amop"
+   },
+   "INSERT INTO pg_amproc" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_amproc",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/opclasscmds.c" : 1
+      },
+      "tablename" : "pg_amproc"
+   },
+   "INSERT INTO pg_appendonly" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_appendonly",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_appendonly.c" : 1
+      },
+      "tablename" : "pg_appendonly"
+   },
+   "INSERT INTO pg_attrdef " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_attrdef",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/heap.c" : 1
+      },
+      "tablename" : "pg_attrdef"
+   },
+   "INSERT INTO pg_attribute " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_attribute",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/heap.c" : 1,
+         "../../../..//src/backend/catalog/index.c" : 1,
+         "../../../..//src/backend/commands/tablecmds.c" : 1
+      },
+      "tablename" : "pg_attribute"
+   },
+   "INSERT INTO pg_attribute_encoding" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_attribute_encoding",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_attribute_encoding.c" : 1
+      },
+      "tablename" : "pg_attribute_encoding"
+   },
+   "INSERT INTO pg_auth_members " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_auth_members",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/user.c" : 1
+      },
+      "tablename" : "pg_auth_members"
+   },
+   "INSERT INTO pg_auth_time_constraint " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_auth_time_constraint",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/user.c" : 1
+      },
+      "tablename" : "pg_auth_time_constraint"
+   },
+   "INSERT INTO pg_authid " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_authid",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/user.c" : 1
+      },
+      "tablename" : "pg_authid"
+   },
+   "INSERT INTO pg_cast" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_cast",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/functioncmds.c" : 1
+      },
+      "tablename" : "pg_cast"
+   },
+   "INSERT INTO pg_class " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_class",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/heap.c" : 1
+      },
+      "tablename" : "pg_class"
+   },
+   "INSERT INTO pg_constraint" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_constraint",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_constraint.c" : 1
+      },
+      "tablename" : "pg_constraint"
+   },
+   "INSERT INTO pg_conversion" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_conversion",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_conversion.c" : 1
+      },
+      "tablename" : "pg_conversion"
+   },
+   "INSERT INTO pg_database" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_database",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/dbcommands.c" : 1
+      },
+      "tablename" : "pg_database"
+   },
+   "INSERT INTO pg_depend " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_depend",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_depend.c" : 1
+      },
+      "tablename" : "pg_depend"
+   },
+   "INSERT INTO pg_description" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_description",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/comment.c" : 1
+      },
+      "tablename" : "pg_description"
+   },
+   "INSERT INTO pg_extprotocol" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_extprotocol",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_extprotocol.c" : 1
+      },
+      "tablename" : "pg_extprotocol"
+   },
+   "INSERT INTO pg_exttable" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_exttable",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_exttable.c" : 1
+      },
+      "tablename" : "pg_exttable"
+   },
+   "INSERT INTO pg_filespace" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_filespace",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/filespace.c" : 1
+      },
+      "tablename" : "pg_filespace"
+   },
+   "INSERT INTO pg_filespace_entry" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_filespace_entry",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/filespace.c" : 1
+      },
+      "tablename" : "pg_filespace_entry"
+   },
+   "INSERT INTO pg_foreign_data_wrapper" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_foreign_data_wrapper",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/foreigncmds.c" : 1
+      },
+      "tablename" : "pg_foreign_data_wrapper"
+   },
+   "INSERT INTO pg_foreign_server" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_foreign_server",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/foreigncmds.c" : 1
+      },
+      "tablename" : "pg_foreign_server"
+   },
+   "INSERT INTO pg_foreign_table" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_foreign_table",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/foreigncmds.c" : 1
+      },
+      "tablename" : "pg_foreign_table"
+   },
+   "INSERT INTO pg_index " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_index",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/index.c" : 1
+      },
+      "tablename" : "pg_index"
+   },
+   "INSERT INTO pg_inherits" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_inherits",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/tablecmds.c" : 1
+      },
+      "tablename" : "pg_inherits"
+   },
+   "INSERT INTO pg_language" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_language",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/proclang.c" : 1
+      },
+      "tablename" : "pg_language"
+   },
+   "INSERT INTO pg_namespace" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_namespace",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_namespace.c" : 1
+      },
+      "tablename" : "pg_namespace"
+   },
+   "INSERT INTO pg_opclass" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_opclass",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/opclasscmds.c" : 1
+      },
+      "tablename" : "pg_opclass"
+   },
+   "INSERT INTO pg_operator" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_operator",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_operator.c" : 1
+      },
+      "tablename" : "pg_operator"
+   },
+   "INSERT INTO pg_partition " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_partition",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartition.c" : 1
+      },
+      "tablename" : "pg_partition"
+   },
+   "INSERT INTO pg_partition_encoding " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_partition_encoding",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartition.c" : 1
+      },
+      "tablename" : "pg_partition_encoding"
+   },
+   "INSERT INTO pg_partition_rule " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_partition_rule",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartition.c" : 1
+      },
+      "tablename" : "pg_partition_rule"
+   },
+   "INSERT INTO pg_proc " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_proc",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_proc.c" : 1
+      },
+      "tablename" : "pg_proc"
+   },
+   "INSERT INTO pg_proc_callback " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_proc_callback",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_proc_callback.c" : 1
+      },
+      "tablename" : "pg_proc_callback"
+   },
+   "INSERT INTO pg_shdepend " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_shdepend",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_shdepend.c" : 2
+      },
+      "tablename" : "pg_shdepend"
+   },
+   "INSERT INTO pg_shdescription" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_shdescription",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/comment.c" : 1
+      },
+      "tablename" : "pg_shdescription"
+   },
+   "INSERT INTO pg_stat_last_operation " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_stat_last_operation",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/heap.c" : 1
+      },
+      "tablename" : "pg_stat_last_operation"
+   },
+   "INSERT INTO pg_stat_last_shoperation " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_stat_last_shoperation",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/heap.c" : 1
+      },
+      "tablename" : "pg_stat_last_shoperation"
+   },
+   "INSERT INTO pg_tablespace" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_tablespace",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/tablespace.c" : 1
+      },
+      "tablename" : "pg_tablespace"
+   },
+   "INSERT INTO pg_trigger " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_trigger",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/trigger.c" : 1
+      },
+      "tablename" : "pg_trigger"
+   },
+   "INSERT INTO pg_type " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_type",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_type.c" : 1
+      },
+      "tablename" : "pg_type"
+   },
+   "INSERT INTO pg_type_encoding " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_type_encoding",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_type.c" : 1
+      },
+      "tablename" : "pg_type_encoding"
+   },
+   "INSERT INTO pg_user_mapping" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 1,
+      "bUpdate" : 0,
+      "basic" : "insert into pg_user_mapping",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/foreigncmds.c" : 1
+      },
+      "tablename" : "pg_user_mapping"
+   },
+   "SELECT * FROM gp_distribution_policy  WHERE localoid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from gp_distribution_policy where localoid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbcat.c" : 1
+      },
+      "tablename" : "gp_distribution_policy"
+   },
+   "SELECT * FROM gp_distribution_policy  WHERE localoid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from gp_distribution_policy where localoid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbcat.c" : 1
+      },
+      "tablename" : "gp_distribution_policy"
+   },
+   "SELECT * FROM gp_fastsequence  WHERE objid = :1  AND objmod = :2  AND contentid = :3  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from gp_fastsequence where objid = :1 and objmod = :2 and contentid = :3",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/gp_fastsequence.c" : 1
+      },
+      "tablename" : "gp_fastsequence"
+   },
+   "SELECT * FROM gp_fastsequence  WHERE objid = :1  AND objmod = :2  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from gp_fastsequence where objid = :1 and objmod = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/gp_fastsequence.c" : 1
+      },
+      "tablename" : "gp_fastsequence"
+   },
+   "SELECT * FROM gp_segment_configuration  WHERE registration_order = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from gp_segment_configuration where registration_order = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbutil.c" : 1
+      },
+      "tablename" : "gp_segment_configuration"
+   },
+   "SELECT * FROM gp_segment_configuration  WHERE registration_order = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from gp_segment_configuration where registration_order = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/gp/segadmin.c" : 1
+      },
+      "tablename" : "gp_segment_configuration"
+   },
+   "SELECT * FROM gp_segment_configuration  WHERE role = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from gp_segment_configuration where role = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbutil.c" : 1
+      },
+      "tablename" : "gp_segment_configuration"
+   },
+   "SELECT * FROM pg_aggregate  WHERE aggfnoid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_aggregate where aggfnoid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbquerycontextdispatching.c" : 1,
+         "../../../..//src/backend/executor/nodeAgg.c" : 1,
+         "../../../..//src/backend/executor/nodeWindow.c" : 1,
+         "../../../..//src/backend/optimizer/plan/planwindow.c" : 1,
+         "../../../..//src/backend/optimizer/util/clauses.c" : 1,
+         "../../../..//src/backend/parser/parse_func.c" : 1
+      },
+      "tablename" : "pg_aggregate"
+   },
+   "SELECT * FROM pg_am  WHERE amname = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_am where amname = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/indexcmds.c" : 2,
+         "../../../..//src/backend/commands/opclasscmds.c" : 1
+      },
+      "tablename" : "pg_am"
+   },
+   "SELECT * FROM pg_am  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_am where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/adt/ruleutils.c" : 1
+      },
+      "tablename" : "pg_am"
+   },
+   "SELECT * FROM pg_amop  WHERE amopclaid = :1  AND amopsubtype = :2 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_amop where amopclaid = :1 and amopsubtype = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/relcache.c" : 1
+      },
+      "tablename" : "pg_amop"
+   },
+   "SELECT * FROM pg_amop  WHERE amopopr = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_amop where amopopr = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_amop"
+   },
+   "SELECT * FROM pg_amop  WHERE amopopr = :1  AND amopclaid = :2 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_amop where amopopr = :1 and amopclaid = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/optimizer/util/predtest.c" : 2,
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 2
+      },
+      "tablename" : "pg_amop"
+   },
+   "SELECT * FROM pg_amop  WHERE amopopr = :1  ORDER BY amopopr,  amopclaid " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_amop where amopopr = :1 ORDER_BY AccessMethodOperatorIndexId",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/executor/nodeMergejoin.c" : 1,
+         "../../../..//src/backend/optimizer/util/predtest.c" : 2,
+         "../../../..//src/backend/parser/parse_clause.c" : 1,
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 3,
+         "../../../..//src/backend/utils/sort/tuplesort.c" : 1
+      },
+      "oby" : {
+         "attnums" : [
+            "Anum_pg_amop_amopopr",
+            "Anum_pg_amop_amopclaid"
+         ],
+         "colnames" : [
+            "amopopr",
+            "amopclaid"
+         ],
+         "index" : {
+            "CamelCaseIndexId" : "AccessMethodOperatorIndexId",
+            "SysCacheIdentifier" : "AMOPOPID",
+            "allcols" : 1,
+            "numcols" : "2",
+            "primarykey_prefix" : {
+               "READPK_INIT" : "newhash = caql_pkhash(pCtx, newhash, (pCtx->cq_datumKeys[0]), \n\t\t\t\t\t  false /* isnull */, OIDOID);\n\n",
+               "fkcolname" : "amopopr",
+               "pkcolname" : "oid",
+               "pkidx" : "OperatorOidIndexId",
+               "pkrelid" : "OperatorRelationId",
+               "pktname" : "pg_operator"
+            },
+            "unique" : 1
+         },
+         "rawtxt" : "amopopr, amopclaid"
+      },
+      "tablename" : "pg_amop"
+   },
+   "SELECT * FROM pg_amop WHERE amopclaid = :1" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_amop where amopclaid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbquerycontextdispatching.c" : 1
+      },
+      "tablename" : "pg_amop"
+   },
+   "SELECT * FROM pg_amop WHERE amopopr = :1" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_amop where amopopr = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbquerycontextdispatching.c" : 1
+      },
+      "tablename" : "pg_amop"
+   },
+   "SELECT * FROM pg_amproc  WHERE amopclaid = :1  AND amprocsubtype = :2 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_amproc where amopclaid = :1 and amprocsubtype = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/relcache.c" : 1
+      },
+      "tablename" : "pg_amproc"
+   },
+   "SELECT * FROM pg_amproc WHERE amopclaid = :1" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_amproc where amopclaid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbquerycontextdispatching.c" : 1
+      },
+      "tablename" : "pg_amproc"
+   },
+   "SELECT * FROM pg_appendonly  WHERE relid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_appendonly where relid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_appendonly.c" : 2
+      },
+      "tablename" : "pg_appendonly"
+   },
+   "SELECT * FROM pg_appendonly  WHERE relid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_appendonly where relid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_appendonly.c" : 3
+      },
+      "tablename" : "pg_appendonly"
+   },
+   "SELECT * FROM pg_attrdef  WHERE adrelid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_attrdef where adrelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/relcache.c" : 1
+      },
+      "tablename" : "pg_attrdef"
+   },
+   "SELECT * FROM pg_attrdef  WHERE adrelid = :1  AND adnum = :2  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_attrdef where adrelid = :1 and adnum = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/heap.c" : 1
+      },
+      "tablename" : "pg_attrdef"
+   },
+   "SELECT * FROM pg_attrdef  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_attrdef where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/dependency.c" : 1
+      },
+      "tablename" : "pg_attrdef"
+   },
+   "SELECT * FROM pg_attrdef  WHERE oid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_attrdef where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/heap.c" : 1
+      },
+      "tablename" : "pg_attrdef"
+   },
+   "SELECT * FROM pg_attribute  WHERE attrelid = :1  AND attnum = :2 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_attribute where attrelid = :1 and attnum = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbsubselect.c" : 1,
+         "../../../..//src/backend/parser/parse_relation.c" : 2,
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 2
+      },
+      "tablename" : "pg_attribute"
+   },
+   "SELECT * FROM pg_attribute  WHERE attrelid = :1  AND attnum = :2  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_attribute where attrelid = :1 and attnum = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/heap.c" : 3,
+         "../../../..//src/backend/commands/tablecmds.c" : 1
+      },
+      "tablename" : "pg_attribute"
+   },
+   "SELECT * FROM pg_attribute  WHERE attrelid = :1  AND attnum > :2 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_attribute where attrelid = :1 and attnum > :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/relcache.c" : 1
+      },
+      "tablename" : "pg_attribute"
+   },
+   "SELECT * FROM pg_attribute  WHERE attrelid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_attribute where attrelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/tablecmds.c" : 1
+      },
+      "tablename" : "pg_attribute"
+   },
+   "SELECT * FROM pg_attribute_encoding  WHERE attrelid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_attribute_encoding where attrelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_attribute_encoding.c" : 1
+      },
+      "tablename" : "pg_attribute_encoding"
+   },
+   "SELECT * FROM pg_auth_members  WHERE member = :1  ORDER BY member,  roleid " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_auth_members where member = :1 ORDER_BY AuthMemMemRoleIndexId",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/adt/acl.c" : 3
+      },
+      "oby" : {
+         "attnums" : [
+            "Anum_pg_auth_members_member",
+            "Anum_pg_auth_members_roleid"
+         ],
+         "colnames" : [
+            "member",
+            "roleid"
+         ],
+         "index" : {
+            "CamelCaseIndexId" : "AuthMemMemRoleIndexId",
+            "SysCacheIdentifier" : "AUTHMEMMEMROLE",
+            "allcols" : 1,
+            "numcols" : "2",
+            "primarykey_prefix" : {
+               "READPK_INIT" : "newhash = caql_pkhash(pCtx, newhash, (pCtx->cq_datumKeys[0]), \n\t\t\t\t\t  false /* isnull */, OIDOID);\n\n",
+               "fkcolname" : "member",
+               "pkcolname" : "oid",
+               "pkidx" : "AuthIdOidIndexId",
+               "pkrelid" : "AuthIdRelationId",
+               "pktname" : "pg_authid"
+            },
+            "unique" : 1
+         },
+         "rawtxt" : "member, roleid"
+      },
+      "tablename" : "pg_auth_members"
+   },
+   "SELECT * FROM pg_auth_members  WHERE roleid = :1  AND member = :2  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_auth_members where roleid = :1 and member = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/user.c" : 2
+      },
+      "tablename" : "pg_auth_members"
+   },
+   "SELECT * FROM pg_auth_time_constraint  WHERE authid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_auth_time_constraint where authid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/user.c" : 1
+      },
+      "tablename" : "pg_auth_time_constraint"
+   },
+   "SELECT * FROM pg_authid  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_authid where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1,
+         "../../../..//src/backend/commands/dbcommands.c" : 1,
+         "../../../..//src/backend/commands/user.c" : 1,
+         "../../../..//src/backend/utils/adt/acl.c" : 1,
+         "../../../..//src/backend/utils/misc/superuser.c" : 1
+      },
+      "tablename" : "pg_authid"
+   },
+   "SELECT * FROM pg_authid  WHERE oid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_authid where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/tablecmds.c" : 1
+      },
+      "tablename" : "pg_authid"
+   },
+   "SELECT * FROM pg_authid  WHERE rolname = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_authid where rolname = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/variable.c" : 2,
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1,
+         "../../../..//src/backend/utils/init/miscinit.c" : 1
+      },
+      "tablename" : "pg_authid"
+   },
+   "SELECT * FROM pg_authid  WHERE rolname = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_authid where rolname = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/user.c" : 4
+      },
+      "tablename" : "pg_authid"
+   },
+   "SELECT * FROM pg_authid WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_authid where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbquerycontextdispatching.c" : 1
+      },
+      "tablename" : "pg_authid"
+   },
+   "SELECT * FROM pg_cast  WHERE castsource = :1  AND casttarget = :2 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_cast where castsource = :1 and casttarget = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/comment.c" : 1,
+         "../../../..//src/backend/parser/parse_coerce.c" : 2
+      },
+      "tablename" : "pg_cast"
+   },
+   "SELECT * FROM pg_cast  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_cast where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/dependency.c" : 1
+      },
+      "tablename" : "pg_cast"
+   },
+   "SELECT * FROM pg_class " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_class",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/indexcmds.c" : 1,
+         "../../../..//src/backend/commands/vacuum.c" : 1
+      },
+      "tablename" : "pg_class"
+   },
+   "SELECT * FROM pg_class  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_class where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1,
+         "../../../..//src/backend/catalog/dependency.c" : 1,
+         "../../../..//src/backend/catalog/namespace.c" : 1,
+         "../../../..//src/backend/cdb/cdbpartition.c" : 1,
+         "../../../..//src/backend/commands/cluster.c" : 1,
+         "../../../..//src/backend/commands/indexcmds.c" : 3,
+         "../../../..//src/backend/commands/tablecmds.c" : 3,
+         "../../../..//src/backend/parser/parse_relation.c" : 1,
+         "../../../..//src/backend/parser/parse_utilcmd.c" : 1,
+         "../../../..//src/backend/tcop/utility.c" : 3,
+         "../../../..//src/backend/utils/adt/regproc.c" : 1,
+         "../../../..//src/backend/utils/adt/ruleutils.c" : 5,
+         "../../../..//src/backend/utils/adt/selfuncs.c" : 1,
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 5,
+         "../../../..//src/backend/utils/cache/relcache.c" : 1
+      },
+      "tablename" : "pg_class"
+   },
+   "SELECT * FROM pg_class  WHERE oid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_class where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1,
+         "../../../..//src/backend/catalog/heap.c" : 3,
+         "../../../..//src/backend/catalog/index.c" : 2,
+         "../../../..//src/backend/catalog/pg_constraint.c" : 1,
+         "../../../..//src/backend/catalog/toasting.c" : 1,
+         "../../../..//src/backend/cdb/cdbpartition.c" : 2,
+         "../../../..//src/backend/commands/analyze.c" : 1,
+         "../../../..//src/backend/commands/cluster.c" : 2,
+         "../../../..//src/backend/commands/tablecmds.c" : 10,
+         "../../../..//src/backend/commands/trigger.c" : 2,
+         "../../../..//src/backend/commands/vacuum.c" : 1,
+         "../../../..//src/backend/rewrite/rewriteSupport.c" : 1
+      },
+      "tablename" : "pg_class"
+   },
+   "SELECT * FROM pg_class  WHERE relkind = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_class where relkind = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/analyze.c" : 1,
+         "../../../..//src/backend/commands/vacuum.c" : 1
+      },
+      "tablename" : "pg_class"
+   },
+   "SELECT * FROM pg_compression  WHERE compname = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_compression where compname = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_compression.c" : 1
+      },
+      "tablename" : "pg_compression"
+   },
+   "SELECT * FROM pg_constraint  WHERE conname = :1  AND connamespace = :2 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_constraint where conname = :1 and connamespace = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_constraint.c" : 1
+      },
+      "tablename" : "pg_constraint"
+   },
+   "SELECT * FROM pg_constraint  WHERE conrelid = :1" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_constraint where conrelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartindex.c" : 1,
+         "../../../..//src/backend/cdb/cdbpartition.c" : 1
+      },
+      "tablename" : "pg_constraint"
+   },
+   "SELECT * FROM pg_constraint  WHERE conrelid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_constraint where conrelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_constraint.c" : 1,
+         "../../../..//src/backend/cdb/cdbpartition.c" : 1,
+         "../../../..//src/backend/commands/comment.c" : 1,
+         "../../../..//src/backend/commands/tablecmds.c" : 2,
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1,
+         "../../../..//src/backend/utils/cache/relcache.c" : 1
+      },
+      "tablename" : "pg_constraint"
+   },
+   "SELECT * FROM pg_constraint  WHERE conrelid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_constraint where conrelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/heap.c" : 1,
+         "../../../..//src/backend/catalog/pg_constraint.c" : 1
+      },
+      "tablename" : "pg_constraint"
+   },
+   "SELECT * FROM pg_constraint  WHERE contypid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_constraint where contypid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/typecmds.c" : 1
+      },
+      "tablename" : "pg_constraint"
+   },
+   "SELECT * FROM pg_constraint  WHERE contypid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_constraint where contypid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_constraint.c" : 1,
+         "../../../..//src/backend/commands/typecmds.c" : 1
+      },
+      "tablename" : "pg_constraint"
+   },
+   "SELECT * FROM pg_constraint  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_constraint where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/dependency.c" : 1,
+         "../../../..//src/backend/utils/adt/ruleutils.c" : 1
+      },
+      "tablename" : "pg_constraint"
+   },
+   "SELECT * FROM pg_constraint  WHERE oid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_constraint where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_constraint.c" : 1
+      },
+      "tablename" : "pg_constraint"
+   },
+   "SELECT * FROM pg_conversion  WHERE conname = :1  AND connamespace = :2 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_conversion where conname = :1 and connamespace = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_conversion.c" : 1
+      },
+      "tablename" : "pg_conversion"
+   },
+   "SELECT * FROM pg_conversion  WHERE connamespace = :1  AND conforencoding = :2  AND contoencoding = :3  ORDER BY connamespace,   conforencoding,    contoencoding,    oid  " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_conversion where connamespace = :1 and conforencoding = :2 and contoencoding = :3 ORDER_BY ConversionDefaultIndexId",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_conversion.c" : 1
+      },
+      "oby" : {
+         "attnums" : [
+            "Anum_pg_conversion_connamespace",
+            "Anum_pg_conversion_conforencoding",
+            "Anum_pg_conversion_contoencoding",
+            "Anum_pg_conversion_oid"
+         ],
+         "colnames" : [
+            "connamespace",
+            "conforencoding",
+            "contoencoding",
+            "oid"
+         ],
+         "index" : {
+            "CamelCaseIndexId" : "ConversionDefaultIndexId",
+            "SysCacheIdentifier" : "CONDEFAULT",
+            "allcols" : 1,
+            "numcols" : "4",
+            "primarykey_prefix" : {
+               "READPK_INIT" : "newhash = caql_pkhash(pCtx, newhash, (pCtx->cq_datumKeys[0]), \n\t\t\t\t\t  false /* isnull */, OIDOID);\n\n",
+               "fkcolname" : "connamespace",
+               "pkcolname" : "oid",
+               "pkidx" : "NamespaceOidIndexId",
+               "pkrelid" : "NamespaceRelationId",
+               "pktname" : "pg_namespace"
+            },
+            "unique" : 1
+         },
+         "rawtxt" : "connamespace, conforencoding, contoencoding, oid"
+      },
+      "tablename" : "pg_conversion"
+   },
+   "SELECT * FROM pg_conversion  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_conversion where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/namespace.c" : 1,
+         "../../../..//src/backend/catalog/pg_conversion.c" : 2
+      },
+      "tablename" : "pg_conversion"
+   },
+   "SELECT * FROM pg_conversion  WHERE oid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_conversion where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/conversioncmds.c" : 2
+      },
+      "tablename" : "pg_conversion"
+   },
+   "SELECT * FROM pg_database " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_database",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/vacuum.c" : 1
+      },
+      "tablename" : "pg_database"
+   },
+   "SELECT * FROM pg_database  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_database where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1,
+         "../../../..//src/backend/commands/dbcommands.c" : 1
+      },
+      "tablename" : "pg_database"
+   },
+   "SELECT * FROM pg_database  WHERE oid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_database where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1,
+         "../../../..//src/backend/commands/dbcommands.c" : 1,
+         "../../../..//src/backend/commands/vacuum.c" : 1
+      },
+      "tablename" : "pg_database"
+   },
+   "SELECT * FROM pg_database WHERE datname = :1 FOR UPDATE" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_database where datname = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/dbcommands.c" : 3
+      },
+      "tablename" : "pg_database"
+   },
+   "SELECT * FROM pg_depend  WHERE classid = :1  AND objid = :2 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_depend where classid = :1 and objid = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_depend.c" : 1,
+         "../../../..//src/backend/commands/tablecmds.c" : 1
+      },
+      "tablename" : "pg_depend"
+   },
+   "SELECT * FROM pg_depend  WHERE classid = :1  AND objid = :2  AND objsubid = :3 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_depend where classid = :1 and objid = :2 and objsubid = :3",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_depend.c" : 1
+      },
+      "tablename" : "pg_depend"
+   },
+   "SELECT * FROM pg_depend  WHERE classid = :1  AND objid = :2  AND objsubid = :3  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_depend where classid = :1 and objid = :2 and objsubid = :3",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/dependency.c" : 1,
+         "../../../..//src/backend/commands/tablecmds.c" : 2
+      },
+      "tablename" : "pg_depend"
+   },
+   "SELECT * FROM pg_depend  WHERE classid = :1  AND objid = :2  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_depend where classid = :1 and objid = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/dependency.c" : 1,
+         "../../../..//src/backend/catalog/pg_depend.c" : 2
+      },
+      "tablename" : "pg_depend"
+   },
+   "SELECT * FROM pg_depend  WHERE refclassid = :1  AND refobjid = :2 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_depend where refclassid = :1 and refobjid = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/dependency.c" : 1,
+         "../../../..//src/backend/catalog/pg_depend.c" : 1,
+         "../../../..//src/backend/catalog/pg_proc.c" : 1,
+         "../../../..//src/backend/commands/tablecmds.c" : 3,
+         "../../../..//src/backend/commands/typecmds.c" : 1
+      },
+      "tablename" : "pg_depend"
+   },
+   "SELECT * FROM pg_depend  WHERE refclassid = :1  AND refobjid = :2  AND refobjsubid = :3 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_depend where refclassid = :1 and refobjid = :2 and refobjsubid = :3",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/dependency.c" : 1,
+         "../../../..//src/backend/catalog/pg_depend.c" : 1,
+         "../../../..//src/backend/utils/adt/ruleutils.c" : 1
+      },
+      "tablename" : "pg_depend"
+   },
+   "SELECT * FROM pg_depend  WHERE refclassid = :1  AND refobjid = :2  AND refobjsubid = :3  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_depend where refclassid = :1 and refobjid = :2 and refobjsubid = :3",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/dependency.c" : 1,
+         "../../../..//src/backend/commands/tablecmds.c" : 1
+      },
+      "tablename" : "pg_depend"
+   },
+   "SELECT * FROM pg_depend  WHERE refclassid = :1  AND refobjid = :2  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_depend where refclassid = :1 and refobjid = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/dependency.c" : 1
+      },
+      "tablename" : "pg_depend"
+   },
+   "SELECT * FROM pg_description where objoid = :1 AND  classoid = :2 AND  objsubid = :3 FOR UPDATE" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_description where objoid = :1 and classoid = :2 and objsubid = :3",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/comment.c" : 1
+      },
+      "tablename" : "pg_description"
+   },
+   "SELECT * FROM pg_extprotocol  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_extprotocol where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1
+      },
+      "tablename" : "pg_extprotocol"
+   },
+   "SELECT * FROM pg_extprotocol  WHERE oid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_extprotocol where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1
+      },
+      "tablename" : "pg_extprotocol"
+   },
+   "SELECT * FROM pg_extprotocol  WHERE ptcname = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_extprotocol where ptcname = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/extprotocolcmds.c" : 2
+      },
+      "tablename" : "pg_extprotocol"
+   },
+   "SELECT * FROM pg_exttable  WHERE reloid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_exttable where reloid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_exttable.c" : 1
+      },
+      "tablename" : "pg_exttable"
+   },
+   "SELECT * FROM pg_filespace  WHERE fsname = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_filespace where fsname = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/filespace.c" : 2
+      },
+      "tablename" : "pg_filespace"
+   },
+   "SELECT * FROM pg_foreign_data_wrapper  WHERE fdwname = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_foreign_data_wrapper where fdwname = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/foreigncmds.c" : 2
+      },
+      "tablename" : "pg_foreign_data_wrapper"
+   },
+   "SELECT * FROM pg_foreign_data_wrapper  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_foreign_data_wrapper where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1
+      },
+      "tablename" : "pg_foreign_data_wrapper"
+   },
+   "SELECT * FROM pg_foreign_data_wrapper  WHERE oid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_foreign_data_wrapper where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1
+      },
+      "tablename" : "pg_foreign_data_wrapper"
+   },
+   "SELECT * FROM pg_foreign_server  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_foreign_server where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1
+      },
+      "tablename" : "pg_foreign_server"
+   },
+   "SELECT * FROM pg_foreign_server  WHERE oid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_foreign_server where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1
+      },
+      "tablename" : "pg_foreign_server"
+   },
+   "SELECT * FROM pg_foreign_server  WHERE srvname = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_foreign_server where srvname = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/foreigncmds.c" : 2
+      },
+      "tablename" : "pg_foreign_server"
+   },
+   "SELECT * FROM pg_index  WHERE indexrelid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_index where indexrelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/index.c" : 1,
+         "../../../..//src/backend/cdb/cdbpartindex.c" : 1,
+         "../../../..//src/backend/commands/cluster.c" : 3,
+         "../../../..//src/backend/commands/indexcmds.c" : 2,
+         "../../../..//src/backend/commands/tablecmds.c" : 4,
+         "../../../..//src/backend/utils/adt/ruleutils.c" : 1,
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_index"
+   },
+   "SELECT * FROM pg_index  WHERE indexrelid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_index where indexrelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/index.c" : 2,
+         "../../../..//src/backend/commands/cluster.c" : 1,
+         "../../../..//src/backend/commands/indexcmds.c" : 1
+      },
+      "tablename" : "pg_index"
+   },
+   "SELECT * FROM pg_index  WHERE indisclustered = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_index where indisclustered = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/cluster.c" : 1
+      },
+      "tablename" : "pg_index"
+   },
+   "SELECT * FROM pg_index  WHERE indrelid = :1" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_index where indrelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartindex.c" : 1
+      },
+      "tablename" : "pg_index"
+   },
+   "SELECT * FROM pg_index  WHERE indrelid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_index where indrelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartindex.c" : 1,
+         "../../../..//src/backend/utils/cache/relcache.c" : 1
+      },
+      "tablename" : "pg_index"
+   },
+   "SELECT * FROM pg_inherits  WHERE inhparent = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_inherits where inhparent = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/optimizer/util/plancat.c" : 1
+      },
+      "tablename" : "pg_inherits"
+   },
+   "SELECT * FROM pg_inherits  WHERE inhrelid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_inherits where inhrelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/parser/parse_func.c" : 1
+      },
+      "tablename" : "pg_inherits"
+   },
+   "SELECT * FROM pg_inherits  WHERE inhrelid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_inherits where inhrelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/tablecmds.c" : 2
+      },
+      "tablename" : "pg_inherits"
+   },
+   "SELECT * FROM pg_language  WHERE lanname = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_language where lanname = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/functioncmds.c" : 1
+      },
+      "tablename" : "pg_language"
+   },
+   "SELECT * FROM pg_language  WHERE lanname = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_language where lanname = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/proclang.c" : 1
+      },
+      "tablename" : "pg_language"
+   },
+   "SELECT * FROM pg_language  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_language where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1,
+         "../../../..//src/backend/cdb/cdbquerycontextdispatching.c" : 1
+      },
+      "tablename" : "pg_language"
+   },
+   "SELECT * FROM pg_language  WHERE oid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_language where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1
+      },
+      "tablename" : "pg_language"
+   },
+   "SELECT * FROM pg_language WHERE oid = :1" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_language where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/functioncmds.c" : 1
+      },
+      "tablename" : "pg_language"
+   },
+   "SELECT * FROM pg_largeobject  WHERE loid = :1  AND pageno >= :2  ORDER BY loid, pageno " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_largeobject where loid = :1 and pageno >= :2 ORDER_BY LargeObjectLoidPagenoIndexId",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql0",
+      "files" : {
+         "../../../..//src/backend/storage/large_object/inv_api.c" : 1
+      },
+      "oby" : {
+         "attnums" : [
+            "Anum_pg_largeobject_loid",
+            "Anum_pg_largeobject_pageno"
+         ],
+         "colnames" : [
+            "loid",
+            "pageno"
+         ],
+         "index" : {
+            "CamelCaseIndexId" : "LargeObjectLoidPagenoIndexId",
+            "allcols" : 1,
+            "numcols" : "2",
+            "unique" : 1
+         },
+         "rawtxt" : "loid, pageno"
+      },
+      "tablename" : "pg_largeobject"
+   },
+   "SELECT * FROM pg_largeobject  WHERE loid = :1  AND pageno >= :2  ORDER BY loid, pageno  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_largeobject where loid = :1 and pageno >= :2 ORDER_BY LargeObjectLoidPagenoIndexId",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql0",
+      "files" : {
+         "../../../..//src/backend/storage/large_object/inv_api.c" : 2
+      },
+      "oby" : {
+         "attnums" : [
+            "Anum_pg_largeobject_loid",
+            "Anum_pg_largeobject_pageno"
+         ],
+         "colnames" : [
+            "loid",
+            "pageno"
+         ],
+         "index" : {
+            "CamelCaseIndexId" : "LargeObjectLoidPagenoIndexId",
+            "allcols" : 1,
+            "numcols" : "2",
+            "unique" : 1
+         },
+         "rawtxt" : "loid, pageno"
+      },
+      "tablename" : "pg_largeobject"
+   },
+   "SELECT * FROM pg_largeobject  WHERE loid = :1  ORDER BY loid, pageno " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_largeobject where loid = :1 ORDER_BY LargeObjectLoidPagenoIndexId",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql0",
+      "files" : {
+         "../../../..//src/backend/storage/large_object/inv_api.c" : 1
+      },
+      "oby" : {
+         "attnums" : [
+            "Anum_pg_largeobject_loid",
+            "Anum_pg_largeobject_pageno"
+         ],
+         "colnames" : [
+            "loid",
+            "pageno"
+         ],
+         "index" : {
+            "CamelCaseIndexId" : "LargeObjectLoidPagenoIndexId",
+            "allcols" : 1,
+            "numcols" : "2",
+            "unique" : 1
+         },
+         "rawtxt" : "loid, pageno"
+      },
+      "tablename" : "pg_largeobject"
+   },
+   "SELECT * FROM pg_namespace  WHERE nspname = :1 and nspdboid = :2 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_namespace where nspname = :1 and nspdboid = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/schemacmds.c" : 1
+      },
+      "tablename" : "pg_namespace"
+   },
+   "SELECT * FROM pg_namespace  WHERE nspname = :1 and nspdboid = :2  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_namespace where nspname = :1 and nspdboid = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/schemacmds.c" : 1
+      },
+      "tablename" : "pg_namespace"
+   },
+   "SELECT * FROM pg_namespace  WHERE nspname = :1 and nspdboid = :2 FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_namespace where nspname = :1 and nspdboid = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/schemacmds.c" : 1
+      },
+      "tablename" : "pg_namespace"
+   },
+   "SELECT * FROM pg_namespace  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_namespace where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1
+      },
+      "tablename" : "pg_namespace"
+   },
+   "SELECT * FROM pg_namespace  WHERE oid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_namespace where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1,
+         "../../../..//src/backend/commands/schemacmds.c" : 1
+      },
+      "tablename" : "pg_namespace"
+   },
+   "SELECT * FROM pg_opclass  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_opclass where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/dependency.c" : 1,
+         "../../../..//src/backend/catalog/namespace.c" : 1,
+         "../../../..//src/backend/commands/indexcmds.c" : 1,
+         "../../../..//src/backend/commands/opclasscmds.c" : 1,
+         "../../../..//src/backend/parser/parse_utilcmd.c" : 1,
+         "../../../..//src/backend/utils/adt/ruleutils.c" : 1,
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_opclass"
+   },
+   "SELECT * FROM pg_opclass  WHERE oid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_opclass where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/opclasscmds.c" : 3
+      },
+      "tablename" : "pg_opclass"
+   },
+   "SELECT * FROM pg_opclass  WHERE opcamid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_opclass where opcamid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/indexcmds.c" : 1,
+         "../../../..//src/backend/commands/opclasscmds.c" : 1
+      },
+      "tablename" : "pg_opclass"
+   },
+   "SELECT * FROM pg_opclass  WHERE opcamid = :1  AND opcname = :2  AND opcnamespace = :3 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_opclass where opcamid = :1 and opcname = :2 and opcnamespace = :3",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/indexcmds.c" : 1,
+         "../../../..//src/backend/commands/opclasscmds.c" : 1
+      },
+      "tablename" : "pg_opclass"
+   },
+   "SELECT * FROM pg_opclass  WHERE opcamid = :1  AND opcname = :2  AND opcnamespace = :3  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_opclass where opcamid = :1 and opcname = :2 and opcnamespace = :3",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/opclasscmds.c" : 2
+      },
+      "tablename" : "pg_opclass"
+   },
+   "SELECT * FROM pg_opclass WHERE oid = :1" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_opclass where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbquerycontextdispatching.c" : 1
+      },
+      "tablename" : "pg_opclass"
+   },
+   "SELECT * FROM pg_operator  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_operator where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/namespace.c" : 1,
+         "../../../..//src/backend/commands/opclasscmds.c" : 1,
+         "../../../..//src/backend/parser/parse_oper.c" : 1,
+         "../../../..//src/backend/utils/adt/regproc.c" : 2,
+         "../../../..//src/backend/utils/adt/ruleutils.c" : 2,
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 4
+      },
+      "tablename" : "pg_operator"
+   },
+   "SELECT * FROM pg_operator  WHERE oid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_operator where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_operator.c" : 3,
+         "../../../..//src/backend/commands/operatorcmds.c" : 1
+      },
+      "tablename" : "pg_operator"
+   },
+   "SELECT * FROM pg_operator  WHERE oprleft = :1 and oprright = :2" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_operator where oprleft = :1 and oprright = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 2
+      },
+      "tablename" : "pg_operator"
+   },
+   "SELECT * FROM pg_operator  WHERE oprname = :1  AND oprleft = :2  AND oprright = :3  AND oprnamespace = :4 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_operator where oprname = :1 and oprleft = :2 and oprright = :3 and oprnamespace = :4",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_operator.c" : 1,
+         "../../../..//src/backend/executor/nodeWindow.c" : 1
+      },
+      "tablename" : "pg_operator"
+   },
+   "SELECT * FROM pg_operator  WHERE oprname = :1  AND oprleft = :2  AND oprright = :3  ORDER BY oprname,  oprleft,  oprright,  oprnamespace " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_operator where oprname = :1 and oprleft = :2 and oprright = :3 ORDER_BY OperatorNameNspIndexId",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/namespace.c" : 1
+      },
+      "oby" : {
+         "attnums" : [
+            "Anum_pg_operator_oprname",
+            "Anum_pg_operator_oprleft",
+            "Anum_pg_operator_oprright",
+            "Anum_pg_operator_oprnamespace"
+         ],
+         "colnames" : [
+            "oprname",
+            "oprleft",
+            "oprright",
+            "oprnamespace"
+         ],
+         "index" : {
+            "CamelCaseIndexId" : "OperatorNameNspIndexId",
+            "SysCacheIdentifier" : "OPERNAMENSP",
+            "allcols" : 1,
+            "numcols" : "4",
+            "unique" : 1
+         },
+         "rawtxt" : "oprname, oprleft, oprright, oprnamespace"
+      },
+      "tablename" : "pg_operator"
+   },
+   "SELECT * FROM pg_operator  WHERE oprname = :1  ORDER BY oprname,  oprleft,  oprright,  oprnamespace " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_operator where oprname = :1 ORDER_BY OperatorNameNspIndexId",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/namespace.c" : 1
+      },
+      "oby" : {
+         "attnums" : [
+            "Anum_pg_operator_oprname",
+            "Anum_pg_operator_oprleft",
+            "Anum_pg_operator_oprright",
+            "Anum_pg_operator_oprnamespace"
+         ],
+         "colnames" : [
+            "oprname",
+            "oprleft",
+            "oprright",
+            "oprnamespace"
+         ],
+         "index" : {
+            "CamelCaseIndexId" : "OperatorNameNspIndexId",
+            "SysCacheIdentifier" : "OPERNAMENSP",
+            "allcols" : 1,
+            "numcols" : "4",
+            "unique" : 1
+         },
+         "rawtxt" : "oprname, oprleft, oprright, oprnamespace"
+      },
+      "tablename" : "pg_operator"
+   },
+   "SELECT * FROM pg_operator WHERE oid = :1" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_operator where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbquerycontextdispatching.c" : 1
+      },
+      "tablename" : "pg_operator"
+   },
+   "SELECT * FROM pg_partition  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_partition where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartition.c" : 1,
+         "../../../..//src/backend/utils/adt/ruleutils.c" : 1
+      },
+      "tablename" : "pg_partition"
+   },
+   "SELECT * FROM pg_partition  WHERE parrelid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_partition where parrelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartition.c" : 4
+      },
+      "tablename" : "pg_partition"
+   },
+   "SELECT * FROM pg_partition  WHERE parrelid = :1  AND parlevel = :2  AND paristemplate = :3" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_partition where parrelid = :1 and parlevel = :2 and paristemplate = :3",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartindex.c" : 1
+      },
+      "tablename" : "pg_partition"
+   },
+   "SELECT * FROM pg_partition  WHERE parrelid = :1  AND parlevel = :2  AND paristemplate = :3 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_partition where parrelid = :1 and parlevel = :2 and paristemplate = :3",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartition.c" : 1
+      },
+      "tablename" : "pg_partition"
+   },
+   "SELECT * FROM pg_partition  WHERE parrelid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_partition where parrelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/heap.c" : 1
+      },
+      "tablename" : "pg_partition"
+   },
+   "SELECT * FROM pg_partition_encoding  WHERE parencoid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_partition_encoding where parencoid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartition.c" : 1
+      },
+      "tablename" : "pg_partition_encoding"
+   },
+   "SELECT * FROM pg_partition_encoding  WHERE parencoid = :1  FOR UPDATE" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_partition_encoding where parencoid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartition.c" : 1
+      },
+      "tablename" : "pg_partition_encoding"
+   },
+   "SELECT * FROM pg_partition_rule  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_partition_rule where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartition.c" : 2,
+         "../../../..//src/backend/utils/adt/ruleutils.c" : 1
+      },
+      "tablename" : "pg_partition_rule"
+   },
+   "SELECT * FROM pg_partition_rule  WHERE oid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_partition_rule where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/tablecmds.c" : 1
+      },
+      "tablename" : "pg_partition_rule"
+   },
+   "SELECT * FROM pg_partition_rule  WHERE parchildrelid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_partition_rule where parchildrelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartition.c" : 2,
+         "../../../..//src/backend/parser/analyze.c" : 1
+      },
+      "tablename" : "pg_partition_rule"
+   },
+   "SELECT * FROM pg_partition_rule  WHERE parchildrelid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_partition_rule where parchildrelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartition.c" : 1
+      },
+      "tablename" : "pg_partition_rule"
+   },
+   "SELECT * FROM pg_partition_rule  WHERE paroid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_partition_rule where paroid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartition.c" : 1
+      },
+      "tablename" : "pg_partition_rule"
+   },
+   "SELECT * FROM pg_partition_rule  WHERE paroid = :1  AND parparentrule = :2 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_partition_rule where paroid = :1 and parparentrule = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartindex.c" : 1,
+         "../../../..//src/backend/cdb/cdbpartition.c" : 1
+      },
+      "tablename" : "pg_partition_rule"
+   },
+   "SELECT * FROM pg_partition_rule  WHERE paroid = :1  AND parparentrule = :2  AND parruleord <= :3  ORDER BY paroid, parparentrule, parruleord  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_partition_rule where paroid = :1 and parparentrule = :2 and parruleord <= :3 ORDER_BY PartitionRuleParoidParparentruleParruleordIndexId",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartition.c" : 1
+      },
+      "oby" : {
+         "attnums" : [
+            "Anum_pg_partition_rule_paroid",
+            "Anum_pg_partition_rule_parparentrule",
+            "Anum_pg_partition_rule_parruleord"
+         ],
+         "colnames" : [
+            "paroid",
+            "parparentrule",
+            "parruleord"
+         ],
+         "index" : {
+            "CamelCaseIndexId" : "PartitionRuleParoidParparentruleParruleordIndexId",
+            "allcols" : 1,
+            "numcols" : "3",
+            "primarykey_prefix" : {
+               "READPK_INIT" : "newhash = caql_pkhash(pCtx, newhash, (pCtx->cq_datumKeys[0]), \n\t\t\t\t\t  false /* isnull */, OIDOID);\n\n",
+               "fkcolname" : "paroid",
+               "pkcolname" : "oid",
+               "pkidx" : "PartitionOidIndexId",
+               "pkrelid" : "PartitionRelationId",
+               "pktname" : "pg_partition"
+            }
+         },
+         "rawtxt" : "paroid, parparentrule, parruleord"
+      },
+      "tablename" : "pg_partition_rule"
+   },
+   "SELECT * FROM pg_partition_rule  WHERE parparentrule = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_partition_rule where parparentrule = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartition.c" : 2
+      },
+      "tablename" : "pg_partition_rule"
+   },
+   "SELECT * FROM pg_pltemplate  WHERE tmplname = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_pltemplate where tmplname = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/proclang.c" : 1
+      },
+      "tablename" : "pg_pltemplate"
+   },
+   "SELECT * FROM pg_proc  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_proc where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1,
+         "../../../..//src/backend/catalog/namespace.c" : 1,
+         "../../../..//src/backend/catalog/pg_aggregate.c" : 1,
+         "../../../..//src/backend/catalog/pg_proc.c" : 2,
+         "../../../..//src/backend/cdb/cdbdisp.c" : 1,
+         "../../../..//src/backend/cdb/cdbquerycontextdispatching.c" : 1,
+         "../../../..//src/backend/commands/functioncmds.c" : 2,
+         "../../../..//src/backend/commands/opclasscmds.c" : 1,
+         "../../../..//src/backend/executor/functions.c" : 2,
+         "../../../..//src/backend/executor/nodeWindow.c" : 1,
+         "../../../..//src/backend/optimizer/plan/planwindow.c" : 1,
+         "../../../..//src/backend/optimizer/util/clauses.c" : 1,
+         "../../../..//src/backend/parser/parse_coerce.c" : 1,
+         "../../../..//src/backend/parser/parse_func.c" : 2,
+         "../../../..//src/backend/utils/adt/regproc.c" : 2,
+         "../../../..//src/backend/utils/adt/ruleutils.c" : 1,
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 7,
+         "../../../..//src/backend/utils/fmgr/fmgr.c" : 1,
+         "../../../..//src/backend/utils/fmgr/funcapi.c" : 2
+      },
+      "tablename" : "pg_proc"
+   },
+   "SELECT * FROM pg_proc  WHERE oid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_proc where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1,
+         "../../../..//src/backend/commands/aggregatecmds.c" : 1,
+         "../../../..//src/backend/commands/functioncmds.c" : 8
+      },
+      "tablename" : "pg_proc"
+   },
+   "SELECT * FROM pg_proc  WHERE proname = :1" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_proc where proname = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_proc"
+   },
+   "SELECT * FROM pg_proc  WHERE proname = :1  AND proargtypes = :2  AND pronamespace = :3  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_proc where proname = :1 and proargtypes = :2 and pronamespace = :3",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_proc.c" : 1
+      },
+      "tablename" : "pg_proc"
+   },
+   "SELECT * FROM pg_proc  WHERE proname = :1  ORDER BY proname,  proargtypes,  pronamespace " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_proc where proname = :1 ORDER_BY ProcedureNameArgsNspIndexId",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/namespace.c" : 1
+      },
+      "oby" : {
+         "attnums" : [
+            "Anum_pg_proc_proname",
+            "Anum_pg_proc_proargtypes",
+            "Anum_pg_proc_pronamespace"
+         ],
+         "colnames" : [
+            "proname",
+            "proargtypes",
+            "pronamespace"
+         ],
+         "index" : {
+            "CamelCaseIndexId" : "ProcedureNameArgsNspIndexId",
+            "SysCacheIdentifier" : "PROCNAMEARGSNSP",
+            "allcols" : 1,
+            "numcols" : "3",
+            "unique" : 1
+         },
+         "rawtxt" : "proname, proargtypes, pronamespace"
+      },
+      "tablename" : "pg_proc"
+   },
+   "SELECT * FROM pg_resqueue WHERE oid = :1" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_resqueue where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/user.c" : 1
+      },
+      "tablename" : "pg_resqueue"
+   },
+   "SELECT * FROM pg_resqueuecapability WHERE resqueueid = :1  " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_resqueuecapability where resqueueid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/queue.c" : 1
+      },
+      "tablename" : "pg_resqueuecapability"
+   },
+   "SELECT * FROM pg_rewrite  WHERE ev_class = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_rewrite where ev_class = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/relcache.c" : 1
+      },
+      "tablename" : "pg_rewrite"
+   },
+   "SELECT * FROM pg_rewrite  WHERE ev_class = :1  AND rulename = :2 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_rewrite where ev_class = :1 and rulename = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/comment.c" : 1
+      },
+      "tablename" : "pg_rewrite"
+   },
+   "SELECT * FROM pg_rewrite  WHERE ev_class = :1  AND rulename = :2  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_rewrite where ev_class = :1 and rulename = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/rewrite/rewriteDefine.c" : 2,
+         "../../../..//src/backend/rewrite/rewriteRemove.c" : 1
+      },
+      "tablename" : "pg_rewrite"
+   },
+   "SELECT * FROM pg_rewrite  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_rewrite where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/dependency.c" : 1
+      },
+      "tablename" : "pg_rewrite"
+   },
+   "SELECT * FROM pg_rewrite  WHERE oid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_rewrite where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/rewrite/rewriteRemove.c" : 1
+      },
+      "tablename" : "pg_rewrite"
+   },
+   "SELECT * FROM pg_rewrite  WHERE rulename = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_rewrite where rulename = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/comment.c" : 1
+      },
+      "tablename" : "pg_rewrite"
+   },
+   "SELECT * FROM pg_shdepend  WHERE dbid = :1  AND classid = :2  AND objid = :3  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_shdepend where dbid = :1 and classid = :2 and objid = :3",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_shdepend.c" : 3
+      },
+      "tablename" : "pg_shdepend"
+   },
+   "SELECT * FROM pg_shdepend  WHERE dbid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_shdepend where dbid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_shdepend.c" : 1
+      },
+      "tablename" : "pg_shdepend"
+   },
+   "SELECT * FROM pg_shdepend  WHERE refclassid = :1  AND refobjid = :2 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_shdepend where refclassid = :1 and refobjid = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_shdepend.c" : 3
+      },
+      "tablename" : "pg_shdepend"
+   },
+   "SELECT * FROM pg_shdepend  WHERE refclassid = :1  AND refobjid = :2  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_shdepend where refclassid = :1 and refobjid = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_shdepend.c" : 1
+      },
+      "tablename" : "pg_shdepend"
+   },
+   "SELECT * FROM pg_shdescription where objoid  = :1 AND  classoid = :2 FOR UPDATE" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_shdescription where objoid = :1 and classoid = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/comment.c" : 1
+      },
+      "tablename" : "pg_shdescription"
+   },
+   "SELECT * FROM pg_stat_last_operation  WHERE classid = :1  AND objid = :2  AND staactionname = :3  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_stat_last_operation where classid = :1 and objid = :2 and staactionname = :3",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/heap.c" : 1
+      },
+      "tablename" : "pg_stat_last_operation"
+   },
+   "SELECT * FROM pg_stat_last_shoperation  WHERE classid = :1  AND objid = :2  AND staactionname = :3  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_stat_last_shoperation where classid = :1 and objid = :2 and staactionname = :3",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/heap.c" : 1
+      },
+      "tablename" : "pg_stat_last_shoperation"
+   },
+   "SELECT * FROM pg_statistic  WHERE starelid = :1  AND staattnum = :2 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_statistic where starelid = :1 and staattnum = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/adt/selfuncs.c" : 4,
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 3
+      },
+      "tablename" : "pg_statistic"
+   },
+   "SELECT * FROM pg_statistic  WHERE starelid = :1  AND staattnum = :2  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_statistic where starelid = :1 and staattnum = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/analyze.c" : 1
+      },
+      "tablename" : "pg_statistic"
+   },
+   "SELECT * FROM pg_tablespace " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_tablespace",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/dbcommands.c" : 1
+      },
+      "tablename" : "pg_tablespace"
+   },
+   "SELECT * FROM pg_tablespace  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_tablespace where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1
+      },
+      "tablename" : "pg_tablespace"
+   },
+   "SELECT * FROM pg_tablespace  WHERE oid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_tablespace where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1
+      },
+      "tablename" : "pg_tablespace"
+   },
+   "SELECT * FROM pg_tablespace  WHERE spcname = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_tablespace where spcname = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/tablespace.c" : 1
+      },
+      "tablename" : "pg_tablespace"
+   },
+   "SELECT * FROM pg_tablespace  WHERE spcname = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_tablespace where spcname = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/tablespace.c" : 3
+      },
+      "tablename" : "pg_tablespace"
+   },
+   "SELECT * FROM pg_trigger  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_trigger where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/dependency.c" : 1,
+         "../../../..//src/backend/utils/adt/ruleutils.c" : 1,
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 2
+      },
+      "tablename" : "pg_trigger"
+   },
+   "SELECT * FROM pg_trigger  WHERE oid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_trigger where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/trigger.c" : 1
+      },
+      "tablename" : "pg_trigger"
+   },
+   "SELECT * FROM pg_trigger  WHERE tgconstrname = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_trigger where tgconstrname = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/trigger.c" : 1
+      },
+      "tablename" : "pg_trigger"
+   },
+   "SELECT * FROM pg_trigger  WHERE tgconstrrelid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_trigger where tgconstrrelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/tablecmds.c" : 1
+      },
+      "tablename" : "pg_trigger"
+   },
+   "SELECT * FROM pg_trigger  WHERE tgrelid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_trigger where tgrelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/trigger.c" : 1
+      },
+      "tablename" : "pg_trigger"
+   },
+   "SELECT * FROM pg_trigger  WHERE tgrelid = :1  AND tgname = :2  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_trigger where tgrelid = :1 and tgname = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/trigger.c" : 2
+      },
+      "tablename" : "pg_trigger"
+   },
+   "SELECT * FROM pg_trigger  WHERE tgrelid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_trigger where tgrelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/tablecmds.c" : 1,
+         "../../../..//src/backend/commands/trigger.c" : 1
+      },
+      "tablename" : "pg_trigger"
+   },
+   "SELECT * FROM pg_trigger  WHERE tgrelid = :1  ORDER BY tgrelid, tgname" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_trigger where tgrelid = :1 ORDER_BY TriggerRelidNameIndexId",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/trigger.c" : 1
+      },
+      "oby" : {
+         "attnums" : [
+            "Anum_pg_trigger_tgrelid",
+            "Anum_pg_trigger_tgname"
+         ],
+         "colnames" : [
+            "tgrelid",
+            "tgname"
+         ],
+         "index" : {
+            "CamelCaseIndexId" : "TriggerRelidNameIndexId",
+            "allcols" : 1,
+            "numcols" : "2",
+            "primarykey_prefix" : {
+               "READPK_INIT" : "newhash = caql_pkhash(pCtx, newhash, (pCtx->cq_datumKeys[0]), \n\t\t\t\t\t  false /* isnull */, OIDOID);\n\n",
+               "fkcolname" : "tgrelid",
+               "pkcolname" : "oid",
+               "pkidx" : "ClassOidIndexId",
+               "pkrelid" : "RelationRelationId",
+               "pktname" : "pg_class"
+            },
+            "unique" : 1
+         },
+         "rawtxt" : "tgrelid, tgname"
+      },
+      "tablename" : "pg_trigger"
+   },
+   "SELECT * FROM pg_type  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_type where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/access/common/tupdesc.c" : 1,
+         "../../../..//src/backend/catalog/index.c" : 2,
+         "../../../..//src/backend/catalog/namespace.c" : 1,
+         "../../../..//src/backend/cdb/cdbquerycontextdispatching.c" : 1,
+         "../../../..//src/backend/cdb/motion/tupser.c" : 1,
+         "../../../..//src/backend/commands/typecmds.c" : 2,
+         "../../../..//src/backend/utils/adt/format_type.c" : 2,
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 19,
+         "../../../..//src/backend/utils/cache/typcache.c" : 1
+      },
+      "tablename" : "pg_type"
+   },
+   "SELECT * FROM pg_type  WHERE oid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_type where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_type.c" : 1,
+         "../../../..//src/backend/commands/typecmds.c" : 7
+      },
+      "tablename" : "pg_type"
+   },
+   "SELECT * FROM pg_type  WHERE typlen = :1  AND typalign = :2  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_type where typlen = :1 and typalign = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/tablecmds.c" : 1
+      },
+      "tablename" : "pg_type"
+   },
+   "SELECT * FROM pg_type  WHERE typname = :1  AND typnamespace = :2 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_type where typname = :1 and typnamespace = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_type"
+   },
+   "SELECT * FROM pg_type  WHERE typname = :1  AND typnamespace = :2  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_type where typname = :1 and typnamespace = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_type.c" : 1
+      },
+      "tablename" : "pg_type"
+   },
+   "SELECT * FROM pg_type_encoding  WHERE typid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_type_encoding where typid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/parser/analyze.c" : 1
+      },
+      "tablename" : "pg_type_encoding"
+   },
+   "SELECT * FROM pg_type_encoding  WHERE typid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_type_encoding where typid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/typecmds.c" : 1
+      },
+      "tablename" : "pg_type_encoding"
+   },
+   "SELECT * FROM pg_user_mapping  WHERE oid = :1  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_user_mapping where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/foreigncmds.c" : 1
+      },
+      "tablename" : "pg_user_mapping"
+   },
+   "SELECT * FROM pg_window  WHERE winfnoid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_window where winfnoid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/executor/nodeWindow.c" : 1,
+         "../../../..//src/backend/optimizer/plan/planwindow.c" : 1,
+         "../../../..//src/backend/parser/parse_clause.c" : 1,
+         "../../../..//src/backend/parser/parse_func.c" : 1
+      },
+      "tablename" : "pg_window"
+   },
+   "SELECT * from pg_aggregate WHERE aggfnoid = :1" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_aggregate where aggfnoid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 3
+      },
+      "tablename" : "pg_aggregate"
+   },
+   "SELECT * from pg_proc WHERE oid = :1" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_proc where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/functioncmds.c" : 1
+      },
+      "tablename" : "pg_proc"
+   },
+   "SELECT COUNT(*) FROM gp_segment_configuration  WHERE role = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from gp_segment_configuration where role = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/gp/segadmin.c" : 1
+      },
+      "tablename" : "gp_segment_configuration"
+   },
+   "SELECT COUNT(*) FROM pg_aggregate  WHERE aggfnoid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_aggregate where aggfnoid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_aggregate"
+   },
+   "SELECT COUNT(*) FROM pg_amop  WHERE amopopr = :1  AND amopclaid = :2 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_amop where amopopr = :1 and amopclaid = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_amop"
+   },
+   "SELECT COUNT(*) FROM pg_attribute  WHERE attrelid = :1  AND attname = :2 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_attribute where attrelid = :1 and attname = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/tablecmds.c" : 2
+      },
+      "tablename" : "pg_attribute"
+   },
+   "SELECT COUNT(*) FROM pg_attribute  WHERE attrelid = :1  AND attnum = :2 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_attribute where attrelid = :1 and attnum = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/parser/parse_relation.c" : 1
+      },
+      "tablename" : "pg_attribute"
+   },
+   "SELECT COUNT(*) FROM pg_authid  WHERE oid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_authid where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_shdepend.c" : 1
+      },
+      "tablename" : "pg_authid"
+   },
+   "SELECT COUNT(*) FROM pg_authid  WHERE rolname = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_authid where rolname = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/user.c" : 2
+      },
+      "tablename" : "pg_authid"
+   },
+   "SELECT COUNT(*) FROM pg_cast  WHERE castsource = :1  AND casttarget = :2 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_cast where castsource = :1 and casttarget = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/functioncmds.c" : 1
+      },
+      "tablename" : "pg_cast"
+   },
+   "SELECT COUNT(*) FROM pg_class  WHERE oid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_class where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/access/heap/heapam.c" : 1,
+         "../../../..//src/backend/catalog/dependency.c" : 1,
+         "../../../..//src/backend/catalog/namespace.c" : 1,
+         "../../../..//src/backend/commands/cluster.c" : 1,
+         "../../../..//src/backend/commands/sequence.c" : 1,
+         "../../../..//src/backend/utils/adt/acl.c" : 3
+      },
+      "tablename" : "pg_class"
+   },
+   "SELECT COUNT(*) FROM pg_compression  WHERE compname = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_compression where compname = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_compression.c" : 1
+      },
+      "tablename" : "pg_compression"
+   },
+   "SELECT COUNT(*) FROM pg_constraint  WHERE conname = :1  AND connamespace = :2 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_constraint where conname = :1 and connamespace = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_constraint.c" : 1
+      },
+      "tablename" : "pg_constraint"
+   },
+   "SELECT COUNT(*) FROM pg_constraint  WHERE oid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_constraint where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_constraint"
+   },
+   "SELECT COUNT(*) FROM pg_conversion  WHERE conname = :1  AND connamespace = :2 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_conversion where conname = :1 and connamespace = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_conversion.c" : 1,
+         "../../../..//src/backend/commands/conversioncmds.c" : 1
+      },
+      "tablename" : "pg_conversion"
+   },
+   "SELECT COUNT(*) FROM pg_conversion  WHERE oid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_conversion where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/namespace.c" : 1
+      },
+      "tablename" : "pg_conversion"
+   },
+   "SELECT COUNT(*) FROM pg_database  WHERE oid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_database where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/adt/acl.c" : 3
+      },
+      "tablename" : "pg_database"
+   },
+   "SELECT COUNT(*) FROM pg_extprotocol  WHERE ptcname = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_extprotocol where ptcname = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_extprotocol.c" : 1
+      },
+      "tablename" : "pg_extprotocol"
+   },
+   "SELECT COUNT(*) FROM pg_filespace  WHERE fsname = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_filespace where fsname = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/filespace.c" : 1
+      },
+      "tablename" : "pg_filespace"
+   },
+   "SELECT COUNT(*) FROM pg_inherits  WHERE inhparent = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_inherits where inhparent = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_inherits"
+   },
+   "SELECT COUNT(*) FROM pg_inherits  WHERE inhrelid = :1  AND inhseqno = :2 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_inherits where inhrelid = :1 and inhseqno = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/tablecmds.c" : 1
+      },
+      "tablename" : "pg_inherits"
+   },
+   "SELECT COUNT(*) FROM pg_language  WHERE lanname = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_language where lanname = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/proclang.c" : 2
+      },
+      "tablename" : "pg_language"
+   },
+   "SELECT COUNT(*) FROM pg_language  WHERE oid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_language where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/adt/acl.c" : 3
+      },
+      "tablename" : "pg_language"
+   },
+   "SELECT COUNT(*) FROM pg_largeobject  WHERE loid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_largeobject where loid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql0",
+      "files" : {
+         "../../../..//src/backend/storage/large_object/inv_api.c" : 1
+      },
+      "tablename" : "pg_largeobject"
+   },
+   "SELECT COUNT(*) FROM pg_namespace  WHERE nspname = :1 and nspdboid = :2" : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_namespace where nspname = :1 and nspdboid = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_namespace.c" : 1
+      },
+      "tablename" : "pg_namespace"
+   },
+   "SELECT COUNT(*) FROM pg_namespace  WHERE oid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_namespace where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/adt/acl.c" : 3
+      },
+      "tablename" : "pg_namespace"
+   },
+   "SELECT COUNT(*) FROM pg_opclass  WHERE oid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_opclass where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/namespace.c" : 1
+      },
+      "tablename" : "pg_opclass"
+   },
+   "SELECT COUNT(*) FROM pg_opclass  WHERE opcamid = :1  AND opcname = :2  AND opcnamespace = :3 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_opclass where opcamid = :1 and opcname = :2 and opcnamespace = :3",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/opclasscmds.c" : 2
+      },
+      "tablename" : "pg_opclass"
+   },
+   "SELECT COUNT(*) FROM pg_operator  WHERE oid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_operator where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/dependency.c" : 1,
+         "../../../..//src/backend/catalog/namespace.c" : 1
+      },
+      "tablename" : "pg_operator"
+   },
+   "SELECT COUNT(*) FROM pg_partition  WHERE parrelid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_partition where parrelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartition.c" : 1
+      },
+      "tablename" : "pg_partition"
+   },
+   "SELECT COUNT(*) FROM pg_partition_rule  WHERE parchildrelid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_partition_rule where parchildrelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartition.c" : 1
+      },
+      "tablename" : "pg_partition_rule"
+   },
+   "SELECT COUNT(*) FROM pg_proc  WHERE oid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_proc where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/dependency.c" : 1,
+         "../../../..//src/backend/catalog/namespace.c" : 1,
+         "../../../..//src/backend/utils/adt/acl.c" : 3,
+         "../../../..//src/backend/utils/mb/mbutils.c" : 1
+      },
+      "tablename" : "pg_proc"
+   },
+   "SELECT COUNT(*) FROM pg_proc  WHERE proname = :1  AND proargtypes = :2  AND pronamespace = :3 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_proc where proname = :1 and proargtypes = :2 and pronamespace = :3",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/aggregatecmds.c" : 1,
+         "../../../..//src/backend/commands/functioncmds.c" : 2
+      },
+      "tablename" : "pg_proc"
+   },
+   "SELECT COUNT(*) FROM pg_tablespace  WHERE spcfsoid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_tablespace where spcfsoid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/filespace.c" : 1
+      },
+      "tablename" : "pg_tablespace"
+   },
+   "SELECT COUNT(*) FROM pg_tablespace  WHERE spcname = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_tablespace where spcname = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/tablespace.c" : 1
+      },
+      "tablename" : "pg_tablespace"
+   },
+   "SELECT COUNT(*) FROM pg_trigger  WHERE oid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_trigger where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_trigger"
+   },
+   "SELECT COUNT(*) FROM pg_type  WHERE oid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_type where oid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/dependency.c" : 1,
+         "../../../..//src/backend/catalog/namespace.c" : 1,
+         "../../../..//src/backend/commands/tablecmds.c" : 1
+      },
+      "tablename" : "pg_type"
+   },
+   "SELECT COUNT(*) FROM pg_type  WHERE typname = :1  AND typnamespace = :2 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_type where typname = :1 and typnamespace = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/namespace.c" : 1,
+         "../../../..//src/backend/catalog/pg_type.c" : 1,
+         "../../../..//src/backend/commands/typecmds.c" : 1
+      },
+      "tablename" : "pg_type"
+   },
+   "SELECT aggtranstype FROM pg_aggregate  WHERE aggfnoid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_aggregate where aggfnoid = :1",
+      "colname" : "aggtranstype",
+      "colnum" : "Anum_pg_aggregate_aggtranstype",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbgroup.c" : 1,
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_aggregate"
+   },
+   "SELECT amname FROM pg_am  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_am where oid = :1",
+      "colname" : "amname",
+      "colnum" : "Anum_pg_am_amname",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/dependency.c" : 1
+      },
+      "tablename" : "pg_am"
+   },
+   "SELECT amopopr FROM pg_amop  WHERE amopclaid = :1  AND amopsubtype = :2  AND amopstrategy = :3 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_amop where amopclaid = :1 and amopsubtype = :2 and amopstrategy = :3",
+      "colname" : "amopopr",
+      "colnum" : "Anum_pg_amop_amopopr",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_amop"
+   },
+   "SELECT amproc FROM pg_amproc  WHERE amopclaid = :1  AND amprocsubtype = :2  AND amprocnum = :3 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_amproc where amopclaid = :1 and amprocsubtype = :2 and amprocnum = :3",
+      "colname" : "amproc",
+      "colnum" : "Anum_pg_amproc_amproc",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_amproc"
+   },
+   "SELECT attname FROM pg_attribute  WHERE attrelid = :1  AND attnum = :2 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_attribute where attrelid = :1 and attnum = :2",
+      "colname" : "attname",
+      "colnum" : "Anum_pg_attribute_attname",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_attribute"
+   },
+   "SELECT atttypid FROM pg_attribute  WHERE attrelid = :1  AND attnum = :2 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_attribute where attrelid = :1 and attnum = :2",
+      "colname" : "atttypid",
+      "colnum" : "Anum_pg_attribute_atttypid",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_attribute"
+   },
+   "SELECT castfunc FROM pg_cast  WHERE castsource = :1  AND casttarget = :2 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_cast where castsource = :1 and casttarget = :2",
+      "colname" : "castfunc",
+      "colnum" : "Anum_pg_cast_castfunc",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/parser/parse_coerce.c" : 1
+      },
+      "tablename" : "pg_cast"
+   },
+   "SELECT conbin FROM pg_constraint  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_constraint where oid = :1",
+      "colname" : "conbin",
+      "colnum" : "Anum_pg_constraint_conbin",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_constraint"
+   },
+   "SELECT conname FROM pg_constraint  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_constraint where oid = :1",
+      "colname" : "conname",
+      "colnum" : "Anum_pg_constraint_conname",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_constraint.c" : 1,
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_constraint"
+   },
+   "SELECT conname FROM pg_conversion  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_conversion where oid = :1",
+      "colname" : "conname",
+      "colnum" : "Anum_pg_conversion_conname",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/dependency.c" : 1
+      },
+      "tablename" : "pg_conversion"
+   },
+   "SELECT conowner FROM pg_conversion WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_conversion where oid = :1",
+      "colname" : "conowner",
+      "colnum" : "Anum_pg_conversion_conowner",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1
+      },
+      "tablename" : "pg_conversion"
+   },
+   "SELECT conrelid FROM pg_constraint  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_constraint where oid = :1",
+      "colname" : "conrelid",
+      "colnum" : "Anum_pg_constraint_conrelid",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_constraint"
+   },
+   "SELECT count(*) FROM pg_inherits  WHERE inhrelid = :1 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_inherits where inhrelid = :1",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartition.c" : 1
+      },
+      "tablename" : "pg_inherits"
+   },
+   "SELECT count(*) FROM pg_trigger  WHERE tgrelid = :1  AND tgname = :2 " : {
+      "bCount" : 1,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_trigger where tgrelid = :1 and tgname = :2",
+      "colnum" : "InvalidAttrNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/trigger.c" : 1
+      },
+      "tablename" : "pg_trigger"
+   },
+   "SELECT datdba FROM pg_database WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_database where oid = :1",
+      "colname" : "datdba",
+      "colnum" : "Anum_pg_database_datdba",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1
+      },
+      "tablename" : "pg_database"
+   },
+   "SELECT datname FROM pg_database  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_database where oid = :1",
+      "colname" : "datname",
+      "colnum" : "Anum_pg_database_datname",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/dbcommands.c" : 1
+      },
+      "tablename" : "pg_database"
+   },
+   "SELECT fsname FROM pg_filespace  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_filespace where oid = :1",
+      "colname" : "fsname",
+      "colnum" : "Anum_pg_filespace_fsname",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/filespace.c" : 1
+      },
+      "tablename" : "pg_filespace"
+   },
+   "SELECT fsowner FROM pg_filespace WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_filespace where oid = :1",
+      "colname" : "fsowner",
+      "colnum" : "Anum_pg_filespace_fsowner",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1
+      },
+      "tablename" : "pg_filespace"
+   },
+   "SELECT indrelid FROM pg_index  WHERE indexrelid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_index where indexrelid = :1",
+      "colname" : "indrelid",
+      "colnum" : "Anum_pg_index_indrelid",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/tablecmds.c" : 1
+      },
+      "tablename" : "pg_index"
+   },
+   "SELECT inhparent FROM pg_inherits  WHERE inhrelid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_inherits where inhrelid = :1",
+      "colname" : "inhparent",
+      "colnum" : "Anum_pg_inherits_inhparent",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartition.c" : 2,
+         "../../../..//src/backend/commands/tablecmds.c" : 1
+      },
+      "tablename" : "pg_inherits"
+   },
+   "SELECT lanname FROM pg_language  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_language where oid = :1",
+      "colname" : "lanname",
+      "colnum" : "Anum_pg_language_lanname",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/dependency.c" : 1
+      },
+      "tablename" : "pg_language"
+   },
+   "SELECT lanplcallfoid FROM pg_language  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_language where oid = :1",
+      "colname" : "lanplcallfoid",
+      "colnum" : "Anum_pg_language_lanplcallfoid",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/fmgr/fmgr.c" : 1
+      },
+      "tablename" : "pg_language"
+   },
+   "SELECT nspname FROM pg_namespace  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_namespace where oid = :1",
+      "colname" : "nspname",
+      "colnum" : "Anum_pg_namespace_nspname",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_namespace"
+   },
+   "SELECT nspowner FROM pg_namespace WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_namespace where oid = :1",
+      "colname" : "nspowner",
+      "colnum" : "Anum_pg_namespace_nspowner",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1
+      },
+      "tablename" : "pg_namespace"
+   },
+   "SELECT oid FROM pg_am  WHERE amname = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_am where amname = :1",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/comment.c" : 1,
+         "../../../..//src/backend/commands/opclasscmds.c" : 3
+      },
+      "tablename" : "pg_am"
+   },
+   "SELECT oid FROM pg_cast  WHERE castsource = :1  AND casttarget = :2 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_cast where castsource = :1 and casttarget = :2",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/functioncmds.c" : 1
+      },
+      "tablename" : "pg_cast"
+   },
+   "SELECT oid FROM pg_class  WHERE relname = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_class where relname = :1",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/adt/regproc.c" : 1
+      },
+      "tablename" : "pg_class"
+   },
+   "SELECT oid FROM pg_class  WHERE relname = :1  AND relnamespace = :2 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_class where relname = :1 and relnamespace = :2",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_class"
+   },
+   "SELECT oid FROM pg_conversion  WHERE conname = :1  AND connamespace = :2 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_conversion where conname = :1 and connamespace = :2",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/namespace.c" : 1
+      },
+      "tablename" : "pg_conversion"
+   },
+   "SELECT oid FROM pg_database WHERE datname = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_database where datname = :1",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/dbcommands.c" : 2
+      },
+      "tablename" : "pg_database"
+   },
+   "SELECT oid FROM pg_extprotocol  WHERE ptcname = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_extprotocol where ptcname = :1",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_extprotocol.c" : 1
+      },
+      "tablename" : "pg_extprotocol"
+   },
+   "SELECT oid FROM pg_filespace  WHERE fsname = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_filespace where fsname = :1",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/filespace.c" : 1
+      },
+      "tablename" : "pg_filespace"
+   },
+   "SELECT oid FROM pg_language  WHERE lanname = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_language where lanname = :1",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1,
+         "../../../..//src/backend/commands/comment.c" : 1,
+         "../../../..//src/backend/commands/proclang.c" : 1,
+         "../../../..//src/backend/utils/adt/acl.c" : 1
+      },
+      "tablename" : "pg_language"
+   },
+   "SELECT oid FROM pg_namespace  WHERE nspname = :1" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_namespace where nspname = :1",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/namespace.c" : 1
+      },
+      "tablename" : "pg_namespace"
+   },
+   "SELECT oid FROM pg_namespace  WHERE nspname = :1 and nspdboid = :2" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_namespace where nspname = :1 and nspdboid = :2",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/namespace.c" : 1
+      },
+      "tablename" : "pg_namespace"
+   },
+   "SELECT oid FROM pg_namespace  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_namespace where oid = :1",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/namespace.c" : 1
+      },
+      "tablename" : "pg_namespace"
+   },
+   "SELECT oid FROM pg_opclass  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_opclass where oid = :1",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/comment.c" : 1
+      },
+      "tablename" : "pg_opclass"
+   },
+   "SELECT oid FROM pg_opclass  WHERE opcamid = :1  AND opcname = :2  AND opcnamespace = :3 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_opclass where opcamid = :1 and opcname = :2 and opcnamespace = :3",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/namespace.c" : 1,
+         "../../../..//src/backend/commands/comment.c" : 1
+      },
+      "tablename" : "pg_opclass"
+   },
+   "SELECT oid FROM pg_opclass WHERE opcintype = :1" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_opclass where opcintype = :1",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbquerycontextdispatching.c" : 1
+      },
+      "tablename" : "pg_opclass"
+   },
+   "SELECT oid FROM pg_operator  WHERE oprname = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_operator where oprname = :1",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/adt/regproc.c" : 1
+      },
+      "tablename" : "pg_operator"
+   },
+   "SELECT oid FROM pg_operator  WHERE oprname = :1  AND oprleft = :2  AND oprright = :3  AND oprnamespace = :4 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_operator where oprname = :1 and oprleft = :2 and oprright = :3 and oprnamespace = :4",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/namespace.c" : 1
+      },
+      "tablename" : "pg_operator"
+   },
+   "SELECT oid FROM pg_partition  WHERE parrelid = :1  AND parlevel = :2  AND paristemplate = :3" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_partition where parrelid = :1 and parlevel = :2 and paristemplate = :3",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartition.c" : 1
+      },
+      "tablename" : "pg_partition"
+   },
+   "SELECT oid FROM pg_partition  WHERE parrelid = :1  AND parlevel = :2  AND paristemplate = :3  FOR UPDATE " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 1,
+      "basic" : "select * from pg_partition where parrelid = :1 and parlevel = :2 and paristemplate = :3",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartition.c" : 1
+      },
+      "tablename" : "pg_partition"
+   },
+   "SELECT oid FROM pg_partition_rule  WHERE parchildrelid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_partition_rule where parchildrelid = :1",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartition.c" : 1
+      },
+      "tablename" : "pg_partition_rule"
+   },
+   "SELECT oid FROM pg_proc  WHERE proname = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_proc where proname = :1",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/adt/regproc.c" : 1
+      },
+      "tablename" : "pg_proc"
+   },
+   "SELECT oid FROM pg_resqueue  WHERE rsqname = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_resqueue where rsqname = :1",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/comment.c" : 1,
+         "../../../..//src/backend/utils/resscheduler/resscheduler.c" : 1
+      },
+      "tablename" : "pg_resqueue"
+   },
+   "SELECT oid FROM pg_tablespace  WHERE spcname = :1" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_tablespace where spcname = :1",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1
+      },
+      "tablename" : "pg_tablespace"
+   },
+   "SELECT oid FROM pg_trigger  WHERE tgrelid = :1  AND tgname = :2 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_trigger where tgrelid = :1 and tgname = :2",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/comment.c" : 1,
+         "../../../..//src/backend/commands/trigger.c" : 1
+      },
+      "tablename" : "pg_trigger"
+   },
+   "SELECT oid FROM pg_type  WHERE typname = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_type where typname = :1",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/adt/regproc.c" : 1
+      },
+      "tablename" : "pg_type"
+   },
+   "SELECT oid FROM pg_type  WHERE typname = :1  AND typnamespace = :2 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_type where typname = :1 and typnamespace = :2",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/namespace.c" : 1,
+         "../../../..//src/backend/commands/typecmds.c" : 1,
+         "../../../..//src/backend/parser/parse_type.c" : 1
+      },
+      "tablename" : "pg_type"
+   },
+   "SELECT oid FROM pg_user_mapping  WHERE umuser = :1  AND umserver = :2 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_user_mapping where umuser = :1 and umserver = :2",
+      "colname" : "oid",
+      "colnum" : "ObjectIdAttributeNumber",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/foreigncmds.c" : 3
+      },
+      "tablename" : "pg_user_mapping"
+   },
+   "SELECT opcamid FROM pg_opclass  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_opclass where oid = :1",
+      "colname" : "opcamid",
+      "colnum" : "Anum_pg_opclass_opcamid",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 2
+      },
+      "tablename" : "pg_opclass"
+   },
+   "SELECT opcintype FROM pg_opclass  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_opclass where oid = :1",
+      "colname" : "opcintype",
+      "colnum" : "Anum_pg_opclass_opcintype",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_opclass"
+   },
+   "SELECT opckeytype FROM pg_opclass  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_opclass where oid = :1",
+      "colname" : "opckeytype",
+      "colnum" : "Anum_pg_opclass_opckeytype",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/index.c" : 1
+      },
+      "tablename" : "pg_opclass"
+   },
+   "SELECT opcowner FROM pg_opclass WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_opclass where oid = :1",
+      "colname" : "opcowner",
+      "colnum" : "Anum_pg_opclass_opcowner",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1
+      },
+      "tablename" : "pg_opclass"
+   },
+   "SELECT oprcode FROM pg_operator  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_operator where oid = :1",
+      "colname" : "oprcode",
+      "colnum" : "Anum_pg_operator_oprcode",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/parser/analyze.c" : 1,
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_operator"
+   },
+   "SELECT oprcom FROM pg_operator  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_operator where oid = :1",
+      "colname" : "oprcom",
+      "colnum" : "Anum_pg_operator_oprcom",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_operator"
+   },
+   "SELECT oprjoin FROM pg_operator  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_operator where oid = :1",
+      "colname" : "oprjoin",
+      "colnum" : "Anum_pg_operator_oprjoin",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_operator"
+   },
+   "SELECT oprname FROM pg_operator  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_operator where oid = :1",
+      "colname" : "oprname",
+      "colnum" : "Anum_pg_operator_oprname",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/executor/nodeWindow.c" : 1,
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_operator"
+   },
+   "SELECT oprnamespace FROM pg_operator  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_operator where oid = :1",
+      "colname" : "oprnamespace",
+      "colnum" : "Anum_pg_operator_oprnamespace",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/operatorcmds.c" : 1
+      },
+      "tablename" : "pg_operator"
+   },
+   "SELECT oprnegate FROM pg_operator  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_operator where oid = :1",
+      "colname" : "oprnegate",
+      "colnum" : "Anum_pg_operator_oprnegate",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_operator"
+   },
+   "SELECT oprowner FROM pg_operator WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_operator where oid = :1",
+      "colname" : "oprowner",
+      "colnum" : "Anum_pg_operator_oprowner",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1
+      },
+      "tablename" : "pg_operator"
+   },
+   "SELECT oprrest FROM pg_operator  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_operator where oid = :1",
+      "colname" : "oprrest",
+      "colnum" : "Anum_pg_operator_oprrest",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_operator"
+   },
+   "SELECT parchildrelid FROM pg_partition_rule  WHERE paroid = :1  AND parparentrule = :2  AND parname = :3 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_partition_rule where paroid = :1 and parparentrule = :2 and parname = :3",
+      "colname" : "parchildrelid",
+      "colnum" : "Anum_pg_partition_rule_parchildrelid",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/tablecmds.c" : 1
+      },
+      "tablename" : "pg_partition_rule"
+   },
+   "SELECT parchildrelid FROM pg_partition_rule  WHERE paroid = :1  AND parparentrule = :2  AND parruleord = :3 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_partition_rule where paroid = :1 and parparentrule = :2 and parruleord = :3",
+      "colname" : "parchildrelid",
+      "colnum" : "Anum_pg_partition_rule_parchildrelid",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartition.c" : 1
+      },
+      "tablename" : "pg_partition_rule"
+   },
+   "SELECT parlevel FROM pg_partition  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_partition where oid = :1",
+      "colname" : "parlevel",
+      "colnum" : "Anum_pg_partition_parlevel",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/parser/analyze.c" : 1
+      },
+      "tablename" : "pg_partition"
+   },
+   "SELECT paroid FROM pg_partition_rule  WHERE parchildrelid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_partition_rule where parchildrelid = :1",
+      "colname" : "paroid",
+      "colnum" : "Anum_pg_partition_rule_paroid",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartition.c" : 2
+      },
+      "tablename" : "pg_partition_rule"
+   },
+   "SELECT parrelid FROM pg_partition  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_partition where oid = :1",
+      "colname" : "parrelid",
+      "colnum" : "Anum_pg_partition_parrelid",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbpartition.c" : 1
+      },
+      "tablename" : "pg_partition"
+   },
+   "SELECT procallback FROM pg_proc_callback  WHERE profnoid = :1  AND promethod = :2 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_proc_callback where profnoid = :1 and promethod = :2",
+      "colname" : "procallback",
+      "colnum" : "Anum_pg_proc_callback_procallback",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_proc_callback.c" : 1
+      },
+      "tablename" : "pg_proc_callback"
+   },
+   "SELECT proname FROM pg_proc  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_proc where oid = :1",
+      "colname" : "proname",
+      "colnum" : "Anum_pg_proc_proname",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/optimizer/plan/planwindow.c" : 1,
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_proc"
+   },
+   "SELECT pronamespace FROM pg_proc  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_proc where oid = :1",
+      "colname" : "pronamespace",
+      "colnum" : "Anum_pg_proc_pronamespace",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_proc"
+   },
+   "SELECT proowner FROM pg_proc  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_proc where oid = :1",
+      "colname" : "proowner",
+      "colnum" : "Anum_pg_proc_proowner",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1,
+         "../../../..//src/backend/executor/nodeAgg.c" : 1,
+         "../../../..//src/backend/utils/fmgr/fmgr.c" : 1
+      },
+      "tablename" : "pg_proc"
+   },
+   "SELECT prorettype FROM pg_proc  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_proc where oid = :1",
+      "colname" : "prorettype",
+      "colnum" : "Anum_pg_proc_prorettype",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_proc"
+   },
+   "SELECT prosrc FROM pg_proc  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_proc where oid = :1",
+      "colname" : "prosrc",
+      "colnum" : "Anum_pg_proc_prosrc",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_proc.c" : 1
+      },
+      "tablename" : "pg_proc"
+   },
+   "SELECT ptcname FROM pg_extprotocol  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_extprotocol where oid = :1",
+      "colname" : "ptcname",
+      "colnum" : "Anum_pg_extprotocol_ptcname",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_extprotocol.c" : 1
+      },
+      "tablename" : "pg_extprotocol"
+   },
+   "SELECT ptcowner FROM pg_extprotocol WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_extprotocol where oid = :1",
+      "colname" : "ptcowner",
+      "colnum" : "Anum_pg_extprotocol_ptcowner",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1
+      },
+      "tablename" : "pg_extprotocol"
+   },
+   "SELECT ptcreadfn FROM pg_extprotocol  WHERE ptcname = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_extprotocol where ptcname = :1",
+      "colname" : "ptcreadfn",
+      "colnum" : "Anum_pg_extprotocol_ptcreadfn",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_extprotocol.c" : 1
+      },
+      "tablename" : "pg_extprotocol"
+   },
+   "SELECT ptcvalidatorfn FROM pg_extprotocol  WHERE ptcname = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_extprotocol where ptcname = :1",
+      "colname" : "ptcvalidatorfn",
+      "colnum" : "Anum_pg_extprotocol_ptcvalidatorfn",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_extprotocol.c" : 1
+      },
+      "tablename" : "pg_extprotocol"
+   },
+   "SELECT ptcwritefn FROM pg_extprotocol  WHERE ptcname = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_extprotocol where ptcname = :1",
+      "colname" : "ptcwritefn",
+      "colnum" : "Anum_pg_extprotocol_ptcwritefn",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/pg_extprotocol.c" : 1
+      },
+      "tablename" : "pg_extprotocol"
+   },
+   "SELECT relname FROM pg_class  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_class where oid = :1",
+      "colname" : "relname",
+      "colnum" : "Anum_pg_class_relname",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_class"
+   },
+   "SELECT relnamespace FROM pg_class  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_class where oid = :1",
+      "colname" : "relnamespace",
+      "colnum" : "Anum_pg_class_relnamespace",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_class"
+   },
+   "SELECT relowner FROM pg_class WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_class where oid = :1",
+      "colname" : "relowner",
+      "colnum" : "Anum_pg_class_relowner",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1
+      },
+      "tablename" : "pg_class"
+   },
+   "SELECT reltablespace FROM pg_class  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_class where oid = :1",
+      "colname" : "reltablespace",
+      "colnum" : "Anum_pg_class_reltablespace",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_class"
+   },
+   "SELECT reltype FROM pg_class  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_class where oid = :1",
+      "colname" : "reltype",
+      "colnum" : "Anum_pg_class_reltype",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/optimizer/plan/planpartition.c" : 1,
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_class"
+   },
+   "SELECT rolname FROM pg_authid  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_authid where oid = :1",
+      "colname" : "rolname",
+      "colnum" : "Anum_pg_authid_rolname",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/heap.c" : 1,
+         "../../../..//src/backend/catalog/namespace.c" : 2,
+         "../../../..//src/backend/utils/adt/acl.c" : 2,
+         "../../../..//src/backend/utils/adt/ruleutils.c" : 1,
+         "../../../..//src/backend/utils/init/miscinit.c" : 1
+      },
+      "tablename" : "pg_authid"
+   },
+   "SELECT rolresqueue FROM pg_authid  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_authid where oid = :1",
+      "colname" : "rolresqueue",
+      "colnum" : "Anum_pg_authid_rolresqueue",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/resscheduler/resscheduler.c" : 1
+      },
+      "tablename" : "pg_authid"
+   },
+   "SELECT rsqname FROM pg_resqueue WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_resqueue where oid = :1",
+      "colname" : "rsqname",
+      "colnum" : "Anum_pg_resqueue_rsqname",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/queue.c" : 1
+      },
+      "tablename" : "pg_resqueue"
+   },
+   "SELECT spcname FROM pg_tablespace  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_tablespace where oid = :1",
+      "colname" : "spcname",
+      "colnum" : "Anum_pg_tablespace_spcname",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/tablespace.c" : 1
+      },
+      "tablename" : "pg_tablespace"
+   },
+   "SELECT spcowner FROM pg_tablespace WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_tablespace where oid = :1",
+      "colname" : "spcowner",
+      "colnum" : "Anum_pg_tablespace_spcowner",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1
+      },
+      "tablename" : "pg_tablespace"
+   },
+   "SELECT srvowner FROM pg_foreign_server WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_foreign_server where oid = :1",
+      "colname" : "srvowner",
+      "colnum" : "Anum_pg_foreign_server_srvowner",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1
+      },
+      "tablename" : "pg_foreign_server"
+   },
+   "SELECT tgfoid FROM pg_trigger  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_trigger where oid = :1",
+      "colname" : "tgfoid",
+      "colnum" : "Anum_pg_trigger_tgfoid",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_trigger"
+   },
+   "SELECT tgname FROM pg_trigger  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_trigger where oid = :1",
+      "colname" : "tgname",
+      "colnum" : "Anum_pg_trigger_tgname",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_trigger"
+   },
+   "SELECT tgrelid FROM pg_trigger  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_trigger where oid = :1",
+      "colname" : "tgrelid",
+      "colnum" : "Anum_pg_trigger_tgrelid",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_trigger"
+   },
+   "SELECT typelem FROM pg_type  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_type where oid = :1",
+      "colname" : "typelem",
+      "colnum" : "Anum_pg_type_typelem",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/parser/parse_node.c" : 1
+      },
+      "tablename" : "pg_type"
+   },
+   "SELECT typname FROM pg_type  WHERE oid = :1" : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_type where oid = :1",
+      "colname" : "typname",
+      "colnum" : "Anum_pg_type_typname",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/namespace.c" : 1
+      },
+      "tablename" : "pg_type"
+   },
+   "SELECT typname FROM pg_type  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_type where oid = :1",
+      "colname" : "typname",
+      "colnum" : "Anum_pg_type_typname",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/cdb/cdbparquetstoragewrite.c" : 1,
+         "../../../..//src/backend/executor/spi.c" : 1,
+         "../../../..//src/backend/utils/adt/regproc.c" : 1,
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_type"
+   },
+   "SELECT typnamespace FROM pg_type  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_type where oid = :1",
+      "colname" : "typnamespace",
+      "colnum" : "Anum_pg_type_typnamespace",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/commands/typecmds.c" : 1
+      },
+      "tablename" : "pg_type"
+   },
+   "SELECT typowner FROM pg_type WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_type where oid = :1",
+      "colname" : "typowner",
+      "colnum" : "Anum_pg_type_typowner",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/aclchk.c" : 1
+      },
+      "tablename" : "pg_type"
+   },
+   "SELECT typrelid FROM pg_type  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_type where oid = :1",
+      "colname" : "typrelid",
+      "colnum" : "Anum_pg_type_typrelid",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/parser/parse_type.c" : 1,
+         "../../../..//src/backend/utils/cache/lsyscache.c" : 1
+      },
+      "tablename" : "pg_type"
+   },
+   "SELECT umuser FROM pg_user_mapping  WHERE oid = :1 " : {
+      "bCount" : 0,
+      "bDelete" : 0,
+      "bInsert" : 0,
+      "bUpdate" : 0,
+      "basic" : "select * from pg_user_mapping where oid = :1",
+      "colname" : "umuser",
+      "colnum" : "Anum_pg_user_mapping_umuser",
+      "cql" : "cql",
+      "files" : {
+         "../../../..//src/backend/catalog/dependency.c" : 1
+      },
+      "tablename" : "pg_user_mapping"
+   }
+}

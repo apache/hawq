@@ -1,0 +1,478 @@
+{
+   "acl.c" : [
+      "pg_auth_members",
+      "pg_authid",
+      "pg_class",
+      "pg_database",
+      "pg_language",
+      "pg_namespace",
+      "pg_proc"
+   ],
+   "aclchk.c" : [
+      "pg_authid",
+      "pg_class",
+      "pg_conversion",
+      "pg_database",
+      "pg_extprotocol",
+      "pg_filespace",
+      "pg_foreign_data_wrapper",
+      "pg_foreign_server",
+      "pg_language",
+      "pg_namespace",
+      "pg_opclass",
+      "pg_operator",
+      "pg_proc",
+      "pg_tablespace",
+      "pg_type"
+   ],
+   "aggregatecmds.c" : [
+      "pg_proc"
+   ],
+   "cdbcat.c" : [
+      "gp_distribution_policy"
+   ],
+   "cdbdisp.c" : [
+      "pg_proc"
+   ],
+   "cdbgroup.c" : [
+      "pg_aggregate"
+   ],
+   "cdbparquetstoragewrite.c" : [
+      "pg_type"
+   ],
+   "cdbpartindex.c" : [
+      "pg_constraint",
+      "pg_index",
+      "pg_partition",
+      "pg_partition_rule"
+   ],
+   "cdbpartition.c" : [
+      "pg_class",
+      "pg_constraint",
+      "pg_inherits",
+      "pg_partition",
+      "pg_partition_encoding",
+      "pg_partition_rule"
+   ],
+   "cdbquerycontextdispatching.c" : [
+      "pg_aggregate",
+      "pg_language",
+      "pg_proc",
+      "pg_type"
+   ],
+   "cdbsubselect.c" : [
+      "pg_attribute"
+   ],
+   "cdbutil.c" : [
+      "gp_segment_configuration"
+   ],
+   "clauses.c" : [
+      "pg_aggregate",
+      "pg_proc"
+   ],
+   "cluster.c" : [
+      "pg_class",
+      "pg_index"
+   ],
+   "commands/analyze" : [
+      "pg_class",
+      "pg_statistic"
+   ],
+   "comment.c" : [
+      "pg_am",
+      "pg_cast",
+      "pg_constraint",
+      "pg_description",
+      "pg_language",
+      "pg_namespace",
+      "pg_opclass",
+      "pg_resqueue",
+      "pg_rewrite",
+      "pg_shdescription",
+      "pg_trigger"
+   ],
+   "conversioncmds.c" : [
+      "pg_conversion"
+   ],
+   "dbcommands.c" : [
+      "pg_authid",
+      "pg_database",
+      "pg_tablespace"
+   ],
+   "dbsize.c" : [
+      "pg_namespace"
+   ],
+   "dependency.c" : [
+      "pg_am",
+      "pg_attrdef",
+      "pg_cast",
+      "pg_class",
+      "pg_constraint",
+      "pg_conversion",
+      "pg_depend",
+      "pg_language",
+      "pg_opclass",
+      "pg_operator",
+      "pg_proc",
+      "pg_rewrite",
+      "pg_trigger",
+      "pg_type",
+      "pg_user_mapping"
+   ],
+   "extprotocolcmds.c" : [
+      "pg_extprotocol"
+   ],
+   "filespace.c" : [
+      "pg_filespace",
+      "pg_filespace_entry",
+      "pg_tablespace"
+   ],
+   "fmgr.c" : [
+      "pg_language",
+      "pg_proc"
+   ],
+   "foreigncmds.c" : [
+      "pg_foreign_data_wrapper",
+      "pg_foreign_server",
+      "pg_foreign_table",
+      "pg_user_mapping"
+   ],
+   "format_type.c" : [
+      "pg_type"
+   ],
+   "funcapi.c" : [
+      "pg_proc"
+   ],
+   "functioncmds.c" : [
+      "pg_aggregate",
+      "pg_cast",
+      "pg_language",
+      "pg_proc"
+   ],
+   "functions.c" : [
+      "pg_proc"
+   ],
+   "gp_fastsequence.c" : [
+      "gp_fastsequence"
+   ],
+   "heap.c" : [
+      "pg_attrdef",
+      "pg_attribute",
+      "pg_authid",
+      "pg_class",
+      "pg_constraint",
+      "pg_inherits",
+      "pg_partition",
+      "pg_partition_rule",
+      "pg_stat_last_operation",
+      "pg_stat_last_shoperation",
+      "pg_statistic"
+   ],
+   "heapam.c" : [
+      "pg_class"
+   ],
+   "index.c" : [
+      "pg_attribute",
+      "pg_class",
+      "pg_index",
+      "pg_opclass",
+      "pg_type"
+   ],
+   "indexcmds.c" : [
+      "pg_am",
+      "pg_class",
+      "pg_index",
+      "pg_opclass"
+   ],
+   "inv_api.c" : [
+      "pg_largeobject"
+   ],
+   "lsyscache.c" : [
+      "pg_aggregate",
+      "pg_amop",
+      "pg_amproc",
+      "pg_attribute",
+      "pg_authid",
+      "pg_class",
+      "pg_constraint",
+      "pg_inherits",
+      "pg_namespace",
+      "pg_opclass",
+      "pg_operator",
+      "pg_proc",
+      "pg_statistic",
+      "pg_trigger",
+      "pg_type"
+   ],
+   "mbutils.c" : [
+      "pg_proc"
+   ],
+   "miscinit.c" : [
+      "pg_authid"
+   ],
+   "namespace.c" : [
+      "pg_authid",
+      "pg_class",
+      "pg_conversion",
+      "pg_namespace",
+      "pg_opclass",
+      "pg_operator",
+      "pg_proc",
+      "pg_type"
+   ],
+   "nodeAgg.c" : [
+      "pg_aggregate",
+      "pg_proc"
+   ],
+   "nodeMergejoin.c" : [
+      "pg_amop"
+   ],
+   "nodeWindow.c" : [
+      "pg_aggregate",
+      "pg_operator",
+      "pg_proc",
+      "pg_window"
+   ],
+   "opclasscmds.c" : [
+      "pg_am",
+      "pg_amop",
+      "pg_amproc",
+      "pg_opclass",
+      "pg_operator",
+      "pg_proc"
+   ],
+   "operatorcmds.c" : [
+      "pg_operator"
+   ],
+   "parse_clause.c" : [
+      "pg_amop",
+      "pg_window"
+   ],
+   "parse_coerce.c" : [
+      "pg_cast",
+      "pg_proc"
+   ],
+   "parse_func.c" : [
+      "pg_aggregate",
+      "pg_inherits",
+      "pg_proc",
+      "pg_window"
+   ],
+   "parse_node.c" : [
+      "pg_type"
+   ],
+   "parse_oper.c" : [
+      "pg_operator"
+   ],
+   "parse_relation.c" : [
+      "pg_attribute",
+      "pg_class"
+   ],
+   "parse_type.c" : [
+      "pg_type"
+   ],
+   "parse_utilcmd.c" : [
+      "pg_class",
+      "pg_opclass"
+   ],
+   "parser/analyze" : [
+      "pg_operator",
+      "pg_partition",
+      "pg_partition_rule",
+      "pg_type_encoding"
+   ],
+   "pg_aggregate.c" : [
+      "pg_aggregate",
+      "pg_proc"
+   ],
+   "pg_appendonly.c" : [
+      "pg_appendonly"
+   ],
+   "pg_attribute_encoding.c" : [
+      "pg_attribute_encoding"
+   ],
+   "pg_compression.c" : [
+      "pg_compression"
+   ],
+   "pg_constraint.c" : [
+      "pg_class",
+      "pg_constraint"
+   ],
+   "pg_conversion.c" : [
+      "pg_conversion"
+   ],
+   "pg_depend.c" : [
+      "pg_depend"
+   ],
+   "pg_extprotocol.c" : [
+      "pg_extprotocol"
+   ],
+   "pg_exttable.c" : [
+      "pg_exttable"
+   ],
+   "pg_namespace.c" : [
+      "pg_namespace"
+   ],
+   "pg_operator.c" : [
+      "pg_operator"
+   ],
+   "pg_proc.c" : [
+      "pg_depend",
+      "pg_proc"
+   ],
+   "pg_proc_callback.c" : [
+      "pg_proc_callback"
+   ],
+   "pg_shdepend.c" : [
+      "pg_authid",
+      "pg_shdepend"
+   ],
+   "pg_type.c" : [
+      "pg_type",
+      "pg_type_encoding"
+   ],
+   "plancat.c" : [
+      "pg_inherits"
+   ],
+   "planpartition.c" : [
+      "pg_class"
+   ],
+   "planwindow.c" : [
+      "pg_aggregate",
+      "pg_proc",
+      "pg_window"
+   ],
+   "predtest.c" : [
+      "pg_amop"
+   ],
+   "proclang.c" : [
+      "pg_language",
+      "pg_pltemplate"
+   ],
+   "queue.c" : [
+      "pg_authid",
+      "pg_resourcetype",
+      "pg_resqueue",
+      "pg_resqueuecapability"
+   ],
+   "regproc.c" : [
+      "pg_class",
+      "pg_operator",
+      "pg_proc",
+      "pg_type"
+   ],
+   "relcache.c" : [
+      "pg_amop",
+      "pg_amproc",
+      "pg_attrdef",
+      "pg_attribute",
+      "pg_class",
+      "pg_constraint",
+      "pg_index",
+      "pg_rewrite"
+   ],
+   "resscheduler.c" : [
+      "pg_authid",
+      "pg_resqueue"
+   ],
+   "rewriteDefine.c" : [
+      "pg_rewrite"
+   ],
+   "rewriteRemove.c" : [
+      "pg_rewrite"
+   ],
+   "rewriteSupport.c" : [
+      "pg_class"
+   ],
+   "ruleutils.c" : [
+      "pg_am",
+      "pg_authid",
+      "pg_class",
+      "pg_constraint",
+      "pg_depend",
+      "pg_index",
+      "pg_opclass",
+      "pg_operator",
+      "pg_partition",
+      "pg_partition_rule",
+      "pg_proc",
+      "pg_trigger"
+   ],
+   "schemacmds.c" : [
+      "pg_namespace"
+   ],
+   "segadmin.c" : [
+      "gp_segment_configuration",
+      "pg_database",
+      "pg_filespace_entry",
+      "pg_tablespace"
+   ],
+   "selfuncs.c" : [
+      "pg_class",
+      "pg_statistic"
+   ],
+   "sequence.c" : [
+      "pg_class"
+   ],
+   "spi.c" : [
+      "pg_type"
+   ],
+   "superuser.c" : [
+      "pg_authid"
+   ],
+   "tablecmds.c" : [
+      "pg_attribute",
+      "pg_authid",
+      "pg_class",
+      "pg_constraint",
+      "pg_depend",
+      "pg_index",
+      "pg_inherits",
+      "pg_partition_rule",
+      "pg_trigger",
+      "pg_type"
+   ],
+   "tablespace.c" : [
+      "pg_tablespace"
+   ],
+   "toasting.c" : [
+      "pg_class"
+   ],
+   "trigger.c" : [
+      "pg_class",
+      "pg_trigger"
+   ],
+   "tupdesc.c" : [
+      "pg_type"
+   ],
+   "tuplesort.c" : [
+      "pg_amop"
+   ],
+   "tupser.c" : [
+      "pg_type"
+   ],
+   "typcache.c" : [
+      "pg_type"
+   ],
+   "typecmds.c" : [
+      "pg_constraint",
+      "pg_depend",
+      "pg_type",
+      "pg_type_encoding"
+   ],
+   "user.c" : [
+      "pg_auth_members",
+      "pg_auth_time_constraint",
+      "pg_authid"
+   ],
+   "utility.c" : [
+      "pg_class"
+   ],
+   "vacuum.c" : [
+      "pg_class",
+      "pg_database"
+   ],
+   "variable.c" : [
+      "pg_authid"
+   ]
+}
