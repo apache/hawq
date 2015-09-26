@@ -8,7 +8,7 @@ SET escape_string_warning = off;
 SET default_with_oids = false;
 
 CREATE SCHEMA madlib;
-CREATE LANGUAGE plpythonu;
+-- CREATE LANGUAGE plpythonu;
 
 SET search_path = madlib, pg_catalog;
 
