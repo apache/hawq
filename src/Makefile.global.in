@@ -254,6 +254,13 @@ LD = @LD@
 with_gnu_ld = @with_gnu_ld@
 ld_R_works = @ld_R_works@
 
+# Dependencies
+ORCA_DEPENDS_DIR_INTER = @ORCA_DEPENDS_DIR_INTER@
+ORCA_DEPENDS_OBJDIR_DEFAULT = @ORCA_DEPENDS_OBJDIR_DEFAULT@
+ORCA_DEPENDS_XERCES_VER = @ORCA_DEPENDS_XERCES_VER@
+ORCA_DEPENDS_LIBGPOS_VER = @ORCA_DEPENDS_LIBGPOS_VER@
+ORCA_DEPENDS_OPTIMIZER_VER = @ORCA_DEPENDS_OPTIMIZER_VER@
+
 # We want -L for libpgport.a to be first in LDFLAGS.  We also need LDFLAGS
 # to be a "recursively expanded" variable, else adjustments to rpathdir
 # don't work right.  So we must NOT do LDFLAGS := something, meaning this has

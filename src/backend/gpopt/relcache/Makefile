@@ -12,9 +12,6 @@ subdir = src/backend/gpopt/relcache
 top_builddir = ../../../..
 include $(top_builddir)/src/Makefile.global
 
-BLD_TOP = $(top_builddir)
-include $(top_builddir)/build-utils/pivotal/releng.mk
-
 include $(top_builddir)/src/backend/gpopt/gpopt.mk
 
 OBJS = CMDProviderRelcache.o

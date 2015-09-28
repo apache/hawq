@@ -17,9 +17,6 @@ include $(top_builddir)/src/Makefile.global
 SUBDIRS = access bootstrap catalog parser commands executor foreign \
 	lib libpq gp_libpq_fe main nodes optimizer port postmaster regex \
 	rewrite storage tcop utils resourcemanager $(top_builddir)/src/timezone cdb
-ifeq ($(enable_orca),yes)
-SUBDIRS += gpopt
-endif
 
 include $(srcdir)/common.mk
 
@@ -54,11 +51,11 @@ LIBS := -lprotobuf -lboost_thread -lboost_system -lboost_date_time -lstdc++ -lhd
 
 # adding orca libraries
 ifeq ($(enable_orca),yes)
-LIBS := $(LIBS) -L$(LIBGPOS)/$(OBJDIR_DEFAULT) -lgpos
-LIBS := $(LIBS) -L$(XERCES_LIBDIR) -lxerces-c-3.1
-LIBS := $(LIBS) -L$(OPTIMIZER)/libnaucrates/$(OBJDIR_DEFAULT) -lnaucrates
-LIBS := $(LIBS) -L$(OPTIMIZER)/libgpdbcost/$(OBJDIR_DEFAULT) -lgpdbcost
-LIBS := $(LIBS) -L$(OPTIMIZER)/libgpopt/$(OBJDIR_DEFAULT) -lgpopt
+LIBS := $(LIBS) -L$(ORCA_DEPENDS_DIR_INTER)/libgpos/$(ORCA_DEPENDS_OBJDIR_DEFAULT) -lgpos
+LIBS := $(LIBS) -L$(ORCA_DEPENDS_DIR_INTER)/lib -lxerces-c
+LIBS := $(LIBS) -L$(ORCA_DEPENDS_DIR_INTER)/libnaucrates/$(ORCA_DEPENDS_OBJDIR_DEFAULT) -lnaucrates
+LIBS := $(LIBS) -L$(ORCA_DEPENDS_DIR_INTER)/libgpdbcost/$(ORCA_DEPENDS_OBJDIR_DEFAULT) -lgpdbcost
+LIBS := $(LIBS) -L$(ORCA_DEPENDS_DIR_INTER)/libgpopt/$(ORCA_DEPENDS_OBJDIR_DEFAULT) -lgpopt
 LIBS := $(LIBS) -L$(top_builddir)/src/backend/gpopt -ldxltranslators
 endif
 
@@ -75,7 +72,12 @@ SNAPPYLIB = -lsnappy
 LIBS := $(LIBS) $(SNAPPYLIB)
 ##########################################################################
 
-all: submake-libpgport postgres $(POSTGRES_IMP)
+submake-libdxltranslators: 
+ifeq ($(enable_orca),yes)
+	$(MAKE) -C gpopt all
+endif
+
+all: submake-libpgport submake-libdxltranslators  postgres $(POSTGRES_IMP)
 
 ifneq ($(PORTNAME), cygwin)
 ifneq ($(PORTNAME), win32)
@@ -209,6 +211,9 @@ ifeq ($(MAKE_DLL), true)
 	$(INSTALL_DATA) libpostgres.a '$(DESTDIR)$(libdir)/libpostgres.a'
 endif
 endif
+ifeq ($(enable_orca),yes)
+	$(MAKE) -C gpopt install
+endif
 	$(MAKE) -C catalog install-data
 	$(INSTALL_DATA) $(srcdir)/libpq/pg_hba.conf.sample '$(DESTDIR)$(datadir)/pg_hba.conf.sample'
 	$(INSTALL_DATA) $(srcdir)/libpq/pg_ident.conf.sample '$(DESTDIR)$(datadir)/pg_ident.conf.sample'
@@ -292,6 +297,9 @@ endif
 ifeq ($(PORTNAME), win32)
 	rm -f postgres.dll postgres.def libpostgres.a $(WIN32RES)
 endif
+	find gpopt -name *.o | xargs rm -rf
+	find gpopt -name *.so | xargs rm -rf
+	find gpopt -name *.dylib | xargs rm -rf
 
 distclean: clean
 	rm -f port/tas.s port/dynloader.c port/pg_sema.c port/pg_shmem.c

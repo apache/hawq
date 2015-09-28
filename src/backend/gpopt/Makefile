@@ -12,9 +12,6 @@ subdir = src/backend/gpopt
 top_builddir = ../../..
 include $(top_builddir)/src/Makefile.global
 
-BLD_TOP = $(top_builddir)/
-include $(top_builddir)/build-utils/pivotal/releng.mk
-
 include $(top_builddir)/src/backend/gpopt/gpopt.mk
 
 SUBDIRS = config translate relcache utils
@@ -35,6 +32,43 @@ ifeq (SunOS, $(UNAME))
 	LDLIBFLAGS = -shared -ldl -lrt
 endif
 
+# define build flags for GP Optimizer UDFs library
+ifeq (Darwin, $(UNAME))
+	GPOPT_UDF_FLAGS := -dynamiclib -flat_namespace -undefined dynamic_lookup
+else
+	GPOPT_UDF_FLAGS := -shared
+endif
 
-all:
-	 $(CXX)  $(ARCH_FLAGS) $(LDLIBFLAGS) -L$(LIBGPOS)/$(OBJDIR_DEFAULT) -lgpos -L$(XERCES_LIBDIR) -lxerces-c-3.1 -L$(OPTIMIZER)/libnaucrates/$(OBJDIR_DEFAULT) -lnaucrates -L$(OPTIMIZER)/libgpdbcost/$(OBJDIR_DEFAULT) -lgpdbcost -L$(OPTIMIZER)/libgpopt/$(OBJDIR_DEFAULT) -lgpopt -lpthread  -o libdxltranslators.$(LDSFX) $(shell find . -name '*.o' ! -name 'SUBSYS.o')
+LIBGPOS_DIR = $(ORCA_DEPENDS_DIR_INTER)/libgpos
+LIBNAUCRATES_DIR = $(ORCA_DEPENDS_DIR_INTER)/libnaucrates
+LIBGPDBCOST_DIR = $(ORCA_DEPENDS_DIR_INTER)/libgpdbcost
+LIBGPOPT_DIR = $(ORCA_DEPENDS_DIR_INTER)/libgpopt
+
+all: $(SUBDIRS) libdxltranslators.$(LDSFX) libgpoptudf.$(LDSFX)
+
+$(SUBDIRS):
+	$(MAKE) -C $@
+
+libdxltranslators.$(LDSFX): $(SUBDIROBJS) $(OBJS)
+	$(CXX) $(CXXFLAGS) $(LDLIBFLAGS) \
+	  -L$(LIBGPOS_DIR)/$(ORCA_DEPENDS_OBJDIR_DEFAULT) -lgpos \
+	  -L$(ORCA_DEPENDS_DIR_INTER)/lib -lxerces-c \
+	  -L$(LIBNAUCRATES_DIR)/$(ORCA_DEPENDS_OBJDIR_DEFAULT) -lnaucrates \
+	  -L$(LIBGPDBCOST_DIR)/$(ORCA_DEPENDS_OBJDIR_DEFAULT) -lgpdbcost \
+	  -L$(LIBGPOPT_DIR)/$(ORCA_DEPENDS_OBJDIR_DEFAULT) -lgpopt -lpthread -o $@ \
+	  $(SUBDIROBJS) $(OBJS)
+
+libgpoptudf.$(LDSFX): $(SUBDIROBJS)
+	$(CXX) $(CXXFLAGS) $(GPOPT_UDF_FLAGS) \
+	  -L$(ORCA_DEPENDS_DIR_INTER)/lib -lxerces-c \
+	  -L$(LIBGPOS_DIR)/$(ORCA_DEPENDS_OBJDIR_DEFAULT) -lgpos \
+	  -L$(LIBNAUCRATES_DIR)/$(ORCA_DEPENDS_OBJDIR_DEFAULT) -lnaucrates \
+	  -L$(LIBGPDBCOST_DIR)/$(ORCA_DEPENDS_OBJDIR_DEFAULT) -lgpdbcost \
+	  -L$(LIBGPOPT_DIR)/$(ORCA_DEPENDS_OBJDIR_DEFAULT) -lgpopt \
+	  -o $@ ./utils/funcs.o
+
+install:
+	$(INSTALL_DATA) libdxltranslators.$(LDSFX) '$(DESTDIR)$(libdir)/libdxltranslators.$(LDSFX)'
+	$(INSTALL_DATA) libgpoptudf.$(LDSFX) '$(DESTDIR)$(libdir)/libgpoptudf.$(LDSFX)'
+
+.PHONY: all install $(SUBDIRS)

@@ -4,16 +4,13 @@
 #    Makefile for gpopt
 #
 # IDENTIFICATION
-#    $PostgreSQL: pgsql/src/backend/gpopt/relcache/Makefile,v 1.15 2008/02/19 10:30:07 petere Exp $
+#    $PostgreSQL: pgsql/src/backend/gpopt/translate/Makefile,v 1.15 2008/02/19 10:30:07 petere Exp $
 #
 #-------------------------------------------------------------------------
 
-subdir = src/backend/gpopt/relcache
+subdir = src/backend/gpopt/translate
 top_builddir = ../../../..
 include $(top_builddir)/src/Makefile.global
-
-BLD_TOP = $(top_builddir)
-include $(top_builddir)/build-utils/pivotal/releng.mk
 
 include $(top_builddir)/src/backend/gpopt/gpopt.mk
 
