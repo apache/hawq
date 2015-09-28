@@ -5,6 +5,9 @@ drop schema set_functions cascade;
 create schema set_functions;
 set search_path=set_functions;
 
+DROP LANGUAGE IF EXISTS plpythonu CASCADE;
+CREATE LANGUAGE plpythonu;
+
 CREATE TABLE foo2(fooid int, f2 int);
 INSERT INTO foo2 VALUES(1, 11);
 INSERT INTO foo2 VALUES(2, 22);

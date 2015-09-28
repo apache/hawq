@@ -21,6 +21,9 @@ create table i4(a int, b int) distributed by (a);
 insert into i4 values(null,null);
 insert into i4 select i, i-10 from generate_series(-5,0)i;
 
+DROP LANGUAGE IF EXISTS plpythonu CASCADE;
+CREATE LANGUAGE plpythonu;
+
 create or replace function twice(int) returns int as $$
        select 2 * $1;
 $$ language sql;
