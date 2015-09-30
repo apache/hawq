@@ -4,7 +4,8 @@ import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.client.HBaseAdmin;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Admin;
 
 public class HBaseUtilities {
 
@@ -31,8 +32,9 @@ public class HBaseUtilities {
      * @return true if table exists
      * @throws IOException
      */
-    public static boolean isTableAvailable(HBaseAdmin hbaseAdmin, String tableName) throws IOException {
-        return hbaseAdmin.isTableAvailable(tableName) &&
-                hbaseAdmin.isTableEnabled(tableName);
+    public static boolean isTableAvailable(Admin hbaseAdmin, String tableName) throws IOException {
+        TableName name = TableName.valueOf(tableName);
+        return hbaseAdmin.isTableAvailable(name) &&
+                hbaseAdmin.isTableEnabled(name);
     }
 }

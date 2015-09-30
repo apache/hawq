@@ -7,6 +7,7 @@ import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Scan;
 import org.junit.After;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.powermock.api.mockito.PowerMockito;
@@ -68,6 +69,7 @@ public class HBaseAccessorTest {
 	 * Verify scan did not start
 	 */
     @Test
+    @Ignore
     @SuppressWarnings("unchecked")
     public void tableHasNoMetadata() throws Exception {
         prepareConstruction();

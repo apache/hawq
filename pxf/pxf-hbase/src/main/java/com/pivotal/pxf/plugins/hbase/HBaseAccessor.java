@@ -8,11 +8,14 @@ import com.pivotal.pxf.plugins.hbase.utilities.HBaseColumnDescriptor;
 import com.pivotal.pxf.plugins.hbase.utilities.HBaseTupleDescription;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HConstants;
-import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.filter.Filter;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import java.io.ByteArrayInputStream;
@@ -32,7 +35,8 @@ import java.io.ObjectInputStream;
  */
 public class HBaseAccessor extends Plugin implements ReadAccessor {
     private HBaseTupleDescription tupleDescription;
-    private HTable table;
+    private Connection connection;
+    private Table table;
     private SplitBoundary split;
     private Scan scanDetails;
     private ResultScanner currentScanner;
@@ -93,10 +97,12 @@ public class HBaseAccessor extends Plugin implements ReadAccessor {
 
     /**
      * Closes the HBase table.
+     * TODO: Need to make sure the following objects are closed upon any exception
      */
     @Override
     public void closeForRead() throws Exception {
         table.close();
+        connection.close();
     }
 
     /**
@@ -115,8 +121,12 @@ public class HBaseAccessor extends Plugin implements ReadAccessor {
         return new OneRow(null, result);
     }
 
+    /**
+     * Load hbase table object using ConnectionFactory
+     */
     private void openTable() throws IOException {
-        table = new HTable(HBaseConfiguration.create(), inputData.getDataSource().getBytes());
+        connection = ConnectionFactory.createConnection(HBaseConfiguration.create());
+        table = connection.getTable(TableName.valueOf(inputData.getDataSource()));
     }
 
     /**

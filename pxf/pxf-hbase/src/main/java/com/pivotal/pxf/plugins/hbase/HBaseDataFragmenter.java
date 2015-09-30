@@ -7,11 +7,8 @@ import com.pivotal.pxf.plugins.hbase.utilities.HBaseLookupTable;
 import com.pivotal.pxf.plugins.hbase.utilities.HBaseUtilities;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HRegionInfo;
-import org.apache.hadoop.hbase.ServerName;
-import org.apache.hadoop.hbase.TableNotFoundException;
-import org.apache.hadoop.hbase.client.HBaseAdmin;
-import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.*;
+import org.apache.hadoop.hbase.client.*;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -33,7 +30,8 @@ import java.util.NavigableMap;
 public class HBaseDataFragmenter extends Fragmenter {
 
     private static final Configuration hbaseConfiguration = HBaseUtilities.initHBaseConfiguration();
-    private HBaseAdmin hbaseAdmin;
+    private Admin hbaseAdmin;
+    private Connection connection;
 
     public HBaseDataFragmenter(InputData inConf) {
         super(inConf);
@@ -53,7 +51,8 @@ public class HBaseDataFragmenter extends Fragmenter {
 
         // check that Zookeeper and HBase master are available
         HBaseAdmin.checkHBaseAvailable(hbaseConfiguration);
-        hbaseAdmin = new HBaseAdmin(hbaseConfiguration);
+        connection = ConnectionFactory.createConnection(hbaseConfiguration);
+        hbaseAdmin = connection.getAdmin();
         if (!HBaseUtilities.isTableAvailable(hbaseAdmin, inputData.getDataSource())) {
             throw new TableNotFoundException(inputData.getDataSource());
         }
@@ -102,21 +101,21 @@ public class HBaseDataFragmenter extends Fragmenter {
     }
 
     private void addTableFragments(byte[] userData) throws IOException {
-        HTable table = new HTable(hbaseConfiguration, inputData.getDataSource());
-        NavigableMap<HRegionInfo, ServerName> locations = table.getRegionLocations();
+        RegionLocator regionLocator = connection.getRegionLocator(TableName.valueOf(inputData.getDataSource()));
+        List <HRegionLocation> locations = regionLocator.getAllRegionLocations();
 
-        for (Map.Entry<HRegionInfo, ServerName> entry : locations.entrySet()) {
-            addFragment(entry, userData);
+        for (HRegionLocation location : locations) {
+            addFragment(location, userData);
         }
 
-        table.close();
+        regionLocator.close();
     }
 
-    private void addFragment(Map.Entry<HRegionInfo, ServerName> entry,
+    private void addFragment(HRegionLocation location,
             byte[] userData) throws IOException {
-        ServerName serverInfo = entry.getValue();
+        ServerName serverInfo = location.getServerName();
         String[] hosts = new String[] {serverInfo.getHostname()};
-        HRegionInfo region = entry.getKey();
+        HRegionInfo region = location.getRegionInfo();
         byte[] fragmentMetadata = prepareFragmentMetadata(region);
         Fragment fragment = new Fragment(inputData.getDataSource(), hosts, fragmentMetadata, userData);
         fragments.add(fragment);
