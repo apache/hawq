@@ -22,7 +22,7 @@
 /usr/phd/current/hadoop-client/lib/commons-lang-*[0-9].jar
 /usr/phd/current/hadoop-client/lib/commons-logging-*[0-9].jar
 /usr/phd/current/hadoop-client/lib/guava-*[0-9].jar
-/usr/phd/current/hadoop-client/lib/htrace-core-*[0-9].jar
+/usr/phd/current/hadoop-client/lib/htrace-core-*[0-9]*.jar
 /usr/phd/current/hadoop-client/lib/hadoop-lzo-*[0-9].jar
 /usr/phd/current/hadoop-client/lib/jackson-core-asl-*[0-9].jar
 /usr/phd/current/hadoop-client/lib/jackson-mapper-asl-*[0-9].jar
@@ -36,7 +36,7 @@
 /usr/phd/current/hbase-client/lib/hbase-client.jar
 /usr/phd/current/hbase-client/lib/hbase-common.jar
 /usr/phd/current/hbase-client/lib/hbase-protocol.jar
-/usr/phd/current/hbase-client/lib/htrace-core-*[0-9].jar
+/usr/phd/current/hbase-client/lib/htrace-core-*[0-9]*.jar
 /usr/phd/current/hbase-client/lib/netty-*[0-9].Final.jar
 /usr/phd/current/zookeeper-client/zookeeper.jar
 /usr/phd/current/hive-client/lib/antlr-runtime-*[0-9].jar
