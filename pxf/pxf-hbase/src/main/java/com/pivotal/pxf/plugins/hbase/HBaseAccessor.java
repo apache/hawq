@@ -99,7 +99,6 @@ public class HBaseAccessor extends Plugin implements ReadAccessor {
 
     /**
      * Closes the HBase table.
-     * TODO: Need to make sure the following objects are closed upon any exception
      */
     @Override
     public void closeForRead() throws Exception {
