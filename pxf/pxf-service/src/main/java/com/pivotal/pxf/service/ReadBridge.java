@@ -46,6 +46,7 @@ public class ReadBridge implements Bridge {
     /*
      * Accesses the underlying HDFS file
      */
+    @Override
     public boolean beginIteration() throws Exception {
         return fileAccessor.openForRead();
     }
@@ -67,6 +68,7 @@ public class ReadBridge implements Bridge {
             output = outputBuilder.makeOutput(fieldsResolver.getFields(onerow));
         } catch (IOException ex) {
             if (!isDataException(ex)) {
+                fileAccessor.closeForRead();
                 throw ex;
             }
             output = outputBuilder.getErrorOutput(ex);
@@ -81,6 +83,9 @@ public class ReadBridge implements Bridge {
                 Log.debug(ex.toString() + ": " + row_info);
             }
             output = outputBuilder.getErrorOutput(ex);
+        } catch (Exception ex) {
+            fileAccessor.closeForRead();
+            throw ex;
         }
 
         return output;

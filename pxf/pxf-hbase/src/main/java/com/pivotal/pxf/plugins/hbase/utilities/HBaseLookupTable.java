@@ -6,6 +6,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.ClusterStatus;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
 
@@ -36,10 +37,11 @@ public class HBaseLookupTable implements Closeable {
 
     private static final Log LOG = LogFactory.getLog(HBaseLookupTable.class);
 
+    private Connection connection;
     private Configuration hbaseConfiguration;
-    private HBaseAdmin admin;
+    private Admin admin;
     private Map<byte[], byte[]> rawTableMapping;
-    private HTableInterface lookupTable;
+    private Table lookupTable;
 
     /**
      * Constructs a connector to HBase lookup table.
@@ -49,7 +51,8 @@ public class HBaseLookupTable implements Closeable {
      */
     public HBaseLookupTable(Configuration conf) throws Exception {
         hbaseConfiguration = conf;
-        admin = new HBaseAdmin(hbaseConfiguration);
+        connection = ConnectionFactory.createConnection(hbaseConfiguration);
+        admin = connection.getAdmin();
         ClusterStatus cs = admin.getClusterStatus();
         LOG.debug("HBase cluster has " + cs.getServersSize() + " region servers " +
                 "(" + cs.getDeadServers() + " dead)");
@@ -100,7 +103,7 @@ public class HBaseLookupTable implements Closeable {
      * Returns true if {@link #LOOKUPTABLENAME} has {@value #LOOKUPCOLUMNFAMILY} family.
      */
     private boolean lookupHasCorrectStructure() throws IOException {
-        HTableDescriptor htd = admin.getTableDescriptor(Bytes.toBytes(LOOKUPTABLENAME));
+        HTableDescriptor htd = admin.getTableDescriptor(TableName.valueOf(LOOKUPTABLENAME));
         return htd.hasFamily(LOOKUPCOLUMNFAMILY);
     }
 
@@ -135,8 +138,11 @@ public class HBaseLookupTable implements Closeable {
         return lowCaseKeys;
     }
 
+    /**
+     * Load hbase table object using ConnectionFactory
+     */
     private void openLookupTable() throws IOException {
-        lookupTable = new HTable(hbaseConfiguration, LOOKUPTABLENAME);
+        lookupTable = connection.getTable(TableName.valueOf(LOOKUPTABLENAME));
     }
 
     /**
@@ -160,6 +166,7 @@ public class HBaseLookupTable implements Closeable {
 
     private void closeLookupTable() throws IOException {
         lookupTable.close();
+        HBaseUtilities.closeConnection(admin, connection);
     }
 
     private String lowerCase(byte[] key) {

@@ -13,3 +13,4 @@ docs
 *.iml
 .gradle
 /log-regression
+.settings
