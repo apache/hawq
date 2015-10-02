@@ -6,6 +6,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.client.Connection;
 
 public class HBaseUtilities {
 
@@ -36,5 +37,21 @@ public class HBaseUtilities {
         TableName name = TableName.valueOf(tableName);
         return hbaseAdmin.isTableAvailable(name) &&
                 hbaseAdmin.isTableEnabled(name);
+    }
+
+    /**
+     * Closes HBase admin and connection if they are open.
+     *
+     * @param hbaseAdmin
+     * @param hbaseConnection
+     * @throws IOException
+     */
+    public static void closeConnection(Admin hbaseAdmin, Connection hbaseConnection) throws IOException {
+        if (hbaseAdmin != null) {
+            hbaseAdmin.close();
+        }
+        if (hbaseConnection != null) {
+            hbaseConnection.close();
+        }
     }
 }

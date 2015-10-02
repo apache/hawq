@@ -5,7 +5,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.ClusterStatus;
-import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
@@ -167,7 +166,7 @@ public class HBaseLookupTable implements Closeable {
 
     private void closeLookupTable() throws IOException {
         lookupTable.close();
-        connection.close();
+        HBaseUtilities.closeConnection(admin, connection);
     }
 
     private String lowerCase(byte[] key) {

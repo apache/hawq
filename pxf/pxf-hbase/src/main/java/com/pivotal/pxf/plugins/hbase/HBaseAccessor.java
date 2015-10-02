@@ -6,6 +6,8 @@ import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.api.utilities.Plugin;
 import com.pivotal.pxf.plugins.hbase.utilities.HBaseColumnDescriptor;
 import com.pivotal.pxf.plugins.hbase.utilities.HBaseTupleDescription;
+import com.pivotal.pxf.plugins.hbase.utilities.HBaseUtilities;
+
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.client.Connection;
@@ -66,9 +68,9 @@ public class HBaseAccessor extends Plugin implements ReadAccessor {
     }
 
     /**
-     * Constructs {@link HBaseTupleDescription} based on HAWQ table description and 
+     * Constructs {@link HBaseTupleDescription} based on HAWQ table description and
      * initializes the scan start and end keys of the HBase table to default values.
-     *  
+     *
      * @param input query information, contains HBase table name and filter
      */
     public HBaseAccessor(InputData input) {
@@ -82,8 +84,8 @@ public class HBaseAccessor extends Plugin implements ReadAccessor {
 
     /**
      * Opens the HBase table.
-     * 
-     * @return true if the current fragment (split) is 
+     *
+     * @return true if the current fragment (split) is
      * available for reading and includes in the filter
      */
     @Override
@@ -102,7 +104,7 @@ public class HBaseAccessor extends Plugin implements ReadAccessor {
     @Override
     public void closeForRead() throws Exception {
         table.close();
-        connection.close();
+        HBaseUtilities.closeConnection(null, connection);
     }
 
     /**
@@ -130,10 +132,10 @@ public class HBaseAccessor extends Plugin implements ReadAccessor {
     }
 
     /**
-     * Creates a {@link SplitBoundary} of the table split 
-     * this accessor instance is assigned to scan. 
-     * The table split is constructed from the fragment metadata 
-     * passed in {@link InputData#getFragmentMetadata()}. 
+     * Creates a {@link SplitBoundary} of the table split
+     * this accessor instance is assigned to scan.
+     * The table split is constructed from the fragment metadata
+     * passed in {@link InputData#getFragmentMetadata()}.
      * <p>
      * The function verifies the split is within user supplied range.
      * <p>
@@ -165,17 +167,17 @@ public class HBaseAccessor extends Plugin implements ReadAccessor {
      * Returns true if given start/end key pair is within the scan range.
      */
     private boolean withinScanRange(byte[] startKey, byte[] endKey) {
-    	
+
     	// startKey <= scanStartKey
         if (Bytes.compareTo(startKey, scanStartKey) <= 0) {
         	// endKey == table's end or endKey >= scanStartKey
-            if (Bytes.equals(endKey, HConstants.EMPTY_END_ROW) || 
+            if (Bytes.equals(endKey, HConstants.EMPTY_END_ROW) ||
                     Bytes.compareTo(endKey, scanStartKey) >= 0) {
                 return true;
             }
         } else { // startKey > scanStartKey
         	// scanEndKey == table's end or startKey <= scanEndKey
-            if (Bytes.equals(scanEndKey, HConstants.EMPTY_END_ROW) || 
+            if (Bytes.equals(scanEndKey, HConstants.EMPTY_END_ROW) ||
                     Bytes.compareTo(startKey, scanEndKey) <= 0) {
                 return true;
             }

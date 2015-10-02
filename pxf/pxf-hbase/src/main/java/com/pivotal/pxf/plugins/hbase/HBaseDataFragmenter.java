@@ -15,7 +15,6 @@ import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.util.List;
 import java.util.Map;
-import java.util.NavigableMap;
 
 /**
  * Fragmenter class for HBase data resources.
@@ -54,11 +53,14 @@ public class HBaseDataFragmenter extends Fragmenter {
         connection = ConnectionFactory.createConnection(hbaseConfiguration);
         hbaseAdmin = connection.getAdmin();
         if (!HBaseUtilities.isTableAvailable(hbaseAdmin, inputData.getDataSource())) {
+            HBaseUtilities.closeConnection(hbaseAdmin, connection);
             throw new TableNotFoundException(inputData.getDataSource());
         }
 
         byte[] userData = prepareUserData();
         addTableFragments(userData);
+
+        HBaseUtilities.closeConnection(hbaseAdmin, connection);
 
         return fragments;
     }
