@@ -33,7 +33,7 @@ public class HBaseAccessorTest {
     HBaseAccessor accessor;
 
     /*
-	 * After each test is done, close the accessor 
+	 * After each test is done, close the accessor
 	 * if it was created
 	 */
     @After
@@ -49,10 +49,10 @@ public class HBaseAccessorTest {
 	/*
 	 * Test construction of HBaseAccessor.
 	 * Actually no need for this as it is tested in all other tests
-	 * constructing HBaseAccessor but it serves as a simple example 
+	 * constructing HBaseAccessor but it serves as a simple example
 	 * of mocking
 	 *
-	 * HBaseAccessor is created and then HBaseTupleDescriptioncreation 
+	 * HBaseAccessor is created and then HBaseTupleDescriptioncreation
 	 * is verified
 	 */
     @Test
@@ -64,7 +64,7 @@ public class HBaseAccessorTest {
 
 	/*
 	 * Test Open returns false when table has no regions
-	 * 
+	 *
 	 * Done by returning an empty Map from getRegionLocations
 	 * Verify Scan object doesn't contain any columns / filters
 	 * Verify scan did not start
@@ -113,8 +113,6 @@ public class HBaseAccessorTest {
 
         hbaseConfiguration = mock(Configuration.class);
         when(HBaseConfiguration.create()).thenReturn(hbaseConfiguration);
-        //table = mock(HTable.class);
-        //PowerMockito.whenNew(HTable.class).withArguments(hbaseConfiguration, tableName.getBytes()).thenReturn(table);
 
         // Make sure we mock static functions in ConnectionFactory
         PowerMockito.mockStatic(ConnectionFactory.class);
