@@ -44,9 +44,9 @@ public class AnalyzerStats {
      *
      * @param stats the data to be serialized
      * @return the result in json format
-     * @throws IOException
+     * @throws IOException if converting to JSON format failed
      */
-    public static String dataToJSON(AnalyzerStats stats) throws IOException {
+    public static String dataToJSON(AnalyzerStats stats) throws IOException  {
         ObjectMapper mapper = new ObjectMapper();
         // mapper serializes all members of the class by default
         return "{\"PXFDataSourceStats\":" + mapper.writeValueAsString(stats) + "}";

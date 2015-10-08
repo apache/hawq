@@ -2,7 +2,6 @@ package com.pivotal.pxf.plugins.hdfs;
 
 import java.io.DataOutput;
 import java.io.DataInput;
-import java.io.IOException;
 import java.lang.UnsupportedOperationException;
 
 import org.apache.hadoop.io.Writable;
@@ -13,29 +12,28 @@ import org.apache.hadoop.io.Writable;
  */
 public class ChunkWritable implements Writable {
 	public byte [] box;
-	
+
 	/**
-     * Serialize the fields of this object to <code>out</code>.
+     * Serializes the fields of this object to <code>out</code>.
      *
      * @param out <code>DataOutput</code> to serialize this object into.
-     * @throws IOException
+     * @throws UnsupportedOperationException this function is not supported
      */
 	@Override
     public void write(DataOutput out)  {
 		throw new UnsupportedOperationException("ChunkWritable.write() is not implemented");
     }
-	
+
     /**
-     * Deserialize the fields of this object from <code>in</code>.
+     * Deserializes the fields of this object from <code>in</code>.
      * <p>For efficiency, implementations should attempt to re-use storage in the
      * existing object where possible.</p>
      *
      * @param in <code>DataInput</code> to deserialize this object from.
-     * @throws IOException
+     * @throws UnsupportedOperationException  this function is not supported
      */
 	@Override
     public void readFields(DataInput in)  {
 		throw new UnsupportedOperationException("ChunkWritable.readFields() is not implemented");
 	}
-	
 }

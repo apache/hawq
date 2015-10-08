@@ -10,12 +10,15 @@ import static com.pivotal.pxf.plugins.hive.HiveInputFormatFragmenter.PXF_HIVE_SE
 
 /**
  * Specialization of HiveAccessor for a Hive table stored as Text files.
- * Use together with HiveInputFormatFragmenter/HiveStringPassResolver
+ * Use together with {@link HiveInputFormatFragmenter}/{@link HiveStringPassResolver}.
  */
 public class HiveLineBreakAccessor extends HiveAccessor {
 
     /**
      * Constructs a HiveLineBreakAccessor.
+     *
+     * @param input input containing user data
+     * @throws Exception if user data was wrong
      */
     public HiveLineBreakAccessor(InputData input) throws Exception {
         super(input, new TextInputFormat());

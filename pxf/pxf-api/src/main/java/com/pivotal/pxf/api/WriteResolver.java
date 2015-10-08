@@ -13,7 +13,7 @@ public interface WriteResolver {
      *
      * @param record list of {@link OneField}
      * @return the constructed {@link OneRow}
-     * @throws Exception
+     * @throws Exception if constructing a row from the fields failed
      */
     OneRow setFields(List<OneField> record) throws Exception;
 }

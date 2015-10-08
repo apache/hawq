@@ -14,6 +14,8 @@ public class HBaseColumnDescriptor extends ColumnDescriptor {
 
     /**
      * Constructs a column descriptor using the given copy's column name.
+     *
+     * @param copy column descriptor to be copied
      */
     public HBaseColumnDescriptor(ColumnDescriptor copy) {
         this(copy, copy.columnName().getBytes());
@@ -28,9 +30,9 @@ public class HBaseColumnDescriptor extends ColumnDescriptor {
      * <li>recordkey - Row key column (case insensitive).</li>
      * </ol>
      * <p>
-     * For recordkey, no HBase name is created. 
-     * 
-     * @param copy column descriptor 
+     * For recordkey, no HBase name is created.
+     *
+     * @param copy column descriptor
      * @param newColumnName HBase column name - can be different than the given column descriptor name.
      */
     public HBaseColumnDescriptor(ColumnDescriptor copy, byte[] newColumnName) {
@@ -49,6 +51,8 @@ public class HBaseColumnDescriptor extends ColumnDescriptor {
     /**
      * Returns the family column name.
      * (E.g. "cf1:q2" will return "cf1")
+     *
+     * @return family column name
      */
     public byte[] columnFamilyBytes() {
         return columnFamily;
@@ -57,6 +61,8 @@ public class HBaseColumnDescriptor extends ColumnDescriptor {
     /**
      * Returns the qualifier column name.
      * (E.g. "cf1:q2" will return "q2")
+     *
+     * @return qualifier column name
      */
     public byte[] qualifierBytes() {
         return qualifier;

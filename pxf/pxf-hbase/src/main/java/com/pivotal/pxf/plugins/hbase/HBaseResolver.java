@@ -17,7 +17,7 @@ import java.util.List;
 
 /**
  * Record resolver for HBase.
- * 
+ *
  * The class is responsible to convert rows from HBase scans (returned as {@link Result} objects)
  * into a List of {@link OneField} objects.
  * That also includes the conversion process of each HBase column's value into its HAWQ assigned type.
@@ -26,9 +26,11 @@ import java.util.List;
  */
 public class HBaseResolver extends Plugin implements ReadResolver {
     private HBaseTupleDescription tupleDescription;
-    
+
     /**
      * Constructs a resolver and initializes the table's tuple description.
+     *
+     * @param input query information, contains HBase table name and filter
      */
     public HBaseResolver(InputData input) {
         super(input);
@@ -37,9 +39,9 @@ public class HBaseResolver extends Plugin implements ReadResolver {
 
     /**
      * Splits an HBase {@link Result} object into a list of {@link OneField},
-     * based on the table's tuple description. 
+     * based on the table's tuple description.
      * Each field is converted from HBase bytes into its column description type.
-     * 
+     *
      * @return list of fields
      */
     @Override
@@ -70,7 +72,7 @@ public class HBaseResolver extends Plugin implements ReadResolver {
     /**
      * Converts given byte array value to the matching java object, according to
      * the given type code.
-     * 
+     *
      * @param typeCode ColumnDescriptor type id
      * @param typeName type name. Used for error messages
      * @param val value to be converted
@@ -127,7 +129,7 @@ public class HBaseResolver extends Plugin implements ReadResolver {
 
     /**
      * Returns the value of a column from a Result object.
-     * 
+     *
      * @param result HBase table row
      * @param column HBase column to be retrieved
      * @return HBase column value

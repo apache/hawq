@@ -15,12 +15,15 @@ import static com.pivotal.pxf.plugins.hive.HiveInputFormatFragmenter.PXF_HIVE_SE
 /**
  * Specialization of HiveAccessor for a Hive table that stores only RC files.
  * This class replaces the generic HiveAccessor for a case where a table is stored entirely as RC files.
- * Use together with HiveInputFormatFragmenter/HiveColumnarSerdeResolver
+ * Use together with {@link HiveInputFormatFragmenter}/{@link HiveColumnarSerdeResolver}
  */
 public class HiveRCFileAccessor extends HiveAccessor {
 
     /**
      * Constructs a HiveRCFileAccessor.
+     *
+     * @param input input containing user data
+     * @throws Exception if user data was wrong
      */
     public HiveRCFileAccessor(InputData input) throws Exception {
         super(input, new RCFileInputFormat());

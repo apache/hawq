@@ -26,6 +26,11 @@ public class FragmentsResponse implements StreamingOutput {
 
     private List<Fragment> fragments;
 
+    /**
+     * Constructs fragments response out of a list of fragments
+     *
+     * @param fragments fragment list
+     */
     public FragmentsResponse(List<Fragment> fragments) {
         this.fragments = fragments;
     }
@@ -34,7 +39,7 @@ public class FragmentsResponse implements StreamingOutput {
      * Serializes a fragments list in JSON,
      * To be used as the result string for HAWQ.
      * An example result is as follows:
-     * {"PXFFragments":[{"replicas":["sdw1.corp.emc.com","sdw3.corp.emc.com","sdw8.corp.emc.com"],"sourceName":"text2.csv", "index":"0", "metadata":<base64 metadata for fragment>, "userData":"<data_specific_to_third_party_fragmenter>"},{"replicas":["sdw2.corp.emc.com","sdw4.corp.emc.com","sdw5.corp.emc.com"],"sourceName":"text_data.csv","index":"0","metadata":<base64 metadata for fragment>,"userData":"<data_specific_to_third_party_fragmenter>"}]}
+     * {@code {"PXFFragments":[{"replicas":["sdw1.corp.emc.com","sdw3.corp.emc.com","sdw8.corp.emc.com"],"sourceName":"text2.csv", "index":"0", "metadata":<base64 metadata for fragment>, "userData":"<data_specific_to_third_party_fragmenter>"},{"replicas":["sdw2.corp.emc.com","sdw4.corp.emc.com","sdw5.corp.emc.com"],"sourceName":"text_data.csv","index":"0","metadata":<base64 metadata for fragment>,"userData":"<data_specific_to_third_party_fragmenter>"}]}}
      */
     @Override
     public void write(OutputStream output) throws IOException,

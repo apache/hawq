@@ -25,9 +25,9 @@ public class FragmentsResponseFormatter {
      * @param fragments list of fragments
      * @param data data (e.g. path) related to the fragments
      * @return FragmentsResponse with given fragments
-     * @throws IOException
+     * @throws UnknownHostException if converting host names to IP fails
      */
-    public static FragmentsResponse formatResponse(List<Fragment> fragments, String data) throws IOException {
+    public static FragmentsResponse formatResponse(List<Fragment> fragments, String data) throws UnknownHostException   {
         /* print the raw fragment list to log when in debug level */
         if (LOG.isDebugEnabled()) {
             LOG.debug("Fragments before conversion to IP list:");
@@ -69,7 +69,9 @@ public class FragmentsResponseFormatter {
     }
 
     /**
-     * Converts hosts to their matching IP addresses
+     * Converts hosts to their matching IP addresses.
+     *
+     * @throws UnknownHostException if converting host name to IP fails
      */
     private static void convertHostsToIPs(List<Fragment> fragments) throws UnknownHostException {
         /* host converted to IP map. Used to limit network calls. */

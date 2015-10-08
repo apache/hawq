@@ -37,7 +37,7 @@ public class Metadata {
         }
 
         /**
-         * Returns full table name in the form <db_name>.<table_name>
+         * Returns full table name in the form db_name.table_name
          */
         @Override
         public String toString() {

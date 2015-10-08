@@ -4,7 +4,6 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
-
 /**
  * A serializable object which implements a simple, efficient, serialization
  * protocol, based on {@link DataInput} and {@link DataOutput}.
@@ -15,7 +14,7 @@ public interface Writable {
      * Serialize the fields of this object to <code>out</code>.
      *
      * @param out <code>DataOutput</code> to serialize this object into.
-     * @throws IOException
+     * @throws IOException if I/O error occurs
      */
     void write(DataOutput out) throws IOException;
 
@@ -25,7 +24,7 @@ public interface Writable {
      * existing object where possible.</p>
      *
      * @param in <code>DataInput</code> to deserialize this object from.
-     * @throws IOException
+     * @throws IOException if I/O error occurs
      */
     void readFields(DataInput in) throws IOException;
 }

@@ -23,7 +23,7 @@ public class HBaseTupleDescription {
 
     /**
      * Constructs tuple description of the HBase table.
-     * 
+     *
      * @param conf data containing table tuple description
      */
     public HBaseTupleDescription(InputData conf) {
@@ -33,6 +33,8 @@ public class HBaseTupleDescription {
 
     /**
      * Returns the number of fields.
+     *
+     * @return number of fields
      */
     public int columns() {
         return tupleDescription.size();
@@ -40,7 +42,7 @@ public class HBaseTupleDescription {
 
     /**
      * Returns the column description of index column.
-     * 
+     *
      * @param index column index to be returned
      * @return column description
      */
@@ -57,7 +59,7 @@ public class HBaseTupleDescription {
     /**
      * Loads user information from fragmenter.
      * The data contains optional table mappings from the lookup table,
-     * between field names in HAWQ table and in the HBase table. 
+     * between field names in HAWQ table and in the HBase table.
      */
     @SuppressWarnings("unchecked")
     private void loadUserData() {
@@ -87,7 +89,7 @@ public class HBaseTupleDescription {
     /**
      * Returns the {@link #HBaseColumnDescriptor} for given column.
      * If the column has a lookup table mapping, the HBase column name is used.
-     * 
+     *
      * @param column HAWQ column description
      * @return matching HBase column description
      */
@@ -108,7 +110,7 @@ public class HBaseTupleDescription {
 
     /**
      * Returns the HBase name mapping for the given column name.
-     * 
+     *
      * @param column HAWQ column description
      * @return HBase name for the column
      */

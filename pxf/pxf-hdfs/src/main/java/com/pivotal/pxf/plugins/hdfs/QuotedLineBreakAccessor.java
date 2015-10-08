@@ -16,12 +16,11 @@ public class QuotedLineBreakAccessor extends HdfsAtomicDataAccessor {
     private BufferedReader reader;
 
     /**
-     * Constructs a QuotedLineBreakAccessor
-     * 
+     * Constructs a QuotedLineBreakAccessor.
+     *
      * @param input all input parameters coming from the client request
-     * @throws Exception
      */
-    public QuotedLineBreakAccessor(InputData input) throws Exception {
+    public QuotedLineBreakAccessor(InputData input) {
         super(input);
     }
 
@@ -34,8 +33,7 @@ public class QuotedLineBreakAccessor extends HdfsAtomicDataAccessor {
         return true;
     }
 
-    /*
-     * readNextObject
+    /**
      * Fetches one record (maybe partial) from the  file. The record is returned as a Java object.
      */
     @Override

@@ -25,7 +25,7 @@ class Version {
  * as it is used to verify proper load of the PXF webapp.
  *
  * For each path, the version is compared to the current version PXF_VERSION.
- * The expected format of a path is "http://<host>:<port>/pxf/<version>/<rest of path>
+ * The expected format of a path is "{@code http://<host>:<port>/pxf/<version>/<rest of path>}"
  *
  * The returned value is always a Server Error code (500).
  * If the version is different than the current version, an appropriate error is returned with version details.

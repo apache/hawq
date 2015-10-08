@@ -8,7 +8,7 @@ public interface WriteAccessor {
      * Opens the resource for write.
      *
      * @return true if the resource is successfully opened
-     * @throws Exception
+     * @throws Exception if opening the resource failed
      */
     boolean openForWrite() throws Exception;
 
@@ -17,14 +17,14 @@ public interface WriteAccessor {
      *
      * @param onerow the object to be written
      * @return true if the write succeeded
-     * @throws Exception
+     * @throws Exception writing to the resource failed
      */
     boolean writeNextObject(OneRow onerow) throws Exception;
 
     /**
      * Closes the resource for write.
      *
-     * @throws Exception
+     * @throws Exception if closing the resource failed
      */
     void closeForWrite() throws Exception;
 }

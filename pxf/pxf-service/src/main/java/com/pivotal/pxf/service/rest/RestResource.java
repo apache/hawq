@@ -21,10 +21,11 @@ public abstract class RestResource {
     /**
      * Converts the request headers multivalued map to a case-insensitive regular map
      * by taking only first values and storing them in a CASE_INSENSITIVE_ORDER TreeMap.
+     * All values are converted from ISO_8859_1 (ISO-LATIN-1) to UTF_8.
      *
      * @param requestHeaders request headers multi map.
      * @return a regular case-insensitive map.
-     * @throws UnsupportedEncodingException
+     * @throws UnsupportedEncodingException if the named charsets ISO_8859_1 and UTF_8 are not supported
      */
     public Map<String, String> convertToCaseInsensitiveMap(MultivaluedMap<String, String> requestHeaders)
             throws UnsupportedEncodingException {
