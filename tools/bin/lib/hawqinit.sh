@@ -178,7 +178,7 @@ master_init() {
     ${GPHOME}/bin/initdb -E UNICODE -D ${hawq_data_directory} --locale=${locale} --lc-collate=${hawq_lc_collate} \
         --lc-ctype=${hawq_lc_ctype} --lc-messages=${hawq_lc_messages} --lc-monetary=${hawq_lc_monetary} \
         --lc-numeric=${hawq_lc_numeric} --lc-time=${hawq_lc_time} --max_connections=${master_max_connections} \
-        --shared_buffers=${shared_buffers} --backend_output=${hawq_data_directory}.initdb 1>>${MASTER_LOG_FILE} 2>&1
+        --shared_buffers=${shared_buffers} --backend_output=${log_dir}/master.initdb 1>>${MASTER_LOG_FILE} 2>&1
 
     if [ $? -ne 0 ] ; then
         echo "Master postgres initdb failed" | tee -a ${MASTER_LOG_FILE}
@@ -329,7 +329,7 @@ segment_init() {
     ${GPHOME}/bin/initdb -E UNICODE -D ${hawq_data_directory} --locale=${locale} --lc-collate=${hawq_lc_collate} \
          --lc-ctype=${hawq_lc_ctype} --lc-messages=${hawq_lc_messages} --lc-monetary=${hawq_lc_monetary} \
          --lc-numeric=${hawq_lc_numeric} --lc-time=${hawq_lc_time} --max_connections=${segment_max_connections} \
-         --shared_buffers=${shared_buffers} --backend_output=${hawq_data_directory}.initdb 1>>${SEGMENT_LOG_FILE} 2>&1
+         --shared_buffers=${shared_buffers} --backend_output=${log_dir}/segment.initdb 1>>${SEGMENT_LOG_FILE} 2>&1
 
     if [ $? -ne 0 ] ; then
         echo "Postgres initdb failed" | tee -a ${SEGMENT_LOG_FILE}
