@@ -1233,6 +1233,9 @@ AC_SEARCH_LIBS(hdfsOpenFile, hdfs3, [], [AC_MSG_ERROR([libhdfs3 is required])], 
 AC_CHECK_HEADERS(libyarn/LibYarnClientC.h, [], [AC_MSG_ERROR([libyarn is required])])
 AC_SEARCH_LIBS(newLibYarnClient, yarn, [], [AC_MSG_ERROR([libyarn is required])], [])
 
+# apr for gpfdist
+AC_CHECK_PROG([APR_CONFIG], [apr-1-config],[yes])
+test -z "$APR_CONFIG" && AC_MSG_ERROR([Please install apr from http://apr.apache.org/ and add dir of 'apr-1-config' to env variable '$PATH'.])
 
 ##
 ## Types, structures, compiler characteristics
