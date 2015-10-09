@@ -2246,7 +2246,7 @@ gnet_parse_request(const char* buf, int* len, apr_pool_t* pool)
 
 			/* add to previous hvalue */
 			req->hvalue[req->hc - 1] = gstring_trim(apr_pstrcat(pool,
-					req->hvalue[req->hc - 1], " ", line, 0));
+					req->hvalue[req->hc - 1], " ", line, (char*)NULL));
 			continue;
 		}
 		/* find a colon, and break the line in two */

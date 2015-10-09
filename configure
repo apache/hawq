@@ -654,6 +654,7 @@ PTHREAD_CC
 acx_pthread_config
 LIBOBJS
 HAVE_IPV6
+APR_CONFIG
 CXXCPP
 ac_ct_CXX
 CXXFLAGS
@@ -11092,6 +11093,45 @@ else
 fi
 
 
+# apr for gpfdist
+# Extract the first word of "apr-1-config", so it can be a program name with args.
+set dummy apr-1-config; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_APR_CONFIG+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$APR_CONFIG"; then
+  ac_cv_prog_APR_CONFIG="$APR_CONFIG" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_APR_CONFIG="yes"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+APR_CONFIG=$ac_cv_prog_APR_CONFIG
+if test -n "$APR_CONFIG"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $APR_CONFIG" >&5
+$as_echo "$APR_CONFIG" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+test -z "$APR_CONFIG" && as_fn_error $? "Please install apr from http://apr.apache.org/ and add dir of 'apr-1-config' to env variable '$PATH'." "$LINENO" 5
 
 ##
 ## Types, structures, compiler characteristics
