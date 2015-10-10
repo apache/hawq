@@ -466,6 +466,8 @@ _copyExternalScan(ExternalScan *from)
 	COPY_SCALAR_FIELD(rejLimit);
 	COPY_SCALAR_FIELD(rejLimitInRows);
 	COPY_SCALAR_FIELD(fmterrtbl);
+	COPY_NODE_FIELD(errAosegnos);
+	COPY_NODE_FIELD(err_aosegfileinfos);
 	COPY_SCALAR_FIELD(encoding);
 	COPY_SCALAR_FIELD(scancounter);
 
@@ -4177,6 +4179,21 @@ _copyAlterTypeStmt(AlterTypeStmt *from)
 	return newnode;
 }
 
+static ResultRelSegFileInfo *
+_copyResultRelSegFileInfo(ResultRelSegFileInfo *from)
+{
+  ResultRelSegFileInfo *newnode = makeNode(ResultRelSegFileInfo);
+
+  COPY_SCALAR_FIELD(segno);
+  COPY_SCALAR_FIELD(varblock);
+  COPY_SCALAR_FIELD(tupcount);
+  COPY_SCALAR_FIELD(numfiles);
+  COPY_POINTER_FIELD(eof, from->numfiles * sizeof(uint64));
+  COPY_POINTER_FIELD(uncompressed_eof, from->numfiles * sizeof(uint64));
+
+  return newnode;
+}
+
 static CaQLSelect *
 _copyCaQLSelect(const CaQLSelect *from)
 {
@@ -5110,6 +5127,9 @@ copyObject(void *from)
 		case T_AlterTypeStmt:
 			retval = _copyAlterTypeStmt(from);
 			break;
+		case T_ResultRelSegFileInfo:
+		  retval = _copyResultRelSegFileInfo(from);
+		  break;
 
 		case T_DenyLoginInterval:
 			retval = _copyDenyLoginInterval(from);
