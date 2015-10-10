@@ -1122,6 +1122,15 @@ bool AppendOnlyStorageRead_GetBlockInfo(
 	Assert(storageRead != NULL);
 	Assert(storageRead->isActive);
 
+	/*
+	 * If isUseSplitLen= true and readPosition>splitLen,then this block should not belong to this split.
+	 * We should read segment file for a new split.
+	 * This situation will occur when the previous block is the last block of a big tuple which is larger than read split  size(128MB).
+	 * It also means the last tuple cross splits and the rest of this split should handle for other vSeg not this vSeg.
+	 */
+	if (isUseSplitLen && storageRead->bufferedRead.largeReadPosition >= storageRead->bufferedRead.splitLen)
+	   return false;
+
 	isNext = AppendOnlyStorageRead_InternalGetBlockInfo(storageRead, isUseSplitLen);
 
 	/*
@@ -1452,7 +1461,7 @@ void AppendOnlyStorageRead_Content(
 										storageRead,
 										&header,
 										&content,
-										true);
+										isUseSplitLen);
 
 		if (!storageRead->current.isCompressed)
 		{
