@@ -101,7 +101,7 @@ DECLARE_TOAST(pg_remote_credentials, 7078, 7079);
 #define PgRemoteCredentialsToastTable	7078
 #define PgRemoteCredentialsToastIndex	7079
 
-/* relation id: 6026 - pg_resqueue 20140807 */
+/* relation id: 6026 - pg_resqueue 20150917 */
 DECLARE_TOAST(pg_resqueue, 9820, 9821);
 #define PgResQueueToastTable	9820
 #define PgResQueueToastIndex	9821

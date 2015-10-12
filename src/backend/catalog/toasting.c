@@ -162,8 +162,7 @@ BootstrapToastTable(char *relName, Oid toastOid, Oid toastIndexOid)
 			typid = PG_REMOTE_CREDENTIALS_TOAST_RELTYPE_OID;
 			break;
 
-
-/* relation id: 6026 - pg_resqueue 20140807 */
+/* relation id: 6026 - pg_resqueue 20140917 */
 		case PgResQueueToastTable:
 			typid = PG_RESQUEUE_TOAST_RELTYPE_OID;
 			break;

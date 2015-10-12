@@ -88,9 +88,13 @@ cat << EOF
 LIBHDFS3_CONF=\$GPHOME/etc/hdfs-client.xml
 EOF
 
+# libyarn configuration file path
+cat << EOF
+LIBYARN_CONF=\$GPHOME/etc/yarn-client.xml
+EOF
+
 # global resource manager configuration file path
 cat << EOF
-RESOURCEMANAGER_CONF=\$GPHOME/etc/resourcemanager.xml
 HAWQSITE_CONF=\$GPHOME/etc/hawq-site.xml
 EOF
 
@@ -122,6 +126,9 @@ export LIBHDFS3_CONF
 EOF
 
 cat <<EOF
-export RESOURCEMANAGER_CONF
+export LIBYARN_CONF
+EOF
+
+cat <<EOF
 export HAWQSITE_CONF
 EOF

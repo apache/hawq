@@ -12,6 +12,8 @@ ErrorDetailData ErrorDetailsPreset[] = {
 		{RESQUEMGR_NOCLUSTER_TIMEOUT,			"no available cluster to run query"},
 		{RESQUEMGR_NORESOURCE_TIMEOUT,			"no available resource to run query"},
 		{RESQUEMGR_TOO_MANY_FIXED_SEGNUM,		"expecting too many virtual segments"},
+		{REQUESTHANDLER_WRONG_CONNSTAT,			"that resource context maybe recycled due to timeout"},
+		{CONNTRACK_NO_CONNID,					"that resource context does not exist"},
 
 		{-1, ""}
 };

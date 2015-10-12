@@ -1768,7 +1768,8 @@ AS
 	WHERE
 		datname <> 'template0' 
 	AND datname <> 'template1'
-	AND datname <> 'postgres';
+	AND datname <> 'postgres'
+	AND datname <> 'hcatalog';
 		
 GRANT SELECT ON TABLE %%JETPACK_PREFIX%%size_of_database TO public;
 

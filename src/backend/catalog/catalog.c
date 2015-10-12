@@ -793,15 +793,11 @@ relationId == GpVerificationHistoryRelationId ||
 relationId == AuthTimeConstraintRelationId ||
 /* relation id: 6112 - pg_filesystem 20130123 */
 relationId == FileSystemRelationId || 
-/* relation id: 6026 - pg_resqueue 20140807 */
-relationId == ResQueueRelationId || 
-/* relation id: 6059 - pg_resourcetype 20140807 */
-relationId == ResourceTypeRelationId || 
-/* relation id: 6060 - pg_resqueuecapability 20140807 */
-relationId == ResQueueCapabilityRelationId || 
-
 /* relation id: 5036 - gp_segment_configuration 20150204 */
 relationId == GpSegmentConfigRelationId || 
+
+/* relation id: 6026 - pg_resqueue 20150917 */
+relationId == ResQueueRelationId || 
 /* TIDYCAT_END_CODEGEN */
 		0 /* OR ZERO */
 			)
@@ -859,27 +855,15 @@ relationId == GpVerificationHistoryVertokenIndexId ||
 relationId == FileSystemOidIndexId || 
 /* relation id: 6112 - pg_filesystem 20130123 */
 relationId == FileSystemFsysnameIndexId || 
-/* relation id: 6026 - pg_resqueue 20140807 */
-relationId == ResQueueOidIndexId || 
-/* relation id: 6026 - pg_resqueue 20140807 */
-relationId == ResQueueRsqnameIndexId || 
-/* relation id: 6059 - pg_resourcetype 20140807 */
-relationId == ResourceTypeOidIndexId || 
-/* relation id: 6059 - pg_resourcetype 20140807 */
-relationId == ResourceTypeRestypidIndexId || 
-/* relation id: 6059 - pg_resourcetype 20140807 */
-relationId == ResourceTypeResnameIndexId || 
-/* relation id: 6060 - pg_resqueuecapability 20140807 */
-relationId == ResQueueCapabilityOidIndexId || 
-/* relation id: 6060 - pg_resqueuecapability 20140807 */
-relationId == ResQueueCapabilityResqueueidIndexId || 
-/* relation id: 6060 - pg_resqueuecapability 20140807 */
-relationId == ResQueueCapabilityRestypidIndexId || 
-
 /* relation id: 5036 - gp_segment_configuration 20150207 */
 relationId == GpSegmentConfigRegistration_orderIndexId || 
 /* relation id: 5036 - gp_segment_configuration 20150207 */
 relationId == GpSegmentConfigRoleIndexId || 
+
+/* relation id: 6026 - pg_resqueue 20150917 */
+relationId == ResQueueOidIndexId || 
+/* relation id: 6026 - pg_resqueue 20150917 */
+relationId == ResQueueNameIndexId || 
 
 /* TIDYCAT_END_CODEGEN */
 		0 /* OR ZERO */
@@ -902,13 +886,13 @@ relationId == PgFileSpaceEntryToastIndex ||
 /* relation id: 6112 - pg_filesystem 20130123 */
 relationId == PgFileSystemToastTable || 
 relationId == PgFileSystemToastIndex || 
-/* relation id: 6026 - pg_resqueue 20140807 */
-relationId == PgResQueueToastTable || 
-relationId == PgResQueueToastIndex || 
-
 /* relation id: 5036 - gp_segment_configuration 20150204 */
 relationId == GpSegmentConfigToastTable || 
 relationId == GpSegmentConfigToastIndex || 
+
+/* relation id: 6026 - pg_resqueue 20150917 */
+relationId == PgResQueueToastTable || 
+relationId == PgResQueueToastIndex || 
 /* TIDYCAT_END_CODEGEN */
 		0 /* OR ZERO */
 			)

@@ -376,7 +376,7 @@ SetupProcessIdentity(const char *str)
             /* If QE is under one segment. */
             if ( GetQEIndex() != -1 ) {
                 GetLocalTmpDirFromRM("127.0.0.1",//DRMGlobalInstance->SocketLocalHostName.Str,
-                                     rm_seg_addr_port,
+                                     rm_segment_port,
                                      gp_session_id,
                                      gp_command_count,
                                      GetQEIndex());
@@ -384,7 +384,7 @@ SetupProcessIdentity(const char *str)
             /* QE is under master. */
             else {
                 GetLocalTmpDirFromRM("127.0.0.1",//DRMGlobalInstance->SocketLocalHostName.Str,
-                                     rm_master_addr_port,
+                                     rm_master_port,
                                      gp_session_id,
                                      gp_command_count,
                                      GetQEIndex());

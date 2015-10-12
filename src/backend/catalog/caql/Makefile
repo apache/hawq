@@ -62,7 +62,6 @@ CAQL_CQL_SRCS := $(addprefix $(top_srcdir)/src/backend/,\
 	commands/opclasscmds.c \
 	commands/operatorcmds.c \
 	commands/proclang.c \
-	commands/queue.c \
 	commands/schemacmds.c \
 	commands/sequence.c \
 	commands/tablecmds.c \

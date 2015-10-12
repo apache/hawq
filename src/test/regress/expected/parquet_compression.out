@@ -26,7 +26,7 @@ drop table parquet_snappy_part_unc;
 ERROR:  table "parquet_snappy_part_unc" does not exist
 drop table parquet_gzip_2;
 ERROR:  table "parquet_gzip_2" does not exist
-alter resource queue pg_default with ( segment_resource_quota='mem:2gb');
+alter resource queue pg_default with ( vseg_resource_quota='mem:2gb');
 --set statement_mem='1999MB';
 --end_ignore
 --Datatypes covered: text,bytea,varchar,bit varying
@@ -145,4 +145,4 @@ Select count(*) from parquet_gzip_2;
      1
 (1 row)
 
-alter resource queue pg_default with ( vsegment_resource_quota='mem:128mb');
+alter resource queue pg_default with ( vseg_resource_quota='mem:128mb');
