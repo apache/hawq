@@ -401,8 +401,8 @@ cdb_estimate_rel_size(RelOptInfo   *relOptInfo,
 		 * rel is a pxf external table, and it wasn't yet ANALYZE'ed.
 		 */
 
-		float4 tuples, pages;
-		gp_statistics_estimate_reltuples_relpages_external_pxf(rel, &location, &tuples, &pages, NULL);
+		float4 tuples, pages, frags;
+		gp_statistics_estimate_reltuples_relpages_relfrags_external_pxf(rel, &location, &tuples, &pages, &frags, NULL);
 		
 		relpages = curpages = pages;
 		reltuples = tuples;

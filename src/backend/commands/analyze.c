@@ -28,6 +28,7 @@
 #include "access/pxfuriparser.h"
 #include "access/heapam.h"
 #include "access/hd_work_mgr.h"
+#include "access/pxfanalyze.h"
 #include "catalog/catquery.h"
 #include "catalog/heap.h"
 #include "access/transam.h"
@@ -140,13 +141,12 @@ static bool hasMaxDefined(Oid relationOid, const char *attributeName);
 
 /* Sampling related */
 static float4 estimateSampleSize(Oid relationOid, const char *attributeName, float4 relTuples);
-static char* temporarySampleTableName(Oid relationOid);
-static Oid buildSampleTable(Oid relationOid, 
+static Oid buildSampleTable(Oid relationOid,
+		char* sampleTableName,
 		List *lAttributeNames, 
 		float4	relTuples,
 		float4 	requestedSampleSize, 
 		float4 *sampleTableRelTuples);
-static void dropSampleTable(Oid sampleTableOid);
 
 /* Attribute statistics computation */
 static int4 numberOfMCVEntries(Oid relationOid, const char *attributeName);
@@ -197,25 +197,6 @@ static Oid get_largest_leaf_partition(Oid rootOid);
 static void updateAttributeStatisticsInCatalog(Oid relationOid, const char *attributeName, 
 		AttributeStatistics *stats);
 static void updateReltuplesRelpagesInCatalog(Oid relationOid, float4 relTuples, float4 relPages);
-
-/* Convenience */
-static ArrayType * SPIResultToArray(int resultAttributeNumber, MemoryContext allocationContext);
-
-/* spi execution helpers */
-typedef void (*spiCallback)(void *clientDataOut);
-static void spiExecuteWithCallback(const char *src, bool read_only, long tcount,
-           spiCallback callbackFn, void *clientData);
-
-typedef struct
-{
-    int numColumns;
-    MemoryContext memoryContext;
-    ArrayType ** output;
-} EachResultColumnAsArraySpec;
-
-static void spiCallback_getEachResultColumnAsArray(void *clientData);
-static void spiCallback_getProcessedAsFloat4(void *clientData);
-static void spiCallback_getSingleResultRowColumnAsFloat4(void *clientData);
 
 /**
  * Extern stuff.
@@ -916,6 +897,7 @@ static void analyzeRelation(Relation relation, List *lAttributeNames, bool rooto
 	float4 estimatedRelTuples = 0.0;
 	float4 estimatedRelPages = 0.0;
 	float4 sampleTableRelTuples = 0.0;
+	float4 relFrags = 0.0;
 	List	*indexOidList = NIL;
 	ListCell	*lc = NULL;
 	StringInfoData location;
@@ -933,13 +915,12 @@ static void analyzeRelation(Relation relation, List *lAttributeNames, bool rooto
 	else
 	{
 		initStringInfo(&err_msg);
-		gp_statistics_estimate_reltuples_relpages_external_pxf(relation, &location, &estimatedRelTuples, &estimatedRelPages, &err_msg);
+		analyzePxfEstimateReltuplesRelpagesRelFrags(relation, &location, &estimatedRelTuples, &estimatedRelPages, &relFrags, &err_msg);
 		if (err_msg.len > 0)
 		{
-			ereport(WARNING,
-					(errmsg("skipping \"%s\" --- error returned: %s",
-							RelationGetRelationName(relation),
-							err_msg.data)));
+			elog(ERROR,
+					"%s",
+					err_msg.data);
 		}
 		pfree(err_msg.data);
 	}
@@ -986,15 +967,6 @@ static void analyzeRelation(Relation relation, List *lAttributeNames, bool rooto
 	/* report results to the stats collector, too */
 	pgstat_report_analyze(relation, estimatedRelTuples, 0 /*totaldeadrows*/);
 	
-	/**
-	 * For an external PXF table, the next steps are irrelevant - it's time to leave
-	 */
-	if (isExternalPxfReadOnly)
-	{
-		elog(elevel, "ANALYZE on PXF table %s computes only reltuples and relpages.", RelationGetRelationName(relation));
-		return;
-	}
-
 	/**
 	 * Does the relation have any rows. If not, no point analyzing columns.
 	 */
@@ -1053,9 +1025,13 @@ static void analyzeRelation(Relation relation, List *lAttributeNames, bool rooto
 	 * Determine if a sample table needs to be created. If reltuples is very small,
 	 * then, we'd rather work off the entire table. Also, if the sample required is
 	 * the size of the table, then we'd rather work off the entire table.
+	 *
+	 * In case of PXF table, we always need a sample table because the various calculations
+	 * should be done locally in HAWQ and not by retrieving the data again and again.
 	 */
-	if (estimatedRelTuples <= gp_statistics_sampling_threshold 
-			|| minSampleTableSize >= estimatedRelTuples) /* maybe this should be K% of reltuples or something? */
+	if (!isExternalPxfReadOnly &&
+			(estimatedRelTuples <= gp_statistics_sampling_threshold
+			|| minSampleTableSize >= estimatedRelTuples)) /* maybe this should be K% of reltuples or something? */
 	{
 		sampleTableRequired = false;
 	}
@@ -1065,11 +1041,33 @@ static void analyzeRelation(Relation relation, List *lAttributeNames, bool rooto
 	 */
 	if (sampleTableRequired)
 	{
-		elog(elevel, "ANALYZE building sample table of size %.0f on table %s because it has too many rows.", minSampleTableSize, RelationGetRelationName(relation));
-		sampleTableOid = buildSampleTable(relationOid, lAttributeNames, estimatedRelTuples, minSampleTableSize, &sampleTableRelTuples);
-		
+		char * sampleTableName = temporarySampleTableName(relationOid, "pg_analyze"); /* must be pfreed */
+
+		elog(elevel, "ANALYZE building sample table of size %.0f on table %s because %s.",
+				minSampleTableSize, RelationGetRelationName(relation),
+				isExternalPxfReadOnly ? "it's a PXF table" : "it has too many rows");
+
+		if (isExternalPxfReadOnly)
+		{
+			sampleTableOid = buildPxfSampleTable(relationOid, sampleTableName, lAttributeNames,
+					estimatedRelTuples, relFrags, minSampleTableSize,
+					&sampleTableRelTuples);
+		}
+		else
+		{
+			sampleTableOid = buildSampleTable(relationOid, sampleTableName, lAttributeNames,
+					estimatedRelTuples, minSampleTableSize, &sampleTableRelTuples);
+		}
+		/*
+		 * Update the sample table's reltuples, relpages. Without these, the queries to the sample table would call cdbRelsize which can be an expensive call.
+		 * We know the number of tuples in the sample table, but don't have the information about the number of pages. We set it to 2 arbitrarily.
+		 */
+		updateReltuplesRelpagesInCatalog(sampleTableOid, sampleTableRelTuples, 2);
+
 		/* We must have a non-empty sample table */
-		Assert(sampleTableRelTuples > 0.0);	
+		Assert(sampleTableRelTuples > 0.0);
+
+		pfree((void *) sampleTableName);
 	}
 	
 	/**
@@ -1093,7 +1091,7 @@ static void analyzeRelation(Relation relation, List *lAttributeNames, bool rooto
 	if (sampleTableRequired)
 	{
 		elog(elevel, "ANALYZE dropping sample table");
-		dropSampleTable(sampleTableOid);
+		dropSampleTable(sampleTableOid, false);
 	}
 	
 	return;
@@ -1104,14 +1102,14 @@ static void analyzeRelation(Relation relation, List *lAttributeNames, bool rooto
  * This is not super random. However, this should be sufficient for our purpose.
  * Input:
  * 	relationOid 	- relation
- * 	backendId	- pid of the backend.
+ * 	prefix			- sample name prefix
  * Output:
  * 	sample table name. This must be pfree'd by the caller.
  */
-static char* temporarySampleTableName(Oid relationOid)
+char* temporarySampleTableName(Oid relationOid, char* prefix)
 {
 	char tmpname[NAMEDATALEN];
-	snprintf(tmpname, NAMEDATALEN, "pg_analyze_%u_%i", relationOid, MyBackendId);
+	snprintf(tmpname, NAMEDATALEN, "%s_%u_%i", prefix, relationOid, MyBackendId);
 	return pstrdup(tmpname);
 }
 
@@ -1217,18 +1215,18 @@ static float4 estimateSampleSize(Oid relationOid, const char *attributeName, flo
  * 	read_only - is it a read-only call?
  * 	tcount - execution tuple-count limit, or 0 for none
  * 	callbackFn - callback function to be executed once SPI is done.
- * 	clientData - argument to call back function (usually pointer to data-structure 
+ * 	clientData - argument to call back function (usually pointer to data-structure
  * 				that the callback function populates).
- * 
+ *
  */
-static void spiExecuteWithCallback(
+void spiExecuteWithCallback(
 		const char *src,
 		bool read_only,
 		long tcount,
 		spiCallback callbackFn,
 		void *clientData)
 {
-	bool connected = false;
+	volatile bool connected = false; /* needs to be volatile when accessed by PG_CATCH */
 	int ret = 0;
 
 	PG_TRY();
@@ -1236,11 +1234,11 @@ static void spiExecuteWithCallback(
 		if (SPI_OK_CONNECT != SPI_connect())
 		{
 			ereport(ERROR, (errcode(ERRCODE_CDB_INTERNAL_ERROR),
-					errmsg("Unable to connect to execute internal query.")));
+					errmsg("Unable to connect to execute internal query: %s.", src)));
 		}
 		connected = true;
 
-		elog(elevel, "Executing SQL: %s", src);
+		elog(DEBUG2, "Executing SQL: %s", src);
 		
 		/* Do the query. */
 		ret = SPI_execute(src, read_only, tcount);
@@ -1251,13 +1249,17 @@ static void spiExecuteWithCallback(
 			callbackFn(clientData);
 		}
 		connected = false;
-		SPI_finish();
+		int res = SPI_finish();
+		elog(DEBUG5, "finish SPI %s, res %d, ret %d", src, res, ret);
 	}
 	/* Clean up in case of error. */
 	PG_CATCH();
 	{
 		if (connected)
-			SPI_finish();
+		{
+			int res = SPI_finish();
+			elog(DEBUG5, "finish SPI %s after error, res %d, ret %d", src, res, ret);
+		}
 
 		/* Carry on with error handling. */
 		PG_RE_THROW();
@@ -1269,7 +1271,7 @@ static void spiExecuteWithCallback(
  * A callback function for use with spiExecuteWithCallback.  Asserts that exactly one row was returned.
  *  Gets the row's first column as a float, using 0.0 if the value is null
  */
-static void spiCallback_getSingleResultRowColumnAsFloat4(void *clientData)
+void spiCallback_getSingleResultRowColumnAsFloat4(void *clientData)
 {
 	Datum datum_f;
 	bool isnull = false;
@@ -1295,7 +1297,7 @@ static void spiCallback_getSingleResultRowColumnAsFloat4(void *clientData)
  * A callback function for use with spiExecuteWithCallback.  Copies the SPI_processed value into
  *    *clientDataOut, treating it as a float4 pointer.
  */
-static void spiCallback_getProcessedAsFloat4(void *clientData)
+void spiCallback_getProcessedAsFloat4(void *clientData)
 {
     float4 *out = (float4*) clientData;
     *out = (float4)SPI_processed;
@@ -1306,7 +1308,7 @@ static void spiCallback_getProcessedAsFloat4(void *clientData)
  *   The number of arrays, the memory context for them, and the output location are determined by
  *   treating *clientData as a EachResultColumnAsArraySpec and using the values there
  */
-static void spiCallback_getEachResultColumnAsArray(void *clientData)
+void spiCallback_getEachResultColumnAsArray(void *clientData)
 {
     EachResultColumnAsArraySpec * spec = (EachResultColumnAsArraySpec*) clientData;
     int i;
@@ -1334,14 +1336,16 @@ static void spiCallback_getEachResultColumnAsArray(void *clientData)
  * 
  * Input:
  * 	relationOid 	- relation to be sampled
+ * 	sampleTableName - sample table name, moderately unique
  * 	lAttributeNames - attributes to be included in the sample
  * 	relTuples		- estimated size of relation
  * 	requestedSampleSize - as determined by attribute statistics requirements.
- * 	sampleLimit		- limit on size of the sample.
+ * 	sampleTableRelTuples    - limit on size of the sample.
  * Output:
  * 	sampleTableRelTuples - number of tuples in the sample table created.
  */
 static Oid buildSampleTable(Oid relationOid, 
+		char* sampleTableName,
 		List *lAttributeNames, 
 		float4	relTuples,
 		float4 	requestedSampleSize, 
@@ -1354,7 +1358,6 @@ static Oid buildSampleTable(Oid relationOid,
 	const char *schemaName = NULL;
 	const char *tableName = NULL;
 	char	*sampleSchemaName = pstrdup("pg_temp"); 
-	char 	*sampleTableName = NULL;
 	Oid			sampleTableOid = InvalidOid;
 	float4		randomThreshold = 0.0;
 	RangeVar 	*rangeVar = NULL;
@@ -1364,11 +1367,11 @@ static Oid buildSampleTable(Oid relationOid,
 	
 	randomThreshold = requestedSampleSize / relTuples;
 	
-	schemaName = get_namespace_name(get_rel_namespace(relationOid)); //must be pfreed
-	tableName = get_rel_name(relationOid); //must be pfreed
-	sampleTableName = temporarySampleTableName(relationOid); // must be pfreed 
+	schemaName = get_namespace_name(get_rel_namespace(relationOid)); /* must be pfreed */
+	tableName = get_rel_name(relationOid); /* must be pfreed */
 
 	initStringInfo(&str);
+
 	appendStringInfo(&str, "create table %s.%s as (select ", 
 			quote_identifier(sampleSchemaName), quote_identifier(sampleTableName)); 
 	
@@ -1387,7 +1390,7 @@ static Oid buildSampleTable(Oid relationOid,
 		}
 	}
 	
-	// if table is partitioned, we create a sample over all parts
+	/* if table is partitioned, we create a sample over all parts */
 	appendStringInfo(&str, "from %s.%s as Ta where random() < %.38f limit %lu) distributed randomly", 
 			quote_identifier(schemaName), 
 			quote_identifier(tableName), randomThreshold, (unsigned long) requestedSampleSize);
@@ -1419,14 +1422,7 @@ static Oid buildSampleTable(Oid relationOid,
 				quote_identifier(tableName));
 	}
 	
-	/* 
-	 * Update the sample table's reltuples, relpages. Without these, the queries to the sample table would call cdbRelsize which can be an expensive call. 
-	 * We know the number of tuples in the sample table, but don't have the information about the number of pages. We set it to 2 arbitrarily.
-	 */
-	updateReltuplesRelpagesInCatalog(sampleTableOid, *sampleTableRelTuples, 2);
-
 	pfree((void *) rangeVar);
-	pfree((void *) sampleTableName);
 	pfree((void *) tableName);
 	pfree((void *) schemaName);
 	pfree((void *) sampleSchemaName);
@@ -1436,7 +1432,7 @@ static Oid buildSampleTable(Oid relationOid,
 /**
  * Drops the sample table created during ANALYZE.
  */
-static void dropSampleTable(Oid sampleTableOid)
+void dropSampleTable(Oid sampleTableOid, bool isExternal)
 {
 	StringInfoData str;
 	const char *sampleSchemaName = NULL;
@@ -1446,7 +1442,8 @@ static void dropSampleTable(Oid sampleTableOid)
 	sampleTableName = get_rel_name(sampleTableOid); // must be pfreed 	
 
 	initStringInfo(&str);
-	appendStringInfo(&str, "drop table %s.%s", 
+	appendStringInfo(&str, "drop %stable %s.%s",
+			isExternal ? "external " : "",
 			quote_identifier(sampleSchemaName), 
 			quote_identifier(sampleTableName));
 	
@@ -1457,7 +1454,6 @@ static void dropSampleTable(Oid sampleTableOid)
 	pfree((void *)sampleSchemaName);
 	pfree((void *)sampleTableName);
 }
-
 
 /**
  * This method determines the number of pages corresponding to an index.
@@ -1812,9 +1808,9 @@ static float4 analyzeComputeNRepeating(Oid relationOid,
 
 	initStringInfo(&str);
 	appendStringInfo(&str, "select count(v)::float4 from (select Ta.%s as v, count(Ta.%s) as f from %s.%s as Ta group by Ta.%s) as foo where f > 1",
-			quote_identifier(attributeName), 
 			quote_identifier(attributeName),
-			quote_identifier(sampleSchemaName), 
+			quote_identifier(attributeName),
+            quote_identifier(sampleSchemaName),
 			quote_identifier(sampleTableName),
 			quote_identifier(attributeName));
 
@@ -1838,7 +1834,7 @@ static float4 analyzeComputeNRepeating(Oid relationOid,
  * Output:
  * 	array of attribute type
  */
-static ArrayType * SPIResultToArray(int resultAttributeNumber, MemoryContext allocationContext)
+ArrayType * SPIResultToArray(int resultAttributeNumber, MemoryContext allocationContext)
 {
 	ArrayType *result = NULL;
 	int i = 0;
@@ -2880,7 +2876,6 @@ static void updateAttributeStatisticsInCatalog(Oid relationOid, const char *attr
 
 }
 
-
 /**
  * This method estimates the number of tuples and pages in a heaptable relation. Getting the number of blocks is straightforward.
  * Estimating the number of tuples is a little trickier. There are two factors that complicate this:
@@ -3109,14 +3104,15 @@ static void gp_statistics_estimate_reltuples_relpages_parquet(Relation rel, floa
 }
 
 /* --------------------------------
- *		gp_statistics_estimate_reltuples_relpages_external_pxf -
+ *		gp_statistics_estimate_reltuples_relpages_relfrags_external_pxf  -
  *
- *		Fetch reltuples and relpages for an external table which is PXF
+ *		Fetch reltuples, relpages and number of fragments for an external table which is PXF
  * --------------------------------
  */
-void gp_statistics_estimate_reltuples_relpages_external_pxf(Relation rel, StringInfo location,
-															float4 *reltuples, float4 *relpages,
-															StringInfo err_msg)
+void gp_statistics_estimate_reltuples_relpages_relfrags_external_pxf(Relation rel, StringInfo location,
+																	float4 *reltuples, float4 *relpages,
+																	float4 *relfrags,
+																	StringInfo err_msg)
 {
 
 	PxfStatsElem *elem = NULL;
@@ -3137,6 +3133,7 @@ void gp_statistics_estimate_reltuples_relpages_external_pxf(Relation rel, String
 	
 	*relpages = floor(( ((float4)elem->blockSize) * elem->numBlocks) / BLCKSZ);
 	*reltuples = elem->numTuples;
+	*relfrags = elem->numBlocks;
 	/* relpages can't be 0 if there are tuples in the table. */
 	if ((*relpages < 1.0) && (*reltuples > 0))
 		*relpages = 1.0;
@@ -3147,4 +3144,7 @@ void gp_statistics_estimate_reltuples_relpages_external_pxf(Relation rel, String
 		*relpages =  gp_external_table_default_number_of_pages;
 	if (*reltuples < 0)
 		*reltuples =  gp_external_table_default_number_of_tuples;
+
+	elog(elevel, "ANALYZE estimate for PXF table %s: tuples %f, pages %f, fragments %f max int %d",
+			RelationGetRelationName(rel), *reltuples, *relpages, *relfrags, INT_MAX);
 }
