@@ -12,7 +12,7 @@ public interface ReadResolver {
      *
      * @param row the row to get the fields from
      * @return the {@link OneField} list of one row.
-     * @throws Exception
+     * @throws Exception if decomposing the row into fields failed
      */
     List<OneField> getFields(OneRow row) throws Exception;
 }

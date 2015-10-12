@@ -15,17 +15,20 @@ import java.util.List;
 
 /**
  * Specialized Hive fragmenter for RC and Text files tables. Unlike the
- * HiveDataFragmenter, this class does not send the serde properties to the
- * accessor/resolvers. This is done to avoid memory explosion in Hawq. For RC
- * use together with HiveRCFileAccessor/HiveColumnarSerdeResolver. For Text use
- * together with HiveLineBreakAccessor/HiveStringPassResolver.
- * <p/>
+ * {@link HiveDataFragmenter}, this class does not send the serde properties to
+ * the accessor/resolvers. This is done to avoid memory explosion in Hawq. For
+ * RC use together with {@link HiveRCFileAccessor}/
+ * {@link HiveColumnarSerdeResolver}. For Text use together with
+ * {@link HiveLineBreakAccessor}/{@link HiveStringPassResolver}. <br>
  * Given a Hive table and its partitions, divide the data into fragments (here a
  * data fragment is actually a HDFS file block) and return a list of them. Each
- * data fragment will contain the following information: a. sourceName: full
- * HDFS path to the data file that this data fragment is part of b. hosts: a
- * list of the datanode machines that hold a replica of this block c. userData:
- * inputformat name, serde names and partition keys
+ * data fragment will contain the following information:
+ * <ol>
+ * <li>sourceName: full HDFS path to the data file that this data fragment is
+ * part of</li>
+ * <li>hosts: a list of the datanode machines that hold a replica of this block</li>
+ * <li>userData: inputformat name, serde names and partition keys</li>
+ * </ol>
  */
 public class HiveInputFormatFragmenter extends HiveDataFragmenter {
     private static final Log LOG = LogFactory.getLog(HiveInputFormatFragmenter.class);
@@ -40,13 +43,13 @@ public class HiveInputFormatFragmenter extends HiveDataFragmenter {
     public static final int TOK_KEYS = 1;
     public static final int TOK_FILTER_DONE = 2;
 
-    /* defines the Hive input formats currently supported in pxf */
+    /** Defines the Hive input formats currently supported in pxf */
     public enum PXF_HIVE_INPUT_FORMATS {
         RC_FILE_INPUT_FORMAT,
         TEXT_FILE_INPUT_FORMAT
     }
 
-    /* defines the Hive serializers (serde classes) currently supported in pxf */
+    /** Defines the Hive serializers (serde classes) currently supported in pxf */
     public enum PXF_HIVE_SERDES {
         COLUMNAR_SERDE,
         LAZY_BINARY_COLUMNAR_SERDE,
@@ -54,7 +57,7 @@ public class HiveInputFormatFragmenter extends HiveDataFragmenter {
     }
 
     /**
-     * Constructs a HiveInputFormatFragmenter
+     * Constructs a HiveInputFormatFragmenter.
      *
      * @param inputData all input parameters coming from the client
      */
@@ -63,10 +66,17 @@ public class HiveInputFormatFragmenter extends HiveDataFragmenter {
     }
 
     /**
-     * Extracts the user data
+     * Extracts the user data:
+     * serde, partition keys and whether filter was included in fragmenter
+     *
+     * @param input input data from client
+     * @param supportedSerdes supported serde names
+     * @return parsed tokens
+     * @throws UserDataException if user data contains unsupported serde
+     *                           or wrong number of tokens
      */
     static public String[] parseToks(InputData input, String... supportedSerdes)
-            throws Exception {
+            throws UserDataException {
         String userData = new String(input.getFragmentUserData());
         String[] toks = userData.split(HIVE_UD_DELIM);
         if (supportedSerdes.length > 0
@@ -143,23 +153,24 @@ public class HiveInputFormatFragmenter extends HiveDataFragmenter {
     }
 
     /**
-     * Converts HAWQ type to hive type. The supported mappings are:<br/>
-     * BOOLEAN -> boolean<br/>
-     * SMALLINT -> smallint (tinyint is converted to smallint)<br/>
-     * BIGINT -> bigint<br/>
-     * TIMESTAMP, TIME -> timestamp<br/>
-     * NUMERIC -> decimal<br/>
-     * BYTEA -> binary<br/>
-     * INTERGER -> int<br/>
-     * TEXT -> string<br/>
-     * REAL -> float<br/>
-     * FLOAT8 -> double
-     * <p/>
+     * Converts HAWQ type to hive type. The supported mappings are:<ul>
+     * <li>{@code BOOLEAN -> boolean}</li>
+     * <li>{@code SMALLINT -> smallint (tinyint is converted to smallint)}</li>
+     * <li>{@code BIGINT -> bigint}</li>
+     * <li>{@code TIMESTAMP, TIME -> timestamp}</li>
+     * <li>{@code NUMERIC -> decimal}</li>
+     * <li>{@code BYTEA -> binary}</li>
+     * <li>{@code INTERGER -> int}</li>
+     * <li>{@code TEXT -> string}</li>
+     * <li>{@code REAL -> float}</li>
+     * <li>{@code FLOAT8 -> double}</li>
+     * </ul>
      * All other types (both in HAWQ and in HIVE) are not supported.
      *
      * @param type HAWQ data type
      * @param name field name
      * @return Hive type
+     * @throws UnsupportedTypeException if type is not supported
      */
     public static String toHiveType(DataType type, String name) {
         switch (type) {
@@ -245,7 +256,6 @@ public class HiveInputFormatFragmenter extends HiveDataFragmenter {
         assertFileType(inputFormatName, partData);
         String userData = assertSerde(serdeName, partData) + HIVE_UD_DELIM
                 + partitionKeys + HIVE_UD_DELIM + filterInFragmenter;
-        ;
 
         return userData.getBytes();
     }

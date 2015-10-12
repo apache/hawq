@@ -8,11 +8,10 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.io.*;
 
-import java.io.IOException;
 import java.util.List;
 
 /**
- * Adapter used for adding a recordkey field to the records output List<OneField>
+ * Adapter used for adding a recordkey field to the records output {@code List<OneField>}.
  */
 public class RecordkeyAdapter {
     private Log Log;
@@ -36,7 +35,7 @@ public class RecordkeyAdapter {
     private ValConverter converter = null;
 
     /**
-     * Constructs a RecordkeyAdapter
+     * Constructs a RecordkeyAdapter.
      */
     public RecordkeyAdapter() {
         Log = LogFactory.getLog(RecordkeyAdapter.class);
@@ -45,9 +44,9 @@ public class RecordkeyAdapter {
     /**
      *  Adds the recordkey to the end of the passed in recFields list.
      *  <p>
-     *  This method also verifies cases in which record keys are not supported 
-     *  by the underlying source type, and therefore "illegally" requested. 
-     *  
+     *  This method also verifies cases in which record keys are not supported
+     *  by the underlying source type, and therefore "illegally" requested.
+     *
      * @param recFields existing list of record (non-key) fields and their values.
      * @param input all input parameters coming from the client request
      * @param onerow a row object which is used here in order to find out if
@@ -55,12 +54,11 @@ public class RecordkeyAdapter {
      * @return 0 if record key not needed, or 1 if record key was appended
      * @throws NoSuchFieldException when the given record type does not support
      *         recordkeys
-     * @throws IOException
      */
     public int appendRecordkeyField(List<OneField> recFields,
                                     InputData input,
-                                    OneRow onerow) throws NoSuchFieldException, IOException {
-        
+                                    OneRow onerow) throws NoSuchFieldException {
+
 		/*
 		 * user did not request the recordkey field in the
 		 * "create external table" statement
@@ -107,7 +105,7 @@ public class RecordkeyAdapter {
 	 * key is already a Java primitive we returned it as is If it is an unknown
 	 * type we throw an exception
 	 */
-    private Object extractVal(Object key) throws IOException {
+    private Object extractVal(Object key) {
         if (extractor == null) {
             extractor = InitializeExtractor(key);
         }

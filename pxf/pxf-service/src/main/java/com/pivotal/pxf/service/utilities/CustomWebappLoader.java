@@ -18,22 +18,22 @@ import org.apache.juli.logging.LogFactory;
 /**
  * A WebappLoader that allows a customized classpath to be added through configuration in context xml.
  * Any additional classpath entry will be added to the default webapp classpath.
- * <p/>
+ *
  * <pre>
- * &lt;Context>
+ * &lt;Context&gt;
  *   &lt;Loader className="com.pivotal.pxf.service.utilities.CustomWebappLoader"
- *              classpathFiles="/somedir/classpathFile1;/somedir/classpathFile2"/>
- * &lt;/Context>
+ *              classpathFiles="/somedir/classpathFile1;/somedir/classpathFile2"/&gt;
+ * &lt;/Context&gt;
  * </pre>
  */
 public class CustomWebappLoader extends WebappLoader {
-	
+
 	/**
-	 * Because this class belongs in tcServer itself, logs go into tcServer's log facility that is separate 
+	 * Because this class belongs in tcServer itself, logs go into tcServer's log facility that is separate
 	 * from the web app's log facility.
-	 * 
+	 *
 	 * Logs are directed to catalina.log file. By default only INFO or higher messages are logged.
-	 * To change log level, add the following line to {catalina.base}/conf/logging.properties  
+	 * To change log level, add the following line to {catalina.base}/conf/logging.properties
 	 * <code>com.pivotal.pxf.level = FINE/INFO/WARNING</code> (FINE = debug).
 	 */
 	private static final Log LOG = LogFactory.getLog(CustomWebappLoader.class);
@@ -46,9 +46,9 @@ public class CustomWebappLoader extends WebappLoader {
 	 * anotherdir/somejar.jar
 	 * anotherone/hadoop*.jar
 	 * anotherone/pxf*[0-9].jar
-	 * Unix wildcard convention can be used to match a number of files 
+	 * Unix wildcard convention can be used to match a number of files
 	 * (e.g. <code>*</code>, <code>[0-9]</code>, <code>?</code>), but not a number of directories.
-	 * 
+	 *
 	 * The files specified under classpathFiles must exist - if they can't be read an exception will be thrown.
 	 */
 	private String classpathFiles;
@@ -101,35 +101,35 @@ public class CustomWebappLoader extends WebappLoader {
 
 		addRepositories(classpathFiles, true);
 		addRepositories(secondaryClasspathFiles, false);
-		
+
 		super.startInternal();
 	}
 
 	private void addRepositories(String classpathFiles, boolean throwException) throws LifecycleException {
-		
+
 		for (String classpathFile : classpathFiles.split(";")) {
-			
+
 			String classpath = readClasspathFile(classpathFile, throwException);
 			if (classpath == null) {
-				continue;	
+				continue;
 			}
-			
+
 			ArrayList<String> classpathEntries = trimEntries(classpath.split("[\\r\\n]+"));
 			LOG.info("Classpath file " + classpathFile + " has " + classpathEntries.size() + " entries");
-			
+
 			for (String entry : classpathEntries) {
 				LOG.debug("Trying to load entry " + entry);
 				int repositoriesCount = 0;
 				Path pathEntry = Paths.get(entry);
 				/*
-				 * For each entry, we look at the parent directory and try to match each of the files 
+				 * For each entry, we look at the parent directory and try to match each of the files
 				 * inside it to the file name or pattern in the file name (the last part of the path).
 				 * E.g., for path '/some/path/with/pattern*', the parent directory will be '/some/path/with/'
-				 * and the file name will be 'pattern*'. Each file under that directory matching 
-				 * this pattern will be added to the class loader repository. 
+				 * and the file name will be 'pattern*'. Each file under that directory matching
+				 * this pattern will be added to the class loader repository.
 				 */
 				try (DirectoryStream<Path> repositories = Files.newDirectoryStream(pathEntry.getParent(),
-						pathEntry.getFileName().toString())) { 
+						pathEntry.getFileName().toString())) {
 					for (Path repository : repositories) {
 						if (addPathToRepository(repository, entry)) {
 							repositoriesCount++;
@@ -137,7 +137,7 @@ public class CustomWebappLoader extends WebappLoader {
 					}
 				} catch (IOException e) {
 					LOG.warn("Failed to load entry " + entry + ": " + e);
-				} 
+				}
 				if (repositoriesCount == 0) {
 					LOG.warn("Entry " + entry + " doesn't match any files");
 				}
@@ -166,17 +166,17 @@ public class CustomWebappLoader extends WebappLoader {
 	 * @return valid entries
 	 */
 	private ArrayList<String> trimEntries(String[] classpathEntries) {
-		
+
 		ArrayList<String> trimmed = new ArrayList<String>();
 		int line = 0;
 		for (String entry : classpathEntries) {
-			
+
 			line++;
 			if (entry == null) {
 				LOG.debug("Skipping entry #" + line + " (null)");
 				continue;
 			}
-			
+
 			entry = entry.trim();
 			if (entry.isEmpty() || entry.startsWith("#")) {
 				LOG.debug("Skipping entry #" + line + " (" + entry + ")");
@@ -186,9 +186,9 @@ public class CustomWebappLoader extends WebappLoader {
 		}
 		return trimmed;
 	}
-	
+
 	private boolean addPathToRepository(Path path, String entry) {
-		
+
 		try {
 			URI pathUri = path.toUri();
 			String pathUriStr = pathUri.toString();
@@ -205,7 +205,7 @@ public class CustomWebappLoader extends WebappLoader {
 
 		return false;
 	}
-	
+
 }
 
 

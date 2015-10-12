@@ -291,36 +291,41 @@ bool debug_fake_segmentnum;
 
 /* New HAWQ 2.0 basic GUCs. Some of these are duplicate variables, they are
  * reserved to facilitate showing settings in hawq-site.xml. */
-char  *master_addr_host;			/* hawq.master.address.host               */
-int    master_addr_port;			/* hawq.master.address.port               */
-char  *standby_addr_host;			/* hawq.standby.address.host              */
-int    seg_addr_port;           	/* hawq.segment.address.port              */
-char  *dfs_url;						/* hawq.dfs.url                           */
-char  *master_directory;			/* hawq.master.directory                  */
-char  *seg_directory;				/* hawq.segment.directory                 */
-bool rm_domain_comm_enable;  /* enable domain socket for RM communication */
+char  *master_addr_host;
+int    master_addr_port;
+char  *standby_addr_host;
+int    seg_addr_port;
+char  *dfs_url;
+char  *master_directory;
+char  *seg_directory;
 
 /* HAWQ 2.0 resource manager GUCs */
-char  *rm_seg_memory_use;			/* hawq.resourcemanager.segment.limit.memory.use */
-double rm_seg_core_use;				/* hawq.resourcemanager.segment.limit.core.use */
-int    rm_master_addr_port;			/* hawq.resourcemanager.master.address.port */
-int	   rm_master_addr_domain_port;
-int	   rm_seg_addr_port;
+int    rm_master_port;
+int	   rm_segment_port;
+int	   rm_master_domain_port;
 
-char   *rm_grm_server_type;			/* hawq.resourcemanager.server.type       */
-char   *rm_grm_yarn_rm_addr;		/* hawq.resourcemanager.yarn.resourcemanager.address*/
-char   *rm_grm_yarn_sched_addr;		/* hawq.resourcemanager.yarn.resourcemanager.scheduler.address*/
-char   *rm_grm_yarn_queue;			/* hawq.resourcemanager.yarn.queue        */
-char   *rm_grm_yarn_app_name;		/* hawq.resourcemanager.yarn.application.name*/
+int    rm_nvseg_perquery_limit;
+int	   rm_nvseg_perquery_perseg_limit;
+int	   rm_nslice_perseg_limit;
+
+char  *rm_seg_memory_use;
+double rm_seg_core_use;
+
+
+
+char   *rm_global_rm_type;
+char   *rm_grm_yarn_rm_addr;
+char   *rm_grm_yarn_sched_addr;
+char   *rm_grm_yarn_queue;
+char   *rm_grm_yarn_app_name;
 int		rm_grm_breath_return_percentage;
 
-int     rm_query_vseg_num_limit;
-int		rm_query_vseg_num_per_seg_limit;
-int		rm_slice_num_per_seg_limit;
+
 int		rm_seg_container_default_waterlevel;
 bool	rm_force_fifo_queue;
 
-int     rm_resource_noaction_timeout; 	/* How many seconds to wait before expiring
+bool	rm_session_lease_heartbeat_enable;
+int     rm_session_lease_timeout; 	/* How many seconds to wait before expiring
 										   allocated resource. */
 int		rm_query_resource_noresource_timeout;	/* How may seconds to wait before
 												   expiring queuing query resource
@@ -329,6 +334,9 @@ int		rm_resource_timeout;		/* How many seconds to wait before returning
 									   resource back to the resource broker. */
 int		rm_resource_heartbeat_interval; /* How many seconds to wait before sending
 										   another heart-beat to resource manager. */
+
+int		rm_tolerate_nseg_limit;
+int		rm_nvseg_variance_among_seg_limit;
 
 char   *rm_resourcepool_test_filename;
 

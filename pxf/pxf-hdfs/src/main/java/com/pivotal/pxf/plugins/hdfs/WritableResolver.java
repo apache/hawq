@@ -23,11 +23,11 @@ import java.util.List;
 import static com.pivotal.pxf.api.io.DataType.*;
 
 /**
- * WritableResolver handles serialization and deserialization of records 
+ * WritableResolver handles serialization and deserialization of records
  * that were serialized using Hadoop's Writable serialization framework.
- * 
- * A field named 'recordkey' is treated as a key of the given row, and not as 
- * part of the data schema. @See RecordkeyAdapter.
+ *
+ * A field named 'recordkey' is treated as a key of the given row, and not as
+ * part of the data schema. See {@link RecordkeyAdapter}.
  */
 public class WritableResolver extends Plugin implements ReadResolver, WriteResolver {
     private static final int RECORDKEY_UNDEFINED = -1;
@@ -40,10 +40,11 @@ public class WritableResolver extends Plugin implements ReadResolver, WriteResol
 
 
     /**
-     * Constructs a WritableResolver
-     * 
+     * Constructs a WritableResolver.
+     *
      * @param input all input parameters coming from the client
-     * @throws Exception
+     * @throws Exception if schema file is missing, cannot be found in
+     *                   classpath or fails to instantiate
      */
     public WritableResolver(InputData input) throws Exception {
         super(input);
@@ -77,7 +78,6 @@ public class WritableResolver extends Plugin implements ReadResolver, WriteResol
                         " type: " + javaType + ", " +
                         (isArray(javaType) ? "Array" : "Primitive") + ", " +
                         (isPrivate ? "Private" : "accessible") + " field");
-
             }
         }
     }
@@ -86,12 +86,6 @@ public class WritableResolver extends Plugin implements ReadResolver, WriteResol
         return (javaType.startsWith("[") && !"[B".equals(javaType));
     }
 
-    /*
-     * getFields returns a list of the fields of one record.
-     * Each record field is represented by a OneField item.
-     * OneField item contains two fields: an integer representing the field type and a Java
-     * Object representing the field value.
-     */
     @Override
     public List<OneField> getFields(OneRow onerow) throws Exception {
         userObject = onerow.getData();
@@ -168,8 +162,8 @@ public class WritableResolver extends Plugin implements ReadResolver, WriteResol
         }
     }
 
-    /*
-     * Sets customWritable fields and creates a OneRow object
+    /**
+     * Sets customWritable fields and creates a OneRow object.
      */
     @Override
     public OneRow setFields(List<OneField> record) throws Exception {

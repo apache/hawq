@@ -370,21 +370,9 @@ Boot_CreateStmt:
 								typid = PG_REMOTE_CREDENTIALS_RELTYPE_OID;
 								break;
 
-/* relation id: 6026 - pg_resqueue 20140807 */
+/* relation id: 6026 - pg_resqueue 20150917 */
 							case ResQueueRelationId:
 								typid = PG_RESQUEUE_RELTYPE_OID;
-								break;
-
-
-/* relation id: 6059 - pg_resourcetype 20140807 */
-							case ResourceTypeRelationId:
-								typid = PG_RESOURCETYPE_RELTYPE_OID;
-								break;
-
-
-/* relation id: 6060 - pg_resqueuecapability 20140807 */
-							case ResQueueCapabilityRelationId:
-								typid = PG_RESQUEUECAPABILITY_RELTYPE_OID;
 								break;
 
 /* TIDYCAT_END_CODEGEN */

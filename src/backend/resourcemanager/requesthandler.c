@@ -72,7 +72,7 @@ bool handleRMRequestConnectionReg(void **arg)
 		else
 		{
 			/* No connection id resource. Return occupation in resource queue. */
-			returnConnectionToQueue(conntrack, true);
+			returnConnectionToQueue(conntrack, false);
 			elog(LOG, "Resource manager can not accept more connections.");
 			response.Result = res;
 			response.ConnID = INVALID_CONNID;
@@ -150,7 +150,7 @@ bool handleRMRequestConnectionRegByOID(void **arg)
 		}
 		else {
 			/* No connection id resource. Return occupation in resource queue. */
-			returnConnectionToQueue(conntrack, true);
+			returnConnectionToQueue(conntrack, false);
 			elog(LOG, "Resource manager can not accept more connections.");
 			response.Result = res;
 			response.ConnID = INVALID_CONNID;
@@ -194,9 +194,11 @@ bool handleRMRequestConnectionUnReg(void **arg)
 	elog(DEBUG5, "HAWQ RM :: Connection id %d try to unregister.",
 				 request->ConnID);
 
-	if ( (*conntrack)->ConnID == INVALID_CONNID ) {
+	if ( (*conntrack)->ConnID == INVALID_CONNID )
+	{
 		res = retrieveConnectionTrack((*conntrack), request->ConnID);
-		if ( res != FUNC_RETURN_OK ) {
+		if ( res != FUNC_RETURN_OK )
+		{
 			elog(LOG, "Not valid resource context with id %d.", request->ConnID);
 			goto sendresponse;
 		}
@@ -213,15 +215,16 @@ bool handleRMRequestConnectionUnReg(void **arg)
 	elog(DEBUG5, "HAWQ RM :: Connection id %d unregisters connection.",
 				 request->ConnID);
 
-	if ( !canTransformConnectionTrackProgress((*conntrack), CONN_PP_ESTABLISHED) ) {
-		elog(RMLOG, "HAWQ RM :: Wrong connection status for unregistering. "
+	if ( !canTransformConnectionTrackProgress((*conntrack), CONN_PP_ESTABLISHED) )
+	{
+		elog(DEBUG5, "HAWQ RM :: Wrong connection status for unregistering. "
 					"Current connection status is %d.",
 					(*conntrack)->Progress);
 		res = REQUESTHANDLER_WRONG_CONNSTAT;
 		goto sendresponse;
 	}
 
-	returnConnectionToQueue(*conntrack, true);
+	returnConnectionToQueue(*conntrack, false);
 
 	elog(DEBUG3, "One connection is unregistered. ConnID=%d", (*conntrack)->ConnID);
 
@@ -299,7 +302,8 @@ bool handleRMRequestAcquireResource(void **arg)
 	 * request list.
 	 */
 	if ( PQUEMGR->RootTrack != NULL &&
-		 PQUEMGR->RootTrack->ClusterSegNumberMax == 0 ) {
+		 PQUEMGR->RootTrack->ClusterSegNumberMax == 0 )
+	{
 		return false;
 	}
 
@@ -314,9 +318,11 @@ bool handleRMRequestAcquireResource(void **arg)
 				 request->ConnID,
 				 request->SessionID);
 
-	if ( (*conntrack)->ConnID == INVALID_CONNID ) {
+	if ( (*conntrack)->ConnID == INVALID_CONNID )
+	{
 		res = retrieveConnectionTrack((*conntrack), request->ConnID);
-		if ( res != FUNC_RETURN_OK ) {
+		if ( res != FUNC_RETURN_OK )
+		{
 			elog(LOG, "Not valid resource context with id %d.", request->ConnID);
 			goto sendresponse;
 		}
@@ -326,21 +332,23 @@ bool handleRMRequestAcquireResource(void **arg)
 					 (*conntrack)->Progress);
 	}
 
-	request = (RPCRequestHeadAcquireResourceFromRM)
-			  ((*conntrack)->MessageBuff.Buffer);
-	if ( (*conntrack)->Progress == CONN_PP_RESOURCE_QUEUE_ALLOC_DONE ) {
+	request = (RPCRequestHeadAcquireResourceFromRM)((*conntrack)->MessageBuff.Buffer);
+	if ( (*conntrack)->Progress == CONN_PP_RESOURCE_QUEUE_ALLOC_DONE )
+	{
 		elog(DEBUG5, "HAWQ RM :: The connection track already has allocated "
 					 "resource. Send again. ConnID=%d",
 					 request->ConnID);
 		goto sendagain;
 	}
-	else if ( (*conntrack)->Progress == CONN_PP_RESOURCE_QUEUE_ALLOC_WAIT ) {
+	else if ( (*conntrack)->Progress == CONN_PP_RESOURCE_QUEUE_ALLOC_WAIT )
+	{
 		elog(DEBUG5, "HAWQ RM :: The connection track already accepted "
 					 "acquire resource request. Ignore. ConnID=%d",
 					 request->ConnID);
 		goto sendignore;
 	}
-	else if ( (*conntrack)->Progress != CONN_PP_REGISTER_DONE ) {
+	else if ( (*conntrack)->Progress != CONN_PP_REGISTER_DONE )
+	{
 		elog(DEBUG5, "HAWQ RM :: Wrong connection status for acquiring resource. "
 					 "Current connection status is %d.",
 					 (*conntrack)->Progress);
@@ -397,7 +405,8 @@ sendresponse:
 									(*conntrack)->MessageMark2,
 									RESPONSE_QD_ACQUIRE_RESOURCE);
 
-		if ( res == CONNTRACK_NO_CONNID ) {
+		if ( res == CONNTRACK_NO_CONNID )
+		{
 			transformConnectionTrackProgress((*conntrack), CONN_PP_TRANSFORM_ERROR);
 		}
 
@@ -440,10 +449,12 @@ bool handleRMRequestReturnResource(void **arg)
 	elog(DEBUG5, "HAWQ RM :: Connection id %d returns query resource.",
 				 request->ConnID);
 
-	if ( (*conntrack)->ConnID == INVALID_CONNID ) {
+	if ( (*conntrack)->ConnID == INVALID_CONNID )
+	{
 		res = retrieveConnectionTrack((*conntrack), request->ConnID);
-		if ( res != FUNC_RETURN_OK ) {
-			elog(LOG, "Not valid resource context with id %d.", request->ConnID);
+		if ( res != FUNC_RETURN_OK )
+		{
+			elog(WARNING, "Not valid resource context with id %d.", request->ConnID);
 			goto sendresponse;
 		}
 		elog(DEBUG5, "HAWQ RM :: Fetched existing connection track "
@@ -456,14 +467,16 @@ bool handleRMRequestReturnResource(void **arg)
 	request = (RPCRequestHeadReturnResource)
 			  ((*conntrack)->MessageBuff.Buffer);
 	elog(DEBUG5, "HAWQ RM :: Connection id %d returns query resource.",
-				request->ConnID);
+				 request->ConnID);
 
-	if ( (*conntrack)->Progress == CONN_PP_REGISTER_DONE ) {
+	if ( (*conntrack)->Progress == CONN_PP_REGISTER_DONE )
+	{
 		elog(DEBUG5, "HAWQ RM :: The resource has been returned or has not been "
 					 "acquired.");
 		goto sendresponse;
 	}
-	else if ( (*conntrack)->Progress != CONN_PP_RESOURCE_QUEUE_ALLOC_DONE ) {
+	else if ( (*conntrack)->Progress != CONN_PP_RESOURCE_QUEUE_ALLOC_DONE )
+	{
 		elog(DEBUG5, "HAWQ RM :: Wrong connection status for acquiring resource. "
 					 "Current connection status is %d.",
 					 (*conntrack)->Progress);
@@ -478,6 +491,8 @@ bool handleRMRequestReturnResource(void **arg)
 
 sendresponse:
 	{
+		elog(DEBUG3, "Return resource result %d.", res);
+
 		RPCResponseHeadReturnResourceData response;
 		response.Result   = res;
 		response.Reserved = 0;
@@ -488,7 +503,8 @@ sendresponse:
 									(*conntrack)->MessageMark2,
 									RESPONSE_QD_RETURN_RESOURCE );
 
-		if ( res == CONNTRACK_NO_CONNID ) {
+		if ( res == CONNTRACK_NO_CONNID )
+		{
 			transformConnectionTrackProgress((*conntrack), CONN_PP_TRANSFORM_ERROR);
 		}
 
@@ -797,14 +813,20 @@ bool handleRMRequestRefreshResource(void **arg)
 	uint32_t *connids = (uint32_t *)
 						(conntrack->MessageBuff.Buffer +
 						 sizeof(RPCRequestHeadRefreshResourceHeartBeatData));
-	for ( int i = 0 ; i < request->ConnIDCount ; ++i ) {
+
+	elog(DEBUG3, "Resource manager refreshes %d ConnIDs.", request->ConnIDCount);
+
+	for ( int i = 0 ; i < request->ConnIDCount ; ++i )
+	{
 		/* Find connection track identified by ConnID */
 		res = getInUseConnectionTrack(connids[i], &oldct);
-		if ( res == FUNC_RETURN_OK ) {
+		if ( res == FUNC_RETURN_OK )
+		{
 			oldct->LastActTime = curmsec;
-			elog(DEBUG5, "Refreshed resource of connection id %d", connids[i]);
+			elog(DEBUG3, "Refreshed resource of connection id %d", connids[i]);
 		}
-		else {
+		else
+		{
 			elog(DEBUG3, "Can not find connection id %d for resource refreshing.",
 					     connids[i]);
 		}

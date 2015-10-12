@@ -64,25 +64,27 @@ public class HiveUtilities {
      * Checks if hive type is supported, and if so
      * return its matching HAWQ type.
      * Unsupported types will result in an exception.
-     *
-     * The supported mappings are:
-     * tinyint -> int2
-     * smallint -> int2
-     * int -> int4
-     * bigint -> int8
-     * boolean -> bool
-     * float -> float4
-     * double -> float8
-     * string -> text
-     * binary -> bytea
-     * timestamp -> timestamp
-     * date -> date
-     * decimal(precision, scale) -> numeric(precision, scale)
-     * varchar(size) -> varchar(size)
-     * char(size) -> bpchar(size)
+     * <br>
+     * The supported mappings are:<ul>
+     * <li>{@code tinyint -> int2}</li>
+     * <li>{@code smallint -> int2}</li>
+     * <li>{@code int -> int4}</li>
+     * <li>{@code bigint -> int8}</li>
+     * <li>{@code boolean -> bool}</li>
+     * <li>{@code float -> float4}</li>
+     * <li>{@code double -> float8}</li>
+     * <li>{@code string -> text}</li>
+     * <li>{@code binary -> bytea}</li>
+     * <li>{@code timestamp -> timestamp}</li>
+     * <li>{@code date -> date}</li>
+     * <li>{@code decimal(precision, scale) -> numeric(precision, scale)}</li>
+     * <li>{@code varchar(size) -> varchar(size)}</li>
+     * <li>{@code char(size) -> bpchar(size)}</li>
+     * </ul>
      *
      * @param hiveColumn hive column schema
      * @return field with mapped HAWQ type and modifiers
+     * @throws UnsupportedTypeException if the column type is not supported
      */
     public static Metadata.Field mapHiveType(FieldSchema hiveColumn) throws UnsupportedTypeException {
         String fieldName = hiveColumn.getName();
@@ -156,8 +158,11 @@ public class HiveUtilities {
 
     /**
      * Verifies modifiers are null or integers.
+     * Modifier is a value assigned to a type,
+     * e.g. size of a varchar - varchar(size).
      *
      * @param modifiers type modifiers to be verified
+     * @return whether modifiers are null or integers
      */
     private static boolean verifyModifers(String[] modifiers) {
         if (modifiers == null) {
@@ -175,7 +180,10 @@ public class HiveUtilities {
      * Extracts the db_name and table_name from the qualifiedName.
      * qualifiedName is the Hive table name that the user enters in the CREATE EXTERNAL TABLE statement
      * or when querying HCatalog table.
-     * It can be either <table_name> or <db_name.table_name>.
+     * It can be either <code>table_name</code> or <code>db_name.table_name</code>.
+     *
+     * @param qualifiedName Hive table name
+     * @return {@link com.pivotal.pxf.api.Metadata.Table} object holding the full table name
      */
     public static Metadata.Table parseTableQualifiedName(String qualifiedName) {
 

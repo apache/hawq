@@ -71,6 +71,8 @@ public class HiveResolver extends Plugin implements ReadResolver {
      *
      * @param input contains the Serde class name, the serde properties string
      *            and the partition keys
+     * @throws Exception if user data was wrong or serde failed to be
+     *             instantiated
      */
     public HiveResolver(InputData input) throws Exception {
         super(input);
@@ -100,7 +102,7 @@ public class HiveResolver extends Plugin implements ReadResolver {
         return record;
     }
 
-    /* parse user data string (arrived from fragmenter) */
+    /* Parses user data string (arrived from fragmenter). */
     void parseUserData(InputData input) throws Exception {
         final int EXPECTED_NUM_OF_TOKS = 5;
 
@@ -122,7 +124,7 @@ public class HiveResolver extends Plugin implements ReadResolver {
                 : input.getUserProperty("MAPKEY_DELIM");
     }
 
-    /* Get and init the deserializer for the records of this Hive data fragment */
+    /* Gets and init the deserializer for the records of this Hive data fragment. */
     void initSerde(InputData inputData) throws Exception {
         Properties serdeProperties;
 
@@ -138,7 +140,7 @@ public class HiveResolver extends Plugin implements ReadResolver {
 
     /*
      * The partition fields are initialized one time base on userData provided
-     * by the fragmenter
+     * by the fragmenter.
      */
     void initPartitionFields() {
         partitionFields = new LinkedList<>();
@@ -234,7 +236,7 @@ public class HiveResolver extends Plugin implements ReadResolver {
 
     /*
      * The partition fields are initialized one time based on userData provided
-     * by the fragmenter
+     * by the fragmenter.
      */
     int initPartitionFields(StringBuilder parts) {
         if (partitionKeys.equals(HiveDataFragmenter.HIVE_NO_PART_TBL)) {
@@ -287,8 +289,7 @@ public class HiveResolver extends Plugin implements ReadResolver {
                         parts.append(HiveDecimal.create(val).bigDecimalValue());
                         break;
                     case serdeConstants.BINARY_TYPE_NAME:
-                        Utilities.byteArrayToOctalString(val.getBytes(),
-                                parts);
+                        Utilities.byteArrayToOctalString(val.getBytes(), parts);
                         break;
                     default:
                         throw new UnsupportedTypeException(
@@ -301,7 +302,7 @@ public class HiveResolver extends Plugin implements ReadResolver {
 
     /**
      * Returns true if the partition value is Hive's default partition name
-     * (defined in hive.exec.default.partition.name)
+     * (defined in hive.exec.default.partition.name).
      *
      * @param partitionType partition field type
      * @param partitionValue partition value
@@ -559,7 +560,7 @@ public class HiveResolver extends Plugin implements ReadResolver {
     }
 
     /*
-     * Get the delimiter character from the URL, verify and store it. Must be a
+     * Gets the delimiter character from the URL, verify and store it. Must be a
      * single ascii character (same restriction as Hawq's). If a hex
      * representation was passed, convert it to its char.
      */

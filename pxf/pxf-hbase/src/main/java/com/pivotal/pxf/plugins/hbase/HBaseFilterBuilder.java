@@ -45,6 +45,10 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
 
     /**
      * Translates a filterString into a HBase {@link Filter} object.
+     *
+     * @param filterString filter string
+     * @return filter object
+     * @throws Exception if parsing failed
      */
     public Filter getFilterObject(String filterString) throws Exception {
         FilterParser parser = new FilterParser(this);
@@ -59,9 +63,11 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
 
     /**
      * Returns the startKey for scanning the HBase table.
-     * If the user specified a {@code > / >=} operation 
+     * If the user specified a {@code > / >=} operation
      * on a textual row key column, this value will be returned.
      * Otherwise, the start of table.
+     *
+     * @return start key for scanning HBase table
      */
     public byte[] startKey() {
         return startKey;
@@ -72,6 +78,8 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
      * If the user specified a {@code < / <=} operation
      * on a textual row key column, this value will be returned.
      * Otherwise, the end of table.
+     *
+     * @return end key for scanning HBase table
      */
     public byte[] endKey() {
         return endKey;
@@ -87,7 +95,7 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
      *    The only supported operation is {@code AND}. </li>
      * </ol>
      * <p>
-     * This function is called by {@link FilterParser}, 
+     * This function is called by {@link FilterParser},
      * each time the parser comes across an operator.
      */
     @Override
@@ -138,7 +146,7 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
                 constant.constant());
 
         /**
-         * If row key is of type TEXT, allow filter in start/stop row key API in 
+         * If row key is of type TEXT, allow filter in start/stop row key API in
          * HBaseAccessor/Scan object.
          */
         if (textualRowKey(hbaseColumn)) {

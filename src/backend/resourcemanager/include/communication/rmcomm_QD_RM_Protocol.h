@@ -107,15 +107,13 @@ enum CatResQueueAction_Action_Enum {
 };
 
 RPC_PROTOCOL_STRUCT_BEGIN(RPCResponseHeadManipulateResQueueERROR)
-	uint32_t	Result;
-	uint32_t	Reserved;
-	char		ErrorText[1];
+	RPCResponseHeadManipulateResQueueData	Result;
+	char									ErrorText[1];
 RPC_PROTOCOL_STRUCT_END(RPCResponseHeadManipulateResQueueERROR)
 
 RPC_PROTOCOL_STRUCT_BEGIN(RPCResponseHeadManipulateRoleERROR)
-	uint32_t	Result;
-	uint32_t	Reserved;
-	char		ErrorText[1];
+	RPCResponseHeadManipulateRoleData		Result;
+	char									ErrorText[1];
 RPC_PROTOCOL_STRUCT_END(RPCResponseHeadManipulateRoleERROR)
 
 /*******************************************************************************

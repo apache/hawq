@@ -16,10 +16,10 @@ public abstract class MetadataFetcher {
 
     /**
      * Gets a metadata of a given table
-     * 
+     *
      * @param tableName table name
      * @return metadata of given table
-     * @throws Exception
+     * @throws Exception if metadata information could not be retrieved
      */
     public abstract Metadata getTableMetadata(String tableName) throws Exception;
 }

@@ -4,6 +4,7 @@ import com.pivotal.pxf.api.OneRow;
 import com.pivotal.pxf.api.WriteAccessor;
 import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.plugins.hdfs.utilities.HdfsUtilities;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -24,7 +25,8 @@ import java.util.EnumSet;
 /**
  * A PXF Accessor for reading and writing Sequence File records
  */
-public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements WriteAccessor {
+public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements
+        WriteAccessor {
 
     private Configuration conf;
     private FileContext fc;
@@ -34,27 +36,24 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements 
     private SequenceFile.Writer writer;
     private LongWritable defaultKey; // used when recordkey is not defined
 
-    private Log Log;
+    private static Log Log = LogFactory.getLog(SequenceFileAccessor.class);;
 
     /**
-     * Constructs a SequenceFileAccessor
-     * 
+     * Constructs a SequenceFileAccessor.
+     *
      * @param input all input parameters coming from the client request
-     * @throws Exception
      */
-    public SequenceFileAccessor(InputData input) throws Exception {
-
-        super(input,
-                new SequenceFileInputFormat<Writable, Writable>());
-
-        Log = LogFactory.getLog(SequenceFileAccessor.class);
+    public SequenceFileAccessor(InputData input) {
+        super(input, new SequenceFileInputFormat<Writable, Writable>());
     }
 
-    /*
-     * Override virtual method to create specialized record reader
+    /**
+     * Overrides virtual method to create specialized record reader
      */
-    protected Object getReader(JobConf jobConf, InputSplit split) throws IOException {
-        return new SequenceFileRecordReader(jobConf, (FileSplit) split);
+    @Override
+    protected Object getReader(JobConf jobConf, InputSplit split)
+            throws IOException {
+        return new SequenceFileRecordReader<Object, Object>(jobConf, (FileSplit) split);
     }
 
     @Override
@@ -74,7 +73,8 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements 
         defaultKey = new LongWritable(inputData.getSegmentId());
 
         if (fs.exists(file)) {
-            throw new IOException("file " + file + " already exists, can't write data");
+            throw new IOException("file " + file
+                    + " already exists, can't write data");
         }
         parent = file.getParent();
         if (!fs.exists(parent)) {
@@ -87,10 +87,11 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements 
     }
 
     /**
-     * Compression: based on compression codec and compression type (default value RECORD).
-     * If there is no codec, compression type is ignored, and NONE is used.
+     * Compression: based on compression codec and compression type (default
+     * value RECORD). If there is no codec, compression type is ignored, and
+     * NONE is used.
      *
-     * @param inputData - container where compression codec and type are held.
+     * @param inputData - container where compression codec and type are held
      */
     private void getCompressionCodec(InputData inputData) {
 
@@ -106,21 +107,23 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements 
             try {
                 compressionType = CompressionType.valueOf(parsedCompressType);
             } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException("Illegal value for compression type " +
-                        "'" + parsedCompressType + "'");
+                throw new IllegalArgumentException(
+                        "Illegal value for compression type " + "'"
+                                + parsedCompressType + "'");
             }
             if (compressionType == null) {
-                throw new IllegalArgumentException("Compression type must be defined");
+                throw new IllegalArgumentException(
+                        "Compression type must be defined");
             }
 
-            Log.debug("Compression ON: " +
-                    "compression codec: " + userCompressCodec +
-                    ", compression type: " + compressionType);
+            Log.debug("Compression ON: " + "compression codec: "
+                    + userCompressCodec + ", compression type: "
+                    + compressionType);
         }
     }
 
     /*
-     * Parse compression type for sequence file. If null, default to RECORD.
+     * Parses compression type for sequence file. If null, default to RECORD.
      * Allowed values: RECORD, BLOCK.
      */
     private String parseCompressionType(String compressType) {
@@ -133,13 +136,15 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements 
         }
 
         if (compressType.equalsIgnoreCase(COMPRESSION_TYPE_NONE)) {
-            throw new IllegalArgumentException("Illegal compression type 'NONE'. " +
-                    "For disabling compression remove COMPRESSION_CODEC parameter.");
+            throw new IllegalArgumentException(
+                    "Illegal compression type 'NONE'. "
+                            + "For disabling compression remove COMPRESSION_CODEC parameter.");
         }
 
-        if (!compressType.equalsIgnoreCase(COMPRESSION_TYPE_RECORD) &&
-        	!compressType.equalsIgnoreCase(COMPRESSION_TYPE_BLOCK)) {
-            throw new IllegalArgumentException("Illegal compression type '" + compressType + "'");
+        if (!compressType.equalsIgnoreCase(COMPRESSION_TYPE_RECORD)
+                && !compressType.equalsIgnoreCase(COMPRESSION_TYPE_BLOCK)) {
+            throw new IllegalArgumentException("Illegal compression type '"
+                    + compressType + "'");
         }
 
         return compressType.toUpperCase();
@@ -165,11 +170,13 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements 
         // init writer on first approach here, based on onerow.getData type
         // TODO: verify data is serializable.
         if (writer == null) {
-            Class valueClass = value.getClass();
-            Class keyClass = (key == null) ? LongWritable.class : key.getClass();
+            Class<? extends Writable> valueClass = value.getClass();
+            Class<? extends Writable> keyClass = (key == null) ? LongWritable.class
+                    : key.getClass();
             // create writer - do not allow overwriting existing file
-            writer = SequenceFile.createWriter(fc, conf, file, keyClass, valueClass,
-                    compressionType, codec, new SequenceFile.Metadata(), EnumSet.of(CreateFlag.CREATE));
+            writer = SequenceFile.createWriter(fc, conf, file, keyClass,
+                    valueClass, compressionType, codec,
+                    new SequenceFile.Metadata(), EnumSet.of(CreateFlag.CREATE));
         }
 
         try {
@@ -188,20 +195,21 @@ public class SequenceFileAccessor extends HdfsSplittableDataAccessor implements 
             writer.sync();
             /*
              * From release 0.21.0 sync() is deprecated in favor of hflush(),
-			 * which only guarantees that new readers will see all data written to that point, 
-			 * and hsync(), which makes a stronger guarantee that the operating system has flushed 
-			 * the data to disk (like POSIX fsync), although data may still be in the disk cache.
-			 */
+             * which only guarantees that new readers will see all data written
+             * to that point, and hsync(), which makes a stronger guarantee that
+             * the operating system has flushed the data to disk (like POSIX
+             * fsync), although data may still be in the disk cache.
+             */
             writer.hsync();
             writer.close();
         }
     }
 
-	public CompressionType getCompressionType() {
-		return compressionType;
-	}
+    public CompressionType getCompressionType() {
+        return compressionType;
+    }
 
-	public CompressionCodec getCodec() {
-		return codec;
-	}
+    public CompressionCodec getCodec() {
+        return codec;
+    }
 }
