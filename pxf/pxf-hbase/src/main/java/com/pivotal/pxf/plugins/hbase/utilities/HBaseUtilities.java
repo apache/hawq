@@ -31,7 +31,7 @@ public class HBaseUtilities {
      * @param hbaseAdmin HBase admin, must be initialized
      * @param tableName table name
      * @return true if table exists
-     * @throws IOException
+     * @throws IOException if a remote or network exception occurs when connecting to HBase
      */
     public static boolean isTableAvailable(Admin hbaseAdmin, String tableName) throws IOException {
         TableName name = TableName.valueOf(tableName);
@@ -42,9 +42,9 @@ public class HBaseUtilities {
     /**
      * Closes HBase admin and connection if they are open.
      *
-     * @param hbaseAdmin
-     * @param hbaseConnection
-     * @throws IOException
+     * @param hbaseAdmin HBase admin
+     * @param hbaseConnection HBase connection
+     * @throws IOException if an I/O error occurs when connecting to HBase
      */
     public static void closeConnection(Admin hbaseAdmin, Connection hbaseConnection) throws IOException {
         if (hbaseAdmin != null) {

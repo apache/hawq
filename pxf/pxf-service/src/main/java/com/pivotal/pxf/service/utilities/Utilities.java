@@ -13,44 +13,46 @@ import com.pivotal.pxf.api.utilities.InputData;
  */
 public class Utilities {
     private static final Log LOG = LogFactory.getLog(Utilities.class);
-     
+
     /**
      * Creates an object using the class name.
      * The class name has to be a class located in the webapp's CLASSPATH.
-     * 
+     *
      * @param confClass the class of the metaData used to initialize the instance
      * @param className a class name to be initialized.
      * @param metaData input data used to initialize the class
      * @return Initialized instance of given className
-     * @throws Exception
+     * @throws Exception throws exception if classname was not found in classpath,
+     *         didn't have expected constructor or failed to be instantiated
      */
-    public static Object createAnyInstance(Class<?> confClass, String className, InputData metaData) throws Exception {
+    public static Object createAnyInstance(Class<?> confClass, String className, InputData metaData) throws Exception  {
         Class<?> cls = Class.forName(className);
         Constructor<?> con = cls.getConstructor(confClass);
         return instantiate(con, metaData);
     }
-    
+
     /**
      * Creates an object using the class name with its default constructor.
      * The class name has to be a class located in the webapp's CLASSPATH.
-     * 
+     *
      * @param className a class name to be initialized
      * @return initialized instance of given className
-     * @throws Exception
+     * @throws Exception throws exception if classname was not found in classpath,
+     *         didn't have expected constructor or failed to be instantiated
      */
     public static Object createAnyInstance(String className) throws Exception {
     	Class<?> cls = Class.forName(className);
         Constructor<?> con = cls.getConstructor();
         return instantiate(con);
     }
-    
+
     private static Object instantiate(Constructor<?> con, Object... args) throws Exception {
     	try {
     		return con.newInstance(args);
     	} catch (InvocationTargetException e) {
     		/*
-    		 * We are creating resolvers, accessors, fragmenters, etc. 
-    		 * using the reflection framework. If for example, a resolver, during 
+    		 * We are creating resolvers, accessors, fragmenters, etc.
+    		 * using the reflection framework. If for example, a resolver, during
     		 * its instantiation - in the c'tor, will throw an exception, the
     		 * Resolver's exception will reach the Reflection layer and there it
     		 * will be wrapped inside an InvocationTargetException. Here we are

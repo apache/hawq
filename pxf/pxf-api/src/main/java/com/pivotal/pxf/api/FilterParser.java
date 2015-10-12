@@ -8,19 +8,21 @@ import java.util.Stack;
  * The parser code which goes over a filter string and pushes operands onto a stack.
  * Once an operation is read, the evaluate function is called for the {@link FilterBuilder}
  * interface with two pop-ed operands.
- *
+ * <br>
  * A string of filters looks like this:
- * a2c5o1a1c"abc"o2o7
- * which means column#2 < 5 AND column#1 > "abc"
- *
+ * <code>a2c5o1a1c"abc"o2o7</code>
+ * which means {@code column#2 < 5 AND column#1 > "abc"}
+ * <br>
  * It is a RPN serialized representation of a filters tree in GPDB where
- * a means an attribute (column)
- * c means a constant (either string or numeric)
- * o means operator
+ * <ul>
+ * <li> a means an attribute (column)</li>
+ * <li>c means a constant (either string or numeric)</li>
+ * <li>o means operator</li>
+ * </ul>
  *
  * Assuming all operators are binary, RPN representation allows it to be read left to right easily.
- *
- * FilterParser only knows about columns and constants. The rest is up to the {@link FilterBuilder} implementer.  *
+ * <br>
+ * FilterParser only knows about columns and constants. The rest is up to the {@link FilterBuilder} implementer.
  * FilterParser makes sure column objects are always on the left of the expression (when relevant).
  */
 public class FilterParser {
@@ -55,7 +57,7 @@ public class FilterParser {
          * @param left the left operand
          * @param right the right operand
          * @return the built filter
-         * @throws Exception
+         * @throws Exception if building the filter failed
          */
         public Object build(Operation operation, Object left, Object right) throws Exception;
     }
@@ -125,6 +127,7 @@ public class FilterParser {
     /**
      * Thrown when a filter's parsing exception occurs.
      */
+    @SuppressWarnings("serial")
     class FilterStringSyntaxException extends Exception {
         FilterStringSyntaxException(String desc) {
             super(desc + " (filter string: '" + filterString + "')");
@@ -146,7 +149,7 @@ public class FilterParser {
      *
      * @param filter the filter to parse
      * @return the parsed filter
-     * @throws Exception
+     * @throws Exception if the filter string had wrong syntax
      */
     public Object parse(String filter) throws Exception {
         index = 0;

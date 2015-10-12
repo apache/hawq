@@ -35,8 +35,8 @@ import com.pivotal.pxf.plugins.hdfs.utilities.HdfsUtilities;
 import com.pivotal.pxf.plugins.hive.utilities.HiveUtilities;
 
 /**
- * Fragmenter class for HIVE tables
- * <p/>
+ * Fragmenter class for HIVE tables.
+ * <br>
  * Given a Hive table and its partitions divide the data into fragments (here a
  * data fragment is actually a HDFS file block) and return a list of them. Each
  * data fragment will contain the following information:
@@ -70,7 +70,7 @@ public class HiveDataFragmenter extends Fragmenter {
     private Set<String> setPartitions = new TreeSet<String>(
             String.CASE_INSENSITIVE_ORDER);
 
-    /*
+    /**
      * A Hive table unit - means a subset of the HIVE table, where we can say
      * that for all files in this subset, they all have the same InputFormat and
      * Serde. For a partitioned table the HiveTableUnit will be one partition
@@ -101,7 +101,7 @@ public class HiveDataFragmenter extends Fragmenter {
     }
 
     /**
-     * Constructs a HiveDataFragmenter object
+     * Constructs a HiveDataFragmenter object.
      *
      * @param inputData all input parameters coming from the client
      */
@@ -110,7 +110,7 @@ public class HiveDataFragmenter extends Fragmenter {
     }
 
     /**
-     * Constructs a HiveDataFragmenter object
+     * Constructs a HiveDataFragmenter object.
      *
      * @param inputData all input parameters coming from the client
      * @param clazz Class for JobConf
@@ -131,11 +131,12 @@ public class HiveDataFragmenter extends Fragmenter {
     }
 
     /**
-     * Creates the partition InputFormat
+     * Creates the partition InputFormat.
      *
      * @param inputFormatName input format class name
      * @param jobConf configuration data for the Hadoop framework
      * @return a {@link org.apache.hadoop.mapred.InputFormat} derived object
+     * @throws Exception if failed to create input format
      */
     public static InputFormat<?, ?> makeInputFormat(String inputFormatName,
                                                     JobConf jobConf)

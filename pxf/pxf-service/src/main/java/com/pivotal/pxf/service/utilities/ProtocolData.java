@@ -16,8 +16,8 @@ import com.pivotal.pxf.api.utilities.InputData;
 import com.pivotal.pxf.api.utilities.ProfilesConf;
 
 /**
- * Common configuration of all MetaData classes.
- * Provides read-only access to common parameters supplied using system properties.
+ * Common configuration of all MetaData classes. Provides read-only access to
+ * common parameters supplied using system properties.
  */
 public class ProtocolData extends InputData {
 
@@ -35,8 +35,7 @@ public class ProtocolData extends InputData {
     protected String token;
 
     /**
-     * Constructs a ProtocolData.
-     * Parses X-GP-* configuration variables.
+     * Constructs a ProtocolData. Parses X-GP-* configuration variables.
      *
      * @param paramsMap contains all query-specific parameters from Hawq
      */
@@ -61,10 +60,10 @@ public class ProtocolData extends InputData {
         parseTupleDescription();
 
         /*
-         * accessor - will throw exception from getPropery() if outputFormat is BINARY
-         * and the user did not supply accessor=... or profile=...
-         * resolver - will throw exception from getPropery() if outputFormat is BINARY
-         * and the user did not supply resolver=... or profile=...
+         * accessor - will throw exception from getPropery() if outputFormat is
+         * BINARY and the user did not supply accessor=... or profile=...
+         * resolver - will throw exception from getPropery() if outputFormat is
+         * BINARY and the user did not supply resolver=... or profile=...
          */
         profile = getOptionalProperty("PROFILE");
         if (profile != null) {
@@ -94,8 +93,8 @@ public class ProtocolData extends InputData {
     }
 
     /**
-     * Constructs an InputDataBuilder from a copy.
-     * Used to create from an extending class.
+     * Constructs an InputDataBuilder from a copy. Used to create from an
+     * extending class.
      *
      * @param copy the input data to copy
      */
@@ -128,7 +127,8 @@ public class ProtocolData extends InputData {
     }
 
     /**
-     * Sets the requested profile plugins from profile file into {@link #requestParametersMap}.
+     * Sets the requested profile plugins from profile file into
+     * {@link #requestParametersMap}.
      */
     private void setProfilePlugins() {
         Map<String, String> pluginsMap = ProfilesConf.getProfilePluginsMap(profile);
@@ -137,12 +137,13 @@ public class ProtocolData extends InputData {
     }
 
     /**
-     * Verifies there are no duplicates between parameters declared in the table definition
-     * and parameters defined in a profile.
+     * Verifies there are no duplicates between parameters declared in the table
+     * definition and parameters defined in a profile.
      *
      * The parameters' names are case insensitive.
      */
-    private void checkForDuplicates(Map<String, String> plugins, Map<String, String> params) {
+    private void checkForDuplicates(Map<String, String> plugins,
+                                    Map<String, String> params) {
         List<String> duplicates = new ArrayList<>();
         for (String key : plugins.keySet()) {
             if (params.containsKey(key)) {
@@ -151,17 +152,29 @@ public class ProtocolData extends InputData {
         }
 
         if (!duplicates.isEmpty()) {
-            throw new IllegalArgumentException("Profile '" + profile + "' already defines: " + String.valueOf(duplicates).replace("X-GP-", ""));
+            throw new IllegalArgumentException("Profile '" + profile
+                    + "' already defines: "
+                    + String.valueOf(duplicates).replace("X-GP-", ""));
         }
     }
 
-    /** Returns the request parameters */
+    /**
+     * Returns the request parameters.
+     *
+     * @return map of request parameters
+     */
     public Map<String, String> getParametersMap() {
         return requestParametersMap;
     }
 
-    public void protocolViolation(String property)
-    {
+    /**
+     * Throws an exception when the given property value is missing in request.
+     *
+     * @param property missing property name
+     * @throws IllegalArgumentException throws an exception with the property
+     *             name in the error message
+     */
+    public void protocolViolation(String property) {
         String error = "Internal server error. Property \"" + property
                 + "\" has no value in current request";
 
@@ -170,7 +183,8 @@ public class ProtocolData extends InputData {
     }
 
     /**
-     * Returns the value to which the specified property is mapped in {@link #requestParametersMap}.
+     * Returns the value to which the specified property is mapped in
+     * {@link #requestParametersMap}.
      *
      * @param property the lookup property key
      * @throws IllegalArgumentException if property key is missing
@@ -186,8 +200,8 @@ public class ProtocolData extends InputData {
     }
 
     /**
-     * Returns the optional property value.
-     * Unlike {@link #getProperty}, it will not fail if the property is not found. It will just return null instead.
+     * Returns the optional property value. Unlike {@link #getProperty}, it will
+     * not fail if the property is not found. It will just return null instead.
      *
      * @param property the lookup optional property
      * @return property value as a String
@@ -201,44 +215,56 @@ public class ProtocolData extends InputData {
      *
      * @param property the lookup property
      * @return property value as an int type
-     * @throws NumberFormatException
-     *         if the value is missing or can't be represented by an Integer
+     * @throws NumberFormatException if the value is missing or can't be
+     *             represented by an Integer
      */
     private int getIntProperty(String property) {
         return Integer.parseInt(getProperty(property));
     }
 
     /**
-     * Returns a property value as boolean type.
-     * A boolean property is defined as an int where 0 means false, and anything else true (like C).
+     * Returns a property value as boolean type. A boolean property is defined
+     * as an int where 0 means false, and anything else true (like C).
      *
      * @param property the lookup property
      * @return property value as boolean
-     * @throws NumberFormatException
-     *         if the value is missing or can't be represented by an Integer
+     * @throws NumberFormatException if the value is missing or can't be
+     *             represented by an Integer
      */
     private boolean getBoolProperty(String property) {
         return getIntProperty(property) != 0;
     }
 
-    /** Returns the current outputFormat, either {@link OutputFormat#TEXT} or {@link OutputFormat#BINARY}. */
+    /**
+     * Returns the current output format, either {@link OutputFormat#TEXT} or
+     * {@link OutputFormat#BINARY}.
+     *
+     * @return output format
+     */
     public OutputFormat outputFormat() {
         return outputFormat;
     }
 
-    /** Returns the server name providing the service. */
+    /**
+     * Returns the server name providing the service.
+     *
+     * @return server name
+     */
     public String serverName() {
         return host;
     }
 
-    /** Returns the server port providing the service. */
+    /**
+     * Returns the server port providing the service.
+     *
+     * @return server port
+     */
     public int serverPort() {
         return port;
     }
 
     /**
-     * Sets the thread safe parameter.
-     * Default value - true.
+     * Sets the thread safe parameter. Default value - true.
      */
     private void parseThreadSafe() {
 
@@ -257,24 +283,27 @@ public class ProtocolData extends InputData {
         if (threadSafeStr.equalsIgnoreCase(FALSE_LCASE)) {
             return false;
         }
-        throw new IllegalArgumentException("Illegal boolean value '" + threadSafeStr + "'." +
-                " Usage: [TRUE|FALSE]");
+        throw new IllegalArgumentException("Illegal boolean value '"
+                + threadSafeStr + "'." + " Usage: [TRUE|FALSE]");
     }
 
     /**
-     * Sets the format type based on the input string.
-     * Allowed values are: {@link OutputFormat#TEXT}, {@link OutputFormat#BINARY}.
+     * Sets the format type based on the input string. Allowed values are:
+     * "TEXT", "GPDBWritable".
+     *
+     * @param formatString format string
      */
     protected void parseFormat(String formatString) {
         switch (formatString) {
-        case "TEXT":
-            outputFormat = OutputFormat.TEXT;
-            break;
-        case "GPDBWritable":
-            outputFormat = OutputFormat.BINARY;
-            break;
-        default:
-            throw new IllegalArgumentException("Wrong value for greenplum.format " + formatString);
+            case "TEXT":
+                outputFormat = OutputFormat.TEXT;
+                break;
+            case "GPDBWritable":
+                outputFormat = OutputFormat.BINARY;
+                break;
+            default:
+                throw new IllegalArgumentException(
+                        "Wrong value for greenplum.format " + formatString);
         }
     }
 
@@ -288,7 +317,8 @@ public class ProtocolData extends InputData {
             int columnTypeCode = getIntProperty("ATTR-TYPECODE" + i);
             String columnTypeName = getProperty("ATTR-TYPENAME" + i);
 
-            ColumnDescriptor column = new ColumnDescriptor(columnName, columnTypeCode, i, columnTypeName);
+            ColumnDescriptor column = new ColumnDescriptor(columnName,
+                    columnTypeCode, i, columnTypeName);
             tupleDescription.add(column);
 
             if (columnName.equalsIgnoreCase(ColumnDescriptor.RECORD_KEY_NAME)) {
@@ -299,6 +329,7 @@ public class ProtocolData extends InputData {
 
     /**
      * Sets the index of the allocated data fragment
+     *
      * @param fragment the allocated data fragment
      */
     protected void parseDataFragment(String fragment) {
@@ -313,7 +344,8 @@ public class ProtocolData extends InputData {
     }
 
     private void parseFragmentMetadata() {
-        fragmentMetadata = parseBase64("FRAGMENT-METADATA", "Fragment metadata information");
+        fragmentMetadata = parseBase64("FRAGMENT-METADATA",
+                "Fragment metadata information");
     }
 
     private void parseUserData() {
@@ -326,8 +358,9 @@ public class ProtocolData extends InputData {
             return null;
         }
         if (!Base64.isArrayByteBase64(encoded.getBytes())) {
-            throw new IllegalArgumentException(errName + " must be Base64 encoded." +
-                    "(Bad value: " + encoded + ")");
+            throw new IllegalArgumentException(errName
+                    + " must be Base64 encoded." + "(Bad value: " + encoded
+                    + ")");
         }
         byte[] parsed = Base64.decodeBase64(encoded);
         LOG.debug("decoded " + key + ": " + new String(parsed));

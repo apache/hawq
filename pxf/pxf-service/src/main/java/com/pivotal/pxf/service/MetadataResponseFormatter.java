@@ -18,6 +18,10 @@ public class MetadataResponseFormatter {
 
     /**
      * Converts {@link Metadata} to JSON String format.
+     *
+     * @param metadata metadata to convert
+     * @return JSON formatted response
+     * @throws IOException if converting the data to JSON fails
      */
     public static String formatResponseString(Metadata metadata) throws IOException {
         /* print the metadata before serialization */

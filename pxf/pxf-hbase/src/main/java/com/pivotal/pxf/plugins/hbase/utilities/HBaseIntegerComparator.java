@@ -14,7 +14,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
  * <p>
  * To use with HBase it must reside in the classpath of every region server.
  * <p>
- * It converts a value into {@link Long} before comparing. 
+ * It converts a value into {@link Long} before comparing.
  * The filter is good for any integer numeric comparison i.e. integer, bigint, smallint.
  * <p>
  * according to HBase 0.96 requirements, this must serialized using Protocol Buffers
@@ -25,7 +25,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 public class HBaseIntegerComparator extends ByteArrayComparable {
 	private Long val;
 
-	
+
 	public HBaseIntegerComparator(Long inVal) {
 		super(Bytes.toBytes(inVal));
 		this.val = inVal;
@@ -33,6 +33,10 @@ public class HBaseIntegerComparator extends ByteArrayComparable {
 
 	/**
 	 * The comparison function. Currently uses {@link Long#parseLong(String)}.
+	 *
+	 * @return 0 if equal;
+	 *         a value less than 0 if row value is less than filter value;
+	 *         and a value greater than 0 if the row value is greater than the filter value.
 	 */
 	@Override
 	public int compareTo(byte[] value, int offset, int length) {
@@ -42,7 +46,7 @@ public class HBaseIntegerComparator extends ByteArrayComparable {
 		if (length == 0)
 			return 1; // empty line, can't compare.
 
-		/** 
+		/**
 		 * TODO optimize by parsing the bytes directly.
 		 * Maybe we can even determine if it is an int or a string encoded.
 		 */
@@ -53,6 +57,8 @@ public class HBaseIntegerComparator extends ByteArrayComparable {
 
 	/**
 	 * Returns the comparator serialized using Protocol Buffers.
+	 *
+	 * @return serialized comparator
 	 */
 	@Override
 	public byte[] toByteArray() {
@@ -64,12 +70,12 @@ public class HBaseIntegerComparator extends ByteArrayComparable {
 	/**
 	 * Hides ("overrides") a static method in {@link ByteArrayComparable}.
 	 * This method will be called in deserialization.
-	 * 
+	 *
 	 * @param pbBytes
 	 *            A pb serialized instance
 	 * @return An instance of {@link HBaseIntegerComparator} made from
 	 *         <code>bytes</code>
-	 * @throws DeserializationException
+	 * @throws DeserializationException if deserialization of bytes to Protocol Buffers failed
 	 * @see #toByteArray
 	 */
 	public static ByteArrayComparable parseFrom(final byte[] pbBytes)
