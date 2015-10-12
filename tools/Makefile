@@ -22,7 +22,6 @@ clean distclean:
 #---------------------------------------------------------------------
 
 SET_VERSION_SCRIPTS = \
-	bin/gpactivatestandby \
 	bin/gpaddmirrors \
 	bin/gpbitmapreindex \
 	bin/gpcheck \
@@ -33,8 +32,6 @@ SET_VERSION_SCRIPTS = \
 	bin/gpexpand \
 	bin/gpextract \
 	bin/gpfilespace \
-	bin/gpinitstandby \
-	bin/gpinitsystem \
 	bin/gpload.py \
 	bin/gplogfilter \
 	bin/gpmigrator \
