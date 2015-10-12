@@ -16,10 +16,11 @@ import java.util.ListIterator;
  * Accessor for accessing a splittable HDFS data sources. HDFS will divide the
  * file into splits based on an internal decision (by default, the block size is
  * also the split size).
- * 
+ *
  * Accessors that require such base functionality should extend this class.
  */
-public abstract class HdfsSplittableDataAccessor extends Plugin implements ReadAccessor {
+public abstract class HdfsSplittableDataAccessor extends Plugin implements
+        ReadAccessor {
     protected Configuration conf = null;
     protected RecordReader<Object, Object> reader = null;
     protected InputFormat<?, ?> inputFormat = null;
@@ -29,12 +30,12 @@ public abstract class HdfsSplittableDataAccessor extends Plugin implements ReadA
 
     /**
      * Constructs an HdfsSplittableDataAccessor
-     * 
+     *
      * @param input all input parameters coming from the client request
      * @param inFormat the HDFS {@link InputFormat} the caller wants to use
-     * @throws Exception
      */
-    public HdfsSplittableDataAccessor(InputData input, InputFormat<?, ?> inFormat) throws Exception {
+    public HdfsSplittableDataAccessor(InputData input,
+                                      InputFormat<?, ?> inFormat) {
         super(input);
         inputFormat = inFormat;
 
@@ -46,11 +47,12 @@ public abstract class HdfsSplittableDataAccessor extends Plugin implements ReadA
     }
 
     /**
-     * Fetches the requested fragment (file split) for the current client 
+     * Fetches the requested fragment (file split) for the current client
      * request, and sets a record reader for the job.
-     * 
+     *
      * @return true if succeeded, false if no more splits to be read
      */
+    @Override
     public boolean openForRead() throws Exception {
         LinkedList<InputSplit> requestSplits = new LinkedList<InputSplit>();
         FileSplit fileSplit = HdfsUtilities.parseFragmentMetadata(inputData);
@@ -62,23 +64,28 @@ public abstract class HdfsSplittableDataAccessor extends Plugin implements ReadA
     }
 
     /**
-     * Specialized accessors will override this method and implement their own 
+     * Specialized accessors will override this method and implement their own
      * recordReader. For example, a plain delimited text accessor may want to
-     * return a LineRecordReader. 
-     * 
+     * return a LineRecordReader.
+     *
      * @param jobConf the hadoop jobconf to use for the selected InputFormat
      * @param split the input split to be read by the accessor
-     * @return a recordreader to be used for reading the data records of the split
-     * @throws IOException
+     * @return a recordreader to be used for reading the data records of the
+     *         split
+     * @throws IOException if recordreader could not be created
      */
-    abstract protected Object getReader(JobConf jobConf, InputSplit split) throws IOException;
+    abstract protected Object getReader(JobConf jobConf, InputSplit split)
+            throws IOException;
 
-    /*
-     * getNextSplit
-     * Sets the current split and initializes a RecordReader who feeds from the split
+    /**
+     * Sets the current split and initializes a RecordReader who feeds from the
+     * split
+     *
+     * @return true if there is a split to read
+     * @throws IOException if record reader could not be created
      */
     @SuppressWarnings(value = "unchecked")
-    protected boolean getNextSplit() throws IOException {
+    protected boolean getNextSplit() throws IOException  {
         if (!iter.hasNext()) {
             return false;
         }
@@ -90,36 +97,40 @@ public abstract class HdfsSplittableDataAccessor extends Plugin implements ReadA
         return true;
     }
 
-    /*
-     * readNextObject
-     * Fetches one record from the  file. The record is returned as a Java object.
+    /**
+     * Fetches one record from the file. The record is returned as a Java
+     * object.
      */
     @Override
     public OneRow readNextObject() throws IOException {
-		
-        if (!reader.next(key, data)) { // if there is one more record in the current split
-            if (getNextSplit()) {// the current split is exhausted. try to move to the next split.
-                if (!reader.next(key, data)) {// read the first record of the new split
-                    return null; // make sure we return nulls
+        // if there is one more record in the current split
+        if (!reader.next(key, data)) {
+            // the current split is exhausted. try to move to the next split
+            if (getNextSplit()) {
+                // read the first record of the new split
+                if (!reader.next(key, data)) {
+                    // make sure we return nulls
+                    return null;
                 }
             } else {
-                return null; // make sure we return nulls
+                // make sure we return nulls
+                return null;
             }
         }
 
-		/*
-		 * if neither condition was met, it means we already read all the
-		 * records in all the splits, and in this call record variable was not
-		 * set, so we return null and thus we are signaling end of records
-		 * sequence
-		 */
+        /*
+         * if neither condition was met, it means we already read all the
+         * records in all the splits, and in this call record variable was not
+         * set, so we return null and thus we are signaling end of records
+         * sequence
+         */
         return new OneRow(key, data);
     }
 
-    /*
-     * closeForRead
+    /**
      * When user finished reading the file, it closes the RecordReader
      */
+    @Override
     public void closeForRead() throws Exception {
         if (reader != null) {
             reader.close();
@@ -129,7 +140,7 @@ public abstract class HdfsSplittableDataAccessor extends Plugin implements ReadA
     @Override
     public boolean isThreadSafe() {
         return HdfsUtilities.isThreadSafe(inputData.getDataSource(),
-				  inputData.getUserProperty("COMPRESSION_CODEC"));
+                inputData.getUserProperty("COMPRESSION_CODEC"));
     }
 
 }

@@ -19,8 +19,9 @@ import java.util.Map;
  * HBaseLookupTable will load a table's lookup information
  * from HBase pxflookup table if exists.<br>
  * This table holds mappings between HAWQ column names (key) and HBase column names (value).<br>
- * E.g. for an HBase table "hbase_table", mappings between HAWQ column names and HBase column name
- * "hawq1" -> "cf1:hbase1" and "hawq2" -> "cf1:hbase2" will be:<br>
+ * E.g. for an HBase table "hbase_table", mappings between HAWQ column names and HBase column names,
+ * when <code>"hawq1"</code> is mapped to <code>"cf1:hbase1"</code> and
+ * <code>"hawq2"</code> is mapped to <code>"cf1:hbase2"</code>, will be:<br>
  * <pre>
  * 	ROW                     COLUMN+CELL
  *  hbase_table             column=mapping:hawq1, value=cf1:hbase1
@@ -47,6 +48,7 @@ public class HBaseLookupTable implements Closeable {
      * Constructs a connector to HBase lookup table.
      * Requires calling {@link #close()} to close {@link HBaseAdmin} instance.
      *
+     * @param conf HBase configuration
      * @throws IOException when initializing HBaseAdmin fails
      */
     public HBaseLookupTable(Configuration conf) throws Exception {
@@ -93,6 +95,8 @@ public class HBaseLookupTable implements Closeable {
 
     /**
      * Returns true if {@link #LOOKUPTABLENAME} is available and enabled.
+     *
+     * @return whether lookup table is valid
      */
     private boolean lookupTableValid() throws IOException {
         return (HBaseUtilities.isTableAvailable(admin, LOOKUPTABLENAME) &&
@@ -101,6 +105,8 @@ public class HBaseLookupTable implements Closeable {
 
     /**
      * Returns true if {@link #LOOKUPTABLENAME} has {@value #LOOKUPCOLUMNFAMILY} family.
+     *
+     * @return whether lookup has expected column family name
      */
     private boolean lookupHasCorrectStructure() throws IOException {
         HTableDescriptor htd = admin.getTableDescriptor(TableName.valueOf(LOOKUPTABLENAME));
@@ -109,6 +115,8 @@ public class HBaseLookupTable implements Closeable {
 
     /**
      * Loads table name mappings from {@link #LOOKUPTABLENAME} lookup table.
+     *
+     * @param tableName table name
      */
     private void loadTableMappings(String tableName) throws IOException {
         openLookupTable();

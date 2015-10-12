@@ -2,6 +2,7 @@ package com.pivotal.pxf.plugins.hdfs;
 
 import com.pivotal.pxf.api.OneRow;
 import com.pivotal.pxf.api.utilities.InputData;
+
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.mapred.*;
@@ -21,10 +22,11 @@ public class AvroFileAccessor extends HdfsSplittableDataAccessor {
     private AvroWrapper<GenericRecord> avroWrapper = null;
 
     /**
-     * Constructs a AvroFileAccessor that creates the job configuration and 
+     * Constructs a AvroFileAccessor that creates the job configuration and
      * accesses the avro file to fetch the avro schema
-     * 
+     *
      * @param input all input parameters coming from the client
+     * @throws Exception if getting the avro schema fails
      */
     public AvroFileAccessor(InputData input) throws Exception {
         // 1. Call the base class
@@ -44,15 +46,15 @@ public class AvroFileAccessor extends HdfsSplittableDataAccessor {
 
     @Override
     protected Object getReader(JobConf jobConf, InputSplit split) throws IOException {
-        return new AvroRecordReader(jobConf, (FileSplit) split);
+        return new AvroRecordReader<Object>(jobConf, (FileSplit) split);
     }
 
     /**
      * readNextObject
-     * The AVRO accessor is currently the only specialized accessor that 
-     * overrides this method. This happens, because the special 
+     * The AVRO accessor is currently the only specialized accessor that
+     * overrides this method. This happens, because the special
      * AvroRecordReader.next() semantics (use of the AvroWrapper), so it
-     * cannot use the RecordReader's default implementation in 
+     * cannot use the RecordReader's default implementation in
      * SplittableFileAccessor
      */
     @Override

@@ -27,7 +27,7 @@ public abstract class Fragmenter extends Plugin {
      * Used to get fragments of data that could be read in parallel from the different segments.
      *
      * @return list of data fragments
-     * @throws Exception
+     * @throws Exception if fragment list could not be retrieved
      */
     public abstract List<Fragment> getFragments() throws Exception;
 }

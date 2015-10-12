@@ -19,7 +19,7 @@ public class GPDBWritable implements Writable {
      * GPDBWritable is using the following serialization form:
 	 * Total Length | Version | Error Flag | # of columns | Col type |...| Col type | Null Bit array            |   Col val...
      * 4 byte		| 2 byte  |	1 byte     |   2 byte     |  1 byte  |...|  1 byte  | ceil(# of columns/8) byte |   Fixed or Var length
-     * 
+     *
      * For fixed length type, we know the length.
      * In the col val, we align pad according to the alignment requirement of the type.
      * For var length type, the alignment is always 4 byte.
@@ -150,11 +150,11 @@ public class GPDBWritable implements Writable {
     public void readFields(DataInput in) throws IOException {
         /*
          * extract pkt len.
-		 * 
-		 * GPSQL-1107: 
+		 *
+		 * GPSQL-1107:
 		 * The DataInput might already be empty (EOF), but we can't check it beforehand.
 		 * If that's the case, pktlen is updated to -1, to mark that the object is still empty.
-		 * (can be checked with isEmpty()). 
+		 * (can be checked with isEmpty()).
 		 */
         pktlen = readPktLen(in);
         if (isEmpty()) {
@@ -185,7 +185,7 @@ public class GPDBWritable implements Writable {
         colType = new int[colCnt];
         DBType[] coldbtype = new DBType[colCnt];
         for (int i = 0; i < colCnt; i++) {
-            int enumType = (int) (in.readByte());
+            int enumType = (in.readByte());
             curOffset += 1;
             if (enumType == DBType.BIGINT.ordinal()) {
                 colType[i] = BIGINT.getOID();
@@ -362,7 +362,7 @@ public class GPDBWritable implements Writable {
             } else {
                 nullBits[i] = false;
 
-				/* 
+				/*
                  * For fixed length type, we get the fixed length.
 				 * For var len binary format, the length is in the col value.
 				 * For text format, we must convert encoding first.
@@ -378,7 +378,7 @@ public class GPDBWritable implements Writable {
 				/* calculate and add the type alignment padding */
                 padLength[i] = roundUpAlignment(datlen, coldbtype.getAlignment()) - datlen;
                 datlen += padLength[i];
-				
+
 				/* for variable length type, we add a 4 byte length header */
                 if (coldbtype.isVarLength()) {
                     datlen += 4;
@@ -392,22 +392,22 @@ public class GPDBWritable implements Writable {
 		 */
         int endpadding = roundUpAlignment(datlen, 8) - datlen;
         datlen += endpadding;
-		
+
 		/* Construct the packet header */
         out.writeInt(datlen);
         out.writeShort(VERSION);
         out.writeByte(errorFlag);
         out.writeShort(numCol);
-		
+
 		/* Write col type */
         for (int i = 0; i < numCol; i++) {
             out.writeByte(enumType[i]);
         }
-		
+
 		/* Nullness */
         byte[] nullBytes = boolArrayToByteArray(nullBits);
         out.write(nullBytes);
-		
+
 		/* Column Value */
         for (int i = 0; i < numCol; i++) {
             if (!nullBits[i]) {
@@ -442,7 +442,7 @@ public class GPDBWritable implements Writable {
                         out.writeInt(colLength[i]);
                         out.write((byte[]) colValue[i]);
                         break;
-					
+
 					/* For text format, add 4byte length header. string is already '\0' terminated */
                     default: {
                         out.writeInt(colLength[i]);
@@ -513,7 +513,7 @@ public class GPDBWritable implements Writable {
      */
 
     /**
-     * Set the column value of the record
+     * Sets the column value of the record.
      *
      * @param colIdx the column index
      * @param val    the value
@@ -526,7 +526,7 @@ public class GPDBWritable implements Writable {
     }
 
     /**
-     * Set the column value of the record
+     * Sets the column value of the record.
      *
      * @param colIdx the column index
      * @param val    the value
@@ -539,7 +539,7 @@ public class GPDBWritable implements Writable {
     }
 
     /**
-     * Set the column value of the record
+     * Sets the column value of the record.
      *
      * @param colIdx the column index
      * @param val    the value
@@ -552,7 +552,7 @@ public class GPDBWritable implements Writable {
     }
 
     /**
-     * Set the column value of the record
+     * Sets the column value of the record.
      *
      * @param colIdx the column index
      * @param val    the value
@@ -569,7 +569,7 @@ public class GPDBWritable implements Writable {
     }
 
     /**
-     * Set the column value of the record
+     * Sets the column value of the record.
      *
      * @param colIdx the column index
      * @param val    the value
@@ -582,7 +582,7 @@ public class GPDBWritable implements Writable {
     }
 
     /**
-     * Set the column value of the record
+     * Sets the column value of the record.
      *
      * @param colIdx the column index
      * @param val    the value
@@ -595,7 +595,7 @@ public class GPDBWritable implements Writable {
     }
 
     /**
-     * Set the column value of the record
+     * Sets the column value of the record.
      *
      * @param colIdx the column index
      * @param val    the value
@@ -608,7 +608,7 @@ public class GPDBWritable implements Writable {
     }
 
     /**
-     * Set the column value of the record
+     * Sets the column value of the record.
      *
      * @param colIdx the column index
      * @param val    the value
@@ -621,9 +621,10 @@ public class GPDBWritable implements Writable {
     }
 
     /**
-     * Get the column value of the record
+     * Gets the column value of the record.
      *
      * @param colIdx the column index
+     * @return column value
      * @throws TypeMismatchException the column type does not match
      */
     public Long getLong(int colIdx)
@@ -633,9 +634,10 @@ public class GPDBWritable implements Writable {
     }
 
     /**
-     * Get the column value of the record
+     * Gets the column value of the record.
      *
      * @param colIdx the column index
+     * @return column value
      * @throws TypeMismatchException the column type does not match
      */
     public Boolean getBoolean(int colIdx)
@@ -645,9 +647,10 @@ public class GPDBWritable implements Writable {
     }
 
     /**
-     * Get the column value of the record
+     * Gets the column value of the record.
      *
      * @param colIdx the column index
+     * @return column value
      * @throws TypeMismatchException the column type does not match
      */
     public byte[] getBytes(int colIdx)
@@ -657,9 +660,10 @@ public class GPDBWritable implements Writable {
     }
 
     /**
-     * Get the column value of the record
+     * Gets the column value of the record.
      *
      * @param colIdx the column index
+     * @return column value
      * @throws TypeMismatchException the column type does not match
      */
     public String getString(int colIdx)
@@ -669,9 +673,10 @@ public class GPDBWritable implements Writable {
     }
 
     /**
-     * Get the column value of the record
+     * Gets the column value of the record.
      *
      * @param colIdx the column index
+     * @return column value
      * @throws TypeMismatchException the column type does not match
      */
     public Float getFloat(int colIdx)
@@ -681,9 +686,10 @@ public class GPDBWritable implements Writable {
     }
 
     /**
-     * Get the column value of the record
+     * Gets the column value of the record.
      *
      * @param colIdx the column index
+     * @return column value
      * @throws TypeMismatchException the column type does not match
      */
     public Double getDouble(int colIdx)
@@ -693,9 +699,10 @@ public class GPDBWritable implements Writable {
     }
 
     /**
-     * Get the column value of the record
+     * Gets the column value of the record.
      *
      * @param colIdx the column index
+     * @return column value
      * @throws TypeMismatchException the column type does not match
      */
     public Integer getInt(int colIdx)
@@ -705,9 +712,10 @@ public class GPDBWritable implements Writable {
     }
 
     /**
-     * Get the column value of the record
+     * Gets the column value of the record.
      *
      * @param colIdx the column index
+     * @return column value
      * @throws TypeMismatchException the column type does not match
      */
     public Short getShort(int colIdx)
@@ -717,7 +725,7 @@ public class GPDBWritable implements Writable {
     }
 
     /**
-     * Set the error field
+     * Sets the error field.
      *
      * @param errorVal the error value
      */
@@ -726,8 +734,9 @@ public class GPDBWritable implements Writable {
     }
 
     /**
-     * Return a string representation of the object
+     * Returns a string representation of the object.
      */
+    @Override
     public String toString() {
         if (colType == null) {
             return null;
@@ -798,6 +807,9 @@ public class GPDBWritable implements Writable {
      * Helper to get the type name.
      * If a given oid is not in the commonly used list, we
      * would expect a TEXT for it (for the error message).
+     *
+     * @param oid type OID
+     * @return type name
      */
     public static String getTypeName(int oid) {
         switch (DataType.get(oid)) {
@@ -852,6 +864,8 @@ public class GPDBWritable implements Writable {
      * Returns if the writable object is empty,
      * based on the pkt len as read from stream.
      * -1 means nothing was read (eof).
+     *
+     * @return whether the writable object is empty
      */
     public boolean isEmpty() {
         return pktlen == EOF;
