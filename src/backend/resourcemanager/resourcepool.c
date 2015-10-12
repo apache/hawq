@@ -47,6 +47,8 @@ void getSegResResourceCountersByMemCoreCounters(SegResource  resinfo,
 VSegmentCounterInternal createVSegmentCounter(uint32_t 		hdfsnameindex,
 											  SegResource	segres);
 
+void refreshSlavesFileHostSize(FILE *fp);
+
 /* Functions for BBST indices. */
 int __DRM_NODERESPOOL_comp_ratioFree(void *arg, void *val1, void *val2);
 int __DRM_NODERESPOOL_comp_ratioAlloc(void *arg, void *val1, void *val2);
@@ -331,6 +333,9 @@ void initializeResourcePoolManager(void)
 		PRESPOOL->allocateResFuncs[i] = NULL;
 	}
 	PRESPOOL->allocateResFuncs[0] = allocateResourceFromResourcePoolIOBytes;
+
+	PRESPOOL->SlavesFileTimestamp = 0;
+	PRESPOOL->SlavesHostCount	  = 0;
 }
 
 #define CONNECT_TIMEOUT 60
@@ -1838,7 +1843,7 @@ int allocateResourceFromResourcePoolIOBytes(int32_t 	nodecount,
 			 * 		 slice limit. Because we will gothrough all segments later
 			 * 		 if not enough segments are found in this loop.
 			 */
-			if ( segresource->SliceWorkload + slicesize > rm_slice_num_per_seg_limit )
+			if ( segresource->SliceWorkload + slicesize > rm_nslice_perseg_limit )
 			{
 				elog(DEBUG3, "Segment %s contains %d slices working now, it can "
 							 "not afford %d more slices.",
@@ -1968,8 +1973,7 @@ int allocateResourceFromResourcePoolIOBytes(int32_t 	nodecount,
 			else
 			{
 
-				if ( !fixnodecount &&
-					 curres->SliceWorkload + slicesize > rm_slice_num_per_seg_limit )
+				if ( curres->SliceWorkload + slicesize > rm_nslice_perseg_limit )
 				{
 					elog(LOG, "Segment %s contains %d slices working now, "
 							  "it can not afford %d more slices.",
@@ -3553,6 +3557,124 @@ int getSegmentGRMContainerSize(SegResource segres)
 	return segres->GRMContainerCount;
 }
 
+void checkSlavesFile(void)
+{
+	static char *filename = NULL;
+
+	if ( filename == NULL )
+	{
+
+		char *gphome = getenv("GPHOME");
+		if ( gphome == NULL )
+		{
+			elog(WARNING, "The environment variable GPHOME is not set. "
+						  "Resource manager can not find file slaves.");
+			return;
+		}
+
+		filename = rm_palloc0(PCONTEXT, strlen(gphome) + sizeof("/etc/slaves"));
+
+		sprintf(filename, "%s%s", gphome, "/etc/slaves");
+	}
+
+	elog(DEBUG3, "Resource manager reads slaves file %s.", filename);
+
+	/* Get file stat. */
+	struct stat filestat;
+	FILE *fp = fopen(filename, "r");
+	if ( fp == NULL )
+	{
+		elog(WARNING, "Fail to open slaves file %s. errno %d", filename, errno);
+		return;
+	}
+	int fd = fileno(fp);
+
+	int fres = fstat(fd, &filestat);
+	if ( fres != 0 )
+	{
+		fclose(fp);
+		elog(WARNING, "Fail to get slaves file stat %s. errno %d", filename, errno);
+		return;
+	}
+	int64_t filechangetime = filestat.st_mtime;
+
+	elog(DEBUG3, "Current file change time stamp " INT64_FORMAT, filechangetime);
+
+	if ( filechangetime != PRESPOOL->SlavesFileTimestamp )
+	{
+		refreshSlavesFileHostSize(fp);
+		PRESPOOL->SlavesFileTimestamp = filechangetime;
+	}
+
+	fclose(fp);
+}
+
+void refreshSlavesFileHostSize(FILE *fp)
+{
+	static char				zero[1]  = "";
+	int 					newcnt 	 = 0;
+	bool 					haserror = false;
+	SelfMaintainBufferData 	smb;
+
+	elog(DEBUG3, "Refresh slaves file host size now.");
+
+	initializeSelfMaintainBuffer(&smb, PCONTEXT);
+	while( true )
+	{
+		char c = fgetc(fp);
+		if ( c == EOF )
+		{
+			if ( feof(fp) == 0 )
+			{
+				elog(WARNING, "Failed to read slaves file, ferror() gets %d",
+							  ferror(fp));
+				haserror = true;
+			}
+
+			break;
+		}
+
+		if ( c == '\t' || c == ' ' || c == '\r' )
+		{
+			continue;
+		}
+
+		if ( c == '\n' )
+		{
+			if ( smb.Cursor + 1 > 0 )
+			{
+				appendSelfMaintainBuffer(&smb, zero, 1);
+				elog(DEBUG3, "Loaded slaves host %s", smb.Buffer);
+
+				resetSelfMaintainBuffer(&smb);
+				newcnt++;
+			}
+		}
+		else
+		{
+			/* Add this character into the buffer. */
+			appendSelfMaintainBuffer(&smb, &c, 1);
+		}
+	}
+
+	if ( smb.Cursor + 1 > 0 )
+	{
+		appendSelfMaintainBuffer(&smb, zero, 1);
+		elog(DEBUG3, "Loaded slaves host %s (last one)", smb.Buffer);
+		newcnt++;
+	}
+
+	destroySelfMaintainBuffer(&smb);
+
+	if ( !haserror )
+	{
+		elog(LOG, "Resource manager refreshed slaves host size from %d to %d.",
+				  PRESPOOL->SlavesHostCount,
+				  newcnt);
+		PRESPOOL->SlavesHostCount = newcnt;
+	}
+
+}
 
 void getSegResResourceCountersByMemCoreCounters(SegResource  resinfo,
 												int32_t		*allocmem,

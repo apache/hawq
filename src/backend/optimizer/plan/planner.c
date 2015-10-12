@@ -328,6 +328,8 @@ planner(Query *parse, int cursorOptions,
 	  }
 	}
 
+	int optimizer_segments_saved_value = optimizer_segments;
+
 	PG_TRY();
 	{
     if (resourceNegotiateDone)
@@ -347,6 +349,11 @@ planner(Query *parse, int cursorOptions,
 			}
 			START_MEMORY_ACCOUNT(MemoryAccounting_CreateAccount(0, MEMORY_OWNER_TYPE_Optimizer));
 			{
+				if (optimizer_segments == 0) // value not set by user
+				{
+					optimizer_segments = gp_segments_for_planner;
+				}
+
 				result = optimize_query(parse, boundParams);
 				if (ppResult->stmt && ppResult->stmt->intoPolicy
 						&& result && result->intoPolicy)
@@ -354,6 +361,7 @@ planner(Query *parse, int cursorOptions,
 					result->intoPolicy->bucketnum =
 							ppResult->stmt->intoPolicy->bucketnum;
 				}
+				optimizer_segments = optimizer_segments_saved_value;
 			}
 			END_MEMORY_ACCOUNT();
 
@@ -405,6 +413,7 @@ planner(Query *parse, int cursorOptions,
 	   */
 	  resourceNegotiateDone = false;
 	  plannerLevel = 0;
+  	  optimizer_segments = optimizer_segments_saved_value;
 	  if (savedQueryResource)
 	  {
 	    gp_segments_for_planner = list_length(savedQueryResource->segments);

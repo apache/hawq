@@ -38,14 +38,17 @@ enum RESOURCE_QUEUE_DDL_ATTR_INDEX
 	RSQ_DDL_ATTR_ACTIVE_STATMENTS,
 	RSQ_DDL_ATTR_MEMORY_LIMIT_CLUSTER,
 	RSQ_DDL_ATTR_CORE_LIMIT_CLUSTER,
-	RSQ_DDL_ATTR_VSEGMENT_RESOURCE_QUOTA,
+	RSQ_DDL_ATTR_VSEG_RESOURCE_QUOTA,
 	RSQ_DDL_ATTR_ALLOCATION_POLICY,
-	RSQ_DDL_ATTR_RESOURCE_UPPER_FACTOR,
-	RSQ_DDL_ATTR_VSEGMENT_UPPER_LIMIT,
+	RSQ_DDL_ATTR_RESOURCE_OVERCOMMIT_FACTOR,
+	RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT,
+	RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT,
+	RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT_PERSEG,
+	RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT_PERSEG,
 	RSQ_DDL_ATTR_COUNT
 };
 
-extern char RSQDDLAttrNames[RSQ_DDL_ATTR_COUNT][RESOURCE_QUEUE_DDL_ATTR_LENGTH_MAX];
+extern char RSQDDLAttrNames[RSQ_DDL_ATTR_COUNT][RESOURCE_QUEUE_DDL_ATTR_LENGTH_MAX+1];
 
 /*
  * The attributes for expressing one complete resource queue definition.
@@ -57,10 +60,13 @@ enum RESOURCE_QUEUE_TABLE_ATTR_INDEX {
 	RSQ_TBL_ATTR_ACTIVE_STATMENTS,
 	RSQ_TBL_ATTR_MEMORY_LIMIT_CLUSTER,
 	RSQ_TBL_ATTR_CORE_LIMIT_CLUSTER,
-	RSQ_TBL_ATTR_VSEGMENT_RESOURCE_QUOTA,
+	RSQ_TBL_ATTR_VSEG_RESOURCE_QUOTA,
 	RSQ_TBL_ATTR_ALLOCATION_POLICY,
-	RSQ_TBL_ATTR_RESORUCE_UPPER_FACTOR,
-	RSQ_TBL_ATTR_VSEGMENT_UPPER_LIMIT,
+	RSQ_TBL_ATTR_RESORUCE_OVERCOMMIT_FACTOR,
+	RSQ_TBL_ATTR_NVSEG_UPPER_LIMIT,
+	RSQ_TBL_ATTR_NVSEG_LOWER_LIMIT,
+	RSQ_TBL_ATTR_NVSEG_UPPER_LIMIT_PERSEG,
+	RSQ_TBL_ATTR_NVSEG_LOWER_LIMIT_PERSEG,
 
 	/* The attributes automatically generated. */
 	RSQ_TBL_ATTR_OID,
@@ -71,17 +77,6 @@ enum RESOURCE_QUEUE_TABLE_ATTR_INDEX {
 
 	RSQ_TBL_ATTR_COUNT
 };
-
-/*
- * The possible resource allocation policies.
- */
-enum RESOURCE_QUEUE_ALLOCATION_POLICY_INDEX {
-	RSQ_ALLOCATION_POLICY_EVEN = 0,
-	RSQ_ALLOCATION_POLICY_FIFO,
-
-	RSQ_ALLOCATION_POLICY_COUNT
-};
-
 
 /*
  * The attributes for expressing one complete role/user definition.
@@ -114,8 +109,11 @@ struct DynResourceQueueData {
     int32_t				SegResourceQuotaMemoryMB;/* Segment resource quota    */
     int32_t				Reserved2;
 
-    double				ResourceUpperFactor;
-    int32_t				VSegUpperLimit;			/* vseg upper limit. 		  */
+    int32_t				NVSegUpperLimit;		/* vseg upper limit. 		  */
+    int32_t				NVSegLowerLimit;		/* vseg upper limit. 		  */
+    double				NVSegUpperLimitPerSeg;	/* vseg upper limit per seg.  */
+    double				NVSegLowerLimitPerSeg;	/* vseg lower limit per seg.  */
+    double				ResourceOvercommit;
 
     int8_t				AllocatePolicy;			/* Allocation policy          */
     int8_t				QueuingPolicy;			/* Temporary unused. 		  */
@@ -334,6 +332,7 @@ int shallowparseResourceQueueWithAttributes(List 	*rawattr,
 
 int parseResourceQueueAttributes( List 			 	*attributes,
 								  DynResourceQueue 	 queue,
+								  bool				 checkformatonly,
 								  char 				*errorbuf,
 								  int   			 errorbufsize);
 
@@ -367,8 +366,7 @@ void setQueueTrackIndexedByQueueName(DynResourceQueueTrack queuetrack);
 
 void removeQueueTrackIndexedByQueueName(DynResourceQueueTrack queuetrack);
 
-DynResourceQueueTrack getQueueTrackByQueueOID (int64_t 	 queoid,
-											   bool 	*exist);
+DynResourceQueueTrack getQueueTrackByQueueOID (int64_t queoid, bool *exist);
 
 DynResourceQueueTrack getQueueTrackByQueueName(char 	*quename,
 											   int 		 quenamelen,
@@ -382,7 +380,7 @@ int parseUserAttributes( List 	 	*attributes,
 
 int checkUserAttributes(UserInfo user, char *errorbuf, int errorbufsize);
 
-int createUser(UserInfo userinfo, char *errorbuf, int errorbufsize);
+void createUser(UserInfo userinfo);
 
 void setUserIndexedByUserOID(UserInfo userinfo);
 void setUserIndexedByUserName(UserInfo userinfo);
@@ -420,7 +418,7 @@ const char *getUSRTBLAttributeName(int attrindex);
 int registerConnectionByUserID(ConnectionTrack conntrack);
 int acquireResourceFromResQueMgr(ConnectionTrack conntrack);
 int returnResourceToResQueMgr(ConnectionTrack conntrack);
-void returnConnectionToQueue(ConnectionTrack conntrack, bool normally);
+void returnConnectionToQueue(ConnectionTrack conntrack, bool istimeout);
 int acquireResourceQuotaFromResQueMgr(ConnectionTrack conntrack);
 void cancelResourceAllocRequest(ConnectionTrack conntrack);
 /*

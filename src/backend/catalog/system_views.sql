@@ -374,7 +374,7 @@ CREATE VIEW pg_stat_database AS
 CREATE VIEW pg_stat_resqueues AS
 	SELECT
 		Q.oid AS queueid,
-		Q.rsqname AS queuename,
+		Q.name AS queuename,
 		pg_stat_get_queue_num_exec(Q.oid) AS n_queries_exec,
 		pg_stat_get_queue_num_wait(Q.oid) AS n_queries_wait,
 		pg_stat_get_queue_elapsed_exec(Q.oid) AS elapsed_exec,
@@ -385,7 +385,7 @@ CREATE VIEW pg_stat_resqueues AS
 
 CREATE VIEW pg_resqueue_status AS
 	SELECT 
-			q.rsqname,
+			q.name,
 			s.segmem AS segmem, 
 			s.segcore AS segcore, 
 			s.segsize AS segsize, 
@@ -397,7 +397,7 @@ CREATE VIEW pg_resqueue_status AS
 			s.paused AS paused
 	FROM pg_resqueue AS q 
 			INNER JOIN pg_resqueue_status() AS s 
-			(	rsqname text,
+			(	name text,
 				segmem text,
 				segcore text,
 				segsize text,
@@ -407,7 +407,7 @@ CREATE VIEW pg_resqueue_status AS
 				rsqholders text,
 				rsqwaiters text,
 				paused text)
-			ON (s.rsqname = q.rsqname);
+			ON (s.name = q.name);
 
 -- External table views
 
@@ -772,7 +772,7 @@ pg_namespace.oid FROM pg_namespace WHERE (pg_namespace.nspname =
 'pg_catalog'::name)))))))
 UNION
 SELECT 'pg_resqueue' AS classname,
-a.rsqname as objname,
+a.name as objname,
 c.objid, NULL AS schemaname,
 CASE WHEN 
 ((b.oid = c.stasysid) AND (b.rolname = c.stausename) )
