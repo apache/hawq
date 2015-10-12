@@ -39,6 +39,7 @@ objfiles.txt
 # Eclipse Project
 .project
 .pydevproject
+.cproject
 
 # Generated files
 GNUmakefile
