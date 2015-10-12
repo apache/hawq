@@ -4402,15 +4402,6 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
-	    {"hawq_rm_domain_comm_enable", PGC_USERSET, DEVELOPER_OPTIONS,
-	        gettext_noop("Indicate whether domain socket for RM communication is allowed"),
-	        NULL,
-	    },
-	    &rm_domain_comm_enable,
-	    false, NULL, NULL
-	},
-
-	{
 		{"hawq_resourceenforcer_cpu_enable", PGC_POSTMASTER, RESOURCES_MGM,
 		 gettext_noop("enable enforcing cpu resource consumption."),
 		 NULL
@@ -4444,6 +4435,15 @@ static struct config_bool ConfigureNamesBool[] =
 		 NULL
 		},
 		&rm_force_fifo_queue,
+		true, NULL, NULL
+	},
+
+	{
+		{"hawq_rm_session_lease_heartbeat_enable", PGC_USERSET, RESOURCES_MGM,
+		 gettext_noop("enable or disable session lease heartbeat for test."),
+		 NULL
+		},
+		&rm_session_lease_heartbeat_enable,
 		true, NULL, NULL
 	},
 
@@ -6294,32 +6294,32 @@ static struct config_int ConfigureNamesInt[] =
 		1, 1, 65535, NULL, NULL
 	},
 
-	{
-		{"hawq_resourcemanager_master_address_port", PGC_POSTMASTER, RESOURCES_MGM,
-			gettext_noop("master resource manager server address port number"),
-			NULL
-		},
-		&rm_master_addr_port,
-		5437, 1, 65535, NULL, NULL
-	},
+    {
+            {"hawq_rm_master_port", PGC_POSTMASTER, RESOURCES_MGM,
+                    gettext_noop("resource manager master server port number"),
+                    NULL
+            },
+            &rm_master_port,
+            5437, 1, 65535, NULL, NULL
+    },
 
-	{
-		{"hawq_resourcemanager_master_address_domainsocket_port", PGC_POSTMASTER, RESOURCES_MGM,
-			gettext_noop("master resource manager server address domain socket port number"),
-			NULL
-		},
-		&rm_master_addr_domain_port,
-		5436, 1, 65535, NULL, NULL
-	},
+    {
+            {"hawq_rm_segment_port", PGC_POSTMASTER, RESOURCES_MGM,
+                    gettext_noop("resource manager segment server port number"),
+                    NULL
+            },
+            &rm_segment_port,
+            5438, 1, 65535, NULL, NULL
+    },
 
-	{
-		{"hawq_resourcemanager_segment_address_port", PGC_POSTMASTER, RESOURCES_MGM,
-			gettext_noop("segment resource manager server address port number"),
-			NULL
-		},
-		&rm_seg_addr_port,
-		5438, 1, 65535, NULL, NULL
-	},
+    {
+            {"hawq_rm_master_domain_port", PGC_POSTMASTER, RESOURCES_MGM,
+                    gettext_noop("resource manager master domain socket port number"),
+                    NULL
+            },
+            &rm_master_domain_port,
+            5436, 1, 65535, NULL, NULL
+    },
 
 	{
 		{"hawq_resourcemanager_log_level", PGC_USERSET, DEVELOPER_OPTIONS,
@@ -6391,32 +6391,34 @@ static struct config_int ConfigureNamesInt[] =
 		0, 0, 10, NULL, NULL
 	},
 
-	{
-		{"hawq_resourcemanager_query_vsegment_number_limit", PGC_USERSET, RESOURCES_MGM,
-			gettext_noop("the limit of the number of virtual segments for one query."),
-			NULL
-		},
-		&rm_query_vseg_num_limit,
-		1000, 1, 65535, NULL, NULL
-	},
+    {
+            {"hawq_rm_nvseg_perquery_limit", PGC_USERSET, RESOURCES_MGM,
+                    gettext_noop("the limit of the number of virtual segments for one query."),
+                    NULL
+            },
+            &rm_nvseg_perquery_limit,
+            1000, 1, 65535, NULL, NULL
+    },
 
-	{
-		{"hawq_resourcemanager_query_vsegment_number_per_segment_limit", PGC_USERSET, RESOURCES_MGM,
-			gettext_noop("the limit of the number of virtual segments in one segment for one query."),
-			NULL
-		},
-		&rm_query_vseg_num_per_seg_limit,
-		8, 1, 65535, NULL, NULL
-	},
+    {
+            {"hawq_rm_nvseg_perquery_perseg_limit", PGC_USERSET, RESOURCES_MGM,
+                    gettext_noop("the limit of the number of virtual segments in one "
+                                             "segment for one query."),
+                    NULL
+            },
+            &rm_nvseg_perquery_perseg_limit,
+            8, 1, 65535, NULL, NULL
+    },
 
-	{
-		{"hawq_resourcemanager_segment_slice_number_limit", PGC_POSTMASTER, RESOURCES_MGM,
-			gettext_noop("the limit of the number of slice number in one segment for one query."),
-			NULL
-		},
-		&rm_slice_num_per_seg_limit,
-		3000, 1, 65535, NULL, NULL
-	},
+    {
+            {"hawq_rm_nslice_perseg_limit", PGC_POSTMASTER, RESOURCES_MGM,
+                    gettext_noop("the limit of the number of slice number in one segment "
+                                             "for one query."),
+                    NULL
+            },
+            &rm_nslice_perseg_limit,
+            3000, 1, 65535, NULL, NULL
+    },
 
 	{
 		{"hawq_resourcemanager_segment_container_waterlevel", PGC_POSTMASTER, RESOURCES_MGM,
@@ -6430,12 +6432,13 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"hawq_resourcemanager_resource_noacition_timeout", PGC_POSTMASTER, RESOURCES_MGM,
-			gettext_noop("timeout for closing active connection for resource negotiation."),
+		{"hawq_rm_session_lease_timeout", PGC_POSTMASTER, RESOURCES_MGM,
+			gettext_noop("timeout for closing a session lease if dispatcher does "
+						 "not send heart-beat for a while."),
 			NULL
 		},
-		&rm_resource_noaction_timeout,
-		10, -1, 65535, NULL, NULL
+		&rm_session_lease_timeout,
+		10, 5, 65535, NULL, NULL
 	},
 
 	{
@@ -6463,6 +6466,24 @@ static struct config_int ConfigureNamesInt[] =
 		},
 		&rm_resource_heartbeat_interval,
 		1, 1, 65535, NULL, NULL
+	},
+
+	{
+		{"hawq_rm_tolerate_nseg_limit", PGC_POSTMASTER, RESOURCES_MGM,
+			gettext_noop("the size of down segments that resource manager should tolerate at most ."),
+			NULL
+		},
+		&rm_tolerate_nseg_limit,
+		2, 0, 65535, NULL, NULL
+	},
+
+	{
+		{"hawq_rm_nvseg_variance_amon_seg_limit", PGC_POSTMASTER, RESOURCES_MGM,
+			gettext_noop("the variance of vseg number in each segment that resource manager should tolerate at most."),
+			NULL
+		},
+		&rm_nvseg_variance_among_seg_limit,
+		1, 0, 65535, NULL, NULL
 	},
 
 	{
@@ -8003,14 +8024,14 @@ static struct config_string ConfigureNamesString[] =
 		"", NULL, NULL
 	},
 
-	{
-		{"hawq_resourcemanager_server_type", PGC_POSTMASTER, RESOURCES_MGM,
-			gettext_noop("set resource management server type"),
-			NULL
+    {
+		{"hawq_global_rm_type", PGC_POSTMASTER, RESOURCES_MGM,
+				gettext_noop("set resource management server type"),
+				NULL
 		},
-		&rm_grm_server_type,
+		&rm_global_rm_type,
 		"none", NULL, NULL
-	},
+    },
 
 	{
 		{"hawq_resourcemanager_yarn_resourcemanager_address", PGC_POSTMASTER, RESOURCES_MGM,

@@ -793,21 +793,13 @@ DATA(insert OID = 7077 ( pg_remote_credentials	    PGNSP PGUID -1 f c t \054 707
 /* relation id: 7076 - pg_remote_credentials 20140205 */
 DATA(insert OID = 7080 (pg_toast_7076 TOASTNSP PGUID -1 f c t \054 7078 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_));
 #define PG_REMOTE_CREDENTIALS_TOAST_RELTYPE_OID 7080
-/* relation id: 6026 - pg_resqueue 20140807 */
+/* relation id: 6026 - pg_resqueue 20150917 */
 DATA(insert OID = 9830 ( pg_resqueue	    PGNSP PGUID -1 f c t \054 6026 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_ ));	
 #define PG_RESQUEUE_RELTYPE_OID 9830
 
-/* relation id: 6026 - pg_resqueue 20140807 */
+/* relation id: 6026 - pg_resqueue 20150917 */
 DATA(insert OID = 9822 (pg_toast_6026 TOASTNSP PGUID -1 f c t \054 9820 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_));
 #define PG_RESQUEUE_TOAST_RELTYPE_OID 9822
-
-/* relation id: 6059 - pg_resourcetype 20140807 */
-DATA(insert OID = 6445 ( pg_resourcetype	    PGNSP PGUID -1 f c t \054 6059 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_ ));	
-#define PG_RESOURCETYPE_RELTYPE_OID 6445
-
-/* relation id: 6060 - pg_resqueuecapability 20140807 */
-DATA(insert OID = 6446 ( pg_resqueuecapability	    PGNSP PGUID -1 f c t \054 6060 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_ ));	
-#define PG_RESQUEUECAPABILITY_RELTYPE_OID 6446
 
 /* TIDYCAT_END_CODEGEN */
 

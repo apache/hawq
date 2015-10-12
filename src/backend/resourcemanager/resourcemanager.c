@@ -145,7 +145,6 @@ bool cleanedAllGRMContainers(void);
 							 colname##IsNull ? -1 :					   	   \
 								DatumGetInt64(colname##Datum)));
 
-
 int	 loadUserPropertiesFromCatalog(List **users);
 int	 loadQueuePropertiesFromCatalog(List **queues);
 
@@ -618,7 +617,9 @@ int MainHandlerLoop(void)
 		/* STEP 10. Dispatch resource to queries and send the messages out.*/
         if ( PRESPOOL->Segments.NodeCount > 0 && PQUEMGR->RatioCount > 0 &&
 			 PQUEMGR->toRunQueryDispatch &&
-			 PQUEMGR->ForcedReturnGRMContainerCount == 0 )
+			 PQUEMGR->ForcedReturnGRMContainerCount == 0 &&
+			 PRESPOOL->AddPendingContainerCount == 0 &&
+			 PRESPOOL->SlavesHostCount > 0 )
         {
     		dispatchResourceToQueries();
         }
@@ -646,6 +647,12 @@ int MainHandlerLoop(void)
 
         /* STEP 13. Notify segments to decrease resource. */
         notifyToBeKickedGRMContainersToRMSEG();
+
+        /*
+         * STEP 14. Check slaves file if the content is not checked or is
+         * 			updated.
+         */
+        checkSlavesFile();
 	}
 
 	elog(LOG, "Resource manager main event handler exits.");
@@ -960,43 +967,55 @@ static void InitTemporaryDirs(DQueue tmpdirs_list, char *tmpdirs_string)
  */
 int  loadDynamicResourceManagerConfigure(void)
 {
-	elog(DEBUG5, "HAWQ RM :: Unix Domain Socket Port %d", rm_master_addr_domain_port);
-	elog(DEBUG5, "HAWQ RM :: Socket Listening Port %d", rm_master_addr_port);
-	elog(DEBUG5, "HAWQ RM :: Segment Socket Listening Port %d", rm_seg_addr_port);
+#ifdef ENABLE_DOMAINSERVER
+	elog(DEBUG3, "Resource manager loads Unix Domain Socket Port %d",
+				 rm_master_addr_domain_port);
+#endif
+	elog(DEBUG3, "Resource manager loads Socket Listening Port %d",
+				 rm_master_port);
+	elog(DEBUG3, "Resource manager loads Segment Socket Listening Port %d",
+				 rm_segment_port);
 
 	/* Decide global resource manager mode. */
-	if ( strcmp(rm_grm_server_type, HAWQDRM_CONFFILE_SVRTYPE_VAL_YARN) == 0 ) {
+	if ( strcmp(rm_global_rm_type, HAWQDRM_CONFFILE_SVRTYPE_VAL_YARN) == 0 )
+	{
 		DRMGlobalInstance->ImpType = YARN_LIBYARN;
 	}
-	else if ( strcmp(rm_grm_server_type, HAWQDRM_CONFFILE_SVRTYPE_VAL_NONE) == 0 ) {
+	else if ( strcmp(rm_global_rm_type, HAWQDRM_CONFFILE_SVRTYPE_VAL_NONE) == 0 )
+	{
 		DRMGlobalInstance->ImpType = NONE_HAWQ2;
 	}
-	else {
-		elog(LOG, "Wrong global resource manager type set in %s.",
-				  HAWQDRM_CONFFILE_SERVER_TYPE);
+	else
+	{
+		elog(WARNING, "Wrong global resource manager type set in %s.",
+				  	  HAWQDRM_CONFFILE_SERVER_TYPE);
 		return MAIN_CONF_UNSET_ROLE;
 	}
-	elog(DEBUG5, "HAWQ RM :: Resource broker implement mode : %d", DRMGlobalInstance->ImpType);
+	elog(DEBUG3, "Resource manager loads resource broker implement mode : %d",
+				 DRMGlobalInstance->ImpType);
 
 	SimpString segmem;
-	if ( rm_seg_memory_use[0] == '\0' ) {
-		elog(LOG, "%s is not set", HAWQDRM_CONFFILE_LIMIT_MEMORY_USE);
+	if ( rm_seg_memory_use[0] == '\0' )
+	{
+		elog(WARNING, "%s is not set", HAWQDRM_CONFFILE_LIMIT_MEMORY_USE);
 		return MAIN_CONF_UNSET_SEGMENT_MEMORY_USE;
 	}
+
 	setSimpleStringRefNoLen(&segmem, rm_seg_memory_use);
 	int res = SimpleStringToStorageSizeMB(&segmem,
 										  &(DRMGlobalInstance->SegmentMemoryMB));
-	if ( res != FUNC_RETURN_OK) {
-		elog(LOG, "Can not understand the value '%s' of property %s.",
-					rm_seg_memory_use,
-					HAWQDRM_CONFFILE_LIMIT_MEMORY_USE);
+	if ( res != FUNC_RETURN_OK)
+	{
+		elog(WARNING, "Can not understand the value '%s' of property %s.",
+				  	  rm_seg_memory_use,
+					  HAWQDRM_CONFFILE_LIMIT_MEMORY_USE);
 		return MAIN_CONF_UNSET_SEGMENT_MEMORY_USE;
 	}
 
 	DRMGlobalInstance->SegmentCore = rm_seg_core_use;
 
-	elog(DEBUG5, "HAWQ RM :: Accepted NONE mode resource management : "
-				 "each host has (%d MB,%lf).\n",
+	elog(DEBUG3, "HAWQ RM :: Accepted NONE mode resource management setting, "
+				 "each host has (%d MB,%lf) resource capacity.\n",
 				 DRMGlobalInstance->SegmentMemoryMB,
 				 DRMGlobalInstance->SegmentCore);
 
@@ -1043,7 +1062,6 @@ int  loadDynamicResourceManagerConfigure(void)
 	DRMGlobalInstance->ResourceEnforcerCleanupPeriod = rm_enforce_cleanup_period;
 
 	/****** Resource enforcement GUCs ends ******/
-
     return FUNC_RETURN_OK;
 }
 
@@ -1249,44 +1267,51 @@ cleanup:
  *****************************************************************************/
 int	 loadQueuePropertiesFromCatalog(List **queues)
 {
-	int		 	 libpqres 		= CONNECTION_OK;
-	int 	 	 ret 	 		= FUNC_RETURN_OK;
-	PGconn 		*conn 			= NULL;
+	int		 	 libpqres 			= CONNECTION_OK;
+	int 	 	 ret 	 			= FUNC_RETURN_OK;
+	PGconn 		*conn 				= NULL;
 	static char  conninfo[1024];
-	PQExpBuffer  sql 			= NULL;
-	PGresult* result 			= NULL;
-	int ntups 					= 0;
-	int i_oid 					= 0,
-		i_name 					= 0,
-		i_parent 				= 0,
-		i_active_stats_cluster  = 0,
-		i_memory_limit_cluster 	= 0,
-		i_core_limit_cluster 	= 0,
-		i_resource_upper_factor = 0,
-		i_allocation_policy 	= 0,
-		i_vseg_resource_quota 	= 0,
-		i_vseg_upper_limit		= 0,
-		i_creation_time 		= 0,
-		i_update_time 			= 0,
-		i_status 				= 0;
+	PQExpBuffer  sql 				= NULL;
+	PGresult* result 				= NULL;
+	int ntups 						= 0;
+	int i_oid 						= 0,
+		i_name 						= 0,
+		i_parent 					= 0,
+		i_active_stats_cluster  	= 0,
+		i_memory_limit_cluster 		= 0,
+		i_core_limit_cluster 		= 0,
+		i_resource_overcommit 		= 0,
+		i_allocation_policy 		= 0,
+		i_vseg_resource_quota 		= 0,
+		i_nvseg_upper_limit			= 0,
+		i_nvseg_lower_limit			= 0,
+		i_nvseg_upper_limit_perseg 	= 0,
+		i_nvseg_lower_limit_perseg 	= 0,
+		i_creation_time 			= 0,
+		i_update_time 				= 0,
+		i_status 					= 0;
 
-	Oid oid 		= 0,
-		rsq_parent 	= 0;
+	Oid oid 						= 0,
+		parentoid 					= 0;
 
-	char *rsqname 					= NULL,
+	char *name 						= NULL,
 		 *parent 					= NULL,
-		 *rsq_memory_limit_cluster 	= NULL,
-		 *rsq_core_limit_cluster 	= NULL,
-		 *rsq_allocation_policy 	= NULL,
-		 *rsq_vseg_resource_quota 	= NULL,
-		 *rsq_status 				= NULL;
+		 *memory_limit_cluster 		= NULL,
+		 *core_limit_cluster 		= NULL,
+		 *allocation_policy 		= NULL,
+		 *vseg_resource_quota 		= NULL,
+		 *status 					= NULL;
 
-	int rsq_active_stats_cluster 	= 0,
-		rsq_vseg_upper_limit		= 0;
+	int active_stats_cluster 		= 0,
+		nvseg_upper_limit			= 0,
+		nvseg_lower_limit			= 0;
 
-	float rsq_resource_upper_factor	= 0.0;
-	int64 rsq_creation_time 		= 0,
-		  rsq_update_time 			= 0;
+	float nvseg_upper_limit_perseg	= 0.0,
+		  nvseg_lower_limit_perseg	= 0.0,
+		  resource_overcommit		= 0.0;
+
+	int64 creation_time 			= 0,
+		  update_time 				= 0;
 
 	snprintf(conninfo, sizeof(conninfo),
 			 "options='-c gp_session_role=UTILITY' "
@@ -1313,19 +1338,23 @@ int	 loadQueuePropertiesFromCatalog(List **queues)
 					  "sql statement.");
 		goto cleanup;
 	}
+
 	appendPQExpBuffer(sql,"SELECT oid,"
-								 "rsqname,"
-								 "rsq_parent,"
-								 "rsq_active_stats_cluster,"
-								 "rsq_memory_limit_cluster, "
-								 "rsq_core_limit_cluster, "
-								 "rsq_resource_upper_factor,"
-								 "rsq_allocation_policy, "
-								 "rsq_vseg_resource_quota, "
-								 "rsq_vseg_upper_limit, "
-								 "rsq_creation_time, "
-								 "rsq_update_time, "
-								 "rsq_status "
+								 "name,"
+								 "parentoid,"
+								 "activestats,"
+								 "memorylimit, "
+								 "corelimit, "
+								 "resovercommit,"
+								 "allocpolicy, "
+								 "vsegresourcequota, "
+								 "nvsegupperlimit, "
+								 "nvseglowerlimit, "
+								 "nvsegupperlimitperseg, "
+								 "nvseglowerlimitperseg, "
+								 "creationtime, "
+								 "updatetime, "
+								 "status "
 								 "FROM pg_resqueue");
 	result = PQexec(conn, sql->data);
 
@@ -1342,45 +1371,51 @@ int	 loadQueuePropertiesFromCatalog(List **queues)
 
 	ntups = PQntuples(result);
 
-	i_oid 					= PQfnumber(result, PG_RESQUEUE_COL_OID);
-	i_name 					= PQfnumber(result, PG_RESQUEUE_COL_RSQNAME);
-	i_parent 				= PQfnumber(result, PG_RESQUEUE_COL_PARENT);
-	i_active_stats_cluster 	= PQfnumber(result, PG_RESQUEUE_COL_ACTIVE_STATS_CLUSTER);
-	i_memory_limit_cluster 	= PQfnumber(result, PG_RESQUEUE_COL_MEMORY_LIMIT_CLUSTER);
-	i_core_limit_cluster  	= PQfnumber(result, PG_RESQUEUE_COL_CORE_LIMIT_CLUSTER);
-	i_resource_upper_factor = PQfnumber(result, PG_RESQUEUE_COL_RESOURCE_UPPER_FACTOR);
-	i_allocation_policy 	= PQfnumber(result, PG_RESQUEUE_COL_ALLOCATION_POLICY);
-	i_vseg_resource_quota 	= PQfnumber(result, PG_RESQUEUE_COL_VSEG_RESOURCE_QUOTA);
-	i_vseg_upper_limit		= PQfnumber(result, PG_RESQUEUE_COL_VSEG_UPPER_LIMIT);
-	i_creation_time 		= PQfnumber(result, PG_RESQUEUE_COL_CREATION_TIME);
-	i_update_time 			= PQfnumber(result, PG_RESQUEUE_COL_UPDATE_TIME);
-	i_status 				= PQfnumber(result, PG_RESQUEUE_COL_STATUS);
+	i_oid 						= PQfnumber(result, PG_RESQUEUE_COL_OID);
+	i_name 						= PQfnumber(result, PG_RESQUEUE_COL_NAME);
+	i_parent 					= PQfnumber(result, PG_RESQUEUE_COL_PARENTOID);
+	i_active_stats_cluster 		= PQfnumber(result, PG_RESQUEUE_COL_ACTIVESTATS);
+	i_memory_limit_cluster 		= PQfnumber(result, PG_RESQUEUE_COL_MEMORYLIMIT);
+	i_core_limit_cluster  		= PQfnumber(result, PG_RESQUEUE_COL_CORELIMIT);
+	i_resource_overcommit 		= PQfnumber(result, PG_RESQUEUE_COL_RESOVERCOMMIT);
+	i_allocation_policy 		= PQfnumber(result, PG_RESQUEUE_COL_ALLOCPOLICY);
+	i_vseg_resource_quota 		= PQfnumber(result, PG_RESQUEUE_COL_VSEGRESOURCEQUOTA);
+	i_nvseg_upper_limit			= PQfnumber(result, PG_RESQUEUE_COL_NVSEGUPPERLIMIT);
+	i_nvseg_lower_limit			= PQfnumber(result, PG_RESQUEUE_COL_NVSEGLOWERLIMIT);
+	i_nvseg_upper_limit_perseg	= PQfnumber(result, PG_RESQUEUE_COL_NVSEGUPPERLIMITPERSEG);
+	i_nvseg_lower_limit_perseg	= PQfnumber(result, PG_RESQUEUE_COL_NVSEGLOWERLIMITPERSEG);
+	i_creation_time 			= PQfnumber(result, PG_RESQUEUE_COL_CREATIONTIME);
+	i_update_time 				= PQfnumber(result, PG_RESQUEUE_COL_UPDATETIME);
+	i_status 					= PQfnumber(result, PG_RESQUEUE_COL_STATUS);
 
 	for (int i = 0; i < ntups; i++)
 	{
 	    oid 					  = (Oid)strtoul(PQgetvalue(result, i, i_oid), NULL, 10);
-	    rsqname 				  = 			 PQgetvalue(result, i, i_name);
+	    name 				  	  = 			 PQgetvalue(result, i, i_name);
 	    parent 					  = 			 PQgetvalue(result, i, i_parent);
 	    if (parent == NULL || strlen(parent) == 0)
 	    {
-	    	rsq_parent = InvalidOid;
+	    	parentoid = InvalidOid;
 	    }
 	    else
 	    {
-	    	rsq_parent = (Oid)strtoul(parent, NULL, 10);
+	    	parentoid = (Oid)strtoul(parent, NULL, 10);
 	    }
 
-	    rsq_parent 				  = (Oid)strtoul(PQgetvalue(result, i, i_parent), NULL, 10);
-	    rsq_active_stats_cluster  = 		atoi(PQgetvalue(result, i, i_active_stats_cluster));
-	    rsq_memory_limit_cluster  = 			 PQgetvalue(result, i, i_memory_limit_cluster);
-	    rsq_core_limit_cluster 	  = 			 PQgetvalue(result, i, i_core_limit_cluster);
-	    rsq_resource_upper_factor = 		atof(PQgetvalue(result, i, i_resource_upper_factor));
-	    rsq_allocation_policy 	  = 			 PQgetvalue(result, i, i_allocation_policy);
-	    rsq_vseg_resource_quota   = 			 PQgetvalue(result, i, i_vseg_resource_quota);
-	    rsq_vseg_upper_limit	  = 		atoi(PQgetvalue(result, i, i_vseg_upper_limit));
-	    rsq_creation_time 		  = 		atol(PQgetvalue(result, i, i_creation_time));
-	    rsq_update_time 		  = 		atol(PQgetvalue(result, i, i_update_time));
-	    rsq_status 				  = 			 PQgetvalue(result, i, i_status);
+	    parentoid 			     = (Oid)strtoul(PQgetvalue(result, i, i_parent), NULL, 10);
+	    active_stats_cluster     = 		atoi(PQgetvalue(result, i, i_active_stats_cluster));
+	    memory_limit_cluster     = 			 PQgetvalue(result, i, i_memory_limit_cluster);
+	    core_limit_cluster 	     = 			 PQgetvalue(result, i, i_core_limit_cluster);
+	    resource_overcommit      = 		atof(PQgetvalue(result, i, i_resource_overcommit));
+	    allocation_policy 	     = 			 PQgetvalue(result, i, i_allocation_policy);
+	    vseg_resource_quota      = 			 PQgetvalue(result, i, i_vseg_resource_quota);
+	    nvseg_upper_limit	     = 		atoi(PQgetvalue(result, i, i_nvseg_upper_limit));
+	    nvseg_lower_limit	     = 		atoi(PQgetvalue(result, i, i_nvseg_lower_limit));
+	    nvseg_upper_limit_perseg = 		atof(PQgetvalue(result, i, i_nvseg_upper_limit_perseg));
+	    nvseg_lower_limit_perseg = 		atof(PQgetvalue(result, i, i_nvseg_lower_limit_perseg));
+	    creation_time 		     = 		atol(PQgetvalue(result, i, i_creation_time));
+	    update_time 		     = 		atol(PQgetvalue(result, i, i_update_time));
+	    status 				     = 			 PQgetvalue(result, i, i_status);
 
 	    MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
 	    *queues = lappend(*queues,
@@ -1397,7 +1432,7 @@ int	 loadQueuePropertiesFromCatalog(List **queues)
 							  "queue",
 							  getRSQTBLAttributeName(RSQ_TBL_ATTR_NAME),
 							  &i,
-							  (Name)rsqname));
+							  (Name)name));
 
 	    *queues = lappend(*queues,
 	    				  createPropertyOID(
@@ -1405,7 +1440,7 @@ int	 loadQueuePropertiesFromCatalog(List **queues)
 	    					  "queue",
 							  getRSQTBLAttributeName(RSQ_TBL_ATTR_PARENT),
 							  &i,
-							  rsq_parent));
+							  parentoid));
 
 	    *queues = lappend(*queues,
 	    				  createPropertyInt32(
@@ -1413,7 +1448,7 @@ int	 loadQueuePropertiesFromCatalog(List **queues)
 	 						  "queue",
 							  getRSQTBLAttributeName(RSQ_TBL_ATTR_ACTIVE_STATMENTS),
 							  &i,
-							  rsq_active_stats_cluster));
+							  active_stats_cluster));
 
 	    *queues = lappend(*queues,
 	    				  createPropertyString(
@@ -1421,7 +1456,7 @@ int	 loadQueuePropertiesFromCatalog(List **queues)
 	 						  "queue",
 	 						  getRSQTBLAttributeName(RSQ_TBL_ATTR_MEMORY_LIMIT_CLUSTER),
 	 						  &i,
-	 						  rsq_memory_limit_cluster));
+	 						  memory_limit_cluster));
 
 	    *queues = lappend(*queues,
 	    				  createPropertyString(
@@ -1429,7 +1464,7 @@ int	 loadQueuePropertiesFromCatalog(List **queues)
 	 						  "queue",
 	 						  getRSQTBLAttributeName(RSQ_TBL_ATTR_CORE_LIMIT_CLUSTER),
 	 						  &i,
-							  rsq_core_limit_cluster));
+							  core_limit_cluster));
 
 	    *queues = lappend(*queues,
 	    				  createPropertyString(
@@ -1437,31 +1472,55 @@ int	 loadQueuePropertiesFromCatalog(List **queues)
 	 						  "queue",
 	 						  getRSQTBLAttributeName(RSQ_TBL_ATTR_ALLOCATION_POLICY),
 	 						  &i,
-							  rsq_allocation_policy));
+							  allocation_policy));
 
 	    *queues = lappend(*queues,
 	    				  createPropertyFloat(
 	    					  PCONTEXT,
 							  "queue",
-	 						  getRSQTBLAttributeName(RSQ_DDL_ATTR_RESOURCE_UPPER_FACTOR),
+	 						  getRSQTBLAttributeName(RSQ_DDL_ATTR_RESOURCE_OVERCOMMIT_FACTOR),
 							  &i,
-							  rsq_resource_upper_factor));
+							  resource_overcommit));
 
 	    *queues = lappend(*queues,
 	    				  createPropertyString(
 	    					  PCONTEXT,
 							  "queue",
-	 						  getRSQTBLAttributeName(RSQ_TBL_ATTR_VSEGMENT_RESOURCE_QUOTA),
+	 						  getRSQTBLAttributeName(RSQ_TBL_ATTR_VSEG_RESOURCE_QUOTA),
 							  &i,
-							  rsq_vseg_resource_quota));
+							  vseg_resource_quota));
 
 	    *queues = lappend(*queues,
 	    				  createPropertyInt32(
 	    					  PCONTEXT,
 	 						  "queue",
-							  getRSQTBLAttributeName(RSQ_TBL_ATTR_VSEGMENT_UPPER_LIMIT),
+							  getRSQTBLAttributeName(RSQ_TBL_ATTR_NVSEG_UPPER_LIMIT),
 							  &i,
-							  rsq_vseg_upper_limit));
+							  nvseg_upper_limit));
+
+	    *queues = lappend(*queues,
+	    				  createPropertyInt32(
+	    					  PCONTEXT,
+	 						  "queue",
+							  getRSQTBLAttributeName(RSQ_TBL_ATTR_NVSEG_LOWER_LIMIT),
+							  &i,
+							  nvseg_lower_limit));
+
+	    *queues = lappend(*queues,
+	    				  createPropertyFloat(
+	    					  PCONTEXT,
+							  "queue",
+	 						  getRSQTBLAttributeName(RSQ_TBL_ATTR_NVSEG_UPPER_LIMIT_PERSEG),
+							  &i,
+							  nvseg_upper_limit_perseg));
+
+	    *queues = lappend(*queues,
+	    				  createPropertyFloat(
+	    					  PCONTEXT,
+							  "queue",
+	 						  getRSQTBLAttributeName(RSQ_TBL_ATTR_NVSEG_LOWER_LIMIT_PERSEG),
+							  &i,
+							  nvseg_lower_limit_perseg));
 
 	    *queues = lappend(*queues,
 	    				  createPropertyInt32(
@@ -1469,7 +1528,7 @@ int	 loadQueuePropertiesFromCatalog(List **queues)
 	 						  "queue",
 							  getRSQTBLAttributeName(RSQ_TBL_ATTR_CREATION_TIME),
 							  &i,
-							  rsq_creation_time));
+							  creation_time));
 
 	    *queues = lappend(*queues,
 	    				  createPropertyInt32(
@@ -1477,7 +1536,7 @@ int	 loadQueuePropertiesFromCatalog(List **queues)
 	 						  "queue",
 							  getRSQTBLAttributeName(RSQ_TBL_ATTR_UPDATE_TIME),
 							  &i,
-							  rsq_update_time));
+							  update_time));
 
 	    *queues = lappend(*queues,
 	    				  createPropertyString(
@@ -1485,7 +1544,7 @@ int	 loadQueuePropertiesFromCatalog(List **queues)
 							  "queue",
 	 						  getRSQTBLAttributeName(RSQ_TBL_ATTR_STATUS),
 							  &i,
-							  rsq_status));
+							  status));
 		MEMORY_CONTEXT_SWITCH_BACK
 	}
 
@@ -1558,12 +1617,12 @@ int  addResourceQueueAndUserFromProperties(List *queueprops, List *userprops)
 	{
 		KVProperty value = lfirst(cell);
 
-		elog(DEBUG3, "Loads queue property %s=%s", value->Key.Str, value->Val.Str);
+		elog(RMLOG, "Loads queue property %s=%s", value->Key.Str, value->Val.Str);
 
 		/* Split key string into (attribute, index) */
 		if ( SimpleStringStartWith(&(value->Key), "queue.") != FUNC_RETURN_OK )
 		{
-			elog(DEBUG3, "Ignore property %s=%s", value->Key.Str, value->Val.Str);
+			elog(RMLOG, "Ignore property %s=%s", value->Key.Str, value->Val.Str);
 			continue;
 		}
 
@@ -1619,9 +1678,9 @@ int  addResourceQueueAndUserFromProperties(List *queueprops, List *userprops)
 			currentindex = queueindex;
 		}
 
-		elog(DEBUG3, "Resource manager loaded attribute for creating queue %s=%s",
-				     newprop->Key.Str,
-					 newprop->Val.Str);
+		elog(RMLOG, "Resource manager loaded attribute for creating queue %s=%s",
+				    newprop->Key.Str,
+					newprop->Val.Str);
 
 		currentattrs = lappend(currentattrs, newprop);
 		MEMORY_CONTEXT_SWITCH_BACK
@@ -1641,12 +1700,12 @@ int  addResourceQueueAndUserFromProperties(List *queueprops, List *userprops)
 	{
 		KVProperty value = lfirst(cell);
 
-		elog(DEBUG3, "Loads user property %s=%s", value->Key.Str, value->Val.Str);
+		elog(RMLOG, "Loads user property %s=%s", value->Key.Str, value->Val.Str);
 
 		/* Split key string into (attribute, index) */
 		if ( SimpleStringStartWith(&(value->Key), "user.") != FUNC_RETURN_OK )
 		{
-			elog(DEBUG3, "Ignore property %s=%s", value->Key.Str, value->Val.Str);
+			elog(RMLOG, "Ignore property %s=%s", value->Key.Str, value->Val.Str);
 			continue;
 		}
 
@@ -1698,9 +1757,9 @@ int  addResourceQueueAndUserFromProperties(List *queueprops, List *userprops)
 			currentindex = userindex;
 		}
 
-		elog(DEBUG3, "Resource manager loaded attribute for creating role %s=%s",
-				     newprop->Key.Str,
-					 newprop->Val.Str);
+		elog(RMLOG, "Resource manager loaded attribute for creating role %s=%s",
+				    newprop->Key.Str,
+					newprop->Val.Str);
 
 		currentattrs = lappend(currentattrs, newprop);
 		MEMORY_CONTEXT_SWITCH_BACK
@@ -1726,7 +1785,7 @@ int  addResourceQueueAndUserFromProperties(List *queueprops, List *userprops)
 		foreach(cell2, attrs)
 		{
 			KVProperty attrkv = lfirst(cell2);
-			elog(DEBUG3, "To parse : %s=%s", attrkv->Key.Str, attrkv->Val.Str);
+			elog(RMLOG, "To parse : %s=%s", attrkv->Key.Str, attrkv->Val.Str);
 		}
 
 		DynResourceQueue newqueue = rm_palloc0(PCONTEXT,
@@ -1734,6 +1793,7 @@ int  addResourceQueueAndUserFromProperties(List *queueprops, List *userprops)
 
 		res = parseResourceQueueAttributes(attrs,
 										   newqueue,
+										   false,
 										   errorbuf,
 										   sizeof(errorbuf));
 		if ( res != FUNC_RETURN_OK )
@@ -1748,7 +1808,7 @@ int  addResourceQueueAndUserFromProperties(List *queueprops, List *userprops)
 		MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
 		rawrsqs = lappend(rawrsqs, newqueue);
 		MEMORY_CONTEXT_SWITCH_BACK
-	DQUEUE_LOOP_END
+	}
 
 	/*
 	 * STEP 2.2. Reorder the resource queue sequence to ensure that every time
@@ -1796,8 +1856,8 @@ int  addResourceQueueAndUserFromProperties(List *queueprops, List *userprops)
 		orderchanged = false;
 		if ( toreordrsq != NULL )
 		{
-			elog(DEBUG3, "Find one resource queue valid to continue loading %s.",
-					     toreordrsq->Name);
+			elog(RMLOG, "Find one resource queue valid to continue loading %s.",
+					    toreordrsq->Name);
 			orderchanged = true;
 			MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
 			orderedrsqs = lappend(orderedrsqs, toreordrsq);
@@ -1842,23 +1902,29 @@ int  addResourceQueueAndUserFromProperties(List *queueprops, List *userprops)
 		orderedrsqs = list_delete_first(orderedrsqs);
 		MEMORY_CONTEXT_SWITCH_BACK
 
+		elog(RMLOG, "Load queue %s.", partqueue->Name);
+
 		res = checkAndCompleteNewResourceQueueAttributes(partqueue,
 														 errorbuf,
 														 sizeof(errorbuf));
 		if ( res != FUNC_RETURN_OK )
 		{
+			elog(RMLOG, "res=%d error=%s, after check and complete queue %s.",
+						res,
+						errorbuf,
+						partqueue->Name);
+
 			rm_pfree(PCONTEXT, partqueue);
-			elog( WARNING, "Resource manager can not complete resource queue's "
-						   "attributes because %s",
-						   errorbuf);
+			elog(WARNING, "Resource manager can not complete resource queue's "
+						  "attributes because %s",
+						  errorbuf);
 			continue;
 		}
 
+		elog(RMLOG, "Checked and completed queue %s.", partqueue->Name);
+
 		DynResourceQueueTrack newtrack = NULL;
-		res = createQueueAndTrack(partqueue,
-								  &newtrack,
-								  errorbuf,
-								  sizeof(errorbuf));
+		res = createQueueAndTrack(partqueue, &newtrack, errorbuf, sizeof(errorbuf));
 
 		if ( res != FUNC_RETURN_OK )
 		{
@@ -1874,6 +1940,8 @@ int  addResourceQueueAndUserFromProperties(List *queueprops, List *userprops)
 						   errorbuf);
 			continue;
 		}
+
+		elog(RMLOG, "Created queue %s.", partqueue->Name);
 
 		char buffer[1024];
 		generateQueueReport(partqueue->OID, buffer, sizeof(buffer));
@@ -1912,15 +1980,7 @@ int  addResourceQueueAndUserFromProperties(List *queueprops, List *userprops)
 			continue;
 		}
 
-		res = createUser(newuser, errorbuf, sizeof(errorbuf));
-		if ( res != FUNC_RETURN_OK )
-		{
-			elog(WARNING, "Can not create user %s because %s",
-						  newuser->Name,
-						  errorbuf);
-			rm_pfree(PCONTEXT, newuser);
-			continue;
-		}
+		createUser(newuser);
 
 		char buffer[256];
 		generateUserReport(newuser->Name,
@@ -2125,10 +2185,12 @@ int	 initializeSocketServer(void)
 	char 	   *allip   = "0.0.0.0";
 	pgsocket 	RMListenSocket[HAWQRM_SERVER_PORT_COUNT];
 
-	for ( int i = 0 ; i < HAWQRM_SERVER_PORT_COUNT ; ++i ) {
+	for ( int i = 0 ; i < HAWQRM_SERVER_PORT_COUNT ; ++i )
+	{
 		RMListenSocket[i] = PGINVALID_SOCKET;
 	}
 
+#ifdef ENABLE_DOMAINSERVER
 	/* Listen local unix domain socket port. */
 	netres = StreamServerPort(AF_UNIX,
 							  NULL,
@@ -2142,7 +2204,8 @@ int	 initializeSocketServer(void)
 		  * This condition is for double-checking the server is successfully
 		  * created.
 		  */
-		 (netres == STATUS_OK && RMListenSocket[0] == PGINVALID_SOCKET)	) {
+		 (netres == STATUS_OK && RMListenSocket[0] == PGINVALID_SOCKET)	)
+	{
 		res = REQUESTHANDLER_FAIL_START_SOCKET_SERVER;
 		elog(LOG, "Resource manager cannot create UNIX domain socket server. Port=%d",
 				  rm_master_addr_domain_port);
@@ -2152,15 +2215,23 @@ int	 initializeSocketServer(void)
 	/* Listen normal socket addresses. */
 	netres = StreamServerPort(AF_UNSPEC,
 							  allip,
-							  rm_master_addr_port,
+							  rm_master_port,
 							  NULL,
 							  &(RMListenSocket[1]),
 							  HAWQRM_SERVER_PORT_COUNT-1);
-
-	if ( netres != STATUS_OK ) {
+#else
+	netres = StreamServerPort(AF_UNSPEC,
+			  	  	  	  	  allip,
+							  rm_master_port,
+							  NULL,
+							  RMListenSocket,
+							  HAWQRM_SERVER_PORT_COUNT);
+#endif
+	if ( netres != STATUS_OK )
+	{
 		res = REQUESTHANDLER_FAIL_START_SOCKET_SERVER;
 		elog(LOG, "Resource manager cannot create socket server. Port=%d",
-			  	  rm_master_addr_port);
+				  rm_master_port);
 		return res;
 	}
 
@@ -2168,39 +2239,54 @@ int	 initializeSocketServer(void)
 	initializeAsyncComm();
 	int 			validfdcount = 0;
 	AsyncCommBuffer newbuffer    = NULL;
-	for ( int i = 0 ; i < HAWQRM_SERVER_PORT_COUNT ; ++i ) {
-		if (RMListenSocket[i] != PGINVALID_SOCKET) {
+	for ( int i = 0 ; i < HAWQRM_SERVER_PORT_COUNT ; ++i )
+	{
+		if (RMListenSocket[i] != PGINVALID_SOCKET)
+		{
 			netres = registerFileDesc(RMListenSocket[i],
 									  NULL,
 									  ASYNCCOMM_READ,
 									  &AsyncCommBufferHandlersMsgServer,
 									  NULL,
 									  &newbuffer);
-			if ( netres != FUNC_RETURN_OK ) {
+			if ( netres != FUNC_RETURN_OK )
+			{
 				res = REQUESTHANDLER_FAIL_START_SOCKET_SERVER;
 				elog(WARNING, "Resource manager cannot track socket server.");
 				break;
 			}
 			validfdcount++;
-
 			InitHandler_Message(newbuffer);
 		}
 	}
 
-	if ( res != FUNC_RETURN_OK ) {
-		for ( int i = 0 ; i < HAWQRM_SERVER_PORT_COUNT ; ++i ) {
-			if ( RMListenSocket[i] != PGINVALID_SOCKET ) close(RMListenSocket[i]);
+	if ( res != FUNC_RETURN_OK )
+	{
+		for ( int i = 0 ; i < HAWQRM_SERVER_PORT_COUNT ; ++i )
+		{
+			if ( RMListenSocket[i] != PGINVALID_SOCKET )
+			{
+				close(RMListenSocket[i]);
+			}
 		}
 		return res;
 	}
 
-	elog(DEBUG5, "HAWQ RM :: Start accepting resource request. "
-			 	 "Listening unix domain socket port %d. "
-				 "Listening normal socket port %d. "
-				 "Total listened %d FDs.",
-				 rm_master_addr_domain_port,
-				 rm_master_addr_port,
-				 validfdcount);
+#ifdef ENABLE_DOMAINSERVER
+	elog(LOG, "Resource manager starts accepting resource request. "
+			  "Listening unix domain socket port %d. "
+			  "Listening normal socket port %d. "
+			  "Total listened %d FDs.",
+			  rm_master_addr_domain_port,
+			  rm_master_port,
+			  validfdcount);
+#else
+	elog(LOG, "Resource manager starts accepting resource request. "
+			  "Listening normal socket port %d. "
+			  "Total listened %d FDs.",
+			  rm_master_port,
+			  validfdcount);
+#endif
 	return res;
 }
 

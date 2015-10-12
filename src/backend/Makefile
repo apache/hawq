@@ -222,8 +222,8 @@ endif
 	${INSTALL_SCRIPT} -d ${sysconfdir}
 	${INSTALL_DATA} $(srcdir)/utils/misc/etc/hawq-site.xml ${sysconfdir}
 	${INSTALL_DATA} $(srcdir)/utils/misc/etc/hdfs-client.xml ${sysconfdir}
+	${INSTALL_DATA} $(srcdir)/utils/misc/etc/yarn-client.xml ${sysconfdir}
 	${INSTALL_DATA} $(srcdir)/utils/misc/etc/slaves ${sysconfdir}
-	${INSTALL_DATA} $(srcdir)/utils/misc/etc/slaves.exclude ${sysconfdir}
 	${INSTALL_DATA} $(srcdir)/utils/misc/etc/template-hawq-site.xml ${sysconfdir}
 	${INSTALL_DATA} $(srcdir)/utils/misc/etc/gpcheck.cnf ${sysconfdir}
 

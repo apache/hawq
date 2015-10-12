@@ -3715,6 +3715,14 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 			}
 			/*allocate hash relation as a random relation*/
 			else{
+				MemoryContextSwitchTo(context->old_memorycontext);
+				CurrentRelType* relType = (CurrentRelType *) palloc(
+						sizeof(CurrentRelType));
+				relType->relid = rel_data->relid;
+				relType->isHash = false;
+				result->relsType = lappend(result->relsType, relType);
+				MemoryContextSwitchTo(context->datalocality_memorycontext);
+
 				result->forbid_optimizer = true;
 				allocate_random_relation(rel_data, &log_context,&idMap, &assignment_context, context);
 			}
