@@ -437,7 +437,7 @@ typedef struct WritePersistentStateLockLocalVars
 
 #define WRITE_PERSISTENT_STATE_ORDERED_LOCK_DECLARE \
 	MIRRORED_LOCK_DECLARE; \
-	CHECKPOINT_START_LOCK_DECLARE;
+	CHECKPOINT_START_LOCK_DECLARE; \
 	WritePersistentStateLockLocalVars writePersistentStateLockLocalVars;
 
 #define WRITE_PERSISTENT_STATE_ORDERED_LOCK \
