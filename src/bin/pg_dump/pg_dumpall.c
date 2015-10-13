@@ -589,7 +589,7 @@ dumpResQueues(PGconn *conn)
 					  "rsq_allocation_policy::text as ressetting, "
 					  "6 as ord FROM pg_resqueue "
 					  "UNION "
-					  "SELECT rsqname, 'vsegment_resource_quota' as resname, "
+					  "SELECT rsqname, 'vseg_resource_quota' as resname, "
 					  "rsq_vseg_resource_quota::text as ressetting, "
 					  "7 as ord FROM pg_resqueue "
 					  "UNION "

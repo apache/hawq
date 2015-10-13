@@ -106,7 +106,7 @@ UPDATE pg_resourcetype SET resname='active_statements', resrequired=false, resha
 UPDATE pg_resourcetype SET resname='parent', resrequired=true, reshasdefault=false, reshasdisable=false, resdefaultsetting=-1, resdisabledsetting=-1 WHERE restypid=2;
 UPDATE pg_resourcetype SET resname='memory_limit_cluster', resrequired=true, reshasdefault=false, reshasdisable=false, resdefaultsetting=-1, resdisabledsetting=-1 WHERE restypid=3;
 UPDATE pg_resourcetype SET resname='core_limit_cluster', resrequired=true, reshasdefault=false, reshasdisable=false, resdefaultsetting=-1, resdisabledsetting=-1 WHERE restypid=4;
-UPDATE pg_resourcetype SET resname='segment_resource_quota', resrequired=false, reshasdefault=true, reshasdisable=false, resdefaultsetting=-1, resdisabledsetting=-1 WHERE restypid=5;
+UPDATE pg_resourcetype SET resname='vseg_resource_quota', resrequired=false, reshasdefault=true, reshasdisable=false, resdefaultsetting=-1, resdisabledsetting=-1 WHERE restypid=5;
 UPDATE pg_resourcetype SET resname='resource_upper_factor', resrequired=false, reshasdefault=true, reshasdisable=false, resdefaultsetting=-1, resdisabledsetting=-1 WHERE restypid=6;
 
 -- change proc pg_stat_get_activity

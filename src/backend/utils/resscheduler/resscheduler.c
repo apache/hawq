@@ -85,7 +85,7 @@ GetResQueueIdForName(char	*name)
 	queueid = caql_getoid(
 			NULL,
 			cql("SELECT oid FROM pg_resqueue "
-				" WHERE rsqname = :1 ",
+				" WHERE name = :1 ",
 				CStringGetDatum(name)));
 
 	return queueid;

@@ -377,42 +377,22 @@ DECLARE_UNIQUE_INDEX(pg_filesystem_fsysname_index, 7184, on pg_filesystem using 
 /* relation id: 7076 - pg_remote_credentials 20140205 */
 DECLARE_UNIQUE_INDEX(pg_remote_credentials_owner_service_index, 7081, on pg_remote_credentials using btree(rcowner oid_ops, rcservice text_ops));
 #define RemoteCredentialsOwnerServiceIndexId	7081
-/* relation id: 6026 - pg_resqueue 20140807 */
-DECLARE_UNIQUE_INDEX(pg_resqueue_oid_index, 6027, on pg_resqueue using btree(oid oid_ops));
-#define ResQueueOidIndexId	6027
-/* relation id: 6026 - pg_resqueue 20140807 */
-DECLARE_UNIQUE_INDEX(pg_resqueue_rsqname_index, 6028, on pg_resqueue using btree(rsqname name_ops));
-#define ResQueueRsqnameIndexId	6028
-/* relation id: 6059 - pg_resourcetype 20140807 */
-DECLARE_UNIQUE_INDEX(pg_resourcetype_oid_index, 6061, on pg_resourcetype using btree(oid oid_ops));
-#define ResourceTypeOidIndexId	6061
-/* relation id: 6059 - pg_resourcetype 20140807 */
-DECLARE_UNIQUE_INDEX(pg_resourcetype_restypid_index, 6062, on pg_resourcetype using btree(restypid int2_ops));
-#define ResourceTypeRestypidIndexId	6062
-/* relation id: 6059 - pg_resourcetype 20140807 */
-DECLARE_UNIQUE_INDEX(pg_resourcetype_resname_index, 6063, on pg_resourcetype using btree(resname name_ops));
-#define ResourceTypeResnameIndexId	6063
-/* relation id: 6060 - pg_resqueuecapability 20140807 */
-DECLARE_UNIQUE_INDEX(pg_resqueuecapability_oid_index, 6064, on pg_resqueuecapability using btree(oid oid_ops));
-#define ResQueueCapabilityOidIndexId	6064
-/* relation id: 6060 - pg_resqueuecapability 20140807 */
-DECLARE_INDEX(pg_resqueuecapability_resqueueid_index, 6065, on pg_resqueuecapability using btree(resqueueid oid_ops));
-#define ResQueueCapabilityResqueueidIndexId	6065
-/* relation id: 6060 - pg_resqueuecapability 20140807 */
-DECLARE_INDEX(pg_resqueuecapability_restypid_index, 6066, on pg_resqueuecapability using btree(restypid int2_ops));
-#define ResQueueCapabilityRestypidIndexId	6066
 /* relation id: 5036 - gp_segment_configuration 20150207 */
 DECLARE_UNIQUE_INDEX(gp_segment_config_registration_order_index, 6106, on gp_segment_configuration using btree(registration_order int4_ops));
 #define GpSegmentConfigRegistration_orderIndexId	6106
-
 /* relation id: 5036 - gp_segment_configuration 20150207 */
 DECLARE_INDEX(gp_segment_config_role_index, 6107, on gp_segment_configuration using btree(role char_ops));
 #define GpSegmentConfigRoleIndexId	6107
-
 /* relation id: 6119 - pg_attribute_encoding 20141112 */
 DECLARE_INDEX(pg_attribute_attrelid_index, 6119, on pg_attribute using btree(attrelid oid_ops));
 #define AttributeAttrelidIndexId    6119
+/* relation id: 6026 - pg_resqueue 20150917 */
+DECLARE_UNIQUE_INDEX(pg_resqueue_oid_index, 6027, on pg_resqueue using btree(oid oid_ops));
+#define ResQueueOidIndexId	6027
 
+/* relation id: 6026 - pg_resqueue 20150917 */
+DECLARE_UNIQUE_INDEX(pg_resqueue_name_index, 6028, on pg_resqueue using btree(name name_ops));
+#define ResQueueNameIndexId	6028
 
 /* TIDYCAT_END_CODEGEN */
 

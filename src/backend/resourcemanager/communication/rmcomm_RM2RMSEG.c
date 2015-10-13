@@ -142,7 +142,7 @@ int sendRUAlive(char *seghostname)
 	/* Connect to HAWQ RM server */
 	res = registerAsyncConnectionFileDesc(NULL,
 										  seghostname,
-										  rm_seg_addr_port,
+										  rm_segment_port,
 										  ASYNCCOMM_READBYTES | ASYNCCOMM_WRITEBYTES,
 										  &AsyncCommBufferHandlersMessage,
 										  context,
@@ -333,7 +333,7 @@ int increaseMemoryQuota(char *seghostname, GRMContainerSet containerset)
 
 	res = registerAsyncConnectionFileDesc(NULL,
 										  seghostname,
-										  rm_seg_addr_port,
+										  rm_segment_port,
 										  ASYNCCOMM_READBYTES | ASYNCCOMM_WRITEBYTES,
 										  &AsyncCommBufferHandlersMessage,
 										  context,
@@ -343,7 +343,7 @@ int increaseMemoryQuota(char *seghostname, GRMContainerSet containerset)
         elog(LOG, "Resource manager failed to set connection to segment host %s "
         		  "on port %d to increase memory quota.",
                   seghostname,
-				  rm_seg_addr_port);
+				  rm_segment_port);
         processContainersAfterIncreaseMemoryQuota(containerset, false);
 		freeGRMContainerSet(newctns);
         rm_pfree(AsyncCommContext, context);
@@ -354,7 +354,7 @@ int increaseMemoryQuota(char *seghostname, GRMContainerSet containerset)
     	elog(DEBUG3, "Resource manager succeeded set connection to segment host %s "
     				 "on port %d to increase memory quota.",
      			     seghostname,
- 				     rm_seg_addr_port);
+					 rm_segment_port);
     }
 
     buildMessageToCommBuffer(commbuffer,
@@ -504,7 +504,7 @@ int decreaseMemoryQuota(char 			*seghostname,
 
 	res = registerAsyncConnectionFileDesc(NULL,
 										  seghostname,
-										  rm_seg_addr_port,
+										  rm_segment_port,
 										  ASYNCCOMM_READBYTES | ASYNCCOMM_WRITEBYTES,
 										  &AsyncCommBufferHandlersMessage,
 										  context,
@@ -514,7 +514,7 @@ int decreaseMemoryQuota(char 			*seghostname,
         elog(LOG, "Resource manager failed to set connection to segment host %s "
         		  "on port %d to decrease memory quota.",
                   seghostname,
-				  rm_seg_addr_port);
+				  rm_segment_port);
 		processContainersAfterDecreaseMemoryQuota(ctns, false);
 		freeGRMContainerSet(ctns);
 		rm_pfree(AsyncCommContext, context);
@@ -525,7 +525,7 @@ int decreaseMemoryQuota(char 			*seghostname,
     	elog(DEBUG3, "Resource manager succeeded set connection to segment host %s "
     				 "on port %d to decrease memory quota.",
      			     seghostname,
- 				     rm_seg_addr_port);
+					 rm_segment_port);
     }
 
     buildMessageToCommBuffer(commbuffer,

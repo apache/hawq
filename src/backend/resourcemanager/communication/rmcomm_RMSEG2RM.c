@@ -129,7 +129,7 @@ int sendIMAlive(int  *errorcode,
 										  DRMGlobalInstance->SendToStandby?
 											  standby_addr_host:
 											  master_addr_host,
-										  rm_master_addr_port,
+										  rm_master_port,
 										  ASYNCCOMM_READBYTES | ASYNCCOMM_WRITEBYTES,
 										  &AsyncCommBufferHandlersMessage,
 										  context,

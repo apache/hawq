@@ -210,7 +210,7 @@ void initializeQD2RMComm(void)
     }
 
     /* Get UNIX domain socket file. */
-    UNIXSOCK_PATH(QD2RM_SocketFile, rm_master_addr_domain_port, UnixSocketDir);
+    UNIXSOCK_PATH(QD2RM_SocketFile, rm_master_domain_port, UnixSocketDir);
 
     /* Initialize global variables for maintaining a list of resource sets. */
     QD2RM_ResourceSets 	   = rm_palloc0(QD2RM_CommContext,
@@ -232,13 +232,16 @@ void initializeQD2RMComm(void)
     }
 
     /* Start resource heart-beat thread. */
-    if ( pthread_create(&ResourceHeartBeatThreadHandle,
-    		            NULL,
-						generateResourceRefreshHeartBeat,
-						NULL) != 0)
+    if ( rm_session_lease_heartbeat_enable )
     {
-    	elog(ERROR, "Fail to create background thread for communication with "
-    			    "resource manager.");
+		if ( pthread_create(&ResourceHeartBeatThreadHandle,
+							NULL,
+							generateResourceRefreshHeartBeat,
+							NULL) != 0)
+		{
+			elog(ERROR, "Fail to create background thread for communication with "
+						"resource manager.");
+		}
     }
 
     initializeMessageHandlers();
@@ -530,6 +533,7 @@ int	unregisterConnectionInRM(int 			   index,
     		(RPCResponseHeadUnregisterConnectionInRM)(recvbuffer->Buffer);
     if ( response->Result != FUNC_RETURN_OK )
     {
+    	res = response->Result;
     	snprintf(errorbuf, errorbufsize,
     			 "Fail to unregister in HAWQ resource manager because of "
     			 "remote error %s.",
@@ -540,7 +544,7 @@ int	unregisterConnectionInRM(int 			   index,
         		 QD2RM_ResourceSets[index]->QD_Conn_ID);
 
     QD2RM_ResourceSets[index]->QD_Conn_ID = INVALID_CONNID;
-    return FUNC_RETURN_OK;
+    return res;
 }
 
 void unregisterConnectionInRMWithErrorReport(int index)
@@ -598,8 +602,8 @@ int acquireResourceFromRM(int 		  		  index,
     requesthead.MaxSegCountFix   = max_seg_count_fix;
     requesthead.MinSegCountFix   = min_seg_count_fix;
     requesthead.SliceSize  	 	 = slice_size;
-    requesthead.VSegLimitPerSeg	 = rm_query_vseg_num_per_seg_limit;
-    requesthead.VSegLimit		 = rm_query_vseg_num_limit;
+    requesthead.VSegLimitPerSeg	 = rm_nvseg_perquery_perseg_limit;
+    requesthead.VSegLimit		 = rm_nvseg_perquery_limit;
     requesthead.Reserved		 = 0;
     requesthead.IOBytes		 	 = iobytes;
 
@@ -781,7 +785,9 @@ int returnResource(int 		index,
     /* Parse response. */
     RPCResponseHeadReturnResource response =
     		(RPCResponseHeadReturnResource)(recvbuffer->Buffer);
-    if ( response->Result != FUNC_RETURN_OK ) {
+    if ( response->Result != FUNC_RETURN_OK )
+    {
+    	res = response->Result;
         snprintf(errorbuf, errorbufsize,
         		 "Fail to return resource to HAWQ resource manager because of "
         		 "remote error %s.",
@@ -845,9 +851,7 @@ int manipulateResourceQueue(int 	 index,
 						  recvbuffer);
     if ( res != FUNC_RETURN_OK )
     {
-    	snprintf(errorbuf, errorbufsize,
-    			 "Fail to manipulate resource queue because of RPC error %s.",
-				 getErrorCodeExplain(res));
+    	snprintf(errorbuf, errorbufsize, "%s", getErrorCodeExplain(res));
     	return res;
     }
 
@@ -856,27 +860,29 @@ int manipulateResourceQueue(int 	 index,
 		(RPCResponseHeadManipulateResQueue)(recvbuffer->Buffer);
 
 	/* CASE 1. The response contains error message. */
-	if ( response->Result != FUNC_RETURN_OK ) {
-
+	if ( response->Result != FUNC_RETURN_OK )
+	{
 		RPCResponseHeadManipulateResQueueERROR error =
 			(RPCResponseHeadManipulateResQueueERROR)(recvbuffer->Buffer);
 
-		elog(LOG, "Fail to manipulate resource queue because %s",
-				  error->ErrorText);
+		elog(WARNING, "Fail to manipulate resource queue because %s",
+					  error->ErrorText);
 		snprintf(errorbuf, errorbufsize, "%s", error->ErrorText);
 	}
+
+	elog(DEBUG3, "Manipulated resource queue and got result %d", response->Result);
+
 	return response->Result;
 }
 
-int manipulateRoleForResourceQueue (int 	 index,
-									Oid 	 roleid,
-									Oid 	 queueid,
-									uint16_t action,
-									uint8_t  isSuperUser,
-									char	*rolename,
-									int	 	*errorcode,
-									char 	*errorbuf,
-									int  	 errorbufsize)
+int manipulateRoleForResourceQueue (int 	  index,
+									Oid 	  roleid,
+									Oid 	  queueid,
+									uint16_t  action,
+									uint8_t   isSuperUser,
+									char	 *rolename,
+									char 	 *errorbuf,
+									int  	  errorbufsize)
 {
 	initializeQD2RMComm();
 
@@ -902,65 +908,51 @@ int manipulateRoleForResourceQueue (int 	 index,
 	request.isSuperUser = isSuperUser;
 	request.Action = action;
 	if (strlen(rolename) < sizeof(request.Name))
-		strncpy(request.Name, rolename, strlen(rolename));
-	else {
-		snprintf(errorbuf, errorbufsize, "Invalid role name.");
-		*errorcode = res;
-		return res;
-	}
-
-	elog(RMLOG, "HAWQ RM: manipulateRoleForResourceQueue "
-				"role oid:%d, queueID:%d, isSuper:%d, roleName:%s, action:%d",
-				request.RoleOID, request.QueueOID, request.isSuperUser,
-				request.Name, request.Action);
-
-	appendSMBVar(sendbuffer, request);
-
-	if (rm_domain_comm_enable)
 	{
-    res = callSyncRPCDomain(QD2RM_SocketFile,
-    						sendbuffer->Buffer,
-							sendbuffer->Cursor + 1,
-							REQUEST_QD_DDL_MANIPULATEROLE,
-							RESPONSE_QD_DDL_MANIPULATEROLE,
-							recvbuffer);
+		strncpy(request.Name, rolename, strlen(rolename));
 	}
 	else
 	{
-	  res = callSyncRPCRemote(master_addr_host,
-                            rm_master_addr_port,
-                            sendbuffer->Buffer,
-                            sendbuffer->Cursor + 1,
-                            REQUEST_QD_DDL_MANIPULATEROLE,
-                            RESPONSE_QD_DDL_MANIPULATEROLE,
-                            recvbuffer);
+		elog(WARNING, "Resource manager finds in valid role name %s.", rolename);
+		snprintf(errorbuf, errorbufsize, "invalid role name %s.", rolename);
+		return RESQUEMGR_NO_USERID;
 	}
-    if ( res != FUNC_RETURN_OK ) {
-    	snprintf(errorbuf, errorbufsize,
-    			 "Fail to get response from resource manager RPC.");
-    	*errorcode = res;
+
+	elog(DEBUG3, "Resource manager (manipulateRoleForResourceQueue) "
+				 "role oid:%d, queueID:%d, isSuper:%d, roleName:%s, action:%d",
+				 request.RoleOID, request.QueueOID, request.isSuperUser,
+				 request.Name, request.Action);
+
+	appendSMBVar(sendbuffer, request);
+
+	res = callSyncRPCToRM(sendbuffer->Buffer,
+						  sendbuffer->Cursor + 1,
+						  REQUEST_QD_DDL_MANIPULATEROLE,
+						  RESPONSE_QD_DDL_MANIPULATEROLE,
+						  recvbuffer);
+
+    if ( res != FUNC_RETURN_OK )
+    {
+    	snprintf(errorbuf, errorbufsize, "%s", getErrorCodeExplain(res));
     	return res;
     }
 
 	/* Start parsing response. */
-	RPCResponseHeadManipulateRole response =
-		(RPCResponseHeadManipulateRole)(recvbuffer->Buffer);
+	RPCResponseHeadManipulateRole response = (RPCResponseHeadManipulateRole)
+											 (recvbuffer->Buffer);
 
 	/* The response contains error message. */
-	if ( response->Result != FUNC_RETURN_OK ) {
-
+	if ( response->Result != FUNC_RETURN_OK )
+	{
 		RPCResponseHeadManipulateRoleERROR error =
 			(RPCResponseHeadManipulateRoleERROR)(recvbuffer->Buffer);
 
-		elog(RMLOG, "HAWQ RM :: Fail to manipulate role. %s",
-						  error->ErrorText);
+		elog(WARNING, "Resource manager failed to manipulate role %s. %s",
+					  rolename,
+					  error->ErrorText);
 		snprintf(errorbuf, errorbufsize, "%s", error->ErrorText);
-		*errorcode = error->Result;
-		return FUNC_RETURN_OK;
 	}
-
-	*errorcode = FUNC_RETURN_OK;
-	return res;
+	return response->Result;
 }
 
 void buildManipulateResQueueRequest(SelfMaintainBuffer sendbuffer,
@@ -972,8 +964,7 @@ void buildManipulateResQueueRequest(SelfMaintainBuffer sendbuffer,
 	Assert( sendbuffer != NULL );
 	Assert( connid != 0XFFFFFFFF );
 	Assert( queuename != NULL );
-	Assert( action >= MANIPULATE_RESQUEUE_CREATE &&
-			action <= MANIPULATE_RESQUEUE_DROP );
+	Assert( action >= MANIPULATE_RESQUEUE_CREATE && action <= MANIPULATE_RESQUEUE_DROP );
 
 	uint16_t  withlength 	 	= 0;
 	bool	  nowIsWithOption 	= false;
@@ -1069,26 +1060,14 @@ void sendFailedNodeToResourceManager(int hostNum, char **pghost) {
 	elog(LOG, "HAWQ RM :: QD sends %d failed host(s) to resource manager.",
 				 hostNum);
 
-	if (rm_domain_comm_enable)
-	{
-    res = callSyncRPCDomain(QD2RM_SocketFile,
-    						sendBuffer.Buffer,
-							sendBuffer.Cursor + 1,
-							REQUEST_QD_SEGMENT_ISDOWN,
-							RESPONSE_QD_SEGMENT_ISDOWN,
-							&recvBuffer);
-	}
-	else
-	{
-	  res = callSyncRPCRemote(master_addr_host,
-	                          rm_master_addr_port,
-	                          sendBuffer.Buffer,
-	                          sendBuffer.Cursor + 1,
-	                          REQUEST_QD_SEGMENT_ISDOWN,
-	                          RESPONSE_QD_SEGMENT_ISDOWN,
-	                          &recvBuffer);
-	}
-    if ( res != FUNC_RETURN_OK ) {
+	res = callSyncRPCToRM(sendBuffer.Buffer,
+						  sendBuffer.Cursor + 1,
+						  REQUEST_QD_SEGMENT_ISDOWN,
+						  RESPONSE_QD_SEGMENT_ISDOWN,
+						  &recvBuffer);
+
+    if ( res != FUNC_RETURN_OK )
+    {
     	elog(LOG, "Fail to get response from resource manager RPC. %d", res);
     	goto exit;
     }
@@ -1114,25 +1093,11 @@ int getLocalTmpDirFromMasterRM()
     request.Reserved = 0;
 	appendSMBVar(&sendBuffer, request);
 
-	if (rm_domain_comm_enable)
-	{
-    res = callSyncRPCDomain(QD2RM_SocketFile,
-    						sendBuffer.Buffer,
-							sendBuffer.Cursor + 1,
-							REQUEST_QD_TMPDIR,
-							RESPONSE_QD_TMPDIR,
-							&recvBuffer);
-	}
-	else
-	{
-	  res = callSyncRPCRemote(master_addr_host,
-                            rm_master_addr_port,
-                            sendBuffer.Buffer,
-                            sendBuffer.Cursor + 1,
-                            REQUEST_QD_TMPDIR,
-                            RESPONSE_QD_TMPDIR,
-                            &recvBuffer);
-	}
+	res = callSyncRPCToRM(sendBuffer.Buffer,
+						  sendBuffer.Cursor + 1,
+						  REQUEST_QD_TMPDIR,
+						  RESPONSE_QD_TMPDIR,
+						  &recvBuffer);
     if ( res != FUNC_RETURN_OK ) 
     {
         elog(ERROR, "getLocalTmpDirFromMasterRM fail");
@@ -1185,35 +1150,23 @@ int acquireResourceQuotaFromRM(int64_t		user_oid,
 	request.UseridOid     	 = user_oid;
 	request.MaxSegCountFix 	 = max_seg_count_fix;
 	request.MinSegCountFix   = min_seg_count_fix;
-    request.VSegLimitPerSeg	 = rm_query_vseg_num_per_seg_limit;
-    request.VSegLimit		 = rm_query_vseg_num_limit;
+    request.VSegLimitPerSeg	 = rm_nvseg_perquery_perseg_limit;
+    request.VSegLimit		 = rm_nvseg_perquery_limit;
 	appendSMBVar(&sendBuffer, request);
 
-	elog(DEBUG3, "HAWQ RM :: Acquire resource quota for query with %d splits, %d preferred virtual segments by user "INT64_FORMAT,
+	elog(DEBUG3, "HAWQ RM :: Acquire resource quota for query with %d splits, "
+				 "%d preferred virtual segments by user "INT64_FORMAT,
 				 max_seg_count_fix,
 				 min_seg_count_fix,
 				 user_oid);
 
-	if (rm_domain_comm_enable)
-	{
-    res = callSyncRPCDomain(QD2RM_SocketFile,
-    						sendBuffer.Buffer,
-							sendBuffer.Cursor + 1,
-							REQUEST_QD_ACQUIRE_RESOURCE_QUOTA,
-							RESPONSE_QD_ACQUIRE_RESOURCE_QUOTA,
-							&recvBuffer);
-	}
-	else
-	{
-	  res = callSyncRPCRemote(master_addr_host,
-                            rm_master_addr_port,
-                            sendBuffer.Buffer,
-                            sendBuffer.Cursor + 1,
-                            REQUEST_QD_ACQUIRE_RESOURCE_QUOTA,
-                            RESPONSE_QD_ACQUIRE_RESOURCE_QUOTA,
-                            &recvBuffer);
-	}
-    if ( res != FUNC_RETURN_OK ) {
+	res = callSyncRPCToRM(sendBuffer.Buffer,
+						  sendBuffer.Cursor + 1,
+						  REQUEST_QD_ACQUIRE_RESOURCE_QUOTA,
+						  RESPONSE_QD_ACQUIRE_RESOURCE_QUOTA,
+						  &recvBuffer);
+    if ( res != FUNC_RETURN_OK )
+    {
     	snprintf(errorbuf, errorbufsize,
     			 "Fail to get response from resource manager RPC.");
     	*errorcode = res;
@@ -1245,7 +1198,6 @@ exit:
 
 void *generateResourceRefreshHeartBeat(void *arg)
 {
-	static char dfilename[256];
 	static char messagehead[16] = {'M' ,'S' ,'G' ,'S' ,'T' ,'A' ,'R' ,'T' ,
 								   '\0','\0','\0','\0','\0','\0','\0','\0'};
 	static char messagetail[8]  = {'M' ,'S' ,'G' ,'E' ,'N' ,'D' ,'S' ,'!' };
@@ -1292,11 +1244,12 @@ void *generateResourceRefreshHeartBeat(void *arg)
 		/* Build final request content and send out. */
 		appendSelfMaintainBufferTill64bitAligned(&contbuffer);
 
-		if ( sendcontent ) {
+		if ( sendcontent )
+		{
 			int fd = -1;
-			int res = connectToServerDomain(QD2RM_SocketFile, 0, &fd, 1, dfilename);
-			if ( res == FUNC_RETURN_OK ) {
-
+			int res = connectToServerRemote(master_addr_host, rm_master_port, &fd);
+			if ( res == FUNC_RETURN_OK )
+			{
 				RMMessageHead phead = (RMMessageHead)messagehead;
 				RMMessageTail ptail = (RMMessageTail)messagetail;
 				phead->Mark1       = 0;
@@ -1322,7 +1275,7 @@ void *generateResourceRefreshHeartBeat(void *arg)
 				  write_log("generateResourceRefreshHeartBeat send error (errno %d)", errno);
 				}
 			}
-      closeConnectionDomain(&fd, dfilename);
+			closeConnectionRemote(&fd);
 		}
 		pg_usleep(rm_resource_heartbeat_interval * 1000000);
 	}
@@ -1362,24 +1315,17 @@ Datum pg_resqueue_status(PG_FUNCTION_ARGS)
         request.Reserved = 0;
         appendSMBVar(&sendBuffer, request);
 
-        if (rm_domain_comm_enable)
+    	res = callSyncRPCToRM(sendBuffer.Buffer,
+							  sendBuffer.Cursor + 1,
+							  REQUEST_QD_DUMP_RESQUEUE_STATUS,
+							  RESPONSE_QD_DUMP_RESQUEUE_STATUS,
+							  &recvBuffer);
+        if ( res != FUNC_RETURN_OK )
         {
-          res = callSyncRPCDomain(QD2RM_SocketFile,
-                                sendBuffer.Buffer,
-                                sendBuffer.Cursor + 1,
-                                REQUEST_QD_DUMP_RESQUEUE_STATUS,
-                                RESPONSE_QD_DUMP_RESQUEUE_STATUS,
-                                &recvBuffer);
-        }
-        else
-        {
-          res = callSyncRPCRemote(master_addr_host,
-                                  rm_master_addr_port,
-                                  sendBuffer.Buffer,
-                                  sendBuffer.Cursor + 1,
-                                  REQUEST_QD_DUMP_RESQUEUE_STATUS,
-                                  RESPONSE_QD_DUMP_RESQUEUE_STATUS,
-                                  &recvBuffer);
+            destroySelfMaintainBuffer(&sendBuffer);
+            destroySelfMaintainBuffer(&recvBuffer);
+		    funcctx->max_calls = 0;
+            SRF_RETURN_DONE(funcctx);
         }
 
         RPCResponseResQueueStatus response = (RPCResponseResQueueStatus)(recvBuffer.Buffer);
@@ -1507,25 +1453,15 @@ void dumpResourceManagerStatus(uint32_t type, const char *dump_file)
     strncpy(request.dump_file, dump_file, sizeof(request.dump_file) - 1);
     appendSMBVar(&sendBuffer, request);
 
-    if (rm_domain_comm_enable)
-    {
-      res = callSyncRPCDomain(QD2RM_SocketFile,
-                            sendBuffer.Buffer,
-                            sendBuffer.Cursor + 1,
-                            REQUEST_QD_DUMP_STATUS,
-                            RESPONSE_QD_DUMP_STATUS,
-                            &recvBuffer);
-    }
-    else
-    {
-      res = callSyncRPCRemote(master_addr_host,
-                              rm_master_addr_port,
-                              sendBuffer.Buffer,
-                              sendBuffer.Cursor + 1,
-                              REQUEST_QD_DUMP_STATUS,
-                              RESPONSE_QD_DUMP_STATUS,
-                              &recvBuffer);
-    }
+   	res = callSyncRPCToRM(sendBuffer.Buffer,
+						  sendBuffer.Cursor + 1,
+						  REQUEST_QD_DUMP_STATUS,
+						  RESPONSE_QD_DUMP_STATUS,
+						  &recvBuffer);
+   	if ( res != FUNC_RETURN_OK )
+   	{
+   		goto exit;
+   	}
 
     RPCResponseDumpStatus response = (RPCResponseDumpStatus)(recvBuffer.Buffer);
 
@@ -2494,23 +2430,20 @@ int callSyncRPCToRM(const char 	 	   *sendbuff,
 					uint16_t 		  	exprecvmsgid,
 					SelfMaintainBuffer	recvsmb)
 {
-	if (rm_domain_comm_enable)
-	{
+#ifdef ENABLE_DOMAINSERVER
 		return callSyncRPCDomain(QD2RM_SocketFile,
 								 sendbuff,
 								 sendbuffsize,
 								 sendmsgid,
 								 exprecvmsgid,
 								 recvsmb);
-	}
-	else
-	{
+#else
 		return callSyncRPCRemote(master_addr_host,
-							     rm_master_addr_port,
+								 rm_master_port,
 								 sendbuff,
 								 sendbuffsize,
 								 sendmsgid,
 								 exprecvmsgid,
 								 recvsmb);
-	}
+#endif
 }
