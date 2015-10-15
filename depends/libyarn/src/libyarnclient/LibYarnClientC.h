@@ -130,7 +130,7 @@ const char* getErrorMessage();
 
 void setErrorMessage(const char* errorMsg);
 
-int newLibYarnClient(char *rmHost, char *rmPort,
+int newLibYarnClient(char* user, char *rmHost, char *rmPort,
 				char *schedHost, char *schedPort, char *amHost,
 				int32_t amPort, char *am_tracking_url,LibYarnClient_t **client,int heartbeatInterval);
 

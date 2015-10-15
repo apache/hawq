@@ -634,7 +634,7 @@ void RpcChannelImpl::sendConnectionHeader(const RpcAuth &auth) {
 void RpcChannelImpl::buildConnectionContext(
     hadoop::common::IpcConnectionContextProto & connectionContext, const RpcAuth & auth) {
     connectionContext.set_protocol(key.getProtocol().getProtocol());
-    std::string euser = key.getAuth().getUser().getPrincipal();
+    std::string euser = key.getAuth().getUser().getEffectiveUser();
     std::string ruser = key.getAuth().getUser().getRealUser();
 
     if (auth.getMethod() != AuthMethod::TOKEN) {
@@ -686,8 +686,10 @@ RpcRemoteCallPtr RpcChannelImpl::getPendingCall(int32_t id) {
 bool RpcChannelImpl::getResponse() {
     int idleTimeout = key.getConf().getMaxIdleTime();
     int pingTimeout = key.getConf().getPingTimeout();
+    int timeout = key.getConf().getRpcTimeout();
     int interval = pingTimeout < idleTimeout ? pingTimeout : idleTimeout;
     interval /= 2;
+    interval = interval < timeout ? interval : timeout;
     steady_clock::time_point s = steady_clock::now();
 
     while (client.isRunning()) {

@@ -122,6 +122,9 @@ std::string SaslClient::evaluateChallenge(const std::string & challenge) {
             free(output);
         }
     } else {
+        if (output) {
+            free(output);
+        }
         THROW(AccessControlException, "Failed to evaluate challenge: %s", gsasl_strerror(rc));
     }
 
@@ -134,26 +137,6 @@ std::string SaslClient::evaluateChallenge(const std::string & challenge) {
 
 bool SaslClient::isComplete() {
     return complete;
-}
-
-std::string SaslClient::getQOP() {
-    const char * retval = gsasl_property_get(session, GSASL_QOP);
-    std::string qop = retval == NULL ? "" : retval;
-    std::transform(qop.begin(), qop.end(), qop.begin(), ::tolower);
-
-    if (qop.find("auth") != qop.npos) {
-        return "auth";
-    }
-
-    if (qop.find("int") != qop.npos) {
-        return "int";
-    }
-
-    if (qop.find("conf") != qop.npos) {
-        return "conf";
-    }
-
-    return "auth";
 }
 
 }

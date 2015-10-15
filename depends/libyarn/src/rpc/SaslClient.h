@@ -30,8 +30,6 @@ public:
 
     bool isComplete();
 
-    std::string getQOP();
-
 private:
     void initKerberos(const hadoop::common::RpcSaslProto_SaslAuth & auth,
                       const std::string & principal);

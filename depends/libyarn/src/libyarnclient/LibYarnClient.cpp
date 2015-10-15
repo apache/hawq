@@ -17,17 +17,17 @@ using namespace Yarn::Internal;
 
 namespace libyarn {
 
-LibYarnClient::LibYarnClient(string &rmHost, string &rmPort,
+LibYarnClient::LibYarnClient(string &user, string &rmHost, string &rmPort,
 		string &schedHost, string &schedPort, string &amHost,
 		int32_t amPort, string &am_tracking_url,int heartbeatInterval) :
-		schedHost(schedHost), schedPort(schedPort), amHost(amHost),
+		amUser(user), schedHost(schedHost), schedPort(schedPort), amHost(amHost),
 		amPort(amPort), am_tracking_url(am_tracking_url),
 		heartbeatInterval(heartbeatInterval),clientJobId(""),response_id(0),
 		keepRun(true){
         pthread_mutex_init( &(heartbeatLock), NULL );
 
 		amrmClient = NULL;
-		appClient = (void*) new ApplicationClient(rmHost, rmPort);
+		appClient = (void*) new ApplicationClient(user, rmHost, rmPort);
 		nmClient = (void*) new ContainerManagement();
 }
 #ifdef MOCKTEST
@@ -107,10 +107,10 @@ int LibYarnClient::createJob(string &jobName, string &queue,string &jobId) {
     	if (clientJobId != ""){
     		throw std::invalid_argument( "Exist an application for the client");
     	}
-        ApplicationClient *appClientAlias = (ApplicationClient*)appClient;
+        ApplicationClient *applicationClient = (ApplicationClient*)appClient;
 
         //1. getNewApplication
-        ApplicationID appId = appClientAlias->getNewApplication();
+        ApplicationID appId = applicationClient->getNewApplication();
         LOG(INFO, "LibYarnClient::createJob, getNewApplication finished, appId:[clusterTimeStamp:%lld,id:%d]",
                 appId.getClusterTimestamp(), appId.getId());
 
@@ -129,16 +129,16 @@ int LibYarnClient::createJob(string &jobName, string &queue,string &jobId) {
         appSubmitCtx.setUnmanagedAM(true);
         appSubmitCtx.setMaxAppAttempts(1);
 
-        appClientAlias->submitApplication(appSubmitCtx);
+        applicationClient->submitApplication(appSubmitCtx);
         LOG(INFO, "LibYarnClient::createJob, submitApplication finished");
 
         //3. wait util AM is ACCEPTED and return the AMRMToken
         ApplicationReport report;
         while (true) {
-            report = appClientAlias->getApplicationReport(appId);
+            report = applicationClient->getApplicationReport(appId);
             LOG(INFO,"LibYarnClient::createJob, appId[cluster_timestamp:%lld,id:%d], appState:%d",
                     appId.getClusterTimestamp(), appId.getId(), report.getYarnApplicationState());
-            if ((report.getAMRMToken().getPassword() != "") && report.getYarnApplicationState() == YarnApplicationState::ACCEPTED) {
+			if ((report.getAMRMToken().getPassword() != "") && report.getYarnApplicationState() == YarnApplicationState::ACCEPTED) {
                 break;
             } else {
                 usleep(1000000L);
@@ -150,15 +150,23 @@ int LibYarnClient::createJob(string &jobName, string &queue,string &jobId) {
 
         //4.1 new ApplicationMaster
         Token token = report.getAMRMToken();
-        UserInfo user = UserInfo::LocalUser();
-        Yarn::Token anotherToken;
-        anotherToken.setIdentifier(token.getIdentifier());
-        anotherToken.setKind(token.getKind());
-        anotherToken.setPassword(token.getPassword());
-        anotherToken.setService(token.getService());
+        UserInfo user;
+		if (applicationClient->getMethod() == SIMPLE)
+			user = UserInfo::LocalUser();
+		else if (applicationClient->getMethod() == KERBEROS) {
+			user.setEffectiveUser(applicationClient->getPrincipal());
+			user.setRealUser(applicationClient->getUser());
+		} else {
+			LOG(WARNING, "LibYarnClient::createJob: unsupported RPC method:%d. ", applicationClient->getMethod());
+		}
 
-        //LOG(INFO,"%s",token.getIdentifier());
-        user.addToken(anotherToken);
+		Yarn::Token AMToken;
+		AMToken.setIdentifier(token.getIdentifier());
+		AMToken.setKind(token.getKind());
+		AMToken.setPassword(token.getPassword());
+		AMToken.setService(token.getService());
+
+        user.addToken(AMToken);
 #ifndef MOCKTEST
         amrmClient = (void*) new ApplicationMaster(this->schedHost, this->schedPort,
                 user, token.getService());
