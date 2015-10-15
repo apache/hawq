@@ -1,10 +1,7 @@
 #include "utils/network_utils.h"
 #include "utils/memutilities.h"
 #include "miscadmin.h"
-
-#ifdef GETIFADDRS_USING_SIGAR
 #include "sigar.h"
-#endif
 
 #include <arpa/inet.h>
 #include <sys/socket.h>

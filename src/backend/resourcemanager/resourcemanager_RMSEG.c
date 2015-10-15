@@ -73,7 +73,7 @@ int  initializeSocketServer_RMSEG(void)
 	/* Listen normal socket addresses. */
 	netres = StreamServerPort( AF_UNSPEC,
 							   allip,
-							   rm_seg_addr_port,
+							   rm_segment_port,
 							   NULL,
 							   RMListenSocket,
 							   HAWQRM_SERVER_PORT_COUNT);
@@ -87,7 +87,7 @@ int  initializeSocketServer_RMSEG(void)
 		res = REQUESTHANDLER_FAIL_START_SOCKET_SERVER;
 		elog( LOG,  "Can not create socket server. HostName=%s, Port=%d",
 				    allip,
-					rm_seg_addr_port);
+					rm_segment_port);
 		return res;
 	}
 
@@ -125,7 +125,7 @@ int  initializeSocketServer_RMSEG(void)
 				 "Listening normal socket port %s:%d. "
 				 "Total listened %d FDs.",
 				allip,
-				rm_seg_addr_port,
+				rm_segment_port,
 				validfdcount);
 	return res;
 

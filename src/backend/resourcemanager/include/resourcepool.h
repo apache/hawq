@@ -460,6 +460,9 @@ struct ResourcePoolData {
 	 */
 	ALLOC_RES_FROM_RESPOOL_FUNC allocateResFuncs[RESOURCEPOOL_MAX_ALLOC_POLICY_SIZE];
 
+	/* Slaves file content. */
+	int64_t			SlavesFileTimestamp;
+	int				SlavesHostCount;
 };
 
 typedef struct ResourcePoolData *ResourcePool;
@@ -601,6 +604,9 @@ typedef struct RB_GRMContainerStatData *RB_GRMContainerStat;
 void checkGRMContainerStatus(RB_GRMContainerStat ctnstats, int size);
 
 int getClusterGRMContainerSize(void);
+
+void checkSlavesFile(void);
+
 /*
  *------------------------------------------------------------------------------
  * gp_segment_configuration catalog operating APIs.
@@ -617,6 +623,7 @@ void add_segment_config_row(int32_t 	 id,
 							char		*address,
 							uint32_t 	 port,
 							char 		 role);
+
 /*
  * In resource pool, segment's id starts from 0, however in gp_segment_configuration table,
  * segment registration order starts from 1(0 is for master, -1 is for standby).

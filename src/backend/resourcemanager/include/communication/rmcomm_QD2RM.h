@@ -136,15 +136,14 @@ int manipulateResourceQueue(int 	 index,
 							char	*errorbuf,
 							int		 errorbufsize);
 
-int manipulateRoleForResourceQueue (int 	 index,
-									Oid 	 roleid,
-									Oid 	 queueid,
-									uint16_t action,
-									uint8_t  isSuperUser,
-									char	*rolename,
-									int		*errorcode,
-									char	*errorbuf,
-									int		 errorbufsize);
+int manipulateRoleForResourceQueue (int 	  index,
+									Oid 	  roleid,
+									Oid 	  queueid,
+									uint16_t  action,
+									uint8_t   isSuperUser,
+									char	 *rolename,
+									char	 *errorbuf,
+									int		  errorbufsize);
 
 void SendResourceRefreshHeartBeat(void);
 

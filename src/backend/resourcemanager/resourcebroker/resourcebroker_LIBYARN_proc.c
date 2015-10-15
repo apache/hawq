@@ -11,11 +11,16 @@
 
 #include "libyarn/LibYarnClientC.h"
 
+#include <krb5.h>
+#include "cdb/cdbfilesystemcredential.h"
+
 /*
  *------------------------------------------------------------------------------
  * Internal functions
  *------------------------------------------------------------------------------
  */
+char * ExtractPrincipalFromTicketCache(const char* cache);
+
 int ResBrokerMainInternal(void);
 
 int loadParameters(void);
@@ -65,6 +70,12 @@ int sendRBGetContainerReportErrorData(int errorcode);
 void quitResBroker(SIGNAL_ARGS);
 
 uint64_t                 ResBrokerStartTime;
+
+/* The user who submits hawq application to Hadoop Yarn,
+ * default is postgres, if Kerberos is enable, should be principal name.
+ * */
+char*				 	 YARNUser;
+bool					 YARNUserShouldFree;
 
 SimpString				 YARNServer;
 SimpString				 YARNPort;
@@ -286,6 +297,85 @@ int ResBrokerMainInternal(void)
 	return FUNC_RETURN_OK;
 }
 
+/*
+ * Extract principal from cache
+ */
+char * ExtractPrincipalFromTicketCache(const char* cache)
+{
+	krb5_context cxt = NULL;
+	krb5_ccache ccache = NULL;
+	krb5_principal principal = NULL;
+	krb5_error_code ec = 0;
+	char *priName = NULL, *retval = NULL;
+	const char *errorMsg = NULL;
+
+    /*
+     * refresh kerberos ticket
+     */
+	if (!login()) {
+		elog(WARNING, "Cannot login kerberos.");
+		return NULL;
+	}
+
+	if (!cache) {
+        if (0 != setenv("KRB5CCNAME", cache, 1)) {
+            elog(WARNING, "Cannot set env parameter \"KRB5CCNAME\" when extract principal from cache:%s", cache);
+            return NULL;
+        }
+    }
+
+    do {
+        if (0 != (ec = krb5_init_context(&cxt))) {
+            break;
+        }
+
+        if (0 != (ec = krb5_cc_default(cxt, &ccache))) {
+            break;
+        }
+
+        if (0 != (ec = krb5_cc_get_principal(cxt, ccache, &principal))) {
+            break;
+        }
+
+        if (0 != (ec = krb5_unparse_name(cxt, principal, &priName))) {
+            break;
+        }
+    } while (0);
+
+    if (!ec) {
+        retval = strdup(priName);
+    } else {
+        if (cxt) {
+        	errorMsg = krb5_get_error_message(cxt, ec);
+        } else {
+        	errorMsg = "Cannot initialize kerberos context";
+        }
+    }
+
+    if (priName != NULL) {
+        krb5_free_unparsed_name(cxt, priName);
+    }
+
+    if (principal != NULL) {
+        krb5_free_principal(cxt, principal);
+    }
+
+    if (ccache != NULL) {
+        krb5_cc_close(cxt, ccache);
+    }
+
+    if (cxt != NULL) {
+        krb5_free_context(cxt);
+    }
+
+    if (errorMsg != NULL) {
+    	elog(WARNING, "Fail to extract principal from cache, because : %s", errorMsg);
+    	return NULL;
+    }
+
+    return retval;
+}
+
 int  loadParameters(void)
 {
 	int	 			res 		= FUNC_RETURN_OK;
@@ -296,6 +386,8 @@ int  loadParameters(void)
 	initSimpleString(&YARNSchedulerPort, 	PCONTEXT);
 	initSimpleString(&YARNQueueName, 		PCONTEXT);
 	initSimpleString(&YARNAppName, 			PCONTEXT);
+	YARNUser = NULL;
+	YARNUserShouldFree = false;
 
 	/* Get server and port */
 	char *pcolon = NULL;
@@ -363,16 +455,31 @@ int  loadParameters(void)
 
 	setSimpleStringNoLen(&YARNAppName, rm_grm_yarn_app_name);
 
+	/* If kerberos is enable, fetch the principal from ticket cache file. */
+	if (enable_secure_filesystem)
+	{
+		YARNUser = ExtractPrincipalFromTicketCache(krb5_ccname);
+		YARNUserShouldFree = true;
+	}
+
+	if (YARNUser == NULL)
+	{
+		YARNUser = "postgres";
+		YARNUserShouldFree = false;
+	}
+
 	elog(LOG, "YARN mode resource broker accepted YARN connection arguments : "
 			  "YARN Server %s:%s "
 			  "Scheduler server %s:%s "
-			  "Queue %s Application name %s",
+			  "Queue %s Application name %s, "
+			  "by user:%s",
 		      YARNServer.Str,
 		      YARNPort.Str,
 		      YARNSchedulerServer.Str,
 		      YARNSchedulerPort.Str,
 		      YARNQueueName.Str,
-		      YARNAppName.Str);
+		      YARNAppName.Str,
+		      YARNUser);
 exit:
 	if ( res != FUNC_RETURN_OK ) {
 		elog(LOG, "YARN mode resource broker failed to load YARN connection arguments.");
@@ -1139,7 +1246,8 @@ int RB2YARN_connectToYARN(void)
 	int yarnres = FUNCTION_SUCCEEDED;
 
     /* Setup YARN client. */
-	yarnres = newLibYarnClient(YARNServer.Str,
+	yarnres = newLibYarnClient(YARNUser,
+							   YARNServer.Str,
 						       YARNPort.Str,
 						       YARNSchedulerServer.Str,
 						       YARNSchedulerPort.Str,
@@ -1665,7 +1773,13 @@ int  RB2YARN_disconnectFromYARN(void)
 	if ( YARNJobID != NULL ) {
 		free(YARNJobID);
 	}
+	if (YARNUser != NULL && YARNUserShouldFree )
+	{
+		free(YARNUser);
+	}
 	LIBYARNClient 		= NULL;
 	YARNJobID 			= NULL;
+	YARNUser 			= NULL;
+	YARNUserShouldFree	= true;
 	return FUNCTION_SUCCEEDED;
 }

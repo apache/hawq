@@ -1155,13 +1155,12 @@ extern char   *dfs_url;
 extern char   *master_directory;
 extern char   *seg_directory;
 
-extern bool rm_domain_comm_enable;
 /* HAWQ 2.0 resource manager GUCs */
-extern int	   rm_master_addr_domain_port;
-extern int     rm_master_addr_port;
-extern int	   rm_seg_addr_port;
+extern int	   rm_master_domain_port;
+extern int     rm_master_port;
+extern int	   rm_segment_port;
 
-extern char   *rm_grm_server_type;
+extern char   *rm_global_rm_type;
 
 extern char   *rm_seg_memory_use;
 extern double  rm_seg_core_use;
@@ -1172,14 +1171,19 @@ extern char   *rm_grm_yarn_queue;
 extern char   *rm_grm_yarn_app_name;
 extern int	   rm_grm_breath_return_percentage;
 
-extern int     rm_query_vseg_num_limit;
-extern int	   rm_query_vseg_num_per_seg_limit;
-extern int	   rm_slice_num_per_seg_limit;
+extern int     rm_nvseg_perquery_limit;
+extern int	   rm_nvseg_perquery_perseg_limit;
+extern int	   rm_nslice_perseg_limit;
 extern int	   rm_seg_container_default_waterlevel;
-extern int     rm_resource_noaction_timeout;
+
+extern int     rm_session_lease_timeout;
+extern bool    rm_session_lease_heartbeat_enable;
+
 extern int 	   rm_query_resource_noresource_timeout;
 extern int	   rm_resource_timeout;
 extern int	   rm_resource_heartbeat_interval;
+extern int	   rm_tolerate_nseg_limit;
+extern int	   rm_nvseg_variance_among_seg_limit;
 extern char   *rm_resourcepool_test_filename;
 extern bool	   rm_force_fifo_queue;
 

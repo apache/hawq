@@ -146,7 +146,7 @@ static bool resourceQueueIsBranch(Oid queueid)
 
 	Assert(tuple != NULL);
 
-	status = heap_getattr(tuple, Anum_pg_resqueue_rsq_status, RelationGetDescr(pg_resqueue_rel), &isNull);
+	status = heap_getattr(tuple, Anum_pg_resqueue_status, RelationGetDescr(pg_resqueue_rel), &isNull);
 	if (!isNull && strncmp(TextDatumGetCString(status), "branch", strlen("branch")) == 0)
 		res = true;
 
@@ -206,9 +206,8 @@ CreateRole(CreateRoleStmt *stmt)
 	cqContext  *pcqCtx;
 	Oid		queueid = InvalidOid;
 
-	int  res 		= FUNC_RETURN_OK;
-	int  errorcode	= FUNC_RETURN_OK;
-	char errorbuf[1024];
+	int  		res 		= FUNC_RETURN_OK;
+	static char errorbuf[1024] = "";
 
 	/* The defaults can vary depending on the original statement type */
 	switch (stmt->stmt_type)
@@ -449,22 +448,10 @@ CreateRole(CreateRoleStmt *stmt)
 									  GetUserId(),
 									  errorbuf,
 									  sizeof(errorbuf));
-	errorcode = res;
-
-	if (res != FUNC_RETURN_OK) {
+	if (res != FUNC_RETURN_OK)
+	{
 		releaseResourceContextWithErrorReport(resourceid);
-		ereport(ERROR,
-				(errcode(ERRCODE_INTERNAL_ERROR),
-						 errmsg("Can not apply CREATE ROLE. "
-								"Because fail to communicate with resource manager.")));
-	}
-	if (errorcode != FUNC_RETURN_OK) {
-		releaseResourceContextWithErrorReport(resourceid);
-		ereport(ERROR,
-				(errcode(ERRCODE_INTERNAL_ERROR),
-						 errmsg("Can not register connection in resource manager "
-								"for applying CREATE ROLE. Because [%d]%s",
-								errorcode, errorbuf)));
+		ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("%s", errorbuf)));
 	}
 
 	/*
@@ -554,31 +541,34 @@ CreateRole(CreateRoleStmt *stmt)
 
 	if (resqueue)
 	{
-		if (strcmp(resqueue, "none") == 0) {
+		if (strcmp(resqueue, "none") == 0)
+		{
 			unregisterConnectionInRMWithErrorReport(resourceid);
 			releaseResourceContextWithErrorReport(resourceid);
 			ereport(ERROR,
 					(errcode(ERRCODE_RESERVED_NAME),
-					 errmsg("resource queue name \"%s\" is reserved",
+					 errmsg("Resource queue name \"%s\" is reserved",
 							resqueue), errOmitLocation(true)));
 		}
 
 		queueid = GetResQueueIdForName(resqueue);
-		if (queueid == InvalidOid) {
+		if (queueid == InvalidOid)
+		{
 			unregisterConnectionInRMWithErrorReport(resourceid);
 			releaseResourceContextWithErrorReport(resourceid);
 			ereport(ERROR,
 					(errcode(ERRCODE_UNDEFINED_OBJECT),
-					 errmsg("resource queue \"%s\" does not exist",
+					 errmsg("Resource queue \"%s\" does not exist",
 							resqueue), errOmitLocation(true)));
 		}
 
-		if(resourceQueueIsBranch(queueid)) {
+		if(resourceQueueIsBranch(queueid))
+		{
 			unregisterConnectionInRMWithErrorReport(resourceid);
 			releaseResourceContextWithErrorReport(resourceid);
 			ereport(ERROR,
 					(errcode(ERRCODE_UNDEFINED_OBJECT),
-					 errmsg("can't assign a branch resource queue \"%s\" to role",
+					 errmsg("Can't assign a branch resource queue \"%s\" to role",
 							resqueue), errOmitLocation(true)));
 		}
 
@@ -614,7 +604,6 @@ CreateRole(CreateRoleStmt *stmt)
 											 MANIPULATE_ROLE_RESQUEUE_CREATE,
 											 issuper,
 											 stmt->role,
-											 &errorcode,
 											 errorbuf,
 											 sizeof(errorbuf));
 	}
@@ -627,19 +616,13 @@ CreateRole(CreateRoleStmt *stmt)
 
 	if (resqueue && queueid != InvalidOid)
 	{
-		if (res != FUNC_RETURN_OK) {
+		if ( res != FUNC_RETURN_OK )
+		{
 			ereport(ERROR,
-					(errcode(ERRCODE_INTERNAL_ERROR),
-							 errmsg("Can not apply CREATE ROLE. "
-									"Because fail to communicate with resource "
-									"manager.")));
-		}
-		if (errorcode != FUNC_RETURN_OK) {
-			/* TODO: Check if we should use another error code. */
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-							errmsg("Can not apply CREATE ROLE. Because [%d]%s",
-								   errorcode, errorbuf)));
+					(errcode(IS_TO_RM_RPC_ERROR(res) ?
+							 ERRCODE_INTERNAL_ERROR :
+							 ERRCODE_INVALID_OBJECT_DEFINITION),
+					 errmsg("Can not apply CREATE ROLE because of %s", errorbuf)));
 		}
 	}
 
@@ -774,11 +757,10 @@ AlterRole(AlterRoleStmt *stmt)
 
 	cqContext	 cqc;
 	cqContext	*pcqCtx;
-	Oid			queueid = InvalidOid;
+	Oid			 queueid = InvalidOid;
 
-	int  res 		= FUNC_RETURN_OK;
-	int  errorcode	= FUNC_RETURN_OK;
-	char errorbuf[1024];
+	int  		 res 			= FUNC_RETURN_OK;
+	static char  errorbuf[1024] = "";
 
 	numopts = list_length(stmt->options);
 
@@ -977,7 +959,8 @@ AlterRole(AlterRoleStmt *stmt)
 	 */
 	int resourceid = 0;
     res = createNewResourceContext(&resourceid);
-    if ( res != FUNC_RETURN_OK ) {
+    if ( res != FUNC_RETURN_OK )
+    {
     	Assert( res == COMM2RM_CLIENT_FULL_RESOURCECONTEXT );
     	ereport(ERROR,
     			(errcode(ERRCODE_INTERNAL_ERROR),
@@ -989,21 +972,10 @@ AlterRole(AlterRoleStmt *stmt)
 									  GetUserId(),
 									  errorbuf,
 									  sizeof(errorbuf));
-	errorcode = res;
-	if (res != FUNC_RETURN_OK) {
+	if (res != FUNC_RETURN_OK)
+	{
 		releaseResourceContextWithErrorReport(resourceid);
-		ereport(ERROR,
-				(errcode(ERRCODE_INTERNAL_ERROR),
-						 errmsg("Can not apply ALTER ROLE. "
-								"Because fail to communicate with resource manager.")));
-	}
-	if (errorcode != FUNC_RETURN_OK) {
-		releaseResourceContextWithErrorReport(resourceid);
-		ereport(ERROR,
-				(errcode(ERRCODE_INTERNAL_ERROR),
-						 errmsg("Can not register connection in resource manager "
-								"for applying ALTER ROLE. Because [%d]%s",
-								errorcode, errorbuf)));
+		ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("%s", errorbuf)));
 	}
 
 	/*
@@ -1278,7 +1250,6 @@ AlterRole(AlterRoleStmt *stmt)
 											  MANIPULATE_ROLE_RESQUEUE_ALTER,
 											  issuper,
 											  stmt->role,
-											  &errorcode,
 											  errorbuf,
 											  sizeof(errorbuf));
 	}
@@ -1291,19 +1262,14 @@ AlterRole(AlterRoleStmt *stmt)
 
 	if (resqueue && queueid != InvalidOid)
 	{
-		if ( res != FUNC_RETURN_OK ) {
+		if ( res != FUNC_RETURN_OK )
+		{
+
 			ereport(ERROR,
-					(errcode(ERRCODE_INTERNAL_ERROR),
-							 errmsg("Can not apply ALTER ROLE. "
-									"Because fail to communicate with resource "
-									"manager.")));
-		}
-		if (errorcode != FUNC_RETURN_OK) {
-			/* TODO: Check if we should use another error code. */
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-							errmsg("Can not apply ALTER ROLE. Because [%d]%s",
-								   errorcode, errorbuf)));
+					(errcode(IS_TO_RM_RPC_ERROR(res) ?
+							 ERRCODE_INTERNAL_ERROR :
+							 ERRCODE_INVALID_OBJECT_DEFINITION),
+					 errmsg("Can not apply ALTER ROLE because of %s", errorbuf)));
 		}
 	}
 
@@ -1541,9 +1507,8 @@ DropRole(DropRoleStmt *stmt)
 				pg_auth_members_rel;
 	ListCell   *item;
 
-	int  res		= FUNC_RETURN_OK;
-	int  errorcode	= FUNC_RETURN_OK;
-	char errorbuf[1024];
+	int  		res			   = FUNC_RETURN_OK;
+	static char errorbuf[1024] = "";
 
 	if (!have_createrole_privilege())
 		ereport(ERROR,
@@ -1662,22 +1627,10 @@ DropRole(DropRoleStmt *stmt)
 										  GetUserId(),
 										  errorbuf,
 										  sizeof(errorbuf));
-		errorcode = res;
-		if ( res != FUNC_RETURN_OK ) {
+		if (res != FUNC_RETURN_OK)
+		{
 			releaseResourceContextWithErrorReport(resourceid);
-			ereport(ERROR,
-					(errcode(ERRCODE_INTERNAL_ERROR),
-							 errmsg("Can not apply DROP ROLE. "
-									"Because fail to communicate with resource manager.")));
-		}
-
-		if ( errorcode != FUNC_RETURN_OK ) {
-			releaseResourceContextWithErrorReport(resourceid);
-			ereport(ERROR,
-					(errcode(ERRCODE_INTERNAL_ERROR),
-							 errmsg("Can not register connection in resource manager "
-									"for applying DROP ROLE. Because [%d]%s",
-									errorcode, errorbuf)));
+			ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("%s", errorbuf)));
 		}
 
 		/* Notify resource manager to drop role. */
@@ -1687,7 +1640,6 @@ DropRole(DropRoleStmt *stmt)
 											  MANIPULATE_ROLE_RESQUEUE_DROP,
 											  0,		// not used when drop role
 											  (char*)role,
-											  &errorcode,
 											  errorbuf,
 											  sizeof(errorbuf));
 		/* We always unregister connection. */
@@ -1696,19 +1648,13 @@ DropRole(DropRoleStmt *stmt)
 		/* We always release resource context. */
 		releaseResourceContextWithErrorReport(resourceid);
 
-		if ( res != FUNC_RETURN_OK ) {
+		if ( res != FUNC_RETURN_OK )
+		{
 			ereport(ERROR,
-					(errcode(ERRCODE_INTERNAL_ERROR),
-							 errmsg("Can not apply DROP ROLE. "
-									"Because fail to communicate with resource "
-									"manager.")));
-		}
-		if (errorcode != FUNC_RETURN_OK) {
-			/* TODO: Check if we should use another error code. */
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-							errmsg("Can not apply DROP ROLE. Because [%d]%s",
-								   errorcode, errorbuf)));
+					(errcode(IS_TO_RM_RPC_ERROR(res) ?
+							 ERRCODE_INTERNAL_ERROR :
+							 ERRCODE_INVALID_OBJECT_DEFINITION),
+					 errmsg("Can not apply DROP ROLE because of %s", errorbuf)));
 		}
 
 		/*
@@ -2145,16 +2091,7 @@ AddRoleMems(const char *rolename, Oid roleid,
 							rolename)));
 	}
 
-	/*
-	 * The role membership grantor of record has little significance at
-	 * present.  Nonetheless, inasmuch as users might look to it for a crude
-	 * audit trail, let only superusers impute the grant to a third party.
-	 *
-	 * Before lifting this restriction, give the member == role case of
-	 * is_admin_of_role() a fresh look.  Ensure that the current role cannot
-	 * use an explicit grantor specification to take advantage of the session
-	 * user's self-admin right.
-	 */
+	/* XXX not sure about this check */
 	if (grantorId != GetUserId() && !superuser())
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),

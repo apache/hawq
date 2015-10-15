@@ -45,18 +45,21 @@ void freeUpdateActionList(MCTYPE context, List **actions);
  * mapping with the definition of table pg_resqueue in pg_resqueue.h
  */
 const char* PG_Resqueue_Column_Names[Natts_pg_resqueue] = {
-	"rsqname",
-	"rsq_parent",
-	"rsq_active_stats_cluster",
-	"rsq_memory_limit_cluster",
-	"rsq_core_limit_cluster",
-	"rsq_resource_upper_factor",
-	"rsq_allocation_policy",
-	"rsq_vseg_resource_quota",
-	"rsq_vseg_upper_limit",
-	"rsq_creation_time",
-	"rsq_update_time",
-	"rsq_status"
+	"name",
+	"parentoid",
+	"activestats",
+	"memorylimit",
+	"corelimit",
+	"resovercommit",
+	"allocpolicy",
+	"vsegresourcequota",
+	"nvsegupperlimit",
+	"nvseglowerlimit",
+	"nvsegupperlimitperseg",
+	"nvseglowerlimitperseg",
+	"creationtime",
+	"updatetime",
+	"status"
 };
 
 /**
@@ -72,7 +75,7 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 	DynResourceQueueTrack   todroptrack		= NULL;
 	DynResourceQueueTrack   toupdatetrack	= NULL;
 	SelfMaintainBufferData  responsebuff;
-	char 					errorbuf[1024] 	= "";
+	static char 			errorbuf[1024] 	= "";
 	bool					exist 			= false;
 	List 				   *fineattr		= NULL;
 	List 				   *rsqattr			= NULL;
@@ -80,8 +83,8 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 	DynResourceQueue        oldqueue        = NULL;
 
 	/* Check context and retrieve the connection track based on connection id.*/
-	RPCRequestHeadManipulateResQueue request =
-		(RPCRequestHeadManipulateResQueue)((*conntrack)->MessageBuff.Buffer);
+	RPCRequestHeadManipulateResQueue request = (RPCRequestHeadManipulateResQueue)
+											   ((*conntrack)->MessageBuff.Buffer);
 
 	elog(LOG, "Resource manager gets a request from ConnID %d to submit resource "
 			  "queue DDL statement.",
@@ -155,8 +158,8 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 	foreach(cell, rsqattr)
 	{
 		KVProperty attribute = lfirst(cell);
-		elog(LOG, "Resource manager received DDL Request: %s=%s",
-				  attribute->Key.Str, attribute->Val.Str);
+		elog(DEBUG3, "Resource manager received DDL Request: %s=%s",
+				     attribute->Key.Str, attribute->Val.Str);
 	}
 
 	/* Shallow parse the 'withlist' attributes. */
@@ -167,10 +170,7 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 	if (res != FUNC_RETURN_OK)
 	{
 		ddlres = res;
-		elog(WARNING, ERRORPOS_FORMAT
-			 "Can not recognize DDL attribute because %s",
-			 ERRREPORTPOS,
-			 errorbuf);
+		elog(WARNING, "Can not recognize DDL attribute because %s", errorbuf);
 		goto senderr;
 	}
 
@@ -202,6 +202,7 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			newqueue = rm_palloc0(PCONTEXT, sizeof(DynResourceQueueData));
 			res = parseResourceQueueAttributes(fineattr,
 											   newqueue,
+											   false,
 											   errorbuf,
 											   sizeof(errorbuf));
 			if (res != FUNC_RETURN_OK)
@@ -228,10 +229,7 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			}
 
 			newtrack = NULL;
-			res = createQueueAndTrack(newqueue,
-									  &newtrack,
-									  errorbuf,
-									  sizeof(errorbuf));
+			res = createQueueAndTrack(newqueue, &newtrack, errorbuf, sizeof(errorbuf));
 			if (res != FUNC_RETURN_OK)
 			{
 				rm_pfree(PCONTEXT, newqueue);
@@ -267,6 +265,23 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			break;
 
 		case MANIPULATE_RESQUEUE_ALTER:
+			newqueue = rm_palloc0(PCONTEXT, sizeof(DynResourceQueueData));
+			res = parseResourceQueueAttributes(fineattr,
+											   newqueue,
+											   true,
+											   errorbuf,
+											   sizeof(errorbuf));
+			if (res != FUNC_RETURN_OK)
+			{
+				rm_pfree(PCONTEXT, newqueue);
+				ddlres = res;
+				elog(WARNING, "Resource manager can not alter resource queue "
+							  "with its attributes because %s",
+							  errorbuf);
+				goto senderr;
+			}
+			rm_pfree(PCONTEXT, newqueue);
+
 			toupdatetrack = getQueueTrackByQueueName((char *)(nameattr->Val.Str),
 					   	   	   	   	   	   	   	   	nameattr->Val.Len,
 					   	   	   	   	   	   	   	   	&exist);
@@ -428,10 +443,8 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			if (res != FUNC_RETURN_OK)
 			{
 				ddlres = res;
-				elog(WARNING, ERRORPOS_FORMAT
-				     "Resource manager can not dropQueueAndTrack because %s",
-					 ERRREPORTPOS,
-					 errorbuf);
+				elog(WARNING, "Resource manager can not dropQueueAndTrack because %s",
+						      errorbuf);
 				goto senderr;
 			}
 
@@ -471,58 +484,62 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 	return true;
 
 senderr:
-	initializeSelfMaintainBuffer(&responsebuff, PCONTEXT);
-	appendSelfMaintainBuffer(&responsebuff, (void *)&ddlres, sizeof(uint32_t));
-	appendSelfMaintainBufferTill64bitAligned(&responsebuff);
-
-	if (ddlres != FUNC_RETURN_OK) {
-		appendSelfMaintainBuffer(&responsebuff, errorbuf, strlen(errorbuf)+1);
-	}
-
-	appendSelfMaintainBufferTill64bitAligned(&responsebuff);
-
-	/* Build message saved in the connection track instance. */
-	buildResponseIntoConnTrack((*conntrack),
-							   responsebuff.Buffer,
-							   responsebuff.Cursor+1,
-							   (*conntrack)->MessageMark1,
-							   (*conntrack)->MessageMark2,
-							   RESPONSE_QD_DDL_MANIPULATERESQUEUE);
-	(*conntrack)->ResponseSent = false;
 	{
+		initializeSelfMaintainBuffer(&responsebuff, PCONTEXT);
+
+		RPCResponseHeadManipulateResQueueERRORData response;
+		response.Result.Result 	 = ddlres;
+		response.Result.Reserved = 0;
+
+		appendSMBVar(&responsebuff, response.Result);
+		appendSMBStr(&responsebuff, errorbuf);
+		appendSelfMaintainBufferTill64bitAligned(&responsebuff);
+
+		/* Build message saved in the connection track instance. */
+		buildResponseIntoConnTrack((*conntrack),
+								   responsebuff.Buffer,
+								   responsebuff.Cursor + 1,
+								   (*conntrack)->MessageMark1,
+								   (*conntrack)->MessageMark2,
+								   RESPONSE_QD_DDL_MANIPULATERESQUEUE);
+		(*conntrack)->ResponseSent = false;
 		MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
 		PCONTRACK->ConnToSend = lappend(PCONTRACK->ConnToSend, *conntrack);
 		MEMORY_CONTEXT_SWITCH_BACK
-	}
-	destroySelfMaintainBuffer(&responsebuff);
+		destroySelfMaintainBuffer(&responsebuff);
 
-	/* Clean up temporary variable. */
-	cleanPropertyList(PCONTEXT, &fineattr);
-	cleanPropertyList(PCONTEXT, &rsqattr);
-	return true;
+		/* Clean up temporary variable. */
+		cleanPropertyList(PCONTEXT, &fineattr);
+		cleanPropertyList(PCONTEXT, &rsqattr);
+		return true;
+	}
 }
 
 bool handleRMDDLRequestManipulateRole(void **arg)
 {
 	RPCResponseHeadManipulateRoleData response;
 
-    ConnectionTrack conntrack 	= (ConnectionTrack)(*arg);
-    UserInfo 		user;
-    int 			res			= FUNC_RETURN_OK;
+    ConnectionTrack conntrack = (ConnectionTrack)(*arg);
+    UserInfo 		user	  = NULL;
+    int 			res		  = FUNC_RETURN_OK;
 
-    RPCRequestHeadManipulateRole request =
-    		(RPCRequestHeadManipulateRole )conntrack->MessageBuff.Buffer;
+    RPCRequestHeadManipulateRole request = (RPCRequestHeadManipulateRole)
+    									   (conntrack->MessageBuff.Buffer);
 
     switch(request->Action)
     {
     	case MANIPULATE_ROLE_RESQUEUE_CREATE:
     	{
+    		/*
+    		 * In case creating new role, resource manager expects no error, as
+    		 * in QD side, the validation was passed.
+    		 */
 			user = rm_palloc0(PCONTEXT, sizeof(UserInfoData));
 			user->OID 		  = request->RoleOID;
 			user->QueueOID 	  = request->QueueOID;
 			user->isSuperUser = request->isSuperUser;
 			strncpy(user->Name, request->Name, sizeof(user->Name)-1);
-			res = createUser(user, NULL, 0);
+			createUser(user);
 			elog(LOG, "Resource manager handles request CREATE ROLE oid:%d, "
 					  "queueID:%d, isSuper:%d, roleName:%s",
 					  request->RoleOID,
@@ -533,14 +550,13 @@ bool handleRMDDLRequestManipulateRole(void **arg)
     	}
     	case MANIPULATE_ROLE_RESQUEUE_ALTER:
     	{
-			res = dropUser((int64_t)request->RoleOID, request->Name);
-			if ( res != FUNC_RETURN_OK )
-			{
-				elog(WARNING, "Resource manager cannot find user "INT64_FORMAT
-							  " to alter.",
-							  (int64_t)(request->RoleOID));
-				goto exit;
-			}
+    		/*
+    		 * In case altering one role, the old one is deleted firstly.
+    		 * Resource manager expects the role always exists.
+    		 */
+    		int64_t roleoid = request->RoleOID;
+			res = dropUser(roleoid, request->Name);
+			Assert(res == FUNC_RETURN_OK);
 
 			/* Create new user instance. */
 			user = (UserInfo)rm_palloc0(PCONTEXT, sizeof(UserInfoData));
@@ -548,7 +564,7 @@ bool handleRMDDLRequestManipulateRole(void **arg)
 			user->QueueOID 	  = request->QueueOID;
 			user->isSuperUser = request->isSuperUser;
 			strncpy(user->Name, request->Name, sizeof(user->Name)-1);
-			res = createUser(user, NULL, 0);
+			createUser(user);
 			elog(LOG, "Resource manager handles request ALTER ROLE oid:%d, "
 					  "queueID:%d, isSuper:%d, roleName:%s",
 					  request->RoleOID,
@@ -559,14 +575,10 @@ bool handleRMDDLRequestManipulateRole(void **arg)
     	}
 		case MANIPULATE_ROLE_RESQUEUE_DROP:
 		{
-			res = dropUser((int64_t)request->RoleOID, request->Name);
-			if ( res != FUNC_RETURN_OK )
-			{
-				elog(WARNING, "Resource manager cannot find user "INT64_FORMAT
-							  " to drop.",
-							  (int64_t)(request->RoleOID));
-				goto exit;
-			}
+			/* Resource manager expects the role always exists. */
+			int64_t roleoid = request->RoleOID;
+			res = dropUser(roleoid, request->Name);
+			Assert(res == FUNC_RETURN_OK);
 			elog(LOG, "Resource manager handles request drop role oid:%d, "
 					  "roleName:%s",
 					  request->RoleOID,
@@ -579,7 +591,6 @@ bool handleRMDDLRequestManipulateRole(void **arg)
 		}
     }
 
-exit:
 	/* Build response. */
 	response.Result 	= res;
 	response.Reserved 	= 0;
@@ -821,17 +832,20 @@ int buildInsertActionForPGResqueue(DynResourceQueue   queue,
 							   	   List 			 *rsqattr,
 							   	   List		   		**insvalues)
 {
+	static char defaultActiveStats[] 	    	= DEFAULT_RESQUEUE_ACTIVESTATS;
+	static char defaultResOvercommit[]     		= DEFAULT_RESQUEUE_OVERCOMMIT;
+	static char defaultNVSegUpperLimit[]   		= DEFAULT_RESQUEUE_NVSEG_UPPER_LIMIT;
+	static char defaultNVSegLowerLimit[]   		= DEFAULT_RESQUEUE_NVSEG_LOWER_LIMIT;
+	static char defaultNVSegUpperLimitPerSeg[] 	= DEFAULT_RESQUEUE_NVSEG_UPPER_PERSEG_LIMIT;
+	static char defaultNVSegLowerLimitPerSeg[] 	= DEFAULT_RESQUEUE_NVSEG_LOWER_PERSEG_LIMIT;
+	static char defaultAllocPolicy[]	    	= DEFAULT_RESQUEUE_ALLOCPOLICY;
+	static char defaultVSegResourceQuota[] 		= DEFAULT_RESQUEUE_VSEGRESOURCEQUOTA;
+	int	 res				 	    			= FUNC_RETURN_OK;
+	PAIR newpair				    			= NULL;
+
 	Assert( queue     != NULL );
 	Assert( rsqattr   != NULL );
 	Assert( insvalues != NULL );
-
-	int	 res				 	  = FUNC_RETURN_OK;
-	char defaultActiveStats[] 	  = DEFAULT_RESQUEUE_ACTIVESTATS;
-	char defaultUpperFactor[] 	  = DEFAULT_RESQUEUE_UPPERFACTOR;
-	char defaultVSegUpperFactor[] = DEFAULT_RESQUEUE_VSEG_UPPER_LIMIT;
-	char defaultPolicy[]		  = DEFAULT_RESQUEUE_POLICY;
-	char defaultSegQuota[]		  = DEFAULT_RESQUEUE_SEG_QUOTA;
-	PAIR newpair				  = NULL;
 
 	/* Insert resource queue column value. */
 	newpair = createPAIR(PCONTEXT,
@@ -846,67 +860,101 @@ int buildInsertActionForPGResqueue(DynResourceQueue   queue,
 
 	*insvalues = lappend(*insvalues, newpair);
 
-	/* Default value for rsq_active_stats_cluster if not set */
 	SimpStringPtr colvalue = NULL;
-	if (findPropertyValue(
-					rsqattr,
-					getRSQDDLAttributeName(RSQ_DDL_ATTR_ACTIVE_STATMENTS),
-					&colvalue) != FUNC_RETURN_OK)
+	if (findPropertyValue(rsqattr,
+						  getRSQDDLAttributeName(RSQ_DDL_ATTR_ACTIVE_STATMENTS),
+						  &colvalue) != FUNC_RETURN_OK)
 	{
-		ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(insvalues, defaultActiveStats, Anum_pg_resqueue_rsq_active_stats_cluster);
+		ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(insvalues,
+										  defaultActiveStats,
+										  Anum_pg_resqueue_activestats);
 	}
-	/* Default value for rsq_resource_upper_factor if not set */
-	if (findPropertyValue(
-					rsqattr,
-					getRSQDDLAttributeName(RSQ_DDL_ATTR_RESOURCE_UPPER_FACTOR),
-					&colvalue) != FUNC_RETURN_OK)
+
+	if (findPropertyValue(rsqattr,
+						  getRSQDDLAttributeName(RSQ_DDL_ATTR_RESOURCE_OVERCOMMIT_FACTOR),
+						  &colvalue) != FUNC_RETURN_OK)
 	{
-		ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(insvalues, defaultUpperFactor, Anum_pg_resqueue_rsq_resource_upper_factor);
+		ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(insvalues,
+										  defaultResOvercommit,
+										  Anum_pg_resqueue_resovercommit);
+	}
+
+	if (findPropertyValue(rsqattr,
+						  getRSQDDLAttributeName(RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT),
+						  &colvalue) != FUNC_RETURN_OK)
+	{
+		ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(insvalues,
+										  defaultNVSegUpperLimit,
+										  Anum_pg_resqueue_nvsegupperlimit);
+	}
+
+	if (findPropertyValue(rsqattr,
+						  getRSQDDLAttributeName(RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT),
+						  &colvalue) != FUNC_RETURN_OK)
+	{
+		ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(insvalues,
+										  defaultNVSegLowerLimit,
+										  Anum_pg_resqueue_nvseglowerlimit);
+	}
+
+	if (findPropertyValue(rsqattr,
+						  getRSQDDLAttributeName(RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT_PERSEG),
+						  &colvalue) != FUNC_RETURN_OK)
+	{
+		ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(insvalues,
+										  defaultNVSegUpperLimitPerSeg,
+										  Anum_pg_resqueue_nvsegupperlimitperseg);
 	}
 
 	/* Default value for rsq_vseg_upper_limit if not set */
-	if (findPropertyValue(
-					rsqattr,
-					getRSQDDLAttributeName(RSQ_DDL_ATTR_VSEGMENT_UPPER_LIMIT),
-					&colvalue) != FUNC_RETURN_OK)
+	if (findPropertyValue(rsqattr,
+						  getRSQDDLAttributeName(RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT_PERSEG),
+						  &colvalue) != FUNC_RETURN_OK)
 	{
-		ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(insvalues, defaultVSegUpperFactor, Anum_pg_resqueue_rsq_vseg_upper_limit);
+		ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(insvalues,
+										  defaultNVSegLowerLimitPerSeg,
+										  Anum_pg_resqueue_nvseglowerlimitperseg);
 	}
 
 	/* Default value for rsq_allocation_policy if not set */
-	if (findPropertyValue(
-					rsqattr,
-					getRSQDDLAttributeName(RSQ_DDL_ATTR_ALLOCATION_POLICY),
-					&colvalue) != FUNC_RETURN_OK)
+	if (findPropertyValue(rsqattr,
+					  	  getRSQDDLAttributeName(RSQ_DDL_ATTR_ALLOCATION_POLICY),
+						  &colvalue) != FUNC_RETURN_OK)
 	{
-		ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(insvalues, defaultPolicy, Anum_pg_resqueue_rsq_allocation_policy);
+		ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(insvalues,
+										  defaultAllocPolicy,
+										  Anum_pg_resqueue_allocpolicy);
 	}
 
 	/* Default value for rsq_vseg_resource_quota if not set */
-	if (findPropertyValue(
-					rsqattr,
-					getRSQDDLAttributeName(RSQ_DDL_ATTR_VSEGMENT_RESOURCE_QUOTA),
-					&colvalue) != FUNC_RETURN_OK)
+	if (findPropertyValue(rsqattr,
+						  getRSQDDLAttributeName(RSQ_DDL_ATTR_VSEG_RESOURCE_QUOTA),
+						  &colvalue) != FUNC_RETURN_OK)
 	{
-		ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(insvalues, defaultSegQuota, Anum_pg_resqueue_rsq_vseg_resource_quota);
+		ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(insvalues,
+										  defaultVSegResourceQuota,
+										  Anum_pg_resqueue_vsegresourcequota);
 	}
 
-	ADD_PG_RESQUEUE_COLVALUE_OID(insvalues, queue->ParentOID, Anum_pg_resqueue_rsq_parent);
+	ADD_PG_RESQUEUE_COLVALUE_OID(insvalues, queue->ParentOID, Anum_pg_resqueue_parentoid);
 
-	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(insvalues, rsqattr, RSQ_DDL_ATTR_ACTIVE_STATMENTS, 		 Anum_pg_resqueue_rsq_active_stats_cluster);
-	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(insvalues, rsqattr, RSQ_DDL_ATTR_MEMORY_LIMIT_CLUSTER, 	 Anum_pg_resqueue_rsq_memory_limit_cluster);
-	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(insvalues, rsqattr, RSQ_DDL_ATTR_CORE_LIMIT_CLUSTER, 	 Anum_pg_resqueue_rsq_core_limit_cluster);
-	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(insvalues, rsqattr, RSQ_DDL_ATTR_RESOURCE_UPPER_FACTOR, 	 Anum_pg_resqueue_rsq_resource_upper_factor);
-	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(insvalues, rsqattr, RSQ_DDL_ATTR_VSEGMENT_UPPER_LIMIT, 	 Anum_pg_resqueue_rsq_vseg_upper_limit);
-	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(insvalues, rsqattr, RSQ_DDL_ATTR_ALLOCATION_POLICY, 		 Anum_pg_resqueue_rsq_allocation_policy);
-	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(insvalues, rsqattr, RSQ_DDL_ATTR_VSEGMENT_RESOURCE_QUOTA, Anum_pg_resqueue_rsq_vseg_resource_quota);
+	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(insvalues, rsqattr, RSQ_DDL_ATTR_ACTIVE_STATMENTS, 		 	Anum_pg_resqueue_activestats);
+	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(insvalues, rsqattr, RSQ_DDL_ATTR_MEMORY_LIMIT_CLUSTER, 	 	Anum_pg_resqueue_memorylimit);
+	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(insvalues, rsqattr, RSQ_DDL_ATTR_CORE_LIMIT_CLUSTER, 	 	Anum_pg_resqueue_corelimit);
+	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(insvalues, rsqattr, RSQ_DDL_ATTR_RESOURCE_OVERCOMMIT_FACTOR, Anum_pg_resqueue_resovercommit);
+	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(insvalues, rsqattr, RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT, 	 		Anum_pg_resqueue_nvsegupperlimit);
+	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(insvalues, rsqattr, RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT, 	 		Anum_pg_resqueue_nvseglowerlimit);
+	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(insvalues, rsqattr, RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT_PERSEG, 	Anum_pg_resqueue_nvsegupperlimitperseg);
+	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(insvalues, rsqattr, RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT_PERSEG, 	Anum_pg_resqueue_nvseglowerlimitperseg);
+	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(insvalues, rsqattr, RSQ_DDL_ATTR_ALLOCATION_POLICY, 		 	Anum_pg_resqueue_allocpolicy);
+	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(insvalues, rsqattr, RSQ_DDL_ATTR_VSEG_RESOURCE_QUOTA, 		Anum_pg_resqueue_vsegresourcequota);
 
 	/* creation time and update time */
 	TimestampTz curtime    = GetCurrentTimestamp();
 	const char *curtimestr = timestamptz_to_str(curtime);
 
-	ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(insvalues, curtimestr, Anum_pg_resqueue_rsq_creation_time);
-	ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(insvalues, curtimestr, Anum_pg_resqueue_rsq_update_time);
+	ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(insvalues, curtimestr, Anum_pg_resqueue_creationtime);
+	ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(insvalues, curtimestr, Anum_pg_resqueue_updatetime);
 
 	/* status */
 	char statusstr[256];
@@ -914,7 +962,7 @@ int buildInsertActionForPGResqueue(DynResourceQueue   queue,
 	if ( RESQUEUE_IS_BRANCH(queue) )
 		strcat(statusstr, "branch");
 
-	ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(insvalues, statusstr, Anum_pg_resqueue_rsq_status);
+	ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(insvalues, statusstr, Anum_pg_resqueue_status);
 
 	MEMORY_CONTEXT_SWITCH_BACK
 	return res;
@@ -926,18 +974,21 @@ int buildUpdateActionForPGResqueue(DynResourceQueue   queue,
 {
 	int res = FUNC_RETURN_OK;
 	/* Insert resource queue column value. */
-	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(updvalues, rsqattr, RSQ_DDL_ATTR_ACTIVE_STATMENTS, 		 Anum_pg_resqueue_rsq_active_stats_cluster);
-	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(updvalues, rsqattr, RSQ_DDL_ATTR_MEMORY_LIMIT_CLUSTER, 	 Anum_pg_resqueue_rsq_memory_limit_cluster);
-	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(updvalues, rsqattr, RSQ_DDL_ATTR_CORE_LIMIT_CLUSTER, 	 Anum_pg_resqueue_rsq_core_limit_cluster);
-	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(updvalues, rsqattr, RSQ_DDL_ATTR_RESOURCE_UPPER_FACTOR, 	 Anum_pg_resqueue_rsq_resource_upper_factor);
-	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(updvalues, rsqattr, RSQ_DDL_ATTR_ALLOCATION_POLICY, 		 Anum_pg_resqueue_rsq_allocation_policy);
-	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(updvalues, rsqattr, RSQ_DDL_ATTR_VSEGMENT_RESOURCE_QUOTA, Anum_pg_resqueue_rsq_vseg_resource_quota);
-	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(updvalues, rsqattr, RSQ_DDL_ATTR_VSEGMENT_UPPER_LIMIT, 	 Anum_pg_resqueue_rsq_vseg_upper_limit);
+	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(updvalues, rsqattr, RSQ_DDL_ATTR_ACTIVE_STATMENTS, 		 	Anum_pg_resqueue_activestats);
+	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(updvalues, rsqattr, RSQ_DDL_ATTR_MEMORY_LIMIT_CLUSTER, 	 	Anum_pg_resqueue_memorylimit);
+	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(updvalues, rsqattr, RSQ_DDL_ATTR_CORE_LIMIT_CLUSTER, 	 	Anum_pg_resqueue_corelimit);
+	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(updvalues, rsqattr, RSQ_DDL_ATTR_RESOURCE_OVERCOMMIT_FACTOR, Anum_pg_resqueue_resovercommit);
+	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(updvalues, rsqattr, RSQ_DDL_ATTR_ALLOCATION_POLICY, 		 	Anum_pg_resqueue_allocpolicy);
+	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(updvalues, rsqattr, RSQ_DDL_ATTR_VSEG_RESOURCE_QUOTA, 		Anum_pg_resqueue_vsegresourcequota);
+	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(updvalues, rsqattr, RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT, 	 		Anum_pg_resqueue_nvsegupperlimit);
+	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(updvalues, rsqattr, RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT, 	 		Anum_pg_resqueue_nvseglowerlimit);
+	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(updvalues, rsqattr, RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT_PERSEG, 	Anum_pg_resqueue_nvsegupperlimitperseg);
+	ADD_PG_RESQUEUE_COLVALUE_INDDLATTR(updvalues, rsqattr, RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT_PERSEG, 	Anum_pg_resqueue_nvseglowerlimitperseg);
 
 	/* creation time and update time */
 	TimestampTz curtime = GetCurrentTimestamp();
 	const char *curtimestr = timestamptz_to_str(curtime);
-	ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(updvalues, curtimestr, Anum_pg_resqueue_rsq_update_time);
+	ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(updvalues, curtimestr, Anum_pg_resqueue_updatetime);
 
 	/* status */
 	char statusstr[256];
@@ -945,7 +996,7 @@ int buildUpdateActionForPGResqueue(DynResourceQueue   queue,
 	if ( RESQUEUE_IS_BRANCH(queue) )
 		strcat(statusstr, "branch");
 
-	ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(updvalues, statusstr, Anum_pg_resqueue_rsq_status);
+	ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(updvalues, statusstr, Anum_pg_resqueue_status);
 	return res;
 }
 
@@ -969,10 +1020,10 @@ int buildUpdateStatusActionForPGResqueue(DynResourceQueue   queue,
 	TimestampTz curtime = GetCurrentTimestamp();
 	const char *curtimestr = timestamptz_to_str(curtime);
 
-	ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(updvalues,curtimestr, Anum_pg_resqueue_rsq_update_time);
+	ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(updvalues,curtimestr, Anum_pg_resqueue_updatetime);
 
 	/* status */
-	ADD_PG_RESQUEUE_COLVALUE_INATTR(updvalues, rsqattr, RSQ_TBL_ATTR_STATUS, Anum_pg_resqueue_rsq_status);
+	ADD_PG_RESQUEUE_COLVALUE_INATTR(updvalues, rsqattr, RSQ_TBL_ATTR_STATUS, Anum_pg_resqueue_status);
 	return res;
 }
 
@@ -1352,19 +1403,6 @@ int performDeleteActionForPGResqueue(char *queuename)
 					  sql->data,
 					  PQresultErrorMessage(result));
 
-	/* MPP-6923: drop the extended attributes for this queue */
-	PQclear(result);
-	resetPQExpBuffer(sql);
-	appendPQExpBuffer(sql,
-					  "DELETE FROM pg_resqueuecapability WHERE resqueueid = %d",
-					  queueid);
-	result = PQexec(conn, sql->data);
-	if (!result || PQresultStatus(result) != PGRES_COMMAND_OK)
-		elog(WARNING, "Resource manager failed to run SQL: %s "
-		  	  	  	  "when delete a row from pg_resqueue, reason : %s",
-					  sql->data,
-					  PQresultErrorMessage(result));
-
 	PQclear(result);
 	result = PQexec(conn, "COMMIT");
 	if (!result || PQresultStatus(result) != PGRES_COMMAND_OK) {
@@ -1405,25 +1443,25 @@ Datum getDatumFromStringValuForPGResqueue(int	 colindex,
 		return DirectFunctionCall1(namein, CStringGetDatum(colvaluestr));
 
 
-	case Anum_pg_resqueue_rsq_creation_time:
-	case Anum_pg_resqueue_rsq_update_time:
+	case Anum_pg_resqueue_creationtime:
+	case Anum_pg_resqueue_updatetime:
 		return 0;
 
-	case Anum_pg_resqueue_rsq_memory_limit_cluster:
-	case Anum_pg_resqueue_rsq_core_limit_cluster:
-	case Anum_pg_resqueue_rsq_allocation_policy:
-	case Anum_pg_resqueue_rsq_vseg_resource_quota:
-	case Anum_pg_resqueue_rsq_status:
+	case Anum_pg_resqueue_memorylimit:
+	case Anum_pg_resqueue_corelimit:
+	case Anum_pg_resqueue_allocpolicy:
+	case Anum_pg_resqueue_vsegresourcequota:
+	case Anum_pg_resqueue_status:
 		/* Set value as text format */
 		return DirectFunctionCall1(textin, CStringGetDatum(colvaluestr));
 
-	case Anum_pg_resqueue_rsq_active_stats_cluster:
+	case Anum_pg_resqueue_activestats:
 	{
 		int32_t tmpvalue;
 		sscanf(colvaluestr, "%d", &tmpvalue);
 		return Int32GetDatum(tmpvalue);
 	}
-	case Anum_pg_resqueue_rsq_parent:
+	case Anum_pg_resqueue_parentoid:
 	{
 		int64_t tmpoid;
 		Oid 	parentoid;

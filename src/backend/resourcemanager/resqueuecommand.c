@@ -56,7 +56,7 @@ void createResourceQueue(CreateQueueStmt *stmt)
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_RESERVED_NAME),
-				 errmsg("resource queue name \"%s\" is reserved",
+				 errmsg("resource queue name %s is reserved",
 						stmt->queue),
 				 errOmitLocation(true)));
 	}
@@ -73,7 +73,7 @@ void createResourceQueue(CreateQueueStmt *stmt)
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_DUPLICATE_OBJECT),
-				 errmsg("resource queue \"%s\" already exists",
+				 errmsg("resource queue %s already exists",
 						stmt->queue)));
 	}
 
@@ -86,7 +86,8 @@ void createResourceQueue(CreateQueueStmt *stmt)
      */
 	int resourceid = 0;
 	res = createNewResourceContext(&resourceid);
-	if ( res != FUNC_RETURN_OK ) {
+	if ( res != FUNC_RETURN_OK )
+	{
 		Assert( res == COMM2RM_CLIENT_FULL_RESOURCECONTEXT );
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
@@ -99,7 +100,8 @@ void createResourceQueue(CreateQueueStmt *stmt)
 									  GetUserId(),
 									  errorbuf,
 									  sizeof(errorbuf));
-	if ( res != FUNC_RETURN_OK ) {
+	if ( res != FUNC_RETURN_OK )
+	{
 		releaseResourceContextWithErrorReport(resourceid);
 		ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("%s", errorbuf)));
 	}
@@ -123,7 +125,7 @@ void createResourceQueue(CreateQueueStmt *stmt)
 				(errcode(IS_TO_RM_RPC_ERROR(res) ?
 						 ERRCODE_INTERNAL_ERROR :
 						 ERRCODE_INVALID_OBJECT_DEFINITION),
-				 errmsg("%s", errorbuf)));
+				 errmsg("Can not apply CREATE RESOURCE QUEUE because %s", errorbuf)));
 	}
 	elog(LOG, "Complete applying CREATE RESOURCE QUEUE statement.");
 }
@@ -144,9 +146,21 @@ void dropResourceQueue(DropQueueStmt *stmt)
 
 	/* Permission check - only superuser can create queues. */
 	if (!superuser())
+	{
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 				 errmsg("must be superuser to create resource queues")));
+	}
+
+	/* Cannot DROP default and root queue  */
+	if ( strcmp(stmt->queue, RESOURCE_QUEUE_DEFAULT_QUEUE_NAME) == 0 ||
+		 strcmp(stmt->queue, RESOURCE_QUEUE_ROOT_QUEUE_NAME) == 0 )
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("cannot drop system resource queue %s",
+						stmt->queue)));
+	}
 
 	/*
 	 * Check the pg_resqueue relation to be certain the queue already
@@ -156,29 +170,18 @@ void dropResourceQueue(DropQueueStmt *stmt)
 
 	pcqCtx = caql_addrel(cqclr(&cqc), pg_resqueue_rel);
 
-	tuple = caql_getfirst(
-			pcqCtx,
-			cql("SELECT * FROM pg_resqueue"
-				 " WHERE rsqname = :1 FOR UPDATE",
-				CStringGetDatum(stmt->queue)));
+	tuple = caql_getfirst(pcqCtx,
+						  cql("SELECT * FROM pg_resqueue WHERE rsqname = :1 FOR UPDATE",
+						  CStringGetDatum(stmt->queue)));
 
 	if (!HeapTupleIsValid(tuple))
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("resource queue \"%s\" does not exist",
+				 errmsg("resource queue %s does not exist",
 						stmt->queue)));
 
-	/*
-	 * Remember the Oid
-	 */
+	/* Remember the Oid */
 	queueid = HeapTupleGetOid(tuple);
-
-	/* MPP-6926: cannot DROP default queue  */
-	if (queueid == DEFAULTRESQUEUE_OID || queueid == ROOTRESQUEUE_OID)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot drop system resource queue \"%s\"",
-						stmt->queue)));
 
 	/*
 	 * Check to see if any roles are in this queue.
@@ -190,7 +193,7 @@ void dropResourceQueue(DropQueueStmt *stmt)
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_DEPENDENT_OBJECTS_STILL_EXIST),
-				 errmsg("resource queue \"%s\" is used by at least one role",
+				 errmsg("resource queue %s is used by at least one role",
 						stmt->queue)));
 	}
 
@@ -252,7 +255,7 @@ void dropResourceQueue(DropQueueStmt *stmt)
 				(errcode(IS_TO_RM_RPC_ERROR(res) ?
 						 ERRCODE_INTERNAL_ERROR :
 						 ERRCODE_INVALID_OBJECT_DEFINITION),
-				 errmsg("%s", errorbuf)));
+				 errmsg("Can not apply DROP RESOURCE QUEUE because %s", errorbuf)));
 	}
 
 	elog(LOG, "Completed applying DROP RESOURCE QUEUE statement.");
@@ -272,9 +275,20 @@ void alterResourceQueue(AlterQueueStmt *stmt)
 
 	/* Permission check - only superuser can create queues. */
 	if (!superuser())
+	{
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 				 errmsg("must be superuser to create resource queues")));
+	}
+
+	/* Cannot DROP default and root queue  */
+	if ( strcmp(stmt->queue, RESOURCE_QUEUE_ROOT_QUEUE_NAME) == 0 )
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("cannot alter system resource queue %s",
+						stmt->queue)));
+	}
 
 	/*
 	 * MPP-7960: We cannot run ALTER RESOURCE QUEUE inside a user transaction
@@ -282,7 +296,8 @@ void alterResourceQueue(AlterQueueStmt *stmt)
 	 * resulting in "leaked", unreachable queues.
 	 */
 
-	if (Gp_role == GP_ROLE_DISPATCH) {
+	if (Gp_role == GP_ROLE_DISPATCH)
+	{
 		PreventTransactionChain((void *) stmt, "ALTER RESOURCE QUEUE");
 	}
 
@@ -301,7 +316,7 @@ void alterResourceQueue(AlterQueueStmt *stmt)
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_DUPLICATE_OBJECT),
-				 errmsg("resource queue \"%s\" does not exist",
+				 errmsg("resource queue %s does not exist",
 						stmt->queue)));
 	}
 
@@ -350,20 +365,20 @@ void alterResourceQueue(AlterQueueStmt *stmt)
 				(errcode(IS_TO_RM_RPC_ERROR(res) ?
 						 ERRCODE_INTERNAL_ERROR :
 						 ERRCODE_INVALID_OBJECT_DEFINITION),
-				 errmsg("%s", errorbuf)));
+				 errmsg("Can not apply ALTER RESOURCE QUEUE because %s", errorbuf)));
 	}
 
 	elog(LOG, "Completed applying ALTER RESOURCE QUEUE statement.");
 }
 
-#define VALIDATE_DDL_DUPLICATE_ATTRIBUTE(index, defel, targref)				   \
+#define VALID_DDL_DUP(index, defel, targref)				   \
 		if (strcmp((defel)->defname, RSQDDLAttrNames[(index)]) == 0)		   \
 		{																	   \
 			if ((targref) != NULL)											   \
 			{																   \
 				ereport(ERROR,												   \
 						(errcode(ERRCODE_SYNTAX_ERROR),						   \
-						 errmsg("redundant option %s",						   \
+						 errmsg("redundant attribute %s",					   \
 								RSQDDLAttrNames[(index)])));				   \
 			}																   \
 			(targref) = (defel);											   \
@@ -372,13 +387,17 @@ void alterResourceQueue(AlterQueueStmt *stmt)
 
 void validateDDLAttributeOptions(List *options)
 {
-	DefElem     *dactivelimit 	 = NULL;
-	DefElem     *dmemorylimit 	 = NULL;
-	DefElem     *dcorelimit 	 = NULL;
-	DefElem		*dvsegresquota	 = NULL;
-	DefElem		*dallocpolicy	 = NULL;
-	DefElem		*dresupperfactor = NULL;
-	DefElem		*dvsegupperlimit = NULL;
+	DefElem		*dparent		  	  = NULL;
+	DefElem     *dactivelimit 	  	  = NULL;
+	DefElem     *dmemorylimit 	  	  = NULL;
+	DefElem     *dcorelimit 	  	  = NULL;
+	DefElem		*dvsegresquota	  	  = NULL;
+	DefElem		*dallocpolicy	  	  = NULL;
+	DefElem		*dresovercommit  	  = NULL;
+	DefElem		*dnvsegupperlimit 	  = NULL;
+	DefElem		*dnvseglowerlimit 	  = NULL;
+	DefElem		*dnvsegupperlimitpseg = NULL;
+	DefElem		*dnvseglowerlimitpseg = NULL;
 
 	Cost		 activelimit 	 = INVALID_RES_LIMIT_THRESHOLD;
 	ListCell    *option			 = NULL;
@@ -387,13 +406,17 @@ void validateDDLAttributeOptions(List *options)
 	foreach(option, options)
 	{
 		DefElem    *defel = (DefElem *) lfirst(option);
-		VALIDATE_DDL_DUPLICATE_ATTRIBUTE(RSQ_DDL_ATTR_ACTIVE_STATMENTS, 		defel, dactivelimit)
-		VALIDATE_DDL_DUPLICATE_ATTRIBUTE(RSQ_DDL_ATTR_MEMORY_LIMIT_CLUSTER, 	defel, dmemorylimit)
-		VALIDATE_DDL_DUPLICATE_ATTRIBUTE(RSQ_DDL_ATTR_CORE_LIMIT_CLUSTER, 		defel, dcorelimit)
-		VALIDATE_DDL_DUPLICATE_ATTRIBUTE(RSQ_DDL_ATTR_VSEGMENT_RESOURCE_QUOTA, 	defel, dvsegresquota)
-		VALIDATE_DDL_DUPLICATE_ATTRIBUTE(RSQ_DDL_ATTR_ALLOCATION_POLICY, 		defel, dallocpolicy)
-		VALIDATE_DDL_DUPLICATE_ATTRIBUTE(RSQ_DDL_ATTR_RESOURCE_UPPER_FACTOR, 	defel, dresupperfactor)
-		VALIDATE_DDL_DUPLICATE_ATTRIBUTE(RSQ_DDL_ATTR_VSEGMENT_UPPER_LIMIT, 	defel, dvsegupperlimit)
+		VALID_DDL_DUP(RSQ_DDL_ATTR_PARENT, 						defel, dparent)
+		VALID_DDL_DUP(RSQ_DDL_ATTR_ACTIVE_STATMENTS, 			defel, dactivelimit)
+		VALID_DDL_DUP(RSQ_DDL_ATTR_MEMORY_LIMIT_CLUSTER, 		defel, dmemorylimit)
+		VALID_DDL_DUP(RSQ_DDL_ATTR_CORE_LIMIT_CLUSTER, 			defel, dcorelimit)
+		VALID_DDL_DUP(RSQ_DDL_ATTR_VSEG_RESOURCE_QUOTA, 		defel, dvsegresquota)
+		VALID_DDL_DUP(RSQ_DDL_ATTR_ALLOCATION_POLICY, 			defel, dallocpolicy)
+		VALID_DDL_DUP(RSQ_DDL_ATTR_RESOURCE_OVERCOMMIT_FACTOR,	defel, dresovercommit)
+		VALID_DDL_DUP(RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT, 			defel, dnvsegupperlimit)
+		VALID_DDL_DUP(RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT, 			defel, dnvseglowerlimit)
+		VALID_DDL_DUP(RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT_PERSEG, 	defel, dnvsegupperlimitpseg)
+		VALID_DDL_DUP(RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT_PERSEG, 	defel, dnvseglowerlimitpseg)
 	}
 
 	/* Perform range checks on the various thresholds.*/
@@ -440,31 +463,83 @@ void validateDDLAttributeOptions(List *options)
 		}
 	}
 
-	/* The vsegment upper limit must be an integer and no less than -1. */
-	if (dvsegupperlimit != NULL)
+	/*
+	 * NVSEG_UPPER_LIMIT/NVSEG_LOWER_LIMIT has 0 as default value that means the
+	 * setting is not effective, otherwise, it must be greater than 0.
+	 */
+	int64_t nvsegupperlimit = -1;
+	int64_t nvseglowerlimit = -1;
+	if (dnvsegupperlimit != NULL)
 	{
-		int64_t vsegupperlimit = defGetInt64(dvsegupperlimit);
-		if (vsegupperlimit < DEFAULT_RESQUEUE_VSEG_UPPER_LIMIT_N)
+		nvsegupperlimit = defGetInt64(dnvsegupperlimit);
+		if (nvsegupperlimit < MINIMUM_RESQUEUE_NVSEG_UPPER_LIMIT_N)
 		{
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("%s cannot be less than %s",
-							RSQDDLAttrNames[RSQ_DDL_ATTR_VSEGMENT_UPPER_LIMIT],
-							DEFAULT_RESQUEUE_VSEG_UPPER_LIMIT)));
+							RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT],
+							MINIMUM_RESQUEUE_NVSEG_UPPER_LIMIT)));
 		}
 	}
 
-	/* The resource upper factor must be no less than 1. */
-	if( dresupperfactor != NULL)
+	if (dnvseglowerlimit != NULL)
 	{
-		double resupperfactor = defGetNumeric(dresupperfactor);
-		if (resupperfactor < MINIMUM_RESQUEUE_UPPER_FACTOR_LIMIT_N)
+		nvseglowerlimit = defGetInt64(dnvseglowerlimit);
+		if (nvseglowerlimit < MINIMUM_RESQUEUE_NVSEG_LOWER_LIMIT_N)
 		{
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("%s cannot be less than %s",
-							RSQDDLAttrNames[RSQ_DDL_ATTR_RESOURCE_UPPER_FACTOR],
-							MINIMUM_RESQUEUE_UPPER_FACTOR_LIMIT)));
+							RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT],
+							MINIMUM_RESQUEUE_NVSEG_LOWER_LIMIT)));
+		}
+	}
+
+	/*
+	 * NVSEG_UPPER_LIMIT_PERSEG/NVSEG_LOWER_LIMIT_PERSEG has 0 as default value
+	 * that means the setting is not effective, otherwise, it must be greater
+	 * than 0.
+	 */
+	double nvsegupperlimitpseg = -1.0;
+	double nvseglowerlimitpseg = -1.0;
+	if (dnvsegupperlimitpseg != NULL)
+	{
+		nvsegupperlimitpseg = defGetNumeric(dnvsegupperlimitpseg);
+		if (nvsegupperlimitpseg < MINIMUM_RESQUEUE_NVSEG_UPPER_PERSEG_LIMIT_N)
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("%s cannot be less than %s",
+							RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT_PERSEG],
+							MINIMUM_RESQUEUE_NVSEG_UPPER_PERSEG_LIMIT)));
+		}
+	}
+
+	if (dnvseglowerlimitpseg != NULL)
+	{
+		nvseglowerlimitpseg = defGetNumeric(dnvseglowerlimitpseg);
+		if (nvseglowerlimitpseg < MINIMUM_RESQUEUE_NVSEG_LOWER_PERSEG_LIMIT_N)
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("%s cannot be less than %s",
+							RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT_PERSEG],
+							MINIMUM_RESQUEUE_NVSEG_LOWER_PERSEG_LIMIT)));
+		}
+	}
+
+
+	/* The resource upper factor must be no less than 1. */
+	if( dresovercommit != NULL)
+	{
+		double resovercommit = defGetNumeric(dresovercommit);
+		if (resovercommit < MINIMUM_RESQUEUE_OVERCOMMIT_N)
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("%s cannot be less than %s",
+							RSQDDLAttrNames[RSQ_DDL_ATTR_RESOURCE_OVERCOMMIT_FACTOR],
+							MINIMUM_RESQUEUE_OVERCOMMIT)));
 		}
 	}
 }
