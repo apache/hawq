@@ -272,45 +272,44 @@ cdbpathlocus_from_baserel(struct PlannerInfo   *root,
     GpPolicy   *policy = rel->cdbpolicy;
     bool allocatedResource = root->glob->allocatedResource;
 	
-	if ( Gp_role != GP_ROLE_DISPATCH )
-	{
-		CdbPathLocus_MakeEntry(&result);
-		return result;
-	}
-
-    if (policy &&
-        policy->ptype == POLICYTYPE_PARTITIONED)
+    if ( Gp_role != GP_ROLE_DISPATCH )
     {
-        /* Are the rows distributed by hashing on specified columns? */
-    			bool isRelationRuntimeHash =true;
-    			if(root->glob->resource !=NULL && root->glob->relsType !=NIL){
-    				List* relsType = root->glob->relsType;
-    				Oid baseRelOid = 0;
-    				ListCell *lc;
-    				int pindex=1;
-    				foreach(lc, root->parse->rtable)
-    				{
-    					if(rel->relid == pindex){
-    						RangeTblEntry *rte = (RangeTblEntry *) lfirst(lc);
-    						baseRelOid = rte->relid;
-    					}
-    				}
-    				foreach(lc, relsType)
-    				{
-    					CurrentRelType *relType = (CurrentRelType *) lfirst(lc);
-    					if(relType->relid == baseRelOid){
-    						isRelationRuntimeHash =relType->isHash;
-    					}
-    				}
-    			}
-        if (isRelationRuntimeHash && (policy->nattrs > 0) && allocatedResource &&
-            (list_length(root->glob->resource->segments) == (policy->bucketnum)))
-        {
-	        List *partkey = cdb_build_distribution_pathkeys(root,
-	                                                        rel,
-	                                                        policy->nattrs,
-	                                                        policy->attrs);
-	        CdbPathLocus_MakeHashed(&result, partkey);
+    	    CdbPathLocus_MakeEntry(&result);
+    		  return result;
+    }
+
+    if (policy && policy->ptype == POLICYTYPE_PARTITIONED)
+    {
+		    /* Are the rows distributed by hashing on specified columns? */
+		    bool isRelationRuntimeHash = true;
+		    if (root->glob->resource != NULL && root->glob->relsType != NIL) {
+			      List* relsType = root->glob->relsType;
+			      Oid baseRelOid = 0;
+			      ListCell *lc;
+			      int pindex = 1;
+			      foreach(lc, root->parse->rtable)
+			      {
+				        if (rel->relid == pindex) {
+					          RangeTblEntry *rte = (RangeTblEntry *) lfirst(lc);
+					          baseRelOid = rte->relid;
+					          break;
+				        }
+				        pindex++;
+			      }
+			      foreach(lc, relsType)
+			      {
+				        CurrentRelType *relType = (CurrentRelType *) lfirst(lc);
+				        if (relType->relid == baseRelOid) {
+					          isRelationRuntimeHash = relType->isHash;
+				        }
+			      }
+		    }
+    	    /* we determine the runtime table distribution type here*/
+    	    if (isRelationRuntimeHash && (policy->nattrs > 0) &&
+    	    	((allocatedResource && list_length(root->glob->resource->segments) == policy->bucketnum) || !allocatedResource))
+    	    {
+	          List *partkey = cdb_build_distribution_pathkeys(root,rel, policy->nattrs, policy->attrs);
+	          CdbPathLocus_MakeHashed(&result, partkey);
         }
         /* Rows are distributed on an unknown criterion (uniformly, we hope!) */
         else
