@@ -7,7 +7,7 @@ SYNOPSIS
 *****************************************************
 
 
-gpfdist [-d <directory>] [-p <http_port>] [-l <log_file>] [-t <timeout>]  
+gpfdist [-d <directory>] [-p <http_port>] [-l <log_file>] [-t <timeout>]  [-c <config_file>]
 [-S] [-v | -V] [-m <maxlen>] [--ssl certificate_path]
 
 gpfdist [-? | --help] | --version
@@ -121,7 +121,25 @@ contain the following files:
 - The trusted certificate authorities, root.crt
 
 The root directory (/) cannot be specified as certificate_path.
- 
+
+-c <config_file>
+
+Configuration file for transformations.The option config_file specifies
+the location of the transformation configuration file, passed to gpload via -c.
+The gpfdist configuration is expected to be a YAML file with the following format:
+--- 
+VERSION: 1.0.0.1 
+TRANSFORMATIONS: 
+  transformname1:
+      TYPE:    input | output
+      COMMAND: command1
+      CONTENT: data | paths
+      SAFE:    posix-regex
+
+  transformname2: 
+      TYPE:    input | output
+      COMMAND: command2
+  ...
 
 -v (verbose)
 

@@ -11,15 +11,15 @@ OBJS         = $(subst .c,.o,$(GPFDISTFILES))
 
 SHELL=bash
 GP_VERSION:=$(shell cat $(top_builddir)/VERSION)
-
 APR_CFG  := $(shell which apr-1-config)
 APR_DIR  := $(shell dirname $(APR_CFG))/../
-INCLUDES := $$($(APR_CFG) --includes) -I$(code_dir) -I$(CURDIR)/../../../src/include $(INCLUDES)
-CFLAGS   := $$($(APR_CFG) --cflags) -Wall $(GPFXDIST) $(CFLAGS)
-LIBS     := $$($(APR_CFG) --link-ld --libs) $(LIBS)
 
 # flag to include/exclude gpfdist transformation support
 GPFXDIST=-DGPFXDIST
+
+INCLUDES := $$($(APR_CFG) --includes) -I$(code_dir) -I$(CURDIR)/../../../src/include $(INCLUDES)
+CFLAGS   := $$($(APR_CFG) --cflags) -Wall $(GPFXDIST) $(CFLAGS)
+LIBS     := $$($(APR_CFG) --link-ld --libs) $(LIBS)
 
 sol10_sparc_32_CPPFLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
 sol9_sparc_32_CPPFLAGS  = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
