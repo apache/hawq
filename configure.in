@@ -1221,6 +1221,11 @@ fi
 AC_CHECK_HEADERS(json/json.h, [], [AC_MSG_ERROR([json-c is required])])
 AC_SEARCH_LIBS(json_tokener_parse, json, [], [AC_MSG_ERROR([json-c is required])], [])
 
+# libxml2
+
+AM_PATH_XML2([2.7.6], [], [AC_MSG_ERROR([libxml2 is required])])
+pgac_args="$pgac_args with_xml_prefix with_xml_exec_prefix enable_xmltest"
+CFLAGS="$CFLAGS $XML_CPPFLAGS"
 
 # libhdfs3 
 
