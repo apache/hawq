@@ -8,14 +8,19 @@ subdir = tools
 top_builddir = ..
 include $(top_builddir)/src/Makefile.global
 
+all:
+	${MAKE} -C gpnetbench $@
+
 install :
 	${MAKE} -C bin $@
 	${MAKE} -C sbin $@
 	${MAKE} -C doc $@
 	${MAKE} set_scripts_version
+	${MAKE} -C gpnetbench $@
 
 clean distclean:
 	${MAKE} -C bin $@
+	${MAKE} -C gpnetbench $@
 
 #---------------------------------------------------------------------
 # Set Version
