@@ -10,10 +10,15 @@ import org.apache.hawq.pxf.service.io.GPDBWritable.TypeMismatchException;
 import org.apache.hawq.pxf.service.io.Text;
 import org.apache.hawq.pxf.service.io.Writable;
 import org.apache.hawq.pxf.service.utilities.ProtocolData;
+
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.ObjectUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 import java.lang.reflect.Array;
 import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 
 import static org.apache.hawq.pxf.api.io.DataType.TEXT;
@@ -29,9 +34,17 @@ import static org.apache.hawq.pxf.api.io.DataType.TEXT;
 public class BridgeOutputBuilder {
     private ProtocolData inputData;
     private Writable output = null;
+    private LinkedList<Writable> outputList = null;
+    private Writable partialLine = null;
     private GPDBWritable errorRecord = null;
     private int[] schema;
     private String[] colNames;
+    private boolean samplingEnabled = false;
+    private boolean isPartialLine = false;
+
+    private static final byte DELIM = 10; /* (byte)'\n'; */
+
+    private static final Log LOG = LogFactory.getLog(BridgeOutputBuilder.class);
 
     /**
      * Constructs a BridgeOutputBuilder.
@@ -41,7 +54,9 @@ public class BridgeOutputBuilder {
      */
     public BridgeOutputBuilder(ProtocolData input) {
         inputData = input;
+        outputList = new LinkedList<Writable>();
         makeErrorRecord();
+        samplingEnabled = (inputData.getStatsSampleRatio() > 0);
     }
 
     /**
@@ -87,18 +102,29 @@ public class BridgeOutputBuilder {
      * Translates recFields (obtained from the Resolver) into an output record.
      *
      * @param recFields record fields to be serialized
-     * @return Writable object with serialized row
+     * @return list of Writable objects with serialized row
      * @throws BadRecordException if building the output record failed
      */
-    public Writable makeOutput(List<OneField> recFields)
+    public LinkedList<Writable> makeOutput(List<OneField> recFields)
             throws BadRecordException {
         if (output == null && inputData.outputFormat() == OutputFormat.BINARY) {
             makeGPDBWritableOutput();
         }
 
+        outputList.clear();
+
         fillOutputRecord(recFields);
 
-        return output;
+        return outputList;
+    }
+
+    /**
+     * Returns whether or not this is a partial line.
+     *
+     * @return true for a partial line
+     */
+    public Writable getPartialLine() {
+        return partialLine;
     }
 
     /**
@@ -167,6 +193,8 @@ public class BridgeOutputBuilder {
 
             fillOneGPDBWritableField(current, i);
         }
+
+        outputList.add(output);
     }
 
     /**
@@ -201,7 +229,8 @@ public class BridgeOutputBuilder {
      * Fills a Text object based on recFields.
      *
      * @param recFields record fields
-     * @throws BadRecordException if text formatted record has more than one field
+     * @throws BadRecordException if text formatted record has more than one
+     *             field
      */
     void fillText(List<OneField> recFields) throws BadRecordException {
         /*
@@ -216,10 +245,53 @@ public class BridgeOutputBuilder {
         int type = fld.type;
         Object val = fld.val;
         if (DataType.get(type) == DataType.BYTEA) {// from LineBreakAccessor
-            output = new BufferWritable((byte[]) val);
+            if (samplingEnabled) {
+                convertTextDataToLines((byte[]) val);
+            } else {
+                output = new BufferWritable((byte[]) val);
+                outputList.add(output); // TODO break output into lines
+            }
         } else { // from QuotedLineBreakAccessor
             String textRec = (String) val;
             output = new Text(textRec + "\n");
+            outputList.add(output);
+        }
+    }
+
+    void convertTextDataToLines(byte[] val) {
+        int len = val.length;
+        int start = 0;
+        int end = 0;
+        byte[] line;
+        BufferWritable writable;
+
+        while (start < len) {
+            end = ArrayUtils.indexOf(val, DELIM, start);
+            if (end == ArrayUtils.INDEX_NOT_FOUND) {
+                // data finished in the middle of the line
+                end = len;
+                isPartialLine = true;
+            } else {
+                end++; // include the DELIM character
+                isPartialLine = false;
+            }
+            line = Arrays.copyOfRange(val, start, end);
+
+            if (partialLine != null) {
+                // partial data was completed
+                ((BufferWritable) partialLine).append(line);
+                writable = (BufferWritable) partialLine;
+                partialLine = null;
+            } else {
+                writable = new BufferWritable(line);
+            }
+
+            if (isPartialLine) {
+                partialLine = writable;
+            } else {
+                outputList.add(writable);
+            }
+            start = end;
         }
     }
 
@@ -228,32 +300,33 @@ public class BridgeOutputBuilder {
      *
      * @param oneField field
      * @param colIdx column index
-     * @throws BadRecordException if field type is not supported or doesn't match the schema
+     * @throws BadRecordException if field type is not supported or doesn't
+     *             match the schema
      */
     void fillOneGPDBWritableField(OneField oneField, int colIdx)
             throws BadRecordException {
         int type = oneField.type;
         Object val = oneField.val;
-        GPDBWritable GPDBoutput = (GPDBWritable) output;
+        GPDBWritable gpdbOutput = (GPDBWritable) output;
         try {
             switch (DataType.get(type)) {
                 case INTEGER:
-                    GPDBoutput.setInt(colIdx, (Integer) val);
+                    gpdbOutput.setInt(colIdx, (Integer) val);
                     break;
                 case FLOAT8:
-                    GPDBoutput.setDouble(colIdx, (Double) val);
+                    gpdbOutput.setDouble(colIdx, (Double) val);
                     break;
                 case REAL:
-                    GPDBoutput.setFloat(colIdx, (Float) val);
+                    gpdbOutput.setFloat(colIdx, (Float) val);
                     break;
                 case BIGINT:
-                    GPDBoutput.setLong(colIdx, (Long) val);
+                    gpdbOutput.setLong(colIdx, (Long) val);
                     break;
                 case SMALLINT:
-                    GPDBoutput.setShort(colIdx, (Short) val);
+                    gpdbOutput.setShort(colIdx, (Short) val);
                     break;
                 case BOOLEAN:
-                    GPDBoutput.setBoolean(colIdx, (Boolean) val);
+                    gpdbOutput.setBoolean(colIdx, (Boolean) val);
                     break;
                 case BYTEA:
                     byte[] bts = null;
@@ -264,7 +337,7 @@ public class BridgeOutputBuilder {
                             bts[j] = Array.getByte(val, j);
                         }
                     }
-                    GPDBoutput.setBytes(colIdx, bts);
+                    gpdbOutput.setBytes(colIdx, bts);
                     break;
                 case VARCHAR:
                 case BPCHAR:
@@ -273,7 +346,8 @@ public class BridgeOutputBuilder {
                 case NUMERIC:
                 case TIMESTAMP:
                 case DATE:
-                    GPDBoutput.setString(colIdx, ObjectUtils.toString(val, null));
+                    gpdbOutput.setString(colIdx,
+                            ObjectUtils.toString(val, null));
                     break;
                 default:
                     String valClassName = (val != null) ? val.getClass().getSimpleName()

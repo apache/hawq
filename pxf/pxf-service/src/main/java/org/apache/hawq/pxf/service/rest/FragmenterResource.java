@@ -5,6 +5,7 @@ import org.apache.hawq.pxf.api.Fragmenter;
 import org.apache.hawq.pxf.service.FragmenterFactory;
 import org.apache.hawq.pxf.service.FragmentsResponse;
 import org.apache.hawq.pxf.service.FragmentsResponseFormatter;
+import org.apache.hawq.pxf.service.utilities.AnalyzeUtils;
 import org.apache.hawq.pxf.service.utilities.ProtocolData;
 import org.apache.hawq.pxf.service.utilities.SecuredHDFS;
 
@@ -25,12 +26,12 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-/*
+/**
  * Class enhances the API of the WEBHDFS REST server.
  * Returns the data fragments that a data resource is made of, enabling parallel processing of the data resource.
  * Example for querying API FRAGMENTER from a web client
- * curl -i "http://localhost:50070/pxf/v2/Fragmenter/getFragments?path=/dir1/dir2/*txt"
- * /pxf/ is made part of the path when there is a webapp by that name in tcServer.
+ * {@code curl -i "http://localhost:50070/pxf/v2/Fragmenter/getFragments?path=/dir1/dir2/*txt"}
+ * <code>/pxf/</code> is made part of the path when there is a webapp by that name in tomcat.
  */
 @Path("/" + Version.PXF_PROTOCOL_VERSION + "/Fragmenter/")
 public class FragmenterResource extends RestResource {
@@ -77,6 +78,9 @@ public class FragmenterResource extends RestResource {
         final Fragmenter fragmenter = FragmenterFactory.create(protData);
 
         List<Fragment> fragments = fragmenter.getFragments();
+
+        fragments = AnalyzeUtils.getSampleFragments(fragments, protData);
+
         FragmentsResponse fragmentsResponse = FragmentsResponseFormatter.formatResponse(fragments, path);
 
         return Response.ok(fragmentsResponse, MediaType.APPLICATION_JSON_TYPE).build();
