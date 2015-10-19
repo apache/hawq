@@ -711,12 +711,12 @@ static exception_ptr HandlerRpcResponseException(exception_ptr e) {
     try {
         rethrow_exception(e);
     } catch (const YarnRpcServerException & e) {
-        UnWrapper < NameNodeStandbyException, UnsupportedOperationException,
+        UnWrapper < ResourceManagerStandbyException, UnsupportedOperationException,
                   AccessControlException, SafeModeException, SaslException > unwrapper(e);
 
         try {
             unwrapper.unwrap(__FILE__, __LINE__);
-        } catch (const NameNodeStandbyException & e) {
+        } catch (const ResourceManagerStandbyException & e) {
             retval = current_exception();
         } catch (const UnsupportedOperationException & e) {
             retval = current_exception();

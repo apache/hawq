@@ -42,7 +42,7 @@ public:
      * Get a string with given configure key.
      * @param key The key of the configure item.
      * @return The value of configure item.
-     * @throw HdfsConfigNotFound
+     * @throw YarnConfigNotFound
      */
     const char * getString(const char * key) const;
 
@@ -59,7 +59,7 @@ public:
      * Get a string with given configure key.
      * @param key The key of the configure item.
      * @return The value of configure item.
-     * @throw HdfsConfigNotFound
+     * @throw YarnConfigNotFound
      */
     const char * getString(const std::string & key) const;
 
@@ -77,7 +77,7 @@ public:
      * Get a 64 bit integer with given configure key.
      * @param key The key of the configure item.
      * @return The value of configure item.
-     * @throw HdfsConfigNotFound
+     * @throw YarnConfigNotFound
      */
     int64_t getInt64(const char * key) const;
 
@@ -94,7 +94,7 @@ public:
      * Get a 32 bit integer with given configure key.
      * @param key The key of the configure item.
      * @return The value of configure item.
-     * @throw HdfsConfigNotFound
+     * @throw YarnConfigNotFound
      */
     int32_t getInt32(const char * key) const;
 
@@ -111,7 +111,7 @@ public:
      * Get a double with given configure key.
      * @param key The key of the configure item.
      * @return The value of configure item.
-     * @throw HdfsConfigNotFound
+     * @throw YarnConfigNotFound
      */
     double getDouble(const char * key) const;
 
@@ -128,7 +128,7 @@ public:
      * Get a boolean with given configure key.
      * @param key The key of the configure item.
      * @return The value of configure item.
-     * @throw HdfsConfigNotFound
+     * @throw YarnConfigNotFound
      */
     bool getBool(const char * key) const;
 

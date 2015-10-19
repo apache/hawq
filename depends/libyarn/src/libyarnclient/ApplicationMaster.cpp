@@ -8,23 +8,112 @@
 #include "ApplicationClient.h"
 
 namespace libyarn {
+
+const char * YARN_RESOURCEMANAGER_SCHEDULER_HA = "yarn.resourcemanager.scheduler.ha";
+
 ApplicationMaster::ApplicationMaster(string &schedHost, string &schedPort,
 		UserInfo &user, const string &tokenService) {
 	Yarn::Internal::shared_ptr<Yarn::Config> conf = DefaultConfig().getConfig();
 	Yarn::Internal::SessionConfig sessionConfig(*conf);
 	RpcAuth rpcAuth(user, AuthMethod::TOKEN);
-	rmClient = (void*) new ApplicationMasterProtocol(schedHost,
-			schedPort, tokenService, sessionConfig, rpcAuth);
-}
 
-ApplicationMaster::ApplicationMaster(ApplicationMasterProtocol *rmclient){
-	rmClient = (void*)rmclient;
-}
+	std::vector<RMInfo> rmInfos = RMInfo::getHARMInfo(*conf, YARN_RESOURCEMANAGER_SCHEDULER_HA);
 
+    if (rmInfos.size() <= 1) {
+    	LOG(INFO, "ApplicationClient RM Scheduler HA is disable.");
+    	enableRMSchedulerHA = false;
+        maxRMHARetry = 0;
+    } else {
+    	LOG(INFO, "ApplicationClient RM Scheduler HA is enable. Number of RM scheduler: %d", rmInfos.size());
+    	enableRMSchedulerHA = true;
+    	maxRMHARetry = sessionConfig.getRpcMaxHaRetry();
+    }
+
+    if (!enableRMSchedulerHA)
+    {
+    	appMasterProtos.push_back(
+    		std::shared_ptr<ApplicationMasterProtocol>(
+    			new ApplicationMasterProtocol(schedHost, schedPort, tokenService, sessionConfig, rpcAuth)));
+    }
+    else {
+    	/*
+    	 * iterate RMInfo vector and create 1-1 applicationMasterProtocol for each standby RM scheduler.
+    	 */
+		for (size_t i = 0; i < rmInfos.size(); ++i) {
+	    	appMasterProtos.push_back(
+	    		std::shared_ptr<ApplicationMasterProtocol>(
+	    			new ApplicationMasterProtocol(rmInfos[i].getHost(),
+	    				rmInfos[i].getPort(), tokenService, sessionConfig, rpcAuth)));
+			LOG(INFO, "ApplicationMaster finds a standby RM scheduler, host:%s, port:%s",
+					  rmInfos[i].getHost().c_str(), rmInfos[i].getPort().c_str());
+		}
+    }
+    currentAppMasterProto = 0;
+}
 
 ApplicationMaster::~ApplicationMaster() {
-	delete (ApplicationMasterProtocol*) rmClient;
 }
+
+std::shared_ptr<ApplicationMasterProtocol>
+	ApplicationMaster::getActiveAppMasterProto(uint32_t & oldValue) {
+	lock_guard<mutex> lock(this->mut);
+
+	if (appMasterProtos.empty()) {
+		LOG(WARNING, "The vector of ApplicationMasterProtocol is empty.");
+		THROW(Yarn::YarnResourceManagerClosed, "ApplicationMasterProtocol is closed.");
+	}
+
+    oldValue = currentAppMasterProto;
+    LOG(INFO, "ApplicationMaster::getActiveAppMasterProto, current is %d.", currentAppMasterProto);
+    return appMasterProtos[currentAppMasterProto % appMasterProtos.size()];
+}
+
+void ApplicationMaster::failoverToNextAppMasterProto(uint32_t oldValue){
+	lock_guard<mutex> lock(mut);
+
+	if (oldValue != currentAppMasterProto || appMasterProtos.size() == 1) {
+		return;
+	}
+
+	++currentAppMasterProto;
+	currentAppMasterProto = currentAppMasterProto % appMasterProtos.size();
+	LOG(INFO, "ApplicationMaster::failoverToNextAppMasterProto, current is %d.", currentAppMasterProto);
+}
+
+static void HandleYarnFailoverException(const Yarn::YarnFailoverException & e) {
+    try {
+        rethrow_if_nested(e);
+    } catch (...) {
+        NESTED_THROW(Yarn::YarnRpcException, "%s", e.what());
+    }
+
+    //should not reach here
+    abort();
+}
+
+#define RESOURCEMANAGER_SCHEDULER_HA_RETRY_BEGIN() \
+    do { \
+        int __count = 0; \
+        do { \
+            uint32_t __oldValue = 0; \
+            std::shared_ptr<ApplicationMasterProtocol> appMasterProto = getActiveAppMasterProto(__oldValue); \
+            try { \
+                (void)0
+
+#define RESOURCEMANAGER_SCHEDULER_HA_RETRY_END() \
+    break; \
+    } catch (const Yarn::ResourceManagerStandbyException & e) { \
+		if (!enableRMSchedulerHA || __count++ > maxRMHARetry) { \
+            throw; \
+        } \
+    } catch (const Yarn::YarnFailoverException & e) { \
+		if (!enableRMSchedulerHA || __count++ > maxRMHARetry) { \
+            HandleYarnFailoverException(e); \
+        } \
+    } \
+    failoverToNextAppMasterProto(__oldValue); \
+    } while (true); \
+    } while (0)
 
 /*
 rpc registerApplicationMaster (RegisterApplicationMasterRequestProto) returns (RegisterApplicationMasterResponseProto);
@@ -44,11 +133,15 @@ message RegisterApplicationMasterResponseProto {
 RegisterApplicationMasterResponse ApplicationMaster::registerApplicationMaster(
 		string &amHost, int32_t amPort, string &am_tracking_url) {
 	RegisterApplicationMasterRequest request;
+	RegisterApplicationMasterResponse response;
 	request.setHost(amHost);
 	request.setRpcPort(amPort);
 	request.setTrackingUrl(am_tracking_url);
-	ApplicationMasterProtocol* rmClientAlias = (ApplicationMasterProtocol*) rmClient;
-	return rmClientAlias->registerApplicationMaster(request);
+
+	RESOURCEMANAGER_SCHEDULER_HA_RETRY_BEGIN();
+	response = appMasterProto->registerApplicationMaster(request);
+	RESOURCEMANAGER_SCHEDULER_HA_RETRY_END();
+	return response;
 }
 
 /*
@@ -77,13 +170,17 @@ AllocateResponse ApplicationMaster::allocate(list<ResourceRequest> &asks,
 		list<ContainerId> &releases, ResourceBlacklistRequest &blacklistRequest,
 		int32_t responseId, float progress) {
 	AllocateRequest request;
+	AllocateResponse response;
 	request.setAsks(asks);
 	request.setReleases(releases);
 	request.setBlacklistRequest(blacklistRequest);
 	request.setResponseId(responseId);
 	request.setProgress(progress);
 
-	return ((ApplicationMasterProtocol*) rmClient)->allocate(request);
+	RESOURCEMANAGER_SCHEDULER_HA_RETRY_BEGIN();
+	response = appMasterProto->allocate(request);
+	RESOURCEMANAGER_SCHEDULER_HA_RETRY_END();
+	return response;
 }
 
 /*
@@ -102,15 +199,15 @@ message FinishApplicationMasterResponseProto {
 
 bool ApplicationMaster::finishApplicationMaster(string &diagnostics,
 		string &trackingUrl, FinalApplicationStatus finalstatus) {
-	ApplicationMasterProtocol* rmClientAlias = (ApplicationMasterProtocol*) rmClient;
-
 	FinishApplicationMasterRequest request;
+	FinishApplicationMasterResponse response;
 	request.setDiagnostics(diagnostics);
 	request.setTrackingUrl(trackingUrl);
 	request.setFinalApplicationStatus(finalstatus);
 
-	FinishApplicationMasterResponse response = rmClientAlias->finishApplicationMaster(request);
-
+	RESOURCEMANAGER_SCHEDULER_HA_RETRY_BEGIN();
+	response = appMasterProto->finishApplicationMaster(request);
+	RESOURCEMANAGER_SCHEDULER_HA_RETRY_END();
 	return response.getIsUnregistered();
 }
 

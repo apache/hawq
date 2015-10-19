@@ -19,8 +19,8 @@ using namespace Yarn;
 
 namespace libyarn {
 
-ApplicationMasterProtocol::ApplicationMasterProtocol(std::string & schedHost,
-		std::string & schedPort, const std::string & tokenService,
+ApplicationMasterProtocol::ApplicationMasterProtocol(const std::string & schedHost,
+		const std::string & schedPort, const std::string & tokenService,
 		const SessionConfig & c, const RpcAuth & a) :
 		auth(a), client(RpcClient::getClient()), conf(c), protocol(
 		APPLICATION_MASTER_VERSION, APPLICATION_MASTER_PROTOCOL,
@@ -48,6 +48,8 @@ RegisterApplicationMasterResponse ApplicationMasterProtocol::registerApplication
 		RegisterApplicationMasterRequestProto requestProto = request.getProto();
 		invoke(RpcCall(true, "registerApplicationMaster", &requestProto, &responseProto));
 		return RegisterApplicationMasterResponse(responseProto);
+	} catch (const YarnFailoverException & e) {
+		 throw;
 	} catch (const YarnRpcServerException & e) {
 		UnWrapper<UnresolvedLinkException, YarnIOException> unwrapper(e);
 		unwrapper.unwrap(__FILE__, __LINE__);
@@ -66,6 +68,8 @@ AllocateResponse ApplicationMasterProtocol::allocate(AllocateRequest &request) {
 		AllocateResponseProto responseProto;
 		invoke(RpcCall(true, "allocate", &requestProto, &responseProto));
 		return AllocateResponse(responseProto);
+	} catch (const YarnFailoverException & e) {
+		 throw;
 	} catch (const YarnRpcServerException & e) {
 		UnWrapper<UnresolvedLinkException, YarnIOException> unwrapper(e);
 		unwrapper.unwrap(__FILE__, __LINE__);
@@ -85,6 +89,8 @@ FinishApplicationMasterResponse ApplicationMasterProtocol::finishApplicationMast
 		FinishApplicationMasterResponseProto responseProto;
 		invoke(RpcCall(true, "finishApplicationMaster", &requestProto, &responseProto));
 		return FinishApplicationMasterResponse(responseProto);
+	} catch (const YarnFailoverException & e) {
+		 throw;
 	} catch (const YarnRpcServerException & e) {
 		UnWrapper<UnresolvedLinkException, YarnIOException> unwrapper(e);
 		unwrapper.unwrap(__FILE__, __LINE__);

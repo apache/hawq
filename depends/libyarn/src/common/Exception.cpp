@@ -47,7 +47,7 @@ const char * UnsupportedOperationException::ReflexName =
 const char * ReplicaNotFoundException::ReflexName =
     "org.apache.hadoop.hdfs.server.datanode.ReplicaNotFoundException";
 
-const char * NameNodeStandbyException::ReflexName =
+const char * ResourceManagerStandbyException::ReflexName =
     "org.apache.hadoop.ipc.StandbyException";
 
 const char * YarnInvalidBlockToken::ReflexName =

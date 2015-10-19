@@ -10,6 +10,7 @@
 #include "records/ApplicationSubmissionContext.h"
 #include "records/YarnClusterMetrics.h"
 #include "records/QueueUserACLInfo.h"
+#include "Thread.h"
 
 using namespace std;
 
@@ -64,11 +65,39 @@ private:
     Yarn::Internal::shared_ptr<Yarn::Config> conf;
 };
 
+class RMInfo {
+
+public:
+	RMInfo();
+
+	RMInfo(string &rmHost, string &rmPort) : host(rmHost), port(rmPort){};
+
+    const std::string & getHost() const {
+        return host;
+    }
+
+    void setHost(const std::string & rmHost) {
+        host = rmHost;
+    }
+
+    const std::string & getPort() const {
+        return port;
+    }
+
+    void setPort(const std::string & rmPort) {
+        port = rmPort;
+    }
+
+	static std::vector<RMInfo> getHARMInfo(const Yarn::Config & conf, const char* name);
+
+private:
+	std::string host;
+	std::string port;
+};
+
 class ApplicationClient {
 public:
 	ApplicationClient(string &user, string &host, string &port);
-
-	ApplicationClient(ApplicationClientProtocol *appclient);
 
 	virtual ~ApplicationClient();
 
@@ -94,14 +123,27 @@ public:
 
 	virtual list<QueueUserACLInfo> getQueueAclsInfo();
 
-    const std::string & getUser() const {return ((ApplicationClientProtocol*)appClient)->getUser();};
+	const std::string & getUser(){uint32_t old=0; return getActiveAppClientProto(old)->getUser();};
 
-    AuthMethod getMethod() const {return ((ApplicationClientProtocol*)appClient)->getMethod();};
+	const AuthMethod getMethod(){uint32_t old=0; return getActiveAppClientProto(old)->getMethod();};
 
-    const std::string getPrincipal() const {return ((ApplicationClientProtocol*)appClient)->getPrincipal();};
+    const std::string getPrincipal(){uint32_t old=0; return getActiveAppClientProto(old)->getPrincipal();};
 
 private:
-	void *appClient;
+    std::shared_ptr<ApplicationClientProtocol> getActiveAppClientProto(uint32_t & oldValue);
+    void failoverToNextAppClientProto(uint32_t oldValue);
+
+private:
+	bool enableRMHA;
+	int maxRMHARetry;
+	mutex mut;
+	/**
+	 * Each ApplicationClientProto object stands for a connection to a standby resource manager.
+	 * If application client fail in connecting the active resource manager, it will try the
+	 * next one in the list.
+	 */
+	std::vector<std::shared_ptr<ApplicationClientProtocol>> appClientProtos;
+	uint32_t currentAppClientProto;
 };
 
 } /* namespace libyarn */

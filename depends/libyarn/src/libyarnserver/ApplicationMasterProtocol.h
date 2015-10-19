@@ -46,7 +46,7 @@ namespace libyarn {
 
 class ApplicationMasterProtocol {
 public:
-	ApplicationMasterProtocol(std::string & schedHost, std::string & schedPort,
+	ApplicationMasterProtocol(const std::string & schedHost, const std::string & schedPort,
 			const std::string & tokenService, const SessionConfig & c,
 			const RpcAuth & a);
 
