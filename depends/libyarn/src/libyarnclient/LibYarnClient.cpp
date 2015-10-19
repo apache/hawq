@@ -138,7 +138,7 @@ int LibYarnClient::createJob(string &jobName, string &queue,string &jobId) {
             report = applicationClient->getApplicationReport(appId);
             LOG(INFO,"LibYarnClient::createJob, appId[cluster_timestamp:%lld,id:%d], appState:%d",
                     appId.getClusterTimestamp(), appId.getId(), report.getYarnApplicationState());
-			if ((report.getAMRMToken().getPassword() != "") && report.getYarnApplicationState() == YarnApplicationState::ACCEPTED) {
+            if ((report.getAMRMToken().getPassword() != "") && report.getYarnApplicationState() == YarnApplicationState::ACCEPTED) {
                 break;
             } else {
                 usleep(1000000L);
@@ -151,7 +151,7 @@ int LibYarnClient::createJob(string &jobName, string &queue,string &jobId) {
         //4.1 new ApplicationMaster
         Token token = report.getAMRMToken();
         UserInfo user;
-		if (applicationClient->getMethod() == SIMPLE)
+        if (applicationClient->getMethod() == SIMPLE)
 			user = UserInfo::LocalUser();
 		else if (applicationClient->getMethod() == KERBEROS) {
 			user.setEffectiveUser(applicationClient->getPrincipal());
