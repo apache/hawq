@@ -768,6 +768,10 @@ gp_persistent_build_all(PG_FUNCTION_ARGS)
 		Oid dbOid;
 		
 		dbOid = HeapTupleGetOid(tuple);
+
+		if (dbOid == HcatalogDbOid)
+			continue;
+
 		if (dbOid == TemplateDbOid)
 		{
 			if (Debug_persistent_print)
