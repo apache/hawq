@@ -3621,7 +3621,7 @@ void refreshSlavesFileHostSize(FILE *fp)
 	initializeSelfMaintainBuffer(&smb, PCONTEXT);
 	while( true )
 	{
-		char c = fgetc(fp);
+		int c = fgetc(fp);
 		if ( c == EOF )
 		{
 			if ( feof(fp) == 0 )
@@ -3653,7 +3653,8 @@ void refreshSlavesFileHostSize(FILE *fp)
 		else
 		{
 			/* Add this character into the buffer. */
-			appendSelfMaintainBuffer(&smb, &c, 1);
+			char cval = c;
+			appendSelfMaintainBuffer(&smb, &cval, 1);
 		}
 	}
 
