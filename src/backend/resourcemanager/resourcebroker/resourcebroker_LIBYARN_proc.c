@@ -312,12 +312,12 @@ char * ExtractPrincipalFromTicketCache(const char* cache)
     /*
      * refresh kerberos ticket
      */
-	if (!login()) {
-		elog(WARNING, "Cannot login kerberos.");
-		return NULL;
-	}
+    if (!login()) {
+        elog(WARNING, "Cannot login kerberos.");
+        return NULL;
+    }
 
-	if (!cache) {
+    if (cache) {
         if (0 != setenv("KRB5CCNAME", cache, 1)) {
             elog(WARNING, "Cannot set env parameter \"KRB5CCNAME\" when extract principal from cache:%s", cache);
             return NULL;
