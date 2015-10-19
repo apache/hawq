@@ -9,14 +9,12 @@
 
 namespace libyarn {
 
-ApplicationClient::ApplicationClient(string &host, string &port) {
+ApplicationClient::ApplicationClient(string &user, string &host, string &port) {
 	std::string tokenService = "";
-	Yarn::Config config;
-	Yarn::Internal::SessionConfig sessionConfig(config);
-	Yarn::Internal::UserInfo user = Yarn::Internal::UserInfo::LocalUser();
-	Yarn::Internal::RpcAuth rpcAuth(user, Yarn::Internal::AuthMethod::SIMPLE);
-	appClient = (void*) new ApplicationClientProtocol(host, port, tokenService,
-			sessionConfig, rpcAuth);
+	Yarn::Internal::shared_ptr<Yarn::Config> conf = DefaultConfig().getConfig();
+	Yarn::Internal::SessionConfig sessionConfig(*conf);
+	LOG(INFO, "ApplicationClient session auth method : %s", sessionConfig.getRpcAuthMethod().c_str());
+	appClient = (void*) new ApplicationClientProtocol(user, host, port, tokenService, sessionConfig);
 }
 
 ApplicationClient::ApplicationClient(ApplicationClientProtocol *appclient){

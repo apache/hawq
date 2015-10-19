@@ -15,12 +15,29 @@ using namespace Yarn;
 
 namespace libyarn {
 
-ApplicationClientProtocol::ApplicationClientProtocol(const string & rmHost,
-		const string & rmPort, const string & tokenService,
-		const SessionConfig & c, const RpcAuth & a) :
-		auth(a), client(RpcClient::getClient()), conf(c), protocol(
-		APP_CLIENT_PROTOCOL_VERSION, APP_CLIENT_PROTOCOL,
-		APP_CLIENT_DELEGATION_TOKEN_KIND), server(tokenService, rmHost, rmPort) {
+ApplicationClientProtocol::ApplicationClientProtocol(const string &rmUser,
+			const string & rmHost, const string & rmPort,
+			const string & tokenService,const SessionConfig & c) :
+			client(RpcClient::getClient()), conf(c),
+			protocol(APP_CLIENT_PROTOCOL_VERSION, APP_CLIENT_PROTOCOL,APP_CLIENT_DELEGATION_TOKEN_KIND),
+			server(tokenService, rmHost, rmPort) {
+
+	/* create RpcAuth for rpc method,
+	 * can be SIMPLE or KERBEROS
+	 * */
+	if (RpcAuth::ParseMethod(c.getRpcAuthMethod()) == KERBEROS) {
+		/*
+		 * If using KERBEROS, rmUser should be principal name.
+		 */
+		Yarn::Internal::UserInfo user(rmUser);
+		user.setRealUser(user.getEffectiveUser());
+		Yarn::Internal::RpcAuth rpcAuth(user, KERBEROS);
+		auth = rpcAuth;
+	} else {
+		Yarn::Internal::UserInfo user = Yarn::Internal::UserInfo::LocalUser();
+		Yarn::Internal::RpcAuth rpcAuth(user, SIMPLE);
+		auth = rpcAuth;
+	}
 }
 
 ApplicationClientProtocol::~ApplicationClientProtocol() {

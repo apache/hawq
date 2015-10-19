@@ -44,9 +44,8 @@ namespace libyarn {
 
 class ApplicationClientProtocol {
 public:
-	ApplicationClientProtocol(const string & rmHost, const string & rmPort,
-			const string & tokenService, const SessionConfig & c,
-			const RpcAuth & a);
+	ApplicationClientProtocol(const string &user, const string &rmHost, const string &rmPort,
+			const string &tokenService, const SessionConfig &c);
 
 	virtual ~ApplicationClientProtocol();
 
@@ -73,6 +72,12 @@ public:
 	virtual GetApplicationsResponse getApplications(GetApplicationsRequest &request);
 
 	virtual GetQueueUserAclsInfoResponse getQueueAclsInfo(GetQueueUserAclsInfoRequest &request);
+
+	const string & getUser() {return auth.getUser().getRealUser();};
+
+	AuthMethod getMethod() {return auth.getMethod();};
+
+	const string getPrincipal() {return auth.getUser().getPrincipal();};
 
 private:
 	void invoke(const RpcCall & call);

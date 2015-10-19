@@ -25,7 +25,7 @@
 namespace libyarn {
 	class LibYarnClient {
 	public:
-		LibYarnClient(string &rmHost, string &rmPort, string &schedHost,
+		LibYarnClient(string &user, string &rmHost, string &rmPort, string &schedHost,
 				string &schedPort, string &amHost, int32_t amPort,
 				string &am_tracking_url, int heartbeatInterval);
 
@@ -99,6 +99,8 @@ namespace libyarn {
 		ApplicationID clientAppId;
 		ApplicationAttemptId clientAppAttempId;
 
+		// the user of running AM, default is postgres
+		string amUser;
 		string schedHost;
 		string schedPort;
 

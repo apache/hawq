@@ -15,10 +15,10 @@ extern "C" {
 
 	struct LibYarnClient_wrapper {
 		public:
-			LibYarnClient_wrapper(string &rmHost, string &rmPort, string &schedHost,
+			LibYarnClient_wrapper(string &rmUser, string &rmHost, string &rmPort, string &schedHost,
 							string &schedPort, string &amHost, int32_t amPort,
 							string &am_tracking_url,int heartbeatInterval) {
-				client = new LibYarnClient(rmHost, rmPort, schedHost, schedPort, amHost,
+				client = new LibYarnClient(rmUser, rmHost, rmPort, schedHost, schedPort, amHost,
 								amPort, am_tracking_url,heartbeatInterval);
 			}
 
@@ -121,16 +121,17 @@ extern "C" {
 		errorMessage = errorMsg;
 	}
 
-	int  newLibYarnClient(char *rmHost, char *rmPort,
+	int  newLibYarnClient(char* user, char *rmHost, char *rmPort,
 					char *schedHost, char *schedPort, char *amHost,
 					int32_t amPort, char *am_tracking_url,LibYarnClient_t **client,int heartbeatInterval) {
+		string userStr(user);
 		string rmHostStr(rmHost);
 		string rmPortStr(rmPort);
 		string schedHostStr(schedHost);
 		string schedPortStr(schedPort);
 		string amHostStr(amHost);
 		string amTrackingUrlStr(am_tracking_url);
-		*client =  new LibYarnClient_t(rmHostStr, rmPortStr, schedHostStr, schedPortStr,
+		*client =  new LibYarnClient_t(userStr, rmHostStr, rmPortStr, schedHostStr, schedPortStr,
 						amHostStr, amPort, amTrackingUrlStr,heartbeatInterval);
 		return FUNCTION_SUCCEEDED;
 	}

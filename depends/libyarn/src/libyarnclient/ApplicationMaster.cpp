@@ -5,12 +5,13 @@
 #include "common/SessionConfig.h"
 
 #include "ApplicationMaster.h"
+#include "ApplicationClient.h"
 
 namespace libyarn {
 ApplicationMaster::ApplicationMaster(string &schedHost, string &schedPort,
 		UserInfo &user, const string &tokenService) {
-	Config config;
-	SessionConfig sessionConfig(config);
+	Yarn::Internal::shared_ptr<Yarn::Config> conf = DefaultConfig().getConfig();
+	Yarn::Internal::SessionConfig sessionConfig(*conf);
 	RpcAuth rpcAuth(user, AuthMethod::TOKEN);
 	rmClient = (void*) new ApplicationMasterProtocol(schedHost,
 			schedPort, tokenService, sessionConfig, rpcAuth);
