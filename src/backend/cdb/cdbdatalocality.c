@@ -355,7 +355,7 @@ static bool IsAggFunction(char* funcName);
 static bool allocate_hash_relation(Relation_Data* rel_data,
 		Assignment_Log_Context *log_context, TargetSegmentIDMap* idMap,
 		Relation_Assignment_Context* assignment_context,
-		split_to_segment_mapping_context *context);
+		split_to_segment_mapping_context *context, bool parentIsHashExist, bool parentIsHash);
 
 static void allocate_random_relation(Relation_Data* rel_data,
 		Assignment_Log_Context *log_context, TargetSegmentIDMap* idMap,
@@ -2477,7 +2477,7 @@ static int64 set_maximum_segment_volumn_parameter(Relation_Data *rel_data,
 static bool allocate_hash_relation(Relation_Data* rel_data,
 		Assignment_Log_Context* log_context, TargetSegmentIDMap* idMap,
 		Relation_Assignment_Context* assignment_context,
-		split_to_segment_mapping_context *context) {
+		split_to_segment_mapping_context *context, bool parentIsHashExist, bool parentIsHash) {
 	/*allocation unit in hash relation is file, we assign all the blocks of one file to one virtual segments*/
 	ListCell *lc_file;
 	int fileCount = 0;
@@ -2492,8 +2492,8 @@ static bool allocate_hash_relation(Relation_Data* rel_data,
 			for (int i = 0; i < rel_file->split_num; i++) {
 				int64 split_size = rel_file->splits[i].length;
 				int targethost = (rel_file->segno - 1) % (assignment_context->virtual_segment_num);
-				//calculate keephash datalocality
-				// for keep hash one file corresponds to one split
+				/*calculate keephash datalocality*/
+				/*for keep hash one file corresponds to one split*/
 				for (int p = 0; p < rel_file->block_num; p++) {
 					bool islocal = false;
 					Block_Host_Index *hostID = rel_file->hostIDs + p;
@@ -2522,8 +2522,17 @@ static bool allocate_hash_relation(Relation_Data* rel_data,
 			relationDatalocality = log_context->localDataSizePerRelation / log_context->totalDataSizePerRelation;
 	}
 	double hash2RandomDatalocalityThreshold= 0.9;
-	// for now orca doesn't support convert hash to random
-	if(relationDatalocality < hash2RandomDatalocalityThreshold && relationDatalocality >= 0 && !optimizer){
+	/*for partition hash table, whether to convert random table to hash
+	 * is determined by the datalocality of the first partition*/
+	if (parentIsHashExist) {
+		if (!parentIsHash) {
+			log_context->totalDataSizePerRelation = 0;
+			log_context->localDataSizePerRelation = 0;
+			return true;
+		}
+	}
+	/*for now orca doesn't support convert hash to random*/
+	else if(relationDatalocality < hash2RandomDatalocalityThreshold && relationDatalocality >= 0 && !optimizer){
 		log_context->totalDataSizePerRelation =0;
 		log_context->localDataSizePerRelation =0;
 		return true;
@@ -3515,36 +3524,6 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 				compare_relation_size);
 	}
 
-	/*
-	Relation pg_proc_rel;
-		TupleDesc pg_proc_dsc;
-		HeapTuple tuple;
-		SysScanDesc pg_proc_scan;
-
-		pg_proc_rel = heap_open(ProcedureRelationId, AccessShareLock);
-		pg_proc_dsc = RelationGetDescr(pg_proc_rel);
-		ScanKeyData skey;
-
-		ScanKeyInit(&skey, PRONAME, BTEqualStrategyNumber,
-		F_NAMEEQ, CStringGetDatum(funcName));
-
-		pg_proc_scan = systable_beginscan(pg_proc_rel, InvalidOid, FALSE,
-				ActiveSnapshot, 1, &skey);
-		while (HeapTupleIsValid(tuple = systable_getnext(pg_proc_scan))) {
-
-			bool isAgg = DatumGetBool(fastgetattr(tuple, PROISAGG, pg_proc_dsc, NULL));
-			systable_endscan(pg_proc_scan);
-			heap_close(pg_proc_rel, AccessShareLock);
-			if (isAgg) {
-				return true;
-			} else {
-				return false;
-			}
-		}
-		systable_endscan(pg_proc_scan);
-		heap_close(pg_proc_rel, AccessShareLock);
-		*/
-
 	assignment_context.patition_parent_size_map = createHASHTABLE(
 				context->datalocality_memorycontext, 16,
 				HASHTABLE_SLOT_VOLUME_DEFAULT_MAX, HASHTABLE_KEYTYPE_UINT32,
@@ -3563,7 +3542,8 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 	cqContext  *pcqCtx;
 	cqContext	cqc;
 	HeapTuple	inhtup;
-	/*calculate average size per vseg for all all the relation in a query*/
+	/*calculate average size per vseg for all all the relation in a query
+	 * and initialize the patition_parent_size_map*/
 	for (int relIndex = 0; relIndex < relationCount; relIndex++) {
 			Relation_Data *rel_data = rel_data_vector[relIndex];
 			pcqCtx = caql_beginscan(
@@ -3640,6 +3620,7 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 	int allocate_hash_or_random_time = 0;
 
 	bool vSegOrderChanged = false;
+	List* parentRelsType =NULL;
 	for (int relIndex = 0; relIndex < relationCount; relIndex++) {
 		log_context.localDataSizePerRelation = 0;
 		log_context.totalDataSizePerRelation = 0;
@@ -3695,11 +3676,35 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 		if (isRelationHash) {
 			if (context->keep_hash && assignment_context.virtual_segment_num
 						== targetPolicy->bucketnum) {
-				bool needToChangeHash2Random = allocate_hash_relation(rel_data,
-						&log_context, &idMap, &assignment_context, context);
-				MemoryContextSwitchTo(context->old_memorycontext);
+				ListCell* parlc;
+				bool parentIsHashExist=false;
+				bool parentIsHash =false;
+				/*check whether relation is partition table and need to be checked as random relation*/
+				if (parentRelsType != NULL) {
+					foreach(parlc, parentRelsType)
+					{
+						CurrentRelType* prtype = (CurrentRelType *) lfirst(parlc);
+						if(prtype->relid == rel_data->partition_parent_relid || prtype->relid == rel_data->relid){
+							parentIsHashExist=true;
+							parentIsHash = prtype->isHash;
+						}
+					}
+				}
+				bool needToChangeHash2Random = false;
+				needToChangeHash2Random = allocate_hash_relation(rel_data,
+											&log_context, &idMap, &assignment_context, context, parentIsHashExist,parentIsHash);
+				if (!parentIsHashExist) {
+					/*for partition table, whether to convert from hash to random is determined by the first partition.
+					 * it doesn't need by planner, so it doesn't need to be in global memory context*/
+					CurrentRelType* parentRelType = (CurrentRelType *) palloc(
+							sizeof(CurrentRelType));
+					parentRelType->relid = rel_data->partition_parent_relid;
+					parentRelType->isHash = !needToChangeHash2Random;
+					parentRelsType = lappend(parentRelsType, parentRelType);
+				}
+				MemoryContext cur_memorycontext;
+				cur_memorycontext = MemoryContextSwitchTo(context->old_memorycontext);
 				CurrentRelType* relType = (CurrentRelType *) palloc(sizeof(CurrentRelType));
-				//CurrentRelType* relType = makeNode(CurrentRelType);
 				relType->relid = rel_data->relid;
 				if (needToChangeHash2Random) {
 					relType->isHash = false;
@@ -3707,7 +3712,7 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 					relType->isHash = true;
 				}
 				result->relsType = lappend(result->relsType, relType);
-				MemoryContextSwitchTo(context->datalocality_memorycontext);
+				MemoryContextSwitchTo(cur_memorycontext);
 				if (needToChangeHash2Random) {
 					result->forbid_optimizer = true;
 					allocate_random_relation(rel_data, &log_context, &idMap, 	&assignment_context, context);
@@ -3715,14 +3720,14 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 			}
 			/*allocate hash relation as a random relation*/
 			else{
-				MemoryContextSwitchTo(context->old_memorycontext);
+				MemoryContext cur_memorycontext;
+				cur_memorycontext = MemoryContextSwitchTo(context->old_memorycontext);
 				CurrentRelType* relType = (CurrentRelType *) palloc(
 						sizeof(CurrentRelType));
 				relType->relid = rel_data->relid;
 				relType->isHash = false;
 				result->relsType = lappend(result->relsType, relType);
-				MemoryContextSwitchTo(context->datalocality_memorycontext);
-
+				MemoryContextSwitchTo(cur_memorycontext);
 				result->forbid_optimizer = true;
 				allocate_random_relation(rel_data, &log_context,&idMap, &assignment_context, context);
 			}
@@ -4000,7 +4005,7 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 						context.randomSegNum = context.hashSegNum;
 					}
 					maxTargetSegmentNumber = context.randomSegNum;
-					minTargetSegmentNumber = context.hashSegNum;
+					minTargetSegmentNumber = minimum_segment_num;
 				} else {
 					maxTargetSegmentNumber = context.hashSegNum;
 					minTargetSegmentNumber = context.hashSegNum;
@@ -4014,7 +4019,7 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 					context.randomSegNum = context.tableFuncSegNum;
 				}
 				maxTargetSegmentNumber = context.randomSegNum;
-				minTargetSegmentNumber = context.tableFuncSegNum;
+				minTargetSegmentNumber = minimum_segment_num;
 			}
 		} else {
 			maxTargetSegmentNumber = context.randomSegNum;

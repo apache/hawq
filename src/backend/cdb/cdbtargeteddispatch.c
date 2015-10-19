@@ -26,6 +26,7 @@
 #include "cdb/cdbplan.h"
 #include "cdb/cdbvars.h"
 #include "cdb/cdbutil.h"
+#include "cdb/cdbdatalocality.h"
 
 #include "executor/executor.h"
 
@@ -593,6 +594,21 @@ AssignContentIdsToPlanData(Query *query, Plan *plan, PlannerInfo *root)
 	data.sliceStack = list_make1(ddcr);
 	data.rtable = root->glob->finalrtable;
 	data.allSlices = NULL;
+
+	List* relsType = root->glob->relsType;
+	ListCell *lc;
+	foreach(lc, relsType)
+	{
+		CurrentRelType *relType = (CurrentRelType *) lfirst(lc);
+		ListCell *lctable;
+		foreach(lctable, data.rtable)
+		{
+			RangeTblEntry *rte = (RangeTblEntry *) lfirst(lctable);
+			if (relType->relid == rte->relid) {
+				rte->forceDistRandom = !relType->isHash;
+			}
+		}
+	}
 
 	/* Do it! */
 	AssignContentIdsToPlanData_Walker((Node*)plan, &data);
