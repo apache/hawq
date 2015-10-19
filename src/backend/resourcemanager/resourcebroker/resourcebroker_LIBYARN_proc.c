@@ -317,7 +317,7 @@ char * ExtractPrincipalFromTicketCache(const char* cache)
 		return NULL;
 	}
 
-	if (!cache) {
+	if (cache) {
         if (0 != setenv("KRB5CCNAME", cache, 1)) {
             elog(WARNING, "Cannot set env parameter \"KRB5CCNAME\" when extract principal from cache:%s", cache);
             return NULL;
