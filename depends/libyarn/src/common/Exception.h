@@ -4,8 +4,8 @@
  *
  * Author: Zhanwei Wang
  ********************************************************************/
-#ifndef _HDFS_LIBHDFS3_COMMON_EXCEPTION_H_
-#define _HDFS_LIBHDFS3_COMMON_EXCEPTION_H_
+#ifndef _YARN_LIBYARN_COMMON_EXCEPTION_H_
+#define _YARN_LIBYARN_COMMON_EXCEPTION_H_
 
 #include <stdexcept>
 #include <string>
@@ -40,6 +40,17 @@ public:
 
 public:
     static const char * ReflexName;
+};
+
+class YarnResourceManagerClosed: public YarnException {
+public:
+	YarnResourceManagerClosed(const std::string & arg, const char * file, int line,
+                         const char * stack) :
+        YarnException(arg, file, line, stack) {
+    }
+
+    ~YarnResourceManagerClosed() throw () {
+    }
 };
 
 class YarnNetworkException: public YarnIOException {
@@ -456,14 +467,14 @@ public:
     static const char * ReflexName;
 };
 
-class NameNodeStandbyException: public YarnException {
+class ResourceManagerStandbyException: public YarnException {
 public:
-    NameNodeStandbyException(const std::string & arg, const char * file,
+	ResourceManagerStandbyException(const std::string & arg, const char * file,
                              int line, const char * stack) :
         YarnException(arg, file, line, stack) {
     }
 
-    ~NameNodeStandbyException() throw () {
+    ~ResourceManagerStandbyException() throw () {
     }
 
 public:
@@ -473,4 +484,4 @@ public:
 
 }
 
-#endif /* _HDFS_LIBHDFS3_COMMON_EXCEPTION_H_ */
+#endif /* _YARN_LIBYARN_COMMON_EXCEPTION_H_ */

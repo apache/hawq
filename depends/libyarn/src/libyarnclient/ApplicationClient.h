@@ -10,6 +10,7 @@
 #include "records/ApplicationSubmissionContext.h"
 #include "records/YarnClusterMetrics.h"
 #include "records/QueueUserACLInfo.h"
+#include "Thread.h"
 
 using namespace std;
 
@@ -64,44 +65,85 @@ private:
     Yarn::Internal::shared_ptr<Yarn::Config> conf;
 };
 
-class ApplicationClient {
+class RMInfo {
+
 public:
-	ApplicationClient(string &user, string &host, string &port);
+	RMInfo();
 
-	ApplicationClient(ApplicationClientProtocol *appclient);
+	RMInfo(string &rmHost, string &rmPort) : host(rmHost), port(rmPort){};
 
-	virtual ~ApplicationClient();
+    const std::string & getHost() const {
+        return host;
+    }
 
-	virtual ApplicationID getNewApplication();
+    void setHost(const std::string & rmHost) {
+        host = rmHost;
+    }
 
-	virtual void submitApplication(ApplicationSubmissionContext &appContext);
+    const std::string & getPort() const {
+        return port;
+    }
 
-	virtual ApplicationReport getApplicationReport(ApplicationID &appId);
+    void setPort(const std::string & rmPort) {
+        port = rmPort;
+    }
 
-	virtual list<ContainerReport> getContainers(ApplicationAttemptId &appAttempId);
-
-	virtual list<NodeReport> getClusterNodes(list<NodeState> &state);
-
-	virtual QueueInfo getQueueInfo(string &queue, bool includeApps,
-			bool includeChildQueues, bool recursive);
-
-	virtual void forceKillApplication(ApplicationID &appId);
-
-	virtual YarnClusterMetrics getClusterMetrics();
-
-	virtual list<ApplicationReport> getApplications(list<string> &applicationTypes,
-			list<YarnApplicationState> &applicationStates);
-
-	virtual list<QueueUserACLInfo> getQueueAclsInfo();
-
-    const std::string & getUser() const {return ((ApplicationClientProtocol*)appClient)->getUser();};
-
-    AuthMethod getMethod() const {return ((ApplicationClientProtocol*)appClient)->getMethod();};
-
-    const std::string getPrincipal() const {return ((ApplicationClientProtocol*)appClient)->getPrincipal();};
+	static std::vector<RMInfo> getHARMInfo(const Yarn::Config & conf, const char* name);
 
 private:
-	void *appClient;
+	std::string host;
+	std::string port;
+};
+
+class ApplicationClient {
+public:
+    ApplicationClient(string &user, string &host, string &port);
+
+    virtual ~ApplicationClient();
+
+    virtual ApplicationID getNewApplication();
+
+    virtual void submitApplication(ApplicationSubmissionContext &appContext);
+
+    virtual ApplicationReport getApplicationReport(ApplicationID &appId);
+
+    virtual list<ContainerReport> getContainers(ApplicationAttemptId &appAttempId);
+
+    virtual list<NodeReport> getClusterNodes(list<NodeState> &state);
+
+    virtual QueueInfo getQueueInfo(string &queue, bool includeApps,
+            bool includeChildQueues, bool recursive);
+
+    virtual void forceKillApplication(ApplicationID &appId);
+
+    virtual YarnClusterMetrics getClusterMetrics();
+
+    virtual list<ApplicationReport> getApplications(list<string> &applicationTypes,
+            list<YarnApplicationState> &applicationStates);
+
+    virtual list<QueueUserACLInfo> getQueueAclsInfo();
+
+    const std::string & getUser(){uint32_t old=0; return getActiveAppClientProto(old)->getUser();};
+
+    const AuthMethod getMethod(){uint32_t old=0; return getActiveAppClientProto(old)->getMethod();};
+
+    const std::string getPrincipal(){uint32_t old=0; return getActiveAppClientProto(old)->getPrincipal();};
+
+private:
+    std::shared_ptr<ApplicationClientProtocol> getActiveAppClientProto(uint32_t & oldValue);
+    void failoverToNextAppClientProto(uint32_t oldValue);
+
+private:
+    bool enableRMHA;
+    int maxRMHARetry;
+    mutex mut;
+    /**
+     * Each ApplicationClientProto object stands for a connection to a standby resource manager.
+     * If application client fail in connecting the active resource manager, it will try the
+     * next one in the list.
+     */
+    std::vector<std::shared_ptr<ApplicationClientProtocol>> appClientProtos;
+    uint32_t currentAppClientProto;
 };
 
 } /* namespace libyarn */
