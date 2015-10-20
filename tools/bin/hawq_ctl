@@ -77,7 +77,6 @@ class HawqInit:
         self.hawq_master_temp_directory = self.hawq_dict['hawq_master_temp_directory']
         self.hawq_segment_temp_directory = self.hawq_dict['hawq_segment_temp_directory']
         self.dfs_url = self.hawq_dict['hawq_dfs_url']
-        self.dfs_namenode, self.dfs_namenode_port, self.dfs_space = re.split('[:/]', self.dfs_url, maxsplit=2)
         self.host_list = parse_hosts_file(self.GPHOME)
         self.hosts_count_number = len(self.host_list)
         if self.hosts_count_number == 0:
@@ -428,7 +427,6 @@ class HawqStart:
         self.segment_data_directory = self.hawq_dict['hawq_segment_directory']
         self.segment_port = self.hawq_dict['hawq_segment_address_port']
         self.dfs_url = self.hawq_dict['hawq_dfs_url']
-        self.dfs_namenode, self.dfs_namenode_port, self.dfs_space = re.split('[:/]', self.dfs_url, maxsplit=2)
         self.host_list = parse_hosts_file(self.GPHOME)
         self.hosts_count_number = len(self.host_list)
 
@@ -615,7 +613,6 @@ class HawqStop:
         self.segment_data_directory = self.hawq_dict['hawq_segment_directory']
         self.segment_port = self.hawq_dict['hawq_segment_address_port']
         self.dfs_url = self.hawq_dict['hawq_dfs_url']
-        self.dfs_namenode, self.dfs_namenode_port, self.dfs_space = re.split('[:/]', self.dfs_url, maxsplit=2)
         self.host_list = parse_hosts_file(self.GPHOME)
         self.hosts_count_number = len(self.host_list)
 
