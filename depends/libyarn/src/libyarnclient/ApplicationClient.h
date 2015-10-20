@@ -97,35 +97,35 @@ private:
 
 class ApplicationClient {
 public:
-	ApplicationClient(string &user, string &host, string &port);
+    ApplicationClient(string &user, string &host, string &port);
 
-	virtual ~ApplicationClient();
+    virtual ~ApplicationClient();
 
-	virtual ApplicationID getNewApplication();
+    virtual ApplicationID getNewApplication();
 
-	virtual void submitApplication(ApplicationSubmissionContext &appContext);
+    virtual void submitApplication(ApplicationSubmissionContext &appContext);
 
-	virtual ApplicationReport getApplicationReport(ApplicationID &appId);
+    virtual ApplicationReport getApplicationReport(ApplicationID &appId);
 
-	virtual list<ContainerReport> getContainers(ApplicationAttemptId &appAttempId);
+    virtual list<ContainerReport> getContainers(ApplicationAttemptId &appAttempId);
 
-	virtual list<NodeReport> getClusterNodes(list<NodeState> &state);
+    virtual list<NodeReport> getClusterNodes(list<NodeState> &state);
 
-	virtual QueueInfo getQueueInfo(string &queue, bool includeApps,
-			bool includeChildQueues, bool recursive);
+    virtual QueueInfo getQueueInfo(string &queue, bool includeApps,
+            bool includeChildQueues, bool recursive);
 
-	virtual void forceKillApplication(ApplicationID &appId);
+    virtual void forceKillApplication(ApplicationID &appId);
 
-	virtual YarnClusterMetrics getClusterMetrics();
+    virtual YarnClusterMetrics getClusterMetrics();
 
-	virtual list<ApplicationReport> getApplications(list<string> &applicationTypes,
-			list<YarnApplicationState> &applicationStates);
+    virtual list<ApplicationReport> getApplications(list<string> &applicationTypes,
+            list<YarnApplicationState> &applicationStates);
 
-	virtual list<QueueUserACLInfo> getQueueAclsInfo();
+    virtual list<QueueUserACLInfo> getQueueAclsInfo();
 
-	const std::string & getUser(){uint32_t old=0; return getActiveAppClientProto(old)->getUser();};
+    const std::string & getUser(){uint32_t old=0; return getActiveAppClientProto(old)->getUser();};
 
-	const AuthMethod getMethod(){uint32_t old=0; return getActiveAppClientProto(old)->getMethod();};
+    const AuthMethod getMethod(){uint32_t old=0; return getActiveAppClientProto(old)->getMethod();};
 
     const std::string getPrincipal(){uint32_t old=0; return getActiveAppClientProto(old)->getPrincipal();};
 
@@ -134,16 +134,16 @@ private:
     void failoverToNextAppClientProto(uint32_t oldValue);
 
 private:
-	bool enableRMHA;
-	int maxRMHARetry;
-	mutex mut;
-	/**
-	 * Each ApplicationClientProto object stands for a connection to a standby resource manager.
-	 * If application client fail in connecting the active resource manager, it will try the
-	 * next one in the list.
-	 */
-	std::vector<std::shared_ptr<ApplicationClientProtocol>> appClientProtos;
-	uint32_t currentAppClientProto;
+    bool enableRMHA;
+    int maxRMHARetry;
+    mutex mut;
+    /**
+     * Each ApplicationClientProto object stands for a connection to a standby resource manager.
+     * If application client fail in connecting the active resource manager, it will try the
+     * next one in the list.
+     */
+    std::vector<std::shared_ptr<ApplicationClientProtocol>> appClientProtos;
+    uint32_t currentAppClientProto;
 };
 
 } /* namespace libyarn */

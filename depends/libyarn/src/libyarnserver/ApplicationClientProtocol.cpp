@@ -16,43 +16,43 @@ using namespace Yarn;
 namespace libyarn {
 
 ApplicationClientProtocol::ApplicationClientProtocol(const string &rmUser,
-			const string & rmHost, const string & rmPort,
-			const string & tokenService,const SessionConfig & c) :
-			client(RpcClient::getClient()), conf(c),
-			protocol(APP_CLIENT_PROTOCOL_VERSION, APP_CLIENT_PROTOCOL,APP_CLIENT_DELEGATION_TOKEN_KIND),
-			server(tokenService, rmHost, rmPort) {
+            const string & rmHost, const string & rmPort,
+            const string & tokenService,const SessionConfig & c) :
+            client(RpcClient::getClient()), conf(c),
+            protocol(APP_CLIENT_PROTOCOL_VERSION, APP_CLIENT_PROTOCOL,APP_CLIENT_DELEGATION_TOKEN_KIND),
+            server(tokenService, rmHost, rmPort) {
 
-	/* create RpcAuth for rpc method,
-	 * can be SIMPLE or KERBEROS
-	 * */
-	if (RpcAuth::ParseMethod(c.getRpcAuthMethod()) == KERBEROS) {
-		/*
-		 * If using KERBEROS, rmUser should be principal name.
-		 */
-		Yarn::Internal::UserInfo user(rmUser);
-		user.setRealUser(user.getEffectiveUser());
-		Yarn::Internal::RpcAuth rpcAuth(user, KERBEROS);
-		auth = rpcAuth;
-	} else {
-		Yarn::Internal::UserInfo user = Yarn::Internal::UserInfo::LocalUser();
-		Yarn::Internal::RpcAuth rpcAuth(user, SIMPLE);
-		auth = rpcAuth;
-	}
+    /* create RpcAuth for rpc method,
+     * can be SIMPLE or KERBEROS
+     */
+    if (RpcAuth::ParseMethod(c.getRpcAuthMethod()) == KERBEROS) {
+        /*
+         * If using KERBEROS, rmUser should be principal name.
+         */
+        Yarn::Internal::UserInfo user(rmUser);
+        user.setRealUser(user.getEffectiveUser());
+        Yarn::Internal::RpcAuth rpcAuth(user, KERBEROS);
+        auth = rpcAuth;
+    } else {
+        Yarn::Internal::UserInfo user = Yarn::Internal::UserInfo::LocalUser();
+        Yarn::Internal::RpcAuth rpcAuth(user, SIMPLE);
+        auth = rpcAuth;
+    }
 }
 
 ApplicationClientProtocol::~ApplicationClientProtocol() {
 }
 
 void ApplicationClientProtocol::invoke(const RpcCall & call) {
-	try {
-		channel = &client.getChannel(auth, protocol, server, conf);
-		channel->invoke(call);
-		channel->close(false);
-	}
-	catch (...) {
-		channel->close(false);
-		throw;
-	}
+    try {
+        channel = &client.getChannel(auth, protocol, server, conf);
+        channel->invoke(call);
+        channel->close(false);
+    }
+    catch (...) {
+        channel->close(false);
+        throw;
+    }
 }
 
 /*
@@ -68,23 +68,23 @@ void ApplicationClientProtocol::invoke(const RpcCall & call) {
  */
 
 GetNewApplicationResponse ApplicationClientProtocol::getNewApplication(
-		GetNewApplicationRequest &request) {
-	try {
-		GetNewApplicationResponseProto responseProto;
-		GetNewApplicationRequestProto requestProto = request.getProto();
-		invoke(RpcCall(true, "getNewApplication", &requestProto, &responseProto));
-		return GetNewApplicationResponse(responseProto);
-	} catch (const YarnFailoverException & e) {
-		 throw;
-	} catch (const YarnRpcServerException & e) {
-		UnWrapper<UnresolvedLinkException, YarnIOException> unwrapper(e);
-		unwrapper.unwrap(__FILE__, __LINE__);
-	} catch (...) {
-		THROW(YarnIOException,
-			  "Unexpected exception: when calling "
-			  "ApplicationClientProtocol::getNewApplication in %s: %d",
-			  __FILE__, __LINE__);
-	}
+        GetNewApplicationRequest &request) {
+    try {
+        GetNewApplicationResponseProto responseProto;
+        GetNewApplicationRequestProto requestProto = request.getProto();
+        invoke(RpcCall(true, "getNewApplication", &requestProto, &responseProto));
+        return GetNewApplicationResponse(responseProto);
+    } catch (const YarnFailoverException & e) {
+         throw;
+    } catch (const YarnRpcServerException & e) {
+        UnWrapper<UnresolvedLinkException, YarnIOException> unwrapper(e);
+        unwrapper.unwrap(__FILE__, __LINE__);
+    } catch (...) {
+        THROW(YarnIOException,
+              "Unexpected exception: when calling "
+              "ApplicationClientProtocol::getNewApplication in %s: %d",
+              __FILE__, __LINE__);
+    }
 }
 
 /*
@@ -99,22 +99,22 @@ GetNewApplicationResponse ApplicationClientProtocol::getNewApplication(
  */
 
 void ApplicationClientProtocol::submitApplication(
-		SubmitApplicationRequest &request) {
-	try {
-		SubmitApplicationResponseProto responseProto;
-		SubmitApplicationRequestProto requestProto = request.getProto();
-		invoke(RpcCall(true, "submitApplication", &requestProto, &responseProto));
-	} catch (const YarnFailoverException & e) {
-		 throw;
-	} catch (const YarnRpcServerException & e) {
-		UnWrapper<UnresolvedLinkException, YarnIOException> unwrapper(e);
-		unwrapper.unwrap(__FILE__, __LINE__);
-	} catch (...) {
-		THROW(YarnIOException,
-			  "Unexpected exception: when calling "
-			  "ApplicationClientProtocol::submitApplication in %s: %d",
-			  __FILE__, __LINE__);
-	}
+        SubmitApplicationRequest &request) {
+    try {
+        SubmitApplicationResponseProto responseProto;
+        SubmitApplicationRequestProto requestProto = request.getProto();
+        invoke(RpcCall(true, "submitApplication", &requestProto, &responseProto));
+    } catch (const YarnFailoverException & e) {
+         throw;
+    } catch (const YarnRpcServerException & e) {
+        UnWrapper<UnresolvedLinkException, YarnIOException> unwrapper(e);
+        unwrapper.unwrap(__FILE__, __LINE__);
+    } catch (...) {
+        THROW(YarnIOException,
+              "Unexpected exception: when calling "
+              "ApplicationClientProtocol::submitApplication in %s: %d",
+              __FILE__, __LINE__);
+    }
 }
 /*
  rpc getApplicationReport (GetApplicationReportRequestProto) returns (GetApplicationReportResponseProto);
@@ -128,24 +128,24 @@ void ApplicationClientProtocol::submitApplication(
  }
  */
 GetApplicationReportResponse ApplicationClientProtocol::getApplicationReport(
-		GetApplicationReportRequest &request) {
-	try {
-		GetApplicationReportResponseProto responseProto;
-		GetApplicationReportRequestProto requestProto = request.getProto();
-		invoke(RpcCall(true, "getApplicationReport", &requestProto, &responseProto));
-		return GetApplicationReportResponse(responseProto);
-	} catch (const YarnFailoverException & e) {
-		 throw;
-	} catch (const YarnRpcServerException & e) {
-		UnWrapper<UnresolvedLinkException, YarnIOException> unwrapper(e);
-		unwrapper.unwrap(__FILE__, __LINE__);
-	} catch (...) {
-		THROW(YarnIOException,
-			  "Unexpected exception: when calling "
-			  "ApplicationClientProtocol::getApplicationReport in %s: %d",
-			  __FILE__, __LINE__);
-	}
-}
+        GetApplicationReportRequest &request) {
+    try {
+        GetApplicationReportResponseProto responseProto;
+        GetApplicationReportRequestProto requestProto = request.getProto();
+        invoke(RpcCall(true, "getApplicationReport", &requestProto, &responseProto));
+        return GetApplicationReportResponse(responseProto);
+    } catch (const YarnFailoverException & e) {
+         throw;
+    } catch (const YarnRpcServerException & e) {
+        UnWrapper<UnresolvedLinkException, YarnIOException> unwrapper(e);
+        unwrapper.unwrap(__FILE__, __LINE__);
+    } catch (...) {
+        THROW(YarnIOException,
+              "Unexpected exception: when calling "
+              "ApplicationClientProtocol::getApplicationReport in %s: %d",
+              __FILE__, __LINE__);
+    }
+    }
 
 /*
  rpc getContainers (GetContainersRequestProto) returns (GetContainersResponseProto);
@@ -159,22 +159,22 @@ message GetContainersResponseProto {
 }
  */
 GetContainersResponse ApplicationClientProtocol::getContainers(GetContainersRequest &request){
-	try {
-		GetContainersResponseProto responseProto;
-		GetContainersRequestProto requestProto = request.getProto();
-		invoke(RpcCall(true, "getContainers", &requestProto,&responseProto));
-		return GetContainersResponse(responseProto);
-	} catch (const YarnFailoverException & e) {
-		 throw;
-	} catch (const YarnRpcServerException & e) {
-		UnWrapper<UnresolvedLinkException, YarnIOException> unwrapper(e);
-		unwrapper.unwrap(__FILE__, __LINE__);
-	} catch (...) {
-		THROW(YarnIOException,
-			  "Unexpected exception: when calling "
-			  "ApplicationClientProtocol::getContainers in %s: %d",
-			  __FILE__, __LINE__);
-	}
+    try {
+        GetContainersResponseProto responseProto;
+        GetContainersRequestProto requestProto = request.getProto();
+        invoke(RpcCall(true, "getContainers", &requestProto,&responseProto));
+        return GetContainersResponse(responseProto);
+    } catch (const YarnFailoverException & e) {
+         throw;
+    } catch (const YarnRpcServerException & e) {
+        UnWrapper<UnresolvedLinkException, YarnIOException> unwrapper(e);
+        unwrapper.unwrap(__FILE__, __LINE__);
+    } catch (...) {
+        THROW(YarnIOException,
+              "Unexpected exception: when calling "
+              "ApplicationClientProtocol::getContainers in %s: %d",
+              __FILE__, __LINE__);
+    }
 }
 
 /*
@@ -189,23 +189,23 @@ GetContainersResponse ApplicationClientProtocol::getContainers(GetContainersRequ
  }
  */
 GetClusterNodesResponse ApplicationClientProtocol::getClusterNodes(
-		GetClusterNodesRequest &request) {
-	try {
-		GetClusterNodesResponseProto responseProto;
-		GetClusterNodesRequestProto requestProto = request.getProto();
-		invoke(RpcCall(true, "getClusterNodes", &requestProto, &responseProto));
-		return GetClusterNodesResponse(responseProto);
-	} catch (const YarnFailoverException & e) {
-		 throw;
-	} catch (const YarnRpcServerException & e) {
-		UnWrapper<UnresolvedLinkException, YarnIOException> unwrapper(e);
-		unwrapper.unwrap(__FILE__, __LINE__);
-	} catch (...) {
-		THROW(YarnIOException,
-			  "Unexpected exception: when calling "
-			  "ApplicationClientProtocol::getClusterNodes in %s: %d",
-			  __FILE__, __LINE__);
-	}
+        GetClusterNodesRequest &request) {
+    try {
+        GetClusterNodesResponseProto responseProto;
+        GetClusterNodesRequestProto requestProto = request.getProto();
+        invoke(RpcCall(true, "getClusterNodes", &requestProto, &responseProto));
+        return GetClusterNodesResponse(responseProto);
+    } catch (const YarnFailoverException & e) {
+         throw;
+    } catch (const YarnRpcServerException & e) {
+        UnWrapper<UnresolvedLinkException, YarnIOException> unwrapper(e);
+        unwrapper.unwrap(__FILE__, __LINE__);
+    } catch (...) {
+        THROW(YarnIOException,
+              "Unexpected exception: when calling "
+              "ApplicationClientProtocol::getClusterNodes in %s: %d",
+              __FILE__, __LINE__);
+    }
 }
 
 /*
@@ -233,23 +233,23 @@ GetClusterNodesResponse ApplicationClientProtocol::getClusterNodes(
  }
  */
 GetQueueInfoResponse ApplicationClientProtocol::getQueueInfo(
-		GetQueueInfoRequest &request) {
-	try {
-		GetQueueInfoResponseProto responseProto;
-		GetQueueInfoRequestProto requestProto = request.getProto();
-		invoke(RpcCall(true, "getQueueInfo", &requestProto, &responseProto));
-		return GetQueueInfoResponse(responseProto);
-	} catch (const YarnFailoverException & e) {
-		 throw;
-	} catch (const YarnRpcServerException & e) {
-		UnWrapper<UnresolvedLinkException, YarnIOException> unwrapper(e);
-		unwrapper.unwrap(__FILE__, __LINE__);
-	} catch (...) {
-		THROW(YarnIOException,
-			  "Unexpected exception: when calling "
-			  "ApplicationClientProtocol::getQueueInfo in %s: %d",
-			  __FILE__, __LINE__);
-	}
+        GetQueueInfoRequest &request) {
+    try {
+        GetQueueInfoResponseProto responseProto;
+        GetQueueInfoRequestProto requestProto = request.getProto();
+        invoke(RpcCall(true, "getQueueInfo", &requestProto, &responseProto));
+        return GetQueueInfoResponse(responseProto);
+    } catch (const YarnFailoverException & e) {
+         throw;
+    } catch (const YarnRpcServerException & e) {
+        UnWrapper<UnresolvedLinkException, YarnIOException> unwrapper(e);
+        unwrapper.unwrap(__FILE__, __LINE__);
+    } catch (...) {
+        THROW(YarnIOException,
+              "Unexpected exception: when calling "
+              "ApplicationClientProtocol::getQueueInfo in %s: %d",
+              __FILE__, __LINE__);
+    }
 }
 
 //rpc getClusterMetrics (GetClusterMetricsRequestProto) returns (GetClusterMetricsResponseProto);
@@ -258,85 +258,85 @@ GetQueueInfoResponse ApplicationClientProtocol::getQueueInfo(
 //}
 
 GetClusterMetricsResponse ApplicationClientProtocol::getClusterMetrics(
-		GetClusterMetricsRequest &request) {
-	try {
-		GetClusterMetricsResponseProto responseProto;
-		GetClusterMetricsRequestProto requestProto = request.getProto();
-		invoke(RpcCall(true, "getClusterMetrics", &requestProto, &responseProto));
-		return GetClusterMetricsResponse(responseProto);
-	} catch (const YarnFailoverException & e) {
-		 throw;
-	} catch (const YarnRpcServerException & e) {
-		UnWrapper<UnresolvedLinkException, YarnIOException> unwrapper(e);
-		unwrapper.unwrap(__FILE__, __LINE__);
-	} catch (...) {
-		THROW(YarnIOException,
-			  "Unexpected exception: when calling "
-			  "ApplicationClientProtocol::getClusterMetrics in %s: %d",
-			  __FILE__, __LINE__);
-	}
+        GetClusterMetricsRequest &request) {
+    try {
+        GetClusterMetricsResponseProto responseProto;
+        GetClusterMetricsRequestProto requestProto = request.getProto();
+        invoke(RpcCall(true, "getClusterMetrics", &requestProto, &responseProto));
+        return GetClusterMetricsResponse(responseProto);
+    } catch (const YarnFailoverException & e) {
+         throw;
+    } catch (const YarnRpcServerException & e) {
+        UnWrapper<UnresolvedLinkException, YarnIOException> unwrapper(e);
+        unwrapper.unwrap(__FILE__, __LINE__);
+    } catch (...) {
+        THROW(YarnIOException,
+              "Unexpected exception: when calling "
+              "ApplicationClientProtocol::getClusterMetrics in %s: %d",
+              __FILE__, __LINE__);
+    }
 }
 
 KillApplicationResponse ApplicationClientProtocol::forceKillApplication(
-		KillApplicationRequest &request) {
-	try {
-		KillApplicationResponseProto responseProto;
-		KillApplicationRequestProto requestProto = request.getProto();
-		invoke(
-				RpcCall(true, "forceKillApplication", &requestProto,
-						&responseProto));
-		return KillApplicationResponse(responseProto);
-	} catch (const YarnFailoverException & e) {
-		 throw;
-	} catch (const YarnRpcServerException & e) {
-		UnWrapper<UnresolvedLinkException, YarnIOException> unwrapper(e);
-		unwrapper.unwrap(__FILE__, __LINE__);
-	} catch (...) {
-		THROW(YarnIOException,
-			  "Unexpected exception: when calling "
-			  "ApplicationClientProtocol::forceKillApplication in %s: %d",
-			  __FILE__, __LINE__);
-	}
+        KillApplicationRequest &request) {
+    try {
+        KillApplicationResponseProto responseProto;
+        KillApplicationRequestProto requestProto = request.getProto();
+        invoke(
+                RpcCall(true, "forceKillApplication", &requestProto,
+                        &responseProto));
+        return KillApplicationResponse(responseProto);
+    } catch (const YarnFailoverException & e) {
+         throw;
+    } catch (const YarnRpcServerException & e) {
+        UnWrapper<UnresolvedLinkException, YarnIOException> unwrapper(e);
+        unwrapper.unwrap(__FILE__, __LINE__);
+    } catch (...) {
+        THROW(YarnIOException,
+              "Unexpected exception: when calling "
+              "ApplicationClientProtocol::forceKillApplication in %s: %d",
+              __FILE__, __LINE__);
+    }
 }
 
 GetApplicationsResponse ApplicationClientProtocol::getApplications(
-		GetApplicationsRequest &request) {
-	try {
-		GetApplicationsResponseProto responseProto;
-		GetApplicationsRequestProto requestProto = request.getProto();
-		invoke(RpcCall(true, "getApplications", &requestProto, &responseProto));
-		return GetApplicationsResponse(responseProto);
-	} catch (const YarnFailoverException & e) {
-		 throw;
-	} catch (const YarnRpcServerException & e) {
-		UnWrapper<UnresolvedLinkException, YarnIOException> unwrapper(e);
-		unwrapper.unwrap(__FILE__, __LINE__);
-	} catch (...) {
-		THROW(YarnIOException,
-			  "Unexpected exception: when calling "
-			  "ApplicationClientProtocol::getApplications in %s: %d",
-			  __FILE__, __LINE__);
-	}
+        GetApplicationsRequest &request) {
+    try {
+        GetApplicationsResponseProto responseProto;
+        GetApplicationsRequestProto requestProto = request.getProto();
+        invoke(RpcCall(true, "getApplications", &requestProto, &responseProto));
+        return GetApplicationsResponse(responseProto);
+    } catch (const YarnFailoverException & e) {
+         throw;
+    } catch (const YarnRpcServerException & e) {
+        UnWrapper<UnresolvedLinkException, YarnIOException> unwrapper(e);
+        unwrapper.unwrap(__FILE__, __LINE__);
+    } catch (...) {
+        THROW(YarnIOException,
+              "Unexpected exception: when calling "
+              "ApplicationClientProtocol::getApplications in %s: %d",
+              __FILE__, __LINE__);
+    }
 }
 
 GetQueueUserAclsInfoResponse ApplicationClientProtocol::getQueueAclsInfo(
-		GetQueueUserAclsInfoRequest &request) {
-	try {
-		GetQueueUserAclsInfoResponseProto responseProto;
-		GetQueueUserAclsInfoRequestProto requestProto = request.getProto();
-		invoke(RpcCall(true, "getQueueUserAcls", &requestProto, &responseProto));
-		return GetQueueUserAclsInfoResponse(responseProto);
-	} catch (const YarnFailoverException & e) {
-		 throw;
-	} catch (const YarnRpcServerException & e) {
-		UnWrapper<UnresolvedLinkException, YarnIOException> unwrapper(e);
-		unwrapper.unwrap(__FILE__, __LINE__);
-	} catch (...) {
-		THROW(YarnIOException,
-			  "Unexpected exception: when calling "
-			  "ApplicationClientProtocol::getQueueAclsInfo in %s: %d",
-			  __FILE__, __LINE__);
-	}
+        GetQueueUserAclsInfoRequest &request) {
+    try {
+        GetQueueUserAclsInfoResponseProto responseProto;
+        GetQueueUserAclsInfoRequestProto requestProto = request.getProto();
+        invoke(RpcCall(true, "getQueueUserAcls", &requestProto, &responseProto));
+        return GetQueueUserAclsInfoResponse(responseProto);
+    } catch (const YarnFailoverException & e) {
+         throw;
+    } catch (const YarnRpcServerException & e) {
+        UnWrapper<UnresolvedLinkException, YarnIOException> unwrapper(e);
+        unwrapper.unwrap(__FILE__, __LINE__);
+    } catch (...) {
+        THROW(YarnIOException,
+              "Unexpected exception: when calling "
+              "ApplicationClientProtocol::getQueueAclsInfo in %s: %d",
+              __FILE__, __LINE__);
+    }
 }
 
 }
