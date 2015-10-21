@@ -109,6 +109,9 @@ void createEmptyConnectionTrack(ConnectionTrack *track)
 	(*track)->MinSegCountFixed			= 0;
 	(*track)->VSegLimitPerSeg			= -1;
 	(*track)->VSegLimit					= -1;
+	(*track)->StatVSegMemoryMB			= 0;
+	(*track)->StatNVSeg					= 0;
+	(*track)->SegNumEqual				= 0;
 	(*track)->SliceSize					= 0;
 	(*track)->IOBytes					= 0;
 	(*track)->QueueID			 		= 0;
@@ -259,6 +262,9 @@ int retrieveConnectionTrack(ConnectionTrack track, int32_t connid)
 	track->MinSegCountFixed			= oldct->MinSegCountFixed;
 	track->VSegLimitPerSeg			= oldct->VSegLimitPerSeg;
 	track->VSegLimit				= oldct->VSegLimit;
+	track->StatNVSeg				= oldct->StatNVSeg;
+	track->StatVSegMemoryMB			= oldct->StatVSegMemoryMB;
+	track->SegNumEqual				= oldct->SegNumEqual;
 	track->SliceSize				= oldct->SliceSize;
 	track->SegIOBytes				= oldct->SegIOBytes;
 	track->IOBytes					= oldct->IOBytes;
@@ -595,7 +601,8 @@ void dumpConnectionTracks(const char *filename)
 						"vseg limit per query=%d:"
 						"fixsegsize=%d:"
 						"reqtime=%s:"
-						"alloctime=%s),",
+						"alloctime=%s:"
+						"stmt=%d MB x %d),",
 						conn->SessionID,
 						conn->SegMemoryMB, conn->SegCore,
 						conn->SegNum, conn->SegNumMin, conn->SegNumActual,
@@ -605,7 +612,9 @@ void dumpConnectionTracks(const char *filename)
 						conn->VSegLimit,
 						conn->MinSegCountFixed,
 						format_time_microsec(conn->ResRequestTime),
-						format_time_microsec(conn->ResAllocTime));
+						format_time_microsec(conn->ResAllocTime),
+						conn->StatVSegMemoryMB,
+						conn->StatNVSeg);
 
 			fprintf(fp, "LOC(size=%d", conn->SegPreferredHostCount);
 			if ( conn->SegPreferredHostCount <= 0 )

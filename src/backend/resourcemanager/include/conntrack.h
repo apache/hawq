@@ -95,6 +95,7 @@ struct ConnectionTrackData
 	int32_t					SegNum;
 	int32_t					SegNumMin;
 	int32_t					SegNumActual;
+	int32_t					SegNumEqual;
 	int32_t					SegPreferredHostCount;
 	char 			  	  **SegPreferredHostNames;
 	int64_t			   	   *SegPreferredScanSizeMB;
@@ -104,6 +105,8 @@ struct ConnectionTrackData
 	int32_t			    	MinSegCountFixed;
 	int32_t					VSegLimitPerSeg;
 	int32_t					VSegLimit;
+	uint32_t				StatVSegMemoryMB;
+	uint32_t				StatNVSeg;
 	List				   *Resource;		/* Allocated resource. 	   		  */
 
 	void				   *QueueTrack;
