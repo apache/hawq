@@ -1,10 +1,10 @@
 top_builddir=../../../../..
 subdir=src/backend/utils/misc
 
-TARGETS=guc
+TARGETS=guc atomic
 
 # Objects from backend, which don't need to be mocked but need to be linked.
-guc_REAL_OBJS=\
+common_REAL_OBJS=\
     $(top_srcdir)/src/backend/access/hash/hashfunc.o \
     $(top_srcdir)/src/backend/access/heap/tuptoaster.o \
     $(top_srcdir)/src/backend/bootstrap/bootparse.o \
@@ -34,5 +34,11 @@ guc_REAL_OBJS=\
     $(top_srcdir)/src/port/thread.o \
     $(top_srcdir)/src/timezone/localtime.o \
     $(top_srcdir)/src/timezone/pgtz.o 
+
+guc_REAL_OBJS=$(common_REAL_OBJS)
+
+atomic_REAL_OBJS=$(common_REAL_OBJS) \
+	$(top_srcdir)/src/backend/utils/misc/guc.o
+
 
 include ../../../../Makefile.mock

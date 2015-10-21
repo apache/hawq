@@ -43,7 +43,7 @@ typedef struct mdver_local_mdvsn
 } mdver_local_mdvsn;
 
 /* Pointer to the shared memory global version counter (GVC) */
-extern int64 *mdver_global_version_counter;
+extern uint64 *mdver_global_version_counter;
 
 /* MD Versioning shared memory initialization */
 void mdver_shmem_init(void);
