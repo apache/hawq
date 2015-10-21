@@ -20,7 +20,7 @@
 #define MDVER_GLOBAL_VER_SHMEM_NAME "MDVer Global Version Counter"
 
 /* Pointer to the shared memory global version counter (GVC) */
-int64 *mdver_global_version_counter = NULL;
+uint64 *mdver_global_version_counter = NULL;
 
 /* MDVer Global MDVSN is stored here, once attached to */
 Cache *mdver_glob_mdvsn = NULL;
@@ -64,7 +64,7 @@ mdver_shmem_init(void)
 			sizeof(*mdver_global_version_counter),
 			&attach);
 
-	mdver_global_version_counter = (int64 *)shmem_base;
+	mdver_global_version_counter = (uint64 *)shmem_base;
 	Assert(0 == *mdver_global_version_counter);
 
 }

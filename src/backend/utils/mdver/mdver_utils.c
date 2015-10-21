@@ -298,8 +298,7 @@ mdver_request_after_nuke(Oid key, uint64 *ddl_version, uint64 *dml_version)
 uint64
 mdver_next_global_version()
 {
-	/* TODO gcaragea 03/28/2014: Determine if we should use int64 or uint64 (MPP-23087) */
-	return (uint64) gp_atomic_add_64(mdver_global_version_counter, 1);
+	return gp_atomic_add_uint64(mdver_global_version_counter, 1);
 }
 
 /*
