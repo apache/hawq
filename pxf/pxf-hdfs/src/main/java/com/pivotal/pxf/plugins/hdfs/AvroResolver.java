@@ -161,22 +161,31 @@ public class AvroResolver extends Plugin implements ReadResolver {
 
         Schema.Type fieldType = fieldSchema.getType();
         int ret = 0;
-        Object value;
+        Object value = fieldValue;
 
         switch (fieldType) {
             case ARRAY:
+                if(fieldValue == null) {
+                    return addOneFieldToRecord(record, TEXT, fieldValue);
+                }
                 List<OneField> listRecord = new LinkedList<>();
                 ret = setArrayField(listRecord, fieldValue, fieldSchema);
                 addOneFieldToRecord(record, TEXT, String.format("[%s]",
                         HdfsUtilities.toString(listRecord, collectionDelim)));
                 break;
             case MAP:
+                if(fieldValue == null) {
+                    return addOneFieldToRecord(record, TEXT, fieldValue);
+                }
                 List<OneField> mapRecord = new LinkedList<>();
                 ret = setMapField(mapRecord, fieldValue, fieldSchema);
                 addOneFieldToRecord(record, TEXT, String.format("{%s}",
                         HdfsUtilities.toString(mapRecord, collectionDelim)));
                 break;
             case RECORD:
+                if(fieldValue == null) {
+                    return addOneFieldToRecord(record, TEXT, fieldValue);
+                }
                 List<OneField> recRecord = new LinkedList<>();
                 ret = setRecordField(recRecord, fieldValue, fieldSchema);
                 addOneFieldToRecord(record, TEXT, String.format("{%s}",
@@ -201,15 +210,12 @@ public class AvroResolver extends Plugin implements ReadResolver {
                         fieldSchema.getTypes().get(unionIndex));
                 break;
             case ENUM:
-                value = (fieldValue != null) ? fieldValue : null;
                 ret = addOneFieldToRecord(record, TEXT, value);
                 break;
             case INT:
-                value = (fieldValue != null) ? fieldValue : null;
                 ret = addOneFieldToRecord(record, INTEGER, value);
                 break;
             case DOUBLE:
-                value = (fieldValue != null) ? fieldValue : null;
                 ret = addOneFieldToRecord(record, FLOAT8, value);
                 break;
             case STRING:
@@ -218,23 +224,18 @@ public class AvroResolver extends Plugin implements ReadResolver {
                 ret = addOneFieldToRecord(record, TEXT, value);
                 break;
             case FLOAT:
-                value = (fieldValue != null) ? fieldValue : null;
                 ret = addOneFieldToRecord(record, REAL, value);
                 break;
             case LONG:
-                value = (fieldValue != null) ? fieldValue : null;
                 ret = addOneFieldToRecord(record, BIGINT, value);
                 break;
             case BYTES:
-                value = (fieldValue != null) ? fieldValue : null;
                 ret = addOneFieldToRecord(record, BYTEA, value);
                 break;
             case BOOLEAN:
-                value = (fieldValue != null) ? fieldValue : null;
                 ret = addOneFieldToRecord(record, BOOLEAN, value);
                 break;
             case FIXED:
-                value = (fieldValue != null) ? fieldValue : null;
                 ret = addOneFieldToRecord(record, BYTEA, value);
                 break;
             default:
