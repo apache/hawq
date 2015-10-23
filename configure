@@ -714,6 +714,7 @@ ELF_SYS
 EGREP
 GREP
 with_rt
+ADDON_DIR
 with_zlib
 with_system_tzdata
 with_openssl
@@ -5983,6 +5984,11 @@ else
 fi
 
 
+
+
+#
+# addon
+#
 
 
 #

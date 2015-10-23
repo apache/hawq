@@ -14,9 +14,14 @@ subdir = src/backend
 top_builddir = ../..
 include $(top_builddir)/src/Makefile.global
 
+ifdef ADDON_DIR
+include $(ADDON_DIR)/src/Makefile
+endif
+
 SUBDIRS = access bootstrap catalog parser commands executor foreign \
 	lib libpq gp_libpq_fe main nodes optimizer port postmaster regex \
-	rewrite storage tcop utils resourcemanager $(top_builddir)/src/timezone cdb
+	rewrite storage tcop utils resourcemanager $(top_builddir)/src/timezone cdb \
+	$(ADDON_SUBDIR)
 
 include $(srcdir)/common.mk
 

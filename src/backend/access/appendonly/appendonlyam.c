@@ -75,11 +75,6 @@
 #include "utils/builtins.h"
 #include "utils/guc.h"
 
-#ifdef HAVE_QUICKLZ
-#include <quicklz1.h>
-#include <quicklz3.h>
-#endif
-
 #ifdef HAVE_LIBZ
 #include <zlib.h>
 #endif

@@ -805,6 +805,11 @@ PGAC_ARG_BOOL(with, zlib, yes,
 AC_SUBST(with_zlib)
 
 #
+# addon
+#
+AC_SUBST(ADDON_DIR)
+
+#
 # Realtime library
 #
 PGAC_ARG_BOOL(with, rt, yes,

@@ -517,7 +517,6 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 
 		if (!compresstype_is_valid(compresstype))
 		{
-#ifndef HAVE_QUICKLZ
 		  if (strcmp(compresstype, "quicklz") == 0)
 		  {
 		    ereport(ERROR,
@@ -526,7 +525,6 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 		         errOmitLocation(true)));
 		  }
 		  else
-#endif
 		  {
 		    ereport(ERROR,
 		        (errcode(ERRCODE_UNDEFINED_OBJECT),
@@ -615,7 +613,6 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 				compresstype = pstrdup(defaultParquetCompressor);
 		}
 
-#ifdef HAVE_QUICKLZ
 		if (compresstype && (pg_strcasecmp(compresstype, "quicklz") == 0) &&
 		    (compresslevel != 1))
 		{
@@ -632,7 +629,7 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 		      compresslevel = setDefaultCompressionLevel(compresstype);
 		  }
 		}
-#endif
+
 		if (compresstype && (pg_strcasecmp(compresstype, "rle_type") == 0) &&
 			(compresslevel > 4))
 		{
