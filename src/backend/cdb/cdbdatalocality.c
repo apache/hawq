@@ -2532,7 +2532,10 @@ static bool allocate_hash_relation(Relation_Data* rel_data,
 		}
 	}
 	/*for now orca doesn't support convert hash to random*/
-	else if(relationDatalocality < hash2RandomDatalocalityThreshold && relationDatalocality >= 0 && !optimizer){
+	/*enforce_hash_to_random=0: convert when datalocality is low, 1: enforce hash, 2: enforce random*/
+	else if((enforce_hash_to_random == 1 ||
+			(relationDatalocality < hash2RandomDatalocalityThreshold && relationDatalocality >= 0 && !optimizer))
+			&& enforce_hash_to_random != 2){
 		log_context->totalDataSizePerRelation =0;
 		log_context->localDataSizePerRelation =0;
 		return true;

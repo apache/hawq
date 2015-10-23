@@ -6372,6 +6372,17 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
+		  {"enforce_hash_to_random", PGC_USERSET, DEVELOPER_OPTIONS,
+				gettext_noop("Sets whether convert hash to random, 0: convert when datalocality is low, "
+						"1: enforce hash, 2: enforce random"),
+				NULL,
+				GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+			},
+			&enforce_hash_to_random,
+			0, 0, 2 ,NULL, NULL
+	},
+
+	{
 		{"hawq_resourceenforcer_cleanup_period", PGC_USERSET, DEVELOPER_OPTIONS,
 			gettext_noop("period for resource enforcer to cleanup cgroups."),
 			NULL,

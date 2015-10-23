@@ -1211,4 +1211,6 @@ extern int     rm_max_resource_queue_number;
 extern int max_filecount_notto_split_segment;
 extern int min_datasize_to_combine_segment;
 extern int datalocality_algorithm_version;
+
+extern int enforce_hash_to_random;
 #endif   /* GPVARS_H */
