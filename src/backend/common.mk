@@ -22,7 +22,7 @@ SUBDIROBJS = $(SUBDIRS:%=%/$(subsysfilename))
 
 # top-level backend directory obviously has its own "all" target
 ifneq ($(subdir), src/backend)
-all: $(subsysfilename)
+all: $(subsysfilename) $(OTHER_TASK)
 endif
 
 SUBSYS.o: $(SUBDIROBJS) $(OBJS)

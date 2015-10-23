@@ -18,7 +18,7 @@ SUBDIRS = config translate relcache utils
 
 OBJS = Allocators.o CGPOptimizer.o gpdbwrappers.o
 
-include $(top_srcdir)/src/backend/common.mk
+OTHER_TASK = libdxltranslators.$(LDSFX) libgpoptudf.$(LDSFX)
 
 ifeq (Darwin, $(UNAME))
 	LDLIBFLAGS = -dynamiclib -flat_namespace -undefined dynamic_lookup -Wl,-unexported_symbols_list -Wl,unexported_symbols_list.txt
@@ -44,10 +44,7 @@ LIBNAUCRATES_DIR = $(ORCA_DEPENDS_DIR_INTER)/libnaucrates
 LIBGPDBCOST_DIR = $(ORCA_DEPENDS_DIR_INTER)/libgpdbcost
 LIBGPOPT_DIR = $(ORCA_DEPENDS_DIR_INTER)/libgpopt
 
-all: $(SUBDIRS) libdxltranslators.$(LDSFX) libgpoptudf.$(LDSFX)
-
-$(SUBDIRS):
-	$(MAKE) -C $@
+include $(top_srcdir)/src/backend/common.mk
 
 libdxltranslators.$(LDSFX): $(SUBDIROBJS) $(OBJS)
 	$(CXX) $(CXXFLAGS) $(LDLIBFLAGS) \
@@ -71,4 +68,4 @@ install:
 	$(INSTALL_DATA) libdxltranslators.$(LDSFX) '$(DESTDIR)$(libdir)/libdxltranslators.$(LDSFX)'
 	$(INSTALL_DATA) libgpoptudf.$(LDSFX) '$(DESTDIR)$(libdir)/libgpoptudf.$(LDSFX)'
 
-.PHONY: all install $(SUBDIRS)
+.PHONY: install
