@@ -272,7 +272,7 @@ int debug_fix_vseg_num;
 int max_filecount_notto_split_segment;
 int min_datasize_to_combine_segment;
 int datalocality_algorithm_version;
-int enforce_hash_to_random;
+int hash_to_random_flag;
 bool metadata_cache_enable;
 int metadata_cache_block_capacity;
 

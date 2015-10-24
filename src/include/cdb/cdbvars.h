@@ -1212,5 +1212,12 @@ extern int max_filecount_notto_split_segment;
 extern int min_datasize_to_combine_segment;
 extern int datalocality_algorithm_version;
 
-extern int enforce_hash_to_random;
+typedef enum
+{
+	HASH_TO_RANDOM_BASEDON_DATALOCALITY = 0,
+	ENFORCE_HASH_TO_RANDOM ,
+	ENFORCE_KEEP_HASH,
+} HashToRandomFlagValue;
+
+extern int hash_to_random_flag;
 #endif   /* GPVARS_H */
