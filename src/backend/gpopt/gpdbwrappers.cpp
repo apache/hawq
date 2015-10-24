@@ -199,6 +199,8 @@
 #define ALLOW_isMotionGather
 #define ALLOW_estimate_rel_size
 #define ALLOW_rel_partitioning_is_uniform
+#define ALLOW_GetActiveRelType
+#define ALLOW_GetActiveQueryResource
 
 #define ALLOW_mdver_request_version
 #define ALLOW_mdver_enabled
@@ -2363,6 +2365,30 @@ gpdb::Pdistrpolicy
     GP_WRAP_END;
     return NULL;
 }
+
+
+List *
+gpdb::PlActiveRelTypes(void)
+{
+	GP_WRAP_START;
+	{
+		return GetActiveRelType();
+	}
+	GP_WRAP_END;
+	return NULL;
+}
+
+QueryResource *
+gpdb::PqrActiveQueryResource(void)
+{
+	GP_WRAP_START;
+	{
+		return GetActiveQueryResource();
+	}
+	GP_WRAP_END;
+	return NULL;
+}
+
 
 BOOL
 gpdb::FChildPartDistributionMismatch

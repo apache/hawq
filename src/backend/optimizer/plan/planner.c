@@ -340,8 +340,7 @@ planner(Query *parse, int cursorOptions,
 		* then fall back to the planner.
 		* TODO: caragg 11/08/2013: Enable ORCA when running in utility mode (MPP-21841)
 		*/
-		if (!ppResult->saResult.forbid_optimizer && optimizer
-				&& AmIMaster() && (GP_ROLE_UTILITY != Gp_role))
+    	if (optimizer && AmIMaster() && (GP_ROLE_UTILITY != Gp_role))
 		{
 			if (gp_log_optimization_time)
 			{
