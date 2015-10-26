@@ -1186,10 +1186,10 @@ extern int 	   rm_query_resource_noresource_timeout;
 extern int	   rm_resource_timeout;
 extern int	   rm_resource_heartbeat_interval;
 extern int	   rm_tolerate_nseg_limit;
+extern int	   rm_rejectrequest_nseg_limit;
 extern int	   rm_nvseg_variance_among_seg_limit;
 extern char   *rm_resourcepool_test_filename;
 extern bool	   rm_force_fifo_queue;
-
 
 extern bool	   rm_enforce_cpu_enable;
 extern bool    rm_enforce_blkio_enable;

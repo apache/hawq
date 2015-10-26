@@ -6494,10 +6494,22 @@ static struct config_int ConfigureNamesInt[] =
 
 	{
 		{"hawq_rm_tolerate_nseg_limit", PGC_POSTMASTER, RESOURCES_MGM,
-			gettext_noop("the size of down segments that resource manager should tolerate at most ."),
+			gettext_noop("resource manager re-allocates resource if the number of exclusive "
+						 "segments is greater than this limit value when there is at least "
+						 "one segment containing two or more virtual segments."),
 			NULL
 		},
 		&rm_tolerate_nseg_limit,
+		2, 0, 65535, NULL, NULL
+	},
+
+	{
+		{"hawq_rm_rejectrequest_nseg_limit", PGC_POSTMASTER, RESOURCES_MGM,
+			gettext_noop("resource manager rejects new resource request if the number of "
+						 "unavailable segments is greater than this limit value."),
+			NULL
+		},
+		&rm_rejectrequest_nseg_limit,
 		2, 0, 65535, NULL, NULL
 	},
 

@@ -649,8 +649,7 @@ int acquireResourceFromRM(int 		  		  index,
     if ( res != FUNC_RETURN_OK )
     {
     	snprintf(errorbuf, errorbufsize,
-    			 "failed to acquire resource from HAWQ resource manager because "
-    			 "of RPC error %s.",
+    			 "failed to acquire resource because of %s.",
 				 getErrorCodeExplain(res));
     	pgstat_report_waiting_resource(false);
     	return res;
@@ -662,7 +661,7 @@ int acquireResourceFromRM(int 		  		  index,
     if ( errres->Result != FUNC_RETURN_OK )
     {
     	snprintf(errorbuf, errorbufsize,
-    			 "failed to acquire resource because of remote error %s.",
+    			 "failed to acquire resource because of %s.",
     			 getErrorCodeExplain(errres->Result));
     	return errres->Result;
     }
