@@ -50,7 +50,7 @@
      
     <!-- HAWQ resource manager parameters -->
     <property>
-        <name>hawq_resourcemanager_server_type</name>
+        <name>hawq_global_rm_type</name>
         <value>none</value>
         <description>The resource manager type to start for allocating resource. 
                      'none' means hawq resource manager exclusively uses whole
@@ -63,7 +63,7 @@
         <name>hawq_resourcemanager_segment_limit_memory_use</name>
         <value>64GB</value>
         <description>The limit of memory usage in a hawq segment when 
-                     hawq_resourcemanager_server_type is set 'none'.
+                     hawq_global_rm_type is set 'none'.
         </description>
     </property>
 
@@ -71,7 +71,7 @@
         <name>hawq_resourcemanager_segment_limit_core_use</name>
         <value>16</value>
         <description>The limit of virtual core usage in a hawq segment when 
-                     hawq_resourcemanager_server_type is set 'none'.
+                     hawq_global_rm_type is set 'none'.
         </description>
     </property>
     

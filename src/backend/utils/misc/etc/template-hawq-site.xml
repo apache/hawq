@@ -57,7 +57,7 @@
     </property>
 
     <property>
-        <name>hawq_resourcemanager_server_type</name>
+        <name>hawq_global_rm_type</name>
         <value>%enable_yarn%</value>
     </property>
 
@@ -67,12 +67,12 @@
     </property>
     
     <property>
-        <name>hawq_resourcemanager_master_address_port</name>
+        <name>hawq_rm_master_port</name>
         <value>5437</value>
     </property>
     
     <property>
-        <name>hawq_resourcemanager_segment_address_port</name>
+        <name>hawq_rm_segment_port</name>
         <value>5438</value>
     </property>
     
