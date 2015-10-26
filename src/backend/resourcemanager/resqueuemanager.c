@@ -43,7 +43,7 @@ static char RSQTBLAttrNames[RSQ_TBL_ATTR_COUNT]
 	"nvseglowerlimitperseg",
 
 	"oid",
-	"name",
+	"rsqname",
 	"creationtime",
 	"updatetime",
 	"status"
