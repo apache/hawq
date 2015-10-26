@@ -218,6 +218,8 @@ static bool assign_stage_log_stats(bool newval, bool doit, GucSource source);
 static bool assign_log_stats(bool newval, bool doit, GucSource source);
 static bool assign_dispatch_log_stats(bool newval, bool doit, GucSource source);
 static bool assign_transaction_read_only(bool newval, bool doit, GucSource source);
+static bool assign_optimizer_release_mdcache(bool newval, bool doit, GucSource source);
+static bool assign_gp_metadata_versioning(bool newval, bool doit, GucSource source);
 static const char *assign_canonical_path(const char *newval, bool doit, GucSource source);
 static const char *assign_backslash_quote(const char *newval, bool doit, GucSource source);
 static const char *assign_timezone_abbreviations(const char *newval, bool doit, GucSource source);
@@ -684,7 +686,7 @@ int             optimizer_cost_model;
 bool		optimizer_print_query;
 bool		optimizer_print_plan;
 bool		optimizer_print_xform;
-bool		optimizer_release_mdcache;
+bool		optimizer_release_mdcache = true; /* Make sure we release MDCache between queries by default */
 bool		optimizer_disable_xform_result_printing;
 bool		optimizer_print_memo_after_exploration;
 bool		optimizer_print_memo_after_implementation;
@@ -1167,7 +1169,7 @@ static struct config_bool ConfigureNamesBool[] =
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
 		&gp_metadata_versioning,
-		false, NULL, NULL
+		false, &assign_gp_metadata_versioning, NULL
 	},
 	{
 		{"force_bitmap_table_scan", PGC_USERSET, DEVELOPER_OPTIONS,
@@ -3522,7 +3524,7 @@ static struct config_bool ConfigureNamesBool[] =
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
 		&optimizer_release_mdcache,
-		true, NULL, NULL
+		true, &assign_optimizer_release_mdcache, NULL
 	},
 
 	{
@@ -13224,6 +13226,53 @@ assign_transaction_read_only(bool newval, bool doit, GucSource source)
 		/* source == PGC_S_OVERRIDE means do it anyway, eg at xact abort */
 		else if (source != PGC_S_OVERRIDE)
 			return false;
+	}
+	return true;
+}
+
+
+/*
+ * Validate that if we disable releasing the MD Cache after each query,
+ *   we must have MD Versioning turned on.
+ */
+static bool
+assign_optimizer_release_mdcache(bool newval, bool doit, GucSource source)
+{
+	 /*
+	  * We want to avoid reaching the following state:
+	  *  - optimizer_release_mdcache = off
+	  *  - gp_metadata_versioning = off
+	  * Other states are fine.
+	  */
+	if (!newval && !gp_metadata_versioning)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("cannot set optimizer_release_mdcache to off when gp_metadata_versioning is off")));
+		return false;
+	}
+	return true;
+}
+
+/*
+ * Validate that if we disable MD Versioning, we are releasing the MD Cache
+ *   after each query.
+ */
+static bool
+assign_gp_metadata_versioning(bool newval, bool doit, GucSource source)
+{
+	 /*
+	  * We want to avoid reaching the following state:
+	  *  - optimizer_release_mdcache = off
+	  *  - gp_metadata_versioning = off
+	  * Other states are fine.
+	  */
+	if (!newval && !optimizer_release_mdcache)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("cannot set gp_metadata_versioning to off when optimizer_release_mdcache is off")));
+		return false;
 	}
 	return true;
 }
