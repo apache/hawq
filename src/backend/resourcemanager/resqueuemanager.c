@@ -97,14 +97,7 @@ computeQueryQuotaByPolicy AllocationPolicy[RSQ_ALLOCATION_POLICY_COUNT] = {
 	computeQueryQuota_EVEN
 };
 
-int computeQueryQuota( DynResourceQueueTrack  track,
-					   int32_t			 	 *max_segcountfix,
-					   int32_t			 	 *min_segcountfix,
-		   	   	   	   int32_t		       	 *segmemmb,
-					   double		       	 *segcore,
-					   int32_t		       	 *segnum,
-					   int32_t				 *segnummin,
-					   int32_t				  segnumlimit);
+int computeQueryQuota( ConnectionTrack conn);
 
 /*------------------------------------------
  * The resource distribution functions.
@@ -2116,78 +2109,74 @@ int acquireResourceFromResQueMgr(ConnectionTrack conntrack)
 	}
 
 	/* Call quota logic to make decision of resource for current query. */
-	res = computeQueryQuota(queuetrack,
-							&conntrack->MaxSegCountFixed,
-							&conntrack->MinSegCountFixed,
-							&(conntrack->SegMemoryMB),
-							&(conntrack->SegCore),
-							&(conntrack->SegNum),
-							&(conntrack->SegNumMin),
-							conntrack->VSegLimit);
+	res = computeQueryQuota(conntrack);
 
 	if ( res == FUNC_RETURN_OK )
 	{
-
-		int32_t Rmax  = conntrack->SegNum;
-		int32_t RmaxL = conntrack->VSegLimitPerSeg * PRESPOOL->AvailNodeCount;
-		int32_t Rmin  = conntrack->SegNumMin;
-		elog(LOG, "HAWQ RM :: original quota min seg num:%d, max seg num:%d",
-				  conntrack->SegNumMin,
-				  conntrack->SegNum);
-
-		/* Ensure quota [min,max] is between request [min,max] */
-		int32_t Gmax= conntrack->MaxSegCountFixed;
-		int32_t Gmin= conntrack->MinSegCountFixed;
-
-		if(Gmin==1)
+		if ( conntrack->StatNVSeg == 0 )
 		{
-			/* case 1 */
-			conntrack->SegNumMin = min(min(Gmax,Rmin),RmaxL);
-			conntrack->SegNum = min(Gmax,RmaxL);
-			if(conntrack->SegNumMin > conntrack->SegNum)
-			{
-				return RESQUEMGR_NO_RESOURCE;
-			}
-		}
-		else if(Gmax == Gmin)
-		{
-			/* case 2 */
-			conntrack->SegNumMin = Gmax;
-			conntrack->SegNum = Gmax;
-			if(Rmax < Gmax)
-			{
-				return RESQUEMGR_NO_RESOURCE;
-			}
-		}
-		else
-		{
-			/* case 3 */
-			conntrack->SegNumMin = min(max(Gmin,Rmin),Gmax);
-			conntrack->SegNum = min(max(min(RmaxL,Gmax),Gmin),Rmax);
-			if(conntrack->SegNumMin > conntrack->SegNum)
-			{
-				return RESQUEMGR_NO_RESOURCE;
-			}
-		}
+			int32_t Rmax  = conntrack->SegNum;
+			int32_t RmaxL = conntrack->VSegLimitPerSeg * PRESPOOL->AvailNodeCount;
+			int32_t Rmin  = conntrack->SegNumMin;
+			elog(LOG, "Original quota min seg num:%d, max seg num:%d",
+					  conntrack->SegNumMin,
+					  conntrack->SegNum);
 
-		elog(LOG, "Query resource expects (%d MB, %lf CORE) x %d ( min %d ) resource.",
-				   conntrack->SegMemoryMB,
-				   conntrack->SegCore,
-				   conntrack->SegNum,
-				   conntrack->SegNumMin);
+			/* Ensure quota [min,max] is between request [min,max] */
+			int32_t Gmax= conntrack->MaxSegCountFixed;
+			int32_t Gmin= conntrack->MinSegCountFixed;
 
-		adjustResourceExpectsByQueueNVSegLimits(conntrack);
+			if(Gmin==1)
+			{
+				/* case 1 */
+				conntrack->SegNumMin = min(min(Gmax,Rmin),RmaxL);
+				conntrack->SegNum = min(Gmax,RmaxL);
+				if(conntrack->SegNumMin > conntrack->SegNum)
+				{
+					return RESQUEMGR_NO_RESOURCE;
+				}
+			}
+			else if(Gmax == Gmin)
+			{
+				/* case 2 */
+				conntrack->SegNumMin = Gmax;
+				conntrack->SegNum = Gmax;
+				if(Rmax < Gmax)
+				{
+					return RESQUEMGR_NO_RESOURCE;
+				}
+			}
+			else
+			{
+				/* case 3 */
+				conntrack->SegNumMin = min(max(Gmin,Rmin),Gmax);
+				conntrack->SegNum = min(max(min(RmaxL,Gmax),Gmin),Rmax);
+				if(conntrack->SegNumMin > conntrack->SegNum)
+				{
+					return RESQUEMGR_NO_RESOURCE;
+				}
+			}
 
-		elog(LOG, "Query resource expects (%d MB, %lf CORE) x %d ( min %d ) "
-				  "resource after adjusting based on queue NVSEG limits.",
-				   conntrack->SegMemoryMB,
-				   conntrack->SegCore,
-				   conntrack->SegNum,
-				   conntrack->SegNumMin);
+			elog(LOG, "Query resource expects (%d MB, %lf CORE) x %d ( min %d ) resource.",
+					   conntrack->SegMemoryMB,
+					   conntrack->SegCore,
+					   conntrack->SegNum,
+					   conntrack->SegNumMin);
+
+			adjustResourceExpectsByQueueNVSegLimits(conntrack);
+
+			elog(LOG, "Query resource expects (%d MB, %lf CORE) x %d ( min %d ) "
+					  "resource after adjusting based on queue NVSEG limits.",
+					   conntrack->SegMemoryMB,
+					   conntrack->SegCore,
+					   conntrack->SegNum,
+					   conntrack->SegNumMin);
+		}
 
 		/* Add request to the resource queue and return. */
 		res = addQueryResourceRequestToQueue(queuetrack, conntrack);
-		if ( res == FUNC_RETURN_OK ) {
+		if ( res == FUNC_RETURN_OK )
+		{
 			transformConnectionTrackProgress(conntrack,
 											 CONN_PP_RESOURCE_QUEUE_ALLOC_WAIT);
 			return res;
@@ -2230,75 +2219,73 @@ int acquireResourceQuotaFromResQueMgr(ConnectionTrack conntrack)
 		goto exit;
 	}
 
+	conntrack->QueueTrack = queuetrack;
+	conntrack->QueueID	  = queuetrack->QueueInfo->OID;
+
 	/* Compute query quota */
-	res = computeQueryQuota(queuetrack,
-							&conntrack->MaxSegCountFixed,
-							&conntrack->MinSegCountFixed,
-							&(conntrack->SegMemoryMB),
-							&(conntrack->SegCore),
-							&(conntrack->SegNum),
-							&(conntrack->SegNumMin),
-							conntrack->VSegLimit);
+	res = computeQueryQuota(conntrack);
 
 	if ( res == FUNC_RETURN_OK )
 	{
-
-		int32_t Rmax = conntrack->SegNum;
-		int32_t RmaxL =conntrack->VSegLimitPerSeg *	PRESPOOL->AvailNodeCount;
-		int32_t Rmin = conntrack->SegNumMin;
-		elog(LOG, "HAWQ RM :: original quota min seg num:%d, max seg num:%d",
-					conntrack->SegNumMin,
-					conntrack->SegNum);
-
-		/* Ensure quota [min,max] is between request [min,max] */
-		int32_t Gmax= conntrack->MaxSegCountFixed;
-		int32_t Gmin= conntrack->MinSegCountFixed;
-
-		if(Gmin==1)
+		if ( conntrack->StatNVSeg == 0 )
 		{
-			/* case 1 */
-			conntrack->SegNumMin = min(min(Gmax,Rmin),RmaxL);
-			conntrack->SegNum = min(Gmax,RmaxL);
-			if(conntrack->SegNumMin > conntrack->SegNum)
-			{
-				return RESQUEMGR_NO_RESOURCE;
-			}
-		}
-		else if(Gmax == Gmin)
-		{
-			/* case 2 */
-			conntrack->SegNumMin = Gmax;
-			conntrack->SegNum = Gmax;
-			if(Rmax < Gmax)
-			{
-				return RESQUEMGR_NO_RESOURCE;
-			}
-		}
-		else
-		{
-			/* case 3 */
-			conntrack->SegNumMin = min(max(Gmin,Rmin),Gmax);
-			conntrack->SegNum = min(max(min(RmaxL,Gmax),Gmin),Rmax);
-			if(conntrack->SegNumMin > conntrack->SegNum)
-			{
-				return RESQUEMGR_NO_RESOURCE;
-			}
-		}
+			int32_t Rmax = conntrack->SegNum;
+			int32_t RmaxL =conntrack->VSegLimitPerSeg *	PRESPOOL->AvailNodeCount;
+			int32_t Rmin = conntrack->SegNumMin;
+			elog(LOG, "Original quota min seg num:%d, max seg num:%d",
+						conntrack->SegNumMin,
+						conntrack->SegNum);
 
-		elog(LOG, "Expect (%d MB, %lf CORE) x %d ( min %d ) resource quota.",
-				   conntrack->SegMemoryMB,
-				   conntrack->SegCore,
-				   conntrack->SegNum,
-				   conntrack->SegNumMin);
+			/* Ensure quota [min,max] is between request [min,max] */
+			int32_t Gmax= conntrack->MaxSegCountFixed;
+			int32_t Gmin= conntrack->MinSegCountFixed;
 
-		adjustResourceExpectsByQueueNVSegLimits(conntrack);
+			if(Gmin==1)
+			{
+				/* case 1 */
+				conntrack->SegNumMin = min(min(Gmax,Rmin),RmaxL);
+				conntrack->SegNum = min(Gmax,RmaxL);
+				if(conntrack->SegNumMin > conntrack->SegNum)
+				{
+					return RESQUEMGR_NO_RESOURCE;
+				}
+			}
+			else if(Gmax == Gmin)
+			{
+				/* case 2 */
+				conntrack->SegNumMin = Gmax;
+				conntrack->SegNum = Gmax;
+				if(Rmax < Gmax)
+				{
+					return RESQUEMGR_NO_RESOURCE;
+				}
+			}
+			else
+			{
+				/* case 3 */
+				conntrack->SegNumMin = min(max(Gmin,Rmin),Gmax);
+				conntrack->SegNum = min(max(min(RmaxL,Gmax),Gmin),Rmax);
+				if(conntrack->SegNumMin > conntrack->SegNum)
+				{
+					return RESQUEMGR_NO_RESOURCE;
+				}
+			}
 
-		elog(LOG, "Query resource expects (%d MB, %lf CORE) x %d ( min %d ) "
-				  "resource after adjusting based on queue NVSEG limits.",
-				   conntrack->SegMemoryMB,
-				   conntrack->SegCore,
-				   conntrack->SegNum,
-				   conntrack->SegNumMin);
+			elog(LOG, "Expect (%d MB, %lf CORE) x %d ( min %d ) resource quota.",
+					   conntrack->SegMemoryMB,
+					   conntrack->SegCore,
+					   conntrack->SegNum,
+					   conntrack->SegNumMin);
+
+			adjustResourceExpectsByQueueNVSegLimits(conntrack);
+
+			elog(LOG, "Query resource expects (%d MB, %lf CORE) x %d ( min %d ) "
+					  "resource after adjusting based on queue NVSEG limits.",
+					   conntrack->SegMemoryMB,
+					   conntrack->SegCore,
+					   conntrack->SegNum,
+					   conntrack->SegNumMin);
+		}
 	}
 	else
 	{
@@ -2497,17 +2484,6 @@ void refreshMemoryCoreRatioLevelUsage(uint64_t curmicrosec)
 		{
 			mctrack->TotalRequest.MemoryMB = mctrack->ClusterMemoryMaxMB;
 		}
-
-		/*
-		elog(DEBUG5, "HAWQ RM :: Memory/ratio[%d] %d MBPCORE has "
-					 "(%d MB, %lf CORE) in use, (%d MB, %lf CORE) requested.",
-					 i,
-					 mctrack->MemCoreRatio,
-					 mctrack->TotalUsed.MemoryMB,
-					 mctrack->TotalUsed.Core,
-					 mctrack->TotalRequest.MemoryMB,
-					 mctrack->TotalRequest.Core);
-		*/
 
 		markMemoryCoreRatioWaterMark(&(PQUEMGR->RatioWaterMarks[i]),
 									 curmicrosec,
@@ -3301,66 +3277,107 @@ void minusResourceBundleDataByBundle(ResourceBundle detail, ResourceBundle sourc
 /**
  * Compute the query quota.
  */
-int computeQueryQuota( DynResourceQueueTrack	 track,
-		   	   	   	   int32_t			 		*max_segcountfix,
-		   	   	   	   int32_t			 		*min_segcountfix,
-		   	   	   	   int32_t		       		*segmemmb,
-					   double		       		*segcore,
-					   int32_t		       		*segnum,
-					   int32_t					*segnummin,
-					   int32_t					 segnumlimit)
+int computeQueryQuota( ConnectionTrack conn)
 {
-	int			res				= FUNC_RETURN_OK;
-	int			policy			= 0;
+	Assert( conn != NULL );
+	Assert( conn->QueueTrack != NULL );
 
-	Assert( track != NULL );
+	int					  res		= FUNC_RETURN_OK;
+	int					  policy	= 0;
+	DynResourceQueueTrack track		= (DynResourceQueueTrack)(conn->QueueTrack);
 
 	policy = track->QueueInfo->AllocatePolicy;
 	Assert( policy >= 0 && policy < RSQ_ALLOCATION_POLICY_COUNT );
 
-	/* Get one segment resource quota. */
-	*segmemmb = track->QueueInfo->SegResourceQuotaMemoryMB;
-	*segcore  = track->QueueInfo->SegResourceQuotaVCore;
+	/*
+	 *--------------------------------------------------------------------------
+	 * Get one segment resource quota. If statement level resource quota is not
+	 * specified, the queue vseg resource quota is derived, otherwise, statement
+	 * level resource quota. The resource memory/core ratio is not changed, thus
+	 * code has to calculate the adjusted vcore quota for each vseg in case
+	 * statement level resource quota is active.
+	 *--------------------------------------------------------------------------
+	 */
+	if ( conn->StatNVSeg > 0 )
+	{
+		conn->SegMemoryMB = conn->StatVSegMemoryMB;
+		conn->SegCore	  = track->QueueInfo->SegResourceQuotaVCore *
+							conn->StatVSegMemoryMB /
+							track->QueueInfo->SegResourceQuotaMemoryMB;
+		conn->SegNum	  = conn->StatNVSeg;
+		conn->SegNumMin	  = conn->StatNVSeg;
 
-	/* Decide segment number and minimum runnable segment number. */
+		/* Check if the resource capacity is more than the capacity of queue. */
+		conn->SegNumEqual = ceil(1.0 * conn->SegMemoryMB * conn->SegNumMin /
+						  	     track->QueueInfo->SegResourceQuotaMemoryMB);
+		Assert( conn->SegNumEqual > 0 );
+		if ( conn->SegNumEqual > track->ClusterSegNumberMax )
+		{
+			res = RESQUEMGR_TOO_MANY_FIXED_SEGNUM;
+			elog(WARNING, "ConnID %d expects too many virtual segments %d that is"
+						  "set by hawq_rm_stmt_nvseg.",
+						  conn->ConnID,
+						  conn->SegNum);
+			return res;
+		}
+	}
+	else
+	{
+		conn->SegMemoryMB = track->QueueInfo->SegResourceQuotaMemoryMB;
+		conn->SegCore 	  = track->QueueInfo->SegResourceQuotaVCore;
+	}
 
-	if (*min_segcountfix > segnumlimit)
+	/* Decide vseg number and minimum runnable vseg number. */
+	if ( conn->SegNumMin > conn->VSegLimit )
 	{
 		res = RESQUEMGR_TOO_MANY_FIXED_SEGNUM;
-		elog(LOG, " Expect too many virtual segments %d, can not be more "
-		"than %d",
-		*min_segcountfix,
-		segnumlimit);
+		elog(WARNING, "ConnID %d expects too many virtual segments %d, "
+					  "cannot be more than %d",
+					  conn->ConnID,
+					  conn->SegNumMin,
+					  conn->VSegLimit);
 		return res;
 	}
-	if(*max_segcountfix > segnumlimit)
+
+	if ( conn->SegNum > conn->VSegLimit )
 	{
-		*max_segcountfix = segnumlimit;
+		conn->SegNum = conn->VSegLimit;
 	}
 
-	/* Compute total resource quota. */
-	res = AllocationPolicy[policy] (track, segnum, segnummin, segnumlimit);
-
-	if ( *segnum < *min_segcountfix )
+	if ( conn->StatNVSeg <= 0 )
 	{
-		res = RESQUEMGR_TOO_MANY_FIXED_SEGNUM;
-		elog(LOG, " Expect too many virtual segments %d, can not be more "
-		"than %d",
-		*min_segcountfix,
-		*segnum);
-		return res;
+		/* Compute total resource quota. */
+		res = AllocationPolicy[policy] (track,
+										&(conn->SegNum),
+										&(conn->SegNumMin),
+										conn->VSegLimit);
 
+		/*
+		 * If fixed vseg count range is lower than estimated vseg count range
+		 * based on one allocation policy, we always respect the fixed range.
+		 */
+		if ( conn->SegNum < conn->MinSegCountFixed )
+		{
+			res = RESQUEMGR_TOO_MANY_FIXED_SEGNUM;
+			elog(WARNING, "Expect too many virtual segments %d, cannot be more "
+						  "than %d",
+						  conn->MinSegCountFixed,
+						  conn->SegNum);
+			return res;
+		}
+
+		conn->SegNumMin = conn->MinSegCountFixed;
+		conn->SegNum = conn->SegNum < conn->MaxSegCountFixed ?
+					   conn->SegNum :
+					   conn->MaxSegCountFixed;
 	}
-
-	/* Always respect the expected minimum vseg num. */
-	*segnummin = *min_segcountfix;
 
 	elog(DEBUG3, "Expect cluster resource (%d MB, %lf CORE) x %d "
 				 "minimum runnable %d segment(s).",
-			     *segmemmb,
-			     *segcore,
-				 *segnum,
-				 *segnummin);
+			     conn->SegMemoryMB,
+			     conn->SegCore,
+				 conn->SegNum,
+				 conn->SegNumMin);
 
 	return FUNC_RETURN_OK;
 }
@@ -3417,7 +3434,7 @@ int addQueryResourceRequestToQueue(DynResourceQueueTrack queuetrack,
 {
 	insertDQueueTailNode(&(queuetrack->QueryResRequests), conntrack);
 
-	/* add resource request counter. */
+	/* Add resource request counter. */
 	addResourceBundleData(&(queuetrack->TotalRequest),
 						  conntrack->SegMemoryMB * conntrack->SegNum,
 						  conntrack->SegCore * conntrack->SegNum);
@@ -3854,14 +3871,27 @@ int dispatchResourceToQueries_EVEN(DynResourceQueueTrack track)
 		/* Consider concurrency no more than defined parallel count. */
 		/* TODO: Consider more here... */
 		if ( counter + track->NumOfRunningQueries >= track->QueueInfo->ParallelCount )
-			break;
-		/* Check if the minimum segment requirement is met. */
-		if ( segmincounter + conntrack->SegNumMin > availsegnum )
 		{
 			break;
 		}
-		segcounter    += conntrack->SegNum;
-		segmincounter += conntrack->SegNumMin;
+
+		int equalsegnummin = conntrack->StatNVSeg <= 0 ?
+							 conntrack->SegNumMin :
+							 conntrack->SegNumEqual;
+
+		/* Check if the minimum segment requirement is met. */
+		if ( segmincounter + equalsegnummin > availsegnum )
+		{
+			break;
+		}
+
+		segcounter += conntrack->StatNVSeg <= 0 ?
+					  conntrack->SegNum :
+					  conntrack->SegNumEqual;
+
+		segmincounter += conntrack->StatNVSeg <= 0 ?
+						 conntrack->SegNumMin :
+						 conntrack->SegNumEqual;
 		counter++;
 	DQUEUE_LOOP_END
 
@@ -3880,7 +3910,7 @@ int dispatchResourceToQueries_EVEN(DynResourceQueueTrack track)
 		ConnectionTrack conn = removeDQueueHeadNode(&(track->QueryResRequests));
 		conn->SegNumActual = conn->SegNumMin;
 		insertDQueueTailNode(&todisp, conn);
-		availsegnum -= conn->SegNumMin;
+		availsegnum -= conn->StatNVSeg <= 0 ? conn->SegNumMin : conn->SegNumEqual;
 	}
 
 	DQueueNode pnode = getDQueueContainerHead(&todisp);
@@ -3888,7 +3918,7 @@ int dispatchResourceToQueries_EVEN(DynResourceQueueTrack track)
 	while(availsegnum > 0)
 	{
 		ConnectionTrack conn = (ConnectionTrack)(pnode->Data);
-		if ( conn->SegNum > conn->SegNumActual )
+		if ( conn->StatNVSeg == 0 && conn->SegNum > conn->SegNumActual )
 		{
 			conn->SegNumActual++;
 			availsegnum--;
@@ -3912,7 +3942,7 @@ int dispatchResourceToQueries_EVEN(DynResourceQueueTrack track)
 		elog(DEBUG3, "Resource manager tries to dispatch resource to connection %d. "
 		   		  	 "Expect (%d MB, %lf CORE) x %d(max %d min %d) segment(s). "
 		   		  	 "Original vseg %d(min %d). "
-		   		  	 "VSeg limit per segment %d VSeg limit per query %d",
+		   		  	 "VSeg limit per segment %d VSeg limit per query %d.",
 					 conn->ConnID,
 				     conn->SegMemoryMB,
 					 conn->SegCore,
@@ -3923,6 +3953,16 @@ int dispatchResourceToQueries_EVEN(DynResourceQueueTrack track)
 					 conn->MinSegCountFixed,
 					 conn->VSegLimitPerSeg,
 					 conn->VSegLimit);
+
+		if ( conn->StatNVSeg > 0 )
+		{
+			elog(LOG, "Resource manager tries to dispatch resource to connection %d. "
+					  "Statement level resource quota is active. "
+					  "Total %d vsegs, each vseg has %d MB memory quota.",
+					  conn->ConnID,
+					  conn->StatNVSeg,
+					  conn->StatVSegMemoryMB);
+		}
 
 		/* Build resource. */
 		int32_t segnumact = 0;

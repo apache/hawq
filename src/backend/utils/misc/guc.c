@@ -85,6 +85,8 @@
 #include "cdb/cdbquerycontextdispatching.h"
 #include "cdb/memquota.h"
 #include "utils/vmem_tracker.h"
+#include "resourcemanager/errorcode.h"
+#include "resourcemanager/utils/simplestring.h"
 
 #ifndef PG_KRB_SRVTAB
 #define PG_KRB_SRVTAB ""
@@ -249,6 +251,8 @@ extern const char *gpvars_assign_gp_resqueue_priority_default_value(const char *
 static const char *assign_password_hash_algorithm(const char *newval,
 												  bool doit, GucSource source);
 static bool	assign_gp_temporary_directory_mark_error(int newval, bool doit, GucSource source);
+
+static const char * assign_hawq_rm_stmt_vseg_memory(const char *newval, bool doit, GucSource source);
 
 /*
  * GUC option variables that are exported from this module
@@ -6422,6 +6426,15 @@ static struct config_int ConfigureNamesInt[] =
     },
 
     {
+            {"hawq_rm_stmt_nvseg", PGC_USERSET, RESOURCES_MGM,
+                    gettext_noop("the size quota of virtual segments for one statement."),
+                    NULL
+            },
+            &rm_stmt_nvseg,
+            0, 0, 65535, NULL, NULL
+    },
+
+    {
             {"hawq_rm_nslice_perseg_limit", PGC_POSTMASTER, RESOURCES_MGM,
                     gettext_noop("the limit of the number of slice number in one segment "
                                              "for one query."),
@@ -8088,6 +8101,15 @@ static struct config_string ConfigureNamesString[] =
 		&rm_resourcepool_test_filename,
 		"", NULL, NULL
 	},
+
+    {
+        {"hawq_rm_stmt_vseg_memory", PGC_USERSET, RESOURCES_MGM,
+            gettext_noop("the memory quota of one virtual segment for one statement."),
+            NULL
+        },
+        &rm_stmt_vseg_mem_str,
+        "128mb", assign_hawq_rm_stmt_vseg_memory, NULL
+    },
 
 	{
 		{"hawq_resourceenforcer_cgroup_mount_point", PGC_POSTMASTER, RESOURCES_MGM,
@@ -13529,6 +13551,39 @@ assign_gp_temporary_directory_mark_error(int newval, bool doit, GucSource source
 		TemporaryDirectoryFaultInjection(newval);
 
 	return true;
+}
+
+static const char *
+assign_hawq_rm_stmt_vseg_memory(const char *newval, bool doit, GucSource source)
+{
+	if (doit)
+	{
+		int32_t newvalmb = 0;
+		int parseres = FUNC_RETURN_OK;
+		SimpString valuestr;
+		setSimpleStringRef(&valuestr, newval, strlen(newval));
+		parseres = SimpleStringToStorageSizeMB(&valuestr, &newvalmb);
+
+		if ( parseres != FUNC_RETURN_OK )
+		{
+			return NULL; /* Not valid format of memory quota. */
+		}
+
+		if ( newvalmb == 64   ||
+			 newvalmb == 128  ||
+			 newvalmb == 256  ||
+			 newvalmb == 512  ||
+			 newvalmb == 1024 ||
+			 newvalmb == 2048 ||
+			 newvalmb == 4096 ||
+			 newvalmb == 8192 ||
+			 newvalmb == 16384 )
+		{
+			return newval;
+		}
+		return NULL; /* Not valid quota value. */
+	}
+	return newval;
 }
 
 #include "guc-file.c"

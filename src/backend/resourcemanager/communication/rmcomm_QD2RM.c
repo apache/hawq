@@ -32,7 +32,7 @@
 		 QD2RM_ResourceSets[(index)] == NULL ) 								   \
 	{					   	   	   											   \
 		snprintf((errorbuf), (errorbufsize), 							   	   \
-				 "Wrong resource set index %d", (index)); 	   		   		   \
+				 "wrong resource set index %d", (index)); 	   		   		   \
 		return COMM2RM_CLIENT_WRONG_INPUT;								   	   \
 	}
 
@@ -374,20 +374,24 @@ int cleanupQD2RMComm(void)
         {
             if ( QD2RM_ResourceSets[i]->QD_ResourceList != NULL )
             {
-                elog( LOG, "Un-returned resource is probed, will be returned. "
-                        "(%d MB, %lf CORE) x %d. Conn ID=%d",
-                        QD2RM_ResourceSets[i]->QD_SegMemoryMB,
-                        QD2RM_ResourceSets[i]->QD_SegCore,
-                        QD2RM_ResourceSets[i]->QD_SegCount,
-                        QD2RM_ResourceSets[i]->QD_Conn_ID);
+            	elog(LOG, "Un-returned resource is probed, will be returned. "
+                          "(%d MB, %lf CORE) x %d. Conn ID=%d",
+                          QD2RM_ResourceSets[i]->QD_SegMemoryMB,
+                          QD2RM_ResourceSets[i]->QD_SegCore,
+                          QD2RM_ResourceSets[i]->QD_SegCount,
+                          QD2RM_ResourceSets[i]->QD_Conn_ID);
 
                 res = returnResource(i, errorbuf, sizeof(errorbuf));
-                if ( res != FUNC_RETURN_OK ) {
-                	elog(LOG, "Fail to return resource when cleaning up resource context.");
+                if ( res != FUNC_RETURN_OK )
+                {
+                	elog(WARNING, "Failed to return resource when cleaning up "
+                				  "resource context.");
             	}
                 res = unregisterConnectionInRM(i, errorbuf, sizeof(errorbuf));
-                if ( res != FUNC_RETURN_OK ) {
-                	elog(LOG, "Fail to unregister when cleaning up resource context.");
+                if ( res != FUNC_RETURN_OK )
+                {
+                	elog(WARNING, "Failed to unregister when cleaning up "
+                				  "resource context.");
                 }
             }
         }
@@ -422,7 +426,7 @@ int registerConnectionInRMByStr(int 		   index,
     if ( res != FUNC_RETURN_OK )
     {
     	snprintf(errorbuf, errorbufsize,
-    			 "Fail to register in HAWQ resource manager because of "
+    			 "failed to register in HAWQ resource manager because of "
     			 "RPC error %s.",
 				 getErrorCodeExplain(res));
     	return res;
@@ -436,7 +440,7 @@ int registerConnectionInRMByStr(int 		   index,
     if ( response->Result != FUNC_RETURN_OK )
     {
     	snprintf(errorbuf, errorbufsize,
-    			 "Fail to register in HAWQ resource manager because of remote"
+    			 "failed to register in HAWQ resource manager because of remote"
     			 "error %s.",
 				 getErrorCodeExplain(response->Result));
     	return response->Result;
@@ -472,7 +476,7 @@ int registerConnectionInRMByOID(int 		   index,
     if ( res != FUNC_RETURN_OK )
     {
     	snprintf(errorbuf, errorbufsize,
-    			 "Fail to register in HAWQ resource manager because of "
+    			 "failed to register in HAWQ resource manager because of "
     			 "RPC error %s.",
 				 getErrorCodeExplain(res));
     	return res;
@@ -486,7 +490,7 @@ int registerConnectionInRMByOID(int 		   index,
     if ( response->Result != FUNC_RETURN_OK )
     {
     	snprintf(errorbuf, errorbufsize,
-    			 "Fail to register in HAWQ resource manager because of remote"
+    			 "failed to register in HAWQ resource manager because of remote"
     			 "error %s.",
 				 getErrorCodeExplain(response->Result));
     	return response->Result;
@@ -522,7 +526,7 @@ int	unregisterConnectionInRM(int 			   index,
     if ( res != FUNC_RETURN_OK )
     {
     	snprintf(errorbuf, errorbufsize,
-    			 "Fail to unregister in HAWQ resource manager because of "
+    			 "failed to unregister in HAWQ resource manager because of "
     			 "RPC error %s.",
 				 getErrorCodeExplain(res));
     	return res;
@@ -535,7 +539,7 @@ int	unregisterConnectionInRM(int 			   index,
     {
     	res = response->Result;
     	snprintf(errorbuf, errorbufsize,
-    			 "Fail to unregister in HAWQ resource manager because of "
+    			 "failed to unregister in HAWQ resource manager because of "
     			 "remote error %s.",
 				 getErrorCodeExplain(response->Result));
     }
@@ -606,6 +610,15 @@ int acquireResourceFromRM(int 		  		  index,
     requesthead.VSegLimit		 = rm_nvseg_perquery_limit;
     requesthead.Reserved		 = 0;
     requesthead.IOBytes		 	 = iobytes;
+    requesthead.StatNVSeg		 = rm_stmt_nvseg;
+
+    requesthead.StatVSegMemoryMB = 0;
+    int parseres = FUNC_RETURN_OK;
+    SimpString valuestr;
+    setSimpleStringRef(&valuestr, rm_stmt_vseg_mem_str, strlen(rm_stmt_vseg_mem_str));
+    parseres = SimpleStringToStorageSizeMB(&valuestr,
+    									   &(requesthead.StatVSegMemoryMB));
+    Assert(parseres == FUNC_RETURN_OK);
 
     appendSMBVar(sendbuffer,requesthead);
 
@@ -636,8 +649,8 @@ int acquireResourceFromRM(int 		  		  index,
     if ( res != FUNC_RETURN_OK )
     {
     	snprintf(errorbuf, errorbufsize,
-    			 "Fail to acquire resource from HAWQ resource manager because of "
-    			 "RPC error %s.",
+    			 "failed to acquire resource from HAWQ resource manager because "
+    			 "of RPC error %s.",
 				 getErrorCodeExplain(res));
     	pgstat_report_waiting_resource(false);
     	return res;
@@ -649,7 +662,7 @@ int acquireResourceFromRM(int 		  		  index,
     if ( errres->Result != FUNC_RETURN_OK )
     {
     	snprintf(errorbuf, errorbufsize,
-    			 "Fail to acquire resource because of remote error %s.",
+    			 "failed to acquire resource because of remote error %s.",
     			 getErrorCodeExplain(errres->Result));
     	return errres->Result;
     }
@@ -776,7 +789,7 @@ int returnResource(int 		index,
     if ( res != FUNC_RETURN_OK )
     {
     	snprintf(errorbuf, errorbufsize,
-    			 "Fail to return resource to HAWQ resource manager because of "
+    			 "failed to return resource to HAWQ resource manager because of "
     			 "RPC error %s.",
 				 getErrorCodeExplain(res));
     	return res;
@@ -865,7 +878,7 @@ int manipulateResourceQueue(int 	 index,
 		RPCResponseHeadManipulateResQueueERROR error =
 			(RPCResponseHeadManipulateResQueueERROR)(recvbuffer->Buffer);
 
-		elog(WARNING, "Fail to manipulate resource queue because %s",
+		elog(LOG, "Fail to manipulate resource queue because %s",
 					  error->ErrorText);
 		snprintf(errorbuf, errorbufsize, "%s", error->ErrorText);
 	}
@@ -1147,11 +1160,21 @@ int acquireResourceQuotaFromRM(int64_t		user_oid,
 	initializeSelfMaintainBuffer(&recvBuffer, QD2RM_CommContext);
 
 	RPCRequestHeadAcquireResourceQuotaFromRMByOIDData request;
-	request.UseridOid     	 = user_oid;
-	request.MaxSegCountFix 	 = max_seg_count_fix;
-	request.MinSegCountFix   = min_seg_count_fix;
-    request.VSegLimitPerSeg	 = rm_nvseg_perquery_perseg_limit;
-    request.VSegLimit		 = rm_nvseg_perquery_limit;
+	request.UseridOid		 = user_oid;
+	request.MaxSegCountFix	 = max_seg_count_fix;
+	request.MinSegCountFix	 = min_seg_count_fix;
+	request.VSegLimitPerSeg	 = rm_nvseg_perquery_perseg_limit;
+	request.VSegLimit		 = rm_nvseg_perquery_limit;
+	request.StatNVSeg		 = rm_stmt_nvseg;
+
+	request.StatVSegMemoryMB = 0;
+	int parseres = FUNC_RETURN_OK;
+	SimpString valuestr;
+	setSimpleStringRef(&valuestr, rm_stmt_vseg_mem_str, strlen(rm_stmt_vseg_mem_str));
+	parseres = SimpleStringToStorageSizeMB(&valuestr,
+										   &(request.StatVSegMemoryMB));
+	Assert(parseres == FUNC_RETURN_OK);
+
 	appendSMBVar(&sendBuffer, request);
 
 	elog(DEBUG3, "HAWQ RM :: Acquire resource quota for query with %d splits, "
@@ -1168,24 +1191,27 @@ int acquireResourceQuotaFromRM(int64_t		user_oid,
     if ( res != FUNC_RETURN_OK )
     {
     	snprintf(errorbuf, errorbufsize,
-    			 "Fail to get response from resource manager RPC.");
+    			 "failed to get response from resource manager RPC.");
     	*errorcode = res;
     	goto exit;
     }
 
     RPCResponseHeadAcquireResourceQuotaFromRMByOID response =
     	(RPCResponseHeadAcquireResourceQuotaFromRMByOID)(recvBuffer.Buffer);
-    if ( response->Result == FUNC_RETURN_OK ) {
+    if ( response->Result == FUNC_RETURN_OK )
+    {
     	*seg_num 		= response->SegNum;
     	*seg_num_min 	= response->SegNumMin;
     	*seg_memory_mb  = response->SegMemoryMB;
     	*seg_core		= response->SegCore;
     }
-    else {
+    else
+    {
     	res = response->Result;
     	*errorcode = res;
-    	snprintf(errorbuf, errorbufsize, "Fail to get resource quota due to "
-    									 "remote error %d.", res);
+    	snprintf(errorbuf, errorbufsize,
+    			 "failed to get resource quota due to remote error %s.",
+				 getErrorCodeExplain(res));
     }
 
 exit:
@@ -1610,15 +1636,16 @@ extern Datum pg_explain_resource_distribution(PG_FUNCTION_ARGS)
 		ret = returnResource(resourceId, errorbuf, sizeof(errorbuf));
 		if ( ret != FUNC_RETURN_OK )
 		{
-			elog(ERROR, "Fail to return resource back to resource manager "
-					    "because %s", errorbuf);
+			elog(ERROR, "failed to return resource back to resource manager "
+					    "because %s",
+						errorbuf);
 		}
 
 		/* STEP 5. Unregister. */
 		ret = unregisterConnectionInRM(resourceId, errorbuf, sizeof(errorbuf));
 		if ( ret != FUNC_RETURN_OK )
 		{
-			elog(ERROR, "Fail to unregister connection in RM because %s",
+			elog(ERROR, "failed to unregister connection in RM because %s",
 						errorbuf);
 		}
 

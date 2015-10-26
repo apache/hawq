@@ -321,6 +321,8 @@ char   *rm_grm_yarn_queue;
 char   *rm_grm_yarn_app_name;
 int		rm_grm_breath_return_percentage;
 
+char   *rm_stmt_vseg_mem_str;
+int		rm_stmt_nvseg;
 
 int		rm_seg_container_default_waterlevel;
 bool	rm_force_fifo_queue;

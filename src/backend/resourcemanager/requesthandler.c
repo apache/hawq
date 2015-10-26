@@ -368,6 +368,8 @@ bool handleRMRequestAcquireResource(void **arg)
 	(*conntrack)->SessionID				= request->SessionID;
 	(*conntrack)->VSegLimitPerSeg		= request->VSegLimitPerSeg;
 	(*conntrack)->VSegLimit				= request->VSegLimit;
+	(*conntrack)->StatVSegMemoryMB		= request->StatVSegMemoryMB;
+	(*conntrack)->StatNVSeg				= request->StatNVSeg;
 
 	/* Get preferred nodes. */
 	buildSegPreferredHostInfo((*conntrack));
@@ -381,6 +383,17 @@ bool handleRMRequestAcquireResource(void **arg)
 				 (*conntrack)->SegPreferredHostCount,
 				 (*conntrack)->VSegLimitPerSeg,
 				 (*conntrack)->VSegLimit);
+
+	if ( (*conntrack)->StatNVSeg > 0 )
+	{
+		elog(LOG, "Statement level resource quota is active. "
+				  "ConnID=%d, Expect resource. "
+				  "Total %d vsegs, each vseg has %d MB memory quota.",
+				  (*conntrack)->ConnID,
+				  (*conntrack)->StatNVSeg,
+				  (*conntrack)->StatVSegMemoryMB);
+	}
+
 	res = acquireResourceFromResQueMgr((*conntrack));
 	if ( res != FUNC_RETURN_OK )
 	{

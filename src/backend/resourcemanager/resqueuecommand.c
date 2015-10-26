@@ -91,8 +91,8 @@ void createResourceQueue(CreateQueueStmt *stmt)
 		Assert( res == COMM2RM_CLIENT_FULL_RESOURCECONTEXT );
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
-						 errmsg("Can not apply CREATE RESOURCE QUEUE. "
-								"Because too many resource contexts were created.")));
+						 errmsg("can not apply CREATE RESOURCE QUEUE, "
+								"because too many resource contexts were created.")));
 	}
 
 	/* Here, using user oid is more convenient. */
@@ -125,7 +125,7 @@ void createResourceQueue(CreateQueueStmt *stmt)
 				(errcode(IS_TO_RM_RPC_ERROR(res) ?
 						 ERRCODE_INTERNAL_ERROR :
 						 ERRCODE_INVALID_OBJECT_DEFINITION),
-				 errmsg("Can not apply CREATE RESOURCE QUEUE because %s", errorbuf)));
+				 errmsg("can not apply CREATE RESOURCE QUEUE because %s", errorbuf)));
 	}
 	elog(LOG, "Complete applying CREATE RESOURCE QUEUE statement.");
 }
@@ -222,8 +222,8 @@ void dropResourceQueue(DropQueueStmt *stmt)
 		Assert( res == COMM2RM_CLIENT_FULL_RESOURCECONTEXT );
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
-						 errmsg("Can not apply DROP RESOURCE QUEUE. "
-								"Because too many resource contexts were created.")));
+						 errmsg("cannot apply DROP RESOURCE QUEUE, "
+								"because too many resource contexts were created.")));
 	}
 
 	/* Here, using user oid is more convenient. */
@@ -255,7 +255,7 @@ void dropResourceQueue(DropQueueStmt *stmt)
 				(errcode(IS_TO_RM_RPC_ERROR(res) ?
 						 ERRCODE_INTERNAL_ERROR :
 						 ERRCODE_INVALID_OBJECT_DEFINITION),
-				 errmsg("Can not apply DROP RESOURCE QUEUE because %s", errorbuf)));
+				 errmsg("can not apply DROP RESOURCE QUEUE because %s", errorbuf)));
 	}
 
 	elog(LOG, "Completed applying DROP RESOURCE QUEUE statement.");
@@ -334,7 +334,7 @@ void alterResourceQueue(AlterQueueStmt *stmt)
 		Assert(res == COMM2RM_CLIENT_FULL_RESOURCECONTEXT);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
-						errmsg("Too many existing resource context.")));
+						errmsg("too many existing resource context.")));
 	}
 
 	/* Here, using user oid is more convenient. */
@@ -365,7 +365,7 @@ void alterResourceQueue(AlterQueueStmt *stmt)
 				(errcode(IS_TO_RM_RPC_ERROR(res) ?
 						 ERRCODE_INTERNAL_ERROR :
 						 ERRCODE_INVALID_OBJECT_DEFINITION),
-				 errmsg("Can not apply ALTER RESOURCE QUEUE because %s", errorbuf)));
+				 errmsg("cannot apply ALTER RESOURCE QUEUE because %s", errorbuf)));
 	}
 
 	elog(LOG, "Completed applying ALTER RESOURCE QUEUE statement.");

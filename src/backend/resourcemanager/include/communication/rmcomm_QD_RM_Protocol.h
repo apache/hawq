@@ -196,6 +196,8 @@ RPC_PROTOCOL_STRUCT_BEGIN(RPCRequestHeadAcquireResourceFromRM)
 	int32_t			SliceSize;
 	uint32_t		VSegLimitPerSeg;
 	uint32_t		VSegLimit;
+	uint32_t		StatVSegMemoryMB;
+	uint32_t		StatNVSeg;
 	uint32_t		Reserved;
 	int64_t			IOBytes;
 RPC_PROTOCOL_STRUCT_END(RPCRequestHeadAcquireResourceFromRM)
@@ -246,6 +248,8 @@ RPC_PROTOCOL_STRUCT_BEGIN(RPCRequestHeadAcquireResourceQuotaFromRMByOID)
 	uint32_t		MinSegCountFix;
 	uint32_t		VSegLimitPerSeg;
 	uint32_t		VSegLimit;
+	uint32_t		StatVSegMemoryMB;
+	uint32_t		StatNVSeg;
 RPC_PROTOCOL_STRUCT_END(RPCRequestHeadAcquireResourceQuotaFromRMByOID)
 
 /*

@@ -1171,6 +1171,9 @@ extern char   *rm_grm_yarn_queue;
 extern char   *rm_grm_yarn_app_name;
 extern int	   rm_grm_breath_return_percentage;
 
+extern char   *rm_stmt_vseg_mem_str;
+extern int	   rm_stmt_nvseg;
+
 extern int     rm_nvseg_perquery_limit;
 extern int	   rm_nvseg_perquery_perseg_limit;
 extern int	   rm_nslice_perseg_limit;
