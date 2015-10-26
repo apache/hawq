@@ -45,7 +45,7 @@ void freeUpdateActionList(MCTYPE context, List **actions);
  * mapping with the definition of table pg_resqueue in pg_resqueue.h
  */
 const char* PG_Resqueue_Column_Names[Natts_pg_resqueue] = {
-	"rsqname",
+	"name",
 	"parentoid",
 	"activestats",
 	"memorylimit",

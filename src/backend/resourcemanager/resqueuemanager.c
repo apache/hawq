@@ -43,7 +43,7 @@ static char RSQTBLAttrNames[RSQ_TBL_ATTR_COUNT]
 	"nvseglowerlimitperseg",
 
 	"oid",
-	"rsqname",
+	"name",
 	"creationtime",
 	"updatetime",
 	"status"
@@ -3359,10 +3359,10 @@ int computeQueryQuota( ConnectionTrack conn)
 		if ( conn->SegNum < conn->MinSegCountFixed )
 		{
 			res = RESQUEMGR_TOO_MANY_FIXED_SEGNUM;
-			elog(WARNING, " Expect too many virtual segments %d, cannot be more "
-			"than %d",
-			conn->MinSegCountFixed,
-			conn->SegNum);
+			elog(WARNING, "Expect too many virtual segments %d, cannot be more "
+						  "than %d",
+						  conn->MinSegCountFixed,
+						  conn->SegNum);
 			return res;
 		}
 

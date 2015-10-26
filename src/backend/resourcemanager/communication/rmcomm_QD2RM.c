@@ -374,7 +374,7 @@ int cleanupQD2RMComm(void)
         {
             if ( QD2RM_ResourceSets[i]->QD_ResourceList != NULL )
             {
-                elog(LOG, "Un-returned resource is probed, will be returned. "
+            	elog(LOG, "Un-returned resource is probed, will be returned. "
                           "(%d MB, %lf CORE) x %d. Conn ID=%d",
                           QD2RM_ResourceSets[i]->QD_SegMemoryMB,
                           QD2RM_ResourceSets[i]->QD_SegCore,
@@ -1160,20 +1160,20 @@ int acquireResourceQuotaFromRM(int64_t		user_oid,
 	initializeSelfMaintainBuffer(&recvBuffer, QD2RM_CommContext);
 
 	RPCRequestHeadAcquireResourceQuotaFromRMByOIDData request;
-	request.UseridOid     	 = user_oid;
-	request.MaxSegCountFix 	 = max_seg_count_fix;
-	request.MinSegCountFix   = min_seg_count_fix;
-    request.VSegLimitPerSeg	 = rm_nvseg_perquery_perseg_limit;
-    request.VSegLimit		 = rm_nvseg_perquery_limit;
-    request.StatNVSeg		 = rm_stmt_nvseg;
+	request.UseridOid		 = user_oid;
+	request.MaxSegCountFix	 = max_seg_count_fix;
+	request.MinSegCountFix	 = min_seg_count_fix;
+	request.VSegLimitPerSeg	 = rm_nvseg_perquery_perseg_limit;
+	request.VSegLimit		 = rm_nvseg_perquery_limit;
+	request.StatNVSeg		 = rm_stmt_nvseg;
 
-    request.StatVSegMemoryMB = 0;
-    int parseres = FUNC_RETURN_OK;
-    SimpString valuestr;
-    setSimpleStringRef(&valuestr, rm_stmt_vseg_mem_str, strlen(rm_stmt_vseg_mem_str));
-    parseres = SimpleStringToStorageSizeMB(&valuestr,
-    									   &(request.StatVSegMemoryMB));
-    Assert(parseres == FUNC_RETURN_OK);
+	request.StatVSegMemoryMB = 0;
+	int parseres = FUNC_RETURN_OK;
+	SimpString valuestr;
+	setSimpleStringRef(&valuestr, rm_stmt_vseg_mem_str, strlen(rm_stmt_vseg_mem_str));
+	parseres = SimpleStringToStorageSizeMB(&valuestr,
+										   &(request.StatVSegMemoryMB));
+	Assert(parseres == FUNC_RETURN_OK);
 
 	appendSMBVar(&sendBuffer, request);
 

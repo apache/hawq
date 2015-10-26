@@ -13548,18 +13548,18 @@ assign_hawq_rm_stmt_vseg_memory(const char *newval, bool doit, GucSource source)
 	if (doit)
 	{
 		int32_t newvalmb = 0;
-	    int parseres = FUNC_RETURN_OK;
-	    SimpString valuestr;
-	    setSimpleStringRef(&valuestr, newval, strlen(newval));
-	    parseres = SimpleStringToStorageSizeMB(&valuestr, &newvalmb);
+		int parseres = FUNC_RETURN_OK;
+		SimpString valuestr;
+		setSimpleStringRef(&valuestr, newval, strlen(newval));
+		parseres = SimpleStringToStorageSizeMB(&valuestr, &newvalmb);
 
-	    if ( parseres != FUNC_RETURN_OK )
-	    {
-	    	return NULL; /* Not valid format of memory quota. */
-	    }
+		if ( parseres != FUNC_RETURN_OK )
+		{
+			return NULL; /* Not valid format of memory quota. */
+		}
 
-	    if ( newvalmb == 64   ||
-	    	 newvalmb == 128  ||
+		if ( newvalmb == 64   ||
+			 newvalmb == 128  ||
 			 newvalmb == 256  ||
 			 newvalmb == 512  ||
 			 newvalmb == 1024 ||
@@ -13567,11 +13567,10 @@ assign_hawq_rm_stmt_vseg_memory(const char *newval, bool doit, GucSource source)
 			 newvalmb == 4096 ||
 			 newvalmb == 8192 ||
 			 newvalmb == 16384 )
-	    {
-	    	return newval;
-	    }
-
-	    return NULL; /* Not valid quota value. */
+		{
+			return newval;
+		}
+		return NULL; /* Not valid quota value. */
 	}
 	return newval;
 }
