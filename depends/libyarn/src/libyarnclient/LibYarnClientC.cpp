@@ -124,6 +124,11 @@ extern "C" {
 	int  newLibYarnClient(char* user, char *rmHost, char *rmPort,
 					char *schedHost, char *schedPort, char *amHost,
 					int32_t amPort, char *am_tracking_url,LibYarnClient_t **client,int heartbeatInterval) {
+
+		if(user == NULL || rmHost== NULL || rmPort == NULL || schedHost == NULL || schedPort == NULL
+			|| amHost ==NULL || am_tracking_url == NULL)
+			return FUNCTION_FAILED;
+
 		string userStr(user);
 		string rmHostStr(rmHost);
 		string rmPortStr(rmPort);
@@ -131,7 +136,7 @@ extern "C" {
 		string schedPortStr(schedPort);
 		string amHostStr(amHost);
 		string amTrackingUrlStr(am_tracking_url);
-		*client =  new LibYarnClient_t(userStr, rmHostStr, rmPortStr, schedHostStr, schedPortStr,
+		*client = new LibYarnClient_t(userStr, rmHostStr, rmPortStr, schedHostStr, schedPortStr,
 						amHostStr, amPort, amTrackingUrlStr,heartbeatInterval);
 		return FUNCTION_SUCCEEDED;
 	}
