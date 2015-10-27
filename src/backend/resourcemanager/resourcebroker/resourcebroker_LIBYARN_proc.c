@@ -289,6 +289,12 @@ int ResBrokerMainInternal(void)
 		elog(LOG, "YARN mode resource broker get result of finish yarn application "
 				  "through libYARN %d",
 				  yarnres);
+		if (YARNUser != NULL && YARNUserShouldFree)
+		{
+			free(YARNUser);
+		}
+		YARNUser = NULL;
+		YARNUserShouldFree = true;
 		yarnres = RB2YARN_disconnectFromYARN();
 		elog(LOG, "YARN mode resource broker get result of disconnecting YARN "
 				  "through libYARN %d",
@@ -1773,13 +1779,7 @@ int  RB2YARN_disconnectFromYARN(void)
 	if ( YARNJobID != NULL ) {
 		free(YARNJobID);
 	}
-	if (YARNUser != NULL && YARNUserShouldFree )
-	{
-		free(YARNUser);
-	}
 	LIBYARNClient 		= NULL;
 	YARNJobID 			= NULL;
-	YARNUser 			= NULL;
-	YARNUserShouldFree	= true;
 	return FUNCTION_SUCCEEDED;
 }
