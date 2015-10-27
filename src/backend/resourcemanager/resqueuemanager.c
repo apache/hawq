@@ -4090,10 +4090,12 @@ bool isResourceAcceptable(ConnectionTrack conn, int segnumact)
 		if ( PRESPOOL->SlavesHostCount - rm_tolerate_nseg_limit >
 			 list_length(conn->Resource) )
 		{
-			elog(WARNING, "Find virtual segments are dispatched to %d segments, "
-						  "less than %d",
-						  segnumact,
-						  list_length(conn->Resource));
+			elog(WARNING, "Find virtual segments are dispatched to %d segments in "
+						  "the cluster containing %d segments defined in slaves file. "
+						  "The number of excluded segments are more than %d.",
+						  list_length(conn->Resource),
+						  PRESPOOL->SlavesHostCount,
+						  rm_tolerate_nseg_limit);
 			return false;
 		}
 	}
