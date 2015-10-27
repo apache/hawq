@@ -14,7 +14,7 @@ all:
 	$(MAKE) -C config all
 	$(MAKE) -C contrib/formatter_fixedwidth all
 	$(MAKE) -C contrib/gp_sparse_vector all
-#	$(MAKE) -C contrib/hawq-hadoop all
+	$(MAKE) -C contrib/hawq-hadoop all
 	$(MAKE) -C contrib/gp_mdver all
 	$(MAKE) -C tools all
 	@echo "All of HAWQ successfully made. Ready to install."
@@ -25,7 +25,7 @@ install:
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib/formatter_fixedwidth $@
 	$(MAKE) -C contrib/gp_sparse_vector $@
-#	$(MAKE) -C contrib/hawq-hadoop $@
+	$(MAKE) -C contrib/hawq-hadoop $@
 	$(MAKE) -C contrib/gp_mdver $@
 	$(MAKE) -C tools $@
 	@echo "HAWQ installation complete."
@@ -36,7 +36,7 @@ installdirs uninstall:
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib/formatter_fixedwidth $@
 	$(MAKE) -C contrib/gp_sparse_vector $@
-#	$(MAKE) -C contrib/hawq-hadoop $@
+	$(MAKE) -C contrib/hawq-hadoop $@
 	$(MAKE) -C contrib/gp_mdver $@	
 
 distprep:
@@ -54,7 +54,7 @@ clean:
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib/formatter_fixedwidth $@
 	$(MAKE) -C contrib/gp_sparse_vector $@
-#	$(MAKE) -C contrib/hawq-hadoop $@
+	$(MAKE) -C contrib/hawq-hadoop $@
 	$(MAKE) -C contrib/gp_mdver $@	
 	$(MAKE) -C tools $@
 # Garbage from autoconf:
