@@ -47,7 +47,6 @@ else
 subdir = contrib/pgcrypto
 top_builddir = ../..
 include $(top_builddir)/src/Makefile.global
-include $(top_srcdir)/contrib/contrib-global.mk
 endif
 
 # Add libraries that pgcrypto depends (or might depend) on into the
