@@ -24,6 +24,6 @@ include $(BLD_TOP)/../build-utils/makefiles/gppkg.mk
 gppkg: 
 	$(MAKE) $(PGCRYPTO_RPM) RPM_FLAGS=$(PGCRYPTO_RPM_FLAGS)
 	$(MAKE) $(PGCRYPTO_GPPKG) MAIN_RPM=$(PGCRYPTO_RPM) GPPKG_REL=$(PGCRYPTO_REL)
-	-cp pgcrypto*.gppkg pgcrypto.gppkg
+	cp pgcrypto*.gppkg pgcrypto.gppkg
 
 .PHONY: gppkg

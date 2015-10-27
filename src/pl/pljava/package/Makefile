@@ -25,6 +25,6 @@ include $(BLD_TOP)/../build-utils/makefiles/gppkg.mk
 gppkg:
 	$(MAKE) $(PLJAVA_RPM) RPM_FLAGS=$(PLJAVA_RPM_FLAGS)
 	$(MAKE) $(PLJAVA_GPPKG) MAIN_RPM=$(PLJAVA_RPM) GPPKG_REL=$(PLJAVA_REL)
-	-cp pljava*.gppkg pljava.gppkg
+	cp pljava*.gppkg pljava.gppkg
 
 .PHONY: gppkg
