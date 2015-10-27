@@ -1,9 +1,6 @@
 all: gppkg
 
 BLD_TOP=../../../../
-GPMGMT=$(BLD_TOP)/tools
-include $(BLD_TOP)/build-utils/pivotal/tools.mk
-include $(BLD_TOP)/build-utils/pivotal/Makefile.global
 
 include $(BLD_TOP)/src/VERSIONS.mk
 
@@ -23,7 +20,7 @@ EXTRA_CLEAN+=$(PLJAVA_RPM) $(PLJAVA_GPPKG)
 #
 # Generic rules to build gppkgs included here
 #
-include $(BLD_TOP)/build-utils/pivotal/gppkg.mk
+include $(BLD_TOP)/../build-utils/makefiles/gppkg.mk
 
 gppkg:
 	$(MAKE) $(PLJAVA_RPM) RPM_FLAGS=$(PLJAVA_RPM_FLAGS)

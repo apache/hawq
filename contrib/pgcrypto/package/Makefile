@@ -1,8 +1,6 @@
 all: gppkg
 
-BLD_TOP=../../../
-GPMGMT=$(BLD_TOP)/tools
-include $(BLD_TOP)/build-utils/pivotal/Makefile.global
+BLD_TOP=./../../../
 include $(BLD_TOP)/src/VERSIONS.mk
 
 OS=$(word 1,$(subst _, ,$(BLD_ARCH)))
@@ -21,7 +19,7 @@ EXTRA_CLEAN+=$(PGCRYPTO_RPM) $(PGCRYPTO_GPPKG)
 #
 # Generic rules to build gppkgs included here
 #
-include $(BLD_TOP)/build-utils/pivotal/gppkg.mk
+include $(BLD_TOP)/../build-utils/makefiles/gppkg.mk
 
 gppkg: 
 	$(MAKE) $(PGCRYPTO_RPM) RPM_FLAGS=$(PGCRYPTO_RPM_FLAGS)
