@@ -46,8 +46,10 @@ include $(PGXS)
 else
 subdir = contrib/pgcrypto
 top_builddir = ../..
+BLD_TOP = ../../..
 include $(top_builddir)/src/Makefile.global
-include $(top_srcdir)/contrib/contrib-global.mk
+include $(top_builddir)/contrib/contrib-global.mk
+include $(BLD_TOP)/build-utils/makefiles/gppkg.mk
 endif
 
 # Add libraries that pgcrypto depends (or might depend) on into the
