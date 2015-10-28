@@ -3265,10 +3265,10 @@ static void print_datalocality_overall_log_information(SplitAllocResult *result,
 			log_context->avgContinuityOverall,log_context->minContinuityOverall,log_context->maxContinuityOverall
 			);
 
-	appendStringInfo(result->datalocalityInfo, "datalocality ratio: %.3f; virtual segments number: %d, "
-			"different host number: %d, segment number per host(avg/min/max): (%d/%d/%d); "
-			"segments size(avg/min/max): (%.3f/"INT64_FORMAT"/"INT64_FORMAT"); "
-			"segments size with penalty(avg/min/max): (%.3f/"INT64_FORMAT"/"INT64_FORMAT"); continuity(avg/min/max): (%.3f/%.3f/%.3f)."
+	appendStringInfo(result->datalocalityInfo, "data locality ratio: %.3f; virtual segment number: %d; "
+			"different host number: %d; virtual segment number per host(avg/min/max): (%d/%d/%d); "
+			"segment size(avg/min/max): (%.3f/"INT64_FORMAT"/"INT64_FORMAT"); "
+			"segment size with penalty(avg/min/max): (%.3f/"INT64_FORMAT"/"INT64_FORMAT"); continuity(avg/min/max): (%.3f/%.3f/%.3f)."
 			,log_context->datalocalityRatio,assignment_context->virtual_segment_num,log_context->numofDifferentHost,
 			log_context->avgSegmentNumofHost,log_context->minSegmentNumofHost,log_context->maxSegmentNumofHost,
 			log_context->avgSizeOverall,log_context->minSizeSegmentOverall,log_context->maxSizeSegmentOverall,
