@@ -1,0 +1,14 @@
+package org.apache.hawq.pxf.service;
+
+import org.apache.hawq.pxf.api.MetadataFetcher;
+
+/**
+ * Factory class for creation of {@link MetadataFetcher} objects. 
+ * The actual {@link MetadataFetcher} object is "hidden" behind an {@link MetadataFetcher} 
+ * abstract class which is returned by the MetadataFetcherFactory. 
+ */
+public class MetadataFetcherFactory {
+    static public MetadataFetcher create(String fetcherName) throws Exception {
+        return (MetadataFetcher) Class.forName(fetcherName).newInstance();
+    }
+}

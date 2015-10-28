@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Context>
-     <Loader className="com.pivotal.pxf.service.utilities.CustomWebappLoader" 
+     <Loader className="org.apache.hawq.pxf.service.utilities.CustomWebappLoader"
              classpathFiles="/etc/pxf/conf/pxf-private.classpath"
              secondaryClasspathFiles="/etc/pxf/conf/pxf-public.classpath"/>
 </Context>
