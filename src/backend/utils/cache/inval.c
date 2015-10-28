@@ -152,10 +152,16 @@ typedef struct TransInvalidationInfo
 	/* Subtransaction nesting depth */
 	int			my_level;
 
-	/* head of current-command event list */
+	/*
+	 * head of current-command event list.
+	 * In Metadata versioning, this is the Command Versioning Queue (CVQ)
+	 */
 	InvalidationListHeader CurrentCmdInvalidMsgs;
 
-	/* head of previous-commands event list */
+	/*
+	 * head of previous-commands event list.
+	 * In Metadata versioning, this is the Transaction Versioning Queue (XVQ)
+	 */
 	InvalidationListHeader PriorCmdInvalidMsgs;
 
 	/* init file must be invalidated? */
@@ -195,7 +201,9 @@ static int	cache_callback_count = 0;
 
 static void PersistInvalidationMessage(SharedInvalidationMessage *msg);
 static void PrepareForRelcacheInvalidation(Oid relid, HeapTuple tuple);
-
+static bool MdVer_IsRedundantNukeEvent(InvalidationListHeader *hdr, mdver_event *mdev);
+static void MdVer_PreProcessInvalidMsgs(InvalidationListHeader *dest,
+				InvalidationListHeader *src);
 /* ----------------------------------------------------------------
  *				Invalidation list support functions
  *
@@ -375,11 +383,59 @@ AddCatcacheInvalidationMessage(InvalidationListHeader *hdr,
 static void
 AddVersioningEventMessage(InvalidationListHeader *hdr, mdver_event *mdev)
 {
+	Assert(NULL != hdr);
+	Assert(NULL != mdev);
+
+	/* Check for last event in the queue. If we're trying to add a nuke, and it's already nuke, skip it */
+	if (MdVer_IsRedundantNukeEvent(hdr, mdev))
+	{
+		elog(gp_mdversioning_loglevel, "Adding nuke event to XVQ when the last added is already nuke. Skipping.");
+		return;
+	}
+
 	SharedInvalidationMessage msg;
 	msg.ve.id = SHAREDVERSIONINGMSG_ID;
 	msg.ve.local = true;
 	msg.ve.verEvent = *mdev;
 	AddInvalidationMessage(&hdr->velist, &msg);
+}
+
+/*
+ * Detect if adding a Metadata Versioning Nuke event to the event list is redundant.
+ * A Nuke message is redundant if the last message in the list is already a Nuke.
+ */
+static bool
+MdVer_IsRedundantNukeEvent(InvalidationListHeader *hdr, mdver_event *mdev)
+{
+	Assert(NULL != hdr);
+	Assert(NULL != mdev);
+
+	if (!mdver_is_nuke_event(mdev)) {
+		return false;
+	}
+
+	InvalidationChunk *chunk = hdr->velist;
+	if (NULL == chunk)
+	{
+		/* Destination is empty */
+		return false;
+	}
+
+	/* Find last chunk of destination list */
+	while (chunk->next != NULL)
+	{
+		chunk = chunk->next;
+	}
+
+	/* Get the last event from the last chunk. Then check if it's a NUKE */
+	SharedInvalidationMessage *last_message = &chunk->msgs[chunk->nitems - 1];
+	Assert(last_message->id == SHAREDVERSIONINGMSG_ID);
+	mdver_event *last_event = &(last_message->ve.verEvent);
+	if (mdver_is_nuke_event(last_event)) {
+		return true;
+	}
+
+	return false;
 }
 
 /*
@@ -1226,6 +1282,9 @@ CommandEndInvalidationMessages(void)
 	if (transInvalInfo == NULL)
 		return;
 
+	MdVer_PreProcessInvalidMsgs(&transInvalInfo->PriorCmdInvalidMsgs,
+			   &transInvalInfo->CurrentCmdInvalidMsgs);
+
 	ProcessInvalidationMessages(&transInvalInfo->CurrentCmdInvalidMsgs,
 								LocalExecuteInvalidationMessage);
 	AppendInvalidationMessages(&transInvalInfo->PriorCmdInvalidMsgs,
@@ -1405,3 +1464,73 @@ GetCurrentLocalMDVSN(void)
 
 	return NULL;
 }
+
+/*
+ * When moving messages from the Current Command Invalidation Queue (CVQ) to the
+ *   Prior Command Invalidation Queue (XVQ), pre-process the event queue to
+ *   eliminate any events that will have no effect.
+ *   If a versioning event is followed by a nuke event, it will have no effect.
+ *   Moreover, when a nuke event is moved to XVQ, everything prior in XVQ will
+ *   also have no effect.
+ *   Therefore we look for Nuke events in CVQ. Find the last one (in the order
+ *   of creation), then move all messages from then on to XVQ, overwriting XVQ.
+ */
+static void
+MdVer_PreProcessInvalidMsgs(InvalidationListHeader *dest,
+						   InvalidationListHeader *src)
+{
+
+	/* Go through src from first until last. Keep track of last nuke found
+	 * If nuke found, then:
+	 *  -- move msgs from nuke onward from cvq to svq
+	 *     -- move msgs to the beginning of first chunk
+	 *     -- make the first chunk of cvq to be the firs chunk of svq
+	 *  -- at this point, make cvq null, we already moved everything
+	 */
+
+	InvalidationChunk *chunk = src->velist;
+	if (NULL == chunk)
+	{
+		/* Source is empty */
+		return;
+	}
+
+	/* Find chunk and index of the last nuke message */
+	InvalidationChunk *last_good_chunk = NULL;
+	int last_good_index = -1;
+	while (NULL != chunk)
+	{
+		for (int i = 0; i < chunk->nitems; i++)
+		{
+			SharedInvalidationMessage *crt_message = &chunk->msgs[i];
+			Assert(crt_message->id == SHAREDVERSIONINGMSG_ID);
+			mdver_event *crt_event = &(crt_message->ve.verEvent);
+			if (mdver_is_nuke_event(crt_event))
+			{
+				last_good_chunk = chunk;
+				last_good_index = i;
+			}
+		}
+		chunk = chunk->next;
+	}
+
+	if (NULL != last_good_chunk) {
+		/* Found a nuke, and we have the chunk and index saved */
+		Assert(last_good_index >= 0);
+		/* 1. Move messages to the beginning of the chunk */
+		for (int i = last_good_index; i < last_good_chunk->nitems; i++)
+		{
+			last_good_chunk[i - last_good_index] = last_good_chunk[i];
+		}
+		/* 2. Update nitems value */
+		last_good_chunk->nitems = last_good_chunk->nitems - last_good_index;
+
+		/* Move messages from src to overwrite dest */
+		dest->velist = last_good_chunk;
+
+		/* Set src to NULL as we're done with the transfer */
+		src->velist = NULL;
+	}
+}
+
+
