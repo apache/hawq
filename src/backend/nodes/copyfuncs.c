@@ -24,6 +24,7 @@
 #include "postgres.h"
 
 #include "access/attnum.h"
+#include "access/filesplit.h"
 #include "catalog/caqlparse.h"
 #include "catalog/gp_policy.h"
 #include "nodes/plannodes.h"
@@ -174,7 +175,7 @@ _copyPlannedStmt(PlannedStmt *from)
 	COPY_NODE_FIELD(result_partitions);
 	COPY_NODE_FIELD(result_aosegnos);
 	COPY_NODE_FIELD(result_segfileinfos);
-	COPY_SCALAR_FIELD(scantable_splits);
+	COPY_NODE_FIELD(scantable_splits);
 	COPY_NODE_FIELD(into_aosegnos);
 	COPY_NODE_FIELD(queryPartOids);
 	COPY_NODE_FIELD(queryPartsMetadata);
@@ -4194,6 +4195,30 @@ _copyResultRelSegFileInfo(ResultRelSegFileInfo *from)
   return newnode;
 }
 
+static SegFileSplitMapNode *
+_copySegFileSplitMapNode(SegFileSplitMapNode *from)
+{
+  SegFileSplitMapNode *newnode = makeNode(SegFileSplitMapNode);
+
+  COPY_SCALAR_FIELD(relid);
+  COPY_NODE_FIELD(splits);
+
+  return newnode;
+}
+
+static FileSplitNode *
+_copyFileSplitNode(FileSplitNode *from)
+{
+  FileSplitNode *newnode = makeNode(FileSplitNode);
+
+  COPY_SCALAR_FIELD(segno);
+  COPY_SCALAR_FIELD(logiceof);
+  COPY_SCALAR_FIELD(offsets);
+  COPY_SCALAR_FIELD(lengths);
+
+  return newnode;
+}
+
 static CaQLSelect *
 _copyCaQLSelect(const CaQLSelect *from)
 {
@@ -5129,6 +5154,12 @@ copyObject(void *from)
 			break;
 		case T_ResultRelSegFileInfo:
 		  retval = _copyResultRelSegFileInfo(from);
+		  break;
+		case T_SegFileSplitMapNode:
+		  retval = _copySegFileSplitMapNode(from);
+		  break;
+		case T_FileSplitNode:
+		  retval = _copyFileSplitNode(from);
 		  break;
 
 		case T_DenyLoginInterval:

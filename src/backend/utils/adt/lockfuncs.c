@@ -128,6 +128,8 @@ pg_lock_status(PG_FUNCTION_ARGS)
 		mystatus->numSegLocks = 0;
 		mystatus->numsegresults = 0;
 		mystatus->segresults = NULL;
+
+		MemoryContextSwitchTo(oldcontext);
 	}
 
 	funcctx = SRF_PERCALL_SETUP();
