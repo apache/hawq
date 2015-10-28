@@ -74,18 +74,21 @@ DELETE FROM pg_type where typname='pg_resqueue';
 set gp_before_persistence_work to false;
 CREATE TABLE pg_resqueue
 (
-    rsqname name not null, -- name of resource queue
-    rsq_parent oid not null, -- oid of resource queue
-    rsq_active_stats_cluster integer not null, -- active statement count limit
-    rsq_memory_limit_cluster text, -- memory limit in cluster
-    rsq_core_limit_cluster text, -- core limit in cluster
-    rsq_resource_upper_factor real, -- resource upper limit in cluster
-    rsq_allocation_policy text, -- query resource allocation policy
-    rsq_vseg_resource_quota text, -- vsegment resource quota
-    rsq_vseg_upper_limit integer, -- vsegment size upper limit
-    rsq_creation_time timestamp with time zone, -- when the queue is created
-    rsq_update_time timestamp with time zone, -- when the queue is updated ( create or alter )
-    rsq_status text -- the status of resource queue.
+  name name, -- name of resource queue
+  parentoid oid, -- oid of resource queue
+  activestats integer, -- active statement count limit
+  memorylimit text, -- memory limit in cluster
+  corelimit text, -- core limit in cluster
+  resovercommit real, -- resource upper limit in cluster
+  allocpolicy text, -- query resource allocation policy
+  vsegresourcequota text, -- vsegment resource quota
+  nvsegupperlimit integer, -- vsegment size upper limit
+  nvseglowerlimit integer, -- vsegment size lower limit
+  nvsegupperlimitperseg real, -- vsegment size upper limit per segment
+  nvseglowerlimitperseg real, -- vsegment size lower limit per segment
+  creationtime timestamp with time zone, -- when the queue is created
+  updatetime timestamp with time zone, -- when the queue is updated ( create or alter  )
+  status text -- the status of resource queue
 )
 with (camelcase=ResQueue, shared=true, oids=true, relid=6026, reltype_oid=9830, toast_oid=9820, toast_index=9821, toast_reltype=9822)
 TABLESPACE pg_global;

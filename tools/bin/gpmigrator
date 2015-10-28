@@ -1697,7 +1697,7 @@ class GPUpgrade(GPUpgradeBase):
             self.update_xml_content(file_cont, 'hawq_segment_directory', self.array.segments[0].primaryDB.datadir)
 
         # yarn related is set to default value: yarn disabled
-        self.update_xml_content(file_cont, 'hawq_resourcemanager_server_type', 'none')
+        self.update_xml_content(file_cont, 'hawq_global_rm_type', 'none')
         self.update_xml_content(file_cont, 'hawq_resourcemanager_yarn_resourcemanager_address', 'localhost:9980')
         self.update_xml_content(file_cont, 'hawq_resourcemanager_yarn_resourcemanager_scheduler_address', 'localhost:9981')
 
