@@ -6383,7 +6383,7 @@ static struct config_int ConfigureNamesInt[] =
 				GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 			},
 			&hash_to_random_flag,
-			0, 0, 2 ,NULL, NULL
+			2, 0, 2 ,NULL, NULL
 	},
 
 	{
