@@ -339,6 +339,7 @@ int		rm_resource_heartbeat_interval; /* How many seconds to wait before sending
 										   another heart-beat to resource manager. */
 
 int		rm_tolerate_nseg_limit;
+int		rm_rejectrequest_nseg_limit;
 int		rm_nvseg_variance_among_seg_limit;
 
 char   *rm_resourcepool_test_filename;

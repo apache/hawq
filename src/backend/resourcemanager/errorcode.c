@@ -14,6 +14,7 @@ ErrorDetailData ErrorDetailsPreset[] = {
 		{RESQUEMGR_TOO_MANY_FIXED_SEGNUM,		"expecting too many virtual segments"},
 		{REQUESTHANDLER_WRONG_CONNSTAT,			"that resource context maybe recycled due to timeout"},
 		{CONNTRACK_NO_CONNID,					"that resource context does not exist"},
+		{RESOURCEPOOL_TOO_MANY_UAVAILABLE_HOST, "too many unavailable segments"},
 
 		{-1, ""}
 };

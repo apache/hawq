@@ -356,6 +356,17 @@ bool handleRMRequestAcquireResource(void **arg)
 		goto sendresponse;
 	}
 
+	/* Check if HAWQ has enough alive segments. */
+	int unavailcount = PRESPOOL->SlavesHostCount - PRESPOOL->AvailNodeCount;
+	if ( unavailcount >= rm_rejectrequest_nseg_limit )
+	{
+		elog(WARNING, "Resource manager finds %d segments not available yet, all "
+					  "resource allocation requests are rejected.",
+					  unavailcount);
+		res = RESOURCEPOOL_TOO_MANY_UAVAILABLE_HOST;
+		goto sendresponse;
+	}
+
 	/* Get scan size. */
 	request = (RPCRequestHeadAcquireResourceFromRM)
 			  ((*conntrack)->MessageBuff.Buffer);
