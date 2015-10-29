@@ -808,6 +808,14 @@ int handleRM2RB_AllocateResource(void)
 
 	if ( YARNJobID == NULL )
 	{
+    	if (pBuffer != NULL)
+    	{
+    		rm_pfree(PCONTEXT, pBuffer);
+    	}
+    	if (preferredArray != NULL)
+    	{
+    		rm_pfree(PCONTEXT, preferredArray);
+    	}
 		return sendRBAllocateResourceErrorData(RESBROK_ERROR_GRM, &request);
 	}
 
@@ -830,9 +838,13 @@ int handleRM2RB_AllocateResource(void)
     if ( libyarnres != FUNCTION_SUCCEEDED )
     {
     	if (pBuffer != NULL)
+    	{
     		rm_pfree(PCONTEXT, pBuffer);
+    	}
     	if (preferredArray != NULL)
+    	{
     		rm_pfree(PCONTEXT, preferredArray);
+    	}
     	return sendRBAllocateResourceErrorData(RESBROK_ERROR_GRM, &request);
     }
 
