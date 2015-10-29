@@ -6,7 +6,6 @@ import os
 import sys
 import subprocess
 from hawqpylib.HAWQ_HELP import *
-from hawqpylib.hawqlib import local_ssh
 
 global hawq_home, source_hawq_env
 
@@ -21,11 +20,18 @@ def local_ssh(cmd):
     result = subprocess.Popen(cmd, shell=True).wait()
     return result
 
+def check_error_code(result):
+    '''Check shell command exit code.'''
+    if result != 0:
+        sys.exit(1)
+    else:
+        sys.exit(0)
 
 def main():
     cluster_type_list = ('cluster', 'segment', 'master', 'standby', 'allsegments')
     cluster_init_list = ('cluster', 'segment', 'master', 'standby')
     hawq_home = os.getenv('GPHOME')
+    result = 0
 
     if not hawq_home:
         print "HAWQ home directory not defined, please check GPHOME settings."
@@ -51,71 +57,69 @@ def main():
             print START_HELP
             sys.exit(1)
         cmd = "%s; hawq_ctl %s %s" % (source_hawq_env, hawq_command, sub_args)
-        local_ssh(cmd)
+        result = local_ssh(cmd)
     elif hawq_command == "stop":
         if second_arg not in cluster_type_list:
             print STOP_HELP
             sys.exit(1)
         cmd = "%s; hawq_ctl %s %s" % (source_hawq_env, hawq_command, sub_args)
-        local_ssh(cmd)
+        result = local_ssh(cmd)
     elif hawq_command == "init":
         if second_arg not in cluster_init_list:
             print INIT_HELP
             sys.exit(1)
         cmd = "%s; hawq_ctl %s %s" % (source_hawq_env, hawq_command, sub_args)
-        local_ssh(cmd)
+        result = local_ssh(cmd)
     elif hawq_command == "restart":
         if second_arg not in cluster_type_list:
             print START_HELP
             sys.exit(1)
         cmd = "%s; hawq_ctl stop %s" % (source_hawq_env, sub_args)
-        local_ssh(cmd)
+        result = local_ssh(cmd)
         cmd = "%s; hawq_ctl start %s" % (source_hawq_env, sub_args)
-        local_ssh(cmd)
+        result = local_ssh(cmd)
     elif hawq_command == "activate":
         if second_arg in ['', 'help', '--help']:
             print ACTIVE_HELP
             sys.exit(1)
         cmd = "%s; hawq_ctl %s %s" % (source_hawq_env, hawq_command, sub_args)
-        local_ssh(cmd)
+        result = local_ssh(cmd)
     elif hawq_command == "config":
         if second_arg in ['', 'help', '--help']:
             print CONFIG_HELP
             sys.exit(1)
         cmd = "%s; hawqconfig %s" % (source_hawq_env, sub_args)
-        local_ssh(cmd)
-    elif hawq_command == "create":
-        print "In construction..."
-        #print "hawq %s %s" % (hawq_command, sub_args)
+        result = local_ssh(cmd)
     elif hawq_command == "extract":
         cmd = "%s; hawqextract %s" % (source_hawq_env, sub_args)
-        local_ssh(cmd)
+        result = local_ssh(cmd)
     elif hawq_command == "check":
         cmd = "%s; gpcheck %s" % (source_hawq_env, sub_args)
-        local_ssh(cmd)
+        result = local_ssh(cmd)
     elif hawq_command == "load":
         cmd = "%s; gpload %s" % (source_hawq_env, sub_args)
-        local_ssh(cmd)
+        result = local_ssh(cmd)
     elif hawq_command == "filespace":
         cmd = "%s; hawqfilespace %s" % (source_hawq_env, sub_args)
-        local_ssh(cmd)
+        result = local_ssh(cmd)
     elif hawq_command == "state":
         cmd = "%s; hawqstate %s" % (source_hawq_env, sub_args)
-        local_ssh(cmd)
+        result = local_ssh(cmd)
     elif hawq_command == "ssh":
         cmd = "%s; gpssh %s" % (source_hawq_env, sub_args)
-        local_ssh(cmd)
+        result = local_ssh(cmd)
     elif hawq_command == "ssh-exkeys":
         cmd = "%s; gpssh-exkeys %s" % (source_hawq_env, sub_args)
-        local_ssh(cmd)
+        result = local_ssh(cmd)
     elif hawq_command == "scp":
         cmd = "%s; gpscp %s" % (source_hawq_env, sub_args)
-        local_ssh(cmd)
+        result = local_ssh(cmd)
     elif hawq_command == "version" or hawq_command == "--version":
         print_version()
     else:
         print COMMON_HELP
-        sys.exit()
+        sys.exit(1)
+    check_error_code(result)
 
 if __name__ == '__main__':
     main()

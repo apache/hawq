@@ -19,7 +19,7 @@ try:
     from gppylib.commands import gp
     from gppylib import userinput
     from hawqpylib.hawqlib import local_ssh, HawqCommands, HawqXMLParser, parse_hosts_file,\
-        remove_property_xml, sync_hawq_site
+        remove_property_xml, sync_hawq_site, check_error_code
     from hawqpylib.HAWQ_HELP import *
     from gppylib.db import dbconn
     from pygresql.pg import DatabaseError
@@ -266,7 +266,10 @@ class HawqInit:
             sys.exit(1)
         else:
             cmd = "%s; hawq start cluster -a" % source_hawq_env
-            local_ssh(cmd)
+            result = local_ssh(cmd)
+            if result != 0:
+                logger.error("Start hawq cluster failed.")
+                sys.exit(1)
 
         return result
         
@@ -573,11 +576,15 @@ class HawqStart:
             else:
                 logger.info("Segment started successfully")
         elif self.node_type == "cluster":
-            self._start_all_nodes()
+            result = self._start_all_nodes()
+            if result != 0:
+                sys.exit(1)
         elif self.node_type == "allsegments":
-            self._start_all_segments()
+            result = self._start_all_segments()
+            if result != 0:
+                sys.exit(1)
         else:
-            sys.exit('Node object should be in master/standby/segment/allsegments/cluster')
+            sys.exit('Node object should be in [master, standby, segment, allsegments, cluster]')
         return None
 
 
@@ -749,11 +756,15 @@ class HawqStop:
             else:
                 logger.info("Segment stopped successfully")
         elif self.node_type == "cluster":
-            self._stopAll()
+            result = self._stopAll()
+            if result != 0:
+                sys.exit(1)
         elif self.node_type == "allsegments":
-            self._stopAllSegments()
+            result = self._stopAllSegments()
+            if result != 0:
+                sys.exit(1)
         else:
-            sys.exit('node_type should be in master/standby/segment/allsegments/cluster')
+            sys.exit('Node object should be in [master, standby, segment, allsegments, cluster]')
         return None
 
 
@@ -886,24 +897,47 @@ def hawq_activate_standby(opts, hawq_dict):
     if result != 0:
         logger.debug("Stop cluster failed, try to stop it immediately.")
         cmd = "%s; hawq stop cluster -a -M immediate;" % source_hawq_env
-        local_ssh(cmd)
+        result = local_ssh(cmd)
+        if result != 0:
+            logger.error("Stop cluster failed, exit.")
+            sys.exit(1)
     cmd = "%s; hawq config -c hawq_master_address_host -v %s --skipvalidation -q" % (source_hawq_env, hawq_dict['hawq_standby_address_host'])
-    local_ssh(cmd)
+    result = local_ssh(cmd)
+    if result != 0:
+        logger.error("Set hawq_master_address_host  failed.")
+        sys.exit(1)
     cmd = "%s; hawq config -c hawq_standby_address_host -v %s --skipvalidation -q" % (source_hawq_env, 'none')
-    local_ssh(cmd)
+    result = local_ssh(cmd)
+    if result != 0:
+        logger.error("Set hawq_standby_address_host failed.")
+        sys.exit(1)
     cmd = '''echo "gp_persistent_repair_global_sequence = true" >> %s/%s''' % (hawq_dict['hawq_master_directory'], 'postgresql.conf')
-    local_ssh(cmd)
+    result = local_ssh(cmd)
+    if result != 0:
+        logger.error("Set gp_persistent_repair_global_sequence = true failed.")
+        sys.exit(1)
     cmd = "%s; hawq start master" % source_hawq_env
-    local_ssh(cmd)
+    result = local_ssh(cmd)
+    if result != 0:
+        logger.error("Start master failed.")
+        sys.exit(1)
     cmd = "%s; env PGOPTIONS=\"-c gp_session_role=utility\" psql -p %s -d template1 -c \"select gp_remove_master_standby()\
             where (select count(*) from gp_segment_configuration where role='s') = 1;\"" % (source_hawq_env, hawq_dict['hawq_master_address_port'])
-    local_ssh(cmd)
+    result = local_ssh(cmd)
     cmd = "%s; hawq stop master -a" % source_hawq_env
-    local_ssh(cmd)
+    result = local_ssh(cmd)
+    if result != 0:
+        logger.error("Stop master failed.")
+        sys.exit(1)
     cmd = "%s; hawq start cluster" % source_hawq_env
-    local_ssh(cmd)
+    result = local_ssh(cmd)
+    if result != 0:
+        logger.warn("Start cluster failed.")
+        sys.exit(1)
     cmd = '''sed -i "/gp_persistent_repair_global_sequence/d" %s/%s''' % (hawq_dict['hawq_master_directory'], 'postgresql.conf')
-    local_ssh(cmd)
+    result = local_ssh(cmd)
+    if result != 0:
+        sys.exit(1)
     return None
 
 

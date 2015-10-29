@@ -95,6 +95,13 @@ def remote_ssh(cmd, host, user):
     result = subprocess.Popen(remote_cmd_str, shell=True).wait()
     return result
 
+def check_error_code(result):
+    '''Check shell command exit code.'''
+    print "[Debug]: result is %s" % result
+    if result != 0:
+        sys.exit(1)
+    else:
+        sys.exit(0)
 
 def parse_hosts_file(GPHOME):
     host_file = "%s/etc/slaves" % GPHOME
