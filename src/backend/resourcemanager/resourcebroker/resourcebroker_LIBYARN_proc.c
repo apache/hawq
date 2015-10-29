@@ -1273,7 +1273,8 @@ int RB2YARN_registerYARNApplication(void)
 					    YARNAppName.Str,
 						YARNQueueName.Str,
 						&YARNJobID);
-	if ( yarnres != FUNCTION_SUCCEEDED ) {
+	if ( yarnres != FUNCTION_SUCCEEDED )
+	{
 		elog(WARNING, "YARN mode resource broker failed to create application "
 					  "in YARN resource manager. %s",
 					  getErrorMessage());
@@ -1291,7 +1292,8 @@ int RB2YARN_registerYARNApplication(void)
 	 */
 	LibYarnApplicationReport_t *applicationReport = NULL;
 	result = getApplicationReport(LIBYARNClient, YARNJobID, &applicationReport);
-	if (result != FUNCTION_SUCCEEDED || applicationReport == NULL) {
+	if (result != FUNCTION_SUCCEEDED || applicationReport == NULL)
+	{
 		elog(WARNING, "YARN mode resource broker failed to get application report, "
 					  "so kill it from Hadoop Yarn.");
 		result = forceKillJob(LIBYARNClient, YARNJobID);
@@ -1299,7 +1301,9 @@ int RB2YARN_registerYARNApplication(void)
 			elog(WARNING, "YARN mode resource broker kill job failed.");
 		return FUNCTION_FAILED;
 	}
-	if (applicationReport->progress < 0.5) {
+
+	if (applicationReport->progress < 0.5)
+	{
 		elog(WARNING, "YARN mode resource broker failed to register itself in Hadoop Yarn."
 					  "Got progress:%f, and try to kill application from Hadoop Yarn", applicationReport->progress);
 		result = forceKillJob(LIBYARNClient, YARNJobID);
