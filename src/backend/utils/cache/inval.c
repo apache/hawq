@@ -389,7 +389,6 @@ AddVersioningEventMessage(InvalidationListHeader *hdr, mdver_event *mdev)
 	/* Check for last event in the queue. If we're trying to add a nuke, and it's already nuke, skip it */
 	if (MdVer_IsRedundantNukeEvent(hdr, mdev))
 	{
-		elog(gp_mdversioning_loglevel, "Adding nuke event to XVQ when the last added is already nuke. Skipping.");
 		return;
 	}
 
