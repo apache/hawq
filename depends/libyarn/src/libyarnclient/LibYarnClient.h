@@ -39,6 +39,8 @@ namespace libyarn {
 
 		virtual int createJob(string &jobName, string &queue, string &jobId);
 
+		virtual int forceKillJob(string &jobId);
+
 		virtual void addResourceRequest(Resource capability, int32_t num_containers,
 				   string host, int32_t priority, bool relax_locality);
 

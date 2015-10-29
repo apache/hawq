@@ -214,6 +214,60 @@ int LibYarnClient::createJob(string &jobName, string &queue,string &jobId) {
     }
 }
 
+int LibYarnClient::forceKillJob(string &jobId) {
+
+#ifndef MOCKTEST
+    if ( keepRun ) {
+        keepRun=false;
+        void *thrc = NULL;
+        int rc = pthread_join(heartbeatThread, &thrc);
+        if ( rc != 0 ) {
+            LOG(INFO, "LibYarnClient::forceKillJob, fail to join heart-beat thread. "
+                      "error code %d", rc);
+            return FR_FAILED;
+        }
+    }
+#endif
+
+    try{
+        if (jobId != clientJobId) {
+            throw std::invalid_argument("The jobId is wrong, please check the jobId argument");
+        }
+
+        for (map<int,Container*>::iterator it = jobIdContainers.begin(); it != jobIdContainers. end(); it++) {
+            ostringstream key;
+            Container *container = it->second;
+            key << container->getNodeId().getHost() << ":" << container->getNodeId().getPort();
+            Token nmToken = nmTokenCache[key.str()];
+            ((ContainerManagement*)nmClient)->stopContainer((*container), nmToken);
+            LOG(INFO,"LibYarnClient::forceKillJob, container:%d is stopped",container->getId().getId());
+        }
+
+        ((ApplicationClient*) appClient)->forceKillApplication(clientAppId);
+        LOG(INFO, "LibYarnClient::forceKillJob, forceKillApplication");
+
+        for (map<int,Container*>::iterator it = jobIdContainers.begin(); it != jobIdContainers.end(); it++) {
+            LOG(INFO,"LibYarnClient::forceKillJob, container:%d in jobIdContainers is deleted",it->second->getId().getId());
+            delete it->second;
+            it->second = NULL;
+        }
+        jobIdContainers.clear();
+        activeFailContainerIds.clear();
+        return FR_SUCCEEDED;
+    } catch(std::exception& e){
+        stringstream errorMsg;
+        errorMsg << "LibYarnClient::forceKillJob, catch the exception:" << e.what();
+        setErrorMessage(errorMsg.str());
+        return FR_FAILED;
+    } catch (...) {
+        stringstream errorMsg;
+        errorMsg << "LibYarnClient::forceKillJob, catch unexpected exception.";
+        setErrorMessage(errorMsg.str());
+        return FR_FAILED;
+    }
+}
+
+
 void LibYarnClient::dummyAllocate() {
 
     pthread_mutex_lock(&heartbeatLock);

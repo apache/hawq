@@ -1261,6 +1261,8 @@ int RB2YARN_initializeConnection(void)
 	return FUNCTION_SUCCEEDED;
 }
 
+#define HAWQ_YARN_AM_HEARTBEAT_INTERVAL 5
+
 /* Connect and disconnect to the global resource manager. */
 int RB2YARN_connectToYARN(void)
 {
@@ -1276,35 +1278,82 @@ int RB2YARN_connectToYARN(void)
 						       YARNAMPort,
 						       YARNTRKUrl,
 						       &LIBYARNClient,
-						       5*1000 /* Hard code 5 sec */);
+						       HAWQ_YARN_AM_HEARTBEAT_INTERVAL*1000 /* Hard code 5 sec */);
     return yarnres;
 }
 
 int RB2YARN_registerYARNApplication(void)
 {
-	int yarnres = FUNCTION_SUCCEEDED;
+	int retry = 5;
+	int yarnres = FUNCTION_SUCCEEDED, result = FUNCTION_SUCCEEDED;
+
 	yarnres = createJob(LIBYARNClient,
 					    YARNAppName.Str,
 						YARNQueueName.Str,
 						&YARNJobID);
-	if ( yarnres != FUNCTION_SUCCEEDED ) {
+	if ( yarnres != FUNCTION_SUCCEEDED )
+	{
 		elog(WARNING, "YARN mode resource broker failed to create application "
 					  "in YARN resource manager. %s",
 					  getErrorMessage());
+		return yarnres;
 	}
-	else {
-		elog(LOG, "YARN mode resource broker created job in YARN resource "
-				  "manager %s as new application %s assigned to queue %s.",
-				  YARNJobID,
-				  YARNAppName.Str,
-                  YARNQueueName.Str);
 
-		ResBrokerStartTime = gettime_microsec();
+	elog(LOG, "YARN mode resource broker created job in YARN resource "
+			  "manager %s as new application %s assigned to queue %s.",
+			  YARNJobID,
+			  YARNAppName.Str,
+			  YARNQueueName.Str);
 
-		elog(LOG, "YARN mode resource broker registered new "
-				  "YARN application. Start time stamp "UINT64_FORMAT,
-				  ResBrokerStartTime);
+	/* check if hawq is registered successfully in Hadoop Yarn.
+	 * if not, kill application from Hadoop Yarn.
+	 */
+	LibYarnApplicationReport_t *applicationReport = NULL;
+	while (retry > 0)
+	{
+		result = getApplicationReport(LIBYARNClient, YARNJobID, &applicationReport);
+		if (result != FUNCTION_SUCCEEDED || applicationReport == NULL)
+		{
+			if (retry > 0) {
+				retry--;
+				usleep(HAWQ_YARN_AM_HEARTBEAT_INTERVAL*1000*1000L);
+				continue;
+			} else {
+				elog(WARNING, "YARN mode resource broker failed to get application report, "
+							  "so kill it from Hadoop Yarn.");
+				result = forceKillJob(LIBYARNClient, YARNJobID);
+				if (result != FUNCTION_SUCCEEDED)
+					elog(WARNING, "YARN mode resource broker kill job failed.");
+				return FUNCTION_FAILED;
+			}
+		}
+
+		if (applicationReport->progress < 0.5)
+		{
+			if (retry > 0) {
+				retry--;
+				usleep(HAWQ_YARN_AM_HEARTBEAT_INTERVAL*1000*1000L);
+				continue;
+			} else {
+				elog(WARNING, "YARN mode resource broker failed to register itself in Hadoop Yarn."
+							  "Got progress:%f, and try to kill application from Hadoop Yarn",
+							  applicationReport->progress);
+				result = forceKillJob(LIBYARNClient, YARNJobID);
+				if (result != FUNCTION_SUCCEEDED)
+					elog(WARNING, "YARN mode resource broker kill job failed.");
+				return FUNCTION_FAILED;
+			}
+		} else {
+			break;
+		}
 	}
+
+	ResBrokerStartTime = gettime_microsec();
+
+	elog(LOG, "YARN mode resource broker registered new "
+			  "YARN application. Progress:%f, Start time stamp "UINT64_FORMAT,
+			  applicationReport->progress, ResBrokerStartTime);
+
 	return yarnres;
 }
 

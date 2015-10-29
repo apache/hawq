@@ -42,6 +42,10 @@ extern "C" {
 				return client->createJob(jobName, queue, jobId);
 			}
 
+			int forceKillJob(string &jobId) {
+				return client->forceKillJob(jobId);
+			}
+
 			int addContainerRequests(string &jobId,
 									Resource &capability,
 									int num_containers,
@@ -160,6 +164,17 @@ extern "C" {
 			return FUNCTION_SUCCEEDED;
 		}else{
 			*jobId = strdup(jobIdStr.c_str());
+			setErrorMessage(client->getErrorMessage());
+			return FUNCTION_FAILED;
+		}
+	}
+
+	int forceKillJob(LibYarnClient_t *client, char* jobId) {
+		string jobIdStr(jobId);
+		int result = client->forceKillJob(jobIdStr);
+		if (result == FUNCTION_SUCCEEDED) {
+			return FUNCTION_SUCCEEDED;
+		} else {
 			setErrorMessage(client->getErrorMessage());
 			return FUNCTION_FAILED;
 		}
@@ -375,6 +390,7 @@ exit_err:
 			(*applicationReport)->status = applicationReportCpp.getYarnApplicationState();
 			(*applicationReport)->diagnostics = strdup(applicationReportCpp.getDiagnostics().c_str());
 			(*applicationReport)->startTime = applicationReportCpp.getStartTime();
+			(*applicationReport)->progress = applicationReportCpp.getProgress();
 			return FUNCTION_SUCCEEDED;
 		} else{
 			setErrorMessage(client->getErrorMessage());
