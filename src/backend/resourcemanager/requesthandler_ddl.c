@@ -187,12 +187,12 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 	{
 		case MANIPULATE_RESQUEUE_CREATE:
 			/* Resource queue number check. */
-			if (list_length(PQUEMGR->Queues) >= rm_max_resource_queue_number)
+			if (list_length(PQUEMGR->Queues) >= rm_nresqueue_limit)
 			{
 				ddlres = RESQUEMGR_EXCEED_MAX_QUEUE_NUMBER;
 				snprintf(errorbuf, sizeof(errorbuf),
 						"exceed maximum resource queue number %d",
-						rm_max_resource_queue_number);
+						rm_nresqueue_limit);
 				elog(WARNING, "Resource manager can not create resource queue "
 							  "because %s",
 							  errorbuf);

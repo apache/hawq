@@ -1294,7 +1294,7 @@ void *generateResourceRefreshHeartBeat(void *arg)
 			}
 			closeConnectionRemote(&fd);
 		}
-		pg_usleep(rm_resource_heartbeat_interval * 1000000);
+		pg_usleep(rm_session_lease_heartbeat_interval * 1000000);
 	}
 
 	return 0;

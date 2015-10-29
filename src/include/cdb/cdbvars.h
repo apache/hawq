@@ -1169,7 +1169,8 @@ extern char   *rm_grm_yarn_rm_addr;
 extern char	  *rm_grm_yarn_sched_addr;
 extern char   *rm_grm_yarn_queue;
 extern char   *rm_grm_yarn_app_name;
-extern int	   rm_grm_breath_return_percentage;
+extern int	   rm_return_percentage_on_overcommit;
+extern int	   rm_cluster_report_period;
 
 extern char   *rm_stmt_vseg_mem_str;
 extern int	   rm_stmt_nvseg;
@@ -1177,14 +1178,14 @@ extern int	   rm_stmt_nvseg;
 extern int     rm_nvseg_perquery_limit;
 extern int	   rm_nvseg_perquery_perseg_limit;
 extern int	   rm_nslice_perseg_limit;
-extern int	   rm_seg_container_default_waterlevel;
+extern int	   rm_min_resource_perseg;
 
 extern int     rm_session_lease_timeout;
 extern bool    rm_session_lease_heartbeat_enable;
 
-extern int 	   rm_query_resource_noresource_timeout;
+extern int 	   rm_resource_allocation_timeout;
 extern int	   rm_resource_timeout;
-extern int	   rm_resource_heartbeat_interval;
+extern int	   rm_session_lease_heartbeat_interval;
 extern int	   rm_tolerate_nseg_limit;
 extern int	   rm_rejectrequest_nseg_limit;
 extern int	   rm_nvseg_variance_among_seg_limit;
@@ -1204,12 +1205,11 @@ extern int     rm_enforce_cleanup_period;
 extern int     rm_enforce_cgrp_timeout;
 extern int     rm_allocation_policy;
 
-extern char   *rm_tmp_dirs;
 extern char   *rm_master_tmp_dirs;
 extern char   *rm_seg_tmp_dirs;
 
 extern int     rm_log_level;
-extern int     rm_max_resource_queue_number;
+extern int     rm_nresqueue_limit;
 
 extern int max_filecount_notto_split_segment;
 extern int min_datasize_to_combine_segment;

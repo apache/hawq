@@ -60,7 +60,7 @@
     </property>
 
     <property>
-        <name>hawq_resourcemanager_segment_limit_memory_use</name>
+        <name>hawq_rm_memory_limit_perseg</name>
         <value>64GB</value>
         <description>The limit of memory usage in a hawq segment when 
                      hawq_global_rm_type is set 'none'.
@@ -68,7 +68,7 @@
     </property>
 
     <property>
-        <name>hawq_resourcemanager_segment_limit_core_use</name>
+        <name>hawq_rm_nvcore_limit_perseg</name>
         <value>16</value>
         <description>The limit of virtual core usage in a hawq segment when 
                      hawq_global_rm_type is set 'none'.
@@ -76,25 +76,25 @@
     </property>
     
     <property>
-        <name>hawq_resourcemanager_yarn_resourcemanager_address</name>
+        <name>hawq_rm_yarn_address</name>
         <value>localhost:8032</value>
         <description>The address of YARN resource manager server.</description>
     </property>
 
     <property>
-        <name>hawq_resourcemanager_yarn_resourcemanager_scheduler_address</name>
+        <name>hawq_rm_yarn_scheduler_address</name>
         <value>localhost:8030</value>
         <description>The address of YARN scheduler server.</description>
     </property>
 
     <property>
-        <name>hawq_resourcemanager_yarn_queue</name>
+        <name>hawq_rm_yarn_queue_name</name>
         <value>default</value>
         <description>The YARN queue name to register hawq resource manager.</description>
     </property>
 
     <property>
-        <name>hawq_resourcemanager_yarn_application_name</name>
+        <name>hawq_rm_yarn_app_name</name>
         <value>hawq</value>
         <description>The application name to register hawq resource manager in YARN.</description>
     </property>

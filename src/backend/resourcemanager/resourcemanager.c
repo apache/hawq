@@ -2019,7 +2019,7 @@ int generateAllocRequestToBroker(void)
 	}
 
 	/* Decide water level of resource. */
-	int wlevel = hasWorkload ? rm_seg_container_default_waterlevel : 0;
+	int wlevel = hasWorkload ? rm_min_resource_perseg : 0;
 	switch( DRMGlobalInstance->ImpType )
 	{
 	case YARN_LIBYARN:
@@ -2591,7 +2591,8 @@ void processResourceBrokerTasks(void)
 		 */
         curtime = gettime_microsec();
 
-		if ( (curtime - PRESPOOL->LastUpdateTime  >  60LL * 1000000LL ||
+		if ( (curtime - PRESPOOL->LastUpdateTime  >
+			  rm_cluster_report_period * 1000000LL ||
 			  hasSegmentGRMCapacityNotUpdated() ) &&
 			  curtime - PRESPOOL->LastRequestTime >    5LL * 1000000LL)
 		{
@@ -2614,7 +2615,8 @@ void processResourceBrokerTasks(void)
 
 		if ( PRESPOOL->AddPendingContainerCount == 0 &&
 			 PRESPOOL->RetPendingContainerCount == 0 &&
-			 (curtime - PRESPOOL->LastCheckContainerTime   > 60LL * 1000000LL) &&
+			 (curtime - PRESPOOL->LastCheckContainerTime   >
+			  rm_cluster_report_period * 1000000LL) &&
 			 (curtime - PRESPOOL->LastRequestContainerTime > 5LL  * 1000000LL) )
 		{
 			List *report = NULL;
