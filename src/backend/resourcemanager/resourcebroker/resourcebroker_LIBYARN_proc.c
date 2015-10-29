@@ -770,11 +770,6 @@ int handleRM2RB_AllocateResource(void)
 				 request.Core,
 				 request.ContainerCount);
 
-	if ( YARNJobID == NULL )
-	{
-		return sendRBAllocateResourceErrorData(RESBROK_ERROR_GRM, &request);
-	}
-
 	/* build preferred host list */
 	if (request.MsgLength > 0 && request.PreferredSize > 0) {
 
@@ -806,6 +801,14 @@ int handleRM2RB_AllocateResource(void)
 					  "preferred host, hostname:%s, rackname:%s, container number:%d.",
 					  preferredArray[i].hostname, preferredArray[i].rackname, preferredArray[i].num_containers);
 		}
+	}
+
+	elog(DEBUG3, "LIBYARN mode resource broker process read %d bytes in.",
+				 request.MsgLength + sizeof(RPCRequestRBAllocateResourceContainersData));
+
+	if ( YARNJobID == NULL )
+	{
+		return sendRBAllocateResourceErrorData(RESBROK_ERROR_GRM, &request);
 	}
 
 	/*

@@ -2137,6 +2137,8 @@ int generateAllocRequestToBroker(void)
 		if ( mctrack->TotalPendingStartTime == 0 )
 		{
 			mctrack->TotalPendingStartTime = gettime_microsec();
+			elog(DEBUG3, "Global resource total pending start time is updated to "UINT64_FORMAT,
+						 mctrack->TotalPendingStartTime);
 		}
 		res = RB_acquireResource(reqmem, reqcore, preferred);
 		if ( res != FUNC_RETURN_OK && res != RESBROK_PIPE_BUSY )
