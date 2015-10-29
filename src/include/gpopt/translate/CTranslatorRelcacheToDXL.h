@@ -307,10 +307,6 @@ namespace gpdxl
 			static 
 			BOOL FDefaultPartition(List *plDefaultLevels, ULONG ulLevel);
 			
-			// treat a hash distributed table as random distributed
-			static
-			BOOL FTreatAsRandom(OID oid, GpPolicy *pgppolicy);
-
 			// retrieve part constraint for index
 			static
 			CMDPartConstraintGPDB *PmdpartcnstrIndex

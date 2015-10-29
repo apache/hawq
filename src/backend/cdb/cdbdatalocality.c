@@ -2531,8 +2531,9 @@ static bool allocate_hash_relation(Relation_Data* rel_data,
 			return true;
 		}
 	}
+	/*for now orca doesn't support convert hash to random*/
 	else if((hash_to_random_flag == ENFORCE_HASH_TO_RANDOM ||
-			(relationDatalocality < hash2RandomDatalocalityThreshold && relationDatalocality >= 0 ))
+			(relationDatalocality < hash2RandomDatalocalityThreshold && relationDatalocality >= 0 && !optimizer))
 			&& hash_to_random_flag != ENFORCE_KEEP_HASH){
 		log_context->totalDataSizePerRelation =0;
 		log_context->localDataSizePerRelation =0;
@@ -3715,6 +3716,7 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 				result->relsType = lappend(result->relsType, relType);
 				MemoryContextSwitchTo(cur_memorycontext);
 				if (needToChangeHash2Random) {
+					result->forbid_optimizer = true;
 					allocate_random_relation(rel_data, &log_context, &idMap, 	&assignment_context, context);
 				}
 			}
@@ -3728,6 +3730,7 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 				relType->isHash = false;
 				result->relsType = lappend(result->relsType, relType);
 				MemoryContextSwitchTo(cur_memorycontext);
+				result->forbid_optimizer = true;
 				allocate_random_relation(rel_data, &log_context,&idMap, &assignment_context, context);
 			}
 
@@ -3834,7 +3837,7 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 	result = (SplitAllocResult *) palloc(sizeof(SplitAllocResult));
 	result->relsType = NIL;
 	result->datalocalityInfo = makeStringInfo();
-
+	result->forbid_optimizer = false;
 	/* fake data locality */
 	if (debug_fake_datalocality) {
 		fp = fopen("/tmp/cdbdatalocality.result", "w+");

@@ -55,7 +55,6 @@ struct GpPolicy;
 struct PartitionSelector;
 struct SelectedParts;
 struct Motion;
-struct QueryResource;
 
 namespace gpdb {
 
@@ -489,12 +488,6 @@ namespace gpdb {
     // and the parts are distributed differently, return Random distribution
     GpPolicy *Pdistrpolicy(Relation rel);
     
-    // return active relation distribution types
-    List *PlActiveRelTypes(void);
-
-    // return active query resource
-    QueryResource *PqrActiveQueryResource(void);
-
     // return true if the table is partitioned and hash-distributed, and one of  
     // the child partitions is randomly distributed
     BOOL FChildPartDistributionMismatch(Relation rel);

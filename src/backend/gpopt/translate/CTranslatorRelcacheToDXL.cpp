@@ -58,7 +58,6 @@
 #include "catalog/pg_exttable.h"
 
 #include "cdb/cdbpartition.h"
-#include "cdb/cdbdatalocality.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_statistic.h"
 
@@ -505,52 +504,6 @@ CTranslatorRelcacheToDXL::CheckUnsupportedRelation
 
 //---------------------------------------------------------------------------
 //	@function:
-//		CTranslatorRelcacheToDXL::FTreatAsRandom
-//
-//	@doc:
-//		Whether we need to treat a hash distributed table as random distributed
-//
-//---------------------------------------------------------------------------
-BOOL
-CTranslatorRelcacheToDXL::FTreatAsRandom
-	(
-	OID oid,
-	GpPolicy *pgppolicy
-	)
-{
-	QueryResource *resource = gpdb::PqrActiveQueryResource();
-	if (NULL == resource)
-	{
-		// no resource has been allocated. In this case we are inside an 'explain',
-		// no hash to random conversion will happen
-		return false;
-	}
-
-	List *lRelsType = gpdb::PlActiveRelTypes();
-	ListCell *lc = NULL;
-	foreach(lc, lRelsType)
-	{
-		CurrentRelType *relType = (CurrentRelType *) lfirst(lc);
-		if (relType->relid == oid)
-		{
-			/* a hash distributed table can be considered as hash if
-			 * 1. The active relation type is hash
-			 * 2. The bucketnum of this relation matches the number of vSegs allocated
-			 */
-			if (relType->isHash && pgppolicy->bucketnum == list_length(resource->segments))
-			{
-				return false; // keep hash distributed
-			}
-			break;
-		}
-	}
-
-	return true;
-}
-
-
-//---------------------------------------------------------------------------
-//	@function:
 //		CTranslatorRelcacheToDXL::Pmdrel
 //
 //	@doc:
@@ -585,7 +538,7 @@ CTranslatorRelcacheToDXL::Pmdrel
 	DrgPmdid *pdrgpmdidIndexes = NULL;
 	DrgPmdid *pdrgpmdidTriggers = NULL;
 	DrgPul *pdrgpulPartKeys = NULL;
-	BOOL fConvertHashToRandom = false;
+	BOOL fChildDistributionMismatch = false;
 	DrgPdrgPul *pdrgpdrgpulKeys = NULL;
 	DrgPmdid *pdrgpmdidCheckConstraints = NULL;
 	BOOL fTemporary = false;
@@ -609,15 +562,13 @@ CTranslatorRelcacheToDXL::Pmdrel
 		// get distribution policy
 		GpPolicy *pgppolicy = gpdb::Pdistrpolicy(rel);
 		ereldistribution = Ereldistribution(pgppolicy);
+		fChildDistributionMismatch = gpdb::FChildPartDistributionMismatch(rel);
 
-		// determine if table should be treated as randomly distributed, otherwise get distribution columns
+		// get distribution columns
 		if (IMDRelation::EreldistrHash == ereldistribution)
 		{
-			fConvertHashToRandom = FTreatAsRandom(oid, pgppolicy);
 			pdrpulDistrCols = PdrpulDistrCols(pmp, pgppolicy, pdrgpmdcol, ulMaxCols);
 		}
-
-		fConvertHashToRandom = fConvertHashToRandom || gpdb::FChildPartDistributionMismatch(rel);
 
 		// collect relation indexes
 		pdrgpmdidIndexes = PdrgpmdidRelIndexes(pmp, rel);
@@ -684,7 +635,6 @@ CTranslatorRelcacheToDXL::Pmdrel
 							ereldistribution,
 							pdrgpmdcol,
 							pdrpulDistrCols,
-							fConvertHashToRandom,
 							pdrgpdrgpulKeys,
 							pdrgpmdidIndexes,
 							pdrgpmdidTriggers,
@@ -710,7 +660,7 @@ CTranslatorRelcacheToDXL::Pmdrel
 							pdrgpmdcol,
 							pdrpulDistrCols,
 							pdrgpulPartKeys,
-							fConvertHashToRandom,
+							fChildDistributionMismatch,
 							pdrgpdrgpulKeys,
 							pdrgpmdidIndexes,
 							pdrgpmdidTriggers,

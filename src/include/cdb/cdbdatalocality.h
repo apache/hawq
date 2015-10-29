@@ -28,6 +28,8 @@ typedef struct SplitAllocResult
   int planner_segments;
   List *relsType;// relation type after datalocality changing
   StringInfo datalocalityInfo;
+  //orca currently doesn't support hash table to be processed as random table.
+  bool forbid_optimizer;
 } SplitAllocResult;
 
 /*
