@@ -668,7 +668,7 @@ ExplainExecuteQuery(ExecuteStmt *execstmt, ExplainStmt *stmt, const char * query
 	
 	
 	query_list = copyObject(entry->query_list); /* planner scribbles on query tree */
-	stmt_list = pg_plan_queries(query_list, paramLI, false, stmt->analyze ? QRL_ONCE : QRL_NONE);
+	stmt_list = pg_plan_queries(query_list, paramLI, false, QRL_ONCE);
 	
 	Assert(list_length(query_list) == list_length(stmt_list));
 

@@ -348,7 +348,7 @@ make_subplan(PlannerInfo *root, Query *orig_subquery, SubLinkType subLinkType,
 {
 	Query	   *subquery = NULL;
 	double		tuple_fraction = 1.0;
-	bool hasResource = root->glob->allocatedResource;
+	bool hasResource = (root->glob->resource != NULL);
 	/*
 	 * Copy the source Query node.	This is a quick and dirty kluge to resolve
 	 * the fact that the parser can generate trees with multiple links to the

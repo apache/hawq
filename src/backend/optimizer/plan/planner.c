@@ -578,18 +578,6 @@ standard_planner(Query *parse, int cursorOptions, ParamListInfo boundParams)
 	
 	parse = normalize_query(parse);
 
-	if (NULL == resource)
-	{
-	  glob->allocatedResource = false;
-	}
-	else
-	{
-	  /*
-	   * determine the segment number for this query.
-	   */
-	  glob->allocatedResource = true;
-	}
-
 	glob->resource = resource;
 
 	glob->relsType =relsType;

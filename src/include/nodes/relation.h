@@ -108,8 +108,6 @@ typedef struct PlannerGlobal
 	
 	struct QueryResource *resource;	/* the resource for the plan to be optimized and executed */
 
-	bool allocatedResource;     /* indicate whether resource has been allocated */
-
 	List* relsType; /* relation and relation runtime type list. for hash table may convert to random table in runtime*/
 } PlannerGlobal;
 

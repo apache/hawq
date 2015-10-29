@@ -270,7 +270,7 @@ cdbpathlocus_from_baserel(struct PlannerInfo   *root,
 {
     CdbPathLocus result;
     GpPolicy   *policy = rel->cdbpolicy;
-    bool allocatedResource = root->glob->allocatedResource;
+    bool allocatedResource = (root->glob->resource != NULL);
 	
     if ( Gp_role != GP_ROLE_DISPATCH )
     {
@@ -282,7 +282,7 @@ cdbpathlocus_from_baserel(struct PlannerInfo   *root,
     {
 		    /* Are the rows distributed by hashing on specified columns? */
 		    bool isRelationRuntimeHash = true;
-		    if (root->glob->resource != NULL && root->glob->relsType != NIL) {
+		    if (allocatedResource && root->glob->relsType != NIL) {
 			      List* relsType = root->glob->relsType;
 			      Oid baseRelOid = 0;
 			      ListCell *lc;

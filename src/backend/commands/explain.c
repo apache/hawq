@@ -319,7 +319,7 @@ ExplainOneQuery(Query *query, ExplainStmt *stmt, const char *queryString,
 
 	/* plan the query */
 	//pstmt = planner(query, cursorOptions, params);
- 	plan = pg_plan_query(query,/*0,*/ params, stmt->analyze ? QRL_ONCE : QRL_NONE);
+ 	plan = pg_plan_query(query,/*0,*/ params, QRL_ONCE);
 
 	/*
 	 * Update snapshot command ID to ensure this query sees results of any
@@ -790,7 +790,7 @@ ExplainOnePlan_internal(PlannedStmt *plannedstmt,
     /*
      * Display final elapsed time.
      */
-	if (stmt->analyze)
+	if (stmt->analyze || stmt->verbose)
 	{
 		dispatcher_print_statistics(buf, estate->dispatch_data);
 		appendStringInfo(buf, "Data locality statistics:\n");

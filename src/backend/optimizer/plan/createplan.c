@@ -1226,7 +1226,7 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 	Oid				fmtErrTblOid = InvalidOid;
 	List			*segments = NIL;
 	ListCell		*lc;
-	bool hasResource = ctx->root->glob->allocatedResource;
+	bool allocatedResource = (ctx->root->glob->resource != NULL);
 
 	/* various processing flags */
 	bool			using_execute = false; /* true if EXECUTE is used */
@@ -1253,7 +1253,7 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 	scan_clauses = order_qual_clauses(ctx->root, scan_clauses);
 
 	/* get the total valid primary segdb count */
-	if (hasResource)
+	if (allocatedResource)
 	{
 	  segments = ctx->root->glob->resource->segments;
 	  total_primaries = list_length(segments);
@@ -1284,7 +1284,7 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 
 	/* various validations */
 
-	if(rel->writable && hasResource)
+	if(rel->writable && allocatedResource)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				errmsg("it is not possible to read from a WRITABLE external table."),
@@ -1428,7 +1428,7 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 			/*
 			 * We failed to find a segdb for this URI.
 			 */
-			if(hasResource && (!found_match))
+			if(allocatedResource && (!found_match))
 			{
 				if(uri->protocol == URI_FILE)
 				{
@@ -1535,7 +1535,7 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 				 total_primaries);
 		}
 
-		if(hasResource && (list_length(rel->locationlist) > num_segs_participating))
+		if(allocatedResource && (list_length(rel->locationlist) > num_segs_participating))
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
 					 errmsg("There are more external files (URLs) than primary "
@@ -1564,7 +1564,7 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 					break;
 				}
 
-				if(hasResource && (list_length(modifiedloclist) > num_segs_participating))
+				if(allocatedResource && (list_length(modifiedloclist) > num_segs_participating))
 				{
 					elog(ERROR, "External scan location list failed building distribution.");
 				}
@@ -1622,7 +1622,7 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 			 * when is_custom_hd is true it means that the HD segment allocation algorithm
 			 * is activated and in this case it is not necessarily true that all segments are allocated
 			 */
-			if(hasResource && (!found_match))
+			if(allocatedResource && (!found_match))
 			{
 				/* should never happen */
 				elog(LOG, "external tables gpfdist(s) allocation error. "
@@ -1737,7 +1737,7 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 				}
 			}
 
-			if (hasResource && (!match_found))
+			if (allocatedResource && (!match_found))
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
 						 errmsg("Could not assign a segment database for "
@@ -1764,7 +1764,7 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 				}
 			}
 
-			if(hasResource && (!match_found))
+			if(allocatedResource && (!match_found))
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
 						 errmsg("Could not assign a segment database for "
@@ -1779,7 +1779,7 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 
 			int		num_segs_to_use = atoi(on_clause + strlen("TOTAL_SEGS:"));
 
-			if(hasResource && (num_segs_to_use > total_primaries))
+			if(allocatedResource && (num_segs_to_use > total_primaries))
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
 						 errmsg("Table defined with EXECUTE ON %d but there "
