@@ -2,8 +2,12 @@
  *
  * gpcheckhdfs.c
  *
- * This file mainly provide checking Hdfs when run gpinitsystem.It uses libhdfs
- * to communicate with HDFS.
+ * This file mainly provide functionalities to check status of
+ * HDFS cluster when:
+ *     1. doing HAWQ cluster initialization;
+ *     2. monitoring HDFS cluster health manually.
+ *
+ * It uses libhdfs to communicate with HDFS.
  *
  * Copyright (c) 2014, Greenplum inc
  *
@@ -246,7 +250,7 @@ int testHdfsExisted(hdfsFS fs, const char * filepath, const char * dfscompleteur
 
         if (NULL == fi || num != 0) {
             fprintf(stderr, "ERROR: failed to list directory %s or it is not empty\n"
-                    "Please Check your filepath before run gpinitsystem\n", dfscompleteurl);
+                    "Please Check your filepath before doing HAWQ cluster initialization.\n", dfscompleteurl);
             return DFSDIR_ERR;
         }
     }
