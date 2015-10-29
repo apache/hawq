@@ -1246,6 +1246,8 @@ int RB2YARN_initializeConnection(void)
 	return FUNCTION_SUCCEEDED;
 }
 
+#define HAWQ_YARN_AM_HEARTBEAT_INTERVAL 5
+
 /* Connect and disconnect to the global resource manager. */
 int RB2YARN_connectToYARN(void)
 {
@@ -1261,7 +1263,7 @@ int RB2YARN_connectToYARN(void)
 						       YARNAMPort,
 						       YARNTRKUrl,
 						       &LIBYARNClient,
-						       5*1000 /* Hard code 5 sec */);
+						       HAWQ_YARN_AM_HEARTBEAT_INTERVAL*1000 /* Hard code 5 sec */);
     return yarnres;
 }
 
@@ -1299,7 +1301,7 @@ int RB2YARN_registerYARNApplication(void)
 		{
 			if (retry > 0) {
 				retry--;
-				usleep(5*1000*1000L);
+				usleep(HAWQ_YARN_AM_HEARTBEAT_INTERVAL*1000*1000L);
 				continue;
 			} else {
 				elog(WARNING, "YARN mode resource broker failed to get application report, "
@@ -1315,7 +1317,7 @@ int RB2YARN_registerYARNApplication(void)
 		{
 			if (retry > 0) {
 				retry--;
-				usleep(5*1000*1000L);
+				usleep(HAWQ_YARN_AM_HEARTBEAT_INTERVAL*1000*1000L);
 				continue;
 			} else {
 				elog(WARNING, "YARN mode resource broker failed to register itself in Hadoop Yarn."
