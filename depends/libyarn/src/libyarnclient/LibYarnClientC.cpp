@@ -43,7 +43,7 @@ extern "C" {
 			}
 
 			int forceKillJob(string &jobId) {
-				return client->forceKill(jobId);
+				return client->forceKillJob(jobId);
 			}
 
 			int addContainerRequests(string &jobId,
