@@ -34,12 +34,13 @@ CREATE EXTERNAL TABLE EXT_NATION  ( N_NATIONKEY  INTEGER ,
                             N_COMMENT    VARCHAR(152))
 location ('file://@hostname@@abs_srcdir@/data/nation.tbl' )
 FORMAT 'text' (delimiter '|');
+ERROR:  the file protocol for external tables is deprecated
+HINT:  use the gpfdist protocol or COPY FROM instead
 CREATE EXTERNAL TABLE EXT_REGION  (LIKE REG_REGION)
 location ('file://@hostname@@abs_srcdir@/data/region.tbl' )
 FORMAT 'text' (delimiter '|');
--- drop tables
-DROP EXTERNAL TABLE EXT_NATION;
-DROP EXTERNAL TABLE EXT_REGION;
+ERROR:  the file protocol for external tables is deprecated
+HINT:  use the gpfdist protocol or COPY FROM instead
 -- start_ignore
 -- --------------------------------------
 -- check platform
@@ -60,7 +61,7 @@ select * from check_ps;
 ERROR:  external table check_ps command ended with error.  (seg0 slice1 @hostname@:50000 pid=64819)
 DETAIL:  Command: execute:( (ps -ef || ps -aux) | grep gpfdist | grep -v grep)
 select * from check_env;
-                                                                                                                                                    x                                                                                                                                                     
+                                                                                                                                                                                                                                      x                                                                                                                                                                                                                                      
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  CLICOLOR=1
  DYLD_LIBRARY_PATH=/Users/@gpcurusername@/greenplum-db-devel/lib:/Users/@gpcurusername@/greenplum-db-devel/ext/python/lib:/opt/gcc_infrastructure/lib:/Users/@gpcurusername@/greenplum-perfmon-web-4.0.1.0/lib:/Users/@gpcurusername@/greenplum-db-devel/lib:/Users/@gpcurusername@/greenplum-db-devel/ext/python/lib:
@@ -157,9 +158,9 @@ select * from gpfdist_start;
 (1 row)
 
 select * from gpfdist_status;
-                                            x                                             
----------------------------------------------------------------------------
- Okay, gpfdist version "main build dev" is running on @hostname@:7070.
+                                    x
+-------------------------------------------------------------------------
+ Okay, gpfdist version "2.0.0.0 build dev" is running on localhost:7070.
 (1 row)
 
 -- end_ignore
@@ -244,9 +245,9 @@ SELECT * FROM EXT_REGION as r, EXT_NATION as n WHERE n.N_REGIONKEY = r.R_REGIONK
 
 -- start_ignore
 select * from gpfdist_status;
-                                            x                                             
----------------------------------------------------------------------------
- Okay, gpfdist version "main build dev" is running on @hostname@:7070.
+                                    x
+-------------------------------------------------------------------------
+ Okay, gpfdist version "2.0.0.0 build dev" is running on localhost:7070.
 (1 row)
 
 select * from gpfdist_stop;
@@ -308,9 +309,9 @@ select * from gpfdist_csv_start;
 (1 row)
 
 select * from gpfdist_status;
-                                            x                                             
----------------------------------------------------------------------------
- Okay, gpfdist version "main build dev" is running on @hostname@:7070.
+                                    x
+-------------------------------------------------------------------------
+ Okay, gpfdist version "2.0.0.0 build dev" is running on localhost:7070.
 (1 row)
 
 -- end_ignore
@@ -556,15 +557,9 @@ drop external table ext_mpp12839;
 -- test for exec child process stderr showing in error message
 --
 create external web table ext_stderr1(a text) execute 'nosuchcommand' format 'text';
+ERROR:  the ON ALL syntax for external tables is deprecated
 create external web table ext_stderr2(a text) execute 'cat nosuchfile.txt' format 'text';
-select * from ext_stderr1;
-ERROR:  external table ext_stderr1 command ended with error. sh: nosuchcommand: command not found  (seg0 slice1 @hostname@:50000 pid=64819)
-DETAIL:  Command: execute:nosuchcommand
-select * from ext_stderr2;
-ERROR:  external table ext_stderr2 command ended with error. cat: nosuchfile.txt: No such file or directory  (seg0 slice1 @hostname@:50000 pid=64819)
-DETAIL:  Command: execute:cat nosuchfile.txt
-drop external web table ext_stderr1;
-drop external web table ext_stderr2;
+ERROR:  the ON ALL syntax for external tables is deprecated
 --
 -- bad csv (quote must be a single char)
 --
@@ -582,17 +577,6 @@ LINE 1: select count(*) from bad_whois;
                              ^
 drop external table bad_whois;
 ERROR:  table "bad_whois" does not exist
---
--- try a bad location
---
-create external table badt1 (x text) 
-location ('file://@hostname@@abs_srcdir@/data/no/such/place/badt1.tbl' )
-format 'text' (delimiter '|');
-select * from badt1;
-NOTICE:  gfile stat @abs_srcdir@/data/no/such/place/badt1.tbl failure: No such file or directory  (seg0 slice1 @hostname@:50000 pid=64819)
-NOTICE:  fstream unable to open file @abs_srcdir@/data/no/such/place/badt1.tbl  (seg0 slice1 @hostname@:50000 pid=64819)
-ERROR:  could not open "file://@hostname@@abs_srcdir@/data/no/such/place/badt1.tbl" for reading: 404 file not found  (seg0 slice1 @hostname@:50000 pid=64819)
-drop external table badt1;
 --
 -- try a bad protocol
 --
@@ -641,7 +625,13 @@ ERROR:  protocol "bad_protocol" does not exist
 -- CREATE WRITABLE EXTERNAL TABLE ext_w(a int) location('demoprot://demoprotfile.txt') format 'text'; -- should fail
 -- CREATE READABLE EXTERNAL TABLE ext_r(a int) location('demoprot://demoprotfile.txt') format 'text'; -- should fail
 -- RESET SESSION AUTHORIZATION;
+-- 0|AFRICA|lar deposits. blithely final packages cajole. regular waters are final requests. regular accounts are according to 
+-- 1|AMERICA|hs use ironic, even requests. s
+-- 2|ASIA|ges. thinly even pinto beans ca
+-- 3|EUROPE|ly final courts cajole furiously final excuse
 -- ALTER PROTOCOL demoprot_untrusted OWNER TO extprotu; -- should fail. protocol is not trusted
+-- COPY reg_region FROM STDIN DELIMITER '|';
+-- COPY wet_region FROM STDIN DELIMITER '|';
 -- GRANT SELECT ON PROTOCOL demoprot_untrusted TO extprotu; -- should fail. protocol is not trusted
 -- GRANT SELECT ON PROTOCOL demoprot TO extprotu;
 -- GRANT INSERT ON PROTOCOL demoprot TO extprotu;
@@ -669,14 +659,13 @@ ERROR:  protocol "bad_protocol" does not exist
 create writable external table wet_pos1(a text, b text) location('gpfdist://@hostname@:7070/wet.out') format 'text';
 create writable external table wet_pos2(a text, b text) location('gpfdist://@hostname@:7070/wet.out') format 'text' distributed by(b);
 create writable external table wet_pos3(like wet_pos2) location('gpfdist://@hostname@:7070/wet.out') format 'text' distributed by(a,b);
-create writable external web table wet_pos4(a text, b text) execute 'some command' format 'text';
 create writable external table wet_region(like reg_region) location('gpfdist://@hostname@:7070/wet_region.out') format 'text';
 NOTICE:  Table doesn't have 'distributed by' clause, defaulting to distribution columns from LIKE table
 create readable external table ret_region(like wet_region) location('gpfdist://@hostname@:7070/wet_region.out') format 'text';
 -- negative
 create writable external table wet_neg1(a text, b text) location('file://@hostname@@abs_srcdir@/badt1.tbl') format 'text';
-ERROR:  unsupported URI protocol 'file' for writable external table
-HINT:  Writable external tables may use 'gpfdist(s)' URIs only.
+ERROR:  the file protocol for external tables is deprecated
+HINT:  use the gpfdist protocol or COPY FROM instead
 create writable external table wet_neg1(a text, b text) location('gpfdist://@hostname@:7070/wet.out', 'gpfdist://@hostname@:7070/wet.out') format 'text';
 ERROR:  location uri "gpfdist://@hostname@:7070/wet.out" appears more than once
 create writable external web table wet_pos5(a text, b text) execute 'some command' on segment 0 format 'text';
@@ -686,19 +675,13 @@ ERROR:  ON clause may not be used with a writable external table
 --
 select * from wet_pos1;
 ERROR:  it is not possible to read from a WRITABLE external table.
-HINT: Create the table as READABLE instead
+HINT:  Create the table as READABLE instead
 --
 -- WET: export some data with INSERT SELECT, INSERT and COPY. 
+-- \.
+-- \.
 --
--- COPY reg_region FROM STDIN DELIMITER '|';
--- 0|AFRICA|lar deposits. blithely final packages cajole. regular waters are final requests. regular accounts are according to 
--- 1|AMERICA|hs use ironic, even requests. s
--- \.
 INSERT INTO wet_region SELECT * from reg_region;
--- COPY wet_region FROM STDIN DELIMITER '|';
--- 2|ASIA|ges. thinly even pinto beans ca
--- 3|EUROPE|ly final courts cajole furiously final excuse
--- \.
 INSERT INTO wet_region VALUES(4,'MIDDLE EAST','uickly special');
 --
 -- Now use RET to see if data was exported correctly.
@@ -713,9 +696,9 @@ SELECT DISTINCT(R_NAME) FROM ret_region ORDER BY R_NAME;
 
 -- start_ignore
 select * from gpfdist_status;
-                                            x                                             
----------------------------------------------------------------------------
- Okay, gpfdist version "main build dev" is running on @hostname@:7070.
+                                    x
+-------------------------------------------------------------------------
+ Okay, gpfdist version "2.0.0.0 build dev" is running on localhost:7070.
 (1 row)
 
 select * from gpfdist_stop;
@@ -765,16 +748,12 @@ ERROR:  connection with gpfdist failed for gpfdist://@hostname@:7070/whois.csv. 
 -- DROP ROLE exttab1_u1;
 -- DROP ROLE exttab1_u2;
 drop external table ext_whois;
-drop external table gpfdist_status;
-drop external table gpfdist_start;
 drop external table gpfdist_csv_start;
-drop external table gpfdist_stop;
 drop external table check_ps;
 drop external table check_env;
 drop external table wet_pos1;
 drop external table wet_pos2;
 drop external table wet_pos3;
-drop external table wet_pos4;
 drop external table wet_region;
 drop external table ret_region;
 drop table reg_region;
@@ -786,14 +765,14 @@ CREATE EXTERNAL TABLE exttabletest.EXT_NATION  ( N_NATIONKEY  INTEGER ,
                             N_NAME       CHAR(25) ,
                             N_REGIONKEY  INTEGER ,
                             N_COMMENT    VARCHAR(152))
-location ('file://@hostname@@abs_srcdir@/data/nation.tbl' )
+location ('gpfdist://host:8000/nation.tbl' )
 FORMAT 'text' (delimiter '|');
 -- Don't just return the row, as we'll get skew from OID differences between
 -- runs.
 select count(*) from pg_catalog.pg_exttable where reloid in (select r.oid from pg_class r where r.relname in ('ext_nation', 'ext_whois', 'gpfdist_status'));
  count 
 -------
-     1
+     2
 (1 row)
 
 drop schema exttabletest cascade;
@@ -801,7 +780,7 @@ NOTICE:  drop cascades to external table exttabletest.ext_nation
 select count(*) from pg_catalog.pg_exttable where reloid in (select r.oid from pg_class r where r.relname in ('ext_nation', 'ext_whois', 'gpfdist_status'));
  count 
 -------
-     0
+     1
 (1 row)
 
 SET gp_foreign_data_access = false;
@@ -812,11 +791,33 @@ GRANT INSERT ON PROTOCOL pxf TO nonsuperproto;
 REVOKE SELECT ON PROTOCOL pxf FROM nonsuperproto;
 REVOKE INSERT ON PROTOCOL pxf FROM nonsuperproto;
 DROP USER nonsuperproto;
+-- start_ignore
+select * from gpfdist_status;
+                          x                           
+------------------------------------------------------
+ Error: gpfdist is not running (reason: socket error)
+ Exit: 1
+ 
+(3 rows)
+
+select * from gpfdist_start;
+      x      
+-------------
+ starting...
+(1 row)
+
+select * from gpfdist_status;
+                                    x
+-------------------------------------------------------------------------
+ Okay, gpfdist version "2.0.0.0 build dev" is running on localhost:7070.
+(1 row)
+
+-- end_ignore
 -- Tests for MPP17980: generating artificial CTIDs for external table scans
 -- This is necessary because the planner currently generates plans that include
 -- the CTID attribute for external tables.
 CREATE EXTERNAL TABLE ext_mpp17980 ( id int , id1 int , id2 int)
-LOCATION ('file://@hostname@@abs_srcdir@/data/mpp17980.data')
+LOCATION ('gpfdist://@hostname@:7070/mpp17980.data')
 FORMAT 'CSV' ( DELIMITER ',' NULL ' ');
 CREATE TABLE mpp17980 (id int, date date, amt decimal(10,2))
 DISTRIBUTED randomly PARTITION BY RANGE (date)
@@ -872,3 +873,28 @@ SELECT ctid, * FROM ext_mpp17980;
 
 DROP EXTERNAL TABLE ext_mpp17980;
 DROP TABLE mpp17980;
+-- start_ignore
+select * from gpfdist_status;
+                                    x
+-------------------------------------------------------------------------
+ Okay, gpfdist version "2.0.0.0 build dev" is running on localhost:7070.
+(1 row)
+
+select * from gpfdist_stop;
+      x      
+-------------
+ stopping...
+(1 row)
+
+select * from gpfdist_status;
+                          x                           
+------------------------------------------------------
+ Error: gpfdist is not running (reason: socket error)
+ Exit: 1
+ 
+(3 rows)
+
+-- end_ignore
+drop external table gpfdist_status;
+drop external table gpfdist_start;
+drop external table gpfdist_stop;
