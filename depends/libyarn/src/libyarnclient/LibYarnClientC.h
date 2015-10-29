@@ -50,6 +50,7 @@ typedef struct LibYarnApplicationReport_t {
 	enum YarnApplicationState status;
 	char *diagnostics;
 	int64_t startTime;
+	float progress;
 }LibYarnApplicationReport_t;
 
 typedef struct LibYarnContainerReport_t {
@@ -137,6 +138,8 @@ int newLibYarnClient(char* user, char *rmHost, char *rmPort,
 void deleteLibYarnClient(LibYarnClient_t *client);
 
 int createJob(LibYarnClient_t *client, char *jobName, char *queue,char **jobId);
+
+int forceKillJob(LibYarnClient_t *client, char *jobId);
 
 int addContainerRequest(LibYarnNodeInfo_t preferredHosts[], int preferredHostsSize,
 						int32_t priority, bool relax_locality);

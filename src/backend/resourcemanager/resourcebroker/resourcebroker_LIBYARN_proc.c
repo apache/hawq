@@ -1267,7 +1267,8 @@ int RB2YARN_connectToYARN(void)
 
 int RB2YARN_registerYARNApplication(void)
 {
-	int yarnres = FUNCTION_SUCCEEDED;
+	int yarnres = FUNCTION_SUCCEEDED, result = FUNCTION_SUCCEEDED;
+
 	yarnres = createJob(LIBYARNClient,
 					    YARNAppName.Str,
 						YARNQueueName.Str,
@@ -1276,20 +1277,43 @@ int RB2YARN_registerYARNApplication(void)
 		elog(WARNING, "YARN mode resource broker failed to create application "
 					  "in YARN resource manager. %s",
 					  getErrorMessage());
+		return yarnres;
 	}
-	else {
-		elog(LOG, "YARN mode resource broker created job in YARN resource "
-				  "manager %s as new application %s assigned to queue %s.",
-				  YARNJobID,
-				  YARNAppName.Str,
-                  YARNQueueName.Str);
 
-		ResBrokerStartTime = gettime_microsec();
+	elog(LOG, "YARN mode resource broker created job in YARN resource "
+			  "manager %s as new application %s assigned to queue %s.",
+			  YARNJobID,
+			  YARNAppName.Str,
+			  YARNQueueName.Str);
 
-		elog(LOG, "YARN mode resource broker registered new "
-				  "YARN application. Start time stamp "UINT64_FORMAT,
-				  ResBrokerStartTime);
+	/* check if hawq is registered successfully in Hadoop Yarn.
+	 * if not, kill application from Hadoop Yarn.
+	 */
+	LibYarnApplicationReport_t *applicationReport = NULL;
+	result = getApplicationReport(LIBYARNClient, YARNJobID, &applicationReport);
+	if (result != FUNCTION_SUCCEEDED || applicationReport == NULL) {
+		elog(WARNING, "YARN mode resource broker failed to get application report, "
+					  "so kill it from Hadoop Yarn.");
+		result = forceKillJob(LIBYARNClient, YARNJobID);
+		if (result != FUNCTION_SUCCEEDED)
+			elog(WARNING, "YARN mode resource broker kill job failed.");
+		return FUNCTION_FAILED;
 	}
+	if (applicationReport->progress < 0.5) {
+		elog(WARNING, "YARN mode resource broker failed to register itself in Hadoop Yarn."
+					  "Got progress:%f, and try to kill application from Hadoop Yarn", applicationReport->progress);
+		result = forceKillJob(LIBYARNClient, YARNJobID);
+		if (result != FUNCTION_SUCCEEDED)
+			elog(WARNING, "YARN mode resource broker kill job failed.");
+		return FUNCTION_FAILED;
+	}
+
+	ResBrokerStartTime = gettime_microsec();
+
+	elog(LOG, "YARN mode resource broker registered new "
+			  "YARN application. Progress:%f, Start time stamp "UINT64_FORMAT,
+			  applicationReport->progress, ResBrokerStartTime);
+
 	return yarnres;
 }
 
