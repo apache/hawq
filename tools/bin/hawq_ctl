@@ -19,7 +19,7 @@ try:
     from gppylib.commands import gp
     from gppylib import userinput
     from hawqpylib.hawqlib import local_ssh, HawqCommands, HawqXMLParser, parse_hosts_file,\
-        remove_property_xml, sync_hawq_site, check_error_code
+        remove_property_xml, sync_hawq_site, check_return_code
     from hawqpylib.HAWQ_HELP import *
     from gppylib.db import dbconn
     from pygresql.pg import DatabaseError
@@ -133,11 +133,7 @@ class HawqInit:
               (self.GPHOME, self.dfs_url, self.enable_secure_filesystem, self.krb_server_keyfile)
         logger.info("Check if hdfs path is available.")
         logger.debug("Check hdfs: %s" % cmd)
-        result = local_ssh(cmd)
-        if result != 0:
-            logger.error("Check hdfs failed, please verify your hdfs settings.")
-            sys.exit(1)
-        return result
+        check_return_code(local_ssh(cmd), logger, "Check hdfs failed, please verify your hdfs settings.")
 
     def set_total_vsegment_num(self):
         cmd = "%s; hawq config -c default_segment_num -v %s --skipvalidation -q > /dev/null" % \
@@ -189,16 +185,10 @@ class HawqInit:
             signal.signal(signal.SIGINT,signal.SIG_IGN)
             cmd = "%s; hawq stop cluster -a -q" % source_hawq_env
             logger.info("Stop HAWQ cluster.")
-            result = local_ssh(cmd)
-            if result != 0:
-                logger.error("Stop HAWQ cluster failed, exit.")
-                sys.exit(1)
+            check_return_code(local_ssh(cmd), logger, "Stop HAWQ cluster failed, exit.")
             logger.info("Start HAWQ master.")
             cmd = "%s; hawq start master -m -q" % source_hawq_env
-            result = local_ssh(cmd)
-            if result != 0:
-                logger.error("Start HAWQ master failed, exit.")
-                sys.exit(1)
+            check_return_code(local_ssh(cmd), logger, "Start HAWQ master failed, exit.")
 
             try:
                 logger.info('Remove standby from Database catalog.')
@@ -215,17 +205,11 @@ class HawqInit:
                 logger.info('Database catalog updated successfully.')
                 logger.info("Stop HAWQ master.")
                 cmd = "%s; hawq stop master -a" % source_hawq_env
-                result = local_ssh(cmd)
-                if result != 0:
-                    logger.error("Stop hawq master failed, exit.")
-                    sys.exit(1)
+                check_return_code(local_ssh(cmd), logger, "Stop hawq master failed, exit.")
             except DatabaseError, ex:
                 logger.error("Failed to connect to database, this script can only be run when the database is up.")
                 cmd = "%s; hawq stop master -a" % source_hawq_env
-                result = local_ssh(cmd)
-                if result != 0:
-                    logger.error("Stop hawq master failed, exit.")
-                sys.exit(1)
+                check_return_code(local_ssh(cmd), logger, "Stop hawq master failed, exit.")
             remove_property_xml("hawq_standby_address_host", "%s/etc/hawq-site.xml" % self.GPHOME)
             host_list = parse_hosts_file(self.GPHOME)
             sync_hawq_site(self.GPHOME, host_list)
@@ -241,10 +225,8 @@ class HawqInit:
 
             logger.debug("rm -rf %s %s" % (self.master_data_directory, tmp_dir_list))
             cmd = "rm -rf %s %s" % (self.master_data_directory, tmp_dir_list)
-            result = remote_ssh(cmd, self.standby_host_name, self.user)
-            if result != 0:
-                logger.error("Delete standby master's directories failed, exit.")
-                sys.exit(1)
+            check_return_code(remote_ssh(cmd, self.standby_host_name, self.user), logger, \
+                              "Delete standby master's directories failed, exit.")
             signal.signal(signal.SIGINT,signal.default_int_handler)
             logger.info('Remove standby master finished.')
         else:
@@ -253,10 +235,7 @@ class HawqInit:
     def _resync_standby(self):
         logger.info("Re-sync standby.")
         cmd = "%s; hawq stop cluster -a" % source_hawq_env
-        result = local_ssh(cmd)
-        if result != 0:
-            logger.error("Stop hawq cluster failed, exit.")
-            sys.exit(1)
+        check_return_code(local_ssh(cmd), logger, "Stop hawq cluster failed, exit.")
         cmd = "cd %s; %s; %s/bin/lib/pysync.py -x gpperfmon/data -x pg_log -x db_dumps %s %s:%s" % \
                  (self.master_data_directory, source_hawq_env,  self.GPHOME, self.master_data_directory,
                   self.standby_host_name, self.master_data_directory)
@@ -281,20 +260,13 @@ class HawqInit:
     def _init_cluster(self):
         logger.info("%s segment hosts defined" % self.hosts_count_number)
         logger.info("Set default_segment_num as: %s" % self.total_vseg_num)
-        result = self.set_total_vsegment_num()
-        if result != 0:
-            sys.exit(1)
-        result = self.set_vsegment_num_per_node()
-        if result != 0:
-            sys.exit(1)
+        check_return_code(self.set_total_vsegment_num())
+        check_return_code(self.set_vsegment_num_per_node())
+
         master_cmd = self._get_master_init_cmd()
         logger.info("Start to init master node: '%s'" % self.master_host_name)
-        result = local_ssh(master_cmd)
-        if result != 0:
-            logger.error("Master init failed, exit")
-            sys.exit(1)
-        else:
-            logger.info("Master init successfully")
+        check_return_code(local_ssh(master_cmd), logger, "Master init failed, exit", \
+                          "Master init successfully")
 
         segment_cmd_str = self._get_segment_init_cmd()
         # Execute segment init command on each segment nodes.
@@ -326,13 +298,9 @@ class HawqInit:
             scpcmd = "scp %s/etc/slaves %s:%s/etc/slaves > /dev/null" % \
                      (self.GPHOME, self.standby_host_name, self.GPHOME)
             local_ssh(scpcmd)
-            result = remote_ssh(standby_init_cmd, self.master_host_name, self.user)
-            if result != 0:
-                logger.error("Standby master init failed, exit")
-                sys.exit(1)
-            else:
-                logger.info("Standby master init successfully")
-                logger.info("HAWQ cluster init successfully")
+            check_return_code(remote_ssh(standby_init_cmd, self.master_host_name, self.user), logger, \
+                              "Standby master init failed, exit", "Standby master init successfully")
+            logger.info("HAWQ cluster init successfully")
         return None
 
     def run(self):
@@ -340,20 +308,12 @@ class HawqInit:
             self.check_hdfs_path()
             logger.info("%s segment hosts defined" % self.hosts_count_number)
             logger.info("Set default_segment_num as: %s" % self.total_vseg_num)
-            result = self.set_total_vsegment_num()
-            if result != 0:
-                sys.exit(1)
-            result = self.set_vsegment_num_per_node()
-            if result != 0:
-                sys.exit(1)
+            check_return_code(self.set_total_vsegment_num())
+            check_return_code(self.set_vsegment_num_per_node())
             logger.info("Start to init master")
             cmd = self._get_master_init_cmd()
-            result = local_ssh(cmd)
-            if result != 0:
-                logger.error("Master init failed, exit")
-                sys.exit(1)
-            else:
-                logger.info("Master init successfully")
+            check_return_code(local_ssh(cmd), logger, \
+                              "Master init failed, exit", "Master init successfully")
         elif self.node_type == "standby" and self.remove_standby is True:
             logger.info("Try to remove standby master")
             self.hawq_remove_standby()
@@ -361,29 +321,18 @@ class HawqInit:
             logger.info("Start to init standby master")
             logger.info("This might take couple minutes, please wait...")
             if self.no_update:
-                result = self._resync_standby()
-                if result != 0:
-                    logger.error("Standby master re-sync failed, exit")
-                    sys.exit(1)
-                else:
-                    logger.info("Standby master re-sync successfully")
+                check_return_code(self._resync_standby(), logger, \
+                                  "Standby master re-sync failed, exit", \
+                                  "Standby master re-sync successfully")
             else:
                 cmd = self._get_standby_init_cmd()
-                result = local_ssh(cmd)
-                if result != 0:
-                    logger.error("Standby master init failed, exit")
-                    sys.exit(1)
-                else:
-                    logger.info("Standby master init successfully")
+                check_return_code(local_ssh(cmd), logger, "Standby master init failed, exit", \
+                                  "Standby master init successfully")
 
         elif self.node_type == "segment":
             cmd = self._get_segment_init_cmd()
-            result = local_ssh(cmd)
-            if result != 0:
-                logger.error("Segment init failed, exit")
-                sys.exit(1)
-            else:
-                logger.info("Segment init successfully")
+            check_return_code(local_ssh(cmd), logger, "Segment init failed, exit", \
+                              "Segment init successfully")
 
         elif self.node_type == "cluster":
             self.check_hdfs_path()
@@ -490,21 +439,13 @@ class HawqStart:
     def _start_all_nodes(self):
         logger.info("Start all the nodes in hawq cluster")
         logger.info("Starting master node '%s'" % self.master_host_name)
-        result = self.start_master()
-        if result != 0:
-            logger.error("Master start failed, exit")
-            sys.exit(1)
-        else:
-            logger.info("Master started successfully")
+        check_return_code(self.start_master(), logger, "Master start failed, exit", \
+                          "Master started successfully")
 
         if self.standby_host_name not in ('', 'None', 'none', 'NONE'):
             logger.info("Starting standby master '%s'" % self.standby_host_name)
-            result = self.start_standby()
-            if result != 0:
-                logger.error("Standby master start failed, exit")
-                sys.exit(1)
-            else:
-                logger.info("Standby master started successfully")
+            check_return_code(self.start_standby(), logger, "Standby master start failed, exit", 
+                              "Standby master started successfully")
         segment_cmd_str = self._start_segment_cmd()
         logger.info("Start segments in list: %s" % self.host_list)
         work_list = []
@@ -553,36 +494,20 @@ class HawqStart:
 
     def run(self):
         if self.node_type == "master":
-            result = self.start_master()
-            if result != 0:
-                logger.error("Master start failed, exit")
-                sys.exit(1)
-            else:
-                logger.info("Master started successfully")
+            check_return_code(self.start_master(), logger, \
+                              "Master start failed, exit", "Master started successfully")
         elif self.node_type == "standby":
             if self.standby_host_name == '':
                 sys.exit(1)
-            result = self.start_standby()
-            if result != 0:
-                logger.error("Standby master start failed, exit")
-                sys.exit(1)
-            else:
-                logger.info("Standby master started successfully")
+            check_return_code(self.start_standby(), logger, \
+                              "Standby master start failed, exit", "Standby master started successfully")
         elif self.node_type == "segment":
-            result = self.start_segment()
-            if result != 0:
-                logger.error("Segment start failed, exit")
-                sys.exit(1)
-            else:
-                logger.info("Segment started successfully")
+            check_return_code(self.start_segment(), logger, \
+                              "Segment start failed, exit", "Segment started successfully")
         elif self.node_type == "cluster":
-            result = self._start_all_nodes()
-            if result != 0:
-                sys.exit(1)
+            check_return_code(self._start_all_nodes())
         elif self.node_type == "allsegments":
-            result = self._start_all_segments()
-            if result != 0:
-                sys.exit(1)
+            check_return_code(self._start_all_segments())
         else:
             sys.exit('Node object should be in [master, standby, segment, allsegments, cluster]')
         return None
@@ -735,34 +660,18 @@ class HawqStop:
 
     def run(self):
         if self.node_type == "master":
-            result = self._stop_master()
-            if result != 0:
-                logger.error("Master stop failed, exit")
-                sys.exit(1)
-            else:
-                logger.info("Master stopped successfully")
+            check_return_code(self._stop_master(), logger, \
+                              "Master stop failed, exit", "Master stopped successfully")
         elif self.node_type == "standby":
-            result = self._stop_standby()
-            if result != 0:
-                logger.error("Standby master stop failed, exit")
-                sys.exit(1)
-            else:
-                logger.info("Standby master stopped successfully")
+            check_return_code(self._stop_standby(), logger, \
+                              "Standby master stop failed, exit", "Standby master stopped successfully")
         elif self.node_type == "segment":
-            result = self._stop_segment()
-            if result != 0:
-                logger.error("Segment stop failed, exit")
-                sys.exit(1)
-            else:
-                logger.info("Segment stopped successfully")
+            check_return_code(self._stop_segment(), logger, \
+                              "Segment stop failed, exit", "Segment stopped successfully")
         elif self.node_type == "cluster":
-            result = self._stopAll()
-            if result != 0:
-                sys.exit(1)
+            check_return_code(self._stopAll())
         elif self.node_type == "allsegments":
-            result = self._stopAllSegments()
-            if result != 0:
-                sys.exit(1)
+            check_return_code(self._stopAllSegments())
         else:
             sys.exit('Node object should be in [master, standby, segment, allsegments, cluster]')
         return None
@@ -897,47 +806,31 @@ def hawq_activate_standby(opts, hawq_dict):
     if result != 0:
         logger.debug("Stop cluster failed, try to stop it immediately.")
         cmd = "%s; hawq stop cluster -a -M immediate;" % source_hawq_env
-        result = local_ssh(cmd)
-        if result != 0:
-            logger.error("Stop cluster failed, exit.")
-            sys.exit(1)
-    cmd = "%s; hawq config -c hawq_master_address_host -v %s --skipvalidation -q" % (source_hawq_env, hawq_dict['hawq_standby_address_host'])
-    result = local_ssh(cmd)
-    if result != 0:
-        logger.error("Set hawq_master_address_host  failed.")
-        sys.exit(1)
-    cmd = "%s; hawq config -c hawq_standby_address_host -v %s --skipvalidation -q" % (source_hawq_env, 'none')
-    result = local_ssh(cmd)
-    if result != 0:
-        logger.error("Set hawq_standby_address_host failed.")
-        sys.exit(1)
+        check_return_code(local_ssh(cmd), logger, "Stop cluster failed, exit.")
+
+    cmd = "%s; hawq config -c hawq_master_address_host -v %s --skipvalidation -q" % \
+           (source_hawq_env, hawq_dict['hawq_standby_address_host'])
+    check_return_code(local_ssh(cmd), logger, "Set hawq_master_address_host failed.")
+
+    cmd = "%s; hawq config -c hawq_standby_address_host -v %s --skipvalidation -q" % \
+           (source_hawq_env, 'none')
+    check_return_code(local_ssh(cmd), logger, "Set hawq_standby_address_host failed.")
+
     cmd = '''echo "gp_persistent_repair_global_sequence = true" >> %s/%s''' % (hawq_dict['hawq_master_directory'], 'postgresql.conf')
-    result = local_ssh(cmd)
-    if result != 0:
-        logger.error("Set gp_persistent_repair_global_sequence = true failed.")
-        sys.exit(1)
+    check_return_code(local_ssh(cmd), logger, "Set gp_persistent_repair_global_sequence = true failed.")
+
     cmd = "%s; hawq start master" % source_hawq_env
-    result = local_ssh(cmd)
-    if result != 0:
-        logger.error("Start master failed.")
-        sys.exit(1)
+    check_return_code(local_ssh(cmd), logger, "Start master failed.")
+
     cmd = "%s; env PGOPTIONS=\"-c gp_session_role=utility\" psql -p %s -d template1 -c \"select gp_remove_master_standby()\
             where (select count(*) from gp_segment_configuration where role='s') = 1;\"" % (source_hawq_env, hawq_dict['hawq_master_address_port'])
     result = local_ssh(cmd)
     cmd = "%s; hawq stop master -a" % source_hawq_env
-    result = local_ssh(cmd)
-    if result != 0:
-        logger.error("Stop master failed.")
-        sys.exit(1)
+    check_return_code(local_ssh(cmd), logger, "Stop master failed.")
     cmd = "%s; hawq start cluster" % source_hawq_env
-    result = local_ssh(cmd)
-    if result != 0:
-        logger.warn("Start cluster failed.")
-        sys.exit(1)
+    check_return_code(local_ssh(cmd), logger, "Start cluster failed.")
     cmd = '''sed -i "/gp_persistent_repair_global_sequence/d" %s/%s''' % (hawq_dict['hawq_master_directory'], 'postgresql.conf')
-    result = local_ssh(cmd)
-    if result != 0:
-        sys.exit(1)
+    check_return_code(local_ssh(cmd))
     return None
 
 

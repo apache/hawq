@@ -6,6 +6,7 @@ import os
 import sys
 import subprocess
 from hawqpylib.HAWQ_HELP import *
+from hawqpylib.hawqlib import exit_with_return_code
 
 global hawq_home, source_hawq_env
 
@@ -19,13 +20,6 @@ def local_ssh(cmd):
     '''Execute shell command on local machine.'''
     result = subprocess.Popen(cmd, shell=True).wait()
     return result
-
-def check_error_code(result):
-    '''Check shell command exit code.'''
-    if result != 0:
-        sys.exit(1)
-    else:
-        sys.exit(0)
 
 def main():
     cluster_type_list = ('cluster', 'segment', 'master', 'standby', 'allsegments')
@@ -119,7 +113,7 @@ def main():
     else:
         print COMMON_HELP
         sys.exit(1)
-    check_error_code(result)
+    exit_with_return_code(result)
 
 if __name__ == '__main__':
     main()
