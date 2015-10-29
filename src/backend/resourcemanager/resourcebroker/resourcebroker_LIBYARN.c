@@ -321,6 +321,8 @@ int RB_LIBYARN_acquireResource(uint32_t memorymb, uint32_t core, List *preferred
 		res = RESBROK_PIPE_ERROR;
 	}
 
+	elog(DEBUG3, "LIBYARN mode resource broker wrote %d bytes out.", sendBuffer.Cursor+1);
+
 	destroySelfMaintainBuffer(&sendBuffer);
 	elog(LOG, "YARN mode resource broker wrote resource allocation request to "
 			  "resource broker process.");
@@ -830,7 +832,8 @@ int handleRB2RM_AllocatedResource(void)
 	 */
 	removePendingResourceRequestInRootQueue(
 		response.MemoryMB * (response.ExpectedContainerCount - acceptedcount),
-		response.Core     * (response.ExpectedContainerCount - acceptedcount));
+		response.Core     * (response.ExpectedContainerCount - acceptedcount),
+		response.Result == FUNC_RETURN_OK);
 
 	elog(LOG, "Accepted (%d MB, %d CORE) x %d from resource broker, "
 			  "Expected %d containers, skipped %d containers.",

@@ -650,7 +650,7 @@ void processContainersAfterIncreaseMemoryQuota(GRMContainerSet ctns, bool accept
     		/* Add container to KickedContainers if lifetime is long enough */
     		else
     		{
-    			removePendingResourceRequestInRootQueue(ctn->MemoryMB, ctn->Core);
+    			removePendingResourceRequestInRootQueue(ctn->MemoryMB, ctn->Core, false);
     			addGRMContainerToKicked(ctn);
     		}
     	}

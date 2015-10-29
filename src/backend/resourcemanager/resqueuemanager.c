@@ -3801,7 +3801,9 @@ void returnAllocatedResourceToLeafQueue(DynResourceQueueTrack track,
 			  memorymb, core);
 }
 
-void removePendingResourceRequestInRootQueue(int32_t memorymb, uint32_t core)
+void removePendingResourceRequestInRootQueue(int32_t 	memorymb,
+											 uint32_t 	core,
+											 bool 		updatependingtime)
 {
 	if ( memorymb ==0 && core == 0 )
 		return;
@@ -3823,13 +3825,21 @@ void removePendingResourceRequestInRootQueue(int32_t memorymb, uint32_t core)
 	Assert(PQUEMGR->RatioTrackers[ratioindex]->TotalPending.MemoryMB >= 0 &&
 		   PQUEMGR->RatioTrackers[ratioindex]->TotalPending.Core >= 0);
 
-	if ( PQUEMGR->RatioTrackers[ratioindex]->TotalPending.MemoryMB == 0 &&
-		 PQUEMGR->RatioTrackers[ratioindex]->TotalPending.Core == 0 )
+	if ( updatependingtime )
 	{
-		PQUEMGR->RatioTrackers[ratioindex]->TotalPendingStartTime = 0;
-	}
-	else if ( memorymb > 0 && core > 0 ){
-		PQUEMGR->RatioTrackers[ratioindex]->TotalPendingStartTime = gettime_microsec();
+		if ( PQUEMGR->RatioTrackers[ratioindex]->TotalPending.MemoryMB == 0 &&
+			 PQUEMGR->RatioTrackers[ratioindex]->TotalPending.Core == 0 )
+		{
+			PQUEMGR->RatioTrackers[ratioindex]->TotalPendingStartTime = 0;
+			elog(DEBUG3, "Global resource total pending start time is updated to "UINT64_FORMAT,
+						 PQUEMGR->RatioTrackers[ratioindex]->TotalPendingStartTime);
+		}
+		else if ( memorymb > 0 && core > 0 )
+		{
+			PQUEMGR->RatioTrackers[ratioindex]->TotalPendingStartTime = gettime_microsec();
+			elog(DEBUG3, "Global resource total pending start time is updated to "UINT64_FORMAT,
+						 PQUEMGR->RatioTrackers[ratioindex]->TotalPendingStartTime);
+		}
 	}
 
 	elog(LOG, "Removed pending GRM request from root resource queue by "
@@ -3849,7 +3859,8 @@ void clearPendingResourceRequestInRootQueue(void)
 		{
 			removePendingResourceRequestInRootQueue(
 					PQUEMGR->RatioTrackers[i]->TotalPending.MemoryMB,
-					PQUEMGR->RatioTrackers[i]->TotalPending.Core);
+					PQUEMGR->RatioTrackers[i]->TotalPending.Core,
+					true);
 		}
 	}
 }
@@ -4419,6 +4430,7 @@ void timeoutQueuedRequest(void)
 						  "available cluster.");
 			/* Build timeout response. */
 			buildTimeoutResponseForQueuedRequest(ct, RESQUEMGR_NOCLUSTER_TIMEOUT);
+			transformConnectionTrackProgress(ct, CONN_PP_TIMEOUT_FAIL);
 		}
 		else
 		{
@@ -4447,7 +4459,6 @@ void timeoutQueuedRequest(void)
 
 		if ( curcon->Progress == CONN_PP_RESOURCE_QUEUE_ALLOC_WAIT )
 		{
-			elog(DEBUG3, "Check waiting connection track now.");
 			/*
 			 * Check if corresponding mem core ratio tracker has long enough
 			 * time to waiting for GRM containers.
@@ -4460,6 +4471,24 @@ void timeoutQueuedRequest(void)
 			 * 		   resource increase pending time and top query waiting time.
 			 */
 			Assert(PQUEMGR->RootTrack != NULL);
+
+			/* Check if this is a head request in the queue. */
+			if ( queuetrack->QueryResRequests.NodeCount > 0 )
+			{
+				ConnectionTrack topwaiter = getDQueueHeadNodeData(&(queuetrack->QueryResRequests));
+				if ( topwaiter == curcon && topwaiter->HeadQueueTime == 0 )
+				{
+					topwaiter->HeadQueueTime = gettime_microsec();
+					elog(DEBUG3, "Set timestamp of waiting at head of queue.");
+				}
+			}
+
+			elog(DEBUG3, "Check waiting connection track: ConnID %d "
+						 "Head time "UINT64_FORMAT " "
+						 "Global resource pending time "UINT64_FORMAT " ",
+						 curcon->ConnID,
+						 curmsec - curcon->HeadQueueTime,
+						 curmsec - PQUEMGR->RatioTrackers[index]->TotalPendingStartTime);
 
 			bool tocancel = false;
 
@@ -4512,7 +4541,7 @@ void timeoutQueuedRequest(void)
 			if ( tocancel )
 			{
 				cancelResourceAllocRequest(curcon);
-				returnConnectionToQueue(curcon, false);
+				returnConnectionToQueue(curcon, true);
 			}
 		}
 	}
@@ -4532,7 +4561,6 @@ void buildTimeoutResponseForQueuedRequest(ConnectionTrack conntrack, uint32_t re
 								conntrack->MessageMark1,
 								conntrack->MessageMark2,
 								RESPONSE_QD_ACQUIRE_RESOURCE);
-	transformConnectionTrackProgress(conntrack, CONN_PP_TIMEOUT_FAIL);
 	conntrack->ResponseSent = false;
 	MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
 	PCONTRACK->ConnToSend = lappend(PCONTRACK->ConnToSend, conntrack);

@@ -393,7 +393,9 @@ int minusResourceFromReourceManager(int32_t memorymb, double core);
 int addNewResourceToResourceManagerByBundle(ResourceBundle bundle);
 int minusResourceFromResourceManagerByBundle(ResourceBundle bundle);
 
-void removePendingResourceRequestInRootQueue(int32_t memorymb, uint32_t core);
+void removePendingResourceRequestInRootQueue(int32_t 	memorymb,
+											 uint32_t 	core,
+											 bool 		updatependingtime);
 void clearPendingResourceRequestInRootQueue(void);
 void buildAcquireResourceResponseMessage(ConnectionTrack conn);
 

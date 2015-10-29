@@ -426,8 +426,7 @@ int registerConnectionInRMByStr(int 		   index,
     if ( res != FUNC_RETURN_OK )
     {
     	snprintf(errorbuf, errorbufsize,
-    			 "failed to register in HAWQ resource manager because of "
-    			 "RPC error %s.",
+    			 "failed to register in HAWQ resource manager because of %s.",
 				 getErrorCodeExplain(res));
     	return res;
     }
@@ -440,8 +439,7 @@ int registerConnectionInRMByStr(int 		   index,
     if ( response->Result != FUNC_RETURN_OK )
     {
     	snprintf(errorbuf, errorbufsize,
-    			 "failed to register in HAWQ resource manager because of remote"
-    			 "error %s.",
+    			 "failed to register in HAWQ resource manager because of %s.",
 				 getErrorCodeExplain(response->Result));
     	return response->Result;
     }
@@ -476,8 +474,7 @@ int registerConnectionInRMByOID(int 		   index,
     if ( res != FUNC_RETURN_OK )
     {
     	snprintf(errorbuf, errorbufsize,
-    			 "failed to register in HAWQ resource manager because of "
-    			 "RPC error %s.",
+    			 "failed to register in HAWQ resource manager because of %s.",
 				 getErrorCodeExplain(res));
     	return res;
     }
@@ -490,8 +487,7 @@ int registerConnectionInRMByOID(int 		   index,
     if ( response->Result != FUNC_RETURN_OK )
     {
     	snprintf(errorbuf, errorbufsize,
-    			 "failed to register in HAWQ resource manager because of remote"
-    			 "error %s.",
+    			 "failed to register in HAWQ resource manager because of %s.",
 				 getErrorCodeExplain(response->Result));
     	return response->Result;
     }
@@ -526,8 +522,7 @@ int	unregisterConnectionInRM(int 			   index,
     if ( res != FUNC_RETURN_OK )
     {
     	snprintf(errorbuf, errorbufsize,
-    			 "failed to unregister in HAWQ resource manager because of "
-    			 "RPC error %s.",
+    			 "failed to unregister in HAWQ resource manager because of %s.",
 				 getErrorCodeExplain(res));
     	return res;
     }
@@ -539,8 +534,7 @@ int	unregisterConnectionInRM(int 			   index,
     {
     	res = response->Result;
     	snprintf(errorbuf, errorbufsize,
-    			 "failed to unregister in HAWQ resource manager because of "
-    			 "remote error %s.",
+    			 "failed to unregister in HAWQ resource manager because of %s.",
 				 getErrorCodeExplain(response->Result));
     }
 
@@ -662,7 +656,7 @@ int acquireResourceFromRM(int 		  		  index,
     if ( errres->Result != FUNC_RETURN_OK )
     {
     	snprintf(errorbuf, errorbufsize,
-    			 "failed to acquire resource because of remote error %s.",
+    			 "failed to acquire resource because of %s.",
     			 getErrorCodeExplain(errres->Result));
     	return errres->Result;
     }
@@ -789,8 +783,7 @@ int returnResource(int 		index,
     if ( res != FUNC_RETURN_OK )
     {
     	snprintf(errorbuf, errorbufsize,
-    			 "failed to return resource to HAWQ resource manager because of "
-    			 "RPC error %s.",
+    			 "failed to return resource to HAWQ resource manager because of %s.",
 				 getErrorCodeExplain(res));
     	return res;
     }
@@ -802,8 +795,7 @@ int returnResource(int 		index,
     {
     	res = response->Result;
         snprintf(errorbuf, errorbufsize,
-        		 "Fail to return resource to HAWQ resource manager because of "
-        		 "remote error %s.",
+        		 "failed to return resource to HAWQ resource manager because of %s.",
 				 getErrorCodeExplain(res));
         return res;
     }

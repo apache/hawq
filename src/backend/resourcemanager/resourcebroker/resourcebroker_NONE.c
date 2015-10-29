@@ -202,9 +202,10 @@ int RB_NONE_acquireResource(uint32_t memorymb, uint32_t core, List *preferred)
 
 	/* Clean up pending resource quantity. */
 	removePendingResourceRequestInRootQueue( contmemorymb * (contcount - contactcount),
-											 1            * (contcount - contactcount));
+											 1            * (contcount - contactcount),
+											 res == FUNC_RETURN_OK);
 
-	return FUNC_RETURN_OK;
+	return res;
 }
 
 int RB_NONE_returnResource(List **ctnl)

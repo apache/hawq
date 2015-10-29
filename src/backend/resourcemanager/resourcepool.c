@@ -2746,7 +2746,7 @@ void moveAllAcceptedGRMContainersToResPool(void)
 		elog(LOG, "AddPendingContainerCount minused 1, current value %d",
 				  PRESPOOL->AddPendingContainerCount);
 		addNewResourceToResourceManager(ctn->MemoryMB, ctn->Core);
-		removePendingResourceRequestInRootQueue(ctn->MemoryMB, ctn->Core);
+		removePendingResourceRequestInRootQueue(ctn->MemoryMB, ctn->Core, true);
 	}
 	validateResourcePoolStatus(true);
 }
@@ -3237,7 +3237,7 @@ void dropAllResPoolGRMContainersToToBeKicked(void)
 	for ( int i = 0 ; i < PQUEMGR->RatioCount ; ++i )
 	{
 		resetResourceBundleData(&(PQUEMGR->RatioTrackers[i]->TotalPending), 0, 0, -1);
-		PQUEMGR->RatioTrackers[i]->TotalPendingStartTime = 0;
+		//PQUEMGR->RatioTrackers[i]->TotalPendingStartTime = 0;
 	}
 
 	refreshMemoryCoreRatioLevelUsage(gettime_microsec());
