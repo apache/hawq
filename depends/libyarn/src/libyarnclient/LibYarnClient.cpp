@@ -222,7 +222,7 @@ int LibYarnClient::forceKillJob(string &jobId) {
         void *thrc = NULL;
         int rc = pthread_join(heartbeatThread, &thrc);
         if ( rc != 0 ) {
-            LOG(INFO, "LibYarnClient::foreceKillJob, fail to join heart-beat thread. "
+            LOG(INFO, "LibYarnClient::forceKillJob, fail to join heart-beat thread. "
                       "error code %d", rc);
             return FR_FAILED;
         }
@@ -240,14 +240,14 @@ int LibYarnClient::forceKillJob(string &jobId) {
             key << container->getNodeId().getHost() << ":" << container->getNodeId().getPort();
             Token nmToken = nmTokenCache[key.str()];
             ((ContainerManagement*)nmClient)->stopContainer((*container), nmToken);
-            LOG(INFO,"LibYarnClient::foreceKillJob, container:%d are stopped",container->getId().getId());
+            LOG(INFO,"LibYarnClient::forceKillJob, container:%d is stopped",container->getId().getId());
         }
 
         ((ApplicationClient*) appClient)->forceKillApplication(clientAppId);
-        LOG(INFO, "LibYarnClient::foreceKillJob, forceKillApplication");
+        LOG(INFO, "LibYarnClient::forceKillJob, forceKillApplication");
 
         for (map<int,Container*>::iterator it = jobIdContainers.begin(); it != jobIdContainers.end(); it++) {
-            LOG(INFO,"LibYarnClient::foreceKillJob, container:%d in jobIdContainers are delete",it->second->getId().getId());
+            LOG(INFO,"LibYarnClient::forceKillJob, container:%d in jobIdContainers is deleted",it->second->getId().getId());
             delete it->second;
             it->second = NULL;
         }
@@ -256,7 +256,7 @@ int LibYarnClient::forceKillJob(string &jobId) {
         return FR_SUCCEEDED;
     } catch(std::exception& e){
         stringstream errorMsg;
-        errorMsg << "LibYarnClient::forceKillJob, Catch the Exception:" << e.what();
+        errorMsg << "LibYarnClient::forceKillJob, catch the exception:" << e.what();
         setErrorMessage(errorMsg.str());
         return FR_FAILED;
     } catch (...) {

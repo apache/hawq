@@ -1328,9 +1328,9 @@ int RB2YARN_registerYARNApplication(void)
 					elog(WARNING, "YARN mode resource broker kill job failed.");
 				return FUNCTION_FAILED;
 			}
-		}
-		else
+		} else {
 			break;
+		}
 	}
 
 	ResBrokerStartTime = gettime_microsec();
