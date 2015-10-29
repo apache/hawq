@@ -1267,6 +1267,7 @@ int RB2YARN_connectToYARN(void)
 
 int RB2YARN_registerYARNApplication(void)
 {
+	int retry = 5;
 	int yarnres = FUNCTION_SUCCEEDED, result = FUNCTION_SUCCEEDED;
 
 	yarnres = createJob(LIBYARNClient,
@@ -1291,25 +1292,43 @@ int RB2YARN_registerYARNApplication(void)
 	 * if not, kill application from Hadoop Yarn.
 	 */
 	LibYarnApplicationReport_t *applicationReport = NULL;
-	result = getApplicationReport(LIBYARNClient, YARNJobID, &applicationReport);
-	if (result != FUNCTION_SUCCEEDED || applicationReport == NULL)
+	while (retry > 0)
 	{
-		elog(WARNING, "YARN mode resource broker failed to get application report, "
-					  "so kill it from Hadoop Yarn.");
-		result = forceKillJob(LIBYARNClient, YARNJobID);
-		if (result != FUNCTION_SUCCEEDED)
-			elog(WARNING, "YARN mode resource broker kill job failed.");
-		return FUNCTION_FAILED;
-	}
+		result = getApplicationReport(LIBYARNClient, YARNJobID, &applicationReport);
+		if (result != FUNCTION_SUCCEEDED || applicationReport == NULL)
+		{
+			if (retry > 0) {
+				retry--;
+				usleep(5*1000*1000L);
+				continue;
+			} else {
+				elog(WARNING, "YARN mode resource broker failed to get application report, "
+							  "so kill it from Hadoop Yarn.");
+				result = forceKillJob(LIBYARNClient, YARNJobID);
+				if (result != FUNCTION_SUCCEEDED)
+					elog(WARNING, "YARN mode resource broker kill job failed.");
+				return FUNCTION_FAILED;
+			}
+		}
 
-	if (applicationReport->progress < 0.5)
-	{
-		elog(WARNING, "YARN mode resource broker failed to register itself in Hadoop Yarn."
-					  "Got progress:%f, and try to kill application from Hadoop Yarn", applicationReport->progress);
-		result = forceKillJob(LIBYARNClient, YARNJobID);
-		if (result != FUNCTION_SUCCEEDED)
-			elog(WARNING, "YARN mode resource broker kill job failed.");
-		return FUNCTION_FAILED;
+		if (applicationReport->progress < 0.5)
+		{
+			if (retry > 0) {
+				retry--;
+				usleep(5*1000*1000L);
+				continue;
+			} else {
+				elog(WARNING, "YARN mode resource broker failed to register itself in Hadoop Yarn."
+							  "Got progress:%f, and try to kill application from Hadoop Yarn",
+							  applicationReport->progress);
+				result = forceKillJob(LIBYARNClient, YARNJobID);
+				if (result != FUNCTION_SUCCEEDED)
+					elog(WARNING, "YARN mode resource broker kill job failed.");
+				return FUNCTION_FAILED;
+			}
+		}
+		else
+			break;
 	}
 
 	ResBrokerStartTime = gettime_microsec();
