@@ -142,7 +142,7 @@ ignore: returning
 ignore: stats
 ignore: tablespace
 ignore: gpdiffcheck
-ignore: exttab1
+test: exttab1
 ignore: custom_format
 ignore: resource_queue
 ignore: gptokencheck
