@@ -1698,8 +1698,8 @@ class GPUpgrade(GPUpgradeBase):
 
         # yarn related is set to default value: yarn disabled
         self.update_xml_content(file_cont, 'hawq_global_rm_type', 'none')
-        self.update_xml_content(file_cont, 'hawq_resourcemanager_yarn_resourcemanager_address', 'localhost:9980')
-        self.update_xml_content(file_cont, 'hawq_resourcemanager_yarn_resourcemanager_scheduler_address', 'localhost:9981')
+        self.update_xml_content(file_cont, 'hawq_rm_yarn_address', 'localhost:9980')
+        self.update_xml_content(file_cont, 'hawq_rm_yarn_scheduler_address', 'localhost:9981')
 
         # write buffer back to the xml file
         f2 = open("%s/etc/hawq-site.xml" % self.newhome, 'w')

@@ -4406,7 +4406,7 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
-		{"hawq_resourceenforcer_cpu_enable", PGC_POSTMASTER, RESOURCES_MGM,
+		{"hawq_re_cpu_enable", PGC_POSTMASTER, RESOURCES_MGM,
 		 gettext_noop("enable enforcing cpu resource consumption."),
 		 NULL
 		},
@@ -4434,8 +4434,8 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
-		{"hawq_resourcemanager_force_fifo_queue", PGC_POSTMASTER, RESOURCES_MGM,
-		 gettext_noop("force to execute query in queue in a fifo way."),
+		{"hawq_rm_force_fifo_queuing", PGC_POSTMASTER, RESOURCES_MGM,
+		 gettext_noop("force to execute query in queue in a fifo sequence."),
 		 NULL
 		},
 		&rm_force_fifo_queue,
@@ -6326,8 +6326,8 @@ static struct config_int ConfigureNamesInt[] =
     },
 
 	{
-		{"hawq_resourcemanager_log_level", PGC_USERSET, DEVELOPER_OPTIONS,
-			gettext_noop("set resource manager related log level."),
+		{"hawq_rm_log_level", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("set resource manager related log level"),
 			NULL,
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
@@ -6336,12 +6336,22 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"hawq_resourcemanager_breath_percentage", PGC_POSTMASTER, RESOURCES_MGM,
+		{"hawq_rm_return_percent_on_overcommit", PGC_POSTMASTER, RESOURCES_MGM,
 			gettext_noop("segment resource manager server address port number"),
 			NULL
 		},
-		&rm_grm_breath_return_percentage,
+		&rm_return_percentage_on_overcommit,
 		10, 0, 100, NULL, NULL
+	},
+
+	{
+		{"hawq_rm_cluster_report_period", PGC_POSTMASTER, RESOURCES_MGM,
+			gettext_noop("interval of periodically getting global resource manager "
+						 "cluster report"),
+			NULL
+		},
+		&rm_cluster_report_period,
+		60, 10, 100, NULL, NULL
 	},
 
 	//cdbdatalocality
@@ -6387,7 +6397,7 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"hawq_resourceenforcer_cleanup_period", PGC_USERSET, DEVELOPER_OPTIONS,
+		{"hawq_re_cleanup_period", PGC_USERSET, DEVELOPER_OPTIONS,
 			gettext_noop("period for resource enforcer to cleanup cgroups."),
 			NULL,
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
@@ -6397,8 +6407,8 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"hawq_resourcemanager_allocation_policy", PGC_USERSET, DEVELOPER_OPTIONS,
-			gettext_noop("resource manager allocation policy."),
+		{"hawq_rm_respool_alloc_policy", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("resource manager allocation policy index."),
 			NULL,
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
@@ -6445,13 +6455,13 @@ static struct config_int ConfigureNamesInt[] =
     },
 
 	{
-		{"hawq_resourcemanager_segment_container_waterlevel", PGC_POSTMASTER, RESOURCES_MGM,
+		{"hawq_rm_min_resource_perseg", PGC_POSTMASTER, RESOURCES_MGM,
 			gettext_noop("the least water level of the number of global resource "
 					     "manager containers in one segment when the workload is "
 					     "not zero."),
 			NULL
 		},
-		&rm_seg_container_default_waterlevel,
+		&rm_min_resource_perseg,
 		2, 0, 65535, NULL, NULL
 	},
 
@@ -6466,17 +6476,17 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"hawq_resourcemanager_query_noresource_timeout", PGC_POSTMASTER, RESOURCES_MGM,
-			gettext_noop("timeout for closing active connection for resource negotiation."),
+		{"hawq_rm_resource_allocation_timeout", PGC_POSTMASTER, RESOURCES_MGM,
+			gettext_noop("timeout for closing queued connection for resource allocation request."),
 			NULL
 		},
-		&rm_query_resource_noresource_timeout,
+		&rm_resource_allocation_timeout,
 		600, 1, 65535, NULL, NULL
 	},
 
 	{
-		{"hawq_resourcemanager_resource_timeout", PGC_POSTMASTER, RESOURCES_MGM,
-			gettext_noop("timeout for returning resource back to resource broker."),
+		{"hawq_rm_resource_idle_timeout", PGC_POSTMASTER, RESOURCES_MGM,
+			gettext_noop("timeout for returning resource back to global resource manager."),
 			NULL
 		},
 		&rm_resource_timeout,
@@ -6484,11 +6494,12 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"hawq_resourcemanager_resource_heartbeat_interval", PGC_POSTMASTER, RESOURCES_MGM,
-			gettext_noop("interval for sending heart-beat to resource manager to keep resource context alive."),
+		{"hawq_rm_session_lease_heartbeat_interval", PGC_POSTMASTER, RESOURCES_MGM,
+			gettext_noop("interval for sending heart-beat to resource manager to keep "
+						 "resource context alive."),
 			NULL
 		},
-		&rm_resource_heartbeat_interval,
+		&rm_session_lease_heartbeat_interval,
 		1, 1, 65535, NULL, NULL
 	},
 
@@ -6523,11 +6534,11 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"hawq_reourcemanager_max_resourcequeue_number", PGC_POSTMASTER, RESOURCES_MGM,
+		{"hawq_rm_nresqueue_limit", PGC_POSTMASTER, RESOURCES_MGM,
 			gettext_noop("the maximum number of resource queue."),
 			NULL
 		},
-		&rm_max_resource_queue_number,
+		&rm_nresqueue_limit,
 		128, 3, 1024, NULL, NULL
 	},
 
@@ -6855,7 +6866,7 @@ static struct config_real ConfigureNamesReal[] =
 	},
 
 	{
-		{"hawq_resourcemanager_segment_limit_core_use",PGC_POSTMASTER, RESOURCES_MGM,
+		{"hawq_rm_nvcore_limit_perseg",PGC_POSTMASTER, RESOURCES_MGM,
 			gettext_noop("set number of cores can be used for HAWQ execution in one segment host"),
 			NULL
 		},
@@ -6864,7 +6875,7 @@ static struct config_real ConfigureNamesReal[] =
 	},
 
 	{
-		{"hawq_resourceenforcer_cpu_weight",PGC_POSTMASTER, RESOURCES_MGM,
+		{"hawq_re_cpu_weight",PGC_POSTMASTER, RESOURCES_MGM,
 			gettext_noop("mapping of virtual cores from hawq to yarn"),
 			NULL
 		},
@@ -6873,7 +6884,7 @@ static struct config_real ConfigureNamesReal[] =
 	},
 
 	{
-		{"hawq_resourceenforcer_vcore_pcore_ratio",PGC_POSTMASTER, RESOURCES_MGM,
+		{"hawq_re_vcore_pcore_ratio",PGC_POSTMASTER, RESOURCES_MGM,
 			gettext_noop("mapping from virtual cores to physical cores"),
 			NULL
 		},
@@ -8052,7 +8063,7 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"hawq_resourcemanager_segment_limit_memory_use", PGC_POSTMASTER, RESOURCES_MGM,
+		{"hawq_rm_memory_limit_perseg", PGC_POSTMASTER, RESOURCES_MGM,
 			gettext_noop("set memory can be used for execution in one segment host"),
 			NULL
 		},
@@ -8070,7 +8081,7 @@ static struct config_string ConfigureNamesString[] =
     },
 
 	{
-		{"hawq_resourcemanager_yarn_resourcemanager_address", PGC_POSTMASTER, RESOURCES_MGM,
+		{"hawq_rm_yarn_address", PGC_POSTMASTER, RESOURCES_MGM,
 			gettext_noop("set yarn resource manager server address"),
 			NULL
 		},
@@ -8079,7 +8090,7 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"hawq_resourcemanager_yarn_resourcemanager_scheduler_address", PGC_POSTMASTER, RESOURCES_MGM,
+		{"hawq_rm_yarn_scheduler_address", PGC_POSTMASTER, RESOURCES_MGM,
 			gettext_noop("set yarn resource manager scheduler server address"),
 			NULL
 		},
@@ -8088,7 +8099,7 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"hawq_resourcemanager_yarn_queue", PGC_POSTMASTER, RESOURCES_MGM,
+		{"hawq_rm_yarn_queue_name", PGC_POSTMASTER, RESOURCES_MGM,
 			gettext_noop("set yarn resource manager target queue name"),
 			NULL
 		},
@@ -8097,7 +8108,7 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"hawq_resourcemanager_yarn_application_name", PGC_POSTMASTER, RESOURCES_MGM,
+		{"hawq_rm_yarn_app_name", PGC_POSTMASTER, RESOURCES_MGM,
 			gettext_noop("set yarn resource manager application name"),
 			NULL
 		},
@@ -8106,7 +8117,7 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"hawq_resourcemanager_resourcepool_test_filename", PGC_POSTMASTER, RESOURCES_MGM,
+		{"hawq_rm_respool_test_file", PGC_POSTMASTER, RESOURCES_MGM,
 			gettext_noop("set host filename for resourcepool testing."),
 			NULL
 		},
@@ -8124,7 +8135,7 @@ static struct config_string ConfigureNamesString[] =
     },
 
 	{
-		{"hawq_resourceenforcer_cgroup_mount_point", PGC_POSTMASTER, RESOURCES_MGM,
+		{"hawq_re_cgroup_mount_point", PGC_POSTMASTER, RESOURCES_MGM,
 			gettext_noop("set cgroup mount point for resource enforcement"),
 			NULL
 		},
@@ -8133,21 +8144,12 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"hawq_resourceenforcer_cgroup_hierarchy_name", PGC_POSTMASTER, RESOURCES_MGM,
+		{"hawq_re_cgroup_hierarchy_name", PGC_POSTMASTER, RESOURCES_MGM,
 			gettext_noop("set cgroup hierarchy name for resource enforcement"),
 			NULL
 		},
 		&rm_enforce_cgrp_hier_name,
 		"hadoop-yarn", NULL, NULL
-	},
-
-	{
-		{"hawq_resourcemanager_tempdirs", PGC_POSTMASTER, RESOURCES_MGM,
-			gettext_noop("resource manager temporary directories"),
-			NULL
-		},
-		&rm_tmp_dirs,
-		"/tmp", NULL, NULL
 	},
 
 	{

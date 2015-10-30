@@ -254,8 +254,8 @@ int refreshGlobalRMClusterInformation(void);
 #define HAWQDRM_CONFFILE_TEST_CONF_FILE 			"hawq_resourcemanager_test_configure_filename"
 #define HAWQDRM_CONFFILE_TEST_QUEUSR_FILE 			"hawq_resourcemanager_test_queueuser_filename"
 
-#define HAWQDRM_CONFFILE_LIMIT_MEMORY_USE 			"hawq_resourcemanager_segment_limit_memory_use"
-#define HAWQDRM_CONFFILE_LIMIT_CORE_USE  			"hawq_resourcemanager_segment_limit_core_use"
+#define HAWQDRM_CONFFILE_LIMIT_MEMORY_USE 			"hawq_rm_memory_limit_perseg"
+#define HAWQDRM_CONFFILE_LIMIT_CORE_USE  			"hawq_rm_nvcore_limit_perseg"
 
 #define HAWQDRM_CONFFILE_HOSTNAMES_ALL				"hawq_resourcemanager_hostnames_all"
 #define HAWQDRM_CONFFILE_HOSTNAMES_BLACK			"hawq_resourcemanager_hostnames_black"
@@ -265,17 +265,12 @@ int refreshGlobalRMClusterInformation(void);
 #define HAWQ_CONFFILE_MASTER_ADDR_PORT 				"hawq_resourcemanager_master_address_port"
 #define HAWQ_CONFFILE_STANDBY_ADDR                  "hawq_resourcemanager_standby_address"
 #define HAWQ_CONFFILE_SEGMENT_PORT					"hawq_resourcemanager_segment_port"
-#define HAWQ_CONFFILE_TEMPDIRS                      "hawq_resourcemanager_tempdirs"
-
-#define HAWQ_CONFFILE_RESOURCE_ENFORCER_CPU_FLAG		"hawq_resourceenforcer_cpu_enabled"
-#define HAWQ_CONFFILE_RESOURCE_ENFORCER_CGROUP_MOUNT_POINT	"hawq_resourceenforcer_cgroup_mount_point"
-#define HAWQ_CONFFILE_RESOURCE_ENFORCER_CGROUP_HIERARCHY_NAME	"hawq_resourceenforcer_cgroup_hierarchy_name"
 
 /* Property for libYarn */
-#define HAWQDRM_CONFFILE_YARN_SERVERADDR			"hawq_resourcemanager_yarn_resourcemanager_address"
-#define HAWQDRM_CONFFILE_YARN_SCHEDULERADDR			"hawq_resourcemanager_yarn_resourcemanager_scheduler_address"
-#define HAWQDRM_CONFFILE_YARN_QUEUE 				"hawq_resourcemanager_yarn_queue"
-#define HAWQDRM_CONFFILE_YARN_APP_NAME  			"hawq_resourcemanager_yarn_application_name"
+#define HAWQDRM_CONFFILE_YARN_SERVERADDR			"hawq_rm_yarn_address"
+#define HAWQDRM_CONFFILE_YARN_SCHEDULERADDR			"hawq_rm_yarn_scheduler_address"
+#define HAWQDRM_CONFFILE_YARN_QUEUE 				"hawq_rm_yarn_queue_name"
+#define HAWQDRM_CONFFILE_YARN_APP_NAME  			"hawq_rm_yarn_app_name"
 
 #define HAWQDRM_CONFFILE_SVRTYPE_VAL_YARN  		"yarn"
 #define HAWQDRM_CONFFILE_SVRTYPE_VAL_MESOS 		"mesos"

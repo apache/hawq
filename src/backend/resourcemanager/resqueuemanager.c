@@ -4426,7 +4426,7 @@ void timeoutQueuedRequest(void)
 					 curmsec,
 					 curmsec - ct->ConnectTime);
 
-		if ( curmsec - ct->ConnectTime > 1000000L * rm_query_resource_noresource_timeout )
+		if ( curmsec - ct->ConnectTime > 1000000L * rm_resource_allocation_timeout )
 		{
 			elog(WARNING, "Waiting request timeout is detected due to no "
 						  "available cluster.");
@@ -4496,13 +4496,13 @@ void timeoutQueuedRequest(void)
 
 			if ( ( (PQUEMGR->RootTrack->ClusterSegNumberMax == 0) &&
 				   (curmsec - curcon->ResRequestTime >
-						1000000L * rm_query_resource_noresource_timeout ) ) ||
+						1000000L * rm_resource_allocation_timeout ) ) ||
 				 ( (PQUEMGR->RatioTrackers[index]->TotalPendingStartTime > 0) &&
 				   (curmsec - PQUEMGR->RatioTrackers[index]->TotalPendingStartTime >
-						1000000L * rm_query_resource_noresource_timeout) &&
+						1000000L * rm_resource_allocation_timeout) &&
 				   (curcon->HeadQueueTime > 0) &&
 				   (curmsec - curcon->HeadQueueTime >
-				 	 	1000000L * rm_query_resource_noresource_timeout) ) )
+				 	 	1000000L * rm_resource_allocation_timeout) ) )
 			{
 				elog(LOG, "The queued resource request no resource timeout is "
 						  "detected. ConnID %d",
@@ -4513,7 +4513,7 @@ void timeoutQueuedRequest(void)
 			/* Case 3. Check if resource fragment problem lasts too long time. */
 			if ( curcon->troubledByFragment &&
 			     curmsec - curcon->troubledByFragmentTimestamp >
-					 1000000L * rm_query_resource_noresource_timeout &&
+					 1000000L * rm_resource_allocation_timeout &&
 				 ((DynResourceQueueTrack)(curcon->QueueTrack))->NumOfRunningQueries == 0 )
 			{
 				elog(LOG, "The queued resource request timeout is detected due to "
@@ -4530,7 +4530,7 @@ void timeoutQueuedRequest(void)
 			 */
 			if ( (curcon->HeadQueueTime > 0) &&
 				 (curmsec - curcon->HeadQueueTime >
-	 	 			  1000000L * rm_query_resource_noresource_timeout) &&
+	 	 			  1000000L * rm_resource_allocation_timeout) &&
 				 (curcon->SegNumMin * curcon->SegMemoryMB >
 				 	  ((DynResourceQueueTrack)curcon->QueueTrack)->ClusterMemoryMaxMB) )
 			{
@@ -4595,10 +4595,8 @@ void resetAllDeadLockDetector(void)
 
 void getIdleResourceRequest(int32_t *mem, double *core)
 {
-	*mem  = PRESPOOL->MemCoreRatio * PRESPOOL->AvailNodeCount *
-		    rm_seg_container_default_waterlevel;
-	*core = 1.0 * PRESPOOL->AvailNodeCount *
-			rm_seg_container_default_waterlevel;
+	*mem  = PRESPOOL->MemCoreRatio * PRESPOOL->AvailNodeCount * rm_min_resource_perseg;
+	*core = 1.0 * PRESPOOL->AvailNodeCount * rm_min_resource_perseg;
 }
 
 void setForcedReturnGRMContainerCount(void)
@@ -4637,18 +4635,13 @@ void setForcedReturnGRMContainerCount(void)
 					 r,
 					 clusterctnsize);
 		toretctnsize = ceil(r * clusterctnsize);
-	}
-	else
-	{
-		if ( rm_grm_breath_return_percentage > 0 )
+
+		if ( rm_return_percentage_on_overcommit > 0 )
 		{
-			double r = 1.0 * clusterctnsize * rm_grm_breath_return_percentage / 100;
-			toretctnsize = ceil(r);
-			elog(DEBUG3, "GRM queue cur capacity %lf is not larger than capacity %lf. "
-						 "Calculated r %lf",
-						 PQUEMGR->GRMQueueCurCapacity,
-						 PQUEMGR->GRMQueueCapacity,
-						 r);
+			double r = 1.0 * clusterctnsize * rm_return_percentage_on_overcommit / 100;
+			int toretctnsize2 = ceil(r);
+			elog(DEBUG3, "Calculated r %lf based on return percentage.", r);
+			toretctnsize = toretctnsize < toretctnsize2 ? toretctnsize : toretctnsize2;
 		}
 	}
 

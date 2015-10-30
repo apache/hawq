@@ -312,31 +312,30 @@ int	   rm_nslice_perseg_limit;
 char  *rm_seg_memory_use;
 double rm_seg_core_use;
 
-
-
 char   *rm_global_rm_type;
 char   *rm_grm_yarn_rm_addr;
 char   *rm_grm_yarn_sched_addr;
 char   *rm_grm_yarn_queue;
 char   *rm_grm_yarn_app_name;
-int		rm_grm_breath_return_percentage;
+int		rm_return_percentage_on_overcommit;
+int     rm_cluster_report_period;
 
 char   *rm_stmt_vseg_mem_str;
 int		rm_stmt_nvseg;
 
-int		rm_seg_container_default_waterlevel;
+int		rm_min_resource_perseg;
 bool	rm_force_fifo_queue;
 
 bool	rm_session_lease_heartbeat_enable;
 int     rm_session_lease_timeout; 	/* How many seconds to wait before expiring
-										   allocated resource. */
-int		rm_query_resource_noresource_timeout;	/* How may seconds to wait before
-												   expiring queuing query resource
-												   request. */
+									   allocated resource. */
+int		rm_resource_allocation_timeout;	/* How may seconds to wait before
+										   expiring queuing query resource
+										   request. */
 int		rm_resource_timeout;		/* How many seconds to wait before returning
 									   resource back to the resource broker. */
-int		rm_resource_heartbeat_interval; /* How many seconds to wait before sending
-										   another heart-beat to resource manager. */
+int		rm_session_lease_heartbeat_interval; /* How many seconds to wait before sending
+										   	    another heart-beat to resource manager. */
 
 int		rm_tolerate_nseg_limit;
 int		rm_rejectrequest_nseg_limit;
@@ -344,21 +343,20 @@ int		rm_nvseg_variance_among_seg_limit;
 
 char   *rm_resourcepool_test_filename;
 
-bool	rm_enforce_cpu_enable;		/* hawq_resourceenforcer_cpu_enable */
-char	*rm_enforce_cgrp_mnt_pnt;	/* hawq_resourceenforcer_cgroup_mount_point */
-char	*rm_enforce_cgrp_hier_name;	/* hawq_resourceenforcer_cgroup_hierarchy_name */
-double	rm_enforce_cpu_weight;		/* hawq_resourceenforcer_cpu_weight */
-double	rm_enforce_core_vpratio;	/* hawq_resourceenforcer_vcore_pcore_ratio */
-int	rm_enforce_cleanup_period;	/* hawq_resourceenforcer_cleanup_period */
+bool	rm_enforce_cpu_enable;
+char	*rm_enforce_cgrp_mnt_pnt;
+char	*rm_enforce_cgrp_hier_name;
+double	rm_enforce_cpu_weight;
+double	rm_enforce_core_vpratio;
+int	rm_enforce_cleanup_period;
 
-int	rm_allocation_policy;		/* hawq_resourcemanager_allocation_policy */
+int	rm_allocation_policy;
 
-char   *rm_tmp_dirs;				/* hawq.resourcemanager.tempdirs */
-char   *rm_master_tmp_dirs;			/* hawq.master.temp.directory */
-char   *rm_seg_tmp_dirs;			/* hawq.segment.temp.directory */
+char   *rm_master_tmp_dirs;
+char   *rm_seg_tmp_dirs;
 
-int     rm_log_level;				/* hawq.reourcemanager.log.level */
-int     rm_max_resource_queue_number; /* hawq_reourcemanager_max_resourcequeue_number */
+int     rm_log_level;
+int     rm_nresqueue_limit;
 
 /* Greenplum Database Experimental Feature GUCs */
 int         gp_distinct_grouping_sets_threshold = 32;
