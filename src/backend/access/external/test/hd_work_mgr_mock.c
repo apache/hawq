@@ -51,3 +51,49 @@ void restoreCdbComponentDatabases()
 	GpAliveSegmentsInfo.cdbComponentDatabases = orig_cdb;
 	GpAliveSegmentsInfo.aliveSegmentsCount = orig_seg_count;
 }
+
+/* Builds the QueryResource for a query */
+void buildQueryResource(int segs_num,
+                        char * segs_hostips[])
+{
+	resource = (QueryResource *)palloc(sizeof(QueryResource));
+
+	resource->segments = NULL;
+	for (int i = 0; i < segs_num; ++i)
+	{
+		Segment *segment = (Segment *)palloc0(sizeof(Segment));
+		segment->hostip = pstrdup(segs_hostips[i]);
+		segment->segindex = i;
+		segment->alive = true;
+
+		resource->segments = lappend(resource->segments, segment);
+	}
+
+	return resource;
+}
+
+/* Restores the QueryResource for a query */
+void restoreQueryResource()
+{
+	if (resource)
+	{
+		ListCell *cell;
+
+		if (resource->segments)
+		{
+			cell = list_head(resource->segments);
+			while(cell != NULL)
+			{
+				ListCell *tmp = cell;
+				cell = lnext(cell);
+
+				pfree(((Segment *)lfirst(tmp))->hostip);
+				pfree(lfirst(tmp));
+				pfree(tmp);
+			}
+		}
+
+		pfree(resource);
+	}
+}
+
