@@ -48,7 +48,6 @@ int RB_NONE_acquireResource(uint32_t memorymb, uint32_t core, List *preferred)
 	GRMContainer 		newcontainer	= NULL;
 	int					hostcount		= PRESPOOL->SegmentIDCounter;
 	ListCell		   *cell			= NULL;
-	int					res				= FUNC_RETURN_OK;
 
 	elog(DEBUG3, "NONE mode resource broker received resource allocation request "
 				 "(%d MB, %d CORE)",
@@ -196,16 +195,11 @@ int RB_NONE_acquireResource(uint32_t memorymb, uint32_t core, List *preferred)
 				contactcount,
 				contcount);
 
-	if ( contactcount <= 0 ) {
-		res = RESBROK_TEMP_NO_RESOURCE;
-	}
-
 	/* Clean up pending resource quantity. */
-	removePendingResourceRequestInRootQueue( contmemorymb * (contcount - contactcount),
-											 1            * (contcount - contactcount),
-											 res == FUNC_RETURN_OK);
-
-	return res;
+	removePendingResourceRequestInRootQueue(contmemorymb * (contcount - contactcount),
+											1            * (contcount - contactcount),
+											contactcount > 0);
+	return FUNC_RETURN_OK;
 }
 
 int RB_NONE_returnResource(List **ctnl)
