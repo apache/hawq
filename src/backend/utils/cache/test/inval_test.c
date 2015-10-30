@@ -133,6 +133,120 @@ void test__InvalidateSystemCaches__resets_mdvsn_no_xact(void **state)
 	 */
 }
 
+/* ==================== MdVer_IsRedundantNukeEvent ==================== */
+/*
+ * Trivial cases: not a nuke event, or the list is empty
+ */
+void test__MdVer_IsRedundantNukeEvent__no_action(void **state)
+{
+	InvalidationListHeader hdr;
+	hdr.cclist = hdr.rclist = hdr.velist = NULL;
+
+	/* First case, when the event is not a nuke */
+	mdver_event *mdev = (mdver_event *) palloc0(sizeof(mdver_event));
+	mdev->key = 100;
+	mdev->new_ddl_version = 1;
+	mdev->new_dml_version = 2;
+
+	bool result = MdVer_IsRedundantNukeEvent(&hdr, mdev);
+	assert_false(result);
+
+	/* Second case, when the event is a nuke, but queue is empty */
+	mdev->key = MDVER_NUKE_KEY;
+	result = MdVer_IsRedundantNukeEvent(&hdr, mdev);
+	assert_false(result);
+}
+
+/*
+ * Non-trivial case: We have one chunk, with some events. Test that we are
+ * correctly looking at the last event in the chunk.
+ */
+void test__MdVer_IsRedundantNukeEvent__chunks(void **state)
+{
+	InvalidationListHeader hdr;
+	hdr.cclist = hdr.rclist = hdr.velist = NULL;
+
+	/* Create an event to add to the list */
+	mdver_event *mdev_list = (mdver_event *) palloc0(sizeof(mdver_event));
+	mdev_list->key = 100;
+	mdev_list->new_ddl_version = 1;
+	mdev_list->new_dml_version = 2;
+
+	/* Create a chunk */
+	InvalidationChunk *first_chunk = (InvalidationChunk *)
+					MemoryContextAlloc(CurTransactionContext,
+							sizeof(InvalidationChunk) +
+							(FIRSTCHUNKSIZE - 1) *sizeof(SharedInvalidationMessage));
+	first_chunk->nitems = 0;
+	first_chunk->maxitems = FIRSTCHUNKSIZE;
+	first_chunk->next = NULL;
+
+	/* Create a message */
+	SharedInvalidationMessage msg;
+	msg.ve.id = SHAREDVERSIONINGMSG_ID;
+	msg.ve.local = true;
+	msg.ve.verEvent = *mdev_list;
+
+	/* Add it to the chunk */
+	first_chunk->msgs[first_chunk->nitems++] = msg;
+
+	/* Add chunk to the list */
+	hdr.velist = first_chunk;
+
+	/* Create a new nuke event to be added */
+	mdver_event *mdev_nuke = (mdver_event *) palloc0(sizeof(mdver_event));
+	mdev_nuke->key = MDVER_NUKE_KEY;
+
+
+	/* First case, last event in chunk is not nuke. */
+	bool result = MdVer_IsRedundantNukeEvent(&hdr, mdev_nuke);
+	assert_false(result);
+
+	/* Second case, last event in chunk is not nuke. */
+
+	/* Create a new nuke event and add it to the chunk */
+	mdver_event *mdev_list_nuke = (mdver_event *) palloc0(sizeof(mdver_event));
+	mdev_list_nuke->key = MDVER_NUKE_KEY;
+	msg.ve.verEvent = *mdev_list_nuke;
+	first_chunk->msgs[first_chunk->nitems++] = msg;
+
+	result = MdVer_IsRedundantNukeEvent(&hdr, mdev_nuke);
+	assert_true(result);
+
+	/* Multiple chunk case.
+	 * Let's add a new chunk in the list. We'll add it as the first
+	 * chunk, so we don't have to add more messages to it. Just test that we
+	 * correctly skip over it. */
+	InvalidationChunk *second_chunk = (InvalidationChunk *)
+								MemoryContextAlloc(CurTransactionContext,
+										sizeof(InvalidationChunk) +
+										(FIRSTCHUNKSIZE - 1) *sizeof(SharedInvalidationMessage));
+	second_chunk->nitems = 0;
+	second_chunk->maxitems = FIRSTCHUNKSIZE;
+
+	/* Add chunk to the list. List now looks like this: hdr -> second_chunk -> first_chunk */
+	hdr.velist = second_chunk;
+	second_chunk->next = first_chunk;
+
+	/* Last message in the list is the last message in first_chunk, which is a nuke */
+	result = MdVer_IsRedundantNukeEvent(&hdr, mdev_nuke);
+	assert_true(result);
+
+
+	/* Add another non-nuke message to the last chunk */
+	/* Create an event to add to the list */
+	mdver_event *mdev_list_last = (mdver_event *) palloc0(sizeof(mdver_event));
+	mdev_list_last->key = 200;
+	mdev_list_last->new_ddl_version = 3;
+	mdev_list_last->new_dml_version = 4;
+
+	msg.ve.verEvent = *mdev_list_last;
+	first_chunk->msgs[first_chunk->nitems++] = msg;
+
+	/* Last message in the list is the last message in first_chunk, which is not a nuke */
+	result = MdVer_IsRedundantNukeEvent(&hdr, mdev_nuke);
+	assert_false(result);
+}
 
 int
 main(int argc, char* argv[]) {
@@ -144,7 +258,9 @@ main(int argc, char* argv[]) {
 			unit_test(test__sizeof__InvalidationChunk),
 			unit_test(test__InvalidateSystemCaches__resets_mdvsn_enabled),
 			unit_test(test__InvalidateSystemCaches__resets_mdvsn_disabled),
-			unit_test(test__InvalidateSystemCaches__resets_mdvsn_no_xact)
+			unit_test(test__InvalidateSystemCaches__resets_mdvsn_no_xact),
+			unit_test(test__MdVer_IsRedundantNukeEvent__no_action),
+			unit_test(test__MdVer_IsRedundantNukeEvent__chunks)
 	};
 	return run_tests(tests);
 }

@@ -23,9 +23,6 @@
 #include "catalog/pg_operator.h"
 #include "catalog/pg_aggregate.h"
 
-/* We use Oid = InvalidOid to signal that it's a NUKE event */
-#define MDVER_NUKE_KEY InvalidOid
-
 static void mdver_dt_add_cache_events(List **events);
 static mdver_event *mdver_new_nuke_event(void);
 static void mdver_add_nuke_event(List **events);
