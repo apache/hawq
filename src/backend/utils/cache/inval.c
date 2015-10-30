@@ -1519,7 +1519,7 @@ MdVer_PreProcessInvalidMsgs(InvalidationListHeader *dest,
 		/* 1. Move messages to the beginning of the chunk */
 		for (int i = last_good_index; i < last_good_chunk->nitems; i++)
 		{
-			last_good_chunk[i - last_good_index] = last_good_chunk[i];
+			last_good_chunk->msgs[i - last_good_index] = last_good_chunk->msgs[i];
 		}
 		/* 2. Update nitems value */
 		last_good_chunk->nitems = last_good_chunk->nitems - last_good_index;
