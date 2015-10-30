@@ -1311,11 +1311,11 @@ int RB2YARN_registerYARNApplication(void)
 	LibYarnApplicationReport_t *applicationReport = NULL;
 	while (retry > 0)
 	{
+		retry--;
 		result = getApplicationReport(LIBYARNClient, YARNJobID, &applicationReport);
 		if (result != FUNCTION_SUCCEEDED || applicationReport == NULL)
 		{
 			if (retry > 0) {
-				retry--;
 				usleep(HAWQ_YARN_AM_HEARTBEAT_INTERVAL*1000*1000L);
 				continue;
 			} else {
@@ -1331,7 +1331,6 @@ int RB2YARN_registerYARNApplication(void)
 		if (applicationReport->progress < 0.5)
 		{
 			if (retry > 0) {
-				retry--;
 				usleep(HAWQ_YARN_AM_HEARTBEAT_INTERVAL*1000*1000L);
 				continue;
 			} else {
