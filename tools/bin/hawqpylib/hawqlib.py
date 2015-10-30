@@ -98,22 +98,15 @@ def remote_ssh(cmd, host, user):
 def check_return_code(result, logger = None,  error_msg = None, info_msg = None, exit_true = False):
     '''Check shell command exit code.'''
     if result != 0:
-        if error_msg:
+        if error_msg and logger:
             logger.error(error_msg)
         sys.exit(1)
     else:
-        if info_msg:
+        if info_msg and logger:
             logger.info(info_msg)
         if exit_true:
             sys.exit(0)
     return result
-
-def exit_with_return_code(result):
-    '''Check shell command exit code.'''
-    if result != 0:
-        sys.exit(1)
-    else:
-        sys.exit(0)
 
 def parse_hosts_file(GPHOME):
     host_file = "%s/etc/slaves" % GPHOME

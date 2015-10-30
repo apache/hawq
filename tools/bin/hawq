@@ -6,7 +6,7 @@ import os
 import sys
 import subprocess
 from hawqpylib.HAWQ_HELP import *
-from hawqpylib.hawqlib import exit_with_return_code
+from hawqpylib.hawqlib import check_return_code
 
 global hawq_home, source_hawq_env
 
@@ -113,7 +113,7 @@ def main():
     else:
         print COMMON_HELP
         sys.exit(1)
-    exit_with_return_code(result)
+    check_return_code(result)
 
 if __name__ == '__main__':
     main()

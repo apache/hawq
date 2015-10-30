@@ -240,15 +240,10 @@ class HawqInit:
                  (self.master_data_directory, source_hawq_env,  self.GPHOME, self.master_data_directory,
                   self.standby_host_name, self.master_data_directory)
         result = local_ssh(cmd)
-        if result != 0:
-            logger.error("Re-sync standby master failed, exit.")
-            sys.exit(1)
-        else:
-            cmd = "%s; hawq start cluster -a" % source_hawq_env
-            result = local_ssh(cmd)
-            if result != 0:
-                logger.error("Start hawq cluster failed.")
-                sys.exit(1)
+        check_return_code(result, logger, "Re-sync standby master failed, exit.")
+        cmd = "%s; hawq start cluster -a" % source_hawq_env
+        result = local_ssh(cmd)
+        check_return_code(result, logger, "Start hawq cluster failed.")
 
         return result
         
