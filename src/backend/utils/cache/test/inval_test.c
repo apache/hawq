@@ -133,125 +133,8 @@ void test__InvalidateSystemCaches__resets_mdvsn_no_xact(void **state)
 	 */
 }
 
-/* ==================== MdVer_IsRedundantNukeEvent ==================== */
-/*
- * Trivial cases: not a nuke event, or the list is empty
- */
-void test__MdVer_IsRedundantNukeEvent__no_action(void **state)
-{
-	InvalidationListHeader hdr;
-	hdr.cclist = hdr.rclist = hdr.velist = NULL;
 
-	/* First case, when the event is not a nuke */
-	mdver_event *mdev = (mdver_event *) palloc0(sizeof(mdver_event));
-	mdev->key = 100;
-	mdev->new_ddl_version = 1;
-	mdev->new_dml_version = 2;
-
-	bool result = MdVer_IsRedundantNukeEvent(&hdr, mdev);
-	assert_false(result);
-
-	/* Second case, when the event is a nuke, but queue is empty */
-	mdev->key = MDVER_NUKE_KEY;
-	result = MdVer_IsRedundantNukeEvent(&hdr, mdev);
-	assert_false(result);
-}
-
-/*
- * Non-trivial case: We have one chunk, with some events. Test that we are
- * correctly looking at the last event in the chunk.
- */
-void test__MdVer_IsRedundantNukeEvent__chunks(void **state)
-{
-	InvalidationListHeader hdr;
-	hdr.cclist = hdr.rclist = hdr.velist = NULL;
-
-	/* Create an event to add to the list */
-	mdver_event *mdev_list = (mdver_event *) palloc0(sizeof(mdver_event));
-	mdev_list->key = 100;
-	mdev_list->new_ddl_version = 1;
-	mdev_list->new_dml_version = 2;
-
-	/* Create a chunk */
-	InvalidationChunk *first_chunk = (InvalidationChunk *)
-					MemoryContextAlloc(CurTransactionContext,
-							sizeof(InvalidationChunk) +
-							(FIRSTCHUNKSIZE - 1) *sizeof(SharedInvalidationMessage));
-	first_chunk->nitems = 0;
-	first_chunk->maxitems = FIRSTCHUNKSIZE;
-	first_chunk->next = NULL;
-
-	/* Create a message */
-	SharedInvalidationMessage msg;
-	msg.ve.id = SHAREDVERSIONINGMSG_ID;
-	msg.ve.local = true;
-	msg.ve.verEvent = *mdev_list;
-
-	/* Add it to the chunk */
-	first_chunk->msgs[first_chunk->nitems++] = msg;
-
-	/* Add chunk to the list */
-	hdr.velist = first_chunk;
-
-	/* Create a new nuke event to be added */
-	mdver_event *mdev_nuke = (mdver_event *) palloc0(sizeof(mdver_event));
-	mdev_nuke->key = MDVER_NUKE_KEY;
-
-
-	/* First case, last event in chunk is not nuke. */
-	bool result = MdVer_IsRedundantNukeEvent(&hdr, mdev_nuke);
-	assert_false(result);
-
-	/* Second case, last event in chunk is not nuke. */
-
-	/* Create a new nuke event and add it to the chunk */
-	mdver_event *mdev_list_nuke = (mdver_event *) palloc0(sizeof(mdver_event));
-	mdev_list_nuke->key = MDVER_NUKE_KEY;
-	msg.ve.verEvent = *mdev_list_nuke;
-	first_chunk->msgs[first_chunk->nitems++] = msg;
-
-	result = MdVer_IsRedundantNukeEvent(&hdr, mdev_nuke);
-	assert_true(result);
-
-	/* Multiple chunk case.
-	 * Let's add a new chunk in the list. We'll add it as the first
-	 * chunk, so we don't have to add more messages to it. Just test that we
-	 * correctly skip over it. */
-	InvalidationChunk *second_chunk = (InvalidationChunk *)
-								palloc0(sizeof(InvalidationChunk) +
-										(FIRSTCHUNKSIZE - 1) *sizeof(SharedInvalidationMessage));
-	second_chunk->nitems = 0;
-	second_chunk->maxitems = FIRSTCHUNKSIZE;
-
-	/* Add chunk to the list. List now looks like this: hdr -> second_chunk -> first_chunk */
-	hdr.velist = second_chunk;
-	second_chunk->next = first_chunk;
-
-	/* Last message in the list is the last message in first_chunk, which is a nuke */
-	result = MdVer_IsRedundantNukeEvent(&hdr, mdev_nuke);
-	assert_true(result);
-
-
-	/* Add another non-nuke message to the last chunk */
-	/* Create an event to add to the list */
-	mdver_event *mdev_list_last = (mdver_event *) palloc0(sizeof(mdver_event));
-	mdev_list_last->key = 200;
-	mdev_list_last->new_ddl_version = 3;
-	mdev_list_last->new_dml_version = 4;
-
-	msg.ve.verEvent = *mdev_list_last;
-	first_chunk->msgs[first_chunk->nitems++] = msg;
-
-	/* Last message in the list is the last message in first_chunk, which is not a nuke */
-	result = MdVer_IsRedundantNukeEvent(&hdr, mdev_nuke);
-	assert_false(result);
-}
-
-/* ==================== MdVer_PreProcessInvalidMsgs ==================== */
-/*
- *
- */
-
+/* Helper functions for the MdVer queue pre-processing */
 static InvalidationListHeader *
 create_list_one_chunk(void) {
 	InvalidationListHeader *hdr = (InvalidationListHeader *) palloc0(sizeof(InvalidationListHeader));
@@ -294,6 +177,87 @@ static void add_event_to_chunk(InvalidationChunk *chunk, bool is_nuke, int key) 
 
 	chunk->msgs[chunk->nitems++] = msg;
 }
+
+
+/* ==================== MdVer_IsRedundantNukeEvent ==================== */
+/*
+ * Trivial cases: not a nuke event, or the list is empty
+ */
+void test__MdVer_IsRedundantNukeEvent__no_action(void **state)
+{
+	InvalidationListHeader hdr;
+	hdr.cclist = hdr.rclist = hdr.velist = NULL;
+
+	/* First case, when the event is not a nuke */
+	mdver_event *mdev = (mdver_event *) palloc0(sizeof(mdver_event));
+	mdev->key = 100;
+	mdev->new_ddl_version = 1;
+	mdev->new_dml_version = 2;
+
+	bool result = MdVer_IsRedundantNukeEvent(&hdr, mdev);
+	assert_false(result);
+
+	/* Second case, when the event is a nuke, but queue is empty */
+	mdev->key = MDVER_NUKE_KEY;
+	result = MdVer_IsRedundantNukeEvent(&hdr, mdev);
+	assert_false(result);
+}
+
+/*
+ * Non-trivial case: We have one chunk, with some events. Test that we are
+ * correctly looking at the last event in the chunk.
+ */
+void test__MdVer_IsRedundantNukeEvent__chunks(void **state)
+{
+	InvalidationListHeader *hdr = create_list_one_chunk();
+	add_event_to_chunk(hdr->velist, false /* is_nuke */, 100 /* key */);
+
+
+	/* Create a new nuke event to be added */
+	mdver_event *mdev_nuke = (mdver_event *) palloc0(sizeof(mdver_event));
+	mdev_nuke->key = MDVER_NUKE_KEY;
+
+
+	/* First case, last event in chunk is not nuke. */
+	bool result = MdVer_IsRedundantNukeEvent(hdr, mdev_nuke);
+	assert_false(result);
+
+	/* Second case, last event in chunk is a nuke. */
+	add_event_to_chunk(hdr->velist, true /* is_nuke */, 101);
+
+	result = MdVer_IsRedundantNukeEvent(hdr, mdev_nuke);
+	assert_true(result);
+
+	/* Multiple chunk case. Let's add a new chunk in the list. */
+	InvalidationChunk *second_chunk = (InvalidationChunk *)
+								palloc0(sizeof(InvalidationChunk) +
+										(FIRSTCHUNKSIZE - 1) *sizeof(SharedInvalidationMessage));
+	second_chunk->nitems = 0;
+	second_chunk->maxitems = FIRSTCHUNKSIZE;
+	second_chunk->next = NULL;
+
+	/* Add chunk to the list. List now looks like this: hdr -> first_chunk -> second_chunk  */
+	hdr->velist->next = second_chunk;
+
+	/* Last message in the list is not a nuke */
+	add_event_to_chunk(second_chunk, false /* is_nuke */, 200 /* key */);
+
+	result = MdVer_IsRedundantNukeEvent(hdr, mdev_nuke);
+	assert_false(result);
+
+
+	/* Add a nuke message to the last chunk */
+	add_event_to_chunk(second_chunk, true /* is_nuke */, 210 /* key */);
+
+	/* Last message in the list is the last message in first_chunk, which is not a nuke */
+	result = MdVer_IsRedundantNukeEvent(hdr, mdev_nuke);
+	assert_true(result);
+}
+
+/* ==================== MdVer_PreProcessInvalidMsgs ==================== */
+/*
+ *
+ */
 
 /* Test that when appending a list with no nukes to dest, nothing changes */
 void test__MdVer_PreProcessInvalidMsgs__no_nuke(void **state)
@@ -344,7 +308,7 @@ void test__MdVer_PreProcessInvalidMsgs__nuke_first_chunk(void **state)
 	assert_true(NULL == src->velist);
 }
 
-/* Test that when appending a list with a nuke in first chunk, dest gets updated */
+/* Test that when appending a list with a nuke in second chunk, dest gets updated */
 void test__MdVer_PreProcessInvalidMsgs__nuke_second_chunk(void **state)
 {
 	InvalidationListHeader* dest = create_list_one_chunk();
@@ -353,13 +317,36 @@ void test__MdVer_PreProcessInvalidMsgs__nuke_second_chunk(void **state)
 	InvalidationListHeader *src = create_list_one_chunk();
 	add_event_to_chunk(src->velist, false /* is_nuke */, 200 /* key */);
 	add_event_to_chunk(src->velist, true /* is_nuke */, 210 /* key */);
-	add_event_to_chunk(src->velist, false /* is_nuke */, 220 /* key */);
-	add_event_to_chunk(src->velist, true /* is_nuke */, 230 /* key */);
-	add_event_to_chunk(src->velist, true /* is_nuke */, 240 /* key */);
-	add_event_to_chunk(src->velist, false /* is_nuke */, 250 /* key */);
-	/* src now is: 200->nuke->220->nuke->nuke->250 */
 
+	/* Create a chunk */
+	InvalidationChunk *second_chunk = (InvalidationChunk *)
+					palloc0(sizeof(InvalidationChunk) +
+							(FIRSTCHUNKSIZE - 1) *sizeof(SharedInvalidationMessage));
+	second_chunk->nitems = 0;
+	second_chunk->maxitems = FIRSTCHUNKSIZE;
+	second_chunk->next = NULL;
 
+	/* Add events to second chunk */
+	add_event_to_chunk(second_chunk, false /* is_nuke */, 220 /* key */);
+	add_event_to_chunk(second_chunk, true /* is_nuke */, 230 /* key */);
+	add_event_to_chunk(second_chunk, true /* is_nuke */, 240 /* key */);
+	add_event_to_chunk(second_chunk, false /* is_nuke */, 250 /* key */);
+	/* src now is: [200->nuke]->[220->nuke->nuke->250] */
+
+	/* Link second chunk into list */
+	src->velist->next = second_chunk;
+
+	MdVer_PreProcessInvalidMsgs(dest, src);
+
+	/* After processing, we should have:
+	 *    src: null
+	 *    dest: nuke->250
+	 */
+	assert_int_equal(dest->velist->nitems, 2);
+	assert_int_equal(dest->velist->msgs[0].ve.verEvent.key, MDVER_NUKE_KEY);
+	assert_int_equal(dest->velist->msgs[1].ve.verEvent.key, 250);
+
+	assert_true(NULL == src->velist);
 }
 
 int
