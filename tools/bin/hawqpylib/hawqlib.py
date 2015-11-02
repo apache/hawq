@@ -82,8 +82,14 @@ class HawqXMLParser:
         return xmldoc
 
 
-def local_ssh(cmd):
-    result = subprocess.Popen(cmd, shell=True).wait()
+def local_ssh(cmd, logger = None):
+    result = subprocess.Popen(cmd, shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+    stdout,stderr = result.communicate()
+    if logger:
+        if stdout != '':
+            logger.info(stdout)
+        if stderr != '':
+            logger.error(stderr)
     return result
 
 
