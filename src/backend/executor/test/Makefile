@@ -36,7 +36,6 @@ nodeSubplan_REAL_OBJS=\
 
 nodeShareInputScan_REAL_OBJS=\
         $(top_srcdir)/src/backend/access/hash/hashfunc.o \
-        $(top_srcdir)/src/backend/access/transam/filerepdefs.o \
         $(top_srcdir)/src/backend/bootstrap/bootparse.o \
         $(top_srcdir)/src/backend/lib/stringinfo.o \
 	$(top_srcdir)/src/backend/nodes/bitmapset.o \
@@ -50,6 +49,7 @@ nodeShareInputScan_REAL_OBJS=\
         $(top_srcdir)/src/backend/storage/page/itemptr.o \
 	$(top_srcdir)/src/backend/utils/adt/datum.o \
         $(top_srcdir)/src/backend/utils/adt/like.o \
+        $(top_srcdir)/src/backend/utils/fmgrtab.o \
         $(top_srcdir)/src/backend/utils/hash/dynahash.o \
         $(top_srcdir)/src/backend/utils/hash/hashfn.o \
         $(top_srcdir)/src/backend/utils/misc/guc.o \
@@ -66,7 +66,6 @@ nodeShareInputScan_REAL_OBJS=\
 
 execAmi_REAL_OBJS=\
         $(top_srcdir)/src/backend/access/hash/hashfunc.o \
-        $(top_srcdir)/src/backend/access/transam/filerepdefs.o \
         $(top_srcdir)/src/backend/bootstrap/bootparse.o \
         $(top_srcdir)/src/backend/lib/stringinfo.o \
         $(top_srcdir)/src/backend/nodes/bitmapset.o \

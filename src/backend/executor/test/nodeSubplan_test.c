@@ -39,7 +39,7 @@ test__ExecSetParamPlan__Check_Dispatch_Results(void **state)
 	expect_any(AllocSetContextCreate,minContextSize);
 	expect_any(AllocSetContextCreate,initBlockSize);
 	expect_any(AllocSetContextCreate,maxBlockSize);
-	will_be_called(AllocSetContextCreate);	
+	will_be_called(AllocSetContextCreate);
 	EState *estate = CreateExecutorState();
 
 	/*Assign mocked estate to plan.*/
@@ -64,7 +64,7 @@ test__ExecSetParamPlan__Check_Dispatch_Results(void **state)
 	queryDesc->plannedstmt = plannedstmt;
 	queryDesc->estate = (EState *)palloc(sizeof(EState));
 	queryDesc->estate->es_sliceTable = (SliceTable *) palloc(sizeof(SliceTable));
-	
+
 	/*Set of functions called within tested function*/
 	expect_any(MemoryContextGetPeakSpace,context);
 	will_be_called(MemoryContextGetPeakSpace);
@@ -89,7 +89,7 @@ test__ExecSetParamPlan__Check_Dispatch_Results(void **state)
 	expect_any(CreateQueryDesc,params);
 	expect_any(CreateQueryDesc,doInstrument);
 	will_return(CreateQueryDesc,internalQueryDesc);
-	
+
 	expect_any(AllocSetContextCreate,parent);
 	expect_any(AllocSetContextCreate,name);
 	expect_any(AllocSetContextCreate,minContextSize);
@@ -100,14 +100,6 @@ test__ExecSetParamPlan__Check_Dispatch_Results(void **state)
 	Gp_role = GP_ROLE_DISPATCH;
 	plan->planstate->plan->dispatch=DISPATCH_PARALLEL;
 
-	will_be_called(isCurrentDtxTwoPhase);
-
-	expect_any(cdbdisp_dispatchPlan,queryDesc);
-	expect_any(cdbdisp_dispatchPlan,planRequiresTxn);
-	expect_any(cdbdisp_dispatchPlan,cancelOnError);
-	expect_any(cdbdisp_dispatchPlan,ds);
-	will_be_called(cdbdisp_dispatchPlan);
-
 	expect_any(SetupInterconnect,estate);
 	/* Force SetupInterconnect to fail */
 	will_be_called_with_sideeffect(SetupInterconnect,&_RETHROW,NULL);
@@ -117,14 +109,11 @@ test__ExecSetParamPlan__Check_Dispatch_Results(void **state)
 	expect_any(cdbexplain_localExecStats,showstatctx);
 	will_be_called(cdbexplain_localExecStats);
 
-	expect_any(CdbCheckDispatchResult,ds);
-	expect_any(CdbCheckDispatchResult,cancelUnfinishedWork);
-	will_be_called(CdbCheckDispatchResult);
-
 	expect_any(cdbexplain_recvExecStats,planstate);
 	expect_any(cdbexplain_recvExecStats,dispatchResults);
 	expect_any(cdbexplain_recvExecStats,sliceIndex);
 	expect_any(cdbexplain_recvExecStats,showstatctx);
+	expect_any(cdbexplain_recvExecStats,segmentNum);
 	will_be_called(cdbexplain_recvExecStats);
 
 	expect_any(MemoryContextSetPeakSpace,context);
@@ -137,6 +126,29 @@ test__ExecSetParamPlan__Check_Dispatch_Results(void **state)
 	expect_any(TeardownInterconnect,mlStates);
 	expect_any(TeardownInterconnect,forceEOS);
 	will_be_called(TeardownInterconnect);
+
+	expect_any(initialize_dispatch_data, resource);
+	expect_any(initialize_dispatch_data, dispatch_to_all_cached_executors);
+	will_be_called(initialize_dispatch_data);
+
+	expect_any(prepare_dispatch_query_desc, data);
+	expect_any(prepare_dispatch_query_desc, queryDesc);
+	will_be_called(prepare_dispatch_query_desc);
+
+	expect_any(dispatch_run, data);
+	will_be_called(dispatch_run);
+
+	expect_any(cleanup_dispatch_data, data);
+	will_be_called(cleanup_dispatch_data);
+
+	expect_any(dispatch_wait, data);
+	will_be_called(dispatch_wait);
+
+	expect_any(dispatch_get_segment_num, data);
+	will_be_called(dispatch_get_segment_num);
+
+	expect_any(dispatch_get_results, data);
+	will_be_called(dispatch_get_results);
 
 	/* Catch PG_RE_THROW(); after cleaning with CdbCheckDispatchResult */
 	PG_TRY();
