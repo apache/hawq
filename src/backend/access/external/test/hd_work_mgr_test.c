@@ -16,7 +16,6 @@ main(int argc, char* argv[])
 
 	const UnitTest tests[] = {
 			unit_test(test__do_segment_clustering_by_host__10SegmentsOn3Hosts),
-			unit_test(test__do_segment_clustering_by_host__10SegmentsOn3HostsWithMirrors),
 			unit_test(test__get_dn_processing_load),
 			unit_test(test__create_allocated_fragment__NoUserData),
 			unit_test(test__create_allocated_fragment__WithUserData),

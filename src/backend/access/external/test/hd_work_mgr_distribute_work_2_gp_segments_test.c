@@ -97,14 +97,15 @@ test__distribute_work_to_gp_segments__big_cluster_few_active_nodes(void **state)
 	input->m_num_data_fragments = 100; /* number of fragments in the data we intend to allocate between the hawq segments */
 	input->m_num_active_data_nodes = 10; /* number of datanodes that hold the 'querried' data - there one datanode om each cluster host - so there are <num_hosts_in_cluster> datanodes */
 	input->m_num_of_fragment_replicas = 3;
-	input->m_num_segments_on_host = 4;/* number of Hawq segments on each cluster host - we assume all cluster hosts have Hawq segments installed */
+	input->m_num_segments_on_host = 1;/* number of Hawq segments on each cluster host - we assume all cluster hosts have Hawq segments installed */
 	input->m_num_working_segs = 64; /* the subset of Hawq segments that will do the processing  - not all the Hawqs segments in the cluster are involved */
 	input->m_enable_print_input_cluster = false;
 	input->m_enable_print_input_fragments = false;
 	input->m_enable_print_input_segments = false;
 	input->m_enable_print_allocated_fragments = false;
-	
+
 	test__distribute_work_to_gp_segments(input);
+
 	pfree(input);
 }
 
@@ -243,18 +244,24 @@ static void test__distribute_work_to_gp_segments(TestInputData *input)
 	buildCdbComponentDatabases(total_segs, array_of_segs, array_of_primaries);	
 	if (enable_print_input_segments)
 		print_segments_list();
-		
-	/* 5. The actual unitest of distribute_work_2_gp_segments() */
+
+    /* 5. Build QueryResource */
+    buildQueryResource(num_hosts_in_cluster*num_segments_on_host, array_of_segs);
+    will_return(GetActiveQueryResource, resource);
+    will_return(GetActiveQueryResource, resource);
+
+	/* 6. The actual unitest of distribute_work_2_gp_segments() */
 	segs_allocated_data = distribute_work_2_gp_segments(input_fragments_list, total_segs, num_working_segs);
 	if (enable_print_allocated_fragments)
 		print_allocated_fragments(segs_allocated_data, total_segs);
 	
-	/* 6. The validations - verifying that the expected output was obtained */
+	/* 7. The validations - verifying that the expected output was obtained */
 	validate_total_fragments_allocated(segs_allocated_data, total_segs, num_data_fragments);
 	validate_max_load_per_segment(segs_allocated_data, total_segs, num_working_segs, num_data_fragments);
 	validate_all_working_segments_engagement(segs_allocated_data, total_segs, num_working_segs, num_data_fragments, num_hosts_in_cluster);
 	
-	/* 7. Cleanup */
+	/* 8. Cleanup */
+	freeQueryResource();
 	restoreCdbComponentDatabases();
 	clean_cluster(cluster, num_hosts_in_cluster);
 	clean_array_of_segs(array_of_segs, total_segs);
@@ -324,7 +331,7 @@ static char** create_cluster(int num_hosts)
 		}
 		resetStringInfo(&ip);
 	}
-	
+
 	return  cluster;
 }
 
@@ -367,7 +374,7 @@ static void print_segments_list()
 	StringInfoData msg;
 	CdbComponentDatabases *test_cdb = GpAliveSegmentsInfo.cdbComponentDatabases;
 	initStringInfo(&msg);
-	
+
 	for (int i = 0; i < test_cdb->total_segment_dbs; ++i)
 	{
 		CdbComponentDatabaseInfo* component = &test_cdb->segment_db_info[i];
@@ -408,7 +415,7 @@ static void print_allocated_fragments(List **allocated_fragments, int total_segs
 	StringInfoData msg;
 	initStringInfo(&msg);
 	appendStringInfo(&msg, "ALLOCATED FRAGMENTS FOR EACH SEGMENT:\n");
-	
+
 	for (int i = 0; i < total_segs; i++)
 	{
 		if (allocated_fragments[i])
@@ -440,6 +447,7 @@ static char* print_one_allocated_data_fragment(AllocatedDataFragment *frag, int 
 	appendStringInfo(&msg, 
 	                 "locality: %d, segment number: %d , segment ip: %s --- fragment index: %d, datanode host: %s, file: %s", 
 	                 locality, seg_index, seg_ip, frag->index, frag->host, frag->source_name);
+
 	return msg.data;
 }
 
@@ -482,13 +490,13 @@ static bool is_host_uniq(List** ips_list, char* ip)
 static void validate_total_fragments_allocated(List **allocated_fragments, int total_segs, int input_total_fragments)
 {
 	int total_fragments_allocated = 0; 
-	
+
 	for (int i = 0; i < total_segs; i++)
 	{
 		if (allocated_fragments[i])
 			total_fragments_allocated += list_length(allocated_fragments[i]);
 	}
-	
+
 	assert_int_equal(total_fragments_allocated, input_total_fragments);
 }
 
@@ -576,7 +584,7 @@ spread_fragments_in_cluster(int number_of_fragments,
 	List* fragments_list = NIL;
 	StringInfoData string_info;
 	initStringInfo(&string_info);
-	
+
 	/* pick the first host in the cluster that will host the data. The fragments will be spread from this host onward */
 	first_host = 0;
 	
@@ -608,14 +616,8 @@ spread_fragments_in_cluster(int number_of_fragments,
 		resetStringInfo(&string_info);
 		fragments_list = lappend(fragments_list, fragment);
 	}
-	
+
 	pfree(string_info.data);
 	return fragments_list;
 }
-
-
-
-
-
-
 
