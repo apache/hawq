@@ -9,6 +9,9 @@ import org.apache.commons.logging.LogFactory;
 
 import com.pivotal.pxf.api.Fragment;
 
+/**
+ * Helper class to get statistics for ANALYZE.
+ */
 public class AnalyzeUtils {
 
     private static Log Log = LogFactory.getLog(AnalyzeUtils.class);

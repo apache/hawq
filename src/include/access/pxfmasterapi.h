@@ -55,7 +55,7 @@ typedef struct sFragmentHost
 extern List* get_datanode_rest_servers(GPHDUri *hadoop_uri, ClientContext* client_context);
 extern void free_datanode_rest_servers(List *srvrs);
 extern void free_datanode_rest_server(PxfServer* srv);
-extern PxfStatsElem *get_data_statistics(GPHDUri* hadoop_uri, ClientContext *cl_context, StringInfo err_msg);
+extern PxfFragmentStatsElem *get_fragments_statistics(GPHDUri* hadoop_uri, ClientContext *cl_context, StringInfo err_msg);
 extern List* get_data_fragment_list(GPHDUri *hadoop_uri,  ClientContext* client_context);
 extern void free_fragment(DataFragment *fragment);
 extern List* get_hcat_metadata(GPHDUri* hadoop_uri, char *location, ClientContext *client_context);

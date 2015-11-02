@@ -20,15 +20,15 @@ extern char** map_hddata_2gp_segments(char *uri, int total_segs, int working_seg
 extern void free_hddata_2gp_segments(char **segs_work_map, int total_segs);
 
 /*
- * Structure that describes one Statistics element received from the PXF service
+ * Structure that describes fragments statistics element received from PXF service
  */
-typedef struct sPxfStatsElem
+typedef struct sPxfFragmentStatsElem
 {
-	int   blockSize; /* size of a block size in the PXF target datasource */
-	int   numBlocks;
-	int   numTuples;
-} PxfStatsElem;
-PxfStatsElem *get_pxf_statistics(char *uri, Relation rel, StringInfo err_msg);
+	int numFrags;
+	int firstFragSize; /* size of the first fragment */
+	int totalSize; /* size of the total datasource */
+} PxfFragmentStatsElem;
+PxfFragmentStatsElem *get_pxf_fragments_statistics(char *uri, Relation rel, StringInfo err_msg);
 
 List *get_pxf_hcat_metadata(char *relation_location);
 

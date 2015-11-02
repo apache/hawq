@@ -11,6 +11,7 @@
 #include "postgres.h"
 #include <curl/curl.h>
 #include <json/json.h>
+#include "access/hd_work_mgr.h"
 #include "access/pxfanalyze.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_exttable.h"
@@ -51,36 +52,68 @@ static char* createPxfSampleStmt(Oid relationOid,
 static float4 getPxfFragmentTupleCount(Oid relationOid);
 static float4 countFirstFragmentTuples(const char* schemaName,
 									   const char* tableName);
+static void getFragmentStats(Relation rel, StringInfo location,
+							 float4 *numfrags, float4 *firstfragsize,
+							 float4 *totalsize, StringInfo err_msg);
 
 
-void analyzePxfEstimateReltuplesRelpagesRelFrags(Relation relation,
+void analyzePxfEstimateReltuplesRelpages(Relation relation,
 		StringInfo location,
 		float4* estimatedRelTuples,
 		float4* estimatedRelPages,
-		float4* relFrags,
 		StringInfo err_msg)
 {
+
+	float4 numFrags = 0.0;
+	float4 firstFragSize = 0.0;
+	float4 totalSize = 0.0;
 
 	float4 firstFragTuples = 0.0;
 	float4 estimatedTuples = 0.0;
 
-	/* get number of fragments and pages (tuples will be ignored) */
-	/* TODO: return the number of fragments, the size of the first fragment and the total size
-	 *  - tuple estimate can be calculated based on that */
-	gp_statistics_estimate_reltuples_relpages_relfrags_external_pxf(relation, location, estimatedRelTuples, estimatedRelPages, relFrags, err_msg);
+	/* get number of fragments, size of first fragment and total size.
+	 * This is used together with the number of tuples in first fragment
+	 * to estimate the number of tuples in the table. */
+	getFragmentStats(relation, location, &numFrags, &firstFragSize, &totalSize, err_msg);
 	if (err_msg->len > 0)
+	{
 		return;
+	}
 
 	/* get number of tuples from first fragment */
 	firstFragTuples = getPxfFragmentTupleCount(relation->rd_id);
 
 	/* calculate estimated tuple count */
 	if (firstFragTuples > 0)
-		estimatedTuples = firstFragTuples * (*relFrags);
+	{
+		 /* The calculation:
+		  * size of each tuple = first fragment size / first fragment row
+		  * total size = size of each tuple * number of tuples
+		  * number of tuples = total size / size of each tuple
+		  */
+		estimatedTuples = (totalSize / firstFragSize) * firstFragTuples;
+	}
 
 	elog(DEBUG2, "Estimated tuples for PXF table: %f. (first fragment count %f, fragments number %f, old estimate %f)",
-		 estimatedTuples, firstFragTuples, *relFrags, *estimatedRelTuples);
+		 estimatedTuples, firstFragTuples, numFrags, *estimatedRelTuples);
+
 	*estimatedRelTuples = estimatedTuples;
+	*estimatedRelPages = numFrags;
+
+	/* relpages can't be 0 if there are tuples in the table. */
+	if ((*estimatedRelPages < 1.0) && (estimatedTuples > 0))
+	{
+		*estimatedRelPages = 1.0;
+	}
+	/* in case there were problems with the PXF service, keep the defaults */
+	if (*estimatedRelPages < 0)
+	{
+		*estimatedRelPages =  gp_external_table_default_number_of_pages;
+	}
+	if (*estimatedRelTuples < 0)
+	{
+		*estimatedRelTuples =  gp_external_table_default_number_of_tuples;
+	}
 }
 
 /*
@@ -125,6 +158,7 @@ Oid buildPxfSampleTable(Oid relationOid,
 
 	Assert(requestedSampleSize > 0.0);
 	Assert(relTuples > 0.0);
+	Assert(relFrags > 0.0);
 
 	/* calculate pxf_sample_ratio */
 	pxfSamplingRatio = calculateSamplingRatio(relTuples, relFrags, requestedSampleSize);
@@ -671,4 +705,40 @@ static float4 countFirstFragmentTuples(const char* schemaName,
 	elog(DEBUG3, "count() of first pxf fragment gives %f values.", ntuples);
 
 	return ntuples;
+}
+
+/* --------------------------------
+ *		getFragmentStats  -
+ *
+ *		Fetch number of fragments, size of first fragment and total size of datasource,
+ *		for an external table which is PXF
+ * --------------------------------
+ */
+static void getFragmentStats(Relation rel, StringInfo location,
+							 float4 *numfrags, float4 *firstfragsize,
+							 float4 *totalsize, StringInfo err_msg)
+{
+
+	PxfFragmentStatsElem *elem = NULL;
+	elem = get_pxf_fragments_statistics(location->data, rel, err_msg);
+
+	/*
+	 * if get_pxf_fragments_statistics returned NULL - probably a communication error, we fall back to former values
+	 * for the relation (can be default if no analyze was run successfully before)
+	 * we don't want to stop the analyze, since this can be part of a long procedure performed on many tables
+	 * not just this one
+	 */
+	if (!elem)
+	{
+		return;
+	}
+
+	*numfrags = elem->numFrags;
+	*firstfragsize = elem->firstFragSize;
+	*totalsize = elem->totalSize;
+	pfree(elem);
+
+	elog(DEBUG2, "ANALYZE estimate for PXF table %s: fragments %f, first frag size %f, "
+			"total size %f [max int %d]",
+			RelationGetRelationName(rel), *numfrags, *firstfragsize, *totalsize, INT_MAX);
 }

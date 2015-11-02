@@ -2,9 +2,11 @@ package org.apache.hawq.pxf.plugins.hdfs;
 
 import org.apache.hawq.pxf.api.Fragment;
 import org.apache.hawq.pxf.api.Fragmenter;
+import org.apache.hawq.pxf.api.FragmentsStats;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.plugins.hdfs.utilities.HdfsUtilities;
 import org.apache.hawq.pxf.plugins.hdfs.utilities.PxfInputFormat;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.FileSplit;
@@ -12,6 +14,7 @@ import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -43,18 +46,10 @@ public class HdfsDataFragmenter extends Fragmenter {
     @Override
     public List<Fragment> getFragments() throws Exception {
         String absoluteDataPath = HdfsUtilities.absoluteDataPath(inputData.getDataSource());
-        InputSplit[] splits = getSplits(new Path(absoluteDataPath));
+        ArrayList<InputSplit> splits = getSplits(new Path(absoluteDataPath));
 
-        for (InputSplit split : splits != null ? splits : new InputSplit[] {}) {
+        for (InputSplit split : splits) {
             FileSplit fsp = (FileSplit) split;
-
-            /*
-             * HD-2547: If the file is empty, an empty split is returned: no
-             * locations and no length.
-             */
-            if (fsp.getLength() <= 0) {
-                continue;
-            }
 
             String filepath = fsp.getPath().toUri().getPath();
             String[] hosts = fsp.getLocations();
@@ -71,9 +66,40 @@ public class HdfsDataFragmenter extends Fragmenter {
         return fragments;
     }
 
-    private InputSplit[] getSplits(Path path) throws IOException {
-        PxfInputFormat format = new PxfInputFormat();
+    @Override
+    public FragmentsStats getFragmentsStats() throws Exception {
+        String absoluteDataPath = HdfsUtilities.absoluteDataPath(inputData.getDataSource());
+        ArrayList<InputSplit> splits = getSplits(new Path(absoluteDataPath));
+
+        if (splits.isEmpty()) {
+            return new FragmentsStats(0, 0, 0);
+        }
+        long totalSize = 0;
+        for (InputSplit split: splits) {
+            totalSize += split.getLength();
+        }
+        InputSplit firstSplit = splits.get(0);
+        return new FragmentsStats(splits.size(), firstSplit.getLength(), totalSize);
+    }
+
+    private ArrayList<InputSplit> getSplits(Path path) throws IOException {
+        PxfInputFormat fformat = new PxfInputFormat();
         PxfInputFormat.setInputPaths(jobConf, path);
-        return format.getSplits(jobConf, 1);
+        InputSplit[] splits = fformat.getSplits(jobConf, 1);
+        ArrayList<InputSplit> result = new ArrayList<InputSplit>();
+
+        /*
+         * HD-2547: If the file is empty, an empty split is returned: no
+         * locations and no length.
+         */
+        if (splits != null) {
+            for (InputSplit split : splits) {
+                if (split.getLength() > 0) {
+                    result.add(split);
+                }
+            }
+        }
+
+        return result;
     }
 }

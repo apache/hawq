@@ -26,13 +26,13 @@ extern Oid buildPxfSampleTable(Oid relationOid,
 		float4 	requestedSampleSize,
 		float4 *sampleTableRelTuples);
 /*
- * get tuple count estimate, page count estimate and
- * number of fragments of a given PXF table.
+ * get tuple count estimate, page count estimate (which is
+ * the number of fragments) of a given PXF table.
  */
-void analyzePxfEstimateReltuplesRelpagesRelFrags(Relation relation,
+void analyzePxfEstimateReltuplesRelpages(Relation relation,
 		StringInfo location,
 		float4* estimatedRelTuples,
-		float4* estimatedRelPages, float4* relFrags,
+		float4* estimatedRelPages,
 		StringInfo err_msg);
 
 #endif   /* PXFANALYZE_H */

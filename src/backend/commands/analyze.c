@@ -897,7 +897,6 @@ static void analyzeRelation(Relation relation, List *lAttributeNames, bool rooto
 	float4 estimatedRelTuples = 0.0;
 	float4 estimatedRelPages = 0.0;
 	float4 sampleTableRelTuples = 0.0;
-	float4 relFrags = 0.0;
 	List	*indexOidList = NIL;
 	ListCell	*lc = NULL;
 	StringInfoData location;
@@ -915,7 +914,7 @@ static void analyzeRelation(Relation relation, List *lAttributeNames, bool rooto
 	else
 	{
 		initStringInfo(&err_msg);
-		analyzePxfEstimateReltuplesRelpagesRelFrags(relation, &location, &estimatedRelTuples, &estimatedRelPages, &relFrags, &err_msg);
+		analyzePxfEstimateReltuplesRelpages(relation, &location, &estimatedRelTuples, &estimatedRelPages, &err_msg);
 		if (err_msg.len > 0)
 		{
 			elog(ERROR,
@@ -1050,7 +1049,7 @@ static void analyzeRelation(Relation relation, List *lAttributeNames, bool rooto
 		if (isExternalPxfReadOnly)
 		{
 			sampleTableOid = buildPxfSampleTable(relationOid, sampleTableName, lAttributeNames,
-					estimatedRelTuples, relFrags, minSampleTableSize,
+					estimatedRelTuples, estimatedRelPages, minSampleTableSize,
 					&sampleTableRelTuples);
 		}
 		else
@@ -3101,50 +3100,4 @@ static void gp_statistics_estimate_reltuples_relpages_parquet(Relation rel, floa
 
 	pfree(fstotal);
 	return;
-}
-
-/* --------------------------------
- *		gp_statistics_estimate_reltuples_relpages_relfrags_external_pxf  -
- *
- *		Fetch reltuples, relpages and number of fragments for an external table which is PXF
- * --------------------------------
- */
-void gp_statistics_estimate_reltuples_relpages_relfrags_external_pxf(Relation rel, StringInfo location,
-																	float4 *reltuples, float4 *relpages,
-																	float4 *relfrags,
-																	StringInfo err_msg)
-{
-
-	PxfStatsElem *elem = NULL;
-	elem = get_pxf_statistics(location->data, rel, err_msg);
-
-	/*
-	 * if get_pxf_statistics returned NULL - probably a communication error, we fall back to former values
-	 * for the relation (can be default if no analyze was run successfully before)
-	 * we don't want to stop the analyze, since this can be part of a long procedure performed on many tables
-	 * not just this one
-	 */
-	if (!elem)
-	{
-		*relpages = rel->rd_rel->relpages;
-		*reltuples = rel->rd_rel->reltuples;
-		return;
-	}
-	
-	*relpages = floor(( ((float4)elem->blockSize) * elem->numBlocks) / BLCKSZ);
-	*reltuples = elem->numTuples;
-	*relfrags = elem->numBlocks;
-	/* relpages can't be 0 if there are tuples in the table. */
-	if ((*relpages < 1.0) && (*reltuples > 0))
-		*relpages = 1.0;
-	pfree(elem);
-	
-	/* in case there were problems with the PXF service, keep the defaults */
-	if (*relpages < 0)
-		*relpages =  gp_external_table_default_number_of_pages;
-	if (*reltuples < 0)
-		*reltuples =  gp_external_table_default_number_of_tuples;
-
-	elog(elevel, "ANALYZE estimate for PXF table %s: tuples %f, pages %f, fragments %f max int %d",
-			RelationGetRelationName(rel), *reltuples, *relpages, *relfrags, INT_MAX);
 }

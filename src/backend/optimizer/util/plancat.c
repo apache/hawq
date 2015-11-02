@@ -21,7 +21,6 @@
 #include "access/genam.h"
 #include "access/heapam.h"
 #include "access/parquetsegfiles.h"
-#include "access/pxfuriparser.h"
 #include "catalog/catquery.h"
 #include "catalog/gp_policy.h"
 #include "catalog/pg_inherits.h"
@@ -79,9 +78,6 @@ cdb_estimate_rel_size(RelOptInfo   *relOptInfo,
 
 static void
 cdb_default_stats_warning_for_index(Oid reloid, Oid indexoid);
-
-static bool 
-need_to_get_stats_pxf(Relation rel, StringInfo location, BlockNumber relpages, double reltuples);
 
 extern BlockNumber RelationGuessNumberOfBlocks(double totalbytes);
 
@@ -395,20 +391,7 @@ cdb_estimate_rel_size(RelOptInfo   *relOptInfo,
 	 * Asking the QE for the size of the relation is a bit expensive.
 	 * Do we want to do it all the time?  Or only for tables that have never had analyze run?
 	 */
-	if (need_to_get_stats_pxf(rel, &location, relpages, reltuples))
-	{
-		/*
-		 * rel is a pxf external table, and it wasn't yet ANALYZE'ed.
-		 */
-
-		float4 tuples, pages, frags;
-		gp_statistics_estimate_reltuples_relpages_relfrags_external_pxf(rel, &location, &tuples, &pages, &frags, NULL);
-		
-		relpages = curpages = pages;
-		reltuples = tuples;
-		pfree(location.data);
-	}	
-	else if (relpages > 0) 
+	if (relpages > 0)
 	{
 
 		/*
@@ -420,7 +403,7 @@ cdb_estimate_rel_size(RelOptInfo   *relOptInfo,
 
 		curpages = relpages;
 	}
-	else /* relpages is 0 and this is a regular table or an external non-PXF table */
+	else /* relpages is 0 and this is a regular table or an external table */
 	{
 
 		/*
@@ -499,24 +482,6 @@ cdb_estimate_rel_size(RelOptInfo   *relOptInfo,
 	elog(DEBUG2,"cdb_estimate_rel_size  estimated %g tuples and %d pages",*tuples,(int)*pages);
 
 }                               /* cdb_estimate_rel_size */
-
-/* 
- * need_to_get_stats_pxf
- *
- * 1. Table is PXF external table, and
- * 2. ANALYZE was not run on the table, and
- * 3. GUC pxf_enable_stat_collection is on
- */
-static bool need_to_get_stats_pxf(Relation rel,
-								 StringInfo loc, 	
-								 BlockNumber relpages,
-								 double		reltuples)
-{
-	return pxf_enable_stat_collection &&
-		   RelationIsExternalPxfReadOnly(rel, loc) &&
-		   relpages == gp_external_table_default_number_of_pages &&
-		   reltuples == gp_external_table_default_number_of_tuples;
-}
 
 /*
  * estimate_rel_size - estimate # pages and # tuples in a table or index
