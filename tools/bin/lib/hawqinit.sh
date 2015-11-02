@@ -15,7 +15,7 @@ fi
 source ${GPHOME}/greenplum_path.sh
 
 if [ -f ${mgmt_config_file} ]; then
-    source ${mgmt_config_file}
+    source ${mgmt_config_file} > /dev/null 2>&1
 else
     echo "${mgmt_config_file} is not exist, exit"
     exit 1
