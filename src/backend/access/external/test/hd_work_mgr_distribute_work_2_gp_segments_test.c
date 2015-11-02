@@ -261,7 +261,7 @@ static void test__distribute_work_to_gp_segments(TestInputData *input)
 	validate_all_working_segments_engagement(segs_allocated_data, total_segs, num_working_segs, num_data_fragments, num_hosts_in_cluster);
 	
 	/* 8. Cleanup */
-	restoreQueryResource();
+	freeQueryResource();
 	restoreCdbComponentDatabases();
 	clean_cluster(cluster, num_hosts_in_cluster);
 	clean_array_of_segs(array_of_segs, total_segs);

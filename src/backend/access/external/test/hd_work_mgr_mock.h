@@ -79,6 +79,6 @@ void restoreCdbComponentDatabases();
 
 void buildQueryResource(int segs_num,
                         char * segs_hostips[]);
-void restoreQueryResource();
+void freeQueryResource();
                                   
 #endif //HD_WORK_MGR_MOCK_

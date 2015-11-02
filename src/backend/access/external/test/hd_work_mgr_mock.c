@@ -73,7 +73,7 @@ void buildQueryResource(int segs_num,
 }
 
 /* Restores the QueryResource for a query */
-void restoreQueryResource()
+void freeQueryResource()
 {
 	if (resource)
 	{
@@ -94,6 +94,7 @@ void restoreQueryResource()
 		}
 
 		pfree(resource);
+		resource = NULL;
 	}
 }
 

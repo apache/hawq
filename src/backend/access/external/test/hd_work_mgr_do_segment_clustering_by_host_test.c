@@ -93,7 +93,7 @@ test__do_segment_clustering_by_host__10SegmentsOn3Hosts(void **state)
 		check_segment_info(gphost->segs, i, "1.2.3.3");
 	}
 
-	restoreQueryResource();
+	freeQueryResource();
 	restoreCdbComponentDatabases();
 }
 
