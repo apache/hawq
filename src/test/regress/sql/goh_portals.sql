@@ -2,6 +2,8 @@
 -- Cursor regression tests
 --
 -- setup
+ALTER RESOURCE QUEUE pg_default WITH (active_statements=30);
+
 CREATE TABLE test1 (a int, b int, c int, d int);
 CREATE TABLE test2 (a int, b int, c int, d int);
 INSERT INTO test1 SELECT x, 2 * x, 3 * x, 4 * x FROM generate_series(1, 1000) x;
@@ -200,3 +202,5 @@ ROLLBACK;
 -- teardown
 DROP TABLE test1;
 DROP TABLE test2;
+
+ALTER RESOURCE QUEUE pg_default WITH (active_statements=20);
