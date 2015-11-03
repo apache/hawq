@@ -27,7 +27,7 @@ if (hddist != 'phd' && hddist != 'hdp') {
 }
 
 subprojects { subProject ->
-    group = 'com.pivotal.pxf'
+    group = 'org.apache.hawq.pxf'
     apply plugin: 'java'
     apply plugin: 'idea'
     apply plugin: 'eclipse'
@@ -154,7 +154,7 @@ project('pxf-service') {
         }
 
         from("src/main/resources") {
-            into("/etc/gphd/pxf-${project.version}/conf")
+            into("/etc/pxf-${project.version}/conf")
             include("**/pxf-private*.classpath")
         }
 

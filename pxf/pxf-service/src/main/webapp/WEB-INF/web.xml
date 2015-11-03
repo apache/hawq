@@ -26,7 +26,7 @@
         </servlet-class>
         <init-param>
             <param-name>com.sun.jersey.config.property.packages</param-name>
-            <param-value>com.pivotal.pxf.service.rest</param-value>
+            <param-value>org.apache.hawq.pxf.service.rest</param-value>
         </init-param>
         <init-param>
             <param-name>jersey.config.server.provider.scanning.recursive</param-name>
@@ -39,7 +39,7 @@
         <url-pattern>/*</url-pattern>
     </servlet-mapping>
     <listener>
-	   <listener-class>com.pivotal.pxf.service.rest.ServletLifecycleListener</listener-class>
+	   <listener-class>org.apache.hawq.pxf.service.rest.ServletLifecycleListener</listener-class>
     </listener>
 
     <!-- log4j configuration 
