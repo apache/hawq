@@ -90,7 +90,7 @@ def local_ssh(cmd, logger = None):
             logger.info(stdout)
         if stderr != '':
             logger.error(stderr)
-    return result
+    return result.returncode
 
 
 def remote_ssh(cmd, host, user):
