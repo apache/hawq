@@ -3610,9 +3610,10 @@ void checkSlavesFile(void)
 
 void refreshSlavesFileHostSize(FILE *fp)
 {
-	static char				zero[1]  = "";
-	int 					newcnt 	 = 0;
-	bool 					haserror = false;
+	static char				zero[1]   = "";
+	int 					newcnt 	  = 0;
+	bool 					haserror  = false;
+	bool					incomment = false;
 	SelfMaintainBufferData 	smb;
 
 	elog(DEBUG3, "Refresh slaves file host size now.");
@@ -3648,8 +3649,14 @@ void refreshSlavesFileHostSize(FILE *fp)
 				resetSelfMaintainBuffer(&smb);
 				newcnt++;
 			}
+			incomment = false;
 		}
-		else
+		/* '#' is treated as a start symbol of a comment string in the line. */
+		else if ( c == '#' )
+		{
+			incomment = true;
+		}
+		else if ( !incomment )
 		{
 			/* Add this character into the buffer. */
 			char cval = c;
