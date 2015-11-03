@@ -114,8 +114,9 @@ def parse_hosts_file(GPHOME):
     with open(host_file) as f:
         hosts = f.readlines()
     for host in hosts:
-        host = host.strip()
-        host_list.append(host)
+        host = host.split("#",1)[0].strip()
+        if host:
+            host_list.append(host)
     return host_list
 
 
