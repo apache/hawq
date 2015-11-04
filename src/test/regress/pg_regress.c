@@ -526,10 +526,6 @@ convert_sourcefiles(void)
 	ret = stat("output", &st);
 	if (ret == 0 && S_ISDIR(st.st_mode))
 		convert_sourcefiles_in("output", "expected", "out");
-
-	ret = stat("mapred", &st);
-	if (ret == 0 && S_ISDIR(st.st_mode))
-		convert_sourcefiles_in("mapred", "yml", "yml");
 }
 
 /*
