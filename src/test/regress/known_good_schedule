@@ -172,7 +172,6 @@ ignore: notin
 ignore: with_clause
 ignore: eagerfree
 ignore: toast
-ignore: mapred
 ignore: gpparams
 ignore: tidycat
 ignore: tidycat2
