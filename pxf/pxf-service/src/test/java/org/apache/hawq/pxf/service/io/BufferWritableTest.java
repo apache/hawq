@@ -1,4 +1,4 @@
-package com.pivotal.pxf.service.io;
+package org.apache.hawq.pxf.service.io;
 
 import static org.junit.Assert.*;
 

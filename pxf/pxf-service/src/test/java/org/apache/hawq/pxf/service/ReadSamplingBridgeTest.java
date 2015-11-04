@@ -1,4 +1,4 @@
-package com.pivotal.pxf.service;
+package org.apache.hawq.pxf.service;
 
 import static org.junit.Assert.*;
 import static org.mockito.Matchers.any;
@@ -10,6 +10,11 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.util.BitSet;
 
+import org.apache.hawq.pxf.service.io.Writable;
+import org.apache.hawq.pxf.service.ReadSamplingBridge;
+import org.apache.hawq.pxf.service.utilities.AnalyzeUtils;
+import org.apache.hawq.pxf.service.utilities.ProtocolData;
+
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -18,10 +23,6 @@ import org.mockito.stubbing.Answer;
 import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
-
-import com.pivotal.pxf.service.io.Writable;
-import com.pivotal.pxf.service.utilities.AnalyzeUtils;
-import com.pivotal.pxf.service.utilities.ProtocolData;
 
 @RunWith(PowerMockRunner.class)
 @PrepareForTest({ AnalyzeUtils.class, ReadSamplingBridge.class })

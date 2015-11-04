@@ -1,4 +1,4 @@
-package com.pivotal.pxf.service;
+package org.apache.hawq.pxf.service;
 
 import java.io.DataInputStream;
 import java.util.BitSet;
@@ -6,9 +6,9 @@ import java.util.BitSet;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import com.pivotal.pxf.service.io.Writable;
-import com.pivotal.pxf.service.utilities.AnalyzeUtils;
-import com.pivotal.pxf.service.utilities.ProtocolData;
+import org.apache.hawq.pxf.service.io.Writable;
+import org.apache.hawq.pxf.service.utilities.AnalyzeUtils;
+import org.apache.hawq.pxf.service.utilities.ProtocolData;
 
 /**
  * ReadSamplingBridge wraps a ReadBridge, and returns only some of the output

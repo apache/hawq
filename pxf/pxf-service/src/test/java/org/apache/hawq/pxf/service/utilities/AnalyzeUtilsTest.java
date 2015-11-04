@@ -1,4 +1,4 @@
-package com.pivotal.pxf.service.utilities;
+package org.apache.hawq.pxf.service.utilities;
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.mock;
@@ -8,12 +8,13 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
 
+import org.apache.hawq.pxf.api.Fragment;
+import org.apache.hawq.pxf.service.utilities.AnalyzeUtils;
+
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.powermock.modules.junit4.PowerMockRunner;
-
-import com.pivotal.pxf.api.Fragment;
 
 @RunWith(PowerMockRunner.class)
 public class AnalyzeUtilsTest {

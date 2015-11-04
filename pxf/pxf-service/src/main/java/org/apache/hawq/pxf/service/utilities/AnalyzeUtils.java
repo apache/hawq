@@ -1,4 +1,4 @@
-package com.pivotal.pxf.service.utilities;
+package org.apache.hawq.pxf.service.utilities;
 
 import java.util.ArrayList;
 import java.util.BitSet;
@@ -7,7 +7,7 @@ import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import com.pivotal.pxf.api.Fragment;
+import org.apache.hawq.pxf.api.Fragment;
 
 /**
  * Helper class to get statistics for ANALYZE.

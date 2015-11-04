@@ -1,4 +1,4 @@
-package com.pivotal.pxf.api;
+package org.apache.hawq.pxf.api;
 
 import org.codehaus.jackson.map.ObjectMapper;
 
