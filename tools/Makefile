@@ -27,32 +27,15 @@ clean distclean:
 #---------------------------------------------------------------------
 
 SET_VERSION_SCRIPTS = \
-	bin/gpaddmirrors \
-	bin/gpbitmapreindex \
 	bin/gpcheck \
 	bin/gpcheckperf \
 	bin/gpcrondump.py \
-	bin/gpdbrestore \
-	bin/gpdeletesystem \
-	bin/gpexpand \
-	bin/gpextract \
-	bin/gpfilespace \
 	bin/gpload.py \
 	bin/gplogfilter \
-	bin/gpmigrator \
-	bin/gpmigrator_mirror \
-	bin/gpmovemirrors \
-	bin/gprebuildsystem \
-	bin/gprecoverseg \
 	bin/hawq \
 	bin/gpscp \
-	bin/gpsizecalc \
-	bin/gpskew \
 	bin/gpssh \
 	bin/gpssh-exkeys \
-	bin/gpstart \
-	bin/gpstate \
-	bin/gpstop \
 	bin/gpsys1 \
 	bin/lib/gpcheckcat \
 	sbin/gpaddconfig.py \
@@ -61,13 +44,7 @@ SET_VERSION_SCRIPTS = \
 	sbin/gpcleansegmentdir.py \
 	sbin/gpfixuserlimts \
 	sbin/gpgetstatususingtransition.py \
-	sbin/gprepairmirrorseg.py \
-	sbin/gpsegstart.py \
-	sbin/gpsegstop.py \
-	sbin/gpsegtoprimaryormirror.py \
 	sbin/gpsetdbid.py \
-	sbin/gpsuspend.py \
-	sbin/gpupgrademirror.py \
 	lib/python/gppylib/programs/clsAddMirrors.py \
 	lib/python/gppylib/programs/clsHostCacheLookup.py \
 	lib/python/gppylib/programs/clsInjectFault.py \
