@@ -82,7 +82,7 @@ import org.apache.hawq.pxf.service.utilities.Utilities;
 
 
 /**
- * This class handles the subpath /<version>/Writable/ of this
+ * This class handles the subpath /&lt;version&gt;/Writable/ of this
  * REST component
  */
 @Path("/" + Version.PXF_PROTOCOL_VERSION + "/Writable/")
