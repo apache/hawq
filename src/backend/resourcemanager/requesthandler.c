@@ -358,7 +358,7 @@ bool handleRMRequestAcquireResource(void **arg)
 
 	/* Check if HAWQ has enough alive segments. */
 	int unavailcount = PRESPOOL->SlavesHostCount - PRESPOOL->AvailNodeCount;
-	if ( unavailcount >= rm_rejectrequest_nseg_limit )
+	if ( unavailcount > rm_rejectrequest_nseg_limit )
 	{
 		elog(WARNING, "Resource manager finds %d segments not available yet, all "
 					  "resource allocation requests are rejected.",
