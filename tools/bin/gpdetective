@@ -720,7 +720,7 @@ class GPDetective:
 
         self.writeSelect('pg_stat_resqueue.log',
         '''
-            SELECT * FROM pg_catalog.pg_stat_resqueues            
+            SELECT * FROM pg_catalog.pg_resqueue_status            
         ''')
         
         self.writeSelect('pg_stat_database.log',
