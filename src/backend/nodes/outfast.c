@@ -3810,6 +3810,9 @@ _outAlterTypeStmt(StringInfo str, AlterTypeStmt *node)
 static void
 _outQueryContextInfo(StringInfo str, QueryContextInfo *node)
 {
+    /* Make sure this QueryContextInfo has been closed */
+    Assert(node->finalized);
+
     WRITE_NODE_TYPE("QUERYCONTEXTINFO");
     WRITE_BOOL_FIELD(useFile);
 
@@ -3822,6 +3825,8 @@ _outQueryContextInfo(StringInfo str, QueryContextInfo *node)
         WRITE_INT_FIELD(cursor);
         appendBinaryStringInfo(str, (const char *) node->buffer, node->cursor);
     }
+
+    WRITE_BOOL_FIELD(finalized);
 }
 
 static void

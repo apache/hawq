@@ -223,8 +223,9 @@ CreateQueryContextInfo(void)
 
     AddAuxInfoToQueryContextInfo(retval);
 
-    return retval;
+    retval->finalized = false;
 
+    return retval;
 }
 
 /*
@@ -251,9 +252,10 @@ InitQueryContextInfoFromFile(QueryContextInfo *cxt)
  * close  a QueryContextInfo and close its file if it is opened.
  */
 void
-CloseQueryContextInfo(QueryContextInfo *cxt)
+FinalizeQueryContextInfo(QueryContextInfo *cxt)
 {
     Assert(cxt);
+    Assert(!cxt->finalized);
 
     if (Debug_querycontext_print && Gp_role != GP_ROLE_EXECUTE)
     {
@@ -304,6 +306,8 @@ CloseQueryContextInfo(QueryContextInfo *cxt)
         FileClose(cxt->file);
         cxt->file = 0;
     }
+
+    cxt->finalized = true;
 }
 
 /*
@@ -790,6 +794,7 @@ RebuildQueryContext(QueryContextInfo *cxt, HTAB **currentFilesystemCredentials,
         }
     }
 
+    cxt->finalized = false;
 	/*
 	 * This is a bit overkill, but since we don't yet have a decent way to
 	 * determine individual cache entries affected by the dispatched
@@ -808,6 +813,7 @@ void
 AddAuxInfoToQueryContextInfo(QueryContextInfo *cxt)
 {
     Assert(NULL != cxt);
+    Assert(!cxt->finalized);
 
     StringInfoData buffer;
     initStringInfo(&buffer);
@@ -855,6 +861,7 @@ AddTupleToContextInfo(QueryContextInfo *cxt, Oid relid,
         const char *relname, HeapTuple tuple, int32 contentid)
 {
     Assert(NULL != cxt);
+    Assert(!cxt->finalized);
 
     StringInfoData header;
     initStringInfo(&header);
@@ -990,6 +997,7 @@ AddTablespaceLocationToContextInfo(QueryContextInfo *cxt, Oid tspoid,
         const char *fmt)
 {
     Assert(NULL != cxt);
+    Assert(!cxt->finalized);
 
     StringInfoData header;
     initStringInfo(&header);

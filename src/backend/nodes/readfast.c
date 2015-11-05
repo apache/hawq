@@ -4042,6 +4042,8 @@ _readQueryContextInfo(const char **str)
         *str += local_node->size;
     }
 
+    READ_BOOL_FIELD(finalized);
+    Assert(local_node->finalized);
     READ_DONE();
 }
 
