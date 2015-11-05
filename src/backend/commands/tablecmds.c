@@ -6446,7 +6446,7 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 												   OIDNewHeap,
 												   true,
 												   segment_segnos);
-		CloseQueryContextInfo(contextdisp);
+		FinalizeQueryContextInfo(contextdisp);
 
 		ar_tab->newheap_oid = OIDNewHeap;
 
@@ -6454,6 +6454,7 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
     cdbdisp_iterate_results_sendback(result.result, result.numresults,
                 UpdateCatalogModifiedOnSegments);
     dispatch_free_result(&result);
+    DropQueryContextInfo(contextdisp);
     FreeResource(resource);
     SetActiveQueryResource(savedResource);
 	}
@@ -16705,11 +16706,12 @@ ATPExecPartSplit(Relation rel,
     pc->scantable_splits = scantable_splits;
     pc->newpart_aosegnos = segment_segnos;
 
+    FinalizeQueryContextInfo(contextdisp);
     dispatch_statement_node((Node *) pc, contextdisp, resource, &result);
     cdbdisp_iterate_results_sendback(result.result, result.numresults,
                 UpdateCatalogModifiedOnSegments);
     dispatch_free_result(&result);
-    CloseQueryContextInfo(contextdisp);
+    DropQueryContextInfo(contextdisp);
     FreeResource(resource);
     SetActiveQueryResource(savedResource);
 	}

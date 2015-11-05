@@ -1020,7 +1020,7 @@ exec_mpp_query(const char *query_string,
 		{
 			RebuildQueryContext(query->contextdisp, &currentFilesystemCredentials,
 			        &currentFilesystemCredentialsMemoryContext);
-			CloseQueryContextInfo(query->contextdisp);
+			FinalizeQueryContextInfo(query->contextdisp);
 		}
 	}
 
@@ -1072,7 +1072,7 @@ exec_mpp_query(const char *query_string,
 		Assert(NULL != plan->contextdisp);
 		RebuildQueryContext(plan->contextdisp, &currentFilesystemCredentials,
                 &currentFilesystemCredentialsMemoryContext);
-		CloseQueryContextInfo(plan->contextdisp);
+		FinalizeQueryContextInfo(plan->contextdisp);
     }
 
 	/*

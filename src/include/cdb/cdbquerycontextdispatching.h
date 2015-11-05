@@ -53,6 +53,8 @@ struct QueryContextInfo
     HTAB	   *htab;			/* a hash table used to dedup */
 
     List	   *errTblOid;		/* already handled error table oid in the statement */
+
+    bool  finalized;   /* whether this query context info is closed */
 };
 
 typedef struct QueryContextInfo QueryContextInfo;
@@ -102,7 +104,7 @@ extern void
 InitQueryContextInfoFromFile(QueryContextInfo *cxt);
 
 extern void
-CloseQueryContextInfo(QueryContextInfo *cxt);
+FinalizeQueryContextInfo(QueryContextInfo *cxt);
 
 extern void
 DropQueryContextInfo(QueryContextInfo *cxt);

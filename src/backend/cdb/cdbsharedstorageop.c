@@ -134,7 +134,7 @@ void PerformSharedStorageOpTasks(SharedStorageOpTasks *tasks,
 
   stat->numTasks = j;
 
-  CloseQueryContextInfo(contextdisp);
+  FinalizeQueryContextInfo(contextdisp);
 
   int gp_segments_for_planner_before = gp_segments_for_planner;
 

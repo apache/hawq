@@ -887,7 +887,7 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
                     cxt.info = plannedstmt->contextdisp;
                     plan_tree_walker((Node *)plannedstmt->planTree, SetupSegnoForErrorTable, &cxt);
                     
-                    CloseQueryContextInfo(plannedstmt->contextdisp);
+                    FinalizeQueryContextInfo(plannedstmt->contextdisp);
                 }
                 
                 /*

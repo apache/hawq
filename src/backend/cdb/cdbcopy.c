@@ -207,7 +207,7 @@ cdbCopyStart(CdbCopy *c, char *copyCmd, Oid relid, Oid relerror, List *err_aoseg
 		((CopyStmt *)q->utilityStmt)->scantable_splits = scantable_splits;
 	}
 
-    CloseQueryContextInfo(q->contextdisp);
+  FinalizeQueryContextInfo(q->contextdisp);
 
 	/*
 	 * serialized the stmt tree, and dispatch it ....
