@@ -11,35 +11,13 @@ KDC -->
 	
 <!-- HA
 	<property>
-		<name>dfs.nameservices</name>
-		<value>phdcluster</value>
+		<name>yarn.resourcemanager.ha</name>
+		<value>%RESOURCEMANAGER%:8030,%RESOURCEMANAGER2%:8030</value>
 	</property>
-	
 	<property>
-		<name>dfs.ha.namenodes.phdcluster</name>
-		<value>nn1,nn2</value>
+		<name>yarn.resourcemanager.scheduler.ha</name>
+		<value>%RESOURCEMANAGER%:8032,%RESOURCEMANAGER2%:8032</value>
 	</property>
-	
-	<property>
-		<name>dfs.namenode.rpc-address.phdcluster.nn1</name>
-		<value>mdw:9000</value>
-	</property>
-	
-	<property>
-		<name>dfs.namenode.rpc-address.phdcluster.nn2</name>
-		<value>smdw:9000</value>
-	</property>
-
-	<property>
-		<name>dfs.namenode.http-address.phdcluster.nn1</name>
-		<value>mdw:50070</value>
-	</property>
-	
-	<property>
-		<name>dfs.namenode.http-address.phdcluster.nn2</name>
-		<value>smdw:50070</value>
-	</property>
-	
 HA -->
 
 	<!-- RPC client configuration -->
