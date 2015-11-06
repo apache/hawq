@@ -12,11 +12,11 @@ KDC -->
 <!-- HA
 	<property>
 		<name>yarn.resourcemanager.ha</name>
-		<value>%RESOURCEMANAGER%:8030,%RESOURCEMANAGER2%:8030</value>
+		<value>%RESOURCEMANAGER%:9980,%RESOURCEMANAGER2%:9980</value>
 	</property>
 	<property>
 		<name>yarn.resourcemanager.scheduler.ha</name>
-		<value>%RESOURCEMANAGER%:8032,%RESOURCEMANAGER2%:8032</value>
+		<value>%RESOURCEMANAGER%:9981,%RESOURCEMANAGER2%:9981</value>
 	</property>
 HA -->
 
