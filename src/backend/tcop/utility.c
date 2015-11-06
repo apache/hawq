@@ -254,7 +254,7 @@ CheckDropRelStorage(RangeVar *rel, ObjectType removeType)
 	Form_pg_class classform;
 	cqContext	*pcqCtx;
 
-	relOid = RangeVarGetRelid(rel, true, false /*allowHcatalog*/);
+	relOid = RangeVarGetRelid(rel, false, false /*allowHcatalog*/);
 	
 	if (!OidIsValid(relOid))
 		return false;
