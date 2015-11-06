@@ -13,7 +13,10 @@ all:
 	$(MAKE) -C src all
 	$(MAKE) -C config all
 	$(MAKE) -C contrib/formatter_fixedwidth all
+	$(MAKE) -C contrib/extprotocol all	
 	$(MAKE) -C contrib/gp_sparse_vector all
+	$(MAKE) -C contrib/orafce all
+	$(MAKE) -C contrib/gp_cancel_query all
 	$(MAKE) -C contrib/hawq-hadoop all
 	$(MAKE) -C contrib/gp_mdver all
 	$(MAKE) -C tools all
@@ -24,7 +27,10 @@ install:
 	$(MAKE) -C src $@
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib/formatter_fixedwidth $@
+	$(MAKE) -C contrib/extprotocol $@
 	$(MAKE) -C contrib/gp_sparse_vector $@
+	$(MAKE) -C contrib/orafce $@
+	$(MAKE) -C contrib/gp_cancel_query $@
 	$(MAKE) -C contrib/hawq-hadoop $@
 	$(MAKE) -C contrib/gp_mdver $@
 	$(MAKE) -C tools $@
@@ -35,7 +41,10 @@ installdirs uninstall:
 	$(MAKE) -C src $@
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib/formatter_fixedwidth $@
+	$(MAKE) -C contrib/extprotocol $@
 	$(MAKE) -C contrib/gp_sparse_vector $@
+	$(MAKE) -C contrib/orafce $@
+	$(MAKE) -C contrib/gp_cancel_query $@
 	$(MAKE) -C contrib/hawq-hadoop $@
 	$(MAKE) -C contrib/gp_mdver $@	
 
@@ -53,7 +62,10 @@ clean:
 	$(MAKE) -C src $@
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib/formatter_fixedwidth $@
+	$(MAKE) -C contrib/extprotocol $@
 	$(MAKE) -C contrib/gp_sparse_vector $@
+	$(MAKE) -C contrib/orafce $@
+	$(MAKE) -C contrib/gp_cancel_query $@
 	$(MAKE) -C contrib/hawq-hadoop $@
 	$(MAKE) -C contrib/gp_mdver $@	
 	$(MAKE) -C tools $@
