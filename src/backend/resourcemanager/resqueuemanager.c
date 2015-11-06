@@ -860,22 +860,6 @@ int updateResourceQueueAttributes(List 			 	*attributes,
 						 queue->ResourceOvercommit);
 			break;
 
-		case RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT:
-			res = SimpleStringToInt32(attrvalue, &(queue->NVSegUpperLimit));
-			if ( res != FUNC_RETURN_OK )
-			{
-				snprintf(errorbuf, errorbufsize,
-						 "Virtual segment upper limit %s is not valid.",
-						 attrvalue->Str);
-				ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
-				return res;
-			}
-
-			elog(DEBUG3, "Resource manager updateResourceQueueAttributes() "
-						 "updated virtual segment size upper limit %d",
-						 queue->NVSegUpperLimit);
-			break;
-
 		case RSQ_TBL_ATTR_ALLOCATION_POLICY:
 			res = SimpleStringToMapIndexInt8(
 						attrvalue,
@@ -891,6 +875,67 @@ int updateResourceQueueAttributes(List 			 	*attributes,
 				ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
 				return res;
 			}
+			break;
+
+		case RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT:
+			res = SimpleStringToInt32(attrvalue, &(queue->NVSegUpperLimit));
+			if ( res != FUNC_RETURN_OK )
+			{
+				snprintf(errorbuf, errorbufsize,
+						 "Virtual segment upper limit %s is not valid.",
+						 attrvalue->Str);
+				ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+				return res;
+			}
+
+			elog(DEBUG3, "Resource manager updateResourceQueueAttributes() "
+						 "updated virtual segment size upper limit %d",
+						 queue->NVSegUpperLimit);
+			break;
+		case RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT:
+			res = SimpleStringToInt32(attrvalue, &(queue->NVSegLowerLimit));
+			if ( res != FUNC_RETURN_OK )
+			{
+				snprintf(errorbuf, errorbufsize,
+						 "Virtual segment lower limit %s is not valid.",
+						 attrvalue->Str);
+				ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+				return res;
+			}
+
+			elog(DEBUG3, "Resource manager updateResourceQueueAttributes() "
+						 "updated virtual segment size lower limit %d",
+						 queue->NVSegLowerLimit);
+			break;
+		case RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT_PERSEG:
+			res = SimpleStringToDouble(attrvalue, &(queue->NVSegUpperLimitPerSeg));
+			if ( res != FUNC_RETURN_OK )
+			{
+				snprintf(errorbuf, errorbufsize,
+						 "Virtual segment upper limit per segment %s is not valid.",
+						 attrvalue->Str);
+				ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+				return res;
+			}
+
+			elog(DEBUG3, "Resource manager updateResourceQueueAttributes() "
+						 "updated virtual segment size upper limit per segment %lf",
+						 queue->NVSegUpperLimitPerSeg);
+			break;
+		case RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT_PERSEG:
+			res = SimpleStringToDouble(attrvalue, &(queue->NVSegLowerLimitPerSeg));
+			if ( res != FUNC_RETURN_OK )
+			{
+				snprintf(errorbuf, errorbufsize,
+						 "Virtual segment lower limit per segment %s is not valid.",
+						 attrvalue->Str);
+				ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+				return res;
+			}
+
+			elog(DEBUG3, "Resource manager updateResourceQueueAttributes() "
+						 "updated virtual segment size lower limit per segment %lf",
+						 queue->NVSegLowerLimitPerSeg);
 			break;
 
 		case RSQ_TBL_ATTR_STATUS:

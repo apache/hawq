@@ -565,47 +565,50 @@ dumpResQueues(PGconn *conn)
 	bool		bWith = false;
 
 	printfPQExpBuffer(buf,
-					  "SELECT rsqname, 'parent' as resname, "
-					  "rsq_parent::text as ressetting, "
+					  "SELECT oid, rsqname, 'parent' as resname, "
+					  "parentoid::text as ressetting, "
 					  "1 as ord FROM pg_resqueue "
 					  "UNION "
-					  "SELECT rsqname, 'active_statements' as resname, "
-					  "rsq_active_stats_cluster::text as ressetting, "
+					  "SELECT oid, rsqname, 'active_statements' as resname, "
+					  "activestats::text as ressetting, "
 					  "2 as ord FROM pg_resqueue "
 					  "UNION "
-					  "SELECT rsqname, 'memory_limit_cluster' as resname, "
-					  "rsq_memory_limit_cluster::text as ressetting, "
+					  "SELECT oid, rsqname, 'memory_limit_cluster' as resname, "
+					  "memorylimit::text as ressetting, "
 					  "3 as ord FROM pg_resqueue "
 					  "UNION "
-					  "SELECT  rsqname, 'core_limit_cluster' as resname, "
-					  "rsq_core_limit_cluster::text as ressetting, "
+					  "SELECT oid, rsqname, 'core_limit_cluster' as resname, "
+					  "corelimit::text as ressetting, "
 					  "4 as ord FROM pg_resqueue "
 					  "UNION "
-					  "SELECT rsqname, 'resource_upper_factor' as resname, "
-					  "rsq_resource_upper_factor::text as ressetting, "
+					  "SELECT oid, rsqname, 'resource_overcommit_factor' as resname, "
+					  "resovercommit::text as ressetting, "
 					  "5 as ord FROM pg_resqueue "
 					  "UNION "
-					  "SELECT rsqname, 'allocation_policy' as resname, "
-					  "rsq_allocation_policy::text as ressetting, "
+					  "SELECT oid, rsqname, 'allocation_policy' as resname, "
+					  "allocpolicy::text as ressetting, "
 					  "6 as ord FROM pg_resqueue "
 					  "UNION "
-					  "SELECT rsqname, 'vseg_resource_quota' as resname, "
-					  "rsq_vseg_resource_quota::text as ressetting, "
+					  "SELECT oid, rsqname, 'vseg_resource_quota' as resname, "
+					  "vsegresourcequota::text as ressetting, "
 					  "7 as ord FROM pg_resqueue "
 					  "UNION "
-					  "SELECT rsqname, 'vsegment_upper_limit' as resname, "
-					  "rsq_vseg_upper_limit::text as ressetting, "
+					  "SELECT oid, rsqname, 'nvseg_upper_limit' as resname, "
+					  "nvsegupperlimit::text as ressetting, "
 					  "8 as ord FROM pg_resqueue "
-					  "%s"
-					  "order by rsqname,  ord",
-					  (server_version >= 80214 ?
-					   "UNION "
-					   "select rq.rsqname ,  rt.resname,  rc.ressetting, "
-					   "rt.restypid as ord from "
-					   "pg_resqueue rq,  pg_resourcetype rt, "
-					   "pg_resqueuecapability rc where "
-					   "rq.oid=rc.resqueueid and rc.restypid = rt.restypid "
-					   : "")
+					  "UNION "
+					  "SELECT oid, rsqname, 'nvseg_lower_limit' as resname, "
+					  "nvseglowerlimit::text as ressetting, "
+					  "9 as ord FROM pg_resqueue "
+					  "UNION "
+					  "SELECT oid, rsqname, 'nvseg_upper_limit_perseg' as resname, "
+					  "nvsegupperlimitperseg::text as ressetting, "
+					  "10 as ord FROM pg_resqueue "
+					  "UNION "
+					  "SELECT oid, rsqname, 'nvseg_lower_limit_perseg' as resname, "
+					  "nvseglowerlimitperseg::text as ressetting, "
+					  "11 as ord FROM pg_resqueue "
+					  "order by oid, ord"
 		);
 
 	res = executeQuery(conn, buf->data);
@@ -617,28 +620,31 @@ dumpResQueues(PGconn *conn)
 	if (PQntuples(res) > 0)
 	    fprintf(OPF, "--\n-- Resource Queues\n--\n\n");
 
-
 	/*
 	 * settings for resource queue are spread over multiple rows, but sorted
-	 * by queue name (and ranked in order of resname ) eg:
+	 * by queue oid :
 	 *
-	 * rsqname	  |		resname		| ressetting | ord
-	 * -----------+-----------------+------------+-----
+	 * oid | rsqname   |     resname     | ressetting | ord
+	 * ----+-----------+-----------------+------------+-----
 	 *
-	 * This format lets us support an arbitrary number of resqueuecapability
+	 * This format lets us support an arbitrary number of capability
 	 * entries.  So watch for change of rsqname to switch to next CREATE
 	 * statement.
+	 *
+	 * We order rows based on oid values, because we would like to let resource
+	 * queues be created from the ones having smaller oid values, which guarantees
+	 * that every queue can find its parent queue.
 	 *
 	 */
 
 	for (i = 0; i < PQntuples(res); i++)
 	{
-		const char *rsqname;
-		const char *resname;
-		const char *ressetting;
+		const char *rsqname		= NULL;
+		const char *resname		= NULL;
+		const char *ressetting	= NULL;
 
-		rsqname = PQgetvalue(res, i, i_rsqname);
-		resname = PQgetvalue(res, i, i_resname);
+		rsqname    = PQgetvalue(res, i, i_rsqname);
+		resname    = PQgetvalue(res, i, i_resname);
 		ressetting = PQgetvalue(res, i, i_ressetting);
 
 		/* skip pg_root */
@@ -688,10 +694,16 @@ dumpResQueues(PGconn *conn)
 			appendPQExpBuffer(buf, "\n WITH (");
 		}
 
-		if (0 == strcmp("active_statements", resname) || 0 == strcmp("vsegment_upper_limit", resname))
+		if (0 == strcmp("active_statements",          resname) ||
+			0 == strcmp("resource_overcommit_factor", resname) ||
+			0 == strcmp("nvseg_upper_limit",          resname) ||
+			0 == strcmp("nvseg_lower_limit",          resname) ||
+			0 == strcmp("nvseg_upper_limit_perseg",   resname) ||
+			0 == strcmp("nvseg_lower_limit_perseg",   resname))
 			/* numeric */
 			appendPQExpBuffer(buf, " %s=%s", resname, ressetting);
-		else if (0 == strcmp("parent", resname)) {
+		else if (0 == strcmp("parent", resname))
+		{
 			/* find parent's name with oid. */
 			appendPQExpBuffer(sql, "SELECT rsqname FROM pg_resqueue WHERE oid='%s'", ressetting);
 			res2 = executeQuery(conn, sql->data);

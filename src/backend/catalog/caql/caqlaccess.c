@@ -939,15 +939,6 @@ caql_getattr(cqContext *pCtx, AttrNumber attnum, bool *isnull)
 	Assert(HeapTupleIsValid(pCtx->cq_lasttup));
 
 	return caql_getattr_internal(pCtx, pCtx->cq_lasttup, attnum, isnull);
-
-	/*
-	 * NOTE: could this be used if caql is extended to support joins, eg
-	 * what would attnum be for
-	 * "SELECT * FROM pg_resqueue, pg_resqueuecapability ..." ?
-	 * Potentially, the attnum is just the ordinal position of the combined
-	 * SELECT list, eg you could reference pg_resqueuecapability.restypid
-	 * as (Natts_pg_resqueue+Anum_pg_resourcetype_restypid).
-	 */
 }
 
 /* ----------------------------------------------------------------

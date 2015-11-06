@@ -844,7 +844,6 @@ FormData_pg_partition
 FormData_pg_partition_rule
 FormData_pg_pltemplate
 FormData_pg_proc
-FormData_pg_resourcetype
 FormData_pg_resqueue
 FormData_pg_rewrite
 FormData_pg_sequence
@@ -900,7 +899,6 @@ Form_pg_partition
 Form_pg_partition_rule
 Form_pg_pltemplate
 Form_pg_proc
-Form_pg_resourcetype
 Form_pg_resqueue
 Form_pg_rewrite
 Form_pg_sequence
