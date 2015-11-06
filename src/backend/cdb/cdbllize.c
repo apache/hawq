@@ -269,6 +269,11 @@ cdbparallelize(PlannerInfo *root,
 		Assert(root->parse == query);
 		plan = apply_motion(root, plan, query);
 	}
+    else
+    {
+        //default to sequential
+        plan->dispatch = DISPATCH_SEQUENTIAL;
+    }
 
 
 	/* Restore the global count of PARAM_EXEC from the top plan node. */
