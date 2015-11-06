@@ -27,17 +27,18 @@ public class WriteBridge implements Bridge {
      * C'tor - set the implementation of the bridge
      */
     public WriteBridge(ProtocolData protocolData) throws Exception {
-    	
-        inputBuilder = new BridgeInputBuilder(protocolData);        
-        /* plugins accept InputData paramaters */
+
+        inputBuilder = new BridgeInputBuilder(protocolData);
+        /* plugins accept InputData parameters */
         fileAccessor = getFileAccessor(protocolData);
         fieldsResolver = getFieldsResolver(protocolData);
-        
+
     }
 
     /*
      * Accesses the underlying HDFS file
      */
+    @Override
     public boolean beginIteration() throws Exception {
         return fileAccessor.openForWrite();
     }

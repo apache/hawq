@@ -2,10 +2,10 @@ package org.apache.hawq.pxf.plugins.hbase;
 
 import org.apache.hawq.pxf.api.Fragment;
 import org.apache.hawq.pxf.api.Fragmenter;
+import org.apache.hawq.pxf.api.FragmentsStats;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.plugins.hbase.utilities.HBaseLookupTable;
 import org.apache.hawq.pxf.plugins.hbase.utilities.HBaseUtilities;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.*;
 import org.apache.hadoop.hbase.client.*;
@@ -32,8 +32,21 @@ public class HBaseDataFragmenter extends Fragmenter {
     private Admin hbaseAdmin;
     private Connection connection;
 
+    /**
+     * Constructor for HBaseDataFragmenter.
+     *
+     * @param inConf input data such as which HBase table to scan
+     */
     public HBaseDataFragmenter(InputData inConf) {
         super(inConf);
+    }
+
+    /**
+     * Returns statistics for HBase table. Currently it's not implemented.
+     */
+    @Override
+    public FragmentsStats getFragmentsStats() throws Exception {
+        throw new UnsupportedOperationException("ANALYZE for HBase plugin is not supported");
     }
 
     /**

@@ -1,5 +1,6 @@
 package org.apache.hawq.pxf.plugins.hive;
 
+import org.apache.hawq.pxf.api.FragmentsStats;
 import org.apache.hawq.pxf.api.UnsupportedTypeException;
 import org.apache.hawq.pxf.api.UserDataException;
 import org.apache.hawq.pxf.api.io.DataType;
@@ -258,5 +259,13 @@ public class HiveInputFormatFragmenter extends HiveDataFragmenter {
                 + partitionKeys + HIVE_UD_DELIM + filterInFragmenter;
 
         return userData.getBytes();
+    }
+
+    /**
+     * Returns statistics for Hive table. Currently it's not implemented.
+     */
+    @Override
+    public FragmentsStats getFragmentsStats() throws Exception {
+        throw new UnsupportedOperationException("ANALYZE for HiveRc and HiveText plugins is not supported");
     }
 }
