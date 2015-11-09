@@ -2165,39 +2165,42 @@ int generateAllocRequestToBroker(void)
 					"overall water level.",
 					reqcore);
 
-		addResourceBundleData(&(mctrack->TotalPending), reqmem, reqcore);
-		uint64_t oldtime = mctrack->TotalPendingStartTime;
-		if ( mctrack->TotalPendingStartTime == 0 )
+		if ( reqcore > 0 )
 		{
-			mctrack->TotalPendingStartTime = gettime_microsec();
-			elog(DEBUG3, "Global resource total pending start time is updated "
-						 "to "UINT64_FORMAT,
-						 mctrack->TotalPendingStartTime);
-		}
+			addResourceBundleData(&(mctrack->TotalPending), reqmem, reqcore);
+			uint64_t oldtime = mctrack->TotalPendingStartTime;
+			if ( mctrack->TotalPendingStartTime == 0 )
+			{
+				mctrack->TotalPendingStartTime = gettime_microsec();
+				elog(DEBUG3, "Global resource total pending start time is updated "
+							 "to "UINT64_FORMAT,
+							 mctrack->TotalPendingStartTime);
+			}
 
-		/* Generate request to resource broker now. */
-		res = RB_acquireResource(reqmem, reqcore, preferred);
-		if ( res != FUNC_RETURN_OK && res != RESBROK_PIPE_BUSY )
-		{
-			minusResourceBundleData(&(mctrack->TotalPending), reqmem, reqcore);
-			mctrack->TotalPendingStartTime = oldtime;
-			elog(WARNING, "Resource manager failed to allocate resource from "
-						  "resource broker (%d MB, %d CORE).",
-						  reqmem, reqcore);
-		}
-		else if ( res == RESBROK_PIPE_BUSY )
-		{
-			minusResourceBundleData(&(mctrack->TotalPending), reqmem, reqcore);
-			elog(DEBUG3, "Resource manager should retry to submit request.");
-			res = FUNC_RETURN_OK;
-		}
-		else
-		{
-			elog(RMLOG, "Resource manager finished submitting resource "
-						"allocation request to global resource manager for "
-						"(%d MB, %d CORE).",
-						reqmem,
-						reqcore);
+			/* Generate request to resource broker now. */
+			res = RB_acquireResource(reqmem, reqcore, preferred);
+			if ( res != FUNC_RETURN_OK && res != RESBROK_PIPE_BUSY )
+			{
+				minusResourceBundleData(&(mctrack->TotalPending), reqmem, reqcore);
+				mctrack->TotalPendingStartTime = oldtime;
+				elog(WARNING, "Resource manager failed to allocate resource from "
+							  "resource broker (%d MB, %d CORE).",
+							  reqmem, reqcore);
+			}
+			else if ( res == RESBROK_PIPE_BUSY )
+			{
+				minusResourceBundleData(&(mctrack->TotalPending), reqmem, reqcore);
+				elog(DEBUG3, "Resource manager should retry to submit request.");
+				res = FUNC_RETURN_OK;
+			}
+			else
+			{
+				elog(RMLOG, "Resource manager finished submitting resource "
+							"allocation request to global resource manager for "
+							"(%d MB, %d CORE).",
+							reqmem,
+							reqcore);
+			}
 		}
 
 		/* Free preferred host list. */
@@ -2233,6 +2236,7 @@ void completeAllocRequestToBroker(int32_t 	 *reqmem,
 	int llevel = INT_MAX;
 	int totalcount = 0;
 	int index = 0;
+	bool allunavail = true;
 	ListCell *cell = NULL;
 	foreach(cell, ressegl)
 	{
@@ -2255,6 +2259,8 @@ void completeAllocRequestToBroker(int32_t 	 *reqmem,
 			index++;
 			continue;
 		}
+
+		allunavail = false;
 
 		int clevel = segres->ContainerSets[0] == NULL ?
 					 0 :
@@ -2283,12 +2289,21 @@ void completeAllocRequestToBroker(int32_t 	 *reqmem,
 		index++;
 	}
 
+	/* If no segment available for adjusting the request, no need to keep going */
+	if ( allunavail )
+	{
+		rm_pfree(PCONTEXT, reqidx);
+		return;
+	}
+
 	/* Step 2. Adjust request. */
 	int32_t reqcoreleft = *reqcore - totalcount;
-	while( reqcoreleft > 0 )
+	bool keeplooping = true;
+	while( reqcoreleft > 0 && keeplooping )
 	{
 		llevel++;
 		index = 0;
+		keeplooping = false;
 		foreach(cell, ressegl)
 		{
 			PAIR pair = (PAIR)lfirst(cell);
@@ -2309,6 +2324,10 @@ void completeAllocRequestToBroker(int32_t 	 *reqmem,
 				continue;
 			}
 
+			/* Check total capacity of the segment. */
+			uint32_t corecap = getSegResourceCapacityCore(segres);
+
+
 			int clevel = segres->ContainerSets[0] == NULL ?
 						 0 :
 						 list_length(segres->ContainerSets[0]->Containers) +
@@ -2318,9 +2337,8 @@ void completeAllocRequestToBroker(int32_t 	 *reqmem,
 						  clevel :
 						  clevel + ((ResourceBundle)(reqidx[index]->Value))->MemoryMB / ratio;
 
-			if ( llevel > aclevel )
+			if ( llevel > aclevel && llevel <= corecap )
 			{
-
 				if ( reqidx[index] == NULL )
 				{
 					reqidx[index] = rm_palloc0(PCONTEXT, sizeof(PAIRData));
@@ -2335,6 +2353,7 @@ void completeAllocRequestToBroker(int32_t 	 *reqmem,
 									  (llevel-aclevel) * ratio,
 									  llevel-aclevel);
 				reqcoreleft -= llevel-aclevel;
+				keeplooping = true;
 
 				elog(RMLOG, "Resource manager acquires %lf GRM containers on "
 						    "host %s. Current level(having pending) %d, "
@@ -2345,7 +2364,6 @@ void completeAllocRequestToBroker(int32_t 	 *reqmem,
 							llevel,
 							aclevel-clevel);
 			}
-
 			index++;
 		}
 	}
