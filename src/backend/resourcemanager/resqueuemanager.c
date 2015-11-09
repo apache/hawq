@@ -4550,8 +4550,14 @@ void timeoutQueuedRequest(void)
 				 	 	1000000L * rm_resource_allocation_timeout) ) )
 			{
 				elog(LOG, "The queued resource request no resource timeout is "
-						  "detected. ConnID %d",
-						  curcon->ConnID);
+						  "detected. ConnID %d, the waiting time in head of the"
+						  "queue is "UINT64_FORMAT " global resource pending "
+						  "start time is "UINT64_FORMAT
+						  ", current time is "UINT64_FORMAT".",
+						  curcon->ConnID,
+						  curmsec - curcon->HeadQueueTime,
+						  PQUEMGR->RatioTrackers[index]->TotalPendingStartTime,
+						  curmsec);
 				tocancel = true;
 			}
 
