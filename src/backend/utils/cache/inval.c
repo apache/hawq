@@ -1513,9 +1513,20 @@ MdVer_PreProcessInvalidMsgs(InvalidationListHeader *dest,
 		chunk = chunk->next;
 	}
 
+
 	if (NULL != last_good_chunk) {
 		/* Found a nuke, and we have the chunk and index saved */
 		Assert(last_good_index >= 0);
+
+		/* 1. Free up previous chunks from src, as we'll discard them */
+		InvalidationChunk *src_chunk = src->velist;
+		while (src_chunk != last_good_chunk) {
+			InvalidationChunk *next_chunk = src_chunk->next;
+			pfree(src_chunk);
+			src_chunk = next_chunk;
+		}
+		src->velist = last_good_chunk;
+
 		/* 1. Move messages to the beginning of the chunk */
 		for (int i = last_good_index; i < last_good_chunk->nitems; i++)
 		{
@@ -1523,6 +1534,14 @@ MdVer_PreProcessInvalidMsgs(InvalidationListHeader *dest,
 		}
 		/* 2. Update nitems value */
 		last_good_chunk->nitems = last_good_chunk->nitems - last_good_index;
+
+		/* Free up all the chunks from dest */
+		InvalidationChunk *dest_chunk = dest->velist;
+		while (NULL != dest_chunk) {
+			InvalidationChunk *next_chunk = dest_chunk->next;
+			pfree(dest_chunk);
+			dest_chunk = next_chunk;
+		}
 
 		/* Move messages from src to overwrite dest */
 		dest->velist = last_good_chunk;
