@@ -504,15 +504,15 @@ int parseResourceQueueAttributes( List 			 	*attributes,
 								 "parsed segment resource quota %d MB",
 								 queue->SegResourceQuotaMemoryMB);
 
-					if ( !(queue->SegResourceQuotaMemoryMB == (2<<6))   &&
-						 !(queue->SegResourceQuotaMemoryMB == (2<<7))  &&
-						 !(queue->SegResourceQuotaMemoryMB == (2<<8))  &&
-						 !(queue->SegResourceQuotaMemoryMB == (2<<9))  &&
-						 !(queue->SegResourceQuotaMemoryMB == (2<<10)) &&
-						 !(queue->SegResourceQuotaMemoryMB == (2<<11)) &&
-						 !(queue->SegResourceQuotaMemoryMB == (2<<12)) &&
-						 !(queue->SegResourceQuotaMemoryMB == (2<<13)) &&
-						 !(queue->SegResourceQuotaMemoryMB == (2<<14)) )
+					if ( !(queue->SegResourceQuotaMemoryMB == (1<<6))  &&
+						 !(queue->SegResourceQuotaMemoryMB == (1<<7))  &&
+						 !(queue->SegResourceQuotaMemoryMB == (1<<8))  &&
+						 !(queue->SegResourceQuotaMemoryMB == (1<<9))  &&
+						 !(queue->SegResourceQuotaMemoryMB == (1<<10)) &&
+						 !(queue->SegResourceQuotaMemoryMB == (1<<11)) &&
+						 !(queue->SegResourceQuotaMemoryMB == (1<<12)) &&
+						 !(queue->SegResourceQuotaMemoryMB == (1<<13)) &&
+						 !(queue->SegResourceQuotaMemoryMB == (1<<14)) )
 					{
 						res = RESQUEMGR_WRONG_RES_QUOTA_EXP;
 						snprintf(errorbuf, errorbufsize,
