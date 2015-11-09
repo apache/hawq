@@ -55,6 +55,9 @@ void quitResManager(SIGNAL_ARGS);
 void handleChildSignal(SIGNAL_ARGS);
 void notifyPostmasterResManagerStarted(SIGNAL_ARGS);
 int  generateAllocRequestToBroker(void);
+void completeAllocRequestToBroker(int32_t 	 *reqmem,
+								  int32_t 	 *reqcore,
+								  List 		**preferred);
 void processResourceBrokerTasks(void);
 void cleanupAllGRMContainers(void);
 bool cleanedAllGRMContainers(void);
@@ -1997,8 +2000,10 @@ int generateAllocRequestToBroker(void)
 {
 	int res = FUNC_RETURN_OK;
 	/*
+	 *--------------------------------------------------------------------------
 	 * This is a temporary restrict that HAWQ RM supports only one memory/core
 	 * ratio in current version.
+	 *--------------------------------------------------------------------------
 	 */
 	Assert( PQUEMGR->RatioCount == 1 );
 	DynMemoryCoreRatioTrack mctrack = PQUEMGR->RatioTrackers[0];
@@ -2035,7 +2040,7 @@ int generateAllocRequestToBroker(void)
 
 	/*
 	 * Go through each segment, decide how many containers should be allocated.
-	 * And generate preferred host list.
+	 * And generate preferred host list based on minimum water level.
 	 */
 	int		  grmctnsize = 0;
 	List	 *preferred	 = NULL;
@@ -2047,12 +2052,17 @@ int generateAllocRequestToBroker(void)
 		PAIR pair = (PAIR)lfirst(cell);
 		SegResource segres = (SegResource)(pair->Value);
 
-		if ( segres->DecPending.MemoryMB > 0 && segres->DecPending.Core > 0 )
+		/*
+		 * Resource manager skips this segment if
+		 * 1) Not FTS available;
+		 * 2) Not GRM available;
+		 * 3) Having resource decrease pending.
+		 */
+		if (!IS_SEGSTAT_FTSAVAILABLE(segres->Stat) ||
+			(DRMGlobalInstance->ImpType != NONE_HAWQ2 &&
+			 !IS_SEGSTAT_GRMAVAILABLE(segres->Stat)) ||
+			(segres->DecPending.MemoryMB > 0 && segres->DecPending.Core > 0))
 		{
-			/*
-			 * If the segment is in resource decrease pending status, resource
-			 * manager temporarily skip this segment.
-			 */
 			continue;
 		}
 
@@ -2070,7 +2080,7 @@ int generateAllocRequestToBroker(void)
 		/* Follow the water level calculated. */
 		ctnsize = ctnsize < wlevel ? ctnsize : wlevel;
 
-		elog(DEBUG3, "Host %s has %d GRM containers, (%d MB, %lf CORE) increase pending.",
+		elog(RMLOG, "Host %s has %d GRM containers, (%d MB, %lf CORE) increase pending.",
 					 GET_SEGRESOURCE_HOSTNAME(segres),
 					 (segres->ContainerSets[0] == NULL ?
 					  0 :
@@ -2101,25 +2111,31 @@ int generateAllocRequestToBroker(void)
 		newpair->Value = resource;
 		preferred = lappend(preferred, newpair);
 
+		elog(DEBUG3, "Expect resource from resource broker with "
+				     "preferred host, hostname:%s, container number:%lf.",
+				     GET_SEGRESOURCE_HOSTNAME(segres),
+				     resource->Core);
+
+
 		grmctnsize += ctnsizeneed;
 	}
 	freePAIRRefList(&(PRESPOOL->Segments), &ressegl);
 
-	elog(DEBUG3, "Resource manager needs minimum %d GRM containers.", grmctnsize);
+	elog(RMLOG, "Resource manager needs minimum %d GRM containers.", grmctnsize);
 
 	/* Decide how much resource to acquire from global resource manager. */
 	int32_t reqmem  = 0;
-	int  reqcore = ceil(mctrack->TotalRequest.Core +
-			  	   	    mctrack->TotalUsed.Core -
-						mctrack->TotalAllocated.Core -
-						mctrack->TotalPending.Core);
+	int32_t reqcore = ceil(mctrack->TotalRequest.Core   +
+			  	   	       mctrack->TotalUsed.Core      -
+						   mctrack->TotalAllocated.Core -
+						   mctrack->TotalPending.Core);
 
-	elog(DEBUG3, "Memory Core Track has %lf requested, %lf used, %lf allocated, %lf pending.",
+	elog(RMLOG, "Memory Core Track has %lf requested, %lf used, %lf allocated, "
+				 "%lf pending.",
 				 mctrack->TotalRequest.Core,
 				 mctrack->TotalUsed.Core,
 				 mctrack->TotalAllocated.Core,
 				 mctrack->TotalPending.Core);
-	elog(DEBUG3, "Resource manager needs %d GRM containers.", reqcore);
 	/*
 	 * If after checking water level of segment resource, we expect more resource
 	 * containers, we expect more as well.
@@ -2129,17 +2145,37 @@ int generateAllocRequestToBroker(void)
 			  reqcore;
 	reqmem = reqcore * mctrack->MemCoreRatio;
 
+	elog(RMLOG, "Resource manager now needs %d GRM containers.", reqcore);
+
 	/* Call resource broker to request resource. */
 	if ( reqmem > 0 && reqcore > 0 )
 	{
+
+		/*
+		 * Here we know that we have to allocate more resource from GRM, we should
+		 * check again to enrich the preferred host list for new locality data
+		 * of expected additional GRM containers.
+		 *
+		 * The expected size of GRM containers may vary because we expect GRM
+		 * to have even number of GRM containers in each available segments.
+		 */
+		completeAllocRequestToBroker(&reqmem, &reqcore, &preferred);
+
+		elog(RMLOG, "Resource manager needs %d GRM containers after adjusting "
+					"overall water level.",
+					reqcore);
+
 		addResourceBundleData(&(mctrack->TotalPending), reqmem, reqcore);
 		uint64_t oldtime = mctrack->TotalPendingStartTime;
 		if ( mctrack->TotalPendingStartTime == 0 )
 		{
 			mctrack->TotalPendingStartTime = gettime_microsec();
-			elog(DEBUG3, "Global resource total pending start time is updated to "UINT64_FORMAT,
+			elog(DEBUG3, "Global resource total pending start time is updated "
+						 "to "UINT64_FORMAT,
 						 mctrack->TotalPendingStartTime);
 		}
+
+		/* Generate request to resource broker now. */
 		res = RB_acquireResource(reqmem, reqcore, preferred);
 		if ( res != FUNC_RETURN_OK && res != RESBROK_PIPE_BUSY )
 		{
@@ -2157,11 +2193,11 @@ int generateAllocRequestToBroker(void)
 		}
 		else
 		{
-			elog(DEBUG3, "Resource manager finished submitting resource "
-						 "allocation request to global resource manager for "
-						 "(%d MB, %d CORE).",
-						 reqmem,
-						 reqcore);
+			elog(RMLOG, "Resource manager finished submitting resource "
+						"allocation request to global resource manager for "
+						"(%d MB, %d CORE).",
+						reqmem,
+						reqcore);
 		}
 
 		/* Free preferred host list. */
@@ -2177,6 +2213,149 @@ int generateAllocRequestToBroker(void)
 	return res;
 }
 
+void completeAllocRequestToBroker(int32_t 	 *reqmem,
+								  int32_t 	 *reqcore,
+								  List 		**preferred)
+{
+	/*
+	 * Go through each segment to get minimum water level. The idea of completing
+	 * the request is to keep pulling up the lowest water level in the cluster
+	 * until equal or more GRM containers are requested.
+	 */
+	Assert(*reqmem % *reqcore == 0);
+	uint32_t ratio = *reqmem / *reqcore;
+
+	/* Step 1. Get lowest water level and build up index. */
+	List *ressegl = NULL;
+	getAllPAIRRefIntoList(&(PRESPOOL->Segments), &ressegl);
+	/* Index of each segment in current preferred host list. */
+	PAIR *reqidx = rm_palloc0(PCONTEXT, sizeof(PAIR) * list_length(ressegl));
+	int llevel = INT_MAX;
+	int totalcount = 0;
+	int index = 0;
+	ListCell *cell = NULL;
+	foreach(cell, ressegl)
+	{
+		reqidx[index] = NULL;
+
+		PAIR pair = (PAIR)lfirst(cell);
+		SegResource segres = (SegResource)(pair->Value);
+
+		/*
+		 * Resource manager skips this segment if
+		 * 1) Not FTS available;
+		 * 2) Not GRM available;
+		 * 3) Having resource decrease pending.
+		 */
+		if (!IS_SEGSTAT_FTSAVAILABLE(segres->Stat) ||
+			(DRMGlobalInstance->ImpType != NONE_HAWQ2 &&
+			 !IS_SEGSTAT_GRMAVAILABLE(segres->Stat)) ||
+			(segres->DecPending.MemoryMB > 0 && segres->DecPending.Core > 0))
+		{
+			index++;
+			continue;
+		}
+
+		int clevel = segres->ContainerSets[0] == NULL ?
+					 0 :
+					 list_length(segres->ContainerSets[0]->Containers) +
+					 segres->IncPending.MemoryMB / ratio;
+
+		ListCell *pcell = NULL;
+		foreach(pcell, *preferred)
+		{
+			PAIR existpair = (PAIR)lfirst(pcell);
+			if ( pair->Value == segres )
+			{
+				reqidx[index] = existpair;
+				totalcount += ((ResourceBundle)(reqidx[index]->Value))->MemoryMB /
+							  ratio;
+				break;
+			}
+		}
+
+
+		int creqsize = reqidx[index] == NULL ?
+					   0 :
+					   ((ResourceBundle)(reqidx[index]->Value))->MemoryMB / ratio;
+
+		llevel = clevel+creqsize < llevel ? clevel+creqsize : llevel;
+		index++;
+	}
+
+	/* Step 2. Adjust request. */
+	int32_t reqcoreleft = *reqcore - totalcount;
+	while( reqcoreleft > 0 )
+	{
+		llevel++;
+		index = 0;
+		foreach(cell, ressegl)
+		{
+			PAIR pair = (PAIR)lfirst(cell);
+			SegResource segres = (SegResource)(pair->Value);
+
+			/*
+			 * Resource manager skips this segment if
+			 * 1) Not FTS available;
+			 * 2) Not GRM available;
+			 * 3) Having resource decrease pending.
+			 */
+			if (!IS_SEGSTAT_FTSAVAILABLE(segres->Stat) ||
+				(DRMGlobalInstance->ImpType != NONE_HAWQ2 &&
+				 !IS_SEGSTAT_GRMAVAILABLE(segres->Stat)) ||
+				(segres->DecPending.MemoryMB > 0 && segres->DecPending.Core > 0))
+			{
+				index++;
+				continue;
+			}
+
+			int clevel = segres->ContainerSets[0] == NULL ?
+						 0 :
+						 list_length(segres->ContainerSets[0]->Containers) +
+						 segres->IncPending.MemoryMB / ratio;
+
+			int aclevel = reqidx[index] == NULL ?
+						  clevel :
+						  clevel + ((ResourceBundle)(reqidx[index]->Value))->MemoryMB / ratio;
+
+			if ( llevel > aclevel )
+			{
+
+				if ( reqidx[index] == NULL )
+				{
+					reqidx[index] = rm_palloc0(PCONTEXT, sizeof(PAIRData));
+					reqidx[index]->Key = segres;
+					ResourceBundle resource = rm_palloc0(PCONTEXT,
+														 sizeof(ResourceBundleData));
+					resetResourceBundleData(resource, 0, 0, ratio);
+					reqidx[index]->Value = resource;
+					*preferred = lappend(*preferred, reqidx[index]);
+				}
+				addResourceBundleData((ResourceBundle)(reqidx[index]->Value),
+									  (llevel-aclevel) * ratio,
+									  llevel-aclevel);
+				reqcoreleft -= llevel-aclevel;
+
+				elog(RMLOG, "Resource manager acquires %lf GRM containers on "
+						    "host %s. Current level(having pending) %d, "
+						    "expect level %d, acquired in current request %d.",
+						    ((ResourceBundle)(reqidx[index]->Value))->Core,
+						    GET_SEGRESOURCE_HOSTNAME(((SegResource)(reqidx[index]->Key))),
+							clevel,
+							llevel,
+							aclevel-clevel);
+			}
+
+			index++;
+		}
+	}
+
+	/* Adjust total mem and core request. */
+	*reqcore -= reqcoreleft;
+	*reqmem = *reqcore * ratio;
+
+	rm_pfree(PCONTEXT, reqidx);
+}
 /*
  * Create all socket servers to accept connection from QD or RM agents.
  */

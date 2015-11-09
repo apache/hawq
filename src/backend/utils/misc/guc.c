@@ -6334,7 +6334,7 @@ static struct config_int ConfigureNamesInt[] =
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
 		&rm_log_level,
-		DEBUG5, DEBUG5, NOTICE, NULL, NULL
+		DEBUG3, DEBUG5, NOTICE, NULL, NULL
 	},
 
 	{
