@@ -135,6 +135,10 @@ void test__InvalidateSystemCaches__resets_mdvsn_no_xact(void **state)
 
 
 /* Helper functions for the MdVer queue pre-processing */
+
+/*
+ * Creates a new invalidation list, and adds a new empty chunk to it
+ */
 static InvalidationListHeader *
 create_list_one_chunk(void) {
 	InvalidationListHeader *hdr = (InvalidationListHeader *) palloc0(sizeof(InvalidationListHeader));
@@ -152,7 +156,13 @@ create_list_one_chunk(void) {
 	return hdr;
 }
 
-static void add_event_to_chunk(InvalidationChunk *chunk, bool is_nuke, int key) {
+/*
+ * Adds a new event to an existing InvalidationChunk.
+ * If is_nuke is true, adds a nuke event. Otherwise, uses the given key
+ * to populate the event fields.
+ */
+static void
+add_event_to_chunk(InvalidationChunk *chunk, bool is_nuke, int key) {
 
 	/* Create a message */
 	SharedInvalidationMessage msg;
