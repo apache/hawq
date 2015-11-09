@@ -5985,9 +5985,9 @@ static struct config_int ConfigureNamesInt[] =
 		},
 		&gp_vmem_protect_limit,
 #ifdef __darwin__
-        2048,
+        8192,
 #else
-        2048,
+        8192,
 #endif
             0, INT_MAX / 2, NULL, NULL
 	},

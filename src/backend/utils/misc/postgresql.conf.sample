@@ -491,7 +491,7 @@ gp_segment_connect_timeout = 600s
 #gp_enable_delete_as_truncate = off
 
 # - Resource limits -
-gp_vmem_protect_limit = 2048  #Virtual memory limit (in MB).
+gp_vmem_protect_limit = 8192  #Virtual memory limit (in MB).
 #gp_vmem_idle_resource_timeout = 18000 # idle-time before gang-release, in milliseconds (zero disables release).
 
 #------------------------------------------------------------------------------
