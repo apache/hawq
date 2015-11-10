@@ -234,6 +234,26 @@ test__rest_request__callRestHASuccessFromTheFirstCall(void **state)
 	pfree(client_context);
 }
 
+void
+test__normalize_size(void **state)
+{
+	float4 result = normalize_size(10000000, "B");
+	assert_int_equal(result, 10000000);
+
+	result = normalize_size(10000000, "KB");
+	assert_int_equal(result, 10240000000);
+
+	result = normalize_size(500, "MB");
+	assert_int_equal(result, 524288000);
+
+	result = normalize_size(10, "GB");
+	assert_int_equal(result, 10737418240);
+
+	result = normalize_size(10000, "TB");
+	assert_int_equal(result, 10995116277760000);
+
+
+}
 
 int 
 main(int argc, char *argv[]) 
@@ -244,7 +264,8 @@ main(int argc, char *argv[])
 		    unit_test(test__rest_request__callRestThrowsNoHA),
 		    unit_test(test__rest_request__callRestThrowsHAFirstTime),
 		    unit_test(test__rest_request__callRestThrowsHASecondTime),
-		    unit_test(test__rest_request__callRestHASuccessFromTheFirstCall)
+		    unit_test(test__rest_request__callRestHASuccessFromTheFirstCall),
+			unit_test(test__normalize_size)
 	};
 	return run_tests(tests);
 }

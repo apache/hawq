@@ -31,6 +31,7 @@
 
 static List* parse_datanodes_response(List *rest_srvrs, StringInfo rest_buf);
 static PxfFragmentStatsElem *parse_get_frag_stats_response(StringInfo rest_buf);
+static float4 normalize_size(long size, char* unit);
 static List* parse_get_fragments_response(List* fragments, StringInfo rest_buf);
 static void ha_failover(GPHDUri *hadoop_uri, ClientContext *client_context, char* rest_msg);
 static void rest_request(GPHDUri *hadoop_uri, ClientContext* client_context, char *rest_msg);
@@ -201,13 +202,48 @@ static PxfFragmentStatsElem *parse_get_frag_stats_response(StringInfo rest_buf)
 
 	/* 1. first fragment size */
 	struct json_object *js_first_frag_size = json_object_object_get(head, "firstFragmentSize");
-	statsElem->firstFragSize = json_object_get_int(js_first_frag_size);
+	struct json_object *js_size = json_object_object_get(js_first_frag_size, "size");
+	long size = json_object_get_int(js_size);
+	struct json_object *js_unit = json_object_object_get(js_first_frag_size, "unit");
+	char* unit = pstrdup(json_object_get_string(js_unit));
+	statsElem->firstFragSize = normalize_size(size, unit);
+	pfree(unit);
 
 	/* 2. total size */
 	struct json_object *js_total_size = json_object_object_get(head, "totalSize");
-	statsElem->totalSize = json_object_get_int(js_total_size);
+	js_size = json_object_object_get(js_total_size, "size");
+	size = json_object_get_int(js_size);
+	js_unit = json_object_object_get(js_total_size, "unit");
+	unit = pstrdup(json_object_get_string(js_unit));
+	statsElem->totalSize = normalize_size(size, unit);
+	pfree(unit);
 
 	return statsElem;
+}
+
+static float4 normalize_size(long size, char* unit) {
+	const float4 multiplier = 1024.0;
+	if (strcmp(unit,"B") == 0)
+	{
+		return size;
+	}
+	if (strcmp(unit,"KB") == 0)
+	{
+		return size * multiplier;
+	}
+	if (strcmp(unit,"MB") == 0)
+	{
+		return size * multiplier * multiplier;
+	}
+	if (strcmp(unit,"GB") == 0)
+	{
+		return size * multiplier * multiplier * multiplier;
+	}
+	if (strcmp(unit,"TB") == 0)
+	{
+		return size * multiplier * multiplier * multiplier * multiplier;
+	}
+	return -1;
 }
 
 /*

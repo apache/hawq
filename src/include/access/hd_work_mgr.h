@@ -25,8 +25,8 @@ extern void free_hddata_2gp_segments(char **segs_work_map, int total_segs);
 typedef struct sPxfFragmentStatsElem
 {
 	int numFrags;
-	int firstFragSize; /* size of the first fragment */
-	int totalSize; /* size of the total datasource */
+	float4 firstFragSize; /* size of the first fragment */
+	float4 totalSize; /* size of the total datasource */
 } PxfFragmentStatsElem;
 PxfFragmentStatsElem *get_pxf_fragments_statistics(char *uri, Relation rel, StringInfo err_msg);
 
