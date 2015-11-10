@@ -251,8 +251,6 @@ test__normalize_size(void **state)
 
 	result = normalize_size(10000, "TB");
 	assert_int_equal(result, 10995116277760000);
-
-
 }
 
 int 
