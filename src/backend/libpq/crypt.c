@@ -33,7 +33,6 @@ hash_password(const char *passwd, char *salt, size_t salt_len, char *buf)
 		case PASSWORD_HASH_MD5:
 			return pg_md5_encrypt(passwd, salt, salt_len, buf);
 		case PASSWORD_HASH_SHA_256:
-		case PASSWORD_HASH_SHA_256_FIPS:
 			return pg_sha256_encrypt(passwd, salt, salt_len, buf);
 			break;
 		default:

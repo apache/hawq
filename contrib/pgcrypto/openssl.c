@@ -862,7 +862,7 @@ static PX_Alias ossl_aliases[] = {
 	{"rijndael", "aes-cbc"},
 	{"rijndael-cbc", "aes-cbc"},
 	{"rijndael-ecb", "aes-ecb"},
-	{NULL}
+	{NULL, NULL}
 };
 
 static const struct ossl_cipher ossl_bf_cbc = {
@@ -954,27 +954,17 @@ px_find_cipher(const char *name, PX_Cipher **res)
 	ossldata   *od;
 
 	name = px_resolve_alias(ossl_aliases, name);
-	if (fips_mode)
-	{
-		if (!strcmp(name, fips_crypto_algo_str))
-	 		return PXE_NOT_ALLOWED_FIPS;
-	}
 
 	for (i = ossl_cipher_types; i->name; i++)
 		if (!strcmp(i->name, name))
 			break;
+
 	if (i->name == NULL)
 		return PXE_NO_CIPHER;
 
 	od = px_alloc(sizeof(*od));
 	memset(od, 0, sizeof(*od));
 	od->ciph = i->ciph;
-
-	if (fips_mode)
-	{
-		if (!i->fips)
-			return PXE_NOT_ALLOWED_FIPS;
-	}
 
 	c = px_alloc(sizeof(*c));
 	c->block_size = gen_ossl_block_size;

@@ -23,8 +23,7 @@ typedef enum
 {
 	PASSWORD_HASH_NONE = 0,
 	PASSWORD_HASH_MD5,
-	PASSWORD_HASH_SHA_256,
-	PASSWORD_HASH_SHA_256_FIPS
+	PASSWORD_HASH_SHA_256
 } PasswdHashAlg;
 
 extern PasswdHashAlg password_hash_algorithm;

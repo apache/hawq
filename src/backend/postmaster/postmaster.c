@@ -257,7 +257,6 @@ static int	SendStop = false;
 
 /* still more option variables */
 bool		EnableSSL = false;
-bool		fips_mode = false;
 bool		SilentMode = false; /* silent_mode */
 
 int			PreAuthDelay = 0;

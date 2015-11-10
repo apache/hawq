@@ -113,12 +113,7 @@ px_resolve_alias(const PX_Alias *list, const char *name)
 	while (list->name)
 	{
 		if (pg_strcasecmp(list->alias, name) == 0)
-		{
-			if (fips_mode && !list->fips)
-				return fips_crypto_algo_str;
-			else
-				return list->name;
-		}
+			return list->name;
 		list++;
 	}
 	return name;
