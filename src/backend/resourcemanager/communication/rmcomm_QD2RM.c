@@ -1340,11 +1340,12 @@ void *generateResourceRefreshHeartBeat(void *arg)
 				   tharg->HostAddrLength);
 			server_addr.sin_port = htons(rm_master_port);
 
+			int sockres = 0;
 			while(true)
 			{
-				int sockres = connect(fd,
-									  (struct sockaddr *)&server_addr,
-									  sizeof(server_addr));
+				sockres = connect(fd,
+								  (struct sockaddr *)&server_addr,
+								  sizeof(server_addr));
 				if( sockres < 0)
 				{
 					if (errno == EINTR)
@@ -1360,8 +1361,13 @@ void *generateResourceRefreshHeartBeat(void *arg)
 					}
 					break;
 			    }
-
 				break;
+			}
+
+			if ( sockres < 0 )
+			{
+				pg_usleep(1000000L);
+				continue;
 			}
 
 			RMMessageHead phead = (RMMessageHead)messagehead;
