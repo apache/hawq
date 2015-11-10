@@ -1438,6 +1438,7 @@ void freeHeartBeatThreadArg(HeartBeatThreadArg *arg)
 	{
 		free((*arg)->HostAddrs[i]);
 	}
+	free((*arg)->HostAddrs);
 	free(*arg);
 	*arg = NULL;
 }
