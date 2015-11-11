@@ -340,7 +340,7 @@ bool		Debug_datumstream_write_use_small_initial_buffers = false;
 bool		gp_temporary_files_filespace_repair = false;
 bool		filesystem_support_truncate = true;
 bool		gp_create_table_random_default_distribution = false;
-bool		gp_allow_non_uniform_partitioning_ddl = false;
+bool		gp_allow_non_uniform_partitioning_ddl = true;
 
 int			explain_memory_verbosity = 0;
 char* 		memory_profiler_run_id = "none";
@@ -3450,7 +3450,7 @@ static struct config_bool ConfigureNamesBool[] =
 			GUC_SUPERUSER_ONLY | GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
 		&gp_allow_non_uniform_partitioning_ddl,
-		false, NULL, NULL
+		true, NULL, NULL
 	},
 
 	{

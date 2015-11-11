@@ -46,7 +46,12 @@ subpartition by hash (d)
 partition aa (subpartition cc, subpartition dd (subpartition iii)),
 partition bb (subpartition cc, subpartition dd)
 );
-ERROR:  Multi-level partitioned tables without templates are not supported
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa" for table "ggg"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb" for table "ggg"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc" for table "ggg_1_prt_aa"
+ERROR:  missing SUBPARTITION BY clause for subpartition specification (at depth 2)
+LINE 6: partition aa (subpartition cc, subpartition dd (subpartition...
+                                       ^
 -- Test column lookup works
 create table ggg (a char(1), b char(2), d char(3))
 distributed by (a)
@@ -78,9 +83,13 @@ subpartition by hash (d)
 partition aa (subpartition cc, subpartition dd),
 partition bb (subpartition cc, subpartition dd)
 );
-ERROR:  Multi-level partitioned tables without templates are not supported
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa" for table "ggg"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb" for table "ggg"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc" for table "ggg_1_prt_aa"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd" for table "ggg_1_prt_aa"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_cc" for table "ggg_1_prt_bb"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd" for table "ggg_1_prt_bb"
 drop table if exists ggg cascade;
-NOTICE:  table "ggg" does not exist, skipping
 -- disable hash partitions
 set gp_enable_hash_partitioned_tables = false;
 create table ggg (a char(1), b char(2), d char(3))
@@ -142,9 +151,21 @@ subpartition ff
 partition aa (subpartition cc, subpartition dd),
 partition bb (subpartition cc, subpartition dd)
 );
-ERROR:  Multi-level partitioned tables without templates are not supported
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa" for table "ggg"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb" for table "ggg"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc" for table "ggg_1_prt_aa"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd" for table "ggg_1_prt_aa"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc_3_prt_ee" for table "ggg_1_prt_aa_2_prt_cc"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc_3_prt_ff" for table "ggg_1_prt_aa_2_prt_cc"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd_3_prt_ee" for table "ggg_1_prt_aa_2_prt_dd"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd_3_prt_ff" for table "ggg_1_prt_aa_2_prt_dd"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_cc" for table "ggg_1_prt_bb"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd" for table "ggg_1_prt_bb"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_cc_3_prt_ee" for table "ggg_1_prt_bb_2_prt_cc"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_cc_3_prt_ff" for table "ggg_1_prt_bb_2_prt_cc"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd_3_prt_ee" for table "ggg_1_prt_bb_2_prt_dd"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd_3_prt_ff" for table "ggg_1_prt_bb_2_prt_dd"
 drop table if exists ggg cascade;
-NOTICE:  table "ggg" does not exist, skipping
 -- doesn't work because cannot have nested declaration in template
 create table ggg (a char(1), b char(2), d char(3), e int)
 distributed by (a)
@@ -188,7 +209,17 @@ subpartition by hash (e)
 subpartition template ( subpartition ee, subpartition ff ) (
 partition aa (subpartition cc, subpartition dd), partition bb
 (subpartition cc start ('a') , subpartition dd) );
-ERROR:  Multi-level partitioned tables without templates are not supported
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa" for table "ggg"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb" for table "ggg"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc" for table "ggg_1_prt_aa"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd" for table "ggg_1_prt_aa"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc_3_prt_ee" for table "ggg_1_prt_aa_2_prt_cc"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc_3_prt_ff" for table "ggg_1_prt_aa_2_prt_cc"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd_3_prt_ee" for table "ggg_1_prt_aa_2_prt_dd"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd_3_prt_ff" for table "ggg_1_prt_aa_2_prt_dd"
+ERROR:  invalid use of RANGE boundary specification in partition "cc" of type HASH (at depth 2)
+LINE 6: (subpartition cc start ('a') , subpartition dd) );
+                         ^
 -- this is subtly wrong -- it defines 4 partitions
 -- the problem is the comma before "end", which causes us to
 -- generate 2 anonymous partitions.
@@ -397,9 +428,13 @@ subpartition by hash (d)
 partition aa (subpartition cc, subpartition dd),
 partition bb (subpartition cc, subpartition dd)
 );
-ERROR:  Multi-level partitioned tables without templates are not supported
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa" for table "ggg"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb" for table "ggg"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc" for table "ggg_1_prt_aa"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd" for table "ggg_1_prt_aa"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_cc" for table "ggg_1_prt_bb"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd" for table "ggg_1_prt_bb"
 drop table ggg cascade;
-ERROR:  table "ggg" does not exist
 -- subpartitions with templates
 create table ggg (a char(1), b char(2), d char(3), e numeric)
 distributed by (a)
@@ -447,9 +482,21 @@ subpartition ff
 partition aa (subpartition cc, subpartition dd),
 partition bb (subpartition cc, subpartition dd)
 );
-ERROR:  Multi-level partitioned tables without templates are not supported
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa" for table "ggg"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb" for table "ggg"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc" for table "ggg_1_prt_aa"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd" for table "ggg_1_prt_aa"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc_3_prt_ee" for table "ggg_1_prt_aa_2_prt_cc"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc_3_prt_ff" for table "ggg_1_prt_aa_2_prt_cc"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd_3_prt_ee" for table "ggg_1_prt_aa_2_prt_dd"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd_3_prt_ff" for table "ggg_1_prt_aa_2_prt_dd"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_cc" for table "ggg_1_prt_bb"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd" for table "ggg_1_prt_bb"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_cc_3_prt_ee" for table "ggg_1_prt_bb_2_prt_cc"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_cc_3_prt_ff" for table "ggg_1_prt_bb_2_prt_cc"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd_3_prt_ee" for table "ggg_1_prt_bb_2_prt_dd"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd_3_prt_ff" for table "ggg_1_prt_bb_2_prt_dd"
 drop table ggg cascade;
-ERROR:  table "ggg" does not exist
 -- basic list partition
 create table ggg (a char(1), b char(2), d char(3))
 distributed by (a)
@@ -623,9 +670,25 @@ end (date '2009-01-01')
        (subpartition dd values ('1', '2', '3'),
 	    subpartition ee values ('4', '5', '6'))
 );
-ERROR:  Multi-level partitioned tables without templates are not supported
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa" for table "ggg"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb" for table "ggg"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd" for table "ggg_1_prt_aa"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_ee" for table "ggg_1_prt_aa"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd_3_prt_1" for table "ggg_1_prt_aa_2_prt_dd"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd_3_prt_2" for table "ggg_1_prt_aa_2_prt_dd"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd_3_prt_3" for table "ggg_1_prt_aa_2_prt_dd"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_ee_3_prt_1" for table "ggg_1_prt_aa_2_prt_ee"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_ee_3_prt_2" for table "ggg_1_prt_aa_2_prt_ee"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_ee_3_prt_3" for table "ggg_1_prt_aa_2_prt_ee"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd" for table "ggg_1_prt_bb"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_ee" for table "ggg_1_prt_bb"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd_3_prt_1" for table "ggg_1_prt_bb_2_prt_dd"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd_3_prt_2" for table "ggg_1_prt_bb_2_prt_dd"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd_3_prt_3" for table "ggg_1_prt_bb_2_prt_dd"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_ee_3_prt_1" for table "ggg_1_prt_bb_2_prt_ee"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_ee_3_prt_2" for table "ggg_1_prt_bb_2_prt_ee"
+NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_ee_3_prt_3" for table "ggg_1_prt_bb_2_prt_ee"
 drop table ggg cascade;
-ERROR:  table "ggg" does not exist
 -- demo ends here
 -- LIST validation
 -- duplicate partition name
@@ -934,7 +997,7 @@ insert into ggg values (7, 7);
 insert into ggg values (8, 8);
 insert into ggg values (9, 9);
 insert into ggg values (10, 10);
-ERROR:  no partition for partitioning key  (seg1 Entong-Shen-MacBook-Pro.local:41001 pid=51557)
+ERROR:  no partition for partitioning key  (seg7 localhost:40000 pid=55503)
 select * from ggg order by 1, 2;
  id | a 
 ----+---
@@ -1075,8 +1138,6 @@ drop table foz cascade;
 -- complain if create table as select (CTAS)
 CREATE TABLE rank1 (id int,
 rank int, year date, gender char(1));
-NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'id' as the Greenplum Database data distribution key for this table.
-HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
 create table rank2 as select * from rank1
 DISTRIBUTED BY (id, gender, year)
 partition by list (gender)
@@ -1146,12 +1207,10 @@ alter table hhh add partition cc end ('2010-01-01');
 NOTICE:  CREATE TABLE will create partition "hhh_1_prt_cc" for table "hhh"
 -- works - anonymous partition MPP-3350
 alter table hhh add partition end ('2010-02-01');
-NOTICE:  CREATE TABLE will create partition "hhh_1_prt_r1960447470" for table "hhh"
+NOTICE:  CREATE TABLE will create partition "hhh_1_prt_r671594530" for table "hhh"
 -- MPP-3607 - ADD PARTITION with open intervals
 create table no_end1 (aa int, bb int) partition by range (bb)
 (partition foo start(3));
-NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'aa' as the Greenplum Database data distribution key for this table.
-HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
 NOTICE:  CREATE TABLE will create partition "no_end1_1_prt_foo" for table "no_end1"
 -- fail overlap
 alter table no_end1 add partition baz end (4);
@@ -1167,8 +1226,6 @@ alter table no_end1 add partition baz2 end (1);
 NOTICE:  CREATE TABLE will create partition "no_end1_1_prt_baz2" for table "no_end1"
 create table no_start1 (aa int, bb int) partition by range (bb)
 (partition foo end(3));
-NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'aa' as the Greenplum Database data distribution key for this table.
-HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
 NOTICE:  CREATE TABLE will create partition "no_start1_1_prt_foo" for table "no_start1"
 -- fail overlap (because next partition has no start)
 alter table no_start1 add partition baz start (2);
@@ -1202,8 +1259,6 @@ drop table no_start1;
 create table jjj (aa int, bb int) 
 partition by hash(bb) 
 (partition j1, partition j2);
-NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'aa' as the Greenplum Database data distribution key for this table.
-HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
 NOTICE:  CREATE TABLE will create partition "jjj_1_prt_j1" for table "jjj"
 NOTICE:  CREATE TABLE will create partition "jjj_1_prt_j2" for table "jjj"
 alter table jjj add default partition;
@@ -1216,8 +1271,6 @@ create table jjj (aa int, bb date)
 partition by range(bb) 
 (partition j1 end (date '2008-01-01'), 
 partition j2 end (date '2009-01-01'));
-NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'aa' as the Greenplum Database data distribution key for this table.
-HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
 NOTICE:  CREATE TABLE will create partition "jjj_1_prt_j1" for table "jjj"
 NOTICE:  CREATE TABLE will create partition "jjj_1_prt_j2" for table "jjj"
 -- must have a name
@@ -1237,8 +1290,6 @@ partition by range(bb)
 (partition j1 end (date '2008-01-01'), 
 partition j2 end (date '2009-01-01'),
 default partition j3);
-NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'aa' as the Greenplum Database data distribution key for this table.
-HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
 NOTICE:  CREATE TABLE will create partition "jjj_1_prt_j3" for table "jjj"
 NOTICE:  CREATE TABLE will create partition "jjj_1_prt_j1" for table "jjj"
 NOTICE:  CREATE TABLE will create partition "jjj_1_prt_j2" for table "jjj"
@@ -1368,8 +1419,6 @@ drop table hhh_l1 cascade;
 -- basic sanity tests. All should pass.
 create table k (i int) partition by range(i) (start(1) end(10) every(2), 
 default partition mydef);
-NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'i' as the Greenplum Database data distribution key for this table.
-HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
 NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_2" for table "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_3" for table "k"
@@ -1383,45 +1432,43 @@ ERROR:  AT clause cannot be used when splitting a default RANGE partition
 drop table k;
 create table j (i int) partition by list(i) (partition a values(1, 2, 3, 4),
 partition b values(5, 6, 7, 8));
-NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'i' as the Greenplum Database data distribution key for this table.
-HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
 NOTICE:  CREATE TABLE will create partition "j_1_prt_a" for table "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_b" for table "j"
 insert into j select i from generate_series(1, 8) i;
 alter table j split partition for(1) at (2, 3) into (partition fa, partition
 fb);
-NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_261824"
+NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_19493"
 NOTICE:  dropped partition "a" for relation "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_fa" for table "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_fb" for table "j"
 select * from j_1_prt_fa;
  i 
 ---
- 1
  4
+ 1
 (2 rows)
 
 select * from j_1_prt_fb;
  i 
 ---
- 2
  3
+ 2
 (2 rows)
 
 alter table j split partition for(5) at (6);
-NOTICE:  exchanged partition "b" of relation "j" with relation "pg_temp_261824"
+NOTICE:  exchanged partition "b" of relation "j" with relation "pg_temp_19493"
 NOTICE:  dropped partition "b" for relation "j"
-NOTICE:  CREATE TABLE will create partition "j_1_prt_r2133557652" for table "j"
-NOTICE:  CREATE TABLE will create partition "j_1_prt_r951815815" for table "j"
+NOTICE:  CREATE TABLE will create partition "j_1_prt_r110764385" for table "j"
+NOTICE:  CREATE TABLE will create partition "j_1_prt_r1253749698" for table "j"
 select * from j;
  i 
 ---
+ 4
  1
  3
- 5
- 7
- 4
  2
+ 7
+ 5
  8
  6
 (8 rows)
@@ -1432,8 +1479,6 @@ ERROR:  AT clause parameter is not a member of the target partition specificatio
 drop table j;
 create table k (i int) partition by range(i) (start(1) end(10) every(2), 
 default partition mydef);
-NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'i' as the Greenplum Database data distribution key for this table.
-HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
 NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_2" for table "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_3" for table "k"
@@ -1449,8 +1494,6 @@ drop table k;
 -- should work
 create table k (i int) partition by range(i) (start(1) end(10) every(2), 
 default partition mydef);
-NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'i' as the Greenplum Database data distribution key for this table.
-HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
 NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_2" for table "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_3" for table "k"
@@ -1460,7 +1503,7 @@ NOTICE:  CREATE TABLE will create partition "k_1_prt_6" for table "k"
 insert into k select i from generate_series(1, 30) i;
 alter table k split default partition start(15) end(20) into
 (partition mydef, partition foo);
-NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_262206"
+NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_19600"
 NOTICE:  dropped partition "mydef" for relation "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_foo" for table "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
@@ -1468,28 +1511,28 @@ select * from k_1_prt_foo;
  i  
 ----
  16
- 18
- 15
- 17
  19
+ 17
+ 15
+ 18
 (5 rows)
 
 alter table k split default partition start(22) exclusive end(25) inclusive
 into (partition bar, partition mydef);
-NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_262206"
+NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_19600"
 NOTICE:  dropped partition "mydef" for relation "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_bar" for table "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
 select * from k_1_prt_bar;
  i  
 ----
- 23
- 25
  24
+ 25
+ 23
 (3 rows)
 
 alter table k split partition bar at (23) into (partition baz, partition foz);
-NOTICE:  exchanged partition "bar" of relation "k" with relation "pg_temp_262206"
+NOTICE:  exchanged partition "bar" of relation "k" with relation "pg_temp_19600"
 NOTICE:  dropped partition "bar" for relation "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_baz" for table "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_foz" for table "k"
@@ -1513,8 +1556,6 @@ drop table k;
 -- Test errors for default handling
 create table k (i int) partition by range(i) (start(1) end(2), 
 default partition mydef);
-NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'i' as the Greenplum Database data distribution key for this table.
-HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
 NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_2" for table "k"
 alter table k split partition mydef at (25) into (partition foo, partition
@@ -1524,8 +1565,6 @@ drop table k;
 -- check that when we split a default, the INTO clause must named the default
 create table k (i date) partition by range(i) (start('2008-01-01')
 end('2009-01-01') every(interval '1 month'), default partition default_part);
-NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'i' as the Greenplum Database data distribution key for this table.
-HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
 NOTICE:  CREATE TABLE will create partition "k_1_prt_default_part" for table "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_2" for table "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_3" for table "k"
@@ -1544,47 +1583,43 @@ into (partition aa, partition nodate);
 ERROR:  default partition name missing from INTO clause
 alter table k split default partition start ('2009-01-01') end ('2009-02-01')
 into (partition aa, partition default_part);
-NOTICE:  exchanged partition "default_part" of relation "k" with relation "pg_temp_262658"
+NOTICE:  exchanged partition "default_part" of relation "k" with relation "pg_temp_19722"
 NOTICE:  dropped partition "default_part" for relation "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_aa" for table "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_default_part" for table "k"
 -- check that it works without INTO
 alter table k split default partition start ('2009-02-01') end ('2009-03-01');
-NOTICE:  exchanged partition "default_part" of relation "k" with relation "pg_temp_262658"
+NOTICE:  exchanged partition "default_part" of relation "k" with relation "pg_temp_19722"
 NOTICE:  dropped partition "default_part" for relation "k"
-NOTICE:  CREATE TABLE will create partition "k_1_prt_r2094881790" for table "k"
+NOTICE:  CREATE TABLE will create partition "k_1_prt_r520735789" for table "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_default_part" for table "k"
 drop table k;
 -- List too
 create table k (i int) partition by list(i) (partition a values(1, 2),
 partition b values(3, 4), default partition mydef);
-NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'i' as the Greenplum Database data distribution key for this table.
-HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
 NOTICE:  CREATE TABLE will create partition "k_1_prt_a" for table "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_b" for table "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
 alter table k split partition mydef at (5) into (partition foo, partition bar);
 ERROR:  default partition name missing from INTO clause
 alter table k split partition mydef at (5) into (partition foo, partition mydef);
-NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_263098"
+NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_19854"
 NOTICE:  dropped partition "mydef" for relation "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_foo" for table "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
 alter table k split partition mydef at (10);
-NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_263098"
+NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_19854"
 NOTICE:  dropped partition "mydef" for relation "k"
-NOTICE:  CREATE TABLE will create partition "k_1_prt_r1055980794" for table "k"
+NOTICE:  CREATE TABLE will create partition "k_1_prt_r471114786" for table "k"
 NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
 drop table k;
 -- For LIST, make sure that we reject AT() clauses which match all parameters
 create table j (i int) partition by list(i) (partition a values(1, 2, 3, 4),
  partition b values(5, 6, 7, 8));
-NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'i' as the Greenplum Database data distribution key for this table.
-HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
 NOTICE:  CREATE TABLE will create partition "j_1_prt_a" for table "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_b" for table "j"
 alter table j split partition for(1) at (1,2) into (partition fa, partition fb);
-NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_263358"
+NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_19916"
 NOTICE:  dropped partition "a" for relation "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_fa" for table "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_fb" for table "j"
@@ -1595,14 +1630,12 @@ drop table j;
 -- Check that we can split LIST partitions that have a default partition
 create table j (i int) partition by list(i) (partition a values(1, 2, 3, 4),
 partition b values(5, 6, 7, 8), default partition default_part);
-NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'i' as the Greenplum Database data distribution key for this table.
-HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
 NOTICE:  CREATE TABLE will create partition "j_1_prt_a" for table "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_b" for table "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_default_part" for table "j"
 alter table j split partition for(1) at (1,2) into (partition f1a, partition
 f1b);
-NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_263508"
+NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_19956"
 NOTICE:  dropped partition "a" for relation "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_f1a" for table "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_f1b" for table "j"
@@ -1610,12 +1643,10 @@ drop table j;
 -- Make sure range can too
 create table j (i int) partition by range(i) (partition a start(1) end(10),
 default partition default_part);
-NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'i' as the Greenplum Database data distribution key for this table.
-HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
 NOTICE:  CREATE TABLE will create partition "j_1_prt_default_part" for table "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_a" for table "j"
 alter table j split partition for(1) at (5) into (partition f1a, partition f1b);
-NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_263664"
+NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_20002"
 NOTICE:  dropped partition "a" for relation "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_f1a" for table "j"
 NOTICE:  CREATE TABLE will create partition "j_1_prt_f1b" for table "j"
@@ -1660,7 +1691,7 @@ select * from pt_table_1_prt_2 order by d;
 (2 rows)
 
 insert into pt_table_1_prt_others values(1,1,1,1);
-ERROR:  the data does not belong to partition: pt_table_1_prt_others  (seg0 Entong-Shen-MacBook-Pro.local:41000 pid=51556)
+ERROR:  the data does not belong to partition: pt_table_1_prt_others  (seg0 localhost:40000 pid=55614)
 select * from pt_table order by b,d;
  a | b | c | d 
 ---+---+---+---
@@ -1787,7 +1818,7 @@ select * from pt_check order by col1;
 ALTER TABLE pt_check SPLIT DEFAULT PARTITION
 	START ('2011-01-01') INCLUSIVE END ('2011-02-01') EXCLUSIVE
 	INTO (PARTITION jan2011, DEFAULT PARTITION);
-NOTICE:  exchanged partition "defpt" of relation "pt_check" with relation "pg_temp_264250"
+NOTICE:  exchanged partition "defpt" of relation "pt_check" with relation "pg_temp_20214"
 NOTICE:  dropped partition "defpt" for relation "pt_check"
 NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_jan2011" for table "pt_check"
 NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_defpt" for table "pt_check"
@@ -1848,7 +1879,7 @@ select * from pt_check order by col1;
 ALTER TABLE pt_check SPLIT DEFAULT PARTITION
 	START ('2011-01-01') INCLUSIVE END ('2011-02-01') EXCLUSIVE
 	INTO (DEFAULT PARTITION, PARTITION jan2011);
-NOTICE:  exchanged partition "defpt" of relation "pt_check" with relation "pg_temp_264601"
+NOTICE:  exchanged partition "defpt" of relation "pt_check" with relation "pg_temp_20345"
 NOTICE:  dropped partition "defpt" for relation "pt_check"
 NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_jan2011" for table "pt_check"
 NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_defpt" for table "pt_check"
@@ -2028,7 +2059,25 @@ PARTITION BY LIST (AGG_LEVEL)
                                       END (date '2999-12-31') EXCLUSIVE
     )
 );
-ERROR:  Multi-level partitioned tables without templates are not supported
+NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_min15part" for table "mpp10223pk"
+NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_hourpart" for table "mpp10223pk"
+NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_daypart" for table "mpp10223pk"
+NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_min15part_2_prt_p_future" for table "mpp10223pk_1_prt_min15part"
+NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_min15part_2_prt_p_endpart" for table "mpp10223pk_1_prt_min15part"
+NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_hourpart_2_prt_p_future" for table "mpp10223pk_1_prt_hourpart"
+NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_hourpart_2_prt_p20100622" for table "mpp10223pk_1_prt_hourpart"
+NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_hourpart_2_prt_p20100623" for table "mpp10223pk_1_prt_hourpart"
+NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_hourpart_2_prt_p20100624" for table "mpp10223pk_1_prt_hourpart"
+NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_hourpart_2_prt_p20100625" for table "mpp10223pk_1_prt_hourpart"
+NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_hourpart_2_prt_p20100626" for table "mpp10223pk_1_prt_hourpart"
+NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_hourpart_2_prt_p_endpart" for table "mpp10223pk_1_prt_hourpart"
+NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_daypart_2_prt_p_future" for table "mpp10223pk_1_prt_daypart"
+NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_daypart_2_prt_p20100622" for table "mpp10223pk_1_prt_daypart"
+NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_daypart_2_prt_p20100623" for table "mpp10223pk_1_prt_daypart"
+NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_daypart_2_prt_p20100624" for table "mpp10223pk_1_prt_daypart"
+NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_daypart_2_prt_p20100625" for table "mpp10223pk_1_prt_daypart"
+NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_daypart_2_prt_p20100626" for table "mpp10223pk_1_prt_daypart"
+NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_daypart_2_prt_p_endpart" for table "mpp10223pk_1_prt_daypart"
 --- disallow the creation of multi-level partition tables without templates
 CREATE TABLE rank3 (id int, rank int,
 year date, gender char(1),
@@ -2106,4 +2155,45 @@ subpartition ohio values ('OH')
 )
 )
 );
-ERROR:  Multi-level partitioned tables without templates are not supported
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys" for table "rank3"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls" for table "rank3"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan01" for table "rank3_1_prt_boys"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan02" for table "rank3_1_prt_boys"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan03" for table "rank3_1_prt_boys"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan04" for table "rank3_1_prt_boys"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan05" for table "rank3_1_prt_boys"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan01_3_prt_mass" for table "rank3_1_prt_boys_2_prt_jan01"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan01_3_prt_cali" for table "rank3_1_prt_boys_2_prt_jan01"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan01_3_prt_ohio" for table "rank3_1_prt_boys_2_prt_jan01"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan02_3_prt_mass" for table "rank3_1_prt_boys_2_prt_jan02"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan02_3_prt_cali" for table "rank3_1_prt_boys_2_prt_jan02"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan02_3_prt_ohio" for table "rank3_1_prt_boys_2_prt_jan02"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan03_3_prt_mass" for table "rank3_1_prt_boys_2_prt_jan03"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan03_3_prt_cali" for table "rank3_1_prt_boys_2_prt_jan03"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan03_3_prt_ohio" for table "rank3_1_prt_boys_2_prt_jan03"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan04_3_prt_mass" for table "rank3_1_prt_boys_2_prt_jan04"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan04_3_prt_cali" for table "rank3_1_prt_boys_2_prt_jan04"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan04_3_prt_ohio" for table "rank3_1_prt_boys_2_prt_jan04"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan05_3_prt_mass" for table "rank3_1_prt_boys_2_prt_jan05"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan05_3_prt_cali" for table "rank3_1_prt_boys_2_prt_jan05"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan05_3_prt_ohio" for table "rank3_1_prt_boys_2_prt_jan05"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan01" for table "rank3_1_prt_girls"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan02" for table "rank3_1_prt_girls"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan03" for table "rank3_1_prt_girls"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan04" for table "rank3_1_prt_girls"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan05" for table "rank3_1_prt_girls"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan01_3_prt_mass" for table "rank3_1_prt_girls_2_prt_jan01"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan01_3_prt_cali" for table "rank3_1_prt_girls_2_prt_jan01"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan01_3_prt_ohio" for table "rank3_1_prt_girls_2_prt_jan01"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan02_3_prt_mass" for table "rank3_1_prt_girls_2_prt_jan02"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan02_3_prt_cali" for table "rank3_1_prt_girls_2_prt_jan02"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan02_3_prt_ohio" for table "rank3_1_prt_girls_2_prt_jan02"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan03_3_prt_mass" for table "rank3_1_prt_girls_2_prt_jan03"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan03_3_prt_cali" for table "rank3_1_prt_girls_2_prt_jan03"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan03_3_prt_ohio" for table "rank3_1_prt_girls_2_prt_jan03"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan04_3_prt_mass" for table "rank3_1_prt_girls_2_prt_jan04"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan04_3_prt_cali" for table "rank3_1_prt_girls_2_prt_jan04"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan04_3_prt_ohio" for table "rank3_1_prt_girls_2_prt_jan04"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan05_3_prt_mass" for table "rank3_1_prt_girls_2_prt_jan05"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan05_3_prt_cali" for table "rank3_1_prt_girls_2_prt_jan05"
+NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan05_3_prt_ohio" for table "rank3_1_prt_girls_2_prt_jan05"
