@@ -68,7 +68,6 @@
 
 #authentication_timeout = 1min		# 1s-600s
 #ssl = off				# (change requires restart)
-#fips_mode = off			# use OpenSSL FIPS mode.
 #ssl_ciphers = 'ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH'	# allowed SSL ciphers
 					# (change requires restart)
 #password_encryption = on

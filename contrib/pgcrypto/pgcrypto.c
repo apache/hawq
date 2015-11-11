@@ -138,11 +138,6 @@ pg_gen_salt(PG_FUNCTION_ARGS)
 	text	   *res;
 	char		buf[PX_MAX_SALT_LEN + 1];
 
-	if (fips_mode)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("gen_salt is insecure in fips mode")));
-
 	arg0 = PG_GETARG_TEXT_P(0);
 
 	len = VARSIZE(arg0) - VARHDRSZ;
@@ -175,11 +170,6 @@ pg_gen_salt_rounds(PG_FUNCTION_ARGS)
 	int			len;
 	text	   *res;
 	char		buf[PX_MAX_SALT_LEN + 1];
-
-	if (fips_mode)
-	 	ereport(ERROR,
-	 			(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-	 			errmsg("gen_salt is insecure in fips mode")));
 
 	arg0 = PG_GETARG_TEXT_P(0);
 	rounds = PG_GETARG_INT32(1);
@@ -219,11 +209,6 @@ pg_crypt(PG_FUNCTION_ARGS)
 			   *cres,
 			   *resbuf;
 	text	   *res;
-
-	if (fips_mode)
-	 	ereport(ERROR,
-	 			(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-	 			errmsg("gen_salt is insecure in fips mode")));
 
 	arg0 = PG_GETARG_TEXT_P(0);
 	arg1 = PG_GETARG_TEXT_P(1);

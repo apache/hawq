@@ -48,18 +48,6 @@ pg_sha256_encrypt(const char *pass, char *salt, size_t salt_len,
 	memcpy(target + passwd_len, salt, salt_len);
 	target[passwd_len + salt_len] = '\0';
 
-	/* 
-	 * Users might require a FIPS compliant implementation. They can specify
-	 * this by setting the password_hash_algorithm  GUC to SHA-256-FIPS.
-	 */
-	if (password_hash_algorithm == PASSWORD_HASH_SHA_256_FIPS && !fips_mode)
-	{
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("FIPS certified SHA-256 is not enabled"),
-				 errhint("Use fips_mode=on setting to enable")));
-	}
-
 	SHA256_Init(&ctx);
 	SHA256_Update(&ctx, (uint8 *)target, passwd_len + salt_len);
 	SHA256_Final(digest, &ctx);

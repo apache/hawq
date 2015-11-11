@@ -213,7 +213,6 @@ static const char *assign_custom_variable_classes(const char *newval, bool doit,
 static const char *assign_explain_memory_verbosity(const char *newval, bool doit, GucSource source);
 static bool assign_debug_assertions(bool newval, bool doit, GucSource source);
 static bool assign_ssl(bool newval, bool doit, GucSource source);
-static bool assign_fips_mode(bool newval, bool doit, GucSource source);
 static bool assign_stage_log_stats(bool newval, bool doit, GucSource source);
 static bool assign_log_stats(bool newval, bool doit, GucSource source);
 static bool assign_dispatch_log_stats(bool newval, bool doit, GucSource source);
@@ -4427,15 +4426,6 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
-		{"fips_mode", PGC_POSTMASTER, CONN_AUTH_SECURITY,
-			gettext_noop("If set, enable OpenSSL FIPS Object Module, restricting allowed algorithms"),
-			NULL
-		},
-		&fips_mode,
-		false, assign_fips_mode, NULL
-	},
-
-	{
 		{"hawq_rm_force_fifo_queuing", PGC_POSTMASTER, RESOURCES_MGM,
 		 gettext_noop("force to execute query in queue in a fifo sequence."),
 		 NULL
@@ -7953,7 +7943,7 @@ static struct config_string ConfigureNamesString[] =
 	{
 		{"password_hash_algorithm", PGC_SUSET, CONN_AUTH_SECURITY,
 			gettext_noop("The cryptograph hash algorithm to apply to passwords before storing them."),
-			gettext_noop("Valid values are MD5, SHA-256 or SHA-256-FIPS (for a FIPS compliant implementation)."),
+			gettext_noop("Valid values are MD5, SHA-256."),
 			GUC_SUPERUSER_ONLY
 		},
 		&password_hash_algorithm_str,
@@ -12826,11 +12816,6 @@ assign_password_hash_algorithm(const char *newval, bool doit, GucSource source)
 		if (doit)
 			password_hash_algorithm = PASSWORD_HASH_SHA_256;
 	}
-	else if (pg_strcasecmp(newval, "SHA-256-FIPS") == 0)
-	{
-		if (doit)
-			password_hash_algorithm = PASSWORD_HASH_SHA_256_FIPS;
-	}
 	else
 		return NULL;
 
@@ -13110,49 +13095,6 @@ assign_ssl(bool newval, bool doit, GucSource source)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("SSL is not supported by this build")));
-#endif
-	return true;
-}
-
-static bool
-assign_fips_mode(bool newval, bool doit, GucSource source)
-{
-#ifndef USE_SSL
-	if (newval)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("SSL is not supported by this build")));
-#else
-	/*
-	 * Put OpenSSL into FIPS mode. fips_mode is PGC_USERSET, but once entered,
-	 * there is actually no way of taking OpenSSL out of FIPS mode. So turning
-	 * it off doesn't do much. It does affect the allowed algorithms in
-	 * pgcrypto though.
-	 */
-	if (newval && doit)
-	{
-		if (!FIPS_mode_set(1))
-		{
-			unsigned long ssl_err = ERR_get_error();
-
-			/*
-			 * Give a more specific error message for the common case that
-			 * we're not linked with a FIPS-certified version of OpenSSL.
-			 */
-#ifdef CRYPTO_R_FIPS_MODE_NOT_SUPPORTED
-			if (ERR_GET_REASON(ssl_err) == CRYPTO_R_FIPS_MODE_NOT_SUPPORTED)
-				ereport(ERROR,
-						(errcode(ERRCODE_EXTERNAL_ROUTINE_INVOCATION_EXCEPTION),
-						 errmsg("FIPS mode is not supported by this version of OpenSSL")));
-			else
-#endif
-				ereport(ERROR,
-						(errcode(ERRCODE_EXTERNAL_ROUTINE_INVOCATION_EXCEPTION),
-						 errmsg("OpenSSL FIPS mode initialization failed"),
-						 errdetail("OpenSSL returned error %lx: %s",
-								   ssl_err, ERR_error_string(ssl_err, NULL))));
-		}
-	}
 #endif
 	return true;
 }
