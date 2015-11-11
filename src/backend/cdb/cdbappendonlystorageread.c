@@ -718,7 +718,7 @@ AppendOnlyStorageRead_PositionToNextBlock(
 	else
 		*blockLimitLen = storageRead->maxBufferLen;
 
-	return true;
+	return (*blockLimitLen > 0);
 }
 
 
