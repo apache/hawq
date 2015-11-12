@@ -2704,7 +2704,7 @@ add_partition_by_footer(const char* oid, PQExpBufferData *inoutbuf, PQExpBufferD
 
 	PQclear(result);
 
-	if(nRows)
+	if (nRows)
 	{
 		/* query partition key on the root partition */
 		printfPQExpBuffer(buf,
@@ -2748,7 +2748,10 @@ add_partition_by_footer(const char* oid, PQExpBufferData *inoutbuf, PQExpBufferD
 			partColName = PQgetvalue(result, i, 0);
 
 			if (!partColName)
+			{
+				resetPQExpBuffer(inoutbuf);
 				return 1;
+			}
 			appendPQExpBuffer(inoutbuf, "%s", partColName);
 		}
 		appendPQExpBuffer(inoutbuf, ")");
