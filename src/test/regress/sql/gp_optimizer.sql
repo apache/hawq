@@ -713,5 +713,68 @@ from cust c, sales s, datedim d
 where c.cid = s.cid and s.date_sk = d.date_sk and
       ((d.year = 2001 and lower(s.type) = 't1' and plusone(d.moy) = 5) or (d.moy = 4 and upper(s.type) = 'T2'));
 reset optimizer_segments;
+
+--
+-- apply parallelization for subplan MPP-24563
+--
+create table t1_mpp_24563 (id int, value int) distributed by (id);
+insert into t1_mpp_24563 values (1, 3);
+
+create table t2_mpp_24563 (id int, value int, seq int) distributed by (id);
+insert into t2_mpp_24563 values (1, 7, 5);
+
+set optimizer = off;
+select row_number() over (order by seq asc) as id, foo.cnt
+from
+(select seq, (select count(*) from t1_mpp_24563 t1 where t1.id = t2.id) cnt from
+	t2_mpp_24563 t2 where value = 7) foo;
+
+set optimizer = on;
+select row_number() over (order by seq asc) as id, foo.cnt
+from
+(select seq, (select count(*) from t1_mpp_24563 t1 where t1.id = t2.id) cnt from
+	t2_mpp_24563 t2 where value = 7) foo;
+
+drop table t1_mpp_24563;
+drop table t2_mpp_24563;
+
+--
+-- MPP-20470 update the flow of node after parallelizing subplan.
+--
+CREATE TABLE t_mpp_20470 (
+    col_date timestamp without time zone,
+    col_name character varying(6),
+    col_expiry date
+) DISTRIBUTED BY (col_date) PARTITION BY RANGE(col_date)
+(
+START ('2013-05-10 00:00:00'::timestamp without time zone) END ('2013-05-11
+	00:00:00'::timestamp without time zone) WITH (tablename='t_mpp_20470_ptr1'),
+START ('2013-05-24 00:00:00'::timestamp without time zone) END ('2013-05-25
+	00:00:00'::timestamp without time zone) WITH (tablename='t_mpp_20470_ptr2')
+);
+
+COPY t_mpp_20470 from STDIN delimiter '|' null '';
+2013-05-10 00:00:00|OPTCUR|2013-05-29
+2013-05-10 04:35:20|OPTCUR|2013-05-29
+2013-05-24 03:10:30|FUTCUR|2014-04-28
+2013-05-24 05:32:34|OPTCUR|2013-05-29
+\.
+
+create view v1_mpp_20470 as
+SELECT
+CASE
+	WHEN  b.col_name::text = 'FUTCUR'::text
+	THEN  ( SELECT count(a.col_expiry) AS count FROM t_mpp_20470 a WHERE
+		a.col_name::text = b.col_name::text)::text
+	ELSE 'Q2'::text END  AS  cc,  1 AS nn
+FROM t_mpp_20470 b;
+
+set optimizer = off;
+SELECT  cc, sum(nn) over() FROM v1_mpp_20470;
+set optimizer = on;
+SELECT  cc, sum(nn) over() FROM v1_mpp_20470;
+
+drop view v1_mpp_20470;
+drop table t_mpp_20470;
 -- clean up
 drop schema orca cascade;

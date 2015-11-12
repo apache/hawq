@@ -61,7 +61,6 @@ typedef struct reduce_outer_joins_state
 
 static void pull_up_fromlist_subqueries(PlannerInfo    *root,
                                         List          **inout_fromlist,
-                                        Node          **inout_quals,
 				                        bool            below_outer_join);
 static Node *pull_up_simple_subquery(PlannerInfo *root, Node *jtnode,
 						RangeTblEntry *rte,
@@ -174,8 +173,7 @@ pull_up_subqueries(PlannerInfo *root, Node *jtnode,
 		FromExpr   *f = (FromExpr *) jtnode;
 
 		Assert(!append_rel_member);
-        pull_up_fromlist_subqueries(root, &f->fromlist, &f->quals,
-                                    below_outer_join);
+        pull_up_fromlist_subqueries(root, &f->fromlist, below_outer_join);
 	}
 	else if (IsA(jtnode, JoinExpr))
 	{
@@ -226,7 +224,7 @@ pull_up_subqueries(PlannerInfo *root, Node *jtnode,
          * side of the JOIN (right side of LEFT JOIN).
          */
         if (j->subqfromlist)
-            pull_up_fromlist_subqueries(root, &j->subqfromlist, &j->quals,
+            pull_up_fromlist_subqueries(root, &j->subqfromlist,
                                         below_outer_join || (j->jointype != JOIN_INNER));
 	}
 	else
@@ -243,7 +241,6 @@ pull_up_subqueries(PlannerInfo *root, Node *jtnode,
 static void
 pull_up_fromlist_subqueries(PlannerInfo    *root,
                             List          **inout_fromlist,
-                            Node          **inout_quals,
 				            bool            below_outer_join)
 {
     ListCell   *l;
@@ -254,30 +251,7 @@ pull_up_fromlist_subqueries(PlannerInfo    *root,
         Node   *newkid = pull_up_subqueries(root, oldkid,
 											below_outer_join, false);
 
-        /* CDB: Collapse subquery FROM list into current FROM list,
-         * so correlated refs from subquery will be in the right scope.
-         * Otherwise deconstruct_jointree() complains about them.
-         */
-        if (IsA(oldkid, RangeTblRef) &&
-            IsA(newkid, FromExpr))
-        {
-            FromExpr   *fkid = (FromExpr *)newkid;
-            ListCell   *lkid;
-
-            /* Replace RangeTblRef with subquery FROM list. */
-            foreach(lkid, fkid->fromlist)
-            {
-                if (lfirst(l) == oldkid)
-                    lfirst(l) = lfirst(lkid);
-                else
-                    l = lappend_cell(*inout_fromlist, l, lfirst(lkid));
-            }
-
-            /* Conjoin subquery WHERE clause with current search condition. */
-            *inout_quals = make_and_qual(*inout_quals, fkid->quals);
-        }
-        else
-            lfirst(l) = newkid;
+        lfirst(l) = newkid;
     }
 }                               /* pull_up_fromlist_subqueries */
 
@@ -487,6 +461,18 @@ pull_up_simple_subquery(PlannerInfo *root, Node *jtnode, RangeTblEntry *rte,
 				ResolveNew((Node *) otherrte->joinaliasvars,
 						   varno, 0, rte,
 						   subtlist, CMD_SELECT, 0);
+
+		else if (otherrte->rtekind == RTE_SUBQUERY && rte != otherrte)
+		{
+			otherrte->subquery = (Query *)
+				ResolveNew((Node *) otherrte->subquery,
+							varno, 1, rte, /* here the sublevels_up can only be 1, because if larger than 1,
+											  then the sublink is multilevel correlated, and cannot be pulled
+											  up to be a subquery range table; while on the other hand, we
+											  cannot directly put a subquery which refer to other relations
+											  of the same level after FROM. */
+							subtlist, CMD_SELECT, 0);
+		}
 	}
 
 	/*
@@ -633,17 +619,6 @@ is_simple_subquery(PlannerInfo *root, Query *subquery)
 	if (contain_volatile_functions((Node *) subquery->targetList))
 		return false;
 
-	/*
-	 * Don't pull up a subquery that coerces values to a different domain, since
-	 * those may be used incorrectly before they are coerced by operators in 
-	 * the tree above
-	 */
-	List *corce_to_domain_list = extract_nodes(root->glob, (Node *) subquery, T_CoerceToDomain);
-	if (NIL != corce_to_domain_list)
-	{
-		return false;
-	}
-	
 	/*
 	 * Hack: don't try to pull up a subquery with an empty jointree.
 	 * query_planner() will correctly generate a Result plan for a jointree

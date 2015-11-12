@@ -246,7 +246,8 @@ extern void distribute_qual_to_rels(PlannerInfo *root, Node *clause,
 						Relids qualscope,
 						Relids ojscope,
 						Relids outerjoin_nonnullable,
-						List **ptrToLocalEquiKeyList);
+						List **ptrToLocalEquiKeyList,
+						List **postponed_qual_list);
 
 
 /*
