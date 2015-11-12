@@ -51,7 +51,7 @@ Libraries that can be installed through yum.
         libyaml-devel       0.1.1
         flex-devel          2.5.35
 ## Build
-After installed the libraries listed above, get source code:
+After the libraries list above are installed, get source code:
 
         git clone https://github.com/apache/incubator-hawq.git
 The code directory is CODEHOME/incubator-hawq. Then cd CODEHOME/incubator-hawq and build Apache HAWQ under this directory.
