@@ -2528,6 +2528,7 @@ cdb_insert_result_node(PlannerGlobal *glob, Plan *plan, int rtoffset)
 	
     /* Reattach the Flow node. */
     resultplan->flow = flow;
+    plan->flow = flow;
 	
     return resultplan;
 }                               /* cdb_insert_result_node */

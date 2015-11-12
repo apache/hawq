@@ -329,7 +329,6 @@ typedef struct ParallelizeCorrelatedPlanWalkerContext
 	Movement movement; /* What is the final movement necessary? Is it gather or broadcast */
 	List *rtable; /* rtable from the global context */
 	bool subPlanDistributed; /* is original subplan distributed */
-	bool subPlanHasMotion;/* is original subplan has motion already  */
 } ParallelizeCorrelatedPlanWalkerContext;
 
 /**
@@ -416,12 +415,20 @@ Plan *materialize_subplan(PlannerInfo *root, Plan *subplan)
 	return mat;
 }
 
+/* *
+ * Not listing every node type here, if further bug found due to not updating flow
+ * after cdbparallelize, just simply add that node type here.
+ * */
 static Node *ParallelizeCorrelatedSubPlanUpdateFlowMutator(Node *node)
 {
 	Assert(is_plan_node(node));
 	switch (nodeTag(node))
 	{
 		case T_Agg:
+		case T_Window:
+		case T_Sort:
+		case T_Material:
+		case T_Limit:
 		case T_Result:
 		{
 			if(((Plan *)node)->lefttree && ((Plan *)node)->lefttree->flow)
@@ -501,11 +508,8 @@ static Node* ParallelizeCorrelatedSubPlanMutator(Node *node, ParallelizeCorrelat
 		 * unnest(array[typoutput, typsend]) from pg_type) then 'upg_catalog.'
 		 * else 'pg_catalog.' end) FROM pg_proc p;
 		 **/
-		if(!ctx->subPlanHasMotion)
-		{
-			if(!scanPlan->flow || scanPlan->flow->flotype == FLOW_REPLICATED)
-				return (Node *)node;
-		}
+		if(scanPlan->flow && (scanPlan->flow->locustype == CdbLocusType_Entry))
+			return (Node *)node;
 
 		/**
 		 * Steps:
@@ -663,7 +667,6 @@ static Node* ParallelizeCorrelatedSubPlanMutator(Node *node, ParallelizeCorrelat
 	 */
 	if (IsA(node, Motion))
 	{
-		ctx->subPlanHasMotion = true;
 		Plan *plan = (Plan *) node;
 		node = (Node *) plan->lefttree;
 		Assert(node);
@@ -671,6 +674,9 @@ static Node* ParallelizeCorrelatedSubPlanMutator(Node *node, ParallelizeCorrelat
 	}
 
 	Node * result = plan_tree_mutator(node, ParallelizeCorrelatedSubPlanMutator, ctx);
+	/* *
+	 * Update the flow of the current plan node.
+	 * */
 	if(is_plan_node(node))
 		return ParallelizeCorrelatedSubPlanUpdateFlowMutator(result);
 	return result;
@@ -685,7 +691,6 @@ Plan* ParallelizeCorrelatedSubPlan(PlannerInfo *root, SubPlan *spExpr, Plan *pla
 	ctx.base.node = (Node *) root;
 	ctx.movement = m;
 	ctx.subPlanDistributed = subPlanDistributed;
-	ctx.subPlanHasMotion = false;
 	ctx.sp = spExpr;
 	ctx.rtable = root->glob->finalrtable;
 	return (Plan *) ParallelizeCorrelatedSubPlanMutator((Node *) plan, &ctx);
