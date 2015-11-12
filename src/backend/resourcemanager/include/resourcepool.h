@@ -651,6 +651,10 @@ void add_segment_config_row(int32_t 	 id,
 
 #define SEGMENT_STATUS_UP   	'u'
 #define SEGMENT_STATUS_DOWN 	'd'
+
+#define VALIDATE_RATIO_BIAS 	0.005
+#define VALIDATE_RESOURCE_BIAS	0.0001
+
 void validateResourcePoolStatus(bool refquemgr);
 
 /*

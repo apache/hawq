@@ -3085,8 +3085,10 @@ void dispatchResourceToQueries(void)
 						 track->TotalAllocated.Core,
 						 track->QueueInfo->Name);
 
-			Assert( track->TotalAllocated.MemoryMB >= track->TotalUsed.MemoryMB &&
-					track->TotalAllocated.Core     >= track->TotalUsed.Core) ;
+			double evalcore = track->TotalAllocated.Core == 0 ?
+							  VALIDATE_RESOURCE_BIAS :
+							  track->TotalAllocated.Core * (1+VALIDATE_RESOURCE_BIAS);
+			Assert(evalcore >= track->TotalUsed.Core);
 		DQUEUE_LOOP_END
 
 		/*

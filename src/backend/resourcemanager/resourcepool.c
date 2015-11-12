@@ -3342,12 +3342,14 @@ void validateResourcePoolStatus(bool refquemgr)
 			}
 
 			/* Validation 2. The ratio should be correct. */
+			double r1 = alloccore == 0 ? 0 : allocmem/alloccore;
+			double r2 = availcore == 0 ? 0 : availmem/availcore;
 			if ( (allocmem == 0 && alloccore != 0) ||
 				 (allocmem != 0 && alloccore == 0) ||
 				 (availmem == 0 && availcore != 0) ||
 				 (availmem != 0 && availcore == 0) ||
 				 (alloccore != 0 && availcore != 0 &&
-				  trunc(allocmem/alloccore) != trunc(availmem/availcore)))
+				  2 * fabs(r1-r2) / (r1 + r2) > VALIDATE_RATIO_BIAS) )
 			{
 				elog(ERROR, "HAWQ RM Validation. Wrong resource counter ratio. "
 							"Host %s. "
@@ -3433,7 +3435,8 @@ void validateResourcePoolStatus(bool refquemgr)
 						PQUEMGR->RatioTrackers[0]->TotalAllocated.Core);
 		}
 
-		if ( totalavailmem > totalallocmem || totalavailcore > totalalloccore )
+		if ( totalavailmem > totalallocmem ||
+			 totalavailcore > totalalloccore * (1+VALIDATE_RESOURCE_BIAS) )
 		{
 				elog(ERROR, "HAWQ RM Validation. Wrong total allocated resource. "
 							"In resource pool available (%d MB, %lf CORE), "
