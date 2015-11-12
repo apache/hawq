@@ -1,0 +1,361 @@
+Apache HAWQ (incubating) 
+Copyright 2015 The Apache Software Foundation.
+
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
+
+The following is a listing of the open source components detailed in
+this document. This list is provided for your convenience; please read
+further if you wish to review the copyright notice(s) and the full text
+of the license associated with each component.
+
+SECTION 1: Apache License, V2.0
+
+   >>> Hadoop
+   >>> HBase
+   >>> Tomcat
+   >>> Commons Codec
+   >>> Commons Collections
+   >>> Commons Configuration
+   >>> Commons Lang
+   >>> Commons Logging
+   >>> Avro
+   >>> log4j
+   >>> gradle
+   >>> gradle-download-task
+   >>> Jackson JSON processor databind
+   >>> Powermock
+   >>> Parquet
+
+SECTION 2: CDDL 1.1
+   >>> Jersey
+
+SECTION 3: Eclipse Public License - v 1.0
+   >>> JUnit
+
+SECTION 4: BSD
+   >>> Protocol Buffers
+
+SECTION 5: MIT
+   >>> Mockito
+
+-------- SECTION 1: Apache License, V2.0 Detailed List to include for NOTICE --------
+
+>>> Hadoop
+This product includes software developed by The Apache Software
+Foundation (http://www.apache.org/).
+
+>>> HBase
+Apache HBase
+Copyright 2007-2015 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
+
+--
+This product incorporates portions of the 'Hadoop' project
+
+Copyright 2007-2009 The Apache Software Foundation
+
+Licensed under the Apache License v2.0
+--
+Our Orca logo we got here: http://www.vectorfree.com/jumping-orca
+It is licensed Creative Commons Attribution 3.0.
+See https://creativecommons.org/licenses/by/3.0/us/
+We changed the logo by stripping the colored background, inverting
+it and then rotating it some.
+
+Later we found that vectorfree.com image is not properly licensed.
+The original is owned by vectorportal.com. The original was
+relicensed so we could use it as Creative Commons Attribution 3.0.
+The license is bundled with the download available here:
+http://www.vectorportal.com/subcategory/205/KILLER-WHALE-FREE-VECTOR.eps/ifile/9136/detailtest.asp
+--
+This product includes portions of the Bootstrap project v3.0.0
+
+Copyright 2013 Twitter, Inc.
+
+Licensed under the Apache License v2.0
+
+This product uses the Glyphicons Halflings icon set.
+
+http://glyphicons.com/
+
+Copyright Jan Kovařík
+
+Licensed under the Apache License v2.0 as a part of the Bootstrap project.
+
+--
+This product includes portions of the Guava project v14, specifically
+'hbase-common/src/main/java/org/apache/hadoop/hbase/io/LimitInputStream.java'
+
+Copyright (C) 2007 The Guava Authors
+
+Licensed under the Apache License, Version 2.0
+
+>>> Tomcat
+Apache Tomcat
+Copyright 1999-2015 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
+
+This software contains code derived from netty-native
+developed by the Netty project
+(http://netty.io, https://github.com/netty/netty-tcnative/)
+and from finagle-native developed at Twitter
+(https://github.com/twitter/finagle).
+
+The Windows Installer is built with the Nullsoft
+Scriptable Install System (NSIS), which is
+open source software.  The original software and
+related information is available at
+http://nsis.sourceforge.net.
+
+Java compilation software for JSP pages is provided by the Eclipse
+JDT Core Batch Compiler component, which is open source software.
+The original software and related information is available at
+http://www.eclipse.org/jdt/core/.
+
+For portions of the Tomcat JNI OpenSSL API and the OpenSSL JSSE integration
+The org.apache.tomcat.jni and the org.apache.tomcat.net.openssl packages
+are derivative work originating from the Netty project and the finagle-native
+project developed at Twitter
+* Copyright 2014 The Netty Project
+* Copyright 2014 Twitter
+
+The original XML Schemas for Java EE Deployment Descriptors:
+ - javaee_5.xsd
+ - javaee_web_services_1_2.xsd
+ - javaee_web_services_client_1_2.xsd
+ - javaee_6.xsd
+ - javaee_web_services_1_3.xsd
+ - javaee_web_services_client_1_3.xsd
+ - jsp_2_2.xsd
+ - web-app_3_0.xsd
+ - web-common_3_0.xsd
+ - web-fragment_3_0.xsd
+ - javaee_7.xsd
+ - javaee_web_services_1_4.xsd
+ - javaee_web_services_client_1_4.xsd
+ - jsp_2_3.xsd
+ - web-app_3_1.xsd
+ - web-common_3_1.xsd
+ - web-fragment_3_1.xsd
+
+may be obtained from:
+http://www.oracle.com/webfolder/technetwork/jsc/xml/ns/javaee/index.html
+
+>>> Commons Codec
+Apache Commons Codec
+Copyright 2002-2015 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
+
+src/test/org/apache/commons/codec/language/DoubleMetaphoneTest.java
+contains test data from http://aspell.net/test/orig/batch0.tab.
+Copyright (C) 2002 Kevin Atkinson (kevina@gnu.org)
+
+===============================================================================
+
+The content of package org.apache.commons.codec.language.bm has been translated
+from the original php source code available at http://stevemorse.org/phoneticinfo.htm
+with permission from the original authors.
+Original source copyright:
+Copyright (c) 2008 Alexander Beider & Stephen P. Morse.
+
+>>> Commons Collections
+Apache Commons Collections
+Copyright 2001-2015 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
+
+>>> Commons Configuration
+Apache Commons Configuration
+Copyright 2001-2015 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
+
+>>> Commons Lang
+Apache Commons Lang
+Copyright 2001-2015 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
+
+This product includes software from the Spring Framework,
+under the Apache License 2.0 (see: StringUtils.containsWhitespace())
+
+>>> Commons Logging
+Apache Commons Logging
+Copyright 2003-2014 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
+
+>>> Avro
+Apache Avro
+Copyright 2010 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
+
+C JSON parsing provided by Jansson and
+written by Petri Lehtinen. The original software is
+available from http://www.digip.org/jansson/.
+
+>>> log4j
+Apache log4j
+Copyright 2010 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
+
+>>> gradle
+Copyright 2007-2011 the original author or authors
+
+Licensed under the Apache License, Version 2.0 (the “License”);
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an “AS IS” BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+>>> gradle-download-task
+The plugin is licensed under the Apache License, Version 2.0.
+
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+
+>>> Jackson JSON processor databind
+This copy of Jackson JSON processor databind module is licensed under the
+Apache (Software) License, version 2.0 ("the License").
+See the License for details about distribution rights, and the
+specific rights regarding derivate works.
+
+You may obtain a copy of the License at:
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+>>> Powermock
+You may obtain a copy of the License at:
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+>>> Parquet
+Copyright 2014 Apache Software Foundation
+Licensed under the Apache License v2.0
+
+http://parquet.apache.org
+
+-------- SECTION 2 CDDL v1.1 Detailed List to include for NOTICE --------
+>>> Jersey
+Copyright (C) 1989, 1991 Free Software Foundation, Inc.
+51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
+
+Everyone is permitted to copy and distribute verbatim copies
+of this license document, but changing it is not allowed.
+
+Classpath Exception to the GPL
+Certain source files distributed by Oracle America and/or its affiliates are subject to the following clarification and special exception to the GPL, but only where Oracle has expressly included in the particular source file’s header the words “Oracle designates this particular file as subject to the ”Classpath“ exception as provided by Oracle in the LICENSE file that accompanied this code.”
+
+	Linking this library statically or dynamically with other modules is making a combined work based on this library. Thus, the terms and conditions of the GNU General Public License cover the whole combination.
+	As a special exception, the copyright holders of this library
+	give you permission to link this library with independent modules
+	to produce an executable, regardless of the license terms of these
+	independent modules, and to copy and distribute the resulting
+	executable under terms of your choice, provided that you also meet,
+	for each linked independent module, the terms and conditions of the
+	license of that module.  An independent module is a module which is
+	not derived from or based on this library.  If you modify this
+	library, you may extend this exception to your version of the
+	library, but you are not obligated to do so.  If you do not wish to
+	do so, delete this exception statement from your version.
+
+
+-------- SECTION 3 Eclipse Public License - v 1.0 Detailed List to include for NOTICE --------
+ 
+ >>> JUnit
+   ===================================================================================
+   ==  Notices and attributions required by libraries that the project depends on   ==
+   ===================================================================================
+
+ The JUnit depends on Java Hamcrest (http://hamcrest.org/JavaHamcrest/).
+
+-------- SECTION 4 Google License Detailed List to include for NOTICE --------
+>>> protocol buffers
+
+This license applies to all parts of Protocol Buffers except the following:
+
+  - Atomicops support for generic gcc, located in
+    src/google/protobuf/stubs/atomicops_internals_generic_gcc.h.
+    This file is copyrighted by Red Hat Inc.
+
+  - Atomicops support for AIX/POWER, located in
+    src/google/protobuf/stubs/atomicops_internals_aix.h.
+    This file is copyrighted by Bloomberg Finance LP.
+
+Copyright 2014, Google Inc.  All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+    * Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above
+copyright notice, this list of conditions and the following disclaimer
+in the documentation and/or other materials provided with the
+distribution.
+    * Neither the name of Google Inc. nor the names of its
+contributors may be used to endorse or promote products derived from
+this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Code generated by the Protocol Buffer compiler is owned by the owner
+of the input file used when generating it.  This code is not
+standalone and requires a support library to be linked with it.  This
+support library is itself covered by the above license.
+
+
+-------- SECTION 5 MIT License Detailed List to include for NOTICE --------
+>>> Mockito
+The MIT License
+
+Copyright (c) 2007 Mockito contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
