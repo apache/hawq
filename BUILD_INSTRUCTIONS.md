@@ -1,4 +1,4 @@
-Build Instructions for Apache HAWQ
+# Build Instructions for Apache HAWQ
 ------
 
 ## Requirement
@@ -6,13 +6,11 @@ Build Instructions for Apache HAWQ
 
         Linux (tested on redhat 6.x).
 ### Compiler & Dependencies
-To build Apache HAWQ, gcc and some dependencies are needed. The libraries are tested on the version given. Most of the dependencies could be installed through yum. Other dependencies should be installed through the source tarball.
+To build Apache HAWQ, gcc and some dependencies are needed. The libraries are tested on the given versions. Most of the dependencies can be installed through yum. Other dependencies must be installed through the source tarball.Typically you can use "./configure && make && make install" to install from source tarball.
 
-Libraries should be installed using source tarball.
+Libraries that must be installed using source tarball.
 
         name        version     url
-        GCC         4.4.7       https://gcc.gnu.org/
-        GNU make    3.81        http://ftp.gnu.org/gnu/make/
         json-c      0.9         http://oss.metaparadigm.com/json-c/json-c-0.9.tar.gz
         boost       1.56        http://sourceforge.net/projects/boost/files/boost/1.56.0/boost_1_56_0.tar.bz2
         thrift      0.9.1-1     http://archive.apache.org/dist/thrift/0.9.1/thrift-0.9.1.tar.gz
@@ -20,9 +18,22 @@ Libraries should be installed using source tarball.
         curl        7.44.0      http://www.curl.haxx.se/download/curl-7.44.0.tar.gz
         libhdfs3    Github      https://github.com/PivotalRD/libhdfs3.git
         libyarn                 Code shipped with Apache HAWQ (under incubator-hawq/depends/)
-Libraries could be installed through yum. 
+                                Steps:
+                                    cd depends/libyarn/
+                                    mkdir build
+                                    cd build
+                                    ../bootstrap --prefix=/usr/local/
+                                    make
+                                    sudo make install
+
+
+Libraries that can be installed through yum. 
 
         name                version
+        epel-release        6-8
+        make                3.81
+        gcc                 4.4.7
+        gcc-c++             4.4.7
         gperf               3.0.4
         snappy-devel        1.1.3
         bzip2-devel         1.0.6
@@ -40,7 +51,7 @@ Libraries could be installed through yum.
         libyaml-devel       0.1.1
         flex-devel          2.5.35
 ## Build
-After installed the libraries listed above, get code with command:
+After installed the libraries listed above, get source code:
 
         git clone https://github.com/apache/incubator-hawq.git
 The code directory is CODEHOME/incubator-hawq. Then cd CODEHOME/incubator-hawq and build Apache HAWQ under this directory.
@@ -48,7 +59,7 @@ The code directory is CODEHOME/incubator-hawq. Then cd CODEHOME/incubator-hawq a
 Run command to generate makefile.
 
         ./configure
-Or you could use --prefix=/hawq/install/path to change the Apache HAWQ install path.
+Or you can use --prefix=/hawq/install/path to change the Apache HAWQ install path.
 
         ./configure --prefix=/hawq/install/path
 Run the command below for more configuration.
@@ -61,19 +72,23 @@ To build concurrently, run make with -j option.
 
         make -j8
 ## Install
-To install Apache HAWQ, run command
+To install HAWQ, run command
 
         make install
+## Install YARN (Optional)
+If you want to integrate with YARN for resource management, you need to install YARN first.
 ## Test
 ### Unit Test ###
-To do unit test, go to the src/backend and run unittest check.
+To do unit test, go to the src/backend and run unittest.
 
         cd src/backend
         make unittest-check
-### Install Check ###
-After installed Apache HAWQ , ensure HDFS work before init Apache HAWQ.Then init Apache HAWQ.To do install check, run the command below under incubator-hawq.
+### Installcheck-good Test ###
+After installing HAWQ , please ensure HDFS work before initializing HAWQ.
 
+        source /install/dir/greenplum_path.sh
         hawq init cluster
         make installcheck-good
+
 ## Wiki
 https://cwiki.apache.org/confluence/display/HAWQ/Apache+HAWQ+Home
