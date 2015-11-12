@@ -96,7 +96,7 @@ size_t header_callback(char *buffer, size_t size, size_t nitems, void *userp);
 void free_http_response(churl_context* context);
 void compact_internal_buffer(churl_buffer* buffer);
 void realloc_internal_buffer(churl_buffer* buffer, size_t required);
-bool handle_special_error(long response);
+bool handle_special_error(long response, StringInfo err);
 char* get_http_error_msg(long http_ret_code, char* msg, char* curl_error_buffer);
 char* build_header_str(const char* format, const char* key, const char* value);
 void print_http_headers(CHURL_HEADERS headers);
@@ -815,42 +815,49 @@ void check_response_code(churl_context* context)
 	}
 	else if (response_code != 200 && response_code != 100)
 	{
-		if (!handle_special_error(response_code))
+		StringInfoData err;
+		char    *http_error_msg;
+		char    *addr;
+
+		initStringInfo(&err);
+
+		/* prepare response text if any */
+		if (context->download_buffer->ptr)
 		{
-			StringInfoData err;
-			char    *http_error_msg;
-			char    *addr;
+			context->download_buffer->ptr[context->download_buffer->top] = '\0';
+			response_text = context->download_buffer->ptr + context->download_buffer->bot;
+		}
 
-			initStringInfo(&err);
+		/* add remote http error code */
+		appendStringInfo(&err, "remote component error (%ld)", response_code);
 
-			/* prepare response text if any */
-			if (context->download_buffer->ptr)
-			{
-				context->download_buffer->ptr[context->download_buffer->top] = '\0';
-				response_text = context->download_buffer->ptr + context->download_buffer->bot;
-			}
+		addr = get_dest_address(context->curl_handle);
+		if (strlen(addr) != 0)
+		{
+			appendStringInfo(&err, " from %s", addr);
+		}
+		pfree(addr);
 
-			/* add remote http error code */
-			appendStringInfo(&err, "remote component error (%ld)", response_code);
-
-			addr = get_dest_address(context->curl_handle);
-			if (strlen(addr) != 0)
-				appendStringInfo(&err, " from %s", addr);
-			pfree(addr);
-
+		if (!handle_special_error(response_code, &err))
+		{
 			/*
 			 * add detailed error message from the http response. response_text
 			 * could be NULL in some cases. get_http_error_msg checks for that.
 			 */
 			http_error_msg = get_http_error_msg(response_code, response_text, context->curl_error_buffer);
 			/* check for a specific confusing error, and replace with a clearer one */
-			if(strstr(http_error_msg, "instance does not contain any root resource classes") != NULL)
+			if (strstr(http_error_msg, "instance does not contain any root resource classes") != NULL)
+			{
 				appendStringInfo(&err, " : PXF not correctly installed in CLASSPATH");
+			}
 			else
+			{
 				appendStringInfo(&err, ": %s", http_error_msg);
-
-			elog(ERROR, "%s", err.data);
+			}
 		}
+
+		elog(ERROR, "%s", err.data);
+
 	}
 
 	free_http_response(context);
@@ -1050,12 +1057,12 @@ void realloc_internal_buffer(churl_buffer* buffer, size_t required)
 	buffer->max = n;
 }
 
-bool handle_special_error(long response)
+bool handle_special_error(long response, StringInfo err)
 {
 	switch (response)
 	{
 		case 404:
-			elog(ERROR, "GPHD component not found");
+			appendStringInfo(err, ": PXF service could not be reached. PXF is not running in the tomcat container");
 			break;
 		default:
 			return false;
