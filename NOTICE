@@ -25,6 +25,7 @@ SECTION 1: Apache License, V2.0
    >>> gradle-download-task
    >>> Jackson JSON processor databind
    >>> Powermock
+   >>> Parquet
 
 SECTION 2: CDDL 1.1
    >>> Jersey
@@ -247,6 +248,12 @@ http://www.apache.org/licenses/LICENSE-2.0
 You may obtain a copy of the License at:
 
 http://www.apache.org/licenses/LICENSE-2.0
+
+>>> Parquet
+Copyright 2014 Apache Software Foundation
+Licensed under the Apache License v2.0
+
+http://parquet.apache.org
 
 -------- SECTION 2 CDDL v1.1 Detailed List to include for NOTICE --------
 >>> Jersey
