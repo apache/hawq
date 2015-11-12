@@ -20,7 +20,6 @@
 #include "utils/network_utils.h"
 #include "utils/memutilities.h"
 #include "miscadmin.h"
-#include "sigar.h"
 
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -206,54 +205,6 @@ int getLocalHostAllIPAddresses(DQueue addresslist)
 int getLocalHostAllIPAddressesAsStrings(DQueue addresslist)
 {
 	int		 res	   = FUNC_RETURN_OK;
-#ifdef GETIFADDRS_USING_SIGAR
-	/* This is a sigar version implementation to get all netcards' ip addresses. */
-	sigar_t 					*sighandle = NULL;
-	int		 					 sigres	   = 0;
-	sigar_net_interface_list_t 	 iflist;
-	sigar_net_interface_config_t ifconf;
-
-	sigar_open(&sighandle);
-
-	/* Get all netcards. */
-	sigres = sigar_net_interface_list_get(sighandle, &iflist);
-	if ( sigres != SIGAR_OK ) {
-		res = UTIL_NETWORK_FAIL_GET_NETCARD_CONFIG;
-		goto exit;
-	}
-	/* For each netcard, get address. */
-	for (int i = 0 ; i < iflist.number ; ++i ) {
-
-		elog(RMLOG, "interface name %s", iflist.data[i]);
-
-		sigres = sigar_net_interface_config_get(sighandle,
-												iflist.data[i],
-											    &ifconf);
-		if ( sigres != SIGAR_OK ) {
-			res = UTIL_NETWORK_FAIL_GET_NETCARD_CONFIG;
-			goto clean;
-		}
-
-		/* NOTE: We currently recognize only ipv4 addresses. */
-		if ( ifconf.address.family == SIGAR_AF_INET ) {
-			HostAddress newaddr = NULL;
-
-			newaddr = createHostAddressAsStringFromIPV4Address(
-							addresslist->Context,
-							(uint32_t)(ifconf.address.addr.in));
-
-			insertDQueueTailNode(addresslist, newaddr);
-		}
-	}
-
-clean:
-	sigar_net_interface_list_destroy(sighandle, &iflist);
-
-exit:
-	sigar_close(sighandle);
-
-#endif /* GETIFADDRS_USING_SIGAR */
-
 	struct ifaddrs *ifaddr, *ifa;
 	int family, s, n;
 	char host[NI_MAXHOST];
