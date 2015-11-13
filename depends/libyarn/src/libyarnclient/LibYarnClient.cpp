@@ -42,7 +42,7 @@ LibYarnClient::LibYarnClient(string &user, string &rmHost, string &rmPort,
 		amUser(user), schedHost(schedHost), schedPort(schedPort), amHost(amHost),
 		amPort(amPort), am_tracking_url(am_tracking_url),
 		heartbeatInterval(heartbeatInterval),clientJobId(""),response_id(0),
-		keepRun(true){
+		keepRun(false){
         pthread_mutex_init( &(heartbeatLock), NULL );
 
 		amrmClient = NULL;
@@ -66,6 +66,21 @@ LibYarnClient::LibYarnClient(string &rmHost, string &rmPort, string &schedHost,
 #endif
 
 LibYarnClient::~LibYarnClient() {
+#ifndef MOCKTEST
+	if ( keepRun ) {
+		// No need to run heart-beat thread now.
+		keepRun = false;
+		void *thrc = NULL;
+		int rc = pthread_join(heartbeatThread, &thrc);
+		if ( rc != 0 ) {
+			LOG(INFO, "LibYarnClient::~LibYarnClient, fail to join heart-beat thread. "
+						"error code %d", rc);
+		}
+		else {
+			LOG(INFO, "LibYarnClient::~LibYarnClient, join heart-beat thread successfully.");
+		}
+	}
+#endif
 	if (amrmClient != NULL){
 		delete (ApplicationMaster*)amrmClient;
 	}
@@ -196,12 +211,14 @@ int LibYarnClient::createJob(string &jobName, string &queue,string &jobId) {
         LOG(INFO, "LibYarnClient::createJob, registerApplicationMaster finished");
 
 #ifndef MOCKTEST
+        keepRun = true;
         //5. setup the heartbeat thread to allocate, release, heartbeat
         int rc = pthread_create(&heartbeatThread, NULL, heartbeatFunc, this);
         if ( rc != 0 ) {
-        	LOG(INFO, "LibYarnClient::createJob, fail to create heart-beat thread. "
-        			  "error code %d", rc);
-        	throw std::runtime_error( "Fail to create heart-beat thread.");
+            keepRun = false;
+            LOG(INFO, "LibYarnClient::createJob, fail to create heart-beat thread. "
+                      "error code %d", rc);
+            throw std::runtime_error( "Fail to create heart-beat thread.");
         }
 #endif
 
@@ -237,13 +254,15 @@ int LibYarnClient::forceKillJob(string &jobId) {
 
 #ifndef MOCKTEST
     if ( keepRun ) {
-        keepRun=false;
+        keepRun = false;
         void *thrc = NULL;
         int rc = pthread_join(heartbeatThread, &thrc);
         if ( rc != 0 ) {
             LOG(INFO, "LibYarnClient::forceKillJob, fail to join heart-beat thread. "
                       "error code %d", rc);
             return FR_FAILED;
+        } else {
+            LOG(INFO, "LibYarnClient::forceKillJob, join heart-beat thread successfully.");
         }
     }
 #endif
@@ -737,17 +756,19 @@ int LibYarnClient::getActiveFailContainerIds(set<int> &activeFailIds){
 int LibYarnClient::finishJob(string &jobId, FinalApplicationStatus finalStatus) {
 
 #ifndef MOCKTEST
-	if ( keepRun ) {
-    	// No need to run heart-beat thread now.
-    	keepRun=false;
-    	void *thrc = NULL;
-    	int rc = pthread_join(heartbeatThread, &thrc);
-    	if ( rc != 0 ) {
-			LOG(INFO, "LibYarnClient::finishJob, fail to join heart-beat thread. "
-					  "error code %d", rc);
-			return FR_FAILED;
-    	}
-	}
+    if ( keepRun ) {
+        // No need to run heart-beat thread now.
+        keepRun = false;
+        void *thrc = NULL;
+        int rc = pthread_join(heartbeatThread, &thrc);
+        if ( rc != 0 ) {
+            LOG(INFO, "LibYarnClient::finishJob, fail to join heart-beat thread. "
+                        "error code %d", rc);
+            return FR_FAILED;
+        } else {
+            LOG(INFO, "LibYarnClient::finishJob, join heart-beat thread successfully.");
+        }
+    }
 #endif
 
 	try{
