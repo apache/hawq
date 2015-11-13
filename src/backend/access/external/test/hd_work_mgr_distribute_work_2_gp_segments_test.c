@@ -43,11 +43,10 @@ static void print_allocated_fragments(List **allocated_fragments, int total_segs
 static char* print_one_allocated_data_fragment(AllocatedDataFragment *frag, int seg_index);
 static char* find_segment_ip_by_index(int seg_index);
 static char** create_cluster(int num_hosts);
-static char** clean_cluster(char** cluster, int num_hosts);
+static void clean_cluster(char** cluster, int num_hosts);
 static char** create_array_of_segs(char **cluster, int num_hosts, int num_segments_on_host);
 static void clean_array_of_segs(char **array_of_segs, int number_of_segments);
-static bool* create_array_of_primaries(int number_of_segments);
-static char** print_cluster(char** cluster, int num_hosts);
+static void print_cluster(char** cluster, int num_hosts);
 static void print_segments_list();
 void clean_allocated_fragments(List **allocated_fragments, int total_segs);
 static void validate_total_fragments_allocated(List **allocated_fragments, int total_segs, int input_total_fragments);
@@ -216,7 +215,6 @@ static void test__distribute_work_to_gp_segments(TestInputData *input)
 	List **segs_allocated_data = NULL;
 	List * input_fragments_list = NIL;
 	char** array_of_segs = NULL;
-	bool *array_of_primaries;
 	int total_segs;
 	bool cluster_size_not_exceeded = input->m_num_hosts_in_cluster <=  65025;
 	
@@ -258,14 +256,12 @@ static void test__distribute_work_to_gp_segments(TestInputData *input)
 	/* 4. Input - hawq segments */
 	total_segs = num_hosts_in_cluster * num_segments_on_host;
 	array_of_segs = create_array_of_segs(cluster, num_hosts_in_cluster, num_segments_on_host);	
-	array_of_primaries = create_array_of_primaries(total_segs);
 		
-	buildCdbComponentDatabases(total_segs, array_of_segs, array_of_primaries);	
-	if (enable_print_input_segments)
-		print_segments_list();
+    /* 5. Build QueryResource (acting hawq segments) */
+    buildQueryResource(total_segs, array_of_segs);
+    if (enable_print_input_segments)
+    	print_segments_list();
 
-    /* 5. Build QueryResource */
-    buildQueryResource(num_hosts_in_cluster*num_segments_on_host, array_of_segs);
     will_return(GetActiveQueryResource, resource);
     will_return(GetActiveQueryResource, resource);
 
@@ -281,11 +277,9 @@ static void test__distribute_work_to_gp_segments(TestInputData *input)
 	
 	/* 8. Cleanup */
 	freeQueryResource();
-	restoreCdbComponentDatabases();
 	clean_cluster(cluster, num_hosts_in_cluster);
 	clean_array_of_segs(array_of_segs, total_segs);
 	clean_allocated_fragments(segs_allocated_data, total_segs);
-	pfree(array_of_primaries);
 }
 
 /* create an array of segments based on the host in the cluster and the number of Hawq segments on host */
@@ -314,16 +308,6 @@ static void clean_array_of_segs(char **array_of_segs, int total_segments)
 	for (i = 0; i < total_segments; i++)
 		pfree(array_of_segs[i]);
 	pfree(array_of_segs);
-}
-
-static bool* create_array_of_primaries(int total_segments)
-{
-	int i;
-	bool *primaries = (bool*)palloc0(total_segments * sizeof(bool));
-	for (i = 0; i < total_segments; i++)
-		primaries[i] = true;
-		
-	return primaries;
 }
 
 /* gives an ip to each host in a num_hosts size cluster */
@@ -355,7 +339,7 @@ static char** create_cluster(int num_hosts)
 }
 
 /* release memory */
-static char** clean_cluster(char** cluster, int num_hosts)
+static void clean_cluster(char** cluster, int num_hosts)
 {
 	int i;
 	
@@ -368,7 +352,7 @@ static char** clean_cluster(char** cluster, int num_hosts)
 }
 
 /* show the cluster*/
-static char** print_cluster(char** cluster, int num_hosts)
+static void print_cluster(char** cluster, int num_hosts)
 {
 	int i;
 	StringInfoData msg;
@@ -391,13 +375,12 @@ static char** print_cluster(char** cluster, int num_hosts)
 static void print_segments_list()
 {
 	StringInfoData msg;
-	CdbComponentDatabases *test_cdb = GpAliveSegmentsInfo.cdbComponentDatabases;
 	initStringInfo(&msg);
 
-	for (int i = 0; i < test_cdb->total_segment_dbs; ++i)
+	for (int i = 0; i < resource->numSegments; ++i)
 	{
-		CdbComponentDatabaseInfo* component = &test_cdb->segment_db_info[i];
-		appendStringInfo(&msg, "\nsegment -- index: %d, ip: %s", component->segindex, component->hostip);
+		Segment* seg = list_nth(resource->segments, i);
+		appendStringInfo(&msg, "\nsegment -- index: %d, ip: %s", seg->segindex, seg->hostip);
 	}
 	
 	elog(FRAGDEBUG, "%s", msg.data);
@@ -407,13 +390,12 @@ static void print_segments_list()
 /* returns the ip  of the segment's host */
 static char* find_segment_ip_by_index(int seg_index)
 {	
-	CdbComponentDatabases *test_cdb = GpAliveSegmentsInfo.cdbComponentDatabases;
-	if (seg_index < 0 || seg_index >= test_cdb->total_segment_dbs)
+	if (seg_index < 0 || seg_index >= resource->numSegments)
 		assert_true(false);
 		
-	for (int i = 0; i < test_cdb->total_segment_dbs; ++i)
+	for (int i = 0; i < resource->numSegments; ++i)
 	{
-		CdbComponentDatabaseInfo* seg = &test_cdb->segment_db_info[i];
+		Segment* seg = list_nth(resource->segments, i);
 		if (seg->segindex == seg_index)
 			return seg->hostip;
 	}
