@@ -34,8 +34,8 @@ void check_segment_info(List* segment_list, int list_index,
 						const char* expected_hostip)
 {
 
-	CdbComponentDatabaseInfo* seg_info =
-			(CdbComponentDatabaseInfo*)lfirst(list_nth_cell(segment_list, list_index));
+	Segment* seg_info =
+			(Segment*)(list_nth(segment_list, list_index));
 	assert_string_equal(seg_info->hostip, expected_hostip);
 }
 
@@ -50,34 +50,21 @@ test__do_segment_clustering_by_host__10SegmentsOn3Hosts(void **state)
 	ListCell* cell = NULL;
 	GpHost* gphost = NULL;
 	List* segs = NIL;
-	CdbComponentDatabaseInfo* seg_info = NULL;
 
 	char* array_of_segs[10] =
 		{"1.2.3.1", "1.2.3.1", "1.2.3.1", "1.2.3.1",
 		 "1.2.3.2", "1.2.3.2", "1.2.3.2",
 		 "1.2.3.3", "1.2.3.3", "1.2.3.3"
 	};
-	bool array_of_primaries[10] =
-	{
-		true, true, true, true,
-		true, true, true,
-		true, true, true
-	};
 	int number_of_segments = 10;
 	/* sanity */
 	assert_true(number_of_segments == (sizeof(array_of_segs) / sizeof(array_of_segs[0])));
-	assert_true(number_of_segments == (sizeof(array_of_primaries) / sizeof(array_of_primaries[0])));
-
-	buildCdbComponentDatabases(number_of_segments, array_of_segs, array_of_primaries);
-
-	CdbComponentDatabases *cdb = GpAliveSegmentsInfo.cdbComponentDatabases;
-
-	/* sanity for cdbComponentDatabases building*/
-	assert_int_equal(cdb->total_segment_dbs, number_of_segments);
-	assert_string_equal(cdb->segment_db_info[4].hostip, array_of_segs[4]);
 
 	/* build QueryResource */
 	buildQueryResource(10, array_of_segs);
+	/* sanity for QueryResource building*/
+	assert_int_equal(resource->numSegments, 10);
+	assert_string_equal(((Segment*)list_nth(resource->segments, 4))->hostip, array_of_segs[4]);
 	will_return(GetActiveQueryResource, resource);
 
 	/* test do_segment_clustering_by_host */
@@ -113,6 +100,5 @@ test__do_segment_clustering_by_host__10SegmentsOn3Hosts(void **state)
 	}
 
 	freeQueryResource();
-	restoreCdbComponentDatabases();
 }
 
