@@ -87,12 +87,12 @@ def local_ssh(cmd, logger = None, warning = False):
     stdout,stderr = result.communicate()
     if logger:
         if stdout != '':
-            logger.info(stdout.strip())
+            logger.info(stdout)
         if stderr != '':
             if not warning:
-                logger.error(stderr.strip())
+                logger.error(stderr)
             else:
-                logger.warn(stderr.strip())
+                logger.warn(stderr)
     return result.returncode
 
 
