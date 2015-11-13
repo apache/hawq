@@ -6405,7 +6405,7 @@ static struct config_int ConfigureNamesInt[] =
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
 		&rm_allocation_policy,
-		0, 0, 10, NULL, NULL
+		1, 0, 10, NULL, NULL
 	},
 
     {

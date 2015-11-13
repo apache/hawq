@@ -559,6 +559,21 @@ int allocateResourceFromResourcePoolIOBytes(int32_t 	nodecount,
 										    int32_t    *totalvsegcount,
 										    int64_t    *vsegiobytes);
 
+int allocateResourceFromResourcePoolIOBytes2(int32_t 	 nodecount,
+										     int32_t	 minnodecount,
+										     uint32_t 	 memory,
+										     double 	 core,
+										     int64_t	 iobytes,
+										     int32_t   	 slicesize,
+											 int32_t	 vseglimitpseg,
+										     int 		 preferredcount,
+										     char 	   **preferredhostname,
+										     int64_t    *preferredscansize,
+										     bool		 fixnodecount,
+										     List 	   **vsegcounters,
+										     int32_t    *totalvsegcount,
+										     int64_t    *vsegiobytes);
+
 int allocateResourceFromResourcePool(int32_t 	nodecount,
 									 int32_t	minnodecount,
 		 	 	 	 	 	 	 	 uint32_t 	memory,
