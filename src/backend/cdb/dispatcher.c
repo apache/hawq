@@ -1250,6 +1250,7 @@ dispatch_wait(DispatchData *data)
 		return;
 
 	workermgr_wait_job(data->worker_mgr_state);
+	CHECK_FOR_INTERRUPTS();
 
 	/* Check executors state before return. */
 	if (dispatch_collect_executors_error(data))
