@@ -1,9 +1,7 @@
 subdir=src/backend/access/external
 top_builddir=../../../../..
 
-#TODO: enable hd_work_mgr tests
-#TARGETS=pxfuriparser hd_work_mgr pxfheaders ha_config pxffilters pxfmasterapi pxfanalyze
-TARGETS=pxfuriparser pxfheaders ha_config pxffilters pxfmasterapi pxfanalyze
+TARGETS=pxfuriparser hd_work_mgr pxfheaders ha_config pxffilters pxfmasterapi pxfanalyze
 
 # Objects from backend, which don't need to be mocked but need to be linked.
 COMMON_REAL_OBJS=\

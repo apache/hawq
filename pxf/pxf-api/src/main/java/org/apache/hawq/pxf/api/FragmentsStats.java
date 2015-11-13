@@ -27,7 +27,7 @@ public class FragmentsStats {
     private SizeAndUnit totalSize;
 
     /**
-     * Enum to represent unit (Bytes/MB/GB/TB)
+     * Enum to represent unit (Bytes/KB/MB/GB/TB)
      */
     public enum SizeUnit {
         /**
@@ -205,22 +205,29 @@ public class FragmentsStats {
     }
 
     private SizeUnit getSizeUnit(int orderOfMagnitude) {
+        SizeUnit unit;
         switch (orderOfMagnitude) {
             case 0:
-                return SizeUnit.B;
+                unit = SizeUnit.B;
+                break;
             case 1:
-                return SizeUnit.KB;
+                unit = SizeUnit.KB;
+                break;
             case 2:
-                return SizeUnit.MB;
+                unit = SizeUnit.MB;
+                break;
             case 3:
-                return SizeUnit.GB;
+                unit = SizeUnit.GB;
+                break;
             case 4:
-                return SizeUnit.TB;
+                unit = SizeUnit.TB;
+                break;
             default:
                 throw new IllegalArgumentException(
                         "Unsupported order of magnitude "
                                 + orderOfMagnitude
                                 + ". Size's order of magnitue can be a value between 0(Bytes) and 4(TB)");
         }
+        return unit;
     }
 }
