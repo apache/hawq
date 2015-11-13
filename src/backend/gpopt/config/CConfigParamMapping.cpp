@@ -212,6 +212,13 @@ CConfigParamMapping::SConfigMappingElem CConfigParamMapping::m_elem[] =
 		GPOS_WSZ_LIT("Disable outer join to inner join rewrite in optimizer.")
 		},
 
+        {
+        EopttraceDonotDeriveStatsForAllGroups,
+        &optimizer_enable_derive_stats_all_groups,
+        true, // m_fNegate
+        GPOS_WSZ_LIT("Disable deriving stats for all groups after exploration.")
+        },
+    
 		{
 		EopttraceEnableSpacePruning,
 		&optimizer_enable_space_pruning,
