@@ -570,6 +570,7 @@ dispmgt_concurrent_connect(List	*executors, int executors_num_per_thread)
 	if (has_error)
 		return false;
 
+	CHECK_FOR_INTERRUPTS();
 	dispmgt_free_concurrent_connect_state(tasks);
 	workermgr_free_workermgr_state(state);
 

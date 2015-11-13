@@ -153,7 +153,6 @@ workermgr_wait_job(WorkerMgrState *state)
 {
 	state->cancel = false;
 	workermgr_join(state);
-	CHECK_FOR_INTERRUPTS();
 }
 
 static void
