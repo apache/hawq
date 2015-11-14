@@ -1115,8 +1115,8 @@ class gpload:
         seenv = False
         seenq = False
 
-        # default to gpAdminLogs for a log file, may be overwritten
-        self.options.l = os.path.join(os.environ.get('HOME', '.'),'gpAdminLogs')
+        # default to hawqAdminLogs for a log file, may be overwritten
+        self.options.l = os.path.join(os.environ.get('HOME', '.'),'hawqAdminLogs')
         if not os.path.isdir(self.options.l):
             os.mkdir(self.options.l)
 

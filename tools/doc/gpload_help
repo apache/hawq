@@ -69,7 +69,7 @@ OPTIONS
 -l log_file
  
   Specifies where to write the log file. Defaults to 
-  ~/gpAdminLogs/hawq_load_YYYYMMDD. 
+  ~/hawqAdminLogs/hawq_load_YYYYMMDD. 
 
 -v (verbose mode) 
 

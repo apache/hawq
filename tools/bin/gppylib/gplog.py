@@ -89,7 +89,7 @@ def setup_hawq_tool_logging(appName,hostname,userName,logdir=None,nonuser=False)
     """
     Returns a singleton logger for standard Greenplum tools:
       - Logs output to stdout
-      - Logs output to a file, typically in ~/gpAdminLogs
+      - Logs output to a file, typically in ~/hawqAdminLogs
     """
     global _DEFAULT_FORMATTER
     global _APP_NAME_FOR_DEFAULT_FORMAT
@@ -117,7 +117,7 @@ def setup_tool_logging(appName,hostname,userName,logdir=None,nonuser=False):
     """
     Returns a singleton logger for standard Greenplum tools:
       - Logs output to stdout
-      - Logs output to a file, typically in ~/gpAdminLogs
+      - Logs output to a file, typically in ~/hawqAdminLogs
     """
     global _DEFAULT_FORMATTER
     global _APP_NAME_FOR_DEFAULT_FORMAT
@@ -280,7 +280,7 @@ def _get_literal_formatter():
 def _enable_hawqadmin_logging(name,logdir=None):
     """
     Sets up the file output handler for the default logger.
-      - if logdir is not specified it uses ~/gpAdminLogs
+      - if logdir is not specified it uses ~/hawqAdminLogs
       - the file is constructed as appended with "<logdir>/<name>_<date>.log"
 
     NOTE: internal use only
@@ -310,7 +310,7 @@ def _enable_hawqadmin_logging(name,logdir=None):
 def _enable_gpadmin_logging(name,logdir=None):
     """
     Sets up the file output handler for the default logger.
-      - if logdir is not specified it uses ~/gpAdminLogs
+      - if logdir is not specified it uses ~/hawqAdminLogs
       - the file is constructed as appended with "<logdir>/<name>_<date>.log"
 
     NOTE: internal use only

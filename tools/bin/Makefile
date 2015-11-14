@@ -227,7 +227,7 @@ clean :
 distclean: clean
 	rm -rf $(NETPERF_DIR)    
 
-SKIP_INSTALL=.epydoc.config|.gitignore|.p4ignore|.rcfile|Makefile|gpchecksubnetcfg|generate-greenplum-path.sh
+SKIP_INSTALL=.epydoc.config|.gitignore|.p4ignore|.rcfile|Makefile|generate-greenplum-path.sh
 install: all
 	${INSTALL_SCRIPT} -d ${bindir}
 	for files in `find * -maxdepth 0 -type f | grep -x -v -E "${SKIP_INSTALL}"`; do ${INSTALL_SCRIPT} $${files} ${bindir}; done
