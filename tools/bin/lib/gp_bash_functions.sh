@@ -1970,7 +1970,7 @@ UPDATE_MPP () {
 # Setup logging directory
 #******************************************************************************
 CUR_DATE=`$DATE +%Y%m%d`
-DEFLOGDIR=$HOME/gpAdminLogs
+DEFLOGDIR=$HOME/hawqAdminLogs
 if [ ! -d $DEFLOGDIR ]; then
 		mkdir $DEFLOGDIR
 fi

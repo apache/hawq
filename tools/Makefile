@@ -38,13 +38,7 @@ SET_VERSION_SCRIPTS = \
 	bin/gpssh-exkeys \
 	bin/gpsys1 \
 	bin/lib/gpcheckcat \
-	sbin/gpaddconfig.py \
-	sbin/gpchangeuserpassword \
 	sbin/gpcheck_hostdump \
-	sbin/gpcleansegmentdir.py \
-	sbin/gpfixuserlimts \
-	sbin/gpgetstatususingtransition.py \
-	sbin/gpsetdbid.py \
 	lib/python/gppylib/programs/clsAddMirrors.py \
 	lib/python/gppylib/programs/clsHostCacheLookup.py \
 	lib/python/gppylib/programs/clsInjectFault.py \
