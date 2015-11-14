@@ -2281,16 +2281,16 @@ void completeAllocRequestToBroker(int32_t 	 *reqmem,
 
 		allunavail = false;
 
-		int clevel = segres->ContainerSets[0] == NULL ?
-					 0 :
-					 list_length(segres->ContainerSets[0]->Containers) +
+		int clevel = (segres->ContainerSets[0] == NULL ?
+					  0 :
+					  list_length(segres->ContainerSets[0]->Containers)) +
 					 segres->IncPending.MemoryMB / ratio;
 
 		ListCell *pcell = NULL;
 		foreach(pcell, *preferred)
 		{
 			PAIR existpair = (PAIR)lfirst(pcell);
-			if ( pair->Value == segres )
+			if ( existpair->Key == segres )
 			{
 				reqidx[index] = existpair;
 				totalcount += ((ResourceBundle)(reqidx[index]->Value))->MemoryMB /
@@ -2299,12 +2299,11 @@ void completeAllocRequestToBroker(int32_t 	 *reqmem,
 			}
 		}
 
-
 		int creqsize = reqidx[index] == NULL ?
 					   0 :
 					   ((ResourceBundle)(reqidx[index]->Value))->MemoryMB / ratio;
 
-		llevel = clevel+creqsize < llevel ? clevel+creqsize : llevel;
+		llevel = (clevel+creqsize) < llevel ? (clevel+creqsize) : llevel;
 		index++;
 	}
 
@@ -2314,6 +2313,23 @@ void completeAllocRequestToBroker(int32_t 	 *reqmem,
 		rm_pfree(PCONTEXT, reqidx);
 		return;
 	}
+
+	for ( int i = 0 ; i < list_length(ressegl) ; ++i )
+	{
+		if ( reqidx[i] == NULL )
+		{
+			continue;
+		}
+
+		elog(RMLOG, "Expect resource from resource broker with "
+				    "preferred host, hostname:%s, container number:%lf, "
+				    "increase pending %d.",
+				    GET_SEGRESOURCE_HOSTNAME(((SegResource)(reqidx[i]->Key))),
+					((ResourceBundle)(reqidx[i]->Value))->Core,
+					((SegResource)(reqidx[i]->Key))->IncPending.MemoryMB/ratio);
+	}
+
+	elog(RMLOG, "Lowest water level before adjusting is %d.", llevel);
 
 	/* Step 2. Adjust request. */
 	int32_t reqcoreleft = *reqcore - totalcount;
@@ -2346,15 +2362,14 @@ void completeAllocRequestToBroker(int32_t 	 *reqmem,
 			/* Check total capacity of the segment. */
 			uint32_t corecap = getSegResourceCapacityCore(segres);
 
-
-			int clevel = segres->ContainerSets[0] == NULL ?
-						 0 :
-						 list_length(segres->ContainerSets[0]->Containers) +
+			int clevel = (segres->ContainerSets[0] == NULL ?
+						  0 :
+						  list_length(segres->ContainerSets[0]->Containers)) +
 						 segres->IncPending.MemoryMB / ratio;
 
 			int aclevel = reqidx[index] == NULL ?
 						  clevel :
-						  clevel + ((ResourceBundle)(reqidx[index]->Value))->MemoryMB / ratio;
+						  (clevel + ((ResourceBundle)(reqidx[index]->Value))->MemoryMB / ratio);
 
 			if ( llevel > aclevel && llevel <= corecap )
 			{
