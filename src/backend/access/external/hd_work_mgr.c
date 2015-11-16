@@ -238,7 +238,7 @@ static void assign_pxf_port_to_fragments(int remote_rest_port, List *fragments)
  * The function will generate a delegation token when secure filesystem mode
  * is on and cancel it right after.
  */
-PxfFragmentStatsElem *get_pxf_fragments_statistics(char *uri, Relation rel, StringInfo err_msg)
+PxfFragmentStatsElem *get_pxf_fragments_statistics(char *uri, Relation rel)
 {
 	ClientContext client_context; /* holds the communication info */
 	char *analyzer = NULL;
@@ -248,17 +248,8 @@ PxfFragmentStatsElem *get_pxf_fragments_statistics(char *uri, Relation rel, Stri
 
 	GPHDUri* hadoop_uri = init(uri, &client_context);
 	if (!hadoop_uri)
-		return NULL;
-
-	/*
-	 * Get the statistics info from REST only if fragmenter is defined
-     */
-	if(GPHDUri_get_value_for_opt(hadoop_uri, "fragmenter", &analyzer, false) != 0 &&
-	   GPHDUri_get_value_for_opt(hadoop_uri, "profile", &profile, false) != 0)
 	{
-		if (err_msg)
-			appendStringInfo(err_msg, "no FRAGMENTER or PROFILE option in table definition");
-		return NULL;
+		elog(ERROR, "Failed to parse PXF location %s", uri);
 	}
 
 	/*
@@ -271,7 +262,7 @@ PxfFragmentStatsElem *get_pxf_fragments_statistics(char *uri, Relation rel, Stri
     generate_delegation_token(&inputData);
 	build_http_header(&inputData);
 
-	result = get_fragments_statistics(hadoop_uri, &client_context, err_msg);
+	result = get_fragments_statistics(hadoop_uri, &client_context);
 
 	cancel_delegation_token(&inputData);
 	return result;

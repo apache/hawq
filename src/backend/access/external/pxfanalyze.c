@@ -54,14 +54,13 @@ static float4 countFirstFragmentTuples(const char* schemaName,
 									   const char* tableName);
 static void getFragmentStats(Relation rel, StringInfo location,
 							 float4 *numfrags, float4 *firstfragsize,
-							 float4 *totalsize, StringInfo err_msg);
+							 float4 *totalsize);
 
 
 void analyzePxfEstimateReltuplesRelpages(Relation relation,
 		StringInfo location,
 		float4* estimatedRelTuples,
-		float4* estimatedRelPages,
-		StringInfo err_msg)
+		float4* estimatedRelPages)
 {
 
 	float4 numFrags = 0.0;
@@ -74,11 +73,7 @@ void analyzePxfEstimateReltuplesRelpages(Relation relation,
 	/* get number of fragments, size of first fragment and total size.
 	 * This is used together with the number of tuples in first fragment
 	 * to estimate the number of tuples in the table. */
-	getFragmentStats(relation, location, &numFrags, &firstFragSize, &totalSize, err_msg);
-	if (err_msg->len > 0)
-	{
-		return;
-	}
+	getFragmentStats(relation, location, &numFrags, &firstFragSize, &totalSize);
 
 	/* get number of tuples from first fragment */
 	firstFragTuples = getPxfFragmentTupleCount(relation->rd_id);
@@ -86,11 +81,13 @@ void analyzePxfEstimateReltuplesRelpages(Relation relation,
 	/* calculate estimated tuple count */
 	if (firstFragTuples > 0)
 	{
-		 /* The calculation:
-		  * size of each tuple = first fragment size / first fragment row
-		  * total size = size of each tuple * number of tuples
-		  * number of tuples = total size / size of each tuple
-		  */
+		Assert(firstFragSize > 0);
+		Assert(totalSize > 0);
+		/* The calculation:
+		 * size of each tuple = first fragment size / first fragment row
+		 * total size = size of each tuple * number of tuples
+		 * number of tuples = total size / size of each tuple
+		 */
 		estimatedTuples = (totalSize / firstFragSize) * firstFragTuples;
 	}
 
@@ -105,6 +102,7 @@ void analyzePxfEstimateReltuplesRelpages(Relation relation,
 	{
 		*estimatedRelPages = 1.0;
 	}
+
 	/* in case there were problems with the PXF service, keep the defaults */
 	if (*estimatedRelPages < 0)
 	{
@@ -716,21 +714,19 @@ static float4 countFirstFragmentTuples(const char* schemaName,
  */
 static void getFragmentStats(Relation rel, StringInfo location,
 							 float4 *numfrags, float4 *firstfragsize,
-							 float4 *totalsize, StringInfo err_msg)
+							 float4 *totalsize)
 {
 
 	PxfFragmentStatsElem *elem = NULL;
-	elem = get_pxf_fragments_statistics(location->data, rel, err_msg);
+	elem = get_pxf_fragments_statistics(location->data, rel);
 
 	/*
-	 * if get_pxf_fragments_statistics returned NULL - probably a communication error, we fall back to former values
-	 * for the relation (can be default if no analyze was run successfully before)
-	 * we don't want to stop the analyze, since this can be part of a long procedure performed on many tables
-	 * not just this one
+	 * if get_pxf_fragments_statistics returned NULL - probably a communication error, we
+	 * error out.
 	 */
 	if (!elem)
 	{
-		return;
+		elog(ERROR, "No statistics were returned for relation %s", RelationGetRelationName(rel));
 	}
 
 	*numfrags = elem->numFrags;

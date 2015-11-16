@@ -32,7 +32,6 @@ extern Oid buildPxfSampleTable(Oid relationOid,
 void analyzePxfEstimateReltuplesRelpages(Relation relation,
 		StringInfo location,
 		float4* estimatedRelTuples,
-		float4* estimatedRelPages,
-		StringInfo err_msg);
+		float4* estimatedRelPages);
 
 #endif   /* PXFANALYZE_H */

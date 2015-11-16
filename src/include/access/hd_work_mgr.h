@@ -28,7 +28,7 @@ typedef struct sPxfFragmentStatsElem
 	float4 firstFragSize; /* size of the first fragment */
 	float4 totalSize; /* size of the total datasource */
 } PxfFragmentStatsElem;
-PxfFragmentStatsElem *get_pxf_fragments_statistics(char *uri, Relation rel, StringInfo err_msg);
+PxfFragmentStatsElem *get_pxf_fragments_statistics(char *uri, Relation rel);
 
 List *get_pxf_hcat_metadata(char *relation_location);
 

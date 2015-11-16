@@ -143,41 +143,12 @@ void free_datanode_rest_server(PxfServer* srv)
  * Fetch fragment statistics from the PXF service
  */
 PxfFragmentStatsElem *get_fragments_statistics(GPHDUri* hadoop_uri,
-											   ClientContext *client_context,
-											   StringInfo err_msg)
+											   ClientContext *client_context)
 {
 	char *restMsg = concat("http://%s:%s/%s/%s/Fragmenter/getFragmentsStats?path=", hadoop_uri->data);
 
 	/* send the request. The response will exist in rest_buf.data */
-	PG_TRY();
-	{
-		rest_request(hadoop_uri, client_context, restMsg);
-	}
-	PG_CATCH();
-	{
-		/*
-		 * communication problems with PXF service
-		 * Statistics for a table can be done as part of an ANALYZE procedure on many tables,
-		 * and we don't want to stop because of a communication error. So we catch the exception,
-		 * append its error to err_msg, and return a NULL,
-		 * which will force the the analyze code to use former calculated values or defaults.
-		 */
-		if (err_msg)
-		{
-			char* message = elog_message();
-			if (message)
-				appendStringInfo(err_msg, "%s", message);
-			else
-				appendStringInfo(err_msg, "Unknown error");
-		}
-
-		/* release error state */
-		if (!elog_dismiss(DEBUG5))
-			PG_RE_THROW(); /* hope to never get here! */
-
-		return NULL;
-	}
-	PG_END_TRY();
+	rest_request(hadoop_uri, client_context, restMsg);
 
 	/* parse the JSON response and form a statistics struct to return */
 	return parse_get_frag_stats_response(&(client_context->the_rest_buf));

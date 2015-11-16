@@ -585,9 +585,9 @@ void analyzeStmt(VacuumStmt *stmt, List *relids)
 						FaultInjector_InjectFaultIfSet(
 								AnalyzeSubxactError,
 								DDLNotSpecified,
-								"",  // databaseName
-								""); // tableName
-#endif // FAULT_INJECTOR
+								"",  /* databaseName */
+								""); /* tableName */
+#endif /* FAULT_INJECTOR */
 
 						ReleaseCurrentSubTransaction();
 						MemoryContextSwitchTo(oldcontext);
@@ -864,7 +864,7 @@ static List *analyzableAttributes(Relation candidateRelation)
 				|| attr->atttypid == UNKNOWNOID))
 		{
 			char	*attName = NULL;
-			attName = pstrdup(NameStr(attr->attname)); //needs to be pfree'd by caller
+			attName = pstrdup(NameStr(attr->attname)); /* needs to be pfree'd by caller */
 			Assert(attName);
 			lAttNames = lappend(lAttNames, (void *) attName);
 		}
@@ -913,15 +913,7 @@ static void analyzeRelation(Relation relation, List *lAttributeNames, bool rooto
 	}
 	else
 	{
-		initStringInfo(&err_msg);
-		analyzePxfEstimateReltuplesRelpages(relation, &location, &estimatedRelTuples, &estimatedRelPages, &err_msg);
-		if (err_msg.len > 0)
-		{
-			elog(ERROR,
-					"%s",
-					err_msg.data);
-		}
-		pfree(err_msg.data);
+		analyzePxfEstimateReltuplesRelpages(relation, &location, &estimatedRelTuples, &estimatedRelPages);
 	}
 	pfree(location.data);
 	
@@ -1276,9 +1268,9 @@ void spiCallback_getSingleResultRowColumnAsFloat4(void *clientData)
 	bool isnull = false;
 	float4 *out = (float4*) clientData;
 
-    Assert(SPI_tuptable != NULL); // must have result
-    Assert(SPI_processed == 1); //we expect only one tuple.
-	Assert(SPI_tuptable->tupdesc->attrs[0]->atttypid == FLOAT4OID); // must be float4
+    Assert(SPI_tuptable != NULL); /* must have result */
+    Assert(SPI_processed == 1); /* we expect only one tuple. */
+	Assert(SPI_tuptable->tupdesc->attrs[0]->atttypid == FLOAT4OID); /* must be float4 */
 
 	datum_f = heap_getattr(SPI_tuptable->vals[0], 1, SPI_tuptable->tupdesc, &isnull);
 
@@ -1437,8 +1429,8 @@ void dropSampleTable(Oid sampleTableOid, bool isExternal)
 	const char *sampleSchemaName = NULL;
 	const char *sampleTableName = NULL;
 
-	sampleSchemaName = get_namespace_name(get_rel_namespace(sampleTableOid)); //must be pfreed
-	sampleTableName = get_rel_name(sampleTableOid); // must be pfreed 	
+	sampleSchemaName = get_namespace_name(get_rel_namespace(sampleTableOid)); /* must be pfreed */
+	sampleTableName = get_rel_name(sampleTableOid); /* must be pfreed */
 
 	initStringInfo(&str);
 	appendStringInfo(&str, "drop %stable %s.%s",
@@ -1761,8 +1753,8 @@ static float4 analyzeComputeNDistinctAbsolute(Oid sampleTableOid,
 	const char *sampleSchemaName = NULL;
 	const char *sampleTableName = NULL;
 	
-	sampleSchemaName = get_namespace_name(get_rel_namespace(sampleTableOid)); //must be pfreed
-	sampleTableName = get_rel_name(sampleTableOid); // must be pfreed 	
+	sampleSchemaName = get_namespace_name(get_rel_namespace(sampleTableOid)); /* must be pfreed */
+	sampleTableName = get_rel_name(sampleTableOid); /* must be pfreed */
 
 	initStringInfo(&str);
 	appendStringInfo(&str, "select count(*)::float4 from (select Ta.%s from %s.%s as Ta group by Ta.%s) as Tb",
@@ -1802,8 +1794,8 @@ static float4 analyzeComputeNRepeating(Oid relationOid,
 	const char *sampleSchemaName = NULL;
 	const char *sampleTableName = NULL;
 	
-	sampleSchemaName = get_namespace_name(get_rel_namespace(relationOid)); //must be pfreed
-	sampleTableName = get_rel_name(relationOid); // must be pfreed 	
+	sampleSchemaName = get_namespace_name(get_rel_namespace(relationOid)); /* must be pfreed */
+	sampleTableName = get_rel_name(relationOid); /* must be pfreed */
 
 	initStringInfo(&str);
 	appendStringInfo(&str, "select count(v)::float4 from (select Ta.%s as v, count(Ta.%s) as f from %s.%s as Ta group by Ta.%s) as foo where f > 1",
@@ -1957,8 +1949,8 @@ static float4 analyzeNullCount(Oid sampleTableOid, Oid relationOid, const char *
 		const char *schemaName = NULL;
 		const char *tableName = NULL;
 
-		schemaName = get_namespace_name(get_rel_namespace(sampleTableOid)); //must be pfreed
-		tableName = get_rel_name(sampleTableOid); // must be pfreed
+		schemaName = get_namespace_name(get_rel_namespace(sampleTableOid)); /* must be pfreed */
+		tableName = get_rel_name(sampleTableOid); /* must be pfreed */
 
 		initStringInfo(&str);
 		appendStringInfo(&str, "select count(*)::float4 from %s.%s as Ta where Ta.%s is null",
@@ -2059,8 +2051,8 @@ static float4 analyzeComputeAverageWidth(Oid sampleTableOid,
 		const char *sampleSchemaName = NULL;
 		const char *sampleTableName = NULL;
 
-		sampleSchemaName = get_namespace_name(get_rel_namespace(sampleTableOid)); //must be pfreed
-		sampleTableName = get_rel_name(sampleTableOid); // must be pfreed
+		sampleSchemaName = get_namespace_name(get_rel_namespace(sampleTableOid)); /* must be pfreed */
+		sampleTableName = get_rel_name(sampleTableOid); /* must be pfreed */
 
 		initStringInfo(&str);
 		appendStringInfo(&str, "select avg(pg_column_size(Ta.%s))::float4 from %s.%s as Ta where Ta.%s is not null",
@@ -2125,8 +2117,8 @@ static void analyzeComputeMCV(Oid relationOid,
 		Assert(relTuples > 0.0);
 		Assert(nEntries > 0);
 
-		sampleSchemaName = get_namespace_name(get_rel_namespace(sampleTableOid)); //must be pfreed
-		sampleTableName = get_rel_name(sampleTableOid); // must be pfreed
+		sampleSchemaName = get_namespace_name(get_rel_namespace(sampleTableOid)); /* must be pfreed */
+		sampleTableName = get_rel_name(sampleTableOid); /* must be pfreed */
 
 		initStringInfo(&str);
 		appendStringInfo(&str, "select Ta.%s as v, count(Ta.%s)::float4/%f::float4 as f from %s.%s as Ta "
@@ -2960,7 +2952,7 @@ static void gp_statistics_estimate_reltuples_relpages_heap(Relation rel, float4 
 			 * could get added to it, but we ignore such tuples.
 			 */
 
-			// -------- MirroredLock ----------
+			/* -------- MirroredLock ---------- */
 			MIRROREDLOCK_BUFMGR_LOCK;
 
 			targbuffer = ReadBuffer(rel, targblock);
@@ -2996,7 +2988,7 @@ static void gp_statistics_estimate_reltuples_relpages_heap(Relation rel, float4 
 			UnlockReleaseBuffer(targbuffer);
 
 			MIRROREDLOCK_BUFMGR_UNLOCK;
-			// -------- MirroredLock ----------
+			/* -------- MirroredLock ---------- */
 
 			nblocksseen++;
 		}		
