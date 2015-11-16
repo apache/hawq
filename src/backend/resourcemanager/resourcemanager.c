@@ -2775,17 +2775,17 @@ extern Datum dump_resource_manager_status(PG_FUNCTION_ARGS)
     switch (type)
     {
     case 1:
-        strcpy(dump_file, "/tmp/resouce_manager_conntrack_status");
+        strcpy(dump_file, "/tmp/resource_manager_conntrack_status");
         sprintf(message, "Dump resource manager connection track status to %s", dump_file);
         break;
 
     case 2:
-        strcpy(dump_file, "/tmp/resouce_manager_resqueue_status");
+        strcpy(dump_file, "/tmp/resource_manager_resqueue_status");
         sprintf(message, "Dump resource manager resource queue status to %s", dump_file);
         break;
 
     case 3:
-        strcpy(dump_file, "/tmp/resouce_manager_respool_status");
+        strcpy(dump_file, "/tmp/resource_manager_respool_status");
         sprintf(message, "Dump resource manager resource pool status to %s", dump_file);
         break;
 
