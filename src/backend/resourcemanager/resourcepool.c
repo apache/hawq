@@ -2397,7 +2397,8 @@ int allocateResourceFromResourcePoolIOBytes2(int32_t 	 nodecount,
 				continue;
 			}
 
-			if ( containerset->Available.MemoryMB < memory ||
+			if ( containerset == NULL ||
+				 containerset->Available.MemoryMB < memory ||
 				 containerset->Available.Core < core )
 			{
 				elog(RMLOG, "Segment %s does not contain enough resource of "
