@@ -757,19 +757,15 @@ def check_progress(q, total_num, action, quiet=False):
     pnum = 0
     sys.stdout.write("\r")
     while working_num > 0:
-        if not q.empty():
+        while not q.empty():
             msg = q.get()
             if msg[0] == "done":
                 working_num = working_num - 1
             if msg[2] == 0:
                 success_num = success_num + 1
-            if not quiet:
-                sys.stdout.write(".")
-                sys.stdout.flush()
-        else:
-            if not quiet:
-                sys.stdout.write(".")
-                sys.stdout.flush()
+        if not quiet:
+            sys.stdout.write(".")
+            sys.stdout.flush()
         time.sleep(1)
     if not quiet:
         sys.stdout.write("\n")
