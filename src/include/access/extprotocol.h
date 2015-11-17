@@ -68,6 +68,7 @@ typedef struct ExtProtocolValidatorData
 {
 	NodeTag				 type;            /* see T_ExtProtocolValidatorData */
 	List 		  		*url_list;
+	List 		  		*format_opts;
 	ValidatorDirection 	 direction;  /* validating read or write? */
 	char				*errmsg;		  /* the validation error upon return, if any */
 	
@@ -82,6 +83,11 @@ typedef ExtProtocolValidatorData *ExtProtocolValidator;
 #define EXTPROTOCOL_VALIDATOR_GET_NUM_URLS(fcinfo)	(list_length(((ExtProtocolValidatorData*) fcinfo->context)->url_list))
 
 #define EXTPROTOCOL_VALIDATOR_GET_NTH_URL(fcinfo, n) (((Value *)(list_nth(EXTPROTOCOL_VALIDATOR_GET_URL_LIST(fcinfo),(n - 1))))->val.str)
+
+#define EXTPROTOCOL_VALIDATOR_GET_FMT_OPT_LIST(fcinfo)  (((ExtProtocolValidatorData*) fcinfo->context)->format_opts)
+#define EXTPROTOCOL_VALIDATOR_GET_NUM_FMT_OPTS(fcinfo)  (list_length(((ExtProtocolValidatorData*) fcinfo->context)->format_opts))
+#define EXTPROTOCOL_VALIDATOR_GET_NTH_FMT_OPT(fcinfo, n) (((Value *)(list_nth(EXTPROTOCOL_VALIDATOR_GET_FMT_OPT_LIST(fcinfo),(n - 1))))->val.str)
+
 #define EXTPROTOCOL_VALIDATOR_GET_DIRECTION(fcinfo)	(((ExtProtocolValidatorData*) fcinfo->context)->direction)
 
 

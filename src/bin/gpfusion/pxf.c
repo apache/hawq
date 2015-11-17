@@ -73,5 +73,20 @@ pxfprotocol_validate_urls(PG_FUNCTION_ARGS)
 	/* if we're here - the URI is valid. Don't need it no more */
 	freeGPHDUri(uri);
 
+	/* HEADER option is not allowed */
+	List* format_opts = EXTPROTOCOL_VALIDATOR_GET_FMT_OPT_LIST(fcinfo);
+	ListCell   *format_option;
+	foreach(format_option, format_opts)
+	{
+		DefElem    *defel = (DefElem *) lfirst(format_option);
+		if (strcmp(defel->defname, "header") == 0)
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_PROTOCOL_VIOLATION),
+							errmsg("HEADER option is not allowed in a PXF external table")));
+
+		}
+	}
+
 	PG_RETURN_VOID();
 }
