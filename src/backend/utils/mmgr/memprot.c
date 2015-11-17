@@ -480,7 +480,7 @@ void gp_free2(void *ptr, int64 sz)
 
 static inline bool gp_memprot_dynamic_enabled()
 {
-	return (gp_vmem_protect_limit > 0);
+	return (hawq_re_memory_overcommit_max > 0);
 }
 
 int gp_update_mem_quota(int mem_quota_total)
@@ -496,13 +496,13 @@ int gp_update_mem_quota(int mem_quota_total)
 			return RESENFORCER_FAIL_UPDATE_MEMORY_QUOTA;
 		}
 
-		if (mem_quota_total > VmemTracker_GetPhysicalMemQuotaInMB() - gp_vmem_protect_limit)
+		if (mem_quota_total > VmemTracker_GetPhysicalMemQuotaInMB() - hawq_re_memory_overcommit_max)
 		{
-			mem_quota_total = VmemTracker_GetPhysicalMemQuotaInMB() - gp_vmem_protect_limit;
+			mem_quota_total = VmemTracker_GetPhysicalMemQuotaInMB() - hawq_re_memory_overcommit_max;
 			elog(LOG, "Greenplum memory protection sets memory counter to its maximum value");
 		}
 
-		mem_quota_total = VmemTracker_ConvertVmemMBToChunks(mem_quota_total + gp_vmem_protect_limit);
+		mem_quota_total = VmemTracker_ConvertVmemMBToChunks(mem_quota_total + hawq_re_memory_overcommit_max);
 
 		ret = VmemTracker_SetDynamicMemoryQuotaSema(mem_quota_total);
 

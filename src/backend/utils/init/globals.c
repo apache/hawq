@@ -146,8 +146,8 @@ bool	pljava_debug = false;
 
 /* Memory protection GUCs*/
 #ifdef __darwin__
-int gp_vmem_protect_limit = 8192;
+int hawq_re_memory_overcommit_max = 8192;
 #else
-int gp_vmem_protect_limit = 8192;
+int hawq_re_memory_overcommit_max = 8192;
 #endif
 int gp_vmem_protect_gang_cache_limit = 500;

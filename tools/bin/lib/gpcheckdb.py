@@ -272,7 +272,7 @@ def main():
     # check for users not associated with any resource queues
     chk_users_without_resource_queues()
 
-    # check for a few guc settings (e.g., gp_vmem_protect_limit)
+    # check for a few guc settings (e.g., hawq_re_memory_overcommit_max)
     chk_guc()
 
 

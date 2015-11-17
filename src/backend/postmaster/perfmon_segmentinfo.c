@@ -167,7 +167,7 @@ NON_EXEC_STATIC void SegmentInfoSenderMain(int argc, char *argv[])
 	MyBackendId = InvalidBackendId;
 
 	/*
-	 * Save gp_vmem_protect_limit value in bytes.
+	 * Save hawq_re_memory_overcommit_max value in bytes.
 	 * This value cannot change after starting the server.
 	 */
 	mem_alloc_max = VmemTracker_GetVmemLimitBytes();

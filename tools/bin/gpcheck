@@ -148,7 +148,7 @@ pool = WorkerPool()
 tmpdir = None
 found_errors = 0
 
-HAWQ_GUC_MEMORY    = "gp_vmem_protect_limit"
+HAWQ_GUC_MEMORY    = "hawq_re_memory_overcommit_max"
 
 
 def checkPlatform():

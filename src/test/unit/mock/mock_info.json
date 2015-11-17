@@ -14504,7 +14504,7 @@
             "filename": "src/backend/tcop/postgres.c", 
             "header filename": "src/include/miscadmin.h"
         }, 
-        "gp_vmem_protect_limit": {
+        "hawq_re_memory_overcommit_max": {
             "filename": "src/backend/tcop/postgres.c", 
             "header filename": "src/include/miscadmin.h"
         }, 
