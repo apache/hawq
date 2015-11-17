@@ -1,6 +1,6 @@
 #!/bin/bash
 
-GP_VERSION="2.0.0.0-beta"
+GP_VERSION="2.0.0.0_beta"
 
 GP_BUILDNUMBER=dev
 if [ -f BUILD_NUMBER ] ; then
