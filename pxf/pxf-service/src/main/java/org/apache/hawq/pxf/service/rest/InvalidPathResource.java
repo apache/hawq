@@ -12,11 +12,9 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
 import javax.ws.rs.core.UriInfo;
-import java.io.IOException;
-
 
 class Version {
-    final static String PXF_PROTOCOL_VERSION = "v13";
+    final static String PXF_PROTOCOL_VERSION = "v14";
 }
 
 /**
@@ -38,7 +36,7 @@ public class InvalidPathResource {
 
     private Log Log;
 
-    public InvalidPathResource() throws IOException {
+    public InvalidPathResource() {
         super();
         Log = LogFactory.getLog(InvalidPathResource.class);
     }
