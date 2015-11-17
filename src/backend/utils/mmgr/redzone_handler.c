@@ -75,7 +75,7 @@ RedZoneHandler_GetRedZoneLimitChunks()
 	/*
 	 * runaway_detector_activation_percent = 100% is reserved for not enforcing runaway
 	 * detection by setting the redZoneChunks to an artificially high value. Also, during
-	 * gpinitsystem we may start a QD without initializing the gp_vmem_protect_limit.
+	 * gpinitsystem we may start a QD without initializing the hawq_re_memory_overcommit_max.
 	 * This may result in 0 vmem protect limit. In such case, we ensure that the
 	 * redZoneChunks is set to a large value.
 	 */

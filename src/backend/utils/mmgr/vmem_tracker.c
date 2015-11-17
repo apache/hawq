@@ -165,7 +165,7 @@ VmemTracker_ShmemInit()
 		physicalMemQuotaInMB = VmemTracker_GetPhysicalMemQuotaInMB();
 		physicalMemQuotaInChunks = physicalMemQuotaInMB;
 
-		int32 vmemChunksQuota = gp_vmem_protect_limit;
+		int32 vmemChunksQuota = hawq_re_memory_overcommit_max;
 		/*
 		 * If vmem is larger than 16GB (i.e., 16K MB), we make the chunks bigger
 		 * so that the vmem limit in chunks unit is not larger than 16K.
@@ -178,7 +178,7 @@ VmemTracker_ShmemInit()
 		}
 
 		/* There is at least one chunk if memory enforcement is enabled */
-		if (gp_vmem_protect_limit > 0)
+		if (hawq_re_memory_overcommit_max > 0)
 		{
 			vmemChunksQuota = Max(vmemChunksQuota, (int32)1);
 		}
@@ -689,7 +689,7 @@ VmemTracker_Fault(int32 reason, int64 arg)
 	switch(reason)
 	{
 	case GP_FAULT_USER_MP_CONFIG:
-		return (int64) gp_vmem_protect_limit;
+		return (int64) hawq_re_memory_overcommit_max;
 	case GP_FAULT_USER_MP_ALLOC:
 		return (int64) (BYTES_TO_MB(VmemTracker_GetReservedVmemBytes()));
 	case GP_FAULT_USER_MP_HIGHWM:

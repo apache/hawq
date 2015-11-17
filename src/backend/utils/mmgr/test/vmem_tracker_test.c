@@ -101,7 +101,7 @@ void VmemTrackerTestSetup(void **state)
 	OOMEventSetup();
 
 	/* 8GB default VMEM */
-	gp_vmem_protect_limit = 8192;
+	hawq_re_memory_overcommit_max = 8192;
 	/* Disable runaway detector */
 	runaway_detector_activation_percent = 100;
 
@@ -535,7 +535,7 @@ SetVmemLimit(int32 newSegmentVmemLimitMB, int32 newSessionVmemLimitMB)
 
 	IsUnderPostmaster = false;
 
-	gp_vmem_protect_limit = newSegmentVmemLimitMB;
+	hawq_re_memory_overcommit_max = newSegmentVmemLimitMB;
 	/* Session vmem limit is in kB unit */
 	gp_vmem_limit_per_query = newSessionVmemLimitMB * 1024;
 	will_return(VmemTracker_GetPhysicalMemQuotaInMB, newSegmentVmemLimitMB);
@@ -554,22 +554,22 @@ test__VmemTracker_ShmemInit__QuotaCalculation(void **state)
 {
 	SetVmemLimit(0, 1024);
 	assert_true(chunkSizeInBits == BITS_IN_MB);
-	assert_true(*segmentVmemQuotaChunks == gp_vmem_protect_limit);
+	assert_true(*segmentVmemQuotaChunks == hawq_re_memory_overcommit_max);
 	assert_true(maxChunksPerQuery == (gp_vmem_limit_per_query / 1024));
 
 	SetVmemLimit(1024 * 8, 1024);
 	assert_true(chunkSizeInBits == BITS_IN_MB);
-	assert_true(*segmentVmemQuotaChunks == gp_vmem_protect_limit);
+	assert_true(*segmentVmemQuotaChunks == hawq_re_memory_overcommit_max);
 	assert_true(maxChunksPerQuery == (gp_vmem_limit_per_query / 1024));
 
 	SetVmemLimit(1024 * 16 + 1, 1024);
 	assert_true(chunkSizeInBits == BITS_IN_MB + 1);
-	assert_true(*segmentVmemQuotaChunks == gp_vmem_protect_limit / 2);
+	assert_true(*segmentVmemQuotaChunks == hawq_re_memory_overcommit_max / 2);
 	assert_true(maxChunksPerQuery == (gp_vmem_limit_per_query / (1024 * 2)));
 
 	SetVmemLimit(1024 * 32, 1024);
 	assert_true(chunkSizeInBits == BITS_IN_MB + 1);
-	assert_true(*segmentVmemQuotaChunks == gp_vmem_protect_limit / 2);
+	assert_true(*segmentVmemQuotaChunks == hawq_re_memory_overcommit_max / 2);
 	assert_true(maxChunksPerQuery == (gp_vmem_limit_per_query / (1024 * 2)));
 
 	/*
@@ -578,7 +578,7 @@ test__VmemTracker_ShmemInit__QuotaCalculation(void **state)
 	 */
 	SetVmemLimit(1024 * 32 + 1, 1024);
 	assert_true(chunkSizeInBits == BITS_IN_MB + 1);
-	assert_true(*segmentVmemQuotaChunks == gp_vmem_protect_limit / 2);
+	assert_true(*segmentVmemQuotaChunks == hawq_re_memory_overcommit_max / 2);
 	assert_true(maxChunksPerQuery == (gp_vmem_limit_per_query / (1024 * 2)));
 
 	/*
@@ -587,12 +587,12 @@ test__VmemTracker_ShmemInit__QuotaCalculation(void **state)
 	 */
 	SetVmemLimit(1024 * 32 + 2, 1024);
 	assert_true(chunkSizeInBits == BITS_IN_MB + 2);
-	assert_true(*segmentVmemQuotaChunks == gp_vmem_protect_limit / 4);
+	assert_true(*segmentVmemQuotaChunks == hawq_re_memory_overcommit_max / 4);
 	assert_true(maxChunksPerQuery == (gp_vmem_limit_per_query / (1024 * 4)));
 
 	SetVmemLimit(1024 * 64 + 4, 1024);
 	assert_true(chunkSizeInBits == BITS_IN_MB + 3);
-	assert_true(*segmentVmemQuotaChunks == gp_vmem_protect_limit / 8);
+	assert_true(*segmentVmemQuotaChunks == hawq_re_memory_overcommit_max / 8);
 	assert_true(maxChunksPerQuery == (gp_vmem_limit_per_query / (1024 * 8)));
 
 	/* Reset to default for future test sanity */

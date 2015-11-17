@@ -313,7 +313,7 @@ extern int	VacuumCostDelay;
 extern int	VacuumCostBalance;
 extern bool VacuumCostActive;
 
-extern int gp_vmem_protect_limit;
+extern int hawq_re_memory_overcommit_max;
 extern int gp_vmem_protect_gang_cache_limit;
 
 /* in tcop/postgres.c */

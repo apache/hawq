@@ -5980,11 +5980,11 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"gp_vmem_protect_limit", PGC_POSTMASTER, RESOURCES_MEM,
-			gettext_noop("Virtual memory limit (in MB) of Greenplum memory protection."),
+		{"hawq_re_memory_overcommit_max", PGC_POSTMASTER, RESOURCES_MEM,
+			gettext_noop("Maximum quota of memory overcommit (in MB) per HAWQ physical segment in resource enforcement"),
 			NULL,
 		},
-		&gp_vmem_protect_limit,
+		&hawq_re_memory_overcommit_max,
 #ifdef __darwin__
         8192,
 #else

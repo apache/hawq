@@ -120,7 +120,7 @@ where queue_attribute is:
    exceed the amount of physical memory of a segment host.If workloads are staggered 
    over multiple queues, memory allocations can be oversubscribed. However, queries 
    can be cancelled during execution if the segment host memory limit specified 
-   in gp_vmem_protect_limit is exceeded.
+   in hawq_re_memory_overcommit_max is exceeded.
   </para>
 
  </refsect1>
