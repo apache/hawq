@@ -31,7 +31,7 @@ public class ReadBridge implements Bridge {
     BridgeOutputBuilder outputBuilder = null;
     LinkedList<Writable> outputQueue = null;
 
-    static private Log Log = LogFactory.getLog(ReadBridge.class);
+    private static final Log Log = LogFactory.getLog(ReadBridge.class);
 
     /**
      * C'tor - set the implementation of the bridge.

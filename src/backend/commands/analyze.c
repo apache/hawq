@@ -1801,7 +1801,7 @@ static float4 analyzeComputeNRepeating(Oid relationOid,
 	appendStringInfo(&str, "select count(v)::float4 from (select Ta.%s as v, count(Ta.%s) as f from %s.%s as Ta group by Ta.%s) as foo where f > 1",
 			quote_identifier(attributeName),
 			quote_identifier(attributeName),
-            quote_identifier(sampleSchemaName),
+			quote_identifier(sampleSchemaName),
 			quote_identifier(sampleTableName),
 			quote_identifier(attributeName));
 

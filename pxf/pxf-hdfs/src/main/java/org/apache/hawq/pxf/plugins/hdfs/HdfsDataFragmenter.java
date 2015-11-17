@@ -46,7 +46,7 @@ public class HdfsDataFragmenter extends Fragmenter {
     @Override
     public List<Fragment> getFragments() throws Exception {
         String absoluteDataPath = HdfsUtilities.absoluteDataPath(inputData.getDataSource());
-        ArrayList<InputSplit> splits = getSplits(new Path(absoluteDataPath));
+        List<InputSplit> splits = getSplits(new Path(absoluteDataPath));
 
         for (InputSplit split : splits) {
             FileSplit fsp = (FileSplit) split;

@@ -258,6 +258,19 @@ public class BridgeOutputBuilder {
         }
     }
 
+    /**
+     * Breaks raw bytes into lines. Used only for sampling.
+     *
+     * When sampling a data source, we have to make sure that
+     * we deal with actual rows (lines) and not bigger chunks of
+     * data such as used by LineBreakAccessor for performance.
+     * The input byte array is broken into lines, each one stored in
+     * the outputList. In case the read data doesn't end with a line delimiter,
+     * which can happen when reading chunks of bytes, the partial line is
+     * stored separately, and is being completed when reading the next chunk of data.
+     *
+     * @param val input raw data to break into lines
+     */
     void convertTextDataToLines(byte[] val) {
         int len = val.length;
         int start = 0;
