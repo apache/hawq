@@ -308,7 +308,7 @@ HA -->
 
 	<property>
 		<name>dfs.domain.socket.path</name>
-		<value>/var/lib/hadoop-hdfs/hdfs_domain</value>
+		<value>/var/lib/hadoop-hdfs/dn_socket</value>
 		<description>
 		Optional.  This is a path to a UNIX domain socket that will be used for
 		communication between the DataNode and local HDFS clients.
