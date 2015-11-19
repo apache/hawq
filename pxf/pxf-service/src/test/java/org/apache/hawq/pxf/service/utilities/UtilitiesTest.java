@@ -1,17 +1,13 @@
 package org.apache.hawq.pxf.service.utilities;
 
-import org.apache.hadoop.security.UserGroupInformation;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.powermock.core.classloader.annotations.PrepareForTest;
-import org.powermock.modules.junit4.PowerMockRunner;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.fail;
+import static org.mockito.Mockito.mock;
 
+import org.apache.hawq.pxf.api.utilities.InputData;
+import org.junit.Test;
 
-@RunWith(PowerMockRunner.class)
-@PrepareForTest({UserGroupInformation.class})
 public class UtilitiesTest {
     @Test
     public void byteArrayToOctalStringNull() throws Exception {
@@ -44,5 +40,23 @@ public class UtilitiesTest {
 
         assertEquals(orig.length() + (octal.length() * 5), sb.length());
         assertEquals(expected, sb.toString());
+    }
+
+    @Test
+    public void createAnyInstanceOldPackageName() throws Exception {
+
+        InputData metaData = mock(InputData.class);
+
+        try {
+            Utilities.createAnyInstance(InputData.class,
+                    "com.pivotal.pxf.Lucy", metaData);
+            fail("creating an instance should fail because the class doesn't exist in classpath");
+        } catch (Exception e) {
+            assertEquals(e.getClass(), Exception.class);
+            assertEquals(
+                    e.getMessage(),
+                    "Class com.pivotal.pxf.Lucy doesn't not appear in classpath. "
+                    + "Try changing the plugin name to start with \"org.apache.hawq.pxf\"");
+        }
     }
 }
