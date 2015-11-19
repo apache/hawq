@@ -91,6 +91,7 @@ Child tables: public.parquet_alter_table_1_prt_1,
 Has OIDs: no
 Options: appendonly=true, orientation=parquet, compresstype=gzip, compresslevel=1, pagesize=1048576, rowgroupsize=8388608
 Distributed randomly
+Partition by: (a1)
 
 Alter table parquet_alter_table SET DISTRIBUTED BY (a9);
 INSERT INTO parquet_alter_table(a1,a2,a3,a4,a5,a6,a7,a8,a9,a10) values(31,'F',2011,'f','b','If the scale of a value to be stored is greater than the declared scale of the column, the system will round the value to the specified number of fractional digits. Then, if the number of digits to the left of the decimal point ','2001-11-24 02:26:11','bbffruikjjjk89kjhjjdsdsjflsdkfjowikfo;lwejkufhekusgfuyewhfkdhsuyfgjsdbfjhkdshgciuvhdskfhiewyerwhkjehriur687687rt3ughjgd67567tcghjzvcnzfTYr7tugfTRE#$#^%*GGHJFTEW#RUYJBJHCFDGJBJGYrythgfT^&^tjhE655ugHD655uVtyr%^uygUYT&^R%^FJYFHGF',2802,'2011-11-12');
