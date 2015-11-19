@@ -319,7 +319,7 @@ HA -->
 
 	<property>
 		<name>dfs.client.use.legacy.blockreader.local</name>
-		<value>true</value>
+		<value>false</value>
 		<description>
 		Legacy short-circuit reader implementation based on HDFS-2246 is used
 		if this configuration parameter is true.
