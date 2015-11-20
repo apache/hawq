@@ -3890,7 +3890,7 @@ static struct config_bool ConfigureNamesBool[] =
         				GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
         		},
         		&optimizer_push_requirements_from_consumer_to_producer,
-        		false, NULL, NULL
+        		true, NULL, NULL
         },
 
         {
