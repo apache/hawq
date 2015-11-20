@@ -40,11 +40,9 @@
 #include "catalog/pg_operator.h"
 #include "catalog/pg_aggregate.h"
 
-/* We use Oid = InvalidOid to signal that it's a NUKE event */
-#define MDVER_NUKE_KEY InvalidOid
-
 static void mdver_dt_add_cache_events(List **events);
 static mdver_event *mdver_new_nuke_event(void);
+static void mdver_add_nuke_event(List **events);
 
 /*
  * Generate all the invalidation messages caused by updating a tuple in a catalog table
@@ -95,7 +93,7 @@ mdver_dt_catcache_inval(Relation relation, HeapTuple tuple, SysCacheInvalidateAc
 	case SysCacheInvalidate_Update_InPlace:
 		/* fall through */
 	case SysCacheInvalidate_VacuumMove:
-		events = lappend(events, mdver_new_nuke_event());
+		mdver_add_nuke_event(&events);
 		break;
 	default:
 		insist_log(false, "Unkown syscache invalidation operation");
@@ -107,6 +105,26 @@ mdver_dt_catcache_inval(Relation relation, HeapTuple tuple, SysCacheInvalidateAc
 	{
 		mdver_dt_add_cache_events(&events);
 	}
+}
+
+/*
+ * Add a new nuke event to the list of events generated.
+ * Avoid adding consecutive nuke events since they are composable.
+ */
+static void
+mdver_add_nuke_event(List **events)
+{
+	/* Don't append a nuke if the last event in the queue is already a nuke */
+	if (NIL != *events) {
+		ListCell *tail = list_tail(*events);
+		mdver_event *last_event = lfirst(tail);
+		if (mdver_is_nuke_event(last_event)) {
+			return;
+		}
+	}
+
+	/* Last event is not nuke, or events was empty. Append to queue */
+	*events = lappend(*events, mdver_new_nuke_event());
 }
 
 /*

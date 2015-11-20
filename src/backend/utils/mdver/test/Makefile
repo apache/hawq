@@ -1,9 +1,9 @@
 top_builddir=../../../../..
-subdir=src/backend/utils/cache
+subdir=src/backend/utils/mdver
 
-TARGETS=inval
+TARGETS=mdver_dep_translator
 
-inval_REAL_OBJS=\
+mdver_dep_translator_REAL_OBJS=\
 		$(top_srcdir)/src/backend/access/hash/hashfunc.o \
         $(top_srcdir)/src/backend/bootstrap/bootparse.o \
         $(top_srcdir)/src/backend/lib/stringinfo.o \
@@ -32,8 +32,7 @@ inval_REAL_OBJS=\
         $(top_srcdir)/src/port/thread.o \
         $(top_srcdir)/src/timezone/localtime.o \
         $(top_srcdir)/src/timezone/strftime.o \
-        $(top_srcdir)/src/timezone/pgtz.o \
-        $(top_srcdir)/src/backend/utils/mdver/mdver_dep_translator.o
+        $(top_srcdir)/src/timezone/pgtz.o
 
 include ../../../../Makefile.mock
 

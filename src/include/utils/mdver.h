@@ -17,6 +17,9 @@
 
 #define INVALID_MD_VERSION 0
 
+/* We use Oid = InvalidOid to signal that it's a NUKE event */
+#define MDVER_NUKE_KEY InvalidOid
+
 typedef struct mdver_entry
 {
 	Oid key; /* Key of the versioned entry */
