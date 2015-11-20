@@ -63,7 +63,7 @@ public class StringPassResolver extends Plugin implements ReadResolver, WriteRes
      * Creates a OneRow object from the singleton list.
      */
     @Override
-    public OneRow setFields(List<OneField> record) throws Exception {
+    public OneRow setFields(List<OneField> record) {
         if (((byte[]) record.get(0).val).length == 0) {
             return null;
         }

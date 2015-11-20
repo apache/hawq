@@ -33,6 +33,9 @@ public class ProtocolData extends InputData {
     protected String host;
     protected String profile;
     protected String token;
+    // statistics parameters
+    protected int statsMaxFragments;
+    protected float statsSampleRatio;
 
     /**
      * Constructs a ProtocolData. Parses X-GP-* configuration variables.
@@ -88,6 +91,10 @@ public class ProtocolData extends InputData {
         dataFragment = INVALID_SPLIT_IDX;
         parseDataFragment(getOptionalProperty("DATA-FRAGMENT"));
 
+        statsMaxFragments = 0;
+        statsSampleRatio = 0;
+        parseStatsParameters();
+
         // Store alignment for global use as a system property
         System.setProperty("greenplum.alignment", getProperty("ALIGNMENT"));
     }
@@ -120,10 +127,8 @@ public class ProtocolData extends InputData {
         this.remoteLogin = copy.remoteLogin;
         this.remoteSecret = copy.remoteSecret;
         this.token = copy.token;
-    }
-
-    public String getToken() {
-        return token;
+        this.statsMaxFragments = copy.statsMaxFragments;
+        this.statsSampleRatio = copy.statsSampleRatio;
     }
 
     /**
@@ -264,6 +269,38 @@ public class ProtocolData extends InputData {
     }
 
     /**
+     * Returns Kerberos token information.
+     *
+     * @return token
+     */
+    public String getToken() {
+        return token;
+    }
+
+    /**
+     * Statistics parameter. Returns the max number of fragments to return for
+     * ANALYZE sampling. The value is set in HAWQ side using the GUC
+     * pxf_stats_max_fragments.
+     *
+     * @return max number of fragments to be processed by analyze
+     */
+    public int getStatsMaxFragments() {
+        return statsMaxFragments;
+    }
+
+    /**
+     * Statistics parameter. Returns a number between 0.0001 and 1.0,
+     * representing the sampling ratio on each fragment for ANALYZE sampling.
+     * The value is set in HAWQ side based on ANALYZE computations and the
+     * number of sampled fragments.
+     *
+     * @return sampling ratio
+     */
+    public float getStatsSampleRatio() {
+        return statsSampleRatio;
+    }
+
+    /**
      * Sets the thread safe parameter. Default value - true.
      */
     private void parseThreadSafe() {
@@ -370,5 +407,35 @@ public class ProtocolData extends InputData {
     private void parseRemoteCredentials() {
         remoteLogin = getOptionalProperty("REMOTE-USER");
         remoteSecret = getOptionalProperty("REMOTE-PASS");
+    }
+
+    private void parseStatsParameters() {
+
+        String maxFrags = getOptionalProperty("STATS-MAX-FRAGMENTS");
+        if (!StringUtils.isEmpty(maxFrags)) {
+            statsMaxFragments = Integer.parseInt(maxFrags);
+            if (statsMaxFragments <= 0) {
+                throw new IllegalArgumentException("Wrong value '"
+                        + statsMaxFragments + "'. "
+                        + "STATS-MAX-FRAGMENTS must be a positive integer");
+            }
+        }
+
+        String sampleRatioStr = getUserProperty("STATS-SAMPLE-RATIO");
+        if (!StringUtils.isEmpty(sampleRatioStr)) {
+            statsSampleRatio = Float.parseFloat(sampleRatioStr);
+            if (statsSampleRatio < 0.0001 || statsSampleRatio > 1.0) {
+                throw new IllegalArgumentException(
+                        "Wrong value '"
+                                + statsSampleRatio
+                                + "'. "
+                                + "STATS-SAMPLE-RATIO must be a value between 0.0001 and 1.0");
+            }
+        }
+
+        if ((statsSampleRatio > 0) != (statsMaxFragments > 0)) {
+            throw new IllegalArgumentException(
+                    "Missing parameter: STATS-SAMPLE-RATIO and STATS-MAX-FRAGMENTS must be set together");
+        }
     }
 }

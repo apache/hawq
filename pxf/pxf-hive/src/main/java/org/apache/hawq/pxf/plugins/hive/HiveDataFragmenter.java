@@ -24,10 +24,10 @@ import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.TextInputFormat;
-
 import org.apache.hawq.pxf.api.FilterParser;
 import org.apache.hawq.pxf.api.Fragment;
 import org.apache.hawq.pxf.api.Fragmenter;
+import org.apache.hawq.pxf.api.FragmentsStats;
 import org.apache.hawq.pxf.api.Metadata;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
@@ -442,5 +442,13 @@ public class HiveDataFragmenter extends Fragmenter {
         filtersString.append(HIVE_API_DQUOTE);
 
         return true;
+    }
+
+    /**
+     * Returns statistics for Hive table. Currently it's not implemented.
+     */
+    @Override
+    public FragmentsStats getFragmentsStats() throws Exception {
+        throw new UnsupportedOperationException("ANALYZE for Hive plugin is not supported");
     }
 }

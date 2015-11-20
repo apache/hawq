@@ -895,11 +895,11 @@ static Datum AddDefaultPageRowGroupSize(Datum relOptions, List *defList){
 * In here we first dispatch a normal DefineRelation() (with relstorage
 * external) in order to create the external relation entries in pg_class
 * pg_type etc. Then once this is done we dispatch ourselves (DefineExternalRelation)
-* in order to create the pg_exttable entry accross the gp array and we
+* in order to create the pg_exttable entry across the gp array and we
 * also record a dependency with the error table, if one exists.
 *
 * Why don't we just do all of this in one dispatch run? because that
-* involves duplicating the DefineRelation() code or severly modifying it
+* involves duplicating the DefineRelation() code or severely modifying it
 * to have special cases for external tables. IMHO it's better and cleaner
 * to leave it intact and do another dispatch.
 * ----------------------------------------------------------------

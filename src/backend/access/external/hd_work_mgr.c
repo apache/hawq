@@ -233,50 +233,40 @@ static void assign_pxf_port_to_fragments(int remote_rest_port, List *fragments)
 }
 
 /*
- * Fetches statistics of the PXF datasource from the PXF service
+ * Fetches fragments statistics of the PXF datasource from the PXF service
  *
- * The function will generate a delegation token when secure filesystem mode 
+ * The function will generate a delegation token when secure filesystem mode
  * is on and cancel it right after.
  */
-PxfStatsElem *get_pxf_statistics(char *uri, Relation rel, StringInfo err_msg)
+PxfFragmentStatsElem *get_pxf_fragments_statistics(char *uri, Relation rel)
 {
 	ClientContext client_context; /* holds the communication info */
 	char *analyzer = NULL;
 	char *profile = NULL;
 	PxfInputData inputData = {0};
-	PxfStatsElem *result = NULL;
-	
+	PxfFragmentStatsElem *result = NULL;
+
 	GPHDUri* hadoop_uri = init(uri, &client_context);
 	if (!hadoop_uri)
-		return NULL;
-
-	/*
-	 * Get the statistics info from REST only if analyzer is defined
-     */
-	if(GPHDUri_get_value_for_opt(hadoop_uri, "analyzer", &analyzer, false) != 0 &&
-	   GPHDUri_get_value_for_opt(hadoop_uri, "profile", &profile, false) != 0)
 	{
-		if (err_msg)
-			appendStringInfo(err_msg, "no ANALYZER or PROFILE option in table definition");
-		return NULL;
+		elog(ERROR, "Failed to parse PXF location %s", uri);
 	}
-	
+
 	/*
 	 * Enrich the curl HTTP header
 	 */
 	inputData.headers = client_context.http_headers;
 	inputData.gphduri = hadoop_uri;
-	inputData.rel = rel; 
-	inputData.filterstr = NULL; /* We do not supply filter data to the HTTP header */	
+	inputData.rel = rel;
+	inputData.filterstr = NULL; /* We do not supply filter data to the HTTP header */
     generate_delegation_token(&inputData);
 	build_http_header(&inputData);
-	
-	result = get_data_statistics(hadoop_uri, &client_context, err_msg);
+
+	result = get_fragments_statistics(hadoop_uri, &client_context);
 
 	cancel_delegation_token(&inputData);
 	return result;
 }
-
 
 /*
  * Preliminary uri parsing and curl initializations for the REST communication

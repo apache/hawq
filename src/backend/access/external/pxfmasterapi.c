@@ -30,11 +30,11 @@
 #include "catalog/hcatalog/externalmd.h"
 
 static List* parse_datanodes_response(List *rest_srvrs, StringInfo rest_buf);
-static PxfStatsElem* parse_get_stats_response(StringInfo rest_buf);
+static PxfFragmentStatsElem *parse_get_frag_stats_response(StringInfo rest_buf);
+static float4 normalize_size(long size, char* unit);
 static List* parse_get_fragments_response(List* fragments, StringInfo rest_buf);
 static void ha_failover(GPHDUri *hadoop_uri, ClientContext *client_context, char* rest_msg);
-static void rest_request(GPHDUri *hadoop_uri, ClientContext* client_context, char *
-);
+static void rest_request(GPHDUri *hadoop_uri, ClientContext* client_context, char *rest_msg);
 static char* concat(char *body, char *tail);
 
 /*
@@ -72,14 +72,14 @@ parse_datanodes_response(List *rest_srvrs, StringInfo rest_buf)
  * Wrap the REST call with a retry for the HA HDFS scenario
  */
 static void
-rest_request(GPHDUri *hadoop_uri, ClientContext* client_context, char *restMsg)
+rest_request(GPHDUri *hadoop_uri, ClientContext* client_context, char *rest_msg)
 {
 	Assert(hadoop_uri->host != NULL && hadoop_uri->port != NULL);
 
 	/* construct the request */
 	PG_TRY();
 	{
-		call_rest(hadoop_uri, client_context, restMsg);
+		call_rest(hadoop_uri, client_context, rest_msg);
 	}
 	PG_CATCH();
 	{
@@ -93,7 +93,7 @@ rest_request(GPHDUri *hadoop_uri, ClientContext* client_context, char *restMsg)
 			if (!elog_dismiss(DEBUG5))
 				PG_RE_THROW(); /* hope to never get here! */
 
-			ha_failover(hadoop_uri, client_context, restMsg);
+			ha_failover(hadoop_uri, client_context, rest_msg);
 		}
 		else /*This is not HA - so let's re-throw */
 			PG_RE_THROW();
@@ -140,75 +140,81 @@ void free_datanode_rest_server(PxfServer* srv)
 }
 
 /*
- * Fetch the statistics from the PXF service
+ * Fetch fragment statistics from the PXF service
  */
-PxfStatsElem *get_data_statistics(GPHDUri* hadoop_uri,
-										 ClientContext *client_context,
-										 StringInfo err_msg)
+PxfFragmentStatsElem *get_fragments_statistics(GPHDUri* hadoop_uri,
+											   ClientContext *client_context)
 {
-	char *restMsg = concat("http://%s:%s/%s/%s/Analyzer/getEstimatedStats?path=", hadoop_uri->data);
+	char *restMsg = concat("http://%s:%s/%s/%s/Fragmenter/getFragmentsStats?path=", hadoop_uri->data);
 
 	/* send the request. The response will exist in rest_buf.data */
-	PG_TRY();
-	{
-		rest_request(hadoop_uri, client_context, restMsg);
-	}
-	PG_CATCH();
-	{
-		/*
-		 * communication problems with PXF service
-		 * Statistics for a table can be done as part of an ANALYZE procedure on many tables,
-		 * and we don't want to stop because of a communication error. So we catch the exception,
-		 * append its error to err_msg, and return a NULL,
-		 * which will force the the analyze code to use former calculated values or defaults.
-		 */
-		if (err_msg)
-		{
-			char* message = elog_message();
-			if (message)
-				appendStringInfo(err_msg, "%s", message);
-			else
-				appendStringInfo(err_msg, "Unknown error");
-		}
+	rest_request(hadoop_uri, client_context, restMsg);
 
-		/* release error state */
-		if (!elog_dismiss(DEBUG5))
-			PG_RE_THROW(); /* hope to never get here! */
-
-		return NULL;
-	}
-	PG_END_TRY();
-
-	/* parse the JSON response and form a fragments list to return */
-	return parse_get_stats_response(&(client_context->the_rest_buf));
+	/* parse the JSON response and form a statistics struct to return */
+	return parse_get_frag_stats_response(&(client_context->the_rest_buf));
 }
 
 /*
- * Parse the json response from the PXF Fragmenter.getSize
+ * Parse the json response from the PXF Fragmenter.getFragmentsStats
  */
-static PxfStatsElem *parse_get_stats_response(StringInfo rest_buf)
+static PxfFragmentStatsElem *parse_get_frag_stats_response(StringInfo rest_buf)
 {
-	PxfStatsElem* statsElem = (PxfStatsElem*)palloc0(sizeof(PxfStatsElem));
+	PxfFragmentStatsElem* statsElem = (PxfFragmentStatsElem*)palloc0(sizeof(PxfFragmentStatsElem));
 	struct json_object	*whole	= json_tokener_parse(rest_buf->data);
 	if ((whole == NULL) || is_error(whole))
 	{
 		elog(ERROR, "Failed to parse statistics data from PXF");
 	}
-	struct json_object	*head	= json_object_object_get(whole, "PXFDataSourceStats");
+	struct json_object	*head	= json_object_object_get(whole, "PXFFragmentsStats");
 
-	/* 0. block size */
-	struct json_object *js_block_size = json_object_object_get(head, "blockSize");
-	statsElem->blockSize = json_object_get_int(js_block_size);
+	/* 0. number of fragments */
+	struct json_object *js_num_fragments = json_object_object_get(head, "fragmentsNumber");
+	statsElem->numFrags = json_object_get_int(js_num_fragments);
 
-	/* 1. number of blocks */
-	struct json_object *js_num_blocks = json_object_object_get(head, "numberOfBlocks");
-	statsElem->numBlocks = json_object_get_int(js_num_blocks);
+	/* 1. first fragment size */
+	struct json_object *js_first_frag_size = json_object_object_get(head, "firstFragmentSize");
+	struct json_object *js_size = json_object_object_get(js_first_frag_size, "size");
+	long size = json_object_get_int(js_size);
+	struct json_object *js_unit = json_object_object_get(js_first_frag_size, "unit");
+	char* unit = pstrdup(json_object_get_string(js_unit));
+	statsElem->firstFragSize = normalize_size(size, unit);
+	pfree(unit);
 
-	/* 2. number of tuples */
-	struct json_object *js_num_tuples = json_object_object_get(head, "numberOfTuples");
-	statsElem->numTuples = json_object_get_int(js_num_tuples);
+	/* 2. total size */
+	struct json_object *js_total_size = json_object_object_get(head, "totalSize");
+	js_size = json_object_object_get(js_total_size, "size");
+	size = json_object_get_int(js_size);
+	js_unit = json_object_object_get(js_total_size, "unit");
+	unit = pstrdup(json_object_get_string(js_unit));
+	statsElem->totalSize = normalize_size(size, unit);
+	pfree(unit);
 
 	return statsElem;
+}
+
+static float4 normalize_size(long size, char* unit) {
+	const float4 multiplier = 1024.0;
+	if (strcmp(unit,"B") == 0)
+	{
+		return size;
+	}
+	if (strcmp(unit,"KB") == 0)
+	{
+		return size * multiplier;
+	}
+	if (strcmp(unit,"MB") == 0)
+	{
+		return size * multiplier * multiplier;
+	}
+	if (strcmp(unit,"GB") == 0)
+	{
+		return size * multiplier * multiplier * multiplier;
+	}
+	if (strcmp(unit,"TB") == 0)
+	{
+		return size * multiplier * multiplier * multiplier * multiplier;
+	}
+	return -1;
 }
 
 /*

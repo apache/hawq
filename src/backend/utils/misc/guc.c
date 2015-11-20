@@ -614,6 +614,7 @@ show_allow_system_table_mods(void);
 /* Extension Framework GUCs */
 bool   pxf_enable_filter_pushdown = true;
 bool   pxf_enable_stat_collection = true;
+int    pxf_stat_max_fragments = 100;
 bool   pxf_enable_locality_optimizations = true;
 bool   pxf_isilon = false; /* temporary GUC */
 int    pxf_service_port = 51200; /* temporary GUC */
@@ -6261,6 +6262,16 @@ static struct config_int ConfigureNamesInt[] =
 		},
 		&optimizer_segments,
 		0, 0, INT_MAX, NULL, NULL
+	},
+
+	{
+		{"pxf_stat_max_fragments", PGC_USERSET, EXTERNAL_TABLES,
+			gettext_noop("Max number of fragments to be sampled during ANALYZE on a PXF table."),
+			NULL,
+			GUC_GPDB_ADDOPT
+		},
+		&pxf_stat_max_fragments,
+		100, 1, INT_MAX, NULL, NULL
 	},
 
 	{

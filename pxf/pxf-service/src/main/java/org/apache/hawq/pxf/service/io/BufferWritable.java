@@ -54,4 +54,25 @@ public class BufferWritable implements Writable {
                 "BufferWritable.readFields() is not implemented");
     }
 
+    /**
+     * Appends given app's buffer to existing buffer.
+     * <br>
+     * Not efficient - requires copying both this and the appended buffer.
+     *
+     * @param app buffer to append
+     */
+    public void append(byte[] app) {
+        if (buf == null) {
+            buf = app;
+            return;
+        }
+        if (app == null) {
+            return;
+        }
+
+        byte[] newbuf = new byte[buf.length + app.length];
+        System.arraycopy(buf, 0, newbuf, 0, buf.length);
+        System.arraycopy(app, 0, newbuf, buf.length, app.length);
+        buf = newbuf;
+    }
 }

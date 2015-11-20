@@ -454,6 +454,7 @@ extern char   *gp_snmp_debug_log;
 /* Extension Framework GUCs */
 extern bool   pxf_enable_filter_pushdown; /* turn pushdown logic on/off     */
 extern bool   pxf_enable_stat_collection; /* turn off stats collection if needed */
+extern int    pxf_stat_max_fragments; /* max fragments to be sampled during analyze */
 extern bool   pxf_enable_locality_optimizations; /* turn locality optimization in the data allocation algorithm on/off     */
 /*
  * Is Isilon the target storage system ?
