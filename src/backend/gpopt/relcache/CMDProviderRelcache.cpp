@@ -24,9 +24,9 @@
 
 #include "gpos/io/COstreamString.h"
 
-#include "dxl/CDXLUtils.h"
+#include "naucrates/dxl/CDXLUtils.h"
 
-#include "exception.h"
+#include "naucrates/exception.h"
 
 using namespace gpos;
 using namespace gpdxl;

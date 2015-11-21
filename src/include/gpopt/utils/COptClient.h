@@ -20,7 +20,7 @@
 
 #include "gpos/base.h"
 
-#include "md/CSystemId.h"
+#include "naucrates/md/CSystemId.h"
 
 // forward declarations
 namespace gpopt

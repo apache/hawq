@@ -22,7 +22,7 @@
 #include "gpos/common/CBitSet.h"
 #include "gpos/memory/IMemoryPool.h"
 
-#include "traceflags/traceflags.h"
+#include "naucrates/traceflags/traceflags.h"
 
 using namespace gpos;
 
