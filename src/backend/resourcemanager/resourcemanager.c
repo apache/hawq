@@ -1816,6 +1816,7 @@ int  addResourceQueueAndUserFromProperties(List *queueprops, List *userprops)
 		res = parseResourceQueueAttributes(attrs,
 										   newqueue,
 										   false,
+										   true,
 										   errorbuf,
 										   sizeof(errorbuf));
 		if ( res != FUNC_RETURN_OK )

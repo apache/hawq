@@ -189,7 +189,7 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 	if (res != FUNC_RETURN_OK)
 	{
 		ddlres = res;
-		elog(WARNING, "Can not recognize DDL attribute because %s", errorbuf);
+		elog(WARNING, "Cannot recognize DDL attribute because %s", errorbuf);
 		goto senderr;
 	}
 
@@ -221,6 +221,7 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			newqueue = rm_palloc0(PCONTEXT, sizeof(DynResourceQueueData));
 			res = parseResourceQueueAttributes(fineattr,
 											   newqueue,
+											   false,
 											   false,
 											   errorbuf,
 											   sizeof(errorbuf));
@@ -288,6 +289,7 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			res = parseResourceQueueAttributes(fineattr,
 											   newqueue,
 											   true,
+											   false,
 											   errorbuf,
 											   sizeof(errorbuf));
 			if (res != FUNC_RETURN_OK)
@@ -307,7 +309,7 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			if (!exist || toupdatetrack == NULL)
 			{
 				ddlres = RESQUEMGR_NO_QUENAME;
-				snprintf(errorbuf, sizeof(errorbuf), "The queue doesn't exist");
+				snprintf(errorbuf, sizeof(errorbuf), "the queue doesn't exist");
 				elog(WARNING, ERRORPOS_FORMAT
 					 "Resource manager can not alter resource queue %s because %s",
 				     ERRREPORTPOS,
@@ -402,8 +404,8 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			{
 				ddlres = RESQUEMGR_IN_USE;
 				snprintf(errorbuf, sizeof(errorbuf),
-						"The Resource Queue is a branch queue. "
-						"Drop the children queues firstly.");
+						 "resource queue %s is a branch queue",
+						 todroptrack->QueueInfo->Name);
 				elog(WARNING, ERRORPOS_FORMAT
 					 "Resource manager can not drop resource queue %s because %s.",
 					 ERRREPORTPOS,

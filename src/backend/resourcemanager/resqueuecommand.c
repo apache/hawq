@@ -110,8 +110,7 @@ void createResourceQueue(CreateQueueStmt *stmt)
 		Assert( res == COMM2RM_CLIENT_FULL_RESOURCECONTEXT );
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
-						 errmsg("can not apply CREATE RESOURCE QUEUE, "
-								"because too many resource contexts were created.")));
+						 errmsg("too many resource contexts were created")));
 	}
 
 	/* Here, using user oid is more convenient. */
@@ -144,7 +143,7 @@ void createResourceQueue(CreateQueueStmt *stmt)
 				(errcode(IS_TO_RM_RPC_ERROR(res) ?
 						 ERRCODE_INTERNAL_ERROR :
 						 ERRCODE_INVALID_OBJECT_DEFINITION),
-				 errmsg("can not apply CREATE RESOURCE QUEUE because %s", errorbuf)));
+				 errmsg("%s", errorbuf)));
 	}
 	elog(LOG, "Complete applying CREATE RESOURCE QUEUE statement.");
 }
@@ -168,7 +167,7 @@ void dropResourceQueue(DropQueueStmt *stmt)
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to create resource queues")));
+				 errmsg("must be superuser to drop resource queues")));
 	}
 
 	/* Cannot DROP default and root queue  */
@@ -241,8 +240,7 @@ void dropResourceQueue(DropQueueStmt *stmt)
 		Assert( res == COMM2RM_CLIENT_FULL_RESOURCECONTEXT );
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
-						 errmsg("cannot apply DROP RESOURCE QUEUE, "
-								"because too many resource contexts were created.")));
+						 errmsg("too many resource contexts were created")));
 	}
 
 	/* Here, using user oid is more convenient. */
@@ -274,7 +272,7 @@ void dropResourceQueue(DropQueueStmt *stmt)
 				(errcode(IS_TO_RM_RPC_ERROR(res) ?
 						 ERRCODE_INTERNAL_ERROR :
 						 ERRCODE_INVALID_OBJECT_DEFINITION),
-				 errmsg("can not apply DROP RESOURCE QUEUE because %s", errorbuf)));
+				 errmsg("%s", errorbuf)));
 	}
 
 	elog(LOG, "Completed applying DROP RESOURCE QUEUE statement.");
@@ -297,7 +295,7 @@ void alterResourceQueue(AlterQueueStmt *stmt)
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to create resource queues")));
+				 errmsg("must be superuser to alter resource queues")));
 	}
 
 	/* Cannot DROP default and root queue  */
@@ -353,7 +351,7 @@ void alterResourceQueue(AlterQueueStmt *stmt)
 		Assert(res == COMM2RM_CLIENT_FULL_RESOURCECONTEXT);
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
-						errmsg("too many existing resource context.")));
+						errmsg("too many existing resource context")));
 	}
 
 	/* Here, using user oid is more convenient. */
@@ -384,7 +382,7 @@ void alterResourceQueue(AlterQueueStmt *stmt)
 				(errcode(IS_TO_RM_RPC_ERROR(res) ?
 						 ERRCODE_INTERNAL_ERROR :
 						 ERRCODE_INVALID_OBJECT_DEFINITION),
-				 errmsg("cannot apply ALTER RESOURCE QUEUE because %s", errorbuf)));
+				 errmsg("%s", errorbuf)));
 	}
 
 	elog(LOG, "Completed applying ALTER RESOURCE QUEUE statement.");
@@ -442,11 +440,14 @@ void validateDDLAttributeOptions(List *options)
 	if (dactivelimit)
 	{
 		activelimit = (Cost) defGetInt64(dactivelimit);
-		if (!(activelimit == INVALID_RES_LIMIT_THRESHOLD || (activelimit > 0)))
+		if ( activelimit < MINIMUM_RESQUEUE_ACTIVESTATS_N )
+		{
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("active threshold cannot be less than %d or equal to 0",
-							INVALID_RES_LIMIT_THRESHOLD)));
+					 errmsg("%s is less than %d",
+						   RSQDDLAttrNames[RSQ_DDL_ATTR_ACTIVE_STATMENTS],
+						   MINIMUM_RESQUEUE_ACTIVESTATS_N)));
+		}
 	}
 
 	/* Memory and core expression must be the same. */
@@ -465,7 +466,7 @@ void validateDDLAttributeOptions(List *options)
 				if(need_free_core) { free(core_limit); }
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-						errmsg("the values of %s and %s must be same",
+						errmsg("the values of %s and %s are not identical",
 								RSQDDLAttrNames[RSQ_DDL_ATTR_MEMORY_LIMIT_CLUSTER],
 								RSQDDLAttrNames[RSQ_DDL_ATTR_CORE_LIMIT_CLUSTER])));
 			}
@@ -495,7 +496,7 @@ void validateDDLAttributeOptions(List *options)
 		{
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("%s cannot be less than %s",
+					 errmsg("%s is less than %s",
 							RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT],
 							MINIMUM_RESQUEUE_NVSEG_UPPER_LIMIT)));
 		}
@@ -508,7 +509,7 @@ void validateDDLAttributeOptions(List *options)
 		{
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("%s cannot be less than %s",
+					 errmsg("%s is less than %s",
 							RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT],
 							MINIMUM_RESQUEUE_NVSEG_LOWER_LIMIT)));
 		}
@@ -528,7 +529,7 @@ void validateDDLAttributeOptions(List *options)
 		{
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("%s cannot be less than %s",
+					 errmsg("%s is less than %s",
 							RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT_PERSEG],
 							MINIMUM_RESQUEUE_NVSEG_UPPER_PERSEG_LIMIT)));
 		}
@@ -541,7 +542,7 @@ void validateDDLAttributeOptions(List *options)
 		{
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("%s cannot be less than %s",
+					 errmsg("%s is less than %s",
 							RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT_PERSEG],
 							MINIMUM_RESQUEUE_NVSEG_LOWER_PERSEG_LIMIT)));
 		}
@@ -556,7 +557,7 @@ void validateDDLAttributeOptions(List *options)
 		{
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("%s cannot be less than %s",
+					 errmsg("%s is less than %s",
 							RSQDDLAttrNames[RSQ_DDL_ATTR_RESOURCE_OVERCOMMIT_FACTOR],
 							MINIMUM_RESQUEUE_OVERCOMMIT)));
 		}
