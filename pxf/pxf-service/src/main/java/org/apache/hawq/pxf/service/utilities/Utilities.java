@@ -42,7 +42,7 @@ public class Utilities {
                         "Class "
                                 + className
                                 + " doesn't not appear in classpath. "
-                                + "Try changing the plugin name to start with \"org.apache.hawq.pxf\"",
+                                + "Plugins provided by PXF must start with \"org.apache.hawq.pxf\"",
                         e.getCause());
             } else {
                 throw e;
