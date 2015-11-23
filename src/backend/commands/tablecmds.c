@@ -369,7 +369,7 @@ static void update_ri_trigger_args(Oid relid,
 					   const char *newname,
 					   bool fk_scan,
 					   bool update_relname);
-static Datum transformLocationUris(List *locs, bool isweb, bool iswritable);
+static Datum transformLocationUris(List *locs, List* fmtopts, bool isweb, bool iswritable);
 static Datum transformExecOnClause(List	*on_clause, int *preferred_segment_num);
 static char transformFormatType(char *formatname);
 static Datum transformFormatOpts(char formattype, List *formatOpts, int numcols, bool iswritable);
@@ -389,7 +389,7 @@ static RangeVar *make_temp_table_name(Relation rel, BackendId id);
 static bool prebuild_temp_table(Relation rel, RangeVar *tmpname, List *distro,
 								List *opts, List **hidden_types, bool isTmpTableAo);
 static void ATPartitionCheck(AlterTableType subtype, Relation rel, bool rejectroot, bool recursing);
-static void InvokeProtocolValidation(Oid procOid, char *procName, bool iswritable, List *locs);
+static void InvokeProtocolValidation(Oid procOid, char *procName, bool iswritable, List *locs, List* fmtopts);
 
 static char *alterTableCmdString(AlterTableType subtype);
 
@@ -948,6 +948,7 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 
 			/* Parse and validate URI strings (LOCATION clause) */
 			locationUris = transformLocationUris(exttypeDesc->location_list,
+												 createExtStmt->formatOpts,
 												 isweb, iswritable);
 			
 			break;
@@ -17404,7 +17405,7 @@ AtEOSubXact_on_commit_actions(bool isCommit, SubTransactionId mySubid,
  * The result is a text array but we declare it as Datum to avoid
  * including array.h in analyze.h.
  */
-static Datum transformLocationUris(List *locs, bool isweb, bool iswritable)
+static Datum transformLocationUris(List *locs, List* fmtopts, bool isweb, bool iswritable)
 {
 	ListCell   *cell;
 	ArrayBuildState *astate;
@@ -17522,7 +17523,7 @@ static Datum transformLocationUris(List *locs, bool isweb, bool iswritable)
 				InvokeProtocolValidation(procOid, 
 										 uri->customprotocol, 
 										 iswritable, 
-										 locs);
+										 locs, fmtopts);
 		}
 		
 		if(first_uri)
@@ -18272,7 +18273,7 @@ char *alterTableCmdString(AlterTableType subtype)
 }
 
 static void 
-InvokeProtocolValidation(Oid procOid, char *procName, bool iswritable, List *locs)
+InvokeProtocolValidation(Oid procOid, char *procName, bool iswritable, List *locs, List* fmtopts)
 {
 	
 	ExtProtocolValidatorData   *validator_data;
@@ -18285,6 +18286,7 @@ InvokeProtocolValidation(Oid procOid, char *procName, bool iswritable, List *loc
 	
 	validator_data->type 		= T_ExtProtocolValidatorData;
 	validator_data->url_list 	= locs;
+	validator_data->format_opts = fmtopts;
 	validator_data->errmsg		= NULL;
 	validator_data->direction 	= (iswritable ? EXT_VALIDATE_WRITE :
 											    EXT_VALIDATE_READ);
