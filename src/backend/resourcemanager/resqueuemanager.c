@@ -1151,10 +1151,10 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 		{
 			res = RESQUEMGR_WRONG_ATTR;
 			snprintf(errorbuf, errorbufsize,
-					 "the explicit value of %s must be between 1%% and 100%%. "
-					"Wrong value = %.0lf%%",
-					RSQDDLAttrNames[RSQ_DDL_ATTR_MEMORY_LIMIT_CLUSTER],
-					queue->ClusterVCorePer);
+					 "the explicit value of %s must be between 1%% and 100%%, "
+					 "wrong value = %.0lf%%",
+					 RSQDDLAttrNames[RSQ_DDL_ATTR_MEMORY_LIMIT_CLUSTER],
+					 queue->ClusterVCorePer);
 			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
 			return res;
 		}
@@ -1163,10 +1163,10 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 		{
 			res = RESQUEMGR_WRONG_ATTR;
 			snprintf(errorbuf, errorbufsize,
-					 "the explicit value of %s must be between 1%% and 100%%. "
-					"Wrong value = %.0lf%%",
-					RSQDDLAttrNames[RSQ_DDL_ATTR_CORE_LIMIT_CLUSTER],
-					queue->ClusterMemoryPer);
+					 "the explicit value of %s must be between 1%% and 100%%, "
+					 "wrong value = %.0lf%%",
+					 RSQDDLAttrNames[RSQ_DDL_ATTR_CORE_LIMIT_CLUSTER],
+					 queue->ClusterMemoryPer);
 			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
 			return res;
 		}
@@ -1179,9 +1179,9 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 		{
 			res = RESQUEMGR_WRONG_ATTR;
 			snprintf(errorbuf, errorbufsize,
-					 "the value of %s must be identical with the value of %s. "
-					 "Wrong value of %s = %.0lf%%. "
-					 "Wrong value of %s = %.0lf%% ",
+					 "the value of %s must be identical with the value of %s, "
+					 "wrong value of %s = %.0lf%%, "
+					 "wrong value of %s = %.0lf%% ",
 					 RSQDDLAttrNames[RSQ_DDL_ATTR_MEMORY_LIMIT_CLUSTER],
 					 RSQDDLAttrNames[RSQ_DDL_ATTR_CORE_LIMIT_CLUSTER],
 					 RSQDDLAttrNames[RSQ_DDL_ATTR_MEMORY_LIMIT_CLUSTER],
@@ -1216,11 +1216,11 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 				{
 					res = RESQUEMGR_WRONG_ATTR;
 					snprintf(errorbuf, errorbufsize,
-							 "the value of %s and %s exceeds parent queue's limit. "
-							"Wrong value = %.0lf%%",
-							RSQDDLAttrNames[RSQ_DDL_ATTR_CORE_LIMIT_CLUSTER],
-							RSQDDLAttrNames[RSQ_DDL_ATTR_MEMORY_LIMIT_CLUSTER],
-							queue->ClusterMemoryPer);
+							 "the value of %s and %s exceeds parent queue's limit, "
+							 "wrong value = %.0lf%%",
+							 RSQDDLAttrNames[RSQ_DDL_ATTR_CORE_LIMIT_CLUSTER],
+							 RSQDDLAttrNames[RSQ_DDL_ATTR_MEMORY_LIMIT_CLUSTER],
+							 queue->ClusterMemoryPer);
 					ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
 					return res;
 				}
@@ -1262,8 +1262,8 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 		{
 			res = RESQUEMGR_WRONG_ATTR;
 			snprintf(errorbuf, errorbufsize,
-					 "the explicit value of %s must be greater than 0. "
-					 "Wrong value = %f",
+					 "the explicit value of %s must be greater than 0, "
+					 "wrong value = %f",
 					 RSQDDLAttrNames[RSQ_DDL_ATTR_CORE_LIMIT_CLUSTER],
 					 queue->ClusterVCore);
 			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
@@ -1274,8 +1274,8 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 		{
 			res = RESQUEMGR_WRONG_ATTR;
 			snprintf(errorbuf, errorbufsize,
-					 "the explicit value of %s must be greater than 0. "
-					 "Wrong value = %dMB",
+					 "the explicit value of %s must be greater than 0, "
+					 "wrong value = %dMB",
 					 RSQTBLAttrNames[RSQ_DDL_ATTR_MEMORY_LIMIT_CLUSTER],
 					 queue->ClusterMemoryMB);
 			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
@@ -1338,7 +1338,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 	{
 		res = RESQUEMGR_WRONG_ATTR;
 		snprintf(errorbuf, errorbufsize,
-				 "%s is less than %lf. Wrong value %lf",
+				 "%s is less than %lf, wrong value %lf",
 				 RSQDDLAttrNames[RSQ_DDL_ATTR_RESOURCE_OVERCOMMIT_FACTOR],
 				 MINIMUM_RESQUEUE_OVERCOMMIT_N,
 				 queue->ResourceOvercommit);
@@ -1353,7 +1353,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 	{
 		res = RESQUEMGR_WRONG_ATTR;
 		snprintf(errorbuf, errorbufsize,
-				 "%s is less than %d. Wrong value %d",
+				 "%s is less than %d, wrong value %d",
 				 RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT],
 				 MINIMUM_RESQUEUE_NVSEG_UPPER_LIMIT_N,
 				 queue->NVSegUpperLimit);
@@ -1365,7 +1365,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 	{
 		res = RESQUEMGR_WRONG_ATTR;
 		snprintf(errorbuf, errorbufsize,
-				 "%s is less than %d. Wrong value %d",
+				 "%s is less than %d, wrong value %d",
 				 RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT],
 				 MINIMUM_RESQUEUE_NVSEG_LOWER_LIMIT_N,
 				 queue->NVSegLowerLimit);
@@ -1393,7 +1393,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 	{
 		res = RESQUEMGR_WRONG_ATTR;
 		snprintf(errorbuf, errorbufsize,
-				 "%s is less than %lf. Wrong value %lf",
+				 "%s is less than %lf, wrong value %lf",
 				 RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT_PERSEG],
 				 MINIMUM_RESQUEUE_NVSEG_UPPER_PERSEG_LIMIT_N,
 				 queue->NVSegUpperLimitPerSeg);
@@ -1405,7 +1405,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 	{
 		res = RESQUEMGR_WRONG_ATTR;
 		snprintf(errorbuf, errorbufsize,
-				 "%s is less than %lf. Wrong value %lf",
+				 "%s is less than %lf, wrong value %lf",
 				 RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT_PERSEG],
 				 MINIMUM_RESQUEUE_NVSEG_LOWER_PERSEG_LIMIT_N,
 				 queue->NVSegLowerLimitPerSeg);
