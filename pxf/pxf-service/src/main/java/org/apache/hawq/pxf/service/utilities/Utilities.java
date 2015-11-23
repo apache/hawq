@@ -30,8 +30,27 @@ public class Utilities {
     public static Object createAnyInstance(Class<?> confClass,
                                            String className, InputData metaData)
             throws Exception {
-        Class<?> cls = Class.forName(className);
+
+        Class<?> cls = null;
+        try {
+            cls = Class.forName(className);
+        } catch (ClassNotFoundException e) {
+            // in case the class name uses the old "com.pivotal.pxf" package
+            // name, recommend using the new package "org.apache.hawq.pxf".
+            if (className.startsWith("com.pivotal.pxf")) {
+                throw new Exception(
+                        "Class "
+                                + className
+                                + " doesn't not appear in classpath. "
+                                + "Plugins provided by PXF must start with \"org.apache.hawq.pxf\"",
+                        e.getCause());
+            } else {
+                throw e;
+            }
+        }
+
         Constructor<?> con = cls.getConstructor(confClass);
+
         return instantiate(con, metaData);
     }
 
