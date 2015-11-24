@@ -62,9 +62,18 @@ public class AvroResolver extends Plugin implements ReadResolver {
     public AvroResolver(InputData input) throws IOException {
         super(input);
 
-        Schema schema = isAvroFile() ? getAvroSchema(new Configuration(),
-                input.getDataSource())
-                : (new Schema.Parser()).parse(openExternalSchema());
+        Schema schema;
+
+        if (isAvroFile()) {
+            schema = getAvroSchema(new Configuration(), input.getDataSource());
+        } else {
+            InputStream externalSchema = openExternalSchema();
+            try {
+                schema = (new Schema.Parser()).parse(externalSchema);
+            } finally {
+                externalSchema.close();
+            }
+        }
 
         reader = new GenericDatumReader<>(schema);
         fields = schema.getFields();
