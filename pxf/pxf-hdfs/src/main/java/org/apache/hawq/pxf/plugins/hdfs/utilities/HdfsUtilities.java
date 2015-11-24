@@ -191,7 +191,7 @@ public class HdfsUtilities {
      * @param conf Hadoop configuration
      * @param dataSource Avro file (i.e fileName.avro) path
      * @return the Avro schema
-     * @throws IOException if I/O error occured while accessing Avro schema file
+     * @throws IOException if I/O error occurred while accessing Avro schema file
      */
     public static Schema getAvroSchema(Configuration conf, String dataSource)
             throws IOException {
