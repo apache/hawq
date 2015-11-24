@@ -10,11 +10,6 @@ filesystem.out
 goh_copy.out
 goh_create_function_1.out
 goh_prepare.out
-pxf_hbase.out
-pxf_hdfs.out
-pxf_hdfs_ext.out
-pxf_hdfs_writable.out
-pxf_hive.out
 resource_queue_function.out
 table_functions.out
 table_functions_optimizer.out
