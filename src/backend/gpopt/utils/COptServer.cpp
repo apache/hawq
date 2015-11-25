@@ -43,9 +43,9 @@
 #include "gpos/net/CSocketListenerUDS.h"
 #include "gpos/task/CAutoTaskProxy.h"
 
-#include "base/CQueryToDXLResult.h"
-#include "comm/CCommunicator.h"
-#include "comm/CLoggerComm.h"
+#include "naucrates/base/CQueryToDXLResult.h"
+#include "naucrates/comm/CCommunicator.h"
+#include "naucrates/comm/CLoggerComm.h"
 
 #include "gpopt/base/CAutoOptCtxt.h"
 #include "gpopt/base/CQueryContext.h"
@@ -60,19 +60,18 @@
 #include "gpopt/translate/CTranslatorDXLToExpr.h"
 #include "gpopt/translate/CTranslatorExprToDXL.h"
 
-#include "exception.h"
+#include "naucrates/exception.h"
 #include "gpopt/utils/COptServer.h"
 
-#include "dxl/operators/CDXLNode.h"
-#include "dxl/CDXLUtils.h"
-#include "dxl/CIdGenerator.h"
-
-#include "md/CMDProviderComm.h"
-#include "md/CSystemId.h"
+#include "naucrates/dxl/operators/CDXLNode.h"
+#include "naucrates/dxl/CDXLUtils.h"
+#include "naucrates/dxl/CIdGenerator.h"
+#include "naucrates/md/CMDProviderComm.h"
+#include "naucrates/md/CSystemId.h"
 
 #include "gpopt/gpdbwrappers.h"
 
-#include "CCostModelGPDB.h"
+#include "gpdbcost/CCostModelGPDB.h"
 
 using namespace gpos;
 using namespace gpmd;

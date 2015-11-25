@@ -49,16 +49,13 @@
 #include "gpopt/mdcache/CAutoMDAccessor.h"
 #include "gpopt/xforms/CXform.h"
 
-#include "exception.h"
-#include "comm/CCommunicator.h"
-
-#include "dxl/operators/CDXLNode.h"
-#include "dxl/CDXLUtils.h"
-#include "dxl/CIdGenerator.h"
-
-#include "md/CMDProviderCommProxy.h"
-
-#include "md/CSystemId.h"
+#include "naucrates/exception.h"
+#include "naucrates/comm/CCommunicator.h"
+#include "naucrates/dxl/operators/CDXLNode.h"
+#include "naucrates/dxl/CDXLUtils.h"
+#include "naucrates/dxl/CIdGenerator.h"
+#include "naucrates/md/CMDProviderCommProxy.h"
+#include "naucrates/md/CSystemId.h"
 
 #include "gpopt/utils/COptClient.h"
 #include "gpopt/gpdbwrappers.h"

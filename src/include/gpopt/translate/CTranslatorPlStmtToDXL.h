@@ -25,10 +25,10 @@
 
 #include "gpos/base.h"
 
-#include "dxl/operators/dxlops.h"
-#include "dxl/CIdGenerator.h"
+#include "naucrates/dxl/operators/dxlops.h"
+#include "naucrates/dxl/CIdGenerator.h"
 
-#include "md/IMDIndex.h"
+#include "naucrates/md/IMDIndex.h"
 
 
 // fwd declarations

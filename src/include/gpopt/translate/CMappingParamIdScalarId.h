@@ -22,7 +22,7 @@
 #include "gpos/base.h"
 #include "gpos/common/CHashMap.h"
 #include "nodes/primnodes.h"
-#include "dxl/operators/CDXLScalarIdent.h"
+#include "naucrates/dxl/operators/CDXLScalarIdent.h"
 
 namespace gpdxl
 {
