@@ -1521,7 +1521,7 @@ int createQueueAndTrack( DynResourceQueue		queue,
 			{
 				res = RESQUEMGR_WRONG_PARENT_QUEUE;
 				snprintf( errorbuf, errorbufsize,
-						  "the parent queue can not be pg_default");
+						  "the parent queue cannot be pg_default");
 				ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
 				goto exit;
 			}
