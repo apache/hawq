@@ -352,6 +352,7 @@ int shallowparseResourceQueueWithAttributes(List 	*rawattr,
 int parseResourceQueueAttributes( List 			 	*attributes,
 								  DynResourceQueue 	 queue,
 								  bool				 checkformatonly,
+								  bool				 loadcatalog,
 								  char 				*errorbuf,
 								  int   			 errorbufsize);
 
@@ -390,6 +391,8 @@ DynResourceQueueTrack getQueueTrackByQueueOID (int64_t queoid, bool *exist);
 DynResourceQueueTrack getQueueTrackByQueueName(char 	*quename,
 											   int 		 quenamelen,
 											   bool		*exist);
+
+bool hasUserAssignedToQueue(DynResourceQueue queue);
 
 /** APIs for user loading, creating, etc. **/
 int parseUserAttributes( List 	 	*attributes,
