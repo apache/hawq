@@ -1170,3 +1170,36 @@ bool handleRMRequestDummy(void **arg)
 
     return true;
 }
+
+bool handleRMRequestQuotaControl(void **arg)
+{
+	ConnectionTrack conntrack = (ConnectionTrack)(*arg);
+	RPCRequestQuotaControl request = (RPCRequestQuotaControl)(conntrack->MessageBuff.Buffer);
+	Assert(request->Phase >= 0 && request->Phase < QUOTA_PHASE_COUNT);
+	bool oldvalue = PRESPOOL->pausePhase[request->Phase];
+	PRESPOOL->pausePhase[request->Phase] = request->Pause;
+	if ( oldvalue != PRESPOOL->pausePhase[request->Phase] )
+	{
+		elog(LOG, "Resource manager resource quota life cycle pause setting %d "
+				  "changes to %s",
+				  request->Phase,
+				  PRESPOOL->pausePhase[request->Phase]?"paused":"resumed");
+	}
+
+	RPCResponseQuotaControlData response;
+	response.Result 	= FUNC_RETURN_OK;
+	response.Reserved	= 0;
+
+    buildResponseIntoConnTrack(conntrack,
+                               (char *)&response,
+                               sizeof(response),
+                               conntrack->MessageMark1,
+                               conntrack->MessageMark2,
+							   RESPONSE_QD_QUOTA_CONTROL);
+    conntrack->ResponseSent = false;
+	MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
+	PCONTRACK->ConnToSend = lappend(PCONTRACK->ConnToSend, conntrack);
+	MEMORY_CONTEXT_SWITCH_BACK
+
+	return true;
+}

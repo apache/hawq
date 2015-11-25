@@ -116,6 +116,7 @@ bool handleRMRequestDumpStatus(void **arg);
 bool handleRMRequestDumpResQueueStatus(void **arg);
 
 bool handleRMRequestDummy(void **arg);
+bool handleRMRequestQuotaControl(void **arg);
 
 int refreshLocalHostInstance(void);
 void checkLocalPostmasterStatus(void);

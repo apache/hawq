@@ -357,6 +357,11 @@ void initializeResourcePoolManager(void)
 
 	PRESPOOL->SlavesFileTimestamp = 0;
 	PRESPOOL->SlavesHostCount	  = 0;
+
+	for ( int i = 0 ; i < QUOTA_PHASE_COUNT ; ++i )
+	{
+		PRESPOOL->pausePhase[i] = false;
+	}
 }
 
 #define CONNECT_TIMEOUT 60
@@ -3041,6 +3046,12 @@ int notifyToBeAcceptedGRMContainersToRMSEG(void)
 	List	 *ctnss = NULL;
 	ListCell *cell  = NULL;
 
+	if ( PRESPOOL->pausePhase[QUOTA_PHASE_TOACC_TO_ACCED] )
+	{
+		elog(LOG, "Paused notifying GRM containers to be accepted to segments.");
+		return FUNC_RETURN_OK;
+	}
+
 	getAllPAIRRefIntoList(&(PRESPOOL->ToAcceptContainers), &ctnss);
 
 	foreach(cell, ctnss)
@@ -3086,6 +3097,12 @@ int notifyToBeKickedGRMContainersToRMSEG(void)
 	List	 *ctnss = NULL;
 	ListCell *cell  = NULL;
 
+	if ( PRESPOOL->pausePhase[QUOTA_PHASE_TOKICK_TO_KICKED] )
+	{
+		elog(LOG, "Paused notifying GRM containers to be kicked to segments.");
+		return FUNC_RETURN_OK;
+	}
+
 	getAllPAIRRefIntoList(&(PRESPOOL->ToKickContainers), &ctnss);
 
 	foreach(cell, ctnss)
@@ -3126,6 +3143,12 @@ int notifyToBeKickedGRMContainersToRMSEG(void)
 
 void moveAllAcceptedGRMContainersToResPool(void)
 {
+	if ( PRESPOOL->pausePhase[QUOTA_PHASE_ACCED_TO_RESPOOL] )
+	{
+		elog(LOG, "Paused adding GRM containers accepted to resource pool.");
+		return;
+	}
+
 	while( PRESPOOL->AcceptedContainers != NULL )
 	{
 		GRMContainer ctn = (GRMContainer)
