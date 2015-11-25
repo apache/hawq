@@ -17,8 +17,8 @@
  * under the License.
  */
 
-#ifndef _HDFS_LIBHDFS3_COMMON_SESSIONCONFIG_H_
-#define _HDFS_LIBHDFS3_COMMON_SESSIONCONFIG_H_
+#ifndef _YARN_LIBYARN_COMMON_SESSIONCONFIG_H_
+#define _YARN_LIBYARN_COMMON_SESSIONCONFIG_H_
 
 #include "Exception.h"
 #include "ExceptionInternal.h"
@@ -77,103 +77,12 @@ public:
         return rpcWriteTimeout;
     }
 
-    /*
-     * FileSystem configure
-     */
-    const std::string & getDefaultUri() const {
-        return defaultUri;
-    }
-
-    int32_t getDefaultReplica() const {
-        return defaultReplica;
-    }
-
-    int64_t getDefaultBlockSize() const {
-        return defaultBlockSize;
-    }
-
-    /*
-     * InputStream configure
-     */
-    int32_t getLocalReadBufferSize() const {
-        return localReadBufferSize;
-    }
-
-    int32_t getInputReadTimeout() const {
-        return inputReadTimeout;
-    }
-
-    int32_t getInputWriteTimeout() const {
-        return inputWriteTimeout;
-    }
-
-    int32_t getInputConnTimeout() const {
-        return inputConnTimeout;
-    }
-
-    int32_t getPrefetchSize() const {
-        return prefetchSize;
-    }
-
-    bool isReadFromLocal() const {
-        return readFromLocal;
-    }
-
-    int32_t getMaxGetBlockInfoRetry() const {
-        return maxGetBlockInfoRetry;
-    }
-
-    int32_t getMaxLocalBlockInfoCacheSize() const {
-        return maxLocalBlockInfoCacheSize;
-    }
-
-    /*
-     * OutputStream configure
-     */
-    int32_t getDefaultChunkSize() const {
-        return chunkSize;
-    }
-
-    int32_t getDefaultPacketSize() const {
-        if (packetSize % chunkSize != 0) {
-            THROW(YarnConfigInvalid,
-                  "output.default.packetsize should be larger than 0 "
-                  "and be the multiple of output.default.chunksize.");
-        }
-
-        return packetSize;
-    }
-
-    int32_t getBlockWriteRetry() const {
-        return blockWriteRetry;
-    }
-
-    int32_t getOutputConnTimeout() const {
-        return outputConnTimeout;
-    }
-
-    int32_t getOutputReadTimeout() const {
-        return outputReadTimeout;
-    }
-
-    int32_t getOutputWriteTimeout() const {
-        return outputWriteTimeout;
-    }
-
-    bool canAddDatanode() const {
-        return addDatanode;
-    }
-
-    int32_t getHeartBeatInterval() const {
-        return heartBeatInterval;
+    void setRpcMaxHaRetry(int32_t rpcMaxHaRetry) {
+        rpcMaxHARetry = rpcMaxHaRetry;
     }
 
     int32_t getRpcMaxHaRetry() const {
         return rpcMaxHARetry;
-    }
-
-    void setRpcMaxHaRetry(int32_t rpcMaxHaRetry) {
-        rpcMaxHARetry = rpcMaxHaRetry;
     }
 
     const std::string & getRpcAuthMethod() const {
@@ -215,22 +124,6 @@ public:
         this->logSeverity = logSeverityLevel;
     }
 
-    int32_t getPacketPoolSize() const {
-        return packetPoolSize;
-    }
-
-    void setPacketPoolSize(int32_t packetPoolSize) {
-        this->packetPoolSize = packetPoolSize;
-    }
-
-    int32_t getCloseFileTimeout() const {
-        return closeFileTimeout;
-    }
-
-    void setCloseFileTimeout(int32_t closeFileTimeout) {
-        this->closeFileTimeout = closeFileTimeout;
-    }
-
     int32_t getRpcTimeout() const {
         return rpcTimeout;
     }
@@ -255,44 +148,11 @@ public:
     bool rpcTcpNoDelay;
     std::string rpcAuthMethod;
 
-    /*
-     * FileSystem configure
-     */
-    std::string defaultUri;
     std::string kerberosCachePath;
     std::string logSeverity;
-    int32_t defaultReplica;
-    int64_t defaultBlockSize;
-
-    /*
-     * InputStream configure
-     */
-    bool readFromLocal;
-    int32_t inputConnTimeout;
-    int32_t inputReadTimeout;
-    int32_t inputWriteTimeout;
-    int32_t localReadBufferSize;
-    int32_t maxGetBlockInfoRetry;
-    int32_t maxLocalBlockInfoCacheSize;
-    int32_t prefetchSize;
-
-    /*
-     * OutputStream configure
-     */
-    bool addDatanode;
-    int32_t chunkSize;
-    int32_t packetSize;
-    int32_t blockWriteRetry; //retry on block not replicated yet.
-    int32_t outputConnTimeout;
-    int32_t outputReadTimeout;
-    int32_t outputWriteTimeout;
-    int32_t packetPoolSize;
-    int32_t heartBeatInterval;
-    int32_t closeFileTimeout;
-
 };
 
 }
 }
 
-#endif /* _HDFS_LIBHDFS3_COMMON_SESSIONCONFIG_H_ */
+#endif /* _YARN_LIBYARN_COMMON_SESSIONCONFIG_H_ */

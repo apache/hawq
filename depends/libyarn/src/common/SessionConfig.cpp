@@ -50,10 +50,6 @@ SessionConfig::SessionConfig(const Config & conf) {
     ConfigDefault<bool> boolValues [] = {
         {
             &rpcTcpNoDelay, "rpc.client.connect.tcpnodelay", true
-        }, {
-            &readFromLocal, "dfs.client.read.shortcircuit", true
-        }, {
-            &addDatanode, "output.replace-datanode-on-failure", true
         }
     };
     ConfigDefault<int32_t> i32Values[] = {
@@ -74,53 +70,14 @@ SessionConfig::SessionConfig(const Config & conf) {
         }, {
             &rpcTimeout, "rpc.client.timeout", 3600 * 1000
         }, {
-            &defaultReplica, "dfs.default.replica", 3, bind(CheckRangeGE<int32_t>, _1, _2, 1)
-        }, {
-            &inputConnTimeout, "input.connect.timeout", 600 * 1000
-        }, {
-            &inputReadTimeout, "input.read.timeout", 3600 * 1000
-        }, {
-            &inputWriteTimeout, "input.write.timeout", 3600 * 1000
-        }, {
-            &localReadBufferSize, "input.localread.default.buffersize", 1 * 1024 * 1024, bind(CheckRangeGE<int32_t>, _1, _2, 1)
-        }, {
-            &prefetchSize, "dfs.prefetchsize", 10, bind(CheckRangeGE<int32_t>, _1, _2, 1)
-        }, {
-            &maxGetBlockInfoRetry, "input.read.getblockinfo.retry", 3, bind(CheckRangeGE<int32_t>, _1, _2, 1)
-        }, {
-            &maxLocalBlockInfoCacheSize, "input.localread.blockinfo.cachesize", 1000, bind(CheckRangeGE<int32_t>, _1, _2, 1)
-        }, {
-            &chunkSize, "output.default.chunksize", 512, bind(CheckMultipleOf<int32_t>, _1, _2, 512)
-        }, {
-            &packetSize, "output.default.packetsize", 64 * 1024
-        }, {
-            &blockWriteRetry, "output.default.write.retry", 10, bind(CheckRangeGE<int32_t>, _1, _2, 1)
-        }, {
-            &outputConnTimeout, "output.connect.timeout", 600 * 1000
-        }, {
-            &outputReadTimeout, "output.read.timeout", 3600 * 1000
-        }, {
-            &outputWriteTimeout, "output.write.timeout", 3600 * 1000
-        }, {
-            &closeFileTimeout, "output.close.timeout", 3600 * 1000
-        }, {
-            &packetPoolSize, "output.packetpool.size", 1024
-        }, {
-            &heartBeatInterval, "output.heeartbeat.interval", 10 * 1000
-        }, {
-            &rpcMaxHARetry, "dfs.client.failover.max.attempts", 15, bind(CheckRangeGE<int32_t>, _1, _2, 0)
+            &rpcMaxHARetry, "yarn.client.failover.max.attempts", 15, bind(CheckRangeGE<int32_t>, _1, _2, 0)
         }
     };
-    ConfigDefault<int64_t> i64Values [] = {
-        {
-            &defaultBlockSize, "dfs.default.blocksize", 64 * 1024 * 1024, bind(CheckMultipleOf<int64_t>, _1, _2, 512)
-        }
-    };
+
     ConfigDefault<std::string> strValues [] = {
-        {&defaultUri, "dfs.default.uri", "hdfs://localhost:9000" },
         {&rpcAuthMethod, "hadoop.security.authentication", "simple" },
         {&kerberosCachePath, "hadoop.security.kerberos.ticket.cache.path", "" },
-        {&logSeverity, "dfs.client.log.severity", "INFO" }
+        {&logSeverity, "yarn.client.log.severity", "INFO" }
     };
 
     for (size_t i = 0; i < ARRAYSIZE(boolValues); ++i) {
@@ -138,15 +95,6 @@ SessionConfig::SessionConfig(const Config & conf) {
 
         if (i32Values[i].check) {
             i32Values[i].check(i32Values[i].key, *i32Values[i].variable);
-        }
-    }
-
-    for (size_t i = 0; i < ARRAYSIZE(i64Values); ++i) {
-        *i64Values[i].variable = conf.getInt64(i64Values[i].key,
-                                               i64Values[i].value);
-
-        if (i64Values[i].check) {
-            i64Values[i].check(i64Values[i].key, *i64Values[i].variable);
         }
     }
 
