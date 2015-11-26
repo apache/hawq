@@ -26,7 +26,7 @@ under the License.
 	</property>
 	
 	<property>
-		<name>rpc.socekt.linger.timeout</name>
+		<name>rpc.client.socket.linger.timeout</name>
 		<value>20</value>
 	</property>
 	
