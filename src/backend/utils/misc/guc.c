@@ -762,6 +762,7 @@ bool sort_segments_enable;
 bool 		optimizer_multilevel_partitioning;
 bool        optimizer_enable_derive_stats_all_groups;
 bool		optimizer_explain_show_status;
+bool		optimizer_prefer_scalar_dqa_multistage_agg;
 
 /* Security */
 bool		gp_reject_internal_tcp_conn = true;
@@ -4463,6 +4464,16 @@ static struct config_bool ConfigureNamesBool[] =
 		 NULL
 		},
 		&rm_session_lease_heartbeat_enable,
+		true, NULL, NULL
+	},
+
+	{
+		{"optimizer_prefer_scalar_dqa_multistage_agg", PGC_USERSET, DEVELOPER_OPTIONS,
+		 gettext_noop("Prefer multistage aggregates for scalar distinct qualified aggregate in the optimizer."),
+		 NULL,
+		 GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&optimizer_prefer_scalar_dqa_multistage_agg,
 		true, NULL, NULL
 	},
 
