@@ -459,6 +459,7 @@ int ResManagerMainServer2ndPhase(void)
 	registerMessageHandler(REQUEST_QD_DUMP_STATUS           , handleRMRequestDumpStatus);
     registerMessageHandler(REQUEST_QD_DUMP_RESQUEUE_STATUS  , handleRMRequestDumpResQueueStatus);
 	registerMessageHandler(REQUEST_DUMMY                    , handleRMRequestDummy);
+	registerMessageHandler(REQUEST_QD_QUOTA_CONTROL 		, handleRMRequestQuotaControl);
 	/* New socket facility poll based server.*/
 	res = initializeSocketServer();
 	if ( res != FUNC_RETURN_OK ) {
@@ -2885,14 +2886,20 @@ void processResourceBrokerTasks(void)
         /* STEP 4. Return kicked GRM containers. */
         curtime = gettime_microsec();
 
-        res = RB_returnResource(&(PRESPOOL->KickedContainers));
-        if ( res != FUNC_RETURN_OK )
-        {
-        	elog(WARNING, "Resource manager failed to return kicked container to "
-        				  "global resource manager.");
-        	goto exit;
-        }
-
+    	if ( !PRESPOOL->pausePhase[QUOTA_PHASE_KICKED_TO_RETURN] )
+    	{
+			res = RB_returnResource(&(PRESPOOL->KickedContainers));
+			if ( res != FUNC_RETURN_OK )
+			{
+				elog(WARNING, "Resource manager failed to return kicked container to "
+							  "global resource manager.");
+				goto exit;
+			}
+    	}
+    	else
+		{
+			elog(LOG, "Paused returning GRM containers kicked to GRM.");
+    	}
 	    /*
 	     * STEP 5. Handle resource broker input as new allocated resource or
 		 * 		   cluster report, container report etc. The allocated resource
