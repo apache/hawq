@@ -64,7 +64,7 @@ SessionConfig::SessionConfig(const Config & conf) {
         }, {
             &rpcWriteTimeout, "rpc.client.write.timeout", 3600 * 1000
         }, {
-            &rpcSocketLingerTimeout, "rpc.client.socekt.linger.timeout", -1
+            &rpcSocketLingerTimeout, "rpc.client.socket.linger.timeout", -1
         }, {
             &rpcMaxRetryOnConnect, "rpc.client.connect.retry", 10, bind(CheckRangeGE<int32_t>, _1, _2, 1)
         }, {

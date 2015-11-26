@@ -105,7 +105,7 @@ HA -->
 	</property>
 	
 	<property>
-		<name>rpc.client.socekt.linger.timeout</name>
+		<name>rpc.client.socket.linger.timeout</name>
 		<value>-1</value>
 		<description>
 		set value to socket SO_LINGER when connect to RPC server. -1 means default OS value. default is -1.
