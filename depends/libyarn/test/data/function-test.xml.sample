@@ -36,7 +36,7 @@
 	</property>
 	
 	<property>
-		<name>rpc.socekt.linger.timeout</name>
+		<name>rpc.socket.linger.timeout</name>
 		<value>20</value>
 	</property>
 	
