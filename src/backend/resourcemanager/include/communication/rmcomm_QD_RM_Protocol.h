@@ -422,6 +422,18 @@ RPC_PROTOCOL_STRUCT_BEGIN(RPCResponseResQueueStatus)
 RPC_PROTOCOL_STRUCT_END(RPCResponseResQueueStatus)
 
 /*******************************************************************************
+ * Protocol of Segment Resource Quota Control Request.
+ ******************************************************************************/
+RPC_PROTOCOL_STRUCT_BEGIN(RPCRequestQuotaControl)
+	uint32_t	Pause;
+	uint32_t	Phase;
+RPC_PROTOCOL_STRUCT_END(RPCRequestQuotaControl)
+
+RPC_PROTOCOL_STRUCT_BEGIN(RPCResponseQuotaControl)
+	uint32_t	Result;
+	uint32_t	Reserved;
+RPC_PROTOCOL_STRUCT_END(RPCResponseQuotaControl)
+/*******************************************************************************
  * Protocol of Dummy Request.
  ******************************************************************************/
 RPC_PROTOCOL_STRUCT_BEGIN(RPCResponseDummy)

@@ -311,6 +311,16 @@ uint32_t getSegResourceCapacityMemory(SegResource segres);
 uint32_t getSegResourceCapacityCore(SegResource segres);
 
 int getSegmentGRMContainerSize(SegResource segres);
+
+enum ResourcePoolQuotaControlFlags
+{
+	QUOTA_PHASE_TOACC_TO_ACCED = 0,
+	QUOTA_PHASE_ACCED_TO_RESPOOL,
+	QUOTA_PHASE_TOKICK_TO_KICKED,
+	QUOTA_PHASE_KICKED_TO_RETURN,
+	QUOTA_PHASE_COUNT
+};
+
 /*
  *------------------------------------------------------------------------------
  * RESOURCE POOL
@@ -472,6 +482,12 @@ struct ResourcePoolData {
 	List		   *KickedContainers;
 	int				AddPendingContainerCount;
 	int				RetPendingContainerCount;
+
+	/*
+	 * The flags for testing the life cycle of GRM containers by pausing specified
+	 * phases.
+	 */
+	bool			pausePhase[QUOTA_PHASE_COUNT];
 
 	/*
 	 * The function array for extending multiple policies of allocating virtual

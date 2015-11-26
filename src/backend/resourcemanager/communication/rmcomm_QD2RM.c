@@ -133,6 +133,7 @@ typedef struct TestActionPlayData *TestActionPlay;
 
 #define RESOURCE_ACTION_RPC_FAULT				"rpcfault"
 #define RESOURCE_ACTION_RPC_FAULT_RM			"rpcrmfault"
+#define RESOURCE_ACTION_QUOTA_PAUSE				"quotapause"
 
 #define PG_PLAY_RESOURCE_ACTION_COLUMNS 5
 #define PG_PLAY_RESOURCE_ACTION_BUFSIZE 1024
@@ -144,6 +145,11 @@ int runTestActionScript(List *actions, const char *filename);
 int findFile(const char *filename);
 int createFile(const char *filename);
 int removeFile(const char *filename);
+int setResourceManagerQuotaControl(bool 	pause,
+								   int 		phase,
+								   char    *errorbuf,
+								   int 		errorbufsize,
+								   int	   *errorcode);
 
 void outputAllcatedResourceToFile(const char *filename, int resourceid);
 void *buildResourceActionPlayRowData(MCTYPE context, List *actions);
@@ -2154,6 +2160,67 @@ int removeFile(const char *filename)
 	return res == 0 ? FUNC_RETURN_OK : FUNC_RETURN_FAIL;
 }
 
+int setResourceManagerQuotaControl(bool 	pause,
+								   int 		phase,
+								   char    *errorbuf,
+								   int 		errorbufsize,
+								   int	   *errorcode)
+{
+	initializeQD2RMComm();
+
+	int 				   res 		   = FUNC_RETURN_OK;
+	SelfMaintainBufferData sendBuffer;
+	SelfMaintainBufferData recvBuffer;
+	initializeSelfMaintainBuffer(&sendBuffer, QD2RM_CommContext);
+	initializeSelfMaintainBuffer(&recvBuffer, QD2RM_CommContext);
+
+	RPCRequestQuotaControlData request;
+	request.Pause = pause;
+	request.Phase = phase;
+
+	appendSMBVar(&sendBuffer, request);
+
+	elog(LOG, "Request GRM container life cycle phase %d %s",
+			  phase,
+			  pause?"paused":"resumed");
+
+	res = callSyncRPCToRM(sendBuffer.Buffer,
+						  sendBuffer.Cursor + 1,
+						  REQUEST_QD_QUOTA_CONTROL,
+						  RESPONSE_QD_QUOTA_CONTROL,
+						  &recvBuffer);
+
+	if ( res != FUNC_RETURN_OK )
+	{
+		snprintf(errorbuf, errorbufsize,
+				 "failed to get response from resource manager RPC.");
+		*errorcode = res;
+		goto exit;
+	}
+
+	RPCResponseQuotaControl response = (RPCResponseQuotaControl)(recvBuffer.Buffer);
+	if ( response->Result == FUNC_RETURN_OK )
+	{
+		elog(LOG, "succeeded in setting container life cycle phase %d %s",
+				  phase,
+				  pause?"paused":"resumed");
+	}
+	else
+	{
+		elog(WARNING, "failed to set container life cycle phase %d %s",
+					  phase,
+					  pause?"paused":"resumed");
+		*errorcode = res;
+		snprintf(errorbuf, errorbufsize,
+				 "failed to get resource quota due to remote error %s.",
+				 getErrorCodeExplain(res));
+	}
+exit:
+	destroySelfMaintainBuffer(&sendBuffer);
+	destroySelfMaintainBuffer(&recvBuffer);
+	return res;
+}
+
 int loadTestActionScript(const char *filename, List **actions)
 {
 	Assert(actions != NULL && *actions == NULL);
@@ -2526,6 +2593,25 @@ int runTestActionScript(List *actions, const char *filename)
 			}
 			else if ( strcmp(actitem->ActionName, RESOURCE_ACTION_RPC_FAULT_RM) == 0 )
 			{
+			}
+			else if ( strcmp(actitem->ActionName, RESOURCE_ACTION_QUOTA_PAUSE) == 0 )
+			{
+				/*
+				 * The first argument should be pause or resume quota changes;
+				 * The second argument should be which phase should be paused or
+				 * resumed.
+				 */
+				ListCell *cell = list_head(actitem->Arguments);
+				const char *action = (const char *)lfirst(cell);
+				cell = lnext(cell);
+				int phase = atoi((const char *)lfirst(cell));
+				ret = setResourceManagerQuotaControl(strcmp(action, "pause") == 0 ?
+											   	   	     true:
+														 false,
+													 phase,
+													 errorbuf,
+													 sizeof(errorbuf),
+													 &errorcode);
 			}
 
 			actitem->ResultCode = ret;
