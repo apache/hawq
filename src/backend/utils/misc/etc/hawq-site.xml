@@ -110,13 +110,16 @@ under the License.
     <property>
         <name>hawq_rm_yarn_queue_name</name>
         <value>default</value>
-        <description>The YARN queue name to register hawq resource manager.</description>
+        <description>The YARN queue name to register hawq resource manager.
+        </description>
     </property>
 
     <property>
         <name>hawq_rm_yarn_app_name</name>
         <value>hawq</value>
-        <description>The application name to register hawq resource manager in YARN.</description>
+        <description>The application name to register hawq resource manager 
+                     in YARN.
+        </description>
     </property>
 
 </configuration>

@@ -356,6 +356,7 @@ int		rm_session_lease_heartbeat_interval; /* How many seconds to wait before sen
 int		rm_tolerate_nseg_limit;
 int		rm_rejectrequest_nseg_limit;
 int		rm_nvseg_variance_among_seg_limit;
+int		rm_container_batch_limit;
 
 char   *rm_resourcepool_test_filename;
 

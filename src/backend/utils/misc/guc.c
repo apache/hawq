@@ -6548,6 +6548,15 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
+		{"hawq_rm_container_batch_limit", PGC_POSTMASTER, RESOURCES_MGM,
+			gettext_noop("the batch process limit for global resource manager containers."),
+			NULL
+		},
+		&rm_container_batch_limit,
+		1000, 1, 65535, NULL, NULL
+	},
+
+	{
 		{"hawq_rm_nresqueue_limit", PGC_POSTMASTER, RESOURCES_MGM,
 			gettext_noop("the maximum number of resource queue."),
 			NULL

@@ -1417,8 +1417,6 @@ void addGRMContainerToResPool(GRMContainer container)
 			  segresource->Stat->ID,
 			  segresource->Stat->Info.HostNameLen,
 			  GET_SEGRESOURCE_HOSTNAME(segresource));
-
-	validateResourcePoolStatus(false);
 }
 
 void dropGRMContainerFromResPool(GRMContainer ctn)
@@ -3149,6 +3147,7 @@ void moveAllAcceptedGRMContainersToResPool(void)
 		return;
 	}
 
+	int counter = 0;
 	while( PRESPOOL->AcceptedContainers != NULL )
 	{
 		GRMContainer ctn = (GRMContainer)
@@ -3163,6 +3162,15 @@ void moveAllAcceptedGRMContainersToResPool(void)
 				  PRESPOOL->AddPendingContainerCount);
 		addNewResourceToResourceManager(ctn->MemoryMB, ctn->Core);
 		removePendingResourceRequestInRootQueue(ctn->MemoryMB, ctn->Core, true);
+
+		counter++;
+		if ( counter >= rm_container_batch_limit )
+		{
+			elog(LOG, "%d GRM containers left, they will be added into "
+					  "resourcepool next processing cycle.",
+					  list_length(PRESPOOL->AcceptedContainers));
+			break;
+		}
 	}
 	validateResourcePoolStatus(true);
 }
