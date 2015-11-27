@@ -20,7 +20,6 @@
 
 """
   gp_contentnum.py
-  Copyright (c) EMC/Greenplum Inc 2013. All Rights Reserved. 
 """
 
 import re

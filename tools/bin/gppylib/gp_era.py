@@ -20,7 +20,6 @@
 
 """
   gp_era.py, based on gp_dbid.py
-  Copyright (c) EMC/Greenplum Inc 2011. All Rights Reserved. 
 """
 
 import sys, os, stat, re

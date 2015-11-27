@@ -23,8 +23,6 @@
     
   Routines to parse "flexible" configuration files for tools like 
     gpaddmirrors, gprecoverseg, gpexpand, etc.
-
-  Copyright (c) EMC/Greenplum Inc 2011. All Rights Reserved. 
 """
 
 import sys
