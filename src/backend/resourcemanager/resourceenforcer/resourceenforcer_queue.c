@@ -20,8 +20,6 @@
 /*
  * resourceenforcer_queue.c
  *		Thread safe queue implementation for resource enforcement.
- *
- * Copyright(c) 2015, Pivotal Inc.
  */
 #include "resourceenforcer/resourceenforcer_queue.h"
 #include <pthread.h>

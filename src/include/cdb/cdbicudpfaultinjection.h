@@ -21,9 +21,6 @@
  * cdbicudpfaultinjection.h
  *	   Fault injection code for UDP interconnect.
  *
- * Copyright (c) 2005-2011, Greenplum Inc.
- * Copyright (c) 2011-2012, EMC Corporation
- *
  *-------------------------------------------------------------------------
  */
 

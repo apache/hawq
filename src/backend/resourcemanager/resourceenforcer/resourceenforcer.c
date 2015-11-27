@@ -21,8 +21,6 @@
  * resourceenforcer.c
  *     CPU usage enforcement for HAWQ.
  *
- * Copyright(c) 2015, Pivotal Inc.
- *
  * We leverage CGroup so as to make sure a query will not go
  * beyond its allowed CPU usage quota.
  */

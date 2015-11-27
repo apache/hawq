@@ -19,8 +19,6 @@
 
 /*
  * resourceenforcer_hash.c
- *
- * Copyright(c) 2015, Pivotal Inc.
  */
 #include "postgres.h"
 #include "cdb/cdbvars.h"
