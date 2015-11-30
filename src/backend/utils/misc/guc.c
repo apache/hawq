@@ -4420,7 +4420,7 @@ static struct config_bool ConfigureNamesBool[] =
 
 	{
 		{"hawq_re_cpu_enable", PGC_POSTMASTER, RESOURCES_MGM,
-		 gettext_noop("enable enforcing cpu resource consumption."),
+		 gettext_noop("Enables CPU sub-system for resource enforcement."),
 		 NULL
 		},
 		&rm_enforce_cpu_enable,
@@ -5982,7 +5982,7 @@ static struct config_int ConfigureNamesInt[] =
 
 	{
 		{"hawq_re_memory_overcommit_max", PGC_POSTMASTER, RESOURCES_MEM,
-			gettext_noop("Maximum quota of memory overcommit (in MB) per HAWQ physical segment in resource enforcement"),
+			gettext_noop("Sets the maximum quota of memory overcommit (in MB) per physical segment for resource enforcement."),
 			NULL,
 		},
 		&hawq_re_memory_overcommit_max,
@@ -6412,7 +6412,7 @@ static struct config_int ConfigureNamesInt[] =
 
 	{
 		{"hawq_re_cleanup_period", PGC_USERSET, DEVELOPER_OPTIONS,
-			gettext_noop("period for resource enforcer to cleanup cgroups."),
+			gettext_noop("Sets the time period (in Second) to clean up CGroup directories/files for resource enforcement."),
 			NULL,
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
@@ -6890,7 +6890,7 @@ static struct config_real ConfigureNamesReal[] =
 
 	{
 		{"hawq_re_cpu_weight",PGC_POSTMASTER, RESOURCES_MGM,
-			gettext_noop("mapping of virtual cores from hawq to yarn"),
+			gettext_noop("Sets the weight to map virtual cores in HAWQ to virtual cores in YARN for resource enforcement."),
 			NULL
 		},
 		&rm_enforce_cpu_weight,
@@ -6899,7 +6899,7 @@ static struct config_real ConfigureNamesReal[] =
 
 	{
 		{"hawq_re_vcore_pcore_ratio",PGC_POSTMASTER, RESOURCES_MGM,
-			gettext_noop("mapping from virtual cores to physical cores"),
+			gettext_noop("Sets the weight to map virtual cores to physical cores in HAWQ for resource enforcement."),
 			NULL
 		},
 		&rm_enforce_core_vpratio,
@@ -8150,7 +8150,7 @@ static struct config_string ConfigureNamesString[] =
 
 	{
 		{"hawq_re_cgroup_mount_point", PGC_POSTMASTER, RESOURCES_MGM,
-			gettext_noop("set cgroup mount point for resource enforcement"),
+			gettext_noop("Sets the mount point of CGroup file system for resource enforcement."),
 			NULL
 		},
 		&rm_enforce_cgrp_mnt_pnt,
@@ -8159,11 +8159,11 @@ static struct config_string ConfigureNamesString[] =
 
 	{
 		{"hawq_re_cgroup_hierarchy_name", PGC_POSTMASTER, RESOURCES_MGM,
-			gettext_noop("set cgroup hierarchy name for resource enforcement"),
+			gettext_noop("Sets the name of the hierarchy to accomodate CGroup directories/files for resource enforcement."),
 			NULL
 		},
 		&rm_enforce_cgrp_hier_name,
-		"hadoop-yarn", NULL, NULL
+		"hawq", NULL, NULL
 	},
 
 	{
