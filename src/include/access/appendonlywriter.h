@@ -21,12 +21,6 @@
 #include "storage/lock.h"
 #include "tcop/dest.h"
 
-/*
- * Maximum concurrent number of write segment files for AO relation.
- * TODO: may want to make this a guc instead (can only be set at gpinit time).
- */
-#define MAX_AOREL_SEGFILE_STATUS (2048 * 128)
-
 #define NEXT_END_OF_LIST (-1)
 
 /*
@@ -50,7 +44,7 @@
  * GUC variables
  */
 extern int	MaxAppendOnlyTables;	/* Max # of concurrently used AO rels */
-
+extern int MaxAORelSegFileStatus; /* Max # of concurrently used AO segfiles */
 /*
  * Describes the status of a particular file segment number accross an entire
  * AO relation. 

@@ -41,6 +41,7 @@
  * GUC variables
  */
 int		MaxAppendOnlyTables;		/* Max # of tables */
+int MaxAORelSegFileStatus;  /* Max # of AO relation segfiles */
 extern bool		filesystem_support_truncate;
 
 /*
@@ -180,7 +181,7 @@ AppendOnlyWriterShmemSize(void)
 	size = add_size(size, sizeof(AppendOnlyWriterData));
 
 	/* The size of the AOSegfileStatus pool */
-	size = add_size(size, mul_size((Size)MAX_AOREL_SEGFILE_STATUS, sizeof(AOSegfileStatus)));
+	size = add_size(size, mul_size((Size)MaxAORelSegFileStatus, sizeof(AOSegfileStatus)));
 
 	/* Add a safety margin */
 	size = add_size(size, size / 10);
@@ -224,7 +225,7 @@ InitAppendOnlyWriter(void)
 				 errmsg("not enough shared memory for append only writer")));
 
 	/* Create the pool of AOSegfileStatus. */
-	poolAOSegfileStatusTotalSize = mul_size((Size)MAX_AOREL_SEGFILE_STATUS, sizeof(AOSegfileStatus));
+	poolAOSegfileStatusTotalSize = mul_size((Size)MaxAORelSegFileStatus, sizeof(AOSegfileStatus));
 	AOSegfileStatusPool = (AOSegfileStatus *)
 			ShmemInitStruct("Append Only Segment Status Pool",
 					poolAOSegfileStatusTotalSize,
@@ -232,12 +233,12 @@ InitAppendOnlyWriter(void)
 
 	/* Initialize all segfile status */
 	status = AOSegfileStatusPool;
-	for(i = 0; i < MAX_AOREL_SEGFILE_STATUS; status++, i++)
+	for(i = 0; i < MaxAORelSegFileStatus; status++, i++)
 	{
 		status->id = i;
 		status->next = i + 1;
 	}
-	AOSegfileStatusPool[MAX_AOREL_SEGFILE_STATUS-1].next = NEXT_END_OF_LIST;
+	AOSegfileStatusPool[MaxAORelSegFileStatus-1].next = NEXT_END_OF_LIST;
 
 	/* Specify we have no open segment files now */
 	AppendOnlyWriter->head_free_segfilestatus = 0;
@@ -373,7 +374,7 @@ AORelCreateHashEntry(Oid relid)
 
 	Insist(aoHashEntry->relid == relid);
 	aoHashEntry->txns_using_rel = 0;
-    aoHashEntry->staleTid = InvalidTransactionId;
+  aoHashEntry->staleTid = InvalidTransactionId;
 
 	/*
 	 * Segment file number 0 is reserved for utility mode operations.
@@ -384,7 +385,7 @@ AORelCreateHashEntry(Oid relid)
 	aoHashEntry->head_rel_segfile.xid = InvalidTransactionId;
 	aoHashEntry->head_rel_segfile.latestWriteXid = InvalidTransactionId;
 	aoHashEntry->head_rel_segfile.isfull = true;
-    aoHashEntry->head_rel_segfile.needCheck = true;
+  aoHashEntry->head_rel_segfile.needCheck = true;
 	aoHashEntry->head_rel_segfile.tupcount = 0;
 	aoHashEntry->head_rel_segfile.tupsadded = 0;
 	aoHashEntry->max_seg_no = 0;
@@ -720,7 +721,7 @@ AppendOnlyRelHashNew(Oid relid, bool *exists)
 
 					/* remove this unused entry */
 					/* TODO: remove the LRU entry, not just any unused one */
-                    AORelRemoveHashEntry(hentry->relid, false);
+          AORelRemoveHashEntry(hentry->relid, false);
 					hash_seq_term(&status);
 
 					/* we now have room for a new entry, create it */
@@ -1117,7 +1118,7 @@ List *SetSegnoForWrite(List *existing_segnos, Oid relid, int segment_num,
                     {
                         LWLockRelease(AOSegFileLock);
                         ereport(ERROR, (errmsg("cannot open more than %d append-only table segment files cocurrently",
-                                        MAX_AOREL_SEGFILE_STATUS)));
+                                        MaxAORelSegFileStatus)));
                     }
                     AOSegfileStatusPool[new_status].segno = ++aoentry->max_seg_no;
                     AOSegfileStatusPool[new_status].next = aoentry->head_rel_segfile.next;
@@ -1676,7 +1677,7 @@ AORelGetSegfileStatus(void)
 {
 	int result;
 
-	if (AppendOnlyWriter->num_existing_segfilestatus + 1 > MAX_AOREL_SEGFILE_STATUS)
+	if (AppendOnlyWriter->num_existing_segfilestatus + 1 > MaxAORelSegFileStatus)
 	{
 		return NEXT_END_OF_LIST;
 	}
@@ -1692,7 +1693,7 @@ AORelGetSegfileStatus(void)
 static void
 AORelPutSegfileStatus(int id)
 {
-	Assert((id >= 0) && (id < MAX_AOREL_SEGFILE_STATUS));
+	Assert((id >= 0) && (id < MaxAORelSegFileStatus));
 	Assert(AOSegfileStatusPool[id].id == id);
 
 	AOSegfileStatusPool[id].next = AppendOnlyWriter->head_free_segfilestatus;
