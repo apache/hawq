@@ -30,6 +30,7 @@
 
 #include <signal.h>
 
+#include "access/appendonlywriter.h"
 #include "access/gin.h"
 #include "access/transam.h"
 #include "access/aosegfiles.h"
@@ -5434,6 +5435,15 @@ static struct config_int ConfigureNamesInt[] =
 		},
 		&MaxAppendOnlyTables,
 		2048, 0, INT_MAX, NULL, NULL
+	},
+
+	{
+	  {"max_appendonly_segfiles", PGC_POSTMASTER, APPENDONLY_TABLES,
+	    gettext_noop("Maximum number of different (unrelated) appendonly table segment files that can be opened concurrently."),
+	    NULL
+	  },
+	  &MaxAORelSegFileStatus,
+	  262144, 2048, INT_MAX, NULL, NULL
 	},
 
 	{
