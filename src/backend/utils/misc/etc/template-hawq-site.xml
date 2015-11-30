@@ -103,13 +103,13 @@ under the License.
 
 	<property>
 		<name>hawq_rm_yarn_address</name>
-		<value>%master.host%:9980</value>
+		<value>%master.host%:8032</value>
 		<description>The address of YARN resource manager server.</description>
 	</property>
 
 	<property>
 		<name>hawq_rm_yarn_scheduler_address</name>
-		<value>%master.host%:9981</value>
+		<value>%master.host%:8030</value>
 		<description>The address of YARN scheduler server.</description>
 	</property>
 
