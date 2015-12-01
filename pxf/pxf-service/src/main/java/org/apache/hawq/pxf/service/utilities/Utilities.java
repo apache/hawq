@@ -23,9 +23,9 @@ package org.apache.hawq.pxf.service.utilities;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.apache.hawq.pxf.api.utilities.InputData;
 
 /**
@@ -135,5 +135,22 @@ public class Utilities {
         for (int b : bytes) {
             sb.append(String.format("\\\\%03o", b & 0xff));
         }
+    }
+
+    /**
+     * Replaces any non-alpha-numeric character with a '.'.
+     * This measure is used to prevent cross-site scripting (XSS)
+     * when an input string might include code or script. By removing
+     * all special character and returning a censured string to the user
+     * this thread is avoided.
+     *
+     * @param input string to be masked
+     * @return masked string
+     */
+    public static String maskNonPrintables(String input) {
+        if (StringUtils.isEmpty(input)) {
+            return input;
+        }
+        return input.replaceAll("[^a-zA-Z0-9_-]", ".");
     }
 }

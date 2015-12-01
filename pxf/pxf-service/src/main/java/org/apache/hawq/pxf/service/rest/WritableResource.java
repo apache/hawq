@@ -8,9 +8,9 @@ package org.apache.hawq.pxf.service.rest;
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -37,16 +37,16 @@ import javax.ws.rs.core.Response;
 import org.apache.catalina.connector.ClientAbortException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.apache.hawq.pxf.service.Bridge;
 import org.apache.hawq.pxf.service.WriteBridge;
 import org.apache.hawq.pxf.service.utilities.ProtocolData;
 import org.apache.hawq.pxf.service.utilities.SecuredHDFS;
+import org.apache.hawq.pxf.service.utilities.Utilities;
 
 /*
  * Running this resource manually:
  *
- * run: 
+ * run:
  	curl -i -X post "http://localhost:50070/pxf/v5w/Writable/stream?path=/data/curl/curl`date \"+%h%d_%H%M%s\"`" \
  	--header "X-GP-Accessor: TextFileWAccessor" \
  	--header "X-GP-Resolver: TextWResolver" \
@@ -75,13 +75,13 @@ import org.apache.hawq.pxf.service.utilities.SecuredHDFS;
 	wrote 15 bytes to curlAug11_17271376231245
 
 	file content:
-	bin/hdfs dfs -cat /data/curl/*45 
+	bin/hdfs dfs -cat /data/curl/*45
 	data111&data222
 
  */
 
 
-/*
+/**
  * This class handles the subpath /<version>/Writable/ of this
  * REST component
  */
@@ -92,7 +92,7 @@ public class WritableResource extends RestResource{
     public WritableResource() {
     }
 
-    /*
+    /**
      * This function is called when http://nn:port/pxf/vx/Writable/stream?path=...
 	 * is used.
 	 *
@@ -100,6 +100,9 @@ public class WritableResource extends RestResource{
 	 * @param headers Holds HTTP headers from request
 	 * @param path Holds URI path option used in this request
 	 * @param inputStream stream of bytes to write from Hawq
+     * @return ok response if the operation finished successfully
+     * @throws Exception in case of wrong request parameters, failure to
+     *             initialize bridge or to write data
      */
     @POST
     @Path("stream")
@@ -117,7 +120,7 @@ public class WritableResource extends RestResource{
 
         ProtocolData protData = new ProtocolData(params);
         protData.setDataSource(path);
-        
+
         SecuredHDFS.verifyToken(protData, servletContext);
         Bridge bridge = new WriteBridge(protData);
 
@@ -163,7 +166,9 @@ public class WritableResource extends RestResource{
         } finally {
             inputStream.close();
         }
-        returnMsg = "wrote " + totalWritten + " bulks to " + path;
+
+        String censuredPath = Utilities.maskNonPrintables(path);
+        returnMsg = "wrote " + totalWritten + " bulks to " + censuredPath;
         LOG.debug(returnMsg);
 
         return Response.ok(returnMsg).build();
