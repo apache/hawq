@@ -8,9 +8,9 @@ package org.apache.hawq.pxf.service.rest;
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -37,11 +37,11 @@ import javax.ws.rs.core.Response;
 import org.apache.catalina.connector.ClientAbortException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.apache.hawq.pxf.service.Bridge;
 import org.apache.hawq.pxf.service.WriteBridge;
 import org.apache.hawq.pxf.service.utilities.ProtocolData;
 import org.apache.hawq.pxf.service.utilities.SecuredHDFS;
+import org.apache.hawq.pxf.service.utilities.Utilities;
 
 /*
  * Running this resource manually:
@@ -166,7 +166,8 @@ public class WritableResource extends RestResource{
         } finally {
             inputStream.close();
         }
-        String censuredPath = path.replaceAll("[^a-zA-Z0-9_-]", ".");
+
+        String censuredPath = Utilities.maskNonPrintable(path);
         returnMsg = "wrote " + totalWritten + " bulks to " + censuredPath;
         LOG.debug(returnMsg);
 
