@@ -90,4 +90,23 @@ public class UtilitiesTest {
                     + "Plugins provided by PXF must start with \"org.apache.hawq.pxf\"");
         }
     }
+
+    @Test
+    public void maskNonPrintable() throws Exception {
+        String input = "";
+        String result = Utilities.maskNonPrintable(input);
+        assertEquals("", result);
+
+        input = null;
+        result = Utilities.maskNonPrintable(input);
+        assertEquals(null, result);
+
+        input = "Lucy in the sky";
+        result = Utilities.maskNonPrintable(input);
+        assertEquals("Lucy.in.the.sky", result);
+
+        input = "with <$$$@#$!000diamonds!!?!$#&%/>";
+        result = Utilities.maskNonPrintable(input);
+        assertEquals("with.........000diamonds..........", result);
+    }
 }
