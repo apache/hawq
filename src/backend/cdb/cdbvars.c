@@ -350,6 +350,8 @@ int		rm_resource_allocation_timeout;	/* How may seconds to wait before
 										   request. */
 int		rm_resource_timeout;		/* How many seconds to wait before returning
 									   resource back to the resource broker. */
+int		rm_request_timeoutcheck_interval;
+
 int		rm_session_lease_heartbeat_interval; /* How many seconds to wait before sending
 										   	    another heart-beat to resource manager. */
 

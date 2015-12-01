@@ -2020,13 +2020,13 @@ int  addResourceQueueAndUserFromProperties(List *queueprops, List *userprops)
 int generateAllocRequestToBroker(void)
 {
 	int res = FUNC_RETURN_OK;
-	/*
-	 *--------------------------------------------------------------------------
+	/*--------------------------------------------------------------------------
 	 * This is a temporary restrict that HAWQ RM supports only one memory/core
 	 * ratio in current version.
 	 *--------------------------------------------------------------------------
 	 */
 	Assert( PQUEMGR->RatioCount == 1 );
+
 	DynMemoryCoreRatioTrack mctrack = PQUEMGR->RatioTrackers[0];
 
 	bool hasWorkload = mctrack->TotalUsed.MemoryMB +
@@ -2068,6 +2068,7 @@ int generateAllocRequestToBroker(void)
 	List 	 *ressegl	 = NULL;
 	ListCell *cell		 = NULL;
 	getAllPAIRRefIntoList(&(PRESPOOL->Segments), &ressegl);
+
 	foreach(cell, ressegl)
 	{
 		PAIR pair = (PAIR)lfirst(cell);
@@ -2167,6 +2168,37 @@ int generateAllocRequestToBroker(void)
 	reqmem = reqcore * mctrack->MemCoreRatio;
 
 	elog(RMLOG, "Resource manager now needs %d GRM containers.", reqcore);
+
+	/*
+	 * Check if should raise water level to deal with resource fragment or
+	 * resource uneven problems. We trigger this logic only when no resource
+	 * request caused by lack of resource, and no pending resource are waited
+	 * for.
+	 */
+	if ( reqcore <= 0 &&
+		 mctrack->TotalPending.Core <= 0 &&
+		 (PQUEMGR->hasResourceProblem[RESPROBLEM_FRAGMENT] ||
+		  PQUEMGR->hasResourceProblem[RESPROBLEM_UNEVEN]   ||
+		  PQUEMGR->hasResourceProblem[RESPROBLEM_TOOFEWSEG]) )
+	{
+		/* Check if it is possible to raise water level. */
+		if ( mctrack->TotalAllocated.Core + 1 <=
+			 PRESPOOL->GRMTotal.Core * PQUEMGR->GRMQueueMaxCapacity )
+		{
+			/*
+			 * We only add one more GRM container to acquire, this will trigger
+			 * the following logic to raise the water level.
+			 */
+			reqcore = 1;
+			reqmem = reqcore * mctrack->MemCoreRatio;
+
+			PQUEMGR->hasResourceProblem[RESPROBLEM_FRAGMENT]  = false;
+			PQUEMGR->hasResourceProblem[RESPROBLEM_UNEVEN]    = false;
+			PQUEMGR->hasResourceProblem[RESPROBLEM_TOOFEWSEG] = false;
+
+			elog(LOG, "Resource manager raises segment resource water level.");
+		}
+	}
 
 	/* Call resource broker to request resource. */
 	if ( reqmem > 0 && reqcore > 0 )
