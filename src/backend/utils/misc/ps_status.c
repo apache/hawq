@@ -109,6 +109,9 @@ static char     ps_username[64];        /*CDB*/
 static int	save_argc;
 static char **save_argv;
 
+/* maximum database name string length */
+#define DBNAME_MAX	10
+
 /*
  * GPDB: the real activity location, the location right after
  * those "con1 seg1 cmd1" strings. Sometimes we need to modify
@@ -310,6 +313,22 @@ init_ps_display(const char *username, const char *dbname,
      * Make fixed prefix of ps display.
      */
 
+    /* Cut displayed database name to a short string if necessary. */
+    char dbname2[DBNAME_MAX+4];
+    int dbnamelen = strlen(dbname);
+    if ( dbnamelen <= DBNAME_MAX )
+    {
+    	strcpy(dbname2, dbname);
+    }
+    else
+    {
+    	strncpy(dbname2, dbname, DBNAME_MAX);
+    	dbname2[DBNAME_MAX  ] = '.';
+    	dbname2[DBNAME_MAX+1] = '.';
+    	dbname2[DBNAME_MAX+2] = '.';
+    	dbname2[DBNAME_MAX+3] = '\0';
+    }
+
 #ifdef PS_USE_SETPROCTITLE
 
     /*
@@ -318,11 +337,11 @@ init_ps_display(const char *username, const char *dbname,
      */
     snprintf(ps_buffer, ps_buffer_size,
              "port %5d, %s %s %s ",
-             PostPortNumber, username, dbname, host_info);
+             PostPortNumber, username, dbname2, host_info);
 #else
     snprintf(ps_buffer, ps_buffer_size,
              "postgres: port %5d, %s %s %s ",
-             PostPortNumber, username, dbname, host_info);
+             PostPortNumber, username, dbname2, host_info);
 #endif /* not PS_USE_SETPROCTITLE */
 
     ps_buffer_fixed_size = strlen(ps_buffer);
@@ -384,31 +403,30 @@ set_ps_display(const char *activity, bool force)
     }
 
     /* Add client session's global id. */
-    if (gp_session_id > 0)
+    if (ep > cp && gp_session_id > 0)
         cp += snprintf(cp, ep-cp, "con%d ", gp_session_id);
 
-    /* Add host and port.  (Not very useful for qExecs, so skip.) */
-    if (Gp_role != GP_ROLE_EXECUTE &&
-        ps_host_info[0] != '\0')
-        cp += snprintf(cp, ep-cp, "%s ", ps_host_info);
-
     /* Which segment is accessed by this qExec? */
-    if (Gp_role == GP_ROLE_EXECUTE &&
-        GetQEIndex() >= MASTER_CONTENT_ID)
+    if (ep > cp && Gp_role == GP_ROLE_EXECUTE && GetQEIndex() >= MASTER_CONTENT_ID)
         cp += snprintf(cp, ep-cp, "seg%d ", GetQEIndex());
 
     /* Add count of commands received from client session. */
-    if (gp_command_count > 0)
+    if (ep > cp && gp_command_count > 0)
         cp += snprintf(cp, ep-cp, "cmd%d ", gp_command_count);
 
 	/* Add slice number information */
-	if (currentSliceId > 0)
+	if (ep > cp && currentSliceId > 0)
 		cp += snprintf(cp, ep-cp,"slice%d ", currentSliceId);
 
 	real_act_prefix_size = cp - ps_buffer;
 
     /* Append caller's activity string. */
-    StrNCpy(cp, activity, ep-cp);
+	if ( ep > cp )
+		cp += snprintf(cp, ep-cp, "%s ", activity);
+
+    /* Add host and port.  (Not very useful for qExecs, so skip.) */
+    if (ep > cp && Gp_role != GP_ROLE_EXECUTE && ps_host_info[0] != '\0')
+        cp += snprintf(cp, ep-cp, "%s ", ps_host_info);
 
     /* Transmit new setting to kernel, if necessary */
 #ifdef PS_USE_SETPROCTITLE
