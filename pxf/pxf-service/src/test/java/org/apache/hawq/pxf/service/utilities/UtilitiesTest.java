@@ -107,6 +107,10 @@ public class UtilitiesTest {
 
         input = "with <$$$@#$!000diamonds!!?!$#&%/>";
         result = Utilities.maskNonPrintables(input);
-        assertEquals("with.........000diamonds..........", result);
+        assertEquals("with.........000diamonds......../.", result);
+
+        input = "http://www.beatles.com/info?query=whoisthebest";
+        result = Utilities.maskNonPrintables(input);
+        assertEquals("http://www.beatles.com/info.query.whoisthebest", result);
     }
 }

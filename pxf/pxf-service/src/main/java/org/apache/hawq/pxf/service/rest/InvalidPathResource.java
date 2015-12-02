@@ -22,6 +22,7 @@ package org.apache.hawq.pxf.service.rest;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hawq.pxf.service.utilities.Utilities;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -73,7 +74,7 @@ public class InvalidPathResource {
     }
 
     private Response noPath() throws Exception {
-        String errmsg = "Unknown path " + rootUri.getAbsolutePath();
+        String errmsg = "Unknown path \"" + Utilities.maskNonPrintables(rootUri.getAbsolutePath().toString()) + "\"";
         return sendErrorMessage(errmsg);
     }
 
@@ -105,7 +106,7 @@ public class InvalidPathResource {
                 "Version " + version + ", supported version is " + Version.PXF_PROTOCOL_VERSION);
 
         if (version.equals(Version.PXF_PROTOCOL_VERSION)) {
-            errmsg = "Unknown path " + rootUri.getAbsolutePath();
+            errmsg = "Unknown path \"" + Utilities.maskNonPrintables(rootUri.getAbsolutePath().toString()) + "\"";
         } else {
             errmsg = "Wrong version " + version + ", supported version is " + Version.PXF_PROTOCOL_VERSION;
         }
