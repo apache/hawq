@@ -141,8 +141,8 @@ public class Utilities {
      * Replaces any non-alpha-numeric character with a '.'.
      * This measure is used to prevent cross-site scripting (XSS)
      * when an input string might include code or script. By removing
-     * all special character and returning a censured string to the user
-     * this thread is avoided.
+     * all special characters and returning a censured string to the user
+     * this threat is avoided.
      *
      * @param input string to be masked
      * @return masked string
