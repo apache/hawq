@@ -579,7 +579,7 @@ BlockLocation *GetHdfsFileBlockLocations(const HdfsFileInfo *file_info, uint64_t
     MetadataCacheEntry *cache_entry = NULL;
     BlockLocation *locations = NULL;
 
-    LWLockAcquire(MetadataCacheLock, LW_EXCLUSIVE);
+    LWLockAcquire(MetadataCacheLock, LW_SHARED);
 
     cache_entry = MetadataCacheExists(file_info);
     if (!cache_entry)
@@ -619,6 +619,9 @@ BlockLocation *GetHdfsFileBlockLocations(const HdfsFileInfo *file_info, uint64_t
             if (cache_entry->block_num <= 1)
             {
                 // only one file, re-fetch 
+                LWLockRelease(MetadataCacheLock); 
+                
+                LWLockAcquire(MetadataCacheLock, LW_EXCLUSIVE);
                 RemoveHdfsFileBlockLocations(file_info);
                 LWLockRelease(MetadataCacheLock); 
                 
