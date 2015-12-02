@@ -4199,6 +4199,16 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
+		{"debug_datalocality_time", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Sets whether enable debug data locality to check elapse time of metadata, datalocality, rm"),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&debug_datalocality_time,
+		false, NULL, NULL
+	},
+
+	{
 		{"datalocality_remedy_enable", PGC_USERSET, DEVELOPER_OPTIONS,
 			gettext_noop("Sets whether enable data locality remedy when nonlocal read"),
 			NULL,

@@ -893,6 +893,10 @@ int64 get_block_locations_and_claculte_table_size(split_to_segment_mapping_conte
 	" %d us with hit rate %f \n", totalFileCount,eclaspeTime,hitrate);
 	context->total_file_count = totalFileCount;
 	context->total_size = total_size;
+
+	if(debug_datalocality_time){
+		elog(LOG, "metadata overall execution time: %d us. \n", eclaspeTime);
+	}
 	return total_size;
 }
 
@@ -3800,7 +3804,12 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 
 	alloc_result = post_process_assign_result(&split_assign_result);
 
-
+	uint64_t run_datalocality = 0;
+	run_datalocality = gettime_microsec();
+	int dl_overall_time = run_datalocality - before_run_allocation;
+	if(debug_datalocality_time){
+		elog(LOG, "datalocality overall execution time: %d us. \n", dl_overall_time);
+	}
 	return alloc_result;
 }
 
@@ -4046,6 +4055,7 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 			maxTargetSegmentNumber = enforce_virtual_segment_number;
 			minTargetSegmentNumber = enforce_virtual_segment_number;
 		}
+		uint64_t before_rm_allocate_resource = gettime_microsec();
 		if (QRL_NONE != resourceLife) {
 			resource = AllocateResource(QRL_ONCE, sliceNum, context.total_size,
 					maxTargetSegmentNumber, minTargetSegmentNumber,
@@ -4058,6 +4068,11 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 			GetResourceQuota(maxTargetSegmentNumber, minTargetSegmentNumber, &seg_num,
 					&seg_num_min, &seg_memory_mb, &seg_core);
 			planner_segments = seg_num;
+		}
+		uint64_t after_rm_allocate_resource = gettime_microsec();
+		int eclaspeTime = after_rm_allocate_resource - before_rm_allocate_resource;
+		if(debug_datalocality_time){
+			elog(LOG, "rm allocate resource overall execution time: %d us. \n", eclaspeTime);
 		}
 
 		if (resource == NULL) {
@@ -4104,5 +4119,8 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 
 	cleanup_allocation_algorithm(&context);
 
+	if(debug_datalocality_time){
+		elog(ERROR, "Abort debug metadata, datalocality, rm Time.");
+	}
 	return result;
 }

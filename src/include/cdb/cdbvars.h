@@ -1163,6 +1163,7 @@ extern bool debug_fake_datalocality;
 extern bool datalocality_remedy_enable;
 extern bool get_tmpdir_from_rm;
 extern bool debug_fake_segmentnum;
+extern bool debug_datalocality_time;
 
 /* New HAWQ 2.0 basic GUCs */
 extern char   *master_addr_host;
