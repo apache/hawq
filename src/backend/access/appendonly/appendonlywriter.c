@@ -1672,14 +1672,52 @@ void ValidateAppendOnlyMetaDataSnapshot(
 	// Placeholder.
 }
 
+static bool
+AORelFreeSegfileStatus()
+{
+  HASH_SEQ_STATUS status;
+  AORelHashEntryData  *hentry;
+  bool freedOne = false;
+  /*
+   * loop through all entries looking for an unused one
+   */
+  hash_seq_init(&status, AppendOnlyHash);
+
+  while ((hentry = (AORelHashEntryData *) hash_seq_search(&status)) != NULL)
+  {
+    if(hentry->txns_using_rel == 0 && InvalidTransactionId==hentry->staleTid)
+    {
+      if (Debug_appendonly_print_segfile_choice)
+      {
+        ereport(LOG, (errmsg("AppendOnlyRelHashNew: Appendonly Writer removing an "
+                   "unused entry (rel %d) to make "
+                   "room for a new one",
+                   hentry->relid)));
+      }
+
+      /* remove this unused entry */
+      /* TODO: remove the LRU entry, not just any unused one */
+      freedOne = AORelRemoveHashEntry(hentry->relid, false);
+      hash_seq_term(&status);
+      break;
+    }
+  }
+  return freedOne;
+}
+
 static int
 AORelGetSegfileStatus(void)
 {
 	int result;
 
-	if (AppendOnlyWriter->num_existing_segfilestatus + 1 > MaxAORelSegFileStatus)
+
+	while (AppendOnlyWriter->num_existing_segfilestatus + 1 > MaxAORelSegFileStatus)
 	{
-		return NEXT_END_OF_LIST;
+	  bool freedOne = AORelFreeSegfileStatus();
+	  if (!freedOne)
+	  {
+	    return NEXT_END_OF_LIST;
+	  }
 	}
 
 	result = AppendOnlyWriter->head_free_segfilestatus;
