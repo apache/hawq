@@ -257,14 +257,14 @@ struct UserInfoData {
 typedef struct UserInfoData *UserInfo;
 typedef struct UserInfoData  UserInfoData;
 
-enum RESOURCEPROBLEM
+typedef enum RESOURCEPROBLEM
 {
 	RESPROBLEM_NO = 0,
 	RESPROBLEM_FRAGMENT,
 	RESPROBLEM_UNEVEN,
 	RESPROBLEM_TOOFEWSEG,
 	RESPROBLEM_COUNT
-};
+} RESOURCEPROBLEM;
 
 /******************************************************************************
  * In resource queue manager,  a list of resource queues are saved. This can  *

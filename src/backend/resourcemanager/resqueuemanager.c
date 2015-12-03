@@ -25,6 +25,7 @@
 #include "communication/rmcomm_MessageHandler.h"
 #include "communication/rmcomm_QD_RM_Protocol.h"
 #include "catalog/pg_resqueue.h"
+#include "resourcemanager/resqueuemanager.h"
 
 /*
  * The DDL statement attribute name strings.
@@ -166,7 +167,7 @@ void markMemoryCoreRatioWaterMark(DQueue 		marks,
 void buildTimeoutResponseForQueuedRequest(ConnectionTrack conntrack,
 										  uint32_t 		  reason);
 
-enum RESOURCEPROBLEM isResourceAcceptable(ConnectionTrack conn, int segnumact);
+RESOURCEPROBLEM isResourceAcceptable(ConnectionTrack conn, int segnumact);
 
 void adjustResourceExpectsByQueueNVSegLimits(ConnectionTrack conntrack);
 /*----------------------------------------------------------------------------*/
@@ -4082,7 +4083,7 @@ int dispatchResourceToQueries_EVEN(DynResourceQueueTrack track)
 										 &segnumact,
 										 &(conn->SegIOBytes));
 
-		enum RESOURCEPROBLEM accepted = isResourceAcceptable(conn, segnumact);
+		RESOURCEPROBLEM accepted = isResourceAcceptable(conn, segnumact);
 		if ( accepted == RESPROBLEM_NO )
 		{
 			elog(DEBUG3, "Resource manager dispatched %d segment(s) to connection %d",
@@ -4172,7 +4173,7 @@ int dispatchResourceToQueries_EVEN(DynResourceQueueTrack track)
 	return FUNC_RETURN_OK;
 }
 
-enum RESOURCEPROBLEM isResourceAcceptable(ConnectionTrack conn, int segnumact)
+RESOURCEPROBLEM isResourceAcceptable(ConnectionTrack conn, int segnumact)
 {
 	/*--------------------------------------------------------------------------
 	 * Enough number of vsegments. If resource queue has enough quota, but
