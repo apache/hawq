@@ -305,6 +305,7 @@ bool debug_fake_datalocality;
 bool datalocality_remedy_enable;
 bool get_tmpdir_from_rm;
 bool debug_fake_segmentnum;
+bool debug_datalocality_time;
 
 /* New HAWQ 2.0 basic GUCs. Some of these are duplicate variables, they are
  * reserved to facilitate showing settings in hawq-site.xml. */
