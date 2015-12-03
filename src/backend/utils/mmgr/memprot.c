@@ -491,7 +491,9 @@ int gp_update_mem_quota(int mem_quota_total)
 
 		if (mem_quota_total < 0)
 		{
-			elog(LOG, "Greenplum memory protection cannot set memory counter to negative value");
+			elog(LOG, "Resource enforcer cannot set memory counter to "
+			          "negative value %d MB",
+			          mem_quota_total);
 
 			return RESENFORCER_FAIL_UPDATE_MEMORY_QUOTA;
 		}
@@ -499,7 +501,6 @@ int gp_update_mem_quota(int mem_quota_total)
 		if (mem_quota_total > VmemTracker_GetPhysicalMemQuotaInMB() - hawq_re_memory_overcommit_max)
 		{
 			mem_quota_total = VmemTracker_GetPhysicalMemQuotaInMB() - hawq_re_memory_overcommit_max;
-			elog(LOG, "Greenplum memory protection sets memory counter to its maximum value");
 		}
 
 		mem_quota_total = VmemTracker_ConvertVmemMBToChunks(mem_quota_total + hawq_re_memory_overcommit_max);
@@ -508,14 +509,22 @@ int gp_update_mem_quota(int mem_quota_total)
 
 		if ( ret == 0 )
 		{
-			elog(LOG, "Greenplum memory protection succeeds to set memory counter: Total = %d MB",
-			           VmemTracker_GetDynamicMemoryQuotaSema());
+			elog(LOG, "Resource enforcer succeeds to set memory counter to "
+			          "%d chunks: "
+			          "there are %d chunks with %d MB per chunk now",
+			          mem_quota_total,
+			          VmemTracker_GetDynamicMemoryQuotaSema(),
+			          VmemTracker_ConvertVmemChunksToMB(1));
 		}
 		else
 		{
-			elog(LOG, "Greenplum memory protection fails to set memory counter with error %d: Total = %d MB",
-					   ret,
-					   VmemTracker_GetDynamicMemoryQuotaSema());
+			elog(LOG, "Resource enforcer fails to set memory counter to "
+			          "%d chunks with error %d: "
+			          "there are %d chunks with %d MB per chunk now",
+			           mem_quota_total,
+			           ret,
+			           VmemTracker_GetDynamicMemoryQuotaSema(),
+			           VmemTracker_ConvertVmemChunksToMB(1));
 		}
 
 		return (ret == 0) ? FUNC_RETURN_OK : RESENFORCER_FAIL_UPDATE_MEMORY_QUOTA;

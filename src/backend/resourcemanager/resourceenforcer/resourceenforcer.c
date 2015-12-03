@@ -44,7 +44,7 @@
 #include "resourceenforcer/resourceenforcer_hash.h"
 
 
-#define	ENFORCER_MESSAGE_HEAD "Resource Enforcement ::"
+#define	ENFORCER_MESSAGE_HEAD "Resource enforcer"
 /* #define DEBUG_GHASH 1 */
 
 static char *getCGroupPath(const char *cgroup_name, const char *sub_system);
@@ -92,9 +92,9 @@ int MoveToCGroup(uint32 pid, const char *cgroup_name)
 	GSimpStringPtr pkey = stringToGSimpString(cgroup_name);
 	if (pkey == NULL)
 	{
-		write_log("%s Prepare CGroup name %s failed with out of memory",
-				  ENFORCER_MESSAGE_HEAD,
-				  cgroup_name);
+		write_log("%s fails to prepare CGroup name %s due to out of memory",
+		          ENFORCER_MESSAGE_HEAD,
+		          cgroup_name);
 
 		return RESENFORCER_ERROR_INSUFFICIENT_MEMORY;
 	}
@@ -108,9 +108,9 @@ int MoveToCGroup(uint32 pid, const char *cgroup_name)
 
 			if (res != FUNC_RETURN_OK)
 			{
-				write_log("%s Create CGroup %s failed",
-						  ENFORCER_MESSAGE_HEAD,
-						  cgroup_name);
+				write_log("%s fails to create CGroup %s",
+				          ENFORCER_MESSAGE_HEAD,
+				          cgroup_name);
 
 				return res;
 			}
@@ -119,9 +119,9 @@ int MoveToCGroup(uint32 pid, const char *cgroup_name)
 		cgi = (CGroupInfo *)malloc(sizeof(CGroupInfo));
 		if (cgi == NULL)
 		{
-			write_log("%s Create CGroup %s failed with out of memory",
-					  ENFORCER_MESSAGE_HEAD,
-					  cgroup_name);
+			write_log("%s fails to create CGroup %s due to out of memory",
+			          ENFORCER_MESSAGE_HEAD,
+			          cgroup_name);
 
 			return RESENFORCER_ERROR_INSUFFICIENT_MEMORY;
 		}
@@ -132,10 +132,10 @@ int MoveToCGroup(uint32 pid, const char *cgroup_name)
 		cgi->pids = llist_create();
 		if (cgi->pids == NULL)
 		{
-			write_log("%s Add PID %d to CGroup %s failed",
-					  ENFORCER_MESSAGE_HEAD,
-					  pid,
-					  cgroup_name);
+			write_log("%s fails to add PID %d to CGroup %s",
+			          ENFORCER_MESSAGE_HEAD,
+			          pid,
+			          cgroup_name);
 
 			res = RESENFORCER_ERROR_INSUFFICIENT_MEMORY;
 
@@ -148,9 +148,9 @@ int MoveToCGroup(uint32 pid, const char *cgroup_name)
 		void *oldvalue = NULL;
 
 	#ifdef DEBUG_GHASH
-		write_log("%s ########## Before add CGroup %s in hash in MoveToCGroup ##########",
-				  ENFORCER_MESSAGE_HEAD,
-				  cgroup_name);
+		write_log("%s: before add CGroup %s in hash in MoveToCGroup",
+		          ENFORCER_MESSAGE_HEAD,
+		          cgroup_name);
 		dumpGHash(g_ghash_cgroup);
 	#endif
 
@@ -160,16 +160,16 @@ int MoveToCGroup(uint32 pid, const char *cgroup_name)
 						 false,
 						 &oldvalue) != FUNC_RETURN_OK)
 		{
-			write_log("%s Add CGroup to list failed with out of memory",
-					  ENFORCER_MESSAGE_HEAD);
+			write_log("%s fails to add CGroup to hash due to out of memory",
+			          ENFORCER_MESSAGE_HEAD);
 			res = RESENFORCER_ERROR_INSUFFICIENT_MEMORY;
 			goto exit;
 		}
 
 	#ifdef DEBUG_GHASH
-		write_log("%s ########## After add CGroup %s in hash in MoveToCGroup ##########",
-				  ENFORCER_MESSAGE_HEAD,
-				  cgroup_name);
+		write_log("%s: after add CGroup %s in hash in MoveToCGroup",
+		          ENFORCER_MESSAGE_HEAD,
+		          cgroup_name);
 		dumpGHash(g_ghash_cgroup);
 	#endif
 	}
@@ -179,9 +179,10 @@ int MoveToCGroup(uint32 pid, const char *cgroup_name)
 		/* revert the delete operation */
 		if (cgi == NULL)
 		{
-			write_log("%s CGroup %s found in hash but its content is inaccessible",
-					  ENFORCER_MESSAGE_HEAD,
-					  cgroup_name);
+			write_log("%s finds CGroup %s is already in hash, "
+			          "but its content is inaccessible",
+			          ENFORCER_MESSAGE_HEAD,
+			          cgroup_name);
 
 			goto exit;
 		}
@@ -192,10 +193,10 @@ int MoveToCGroup(uint32 pid, const char *cgroup_name)
 	}
 
 #ifdef DEBUG_GHASH
-	write_log("%s ########## Before add PID %d in CGroup %s in hash in MoveToCGroup ##########",
-			  ENFORCER_MESSAGE_HEAD,
-			  pid,
-			  cgroup_name);
+	write_log("%s: before add PID %d in CGroup %s in hash in MoveToCGroup",
+	          ENFORCER_MESSAGE_HEAD,
+	          pid,
+	          cgroup_name);
 	dumpGHash(g_ghash_cgroup);
 #endif
 
@@ -203,9 +204,9 @@ int MoveToCGroup(uint32 pid, const char *cgroup_name)
 
 	if (pid_add == NULL)
 	{
-		write_log("%s Create PID %d failed with out of memory",
-				  ENFORCER_MESSAGE_HEAD,
-				  pid);
+		write_log("%s fails to create PID %d due to out of memory",
+		          ENFORCER_MESSAGE_HEAD,
+		          pid);
 
 		res = RESENFORCER_ERROR_INSUFFICIENT_MEMORY;
 
@@ -215,10 +216,10 @@ int MoveToCGroup(uint32 pid, const char *cgroup_name)
 	llist_insert(cgi->pids, pid_add);
 
 #ifdef DEBUG_GHASH
-	write_log("%s ########## After add PID %d in CGroup %s in hash in MoveToCGroup ##########",
-			  ENFORCER_MESSAGE_HEAD,
-			  pid,
-			  cgroup_name);
+	write_log("%s: after add PID %d in CGroup %s in hash in MoveToCGroup",
+	          ENFORCER_MESSAGE_HEAD,
+	          pid,
+	          cgroup_name);
 	dumpGHash(g_ghash_cgroup);
 #endif
 
@@ -229,10 +230,10 @@ int MoveToCGroup(uint32 pid, const char *cgroup_name)
 
 		if (res != FUNC_RETURN_OK)
 		{
-			write_log("%s Add PID %d to CPU CGroup %s failed",
-					  ENFORCER_MESSAGE_HEAD,
-					  pid,
-					  cgroup_name);
+			write_log("%s fails to add PID %d to CPU CGroup %s",
+			          ENFORCER_MESSAGE_HEAD,
+			          pid,
+			          cgroup_name);
 			goto exit;
 		}
 	}
@@ -269,29 +270,30 @@ int MoveOutCGroup(uint32 find_pid, const char *cgroup_name)
 	GSimpStringPtr pkey = stringToGSimpString(cgroup_name);
 	if (pkey == NULL)
 	{
-		write_log("%s Prepare CGroup name %s failed with out of memory",
-				  ENFORCER_MESSAGE_HEAD,
-				  cgroup_name);
+		write_log("%s fails to prepare CGroup name %s due to out of memory",
+		          ENFORCER_MESSAGE_HEAD,
+		          cgroup_name);
 		return RESENFORCER_ERROR_INSUFFICIENT_MEMORY;
 	}
 
 	Pair cgroup = getGHashNode(g_ghash_cgroup, (void *)pkey);
 	if (cgroup == NULL)
 	{
-		write_log("%s Failed to move PID %u out from non-exist cgroup %s",
-				  ENFORCER_MESSAGE_HEAD,
-				  find_pid,
-				  cgroup_name);
+		write_log("%s fails to move PID %u out from CGroup %s "
+		          "since the CGroup does not exist",
+		          ENFORCER_MESSAGE_HEAD,
+		          find_pid,
+		          cgroup_name);
 
 		return RESENFORCER_FAIL_FIND_CGROUP_HASH_ENTRY;
 	}
 	else
 	{
 	#ifdef DEBUG_GHASH
-		write_log("%s ########## Before remove PID %d from CGroup %s in hash in MoveOutCGroup ##########",
-				  ENFORCER_MESSAGE_HEAD,
-				  find_pid,
-				  cgroup_name);
+		write_log("%s: before remove PID %d from CGroup %s in hash in MoveOutCGroup",
+		          ENFORCER_MESSAGE_HEAD,
+		          find_pid,
+		          cgroup_name);
 		dumpGHash(g_ghash_cgroup);
 	#endif
 
@@ -299,10 +301,10 @@ int MoveOutCGroup(uint32 find_pid, const char *cgroup_name)
 		lnode *pid = llist_delete(cgi->pids, &find_pid, CGroupPidCmp);
 
 	#ifdef DEBUG_GHASH
-		write_log("%s ########## After remove PID %d from CGroup %s in hash in MoveOutCGroup ##########",
-				  ENFORCER_MESSAGE_HEAD,
-				  find_pid,
-				  cgroup_name);
+		write_log("%s: after remove PID %d from CGroup %s in hash in MoveOutCGroup",
+		          ENFORCER_MESSAGE_HEAD,
+		          find_pid,
+		          cgroup_name);
 		dumpGHash(g_ghash_cgroup);
 	#endif
 
@@ -318,9 +320,10 @@ int MoveOutCGroup(uint32 find_pid, const char *cgroup_name)
 		}
 		else
 		{
-			write_log("%s Failed to move non-exist PID %u out from CGroup %s",
+			write_log("%s fails to move PID %u out from CGroup %s "
+			          "since the PID does not exist",
 			          ENFORCER_MESSAGE_HEAD,
-					  find_pid,
+			          find_pid,
 			          cgroup_name);
 
 			return RESENFORCER_FAIL_FIND_CGROUP_HASH_ENTRY;
@@ -346,9 +349,9 @@ int SetupWeightCGroup(uint32 pid, const char *cgroup_name, SegmentResource *reso
 	GSimpStringPtr pkey = stringToGSimpString(cgroup_name);
 	if (pkey == NULL)
 	{
-		write_log("%s Prepare CGroup name %s failed with out of memory",
-				  ENFORCER_MESSAGE_HEAD,
-				  cgroup_name);
+		write_log("%s fails to prepare CGroup name %s due to out of memory",
+		          ENFORCER_MESSAGE_HEAD,
+		          cgroup_name);
 
 		return RESENFORCER_ERROR_INSUFFICIENT_MEMORY;
 	}
@@ -356,9 +359,9 @@ int SetupWeightCGroup(uint32 pid, const char *cgroup_name, SegmentResource *reso
 	Pair cgroup = getGHashNode(g_ghash_cgroup, (void *)pkey);
 	if (cgroup == NULL)
 	{
-		write_log("%s Failed to set weight for CGroup %s since it does not exist",
-				  ENFORCER_MESSAGE_HEAD,
-				  cgroup_name);
+		write_log("%s fails to set weight for CGroup %s since it does not exist",
+		          ENFORCER_MESSAGE_HEAD,
+		          cgroup_name);
 
 		return RESENFORCER_FAIL_FIND_CGROUP_HASH_ENTRY;
 	}
@@ -369,10 +372,10 @@ int SetupWeightCGroup(uint32 pid, const char *cgroup_name, SegmentResource *reso
 		cpu_weight = (int32)(resource->vcore * rm_enforce_cpu_weight) + 1;
 
 	#ifdef DEBUG_GHASH
-		write_log("%s ########## Before set CPU weight %d for CGroup %s in hash in SetupWeightCGroup ##########",
-				  ENFORCER_MESSAGE_HEAD,
-				  cpu_weight,
-				  cgroup_name);
+		write_log("%s: before set CPU weight %d for CGroup %s in hash in SetupWeightCGroup",
+		          ENFORCER_MESSAGE_HEAD,
+		          cpu_weight,
+		          cgroup_name);
 		dumpGHash(g_ghash_cgroup);
 	#endif
 
@@ -390,20 +393,20 @@ int SetupWeightCGroup(uint32 pid, const char *cgroup_name, SegmentResource *reso
 			}
 			else
 			{
-				write_log("%s Set weight %d for CPU CGroup %s failed",
-						  ENFORCER_MESSAGE_HEAD,
-						  cpu_weight,
-						  cgroup_name);
+				write_log("%s fails to set weight %d for CPU CGroup %s",
+				          ENFORCER_MESSAGE_HEAD,
+				          cpu_weight,
+				          cgroup_name);
 
 				return res;
 			}
 		}
 
 	#ifdef DEBUG_GHASH
-		write_log("%s ########## After set CPU weight %d for CGroup %s in hash in SetupWeightCGroup ##########",
-				  ENFORCER_MESSAGE_HEAD,
-				  cpu_weight,
-				  cgroup_name);
+		write_log("%s: after set CPU weight %d for CGroup %s in hash in SetupWeightCGroup",
+		          ENFORCER_MESSAGE_HEAD,
+		          cpu_weight,
+		          cgroup_name);
 		dumpGHash(g_ghash_cgroup);
 	#endif
 	}
@@ -451,9 +454,10 @@ int CleanUpCGroupAtRuntime(void)
 
 				if (res == RESENFORCER_ERROR_INSUFFICIENT_MEMORY)
 				{
-					write_log("%s Cannot remove CPU CGroup directory %s due to out of memory",
-							  ENFORCER_MESSAGE_HEAD,
-							  cgi->name);
+					write_log("%s fails to remove CPU CGroup directory %s "
+					          "due to out of memory",
+					          ENFORCER_MESSAGE_HEAD,
+					          cgi->name);
 
 					return RESENFORCER_ERROR_INSUFFICIENT_MEMORY;
 				}
@@ -496,10 +500,10 @@ int CleanUpCGroupAtRuntime(void)
 				}
 				else
 				{
-					write_log("%s Failed to remove CGroup %s with errno %d",
-							  ENFORCER_MESSAGE_HEAD,
-							  cgi->name,
-							  res);
+					write_log("%s fails to remove CGroup %s with errno %d",
+					          ENFORCER_MESSAGE_HEAD,
+					          cgi->name,
+					          res);
 				}
 			}
 
@@ -526,9 +530,10 @@ int CleanUpCGroupAtStartup(const char *sub_system)
 	cgroup_path = getCGroupPath("", sub_system);
 	if (cgroup_path == NULL)
 	{
-		write_log("%s Get CGroup root directory %s out of memory for cleanup at startup",
-				  ENFORCER_MESSAGE_HEAD,
-				  cgroup_path);
+		write_log("%s fails to get CGroup root directory %s "
+		          "for cleanup at startup due to out of memory",
+		          ENFORCER_MESSAGE_HEAD,
+		          cgroup_path);
 
 		return RESENFORCER_ERROR_INSUFFICIENT_MEMORY;
 	}
@@ -536,9 +541,10 @@ int CleanUpCGroupAtStartup(const char *sub_system)
 	cgroup_dir = opendir(cgroup_path);
 	if (cgroup_dir == NULL)
 	{
-		write_log("%s Cannot open CGroup root directory %s for cleanup at startup",
-				  ENFORCER_MESSAGE_HEAD,
-				  cgroup_path);
+		write_log("%s fails to open CGroup root directory %s "
+		          "for cleanup at startup",
+		          ENFORCER_MESSAGE_HEAD,
+		          cgroup_path);
 
 		free(cgroup_path);
 		return RESENFORCER_FAIL_READ_CGROUP_FILE;
@@ -553,9 +559,10 @@ int CleanUpCGroupAtStartup(const char *sub_system)
 
 			if (res != FUNC_RETURN_OK)
 			{
-				write_log("%s Cannot remove CGroup directory %s for cleanup at startup",
-						  ENFORCER_MESSAGE_HEAD,
-						  cgroup_ent->d_name);
+				write_log("%s fails to remove CGroup directory %s "
+				          "for cleanup at startup",
+				          ENFORCER_MESSAGE_HEAD,
+				          cgroup_ent->d_name);
 
 				closedir(cgroup_dir);
 				return RESENFORCER_FAIL_DELETE_CGROUP;
@@ -600,8 +607,8 @@ char *getCGroupPath(const char *cgroup_name, const char *sub_system)
 
 	if (cgroup_path == NULL)
 	{
-		write_log("%s Failed to get CGroup path with out of memroy",
-				  ENFORCER_MESSAGE_HEAD);
+		write_log("%s fails to get CGroup path due to out of memroy",
+		          ENFORCER_MESSAGE_HEAD);
 
 		return NULL;
 	}
@@ -628,9 +635,9 @@ int createCGroup(const char *cgroup_name, const char *sub_system)
 
 	if (cgroup_path == NULL)
 	{
-		write_log("%s Create CGroup %s failed with out of memory",
-				  ENFORCER_MESSAGE_HEAD,
-				  cgroup_name);
+		write_log("%s fails to create CGroup %s due to out of memory",
+		          ENFORCER_MESSAGE_HEAD,
+		          cgroup_name);
 
 		return RESENFORCER_ERROR_INSUFFICIENT_MEMORY;
 	}
@@ -638,7 +645,7 @@ int createCGroup(const char *cgroup_name, const char *sub_system)
 	/*  create the CGroup directory directly */
 	if (mkdir(cgroup_path, S_IRWXU | S_IRGRP | S_IXGRP) < 0)
 	{
-		write_log("%s Cannot create CGroup directory %s with errno %d",
+		write_log("%s fails to create CGroup directory %s with errno %d",
 		          ENFORCER_MESSAGE_HEAD,
 		          cgroup_path,
 		          errno);
@@ -663,9 +670,9 @@ int deleteCGroup(const char *cgroup_name, const char *sub_system)
 
 	if (cgroup_path == NULL)
 	{
-		write_log("%s Failed to delete CGroup %s due to out of memory",
-				  ENFORCER_MESSAGE_HEAD,
-				  cgroup_name);
+		write_log("%s fails to delete CGroup %s due to out of memory",
+		          ENFORCER_MESSAGE_HEAD,
+		          cgroup_name);
 
 		return RESENFORCER_ERROR_INSUFFICIENT_MEMORY;
 	}
@@ -675,7 +682,7 @@ int deleteCGroup(const char *cgroup_name, const char *sub_system)
 	/* Delete the CGroup directory directly */
 	if (rmdir(cgroup_path) < 0)
 	{
-		write_log("%s Cannot delete CGroup directory %s with errno %d",
+		write_log("%s fails to delete CGroup directory %s with errno %d",
 		          ENFORCER_MESSAGE_HEAD,
 		          cgroup_path,
 		          errno);
@@ -708,8 +715,8 @@ char *getCGroupFilePath(const char *cgroup_name,
 
 	if (cgroup_path == NULL)
 	{
-		write_log("%s Failed to get cgroup path with out of memroy",
-				  ENFORCER_MESSAGE_HEAD);
+		write_log("%s fails to get CGroup path due to out of memroy",
+		          ENFORCER_MESSAGE_HEAD);
 
 		return NULL;
 	}
@@ -737,11 +744,11 @@ int writeCGroupFileInt32(const char *cgroup_path,
 
 	if (!fp)
 	{
-		write_log("%s Write weight %d for CGroup %s failed with errno %d",
-				  ENFORCER_MESSAGE_HEAD,
-				  value,
-				  cgroup_path,
-				  errno);
+		write_log("%s fails to write weight %d for CGroup %s with errno %d",
+		          ENFORCER_MESSAGE_HEAD,
+		          value,
+		          cgroup_path,
+		          errno);
 
 		return RESENFORCER_FAIL_WRITE_CGROUP_FILE;
 	}
@@ -749,11 +756,11 @@ int writeCGroupFileInt32(const char *cgroup_path,
 	res = fprintf(fp, "%d\n", value);
 	if ((res < 0) && (errno != ESRCH))
 	{
-		write_log("%s Write weight %d for CGroup %s failed with errno %d",
-				  ENFORCER_MESSAGE_HEAD,
-				  value,
-				  cgroup_path,
-				  errno);
+		write_log("%s fails to write weight %d for CGroup %s with errno %d",
+		          ENFORCER_MESSAGE_HEAD,
+		          value,
+		          cgroup_path,
+		          errno);
 
 		fclose(fp);
 
@@ -780,10 +787,10 @@ int setCGroupProcess(const char *cgroup_name,
 
 	if (cgroup_path == NULL)
 	{
-		write_log("%s Add PID %d to CGroup %s failed with out of memory",
-				  ENFORCER_MESSAGE_HEAD,
-				  pid,
-				  cgroup_name);
+		write_log("%s fails to add PID %d to CGroup %s due to out of memory",
+		          ENFORCER_MESSAGE_HEAD,
+		          pid,
+		          cgroup_name);
 
 		return RESENFORCER_ERROR_INSUFFICIENT_MEMORY;
 	}
@@ -792,7 +799,7 @@ int setCGroupProcess(const char *cgroup_name,
 
 	if (res != FUNC_RETURN_OK)
 	{
-		write_log("%s Failed to add PID %u to CGroup %s",
+		write_log("%s fails to add PID %u to CGroup %s",
 		          ENFORCER_MESSAGE_HEAD,
 		          pid,
 		          cgroup_path);
@@ -821,10 +828,10 @@ int setCGroupWeightInt32(const char *cgroup_name,
 
 	if (cgroup_path == NULL)
 	{
-		write_log("%s Set weight %d for CGroup %s failed due to out of memory",
-				  ENFORCER_MESSAGE_HEAD,
-				  weight,
-				  cgroup_name);
+		write_log("%s fails to set weight %d for CGroup %s due to out of memory",
+		          ENFORCER_MESSAGE_HEAD,
+		          weight,
+		          cgroup_name);
 
 		return RESENFORCER_ERROR_INSUFFICIENT_MEMORY;
 	}
@@ -833,7 +840,7 @@ int setCGroupWeightInt32(const char *cgroup_name,
 
 	if (res != FUNC_RETURN_OK)
 	{
-		write_log("%s Failed to set weight %d for CGroup %s",
+		write_log("%s fails to set weight %d for CGroup %s",
 		          ENFORCER_MESSAGE_HEAD,
 		          weight,
 		          cgroup_path);
@@ -852,9 +859,10 @@ bool isCGroupEnabled(const char *sub_system)
 	}
 	else
 	{
-		write_log("%s Invalid sub-system name %s in CGroup enable check",
-			  ENFORCER_MESSAGE_HEAD,
-			  sub_system);
+		write_log("%s fails to check CGroup enablement "
+		          "due to invalid sub-system name %s",
+		          ENFORCER_MESSAGE_HEAD,
+		          sub_system);
 
 		return false;
 	}
@@ -884,22 +892,22 @@ void ShowCGroupEnablementInformation(const char *sub_system)
 	{
 		if (isCGroupSetup(sub_system))
 		{
-			elog(RMLOG, "%s %s sub-system is enabled and setup",
-					    ENFORCER_MESSAGE_HEAD,
-						sub_system);
+			elog(RMLOG, "%s finds %s sub-system is enabled and setup",
+			            ENFORCER_MESSAGE_HEAD,
+			            sub_system);
 		}
 		else
 		{
-			elog(WARNING, "%s %s sub-system is enabled but not setup",
-					      ENFORCER_MESSAGE_HEAD,
-						  sub_system);
+			elog(WARNING, "%s finds %s sub-system is enabled but not setup",
+			              ENFORCER_MESSAGE_HEAD,
+			              sub_system);
 		}
 	}
 	else
 	{
-		elog(RMLOG, "%s %s sub-system is disabled",
-				    ENFORCER_MESSAGE_HEAD,
-					sub_system);
+		elog(RMLOG, "%s finds %s sub-system is disabled",
+		            ENFORCER_MESSAGE_HEAD,
+		            sub_system);
 	}
 
 #endif
@@ -914,9 +922,9 @@ void *cgroupService(void *arg)
 	res = CleanUpCGroupAtStartup("cpu");
 	if (res != FUNC_RETURN_OK)
 	{
-		write_log("%s Function CleanUpCGroupAtStartup failed, "
-				  "cgroupService thread will quit",
-				  ENFORCER_MESSAGE_HEAD);
+		write_log("%s fails to CleanUpCGroupAtStartup, "
+		          "cgroupService thread will quit",
+		          ENFORCER_MESSAGE_HEAD);
 		return NULL;
 	}
 
@@ -926,9 +934,9 @@ void *cgroupService(void *arg)
 								 NULL);
 	if (g_ghash_cgroup == NULL)
 	{
-		write_log("%s Function createGHash failed with out of memory, "
-				  "cgroupService thread will quit",
-				  ENFORCER_MESSAGE_HEAD);
+		write_log("%s fails to createGHash due to out of memory, "
+		          "cgroupService thread will quit",
+		          ENFORCER_MESSAGE_HEAD);
 		return NULL;
 	}
 
@@ -950,11 +958,11 @@ void *cgroupService(void *arg)
 
     		if (res != FUNC_RETURN_OK)
     		{
-    			write_log("%s Move PID %d to CGroup %s failed with error %d",
-    					  ENFORCER_MESSAGE_HEAD,
-    					  task->pid,
-    					  task->cgroup_name,
-    					  res);
+				write_log("%s fails to move PID %d to CGroup %s with error %d",
+				          ENFORCER_MESSAGE_HEAD,
+				          task->pid,
+				          task->cgroup_name,
+				          res);
     			free(task);
     			break;
     		}
@@ -965,11 +973,12 @@ void *cgroupService(void *arg)
 
     		if (res != FUNC_RETURN_OK)
 			{
-				write_log("%s Move PID %d out from CGroup %s failed with error %d",
-						  ENFORCER_MESSAGE_HEAD,
-						  task->pid,
-						  task->cgroup_name,
-						  res);
+				write_log("%s fails to move PID %d out from CGroup %s "
+				          "with error %d",
+				          ENFORCER_MESSAGE_HEAD,
+				          task->pid,
+				          task->cgroup_name,
+				          res);
 				free(task);
 				break;
 			}
@@ -980,19 +989,19 @@ void *cgroupService(void *arg)
 
     		if (res != FUNC_RETURN_OK)
 			{
-				write_log("%s Set weight %lf for CGroup %s failed with error %d",
-						  ENFORCER_MESSAGE_HEAD,
-						  task->query_resource.vcore,
-						  task->cgroup_name,
-						  res);
+				write_log("%s fails to set weight %lf for CGroup %s with error %d",
+				          ENFORCER_MESSAGE_HEAD,
+				          task->query_resource.vcore,
+				          task->cgroup_name,
+				          res);
 				free(task);
 				break;
 			}
     	}
     	else
     	{
-    		write_log("%s WARNING :: invalid CGroup task type",
-					  ENFORCER_MESSAGE_HEAD);
+			write_log("%s receives invalid CGroup task type",
+			          ENFORCER_MESSAGE_HEAD);
     		free(task);
     		break;
     	}
@@ -1002,7 +1011,8 @@ void *cgroupService(void *arg)
     	CleanUpCGroupAtRuntime();
     }
 
-	write_log("%s Worker thread will quit", ENFORCER_MESSAGE_HEAD);
+	write_log("%s marks the indicator that cgroupService thread will quit",
+	          ENFORCER_MESSAGE_HEAD);
 
 	g_enforcement_thread_quited = true;
 
@@ -1022,15 +1032,16 @@ void initCGroupThreads(void)
 
 	if (g_queue_cgroup == NULL)
 	{
-		elog(ERROR, "%s Function initCGroupThreads failed with out of memory",
-					ENFORCER_MESSAGE_HEAD);
+		elog(ERROR, "%s fail to initCGroupThreads due to out of memory",
+		            ENFORCER_MESSAGE_HEAD);
 	}
 
 	/* Create thread to handle CPU enforcement tasks in queue */
 	if (pthread_create(&t_move_cgroup, NULL, cgroupService, NULL))
 	{
-		elog(FATAL, "%s Function initCGroupThreads failed to create worker thread",
-					ENFORCER_MESSAGE_HEAD);
+		elog(FATAL, "%s fails to initCGroupThreads "
+		            "due to failure to create cgroupService thread",
+		            ENFORCER_MESSAGE_HEAD);
 	}
 
 	/* Set current time as latest cleanup time for CGroup */
@@ -1067,8 +1078,9 @@ static GSimpStringPtr stringToGSimpString(const char *str)
 	char *tempStr = (char *)malloc(strlen(str) + 1);
 	if ( tempStr == NULL )
 	{
-		write_log("%s Function malloc in stringToGSimpleString out of memory",
-				  ENFORCER_MESSAGE_HEAD);
+		write_log("%s fails to malloc in stringToGSimpleString "
+		          "due to out of memory",
+		          ENFORCER_MESSAGE_HEAD);
 		return NULL;
 	}
 	strncpy(tempStr, str, strlen(str)+1);
@@ -1077,8 +1089,9 @@ static GSimpStringPtr stringToGSimpString(const char *str)
 	if ( simpStr == NULL )
 	{
 		free(tempStr);
-		write_log("%s Function createGSimpString in stringToGSimpleStringi out of memory",
-				  ENFORCER_MESSAGE_HEAD);
+		write_log("%s fails to createGSimpString in stringToGSimpleString "
+		          "due to out of memory",
+		          ENFORCER_MESSAGE_HEAD);
 		return NULL;
 	}
 
@@ -1086,8 +1099,9 @@ static GSimpStringPtr stringToGSimpString(const char *str)
 	{
 		free(tempStr);
 		free(simpStr);
-		write_log("%s Function setGSimpStringWithContent in stringToGSimpleStringi out of memory",
-				  ENFORCER_MESSAGE_HEAD);
+		write_log("%s fails to setGSimpStringWithContent in stringToGSimpleString "
+		          "due to out of memory",
+		          ENFORCER_MESSAGE_HEAD);
 		return NULL;
 	}
 

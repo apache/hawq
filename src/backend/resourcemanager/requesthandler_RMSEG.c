@@ -554,10 +554,10 @@ bool handleQEMoveToCGroup(void **arg)
 	segId			= request->SegmentID;
 	segmentPid		= request->ProcID;
 
-	elog(DEBUG1, "Resource Enforcement :: masterStartTime: %s, connId: %d,"
-		     "segId: %d, procId: %d",
+	elog(DEBUG1, "Resource enforcer moves QE to CGroup: "
+	             "masterStartTime = %s, connId = %d, segId = %d, procId = %d",
 	             timestamptz_to_str(masterStartTime),
-		     connId, segmentPid, segmentPid);
+	             connId, segmentPid, segmentPid);
 
 	response.Result = FUNC_RETURN_OK;
 	response.Reserved = 0;
@@ -612,10 +612,10 @@ bool handleQEMoveOutCGroup(void **arg)
 	segId			= request->SegmentID;
 	segmentPid		= request->ProcID;
 
-	elog(DEBUG5, "Resource Enforcement :: masterStartTime: %s, connId: %d,"
-				 "segId: %d, procId: %d",
-				 timestamptz_to_str(masterStartTime),
-				 connId, segmentPid, segmentPid);
+	elog(DEBUG1, "Resource enforcer moves QE out from CGroup: "
+	             "masterStartTime = %s, connId = %d, segId = %d, procId = %d",
+	             timestamptz_to_str(masterStartTime),
+	             connId, segmentPid, segmentPid);
 
 	response.Result = FUNC_RETURN_OK;
 	response.Reserved = 0;
@@ -671,30 +671,34 @@ bool handleQESetWeightCGroup(void **arg)
 	segmentPid		= request->ProcID;
 	weight			= request->Weight;
 
-	elog(DEBUG5, "Resource Enforcement :: masterStartTime: %s, connId: %d,"
-				 "segId: %d, procId: %d, weight %lf",
-				 timestamptz_to_str(masterStartTime),
-				 connId, segmentPid, segmentPid, weight);
+	elog(DEBUG1, "Resource enforcer sets weight for QE in CGroup: "
+	             "masterStartTime = %s, connId = %d, segId = %d, "
+	             "procId = %d, weight = %lf",
+	             timestamptz_to_str(masterStartTime),
+	             connId, segmentPid, segmentPid, weight);
 
 	/* Prepare cgroupName from masterStartTime, connId and segId information */
 	char *cgroupName = buildCGroupNameString(masterStartTime, connId);
 
 	/* Build request instance and add request into the queue. */
-    ResourceEnforcementRequest *task = (ResourceEnforcementRequest *)
-    								   malloc(sizeof(ResourceEnforcementRequest));
-    if ( task == NULL ) {
-    	elog(ERROR, "Resource Enforcement :: fail to malloc resource enforcement request instance.");
-    }
-    task->type = SETWEIGHT;
-    task->pid = segmentPid;
-    memset(task->cgroup_name, 0, sizeof(task->cgroup_name));
-    strncpy(task->cgroup_name, cgroupName, strlen(cgroupName)+1);
-    task->query_resource.vcore = weight;
-    if (enqueue(g_queue_cgroup, (void *)task) == -1 ) {
-    	elog(ERROR, "Resource Enforcement :: fail to add resource enforcement request into queue.");
-    }
+	ResourceEnforcementRequest *task = (ResourceEnforcementRequest *)
+	                                   malloc(sizeof(ResourceEnforcementRequest));
 
-    RPCResponseSetWeightCGroupData	response;
+	if ( task == NULL ) {
+		elog(ERROR, "Resource enforcer fails to malloc "
+		            "resource enforcement request instance");
+	}
+	task->type = SETWEIGHT;
+	task->pid = segmentPid;
+	memset(task->cgroup_name, 0, sizeof(task->cgroup_name));
+	strncpy(task->cgroup_name, cgroupName, strlen(cgroupName)+1);
+	task->query_resource.vcore = weight;
+	if (enqueue(g_queue_cgroup, (void *)task) == -1 ) {
+		elog(ERROR, "Resource enforcer fails to add "
+		            "resource enforcement request into task queue");
+	}
+
+	RPCResponseSetWeightCGroupData	response;
 	response.Result   = FUNC_RETURN_OK;
 	response.Reserved = 0;
 
@@ -734,10 +738,10 @@ bool handleRMIncreaseMemoryQuota(void **arg)
 	memquotadelta = request->MemoryQuotaDelta;
 	memquotatotal = request->MemoryQuotaTotalPending;
 
-	elog(LOG, "Resource Enforcement :: Increase Memory Quota: "INT64_FORMAT". "
-			  "Total Memory Quota: "INT64_FORMAT,
-			  memquotadelta,
-			  memquotatotal);
+	elog(LOG, "Resource enforcer increases memory quota to: "
+	          "total memory quota = "INT64_FORMAT" MB, "
+	          "delta memory quota = "INT64_FORMAT" MB",
+	          memquotatotal, memquotadelta);
 
 	/* Update memory quota */
 	uint64_t umq_beg_time = 0;
@@ -754,8 +758,12 @@ bool handleRMIncreaseMemoryQuota(void **arg)
 	{
 		umq_end_time = gettime_microsec();
 	}
-	elog(DEBUG5, "Resource Enforcement :: Increase Memory Quota Time: "UINT64_FORMAT" us",
-				 umq_end_time - umq_beg_time);
+	elog(DEBUG1, "Resource enforcer increases memory quota "
+	             "in "UINT64_FORMAT" us to: ",
+	             "total memory quota = "INT64_FORMAT" MB, ",
+	             "delta memory quota = "INT64_FORMAT" MB",
+	             umq_end_time - umq_beg_time,
+	             memquotatotal, memquotadelta);
 
 	/* Build response */
 	RPCResponseUpdateMemoryQuotaData response;
@@ -784,7 +792,10 @@ bool handleRMIncreaseMemoryQuota(void **arg)
 								   conntrack->MessageMark2,
 								   RESPONSE_RM_INCREASE_MEMORY_QUOTA);
 
-		elog(ERROR, "Resource Enforcement :: Failed to increase memory quota");
+		elog(ERROR, "Resource enforcer fails to increase memory quota to: ",
+		            "total memory quota = "INT64_FORMAT" MB, "
+		            "delta memory quota = "INT64_FORMAT" MB",
+		            memquotatotal, memquotadelta);
 	}
 
 	conntrack->ResponseSent = false;
@@ -815,10 +826,10 @@ bool handleRMDecreaseMemoryQuota(void **arg)
 	memquotadelta = request->MemoryQuotaDelta;
 	memquotatotal = request->MemoryQuotaTotalPending;
 
-	elog(LOG, "Resource Enforcement :: Decrease Memory Quota : "INT64_FORMAT". "
-			  "Total Memory Quota : " INT64_FORMAT,
-			  memquotadelta,
-			  memquotatotal);
+	elog(LOG, "Resource enforcer decreases memory quota to: "
+	          "memory quota total = "INT64_FORMAT" MB, "
+	          "memory quota delta = "INT64_FORMAT" MB",
+	          memquotatotal, memquotadelta);
 
 	/* Update memory quota */
 	uint64_t umq_beg_time = 0;
@@ -835,8 +846,12 @@ bool handleRMDecreaseMemoryQuota(void **arg)
 	{
 		umq_end_time = gettime_microsec();
 	}
-	elog(DEBUG5, "Resource Enforcement :: Decrease Memory Quota Time: "UINT64_FORMAT" us",
-				 umq_end_time - umq_beg_time);
+	elog(DEBUG1, "Resource enforcer decreases memory quota "
+	             "in "UINT64_FORMAT" us to: ",
+	             "total memory quota = "INT64_FORMAT" MB, ",
+	             "delta memory quota = "INT64_FORMAT" MB",
+	             umq_end_time - umq_beg_time,
+	             memquotatotal, memquotadelta);
 
 	/* Build response */
 	RPCResponseUpdateMemoryQuotaData response;
@@ -865,7 +880,10 @@ bool handleRMDecreaseMemoryQuota(void **arg)
 								   conntrack->MessageMark2,
 								   RESPONSE_RM_DECREASE_MEMORY_QUOTA);
 
-		elog(ERROR, "Resource Enforcement :: Failed to decrease memory quota");
+		elog(ERROR, "Resource enforcer fails to decrease memory quota to: ",
+		            "total memory quota = "INT64_FORMAT" MB, "
+		            "delta memory quota = "INT64_FORMAT" MB",
+		            memquotatotal, memquotadelta);
 	}
 
 	conntrack->ResponseSent = false;
@@ -875,5 +893,4 @@ bool handleRMDecreaseMemoryQuota(void **arg)
 
 	return true;
 }
-
 
