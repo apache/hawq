@@ -38,11 +38,11 @@ ContainerReportProto& ContainerReport::getProto(){
 void ContainerReport::setId(ContainerId &id){
 	ContainerIdProto *proto = new ContainerIdProto();
 	proto->CopyFrom(id.getProto());
-	reportProto.set_allocated_id(proto);
+	reportProto.set_allocated_container_id(proto);
 }
 
 ContainerId ContainerReport::getId(){
-	return ContainerId(reportProto.id());
+	return ContainerId(reportProto.container_id());
 }
 
 void ContainerReport::setResource(Resource &resource){
@@ -58,10 +58,10 @@ Resource ContainerReport::getResource(){
 void ContainerReport::setNodeId(NodeId &nodeId){
 	NodeIdProto *proto = new NodeIdProto();
 	proto->CopyFrom(nodeId.getProto());
-	reportProto.set_allocated_nodeid(proto);
+	reportProto.set_allocated_node_id(proto);
 }
 NodeId ContainerReport::getNodeId(){
-	return NodeId(reportProto.nodeid());
+	return NodeId(reportProto.node_id());
 }
 
 void ContainerReport::setPriority(Priority &priority){
@@ -74,19 +74,19 @@ Priority ContainerReport::getPriority(){
 	return Priority(reportProto.priority());
 }
 
-void ContainerReport::setStartTime(int64_t time){
-	reportProto.set_starttime(time);
+void ContainerReport::setCreationTime(int64_t time){
+	reportProto.set_creation_time(time);
 }
 
-int64_t ContainerReport::getStartTime(){
-	return reportProto.starttime();
+int64_t ContainerReport::getCreationTime(){
+	return reportProto.creation_time();
 }
 
 void ContainerReport::setFinishTime(int64_t time){
-	reportProto.set_finishtime(time);
+	reportProto.set_finish_time(time);
 }
 int64_t ContainerReport::getFinishTime(){
-	return reportProto.finishtime();
+	return reportProto.finish_time();
 }
 
 void ContainerReport::setContainerExitStatus(ContainerExitStatus container_exit_status){
@@ -98,27 +98,27 @@ ContainerExitStatus ContainerReport::getContainerExitStatus(){
 }
 
 void ContainerReport::setContaierState(ContainerState state){
-	reportProto.set_state((ContainerStateProto)state);
+	reportProto.set_container_state((ContainerStateProto)state);
 }
 
 ContainerState ContainerReport::getContainerState(){
-	return (ContainerState)reportProto.state();
+	return (ContainerState)reportProto.container_state();
 }
 
 void ContainerReport::setDiagnostics(string &diagnostics){
-	reportProto.set_diagnostics(diagnostics);
+	reportProto.set_diagnostics_info(diagnostics);
 }
 
 string ContainerReport::getDiagnostics(){
-	return reportProto.diagnostics();
+	return reportProto.diagnostics_info();
 }
 
 void ContainerReport::setLogUrl(string &url){
-	reportProto.set_logurl(url);
+	reportProto.set_log_url(url);
 }
 
 string ContainerReport::getLogUrl(){
-	return reportProto.logurl();
+	return reportProto.log_url();
 }
 
 }

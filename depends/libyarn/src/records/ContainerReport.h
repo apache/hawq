@@ -70,8 +70,8 @@ public:
 	void setPriority(Priority &priority);
 	Priority getPriority();
 
-	void setStartTime(int64_t time);
-	int64_t getStartTime();
+	void setCreationTime(int64_t time);
+	int64_t getCreationTime();
 
 	void setFinishTime(int64_t time);
 	int64_t getFinishTime();

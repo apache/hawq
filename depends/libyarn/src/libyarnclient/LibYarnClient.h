@@ -72,10 +72,10 @@ namespace libyarn {
 									  list<string> &blackListAdditions, list<string> &blackListRemovals,
 									  list<Container> &allocatedContainers, int32_t num_containers);
 
-		virtual int activeResources(string &jobId, int activeContainerIds[],
+		virtual int activeResources(string &jobId, int64_t activeContainerIds[],
 				int activeContainerSize);
 
-		virtual int releaseResources(string &jobId, int releaseContainerIds[],
+		virtual int releaseResources(string &jobId, int64_t releaseContainerIds[],
 				int releaseContainerSize);
 
 		virtual int finishJob(string &jobId, FinalApplicationStatus finalStatus);
@@ -85,7 +85,7 @@ namespace libyarn {
 		virtual int getContainerReports(string &jobId,
 				list<ContainerReport> &containerReports);
 
-		virtual int getContainerStatuses(string &jobId, int32_t containerIds[],
+		virtual int getContainerStatuses(string &jobId, int64_t containerIds[],
 				int containerSize, list<ContainerStatus> &containerStatues);
 
 		virtual int getQueueInfo(string &queue, bool includeApps, bool includeChildQueues,
@@ -93,7 +93,7 @@ namespace libyarn {
 
 		virtual int getClusterNodes(list<NodeState> &states, list<NodeReport> &nodeReports);
 
-		virtual int getActiveFailContainerIds(set<int> &activeFailIds);
+		virtual int getActiveFailContainerIds(set<int64_t> &activeFailIds);
 
 		friend void* heartbeatFunc(void* args);
 
@@ -136,9 +136,9 @@ namespace libyarn {
 		int32_t response_id;
 		string clientJobId;
 
-		map<int, Container*> jobIdContainers;
+		map<int64_t, Container*> jobIdContainers;
 		map<string, Token> nmTokenCache;
-		set<int> activeFailContainerIds;
+		set<int64_t> activeFailContainerIds;
 		list<ResourceRequest> askRequests;
 
 		volatile bool keepRun;

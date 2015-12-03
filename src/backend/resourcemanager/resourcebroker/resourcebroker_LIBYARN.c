@@ -388,7 +388,7 @@ int RB_LIBYARN_returnResource(List **ctnl)
 
 		appendSMBVar(&sendBuffer, ctn->ID);
 
-		elog(LOG, "YARN mode resource broker returned resource container %d "
+		elog(LOG, "YARN mode resource broker returned resource container "INT64_FORMAT
 				  "(%d MB, %d CORE) to host %s",
 				  ctn->ID,
 				  ctn->MemoryMB,
@@ -999,7 +999,7 @@ void buildToReturnNotTrackedGRMContainers(RB_GRMContainerStat ctnstats, int size
 		ctn->Life 			= 0;
 		ctn->Resource 		= NULL;
 
-		elog(DEBUG3, "YARN mode resource broker creates dummy GRM container %d.",
+		elog(DEBUG3, "YARN mode resource broker creates dummy GRM container "INT64_FORMAT".",
 					 ctn->ID);
 
 		addGRMContainerToKicked(ctn);

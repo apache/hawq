@@ -50,12 +50,22 @@ message ApplicationAttemptIdProto {
 message ContainerIdProto {
   optional ApplicationIdProto app_id = 1;
   optional ApplicationAttemptIdProto app_attempt_id = 2;
-  optional int32 id = 3;
+  optional int64 id = 3;
 }
 
 message ResourceProto {
   optional int32 memory = 1;
   optional int32 virtual_cores = 2;
+}
+
+message ResourceOptionProto {
+  optional ResourceProto resource = 1;
+  optional int32 over_commit_timeout = 2;
+}
+
+message NodeResourceMapProto {
+  optional NodeIdProto node_id = 1;
+  optional ResourceOptionProto resource_option = 2;
 }
 
 message PriorityProto {
@@ -68,19 +78,6 @@ enum ContainerStateProto {
   C_COMPLETE = 3;
 }
 
-enum ContainerExitStatusProto {
-	SUCCESS = 0;
-	ABORTED = -100;
-	DISKS_FAILED = -101;
-	PREEMPTED = -102;
-	KILLED_EXCEEDED_VMEM = -103;
-	KILLED_EXCEEDED_PMEM = -104;
-	KILLED_BY_APPMASTER = -105;
-	KILLED_BY_RESOURCEMANAGER = -106;
-	KILLED_AFTER_APP_COMPLETION = -107;
-	INVALID = -1000;
-}
-
 message ContainerProto {
   optional ContainerIdProto id = 1;
   optional NodeIdProto nodeId = 2;
@@ -88,6 +85,20 @@ message ContainerProto {
   optional ResourceProto resource = 4;
   optional PriorityProto priority = 5;
   optional hadoop.common.TokenProto container_token = 6;
+}
+
+message ContainerReportProto {
+  optional ContainerIdProto container_id = 1;
+  optional ResourceProto resource = 2;
+  optional NodeIdProto node_id = 3;
+  optional PriorityProto priority = 4;
+  optional int64 creation_time = 5;
+  optional int64 finish_time = 6;
+  optional string diagnostics_info = 7 [default = "N/A"];
+  optional string log_url = 8;
+  optional int32 container_exit_status = 9;
+  optional ContainerStateProto container_state = 10;
+  optional string node_http_address = 11;
 }
 
 enum YarnApplicationStateProto {
@@ -99,6 +110,20 @@ enum YarnApplicationStateProto {
   FINISHED = 6;
   FAILED = 7;
   KILLED = 8;
+}
+
+enum YarnApplicationAttemptStateProto {
+  APP_ATTEMPT_NEW = 1;
+  APP_ATTEMPT_SUBMITTED = 2;
+  APP_ATTEMPT_SCHEDULED = 3;
+  APP_ATTEMPT_ALLOCATED_SAVING = 4;
+  APP_ATTEMPT_ALLOCATED = 5;
+  APP_ATTEMPT_LAUNCHED = 6;
+  APP_ATTEMPT_FAILED = 7;
+  APP_ATTEMPT_RUNNING = 8;
+  APP_ATTEMPT_FINISHING = 9;
+  APP_ATTEMPT_FINISHED = 10;
+  APP_ATTEMPT_KILLED = 11;
 }
 
 enum FinalApplicationStatusProto {
@@ -124,7 +149,7 @@ enum LocalResourceVisibilityProto {
 
 enum LocalResourceTypeProto {
   ARCHIVE = 1;
-  FILETYPE = 2;
+  FILE = 2;
   PATTERN = 3;
 }
 
@@ -135,6 +160,7 @@ message LocalResourceProto {
   optional LocalResourceTypeProto type = 4;
   optional LocalResourceVisibilityProto visibility = 5;
   optional string pattern = 6;
+  optional bool should_be_uploaded_to_shared_cache = 7;
 }
 
 message ApplicationResourceUsageReportProto {
@@ -143,6 +169,8 @@ message ApplicationResourceUsageReportProto {
   optional ResourceProto used_resources = 3;
   optional ResourceProto reserved_resources = 4;
   optional ResourceProto needed_resources = 5;
+  optional int64 memory_seconds = 6;
+  optional int64 vcore_seconds = 7;
 }
 
 message ApplicationReportProto {
@@ -165,6 +193,18 @@ message ApplicationReportProto {
   optional float progress = 17;
   optional string applicationType = 18;
   optional hadoop.common.TokenProto am_rm_token = 19;
+  repeated string applicationTags = 20;
+}
+
+message ApplicationAttemptReportProto {
+  optional ApplicationAttemptIdProto application_attempt_id = 1;
+  optional string host = 2;
+  optional int32 rpc_port = 3;
+  optional string tracking_url = 4;
+  optional string diagnostics = 5 [default = "N/A"];
+  optional YarnApplicationAttemptStateProto yarn_application_attempt_state = 6;
+  optional ContainerIdProto am_container_id = 7;
+  optional string original_tracking_url = 8;
 }
 
 enum NodeStateProto {
@@ -191,8 +231,18 @@ message NodeReportProto {
   optional NodeStateProto node_state = 7;
   optional string health_report = 8;
   optional int64 last_health_report_time = 9;
+  repeated string node_labels = 10;
 }
 
+message NodeIdToLabelsProto {
+  optional NodeIdProto nodeId = 1;
+  repeated string nodeLabels = 2;
+}
+
+message LabelsToNodeIdsProto {
+  optional string nodeLabels = 1;
+  repeated NodeIdProto nodeId = 2;
+}
 
 ////////////////////////////////////////////////////////////////////////
 ////// From AM_RM_Protocol /////////////////////////////////////////////
@@ -203,6 +253,7 @@ message ResourceRequestProto {
   optional ResourceProto capability = 3;
   optional int32 num_containers = 4;
   optional bool relax_locality = 5 [default = true];
+  optional string node_label_expression = 6;
 }
 
 enum AMCommandProto {
@@ -251,6 +302,20 @@ message ApplicationSubmissionContextProto {
   optional int32 maxAppAttempts = 8 [default = 0];
   optional ResourceProto resource = 9;
   optional string applicationType = 10 [default = "YARN"];
+  optional bool keep_containers_across_application_attempts = 11 [default = false];
+  repeated string applicationTags = 12;
+  optional int64 attempt_failures_validity_interval = 13 [default = -1];
+  optional LogAggregationContextProto log_aggregation_context = 14;
+  optional ReservationIdProto reservation_id = 15;
+  optional string node_label_expression = 16;
+  optional ResourceRequestProto am_container_resource_request = 17;
+}
+
+message LogAggregationContextProto {
+ optional string include_pattern = 1 [default = ".*"];
+ optional string exclude_pattern = 2 [default = ""];
+ optional string rolled_logs_include_pattern = 3 [default = ""];
+ optional string rolled_logs_exclude_pattern = 4 [default = ".*"];
 }
 
 enum ApplicationAccessTypeProto {
@@ -272,19 +337,6 @@ enum QueueStateProto {
   Q_RUNNING = 2;
 }
 
-message ContainerReportProto {
-  optional ContainerIdProto id = 1;
-  optional ResourceProto resource = 2;
-  optional NodeIdProto nodeId = 3;
-  optional PriorityProto priority = 4;
-  optional int64 startTime = 5;
-  optional int64 finishTime = 6;
-  optional ContainerExitStatusProto container_exit_status = 7;
-  optional ContainerStateProto state = 8;
-  optional string diagnostics = 9 [default = "N/A"];
-  optional string logUrl = 10;
-}
-
 message QueueInfoProto {
   optional string queueName = 1;
   optional float capacity = 2;
@@ -293,6 +345,8 @@ message QueueInfoProto {
   optional QueueStateProto state = 5;
   repeated QueueInfoProto childQueues = 6;
   repeated ApplicationReportProto applications = 7;
+  repeated string accessibleNodeLabels = 8;
+  optional string defaultNodeLabelExpression = 9;
 }
 
 enum QueueACLProto {
@@ -304,6 +358,41 @@ message QueueUserACLInfoProto {
   optional string queueName = 1;
   repeated QueueACLProto userAcls = 2;
 }
+
+////////////////////////////////////////////////////////////////////////
+////// From reservation_protocol /////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
+
+message ReservationIdProto {
+  optional int64 id = 1;
+  optional int64 cluster_timestamp = 2;
+}
+
+message ReservationRequestProto {
+  optional ResourceProto capability = 1;
+  optional int32 num_containers = 2 [default = 1];
+  optional int32 concurrency = 3 [default = 1];
+  optional int64 duration = 4 [default = -1];
+}
+
+message ReservationRequestsProto {
+  repeated ReservationRequestProto reservation_resources = 1;
+  optional ReservationRequestInterpreterProto interpreter = 2 [default = R_ALL];
+}
+
+message ReservationDefinitionProto {
+  optional ReservationRequestsProto reservation_requests = 1;
+  optional int64 arrival = 2;
+  optional int64 deadline = 3;
+  optional string reservation_name = 4;
+}
+
+enum ReservationRequestInterpreterProto {
+  R_ANY = 0;
+  R_ALL = 1;
+  R_ORDER = 2;
+  R_ORDER_NO_GAP = 3;
+ }
 
 ////////////////////////////////////////////////////////////////////////
 ////// From container_manager //////////////////////////////////////////
@@ -323,6 +412,29 @@ message ContainerStatusProto {
   optional ContainerStateProto state = 2;
   optional string diagnostics = 3 [default = "N/A"];
   optional int32 exit_status = 4 [default = -1000];
+}
+
+enum ContainerExitStatusProto {
+  SUCCESS = 0;
+  INVALID = -1000;
+  ABORTED = -100;
+  DISKS_FAILED = -101;
+}
+
+message ContainerResourceIncreaseRequestProto {
+  optional ContainerIdProto container_id = 1;
+  optional ResourceProto capability = 2;
+} 
+
+message ContainerResourceIncreaseProto {
+  optional ContainerIdProto container_id = 1;
+  optional ResourceProto capability = 2;
+  optional hadoop.common.TokenProto container_token = 3;
+}
+
+message ContainerResourceDecreaseProto {
+  optional ContainerIdProto container_id = 1;
+  optional ResourceProto capability = 2;
 }
 
 ////////////////////////////////////////////////////////////////////////

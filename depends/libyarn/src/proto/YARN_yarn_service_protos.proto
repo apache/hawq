@@ -44,6 +44,10 @@ message RegisterApplicationMasterResponseProto {
   optional ResourceProto maximumCapability = 1;
   optional bytes client_to_am_token_master_key = 2;
   repeated ApplicationACLMapProto application_ACLs = 3;
+  repeated ContainerProto containers_from_previous_attempts = 4;
+  optional string queue = 5;
+  repeated NMTokenProto nm_tokens_from_previous_attempts = 6;
+  repeated SchedulerResourceTypes scheduler_resource_types = 7;
 }
 
 message FinishApplicationMasterRequestProto {
@@ -62,6 +66,7 @@ message AllocateRequestProto {
   optional ResourceBlacklistRequestProto blacklist_request = 3;
   optional int32 response_id = 4;
   optional float progress = 5;
+  repeated ContainerResourceIncreaseRequestProto increase_request = 6;
 }
 
 message NMTokenProto {
@@ -79,6 +84,14 @@ message AllocateResponseProto {
   optional int32 num_cluster_nodes = 7;
   optional PreemptionMessageProto preempt = 8;
   repeated NMTokenProto nm_tokens = 9;
+  repeated ContainerResourceIncreaseProto increased_containers = 10;
+  repeated ContainerResourceDecreaseProto decreased_containers = 11;
+  optional hadoop.common.TokenProto am_rm_token = 12;
+}
+
+enum SchedulerResourceTypes {
+  MEMORY = 0;
+  CPU = 1;
 }
 
 //////////////////////////////////////////////////////
@@ -91,14 +104,6 @@ message GetNewApplicationRequestProto {
 message GetNewApplicationResponseProto {
   optional ApplicationIdProto application_id = 1;
   optional ResourceProto maximumCapability = 2;
-}
-
-message GetContainersRequestProto {
-  optional ApplicationAttemptIdProto app_attempt_id = 1;
-}
-
-message GetContainersResponseProto {
-  repeated ContainerReportProto containers_reports = 1;
 }
 
 message GetApplicationReportRequestProto {
@@ -121,6 +126,7 @@ message KillApplicationRequestProto {
 }
 
 message KillApplicationResponseProto {
+  optional bool is_kill_completed = 1 [default = false];
 }
 
 message GetClusterMetricsRequestProto {
@@ -130,9 +136,32 @@ message GetClusterMetricsResponseProto {
   optional YarnClusterMetricsProto cluster_metrics = 1;
 }
 
+message MoveApplicationAcrossQueuesRequestProto {
+  required ApplicationIdProto application_id = 1;
+  required string target_queue = 2;
+}
+
+message MoveApplicationAcrossQueuesResponseProto {
+}
+
+enum ApplicationsRequestScopeProto {
+  ALL = 0;
+  VIEWABLE = 1;
+  OWN = 2;
+}
+
 message GetApplicationsRequestProto {
   repeated string application_types = 1;
   repeated YarnApplicationStateProto application_states = 2;
+  repeated string users = 3;
+  repeated string queues = 4;
+  optional int64 limit = 5;
+  optional int64 start_begin = 6;
+  optional int64 start_end = 7;
+  optional int64 finish_begin = 8;
+  optional int64 finish_end = 9;
+  repeated string applicationTags = 10;
+  optional ApplicationsRequestScopeProto scope = 11 [default = ALL];
 }
 
 message GetApplicationsResponseProto {
@@ -165,6 +194,27 @@ message GetQueueUserAclsInfoResponseProto {
   repeated QueueUserACLInfoProto queueUserAcls = 1;
 }
 
+message GetNodesToLabelsRequestProto {
+}
+
+message GetNodesToLabelsResponseProto {
+  repeated NodeIdToLabelsProto nodeToLabels = 1;
+}
+
+message GetLabelsToNodesRequestProto {
+  repeated string nodeLabels = 1;
+}
+
+message GetLabelsToNodesResponseProto {
+  repeated LabelsToNodeIdsProto labelsToNodes = 1;
+}
+
+message GetClusterNodeLabelsRequestProto {
+}
+
+message GetClusterNodeLabelsResponseProto {
+  repeated string nodeLabels = 1;
+}
 
 //////////////////////////////////////////////////////
 /////// client_NM_Protocol ///////////////////////////
@@ -226,4 +276,100 @@ message GetContainerStatusesRequestProto {
 message GetContainerStatusesResponseProto {
   repeated ContainerStatusProto status = 1;
   repeated ContainerExceptionMapProto failed_requests = 2;
+}
+
+//////////////////////////////////////////////////////
+/////// Application_History_Protocol /////////////////
+//////////////////////////////////////////////////////
+
+message GetApplicationAttemptReportRequestProto {
+  optional ApplicationAttemptIdProto application_attempt_id = 1;
+}
+
+message GetApplicationAttemptReportResponseProto {
+  optional ApplicationAttemptReportProto application_attempt_report = 1;
+}
+
+message GetApplicationAttemptsRequestProto {
+  optional ApplicationIdProto application_id = 1;
+}
+
+message GetApplicationAttemptsResponseProto {
+  repeated ApplicationAttemptReportProto application_attempts = 1;
+}
+
+message GetContainerReportRequestProto {
+  optional ContainerIdProto container_id = 1;
+}
+
+message GetContainerReportResponseProto {
+  optional ContainerReportProto container_report = 1;
+}
+
+message GetContainersRequestProto {
+  optional ApplicationAttemptIdProto application_attempt_id = 1;
+}
+
+message GetContainersResponseProto {
+  repeated ContainerReportProto containers = 1;
+}
+
+//////////////////////////////////////////////////////
+/////// client_SCM_Protocol //////////////////////////
+//////////////////////////////////////////////////////
+
+message UseSharedCacheResourceRequestProto {
+  optional ApplicationIdProto applicationId = 1;
+  optional string resourceKey = 2;
+}
+
+message UseSharedCacheResourceResponseProto {
+  optional string path = 1;
+}
+
+message ReleaseSharedCacheResourceRequestProto {
+  optional ApplicationIdProto applicationId = 1;
+  optional string resourceKey = 2;
+}
+
+message ReleaseSharedCacheResourceResponseProto {
+}
+
+//////////////////////////////////////////////////////
+//  reservation_protocol
+//////////////////////////////////////////////////////
+
+message ReservationSubmissionRequestProto {
+  optional string queue = 1;
+  optional ReservationDefinitionProto reservation_definition = 2;
+}
+
+message ReservationSubmissionResponseProto {
+    optional ReservationIdProto reservation_id = 1;
+}
+
+message ReservationUpdateRequestProto {
+  optional ReservationDefinitionProto reservation_definition = 1;
+  optional ReservationIdProto reservation_id = 2;
+}
+
+message ReservationUpdateResponseProto {   
+}
+
+message ReservationDeleteRequestProto {
+  optional ReservationIdProto reservation_id = 1;
+}
+
+message ReservationDeleteResponseProto {
+}
+
+//////////////////////////////////////////////////////
+/////// SCM_Admin_Protocol //////////////////////////
+//////////////////////////////////////////////////////
+
+message RunSharedCacheCleanerTaskRequestProto {
+}
+
+message RunSharedCacheCleanerTaskResponseProto {
+  optional bool accepted = 1;
 }

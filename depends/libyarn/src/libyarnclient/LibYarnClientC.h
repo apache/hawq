@@ -50,7 +50,7 @@ typedef struct LibYarnResourceRequest_t {
 } LibYarnResourceRequest_t;
 
 typedef struct LibYarnResource_t {
-	int32_t containerId;
+	int64_t containerId;
 	char *host;
 	int32_t port;
 	char *nodeHttpAddress;
@@ -73,7 +73,7 @@ typedef struct LibYarnApplicationReport_t {
 }LibYarnApplicationReport_t;
 
 typedef struct LibYarnContainerReport_t {
-	int32_t containerId;
+	int64_t containerId;
 	int32_t vCores;
 	int32_t memory;
 	char *host;
@@ -86,7 +86,7 @@ typedef struct LibYarnContainerReport_t {
 }LibYarnContainerReport_t;
 
 typedef struct LibYarnContainerStatus_t {
-	int32_t containerId;
+	int64_t containerId;
 	enum ContainerState state;
 	int32_t exitStatus;
 	char *diagnostics;
@@ -170,20 +170,20 @@ int allocateResources(LibYarnClient_t *client, char *jobId,
 				LibYarnNodeInfo_t preferredHost[], int preferredHostSize,
 				LibYarnResource_t **allocatedResourcesArray, int *allocatedResourceArraySize);
 
-int activeResources(LibYarnClient_t *client, char *jobId,int32_t activeContainerIds[],int activeContainerSize);
+int activeResources(LibYarnClient_t *client, char *jobId,int64_t activeContainerIds[],int activeContainerSize);
 
-int releaseResources(LibYarnClient_t *client, char *jobId, int32_t releaseContainerIds[],int releaseContainerSize);
+int releaseResources(LibYarnClient_t *client, char *jobId, int64_t releaseContainerIds[],int releaseContainerSize);
 
 int finishJob(LibYarnClient_t *client, char *jobId, enum FinalApplicationStatus_t finalStatus);
 
-int getActiveFailContainerIds(LibYarnClient_t *client,int32_t *activeFailIds[],int *activeFailSize);
+int getActiveFailContainerIds(LibYarnClient_t *client,int64_t *activeFailIds[],int *activeFailSize);
 
 int getApplicationReport(LibYarnClient_t *client,char *jobId,LibYarnApplicationReport_t **applicationReport);
 
 int getContainerReports(LibYarnClient_t *client, char *jobId,
 				LibYarnContainerReport_t **containerReportArray,int *containerReportArraySize);
 
-int getContainerStatuses(LibYarnClient_t *client,char *jobId,int32_t containerIds[],int containerSize,
+int getContainerStatuses(LibYarnClient_t *client,char *jobId,int64_t containerIds[],int containerSize,
 				LibYarnContainerStatus_t **containerStatusesArray,int *containerStatusesArraySize);
 
 int getQueueInfo(LibYarnClient_t *client, char *queue, bool includeApps,

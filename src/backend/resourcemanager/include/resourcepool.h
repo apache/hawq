@@ -206,7 +206,7 @@ typedef struct SegResourceData  SegResourceData;
  */
 
 struct GRMContainerData {
-	int32_t		 	 ID;
+	int64_t		 	 ID;
 	int32_t		 	 MemoryMB;
 	int32_t		 	 Core;
 	int32_t			 Life;			/* Ref container life-cycle management.   */
@@ -228,8 +228,8 @@ struct GRMContainerSetData {
 typedef struct GRMContainerSetData *GRMContainerSet;
 typedef struct GRMContainerSetData  GRMContainerSetData;
 
-GRMContainer createGRMContainer(uint32_t	 id,
-                                int32_t    	 memory,
+GRMContainer createGRMContainer(int64_t      id,
+                                int32_t      memory,
 								double	 	 core,
 								char      	*hostname,
 								SegResource  segres);
@@ -642,10 +642,10 @@ void setAllSegResourceGRMUnavailable(void);
 
 struct RB_GRMContainerStatData
 {
-	int32_t		ContainerID;
+	int64_t		ContainerID;
 	uint8_t		isActive;
 	uint8_t		isFound;
-	uint8_t		Reserved[2];
+	uint8_t		Reserved[6];
 };
 
 typedef struct RB_GRMContainerStatData  RB_GRMContainerStatData;

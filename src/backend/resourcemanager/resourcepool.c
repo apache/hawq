@@ -218,8 +218,8 @@ void getBufferedHostName(char *hostname, char **buffhostname)
 	}
 }
 
-GRMContainer createGRMContainer(uint32_t	 id,
-                                int32_t    	 memory,
+GRMContainer createGRMContainer(int64_t     id,
+                                int32_t     memory,
 								double	 	 core,
 								char      	*hostname,
 								SegResource  segres)
@@ -3009,7 +3009,7 @@ void dropAllGRMContainersFromSegment(SegResource segres)
 
 			count++;
 
-			elog(LOG, "Resource manager decides to return container %d in host %s "
+			elog(LOG, "Resource manager decides to return container "INT64_FORMAT" in host %s "
 					  "in order to drop all resource pool's GRM containers.",
 					  ctn->ID,
 					  ctn->HostName);
@@ -3389,7 +3389,7 @@ void timeoutIdleGRMResourceToRBByRatio(int 		 ratioindex,
 
 			addGRMContainerToToBeKicked(retcont);
 			(*realretcontnum)++;
-			elog(LOG, "Resource manager decides to return container %d in host %s",
+			elog(LOG, "Resource manager decides to return container "INT64_FORMAT" in host %s",
 					  retcont->ID,
 					  retcont->HostName);
 			validateResourcePoolStatus(false);
@@ -3519,11 +3519,11 @@ void checkGRMContainerStatus(RB_GRMContainerStat ctnstats, int size)
 						PCONTEXT,
 						HASHTABLE_SLOT_VOLUME_DEFAULT,
 						HASHTABLE_SLOT_VOLUME_DEFAULT_MAX,
-						HASHTABLE_KEYTYPE_UINT32,
+						HASHTABLE_KEYTYPE_CHARARRAY,
 						NULL);
 	for ( int i = 0 ; i < size ; ++i )
 	{
-		elog(DEBUG3, "Resource manager tracks container %d.",
+		elog(DEBUG3, "Resource manager tracks container "INT64_FORMAT".",
 					 ctnstats[i].ContainerID);
 		setHASHTABLENode(&stattbl,
 						 TYPCONVERT(void *, ctnstats[i].ContainerID),
@@ -3594,7 +3594,7 @@ void checkGRMContainerStatus(RB_GRMContainerStat ctnstats, int size)
 					reorderSegResourceAvailIndex(segres, PQUEMGR->RatioReverseIndex[ridx]);
 
 					addGRMContainerToToBeKicked(ctn);
-					elog(LOG, "Resource manager decides to return container %d "
+					elog(LOG, "Resource manager decides to return container "INT64_FORMAT
 							  "in host %s because %s.",
 							  ctn->ID,
 							  ctn->HostName,
@@ -3607,7 +3607,7 @@ void checkGRMContainerStatus(RB_GRMContainerStat ctnstats, int size)
 				}
 				else
 				{
-					elog(DEBUG3, "Resource manager set container %d found.",
+					elog(DEBUG3, "Resource manager set container "INT64_FORMAT" found.",
 								 ctnstat->ContainerID);
 					/*
 					 * For all containers not tracked by hawq rm, they are marked
@@ -4229,7 +4229,7 @@ void dumpResourcePoolHosts(const char *filename)
                 {
                 	GRMContainer ctn = (GRMContainer)lfirst(cell);
 					fprintf(fp, "\tRESOURCE_CONTAINER("
-								"ID=%d:"
+								"ID="INT64_FORMAT":"
 								"MemoryMB=%d:Core=%d:"
 								"Life=%d:"
 								"HostName=%s)\n",

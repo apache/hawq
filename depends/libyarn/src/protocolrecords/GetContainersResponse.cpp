@@ -39,8 +39,8 @@ GetContainersResponseProto& GetContainersResponse::getProto() {
 
 list<ContainerReport> GetContainersResponse::getcontainersReportList() {
 	list<ContainerReport> reportList;
-	for (int i = 0; i < responseProto.containers_reports_size(); i++) {
-		ContainerReportProto reportProto = responseProto.containers_reports(i);
+	for (int i = 0; i < responseProto.containers_size(); i++) {
+		ContainerReportProto reportProto = responseProto.containers(i);
 		reportList.push_back(ContainerReport(reportProto));
 	}
 	return reportList;
@@ -50,7 +50,7 @@ void GetContainersResponse::setcontainersReportList(
 		list<ContainerReport> &containersReport) {
 	list<ContainerReport>::iterator it = containersReport.begin();
 	for (; it != containersReport.end(); it++) {
-		ContainerReportProto* reportProto = responseProto.add_containers_reports();
+		ContainerReportProto* reportProto = responseProto.add_containers();
 		reportProto->CopyFrom((*it).getProto());
 	}
 }

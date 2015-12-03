@@ -102,7 +102,7 @@ StartContainerResponse ContainerManagement::startContainer(Container &container,
 	scResponse.setServicesMetaData(scsResponse.getServicesMetaData());
 
 	LOG(INFO,
-			"ContainerManagement::startContainer, after start a container, id:%d on NM [%s:%s]",
+			"ContainerManagement::startContainer, after start a container, id:%ld on NM [%s:%s]",
 			container.getId().getId(), host.c_str(), port.c_str());
 
 	//3. free
