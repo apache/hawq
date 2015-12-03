@@ -3551,8 +3551,9 @@ void checkGRMContainerStatus(RB_GRMContainerStat ctnstats, int size)
 			while( cell != NULL )
 			{
 				GRMContainer ctn = (GRMContainer)lfirst(cell);
-				PAIR pair = (PAIR)getHASHTABLENode(&(stattbl),
-												   TYPCONVERT(void *, ctn->ID));
+				SimpArray key;
+				setSimpleArrayRef(&key, (void *)&ctn->ID, sizeof(int64_t));
+				PAIR pair = (PAIR)getHASHTABLENode(&(stattbl), &key);
 				RB_GRMContainerStat ctnstat = pair != NULL ?
 											  (RB_GRMContainerStat)(pair->Value):
 											  NULL;
