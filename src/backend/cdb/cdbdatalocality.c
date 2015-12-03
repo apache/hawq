@@ -2672,7 +2672,7 @@ static void allocate_random_relation(Relation_Data* rel_data,
 							hostOccurTimes[key]++;
 						}
 			}
-			int maxOccurTime=-1;
+			int maxOccurTime = -1;
 			int inserthost = -1;
 			for(int i=0;i< context->dds_context.size;i++){
 				if(hostOccurTimes[i] > maxOccurTime){
@@ -2680,10 +2680,16 @@ static void allocate_random_relation(Relation_Data* rel_data,
 				  inserthost = i;
 				}
 			}
-			/*we consider the insert hosts are the same for blocks in the same file. This logic can be changed in future*/
-			for (i = 0; i < rel_file->split_num; i++) {
-				Block_Host_Index *hostID = rel_file->hostIDs + i;
-				hostID->insertHost = inserthost;
+
+			/* currently we consider the insert hosts are the same for all the blocks in the same file.
+			 * this logic can be changed in future, so we store the state in block level not file level*/
+			if(maxOccurTime < rel_file->split_num){
+				inserthost = -1;
+			}else{
+				for (i = 0; i < rel_file->split_num; i++) {
+					Block_Host_Index *hostID = rel_file->hostIDs + i;
+					hostID->insertHost = inserthost;
+				}
 			}
 	}
 	pfree(hostOccurTimes);
