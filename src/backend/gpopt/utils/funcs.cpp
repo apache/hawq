@@ -22,8 +22,6 @@
 #include "gpopt/utils/nodeutils.h"
 #include "gpopt/utils/CCatalogUtils.h"
 #include "gpopt/utils/COptTasks.h"
-#include "gpopt/utils/COptClient.h"
-#include "gpopt/utils/COptServer.h"
 
 #include "gpos/_api.h"
 #include "gpos/io/CFileReader.h"
@@ -1347,45 +1345,6 @@ PlannedStmt *orca(Query *pquery)
 }
 }
 
-
-//---------------------------------------------------------------------------
-//	@function:
-//		optimize_query
-//
-//	@doc:
-//		Optimize query using the OPT process
-//
-//---------------------------------------------------------------------------
-
-extern "C" {
-int optimize_query(void *pv)
-{
-	gpos_exec_params *pparams = (gpos_exec_params *) pv;
-	pparams->func = gpoptudfs::COptClient::PvRun;
-
-	return gpos_exec(pparams);
-}
-}
-
-
-//---------------------------------------------------------------------------
-//	@function:
-//		optimizer_loop
-//
-//	@doc:
-//		API for optimizer loop initialization
-//
-//---------------------------------------------------------------------------
-
-extern "C" {
-int optimizer_loop(void *pv)
-{
-	gpos_exec_params *pparams = (gpos_exec_params *) pv;
-	pparams->func = gpoptudfs::COptServer::PvRun;
-
-	return gpos_exec(pparams);
-}
-}
 
 extern "C" {
 char *read_file(const char *szFilename)
