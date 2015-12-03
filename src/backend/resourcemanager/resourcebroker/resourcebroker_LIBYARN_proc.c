@@ -1646,8 +1646,8 @@ int RB2YARN_acquireResource(uint32_t memorymb,
     				  activeFailIds[i]);
 
     		setHASHTABLENode(&FailedIDIndex,
-    						 TYPCONVERT(void *, activeFailIds[i]),
-							 TYPCONVERT(void *, activeFailIds[i]),
+    						 TYPCONVERT(void *, &activeFailIds[i]),
+							 TYPCONVERT(void *, &activeFailIds[i]),
 							 false);
     	}
 
