@@ -1645,11 +1645,10 @@ int RB2YARN_acquireResource(uint32_t memorymb,
     		elog(LOG, "YARN mode resource broker failed to activate container "INT64_FORMAT,
     				  activeFailIds[i]);
 
-    		setHASHTABLENode(&FailedIDIndex,
-    						 TYPCONVERT(void *, &activeFailIds[i]),
-							 TYPCONVERT(void *, &activeFailIds[i]),
-							 false);
-    	}
+			SimpArray key;
+			setSimpleArrayRef(&key, (void *)&(activeFailIds[i]), sizeof(int64_t));
+			setHASHTABLENode(&FailedIDIndex, &key, TYPCONVERT(void *, &activeFailIds[i]), false);
+		}
 
     	yarnres = releaseResources(LIBYARNClient,
     							   YARNJobID,

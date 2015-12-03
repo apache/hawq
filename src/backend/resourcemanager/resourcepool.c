@@ -3525,10 +3525,9 @@ void checkGRMContainerStatus(RB_GRMContainerStat ctnstats, int size)
 	{
 		elog(DEBUG3, "Resource manager tracks container "INT64_FORMAT".",
 					 ctnstats[i].ContainerID);
-		setHASHTABLENode(&stattbl,
-						 TYPCONVERT(void *, &ctnstats[i].ContainerID),
-						 &ctnstats[i],
-						 false);
+		SimpArray key;
+		setSimpleArrayRef(&key, (void *)&(ctnstats[i].ContainerID), sizeof(int64_t));
+		setHASHTABLENode(&stattbl, &key, &ctnstats[i], false);
 		ctnstats[i].isFound = false;
 	}
 
