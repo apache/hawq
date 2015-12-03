@@ -1105,7 +1105,9 @@ exec_mpp_query(const char *query_string,
 
 			if ( res != FUNC_RETURN_OK )
 			{
-				elog(ERROR, "Resource Enforcement :: Fail to move self to cgroup. error %d", res);
+				elog(ERROR, "Resource enforcer fails to move QE to CGroup "
+				            "with error %d",
+				            res);
 			}
 			has_been_moved_to_cgroup = true;
 			master_start_time = resource->master_start_time;
@@ -1122,9 +1124,11 @@ exec_mpp_query(const char *query_string,
 						   getpid());
     		}
     		if ( res != FUNC_RETURN_OK )
-		{
-    			elog(ERROR, "Resource Enforcement :: Fail to set self weight in cgroup. error %d", res);
-    		}
+			{
+				elog(ERROR, "Resource enforcer fails to set CGroup weight for QE "
+				            "with error %d",
+				            res);
+			}
     	}
     }
 
