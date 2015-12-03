@@ -748,8 +748,8 @@ int handleRB2RM_AllocatedResource(void)
 	if ( response.ContainerCount > 0 )
 	{
 		/* Read container ids */
-		int contidsize = __SIZE_ALIGN64(sizeof(int32_t) * response.ContainerCount);
-		containerids = (int32_t *)rm_palloc0(PCONTEXT, contidsize);
+		int contidsize = __SIZE_ALIGN64(sizeof(int64_t) * response.ContainerCount);
+		containerids = (int64_t *)rm_palloc0(PCONTEXT, contidsize);
 
 		piperes = readPipe(fd, containerids, contidsize);
 		if ( piperes != contidsize )
@@ -999,7 +999,8 @@ void buildToReturnNotTrackedGRMContainers(RB_GRMContainerStat ctnstats, int size
 		ctn->Life 			= 0;
 		ctn->Resource 		= NULL;
 
-		elog(DEBUG3, "YARN mode resource broker creates dummy GRM container "INT64_FORMAT".",
+		elog(DEBUG3, "YARN mode resource broker creates dummy GRM container "
+					 INT64_FORMAT".",
 					 ctn->ID);
 
 		addGRMContainerToKicked(ctn);

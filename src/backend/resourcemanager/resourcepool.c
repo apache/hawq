@@ -3526,7 +3526,7 @@ void checkGRMContainerStatus(RB_GRMContainerStat ctnstats, int size)
 		elog(DEBUG3, "Resource manager tracks container "INT64_FORMAT".",
 					 ctnstats[i].ContainerID);
 		SimpArray key;
-		setSimpleArrayRef(&key, (void *)&(ctnstats[i].ContainerID), sizeof(int64_t));
+		setSimpleArrayRef(&key, (char *)&(ctnstats[i].ContainerID), sizeof(int64_t));
 		setHASHTABLENode(&stattbl, &key, &ctnstats[i], false);
 		ctnstats[i].isFound = false;
 	}
@@ -3552,7 +3552,7 @@ void checkGRMContainerStatus(RB_GRMContainerStat ctnstats, int size)
 			{
 				GRMContainer ctn = (GRMContainer)lfirst(cell);
 				SimpArray key;
-				setSimpleArrayRef(&key, (void *)&ctn->ID, sizeof(int64_t));
+				setSimpleArrayRef(&key, (char *)&(ctn->ID), sizeof(int64_t));
 				PAIR pair = (PAIR)getHASHTABLENode(&(stattbl), &key);
 				RB_GRMContainerStat ctnstat = pair != NULL ?
 											  (RB_GRMContainerStat)(pair->Value):
