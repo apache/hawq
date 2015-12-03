@@ -344,15 +344,20 @@ int		rm_min_resource_perseg;
 bool	rm_force_fifo_queue;
 
 bool	rm_session_lease_heartbeat_enable;
-int     rm_session_lease_timeout; 	/* How many seconds to wait before expiring
-									   allocated resource. */
-int		rm_resource_allocation_timeout;	/* How may seconds to wait before
-										   expiring queuing query resource
-										   request. */
-int		rm_resource_timeout;		/* How many seconds to wait before returning
-									   resource back to the resource broker. */
-int		rm_session_lease_heartbeat_interval; /* How many seconds to wait before sending
-										   	    another heart-beat to resource manager. */
+int     rm_session_lease_timeout; 			/* How many seconds to wait before
+											   expiring allocated resource. */
+int		rm_resource_allocation_timeout;		/* How may seconds to wait before
+										   	   expiring queuing query resource
+										   	   request. */
+int		rm_resource_timeout;				/* How many seconds to wait before
+											   returning resource back to the
+											   resource broker. */
+int		rm_request_timeoutcheck_interval; 	/* How many seconds to wait before
+											   checking resource contexts for
+											   timeout. */
+int		rm_session_lease_heartbeat_interval;/* How many seconds to wait before
+											   sending another heart-beat to
+											   resource manager. */
 
 int		rm_tolerate_nseg_limit;
 int		rm_rejectrequest_nseg_limit;

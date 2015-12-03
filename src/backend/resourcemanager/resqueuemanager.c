@@ -166,7 +166,7 @@ void markMemoryCoreRatioWaterMark(DQueue 		marks,
 void buildTimeoutResponseForQueuedRequest(ConnectionTrack conntrack,
 										  uint32_t 		  reason);
 
-bool isResourceAcceptable(ConnectionTrack conn, int segnumact);
+enum RESOURCEPROBLEM isResourceAcceptable(ConnectionTrack conn, int segnumact);
 
 void adjustResourceExpectsByQueueNVSegLimits(ConnectionTrack conntrack);
 /*----------------------------------------------------------------------------*/
@@ -250,6 +250,11 @@ void initializeResourceQueueManager(void)
     PQUEMGR->GRMQueueCurCapacity			= 0.0;
     PQUEMGR->GRMQueueResourceTight			= false;
     PQUEMGR->toRunQueryDispatch 			= false;
+
+    for ( int i = 0 ; i < RESPROBLEM_COUNT ; ++i )
+    {
+    	PQUEMGR->hasResourceProblem[i] = false;
+    }
 }
 
 /*
@@ -4077,7 +4082,8 @@ int dispatchResourceToQueries_EVEN(DynResourceQueueTrack track)
 										 &segnumact,
 										 &(conn->SegIOBytes));
 
-		if ( isResourceAcceptable(conn, segnumact) )
+		enum RESOURCEPROBLEM accepted = isResourceAcceptable(conn, segnumact);
+		if ( accepted == RESPROBLEM_NO )
 		{
 			elog(DEBUG3, "Resource manager dispatched %d segment(s) to connection %d",
 						 segnumact,
@@ -4108,6 +4114,7 @@ int dispatchResourceToQueries_EVEN(DynResourceQueueTrack track)
 		}
 		else
 		{
+			PQUEMGR->hasResourceProblem[accepted] = true;
 			/*
 			 * In case we have 0 segments allocated. This may occur because we
 			 * have too many resource small pieces. In this case, we treat the
@@ -4131,16 +4138,16 @@ int dispatchResourceToQueries_EVEN(DynResourceQueueTrack track)
 			}
 
 			/* Mark the request has resource fragment problem. */
-			if ( !conn->troubledByFragment )
+			if ( !conn->troubledByFragment && accepted == RESPROBLEM_FRAGMENT )
 			{
 				conn->troubledByFragmentTimestamp = gettime_microsec();
 				conn->troubledByFragment 		  = true;
-			}
 
-			elog(LOG, "Resource fragment problem is probably encountered. "
-					  "Session "INT64_FORMAT" expects minimum %d virtual segments.",
-					  conn->SessionID,
-					  conn->SegNumMin);
+				elog(LOG, "Resource fragment problem is probably encountered. "
+						  "Session "INT64_FORMAT" expects minimum %d virtual segments.",
+						  conn->SessionID,
+						  conn->SegNumMin);
+			}
 
 			/* Decide whether continue to process next query request. */
 			if ( rm_force_fifo_queue )
@@ -4165,12 +4172,17 @@ int dispatchResourceToQueries_EVEN(DynResourceQueueTrack track)
 	return FUNC_RETURN_OK;
 }
 
-bool isResourceAcceptable(ConnectionTrack conn, int segnumact)
+enum RESOURCEPROBLEM isResourceAcceptable(ConnectionTrack conn, int segnumact)
 {
-	/* Enough number of vsegments. */
+	/*--------------------------------------------------------------------------
+	 * Enough number of vsegments. If resource queue has enough quota, but
+	 * resource pool does not provide enough virtual segments allocated, we
+	 * consider this a resource fragment problem.
+	 *--------------------------------------------------------------------------
+	 */
 	if ( segnumact < conn->SegNumMin )
 	{
-		return false;
+		return RESPROBLEM_FRAGMENT;
 	}
 
 	/*
@@ -4191,7 +4203,7 @@ bool isResourceAcceptable(ConnectionTrack conn, int segnumact)
 						  list_length(conn->Resource),
 						  PRESPOOL->SlavesHostCount,
 						  rm_tolerate_nseg_limit);
-			return false;
+			return RESPROBLEM_TOOFEWSEG;
 		}
 	}
 
@@ -4219,10 +4231,10 @@ bool isResourceAcceptable(ConnectionTrack conn, int segnumact)
 						  "minimum virtual segment size is %d.",
 						  maxval,
 						  minval);
-			return false;
+			return RESPROBLEM_UNEVEN;
 		}
 	}
-	return true;
+	return RESPROBLEM_NO;
 }
 
 int dispatchResourceToQueries_FIFO(DynResourceQueueTrack track)
@@ -4396,7 +4408,9 @@ void timeoutDeadResourceAllocation(void)
 {
 	uint64_t curmsec = gettime_microsec();
 
-	if ( curmsec - PQUEMGR->LastCheckingDeadAllocationTime < 1000000L * 5 ) {
+	if ( curmsec - PQUEMGR->LastCheckingDeadAllocationTime <
+		 1000000LL * rm_request_timeoutcheck_interval )
+	{
 		return;
 	}
 
@@ -4484,7 +4498,9 @@ void timeoutQueuedRequest(void)
 {
 	uint64_t curmsec = gettime_microsec();
 
-	if ( curmsec - PQUEMGR->LastCheckingQueuedTimeoutTime < 1000000L * 5 ) {
+	if ( curmsec - PQUEMGR->LastCheckingQueuedTimeoutTime <
+		 1000000LL * rm_request_timeoutcheck_interval )
+	{
 		return;
 	}
 
@@ -4499,7 +4515,7 @@ void timeoutQueuedRequest(void)
 		PCONTRACK->ConnHavingRequests = list_delete_first(PCONTRACK->ConnHavingRequests);
 
 		/*
-		 * Case 1. RM has no workable cluster built yet, the request is not
+		 * Case 1. RM has no available cluster built yet, the request is not
 		 * 		   added into resource queue manager queues.
 		 */
 		elog(DEBUG3, "Deferred connection track is found. "
@@ -4538,7 +4554,6 @@ void timeoutQueuedRequest(void)
 	ListCell *cell	  = NULL;
 
 	getAllPAIRRefIntoList(&(PCONTRACK->Connections), &allcons);
-
 	foreach(cell, allcons)
 	{
 		ConnectionTrack curcon = (ConnectionTrack)(((PAIR)lfirst(cell))->Value);
@@ -4549,19 +4564,19 @@ void timeoutQueuedRequest(void)
 			 * Check if corresponding mem core ratio tracker has long enough
 			 * time to waiting for GRM containers.
 			 */
-			DynResourceQueueTrack queuetrack = (DynResourceQueueTrack)(curcon->QueueTrack);
+			DynResourceQueueTrack queuetrack = (DynResourceQueueTrack)
+											   (curcon->QueueTrack);
 			int index = getResourceQueueRatioIndex(queuetrack->MemCoreRatio);
-			/* Case 1. No available cluster information yet. We check only top
-			 * 		   query waiting time and resource request time.
-			 * Case 2. We have available cluster information, we check the
-			 * 		   resource increase pending time and top query waiting time.
-			 */
 			Assert(PQUEMGR->RootTrack != NULL);
 
-			/* Check if this is a head request in the queue. */
+			/*
+			 * Set the head waiting timestamp if this request is a head request
+			 * in the target queue.
+			 */
 			if ( queuetrack->QueryResRequests.NodeCount > 0 )
 			{
-				ConnectionTrack topwaiter = getDQueueHeadNodeData(&(queuetrack->QueryResRequests));
+				ConnectionTrack topwaiter =
+						getDQueueHeadNodeData(&(queuetrack->QueryResRequests));
 				if ( topwaiter == curcon && topwaiter->HeadQueueTime == 0 )
 				{
 					topwaiter->HeadQueueTime = gettime_microsec();
@@ -4578,6 +4593,13 @@ void timeoutQueuedRequest(void)
 
 			bool tocancel = false;
 
+			/*
+			 * Case 1. No available cluster for executing.
+			 *
+			 * Case 2. No enough resource to run, resource manager is still
+			 * 		   acquiring resource from global resource manager, and the
+			 * 		   request is at the head of the queue.
+			 */
 			if ( ( (PQUEMGR->RootTrack->ClusterSegNumberMax == 0) &&
 				   (curmsec - curcon->ResRequestTime >
 						1000000L * rm_resource_allocation_timeout ) ) ||

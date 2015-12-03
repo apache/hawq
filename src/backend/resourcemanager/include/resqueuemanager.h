@@ -257,6 +257,15 @@ struct UserInfoData {
 typedef struct UserInfoData *UserInfo;
 typedef struct UserInfoData  UserInfoData;
 
+enum RESOURCEPROBLEM
+{
+	RESPROBLEM_NO = 0,
+	RESPROBLEM_FRAGMENT,
+	RESPROBLEM_UNEVEN,
+	RESPROBLEM_TOOFEWSEG,
+	RESPROBLEM_COUNT
+};
+
 /******************************************************************************
  * In resource queue manager,  a list of resource queues are saved. This can  *
  * be referenced from global instance DRMGlobalInstance->ResourceQueueManager.*
@@ -315,6 +324,7 @@ struct DynResourceQueueManagerData {
     bool					 GRMQueueResourceTight;
     int						 ForcedReturnGRMContainerCount;
     bool					 toRunQueryDispatch;
+    bool	 				 hasResourceProblem[RESPROBLEM_COUNT];
 };
 typedef struct DynResourceQueueManagerData *DynResourceQueueManager;
 typedef struct DynResourceQueueManagerData  DynResourceQueueManagerData;
