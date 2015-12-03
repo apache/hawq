@@ -154,6 +154,7 @@ typedef struct Block_Host_Index {
 	int replica_num;
 	int* hostIndex; // hdfs host name list(size is replica_num)
 	Host_Index *hostIndextoSort; // used to sore host index
+	int insertHost; // the host which inserted this block.
 } Block_Host_Index;
 
 /*
@@ -1016,6 +1017,7 @@ update_data_dist_stat(split_to_segment_mapping_context *context,
 	for (i = 0; i < block_num; i++) {
 		int j;
 		hostIDs[i].replica_num = locations[i].numOfNodes;
+		hostIDs[i].insertHost = -1;
 		hostIDs[i].hostIndex = (int *) palloc(sizeof(int) * hostIDs[i].replica_num);
 		hostIDs[i].hostIndextoSort = (Host_Index *) palloc(
 				sizeof(Host_Index) * hostIDs[i].replica_num);
@@ -1603,9 +1605,14 @@ static int select_random_host_algorithm(Relation_Assignment_Context *context,
 					if (minvols > context->vols[j]) {
 						minvols = context->vols[j];
 						minindex = j;
-					} else {
-						if (context->block_lessthan_vseg_round_robin_no >= 0) {
-							if (minvols == context->vols[j] && l == context->block_lessthan_vseg_round_robin_no) {
+					} else if(minvols == context->vols[j]){
+						/*prefer insert host if exists*/
+						int inserthost = (*hostID)->insertHost;
+						if(inserthost == idMap->global_IDs[j]){
+							minindex = j;
+						}
+						else if (context->block_lessthan_vseg_round_robin_no >= 0) {
+							if (l == context->block_lessthan_vseg_round_robin_no) {
 								minindex = j;
 								context->block_lessthan_vseg_round_robin_no = (context->block_lessthan_vseg_round_robin_no+1)%(*hostID)->replica_num;
 							}
@@ -2645,6 +2652,43 @@ static void allocate_random_relation(Relation_Data* rel_data,
 	int* isBlockContinue = (int *) palloc(
 			sizeof(int) * assignment_context->virtual_segment_num);
 
+
+	/*find the insert node for each block*/
+	int *hostOccurTimes = (int *) palloc(
+						sizeof(int) * context->dds_context.size);
+	for (int fi = 0; fi < fileCount; fi++) {
+			Relation_File *rel_file = file_vector[fi];
+			/*for hash file whose bucket number doesn't equal to segment number*/
+			if (rel_file->hostIDs == NULL) {
+				rel_file->splits[0].host = 0;
+				assignment_context->total_split_num += 1;
+				continue;
+			}
+			MemSet(hostOccurTimes, 0,	sizeof(int) * context->dds_context.size);
+			for (i = 0; i < rel_file->split_num; i++) {
+				Block_Host_Index *hostID = rel_file->hostIDs + i;
+						for (int l = 0; l < hostID->replica_num; l++) {
+							uint32_t key = hostID->hostIndex[l];
+							hostOccurTimes[key]++;
+						}
+			}
+			int maxOccurTime=-1;
+			int inserthost = -1;
+			for(int i=0;i< context->dds_context.size;i++){
+				if(hostOccurTimes[i] > maxOccurTime){
+				  maxOccurTime = hostOccurTimes[i];
+				  inserthost = i;
+				}
+			}
+			/*we consider the insert hosts are the same for blocks in the same file. This logic can be changed in future*/
+			for (i = 0; i < rel_file->split_num; i++) {
+				Block_Host_Index *hostID = rel_file->hostIDs + i;
+				hostID->insertHost = inserthost;
+			}
+	}
+	pfree(hostOccurTimes);
+
+	/*three stage allocation algorithm*/
 	for (int fi = 0; fi < fileCount; fi++) {
 		Relation_File *rel_file = file_vector[fi];
 
