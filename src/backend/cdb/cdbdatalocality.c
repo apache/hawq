@@ -889,9 +889,9 @@ int64 get_block_locations_and_claculte_table_size(split_to_segment_mapping_conte
 	allRelationFetchLeavetime = gettime_microsec();
 	int eclaspeTime = allRelationFetchLeavetime - allRelationFetchBegintime;
 	double hitrate = (allblocks == 0) ? 0 : (double) hitblocks / allblocks;
-	if(debug_print_split_alloc_result){
-	  elog(LOG, "fetch blocks of %d files overall execution time:"
-	  " %d us with hit rate %f \n", totalFileCount,eclaspeTime,hitrate);
+	if (debug_print_split_alloc_result) {
+		elog(LOG, "fetch blocks of %d files overall execution time: %d us with hit rate %f",
+				totalFileCount, eclaspeTime, hitrate);
 	}
 	context->total_file_count = totalFileCount;
 	context->total_size = total_size;
