@@ -151,6 +151,6 @@ public class Utilities {
         if (StringUtils.isEmpty(input)) {
             return input;
         }
-        return input.replaceAll("[^a-zA-Z0-9_-]", ".");
+        return input.replaceAll("[^a-zA-Z0-9_:/-]", ".");
     }
 }

@@ -22,6 +22,7 @@ package org.apache.hawq.pxf.service.rest;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hawq.pxf.service.utilities.Utilities;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -50,53 +51,62 @@ public class InvalidPathResource {
     @Context
     UriInfo rootUri;
 
-    private Log Log;
+    private static final Log Log = LogFactory.getLog(InvalidPathResource.class);
 
     public InvalidPathResource() {
-        super();
-        Log = LogFactory.getLog(InvalidPathResource.class);
     }
 
-    /*
-     * Catch path /pxf/
+    /**
+     * Catches path /pxf/
+     *
+     * @return error message response
      */
     @GET
     @Path("/")
-    public Response noPathGet() throws Exception {
+    public Response noPathGet() {
         return noPath();
     }
 
+    /**
+     * Catches path /pxf/
+     *
+     * @return error message response
+     */
     @POST
     @Path("/")
-    public Response noPathPost() throws Exception {
+    public Response noPathPost() {
         return noPath();
     }
 
-    private Response noPath() throws Exception {
-        String errmsg = "Unknown path " + rootUri.getAbsolutePath();
-        return sendErrorMessage(errmsg);
+    private Response noPath() {
+        return sendErrorMessage(getUnknownPathMsg());
     }
 
-    /*
-     * Catch paths of pattern /pxf/*
+    /**
+     * Catches paths of pattern /pxf/*
+     *
+     * @param path request path
+     * @return error message response
      */
     @GET
     @Path("/{path:.*}")
-    public Response wrongPathGet(@PathParam("path") String path) throws Exception {
+    public Response wrongPathGet(@PathParam("path") String path) {
         return wrongPath(path);
     }
 
-    /*
-     * Catch paths of pattern /pxf/*
+    /**
+     * Catches paths of pattern /pxf/*
+     *
+     * @param path request path
+     * @return error message response
      */
     @POST
     @Path("/{path:.*}")
-    public Response wrongPathPost(@PathParam("path") String path) throws Exception {
+    public Response wrongPathPost(@PathParam("path") String path) {
         return wrongPath(path);
     }
 
-
-    private Response wrongPath(String path) throws Exception {
+    private Response wrongPath(String path) {
 
         String errmsg;
         String version = parseVersion(path);
@@ -104,8 +114,9 @@ public class InvalidPathResource {
         Log.debug("REST request: " + rootUri.getAbsolutePath() + ". " +
                 "Version " + version + ", supported version is " + Version.PXF_PROTOCOL_VERSION);
 
-        if (version.equals(Version.PXF_PROTOCOL_VERSION)) {
-            errmsg = "Unknown path " + rootUri.getAbsolutePath();
+        // if version is not of the format "v<number>" then it's not a version but a wrong path
+        if (version.equals(Version.PXF_PROTOCOL_VERSION)  || !(version.matches("v[0-9]+"))) {
+            errmsg = getUnknownPathMsg();
         } else {
             errmsg = "Wrong version " + version + ", supported version is " + Version.PXF_PROTOCOL_VERSION;
         }
@@ -113,8 +124,8 @@ public class InvalidPathResource {
         return sendErrorMessage(errmsg);
     }
 
-    /*
-     * Return error message
+    /**
+     * Returns error message
      */
     private Response sendErrorMessage(String message) {
         ResponseBuilder b = Response.serverError();
@@ -123,8 +134,8 @@ public class InvalidPathResource {
         return b.build();
     }
 
-    /*
-     * Parse the version part from the path.
+    /**
+     * Parses the version part from the path.
      * The the absolute path is
      * http://<host>:<port>/pxf/<version>/<rest of path>
      *
@@ -139,5 +150,12 @@ public class InvalidPathResource {
         }
 
         return path.substring(0, slash);
+    }
+
+    /**
+     * Returns unknown path message, with the path's special characters masked.
+     */
+    private String getUnknownPathMsg() {
+        return "Unknown path \"" + Utilities.maskNonPrintables(rootUri.getAbsolutePath().toString()) + "\"";
     }
 }
