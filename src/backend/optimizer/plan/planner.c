@@ -63,7 +63,6 @@
 #include "utils/debugbreak.h"
 #include "catalog/gp_policy.h"
 
-#include "postmaster/optserver.h"
 #include "postmaster/identity.h"
 
 /* GUC parameter */
@@ -84,18 +83,6 @@ ParamListInfo PlannerBoundParamList = NULL;		/* current boundParams */
 #define EXPRKIND_APPINFO		6
 #define EXPRKIND_WINDOW_BOUND	7
 
-/*
- * struct containing optimization request parameters;
- * needs to be in sync with the argument expected by COptClient object;
- */
-struct optimizer_params
-{
-	// path where socket is initialized
-	const char *socketPath;
-
-	// input query
-	Query *query;
-};
 
 /*
  * structure containing psudo optimization result

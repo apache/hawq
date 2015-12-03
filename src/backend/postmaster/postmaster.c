@@ -134,7 +134,6 @@
 #include "postmaster/ddaserver.h"
 #include "postmaster/syslogger.h"
 #include "postmaster/perfmon_segmentinfo.h"
-#include "postmaster/optserver.h"
 #include "storage/fd.h"
 #include "storage/ipc.h"
 #include "storage/pg_shmem.h"
@@ -196,7 +195,6 @@ typedef struct bkend
 static Dllist *BackendList;
 
 /* #define DO_DDA_SERV 1 */
-/* #define GP_OPT_PROCESS 1 */
 /* CDB */
 typedef enum pmsub_type
 {
@@ -210,9 +208,6 @@ typedef enum pmsub_type
 	PerfmonSegmentInfoProc,
     MetadataCacheProc,
     ResouceManagerProc,
-#ifdef GP_OPT_PROCESS
-	OptProc,
-#endif	
 	MaxPMSubType
 } PMSubType;
 
@@ -489,11 +484,6 @@ static PMSubProc PMSubProcList[MaxPMSubType] =
     {0, ResouceManagerProc,
     (PMSubStartCallback*)&ResManagerProcessStartup,
     "resourcemanager process", PMSUBPROC_FLAG_QD_AND_QE, true},
-#ifdef GP_OPT_PROCESS
-	{0, OptProc,
-	(PMSubStartCallback*)&optimizer_start,
-	"optimizer process", PMSUBPROC_FLAG_QD, true},
-#endif // !GP_OPT_PROCESS
 #ifdef DO_DDA_SERV
 	{0, DdaServerProc,
 	 (PMSubStartCallback*)&ddaserver_start,
