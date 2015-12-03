@@ -6538,6 +6538,16 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
+		{"hawq_rm_request_timeoutcheck_interval", PGC_POSTMASTER, RESOURCES_MGM,
+			gettext_noop("interval for sending heart-beat to resource manager to keep "
+						 "resource context alive."),
+			NULL
+		},
+		&rm_request_timeoutcheck_interval,
+		1, 1, 65535, NULL, NULL
+	},
+
+	{
 		{"hawq_rm_tolerate_nseg_limit", PGC_POSTMASTER, RESOURCES_MGM,
 			gettext_noop("resource manager re-allocates resource if the number of exclusive "
 						 "segments is greater than this limit value when there is at least "
