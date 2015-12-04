@@ -1246,6 +1246,11 @@ static void AOGetSegFileDataLocation(Relation relation,
 		aoscan = systable_beginscan(pg_aoseg_rel, InvalidOid, FALSE,
 				metadataSnapshot, 0, NULL);
 
+		// get targetPolicy
+		GpPolicy *targetPolicy = NULL;
+		Oid myrelid = rel_data->relid;
+		targetPolicy = GpPolicyFetch(CurrentMemoryContext, myrelid);
+
 		while (HeapTupleIsValid(tuple = systable_getnext(aoscan))) {
 			BlockLocation *locations = NULL;
 			int block_num;
@@ -1257,9 +1262,6 @@ static void AOGetSegFileDataLocation(Relation relation,
 			int64 logic_len = (int64) DatumGetFloat8(
 					fastgetattr(tuple, Anum_pg_aoseg_eof, pg_aoseg_dsc, NULL));
 			bool isRelationHash = true;
-			GpPolicy *targetPolicy = NULL;
-			Oid myrelid = rel_data->relid;
-			targetPolicy = GpPolicyFetch(CurrentMemoryContext, myrelid);
 			if (targetPolicy->nattrs == 0) {
 				isRelationHash = false;
 			}
@@ -1421,6 +1423,12 @@ static void ParquetGetSegFileDataLocation(Relation relation,
 	pg_parquetseg_dsc = RelationGetDescr(pg_parquetseg_rel);
 	parquetscan = systable_beginscan(pg_parquetseg_rel, InvalidOid, FALSE,
 			metadataSnapshot, 0, NULL);
+
+	// get targetPolicy
+	GpPolicy *targetPolicy = NULL;
+	Oid myrelid = rel_data->relid;
+	targetPolicy = GpPolicyFetch(CurrentMemoryContext, myrelid);
+
 	while (HeapTupleIsValid(tuple = systable_getnext(parquetscan))) {
 		BlockLocation *locations;
 		int block_num;
@@ -1432,9 +1440,6 @@ static void ParquetGetSegFileDataLocation(Relation relation,
 				fastgetattr(tuple, Anum_pg_parquetseg_eof, pg_parquetseg_dsc, NULL));
 
 		bool isRelationHash = true;
-		GpPolicy *targetPolicy = NULL;
-		Oid myrelid = rel_data->relid;
-		targetPolicy = GpPolicyFetch(CurrentMemoryContext, myrelid);
 		if (targetPolicy->nattrs == 0) {
 			isRelationHash = false;
 		}
