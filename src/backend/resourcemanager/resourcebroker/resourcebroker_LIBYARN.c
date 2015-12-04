@@ -711,7 +711,7 @@ int handleRB2RM_ClusterReport(void)
 int handleRB2RM_AllocatedResource(void)
 {
 	int				fd 		  		= ResBrokerNotifyPipe[0];
-	int32_t 	   *containerids 	= NULL;
+	int64_t 	   *containerids 	= NULL;
 	char 		   *buffer 	  		= NULL;
 	int   			acceptedcount 	= 0;
 	int				piperes			= 0;

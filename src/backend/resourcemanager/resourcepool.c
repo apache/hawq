@@ -3595,7 +3595,7 @@ void checkGRMContainerStatus(RB_GRMContainerStat ctnstats, int size)
 
 					addGRMContainerToToBeKicked(ctn);
 					elog(LOG, "Resource manager decides to return container "INT64_FORMAT
-							  "in host %s because %s.",
+							  " in host %s because %s.",
 							  ctn->ID,
 							  ctn->HostName,
 							  ctnstat == NULL ?
