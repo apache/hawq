@@ -25,3 +25,8 @@ FROM
   FROM foo F1
   LIMIT 3
 ) F2 GROUP BY GROUPING SETS((type, prod), (prod)) ORDER BY type, s_quant;
+
+---
+--- Drop created table
+---
+DROP TABLE IF EXISTS foo;
