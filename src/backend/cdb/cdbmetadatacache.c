@@ -92,6 +92,17 @@ typedef struct BlockInfoEntry
     uint16_t            index;            
 } BlockInfoEntry;
 
+typedef struct RevertBlockInfoKey
+{
+    uint16_t            index;
+} RevertBlockInfoKey;
+
+typedef struct RevertBlockInfoEntry
+{
+    RevertBlockInfoKey  key;
+    char                block_info[MAX_BLOCK_INFO_LEN];
+} RevertBlockInfoEntry;
+
 /*
  * Metadata Cache Global Initialization Functions
  */
@@ -100,6 +111,9 @@ MetadataCacheHashTableInit(void);
 
 static bool 
 MetadataBlockInfoTablesInit(void);
+
+static bool
+MetadataRevertBlockInfoTablesInit(void);
 
 static bool 
 MetadataCacheHdfsBlockArrayInit(void);
@@ -144,6 +158,10 @@ MetadataHdfsBlockInfo    *MetadataBlockArray = NULL;
 static HTAB                     *BlockHostsMap = NULL;
 static HTAB                     *BlockNamesMap = NULL;
 static HTAB                     *BlockTopologyPathsMap = NULL;
+
+static HTAB                     *RevertBlockHostsMap = NULL;
+static HTAB                     *RevertBlockNamesMap = NULL;
+static HTAB                     *RevertBlockTopologyPathsMap = NULL;
 
 //static BlockLocation *CreateHdfsFileBlockLocations(BlockLocation *hdfs_locations, int block_num);
 static BlockLocation *MergeHdfsFileBlockLocations(BlockLocation *locations1, int block_num1, BlockLocation *locations2, int block_num2);
@@ -216,6 +234,11 @@ MetadataCache_ShmemInit(void)
     if (!MetadataBlockInfoTablesInit())
     {
         elog(FATAL, "[MetadataCache] fail to allocate share memory for metadata cache block info hash tables");
+    }
+
+    if (!MetadataRevertBlockInfoTablesInit())
+    {
+        elog(FATAL, "[MetadataCache] fail to allocate share memory for metadata cache revert block info hash tables");
     }
 
     if (!MetadataCacheHdfsBlockArrayInit())
@@ -291,6 +314,43 @@ MetadataBlockInfoTablesInit(void)
 
     return true;
 }
+
+/*
+ *  Initialize metadata revert block info hash tables
+ */
+bool 
+MetadataRevertBlockInfoTablesInit(void)
+{
+    HASHCTL     info;
+    int         hash_flags;
+ 
+    MemSet(&info, 0, sizeof(info));
+
+    info.keysize = sizeof(RevertBlockInfoKey);
+    info.entrysize = sizeof(RevertBlockInfoEntry);
+    hash_flags = HASH_ELEM;
+
+    RevertBlockHostsMap = ShmemInitHash("Metadata Revert Block Hosts Map", MAX_HDFS_HOST_NUM, MAX_HDFS_HOST_NUM, &info, hash_flags);
+    if (NULL == RevertBlockHostsMap)
+    {
+        return false;
+    }
+ 
+    RevertBlockNamesMap = ShmemInitHash("Metadata Revert Block Names Map", MAX_HDFS_HOST_NUM, MAX_HDFS_HOST_NUM, &info, hash_flags);
+    if (NULL == RevertBlockNamesMap)
+    {
+        return false;
+    }
+    
+    RevertBlockTopologyPathsMap = ShmemInitHash("Metadata Revert Block TopologyPaths Map", MAX_HDFS_HOST_NUM, MAX_HDFS_HOST_NUM, &info, hash_flags);
+    if (NULL == RevertBlockTopologyPathsMap)
+    {
+        return false;
+    }
+
+    return true;
+}
+
 
 /*
  *  Initialize metadata hdfs block array
@@ -482,22 +542,30 @@ SetMetadataBlockInfo(MetadataBlockInfoType type, char **infos, uint32_t num)
     BlockInfoKey key;
     BlockInfoEntry *entry;
     HTAB *htab = NULL;
+
+    RevertBlockInfoKey rkey;
+    RevertBlockInfoEntry *rentry;
+    HTAB *rhtab = NULL;
+
     uint32_t *cur_idx = NULL;
 
     switch (type)
     {
     case METADATA_BLOCK_INFO_TYPE_HOSTS:
         htab = BlockHostsMap;
+        rhtab = RevertBlockHostsMap;
         cur_idx = &MetadataCacheSharedDataInstance->cur_hosts_idx;
         break;
 
     case METADATA_BLOCK_INFO_TYPE_NAMES:
         htab = BlockNamesMap;
+        rhtab = RevertBlockNamesMap;
         cur_idx = &MetadataCacheSharedDataInstance->cur_names_idx;
         break;
     
     case METADATA_BLOCK_INFO_TYPE_TOPOLOGYPATHS:
         htab = BlockTopologyPathsMap;
+        rhtab = RevertBlockTopologyPathsMap;
         cur_idx = &MetadataCacheSharedDataInstance->cur_topologyPaths_idx;
         break;
 
@@ -520,6 +588,11 @@ SetMetadataBlockInfo(MetadataBlockInfoType type, char **infos, uint32_t num)
         {
             (*cur_idx)++;
             entry->index = (*cur_idx);
+            
+            rkey.index = (*cur_idx);
+            rentry = hash_search(rhtab, (void *)&rkey, HASH_ENTER_NULL, &found);
+            memset(rentry->block_info, 0, MAX_BLOCK_INFO_LEN);
+            snprintf(rentry->block_info, MAX_BLOCK_INFO_LEN, "%s", infos[i]);
         }
         entry_idx = entry->index;
         result |= (entry_idx << (i * BLOCK_INFO_BIT_NUM));
@@ -536,26 +609,25 @@ char *
 GetMetadataBlockInfo(MetadataBlockInfoType type, uint64_t infos, int index)
 {
     Insist(index >= 0 && index < 4);
-    
-    HASH_SEQ_STATUS hstat;
-    BlockInfoEntry *entry;
-    char *result = NULL;   
-    HTAB *htab = NULL;
+ 
+    RevertBlockInfoKey rkey;
+    RevertBlockInfoEntry *rentry;
+    HTAB *rhtab = NULL;
     uint64_t mask;
-    int infos_idx = -1;
+    bool found;
 
     switch (type)
     {
     case METADATA_BLOCK_INFO_TYPE_HOSTS:
-        htab = BlockHostsMap;
+        rhtab = RevertBlockHostsMap;
         break;
 
     case METADATA_BLOCK_INFO_TYPE_NAMES:
-        htab = BlockNamesMap;
+        rhtab = RevertBlockNamesMap;
         break;
     
     case METADATA_BLOCK_INFO_TYPE_TOPOLOGYPATHS:
-        htab = BlockTopologyPathsMap;
+        rhtab = RevertBlockTopologyPathsMap;
         break;
 
     default:
@@ -564,20 +636,13 @@ GetMetadataBlockInfo(MetadataBlockInfoType type, uint64_t infos, int index)
 
     mask = 0x000000000000ffff;
     mask = mask << (index * BLOCK_INFO_BIT_NUM);
-    infos_idx = (mask & infos) >> (index * BLOCK_INFO_BIT_NUM);
+    rkey.index = (mask & infos) >> (index * BLOCK_INFO_BIT_NUM);
 
-    hash_seq_init(&hstat, htab);
-    while ((entry = (BlockInfoEntry *)hash_seq_search(&hstat)) != NULL)
-    {
-        if (entry->index == infos_idx)
-        {
-            result = entry->key.block_info;
-            hash_seq_term(&hstat);
-            break;
-        }
+    rentry = (RevertBlockInfoEntry *)hash_search(rhtab, (void *)&rkey, HASH_FIND, &found);
+    if (!found) {
+        return NULL;
     }
-
-    return result; 
+    return rentry->block_info;
 }
 
 /*
