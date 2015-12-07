@@ -2657,40 +2657,45 @@ static void allocate_random_relation(Relation_Data* rel_data,
 	int *hostOccurTimes = (int *) palloc(
 						sizeof(int) * context->dds_context.size);
 	for (int fi = 0; fi < fileCount; fi++) {
-			Relation_File *rel_file = file_vector[fi];
-			/*for hash file whose bucket number doesn't equal to segment number*/
-			if (rel_file->hostIDs == NULL) {
-				rel_file->splits[0].host = 0;
-				assignment_context->total_split_num += 1;
-				continue;
+	  Relation_File *rel_file = file_vector[fi];
+		/*for hash file whose bucket number doesn't equal to segment number*/
+		if (rel_file->hostIDs == NULL) {
+			rel_file->splits[0].host = 0;
+			assignment_context->total_split_num += 1;
+			continue;
+		}
+		MemSet(hostOccurTimes, 0, sizeof(int) * context->dds_context.size);
+		for (i = 0; i < rel_file->split_num; i++) {
+			Block_Host_Index *hostID = rel_file->hostIDs + i;
+			for (int l = 0; l < hostID->replica_num; l++) {
+				uint32_t key = hostID->hostIndex[l];
+				hostOccurTimes[key]++;
 			}
-			MemSet(hostOccurTimes, 0,	sizeof(int) * context->dds_context.size);
-			for (i = 0; i < rel_file->split_num; i++) {
-				Block_Host_Index *hostID = rel_file->hostIDs + i;
-						for (int l = 0; l < hostID->replica_num; l++) {
-							uint32_t key = hostID->hostIndex[l];
-							hostOccurTimes[key]++;
-						}
+		}
+		int maxOccurTime = -1;
+		int inserthost = -1;
+		int hostsWithSameOccurTimesExist = true;
+		for (int i = 0; i < context->dds_context.size; i++) {
+			if (hostOccurTimes[i] > maxOccurTime) {
+				maxOccurTime = hostOccurTimes[i];
+				inserthost = i;
+				hostsWithSameOccurTimesExist = false;
+			} else if (hostOccurTimes[i] == maxOccurTime) {
+				hostsWithSameOccurTimesExist = true;
 			}
-			int maxOccurTime = -1;
-			int inserthost = -1;
-			for(int i=0;i< context->dds_context.size;i++){
-				if(hostOccurTimes[i] > maxOccurTime){
-				  maxOccurTime = hostOccurTimes[i];
-				  inserthost = i;
-				}
-			}
+		}
 
-			/* currently we consider the insert hosts are the same for all the blocks in the same file.
-			 * this logic can be changed in future, so we store the state in block level not file level*/
-			if(maxOccurTime < rel_file->split_num){
-				inserthost = -1;
-			}else{
-				for (i = 0; i < rel_file->split_num; i++) {
-					Block_Host_Index *hostID = rel_file->hostIDs + i;
-					hostID->insertHost = inserthost;
-				}
-			}
+		/* currently we consider the insert hosts are the same for all the blocks in the same file.
+		 * this logic can be changed in future, so we store the state in block level not file level
+		 * if hostsWithSameOccurTimesExist we cannot determine which is insert host
+		 * if maxOccurTime <2 we cannot determine which is insert host either*/
+		if (maxOccurTime < rel_file->split_num || maxOccurTime < 2 || hostsWithSameOccurTimesExist) {
+			inserthost = -1;
+		}
+		for (i = 0; i < rel_file->split_num; i++) {
+			Block_Host_Index *hostID = rel_file->hostIDs + i;
+			hostID->insertHost = inserthost;
+		}
 	}
 	pfree(hostOccurTimes);
 
