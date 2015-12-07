@@ -291,4 +291,5 @@ caql_raw_parser(const char *query, const char *file, int line)
 #undef yylval
 #undef yylloc
 
+struct yyguts_t * yyg = NULL;
 #include "scan.c"

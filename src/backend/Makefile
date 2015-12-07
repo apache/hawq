@@ -67,9 +67,6 @@ endif
 # HAWQ uses threads in the backend
 LIBS := $(LIBS) -lpthread
 
-JSONLIB = -ljson
-LIBS := $(LIBS) $(JSONLIB)
-
 THRIFTLIB = -lthrift
 LIBS := $(LIBS) $(THRIFTLIB)
 

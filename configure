@@ -10921,7 +10921,7 @@ return json_tokener_parse ();
   return 0;
 }
 _ACEOF
-for ac_lib in '' json; do
+for ac_lib in '' json-c json; do
   if test -z "$ac_lib"; then
     ac_res="none required"
   else

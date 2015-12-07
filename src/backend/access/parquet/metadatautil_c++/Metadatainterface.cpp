@@ -27,13 +27,17 @@
 #include <fstream>
 #include <stdio.h>
 #include <bitset>
+
+extern "C" {
+#include "postgres.h"
+}
+
 #include "MetadataUtil.h"
 using namespace hawq;
 using namespace std;
 using namespace boost;
 
 extern "C" {
-#include "postgres.h"
 #include "utils/palloc.h"
 
 /*

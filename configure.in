@@ -1224,7 +1224,7 @@ fi
 # json-c 
 
 AC_CHECK_HEADERS(json/json.h, [], [AC_MSG_ERROR([json-c is required])])
-AC_SEARCH_LIBS(json_tokener_parse, json, [], [AC_MSG_ERROR([json-c is required])], [])
+AC_SEARCH_LIBS(json_tokener_parse, json-c json, [], [AC_MSG_ERROR([json-c is required])], [])
 
 # libxml2
 

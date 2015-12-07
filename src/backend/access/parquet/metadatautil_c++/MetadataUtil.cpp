@@ -27,14 +27,16 @@
 #include <fcntl.h>
 #include <vector>
 #include <string.h>
-#include "MetadataUtil.h"
-#include "parquet_types.h"
 
 extern "C" {
 #include "postgres.h"
 #include "utils/palloc.h"
 #include "lib/stringinfo.h"
 }
+
+#include "MetadataUtil.h"
+#include "parquet_types.h"
+
 using namespace hawq;
 
 ThriftSerializer *MetadataUtil::thriftSerializer  = new ThriftSerializer(true, 1024);

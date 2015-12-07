@@ -43,6 +43,7 @@ objfiles.txt
 .settings
 
 # Generated files
+BUILD_NUMBER
 GNUmakefile
 config.log
 config.status

@@ -20,12 +20,14 @@
 #include "lib/stringinfo.h"
 
 #include "plvlex.h"
-#include "sqlparse.h"
 #include "nodes/pg_list.h"
 #include "funcapi.h"
 #include "catalog/pg_type.h"
 #include "orafunc.h"
 #include "builtins.h"
+
+#define YYPARSE_PARAM
+#include "sqlparse.h"
 
 typedef struct {
 	List	*nodes;
