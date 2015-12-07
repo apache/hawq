@@ -2666,7 +2666,6 @@ static void allocate_random_relation(Relation_Data* rel_data,
 			/*for hash file whose bucket number doesn't equal to segment number*/
 			if (rel_file->hostIDs == NULL) {
 				rel_file->splits[0].host = 0;
-				assignment_context->total_split_num += 1;
 				continue;
 			}
 			MemSet(hostOccurTimes, 0,	sizeof(int) * context->dds_context.size);
