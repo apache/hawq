@@ -324,7 +324,8 @@ void PersistentRelfile_AddCreatePending(
 						relFileNode->spcNode,
 						relFileNode->dbNode,
 						relFileNode->relNode,
-						segmentFileNum);	
+						segmentFileNum,
+						persistentTid, serialNum);
 #endif
 
 	#ifdef FAULT_INJECTOR
@@ -826,7 +827,8 @@ PersistentRelfile_DroppedVerifiedActionCallback(
 							relFileNode->spcNode, 
 							relFileNode->dbNode, 
 							relFileNode->relNode,
-							segmentFileNum);
+							segmentFileNum,
+							persistentTid, persistentSerialNum);
 #endif
 				
 		break;

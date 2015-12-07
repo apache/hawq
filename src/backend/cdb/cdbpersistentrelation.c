@@ -628,7 +628,8 @@ void PersistentRelation_MarkCreatePending(
 	mmxlog_log_create_relation(
 						relFileNode->spcNode,
 						relFileNode->dbNode,
-						relFileNode->relNode);
+						relFileNode->relNode,
+						persistentTid, persistentSerialNum);
 #endif
 
 	/*
@@ -1046,7 +1047,8 @@ PersistentRelation_DroppedVerifiedActionCallback(
 		 * This XLOG must be generated under the persistent write-lock.
 		 */
 #ifdef MASTER_MIRROR_SYNC
-		mmxlog_log_remove_relation(relFileNode->spcNode, relFileNode->dbNode, relFileNode->relNode);
+		mmxlog_log_remove_relation(relFileNode->spcNode, relFileNode->dbNode, relFileNode->relNode,
+				persistentTid, persistentSerialNum);
 #endif
 		break;
 

@@ -197,9 +197,34 @@ void ChangeTracking_GetRelationChangeInfoFromXlog(
 		case RM_SMGR_ID:
 		case RM_DBASE_ID:
 		case RM_TBLSPC_ID:
-		case RM_MMXLOG_ID:
 			break;
-			
+		case RM_MMXLOG_ID:
+			switch (info)
+			{
+				// relation dirs and node files create/drop need to be tracked down
+                // so that we can skip at recovery pass3
+                case MMXLOG_CREATE_DIR:
+				case MMXLOG_CREATE_FILE:
+                case MMXLOG_REMOVE_DIR:
+				case MMXLOG_REMOVE_FILE:
+				{
+					xl_heap_freeze *xlrec = (xl_heap_freeze *) data;
+
+					ChangeTracking_AddRelationChangeInfo(
+													   relationChangeInfoArray,
+													   relationChangeInfoArrayCount,
+													   relationChangeInfoMaxSize,
+													   &(xlrec->heapnode.node),
+													   InvalidBlockNumber,
+													   &xlrec->heapnode.persistentTid,
+													   xlrec->heapnode.persistentSerialNum);
+					break;
+				}
+				default:
+					break;
+			}
+			break;
+
 		/* 
 		 * These aren't supported in GPDB
 		 */
