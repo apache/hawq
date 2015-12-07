@@ -67,7 +67,7 @@ char *PersistentFileSysObjName_ObjectName(
 		else
 		{
 			/* All other tablespaces are accessed via filespace locations */
-			sprintf(path, "%u/%u/%u%u",
+			sprintf(path, "%u/%u/%u/%u",
 					 name->variant.rel.relFileNode.spcNode,
 					 name->variant.rel.relFileNode.dbNode,
 					 name->variant.rel.relFileNode.relNode,

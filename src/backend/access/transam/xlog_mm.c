@@ -437,6 +437,7 @@ append_file_parts(mm_fs_obj_type type,
 static bool
 emit_mmxlog_fs_record(mm_fs_obj_type type, Oid filespace,
 					  Oid tablespace, Oid database, Oid relfilenode,
+					  ItemPointer persistentTid, int64 persistentSerialNum,
 					  int32 segnum, uint8 flags, XLogRecPtr *beginLoc)
 {
 	XLogRecData		rdata;
@@ -480,6 +481,8 @@ emit_mmxlog_fs_record(mm_fs_obj_type type, Oid filespace,
 	xlrec.relfilenode = relfilenode;
 	xlrec.segnum = segnum;
 	xlrec.shared = is_filespace_shared(filespace);
+    xlrec.persistentTid = *persistentTid;
+    xlrec.persistentSerialNum = persistentSerialNum;
 
 	Insist(!path || strlen(path) <= MAXPGPATH);
 
@@ -516,7 +519,7 @@ emit_mmxlog_fs_record(mm_fs_obj_type type, Oid filespace,
 
 /* External interface to filespace removal logging */
 void
-mmxlog_log_remove_filespace(Oid filespace)
+mmxlog_log_remove_filespace(Oid filespace,ItemPointer persistentTid, int64 persistentSerialNum)
 {
 	bool emitted;
 	XLogRecPtr beginLoc;
@@ -531,6 +534,8 @@ mmxlog_log_remove_filespace(Oid filespace)
 						  InvalidOid /* tablespace */,
 						  InvalidOid /* database */,
 						  InvalidOid /* relfilenode */,
+						  persistentTid,
+						  persistentSerialNum,
 						  0 /* segnum */,
 						  MMXLOG_REMOVE_DIR,
 						  &beginLoc);
@@ -552,7 +557,7 @@ mmxlog_log_remove_filespace(Oid filespace)
 
 /* External interface to tablespace removal logging */
 void
-mmxlog_log_remove_tablespace(Oid tablespace)
+mmxlog_log_remove_tablespace(Oid tablespace,ItemPointer persistentTid, int64 persistentSerialNum)
 {
 	bool emitted;
 	XLogRecPtr beginLoc;
@@ -567,6 +572,8 @@ mmxlog_log_remove_tablespace(Oid tablespace)
 						  tablespace,
 						  InvalidOid /* database */,
 						  InvalidOid /* relfilenode */,
+						  persistentTid,
+						  persistentSerialNum,
 						  0 /* segnum */,
 						  MMXLOG_REMOVE_DIR,
 						  &beginLoc);
@@ -588,7 +595,8 @@ mmxlog_log_remove_tablespace(Oid tablespace)
 
 /* External interface to database removal logging */
 void
-mmxlog_log_remove_database(Oid tablespace, Oid database)
+mmxlog_log_remove_database(Oid tablespace, Oid database,
+		ItemPointer persistentTid, int64 persistentSerialNum)
 {
 	bool emitted;
 	XLogRecPtr beginLoc;
@@ -603,6 +611,8 @@ mmxlog_log_remove_database(Oid tablespace, Oid database)
 						  tablespace,
 						  database,
 						  InvalidOid /* relfilenode */,
+						  persistentTid,
+						  persistentSerialNum,
 						  0 /* segnum */,
 						  MMXLOG_REMOVE_DIR,
 						  &beginLoc);
@@ -625,7 +635,8 @@ mmxlog_log_remove_database(Oid tablespace, Oid database)
 
 /* External interface to relation removal logging */
 void
-mmxlog_log_remove_relation(Oid tablespace, Oid database, Oid relfilenode)
+mmxlog_log_remove_relation(Oid tablespace, Oid database, Oid relfilenode,
+		ItemPointer persistentTid, int64 persistentSerialNum)
 {
 	bool emitted;
 	XLogRecPtr beginLoc;
@@ -642,6 +653,8 @@ mmxlog_log_remove_relation(Oid tablespace, Oid database, Oid relfilenode)
 								tablespace,
 								database,
 								relfilenode,
+								persistentTid,
+								persistentSerialNum,
 								0 /* segnum */,
 								MMXLOG_REMOVE_DIR,
 								&beginLoc);
@@ -666,7 +679,7 @@ mmxlog_log_remove_relation(Oid tablespace, Oid database, Oid relfilenode)
 /* External interface to relfilenode removal logging */
 void
 mmxlog_log_remove_relfilenode(Oid tablespace, Oid database, Oid relfilenode,
-							  int32 segnum)
+							  int32 segnum,ItemPointer persistentTid, int64 persistentSerialNum)
 {
 	bool emitted;
 	XLogRecPtr beginLoc;
@@ -681,6 +694,8 @@ mmxlog_log_remove_relfilenode(Oid tablespace, Oid database, Oid relfilenode,
 						  tablespace,
 						  database,
 						  relfilenode,
+						  persistentTid,
+						  persistentSerialNum,
 						  segnum,
 						  MMXLOG_REMOVE_FILE,
 						  &beginLoc);
@@ -705,7 +720,7 @@ mmxlog_log_remove_relfilenode(Oid tablespace, Oid database, Oid relfilenode,
 
 /* External interface to filespace creation logging */
 void
-mmxlog_log_create_filespace(Oid filespace)
+mmxlog_log_create_filespace(Oid filespace,ItemPointer persistentTid, int64 persistentSerialNum)
 {
 	bool emitted;
 	XLogRecPtr beginLoc;
@@ -717,6 +732,8 @@ mmxlog_log_create_filespace(Oid filespace)
 						  InvalidOid /* tablespace */,
 						  InvalidOid /* database */,
 						  InvalidOid /* relfilenode */,
+						  persistentTid,
+						  persistentSerialNum,
 						  0 /* segnum */,
 						  MMXLOG_CREATE_DIR,
 						  &beginLoc);
@@ -738,7 +755,7 @@ mmxlog_log_create_filespace(Oid filespace)
 
 /* External interface to tablespace creation logging */
 void
-mmxlog_log_create_tablespace(Oid filespace, Oid tablespace)
+mmxlog_log_create_tablespace(Oid filespace, Oid tablespace, ItemPointer persistentTid, int64 persistentSerialNum)
 {
 	bool emitted;
 	XLogRecPtr beginLoc;
@@ -750,6 +767,8 @@ mmxlog_log_create_tablespace(Oid filespace, Oid tablespace)
 						  tablespace,
 						  InvalidOid /* database */,
 						  InvalidOid /* relfilenode */,
+						  persistentTid,
+						  persistentSerialNum,
 						  0 /* segnum */,
 						  MMXLOG_CREATE_DIR,
 						  &beginLoc);
@@ -772,7 +791,8 @@ mmxlog_log_create_tablespace(Oid filespace, Oid tablespace)
 
 /* External interface to database creation logging */
 void
-mmxlog_log_create_database(Oid tablespace, Oid database)
+mmxlog_log_create_database(Oid tablespace, Oid database,
+		ItemPointer persistentTid, int64 persistentSerialNum)
 {
 	bool emitted;
 	XLogRecPtr beginLoc;
@@ -784,6 +804,8 @@ mmxlog_log_create_database(Oid tablespace, Oid database)
 						  tablespace,
 						  database,
 						  InvalidOid /* relfilenode */,
+						  persistentTid,
+						  persistentSerialNum,
 						  0 /* segnum */,
 						  MMXLOG_CREATE_DIR,
 						  &beginLoc);
@@ -808,7 +830,8 @@ mmxlog_log_create_database(Oid tablespace, Oid database)
  * External interface to relation create logging
  */
 void
-mmxlog_log_create_relation(Oid tablespace, Oid database, Oid relfilenode)
+mmxlog_log_create_relation(Oid tablespace, Oid database, Oid relfilenode,
+		ItemPointer persistentTid, int64 persistentSerialNum)
 {
 	bool emitted;
 	XLogRecPtr beginLoc;
@@ -819,6 +842,8 @@ mmxlog_log_create_relation(Oid tablespace, Oid database, Oid relfilenode)
 								tablespace,
 								database,
 								relfilenode,
+								persistentTid,
+								persistentSerialNum,
 								0 /*segnum */,
 								MMXLOG_CREATE_DIR,
 								&beginLoc);
@@ -843,7 +868,8 @@ mmxlog_log_create_relation(Oid tablespace, Oid database, Oid relfilenode)
 /* External interface to relfilenode creation logging */
 void
 mmxlog_log_create_relfilenode(Oid tablespace, Oid database,
-							  Oid relfilenode, int32 segnum)
+							  Oid relfilenode, int32 segnum,
+							  ItemPointer persistentTid, int64 persistentSerialNum)
 {
 	bool emitted;
 	XLogRecPtr beginLoc;
@@ -855,6 +881,8 @@ mmxlog_log_create_relfilenode(Oid tablespace, Oid database,
 						  tablespace,
 						  database,
 						  relfilenode,
+						  persistentTid,
+						  persistentSerialNum,
 						  segnum,
 						  MMXLOG_CREATE_FILE,
 						  &beginLoc);

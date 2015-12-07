@@ -611,7 +611,8 @@ void PersistentDatabase_MarkCreatePending(
 	 * This XLOG must be generated under the persistent write-lock.
 	 */
 #ifdef MASTER_MIRROR_SYNC
-	mmxlog_log_create_database(dbDirNode->tablespace, dbDirNode->database); 
+	mmxlog_log_create_database(dbDirNode->tablespace, dbDirNode->database,
+			persistentTid, persistentSerialNum);
 #endif
 
 
@@ -1053,7 +1054,8 @@ PersistentDatabase_DroppedVerifiedActionCallback(
 		 * This XLOG must be generated under the persistent write-lock.
 		 */
 #ifdef MASTER_MIRROR_SYNC
-		mmxlog_log_remove_database(dbDirNode->tablespace, dbDirNode->database);
+		mmxlog_log_remove_database(dbDirNode->tablespace, dbDirNode->database,
+				persistentTid, persistentSerialNum);
 #endif
 				
 		break;
@@ -1288,7 +1290,8 @@ void PersistentDatabase_MarkJustInTimeCreatePending(
 	 */
 #ifdef MASTER_MIRROR_SYNC
 	mmxlog_log_create_database(dbDirNode->tablespace,
-							   dbDirNode->database);	
+							   dbDirNode->database,
+							   persistentTid, persistentSerialNum);
 #endif
 	
 	WRITE_PERSISTENT_STATE_ORDERED_UNLOCK;

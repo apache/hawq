@@ -711,7 +711,8 @@ void PersistentTablespace_MarkCreatePending(
 #ifdef MASTER_MIRROR_SYNC
 	mmxlog_log_create_tablespace(
 						filespaceOid,
-						tablespaceOid);
+						tablespaceOid,
+						persistentTid, persistentSerialNum);
 #endif
 
 	#ifdef FAULT_INJECTOR
@@ -1075,7 +1076,7 @@ PersistentTablespace_DroppedVerifiedActionCallback(
 		 * This XLOG must be generated under the persistent write-lock.
 		 */
 #ifdef MASTER_MIRROR_SYNC
-		mmxlog_log_remove_tablespace(tablespaceOid);
+		mmxlog_log_remove_tablespace(tablespaceOid,persistentTid, persistentSerialNum);
 #endif
 				
 		break;
