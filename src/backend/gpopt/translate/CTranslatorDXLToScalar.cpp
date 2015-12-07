@@ -1,16 +1,10 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2011 EMC Corp.
-//
 //	@filename:
 //		CTranslatorDXLToScalar.cpp
 //
 //	@doc:
 //		Implementation of the methods used to translate DXL Scalar Node into
 //		GPDB's Expr.
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //---------------------------------------------------------------------------

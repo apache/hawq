@@ -1,16 +1,9 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2010 Greenplum, Inc.
-//
 //	@filename:
 //		CTranslatorPlStmtToDXL.h
 //
 //	@doc:
 //		Class providing methods for translating GPDB's PlannedStmt into DXL Tree
-//
-//
-//	@owner:
-//		antovl
 //
 //	@test:
 //

@@ -1,15 +1,9 @@
-//---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2011 EMC Greenplum, Inc.
-//
+//--------------------------------------------------------------------------
 //	@filename:
 //		COptTasks.cpp
 //
 //	@doc:
 //		Routines to perform optimization related tasks using the gpos framework
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //

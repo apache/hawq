@@ -1,7 +1,4 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2011 Greenplum, Inc.
-//
 //	@filename:
 //		CMappingColIdVar.h
 //
@@ -10,9 +7,6 @@
 //		If we need a CDXLScalar translator during DXL->PlStmt or DXL->Query translation
 //		we implement a colid->Var mapping for PlStmt or Query respectively that
 //		is derived from this interface.
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //

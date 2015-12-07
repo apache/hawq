@@ -1,15 +1,9 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2012 EMC Corp.
-//
 //	@filename:
 //		COptClient.h
 //
 //	@doc:
 //		API for optimizer client
-//
-//	@owner:
-//		solimm1
 //
 //	@test:
 //

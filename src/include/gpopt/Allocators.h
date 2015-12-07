@@ -1,15 +1,9 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2013 EMC Corp.
-//
 //	@filename:
 //		Allocators.h
 //
 //	@doc:
 //		Memory allocation/deallocation operators
-//
-//	@owner:
-//		solimm1
 //
 //	@test:
 //

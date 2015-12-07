@@ -1,12 +1,6 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2011 Greenplum, Inc.
-//
 //	@filename:
 //		nodeutils.h
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //

@@ -1,7 +1,4 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2011 Greenplum, Inc.
-//
 //	@filename:
 //		CMappingVarColId.h
 //
@@ -10,9 +7,6 @@
 //		If we need a scalar translator during PlStmt->DXL or Query->DXL translation
 //		we implement a variable mapping for PlStmt or Query respectively that
 //		is derived from this interface.
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //

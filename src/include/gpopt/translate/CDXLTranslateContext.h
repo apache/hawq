@@ -1,16 +1,10 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2010 Greenplum, Inc.
-//
 //	@filename:
 //		CDXLTranslateContext.h
 //
 //	@doc:
 //		Class providing access to translation context, such as mappings between
 //		table names, operator names, etc. and oids
-//
-//	@owner:
-//		antovl
 //
 //	@test:
 //

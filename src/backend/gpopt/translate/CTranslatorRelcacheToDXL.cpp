@@ -1,15 +1,9 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2011 EMC Corp.
-//
 //	@filename:
 //		CTranslatorRelcacheToDXL.cpp
 //
 //	@doc:
 //		Class translating relcache entries into DXL objects
-//
-//	@owner:
-//		antovl
 //
 //	@test:
 //

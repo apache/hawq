@@ -1,16 +1,10 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2012 EMC Corp.
-//
 //	@filename:
 //		CMappingElementColIdParamId.h
 //
 //	@doc:
 //		Wrapper class providing functions for the mapping element between ColId
 //		and ParamId during DXL->PlStmt translation
-//
-//	@owner:
-//		elhela
 //
 //	@test:
 //

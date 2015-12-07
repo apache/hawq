@@ -1,15 +1,9 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2011 EMC Greenplum, Inc.
-//
 //	@filename:
 //		funcs.cpp
 //
 //	@doc:
 //		API for invoking optimizer using GPDB udfs
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //

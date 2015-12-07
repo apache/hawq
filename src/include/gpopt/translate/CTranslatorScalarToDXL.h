@@ -1,16 +1,10 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2011 Greenplum, Inc.
-//
 //	@filename:
 //		CTranslatorScalarToDXL.h
 //
 //	@doc:
 //		Class providing methods for translating a GPDB Scalar Operation (in a Query / PlStmt object)
 //		into a DXL tree.
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //

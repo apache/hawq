@@ -1,15 +1,9 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2012 Greenplum, Inc.
-//
 //	@filename:
 //		CGPOptimizer.h
 //
 //	@doc:
 //		Entry point to GP optimizer
-//
-//	@owner:
-//		solimm1
 //
 //	@test:
 //

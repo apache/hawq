@@ -1,15 +1,9 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2012 EMC Corp.
-//
 //	@filename:
 //		CMappingParamIdScalarId.h
 //
 //	@doc:
 //		ParamId to ScalarId mapping during PlStmt->DXL translation
-//
-//	@owner:
-//		elhela
 //
 //	@test:
 //

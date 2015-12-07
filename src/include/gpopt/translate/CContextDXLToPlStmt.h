@@ -1,7 +1,4 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2011 Greenplum, Inc.
-//
 //	@filename:
 //		CContextDXLToPlStmt.h
 //
@@ -9,9 +6,6 @@
 //		Class providing access to CIdGenerators (needed to number initplans, motion
 //		nodes as well as params), list of RangeTableEntires and Subplans
 //		generated so far during DXL-->PlStmt translation.
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //

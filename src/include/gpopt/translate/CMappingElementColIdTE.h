@@ -1,16 +1,10 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2011 EMC Corp.
-//
 //	@filename:
 //		CMappingElementColIdTE.h
 //
 //	@doc:
 //		Wrapper class providing functions for the mapping element (between ColId and TE)
 //		during DXL->Query translation
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //

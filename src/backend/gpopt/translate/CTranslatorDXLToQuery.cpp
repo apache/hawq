@@ -1,7 +1,4 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2011 EMC Corp.
-//
 //	@filename:
 //		CTranslatorDXLToQuery.cpp
 //
@@ -10,9 +7,6 @@
 //		All translator methods allocate memory in the provided memory pool, and
 //		the caller is responsible for freeing it.
 //
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //

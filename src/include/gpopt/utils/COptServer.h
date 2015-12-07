@@ -1,15 +1,9 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2012 EMC Corp.
-//
 //	@filename:
 //		COptServer.h
 //
 //	@doc:
 //		API for optimizer server
-//
-//	@owner:
-//		solimm1
 //
 //	@test:
 //

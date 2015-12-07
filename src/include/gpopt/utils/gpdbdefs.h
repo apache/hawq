@@ -1,15 +1,9 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2011 Greenplum, Inc.
-//
 //	@filename:
 //		gpdbdefs.h
 //
 //	@doc:
 //		C Linkage for GPDB functions used by GP optimizer
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //

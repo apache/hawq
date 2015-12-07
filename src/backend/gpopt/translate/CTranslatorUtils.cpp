@@ -1,16 +1,10 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2012 EMC Corp.
-//
 //	@filename:
 //		CTranslatorUtils.cpp
 //
 //	@doc:
 //		Implementation of the utility methods for translating GPDB's
 //		Query / PlannedStmt into DXL Tree
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //

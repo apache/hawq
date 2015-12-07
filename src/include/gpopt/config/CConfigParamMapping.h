@@ -1,15 +1,9 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2012 EMC Corp.
-//
 //	@filename:
 //		CConfigParamMapping.h
 //
 //	@doc:
 //		Mapping of GPDB config params to traceflags
-//
-//	@owner:
-//		antovl
 //
 //	@test:
 //

@@ -1,7 +1,4 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2010 Greenplum, Inc.
-//
 //	@filename:
 //		CDXLTranslateContextBaseTable.h
 //
@@ -9,9 +6,6 @@
 //		Class providing access to translation context for translating base table
 //		column references, such as mappings from a DXL ColId to a GPDB attribute number in
 //		the base table schema
-//
-//	@owner:
-//		antovl
 //
 //	@test:
 //

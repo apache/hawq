@@ -1,16 +1,10 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2011 EMC Corp.
-//
 //	@filename:
 //		CMDProviderRelcache.cpp
 //
 //	@doc:
 //		Implementation of a relcache-based metadata provider, which uses GPDB's
 //		relcache to lookup objects given their ids.
-//
-//	@owner:
-//		antovl
 //
 //	@test:
 //

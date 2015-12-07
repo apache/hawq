@@ -1,15 +1,9 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2011 EMC Corp.
-//
 //	@filename:
 //		CTranslatorRelcacheToDXL.h
 //
 //	@doc:
 //		Class for translating GPDB's relcache entries into DXL MD objects
-//
-//	@owner:
-//		antovl
 //
 //	@test:
 //

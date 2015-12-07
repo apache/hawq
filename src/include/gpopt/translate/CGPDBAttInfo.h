@@ -1,15 +1,9 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2012 EMC Corp.
-//
 //	@filename:
 //		CGPDBAttInfo.h
 //
 //	@doc:
 //		Class to uniquely identify a column in GPDB
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //

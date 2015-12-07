@@ -1,16 +1,10 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2011 Greenplum, Inc.
-//
 //	@filename:
 //		CCTEListEntry.h
 //
 //	@doc:
 //		Class representing the list of common table expression defined at a
 //		query level
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //

@@ -1,16 +1,10 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2011 Greenplum, Inc.
-//
 //	@filename:
 //		CMappingColIdVarPlStmt.h
 //
 //	@doc:
 //		Class defining the functions that provide the mapping between Var, Param
 //		and variables of Sub-query to CDXLNode during Query->DXL translation
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //

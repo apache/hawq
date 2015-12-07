@@ -1,15 +1,9 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2011 EMC Corp.
-//
 //	@filename:
 //		CMDProviderRelcache.h
 //
 //	@doc:
 //		Relcache-based provider of metadata objects.
-//
-//	@owner:
-//		antovl
 //
 //	@test:
 //

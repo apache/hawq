@@ -1,16 +1,9 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2011 Greenplum, Inc.
-//
 //	@filename:
 //		CMappingVarColId.cpp
 //
 //	@doc:
 //		Implementation of base (abstract) var mapping class
-//
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //

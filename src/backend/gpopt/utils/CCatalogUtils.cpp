@@ -1,15 +1,9 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2011 EMC Greenplum, Inc.
-//
 //	@filename:
 //		CCatalogUtils.cpp
 //
 //	@doc:
 //		Routines to extract interesting information from the catalog
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //

@@ -1,15 +1,9 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2010 Greenplum, Inc.
-//
 //	@filename:
 //		CDXLTranslateContext.cpp
 //
 //	@doc:
 //		Implementation of the methods for accessing translation context
-//
-//	@owner:
-//		antovl
 //
 //	@test:
 //

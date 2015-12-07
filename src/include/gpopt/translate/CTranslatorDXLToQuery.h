@@ -1,15 +1,9 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2011 EMC Corp.
-//
 //	@filename:
 //		CTranslatorDXLToQuery.h
 //
 //	@doc:
 //		Class providing methods for translating from DXL tree to GPDB's Query.
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //

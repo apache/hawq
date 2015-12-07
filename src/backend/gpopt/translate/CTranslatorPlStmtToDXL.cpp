@@ -1,7 +1,4 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2010 Greenplum, Inc.
-//
 //	@filename:
 //		CTranslatorPlStmtToDXL.cpp
 //
@@ -9,9 +6,6 @@
 //		Implementation of the methods for translating GPDB's PlannedStmt into DXL Tree.
 //		All translator methods allocate memory in the provided memory pool, and
 //		the caller is responsible for freeing it
-//
-//	@owner:
-//		antovl
 //
 //	@test:
 //

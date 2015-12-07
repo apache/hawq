@@ -1,15 +1,10 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2010 Greenplum, Inc.
 //
 //	@filename:
 //		CDXLTranslateContextBaseTable.cpp
 //
 //	@doc:
 //		Implementation of the methods for accessing translation context for base tables.
-//
-//	@owner:
-//		antovl
 //
 //	@test:
 //

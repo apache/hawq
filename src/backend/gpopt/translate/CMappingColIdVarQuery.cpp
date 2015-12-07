@@ -1,16 +1,10 @@
-//---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2011 Greenplum, Inc.
-//
+//--------------------------------------------------------------------------
 //	@filename:
 //		CMappingColIdVarQuery.cpp
 //
 //	@doc:
 //		Implementation of the functions that provide the mapping from CDXLNode to
 //		Var during DXL->Query translation
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //

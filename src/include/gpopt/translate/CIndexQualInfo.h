@@ -1,16 +1,10 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2013 EMC Corp.
-//
 //	@filename:
 //		CIndexQualInfo.h
 //
 //	@doc:
 //		Class providing access to the original index qual expression, its modified
 //		version tailored for GPDB, and index strategy
-//	@owner:
-//		raghav
-//
 //	@test:
 //
 //

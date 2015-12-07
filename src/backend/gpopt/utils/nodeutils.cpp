@@ -1,15 +1,8 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2011 EMC Greenplum, Inc.
-//
 //	@filename:
 //		nodeutils.cpp
 //
 //	@doc:
-//
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //

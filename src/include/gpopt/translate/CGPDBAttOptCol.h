@@ -1,15 +1,9 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2012 EMC Greenplum
-//
 //	@filename:
 //		CGPDBAttOptCol.h
 //
 //	@doc:
 //		Class to represent pair of GPDB var info to optimizer col info
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //

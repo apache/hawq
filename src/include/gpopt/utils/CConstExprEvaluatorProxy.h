@@ -1,15 +1,9 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2014 Pivotal, Inc.
-//
 //	@filename:
 //		CConstExprEvaluatorProxy.h
 //
 //	@doc:
 //		Evaluator for constant expressions passed as DXL
-//
-//	@owner:
-//		onose
 //
 //	@test:
 //

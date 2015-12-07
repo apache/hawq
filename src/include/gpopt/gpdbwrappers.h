@@ -1,15 +1,9 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2012 EMC Corp.
-//
 //	@filename:
 //		gpdbwrappers.h
 //
 //	@doc:
 //		Definition of GPDB function wrappers
-//
-//	@owner:
-//		elhela
 //
 //	@test:
 //

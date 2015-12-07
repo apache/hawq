@@ -1,15 +1,9 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2011 EMC Greenplum, Inc.
-//
 //	@filename:
 //		COptTasks.h
 //
 //	@doc:
 //		Tasks that will perform optimization and related tasks
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //

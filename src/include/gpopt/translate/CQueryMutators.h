@@ -1,16 +1,10 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2012 EMC Corp.
-//
 //	@filename:
 //		CQueryMutators.h
 //
 //	@doc:
 //		Class providing methods for translating a GPDB Query object into a
 //		DXL Tree
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //

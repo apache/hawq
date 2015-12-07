@@ -1,16 +1,10 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2011 EMC Corp.
-//
 //	@filename:
 //		CStateDXLToQuery.h
 //
 //	@doc:
 //		Class providing access to list of output column target entries and
 //		the corresponding list of column names.
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //

@@ -1,16 +1,9 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2012 EMC Corp.
-//
 //	@filename:
 //		CMappingParamIdScalarId.cpp
 //
 //	@doc:
 //		Implementation of param id -> scalar id mapping class
-//
-//
-//	@owner:
-//		elhela
 //
 //	@test:
 //

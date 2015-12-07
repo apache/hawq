@@ -1,7 +1,4 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2011 EMC Corp.
-//
 //	@filename:
 //		CStateDXLToQuery.cpp
 //
@@ -9,9 +6,6 @@
 //		Implementation of the functions that provide access to the list of
 //		output target entries and output column names during DXL-->Query
 //		translation.
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //

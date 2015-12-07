@@ -1,7 +1,4 @@
 //---------------------------------------------------------------------------
-//  Greenplum Database
-//	Copyright (C) 2011 EMC Corp.
-//
 //	@filename:
 //		CTranslatorQueryToDXL.cpp
 //
@@ -9,9 +6,6 @@
 //		Implementation of the methods used to translate a query into DXL tree.
 //		All translator methods allocate memory in the provided memory pool, and
 //		the caller is responsible for freeing it
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //

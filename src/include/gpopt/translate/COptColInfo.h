@@ -1,15 +1,9 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2012 EMC Greenplum
-//
 //	@filename:
 //		COptColInfo.h
 //
 //	@doc:
 //		Class to uniquely identify a column in optimizer
-//
-//	@owner:
-//		raghav
 //
 //	@test:
 //

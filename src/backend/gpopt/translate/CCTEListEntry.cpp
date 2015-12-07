@@ -1,15 +1,10 @@
 //---------------------------------------------------------------------------
-//	Greenplum Database
-//	Copyright (C) 2012 EMC Corp.
-//
 //	@filename:
 //		CCTEListEntry.cpp
 //
 //	@doc:
 //		Implementation of the class representing the list of common table
 //		expression defined at a query level
-//	@owner:
-//		raghav
 //
 //	@test:
 //
