@@ -221,7 +221,7 @@ int SimpleStringToPercentage(SimpStringPtr str, int8_t *value)
 
 }
 
-int  SimpleStringToStorageSizeMB(SimpStringPtr str, int32_t *value)
+int  SimpleStringToStorageSizeMB(SimpStringPtr str, uint32_t *value)
 {
 	int 	tail 	= strlen(str->Str) - 1;
 	int 	scanres = -1;

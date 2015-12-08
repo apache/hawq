@@ -99,17 +99,16 @@ int addQueryResourceRequestToQueue(DynResourceQueueTrack queuetrack,
 typedef int  (* computeQueryQuotaByPolicy )(DynResourceQueueTrack,
 											int32_t *,
 											int32_t *,
-											int32_t);
+											int32_t,
+											char *,
+											int);
 
-int computeQueryQuota_EVEN( DynResourceQueueTrack	track,
-							int32_t			   	   *segnum,
-							int32_t			   	   *segnummin,
-							int32_t					segnumlimit);
-
-int computeQueryQuota_FIFO( DynResourceQueueTrack	track,
-							int32_t			   	   *segnum,
-							int32_t			   	   *segnummin,
-							int32_t					segnumlimit);
+int computeQueryQuota_EVEN(DynResourceQueueTrack	track,
+						   int32_t			   	   *segnum,
+						   int32_t			   	   *segnummin,
+						   int32_t					segnumlimit,
+						   char				   	   *errorbuf,
+						   int						errorbufsize);
 
 int32_t min(int32_t a, int32_t b);
 int32_t max(int32_t a, int32_t b);
@@ -117,7 +116,7 @@ computeQueryQuotaByPolicy AllocationPolicy[RSQ_ALLOCATION_POLICY_COUNT] = {
 	computeQueryQuota_EVEN
 };
 
-int computeQueryQuota( ConnectionTrack conn);
+int computeQueryQuota(ConnectionTrack conn, char *errorbuf, int errorbufsize);
 
 /*------------------------------------------
  * The resource distribution functions.
@@ -165,7 +164,8 @@ void markMemoryCoreRatioWaterMark(DQueue 		marks,
 								  double 		core);
 
 void buildTimeoutResponseForQueuedRequest(ConnectionTrack conntrack,
-										  uint32_t 		  reason);
+										  uint32_t 		  reason,
+										  char			 *errorbuf);
 
 RESOURCEPROBLEM isResourceAcceptable(ConnectionTrack conn, int segnumact);
 
@@ -2053,7 +2053,9 @@ void generateUserReport( const char   *userid,
  * NOTE: In order to facilitate test automation, currently all undefined users
  * 	 	 are assigned to 'default' queue.
  */
-int registerConnectionByUserID( ConnectionTrack			 conntrack)
+int registerConnectionByUserID(ConnectionTrack  conntrack,
+							   char			   *errorbuf,
+							   int				errorbufsize)
 {
 	int 					res 		  = FUNC_RETURN_OK;
 	UserInfo 				userinfo 	  = NULL;
@@ -2076,28 +2078,23 @@ int registerConnectionByUserID( ConnectionTrack			 conntrack)
 	}
 	else
 	{
-		elog(LOG, "No user %s defined for registering connection.",
-				  conntrack->UserID);
+		snprintf(errorbuf, errorbufsize,
+				 "role %s is not defined for registering connection",
+				 conntrack->UserID);
+		elog(WARNING, "ConnID %d. %s", conntrack->ConnID, errorbuf);
 		res = RESQUEMGR_NO_USERID;
 		goto exit;
 	}
 
 	if ( queuetrack == NULL )
 	{
-		elog(LOG, "Resource manager fails to find target resource queue for user %s.",
-				  conntrack->UserID);
+		snprintf(errorbuf, errorbufsize,
+				 "no resource queue assigned for role %s",
+				 conntrack->UserID);
+		elog(WARNING, "ConnID %d. %s", conntrack->ConnID, errorbuf);
 		res = RESQUEMGR_NO_ASSIGNEDQUEUE;
 		goto exit;
 	}
-
-//	/* Acquire new connection. */
-//	if (queuetrack->CurConnCounter >= queuetrack->QueueInfo->ParallelCount) {
-//		res = RESQUEMGR_PARALLEL_FULL;
-//		elog(DEBUG5, "Queue %s is full connected with %d connections.",
-//				     queuetrack->QueueInfo->Name,
-//				     queuetrack->CurConnCounter);
-//		goto exit;
-//	}
 
 	queuetrack->CurConnCounter++;
 
@@ -2107,6 +2104,9 @@ int registerConnectionByUserID( ConnectionTrack			 conntrack)
 	conntrack->LastActTime  = conntrack->RegisterTime;
 
 	transformConnectionTrackProgress(conntrack, CONN_PP_REGISTER_DONE);
+
+	elog(LOG, "ConnID %d. Connection is registered.", conntrack->ConnID);
+
 exit:
 	if ( res != FUNC_RETURN_OK )
 	{
@@ -2145,7 +2145,7 @@ void returnConnectionToQueue(ConnectionTrack conntrack, bool istimeout)
 /*
  * Cancel one queued resource allocation request.
  */
-void cancelResourceAllocRequest(ConnectionTrack conntrack)
+void cancelResourceAllocRequest(ConnectionTrack conntrack, char *errorbuf)
 {
 	if ( conntrack->Progress != CONN_PP_RESOURCE_QUEUE_ALLOC_WAIT )
 	{
@@ -2165,103 +2165,87 @@ void cancelResourceAllocRequest(ConnectionTrack conntrack)
 	/* Unlock session in deadlock */
 	unlockSessionResource(&(queuetrack->DLDetector), conntrack->SessionID);
 
-	buildTimeoutResponseForQueuedRequest(conntrack, RESQUEMGR_NORESOURCE_TIMEOUT);
+	buildTimeoutResponseForQueuedRequest(conntrack,
+										 RESQUEMGR_NORESOURCE_TIMEOUT,
+										 errorbuf);
 }
 
 /* Acquire resource from queue. */
-int acquireResourceFromResQueMgr(ConnectionTrack conntrack)
+int acquireResourceFromResQueMgr(ConnectionTrack  conntrack,
+								 char 			 *errorbuf,
+								 int 			  errorbufsize)
 {
-	int						res			  	= FUNC_RETURN_OK;
-
-	DynResourceQueueTrack   queuetrack	  	= conntrack->QueueTrack;
-
-	if ( queuetrack->ClusterSegNumberMax == 0 )
-	{
-		elog(LOG, "The queue %s has no resource available to run queries.",
-				  queuetrack->QueueInfo->Name);
-		return RESQUEMGR_NO_RESOURCE;
-	}
+	int						res			= FUNC_RETURN_OK;
+	DynResourceQueueTrack	queuetrack	= conntrack->QueueTrack;
 
 	/* Call quota logic to make decision of resource for current query. */
-	res = computeQueryQuota(conntrack);
+	res = computeQueryQuota(conntrack, errorbuf, errorbufsize);
 
 	if ( res == FUNC_RETURN_OK )
 	{
 		if ( conntrack->StatNVSeg == 0 )
 		{
-			int32_t Rmax  = conntrack->SegNum;
-			int32_t RmaxL = conntrack->VSegLimitPerSeg * PRESPOOL->AvailNodeCount;
-			int32_t Rmin  = conntrack->SegNumMin;
-			elog(LOG, "Original quota min seg num:%d, max seg num:%d",
-					  conntrack->SegNumMin,
-					  conntrack->SegNum);
+			/*------------------------------------------------------------------
+			 * The following logic consider the actual resource requirement from
+			 * dispatcher based on table size, workload, etc. The requirement is
+			 * described by (MinSegCountFixed, MaxSegCountFixed). The requirement
+			 * can be satisfied only when there is a non-empty intersect between
+			 * (MinSegCountFixed, MaxSegCountFixed) and (SegNumMin, SegNum).
+			 *------------------------------------------------------------------
+			 */
+			conntrack->SegNumMin =
+				conntrack->MaxSegCountFixed < conntrack->SegNumMin ?
+				conntrack->MinSegCountFixed :
+				max(conntrack->SegNumMin, conntrack->MinSegCountFixed);
 
-			/* Ensure quota [min,max] is between request [min,max] */
-			int32_t Gmax= conntrack->MaxSegCountFixed;
-			int32_t Gmin= conntrack->MinSegCountFixed;
+			conntrack->SegNum = min(conntrack->SegNum,
+									conntrack->MaxSegCountFixed);
 
-			if(Gmin==1)
-			{
-				/* case 1 */
-				conntrack->SegNumMin = min(min(Gmax,Rmin),RmaxL);
-				conntrack->SegNum = min(Gmax,RmaxL);
-				if(conntrack->SegNumMin > conntrack->SegNum)
-				{
-					return RESQUEMGR_NO_RESOURCE;
-				}
-			}
-			else if(Gmax == Gmin)
-			{
-				/* case 2 */
-				conntrack->SegNumMin = Gmax;
-				conntrack->SegNum = Gmax;
-				if(Rmax < Gmax)
-				{
-					return RESQUEMGR_NO_RESOURCE;
-				}
-			}
-			else
-			{
-				/* case 3 */
-				conntrack->SegNumMin = min(max(Gmin,Rmin),Gmax);
-				conntrack->SegNum = min(max(min(RmaxL,Gmax),Gmin),Rmax);
-				if(conntrack->SegNumMin > conntrack->SegNum)
-				{
-					return RESQUEMGR_NO_RESOURCE;
-				}
-			}
+			Assert( conntrack->SegNumMin <= conntrack->SegNum );
+			elog(LOG, "ConnID %d. Query resource expects (%d MB, %lf CORE) x %d "
+					  "( MIN %d ) resource after adjusting based on query "
+					  "characters.",
+					  conntrack->ConnID,
+					  conntrack->SegMemoryMB,
+					  conntrack->SegCore,
+					  conntrack->SegNum,
+					  conntrack->SegNumMin);
 
-			elog(LOG, "Query resource expects (%d MB, %lf CORE) x %d ( min %d ) resource.",
-					   conntrack->SegMemoryMB,
-					   conntrack->SegCore,
-					   conntrack->SegNum,
-					   conntrack->SegNumMin);
-
+			/*------------------------------------------------------------------
+			 * Adjust the number of virtual segments again based on
+			 * NVSEG_*_LIMITs and NVSEG_*_LIMIT_PERSEGs. This adjustment must
+			 * succeed.
+			 *------------------------------------------------------------------
+			 */
 			adjustResourceExpectsByQueueNVSegLimits(conntrack);
 
-			elog(LOG, "Query resource expects (%d MB, %lf CORE) x %d ( min %d ) "
-					  "resource after adjusting based on queue NVSEG limits.",
-					   conntrack->SegMemoryMB,
-					   conntrack->SegCore,
-					   conntrack->SegNum,
-					   conntrack->SegNumMin);
+			elog(LOG, "ConnID %d. Query resource expects (%d MB, %lf CORE) x %d "
+					  "( MIN %d ) resource after adjusting based on queue NVSEG "
+					  "limits.",
+					  conntrack->ConnID,
+					  conntrack->SegMemoryMB,
+					  conntrack->SegCore,
+					  conntrack->SegNum,
+					  conntrack->SegNumMin);
 		}
 
 		/* Add request to the resource queue and return. */
-		res = addQueryResourceRequestToQueue(queuetrack, conntrack);
-		if ( res == FUNC_RETURN_OK )
-		{
-			transformConnectionTrackProgress(conntrack,
-											 CONN_PP_RESOURCE_QUEUE_ALLOC_WAIT);
-			return res;
-		}
+		addQueryResourceRequestToQueue(queuetrack, conntrack);
+		transformConnectionTrackProgress(conntrack,
+										 CONN_PP_RESOURCE_QUEUE_ALLOC_WAIT);
+		/* Exit on succeeding in adding request to the queue. */
 	}
-	elog(LOG, "Not accepted resource acquiring request.");
-	transformConnectionTrackProgress(conntrack, CONN_PP_RESOURCE_ACQUIRE_FAIL);
+	else
+	{
+		elog(WARNING, "ConnID %d. %s", conntrack->ConnID, errorbuf);
+		transformConnectionTrackProgress(conntrack, CONN_PP_RESOURCE_ACQUIRE_FAIL);
+	}
 	return res;
 }
 
-int acquireResourceQuotaFromResQueMgr(ConnectionTrack conntrack)
+int acquireResourceQuotaFromResQueMgr(ConnectionTrack	conntrack,
+									  char			   *errorbuf,
+									  int				errorbufsize)
 {
 	int 					res 		= FUNC_RETURN_OK;
 	DynResourceQueueTrack   queuetrack	= conntrack->QueueTrack;
@@ -2278,149 +2262,147 @@ int acquireResourceQuotaFromResQueMgr(ConnectionTrack conntrack)
 	}
 	else
 	{
-		elog(LOG, "No user %s defined for registering connection. Assign to "
-				  "default queue.",
+		elog(LOG, "ConnID %d. No user %s defined for registering connection. "
+				  "Assign to pg_default queue.",
+				  conntrack->ConnID,
 				  conntrack->UserID);
 		queuetrack = PQUEMGR->DefaultTrack;
 		userinfo = NULL;
 	}
 
-	if ( queuetrack == NULL )
-	{
-		elog(LOG, "Resource manager fails to find target resource queue for user %s.",
-				  conntrack->UserID);
-		res = RESQUEMGR_NO_ASSIGNEDQUEUE;
-		goto exit;
-	}
+	Assert( queuetrack != NULL );
 
 	conntrack->QueueTrack = queuetrack;
 	conntrack->QueueID	  = queuetrack->QueueInfo->OID;
 
-	/* Compute query quota */
-	res = computeQueryQuota(conntrack);
+	/* Call quota logic to make decision of resource for current query. */
+	res = computeQueryQuota(conntrack, errorbuf, errorbufsize);
 
 	if ( res == FUNC_RETURN_OK )
 	{
 		if ( conntrack->StatNVSeg == 0 )
 		{
-			int32_t Rmax = conntrack->SegNum;
-			int32_t RmaxL =conntrack->VSegLimitPerSeg *	PRESPOOL->AvailNodeCount;
-			int32_t Rmin = conntrack->SegNumMin;
-			elog(LOG, "Original quota min seg num:%d, max seg num:%d",
-						conntrack->SegNumMin,
-						conntrack->SegNum);
+			/*------------------------------------------------------------------
+			 * The following logic consider the actual resource requirement from
+			 * dispatcher based on table size, workload, etc. The requirement is
+			 * described by (MinSegCountFixed, MaxSegCountFixed). The requirement
+			 * can be satisfied only when there is a non-empty intersect between
+			 * (MinSegCountFixed, MaxSegCountFixed) and (SegNumMin, SegNum).
+			 *------------------------------------------------------------------
+			 */
+			conntrack->SegNumMin = conntrack->MaxSegCountFixed < conntrack->SegNumMin ?
+								   conntrack->MinSegCountFixed :
+								   max(conntrack->SegNumMin, conntrack->MinSegCountFixed);
 
-			/* Ensure quota [min,max] is between request [min,max] */
-			int32_t Gmax= conntrack->MaxSegCountFixed;
-			int32_t Gmin= conntrack->MinSegCountFixed;
+			conntrack->SegNum = min(conntrack->SegNum, conntrack->MaxSegCountFixed);
 
-			if(Gmin==1)
-			{
-				/* case 1 */
-				conntrack->SegNumMin = min(min(Gmax,Rmin),RmaxL);
-				conntrack->SegNum = min(Gmax,RmaxL);
-				if(conntrack->SegNumMin > conntrack->SegNum)
-				{
-					return RESQUEMGR_NO_RESOURCE;
-				}
-			}
-			else if(Gmax == Gmin)
-			{
-				/* case 2 */
-				conntrack->SegNumMin = Gmax;
-				conntrack->SegNum = Gmax;
-				if(Rmax < Gmax)
-				{
-					return RESQUEMGR_NO_RESOURCE;
-				}
-			}
-			else
-			{
-				/* case 3 */
-				conntrack->SegNumMin = min(max(Gmin,Rmin),Gmax);
-				conntrack->SegNum = min(max(min(RmaxL,Gmax),Gmin),Rmax);
-				if(conntrack->SegNumMin > conntrack->SegNum)
-				{
-					return RESQUEMGR_NO_RESOURCE;
-				}
-			}
+			Assert( conntrack->SegNumMin <= conntrack->SegNum );
+			elog(LOG, "ConnID %d. Query resource quota expects (%d MB, %lf CORE) x %d "
+					  "( MIN %d ) resource after adjusting based on query characters.",
+					  conntrack->ConnID,
+					  conntrack->SegMemoryMB,
+					  conntrack->SegCore,
+					  conntrack->SegNum,
+					  conntrack->SegNumMin);
 
-			elog(LOG, "Expect (%d MB, %lf CORE) x %d ( min %d ) resource quota.",
-					   conntrack->SegMemoryMB,
-					   conntrack->SegCore,
-					   conntrack->SegNum,
-					   conntrack->SegNumMin);
-
+			/*------------------------------------------------------------------
+			 * Adjust the number of virtual segments again based on
+			 * NVSEG_*_LIMITs and NVSEG_*_LIMIT_PERSEGs. This adjustment must
+			 * succeed.
+			 *------------------------------------------------------------------
+			 */
 			adjustResourceExpectsByQueueNVSegLimits(conntrack);
 
-			elog(LOG, "Query resource expects (%d MB, %lf CORE) x %d ( min %d ) "
-					  "resource after adjusting based on queue NVSEG limits.",
-					   conntrack->SegMemoryMB,
-					   conntrack->SegCore,
-					   conntrack->SegNum,
-					   conntrack->SegNumMin);
+			elog(LOG, "ConnID %d. Query resource quota expects (%d MB, %lf CORE) x %d "
+					  "( MIN %d ) resource after adjusting based on queue NVSEG "
+					  "limits.",
+					  conntrack->ConnID,
+					  conntrack->SegMemoryMB,
+					  conntrack->SegCore,
+					  conntrack->SegNum,
+					  conntrack->SegNumMin);
 		}
 	}
 	else
 	{
-		elog(LOG, "Not accepted resource acquiring request.");
+		elog(WARNING, "ConnID %d. Not accepted resource quota request.",
+					  conntrack->ConnID);
 	}
-exit:
 	return res;
 }
 
 void adjustResourceExpectsByQueueNVSegLimits(ConnectionTrack conntrack)
 {
 	DynResourceQueueTrack queuetrack = conntrack->QueueTrack;
+	DynResourceQueue	  queue		 = queuetrack->QueueInfo;
+	bool				  adjusted	 = false;
 
-	if ( queuetrack == NULL )
+	if ( queue->NVSegLowerLimit > MINIMUM_RESQUEUE_NVSEG_LOWER_LIMIT_N )
 	{
-		elog(WARNING, "Detected connection track without assigned queue. ConnID %d",
-					  conntrack->ConnID);
-		return;
-	}
-
-	if ( queuetrack->QueueInfo->NVSegLowerLimit > MINIMUM_RESQUEUE_NVSEG_LOWER_LIMIT_N ||
-		 queuetrack->QueueInfo->NVSegUpperLimit > MINIMUM_RESQUEUE_NVSEG_UPPER_LIMIT_N )
-	{
-		if ( queuetrack->QueueInfo->NVSegLowerLimit > MINIMUM_RESQUEUE_NVSEG_LOWER_LIMIT_N  &&
-			 queuetrack->QueueInfo->NVSegLowerLimit > conntrack->SegNumMin &&
-			 queuetrack->QueueInfo->NVSegLowerLimit <= conntrack->SegNum )
+		if ( conntrack->SegNum >= queue->NVSegLowerLimit &&
+			 conntrack->SegNumMin < queue->NVSegLowerLimit )
 		{
-			conntrack->SegNumMin = queuetrack->QueueInfo->NVSegLowerLimit;
-		}
-
-		if ( queuetrack->QueueInfo->NVSegUpperLimit > MINIMUM_RESQUEUE_NVSEG_UPPER_LIMIT_N  &&
-			 queuetrack->QueueInfo->NVSegUpperLimit >= conntrack->SegNumMin &&
-			 queuetrack->QueueInfo->NVSegUpperLimit < conntrack->SegNum )
-		{
-			conntrack->SegNum = queuetrack->QueueInfo->NVSegUpperLimit;
+			conntrack->SegNumMin = queue->NVSegLowerLimit;
+			adjusted =true;
+			elog(RMLOG, "ConnID %d. Minimum vseg number adjusted to %d",
+						conntrack->ConnID,
+						conntrack->SegNumMin);
 		}
 	}
-	else if ( queuetrack->QueueInfo->NVSegLowerLimitPerSeg > 0 ||
-			  queuetrack->QueueInfo->NVSegUpperLimitPerSeg > 0 )
+	else if ( queue->NVSegLowerLimitPerSeg >
+			  MINIMUM_RESQUEUE_NVSEG_LOWER_PERSEG_LIMIT_N )
 	{
-		if ( queuetrack->QueueInfo->NVSegLowerLimitPerSeg >
-				 MINIMUM_RESQUEUE_NVSEG_LOWER_PERSEG_LIMIT_N  )
+		int minnvseg = ceil(queuetrack->QueueInfo->NVSegLowerLimitPerSeg *
+							PRESPOOL->AvailNodeCount);
+		if ( conntrack->SegNum >= minnvseg && conntrack->SegNumMin < minnvseg )
 		{
-			int minnvseg = ceil(queuetrack->QueueInfo->NVSegLowerLimitPerSeg *
-							    PRESPOOL->AvailNodeCount);
-			if ( minnvseg > conntrack->SegNumMin && minnvseg <= conntrack->SegNum)
-			{
-				conntrack->SegNumMin = minnvseg;
-			}
+			conntrack->SegNumMin = minnvseg;
+			adjusted =true;
+			elog(RMLOG, "ConnID %d. Minimum vseg number adjusted to %d",
+						conntrack->ConnID,
+						conntrack->SegNumMin);
 		}
+	}
 
-		if ( queuetrack->QueueInfo->NVSegUpperLimitPerSeg >
-				 MINIMUM_RESQUEUE_NVSEG_UPPER_PERSEG_LIMIT_N  )
+	if ( queue->NVSegUpperLimit > MINIMUM_RESQUEUE_NVSEG_UPPER_LIMIT_N )
+	{
+		if ( conntrack->SegNum > queue->NVSegUpperLimit )
 		{
-			int maxnvseg = ceil(queuetrack->QueueInfo->NVSegUpperLimitPerSeg *
-							    PRESPOOL->AvailNodeCount);
-			if ( maxnvseg >= conntrack->SegNumMin && maxnvseg < conntrack->SegNum)
-			{
-				conntrack->SegNum = maxnvseg;
-			}
+			conntrack->SegNum = queue->NVSegUpperLimit;
+			adjusted =true;
+			elog(RMLOG, "ConnID %d. Maximum vseg number adjusted to %d",
+						conntrack->ConnID,
+						conntrack->SegNum);
 		}
+	}
+	else if ( queue->NVSegUpperLimitPerSeg >
+			  MINIMUM_RESQUEUE_NVSEG_UPPER_PERSEG_LIMIT_N )
+	{
+		int maxnvseg = ceil(queuetrack->QueueInfo->NVSegUpperLimitPerSeg *
+							PRESPOOL->AvailNodeCount);
+		if ( conntrack->SegNum > maxnvseg )
+		{
+			conntrack->SegNum = maxnvseg;
+			adjusted =true;
+			elog(RMLOG, "ConnID %d. Maximum vseg number adjusted to %d",
+						conntrack->ConnID,
+						conntrack->SegNum);
+		}
+	}
+
+	/*--------------------------------------------------------------------------
+	 * Finally, we must ensure that upper limits limit the minimum resource
+	 * quota. This means, the resource limits from NVSEG upper limits are always
+	 * respected.
+	 *--------------------------------------------------------------------------
+	 */
+	if ( conntrack->SegNumMin > conntrack->SegNum )
+	{
+		conntrack->SegNumMin = conntrack->SegNum;
+		elog(RMLOG, "ConnID %d. Minimum vseg number is forced to be equal to "
+					"maximum vseg number %d",
+					conntrack->ConnID,
+					conntrack->SegNumMin);
 	}
 }
 
@@ -3367,7 +3349,7 @@ void minusResourceBundleDataByBundle(ResourceBundle detail, ResourceBundle sourc
 /**
  * Compute the query quota.
  */
-int computeQueryQuota( ConnectionTrack conn)
+int computeQueryQuota(ConnectionTrack conn, char *errorbuf, int errorbufsize)
 {
 	Assert( conn != NULL );
 	Assert( conn->QueueTrack != NULL );
@@ -3379,8 +3361,7 @@ int computeQueryQuota( ConnectionTrack conn)
 	policy = track->QueueInfo->AllocatePolicy;
 	Assert( policy >= 0 && policy < RSQ_ALLOCATION_POLICY_COUNT );
 
-	/*
-	 *--------------------------------------------------------------------------
+	/*--------------------------------------------------------------------------
 	 * Get one segment resource quota. If statement level resource quota is not
 	 * specified, the queue vseg resource quota is derived, otherwise, statement
 	 * level resource quota. The resource memory/core ratio is not changed, thus
@@ -3404,10 +3385,15 @@ int computeQueryQuota( ConnectionTrack conn)
 		if ( conn->SegNumEqual > track->ClusterSegNumberMax )
 		{
 			res = RESQUEMGR_TOO_MANY_FIXED_SEGNUM;
-			elog(WARNING, "ConnID %d expects too many virtual segments %d that is"
-						  "set by hawq_rm_stmt_nvseg.",
-						  conn->ConnID,
-						  conn->SegNum);
+			snprintf(errorbuf, errorbufsize,
+					 "statement resource quota %d MB x %d vseg exceeds resource "
+					 "queue maximum capacity %d MB",
+					 conn->StatVSegMemoryMB,
+					 conn->StatNVSeg,
+					 track->ClusterSegNumberMax *
+					 track->QueueInfo->SegResourceQuotaMemoryMB);
+
+			elog(WARNING, "ConnID %d. %s", conn->ConnID, errorbuf);
 			return res;
 		}
 	}
@@ -3415,44 +3401,47 @@ int computeQueryQuota( ConnectionTrack conn)
 	{
 		conn->SegMemoryMB = track->QueueInfo->SegResourceQuotaMemoryMB;
 		conn->SegCore 	  = track->QueueInfo->SegResourceQuotaVCore;
-	}
 
-	/* Decide vseg number and minimum runnable vseg number. */
-	if ( conn->SegNumMin > conn->VSegLimit )
-	{
-		res = RESQUEMGR_TOO_MANY_FIXED_SEGNUM;
-		elog(WARNING, "ConnID %d expects too many virtual segments %d, "
-					  "cannot be more than %d",
-					  conn->ConnID,
-					  conn->SegNumMin,
-					  conn->VSegLimit);
-		return res;
-	}
+		int vseglimit = conn->VSegLimitPerSeg * PRESPOOL->AvailNodeCount >
+							conn->VSegLimit ?
+						conn->VSegLimit :
+						conn->VSegLimitPerSeg * PRESPOOL->AvailNodeCount;
 
-	if ( conn->SegNum > conn->VSegLimit )
-	{
-		conn->SegNum = conn->VSegLimit;
-	}
-
-	if ( conn->StatNVSeg <= 0 )
-	{
-		/* Compute total resource quota. */
+		/*----------------------------------------------------------------------
+		 * Compute total resource quota. This calculation already considers the
+		 * query vseg limit and vseg perseg limit.
+		 *----------------------------------------------------------------------
+		 */
 		res = AllocationPolicy[policy] (track,
 										&(conn->SegNum),
 										&(conn->SegNumMin),
-										conn->VSegLimit);
+										vseglimit ,
+										errorbuf,
+										errorbufsize);
+		if ( res != FUNC_RETURN_OK )
+		{
+			/* No setting error buffer here. We expect this is set by
+			 * ApplocationPolicy[] function
+			 */
+			return res;
+		}
 
-		/*
+		/*----------------------------------------------------------------------
 		 * If fixed vseg count range is lower than estimated vseg count range
 		 * based on one allocation policy, we always respect the fixed range.
+		 *----------------------------------------------------------------------
 		 */
 		if ( conn->SegNum < conn->MinSegCountFixed )
 		{
 			res = RESQUEMGR_TOO_MANY_FIXED_SEGNUM;
-			elog(WARNING, "Expect too many virtual segments %d, cannot be more "
-						  "than %d",
-						  conn->MinSegCountFixed,
-						  conn->SegNum);
+			snprintf(errorbuf, errorbufsize,
+					 "minimum expected number of virtual segment %d is more than "
+					 "maximum possible number %d in queue %s",
+					 conn->MinSegCountFixed,
+					 conn->SegNum,
+					 track->QueueInfo->Name);
+
+			elog(WARNING, "ConnID %d. %s", conn->ConnID, errorbuf);
 			return res;
 		}
 
@@ -3462,25 +3451,66 @@ int computeQueryQuota( ConnectionTrack conn)
 					   conn->MaxSegCountFixed;
 	}
 
-	elog(DEBUG3, "Expect cluster resource (%d MB, %lf CORE) x %d "
-				 "minimum runnable %d segment(s).",
-			     conn->SegMemoryMB,
-			     conn->SegCore,
-				 conn->SegNum,
-				 conn->SegNumMin);
+	/*--------------------------------------------------------------------------
+	 * Decide vseg number and minimum runnable vseg number. User may set guc
+	 * rm_nvseg_perquery_limit at session level, this must be followed. Even
+	 * in case the vseg number is set by statement level resource quota.
+	 *
+	 * Another guc rm_nvseg_perquery_perseg_limit can also limit the number of
+	 * vseg for one statement execution.
+	 *--------------------------------------------------------------------------
+	 */
+	if ( conn->SegNumMin > conn->VSegLimit )
+	{
+		res = RESQUEMGR_TOO_MANY_FIXED_SEGNUM;
+
+		snprintf(errorbuf, errorbufsize,
+				 "expected minimum number of virtual segments %d exceeds the "
+				 "limit of number of virtual segments per query %d",
+				 conn->SegNumMin,
+				 conn->VSegLimit);
+
+		elog(WARNING, "ConnID %d. %s", conn->ConnID, errorbuf);
+		return res;
+	}
+
+	if ( conn->SegNumMin > conn->VSegLimitPerSeg * PRESPOOL->AvailNodeCount )
+	{
+		res = RESQUEMGR_TOO_MANY_FIXED_SEGNUM;
+
+		snprintf(errorbuf, errorbufsize,
+				 "expected minimum number of virtual segments %d exceeds the "
+				 "limit of number of virtual segments per query per segment %d "
+				 "in cluster having %d available segments",
+				 conn->SegNumMin,
+				 conn->VSegLimitPerSeg,
+				 PRESPOOL->AvailNodeCount);
+
+		elog(WARNING, "ConnID %d. %s", conn->ConnID, errorbuf);
+		return res;
+	}
+
+	elog(LOG, "ConnID %d. Expect query resource (%d MB, %lf CORE) x %d (MIN %d) ",
+			  conn->ConnID,
+			  conn->SegMemoryMB,
+			  conn->SegCore,
+			  conn->SegNum,
+			  conn->SegNumMin);
 
 	return FUNC_RETURN_OK;
 }
 
-/* Implementation of homogeneous resource allocation. */
+/* Implementation of even resource allocation. */
 int computeQueryQuota_EVEN(DynResourceQueueTrack	track,
 						   int32_t			   	   *segnum,
 						   int32_t			   	   *segnummin,
-						   int32_t					segnumlimit)
+						   int32_t					segnumlimit,
+						   char				   	   *errorbuf,
+						   int						errorbufsize)
 {
 	DynResourceQueue queue = track->QueueInfo;
 
-	/* Decide one connection should have how many segments reserved. */
+	/* Decide one connection should have how many virtual segments reserved. */
 	int reservsegnum = trunc(track->ClusterSegNumber / queue->ParallelCount);
 	reservsegnum = reservsegnum <= 0 ? 1 : reservsegnum;
 
@@ -3489,31 +3519,6 @@ int computeQueryQuota_EVEN(DynResourceQueueTrack	track,
 
 	*segnummin = reservsegnum;
 	*segnummin = *segnummin > *segnum ? *segnum : *segnummin;
-
-	Assert( *segnummin > 0 && *segnummin <= *segnum );
-	return FUNC_RETURN_OK;
-}
-
-int computeQueryQuota_FIFO(DynResourceQueueTrack	 track,
-						   int32_t			   		*segnum,
-						   int32_t			   		*segnummin,
-						   int32_t					 segnumlimit)
-{
-	DynResourceQueue queue = track->QueueInfo;
-
-	/* Decide one connection should have how many segments reserved. */
-	int reservsegnum = trunc(track->ClusterSegNumber / queue->ParallelCount);
-	reservsegnum = reservsegnum <= 0 ? 1 : reservsegnum;
-
-	/*
-	 * FIFO allocation policy does not guarantee the concurrency specified in
-	 * active_statements. Always give as more resource as possible.
-	 */
-	*segnum    = track->ClusterSegNumberMax;
-	*segnummin = track->ClusterSegNumber;
-	*segnum    = segnumlimit < *segnum ?
-				 segnumlimit :
-				 *segnum;
 
 	Assert( *segnummin > 0 && *segnummin <= *segnum );
 	return FUNC_RETURN_OK;
@@ -4337,6 +4342,7 @@ void buildAcquireResourceResponseMessage(ConnectionTrack conn)
 
 void detectAndDealWithDeadLock(DynResourceQueueTrack track)
 {
+	static char errorbuf[ERRORMESSAGE_SIZE];
 	uint32_t availmemorymb = track->ClusterMemoryMaxMB -
 						     track->DLDetector.LockedTotalMemoryMB;
 	double   availcore     = track->ClusterVCoreMax -
@@ -4374,6 +4380,11 @@ void detectAndDealWithDeadLock(DynResourceQueueTrack track)
 		if ( tail != NULL ) {
 			ConnectionTrack canceltrack = (ConnectionTrack)
 										  removeDQueueNode(&(track->QueryResRequests), tail);
+
+			snprintf(errorbuf, sizeof(errorbuf),
+					 "session "INT64_FORMAT" deadlock is detected",
+					 canceltrack->SessionID);
+
 			Assert(canceltrack != NULL);
 			availmemorymb += strack->InUseTotalMemoryMB;
 			availcore     += strack->InUseTotalCore;
@@ -4383,16 +4394,23 @@ void detectAndDealWithDeadLock(DynResourceQueueTrack track)
 
 			/* Cancel this request. */
 			RPCResponseAcquireResourceFromRMERRORData errresponse;
-			/* Send error message. */
 			errresponse.Result   = RESQUEMGR_DEADLOCK_DETECTED;
 			errresponse.Reserved = 0;
 
-			buildResponseIntoConnTrack( canceltrack,
-										(char *)&errresponse,
-										sizeof(errresponse),
-										canceltrack->MessageMark1,
-										canceltrack->MessageMark2,
-										RESPONSE_QD_ACQUIRE_RESOURCE);
+			SelfMaintainBufferData responsedata;
+			initializeSelfMaintainBuffer(&responsedata, PCONTEXT);
+			appendSMBVar(&responsedata, errresponse);
+			appendSMBStr(&responsedata, errorbuf);
+			appendSelfMaintainBufferTill64bitAligned(&responsedata);
+
+			buildResponseIntoConnTrack(canceltrack,
+									   SMBUFF_CONTENT(&responsedata),
+									   getSMBContentSize(&responsedata),
+									   canceltrack->MessageMark1,
+									   canceltrack->MessageMark2,
+									   RESPONSE_QD_ACQUIRE_RESOURCE);
+			destroySelfMaintainBuffer(&responsedata);
+
 			transformConnectionTrackProgress(canceltrack,
 											 CONN_PP_RESOURCE_QUEUE_ALLOC_FAIL);
 
@@ -4407,6 +4425,7 @@ void detectAndDealWithDeadLock(DynResourceQueueTrack track)
 
 void timeoutDeadResourceAllocation(void)
 {
+	static char errorbuf[ERRORMESSAGE_SIZE];
 	uint64_t curmsec = gettime_microsec();
 
 	if ( curmsec - PQUEMGR->LastCheckingDeadAllocationTime <
@@ -4456,10 +4475,15 @@ void timeoutDeadResourceAllocation(void)
 			if ( curmsec - curcon->LastActTime >
 				 1000000L * rm_session_lease_timeout )
 			{
-				elog(LOG, "The queued resource request timeout is detected. "
-						  "ConnID %d",
+				elog(LOG, "ConnID %d. The queued resource request timeout is "
+						  "detected.",
 						  curcon->ConnID);
-				cancelResourceAllocRequest(curcon);
+
+				snprintf(errorbuf, sizeof(errorbuf),
+						 "queued resource request is timed out due to no session "
+						 "lease heart-beat received");
+
+				cancelResourceAllocRequest(curcon, errorbuf);
 				returnConnectionToQueue(curcon, true);
 				if ( curcon->CommBuffer != NULL )
 				{
@@ -4497,6 +4521,7 @@ void timeoutDeadResourceAllocation(void)
 
 void timeoutQueuedRequest(void)
 {
+	static char errorbuf[ERRORMESSAGE_SIZE];
 	uint64_t curmsec = gettime_microsec();
 
 	if ( curmsec - PQUEMGR->LastCheckingQueuedTimeoutTime <
@@ -4529,10 +4554,14 @@ void timeoutQueuedRequest(void)
 
 		if ( curmsec - ct->ConnectTime > 1000000L * rm_resource_allocation_timeout )
 		{
-			elog(WARNING, "Waiting request timeout is detected due to no "
-						  "available cluster.");
+			snprintf(errorbuf, sizeof(errorbuf),
+					 "resource request is timed out due to no available cluster");
+
+			elog(WARNING, "ConnID %d. %s", ct->ConnID, errorbuf);
 			/* Build timeout response. */
-			buildTimeoutResponseForQueuedRequest(ct, RESQUEMGR_NOCLUSTER_TIMEOUT);
+			buildTimeoutResponseForQueuedRequest(ct,
+												 RESQUEMGR_NOCLUSTER_TIMEOUT,
+												 errorbuf);
 			transformConnectionTrackProgress(ct, CONN_PP_TIMEOUT_FAIL);
 		}
 		else
@@ -4611,8 +4640,8 @@ void timeoutQueuedRequest(void)
 				   (curmsec - curcon->HeadQueueTime >
 				 	 	1000000L * rm_resource_allocation_timeout) ) )
 			{
-				elog(LOG, "The queued resource request no resource timeout is "
-						  "detected. ConnID %d, the waiting time in head of the"
+				elog(LOG, "ConnID %d. The queued resource request no resource "
+						  "timeout is detected, the waiting time in head of the"
 						  "queue is "UINT64_FORMAT " global resource pending "
 						  "start time is "UINT64_FORMAT
 						  ", current time is "UINT64_FORMAT".",
@@ -4620,6 +4649,9 @@ void timeoutQueuedRequest(void)
 						  curmsec - curcon->HeadQueueTime,
 						  PQUEMGR->RatioTrackers[index]->TotalPendingStartTime,
 						  curmsec);
+
+				snprintf(errorbuf, sizeof(errorbuf),
+						 "queued resource request is timed out due to no resource");
 				tocancel = true;
 			}
 
@@ -4629,9 +4661,13 @@ void timeoutQueuedRequest(void)
 					 1000000L * rm_resource_allocation_timeout &&
 				 ((DynResourceQueueTrack)(curcon->QueueTrack))->NumOfRunningQueries == 0 )
 			{
-				elog(LOG, "The queued resource request timeout is detected due to "
-						  "resource fragment problem. ConnID %d",
+				elog(LOG, "ConnID %d. The queued resource request timeout is "
+						  "detected due to resource fragment problem.",
 						  curcon->ConnID);
+
+				snprintf(errorbuf, sizeof(errorbuf),
+						 "queued resource request is timed out due to resource "
+						 "fragment problem");
 				tocancel = true;
 			}
 
@@ -4650,12 +4686,16 @@ void timeoutQueuedRequest(void)
 				elog(LOG, "The queued resource request timeout is detected due to "
 						  "no enough cluster resource. ConnID %d",
 						  curcon->ConnID);
+
+				snprintf(errorbuf, sizeof(errorbuf),
+						 "queued resource request is timed out due to not enough "
+						 "cluster resource capacity");
 				tocancel = true;
 			}
 
 			if ( tocancel )
 			{
-				cancelResourceAllocRequest(curcon);
+				cancelResourceAllocRequest(curcon, errorbuf);
 				returnConnectionToQueue(curcon, true);
 			}
 		}
@@ -4665,17 +4705,28 @@ void timeoutQueuedRequest(void)
 	MEMORY_CONTEXT_SWITCH_BACK
 }
 
-void buildTimeoutResponseForQueuedRequest(ConnectionTrack conntrack, uint32_t reason)
+void buildTimeoutResponseForQueuedRequest(ConnectionTrack conntrack,
+										  uint32_t 		  reason,
+										  char			 *errorbuf)
 {
-	RPCResponseAcquireResourceFromRMERRORData errresponse;
-	errresponse.Result   = reason;
-	errresponse.Reserved = 0;
+	SelfMaintainBufferData responsedata;
+	initializeSelfMaintainBuffer(&responsedata, PCONTEXT);
+
+	RPCResponseAcquireResourceFromRMERRORData response;
+	response.Result   = reason;
+	response.Reserved = 0;
+
+	appendSMBVar(&responsedata, response);
+	appendSMBStr(&responsedata, errorbuf);
+	appendSelfMaintainBufferTill64bitAligned(&responsedata);
+
 	buildResponseIntoConnTrack( conntrack,
-								(char *)&errresponse,
-								sizeof(errresponse),
+								SMBUFF_CONTENT(&responsedata),
+								getSMBContentSize(&responsedata),
 								conntrack->MessageMark1,
 								conntrack->MessageMark2,
 								RESPONSE_QD_ACQUIRE_RESOURCE);
+	destroySelfMaintainBuffer(&responsedata);
 	conntrack->ResponseSent = false;
 	MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
 	PCONTRACK->ConnToSend = lappend(PCONTRACK->ConnToSend, conntrack);

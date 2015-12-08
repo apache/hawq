@@ -59,8 +59,10 @@
 	initializeQD2RMComm();													   \
     VALIDATE_RESOURCE_SET_INDEX(index, errorbuf, errorbufsize)				   \
     int 			   res 			= FUNC_RETURN_OK;						   \
+    static char		   errorbuf2[ERRORMESSAGE_SIZE];                      	   \
     SelfMaintainBuffer sendbuffer 	= &(QD2RM_ResourceSets[index]->SendBuffer);\
-    SelfMaintainBuffer recvbuffer	= &(QD2RM_ResourceSets[index]->RecvBuffer);
+    SelfMaintainBuffer recvbuffer	= &(QD2RM_ResourceSets[index]->RecvBuffer);\
+    errorbuf2[0] = '\0';
 
 void buildManipulateResQueueRequest(SelfMaintainBuffer sendbuffer,
 									uint32_t		   connid,
@@ -84,8 +86,11 @@ int callSyncRPCToRM(const char 	 	   *sendbuff,
 					int   		 		sendbuffsize,
 		  	  	    uint16_t			sendmsgid,
 					uint16_t 		  	exprecvmsgid,
-					SelfMaintainBuffer	recvsmb);
+					SelfMaintainBuffer	recvsmb,
+					char			   *errorbuf,
+					int					errorbufsize);
 
+#define GET_STR(textp) DatumGetCString(DirectFunctionCall1(textout, PointerGetDatum(textp)))
 /*
  *------------------------------------------------------------------------------
  * Functions for testing resource manager by playing actions.
@@ -148,8 +153,7 @@ int removeFile(const char *filename);
 int setResourceManagerQuotaControl(bool 	pause,
 								   int 		phase,
 								   char    *errorbuf,
-								   int 		errorbufsize,
-								   int	   *errorcode);
+								   int 		errorbufsize);
 
 void outputAllcatedResourceToFile(const char *filename, int resourceid);
 void *buildResourceActionPlayRowData(MCTYPE context, List *actions);
@@ -190,12 +194,14 @@ DQueue buildResourceDistRowData(MCTYPE 				context,
  *------------------------------------------------------------------------------
  */
 
-extern char 	   *UnixSocketDir;		  	/* Reference global configure.   */
+#ifdef ENABLE_DOMAINSERVER
+/* Reference global configure.   */
+extern char 	   *UnixSocketDir;
+/* Unix domain socket file.      */
+char				QD2RM_SocketFile[1024];
+#endif
 
 MemoryContext		QD2RM_CommContext			  = NULL;
-
-char				QD2RM_SocketFile[1024];	/* Unix domain socket file.      */
-
 QDResourceContext  *QD2RM_ResourceSets            = NULL;
 int					QD2RM_ResourceSetSize         = 0;
 int					QD2RM_ResourceSetCount        = 0;
@@ -206,7 +212,6 @@ bool				QD2RM_Initialized			  = false;
 pthread_t       	ResourceHeartBeatThreadHandle;
 pthread_mutex_t 	ResourceSetsMutex;
 uint64_t        	LastSendResourceRefreshHeartBeatTime = 0;
-
 
 /**
  * Do necessary initialization for coming RPC communication between QD and RM.
@@ -241,13 +246,14 @@ void initializeQD2RMComm(void)
     res = initializeDRMInstanceForQD();
     if ( res != FUNC_RETURN_OK )
     {
-		elog(ERROR, "Fail to initialize data structure for communicating with "
+		elog(ERROR, "Failed to initialize data structure for communicating with "
 					"resource manager.");
     }
 
+#ifdef ENABLE_DOMAINSERVER
     /* Get UNIX domain socket file. */
     UNIXSOCK_PATH(QD2RM_SocketFile, rm_master_domain_port, UnixSocketDir);
-
+#endif
     /* Initialize global variables for maintaining a list of resource sets. */
     QD2RM_ResourceSets 	   = rm_palloc0(QD2RM_CommContext,
             							sizeof(QDResourceContext) *
@@ -302,7 +308,8 @@ void initializeQD2RMComm(void)
     	{
     		freeHeartBeatThreadArg(&tharg);
     		elog(ERROR, "Resource manager host %s does not have available INET "
-    					"address.");
+    					"address.",
+						master_addr_host);
     	}
 
     	tharg->HostAddrs = malloc(sizeof(char *) * tharg->HostAddrSize);
@@ -354,9 +361,9 @@ int createNewResourceContext(int *index)
         	return COMM2RM_CLIENT_FULL_RESOURCECONTEXT;
         }
         QD2RM_ResourceSets = rm_repalloc(QD2RM_CommContext,
-                QD2RM_ResourceSets,
-                sizeof(QDResourceContext) *
-                QD2RM_ResourceSetSize * 2);
+                						 QD2RM_ResourceSets,
+										 sizeof(QDResourceContext) *
+										 	 QD2RM_ResourceSetSize * 2);
 
         for ( int i = QD2RM_ResourceSetSize ; i < QD2RM_ResourceSetSize * 2 ; ++i )
         {
@@ -368,8 +375,8 @@ int createNewResourceContext(int *index)
 
     /* Find one available slot with NULL set. */
     int availableIndex = 0;
-    while( availableIndex < QD2RM_ResourceSetSize &&
-            QD2RM_ResourceSets[availableIndex] != NULL)
+    while(availableIndex < QD2RM_ResourceSetSize &&
+          QD2RM_ResourceSets[availableIndex] != NULL)
     {
         availableIndex++;
     }
@@ -434,7 +441,7 @@ void releaseResourceContextWithErrorReport(int index)
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_INTERNAL_ERROR),
-				errmsg("Can not release resource context.")));
+				errmsg("can not release resource context")));
 	}
 }
 
@@ -453,7 +460,7 @@ int getAllocatedResourceContext(int index, QDResourceContext *rescontext)
 int cleanupQD2RMComm(void)
 {
 	int res = FUNC_RETURN_OK;
-	char errorbuf[1024];
+	char errorbuf[ERRORMESSAGE_SIZE];
 
 	initializeQD2RMComm();
 
@@ -464,24 +471,23 @@ int cleanupQD2RMComm(void)
         {
             if ( QD2RM_ResourceSets[i]->QD_ResourceList != NULL )
             {
-            	elog(LOG, "Un-returned resource is probed, will be returned. "
-                          "(%d MB, %lf CORE) x %d. Conn ID=%d",
-                          QD2RM_ResourceSets[i]->QD_SegMemoryMB,
-                          QD2RM_ResourceSets[i]->QD_SegCore,
-                          QD2RM_ResourceSets[i]->QD_SegCount,
-                          QD2RM_ResourceSets[i]->QD_Conn_ID);
-
+            	elog(WARNING, "Un-returned resource is probed, will be returned. "
+                              "(%d MB, %lf CORE) x %d. Conn ID=%d",
+							  QD2RM_ResourceSets[i]->QD_SegMemoryMB,
+							  QD2RM_ResourceSets[i]->QD_SegCore,
+							  QD2RM_ResourceSets[i]->QD_SegCount,
+							  QD2RM_ResourceSets[i]->QD_Conn_ID);
+            	errorbuf[0] = '\0';
                 res = returnResource(i, errorbuf, sizeof(errorbuf));
                 if ( res != FUNC_RETURN_OK )
                 {
-                	elog(WARNING, "Failed to return resource when cleaning up "
-                				  "resource context.");
+                	elog(WARNING, "%s", errorbuf);
             	}
+                errorbuf[0] = '\0';
                 res = unregisterConnectionInRM(i, errorbuf, sizeof(errorbuf));
                 if ( res != FUNC_RETURN_OK )
                 {
-                	elog(WARNING, "Failed to unregister when cleaning up "
-                				  "resource context.");
+                	elog(WARNING, "%s", errorbuf);
                 }
             }
         }
@@ -507,35 +513,40 @@ int registerConnectionInRMByStr(int 		   index,
     appendSelfMaintainBufferTill64bitAligned(sendbuffer);
 
     /* Call RPC. */
-    res = callSyncRPCToRM(sendbuffer->Buffer,
+    res = callSyncRPCToRM(SMBUFF_CONTENT(sendbuffer),
     					  getSMBContentSize(sendbuffer),
 						  REQUEST_QD_CONNECTION_REG,
 						  RESPONSE_QD_CONNECTION_REG,
-						  recvbuffer);
+						  recvbuffer,
+						  errorbuf2,
+						  sizeof(errorbuf2));
 
     if ( res != FUNC_RETURN_OK )
     {
     	snprintf(errorbuf, errorbufsize,
-    			 "failed to register in HAWQ resource manager because of %s.",
-				 getErrorCodeExplain(res));
+    			 "failed to register in resource manager, %s",
+				 errorbuf2);
     	return res;
     }
 
     /* Parse response. */
-    RPCResponseHeadRegisterConnectionInRMByStr response =
-        (RPCResponseHeadRegisterConnectionInRMByStr)(recvbuffer->Buffer);
+    RPCResponseRegisterConnectionInRMByStr response =
+    		SMBUFF_HEAD(RPCResponseRegisterConnectionInRMByStr,
+    					recvbuffer);
 
     QD2RM_ResourceSets[index]->QD_Conn_ID  = response->ConnID;
     if ( response->Result != FUNC_RETURN_OK )
     {
+    	char *errorstr = SMBUFF_CONTENT(recvbuffer) +
+    					 sizeof(RPCResponseRegisterConnectionInRMByStrData);
     	snprintf(errorbuf, errorbufsize,
-    			 "failed to register in HAWQ resource manager because of %s.",
-				 getErrorCodeExplain(response->Result));
+    			 "failed to register in resource manager, %s",
+				 errorstr);
     	return response->Result;
     }
 
-    elog(DEBUG3, "Registered in HAWQ resource manager, Conn ID %d",
-    			 QD2RM_ResourceSets[index]->QD_Conn_ID);
+    elog(LOG, "ConnID %d. Registered in HAWQ resource manager.",
+    		  QD2RM_ResourceSets[index]->QD_Conn_ID);
     return FUNC_RETURN_OK;
 }
 
@@ -550,40 +561,46 @@ int registerConnectionInRMByOID(int 		   index,
 	RPC_QD_2_RM_HEAD
 
     /* Build request. */
-    RPCRequestHeadRegisterConnectionInRMByOIDData requesthead;
+	resetSelfMaintainBuffer(sendbuffer);
+	RPCRequestRegisterConnectionInRMByOIDData requesthead;
     requesthead.UseridOid = useridoid;
-    resetSelfMaintainBuffer(sendbuffer);
+
     appendSMBVar(sendbuffer,requesthead);
 
     /* Call RPC to get response. */
-    res = callSyncRPCToRM(sendbuffer->Buffer,
+    res = callSyncRPCToRM(SMBUFF_CONTENT(sendbuffer),
     					  getSMBContentSize(sendbuffer),
 						  REQUEST_QD_CONNECTION_REG_OID,
 						  RESPONSE_QD_CONNECTION_REG_OID,
-						  recvbuffer);
+						  recvbuffer,
+						  errorbuf2,
+						  sizeof(errorbuf2));
     if ( res != FUNC_RETURN_OK )
     {
     	snprintf(errorbuf, errorbufsize,
-    			 "failed to register in HAWQ resource manager because of %s.",
-				 getErrorCodeExplain(res));
+    			 "failed to register in resource manager, %s",
+				 errorbuf2);
     	return res;
     }
 
     /* Parse response. */
-    RPCResponseHeadRegisterConnectionInRMByOID response =
-    		(RPCResponseHeadRegisterConnectionInRMByOID)(recvbuffer->Buffer);
+    RPCResponseRegisterConnectionInRMByOID response =
+        		SMBUFF_HEAD(RPCResponseRegisterConnectionInRMByOID,
+        					recvbuffer);
 
     QD2RM_ResourceSets[index]->QD_Conn_ID  = response->ConnID;
     if ( response->Result != FUNC_RETURN_OK )
     {
+    	char *errorstr = SMBUFF_CONTENT(recvbuffer) +
+    					 sizeof(RPCResponseRegisterConnectionInRMByOIDData);
     	snprintf(errorbuf, errorbufsize,
-    			 "failed to register in HAWQ resource manager because of %s.",
-				 getErrorCodeExplain(response->Result));
+    			 "failed to register in resource manager, %s",
+				 errorstr);
     	return response->Result;
     }
 
-    elog(DEBUG3, "Registered in HAWQ resource manager (By OID), Conn ID %d",
-        		 QD2RM_ResourceSets[index]->QD_Conn_ID);
+    elog(LOG, "ConnID %d. Registered in HAWQ resource manager (By OID)",
+        	  QD2RM_ResourceSets[index]->QD_Conn_ID);
     return FUNC_RETURN_OK;
 }
 
@@ -597,47 +614,54 @@ int	unregisterConnectionInRM(int 			   index,
 	RPC_QD_2_RM_HEAD
 
     /* Build request. */
-    RPCRequestHeadUnregisterConnectionInRMData requesthead;
-    requesthead.ConnID =QD2RM_ResourceSets[index]->QD_Conn_ID;
+    RPCRequestHeadUnregisterConnectionInRMData request;
+    request.ConnID =QD2RM_ResourceSets[index]->QD_Conn_ID;
 
     resetSelfMaintainBuffer(sendbuffer);
-    appendSMBVar(sendbuffer,requesthead);
+    appendSMBVar(sendbuffer,request);
 
     /* Call RPC to get response. */
-    res = callSyncRPCToRM(sendbuffer->Buffer,
+    res = callSyncRPCToRM(SMBUFF_CONTENT(sendbuffer),
     					  getSMBContentSize(sendbuffer),
 						  REQUEST_QD_CONNECTION_UNREG,
 						  RESPONSE_QD_CONNECTION_UNREG,
-						  recvbuffer);
+						  recvbuffer,
+						  errorbuf2,
+						  sizeof(errorbuf2));
     if ( res != FUNC_RETURN_OK )
     {
     	snprintf(errorbuf, errorbufsize,
-    			 "failed to unregister in HAWQ resource manager because of %s.",
-				 getErrorCodeExplain(res));
+    			 "failed to unregister from resource manager, %s",
+				 errorbuf2);
     	return res;
     }
 
     /* Parse response. */
-    RPCResponseHeadUnregisterConnectionInRM response =
-    		(RPCResponseHeadUnregisterConnectionInRM)(recvbuffer->Buffer);
+
+    RPCResponseUnregisterConnectionInRM response =
+            		SMBUFF_HEAD(RPCResponseUnregisterConnectionInRM,
+            					recvbuffer);
     if ( response->Result != FUNC_RETURN_OK )
     {
-    	res = response->Result;
+    	char *errorstr = SMBUFF_CONTENT(recvbuffer) +
+    					 sizeof(RPCResponseUnregisterConnectionInRMData);
     	snprintf(errorbuf, errorbufsize,
-    			 "failed to unregister in HAWQ resource manager because of %s.",
-				 getErrorCodeExplain(response->Result));
+    			 "failed to unregister from resource manager, %s",
+				 errorstr);
+    	return response->Result;
     }
 
-    elog(DEBUG3, "Unregistered in HAWQ resource manager. Conn ID %d",
+    elog(LOG, "ConnID %d. Unregistered from HAWQ resource manager.",
         		 QD2RM_ResourceSets[index]->QD_Conn_ID);
 
     QD2RM_ResourceSets[index]->QD_Conn_ID = INVALID_CONNID;
-    return res;
+    return FUNC_RETURN_OK;
 }
 
 void unregisterConnectionInRMWithErrorReport(int index)
 {
-	static char errorbuf[1024];
+	static char errorbuf[ERRORMESSAGE_SIZE];
+	errorbuf[0] = '\0';
 	int res = unregisterConnectionInRM(index, errorbuf, sizeof(errorbuf));
 	if (res != FUNC_RETURN_OK)
 	{
@@ -667,18 +691,16 @@ int acquireResourceFromRM(int 		  		  index,
     								0 :
 									preferred_nodes_size;
 
-    elog(DEBUG3, "Acquire request with Conn ID %d for index %d. "
-    			 "Max vseg size %d Min vseg size %d"
-    			 "Estimated slice size %d "
-    			 "IO bytes size " INT64_FORMAT " "
-				 "Preferred node count %d.",
-				 curcontext->QD_Conn_ID,
-				 index,
-				 max_seg_count_fix,
-				 min_seg_count_fix,
-				 slice_size,
-				 iobytes,
-				 nodecount);
+    elog(LOG, "ConnID: %d. Acquire resource request for index %d. "
+    		  "Max vseg size %d Min vseg size %d Estimated slice size %d "
+    		  "estimated IO bytes size " INT64_FORMAT " Preferred node count %d.",
+			  curcontext->QD_Conn_ID,
+			  index,
+			  max_seg_count_fix,
+			  min_seg_count_fix,
+			  slice_size,
+			  iobytes,
+			  nodecount);
 
     /* Build request. */
     resetSelfMaintainBuffer(sendbuffer);
@@ -725,34 +747,41 @@ int acquireResourceFromRM(int 		  		  index,
     pgstat_report_waiting_resource(true);
 
     /* Call RPC to get response. */
-    res = callSyncRPCToRM(sendbuffer->Buffer,
+    res = callSyncRPCToRM(SMBUFF_CONTENT(sendbuffer),
     					  getSMBContentSize(sendbuffer),
 						  REQUEST_QD_ACQUIRE_RESOURCE,
 						  RESPONSE_QD_ACQUIRE_RESOURCE,
-						  recvbuffer);
+						  recvbuffer,
+						  errorbuf2,
+						  sizeof(errorbuf2));
     if ( res != FUNC_RETURN_OK )
     {
     	snprintf(errorbuf, errorbufsize,
-    			 "failed to acquire resource because of %s.",
-				 getErrorCodeExplain(res));
+    			 "failed to acquire resource from resource manager, %s",
+				 errorbuf2);
     	pgstat_report_waiting_resource(false);
     	return res;
     }
     pgstat_report_waiting_resource(false);
 
     RPCResponseAcquireResourceFromRMERROR errres =
-    		(RPCResponseAcquireResourceFromRMERROR)(recvbuffer->Buffer);
+    		SMBUFF_HEAD(RPCResponseAcquireResourceFromRMERROR,
+    		            recvbuffer);
+
     if ( errres->Result != FUNC_RETURN_OK )
     {
+    	char *errorstr = SMBUFF_CONTENT(recvbuffer) +
+    					 sizeof(RPCResponseAcquireResourceFromRMERRORData);
     	snprintf(errorbuf, errorbufsize,
-    			 "failed to acquire resource because of %s.",
-    			 getErrorCodeExplain(errres->Result));
+    			 "failed to acquire resource from resource manager, %s",
+				 errorstr);
     	return errres->Result;
     }
 
     /* Parse response. */
     RPCResponseHeadAcquireResourceFromRM response =
-    		(RPCResponseHeadAcquireResourceFromRM)(recvbuffer->Buffer);
+    		SMBUFF_HEAD(RPCResponseHeadAcquireResourceFromRM,
+    		    		recvbuffer);
 
     curcontext->QD_SegCount	    = response->SegCount;
     curcontext->QD_SegMemoryMB 	= response->SegMemoryMB;
@@ -784,20 +813,23 @@ int acquireResourceFromRM(int 		  		  index,
     	}
 
         /* Get block of hdfs hostname index array. */
-        uint32_t *hnameidxarray = (uint32_t *)
-								  (recvbuffer->Buffer +
-								   sizeof(RPCResponseHeadAcquireResourceFromRMData));
-        uint32_t hnameidxarraysize = __SIZE_ALIGN64(sizeof(uint32_t) * curcontext->QD_SegCount);
+        uint32_t *hnameidxarray =
+        		(uint32_t *)(SMBUFF_CONTENT(recvbuffer) +
+        					 sizeof(RPCResponseHeadAcquireResourceFromRMData));
+        uint32_t hnameidxarraysize =
+        		__SIZE_ALIGN64(sizeof(uint32_t) * curcontext->QD_SegCount);
+
         /* Get block of machine id instance offset array. */
-        uint32_t *hoffsetarray = (uint32_t *)
-								 (recvbuffer->Buffer +
-								  sizeof(RPCResponseHeadAcquireResourceFromRMData) +
-								  hnameidxarraysize);
+        uint32_t *hoffsetarray =
+        		(uint32_t *)(SMBUFF_CONTENT(recvbuffer) +
+        					 sizeof(RPCResponseHeadAcquireResourceFromRMData) +
+							 hnameidxarraysize);
 
         /* This is an array of pointers of MachineId. */
     	curcontext->QD_ResourceList = (QDSegInfo *)
     								  rm_palloc0(QD2RM_CommContext,
-    										     sizeof(QDSegInfo) * curcontext->QD_SegCount);
+    										     sizeof(QDSegInfo) *
+												 	    curcontext->QD_SegCount);
 
         for ( int i = 0 ; i < curcontext->QD_SegCount ; ++i )
         {
@@ -807,7 +839,8 @@ int acquireResourceFromRM(int 		  		  index,
         	newqdseg->QD_HdfsHostName = (hnameidxarray[i] < nodecount) ?
         								curcontext->QD_HdfsHostNames[hnameidxarray[i]] :
 										NULL;
-        	newqdseg->QD_SegInfo = (SegInfo)(recvbuffer->Buffer + hoffsetarray[i]);
+        	newqdseg->QD_SegInfo = (SegInfo)(SMBUFF_CONTENT(recvbuffer) +
+        									 hoffsetarray[i]);
         	curcontext->QD_ResourceList[i] = newqdseg;
 
         	if ( log_min_messages == DEBUG5 )
@@ -816,23 +849,24 @@ int acquireResourceFromRM(int 		  		  index,
 				initializeSelfMaintainBuffer(&segreport, QD2RM_CommContext);
 				generateSegInfoReport(curcontext->QD_ResourceList[i]->QD_SegInfo,
 									  &segreport);
-				elog(DEBUG5, "Recognized resource on host. %s. "
-							 "Mapped original HDFS host name %s",
-							 segreport.Buffer,
-							 (curcontext->QD_ResourceList[i]->QD_HdfsHostName != NULL ?
-							  curcontext->QD_ResourceList[i]->QD_HdfsHostName	:
-							  "UNSET"));
+				elog(RMLOG, "Recognized resource on host. %s. "
+							"Mapped original HDFS host name %s",
+							SMBUFF_CONTENT(&segreport),
+							(curcontext->QD_ResourceList[i]->QD_HdfsHostName != NULL ?
+							 curcontext->QD_ResourceList[i]->QD_HdfsHostName	:
+							 "UNSET"));
 				destroySelfMaintainBuffer(&segreport);
         	}
         }
-        elog(DEBUG3, "Acquired resource from HAWQ RM, (%d MB, %lf CORE) x %d.",
-        			 curcontext->QD_SegMemoryMB,
-					 curcontext->QD_SegCore,
-					 curcontext->QD_SegCount);
+        elog(LOG, "ConnID %d. Acquired resource from resource manager, "
+        		  "(%d MB, %lf CORE) x %d.",
+				  curcontext->QD_Conn_ID,
+        		  curcontext->QD_SegMemoryMB,
+				  curcontext->QD_SegCore,
+				  curcontext->QD_SegCount);
     }
     else
     {
-    	elog(WARNING, "Can not acquire resource from HAWQ RM.");
     	Assert( false );
     }
     return FUNC_RETURN_OK;
@@ -859,47 +893,56 @@ int returnResource(int 		index,
     RPCRequestHeadReturnResourceData requesthead;
     requesthead.ConnID = QD2RM_ResourceSets[index]->QD_Conn_ID;
     requesthead.Reserved = 0;
+
     resetSelfMaintainBuffer(sendbuffer);
     appendSMBVar(sendbuffer,requesthead);
     appendSelfMaintainBufferTill64bitAligned(sendbuffer);
 
     /* Call RPC to get response. */
-    res = callSyncRPCToRM(sendbuffer->Buffer,
+    res = callSyncRPCToRM(SMBUFF_CONTENT(sendbuffer),
     					  getSMBContentSize(sendbuffer),
 						  REQUEST_QD_RETURN_RESOURCE,
 						  RESPONSE_QD_RETURN_RESOURCE,
-						  recvbuffer);
+						  recvbuffer,
+						  errorbuf2,
+						  sizeof(errorbuf2));
     if ( res != FUNC_RETURN_OK )
     {
     	snprintf(errorbuf, errorbufsize,
-    			 "failed to return resource to HAWQ resource manager because of %s.",
-				 getErrorCodeExplain(res));
+    			 "failed to return resource to resource manager, %s",
+				 errorbuf2);
     	return res;
     }
 
     /* Parse response. */
     RPCResponseHeadReturnResource response =
-    		(RPCResponseHeadReturnResource)(recvbuffer->Buffer);
+        		SMBUFF_HEAD(RPCResponseHeadReturnResource,
+        		    		recvbuffer);
+
     if ( response->Result != FUNC_RETURN_OK )
     {
-    	res = response->Result;
-        snprintf(errorbuf, errorbufsize,
-        		 "failed to return resource to HAWQ resource manager because of %s.",
-				 getErrorCodeExplain(res));
-        return res;
+    	char *errorstr = SMBUFF_CONTENT(recvbuffer) +
+    					 sizeof(RPCResponseHeadReturnResourceData);
+    	snprintf(errorbuf, errorbufsize,
+    			 "failed to return resource to resource manager, %s",
+				 errorstr);
+    	return response->Result;
     }
-
-    elog(DEBUG3, "Returned resource to HAWQ resource manager.");
 
     QD2RM_ResourceSets[index]->QD_SegMemoryMB 	= 0;
     QD2RM_ResourceSets[index]->QD_SegCore	 	= 0.0;
     QD2RM_ResourceSets[index]->QD_SegCount		= 0;
 
     if ( QD2RM_ResourceSets[index]->QD_ResourceList != NULL )
+    {
         rm_pfree(QD2RM_CommContext, QD2RM_ResourceSets[index]->QD_ResourceList);
+    }
 
     QD2RM_ResourceSets[index]->QD_Resource = NULL;
     QD2RM_ResourceSets[index]->QD_ResourceList = NULL;
+
+    elog(LOG, "ConnID %d. Returned resource to resource manager.",
+        	  QD2RM_ResourceSets[index]->QD_Conn_ID);
 
     return FUNC_RETURN_OK;
 }
@@ -908,8 +951,9 @@ int hasAllocatedResource(int index, bool *allocated)
 {
 	initializeQD2RMComm();
 
-	char errorbuf[1024];
+	static char errorbuf[ERRORMESSAGE_SIZE];
     /* Validate index */
+	errorbuf[0] = '\0';
     VALIDATE_RESOURCE_SET_INDEX(index, errorbuf, sizeof(errorbuf))
 
 	*allocated = QD2RM_ResourceSets[index]->QD_SegCount > 0;
@@ -938,29 +982,31 @@ int manipulateResourceQueue(int 	 index,
 								   options);
 
     /* Call RPC to get response. */
-    res = callSyncRPCToRM(sendbuffer->Buffer,
+    res = callSyncRPCToRM(SMBUFF_CONTENT(sendbuffer),
     					  getSMBContentSize(sendbuffer),
 						  REQUEST_QD_DDL_MANIPULATERESQUEUE,
 						  RESPONSE_QD_DDL_MANIPULATERESQUEUE,
-						  recvbuffer);
+						  recvbuffer,
+						  errorbuf2,
+						  sizeof(errorbuf2));
     if ( res != FUNC_RETURN_OK )
     {
-    	snprintf(errorbuf, errorbufsize, "%s", getErrorCodeExplain(res));
+    	snprintf(errorbuf, errorbufsize, "%s", errorbuf2);
     	return res;
     }
 
 	/*Start parsing response. */
 	RPCResponseHeadManipulateResQueue response =
-		(RPCResponseHeadManipulateResQueue)(recvbuffer->Buffer);
+			SMBUFF_HEAD(RPCResponseHeadManipulateResQueue, recvbuffer);
 
 	/* CASE 1. The response contains error message. */
 	if ( response->Result != FUNC_RETURN_OK )
 	{
 		RPCResponseHeadManipulateResQueueERROR error =
-			(RPCResponseHeadManipulateResQueueERROR)(recvbuffer->Buffer);
+			SMBUFF_HEAD(RPCResponseHeadManipulateResQueueERROR, recvbuffer);
 
 		elog(LOG, "Fail to manipulate resource queue because %s",
-					  error->ErrorText);
+				  error->ErrorText);
 		snprintf(errorbuf, errorbufsize, "%s", error->ErrorText);
 	}
 
@@ -978,6 +1024,8 @@ int manipulateRoleForResourceQueue (int 	  index,
 									char 	 *errorbuf,
 									int  	  errorbufsize)
 {
+	static char errorbuf2[ERRORMESSAGE_SIZE];
+
 	initializeQD2RMComm();
 
     Assert(queueid != -1);
@@ -1019,27 +1067,30 @@ int manipulateRoleForResourceQueue (int 	  index,
 
 	appendSMBVar(sendbuffer, request);
 
-	res = callSyncRPCToRM(sendbuffer->Buffer,
-						  sendbuffer->Cursor + 1,
+	errorbuf2[0] = '\0';
+	res = callSyncRPCToRM(SMBUFF_CONTENT(sendbuffer),
+						  getSMBContentSize(sendbuffer),
 						  REQUEST_QD_DDL_MANIPULATEROLE,
 						  RESPONSE_QD_DDL_MANIPULATEROLE,
-						  recvbuffer);
+						  recvbuffer,
+						  errorbuf2,
+						  sizeof(errorbuf2));
 
     if ( res != FUNC_RETURN_OK )
     {
-    	snprintf(errorbuf, errorbufsize, "%s", getErrorCodeExplain(res));
+    	snprintf(errorbuf, errorbufsize, "%s", errorbuf2);
     	return res;
     }
 
 	/* Start parsing response. */
-	RPCResponseHeadManipulateRole response = (RPCResponseHeadManipulateRole)
-											 (recvbuffer->Buffer);
+	RPCResponseHeadManipulateRole response =
+			SMBUFF_HEAD(RPCResponseHeadManipulateRole, recvbuffer);
 
 	/* The response contains error message. */
 	if ( response->Result != FUNC_RETURN_OK )
 	{
 		RPCResponseHeadManipulateRoleERROR error =
-			(RPCResponseHeadManipulateRoleERROR)(recvbuffer->Buffer);
+			SMBUFF_HEAD(RPCResponseHeadManipulateRoleERROR, recvbuffer);
 
 		elog(WARNING, "Resource manager failed to manipulate role %s. %s",
 					  rolename,
@@ -1058,7 +1109,8 @@ void buildManipulateResQueueRequest(SelfMaintainBuffer sendbuffer,
 	Assert( sendbuffer != NULL );
 	Assert( connid != 0XFFFFFFFF );
 	Assert( queuename != NULL );
-	Assert( action >= MANIPULATE_RESQUEUE_CREATE && action <= MANIPULATE_RESQUEUE_DROP );
+	Assert( action >= MANIPULATE_RESQUEUE_CREATE &&
+			action <= MANIPULATE_RESQUEUE_DROP );
 
 	uint16_t  withlength 	 	= 0;
 	bool	  nowIsWithOption 	= false;
@@ -1072,7 +1124,7 @@ void buildManipulateResQueueRequest(SelfMaintainBuffer sendbuffer,
 
 	/* Build request head information. */
 	RPCRequestHeadManipulateResQueue requestheadptr =
-		(RPCRequestHeadManipulateResQueue)(sendbuffer->Buffer);
+		SMBUFF_HEAD(RPCRequestHeadManipulateResQueue, sendbuffer);
 
 	requestheadptr->ConnID 			 = connid;
 	requestheadptr->ManipulateAction = action;
@@ -1124,107 +1176,116 @@ void buildManipulateResQueueRequest(SelfMaintainBuffer sendbuffer,
     appendSelfMaintainBufferTill64bitAligned(sendbuffer);
 
     /* Update with actual with list size. */
-    requestheadptr = (RPCRequestHeadManipulateResQueue)(sendbuffer->Buffer);
+    requestheadptr = SMBUFF_HEAD(RPCRequestHeadManipulateResQueue, sendbuffer);
     requestheadptr->WithAttrLength = withlength;
 
     elog(DEBUG3, "WITH length is %d.", withlength);
 
-    Assert(((sendbuffer->Cursor + 1) & 0X7) == 0 );
+    Assert((getSMBContentSize(sendbuffer) & 0X7) == 0 );
 }
 
-#define GET_STR(textp) DatumGetCString(DirectFunctionCall1(textout, PointerGetDatum(textp)))
-
-void sendFailedNodeToResourceManager(int hostNum, char **pghost) {
+void sendFailedNodeToResourceManager(int hostNum, char **pghost)
+{
+	static char errorbuf2[ERRORMESSAGE_SIZE];
 
 	initializeQD2RMComm();
 
 	int res    = FUNC_RETURN_OK;
+	SelfMaintainBufferData sendbuffer;
+	SelfMaintainBufferData recvbuffer;
+	initializeSelfMaintainBuffer(&sendbuffer, QD2RM_CommContext);
+	initializeSelfMaintainBuffer(&recvbuffer, QD2RM_CommContext);
 
-	SelfMaintainBufferData sendBuffer;
-	SelfMaintainBufferData recvBuffer;
-	initializeSelfMaintainBuffer(&sendBuffer, QD2RM_CommContext);
-	initializeSelfMaintainBuffer(&recvBuffer, QD2RM_CommContext);
-
-	for ( int i = 0 ; i < hostNum ; ++i ) {
-		appendSMBStr(&sendBuffer, pghost[i]);
-		elog(LOG, "HAWQ RM :: QD thinks %s is down.", pghost[i]);
+	for ( int i = 0 ; i < hostNum ; ++i )
+	{
+		appendSMBStr(&sendbuffer, pghost[i]);
+		elog(LOG, "Dispatcher thinks %s is down.", pghost[i]);
 	}
-	appendSelfMaintainBufferTill64bitAligned(&sendBuffer);
+	appendSelfMaintainBufferTill64bitAligned(&sendbuffer);
 
-	elog(LOG, "HAWQ RM :: QD sends %d failed host(s) to resource manager.",
-				 hostNum);
+	elog(LOG, "Dispatcher sends %d failed host(s) to resource manager.",
+			  hostNum);
 
-	res = callSyncRPCToRM(sendBuffer.Buffer,
-						  sendBuffer.Cursor + 1,
+	errorbuf2[0] = '\0';
+	res = callSyncRPCToRM(SMBUFF_CONTENT(&sendbuffer),
+						  getSMBContentSize(&sendbuffer),
 						  REQUEST_QD_SEGMENT_ISDOWN,
 						  RESPONSE_QD_SEGMENT_ISDOWN,
-						  &recvBuffer);
+						  &recvbuffer,
+						  errorbuf2,
+						  sizeof(errorbuf2));
 
     if ( res != FUNC_RETURN_OK )
     {
-    	elog(LOG, "Fail to get response from resource manager RPC. %d", res);
+    	elog(WARNING, "Fail to get response from resource manager RPC. %s",
+    				  errorbuf2);
     	goto exit;
     }
 
-    elog(LOG, "Success for QD sending failed host to resource manager.");
+    elog(LOG, "Succeed in sending failed host to resource manager.");
 
 exit:
-	destroySelfMaintainBuffer(&sendBuffer);
-	destroySelfMaintainBuffer(&recvBuffer);
+	destroySelfMaintainBuffer(&sendbuffer);
+	destroySelfMaintainBuffer(&recvbuffer);
 }
 
-int getLocalTmpDirFromMasterRM()
+int getLocalTmpDirFromMasterRM(char *errorbuf, int errorbufsize)
 {
+	static char 	 errorbuf2[ERRORMESSAGE_SIZE];
     initializeQD2RMComm();
 
 	int 				   res 		   = FUNC_RETURN_OK;
-	SelfMaintainBufferData sendBuffer;
-	SelfMaintainBufferData recvBuffer;
-	initializeSelfMaintainBuffer(&sendBuffer, QD2RM_CommContext);
-	initializeSelfMaintainBuffer(&recvBuffer, QD2RM_CommContext);
+	SelfMaintainBufferData sendbuffer;
+	SelfMaintainBufferData recvbuffer;
+	initializeSelfMaintainBuffer(&sendbuffer, QD2RM_CommContext);
+	initializeSelfMaintainBuffer(&recvbuffer, QD2RM_CommContext);
 
-    RPCRequestTmpDirForQDData   request;
+    RPCRequestTmpDirForQDData request;
     request.Reserved = 0;
-	appendSMBVar(&sendBuffer, request);
+	appendSMBVar(&sendbuffer, request);
 
-	res = callSyncRPCToRM(sendBuffer.Buffer,
-						  sendBuffer.Cursor + 1,
+	errorbuf2[0] = '\0';
+	res = callSyncRPCToRM(SMBUFF_CONTENT(&sendbuffer),
+						  getSMBContentSize(&sendbuffer),
 						  REQUEST_QD_TMPDIR,
 						  RESPONSE_QD_TMPDIR,
-						  &recvBuffer);
+						  &recvbuffer,
+						  errorbuf2,
+						  sizeof(errorbuf2));
     if ( res != FUNC_RETURN_OK ) 
     {
-        elog(ERROR, "getLocalTmpDirFromMasterRM fail");
+        snprintf(errorbuf, errorbufsize,
+        		 "failed to get temporary directory from resource manager, %s",
+        		 errorbuf2);
+        goto exit;
     }
 
-    RPCResponseTmpDirForQD response = (RPCResponseTmpDirForQD)(recvBuffer.Buffer);
-
+    RPCResponseTmpDirForQD response = SMBUFF_HEAD(RPCResponseTmpDirForQD,
+    											  &recvbuffer);
     if ( response->Result != FUNC_RETURN_OK ) 
     {
+    	char *errorstr = SMBUFF_CONTENT(&recvbuffer) +
+    					 sizeof(RPCResponseTmpDirForQDData);
+    	snprintf(errorbuf, errorbufsize,
+    			 "failed to get temporary directory from resource manager, %s",
+				 errorstr);
+    	res = response->Result;
     	goto exit;
     }
 
     LocalTempPath = pstrdup(response->tmpdir);
-
-    if (LocalTempPath)
-    {
-        elog(LOG, "getLocalTmpDirFromMasterRM tmpdir:%s", LocalTempPath);
-    }
-    else
-    {
-        elog(LOG, "getLocalTmpDirFromMasterRM tmpdir:NULL");
-    }
+    elog(LOG, "Got temporary directory %s", LocalTempPath);
 
 exit:
-	destroySelfMaintainBuffer(&sendBuffer);
-	destroySelfMaintainBuffer(&recvBuffer);
+	destroySelfMaintainBuffer(&sendbuffer);
+	destroySelfMaintainBuffer(&recvbuffer);
 	return res;
 }
+
 
 int acquireResourceQuotaFromRM(int64_t		user_oid,
 							   uint32_t		max_seg_count_fix,
 							   uint32_t		min_seg_count_fix,
-							   int	       *errorcode,
 							   char	       *errorbuf,
 							   int			errorbufsize,
 							   uint32_t	   *seg_num,
@@ -1232,13 +1293,15 @@ int acquireResourceQuotaFromRM(int64_t		user_oid,
 							   uint32_t	   *seg_memory_mb,
 							   double	   *seg_core)
 {
+	static char errorbuf2[ERRORMESSAGE_SIZE];
+
 	initializeQD2RMComm();
 
 	int 				   res 		   = FUNC_RETURN_OK;
-	SelfMaintainBufferData sendBuffer;
-	SelfMaintainBufferData recvBuffer;
-	initializeSelfMaintainBuffer(&sendBuffer, QD2RM_CommContext);
-	initializeSelfMaintainBuffer(&recvBuffer, QD2RM_CommContext);
+	SelfMaintainBufferData sendbuffer;
+	SelfMaintainBufferData recvbuffer;
+	initializeSelfMaintainBuffer(&sendbuffer, QD2RM_CommContext);
+	initializeSelfMaintainBuffer(&recvbuffer, QD2RM_CommContext);
 
 	RPCRequestHeadAcquireResourceQuotaFromRMByOIDData request;
 	request.UseridOid		 = user_oid;
@@ -1256,7 +1319,7 @@ int acquireResourceQuotaFromRM(int64_t		user_oid,
 										   &(request.StatVSegMemoryMB));
 	Assert(parseres == FUNC_RETURN_OK);
 
-	appendSMBVar(&sendBuffer, request);
+	appendSMBVar(&sendbuffer, request);
 
 	elog(DEBUG3, "HAWQ RM :: Acquire resource quota for query with %d splits, "
 				 "%d preferred virtual segments by user "INT64_FORMAT,
@@ -1264,21 +1327,24 @@ int acquireResourceQuotaFromRM(int64_t		user_oid,
 				 min_seg_count_fix,
 				 user_oid);
 
-	res = callSyncRPCToRM(sendBuffer.Buffer,
-						  sendBuffer.Cursor + 1,
+	errorbuf2[0] = '\0';
+	res = callSyncRPCToRM(SMBUFF_CONTENT(&sendbuffer),
+						  getSMBContentSize(&sendbuffer),
 						  REQUEST_QD_ACQUIRE_RESOURCE_QUOTA,
 						  RESPONSE_QD_ACQUIRE_RESOURCE_QUOTA,
-						  &recvBuffer);
+						  &recvbuffer,
+						  errorbuf2,
+						  sizeof(errorbuf2));
     if ( res != FUNC_RETURN_OK )
     {
     	snprintf(errorbuf, errorbufsize,
-    			 "failed to get response from resource manager RPC.");
-    	*errorcode = res;
+    			 "failed to get resource quota from resource manager, %s",
+				 errorbuf2);
     	goto exit;
     }
 
     RPCResponseHeadAcquireResourceQuotaFromRMByOID response =
-    	(RPCResponseHeadAcquireResourceQuotaFromRMByOID)(recvBuffer.Buffer);
+    	SMBUFF_HEAD(RPCResponseHeadAcquireResourceQuotaFromRMByOID, &recvbuffer);
     if ( response->Result == FUNC_RETURN_OK )
     {
     	*seg_num 		= response->SegNum;
@@ -1289,15 +1355,17 @@ int acquireResourceQuotaFromRM(int64_t		user_oid,
     else
     {
     	res = response->Result;
-    	*errorcode = res;
+    	char *errorstr = SMBUFF_CONTENT(&recvbuffer) +
+    					 sizeof(RPCResponseHeadAcquireResourceQuotaFromRMByOIDData);
+
     	snprintf(errorbuf, errorbufsize,
-    			 "failed to get resource quota due to remote error %s.",
-				 getErrorCodeExplain(res));
+    			 "failed to get resource quota from resource manager, %s",
+				 errorstr);
     }
 
 exit:
-	destroySelfMaintainBuffer(&sendBuffer);
-	destroySelfMaintainBuffer(&recvBuffer);
+	destroySelfMaintainBuffer(&sendbuffer);
+	destroySelfMaintainBuffer(&recvbuffer);
 	return res;
 }
 
@@ -1409,12 +1477,14 @@ void *generateResourceRefreshHeartBeat(void *arg)
 			phead->MessageSize = contbuffer.Cursor + 1;
 
 			appendSelfMaintainBuffer(&sendbuffer, (char *)phead, sizeof(*phead));
-			appendSelfMaintainBuffer(&sendbuffer, contbuffer.Buffer, contbuffer.Cursor+1);
+			appendSelfMaintainBuffer(&sendbuffer,
+									 SMBUFF_CONTENT(&contbuffer),
+									 getSMBContentSize(&contbuffer));
 			appendSelfMaintainBuffer(&sendbuffer, (char *)ptail, sizeof(*ptail));
 
 			if ( sendWithRetry(fd,
-							   sendbuffer.Buffer,
-							   sendbuffer.Cursor+1,
+							   SMBUFF_CONTENT(&sendbuffer),
+							   getSMBContentSize(&sendbuffer),
 							   false) == FUNC_RETURN_OK)
 			{
 				RPCResponseRefreshResourceHeartBeatData response;
@@ -1473,11 +1543,12 @@ void freeHeartBeatThreadArg(HeartBeatThreadArg *arg)
 
 Datum pg_resqueue_status(PG_FUNCTION_ARGS)
 {
-	FuncCallContext		   *funcctx = NULL;
-	Datum					result;
-	MemoryContext			oldcontext = NULL;
-	HeapTuple				tuple = NULL;
-    int                     res = FUNC_RETURN_OK;
+	static char 	 errorbuf[ERRORMESSAGE_SIZE];
+	FuncCallContext	*funcctx 	= NULL;
+	Datum			 result;
+	MemoryContext	 oldcontext	= NULL;
+	HeapTuple		 tuple 		= NULL;
+    int				 res 		= FUNC_RETURN_OK;
 
 	if (SRF_IS_FIRSTCALL())
 	{
@@ -1491,38 +1562,36 @@ Datum pg_resqueue_status(PG_FUNCTION_ARGS)
          * Call RPC begin
          */
         initializeQD2RMComm();
-        SelfMaintainBufferData sendBuffer;
-        SelfMaintainBufferData recvBuffer;
-        initializeSelfMaintainBuffer(&sendBuffer, QD2RM_CommContext);
-        initializeSelfMaintainBuffer(&recvBuffer, QD2RM_CommContext);
+        SelfMaintainBufferData sendbuffer;
+        SelfMaintainBufferData recvbuffer;
+        initializeSelfMaintainBuffer(&sendbuffer, QD2RM_CommContext);
+        initializeSelfMaintainBuffer(&recvbuffer, QD2RM_CommContext);
 
         RPCRequestResQueueStatusData request;
         request.Reserved = 0;
-        appendSMBVar(&sendBuffer, request);
+        appendSMBVar(&sendbuffer, request);
 
-    	res = callSyncRPCToRM(sendBuffer.Buffer,
-							  sendBuffer.Cursor + 1,
+        errorbuf[0] = '\0';
+    	res = callSyncRPCToRM(SMBUFF_CONTENT(&sendbuffer),
+							  getSMBContentSize(&sendbuffer),
 							  REQUEST_QD_DUMP_RESQUEUE_STATUS,
 							  RESPONSE_QD_DUMP_RESQUEUE_STATUS,
-							  &recvBuffer);
+							  &recvbuffer,
+							  errorbuf,
+							  sizeof(errorbuf));
         if ( res != FUNC_RETURN_OK )
         {
-            destroySelfMaintainBuffer(&sendBuffer);
-            destroySelfMaintainBuffer(&recvBuffer);
+            destroySelfMaintainBuffer(&sendbuffer);
+            destroySelfMaintainBuffer(&recvbuffer);
 		    funcctx->max_calls = 0;
-            SRF_RETURN_DONE(funcctx);
+			ereport(ERROR,
+					(errcode(ERRCODE_INTERNAL_ERROR), errmsg("%s", errorbuf)));
         }
 
-        RPCResponseResQueueStatus response = (RPCResponseResQueueStatus)(recvBuffer.Buffer);
+        RPCResponseResQueueStatus response = SMBUFF_HEAD(RPCResponseResQueueStatus,
+        												 &recvbuffer);
+        Assert(response->Result == FUNC_RETURN_OK);
 
-        if ( response->Result != FUNC_RETURN_OK )
-        {
-            destroySelfMaintainBuffer(&sendBuffer);
-            destroySelfMaintainBuffer(&recvBuffer);
-		    funcctx->max_calls = 0;
-            SRF_RETURN_DONE(funcctx);
-        }
-       
         DQueue funcdata = createDQueue(funcctx->multi_call_memory_ctx);
         for (int i=0;i<response->queuenum;i++) 
         {
@@ -1541,8 +1610,8 @@ Datum pg_resqueue_status(PG_FUNCTION_ARGS)
             insertDQueueTailNode(funcdata, resq);
         }        
 
-        destroySelfMaintainBuffer(&sendBuffer);
-        destroySelfMaintainBuffer(&recvBuffer);
+        destroySelfMaintainBuffer(&sendbuffer);
+        destroySelfMaintainBuffer(&recvbuffer);
         /*
          * Call RPC end
          */
@@ -1622,46 +1691,64 @@ Datum pg_resqueue_status_kv(PG_FUNCTION_ARGS)
 	return 0;
 }
 
-void dumpResourceManagerStatus(uint32_t type, const char *dump_file)
+int dumpResourceManagerStatus(uint32_t		 type,
+							  const char	*dump_file,
+							  char			*errorbuf,
+							  int			 errorbufsize)
 {
+	static char errorbuf2[ERRORMESSAGE_SIZE];
     initializeQD2RMComm();
 
     int                    res         = FUNC_RETURN_OK;
-    SelfMaintainBufferData sendBuffer;
-    SelfMaintainBufferData recvBuffer;
-    initializeSelfMaintainBuffer(&sendBuffer, QD2RM_CommContext);
-    initializeSelfMaintainBuffer(&recvBuffer, QD2RM_CommContext);
+    SelfMaintainBufferData sendbuffer;
+    SelfMaintainBufferData recvbuffer;
+    initializeSelfMaintainBuffer(&sendbuffer, QD2RM_CommContext);
+    initializeSelfMaintainBuffer(&recvbuffer, QD2RM_CommContext);
 
     RPCRequestDumpStatusData   request;
     request.type = type;
     request.Reserved = 0;
     strncpy(request.dump_file, dump_file, sizeof(request.dump_file) - 1);
-    appendSMBVar(&sendBuffer, request);
+    appendSMBVar(&sendbuffer, request);
 
-   	res = callSyncRPCToRM(sendBuffer.Buffer,
-						  sendBuffer.Cursor + 1,
+    errorbuf2[0] = '\0';
+   	res = callSyncRPCToRM(SMBUFF_CONTENT(&sendbuffer),
+						  getSMBContentSize(&sendbuffer),
 						  REQUEST_QD_DUMP_STATUS,
 						  RESPONSE_QD_DUMP_STATUS,
-						  &recvBuffer);
+						  &recvbuffer,
+						  errorbuf2,
+						  sizeof(errorbuf2));
    	if ( res != FUNC_RETURN_OK )
    	{
+   		snprintf(errorbuf, errorbufsize,
+   				 "failed to dump resource manager status, %s",
+				 errorbuf2);
    		goto exit;
    	}
 
-    RPCResponseDumpStatus response = (RPCResponseDumpStatus)(recvBuffer.Buffer);
+    RPCResponseDumpStatus response =
+    		SMBUFF_HEAD(RPCResponseDumpStatus, &recvbuffer);
 
     if ( response->Result != FUNC_RETURN_OK ) 
     {
-        goto exit;
+    	char *errorstr = SMBUFF_CONTENT(&recvbuffer) +
+    					 sizeof(RPCResponseDumpStatusData);
+    	snprintf(errorbuf, errorbufsize,
+    			 "failed to dump resource manager status, %s",
+				 errorstr);
+    	goto exit;
     }
 
 exit:
-    destroySelfMaintainBuffer(&sendBuffer);
-    destroySelfMaintainBuffer(&recvBuffer);
+    destroySelfMaintainBuffer(&sendbuffer);
+    destroySelfMaintainBuffer(&recvbuffer);
+    return res;
 }
 
 extern Datum pg_explain_resource_distribution(PG_FUNCTION_ARGS)
 {
+	static char				errorbuf[ERRORMESSAGE_SIZE];
 	FuncCallContext		   *funcctx = NULL;
 	Datum					result;
 	MemoryContext			oldcontext = NULL;
@@ -1672,7 +1759,6 @@ extern Datum pg_explain_resource_distribution(PG_FUNCTION_ARGS)
 	int						splitsize;
 	int						slicesize;
 	SimpString				locality;
-	char					errorbuf[1024];
 
 	if (SRF_IS_FIRSTCALL())
 	{
@@ -1739,12 +1825,14 @@ extern Datum pg_explain_resource_distribution(PG_FUNCTION_ARGS)
 			elog(ERROR, "Fail to create resource context. %d", ret);
 		}
 		/* STEP 2. Register. */
+		errorbuf[0] = '\0';
 		ret = registerConnectionInRMByStr(resourceId,
 										  role.Str,
-										  errorbuf, sizeof(errorbuf));
+										  errorbuf,
+										  sizeof(errorbuf));
 		if ( ret != FUNC_RETURN_OK )
 		{
-			elog(ERROR, "Fail to register by role %s", role.Str);
+			elog(ERROR, "%s", errorbuf);
 		}
 		/* STEP 3. Acquire resource. */
 
@@ -1795,17 +1883,14 @@ extern Datum pg_explain_resource_distribution(PG_FUNCTION_ARGS)
 		ret = returnResource(resourceId, errorbuf, sizeof(errorbuf));
 		if ( ret != FUNC_RETURN_OK )
 		{
-			elog(ERROR, "failed to return resource back to resource manager "
-					    "because %s",
-						errorbuf);
+			elog(ERROR, "%s", errorbuf);
 		}
 
 		/* STEP 5. Unregister. */
 		ret = unregisterConnectionInRM(resourceId, errorbuf, sizeof(errorbuf));
 		if ( ret != FUNC_RETURN_OK )
 		{
-			elog(ERROR, "failed to unregister connection in RM because %s",
-						errorbuf);
+			elog(ERROR, "%s", errorbuf);
 		}
 
 		/* STEP 6. Remove Context */
@@ -2163,61 +2248,54 @@ int removeFile(const char *filename)
 int setResourceManagerQuotaControl(bool 	pause,
 								   int 		phase,
 								   char    *errorbuf,
-								   int 		errorbufsize,
-								   int	   *errorcode)
+								   int 		errorbufsize)
 {
+	static char errorbuf2[ERRORMESSAGE_SIZE];
+
 	initializeQD2RMComm();
 
 	int 				   res 		   = FUNC_RETURN_OK;
-	SelfMaintainBufferData sendBuffer;
-	SelfMaintainBufferData recvBuffer;
-	initializeSelfMaintainBuffer(&sendBuffer, QD2RM_CommContext);
-	initializeSelfMaintainBuffer(&recvBuffer, QD2RM_CommContext);
+	SelfMaintainBufferData sendbuffer;
+	SelfMaintainBufferData recvbuffer;
+	initializeSelfMaintainBuffer(&sendbuffer, QD2RM_CommContext);
+	initializeSelfMaintainBuffer(&recvbuffer, QD2RM_CommContext);
 
 	RPCRequestQuotaControlData request;
 	request.Pause = pause;
 	request.Phase = phase;
 
-	appendSMBVar(&sendBuffer, request);
+	appendSMBVar(&sendbuffer, request);
 
 	elog(LOG, "Request GRM container life cycle phase %d %s",
 			  phase,
 			  pause?"paused":"resumed");
 
-	res = callSyncRPCToRM(sendBuffer.Buffer,
-						  sendBuffer.Cursor + 1,
+	errorbuf2[0] = '\0';
+	res = callSyncRPCToRM(SMBUFF_CONTENT(&sendbuffer),
+						  getSMBContentSize(&sendbuffer),
 						  REQUEST_QD_QUOTA_CONTROL,
 						  RESPONSE_QD_QUOTA_CONTROL,
-						  &recvBuffer);
+						  &recvbuffer,
+						  errorbuf2,
+						  sizeof(errorbuf2));
 
 	if ( res != FUNC_RETURN_OK )
 	{
 		snprintf(errorbuf, errorbufsize,
-				 "failed to get response from resource manager RPC.");
-		*errorcode = res;
+				 "failed to set resource manager resource quota control, %s",
+				 errorbuf2);
 		goto exit;
 	}
 
-	RPCResponseQuotaControl response = (RPCResponseQuotaControl)(recvBuffer.Buffer);
-	if ( response->Result == FUNC_RETURN_OK )
-	{
-		elog(LOG, "succeeded in setting container life cycle phase %d %s",
-				  phase,
-				  pause?"paused":"resumed");
-	}
-	else
-	{
-		elog(WARNING, "failed to set container life cycle phase %d %s",
-					  phase,
-					  pause?"paused":"resumed");
-		*errorcode = res;
-		snprintf(errorbuf, errorbufsize,
-				 "failed to get resource quota due to remote error %s.",
-				 getErrorCodeExplain(res));
-	}
+	RPCResponseQuotaControl response = SMBUFF_HEAD(RPCResponseQuotaControl,
+												   &recvbuffer);
+	Assert( response->Result == FUNC_RETURN_OK );
+	elog(LOG, "Succeeded in setting container life cycle phase %d %s",
+			  phase,
+			  pause?"paused":"resumed");
 exit:
-	destroySelfMaintainBuffer(&sendBuffer);
-	destroySelfMaintainBuffer(&recvBuffer);
+	destroySelfMaintainBuffer(&sendbuffer);
+	destroySelfMaintainBuffer(&recvbuffer);
 	return res;
 }
 
@@ -2356,7 +2434,7 @@ int loadTestActionScript(const char *filename, List **actions)
 			}
 
 			appendSMBStr(&smb, "$");
-			elog(LOG, "Loaded action play :: %s", smb.Buffer);
+			elog(LOG, "Loaded action play :: %s", SMBUFF_CONTENT(&smb));
 			destroySelfMaintainBuffer(&smb);
 		}
 	}
@@ -2366,11 +2444,11 @@ int loadTestActionScript(const char *filename, List **actions)
 
 int runTestActionScript(List *actions, const char *filename)
 {
-	char 	  errorbuf[1024];
-	int  	  errorcode	= FUNC_RETURN_OK;
-	int  	  ret		= FUNC_RETURN_OK;
-	ListCell *conncell  = NULL;
-	bool 	  alldone   = false;
+	static char errorbuf[ERRORMESSAGE_SIZE];
+	int  	  	errorcode	= FUNC_RETURN_OK;
+	int  	  	ret			= FUNC_RETURN_OK;
+	ListCell   *conncell  	= NULL;
+	bool 		alldone   	= false;
 
 	errorbuf[0]  = '\0';
 
@@ -2610,8 +2688,7 @@ int runTestActionScript(List *actions, const char *filename)
 														 false,
 													 phase,
 													 errorbuf,
-													 sizeof(errorbuf),
-													 &errorcode);
+													 sizeof(errorbuf));
 			}
 
 			actitem->ResultCode = ret;
@@ -2694,7 +2771,9 @@ int callSyncRPCToRM(const char 	 	   *sendbuff,
 					int   		 		sendbuffsize,
 		  	  	    uint16_t			sendmsgid,
 					uint16_t 		  	exprecvmsgid,
-					SelfMaintainBuffer	recvsmb)
+					SelfMaintainBuffer	recvsmb,
+					char			   *errorbuf,
+					int					errorbufsize)
 {
 #ifdef ENABLE_DOMAINSERVER
 		return callSyncRPCDomain(QD2RM_SocketFile,
@@ -2702,7 +2781,9 @@ int callSyncRPCToRM(const char 	 	   *sendbuff,
 								 sendbuffsize,
 								 sendmsgid,
 								 exprecvmsgid,
-								 recvsmb);
+								 recvsmb,
+								 errorbuf,
+								 errorbufsize);
 #else
 		return callSyncRPCRemote(master_addr_host,
 								 rm_master_port,
@@ -2710,6 +2791,8 @@ int callSyncRPCToRM(const char 	 	   *sendbuff,
 								 sendbuffsize,
 								 sendmsgid,
 								 exprecvmsgid,
-								 recvsmb);
+								 recvsmb,
+								 errorbuf,
+								 errorbufsize);
 #endif
 }

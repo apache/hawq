@@ -140,14 +140,15 @@ RPC_PROTOCOL_STRUCT_END(RPCResponseHeadManipulateRoleERROR)
  ******************************************************************************/
 
 /*
- * Response format (SUCCEED):
+ * Response format:
  * 		uint32_t 		return code
  * 		int32_t 		conn_id
+ * 		char			error message [in case failure]
  */
-RPC_PROTOCOL_STRUCT_BEGIN(RPCResponseHeadRegisterConnectionInRMByStr)
+RPC_PROTOCOL_STRUCT_BEGIN(RPCResponseRegisterConnectionInRMByStr)
 	uint32_t	Result;
 	int32_t		ConnID;
-RPC_PROTOCOL_STRUCT_END(RPCResponseHeadRegisterConnectionInRMByStr)
+RPC_PROTOCOL_STRUCT_END(RPCResponseRegisterConnectionInRMByStr)
 
 /*******************************************************************************
  * Protocol of registerConnection In RM By OID.
@@ -156,19 +157,20 @@ RPC_PROTOCOL_STRUCT_END(RPCResponseHeadRegisterConnectionInRMByStr)
  * Request format:
  *		uint64_t 		useridoid;
  */
-RPC_PROTOCOL_STRUCT_BEGIN(RPCRequestHeadRegisterConnectionInRMByOID)
+RPC_PROTOCOL_STRUCT_BEGIN(RPCRequestRegisterConnectionInRMByOID)
 	int64_t     UseridOid;
-RPC_PROTOCOL_STRUCT_END(RPCRequestHeadRegisterConnectionInRMByOID)
+RPC_PROTOCOL_STRUCT_END(RPCRequestRegisterConnectionInRMByOID)
 
 /*
- * Response format (SUCCEED):
+ * Response format:
  * 		uint32_t 		return code
  * 		uint32_t 		conn_id
+ * 		char			error message [in case failure]
  */
-RPC_PROTOCOL_STRUCT_BEGIN(RPCResponseHeadRegisterConnectionInRMByOID)
+RPC_PROTOCOL_STRUCT_BEGIN(RPCResponseRegisterConnectionInRMByOID)
 	uint32_t	Result;
 	uint32_t	ConnID;
-RPC_PROTOCOL_STRUCT_END(RPCResponseHeadRegisterConnectionInRMByOID)
+RPC_PROTOCOL_STRUCT_END(RPCResponseRegisterConnectionInRMByOID)
 
 /*******************************************************************************
  * Protocol of UnregisterConnection In RM.
@@ -176,6 +178,7 @@ RPC_PROTOCOL_STRUCT_END(RPCResponseHeadRegisterConnectionInRMByOID)
 /*
  * Request format:
  *		uint32_t 		conn_id
+ *		uint32_t		reserved
  */
 RPC_PROTOCOL_STRUCT_BEGIN(RPCRequestHeadUnregisterConnectionInRM)
 	uint32_t 		ConnID;
@@ -183,13 +186,15 @@ RPC_PROTOCOL_STRUCT_BEGIN(RPCRequestHeadUnregisterConnectionInRM)
 RPC_PROTOCOL_STRUCT_END(RPCRequestHeadUnregisterConnectionInRM)
 
 /*
- * Response format (SUCCEED):
+ * Response format:
  * 		uint32_t 		return code
+ * 		uint32_t		reserved
+ * 		char			error message [in case failure]
  */
-RPC_PROTOCOL_STRUCT_BEGIN(RPCResponseHeadUnregisterConnectionInRM)
+RPC_PROTOCOL_STRUCT_BEGIN(RPCResponseUnregisterConnectionInRM)
 	uint32_t		Result;
 	uint32_t		Reserved;
-RPC_PROTOCOL_STRUCT_END(RPCResponseHeadUnregisterConnectionInRM)
+RPC_PROTOCOL_STRUCT_END(RPCResponseUnregisterConnectionInRM)
 
 
 /*******************************************************************************
@@ -200,10 +205,16 @@ RPC_PROTOCOL_STRUCT_END(RPCResponseHeadUnregisterConnectionInRM)
  * 		uint64_t		session id
  *		uint32_t 		conn_id
  *		uint32_t 		preferred node count N ( can be 0 )
- *		uint32_t 		seg_count_fix
+ *		uint32_t		maximum vseg count expected
+ *		uint32_t 		minimum vseg count expected
  *		int32_t 		slicesize
- *		int64_t			splitsize
- *		int64_t * N     node scan size mb array
+ *		uint32_t		vseg per seg limit
+ *		uint32_t		vseg limit
+ *		uint32_t		statement vseg memory quota in MB
+ *		uint32_t		statement vseg count
+ *		uint32_t		reserved
+ *		int64_t			estimated io size
+ *		int64_t * N     node IO scan size array
  *		char	 		hostnames array
  */
 RPC_PROTOCOL_STRUCT_BEGIN(RPCRequestHeadAcquireResourceFromRM)

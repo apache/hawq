@@ -449,12 +449,18 @@ const char *getUSRTBLAttributeName(int attrindex);
 /*
  * APIs for request handlers.
  */
-int registerConnectionByUserID(ConnectionTrack conntrack);
-int acquireResourceFromResQueMgr(ConnectionTrack conntrack);
+int registerConnectionByUserID(ConnectionTrack  conntrack,
+							   char			   *errorbuf,
+							   int				errorbufsize);
+int acquireResourceFromResQueMgr(ConnectionTrack  conntrack,
+								 char 			 *errorbuf,
+								 int 			  errorbufsize);
 int returnResourceToResQueMgr(ConnectionTrack conntrack);
 void returnConnectionToQueue(ConnectionTrack conntrack, bool istimeout);
-int acquireResourceQuotaFromResQueMgr(ConnectionTrack conntrack);
-void cancelResourceAllocRequest(ConnectionTrack conntrack);
+int acquireResourceQuotaFromResQueMgr(ConnectionTrack	conntrack,
+									  char			   *errorbuf,
+									  int				errorbufsize);
+void cancelResourceAllocRequest(ConnectionTrack conntrack, char *errorbuf);
 /*
  * APIs for operating resource detail instance.
  */

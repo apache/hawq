@@ -97,6 +97,7 @@ struct SelfMaintainBufferData
 	int32_t Cursor;
 };
 
+#define SMBUFF_CONTENT(buffptr)		 ((buffptr)->Buffer)
 #define SMBUFF_HEAD(ptrtype,buffptr) ((ptrtype)((buffptr)->Buffer))
 
 typedef struct SelfMaintainBufferData  SelfMaintainBufferData;

@@ -106,6 +106,7 @@ GetLocalTmpDirFromRM(char *host,
 					 int qeidx)
 {
     int res = FUNC_RETURN_OK;
+    char errorbuf[ERRORMESSAGE_SIZE] = "";
     SelfMaintainBuffer sendBuffer = createSelfMaintainBuffer(PCONTEXT);
     SelfMaintainBuffer recvBuffer = createSelfMaintainBuffer(PCONTEXT);
 
@@ -124,7 +125,9 @@ GetLocalTmpDirFromRM(char *host,
 							sendBuffer->Cursor + 1,
 							REQUEST_RM_TMPDIR,
 							RESPONSE_RM_TMPDIR,
-							recvBuffer);
+							recvBuffer,
+							errorbuf,
+							sizeof(errorbuf));
 
     deleteSelfMaintainBuffer(sendBuffer);
 
