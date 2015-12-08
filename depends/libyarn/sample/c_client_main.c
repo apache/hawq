@@ -42,7 +42,7 @@ int main() {
 
 		//1. createJob
 		char *jobName = "libyarn";
-		char *queue = "sample_queue";
+		char *queue = "default";
 		char *jobId = NULL;
 		result = createJob(client, jobName, queue,&jobId);
 		printf("1. createJob, jobid:%s The createJob Result Code:%d\n", jobId,result);
@@ -67,13 +67,13 @@ int main() {
 				printf("2. allocateResources, errorMessage:%s\n",errorMessage);
 		}
 
-		int32_t activeContainerIds[allocatedResourceArraySize];
-		int32_t releaseContainerIds[allocatedResourceArraySize];
-		int32_t statusContainerIds[allocatedResourceArraySize];
+		int64_t activeContainerIds[allocatedResourceArraySize];
+		int64_t releaseContainerIds[allocatedResourceArraySize];
+		int64_t statusContainerIds[allocatedResourceArraySize];
 		printf("2. allocateResources, allocatedResourceArraySize:%d\n", allocatedResourceArraySize);
 		for (i = 0 ; i < allocatedResourceArraySize; i++) {
 			puts("----------------------------");
-			printf("allocatedResourcesArray[i].containerId:%d\n", allocatedResourcesArray[i].containerId);
+			printf("allocatedResourcesArray[i].containerId:%ld\n", allocatedResourcesArray[i].containerId);
 			activeContainerIds[i] = allocatedResourcesArray[i].containerId;
 			releaseContainerIds[i] = allocatedResourcesArray[i].containerId;
 			statusContainerIds[i] = allocatedResourcesArray[i].containerId;
@@ -94,12 +94,12 @@ int main() {
 
 		sleep(10);
 
-		int *activeFailIds;
+		int64_t *activeFailIds;
 		int activeFailSize;
 		result = getActiveFailContainerIds(client,&activeFailIds,&activeFailSize);
 		printf("Active Fail Container Size:%d\n",activeFailSize);
 		for (i = 0;i < activeFailSize;i++){
-				printf("Active Fail Container Id:%d\n",activeFailIds[i]);
+				printf("Active Fail Container Id:%ld\n",activeFailIds[i]);
 		}
 
 		//4. getContainerReport
@@ -116,7 +116,7 @@ int main() {
 		printf("containerReportArraySize=%d\n", containerReportArraySize);
 		for (i = 0; i < containerReportArraySize; i++) {
 			printf("-------------container: %d--------------------------\n", i);
-			printf("containerId:%d\n", containerReportArray[i].containerId);
+			printf("containerId:%ld\n", containerReportArray[i].containerId);
 			printf("vCores:%d\n", containerReportArray[i].vCores);
 			printf("memory:%d\n", containerReportArray[i].memory);
 			printf("host:%s\n", containerReportArray[i].host);
@@ -141,7 +141,7 @@ int main() {
 		printf("containerStatusArraySize=%d\n", containerStatusArraySize);
 		for (i = 0; i < containerStatusArraySize; i++) {
 			printf("-------------container: %d--------------------------\n", i);
-			printf("containerId:%d\n", containerStatusArray[i].containerId);
+			printf("containerId:%ld\n", containerStatusArray[i].containerId);
 			printf("exitStatus:%d\n", containerStatusArray[i].exitStatus);
 			printf("state:%d\n", containerStatusArray[i].state);
 			printf("diagnostics:%s\n", containerStatusArray[i].diagnostics);

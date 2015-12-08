@@ -33,7 +33,7 @@ namespace libyarn {
 message ContainerIdProto {
   optional ApplicationIdProto app_id = 1;
   optional ApplicationAttemptIdProto app_attempt_id = 2;
-  optional int32 id = 3;
+  optional int64 id = 3;
 }
 */
 
@@ -51,8 +51,8 @@ public:
 	void setApplicationAttemptId(ApplicationAttemptId &appAttemptId);
 	ApplicationAttemptId getApplicationAttemptId();
 
-	void setId(int32_t id);
-	int32_t getId();
+	void setId(int64_t id);
+	int64_t getId();
 
 private:
 	ContainerIdProto containerIdProto;

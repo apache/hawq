@@ -162,7 +162,7 @@ void RB_clearResource(List **ctnl)
 		(*ctnl) = list_delete_first(*ctnl);
 		MEMORY_CONTEXT_SWITCH_BACK
 
-		elog(LOG, "Resource broker dropped GRM container %d "
+		elog(LOG, "Resource broker dropped GRM container "INT64_FORMAT
 				  "(%d MB, %d CORE) on host %s",
 				  ctn->ID,
 				  ctn->MemoryMB,

@@ -84,11 +84,11 @@ extern "C" {
 								allocatedContainers, num_containers);
 			}
 
-			int activeResources(string &jobId,int activeContainerIds[],int activeContainerSize) {
+			int activeResources(string &jobId,int64_t activeContainerIds[],int activeContainerSize) {
 				return client->activeResources(jobId, activeContainerIds,activeContainerSize);
 			}
 
-			int releaseResources(string &jobId, int releaseContainerIds[],int releaseContainerSize) {
+			int releaseResources(string &jobId, int64_t releaseContainerIds[],int releaseContainerSize) {
 				return client->releaseResources(jobId, releaseContainerIds,releaseContainerSize);
 			}
 
@@ -96,7 +96,7 @@ extern "C" {
 				return client->finishJob(jobId, finalStatus);
 			}
 
-			int getActiveFailContainerIds(set<int> &activeFailIds){
+			int getActiveFailContainerIds(set<int64_t> &activeFailIds){
 				return client->getActiveFailContainerIds(activeFailIds);
 			}
 
@@ -108,7 +108,7 @@ extern "C" {
 				return client->getContainerReports(jobId, containerReports);
 			}
 
-			int getContainerStatuses(string &jobId, int32_t containerIds[],
+			int getContainerStatuses(string &jobId, int64_t containerIds[],
 							int containerSize, list<ContainerStatus> &containerStatues) {
 				return client->getContainerStatuses(jobId, containerIds, containerSize,containerStatues);
 			}
@@ -263,7 +263,7 @@ extern "C" {
 			goto exit_err;
 
 		preferredAllocatedSize = allocatedPreferredList.size();
-		preferredAllocatedArray = (LibYarnResource_t *)malloc(sizeof(LibYarnResource_t) * preferredAllocatedSize);
+		preferredAllocatedArray = (LibYarnResource_t *)(sizeof(LibYarnResource_t) * preferredAllocatedSize);
 		if(preferredAllocatedArray == NULL) {
 			setErrorMessage("LibYarnClientC::fail to allocate memory for resource array");
 			goto exit_err;
@@ -341,7 +341,7 @@ exit_err:
 		return FUNCTION_FAILED;
 	}
 
-	int activeResources(LibYarnClient_t *client, char *jobId,int32_t activeContainerIds[],int activeContainerSize){
+	int activeResources(LibYarnClient_t *client, char *jobId,int64_t activeContainerIds[],int activeContainerSize){
 		string jobIdStr(jobId);
 		int result = client->activeResources(jobIdStr,activeContainerIds,activeContainerSize);
 		if (result == FUNCTION_SUCCEEDED){
@@ -352,7 +352,7 @@ exit_err:
 		}
 	}
 
-	int releaseResources(LibYarnClient_t *client, char *jobId,int32_t releaseContainerIds[], int releaseContainerSize) {
+	int releaseResources(LibYarnClient_t *client, char *jobId,int64_t releaseContainerIds[], int releaseContainerSize) {
 		string jobIdStr(jobId);
 		int result = client->releaseResources(jobIdStr, releaseContainerIds, releaseContainerSize);
 		if (result == FUNCTION_SUCCEEDED) {
@@ -374,14 +374,14 @@ exit_err:
 		}
 	}
 
-	int getActiveFailContainerIds(LibYarnClient_t *client,int32_t *activeFailIds[],int *activeFailSize){
-		set<int> activeFails;
+	int getActiveFailContainerIds(LibYarnClient_t *client,int64_t *activeFailIds[],int *activeFailSize){
+		set<int64_t> activeFails;
 		int result = client->getActiveFailContainerIds(activeFails);
 		if (result == FUNCTION_SUCCEEDED) {
 			*activeFailSize = activeFails.size();
-			*activeFailIds = (int *)malloc(sizeof(int)*(*activeFailSize));
+			*activeFailIds = (int64_t *)malloc(sizeof(int64_t)*(*activeFailSize));
 			int i = 0;
-			for (set<int>::iterator it = activeFails.begin(); it != activeFails.end(); it++) {
+			for (set<int64_t>::iterator it = activeFails.begin(); it != activeFails.end(); it++) {
 					(*activeFailIds)[i] = (*it);
 					i++;
 			}
@@ -445,7 +445,7 @@ exit_err:
 		}
 	}
 
-	int getContainerStatuses(LibYarnClient_t *client,char *jobId,int32_t containerIds[],int containerSize,
+	int getContainerStatuses(LibYarnClient_t *client,char *jobId,int64_t containerIds[],int containerSize,
 					LibYarnContainerStatus_t **containerStatusesArray,int *containerStatusesArraySize){
 		string jobIdStr(jobId);
 		list < ContainerStatus > containerStatuses;

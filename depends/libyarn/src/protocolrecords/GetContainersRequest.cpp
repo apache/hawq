@@ -40,11 +40,11 @@ GetContainersRequestProto& GetContainersRequest::getProto() {
 void GetContainersRequest::setApplicationAttemptId(ApplicationAttemptId &appAttemptId) {
 	ApplicationAttemptIdProto *proto = new ApplicationAttemptIdProto();
 	proto->CopyFrom(appAttemptId.getProto());
-	requestProto.set_allocated_app_attempt_id(proto);
+	requestProto.set_allocated_application_attempt_id(proto);
 }
 
 ApplicationAttemptId GetContainersRequest::getApplicationAttemptId() {
-	return ApplicationAttemptId(requestProto.app_attempt_id());
+	return ApplicationAttemptId(requestProto.application_attempt_id());
 }
 
 } /* namespace libyarn */

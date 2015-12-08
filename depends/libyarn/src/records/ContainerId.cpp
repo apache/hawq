@@ -55,11 +55,11 @@ ApplicationAttemptId ContainerId::getApplicationAttemptId() {
 	return ApplicationAttemptId(containerIdProto.app_attempt_id());
 }
 
-void ContainerId::setId(int32_t id) {
+void ContainerId::setId(int64_t id) {
 	containerIdProto.set_id(id);
 }
 
-int32_t ContainerId::getId() {
+int64_t ContainerId::getId() {
 	return containerIdProto.id();
 }
 

@@ -41,7 +41,7 @@ LibYarnClient::LibYarnClient(string &user, string &rmHost, string &rmPort,
 		int32_t amPort, string &am_tracking_url,int heartbeatInterval) :
 		amUser(user), schedHost(schedHost), schedPort(schedPort), amHost(amHost),
 		amPort(amPort), am_tracking_url(am_tracking_url),
-		heartbeatInterval(heartbeatInterval),clientJobId(""),response_id(0),
+		heartbeatInterval(heartbeatInterval),response_id(0),clientJobId(""),
 		keepRun(false){
         pthread_mutex_init( &(heartbeatLock), NULL );
 
@@ -272,20 +272,20 @@ int LibYarnClient::forceKillJob(string &jobId) {
             throw std::invalid_argument("The jobId is wrong, please check the jobId argument");
         }
 
-        for (map<int,Container*>::iterator it = jobIdContainers.begin(); it != jobIdContainers. end(); it++) {
+        for (map<int64_t,Container*>::iterator it = jobIdContainers.begin(); it != jobIdContainers. end(); it++) {
             ostringstream key;
             Container *container = it->second;
             key << container->getNodeId().getHost() << ":" << container->getNodeId().getPort();
             Token nmToken = nmTokenCache[key.str()];
             ((ContainerManagement*)nmClient)->stopContainer((*container), nmToken);
-            LOG(INFO,"LibYarnClient::forceKillJob, container:%d is stopped",container->getId().getId());
+            LOG(INFO,"LibYarnClient::forceKillJob, container:%ld is stopped",container->getId().getId());
         }
 
         ((ApplicationClient*) appClient)->forceKillApplication(clientAppId);
         LOG(INFO, "LibYarnClient::forceKillJob, forceKillApplication");
 
-        for (map<int,Container*>::iterator it = jobIdContainers.begin(); it != jobIdContainers.end(); it++) {
-            LOG(INFO,"LibYarnClient::forceKillJob, container:%d in jobIdContainers is deleted",it->second->getId().getId());
+        for (map<int64_t,Container*>::iterator it = jobIdContainers.begin(); it != jobIdContainers.end(); it++) {
+            LOG(INFO,"LibYarnClient::forceKillJob, container:%ld in jobIdContainers is deleted",it->second->getId().getId());
             delete it->second;
             it->second = NULL;
         }
@@ -536,7 +536,7 @@ int LibYarnClient::allocateResources(string &jobId,
 			usleep(TimeInterval::ALLOCATE_INTERVAL_MS);
         }
 
-		LOG(INFO,"LibYarnClient::allocate, ask: response_id:%d, allocated container number:%ld",
+		LOG(INFO,"LibYarnClient::allocate, ask: response_id:%d, allocated container number:%d",
 				 response_id, allocatedNumTotal);
 
 		/* a workaround for allocate more container than request */
@@ -586,7 +586,7 @@ int LibYarnClient::allocateResources(string &jobId,
         /* 3. store allocated containers */
         for(list<Container>::iterator it = allocatedContainerCache.begin();it != allocatedContainerCache.end();it++){
             Container *container = new Container((*it));
-            int containerId = container->getId().getId();
+            int64_t containerId = container->getId().getId();
             jobIdContainers[containerId] = container;
         }
         allocatedContainers = allocatedContainerCache;
@@ -616,7 +616,7 @@ int LibYarnClient::allocateResources(string &jobId,
     }
 }
 
-int LibYarnClient::releaseResources(string &jobId,int releaseContainerIds[],int releaseContainerSize) {
+int LibYarnClient::releaseResources(string &jobId,int64_t releaseContainerIds[],int releaseContainerSize) {
     try{
         pthread_mutex_lock(&heartbeatLock);
 		if (jobId != clientJobId) {
@@ -628,8 +628,8 @@ int LibYarnClient::releaseResources(string &jobId,int releaseContainerIds[],int 
         //2) releases
         list<ContainerId> releases;
         for (int i = 0;i < releaseContainerSize;i++){
-            int containerId = releaseContainerIds[i];
-            map<int,Container*>::iterator it = jobIdContainers.find(containerId);
+            int64_t containerId = releaseContainerIds[i];
+            map<int64_t,Container*>::iterator it = jobIdContainers.find(containerId);
             if (it != jobIdContainers.end()) {
                 releases.push_back((it->second)->getId());
             }
@@ -645,17 +645,17 @@ int LibYarnClient::releaseResources(string &jobId,int releaseContainerIds[],int 
         response_id = response.getResponseId();
         //erase from the map jobIdContainers
         for (list<ContainerId>::iterator it = releases.begin();it != releases.end();it++){
-            LOG(INFO, "LibYarnClient::releaseResource, released ContainerId:%d",it->getId());
-            map<int,Container*>::iterator cit = jobIdContainers.find(it->getId());
+            LOG(INFO, "LibYarnClient::releaseResource, released ContainerId:%ld",it->getId());
+            map<int64_t,Container*>::iterator cit = jobIdContainers.find(it->getId());
             if (cit != jobIdContainers.end()){
                 delete cit->second;
                 cit->second = NULL;
                 jobIdContainers.erase(it->getId());
             }
             //erase the element if in activeFailContainers
-            set<int>::iterator sit = activeFailContainerIds.find(it->getId());
+            set<int64_t>::iterator sit = activeFailContainerIds.find(it->getId());
             if(sit != activeFailContainerIds.end()){
-                LOG(INFO, "LibYarnClient::releaseResource, remove %d from  activeFailContainerIds",(*sit));
+                LOG(INFO, "LibYarnClient::releaseResource, remove %ld from  activeFailContainerIds",(*sit));
                 activeFailContainerIds.erase(*sit);
             }
         }
@@ -700,7 +700,7 @@ message StartContainersResponseProto {
   repeated ContainerExceptionMapProto failed_requests = 3;
 }
 */
-int LibYarnClient::activeResources(string &jobId,int activeContainerIds[],int activeContainerSize) {
+int LibYarnClient::activeResources(string &jobId,int64_t activeContainerIds[],int activeContainerSize) {
     try{
 		if (jobId != clientJobId) {
 			throw std::invalid_argument("The jobId is wrong,please check the jobId argument");
@@ -708,8 +708,8 @@ int LibYarnClient::activeResources(string &jobId,int activeContainerIds[],int ac
 	    LOG(INFO, "LibYarnClient::activeResources, activeResources started");
 
         for (int i = 0; i < activeContainerSize; i++){
-            int containerId = activeContainerIds[i];
-            map<int,Container*>::iterator it = jobIdContainers.find(containerId);
+            int64_t containerId = activeContainerIds[i];
+            map<int64_t, Container*>::iterator it = jobIdContainers.find(containerId);
             if (it != jobIdContainers.end()) {
                 try{
                     Container *container = it->second;
@@ -726,9 +726,10 @@ int LibYarnClient::activeResources(string &jobId,int activeContainerIds[],int ac
                     request.setContainerLaunchCtx(ctx);
                     Token cToken = container->getContainerToken();
                     request.setContainerToken(cToken);
+                    LOG(INFO, "LibYarnClient::activeResources active containerId:%ld", containerId);
                     ((ContainerManagement*)nmClient)->startContainer((*container), request, nmToken);
-                }catch(std::exception& e){
-	                LOG(INFO, "LibYarnClient::activeResources, activeResources Failed Id:%d,exception:%s",containerId,e.what());
+                } catch(std::exception& e){
+	                LOG(INFO, "LibYarnClient::activeResources, activeResources Failed Id:%ld,exception:%s",containerId,e.what());
                     activeFailContainerIds.insert(containerId);
                 }
             }
@@ -748,7 +749,7 @@ int LibYarnClient::activeResources(string &jobId,int activeContainerIds[],int ac
 		return FR_FAILED;
     }
 }
-int LibYarnClient::getActiveFailContainerIds(set<int> &activeFailIds){
+int LibYarnClient::getActiveFailContainerIds(set<int64_t> &activeFailIds){
     activeFailIds = activeFailContainerIds;
     return FR_SUCCEEDED;
 }
@@ -777,13 +778,13 @@ int LibYarnClient::finishJob(string &jobId, FinalApplicationStatus finalStatus) 
 		}
         //1. we should stop all containers related with this job
         //ContainerManagement cmgmt;
-        for (map<int,Container*>::iterator it = jobIdContainers.begin(); it != jobIdContainers. end(); it++) {
+        for (map<int64_t,Container*>::iterator it = jobIdContainers.begin(); it != jobIdContainers. end(); it++) {
             ostringstream key;
             Container *container = it->second;
             key << container->getNodeId().getHost() << ":" << container->getNodeId().getPort();
             Token nmToken = nmTokenCache[key.str()];
             ((ContainerManagement*)nmClient)->stopContainer((*container), nmToken);
-            LOG(INFO,"LibYarnClient::finishJob, container:%d are stopped",container->getId().getId());
+            LOG(INFO,"LibYarnClient::finishJob, container:%ld is stopped",container->getId().getId());
         }
         LOG(INFO,"LibYarnClient::finishJob, all containers for jobId:%s are stopped",jobId.c_str());
         //2. finish AM
@@ -792,8 +793,8 @@ int LibYarnClient::finishJob(string &jobId, FinalApplicationStatus finalStatus) 
         ((ApplicationMaster*) amrmClient)->finishApplicationMaster(diagnostics, tracking_url, finalStatus);
         LOG(INFO, "LibYarnClient::finishJob, finish AM for jobId:%s, finalStatus:%d", jobId.c_str(), finalStatus);
         //free the Container* memory
-        for (map<int,Container*>::iterator it = jobIdContainers.begin(); it != jobIdContainers.end(); it++) {
-        	LOG(INFO,"LibYarnClient::finishJob, container:%d in jobIdContainers are delete",it->second->getId().getId());
+        for (map<int64_t,Container*>::iterator it = jobIdContainers.begin(); it != jobIdContainers.end(); it++) {
+        	LOG(INFO,"LibYarnClient::finishJob, container:%ld in jobIdContainers are delete",it->second->getId().getId());
             delete it->second;
             it->second = NULL;
         }
@@ -864,7 +865,7 @@ int LibYarnClient::getContainerReports(string &jobId,list<ContainerReport> &cont
     }
 }
 
-int LibYarnClient::getContainerStatuses(string &jobId,int32_t containerIds[],int containerSize,
+int LibYarnClient::getContainerStatuses(string &jobId,int64_t containerIds[],int containerSize,
 						list<ContainerStatus> &containerStatues){
 	try {
 		if (jobId != clientJobId) {
@@ -872,8 +873,8 @@ int LibYarnClient::getContainerStatuses(string &jobId,int32_t containerIds[],int
 		}
 
 		for (int i = 0; i < containerSize; i++) {
-			int containerId = containerIds[i];
-			map<int, Container*>::iterator it = jobIdContainers.find(containerId);
+			int64_t containerId = containerIds[i];
+			map<int64_t, Container*>::iterator it = jobIdContainers.find(containerId);
 			if (it != jobIdContainers.end()) {
 				try {
 					Container *container = it->second;
@@ -886,7 +887,7 @@ int LibYarnClient::getContainerStatuses(string &jobId,int32_t containerIds[],int
 						containerStatues.push_back(containerStatus);
 					}
 				} catch (std::exception& e) {
-					LOG(INFO,"LibYarnClient::getContainerStatuses, getContainerStatuses Failed Id:%d,exception:%s",containerId, e.what());
+					LOG(INFO,"LibYarnClient::getContainerStatuses, getContainerStatuses Failed Id:%ld,exception:%s",containerId, e.what());
 				}
 			}
 		}

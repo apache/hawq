@@ -63,7 +63,7 @@ int  RB2YARN_acquireResource(uint32_t memorymb,
 							 uint32_t preferredSize,
 							 DQueue	 containerids,
 							 DQueue	 containerhosts);
-int  RB2YARN_returnResource(int32_t *contids, int contcount);
+int  RB2YARN_returnResource(int64_t *contids, int contcount);
 int  RB2YARN_getContainerReport(RB_GRMContainerStat *ctnstats, int *size);
 int  RB2YARN_finishYARNApplication(void);
 int  RB2YARN_disconnectFromYARN(void);
@@ -618,13 +618,14 @@ int handleRM2RB_GetClusterReport(void)
 		if ( ctnids.NodeCount > 0 )
 		{
 			/* Return it at once. */
-			int32_t *ctnidarr = rm_palloc0(PCONTEXT,
-										   sizeof(int32_t) * ctnids.NodeCount);
+			int64_t *ctnidarr = rm_palloc0(PCONTEXT,
+										   sizeof(int64_t) * ctnids.NodeCount);
 			int idx = 0;
-			DQUEUE_LOOP_BEGIN(&ctnids, iter, void *, ctnid)
-				ctnidarr[idx] = TYPCONVERT(int32_t,ctnid);
-				elog(DEBUG3, "YARN mode resource broker returns container ID %d.",
-							 TYPCONVERT(int32_t,ctnid));
+			DQUEUE_LOOP_BEGIN(&ctnids, iter, int64_t *, pctnid)
+				ctnidarr[idx] = *pctnid;
+				elog(DEBUG3, "YARN mode resource broker returns container ID "
+							 INT64_FORMAT".",
+							 ctnidarr[idx]);
 				idx++;
 			DQUEUE_LOOP_END
 			RB2YARN_freeContainersInMemory(&ctnids, &ctnhosts);
@@ -890,9 +891,8 @@ int handleRM2RB_AllocateResource(void)
 	appendSMBVar(&sendBuffer, responsehead);
 
 	/* Append each container id. */
-	DQUEUE_LOOP_BEGIN(&acquiredcontids, iter, void *, contid)
-		int32_t containerid = TYPCONVERT(int32_t, contid);
-		appendSMBVar(&sendBuffer, containerid);
+	DQUEUE_LOOP_BEGIN(&acquiredcontids, iter, int64_t *, pcontid)
+		appendSMBVar(&sendBuffer, *pcontid);
 	DQUEUE_LOOP_END
 	appendSelfMaintainBufferTill64bitAligned(&sendBuffer);
 
@@ -990,7 +990,7 @@ int handleRM2RB_ReturnResource(void)
 	int 					 libyarnres   = FUNCTION_SUCCEEDED;
 	int						 piperes	  = 0;
 	int 					 actualsize   = 0;
-	int32_t    				*containerids = NULL;
+	int64_t    				*containerids = NULL;
 
 	/* Read request content. */
 	RPCRequestRBReturnResourceContainersHeadData request;
@@ -1006,12 +1006,12 @@ int handleRM2RB_ReturnResource(void)
 
 	/* Read the container id list. */
 	actualsize = (((request.ContainerCount + 1)>>1)<<1);
-	containerids = rm_palloc(PCONTEXT, sizeof(int32_t) * actualsize);
+	containerids = rm_palloc(PCONTEXT, sizeof(int64_t) * actualsize);
 
 	piperes = readPipe(ResBrokerRequestPipe[0],
 					   containerids,
-					   sizeof(int32_t) * actualsize);
-	if ( piperes != sizeof(int32_t) * actualsize )
+					   sizeof(int64_t) * actualsize);
+	if ( piperes != sizeof(int64_t) * actualsize )
 	{
 		elog(WARNING, "YARN mode resource broker failed to read resource return "
 					  "request message (container ids) from pipe. "
@@ -1030,7 +1030,8 @@ int handleRM2RB_ReturnResource(void)
 
     for ( int i = 0 ; i < request.ContainerCount ; ++i )
     {
-    	elog(LOG, "YARN mode resource broker tries to return container of id %d",
+    	elog(LOG, "YARN mode resource broker tries to return container of id "
+    			  INT64_FORMAT,
     			  containerids[i]);
     }
 
@@ -1163,7 +1164,7 @@ int handleRM2RB_GetContainerReport(void)
 
     for( int i = 0 ; i < size ; ++i )
     {
-    	elog(LOG, "Container report ID:%d, isActive:%d",
+    	elog(LOG, "Container report ID:"INT64_FORMAT", isActive:%d",
     			  ctnstats[i].ContainerID,
 				  ctnstats[i].isActive);
     }
@@ -1604,11 +1605,11 @@ int RB2YARN_acquireResource(uint32_t memorymb,
 						PCONTEXT,
 						HASHTABLE_SLOT_VOLUME_DEFAULT,
 						HASHTABLE_SLOT_VOLUME_DEFAULT_MAX,
-						HASHTABLE_KEYTYPE_UINT32,
+						HASHTABLE_KEYTYPE_CHARARRAY,
 						NULL);
 
     /* Activate containers. */
-    int32_t activeContainerIds[allocatedResourcesArraySize];
+    int64_t activeContainerIds[allocatedResourcesArraySize];
     for ( int i = 0 ; i < allocatedResourcesArraySize ; ++i ) {
     	activeContainerIds[i]  = allocatedResourcesArray[i].containerId;
     }
@@ -1627,7 +1628,7 @@ int RB2YARN_acquireResource(uint32_t memorymb,
     		  allocatedResourcesArraySize);
 
     /* Return the containers fail to activate. */
-    int *activeFailIds = NULL;
+    int64_t *activeFailIds = NULL;
     int  activeFailSize = 0;
     yarnres = getActiveFailContainerIds(LIBYARNClient,
     									&activeFailIds,
@@ -1642,14 +1643,13 @@ int RB2YARN_acquireResource(uint32_t memorymb,
     /* Build temporary failed container ids in hash table for fast retrieving.*/
     if ( activeFailSize > 0 ) {
     	for (int i = 0 ; i < activeFailSize ; ++i) {
-    		elog(LOG, "YARN mode resource broker failed to activate container %d",
+    		elog(LOG, "YARN mode resource broker failed to activate container "INT64_FORMAT,
     				  activeFailIds[i]);
 
-    		setHASHTABLENode(&FailedIDIndex,
-    						 TYPCONVERT(void *, activeFailIds[i]),
-							 TYPCONVERT(void *, activeFailIds[i]),
-							 false);
-    	}
+			SimpArray key;
+			setSimpleArrayRef(&key, (void *)&(activeFailIds[i]), sizeof(int64_t));
+			setHASHTABLENode(&FailedIDIndex, &key, TYPCONVERT(void *, &activeFailIds[i]), false);
+		}
 
     	yarnres = releaseResources(LIBYARNClient,
     							   YARNJobID,
@@ -1663,11 +1663,12 @@ int RB2YARN_acquireResource(uint32_t memorymb,
     }
 
     /* Build result. */
-    for ( int i = 0 ; i < allocatedResourcesArraySize ; ++i ) {
+    for ( int i = 0 ; i < allocatedResourcesArraySize ; ++i )
+    {
+    	int64_t *ctnid = (int64_t *)rm_palloc0(PCONTEXT, sizeof(int64_t));
+    	*ctnid = allocatedResourcesArray[i].containerId;
+    	insertDQueueTailNode(containerids, ctnid);
 
-    	insertDQueueTailNode(containerids,
-    					 	 TYPCONVERT(void *,
-    					 			 	allocatedResourcesArray[i].containerId));
     	char *hostnamestr =
     			(char *)rm_palloc0(PCONTEXT,
     							   strlen(allocatedResourcesArray[i].host) + 1);
@@ -1675,7 +1676,7 @@ int RB2YARN_acquireResource(uint32_t memorymb,
     	insertDQueueTailNode(containerhosts, hostnamestr);
 
     	elog(LOG, "YARN mode resource broker allocated and activated container. "
-    			  "ID : %d (%d MB, %d CORE) at %s.",
+    			  "ID : "INT64_FORMAT"(%d MB, %d CORE) at %s.",
 				  allocatedResourcesArray[i].containerId,
 				  allocatedResourcesArray[i].memory,
 				  allocatedResourcesArray[i].vCores,
@@ -1696,7 +1697,7 @@ exit:
 	return FUNCTION_SUCCEEDED;
 }
 
-int RB2YARN_returnResource(int32_t *contids, int contcount)
+int RB2YARN_returnResource(int64_t *contids, int contcount)
 {
 	if( contcount == 0 )
 		return FUNCTION_SUCCEEDED;
@@ -1714,7 +1715,7 @@ int RB2YARN_returnResource(int32_t *contids, int contcount)
 	}
 
 	for ( int i = 0 ; i < contcount ; ++i ) {
-		elog(LOG, "YARN mode resource broker returned container of id %d",
+		elog(LOG, "YARN mode resource broker returned container of id "INT64_FORMAT,
 				  contids[i]);
 	}
 
@@ -1729,7 +1730,7 @@ int RB2YARN_getContainerReport(RB_GRMContainerStat *ctnstats, int *size)
 	int 					  arrsize     = 0;
 	LibYarnContainerStatus_t *ctnstatarr  = NULL;
 	int						  ctnstatsize = 0;
-	int32_t 				 *ctnidarr    = NULL;
+	int64_t 				 *ctnidarr    = NULL;
 
 	*ctnstats = NULL;
 	*size     = 0;
@@ -1748,7 +1749,7 @@ int RB2YARN_getContainerReport(RB_GRMContainerStat *ctnstats, int *size)
 		 * container status. The work round here is to call container status API
 		 * to get final container statuses.
 		 */
-		ctnidarr = (int32_t *)rm_palloc(PCONTEXT, sizeof(int32_t) * arrsize);
+		ctnidarr = (int64_t *)rm_palloc(PCONTEXT, sizeof(int64_t) * arrsize);
 		for ( int i = 0 ; i < arrsize ; ++i )
 		{
 			ctnidarr[i] = ctnrparr[i].containerId;
@@ -1778,8 +1779,6 @@ int RB2YARN_getContainerReport(RB_GRMContainerStat *ctnstats, int *size)
 				(*ctnstats)[i].ContainerID = ctnstatarr[i].containerId;
 				(*ctnstats)[i].isActive    = ctnstatarr[i].state == C_RUNNING ? 1 : 0;
 				(*ctnstats)[i].isFound     = 0;
-				(*ctnstats)[i].Reserved[0] = 0;
-				(*ctnstats)[i].Reserved[1] = 0;
 			}
         }
 		freeContainerStatusArray(ctnstatarr, ctnstatsize);
@@ -1791,13 +1790,20 @@ int RB2YARN_getContainerReport(RB_GRMContainerStat *ctnstats, int *size)
 
 void RB2YARN_freeContainersInMemory(DQueue containerids, DQueue containerhosts)
 {
-	if ( containerids != NULL ) {
-		removeAllDQueueNodes(containerids);
+	if ( containerids != NULL )
+	{
+		while( containerids->NodeCount > 0 )
+		{
+			int64_t *pctnid = removeDQueueHeadNode(containerids);
+			rm_pfree(PCONTEXT, pctnid);
+		}
 		cleanDQueue(containerids);
 	}
 
-	if ( containerhosts != NULL ) {
-		while( containerhosts->NodeCount > 0 ) {
+	if ( containerhosts != NULL )
+	{
+		while( containerhosts->NodeCount > 0 )
+		{
 			char *hostname = removeDQueueHeadNode(containerhosts);
 			rm_pfree(PCONTEXT, hostname);
 		}
