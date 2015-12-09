@@ -85,7 +85,6 @@ under the License.
             <fragmenter>org.apache.hawq.pxf.plugins.hdfs.HdfsDataFragmenter</fragmenter>
             <accessor>org.apache.hawq.pxf.plugins.hdfs.LineBreakAccessor</accessor>
             <resolver>org.apache.hawq.pxf.plugins.hdfs.StringPassResolver</resolver>
-            <analyzer>org.apache.hawq.pxf.plugins.hdfs.HdfsAnalyzer</analyzer>
         </plugins>
     </profile>
     <profile>
@@ -97,7 +96,6 @@ under the License.
             <fragmenter>org.apache.hawq.pxf.plugins.hdfs.HdfsDataFragmenter</fragmenter>
             <accessor>org.apache.hawq.pxf.plugins.hdfs.QuotedLineBreakAccessor</accessor>
             <resolver>org.apache.hawq.pxf.plugins.hdfs.StringPassResolver</resolver>
-            <analyzer>org.apache.hawq.pxf.plugins.hdfs.HdfsAnalyzer</analyzer>
         </plugins>
     </profile>
     <profile>
@@ -107,7 +105,6 @@ under the License.
             <fragmenter>org.apache.hawq.pxf.plugins.hdfs.HdfsDataFragmenter</fragmenter>
             <accessor>org.apache.hawq.pxf.plugins.hdfs.AvroFileAccessor</accessor>
             <resolver>org.apache.hawq.pxf.plugins.hdfs.AvroResolver</resolver>
-            <analyzer>org.apache.hawq.pxf.plugins.hdfs.HdfsAnalyzer</analyzer>
         </plugins>
     </profile>
     <profile>
@@ -120,7 +117,6 @@ under the License.
             <fragmenter>org.apache.hawq.pxf.plugins.hdfs.HdfsDataFragmenter</fragmenter>
             <accessor>org.apache.hawq.pxf.plugins.hdfs.SequenceFileAccessor</accessor>
             <resolver>org.apache.hawq.pxf.plugins.hdfs.WritableResolver</resolver>
-            <analyzer>org.apache.hawq.pxf.plugins.hdfs.HdfsAnalyzer</analyzer>
         </plugins>
     </profile>
     <profile>

@@ -94,7 +94,6 @@ public class ProtocolData extends InputData {
         }
         accessor = getProperty("ACCESSOR");
         resolver = getProperty("RESOLVER");
-        analyzer = getOptionalProperty("ANALYZER");
         fragmenter = getOptionalProperty("FRAGMENTER");
         dataSource = getProperty("DATA-DIR");
 
@@ -142,7 +141,6 @@ public class ProtocolData extends InputData {
         this.accessor = copy.accessor;
         this.resolver = copy.resolver;
         this.fragmenter = copy.fragmenter;
-        this.analyzer = copy.analyzer;
         this.threadSafe = copy.threadSafe;
         this.remoteLogin = copy.remoteLogin;
         this.remoteSecret = copy.remoteSecret;
