@@ -356,7 +356,6 @@ int RB_LIBYARN_returnResource(List **ctnl)
 {
 	int			res			= FUNC_RETURN_OK;
 	uint32_t	MessageID	= RM2RB_RETURN_RESOURCE;
-	int32_t		Reserved	= 0;
 
 	if ( *ctnl == NULL )
 	{
@@ -405,11 +404,6 @@ int RB_LIBYARN_returnResource(List **ctnl)
 		/* Destroy resource container. */
 		freeGRMContainer(ctn);
 		PRESPOOL->RetPendingContainerCount--;
-	}
-
-	if ( request.ContainerCount & 0X1 )
-	{
-		appendSMBVar(&sendBuffer, Reserved);
 	}
 
 	int piperes = pipewrite(ResBrokerRequestPipe[1],
