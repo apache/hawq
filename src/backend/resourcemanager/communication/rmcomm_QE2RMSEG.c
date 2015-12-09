@@ -39,7 +39,9 @@ int
 MoveToCGroupForQE(TimestampTz masterStartTime,
 				  int connId,
 				  int segId,
-				  int procId)
+				  int procId,
+				  char *errorbuf,
+				  int errorbufsize)
 {
 #ifdef __linux
 	initializeQE2RMSEGComm();
@@ -67,7 +69,9 @@ MoveToCGroupForQE(TimestampTz masterStartTime,
 	                        sendBuffer->Cursor+1,
 	                        REQUEST_QE_MOVETOCGROUP,
 	                        RESPONSE_QE_MOVETOCGROUP,
-	                        recvBuffer);
+	                        recvBuffer,
+							errorbuf,
+							errorbufsize);
 	deleteSelfMaintainBuffer(sendBuffer);
 	deleteSelfMaintainBuffer(recvBuffer);
 	return res;
@@ -82,7 +86,9 @@ int
 MoveOutCGroupForQE(TimestampTz masterStartTime,
 				   int connId,
 				   int segId,
-				   int procId)
+				   int procId,
+				   char *errorbuf,
+				   int errorbufsize)
 {
 #ifdef __linux
 	initializeQE2RMSEGComm();
@@ -110,7 +116,9 @@ MoveOutCGroupForQE(TimestampTz masterStartTime,
 	                        sendBuffer->Cursor+1,
 	                        REQUEST_QE_MOVEOUTCGROUP,
 	                        RESPONSE_QE_MOVEOUTCGROUP,
-	                        recvBuffer);
+	                        recvBuffer,
+							errorbuf,
+							sizeof(errorbuf));
 
 	deleteSelfMaintainBuffer(sendBuffer);
 	deleteSelfMaintainBuffer(recvBuffer);
@@ -127,7 +135,9 @@ SetWeightCGroupForQE(TimestampTz masterStartTime,
 					 int connId,
 					 int segId,
 					 QueryResource *resource,
-					 int procId)
+					 int procId,
+					 char *errorbuf,
+					 int errorbufsize)
 {
 #ifdef __linux
 	initializeQE2RMSEGComm();
@@ -156,7 +166,9 @@ SetWeightCGroupForQE(TimestampTz masterStartTime,
 	                        sendBuffer->Cursor+1,
 	                        REQUEST_QE_SETWEIGHTCGROUP,
 	                        RESPONSE_QE_SETWEIGHTCGROUP,
-	                        recvBuffer);
+	                        recvBuffer,
+							errorbuf,
+							errorbufsize);
 
 	deleteSelfMaintainBuffer(sendBuffer);
 	deleteSelfMaintainBuffer(recvBuffer);

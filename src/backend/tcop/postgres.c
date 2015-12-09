@@ -1095,40 +1095,44 @@ exec_mpp_query(const char *query_string,
     	if ( isCGroupEnabled("cpu") && isCGroupSetup("cpu") )
     	{
     		int res = FUNC_RETURN_OK;
-    		if ( !has_been_moved_to_cgroup )
-		{
-			res = MoveToCGroupForQE(
-					resource->master_start_time,
-					gp_session_id,
-					0,
-					getpid());
+    		char errorbuf[ERRORMESSAGE_SIZE];
 
-			if ( res != FUNC_RETURN_OK )
-			{
-				elog(ERROR, "Resource enforcer fails to move QE to CGroup "
-				            "with error %d",
-				            res);
-			}
-			has_been_moved_to_cgroup = true;
-			master_start_time = resource->master_start_time;
+    		if ( !has_been_moved_to_cgroup )
+    		{
+				res = MoveToCGroupForQE(resource->master_start_time,
+										gp_session_id,
+										0,
+										getpid(),
+										errorbuf,
+										sizeof(errorbuf));
+				if ( res != FUNC_RETURN_OK )
+				{
+					elog(ERROR, "Resource enforcer fails to move QE to CGroup, "
+								"%s",
+								errorbuf);
+				}
+				has_been_moved_to_cgroup = true;
+				master_start_time = resource->master_start_time;
     		}
 
     		int mySegIdx = GetQEIndex();
     		if (IsWriter() && resource->segment_vcore_writer[mySegIdx] == mySegIdx)
     		{
-			resource->segment_vcore *= resource->segment_vcore_agg[mySegIdx];
-			res = SetWeightCGroupForQE(master_start_time,
-						   gp_session_id,
-						   0,
-						   resource,
-						   getpid());
+				resource->segment_vcore *= resource->segment_vcore_agg[mySegIdx];
+				res = SetWeightCGroupForQE(master_start_time,
+										   gp_session_id,
+										   0,
+										   resource,
+										   getpid(),
+										   errorbuf,
+										   sizeof(errorbuf));
+	    		if ( res != FUNC_RETURN_OK )
+				{
+					elog(ERROR, "Resource enforcer fails to set CGroup weight "
+								"for QE, %s",
+					            errorbuf);
+				}
     		}
-    		if ( res != FUNC_RETURN_OK )
-			{
-				elog(ERROR, "Resource enforcer fails to set CGroup weight for QE "
-				            "with error %d",
-				            res);
-			}
     	}
     }
 
@@ -5379,6 +5383,7 @@ log_disconnections(int code, Datum arg __attribute__((unused)))
 
 void OnMoveOutCGroupForQE(void)
 {
+	char errorbuf[ERRORMESSAGE_SIZE];
 	if (Gp_role == GP_ROLE_EXECUTE)
 	{
 		if (isCGroupEnabled("cpu") && isCGroupSetup("cpu"))
@@ -5386,7 +5391,9 @@ void OnMoveOutCGroupForQE(void)
 			MoveOutCGroupForQE(master_start_time,
 							   gp_session_id,
 							   0,
-							   getpid());
+							   getpid(),
+							   errorbuf,
+							   sizeof(errorbuf));
 		}
 	}
 }
