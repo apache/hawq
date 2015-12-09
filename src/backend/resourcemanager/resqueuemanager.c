@@ -4580,7 +4580,7 @@ void timeoutQueuedRequest(void)
 						getDQueueHeadNodeData(&(queuetrack->QueryResRequests));
 				if ( topwaiter == curcon && topwaiter->HeadQueueTime == 0 )
 				{
-					topwaiter->HeadQueueTime = gettime_microsec();
+					topwaiter->HeadQueueTime = curmsec;
 					elog(DEBUG3, "Set timestamp of waiting at head of queue.");
 				}
 			}
