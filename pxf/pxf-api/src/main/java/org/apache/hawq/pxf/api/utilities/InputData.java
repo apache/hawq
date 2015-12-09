@@ -1,4 +1,4 @@
-pnalyackage org.apache.hawq.pxf.api.utilities;
+package org.apache.hawq.pxf.api.utilities;
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
