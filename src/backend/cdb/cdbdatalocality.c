@@ -2659,6 +2659,7 @@ static void allocate_random_relation(Relation_Data* rel_data,
 
 
 	/*find the insert node for each block*/
+	uint64_t before_run_find_insert_host = gettime_microsec();
 	int *hostOccurTimes = (int *) palloc(sizeof(int) * context->dds_context.size);
 	for (int fi = 0; fi < fileCount; fi++) {
 		Relation_File *rel_file = file_vector[fi];
@@ -2701,6 +2702,12 @@ static void allocate_random_relation(Relation_Data* rel_data,
 		}
 	}
 	pfree(hostOccurTimes);
+
+	uint64_t end_run_find_insert_host = gettime_microsec();
+	int run_find_insert_host = end_run_find_insert_host - before_run_find_insert_host;
+	if(debug_datalocality_time){
+		elog(LOG, "find insert host time: %d us. \n", run_find_insert_host);
+	}
 
 	/*three stage allocation algorithm*/
 	for (int fi = 0; fi < fileCount; fi++) {
