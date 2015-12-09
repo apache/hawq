@@ -1005,7 +1005,7 @@ int handleRM2RB_ReturnResource(void)
 	}
 
 	/* Read the container id list. */
-	actualsize = (((request.ContainerCount + 1)>>1)<<1);
+	actualsize = request.ContainerCount;
 	containerids = rm_palloc(PCONTEXT, sizeof(int64_t) * actualsize);
 
 	piperes = readPipe(ResBrokerRequestPipe[0],
