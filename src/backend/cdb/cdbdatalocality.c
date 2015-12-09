@@ -1095,7 +1095,7 @@ static void AOGetSegFileDataLocation(Relation relation,
 		fclose(fpaoseg);
 		for (int i = 0; i < fileCount; i++) {
 			BlockLocation *locations = NULL;
-			int block_num;
+			int block_num =0;
 			Relation_File *file;
 
 			int segno = i + 1;
@@ -1110,7 +1110,7 @@ static void AOGetSegFileDataLocation(Relation relation,
 
 			if (!context->keep_hash || !isRelationHash) {
 				FormatAOSegmentFileName(basepath, segno, -1, 0, &segno, segfile_path);
-				double hit_ratio;
+				double hit_ratio=0.0;
 				locations = fetch_hdfs_data_block_location(segfile_path, logic_len,
 						&block_num, relation->rd_node, segno, &hit_ratio);
 				*allblocks += block_num;
