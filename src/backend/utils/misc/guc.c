@@ -1476,15 +1476,6 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
-		{"stats_queue_level", PGC_SUSET, STATS_COLLECTOR,
-			gettext_noop("Collects resource queue-level statistics on database activity."),
-			NULL
-		},
-		&pgstat_collect_queuelevel,
-		false, NULL, NULL
-	},
-
-	{
 		{"update_process_title", PGC_SUSET, CLIENT_CONN_OTHER,
 			gettext_noop("Updates the process title to show the active SQL command."),
 			gettext_noop("Enables updating of the process title every time a new SQL command is received by the server.")
@@ -5070,20 +5061,6 @@ static struct config_int ConfigureNamesInt[] =
 		},
 		&StatementTimeout,
 		0, 0, INT_MAX, NULL, NULL
-	},
-
-	{
-		{"gp_vmem_idle_resource_timeout", PGC_USERSET, CLIENT_CONN_OTHER,
-			gettext_noop("Sets the time a session can be idle (in milliseconds) before we release gangs on the segment DBs to free resources."),
-			gettext_noop("A value of 0 turns off the timeout."),
-			GUC_UNIT_MS | GUC_GPDB_ADDOPT
-		},
-		&IdleSessionGangTimeout,
-#ifdef USE_ASSERT_CHECKING
-		600000, 0, INT_MAX, NULL, NULL /* 10 minutes by default on debug builds.*/
-#else
-		18000, 0, INT_MAX, NULL, NULL
-#endif
 	},
 
 	{
