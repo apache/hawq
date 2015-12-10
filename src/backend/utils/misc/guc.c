@@ -1722,16 +1722,6 @@ static struct config_bool ConfigureNamesBool[] =
 		false, NULL, NULL
 	},
 
-    {
-		{"enable_agg_restructure", PGC_USERSET, QUERY_TUNING_METHOD,
-			gettext_noop("Deprecated: use gp_enable_multiphase_agg."),
-			NULL,
-            GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
-		},
-		&defunct_bool,
-		true, NULL, NULL
- 	},
-
 	{
 		/* MPP-9772, MPP-9773: remove support for CREATE INDEX CONCURRENTLY */
 		{"gp_create_index_concurrently", PGC_USERSET, DEVELOPER_OPTIONS,
@@ -2213,15 +2203,6 @@ static struct config_bool ConfigureNamesBool[] =
 		&gp_set_proc_affinity,
         false, NULL, NULL
 	},
-
-    {
-        {"gp_enable_adaptive_nestloop", PGC_USERSET, QUERY_TUNING_METHOD,
-			gettext_noop("Enables the planner's use of the Adaptive Join Choice operator."),
-            gettext_noop("During query execution, actual outer row count determines choice of Nested or Hash Join.")
-        },
-        &enable_adaptive_nestloop,
-        true, NULL, NULL
-    },
 
     {
     	{"gp_is_writer", PGC_BACKEND, GP_WORKER_IDENTITY,
