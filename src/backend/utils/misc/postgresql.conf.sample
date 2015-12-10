@@ -355,8 +355,6 @@ max_prepared_transactions = 250		# can be 0 or more
 #track_counts = off
 #update_process_title = on
 
-#stats_queue_level = off
-
 
 # - Statistics Monitoring -
 
@@ -432,11 +430,6 @@ log_autostats=off	# print additional autostats information
 # RESOURCE SCHEDULING
 #---------------------------------------------------------------------------
 
-#max_resource_queues = 9		# no. of resource queues to create.
-#max_resource_portals_per_transaction = 64	# no. of portals per backend.
-#resource_select_only = on		# resource lock SELECT queries only.
-#resource_cleanup_gangs_on_wait = on	# Cleanup idle reader gangs before
-										# resource lockwait.
 gp_resqueue_memory_policy = 'eager_free'	# memory request based queueing. 
 									# eager_free, auto or none
 #---------------------------------------------------------------------------
@@ -491,7 +484,6 @@ gp_segment_connect_timeout = 600s
 
 # - Resource limits -
 hawq_re_memory_overcommit_max = 8192  # Maximum quota of memory overcommit (in MB) per HAWQ physical segment in resource enforcement
-#gp_vmem_idle_resource_timeout = 18000 # idle-time before gang-release, in milliseconds (zero disables release).
 
 #------------------------------------------------------------------------------
 # CUSTOMIZED OPTIONS

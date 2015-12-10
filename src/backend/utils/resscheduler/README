@@ -163,9 +163,6 @@ Admin
 Some new GUCs are introduced to control the scheduler:
 
 #resource_scheduler = off         # enable resource scheduling
-#max_resource_queues = 8          # no. of resource queues to create.
-#max_resource_portals_per_transaction = 64  # no. of portals per backend.
-#resource_select_only = on        # resource lock SELECT queries only.
 
 
 Some new commands are added and others amended to allow administration of the
