@@ -373,8 +373,6 @@ static void copy_append_only_segment_file(
 	int64			persistentSerialNum,
 	char			*buffer)
 {
-	MIRRORED_LOCK_DECLARE;
-
 	char srcFileName[MAXPGPATH];
 	char dstFileName[MAXPGPATH];
 	char extension[12];
@@ -484,12 +482,6 @@ static void copy_append_only_segment_file(
 		bufferLen = (Size) Min(2*BLCKSZ, endOffset - readOffset);						
 	}
 
-	/*
-	 * Use the MirroredLock here to cover the flush (and close) and evaluation below whether
-	 * we must catchup the mirror.
-	 */
-	MIRRORED_LOCK;
-
 	MirroredAppendOnly_FlushAndClose(
 							&mirroredDstOpen,
 							&primaryError);
@@ -500,9 +492,6 @@ static void copy_append_only_segment_file(
 				 errdetail("%s", HdfsGetLastError())));
 
 	FileClose(srcFile);
-	
-	MIRRORED_UNLOCK;
-
 }
 
 // -----------------------------------------------------------------------------

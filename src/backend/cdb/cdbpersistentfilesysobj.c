@@ -2242,8 +2242,6 @@ void PersistentFileSysObj_PreparedEndXactAction(
 
 	int								prepareAppendOnlyIntentCount)
 {
-	MIRRORED_LOCK_DECLARE;
-
 	PersistentFileSysObjStateChangeResult *stateChangeResults;
 
 	int i;
@@ -2262,13 +2260,6 @@ void PersistentFileSysObj_PreparedEndXactAction(
 	stateChangeResults =
 			(PersistentFileSysObjStateChangeResult*)
 					palloc0(persistentObjects->typed.fileSysActionInfosCount * sizeof(PersistentFileSysObjStateChangeResult));
-
-	/*
-	 * We need to do the transition to 'Aborting Create' or 'Drop Pending' and perform
-	 * the file-system drop while under one acquistion of the MirroredLock.  Otherwise,
-	 * we could race with resynchronize's ReDrop.
-	 */
-	MIRRORED_LOCK;
 
 	/*
 	 * We need to complete this work, or let Crash Recovery complete it.
@@ -2571,8 +2562,6 @@ injectfaultexit:
 jumpoverinjectfaultexit:
 
 	PersistentFileSysObj_FlushXLog();
-
-	MIRRORED_UNLOCK;
 
 	END_CRIT_SECTION();
 

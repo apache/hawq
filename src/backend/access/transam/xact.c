@@ -943,8 +943,6 @@ AtSubStart_ResourceOwner(void)
 void
 RecordTransactionCommit(void)
 {
-	MIRRORED_LOCK_DECLARE;
-
 	CHECKPOINT_START_LOCK_DECLARE;
 
 	int32						persistentCommitSerializeLen;
@@ -1011,8 +1009,6 @@ RecordTransactionCommit(void)
 			 *
 			 * The lock order is: MirroredLock then CheckpointStartLock.
 			 */
-			MIRRORED_LOCK;
-				
 			CHECKPOINT_START_LOCK;
 		}
 
@@ -1167,8 +1163,6 @@ RecordTransactionCommit(void)
 		if (madeTCentries)
 		{
 			CHECKPOINT_START_UNLOCK;
-
-			MIRRORED_UNLOCK;
 		}
 
 		END_CRIT_SECTION();
@@ -2249,8 +2243,6 @@ StartTransaction(void)
 void
 CommitTransaction(void)
 {
-	MIRRORED_LOCK_DECLARE;
-
 	CHECKPOINT_START_LOCK_DECLARE;
 
 	TransactionState s = CurrentTransactionState;
@@ -2330,14 +2322,7 @@ CommitTransaction(void)
 		/*
 		 * We need to ensure the recording of the [distributed-]commit record and the
 		 * persistent post-commit work will be done either before or after a checkpoint.
-		 *
-		 * When we use CheckpointStartLock, we make sure we already have the
-		 * MirroredLock first.
-		 *
-		 * The lock order is: MirroredLock then CheckpointStartLock.
 		 */
-		MIRRORED_LOCK;
-			
 		CHECKPOINT_START_LOCK;
 	}
 
@@ -2444,8 +2429,6 @@ CommitTransaction(void)
 	if (willHaveObjectsFromSmgr)
 	{
 		CHECKPOINT_START_UNLOCK;
-		
-		MIRRORED_UNLOCK;
 	}
 	
 	AtEOXact_MultiXact();
@@ -2735,8 +2718,6 @@ PrepareTransaction(void)
 void
 AbortTransaction(void)
 {
-	MIRRORED_LOCK_DECLARE;
-
 	CHECKPOINT_START_LOCK_DECLARE;
 
 	TransactionState s = CurrentTransactionState;
@@ -2833,14 +2814,7 @@ AbortTransaction(void)
 		/*
 		 * We need to ensure the recording of the abort record and the
 		 * persistent post-abort work will be done either before or after a checkpoint.
-		 *
-		 * When we use CheckpointStartLock, we make sure we already have the
-		 * MirroredLock first.
-		 *
-		 * The lock order is: MirroredLock then CheckpointStartLock.
 		 */
-		MIRRORED_LOCK;
-			
 		CHECKPOINT_START_LOCK;
 	}
 
@@ -2899,8 +2873,6 @@ AbortTransaction(void)
 	if (willHaveObjectsFromSmgr)
 	{
 		CHECKPOINT_START_UNLOCK;
-		
-		MIRRORED_UNLOCK;
 	}
 	
 	AtEOXact_MultiXact();

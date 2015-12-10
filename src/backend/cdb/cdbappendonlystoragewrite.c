@@ -633,8 +633,6 @@ void AppendOnlyStorageWrite_TransactionFlushAndCloseFile(
 
 	int64						*fileLen_uncompressed)
 {
-	MIRRORED_LOCK_DECLARE;
-
 	RelFileNode relFileNode;
 	int32 segmentFileNum;
 
@@ -655,19 +653,10 @@ void AppendOnlyStorageWrite_TransactionFlushAndCloseFile(
 
 	startEof = storageWrite->startEof;
 
-	/*
-	 * Use the MirroredLock here to cover the flush (and close) and evaluation below whether
-	 * we must catchup the mirror.
-	 */
-	MIRRORED_LOCK;
-
 	AppendOnlyStorageWrite_FlushAndCloseFile(
 										storageWrite,
 										newLogicalEof,
 										fileLen_uncompressed);
-
-	MIRRORED_UNLOCK;
-
 }
 
 // -----------------------------------------------------------------------------

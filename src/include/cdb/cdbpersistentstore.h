@@ -148,187 +148,6 @@ inline static bool PersistentStore_IsZeroTid(
 	return (ItemPointerCompare(testTid, &zeroTid) == 0);
 }
 
-
-#ifdef USE_ASSERT_CHECKING
-
-typedef struct MirroredLockLocalVars
-{
-	bool mirroredLockIsHeldByMe;
-
-	bool specialResyncManagerFlag;
-
-	bool mirroredVariablesSet;
-} MirroredLockLocalVars;
-
-#define MIRRORED_LOCK_DECLARE \
-	MirroredLockLocalVars mirroredLockLocalVars = {false, false, false};
-#else
-
-typedef struct MirroredLockLocalVars
-{
-	bool mirroredLockIsHeldByMe;
-
-	bool specialResyncManagerFlag;
-} MirroredLockLocalVars;
-
-#define MIRRORED_LOCK_DECLARE \
-	MirroredLockLocalVars mirroredLockLocalVars = {false, false};
-#endif
-
-#ifdef USE_ASSERT_CHECKING
-#define MIRRORED_LOCK \
-	{ \
-		mirroredLockLocalVars.mirroredLockIsHeldByMe = LWLockHeldByMe(MirroredLock); \
-		mirroredLockLocalVars.specialResyncManagerFlag = false; \
-		mirroredLockLocalVars.mirroredVariablesSet = true; \
-		\
-		if (!mirroredLockLocalVars.mirroredLockIsHeldByMe) \
-		{ \
-			if (!mirroredLockLocalVars.specialResyncManagerFlag) \
-			{ \
-				LWLockAcquire(MirroredLock , LW_SHARED); \
-			} \
-			else \
-			{ \
-				HOLD_INTERRUPTS(); \
-			} \
-		} \
-		\
-		Assert(InterruptHoldoffCount > 0); \
-	}
-#else
-#define MIRRORED_LOCK \
-	{ \
-		mirroredLockLocalVars.mirroredLockIsHeldByMe = LWLockHeldByMe(MirroredLock); \
-		mirroredLockLocalVars.specialResyncManagerFlag = false; \
-		\
-		if (!mirroredLockLocalVars.mirroredLockIsHeldByMe) \
-		{ \
-			if (!mirroredLockLocalVars.specialResyncManagerFlag) \
-			{ \
-				LWLockAcquire(MirroredLock , LW_SHARED); \
-			} \
-			else \
-			{ \
-				HOLD_INTERRUPTS(); \
-			} \
-		} \
-		\
-	}
-#endif
-
-#ifdef USE_ASSERT_CHECKING
-#define MIRRORED_UNLOCK \
-	{ \
-		Assert(mirroredLockLocalVars.mirroredVariablesSet); \
-		Assert(InterruptHoldoffCount > 0); \
-		\
-		if (!mirroredLockLocalVars.mirroredLockIsHeldByMe) \
-		{ \
-			if (!mirroredLockLocalVars.specialResyncManagerFlag) \
-			{ \
-				LWLockRelease(MirroredLock); \
-			} \
-			else \
-			{ \
-				RESUME_INTERRUPTS(); \
-			} \
-		} \
-	}
-#else
-#define MIRRORED_UNLOCK \
-	{ \
-		if (!mirroredLockLocalVars.mirroredLockIsHeldByMe) \
-		{ \
-			if (!mirroredLockLocalVars.specialResyncManagerFlag) \
-			{ \
-				LWLockRelease(MirroredLock); \
-			} \
-			else \
-			{ \
-				RESUME_INTERRUPTS(); \
-			} \
-		} \
-	}
-#endif
-
-#ifdef USE_ASSERT_CHECKING
-#define MIRRORED_LOCK_BY_REF \
-	{ \
-		mirroredLockByRefVars->mirroredLockIsHeldByMe = LWLockHeldByMe(MirroredLock); \
-		mirroredLockByRefVars->specialResyncManagerFlag = false; \
-		mirroredLockByRefVars->mirroredVariablesSet = true; \
-		\
-		if (!mirroredLockByRefVars->mirroredLockIsHeldByMe) \
-		{ \
-			if (!mirroredLockByRefVars->specialResyncManagerFlag) \
-			{ \
-				LWLockAcquire(MirroredLock , LW_SHARED); \
-			} \
-			else \
-			{ \
-				HOLD_INTERRUPTS(); \
-			} \
-		} \
-		\
-		Assert(InterruptHoldoffCount > 0); \
-	}
-#else
-#define MIRRORED_LOCK_BY_REF \
-	{ \
-		mirroredLockByRefVars->mirroredLockIsHeldByMe = LWLockHeldByMe(MirroredLock); \
-		mirroredLockByRefVars->specialResyncManagerFlag = false; \
-		\
-		if (!mirroredLockByRefVars->mirroredLockIsHeldByMe) \
-		{ \
-			if (!mirroredLockByRefVars->specialResyncManagerFlag) \
-			{ \
-				LWLockAcquire(MirroredLock , LW_SHARED); \
-			} \
-			else \
-			{ \
-				HOLD_INTERRUPTS(); \
-			} \
-		} \
-		\
-	}
-#endif
-
-#ifdef USE_ASSERT_CHECKING
-#define MIRRORED_UNLOCK_BY_REF \
-	{ \
-		Assert(mirroredLockByRefVars->mirroredVariablesSet); \
-		Assert(InterruptHoldoffCount > 0); \
-		\
-		if (!mirroredLockByRefVars->mirroredLockIsHeldByMe) \
-		{ \
-			if (!mirroredLockByRefVars->specialResyncManagerFlag) \
-			{ \
-				LWLockRelease(MirroredLock); \
-			} \
-			else \
-			{ \
-				RESUME_INTERRUPTS(); \
-			} \
-		} \
-	}
-#else
-#define MIRRORED_UNLOCK_BY_REF \
-	{ \
-		if (!mirroredLockByRefVars->mirroredLockIsHeldByMe) \
-		{ \
-			if (!mirroredLockByRefVars->specialResyncManagerFlag) \
-			{ \
-				LWLockRelease(MirroredLock); \
-			} \
-			else \
-			{ \
-				RESUME_INTERRUPTS(); \
-			} \
-		} \
-	}
-#endif
-
 #ifdef USE_ASSERT_CHECKING
 
 typedef struct CheckpointStartLockLocalVars
@@ -453,13 +272,11 @@ typedef struct WritePersistentStateLockLocalVars
 } WritePersistentStateLockLocalVars;
 
 #define WRITE_PERSISTENT_STATE_ORDERED_LOCK_DECLARE \
-	MIRRORED_LOCK_DECLARE; \
 	CHECKPOINT_START_LOCK_DECLARE; \
 	WritePersistentStateLockLocalVars writePersistentStateLockLocalVars;
 
 #define WRITE_PERSISTENT_STATE_ORDERED_LOCK \
 	{ \
-		MIRRORED_LOCK; \
 		CHECKPOINT_START_LOCK; \
 		writePersistentStateLockLocalVars.persistentObjLockIsHeldByMe = LWLockHeldByMe(PersistentObjLock); \
 		if (!writePersistentStateLockLocalVars.persistentObjLockIsHeldByMe) \
@@ -471,7 +288,6 @@ typedef struct WritePersistentStateLockLocalVars
 
 #define WRITE_PERSISTENT_STATE_ORDERED_UNLOCK \
 	{ \
-		MIRRORED_UNLOCK; \
 		CHECKPOINT_START_UNLOCK; \
 		if (!writePersistentStateLockLocalVars.persistentObjLockIsHeldByMe) \
 		{ \
