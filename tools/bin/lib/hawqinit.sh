@@ -284,16 +284,7 @@ standby_init() {
     fi
 
     LOG_MSG ""
-    LOG_MSG "[INFO]:-Stopping HAWQ cluster"
-    ${SSH} -o 'StrictHostKeyChecking no' ${hawqUser}@${master_host_name} \
-        "${SOURCE_PATH}; hawq stop allsegments -a -M fast;" >> ${STANDBY_LOG_FILE} 2>&1
-    if [ $? -ne 0 ] ; then
-        LOG_MSG "[ERROR]:-Stop segments failed" verbose
-        exit 1
-    else
-        LOG_MSG "[INFO]:-HAWQ segments stopped" verbose
-    fi
-
+    LOG_MSG "[INFO]:-Stopping HAWQ master"
     ${SSH} -o 'StrictHostKeyChecking no' ${hawqUser}@${master_host_name} \
         "${SOURCE_PATH}; hawq stop master -a -M fast;" >> ${STANDBY_LOG_FILE} 2>&1
     if [ $? -ne 0 ] ; then
@@ -361,12 +352,21 @@ standby_init() {
     fi
     
     ${SSH} -o 'StrictHostKeyChecking no' ${hawqUser}@${master_host_name} \
-        "${SOURCE_PATH}; hawq start cluster -a;" >> ${STANDBY_LOG_FILE}
+        "${SOURCE_PATH}; hawq start master -a;" >> ${STANDBY_LOG_FILE}
     if [ $? -ne 0 ] ; then
-        LOG_MSG "[ERROR]:-Start HAWQ cluster failed" verbose
+        LOG_MSG "[ERROR]:-Start HAWQ master failed" verbose
         exit 1
     else
-        LOG_MSG "[INFO]:-HAWQ cluster started" verbose
+        LOG_MSG "[INFO]:-HAWQ master started" verbose
+    fi
+
+    ${SSH} -o 'StrictHostKeyChecking no' ${hawqUser}@${master_host_name} \
+        "${SOURCE_PATH}; hawq start standby -a;" >> ${STANDBY_LOG_FILE}
+    if [ $? -ne 0 ] ; then
+        LOG_MSG "[ERROR]:-Start HAWQ standby failed" verbose
+        exit 1
+    else
+        LOG_MSG "[INFO]:-HAWQ standby started" verbose
     fi
 
     ${SSH} -o 'StrictHostKeyChecking no' ${hawqUser}@${master_host_name} \
