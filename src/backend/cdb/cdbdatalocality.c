@@ -347,13 +347,13 @@ static void AOGetSegFileDataLocation(Relation relation,
 		AppendOnlyEntry *aoEntry, Snapshot metadataSnapshot,
 		split_to_segment_mapping_context *context, int64 splitsize,
 		Relation_Data *rel_data, int* hitblocks,
-		int* allblocks);
+		int* allblocks, GpPolicy *targetPolicy);
 
 static void ParquetGetSegFileDataLocation(Relation relation,
 		AppendOnlyEntry *aoEntry, Snapshot metadataSnapshot,
 		split_to_segment_mapping_context *context, int64 splitsize,
 		Relation_Data *rel_data, int* hitblocks,
-		int* allblocks);
+		int* allblocks, GpPolicy *targetPolicy);
 
 static BlockLocation *fetch_hdfs_data_block_location(char *filepath, int64 len,
 		int *block_num, RelFileNode rnode, uint32_t segno, double* hit_ratio);
@@ -838,6 +838,9 @@ int64 get_block_locations_and_claculte_table_size(split_to_segment_mapping_conte
 			rel_data->files = NIL;
 			rel_data->partition_parent_relid = 0;
 			rel_data->block_count = 0;
+
+			GpPolicy *targetPolicy = NULL;
+			targetPolicy = GpPolicyFetch(CurrentMemoryContext, rel_oid);
 			/*
 			 * Based on the pg_appendonly information, calculate the data
 			 * location information associated with this relation.
@@ -846,12 +849,12 @@ int64 get_block_locations_and_claculte_table_size(split_to_segment_mapping_conte
 				rel_data->type = DATALOCALITY_APPENDONLY;
 				AOGetSegFileDataLocation(rel, aoEntry, ActiveSnapshot, context,
 						aoEntry->splitsize, rel_data, &hitblocks,
-						&allblocks);
+						&allblocks, targetPolicy);
 			} else {
 				rel_data->type = DATALOCALITY_PARQUET;
 				ParquetGetSegFileDataLocation(rel, aoEntry, ActiveSnapshot, context,
 						context->split_size, rel_data, &hitblocks,
-						&allblocks);
+						&allblocks, targetPolicy);
 			}
 
 			bool isResultRelation = true;
@@ -866,18 +869,16 @@ int64 get_block_locations_and_claculte_table_size(split_to_segment_mapping_conte
 			if (!isResultRelation) {
 				total_size += rel_data->total_size;
 				totalFileCount += list_length(rel_data->files);
-				GpPolicy *targetPolicy = NULL;
-				targetPolicy = GpPolicyFetch(CurrentMemoryContext, rel_oid);
 				//for hash relation
 				if (targetPolicy->nattrs > 0) {
 					context->hashRelSize += rel_data->total_size;
 				} else {
 					context->randomRelSize += rel_data->total_size;
 				}
-				pfree(targetPolicy);
 			}
 			context->chsl_context.relations = lappend(context->chsl_context.relations,
 					rel_data);
+			pfree(targetPolicy);
 		}
 
 		relation_close(rel, AccessShareLock);
@@ -1051,7 +1052,7 @@ static void AOGetSegFileDataLocation(Relation relation,
 		AppendOnlyEntry *aoEntry, Snapshot metadataSnapshot,
 		split_to_segment_mapping_context *context, int64 splitsize,
 		Relation_Data *rel_data, int* hitblocks,
-		int* allblocks) {
+		int* allblocks, GpPolicy *targetPolicy) {
 	char *basepath;
 	char *segfile_path;
 	int filepath_maxlen;
@@ -1070,7 +1071,7 @@ static void AOGetSegFileDataLocation(Relation relation,
 	filepath_maxlen = strlen(basepath) + 9;
 	segfile_path = (char *) palloc0(filepath_maxlen);
 
-// fake data locality
+	// fake data locality
 	if (debug_fake_datalocality) {
 		fpaoseg = fopen("/tmp/aoseg.result", "r");
 		if (fpaoseg == NULL) {
@@ -1101,9 +1102,6 @@ static void AOGetSegFileDataLocation(Relation relation,
 			int segno = i + 1;
 			int64 logic_len = 0;
 			bool isRelationHash = true;
-			GpPolicy *targetPolicy = NULL;
-			Oid myrelid = rel_data->relid;
-			targetPolicy = GpPolicyFetch(CurrentMemoryContext, myrelid);
 			if (targetPolicy->nattrs == 0) {
 				isRelationHash = false;
 			}
@@ -1182,7 +1180,7 @@ static void AOGetSegFileDataLocation(Relation relation,
 			} else {
 
 				FormatAOSegmentFileName(basepath, segno, -1, 0, &segno, segfile_path);
-				double hit_ratio;
+				double hit_ratio = 0.0;
 				locations = fetch_hdfs_data_block_location(segfile_path, logic_len,
 						&block_num, relation->rd_node, segno, &hit_ratio);
 				*allblocks += block_num;
@@ -1246,14 +1244,9 @@ static void AOGetSegFileDataLocation(Relation relation,
 		aoscan = systable_beginscan(pg_aoseg_rel, InvalidOid, FALSE,
 				metadataSnapshot, 0, NULL);
 
-		// get targetPolicy
-		GpPolicy *targetPolicy = NULL;
-		Oid myrelid = rel_data->relid;
-		targetPolicy = GpPolicyFetch(CurrentMemoryContext, myrelid);
-
 		while (HeapTupleIsValid(tuple = systable_getnext(aoscan))) {
 			BlockLocation *locations = NULL;
-			int block_num;
+			int block_num = 0;
 			Relation_File *file;
 
 			int segno = DatumGetInt32(
@@ -1268,7 +1261,7 @@ static void AOGetSegFileDataLocation(Relation relation,
 
 			if (!context->keep_hash || !isRelationHash) {
 				FormatAOSegmentFileName(basepath, segno, -1, 0, &segno, segfile_path);
-				double hit_ratio;
+				double hit_ratio = 0.0;
 				locations = fetch_hdfs_data_block_location(segfile_path, logic_len,
 						&block_num, relation->rd_node, segno, &hit_ratio);
 				*allblocks += block_num;
@@ -1322,7 +1315,7 @@ static void AOGetSegFileDataLocation(Relation relation,
 			} else {
 
 				FormatAOSegmentFileName(basepath, segno, -1, 0, &segno, segfile_path);
-				double hit_ratio;
+				double hit_ratio = 0.0;
 				locations = fetch_hdfs_data_block_location(segfile_path, logic_len,
 						&block_num, relation->rd_node, segno, &hit_ratio);
 				*allblocks += block_num;
@@ -1404,7 +1397,7 @@ static void ParquetGetSegFileDataLocation(Relation relation,
 		AppendOnlyEntry *aoEntry, Snapshot metadataSnapshot,
 		split_to_segment_mapping_context *context, int64 splitsize,
 		Relation_Data *rel_data, int* hitblocks,
-		int* allblocks) {
+		int* allblocks, GpPolicy *targetPolicy) {
 	char *basepath;
 	char *segfile_path;
 	int filepath_maxlen;
@@ -1424,14 +1417,9 @@ static void ParquetGetSegFileDataLocation(Relation relation,
 	parquetscan = systable_beginscan(pg_parquetseg_rel, InvalidOid, FALSE,
 			metadataSnapshot, 0, NULL);
 
-	// get targetPolicy
-	GpPolicy *targetPolicy = NULL;
-	Oid myrelid = rel_data->relid;
-	targetPolicy = GpPolicyFetch(CurrentMemoryContext, myrelid);
-
 	while (HeapTupleIsValid(tuple = systable_getnext(parquetscan))) {
 		BlockLocation *locations;
-		int block_num;
+		int block_num = 0;
 		Relation_File *file;
 
 		int segno = DatumGetInt32(
@@ -1446,7 +1434,7 @@ static void ParquetGetSegFileDataLocation(Relation relation,
 
 		if (!context->keep_hash || !isRelationHash) {
 			FormatAOSegmentFileName(basepath, segno, -1, 0, &segno, segfile_path);
-			double hit_ratio;
+			double hit_ratio = 0.0;
 			locations = fetch_hdfs_data_block_location(segfile_path, logic_len,
 					&block_num, relation->rd_node, segno, &hit_ratio);
 			*allblocks += block_num;
@@ -1501,7 +1489,7 @@ static void ParquetGetSegFileDataLocation(Relation relation,
 			}
 		} else {
 			FormatAOSegmentFileName(basepath, segno, -1, 0, &segno, segfile_path);
-			double hit_ratio;
+			double hit_ratio = 0.0;
 			locations = fetch_hdfs_data_block_location(segfile_path, logic_len,
 					&block_num, relation->rd_node, segno, &hit_ratio);
 			*allblocks += block_num;
