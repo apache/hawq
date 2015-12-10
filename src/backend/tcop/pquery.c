@@ -1061,13 +1061,13 @@ CleanupGlobalQueryResources(void)
 			ret = returnResource(qri->resource_id, errorbuf, sizeof(errorbuf));
 			if (ret != FUNC_RETURN_OK)
 			{
-				ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("%s",errorbuf)));
+				ereport(WARNING, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("%s",errorbuf)));
 			}
 
 			ret = unregisterConnectionInRM(qri->resource_id, errorbuf, sizeof(errorbuf));
 			if (ret != FUNC_RETURN_OK)
 			{
-				ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("%s",errorbuf)));
+				ereport(WARNING, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("%s",errorbuf)));
 			}
 
 			releaseResourceContext(qri->resource_id);
