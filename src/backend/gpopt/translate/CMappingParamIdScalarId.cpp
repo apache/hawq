@@ -47,7 +47,7 @@ CMappingParamIdScalarId::CMappingParamIdScalarId
 	:
 	m_pmp(pmp)
 {
-	m_phmps = New(m_pmp) HMParamScalar(m_pmp);
+	m_phmps = GPOS_NEW(m_pmp) HMParamScalar(m_pmp);
 }
 
 //---------------------------------------------------------------------------
@@ -84,7 +84,7 @@ CMappingParamIdScalarId::FInsertMapping
 	)
 {
 	// copy key
-	ULONG *pulKey = New(m_pmp) ULONG(ulParamId);
+	ULONG *pulKey = GPOS_NEW(m_pmp) ULONG(ulParamId);
 
 	// insert mapping in the hash map
 	return m_phmps->FInsert(pulKey, pscid);
