@@ -17,15 +17,15 @@
 # under the License.
 
 #Check that SHELL is /bin/bash
-if [ $SHELL != /bin/bash ] && [ `ls -al /bin/sh|grep -c bash` -ne 1 ];then
-    echo "[FATAL]:-Scripts must be run by a user account that has SHELL=/bin/bash"
-    if [ -f /bin/bash ];then
-        echo "[INFO]:-/bin/bash exists, please update user account shell"
-    else
-        echo "[WARN]:-/bin/bash does not exist, does bash need to be installed?"
-    fi
-    exit 2
-fi
+#if [ $SHELL != /bin/bash ] && [ `ls -al /bin/sh|grep -c bash` -ne 1 ];then
+#    echo "[FATAL]:-Scripts must be run by a user account that has SHELL=/bin/bash"
+#    if [ -f /bin/bash ];then
+#        echo "[INFO]:-/bin/bash exists, please update user account shell"
+#    else
+#        echo "[WARN]:-/bin/bash does not exist, does bash need to be installed?"
+#    fi
+#    exit 2
+#fi
 
 declare -a CMDPATH
 CMDPATH=(/usr/kerberos/bin /usr/sfw/bin /opt/sfw/bin /usr/local/bin /bin /usr/bin /sbin /usr/sbin /usr/ucb /sw/bin)

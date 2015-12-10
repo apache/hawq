@@ -25,17 +25,22 @@ from gppylib.db import dbconn
 
 
 class HawqCommands(object):
-    def __init__(self, function_list=None, name='HAWQ'):
+    def __init__(self, function_list=None, name='HAWQ', action_name = 'execute', logger = None):
         self.function_list = function_list
         self.name = name 
+        self.action_name = action_name 
         self.return_flag = 0
         self.thread_list = []
+        if logger:
+            self.logger = logger
 
     def get_function_list(self, function_list):
         self.function_list = function_list
 
     def exec_function(self, func, *args, **kwargs):
         result = func(*args, **kwargs)
+        if result != 0 and self.logger and func.__name__ == 'remote_ssh':
+            self.logger.error("%s %s failed on %s" % (self.name, self.action_name, args[1]))
         self.return_flag += result
 
     def start(self):
@@ -113,6 +118,7 @@ def local_ssh(cmd, logger = None, warning = False):
 
 
 def remote_ssh(cmd, host, user):
+
     if user == "":
         remote_cmd_str = "ssh -o 'StrictHostKeyChecking no' %s \"%s\"" % (host, cmd)
     else:
@@ -133,6 +139,62 @@ def check_return_code(result, logger = None,  error_msg = None, info_msg = None,
             sys.exit(0)
     return result
 
+
+def check_postgres_running(GPHOME, data_directory, user, host = 'localhost', logger = None):
+    cmd='ps -ef | grep postgres | grep %s | grep -v grep > /dev/null || exit 1;' % data_directory
+    result = remote_ssh(cmd, host, user)
+    if result == 0:
+        return True
+    else:
+        if logger:
+            logger.debug("postgres process is not running on %s" % host)
+        return False
+
+
+def check_syncmaster_running(GPHOME, data_directory, user, host = 'localhost', logger = None):
+    cmd='ps -ef | grep gpsyncmaster | grep %s | grep -v grep > /dev/null || exit 1;' % data_directory
+    result = remote_ssh(cmd, host, user)
+    if result == 0:
+        return True
+    else:
+        if logger:
+            logger.debug("syncmaster process is not running on %s" % host)
+        return False
+
+
+def check_file_exist(file_path, host = 'localhost', logger = None):
+    cmd = "if [ -f %s ]; then exit 0; else exit 1;fi" % file_path
+    result = remote_ssh(cmd, host, '')
+    if result == 0:
+        return True
+    else:
+        if logger:
+            logger.debug("%s not exist on %s." % (file_path, host))
+        return False
+
+
+def check_file_exist_list(file_path, hostlist, user):
+    if user == "":
+        user = os.getenv('USER')
+    file_exist_host_list = {}
+    for host in hostlist:
+        result = remote_ssh("test -f %s;" % file_path, host, user)
+        if result == 0:
+            file_exist_host_list[host] = 'exist'
+    return file_exist_host_list
+
+
+def create_cluster_directory(directory_path, hostlist, user = ''):
+    if user == "":
+        user = os.getenv('USER')
+    file_exist_host_list = {}
+    for host in hostlist:
+        try:
+            remote_ssh("if [ ! -d %s ]; then mkdir -p %s; fi;" % (directory_path, directory_path), host, user)
+        except :
+            pass
+
+
 def parse_hosts_file(GPHOME):
     host_file = "%s/etc/slaves" % GPHOME
     host_list = list()
@@ -143,17 +205,6 @@ def parse_hosts_file(GPHOME):
         if host:
             host_list.append(host)
     return host_list
-
-
-def check_file_exist(file_path, hostlist, user):
-    if user == "":
-        user = os.getenv('USER')
-    file_exist_host_list = {}
-    for host in hostlist:
-        result = remote_ssh("test -f %s;" % file_path, host, user)
-        if result == 0:
-            file_exist_host_list[host] = 'exist'
-    return file_exist_host_list
 
 
 def remove_property_xml(property_name, org_config_file):

@@ -16,23 +16,25 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import os
-import sys
-import re
-import logging, time
-from optparse import OptionParser
-import subprocess
-import threading
-import Queue
-import signal
 
 try:
+    import os
+    import sys
+    import re
+    import logging, time
+    import subprocess
+    import threading
+    import Queue
+    import signal
+    from optparse import OptionParser
     from gppylib.gplog import setup_hawq_tool_logging, quiet_stdout_logging, enable_verbose_logging
     from gppylib.commands.unix import getLocalHostname, getUserName
     from gppylib.commands import gp
     from gppylib import userinput
+    from gppylib.commands import unix
     from hawqpylib.hawqlib import local_ssh, HawqCommands, HawqXMLParser, parse_hosts_file,\
-        remove_property_xml, sync_hawq_site, check_return_code
+        remove_property_xml, sync_hawq_site, check_return_code, check_file_exist, check_postgres_running, \
+        check_syncmaster_running, create_cluster_directory
     from hawqpylib.HAWQ_HELP import *
     from gppylib.db import dbconn
     from pygresql.pg import DatabaseError
@@ -271,14 +273,14 @@ class HawqInit:
 
     def _resync_standby(self):
         logger.info("Re-sync standby")
-        cmd = "%s; hawq stop cluster -a" % source_hawq_env
+        cmd = "%s; hawq stop master -a" % source_hawq_env
         check_return_code(local_ssh(cmd, logger), logger, "Stop hawq cluster failed, exit")
         cmd = "cd %s; %s; %s/bin/lib/pysync.py -x gpperfmon/data -x pg_log -x db_dumps %s %s:%s" % \
                  (self.master_data_directory, source_hawq_env,  self.GPHOME, self.master_data_directory,
                   self.standby_host_name, self.master_data_directory)
         result = local_ssh(cmd, logger)
         check_return_code(result, logger, "Re-sync standby master failed, exit")
-        cmd = "%s; hawq start cluster -a" % source_hawq_env
+        cmd = "%s; hawq start master -a" % source_hawq_env
         result = local_ssh(cmd, logger)
         check_return_code(result, logger, "Start hawq cluster failed")
 
@@ -299,7 +301,17 @@ class HawqInit:
         logger.info("Start to init master node: '%s'" % self.master_host_name)
         check_return_code(local_ssh(master_cmd), logger, "Master init failed, exit", \
                           "Master init successfully")
+        if self.standby_host_name.lower() not in ('', 'none'):
+            check_return_code(self._init_standby(), logger, \
+                              "Init standby failed, exit", \
+                              "Init standby successfully")
+        check_return_code(self._init_all_segments(), logger, \
+                          "Segments init failed, exit", \
+                          "Segments init successfully on nodes '%s'" % self.host_list)
+        logger.info("Init HAWQ cluster successfully")
 
+
+    def _init_all_segments(self):
         segment_cmd_str = self._get_segment_init_cmd()
         # Execute segment init command on each segment nodes.
         logger.info("Init segments in list: %s" % self.host_list)
@@ -310,22 +322,12 @@ class HawqInit:
             scpcmd = "scp %s/etc/_mgmt_config %s:%s/etc/_mgmt_config > /dev/null" % (self.GPHOME, host, self.GPHOME)
             local_ssh(scpcmd)
             work_list.append({"func":remote_ssh,"args":(segment_cmd_str, host, self.user, q)})
-        work_list.append({"func":check_progress,"args":(q, self.hosts_count_number, 'init', self.quiet)})
-        node_init = HawqCommands(name='HAWQ-SEG-INIT')
+        work_list.append({"func":check_progress,"args":(q, self.hosts_count_number, 'init', 0, self.quiet)})
+        node_init = HawqCommands(name='HAWQ', action_name = 'init', logger = logger)
         node_init.get_function_list(work_list)
         node_init.start()
-        if node_init.return_flag != 0:
-            logger.info("Segments init failed, exit")
-            sys.exit(1)
-        else:
-            logger.info("Segments init successfully on nodes '%s'" % self.host_list)
 
-        if self.standby_host_name.lower() not in ('', 'none'):
-            check_return_code(self._init_standby(), logger, \
-                              "Init standby failed, exit", \
-                              "Init standby successfully")
-        logger.info("Init HAWQ cluster successfully")
-        return None
+        return node_init.return_flag
 
     def run(self):
         if self.node_type == "master":
@@ -416,6 +418,7 @@ class HawqStart:
             logger.info("No standby host configured")
             self.standby_host_name = ''
 
+
     def _start_master_cmd(self):
         logger.info("Start master service")
         if self.masteronly:
@@ -474,22 +477,10 @@ class HawqStart:
         check_return_code(self.start_master(), logger, "Master start failed, exit", \
                           "Master started successfully")
 
-        segment_cmd_str = self._start_segment_cmd()
-        logger.info("Start segments in list: %s" % self.host_list)
-        work_list = []
-        q = Queue.Queue()
-        for host in self.host_list:
-            work_list.append({"func":remote_ssh,"args":(segment_cmd_str, host, self.user, q)})
-        work_list.append({"func":check_progress,"args":(q, self.hosts_count_number, 'start', self.quiet)})
-        node_init = HawqCommands()
-        node_init.get_function_list(work_list)
-        node_init.start()
-        if node_init.return_flag != 0:
-            logger.error("Segments start failed")
-        else:
-            logger.info("Segments started successfully")
+        segments_return_flag = self._start_all_segments()
+        if segments_return_flag:
             logger.info("HAWQ cluster started successfully")
-        return node_init.return_flag
+        return segments_return_flag
 
     def _start_all_segments(self):
         logger.info("Start all the segments in hawq cluster")
@@ -499,8 +490,8 @@ class HawqStart:
         q = Queue.Queue()
         for host in self.host_list:
             work_list.append({"func":remote_ssh,"args":(segment_cmd_str, host, self.user, q)})
-        work_list.append({"func":check_progress,"args":(q, self.hosts_count_number, 'start', self.quiet)})
-        node_init = HawqCommands(name='HAWQ-SEG-START')
+        work_list.append({"func":check_progress,"args":(q, self.hosts_count_number, 'start', 0, self.quiet)})
+        node_init = HawqCommands(name = 'HAWQ', action_name = 'start', logger = logger)
         node_init.get_function_list(work_list)
         node_init.start()
         logger.info("Total threads return value is : %d" % node_init.return_flag)
@@ -555,6 +546,7 @@ class HawqStop:
         self.hawq_dict = hawq_dict
         self.hawq_reload = opts.hawq_reload
         self.lock = threading.Lock()
+        self.skip_segments = []
         self._get_config()
 
     def _get_config(self):
@@ -584,6 +576,34 @@ class HawqStop:
         else:
             logger.info("No standby host configured")
             self.standby_host_name = ''
+
+
+    def _check_segment_running(self, host):
+
+        segment_running = True
+        segment_pid_file_path = self.segment_data_directory + '/postmaster.pid'
+
+        if check_file_exist(segment_pid_file_path, host, logger):
+            if not check_postgres_running(self.GPHOME, self.segment_data_directory, self.user, host, logger):
+                logger.warning("Have a postmaster.pid file but no segment process running")
+
+                lockfile="/tmp/.s.PGSQL.%s" % self.segment_port
+                logger.info("Clearing segment instance lock files and pid file")
+                cmd = "rm -rf %s %s" % (lockfile, segment_pid_file_path)
+                remote_ssh(cmd, host, self.user)
+                segment_running = False
+            else:
+                segment_running = True
+
+        else:
+            if check_postgres_running(self.GPHOME, self.segment_data_directory, self.user, host, logger):
+                logger.warning("postmaster.pid file does not exist, but hawq process running.")
+                segment_running = True
+            else:
+                logger.warning("HAWQ segment seems not running on %s, skip" % host)
+                segment_running = False
+
+        return segment_running
 
     def _stop_master_cmd(self):
         logger.info("Stop hawq master")
@@ -615,9 +635,14 @@ class HawqStop:
             return cmd_str
 
     def _stop_segment(self):
-        cmd = self._stop_segment_cmd()
-        result = remote_ssh(cmd, 'localhost', self.user)
-        return result
+        segment_running = self._check_segment_running('localhost')
+        if segment_running:
+            cmd = self._stop_segment_cmd()
+            result = remote_ssh(cmd, 'localhost', self.user)
+            return result
+        else:
+            logger.warning('')
+            return True
 
     def _stop_standby_cmd(self):
         logger.info("Stop hawq standby master")
@@ -638,47 +663,44 @@ class HawqStop:
 
     def _stopAll(self):
         logger.info("Stop hawq cluster")
-        result = self._stop_master()
-        if result != 0:
+        master_result = self._stop_master()
+        if master_result != 0:
             logger.error("Master stop failed")
         else:
             logger.info("Master stopped successfully")
         if self.standby_host_name.lower() not in ('', 'none'):
-            result = self._stop_standby()
-            if result != 0:
+            standby_result = self._stop_standby()
+            if standby_result != 0:
                 logger.error("Standby master stop failed")
             else:
                 logger.info("Standby master stopped successfully")
 
-        segment_cmd_str = self._stop_segment_cmd()
-        # Execute segment start command on each segment nodes.
-        logger.info("Stop segments in list: %s" % self.host_list)
-        work_list = []
-        q = Queue.Queue()
-        for host in self.host_list:
-            work_list.append({"func":remote_ssh,"args":(segment_cmd_str, host, self.user, q)})
-        work_list.append({"func":check_progress,"args":(q, self.hosts_count_number, 'stop', self.quiet)})
-        node_init = HawqCommands()
-        node_init.get_function_list(work_list)
-        node_init.start()
-        if node_init.return_flag != 0:
-            logger.error("Segments stop failed")
+        # Execute segment stop command on each node.
+        segments_return_flag = self._stopAllSegments()
+        cluster_result = master_result + standby_result + segments_return_flag
+        if cluster_result != 0:
+            logger.error("Cluster stop failed")
         else:
-            logger.info("Segments stopped successfully")
-        return node_init.return_flag
+            logger.info("Cluster stopped successfully")
+        return cluster_result
+
 
     def _stopAllSegments(self):
-        logger.info("Stop hawq cluster")
-
         segment_cmd_str = self._stop_segment_cmd()
-        # Execute segment start command on each segment nodes.
+        # Execute segment stop command on each nodes.
         logger.info("Stop segments in list: %s" % self.host_list)
         work_list = []
+        self.running_segment_num = self.hosts_count_number
         q = Queue.Queue()
         for host in self.host_list:
-            work_list.append({"func":remote_ssh,"args":(segment_cmd_str, host, self.user, q)})
-        work_list.append({"func":check_progress,"args":(q, self.hosts_count_number, 'stop', self.quiet)})
-        node_init = HawqCommands()
+            if self._check_segment_running(host):
+                work_list.append({"func":remote_ssh,"args":(segment_cmd_str, host, self.user, q)})
+            else:
+                self.skip_segments.append(host)
+                self.running_segment_num = self.running_segment_num - 1
+
+        work_list.append({"func":check_progress,"args":(q, self.running_segment_num, 'stop', len(self.skip_segments), self.quiet)})
+        node_init = HawqCommands(name = 'HAWQ', action_name = 'stop', logger = logger)
         node_init.get_function_list(work_list)
         node_init.start()
         if node_init.return_flag != 0:
@@ -729,6 +751,8 @@ def get_args():
         opts.node_type = ARGS[1]
 
     if opts.node_type in ['master', 'standby', 'segment', 'cluster', 'allsegments'] and opts.hawq_command in ['start', 'stop', 'restart', 'init', 'activate']:
+        if opts.log_dir and not os.path.exists(opts.log_dir):
+            os.makedirs(opts.log_dir)
         global logger, log_filename
         if opts.verbose:
             enable_verbose_logging()
@@ -763,6 +787,17 @@ def get_args():
     hawqsite = HawqXMLParser(opts.GPHOME)
     hawqsite.get_all_values()
     hawq_dict = hawqsite.hawq_dict
+    cluster_host_list = list()
+    cluster_host_list.append(hawq_dict['hawq_master_address_host'])
+
+    if 'hawq_standby_address_host' in hawq_dict:
+        cluster_host_list.append(hawq_dict['hawq_standby_address_host'])
+
+    segments_host_list = parse_hosts_file(opts.GPHOME)
+    for host in segments_host_list:
+        cluster_host_list.append(host)
+
+    create_cluster_directory(opts.log_dir, cluster_host_list)
 
     Capital_Action = opts.hawq_command.title()
     logger.info("%s hawq with args: %s" % (Capital_Action, ARGS))
@@ -793,7 +828,7 @@ def remote_ssh_nowait(cmd, host, user):
     return result
 
 
-def check_progress(q, total_num, action, quiet=False):
+def check_progress(q, total_num, action, skip_num = 0, quiet=False):
     working_num = total_num
     success_num = 0
     pnum = 0
@@ -811,7 +846,10 @@ def check_progress(q, total_num, action, quiet=False):
         time.sleep(1)
     if not quiet:
         sys.stdout.write("\n")
-    logger.info("%d of %d segments %s successfully" % (success_num, total_num, action))
+    if skip_num != 0:
+        logger.info("%d of %d segments %s successfully, %d segments %s skipped" % (success_num, total_num, action, skip_num, action))
+    else:
+        logger.info("%d of %d segments %s successfully" % (success_num, total_num, action))
     return 0
 
 

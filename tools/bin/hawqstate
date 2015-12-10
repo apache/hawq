@@ -19,7 +19,7 @@
 import os
 import sys
 from optparse import Option, OptionParser
-from hawqpylib.hawqlib import HawqXMLParser, parse_hosts_file, check_file_exist
+from hawqpylib.hawqlib import HawqXMLParser, parse_hosts_file, check_file_exist_list
 from gppylib.db import dbconn
 from pygresql.pg import DatabaseError
 from gppylib.gplog import get_default_logger, setup_hawq_tool_logging, quiet_stdout_logging, enable_verbose_logging
@@ -89,7 +89,7 @@ def show_brief_status(hawq_site, segment_list, standby_host):
     total_seg_num_valid = len(valid_seg_host_list)
     total_seg_num_failure = total_seg_num - total_seg_num_valid
     seg_pid_file_path = hawq_site.hawq_dict['hawq_segment_directory'] + "/postmaster.pid"
-    total_seg_pid_file_found = len(check_file_exist(seg_pid_file_path, segment_list, '' ))
+    total_seg_pid_file_found = len(check_file_exist_list(seg_pid_file_path, segment_list, '' ))
     total_seg_pid_file_miss = total_seg_num - total_seg_pid_file_found
     logger.info("-HAWQ instance status summary")
     logger.info("-----------------------------------------------------")
