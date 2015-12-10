@@ -355,7 +355,7 @@ COptTasks::SzAllocate
 		}
 		else
 		{
-			sz = New(pmp) CHAR[ulSize];
+			sz = GPOS_NEW_ARRAY(pmp, CHAR, ulSize);
 		}
 	}
 	GPOS_CATCH_EX(ex)
@@ -422,16 +422,16 @@ COptTasks::PvMDCast
 	CAutoMemoryPool amp(CAutoMemoryPool::ElcExc);
 	IMemoryPool *pmp = amp.Pmp();
 
-	DrgPimdobj *pdrgpmdobj = New(pmp) DrgPimdobj(pmp);
+	DrgPimdobj *pdrgpmdobj = GPOS_NEW(pmp) DrgPimdobj(pmp);
 
-	IMDId *pmdidCast = New(pmp) CMDIdCast
+	IMDId *pmdidCast = GPOS_NEW(pmp) CMDIdCast
 			(
 			CTranslatorUtils::PmdidWithVersion(pmp, oidSrc),
 			CTranslatorUtils::PmdidWithVersion(pmp, oidDest)
 			);
 
 	// relcache MD provider
-	CMDProviderRelcache *pmdpr = New(pmp) CMDProviderRelcache(pmp);
+	CMDProviderRelcache *pmdpr = GPOS_NEW(pmp) CMDProviderRelcache(pmp);
 	
 	{
 		CAutoMDAccessor amda(pmp, pmdpr, sysidDefault);
@@ -486,9 +486,9 @@ COptTasks::PvMDScCmp
 	CAutoMemoryPool amp(CAutoMemoryPool::ElcExc);
 	IMemoryPool *pmp = amp.Pmp();
 
-	DrgPimdobj *pdrgpmdobj = New(pmp) DrgPimdobj(pmp);
+	DrgPimdobj *pdrgpmdobj = GPOS_NEW(pmp) DrgPimdobj(pmp);
 
-	IMDId *pmdidScCmp = New(pmp) CMDIdScCmp
+	IMDId *pmdidScCmp = GPOS_NEW(pmp) CMDIdScCmp
 			(
 			CTranslatorUtils::PmdidWithVersion(pmp, oidLeft),
 			CTranslatorUtils::PmdidWithVersion(pmp, oidRight),
@@ -496,7 +496,7 @@ COptTasks::PvMDScCmp
 			);
 
 	// relcache MD provider
-	CMDProviderRelcache *pmdpr = New(pmp) CMDProviderRelcache(pmp);
+	CMDProviderRelcache *pmdpr = GPOS_NEW(pmp) CMDProviderRelcache(pmp);
 	
 	{
 		CAutoMDAccessor amda(pmp, pmdpr, sysidDefault);
@@ -577,7 +577,7 @@ COptTasks::Execute
 		elog(LOG, "%s", SzFromWsz((WCHAR *)err_buf));
 	}
 
-	delete []err_buf;
+	GPOS_DELETE_ARRAY(err_buf);
 }
 
 
@@ -606,14 +606,14 @@ COptTasks::PvDXLFromQueryTask
 	IMemoryPool *pmp = amp.Pmp();
 
 	// ColId generator
-	CIdGenerator *pidgtorCol = New(pmp) CIdGenerator(GPDXL_COL_ID_START);
-	CIdGenerator *pidgtorCTE = New(pmp) CIdGenerator(GPDXL_CTE_ID_START);
+	CIdGenerator *pidgtorCol = GPOS_NEW(pmp) CIdGenerator(GPDXL_COL_ID_START);
+	CIdGenerator *pidgtorCTE = GPOS_NEW(pmp) CIdGenerator(GPDXL_CTE_ID_START);
 
 	// map that stores gpdb att to optimizer col mapping
-	CMappingVarColId *pmapvarcolid = New(pmp) CMappingVarColId(pmp);
+	CMappingVarColId *pmapvarcolid = GPOS_NEW(pmp) CMappingVarColId(pmp);
 
 	// relcache MD provider
-	CMDProviderRelcache *pmdpr = New(pmp) CMDProviderRelcache(pmp);
+	CMDProviderRelcache *pmdpr = GPOS_NEW(pmp) CMDProviderRelcache(pmp);
 
 	{
 		CAutoMDAccessor amda(pmp, pmdpr, sysidDefault);
@@ -634,8 +634,8 @@ COptTasks::PvDXLFromQueryTask
 		DrgPdxln *pdrgpdxlnCTE = ptrquerytodxl->PdrgpdxlnCTE();
 		GPOS_ASSERT(NULL != pdrgpdxlnQueryOutput);
 
-		delete pidgtorCol;
-		delete pidgtorCTE;
+		GPOS_DELETE(pidgtorCol);
+		GPOS_DELETE(pidgtorCTE);
 
 		CWStringDynamic str(pmp);
 		COstreamString oss(&str);
@@ -654,7 +654,7 @@ COptTasks::PvDXLFromQueryTask
 
 		// clean up
 		pdxlnQuery->Release();
-		delete pstrDXL;
+		GPOS_DELETE(pstrDXL);
 	}
 
 	return NULL;
@@ -744,7 +744,7 @@ COptTasks::PdrgPssLoad
 	}
 	GPOS_CATCH_END;
 
-	delete pphDXL;
+	GPOS_DELETE(pphDXL);
 
 	return pdrgpss;
 }
@@ -775,11 +775,11 @@ COptTasks::PoconfCreate
 
 	ULONG ulCTEInliningCutoff =  (ULONG) optimizer_cte_inlining_bound;
 
-	return New(pmp) COptimizerConfig
+	return GPOS_NEW(pmp) COptimizerConfig
 						(
-						New(pmp) CEnumeratorConfig(pmp, ullPlanId, ullSamples, dCostThreshold),
-						New(pmp) CStatisticsConfig(pmp, dDampingFactorFilter, dDampingFactorJoin, dDampingFactorGroupBy),
-						New(pmp) CCTEConfig(ulCTEInliningCutoff),
+						GPOS_NEW(pmp) CEnumeratorConfig(pmp, ullPlanId, ullSamples, dCostThreshold),
+						GPOS_NEW(pmp) CStatisticsConfig(pmp, dDampingFactorFilter, dDampingFactorJoin, dDampingFactorGroupBy),
+						GPOS_NEW(pmp) CCTEConfig(ulCTEInliningCutoff),
 						pcm
 						);
 }
@@ -913,11 +913,11 @@ COptTasks::Pcm
 	ICostModel *pcm = NULL;
 	if (OPTIMIZER_GPDB_CALIBRATED == optimizer_cost_model)
 	{
-		pcm = New(pmp) CCostModelGPDB(pmp, ulSegments);
+		pcm = GPOS_NEW(pmp) CCostModelGPDB(pmp, ulSegments);
 	}
 	else
 	{
-		pcm = New(pmp) CCostModelGPDBLegacy(pmp, ulSegments);
+		pcm = GPOS_NEW(pmp) CCostModelGPDBLegacy(pmp, ulSegments);
 	}
 
 	SetCostModelParams(pcm);
@@ -977,7 +977,7 @@ COptTasks::PvOptimizeTask
 		SetTraceflags(pmp, pbsTraceFlags, &pbsEnabled, &pbsDisabled);
 
 		// set up relcache MD provider
-		CMDProviderRelcache *pmdpRelcache = New(pmp) CMDProviderRelcache(pmp);
+		CMDProviderRelcache *pmdpRelcache = GPOS_NEW(pmp) CMDProviderRelcache(pmp);
 
 		{
 			// scope for MD accessor
@@ -988,7 +988,7 @@ COptTasks::PvOptimizeTask
 			CIdGenerator idgtorCTE(GPDXL_CTE_ID_START);
 
 			// map that stores gpdb att to optimizer col mapping
-			CMappingVarColId *pmapvarcolid = New(pmp) CMappingVarColId(pmp);
+			CMappingVarColId *pmapvarcolid = GPOS_NEW(pmp) CMappingVarColId(pmp);
 
 			ULONG ulSegments = gpdb::UlSegmentCountGP();
 			ULONG ulSegmentsForCosting = optimizer_segments;
@@ -1013,7 +1013,7 @@ COptTasks::PvOptimizeTask
 			COptimizerConfig *pocconf = PoconfCreate(pmp, pcm);
 			CConstExprEvaluatorProxy ceevalproxy(pmp, &mda);
 			IConstExprEvaluator *pceeval =
-					New(pmp) CConstExprEvaluatorDXL(pmp, &mda, &ceevalproxy);
+					GPOS_NEW(pmp) CConstExprEvaluatorDXL(pmp, &mda, &ceevalproxy);
 
 			// preload metadata if optimizer uses multiple threads
 			if (optimizer_parallel)
@@ -1054,7 +1054,7 @@ COptTasks::PvOptimizeTask
 				// serialize DXL to xml
 				CWStringDynamic *pstrPlan = CDXLUtils::PstrSerializePlan(pmp, pdxlnPlan, pocconf->Pec()->UllPlanId(), pocconf->Pec()->UllPlanSpaceSize(), true /*fSerializeHeaderFooter*/, true /*fIndent*/);
 				poctx->m_szPlanDXL = SzFromWsz(pstrPlan->Wsz());
-				delete pstrPlan;
+				GPOS_DELETE(pstrPlan);
 			}
 
 			// translate DXL->PlStmt only when needed
@@ -1064,10 +1064,10 @@ COptTasks::PvOptimizeTask
 			}
 
 			CStatisticsConfig *pstatsconf = pocconf->Pstatsconf();
-			pdrgmdidCol = New(pmp) DrgPmdid(pmp);
+			pdrgmdidCol = GPOS_NEW(pmp) DrgPmdid(pmp);
 			pstatsconf->CollectMissingStatsColumns(pdrgmdidCol);
 
-			phmmdidRel = New(pmp) HMMDIdMDId(pmp);
+			phmmdidRel = GPOS_NEW(pmp) HMMDIdMDId(pmp);
 			PrintMissingStatsWarning(pmp, &mda, pdrgmdidCol, phmmdidRel);
 
 			phmmdidRel->Release();
@@ -1245,7 +1245,7 @@ COptTasks::PvOptimizeMinidumpTask
 						true // fIndent
 						);
 	poptmdpctxt->m_szDXLResult = SzFromWsz(pstrDXL->Wsz());
-	delete pstrDXL;
+	GPOS_DELETE(pstrDXL);
 	CRefCount::SafeRelease(pdxlnResult);
 	pocconf->Release();
 
@@ -1280,7 +1280,7 @@ COptTasks::PvDXLFromPlstmtTask
 	CIdGenerator idgtor(1);
 
 	// relcache MD provider
-	CMDProviderRelcache *pmdpr = New(pmp) CMDProviderRelcache(pmp);
+	CMDProviderRelcache *pmdpr = GPOS_NEW(pmp) CMDProviderRelcache(pmp);
 
 	{
 		CAutoMDAccessor amda(pmp, pmdpr, sysidDefault);
@@ -1302,7 +1302,7 @@ COptTasks::PvDXLFromPlstmtTask
 		poctx->m_szPlanDXL = SzFromWsz(pstrDXL->Wsz());
 
 		// cleanup
-		delete pstrDXL;
+		GPOS_DELETE(pstrDXL);
 		pdxlnPlan->Release();
 	}
 
@@ -1360,7 +1360,7 @@ COptTasks::PvPlstmtFromDXLTask
 							);
 
 	// relcache MD provider
-	CMDProviderRelcache *pmdpr = New(pmp) CMDProviderRelcache(pmp);
+	CMDProviderRelcache *pmdpr = GPOS_NEW(pmp) CMDProviderRelcache(pmp);
 
 	{
 		CAutoMDAccessor amda(pmp, pmdpr, sysidDefault);
@@ -1419,13 +1419,13 @@ COptTasks::PvQueryFromDXLTask
 	GPOS_ASSERT(NULL != ptroutput->Pdxln());
 
 	// relcache MD provider
-	CMDProviderRelcache *pmdpr = New(pmp) CMDProviderRelcache(pmp);
+	CMDProviderRelcache *pmdpr = GPOS_NEW(pmp) CMDProviderRelcache(pmp);
 
 	{
 		CAutoMDAccessor amda(pmp, pmdpr, sysidDefault);
 
 		// initialize hash table that maintains the mapping between ColId and Var
-		TEMap *ptemap = New (pmp) TEMap(pmp);
+		TEMap *ptemap = GPOS_NEW(pmp) TEMap(pmp);
 
 		CTranslatorDXLToQuery trdxlquery(pmp, amda.Pmda(), gpdb::UlSegmentCountGP());
 		CStateDXLToQuery statedxltoquery(pmp);
@@ -1433,7 +1433,7 @@ COptTasks::PvQueryFromDXLTask
 		Query *pquery = trdxlquery.PqueryFromDXL(ptroutput->Pdxln(), ptroutput->PdrgpdxlnOutputCols(), &statedxltoquery, ptemap, GPDXL_QUERY_LEVEL);
 
 		CRefCount::SafeRelease(ptemap);
-		delete ptroutput;
+		GPOS_DELETE(ptroutput);
 
 		GPOS_ASSERT(NULL != pquery);
 		GPOS_ASSERT(NULL != CurrentMemoryContext);
@@ -1467,10 +1467,10 @@ COptTasks::PvDXLFromMDObjsTask
 	AUTO_MEM_POOL(amp);
 	IMemoryPool *pmp = amp.Pmp();
 
-	DrgPimdobj *pdrgpmdobj = New(pmp) DrgPimdobj(pmp, 1024, 1024);
+	DrgPimdobj *pdrgpmdobj = GPOS_NEW(pmp) DrgPimdobj(pmp, 1024, 1024);
 
 	// relcache MD provider
-	CMDProviderRelcache *pmdp = New(pmp) CMDProviderRelcache(pmp);
+	CMDProviderRelcache *pmdp = GPOS_NEW(pmp) CMDProviderRelcache(pmp);
 	{
 		CAutoMDAccessor amda(pmp, pmdp, sysidDefault);
 		ListCell *plc = NULL;
@@ -1537,12 +1537,12 @@ COptTasks::PvDXLFromRelStatsTask
 	IMemoryPool *pmp = amp.Pmp();
 
 	// relcache MD provider
-	CMDProviderRelcache *pmdpr = New(pmp) CMDProviderRelcache(pmp);
+	CMDProviderRelcache *pmdpr = GPOS_NEW(pmp) CMDProviderRelcache(pmp);
 	CAutoMDAccessor amda(pmp, pmdpr, sysidDefault);
 	ICostModel *pcm = Pcm(pmp, gpdb::UlSegmentCountGP());
 	CAutoOptCtxt aoc(pmp, amda.Pmda(), NULL /*pceeval*/, pcm);
 
-	DrgPimdobj *pdrgpmdobj = New(pmp) DrgPimdobj(pmp);
+	DrgPimdobj *pdrgpmdobj = GPOS_NEW(pmp) DrgPimdobj(pmp);
 
 	ListCell *plc = NULL;
 	ForEach (plc, pctxrelcache->m_plistOids)
@@ -1553,7 +1553,7 @@ COptTasks::PvDXLFromRelStatsTask
 		CMDIdGPDB *pmdid = CTranslatorUtils::PmdidWithVersion(pmp, oidRelation);
 
 		// generate mdid for relstats
-		CMDIdRelStats *pmdidRelStats = New(pmp) CMDIdRelStats(pmdid);
+		CMDIdRelStats *pmdidRelStats = GPOS_NEW(pmp) CMDIdRelStats(pmdid);
 		IMDRelStats *pimdobjrelstats = const_cast<IMDRelStats *>(amda.Pmda()->Pmdrelstats(pmdidRelStats));
 		pdrgpmdobj->Append(dynamic_cast<IMDCacheObject *>(pimdobjrelstats));
 
@@ -1565,7 +1565,7 @@ COptTasks::PvDXLFromRelStatsTask
 			if (!rel->rd_att->attrs[ul]->attisdropped)
 			{
 				pmdid->AddRef();
-				CMDIdColStats *pmdidColStats = New(pmp) CMDIdColStats(pmdid, ulPosCounter);
+				CMDIdColStats *pmdidColStats = GPOS_NEW(pmp) CMDIdColStats(pmdid, ulPosCounter);
 				ulPosCounter++;
 				IMDColStats *pimdobjcolstats = const_cast<IMDColStats *>(amda.Pmda()->Pmdcolstats(pmdidColStats));
 				pdrgpmdobj->Append(dynamic_cast<IMDCacheObject *>(pimdobjcolstats));
@@ -1642,7 +1642,7 @@ COptTasks::PvEvalExprFromDXLTask
 	GPOS_TRY
 	{
 		// set up relcache MD provider
-		CMDProviderRelcache *pmdpRelcache = New(pmp) CMDProviderRelcache(pmp);
+		CMDProviderRelcache *pmdpRelcache = GPOS_NEW(pmp) CMDProviderRelcache(pmp);
 		{
 			// scope for MD accessor
 			CMDAccessor mda(pmp, CMDCache::Pcache(), sysidDefault, pmdpRelcache);
@@ -1686,7 +1686,7 @@ COptTasks::PvEvalExprFromDXLTask
 						true // fIndent
 						);
 	pevalctxt->m_szDXLResult = SzFromWsz(pstrDXL->Wsz());
-	delete pstrDXL;
+	GPOS_DELETE(pstrDXL);
 	CRefCount::SafeRelease(pdxlnResult);
 	pdxlnInput->Release();
 
