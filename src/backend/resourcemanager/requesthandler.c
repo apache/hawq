@@ -345,7 +345,7 @@ bool handleRMRequestAcquireResource(void **arg)
 		if ( res != FUNC_RETURN_OK )
 		{
 			snprintf(errorbuf, sizeof(errorbuf),
-					 "the resource context is invalid or timed out");
+					 "the resource context may be timed out");
 			elog(WARNING, "ConnID %d. %s", request->ConnID, errorbuf);
 			goto sendresponse;
 		}
@@ -505,7 +505,7 @@ bool handleRMRequestReturnResource(void **arg)
 		if ( res != FUNC_RETURN_OK )
 		{
 			snprintf(errorbuf, sizeof(errorbuf),
-					 "the resource context is invalid or timed out");
+					 "the resource context may be timed out");
 			elog(WARNING, "ConnID %d. %s", request->ConnID, errorbuf);
 			goto sendresponse;
 		}

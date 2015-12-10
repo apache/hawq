@@ -4379,7 +4379,8 @@ void detectAndDealWithDeadLock(DynResourceQueueTrack track)
 		}
 		if ( tail != NULL ) {
 			ConnectionTrack canceltrack = (ConnectionTrack)
-										  removeDQueueNode(&(track->QueryResRequests), tail);
+										  removeDQueueNode(&(track->QueryResRequests),
+												  	  	   tail);
 
 			snprintf(errorbuf, sizeof(errorbuf),
 					 "session "INT64_FORMAT" deadlock is detected",
@@ -4456,8 +4457,7 @@ void timeoutDeadResourceAllocation(void)
 			if ( curmsec - curcon->LastActTime >
 				 1000000L * rm_session_lease_timeout )
 			{
-				elog(LOG, "The allocated resource timeout is detected. "
-						  "ConnID %d",
+				elog(LOG, "ConnID %d. The allocated resource timeout is detected.",
 						  curcon->ConnID);
 				returnResourceToResQueMgr(curcon);
 				returnConnectionToQueue(curcon, true);
@@ -4465,6 +4465,10 @@ void timeoutDeadResourceAllocation(void)
 				{
 					curcon->CommBuffer->toClose = true;
 					curcon->CommBuffer->forcedClose = true;
+				}
+				else
+				{
+					returnConnectionTrack(curcon);
 				}
 			}
 			break;
@@ -4490,6 +4494,10 @@ void timeoutDeadResourceAllocation(void)
 					curcon->CommBuffer->toClose = true;
 					curcon->CommBuffer->forcedClose = true;
 				}
+				else
+				{
+					returnConnectionTrack(curcon);
+				}
 			}
 			break;
 		}
@@ -4507,6 +4515,10 @@ void timeoutDeadResourceAllocation(void)
 				{
 					curcon->CommBuffer->toClose = true;
 					curcon->CommBuffer->forcedClose = true;
+				}
+				else
+				{
+					returnConnectionTrack(curcon);
 				}
 			}
 			break;

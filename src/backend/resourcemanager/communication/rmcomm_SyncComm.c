@@ -193,7 +193,7 @@ int callSyncRPCRemote(const char     	   *hostname,
 
 		snprintf(errorbuf, sizeof(errorbuf),
 				 "failed to register socket connection fd %d connected to %s:%d "
-				 "for resource rpc communication.",
+				 "for resource rpc communication",
 				 fd,
 				 hostname, port);
 
@@ -239,6 +239,21 @@ int callSyncRPCRemote(const char     	   *hostname,
 	if (res != FUNC_RETURN_OK)
 	{
 	  elog(WARNING, "Sync RPC framework (inet) finds exception raised.");
+
+	  switch(res)
+	  {
+	  case COMM2RM_CLIENT_FAIL_SEND:
+		  snprintf(errorbuf, errorbufsize, "failed to send content");
+		  break;
+	  case COMM2RM_CLIENT_FAIL_RECV:
+		  snprintf(errorbuf, errorbufsize, "failed to receive content");
+		  break;
+	  case REQUESTHANDLER_WRONGMESSAGE:
+		  snprintf(errorbuf, errorbufsize, "wrong message was received");
+		  break;
+	  default:
+		  Assert(false);
+	  }
 	}
 	return res;
 exit:
