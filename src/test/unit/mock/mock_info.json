@@ -13968,14 +13968,6 @@
             "filename": "src/backend/utils/misc/guc.c", 
             "header filename": "src/include/utils/guc.h"
         }, 
-        "gp_hadoop_home": {
-            "filename": "src/backend/utils/misc/guc.c", 
-            "header filename": "src/include/utils/guc.h"
-        }, 
-        "gp_hadoop_target_version": {
-            "filename": "src/backend/utils/misc/guc.c", 
-            "header filename": "src/include/utils/guc.h"
-        }, 
         "gp_hashagg_compress_spill_files": {
             "filename": "src/backend/cdb/cdbvars.c", 
             "header filename": "src/include/cdb/cdbvars.h"
