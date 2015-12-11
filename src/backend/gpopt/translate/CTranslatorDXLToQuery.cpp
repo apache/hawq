@@ -79,7 +79,7 @@ CTranslatorDXLToQuery::CTranslatorDXLToQuery
 	m_ulSortgrouprefCounter(0),
 	m_ulSegments(ulSegments)
 {
-	m_pdxlsctranslator = New (m_pmp) CTranslatorDXLToScalar(m_pmp, m_pmda, m_ulSegments);
+	m_pdxlsctranslator = GPOS_NEW(m_pmp) CTranslatorDXLToScalar(m_pmp, m_pmda, m_ulSegments);
 }
 
 //---------------------------------------------------------------------------
@@ -92,7 +92,7 @@ CTranslatorDXLToQuery::CTranslatorDXLToQuery
 //---------------------------------------------------------------------------
 CTranslatorDXLToQuery::~CTranslatorDXLToQuery()
 {
-	delete m_pdxlsctranslator;
+	GPOS_DELETE(m_pdxlsctranslator);
 }
 
 //---------------------------------------------------------------------------
@@ -114,7 +114,7 @@ CTranslatorDXLToQuery::PqueryFromDXL
 	)
 {
 	// initialize the colid->var mapping
-	CMappingColIdVarQuery *pmapcidvarquery = New (m_pmp) CMappingColIdVarQuery(m_pmp, ptemap, ulQueryLevel);
+	CMappingColIdVarQuery *pmapcidvarquery = GPOS_NEW(m_pmp) CMappingColIdVarQuery(m_pmp, ptemap, ulQueryLevel);
 
 	GPOS_ASSERT(NULL != pdxln);
 
@@ -152,7 +152,7 @@ CTranslatorDXLToQuery::PqueryFromDXL
 	// TODO: venky; June 14 2011, We currently assume that all queries are of the type select.
 	pquery->commandType = CMD_SELECT;
 
-	delete pmapcidvarquery;
+	GPOS_DELETE(pmapcidvarquery);
 
 	if (m_pdxlsctranslator->FHasSubqueries())
 	{
@@ -182,7 +182,7 @@ CTranslatorDXLToQuery::PqueryFromDXLSubquery
 {
 
 	// initialize the colid->var mapping
-	CMappingColIdVarQuery *pmapcidvarquery = New (m_pmp) CMappingColIdVarQuery(m_pmp, ptemap, ulQueryLevel);
+	CMappingColIdVarQuery *pmapcidvarquery = GPOS_NEW (m_pmp) CMappingColIdVarQuery(m_pmp, ptemap, ulQueryLevel);
 
 	GPOS_ASSERT(NULL != pdxln);
 
@@ -201,7 +201,7 @@ CTranslatorDXLToQuery::PqueryFromDXLSubquery
 
 	pquery->commandType = CMD_SELECT;
 
-	delete pmapcidvarquery;
+	GPOS_DELETE(pmapcidvarquery);
 
 	if (m_pdxlsctranslator->FHasSubqueries())
 	{
@@ -229,7 +229,7 @@ CTranslatorDXLToQuery::SetSubqueryOutput
 	)
 {
 	GPOS_ASSERT(NULL != pquery);
-	CStateDXLToQuery *pstatedxltoqueryOutput = New(m_pmp) CStateDXLToQuery(m_pmp);
+	CStateDXLToQuery *pstatedxltoqueryOutput = GPOS_NEW(m_pmp) CStateDXLToQuery(m_pmp);
 
 	List *plTE = NIL;
 	ULONG ulResno = 1;
@@ -279,7 +279,7 @@ CTranslatorDXLToQuery::SetSubqueryOutput
 	}
 
 	pstatedxltoquery->Reload(pstatedxltoqueryOutput);
-	delete pstatedxltoqueryOutput;
+	GPOS_DELETE(pstatedxltoqueryOutput);
 
 	pquery->targetList = plTE;
 }
@@ -303,7 +303,7 @@ CTranslatorDXLToQuery::SetQueryOutput
 {
 	GPOS_ASSERT(NULL != pdrgpdxlnQueryOutput && NULL != pquery);
 
-	CStateDXLToQuery *pstatedxltoqueryOutput = New(m_pmp) CStateDXLToQuery(m_pmp);
+	CStateDXLToQuery *pstatedxltoqueryOutput = GPOS_NEW(m_pmp) CStateDXLToQuery(m_pmp);
 
 	List *plTE = NIL;
 
@@ -366,7 +366,7 @@ CTranslatorDXLToQuery::SetQueryOutput
 	}
 
 	pstatedxltoquery->Reload(pstatedxltoqueryOutput);
-	delete pstatedxltoqueryOutput;
+	GPOS_DELETE(pstatedxltoqueryOutput);
 
 	pquery->targetList = plTE;
 }
@@ -566,10 +566,10 @@ CTranslatorDXLToQuery::TranslateSetOp
 	{
 		CDXLNode *pdxlnChild = (*pdxln)[ul];
 
-		CStateDXLToQuery *pstatedxltoqueryChild = New(m_pmp) CStateDXLToQuery(m_pmp);
+		CStateDXLToQuery *pstatedxltoqueryChild = GPOS_NEW(m_pmp) CStateDXLToQuery(m_pmp);
 		RangeTblRef *prtrefChild = PrtrefFromDXLLgOp(pdxlnChild, pquery, pstatedxltoqueryChild, pmapcidvarquery);
 		MarkUnusedColumns(pquery, prtrefChild, pstatedxltoqueryChild, pdxlop->Pdrgpul(ul) /*array of colids of the first child*/);
-		delete pstatedxltoqueryChild;
+		GPOS_DELETE(pstatedxltoqueryChild);
 
 		if (0 == ul)
 		{
@@ -632,7 +632,7 @@ CTranslatorDXLToQuery::MarkUnusedColumns
 	Query *pqueryDerTbl = prte->subquery;
 
 	// maintain the list of used columns in a bit set
-	CBitSet *pds = New(m_pmp) CBitSet(m_pmp);
+	CBitSet *pds = GPOS_NEW(m_pmp) CBitSet(m_pmp);
 	const ULONG ulLen = pdrgpulColids->UlLength();
 	for (ULONG ul = 0; ul < ulLen; ul++)
 	{

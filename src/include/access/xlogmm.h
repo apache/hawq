@@ -12,6 +12,7 @@
  */
 #define MASTER_MIRROR_SYNC
 
+#include "c.h"
 #include "access/xlog.h"
 #include "access/xlogdefs.h"
 #include "lib/stringinfo.h"
@@ -42,6 +43,9 @@ typedef struct xl_mm_fs_obj
 
 	bool shared;
 	char path[MAXPGPATH];
+    
+	ItemPointerData persistentTid;
+	int64 persistentSerialNum;
 } xl_mm_fs_obj;
 
 /*
@@ -120,23 +124,23 @@ extern void mmxlog_desc(StringInfo buf, XLogRecPtr beginLoc, XLogRecord *record)
  * Functions to generate WAL records to remove file system objects on the
  * master / standby master.
  */
-extern void mmxlog_log_remove_filespace(Oid filespace);
-extern void mmxlog_log_remove_tablespace(Oid tablespace);
-extern void mmxlog_log_remove_database(Oid tablespace, Oid database);
-extern void mmxlog_log_remove_relation(Oid tablespace, Oid database, Oid relfilenode);
+extern void mmxlog_log_remove_filespace(Oid filespace,ItemPointer persistentTid, int64 persistentSerialNum);
+extern void mmxlog_log_remove_tablespace(Oid tablespace,ItemPointer persistentTid, int64 persistentSerialNum);
+extern void mmxlog_log_remove_database(Oid tablespace, Oid database,ItemPointer persistentTid, int64 persistentSerialNum);
+extern void mmxlog_log_remove_relation(Oid tablespace, Oid database, Oid relfilenode,ItemPointer persistentTid, int64 persistentSerialNum);
 extern void mmxlog_log_remove_relfilenode(Oid tablespace, Oid database,
-										  Oid relfilenode, int32 segnum);
+										  Oid relfilenode, int32 segnum,ItemPointer persistentTid, int64 persistentSerialNum);
 
 /*
  * Functions to generate WAL records to add file system objects on the
  * master / standby master.
  */
-extern void mmxlog_log_create_filespace(Oid filespace);
-extern void mmxlog_log_create_tablespace(Oid filespace, Oid tablespace);
-extern void mmxlog_log_create_database(Oid tablespace, Oid database);
-extern void mmxlog_log_create_relation(Oid tablespace, Oid database, Oid relfilenode);
+extern void mmxlog_log_create_filespace(Oid filespace,ItemPointer persistentTid, int64 persistentSerialNum);
+extern void mmxlog_log_create_tablespace(Oid filespace, Oid tablespace,ItemPointer persistentTid, int64 persistentSerialNum);
+extern void mmxlog_log_create_database(Oid tablespace, Oid database,ItemPointer persistentTid, int64 persistentSerialNum);
+extern void mmxlog_log_create_relation(Oid tablespace, Oid database, Oid relfilenode,ItemPointer persistentTid, int64 persistentSerialNum);
 extern void mmxlog_log_create_relfilenode(Oid tablespace, Oid database,
-										  Oid relfilenode, int32 segnum);
+										  Oid relfilenode, int32 segnum,ItemPointer persistentTid, int64 persistentSerialNum);
 extern void mmxlog_append_checkpoint_data(XLogRecData rdata[5]);
 extern void mmxlog_read_checkpoint_data(char *cpdata, int masterMirroringLen, int checkpointLen, XLogRecPtr *beginLoc);
 extern bool mmxlog_filespace_get_path(

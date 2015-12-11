@@ -647,8 +647,6 @@ ConditionalMultiXactIdWait(MultiXactId multi)
 static MultiXactId
 CreateMultiXactId(int nxids, TransactionId *xids)
 {
-	MIRRORED_LOCK_DECLARE;
-
 	MultiXactId multi;
 	MultiXactOffset offset;
 	XLogRecData rdata[2];
@@ -673,8 +671,6 @@ CreateMultiXactId(int nxids, TransactionId *xids)
 		debug_elog2(DEBUG2, "Create: in cache!");
 		return multi;
 	}
-
-	MIRRORED_LOCK;
 
 	/*
 	 * Assign the MXID and offsets range to use, and make sure there is space
@@ -717,8 +713,6 @@ CreateMultiXactId(int nxids, TransactionId *xids)
 	/* Done with critical section */
 	END_CRIT_SECTION();
 
-	MIRRORED_UNLOCK;
-
 	/* Store the new MultiXactId in the local cache, too */
 	mXactCachePut(multi, nxids, xids);
 
@@ -737,16 +731,12 @@ static void
 RecordNewMultiXact(MultiXactId multi, MultiXactOffset offset,
 				   int nxids, TransactionId *xids)
 {
-	MIRRORED_LOCK_DECLARE;
-
 	int			pageno;
 	int			prev_pageno;
 	int			entryno;
 	int			slotno;
 	MultiXactOffset *offptr;
 	int			i;
-
-	MIRRORED_LOCK;
 
 	LWLockAcquire(MultiXactOffsetControlLock, LW_EXCLUSIVE);
 
@@ -798,8 +788,6 @@ RecordNewMultiXact(MultiXactId multi, MultiXactOffset offset,
 	}
 
 	LWLockRelease(MultiXactMemberControlLock);
-
-	MIRRORED_UNLOCK;
 }
 
 /*
@@ -820,8 +808,6 @@ RecordNewMultiXact(MultiXactId multi, MultiXactOffset offset,
 static MultiXactId
 GetNewMultiXactId(int nxids, MultiXactOffset *offset)
 {
-	MIRRORED_LOCK_DECLARE;
-
 	MultiXactId result;
 	MultiXactOffset nextOffset;
 
@@ -829,8 +815,6 @@ GetNewMultiXactId(int nxids, MultiXactOffset *offset)
 
 	/* MultiXactIdSetOldestMember() must have been called already */
 	Assert(MultiXactIdIsValid(OldestMemberMXactId[MyBackendId]));
-
-	MIRRORED_LOCK;
 
 	LWLockAcquire(MultiXactGenLock, LW_EXCLUSIVE);
 
@@ -886,8 +870,6 @@ GetNewMultiXactId(int nxids, MultiXactOffset *offset)
 
 	LWLockRelease(MultiXactGenLock);
 
-	MIRRORED_UNLOCK;
-
 	debug_elog4(DEBUG2, "GetNew: returning %u offset %u", result, *offset);
 	return result;
 }
@@ -903,8 +885,6 @@ GetNewMultiXactId(int nxids, MultiXactOffset *offset)
 int
 GetMultiXactIdMembers(MultiXactId multi, TransactionId **xids)
 {
-	MIRRORED_LOCK_DECLARE;
-
 	int			pageno;
 	int			prev_pageno;
 	int			entryno;
@@ -974,8 +954,6 @@ GetMultiXactIdMembers(MultiXactId multi, TransactionId **xids)
 		*xids = NULL;
 		return -1;
 	}
-
-	MIRRORED_LOCK;
 
 	/*
 	 * Find out the offset at which we need to start reading MultiXactMembers
@@ -1103,8 +1081,6 @@ retry:
 	}
 
 	LWLockRelease(MultiXactMemberControlLock);
-
-	MIRRORED_UNLOCK;
 
 	/*
 	 * Copy the result into the local cache.
@@ -1367,11 +1343,7 @@ MultiXactShmemInit(void)
 void
 BootStrapMultiXact(void)
 {
-	MIRRORED_LOCK_DECLARE;
-
 	int			slotno;
-
-	MIRRORED_LOCK;
 
 	LWLockAcquire(MultiXactOffsetControlLock, LW_EXCLUSIVE);
 
@@ -1394,8 +1366,6 @@ BootStrapMultiXact(void)
 	Assert(!MultiXactMemberCtl->shared->page_dirty[slotno]);
 
 	LWLockRelease(MultiXactMemberControlLock);
-
-	MIRRORED_UNLOCK;
 }
 
 /*
@@ -1410,18 +1380,12 @@ BootStrapMultiXact(void)
 static int
 ZeroMultiXactOffsetPage(int pageno, bool writeXlog)
 {
-	MIRRORED_LOCK_DECLARE;
-
 	int			slotno;
-
-	MIRRORED_LOCK;
 
 	slotno = SimpleLruZeroPage(MultiXactOffsetCtl, pageno);
 
 	if (writeXlog)
 		WriteMZeroPageXlogRec(pageno, XLOG_MULTIXACT_ZERO_OFF_PAGE);
-
-	MIRRORED_UNLOCK;
 
 	return slotno;
 }
@@ -1432,18 +1396,12 @@ ZeroMultiXactOffsetPage(int pageno, bool writeXlog)
 static int
 ZeroMultiXactMemberPage(int pageno, bool writeXlog)
 {
-	MIRRORED_LOCK_DECLARE;
-
 	int			slotno;
-
-	MIRRORED_LOCK;
 
 	slotno = SimpleLruZeroPage(MultiXactMemberCtl, pageno);
 
 	if (writeXlog)
 		WriteMZeroPageXlogRec(pageno, XLOG_MULTIXACT_ZERO_MEM_PAGE);
-
-	MIRRORED_UNLOCK;
 
 	return slotno;
 }
@@ -1461,14 +1419,10 @@ ZeroMultiXactMemberPage(int pageno, bool writeXlog)
 void
 StartupMultiXact(void)
 {
-	MIRRORED_LOCK_DECLARE;
-
 	MultiXactId multi = MultiXactState->nextMXact;
 	MultiXactOffset offset = MultiXactState->nextOffset;
 	int			pageno;
 	int			entryno;
-
-	MIRRORED_LOCK;
 
 	/* Clean up offsets state */
 	LWLockAcquire(MultiXactOffsetControlLock, LW_EXCLUSIVE);
@@ -1530,8 +1484,6 @@ StartupMultiXact(void)
 
 	LWLockRelease(MultiXactMemberControlLock);
 
-	MIRRORED_UNLOCK;
-
 	/*
 	 * Initialize lastTruncationPoint to invalid, ensuring that the first
 	 * checkpoint will try to do truncation.
@@ -1545,15 +1497,9 @@ StartupMultiXact(void)
 void
 ShutdownMultiXact(void)
 {
-	MIRRORED_LOCK_DECLARE;
-
-	MIRRORED_LOCK;
-
 	/* Flush dirty MultiXact pages to disk */
 	SimpleLruFlush(MultiXactOffsetCtl, false);
 	SimpleLruFlush(MultiXactMemberCtl, false);
-
-	MIRRORED_UNLOCK;
 }
 
 /*
@@ -1564,18 +1510,12 @@ MultiXactGetCheckptMulti(bool is_shutdown __attribute__((unused)) ,
 						 MultiXactId *nextMulti,
 						 MultiXactOffset *nextMultiOffset)
 {
-	MIRRORED_LOCK_DECLARE;
-
-	MIRRORED_LOCK;
-
 	LWLockAcquire(MultiXactGenLock, LW_SHARED);
 
 	*nextMulti = MultiXactState->nextMXact;
 	*nextMultiOffset = MultiXactState->nextOffset;
 
 	LWLockRelease(MultiXactGenLock);
-
-	MIRRORED_UNLOCK;
 
 	debug_elog4(DEBUG2, "MultiXact: checkpoint is nextMulti %u, nextOffset %u",
 				*nextMulti, *nextMultiOffset);
@@ -1587,10 +1527,6 @@ MultiXactGetCheckptMulti(bool is_shutdown __attribute__((unused)) ,
 void
 CheckPointMultiXact(void)
 {
-	MIRRORED_LOCK_DECLARE;
-
-	MIRRORED_LOCK;
-
 	/* Flush dirty MultiXact pages to disk */
 	SimpleLruFlush(MultiXactOffsetCtl, true);
 	SimpleLruFlush(MultiXactMemberCtl, true);
@@ -1605,8 +1541,6 @@ CheckPointMultiXact(void)
 	 */
 	if (!InRecovery)
 		TruncateMultiXact();
-
-	MIRRORED_UNLOCK;
 }
 
 /*
@@ -1662,8 +1596,6 @@ MultiXactAdvanceNextMXact(MultiXactId minMulti,
 static void
 ExtendMultiXactOffset(MultiXactId multi)
 {
-	MIRRORED_LOCK_DECLARE;
-
 	int			pageno;
 
 	/*
@@ -1676,16 +1608,12 @@ ExtendMultiXactOffset(MultiXactId multi)
 
 	pageno = MultiXactIdToOffsetPage(multi);
 
-	MIRRORED_LOCK;
-
 	LWLockAcquire(MultiXactOffsetControlLock, LW_EXCLUSIVE);
 
 	/* Zero the page and make an XLOG entry about it */
 	ZeroMultiXactOffsetPage(pageno, true);
 
 	LWLockRelease(MultiXactOffsetControlLock);
-
-	MIRRORED_UNLOCK;
 }
 
 /*
@@ -1698,10 +1626,6 @@ ExtendMultiXactOffset(MultiXactId multi)
 static void
 ExtendMultiXactMember(MultiXactOffset offset, int nmembers)
 {
-	MIRRORED_LOCK_DECLARE;
-
-	MIRRORED_LOCK;
-
 	/*
 	 * It's possible that the members span more than one page of the members
 	 * file, so we loop to ensure we consider each page.  The coding is not
@@ -1734,8 +1658,6 @@ ExtendMultiXactMember(MultiXactOffset offset, int nmembers)
 		offset += (MULTIXACT_MEMBERS_PER_PAGE - entryno);
 		nmembers -= (MULTIXACT_MEMBERS_PER_PAGE - entryno);
 	}
-
-	MIRRORED_UNLOCK;
 }
 
 /*
@@ -1750,8 +1672,6 @@ ExtendMultiXactMember(MultiXactOffset offset, int nmembers)
 static void
 TruncateMultiXact(void)
 {
-	MIRRORED_LOCK_DECLARE;
-
 	MultiXactId nextMXact;
 	MultiXactOffset nextOffset;
 	MultiXactId oldestMXact;
@@ -1764,8 +1684,6 @@ TruncateMultiXact(void)
 	 * the oldest valid value among all the OldestMemberMXactId[] and
 	 * OldestVisibleMXactId[] entries, or nextMXact if none are valid.
 	 */
-
-	MIRRORED_LOCK;
 
 	LWLockAcquire(MultiXactGenLock, LW_SHARED);
 
@@ -1806,7 +1724,6 @@ TruncateMultiXact(void)
 	 */
 	if (MultiXactState->lastTruncationPoint == oldestMXact)
 	{
-		MIRRORED_UNLOCK;
 		return;
 	}
 	
@@ -1857,8 +1774,6 @@ TruncateMultiXact(void)
 	 * since only one backend does checkpoints at a time.
 	 */
 	MultiXactState->lastTruncationPoint = oldestMXact;
-
-	MIRRORED_UNLOCK;
 }
 
 /*
@@ -1953,11 +1868,7 @@ WriteMZeroPageXlogRec(int pageno, uint8 info)
 void
 multixact_redo(XLogRecPtr beginLoc __attribute__((unused)), XLogRecPtr lsn __attribute__((unused)), XLogRecord *record)
 {
-	MIRRORED_LOCK_DECLARE;
-
 	uint8		info = record->xl_info & ~XLR_INFO_MASK;
-
-	MIRRORED_LOCK;
 
 	if (info == XLOG_MULTIXACT_ZERO_OFF_PAGE)
 	{
@@ -2022,8 +1933,6 @@ multixact_redo(XLogRecPtr beginLoc __attribute__((unused)), XLogRecPtr lsn __att
 	}
 	else
 		elog(PANIC, "multixact_redo: unknown op code %u", info);
-
-	MIRRORED_UNLOCK;
 }
 
 void

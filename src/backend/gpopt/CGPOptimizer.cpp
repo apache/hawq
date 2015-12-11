@@ -29,7 +29,6 @@
 //
 //---------------------------------------------------------------------------
 
-#include "gpopt/Allocators.h"
 #include "gpopt/CGPOptimizer.h"
 #include "gpopt/utils/COptTasks.h"
 

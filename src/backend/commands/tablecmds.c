@@ -10603,8 +10603,6 @@ copy_append_only_data(
 	
 	char			*buffer)
 {
-	MIRRORED_LOCK_DECLARE;
-
 	char srcFileName[MAXPGPATH];
 	char dstFileName[MAXPGPATH];
 	char extension[12];
@@ -10709,12 +10707,6 @@ copy_append_only_data(
 		bufferLen = (Size) Min(2*BLCKSZ, endOffset - readOffset); 					
 	}
 	
-	/*
-	 * Use the MirroredLock here to cover the flush (and close) and evaluation below whether
-	 * we must catchup the mirror.
-	 */
-	MIRRORED_LOCK;
-
 	MirroredAppendOnly_FlushAndClose(
 							&mirroredDstOpen,
 							&primaryError
@@ -10730,8 +10722,6 @@ copy_append_only_data(
 				 errdetail("%s", HdfsGetLastError())));
 
 	FileClose(srcFile);
-
-	MIRRORED_UNLOCK;
 
 	if (Debug_persistent_print)
 		elog(Persistent_DebugPrintLevel(), 

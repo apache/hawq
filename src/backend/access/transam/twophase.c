@@ -1153,8 +1153,6 @@ StartPrepare(GlobalTransaction gxact)
  */
 void EndPrepare(GlobalTransaction gxact)
 {
-        MIRRORED_LOCK_DECLARE;
-
         CHECKPOINT_START_LOCK_DECLARE;
 
         TransactionId       xid = gxact->proc.xid;
@@ -1164,14 +1162,6 @@ void EndPrepare(GlobalTransaction gxact)
 
         /* Add the end sentinel to the list of 2PC records */
         RegisterTwoPhaseRecord(TWOPHASE_RM_END_ID, 0, NULL, 0);
-
-        /*
-         * The MirroredLock will cover BOTH mirrored writes to the pg_twophase directory
-         * and the Prepared XLOG record.
-         *
-         * The lock order is: MirroredLock then CheckpointStartLock.
-         */
-        MIRRORED_LOCK;
 
         /*
          * We have to lock out checkpoint start here, too; otherwise a checkpoint
@@ -1232,8 +1222,6 @@ void EndPrepare(GlobalTransaction gxact)
          */
         CHECKPOINT_START_UNLOCK;
 
-        MIRRORED_UNLOCK;
-
 #ifdef FAULT_INJECTOR
         FaultInjector_InjectFaultIfSet(
                         EndPreparedTwoPhaseSleep,
@@ -1293,7 +1281,6 @@ PrepareDecrAppendOnlyCommitWork(char *gid)
 bool
 FinishPreparedTransaction(const char *gid, bool isCommit, bool raiseErrorIfNotFound)
 {
-        MIRRORED_LOCK_DECLARE;
 	CHECKPOINT_START_LOCK_DECLARE;
 
         GlobalTransaction gxact;
@@ -1430,12 +1417,6 @@ FinishPreparedTransaction(const char *gid, bool isCommit, bool raiseErrorIfNotFo
         // NOTE: work.
         START_CRIT_SECTION();
 
-        /*
-         * Use the MirroredLock to cover both the XLOG of the {COMMIT|ABORT} PREPARED
-         * record and the removal the of the two phase file from the pg_twophase directory.
-         */
-        MIRRORED_LOCK;
-
 	/*
 	 * We have to lock out checkpoint start here when updating persistent relation information
 	 * like Appendonly segment's committed EOF. Otherwise there might be a window betwwen
@@ -1511,8 +1492,6 @@ FinishPreparedTransaction(const char *gid, bool isCommit, bool raiseErrorIfNotFo
         RemoveGXact(gxact);
 
 	CHECKPOINT_START_UNLOCK;
-
-        MIRRORED_UNLOCK;
 
         END_CRIT_SECTION();
 

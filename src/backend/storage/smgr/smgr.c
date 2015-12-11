@@ -1307,8 +1307,6 @@ smgrDoDeleteActions(
 	int					*listCount,
 	bool				forCommit)
 {
-	MIRRORED_LOCK_DECLARE;
-
 	CHECKPOINT_START_LOCK_DECLARE;
 
 	PendingDelete *current;
@@ -1340,13 +1338,6 @@ smgrDoDeleteActions(
 	 * to reduce the time that the lock is held, thus allowing a larger window of time for filerep
 	 * resynchronization to obtain the lock.
 	 */
-
-	/*
-	 * We need to do the transition to 'Aborting Create' or 'Drop Pending' and perform
-	 * the file-system drop while under one acquistion of the MirroredLock.  Otherwise,
-	 * we could race with resynchronize's ReDrop.
-	 */
-	MIRRORED_LOCK;
 
 	/*
 	 * The logic will eventually obtain a CheckpointStartLock in PersistentRelation_Dropped(),
@@ -1618,8 +1609,6 @@ smgrDoDeleteActions(
 	PersistentFileSysObj_FlushXLog();
 
 	CHECKPOINT_START_UNLOCK;
-
-	MIRRORED_UNLOCK;
 
 	if (stateChangeResults != NULL)
 		pfree(stateChangeResults);

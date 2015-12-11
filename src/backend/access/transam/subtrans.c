@@ -68,8 +68,6 @@ static bool SubTransPagePrecedes(int page1, int page2);
 static void
 SubTransGetData(TransactionId xid, SubTransData* subData)
 {
-	MIRRORED_LOCK_DECLARE;
-
 	int			pageno = TransactionIdToPage(xid);
 	int			entryno = TransactionIdToEntry(xid);
 	int			slotno;
@@ -85,8 +83,6 @@ SubTransGetData(TransactionId xid, SubTransData* subData)
 		subData->topMostParent = xid;
 		return;
 	}
-
-	MIRRORED_LOCK;
 
 	/* lock is acquired by SimpleLruReadPage_ReadOnly */
 
@@ -104,8 +100,6 @@ SubTransGetData(TransactionId xid, SubTransData* subData)
 
 	LWLockRelease(SubtransControlLock);
 
-	MIRRORED_UNLOCK;
-
 	return;
 }
 
@@ -115,8 +109,6 @@ SubTransGetData(TransactionId xid, SubTransData* subData)
 void
 SubTransSetParent(TransactionId xid, TransactionId parent)
 {
-	MIRRORED_LOCK_DECLARE;
-
 	int			pageno = TransactionIdToPage(xid);
 	int			entryno = TransactionIdToEntry(xid);
 	int			slotno;
@@ -136,8 +128,6 @@ SubTransSetParent(TransactionId xid, TransactionId parent)
 		subData.topMostParent = InvalidTransactionId;
 	}
 
-	MIRRORED_LOCK;
-
 	LWLockAcquire(SubtransControlLock, LW_EXCLUSIVE);
 
 	slotno = SimpleLruReadPage(SubTransCtl, pageno, xid);
@@ -154,8 +144,6 @@ SubTransSetParent(TransactionId xid, TransactionId parent)
 	SubTransCtl->shared->page_dirty[slotno] = true;
 
 	LWLockRelease(SubtransControlLock);
-
-	MIRRORED_UNLOCK;
 }
 
 /*
@@ -218,11 +206,7 @@ SUBTRANSShmemInit(void)
 void
 BootStrapSUBTRANS(void)
 {
-	MIRRORED_LOCK_DECLARE;
-
 	int			slotno;
-
-	MIRRORED_LOCK;
 
 	LWLockAcquire(SubtransControlLock, LW_EXCLUSIVE);
 
@@ -234,8 +218,6 @@ BootStrapSUBTRANS(void)
 	Assert(!SubTransCtl->shared->page_dirty[slotno]);
 
 	LWLockRelease(SubtransControlLock);
-
-	MIRRORED_UNLOCK;
 }
 
 /*
@@ -249,15 +231,9 @@ BootStrapSUBTRANS(void)
 static int
 ZeroSUBTRANSPage(int pageno)
 {
-	MIRRORED_LOCK_DECLARE;
-
 	int result;
 
-	MIRRORED_LOCK;
-
 	result = SimpleLruZeroPage(SubTransCtl, pageno);
-
-	MIRRORED_UNLOCK;
 
 	return result;
 }
@@ -272,8 +248,6 @@ ZeroSUBTRANSPage(int pageno)
 void
 StartupSUBTRANS(TransactionId oldestActiveXID)
 {
-	MIRRORED_LOCK_DECLARE;
-
 	int			startPage;
 	int			endPage;
 
@@ -283,8 +257,6 @@ StartupSUBTRANS(TransactionId oldestActiveXID)
 	 * Whenever we advance into a new page, ExtendSUBTRANS will likewise zero
 	 * the new page without regard to whatever was previously on disk.
 	 */
-
-	MIRRORED_LOCK;
 
 	LWLockAcquire(SubtransControlLock, LW_EXCLUSIVE);
 
@@ -299,8 +271,6 @@ StartupSUBTRANS(TransactionId oldestActiveXID)
 	(void) ZeroSUBTRANSPage(startPage);
 
 	LWLockRelease(SubtransControlLock);
-
-	MIRRORED_UNLOCK;
 }
 
 /*
@@ -309,10 +279,6 @@ StartupSUBTRANS(TransactionId oldestActiveXID)
 void
 ShutdownSUBTRANS(void)
 {
-	MIRRORED_LOCK_DECLARE;
-
-	MIRRORED_LOCK;
-
 	/*
 	 * Flush dirty SUBTRANS pages to disk
 	 *
@@ -320,8 +286,6 @@ ShutdownSUBTRANS(void)
 	 * it merely as a debugging aid.
 	 */
 	SimpleLruFlush(SubTransCtl, false);
-
-	MIRRORED_UNLOCK;
 }
 
 /*
@@ -330,10 +294,6 @@ ShutdownSUBTRANS(void)
 void
 CheckPointSUBTRANS(void)
 {
-	MIRRORED_LOCK_DECLARE;
-
-	MIRRORED_LOCK;
-
 	/*
 	 * Flush dirty SUBTRANS pages to disk
 	 *
@@ -342,8 +302,6 @@ CheckPointSUBTRANS(void)
 	 * the checkpoint process and not by backends.
 	 */
 	SimpleLruFlush(SubTransCtl, true);
-
-	MIRRORED_UNLOCK;
 }
 
 
@@ -393,8 +351,6 @@ ExtendSUBTRANS(TransactionId newestXact)
 void
 TruncateSUBTRANS(TransactionId oldestXact)
 {
-	MIRRORED_LOCK_DECLARE;
-
 	int			cutoffPage;
 
 	/*
@@ -403,11 +359,7 @@ TruncateSUBTRANS(TransactionId oldestXact)
 	 */
 	cutoffPage = TransactionIdToPage(oldestXact);
 
-	MIRRORED_LOCK;
-
 	SimpleLruTruncate(SubTransCtl, cutoffPage, false);
-
-	MIRRORED_UNLOCK;
 }
 
 
