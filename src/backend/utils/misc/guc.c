@@ -537,7 +537,6 @@ static int	block_size;
 static bool integer_datetimes;
 //static bool standard_conforming_strings;
 static char *gp_log_gang_str;
-static char *gp_log_fts_str;
 static char *gp_log_interconnect_str;
 static char *gp_interconnect_type_str;
 static char *gp_interconnect_fc_method_str;
@@ -5752,46 +5751,6 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"gp_fts_probe_retries", PGC_POSTMASTER, GP_ARRAY_TUNING,
-			gettext_noop("Number of retries for FTS to complete probing a segment."),
-			gettext_noop("Used by the fts-probe process."),
-			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
-		},
-		&gp_fts_probe_retries,
-		5, 0, 100, NULL, NULL
-	},
-
-	{
-		{"gp_fts_probe_timeout", PGC_USERSET, GP_ARRAY_TUNING,
-			gettext_noop("Maximum time (in seconds) allowed for FTS to complete probing a segment."),
-			gettext_noop("Used by the fts-probe process."),
-			GUC_UNIT_S
-		},
-		&gp_fts_probe_timeout,
-		20, 0, INT_MAX, NULL, NULL
-	},
-
-	{
-		{"gp_fts_probe_interval", PGC_POSTMASTER, GP_ARRAY_TUNING,
-			gettext_noop("A complete probe of all segments starts each time a timer with this period expires."),
-			gettext_noop("Used by the fts-probe process. "),
-			GUC_UNIT_S
-		},
-		&gp_fts_probe_interval,
-		60, 10, INT_MAX, NULL, NULL
-	},
-
-	{
-		{"gp_fts_probe_threadcount", PGC_POSTMASTER, GP_ARRAY_TUNING,
-			gettext_noop("Use this number of threads for probing the segments."),
-			gettext_noop("The number of threads to create at each probe interval expiration."),
-			GUC_NOT_IN_SAMPLE
-		},
-		&gp_fts_probe_threadcount,
-		16, 1, 128, NULL, NULL
-	},
-
-	{
 		{"gp_session_id", PGC_BACKEND, CLIENT_CONN_OTHER,
 			gettext_noop("Global ID used to uniquely identify a particular session in an Greenplum Database array"),
 			NULL,
@@ -7729,16 +7688,6 @@ static struct config_string ConfigureNamesString[] =
 		},
 		&gp_log_gang_str,
 		"terse", gpvars_assign_gp_log_gang, gpvars_show_gp_log_gang
-	},
-
-	{
-		{"gp_log_fts", PGC_POSTMASTER, LOGGING_WHAT,
-			gettext_noop("Sets the verbosity of logged messages pertaining to fault probing."),
-			gettext_noop("Valid values are \"off\", \"terse\", \"verbose\" and \"debug\"."),
-			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
-		},
-		&gp_log_fts_str,
-		"terse", gpvars_assign_gp_log_fts, gpvars_show_gp_log_fts
 	},
 
 	{
