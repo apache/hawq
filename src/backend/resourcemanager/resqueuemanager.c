@@ -2186,32 +2186,6 @@ int acquireResourceFromResQueMgr(ConnectionTrack  conntrack,
 		if ( conntrack->StatNVSeg == 0 )
 		{
 			/*------------------------------------------------------------------
-			 * The following logic consider the actual resource requirement from
-			 * dispatcher based on table size, workload, etc. The requirement is
-			 * described by (MinSegCountFixed, MaxSegCountFixed). The requirement
-			 * can be satisfied only when there is a non-empty intersect between
-			 * (MinSegCountFixed, MaxSegCountFixed) and (SegNumMin, SegNum).
-			 *------------------------------------------------------------------
-			 */
-			conntrack->SegNumMin =
-				conntrack->MaxSegCountFixed < conntrack->SegNumMin ?
-				conntrack->MinSegCountFixed :
-				max(conntrack->SegNumMin, conntrack->MinSegCountFixed);
-
-			conntrack->SegNum = min(conntrack->SegNum,
-									conntrack->MaxSegCountFixed);
-
-			Assert( conntrack->SegNumMin <= conntrack->SegNum );
-			elog(LOG, "ConnID %d. Query resource expects (%d MB, %lf CORE) x %d "
-					  "( MIN %d ) resource after adjusting based on query "
-					  "characters.",
-					  conntrack->ConnID,
-					  conntrack->SegMemoryMB,
-					  conntrack->SegCore,
-					  conntrack->SegNum,
-					  conntrack->SegNumMin);
-
-			/*------------------------------------------------------------------
 			 * Adjust the number of virtual segments again based on
 			 * NVSEG_*_LIMITs and NVSEG_*_LIMIT_PERSEGs. This adjustment must
 			 * succeed.
@@ -2219,7 +2193,7 @@ int acquireResourceFromResQueMgr(ConnectionTrack  conntrack,
 			 */
 			adjustResourceExpectsByQueueNVSegLimits(conntrack);
 
-			elog(LOG, "ConnID %d. Query resource expects (%d MB, %lf CORE) x %d "
+			elog(LOG, "ConnID %d. Expect query resource (%d MB, %lf CORE) x %d "
 					  "( MIN %d ) resource after adjusting based on queue NVSEG "
 					  "limits.",
 					  conntrack->ConnID,
@@ -3402,10 +3376,22 @@ int computeQueryQuota(ConnectionTrack conn, char *errorbuf, int errorbufsize)
 		conn->SegMemoryMB = track->QueueInfo->SegResourceQuotaMemoryMB;
 		conn->SegCore 	  = track->QueueInfo->SegResourceQuotaVCore;
 
-		int vseglimit = conn->VSegLimitPerSeg * PRESPOOL->AvailNodeCount >
-							conn->VSegLimit ?
+		int vseglimit = 0;
+		/*----------------------------------------------------------------------
+		 * The limit of vseg number per segment is valid only when query does
+		 * not have fixed vseg number to request.
+		 *----------------------------------------------------------------------
+		 */
+		if ( conn->MinSegCountFixed != conn->MaxSegCountFixed )
+		{
+			vseglimit = conn->VSegLimit ?
 						conn->VSegLimit :
 						conn->VSegLimitPerSeg * PRESPOOL->AvailNodeCount;
+		}
+		else
+		{
+			vseglimit = conn->VSegLimit;
+		}
 
 		/*----------------------------------------------------------------------
 		 * Compute total resource quota. This calculation already considers the
@@ -3420,17 +3406,10 @@ int computeQueryQuota(ConnectionTrack conn, char *errorbuf, int errorbufsize)
 										errorbufsize);
 		if ( res != FUNC_RETURN_OK )
 		{
-			/* No setting error buffer here. We expect this is set by
-			 * ApplocationPolicy[] function
-			 */
+			/* No setting error buffer here. We expect this is already set. */
 			return res;
 		}
 
-		/*----------------------------------------------------------------------
-		 * If fixed vseg count range is lower than estimated vseg count range
-		 * based on one allocation policy, we always respect the fixed range.
-		 *----------------------------------------------------------------------
-		 */
 		if ( conn->SegNum < conn->MinSegCountFixed )
 		{
 			res = RESQUEMGR_TOO_MANY_FIXED_SEGNUM;
@@ -3445,10 +3424,46 @@ int computeQueryQuota(ConnectionTrack conn, char *errorbuf, int errorbufsize)
 			return res;
 		}
 
-		conn->SegNumMin = conn->MinSegCountFixed;
-		conn->SegNum = conn->SegNum < conn->MaxSegCountFixed ?
-					   conn->SegNum :
-					   conn->MaxSegCountFixed;
+		elog(LOG, "ConnID %d. Expect query resource (%d MB, %lf CORE) x %d "
+				  "(MIN %d) after checking queue capacity.",
+				  conn->ConnID,
+				  conn->SegMemoryMB,
+				  conn->SegCore,
+				  conn->SegNum,
+				  conn->SegNumMin);
+
+		/*------------------------------------------------------------------
+		 * The following logic consider the actual resource requirement from
+		 * dispatcher based on table size, workload, etc. The requirement is
+		 * described by (MinSegCountFixed, MaxSegCountFixed). The requirement
+		 * can be satisfied only when there is a non-empty intersect between
+		 * (MinSegCountFixed, MaxSegCountFixed) and (SegNumMin, SegNum).
+		 *------------------------------------------------------------------
+		 */
+		if ( conn->MinSegCountFixed < conn->MaxSegCountFixed )
+		{
+			conn->SegNumMin = conn->MaxSegCountFixed < conn->SegNumMin ?
+							  conn->MinSegCountFixed :
+							  max(conn->SegNumMin, conn->MinSegCountFixed);
+			conn->SegNum = min(conn->SegNum, conn->MaxSegCountFixed);
+		}
+		else
+		{
+			Assert(conn->SegNum >= conn->MaxSegCountFixed);
+			conn->SegNumMin = conn->MinSegCountFixed;
+			conn->SegNum	= conn->MaxSegCountFixed;
+		}
+
+		elog(LOG, "ConnID %d. Expect query resource (%d MB, %lf CORE) x %d "
+				  "(MIN %d) after checking query expectation %d (MIN %d).",
+				  conn->ConnID,
+				  conn->SegMemoryMB,
+				  conn->SegCore,
+				  conn->SegNum,
+				  conn->SegNumMin,
+				  conn->MaxSegCountFixed,
+				  conn->MinSegCountFixed);
+
 	}
 
 	/*--------------------------------------------------------------------------
@@ -3474,7 +3489,16 @@ int computeQueryQuota(ConnectionTrack conn, char *errorbuf, int errorbufsize)
 		return res;
 	}
 
-	if ( conn->SegNumMin > conn->VSegLimitPerSeg * PRESPOOL->AvailNodeCount )
+	/*--------------------------------------------------------------------------
+	 * The vseg number per segment limit is valid only when required vseg num
+	 * is a range containing more than one validate values. Generally, in case
+	 * querying one hash distributed table, hash bucket number of vseg is
+	 * required.
+	 *--------------------------------------------------------------------------
+	 */
+	if (conn->StatNVSeg == 0 &&
+		conn->MinSegCountFixed != conn->MaxSegCountFixed &&
+		conn->SegNumMin > conn->VSegLimitPerSeg * PRESPOOL->AvailNodeCount )
 	{
 		res = RESQUEMGR_TOO_MANY_FIXED_SEGNUM;
 
@@ -3489,14 +3513,6 @@ int computeQueryQuota(ConnectionTrack conn, char *errorbuf, int errorbufsize)
 		elog(WARNING, "ConnID %d. %s", conn->ConnID, errorbuf);
 		return res;
 	}
-
-	elog(LOG, "ConnID %d. Expect query resource (%d MB, %lf CORE) x %d (MIN %d) ",
-			  conn->ConnID,
-			  conn->SegMemoryMB,
-			  conn->SegCore,
-			  conn->SegNum,
-			  conn->SegNumMin);
-
 	return FUNC_RETURN_OK;
 }
 
