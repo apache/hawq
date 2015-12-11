@@ -19,7 +19,7 @@
 # Invalid name  - pylint: disable=C0103
 
 """
-  gp_era.py, based on gp_dbid.py
+  gp_era.py
 """
 
 import sys, os, stat, re

@@ -11014,16 +11014,6 @@
             ], 
             "return": "char*"
         }, 
-        "gpvars_assign_gp_log_fts": {
-            "filename": "src/backend/cdb/cdbvars.c", 
-            "header filename": "src/include/cdb/cdbvars.h", 
-            "parameter": [
-                "newval", 
-                "doit", 
-                "source"
-            ], 
-            "return": "char*"
-        }, 
         "gpvars_assign_gp_log_gang": {
             "filename": "src/backend/cdb/cdbvars.c", 
             "header filename": "src/include/cdb/cdbvars.h", 
@@ -11077,12 +11067,6 @@
             "return": "char*"
         }, 
         "gpvars_show_gp_interconnect_type": {
-            "filename": "src/backend/cdb/cdbvars.c", 
-            "header filename": "src/include/cdb/cdbvars.h", 
-            "parameter": [], 
-            "return": "char*"
-        }, 
-        "gpvars_show_gp_log_fts": {
             "filename": "src/backend/cdb/cdbvars.c", 
             "header filename": "src/include/cdb/cdbvars.h", 
             "parameter": [], 
@@ -13940,23 +13924,7 @@
             "filename": "src/backend/cdb/cdbvars.c", 
             "header filename": "src/include/cdb/cdbvars.h"
         }, 
-        "gp_fts_probe_interval": {
-            "filename": "src/backend/cdb/cdbvars.c", 
-            "header filename": "src/include/cdb/cdbvars.h"
-        }, 
         "gp_fts_probe_pause": {
-            "filename": "src/backend/cdb/cdbvars.c", 
-            "header filename": "src/include/cdb/cdbvars.h"
-        }, 
-        "gp_fts_probe_retries": {
-            "filename": "src/backend/cdb/cdbvars.c", 
-            "header filename": "src/include/cdb/cdbvars.h"
-        }, 
-        "gp_fts_probe_threadcount": {
-            "filename": "src/backend/cdb/cdbvars.c", 
-            "header filename": "src/include/cdb/cdbvars.h"
-        }, 
-        "gp_fts_probe_timeout": {
             "filename": "src/backend/cdb/cdbvars.c", 
             "header filename": "src/include/cdb/cdbvars.h"
         }, 
@@ -14095,10 +14063,6 @@
         "gp_local_distributed_cache_stats": {
             "filename": "src/backend/utils/misc/guc.c", 
             "header filename": "src/include/utils/guc.h"
-        }, 
-        "gp_log_fts": {
-            "filename": "src/backend/cdb/cdbvars.c", 
-            "header filename": "src/include/cdb/cdbvars.h"
         }, 
         "gp_log_gang": {
             "filename": "src/backend/cdb/cdbvars.c", 
