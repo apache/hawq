@@ -312,7 +312,6 @@ int         Test_compresslevel_override = 0;
 int			Test_blocksize_override = 0;
 int			Test_safefswritesize_override = 0;
 bool        Master_mirroring_administrator_disable = false;
-int			gp_max_local_distributed_cache = 1024;
 bool		gp_appendonly_verify_block_checksums = false;
 bool 		gp_appendonly_verify_write_block = false;
 bool		gp_heap_require_relhasoids_match = true;
@@ -340,7 +339,6 @@ bool		Debug_datumstream_read_print_varlena_info = false;
 bool		Debug_datumstream_write_use_small_initial_buffers = false;
 bool		gp_temporary_files_filespace_repair = false;
 bool		filesystem_support_truncate = true;
-bool		gp_create_table_random_default_distribution = false;
 bool		gp_allow_non_uniform_partitioning_ddl = true;
 
 int			explain_memory_verbosity = 0;
@@ -3438,16 +3436,6 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
-		{"gp_create_table_random_default_distribution", PGC_USERSET, COMPAT_OPTIONS,
-			gettext_noop("Set the default distribution of a table to RANDOM."),
-			NULL,
-			GUC_NOT_IN_SAMPLE
-		},
-		&gp_create_table_random_default_distribution,
-		false, NULL, NULL
-	},
-
-	{
 		{"gp_allow_non_uniform_partitioning_ddl", PGC_USERSET, COMPAT_OPTIONS,
 			gettext_noop("Allow DDL that will create multi-level partition table with non-uniform hierarchy."),
 			NULL,
@@ -4688,15 +4676,6 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"gp_max_local_distributed_cache", PGC_POSTMASTER, RESOURCES_MEM,
-			gettext_noop("Sets the number of local-distributed transactions to cache for optimizing visibility processing by backends."),
-			NULL
-		},
-		&gp_max_local_distributed_cache,
-		1024, 0, INT_MAX, NULL, NULL
-	},
-
-	{
 		{"gp_max_relations", PGC_POSTMASTER, RESOURCES_MEM,
 			gettext_noop("Sets the maximum number of relations."),
 			NULL
@@ -4935,15 +4914,6 @@ static struct config_int ConfigureNamesInt[] =
 		},
 		&max_stack_depth,
 		100, 100, MAX_KILOBYTES, assign_max_stack_depth, NULL
-	},
-
-	{
-		{"vacuum_cost_page_hit", PGC_USERSET, RESOURCES,
-			gettext_noop("Vacuum cost for a page found in the buffer cache."),
-			NULL
-		},
-		&VacuumCostPageHit,
-		1, 0, 10000, NULL, NULL
 	},
 
 	{

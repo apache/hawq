@@ -14136,10 +14136,6 @@
             "filename": "src/backend/utils/misc/guc.c", 
             "header filename": "src/include/utils/guc.h"
         }, 
-        "gp_max_local_distributed_cache": {
-            "filename": "src/backend/utils/misc/guc.c", 
-            "header filename": "src/include/utils/guc.h"
-        }, 
         "gp_max_tablespaces": {
             "filename": "src/backend/utils/misc/guc.c", 
             "header filename": "src/include/utils/guc.h"
