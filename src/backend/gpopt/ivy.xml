@@ -1,0 +1,25 @@
+<ivy-module version="2.0">
+    <info organisation="Pivotal"
+          module="hawq" />
+
+    <!-- ================================================================ -->
+    <!-- This file is used to support retrieving the appropriate Pivotal  -->
+    <!-- Optimizer versioned files (header and libraries).  It is only    -->
+    <!-- used for commercial builds and can otherwise be ignored.         -->
+    <!-- ================================================================ -->
+
+    <configurations>
+      <conf name="osx105_x86"    description="osx105_x86"    visibility="public"/>
+      <conf name="osx106_x86"    description="osx106_x86"    visibility="public"/>
+      <conf name="osx106_x86_32" description="osx106_x86_32" visibility="public"/>
+      <conf name="rhel5_x86_64"  description="rhel5_x86_64"  visibility="public"/>
+      <conf name="rhel6_x86_64"  description="rhel6_x86_64"  visibility="public"/>
+      <conf name="suse10_x86_64" description="suse10_x86_64" visibility="public"/>
+    </configurations>
+
+    <dependencies>
+      <dependency org="emc"             name="optimizer"       rev="1.614"          conf="osx106_x86->osx106_x86_32;osx106_x86_32->osx106_x86_32;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64" />
+      <dependency org="emc"             name="libgpos"         rev="1.131"          conf="osx106_x86->osx106_x86_32;osx106_x86_32->osx106_x86_32;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64" />
+      <dependency org="xerces"          name="xerces-c"        rev="3.1.1-p1"       conf="osx106_x86->osx106_x86_32;osx106_x86_32->osx106_x86_32;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64" />
+    </dependencies>
+</ivy-module>

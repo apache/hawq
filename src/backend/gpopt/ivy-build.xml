@@ -1,0 +1,69 @@
+<project name="cdb3" default="resolve" xmlns:ivy="antlib:org.apache.ivy.ant">
+
+  <!-- ================================================================ -->
+  <!-- This file is used to support retrieving the appropriate Pivotal  -->
+  <!-- Optimizer versioned files (header and libraries).  It is only    -->
+  <!-- used for commercial builds and can otherwise be ignored.         -->
+  <!-- ================================================================ -->
+
+  <target name="resolve" if="BLD_ARCH">
+    <ivy:settings file="${BLD_TOP}/build-utils/dependencies/ivysettings.xml"/>
+    <ivy:resolve conf="${BLD_ARCH}"
+                 log="download-only"/>
+  </target>
+
+  <target name="clean">
+    <ivy:cleancache />
+  </target>
+
+
+  <target name="post-resolve-trigger">
+    <echo>
+      ======================================================================
+        Post Resolve Trigger
+      ======================================================================
+      
+      organisation=${dep.organisation}
+      module=${dep.module}
+      revision=${dep.revision}
+      platform=${BLD_ARCH}      
+
+    </echo>
+
+   <exec executable="${BLD_TOP}/build-utils/dependencies/ivy.sh">
+    <arg value="${dep.module}"/>
+    <arg value="${dep.revision}"/>
+    <arg value="${dep.organisation}"/>
+    <arg value="${BLD_ARCH}"/>
+  </exec>
+
+  </target>
+
+  <target name="download-untar-trigger">
+    <echo>
+======================================================================
+  Post download artifact
+======================================================================
+    organisation=${dep.organisation}
+    module=${dep.module}
+    revision=${dep.revision}
+    artifact=${dep.artifact}
+    origin=${dep.origin}
+    local=${dep.local}
+    size=${dep.size}</echo>
+
+  <exec executable="${BLD_TOP}/build-utils/dependencies/ivy_util.sh">
+    <arg value="${dep.file}"/>
+    <arg value="${dep.revision}"/>
+  </exec>
+
+   <exec executable="${BLD_TOP}/build-utils/dependencies/ivy.sh">
+    <arg value="${dep.module}"/>
+    <arg value="${dep.revision}"/>
+    <arg value="${dep.organisation}"/>
+    <arg value="${BLD_ARCH}"/>
+  </exec>
+
+  </target>
+  
+</project>
