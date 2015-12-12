@@ -48,9 +48,6 @@
 		"errSentAlert": {
 			"filename": "src/backend/utils/error/elog.c" 
 		},
-		"BackoffBackendTick": {
-			"filename": "src/backend/postmaster/backoff.c" 	
-		},
 		"pgstat_initstats": {
 			"filename": "src/backend/postmaster/pgstat.c" 	
 		},
