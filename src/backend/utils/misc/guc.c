@@ -246,10 +246,6 @@ static bool dummy_autovac=false;
 static bool assign_autovacuum_warning(bool newval, bool doit, GucSource source);
 
 /* Helper function for guc setter */
-extern const char *gpvars_assign_gp_resqueue_priority_default_value(const char *newval,
-		bool doit,
-		GucSource source __attribute__((unused)) );
-
 static const char *assign_password_hash_algorithm(const char *newval,
 												  bool doit, GucSource source);
 static bool	assign_gp_temporary_directory_mark_error(int newval, bool doit, GucSource source);
@@ -549,16 +545,6 @@ static char *gp_interconnect_fc_method_str;
 /* should be static, but commands/variable.c needs to get at these */
 char	   *role_string;
 char	   *session_authorization_string;
-
-/* Backoff-related GUCs */
-bool gp_enable_resqueue_priority;
-int gp_resqueue_priority_local_interval;
-int gp_resqueue_priority_sweeper_interval;
-int gp_resqueue_priority_inactivity_timeout;
-int gp_resqueue_priority_grouping_timeout;
-double gp_resqueue_priority_cpucores_per_segment;
-char* gp_resqueue_priority_default_value;
-bool gp_debug_resqueue_priority = false;
 
 /* Perfmon segment GUCs */
 int gp_perfmon_segment_interval;

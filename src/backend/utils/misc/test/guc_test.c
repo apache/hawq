@@ -69,7 +69,7 @@ test__find_option(void **state)
 
 	config = find_option("password_encryption", LOG);
 	assert_not_null(config);
-	config = find_option("gp_resqueue_priority_cpucores_per_segment", LOG);
+	config = find_option("non_exist_guc", LOG);
 	assert_null(config);
 
 	/* supported obsolete guc name */
