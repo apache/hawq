@@ -2317,14 +2317,14 @@ CommitTransaction(void)
 	willHaveObjectsFromSmgr =
 			PersistentEndXactRec_WillHaveObjectsFromSmgr(EndXactRecKind_Commit);
 
-	if (willHaveObjectsFromSmgr)
-	{
-		/*
-		 * We need to ensure the recording of the [distributed-]commit record and the
-		 * persistent post-commit work will be done either before or after a checkpoint.
-		 */
-		CHECKPOINT_START_LOCK;
-	}
+	/* In previous version, we ensured the recording of the [distributed-]commit record and the
+	 * persistent post-commit work will be done either before or after a checkpoint.
+	 *
+	 * However the persistent table status will be synchronized with AOSeg_XXXX
+	 * table and hdfs file in PersistentRecovery_Scan() at recovery PASS2.
+	 * We don't need to worry about inconsistent states between them. So no
+	 * CHECKPOINT_START_LOCK any more.
+	 */
 
 	/* Prevent cancel/die interrupt while cleaning up */
 	HOLD_INTERRUPTS();
@@ -2426,11 +2426,6 @@ CommitTransaction(void)
 	 */
 	AtEOXact_smgr(true);
 
-	if (willHaveObjectsFromSmgr)
-	{
-		CHECKPOINT_START_UNLOCK;
-	}
-	
 	AtEOXact_MultiXact();
 
 	ResourceOwnerRelease(TopTransactionResourceOwner,
@@ -2809,14 +2804,15 @@ AbortTransaction(void)
 	willHaveObjectsFromSmgr =
 			PersistentEndXactRec_WillHaveObjectsFromSmgr(EndXactRecKind_Abort);
 
-	if (willHaveObjectsFromSmgr)
-	{
-		/*
-		 * We need to ensure the recording of the abort record and the
-		 * persistent post-abort work will be done either before or after a checkpoint.
-		 */
-		CHECKPOINT_START_LOCK;
-	}
+
+	/* In previous version, we ensured the recording of the the abort record and the
+	 * persistent post-abort work will be done either before or after a checkpoint.
+	 *
+	 * However the persistent table status will be synchronized with AOSeg_XXXX
+	 * table and hdfs file in PersistentRecovery_Scan() at recovery PASS2.
+	 * We don't need to worry about inconsistent states between them. So no
+	 * CHECKPOINT_START_LOCK any more.
+	 */
 
 	/*
 	 * Advertise the fact that we aborted in pg_clog (assuming that we got as
@@ -2869,11 +2865,6 @@ AbortTransaction(void)
 	AtEOXact_Inval(false);
 	AtEOXact_QueryContext();
 	AtEOXact_smgr(false);
-
-	if (willHaveObjectsFromSmgr)
-	{
-		CHECKPOINT_START_UNLOCK;
-	}
 	
 	AtEOXact_MultiXact();
 	ResourceOwnerRelease(TopTransactionResourceOwner,
