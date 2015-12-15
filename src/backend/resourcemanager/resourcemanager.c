@@ -323,9 +323,15 @@ int ResManagerMain(int argc, char *argv[])
 
 		/* Initialize resource broker service. */
 		RB_prepareImplementation(DRMGlobalInstance->ImpType);
-		res = RB_start(true);
-		if ( res != FUNC_RETURN_OK ) {
-			elog(FATAL, "Fail to create resource broker service.");
+		/*
+		 * Don't create resource broker for yarn mode
+		 * if master is running in utility mode.
+		 */
+		if (Gp_role != GP_ROLE_UTILITY) {
+			res = RB_start(true);
+			if ( res != FUNC_RETURN_OK ) {
+				elog(FATAL, "Fail to create resource broker service.");
+			}
 		}
 		res = ResManagerMainServer2ndPhase();
 		elog(LOG, "Master RM exits.\n");
@@ -528,7 +534,8 @@ int MainHandlerLoop(void)
 	while( DRMGlobalInstance->ResManagerMainKeepRun )
 	{
 		/* STEP 1. Check resource broker status. */
-		RB_start(true);
+		if (Gp_role != GP_ROLE_UTILITY)
+			RB_start(true);
 
 		/* STEP 2. Check if resource manager is in clean up status. */
 		if ( isCleanGRMResourceStatus() )
@@ -601,9 +608,11 @@ int MainHandlerLoop(void)
 		/*
 		 * STEP 8. Check the status of all segment nodes, mark down if hasn't got
 		 * 		   IMAlive message for a pre-defined period.
+		 * 		   Don't process it if master is running in utility mode.
 		 */
         uint64_t curtime = gettime_microsec();
-		if ((rm_resourcepool_test_filename == NULL ||
+		if (Gp_role != GP_ROLE_UTILITY &&
+			(rm_resourcepool_test_filename == NULL ||
 			rm_resourcepool_test_filename[0] == '\0') &&
 			(curtime - PRESPOOL->LastCheckTime > 10LL * SEGMENT_HEARTBEAT_INTERVAL))
 		{

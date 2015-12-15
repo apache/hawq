@@ -565,6 +565,12 @@ sendresponse:
  */
 bool handleRMSEGRequestIMAlive(void **arg)
 {
+	/*
+	 * Don't register segments if master is running in utility mode.
+	 */
+	if (Gp_role == GP_ROLE_UTILITY)
+		return true;
+
 	ConnectionTrack conntrack = (ConnectionTrack)(*arg);
 	elog(DEBUG5, "Resource manager receives segment heart-beat information.");
 
