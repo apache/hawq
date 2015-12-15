@@ -1327,28 +1327,6 @@ smgrDoDeleteActions(
 						palloc0((*listCount) * sizeof(PersistentFileSysObjStateChangeResult));
 
 	/*
-	 * There are two situations where we get here. CommitTransaction()/AbortTransaction() or via
-	 * AbortSubTransaction(). In the first case, we have already obtained the MirroredLock and
-	 * CheckPointStartLock. In the second case, we have not obtained the locks, so we attempt
-	 * to get them to make sure proper lock order is maintained.
-	 *
-	 * Normally, if a relation lock is needed, it is obtained before the MirroredLock and CheckPointStartLock,
-	 * but we have not yet obtained an EXCLUSIVE LockRelationForResynchronize. This lock will be obtained in
-	 * PersistentFileSysObj_EndXactDrop(). This is an exception to the normal lock ordering, which is done
-	 * to reduce the time that the lock is held, thus allowing a larger window of time for filerep
-	 * resynchronization to obtain the lock.
-	 */
-
-	/*
-	 * The logic will eventually obtain a CheckpointStartLock in PersistentRelation_Dropped(),
-	 * but functions called from this function my obtain Exclusive locks before the
-	 * CheckpointStartLock is obtained. This could cause a potential deadlock in the future.
-	 * We need to take a CheckpointStartLock here to maintain proper lock ordering
-	 * (i.e. MirrorLock -> CheckpointStartLock ).
-	 */
-	CHECKPOINT_START_LOCK;
-
-	/*
 	 * First pass does the initial State-Changes.
 	 */
 	entryIndex = 0;
@@ -1607,8 +1585,6 @@ smgrDoDeleteActions(
 	Assert(*list == NULL);
 
 	PersistentFileSysObj_FlushXLog();
-
-	CHECKPOINT_START_UNLOCK;
 
 	if (stateChangeResults != NULL)
 		pfree(stateChangeResults);

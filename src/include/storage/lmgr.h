@@ -42,10 +42,6 @@ extern void UnlockRelationForExtension(Relation relation, LOCKMODE lockmode);
 extern void LockRelationForResyncExtension(RelFileNode *relFileNode, LOCKMODE lockmode);
 extern void UnlockRelationForResyncExtension(RelFileNode *relFileNode, LOCKMODE lockmode);
 
-/* Lock a relation for resynchronize */
-extern void LockRelationForResynchronize(RelFileNode *relFileNode, LOCKMODE lockmode);
-extern void UnlockRelationForResynchronize(RelFileNode *relFileNode, LOCKMODE lockmode);
-
 /* Lock a relation for Append-Only segment files. */
 extern LockAcquireResult LockRelationAppendOnlySegmentFile(RelFileNode *relFileNode, int32 segno, LOCKMODE lockmode, bool dontWait);
 extern void UnlockRelationAppendOnlySegmentFile(RelFileNode *relFileNode, int32 segno, LOCKMODE lockmode, int32 contentid);

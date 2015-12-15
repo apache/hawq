@@ -2120,18 +2120,6 @@ void PersistentFileSysObj_EndXactDrop(
 
 	bool					ignoreNonExistence)
 {
-	// NOTE: The caller must already have the MirroredLock.
-
-	if (fsObjName->type == PersistentFsObjType_RelationFile)
-	{
-		/*
-		 * We use this lock to guard data resynchronization.
-		 */
-		LockRelationForResynchronize(
-						PersistentFileSysObjName_GetRelFileNodePtr(fsObjName),
-						AccessExclusiveLock);
-	}
-
 	PersistentFileSysObj_DropObject(
 							fsObjName,
 							relStorageMgr,
@@ -2141,13 +2129,6 @@ void PersistentFileSysObj_EndXactDrop(
 							ignoreNonExistence,
 							Debug_persistent_print,
 							Persistent_DebugPrintLevel());
-
-	if (fsObjName->type == PersistentFsObjType_RelationFile)
-	{
-		UnlockRelationForResynchronize(
-						PersistentFileSysObjName_GetRelFileNodePtr(fsObjName),
-						AccessExclusiveLock);
-	}
 }
 
 void PersistentFileSysObj_UpdateRelationBufpoolKind(

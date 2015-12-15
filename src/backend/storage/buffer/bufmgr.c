@@ -2464,8 +2464,6 @@ RelationTruncate(Relation rel, BlockNumber nblocks, bool markPersistentAsPhysica
 
 	if (markPersistentAsPhysicallyTruncated)
 	{
-		LockRelationForResynchronize(&rel->rd_node, AccessExclusiveLock);
-
 		/*
 		 * Fetch gp_persistent_relation_node information so we can mark the persistent entry.
 		 */
@@ -2522,12 +2520,6 @@ RelationTruncate(Relation rel, BlockNumber nblocks, bool markPersistentAsPhysica
 
 	}
 
-	// -------- MirroredLock ----------
-	
-	if (markPersistentAsPhysicallyTruncated)
-	{
-		UnlockRelationForResynchronize(&rel->rd_node, AccessExclusiveLock);
-	}
 }
 
 /* ---------------------------------------------------------------------
