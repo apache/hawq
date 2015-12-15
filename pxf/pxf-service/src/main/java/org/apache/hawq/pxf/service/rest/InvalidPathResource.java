@@ -117,14 +117,21 @@ public class InvalidPathResource {
     private Response wrongPath(String path) {
 
         String errmsg;
-        String version = parseVersion(path);
+
+        List<PathSegment> pathSegments = rootUri.getPathSegments();
+
+        if(pathSegments.isEmpty()) {
+            return sendErrorMessage(getUnknownPathMsg());
+        }
+
+        String version = pathSegments.get(0).getPath();
+        String endPoint = (pathSegments.size() > 1) ? pathSegments.get(1).getPath() : null;
 
         Log.debug("REST request: " + rootUri.getAbsolutePath() + ". " +
                 "Version " + version + ", supported version is " + Version.PXF_PROTOCOL_VERSION);
 
-        if(version.equals(Version.PXF_PROTOCOL_VERSION)) { // api with incorrect path
-            String endPoint = parseEndpoint(path);
-            if (retiredEndPoints.contains(endPoint)) {
+        if(version.equals(Version.PXF_PROTOCOL_VERSION)) { // api with correct version but incorrect path
+            if (retiredEndPoints.contains(endPoint)) { // api with retired endpoint
                 errmsg = getRetiredPathMsg(endPoint);
             } else {
                 errmsg = getUnknownPathMsg();
@@ -146,40 +153,6 @@ public class InvalidPathResource {
         b.entity(message);
         b.type(MediaType.TEXT_PLAIN_TYPE);
         return b.build();
-    }
-
-    /**
-     * Parses the version part from the path.
-     * The the absolute path is
-     * http://<host>:<port>/pxf/<version>/<rest of path>
-     *
-     * path - the path part after /pxf/
-     * returns the first element after /pxf/
-     */
-    private String parseVersion(String path) {
-
-        int slash = path.indexOf('/');
-        if (slash == -1) {
-            return path;
-        }
-
-        return path.substring(0, slash);
-    }
-
-    /**
-     * Parses the version part from the path.
-     * The the absolute path is
-     * http://<host>:<port>/pxf/<version>/<rest of path>
-     *
-     * path - the endpoint part after /pxf/
-     * returns the first element after /pxf/
-     */
-    private String parseEndpoint(String path) {
-        List<PathSegment> pathSegments = rootUri.getPathSegments();
-        if(pathSegments.size() < 2) {
-            return null;
-        }
-        return pathSegments.get(1).getPath();
     }
 
     /**
