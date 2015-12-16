@@ -69,7 +69,8 @@ typedef struct VirtualSegmentNode
  * we calculate the appropriate planner segment_num.
  */
 SplitAllocResult * calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
-                                                List *rtable, GpPolicy *intoPolicy, int sliceNum);
+                                                List *rtable, GpPolicy *intoPolicy, int sliceNum,
+                                                int dispatchType);
 
 FILE *fp;
 FILE *fpaoseg;
