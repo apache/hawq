@@ -156,7 +156,6 @@ extern int  Test_compresslevel_override;
 extern int	Test_blocksize_override;
 extern int  Test_safefswritesize_override;
 extern bool Master_mirroring_administrator_disable;
-extern int  gp_max_local_distributed_cache;
 extern bool gp_local_distributed_cache_stats;
 extern bool gp_appendonly_verify_block_checksums;
 extern bool gp_appendonly_verify_write_block;
@@ -209,7 +208,6 @@ extern bool filerep_inject_db_startup_fault;
 extern bool filerep_inject_change_tracking_recovery_fault;
 extern bool gp_crash_recovery_suppress_ao_eof;
 extern bool Debug_check_for_invalid_persistent_tid;
-extern bool gp_create_table_random_default_distribution;
 extern bool gp_allow_non_uniform_partitioning_ddl;
 
 extern bool gp_upgrade_mode;

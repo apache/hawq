@@ -396,10 +396,6 @@ extern const char *role_to_string(GpRoleValue role);
 extern int	gp_segment_connect_timeout; /* GUC var - timeout specifier for gang creation */
 extern int  gp_snapshotadd_timeout; /* GUC var - timeout specifier for snapshot-creation wait */
 
-extern int	gp_fts_probe_retries; /* GUC var - specifies probe number of retries for FTS */
-extern int	gp_fts_probe_timeout; /* GUC var - specifies probe timeout for FTS */
-extern int	gp_fts_probe_interval; /* GUC var - specifies polling interval for FTS */
-extern int	gp_fts_probe_threadcount; /* GUC var - specifies number of threads to use for FTS probes */
 extern bool	gp_fts_transition_parallel; /* GUC var - controls parallel segment transition for FTS */
 
 /*
@@ -599,23 +595,6 @@ extern GpVars_Verbosity    gp_log_gang;
 
 const char *gpvars_assign_gp_log_gang(const char *newval, bool doit, GucSource source);
 const char *gpvars_show_gp_log_gang(void);
-
-/*
- * gp_log_fts (string)
- *
- * What kind of messages should be logged by the fault-prober
- * "OFF"     -> only errors are logged
- * "TERSE"   -> terse logging of routine events
- * "VERBOSE" -> more messages
- * "DEBUG"   -> additional events are logged at severity level DEBUG1 to DEBUG5
- *
- * The messages that are enabled by the TERSE and VERBOSE settings are
- * written with a severity level of LOG.
- */
-extern GpVars_Verbosity    gp_log_fts;
-
-const char *gpvars_assign_gp_log_fts(const char *newval, bool doit, GucSource source);
-const char *gpvars_show_gp_log_fts(void);
 
 /*
  * gp_log_interconnect (string)

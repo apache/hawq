@@ -92,7 +92,6 @@
 #include "cdb/cdbfilerep.h"
 #include "postmaster/primary_mirror_mode.h"
 #include "postmaster/identity.h"
-#include "postmaster/backoff.h"
 #include "utils/vmem_tracker.h"
 
 #include "cdb/cdbinmemheapam.h"
@@ -1451,12 +1450,6 @@ exec_mpp_query(const char *query_string,
 
 	if (save_log_statement_stats)
 		ShowUsage("QUERY STATISTICS");
-
-	if (gp_enable_resqueue_priority)
-	{
-		BackoffBackendEntryExit();
-	}
-
 
 	debug_query_string = NULL;
 }

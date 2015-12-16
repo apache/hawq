@@ -114,28 +114,6 @@ bool          gp_select_invisible=false; /* debug mode to allow select to see "i
 int     gp_snapshotadd_timeout=10;
 
 /*
- * Probe retry count for fts prober.
- */
-int			gp_fts_probe_retries = 5;
-
-/*
- * Probe timeout for fts prober.
- */
-int			gp_fts_probe_timeout = 20;
-
-/*
- * Polling interval for the fts prober. A scan of the entire system starts
- * every time this expires.
- */
-int			gp_fts_probe_interval=60;
-
-/*
- * Number of threads to use for probe of segments (it is a good idea to have this
- * larger than the number of segments per host.
- */
-int			gp_fts_probe_threadcount=16;
-
-/*
  * gp_enable_delete_as_truncate
  *
  * piggy-back a truncate on simple delete statements (statements
@@ -787,20 +765,6 @@ show_gp_connections_per_thread(void)
 GpVars_Verbosity   gp_log_gang;
 
 /*
- * gp_log_fts (string)
- *
- * What kind of messages should the fault-prober log ?
- * "OFF"     -> only errors are logged
- * "TERSE"   -> terse logging of routine events
- * "VERBOSE" -> gang allocation per command is logged
- * "DEBUG"   -> additional events are logged at severity level DEBUG1 to DEBUG5
- *
- * The messages that are enabled by the TERSE and VERBOSE settings are
- * written with a severity level of LOG.
- */
-GpVars_Verbosity   gp_log_fts;
-
-/*
  * gp_log_interconnect (string)
  *
  * Should connections between internal processes be logged?  (qDisp/qExec/etc)
@@ -881,27 +845,6 @@ gpvars_show_gp_log_gang(void)
 	return gpvars_verbosity_to_string(gp_log_gang);
 }                               /* gpvars_show_gp_log_gangs */
 
-/*
- * gpvars_assign_gp_log_fts
- * gpvars_show_gp_log_fts
- */
-const char *
-gpvars_assign_gp_log_fts(const char *newval, bool doit, GucSource source __attribute__((unused)) )
-{
-	GpVars_Verbosity v = gpvars_string_to_verbosity(newval);
-
-	if (v == GPVARS_VERBOSITY_UNDEFINED)
-        return NULL;
-	if (doit)
-		gp_log_fts = v;
-	return newval;
-}                               /* gpvars_assign_gp_log_fts */
-
-const char *
-gpvars_show_gp_log_fts(void)
-{
-	return gpvars_verbosity_to_string(gp_log_fts);
-}                               /* gpvars_show_gp_log_fts */
 
 /*
  * gpvars_assign_gp_log_interconnect

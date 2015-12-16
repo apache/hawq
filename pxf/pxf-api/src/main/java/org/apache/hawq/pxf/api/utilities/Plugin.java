@@ -22,7 +22,7 @@ package org.apache.hawq.pxf.api.utilities;
 
 
 /**
- * Base class for all plugin types (Accessor, Resolver, Fragmenter, Analyzer, ...).
+ * Base class for all plugin types (Accessor, Resolver, Fragmenter, ...).
  * Manages the meta data.
  */
 public class Plugin {

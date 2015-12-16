@@ -572,7 +572,7 @@ AS
     FROM 
         gp_toolkit.gp_param_settings()
     WHERE
-        paramname NOT IN ('config_file', 'data_directory', 'gp_contentid', 'gp_dbid', 'hba_file', 'ident_file', 'port')
+        paramname NOT IN ('config_file', 'data_directory', 'hba_file', 'ident_file', 'port')
     GROUP BY 
         1,2
     HAVING 

@@ -45,7 +45,6 @@ public class InputData {
     protected String dataSource;
     protected String accessor;
     protected String resolver;
-    protected String analyzer;
     protected String fragmenter;
     protected String remoteLogin;
     protected String remoteSecret;
@@ -97,7 +96,6 @@ public class InputData {
         this.accessor = copy.accessor;
         this.resolver = copy.resolver;
         this.fragmenter = copy.fragmenter;
-        this.analyzer = copy.analyzer;
         this.remoteLogin = copy.remoteLogin;
         this.remoteSecret = copy.remoteSecret;
         this.threadSafe = copy.threadSafe;
@@ -271,16 +269,6 @@ public class InputData {
      */
     public String getFragmenter() {
         return fragmenter;
-    }
-
-    /**
-     * Returns the ClassName for the java class that was defined as Analyzer or
-     * null if no analyzer was defined.
-     *
-     * @return class name for Analyzer or null
-     */
-    public String getAnalyzer() {
-        return analyzer;
     }
 
     /**

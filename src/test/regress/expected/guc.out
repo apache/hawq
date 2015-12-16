@@ -464,7 +464,6 @@ SHOW gp_disable_catalog_access_on_segment;
 (1 row)
 
 CREATE TABLE test2(c1 int, c2 int);
-ERROR:  invalid catalog access on segments (catalog relid: 1247) (SOMEFILE:SOMEFUNC)
 INSERT INTO test1 values(1, 10);
 ERROR:  invalid catalog access on segments (catalog relid: 1259) (SOMEFILE:SOMEFUNC)
 SELECT 1 FROM test1;
@@ -483,12 +482,10 @@ SHOW gp_disable_catalog_access_on_segment;
 -- start_ignore
 DROP TABLE test1;
 DROP TABLE test2;
-ERROR:  table "test2" does not exist
 -- end_ignore
-
-SELECT min_val, max_val FROM pg_settings WHERE name = 'gp_resqueue_priority_cpucores_per_segment';
+SELECT min_val, max_val FROM pg_settings WHERE name = 'hawq_metadata_cache_free_block_normal_ratio';
  min_val | max_val 
 ---------+---------
- 0.1     | 512
+ 0.05    | 1
 (1 row)
 

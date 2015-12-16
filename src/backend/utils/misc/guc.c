@@ -246,10 +246,6 @@ static bool dummy_autovac=false;
 static bool assign_autovacuum_warning(bool newval, bool doit, GucSource source);
 
 /* Helper function for guc setter */
-extern const char *gpvars_assign_gp_resqueue_priority_default_value(const char *newval,
-		bool doit,
-		GucSource source __attribute__((unused)) );
-
 static const char *assign_password_hash_algorithm(const char *newval,
 												  bool doit, GucSource source);
 static bool	assign_gp_temporary_directory_mark_error(int newval, bool doit, GucSource source);
@@ -312,7 +308,6 @@ int         Test_compresslevel_override = 0;
 int			Test_blocksize_override = 0;
 int			Test_safefswritesize_override = 0;
 bool        Master_mirroring_administrator_disable = false;
-int			gp_max_local_distributed_cache = 1024;
 bool		gp_appendonly_verify_block_checksums = false;
 bool 		gp_appendonly_verify_write_block = false;
 bool		gp_heap_require_relhasoids_match = true;
@@ -340,7 +335,6 @@ bool		Debug_datumstream_read_print_varlena_info = false;
 bool		Debug_datumstream_write_use_small_initial_buffers = false;
 bool		gp_temporary_files_filespace_repair = false;
 bool		filesystem_support_truncate = true;
-bool		gp_create_table_random_default_distribution = false;
 bool		gp_allow_non_uniform_partitioning_ddl = true;
 
 int			explain_memory_verbosity = 0;
@@ -541,7 +535,6 @@ static int	block_size;
 static bool integer_datetimes;
 //static bool standard_conforming_strings;
 static char *gp_log_gang_str;
-static char *gp_log_fts_str;
 static char *gp_log_interconnect_str;
 static char *gp_interconnect_type_str;
 static char *gp_interconnect_fc_method_str;
@@ -549,16 +542,6 @@ static char *gp_interconnect_fc_method_str;
 /* should be static, but commands/variable.c needs to get at these */
 char	   *role_string;
 char	   *session_authorization_string;
-
-/* Backoff-related GUCs */
-bool gp_enable_resqueue_priority;
-int gp_resqueue_priority_local_interval;
-int gp_resqueue_priority_sweeper_interval;
-int gp_resqueue_priority_inactivity_timeout;
-int gp_resqueue_priority_grouping_timeout;
-double gp_resqueue_priority_cpucores_per_segment;
-char* gp_resqueue_priority_default_value;
-bool gp_debug_resqueue_priority = false;
 
 /* Perfmon segment GUCs */
 int gp_perfmon_segment_interval;
@@ -1476,15 +1459,6 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
-		{"stats_queue_level", PGC_SUSET, STATS_COLLECTOR,
-			gettext_noop("Collects resource queue-level statistics on database activity."),
-			NULL
-		},
-		&pgstat_collect_queuelevel,
-		false, NULL, NULL
-	},
-
-	{
 		{"update_process_title", PGC_SUSET, CLIENT_CONN_OTHER,
 			gettext_noop("Updates the process title to show the active SQL command."),
 			gettext_noop("Enables updating of the process title every time a new SQL command is received by the server.")
@@ -1745,16 +1719,6 @@ static struct config_bool ConfigureNamesBool[] =
 		&standard_conforming_strings,
 		false, NULL, NULL
 	},
-
-    {
-		{"enable_agg_restructure", PGC_USERSET, QUERY_TUNING_METHOD,
-			gettext_noop("Deprecated: use gp_enable_multiphase_agg."),
-			NULL,
-            GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
-		},
-		&defunct_bool,
-		true, NULL, NULL
- 	},
 
 	{
 		/* MPP-9772, MPP-9773: remove support for CREATE INDEX CONCURRENTLY */
@@ -2237,15 +2201,6 @@ static struct config_bool ConfigureNamesBool[] =
 		&gp_set_proc_affinity,
         false, NULL, NULL
 	},
-
-    {
-        {"gp_enable_adaptive_nestloop", PGC_USERSET, QUERY_TUNING_METHOD,
-			gettext_noop("Enables the planner's use of the Adaptive Join Choice operator."),
-            gettext_noop("During query execution, actual outer row count determines choice of Nested or Hash Join.")
-        },
-        &enable_adaptive_nestloop,
-        true, NULL, NULL
-    },
 
     {
     	{"gp_is_writer", PGC_BACKEND, GP_WORKER_IDENTITY,
@@ -3434,16 +3389,6 @@ static struct config_bool ConfigureNamesBool[] =
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
 		&gp_ignore_window_exclude,
-		false, NULL, NULL
-	},
-
-	{
-		{"gp_create_table_random_default_distribution", PGC_USERSET, COMPAT_OPTIONS,
-			gettext_noop("Set the default distribution of a table to RANDOM."),
-			NULL,
-			GUC_NOT_IN_SAMPLE
-		},
-		&gp_create_table_random_default_distribution,
 		false, NULL, NULL
 	},
 
@@ -4688,15 +4633,6 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"gp_max_local_distributed_cache", PGC_POSTMASTER, RESOURCES_MEM,
-			gettext_noop("Sets the number of local-distributed transactions to cache for optimizing visibility processing by backends."),
-			NULL
-		},
-		&gp_max_local_distributed_cache,
-		1024, 0, INT_MAX, NULL, NULL
-	},
-
-	{
 		{"gp_max_relations", PGC_POSTMASTER, RESOURCES_MEM,
 			gettext_noop("Sets the maximum number of relations."),
 			NULL
@@ -4938,15 +4874,6 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"vacuum_cost_page_hit", PGC_USERSET, RESOURCES,
-			gettext_noop("Vacuum cost for a page found in the buffer cache."),
-			NULL
-		},
-		&VacuumCostPageHit,
-		1, 0, 10000, NULL, NULL
-	},
-
-	{
 		{"vacuum_cost_page_miss", PGC_USERSET, RESOURCES,
 			gettext_noop("Vacuum cost for a page not found in the buffer cache."),
 			NULL
@@ -5070,20 +4997,6 @@ static struct config_int ConfigureNamesInt[] =
 		},
 		&StatementTimeout,
 		0, 0, INT_MAX, NULL, NULL
-	},
-
-	{
-		{"gp_vmem_idle_resource_timeout", PGC_USERSET, CLIENT_CONN_OTHER,
-			gettext_noop("Sets the time a session can be idle (in milliseconds) before we release gangs on the segment DBs to free resources."),
-			gettext_noop("A value of 0 turns off the timeout."),
-			GUC_UNIT_MS | GUC_GPDB_ADDOPT
-		},
-		&IdleSessionGangTimeout,
-#ifdef USE_ASSERT_CHECKING
-		600000, 0, INT_MAX, NULL, NULL /* 10 minutes by default on debug builds.*/
-#else
-		18000, 0, INT_MAX, NULL, NULL
-#endif
 	},
 
 	{
@@ -5786,46 +5699,6 @@ static struct config_int ConfigureNamesInt[] =
 		},
 		&verify_checkpoint_interval,
 		VERIFY_CHECKPOINT_INTERVAL_DEFAULT, 0, 1800, NULL, NULL
-	},
-
-	{
-		{"gp_fts_probe_retries", PGC_POSTMASTER, GP_ARRAY_TUNING,
-			gettext_noop("Number of retries for FTS to complete probing a segment."),
-			gettext_noop("Used by the fts-probe process."),
-			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
-		},
-		&gp_fts_probe_retries,
-		5, 0, 100, NULL, NULL
-	},
-
-	{
-		{"gp_fts_probe_timeout", PGC_USERSET, GP_ARRAY_TUNING,
-			gettext_noop("Maximum time (in seconds) allowed for FTS to complete probing a segment."),
-			gettext_noop("Used by the fts-probe process."),
-			GUC_UNIT_S
-		},
-		&gp_fts_probe_timeout,
-		20, 0, INT_MAX, NULL, NULL
-	},
-
-	{
-		{"gp_fts_probe_interval", PGC_POSTMASTER, GP_ARRAY_TUNING,
-			gettext_noop("A complete probe of all segments starts each time a timer with this period expires."),
-			gettext_noop("Used by the fts-probe process. "),
-			GUC_UNIT_S
-		},
-		&gp_fts_probe_interval,
-		60, 10, INT_MAX, NULL, NULL
-	},
-
-	{
-		{"gp_fts_probe_threadcount", PGC_POSTMASTER, GP_ARRAY_TUNING,
-			gettext_noop("Use this number of threads for probing the segments."),
-			gettext_noop("The number of threads to create at each probe interval expiration."),
-			GUC_NOT_IN_SAMPLE
-		},
-		&gp_fts_probe_threadcount,
-		16, 1, 128, NULL, NULL
 	},
 
 	{
@@ -7766,16 +7639,6 @@ static struct config_string ConfigureNamesString[] =
 		},
 		&gp_log_gang_str,
 		"terse", gpvars_assign_gp_log_gang, gpvars_show_gp_log_gang
-	},
-
-	{
-		{"gp_log_fts", PGC_POSTMASTER, LOGGING_WHAT,
-			gettext_noop("Sets the verbosity of logged messages pertaining to fault probing."),
-			gettext_noop("Valid values are \"off\", \"terse\", \"verbose\" and \"debug\"."),
-			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
-		},
-		&gp_log_fts_str,
-		"terse", gpvars_assign_gp_log_fts, gpvars_show_gp_log_fts
 	},
 
 	{

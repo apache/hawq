@@ -541,7 +541,6 @@ backend/port/win32_sema.c
 backend/port/win32_shmem.c
 backend/postmaster/alertseverity.c
 backend/postmaster/autovacuum.c
-backend/postmaster/backoff.c
 backend/postmaster/bgwriter.c
 backend/postmaster/checkpoint.c
 backend/postmaster/ddaserver.c
@@ -1293,7 +1292,6 @@ include/postgres.h
 include/postgres_ext.h
 include/postgres_fe.h
 include/postmaster/autovacuum.h
-include/postmaster/backoff.h
 include/postmaster/bgwriter.h
 include/postmaster/checkpoint.h
 include/postmaster/ddaserver.h

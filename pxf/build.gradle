@@ -218,7 +218,7 @@ project('pxf-service') {
 
 project('pxf-hdfs') {
     dependencies {
-        compile(project(':pxf-service')) //Yikes, HdfsAnalyzer is directly accessing the bridge
+        compile(project(':pxf-service'))
         compile 'org.apache.avro:avro-mapred:1.7.4'
         compile "org.apache.hadoop:hadoop-mapreduce-client-core:$hadoopVersion"
     }

@@ -24,12 +24,17 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hawq.pxf.service.utilities.Utilities;
 
+import com.google.common.collect.ImmutableSet;
+import java.util.Arrays;
+import java.util.List;
+
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.PathSegment;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
 import javax.ws.rs.core.UriInfo;
@@ -52,6 +57,9 @@ public class InvalidPathResource {
     UriInfo rootUri;
 
     private static final Log Log = LogFactory.getLog(InvalidPathResource.class);
+    // Set of retired endpoints
+    private final ImmutableSet<String> retiredEndPoints = ImmutableSet.of(
+            "Analyzer");
 
     public InvalidPathResource() {
     }
@@ -109,15 +117,28 @@ public class InvalidPathResource {
     private Response wrongPath(String path) {
 
         String errmsg;
-        String version = parseVersion(path);
+
+        List<PathSegment> pathSegments = rootUri.getPathSegments();
+
+        if(pathSegments.isEmpty()) {
+            return sendErrorMessage(getUnknownPathMsg());
+        }
+
+        String version = pathSegments.get(0).getPath();
+        String endPoint = (pathSegments.size() > 1) ? pathSegments.get(1).getPath() : null;
 
         Log.debug("REST request: " + rootUri.getAbsolutePath() + ". " +
                 "Version " + version + ", supported version is " + Version.PXF_PROTOCOL_VERSION);
 
-        // if version is not of the format "v<number>" then it's not a version but a wrong path
-        if (version.equals(Version.PXF_PROTOCOL_VERSION)  || !(version.matches("v[0-9]+"))) {
+        if(version.equals(Version.PXF_PROTOCOL_VERSION)) { // api with correct version but incorrect path
+            if (retiredEndPoints.contains(endPoint)) { // api with retired endpoint
+                errmsg = getRetiredPathMsg(endPoint);
+            } else {
+                errmsg = getUnknownPathMsg();
+            }
+        } else if(!(version.matches("v[0-9]+"))) { // api with version not of the format "v<number>"
             errmsg = getUnknownPathMsg();
-        } else {
+        } else { // api with wrong version number
             errmsg = "Wrong version " + version + ", supported version is " + Version.PXF_PROTOCOL_VERSION;
         }
 
@@ -135,27 +156,23 @@ public class InvalidPathResource {
     }
 
     /**
-     * Parses the version part from the path.
-     * The the absolute path is
-     * http://<host>:<port>/pxf/<version>/<rest of path>
-     *
-     * path - the path part after /pxf/
-     * returns the first element after /pxf/
-     */
-    private String parseVersion(String path) {
-
-        int slash = path.indexOf('/');
-        if (slash == -1) {
-            return path;
-        }
-
-        return path.substring(0, slash);
-    }
-
-    /**
      * Returns unknown path message, with the path's special characters masked.
      */
     private String getUnknownPathMsg() {
         return "Unknown path \"" + Utilities.maskNonPrintables(rootUri.getAbsolutePath().toString()) + "\"";
+    }
+
+    /**
+     * Warn on recently retired paths
+     * eg: http://<host>:<port>/pxf/<version>/Analyzer/<rest of path>
+     *
+     * Returns message about path not being supported
+     */
+    private String getRetiredPathMsg(String endpoint) {
+        if("Analyzer".equals(endpoint)) {
+            return endpoint + " API is retired. Please use /Fragmenter/getFragmentsStats instead";
+        } else {
+            return endpoint + " API is retired";
+        }
     }
 }
