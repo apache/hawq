@@ -3903,7 +3903,7 @@ static void cleanup_allocation_algorithm(
  */
 SplitAllocResult *
 calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
-		List *fullRangeTable, GpPolicy *intoPolicy, int sliceNum) {
+		List *fullRangeTable, GpPolicy *intoPolicy, int sliceNum, int dispatchType) {
 	SplitAllocResult *result;
 	QueryResource *resource = NULL;
 	List *virtual_segments;
@@ -4104,6 +4104,15 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 		} else {
 			maxTargetSegmentNumber = context.randomSegNum;
 			minTargetSegmentNumber = minimum_segment_num;
+		}
+
+		/*
+		 * Allocate only one virtual segment for query that execute on entry database
+		 */
+		if (dispatchType == DISPATCH_SEQUENTIAL)
+		{
+			maxTargetSegmentNumber = 1;
+			minTargetSegmentNumber = 1;
 		}
 
 		if (enforce_virtual_segment_number > 0) {

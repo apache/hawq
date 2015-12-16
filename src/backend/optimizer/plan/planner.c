@@ -453,32 +453,33 @@ static void
 resource_negotiator(Query *parse, int cursorOptions, ParamListInfo boundParams,
               QueryResourceLife resourceLife, ResourceNegotiatorResult** result)
 {
-  PlannedStmt *plannedstmt = NULL;
-  do
-  {
-    SplitAllocResult *allocResult = NULL;
-    Query *my_parse = copyObject(parse);
-    ParamListInfo my_boundParams = copyParamList(boundParams);
+	PlannedStmt *plannedstmt = NULL;
+	do
+	{
+		SplitAllocResult *allocResult = NULL;
+		Query *my_parse = copyObject(parse);
+		ParamListInfo my_boundParams = copyParamList(boundParams);
 
-    plannedstmt = standard_planner(my_parse, cursorOptions, my_boundParams);
-    (*result)->stmt = plannedstmt;
+		plannedstmt = standard_planner(my_parse, cursorOptions, my_boundParams);
+		(*result)->stmt = plannedstmt;
 
-    /* If this is a parallel plan. */
-    if (plannedstmt->planTree->dispatch == DISPATCH_PARALLEL)
-    {
-      /*
-       * Now, we want to allocate resource.
-       */
-      allocResult = calculate_planner_segment_num(my_parse, resourceLife,
-                                          plannedstmt->rtable, plannedstmt->intoPolicy,
-                                          plannedstmt->nMotionNodes + plannedstmt->nInitPlans + 1);
+		/* If this is a parallel plan. */
+		if (plannedstmt->planTree->dispatch != DISPATCH_UNDETERMINED)
+		{
+			/*
+			 * Now, we want to allocate resource.
+			 */
+			allocResult = calculate_planner_segment_num(my_parse, resourceLife,
+			                    plannedstmt->rtable, plannedstmt->intoPolicy,
+			                    plannedstmt->nMotionNodes + plannedstmt->nInitPlans + 1,
+			                    plannedstmt->planTree->dispatch);
 
-      Assert(allocResult);
+			Assert(allocResult);
 
-      (*result)->saResult = *allocResult;
-      pfree(allocResult);
-    }
-  } while (0);
+			(*result)->saResult = *allocResult;
+			pfree(allocResult);
+		}
+	} while (0);
 }
 
 static PlannedStmt *
