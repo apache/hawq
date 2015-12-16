@@ -6189,16 +6189,6 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"pxf_service_port", PGC_POSTMASTER, EXTERNAL_TABLES,
-			gettext_noop("PXF service port"),
-			NULL,
-			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
-		},
-		&pxf_service_port,
-		51200, 1, 65535, NULL, NULL
-	},
-
-	{
 		{"hawq_master_address_port", PGC_POSTMASTER, PRESET_OPTIONS,
 			gettext_noop("master server address port number"),
 			NULL
