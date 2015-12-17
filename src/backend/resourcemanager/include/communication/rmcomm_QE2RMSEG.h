@@ -27,18 +27,24 @@ int
 MoveToCGroupForQE(TimestampTz masterStartTime,
 				  int connId,
 				  int segId,
-				  int procId);
+				  int procId,
+				  char *errorbuf,
+				  int errorbufsize);
 
 int
 MoveOutCGroupForQE(TimestampTz masterStartTime,
 				   int connId,
 				   int segId,
-				   int procId);
+				   int procId,
+				   char *errorbuf,
+				   int errorbufsize);
 
 int
 SetWeightCGroupForQE(TimestampTz masterStartTime,
 					 int connId,
 					 int segId,
 					 QueryResource *resource,
-					 int procId);
+					 int procId,
+					 char *errorbuf,
+					 int errorbufsize);
 

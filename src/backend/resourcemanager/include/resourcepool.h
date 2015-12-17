@@ -655,6 +655,8 @@ void checkGRMContainerStatus(RB_GRMContainerStat ctnstats, int size);
 
 int getClusterGRMContainerSize(void);
 
+void refreshAvailableNodeCount(void);
+
 void checkSlavesFile(void);
 
 /*

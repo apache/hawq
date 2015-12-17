@@ -504,6 +504,9 @@ int ResManagerMainServer2ndPhase(void)
 	/******* TILL NOW, resource manager starts providing services *******/
 	elog(LOG, "HAWQ RM process works now.");
 
+	/* Check slaves file firstly to ensure we have expected cluster size. */
+	checkSlavesFile();
+
     /* Start request handler to provide services. */
     res = MainHandlerLoop();
     /* res is returned to the caller. */
@@ -2802,6 +2805,7 @@ int  loadHostInformationIntoResourcePool(void)
 
 extern Datum dump_resource_manager_status(PG_FUNCTION_ARGS)
 {
+	static char errorbuf[ERRORMESSAGE_SIZE];
     int type = PG_GETARG_INT32(0);
     char message[1024] = {0};
     char dump_file[1024] = {0};
@@ -2831,7 +2835,7 @@ extern Datum dump_resource_manager_status(PG_FUNCTION_ARGS)
         PG_RETURN_TEXT_P(cstring_to_text(message));    
     }
 
-    dumpResourceManagerStatus(type, dump_file); 
+    dumpResourceManagerStatus(type, dump_file, errorbuf, sizeof(errorbuf));
 
     PG_RETURN_TEXT_P(cstring_to_text(message));    
 }

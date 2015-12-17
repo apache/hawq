@@ -32,7 +32,9 @@ int callSyncRPCDomain(const char     	   *sockfile,
 		        	  int   		  		sendbuffsize,
 					  uint16_t		  		sendmsgid,
 					  uint16_t 		  		exprecvmsgid,
-					  SelfMaintainBuffer 	recvsmb);
+					  SelfMaintainBuffer 	recvsmb,
+					  char				   *errorbuf,
+					  int					errorbufsize);
 
 int callSyncRPCRemote(const char     	   *hostname,
 					  uint16_t              port,
@@ -40,6 +42,8 @@ int callSyncRPCRemote(const char     	   *hostname,
 					  int   		  		sendbuffsize,
 					  uint16_t		  		sendmsgid,
 					  uint16_t 		  		exprecvmsgid,
-					  SelfMaintainBuffer 	recvsmb);
+					  SelfMaintainBuffer 	recvsmb,
+					  char				   *errorbuf,
+					  int					errorbufsize);
 
 #endif /*RESOURCE_MAMANGER_INTER_PROCESS_COMMUNICATION_SYNCCOMM_H*/

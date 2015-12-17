@@ -13,7 +13,7 @@ override CPPFLAGS := -I include $(CPPFLAGS)
 
 OBJS = resourcepool.o requesthandler_ddl.o \
 	   resqueuemanager.o resqueuedeadlock.o resqueuecommand.o \
-       errorcode.o conntrack.o \
+       conntrack.o \
        hawqsite.o \
        requesthandler_RMSEG.o requesthandler.o \
        resourcemanager_RMSEG.o \
