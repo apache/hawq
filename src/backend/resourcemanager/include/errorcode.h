@@ -236,8 +236,6 @@ typedef struct ErrorDetailData  *ErrorDetail;
 #define ERRREPORTPOS __FILE__,__LINE__,__FUNCTION__
 #define ERRORPOS_FORMAT "[%s:%d:%s]"
 
-const char *getErrorCodeExplain(int errcode);
-
 #define IS_TO_RM_RPC_ERROR(errcode) (((errcode)/100*100) == COMM2RM_CLIENT_START_TAG)
 
 #endif /* RESOURCE_MANAGER_ERROR_CODE_H */

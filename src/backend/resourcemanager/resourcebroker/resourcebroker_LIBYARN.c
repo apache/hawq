@@ -678,6 +678,9 @@ int handleRB2RM_ClusterReport(void)
 	 */
 	returnAllGRMResourceFromGRMUnavailableSegments();
 
+	/* Refresh available node count. */
+	refreshAvailableNodeCount();
+
 	/* Update GRM resource queue capacity. */
 	PQUEMGR->GRMQueueCapacity	 	= response.QueueCapacity;
 	PQUEMGR->GRMQueueCurCapacity 	= response.QueueCurCapacity;

@@ -105,9 +105,8 @@ int acquireResourceFromRM(int 		  		  index,
 						  int	      		  errorbufsize);
 
 int acquireResourceQuotaFromRM(int64_t		user_oid,
-								 uint32_t		max_seg_count_fix,
+							   uint32_t		max_seg_count_fix,
 							   uint32_t		min_seg_count_fix,
-							   int	       *errorcode,
 							   char	       *errorbuf,
 							   int			errorbufsize,
 							   uint32_t	   *seg_num,
@@ -168,8 +167,11 @@ void SendResourceRefreshHeartBeat(void);
 
 void sendFailedNodeToResourceManager(int hostNum, char **pghost);
 
-int getLocalTmpDirFromMasterRM(void);
+int getLocalTmpDirFromMasterRM(char *errorbuf, int errorbufsize);
 
-void dumpResourceManagerStatus(uint32_t type, const char *dump_file);
+int dumpResourceManagerStatus(uint32_t		 type,
+							  const char	*dump_file,
+							  char			*errorbuf,
+							  int			 errorbufsize);
 
 #endif /* RESOURCE_MAMANGER_INTER_PROCESS_COMMUNICATION_QD2RM_H */

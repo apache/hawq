@@ -694,31 +694,21 @@ void GetResourceQuota(int		max_target_segment_num,
 					  uint32   *seg_memory_mb,
 					  double   *seg_core)
 {
-	char   errorbuf[1024];
-	int    errorcode = FUNC_RETURN_OK;
+	char   errorbuf[ERRORMESSAGE_SIZE];
 	uint64 useroid 	 = GetUserId();
 
 	int ret = acquireResourceQuotaFromRM(useroid,
 										 max_target_segment_num,
 										 min_target_segment_num,
-										 &errorcode,
 										 errorbuf,
 										 sizeof(errorbuf),
 										 seg_num,
 										 seg_num_min,
 										 seg_memory_mb,
 										 seg_core);
-	if ( ret != FUNC_RETURN_OK ) {
-		elog(ERROR, "The resource quota acquiring request is not accepted by "
-					"HAWQ RM. error code=%d, message =%s",
-					ret,
-					errorbuf);
-	}
-	else if ( errorcode != FUNC_RETURN_OK ) {
-		elog(ERROR, "The resource quota acquiring request fails. "
-					"error code=%d, message =%s",
-					errorcode,
-					errorbuf);
+	if ( ret != FUNC_RETURN_OK )
+	{
+		elog(ERROR, "%s", errorbuf);
 	}
 }
 

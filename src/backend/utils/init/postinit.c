@@ -432,7 +432,12 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
     {
         if (get_tmpdir_from_rm)
         {
-            getLocalTmpDirFromMasterRM();
+        	char errorbuf[ERRORMESSAGE_SIZE] = "";
+            int res = getLocalTmpDirFromMasterRM(errorbuf, sizeof(errorbuf));
+            if ( res != FUNC_RETURN_OK )
+            {
+            	elog(ERROR, "%s", errorbuf);
+            }
         }
         else
         {

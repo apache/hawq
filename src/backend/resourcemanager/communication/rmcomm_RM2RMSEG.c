@@ -120,10 +120,9 @@ int sendRUAlive(char *seghostname)
 	res = getSegIDByHostName(seghostname, strlen(seghostname), &segid);
 	if ( res != FUNC_RETURN_OK )
 	{
-		elog(WARNING, "Resource manager cannot get registered host %s when send RUAlive message, "
-					  "error code: %d",
-					  seghostname,
-					  res);
+		elog(WARNING, "Resource manager host %s not registered when send "
+					  "RUAlive message.",
+					  seghostname);
 		return res;
 	}
 
@@ -175,8 +174,8 @@ int sendRUAlive(char *seghostname)
 	}
 
 	buildMessageToCommBuffer(newcommbuffer,
-							 tosend.Buffer,
-							 tosend.Cursor+1,
+							 SMBUFF_CONTENT(&tosend),
+							 getSMBContentSize(&tosend),
 							 REQUEST_RM_RUALIVE,
 							 0,
 							 0);

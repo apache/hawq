@@ -142,8 +142,8 @@ typedef FormData_pg_resqueue *Form_pg_resqueue;
 
 
 /* Create initial default resource queue */
-DATA(insert OID = 9800 ( "pg_root"    0      "-1"    "100%" "100%" 2 "even" _null_      0 0 0 1 _null_ _null_ "branch"));
-DATA(insert OID = 6055 ( "pg_default" 9800   "20"    "50%"  "50%"  2 "even" "mem:128mb" 0 0 0 1 _null_ _null_ _null_));
+DATA(insert OID = 9800 ( "pg_root"    0      "-1"    "100%" "100%" 2 "even" _null_      0 0 0 0 _null_ _null_ "branch"));
+DATA(insert OID = 6055 ( "pg_default" 9800   "20"    "50%"  "50%"  2 "even" "mem:128mb" 0 0 0 0 _null_ _null_ _null_));
 
 /*
  * The possible resource allocation policies.
@@ -159,7 +159,7 @@ enum RESOURCE_QUEUE_ALLOCATION_POLICY_INDEX {
 #define DEFAULT_RESQUEUE_NVSEG_UPPER_LIMIT				"0"
 #define DEFAULT_RESQUEUE_NVSEG_LOWER_LIMIT				"0"
 #define DEFAULT_RESQUEUE_NVSEG_UPPER_PERSEG_LIMIT		"0"
-#define DEFAULT_RESQUEUE_NVSEG_LOWER_PERSEG_LIMIT		"1"
+#define DEFAULT_RESQUEUE_NVSEG_LOWER_PERSEG_LIMIT		"0"
 
 #define DEFAULT_RESQUEUE_ALLOCPOLICY             		"even"
 #define DEFAULT_RESQUEUE_VSEGRESOURCEQUOTA		    	"mem:128mb"
@@ -169,7 +169,7 @@ enum RESOURCE_QUEUE_ALLOCATION_POLICY_INDEX {
 #define DEFAULT_RESQUEUE_NVSEG_UPPER_LIMIT_N			0
 #define DEFAULT_RESQUEUE_NVSEG_LOWER_LIMIT_N			0
 #define DEFAULT_RESQUEUE_NVSEG_UPPER_PERSEG_LIMIT_N		0.0
-#define DEFAULT_RESQUEUE_NVSEG_LOWER_PERSEG_LIMIT_N		1.0
+#define DEFAULT_RESQUEUE_NVSEG_LOWER_PERSEG_LIMIT_N		0.0
 
 #define DEFAULT_RESQUEUE_ALLOCPOLICY_N					RSQ_ALLOCATION_POLICY_EVEN
 #define DEFAULT_RESQUEUE_VSEGRESOURCEQUOTA_N			128

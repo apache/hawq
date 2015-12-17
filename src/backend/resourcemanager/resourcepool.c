@@ -1133,7 +1133,10 @@ int setSegResHAWQAvailability( SegResource segres, uint8_t newstatus)
 							  segres->Stat->GRMTotalCore);
 
 		addNewResourceToResourceManagerByBundle(&(segres->Allocated));
-		PRESPOOL->AvailNodeCount++;
+		if ( DRMGlobalInstance->ImpType == NONE_HAWQ2 )
+		{
+			PRESPOOL->AvailNodeCount++;
+		}
 	}
 
 	for ( int i = 0 ; i < PQUEMGR->RatioCount ; ++i )
@@ -1153,7 +1156,7 @@ int setSegResHAWQAvailability( SegResource segres, uint8_t newstatus)
 
 int setSegResGLOBAvailability( SegResource segres, uint8_t newstatus)
 {
-	return setSegStatGLOBAvailability(segres->Stat, newstatus);
+	int res = setSegStatGLOBAvailability(segres->Stat, newstatus);
 }
 
 /* Generate HAWQ host report. */
@@ -2174,9 +2177,6 @@ int allocateResourceFromResourcePoolIOBytes2(int32_t 	 nodecount,
 	int32_t			segid		  		= SEGSTAT_ID_INVALID;
 	GRMContainerSet containerset  		= NULL;
 	int				nodecountleft 		= nodecount;
-	int				impossiblecount   	= 0;
-	bool			skipchosenmachine 	= true;
-	int 			fullcount 			= nodetree->NodeIndex->NodeCount;
 	int 			clustersize 		= PRESPOOL->AvailNodeCount;
 	/* This hash saves all selected hosts containing at least one segment.    */
 	HASHTABLEData	vsegcnttbl;
@@ -4108,6 +4108,30 @@ void refreshSlavesFileHostSize(FILE *fp)
 		PRESPOOL->SlavesHostCount = newcnt;
 	}
 
+}
+
+void refreshAvailableNodeCount(void)
+{
+	List 	 *allsegs 	= NULL;
+	ListCell *cell 		= NULL;
+	getAllPAIRRefIntoList(&(PRESPOOL->Segments), &allsegs);
+
+	int oldcount = PRESPOOL->AvailNodeCount;
+	PRESPOOL->AvailNodeCount = 0;
+	foreach(cell, allsegs)
+	{
+		PAIR pair = (PAIR)lfirst(cell);
+		SegResource segres = (SegResource)(pair->Value);
+		Assert( segres != NULL );
+
+		if ( IS_SEGSTAT_FTSAVAILABLE(segres->Stat) &&
+			 IS_SEGSTAT_GRMAVAILABLE(segres->Stat) )
+		{
+			PRESPOOL->AvailNodeCount++;
+		}
+	}
+
+	freePAIRRefList(&(PRESPOOL->Segments), &allsegs);
 }
 
 void getSegResResourceCountersByMemCoreCounters(SegResource  resinfo,

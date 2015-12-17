@@ -98,10 +98,9 @@ int getHostIPV4AddressesByHostNameAsString(MCTYPE 	 		context,
 		}
 		else if ( h_errno != TRY_AGAIN )
 		{
-			write_log("Fail to call gethostbyname() to get host %s, %s, herrno %d",
+			write_log("Failed to call gethostbyname() to get host %s, %s",
 					  hostname,
-					  hstrerror(h_errno),
-					  h_errno);
+					  hstrerror(h_errno));
 			break;
 		}
 		pg_usleep(NETWORK_RETRY_SLEEP_US);
@@ -109,7 +108,7 @@ int getHostIPV4AddressesByHostNameAsString(MCTYPE 	 		context,
 
 	if ( hent == NULL )
 	{
-		write_log("WARNING. Fail to resolve host %s.", hostname);
+		write_log("Failed to resolve host %s.", hostname);
 		return SYSTEM_CALL_ERROR;
 	}
 
@@ -211,7 +210,7 @@ int getLocalHostAllIPAddressesAsStrings(DQueue addresslist)
 
 	if ( getifaddrs(&ifaddr) == -1 )
 	{
-		elog(ERROR, "Fail to get interface addresses when calling getifaddrs(), "
+		elog(ERROR, "Failed to get interface addresses when calling getifaddrs(), "
 					"errno %d",
 					errno);
 	}
@@ -243,8 +242,8 @@ int getLocalHostAllIPAddressesAsStrings(DQueue addresslist)
 																  host);
 			insertDQueueTailNode(addresslist, newaddr);
 
-			elog(DEBUG3, "Resource manager discovered local host IPv4 address %s",
-						 ((AddressString)(newaddr->Address))->Address);
+			elog(LOG, "Resource manager discovered local host IPv4 address %s",
+					  ((AddressString)(newaddr->Address))->Address);
 		}
 	}
 
@@ -383,20 +382,15 @@ int setConnectionNonBlocked(int fd)
 	int flags = fcntl(fd, F_GETFL, 0);
 	if (flags == -1)
 	{
-	  elog(WARNING, "setConnectionNonBlocked() fcntl GETFL failed, fd %d (errno %d)",
-			  		fd,
-					errno);
-	  return SYSTEM_CALL_ERROR;
+		write_log("Failed to call fcntl GETFL, fd %d (errno %d)", fd, errno);
+		return SYSTEM_CALL_ERROR;
 	}
 	flags = fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 	if (flags == -1)
 	{
-	  elog(WARNING, "setConnectionNonBlocked() fcntl SETFL failed, fd %d (errno %d)",
-			  	    fd,
-					errno);
-	  return SYSTEM_CALL_ERROR;
+		write_log("Failed to call fcntl SETFL, fd %d (errno %d)", fd, errno);
+		return SYSTEM_CALL_ERROR;
 	}
-
 	return FUNC_RETURN_OK;
 }
 
@@ -420,16 +414,19 @@ int  connectToServerDomain(const char 	*sockpath,
 						   char			*filename)
 {
 	struct sockaddr_un  sockaddr;
-	int					fd;
-	int					len;
-	int					sockres;
+	int					fd			= 0;
+	int					len			= 0;
+	int					sockres		= 0;
 
-	*clientfd = -1;
+	*clientfd   = -1;
 	filename[0] = '\0';
 
 	fd = socket(AF_UNIX, SOCK_STREAM, 0);
-	if ( fd < 0 ) {
-	  write_log("connectToServerDomain open socket failed (errno %d)", errno);
+	if ( fd < 0 )
+	{
+		write_log("Failed to open socket for connecting domain socket server "
+				  "(errno %d)",
+				  errno);
 		return UTIL_NETWORK_FAIL_CREATESOCKET;
 	}
 
@@ -445,10 +442,15 @@ int  connectToServerDomain(const char 	*sockpath,
 	strcpy(filename, sockaddr.sun_path);
 
 	sockres = bind(fd, (struct sockaddr *)&sockaddr, len);
-	if ( sockres < 0 ) {
-	  write_log("connectToServerDomain bind socket failed %s, fd %d (errno %d)", filename, fd, errno);
-	  closeConnectionDomain(&fd, filename);
-	  return UTIL_NETWORK_FAIL_BIND;
+	if ( sockres < 0 )
+	{
+		write_log("Failed to bind socket for connecting domain socket server "
+				  "%s (errno %d), close fd %d at once",
+				  filename,
+				  errno,
+				  fd);
+		closeConnectionDomain(&fd, filename);
+		return UTIL_NETWORK_FAIL_BIND;
 	}
 
 	memset( &sockaddr, 0, sizeof(struct sockaddr_un) );
@@ -456,21 +458,31 @@ int  connectToServerDomain(const char 	*sockpath,
 	sprintf(sockaddr.sun_path, "%s", sockpath);
 	len = offsetof(struct sockaddr_un, sun_path) + strlen(sockaddr.sun_path);
 
-	for ( int i = 0 ; i < DRM_SOCKET_CONN_RETRY ; ++i ) {
+	for ( int i = 0 ; i < DRM_SOCKET_CONN_RETRY ; ++i )
+	{
 		sockres = connect(fd, (struct sockaddr *)&sockaddr, len);
-		if ( sockres < 0 ) {
-		  write_log("connectToServerDomain connect failed, fd %d (errno %d)", fd, errno);
-		  pg_usleep(1000000); /* Sleep 2 seconds and retry. */
+		if ( sockres < 0 )
+		{
+			write_log("Failed to connect to domain socket server "
+					  "(retry %d, errno %d), fd %d",
+					  i,
+					  errno,
+					  fd);
+			pg_usleep(1000000); /* Sleep 1 seconds and retry. */
 		}
-		else {
-		  break;
+		else
+		{
+			break;
 		}
 	}
 
-	if ( sockres < 0 ) {
-	  write_log("connectToServerDomain connect failed after retry, fd %d (errno %d)", fd, errno);
-	  closeConnectionDomain(&fd, filename);
-	  return UTIL_NETWORK_FAIL_CONNECT;
+	if ( sockres < 0 )
+	{
+		write_log("Failed to connect to domain socket server after retries, "
+				  "close fd %d at once",
+				  fd);
+		closeConnectionDomain(&fd, filename);
+		return UTIL_NETWORK_FAIL_CONNECT;
 	}
 
 	*clientfd = fd;
@@ -495,17 +507,28 @@ int connectToServerRemote(const char *address, uint16_t port, int *clientfd)
 	int					fd		= 0;
 	int 		    	sockres = 0;
 	struct sockaddr_in 	server_addr;
-	struct hostent 	   *server  = gethostbyname(address);
+	struct hostent 	   *server  = NULL;
 
 	*clientfd = -1;
 
-	if ( server == NULL ) {
+	server = gethostbyname(address);
+	if ( server == NULL )
+	{
+		write_log("Failed to get host by name %s for connecting to a remote "
+				  "socket server %s:%d (error %s)",
+				  address,
+				  address,
+				  port,
+				  hstrerror(h_errno));
 		return UTIL_NETWORK_FAIL_GETHOST;
 	}
 
 	fd = socket(AF_INET, SOCK_STREAM, 0);
-	if ( fd < 0 ) {
-	  write_log("connectToServerRemote open socket failed (errno %d)", errno);
+	if ( fd < 0 )
+	{
+		write_log("Failed to open socket for connecting remote socket server "
+				  "(errno %d)",
+				  errno);
 		return UTIL_NETWORK_FAIL_CREATESOCKET;
 	}
 
@@ -518,21 +541,29 @@ int connectToServerRemote(const char *address, uint16_t port, int *clientfd)
 
 	while(true)
 	{
-	  sockres = connect(fd, (struct sockaddr *)&server_addr, sizeof(server_addr));
-	  if( sockres < 0)
-	  {
-	    if (errno == EINTR)
-	    {
-	      continue;
-	    }
-	    else
-	    {
-	      write_log("connectToServerRemote connect failed, fd %d (errno %d)", fd, errno);
-	      closeConnectionRemote(&fd);
-	      return UTIL_NETWORK_FAIL_CONNECT;
-	    }
-	  }
-	  break;
+		sockres = connect(fd,
+						  (struct sockaddr *)&server_addr,
+						  sizeof(server_addr));
+		if( sockres < 0)
+		{
+			write_log("Failed to connect to remove socket server (errno %d), fd %d",
+					  errno,
+					  fd);
+
+			if (errno == EINTR)
+			{
+				continue;
+			}
+			else
+			{
+				write_log("Close fd %d at once due to not recoverable error "
+						  "detected.",
+						  fd);
+				closeConnectionRemote(&fd);
+				return UTIL_NETWORK_FAIL_CONNECT;
+			}
+		}
+		break;
 	}
 
 	*clientfd = fd;
@@ -552,9 +583,7 @@ void closeConnectionRemote(int *clientfd)
 	int ret = close(*clientfd);
 	if (ret < 0)
 	{
-		write_log("ERROR closeConnectionRemote() close FD %d failed, (errno %d)",
-				  *clientfd,
-				  errno);
+		write_log("Failed to close fd %d (errno %d)", *clientfd, errno);
 	}
 	*clientfd = -1;
 }
@@ -571,7 +600,7 @@ void closeConnectionDomain(int *clientfd, char *filename)
 		int ret = close(*clientfd);
 		if (ret < 0)
 		{
-			write_log("closeConnectionDomain close fd failed, fd %d (errno %d)", *clientfd, errno);
+			write_log("Failed to close fd %d (errno %d)", *clientfd, errno);
 		}
 	}
 

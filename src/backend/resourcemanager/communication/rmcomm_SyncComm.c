@@ -22,6 +22,7 @@
 
 #include <pthread.h>
 #include "miscadmin.h"
+#include "rmcommon.h"
 #include "communication/rmcomm_AsyncComm.h"
 #include "communication/rmcomm_Message.h"
 #include "utils/network_utils.h"
@@ -66,9 +67,11 @@ int callSyncRPCDomain(const char     	   *sockfile,
 		        	  int   		  		sendbuffsize,
 					  uint16_t		  		sendmsgid,
 					  uint16_t 		  		exprecvmsgid,
-					  SelfMaintainBuffer 	recvsmb)
+					  SelfMaintainBuffer 	recvsmb,
+					  char				   *errorbuf,
+					  int					errorbufsize)
 {
-	static char            			dfilename[1024];
+	static char            			dfilename[DOMAINSOCKET_FILE_SIZE];
 	int 							fd 			  = -1;
 	int 							res 		  = FUNC_RETURN_OK;
 	AsyncCommBuffer					newcommbuffer = NULL;
@@ -79,9 +82,11 @@ int callSyncRPCDomain(const char     	   *sockfile,
 	res = connectToServerDomain(sockfile, 0, &fd, 0, dfilename);
 	if ( res != FUNC_RETURN_OK )
 	{
-		elog(WARNING, "Fail to connect to domain socket server %s, result %d",
-				  sockfile,
-				  res);
+		snprintf(errorbuf, errorbufsize,
+				 "failed to connect to domain socket server %s",
+				 sockfile);
+
+		elog(WARNING, "%s", errorbuf);
 		goto exit;
 	}
 
@@ -151,7 +156,9 @@ int callSyncRPCRemote(const char     	   *hostname,
 					  int   		  		sendbuffsize,
 					  uint16_t		  		sendmsgid,
 					  uint16_t 		  		exprecvmsgid,
-					  SelfMaintainBuffer 	recvsmb)
+					  SelfMaintainBuffer 	recvsmb,
+					  char				   *errorbuf,
+					  int					errorbufsize)
 {
 	int 							fd 			  = -1;
 	int 							res 		  = FUNC_RETURN_OK;
@@ -161,10 +168,13 @@ int callSyncRPCRemote(const char     	   *hostname,
 
 	/* Connect to the server side. */
 	res = connectToServerRemote(hostname, port, &fd);
-	if ( res != FUNC_RETURN_OK ) {
-		elog(WARNING, "Fail to connect to socket server %s:%d, result %d",
-				  	  hostname, port,
-					  res);
+	if ( res != FUNC_RETURN_OK )
+	{
+		snprintf(errorbuf, sizeof(errorbuf),
+				 "failed to connect to remote socket server %s:%d",
+				 hostname,
+				 port);
+		elog(WARNING, "%s", errorbuf);
 		goto exit;
 	}
 
@@ -180,7 +190,14 @@ int callSyncRPCRemote(const char     	   *hostname,
 	if ( res != FUNC_RETURN_OK )
 	{
 		rm_pfree(AsyncCommContext, context);
-		elog(WARNING, "Fail to register FD for synchronous communication. %d", res);
+
+		snprintf(errorbuf, sizeof(errorbuf),
+				 "failed to register socket connection fd %d connected to %s:%d "
+				 "for resource rpc communication",
+				 fd,
+				 hostname, port);
+
+		elog(WARNING, "%s", errorbuf);
 		goto exit;
 	}
 
@@ -222,9 +239,25 @@ int callSyncRPCRemote(const char     	   *hostname,
 	if (res != FUNC_RETURN_OK)
 	{
 	  elog(WARNING, "Sync RPC framework (inet) finds exception raised.");
+
+	  switch(res)
+	  {
+	  case COMM2RM_CLIENT_FAIL_SEND:
+		  snprintf(errorbuf, errorbufsize, "failed to send content");
+		  break;
+	  case COMM2RM_CLIENT_FAIL_RECV:
+		  snprintf(errorbuf, errorbufsize, "failed to receive content");
+		  break;
+	  case REQUESTHANDLER_WRONGMESSAGE:
+		  snprintf(errorbuf, errorbufsize, "wrong message was received");
+		  break;
+	  default:
+		  Assert(false);
+	  }
 	}
 	return res;
 exit:
+	elog(LOG, "Close fd %d at once", fd);
 	closeConnectionRemote(&fd);
 	return res;
 }
