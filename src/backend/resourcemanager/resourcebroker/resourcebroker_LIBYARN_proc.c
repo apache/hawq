@@ -274,12 +274,15 @@ int ResBrokerMainInternal(void)
             			  res);
             	/* If this is a pipe error between RM and RB or YARN remove error.
             	 * Exit RB and let RM restart RB process. */
-            	if ( res == RESBROK_ERROR_GRM )
-            	{
-            		RB2YARN_disconnectFromYARN();
-            		elog(LOG, "YARN mode resource broker disconnects from YARN. "
-            				  "Resource broker will retry to register soon.");
-            	}
+                if ( res == RESBROK_ERROR_GRM )
+                {
+                    if ( LIBYARNClient != NULL && YARNJobID != NULL ) {
+                        forceKillJob(LIBYARNClient, YARNJobID);
+                        RB2YARN_disconnectFromYARN();
+                        elog(LOG, "YARN mode resource broker disconnects from YARN. "
+                                  "Resource broker will retry to register soon.");
+                    }
+                }
             	else
             	{
             		ResBrokerKeepRun = false;
