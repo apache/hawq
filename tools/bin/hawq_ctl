@@ -57,6 +57,7 @@ class HawqInit:
         self.hawq_dict = hawq_dict
         self.locale = opts.hawq_locale
         self.quiet  = opts.quiet_run
+        self.prompt = opts.prompt
         self.hawq_lc_collate= opts.hawq_lc_collate
         self.hawq_lc_ctype = opts.hawq_lc_ctype
         self.hawq_lc_messages = opts.hawq_lc_messages
@@ -344,6 +345,9 @@ class HawqInit:
             logger.info("Try to remove standby master")
             self.hawq_remove_standby()
         elif self.node_type == "standby":
+            if self.prompt:
+                if not userinput.ask_yesno(None, "\nMaster will be restarted, continue", 'N'):
+                    sys.exit(1)
             if self.standby_host_name.lower() in ('', 'none'):
                 logger.info("No standby host found")
                 logger.info("Please check your standby host name")
