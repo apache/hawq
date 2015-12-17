@@ -663,6 +663,9 @@ class HawqStop:
 
     def _stopAll(self):
         logger.info("Stop hawq cluster")
+        master_result = 0
+        standby_result = 0
+        segments_return_flag = 0
         master_result = self._stop_master()
         if master_result != 0:
             logger.error("Master stop failed")
