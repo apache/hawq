@@ -274,6 +274,8 @@ planner(Query *parse, int cursorOptions,
 	static bool resourceNegotiateDone = false;
 	QueryResource *savedQueryResource = GetActiveQueryResource();;
 	SetActiveRelType(NIL);
+
+	bool isDispatchParallel = false;
 	/*
 	 * Before doing the true query optimization, we first run a resource_negotiator to give
 	 * us some sense of the complexity of the query, and allocate the appropriate
@@ -288,6 +290,11 @@ planner(Query *parse, int cursorOptions,
       START_MEMORY_ACCOUNT(MemoryAccounting_CreateAccount(0, MEMORY_OWNER_TYPE_Resource_Negotiator));
       {
         resource_negotiator(parse, cursorOptions, boundParams, resourceLife, &ppResult);
+
+		if(ppResult->stmt && ppResult->stmt->planTree)
+		{
+			isDispatchParallel = ppResult->stmt->planTree->dispatch == DISPATCH_PARALLEL;
+		}
       }
       END_MEMORY_ACCOUNT();
 	  }
@@ -327,7 +334,7 @@ planner(Query *parse, int cursorOptions,
 		* then fall back to the planner.
 		* TODO: caragg 11/08/2013: Enable ORCA when running in utility mode (MPP-21841)
 		*/
-    	if (optimizer && AmIMaster() && (GP_ROLE_UTILITY != Gp_role))
+    	if (optimizer && AmIMaster() && (GP_ROLE_UTILITY != Gp_role) && isDispatchParallel)
 		{
 			if (gp_log_optimization_time)
 			{
