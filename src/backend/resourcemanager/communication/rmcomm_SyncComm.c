@@ -170,7 +170,7 @@ int callSyncRPCRemote(const char     	   *hostname,
 	res = connectToServerRemote(hostname, port, &fd);
 	if ( res != FUNC_RETURN_OK )
 	{
-		snprintf(errorbuf, sizeof(errorbuf),
+		snprintf(errorbuf, errorbufsize,
 				 "failed to connect to remote socket server %s:%d",
 				 hostname,
 				 port);
@@ -191,7 +191,7 @@ int callSyncRPCRemote(const char     	   *hostname,
 	{
 		rm_pfree(AsyncCommContext, context);
 
-		snprintf(errorbuf, sizeof(errorbuf),
+		snprintf(errorbuf, errorbufsize,
 				 "failed to register socket connection fd %d connected to %s:%d "
 				 "for resource rpc communication",
 				 fd,
