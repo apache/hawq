@@ -1159,6 +1159,7 @@ int setSegResHAWQAvailability( SegResource segres, uint8_t newstatus)
 int setSegResGLOBAvailability( SegResource segres, uint8_t newstatus)
 {
 	int res = setSegStatGLOBAvailability(segres->Stat, newstatus);
+	return res;
 }
 
 /* Generate HAWQ host report. */
