@@ -498,6 +498,8 @@ struct ResourcePoolData {
 	/* Slaves file content. */
 	int64_t			SlavesFileTimestamp;
 	int				SlavesHostCount;
+
+	int				RBClusterReportCounter;
 };
 
 typedef struct ResourcePoolData *ResourcePool;

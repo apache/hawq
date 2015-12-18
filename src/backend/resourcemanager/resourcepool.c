@@ -362,6 +362,8 @@ void initializeResourcePoolManager(void)
 	{
 		PRESPOOL->pausePhase[i] = false;
 	}
+
+	PRESPOOL->RBClusterReportCounter = 0;
 }
 
 #define CONNECT_TIMEOUT 60
@@ -3423,6 +3425,16 @@ bool hasSegmentGRMCapacityNotUpdated(void)
 	{
 		return false;
 	}
+
+	/*
+	 * If there is no segment registered, we consider no need to update global
+	 * resource manager info.
+	 */
+	if ( PRESPOOL->Segments.NodeCount == 0 )
+	{
+		return false;
+	}
+
 	bool res = false;
 
 	List 	 *allsegres = NULL;
