@@ -68,6 +68,8 @@ int RB_getClusterReport(const char *queuename, List **machines, double *maxcapac
 	}
 
 	*maxcapacity = 1;
+	PRESPOOL->RBClusterReportCounter++;
+
 	return FUNC_RETURN_OK;
 }
 

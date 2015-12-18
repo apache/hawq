@@ -191,6 +191,7 @@ struct DynRMGlobalData{
     ConnectionTrackManager   ConnTrackManager;	   /* Connection track. 	  */
     ResourcePool     	 	 ResourcePoolInstance; /* Node management.		  */
     volatile bool			 ResManagerMainKeepRun;
+    uint64_t				 ResourceManagerStartTime;
 
     /*------------------------------------------------------------------------*/
     /* INTERCONN:: RM server and RM agents.                                   */

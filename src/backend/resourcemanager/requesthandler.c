@@ -330,6 +330,19 @@ bool handleRMRequestAcquireResource(void **arg)
 	static char		 errorbuf[ERRORMESSAGE_SIZE];
 	int				 res		= FUNC_RETURN_OK;
 	ConnectionTrack *conntrack	= (ConnectionTrack *)arg;
+	uint64_t		 reqtime	= gettime_microsec();
+
+	/* If we run in YARN mode, we expect that we should try to get at least one
+	 * available segment, and this requires at least once global resource manager
+	 * cluster report returned.
+	 */
+	if ( reqtime - DRMGlobalInstance->ResourceManagerStartTime <=
+		 rm_nocluster_timeout * 1000000LL &&
+		 PRESPOOL->RBClusterReportCounter == 0 )
+	{
+		elog(DEBUG3, "Resource manager defers the resource request.");
+		return false;
+	}
 
 	RPCRequestHeadAcquireResourceFromRM request =
 		SMBUFF_HEAD(RPCRequestHeadAcquireResourceFromRM,
@@ -447,7 +460,7 @@ bool handleRMRequestAcquireResource(void **arg)
 	{
 		goto sendresponse;
 	}
-	(*conntrack)->ResRequestTime = gettime_microsec();
+	(*conntrack)->ResRequestTime = reqtime;
 	(*conntrack)->LastActTime    = (*conntrack)->ResRequestTime;
 
 	return true;

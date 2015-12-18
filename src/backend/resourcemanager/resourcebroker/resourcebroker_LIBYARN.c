@@ -536,6 +536,8 @@ int handleRB2RM_ClusterReport(void)
 	int			piperes     = 0;
 	List	   *segstats	= NULL;
 
+	PRESPOOL->RBClusterReportCounter++;
+
 	/* Read whole result head. */
 	RPCResponseRBGetClusterReportHeadData response;
 	piperes = readPipe(fd, (char *)&response, sizeof(response));

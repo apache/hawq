@@ -528,6 +528,8 @@ int MainHandlerLoop(void)
 {
 	int res = FUNC_RETURN_OK;
 
+	DRMGlobalInstance->ResourceManagerStartTime = gettime_microsec();
+
 	while( DRMGlobalInstance->ResManagerMainKeepRun )
 	{
 		/* STEP 1. Check resource broker status. */
@@ -852,6 +854,10 @@ int initializeDRMInstance(MCTYPE context)
 	if ( res != FUNC_RETURN_OK ) {
 		elog(WARNING, "Fail to get local host name.");
 	}
+
+	/* Set resource manager server startup time to 0, i.e. not started yet. */
+	DRMGlobalInstance->ResourceManagerStartTime = 0;
+
 	return res;
 }
 
@@ -2860,10 +2866,11 @@ void processResourceBrokerTasks(void)
 		 */
         curtime = gettime_microsec();
 
-		if ( (curtime - PRESPOOL->LastUpdateTime  >
+		if ( (PRESPOOL->Segments.NodeCount > 0 ) &&
+			 (curtime - PRESPOOL->LastUpdateTime  >
 			  rm_cluster_report_period * 1000000LL ||
 			  hasSegmentGRMCapacityNotUpdated() ) &&
-			  curtime - PRESPOOL->LastRequestTime >    5LL * 1000000LL)
+			 (curtime - PRESPOOL->LastRequestTime > 5LL * 1000000LL) )
 		{
 			double  maxcap  = 0.0;
 			List   *report	= NULL;
