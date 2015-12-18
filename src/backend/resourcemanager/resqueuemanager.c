@@ -3384,9 +3384,8 @@ int computeQueryQuota(ConnectionTrack conn, char *errorbuf, int errorbufsize)
 		 */
 		if ( conn->MinSegCountFixed != conn->MaxSegCountFixed )
 		{
-			vseglimit = conn->VSegLimit ?
-						conn->VSegLimit :
-						conn->VSegLimitPerSeg * PRESPOOL->AvailNodeCount;
+			vseglimit = conn->VSegLimitPerSeg * PRESPOOL->AvailNodeCount;
+			vseglimit = conn->VSegLimit < vseglimit? conn->VSegLimit : vseglimit;
 		}
 		else
 		{
