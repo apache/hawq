@@ -48,7 +48,7 @@ MoveToCGroupForQE(TimestampTz masterStartTime,
 
 	int			res			= FUNC_RETURN_OK;
 
-	char		*serverHost	= "127.0.0.1";
+	const char	*serverHost	= "127.0.0.1";
 	uint16_t	serverPort	= rm_segment_port;
 
 	SelfMaintainBuffer sendBuffer = createSelfMaintainBuffer(CurrentMemoryContext);
@@ -72,6 +72,7 @@ MoveToCGroupForQE(TimestampTz masterStartTime,
 	                        recvBuffer,
 							errorbuf,
 							errorbufsize);
+
 	deleteSelfMaintainBuffer(sendBuffer);
 	deleteSelfMaintainBuffer(recvBuffer);
 	return res;
@@ -95,7 +96,7 @@ MoveOutCGroupForQE(TimestampTz masterStartTime,
 
 	int			res			= FUNC_RETURN_OK;
 
-	char		*serverHost	= "127.0.0.1";
+	const char	*serverHost	= "127.0.0.1";
 	uint16_t	serverPort	= rm_segment_port;
 
 	SelfMaintainBuffer sendBuffer = createSelfMaintainBuffer(CurrentMemoryContext);
@@ -118,7 +119,7 @@ MoveOutCGroupForQE(TimestampTz masterStartTime,
 	                        RESPONSE_QE_MOVEOUTCGROUP,
 	                        recvBuffer,
 							errorbuf,
-							sizeof(errorbuf));
+							errorbufsize);
 
 	deleteSelfMaintainBuffer(sendBuffer);
 	deleteSelfMaintainBuffer(recvBuffer);
@@ -144,7 +145,7 @@ SetWeightCGroupForQE(TimestampTz masterStartTime,
 
 	int			res			= FUNC_RETURN_OK;
 
-	char		*serverHost	= "127.0.0.1";
+	const char	*serverHost	= "127.0.0.1";
 	uint16_t	serverPort	= rm_segment_port;
 
 	SelfMaintainBuffer sendBuffer = createSelfMaintainBuffer(CurrentMemoryContext);
