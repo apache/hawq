@@ -65,6 +65,23 @@ under the License.
                     </includes>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy</id> 
+                        <phase>package</phase>
+                        <goals>
+                            <goal>copy-dependencies</goal> 
+                        </goals>
+                        <configuration> 
+                            <outputDirectory>./lib</outputDirectory>
+                            <includeArtifactIds>parquet-column,parquet-common,parquet-encoding,parquet-format,parquet-hadoop,postgresql,snakeyaml,snappy-java</includeArtifactIds>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 </project>
