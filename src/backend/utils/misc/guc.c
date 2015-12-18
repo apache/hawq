@@ -6412,7 +6412,7 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"hawq_rm_resource_idle_timeout", PGC_POSTMASTER, RESOURCES_MGM,
+		{"hawq_rm_nocluster_timeout", PGC_POSTMASTER, RESOURCES_MGM,
 			gettext_noop("timeout for having enough number of segments registered."),
 			NULL
 		},
