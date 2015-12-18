@@ -77,16 +77,7 @@ under the License.
                         </goals>
                         <configuration> 
                             <outputDirectory>./lib</outputDirectory>
-                            <includeArtifactIds>
-                                parquet-column,
-                                parquet-common,
-                                parquet-encoding,
-                                parquet-format,
-                                parquet-hadoop,
-                                postgresql,
-                                snakeyaml,
-                                snappy-java
-                            </includeArtifactIds>
+                            <includeArtifactIds>parquet-column,parquet-common,parquet-encoding,parquet-format,parquet-hadoop,postgresql,snakeyaml,snappy-java</includeArtifactIds>
                         </configuration>
                     </execution>
                 </executions>
