@@ -81,8 +81,6 @@ parseGPHDUri(const char *uri_str)
 	GPHDUri_parse_data(uri, &cursor);
 	GPHDUri_parse_options(uri, &cursor);
 
-	port_to_str(&(uri->port), pxf_service_port);
-
 	return uri;
 }
 

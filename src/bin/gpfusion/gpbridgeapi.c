@@ -268,7 +268,7 @@ static void init_client_context(ClientContext *client_context)
 /*
  * get list of data nodes' rest servers,
  * and choose one (based on modulo segment id).
- * if pxf_isilon is true, there are no PXF instances on the datanodes .
+ * if pxf_isilon is true, there are no PXF instances on the datanodes.
  * TODO: add locality
  */
 PxfServer* get_pxf_server(GPHDUri* gphd_uri, const Relation rel)
@@ -291,7 +291,19 @@ PxfServer* get_pxf_server(GPHDUri* gphd_uri, const Relation rel)
 	/* set HTTP header that guarantees response in JSON format */
 	churl_headers_append(client_context.http_headers, REST_HEADER_JSON_RESPONSE, NULL);
 	if (!client_context.http_headers)
+	{
 		return NULL;
+	}
+
+	/* if pxf_isilon is false, ignore the port in the uri
+	 * and use pxf_service_port instead to access PXF.
+	 */
+	if (!pxf_isilon)
+	{
+		sprintf(gphd_uri->port, "%d", pxf_service_port);
+	}
+
+
 
 	/*
 	 * Enrich the curl HTTP header
@@ -303,7 +315,7 @@ PxfServer* get_pxf_server(GPHDUri* gphd_uri, const Relation rel)
 	add_delegation_token(&inputData);
 	build_http_header(&inputData);
 
-	int port = pxf_service_port;
+	int port = atoi(gphd_uri->port);
 
 	if (!pxf_isilon)
 	{
@@ -342,7 +354,7 @@ PxfServer* get_pxf_server(GPHDUri* gphd_uri, const Relation rel)
 	}
 	else /* Isilon */
 	{
-		ret_server->host = pstrdup("localhost");
+		ret_server->host = pstrdup("localhost"); /* TODO: should it always be localhost? */
 		ret_server->port = port;
 		elog(DEBUG2, "get_pxf_server: writing data to an Isilon target storage system");
 	}
