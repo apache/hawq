@@ -2230,9 +2230,10 @@ CTranslatorQueryToDXL::PdxlnUnionAllForGroupingSets
 	)
 {
 	GPOS_ASSERT(NULL != pdrgpbs);
-	GPOS_ASSERT(1 < pdrgpbs->UlLength());
 
 	const ULONG ulGroupingSets = pdrgpbs->UlLength();
+	GPOS_ASSERT(1 < ulGroupingSets);
+
 	CDXLNode *pdxlnUnionAll = NULL;
 	DrgPul *pdrgpulColIdsInner = NULL;
 
