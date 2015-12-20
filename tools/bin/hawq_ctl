@@ -111,10 +111,13 @@ class HawqInit:
             self.standby_host_name = ''
 
         if 'enable_secure_filesystem' in self.hawq_dict:
-            self.enable_secure_filesystem=self.hawq_dict['enable_secure_filesystem']
-            self.krb_server_keyfile =self.hawq_dict['krb_server_keyfile']
+            self.enable_secure_filesystem = self.hawq_dict['enable_secure_filesystem']
         else:
             self.enable_secure_filesystem = 'off'
+
+        if 'krb_server_keyfile' in self.hawq_dict:
+            self.krb_server_keyfile = self.hawq_dict['krb_server_keyfile']
+        else:
             self.krb_server_keyfile = ''
 
     def _write_config(self):
