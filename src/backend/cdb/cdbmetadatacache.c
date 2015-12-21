@@ -65,7 +65,6 @@
 #include "fmgr.h"
 #include "utils/builtins.h"
 
-#define MAX_HDFS_FILE_NUM               (2 << 15)       // 1PB / 32G = 32K, 2^15
 #define MAX_HDFS_HOST_NUM               1024
 #define MAX_BLOCK_INFO_LEN              128
 #define BLOCK_INFO_BIT_NUM              16
@@ -184,7 +183,7 @@ MetadataCache_ShmemSize(void)
 {
     Size size;
     
-    size = hash_estimate_size((Size)MAX_HDFS_FILE_NUM, sizeof(MetadataCacheEntry));
+    size = hash_estimate_size((Size)metadata_cache_max_hdfs_file_num, sizeof(MetadataCacheEntry));
 
     size = add_size(size, hash_estimate_size((Size)MAX_HDFS_HOST_NUM, sizeof(BlockInfoEntry)) * METADATA_BLOCK_INFO_TYPE_NUM);
 
@@ -267,7 +266,7 @@ MetadataCacheHashTableInit(void)
     info.hash = tag_hash;
     hash_flags = (HASH_ELEM | HASH_FUNCTION);
 
-    MetadataCache = ShmemInitHash("Metadata Cache", MAX_HDFS_FILE_NUM, MAX_HDFS_FILE_NUM, &info, hash_flags);
+    MetadataCache = ShmemInitHash("Metadata Cache", metadata_cache_max_hdfs_file_num, metadata_cache_max_hdfs_file_num, &info, hash_flags);
     if (NULL == MetadataCache)
     {
         return false;
