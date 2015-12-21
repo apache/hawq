@@ -1787,7 +1787,8 @@ int RB2YARN_getContainerReport(RB_GRMContainerStat *ctnstats, int *size)
 		freeContainerStatusArray(ctnstatarr, ctnstatsize);
 
 	}
-	freeContainerReportArray(ctnrparr, arrsize);
+	if(ctnrparr != NULL && arrsize > 0)
+		freeContainerReportArray(ctnrparr, arrsize);
 	return yarnres;
 }
 

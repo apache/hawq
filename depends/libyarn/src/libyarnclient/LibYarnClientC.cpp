@@ -263,7 +263,7 @@ extern "C" {
 			goto exit_err;
 
 		preferredAllocatedSize = allocatedPreferredList.size();
-		preferredAllocatedArray = (LibYarnResource_t *)(sizeof(LibYarnResource_t) * preferredAllocatedSize);
+		preferredAllocatedArray = (LibYarnResource_t *)malloc(sizeof(LibYarnResource_t) * preferredAllocatedSize);
 		if(preferredAllocatedArray == NULL) {
 			setErrorMessage("LibYarnClientC::fail to allocate memory for resource array");
 			goto exit_err;

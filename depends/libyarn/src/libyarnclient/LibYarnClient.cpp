@@ -42,7 +42,7 @@ LibYarnClient::LibYarnClient(string &user, string &rmHost, string &rmPort,
 		amUser(user), schedHost(schedHost), schedPort(schedPort), amHost(amHost),
 		amPort(amPort), am_tracking_url(am_tracking_url),
 		heartbeatInterval(heartbeatInterval),response_id(0),clientJobId(""),
-		keepRun(false){
+		keepRun(false), needHeartbeatAlive(false){
         pthread_mutex_init( &(heartbeatLock), NULL );
 
 		amrmClient = NULL;
@@ -220,6 +220,7 @@ int LibYarnClient::createJob(string &jobName, string &queue,string &jobId) {
                       "error code %d", rc);
             throw std::runtime_error( "Fail to create heart-beat thread.");
         }
+        needHeartbeatAlive = true;
 #endif
 
         LOG(INFO,"LibYarnClient::createJob, after AM register to RM, a heartbeat thread has been started");
@@ -272,6 +273,7 @@ int LibYarnClient::forceKillJob(string &jobId) {
             throw std::invalid_argument("The jobId is wrong, please check the jobId argument");
         }
 
+        needHeartbeatAlive = false;
         for (map<int64_t,Container*>::iterator it = jobIdContainers.begin(); it != jobIdContainers. end(); it++) {
             ostringstream key;
             Container *container = it->second;
@@ -484,6 +486,10 @@ int LibYarnClient::allocateResources(string &jobId,
 			throw std::invalid_argument("The jobId is wrong, check the jobId argument");
 		}
 
+        if (!keepRun && needHeartbeatAlive) {
+            throw std::runtime_error("LibYarnClient::libyarn AM heartbeat thread has stopped.");
+        }
+
         ApplicationMaster*    amrmClientAlias = (ApplicationMaster*) amrmClient;
         list<Container>       allocatedContainerCache;
         list<ContainerReport> preContainerReports;
@@ -622,6 +628,11 @@ int LibYarnClient::releaseResources(string &jobId,int64_t releaseContainerIds[],
 		if (jobId != clientJobId) {
 			throw std::invalid_argument("The jobId is wrong,please check the jobId argument");
 		}
+
+        if (!keepRun && needHeartbeatAlive) {
+            throw std::runtime_error("LibYarnClient::libyarn AM heartbeat thread has stopped.");
+        }
+
         ApplicationMaster* amrmClientAlias = (ApplicationMaster*) amrmClient;
         //1) asksBlank
         list<ResourceRequest> asksBlank;
@@ -705,6 +716,10 @@ int LibYarnClient::activeResources(string &jobId,int64_t activeContainerIds[],in
 		if (jobId != clientJobId) {
 			throw std::invalid_argument("The jobId is wrong,please check the jobId argument");
 		}
+        if (!keepRun && needHeartbeatAlive) {
+            throw std::runtime_error("LibYarnClient::libyarn AM heartbeat thread has stopped.");
+        }
+
 	    LOG(INFO, "LibYarnClient::activeResources, activeResources started");
 
         for (int i = 0; i < activeContainerSize; i++){
@@ -772,12 +787,13 @@ int LibYarnClient::finishJob(string &jobId, FinalApplicationStatus finalStatus) 
     }
 #endif
 
-	try{
-		if (jobId != clientJobId) {
-			throw std::invalid_argument("The jobId is wrong,please check the jobId argument");
-		}
+    try{
+        if (jobId != clientJobId) {
+            throw std::invalid_argument("The jobId is wrong,please check the jobId argument");
+        }
+        needHeartbeatAlive = false;
+
         //1. we should stop all containers related with this job
-        //ContainerManagement cmgmt;
         for (map<int64_t,Container*>::iterator it = jobIdContainers.begin(); it != jobIdContainers. end(); it++) {
             ostringstream key;
             Container *container = it->second;
@@ -820,6 +836,11 @@ int LibYarnClient::getApplicationReport(string &jobId,ApplicationReport &applica
 		if (jobId != clientJobId) {
 			throw std::invalid_argument("The jobId is wrong,please check the jobId argument");
 		}
+
+        if (!keepRun && needHeartbeatAlive) {
+            throw std::runtime_error("LibYarnClient::libyarn AM heartbeat thread has stopped.");
+        }
+
 		LOG(INFO,"LibYarnClient::getApplicationReport, appId[cluster_timestamp:%lld,id:%d]",
 				clientAppId.getClusterTimestamp(), clientAppId.getId());
 		applicationReport = ((ApplicationClient*) appClient)->getApplicationReport(clientAppId);
@@ -848,6 +869,11 @@ int LibYarnClient::getContainerReports(string &jobId,list<ContainerReport> &cont
 		if (jobId != clientJobId) {
 			throw std::invalid_argument("The jobId is wrong,please check the jobId argument");
 		}
+
+        if (!keepRun && needHeartbeatAlive) {
+            throw std::runtime_error("LibYarnClient::libyarn AM heartbeat thread has stopped.");
+        }
+
 		LOG(INFO,"LibYarnClient::getContainerReports, appId[cluster_timestamp:%lld,id:%d]",
 				clientAppId.getClusterTimestamp(), clientAppId.getId());
 		containerReports = ((ApplicationClient*) appClient)->getContainers(clientAppAttempId);
@@ -871,6 +897,10 @@ int LibYarnClient::getContainerStatuses(string &jobId,int64_t containerIds[],int
 		if (jobId != clientJobId) {
 			throw std::invalid_argument("The jobId is wrong,please check the jobId argument");
 		}
+
+        if (!keepRun && needHeartbeatAlive) {
+            throw std::runtime_error("LibYarnClient::libyarn AM heartbeat thread has stopped.");
+        }
 
 		for (int i = 0; i < containerSize; i++) {
 			int64_t containerId = containerIds[i];
@@ -908,6 +938,10 @@ int LibYarnClient::getContainerStatuses(string &jobId,int64_t containerIds[],int
 int LibYarnClient::getQueueInfo(string &queue, bool includeApps,
 		bool includeChildQueues, bool recursive,QueueInfo &queueInfo) {
     try{
+        if (!keepRun && needHeartbeatAlive) {
+            throw std::runtime_error("LibYarnClient::libyarn AM heartbeat thread has stopped.");
+        }
+
         queueInfo = ((ApplicationClient*) appClient)->getQueueInfo(queue, includeApps,
                 includeChildQueues, recursive);
         return FR_SUCCEEDED;
@@ -927,6 +961,9 @@ int LibYarnClient::getQueueInfo(string &queue, bool includeApps,
 
 int LibYarnClient::getClusterNodes(list<NodeState> &states,list<NodeReport> &nodeReports) {
     try{
+        if (!keepRun && needHeartbeatAlive) {
+            throw std::runtime_error("LibYarnClient::libyarn AM heartbeat thread has stopped.");
+        }
         nodeReports =  ((ApplicationClient*) appClient)->getClusterNodes(states);
         return FR_SUCCEEDED;
     }

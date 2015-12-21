@@ -142,6 +142,7 @@ namespace libyarn {
 		list<ResourceRequest> askRequests;
 
 		volatile bool keepRun;
+		bool needHeartbeatAlive;
 #ifdef MOCKTEST
 	private:
     /*
