@@ -295,16 +295,6 @@ PxfServer* get_pxf_server(GPHDUri* gphd_uri, const Relation rel)
 		return NULL;
 	}
 
-	/* if pxf_isilon is true, ignore the port in the uri
-	 * and use pxf_service_port instead to access PXF.
-	 */
-	if (pxf_isilon)
-	{
-		sprintf(gphd_uri->port, "%d", pxf_service_port);
-	}
-
-
-
 	/*
 	 * Enrich the curl HTTP header
 	 */

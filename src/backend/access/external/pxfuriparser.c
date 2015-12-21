@@ -361,7 +361,15 @@ GPHDUri_parse_authority(GPHDUri *uri, char **cursor)
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
 				 errmsg("Invalid port: %s for authority host %s",
-						uri->port, uri->host)));	
+						uri->port, uri->host)));
+
+	/* if pxf_isilon is true, ignore the port in the uri
+	 * and use pxf_service_port instead to access PXF.
+	 */
+	if (pxf_isilon)
+	{
+		sprintf(uri->port, "%d", pxf_service_port);
+	}
 }
 
 /*

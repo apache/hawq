@@ -166,17 +166,8 @@ char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs, Rela
 	 * 2. Get the fragments data from the PXF service
 	 */
 	data_fragments = get_data_fragment_list(hadoop_uri, &client_context);
-	/*
-	 * if pxf_isilon == false (example: HDFS)
-	 *   The target port for all fragments is the port
-	 *   supplied in the URI.
-	 * if pxf_isilon == true (example: ISILON)
-	 *   in this case PXF is installed on a proprietary server on the same hosts
-	 *   as the Hawq segments. The target port for all fragments is the port
-	 *   supplied in the GUC.
-	 */
-	int port = pxf_isilon ? pxf_service_port : atoi(hadoop_uri->port);
-	assign_pxf_port_to_fragments(port, data_fragments);
+
+	assign_pxf_port_to_fragments(atoi(hadoop_uri->port), data_fragments);
 
 	/* debug - enable when tracing */
 	print_fragment_list(data_fragments);
@@ -290,14 +281,6 @@ static GPHDUri* init(char* uri, ClientContext* cl_context)
 	 * 1. Cherrypick the data relevant for HADOOP from the input uri
 	 */
 	GPHDUri* hadoop_uri = parseGPHDUri(uri);
-	
-	/* if pxf_isilon is true, ignore the port in the uri
-	 * and use pxf_service_port instead to access PXF.
-	 */
-	if (pxf_isilon)
-	{
-		port_to_str(&(hadoop_uri->port), pxf_service_port);
-	}
 
 	/*
 	 * 2. Communication with the Hadoop back-end
