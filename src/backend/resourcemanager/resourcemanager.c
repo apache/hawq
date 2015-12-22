@@ -2628,7 +2628,9 @@ void updateStatusOfAllNodes() {
         	 */
         	returnAllGRMResourceFromSegment(node);
         	if (Gp_role != GP_ROLE_UTILITY)
+        	{
         		update_segment_status(idx + REGISTRATION_ORDER_OFFSET, SEGMENT_STATUS_DOWN);
+        	}
 
         	elog(LOG, "Resource manager sets host %s from up to down.",
         			  GET_SEGRESOURCE_HOSTNAME(node));

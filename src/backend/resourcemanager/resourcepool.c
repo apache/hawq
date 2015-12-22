@@ -717,11 +717,13 @@ int addHAWQSegWithSegStat(SegStat segstat)
 		Assert(straddr->Address != NULL);
 
 		if (Gp_role != GP_ROLE_UTILITY)
+		{
 			add_segment_config_row(segid+REGISTRATION_ORDER_OFFSET,
 								   hostname,
 								   straddr->Address,
 								   segresource->Stat->Info.port,
 								   SEGMENT_ROLE_PRIMARY);
+		}
 
 		/* Add this node into the io bytes workload BBST structure. */
 		addSegResourceIOBytesWorkloadIndex(segresource);
@@ -743,7 +745,10 @@ int addHAWQSegWithSegStat(SegStat segstat)
 		if ( !IS_SEGSTAT_FTSAVAILABLE(segresource->Stat) )
 		{
 			setSegResHAWQAvailability(segresource, RESOURCE_SEG_STATUS_AVAILABLE);
-			update_segment_status(segresource->Stat->ID + REGISTRATION_ORDER_OFFSET, SEGMENT_STATUS_UP);
+			if (Gp_role != GP_ROLE_UTILITY)
+			{
+				update_segment_status(segresource->Stat->ID + REGISTRATION_ORDER_OFFSET, SEGMENT_STATUS_UP);
+			}
 
 			elog(LOG, "Resource manager sets segment %s(%d) up from down.",
 					  GET_SEGRESOURCE_HOSTNAME(segresource),
