@@ -44,7 +44,8 @@ test__parseGPHDUri__ValidURI(void **state)
 
 	assert_string_equal(parsed->protocol, "pxf");
 	assert_string_equal(parsed->host, "1.2.3.4");
-	assert_string_not_equal(parsed->port, "5678"); /* it should be pxf_service_port */
+	assert_string_equal(parsed->port, "5678");
+	assert_true(parsed->ha_nodes == NULL);
 	assert_string_equal(parsed->data, "some/path/and/table.tbl");
 
 	options = parsed->options;
@@ -73,6 +74,87 @@ test__parseGPHDUri__ValidURI(void **state)
 	assert_true(parsed->fragments == NULL);
 
 	freeGPHDUri(parsed);
+}
+
+/*
+ * Test parsing of valid uri with with nameservice instead of host and port
+ * as given in LOCATION in a PXF external table.
+ */
+void
+test__parseGPHDUri__ValidURI_HA(void **state)
+{
+	char* uri = "pxf://hanameservice/some/path/and/table.tbl?FRAGMENTER=SomeFragmenter&ACCESSOR=SomeAccessor&RESOLVER=SomeResolver&ANALYZER=SomeAnalyzer";
+	List* options = NIL;
+	ListCell* cell = NULL;
+	OptionData* option = NULL;
+
+	/* mock GPHD_HA_load_nodes */
+	NNHAConf* ha_conf = (NNHAConf *)palloc0(sizeof(NNHAConf));
+	ha_conf->nameservice = "hanameservice";
+	ha_conf->numn = 2;
+	ha_conf->nodes = ((char**)palloc0(sizeof(char*) * 2));
+	ha_conf->nodes[0] = "node1";
+	ha_conf->restports = ((char**)palloc0(sizeof(char*) * 2));
+	ha_conf->restports[0] = "1001";
+	expect_string(GPHD_HA_load_nodes, nameservice, "hanameservice");
+	will_return(GPHD_HA_load_nodes, ha_conf);
+
+	/* mock GPHD_HA_release_nodes */
+	expect_value(GPHD_HA_release_nodes, conf, ha_conf);
+	will_be_called(GPHD_HA_release_nodes);
+
+	GPHDUri* parsed = parseGPHDUri(uri);
+
+	assert_true(parsed != NULL);
+	assert_string_equal(parsed->uri, uri);
+
+	assert_string_equal(parsed->protocol, "pxf");
+	assert_string_equal(parsed->host, "node1"); /* value should be taken from ha_nodes */
+	assert_string_equal(parsed->port, "1001"); /* it should be taken from ha_nodes */
+	assert_false(parsed->ha_nodes == NULL);
+	assert_string_equal(parsed->data, "some/path/and/table.tbl");
+
+	freeGPHDUri(parsed);
+
+	/* free NNHAConf */
+	if (ha_conf)
+	{
+		pfree(ha_conf->nodes);
+		pfree(ha_conf->restports);
+		pfree(ha_conf);
+	}
+}
+
+/*
+ * Test parsing of valid uri as given in LOCATION in a PXF external table,
+ * with pxf_isilon set to true.
+ */
+void
+test__parseGPHDUri__ValidURI_Isilon(void **state)
+{
+	char* uri = "pxf://servername:5000/some/path/and/table.tbl?FRAGMENTER=SomeFragmenter&ACCESSOR=SomeAccessor&RESOLVER=SomeResolver&ANALYZER=SomeAnalyzer";
+	List* options = NIL;
+	ListCell* cell = NULL;
+	OptionData* option = NULL;
+
+	/* set pxf_isilon to true */
+	pxf_isilon = true;
+
+	GPHDUri* parsed = parseGPHDUri(uri);
+
+	assert_true(parsed != NULL);
+	assert_string_equal(parsed->uri, uri);
+
+	assert_string_equal(parsed->protocol, "pxf");
+	assert_string_equal(parsed->host, "servername");
+	assert_int_equal(atoi(parsed->port), pxf_service_port); /* it should be pxf_service_port */
+	assert_true(parsed->ha_nodes == NULL);
+	assert_string_equal(parsed->data, "some/path/and/table.tbl");
+
+	freeGPHDUri(parsed);
+
+	/* set pxf_isilon back to false */
+	pxf_isilon = false;
 }
 
 /*
@@ -356,6 +438,8 @@ main(int argc, char* argv[])
 
 	const UnitTest tests[] = {
 			unit_test(test__parseGPHDUri__ValidURI),
+			unit_test(test__parseGPHDUri__ValidURI_HA),
+			unit_test(test__parseGPHDUri__ValidURI_Isilon),
 			unit_test(test__parseGPHDUri__NegativeTestNoProtocol),
 			unit_test(test__parseGPHDUri__NegativeTestNoOptions),
 			unit_test(test__parseGPHDUri__NegativeTestMissingEqual),
