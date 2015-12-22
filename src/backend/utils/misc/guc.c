@@ -6504,7 +6504,7 @@ static struct config_int ConfigureNamesInt[] =
 				NULL
 		},
 		&metadata_cache_check_interval,
-		60, 10, 3600, NULL, NULL
+		30, 10, 3600, NULL, NULL
 	},
 	{
 		{

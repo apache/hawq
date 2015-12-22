@@ -417,9 +417,9 @@ ProcessMetadataCacheCheck()
 
     if (free_block_ratio < metadata_cache_free_block_max_ratio || cache_entry_ratio > metadata_cache_flush_ratio)
     {
-    	if(cache_entry_num == metadata_cache_max_hdfs_file_num)
+    	if(cache_entry_num >= metadata_cache_max_hdfs_file_num)
     	{
-    		elog(WARNING, "[MetadataCache] ProcessMetadataCacheCheck : Metadata cache is full.");
+    		elog(LOG, "[MetadataCache] ProcessMetadataCacheCheck : Metadata cache is full.The cache entry num is:%ld. The metadata_cache_max_hdfs_file_num is:%d", cache_entry_num, metadata_cache_max_hdfs_file_num);
     	}
     	elog(DEBUG1, "[MetadataCache] ProcessMetadataCacheCheck cache_entry_ratio:%f", cache_entry_ratio);
         if (NULL == MetadataCacheLRUList) 
