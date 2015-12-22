@@ -720,7 +720,7 @@ int			optimizer_log_failure;
 double		optimizer_cost_threshold;
 double		optimizer_nestloop_factor;
 double locality_upper_bound;
-int net_disk_ratio;
+double net_disk_ratio;
 bool		optimizer_cte_inlining;
 int		optimizer_cte_inlining_bound;
 double 	optimizer_damping_factor_filter;
@@ -6129,17 +6129,6 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-			{"net_disk_ratio", PGC_USERSET, DEVELOPER_OPTIONS,
-				gettext_noop("set the speed ratio of net against network"),
-	            NULL,
-				GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
-				},
-			&net_disk_ratio,
-			3, 1, 100, NULL, NULL
-	},
-
-
-	{
 		{"server_ticket_renew_interval", PGC_USERSET, CONN_AUTH,
 			gettext_noop("Set the kerberos renew interval"),
 			NULL,
@@ -6856,6 +6845,15 @@ static struct config_real ConfigureNamesReal[] =
 			},
 		&locality_upper_bound,
 		1.2, 1.0, 2.0, NULL, NULL
+	},
+	{
+		{"net_disk_ratio", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("set the scan volumn ratio of disk against network."),
+	        NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&net_disk_ratio,
+		3.0, 1.0, 100.0, NULL, NULL
 	},
 
 /* End-of-list marker */
