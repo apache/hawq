@@ -170,11 +170,11 @@ GetApplicationReportResponse ApplicationClientProtocol::getApplicationReport(
  rpc getContainers (GetContainersRequestProto) returns (GetContainersResponseProto);
 
 message GetContainersRequestProto {
-  optional ApplicationIdProto application_id = 1;
+  optional ApplicationIdProto application_attempt_id = 1;
 }
 
 message GetContainersResponseProto {
-  repeated ContainerReportProto containers_reports = 1;
+  repeated ContainerReportProto containers = 1;
 }
  */
 GetContainersResponse ApplicationClientProtocol::getContainers(GetContainersRequest &request){
