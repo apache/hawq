@@ -716,11 +716,12 @@ int addHAWQSegWithSegStat(SegStat segstat)
 		getSegInfoHostAddrStr(&(segresource->Stat->Info), 0, &straddr);
 		Assert(straddr->Address != NULL);
 
-		add_segment_config_row(segid+REGISTRATION_ORDER_OFFSET,
-							   hostname,
-				               straddr->Address,
-							   segresource->Stat->Info.port,
-							   SEGMENT_ROLE_PRIMARY);
+		if (Gp_role != GP_ROLE_UTILITY)
+			add_segment_config_row(segid+REGISTRATION_ORDER_OFFSET,
+								   hostname,
+								   straddr->Address,
+								   segresource->Stat->Info.port,
+								   SEGMENT_ROLE_PRIMARY);
 
 		/* Add this node into the io bytes workload BBST structure. */
 		addSegResourceIOBytesWorkloadIndex(segresource);
