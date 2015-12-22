@@ -233,7 +233,10 @@ void receivedRUAliveResponse(AsyncCommMessageHandlerContext  context,
 			 */
 			returnAllGRMResourceFromSegment(segres);
 			/* Set the host down in gp_segment_configuration table */
-			update_segment_status(segres->Stat->ID + REGISTRATION_ORDER_OFFSET, SEGMENT_STATUS_DOWN);
+			if (Gp_role != GP_ROLE_UTILITY)
+			{
+				update_segment_status(segres->Stat->ID + REGISTRATION_ORDER_OFFSET, SEGMENT_STATUS_DOWN);
+			}
 			/* Set the host down. */
 			elog(LOG, "Resource manager sets host %s from up to down "
 					  "due to not getting valid RUAlive response.",
@@ -279,7 +282,10 @@ void sentRUAliveError(AsyncCommMessageHandlerContext context)
 		 */
 		returnAllGRMResourceFromSegment(segres);
 		/* Set the host down in gp_segment_configuration table */
-		update_segment_status(segres->Stat->ID + REGISTRATION_ORDER_OFFSET, SEGMENT_STATUS_DOWN);
+		if (Gp_role != GP_ROLE_UTILITY)
+		{
+			update_segment_status(segres->Stat->ID + REGISTRATION_ORDER_OFFSET, SEGMENT_STATUS_DOWN);
+		}
 		/* Set the host down. */
 		elog(LOG, "Resource manager sets host %s from up to down "
 				  "due to communication error.",
