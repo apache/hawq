@@ -196,7 +196,6 @@ class HawqInit:
             conn.close()
         except DatabaseError, ex:
             logger.error("Failed to connect to database, this script can only be run when the database is up")
-            sys.exit(1)
 
         for row in rows:
             if row[0] == 's':
@@ -262,8 +261,12 @@ class HawqInit:
         # Sync config files from master.
         scpcmd = "scp %s/etc/_mgmt_config %s:%s/etc/_mgmt_config > /dev/null" % \
                  (self.GPHOME, self.standby_host_name, self.GPHOME)
-        check_return_code(remote_ssh(scpcmd, self.master_host_name, self.user), \
+        check_return_code(local_ssh(scpcmd, logger, warning = True), \
                           logger, "Sync _mgmt_config failed")
+        scpcmd = "scp %s/etc/hawq-site.xml %s:%s/etc/hawq-site.xml > /dev/null" % \
+                 (self.GPHOME, self.standby_host_name, self.GPHOME)
+        check_return_code(remote_ssh(scpcmd, self.master_host_name, self.user), \
+                          logger, "Sync hawq-site.xml failed")
         scpcmd = "scp %s/etc/slaves %s:%s/etc/slaves > /dev/null" % \
                  (self.GPHOME, self.standby_host_name, self.GPHOME)
         check_return_code(remote_ssh(scpcmd, self.master_host_name, self.user), \
@@ -587,7 +590,7 @@ class HawqStop:
         segment_pid_file_path = self.segment_data_directory + '/postmaster.pid'
 
         if check_file_exist(segment_pid_file_path, host, logger):
-            if not check_postgres_running(self.GPHOME, self.segment_data_directory, self.user, host, logger):
+            if not check_postgres_running(self.segment_data_directory, self.user, host, logger):
                 logger.warning("Have a postmaster.pid file but no segment process running")
 
                 lockfile="/tmp/.s.PGSQL.%s" % self.segment_port
@@ -599,7 +602,7 @@ class HawqStop:
                 segment_running = True
 
         else:
-            if check_postgres_running(self.GPHOME, self.segment_data_directory, self.user, host, logger):
+            if check_postgres_running(self.segment_data_directory, self.user, host, logger):
                 logger.warning("postmaster.pid file does not exist, but hawq process running.")
                 segment_running = True
             else:
@@ -878,36 +881,83 @@ def hawq_init(opts, hawq_dict):
 
 
 def hawq_activate_standby(opts, hawq_dict):
-    cmd = "%s; hawq stop cluster -a -M fast;" % source_hawq_env
-    result = local_ssh(cmd, logger)
-    if result != 0:
-        logger.debug("Stop cluster failed, try to stop it immediately")
-        cmd = "%s; hawq stop cluster -a -M immediate;" % source_hawq_env
-        check_return_code(local_ssh(cmd, logger), logger, "Stop cluster failed, exit")
+    old_master_host_name = hawq_dict['hawq_master_address_host']
+    hawq_master_directory = hawq_dict['hawq_master_directory']
+    if 'hawq_standby_address_host' in hawq_dict:
+        if hawq_dict['hawq_standby_address_host'].lower() not in ['none', '', 'localhost']:
+            old_standby_host_name = hawq_dict['hawq_standby_address_host']
+            new_master_host_name = hawq_dict['hawq_standby_address_host']
+            logger.info("Starting to activate standby master '%s'" % old_standby_host_name)
+        else:
+            logger.error("No valid standby host name found, skip activate standby")
 
+    # Try to stop hawq cluster before doing standby activate.
+    if check_postgres_running(hawq_master_directory, '', old_master_host_name, logger):
+        logger.info("Try to stop hawq master before activate standby")
+        cmd = "%s; hawq stop master -a -M fast -q;" % source_hawq_env
+        result = remote_ssh(cmd, old_master_host_name, '')
+        if result != 0:
+            logger.error("Stop master failed, try again with immediate mode")
+            cmd = "%s; hawq stop master -a -M immediate -q;" % source_hawq_env
+            return_result = remote_ssh(cmd, old_master_host_name, '')
+            if return_resutl != 0:
+                logger.error("Stop master failed, abort")
+                logger.error("Please manually bring hawq cluster down, then do activate standby again")
+                sys.exit(1)
+
+        logger.info("Master is stopped")
+    else:
+        logger.info("HAWQ master is not running, skip")
+
+    cmd = "%s; hawq stop allsegments -a -M fast -q;" % source_hawq_env
+    result = remote_ssh(cmd, old_standby_host_name, '')
+    if result != 0:
+        logger.error("Stop segments failed, abort")
+        logger.error("Please manually bring hawq cluster down, then do activate standby again")
+        sys.exit(1)
+
+    if check_syncmaster_running(hawq_master_directory, '', old_standby_host_name, logger):
+        cmd = "%s; hawq stop standby -a -M fast -q;" % source_hawq_env
+        result = remote_ssh(cmd, old_standby_host_name, '')
+        if result != 0:
+            logger.error("Stop standby failed, abort")
+            logger.error("Please manually bring hawq cluster down, then do activate standby again")
+            sys.exit(1)
+    else:
+        logger.info("Standby master is not running, skip")
+    
+    # Set current standby host name as the new master host name in configuration.
+    logger.info("Update master host name in hawq-site.xml")
     cmd = "%s; hawq config -c hawq_master_address_host -v %s --skipvalidation -q" % \
            (source_hawq_env, hawq_dict['hawq_standby_address_host'])
-    check_return_code(local_ssh(cmd, logger), logger, "Set hawq_master_address_host failed")
+    check_return_code(remote_ssh(cmd, old_standby_host_name, ''), logger, "Set hawq_master_address_host failed")
 
-    cmd = "%s; hawq config -c hawq_standby_address_host -v %s --skipvalidation -q" % \
-           (source_hawq_env, 'none')
-    check_return_code(local_ssh(cmd, logger), logger, "Set hawq_standby_address_host failed")
+    # Remove the old standby host configuration from hawq-site.xml.
+    logger.info("Remove current standby from hawq-site.xml")
+    cmd = "%s; hawq config -r hawq_standby_address_host --skipvalidation -q" % source_hawq_env
+    check_return_code(remote_ssh(cmd, old_standby_host_name, ''), logger, "Remove hawq_standby_address_host from configuration failed")
 
     cmd = '''echo "gp_persistent_repair_global_sequence = true" >> %s/%s''' % (hawq_dict['hawq_master_directory'], 'postgresql.conf')
-    check_return_code(local_ssh(cmd, logger), logger, "Set gp_persistent_repair_global_sequence = true failed")
+    check_return_code(remote_ssh(cmd, old_standby_host_name, ''), logger, "Set gp_persistent_repair_global_sequence = true failed")
 
+    # Start the new master in master only mode.
+    cmd = "%s; hawq start master --masteronly" % source_hawq_env
+    check_return_code(remote_ssh(cmd, new_master_host_name, ''), logger, "Start master in master only mode failed")
+
+    # Remove the old standby information in database.
+    cmd = "%s; env PGOPTIONS=\\\"-c gp_session_role=utility\\\" psql -p %s -d template1 -c \\\"select gp_remove_master_standby()\
+            where (select count(*) from gp_segment_configuration where role='s') = 1;\\\"" % (source_hawq_env, hawq_dict['hawq_master_address_port'])
+    result = remote_ssh(cmd, new_master_host_name, '')
+
+    # Try to restart hawq cluster.
+    cmd = "%s; hawq stop master -a -M fast" % source_hawq_env
+    check_return_code(remote_ssh(cmd, new_master_host_name, ''), logger, "Stop master failed")
     cmd = "%s; hawq start master" % source_hawq_env
-    check_return_code(local_ssh(cmd, logger), logger, "Start master failed")
-
-    cmd = "%s; env PGOPTIONS=\"-c gp_session_role=utility\" psql -p %s -d template1 -c \"select gp_remove_master_standby()\
-            where (select count(*) from gp_segment_configuration where role='s') = 1;\"" % (source_hawq_env, hawq_dict['hawq_master_address_port'])
-    result = local_ssh(cmd, logger)
-    cmd = "%s; hawq stop master -a" % source_hawq_env
-    check_return_code(local_ssh(cmd, logger), logger, "Stop master failed")
-    cmd = "%s; hawq start cluster" % source_hawq_env
-    check_return_code(local_ssh(cmd, logger), logger, "Start cluster failed")
+    check_return_code(remote_ssh(cmd, new_master_host_name, ''), logger, "Start master failed")
+    cmd = "%s; hawq start allsegments" % source_hawq_env
+    check_return_code(remote_ssh(cmd, new_master_host_name, ''), logger, "Start all the segments failed")
     cmd = '''sed -i "/gp_persistent_repair_global_sequence/d" %s/%s''' % (hawq_dict['hawq_master_directory'], 'postgresql.conf')
-    check_return_code(local_ssh(cmd, logger))
+    check_return_code(remote_ssh(cmd, new_master_host_name, ''))
     return None
 
 

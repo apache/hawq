@@ -26,6 +26,8 @@ source ${GPHOME}/bin/lib/hawq_bash_functions.sh
 SOURCE_PATH="source ${GPHOME}/greenplum_path.sh"
 ${SOURCE_PATH}
 
+host_name=`${HOSTNAME}`
+
 if [ -f /etc/redhat-release ]; then
     os_version=`${CAT} /etc/redhat-release | ${AWK} '{print substr($7,0,1)}'`
 else
@@ -380,12 +382,12 @@ segment_init() {
     for tmp_path in `${ECHO} ${hawqSegmentTemp} | sed 's|,| |g'`; do
         if [ ! -d ${tmp_path} ]; then
             ${ECHO} "Temp directory is not exist, please create it" | tee -a ${SEGMENT_LOG_FILE}
-            ${ECHO} "Segment init failed on ${HOSTNAME}"
+            ${ECHO} "Segment init failed on ${host_name}"
             exit 1
         else
            if [ ! -w "${tmp_path}" ]; then 
                ${ECHO} "Do not have write permission to temp directory, please check" | tee -a ${SEGMENT_LOG_FILE}
-               ${ECHO} "Segment init failed on ${HOSTNAME}"
+               ${ECHO} "Segment init failed on ${host_name}"
                exit 1
            fi
         fi
@@ -399,7 +401,7 @@ segment_init() {
 
     if [ $? -ne 0 ] ; then
         ${ECHO} "Postgres initdb failed" | tee -a ${SEGMENT_LOG_FILE}
-        ${ECHO} "Segment init failed on ${HOSTNAME}"
+        ${ECHO} "Segment init failed on ${host_name}"
         exit 1
     fi
 
@@ -409,7 +411,7 @@ segment_init() {
          " -p ${hawq_port} --silent-mode=true -M segment -i" start >> ${SEGMENT_LOG_FILE}
 
     if [ $? -ne 0  ] ; then
-        ${ECHO} "Segment init failed on ${HOSTNAME}" | tee -a ${SEGMENT_LOG_FILE}
+        ${ECHO} "Segment init failed on ${host_name}" | tee -a ${SEGMENT_LOG_FILE}
         exit 1
     fi
     }
@@ -426,7 +428,7 @@ check_data_directorytory() {
     # Check if data directory already exist and clean.
     if [ -d ${hawq_data_directory} ]; then
         if [ "$(ls -A ${hawq_data_directory})" ] && [ "${hawq_data_directory}" != "" ]; then
-             ${ECHO} "Data directory ${hawq_data_directory} is not empty on ${HOSTNAME}"
+             ${ECHO} "Data directory ${hawq_data_directory} is not empty on ${host_name}"
              exit 1
         fi
     else

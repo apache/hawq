@@ -140,7 +140,7 @@ def check_return_code(result, logger = None,  error_msg = None, info_msg = None,
     return result
 
 
-def check_postgres_running(GPHOME, data_directory, user, host = 'localhost', logger = None):
+def check_postgres_running(data_directory, user, host = 'localhost', logger = None):
     cmd='ps -ef | grep postgres | grep %s | grep -v grep > /dev/null || exit 1;' % data_directory
     result = remote_ssh(cmd, host, user)
     if result == 0:
@@ -151,7 +151,7 @@ def check_postgres_running(GPHOME, data_directory, user, host = 'localhost', log
         return False
 
 
-def check_syncmaster_running(GPHOME, data_directory, user, host = 'localhost', logger = None):
+def check_syncmaster_running(data_directory, user, host = 'localhost', logger = None):
     cmd='ps -ef | grep gpsyncmaster | grep %s | grep -v grep > /dev/null || exit 1;' % data_directory
     result = remote_ssh(cmd, host, user)
     if result == 0:
