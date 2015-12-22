@@ -5,10 +5,9 @@ top_builddir = ..
 include $(top_builddir)/src/Makefile.global
 
 WANTED_DIRS = \
-		pgbench \
 		orafce \
 		extprotocol \
-		gp_cancel_query
+		gp_cancel_query \
 		gp_mdver \
 		hawq-hadoop
 
