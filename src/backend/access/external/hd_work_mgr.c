@@ -166,7 +166,8 @@ char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs, Rela
 	 * 2. Get the fragments data from the PXF service
 	 */
 	data_fragments = get_data_fragment_list(hadoop_uri, &client_context);
-	assign_pxf_port_to_fragments(pxf_service_port, data_fragments);
+
+	assign_pxf_port_to_fragments(atoi(hadoop_uri->port), data_fragments);
 
 	/* debug - enable when tracing */
 	print_fragment_list(data_fragments);
@@ -174,12 +175,12 @@ char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs, Rela
 	/*
 	 * 3. Finally, call the actual work allocation algorithm
 	 */
-	  segs_data = distribute_work_2_gp_segments(data_fragments, total_segs, working_segs);
+	segs_data = distribute_work_2_gp_segments(data_fragments, total_segs, working_segs);
 
 	/*
 	 * 4. For each segment transform the list of allocated fragments into an output string
 	 */
-	  segs_work_map = create_output_strings(segs_data, total_segs);
+	segs_work_map = create_output_strings(segs_data, total_segs);
 
 	/*
 	 * 5. Release memory
@@ -280,7 +281,7 @@ static GPHDUri* init(char* uri, ClientContext* cl_context)
 	 * 1. Cherrypick the data relevant for HADOOP from the input uri
 	 */
 	GPHDUri* hadoop_uri = parseGPHDUri(uri);
-	
+
 	/*
 	 * 2. Communication with the Hadoop back-end
 	 *    Initialize churl client context and header
