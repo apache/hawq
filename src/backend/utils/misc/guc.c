@@ -6540,7 +6540,7 @@ static struct config_int ConfigureNamesInt[] =
 				NULL
 		},
 		&metadata_cache_max_hdfs_file_num,
-		524288, 32768, 8388608, NULL, NULL
+		524288, 131072, 8388608, NULL, NULL
 	},
 
 	/* End-of-list marker */
