@@ -131,7 +131,7 @@ PrepareQuery(PrepareStmt *stmt, const char *queryString)
 	query_list_copy = copyObject(query_list); /* planner scribbles on query tree */
 	
 	/* Generate plans for queries.	Snapshot is already set. */
-	plan_list = pg_plan_queries(query_list, NULL, false, QRL_NONE);
+	plan_list = pg_plan_queries(query_list, NULL, true, QRL_NONE);
 	
 	/*
 	 * Save the results.  We don't have the query string for this PREPARE, but
@@ -202,7 +202,7 @@ ExecuteQuery(ExecuteStmt *stmt, const char *queryString,
 			query->intoClause = copyObject(stmt->into);
 		}
 		
-		stmt_list = pg_plan_queries(query_list, paramLI, false, QRL_ONCE);
+		stmt_list = pg_plan_queries(query_list, paramLI, true, QRL_ONCE);
 	}
 
 	/*
@@ -668,7 +668,7 @@ ExplainExecuteQuery(ExecuteStmt *execstmt, ExplainStmt *stmt, const char * query
 	
 	
 	query_list = copyObject(entry->query_list); /* planner scribbles on query tree */
-	stmt_list = pg_plan_queries(query_list, paramLI, false, QRL_ONCE);
+	stmt_list = pg_plan_queries(query_list, paramLI, true, QRL_ONCE);
 	
 	Assert(list_length(query_list) == list_length(stmt_list));
 

@@ -1645,7 +1645,7 @@ exec_simple_query(const char *query_string, const char *seqServerHost, int seqSe
 		querytree_list = pg_analyze_and_rewrite(parsetree, query_string,
 												NULL, 0);
 
-		plantree_list = pg_plan_queries(querytree_list, NULL, false, QRL_ONCE);
+		plantree_list = pg_plan_queries(querytree_list, NULL, true, QRL_ONCE);
 
 		/* Done with the snapshot used for parsing/planning */
 		ActiveSnapshot = NULL;
