@@ -850,14 +850,6 @@ pg_plan_query(Query *querytree, ParamListInfo boundParams, QueryResourceLife res
 /*
  * Generate plans for a list of already-rewritten queries.
  *
- * If needSnapshot is TRUE, we haven't yet set a snapshot for the current
- * query.  A snapshot must be set before invoking the planner, since it
- * might try to evaluate user-defined functions.  But we must not set a
- * snapshot if the list contains only utility statements, because some
- * utility statements depend on not having frozen the snapshot yet.
- * (We assume that such statements cannot appear together with plannable
- * statements in the rewriter's output.)
- *
  * Normal optimizable statements generate PlannedStmt entries in the result
  * list.  Utility statements are simply represented by their statement nodes.
  */
@@ -873,6 +865,15 @@ pg_plan_queries(List *querytrees, ParamListInfo boundParams,
 		Query	   *query = (Query *) lfirst(query_list);
 		Node *stmt;
 
+		/*
+		 * If needSnapshot is TRUE, we haven't yet set a snapshot for the current
+		 * query.  A snapshot must be set before invoking the planner, since it
+		 * might try to evaluate user-defined functions.  But we must not set a
+		 * snapshot if the list contains only utility statements, because some
+		 * utility statements depend on not having frozen the snapshot yet.
+		 * (We assume that such statements cannot appear together with plannable
+		 * statements in the rewriter's output.)
+		 */
 		if (query->commandType == CMD_UTILITY)
 		{
 			/* Utility commands have no plans. */
