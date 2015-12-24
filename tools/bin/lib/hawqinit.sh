@@ -352,16 +352,7 @@ standby_init() {
     else
         LOG_MSG "[INFO]:-HAWQ master stopped" verbose
     fi
-    
-    ${SSH} -o 'StrictHostKeyChecking no' ${hawqUser}@${master_host_name} \
-        "${SOURCE_PATH}; hawq start master -a;" >> ${STANDBY_LOG_FILE}
-    if [ $? -ne 0 ] ; then
-        LOG_MSG "[ERROR]:-Start HAWQ master failed" verbose
-        exit 1
-    else
-        LOG_MSG "[INFO]:-HAWQ master started" verbose
-    fi
-
+ 
     ${SSH} -o 'StrictHostKeyChecking no' ${hawqUser}@${master_host_name} \
         "${SOURCE_PATH}; hawq start standby -a;" >> ${STANDBY_LOG_FILE}
     if [ $? -ne 0 ] ; then
@@ -369,6 +360,17 @@ standby_init() {
         exit 1
     else
         LOG_MSG "[INFO]:-HAWQ standby started" verbose
+    fi
+
+    sleep 5
+
+    ${SSH} -o 'StrictHostKeyChecking no' ${hawqUser}@${master_host_name} \
+        "${SOURCE_PATH}; hawq start master -a;" >> ${STANDBY_LOG_FILE}
+    if [ $? -ne 0 ] ; then
+        LOG_MSG "[ERROR]:-Start HAWQ master failed" verbose
+        exit 1
+    else
+        LOG_MSG "[INFO]:-HAWQ master started" verbose
     fi
 
     ${SSH} -o 'StrictHostKeyChecking no' ${hawqUser}@${master_host_name} \
