@@ -267,6 +267,7 @@ int max_filecount_notto_split_segment;
 int min_datasize_to_combine_segment;
 int datalocality_algorithm_version;
 int hash_to_random_flag;
+int min_cost_for_each_query;
 bool metadata_cache_enable;
 int metadata_cache_block_capacity;
 

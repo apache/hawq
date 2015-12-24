@@ -6273,6 +6273,16 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
+			{"min_cost_for_each_query", PGC_USERSET, DEVELOPER_OPTIONS,
+				gettext_noop("Sets min cost(MB) for each query which is utilized by RM"),
+				NULL,
+				GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+			},
+			&min_cost_for_each_query,
+			128, 1, 1024 ,NULL, NULL
+	},
+
+	{
 			{"datalocality_algorithm_version", PGC_USERSET, DEVELOPER_OPTIONS,
 				gettext_noop("Sets dalocality algorithm version default is 1(For DEBUG)"),
 				NULL,
