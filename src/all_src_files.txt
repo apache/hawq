@@ -1450,6 +1450,7 @@ bin/gpfusion/common.h
 bin/gpfusion/gpbridgeapi.c
 bin/gpfusion/gpdbwritableformatter.c
 bin/gpfusion/pxf.c
+bin/gpmirrortransition/gpmirrortransition.c
 bin/gpupgrade/gpmodcatversion.c
 bin/gpupgrade/gpviewcp.c
 bin/initdb/initdb.c

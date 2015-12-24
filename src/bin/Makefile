@@ -15,7 +15,7 @@ include $(top_builddir)/src/Makefile.global
 
 DIRS = initdb ipcclean pg_ctl pg_dump pgbench \
 	psql scripts pg_config pg_controldata pg_resetxlog \
-	gpfilesystem/hdfs gpupgrade \
+	gpfilesystem/hdfs gpmirrortransition gpupgrade \
 	gpfusion gp_workfile_mgr gpcheckhdfs gpfdist
 
 all install installdirs uninstall distprep clean distclean maintainer-clean:
