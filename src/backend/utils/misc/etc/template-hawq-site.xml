@@ -124,6 +124,18 @@ under the License.
 		<value>hawq</value>
 		<description>The application name to register hawq resource manager in YARN.</description>
 	</property>
+
+    <property>
+        <name>hawq_rm_master_port</name>
+        <value>5437</value>
+        <description>The resource manager master server port number.</description>
+    </property>
+
+    <property>
+        <name>hawq_rm_segment_port</name>
+        <value>5438</value>
+        <description>The resource manager segment server port number.</description>
+    </property>
 	<!-- HAWQ resource manager parameters end here. -->
 
 	<!-- HAWQ resource enforcement parameters -->
