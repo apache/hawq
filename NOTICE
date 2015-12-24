@@ -23,6 +23,7 @@ SECTION 1: Apache License, V2.0
    >>> log4j
    >>> gradle
    >>> gradle-download-task
+   >>> gradlew
    >>> Jackson JSON processor databind
    >>> Powermock
    >>> Parquet
@@ -233,6 +234,11 @@ limitations under the License.
 The plugin is licensed under the Apache License, Version 2.0.
 
 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+
+>>> gradlew
+The wrapper script is licensed under the Apache License, Version 2.0.
+
+It was obtained from Apache Bigtop project.
 
 >>> Jackson JSON processor databind
 This copy of Jackson JSON processor databind module is licensed under the
