@@ -308,7 +308,7 @@ def buildNumber() {
 }
 
 task wrapper(type: Wrapper) {
-    gradleVersion = '2.5'
+    gradleVersion = '2.10'
 }
 
 def distSubprojects = subprojects - project(':pxf-api')
