@@ -2675,6 +2675,30 @@ readNextStringFromString(char *buf, int *offsetInOut, int length)
 	return result;
 }
 
+#ifdef FAULT_INJECTOR
+/**
+ *  Returns 0 if the string could not be read and sets *wasRead (if wasRead is non-NULL) to false
+ */
+static int
+readIntFromString( char *buf, int *offsetInOut, int length, bool *wasRead)
+{
+	int res;
+	char *val = readNextStringFromString(buf, offsetInOut, length);
+	if (val == NULL)
+	{
+		if (wasRead)
+			*wasRead = false;
+		return 0;
+	}
+
+	if (wasRead)
+		*wasRead = true;
+	res = atoi(val);
+	pfree(val);
+	return res;
+}
+#endif
+
 static void sendPrimaryMirrorTransitionResult( const char *msg)
 {
 	StringInfoData buf;
@@ -2792,7 +2816,6 @@ static void processTransitionRequest_getFaultInjectStatus(void * buf, int *offse
 static void
 processTransitionRequest_faultInject(void * inputBuf, int *offsetPtr, int length)
 {
-#undef FAULT_INJECTOR
 #ifdef FAULT_INJECTOR
 	bool wasRead;
 	char *faultName = readNextStringFromString(inputBuf, offsetPtr, length);
