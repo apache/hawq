@@ -278,6 +278,10 @@ int metadata_cache_refresh_max_num;
 double metadata_cache_free_block_max_ratio;
 double metadata_cache_free_block_normal_ratio;
 
+int metadata_cache_max_hdfs_file_num;
+double metadata_cache_flush_ratio;
+double metadata_cache_reduce_ratio;
+
 char *metadata_cache_testfile;
 bool debug_fake_datalocality;
 bool datalocality_remedy_enable;

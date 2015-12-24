@@ -6483,7 +6483,7 @@ static struct config_int ConfigureNamesInt[] =
 				NULL
 		},
 		&metadata_cache_check_interval,
-		60, 10, 3600, NULL, NULL
+		30, 10, 3600, NULL, NULL
 	},
 	{
 		{
@@ -6512,6 +6512,15 @@ static struct config_int ConfigureNamesInt[] =
 		&metadata_cache_refresh_max_num,
 		1000, 1, 10000, NULL, NULL
 	},
+	{
+		{
+			"hawq_metadata_cache_max_hdfs_file_num", PGC_POSTMASTER, DEVELOPER_OPTIONS,
+				gettext_noop("max hdfs file num in metadata."),
+				NULL
+		},
+		&metadata_cache_max_hdfs_file_num,
+		524288, 131072, 8388608, NULL, NULL
+	},
 
 	/* End-of-list marker */
 	{
@@ -6537,6 +6546,22 @@ static struct config_real ConfigureNamesReal[] =
 		},
 		&metadata_cache_free_block_normal_ratio,
 		0.2, 0.05, 1.0, NULL, NULL
+	},
+	{
+		{"hawq_metadata_cache_flush_ratio", PGC_POSTMASTER, DEVELOPER_OPTIONS,
+				gettext_noop("metadata cache flush ratio."),
+				NULL
+		},
+		&metadata_cache_flush_ratio,
+		0.85, 0.50, 1.0, NULL, NULL
+	},
+	{
+		{"hawq_metadata_cache_reduce_ratio", PGC_POSTMASTER, DEVELOPER_OPTIONS,
+				gettext_noop("metadata cache reduce ratio."),
+				NULL
+		},
+		&metadata_cache_reduce_ratio,
+		0.7, 0.50, 1.0, NULL, NULL
 	},
 
 	{

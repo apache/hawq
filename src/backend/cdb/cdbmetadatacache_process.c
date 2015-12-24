@@ -410,11 +410,18 @@ ProcessMetadataCacheCheck()
     HdfsFileInfo *file_info;
 
     double free_block_ratio = (FREE_BLOCK_NUM * 1.0) / metadata_cache_block_capacity;
+    long cache_entry_num = hash_get_num_entries(MetadataCache);
+    double cache_entry_ratio = (cache_entry_num * 1.0) / metadata_cache_max_hdfs_file_num;
 
     elog(DEBUG1, "[MetadataCache] ProcessMetadataCacheCheck free_block_ratio:%f", free_block_ratio);
 
-    if (free_block_ratio < metadata_cache_free_block_max_ratio)
+    if (free_block_ratio < metadata_cache_free_block_max_ratio || cache_entry_ratio > metadata_cache_flush_ratio)
     {
+    	if(cache_entry_num >= metadata_cache_max_hdfs_file_num)
+    	{
+    		elog(LOG, "[MetadataCache] ProcessMetadataCacheCheck : Metadata cache is full.The cache entry num is:%ld. The metadata_cache_max_hdfs_file_num is:%d", cache_entry_num, metadata_cache_max_hdfs_file_num);
+    	}
+    	elog(DEBUG1, "[MetadataCache] ProcessMetadataCacheCheck cache_entry_ratio:%f", cache_entry_ratio);
         if (NULL == MetadataCacheLRUList) 
         {
             GenerateMetadataCacheLRUList();
@@ -436,7 +443,10 @@ ProcessMetadataCacheCheck()
             DestroyHdfsFileInfo(file_info);
             total_remove_files++;
 
-            if (((FREE_BLOCK_NUM * 1.0) / metadata_cache_block_capacity) >= metadata_cache_free_block_normal_ratio)
+            double cache_entry_ratio = hash_get_num_entries(MetadataCache) / metadata_cache_max_hdfs_file_num;
+
+            if (((FREE_BLOCK_NUM * 1.0) / metadata_cache_block_capacity) >= metadata_cache_free_block_normal_ratio
+            		&& cache_entry_ratio < metadata_cache_reduce_ratio)
             {
                 break;
             }
